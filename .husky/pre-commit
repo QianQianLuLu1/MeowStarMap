@@ -1,0 +1,17 @@
+# ============================================================
+# pre-commit 钩子
+# 钩子职责：对暂存区文件运行 lint-staged（eslint + prettier）
+# 跳过策略：当 commit message 包含 [skip lint] 时本钩子仍执行（仅 commit-msg 可被跳过）
+# 失败处理：lint-staged 任一步骤失败即阻止提交
+# 详见：docs/code-comment-rule.md 第七节「批量清理操作步骤」
+# ============================================================
+
+npx --no-install lint-staged || (
+  echo ""
+  echo "================================================"
+  echo " [pre-commit] lint-staged 检查未通过"
+  echo " 请修复上述错误后重新提交"
+  echo " 提示：npm run lint:fix 可自动修复部分问题"
+  echo "================================================"
+  exit 1
+)

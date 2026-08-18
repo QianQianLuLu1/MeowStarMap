@@ -1,0 +1,10 @@
+dist/
+release/
+node_modules/
+node20/
+*.min.js
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+src/renderer/assets/cloth-names.json
+src/renderer/assets/outfit-names.json

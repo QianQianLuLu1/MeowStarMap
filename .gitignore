@@ -1,0 +1,136 @@
+# ===== Dependencies =====
+node_modules/
+.npm-cache/
+
+# ===== Build output =====
+dist/
+release/
+# Playwright 冒烟测试产物（截图/视频/诊断日志）
+test-results/
+playwright-report/
+release-v*/
+release-new/
+out/
+build/
+build-output/
+
+# ===== Debug temp files (root only) =====
+/media-handler.js
+/query-db-temp.cjs
+/index.html
+/__probe2.txt
+/__wtest.tmp
+
+# ===== Cache & temp =====
+.cache/
+.eslintcache
+.stylelintcache
+node_modules/.cache/
+.electron-cache/
+.electron-gyp/
+.vite/
+*.tmp
+backup/
+*.bak
+*.swp
+*~
+# TypeScript 增量编译缓存，不入库
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# ===== Logs =====
+*.log
+logs/
+
+# ===== Runtime data =====
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ===== Package/share output =====
+.trae-html-share-packages/
+*.zip
+
+# ===== Node runtime bundle =====
+node20/
+node20.zip
+
+# ===== Test & debug artifacts =====
+test_*.png
+test_*.py
+test-*.txt
+test-*.js
+poc-*.js
+test_screenshot.png
+test_preview.png
+test_preview.py
+test_run*.png
+test_debug.py
+
+# ===== Generated artifacts =====
+project-issues-fix-guide/
+Others/
+
+# ===== IDE config =====
+.idea/
+.vscode/
+*.code-workspace
+
+# ===== OS =====
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# ===== Env vars =====
+.env
+.env.local
+.env.*.local
+
+# ===== Vite preview build intermediary (local only) =====
+preview.html
+preview/
+
+# ===== Test temp files (tsconfck/vitest typecheck temp copies) =====
+vitest.config.ts.timestamp-*.mjs
+
+# ===== Typecheck-test backup dir =====
+dist__bak*/
+
+# ===== Local AI agent workspace (本地记忆与 Agent 状态，含隐私，不得入仓) =====
+.workbuddy*/
+.workbuddy-ai/
+
+# ===== Stale analysis/report leftovers (一次性分析产物，不入仓) =====
+pre-packaging-analysis.html
+
+# ===== Debug leftover test files =====
+**/__dbg*.test.ts
+
+# ===== Vite build temp intermediary =====
+vite.config.ts.timestamp-*.mjs
+
+# ===== Git rescue / worktree backups (本地恢复产物，不入仓) =====
+.git-backup-*/
+.git-rescue-*/
+.worktree-backup-*/
+
+# ===== Local code index (工具生成的本地索引) =====
+.codegraph/
+.qoder/
+
+# ===== Runtime user data (Chromium 运行时数据，不入仓) =====
+.verify-userdata/
+
+# ===== Service error logs (一次性诊断输出，不入仓) =====
+/svc-errors.txt
+
+# ===== Debug probe files (泛化，覆盖历史 __probe2.txt / __wtest.tmp) =====
+__*.tmp
+__probe*.txt
+
+# ===== 本地 AI 工具产物（不得入仓）=====
+.mimosa/
+.trae/
+.review/
+.codebuddy/

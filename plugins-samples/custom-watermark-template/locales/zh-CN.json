@@ -1,0 +1,7 @@
+{
+  "cwt": {
+    "festival": { "name": "节日纪念水印" },
+    "signature": { "name": "个人签名水印" },
+    "datestamp": { "name": "当日日期戳" }
+  }
+}

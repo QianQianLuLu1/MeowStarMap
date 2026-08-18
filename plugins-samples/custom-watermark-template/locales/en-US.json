@@ -1,0 +1,7 @@
+{
+  "cwt": {
+    "festival": { "name": "Festival Memorial Watermark" },
+    "signature": { "name": "Personal Signature Watermark" },
+    "datestamp": { "name": "Today Date Stamp" }
+  }
+}

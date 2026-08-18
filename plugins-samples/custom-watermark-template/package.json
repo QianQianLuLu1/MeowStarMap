@@ -1,0 +1,22 @@
+{
+  "name": "custom-watermark-template",
+  "version": "1.0.0",
+  "description": "NikkiGallery 自定义水印模板示例插件",
+  "author": "NikkiGallery",
+  "license": "MIT",
+  "main": "index.js",
+  "type": "module",
+  "activationPoints": [
+    "init"
+  ],
+  "nikkiGallery": {
+    "engines": "^2.3.0",
+    "permissions": [
+      "watermark:apply"
+    ],
+    "extensionPoints": [
+      "watermark.template"
+    ],
+    "i18n": "./locales"
+  }
+}

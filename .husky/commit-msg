@@ -1,0 +1,37 @@
+# ============================================================
+# commit-msg 钩子
+# 钩子职责：校验提交信息是否符合 Conventional Commits 规范
+# 配置文件：commitlint.config.js
+# 模板文件：.gitmessage（通过 git config commit.template 启用）
+# 失败处理：校验失败即阻止提交，输出错误详情
+# 详见：docs/code-comment-rule.md 第九节「提交规范」
+# ============================================================
+
+# Windows 环境下 commit-msg 文件路径作为 $1 传入
+# 使用 npx 调用本地安装的 commitlint
+npx --no-install commitlint --edit "$1" || (
+  echo ""
+  echo "================================================"
+  echo " [commit-msg] 提交信息不符合 Conventional Commits 规范"
+  echo ""
+  echo " 正确格式：<type>(<scope>): <subject>"
+  echo ""
+  echo " type 可选值："
+  echo "   feat / fix / docs / style / refactor / perf"
+  echo "   test / build / ci / chore / revert / i18n / release"
+  echo ""
+  echo " scope 推荐值："
+  echo "   main / renderer / shared / scanner / ipc / db / editor"
+  echo "   gallery / video / share / watermark / i18n / theme"
+  echo "   comments / deps / config"
+  echo ""
+  echo " 示例："
+  echo "   feat(scanner): 新增 Epic 游戏目录自动检测"
+  echo "   fix(db): 修复扫描完成后未触发 scanner:complete 事件"
+  echo "   chore(comments): 清理 src/main/services 冗余注释"
+  echo ""
+  echo " 详见：.gitmessage 模板 / docs/code-comment-rule.md"
+  echo " 或使用交互式提交：npm run commit"
+  echo "================================================"
+  exit 1
+)
