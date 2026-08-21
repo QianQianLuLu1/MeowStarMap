@@ -1237,6 +1237,9 @@
       "buildTools": "Build-Toolchain",
       "checkUpdate": "Auf Updates prüfen",
       "checkUpdateHint": "Öffnet das GitHub-Repository im Browser; bitte neueste Version manuell herunterladen",
+      "updateTitle": "Aktualisierung",
+      "updateNetworkBusy": "Netzwerk ist ausgelastet. Klicken Sie auf OK, um zur Website zu gelangen.",
+      "updateNoNewVersion": "Sie verwenden bereits die neueste Version",
       "contactDesc": "GitHub-Repository, QQ-Gruppe und soziale Medien",
       "contactTitle": "Kontakt",
       "copyGroup": "Gruppennummer kopieren",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "Beim Start automatisch scannen",
       "autoScanDesc": "Wenn aktiviert, scannt die App beim Start automatisch die Spielpfade nach neuen Mediendateien.",
+      "hardwareAcceleration": "GPU-Hardwarebeschleunigung",
+      "hardwareAccelerationDesc": "Bei Deaktivierung wird Software-Rendering verwendet, um Startabstürze auf einigen Grafikkarten zu vermeiden. Zum Übernehmen neu starten.",
+      "hardwareAccelerationRestartHint": "Die GPU-Hardwarebeschleunigungs-Einstellung wurde gespeichert. Zum Übernehmen muss die App neu gestartet werden. Jetzt neu starten?",
+      "restartNow": "Jetzt neu starten",
+      "restartLater": "Später",
       "description": "Automatische Verhaltenskonfiguration beim App-Start",
       "title": "Startverhalten"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "Automatischer Scan beim Start deaktiviert",
     "autoScanOn": "Automatischer Scan beim Start aktiviert",
+    "gpuOn": "GPU-Hardwarebeschleunigung aktiviert (nach Neustart wirksam)",
+    "gpuOff": "GPU-Hardwarebeschleunigung deaktiviert (nach Neustart wirksam)",
     "batchThresholdOff": "Schwellenwert für Stapelverarbeitung deaktiviert",
     "batchThresholdOn": "Schwellenwert für Stapelverarbeitung aktiviert",
     "batchThresholdSet": "Schwellenwert für Stapelverarbeitung auf {{count}} gesetzt",

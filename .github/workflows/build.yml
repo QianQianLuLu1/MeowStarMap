@@ -1,0 +1,161 @@
+name: Build & Release
+
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [main]
+
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  lint-typecheck:
+    name: Lint & Typecheck
+    runs-on: windows-latest
+    env:
+      TZ: Asia/Hong_Kong
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+      - run: npm run lint
+      - run: npm run typecheck
+
+  test:
+    name: Test (shard ${{ matrix.shard }}/10)
+    runs-on: windows-latest
+    needs: [lint-typecheck]
+    # 护栏：单分片超时，防止挂起耗尽 40 分钟（即便层 2 句柄未修也能兜底）
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false            # 一个分片挂不影响其他分片出结果
+      matrix:
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    env:
+      TZ: Asia/Hong_Kong
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+      # pool:forks 已在 vitest.config.ts 锁定；此处按分片跑
+      - run: npm test -- --shard=${{ matrix.shard }}/10
+
+
+  build:
+    name: Build & Release (Windows x64 NSIS)
+    runs-on: windows-latest
+    needs: [lint-typecheck, test]
+    # 护栏：打包 + 冒烟挂起时兜底，防止流水线无限等待
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+      - name: Build & publish (release tag)
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build only (preview / PR)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: npm run dist:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # 打包产物运行时冒烟（docs/plans/e2e-smoke-playwright.md）：
+      # tag 发布与 PR 两条分支的两个构建步骤之后都会到达此 step，发布前必须冒烟通过
+      - name: E2E smoke test on win-unpacked
+        run: npm run e2e:smoke
+      # 失败现场采集：Playwright 截图/视频/trace + 主进程诊断日志，仅冒烟失败时上传
+      - name: Upload smoke failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-smoke-failure
+          path: |
+            test-results/**
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload installer artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: NikkiGallery-win-x64-nsis
+          path: |
+            release/*.exe
+            release/latest*.yml
+          if-no-files-found: error
+          retention-days: 14
+      - name: Prepare release body
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        id: release-body
+        shell: bash
+        run: |
+          if [ -f "RELEASE_NOTES_v2.3.5.md" ]; then
+            {
+              echo "body<<EOF"
+              cat "RELEASE_NOTES_v2.3.5.md"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+            echo "generate=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "generate=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish GitHub Release
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/latest*.yml
+          body: ${{ steps.release-body.outputs.body }}
+          generate_release_notes: ${{ steps.release-body.outputs.generate == 'true' }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 只依赖仓库里真实提交的文件编译主进程产物：漏提交的源文件会在这里直接暴露为编译失败
+  clean-clone-build:
+    name: Clean Clone Build (主进程产物编译)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci
+        env:
+          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+      - name: Verify clean clone compiles main-process output
+        run: npm run build

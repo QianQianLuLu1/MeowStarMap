@@ -1224,7 +1224,8 @@ describe('MediaRepository', () => {
         CREATE TABLE import_roots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           root_path TEXT NOT NULL UNIQUE,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
         );
       `)
       const result = repo.listMedia({ page: 0, pageSize: 10, galleryHighQualityOnly: true })
@@ -1238,12 +1239,14 @@ describe('MediaRepository', () => {
         CREATE TABLE import_roots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           root_path TEXT NOT NULL UNIQUE,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
         );
       `)
-      db.prepare('INSERT INTO import_roots (root_path, created_at) VALUES (?, ?)').run(
+      db.prepare('INSERT INTO import_roots (root_path, created_at, disabled) VALUES (?, ?, ?)').run(
         'H:\\My_Photos',
-        '2024-01-01 10:00:00'
+        '2024-01-01 10:00:00',
+        0
       )
 
       const captured: Array<{ sql: string; params: unknown[] }> = []
@@ -1275,7 +1278,8 @@ describe('MediaRepository', () => {
         CREATE TABLE import_roots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           root_path TEXT NOT NULL UNIQUE,
-          created_at TEXT NOT NULL
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
         );
       `)
 
@@ -1298,6 +1302,127 @@ describe('MediaRepository', () => {
       expect(select).toBeDefined()
       expect(select!.sql).toContain('/nikkiphotos_highquality/')
       expect(select!.sql).not.toContain('ESCAPE')
+      expect(select!.params).toEqual([])
+    })
+
+    it('listMedia galleryHighQualityOnly=true 仅放行启用态导入根（排除 disabled）', () => {
+      db.exec(`
+        CREATE TABLE import_roots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          root_path TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
+        );
+      `)
+      db.prepare('INSERT INTO import_roots (root_path, created_at, disabled) VALUES (?, ?, ?)').run(
+        'H:\\Enabled',
+        '2024-01-01 10:00:00',
+        0
+      )
+      db.prepare('INSERT INTO import_roots (root_path, created_at, disabled) VALUES (?, ?, ?)').run(
+        'H:\\Disabled',
+        '2024-01-01 10:00:00',
+        1
+      )
+
+      const captured: Array<{ sql: string; params: unknown[] }> = []
+      const originalPrepare = db.prepare.bind(db)
+      vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+        const stmt = originalPrepare(sql)
+        return {
+          ...stmt,
+          all: (...p: unknown[]) => {
+            captured.push({ sql, params: p })
+            return stmt.all(...p)
+          }
+        }
+      })
+
+      repo.listMedia({ galleryHighQualityOnly: true })
+
+      const select = captured.find((c) => c.sql.includes('FROM media_files'))
+      expect(select).toBeDefined()
+      // 仅含启用态导入根前缀
+      expect(select!.params).toEqual(['h:/enabled/%'])
+      // 不含已关闭目录前缀
+      expect(select!.params).not.toContain('h:/disabled/%')
+    })
+
+    it('listMedia mediaSource=launcher 排除任意导入根之下文件（含已关闭目录）', () => {
+      db.exec(`
+        CREATE TABLE import_roots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          root_path TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
+        );
+      `)
+      db.prepare('INSERT INTO import_roots (root_path, created_at, disabled) VALUES (?, ?, ?)').run(
+        'H:\\Enabled',
+        '2024-01-01 10:00:00',
+        0
+      )
+      db.prepare('INSERT INTO import_roots (root_path, created_at, disabled) VALUES (?, ?, ?)').run(
+        'H:\\Disabled',
+        '2024-01-01 10:00:00',
+        1
+      )
+
+      const captured: Array<{ sql: string; params: unknown[] }> = []
+      const originalPrepare = db.prepare.bind(db)
+      vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+        const stmt = originalPrepare(sql)
+        return {
+          ...stmt,
+          all: (...p: unknown[]) => {
+            captured.push({ sql, params: p })
+            return stmt.all(...p)
+          }
+        }
+      })
+
+      repo.listMedia({ mediaSource: 'launcher' })
+
+      const select = captured.find((c) => c.sql.includes('FROM media_files'))
+      expect(select).toBeDefined()
+      // 缓存视图的导入根排除子句：NOT ( ... LIKE ? ESCAPE ... OR ... )
+      expect(select!.sql).toContain('NOT (')
+      expect(select!.sql).toContain("LOWER(REPLACE(file_path, '\\', '/')) LIKE ? ESCAPE '\\'")
+      // 启用与已关闭目录均被排除（缓存=图库补集）
+      expect(select!.params).toContain('h:/enabled/%')
+      expect(select!.params).toContain('h:/disabled/%')
+      expect(select!.params).toEqual(['h:/enabled/%', 'h:/disabled/%'])
+    })
+
+    it('listMedia mediaSource=launcher 无导入根时不额外排除', () => {
+      db.exec(`
+        CREATE TABLE import_roots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          root_path TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
+        );
+      `)
+      const captured: Array<{ sql: string; params: unknown[] }> = []
+      const originalPrepare = db.prepare.bind(db)
+      vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+        const stmt = originalPrepare(sql)
+        return {
+          ...stmt,
+          all: (...p: unknown[]) => {
+            captured.push({ sql, params: p })
+            return stmt.all(...p)
+          }
+        }
+      })
+
+      repo.listMedia({ mediaSource: 'launcher' })
+
+      const select = captured.find((c) => c.sql.includes('FROM media_files'))
+      expect(select).toBeDefined()
+      // 无导入根时不应出现导入根排除子句（导入根排除用 LIKE ? ESCAPE，而 HQ 条件用 LIKE '%...%' 无 ESCAPE）
+      expect(select!.sql).not.toContain('LIKE ? ESCAPE')
+      // 缓存视图不额外排除，参数列表应为空
       expect(select!.params).toEqual([])
     })
 
@@ -1388,6 +1513,15 @@ describe('MediaRepository', () => {
     describe('mediaSource=launcher 缓存视图', () => {
       it('生成包含 NOT_IN_GALLERY_HQ_CONDITION 的 SQL', () => {
         insertMedia(db, { file_path: '/t/1.jpg' })
+        // 补建 import_roots 表（与相邻用例一致），否则缓存视图的导入根排除查询抛错触发 logger
+        db.exec(`
+          CREATE TABLE import_roots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_path TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            disabled INTEGER NOT NULL DEFAULT 0
+          );
+        `)
         const captured: Array<{ sql: string; params: unknown[] }> = []
         const originalPrepare = db.prepare.bind(db)
         vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
@@ -1418,6 +1552,15 @@ describe('MediaRepository', () => {
       it('mediaSource=launcher 时条件已内联，whereParams 不传 mediaSource', () => {
         insertMedia(db, { file_path: '/t/1.jpg' })
         insertMedia(db, { file_path: '/t/2.jpg', media_source: 'launcher' })
+        // 补建 import_roots 表（与相邻用例一致），否则缓存视图的导入根排除查询抛错触发 logger
+        db.exec(`
+          CREATE TABLE import_roots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_path TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            disabled INTEGER NOT NULL DEFAULT 0
+          );
+        `)
         // mock 的 WHERE 求值器不解析 COALESCE/LOWER/REPLACE/LIKE/NOT 组合条件，
         // 遇到未识别条件保守返回 true（全部放行），此处仅验证不抛错
         expect(() => repo.listMedia({ mediaSource: 'launcher' })).not.toThrow()

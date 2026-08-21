@@ -88,3 +88,29 @@ describe('GalleryPage useEffect 拆分契约（任务 3）', () => {
     expect(subscribeBlock).toMatch(/unsubscribe/)
   })
 })
+
+/**
+ * 回归测试：永久删除确认弹窗在确认后应自动关闭（#fix-permanent-delete-dialog）
+ * 根因：handleDelete 曾直接把 fileOperations.getDeleteConfirm 返回的 onConfirm 透传为
+ *   ConfirmDialog 的 onConfirm，而该回调只负责执行删除、从不关闭对话框，导致
+ *   系统删除二次确认后软件内弹窗常驻不关闭。
+ * 约定：沿用本文件源码结构性断言模式；断言范围严格限定在 handleDelete 函数体内，
+ *   以 'const handleDelete = useCallback(' 起、下一个 '// 稳定回调' 注释止，
+ *   避免误命中 handleBatchDelete / handleCleanupCorrupted 中已有的同类「关闭弹窗」写法。
+ */
+describe('GalleryPage handleDelete 确认后关闭弹窗（#fix-permanent-delete-dialog）', () => {
+  it('handleDelete 的 onConfirm 在确认后应将确认弹窗 open 置为 false', () => {
+    const startMarker = 'const handleDelete = useCallback('
+    const endMarker = '  // 稳定回调'
+    const startIdx = galleryPageSrc.indexOf(startMarker)
+    const endIdx = galleryPageSrc.indexOf(endMarker, startIdx)
+    expect(startIdx, 'handleDelete 定义未找到').toBeGreaterThan(-1)
+    expect(endIdx, 'handleDelete 函数体结束标记（稳定回调注释）未找到').toBeGreaterThan(startIdx)
+
+    // 仅截取 handleDelete 函数体（不含后续 handleBatchDelete 等），检查是否在该作用域内关闭弹窗
+    const handleDeleteBlock = galleryPageSrc.slice(startIdx, endIdx)
+
+    // 修复写法：用 finally 包裹 config.onConfirm，并在其中 setConfirmDialog(...) open:false
+    expect(handleDeleteBlock).toContain('setConfirmDialog((prev) => ({ ...prev, open: false }))')
+  })
+})

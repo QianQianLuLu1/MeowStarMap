@@ -169,30 +169,40 @@ function checkPluggableElectronDynamicOnly(): void {
 }
 
 /**
- * 11.6 app:// 协议处理器使用 net.fetch 而非 fs.readFile + Buffer Response
+ * 11.6 app:// 协议处理器使用 fs.readFile + Response，且显式设置 Content-Length
  *
- * 防止回归：旧实现使用 fs.readFile + new Response(Buffer) 返回无 Content-Length 的响应，
- * 导致 Chromium 网络栈以 ERR_FAILED (-2) 拒绝文档加载。新实现使用
- * net.fetch(pathToFileURL(filePath)) 范式，由 Electron/Chromium 自动填充 Content-Length、
- * 推断正确 MIME 并透明处理 asar 虚拟文件系统。
+ * 防止回归（两版历史缺陷都要防）：
+ * - 旧实现 1：fs.readFile + new Response(Buffer) 缺 Content-Length → ERR_FAILED (-2)；
+ * - 旧实现 2：net.fetch(pathToFileURL(filePath)) 走 Chromium 网络栈，主进程读
+ *   app.asar 内文件无官方背书 → 线上实测 ERR_FAILED (-2) 白屏。
+ * 当前实现：fs.readFile（fs 是官方明确支持 asar 的 Node API）+ Response，显式
+ * Content-Type/Content-Length，两版缺陷均免疫。
  *
- * 校验方法：在 app/ 目录下递归检索 .js 文件，检查 handler 体内是否出现 net.fetch 模式。
- * 简单稳健的判据：存在 pathToFileURL 或 net.fetch 即视为通过。
+ * 校验方法：renderer-protocol 静态打入 dist/main/main/app/index.js。
+ * 判据：index.js 含 'readFile'（fs 读取路径）且不含 'pathToFileURL'（net.fetch 方案
+ * 标记，全库仅 renderer-protocol.ts 使用，其消失即 net.fetch 方案移除）。
  */
-function checkRendererProtocolUsesNetFetch(): void {
-  const appDir = path.join(DIST_MAIN, 'app')
-  if (!getMtime(appDir)) {
-    fail('dist/main/main/app 目录不存在，无法校验 app:// 协议实现，请先执行 npm run build')
+function checkRendererProtocolUsesFileResponse(): void {
+  const mainIndexJs = path.join(DIST_MAIN, 'app', 'index.js')
+  if (!getMtime(mainIndexJs)) {
+    fail('dist/main/main/app/index.js 不存在，无法校验 app:// 协议实现，请先执行 npm run build')
     return
   }
 
-  // 检查 app/ 目录下的 .js 文件是否包含 pathToFileURL（renderer-protocol 产物标记）
-  if (dirContains(appDir, 'pathToFileURL') || dirContains(appDir, 'net.fetch')) {
-    pass('app:// 协议处理器使用 net.fetch 范式（含 Content-Length 正确响应）')
+  let content: string
+  try {
+    content = fs.readFileSync(mainIndexJs, 'utf-8')
+  } catch {
+    fail('读取 dist/main/main/app/index.js 失败，无法校验 app:// 协议实现')
+    return
+  }
+
+  if (content.includes('readFile') && !content.includes('pathToFileURL')) {
+    pass('app:// 协议处理器使用 fs.readFile + Response（显式 Content-Type/Content-Length）')
   } else {
     fail(
-      'app:// 协议处理器未使用 net.fetch 范式（产物中无 pathToFileURL 或 net.fetch），' +
-        '可能存在无 Content-Length 的 Buffer Response 导致 ERR_FAILED (-2) 白屏，' +
+      'app:// 协议处理器未使用 fs.readFile 方案（index.js 无 readFile 或仍含 pathToFileURL），' +
+        '可能存在 net.fetch 读 asar 失败或无 Content-Length 的 ERR_FAILED (-2) 白屏，' +
         '请检查 src/main/app/renderer-protocol.ts 并重新 npm run build'
     )
   }
@@ -581,8 +591,8 @@ function main(): void {
   // 11.5. renderer 协议注册必须在 whenReady 回调内（启动挂起回归防护）
   checkMainIndexProtocolInsideWhenReady()
 
-  // 11.6. app:// 协议处理器使用 net.fetch 范式（防 ERR_FAILED (-2) 回归）
-  checkRendererProtocolUsesNetFetch()
+  // 11.6. app:// 协议处理器使用 fs.readFile + Response（防 ERR_FAILED (-2) 回归）
+  checkRendererProtocolUsesFileResponse()
 
   // 12. 原生模块 ABI 一致性闸门（防 NODE_MODULE_VERSION 错位）
   checkNativeAbiConsistency()

@@ -3,17 +3,28 @@
  * @module src/main/ipc/handlers/settings-handler
  * @coverage settings 域 IPC handler（settings:get / set）
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { AppError } from '../../../shared/errors/app-error'
 import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
 
-const { handleMock, assertFileReadPathMock, assertFileWritePathMock } = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn()
+const { handleMock, assertFileReadPathMock, assertFileWritePathMock, mockAppGetPath } = vi.hoisted(
+  () => ({
+    handleMock: vi.fn(),
+    assertFileReadPathMock: vi.fn(),
+    assertFileWritePathMock: vi.fn(),
+    mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : ''))
+  })
+)
+
+vi.mock('electron', () => ({
+  ipcMain: { handle: handleMock, on: vi.fn() },
+  app: { getPath: mockAppGetPath }
 }))
 
-vi.mock('electron', () => ({ ipcMain: { handle: handleMock, on: vi.fn() } }))
+let tmpUserDir: string
 
 vi.mock('../validator', () => ({
   wrapHandler: vi.fn(
@@ -66,6 +77,23 @@ import { registerSettingsHandlers } from './settings-handler'
 describe('registerSettingsHandlers', () => {
   beforeEach(() => {
     handleMock.mockClear()
+  })
+
+  beforeAll(() => {
+    tmpUserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-pref-'))
+    mockAppGetPath.mockImplementation((name: string) =>
+      name === 'userData' ? tmpUserDir : ''
+    )
+  })
+
+  afterAll(() => {
+    fs.rmSync(tmpUserDir, { recursive: true, force: true })
+  })
+
+  afterEach(() => {
+    // 隔离：清理硬件加速偏好镜像，避免跨用例残留导致断言误判
+    const pref = path.join(tmpUserDir, 'gpu-pref.json')
+    if (fs.existsSync(pref)) fs.rmSync(pref, { force: true })
   })
 
   it('应注册 settings:get / settings:set channel', () => {
@@ -163,5 +191,37 @@ describe('registerSettingsHandlers', () => {
     }
     expect(result.error.code).toBe('IPC_VALIDATION_ERROR')
     expect(result.error.message).toContain('过大')
+  })
+
+  it('settings:set hardwareAcceleration=false 双写到 userData/gpu-pref.json', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')([
+      'hardwareAcceleration',
+      false
+    ])) as {
+      success: true
+      data: { saved: boolean }
+    }
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('hardwareAcceleration', false)
+    expect(result.data.saved).toBe(true)
+    const pref = JSON.parse(
+      fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')
+    ) as { hardwareAcceleration: boolean }
+    expect(pref.hardwareAcceleration).toBe(false)
+  })
+
+  it('settings:set hardwareAcceleration 非布尔值 → 被拒且不写镜像', async () => {
+    registerSettingsHandlers(makeCtx({}))
+    const result = (await getHandler(handleMock, 'settings:set')([
+      'hardwareAcceleration',
+      'on'
+    ])) as {
+      success: false
+      error: { code: string }
+    }
+    expect(result.success).toBe(false)
+    expect(result.error.code).toBe('IPC_VALIDATION_ERROR')
+    expect(fs.existsSync(path.join(tmpUserDir, 'gpu-pref.json'))).toBe(false)
   })
 })

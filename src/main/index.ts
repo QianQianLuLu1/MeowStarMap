@@ -3,6 +3,11 @@ import path from 'path'
 import { diagLog, logStartupError } from './utils/startup-diagnostic'
 import { electronLogger } from './utils/logger'
 import { registerRendererProtocol } from './app/renderer-protocol'
+import {
+  shouldDisableHardwareAcceleration,
+  markBootAttempt,
+  setupGpuProcessWatcher
+} from './app/gpu-fallback'
 
 // 捕获未处理异常和未处理的 Promise 拒绝。
 // 必须放在任何可能抛错的模块级代码（registerSchemesAsPrivileged 等）之前：
@@ -23,6 +28,21 @@ process.on('unhandledRejection', (reason) => {
 })
 
 diagLog('INDEX', '=== index.ts loaded ===')
+
+// GPU 崩溃自动回退（VS Code 模式）：部分机器 GPU 进程无法运行时，Chromium 会以
+// FATAL "GPU process isn't usable. Goodbye." 自杀主进程，表现为 loadURL 报
+// ERR_FAILED(-2) 白屏（app:// 协议层无关，2026-08-19 用户机 54 个 dump 裁决）。
+// 上次已激活回退（GPU 崩溃标记或连续启动失败≥2）→ 本次启动禁用硬件加速。
+// 必须在 app ready 之前调用 disableHardwareAcceleration 才生效。
+if (shouldDisableHardwareAcceleration()) {
+  app.disableHardwareAcceleration()
+  diagLog('INDEX', 'gpu-fallback active: hardware acceleration DISABLED for this boot')
+  try {
+    electronLogger.info('[GPU] 检测到 GPU 崩溃回退标记，本次启动已禁用硬件加速（软件渲染）')
+  } catch {
+    // electronLogger 未就绪时仅依赖 diagLog
+  }
+}
 
 // 注册自定义协议，使渲染进程可以安全访问本地媒体文件
 protocol.registerSchemesAsPrivileged([
@@ -65,6 +85,12 @@ app.whenReady().then(async () => {
   // 首个窗口导航前注册 app:// 处理器（此时 session 已可用）
   registerRendererProtocol()
   diagLog('INDEX', 'registerRendererProtocol done')
+
+  // GPU 回退：登记本次启动尝试（失败计数+1，did-finish-load 时清零），
+  // 并注册 GPU 子进程崩溃观测（须在窗口创建前，抢在 Chromium FATAL 前落盘回退标记）
+  markBootAttempt()
+  setupGpuProcessWatcher()
+  diagLog('INDEX', 'gpu-fallback attempt marked, watcher registered')
 
   try {
     diagLog('INDEX', 'before import Application')

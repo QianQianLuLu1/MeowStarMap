@@ -13,6 +13,9 @@ import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { EmptyState } from '../components/common/EmptyState'
+import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
+import { useStagedTask } from '../hooks/useStagedTask'
+import { settleWithConcurrency } from '../../shared/utils/concurrency'
 import { useContainerSize } from '../hooks/useContainerSize'
 import { getAutoFillColumns } from '../utils/responsive'
 import { formatFileSize } from '../utils/format'
@@ -32,6 +35,8 @@ import {
 const MIN_ITEM_WIDTH = 200
 const GRID_GAP = 12
 const PAGE_PADDING_X = 24
+// 永久删除并发上限
+const DELETE_CONCURRENCY = 5
 
 // P1-I：formatDate 已统一到 utils/date.ts，调用 formatDateTime 处理 null/空值
 // 提到模块作用域，避免每次渲染生成新函数导致 memo 化的列表项全量重渲染
@@ -57,6 +62,8 @@ export const RecycleBinPage: React.FC = () => {
   const contentRef = useRef<HTMLDivElement>(null)
   const { width } = useContainerSize(contentRef)
   const columns = getAutoFillColumns(width - PAGE_PADDING_X * 2, MIN_ITEM_WIDTH, GRID_GAP)
+  // 阶段步骤进度编排（回收站永久删除 / 清空回收站）
+  const staged = useStagedTask()
 
   useEffect(() => {
     loadRecycleBin()
@@ -120,55 +127,105 @@ export const RecycleBinPage: React.FC = () => {
     }
   }, [selectedIds, showMessage, t])
 
-  // 彻底删除选中项（移至系统回收站 + 删除数据库记录）
+  // 彻底删除选中项（移至系统回收站 + 删除数据库记录），带阶段步骤进度 + 可取消
   const handlePermanentDelete = useCallback(async () => {
     if (selectedIds.size === 0 || !window.electronAPI?.mediaAction?.permanentDelete) {
       showMessage(t('recycleBin.selectToDelete'), 'error')
       return
     }
+    const ids = Array.from(selectedIds)
     setOperating(true)
     setFailedAction(null)
-    try {
-      const ids = Array.from(selectedIds).map((id) => Number(id))
-      const result = await window.electronAPI.mediaAction.permanentDelete(ids)
-      showMessage(result.message, result.success ? 'success' : 'error')
-      if (result.success) {
-        setSelectedIds(new Set())
-        await loadRecycleBin()
-      } else {
-        // F-B1：失败时记录操作类型，供用户重试
-        setFailedAction('permanent')
+    const final = await staged.run({
+      taskType: 'batch',
+      title: t('taskProgress.phase.processing'),
+      stageLabels: [
+        t('taskProgress.phase.preparing'),
+        t('taskProgress.phase.processing'),
+        t('taskProgress.phase.finalizing')
+      ],
+      canCancel: true,
+      total: ids.length,
+      execute: async ({ setStage, tick, signal }) => {
+        setStage(0)
+        setStage(0, 'done')
+        setStage(1)
+        const settled = await settleWithConcurrency(
+          ids,
+          DELETE_CONCURRENCY,
+          async (id) => {
+            if (signal.aborted) {
+              const e = new Error('aborted')
+              e.name = 'AbortError'
+              throw e
+            }
+            const r = await window.electronAPI!.mediaAction!.permanentDelete([Number(id)])
+            if (!r.success) throw new Error(r.message)
+          },
+          (done) => tick(done, ids.length),
+          signal
+        )
+        if (signal.aborted) {
+          const e = new Error('aborted')
+          e.name = 'AbortError'
+          throw e
+        }
+        const anyFailed = settled.some((s) => s.status === 'rejected')
+        setStage(1, 'done')
+        setStage(2)
+        if (!anyFailed) {
+          setSelectedIds(new Set())
+          await loadRecycleBin()
+        } else {
+          setFailedAction('permanent')
+        }
+        setStage(2, 'done')
       }
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t('recycleBin.deleteFailed'), 'error')
-      setFailedAction('permanent')
-    } finally {
-      setOperating(false)
+    })
+    if (final?.phase === 'cancelled') {
+      showMessage(t('taskProgress.phase.cancelled'), 'error')
+    } else if (final?.phase === 'error') {
+      showMessage(final.message ?? t('recycleBin.deleteFailed'), 'error')
+    } else if (final && final.stages?.some((s) => s.status === 'failed')) {
+      showMessage(t('recycleBin.deleteFailed'), 'error')
+    } else {
+      showMessage(t('recycleBin.permanentDeleteSuccess'), 'success')
     }
-  }, [selectedIds, showMessage, t])
+    setOperating(false)
+  }, [selectedIds, showMessage, t, staged])
 
-  // 清空回收站
+  // 清空回收站，带阶段步骤进度
   const handleEmptyRecycleBin = useCallback(async () => {
     if (!window.electronAPI?.mediaAction?.emptyRecycleBin) return
     setOperating(true)
     setFailedAction(null)
-    try {
-      const result = await window.electronAPI.mediaAction.emptyRecycleBin()
-      showMessage(result.message, result.success ? 'success' : 'error')
-      if (result.success) {
+    const final = await staged.run({
+      taskType: 'batch',
+      title: t('taskProgress.phase.processing'),
+      stageLabels: [
+        t('taskProgress.phase.preparing'),
+        t('taskProgress.phase.processing'),
+        t('taskProgress.phase.finalizing')
+      ],
+      canCancel: false,
+      execute: async ({ setStage }) => {
+        setStage(0)
+        setStage(0, 'done')
+        setStage(1)
+        const result = await window.electronAPI!.mediaAction!.emptyRecycleBin()
+        if (!result.success) throw new Error(result.message)
+        setStage(1, 'done')
+        setStage(2)
         setSelectedIds(new Set())
         await loadRecycleBin()
-      } else {
-        // F-B1：失败时记录操作类型，供用户重试
-        setFailedAction('empty')
+        setStage(2, 'done')
       }
-    } catch (error) {
-      showMessage(error instanceof Error ? error.message : t('recycleBin.emptyFailed'), 'error')
-      setFailedAction('empty')
-    } finally {
-      setOperating(false)
-    }
-  }, [showMessage, t])
+    })
+    if (final?.phase === 'error') showMessage(final.message ?? t('recycleBin.emptyFailed'), 'error')
+    else if (final && final.phase !== 'cancelled')
+      showMessage(t('recycleBin.emptySuccess'), 'success')
+    setOperating(false)
+  }, [showMessage, t, staged])
 
   // F-B1：重试上次失败的操作
   const handleRetry = useCallback(() => {
@@ -399,6 +456,9 @@ export const RecycleBinPage: React.FC = () => {
         onConfirm={handleConfirm}
         onCancel={() => setConfirm({ open: false, type: null })}
       />
+
+      {/* 删除 / 清空回收站的阶段步骤进度浮窗 */}
+      <TaskProgressOverlay progress={staged.progress} onCancel={staged.cancel} />
     </div>
   )
 }
@@ -411,17 +471,17 @@ interface RecycleBinItemProps {
 
 const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({ file, selected, onToggle }) => {
   const { t } = useTranslation()
-  const thumbUrl = useMemo(() => {
-    if (file.thumbnail) {
-      try {
-        const url = new URL(file.thumbnail, 'media://')
-        return file.thumbnail.startsWith('media://') ? file.thumbnail : url.href
-      } catch {
-        return file.thumbnail
-      }
-    }
-    return toFileUrl(file.file_path)
-  }, [file.thumbnail, file.file_path])
+  // FIX(B-thumb): 原用 new URL(thumbnail, 'media://') 构造缩略图 URL。thumbnail 为绝对
+  // Windows 路径时，new URL 会把盘符「C:」当作 scheme 解析（protocol === 'c:'）且不抛异常，
+  // 于是 catch 分支失效、返回畸形 URL，最终被 Chromium 当作 file:/// 拒绝加载
+  // （Not allowed to load local resource，日志实测 570 次裂图）。
+  // 改用项目统一的 toFileUrl（同 VirtualImageGrid / TimelineView），其已正确处理
+  // media:// / blob: / data: / file:// 前缀与 Electron 环境转换；
+  // media 协议白名单（media-protocol.ts）已放行缩略图缓存目录，故无需改协议层。
+  const thumbUrl = useMemo(
+    () => toFileUrl(file.thumbnail || file.file_path),
+    [file.thumbnail, file.file_path]
+  )
 
   return (
     <div

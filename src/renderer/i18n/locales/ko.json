@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "업데이트",
+      "updateNetworkBusy": "네트워크가 혼잡합니다. 확인을 눌러 공식 사이트로 이동하세요.",
+      "updateNoNewVersion": "이미 최신 버전입니다"
     },
     "backup": {
       "archiveTag": "프로필: {{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "시작 시 자동 스캔",
       "autoScanDesc": "활성화하면 앱 시작 시 게임 경로의 새 미디어 파일을 자동으로 스캔합니다.",
+      "hardwareAcceleration": "GPU 하드웨어 가속",
+      "hardwareAccelerationDesc": "비활성화하면 소프트웨어 렌더링을 사용하여 일부 GPU에서 발생하는 시작 충돌을 방지합니다. 적용하려면 재시작이 필요합니다.",
+      "hardwareAccelerationRestartHint": "GPU 하드웨어 가속 설정을 저장했습니다. 적용하려면 앱을 재시작하세요. 지금 재시작할까요?",
+      "restartNow": "지금 재시작",
+      "restartLater": "나중에",
       "description": "앱 시작 시 자동 동작 설정",
       "title": "시작 동작"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "시작 시 자동 스캔 비활성화",
     "autoScanOn": "시작 시 자동 스캔 활성화",
+    "gpuOn": "GPU 하드웨어 가속 활성화됨 (재시작 후 적용)",
+    "gpuOff": "GPU 하드웨어 가속 비활성화됨 (재시작 후 적용)",
     "batchThresholdOff": "배치 작업 임계값 비활성화",
     "batchThresholdOn": "배치 작업 임계값 활성화",
     "batchThresholdSet": "배치 작업 임계값을 {{count}}로 설정",

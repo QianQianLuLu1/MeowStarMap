@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, schemas, assertFileReadPath } from '../validator'
+import { isMediaPathAllowed } from '../../app/media-protocol'
 import { logger } from '../../utils/logger'
 
 /**
@@ -20,7 +21,14 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
         z.string().min(1).max(64).optional()
       ]),
       async ([filePath, albumType, uid]) => {
-        assertFileReadPath(filePath)
+        // 复用 media:// 已索引媒体白名单：已入库媒体的解密读取与图库显示授权标准统一。
+        // 命中则跳过文件操作审批白名单（pathGuard.roots），避免两套白名单不同步导致误拦截；
+        // 未命中（非媒体路径等）仍走原 assertFileReadPath 兜底，保留既有安全边界。
+        if (!isMediaPathAllowed(ctx, filePath)) {
+          assertFileReadPath(filePath)
+        } else {
+          logger.debug('[decrypt] 命中已索引媒体白名单，跳过 pathGuard 校验:', filePath)
+        }
         const { decodeFileParams } = await import('../../services/decryption-service')
 
         // 当 uid 缺失或为 'default' 时，尝试从角色档案表获取有效 UID

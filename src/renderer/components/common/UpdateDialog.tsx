@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * 自动更新弹窗（复用 electron-updater + 主进程 app:update 推送）。
@@ -7,10 +8,14 @@ import React, { useEffect, useRef, useState, useCallback } from 'react'
  * 纯展示 + 触发 IPC：状态机由主进程驱动，本组件只负责呈现「发现新版本 → 下载进度 → 安装重启」。
  *
  * 阶段细化：
- *   - checking / not-available → 轻量 toast（自动消失）
- *   - downloading            → 右下角非阻塞进度卡片
- *   - available / downloaded / error → 居中模态（需用户决策）
+ *   - checking                → 轻量 toast（自动消失）
+ *   - downloading             → 右下角非阻塞进度卡片
+ *   - available / downloaded  → 居中模态（需用户决策：下载 / 安装）
+ *   - error / not-available   → 居中模态（关闭 / 确定跳转官网）
  */
+
+// 与 about-sections.tsx 保持一致的项目官网
+const GITHUB_URL = 'https://github.com/QianQianLuLu1/NikkiGallery'
 
 type UpdateStage =
   'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
@@ -25,10 +30,12 @@ interface UpdatePayload {
   readyToInstall?: boolean
 }
 
+// error / not-available：带「关闭 / 确定」的模态；available / downloaded：下载安装决策模态
 const isModalStage = (s: UpdateStage): boolean =>
-  s === 'available' || s === 'downloaded' || s === 'error'
+  s === 'available' || s === 'downloaded' || s === 'error' || s === 'not-available'
 
 export const UpdateDialog: React.FC = () => {
+  const { t } = useTranslation()
   const [payload, setPayload] = useState<UpdatePayload | null>(null)
   // 用户主动关闭模态后隐藏，直到下一次事件（如重启后再次检查）重置
   const [dismissed, setDismissed] = useState(false)
@@ -48,10 +55,9 @@ export const UpdateDialog: React.FC = () => {
 
     const unsubscribe = api.onUpdate((p: UpdatePayload) => {
       setPayload(p)
-      // 新事件到达即重置关闭状态，确保重试 / 下次检查能重新弹窗
+      // 新事件到达即重置关闭状态，确保下次检查能重新弹窗
       setDismissed(false)
       if (p.stage === 'checking') showToast('正在检查更新…')
-      else if (p.stage === 'not-available') showToast('已是最新版本')
       else {
         // 进入有实体 UI 的阶段（模态/进度卡片）时清掉 toast
         if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -81,11 +87,12 @@ export const UpdateDialog: React.FC = () => {
     }
   }, [])
 
-  const handleRetry = useCallback(async () => {
+  // 「确定」按钮：打开项目官网（网络繁忙 / 已是最新均跳官网）
+  const handleOpenOfficial = useCallback(async () => {
     try {
-      await window.electronAPI?.app?.checkUpdate()
+      await window.electronAPI?.shell?.openExternal?.(GITHUB_URL)
     } catch (err) {
-      console.error('[UpdateDialog] 重试检查失败:', err)
+      console.error('[UpdateDialog] 打开官网失败:', err)
     }
   }, [])
 
@@ -229,7 +236,7 @@ export const UpdateDialog: React.FC = () => {
         {payload.stage === 'error' && (
           <>
             <h2 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-              更新出错
+              {t('settings.about.updateTitle')}
             </h2>
             <p
               className="text-xs mb-4 p-3 rounded overflow-auto"
@@ -241,7 +248,7 @@ export const UpdateDialog: React.FC = () => {
                 maxHeight: '30vh'
               }}
             >
-              {payload.errorMessage ?? '未知错误'}
+              {t('settings.about.updateNetworkBusy')}
             </p>
             <div className="flex justify-end gap-2 mt-auto">
               <button
@@ -249,14 +256,50 @@ export const UpdateDialog: React.FC = () => {
                 style={{ color: 'var(--text-secondary)' }}
                 onClick={() => setDismissed(true)}
               >
-                关闭
+                {t('common.close')}
               </button>
               <button
                 className="px-3 py-1.5 rounded text-sm font-medium text-white"
                 style={{ background: 'var(--accent)' }}
-                onClick={handleRetry}
+                onClick={handleOpenOfficial}
               >
-                重试
+                {t('common.ok')}
+              </button>
+            </div>
+          </>
+        )}
+
+        {payload.stage === 'not-available' && (
+          <>
+            <h2 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
+              {t('settings.about.updateTitle')}
+            </h2>
+            <p
+              className="text-xs mb-4 p-3 rounded overflow-auto"
+              style={{
+                color: 'var(--text-secondary)',
+                background: 'var(--bg-primary)',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                maxHeight: '30vh'
+              }}
+            >
+              {t('settings.about.updateNoNewVersion')}
+            </p>
+            <div className="flex justify-end gap-2 mt-auto">
+              <button
+                className="px-3 py-1.5 rounded text-sm transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                onClick={() => setDismissed(true)}
+              >
+                {t('common.close')}
+              </button>
+              <button
+                className="px-3 py-1.5 rounded text-sm font-medium text-white"
+                style={{ background: 'var(--accent)' }}
+                onClick={handleOpenOfficial}
+              >
+                {t('common.ok')}
               </button>
             </div>
           </>

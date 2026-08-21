@@ -1645,6 +1645,9 @@
       "buildTools": "构建工具链",
       "checkUpdate": "检查更新",
       "checkUpdateHint": "自动检查更新，发现新版本后可在应用内下载并安装",
+      "updateTitle": "更新",
+      "updateNetworkBusy": "当前网络繁忙，点击确定跳转官网",
+      "updateNoNewVersion": "当前已是最新版本",
       "contactDesc": "GitHub 仓库、QQ 群与社交媒体",
       "contactTitle": "联系方式",
       "copyGroup": "复制群号",
@@ -1969,6 +1972,7 @@
       "importRootsConfirmTitle": "移除指定目录",
       "importRootsConfirmBody": "将移除目录“{{path}}”的登记。是否同时清除其媒体索引记录？",
       "importRootsConfirmClearRecords": "同时清除该目录的媒体索引记录（移入回收站，可恢复）",
+      "importRootsClearRecordsHint": "提示：勾选则媒体移入回收站（可恢复）；不勾选则保留记录，但其在“图库”与“缓存”板块均不再显示（关闭目录的数据仍在库中，可经重新扫描恢复）。",
       "importRootsConfirmCancel": "取消",
       "importRootsConfirmRemove": "确认移除",
       "importRootsRemoving": "移除中…",
@@ -2004,7 +2008,12 @@
       "autoScan": "启动时自动扫描",
       "autoScanDesc": "开启后，应用启动时将自动扫描游戏路径中的新增媒体文件。",
       "description": "应用启动时的自动行为配置",
-      "title": "启动行为"
+      "title": "启动行为",
+      "hardwareAcceleration": "GPU 硬件加速",
+      "hardwareAccelerationDesc": "关闭后改用软件渲染，可规避部分显卡导致的启动崩溃。修改后需重启应用生效。",
+      "hardwareAccelerationRestartHint": "GPU 硬件加速设置已保存，需要重启应用才能生效。是否立即重启？",
+      "restartNow": "立即重启",
+      "restartLater": "稍后重启"
     },
     "theme": {
       "desc": "切换后实时生效，主题偏好会自动保存到本地配置。",
@@ -2130,6 +2139,8 @@
   "toast": {
     "autoScanOff": "已关闭启动时自动扫描",
     "autoScanOn": "已开启启动时自动扫描",
+    "gpuOff": "已关闭 GPU 硬件加速（重启后生效）",
+    "gpuOn": "已开启 GPU 硬件加速（重启后生效）",
     "batchDelete": {
       "allSucceeded": "已将 {{count}} 个文件移至回收站",
       "missingFile": "找不到该文件的记录（id: {{id}}）",

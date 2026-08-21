@@ -414,7 +414,8 @@ export class MediaRepository {
   }
 
   /**
-   * 读取导入根，转为可直接用于 LIKE 的前缀参数（小写 + 正斜杠 + 通配符转义 + '/%' 后缀）。
+   * 读取导入根（仅启用态），转为可直接用于 LIKE 的前缀参数（小写 + 正斜杠 + 通配符转义 + '/%' 后缀）。
+   * 供图库板块放行：已关闭（disabled=1）的目录不返回，从而不在图库显示。
    *
    * 旧库尚未创建 import_roots 表时降级为空数组：图库退回"仅高清目录放行"，
    * 功能受限但不影响可用性，优于让整个 media:list 抛错。
@@ -422,7 +423,7 @@ export class MediaRepository {
   private buildImportRootLikeParams(): string[] {
     let roots: string[]
     try {
-      roots = new ImportRootRepository(this.db).listImportRoots()
+      roots = new ImportRootRepository(this.db).listEnabledImportRoots()
     } catch (err) {
       logger.warn(
         '[DB] 读取 import_roots 失败，图库仅放行高清目录:', // TODO: i18n: internal log
@@ -430,6 +431,31 @@ export class MediaRepository {
       )
       return []
     }
+    return this.buildRootLikeParams(roots)
+  }
+
+  /**
+   * 读取导入根（启用 + 已关闭，全量），转为 LIKE 前缀参数。
+   * 供缓存板块排除：无论目录是否关闭，其下文件都不应出现在缓存（缓存=图库补集）。
+   *
+   * 旧库尚未创建 import_roots 表时降级为空数组：缓存不退化为额外排除，功能不受影响。
+   */
+  private buildImportRootLikeParamsAll(): string[] {
+    let roots: string[]
+    try {
+      roots = new ImportRootRepository(this.db).listAllImportRootPrefixes()
+    } catch (err) {
+      logger.warn(
+        '[DB] 读取 import_roots 失败，缓存不额外排除导入根:', // TODO: i18n: internal log
+        err instanceof Error ? err.message : err
+      )
+      return []
+    }
+    return this.buildRootLikeParams(roots)
+  }
+
+  /** 将导入根列表归一化为 LIKE 前缀参数（小写 + 正斜杠 + 通配符转义 + '/%' 后缀） */
+  private buildRootLikeParams(roots: string[]): string[] {
     const params: string[] = []
     for (const root of roots) {
       const normalized = normalizeRootPath(root).toLowerCase()
@@ -452,6 +478,8 @@ export class MediaRepository {
     const deletedOnly = options.deletedOnly === true
     const accountUid = options.accountUid
     const albumType = options.albumType
+    // 缓存视图（mediaSource='launcher'）的导入根排除前缀参数，紧随 media_source 条件后在 whereParams 中追加
+    let launcherRootLikeParams: string[] = []
     // hideDuplicates 在回收站视图（deletedOnly）下不应用，避免软删除的重复项消失
     const hideDuplicates = options.hideDuplicates === true && !deletedOnly
     const mediaSource = options.mediaSource
@@ -477,8 +505,19 @@ export class MediaRepository {
     if (mediaSource && mediaSource !== 'all') {
       if (mediaSource === 'launcher') {
         // 缓存视图：排除图库 HQ 路径，显示所有非 HQ 文件（含非 HQ game + launcher + cloud）
+        // 并排除任意 import_roots 之下文件（启用或已关闭均排除），使指定目录媒体只存在于图库，
+        // 缓存成为图库补集——修复"已关闭的指定目录仍残留在缓存板块"的显示缺陷。
+        const computedRootParams = this.buildImportRootLikeParamsAll()
+        let rootExclusion = ''
+        if (computedRootParams.length > 0) {
+          const rootConditions = computedRootParams
+            .map(() => `${NORMALIZED_PATH_EXPR} LIKE ? ESCAPE '${LIKE_ESCAPE_CHAR}'`)
+            .join(' OR ')
+          rootExclusion = ` AND NOT (${rootConditions})`
+          launcherRootLikeParams = computedRootParams
+        }
         conditions.push(
-          `(COALESCE(media_source, 'game') = 'launcher' OR COALESCE(media_source, 'game') = 'cloud' OR (COALESCE(media_source, 'game') = 'game' AND ${NOT_IN_GALLERY_HQ_CONDITION}))`
+          `(COALESCE(media_source, 'game') = 'launcher' OR COALESCE(media_source, 'game') = 'cloud' OR (COALESCE(media_source, 'game') = 'game' AND ${NOT_IN_GALLERY_HQ_CONDITION}))${rootExclusion}`
         )
       } else {
         conditions.push('media_source = ?')
@@ -517,7 +556,9 @@ export class MediaRepository {
     // 缓存视图（mediaSource='launcher'）的条件已内联为常量 NOT_IN_GALLERY_HQ_CONDITION，不传参
     if (mediaSource && mediaSource !== 'all' && mediaSource !== 'launcher')
       whereParams.push(mediaSource)
-    // 顺序必须与 conditions 中导入根条件的位置一致（紧随 media_source 之后）
+    // 缓存视图的导入根排除参数：conditions 中该条件位于 media_source 之后，参数需紧随其后
+    if (mediaSource === 'launcher') whereParams.push(...launcherRootLikeParams)
+    // 顺序必须与 conditions 中图库导入根条件的位置一致（紧随 media_source 之后）
     whereParams.push(...importRootLikeParams)
 
     // 默认视图：conditions 仅含 'is_deleted = 0' 与 "media_source != 'launcher'"

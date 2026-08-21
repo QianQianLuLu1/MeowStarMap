@@ -11,7 +11,8 @@ export const RENDERER_PREF_KEYS = [
   'fileOps.permanentDoubleConfirm',
   'fileOps.batchThreshold',
   'fileOps.batchThresholdEnabled',
-  'fileOps.preferSoftDelete'
+  'fileOps.preferSoftDelete',
+  'hardwareAcceleration'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

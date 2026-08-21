@@ -67,9 +67,34 @@ describe('game-events', () => {
       expect(v?.version).toBe('1.5')
     })
 
-    it('最新版本之后的日期返回最新版本', () => {
+    it('开服日归属 1.0 探索季', () => {
+      const v = findVersionByDate('2024-12-05')
+      expect(v?.version).toBe('1.0')
+    })
+
+    it('1.1 流星季区间内归属 1.1', () => {
+      const v = findVersionByDate('2025-01-10')
+      expect(v?.version).toBe('1.1')
+    })
+
+    it('1.2 花焰季归属 1.2', () => {
+      const v = findVersionByDate('2025-02-01')
+      expect(v?.version).toBe('1.2')
+    })
+
+    it('2.0 祷声起诸大地归属 2.0', () => {
+      const v = findVersionByDate('2025-12-15')
+      expect(v?.version).toBe('2.0')
+    })
+
+    it('2.8 黄金尘区间内归属 2.8', () => {
+      const v = findVersionByDate('2026-07-20')
+      expect(v?.version).toBe('2.8')
+    })
+
+    it('最新版本之后的日期返回最新版本 2.8', () => {
       const v = findVersionByDate('2026-12-31')
-      expect(v?.version).toBe('2.3')
+      expect(v?.version).toBe('2.8')
     })
   })
 

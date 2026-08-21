@@ -911,7 +911,8 @@ export class DatabaseManager {
       CREATE TABLE IF NOT EXISTS import_roots (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         root_path TEXT NOT NULL UNIQUE,
-        created_at TEXT NOT NULL
+        created_at TEXT NOT NULL,
+        disabled INTEGER NOT NULL DEFAULT 0
       );
     `)
 
@@ -952,6 +953,10 @@ export class DatabaseManager {
     // is_deleted=0 表示正常，=1 表示已移入应用回收站
     // deleted_at 记录软删除时间，用于回收站排序
     this.migrateSoftDelete()
+
+    // 迁移：import_roots 增加 disabled 列（指定目录"关闭但保留记录"语义）
+    // 已发布库无此列，用 safeEnsureColumn 幂等 ALTER 补充；新库由建表 DDL 直接含列
+    this.migrateImportRootsDisabled()
 
     // F-O1：游戏特色功能增强
     // scene_time：基于图像亮度直方图的场景时段分类（day/night/dawn/dusk/unknown）
@@ -1421,6 +1426,16 @@ export class DatabaseManager {
     if (!this.db) return
     this.safeEnsureColumn('media_files', 'is_deleted INTEGER NOT NULL DEFAULT 0')
     this.safeEnsureColumn('media_files', 'deleted_at TEXT')
+  }
+
+  /**
+   * import_roots 增加 disabled 列（指定目录"关闭但保留记录"语义，L-指定目录缓存显示缺陷修复）。
+   * disabled=0 表示启用（图库放行、缓存排除）；=1 表示关闭（图库与缓存均不显示，记录保留可恢复）。
+   * 新建库由建表 DDL 直接含列；已发布库通过 safeEnsureColumn 幂等 ALTER 补充，列已存在时静默跳过。
+   */
+  private migrateImportRootsDisabled(): void {
+    if (!this.db) return
+    this.safeEnsureColumn('import_roots', 'disabled INTEGER NOT NULL DEFAULT 0')
   }
 
   /**

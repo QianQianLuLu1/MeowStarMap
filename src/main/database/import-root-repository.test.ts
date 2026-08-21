@@ -7,10 +7,12 @@ import type { DatabaseWorkerBridge } from './worker/database-worker-bridge'
  * ImportRootRepository 单元测试
  *
  * 真实 better-sqlite3 是按 Electron ABI 编译的，vitest（Node ABI）下无法加载，
- * 因此用一个自带的最小 fake DB —— 只识别本 Repository 实际发出的 4 条 SQL 模板：
+ * 因此用一个自带的最小 fake DB —— 只识别本 Repository 实际发出的 SQL 模板：
  *   - INSERT OR IGNORE INTO import_roots (root_path, created_at) VALUES (?, datetime(...))
  *   - SELECT root_path FROM import_roots ORDER BY id
+ *   - SELECT root_path FROM import_roots WHERE disabled = 0 ORDER BY id
  *   - DELETE FROM import_roots WHERE LOWER(root_path) = LOWER(?)
+ *   - UPDATE import_roots SET disabled = 1 WHERE LOWER(root_path) = LOWER(?)
  * 不做通用 SQL 解析，避免 mock 复杂度反过来掩盖被测逻辑。
  */
 
@@ -18,6 +20,7 @@ interface ImportRootRow {
   id: number
   root_path: string
   created_at: string
+  disabled: number
 }
 
 class FakeDb {
@@ -50,7 +53,7 @@ class FakeDb {
         return { changes: 0, lastInsertRowid: 0 }
       }
       const id = this.nextId++
-      this.rows.push({ id, root_path: rootPath, created_at: '2024-01-01 10:00:00' })
+      this.rows.push({ id, root_path: rootPath, created_at: '2024-01-01 10:00:00', disabled: 0 })
       return { changes: 1, lastInsertRowid: id }
     }
 
@@ -61,11 +64,26 @@ class FakeDb {
       return { changes: before - this.rows.length, lastInsertRowid: 0 }
     }
 
+    if (/^UPDATE import_roots SET disabled = 1 WHERE LOWER\(root_path\) = LOWER\(\?\)/i.test(sql)) {
+      const target = String(params[0]).toLowerCase()
+      let changes = 0
+      for (const r of this.rows) {
+        if (r.root_path.toLowerCase() === target) {
+          r.disabled = 1
+          changes = 1
+        }
+      }
+      return { changes, lastInsertRowid: 0 }
+    }
+
     throw new Error(`FakeDb: 未覆盖的 SQL: ${sql}`)
   }
 
   private all(sql: string): ImportRootRow[] {
     this.assertTableExists()
+    if (/^SELECT root_path FROM import_roots WHERE disabled = 0 ORDER BY id$/i.test(sql)) {
+      return [...this.rows].filter((r) => r.disabled === 0).sort((a, b) => a.id - b.id)
+    }
     if (/^SELECT root_path FROM import_roots ORDER BY id$/i.test(sql)) {
       return [...this.rows].sort((a, b) => a.id - b.id)
     }
@@ -174,11 +192,12 @@ describe('ImportRootRepository', () => {
 
     it('跳过脏数据（null / 空串 root_path）', async () => {
       await repo.addImportRoot('H:/Valid')
-      fake.rows.push({ id: 99, root_path: '', created_at: '2024-01-01 10:00:00' })
+      fake.rows.push({ id: 99, root_path: '', created_at: '2024-01-01 10:00:00', disabled: 0 })
       fake.rows.push({
         id: 100,
         root_path: null as unknown as string,
-        created_at: '2024-01-01 10:00:00'
+        created_at: '2024-01-01 10:00:00',
+        disabled: 0
       })
       expect(repo.listImportRoots()).toEqual(['H:/Valid'])
     })
@@ -212,6 +231,61 @@ describe('ImportRootRepository', () => {
     it('空路径抛错且不写库', async () => {
       await expect(repo.removeImportRoot('')).rejects.toThrow('removeImportRoot')
       expect(fake.executed).toHaveLength(0)
+    })
+  })
+
+  describe('disableImportRoot', () => {
+    it('关闭后该行 disabled=1', async () => {
+      await repo.addImportRoot('H:/A')
+      await repo.disableImportRoot('H:/A')
+      expect(fake.rows.find((r) => r.root_path === 'H:/A')?.disabled).toBe(1)
+    })
+
+    it('关闭后不再出现在 listEnabledImportRoots，但仍在 listImportRoots（记录保留）', async () => {
+      await repo.addImportRoot('H:/A')
+      await repo.addImportRoot('H:/B')
+      await repo.disableImportRoot('H:/A')
+      expect(repo.listEnabledImportRoots()).toEqual(['H:/B'])
+      expect(repo.listImportRoots()).toEqual(['H:/A', 'H:/B'])
+    })
+
+    it('关闭后仍在 listAllImportRootPrefixes（供缓存板块排除）', async () => {
+      await repo.addImportRoot('H:/A')
+      await repo.disableImportRoot('H:/A')
+      expect(repo.listAllImportRootPrefixes()).toEqual(['H:/A'])
+    })
+
+    it('大小写不同也能关闭', async () => {
+      await repo.addImportRoot('H:/Photos/Nikki')
+      await repo.disableImportRoot('h:\\photos\\nikki')
+      expect(fake.rows.find((r) => r.root_path === 'H:/Photos/Nikki')?.disabled).toBe(1)
+    })
+
+    it('空路径抛错且不写库', async () => {
+      await expect(repo.disableImportRoot('   ')).rejects.toThrow('disableImportRoot')
+      expect(fake.executed).toHaveLength(0)
+    })
+  })
+
+  describe('listEnabledImportRoots / listAllImportRootPrefixes', () => {
+    it('listEnabledImportRoots 仅含启用态（disabled=0）', async () => {
+      await repo.addImportRoot('H:/A')
+      await repo.addImportRoot('H:/B')
+      await repo.addImportRoot('H:/C')
+      await repo.disableImportRoot('H:/B')
+      expect(repo.listEnabledImportRoots()).toEqual(['H:/A', 'H:/C'])
+    })
+
+    it('listAllImportRootPrefixes 含启用与禁用（供缓存统一排除）', async () => {
+      await repo.addImportRoot('H:/A')
+      await repo.addImportRoot('H:/B')
+      await repo.disableImportRoot('H:/B')
+      expect(repo.listAllImportRootPrefixes()).toEqual(['H:/A', 'H:/B'])
+    })
+
+    it('空表均返回空数组', () => {
+      expect(repo.listEnabledImportRoots()).toEqual([])
+      expect(repo.listAllImportRootPrefixes()).toEqual([])
     })
   })
 })

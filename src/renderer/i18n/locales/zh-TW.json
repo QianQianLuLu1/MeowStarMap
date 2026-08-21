@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "更新",
+      "updateNetworkBusy": "當前網路繁忙，點擊確定跳轉官網",
+      "updateNoNewVersion": "當前已是最新版本"
     },
     "backup": {
       "archiveTag": "檔案：{{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "啟動時自動掃描",
       "autoScanDesc": "開啟後,應用啟動時將自動掃描遊戲路徑中的新增媒體檔案。",
+      "hardwareAcceleration": "GPU 硬體加速",
+      "hardwareAccelerationDesc": "關閉後改用軟體渲染，可規避部分顯示卡導致的啟動崩潰。修改後需重新啟動應用程式生效。",
+      "hardwareAccelerationRestartHint": "GPU 硬體加速設定已儲存，需要重新啟動應用程式才能生效。是否立即重新啟動？",
+      "restartNow": "立即重新啟動",
+      "restartLater": "稍後重新啟動",
       "description": "應用啟動時的自動行為設定",
       "title": "啟動行為"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "已關閉啟動時自動掃描",
     "autoScanOn": "已開啟啟動時自動掃描",
+    "gpuOn": "已開啟 GPU 硬體加速（重新啟動後生效）",
+    "gpuOff": "已關閉 GPU 硬體加速（重新啟動後生效）",
     "batchThresholdOff": "已關閉批次操作閾值",
     "batchThresholdOn": "已開啟批次操作閾值",
     "batchThresholdSet": "批次操作閾值已設為 {{count}}",

@@ -9,6 +9,7 @@ import {
   loadNextMediaPage
 } from '../stores/mediaStore'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
 import { PropertiesDialog } from '../components/common/PropertiesDialog'
 import { ContextMenu } from '../components/common/ContextMenu'
 import { VirtualImageGrid } from '../components/gallery/VirtualImageGrid'
@@ -264,6 +265,9 @@ export const GalleryPage: React.FC = () => {
     setRenameDialog({ open: false, file: null, newName: '' })
   }, [renameDialog.file, renameDialog.newName, fileOperations])
 
+  // #fix-permanent-delete-dialog：单文件删除确认后必须关闭弹窗。
+  // getDeleteConfirm 返回的 onConfirm 只负责执行删除、无权关闭对话框，
+  // 因此在此包裹 finally 显式关闭（与 handleBatchDelete / handleCleanupCorrupted 模式一致）。
   const handleDelete = useCallback(
     (file: MediaFile, permanent = false) => {
       const config = fileOperations.getDeleteConfirm(file, permanent)
@@ -271,7 +275,13 @@ export const GalleryPage: React.FC = () => {
         open: true,
         title: config.title,
         message: config.message,
-        onConfirm: config.onConfirm
+        onConfirm: async () => {
+          try {
+            await config.onConfirm()
+          } finally {
+            setConfirmDialog((prev) => ({ ...prev, open: false }))
+          }
+        }
       })
     },
     [fileOperations]
@@ -641,6 +651,12 @@ export const GalleryPage: React.FC = () => {
         confirmVariant="danger"
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}
+      />
+
+      {/* 单文件 / 批量删除的阶段步骤进度浮窗 */}
+      <TaskProgressOverlay
+        progress={fileOperations.deleteProgress}
+        onCancel={fileOperations.cancelDelete}
       />
 
       {/* 文件属性弹窗（含 EXIF 拍摄参数 + 复制按钮） */}

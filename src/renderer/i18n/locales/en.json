@@ -1238,6 +1238,9 @@
       "buildTools": "Build toolchain",
       "checkUpdate": "Check for updates",
       "checkUpdateHint": "Automatically checks for updates; new versions download and install in-app",
+      "updateTitle": "Update",
+      "updateNetworkBusy": "Network is busy. Click OK to open the official site.",
+      "updateNoNewVersion": "You are already on the latest version",
       "contactDesc": "GitHub repo, QQ group, and social media",
       "contactTitle": "Contact",
       "copyGroup": "Copy group number",
@@ -1562,6 +1565,7 @@
       "importRootsConfirmTitle": "Remove Import Root",
       "importRootsConfirmBody": "This will remove the registration of “{{path}}”. Also clear its media index records?",
       "importRootsConfirmClearRecords": "Also clear this directory's media index records (moved to Recycle Bin, recoverable)",
+      "importRootsClearRecordsHint": "Tip: checked → media moves to Recycle Bin (recoverable); unchecked → records are kept but hidden from both the Gallery and Cache sections (the closed directory's data stays in the library and can be restored by re-scanning).",
       "importRootsConfirmCancel": "Cancel",
       "importRootsConfirmRemove": "Remove",
       "importRootsRemoving": "Removing…",
@@ -1596,6 +1600,11 @@
     "startup": {
       "autoScan": "Auto-scan on startup",
       "autoScanDesc": "When enabled, the app will automatically scan game paths for new media files on startup.",
+      "hardwareAcceleration": "GPU Hardware Acceleration",
+      "hardwareAccelerationDesc": "Disabling uses software rendering to avoid startup crashes on some GPUs. Restart required to apply.",
+      "hardwareAccelerationRestartHint": "GPU hardware acceleration setting saved. Restart the app to apply it. Restart now?",
+      "restartNow": "Restart now",
+      "restartLater": "Later",
       "description": "Automatic behaviors on app startup",
       "title": "Startup"
     },
@@ -1710,6 +1719,8 @@
   "toast": {
     "autoScanOff": "Auto-scan on startup disabled",
     "autoScanOn": "Auto-scan on startup enabled",
+    "gpuOn": "GPU hardware acceleration enabled (applies after restart)",
+    "gpuOff": "GPU hardware acceleration disabled (applies after restart)",
     "batchThresholdOff": "Batch operation threshold disabled",
     "batchThresholdOn": "Batch operation threshold enabled",
     "batchThresholdSet": "Batch operation threshold set to {{count}}",

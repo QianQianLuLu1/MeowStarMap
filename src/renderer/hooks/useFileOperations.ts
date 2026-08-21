@@ -1,10 +1,12 @@
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../stores/uiStore'
 import { useMediaStore, type MediaFile } from '../stores/mediaStore'
 import { useOperationHistoryStore } from '../stores/operationHistoryStore'
 import type { ToastType } from './useToast'
 import { useFavoriteToggle } from './useFavoriteToggle'
+import { useStagedTask } from './useStagedTask'
+import { settleWithConcurrency } from '../../shared/utils/concurrency'
 import { formatFileSize } from '../utils/format'
 import { formatDate } from '../utils/date'
 // DU1：路径工具统一到 utils/file.ts
@@ -34,30 +36,6 @@ export interface BatchDeleteResult {
 
 // 批量删除并发上限：一次性发起数百个 IPC 会把主进程事件循环打满
 const DELETE_CONCURRENCY = 5
-
-// 以固定并发数遍历 ids，返回与 ids 下标一一对应的 settled 结果
-// 单个任务失败不中断其余任务，由调用方按下标还原 id
-async function settleWithConcurrency(
-  ids: string[],
-  limit: number,
-  task: (id: string) => Promise<void>
-): Promise<PromiseSettledResult<void>[]> {
-  const results = new Array<PromiseSettledResult<void>>(ids.length)
-  let cursor = 0
-
-  const worker = async (): Promise<void> => {
-    while (cursor < ids.length) {
-      const index = cursor
-      cursor += 1
-      const [settled] = await Promise.allSettled([task(ids[index])])
-      results[index] = settled
-    }
-  }
-
-  const workerCount = Math.min(limit, ids.length)
-  await Promise.all(Array.from({ length: workerCount }, worker))
-  return results
-}
 
 export function useFileOperations(options: UseFileOperationsOptions) {
   const { filteredFiles, onShowMessage, onRefreshMedia } = options
@@ -150,6 +128,10 @@ export function useFileOperations(options: UseFileOperationsOptions) {
       unsubscribers.forEach((unsub) => unsub())
     }
   }, [registerUndoHandler, onRefreshMedia, updateMediaFile, t])
+
+  const staged = useStagedTask()
+  const stagedRef = useRef(staged)
+  stagedRef.current = staged
 
   const handleOpen = useCallback(
     (file: MediaFile) => {
@@ -274,23 +256,53 @@ export function useFileOperations(options: UseFileOperationsOptions) {
         ? t('toast.permanentDeleteConfirm', { name: file.file_name })
         : t('toast.moveToRecycleConfirm', { name: file.file_name }),
       onConfirm: async () => {
-        if (!window.electronAPI) {
+        const api = window.electronAPI
+        if (!api) {
           onShowMessage(t('toast.deleteUnsupported'), 'error')
           return
         }
-        try {
-          if (permanent) {
-            const result = await window.electronAPI.file.deletePermanent([file.file_path])
-            if (result.success) {
-              await window.electronAPI.mediaAction.delete(Number(file.id))
+        let toastText = permanent
+          ? t('toast.permanentDeleteConfirm', { name: file.file_name })
+          : t('toast.moveToRecycleConfirm', { name: file.file_name })
+        let toastType: 'success' | 'error' = 'success'
+        const final = await stagedRef.current.run({
+          taskType: 'batch',
+          title: permanent
+            ? t('toast.permanentDeleteConfirm', { name: file.file_name })
+            : t('toast.moveToRecycleConfirm', { name: file.file_name }),
+          stageLabels: [
+            t('taskProgress.phase.preparing'),
+            t('taskProgress.phase.processing'),
+            t('taskProgress.phase.finalizing')
+          ],
+          canCancel: false,
+          execute: async ({ setStage, tick }) => {
+            if (permanent) {
+              setStage(0)
+              const result = await api.file.deletePermanent([file.file_path])
+              if (!result.success) throw new Error(result.message)
+              toastText = result.message
+              toastType = 'success'
+              setStage(0, 'done')
+              setStage(1)
+              const dbRes = await api.mediaAction.delete(Number(file.id))
+              if (!dbRes.success) throw new Error(dbRes.message)
+              setStage(1, 'done')
+              setStage(2)
               deleteMediaFiles([file.id])
-            }
-            onShowMessage(result.message, result.success ? 'success' : 'error')
-          } else {
-            // 软删除（移入回收站）：可撤销
-            const result = await window.electronAPI.file.delete([file.file_path])
-            if (result.success) {
-              await window.electronAPI.mediaAction.softDelete([Number(file.id)])
+              setStage(2, 'done')
+            } else {
+              setStage(0)
+              const result = await api.file.delete([file.file_path])
+              if (!result.success) throw new Error(result.message)
+              toastText = result.message
+              toastType = 'success'
+              setStage(0, 'done')
+              setStage(1)
+              const dbRes = await api.mediaAction.softDelete([Number(file.id)])
+              if (!dbRes.success) throw new Error(dbRes.message)
+              setStage(1, 'done')
+              setStage(2)
               deleteMediaFiles([file.id])
               // 建议改#9：不传 undoFn，仅传 type + payload
               pushHistory({
@@ -299,12 +311,15 @@ export function useFileOperations(options: UseFileOperationsOptions) {
                 mediaId: file.id,
                 payload: { mediaId: Number(file.id), originalPath: file.file_path }
               })
+              setStage(2, 'done')
             }
-            onShowMessage(result.message, result.success ? 'success' : 'error')
+            tick(1, 1)
           }
-        } catch (error) {
-          onShowMessage(error instanceof Error ? error.message : t('toast.deleteFailed'), 'error')
-        }
+        })
+        onShowMessage(
+          final?.phase === 'error' ? (final.message ?? toastText) : toastText,
+          final?.phase === 'error' ? 'error' : toastType
+        )
       }
     }),
     [deleteMediaFiles, onShowMessage, pushHistory, t]
@@ -328,44 +343,75 @@ export function useFileOperations(options: UseFileOperationsOptions) {
         useMediaStore.getState().mediaFiles.map((file) => [file.id, file.file_path])
       )
 
-      const deleteOne = async (id: string): Promise<void> => {
-        const filePath = pathById.get(id)
-        if (!filePath) throw new Error(t('toast.batchDelete.missingFile', { id }))
-        const fileResult = await api.file.delete([filePath])
-        if (!fileResult.success) throw new Error(fileResult.message)
-        const dbResult = await api.mediaAction.softDelete([Number(id)])
-        if (!dbResult.success) throw new Error(dbResult.message)
-      }
-
-      const settled = await settleWithConcurrency(ids, DELETE_CONCURRENCY, deleteOne)
-
       const succeeded: string[] = []
       const failed: BatchDeleteFailure[] = []
-      settled.forEach((result, index) => {
-        const id = ids[index]
-        if (result.status === 'fulfilled') {
-          succeeded.push(id)
-          return
-        }
-        const reason: unknown = result.reason
-        failed.push({ id, error: reason instanceof Error ? reason.message : String(reason) })
-      })
-
-      if (succeeded.length > 0) deleteMediaFiles(succeeded)
-
-      if (failed.length === 0) {
-        onShowMessage(t('toast.batchDelete.allSucceeded', { count: succeeded.length }), 'success')
-        return { succeeded, failed }
+      const makeAbort = (): Error => {
+        const e = new Error('aborted')
+        e.name = 'AbortError'
+        return e
       }
 
-      console.error('[deleteFilesBatch] partial failure:', failed)
-      onShowMessage(
-        t('toast.batchDelete.partial', {
-          succeeded: succeeded.length,
-          failed: failed.length
-        }),
-        'error'
-      )
+      const final = await stagedRef.current.run({
+        taskType: 'batch',
+        title: t('taskProgress.phase.processing'),
+        stageLabels: [
+          t('taskProgress.phase.preparing'),
+          t('taskProgress.phase.processing'),
+          t('taskProgress.phase.finalizing')
+        ],
+        canCancel: true,
+        total: ids.length,
+        execute: async ({ setStage, tick, signal }) => {
+          setStage(0)
+          setStage(0, 'done')
+          setStage(1)
+          const settled = await settleWithConcurrency(
+            ids,
+            DELETE_CONCURRENCY,
+            async (id) => {
+              if (signal.aborted) throw makeAbort()
+              const filePath = pathById.get(id)
+              if (!filePath) throw new Error(t('toast.batchDelete.missingFile', { id }))
+              const fileResult = await api.file.delete([filePath])
+              if (!fileResult.success) throw new Error(fileResult.message)
+              const dbResult = await api.mediaAction.softDelete([Number(id)])
+              if (!dbResult.success) throw new Error(dbResult.message)
+            },
+            (done) => tick(done, ids.length),
+            signal
+          )
+          settled.forEach((result, index) => {
+            const id = ids[index]
+            if (result.status === 'fulfilled') {
+              succeeded.push(id)
+              return
+            }
+            const reason: unknown = result.reason
+            failed.push({ id, error: reason instanceof Error ? reason.message : String(reason) })
+          })
+          if (signal.aborted) throw makeAbort()
+          setStage(1, 'done')
+          setStage(2)
+          if (succeeded.length > 0) deleteMediaFiles(succeeded)
+          setStage(2, 'done')
+        }
+      })
+
+      if (final?.phase === 'cancelled') {
+        onShowMessage(t('taskProgress.phase.cancelled'), 'error')
+      } else if (failed.length === 0) {
+        onShowMessage(t('toast.batchDelete.allSucceeded', { count: succeeded.length }), 'success')
+        return { succeeded, failed }
+      } else {
+        console.error('[deleteFilesBatch] partial failure:', failed)
+        onShowMessage(
+          t('toast.batchDelete.partial', {
+            succeeded: succeeded.length,
+            failed: failed.length
+          }),
+          'error'
+        )
+      }
       return { succeeded, failed }
     },
     [deleteMediaFiles, onShowMessage, t]
@@ -407,7 +453,10 @@ export function useFileOperations(options: UseFileOperationsOptions) {
       getDeleteConfirm,
       deleteFilesBatch,
       handleToggleFavorite,
-      formatProperties
+      formatProperties,
+      deleteProgress: staged.progress,
+      cancelDelete: staged.cancel,
+      resetDelete: staged.reset
     }),
     [
       handleOpen,
@@ -419,7 +468,10 @@ export function useFileOperations(options: UseFileOperationsOptions) {
       getDeleteConfirm,
       deleteFilesBatch,
       handleToggleFavorite,
-      formatProperties
+      formatProperties,
+      staged.progress,
+      staged.cancel,
+      staged.reset
     ]
   )
 }

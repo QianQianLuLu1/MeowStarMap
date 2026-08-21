@@ -74,6 +74,53 @@ export class ImportRootRepository {
     await this.runWrite('DELETE FROM import_roots WHERE LOWER(root_path) = LOWER(?)', [normalized])
   }
 
+  /**
+   * 返回启用态（disabled=0）的导入根，供图库放行使用。
+   * 已关闭（disabled=1）的目录不返回，从而不在图库显示。
+   */
+  listEnabledImportRoots(): string[] {
+    const rows = this.db
+      .prepare('SELECT root_path FROM import_roots WHERE disabled = 0 ORDER BY id')
+      .all() as Array<{ root_path: unknown }>
+    const roots: string[] = []
+    for (const row of rows) {
+      if (typeof row.root_path === 'string' && row.root_path.length > 0) {
+        roots.push(row.root_path)
+      }
+    }
+    return roots
+  }
+
+  /**
+   * 返回全部导入根（无论启用/禁用）作为路径前缀集合，供缓存板块排除使用。
+   * 必须包含 disabled=1 的目录：关闭目录的媒体记录仍留在库中，
+   * 若不排除，会作为"非HQ game 文件"残留在缓存板块（本修复要消除的现象）。
+   */
+  listAllImportRootPrefixes(): string[] {
+    const rows = this.db.prepare('SELECT root_path FROM import_roots ORDER BY id').all() as Array<{
+      root_path: unknown
+    }>
+    const roots: string[] = []
+    for (const row of rows) {
+      if (typeof row.root_path === 'string' && row.root_path.length > 0) {
+        roots.push(row.root_path)
+      }
+    }
+    return roots
+  }
+
+  /**
+   * 关闭一个导入根：标记 disabled=1，保留行与媒体记录。
+   * 由查询层（图库仅放行启用、缓存排除全量）使该目录媒体在图库与缓存均不显示，记录可恢复。
+   * @throws rootPath 归一化后为空时抛错
+   */
+  async disableImportRoot(rootPath: string): Promise<void> {
+    const normalized = this.requireRootPath(rootPath, 'disableImportRoot')
+    await this.runWrite('UPDATE import_roots SET disabled = 1 WHERE LOWER(root_path) = LOWER(?)', [
+      normalized
+    ])
+  }
+
   // ==========================================================================
   // Private
   // ==========================================================================

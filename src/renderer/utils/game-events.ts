@@ -43,43 +43,56 @@ export interface GameEvent {
 /**
  * 无限暖暖版本更新时间表
  * 按时间升序排列；仅收录已确认的版本日期
- * 数据来源：官方维护公告与游戏内版本号
+ * 数据来源：官方维护公告、B站WIKI、17173、百度百科、3DM、官方论坛（多源交叉核实）
+ * 最近核实日期：2026-08-19
  *
- * TODO: i18n: 版本主题名为游戏专有名词，需重构为存储 i18n key 并在 UI 层 t() 解析
+ * 版本主题名（name）为游戏专有名词，直显即可；endDate 留空由逻辑自动取下一版本 startDate 前一天。
+ * 维护：直接在本数组按 startDate 升序追加/修正即可，无需改任何逻辑代码。
  */
 export const GAME_VERSIONS: GameVersion[] = [
-  { version: '1.0', name: '开服首版', startDate: '2024-12-05' },
-  { version: '1.1', name: '新春特别版', startDate: '2025-01-24' },
-  { version: '1.3', name: '初春版', startDate: '2025-02-26' },
+  { version: '1.0', name: '探索季', startDate: '2024-12-05' },
+  { version: '1.1', name: '流星季', startDate: '2024-12-30' },
+  { version: '1.2', name: '花焰季', startDate: '2025-01-24' },
+  { version: '1.3', name: '传说季', startDate: '2025-02-26' },
   { version: '1.4', name: '妄想季', startDate: '2025-03-26' },
   { version: '1.5', name: '泡泡季', startDate: '2025-04-29' },
   { version: '1.6', name: '天真季', startDate: '2025-06-13' },
   { version: '1.7', name: '蓝泪季', startDate: '2025-07-08' },
   { version: '1.8', name: '丹青季', startDate: '2025-07-30' },
   { version: '1.9', name: '音乐季', startDate: '2025-09-02' },
-  { version: '2.0', name: '二周年', startDate: '2025-11-26' },
-  { version: '2.2', name: '更新版', startDate: '2026-02-02' },
-  { version: '2.3', name: '予我无冕之心', startDate: '2026-03-03' }
+  { version: '2.0', name: '祷声起诸大地', startDate: '2025-11-26' },
+  { version: '2.1', name: '若生命如诗', startDate: '2026-01-07' },
+  { version: '2.2', name: '九色万相生', startDate: '2026-01-30' },
+  { version: '2.3', name: '予我无冕之心', startDate: '2026-03-03' },
+  { version: '2.4', name: '嘘！森林不必听', startDate: '2026-03-27' },
+  { version: '2.5', name: '万灵的归途', startDate: '2026-04-24' },
+  { version: '2.6', name: '潮汐尽头的明天', startDate: '2026-05-29' },
+  { version: '2.7', name: '千星所向的旅途', startDate: '2026-06-24' },
+  { version: '2.8', name: '黄金尘', startDate: '2026-07-17' }
 ]
 
 /**
  * 限时活动时间表
  * 仅收录公开活动中可明确查证起止日期的；后续可追加
- *
- * TODO: i18n: 活动名/描述需重构为存储 i18n key 并在 UI 层 t() 解析
  */
 export const GAME_EVENTS: GameEvent[] = [
   {
-    name: '暖暖生日惊喜速递',
+    name: '开服预热·暖暖生日惊喜速递',
     startDate: '2024-11-30',
     endDate: '2024-12-31',
-    description: '开服预热活动'
+    description: '开服前的预热活动'
   },
   {
-    name: '新春特别活动',
+    name: '1.2 花焰季·贺岁集市',
     startDate: '2025-01-24',
-    endDate: '2025-02-25',
-    description: '1.1 版本限时活动'
+    endDate: '2025-02-26',
+    description: '1.2 版本限时活动'
+  },
+  {
+    name: '2.8 黄金尘·主线终章（下）',
+    startDate: '2026-08-07',
+    endDate: '2026-08-28',
+    description: '2.8 版本下半主线任务'
   }
 ]
 

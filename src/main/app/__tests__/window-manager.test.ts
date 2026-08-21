@@ -20,7 +20,8 @@ const {
   logStartupErrorMock,
   loggerErrorMock,
   BrowserWindowCtorMock,
-  getFocusedWindowMock
+  getFocusedWindowMock,
+  markBootSuccessMock
 } = vi.hoisted(() => ({
   showMessageBoxMock: vi.fn(),
   appQuitMock: vi.fn(),
@@ -28,7 +29,8 @@ const {
   logStartupErrorMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   BrowserWindowCtorMock: vi.fn(),
-  getFocusedWindowMock: vi.fn(() => null)
+  getFocusedWindowMock: vi.fn(() => null),
+  markBootSuccessMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -63,6 +65,10 @@ vi.mock('../../utils/logger', () => ({
 vi.mock('../../utils/startup-diagnostic', () => ({
   logStartupError: logStartupErrorMock,
   diagLog: vi.fn()
+}))
+
+vi.mock('../gpu-fallback', () => ({
+  markBootSuccess: markBootSuccessMock
 }))
 
 import { createMainWindow, getMainWindow } from '../window-manager'
@@ -140,6 +146,7 @@ beforeEach(() => {
   loggerErrorMock.mockReset()
   BrowserWindowCtorMock.mockReset()
   getFocusedWindowMock.mockReset()
+  markBootSuccessMock.mockReset()
 
   // 默认：getFocusedWindow 返回 null
   getFocusedWindowMock.mockReturnValue(null)
@@ -349,6 +356,24 @@ describe('createMainWindow', () => {
       await new Promise((resolve) => setTimeout(resolve, 0))
       expect(logFaultMock).not.toHaveBeenCalled()
     }
+  })
+
+  it('15. did-finish-load 触发时调用 markBootSuccess（GPU 回退失败计数清零）', async () => {
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+
+    lastCreatedWindow!.webContents._emit('did-finish-load')
+
+    expect(markBootSuccessMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('16. 开发模式分支不注册 did-finish-load（markBootSuccess 不被调用）', async () => {
+    process.env.NODE_ENV = 'development'
+    await createMainWindow(makeAppCtx())
+
+    lastCreatedWindow!.webContents._emit('did-finish-load')
+
+    expect(markBootSuccessMock).not.toHaveBeenCalled()
   })
 })
 

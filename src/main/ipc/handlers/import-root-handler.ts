@@ -28,7 +28,9 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
         c.dbManager.getWorkerBridge(),
         c.dbManager.getDbPath()
       )
-      return repo.listImportRoots()
+      // 仅返回启用态（disabled=0）目录；已关闭（disabled=1）目录不在设置列表展示，
+      // 其媒体由查询层在图库与缓存中共同隐藏（保留记录可经重新扫描恢复）。
+      return repo.listEnabledImportRoots()
     })
   )
 
@@ -52,37 +54,49 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
           c.dbManager.getDbPath()
         )
 
-        // 1) 先移除 import_roots 登记（核心操作，失败即整体失败）
-        let removed = false
-        try {
-          await importRootRepo.removeImportRoot(rootPath)
-          removed = true
-        } catch (err) {
-          logger.error('[ImportRoot] 移除导入根失败:', err)
-          throw AppError.internal(
-            `移除指定目录失败: ${err instanceof Error ? err.message : String(err)}`
-          )
-        }
-
-        // 2) 媒体软删独立于 import_roots 移除：任一失败不影响另一操作结果
-        let cleared = 0
-        // FIX(组1-2): 软删失败必须可区分——原实现仅记日志并返回 cleared:0，
-        // 前端无法区分"该根下无媒体记录"与"软删失败"（且 import_roots 行已删，
-        // 此入口无法重试软删）。返回 clearFailed + 错误消息，前端给出明确提示。
-        let clearFailed = false
-        let clearErrorMessage: string | undefined
-        if (clearRecords && removed) {
+        // 1) 按 clearRecords 分流：
+        //   - true ：彻底移除——删除 import_roots 行 + 软删该根下 media_files 记录（进回收站，可恢复）。
+        //            媒体在图库与缓存都不再显示（记录已软删）。
+        //   - false：关闭但保留记录——标记 disabled=1，保留 import_roots 行与媒体记录，
+        //            由查询层（图库仅放行启用、缓存排除全量）使该目录媒体在图库与缓存均不显示，记录可经重新扫描恢复。
+        if (clearRecords) {
+          // 1a) 移除 import_roots 登记（核心操作，失败即整体失败）
+          let removed = false
           try {
-            cleared = await mediaRepo.softDeleteByRootPath(rootPath)
-            c.notifyMediaUpdated()
+            await importRootRepo.removeImportRoot(rootPath)
+            removed = true
           } catch (err) {
-            // 媒体软删失败不影响 import_roots 行移除结果（removed 仍为 true）
-            logger.error('[ImportRoot] 清除目录媒体索引记录失败（指定目录已移除）:', err)
-            clearFailed = true
-            clearErrorMessage = err instanceof Error ? err.message : String(err)
+            logger.error('[ImportRoot] 移除导入根失败:', err)
+            throw AppError.internal(
+              `移除指定目录失败: ${err instanceof Error ? err.message : String(err)}`
+            )
           }
+
+          // 1b) 媒体软删独立于 import_roots 移除：任一失败不影响另一操作结果
+          let cleared = 0
+          // FIX(组1-2): 软删失败必须可区分——原实现仅记日志并返回 cleared:0，
+          // 前端无法区分"该根下无媒体记录"与"软删失败"（且 import_roots 行已删，
+          // 此入口无法重试软删）。返回 clearFailed + 错误消息，前端给出明确提示。
+          let clearFailed = false
+          let clearErrorMessage: string | undefined
+          if (removed) {
+            try {
+              cleared = await mediaRepo.softDeleteByRootPath(rootPath)
+              c.notifyMediaUpdated()
+            } catch (err) {
+              // 媒体软删失败不影响 import_roots 行移除结果（removed 仍为 true）
+              logger.error('[ImportRoot] 清除目录媒体索引记录失败（指定目录已移除）:', err)
+              clearFailed = true
+              clearErrorMessage = err instanceof Error ? err.message : String(err)
+            }
+          }
+          return { removed, cleared, clearFailed, clearErrorMessage }
+        } else {
+          // 2) 关闭但保留记录：标记 disabled=1，保留行与媒体，查询层双隐藏
+          await importRootRepo.disableImportRoot(rootPath)
+          c.notifyMediaUpdated()
+          return { removed: true, cleared: 0, clearFailed: false, disabled: true }
         }
-        return { removed, cleared, clearFailed, clearErrorMessage }
       }
     )
   )

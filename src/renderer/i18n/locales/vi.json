@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "Cập nhật",
+      "updateNetworkBusy": "Mạng đang bận. Nhấn OK để mở trang chủ.",
+      "updateNoNewVersion": "Bạn đã dùng phiên bản mới nhất"
     },
     "backup": {
       "archiveTag": "Hồ sơ: {{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "Tự động quét khi khởi động",
       "autoScanDesc": "Khi được bật, ứng dụng sẽ tự động quét đường dẫn trò chơi để tìm tệp phương tiện mới khi khởi động.",
+      "hardwareAcceleration": "Tăng tốc phần cứng GPU",
+      "hardwareAccelerationDesc": "Khi tắt, ứng dụng dùng render bằng phần mềm để tránh lỗi khởi động trên một số GPU. Cần khởi động lại để áp dụng.",
+      "hardwareAccelerationRestartHint": "Đã lưu cài đặt tăng tốc phần cứng GPU. Khởi động lại ứng dụng để áp dụng. Khởi động lại ngay?",
+      "restartNow": "Khởi động lại ngay",
+      "restartLater": "Để sau",
       "description": "Cấu hình hành vi tự động khi khởi động ứng dụng",
       "title": "Hành vi khởi động"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "Đã tắt tự động quét khi khởi động",
     "autoScanOn": "Đã bật tự động quét khi khởi động",
+    "gpuOn": "Đã bật tăng tốc phần cứng GPU (áp dụng sau khi khởi động lại)",
+    "gpuOff": "Đã tắt tăng tốc phần cứng GPU (áp dụng sau khi khởi động lại)",
     "batchThresholdOff": "Đã tắt ngưỡng thao tác hàng loạt",
     "batchThresholdOn": "Đã bật ngưỡng thao tác hàng loạt",
     "batchThresholdSet": "Ngưỡng thao tác hàng loạt đã được đặt thành {{count}}",

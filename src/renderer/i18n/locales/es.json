@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "Actualización",
+      "updateNetworkBusy": "La red está ocupada. Haga clic en Aceptar para abrir el sitio web.",
+      "updateNoNewVersion": "Ya tiene la última versión"
     },
     "backup": {
       "archiveTag": "Perfil: {{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "Escaneo automático al iniciar",
       "autoScanDesc": "Cuando está activado, la aplicación escaneará automáticamente las rutas del juego en busca de nuevos archivos multimedia al iniciar.",
+      "hardwareAcceleration": "Aceleración de hardware de GPU",
+      "hardwareAccelerationDesc": "Al desactivarla se usa renderizado por software para evitar fallos de inicio en algunas tarjetas gráficas. Requiere reiniciar para aplicar.",
+      "hardwareAccelerationRestartHint": "La configuración de aceleración de hardware de GPU se guardó. Reinicia la aplicación para aplicarla. ¿Reiniciar ahora?",
+      "restartNow": "Reiniciar ahora",
+      "restartLater": "Más tarde",
       "description": "Configuración de comportamiento automático al iniciar la aplicación",
       "title": "Comportamiento de inicio"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "Escaneo automático al iniciar desactivado",
     "autoScanOn": "Escaneo automático al iniciar activado",
+    "gpuOn": "Aceleración de hardware de GPU activada (se aplica tras reiniciar)",
+    "gpuOff": "Aceleración de hardware de GPU desactivada (se aplica tras reiniciar)",
     "batchThresholdOff": "Umbral de operación por lotes desactivado",
     "batchThresholdOn": "Umbral de operación por lotes activado",
     "batchThresholdSet": "Umbral de operación por lotes establecido en {{count}}",

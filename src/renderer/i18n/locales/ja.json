@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "アップデート",
+      "updateNetworkBusy": "ネットワークが混雑しています。OKをクリックして公式サイトを開きます。",
+      "updateNoNewVersion": "すでに最新バージョンです"
     },
     "backup": {
       "archiveTag": "プロファイル：{{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "起動時に自動スキャン",
       "autoScanDesc": "有効にすると、アプリ起動時にゲームパスの新規メディアファイルを自動的にスキャンします。",
+      "hardwareAcceleration": "GPU ハードウェアアクセラレーション",
+      "hardwareAccelerationDesc": "無効にするとソフトウェアレンダリングに切り替わり、一部のGPUでの起動クラッシュを防ぎます。適用には再起動が必要です。",
+      "hardwareAccelerationRestartHint": "GPUハードウェアアクセラレーションの設定を保存しました。適用するにはアプリを再起動してください。今すぐ再起動しますか？",
+      "restartNow": "今すぐ再起動",
+      "restartLater": "後で",
       "description": "アプリ起動時の自動動作設定",
       "title": "起動動作"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "起動時自動スキャンを無効化",
     "autoScanOn": "起動時自動スキャンを有効化",
+    "gpuOn": "GPUハードウェアアクセラレーションを有効化しました（再起動後に適用）",
+    "gpuOff": "GPUハードウェアアクセラレーションを無効化しました（再起動後に適用）",
     "batchThresholdOff": "バッチ操作しきい値を無効化",
     "batchThresholdOn": "バッチ操作しきい値を有効化",
     "batchThresholdSet": "バッチ操作しきい値を {{count}} に設定",

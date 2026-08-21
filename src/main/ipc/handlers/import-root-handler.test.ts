@@ -106,9 +106,9 @@ describe('registerImportRootHandlers', () => {
     expect(channels).toContain('import:removeRoot')
   })
 
-  it('import:roots 返回 import_roots 全量路径', async () => {
+  it('import:roots 仅返回启用态（disabled=0）目录', async () => {
     const listSpy = vi
-      .spyOn(ImportRootRepository.prototype, 'listImportRoots')
+      .spyOn(ImportRootRepository.prototype, 'listEnabledImportRoots')
       .mockReturnValue(['D:/Photos', 'E:/Videos'])
     registerImportRootHandlers(makeCtx({}))
     const result = (await getHandler(handleMock, 'import:roots')()) as {
@@ -119,7 +119,10 @@ describe('registerImportRootHandlers', () => {
     expect(result.data).toEqual(['D:/Photos', 'E:/Videos'])
   })
 
-  it('import:removeRoot clearRecords=false：仅调用 removeImportRoot，不调 softDeleteByRootPath', async () => {
+  it('import:removeRoot clearRecords=false：调用 disableImportRoot（保留行与媒体），不调 removeImportRoot / softDeleteByRootPath', async () => {
+    const disableSpy = vi
+      .spyOn(ImportRootRepository.prototype, 'disableImportRoot')
+      .mockResolvedValue(undefined)
     const removeSpy = vi
       .spyOn(ImportRootRepository.prototype, 'removeImportRoot')
       .mockResolvedValue(undefined)
@@ -127,15 +130,16 @@ describe('registerImportRootHandlers', () => {
     registerImportRootHandlers(makeCtx({}))
     const result = (await getHandler(handleMock, 'import:removeRoot')(['D:/Photos', false])) as {
       success: true
-      data: { removed: boolean; cleared: number }
+      data: { removed: boolean; cleared: number; disabled?: boolean }
     }
-    expect(removeSpy).toHaveBeenCalledWith('D:/Photos')
+    expect(disableSpy).toHaveBeenCalledWith('D:/Photos')
+    expect(removeSpy).not.toHaveBeenCalled()
     expect(softSpy).not.toHaveBeenCalled()
     expect(result.data).toEqual({
       removed: true,
       cleared: 0,
       clearFailed: false,
-      clearErrorMessage: undefined
+      disabled: true
     })
   })
 

@@ -5,6 +5,7 @@ import type { AppContext } from './app-context'
 import { logger } from '../utils/logger'
 import { logFault } from '../utils/logger'
 import { logStartupError, diagLog } from '../utils/startup-diagnostic'
+import { markBootSuccess } from './gpu-fallback'
 
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
 // 单独一处都能被绕过：响应头缺失时靠 meta，HTML 被替换时靠响应头。
@@ -117,6 +118,8 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     })
     mainWindow.webContents.on('did-finish-load', () => {
       diagLog('WIN', 'did-finish-load: page loaded successfully')
+      // GPU 回退状态机：页面成功渲染即清零连续启动失败计数（fallbackActive 保留）
+      markBootSuccess()
     })
     mainWindow.webContents.on('console-message', (details) => {
       // Electron v35+ 改为单一事件对象，level 由数字改为字符串枚举

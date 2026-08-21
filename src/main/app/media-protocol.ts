@@ -2,6 +2,7 @@ import { protocol } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import type Database from 'better-sqlite3'
+import type { HandlerContext } from '../ipc/handler-context'
 import type { AppContext } from './app-context'
 import { MEDIA_EXTENSIONS, getMimeType } from '../utils/media-constants'
 import { MEDIA_CACHE_TTL_MS } from '../utils/constants'
@@ -226,7 +227,7 @@ function createManagedReadStream(
  * 已修复 A-S2/C-F5：原实现 source_path 前缀匹配无扩展名限制，扫描 D:\ 后可读取整盘任意文件
  * 已修复 A-S1/C-S2：原实现每次请求都执行数据库查询，现使用内存缓存（TTL 5分钟）
  */
-function isMediaPathAllowed(ctx: AppContext, filePath: string): boolean {
+export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boolean {
   const db = ctx.dbManager.getDatabase()
   if (!db) return false
 

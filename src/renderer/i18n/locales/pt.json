@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "Atualização",
+      "updateNetworkBusy": "A rede está ocupada. Clique em OK para abrir o site oficial.",
+      "updateNoNewVersion": "Você já está na versão mais recente"
     },
     "backup": {
       "archiveTag": "Perfil: {{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "Digitalização automática ao iniciar",
       "autoScanDesc": "Quando ativado, o aplicativo digitalizará automaticamente os caminhos do jogo em busca de novos arquivos de mídia ao iniciar.",
+      "hardwareAcceleration": "Aceleração de hardware da GPU",
+      "hardwareAccelerationDesc": "Ao desativar, usa renderização por software para evitar falhas de inicialização em alguns GPUs. É necessário reiniciar para aplicar.",
+      "hardwareAccelerationRestartHint": "A configuração de aceleração de hardware da GPU foi salva. Reinicie o aplicativo para aplicá-la. Reiniciar agora?",
+      "restartNow": "Reiniciar agora",
+      "restartLater": "Mais tarde",
       "description": "Configuração de comportamento automático ao iniciar o aplicativo",
       "title": "Comportamento de inicialização"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "Digitalização automática ao iniciar desativada",
     "autoScanOn": "Digitalização automática ao iniciar ativada",
+    "gpuOn": "Aceleração de hardware da GPU ativada (aplica após reiniciar)",
+    "gpuOff": "Aceleração de hardware da GPU desativada (aplica após reiniciar)",
     "batchThresholdOff": "Limite de operação em lote desativado",
     "batchThresholdOn": "Limite de operação em lote ativado",
     "batchThresholdSet": "Limite de operação em lote definido para {{count}}",

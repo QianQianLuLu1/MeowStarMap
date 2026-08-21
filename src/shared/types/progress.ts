@@ -25,6 +25,21 @@ export type TaskPhase =
   | 'cancelled' // 已取消
   | 'error' // 异常
 
+/** 阶段步骤状态（用于「阶段步骤」进度可视化） */
+export type TaskStageStatus = 'pending' | 'active' | 'done' | 'failed'
+
+/** 单个阶段步骤（删除/批量任务可拆成「准备→处理→收尾」等步骤实时展示） */
+export interface TaskStage {
+  /** 阶段唯一 id（通常下标字符串） */
+  id: string
+  /** 阶段文案（建议传已翻译字符串） */
+  label: string
+  /** 阶段状态 */
+  status: TaskStageStatus
+  /** 可选详情（如失败原因） */
+  detail?: string
+}
+
 /**
  * 统一进度状态
  * - 主进程通过 task:progress 通道推送
@@ -58,6 +73,8 @@ export interface TaskProgress {
   currentPath?: string
   /** 已发现文件数（scan 任务特有） */
   found?: number
+  /** 阶段步骤列表（可选；存在时 UI 渲染步骤进度，如 准备→处理→收尾） */
+  stages?: TaskStage[]
 }
 
 /**

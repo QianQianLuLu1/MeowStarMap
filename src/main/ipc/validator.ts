@@ -67,6 +67,15 @@ export const schemas = {
       t('main.validator.mediaIdsMaxLength', { max: MAX_MEDIA_ID_ARRAY_SIZE })
     ),
 
+  /**
+   * mediaId 批量数组（用于软删除/恢复/彻底删除）：保留元素级校验（正整数 + 非空），
+   * 但**去掉 1000 人为上限**——下游 media-repository 经 sql-chunk 的 chunkArray 已按 500 分片，
+   * 可承载任意长度数组。修复「参数校验失败：mediaId 数组长度上限 1000」批量删除报错。
+   */
+  mediaIdArrayBulk: z
+    .array(z.number().int().positive(t('main.validator.mediaIdPositive')))
+    .min(1, t('main.validator.mediaIdsRequired')),
+
   /** 评分（0-5 整数） */
   rating: z.number().int().min(0).max(5, t('main.validator.ratingRange')),
 

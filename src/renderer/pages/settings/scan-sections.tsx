@@ -359,6 +359,9 @@ export const ImportRootsSection: React.FC = () => {
             {t('settings.scan.importRootsConfirmClearRecords')}
           </span>
         </label>
+        <p className="text-xs mt-1.5" style={{ color: 'var(--text-tertiary)' }}>
+          {t('settings.scan.importRootsClearRecordsHint')}
+        </p>
       </BaseDialog>
     </SectionShell>
   )

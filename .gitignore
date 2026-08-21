@@ -119,6 +119,15 @@ vite.config.ts.timestamp-*.mjs
 .codegraph/
 .qoder/
 
+# ===== Local test/build debug artifacts (不入仓) =====
+.alltest.txt
+.lint.txt
+.tc.txt
+.tmp-*.txt
+.tmp-*.err
+.vitest-debug.txt
+vitest-result.txt
+
 # ===== Runtime user data (Chromium 运行时数据，不入仓) =====
 .verify-userdata/
 

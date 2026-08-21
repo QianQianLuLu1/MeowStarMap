@@ -775,6 +775,13 @@ describe('DatabaseManager', () => {
       expect(result).toBeDefined()
     })
 
+    it('初始化后 import_roots 表含 disabled 列（指定目录关闭语义迁移成功）', async () => {
+      await manager.initialize()
+      // 通过 UPDATE 验证列存在；新建库由建表 DDL 含列，已发布库由 safeEnsureColumn 幂等 ALTER 补充
+      const result = manager.execute('UPDATE import_roots SET disabled = 0 WHERE id = 1')
+      expect(result).toBeDefined()
+    })
+
     it('初始化后 media_files 表含 phash 列', async () => {
       await manager.initialize()
       const result = manager.execute('UPDATE media_files SET phash = NULL WHERE id = 1')

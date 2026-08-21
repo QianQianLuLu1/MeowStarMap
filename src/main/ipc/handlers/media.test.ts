@@ -20,6 +20,7 @@ const {
   repoMock,
   generatePhashForUnprocessedMock,
   markDuplicatesMock,
+  loggerWarnMock,
   schemasProxy
 } = vi.hoisted(() => {
   // 链式 mock：支持任意属性访问与方法调用，返回值仍可继续链式调用
@@ -99,6 +100,7 @@ const {
     },
     generatePhashForUnprocessedMock: vi.fn(),
     markDuplicatesMock: vi.fn(),
+    loggerWarnMock: vi.fn(),
     schemasProxy
   }
 })
@@ -133,7 +135,7 @@ vi.mock('../../services/thumbnail-phash-service', () => ({
 }))
 
 vi.mock('../../utils/logger', () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  logger: { info: vi.fn(), warn: loggerWarnMock, error: vi.fn(), debug: vi.fn() },
   logFault: vi.fn(),
   getLogDirectory: vi.fn(() => '/mock/logs')
 }))
@@ -248,6 +250,7 @@ describe('registerMediaHandlers', () => {
     pickBestIdMock.mockReset()
     generatePhashForUnprocessedMock.mockReset()
     markDuplicatesMock.mockReset()
+    loggerWarnMock.mockClear()
     Object.values(repoMock).forEach((fn) => (fn as ReturnType<typeof vi.fn>).mockClear?.())
     // 重设默认返回值
     repoMock.cleanupMissingRecords.mockReturnValue(0)
@@ -459,6 +462,73 @@ describe('registerMediaHandlers', () => {
     expect(result.data.message).toContain('失败')
   })
 
+  // ── 缺陷修复：mediaId 数组 1000 人为上限导致批量删除报错 ──
+  // 下游 media-repository 经 sql-chunk 的 chunkArray 已按 500 分片，可承载任意长度数组。
+  it('media:softDelete 传入 1500 个合法 id 通过校验并调用 softDeleteBatch(1500)', async () => {
+    registerMediaHandlers(makeCtx())
+    const ids = Array.from({ length: 1500 }, (_, i) => i + 1)
+    const result = (await getHandler('media:softDelete')([ids])) as {
+      success: true
+      data: { success: boolean; message: string }
+    }
+    expect(result.success).toBe(true)
+    expect(repoMock.softDeleteBatch).toHaveBeenCalledWith(ids)
+    expect(repoMock.softDeleteBatch.mock.calls[0][0]).toHaveLength(1500)
+  })
+
+  it('media:restore 传入 1200 个合法 id 通过校验并调用 restoreBatch(1200)', async () => {
+    registerMediaHandlers(makeCtx())
+    const ids = Array.from({ length: 1200 }, (_, i) => i + 1)
+    const result = (await getHandler('media:restore')([ids])) as {
+      success: true
+      data: { message: string }
+    }
+    expect(result.success).toBe(true)
+    expect(repoMock.restoreBatch).toHaveBeenCalledWith(ids)
+    expect(repoMock.restoreBatch.mock.calls[0][0]).toHaveLength(1200)
+  })
+
+  it('media:permanentDelete 传入 2000 个合法 id 二次确认通过后分片 hardDeleteBatch', async () => {
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    const ids = Array.from({ length: 2000 }, (_, i) => i + 1)
+    repoMock.getMediaPathsByIds.mockReturnValue(ids.map((id) => ({ id, file_path: `/f${id}` })))
+    trashItemMock.mockResolvedValue(undefined)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:permanentDelete')([ids])) as {
+      success: true
+      data: { deletedCount: number; failedCount: number }
+    }
+    expect(repoMock.softDeleteForPermanentDelete).toHaveBeenCalledWith(ids)
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith(ids)
+    expect(repoMock.hardDeleteBatch.mock.calls[0][0]).toHaveLength(2000)
+    expect(result.data.deletedCount).toBe(2000)
+    expect(result.data.failedCount).toBe(0)
+  })
+
+  it('media:softDelete 空数组原样透传（元素级校验由 validator.test.ts 真实 schema 覆盖）', async () => {
+    // 注意：media.test.ts 通过 vi.mock('../validator') 将 schemas 替换为链式 proxy、
+    // wrapHandler 改为仅解包首参（不执行 zod 校验）。元素级校验（非空/正整数/1000 上限）
+    // 统一由 validator.test.ts 对真实 schema 的单元测试覆盖。本用例仅验证 handler
+    // 转发契约：接收到的 mediaIds 原样透传给 repo，handler 自身不施加任何长度截断。
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:softDelete')([[]])) as {
+      success: true
+      data: { success: boolean; message: string }
+    }
+    expect(result.success).toBe(true)
+    expect(repoMock.softDeleteBatch).toHaveBeenCalledWith([])
+  })
+
+  it('media:softDelete 含非正整数仍原样透传（元素级校验由 validator.test.ts 覆盖）', async () => {
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:softDelete')([[1, 0, -5, 1.5, 99]])) as {
+      success: true
+      data: { success: boolean; message: string }
+    }
+    expect(result.success).toBe(true)
+    expect(repoMock.softDeleteBatch).toHaveBeenCalledWith([1, 0, -5, 1.5, 99])
+  })
+
   it('media:emptyRecycleBin 回收站为空时返回提示', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([])
     registerMediaHandlers(makeCtx())
@@ -536,11 +606,12 @@ describe('registerMediaHandlers', () => {
       { id: 2, file_path: '/ok-b' }
     ])
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    // 第一项失败（文件存在），第二项成功
-    trashItemMock
-      .mockRejectedValueOnce(new Error('permission denied'))
-      .mockResolvedValueOnce(undefined)
-    pathExistsMock.mockResolvedValueOnce(true) // /locked-a 仍存在 → failed
+    // /locked-a 持续失败（文件仍存在），/ok-b 成功。
+    // 用「路径键控」而非「调用序列」模拟，使断言不依赖内部重试次数。
+    trashItemMock.mockImplementation(async (p: string) => {
+      if (p === '/locked-a') throw new Error('permission denied')
+    })
+    pathExistsMock.mockResolvedValue(true) // /locked-a 仍存在 → 重试用尽后判 failed
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:emptyRecycleBin')()) as {
       success: true
@@ -553,6 +624,98 @@ describe('registerMediaHandlers', () => {
     expect(result.data.failedCount).toBe(1)
     expect(result.data.message).toContain('失败')
   })
+
+  // ── 缺陷A 修复：trashItem 瞬时失败重试（日志实测 2474 项全失败，错误文本统一为
+  //    「Failed to perform delete operation」，94.5% 文件物理仍存在）
+  it('media:emptyRecycleBin trashItem 首次失败但重试成功时计 movedCount 并删 DB', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/flaky' }])
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    // 首次瞬时失败、重试后成功（Windows Shell 大批量删除的典型瞬时失败）
+    trashItemMock
+      .mockRejectedValueOnce(new Error('Failed to perform delete operation'))
+      .mockResolvedValueOnce(undefined)
+    pathExistsMock.mockResolvedValue(true) // 文件仍存在 → 应重试而非直接判 failed
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { movedCount: number; missingCount: number; failedCount: number }
+    }
+    expect(result.data.movedCount).toBe(1)
+    expect(result.data.failedCount).toBe(0)
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1])
+  })
+
+  it('media:emptyRecycleBin 重试用尽仍失败时保留 DB 记录且不超过重试上限', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 7, file_path: '/always-locked' }])
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    trashItemMock.mockRejectedValue(new Error('Failed to perform delete operation'))
+    pathExistsMock.mockResolvedValue(true) // 文件始终存在 → 重试到上限后判 failed
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { movedCount: number; failedCount: number }
+    }
+    expect(result.data.failedCount).toBe(1)
+    expect(result.data.movedCount).toBe(0)
+    // 失败项不得进入物理删除，保留供用户重试（B1 数据安全约定）
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([])
+    // 首次尝试 + 2 次重试 = 3 次，防止无限重试
+    expect(trashItemMock).toHaveBeenCalledTimes(3)
+  })
+
+  it('media:emptyRecycleBin 重试期间文件消失时判 missing 并删 DB', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 9, file_path: '/vanishing' }])
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    trashItemMock.mockRejectedValue(new Error('Failed to perform delete operation'))
+    // 首次复检仍存在（触发重试），第二次复检已消失 → 应立即判 missing 停止重试
+    pathExistsMock.mockResolvedValueOnce(true).mockResolvedValue(false)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { movedCount: number; missingCount: number; failedCount: number }
+    }
+    expect(result.data.missingCount).toBe(1)
+    expect(result.data.failedCount).toBe(0)
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([9])
+    // 文件消失后不再重试（仅 2 次尝试，未走到第 3 次）
+    expect(trashItemMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('media:emptyRecycleBin 多项失败时日志聚合为一条（避免刷屏）', async () => {
+    const rows = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, file_path: `/locked-${i}` }))
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue(rows)
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    trashItemMock.mockRejectedValue(new Error('Failed to perform delete operation'))
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { failedCount: number }
+    }
+    expect(result.data.failedCount).toBe(5)
+    // 关键：失败日志聚合为一条，而非每项一条（实测 2474 项会刷爆日志文件）
+    expect(loggerWarnMock).toHaveBeenCalledTimes(1)
+    expect(String(loggerWarnMock.mock.calls[0][0])).toContain('5')
+  })
+
+  it('media:emptyRecycleBin 连续失败达阈值后熔断，不再逐项重试', async () => {
+    const rows = Array.from({ length: 14 }, (_, i) => ({ id: i + 1, file_path: `/sys-fail-${i}` }))
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue(rows)
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    trashItemMock.mockRejectedValue(new Error('Failed to perform delete operation'))
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { failedCount: number }
+    }
+    // 正确性不变：全部失败且全部保留 DB
+    expect(result.data.failedCount).toBe(14)
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([])
+    // 系统性故障（如回收站已满/磁盘不足）时熔断：总尝试数应显著小于 14*3=42，
+    // 避免 2474 项全失败场景下重试退避累积成分钟级卡顿
+    expect(trashItemMock.mock.calls.length).toBeLessThan(42)
+  }, 20000)
 
   it('media:cleanupMissing 返回清理数量', async () => {
     repoMock.cleanupMissingRecords.mockReturnValue(3)

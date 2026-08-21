@@ -1283,7 +1283,10 @@
         "typeScript": "",
         "vite": "",
         "vitest": ""
-      }
+      },
+      "updateTitle": "Mise à jour",
+      "updateNetworkBusy": "Le réseau est occupé. Cliquez sur OK pour ouvrir le site officiel.",
+      "updateNoNewVersion": "Vous utilisez déjà la dernière version"
     },
     "backup": {
       "archiveTag": "Profil : {{name}}",
@@ -1567,6 +1570,11 @@
     "startup": {
       "autoScan": "Analyse automatique au démarrage",
       "autoScanDesc": "Lorsqu'activé, l'application analysera automatiquement les chemins du jeu pour les nouveaux fichiers multimédias au démarrage.",
+      "hardwareAcceleration": "Accélération matérielle GPU",
+      "hardwareAccelerationDesc": "La désactivation utilise le rendu logiciel pour éviter les plantages au démarrage sur certaines cartes graphiques. Redémarrage requis pour appliquer.",
+      "hardwareAccelerationRestartHint": "Le paramètre d'accélération matérielle GPU a été enregistré. Redémarrez l'application pour l'appliquer. Redémarrer maintenant ?",
+      "restartNow": "Redémarrer maintenant",
+      "restartLater": "Plus tard",
       "description": "Configuration des comportements automatiques au démarrage de l'application",
       "title": "Démarrage"
     },
@@ -1681,6 +1689,8 @@
   "toast": {
     "autoScanOff": "Analyse automatique au démarrage désactivée",
     "autoScanOn": "Analyse automatique au démarrage activée",
+    "gpuOn": "Accélération matérielle GPU activée (applicable après redémarrage)",
+    "gpuOff": "Accélération matérielle GPU désactivée (applicable après redémarrage)",
     "batchThresholdOff": "Seuil d'opération par lot désactivé",
     "batchThresholdOn": "Seuil d'opération par lot activé",
     "batchThresholdSet": "Seuil d'opération par lot défini sur {{count}}",

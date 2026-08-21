@@ -12,6 +12,8 @@ import { toFileUrl } from '../utils/file'
 import { fetchMediaFromDatabase } from '../stores/mediaStore'
 import type { TaskProgress } from '../../shared/types/progress'
 import type { DuplicateItem, ScanResult } from '../../shared/types/duplicate'
+import { useStagedTask } from '../hooks/useStagedTask'
+import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
 import {
   IconDuplicate,
   IconRefresh,
@@ -483,7 +485,9 @@ export const DuplicatesPage: React.FC = () => {
 
   const clearSelection = useCallback(() => setSelectedToDelete(new Set()), [])
 
-  // 执行删除（软删除到回收站）
+  const staged = useStagedTask()
+
+  // 执行删除（软删除到回收站），带阶段步骤进度
   const performDelete = useCallback(
     async (ids: number[]) => {
       if (ids.length === 0) {
@@ -495,22 +499,40 @@ export const DuplicatesPage: React.FC = () => {
         return
       }
       setOperating(true)
-      try {
-        const res = await window.electronAPI.mediaAction.softDelete(ids)
-        showMessage(res.message, res.success ? 'success' : 'error')
-        if (res.success) {
+      let toastText = t('taskProgress.phase.processing')
+      const final = await staged.run({
+        taskType: 'batch',
+        title: t('taskProgress.phase.processing'),
+        stageLabels: [
+          t('taskProgress.phase.preparing'),
+          t('taskProgress.phase.processing'),
+          t('taskProgress.phase.finalizing')
+        ],
+        canCancel: false,
+        total: ids.length,
+        execute: async ({ setStage }) => {
+          setStage(0)
+          setStage(0, 'done')
+          setStage(1)
+          const res = await window.electronAPI!.mediaAction!.softDelete(ids)
+          if (!res.success) throw new Error(res.message)
+          toastText = res.message
+          setStage(1, 'done')
+          setStage(2)
           setSelectedToDelete(new Set())
-          // 刷新图库 + 重新扫描
           await fetchMediaFromDatabase()
           await runScan(mode)
+          setStage(2, 'done')
         }
-      } catch (err) {
-        showMessage(err instanceof Error ? err.message : t('duplicates.scanFailed'), 'error')
-      } finally {
-        setOperating(false)
+      })
+      if (final?.phase === 'error') {
+        showMessage(final.message ?? t('duplicates.scanFailed'), 'error')
+      } else if (final && final.phase !== 'cancelled') {
+        showMessage(toastText, 'success')
       }
+      setOperating(false)
     },
-    [showMessage, t, runScan, mode]
+    [showMessage, t, runScan, mode, staged]
   )
 
   const handleDeleteConfirm = useCallback(() => {
@@ -1036,6 +1058,9 @@ export const DuplicatesPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* 删除 / 批量删除的阶段步骤进度浮窗 */}
+      <TaskProgressOverlay progress={staged.progress} onCancel={staged.cancel} />
     </div>
   )
 }

@@ -7,6 +7,7 @@ import { SectionShell, GlobalToastContext } from './shared'
 export const GeneralStartupSection: React.FC = () => {
   const { t } = useTranslation()
   const [autoScan, setAutoScan] = useState(true)
+  const [hardwareAccel, setHardwareAccel] = useState(true)
   const showMessage = useContext(GlobalToastContext)
 
   useEffect(() => {
@@ -14,6 +15,8 @@ export const GeneralStartupSection: React.FC = () => {
       if (!window.electronAPI) return
       const a = (await window.electronAPI.settings.get('autoScanOnStartup', true)) as boolean
       setAutoScan(a)
+      const h = (await window.electronAPI.settings.get('hardwareAcceleration', true)) as boolean
+      setHardwareAccel(h)
     }
     load()
   }, [])
@@ -22,6 +25,22 @@ export const GeneralStartupSection: React.FC = () => {
     setAutoScan(value)
     if (window.electronAPI) await window.electronAPI.settings.set('autoScanOnStartup', value)
     showMessage(value ? t('toast.autoScanOn') : t('toast.autoScanOff'))
+  }
+
+  const saveHardwareAccel = async (value: boolean) => {
+    setHardwareAccel(value)
+    if (window.electronAPI) await window.electronAPI.settings.set('hardwareAcceleration', value)
+    showMessage(value ? t('toast.gpuOn') : t('toast.gpuOff'))
+    // 修改需重启生效：询问是否立即重启（按钮 0 = 立即重启）
+    if (window.electronAPI?.dialog?.showMessageBox && window.electronAPI?.app?.relaunch) {
+      const response = await window.electronAPI.dialog.showMessageBox({
+        type: 'info',
+        title: t('settings.startup.hardwareAcceleration'),
+        message: t('settings.startup.hardwareAccelerationRestartHint'),
+        buttons: [t('settings.startup.restartNow'), t('settings.startup.restartLater')]
+      })
+      if (response === 0) await window.electronAPI.app.relaunch()
+    }
   }
 
   return (
@@ -40,6 +59,22 @@ export const GeneralStartupSection: React.FC = () => {
       </label>
       <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
         {t('settings.startup.autoScanDesc')}
+      </p>
+
+      {/* GPU 硬件加速开关（关闭后改用软件渲染，规避部分显卡导致的启动崩溃） */}
+      <label className="flex items-center justify-between cursor-pointer mt-4">
+        <span style={{ color: 'var(--text-primary)' }}>
+          {t('settings.startup.hardwareAcceleration')}
+        </span>
+        <input
+          type="checkbox"
+          checked={hardwareAccel}
+          onChange={(e) => saveHardwareAccel(e.target.checked)}
+          className="w-5 h-5"
+        />
+      </label>
+      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+        {t('settings.startup.hardwareAccelerationDesc')}
       </p>
     </SectionShell>
   )

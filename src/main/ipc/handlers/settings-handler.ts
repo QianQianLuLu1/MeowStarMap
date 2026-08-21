@@ -4,6 +4,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerRaw, assertFileReadPath } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { RENDERER_PREF_KEYS, SECURITY_SENSITIVE_KEYS } from '../../../shared/settings-keys'
+import { writeHardwareAccelPref } from '../../app/gpu-fallback'
 
 // 与设置页 MAX_CUSTOM_PATHS / scanner:start schema 保持一致
 const MAX_CUSTOM_SCAN_PATHS = 64
@@ -75,6 +76,15 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
         if (key === 'customScanPaths') {
           assertCustomScanPaths(value)
           ctx.dbManager.setSetting(key, value)
+          return { saved: true }
+        }
+        // hardwareAcceleration 走内联布尔校验，并双写启动期可同步读取的偏好镜像
+        if (key === 'hardwareAcceleration') {
+          if (typeof value !== 'boolean') {
+            throw AppError.validation('hardwareAcceleration 必须是布尔值')
+          }
+          ctx.dbManager.setSetting(key, value)
+          writeHardwareAccelPref(value)
           return { saved: true }
         }
         // 其余 key 必须在普通偏好白名单内；命中敏感 key 时给出专用通道指引
