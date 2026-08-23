@@ -11,6 +11,7 @@
 import path from 'path'
 import fs from 'fs'
 import os from 'os'
+import { t } from '../i18n'
 // P2-A3：引用 constants 常量替代硬编码数字
 import {
   MAX_PATH_ARRAY_SIZE,
@@ -50,9 +51,10 @@ const USER_CREDENTIAL_DIR_NAMES = new Set(['.ssh', '.aws', '.gnupg', '.kube'])
  * validateNonSensitivePath 在此基础上追加符号链接解析复检。
  */
 export function isSensitivePath(filePath: string): boolean {
+  // 固化 win32 语义（产品仅发布 Windows，测试可跨平台执行）
   let normalized: string
   try {
-    normalized = path.resolve(filePath).toLowerCase()
+    normalized = path.win32.resolve(filePath).toLowerCase()
   } catch {
     return false
   }
@@ -60,11 +62,11 @@ export function isSensitivePath(filePath: string): boolean {
   if (UNC_ADMIN_SHARE_RE.test(normalized)) return true
   let home = ''
   try {
-    home = path.resolve(os.homedir()).toLowerCase()
+    home = path.win32.resolve(os.homedir()).toLowerCase()
   } catch {
     // 测试环境 homedir 可能抛错，跳过用户目录检查
   }
-  if (home && normalized.startsWith(home + path.sep)) {
+  if (home && normalized.startsWith(home + path.win32.sep)) {
     const firstSeg = normalized.slice(home.length + 1).split(/[\\/]/)[0]
     if (USER_CREDENTIAL_DIR_NAMES.has(firstSeg)) return true
   }
@@ -84,20 +86,27 @@ export function validateFilePathArray(
   maxCount = MAX_PATH_ARRAY_SIZE
 ): { valid: boolean; message?: string } {
   if (!Array.isArray(filePaths)) {
-    return { valid: false, message: '参数必须是字符串数组' }
+    return { valid: false, message: t('main.validator.arrayStringRequired') }
   }
   if (filePaths.length === 0) {
-    return { valid: false, message: '路径数组不能为空' }
+    return { valid: false, message: t('main.validator.pathArrayRequired') }
   }
   if (filePaths.length > maxCount) {
-    return { valid: false, message: `路径数量超过上限 ${maxCount}` }
+    return {
+      valid: false,
+      message: t('main.validator.ipcPathArrayMaxLength', { max: String(maxCount) })
+    }
   }
   for (const p of filePaths) {
     if (typeof p !== 'string' || p.length === 0 || p.length > MAX_FILE_PATH_LENGTH) {
-      return { valid: false, message: `路径必须是 1-${MAX_FILE_PATH_LENGTH} 字符的字符串` }
+      return {
+        valid: false,
+        message: t('main.validator.pathStringLength', { max: String(MAX_FILE_PATH_LENGTH) })
+      }
     }
-    if (!path.isAbsolute(p)) {
-      return { valid: false, message: `路径必须是绝对路径: ${p}` }
+    // 固化 win32 语义（产品仅发布 Windows，测试可跨平台执行）
+    if (!path.win32.isAbsolute(p)) {
+      return { valid: false, message: t('main.validator.pathMustAbsolute', { path: p }) }
     }
   }
   return { valid: true }
@@ -112,10 +121,14 @@ export function validateFilePath(filePath: unknown): { valid: boolean; message?:
     filePath.length === 0 ||
     filePath.length > MAX_FILE_PATH_LENGTH
   ) {
-    return { valid: false, message: `路径必须是 1-${MAX_FILE_PATH_LENGTH} 字符的字符串` }
+    return {
+      valid: false,
+      message: t('main.validator.pathStringLength', { max: String(MAX_FILE_PATH_LENGTH) })
+    }
   }
-  if (!path.isAbsolute(filePath)) {
-    return { valid: false, message: `路径必须是绝对路径: ${filePath}` }
+  // 固化 win32 语义（产品仅发布 Windows，测试可跨平台执行）
+  if (!path.win32.isAbsolute(filePath)) {
+    return { valid: false, message: t('main.validator.pathMustAbsolute', { path: filePath }) }
   }
   return { valid: true }
 }
@@ -130,12 +143,12 @@ export function validateNonSensitivePath(filePath: string): { valid: boolean; me
   // 再对真实路径（解析符号链接后）复检——软链把敏感目录映射到普通路径时，
   // realpath 结果仍落在敏感目录内，阻断该绕过通道（路径不存在时 realpath 抛错跳过复检）
   if (isSensitivePath(filePath)) {
-    return { valid: false, message: '出于安全考虑，不允许操作系统敏感目录' }
+    return { valid: false, message: t('main.shell.error.sensitiveDirForbidden') }
   }
   try {
     const real = fs.realpathSync.native(filePath)
     if (isSensitivePath(real)) {
-      return { valid: false, message: '出于安全考虑，不允许操作系统敏感目录' }
+      return { valid: false, message: t('main.shell.error.sensitiveDirForbidden') }
     }
   } catch {
     // 路径不存在或无法解析：保持模式匹配结果（放行）
@@ -170,10 +183,13 @@ export function validateNumberRange(
   name = 'value'
 ): { valid: boolean; message?: string } {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    return { valid: false, message: `${name} 必须是有限数字` }
+    return { valid: false, message: t('main.validator.numberFinite', { name }) }
   }
   if (value < min || value > max) {
-    return { valid: false, message: `${name} 必须在 ${min}-${max} 范围内` }
+    return {
+      valid: false,
+      message: t('main.validator.numberRange', { name, min: String(min), max: String(max) })
+    }
   }
   return { valid: true }
 }
@@ -188,10 +204,13 @@ export function validateIntRange(
   name = 'value'
 ): { valid: boolean; message?: string } {
   if (typeof value !== 'number' || !Number.isInteger(value)) {
-    return { valid: false, message: `${name} 必须是整数` }
+    return { valid: false, message: t('main.validator.intRequired', { name }) }
   }
   if (value < min || value > max) {
-    return { valid: false, message: `${name} 必须在 ${min}-${max} 范围内` }
+    return {
+      valid: false,
+      message: t('main.validator.numberRange', { name, min: String(min), max: String(max) })
+    }
   }
   return { valid: true }
 }
@@ -205,10 +224,13 @@ export function validateStringLength(
   name = 'string'
 ): { valid: boolean; message?: string } {
   if (typeof value !== 'string') {
-    return { valid: false, message: `${name} 必须是字符串` }
+    return { valid: false, message: t('main.validator.stringTypeRequired', { name }) }
   }
   if (value.length === 0 || value.length > max) {
-    return { valid: false, message: `${name} 长度必须在 1-${max} 之间` }
+    return {
+      valid: false,
+      message: t('main.validator.stringLengthRange', { name, max: String(max) })
+    }
   }
   return { valid: true }
 }
@@ -228,13 +250,16 @@ export function validateMediaIdArray(
   maxCount = MAX_MEDIA_ID_ARRAY_SIZE
 ): { valid: boolean; message?: string } {
   if (!Array.isArray(mediaIds)) {
-    return { valid: false, message: 'mediaIds 必须是数组' }
+    return { valid: false, message: t('main.validator.mediaIdsArrayRequired') }
   }
   if (mediaIds.length === 0) {
-    return { valid: false, message: 'mediaIds 不能为空' }
+    return { valid: false, message: t('main.validator.mediaIdsNotEmpty') }
   }
   if (mediaIds.length > maxCount) {
-    return { valid: false, message: `mediaIds 数量超过上限 ${maxCount}` }
+    return {
+      valid: false,
+      message: t('main.validator.mediaIdsMaxLength', { max: String(maxCount) })
+    }
   }
   for (const id of mediaIds) {
     const r = validateMediaId(id)
@@ -248,15 +273,18 @@ export function validateMediaIdArray(
  */
 export function validateTagName(tagName: unknown): { valid: boolean; message?: string } {
   if (typeof tagName !== 'string') {
-    return { valid: false, message: '标签名必须是字符串' }
+    return { valid: false, message: t('main.validator.tagNameStringRequired') }
   }
   if (tagName.length === 0 || tagName.length > MAX_TAG_NAME_LENGTH) {
-    return { valid: false, message: `标签名长度必须在 1-${MAX_TAG_NAME_LENGTH} 之间` }
+    return {
+      valid: false,
+      message: t('main.validator.tagNameLength', { max: String(MAX_TAG_NAME_LENGTH) })
+    }
   }
   // 禁止控制字符
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x1f\x7f]/.test(tagName)) {
-    return { valid: false, message: '标签名包含非法控制字符' }
+    return { valid: false, message: t('main.validator.tagNameControlChars') }
   }
   return { valid: true }
 }
@@ -266,16 +294,19 @@ export function validateTagName(tagName: unknown): { valid: boolean; message?: s
  */
 export function validateHttpUrl(url: unknown): { valid: boolean; message?: string } {
   if (typeof url !== 'string' || url.length === 0 || url.length > 2048) {
-    return { valid: false, message: 'URL 长度必须在 1-2048 之间' }
+    return { valid: false, message: t('main.validator.urlLength') }
   }
   try {
     const parsed = new URL(url)
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return { valid: false, message: `不允许的协议: ${parsed.protocol}` }
+      return {
+        valid: false,
+        message: t('main.validator.protocolNotAllowed', { protocol: parsed.protocol })
+      }
     }
     return { valid: true }
   } catch {
-    return { valid: false, message: '无效的 URL' }
+    return { valid: false, message: t('main.validator.urlInvalidLiteral') }
   }
 }
 
@@ -285,17 +316,17 @@ export function validateHttpUrl(url: unknown): { valid: boolean; message?: strin
  */
 export function validateFilterPreset(preset: unknown): { valid: boolean; message?: string } {
   if (typeof preset !== 'object' || preset === null) {
-    return { valid: false, message: '预设格式无效，应为 JSON 对象' }
+    return { valid: false, message: t('main.validator.presetObjectRequired') }
   }
   const p = preset as Record<string, unknown>
   if (typeof p.name !== 'string' || p.name.trim() === '') {
-    return { valid: false, message: '缺少有效的 name 字段' }
+    return { valid: false, message: t('main.validator.presetNameRequired') }
   }
   if (typeof p.category !== 'string' || p.category.trim() === '') {
-    return { valid: false, message: '缺少有效的 category 字段' }
+    return { valid: false, message: t('main.validator.presetCategoryRequired') }
   }
   if (typeof p.params !== 'object' || p.params === null) {
-    return { valid: false, message: '缺少有效的 params 对象' }
+    return { valid: false, message: t('main.validator.presetParamsRequired') }
   }
   return { valid: true }
 }

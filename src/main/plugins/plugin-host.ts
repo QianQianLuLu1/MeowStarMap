@@ -20,6 +20,7 @@ import fs from 'fs'
 import { init as peInit, type pluginManager } from 'pluggable-electron/main'
 import { logger } from '../utils/logger'
 import { logStartupError } from '../utils/startup-diagnostic'
+import { t } from '../i18n'
 import type {
   NikkiGalleryManifest,
   PluginFullInfo,
@@ -156,10 +157,10 @@ class PluginHost {
       const parent = this.mainWindow && !this.mainWindow.isDestroyed() ? this.mainWindow : undefined
       const options = {
         type: 'question' as const,
-        title: '插件安装确认',
-        message: '即将安装以下插件：',
-        detail: `${list}\n\n插件拥有您授予的能力权限（如读写文件、应用水印等）。\n仅安装来自可信来源的插件。\n\n是否继续安装？`,
-        buttons: ['安装', '取消'],
+        title: t('main.plugin.dialog.installConfirmTitle'),
+        message: t('main.plugin.dialog.installConfirmMessage'),
+        detail: t('main.plugin.dialog.installConfirmDetail', { list }),
+        buttons: [t('main.plugin.dialog.install'), t('common.cancel')],
         // 默认聚焦「取消」：安装会执行 npm postinstall 脚本，等价于任意代码执行。
         // 若默认停在「安装」，连按回车或诱导性弹窗即可无意中放行。
         defaultId: 1,
@@ -237,10 +238,10 @@ class PluginHost {
    */
   async installPlugins(specifiers: string[]): Promise<PePlugin[]> {
     if (!this.pluginManager) {
-      throw new Error('插件系统未初始化')
+      throw new Error(t('main.plugin.error.notInitialized'))
     }
     if (specifiers.length === 0) {
-      throw new Error('未指定要安装的插件')
+      throw new Error(t('main.plugin.error.noSpecifiers'))
     }
     try {
       const installed = (await this.pluginManager.installPlugins(specifiers, true)) as PePlugin[]

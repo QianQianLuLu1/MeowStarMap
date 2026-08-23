@@ -5,7 +5,7 @@ import { useMediaStore, toFileUrl, type MediaFile } from '../../stores/mediaStor
 import { useToast } from '../../hooks/useToast'
 import { useFavoriteToggle } from '../../hooks/useFavoriteToggle'
 // DU3：幻灯片播放逻辑统一到 useSlideshow hook
-import { useSlideshow } from '../../hooks/useSlideshow'
+import { useSlideshow, type UseSlideshowReturn } from '../../hooks/useSlideshow'
 import { Toast } from '../common/Toast'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ExifPanel } from '../common/ExifPanel'
@@ -81,18 +81,23 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   )
 
   // DU3：幻灯片播放逻辑使用共享 hook（原 stopSlideshow/startSlideshow/toggleSlideshow 三函数合并）
+  // slideshow 由下方 useSlideshow 返回，onTick 内经 slideshowRef 调用 stop（避免声明前使用的循环引用）
+  const slideshowRef = useRef<UseSlideshowReturn | null>(null)
   const slideshow = useSlideshow({
     interval: playInterval,
     onTick: useCallback(() => {
       const idx = useUIStore.getState().fullscreenIndex
       if (idx >= filteredFiles.length - 1) {
         // 播放到最后一张，停止（FullscreenViewer 不循环）
-        slideshow.stop()
+        slideshowRef.current?.stop()
       } else {
         useUIStore.setState({ fullscreenIndex: idx + 1 })
       }
     }, [filteredFiles.length])
   })
+  useEffect(() => {
+    slideshowRef.current = slideshow
+  }, [slideshow])
 
   // F-S10：开始幻灯片播放（包装 slideshow.start，增加最少 2 张校验）
   const startSlideshow = useCallback(() => {

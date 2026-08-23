@@ -21,6 +21,17 @@
 import { IPC_ERROR_CODES, type IpcErrorCode } from '../types/ipc-types'
 import { ERROR_CODES, type ErrorCode } from './error-codes'
 
+// shared 层不能依赖任一侧 i18n 实例（会拖入 electron / react 依赖），
+// 默认 userMessage 的翻译函数由主/渲染进程 i18n 初始化时注入（先例：preload 的 __setPluginI18nT）
+let translate: (key: string, options?: Record<string, unknown>) => string = (key) => key
+
+/** 注入翻译函数（src/main/i18n 与 src/renderer/i18n 初始化时调用） */
+export function setAppErrorTranslator(
+  fn: (key: string, options?: Record<string, unknown>) => string
+): void {
+  translate = fn
+}
+
 /**
  * AppError 构造选项
  */
@@ -94,11 +105,10 @@ export class AppError extends Error {
 
   /** 用户主动取消 */
   static canceled(
-    message: string = '用户取消操作',
+    message: string = translate('appError.canceled'),
     details?: unknown,
     options?: AppErrorOptions
   ): AppError {
-    // TODO: i18n
     return new AppError(IPC_ERROR_CODES.CANCELED, message, details, options)
   }
 
@@ -198,7 +208,7 @@ export class PermissionError extends AppError {
 export class DatabaseError extends AppError {
   constructor(message: string, details?: unknown, options?: AppErrorOptions) {
     super(ERROR_CODES.DATABASE_ERROR, message, details, {
-      userMessage: options?.userMessage ?? '数据库操作失败，请稍后重试', // TODO: i18n
+      userMessage: options?.userMessage ?? translate('appError.database'),
       cause: options?.cause
     })
     this.name = 'DatabaseError'
@@ -215,7 +225,7 @@ export class DatabaseError extends AppError {
 export class FileSystemError extends AppError {
   constructor(message: string, details?: unknown, options?: AppErrorOptions) {
     super(ERROR_CODES.FILE_SYSTEM_ERROR, message, details, {
-      userMessage: options?.userMessage ?? '文件操作失败，请检查文件权限或磁盘空间', // TODO: i18n
+      userMessage: options?.userMessage ?? translate('appError.fileSystem'),
       cause: options?.cause
     })
     this.name = 'FileSystemError'
@@ -232,7 +242,7 @@ export class FileSystemError extends AppError {
 export class InternalError extends AppError {
   constructor(message: string, details?: unknown, options?: AppErrorOptions) {
     super(ERROR_CODES.INTERNAL_ERROR, message, details, {
-      userMessage: options?.userMessage ?? '操作失败，请稍后重试或联系开发者', // TODO: i18n
+      userMessage: options?.userMessage ?? translate('appError.internal'),
       cause: options?.cause
     })
     this.name = 'InternalError'
@@ -322,8 +332,10 @@ export function toIpcError(error: unknown): AppErrorIpcPayload {
  *
  * 渲染层 useErrorToast 钩子使用此函数决定 toast 显示文本。
  */
-export function extractUserMessage(error: unknown, fallback = '操作失败'): string {
-  // TODO: i18n
+export function extractUserMessage(
+  error: unknown,
+  fallback = translate('appError.fallback')
+): string {
   if (isAppError(error)) {
     return error.userMessage ?? error.message
   }

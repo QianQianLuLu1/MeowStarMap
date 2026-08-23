@@ -246,7 +246,7 @@ describe('renameFile', () => {
 
   it('目标文件已存在时返回失败', async () => {
     const src = makeFile('src/a.jpg')
-    const target = makeFile('src/b.jpg')
+    makeFile('src/b.jpg')
     const r = await service.renameFile(src, 'b')
     expect(r.success).toBe(false)
     expect(r.message).toContain('同名文件')

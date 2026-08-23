@@ -45,7 +45,7 @@ import {
 
 // 构造可控的 worker bridge：onCrash 捕获监听器，dispose 返回 resolved promise
 function makeCapturableBridge() {
-  const onCrash = vi.fn((cb: (info: WorkerCrashInfo) => void) => () => {})
+  const onCrash = vi.fn((_cb: (info: WorkerCrashInfo) => void) => () => {})
   return {
     onCrash,
     dispose: vi.fn(() => Promise.resolve())

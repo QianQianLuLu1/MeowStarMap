@@ -36,7 +36,7 @@ export function useRefreshMedia(options?: {
         setCategories(result.categories)
       } else {
         // P2-C9：result 为 null 时提示加载失败，而非静默保留旧数据
-        console.error('[useRefreshMedia] fetchMediaFromDatabase 返回 null，媒体数据加载失败')
+        console.error(t('gallery.media.log.refreshNullFailed'))
         onError?.(t('toast.mediaLoadFailed'))
       }
     } finally {

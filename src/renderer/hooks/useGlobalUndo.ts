@@ -56,7 +56,7 @@ export function useGlobalUndo(): void {
           showMessage(t('toast.undo.undone', { description: top.description }), 'success')
         } else if (result.conflict) {
           // R8：乐观锁冲突——弹窗确认后强制撤销
-          if (window.confirm(result.message || '该文件已被修改，是否仍要撤销？')) {
+          if (window.confirm(result.message || t('toast.undo.conflictPrompt'))) {
             const forceResult = await undo({ force: true })
             if (forceResult.success) {
               showMessage(t('toast.undo.undone', { description: top.description }), 'success')

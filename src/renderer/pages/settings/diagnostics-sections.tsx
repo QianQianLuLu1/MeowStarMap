@@ -50,11 +50,11 @@ export const DiagnosticsLogsSection: React.FC = () => {
         setFileCount(statsRes.fileCount ?? 0)
       }
     } catch (err) {
-      console.error('加载日志数据失败:', err) // TODO: i18n
+      console.error(t('diagnostics.logs.loadFailed'), err)
     } finally {
       setLogLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadLogData()
@@ -766,11 +766,11 @@ export const DiagnosticsCrashSection: React.FC = () => {
         setCrashDirPath(dirPath)
       }
     } catch (err) {
-      console.error('加载崩溃报告数据失败:', err) // TODO: i18n
+      console.error(t('diagnostics.logs.loadCrashesFailed'), err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadCrashData()
@@ -956,20 +956,20 @@ export const DiagnosticsCrashSection: React.FC = () => {
                         className="text-xs px-1.5 py-0.5 rounded font-medium flex-shrink-0"
                         style={{
                           background:
-                            crash.processType === '主进程' // TODO: i18n - data value from main process
+                            crash.processType === 'main'
                               ? 'var(--danger-bg)'
-                              : crash.processType === '渲染进程' // TODO: i18n - data value from main process
+                              : crash.processType === 'renderer'
                                 ? 'rgba(147, 51, 234, 0.12)'
                                 : 'rgba(107, 114, 128, 0.12)',
                           color:
-                            crash.processType === '主进程' // TODO: i18n - data value from main process
+                            crash.processType === 'main'
                               ? 'var(--danger-hover)'
-                              : crash.processType === '渲染进程' // TODO: i18n - data value from main process
+                              : crash.processType === 'renderer'
                                 ? '#9333ea'
                                 : '#6b7280'
                         }}
                       >
-                        {crash.processType}
+                        {t(`diagnostics.crash.processType.${crash.processType}`)}
                       </span>
                       <span
                         className="text-xs font-mono truncate"

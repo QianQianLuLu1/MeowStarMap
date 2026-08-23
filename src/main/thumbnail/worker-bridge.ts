@@ -23,6 +23,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 import type {
   ThumbnailWorkerCommand,
   ThumbnailWorkerEvent,
@@ -100,9 +101,9 @@ export class ThumbnailWorkerBridge {
         stdio: 'pipe'
       })
     } catch (forkErr) {
-      logger.error('[ThumbnailWorker] fork 失败，降级到主进程内联:', forkErr)
+      logger.error(t('main.thumbnail.log.forkFailed'), forkErr)
       this.workerFailed = true
-      void logger.fault('workerCrash', new Error('thumbnail-worker fork 失败'), {
+      void logger.fault('workerCrash', new Error(t('main.thumbnail.error.workerForkFailed')), {
         workerName: 'thumbnail-worker',
         stage: 'fork-failed',
         error: forkErr instanceof Error ? forkErr.message : String(forkErr)
@@ -128,13 +129,13 @@ export class ThumbnailWorkerBridge {
     // WORKER_READY 10s 超时：reject 握手 + 降级到主进程内联（与其余 bridge 一致的 reject 路径）
     this.readyTimer = setTimeout(() => {
       if (!this.readyReject) return
-      logger.error('[ThumbnailWorker] WORKER_READY 超时（10s），降级到主进程内联')
-      void logger.fault('workerCrash', new Error('thumbnail-worker WORKER_READY 超时'), {
+      logger.error(t('main.thumbnail.log.readyTimeout'))
+      void logger.fault('workerCrash', new Error(t('main.thumbnail.error.workerReadyTimeout')), {
         workerName: 'thumbnail-worker',
         stage: 'ready-timeout'
       })
       this.workerFailed = true
-      this.failReadyHandshake('后台进程启动失败（thumbnail-worker 未在限定时间内就绪）')
+      this.failReadyHandshake(t('main.thumbnail.error.workerStartFailed'))
       // kill 当前 worker（已无意义）
       try {
         this.worker?.kill()
@@ -235,7 +236,7 @@ export class ThumbnailWorkerBridge {
       } catch (err) {
         // 握手 reject（超时 / 就绪前退出 / dispose）不外抛：
         // 按"worker 不可用"返回，由 ThumbnailGenerator 降级到内联 sharp
-        logger.warn('[ThumbnailWorker] 启动握手失败，本次请求降级到主进程内联:', err)
+        logger.warn(t('main.thumbnail.log.handshakeFailed'), err)
       }
     }
     if (!this.isAvailable()) {
@@ -280,7 +281,7 @@ export class ThumbnailWorkerBridge {
     this.isDisposed = true
     // dispose 期间若仍有调用方在等待握手，必须 reject（早于 return，覆盖 worker 已为 null 的情况）：
     // 此时 worker 即将被 kill，exit 回调与超时定时器都不会再兜底 reject
-    this.failReadyHandshake('thumbnail-worker 已释放（dispose）')
+    this.failReadyHandshake(t('main.thumbnail.error.workerDisposed'))
     if (!this.worker) return
 
     try {

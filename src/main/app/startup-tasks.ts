@@ -19,6 +19,7 @@ import { EtaCalculator } from '../utils/eta-calculator'
 import { taskRegistry } from '../utils/task-registry'
 import type Database from 'better-sqlite3'
 import type { TaskProgress } from '../../shared/types/progress'
+import { t } from '../i18n'
 
 /**
  * 启动时后台执行一次自动扫描。
@@ -74,7 +75,7 @@ export async function performStartupScan(ctx: AppContext): Promise<void> {
       customKnownPaths,
       fullScan
     })
-    logger.info('[Startup] 扫描完成:', result)
+    logger.info(t('main.startup.log.scanComplete'), result)
     // 启动扫描也需发送 complete 事件，否则渲染进程的 scanProgress 会一直停留在 scanning:true
     sendToRenderer(ctx, 'scanner:complete', result)
     // 扫描完成后立即通知渲染进程刷新媒体列表
@@ -89,12 +90,12 @@ export async function performStartupScan(ctx: AppContext): Promise<void> {
       // 低优先级任务，会因 maxLowConcurrency=1 自锁（外层占满唯一槽位，内层永不启动）。
       // 改为 fire-and-forget 后，startup-integrity-check 等后续低优先级任务可正常 pump。
       void runPostScanIndexing(ctx, result.filesFound ?? 0).catch((e) =>
-        logger.error('[Startup] 索引任务异常:', e)
+        logger.error(t('main.startup.log.indexingTaskError'), e)
       )
     }
   } catch (error) {
     // Bug #08-F1：console.error → logger.error，统一日志渠道
-    logger.error('[Startup] 自动扫描失败:', error)
+    logger.error(t('main.startup.log.autoScanFailed'), error)
     sendToRenderer(ctx, 'scanner:complete', {
       success: false,
       message: String(error)
@@ -183,10 +184,14 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
     logger.error(
       `[Startup] 索引任务超过 ${INDEXING_TOTAL_TIMEOUT_MS}ms 未完成，强制终止（已处理 ${processed}）`
     )
-    void logger.fault?.('indexingTimeout', new Error('索引任务整体超时'), {
-      taskId,
-      elapsedMs: Date.now() - startedAt
-    })
+    void logger.fault?.(
+      'indexingTimeout',
+      new Error(t('main.startup.error.indexingTotalTimeout')),
+      {
+        taskId,
+        elapsedMs: Date.now() - startedAt
+      }
+    )
     controller.abort() // 触发下方统一 abort 监听
   }, INDEXING_TOTAL_TIMEOUT_MS)
   watchdogTimer.unref?.() // 后台启动任务不应持有 event loop
@@ -196,7 +201,10 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
   controller.signal.addEventListener('abort', () => {
     if (aborted) return
     aborted = true
-    report(timedOut ? 'error' : 'cancelled', timedOut ? '建立索引超时，已停止' : '已取消建立索引')
+    report(
+      timedOut ? 'error' : 'cancelled',
+      timedOut ? t('main.startup.index.timeoutStopped') : t('main.startup.index.cancelled')
+    )
     ctx.mediaWorkerManager?.stopThumbnailBatch?.()
     ctx.mediaWorkerManager?.stopPhashBatch?.()
     // 链内 markDuplicates 检查的是 shouldStopDuplicate，单独补一刀停止其续跑
@@ -205,14 +213,14 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
   })
 
   try {
-    report('preparing', '正在准备建立索引…', 0)
+    report('preparing', t('main.startup.index.preparing'), 0)
     // 缩略图：仅当本次扫描发现新文件时执行（与原 if (filesFound>0) 门控一致）
     // 直接调 worker 批次，不再经 generateThumbnailsForUnprocessed → taskScheduler.enqueueLow。
     // 索引链已在 startup-scan 低优先级伞内运行，再次入队低优先级会因 maxLowConcurrency=1
     // 自锁（外层占满唯一槽位，队列内任务永不启动）。此处复刻原 runBatch 的互斥锁与 media:updated 广播。
     if (filesFound > 0 && !aborted) {
       if (ctx.isThumbnailsGenerating()) {
-        logger.info('[Thumbnail] 缩略图生成已在进行中，跳过本次触发')
+        logger.info(t('main.startup.log.thumbnailAlreadyRunning'))
       } else {
         ctx.setThumbnailsGenerating(true)
         try {
@@ -224,8 +232,12 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
             ctx.getMainWindow()?.webContents.send('media:updated')
           } else {
             // 被抢占取消时 worker 返回 success=false + message='用户取消'，不视为错误
-            if (!result.message.includes('取消') && !result.message.includes('已在进行中')) {
-              logger.error('[Thumbnail] 批量生成失败:', result.message)
+            // 匹配用 keyword key（zh-CN 值与 worker 返回文案一致），语言切换后应改用结构化错误码
+            if (
+              !result.message.includes(t('main.task.keyword.canceled')) &&
+              !result.message.includes(t('main.task.keyword.alreadyRunning'))
+            ) {
+              logger.error(t('main.startup.log.thumbnailBatchFailed'), result.message)
             }
           }
         } finally {
@@ -242,7 +254,7 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
     // 这里改为直接 await startPhashBatch，reject 仍记日志不中断）
     if (!aborted) {
       const r = await ctx.mediaWorkerManager.startPhashBatch().catch((e) => {
-        logger.error('[pHash] 启动补算失败:', e)
+        logger.error(t('main.startup.log.phashStartFailed'), e)
         return { processed: 0, total: 0 }
       })
       // pHash 阶段进度由 worker 的 duplicate 真实进度独占（fix-indexing-progress §2.5），
@@ -258,20 +270,20 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
         signal: controller.signal,
         // 场景阶段：把已完成的缩略图+pHash 作为基底，叠加当前场景进度
         report: (sceneCurrent: number) =>
-          report('processing', '正在建立索引：分析场景时段', sceneBase + sceneCurrent)
+          report('processing', t('main.startup.index.analyzingSceneTime'), sceneBase + sceneCurrent)
       })
       if (!aborted) {
         processed += sceneTotal
-        report('processing', '正在建立索引：分析场景时段', processed)
+        report('processing', t('main.startup.index.analyzingSceneTime'), processed)
       }
     }
     if (!aborted) {
-      report('finalizing', '正在完成索引收尾…', total)
-      report('done', '已完成缩略图与索引建立', total)
+      report('finalizing', t('main.startup.index.finalizing'), total)
+      report('done', t('main.startup.index.done'), total)
     }
   } catch (err) {
-    logger.error('[Startup] 索引任务失败:', err)
-    report('error', '建立索引失败')
+    logger.error(t('main.startup.log.indexingFailed'), err)
+    report('error', t('main.startup.index.errorStopped'))
   } finally {
     cleanup() // 幂等：watchdog 已清理则此处为空操作
   }
@@ -345,7 +357,7 @@ export async function autoAnalyzeSceneTime(
       .all() as Array<{ id: number; file_path: string }>
 
     if (rows.length === 0) {
-      logger.info('[Startup] 场景时段分析：无待分析图片')
+      logger.info(t('main.startup.log.sceneAnalysisNone'))
       return
     }
 
@@ -404,7 +416,7 @@ export async function autoAnalyzeSceneTime(
       sendToRenderer(ctx, 'media:updated')
     }
   } catch (error) {
-    logger.error('[Startup] 场景时段分析失败:', error)
+    logger.error(t('main.startup.log.sceneAnalysisFailed'), error)
   } finally {
     // 清理整体超时定时器与监听器，避免定时器/事件监听泄漏
     clearTimeout(totalTimer)
@@ -460,7 +472,7 @@ export async function cleanupOrphanThumbnails(ctx: AppContext): Promise<void> {
       logger.info(`[Thumbnail Cleanup] 清理 ${removed} 个孤儿缩略图`)
     }
   } catch (error) {
-    logger.error('[Thumbnail Cleanup] 清理孤儿缩略图失败:', error)
+    logger.error(t('main.startup.log.orphanCleanupFailed'), error)
   }
 }
 
@@ -613,7 +625,7 @@ export async function retryPendingRenames(ctx: AppContext): Promise<void> {
       .all() as typeof rows
   } catch (err) {
     // pending_renames 表可能在旧库尚未迁移时不存在，启动失败不阻塞
-    logger.warn('[Startup] 读取 pending_renames 失败:', err)
+    logger.warn(t('main.startup.log.readPendingRenamesFailed'), err)
     return
   }
 
@@ -697,7 +709,7 @@ export function cleanupInterruptedScanHistory(ctx: AppContext): number {
     return result.changes
   } catch (err) {
     // scan_history 表在旧库未迁移时可能不存在，启动失败不阻塞
-    logger.warn('[Startup] 清理 scan_history 孤儿记录失败:', err)
+    logger.warn(t('main.startup.log.cleanupScanHistoryFailed'), err)
     return 0
   }
 }
@@ -729,14 +741,14 @@ export function notifyInterruptedScan(ctx: AppContext): void {
       sendToRenderer(ctx, 'scanner:interrupted', { count })
     } catch (err) {
       // 窗口未就绪时 send 静默失败，不阻塞
-      logger.warn('[Startup] 通知 UI 扫描中断事件失败:', err)
+      logger.warn(t('main.startup.log.notifyScanInterruptedFailed'), err)
     }
 
     // 一次性消费：将 interrupted 改为 failed，避免下次启动重复提示
     db.prepare("UPDATE scan_history SET status = 'failed' WHERE status = 'interrupted'").run()
   } catch (err) {
     // scan_history 表不存在或查询失败时不阻塞启动
-    logger.warn('[Startup] 检测 interrupted 扫描记录失败:', err)
+    logger.warn(t('main.startup.log.detectInterruptedFailed'), err)
   }
 }
 
@@ -781,7 +793,7 @@ export async function runPostRestoreRepair(ctx: AppContext): Promise<void> {
     })()
   } catch (err) {
     // 清除失败不阻塞修复流程，下次启动会再次触发（幂等）
-    logger.warn('[Startup] 清除后置修复标志失败:', err)
+    logger.warn(t('main.startup.log.clearRecoveryFlagsFailed'), err)
   }
 
   // 通知 UI 显示"已从备份恢复，正在校验数据"
@@ -793,20 +805,20 @@ export async function runPostRestoreRepair(ctx: AppContext): Promise<void> {
     })
   } catch (err) {
     // 窗口未就绪时 send 静默失败，不阻塞修复流程
-    logger.warn('[Startup] 通知 UI 备份恢复事件失败:', err)
+    logger.warn(t('main.startup.log.notifyBackupRestoredFailed'), err)
   }
 
   // fire-and-forget 触发 phash 重算（R7 mtime 检测会自动识别 stale 记录）
   if (needPhashRecheck === 1) {
     void generatePhashForUnprocessed(ctx, 'low').catch((err) => {
-      logger.warn('[Startup] 备份恢复后 phash 重算失败:', err)
+      logger.warn(t('main.startup.log.postRestorePhashFailed'), err)
     })
   }
 
   // fire-and-forget 触发 markDuplicates 重新标记重复文件
   if (needDuplicateRecheck === 1) {
     void markDuplicates(ctx, 'low').catch((err) => {
-      logger.warn('[Startup] 备份恢复后 duplicate 重新标记失败:', err)
+      logger.warn(t('main.startup.log.postRestoreDuplicateFailed'), err)
     })
   }
 }

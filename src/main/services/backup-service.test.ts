@@ -42,7 +42,7 @@ vi.mock('better-sqlite3', () => {
   return { default: DatabaseMock }
 })
 
-import { backupService, BackupService, type BackupRecord } from './backup-service'
+import { backupService, BackupService } from './backup-service'
 import Database from 'better-sqlite3'
 // 顶部 import 拿到 vi.mock 后的 app 引用，便于断言时直接访问
 import { app as electronApp } from 'electron'
@@ -58,15 +58,6 @@ function makeBackupFile(name: string, size: number, mtime: Date): void {
   const fullPath = path.join(backupDir, name)
   fs.writeFileSync(fullPath, Buffer.alloc(size, 0))
   fs.utimesSync(fullPath, mtime, mtime)
-}
-
-function makeRecord(name: string): BackupRecord {
-  return {
-    filename: name,
-    filePath: path.join(backupDir, name),
-    size: 100,
-    createdAt: new Date().toISOString()
-  }
 }
 
 beforeEach(() => {
@@ -324,7 +315,7 @@ describe('restoreBackup', () => {
     const name = 'wxnn_photo_manager_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     // 模拟 better-sqlite3 readonly 打开失败
-    ;(Database as any).mockImplementationOnce(() => {
+    ;(Database as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
       throw new Error('unable to open database file')
     })
     const r = await backupService.restoreBackup(name)
@@ -456,7 +447,7 @@ describe('R9 markRestoredFlags', () => {
     makeBackupFile(name, 100, new Date())
     // 让第二次 new Database（markRestoredFlags）抛错
     let callCount = 0
-    ;(Database as any).mockImplementation(() => {
+    ;(Database as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
       callCount++
       if (callCount === 2) {
         // 第二次调用（markRestoredFlags）抛错

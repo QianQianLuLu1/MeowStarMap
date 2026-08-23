@@ -35,9 +35,9 @@ export const AppearanceThemeSection: React.FC = () => {
           }}
           aria-label={t('settings.theme.label')}
         >
-          {themes.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
+          {themes.map((th) => (
+            <option key={th.id} value={th.id}>
+              {t(th.nameKey)}
             </option>
           ))}
         </select>
@@ -49,10 +49,31 @@ export const AppearanceThemeSection: React.FC = () => {
   )
 }
 
+// 纯 DOM 样式应用工具：放模块作用域（无组件状态依赖，也不参与 effect 依赖计算）
+type FontSize = 'small' | 'normal' | 'large' | 'xlarge'
+
+const applyFontSize = (size: FontSize) => {
+  const html = document.documentElement
+  html.classList.remove(
+    'font-size-small',
+    'font-size-normal',
+    'font-size-large',
+    'font-size-xlarge'
+  )
+  html.classList.add(`font-size-${size}`)
+}
+
+const applyCompactMode = (enabled: boolean) => {
+  document.documentElement.classList.toggle('compact-mode', enabled)
+}
+
+const applyReduceMotion = (enabled: boolean) => {
+  document.documentElement.classList.toggle('reduce-motion', enabled)
+}
+
 export const AppearanceDisplaySection: React.FC = () => {
   const { t } = useTranslation()
   const showMessage = useContext(GlobalToastContext)
-  type FontSize = 'small' | 'normal' | 'large' | 'xlarge'
   const [fontSize, setFontSize] = useState<FontSize>('normal')
   const [compactMode, setCompactMode] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
@@ -78,25 +99,6 @@ export const AppearanceDisplaySection: React.FC = () => {
     }
     load()
   }, [])
-
-  const applyFontSize = (size: FontSize) => {
-    const html = document.documentElement
-    html.classList.remove(
-      'font-size-small',
-      'font-size-normal',
-      'font-size-large',
-      'font-size-xlarge'
-    )
-    html.classList.add(`font-size-${size}`)
-  }
-
-  const applyCompactMode = (enabled: boolean) => {
-    document.documentElement.classList.toggle('compact-mode', enabled)
-  }
-
-  const applyReduceMotion = (enabled: boolean) => {
-    document.documentElement.classList.toggle('reduce-motion', enabled)
-  }
 
   const handleFontSize = async (size: FontSize) => {
     setFontSize(size)

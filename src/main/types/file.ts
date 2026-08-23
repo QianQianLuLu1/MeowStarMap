@@ -1,13 +1,5 @@
-export type ExportFormat = 'jpg' | 'jpeg' | 'png' | 'webp' | 'original'
-
-export interface ExportOptions {
-  quality?: number
-  format?: ExportFormat
-  // P1-02：导出命名规则（支持变量 {date}/{album_type}/{uid}/{original_name}/{sequence}）
-  namingPattern?: string
-  // P0-F2：useDefaultDir=true 时从 settings 读取默认导出路径（file:export handler 使用）
-  useDefaultDir?: boolean
-}
+// 导出格式与选项的单一来源已上移至 shared（preload 桥接层同样引用），此处 re-export 保持既有导入路径稳定
+export type { ExportFormat, ExportOptions } from '../../shared/types/electron-api'
 
 // P1-02：导出时单文件的元数据（用于命名规则变量替换）
 export interface ExportFileMetadata {

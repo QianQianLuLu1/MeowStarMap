@@ -49,6 +49,7 @@ export interface GameEvent {
  * 版本主题名（name）为游戏专有名词，直显即可；endDate 留空由逻辑自动取下一版本 startDate 前一天。
  * 维护：直接在本数组按 startDate 升序追加/修正即可，无需改任何逻辑代码。
  */
+/* eslint-disable no-restricted-syntax -- 数据值豁免：版本主题名（name）为游戏专有名词，按官方原文直显，不做 i18n；维护时直接在此追加即可 */
 export const GAME_VERSIONS: GameVersion[] = [
   { version: '1.0', name: '探索季', startDate: '2024-12-05' },
   { version: '1.1', name: '流星季', startDate: '2024-12-30' },
@@ -70,11 +71,13 @@ export const GAME_VERSIONS: GameVersion[] = [
   { version: '2.7', name: '千星所向的旅途', startDate: '2026-06-24' },
   { version: '2.8', name: '黄金尘', startDate: '2026-07-17' }
 ]
+/* eslint-enable no-restricted-syntax */
 
 /**
  * 限时活动时间表
  * 仅收录公开活动中可明确查证起止日期的；后续可追加
  */
+/* eslint-disable no-restricted-syntax -- 数据值豁免：活动名/活动简述为游戏专有名词与事实性描述，按官方原文直显，不做 i18n */
 export const GAME_EVENTS: GameEvent[] = [
   {
     name: '开服预热·暖暖生日惊喜速递',
@@ -95,6 +98,7 @@ export const GAME_EVENTS: GameEvent[] = [
     description: '2.8 版本下半主线任务'
   }
 ]
+/* eslint-enable no-restricted-syntax */
 
 /**
  * 获取所有版本节点（按时间升序）

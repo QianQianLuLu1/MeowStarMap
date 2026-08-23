@@ -4,7 +4,6 @@ import type { ScannerWorkerBridge } from '../scanner/scanner-worker-bridge'
 import type { DatabaseWorkerBridge } from '../database/worker/database-worker-bridge'
 import type { MediaWorkerBridge } from '../media-worker/bridge'
 import type { ThumbnailWorkerBridge } from '../thumbnail/worker-bridge'
-import type { VideoEditorBridge } from '../video-editor/bridge'
 import type { DecryptionWorkerBridge } from '../decryption-worker/bridge'
 
 /**

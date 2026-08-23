@@ -8,6 +8,7 @@ import {
   markBootAttempt,
   setupGpuProcessWatcher
 } from './app/gpu-fallback'
+import { t } from './i18n'
 
 // 捕获未处理异常和未处理的 Promise 拒绝。
 // 必须放在任何可能抛错的模块级代码（registerSchemesAsPrivileged 等）之前：
@@ -38,7 +39,7 @@ if (shouldDisableHardwareAcceleration()) {
   app.disableHardwareAcceleration()
   diagLog('INDEX', 'gpu-fallback active: hardware acceleration DISABLED for this boot')
   try {
-    electronLogger.info('[GPU] 检测到 GPU 崩溃回退标记，本次启动已禁用硬件加速（软件渲染）')
+    electronLogger.info(t('main.index.log.gpuFallbackActive'))
   } catch {
     // electronLogger 未就绪时仅依赖 diagLog
   }
@@ -110,10 +111,10 @@ app.whenReady().then(async () => {
     try {
       const result = await dialog.showMessageBox({
         type: 'error',
-        title: '应用启动失败',
-        message: '应用启动失败，请将日志反馈给开发者',
-        detail: `错误：${msg}\n\n日志路径：${logPath}`,
-        buttons: ['打开日志目录', '退出']
+        title: t('main.index.dialog.startupFailedTitle'),
+        message: t('main.index.dialog.startupFailedMessage'),
+        detail: t('main.index.dialog.startupFailedDetail', { message: msg, logPath }),
+        buttons: [t('main.dialog.startupFailed.openLogDir'), t('main.index.dialog.exit')]
       })
       if (result.response === 0) {
         await shell.openPath(path.dirname(logPath))

@@ -239,7 +239,7 @@ export const WatermarkPanel: React.FC<WatermarkPanelProps> = ({ config, onChange
         setTemplates((rows as WatermarkTemplate[]).map((r) => ({ ...r, config: String(r.config) })))
       }
     } catch (error) {
-      console.error('保存水印模板失败:', error) // TODO: i18n
+      console.error(t('watermark.log.saveTemplateFailed'), error)
     } finally {
       setLoading(false)
     }
@@ -262,7 +262,7 @@ export const WatermarkPanel: React.FC<WatermarkPanelProps> = ({ config, onChange
       await window.electronAPI.watermark.deleteTemplate(id)
       setTemplates((prev) => prev.filter((tpl) => tpl.id !== id))
     } catch (error) {
-      console.error('删除水印模板失败:', error) // TODO: i18n
+      console.error(t('watermark.log.deleteTemplateFailed'), error)
     }
   }
 

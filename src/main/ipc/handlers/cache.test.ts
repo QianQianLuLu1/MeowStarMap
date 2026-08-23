@@ -6,7 +6,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 
 const {
   handleMock,
@@ -41,65 +40,7 @@ vi.mock('../../database/media-repository', () => ({
   }))
 }))
 
-vi.mock('../validator', () => {
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    wrapHandlerRaw: vi.fn(
-      (ctx: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    schemas: {
-      filePath: { min: () => ({ max: () => ({}) }) },
-      cacheLimitBytes: { finite: () => ({ positive: () => ({}) }) }
-    },
-    assertFileReadPath: vi.fn(),
-    assertFileWritePath: vi.fn()
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerCacheHandlers } from './cache'
 import { MIN_CACHE_LIMIT_BYTES } from '../../thumbnail/generator'

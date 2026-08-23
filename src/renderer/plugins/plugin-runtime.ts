@@ -96,7 +96,7 @@ export async function bootstrapPluginRuntime(): Promise<void> {
 async function doBootstrap(): Promise<void> {
   // 检测 facade 是否就绪（preload 加载失败时不初始化）
   if (typeof window === 'undefined' || !window.pluggableElectronIpc) {
-    console.warn('[PluginRuntime] pluggable-electron facade 未就绪，跳过插件系统初始化')
+    console.warn(i18n.t('plugins.log.facadeNotReady'))
     return
   }
 
@@ -132,7 +132,7 @@ async function doBootstrap(): Promise<void> {
     try {
       await api.plugins.registerActive()
     } catch (err) {
-      console.error('[PluginRuntime] registerActive 失败:', err)
+      console.error(i18n.t('plugins.log.registerActiveFailed'), err)
     }
 
     // ④ 触发 init 激活点：插件在此调用 extensionPoints.register 注册扩展
@@ -140,10 +140,10 @@ async function doBootstrap(): Promise<void> {
     try {
       await api.activationPoints.trigger('init')
     } catch (err) {
-      console.error('[PluginRuntime] activationPoints.trigger("init") 部分失败:', err)
+      console.error(i18n.t('plugins.log.triggerInitFailed'), err)
     }
   } catch (err) {
-    console.error('[PluginRuntime] 插件系统初始化失败:', err)
+    console.error(i18n.t('plugins.log.bootstrapFailed'), err)
   }
 }
 
@@ -162,7 +162,7 @@ function injectI18n(): void {
       )
     }
   } catch (err) {
-    console.warn('[PluginRuntime] i18n 注入失败:', err)
+    console.warn(i18n.t('plugins.log.i18nInjectFailed'), err)
   }
 }
 

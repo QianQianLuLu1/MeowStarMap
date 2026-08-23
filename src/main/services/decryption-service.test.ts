@@ -68,7 +68,6 @@ vi.mock('koffi', () => {
 // ============================================================
 // Import after mock
 // ============================================================
-import koffi from 'koffi'
 import {
   decodeFileParams,
   encodeCameraParams,
@@ -83,20 +82,6 @@ import {
 // ============================================================
 
 let tmpRoot: string
-
-/** 重置所有 mockFns 为默认行为：status=0, bytes={data:null,len:0,cap:0} */
-function resetMockFns(): void {
-  for (const k of Object.keys(mockFns)) {
-    delete mockFns[k]
-  }
-}
-
-/** 让 getLib() / getBoundFunctions() 重新初始化 */
-async function reloadModule(): Promise<typeof import('./decryption-service')> {
-  vi.resetModules()
-  // 重新 require 后 koffi mock 会重新建立 mockFns
-  return await import('./decryption-service')
-}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -559,9 +544,6 @@ describe('disposeDecryptionService', () => {
     mockFns['free_c_bytes'] = vi.fn()
     await encodeCameraParams('{}')
     // 现在 lib 已加载
-    const koffi = require('koffi').default
-    // 找到实际 lib 实例的 unload
-    // 由于 mock 加载行为，unload 应该已被调用一次
     disposeDecryptionService()
     // 再次调用不抛错（幂等）
     expect(() => disposeDecryptionService()).not.toThrow()

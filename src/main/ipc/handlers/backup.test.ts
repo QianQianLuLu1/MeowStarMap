@@ -6,7 +6,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 
 // 捕获 ipcMain.handle 注册的 channel 与回调（vi.hoisted 保证 vi.mock 之前完成初始化）
 const {
@@ -58,66 +57,7 @@ vi.mock('../../utils/logger', () => ({
 }))
 
 // mock validator：让 wrapHandler 透传到 handler，直接调用业务函数
-vi.mock('../validator', () => {
-  // 测试约定：handler 调用时第一个实参为参数元组，需解包为 zod parseResult.data 形式
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    wrapHandlerRaw: vi.fn(
-      (ctx: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    schemas: {
-      filePath: { min: () => ({ max: () => ({}) }) },
-      backupFilename: { regex: () => ({}) }
-    },
-    assertFileReadPath: vi.fn(),
-    assertFileWritePath: vi.fn()
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerBackupHandlers } from './backup'
 

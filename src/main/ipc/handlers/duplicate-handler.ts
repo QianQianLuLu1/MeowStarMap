@@ -1,7 +1,6 @@
 import { ipcMain } from 'electron'
-import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
-import { wrapHandler, wrapHandlerNoArgs } from '../validator'
+import { wrapHandlerNoArgs } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { calculateFileHash } from '../../utils/file-utils'
 import { pickBestId } from '../../utils/duplicate-scoring'
@@ -12,6 +11,7 @@ import { ProgressThrottle } from '../../utils/progress-throttle'
 import { EtaCalculator } from '../../utils/eta-calculator'
 import type { TaskProgress } from '../../../shared/types/progress'
 import { logger } from '../../utils/logger'
+import { t } from '../../i18n'
 
 /**
  * 重复检测域 IPC handler
@@ -24,7 +24,7 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
   // 数据库写操作进程拆分：传入 workerBridge 与 dbPath，写方法走独立 utilityProcess
   const getRepo = (): MediaRepository => {
     const db = ctx.dbManager.getDatabase()
-    if (!db) throw AppError.preconditionFailed('数据库未初始化')
+    if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
     return new MediaRepository(db, ctx.dbManager.getWorkerBridge(), ctx.dbManager.getDbPath())
   }
 
@@ -90,7 +90,7 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
 
         // 性能重构 v3：检测到取消立即返回，保留已处理结果
         if (controller.signal.aborted) {
-          pushTerminal('cancelled', '重复检测已取消')
+          pushTerminal('cancelled', t('main.duplicate.message.cancelled'))
           return {
             success: true,
             duplicates: [],
@@ -127,7 +127,7 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
           for (const row of group) {
             // 取消检查：在 sha256 计算前检查（sha256 是单文件 IO，粒度合适）
             if (controller.signal.aborted) {
-              pushTerminal('cancelled', '重复检测已取消')
+              pushTerminal('cancelled', t('main.duplicate.message.cancelled'))
               return {
                 success: true,
                 duplicates: [],
@@ -165,12 +165,16 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
             hashed++
             // 每 5 个文件推送一次进度（progressThrottle 内部还会节流到 5 FPS）
             if (hashed % 5 === 0) {
-              pushProgress(hashed, totalToHash, `计算文件指纹 ${hashed}/${totalToHash}`)
+              pushProgress(
+                hashed,
+                totalToHash,
+                t('main.duplicate.progress.hashing', { current: hashed, total: totalToHash })
+              )
             }
           }
         }
         // 尾部进度推送（保证最后状态被 UI 收到）
-        pushProgress(hashed, totalToHash, '指纹计算完成，分组中...')
+        pushProgress(hashed, totalToHash, t('main.duplicate.progress.hashDoneGrouping'))
 
         const duplicateGroups = Array.from(hashGroups.values())
           .filter((g) => g.length > 1)
@@ -189,7 +193,7 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
           (sum, g) => sum + g[0].file_size * (g.length - 1),
           0
         )
-        pushTerminal('done', `重复检测完成，共 ${duplicateGroups.length} 组`)
+        pushTerminal('done', t('main.duplicate.progress.done', { count: duplicateGroups.length }))
         return {
           success: true,
           duplicates: duplicateGroups,
@@ -212,7 +216,7 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
     'media:markDuplicates',
     wrapHandlerNoArgs(ctx, async () => {
       const result = await markDuplicates(ctx)
-      return { success: true, message: '重复标记完成', ...result }
+      return { success: true, message: t('main.duplicate.message.markDone'), ...result }
     })
   )
 

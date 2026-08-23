@@ -12,6 +12,7 @@
  */
 import { create } from 'zustand'
 import type { PluginFullInfo } from '../../shared/types/plugin'
+import i18n from '../i18n'
 
 // ============ 插件 IPC 接口 ============
 // preload 中 electronAPI.plugin 命名空间定义（此处独立声明，避免 preload 全量类型导入）
@@ -111,7 +112,7 @@ export const usePluginStore = create<PluginState>((set, get) => ({
   installPlugin: async (specifier) => {
     const ipc = getPluginIPC()
     if (!ipc) {
-      set({ error: '插件系统不可用（预览版无 IPC）' })
+      set({ error: i18n.t('settings.plugins.error.unavailable') })
       return false
     }
     set({ operatingName: specifier, operatingAction: 'install', error: null })

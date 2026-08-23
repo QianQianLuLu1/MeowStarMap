@@ -4,11 +4,22 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import i18n from 'i18next'
+import type { ComponentProps } from 'react'
 import type { MediaFile } from '../../stores/mediaStore'
 import type { DressingParams } from '../../types/decryption'
 
+/** InfoRowPanel mock 的 props 子集（仅覆盖本测试断言用到的字段） */
+interface MockInfoRowPanelProps {
+  loading?: boolean
+  error?: string | null
+  title?: string
+  loadingText?: string
+  emptyText?: string
+  rows?: { label: string; value: string }[]
+}
+
 vi.mock('./InfoRowPanel', () => ({
-  InfoRowPanel: (props: any) => (
+  InfoRowPanel: (props: MockInfoRowPanelProps) => (
     <div
       data-testid="info-row-panel"
       data-loading={props.loading ? 'true' : 'false'}
@@ -17,7 +28,7 @@ vi.mock('./InfoRowPanel', () => ({
       data-loading-text={props.loadingText}
       data-empty-text={props.emptyText}
     >
-      {props.rows?.map((r: any, i: number) => (
+      {props.rows?.map((r: { label: string; value: string }, i: number) => (
         <div key={i}>
           <span>{r.label}</span>
           <span>{r.value}</span>
@@ -41,13 +52,18 @@ vi.mock('../../utils/cloth-name-lookup', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconOutfit: (p: any) => <svg data-testid="icon-outfit" {...p} />
+  IconOutfit: (p: ComponentProps<'svg'>) => <svg data-testid="icon-outfit" {...p} />
 }))
 
-const mockGameParamsResult = {
-  data: null as any,
+// useGameParams mock 状态（仅注入 dressing 分路）
+const mockGameParamsResult: {
+  data: { dressing?: DressingParams } | null
+  loading: boolean
+  error: string | null
+} = {
+  data: null,
   loading: false,
-  error: null as string | null
+  error: null
 }
 
 vi.mock('../../hooks/useGameParams', () => ({
@@ -79,7 +95,7 @@ describe('OutfitPanel', () => {
   })
 
   it('无 album_type 时返回 null', () => {
-    const { container } = render(<OutfitPanel file={makeFile({ album_type: undefined as any })} />)
+    const { container } = render(<OutfitPanel file={makeFile({ album_type: undefined })} />)
     expect(container.firstChild).toBeNull()
   })
 

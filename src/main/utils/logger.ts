@@ -216,7 +216,8 @@ function writeLog(level: LogLevel, message: string, ...args: unknown[]): void {
   pushToRecentBuffer(level, message + argsStr)
   // 异步写入，失败时至少在控制台暴露问题，便于排查磁盘满/权限问题
   fs.promises.appendFile(getMainLogPath(), line, 'utf-8').catch((err) => {
-    console.error('[Logger] 写入失败:', err) // TODO: i18n: internal log
+    // 中文保留（有意）：logger 是 i18n 不可用时的最后兜底输出渠道，且初始化早于 i18n
+    console.error('[Logger] 写入失败:', err)
   })
   // 同步输出到控制台（开发调试）
   const consoleFn = level === 'debug' ? console.log : console[level]
@@ -352,7 +353,8 @@ export async function logFault(
     totalApproxBytes += Buffer.byteLength(line, 'utf-8')
   } catch (err) {
     // 写入失败时仅控制台告警，避免日志系统本身导致崩溃扩散
-    console.error('[Logger] 故障日志写入失败:', err) // TODO: i18n: internal log
+    // 中文保留（有意）：logger 是 i18n 不可用时的最后兜底输出渠道，且初始化早于 i18n
+    console.error('[Logger] 故障日志写入失败:', err)
   }
 
   writeFaultSideEffects(type, record)
@@ -380,7 +382,8 @@ export function logFaultSync(
     totalApproxBytes += Buffer.byteLength(line, 'utf-8')
   } catch (err) {
     // 写入失败时仅控制台告警，避免日志系统本身导致崩溃扩散
-    console.error('[Logger] 故障日志写入失败:', err) // TODO: i18n: internal log
+    // 中文保留（有意）：logger 是 i18n 不可用时的最后兜底输出渠道，且初始化早于 i18n
+    console.error('[Logger] 故障日志写入失败:', err)
   }
 
   writeFaultSideEffects(type, record)
@@ -455,7 +458,7 @@ async function enforceMaxSize(): Promise<void> {
     for (const file of expired) {
       try {
         await fs.promises.unlink(file.filepath)
-        console.log(`[Logger] 90 天过期触发，删除日志: ${file.name}`) // TODO: i18n: internal log
+        console.log(`[Logger] 90 天过期触发，删除日志: ${file.name}`) // 中文保留（有意）：logger 兜底输出
       } catch {
         // 删除失败时跳过
       }
@@ -474,13 +477,14 @@ async function enforceMaxSize(): Promise<void> {
       try {
         await fs.promises.unlink(file.filepath)
         currentSize -= file.size
-        console.log(`[Logger] 2GB 上限触发，删除最旧日志: ${file.name}`) // TODO: i18n: internal log
+        console.log(`[Logger] 2GB 上限触发，删除最旧日志: ${file.name}`) // 中文保留（有意）：logger 兜底输出
       } catch {
         // 删除失败时跳过，避免阻塞清理流程
       }
     }
   } catch (err) {
-    console.error('[Logger] 大小检查失败:', err) // TODO: i18n: internal log
+    // 中文保留（有意）：logger 是 i18n 不可用时的最后兜底输出渠道，且初始化早于 i18n
+    console.error('[Logger] 大小检查失败:', err)
   }
 }
 

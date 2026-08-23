@@ -3,14 +3,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
 
 vi.mock('./BaseDialog', () => ({
-  BaseDialog: ({ open, children }: any) => (open ? <div role="dialog">{children}</div> : null)
+  BaseDialog: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
+    open ? <div role="dialog">{children}</div> : null
 }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: any) => {
+    t: (key: string, opts?: { port?: string | number }) => {
       if (opts && opts.port) return `${key}:${opts.port}`
       return key
     }
@@ -18,13 +20,23 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconClose: (p: any) => <svg data-testid="icon-close" {...p} />,
-  IconRefresh: (p: any) => <svg data-testid="icon-refresh" {...p} />
+  IconClose: (p: ComponentProps<'svg'>) => <svg data-testid="icon-close" {...p} />,
+  IconRefresh: (p: ComponentProps<'svg'>) => <svg data-testid="icon-refresh" {...p} />
 }))
 
 vi.mock('../../pages/settings/shared', () => ({
   useGlobalToast: () => vi.fn()
 }))
+
+/** electronAPI 测试子集：仅挂 share 分路（全局 WindowElectronAPI 远大于此，测试只注入用到的部分） */
+interface MockShareAPI {
+  startWifi?: ReturnType<typeof vi.fn>
+  stopWifi?: ReturnType<typeof vi.fn>
+}
+
+const setElectronAPI = (share: MockShareAPI): void => {
+  ;(window as unknown as { electronAPI: { share: MockShareAPI } }).electronAPI = { share }
+}
 
 import { WifiShareDialog } from './WifiShareDialog'
 
@@ -48,7 +60,7 @@ describe('WifiShareDialog', () => {
       fileCount: 1,
       timeoutMs: 60000
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     expect(screen.getByRole('dialog')).toBeTruthy()
@@ -56,7 +68,7 @@ describe('WifiShareDialog', () => {
 
   it('filePaths 为空时不调用 startWifi', async () => {
     const startWifi = vi.fn()
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={[]} onClose={vi.fn()} />)
     await act(async () => {
@@ -67,7 +79,7 @@ describe('WifiShareDialog', () => {
   })
 
   it('startWifi 不存在时不报错', async () => {
-    ;(window as any).electronAPI = { share: {} }
+    setElectronAPI({})
 
     await act(async () => {
       expect(() => {
@@ -84,7 +96,7 @@ describe('WifiShareDialog', () => {
       fileCount: 5,
       timeoutMs: 60000
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     expect(await screen.findByText('http://1.2.3.4:8080')).toBeTruthy()
@@ -99,7 +111,7 @@ describe('WifiShareDialog', () => {
       fileCount: 1,
       timeoutMs: 60000
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     expect(await screen.findByText('123456')).toBeTruthy()
@@ -110,7 +122,7 @@ describe('WifiShareDialog', () => {
       success: false,
       message: '端口占用'
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     await act(async () => {
@@ -128,7 +140,7 @@ describe('WifiShareDialog', () => {
       fileCount: 1,
       timeoutMs: 60000
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi } }
+    setElectronAPI({ startWifi, stopWifi })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     await screen.findByText('http://1.2.3.4:8080')
@@ -152,7 +164,7 @@ describe('WifiShareDialog', () => {
       fileCount: 1,
       timeoutMs: 60000
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     await screen.findByText('http://example.com/x')
@@ -172,7 +184,7 @@ describe('WifiShareDialog', () => {
       timeoutMs: 60000
     })
     const stopWifi = vi.fn().mockResolvedValue(undefined)
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi } }
+    setElectronAPI({ startWifi, stopWifi })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={onClose} />)
     await screen.findByText('http://1.2.3.4:8080')
@@ -190,7 +202,7 @@ describe('WifiShareDialog', () => {
       timeoutMs: 1000 // 1 秒超时
     })
     const stopWifi = vi.fn().mockResolvedValue(undefined)
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi } }
+    setElectronAPI({ startWifi, stopWifi })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     // 等待 Promise 解析
@@ -209,7 +221,7 @@ describe('WifiShareDialog', () => {
       fileCount: 1,
       timeoutMs: 60000
     })
-    ;(window as any).electronAPI = { share: { startWifi, stopWifi: vi.fn() } }
+    setElectronAPI({ startWifi, stopWifi: vi.fn() })
 
     render(<WifiShareDialog open={true} filePaths={['/x.jpg']} onClose={vi.fn()} />)
     expect(screen.getByText('share.wifi.title')).toBeTruthy()

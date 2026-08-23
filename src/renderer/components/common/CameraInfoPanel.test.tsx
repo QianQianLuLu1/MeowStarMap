@@ -3,10 +3,24 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
 import type { MediaFile } from '../../stores/mediaStore'
 
+/** InfoRowPanel mock 的 props 子集（仅覆盖本测试断言用到的字段） */
+interface MockInfoRowPanelProps {
+  loading?: boolean
+  error?: string | null
+  variant?: 'light' | 'dark'
+  showTitle?: boolean
+  title?: string
+  loadingText?: string
+  emptyText?: ReactNode
+  onCopy?: () => void
+  copied?: boolean
+}
+
 vi.mock('./InfoRowPanel', () => ({
-  InfoRowPanel: (props: any) => (
+  InfoRowPanel: (props: MockInfoRowPanelProps) => (
     <div
       data-testid="info-row-panel"
       data-loading={props.loading ? 'true' : 'false'}
@@ -33,8 +47,8 @@ vi.mock('../../utils/enum-mappings', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconCamera: (p: any) => <svg data-testid="icon-camera" {...p} />,
-  IconInfo: (p: any) => <svg data-testid="icon-info" {...p} />
+  IconCamera: (p: ComponentProps<'svg'>) => <svg data-testid="icon-camera" {...p} />,
+  IconInfo: (p: ComponentProps<'svg'>) => <svg data-testid="icon-info" {...p} />
 }))
 
 // i18n mock：返回 camera 命名空间的中文值，保证组件渲染与 formatCameraForCopy 输出一致
@@ -86,11 +100,15 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: mockT, i18n: { language: 'zh-CN' } })
 }))
 
-// useGameParams mock 状态
-const mockGameParamsResult = {
-  data: null as any,
+// useGameParams mock 状态（camera 运行时可能为 null，类型按测试实际值放宽）
+const mockGameParamsResult: {
+  data: { camera: RichCameraParams | null } | null
+  loading: boolean
+  error: string | null
+} = {
+  data: null,
   loading: false,
-  error: null as string | null
+  error: null
 }
 
 vi.mock('../../hooks/useGameParams', () => ({
@@ -150,9 +168,7 @@ describe('CameraInfoPanel', () => {
   })
 
   it('file_type=image 但无 album_type 时返回 null', () => {
-    const { container } = render(
-      <CameraInfoPanel file={makeFile({ album_type: undefined as any })} />
-    )
+    const { container } = render(<CameraInfoPanel file={makeFile({ album_type: undefined })} />)
     expect(container.firstChild).toBeNull()
   })
 
@@ -230,7 +246,8 @@ describe('CameraInfoPanel', () => {
 
 describe('formatCameraForCopy', () => {
   it('camera=null 返回基础标题与空原始参数', () => {
-    const text = formatCameraForCopy(null as any, mockT)
+    // 组件内 cameraToGroups 以 !camera 短路，null 与 undefined 同路径；类型层用 RichCameraParams 兜底
+    const text = formatCameraForCopy(null as unknown as RichCameraParams, mockT)
     expect(text).toContain('=== 相机参数代码 ===')
   })
 
@@ -243,7 +260,7 @@ describe('formatCameraForCopy', () => {
       apertureSection: 1,
       brightness: 0.5
     })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('=== 相机参数代码 ===')
     expect(text).toContain('镜头与构图')
     expect(text).toContain('竖构图: 是')
@@ -260,7 +277,7 @@ describe('formatCameraForCopy', () => {
     const camera = makeCamera({
       light: { id: 'light1', strength: 0.8 }
     })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('灯光: 日光 (80%)')
   })
 
@@ -268,19 +285,19 @@ describe('formatCameraForCopy', () => {
     const camera = makeCamera({
       filter: { id: 'filter1', strength: 0.6 }
     })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('滤镜: 滤镜A (60%)')
   })
 
   it('camera 包含 pose 时显示动作场景', () => {
     const camera = makeCamera({ pose: 1 })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('动作场景: 站立')
   })
 
   it('camera 包含 rawParams 时显示原始参数', () => {
     const camera = makeCamera({ rawParams: 'RAW_PARAM_STRING' })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('=== 原始参数 ===')
     expect(text).toContain('RAW_PARAM_STRING')
   })
@@ -289,31 +306,31 @@ describe('formatCameraForCopy', () => {
     const camera = makeCamera({
       cameraLoc: { x: 1.5, y: 2.5, z: 3.5 }
     })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('相机位置: (1.5, 2.5, 3.5)')
   })
 
   it('camera 包含 momoHidden=enabled 时显示已隐藏', () => {
     const camera = makeCamera({ momoHidden: 'enabled' })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('隐藏大喵: 已隐藏')
   })
 
   it('camera 包含 momoHidden=disabled 时显示未隐藏', () => {
     const camera = makeCamera({ momoHidden: 'disabled' })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('隐藏大喵: 未隐藏')
   })
 
   it('camera 包含 framedMoment 时显示定格', () => {
     const camera = makeCamera({ framedMoment: 42 })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('定格: #42')
   })
 
   it('camera 各字段为 0 时不显示对应行（除非是布尔）', () => {
     const camera = makeCamera({ cameraYaw: 0, cameraPitch: 0, pose: 0, framedMoment: 0 })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).not.toContain('镜头偏航')
     expect(text).not.toContain('镜头俯仰')
     expect(text).not.toContain('动作场景')
@@ -323,31 +340,31 @@ describe('formatCameraForCopy', () => {
   it('camera 全部字段未填时仅返回标题', () => {
     const camera = makeCamera({
       portraitMode: false,
-      zoom: undefined as any,
-      focalLength: undefined as any,
-      rotation: undefined as any,
-      cameraYaw: undefined as any,
-      cameraPitch: undefined as any,
+      zoom: undefined,
+      focalLength: undefined,
+      rotation: undefined,
+      cameraYaw: undefined,
+      cameraPitch: undefined,
       cameraLoc: null,
-      pose: undefined as any,
-      framedMoment: undefined as any,
+      pose: undefined,
+      framedMoment: undefined,
       momoHidden: null,
-      apertureSection: undefined as any,
-      bloomIntensity: undefined as any,
-      vignetteIntensity: undefined as any,
-      bloomThreshold: undefined as any,
-      brightness: undefined as any,
-      exposure: undefined as any,
-      contrast: undefined as any,
-      saturation: undefined as any,
-      vibrance: undefined as any,
-      highlights: undefined as any,
-      shadows: undefined as any,
-      light: undefined as any,
-      filter: undefined as any,
-      rawParams: undefined as any
+      apertureSection: undefined,
+      bloomIntensity: undefined,
+      vignetteIntensity: undefined,
+      bloomThreshold: undefined,
+      brightness: undefined,
+      exposure: undefined,
+      contrast: undefined,
+      saturation: undefined,
+      vibrance: undefined,
+      highlights: undefined,
+      shadows: undefined,
+      light: undefined,
+      filter: undefined,
+      rawParams: undefined
     })
-    const text = formatCameraForCopy(camera as any, mockT)
+    const text = formatCameraForCopy(camera, mockT)
     expect(text).toContain('=== 相机参数代码 ===')
     expect(text).toContain('竖构图: 否')
     expect(text).not.toContain('=== 原始参数 ===')

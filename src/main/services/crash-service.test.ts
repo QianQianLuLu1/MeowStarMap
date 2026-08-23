@@ -147,37 +147,37 @@ describe('listCrashes', () => {
   it('解析进程类型为渲染进程', async () => {
     makeDump('xxx-1234-renderer.dmp', mdmpSignature())
     const records = await listCrashes()
-    expect(records[0].processType).toBe('渲染进程')
+    expect(records[0].processType).toBe('renderer')
   })
 
   it('解析进程类型为主进程', async () => {
     makeDump('xxx-1234-main.dmp', mdmpSignature())
     const records = await listCrashes()
-    expect(records[0].processType).toBe('主进程')
+    expect(records[0].processType).toBe('main')
   })
 
   it('解析进程类型为 GPU 进程', async () => {
     makeDump('xxx-1234-gpu.dmp', mdmpSignature())
     const records = await listCrashes()
-    expect(records[0].processType).toBe('GPU 进程')
+    expect(records[0].processType).toBe('gpu')
   })
 
   it('解析进程类型为工具进程', async () => {
     makeDump('xxx-1234-utility.dmp', mdmpSignature())
     const records = await listCrashes()
-    expect(records[0].processType).toBe('工具进程')
+    expect(records[0].processType).toBe('utility')
   })
 
   it('解析进程类型为插件进程', async () => {
     makeDump('xxx-1234-plugin.dmp', mdmpSignature())
     const records = await listCrashes()
-    expect(records[0].processType).toBe('插件进程')
+    expect(records[0].processType).toBe('plugin')
   })
 
   it('未知进程名返回"未知进程"', async () => {
     makeDump('xxx-1234-unknown.dmp', mdmpSignature())
     const records = await listCrashes()
-    expect(records[0].processType).toBe('未知进程')
+    expect(records[0].processType).toBe('unknown')
   })
 
   it('按 mtime 倒序排列（最新在前）', async () => {

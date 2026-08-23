@@ -57,7 +57,7 @@ export const UpdateDialog: React.FC = () => {
       setPayload(p)
       // 新事件到达即重置关闭状态，确保下次检查能重新弹窗
       setDismissed(false)
-      if (p.stage === 'checking') showToast('正在检查更新…')
+      if (p.stage === 'checking') showToast(t('updateDialog.checking'))
       else {
         // 进入有实体 UI 的阶段（模态/进度卡片）时清掉 toast
         if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -69,32 +69,32 @@ export const UpdateDialog: React.FC = () => {
       unsubscribe()
       if (toastTimer.current) clearTimeout(toastTimer.current)
     }
-  }, [])
+  }, [t])
 
   const handleDownload = useCallback(async () => {
     try {
       await window.electronAPI?.app?.downloadUpdate()
     } catch (err) {
-      console.error('[UpdateDialog] 下载更新失败:', err)
+      console.error(t('updateDialog.log.downloadFailed'), err)
     }
-  }, [])
+  }, [t])
 
   const handleInstall = useCallback(async () => {
     try {
       await window.electronAPI?.app?.installUpdate()
     } catch (err) {
-      console.error('[UpdateDialog] 安装更新失败:', err)
+      console.error(t('updateDialog.log.installFailed'), err)
     }
-  }, [])
+  }, [t])
 
   // 「确定」按钮：打开项目官网（网络繁忙 / 已是最新均跳官网）
   const handleOpenOfficial = useCallback(async () => {
     try {
       await window.electronAPI?.shell?.openExternal?.(GITHUB_URL)
     } catch (err) {
-      console.error('[UpdateDialog] 打开官网失败:', err)
+      console.error(t('updateDialog.log.openOfficialFailed'), err)
     }
-  }, [])
+  }, [t])
 
   // 下载进度：右下角非阻塞卡片（与 TaskProgressOverlay 同源样式）
   if (payload?.stage === 'downloading') {
@@ -110,9 +110,16 @@ export const UpdateDialog: React.FC = () => {
           <span
             className="text-sm font-medium truncate"
             style={{ color: 'var(--text-primary)' }}
-            title={payload.version ? `正在下载更新 v${payload.version}` : '正在下载更新'}
+            title={
+              payload.version
+                ? t('updateDialog.downloadingVersion', { version: payload.version })
+                : t('updateDialog.downloading')
+            }
           >
-            {payload.version ? `正在下载更新 v${payload.version}` : '正在下载更新'}…
+            {payload.version
+              ? t('updateDialog.downloadingVersion', { version: payload.version })
+              : t('updateDialog.downloading')}
+            …
           </span>
           <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-tertiary)' }}>
             {percent.toFixed(0)}%
@@ -159,7 +166,7 @@ export const UpdateDialog: React.FC = () => {
       style={{ background: 'rgba(0,0,0,0.35)' }}
       role="dialog"
       aria-modal="true"
-      aria-label="应用更新"
+      aria-label={t('updateDialog.ariaLabel')}
     >
       <div
         className="glass-card p-6 w-[420px] max-w-[90vw] max-h-[80vh] flex flex-col"
@@ -168,10 +175,11 @@ export const UpdateDialog: React.FC = () => {
         {payload.stage === 'available' && (
           <>
             <h2 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-              发现新版本{versionText}
+              {t('updateDialog.foundNewVersion')}
+              {versionText}
             </h2>
             <p className="text-xs mb-3" style={{ color: 'var(--text-tertiary)' }}>
-              有可用更新，是否下载并安装？
+              {t('updateDialog.availablePrompt')}
             </p>
             {payload.releaseNotes && (
               <pre
@@ -193,14 +201,14 @@ export const UpdateDialog: React.FC = () => {
                 style={{ color: 'var(--text-secondary)' }}
                 onClick={() => setDismissed(true)}
               >
-                稍后
+                {t('updateDialog.later')}
               </button>
               <button
                 className="px-3 py-1.5 rounded text-sm font-medium text-white"
                 style={{ background: 'var(--accent)' }}
                 onClick={handleDownload}
               >
-                下载更新
+                {t('updateDialog.downloadNow')}
               </button>
             </div>
           </>
@@ -209,10 +217,11 @@ export const UpdateDialog: React.FC = () => {
         {payload.stage === 'downloaded' && (
           <>
             <h2 className="text-base font-semibold mb-1" style={{ color: 'var(--text-primary)' }}>
-              更新已下载完成{versionText}
+              {t('updateDialog.downloadedTitle')}
+              {versionText}
             </h2>
             <p className="text-xs mb-4" style={{ color: 'var(--text-tertiary)' }}>
-              新版本已准备就绪，重启应用后生效。
+              {t('updateDialog.downloadedPrompt')}
             </p>
             <div className="flex justify-end gap-2 mt-auto">
               <button
@@ -220,14 +229,14 @@ export const UpdateDialog: React.FC = () => {
                 style={{ color: 'var(--text-secondary)' }}
                 onClick={() => setDismissed(true)}
               >
-                稍后重启
+                {t('updateDialog.restartLater')}
               </button>
               <button
                 className="px-3 py-1.5 rounded text-sm font-medium text-white"
                 style={{ background: 'var(--accent)' }}
                 onClick={handleInstall}
               >
-                安装并重启
+                {t('updateDialog.installAndRestart')}
               </button>
             </div>
           </>

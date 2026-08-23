@@ -53,11 +53,11 @@ export const DataBackupSection: React.FC = () => {
         setBackupDir(res.backupDir)
       }
     } catch (err) {
-      console.error('加载备份列表失败:', err)
+      console.error(t('settings.backup.log.loadBackupsFailed'), err)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     loadBackups()
@@ -488,12 +488,10 @@ export const DataCacheSection: React.FC = () => {
         </span>
         <div className="flex-1">
           <div className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-            {t('settings.cache.strategyTitle', { defaultValue: '淘汰策略' })}
+            {t('settings.cache.strategyTitle')}
           </div>
           <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.cache.strategyDesc', {
-              defaultValue: '缓存超限时自动删除最久未访问的缩略图，访问记录跨重启保留。'
-            })}
+            {t('settings.cache.strategyDesc')}
           </div>
         </div>
       </div>
@@ -536,18 +534,13 @@ export const DataCacheSection: React.FC = () => {
                   handleSetLimit(val)
                   ;(e.target as HTMLInputElement).value = ''
                 } else {
-                  showMessage(
-                    t('settings.cache.invalidLimit', {
-                      defaultValue: '请输入 0.1~100 之间的数值'
-                    }),
-                    'error'
-                  )
+                  showMessage(t('settings.cache.invalidLimit'), 'error')
                 }
               }
             }}
           />
           <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.cache.customLimitHint', { defaultValue: 'GB（按回车应用）' })}
+            {t('settings.cache.customLimitHint')}
           </span>
         </div>
       </div>

@@ -258,3 +258,11 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 - **Removed** for now removed features.
 - **Fixed** for any bug fixes.
 - **Security** for vulnerability fixes and hardening.
+
+## 开发者信息 / 作者与社交平台
+
+- **抖音**：纤璐不会玩摄影 ([主页链接](https://v.douyin.com/Dx67wYkw48A/))
+- **小红书**：纤璐不会玩摄影 ([主页链接](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **哔哩哔哩**：纤璐不会玩摄影 ([主页链接](https://b23.tv/zCR5oGE))
+- **GitHub**：[QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)

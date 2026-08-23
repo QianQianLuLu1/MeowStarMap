@@ -160,15 +160,16 @@ export const PropertiesDialog: React.FC<PropertiesDialogProps> = ({ open, file, 
         if (result?.ok && result.data?.hasParams) {
           const d = result.data
           const sections: string[] = []
-          const photoText = formatPhotographyForCopy(d.photography as any, t)
+          // decodeFile 返回的内联类型与 types/decryption.ts 规范类型结构一致，可直接传入
+          const photoText = formatPhotographyForCopy(d.photography, t)
           if (photoText) sections.push(photoText)
-          const cameraText = formatCameraForCopy(d.camera as any, t)
+          const cameraText = formatCameraForCopy(d.camera, t)
           if (cameraText) sections.push(cameraText)
-          const nikkiText = formatNikkiForCopy(d.nikki as any)
+          const nikkiText = formatNikkiForCopy(d.nikki)
           if (nikkiText) sections.push(nikkiText)
-          const outfitText = formatOutfitForCopy(d.dressing as any, t)
+          const outfitText = formatOutfitForCopy(d.dressing, t)
           if (outfitText) sections.push(outfitText)
-          const interactionsText = formatInteractionsForCopy(d.interactions as any)
+          const interactionsText = formatInteractionsForCopy(d.interactions)
           if (interactionsText) sections.push(interactionsText)
           if (sections.length > 0) {
             lines.push('', sections.join('\n'))

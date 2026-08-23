@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 
 /**
  * GPU 崩溃自动回退软件渲染（复刻 VS Code 的成熟自愈模式）。
@@ -159,7 +160,7 @@ export function setupGpuProcessWatcher(): void {
     if (details.type !== 'GPU') return
     markGpuProcessCrash(String(details.reason ?? 'unknown'), details.exitCode ?? -1)
     try {
-      logger.error('[GPU] GPU 子进程崩溃，下次启动将回退软件渲染:', details)
+      logger.error(t('main.gpu.log.processCrashFallback'), details)
     } catch {
       // logger 未初始化时仅依赖 diagLog，不重抛
     }

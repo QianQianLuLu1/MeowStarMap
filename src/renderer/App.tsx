@@ -157,6 +157,7 @@ const InterruptedScanBridge: React.FC = () => {
 }
 
 const App: React.FC = () => {
+  const { t } = useTranslation()
   const currentView = useUIStore((state) => state.currentView)
   const refreshMedia = useRefreshMedia()
   const theme = useThemeStore((state) => state.theme)
@@ -205,9 +206,9 @@ const App: React.FC = () => {
   // facade 未就绪（如 preload 加载失败）时 doBootstrap 内部会跳过
   useEffect(() => {
     void bootstrapPluginRuntime().catch((err) => {
-      console.error('[App] 插件系统引导失败:', err)
+      console.error(t('app.log.pluginBootstrapFailed'), err)
     })
-  }, [])
+  }, [t])
 
   // 启动时应用字体与显示偏好（字号、紧凑模式、动效减弱）
   useEffect(() => {
@@ -258,7 +259,7 @@ const App: React.FC = () => {
       }
     }
     sync()
-  }, [])
+  }, [theme])
 
   const renderPage = useCallback((view: ViewLevel): React.ReactNode => {
     switch (view) {

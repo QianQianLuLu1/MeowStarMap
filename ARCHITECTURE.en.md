@@ -1734,3 +1734,11 @@ Theme switching with zero JS re-render.
 ---
 
 **End of Document**
+
+## Developer Info / Author & Social Platforms
+
+- **Douyin**: 纤璐不会玩摄影 ([profile](https://v.douyin.com/Dx67wYkw48A/))
+- **Xiaohongshu (RED)**: 纤璐不会玩摄影 ([profile](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **Bilibili**: 纤璐不会玩摄影 ([profile](https://b23.tv/zCR5oGE))
+- **GitHub**: [QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN Blog**: [QianQian-LuLu](https://blog.csdn.net/2604_96788940)

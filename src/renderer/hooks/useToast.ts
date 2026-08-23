@@ -103,9 +103,11 @@ export function useToast(duration = 3000): {
   )
 
   useEffect(() => {
+    // 卸载清理时 ref.current 可能已变化，先拷贝到局部变量（exhaustive-deps 推荐写法）
+    const timers = timersRef.current
     return () => {
-      timersRef.current.forEach((timer) => clearTimeout(timer))
-      timersRef.current.clear()
+      timers.forEach((timer) => clearTimeout(timer))
+      timers.clear()
     }
   }, [])
 

@@ -5,6 +5,7 @@ import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas, assertFileWritePath } from '../validator'
 import { SETTING_KEYS } from '../../utils/dir-manager'
+import { t } from '../../i18n'
 
 /**
  * P1-A11：抽取 8 个 setDir/resetDir handler 的工厂函数
@@ -70,13 +71,15 @@ export function registerResetDirHandler(
         return {
           success: true,
           needRestart: true,
-          message: '已恢复为默认目录，需要重启应用才能生效。是否立即重启？'
+          message: t('main.setDir.message.resetToDefault')
         }
       } catch (err) {
         return {
           success: false,
           needRestart: false,
-          message: `恢复默认失败：${err instanceof Error ? err.message : String(err)}`
+          message: t('main.setDir.error.resetFailed', {
+            reason: err instanceof Error ? err.message : String(err)
+          })
         }
       }
     })

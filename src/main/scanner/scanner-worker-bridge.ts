@@ -22,6 +22,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 import { ProgressThrottle } from '../utils/progress-throttle'
 import { EtaCalculator } from '../utils/eta-calculator'
 import { taskRegistry } from '../utils/task-registry'
@@ -115,12 +116,12 @@ export class ScannerWorkerBridge {
     // 超时保护：15s 内未收到 WORKER_READY 则判启动失败，避免调用方无限等待
     const readyTimeout = setTimeout(() => {
       if (!this.readyReject) return
-      logger.error('[ScannerWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败')
-      void logger.fault('workerCrash', new Error('scanner-worker 启动超时'), {
+      logger.error(t('main.scanner.log.bridgeReadyTimeout'))
+      void logger.fault('workerCrash', new Error(t('main.scanner.error.workerReadyTimeout')), {
         workerName: 'scanner-worker',
         stage: 'ready-timeout'
       })
-      this.failReadyHandshake('后台进程启动失败（scanner-worker 未在限定时间内就绪）')
+      this.failReadyHandshake(t('main.scanner.error.workerStartFailed'))
       // FIX(组2-4): 标记启动超时，随后的 exit 事件只做状态清理，不再当崩溃处理
       this.startupTimedOut = true
       try {
@@ -319,7 +320,7 @@ export class ScannerWorkerBridge {
       this.isScanning = false
       const fakeComplete: WorkerEvent = {
         type: 'SCAN_COMPLETE',
-        payload: { success: false, message: '扫描进程异常退出' }
+        payload: { success: false, message: t('main.scanner.error.scanProcessExit') }
       }
       this.messageHandlers.forEach((h) => h(fakeComplete))
 
@@ -332,7 +333,7 @@ export class ScannerWorkerBridge {
           current: 0,
           total: 0,
           percent: 0,
-          message: '扫描进程异常退出',
+          message: t('main.scanner.error.scanProcessExit'),
           startedAt: this.scanStartedAt,
           canCancel: false
         })
@@ -387,11 +388,11 @@ export class ScannerWorkerBridge {
 
     const scheduled = this.restartPolicy.scheduleRestart(async () => {
       // 重启回调：重新 fork worker，若有 lastScanOptions 则恢复扫描
-      logger.info('[ScannerWorker] 开始自动重启 worker...')
+      logger.info(t('main.scanner.log.bridgeRestarting'))
       try {
         await this.ensureWorker()
-        logger.info('[ScannerWorker] worker 已重新启动')
-        void logger.fault('workerRestart', new Error('scanner-worker 已自动重启'), {
+        logger.info(t('main.scanner.log.bridgeRestarted'))
+        void logger.fault('workerRestart', new Error(t('main.scanner.error.autoRestarted')), {
           workerName: 'scanner-worker',
           exitCode,
           restoredScan: !!this.lastScanOptions
@@ -408,9 +409,9 @@ export class ScannerWorkerBridge {
             } else {
               await this.startScan(dbPath, options)
             }
-            logger.info('[ScannerWorker] 已恢复扫描任务')
+            logger.info(t('main.scanner.log.scanTaskRestored'))
           } catch (restoreErr) {
-            logger.error('[ScannerWorker] 恢复扫描任务失败:', restoreErr)
+            logger.error(t('main.scanner.log.scanTaskRestoreFailed'), restoreErr)
             void logger.fault('workerRestart', restoreErr, {
               workerName: 'scanner-worker',
               stage: 'restore-scan-failed'
@@ -418,7 +419,7 @@ export class ScannerWorkerBridge {
           }
         }
       } catch (restartErr) {
-        logger.error('[ScannerWorker] worker 重启失败:', restartErr)
+        logger.error(t('main.scanner.log.bridgeRestartFailed'), restartErr)
         void logger.fault('workerRestart', restartErr, {
           workerName: 'scanner-worker',
           stage: 'restart-failed'
@@ -436,7 +437,7 @@ export class ScannerWorkerBridge {
       try {
         listener(info)
       } catch (err) {
-        logger.error('[ScannerWorker] 崩溃监听器执行失败:', err)
+        logger.error(t('main.scanner.log.bridgeCrashListenerFailed'), err)
       }
     }
   }
@@ -467,7 +468,7 @@ export class ScannerWorkerBridge {
     // 直接放行会覆盖 currentTaskId——旧 taskId 泄漏在 taskRegistry，worker 收到两个 SCAN_START。
     // 以 isScanning 拒绝重复启动；调用方（Manager 的 catch / 恢复回调的 try/catch）已处理该失败。
     if (this.isScanning) {
-      throw new Error('扫描正在进行中，忽略重复的 SCAN_START')
+      throw new Error(t('main.scanner.error.duplicateScanStart'))
     }
     await this.ensureWorker()
     this.isScanning = true
@@ -496,7 +497,7 @@ export class ScannerWorkerBridge {
         current: 0,
         total: 0,
         percent: 0,
-        message: '扫描已取消',
+        message: t('main.scanner.message.scanCancelled'),
         startedAt: this.scanStartedAt,
         canCancel: false
       })
@@ -548,7 +549,7 @@ export class ScannerWorkerBridge {
     this.stopHeartbeat()
     // dispose 期间若仍有调用方在等待握手，必须 reject（早于 return，覆盖 worker 已为 null 的情况）：
     // 此时 worker 即将被 kill，exit 回调与超时定时器都不会再兜底 reject
-    this.failReadyHandshake('scanner-worker 已释放（dispose）')
+    this.failReadyHandshake(t('main.scanner.error.workerDisposed'))
     if (!this.worker) return
     try {
       // R14：先发 SCAN_STOP 让 worker 立即停止扫描循环（shouldStop=true），

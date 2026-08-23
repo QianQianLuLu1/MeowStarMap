@@ -8,6 +8,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 // jest-dom matcher（toBeDisabled 等）的类型扩展；运行时 setup 已全局引入，此处仅补类型
 import '@testing-library/jest-dom/vitest'
 import { ImportWizard } from './ImportWizard'
@@ -35,7 +36,7 @@ vi.mock('../../icons', () => ({
 }))
 
 vi.mock('../common/IconButton', () => ({
-  IconButton: ({ children, onClick, ...props }: any) => (
+  IconButton: ({ children, onClick, ...props }: ComponentProps<'button'>) => (
     <button data-testid="icon-button" onClick={onClick} {...props}>
       {children}
     </button>

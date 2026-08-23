@@ -51,6 +51,17 @@ export function createSchemasMock() {
   }
 }
 
+/**
+ * 链式 mock 类型：任意属性访问与方法调用均返回可继续链式调用的值。
+ * 原先各 handler 测试在 vi.hoisted() 内构造 schemasProxy 时使用；
+ * 现由共享 mock（tests/mocks/mock-validator.ts）的 schemas 链式 Proxy 使用
+ * （type-only import 编译期擦除无运行时依赖）。
+ */
+export interface Chainable {
+  (...args: unknown[]): Chainable
+  [key: string]: Chainable
+}
+
 interface ScannerManagerStub {
   startScan: ReturnType<typeof vi.fn>
   stopScan: ReturnType<typeof vi.fn>

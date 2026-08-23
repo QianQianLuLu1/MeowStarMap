@@ -1,6 +1,7 @@
 import { app, dialog } from 'electron'
 import { logFault, logFaultSync, getLogDirectory } from '../utils/logger'
 import { logStartupError } from '../utils/startup-diagnostic'
+import { t } from '../i18n'
 
 // P1-5：首次异常弹出对话框提示用户，避免高频打扰
 // P1-A9：退出竞态 guard——仅 uncaughtException（致命路径）会置位并退出；
@@ -19,9 +20,9 @@ let rejectionCount = 0
 function getLogDirectorySafe(): string {
   try {
     const dir = getLogDirectory()
-    return dir || '<未知>'
+    return dir || t('main.errorHandlers.unknownPath')
   } catch {
-    return '<未知>'
+    return t('main.errorHandlers.unknownPath')
   }
 }
 
@@ -43,12 +44,11 @@ export function registerGlobalErrorHandlers(): void {
       hasShownRuntimeErrorDialog = true
       try {
         dialog.showErrorBox(
-          '应用遇到错误',
-          `应用遇到未预期的错误：\n\n${err.message}\n\n` +
-            `错误详情已记录到日志。建议：\n` +
-            `1. 保存当前工作后重启应用\n` +
-            `2. 如反复出现，请在设置→诊断中导出诊断包反馈给开发者\n\n` +
-            `日志路径：${getLogDirectorySafe()}`
+          t('main.errorHandlers.dialog.errorTitle'),
+          t('main.errorHandlers.dialog.errorBody', {
+            message: err.message,
+            logPath: getLogDirectorySafe()
+          })
         )
       } catch {}
     }
@@ -96,10 +96,15 @@ export function registerGlobalErrorHandlers(): void {
         dialog
           .showMessageBox({
             type: 'warning',
-            title: '应用频繁出现错误',
-            message: '应用在短时间内多次出现未处理的错误，建议重启应用以恢复稳定',
-            detail: `错误详情已记录到日志。\n\n日志路径：${getLogDirectorySafe()}`,
-            buttons: ['重启应用', '继续使用'],
+            title: t('main.errorHandlers.dialog.frequentErrorTitle'),
+            message: t('main.errorHandlers.dialog.frequentErrorMessage'),
+            detail: t('main.errorHandlers.dialog.frequentErrorDetail', {
+              logPath: getLogDirectorySafe()
+            }),
+            buttons: [
+              t('main.errorHandlers.dialog.restartApp'),
+              t('main.errorHandlers.dialog.continueUsing')
+            ],
             defaultId: 1,
             cancelId: 1,
             noLink: true
@@ -130,12 +135,11 @@ export function registerGlobalErrorHandlers(): void {
       hasShownRuntimeErrorDialog = true
       try {
         dialog.showErrorBox(
-          '应用遇到错误',
-          `应用遇到未预期的错误：\n\n${err.message}\n\n` +
-            `错误详情已记录到日志。建议：\n` +
-            `1. 保存当前工作后重启应用\n` +
-            `2. 如反复出现，请在设置→诊断中导出诊断包反馈给开发者\n\n` +
-            `日志路径：${getLogDirectorySafe()}`
+          t('main.errorHandlers.dialog.errorTitle'),
+          t('main.errorHandlers.dialog.errorBody', {
+            message: err.message,
+            logPath: getLogDirectorySafe()
+          })
         )
       } catch {}
     }

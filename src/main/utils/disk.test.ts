@@ -15,7 +15,7 @@ let statfsResult: { bavail: number; bsize: number } | null | Error = {
 
 vi.mock('fs/promises', () => ({
   default: {
-    statfs: vi.fn(async (dir: string) => {
+    statfs: vi.fn(async (_dir: string) => {
       if (statfsResult instanceof Error) throw statfsResult
       if (statfsResult === null) throw new Error('ENOENT: no such file or directory')
       return statfsResult

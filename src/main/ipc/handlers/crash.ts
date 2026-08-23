@@ -11,6 +11,7 @@ import {
   getCrashDirectory
 } from '../../services/crash-service'
 import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import { t } from '../../i18n'
 
 /**
  * P0-A1：从 Application.setupIPC() 迁移的崩溃报告域 IPC handler 集合。
@@ -25,9 +26,11 @@ export function registerCrashHandlers(ctx: HandlerContext): void {
         const crashes = await listCrashes()
         return { crashes }
       } catch (error) {
-        logger.error('[Crash] 列出崩溃文件失败:', error)
+        logger.error(t('main.crash.log.listFailed'), error)
         throw AppError.internal(
-          `列出崩溃文件失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.crash.error.listFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -41,7 +44,9 @@ export function registerCrashHandlers(ctx: HandlerContext): void {
         return await getCrashStats()
       } catch (error) {
         throw AppError.internal(
-          `获取崩溃统计失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.crash.error.getStatsFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -60,12 +65,14 @@ export function registerCrashHandlers(ctx: HandlerContext): void {
       try {
         const result = await clearAllCrashes()
         if (result.success) {
-          logger.info('[Crash] 用户手动清空了所有崩溃 dump 文件')
+          logger.info(t('main.crash.log.clearedAll'))
         }
         return result
       } catch (error) {
         throw AppError.internal(
-          `清空崩溃文件失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.crash.error.clearFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })

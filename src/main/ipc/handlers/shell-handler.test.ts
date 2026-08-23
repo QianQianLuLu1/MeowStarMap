@@ -4,8 +4,7 @@
  * @coverage shell 域 IPC handler（openExternal / openPath / showItemInFolder）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AppError } from '../../../shared/errors/app-error'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
 const {
   handleMock,
@@ -34,29 +33,7 @@ vi.mock('../../utils/ipc-validate', () => ({
   validateNonSensitivePath: validateNonSensitivePathMock
 }))
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn(),
-  wrapHandlerRaw: vi.fn(),
-  schemas: createSchemasMock()
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerShellHandlers } from './shell-handler'
 

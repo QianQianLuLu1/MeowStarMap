@@ -109,8 +109,6 @@ describe('logger', () => {
     })
 
     it('多次调用幂等（不重复创建）', () => {
-      const beforeMtime = fs.statSync(logDir).mtimeMs
-      // 等待一点时间避免 mtime 相同
       initLogger()
       initLogger()
       expect(fs.existsSync(logDir)).toBe(true)
@@ -274,7 +272,7 @@ describe('logger', () => {
 
     it('summary 超过 200 字符时被截断', async () => {
       const longMsg = 'a'.repeat(300)
-      const id = await logFault('manual', new Error(longMsg))
+      await logFault('manual', new Error(longMsg))
       const faultLog = path.join(logDir, `faults-${new Date().toISOString().slice(0, 10)}.jsonl`)
       const content = fs.readFileSync(faultLog, 'utf8')
       const record = JSON.parse(content.trim().split('\n').pop() as string)

@@ -3,11 +3,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
 import type { MediaFile } from '../../stores/mediaStore'
 
 // 隔离 BaseDialog
 vi.mock('./BaseDialog', () => ({
-  BaseDialog: ({ open, children }: any) => (open ? <div role="dialog">{children}</div> : null)
+  BaseDialog: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
+    open ? <div role="dialog">{children}</div> : null
 }))
 
 // 隔离 i18n
@@ -19,13 +21,13 @@ vi.mock('react-i18next', () => ({
 
 // 隔离图标
 vi.mock('../../icons', () => ({
-  IconFolderOpen: (props: any) => <svg data-testid="icon-folder" {...props} />,
-  IconCopyText: (props: any) => <svg data-testid="icon-copy" {...props} />,
-  IconCamera: (props: any) => <svg data-testid="icon-camera" {...props} />,
-  IconInfo: (props: any) => <svg data-testid="icon-info" {...props} />,
-  IconStar: (props: any) => <svg data-testid="icon-star" {...props} />,
-  IconOutfit: (props: any) => <svg data-testid="icon-outfit" {...props} />,
-  IconCategory: (props: any) => <svg data-testid="icon-category" {...props} />
+  IconFolderOpen: (props: ComponentProps<'svg'>) => <svg data-testid="icon-folder" {...props} />,
+  IconCopyText: (props: ComponentProps<'svg'>) => <svg data-testid="icon-copy" {...props} />,
+  IconCamera: (props: ComponentProps<'svg'>) => <svg data-testid="icon-camera" {...props} />,
+  IconInfo: (props: ComponentProps<'svg'>) => <svg data-testid="icon-info" {...props} />,
+  IconStar: (props: ComponentProps<'svg'>) => <svg data-testid="icon-star" {...props} />,
+  IconOutfit: (props: ComponentProps<'svg'>) => <svg data-testid="icon-outfit" {...props} />,
+  IconCategory: (props: ComponentProps<'svg'>) => <svg data-testid="icon-category" {...props} />
 }))
 
 // 隔离工具函数
@@ -159,7 +161,7 @@ describe('PropertiesDialog', () => {
     render(
       <PropertiesDialog
         open={true}
-        file={makeFile({ width: undefined as any, height: undefined as any })}
+        file={makeFile({ width: undefined, height: undefined })}
         onClose={vi.fn()}
       />
     )

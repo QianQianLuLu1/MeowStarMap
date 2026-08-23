@@ -3,6 +3,7 @@ import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, assertFileWritePath } from '../validator'
 import { MAX_FILE_PATH_LENGTH } from '../../utils/constants'
+import { t } from '../../i18n'
 
 /**
  * export 域专用 handler：导出默认目录与命名规则的安全写入通道。
@@ -18,9 +19,9 @@ const defaultDirSchema = z.string().max(MAX_FILE_PATH_LENGTH)
 // 命名规则：禁止路径分隔符与 ".."（防子目录穿越）；允许空串等同于清空
 const namingPatternSchema = z
   .string()
-  .max(256, '命名规则长度上限 256')
-  .refine((s) => !/[\\/]/.test(s), '命名规则不得包含路径分隔符')
-  .refine((s) => !s.includes('..'), '命名规则不得包含 ".."')
+  .max(256, t('main.exportPref.validation.namingMaxLength'))
+  .refine((s) => !/[\\/]/.test(s), t('main.exportPref.validation.namingNoSeparator'))
+  .refine((s) => !s.includes('..'), t('main.exportPref.validation.namingNoParentDir'))
 
 export function registerExportPrefHandlers(ctx: HandlerContext): void {
   // 设置默认导出目录：空串=清空回退到即时选择；非空经 assertFileWritePath 白名单校验

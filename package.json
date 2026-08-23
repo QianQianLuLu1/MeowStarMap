@@ -28,12 +28,6 @@
   "type": "module",
   "main": "dist/main/main/app/index.js",
   "author": "QianLu",
-  "os": [
-    "win32"
-  ],
-  "cpu": [
-    "x64"
-  ],
   "scripts": {
     "dev": "electron-vite dev",
     "clean": "node -e \"const fs=require('fs');const p=require('path');['dist/renderer/assets','dist/main'].forEach(d=>{const fp=p.join(__dirname,d);if(fs.existsSync(fp)){fs.rmSync(fp,{recursive:true,force:true});console.log('[clean] removed '+d)}})\"",
@@ -57,6 +51,11 @@
     "i18n:check": "tsx scripts/check-i18n-keys.ts",
     "i18n:extract": "babel --config-file ./babel.extract.config.cjs \"src/renderer/**/*.{ts,tsx}\" --quiet",
     "i18n:extract:gallery": "babel --config-file ./babel.extract.config.cjs \"src/renderer/components/gallery/**/*.tsx\" \"src/renderer/pages/{DetailPage,EditorPage}.tsx\" \"src/renderer/components/{layout/AppShell,editor/BatchApplyDialog,editor/ShortcutsModal}.tsx\" --quiet",
+    "i18n:status": "tsx scripts/i18n/whitelist-status.ts",
+    "i18n:extract-legacy": "tsx scripts/i18n/extract-i18n.ts",
+    "i18n:prune-whitelist": "tsx scripts/i18n/prune-whitelist.ts",
+    "i18n:codemod": "tsx scripts/i18n/codemod.ts",
+    "i18n:guard": "tsx scripts/i18n/guard.ts",
     "sync-i18n-keys": "tsx scripts/sync-i18n-keys.ts",
     "preview:check": "tsx scripts/check-preview-drift.ts",
     "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
@@ -135,6 +134,7 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^1.6.1",
+    "audit-ci": "^7.1.0",
     "autoprefixer": "^10.5.4",
     "babel-plugin-i18next-extract": "^1.1.0",
     "commitizen": "^4.3.1",

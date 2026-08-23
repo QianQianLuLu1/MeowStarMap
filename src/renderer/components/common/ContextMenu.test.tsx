@@ -8,7 +8,7 @@ import { ContextMenu, type ContextMenuItem } from './ContextMenu'
 // i18n stub：返回 key 作为文案，便于断言
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: any) => {
+    t: (key: string, options?: { label?: string }) => {
       if (typeof key === 'string' && options && options.label) {
         return `${key}:${options.label}`
       }

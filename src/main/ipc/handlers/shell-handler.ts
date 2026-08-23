@@ -5,6 +5,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { validateNonSensitivePath } from '../../utils/ipc-validate'
+import { t } from '../../i18n'
 
 /**
  * shell 操作（打开目录 / 打开文件所在位置）仅让操作系统定位文件，不经由应用读取文件内容，
@@ -15,11 +16,11 @@ import { validateNonSensitivePath } from '../../utils/ipc-validate'
 function assertShellPathSafe(p: string): void {
   // 兼容 Windows 盘符路径（D:\...）、UNC（\\...）与 POSIX 根路径（/...）；真正的相对路径（foo、./x、../x）才拦截
   if (!path.isAbsolute(p) && !p.startsWith('/') && !/^[a-zA-Z]:[\\/]/.test(p)) {
-    throw AppError.forbidden('路径必须为绝对路径', { path: p })
+    throw AppError.forbidden(t('main.shell.error.pathMustBeAbsolute'), { path: p })
   }
   const result = validateNonSensitivePath(p)
   if (!result.valid) {
-    throw AppError.forbidden(result.message ?? '出于安全考虑，不允许操作系统敏感目录', {
+    throw AppError.forbidden(result.message ?? t('main.shell.error.sensitiveDirForbidden'), {
       path: p
     })
   }
@@ -62,7 +63,7 @@ const EXECUTABLE_PATH_EXTENSIONS = new Set([
 function assertNotExecutablePath(p: string): void {
   const ext = path.extname(p).toLowerCase()
   if (EXECUTABLE_PATH_EXTENSIONS.has(ext)) {
-    throw AppError.forbidden('出于安全考虑，不允许通过 shell:openPath 打开可执行或脚本文件', {
+    throw AppError.forbidden(t('main.shell.error.executableForbidden'), {
       path: p
     })
   }
@@ -82,7 +83,9 @@ export function registerShellHandlers(ctx: HandlerContext): void {
         return { opened: true }
       } catch (error) {
         throw AppError.internal(
-          `打开外部链接失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.shell.error.openExternalFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -101,7 +104,9 @@ export function registerShellHandlers(ctx: HandlerContext): void {
         return { opened: true }
       } catch (error) {
         throw AppError.internal(
-          `打开目录失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.shell.error.openPathFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -118,7 +123,9 @@ export function registerShellHandlers(ctx: HandlerContext): void {
         return { opened: true }
       } catch (error) {
         throw AppError.internal(
-          `打开文件所在位置失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.shell.error.showItemFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })

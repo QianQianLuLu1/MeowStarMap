@@ -5,6 +5,7 @@ import { useMediaStore, loadNextMediaPage, type MediaFile } from '../stores/medi
 import { getGroupFieldValue } from '../utils/group-field'
 // 全文搜索（flexsearch）：索引就绪时优先用 flexsearch 召回；未就绪返回 null 触发降级
 import { searchService } from '../search/search-service'
+import i18n from '../i18n'
 
 // C-O5：module-level 缓存（故意为之，多组件共享过滤结果）
 // GalleryPage / DetailPage / FullscreenViewer 各自调用 useFilteredMediaFiles 时，
@@ -239,7 +240,7 @@ export function useFilteredMediaFiles(): MediaFile[] {
       } else if (matchedIds.length === 0 && !searchService.isReady()) {
         // 防御性兜底：理论上 state !== 'ready' 时 search 返回 null 已降级，
         // 此分支覆盖极端时序（搜索调用瞬间索引状态变化），回退到客户端过滤
-        console.warn('[Search] 索引未就绪，回退到本地搜索:', searchQuery)
+        console.warn(i18n.t('gallery.search.log.indexNotReadyFallback'), searchQuery)
         const query = searchQuery.toLowerCase()
         files = files.filter(
           (f) =>

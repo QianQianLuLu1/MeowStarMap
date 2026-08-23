@@ -11,6 +11,7 @@
  */
 import type DatabaseType from 'better-sqlite3'
 import { extractMediaSourceFromPath } from './path-classifier'
+import { t } from '../i18n/worker-safe'
 
 type LogLevel = 'info' | 'warn' | 'error'
 
@@ -64,14 +65,14 @@ export function repairLegacyDataV4(
     } catch (markErr) {
       log(
         'warn',
-        '[Scanner] repairLegacyDataV4: 标记迁移状态失败:',
+        t('main.scanner.log.markMigrationV4Failed'),
         markErr instanceof Error ? markErr.message : String(markErr)
       )
     }
   } catch (err) {
     log(
       'error',
-      '[Scanner] repairLegacyDataV4 失败:',
+      t('main.scanner.log.repairV4Failed'),
       err instanceof Error ? err.message : String(err)
     )
     // FIX(组3-4): 返回失败标志，调用方中止后续修复步骤

@@ -10,6 +10,7 @@ import { probeVideoMetadata, type VideoMetadata } from '../utils/video-probe'
 import { runFfmpegCommand } from '../utils/ffmpeg-runner'
 // 损坏文件容错：错误日志写入 + 标记回调
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 import type { CorruptedMarkerFn } from '../thumbnail/generator'
 
 // 修复 C-S4：超时时间可配置，默认值按操作类型区分
@@ -43,12 +44,12 @@ export class VideoService {
    */
   private async markCorrupted(filePath: string, reason: string): Promise<void> {
     try {
-      logger.error(`[VideoService] 视频处理失败，标记为损坏: ${filePath}`, reason)
+      logger.error(t('main.videoService.log.markingCorrupted', { path: filePath }), reason)
       if (this.markCorruptedFn) {
         await this.markCorruptedFn(filePath, reason)
       }
     } catch (err) {
-      logger.error('[VideoService] markCorrupted 回调执行失败:', err)
+      logger.error(t('main.videoService.log.markCorruptedCallbackFailed'), err)
     }
   }
 
@@ -79,7 +80,7 @@ export class VideoService {
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
       // 标记源文件为损坏，不阻断调用方错误处理（仍抛出原错误）
-      await this.markCorrupted(filePath, `视频元数据读取失败: ${reason}`)
+      await this.markCorrupted(filePath, t('main.videoService.log.metadataReadFailed', { reason }))
       throw err
     }
   }
@@ -127,25 +128,28 @@ export class VideoService {
           return cmd.output(targetPath)
         },
         timeoutMs,
-        '视频导出'
+        t('main.videoService.log.exportTask')
       )
 
-      return { success: true, message: '视频导出成功' }
+      return { success: true, message: t('main.videoService.message.exportSuccess') }
     } catch (error) {
       // 超时或失败时清理部分输出文件，避免残留损坏文件
       if (targetPath) {
         await this.cleanupPartialOutput(targetPath)
       }
       const reason = error instanceof Error ? error.message : String(error)
-      logger.error(`[VideoService] 视频导出失败: ${filePath}`, reason)
+      logger.error(t('main.videoService.log.exportFailed', { path: filePath }), reason)
       // 源文件解码失败时标记为损坏（区分于磁盘空间/权限等外部错误）
       // ffmpeg 解码失败的常见错误信息包含 "Invalid data" / "Error while decoding" / "could not find codec"
       if (this.isSourceDecodeError(reason)) {
-        await this.markCorrupted(filePath, `视频导出解码失败: ${reason}`)
+        await this.markCorrupted(
+          filePath,
+          t('main.videoService.log.exportDecodeFailed', { reason })
+        )
       }
       return {
         success: false,
-        message: `视频导出失败: ${reason}`
+        message: t('main.videoService.error.exportFailed', { reason })
       }
     }
   }
@@ -170,10 +174,12 @@ export class VideoService {
       const baseName = path.basename(filePath, ext)
       const timeSeconds = Math.floor(currentTime)
       // C-3：统一唯一路径生成（自定义命名模板，保留原中文与时间戳格式）
+      // 输出文件名标识（数据值，非 UI 文案）
       targetPath = await getUniqueFilePath(
         outputDir,
         `${baseName}_帧截图_${timeSeconds}s`,
         '.jpg',
+        // 输出文件名标识（数据值，非 UI 文案）
         (counter) => `${baseName}_帧截图_${timeSeconds}s_${counter}`
       )
 
@@ -182,23 +188,30 @@ export class VideoService {
         filePath,
         (cmd) => cmd.seekInput(currentTime).frames(1).output(targetPath),
         timeoutMs,
-        '帧截图'
+        t('main.videoService.log.frameCaptureTask')
       )
 
-      return { success: true, message: '帧截图保存成功', filePath: targetPath }
+      return {
+        success: true,
+        message: t('main.videoService.message.frameCaptureSuccess'),
+        filePath: targetPath
+      }
     } catch (error) {
       // 超时或失败时清理部分输出文件
       if (targetPath) {
         await this.cleanupPartialOutput(targetPath)
       }
       const reason = error instanceof Error ? error.message : String(error)
-      logger.error(`[VideoService] 帧截图失败: ${filePath}`, reason)
+      logger.error(t('main.videoService.log.frameCaptureFailed', { path: filePath }), reason)
       if (this.isSourceDecodeError(reason)) {
-        await this.markCorrupted(filePath, `视频帧截图解码失败: ${reason}`)
+        await this.markCorrupted(
+          filePath,
+          t('main.videoService.log.frameCaptureDecodeFailed', { reason })
+        )
       }
       return {
         success: false,
-        message: `帧截图失败: ${reason}`
+        message: t('main.videoService.error.frameCaptureFailed', { reason })
       }
     }
   }
@@ -234,14 +247,18 @@ export class VideoService {
         if (available < srcStat.size) {
           const needMB = (srcStat.size / 1024 / 1024).toFixed(1)
           const availMB = (available / 1024 / 1024).toFixed(1)
+          // 错误文案与下方 includes('磁盘空间不足') 判定构成固定协议，保持 zh-CN 原文（数据耦合）
           throw new Error(`磁盘空间不足，需要 ${needMB} MB，仅剩 ${availMB} MB`)
         }
       } catch (error) {
+        // 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
+        // eslint-disable-next-line no-restricted-syntax -- 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
         if (error instanceof Error && error.message.includes('磁盘空间不足')) throw error
       }
 
       const ext = path.extname(filePath)
       const baseName = path.basename(filePath, ext)
+      // 输出文件名标识（数据值，非 UI 文案）
       targetPath = await getUniqueFilePath(targetDir, `${baseName}_裁剪`, ext)
 
       // P2-4：复用 ffmpeg-runner
@@ -255,22 +272,26 @@ export class VideoService {
             .outputOptions(['-c', 'copy', '-avoid_negative_ts', 'make_zero'])
             .output(targetPath),
         timeoutMs,
-        '视频裁剪'
+        t('main.videoService.log.trimTask')
       )
 
-      return { success: true, message: '视频裁剪成功', filePath: targetPath }
+      return {
+        success: true,
+        message: t('main.videoService.message.trimSuccess'),
+        filePath: targetPath
+      }
     } catch (error) {
       if (targetPath) {
         await this.cleanupPartialOutput(targetPath)
       }
       const reason = error instanceof Error ? error.message : String(error)
-      logger.error(`[VideoService] 视频裁剪失败: ${filePath}`, reason)
+      logger.error(t('main.videoService.log.trimFailed', { path: filePath }), reason)
       if (this.isSourceDecodeError(reason)) {
-        await this.markCorrupted(filePath, `视频裁剪解码失败: ${reason}`)
+        await this.markCorrupted(filePath, t('main.videoService.log.trimDecodeFailed', { reason }))
       }
       return {
         success: false,
-        message: `视频裁剪失败: ${reason}`
+        message: t('main.videoService.error.trimFailed', { reason })
       }
     }
   }
@@ -291,7 +312,13 @@ export class VideoService {
     try {
       // 参数校验
       if (speed < MIN_SPEED || speed > MAX_SPEED) {
-        throw new Error(`不支持的速度 ${speed}x（范围 ${MIN_SPEED}-${MAX_SPEED}）`)
+        throw new Error(
+          t('main.videoEditor.error.unsupportedSpeed', {
+            speed: String(speed),
+            min: String(MIN_SPEED),
+            max: String(MAX_SPEED)
+          })
+        )
       }
 
       await fsp.mkdir(targetDir, { recursive: true })
@@ -305,9 +332,12 @@ export class VideoService {
         if (available < required) {
           const needMB = (required / 1024 / 1024).toFixed(1)
           const availMB = (available / 1024 / 1024).toFixed(1)
+          // 错误文案与下方 includes('磁盘空间不足') 判定构成固定协议，保持 zh-CN 原文（数据耦合）
           throw new Error(`磁盘空间不足，需要 ${needMB} MB，仅剩 ${availMB} MB`)
         }
       } catch (error) {
+        // 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
+        // eslint-disable-next-line no-restricted-syntax -- 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
         if (error instanceof Error && error.message.includes('磁盘空间不足')) throw error
       }
 
@@ -330,22 +360,26 @@ export class VideoService {
         filePath,
         (cmd) => cmd.outputOptions(outputOptions).output(targetPath),
         timeoutMs,
-        '视频调速'
+        t('main.videoService.log.speedTask')
       )
 
-      return { success: true, message: '视频调速成功', filePath: targetPath }
+      return {
+        success: true,
+        message: t('main.videoService.message.speedSuccess'),
+        filePath: targetPath
+      }
     } catch (error) {
       if (targetPath) {
         await this.cleanupPartialOutput(targetPath)
       }
       const reason = error instanceof Error ? error.message : String(error)
-      logger.error(`[VideoService] 视频调速失败: ${filePath}`, reason)
+      logger.error(t('main.videoService.log.speedFailed', { path: filePath }), reason)
       if (this.isSourceDecodeError(reason)) {
-        await this.markCorrupted(filePath, `视频调速解码失败: ${reason}`)
+        await this.markCorrupted(filePath, t('main.videoService.log.speedDecodeFailed', { reason }))
       }
       return {
         success: false,
-        message: `视频调速失败: ${reason}`
+        message: t('main.videoService.error.speedFailed', { reason })
       }
     }
   }

@@ -147,7 +147,12 @@ WXNN XiangCe/
 ├── src/
 │   ├── main/                  # Electron 主进程（Node 环境）
 │   │   ├── index.ts           # 主入口，启动应用、创建窗口、注册 IPC
-│   │   ├── preload.ts         # 预加载脚本，向渲染层暴露 electronAPI
+│   │   ├── preload.ts         # 预加载脚本入口：装配各命名空间并暴露 electronAPI（2026-08 拆分重构）
+│   │   ├── preload-logger.ts  # preload 专用零依赖日志（禁止引入主进程 logger/i18n/app）
+│   │   ├── preload/           # preload 拆分模块（按功能域命名空间化）
+│   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
+│   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
+│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 28 个文件，每文件导出 <key>API 对象）
 │   │   ├── app/               # 应用生命周期管理（14 个文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
@@ -442,14 +447,17 @@ npm run format
 
 配置文件：`eslint.config.js`
 
-关键规则：
+关键规则（2026-08-22 起，以下质量规则均为 `error` 级别，提交与 CI 阶段硬性阻断）：
 
-- `@typescript-eslint/no-explicit-any`：`warn`（避免 any，必须用时会出现警告）
-- `@typescript-eslint/no-unused-vars`：`warn`（未使用变量以下划线开头可忽略）
+- `@typescript-eslint/no-explicit-any`：`error`（禁止显式 `any`，必须补充明确类型定义；确实无法确定时用 `unknown` + 类型收窄）
+- `@typescript-eslint/no-unused-vars`：`error`（未使用变量直接报错；有意保留的参数/捕获错误以下划线 `_` 前缀命名）
+- `react-hooks/exhaustive-deps`：`error`（Hooks 依赖数组必须完整，禁止遗漏或冗余）
+- `no-empty`：`error`（空块禁止；空 catch 允许但必须加注释说明或进行处理）
+- `@typescript-eslint/no-unsafe-function-type` / `@typescript-eslint/no-require-imports`：`error`（禁止 `Function` 类型和 `require()` 导入）
 - `react/react-in-jsx-scope`：`off`（React 17+ JSX 转换无需 import React）
-- `no-empty`：`warn`（空 catch 块允许，但建议加注释）
+- `no-restricted-syntax`：`error`（i18n 护栏：禁止硬编码中文与调试用 console 调用，2026-08-22 起硬阻断。存量技术债文件在 `eslint.config.js` 的 legacy 白名单块中降级为 `warn` 渐进收敛，修复一个文件就从白名单删除一个；测试文件整体豁免——断言/fixture 合法包含中文）
 
-提交前请先运行：
+提交前请先运行并确保 **0 error**：
 
 ```bash
 npm run lint
@@ -885,12 +893,13 @@ npm run lint             # ESLint 检查
 
 ---
 
-## 联系开发者
+## 开发者信息 / 作者与社交平台
 
-- **开发者**：QianLu
-- **全网同名**：纤璐不会玩摄影
-- **抖音**：[v.douyin.com/XkTzyJeCFIU](https://v.douyin.com/XkTzyJeCFIU/)
-- **哔哩哔哩**：[b23.tv/FtjgFrW](https://b23.tv/FtjgFrW)
+- **抖音**：纤璐不会玩摄影 ([主页链接](https://v.douyin.com/Dx67wYkw48A/))
+- **小红书**：纤璐不会玩摄影 ([主页链接](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **哔哩哔哩**：纤璐不会玩摄影 ([主页链接](https://b23.tv/zCR5oGE))
+- **GitHub**：[QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 
 ---
 

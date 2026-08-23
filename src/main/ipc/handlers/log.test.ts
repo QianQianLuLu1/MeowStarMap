@@ -6,7 +6,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 
 const {
   handleMock,
@@ -23,28 +22,8 @@ const {
   loggerInfoMock,
   loggerErrorMock,
   registerSetDirHandlerMock,
-  registerResetDirHandlerMock,
-  schemasProxy
+  registerResetDirHandlerMock
 } = vi.hoisted(() => {
-  const makeChainable = (): any => {
-    const fn: any = () => makeChainable()
-    return new Proxy(fn, {
-      get: (_t, prop) => {
-        if (prop === 'then') return undefined
-        if (typeof prop === 'symbol') return undefined
-        return () => makeChainable()
-      }
-    })
-  }
-  const schemasProxy: any = new Proxy(
-    {},
-    {
-      get: (_, prop) => {
-        if (typeof prop === 'symbol') return undefined
-        return makeChainable()
-      }
-    }
-  )
   return {
     handleMock: vi.fn(),
     showSaveDialogMock: vi.fn(),
@@ -60,8 +39,7 @@ const {
     loggerInfoMock: vi.fn(),
     loggerErrorMock: vi.fn(),
     registerSetDirHandlerMock: vi.fn(),
-    registerResetDirHandlerMock: vi.fn(),
-    schemasProxy
+    registerResetDirHandlerMock: vi.fn()
   }
 })
 
@@ -91,62 +69,7 @@ vi.mock('./set-dir-handler', () => ({
   registerResetDirHandler: registerResetDirHandlerMock
 }))
 
-vi.mock('../validator', () => {
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    wrapHandlerRaw: vi.fn(
-      (ctx: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    schemas: schemasProxy,
-    assertFileReadPath: vi.fn(),
-    assertFileWritePath: vi.fn()
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerLogHandlers } from './log'
 

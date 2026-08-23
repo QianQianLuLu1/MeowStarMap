@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import i18n from '../i18n'
 
 /**
  * F-S8：全局操作历史类型。
@@ -129,26 +130,31 @@ export const useOperationHistoryStore = create<OperationHistoryState>((set, get)
         }
       })
       .catch((err) => {
-        console.error('[OperationHistory] 写入数据库失败:', err)
+        console.error(i18n.t('operationHistory.log.dbWriteFailed'), err)
         // P1-F5：通过回调通知 UI，避免静默失败
         const reason = err instanceof Error ? err.message : String(err)
-        dbErrorHandlers.forEach((h) => h(`操作历史保存失败：${reason}，重启后该操作不可撤销`))
+        dbErrorHandlers.forEach((h) =>
+          h(i18n.t('operationHistory.error.dbSaveFailedFull', { reason }))
+        )
       })
   },
 
   undo: async (options) => {
     const state = get()
     if (state.undoing || state.stack.length === 0) {
-      return { success: false, message: '没有可撤销的操作' }
+      return { success: false, message: i18n.t('toast.undo.none') }
     }
     const top = state.stack[state.stack.length - 1]
     const handler = undoHandlers.get(top.type)
     if (!handler) {
-      return { success: false, message: `未注册 ${top.type} 的撤销处理器` }
+      return {
+        success: false,
+        message: i18n.t('operationHistory.error.handlerNotRegistered', { type: top.type })
+      }
     }
     // R8：损坏 payload（解析为空对象）拒绝撤销，避免 handler 用空数据覆盖最新状态
     if (Object.keys(top.payload).length === 0) {
-      return { success: false, message: '操作记录已损坏，无法撤销' }
+      return { success: false, message: i18n.t('operationHistory.error.recordCorrupted') }
     }
     // R8：乐观锁冲突检测——若未强制 force 且记录已入库，比对 snapshot_updated_at 与当前 updated_at
     if (!options?.force && top.dbId != null) {
@@ -158,12 +164,12 @@ export const useOperationHistoryStore = create<OperationHistoryState>((set, get)
           return {
             success: false,
             conflict: true,
-            message: '该文件已被修改，是否仍要撤销？'
+            message: i18n.t('toast.undo.conflictPrompt')
           }
         }
       } catch (err) {
         // 冲突检测本身失败（IPC 不可用等）不阻塞撤销，仅记录
-        console.warn('[OperationHistory] 冲突检测失败，跳过:', err)
+        console.warn(i18n.t('operationHistory.log.conflictCheckFailed'), err)
       }
     }
     set({ undoing: true })
@@ -178,7 +184,7 @@ export const useOperationHistoryStore = create<OperationHistoryState>((set, get)
         // 从数据库删除（fire-and-forget）
         if (top.dbId != null) {
           void window.electronAPI?.operationHistory?.remove(top.dbId).catch((err) => {
-            console.error('[OperationHistory] 从数据库删除失败:', err)
+            console.error(i18n.t('operationHistory.log.dbRemoveFailed'), err)
           })
         }
       } else {
@@ -197,7 +203,7 @@ export const useOperationHistoryStore = create<OperationHistoryState>((set, get)
   clear: () => {
     set({ stack: [] })
     void window.electronAPI?.operationHistory?.clear().catch((err) => {
-      console.error('[OperationHistory] 清空数据库失败:', err)
+      console.error(i18n.t('operationHistory.log.dbClearFailed'), err)
     })
   },
 
@@ -238,7 +244,7 @@ export const useOperationHistoryStore = create<OperationHistoryState>((set, get)
       })
       set({ stack: records })
     } catch (err) {
-      console.error('[OperationHistory] 从数据库加载失败:', err)
+      console.error(i18n.t('operationHistory.log.dbLoadFailed'), err)
     }
   }
 }))

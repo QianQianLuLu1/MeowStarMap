@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Lut3D, builtInLuts, parseCube } from '../../utils/lut'
 import { IconLut, IconClose } from '../../icons'
+import i18n from '../../i18n'
 
 // U-O11：自定义 LUT 持久化存储键
 const CUSTOM_LUTS_STORAGE_KEY = 'wxnn-custom-luts'
@@ -35,7 +36,7 @@ function saveStoredLuts(luts: Lut3D[]): void {
     localStorage.setItem(CUSTOM_LUTS_STORAGE_KEY, JSON.stringify(stored))
   } catch (err) {
     // P1-U11：存储失败（如配额超限）需记录原因，便于用户排查
-    console.warn('[LutPanel] 自定义 LUT 持久化失败:', err)
+    console.warn(i18n.t('lut.log.persistFailed'), err)
   }
 }
 

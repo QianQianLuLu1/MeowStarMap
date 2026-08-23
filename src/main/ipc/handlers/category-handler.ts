@@ -4,6 +4,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
+import { t } from '../../i18n'
 
 /**
  * 分类管理域 IPC handler
@@ -17,7 +18,7 @@ export function registerCategoryHandlers(ctx: HandlerContext): void {
   // 数据库写操作进程拆分：传入 workerBridge 与 dbPath，写方法走独立 utilityProcess
   const getRepo = (): MediaRepository => {
     const db = ctx.dbManager.getDatabase()
-    if (!db) throw AppError.preconditionFailed('数据库未初始化')
+    if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
     return new MediaRepository(db, ctx.dbManager.getWorkerBridge(), ctx.dbManager.getDbPath())
   }
 
@@ -71,7 +72,7 @@ export function registerCategoryHandlers(ctx: HandlerContext): void {
           values.push(value)
         }
         if (fields.length === 0) {
-          throw AppError.validation('没有可更新的字段')
+          throw AppError.validation(t('main.category.error.noUpdatableFields'))
         }
         await getRepo().updateCategoryFields(id, fields, values)
         return { updated: true }
@@ -87,7 +88,7 @@ export function registerCategoryHandlers(ctx: HandlerContext): void {
       // 且无条件返回 deleted:true 误报成功。前置校验使前端得到明确错误而非假成功
       const repo = getRepo()
       if (repo.isSystemCategory(id)) {
-        throw AppError.validation('系统分类不允许删除')
+        throw AppError.validation(t('main.category.error.systemCategoryUndeletable'))
       }
       // F-G9：删除分类前级联清理 media_files.category_id
       await repo.deleteCategoryCascade(id)
@@ -108,8 +109,8 @@ export function registerCategoryHandlers(ctx: HandlerContext): void {
               parent_id: schemas.positiveIntId.nullable().optional()
             })
           )
-          .min(1, 'orders 不能为空')
-          .max(500, 'orders 数量超过上限 500')
+          .min(1, t('main.category.error.ordersRequired'))
+          .max(500, t('main.category.error.ordersMax'))
       ]),
       async ([orders]) => {
         await getRepo().reorderCategories(orders)

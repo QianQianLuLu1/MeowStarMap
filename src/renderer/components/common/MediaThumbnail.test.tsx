@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
 vi.mock('./MissingBadge', () => ({
-  MissingBadge: ({ size }: any) => (
+  MissingBadge: ({ size }: { size?: 'md' | 'sm' }) => (
     <div data-testid="missing-badge" data-size={size}>
       丢失
     </div>
@@ -13,7 +13,15 @@ vi.mock('./MissingBadge', () => ({
 }))
 
 vi.mock('../gallery/MediaThumbPlaceholder', () => ({
-  MediaThumbPlaceholder: ({ fileType, hasError, visible }: any) =>
+  MediaThumbPlaceholder: ({
+    fileType,
+    hasError,
+    visible
+  }: {
+    fileType?: 'image' | 'video'
+    hasError?: boolean
+    visible?: boolean
+  }) =>
     visible ? (
       <div
         data-testid="placeholder"

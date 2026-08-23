@@ -6,6 +6,7 @@ import { AppError } from '../../../shared/errors/app-error'
 import { logger } from '../../utils/logger'
 import { ImportRootRepository } from '../../database/import-root-repository'
 import { MediaRepository } from '../../database/media-repository'
+import { t } from '../../i18n'
 
 /**
  * import-root 域 IPC handler：管理"指定目录扫描"登记的导入根（import_roots 表）。
@@ -22,7 +23,7 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
     'import:roots',
     wrapHandlerNoArgs(ctx, async (c) => {
       const db = c.dbManager.getDatabase()
-      if (!db) throw new Error('数据库未初始化')
+      if (!db) throw new Error(t('main.error.databaseNotInit'))
       const repo = new ImportRootRepository(
         db,
         c.dbManager.getWorkerBridge(),
@@ -42,7 +43,7 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
       z.tuple([schemas.filePath, z.boolean()]),
       async ([rootPath, clearRecords], c) => {
         const db = c.dbManager.getDatabase()
-        if (!db) throw new Error('数据库未初始化')
+        if (!db) throw new Error(t('main.error.databaseNotInit'))
         const importRootRepo = new ImportRootRepository(
           db,
           c.dbManager.getWorkerBridge(),
@@ -66,9 +67,11 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
             await importRootRepo.removeImportRoot(rootPath)
             removed = true
           } catch (err) {
-            logger.error('[ImportRoot] 移除导入根失败:', err)
+            logger.error(t('main.importRoot.log.removeFailed'), err)
             throw AppError.internal(
-              `移除指定目录失败: ${err instanceof Error ? err.message : String(err)}`
+              t('main.importRoot.error.removeFailed', {
+                reason: err instanceof Error ? err.message : String(err)
+              })
             )
           }
 
@@ -85,7 +88,7 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
               c.notifyMediaUpdated()
             } catch (err) {
               // 媒体软删失败不影响 import_roots 行移除结果（removed 仍为 true）
-              logger.error('[ImportRoot] 清除目录媒体索引记录失败（指定目录已移除）:', err)
+              logger.error(t('main.importRoot.log.clearRecordsFailed'), err)
               clearFailed = true
               clearErrorMessage = err instanceof Error ? err.message : String(err)
             }

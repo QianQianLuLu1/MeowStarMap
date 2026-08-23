@@ -4,6 +4,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
+import { t } from '../../i18n'
 
 /**
  * 角色档案管理域 IPC handler
@@ -17,7 +18,7 @@ export function registerProfileHandlers(ctx: HandlerContext): void {
   // 数据库写操作进程拆分：传入 workerBridge 与 dbPath，写方法走独立 utilityProcess
   const getRepo = (): MediaRepository => {
     const db = ctx.dbManager.getDatabase()
-    if (!db) throw AppError.preconditionFailed('数据库未初始化')
+    if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
     return new MediaRepository(db, ctx.dbManager.getWorkerBridge(), ctx.dbManager.getDbPath())
   }
 
@@ -42,7 +43,7 @@ export function registerProfileHandlers(ctx: HandlerContext): void {
         } catch (error) {
           const msg = error instanceof Error ? error.message : String(error)
           if (/UNIQUE constraint/i.test(msg)) {
-            throw AppError.conflict('该 UID 已存在')
+            throw AppError.conflict(t('main.profile.error.uidExists'))
           }
           throw error
         }
@@ -77,7 +78,7 @@ export function registerProfileHandlers(ctx: HandlerContext): void {
     'profile:delete',
     wrapHandler(ctx, z.tuple([schemas.uid]), async ([uid]) => {
       if (uid === 'default') {
-        throw AppError.forbidden('默认档案不可删除')
+        throw AppError.forbidden(t('main.profile.error.defaultUndeletable'))
       }
       // 删除档案前，将该档案下的文件迁移到默认档案
       await getRepo().deleteProfileAndReassign(uid)
@@ -104,11 +105,14 @@ export function registerProfileHandlers(ctx: HandlerContext): void {
         const repo = getRepo()
         const profile = repo.getProfileByUid(targetUid)
         if (!profile) {
-          throw AppError.notFound(`目标档案 ${targetUid} 不存在`)
+          throw AppError.notFound(t('main.profile.error.targetNotFound', { uid: targetUid }))
         }
         await repo.transferFilesToProfile(mediaIds, targetUid)
         return {
-          message: `已转移 ${mediaIds.length} 个文件到档案 ${targetUid}`,
+          message: t('main.profile.message.transferred', {
+            count: mediaIds.length,
+            uid: targetUid
+          }),
           transferred: mediaIds.length
         }
       }

@@ -5,7 +5,12 @@ import { useShallow } from 'zustand/react/shallow'
 import { useUIStore, type GroupDimension } from '../../stores/uiStore'
 import { useMediaStore } from '../../stores/mediaStore'
 // P0-U1：场景分类/时段 label 直接复用 shared 字典，避免本地字典 key 与类型定义不匹配
-import { getSceneCategoryLabel, getSceneTimeLabel } from '../../../shared/scene-category'
+import {
+  getSceneCategoryLabel,
+  getSceneTimeLabel,
+  type SceneCategory,
+  type SceneTime
+} from '../../../shared/scene-category'
 // P1-U4：复用共享字段映射函数，消除 dual-source-of-truth
 import { getGroupFieldValue } from '../../utils/group-field'
 // P2-U6：维度选项统一来自 shared/dimension，消除与 Sidebar 的重复定义
@@ -25,10 +30,11 @@ function getFileTypeLabel(key: string, t: TFunction): string {
 
 // 获取维度下 key 的中文标签
 // scene_category/scene_time 直接走 shared 字典，确保 key 与 SceneCategory/SceneTime 类型一致
+// key 来自主进程分组统计（运行时字符串），在数据边界窄化为字典的领域联合类型；未知 key 由字典内部兜底
 function getGroupLabel(dimension: GroupDimension, key: string, t: TFunction): string {
   if (dimension === 'album_type') return t(key) // album_type 数据库存中文/i18n key，t() 兜底
-  if (dimension === 'scene_category') return t(getSceneCategoryLabel(key as any))
-  if (dimension === 'scene_time') return t(getSceneTimeLabel(key as any))
+  if (dimension === 'scene_category') return t(getSceneCategoryLabel(key as SceneCategory))
+  if (dimension === 'scene_time') return t(getSceneTimeLabel(key as SceneTime))
   if (dimension === 'file_type') return getFileTypeLabel(key, t)
   if (dimension === 'outfit') return key // 套装名即用户输入
   return key
@@ -79,7 +85,7 @@ export const SmartGroupPanel: React.FC<SmartGroupPanelProps> = ({ onClose }) => 
           setRemoteGroups(result.groups)
         }
       } catch (err) {
-        console.error('[SmartGroupPanel] 加载分组统计失败:', err)
+        console.error(t('group.log.loadCountsFailed'), err)
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -88,7 +94,7 @@ export const SmartGroupPanel: React.FC<SmartGroupPanelProps> = ({ onClose }) => 
     return () => {
       cancelled = true
     }
-  }, [groupDimension, currentProfileUid, currentView])
+  }, [groupDimension, currentProfileUid, currentView, t])
 
   // 基于当前已加载的 mediaFiles 计算分组统计（用于本地快速预览，与远程统计互补）
   // 当远程统计尚未返回或失败时，使用本地数据兜底

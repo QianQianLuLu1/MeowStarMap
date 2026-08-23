@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useContext } from 'react'
+import React, { useEffect, useState, useContext, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SectionShell, GlobalToastContext } from './shared'
 import { useMediaStore, loadProfiles, fetchMediaFromDatabase } from '../../stores/mediaStore'
@@ -38,16 +38,16 @@ export const ProfileManageSection: React.FC = () => {
   const [editNickname, setEditNickname] = useState('')
 
   // 加载档案列表
-  const refreshProfiles = async () => {
+  const refreshProfiles = useCallback(async () => {
     const list = await loadProfiles()
     if (list && list.length > 0 && !list.find((p) => p.uid === selectedUid)) {
       setSelectedUid(list[0].uid)
     }
-  }
+  }, [selectedUid])
 
   useEffect(() => {
     void refreshProfiles()
-  }, [])
+  }, [refreshProfiles])
 
   // 加载选中档案的统计
   useEffect(() => {
@@ -214,7 +214,9 @@ export const ProfileManageSection: React.FC = () => {
                     className="w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold"
                     style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
                   >
-                    {(p.nickname || p.uid).charAt(0)}
+                    {(
+                      p.nickname || (p.uid === 'default' ? t('profile.defaultProfile') : p.uid)
+                    ).charAt(0)}
                   </div>
                   <div className="min-w-0">
                     {editingUid === p.uid ? (
@@ -246,7 +248,8 @@ export const ProfileManageSection: React.FC = () => {
                           className="text-sm font-medium truncate"
                           style={{ color: 'var(--text-primary)' }}
                         >
-                          {p.nickname || p.uid}
+                          {p.nickname ||
+                            (p.uid === 'default' ? t('profile.defaultProfile') : p.uid)}
                         </p>
                         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                           UID: {p.uid}

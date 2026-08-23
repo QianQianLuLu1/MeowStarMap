@@ -2,6 +2,7 @@ import { protocol, app } from 'electron'
 import path from 'node:path'
 import fs from 'node:fs'
 import { diagLog, logStartupError } from '../utils/startup-diagnostic'
+import { t } from '../i18n'
 
 // 编译后本文件 __dirname === dist/main/main/app
 // 回退 3 层到达 dist/renderer（与 window-manager.ts 现有路径计算一致）
@@ -59,7 +60,7 @@ export function registerRendererProtocol(): void {
   if (!app.isReady()) {
     logStartupError(
       'renderer-protocol',
-      new Error('registerRendererProtocol 在 app.whenReady() 之前被调用')
+      new Error(t('main.rendererProtocol.error.calledBeforeReady'))
     )
     // 未就绪时不得置位 registered：否则就绪后合法调用被 if(registered) return 拦截，
     // app:// 永久未注册，窗口加载死协议导致白屏且无法自愈

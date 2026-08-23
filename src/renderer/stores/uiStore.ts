@@ -12,6 +12,20 @@ import { SCENE_CATEGORIES, SCENE_TIMES } from '../../shared/scene-category'
 import type { GroupDimension } from '../../shared/dimension'
 export type { GroupDimension }
 
+/**
+ * P3-1：View Transitions API 未包含在当前 TS DOM lib 类型定义中，
+ * 以类型化包装暴露 startViewTransition（浏览器不支持时返回 undefined，调用方走降级路径）。
+ */
+interface ViewTransitionLike {
+  finished: Promise<void>
+}
+
+function getViewTransitionStarter(): ((callback: () => void) => ViewTransitionLike) | undefined {
+  if (typeof document === 'undefined') return undefined
+  return (document as Document & { startViewTransition?: (cb: () => void) => ViewTransitionLike })
+    .startViewTransition
+}
+
 export type ViewLevel =
   | 'gallery'
   | 'detail'
@@ -336,12 +350,9 @@ export const useUIStore = create<UIState>()(
           })
           set({ fullscreenOpen: true, fullscreenIndex: index })
         }
-        if (
-          typeof document !== 'undefined' &&
-          (document as any).startViewTransition &&
-          !document.documentElement.classList.contains('reduce-motion')
-        ) {
-          ;(document as any).startViewTransition(apply)
+        const startViewTransition = getViewTransitionStarter()
+        if (startViewTransition && !document.documentElement.classList.contains('reduce-motion')) {
+          startViewTransition(apply)
         } else {
           apply()
         }
@@ -362,12 +373,9 @@ export const useUIStore = create<UIState>()(
           }
           set({ fullscreenOpen: false, fullscreenTargetImg: null })
         }
-        if (
-          typeof document !== 'undefined' &&
-          (document as any).startViewTransition &&
-          !document.documentElement.classList.contains('reduce-motion')
-        ) {
-          const transition = (document as any).startViewTransition(apply)
+        const startViewTransition = getViewTransitionStarter()
+        if (startViewTransition && !document.documentElement.classList.contains('reduce-motion')) {
+          const transition = startViewTransition(apply)
           // 过渡完成后清除残留的 view-transition-name
           transition.finished.finally(() => {
             document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {

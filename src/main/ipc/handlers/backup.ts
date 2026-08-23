@@ -6,6 +6,7 @@ import { backupService } from '../../services/backup-service'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import { t } from '../../i18n'
 
 /**
  * P0-A1：从 Application.setupIPC() 迁移的数据库备份域 IPC handler 集合。
@@ -35,9 +36,11 @@ export function registerBackupHandlers(ctx: HandlerContext): void {
           }
           return result
         } catch (error) {
-          logger.error('[Backup] 创建备份 IPC 失败:', error)
+          logger.error(t('main.backup.log.createIpcFailed'), error)
           throw AppError.internal(
-            `创建备份失败: ${error instanceof Error ? error.message : String(error)}`
+            t('main.backup.error.createFailed', {
+              reason: error instanceof Error ? error.message : String(error)
+            })
           )
         }
       }
@@ -52,9 +55,11 @@ export function registerBackupHandlers(ctx: HandlerContext): void {
         const backups = await backupService.listBackups()
         return { backups, backupDir: backupService.getBackupDirectory() }
       } catch (error) {
-        logger.error('[Backup] 列出备份失败:', error)
+        logger.error(t('main.backup.log.listFailed'), error)
         throw AppError.internal(
-          `列出备份失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.backup.error.listFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -72,9 +77,11 @@ export function registerBackupHandlers(ctx: HandlerContext): void {
         }
         return result
       } catch (error) {
-        logger.error('[Backup] 恢复备份 IPC 失败:', error)
+        logger.error(t('main.backup.log.restoreIpcFailed'), error)
         throw AppError.internal(
-          `恢复备份失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.backup.error.restoreFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -88,7 +95,9 @@ export function registerBackupHandlers(ctx: HandlerContext): void {
         return await backupService.deleteBackup(filename)
       } catch (error) {
         throw AppError.internal(
-          `删除备份失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.backup.error.deleteFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })

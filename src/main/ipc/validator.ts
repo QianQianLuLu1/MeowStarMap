@@ -411,7 +411,7 @@ function handleError(error: unknown): IpcResponse<never> {
   if (isAppError(error)) {
     return { success: false, error: error.toIpcError() }
   }
-  logger.error('[IPC] handler 未捕获错误:', error) // TODO: i18n: internal log
+  logger.error(t('main.validator.log.handlerUncaught'), error)
   return { success: false, error: toIpcError(error) }
 }
 

@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { toFileUrl } from '../utils/file'
+import i18n from '../i18n'
 // C-S2：从 shared 导入场景分类，消除渲染进程跨边界导入主进程模块
 import type { SceneCategory, SceneTime } from '../../shared/scene-category'
 // P1-01：读取 showDuplicates 状态用于服务端过滤 is_duplicate=1
@@ -240,7 +241,7 @@ export async function updateMediaFileAndPersist(
     return { success: true }
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    console.error('[updateMediaFileAndPersist] 持久化失败:', message)
+    console.error(i18n.t('mediaStore.log.persistFailed'), message)
     return { success: false, message }
   }
 }
@@ -266,7 +267,7 @@ export async function fetchMediaFromDatabase(): Promise<{
 } | null> {
   if (!window.electronAPI?.media?.list || !window.electronAPI?.category?.list) {
     console.error(
-      '[fetchMediaFromDatabase] electronAPI 不可用: media.list=' +
+      i18n.t('mediaStore.log.noElectronApi') +
         !!window.electronAPI?.media?.list +
         ', category.list=' +
         !!window.electronAPI?.category?.list
@@ -309,23 +310,23 @@ export async function fetchMediaFromDatabase(): Promise<{
     })
     // preload 的 call() 已解包 IpcResponse 并在失败时抛出 IpcError，此处仅需防御性检查数据存在
     if (!mediaResult) {
-      console.error('[fetchMediaFromDatabase] media.list 返回 null/undefined')
+      console.error(i18n.t('mediaStore.log.mediaListNull'))
       return null
     }
     if (!mediaResult.files) {
       console.error(
-        '[fetchMediaFromDatabase] mediaResult.files 为空, mediaResult=',
+        i18n.t('mediaStore.log.filesEmpty'),
         JSON.stringify({ total: mediaResult.total, hasMore: mediaResult.hasMore })
       )
       return null
     }
     const categoryResult = await window.electronAPI.category.list()
     if (!categoryResult) {
-      console.error('[fetchMediaFromDatabase] category.list 返回 null/undefined')
+      console.error(i18n.t('mediaStore.log.categoryListNull'))
       return null
     }
     if (!categoryResult.categories) {
-      console.error('[fetchMediaFromDatabase] categoryResult.categories 为空')
+      console.error(i18n.t('mediaStore.log.categoriesEmpty'))
       return null
     }
 
@@ -345,7 +346,7 @@ export async function fetchMediaFromDatabase(): Promise<{
     }
   } catch (error) {
     console.error(
-      '[fetchMediaFromDatabase] 异常:',
+      i18n.t('mediaStore.log.fetchError'),
       error instanceof Error ? error.message : String(error),
       error
     )
@@ -402,7 +403,7 @@ export async function loadMoreMedia(
       hasMore: mediaResult.hasMore ?? false
     }
   } catch (error) {
-    console.error('加载更多媒体文件失败:', error)
+    console.error(i18n.t('mediaStore.log.loadMoreFailed'), error)
     return null
   }
 }
@@ -446,7 +447,7 @@ export async function loadProfiles(): Promise<CharacterProfile[] | null> {
     useMediaStore.getState().setProfiles(profiles)
     return profiles
   } catch (error) {
-    console.error('加载角色档案失败:', error)
+    console.error(i18n.t('mediaStore.log.loadProfilesFailed'), error)
     return null
   }
 }
@@ -477,7 +478,7 @@ export async function loadRecycleBin(): Promise<MediaFile[] | null> {
     })
     return files
   } catch (error) {
-    console.error('加载回收站失败:', error)
+    console.error(i18n.t('mediaStore.log.loadRecycleBinFailed'), error)
     return null
   } finally {
     // T16：无论成功/失败/异常，都重置 loading 标志，避免 UI 卡在加载中状态
@@ -515,7 +516,7 @@ export async function loadNextRecycleBinPage(): Promise<void> {
     })
   } catch (error) {
     // 取数失败时保持游标不变，用户再次触底即可重试
-    console.error('加载回收站下一页失败:', error)
+    console.error(i18n.t('mediaStore.log.loadRecycleBinMoreFailed'), error)
   } finally {
     useMediaStore.setState({ recycleBinLoadingMore: false })
   }

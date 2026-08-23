@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="resources/icons/icon.svg" width="96" height="96" alt="NikkiGallery">
-</p>
-
 <h1 align="center">无限暖暖相册管理工具 · NikkiGallery</h1>
 
 <p align="center">
@@ -58,20 +54,6 @@
 | FFI 调用 | koffi 3.1                         |
 | 参数校验 | zod 4.4                           |
 | 测试框架 | Vitest 1.6                        |
-
-### 截图
-
-![图库](docs/screenshots/screenshot-gallery.png)
-
-![自动扫描](docs/screenshots/screenshot-autoscan.png)
-
-![分类管理](docs/screenshots/screenshot-categories.png)
-
-![编辑滤镜](docs/screenshots/screenshot-editor-filters.png)
-
-![重复检测](docs/screenshots/screenshot-duplicate-similar.png)
-
-![回收站](docs/screenshots/screenshot-recyclebin.png)
 
 ### 下载安装
 
@@ -136,12 +118,13 @@ src/
 - **Live Photo 导出**：导出的 JPG 未写入 Apple MakerNote ContentIdentifier，经 iCloud 同步后可能丢失配对（数据线本地导入正常）
 - **Live Photo 转码**：H.264 + AAC MOV 转码较耗时，单次默认超时 10 分钟
 
-### 开发者
+### 开发者信息 / 作者与社交平台
 
-- **开发者**：QianLu
-- **全网同名**：纤璐不会玩摄影
-- **抖音**：[v.douyin.com/XkTzyJeCFIU](https://v.douyin.com/XkTzyJeCFIU/)
-- **哔哩哔哩**：[b23.tv/FtjgFrW](https://b23.tv/FtjgFrW)
+- **抖音**：纤璐不会玩摄影 ([主页链接](https://v.douyin.com/Dx67wYkw48A/))
+- **小红书**：纤璐不会玩摄影 ([主页链接](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **哔哩哔哩**：纤璐不会玩摄影 ([主页链接](https://b23.tv/zCR5oGE))
+- **GitHub**：[QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 
 ### 许可证
 
@@ -186,20 +169,6 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 | FFI        | koffi 3.1                         |
 | Validation | zod 4.4                           |
 | Testing    | Vitest 1.6                        |
-
-### Screenshots
-
-![Gallery](docs/screenshots/screenshot-gallery.png)
-
-![Auto Scan](docs/screenshots/screenshot-autoscan.png)
-
-![Categories](docs/screenshots/screenshot-categories.png)
-
-![Editor Filters](docs/screenshots/screenshot-editor-filters.png)
-
-![Duplicate Detection](docs/screenshots/screenshot-duplicate-similar.png)
-
-![Recycle Bin](docs/screenshots/screenshot-recyclebin.png)
 
 ### Download
 
@@ -264,12 +233,13 @@ src/
 - **Live Photo Export**: Exported JPGs lack Apple MakerNote ContentIdentifier; iCloud sync may break pairing (local USB import works normally)
 - **Live Photo Transcoding**: H.264 + AAC MOV transcoding is time-consuming; default timeout is 10 minutes
 
-### Developer
+### Developer Info / Author & Social Platforms
 
-- **Developer**: QianLu
-- **Social**: 纤璐不会玩摄影 (Douyin / Bilibili)
-- **Douyin**: [v.douyin.com/XkTzyJeCFIU](https://v.douyin.com/XkTzyJeCFIU/)
-- **Bilibili**: [b23.tv/FtjgFrW](https://b23.tv/FtjgFrW)
+- **Douyin**: 纤璐不会玩摄影 ([profile](https://v.douyin.com/Dx67wYkw48A/))
+- **Xiaohongshu (RED)**: 纤璐不会玩摄影 ([profile](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **Bilibili**: 纤璐不会玩摄影 ([profile](https://b23.tv/zCR5oGE))
+- **GitHub**: [QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN Blog**: [QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 
 ### License
 

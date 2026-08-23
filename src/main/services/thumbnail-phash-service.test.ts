@@ -76,9 +76,10 @@ function makeCtx(overrides: CtxOverrides = {}): HandlerContext {
   const mockMainWindow = {
     webContents: { send: vi.fn() }
   }
+  // 最外层 as unknown as HandlerContext 兜底强转，内部字段直接写对象字面量
   return {
-    dbManager: {} as any,
-    scannerManager: {} as any,
+    dbManager: {},
+    scannerManager: {},
     mediaWorkerManager: {
       startThumbnailBatch: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
       stopThumbnailBatch: vi.fn(),
@@ -90,19 +91,19 @@ function makeCtx(overrides: CtxOverrides = {}): HandlerContext {
         .fn()
         .mockResolvedValue({ success: true, markedDuplicates: 3, totalGroups: 2, message: 'ok' }),
       stopDuplicateMark: vi.fn()
-    } as any,
+    },
     taskScheduler: {
       runHighPriority: vi.fn(async (task: () => Promise<void>) => await task()),
       enqueueLow: vi.fn(async (task: () => Promise<void>) => await task())
-    } as any,
+    },
     thumbnailGen: {
       generate: overrides.generateThumbnail || vi.fn().mockResolvedValue('/cache/thumb.jpg'),
       getCacheDir: vi.fn().mockReturnValue('/cache/thumbnails')
-    } as any,
-    fileService: {} as any,
-    videoService: {} as any,
-    watermarkService: {} as any,
-    getMainWindow: vi.fn(() => mockMainWindow as any),
+    },
+    fileService: {},
+    videoService: {},
+    watermarkService: {},
+    getMainWindow: vi.fn(() => mockMainWindow),
     notifyMediaUpdated: vi.fn(),
     invalidateMediaPathCache: vi.fn(),
     applyUITheme: vi.fn(),
@@ -111,13 +112,16 @@ function makeCtx(overrides: CtxOverrides = {}): HandlerContext {
   } as unknown as HandlerContext
 }
 
+// 从被测函数签名提取 updateStmt 参数类型（better-sqlite3 的 Statement）
+type SqlStmt = Parameters<typeof processThumbnailForRow>[2]
+
 function makeUpdateStmt(): {
   run: ReturnType<typeof vi.fn>
-  _calls: Array<{ args: any[] }>
+  _calls: Array<{ args: unknown[] }>
 } {
-  const _calls: Array<{ args: any[] }> = []
+  const _calls: Array<{ args: unknown[] }> = []
   return {
-    run: vi.fn((...args: any[]) => {
+    run: vi.fn((...args: unknown[]) => {
       _calls.push({ args })
     }),
     _calls
@@ -130,10 +134,10 @@ let videoPath: string
 
 beforeEach(() => {
   vi.clearAllMocks()
-  ;(sharp as any).mockReturnValue({
+  vi.mocked(sharp).mockReturnValue({
     metadata: vi.fn().mockResolvedValue({ width: 1920, height: 1080 })
-  })
-  ;(calculatePHash as any).mockResolvedValue('phash-abcdef')
+  } as unknown as ReturnType<typeof sharp>)
+  vi.mocked(calculatePHash).mockResolvedValue('phash-abcdef')
 
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-phash-'))
   imagePath = path.join(tmpRoot, 'photo.jpg')
@@ -159,7 +163,7 @@ describe('processThumbnailForRow', () => {
     const r = await processThumbnailForRow(
       ctx,
       { id: 1, file_path: imagePath, file_type: 'image' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(true)
@@ -170,16 +174,16 @@ describe('processThumbnailForRow', () => {
   })
 
   it('image 类型：sharp.metadata 抛错时 metadata=null 但仍正常处理（catch 兜底）', async () => {
-    ;(sharp as any).mockReturnValue({
+    vi.mocked(sharp).mockReturnValue({
       metadata: vi.fn().mockRejectedValue(new Error('decode failed'))
-    })
+    } as unknown as ReturnType<typeof sharp>)
     const ctx = makeCtx()
     const stmt = makeUpdateStmt()
 
     const r = await processThumbnailForRow(
       ctx,
       { id: 2, file_path: imagePath, file_type: 'image' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(true)
@@ -193,7 +197,7 @@ describe('processThumbnailForRow', () => {
     const r = await processThumbnailForRow(
       ctx,
       { id: 3, file_path: imagePath, file_type: 'image' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(true)
@@ -207,7 +211,7 @@ describe('processThumbnailForRow', () => {
     const r = await processThumbnailForRow(
       ctx,
       { id: 4, file_path: videoPath, file_type: 'video' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(true)
@@ -225,7 +229,7 @@ describe('processThumbnailForRow', () => {
     const r = await processThumbnailForRow(
       ctx,
       { id: 5, file_path: videoPath, file_type: 'video' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(false)
@@ -239,7 +243,7 @@ describe('processThumbnailForRow', () => {
     const r = await processThumbnailForRow(
       ctx,
       { id: 6, file_path: imagePath, file_type: 'unknown' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(true)
@@ -249,14 +253,14 @@ describe('processThumbnailForRow', () => {
   })
 
   it('image 类型：calculatePHash 抛错时整个 try 失败，返回 false', async () => {
-    ;(calculatePHash as any).mockRejectedValue(new Error('phash failed'))
+    vi.mocked(calculatePHash).mockRejectedValue(new Error('phash failed'))
     const ctx = makeCtx()
     const stmt = makeUpdateStmt()
 
     const r = await processThumbnailForRow(
       ctx,
       { id: 7, file_path: imagePath, file_type: 'image' },
-      stmt as any
+      stmt as unknown as SqlStmt
     )
 
     expect(r).toBe(false)
@@ -300,10 +304,10 @@ describe('generateThumbnailsForUnprocessed', () => {
 
   it('worker 返回 success=false + 取消消息时不发送错误日志也不抛错', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startThumbnailBatch as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startThumbnailBatch).mockResolvedValue({
       success: false,
       message: '用户取消'
-    })
+    } as never)
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await expect(generateThumbnailsForUnprocessed(ctx, 'high')).resolves.toBeUndefined()
@@ -314,10 +318,10 @@ describe('generateThumbnailsForUnprocessed', () => {
 
   it('worker 返回 success=false + 已在进行中消息时不发送错误日志', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startThumbnailBatch as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startThumbnailBatch).mockResolvedValue({
       success: false,
       message: '已在进行中'
-    })
+    } as never)
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     await expect(generateThumbnailsForUnprocessed(ctx, 'high')).resolves.toBeUndefined()
@@ -328,10 +332,10 @@ describe('generateThumbnailsForUnprocessed', () => {
 
   it('worker 返回 success=false + 其他错误消息时输出 logger.error', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startThumbnailBatch as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startThumbnailBatch).mockResolvedValue({
       success: false,
       message: 'batch failed'
-    })
+    } as never)
 
     await generateThumbnailsForUnprocessed(ctx, 'high')
 
@@ -351,7 +355,7 @@ describe('generateThumbnailsForUnprocessed', () => {
 
   it('finally 块：成功后释放互斥锁 setThumbnailsGenerating(false)', async () => {
     const ctx = makeCtx()
-    const setSpy = ctx.setThumbnailsGenerating as any
+    const setSpy = vi.mocked(ctx.setThumbnailsGenerating)
 
     await generateThumbnailsForUnprocessed(ctx, 'high')
 
@@ -361,8 +365,8 @@ describe('generateThumbnailsForUnprocessed', () => {
 
   it('finally 块：失败后也释放互斥锁', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startThumbnailBatch as any).mockRejectedValue(new Error('crashed'))
-    const setSpy = ctx.setThumbnailsGenerating as any
+    vi.mocked(ctx.mediaWorkerManager.startThumbnailBatch).mockRejectedValue(new Error('crashed'))
+    const setSpy = vi.mocked(ctx.setThumbnailsGenerating)
 
     // 源码 finally 释放锁后错误仍向上抛，这里只关心锁是否被释放
     await generateThumbnailsForUnprocessed(ctx, 'high').catch(() => {})
@@ -373,7 +377,7 @@ describe('generateThumbnailsForUnprocessed', () => {
 
   it('priority=low：enqueueLow 被调用时传入 cancel 函数', async () => {
     const ctx = makeCtx()
-    const enqueueSpy = ctx.taskScheduler.enqueueLow as any
+    const enqueueSpy = vi.mocked(ctx.taskScheduler.enqueueLow)
 
     await generateThumbnailsForUnprocessed(ctx, 'low')
 
@@ -418,10 +422,10 @@ describe('generatePhashForUnprocessed', () => {
 
   it('worker 返回 success=false + 取消消息时返回 {0,0} 不报错', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startPhashBatch as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startPhashBatch).mockResolvedValue({
       success: false,
       message: '用户取消'
-    })
+    } as never)
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const r = await generatePhashForUnprocessed(ctx, 'high')
@@ -433,10 +437,10 @@ describe('generatePhashForUnprocessed', () => {
 
   it('worker 返回 success=false + 其他错误时输出 logger.error 并返回 {0,0}', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startPhashBatch as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startPhashBatch).mockResolvedValue({
       success: false,
       message: 'worker crashed'
-    })
+    } as never)
 
     const r = await generatePhashForUnprocessed(ctx, 'high')
 
@@ -446,7 +450,7 @@ describe('generatePhashForUnprocessed', () => {
 
   it('worker 抛出异常时输出 logger.error 并返回 {0,0}', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startPhashBatch as any).mockRejectedValue(new Error('boom'))
+    vi.mocked(ctx.mediaWorkerManager.startPhashBatch).mockRejectedValue(new Error('boom'))
 
     const r = await generatePhashForUnprocessed(ctx, 'high')
 
@@ -456,7 +460,7 @@ describe('generatePhashForUnprocessed', () => {
 
   it('priority=low：enqueueLow 被调用时传入 phash-batch id 与 cancel 函数', async () => {
     const ctx = makeCtx()
-    const enqueueSpy = ctx.taskScheduler.enqueueLow as any
+    const enqueueSpy = vi.mocked(ctx.taskScheduler.enqueueLow)
 
     await generatePhashForUnprocessed(ctx, 'low')
 
@@ -501,10 +505,10 @@ describe('markDuplicates', () => {
 
   it('worker 返回 success=false + 取消消息时返回 {0,0}', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startDuplicateMark as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startDuplicateMark).mockResolvedValue({
       success: false,
       message: '用户取消'
-    })
+    } as never)
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const r = await markDuplicates(ctx, 'high')
@@ -516,10 +520,10 @@ describe('markDuplicates', () => {
 
   it('worker 返回 success=false + 其他错误时输出 logger.error 并返回 {0,0}', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startDuplicateMark as any).mockResolvedValue({
+    vi.mocked(ctx.mediaWorkerManager.startDuplicateMark).mockResolvedValue({
       success: false,
       message: 'db locked'
-    })
+    } as never)
 
     const r = await markDuplicates(ctx, 'high')
 
@@ -529,7 +533,7 @@ describe('markDuplicates', () => {
 
   it('worker 抛出异常时输出 logger.error 并返回 {0,0}', async () => {
     const ctx = makeCtx()
-    ;(ctx.mediaWorkerManager.startDuplicateMark as any).mockRejectedValue(new Error('fatal'))
+    vi.mocked(ctx.mediaWorkerManager.startDuplicateMark).mockRejectedValue(new Error('fatal'))
 
     const r = await markDuplicates(ctx, 'high')
 
@@ -542,7 +546,7 @@ describe('markDuplicates', () => {
 
   it('priority=low：enqueueLow 被调用时传入 duplicate-mark id 与 cancel 函数', async () => {
     const ctx = makeCtx()
-    const enqueueSpy = ctx.taskScheduler.enqueueLow as any
+    const enqueueSpy = vi.mocked(ctx.taskScheduler.enqueueLow)
 
     await markDuplicates(ctx, 'low')
 

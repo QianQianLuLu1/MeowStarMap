@@ -217,8 +217,10 @@ describe('createMainWindow', () => {
     // 生产环境必须通过 onHeadersReceived 下发 CSP 响应头（与 index.html 的 meta 双重防护）。
     expect(session.defaultSession.webRequest.onHeadersReceived).toHaveBeenCalledTimes(1)
     const cb = session.defaultSession.webRequest.onHeadersReceived.mock.calls[0][0]
-    const out = await new Promise<any>((resolve) =>
-      cb({ responseHeaders: {} }, (r: any) => resolve(r))
+    const out = await new Promise<{ responseHeaders: Record<string, string[]> }>((resolve) =>
+      cb({ responseHeaders: {} }, (r: unknown) =>
+        resolve(r as { responseHeaders: Record<string, string[]> })
+      )
     )
     expect(out.responseHeaders['Content-Security-Policy'][0]).toContain("script-src 'self'")
   })

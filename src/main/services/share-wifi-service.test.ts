@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import http from 'http'
-import os from 'os'
 import fs from 'fs'
 import Module from 'node:module'
 
@@ -72,18 +71,18 @@ interface MockServer {
   close: ReturnType<typeof vi.fn>
   closeAllConnections: ReturnType<typeof vi.fn>
   address: ReturnType<typeof vi.fn>
-  _errorCbs: Function[]
+  _errorCbs: ((err: Error) => void)[]
 }
 
 function createMockServer(listenMode: 'success' | 'fail' = 'success'): MockServer {
-  const errorCbs: Function[] = []
+  const errorCbs: ((err: Error) => void)[] = []
   return {
     setTimeout: vi.fn(),
-    once: vi.fn((event: string, cb: Function) => {
+    once: vi.fn((event: string, cb: (err: Error) => void) => {
       if (event === 'error') errorCbs.push(cb)
     }),
     removeListener: vi.fn(),
-    listen: vi.fn((_port: number, _host: string, cb: Function) => {
+    listen: vi.fn((_port: number, _host: string, cb: () => void) => {
       if (listenMode === 'success') {
         // 同步触发 listening 回调（兼容 fake timers）
         cb()

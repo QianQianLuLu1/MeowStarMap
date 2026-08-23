@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import fsp from 'fs/promises'
 import koffi from 'koffi'
-import { app } from 'electron'
 
 /**
  * 集成测试：图片参数解密服务端到端链路

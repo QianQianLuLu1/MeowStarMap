@@ -475,7 +475,7 @@ export class FileService {
         height: exif.ExifImageHeight || exif.ImageLength
       }
     } catch (error) {
-      logger.error('[Exif] 读取失败:', error) // TODO: i18n: internal log
+      logger.error(t('main.file.log.exifReadFailed'), error)
       return {}
     }
   }
@@ -507,7 +507,8 @@ export class FileService {
 
       const format = options.format || 'jpg'
       const ext = format === 'jpeg' ? 'jpg' : format
-      const defaultName = options.fileName || `编辑图片_${Date.now()}` // TODO: i18n: default filename
+      const defaultName =
+        options.fileName || t('main.file.message.editedImageFileName', { timestamp: Date.now() })
       // C-3：统一唯一路径生成
       const targetPath = await getUniqueFilePath(targetDir, defaultName, `.${ext}`)
 
@@ -671,7 +672,6 @@ export class FileService {
 
         // 2. 计算目标文件名（按命名规则）
         const ext = path.extname(fileName)
-        const baseName = path.basename(fileName, ext)
         let newFileName: string
         if (namingRule === 'keep') {
           newFileName = fileName

@@ -751,7 +751,15 @@ describe('DatabaseManager', () => {
       expect(rows).toHaveLength(7)
       const names = rows.map((r) => r.name)
       expect(names).toEqual(
-        expect.arrayContaining(['人物', '地点', '场景', '截图', '录屏', '最近', '收藏'])
+        expect.arrayContaining([
+          'people',
+          'location',
+          'scene',
+          'screenshot',
+          'recording',
+          'recent',
+          'favorite'
+        ])
       )
     })
 
@@ -759,6 +767,30 @@ describe('DatabaseManager', () => {
       await manager.initialize()
       const rows = manager.query('SELECT uid FROM character_profiles') as Array<{ uid: string }>
       expect(rows.some((r) => r.uid === 'default')).toBe(true)
+    })
+
+    it('版本 3 迁移：旧库中文系统分类名/默认档案昵称升级为稳定 key', async () => {
+      await manager.initialize()
+      // 模拟旧库状态：分类名写回中文默认值、默认档案昵称写回中文、撤销 v3 迁移标记
+      manager.execute("UPDATE categories SET name = '人物' WHERE name = 'people'")
+      manager.execute("UPDATE categories SET name = '地点' WHERE name = 'location'")
+      manager.execute("UPDATE character_profiles SET nickname = '默认档案' WHERE uid = 'default'")
+      manager.execute('DELETE FROM schema_migrations WHERE version = 3')
+      manager.close()
+
+      // 再次初始化：v3 迁移应把中文默认值改写为稳定 key（用户改过名的行不受影响）
+      const upgraded = new DatabaseManager()
+      await upgraded.initialize()
+      const names = (upgraded.query('SELECT name FROM categories') as Array<{ name: string }>).map(
+        (r) => r.name
+      )
+      expect(names).toContain('people')
+      expect(names).toContain('location')
+      expect(names).not.toContain('人物')
+      const profile = upgraded.query(
+        "SELECT nickname FROM character_profiles WHERE uid = 'default'"
+      ) as Array<{ nickname: string }>
+      expect(profile[0]?.nickname).toBe('')
     })
 
     it('初始化后 scene_category 迁移已应用（R17 版本号=2）', async () => {
@@ -1095,7 +1127,7 @@ describe('DatabaseManager', () => {
 
     it('db 未初始化时抛出 "Database not initialized"', () => {
       const freshManager = new DatabaseManager()
-      expect(() => freshManager.query('SELECT 1')).toThrow('Database not initialized')
+      expect(() => freshManager.query('SELECT 1')).toThrow('数据库未初始化')
     })
   })
 
@@ -1149,9 +1181,7 @@ describe('DatabaseManager', () => {
 
     it('db 未初始化时抛出 "Database not initialized"', () => {
       const freshManager = new DatabaseManager()
-      expect(() => freshManager.execute('INSERT INTO foo VALUES (1)')).toThrow(
-        'Database not initialized'
-      )
+      expect(() => freshManager.execute('INSERT INTO foo VALUES (1)')).toThrow('数据库未初始化')
     })
   })
 
@@ -1619,9 +1649,9 @@ describe('DatabaseManager', () => {
 
     it('R16：多行 NULL 同时回填', async () => {
       await manager.initialize()
-      const id1 = insertMedia({ file_path: '/test/a.jpg', file_name: 'a.jpg' })
-      const id2 = insertMedia({ file_path: '/test/b.jpg', file_name: 'b.jpg' })
-      const id3 = insertMedia({ file_path: '/test/c.jpg', file_name: 'c.jpg' })
+      insertMedia({ file_path: '/test/a.jpg', file_name: 'a.jpg' })
+      insertMedia({ file_path: '/test/b.jpg', file_name: 'b.jpg' })
+      insertMedia({ file_path: '/test/c.jpg', file_name: 'c.jpg' })
       // 三行 scene_time 都设为 NULL
       manager.execute('UPDATE media_files SET scene_time = NULL')
 

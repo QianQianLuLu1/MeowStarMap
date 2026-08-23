@@ -7,6 +7,7 @@ import { runWithConcurrency } from '../../utils/concurrency'
 import { MediaRepository } from '../../database/media-repository'
 import type { GroupDimension, MediaSourceFilter } from '../../database/media-repository'
 import type { OutfitStat } from '../../../shared/scene-category'
+import { t } from '../../i18n'
 
 // 标签长度内部常量（与 utils/constants 的 MAX_TAG_NAME_LENGTH 保持一致，但避免循环依赖）
 const MAX_TAG_NAME_LENGTH_INTERNAL = 64
@@ -22,7 +23,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
   // 数据库写操作进程拆分：传入 workerBridge 与 dbPath，写方法走独立 utilityProcess
   const getRepo = (): MediaRepository => {
     const db = ctx.dbManager.getDatabase()
-    if (!db) throw AppError.preconditionFailed('数据库未初始化')
+    if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
     return new MediaRepository(db, ctx.dbManager.getWorkerBridge(), ctx.dbManager.getDbPath())
   }
 
@@ -50,7 +51,9 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([
         schemas.mediaId,
-        z.array(schemas.shortString(MAX_TAG_NAME_LENGTH_INTERNAL)).max(100, '标签数量超过上限 100')
+        z
+          .array(schemas.shortString(MAX_TAG_NAME_LENGTH_INTERNAL))
+          .max(100, t('main.media.validation.tagsMax'))
       ]),
       async ([mediaId, tags]) => {
         await getRepo().updateTags(mediaId, tags)
@@ -64,7 +67,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
     'media:updateNotes',
     wrapHandler(
       ctx,
-      z.tuple([schemas.mediaId, z.string().max(10000, 'notes 长度必须在 0-10000 之间')]),
+      z.tuple([schemas.mediaId, z.string().max(10000, t('main.media.validation.notesMaxLength'))]),
       async ([mediaId, notes]) => {
         await getRepo().updateNotes(mediaId, notes)
         ctx.notifyMediaUpdated()
@@ -91,7 +94,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
     'media:updateOutfit',
     wrapHandler(
       ctx,
-      z.tuple([schemas.mediaId, z.string().max(100, 'outfit 长度必须在 0-100 之间')]),
+      z.tuple([schemas.mediaId, z.string().max(100, t('main.media.validation.outfitMaxLength'))]),
       async ([mediaId, outfit]) => {
         await getRepo().updateOutfit(mediaId, outfit)
         ctx.notifyMediaUpdated()
@@ -109,7 +112,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       const rows = repo.getMediaForSceneAnalysis(mediaIds)
 
       if (rows.length === 0) {
-        return { message: '没有需要分析的图片', analyzed: 0 }
+        return { message: t('main.media.message.nothingToAnalyze'), analyzed: 0 }
       }
 
       const { analyzeSceneBrightness } = await import('../../utils/scene-brightness')
@@ -123,7 +126,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       await runWithConcurrency(tasks, 4)
 
       ctx.notifyMediaUpdated()
-      return { message: `已分析 ${analyzed} 张图片的场景时段`, analyzed }
+      return { message: t('main.media.message.sceneTimeAnalyzed', { count: analyzed }), analyzed }
     })
   )
 

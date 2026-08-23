@@ -13,6 +13,8 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
 import crypto from 'crypto'
+// 本模块被 media-worker/thumbnail 等 utilityProcess 复用，须使用无 electron 依赖的翻译
+import { t } from '../i18n/worker-safe'
 
 /**
  * 检查文件/目录是否存在（异步）
@@ -86,7 +88,7 @@ export async function getUniqueFilePath(
  */
 export function parseDataUrlToBuffer(dataUrl: string): { buffer: Buffer; mimeType: string } {
   const match = dataUrl.match(/^data:([\w./-]+);base64,(.+)$/)
-  if (!match) throw new Error('无效的 DataURL')
+  if (!match) throw new Error(t('main.fileUtils.error.invalidDataUrl'))
   return { buffer: Buffer.from(match[2], 'base64'), mimeType: match[1] }
 }
 

@@ -4,13 +4,10 @@
  * @coverage operation-history 域 IPC handler（add / list / remove / clear / checkConflict）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AppError } from '../../../shared/errors/app-error'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
-const { handleMock, assertFileReadPathMock, assertFileWritePathMock } = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn()
+const { handleMock } = vi.hoisted(() => ({
+  handleMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({ ipcMain: { handle: handleMock, on: vi.fn() } }))
@@ -25,44 +22,13 @@ vi.mock('../../database/media-repository', () => ({
   }))
 }))
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-    try {
-      const data = await handler()
-      return { success: true as const, data }
-    } catch (e) {
-      if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-      return {
-        success: false as const,
-        error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-      }
-    }
-  }),
-  wrapHandlerRaw: vi.fn(),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerOperationHistoryHandlers } from './operation-history-handler'
+import { assertFileReadPath, assertFileWritePath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
 
 describe('registerOperationHistoryHandlers', () => {
   beforeEach(() => {

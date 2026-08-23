@@ -14,13 +14,17 @@ import { logger } from '../../utils/logger'
 // P1-A1：4 组函数抽取到共享服务模块，启动路径与 IPC 路径共用同一份实现
 import { generateThumbnailsForUnprocessed } from '../../services/thumbnail-phash-service'
 import { ImportRootRepository } from '../../database/import-root-repository'
+import { t } from '../../i18n'
 
 // scanner:start 参数 schema（提取到模块级避免每次调用重建）
 const scannerStartSchema = z
   .object({
     path: schemas.filePath.optional(),
     incremental: z.boolean().optional(),
-    customKnownPaths: z.array(schemas.filePath).max(64, '自定义路径数量上限 64').optional(),
+    customKnownPaths: z
+      .array(schemas.filePath)
+      .max(64, t('main.scanner.validation.customPathsMax'))
+      .optional(),
     fullScan: z.boolean().optional()
   })
   .optional()
@@ -58,7 +62,7 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
       // 扫描完成后异步生成缩略图并读取尺寸
       // 分级调度：链式触发的缩略图生成作为低优先级任务入队，避免与用户操作争抢 CPU
       generateThumbnailsForUnprocessed(ctx, 'low').catch((err) => {
-        logger.error('[scanner] 扫描后缩略图/phash 生成失败:', err)
+        logger.error(t('main.scanner.log.postScanThumbFailed'), err)
       })
     }
     // 指定目录扫描：登记导入根，使该目录文件对图库视图放行（galleryHighQualityOnly 过滤依赖 import_roots）
@@ -67,7 +71,7 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
     if (result.success && options?.path) {
       try {
         const db = ctx.dbManager.getDatabase()
-        if (!db) throw new Error('数据库未初始化')
+        if (!db) throw new Error(t('main.error.databaseNotInit'))
         const importRootRepo = new ImportRootRepository(
           db,
           ctx.dbManager.getWorkerBridge(),
@@ -75,7 +79,7 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
         )
         await importRootRepo.addImportRoot(options.path)
       } catch (err) {
-        logger.warn('[scanner:start] 登记导入根失败（不影响扫描结果）:', err)
+        logger.warn(t('main.scanner.log.registerImportRootFailed'), err)
       }
     }
     // 通知渲染进程扫描已结束，防止 IPC 返回前 UI 卡在"正在扫描"
@@ -105,9 +109,12 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
           const message = parsed.error.issues
             .map((i) => `[${i.path.join('.')}] ${i.message}`)
             .join('; ')
-          sendComplete({ success: false, message: `参数校验失败: ${message}` })
+          sendComplete({
+            success: false,
+            message: t('main.scanner.error.validationFailed', { reason: message })
+          })
           // 抛 AppError 由 wrapHandlerRaw 统一包装为失败响应
-          throw AppError.validation(`参数校验失败: ${message}`)
+          throw AppError.validation(t('main.scanner.error.validationFailed', { reason: message }))
         }
         const options = parsed.data
         // 路径白名单校验：失败同样要广播 complete，否则前端停在"正在扫描"
@@ -121,7 +128,10 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
           assertScanPathsAllowed(options)
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)
-          sendComplete({ success: false, message: `路径校验失败: ${message}` })
+          sendComplete({
+            success: false,
+            message: t('main.scanner.error.pathCheckFailed', { reason: message })
+          })
           // 原样上抛，保留 AppError.forbidden 的错误码，不降级为 internal
           throw error
         }
@@ -138,11 +148,13 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
           await runPostScanActions(result, options)
           return result
         } catch (error) {
-          const message = `扫描失败: ${error instanceof Error ? error.message : String(error)}`
+          const message = t('main.scanner.error.scanFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
           sendComplete({ success: false, message })
           // 即使扫描失败也刷新一次（DB 可能有旧数据需要重新加载）
           ctx.notifyMediaUpdated()
-          logger.error('[scanner:start] 失败:', error)
+          logger.error(t('main.scanner.log.startFailed'), error)
           throw AppError.internal(message)
         }
       }

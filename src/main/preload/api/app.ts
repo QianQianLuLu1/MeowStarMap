@@ -1,0 +1,18 @@
+// 应用控制命名空间：对应主进程 handlers/app-handler.ts 注册的 app:* 通道
+import { call, subscribe } from '../ipc'
+import type { UpdatePayload } from '../../../shared/types/electron-api'
+
+/** electronAPI.app：应用重启 / 版本 / 自动更新 */
+export const appAPI = {
+  relaunch: () => call<{ relaunching: boolean }>('app:relaunch'),
+  // U1：获取应用版本号，避免渲染层硬编码
+  getVersion: () => call<string>('app:getVersion'),
+  // 自动更新：手动触发检查（生产环境有效，dev 下主进程 no-op）
+  checkUpdate: () => call<{ checking: boolean }>('app:update:check'),
+  // 自动更新：用户确认后开始下载
+  downloadUpdate: () => call<{ downloading: boolean }>('app:update:download'),
+  // 自动更新：用户确认「安装并重启」
+  installUpdate: () => call<{ installing: boolean }>('app:update:install'),
+  // 自动更新：订阅主进程推送的更新状态/进度事件
+  onUpdate: (callback: (payload: UpdatePayload) => void) => subscribe('app:update', callback)
+}

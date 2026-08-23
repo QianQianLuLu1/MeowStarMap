@@ -6,6 +6,7 @@ import { logStartupError } from '../utils/startup-diagnostic'
 import { killAllProcesses, getProcessRegistryStats } from '../utils/process-registry'
 import { wifiShareService } from '../services/share-wifi-service'
 import { backupService } from '../services/backup-service'
+import { t } from '../i18n'
 
 /**
  * 退出前异步清理：确保所有资源正确释放后再调用 app.exit(0)
@@ -172,7 +173,7 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       timestamp: new Date().toISOString(),
       type: 'exitDiagnosis',
-      summary: '进程退出诊断',
+      summary: t('main.cleanup.log.exitDiagnosisSummary'),
       detail: `before: ${JSON.stringify(beforeStats)}\nafter: ${JSON.stringify(afterStats)}`,
       pid: process.pid,
       uptime: process.uptime()

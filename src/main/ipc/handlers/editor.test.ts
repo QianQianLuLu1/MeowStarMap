@@ -15,28 +15,8 @@ const {
   getFocusedWindowMock,
   writeFileMock,
   readFileMock,
-  editorSaveMock,
-  schemasProxy
+  editorSaveMock
 } = vi.hoisted(() => {
-  const makeChainable = (): any => {
-    const fn: any = () => makeChainable()
-    return new Proxy(fn, {
-      get: (_t, prop) => {
-        if (prop === 'then') return undefined
-        if (typeof prop === 'symbol') return undefined
-        return () => makeChainable()
-      }
-    })
-  }
-  const schemasProxy: any = new Proxy(
-    {},
-    {
-      get: (_, prop) => {
-        if (typeof prop === 'symbol') return undefined
-        return makeChainable()
-      }
-    }
-  )
   return {
     handleMock: vi.fn(),
     dialogShowSaveDialogMock: vi.fn(),
@@ -44,8 +24,7 @@ const {
     getFocusedWindowMock: vi.fn(),
     writeFileMock: vi.fn(),
     readFileMock: vi.fn(),
-    editorSaveMock: vi.fn(),
-    schemasProxy
+    editorSaveMock: vi.fn()
   }
 })
 
@@ -77,44 +56,7 @@ vi.mock('../../utils/logger', () => ({
   getLogDirectory: vi.fn(() => '/mock/logs')
 }))
 
-vi.mock('../validator', () => {
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    schemas: schemasProxy,
-    assertFileReadPath: vi.fn(),
-    assertFileWritePath: vi.fn()
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerEditorHandlers } from './editor'
 import { assertFileWritePath } from '../validator'

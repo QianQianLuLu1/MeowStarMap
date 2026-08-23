@@ -144,12 +144,13 @@ export class DatabaseManager {
         await new Promise((resolve) => setTimeout(resolve, 500))
         try {
           this.db = new Database(this.dbPath)
-          logger.warn('[DB] 数据库被外部进程短暂锁定，等待后重试打开成功') // TODO: i18n: internal log
+          logger.warn(t('main.db.log.lockRetrySucceeded'))
         } catch (retryErr) {
           throw new Error(
-            `数据库文件被其他程序锁定（请关闭正在占用该文件的 SQLite 工具/备份软件后重启应用）: ${
-              err instanceof Error ? err.message : String(err)
-            }\n` + `重试错误：${retryErr instanceof Error ? retryErr.message : String(retryErr)}` // TODO: i18n: internal error
+            t('main.db.error.lockedByOtherProgram', {
+              error: err instanceof Error ? err.message : String(err),
+              retryError: retryErr instanceof Error ? retryErr.message : String(retryErr)
+            })
           )
         }
       } else {
@@ -162,7 +163,7 @@ export class DatabaseManager {
           this.db = new Database(this.dbPath)
         } catch (retryErr) {
           // 仍失败：尝试从备份恢复（数据库文件可能已损坏到无法打开）
-          logger.error('[DB] 数据库打开失败，尝试从备份恢复:', err) // TODO: i18n: internal log
+          logger.error(t('main.db.log.openFailedTryingBackup'), err)
           const recovered = await this.attemptRecovery(
             t('main.db.recovery.openFailed', {
               error: err instanceof Error ? err.message : String(err)
@@ -171,9 +172,10 @@ export class DatabaseManager {
           if (!recovered) {
             // 恢复失败：抛出原始错误 + 重试错误，方便诊断
             throw new Error(
-              `数据库打开失败（已尝试清理 WAL/SHM 与从备份恢复）：${
-                err instanceof Error ? err.message : String(err)
-              }\n` + `重试错误：${retryErr instanceof Error ? retryErr.message : String(retryErr)}` // TODO: i18n: internal error
+              t('main.db.error.openFailedAfterRecovery', {
+                error: err instanceof Error ? err.message : String(err),
+                retryError: retryErr instanceof Error ? retryErr.message : String(retryErr)
+              })
             )
           }
           // 恢复成功后 this.db 已由 attemptRecovery 重新打开
@@ -195,14 +197,16 @@ export class DatabaseManager {
       this.fullIntegrityCheckedAtStartup = true
       const integrityResult = this.runFullIntegrityCheck()
       if (!integrityResult.ok) {
-        logger.error(`[DB] 完整性校验失败: ${integrityResult.reason}`) // TODO: i18n: internal log
+        logger.error(
+          t('main.db.recovery.integrityCheckFailed', { reason: integrityResult.reason ?? '' })
+        )
         const recovered = await this.attemptRecovery(
           t('main.db.recovery.integrityCheckFailed', { reason: integrityResult.reason ?? '' })
         )
         if (!recovered) {
           // 恢复失败：保留 db 句柄让上层继续（迁移等流程会暴露具体错误）
           // 不直接抛错，避免阻塞应用启动——用户可通过诊断包反馈
-          logger.error('[DB] 自动恢复失败，应用将以可能损坏的数据库继续启动') // TODO: i18n: internal log
+          logger.error(t('main.db.log.autoRecoveryFailed'))
         }
       }
     } else if (isFreshDb) {
@@ -217,7 +221,7 @@ export class DatabaseManager {
     // 若恢复流程未成功会已 throw；此处再判一次兜底（防御性）
     const db = this.db
     if (!db) {
-      throw new Error('数据库初始化失败：db 句柄为 null') // TODO: i18n: internal error
+      throw new Error(t('main.db.error.initFailedNullHandle'))
     }
 
     db.pragma('journal_mode = WAL')
@@ -249,7 +253,7 @@ export class DatabaseManager {
         db.pragma('auto_vacuum = INCREMENTAL')
       }
     } catch (err) {
-      logger.warn('[DB] auto_vacuum 设置失败（已忽略）:', err) // TODO: i18n: internal log
+      logger.warn(t('main.db.log.autoVacuumFailed'), err)
     }
 
     // PRAGMA optimize：让 SQLite 自动分析索引使用统计，优化查询计划器
@@ -257,7 +261,7 @@ export class DatabaseManager {
     try {
       db.pragma('optimize')
     } catch (err) {
-      logger.warn('[DB] PRAGMA optimize 失败（已忽略）:', err) // TODO: i18n: internal log
+      logger.warn(t('main.db.log.pragmaOptimizeFailed'), err)
     }
   }
 
@@ -276,10 +280,13 @@ export class DatabaseManager {
       const result = this.db.pragma('integrity_check', { simple: true })
       if (result === 'ok') return { ok: true }
       const reason = Array.isArray(result) ? result.join('; ') : String(result)
-      void logger.fault('databaseCorruption', new Error(`integrity_check 失败: ${reason}`), {
-        // TODO: i18n: internal log
-        dbPath: this.dbPath
-      })
+      void logger.fault(
+        'databaseCorruption',
+        new Error(t('main.db.log.integrityCheckFault', { reason })),
+        {
+          dbPath: this.dbPath
+        }
+      )
       return { ok: false, reason }
     } catch (err) {
       const reason = err instanceof Error ? err.message : String(err)
@@ -317,7 +324,7 @@ export class DatabaseManager {
     try {
       fs.writeFileSync(this.getCleanExitMarkerPath(), new Date().toISOString(), 'utf8')
     } catch (err) {
-      logger.warn('[DB] 写入干净退出标志失败（已忽略）:', err) // TODO: i18n: internal log
+      logger.warn(t('main.db.log.writeCleanExitMarkerFailed'), err)
     }
   }
 
@@ -354,12 +361,12 @@ export class DatabaseManager {
    * @param reason 恢复触发原因（用于日志与事件通知）
    * @returns true=恢复成功并已重新打开 db；false=恢复失败（无可用备份或恢复异常）
    */
-  private async attemptRecovery(reason: string): Promise<boolean> {
+  private async attemptRecovery(_reason: string): Promise<boolean> {
     // 1. 关闭当前 db 句柄（即使已损坏也需关闭，避免文件锁阻塞 rename）
     try {
       this.db?.close()
     } catch (err) {
-      logger.warn('[DB] 关闭损坏 db 时出错（已忽略）:', err) // TODO: i18n: internal log
+      logger.warn(t('main.db.log.closeCorruptedFailed'), err)
     }
     this.db = null
 
@@ -401,11 +408,11 @@ export class DatabaseManager {
             if (fs.existsSync(this.dbPath)) fs.unlinkSync(this.dbPath)
           } catch {}
           fs.renameSync(corruptedBackupPath, this.dbPath)
-          logger.warn('[DB] 备份恢复失败，已还原原数据库文件（可能仍损坏）:', this.dbPath) // TODO: i18n: internal log
+          logger.warn(t('main.db.log.restoreFailedReverted'), this.dbPath)
         }
         this.db = new (this.databaseCtor ?? (await getDatabaseImpl()))(this.dbPath)
       } catch (reopenErr) {
-        logger.error('[DB] 恢复失败后重新打开 db 也失败:', reopenErr) // TODO: i18n: internal log
+        logger.error(t('main.db.log.reopenAfterRestoreFailFailed'), reopenErr)
       }
       return false
     }
@@ -414,7 +421,7 @@ export class DatabaseManager {
     try {
       this.db = new (this.databaseCtor ?? (await getDatabaseImpl()))(this.dbPath)
     } catch (reopenErr) {
-      logger.error('[DB] 恢复后重新打开 db 失败:', reopenErr) // TODO: i18n: internal log
+      logger.error(t('main.db.log.reopenAfterRestoreFailed'), reopenErr)
       const failureInfo = {
         success: false,
         reason: t('main.db.recovery.reopenFailed', {
@@ -443,13 +450,16 @@ export class DatabaseManager {
       timestamp: new Date().toISOString()
     }
     this.lastRecovery = successInfo
-    void logger.fault('databaseRestore', new Error(`数据库已自动恢复：${restoreResult.message}`), {
-      // TODO: i18n: internal log
-      dbPath: this.dbPath,
-      corruptedBackupPath,
-      sourceBackup: restoreResult.sourceBackup,
-      stage: 'success'
-    })
+    void logger.fault(
+      'databaseRestore',
+      new Error(t('main.db.log.autoRestored', { message: restoreResult.message })),
+      {
+        dbPath: this.dbPath,
+        corruptedBackupPath,
+        sourceBackup: restoreResult.sourceBackup,
+        stage: 'success'
+      }
+    )
     this.notifyRecovery(successInfo)
     return true
   }
@@ -465,15 +475,15 @@ export class DatabaseManager {
     const corruptPath = `${this.dbPath}.corrupt-${ts}`
     try {
       fs.renameSync(this.dbPath, corruptPath)
-      logger.warn(`[DB] 损坏数据库已重命名: ${corruptPath}`) // TODO: i18n: internal log
-    } catch (renameErr) {
+      logger.warn(t('main.db.log.corruptDbRenamed', { path: corruptPath }))
+    } catch (_renameErr) {
       // rename 失败时尝试 copy（可能跨盘）
       try {
         fs.copyFileSync(this.dbPath, corruptPath)
         fs.unlinkSync(this.dbPath)
-        logger.warn(`[DB] 损坏数据库已复制并删除原文件: ${corruptPath}`) // TODO: i18n: internal log
+        logger.warn(t('main.db.log.corruptDbCopied', { path: corruptPath }))
       } catch (copyErr) {
-        logger.error('[DB] 备份损坏数据库失败:', copyErr) // TODO: i18n: internal log
+        logger.error(t('main.db.log.corruptDbBackupFailed'), copyErr)
         return undefined
       }
     }
@@ -506,7 +516,7 @@ export class DatabaseManager {
       try {
         listener(info)
       } catch (err) {
-        logger.error('[DB] 恢复监听器执行失败:', err) // TODO: i18n: internal log
+        logger.error(t('main.db.log.recoveryListenerFailed'), err)
       }
     }
   }
@@ -537,7 +547,7 @@ export class DatabaseManager {
    */
   private async runMigrations(): Promise<void> {
     const db = this.db
-    if (!db) throw new Error('Database not initialized') // TODO: i18n: internal error
+    if (!db) throw new Error(t('main.error.databaseNotInit'))
 
     const backupPath = this.createPreMigrationBackup()
 
@@ -548,13 +558,15 @@ export class DatabaseManager {
       // 向上抛出中断启动：迁移没成功就让 bootstrapApplication 弹错误页，
       // 好过带着一个 schema 不完整的库继续跑
       throw new Error(
-        `数据库迁移失败，已回滚到迁移前状态：${err instanceof Error ? err.message : String(err)}` // TODO: i18n: internal error
+        t('main.db.error.migrationFailedRolledBack', {
+          error: err instanceof Error ? err.message : String(err)
+        })
       )
     }
   }
 
   /** 已知的版本号迁移；任一未应用即视为"有待执行的迁移" */
-  private static readonly KNOWN_MIGRATION_VERSIONS = [1, 2]
+  private static readonly KNOWN_MIGRATION_VERSIONS = [1, 2, 3]
 
   /**
    * 迁移前备份（VACUUM INTO 生成独立 .db 文件）。
@@ -578,12 +590,12 @@ export class DatabaseManager {
       const ts = new Date().toISOString().replace(/[:.]/g, '-')
       const backupPath = path.join(backupDir, `pre-migration-${ts}.db`)
       db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`)
-      logger.info(`[DB] 迁移前备份已生成: ${backupPath}`) // TODO: i18n: internal log
+      logger.info(t('main.db.log.preMigrationBackupCreated', { path: backupPath }))
       return backupPath
     } catch (err) {
       // 备份失败不阻塞迁移：事务回滚本身已保证原子性，备份只是额外兜底
       logger.warn(
-        '[DB] 迁移前备份失败（已忽略，仍由事务回滚保证原子性）:', // TODO: i18n: internal log
+        t('main.db.log.preMigrationBackupFailed'),
         err instanceof Error ? err.message : err
       )
       return null
@@ -640,7 +652,7 @@ export class DatabaseManager {
    */
   private async handleMigrationFailure(err: unknown, backupPath: string | null): Promise<void> {
     const message = err instanceof Error ? err.message : String(err)
-    logger.error(`[DB] 迁移失败，事务已回滚: ${message}`) // TODO: i18n: internal log
+    logger.error(t('main.db.log.migrationFailedTxRolledBack', { message }))
     void logger.fault('databaseCorruption', err, {
       dbPath: this.dbPath,
       stage: 'migration-failed',
@@ -650,7 +662,7 @@ export class DatabaseManager {
     if (this.isDatabaseUsable()) return
 
     if (!backupPath || !fs.existsSync(backupPath)) {
-      logger.error('[DB] 迁移失败且数据库已不可用，但没有可用的迁移前备份') // TODO: i18n: internal log
+      logger.error(t('main.db.log.migrationFailedNoBackup'))
       return
     }
     await this.restoreFromPreMigrationBackup(backupPath)
@@ -688,7 +700,7 @@ export class DatabaseManager {
 
       const info = {
         success: true,
-        reason: `数据库迁移失败，已回滚到迁移前备份：${filename}`, // TODO: i18n: internal log
+        reason: t('main.db.error.migrationRolledBackToBackup', { filename }),
         sourceBackup: { filePath: backupPath, filename },
         timestamp: new Date().toISOString()
       }
@@ -700,9 +712,9 @@ export class DatabaseManager {
       })
       this.notifyRecovery(info)
     } catch (restoreErr) {
-      const reason = `回滚到迁移前备份失败：${
-        restoreErr instanceof Error ? restoreErr.message : String(restoreErr)
-      }` // TODO: i18n: internal log
+      const reason = t('main.db.error.rollbackToBackupFailed', {
+        error: restoreErr instanceof Error ? restoreErr.message : String(restoreErr)
+      })
       const info = {
         success: false,
         reason,
@@ -710,7 +722,7 @@ export class DatabaseManager {
         timestamp: new Date().toISOString()
       }
       this.lastRecovery = info
-      logger.error(`[DB] ${reason}`) // TODO: i18n: internal log
+      logger.error(`[DB] ${reason}`)
       void logger.fault('databaseRestore', restoreErr, {
         dbPath: this.dbPath,
         backupPath,
@@ -725,7 +737,7 @@ export class DatabaseManager {
    * 必须保持同步（better-sqlite3 的 transaction 不接受返回 Promise 的函数）。
    */
   private applyMigrations(): void {
-    if (!this.db) throw new Error('Database not initialized') // TODO: i18n: internal error
+    if (!this.db) throw new Error(t('main.error.databaseNotInit'))
 
     // P0-A2：创建 schema_migrations 表，用于跟踪命名迁移（仅执行一次的迁移）
     // 幂等创建：旧库首次升级时自动创建，已有库无影响
@@ -881,7 +893,7 @@ export class DatabaseManager {
     } catch (err) {
       // 这里刻意保持容忍：清理的是历史数据，不改 schema，
       // 失败不会造成半迁移（不影响任何列/索引的存在性），没必要为此拦住启动
-      logger.warn('[DB] F-G8 清理 operation_history 失败（已忽略）:', err) // TODO: i18n: internal log
+      logger.warn(t('main.db.log.operationHistoryCleanupFailed'), err)
     }
 
     // R2：批量重命名 DB 失败补偿表
@@ -925,16 +937,17 @@ export class DatabaseManager {
       DROP TABLE IF EXISTS tags;
     `)
 
-    // 插入默认系统分类
-    // TODO: i18n: 默认分类名存入 DB，需重构为存储 i18n key 并在 UI 层 t() 解析
+    // 插入默认系统分类：name 存稳定 key（people/location/...），UI 层经
+    // categories.system.* 翻译；存量库的中文默认名由 migrateSystemCategoryKeys()（版本 3）迁移
+    this.migrateSystemCategoryKeys()
     const defaultCategories = [
-      { name: '人物', icon: 'people', color: '#FF6B6B', sort_order: 1, is_system: 1 },
-      { name: '地点', icon: 'location', color: '#4ECDC4', sort_order: 2, is_system: 1 },
-      { name: '场景', icon: 'scene', color: '#45B7D1', sort_order: 3, is_system: 1 },
-      { name: '截图', icon: 'screenshot', color: '#96CEB4', sort_order: 4, is_system: 1 },
-      { name: '录屏', icon: 'recording', color: '#FFEAA7', sort_order: 5, is_system: 1 },
-      { name: '最近', icon: 'recent', color: '#DDA0DD', sort_order: 6, is_system: 1 },
-      { name: '收藏', icon: 'favorite', color: '#FD79A8', sort_order: 7, is_system: 1 }
+      { name: 'people', icon: 'people', color: '#FF6B6B', sort_order: 1, is_system: 1 },
+      { name: 'location', icon: 'location', color: '#4ECDC4', sort_order: 2, is_system: 1 },
+      { name: 'scene', icon: 'scene', color: '#45B7D1', sort_order: 3, is_system: 1 },
+      { name: 'screenshot', icon: 'screenshot', color: '#96CEB4', sort_order: 4, is_system: 1 },
+      { name: 'recording', icon: 'recording', color: '#FFEAA7', sort_order: 5, is_system: 1 },
+      { name: 'recent', icon: 'recent', color: '#DDA0DD', sort_order: 6, is_system: 1 },
+      { name: 'favorite', icon: 'favorite', color: '#FD79A8', sort_order: 7, is_system: 1 }
     ]
 
     const insertCategory = this.db.prepare(`
@@ -1031,10 +1044,13 @@ export class DatabaseManager {
         // 静默跳过会留下缺索引/缺列的库，业务查询照样炸，只是把崩溃推迟到了图库页面
         if (!DatabaseManager.isIgnorableMigrationError(err)) {
           throw new Error(
-            `索引创建失败: ${stmt} -> ${err instanceof Error ? err.message : String(err)}` // TODO: i18n: internal error
+            t('main.db.error.indexCreationFailed', {
+              stmt,
+              error: err instanceof Error ? err.message : String(err)
+            })
           )
         }
-        logger.warn(`[DB] 索引已存在（已忽略）: ${stmt}`) // TODO: i18n: internal log
+        logger.warn(t('main.db.log.indexExistsIgnored', { stmt }))
       }
     }
 
@@ -1088,10 +1104,13 @@ export class DatabaseManager {
         } catch (err) {
           if (!DatabaseManager.isIgnorableMigrationError(err)) {
             throw new Error(
-              `v3 索引创建失败: ${sql} -> ${err instanceof Error ? err.message : String(err)}` // TODO: i18n: internal error
+              t('main.db.error.v3IndexCreationFailed', {
+                sql,
+                error: err instanceof Error ? err.message : String(err)
+              })
             )
           }
-          logger.warn(`[DB] v3 索引已存在（已忽略）: ${sql}`) // TODO: i18n: internal log
+          logger.warn(t('main.db.log.v3IndexExistsIgnored', { sql }))
         }
       }
 
@@ -1130,20 +1149,17 @@ export class DatabaseManager {
           // FTS5 不可用是既定的降级路径（搜索回退 LIKE），可以放过；
           // 磁盘满、库损坏之类的错误不能吞，否则又变回静默半迁移
           if (!/fts5|no such module/i.test(msg)) throw err
-          logger.warn('[DB] FTS5 不可用（已降级为 LIKE 查询）:', msg) // TODO: i18n: internal log
+          logger.warn(t('main.db.log.fts5Unavailable'), msg)
         }
       }
 
       // 5. 标记迁移完成（与上面的 DDL 同属一个事务，一起提交或一起回滚）
       this.markMigrationVersionApplied(1)
-      logger.info('[DB] v3 索引优化迁移完成') // TODO: i18n: internal log
+      logger.info(t('main.db.log.v3MigrationDone'))
     } catch (err) {
       // 必须重新抛出：本方法跑在 runMigrations 的事务内，
       // 在这里吞掉错误会让事务照常提交，留下"部分索引已建、版本未标记"的半迁移状态
-      logger.error(
-        '[DB] v3 索引优化迁移失败，将回滚整个迁移事务:', // TODO: i18n: internal log
-        err instanceof Error ? err.message : err
-      )
+      logger.error(t('main.db.log.v3MigrationFailed'), err instanceof Error ? err.message : err)
       throw err
     }
   }
@@ -1256,9 +1272,7 @@ export class DatabaseManager {
       // 其他错误（磁盘满、DB 锁、I/O 错误）必须中断迁移：
       // 之前这里只 warn，列没加上却继续往下走，后面的 CREATE INDEX 和业务查询
       // 会引用到不存在的列，最终表现为图库白屏
-      throw new Error(
-        `添加列失败: ALTER TABLE ${tableName} ADD COLUMN ${columnDef} -> ${msg}` // TODO: i18n: internal error
-      )
+      throw new Error(t('main.db.error.addColumnFailed', { tableName, columnDef, msg }))
     }
   }
 
@@ -1285,14 +1299,21 @@ export class DatabaseManager {
         .run()
       if (result.changes > 0) {
         logger.info(
-          `[DB] R16 回填列默认值: ${tableName}.${colName} = ${defaultValue}，影响 ${result.changes} 行`
-        ) // TODO: i18n: internal log
+          t('main.db.log.backfillApplied', {
+            table: tableName,
+            column: colName,
+            value: defaultValue,
+            rows: result.changes
+          })
+        )
       }
     } catch (err) {
       logger.warn(
-        `[DB] R16 回填列默认值失败: UPDATE ${tableName} SET ${colName} = ${defaultValue} WHERE ${colName} IS NULL`,
+        t('main.db.log.backfillFailed', {
+          sql: `UPDATE ${tableName} SET ${colName} = ${defaultValue} WHERE ${colName} IS NULL`
+        }),
         err instanceof Error ? err.message : err
-      ) // TODO: i18n: internal log
+      )
     }
   }
 
@@ -1337,8 +1358,64 @@ export class DatabaseManager {
    */
   private migrateAlbumType(): void {
     if (!this.db) return
-    // TODO: i18n: 默认值 '其他' 存入 DB，需重构为存储 i18n key
-    this.safeEnsureColumn('media_files', "album_type TEXT NOT NULL DEFAULT '其他'")
+    // NOTE（i18n 暂缓项）: album_type 列默认值 '其他' 直接存中文标签。全量 key 化需同时处理
+    // 三种历史形态（扫描器写入的中文标签 / 旧版英文目录名 / DDL 默认值），并联动
+    // media-repository 的 WHERE 等值查询、GROUP BY 分组、ExifPanel 比较、
+    // scanner/path-classifier 与 decryption 的 ALBUM_TYPE_MAP。涉及数据迁移与查询语义变更，
+    // 宜作为独立任务处理，不在本次 i18n 清理范围内。
+    this.safeEnsureColumn('media_files', "album_type TEXT NOT NULL DEFAULT '其他'") // eslint-disable-line no-restricted-syntax -- 存量 DDL 默认值，随上述迁移一并 key 化
+  }
+
+  /**
+   * 版本 3：i18n key 化存量默认数据
+   * - 系统分类名：中文默认名（人物/地点/…）→ 稳定 key（people/location/…），UI 层经 categories.system.* 翻译
+   * - 默认档案：中文昵称 '默认档案' → ''（UI 层对 uid='default' 回退 t('profile.defaultProfile')）
+   *
+   * 仅按"仍为默认中文值"匹配，用户改过名的行不受影响。
+   * 必须在 applyMigrations 的默认分类 INSERT 之前调用：旧库先改名、INSERT OR IGNORE key
+   * 直接命中现有行不会产生重复；新库无旧值，均为 no-op。
+   */
+  private migrateSystemCategoryKeys(): void {
+    if (!this.db) return
+    if (this.isMigrationVersionApplied(3)) return
+    try {
+      const legacyCategoryNames: Array<[string, string]> = [
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['人物', 'people'],
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['地点', 'location'],
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['场景', 'scene'],
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['截图', 'screenshot'],
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['录屏', 'recording'],
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['最近', 'recent'],
+        // eslint-disable-next-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认名，非 UI 文案）
+        ['收藏', 'favorite']
+      ]
+      const rename = this.db.prepare(
+        'UPDATE categories SET name = ? WHERE is_system = 1 AND name = ?'
+      )
+      for (const [legacy, key] of legacyCategoryNames) {
+        rename.run(key, legacy)
+      }
+      // 默认档案昵称重置独立容错：新库此时尚无 character_profiles 表（稍后才创建），UPDATE 报错直接跳过
+      try {
+        this.db
+          .prepare(
+            "UPDATE character_profiles SET nickname = '' WHERE uid = 'default' AND nickname = '默认档案'" // eslint-disable-line no-restricted-syntax -- 数据迁移匹配值（存量中文默认档案昵称，非 UI 文案）
+          )
+          .run()
+      } catch {
+        /* 表不存在（新库首次初始化路径）：跳过 */
+      }
+      this.markMigrationVersionApplied(3)
+    } catch (err) {
+      // 迁移失败不阻塞启动：UI 侧分类名格式化函数对未知值原样显示，仅损失翻译
+      logger.warn(t('main.db.log.systemCategoryKeyMigrationFailed'), err)
+    }
   }
 
   /**
@@ -1397,11 +1474,11 @@ export class DatabaseManager {
       -- F-G9：为 nickname 添加索引，支持按昵称搜索角色档案（避免全表扫描）
       CREATE INDEX IF NOT EXISTS idx_character_profiles_nickname ON character_profiles(nickname);
     `)
-    // 插入默认档案（若不存在）
-    // TODO: i18n: 默认档案名存入 DB，需重构为存储 i18n key
+    // 插入默认档案（若不存在）：nickname 留空，UI 层对 uid='default' 回退到
+    // t('profile.defaultProfile') 翻译；存量库的中文昵称由 migrateSystemCategoryKeys()（版本 3）迁移
     this.db
       .prepare(
-        "INSERT OR IGNORE INTO character_profiles (uid, nickname, created_at) VALUES ('default', '默认档案', datetime('now'))"
+        "INSERT OR IGNORE INTO character_profiles (uid, nickname, created_at) VALUES ('default', '', datetime('now'))"
       )
       .run()
   }
@@ -1487,28 +1564,25 @@ export class DatabaseManager {
           }
         )
         updateMany(rows)
-        logger.info(`[Database] 已迁移 ${rows.length} 条记录的 scene_category`) // TODO: i18n: internal log
+        logger.info(t('main.db.log.sceneCategoryMigrated', { count: rows.length }))
       }
 
       // 标记迁移已完成（与回填同属外层事务，一起提交或一起回滚）
       this.markMigrationVersionApplied(2)
     } catch (error) {
       // 必须重新抛出：吞掉会让外层事务照常提交，留下"部分记录已回填、版本未标记"的状态
-      logger.error(
-        '[Database] scene_category 迁移失败，将回滚整个迁移事务:', // TODO: i18n: internal log
-        error
-      )
+      logger.error(t('main.db.log.sceneCategoryMigrationFailed'), error)
       throw error
     }
   }
 
   query(sql: string, params?: unknown[]): unknown[] {
-    if (!this.db) throw new Error('Database not initialized') // TODO: i18n: internal error
+    if (!this.db) throw new Error(t('main.error.databaseNotInit'))
     return this.db.prepare(sql).all(params || [])
   }
 
   execute(sql: string, params?: unknown[]): DatabaseType.RunResult {
-    if (!this.db) throw new Error('Database not initialized') // TODO: i18n: internal error
+    if (!this.db) throw new Error(t('main.error.databaseNotInit'))
     return this.db.prepare(sql).run(params || [])
   }
 
@@ -1529,7 +1603,7 @@ export class DatabaseManager {
       // 运行时类型校验：基于 defaultValue 的类型检查 parsed 是否兼容
       // 不做深度结构校验（避免引入 zod 等依赖），仅做基础类型守卫
       if (!this.isSettingTypeCompatible(parsed, defaultValue)) {
-        logger.warn(`[Database] 设置项 "${key}" 类型不符，回退到默认值`) // TODO: i18n: internal log
+        logger.warn(t('main.db.log.settingTypeMismatch', { key }))
         return defaultValue
       }
       return parsed as T
@@ -1606,7 +1680,7 @@ export class DatabaseManager {
       try {
         this.db.pragma('optimize')
       } catch (err) {
-        logger.warn('[Database] 退出时 PRAGMA optimize 失败（已忽略）:', err) // TODO: i18n: internal log
+        logger.warn(t('main.db.log.exitOptimizeFailed'), err)
       }
       // 退出前执行 WAL checkpoint，将 WAL 日志写回主数据库文件，防止异常退出丢数据
       // 修复 A-F4/C-S6：原实现直接 close()，WAL 文件未 checkpoint，异常退出可能丢数据
@@ -1616,7 +1690,7 @@ export class DatabaseManager {
       try {
         this.db.pragma('wal_checkpoint(PASSIVE)')
       } catch (error) {
-        logger.error('[Database] WAL checkpoint 失败:', error) // TODO: i18n: internal log
+        logger.error(t('main.db.log.walCheckpointFailed'), error)
       }
       this.db.close()
       this.db = null

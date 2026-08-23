@@ -20,7 +20,14 @@ export const ScanButton: React.FC = () => {
     (reason: string | undefined) => {
       const text = reason || t('toast.unknownError')
       showMessage(`${t('toast.scanFailed')}: ${text}`, 'error')
-      if (reason && (reason.includes('未找到') || reason.includes('游戏目录'))) {
+      if (
+        reason &&
+        // 主进程失败消息固定 zh-CN 语义（worker-safe t），按原文子串匹配，不随界面语言变化
+        // eslint-disable-next-line no-restricted-syntax -- 匹配主进程固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
+        (reason.includes('未找到') ||
+          // eslint-disable-next-line no-restricted-syntax -- 匹配主进程固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
+          reason.includes('游戏目录'))
+      ) {
         showMessage(t('toast.manualPathHintMessage'), 'info')
       }
     },
@@ -57,8 +64,8 @@ export const ScanButton: React.FC = () => {
     return () => {
       if (unsubscribe) unsubscribe()
     }
-    // reportScanFailure / refreshMediaAfterScan 为稳定引用，加入依赖数组避免告警
-  }, [setScanProgress, reportScanFailure, refreshMediaAfterScan])
+    // refreshMediaAfterScan 为模块级导入（稳定引用），无需列入依赖数组
+  }, [setScanProgress, reportScanFailure])
 
   // 建议改#6：挂载时同步主进程当前扫描状态，
   // 避免启动自动扫描时 UI 初始为 false 与实际不一致
@@ -148,9 +155,17 @@ export const ScanButton: React.FC = () => {
   }
 
   const scanOptions: { mode: ScanMode; label: string; desc: string }[] = [
-    { mode: 'incremental', label: '增量扫描', desc: '仅扫描新增文件' },
-    { mode: 'full', label: '自动定位游戏目录', desc: '文件名签名全盘搜索游戏媒体' },
-    { mode: 'custom', label: '指定目录', desc: '手动选择目录扫描（兜底）' }
+    {
+      mode: 'incremental',
+      label: t('settings.scan.incremental'),
+      desc: t('scanButton.incrementalDesc')
+    },
+    {
+      mode: 'full',
+      label: t('scanButton.full'),
+      desc: t('scanButton.fullDesc')
+    },
+    { mode: 'custom', label: t('scanButton.custom'), desc: t('scanButton.customDesc') }
   ]
 
   return (
@@ -160,8 +175,8 @@ export const ScanButton: React.FC = () => {
           className={`icon-btn ${scanning ? 'active' : ''}`}
           onClick={() => handleScan('incremental')}
           disabled={scanning}
-          title="增量扫描"
-          aria-label="增量扫描"
+          title={t('settings.scan.incremental')}
+          aria-label={t('settings.scan.incremental')}
         >
           <IconRefresh size={16} className={scanning ? 'animate-spin' : ''} />
         </button>
@@ -169,8 +184,8 @@ export const ScanButton: React.FC = () => {
           className="icon-btn px-1"
           onClick={() => setMenuOpen((v) => !v)}
           disabled={scanning}
-          title="扫描选项"
-          aria-label="扫描选项"
+          title={t('settings.sections.scanOptions')}
+          aria-label={t('settings.sections.scanOptions')}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
         >

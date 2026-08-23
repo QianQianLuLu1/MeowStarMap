@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface VideoPlayerProps {
   src: string
@@ -37,6 +38,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onTimeUpdate,
   onCaptureFrame
 }) => {
+  const { t } = useTranslation()
   const videoRef = useRef<HTMLVideoElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [currentTime, setCurrentTime] = useState(0)
@@ -174,7 +176,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
           className="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-lg text-xs font-medium z-10"
           style={{ background: 'var(--overlay-bg-strong)', color: 'var(--text-on-overlay)' }}
         >
-          已恢复至 {formatTime(restoredTime)}
+          {t('videoPlayer.restoredTo', { time: formatTime(restoredTime) })}
         </div>
       )}
       <div className="absolute top-4 right-4 flex gap-2 opacity-60 group-hover:opacity-100 transition-opacity">
@@ -186,20 +188,24 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
             color: 'var(--text-primary)',
             border: '1px solid var(--divider)'
           }}
-          title={isFullscreen ? '退出全屏' : '全屏播放'}
-          aria-label={isFullscreen ? '退出全屏' : '全屏播放'}
+          title={
+            isFullscreen ? t('videoPlayer.exitFullscreen') : t('videoPlayer.fullscreenPlayback')
+          }
+          aria-label={
+            isFullscreen ? t('videoPlayer.exitFullscreen') : t('videoPlayer.fullscreenPlayback')
+          }
         >
-          {isFullscreen ? '退出全屏' : '全屏'}
+          {isFullscreen ? t('videoPlayer.exitFullscreen') : t('videoPlayer.fullscreen')}
         </button>
         {onCaptureFrame && (
           <button
             onClick={handleCapture}
             className="px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{ background: 'var(--accent)', color: 'var(--text-on-accent)' }}
-            title="截取当前帧"
-            aria-label="截取当前帧"
+            title={t('videoPlayer.captureFrame')}
+            aria-label={t('videoPlayer.captureFrame')}
           >
-            截图
+            {t('videoPlayer.capture')}
           </button>
         )}
       </div>

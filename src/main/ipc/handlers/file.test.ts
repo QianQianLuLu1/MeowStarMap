@@ -6,42 +6,12 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 
-const {
-  handleMock,
-  showMessageBoxMock,
-  assertFileReadPathMock,
-  assertFileWritePathMock,
-  moveFileMock,
-  schemasProxy
-} = vi.hoisted(() => {
-  const makeChainable = (): any => {
-    const fn: any = () => makeChainable()
-    return new Proxy(fn, {
-      get: (_t, prop) => {
-        if (prop === 'then') return undefined
-        if (typeof prop === 'symbol') return undefined
-        return () => makeChainable()
-      }
-    })
-  }
-  const schemasProxy: any = new Proxy(
-    {},
-    {
-      get: (_, prop) => {
-        if (typeof prop === 'symbol') return undefined
-        return makeChainable()
-      }
-    }
-  )
+const { handleMock, showMessageBoxMock, moveFileMock } = vi.hoisted(() => {
   return {
     handleMock: vi.fn(),
     showMessageBoxMock: vi.fn(),
-    assertFileReadPathMock: vi.fn(),
-    assertFileWritePathMock: vi.fn(),
-    moveFileMock: vi.fn(),
-    schemasProxy
+    moveFileMock: vi.fn()
   }
 })
 
@@ -60,46 +30,13 @@ vi.mock('../../utils/file-utils', () => ({
   moveFile: moveFileMock
 }))
 
-vi.mock('../validator', () => {
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    schemas: schemasProxy,
-    assertFileReadPath: assertFileReadPathMock,
-    assertFileWritePath: assertFileWritePathMock
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerFileHandlers } from './file'
+import { assertFileReadPath, assertFileWritePath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
 
 interface FileServiceStub {
   moveToRecycleBin: ReturnType<typeof vi.fn>

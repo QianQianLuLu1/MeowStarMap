@@ -421,7 +421,8 @@ wxnn-photo-manager/
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
 │   │   │   ├── ffprobe-static.d.ts / koffi.d.ts
 │   │   ├── index.ts                   # 主进程入口（Application 类）
-│   │   ├── preload.ts                 # preload 脚本（contextBridge）
+│   │   ├── preload.ts                 # preload 入口（装配 + contextBridge 暴露）
+│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 28 个命名空间）
 │   │   └── tsconfig.json
 │   ├── renderer/                      # 渲染进程
 │   │   ├── assets/                    # 静态资源
@@ -521,12 +522,17 @@ wxnn-photo-manager/
 - **数据库清理修复**：失效记录删除 + 缺失缩略图修复 + 孤儿缩略图清理
 - **before-quit 异步清理**：含 WAL checkpoint + 子进程 kill + worker dispose + 强制超时兜底
 
-#### `preload.ts` — contextBridge 桥接层
+#### `preload.ts` + `preload/` — contextBridge 桥接层
 
-- 暴露 `electronAPI` 命名空间到 `window`，包含 13 个域的方法
-- 统一 IPC 调用入口 `call<T>(channel, ...args)`：解包 `IpcResponse<T>`，失败抛 `IpcError`
-- 暴露 `IpcError` 类供渲染层 `instanceof` 判断
-- 类型声明合并到 `Window` 接口
+2026-08 命名空间化拆分重构：原 1176 行单体文件拆为入口装配 + 按功能域的模块树，
+对外契约（全局名 / 方法签名 / 通道字符串）不变，并有单元测试守护（`preload/__tests__/`）。
+
+- `preload.ts` 入口：装配 `electronAPI`（reportReady + 28 个命名空间）并执行 5 个 `exposeInMainWorld`
+- `preload/ipc.ts`：`IpcError` 类 + 统一调用入口 `call<T>(channel, ...args)`（解包 `IpcResponse<T>`，失败抛 `IpcError`）+ `subscribe` 事件订阅助手
+- `preload/api/*.ts`：每文件一个命名空间对象（`scannerAPI`、`fileAPI`…），方法与通道字符串与拆分前逐字一致
+- `preload/plugin-bridge.ts`：插件能力桥（`window.pluginAPI`）与 `__setPluginI18nT` 注入点
+- 业务 DTO 类型快照位于 `src/shared/types/electron-api.ts`（preload 层不再内联类型定义）
+- 零依赖约束由测试机械化守护：运行时仅允许 `electron`，shared 引入必须 type-only
 
 ### 5.2 数据库层（database/）
 
@@ -1646,18 +1652,18 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 各自独立 utilityProcess，避
 
 ### B.1 入口与配置
 
-| 文件                     | 用途                            |
-| ------------------------ | ------------------------------- |
-| `src/main/index.ts`      | 主进程入口（Application 类）    |
-| `src/main/preload.ts`    | preload 脚本（contextBridge）   |
-| `src/renderer/main.tsx`  | 渲染进程入口                    |
-| `src/renderer/App.tsx`   | 应用根组件                      |
-| `package.json`           | 依赖与构建配置                  |
-| `vite.config.ts`         | Vite 构建配置                   |
-| `tsconfig.json`          | TypeScript 配置（根，渲染进程） |
-| `src/main/tsconfig.json` | TypeScript 配置（主进程）       |
-| `tailwind.config.ts`     | Tailwind 配置                   |
-| `eslint.config.js`       | ESLint 配置                     |
+| 文件                     | 用途                                                                    |
+| ------------------------ | ----------------------------------------------------------------------- |
+| `src/main/index.ts`      | 主进程入口（Application 类）                                            |
+| `src/main/preload.ts`    | preload 入口（装配 + contextBridge 暴露；模块树见 `src/main/preload/`） |
+| `src/renderer/main.tsx`  | 渲染进程入口                                                            |
+| `src/renderer/App.tsx`   | 应用根组件                                                              |
+| `package.json`           | 依赖与构建配置                                                          |
+| `vite.config.ts`         | Vite 构建配置                                                           |
+| `tsconfig.json`          | TypeScript 配置（根，渲染进程）                                         |
+| `src/main/tsconfig.json` | TypeScript 配置（主进程）                                               |
+| `tailwind.config.ts`     | Tailwind 配置                                                           |
+| `eslint.config.js`       | ESLint 配置                                                             |
 
 ### B.2 类型与错误
 
@@ -1754,3 +1760,11 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 各自独立 utilityProcess，避
 ---
 
 **文档结束**
+
+## 开发者信息 / 作者与社交平台
+
+- **抖音**：纤璐不会玩摄影 ([主页链接](https://v.douyin.com/Dx67wYkw48A/))
+- **小红书**：纤璐不会玩摄影 ([主页链接](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **哔哩哔哩**：纤璐不会玩摄影 ([主页链接](https://b23.tv/zCR5oGE))
+- **GitHub**：[QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)

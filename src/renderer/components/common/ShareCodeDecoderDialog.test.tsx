@@ -3,9 +3,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 vi.mock('./BaseDialog', () => ({
-  BaseDialog: ({ open, children }: any) => (open ? <div role="dialog">{children}</div> : null)
+  BaseDialog: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
+    open ? <div role="dialog">{children}</div> : null
 }))
 
 vi.mock('react-i18next', () => ({
@@ -13,6 +15,15 @@ vi.mock('react-i18next', () => ({
     t: (key: string) => key
   })
 }))
+
+/** electronAPI 测试子集：仅挂 decrypt 分路（传 undefined 模拟 API 缺失） */
+type MockDecryptAPI = Record<string, ReturnType<typeof vi.fn>>
+
+const setDecryptAPI = (decrypt: MockDecryptAPI | undefined): void => {
+  ;(window as unknown as { electronAPI: { decrypt: MockDecryptAPI | undefined } }).electronAPI = {
+    decrypt
+  }
+}
 
 import { ShareCodeDecoderDialog } from './ShareCodeDecoderDialog'
 
@@ -77,7 +88,7 @@ describe('ShareCodeDecoderDialog', () => {
       success: true,
       data: { timestamp: 123, uidBytes: 'abc', networkData: 'net-data' }
     })
-    ;(window as any).electronAPI = { decrypt: { decodeClothDiy } }
+    setDecryptAPI({ decodeClothDiy })
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'cloth_code' } })
@@ -92,7 +103,7 @@ describe('ShareCodeDecoderDialog', () => {
       success: true,
       data: { server: 's1', networkData: 'x' }
     })
-    ;(window as any).electronAPI = { decrypt: { decodeHomeBuild } }
+    setDecryptAPI({ decodeHomeBuild })
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('common.shareCodeDecoder.tabs.homeBuild'))
@@ -108,7 +119,7 @@ describe('ShareCodeDecoderDialog', () => {
       success: true,
       data: 'encoded-string'
     })
-    ;(window as any).electronAPI = { decrypt: { encodeCameraParams } }
+    setDecryptAPI({ encodeCameraParams })
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('common.shareCodeDecoder.tabs.mediaEncrypt'))
@@ -124,7 +135,7 @@ describe('ShareCodeDecoderDialog', () => {
       success: true,
       data: { timestamp: 999, uidBytes: '0a1b', networkData: 'net-data' }
     })
-    ;(window as any).electronAPI = { decrypt: { decodeClothDiy } }
+    setDecryptAPI({ decodeClothDiy })
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'code' } })
@@ -137,7 +148,7 @@ describe('ShareCodeDecoderDialog', () => {
       success: false,
       message: '解析失败原因'
     })
-    ;(window as any).electronAPI = { decrypt: { decodeClothDiy } }
+    setDecryptAPI({ decodeClothDiy })
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'bad-code' } })
@@ -146,7 +157,7 @@ describe('ShareCodeDecoderDialog', () => {
   })
 
   it('electronAPI.decrypt 不存在时显示 apiUnavailable', async () => {
-    ;(window as any).electronAPI = { decrypt: undefined }
+    setDecryptAPI(undefined)
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'code' } })
@@ -156,7 +167,7 @@ describe('ShareCodeDecoderDialog', () => {
 
   it('解码 API 抛错时显示错误消息', async () => {
     const decodeClothDiy = vi.fn().mockRejectedValue(new Error('IPC 异常'))
-    ;(window as any).electronAPI = { decrypt: { decodeClothDiy } }
+    setDecryptAPI({ decodeClothDiy })
 
     render(<ShareCodeDecoderDialog open={true} onClose={vi.fn()} />)
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'code' } })

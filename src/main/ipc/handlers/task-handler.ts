@@ -7,6 +7,7 @@ import { logger } from '../../utils/logger'
 import { taskRegistry } from '../../utils/task-registry'
 // 活动任务快照：task:getActive 拉取挂载前丢失的进度事件（扫描 + 索引）
 import { getActiveTask } from '../../utils/active-task-store'
+import { t } from '../../i18n'
 
 /**
  * task 域 IPC handler：统一任务取消通道。
@@ -21,7 +22,12 @@ export function registerTaskHandlers(ctx: HandlerContext): void {
     'task:cancel',
     wrapHandler(
       ctx,
-      z.tuple([z.string().min(1, 'taskId 不能为空').max(128, 'taskId 长度上限 128')]),
+      z.tuple([
+        z
+          .string()
+          .min(1, t('main.task.validation.taskIdRequired'))
+          .max(128, t('main.task.validation.taskIdMaxLength'))
+      ]),
       async ([taskId]) => {
         const cancelled = taskRegistry.cancel(taskId)
         if (!cancelled) {

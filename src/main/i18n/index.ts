@@ -16,6 +16,7 @@ import i18n from 'i18next'
 import { app } from 'electron'
 import zhCN from '../../renderer/i18n/locales/zh-CN.json'
 import { logger } from '../utils/logger'
+import { setAppErrorTranslator } from '../../shared/errors/app-error'
 
 // 已加载语言集合，避免重复加载
 const loadedLanguages = new Set<string>(['zh-CN'])
@@ -156,5 +157,8 @@ function detectSystemLanguage(): string | null {
 export function t(key: string, options?: Record<string, unknown>): string {
   return i18n.t(key, options)
 }
+
+// AppError 默认 userMessage 的翻译接线（shared 层不能反向依赖本模块）
+setAppErrorTranslator(t)
 
 export default i18n

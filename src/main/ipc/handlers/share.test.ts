@@ -6,7 +6,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 
 const {
   handleMock,
@@ -14,39 +13,15 @@ const {
   wifiStopMock,
   copyFilesToClipboardMock,
   getAppStatusMock,
-  launchAppMock,
-  assertFileReadPathMock,
-  schemasProxy
+  launchAppMock
 } = vi.hoisted(() => {
-  // 链式 mock：支持任意属性访问与方法调用，返回值仍可继续链式调用
-  const makeChainable = (): any => {
-    const fn: any = () => makeChainable()
-    return new Proxy(fn, {
-      get: (_t, prop) => {
-        if (prop === 'then') return undefined
-        if (typeof prop === 'symbol') return undefined
-        return () => makeChainable()
-      }
-    })
-  }
-  const schemasProxy: any = new Proxy(
-    {},
-    {
-      get: (_, prop) => {
-        if (typeof prop === 'symbol') return undefined
-        return makeChainable()
-      }
-    }
-  )
   return {
     handleMock: vi.fn(),
     wifiStartMock: vi.fn(),
     wifiStopMock: vi.fn(),
     copyFilesToClipboardMock: vi.fn(),
     getAppStatusMock: vi.fn(),
-    launchAppMock: vi.fn(),
-    assertFileReadPathMock: vi.fn(),
-    schemasProxy
+    launchAppMock: vi.fn()
   }
 })
 
@@ -73,46 +48,12 @@ vi.mock('../../utils/logger', () => ({
   getLogDirectory: vi.fn(() => '/mock/logs')
 }))
 
-vi.mock('../validator', () => {
-  // 测试约定：handler 调用时第一个实参为参数元组，需解包为 zod parseResult.data 形式
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    schemas: schemasProxy,
-    assertFileReadPath: assertFileReadPathMock
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerShareHandlers } from './share'
+import { assertFileReadPath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
 
 function makeCtx(): HandlerContext {
   return {

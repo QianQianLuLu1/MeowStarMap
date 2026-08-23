@@ -149,11 +149,13 @@ export const Sidebar: React.FC = () => {
   const showFilteredHint = filteredTotal < loadedTotal
 
   // P0-02：当前档案显示名
-  // P2-01：'全部档案' 改为 i18n key
+  // P2-01：'全部档案' 改为 i18n key；默认档案（uid='default'）昵称留空，回退 t('profile.defaultProfile')
+  const currentProfile = profiles.find((p) => p.uid === currentProfileUid)
   const currentProfileLabel =
     currentProfileUid === 'all'
       ? t('nav.allProfiles')
-      : profiles.find((p) => p.uid === currentProfileUid)?.nickname || currentProfileUid
+      : currentProfile?.nickname ||
+        (currentProfileUid === 'default' ? t('profile.defaultProfile') : currentProfileUid)
 
   return (
     <motion.aside
@@ -236,7 +238,9 @@ export const Sidebar: React.FC = () => {
                   onClick={() => handleProfileSwitch(p.uid)}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="truncate">{p.nickname || p.uid}</span>
+                    <span className="truncate">
+                      {p.nickname || (p.uid === 'default' ? t('profile.defaultProfile') : p.uid)}
+                    </span>
                     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       {p.uid}
                     </span>

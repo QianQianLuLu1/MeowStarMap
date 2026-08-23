@@ -4,14 +4,11 @@
  * @coverage import 域 IPC handler（import:preview / run）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AppError } from '../../../shared/errors/app-error'
 import { ImportRootRepository } from '../../database/import-root-repository'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
-const { handleMock, assertFileReadPathMock, assertFileWritePathMock } = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn()
+const { handleMock } = vi.hoisted(() => ({
+  handleMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -25,35 +22,13 @@ vi.mock('../../utils/logger', () => ({
   getLogDirectory: vi.fn(() => '/mock/logs')
 }))
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn(),
-  wrapHandlerRaw: vi.fn(),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock,
-  // 实现调用 pathGuard.register 登记导入目录（import-handler.ts:35,50,53）
-  pathGuard: { register: vi.fn(), setRootMediaDir: vi.fn() }
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerImportHandlers } from './import-handler'
+import { assertFileReadPath, assertFileWritePath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
 
 describe('registerImportHandlers', () => {
   beforeEach(() => {

@@ -12,6 +12,7 @@ import {
 import { AppError } from '../../../shared/errors/app-error'
 import { logger } from '../../utils/logger'
 import { ImportRootRepository } from '../../database/import-root-repository'
+import { t } from '../../i18n'
 
 // 文件导入支持的命名规则 / 分类策略 / 冲突策略枚举
 const importOptionsSchema = z.object({
@@ -67,7 +68,7 @@ export function registerImportHandlers(ctx: HandlerContext): void {
             // 失败仅记日志，不影响已复制文件与导入成功返回（阶段 0 已登记白名单，此处无需再 register）
             try {
               const db = ctx.dbManager.getDatabase()
-              if (!db) throw new Error('数据库未初始化')
+              if (!db) throw new Error(t('main.error.databaseNotInit'))
               const importRootRepo = new ImportRootRepository(
                 db,
                 ctx.dbManager.getWorkerBridge(),
@@ -77,10 +78,11 @@ export function registerImportHandlers(ctx: HandlerContext): void {
               await ctx.scannerManager.scanRoot(targetBaseDir)
             } catch (postErr) {
               warnings.push(
-                '登记导入根或触发扫描失败: ' +
-                  (postErr instanceof Error ? postErr.message : String(postErr))
+                t('main.import.error.registerRootOrScanFailed', {
+                  reason: postErr instanceof Error ? postErr.message : String(postErr)
+                })
               )
-              logger.error('[Import] 登记导入根或触发扫描失败（已复制文件不受影响）:', postErr)
+              logger.error(t('main.import.log.registerRootOrScanFailed'), postErr)
             }
             // 通知媒体列表刷新（导入文件经扫描已入库）
             ctx.notifyMediaUpdated()
@@ -90,9 +92,11 @@ export function registerImportHandlers(ctx: HandlerContext): void {
           }
           return { ...result, warnings }
         } catch (error) {
-          logger.error('[Import] 导入失败:', error)
+          logger.error(t('main.import.log.importFailed'), error)
           throw AppError.internal(
-            `导入失败: ${error instanceof Error ? error.message : String(error)}`
+            t('main.import.error.importFailed', {
+              reason: error instanceof Error ? error.message : String(error)
+            })
           )
         }
       }

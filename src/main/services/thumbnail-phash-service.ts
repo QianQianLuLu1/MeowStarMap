@@ -4,6 +4,7 @@ import type { HandlerContext } from '../ipc/handler-context'
 import { calculatePHash } from '../utils/phash'
 import type { TaskPriority } from '../scheduler/task-scheduler'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 
 /**
  * P1-A1：抽取自 index.ts / misc.ts / media.ts 的 4 组重复函数
@@ -85,7 +86,7 @@ export async function generateThumbnailsForUnprocessed(
   const runBatch = async (): Promise<void> => {
     if (ctx.isThumbnailsGenerating()) {
       // 高优先级抢占后低优先级可能刚释放锁，这里是正常防御
-      logger.info('[Thumbnail] 缩略图生成已在进行中，跳过本次触发')
+      logger.info(t('main.startup.log.thumbnailAlreadyRunning'))
       return
     }
     ctx.setThumbnailsGenerating(true)
@@ -96,9 +97,11 @@ export async function generateThumbnailsForUnprocessed(
       })
 
       if (!result.success) {
-        // 被抢占取消时 worker 返回 success=false + message='用户取消'，不视为错误
+        // 被抢占取消时 worker 返回 success=false + message='用户取消'，不视为错误；
+        // worker 侧文案固定 zh-CN（worker-safe t），此处按原文子串匹配，不随界面语言变化
+        // eslint-disable-next-line no-restricted-syntax -- 匹配 worker 固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
         if (!result.message.includes('取消') && !result.message.includes('已在进行中')) {
-          logger.error('[Thumbnail] 批量生成失败:', result.message)
+          logger.error(t('main.startup.log.thumbnailBatchFailed'), result.message)
         }
         return
       }
@@ -140,11 +143,17 @@ export async function generatePhashForUnprocessed(
       const r = await ctx.mediaWorkerManager.startPhashBatch()
       if (r.success) {
         result = { processed: r.processed, total: r.total }
-      } else if (!r.message.includes('取消') && !r.message.includes('已在进行中')) {
-        logger.error('[pHash] 补算失败:', r.message)
+      } else if (
+        // worker 侧文案固定 zh-CN（worker-safe t），按原文子串匹配，不随界面语言变化
+        // eslint-disable-next-line no-restricted-syntax -- 匹配 worker 固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
+        !r.message.includes('取消') &&
+        // eslint-disable-next-line no-restricted-syntax -- 匹配 worker 固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
+        !r.message.includes('已在进行中')
+      ) {
+        logger.error(t('main.thumbnailPhash.log.phashFailed'), r.message)
       }
     } catch (error) {
-      logger.error('[pHash] 补算失败:', error)
+      logger.error(t('main.thumbnailPhash.log.phashFailed'), error)
     }
   }
 
@@ -180,11 +189,17 @@ export async function markDuplicates(
       const r = await ctx.mediaWorkerManager.startDuplicateMark()
       if (r.success) {
         result = { markedDuplicates: r.markedDuplicates, totalGroups: r.totalGroups }
-      } else if (!r.message.includes('取消') && !r.message.includes('已在进行中')) {
-        logger.error('[Duplicate] 标记失败:', r.message)
+      } else if (
+        // worker 侧文案固定 zh-CN（worker-safe t），按原文子串匹配，不随界面语言变化
+        // eslint-disable-next-line no-restricted-syntax -- 匹配 worker 固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
+        !r.message.includes('取消') &&
+        // eslint-disable-next-line no-restricted-syntax -- 匹配 worker 固定 zh-CN 消息的判定子串（数据耦合，非 UI 文案）
+        !r.message.includes('已在进行中')
+      ) {
+        logger.error(t('main.thumbnailPhash.log.duplicateMarkFailed'), r.message)
       }
     } catch (error) {
-      logger.error('[Duplicate] 标记失败:', error)
+      logger.error(t('main.thumbnailPhash.log.duplicateMarkFailed'), error)
     }
   }
 

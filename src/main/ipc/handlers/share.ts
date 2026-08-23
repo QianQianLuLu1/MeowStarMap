@@ -13,6 +13,7 @@ import {
   getAppStatus,
   launchApp
 } from '../../services/share-clipboard-service'
+import { t } from '../../i18n'
 
 /**
  * P0-A1：从 Application.setupIPC() 迁移的分享域 IPC handler 集合。
@@ -77,7 +78,7 @@ export function registerShareHandlers(ctx: HandlerContext): void {
           installPath: status.installPath
         }
       } catch (error) {
-        logger.error('[Share] detectApp 失败:', error)
+        logger.error(t('main.share.log.detectAppFailed'), error)
         // 失败时返回未安装状态，避免 UI 卡死
         return { installed: false, running: false, installPath: null }
       }
@@ -91,9 +92,11 @@ export function registerShareHandlers(ctx: HandlerContext): void {
       try {
         return await launchApp(channelId)
       } catch (error) {
-        logger.error('[Share] launchApp 失败:', error)
+        logger.error(t('main.share.log.launchAppFailed'), error)
         throw AppError.internal(
-          `启动应用失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.share.error.launchAppFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })

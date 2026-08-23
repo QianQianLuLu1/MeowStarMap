@@ -45,7 +45,6 @@ function createMockDb(
   const mediaFiles: MediaRow[] = []
   const migrations = new Set<string>()
   const importRoots: string[] = [...(opts.importRoots ?? [])]
-  const nextId = 1
   let deleteCount = 0
   let updateCount = 0
   let txFailer: (() => void) | null = null

@@ -43,17 +43,17 @@ vi.mock('./crash-service', () => ({
 
 // process-registry mock（trackProcess 直接返回传入的 child）
 vi.mock('../utils/process-registry', () => ({
-  trackProcess: vi.fn((child: any) => child),
+  trackProcess: vi.fn((child: unknown) => child),
   untrackFfmpegCommand: vi.fn()
 }))
 
 // child_process.spawn mock：构造一个伪 EventEmitter
 const mockSpawnChild = () => {
-  const handlers: Record<string, (...args: any[]) => void> = {}
+  const handlers: Record<string, (...args: unknown[]) => void> = {}
   return {
-    stderr: { on: (ev: string, cb: (...a: any[]) => void) => (handlers[`stderr_${ev}`] = cb) },
-    stdout: { on: (ev: string, cb: (...a: any[]) => void) => (handlers[`stdout_${ev}`] = cb) },
-    on: (ev: string, cb: (...a: any[]) => void) => (handlers[ev] = cb),
+    stderr: { on: (ev: string, cb: (...a: unknown[]) => void) => (handlers[`stderr_${ev}`] = cb) },
+    stdout: { on: (ev: string, cb: (...a: unknown[]) => void) => (handlers[`stdout_${ev}`] = cb) },
+    on: (ev: string, cb: (...a: unknown[]) => void) => (handlers[ev] = cb),
     _handlers: handlers,
     _emitStderr: function (data: string) {
       this._handlers.stderr_data?.(data)
@@ -70,10 +70,10 @@ const mockSpawnChild = () => {
   }
 }
 
-let lastSpawnArgs: any = null
-let lastSpawnChild: any = null
+let lastSpawnArgs: unknown[] | null = null
+let lastSpawnChild: ReturnType<typeof mockSpawnChild> | null = null
 vi.mock('child_process', () => ({
-  spawn: vi.fn((...args: any[]) => {
+  spawn: vi.fn((...args: unknown[]) => {
     lastSpawnArgs = args
     lastSpawnChild = mockSpawnChild()
     return lastSpawnChild
@@ -144,11 +144,11 @@ let tmpRoot: string
 // 等待 spawn 被调用并返回 child mock 对象
 // 源码 exportLogsAsZip 在调用 spawn 之前有大量 fs.promises 异步操作，
 // 单次 setImmediate 等待不足以让 spawn 被调用，所以使用 vi.waitFor 轮询
-async function waitForSpawn(): Promise<any> {
+async function waitForSpawn(): Promise<ReturnType<typeof mockSpawnChild>> {
   await vi.waitFor(() => {
     expect(spawn).toHaveBeenCalled()
   })
-  return lastSpawnChild
+  return lastSpawnChild!
 }
 
 beforeEach(() => {
@@ -379,7 +379,7 @@ describe('getFaultDetail', () => {
 
 describe('openLogDirectory', () => {
   it('openPath 返回空字符串时返回 success=true', async () => {
-    ;(shell.openPath as any).mockResolvedValue('')
+    vi.mocked(shell.openPath).mockResolvedValue('')
 
     const r = await openLogDirectory()
     expect(r.success).toBe(true)
@@ -387,7 +387,7 @@ describe('openLogDirectory', () => {
   })
 
   it('openPath 返回错误字符串时返回 success=false', async () => {
-    ;(shell.openPath as any).mockResolvedValue('Error: path not found')
+    vi.mocked(shell.openPath).mockResolvedValue('Error: path not found')
 
     const r = await openLogDirectory()
     expect(r.success).toBe(false)
@@ -395,7 +395,7 @@ describe('openLogDirectory', () => {
   })
 
   it('openPath 抛异常时返回 success=false 与异常消息', async () => {
-    ;(shell.openPath as any).mockRejectedValue(new Error('shell crashed'))
+    vi.mocked(shell.openPath).mockRejectedValue(new Error('shell crashed'))
 
     const r = await openLogDirectory()
     expect(r.success).toBe(false)
@@ -403,7 +403,7 @@ describe('openLogDirectory', () => {
   })
 
   it('openPath 抛非 Error 类型时使用 String 转换', async () => {
-    ;(shell.openPath as any).mockRejectedValue('string-error')
+    vi.mocked(shell.openPath).mockRejectedValue('string-error')
 
     const r = await openLogDirectory()
     expect(r.success).toBe(false)
@@ -503,11 +503,11 @@ describe('exportLogsAsZip', () => {
     await promise
 
     expect(spawn).toHaveBeenCalled()
-    expect(lastSpawnArgs[0]).toBe('tar.exe')
-    expect(lastSpawnArgs[1]).toContain('-c')
-    expect(lastSpawnArgs[1]).toContain('--format=zip')
-    expect(lastSpawnArgs[1]).toContain('-f')
-    expect(lastSpawnArgs[1]).toContain(target)
+    expect(lastSpawnArgs![0]).toBe('tar.exe')
+    expect(lastSpawnArgs![1]).toContain('-c')
+    expect(lastSpawnArgs![1]).toContain('--format=zip')
+    expect(lastSpawnArgs![1]).toContain('-f')
+    expect(lastSpawnArgs![1]).toContain(target)
   })
 })
 
@@ -551,7 +551,7 @@ describe('clearAllLogs', () => {
 
     // mock unlink 让 faults 文件删除失败，app.log 正常删除
     const realUnlink = fs.promises.unlink
-    const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockImplementation(async (p: any) => {
+    const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockImplementation(async (p: fs.PathLike) => {
       if (String(p).endsWith('faults-2026-07-19.jsonl')) {
         throw new Error('permission denied')
       }

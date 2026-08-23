@@ -20,6 +20,7 @@ import type Database from 'better-sqlite3'
 import { backupService } from './backup-service'
 import { parseDataUrlToBuffer, getUniqueFilePath } from '../utils/file-utils'
 import { getExtFromMime } from '../utils/media-constants'
+import { t } from '../i18n'
 import type { DatabaseManager } from '../database/connection'
 import { MediaRepository } from '../database/media-repository'
 import type { TaskScheduler } from '../scheduler/task-scheduler'
@@ -122,10 +123,13 @@ export class EditorService {
         }
       }
       logger.info(
-        `[Editor] 清理 ${toDelete.length} 个旧快照，剩余 ${snapshots.length - toDelete.length} 个`
+        t('main.editor.log.cleanupSnapshotsDone', {
+          deleted: String(toDelete.length),
+          remaining: String(snapshots.length - toDelete.length)
+        })
       )
     } catch (err) {
-      logger.warn('[Editor] 清理旧快照失败:', err)
+      logger.warn(t('main.editor.log.cleanupSnapshotsFailed'), err)
     }
   }
 
@@ -142,14 +146,14 @@ export class EditorService {
   ): Promise<EditorSaveResult> {
     const normalizedFilePath = path.resolve(filePath)
     const db = this.getDb()
-    if (!db) return { success: false, message: '数据库未初始化' }
+    if (!db) return { success: false, message: t('main.error.databaseNotInit') }
 
     // 安全校验：filePath 必须是数据库中已索引的媒体文件路径，防止任意文件写入
     const mediaRow = db
       .prepare('SELECT id FROM media_files WHERE file_path = ? LIMIT 1')
       .get(normalizedFilePath) as { id: number } | undefined
     if (!mediaRow) {
-      return { success: false, message: '安全限制：只能保存到已索引的媒体文件路径' }
+      return { success: false, message: t('main.editor.error.onlyIndexedPath') }
     }
 
     const { buffer, mimeType } = parseDataUrlToBuffer(dataUrl)
@@ -171,7 +175,10 @@ export class EditorService {
       const backupSize = (await fs.promises.stat(backupPath)).size
       if (backupSize !== originalSize) {
         logger.warn(
-          `[Editor] 备份大小不匹配（原 ${originalSize} vs 备份 ${backupSize}），删除不完整备份`
+          t('main.editor.log.backupSizeMismatch', {
+            original: String(originalSize),
+            backup: String(backupSize)
+          })
         )
         await fs.promises.unlink(backupPath).catch(() => {})
         backupCreated = false
@@ -179,7 +186,7 @@ export class EditorService {
         backupCreated = true
       }
     } catch (backupError) {
-      logger.warn('[Editor] 备份原图失败，继续保存:', backupError)
+      logger.warn(t('main.editor.log.backupFailed'), backupError)
     }
 
     // 写入新文件（sharp pipeline 处理格式转换与质量压缩）
@@ -200,14 +207,17 @@ export class EditorService {
           const backupSize = (await fs.promises.stat(backupPath)).size
           if (backupSize !== originalSize) {
             logger.error(
-              `[Editor] 备份大小已变化（原 ${originalSize} vs 当前 ${backupSize}），拒绝恢复以避免原图损坏`
+              t('main.editor.log.backupSizeChanged', {
+                original: String(originalSize),
+                backup: String(backupSize)
+              })
             )
           } else {
             await fs.promises.copyFile(backupPath, normalizedFilePath)
-            logger.info('[Editor] 写入失败，已从备份恢复原图')
+            logger.info(t('main.editor.log.restoredFromBackup'))
           }
         } catch (restoreError) {
-          logger.error('[Editor] 写入失败且恢复备份也失败:', restoreError)
+          logger.error(t('main.editor.log.restoreFailed'), restoreError)
         }
       }
       throw writeError
@@ -240,10 +250,14 @@ export class EditorService {
         ).run(mediaRow.id, params, null)
       }
     } catch (historyError) {
-      logger.warn('[Editor] 记录编辑历史失败:', historyError)
+      logger.warn(t('main.editor.log.recordHistoryFailed'), historyError)
     }
 
-    return { success: true, message: '保存成功', filePath: normalizedFilePath }
+    return {
+      success: true,
+      message: t('main.file.message.saveSuccess'),
+      filePath: normalizedFilePath
+    }
   }
 
   /**

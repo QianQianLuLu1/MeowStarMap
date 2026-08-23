@@ -10,13 +10,20 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import zhCN from './locales/zh-CN.json'
+import { setAppErrorTranslator } from '../../shared/errors/app-error'
 
 // P2-01：支持的语言列表（顺序影响设置页下拉展示顺序）
+// label 为语言自称名（endonym，国际惯例不随界面语言翻译）；本常量在 i18n 实例 init 前求值，
+// 无法调用 t()，故按数据值豁免中文检测。
 export const SUPPORTED_LANGUAGES = [
+  // eslint-disable-next-line no-restricted-syntax -- 模块级常量早于 i18n init 求值；设置页另由 settings.language.auto 展示"跟随系统"
   { code: 'auto', label: '跟随系统', englishName: 'Auto' },
+  // eslint-disable-next-line no-restricted-syntax -- 语言 endonym（自称名），按惯例不翻译
   { code: 'zh-CN', label: '简体中文', englishName: 'Simplified Chinese' },
+  // eslint-disable-next-line no-restricted-syntax -- 语言 endonym（自称名），按惯例不翻译
   { code: 'zh-TW', label: '繁體中文', englishName: 'Traditional Chinese' },
   { code: 'en', label: 'English', englishName: 'English' },
+  // eslint-disable-next-line no-restricted-syntax -- 语言 endonym（自称名），按惯例不翻译
   { code: 'ja', label: '日本語', englishName: 'Japanese' },
   { code: 'ko', label: '한국어', englishName: 'Korean' },
   { code: 'fr', label: 'Français', englishName: 'French' },
@@ -124,6 +131,9 @@ i18n.use(initReactI18next).init({
   },
   returnNull: false
 })
+
+// AppError 默认 userMessage 的翻译接线（shared 层不能反向依赖本模块）
+setAppErrorTranslator((key, options) => i18n.t(key, options as never) as unknown as string)
 
 // P3：启动时预加载持久化语言（若非 zh-CN）
 // 应在 React 渲染前 await 调用，避免非中文用户首次看到中文闪烁

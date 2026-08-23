@@ -114,6 +114,15 @@
         "failedToast": "",
         "successToast": ""
       }
+    },
+    "system": {
+      "people": "",
+      "location": "",
+      "scene": "",
+      "screenshot": "",
+      "recording": "",
+      "recent": "",
+      "favorite": ""
     }
   },
   "common": {
@@ -301,7 +310,8 @@
       "loadingText": "",
       "originalSize": "",
       "panelTitle": "",
-      "shutter": ""
+      "shutter": "",
+      "gamePhotoEmpty": ""
     },
     "fields": {
       "favorite": "",
@@ -841,7 +851,8 @@
       "targetDirLabel": "",
       "targetDirPlaceholder": "",
       "title": "",
-      "videosCount": ""
+      "videosCount": "",
+      "indexingHint": ""
     },
     "slideshow": {
       "ariaLabel": "",
@@ -1024,6 +1035,16 @@
       "remaining": "",
       "startAdd": "",
       "title": ""
+    },
+    "search": {
+      "log": {
+        "indexNotReadyFallback": ""
+      }
+    },
+    "media": {
+      "log": {
+        "refreshNullFailed": ""
+      }
     }
   },
   "group": {
@@ -1035,7 +1056,10 @@
     "outfit": "Atuendo",
     "sceneCategory": "Escena",
     "sceneTime": "Momento del día",
-    "title": "Grupo inteligente"
+    "title": "Grupo inteligente",
+    "log": {
+      "loadCountsFailed": ""
+    }
   },
   "logAction": {
     "backupDeleted": "Copia de seguridad eliminada",
@@ -1309,7 +1333,10 @@
       "restoreTitle": "Restaurar base de datos",
       "storageLocation": "Ubicación de almacenamiento de copias",
       "total": "{{count}} copias",
-      "wholeDb": "Copia de base de datos completa"
+      "wholeDb": "Copia de base de datos completa",
+      "log": {
+        "loadBackupsFailed": ""
+      }
     },
     "cache": {
       "cacheLimit": "Límite de caché",
@@ -1328,7 +1355,11 @@
       "noData": "Sin datos",
       "openDir": "Abrir directorio",
       "refreshStats": "Actualizar estadísticas",
-      "usage": "Tasa de uso"
+      "usage": "Tasa de uso",
+      "strategyTitle": "",
+      "strategyDesc": "",
+      "invalidLimit": "",
+      "customLimitHint": ""
     },
     "clear": {
       "cleanMissing": "Limpiar registros perdidos",
@@ -1395,7 +1426,9 @@
       "preview": "Vista previa",
       "previewEmpty": "nombre_archivo_original.extensión",
       "selectDir": "Seleccionar",
-      "title": "Flujo de exportación"
+      "title": "Flujo de exportación",
+      "previewAlbumType": "",
+      "previewExtension": ""
     },
     "fileops": {
       "batchThreshold": "Umbral de operación por lotes",
@@ -1425,7 +1458,8 @@
       "auto": "Seguir sistema",
       "description": "Cambiar el idioma de visualización de la interfaz",
       "restartHint": "Algunos textos pueden requerir reiniciar la aplicación para actualizarse completamente",
-      "title": "Idioma"
+      "title": "Idioma",
+      "loading": ""
     },
     "logs": {
       "aggregateTooltip": "Cambiar a vista agregada (mismos errores combinados)",
@@ -1545,7 +1579,34 @@
       "analyzing": "Analizando…",
       "incremental": "Escaneo incremental",
       "sceneTimeDesc": "Reconocimiento automático de día/noche/amanecer/atardecer basado en histograma de brillo de imagen",
-      "sceneTimeTitle": "Análisis de tiempo de escena"
+      "sceneTimeTitle": "Análisis de tiempo de escena",
+      "addPath": "",
+      "adding": "",
+      "emptyPaths": "",
+      "pathAdded": "",
+      "pathExists": "",
+      "pathLimit": "",
+      "pathRemove": "",
+      "pathRemoved": "",
+      "pathsDescription": "",
+      "importRootsTitle": "",
+      "importRootsDescription": "",
+      "importRootsEmpty": "",
+      "importRootsLoading": "",
+      "importRootsRemove": "",
+      "importRootsManageHint": "",
+      "importRootsConfirmTitle": "",
+      "importRootsConfirmBody": "",
+      "importRootsConfirmClearRecords": "",
+      "importRootsClearRecordsHint": "",
+      "importRootsConfirmCancel": "",
+      "importRootsConfirmRemove": "",
+      "importRootsRemoving": "",
+      "importRootsRemovedOnly": "",
+      "importRootsRemovedWithCleared": "",
+      "importRootsClearFailed": "",
+      "importRootsRemoveFailed": "",
+      "importRootsLoadFailed": ""
     },
     "sections": {
       "aboutContact": "Contacto",
@@ -1565,7 +1626,9 @@
       "scanOptions": "Opciones de escaneo",
       "shareCode": "Herramientas de código compartido",
       "startup": "Comportamiento de inicio",
-      "theme": "Tema"
+      "theme": "Tema",
+      "scanPaths": "",
+      "importRoots": ""
     },
     "startup": {
       "autoScan": "Escaneo automático al iniciar",
@@ -1588,6 +1651,14 @@
         "decoder": "Decodificador de código compartido",
         "decoderDesc": "Decodifica códigos compartidos de tinte del juego, códigos de construcción del hogar, o cifra parámetros de cámara. Soporta la extracción de metadatos como marcas de tiempo, UID e ID del servidor.",
         "openTool": "Abrir herramienta"
+      }
+    },
+    "navigation": {
+      "ariaLabel": ""
+    },
+    "plugins": {
+      "error": {
+        "unavailable": ""
       }
     }
   },
@@ -1674,6 +1745,13 @@
       "noFilesSelected": "",
       "notInstalled": "",
       "unsupportedPlatform": ""
+    },
+    "log": {
+      "copiedToClipboard": "",
+      "copyFailed": "",
+      "detectInstallPathFailed": "",
+      "launchFailed": "",
+      "launched": ""
     }
   },
   "timeLabel": {
@@ -1757,7 +1835,8 @@
       "permanentDelete": "",
       "rename": "",
       "undone": "",
-      "unfavorite": ""
+      "unfavorite": "",
+      "conflictPrompt": ""
     },
     "undoUnsupported": "",
     "unfavorite": "",
@@ -1769,7 +1848,18 @@
     "scanFailed": "",
     "scanNoGameDir": "",
     "manualPathHint": "",
-    "manualPathHintMessage": ""
+    "manualPathHintMessage": "",
+    "batchDelete": {
+      "allSucceeded": "",
+      "missingFile": "",
+      "partial": ""
+    },
+    "backup": {
+      "restored": ""
+    },
+    "scanInterrupted": "",
+    "imageProcessorCanvasFailed": "",
+    "imageProcessorLoadFailed": ""
   },
   "video": {
     "applyEdit": "",
@@ -2239,7 +2329,9 @@
     "workerCrash": "",
     "workerRestart": "",
     "databaseCorruption": "",
-    "databaseRestore": ""
+    "databaseRestore": "",
+    "indexingTimeout": "",
+    "renderer-not-ready": ""
   },
   "lut": {
     "builtin": {
@@ -2248,6 +2340,9 @@
       "warmVintage": "",
       "coolDrama": "",
       "highContrast": ""
+    },
+    "log": {
+      "persistFailed": ""
     }
   },
   "watermark": {
@@ -2314,7 +2409,11 @@
     "underline": "",
     "underlineOff": "",
     "verticalSpacing": "",
-    "width": ""
+    "width": "",
+    "log": {
+      "saveTemplateFailed": "",
+      "deleteTemplateFailed": ""
+    }
   },
   "camera": {
     "aperture": "",
@@ -2461,12 +2560,22 @@
       "refreshAria": "",
       "refreshHint": "",
       "sampleId": "",
-      "unknown": ""
+      "unknown": "",
+      "loadFailed": "",
+      "loadCrashesFailed": ""
     },
     "crash": {
       "clearAllHint": "",
       "refreshAria": "",
-      "refreshHint": ""
+      "refreshHint": "",
+      "processType": {
+        "main": "",
+        "renderer": "",
+        "gpu": "",
+        "utility": "",
+        "plugin": "",
+        "unknown": ""
+      }
     }
   },
   "errorFallback": {
@@ -2480,7 +2589,12 @@
     "reload": "",
     "showDetail": "",
     "subtitle": "",
-    "title": ""
+    "title": "",
+    "routeTitle": "",
+    "routeRetry": "",
+    "zoneTitle": "",
+    "zoneRetry": "",
+    "ipcFailed": ""
   },
   "infoPanel": {
     "copied": "",
@@ -2567,7 +2681,11 @@
         "message": "",
         "detail": "",
         "openLogDir": ""
-      }
+      },
+      "validation": {
+        "messageRequired": ""
+      },
+      "defaultOk": ""
     },
     "error": {
       "mainWindowNotInit": "",
@@ -2582,7 +2700,8 @@
         "userCanceledSelect": "",
         "userCanceledExportDir": "",
         "jsonParseFailed": "",
-        "presetFormatInvalid": ""
+        "presetFormatInvalid": "",
+        "onlyIndexedPath": ""
       },
       "validation": {
         "nameRequired": "",
@@ -2592,6 +2711,16 @@
         "dataUrlRequired": "",
         "dataUrlMaxLength": "",
         "fileNameInvalid": ""
+      },
+      "log": {
+        "cleanupSnapshotsDone": "",
+        "cleanupSnapshotsFailed": "",
+        "backupSizeMismatch": "",
+        "backupFailed": "",
+        "backupSizeChanged": "",
+        "restoredFromBackup": "",
+        "restoreFailed": "",
+        "recordHistoryFailed": ""
       }
     },
     "plugin": {
@@ -2606,7 +2735,15 @@
         "tableNotInWhitelist": "",
         "configInvalid": "",
         "taskIdInvalid": "",
-        "currentTotalInvalid": ""
+        "currentTotalInvalid": "",
+        "notInitialized": "",
+        "noSpecifiers": ""
+      },
+      "dialog": {
+        "installConfirmTitle": "",
+        "installConfirmMessage": "",
+        "installConfirmDetail": "",
+        "install": ""
       }
     },
     "media": {
@@ -2635,7 +2772,18 @@
         "cleanedMissing": "",
         "missingRemoved": "",
         "cleanedCorrupted": "",
-        "corruptedRemoved": ""
+        "corruptedRemoved": "",
+        "nothingToAnalyze": "",
+        "sceneTimeAnalyzed": ""
+      },
+      "log": {
+        "recycleBinMoveFailed": "",
+        "recycleBinMoveOmitted": ""
+      },
+      "validation": {
+        "tagsMax": "",
+        "notesMaxLength": "",
+        "outfitMaxLength": ""
       }
     },
     "validator": {
@@ -2663,7 +2811,31 @@
       "pathNotAllowed": "",
       "opWrite": "",
       "opRead": "",
-      "paramValidationFailed": ""
+      "paramValidationFailed": "",
+      "log": {
+        "handlerUncaught": ""
+      },
+      "arrayStringRequired": "",
+      "ipcPathArrayMaxLength": "",
+      "pathStringLength": "",
+      "pathMustAbsolute": "",
+      "numberFinite": "",
+      "numberRange": "",
+      "intRequired": "",
+      "stringTypeRequired": "",
+      "stringLengthRange": "",
+      "mediaIdsArrayRequired": "",
+      "mediaIdsNotEmpty": "",
+      "tagNameStringRequired": "",
+      "tagNameLength": "",
+      "tagNameControlChars": "",
+      "urlLength": "",
+      "protocolNotAllowed": "",
+      "urlInvalidLiteral": "",
+      "presetObjectRequired": "",
+      "presetNameRequired": "",
+      "presetCategoryRequired": "",
+      "presetParamsRequired": ""
     },
     "db": {
       "recovery": {
@@ -2671,6 +2843,56 @@
         "integrityCheckFailed": "",
         "dbHandleNull": "",
         "reopenFailed": ""
+      },
+      "log": {
+        "lockRetrySucceeded": "",
+        "openFailedTryingBackup": "",
+        "autoRecoveryFailed": "",
+        "autoVacuumFailed": "",
+        "pragmaOptimizeFailed": "",
+        "integrityCheckFault": "",
+        "writeCleanExitMarkerFailed": "",
+        "closeCorruptedFailed": "",
+        "restoreFailedReverted": "",
+        "reopenAfterRestoreFailFailed": "",
+        "reopenAfterRestoreFailed": "",
+        "autoRestored": "",
+        "corruptDbRenamed": "",
+        "corruptDbCopied": "",
+        "corruptDbBackupFailed": "",
+        "recoveryListenerFailed": "",
+        "preMigrationBackupCreated": "",
+        "preMigrationBackupFailed": "",
+        "migrationFailedTxRolledBack": "",
+        "migrationFailedNoBackup": "",
+        "operationHistoryCleanupFailed": "",
+        "indexExistsIgnored": "",
+        "v3IndexExistsIgnored": "",
+        "fts5Unavailable": "",
+        "v3MigrationDone": "",
+        "v3MigrationFailed": "",
+        "backfillApplied": "",
+        "backfillFailed": "",
+        "systemCategoryKeyMigrationFailed": "",
+        "sceneCategoryMigrated": "",
+        "sceneCategoryMigrationFailed": "",
+        "settingTypeMismatch": "",
+        "exitOptimizeFailed": "",
+        "walCheckpointFailed": "",
+        "importRootsGalleryFailed": "",
+        "importRootsCacheFailed": "",
+        "fts5QueryFallback": ""
+      },
+      "error": {
+        "lockedByOtherProgram": "",
+        "openFailedAfterRecovery": "",
+        "initFailedNullHandle": "",
+        "migrationFailedRolledBack": "",
+        "migrationRolledBackToBackup": "",
+        "rollbackToBackupFailed": "",
+        "indexCreationFailed": "",
+        "v3IndexCreationFailed": "",
+        "addColumnFailed": ""
       }
     },
     "file": {
@@ -2690,7 +2912,8 @@
         "targetExists": "",
         "invalidName": "",
         "fileTooLarge": "",
-        "noOutputDir": ""
+        "noOutputDir": "",
+        "noDefaultExportDir": ""
       },
       "message": {
         "movedToRecycleBin": "",
@@ -2711,7 +2934,23 @@
         "cannotAccessDir": "",
         "insufficientDiskSpace": "",
         "targetExists": "",
-        "importComplete": ""
+        "importComplete": "",
+        "editedImageFileName": ""
+      },
+      "log": {
+        "exifReadFailed": "",
+        "dbSyncFailed": "",
+        "pendingRenamesRecordFailed": "",
+        "exportMetadataFallback": ""
+      },
+      "validation": {
+        "operationsRequired": "",
+        "operationsMax": ""
+      },
+      "dialog": {
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": ""
       }
     },
     "gameEvents": {
@@ -2736,8 +2975,967 @@
         "networkUnavailable": "Decodificación por red no disponible (puede requerir Internet)",
         "invalidHomeBuildCode": "",
         "ffiNotInit": "",
-        "findNoEndFlagHint": ""
+        "findNoEndFlagHint": "",
+        "uidRequired": "",
+        "dllNotInit": "",
+        "initSendFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "decodeTimeout": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "log": {
+        "mapHint": "",
+        "noCameraParams": "",
+        "unexpectedError": "",
+        "dllResolveFailed": "",
+        "initSendFailed": "",
+        "readyTimeout": "",
+        "decodeTimeout": "",
+        "requestSendFailed": "",
+        "restartExhausted": "",
+        "restarting": "",
+        "restarted": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
       }
+    },
+    "lifecycle": {
+      "log": {
+        "crashReporterStarted": "",
+        "crashReporterFailed": "",
+        "backupInitFailed": "",
+        "themeCleanupFailed": "",
+        "selfCheckFailed": "",
+        "unknownReason": "",
+        "crashCleanFailed": "",
+        "forceExitReasonWal": "",
+        "forceExitReasonDefault": "",
+        "startupFailed": ""
+      }
+    },
+    "autoUpdate": {
+      "log": {
+        "devSkip": "",
+        "updateError": "",
+        "initialized": "",
+        "checkFailed": "",
+        "downloadFailed": ""
+      }
+    },
+    "log": {
+      "dialog": {
+        "filterZipName": ""
+      },
+      "error": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "getStatsFailed": "",
+        "userCanceledSave": "",
+        "clearFailed": "",
+        "reportRendererFailed": ""
+      },
+      "log": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "clearedAll": "",
+        "reportRendererFailed": ""
+      }
+    },
+    "cleanup": {
+      "log": {
+        "exitDiagnosisSummary": ""
+      }
+    },
+    "gpu": {
+      "log": {
+        "processCrashFallback": ""
+      }
+    },
+    "rendererBridge": {
+      "log": {
+        "sendFailed": ""
+      }
+    },
+    "rendererProtocol": {
+      "error": {
+        "calledBeforeReady": ""
+      }
+    },
+    "setDir": {
+      "message": {
+        "resetToDefault": ""
+      },
+      "error": {
+        "resetFailed": ""
+      }
+    },
+    "disk": {
+      "error": {
+        "insufficient": ""
+      },
+      "keyword": {
+        "insufficient": ""
+      }
+    },
+    "fileUtils": {
+      "error": {
+        "invalidDataUrl": ""
+      }
+    },
+    "backup": {
+      "log": {
+        "createIpcFailed": "",
+        "listFailed": "",
+        "restoreIpcFailed": "",
+        "startupAutoBackupFailed": "",
+        "skipAutoBackup": "",
+        "runningStartupAutoBackup": "",
+        "createSuccess": "",
+        "createFailed": "",
+        "restoreToFailed": "",
+        "restoredToDb": "",
+        "restoreSuccessRelaunching": "",
+        "relaunchFailed": "",
+        "restoreFailed": "",
+        "relaunchAfterFailureFailed": "",
+        "repairFlagWritten": "",
+        "repairFlagWriteFailed": "",
+        "deleted": "",
+        "deleteFailed": "",
+        "prunedOld": ""
+      },
+      "error": {
+        "createFailed": "",
+        "listFailed": "",
+        "restoreFailed": "",
+        "deleteFailed": "",
+        "dbUnavailable": "",
+        "noBackupToRestore": "",
+        "restoreFailedPlain": "",
+        "backupNotExist": "",
+        "backupCorrupted": "",
+        "restoreFailedRelaunch": ""
+      },
+      "message": {
+        "restoredFrom": "",
+        "restoredButRelaunchFailed": "",
+        "restoredRelaunching": ""
+      }
+    },
+    "cache": {
+      "log": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      },
+      "error": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      }
+    },
+    "category": {
+      "error": {
+        "noUpdatableFields": "",
+        "systemCategoryUndeletable": "",
+        "ordersRequired": "",
+        "ordersMax": ""
+      }
+    },
+    "crash": {
+      "log": {
+        "listFailed": "",
+        "clearedAll": ""
+      },
+      "error": {
+        "listFailed": "",
+        "getStatsFailed": "",
+        "clearFailed": "",
+        "openDirFailed": ""
+      },
+      "message": {
+        "nativeCrash": "",
+        "unknownFormat": "",
+        "opened": ""
+      }
+    },
+    "data": {
+      "dialog": {
+        "cancel": "",
+        "confirmClear": "",
+        "clearTitle": "",
+        "clearMessage": "",
+        "clearDetail": ""
+      },
+      "message": {
+        "cleared": ""
+      }
+    },
+    "decrypt": {
+      "validation": {
+        "albumTypeRequired": "",
+        "albumTypeMaxLength": "",
+        "jsonTextRequired": "",
+        "jsonTextMaxLength": "",
+        "codeStrRequired": "",
+        "codeStrMaxLength": ""
+      },
+      "log": {
+        "mediaWhitelistHit": "",
+        "resolveUidFailed": "",
+        "getKnownUidsFailed": ""
+      }
+    },
+    "duplicate": {
+      "message": {
+        "cancelled": "",
+        "markDone": ""
+      },
+      "progress": {
+        "hashDoneGrouping": "",
+        "hashing": "",
+        "done": ""
+      }
+    },
+    "exportPref": {
+      "validation": {
+        "namingMaxLength": "",
+        "namingNoSeparator": "",
+        "namingNoParentDir": ""
+      }
+    },
+    "import": {
+      "error": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      },
+      "log": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      }
+    },
+    "importRoot": {
+      "log": {
+        "removeFailed": "",
+        "clearRecordsFailed": ""
+      },
+      "error": {
+        "removeFailed": ""
+      }
+    },
+    "operationHistory": {
+      "validation": {
+        "operationTypeRequired": ""
+      }
+    },
+    "profile": {
+      "error": {
+        "uidExists": "",
+        "defaultUndeletable": "",
+        "targetNotFound": ""
+      },
+      "message": {
+        "transferred": ""
+      }
+    },
+    "scanner": {
+      "validation": {
+        "customPathsMax": ""
+      },
+      "log": {
+        "postScanThumbFailed": "",
+        "registerImportRootFailed": "",
+        "startFailed": "",
+        "skipRestoreReplay": "",
+        "markMigrationV1FailedRetry": "",
+        "repairV1Failed": "",
+        "markMigrationV2Failed": "",
+        "repairV2Failed": "",
+        "markMigrationV3Failed": "",
+        "repairV3Failed": "",
+        "markMigrationV4Failed": "",
+        "repairV4Failed": "",
+        "integrityCheckFailed": "",
+        "heartbeatTimeout": "",
+        "bridgeReadyTimeout": "",
+        "bridgeRestarting": "",
+        "bridgeRestarted": "",
+        "scanTaskRestored": "",
+        "scanTaskRestoreFailed": "",
+        "bridgeRestartFailed": "",
+        "bridgeCrashListenerFailed": ""
+      },
+      "error": {
+        "validationFailed": "",
+        "pathCheckFailed": "",
+        "scanFailed": "",
+        "scanInProgress": "",
+        "dbPathNotInitialized": "",
+        "scanStartFailed": "",
+        "noMediaDirFound": "",
+        "gameDirNotFound": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "scanProcessExit": "",
+        "autoRestarted": "",
+        "duplicateScanStart": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "scanCancelled": ""
+      }
+    },
+    "searchIndex": {
+      "validation": {
+        "segmentsMax": ""
+      },
+      "error": {
+        "persistFailed": ""
+      },
+      "log": {
+        "importReadFailed": ""
+      }
+    },
+    "settings": {
+      "error": {
+        "customPathsNotArray": "",
+        "customPathsMax": "",
+        "customPathsEmptyItem": "",
+        "validationFailed": "",
+        "valueTooLarge": "",
+        "valueNotSerializable": "",
+        "hwAccelNotBoolean": "",
+        "securitySensitiveKey": "",
+        "unknownKey": ""
+      },
+      "validation": {
+        "keyRequired": "",
+        "keyMaxLength": ""
+      }
+    },
+    "share": {
+      "log": {
+        "detectAppFailed": "",
+        "launchAppFailed": "",
+        "rejectedNonLan": "",
+        "pinLocked": "",
+        "authSuccess": ""
+      },
+      "error": {
+        "launchAppFailed": "",
+        "noFilesToShare": ""
+      },
+      "http": {
+        "serviceNotStarted": "",
+        "forbiddenNonLan": "",
+        "fileNotFound": "",
+        "pathNotFound": "",
+        "authTitle": "",
+        "authPrompt": "",
+        "authHint": "",
+        "pinPlaceholder": "",
+        "authSubmit": "",
+        "networkError": "",
+        "tooManyAttempts": "",
+        "locked": "",
+        "pinWrong": "",
+        "authSuccess": ""
+      }
+    },
+    "shell": {
+      "error": {
+        "pathMustBeAbsolute": "",
+        "sensitiveDirForbidden": "",
+        "executableForbidden": "",
+        "openExternalFailed": "",
+        "openPathFailed": "",
+        "showItemFailed": ""
+      }
+    },
+    "similar": {
+      "message": {
+        "phashDone": ""
+      }
+    },
+    "task": {
+      "validation": {
+        "taskIdRequired": "",
+        "taskIdMaxLength": ""
+      },
+      "keyword": {
+        "canceled": "",
+        "alreadyRunning": ""
+      }
+    },
+    "video": {
+      "error": {
+        "endTimeAfterStart": ""
+      },
+      "log": {
+        "exportLivePhotoFailed": ""
+      },
+      "message": {
+        "editSuccess": ""
+      }
+    },
+    "watermark": {
+      "message": {
+        "cancelled": "",
+        "done": "",
+        "failed": ""
+      },
+      "progress": {
+        "applying": ""
+      },
+      "validation": {
+        "configRequired": "",
+        "configMaxLength": ""
+      }
+    },
+    "customDirs": {
+      "label": {
+        "backupFiles": "",
+        "thumbnailMetadata": "",
+        "logFiles": "",
+        "crashDump": ""
+      }
+    },
+    "desktopShortcut": {
+      "log": {
+        "noWritableDesktop": "",
+        "created": "",
+        "createFailedFallback": "",
+        "createdFallback": "",
+        "createFailedAll": ""
+      }
+    },
+    "app": {
+      "name": ""
+    },
+    "errorHandlers": {
+      "unknownPath": "",
+      "dialog": {
+        "errorTitle": "",
+        "errorBody": "",
+        "frequentErrorTitle": "",
+        "frequentErrorMessage": "",
+        "frequentErrorDetail": "",
+        "restartApp": "",
+        "continueUsing": ""
+      }
+    },
+    "mediaProtocol": {
+      "log": {
+        "missingPathParam": "",
+        "realpathFailed": "",
+        "denyNotWhitelisted": "",
+        "fileNotFoundOrNoPerm": "",
+        "handleRequestFailed": "",
+        "streamErrorDestroyed": "",
+        "whitelistCheckFailed": ""
+      }
+    },
+    "recovery": {
+      "title": {
+        "dbRecovered": "",
+        "dbRecoveryFailed": ""
+      },
+      "body": {
+        "sourceBackup": "",
+        "corruptedBackupPath": ""
+      },
+      "worker": {
+        "title": {
+          "startupTimeout": "",
+          "restarted": "",
+          "restartExhausted": "",
+          "exited": ""
+        },
+        "body": {
+          "crashTime": "",
+          "exitCode": "",
+          "crashedAt": "",
+          "restartCount": "",
+          "startupTimeoutHint": "",
+          "restartedHint": "",
+          "exhaustedHint": ""
+        },
+        "state": {
+          "exhausted": "",
+          "continuable": ""
+        },
+        "label": {
+          "scanner": "",
+          "database": "",
+          "media": "",
+          "decryption": ""
+        }
+      },
+      "log": {
+        "repairFailed": "",
+        "showDialogFailed": ""
+      }
+    },
+    "window": {
+      "reason": {
+        "rendererNotReady": ""
+      },
+      "dialog": {
+        "diagTitle": "",
+        "rendererFailed": "",
+        "rendererFailedDetail": "",
+        "gotIt": "",
+        "crashTitle": "",
+        "crashMessage": "",
+        "crashDetail": "",
+        "reload": "",
+        "closeApp": ""
+      },
+      "log": {
+        "rendererCrashed": ""
+      }
+    },
+    "index": {
+      "log": {
+        "gpuFallbackActive": ""
+      },
+      "dialog": {
+        "startupFailedTitle": "",
+        "startupFailedMessage": "",
+        "startupFailedDetail": "",
+        "exit": ""
+      }
+    },
+    "startup": {
+      "log": {
+        "scanComplete": "",
+        "indexingTaskError": "",
+        "autoScanFailed": "",
+        "thumbnailAlreadyRunning": "",
+        "thumbnailBatchFailed": "",
+        "phashStartFailed": "",
+        "indexingFailed": "",
+        "sceneAnalysisNone": "",
+        "sceneAnalysisFailed": "",
+        "orphanCleanupFailed": "",
+        "readPendingRenamesFailed": "",
+        "cleanupScanHistoryFailed": "",
+        "notifyScanInterruptedFailed": "",
+        "detectInterruptedFailed": "",
+        "clearRecoveryFlagsFailed": "",
+        "notifyBackupRestoredFailed": "",
+        "postRestorePhashFailed": "",
+        "postRestoreDuplicateFailed": ""
+      },
+      "error": {
+        "indexingTotalTimeout": ""
+      },
+      "index": {
+        "timeoutStopped": "",
+        "cancelled": "",
+        "preparing": "",
+        "analyzingSceneTime": "",
+        "finalizing": "",
+        "done": "",
+        "errorStopped": ""
+      }
+    },
+    "livephoto": {
+      "error": {
+        "invalidVideo": "",
+        "exportFailed": ""
+      },
+      "message": {
+        "exportSuccess": ""
+      }
+    },
+    "logService": {
+      "message": {
+        "opened": "",
+        "exported": ""
+      },
+      "error": {
+        "openDirFailed": "",
+        "zipRequired": "",
+        "emptyArchive": "",
+        "targetNotGenerated": "",
+        "noErrorOutput": "",
+        "tarStartFailed": "",
+        "packageFailed": ""
+      },
+      "log": {
+        "buildDiagnosticFailed": ""
+      }
+    },
+    "thumbnail": {
+      "log": {
+        "forkFailed": "",
+        "readyTimeout": "",
+        "handshakeFailed": "",
+        "markCorruptedCallbackFailed": "",
+        "clearCorruptedCallbackFailed": "",
+        "lowQualityFailed": "",
+        "highQualityFailed": "",
+        "decodeFailed": "",
+        "generateFailed": "",
+        "workerCallFailed": "",
+        "readCacheMetaFailed": "",
+        "cacheMetaCorrupted": "",
+        "deleteCorruptedMetaFailed": "",
+        "saveCacheMetaFailed": "",
+        "cleanTmpFailed": "",
+        "lruCleanFailed": ""
+      },
+      "error": {
+        "workerForkFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerDisposed": "",
+        "sharpResizeFailed": "",
+        "ffmpegFrameTimeout": ""
+      },
+      "kindVideo": "",
+      "kindImage": ""
+    },
+    "xmpMetadata": {
+      "log": {
+        "invalidStructure": "",
+        "parseEditorDataFailed": "",
+        "readInvalidStructure": "",
+        "deserializeFailed": "",
+        "readFailed": ""
+      }
+    },
+    "videoEditor": {
+      "log": {
+        "editStopReceived": "",
+        "readyTimeout": "",
+        "abnormalExit": "",
+        "batchTaskFailed": ""
+      },
+      "error": {
+        "inputPathRequired": "",
+        "outputPathRequired": "",
+        "unsupportedSpeed": "",
+        "cancelledByUser": "",
+        "taskCancelledSkipped": "",
+        "taskCancelled": "",
+        "exportFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerAbnormalExit": "",
+        "taskInProgress": "",
+        "workerDisposed": "",
+        "appExiting": ""
+      },
+      "message": {
+        "progressStart": "",
+        "progressDone": "",
+        "exportSuccess": "",
+        "editCancelled": "",
+        "exportDone": "",
+        "batchCancelled": "",
+        "batchDoneAll": "",
+        "batchDonePartial": ""
+      }
+    },
+    "thumbnailPhash": {
+      "log": {
+        "phashFailed": "",
+        "duplicateMarkFailed": ""
+      }
+    },
+    "videoService": {
+      "log": {
+        "markingCorrupted": "",
+        "markCorruptedCallbackFailed": "",
+        "metadataReadFailed": "",
+        "exportTask": "",
+        "exportFailed": "",
+        "exportDecodeFailed": "",
+        "frameCaptureTask": "",
+        "frameCaptureFailed": "",
+        "frameCaptureDecodeFailed": "",
+        "trimTask": "",
+        "trimFailed": "",
+        "trimDecodeFailed": "",
+        "speedTask": "",
+        "speedFailed": "",
+        "speedDecodeFailed": ""
+      },
+      "error": {
+        "exportFailed": "",
+        "frameCaptureFailed": "",
+        "trimFailed": "",
+        "speedFailed": ""
+      },
+      "message": {
+        "exportSuccess": "",
+        "frameCaptureSuccess": "",
+        "trimSuccess": "",
+        "speedSuccess": ""
+      }
+    },
+    "mediaWorker": {
+      "progress": {
+        "markingDuplicates": ""
+      },
+      "error": {
+        "thumbnailAlreadyRunning": "",
+        "thumbnailStartFailed": "",
+        "phashAlreadyRunning": "",
+        "phashStartFailed": "",
+        "duplicateAlreadyRunning": "",
+        "duplicateStartFailed": "",
+        "similarAlreadyRunning": "",
+        "similarStartFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "thumbnailProcessExit": "",
+        "phashProcessExit": "",
+        "duplicateProcessExit": "",
+        "similarProcessExit": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "thumbnailCancelled": "",
+        "phashCancelled": "",
+        "duplicateCancelled": "",
+        "workerTaskCancelled": "",
+        "workerTaskDone": "",
+        "nothingToGenerate": "",
+        "nothingToPhash": "",
+        "nothingToDetect": "",
+        "batchGenerateFailed": "",
+        "phashBatchFailed": "",
+        "markFailed": ""
+      },
+      "log": {
+        "readyTimeout": "",
+        "restarting": "",
+        "restarted": "",
+        "thumbnailRestored": "",
+        "thumbnailRestoreFailed": "",
+        "phashRestored": "",
+        "phashRestoreFailed": "",
+        "duplicateRestored": "",
+        "duplicateRestoreFailed": "",
+        "similarRestored": "",
+        "similarRestoreFailed": "",
+        "restartFailed": "",
+        "crashListenerFailed": "",
+        "thumbnailBatchFailed": "",
+        "phashBatchFailed": "",
+        "duplicateMarkFailed": "",
+        "duplicateNoGroups": "",
+        "similarFindFailed": "",
+        "similarStartFailed": ""
+      }
+    },
+    "databaseWorker": {
+      "log": {
+        "restarting": "",
+        "restartedWithDb": "",
+        "restartedPendingOpen": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      },
+      "error": {
+        "bridgeDisposed": "",
+        "writeFailed": "",
+        "unknown": "",
+        "autoRestarted": "",
+        "handshakeAborted": "",
+        "requestsAborted": ""
+      }
+    }
+  },
+  "appError": {
+    "canceled": "",
+    "database": "",
+    "fileSystem": "",
+    "internal": "",
+    "fallback": ""
+  },
+  "app": {
+    "log": {
+      "pluginBootstrapFailed": ""
+    }
+  },
+  "mock": {
+    "log": {
+      "skipInstall": ""
+    },
+    "feature": {
+      "fileScan": "",
+      "fileDelete": "",
+      "fileDeletePermanent": "",
+      "fileCopy": "",
+      "fileMove": "",
+      "fileRename": "",
+      "batchRename": "",
+      "fileExport": "",
+      "fileSaveAs": "",
+      "exportWithMetadata": "",
+      "batchExportWithMetadata": "",
+      "watermarkApply": "",
+      "videoExport": "",
+      "videoCaptureFrame": "",
+      "videoTrim": "",
+      "videoSpeed": "",
+      "livePhotoExport": "",
+      "videoEdit": "",
+      "videoEditBatch": "",
+      "clearDatabase": "",
+      "createBackup": "",
+      "restoreBackup": "",
+      "deleteBackup": "",
+      "appRelaunch": "",
+      "decryptFile": "",
+      "encryptCameraParams": "",
+      "decodeClothDiy": "",
+      "decodeHomeBuild": "",
+      "pluginDetail": "",
+      "pluginInstall": "",
+      "pluginUninstall": "",
+      "pluginToggle": "",
+      "wifiShare": ""
+    },
+    "message": {
+      "browserDownloadTriggered": "",
+      "downloadFailed": "",
+      "openLocalPath": "",
+      "showInFolder": "",
+      "unsupportedShort": "",
+      "openDirectory": "",
+      "exportLogs": "",
+      "clearLogs": "",
+      "clearCrashReports": "",
+      "importPreview": "",
+      "importFiles": "",
+      "copyToClipboard": "",
+      "launchExternalApp": "",
+      "phashDone": "",
+      "duplicatesMarked": "",
+      "batchAnalysisUnsupported": "",
+      "softDeleted": "",
+      "restored": "",
+      "permanentDeleted": "",
+      "recycleBinCleared": "",
+      "noMissingFiles": "",
+      "noCorruptedFiles": "",
+      "exportFileUnsupported": "",
+      "importFileUnsupported": "",
+      "noRestartNeeded": "",
+      "videoMetadataUnsupported": ""
+    }
+  },
+  "scanProgress": {
+    "log": {
+      "getActiveFailed": "",
+      "stopFailed": ""
+    },
+    "stopping": "",
+    "scanning": "",
+    "foundFiles": ""
+  },
+  "plugins": {
+    "log": {
+      "facadeNotReady": "",
+      "registerActiveFailed": "",
+      "triggerInitFailed": "",
+      "bootstrapFailed": "",
+      "i18nInjectFailed": ""
+    }
+  },
+  "themes": {
+    "default": "",
+    "softPinkLuxury": ""
+  },
+  "globalErrorHandler": {
+    "log": {
+      "errorEventFailed": "",
+      "rejectionEventFailed": ""
+    }
+  },
+  "scanButton": {
+    "incrementalDesc": "",
+    "full": "",
+    "fullDesc": "",
+    "custom": "",
+    "customDesc": ""
+  },
+  "videoPlayer": {
+    "restoredTo": "",
+    "exitFullscreen": "",
+    "fullscreenPlayback": "",
+    "fullscreen": "",
+    "captureFrame": "",
+    "capture": ""
+  },
+  "searchService": {
+    "log": {
+      "noIpcFallback": "",
+      "schemaHashMismatch": "",
+      "importFailedFallback": "",
+      "initFailedFallback": "",
+      "rebuildFailed": "",
+      "persistDebouncedFailed": "",
+      "docCountMismatch": "",
+      "verifyFailed": ""
+    }
+  },
+  "mediaStore": {
+    "log": {
+      "persistFailed": "",
+      "noElectronApi": "",
+      "mediaListNull": "",
+      "filesEmpty": "",
+      "categoryListNull": "",
+      "categoriesEmpty": "",
+      "fetchError": "",
+      "loadMoreFailed": "",
+      "loadProfilesFailed": "",
+      "loadRecycleBinFailed": "",
+      "loadRecycleBinMoreFailed": ""
+    }
+  },
+  "operationHistory": {
+    "log": {
+      "dbWriteFailed": "",
+      "conflictCheckFailed": "",
+      "dbRemoveFailed": "",
+      "dbClearFailed": "",
+      "dbLoadFailed": ""
+    },
+    "error": {
+      "dbSaveFailedFull": "",
+      "handlerNotRegistered": "",
+      "recordCorrupted": ""
+    }
+  },
+  "updateDialog": {
+    "checking": "",
+    "downloading": "",
+    "downloadingVersion": "",
+    "ariaLabel": "",
+    "foundNewVersion": "",
+    "availablePrompt": "",
+    "later": "",
+    "downloadNow": "",
+    "downloadedTitle": "",
+    "downloadedPrompt": "",
+    "restartLater": "",
+    "installAndRestart": "",
+    "log": {
+      "downloadFailed": "",
+      "installFailed": "",
+      "openOfficialFailed": ""
     }
   }
 }

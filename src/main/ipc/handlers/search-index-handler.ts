@@ -7,6 +7,7 @@ import { wrapHandler, wrapHandlerNoArgs } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
 import { logger } from '../../utils/logger'
+import { t } from '../../i18n'
 
 /**
  * 全文搜索索引供给域 IPC handler
@@ -19,7 +20,7 @@ export function registerSearchIndexHandlers(ctx: HandlerContext): void {
   // 数据库写操作进程拆分：传入 workerBridge 与 dbPath，写方法走独立 utilityProcess
   const getRepo = (): MediaRepository => {
     const db = ctx.dbManager.getDatabase()
-    if (!db) throw AppError.preconditionFailed('数据库未初始化')
+    if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
     return new MediaRepository(db, ctx.dbManager.getWorkerBridge(), ctx.dbManager.getDbPath())
   }
 
@@ -68,7 +69,7 @@ export function registerSearchIndexHandlers(ctx: HandlerContext): void {
                 data: z.string().max(10 * 1024 * 1024) // 单片段 ≤ 10MB
               })
             )
-            .max(50, '索引片段数量超过上限 50'),
+            .max(50, t('main.searchIndex.validation.segmentsMax')),
           // R15：schema_hash 存入 .meta.json，导入时校验字段级变更
           schemaHash: z.string().max(512).optional()
         })
@@ -107,7 +108,7 @@ export function registerSearchIndexHandlers(ctx: HandlerContext): void {
           // 半写入保护：失败时清理残留临时目录，避免下次重建读到损坏片段
           await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {})
           throw AppError.internal(
-            '搜索索引持久化失败',
+            t('main.searchIndex.error.persistFailed'),
             err instanceof Error ? err.message : String(err)
           )
         }
@@ -149,7 +150,7 @@ export function registerSearchIndexHandlers(ctx: HandlerContext): void {
       } catch (err) {
         // 索引目录不存在或读取失败，返回空片段（触发前端重建）
         logger.warn(
-          '[Search] 索引文件读取失败，将触发重建:',
+          t('main.searchIndex.log.importReadFailed'),
           err instanceof Error ? err.message : err
         )
       }

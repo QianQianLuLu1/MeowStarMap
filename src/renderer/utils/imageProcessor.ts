@@ -1,3 +1,5 @@
+import i18n from '../i18n'
+
 export type HSLColorKey =
   | 'red'
   | 'orange'
@@ -522,7 +524,7 @@ export async function processImageData(
   canvas.height = height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new Error('无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用') // TODO: i18n
+  if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
   ctx.drawImage(source, 0, 0, width, height)
 
   let imageData = ctx.getImageData(0, 0, width, height)
@@ -756,7 +758,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
       img.crossOrigin = 'anonymous'
     }
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(`加载图片失败: ${src}`)) // TODO: i18n
+    img.onerror = () => reject(new Error(i18n.t('toast.imageProcessorLoadFailed', { src })))
     img.src = url
   })
 }
@@ -892,7 +894,7 @@ async function applyWatermark(imageData: ImageData, config: WatermarkConfig): Pr
   canvas.height = imageData.height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new Error('无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用') // TODO: i18n
+  if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
   ctx.putImageData(imageData, 0, 0)
 
   const cw = imageData.width
@@ -949,7 +951,7 @@ export async function imageToDataUrl(
   canvas.height = imageData.height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new Error('无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用') // TODO: i18n
+  if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
   ctx.putImageData(imageData, 0, 0)
   return canvas.toDataURL(format, quality)
 }

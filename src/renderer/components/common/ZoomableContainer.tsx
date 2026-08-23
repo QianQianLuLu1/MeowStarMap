@@ -51,7 +51,8 @@ export const ZoomableContainer: React.FC<ZoomableContainerProps> = ({
       }
       onClick()
     },
-    [onClick]
+    // dragStartPos 为 useZoomable 返回的稳定 ref，列入依赖满足 exhaustive-deps
+    [onClick, dragStartPos]
   )
 
   const cursor = scale > 1 ? (dragging ? 'grabbing' : 'grab') : onClick ? 'zoom-in' : 'default'

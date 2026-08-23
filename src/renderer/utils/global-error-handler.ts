@@ -10,6 +10,8 @@
  * 兜底捕获这些错误，并通过 IPC 上报到主进程 faults 日志
  */
 
+import i18n from '../i18n'
+
 let installed = false
 
 /** 安装全局错误监听器（幂等，多次调用安全） */
@@ -32,7 +34,7 @@ export function installGlobalErrorHandler(): void {
       })
     } catch (e) {
       // P2-C18：原 catch {} 完全静默，错误处理器自身失败时无任何线索
-      console.warn('[GlobalErrorHandler] error 事件处理失败:', e)
+      console.warn(i18n.t('globalErrorHandler.log.errorEventFailed'), e)
     }
   })
 
@@ -48,7 +50,7 @@ export function installGlobalErrorHandler(): void {
       })
     } catch (e) {
       // P2-C18：原 catch {} 完全静默，错误处理器自身失败时无任何线索
-      console.warn('[GlobalErrorHandler] unhandledrejection 事件处理失败:', e)
+      console.warn(i18n.t('globalErrorHandler.log.rejectionEventFailed'), e)
     }
   })
 }

@@ -61,11 +61,14 @@ function createMockWorker(): MockWorker {
 }
 
 /** 从 worker 的 postMessage 调用中取最新一条指定类型命令 */
-function sentCommand(worker: MockWorker, type: DecryptionWorkerCommand['type']): any {
+function sentCommand(
+  worker: MockWorker,
+  type: DecryptionWorkerCommand['type']
+): DecryptionWorkerCommand | undefined {
   const calls = worker.postMessage.mock.calls.filter(
     (c) => (c[0] as DecryptionWorkerCommand).type === type
   )
-  return calls.length ? calls[calls.length - 1][0] : undefined
+  return calls.length ? (calls[calls.length - 1][0] as DecryptionWorkerCommand) : undefined
 }
 
 describe('DecryptionWorkerBridge', () => {

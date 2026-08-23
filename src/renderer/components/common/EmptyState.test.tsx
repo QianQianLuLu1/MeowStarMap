@@ -11,7 +11,9 @@ vi.mock('../../utils/motionPresets', () => ({
 }))
 
 vi.mock('./Spinner', () => ({
-  Spinner: (props: any) => <div data-testid="spinner" data-size={props.size} />
+  Spinner: ({ size }: { size?: 'xs' | 'sm' | 'md' | 'lg' }) => (
+    <div data-testid="spinner" data-size={size} />
+  )
 }))
 
 import { EmptyState } from './EmptyState'

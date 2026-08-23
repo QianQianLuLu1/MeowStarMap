@@ -39,26 +39,6 @@ const HIGH_MAX_WIDTH = 512
 const HIGH_MAX_HEIGHT = 512
 const HIGH_QUALITY = 90
 
-// ============ worker log 转发 ============
-
-/**
- * worker 内部日志转发。
- * - info 级别在 worker 内部丢弃（避免跨进程 IPC 开销）
- * - warn / error 级别通过 THUMBNAIL_WORKER_LOG 转发到主进程
- */
-function workerLog(level: 'info' | 'warn' | 'error', message: string, ...args: unknown[]): void {
-  if (level === 'info') return
-  try {
-    const event: ThumbnailWorkerEvent = {
-      type: 'THUMBNAIL_WORKER_LOG',
-      payload: { level, message, args: args.length > 0 ? args : undefined }
-    }
-    process.parentPort?.postMessage(event)
-  } catch {
-    // parentPort 不可用时丢弃日志，避免日志本身导致 worker 崩溃
-  }
-}
-
 /** 发送事件到主进程 */
 function sendEvent(event: ThumbnailWorkerEvent): void {
   try {

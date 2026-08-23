@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMediaStore, refreshMediaAfterScan } from '../../stores/mediaStore'
 import { TaskProgressOverlay } from '../common/TaskProgressOverlay'
 import type { TaskProgress } from '../../../shared/types/progress'
@@ -17,6 +18,7 @@ import type { TaskProgress } from '../../../shared/types/progress'
 // 本浮窗响应的任务类型：scan（扫描）/ indexing（索引伞）/ batch（缩略图）/ duplicate（pHash）
 const ACCEPTED_TASK_TYPES: TaskProgress['taskType'][] = ['scan', 'indexing', 'batch', 'duplicate']
 export const ScanProgress: React.FC = () => {
+  const { t } = useTranslation()
   const scanProgress = useMediaStore((state) => state.scanProgress)
   const setScanProgress = useMediaStore((state) => state.setScanProgress)
   const [stopping, setStopping] = useState(false)
@@ -96,9 +98,9 @@ export const ScanProgress: React.FC = () => {
         if (snapshot.taskId) taskIdRef.current = snapshot.taskId
       })
       .catch((err) => {
-        console.error('[ScanProgress] task.getActive 拉取快照失败:', err)
+        console.error(t('scanProgress.log.getActiveFailed'), err)
       })
-  }, [])
+  }, [t])
 
   // 兜底：监听 scanner:complete，扫描完成后立即刷新媒体列表
   // 正常链路是 scanner:complete → notifyMediaUpdated → media:updated → GalleryPage refresh
@@ -114,7 +116,8 @@ export const ScanProgress: React.FC = () => {
     return () => {
       if (unsubscribe) unsubscribe()
     }
-  }, [refreshMediaAfterScan])
+    // refreshMediaAfterScan 为模块级导入（稳定引用），无需列入依赖数组
+  }, [])
 
   const handleStop = useCallback(async () => {
     if (stopping) return
@@ -132,12 +135,13 @@ export const ScanProgress: React.FC = () => {
       // 取消后重新加载已扫描的数据，统一走 refreshMediaAfterScan 消除重复 DB 读取
       await refreshMediaAfterScan()
     } catch (error) {
-      console.error('停止扫描失败:', error)
+      console.error(t('scanProgress.log.stopFailed'), error)
     } finally {
       setStopping(false)
       setScanProgress({ scanning: false, status: 'completed' })
     }
-  }, [stopping, setScanProgress, refreshMediaAfterScan])
+    // refreshMediaAfterScan 为模块级导入（稳定引用），无需列入依赖数组
+  }, [stopping, setScanProgress, t])
 
   // 解耦显示门控：不再依赖 scanProgress.scanning / status，
   // 直接由 task:progress（scan 或 indexing 活动任务）驱动；无活动任务则不渲染
@@ -152,7 +156,9 @@ export const ScanProgress: React.FC = () => {
     (scanProgress as { total?: number }).total ??
     Math.max(scanProgress.scanned, scanProgress.found, 1)
   const percent = taskProgress?.percent ?? Math.min(100, (scanProgress.scanned / total) * 100)
-  const message = stopping ? '正在停止...' : (taskProgress?.message ?? '正在扫描...')
+  const message = stopping
+    ? t('scanProgress.stopping')
+    : (taskProgress?.message ?? t('scanProgress.scanning'))
 
   // 合成 TaskProgress 传给 Overlay
   const mergedProgress: TaskProgress | null = taskProgress
@@ -196,7 +202,7 @@ export const ScanProgress: React.FC = () => {
       {/* 已找到文件数（优先取 taskProgress.found，回退 scanProgress；仅当有数量时展示） */}
       {(taskProgress.found ?? scanProgress.found) > 0 && (
         <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-          已找到 {taskProgress.found ?? scanProgress.found} 个文件
+          {t('scanProgress.foundFiles', { count: taskProgress.found ?? scanProgress.found })}
         </p>
       )}
     </TaskProgressOverlay>

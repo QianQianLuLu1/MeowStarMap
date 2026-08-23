@@ -51,6 +51,12 @@ import { runFfmpegCommand } from '../utils/ffmpeg-runner'
 import { probeVideoMetadata } from '../utils/video-probe'
 import { assertDiskSpace } from '../utils/disk'
 
+// 从 runFfmpegCommand 签名提取 configure 回调与 ffmpeg 命令类型（避免显式 any）
+type ConfigureFn = Parameters<typeof runFfmpegCommand>[1]
+type FfmpegCmd = Parameters<ConfigureFn>[0]
+// fs.promises.statfs 的返回类型（低磁盘空间 mock 用）
+type StatsFsResult = Awaited<ReturnType<typeof fs.promises.statfs>>
+
 // ============================================================
 // Helpers
 // ============================================================
@@ -63,13 +69,13 @@ let service: VideoService
 beforeEach(() => {
   vi.clearAllMocks()
   // 模拟真实 ffmpeg 行为：源文件不存在时拒绝，存在时成功
-  ;(runFfmpegCommand as any).mockImplementation(async (input: string) => {
+  vi.mocked(runFfmpegCommand).mockImplementation(async (input: string) => {
     if (!fs.existsSync(input)) {
       throw new Error(`Input file not found: ${input}`)
     }
   })
-  ;(assertDiskSpace as any).mockResolvedValue(undefined)
-  ;(probeVideoMetadata as any).mockResolvedValue({
+  vi.mocked(assertDiskSpace).mockResolvedValue(undefined)
+  vi.mocked(probeVideoMetadata).mockResolvedValue({
     width: 1920,
     height: 1080,
     duration: 10,
@@ -92,24 +98,22 @@ afterEach(() => {
 // 模拟 ffmpeg 写入半成品文件后失败，用于验证 cleanup 逻辑
 // 通过调用 configure 提取真实 targetPath，避免与 getUniqueFilePath 冲突逻辑冲突
 function mockFfmpegWritePartialThenFail(errorMsg: string) {
-  ;(runFfmpegCommand as any).mockImplementation(
-    async (_input: string, configure: (cmd: any) => any) => {
-      let outputPath = ''
-      const fakeCmd = {
-        outputOptions: () => fakeCmd,
-        seekInput: () => fakeCmd,
-        frames: () => fakeCmd,
-        duration: () => fakeCmd,
-        output: (p: string) => {
-          outputPath = p
-          return fakeCmd
-        }
+  vi.mocked(runFfmpegCommand).mockImplementation(async (_input: string, configure: ConfigureFn) => {
+    let outputPath = ''
+    const fakeCmd = {
+      outputOptions: () => fakeCmd,
+      seekInput: () => fakeCmd,
+      frames: () => fakeCmd,
+      duration: () => fakeCmd,
+      output: (p: string) => {
+        outputPath = p
+        return fakeCmd
       }
-      configure(fakeCmd)
-      if (outputPath) fs.writeFileSync(outputPath, Buffer.from('partial'))
-      throw new Error(errorMsg)
-    }
-  )
+    } as unknown as FfmpegCmd
+    configure(fakeCmd)
+    if (outputPath) fs.writeFileSync(outputPath, Buffer.from('partial'))
+    throw new Error(errorMsg)
+  })
 }
 
 // ============================================================
@@ -137,7 +141,7 @@ describe('VideoService.getMetadata', () => {
   })
 
   it('probeVideoMetadata 抛错时向上抛出', async () => {
-    ;(probeVideoMetadata as any).mockRejectedValue(new Error('ffprobe failed'))
+    vi.mocked(probeVideoMetadata).mockRejectedValue(new Error('ffprobe failed'))
 
     await expect(service.getMetadata(srcVideo)).rejects.toThrow('ffprobe failed')
   })
@@ -160,14 +164,14 @@ describe('VideoService.exportVideo', () => {
   it('默认 timeoutMs=300000（5 分钟）', async () => {
     await service.exportVideo(srcVideo, outDir, 'mp4')
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
     expect(call[2]).toBe(5 * 60 * 1000)
   })
 
   it('传入自定义 timeoutMs 时透传给 ffmpeg', async () => {
     await service.exportVideo(srcVideo, outDir, 'mp4', 120_000)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
     expect(call[2]).toBe(120_000)
   })
 
@@ -188,7 +192,7 @@ describe('VideoService.exportVideo', () => {
   })
 
   it('磁盘空间不足时返回 success=false 且不调用 ffmpeg', async () => {
-    ;(assertDiskSpace as any).mockRejectedValue(new Error('磁盘空间不足'))
+    vi.mocked(assertDiskSpace).mockRejectedValue(new Error('磁盘空间不足'))
 
     const r = await service.exportVideo(srcVideo, outDir, 'mp4')
 
@@ -212,7 +216,7 @@ describe('VideoService.exportVideo', () => {
   })
 
   it('ffmpeg 抛非 Error 类型时使用 String 转换', async () => {
-    ;(runFfmpegCommand as any).mockRejectedValue('string-error')
+    vi.mocked(runFfmpegCommand).mockRejectedValue('string-error')
 
     const r = await service.exportVideo(srcVideo, outDir, 'mp4')
 
@@ -224,7 +228,7 @@ describe('VideoService.exportVideo', () => {
     const r = await service.exportVideo(srcVideo, outDir, 'gif')
 
     expect(r.success).toBe(true)
-    const call = (runFfmpegCommand as any).mock.calls[0]
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
     // configure 函数接收 cmd 参数；输出路径基于 .gif
     expect(call[1]).toBeTypeOf('function')
   })
@@ -256,7 +260,7 @@ describe('VideoService.captureFrame', () => {
   it('默认 timeoutMs=30000（30 秒）', async () => {
     await service.captureFrame(srcVideo, 1, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
     expect(call[2]).toBe(30_000)
   })
 
@@ -325,7 +329,7 @@ describe('VideoService.trimVideo', () => {
   it('默认 timeoutMs=600000（10 分钟）', async () => {
     await service.trimVideo(srcVideo, 1, 5, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
     expect(call[2]).toBe(10 * 60 * 1000)
   })
 
@@ -366,7 +370,7 @@ describe('VideoService.trimVideo', () => {
       favail: 0,
       type: 0,
       flags: 0
-    } as any)
+    } as unknown as StatsFsResult)
 
     // 源文件大小 > 1 字节，必触发不足
     const r = await service.trimVideo(srcVideo, 1, 5, outDir)
@@ -426,7 +430,7 @@ describe('VideoService.changeSpeed', () => {
   it('默认 timeoutMs=600000（10 分钟）', async () => {
     await service.changeSpeed(srcVideo, 2.0, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
     expect(call[2]).toBe(10 * 60 * 1000)
   })
 
@@ -471,7 +475,7 @@ describe('VideoService.changeSpeed', () => {
       favail: 0,
       type: 0,
       flags: 0
-    } as any)
+    } as unknown as StatsFsResult)
 
     const r = await service.changeSpeed(srcVideo, 1.0, outDir)
 
@@ -497,13 +501,13 @@ describe('VideoService.changeSpeed', () => {
   it('speed=2.0 时 atempo 链为单层 atempo=2', async () => {
     await service.changeSpeed(srcVideo, 2.0, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
-    const configure = call[1] as (cmd: any) => any
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
+    const configure = call[1]
     const fakeCmd = {
       outputOptions: vi.fn().mockReturnThis(),
       output: vi.fn().mockReturnThis()
     }
-    configure(fakeCmd)
+    configure(fakeCmd as unknown as FfmpegCmd)
     // outputOptions 被调用时传入数组 ['-filter:v', setpts, '-filter:a', atempo]
     const optsArg = fakeCmd.outputOptions.mock.calls[0][0]
     expect(optsArg).toContain('-filter:v')
@@ -515,13 +519,13 @@ describe('VideoService.changeSpeed', () => {
   it('speed=4.0 时 atempo 链为 atempo=2,atempo=2（链式分解）', async () => {
     await service.changeSpeed(srcVideo, 4.0, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
-    const configure = call[1] as (cmd: any) => any
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
+    const configure = call[1]
     const fakeCmd = {
       outputOptions: vi.fn().mockReturnThis(),
       output: vi.fn().mockReturnThis()
     }
-    configure(fakeCmd)
+    configure(fakeCmd as unknown as FfmpegCmd)
     const optsArg = fakeCmd.outputOptions.mock.calls[0][0]
     const atempo = optsArg.find((o: string) => o.startsWith('atempo='))
     expect(atempo).toBe('atempo=2,atempo=2')
@@ -530,13 +534,13 @@ describe('VideoService.changeSpeed', () => {
   it('speed=0.5 时 atempo 链为 atempo=0.5（在范围内，单层）', async () => {
     await service.changeSpeed(srcVideo, 0.5, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
-    const configure = call[1] as (cmd: any) => any
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
+    const configure = call[1]
     const fakeCmd = {
       outputOptions: vi.fn().mockReturnThis(),
       output: vi.fn().mockReturnThis()
     }
-    configure(fakeCmd)
+    configure(fakeCmd as unknown as FfmpegCmd)
     const optsArg = fakeCmd.outputOptions.mock.calls[0][0]
     const atempo = optsArg.find((o: string) => o.startsWith('atempo='))
     expect(atempo).toBe('atempo=0.5')
@@ -545,13 +549,13 @@ describe('VideoService.changeSpeed', () => {
   it('speed=0.25 时 atempo 链为 atempo=0.5,atempo=0.5（链式分解）', async () => {
     await service.changeSpeed(srcVideo, 0.25, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
-    const configure = call[1] as (cmd: any) => any
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
+    const configure = call[1]
     const fakeCmd = {
       outputOptions: vi.fn().mockReturnThis(),
       output: vi.fn().mockReturnThis()
     }
-    configure(fakeCmd)
+    configure(fakeCmd as unknown as FfmpegCmd)
     const optsArg = fakeCmd.outputOptions.mock.calls[0][0]
     const atempo = optsArg.find((o: string) => o.startsWith('atempo='))
     expect(atempo).toBe('atempo=0.5,atempo=0.5')
@@ -560,13 +564,13 @@ describe('VideoService.changeSpeed', () => {
   it('speed=1.5 时 atempo 链为单层 atempo=1.5', async () => {
     await service.changeSpeed(srcVideo, 1.5, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
-    const configure = call[1] as (cmd: any) => any
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
+    const configure = call[1]
     const fakeCmd = {
       outputOptions: vi.fn().mockReturnThis(),
       output: vi.fn().mockReturnThis()
     }
-    configure(fakeCmd)
+    configure(fakeCmd as unknown as FfmpegCmd)
     const optsArg = fakeCmd.outputOptions.mock.calls[0][0]
     const atempo = optsArg.find((o: string) => o.startsWith('atempo='))
     expect(atempo).toBe('atempo=1.5')
@@ -575,13 +579,13 @@ describe('VideoService.changeSpeed', () => {
   it('setpts 滤镜按 1/speed 计算（speed=2.0 → 0.5）', async () => {
     await service.changeSpeed(srcVideo, 2.0, outDir)
 
-    const call = (runFfmpegCommand as any).mock.calls[0]
-    const configure = call[1] as (cmd: any) => any
+    const call = vi.mocked(runFfmpegCommand).mock.calls[0]
+    const configure = call[1]
     const fakeCmd = {
       outputOptions: vi.fn().mockReturnThis(),
       output: vi.fn().mockReturnThis()
     }
-    configure(fakeCmd)
+    configure(fakeCmd as unknown as FfmpegCmd)
     const optsArg = fakeCmd.outputOptions.mock.calls[0][0]
     const setpts = optsArg.find((o: string) => o.startsWith('setpts='))
     expect(setpts).toContain('0.5')

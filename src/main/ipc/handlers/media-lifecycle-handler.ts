@@ -127,9 +127,12 @@ async function trashBatch(
     const samples = shown.join(' | ')
     const omitted = outcome.failedPaths.length - shown.length
     logger.warn(
-      // TODO: i18n: internal log
-      `[RecycleBin] 移至系统回收站失败 ${outcome.failedPaths.length}/${rows.length} 项，` +
-        `DB 记录已保留供重试。样例: ${samples}${omitted > 0 ? ` …(另 ${omitted} 项)` : ''}`,
+      t('main.media.log.recycleBinMoveFailed', {
+        failed: outcome.failedPaths.length,
+        total: rows.length,
+        sample: samples,
+        omitted: omitted > 0 ? t('main.media.log.recycleBinMoveOmitted', { count: omitted }) : ''
+      }),
       firstError
     )
   }

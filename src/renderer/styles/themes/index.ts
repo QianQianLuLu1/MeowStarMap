@@ -7,14 +7,15 @@ export type UITheme = 'default' | 'soft-pink-luxury'
 
 export interface ThemeConfig {
   id: UITheme
-  name: string
+  /** i18n key，UI 展示时用 t(nameKey) 解析 */
+  nameKey: string
   /** 作用于 document.documentElement 的 CSS 类名，空字符串表示不附加类 */
   className: string
 }
 
 export const themes: ThemeConfig[] = [
-  { id: 'default', name: '默认简约', className: '' },
-  { id: 'soft-pink-luxury', name: '柔粉轻奢', className: 'soft-pink-luxury' }
+  { id: 'default', nameKey: 'themes.default', className: '' },
+  { id: 'soft-pink-luxury', nameKey: 'themes.softPinkLuxury', className: 'soft-pink-luxury' }
 ]
 
 export const defaultTheme: UITheme = 'default'

@@ -12,7 +12,8 @@ const PRELOAD_LOG_PREFIX = '[preload]'
 
 export const preloadLogger = {
   info: (message: string, ...args: unknown[]): void => {
-    console.log(PRELOAD_LOG_PREFIX, message, ...args)
+    // console.warn 而非 console.log：eslint 护栏禁用调试 console 调用，warn 属放行级别
+    console.warn(PRELOAD_LOG_PREFIX, message, ...args)
   },
   error: (message: string, ...args: unknown[]): void => {
     console.error(PRELOAD_LOG_PREFIX, message, ...args)

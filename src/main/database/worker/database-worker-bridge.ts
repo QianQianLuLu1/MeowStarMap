@@ -26,6 +26,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../../utils/logger'
+import { t } from '../../i18n'
 import { WorkerRestartPolicy, type WorkerCrashInfo } from '../../utils/worker-restart-policy'
 import type { DbWorkerCommand, DbWorkerEvent, DbRunResult, DbStatement } from './worker-protocol'
 
@@ -81,7 +82,7 @@ export class DatabaseWorkerBridge {
    */
   private async ensureWorker(dbPath: string): Promise<void> {
     if (this.isDisposed) {
-      throw new Error('DatabaseWorkerBridge 已 dispose，无法发起写请求')
+      throw new Error(t('main.databaseWorker.error.bridgeDisposed'))
     }
 
     // worker 已存在：检查 dbPath 是否变化
@@ -162,7 +163,12 @@ export class DatabaseWorkerBridge {
           pending.resolve(result ?? { changes: 0, lastInsertRowid: 0 })
         } else {
           pending.reject(
-            new Error(`[DBWorker] 写操作失败: ${message ?? '未知错误'} | SQL: ${pending.sql}`)
+            new Error(
+              t('main.databaseWorker.error.writeFailed', {
+                message: message ?? t('main.databaseWorker.error.unknown'),
+                sql: pending.sql
+              })
+            )
           )
         }
         break
@@ -261,12 +267,12 @@ export class DatabaseWorkerBridge {
     }
 
     const scheduled = this.restartPolicy.scheduleRestart(async () => {
-      logger.info('[DBWorker] 开始自动重启 worker...')
+      logger.info(t('main.databaseWorker.log.restarting'))
       try {
         if (dbPathForRestart) {
           // ensureWorker 会重新 fork worker + 发送 DB_OPEN
           await this.ensureWorker(dbPathForRestart)
-          logger.info('[DBWorker] worker 已重新启动并打开 db')
+          logger.info(t('main.databaseWorker.log.restartedWithDb'))
         } else {
           // 无 dbPath 信息：仅 fork worker，等下次 execute 时再 DB_OPEN
           // FIX(组9-1): 同步维护 reject 句柄，保证该 worker 异常退出时握手也能被 reject
@@ -284,15 +290,19 @@ export class DatabaseWorkerBridge {
           this.worker.on('exit', (code) => {
             this.handleWorkerExit(code)
           })
-          logger.info('[DBWorker] worker 已重新启动（待 DB_OPEN）')
+          logger.info(t('main.databaseWorker.log.restartedPendingOpen'))
         }
-        void logger.fault('workerRestart', new Error('database-worker 已自动重启'), {
-          workerName: 'database-worker',
-          exitCode,
-          restoredDbPath: !!dbPathForRestart
-        })
+        void logger.fault(
+          'workerRestart',
+          new Error(t('main.databaseWorker.error.autoRestarted')),
+          {
+            workerName: 'database-worker',
+            exitCode,
+            restoredDbPath: !!dbPathForRestart
+          }
+        )
       } catch (restartErr) {
-        logger.error('[DBWorker] worker 重启失败:', restartErr)
+        logger.error(t('main.databaseWorker.log.restartFailed'), restartErr)
         void logger.fault('workerRestart', restartErr, {
           workerName: 'database-worker',
           stage: 'restart-failed'
@@ -310,7 +320,7 @@ export class DatabaseWorkerBridge {
       try {
         listener(info)
       } catch (err) {
-        logger.error('[DBWorker] 崩溃监听器执行失败:', err)
+        logger.error(t('main.databaseWorker.log.crashListenerFailed'), err)
       }
     }
   }
@@ -476,12 +486,12 @@ export class DatabaseWorkerBridge {
     this.readyResolve = null
     // FIX(组9-1): dispose 时若握手仍在进行，同样 reject 兜底，避免调用方永久挂起
     if (this.readyReject) {
-      this.failReadyHandshake('[DBWorker] bridge disposed，握手中止')
+      this.failReadyHandshake(t('main.databaseWorker.error.handshakeAborted'))
     }
     this.currentDbPath = null
     // dispose 后所有 pending 请求都不再有可能收到响应，reject 兜底
     if (this.pendingRequests.size > 0) {
-      const err = new Error('[DBWorker] bridge disposed，写请求被中止')
+      const err = new Error(t('main.databaseWorker.error.requestsAborted'))
       for (const [, pending] of this.pendingRequests) {
         try {
           pending.reject(err)

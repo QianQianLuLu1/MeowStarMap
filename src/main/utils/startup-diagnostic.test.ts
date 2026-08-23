@@ -178,7 +178,7 @@ describe('startup-diagnostic', () => {
       mockGetPathImpl = () => {
         throw new Error('app not ready')
       }
-      const { logStartupError, readStartupErrors, getStartupLogPathValue } = await loadModule()
+      const { logStartupError, getStartupLogPathValue } = await loadModule()
       // 即使 getPath 抛错，logStartupError 也不应抛错
       expect(() => logStartupError('fallback', new Error('test'))).not.toThrow()
       const logPath = getStartupLogPathValue()

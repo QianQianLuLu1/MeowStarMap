@@ -272,11 +272,11 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     try {
       crashReporter.start({ uploadToServer: false, compress: true })
       initCrashDir()
-      logger.info('[Crash] crashReporter 已启动，dump 目录: ' + getCrashDirectory()) // TODO: i18n: internal log
+      logger.info(t('main.lifecycle.log.crashReporterStarted', { dir: getCrashDirectory() }))
     } catch (err) {
       logStartupError('crashReporter.start', err)
       try {
-        logger.error('[Crash] crashReporter 启动失败:', err) // TODO: i18n: internal log
+        logger.error(t('main.lifecycle.log.crashReporterFailed'), err)
       } catch {}
     }
 
@@ -293,7 +293,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     } catch (err) {
       logStartupError('backupService.init', err)
       try {
-        logger.error('[Backup] 初始化失败:', err) // TODO: i18n: internal log
+        logger.error(t('main.lifecycle.log.backupInitFailed'), err)
       } catch {}
     }
 
@@ -371,7 +371,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     } catch (err) {
       logStartupError('cleanup', err)
       try {
-        logger?.error?.('[App] 主题/清理修复失败:', err) // TODO: i18n: internal log
+        logger?.error?.(t('main.lifecycle.log.themeCleanupFailed'), err)
       } catch {}
     }
 
@@ -413,7 +413,11 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
                 if (!result.ok) {
                   logStartupError(
                     'startup-integrity-check',
-                    new Error(`后台完整性自检失败: ${result.reason ?? '未知原因'}`) // TODO: i18n: internal diagnostic
+                    new Error(
+                      t('main.lifecycle.log.selfCheckFailed', {
+                        reason: result.reason ?? t('main.lifecycle.log.unknownReason')
+                      })
+                    )
                   )
                 }
               },
@@ -441,7 +445,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
         void ctx.taskScheduler
           .enqueueLow(() => enforceCrashLimit(), { id: 'startup-crash-cleanup' })
           .catch((err) => {
-            logger?.warn?.('[Crash] 清理过期崩溃文件失败:', err) // TODO: i18n: internal log
+            logger?.warn?.(t('main.lifecycle.log.crashCleanFailed'), err)
           })
       }, STARTUP_SCAN_DELAY_MS + 6000)
     )
@@ -467,7 +471,10 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
           forceExitTimeoutMs = 5000
         }
       } catch {}
-      const forceExitReason = forceExitTimeoutMs > 2000 ? 'WAL 文件较大' : '默认' // TODO: i18n: internal diagnostic
+      const forceExitReason =
+        forceExitTimeoutMs > 2000
+          ? t('main.lifecycle.log.forceExitReasonWal')
+          : t('main.lifecycle.log.forceExitReasonDefault')
 
       // P1-8：超时强制退出定时器——清理逻辑超时则 app.exit(1)
       // 用 logStartupError 记录超时诊断信息，便于排查卡死原因
@@ -542,7 +549,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     logStartupError('initialize-fatal', fatalErr)
     try {
       // 尝试用 logger 记录（如果已初始化）
-      if (logger) logger.error('[App] 启动失败:', fatalErr)
+      if (logger) logger.error(t('main.lifecycle.log.startupFailed'), fatalErr)
     } catch {}
 
     // P1-7：用 dialog.showMessageBox 替代 showErrorBox，提供"打开日志目录"操作按钮

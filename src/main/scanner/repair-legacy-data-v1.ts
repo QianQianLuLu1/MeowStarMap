@@ -23,6 +23,7 @@ import {
   extractAlbumTypeFromPath
 } from './path-classifier'
 import { ImportRootRepository, normalizeRootPath } from '../database/import-root-repository'
+import { t } from '../i18n/worker-safe'
 
 type LogLevel = 'info' | 'warn' | 'error'
 
@@ -184,7 +185,7 @@ export function repairLegacyDataV1(
     } catch (markErr) {
       log(
         'warn',
-        '[Scanner] repairLegacyData: 标记迁移状态失败，下次将重复执行:',
+        t('main.scanner.log.markMigrationV1FailedRetry'),
         markErr instanceof Error ? markErr.message : String(markErr)
       )
     }
@@ -193,7 +194,7 @@ export function repairLegacyDataV1(
     // 事务已回滚，三步修改均不生效，下次启动会重新执行（幂等）
     log(
       'error',
-      '[Scanner] repairLegacyData 失败:',
+      t('main.scanner.log.repairV1Failed'),
       err instanceof Error ? err.message : String(err)
     )
     // FIX(组3-4): 返回失败标志，调用方中止后续修复步骤

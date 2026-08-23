@@ -211,7 +211,10 @@ export const SettingsPage: React.FC = () => {
       </h2>
       <div className="flex gap-6 flex-1 min-h-0">
         {/* 左侧导航：二级分类 + 三级页面列表 */}
-        <nav className="w-48 flex-shrink-0 overflow-y-auto" aria-label="设置导航">
+        <nav
+          className="w-48 flex-shrink-0 overflow-y-auto"
+          aria-label={t('settings.navigation.ariaLabel')}
+        >
           <div className="space-y-4">
             {SETTINGS_GROUPS.map((group) => (
               <div key={group.id}>

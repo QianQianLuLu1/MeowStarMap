@@ -3,10 +3,21 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ReactNode } from 'react'
 
 // 隔离 BaseDialog（依赖 useFocusTrap、motion 等）
 vi.mock('./BaseDialog', () => ({
-  BaseDialog: ({ open, onClose, children, ariaLabelledby }: any) =>
+  BaseDialog: ({
+    open,
+    onClose,
+    children,
+    ariaLabelledby
+  }: {
+    open: boolean
+    onClose: () => void
+    children?: ReactNode
+    ariaLabelledby?: string
+  }) =>
     open ? (
       <div role="dialog" aria-labelledby={ariaLabelledby} data-testid="base-dialog">
         <button data-testid="close-trigger" onClick={onClose}>

@@ -4,27 +4,20 @@
  * @coverage dialog 域 IPC handler（selectDirectory / openFile / saveFile / showMessageBox）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AppError } from '../../../shared/errors/app-error'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
 const {
   handleMock,
   showOpenDialogMock,
   showSaveDialogMock,
   showMessageBoxMock,
-  getFocusedWindowMock,
-  assertFileReadPathMock,
-  assertFileWritePathMock,
-  pathGuardRegisterMock
+  getFocusedWindowMock
 } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   showOpenDialogMock: vi.fn(),
   showSaveDialogMock: vi.fn(),
   showMessageBoxMock: vi.fn(),
-  getFocusedWindowMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn(),
-  pathGuardRegisterMock: vi.fn()
+  getFocusedWindowMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -37,47 +30,15 @@ vi.mock('electron', () => ({
   }
 }))
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-    try {
-      const data = await handler()
-      return { success: true as const, data }
-    } catch (e) {
-      if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-      return {
-        success: false as const,
-        error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-      }
-    }
-  }),
-  wrapHandlerRaw: vi.fn(),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock,
-  // selectDirectory 选中目录后需登记路径白名单，mock 必须提供该成员
-  pathGuard: { register: pathGuardRegisterMock }
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerDialogHandlers } from './dialog-handler'
-import { pathGuard } from '../validator'
+import { pathGuard, assertFileReadPath, assertFileWritePath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
+// selectDirectory 选中目录后需登记路径白名单
+const pathGuardRegisterMock = vi.mocked(pathGuard.register)
 
 describe('registerDialogHandlers', () => {
   beforeEach(() => {

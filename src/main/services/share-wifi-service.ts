@@ -15,6 +15,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import { randomInt } from 'node:crypto'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 // P2-A：统一使用 media-constants 的 getMimeType（单一权威来源）
 import { getMimeType } from '../utils/media-constants'
 
@@ -86,7 +87,7 @@ class WifiShareService {
 
     const fileInfos = await this.collectFiles(files)
     if (fileInfos.length === 0) {
-      throw new Error('没有可分享的文件')
+      throw new Error(t('main.share.error.noFilesToShare'))
     }
 
     // P0-C / F-S3：生成 6 位数字 PIN 码（原 4 位强度不足）
@@ -196,7 +197,7 @@ class WifiShareService {
   private handleRequest(req: http.IncomingMessage, res: http.ServerResponse): void {
     if (!this.session) {
       res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' })
-      res.end('服务未启动')
+      res.end(t('main.share.http.serviceNotStarted'))
       return
     }
 
@@ -205,8 +206,8 @@ class WifiShareService {
     const remoteAddr = req.socket.remoteAddress ?? ''
     if (!PRIVATE_IP_REGEX.test(remoteAddr)) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' })
-      res.end('禁止访问：非局域网来源')
-      logger.warn(`[WifiShare] 拒绝非局域网访问：${remoteAddr}`)
+      res.end(t('main.share.http.forbiddenNonLan'))
+      logger.warn(t('main.share.log.rejectedNonLan', { addr: remoteAddr }))
       return
     }
 
@@ -241,7 +242,7 @@ class WifiShareService {
     if (!this.isAuthorized(req)) {
       res.writeHead(401, { 'Content-Type': 'text/html; charset=utf-8' })
       res.end(
-        `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>需要认证</title><style>body{font-family:-apple-system,sans-serif;background:#f5f5f7;color:#1d1d1f;padding:24px;}h1{font-size:20px;margin-bottom:12px;}.card{background:#fff;border-radius:12px;padding:20px;max-width:360px;margin:0 auto;}input{width:100%;padding:12px;font-size:18px;text-align:center;letter-spacing:8px;border:1px solid #d2d2d7;border-radius:8px;box-sizing:border-box;margin:8px 0;}button{width:100%;padding:12px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;}button:active{background:#0051d5;}.err{color:#ff3b30;font-size:13px;margin-top:8px;}</style></head><body><div class="card"><h1>请输入 PIN 码</h1><p style="color:#6e6e73;font-size:13px;margin-bottom:8px;">请向分享者询问 6 位数字 PIN 码</p><form onsubmit="fetch('/auth?pin='+document.getElementById('pin').value).then(r=>r.ok?location.reload():r.text().then(t=>document.getElementById('err').textContent=t)).catch(()=>document.getElementById('err').textContent='网络错误');return false;"><input id="pin" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="6 位数字" autofocus><button type="submit">验证</button><div class="err" id="err"></div></form></div></body></html>`
+        `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${t('main.share.http.authTitle')}</title><style>body{font-family:-apple-system,sans-serif;background:#f5f5f7;color:#1d1d1f;padding:24px;}h1{font-size:20px;margin-bottom:12px;}.card{background:#fff;border-radius:12px;padding:20px;max-width:360px;margin:0 auto;}input{width:100%;padding:12px;font-size:18px;text-align:center;letter-spacing:8px;border:1px solid #d2d2d7;border-radius:8px;box-sizing:border-box;margin:8px 0;}button{width:100%;padding:12px;background:#007aff;color:#fff;border:none;border-radius:8px;font-size:16px;cursor:pointer;}button:active{background:#0051d5;}.err{color:#ff3b30;font-size:13px;margin-top:8px;}</style></head><body><div class="card"><h1>${t('main.share.http.authPrompt')}</h1><p style="color:#6e6e73;font-size:13px;margin-bottom:8px;">${t('main.share.http.authHint')}</p><form onsubmit="fetch('/auth?pin='+document.getElementById('pin').value).then(r=>r.ok?location.reload():r.text().then(t=>document.getElementById('err').textContent=t)).catch(()=>document.getElementById('err').textContent='${t('main.share.http.networkError')}');return false;"><input id="pin" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" placeholder="${t('main.share.http.pinPlaceholder')}" autofocus><button type="submit">${t('main.share.http.authSubmit')}</button><div class="err" id="err"></div></form></div></body></html>`
       )
       return
     }
@@ -256,7 +257,7 @@ class WifiShareService {
       const id = idParam ? parseInt(idParam, 10) : NaN
       if (Number.isNaN(id) || id < 0 || id >= this.session.files.length) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
-        res.end('文件不存在')
+        res.end(t('main.share.http.fileNotFound'))
         return
       }
       this.serveFile(this.session.files[id], req, res)
@@ -269,7 +270,7 @@ class WifiShareService {
       const id = idParam ? parseInt(idParam, 10) : NaN
       if (Number.isNaN(id) || id < 0 || id >= this.session.files.length) {
         res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
-        res.end('文件不存在')
+        res.end(t('main.share.http.fileNotFound'))
         return
       }
       this.serveFile(this.session.files[id], req, res, true)
@@ -277,7 +278,7 @@ class WifiShareService {
     }
 
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
-    res.end('路径不存在')
+    res.end(t('main.share.http.pathNotFound'))
   }
 
   /**
@@ -288,7 +289,7 @@ class WifiShareService {
   private handleAuth(pin: string, res: http.ServerResponse): void {
     if (!this.session) {
       res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' })
-      res.end('服务未启动')
+      res.end(t('main.share.http.serviceNotStarted'))
       return
     }
 
@@ -297,7 +298,7 @@ class WifiShareService {
     if (now < this.lockUntil) {
       const remainSec = Math.ceil((this.lockUntil - now) / 1000)
       res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-      res.end(`尝试次数过多，请 ${remainSec} 秒后再试`)
+      res.end(t('main.share.http.tooManyAttempts', { seconds: String(remainSec) }))
       return
     }
 
@@ -307,13 +308,20 @@ class WifiShareService {
         this.lockUntil = now + LOCK_DURATION_MS
         this.failedAttempts = 0
         logger.warn(
-          `[WifiShare] PIN 失败 ${MAX_FAILED_ATTEMPTS} 次，锁定 ${LOCK_DURATION_MS / 60000} 分钟`
+          t('main.share.log.pinLocked', {
+            count: String(MAX_FAILED_ATTEMPTS),
+            minutes: String(LOCK_DURATION_MS / 60000)
+          })
         )
         res.writeHead(429, { 'Content-Type': 'text/plain; charset=utf-8' })
-        res.end(`PIN 错误次数过多，已锁定 ${LOCK_DURATION_MS / 60000} 分钟`)
+        res.end(t('main.share.http.locked', { minutes: String(LOCK_DURATION_MS / 60000) }))
       } else {
         res.writeHead(401, { 'Content-Type': 'text/plain; charset=utf-8' })
-        res.end(`PIN 码错误，剩余 ${MAX_FAILED_ATTEMPTS - this.failedAttempts} 次机会`)
+        res.end(
+          t('main.share.http.pinWrong', {
+            count: String(MAX_FAILED_ATTEMPTS - this.failedAttempts)
+          })
+        )
       }
       return
     }
@@ -331,8 +339,8 @@ class WifiShareService {
       `auth_token=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${Math.floor(this.session.timeoutMs / 1000)}`
     )
     res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' })
-    res.end('认证成功')
-    logger.info(`[WifiShare] PIN 认证成功，颁发 token：${token.slice(0, 8)}...`)
+    res.end(t('main.share.http.authSuccess'))
+    logger.info(t('main.share.log.authSuccess', { token: token.slice(0, 8) }))
   }
 
   /**

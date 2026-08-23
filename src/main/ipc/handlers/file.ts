@@ -9,6 +9,7 @@ import { moveFile } from '../../utils/file-utils'
 import { chunkArray } from '../../database/sql-chunk'
 // 日志管理
 import { logger } from '../../utils/logger'
+import { t } from '../../i18n'
 
 // A11：单次批量重命名的操作数上限（防止一次请求撑爆磁盘操作与 DB 事务）
 const MAX_BATCH_RENAME_SIZE = 999
@@ -45,7 +46,7 @@ async function syncMediaFilesAfterRename(
   } catch (error) {
     // R2 补偿机制：DB 失败时尝试反向回滚磁盘，回滚失败的项写入 pending_renames
     // 让 startup-tasks.retryPendingRenames 在下次启动时让 DB 接受新路径。
-    logger.error('[File] DB 同步失败，尝试反向回滚磁盘:', error)
+    logger.error(t('main.file.log.dbSyncFailed'), error)
     const stuck: RenameRecord[] = []
     for (const r of renamed) {
       try {
@@ -68,7 +69,7 @@ async function syncMediaFilesAfterRename(
         insertTx(stuck)
         logger.warn(`[File] 反向回滚失败 ${stuck.length} 项，已写入 pending_renames 待启动重试`)
       } catch (recordErr) {
-        logger.error('[File] 写入 pending_renames 补偿表失败:', recordErr)
+        logger.error(t('main.file.log.pendingRenamesRecordFailed'), recordErr)
       }
     }
     throw error // 向上抛，让前端感知失败而非静默成功
@@ -168,8 +169,8 @@ export function registerFileHandlers(ctx: HandlerContext): void {
       z.tuple([
         z
           .array(z.object({ oldPath: schemas.filePath, newName: schemas.shortString(255) }))
-          .min(1, '操作列表为空')
-          .max(MAX_BATCH_RENAME_SIZE, '操作数量超过上限')
+          .min(1, t('main.file.validation.operationsRequired'))
+          .max(MAX_BATCH_RENAME_SIZE, t('main.file.validation.operationsMax'))
       ]),
       async ([operations]) => {
         for (const op of operations) {
@@ -214,7 +215,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
         if (options?.useDefaultDir) {
           const defaultDir = ctx.dbManager.getSetting<string | null>('export.defaultDir', null)
           if (!defaultDir) {
-            throw AppError.preconditionFailed('未配置默认导出路径，请先在设置中配置')
+            throw AppError.preconditionFailed(t('main.file.error.noDefaultExportDir'))
           }
           finalTargetDir = defaultDir
           assertFileWritePath(finalTargetDir)
@@ -256,7 +257,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
             }
           } catch (err) {
             // 元数据查询失败不阻断导出，仅日志记录
-            logger.warn('[file:export] 查询元数据失败，回退到无变量命名:', err)
+            logger.warn(t('main.file.log.exportMetadataFallback'), err)
           }
         }
 
@@ -287,15 +288,15 @@ export function registerFileHandlers(ctx: HandlerContext): void {
       // A-S3：高危操作二次确认（永久删除文件不可恢复）
       const confirmResult = await dialog.showMessageBox({
         type: 'warning',
-        buttons: ['取消', '确认删除'],
+        buttons: [t('main.media.dialog.cancel'), t('main.media.dialog.confirmDelete')],
         defaultId: 0,
         cancelId: 0,
-        title: '确认永久删除',
-        message: `即将永久删除 ${filePaths.length} 个文件，此操作不可恢复。`,
-        detail: '文件将被直接删除（不进入回收站）。是否继续？'
+        title: t('main.file.dialog.permanentDeleteTitle'),
+        message: t('main.file.dialog.permanentDeleteMessage', { count: filePaths.length }),
+        detail: t('main.file.dialog.permanentDeleteDetail')
       })
       if (confirmResult.response !== 1) {
-        throw AppError.canceled('用户取消操作')
+        throw AppError.canceled(t('main.media.error.userCanceled'))
       }
       return ctx.fileService.deletePermanent(filePaths)
     })

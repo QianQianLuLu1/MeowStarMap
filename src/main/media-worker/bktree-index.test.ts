@@ -26,12 +26,6 @@ function makeRow(id: number, phash: string): BkRow {
   }
 }
 
-function randomBinary(len: number): string {
-  let s = ''
-  for (let i = 0; i < len; i++) s += Math.random() < 0.5 ? '0' : '1'
-  return s
-}
-
 function flipBit(hash: string, pos: number): string {
   // pos 限定在 [0, hash.length)，避免外部传越界值
   if (pos < 0 || pos >= hash.length) return hash

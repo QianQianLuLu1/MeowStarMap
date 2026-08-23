@@ -15,15 +15,15 @@ import os from 'os'
 // Mock 声明（hoisted）
 // ============================================================
 
+// sharp composite overlay 形状（与下方 sharpCalls 收集类型一致）
+type SharpOverlay = { input: Buffer; left: number; top: number; blend: string }
+
 // 收集每次 sharp.composite 调用传入的 overlays（含 SVG buffer）
 const sharpCalls: Array<{
   filePath: string
-  compositeOverlays: Array<{ input: Buffer; left: number; top: number; blend: string }>
+  compositeOverlays: SharpOverlay[]
   outputPath: string
 }> = []
-
-// 记录最后一次 sharp(filePath) 调用
-let lastSharpChain: any = null
 
 vi.mock('sharp', () => {
   const factory = vi.fn((filePath: string) => {
@@ -31,13 +31,12 @@ vi.mock('sharp', () => {
       _filePath: filePath,
       _metadata: { width: 800, height: 600 },
       metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-      composite: vi.fn((overlays: any[]) => {
+      composite: vi.fn((overlays: SharpOverlay[]) => {
         sharpCalls.push({
           filePath,
           compositeOverlays: overlays,
           outputPath: ''
         })
-        lastSharpChain = chain
         return chain
       }),
       toFile: vi.fn(async (outputPath: string) => {
@@ -126,8 +125,7 @@ let service: WatermarkService
 beforeEach(() => {
   vi.clearAllMocks()
   sharpCalls.length = 0
-  lastSharpChain = null
-  ;(assertDiskSpace as any).mockResolvedValue(undefined)
+  vi.mocked(assertDiskSpace).mockResolvedValue(undefined)
 
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-watermark-'))
   srcImage = path.join(tmpRoot, 'photo.jpg')
@@ -279,7 +277,7 @@ describe('WatermarkService.applyBatch - 成功路径', () => {
 
 describe('WatermarkService.applyBatch - 异常路径', () => {
   it('磁盘空间不足时返回 success=false', async () => {
-    ;(assertDiskSpace as any).mockRejectedValue(new Error('磁盘空间不足'))
+    vi.mocked(assertDiskSpace).mockRejectedValue(new Error('磁盘空间不足'))
 
     const r = await service.applyBatch(makeBaseConfig(), [srcImage], outDir)
 
@@ -290,7 +288,7 @@ describe('WatermarkService.applyBatch - 异常路径', () => {
   })
 
   it('assertDiskSpace 抛非 Error 类型时使用 String 转换', async () => {
-    ;(assertDiskSpace as any).mockRejectedValue('string-error')
+    vi.mocked(assertDiskSpace).mockRejectedValue('string-error')
 
     const r = await service.applyBatch(makeBaseConfig(), [srcImage], outDir)
 
@@ -304,7 +302,7 @@ describe('WatermarkService.applyBatch - 异常路径', () => {
     const goodFile2 = path.join(tmpRoot, 'good2.jpg')
     for (const f of [goodFile1, badFile, goodFile2]) fs.writeFileSync(f, Buffer.from('content'))
 
-    ;(sharp as any).mockImplementationOnce(() => {
+    vi.mocked(sharp).mockImplementationOnce(() => {
       throw new Error('sharp init failed')
     })
 
@@ -325,13 +323,16 @@ describe('WatermarkService.applyBatch - 异常路径', () => {
     // mockImplementationOnce 只匹配源码每文件首次 sharp 调用（用于 metadata），
     // 而源码每文件第二次 sharp 调用（用于 composite）会回落到默认 mock 正常工作，
     // 故两个文件均处理成功，processed=2
-    ;(sharp as any).mockImplementationOnce(() => ({
-      metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-      composite: vi.fn(() => {
-        throw new Error('composite failed')
-      }),
-      toFile: vi.fn()
-    }))
+    vi.mocked(sharp).mockImplementationOnce(
+      () =>
+        ({
+          metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+          composite: vi.fn(() => {
+            throw new Error('composite failed')
+          }),
+          toFile: vi.fn()
+        }) as unknown as ReturnType<typeof sharp>
+    )
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
@@ -501,7 +502,7 @@ describe('WatermarkService.applyBatch - 文字水印样式', () => {
 
   it('opacity=undefined 时默认 80 → opacity: 0.8', async () => {
     const cfg = makeBaseConfig({
-      text: { ...makeBaseConfig().text!, opacity: undefined as any }
+      text: { ...makeBaseConfig().text!, opacity: undefined as unknown as number }
     })
 
     await service.applyBatch(cfg, [srcImage], outDir)
@@ -682,7 +683,7 @@ describe('WatermarkService.applyBatch - 位置参数', () => {
         width: 100,
         height: 100,
         opacity: 80,
-        blendMode: undefined as any
+        blendMode: undefined as unknown as string
       }
     })
 
@@ -704,8 +705,8 @@ describe('WatermarkService.applyBatch - 图片水印细节', () => {
       text: undefined,
       image: {
         path: watermarkImg,
-        width: undefined as any,
-        height: undefined as any,
+        width: undefined as unknown as number,
+        height: undefined as unknown as number,
         opacity: 80,
         blendMode: 'normal'
       }
@@ -747,7 +748,7 @@ describe('WatermarkService.applyBatch - 图片水印细节', () => {
         path: watermarkImg,
         width: 100,
         height: 100,
-        opacity: undefined as any,
+        opacity: undefined as unknown as number,
         blendMode: 'normal'
       }
     })

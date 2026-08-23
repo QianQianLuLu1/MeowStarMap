@@ -6,6 +6,7 @@ import { logger } from '../utils/logger'
 import { logFault } from '../utils/logger'
 import { logStartupError, diagLog } from '../utils/startup-diagnostic'
 import { markBootSuccess } from './gpu-fallback'
+import { t } from '../i18n'
 
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
 // 单独一处都能被绕过：响应头缺失时靠 meta，HTML 被替换时靠响应头。
@@ -149,7 +150,7 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
         readyTimer = undefined
       }
       if (mainWindow.isDestroyed()) return
-      const reason = '渲染进程 8s 内未上报就绪：疑似白屏（CORS/crossorigin 或模块加载失败）'
+      const reason = t('main.window.reason.rendererNotReady')
       diagLog('WIN', reason)
       logFault('renderer-not-ready', new Error(reason), {
         source: 'createMainWindow.readyTimeout'
@@ -158,12 +159,10 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
       dialog
         .showMessageBox(mainWindow, {
           type: 'error',
-          title: '启动诊断',
-          message: '应用未能正常渲染',
-          detail:
-            `${reason}\n\n已自动打开开发者工具，请查看 Console 中的 CORS / 模块加载报错。` +
-            `\n诊断日志路径：userData/diag.log`,
-          buttons: ['我知道了']
+          title: t('main.window.dialog.diagTitle'),
+          message: t('main.window.dialog.rendererFailed'),
+          detail: t('main.window.dialog.rendererFailedDetail', { reason }),
+          buttons: [t('main.window.dialog.gotIt')]
         })
         .catch(() => {})
     }, 8000)
@@ -197,17 +196,20 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
       source: 'webContents.render-process-gone'
     }).catch(() => {})
     try {
-      logger?.error?.('[Renderer] 渲染进程崩溃:', details)
+      logger?.error?.(t('main.window.log.rendererCrashed'), details)
     } catch {}
 
     // P1-6：弹窗询问用户是否重新加载（崩溃后窗口可能已不可用，需先销毁重建）
     if (!mainWindow || mainWindow.isDestroyed()) return
     const result = await dialog.showMessageBox(mainWindow, {
       type: 'error',
-      title: '页面崩溃',
-      message: '页面已崩溃，需要重新加载',
-      detail: `崩溃原因：${details.reason}\n退出代码：${details.exitCode}\n\n错误详情已记录到日志，建议重新加载页面继续使用。`,
-      buttons: ['重新加载', '关闭应用'],
+      title: t('main.window.dialog.crashTitle'),
+      message: t('main.window.dialog.crashMessage'),
+      detail: t('main.window.dialog.crashDetail', {
+        reason: details.reason,
+        exitCode: details.exitCode
+      }),
+      buttons: [t('main.window.dialog.reload'), t('main.window.dialog.closeApp')],
       defaultId: 0,
       cancelId: 1
     })
@@ -250,7 +252,7 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
 export function getMainWindow(ctx: AppContext): BrowserWindow {
   const win = ctx.mainWindow ?? BrowserWindow.getFocusedWindow()
   if (!win) {
-    throw new Error('主窗口未初始化')
+    throw new Error(t('main.error.mainWindowNotInit'))
   }
   return win
 }

@@ -2,6 +2,7 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
 import { app, shell } from 'electron'
+import { t } from '../i18n'
 
 // T13：崩溃 dump 文件保留份数上限（建议 ≤ 20 份，避免磁盘占用膨胀）
 // P2-2：从 20 调整为 10（够用且节省空间）
@@ -63,15 +64,17 @@ export function setCrashDirectory(dir: string): void {
 /**
  * T13：从崩溃 dump 文件名解析进程类型
  * Electron crashpad 文件名格式通常为 `xxx-<pid>-renderer.dmp` 或 `xxx-<pid>-main.dmp`
+ * 返回稳定 key（main/renderer/gpu/utility/plugin/unknown），UI 层经
+ * diagnostics.crash.processType.* 翻译展示
  */
 function parseProcessType(filename: string): string {
   const lower = filename.toLowerCase()
-  if (lower.includes('renderer')) return '渲染进程'
-  if (lower.includes('main')) return '主进程'
-  if (lower.includes('gpu')) return 'GPU 进程'
-  if (lower.includes('utility')) return '工具进程'
-  if (lower.includes('plugin')) return '插件进程'
-  return '未知进程'
+  if (lower.includes('renderer')) return 'renderer'
+  if (lower.includes('main')) return 'main'
+  if (lower.includes('gpu')) return 'gpu'
+  if (lower.includes('utility')) return 'utility'
+  if (lower.includes('plugin')) return 'plugin'
+  return 'unknown'
 }
 
 /**
@@ -130,9 +133,9 @@ async function parseCrashDump(
       await fd.read(buf, 0, 4, 0)
       // MDMP 签名：0x504D444D（小端序 'P' 'M' 'D' 'M'）
       if (buf.toString('ascii', 0, 4) === 'MDMP') {
-        if (!result.crashReason) result.crashReason = '原生崩溃（Minidump 格式）'
+        if (!result.crashReason) result.crashReason = t('main.crash.message.nativeCrash')
       } else {
-        result.crashReason = '未知崩溃文件格式'
+        result.crashReason = t('main.crash.message.unknownFormat')
       }
     } finally {
       await fd.close()
@@ -218,9 +221,9 @@ export async function openCrashDirectory(): Promise<{ success: boolean; message:
     const result = await shell.openPath(getCrashDirectory())
     // shell.openPath 失败时返回错误字符串，成功时返回空字符串
     if (result) {
-      return { success: false, message: `无法打开目录: ${result}` }
+      return { success: false, message: t('main.crash.error.openDirFailed', { reason: result }) }
     }
-    return { success: true, message: '已打开崩溃目录' }
+    return { success: true, message: t('main.crash.message.opened') }
   } catch (error) {
     return { success: false, message: error instanceof Error ? error.message : String(error) }
   }

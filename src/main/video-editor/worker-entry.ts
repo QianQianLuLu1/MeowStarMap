@@ -14,6 +14,7 @@ import path from 'path'
 import ffmpeg from 'fluent-ffmpeg'
 import { runFfmpegCommand } from '../utils/ffmpeg-runner'
 import { killAllProcesses } from '../utils/process-registry'
+import { t } from '../i18n/worker-safe'
 import { buildColorFilter } from './filter-builder'
 import { buildWatermarkFilter } from './watermark-builder'
 import type { VideoEditTaskPayload } from './worker-protocol'
@@ -133,19 +134,25 @@ function buildAtempoChain(speed: number): string {
  */
 async function processSingleTask(payload: VideoEditTaskPayload): Promise<void> {
   const { task, index, total } = payload
-  const { inputPath, outputPath, params, watermark, trim, speed } = task
+  const { inputPath, outputPath, params, watermark, speed } = task
 
   // 参数校验：输入路径必填
   if (!inputPath || inputPath.length === 0) {
-    throw new Error('输入路径不能为空')
+    throw new Error(t('main.videoEditor.error.inputPathRequired'))
   }
   if (!outputPath || outputPath.length === 0) {
-    throw new Error('输出路径不能为空')
+    throw new Error(t('main.videoEditor.error.outputPathRequired'))
   }
   // 速度范围校验（与 video-service.ts 一致）
   if (speed !== null && speed !== undefined) {
     if (speed < MIN_SPEED || speed > MAX_SPEED) {
-      throw new Error(`不支持的速度 ${speed}x（范围 ${MIN_SPEED}-${MAX_SPEED}）`)
+      throw new Error(
+        t('main.videoEditor.error.unsupportedSpeed', {
+          speed: String(speed),
+          min: String(MIN_SPEED),
+          max: String(MAX_SPEED)
+        })
+      )
     }
   }
 
@@ -208,7 +215,14 @@ async function processSingleTask(payload: VideoEditTaskPayload): Promise<void> {
       : videoFilterParts.join(',')
   }
 
-  emitProgress(index, total, `开始处理 ${index + 1}/${total}`)
+  emitProgress(
+    index,
+    total,
+    t('main.videoEditor.message.progressStart', {
+      current: String(index + 1),
+      total: String(total)
+    })
+  )
 
   try {
     await runFfmpegCommand(
@@ -226,9 +240,16 @@ async function processSingleTask(payload: VideoEditTaskPayload): Promise<void> {
     if (shouldStop) {
       // 用户在 ffmpeg 执行过程中取消：清理部分输出
       await cleanupPartialOutput(outputPath)
-      throw new Error('用户取消任务')
+      throw new Error(t('main.videoEditor.error.cancelledByUser'))
     }
-    emitProgressForce(index + 1, total, `完成 ${index + 1}/${total}`)
+    emitProgressForce(
+      index + 1,
+      total,
+      t('main.videoEditor.message.progressDone', {
+        current: String(index + 1),
+        total: String(total)
+      })
+    )
   } catch (err) {
     // 失败时清理部分输出
     await cleanupPartialOutput(outputPath)
@@ -360,7 +381,7 @@ async function handleEditStart(payload: VideoEditTaskPayload): Promise<void> {
       type: 'EDIT_COMPLETE',
       payload: {
         success: false,
-        message: '任务已取消: 批量取消后跳过排队任务',
+        message: t('main.videoEditor.error.taskCancelledSkipped'),
         index: payload.index
       }
     })
@@ -370,14 +391,16 @@ async function handleEditStart(payload: VideoEditTaskPayload): Promise<void> {
   cancelledTaskId = null
   shouldStop = false
   currentPayload = payload
-  const { index, total, task } = payload
+  const { index, task } = payload
   try {
     await processSingleTask(payload)
     sendEvent({
       type: 'EDIT_COMPLETE',
       payload: {
         success: true,
-        message: `视频导出成功: ${path.basename(task.outputPath)}`,
+        message: t('main.videoEditor.message.exportSuccess', {
+          filename: path.basename(task.outputPath)
+        }),
         index,
         outputPath: task.outputPath
       }
@@ -388,7 +411,9 @@ async function handleEditStart(payload: VideoEditTaskPayload): Promise<void> {
       type: 'EDIT_COMPLETE',
       payload: {
         success: false,
-        message: shouldStop ? `任务已取消: ${message}` : `视频导出失败: ${message}`,
+        message: shouldStop
+          ? t('main.videoEditor.error.taskCancelled', { reason: message })
+          : t('main.videoEditor.error.exportFailed', { reason: message }),
         index
       }
     })
@@ -437,7 +462,7 @@ process.parentPort?.on('message', (event: { data: unknown }) => {
     try {
       activeCommand?.kill('SIGKILL')
     } catch {}
-    workerLog('warn', '收到 EDIT_STOP 指令，已终止当前 ffmpeg 任务')
+    workerLog('warn', t('main.videoEditor.log.editStopReceived'))
   } else if (msg.type === 'EDITOR_DISPOSE') {
     cleanupAndExit()
   }

@@ -3,14 +3,16 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
 
 vi.mock('./BaseDialog', () => ({
-  BaseDialog: ({ open, children }: any) => (open ? <div role="dialog">{children}</div> : null)
+  BaseDialog: ({ open, children }: { open?: boolean; children?: ReactNode }) =>
+    open ? <div role="dialog">{children}</div> : null
 }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: any) => {
+    t: (key: string, opts?: { label?: string }) => {
       if (opts && opts.label) return `${key}:${opts.label}`
       return key
     }
@@ -18,8 +20,16 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconClose: (p: any) => <svg data-testid="icon-close" {...p} />
+  IconClose: (p: ComponentProps<'svg'>) => <svg data-testid="icon-close" {...p} />
 }))
+
+/** electronAPI 测试子集：仅挂 log.exportZip（全局 WindowElectronAPI 的测试子集） */
+type ExportZipFn = () => Promise<unknown>
+const setLogExportAPI = (exportZip: ExportZipFn): void => {
+  ;(window as unknown as { electronAPI: { log: { exportZip: ExportZipFn } } }).electronAPI = {
+    log: { exportZip }
+  }
+}
 
 import { FeedbackDialog } from './FeedbackDialog'
 
@@ -103,7 +113,7 @@ describe('FeedbackDialog', () => {
 
   it('点击导出按钮调用 electronAPI.log.exportZip', async () => {
     const exportZip = vi.fn().mockResolvedValue({ success: true })
-    ;(window as any).electronAPI = { log: { exportZip } }
+    setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     await act(async () => {
@@ -114,7 +124,7 @@ describe('FeedbackDialog', () => {
 
   it('导出成功时显示成功消息', async () => {
     const exportZip = vi.fn().mockResolvedValue({ success: true })
-    ;(window as any).electronAPI = { log: { exportZip } }
+    setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     await act(async () => {
@@ -125,7 +135,7 @@ describe('FeedbackDialog', () => {
 
   it('导出失败时显示失败消息', async () => {
     const exportZip = vi.fn().mockResolvedValue({ success: false, message: '磁盘不足' })
-    ;(window as any).electronAPI = { log: { exportZip } }
+    setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     await act(async () => {
@@ -142,7 +152,7 @@ describe('FeedbackDialog', () => {
           resolveFn = () => resolve({ success: true })
         })
     )
-    ;(window as any).electronAPI = { log: { exportZip } }
+    setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     fireEvent.click(screen.getByText('common.feedbackDialog.exportButton'))
@@ -157,7 +167,7 @@ describe('FeedbackDialog', () => {
 
   it('用户取消保存对话框时不显示错误', async () => {
     const exportZip = vi.fn().mockResolvedValue({ canceled: true })
-    ;(window as any).electronAPI = { log: { exportZip } }
+    setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     await act(async () => {
@@ -168,7 +178,7 @@ describe('FeedbackDialog', () => {
 
   it('导出抛错时显示错误消息', async () => {
     const exportZip = vi.fn().mockRejectedValue(new Error('IPC 断开'))
-    ;(window as any).electronAPI = { log: { exportZip } }
+    setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     await act(async () => {

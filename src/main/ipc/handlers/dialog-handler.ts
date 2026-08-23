@@ -4,6 +4,7 @@ import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, pathGuard } from '../validator'
 import { requireMainWindow } from './_shared'
+import { t } from '../../i18n'
 
 // 对话框 filters 公共 schema
 const dialogFiltersSchema = z
@@ -114,7 +115,7 @@ export function registerDialogHandlers(ctx: HandlerContext): void {
           title: z.string().max(256).optional(),
           message: z
             .string()
-            .min(1, 'message 不能为空')
+            .min(1, t('main.dialog.validation.messageRequired'))
             .max(8 * 1024),
           buttons: z.array(z.string().max(64)).max(16).optional()
         })
@@ -124,7 +125,7 @@ export function registerDialogHandlers(ctx: HandlerContext): void {
           type: options.type || 'info',
           title: options.title,
           message: options.message,
-          buttons: options.buttons || ['确定']
+          buttons: options.buttons || [t('main.dialog.defaultOk')]
         })
         return result.response
       }

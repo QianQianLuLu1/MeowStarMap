@@ -6,7 +6,15 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { ErrorBoundary } from './ErrorBoundary'
 
 vi.mock('./ErrorFallback', () => ({
-  ErrorFallback: ({ error, onRetry, componentStack }: any) => (
+  ErrorFallback: ({
+    error,
+    onRetry,
+    componentStack
+  }: {
+    error: Error
+    onRetry?: () => void
+    componentStack?: string
+  }) => (
     <div data-testid="error-fallback">
       <span data-testid="error-message">{error.message}</span>
       <span data-testid="error-stack">{componentStack || ''}</span>
@@ -16,6 +24,13 @@ vi.mock('./ErrorFallback', () => ({
     </div>
   )
 }))
+
+/** electronAPI 测试子集：仅挂 log.reportRendererError */
+const setReportAPI = (reportRendererError: () => void): void => {
+  ;(
+    window as unknown as { electronAPI: { log: { reportRendererError: () => void } } }
+  ).electronAPI = { log: { reportRendererError } }
+}
 
 const ThrowOnRender: React.FC<{ message?: string }> = ({ message = 'boom' }) => {
   throw new Error(message)
@@ -56,7 +71,7 @@ describe('ErrorBoundary', () => {
   it('抛错时调用 window.electronAPI.log.reportRendererError', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const reportRendererError = vi.fn()
-    ;(window as any).electronAPI = { log: { reportRendererError } }
+    setReportAPI(reportRendererError)
 
     render(
       <ErrorBoundary>
@@ -89,7 +104,8 @@ describe('ErrorBoundary', () => {
 
   it('electronAPI 不可用时不抛错（容错）', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    ;(window as any).electronAPI = undefined
+    // electronAPI 全局类型本身可选，直接置 undefined 即可
+    window.electronAPI = undefined
 
     expect(() =>
       render(
@@ -103,13 +119,9 @@ describe('ErrorBoundary', () => {
 
   it('reportRendererError 抛错时不影响 fallback 渲染', () => {
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    ;(window as any).electronAPI = {
-      log: {
-        reportRendererError: () => {
-          throw new Error('ipc-down')
-        }
-      }
-    }
+    setReportAPI(() => {
+      throw new Error('ipc-down')
+    })
 
     expect(() =>
       render(

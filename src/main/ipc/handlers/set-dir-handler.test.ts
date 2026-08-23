@@ -6,16 +6,13 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 
-const { handleMock, fsMkdirMock, fsWriteFileMock, fsUnlinkMock, assertFileWritePathMock } =
-  vi.hoisted(() => ({
-    handleMock: vi.fn(),
-    fsMkdirMock: vi.fn(),
-    fsWriteFileMock: vi.fn(),
-    fsUnlinkMock: vi.fn(),
-    assertFileWritePathMock: vi.fn()
-  }))
+const { handleMock, fsMkdirMock, fsWriteFileMock, fsUnlinkMock } = vi.hoisted(() => ({
+  handleMock: vi.fn(),
+  fsMkdirMock: vi.fn(),
+  fsWriteFileMock: vi.fn(),
+  fsUnlinkMock: vi.fn()
+}))
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() }
@@ -31,47 +28,8 @@ vi.mock('fs', () => ({
   }
 }))
 
-// mock validator：使用真实 zod schemas 让 z.tuple 构造正常，但 assertFileWritePath 跳过 PathGuard
-vi.mock('../validator', async () => {
-  const zmod = await vi.importActual<typeof import('zod')>('zod')
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  const filePath = zmod.z.string().min(1).max(1024)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    schemas: { filePath },
-    assertFileReadPath: vi.fn(),
-    assertFileWritePath: assertFileWritePathMock
-  }
-})
+// mock validator：让 wrapHandler 透传到 handler，assertFileWritePath 跳过 PathGuard
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 // mock logger
 vi.mock('../../utils/logger', () => ({
@@ -105,6 +63,9 @@ function getHandler(channel: string): (...args: unknown[]) => Promise<unknown> {
 }
 
 import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import { assertFileWritePath } from '../validator'
+
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
 
 describe('registerSetDirHandler', () => {
   beforeEach(() => {

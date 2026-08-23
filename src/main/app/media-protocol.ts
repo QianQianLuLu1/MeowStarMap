@@ -8,6 +8,7 @@ import { MEDIA_EXTENSIONS, getMimeType } from '../utils/media-constants'
 import { MEDIA_CACHE_TTL_MS } from '../utils/constants'
 import { isPathUnderDir } from '../utils/ipc-validate'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 
 // media:// 协议白名单内存缓存（修复 A-S1/C-S2：原实现每次请求都全表扫描）
 // pathCache: 路径 → 是否允许，带 TTL（5分钟）
@@ -43,7 +44,7 @@ export function registerMediaProtocol(ctx: AppContext): void {
       const url = new URL(request.url)
       const encodedPath = url.searchParams.get('path')
       if (!encodedPath) {
-        logger.warn('[Media Protocol] 缺少 path 参数:', request.url)
+        logger.warn(t('main.mediaProtocol.log.missingPathParam'), request.url)
         return new Response('Missing path', { status: 400 })
       }
 
@@ -55,20 +56,20 @@ export function registerMediaProtocol(ctx: AppContext): void {
       const normalizedPath = path.resolve(filePath)
       const realPath = await resolveRealPath(normalizedPath)
       if (realPath === null) {
-        logger.warn('[Media Protocol] realpath 解析失败（文件不存在或无权限）:', filePath)
+        logger.warn(t('main.mediaProtocol.log.realpathFailed'), filePath)
         return new Response('File not found', { status: 404 })
       }
 
       // 路径白名单校验：仅允许访问已索引的媒体文件或已知缩略图
       if (!isMediaPathAllowed(ctx, realPath)) {
-        logger.warn('[Media Protocol] 拒绝访问白名单外文件:', filePath)
+        logger.warn(t('main.mediaProtocol.log.denyNotWhitelisted'), filePath)
         return new Response('Forbidden', { status: 403 })
       }
 
       try {
         await fs.promises.access(realPath, fs.constants.R_OK)
       } catch {
-        logger.warn('[Media Protocol] 文件不存在或无权限:', filePath)
+        logger.warn(t('main.mediaProtocol.log.fileNotFoundOrNoPerm'), filePath)
         return new Response('File not found', { status: 404 })
       }
 
@@ -121,7 +122,7 @@ export function registerMediaProtocol(ctx: AppContext): void {
         }
       })
     } catch (error) {
-      logger.error('[Media Protocol] 处理请求失败:', error)
+      logger.error(t('main.mediaProtocol.log.handleRequestFailed'), error)
       return new Response('Internal error', { status: 500 })
     }
   })
@@ -201,7 +202,7 @@ function createManagedReadStream(
 
   // 'error' 后 autoClose 不一定跑完，显式 destroy 才能保证 fd 归还
   stream.on('error', (error) => {
-    logger.warn('[Media Protocol] 读流异常，已销毁:', filePath, error)
+    logger.warn(t('main.mediaProtocol.log.streamErrorDestroyed'), filePath, error)
     destroy()
   })
 
@@ -303,7 +304,7 @@ export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boole
 
     return allowed
   } catch (error) {
-    logger.error('[Media Protocol] 白名单校验失败:', error)
+    logger.error(t('main.mediaProtocol.log.whitelistCheckFailed'), error)
     return false
   }
 }

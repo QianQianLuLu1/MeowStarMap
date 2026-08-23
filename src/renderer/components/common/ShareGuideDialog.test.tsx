@@ -3,9 +3,18 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { ComponentProps, ReactNode } from 'react'
 
 vi.mock('./BaseDialog', () => ({
-  BaseDialog: ({ open, children, onClose }: any) =>
+  BaseDialog: ({
+    open,
+    children,
+    onClose
+  }: {
+    open?: boolean
+    children?: ReactNode
+    onClose?: () => void
+  }) =>
     open ? (
       <div role="dialog" data-testid="base-dialog">
         <button data-testid="close-btn" onClick={onClose}>
@@ -18,7 +27,7 @@ vi.mock('./BaseDialog', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: any) => {
+    t: (key: string, opts?: { name?: string }) => {
       // share.guide.channels.xxx 直接返回渠道 id，便于后续拼接
       if (key.startsWith('share.guide.channels.')) return key.split('.').pop() as string
       if (opts && opts.name) return `${key}:${opts.name}`
@@ -28,10 +37,17 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconWeChat: (p: any) => <svg data-testid="icon-wechat" {...p} />,
-  IconQQ: (p: any) => <svg data-testid="icon-qq" {...p} />,
-  IconVivo: (p: any) => <svg data-testid="icon-vivo" {...p} />
+  IconWeChat: (p: ComponentProps<'svg'>) => <svg data-testid="icon-wechat" {...p} />,
+  IconQQ: (p: ComponentProps<'svg'>) => <svg data-testid="icon-qq" {...p} />,
+  IconVivo: (p: ComponentProps<'svg'>) => <svg data-testid="icon-vivo" {...p} />
 }))
+
+/** electronAPI 测试子集：仅挂 share.launchApp */
+const setShareAPI = (launchApp: ReturnType<typeof vi.fn>): void => {
+  ;(
+    window as unknown as { electronAPI: { share: { launchApp: ReturnType<typeof vi.fn> } } }
+  ).electronAPI = { share: { launchApp } }
+}
 
 import { ShareGuideDialog } from './ShareGuideDialog'
 
@@ -247,7 +263,7 @@ describe('ShareGuideDialog', () => {
 
   it('点击"打开"按钮调用 electronAPI.share.launchApp', async () => {
     const launchApp = vi.fn().mockResolvedValue({ success: true })
-    ;(window as any).electronAPI = { share: { launchApp } }
+    setShareAPI(launchApp)
 
     render(
       <ShareGuideDialog
@@ -267,7 +283,7 @@ describe('ShareGuideDialog', () => {
 
   it('launchApp 返回 success=true 时显示成功消息', async () => {
     const launchApp = vi.fn().mockResolvedValue({ success: true })
-    ;(window as any).electronAPI = { share: { launchApp } }
+    setShareAPI(launchApp)
 
     render(
       <ShareGuideDialog
@@ -284,7 +300,7 @@ describe('ShareGuideDialog', () => {
 
   it('launchApp 抛错时显示失败消息', async () => {
     const launchApp = vi.fn().mockRejectedValue(new Error('boom'))
-    ;(window as any).electronAPI = { share: { launchApp } }
+    setShareAPI(launchApp)
 
     render(
       <ShareGuideDialog

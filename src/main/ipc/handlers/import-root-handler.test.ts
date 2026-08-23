@@ -207,6 +207,8 @@ describe('registerImportRootHandlers', () => {
       .spyOn(ImportRootRepository.prototype, 'removeImportRoot')
       .mockResolvedValue(undefined)
     const softSpy = vi.spyOn(MediaRepository.prototype, 'softDeleteByRootPath').mockResolvedValue(0)
+    // mock 本身即为该测试所需（避免真实调用），不额外断言调用次数
+    void softSpy
     registerImportRootHandlers(makeCtx({}))
     const result = (await getHandler(handleMock, 'import:removeRoot')(['C:/ghost', true])) as {
       success: true

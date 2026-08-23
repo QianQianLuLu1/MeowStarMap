@@ -5,6 +5,7 @@ import { wrapHandler, wrapHandlerRaw, assertFileReadPath } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { RENDERER_PREF_KEYS, SECURITY_SENSITIVE_KEYS } from '../../../shared/settings-keys'
 import { writeHardwareAccelPref } from '../../app/gpu-fallback'
+import { t } from '../../i18n'
 
 // 与设置页 MAX_CUSTOM_PATHS / scanner:start schema 保持一致
 const MAX_CUSTOM_SCAN_PATHS = 64
@@ -17,13 +18,15 @@ const MAX_CUSTOM_SCAN_PATHS = 64
  * 故写入时逐条读校验，阻止渲染进程直接注入任意路径绕过 scanner:start 的校验。
  */
 function assertCustomScanPaths(value: unknown): void {
-  if (!Array.isArray(value)) throw AppError.validation('customScanPaths 必须是字符串数组')
+  if (!Array.isArray(value)) throw AppError.validation(t('main.settings.error.customPathsNotArray'))
   if (value.length > MAX_CUSTOM_SCAN_PATHS) {
-    throw AppError.validation(`自定义扫描路径数量上限 ${MAX_CUSTOM_SCAN_PATHS}`)
+    throw AppError.validation(
+      t('main.settings.error.customPathsMax', { max: MAX_CUSTOM_SCAN_PATHS })
+    )
   }
   for (const p of value) {
     if (typeof p !== 'string' || p.length === 0) {
-      throw AppError.validation('customScanPaths 存在空或非字符串项')
+      throw AppError.validation(t('main.settings.error.customPathsEmptyItem'))
     }
     assertFileReadPath(p)
   }
@@ -42,13 +45,18 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
     wrapHandlerRaw<unknown>(ctx, async (args, ctx) => {
       const parsed = z
         .tuple([
-          z.string().min(1, 'key 不能为空').max(128, 'key 长度上限 128'),
+          z
+            .string()
+            .min(1, t('main.settings.validation.keyRequired'))
+            .max(128, t('main.settings.validation.keyMaxLength')),
           z.unknown().optional()
         ])
         .safeParse(args)
       if (!parsed.success) {
         throw AppError.validation(
-          `参数校验失败: ${parsed.error.issues.map((i) => i.message).join('; ')}`
+          t('main.settings.error.validationFailed', {
+            reason: parsed.error.issues.map((i) => i.message).join('; ')
+          })
         )
       }
       const [key, defaultValue] = parsed.data
@@ -60,17 +68,23 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
     'settings:set',
     wrapHandler(
       ctx,
-      z.tuple([z.string().min(1, 'key 不能为空').max(128, 'key 长度上限 128'), z.unknown()]),
+      z.tuple([
+        z
+          .string()
+          .min(1, t('main.settings.validation.keyRequired'))
+          .max(128, t('main.settings.validation.keyMaxLength')),
+        z.unknown()
+      ]),
       async ([key, value]) => {
         // P1-D：校验 value 大小，防止恶意/异常调用写入超大 JSON
         try {
           const valueStr = JSON.stringify(value)
           if (valueStr.length > 1024 * 1024) {
-            throw AppError.validation('设置值过大（上限 1MB）')
+            throw AppError.validation(t('main.settings.error.valueTooLarge'))
           }
         } catch (err) {
           if (err instanceof AppError) throw err
-          throw AppError.validation('设置值无法序列化')
+          throw AppError.validation(t('main.settings.error.valueNotSerializable'))
         }
         // customScanPaths 走内联校验放行（方案 A：维持现状，不迁专用通道）
         if (key === 'customScanPaths') {
@@ -81,7 +95,7 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
         // hardwareAcceleration 走内联布尔校验，并双写启动期可同步读取的偏好镜像
         if (key === 'hardwareAcceleration') {
           if (typeof value !== 'boolean') {
-            throw AppError.validation('hardwareAcceleration 必须是布尔值')
+            throw AppError.validation(t('main.settings.error.hwAccelNotBoolean'))
           }
           ctx.dbManager.setSetting(key, value)
           writeHardwareAccelPref(value)
@@ -91,9 +105,11 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
         if (!(RENDERER_PREF_KEYS as readonly string[]).includes(key)) {
           const channel = (SECURITY_SENSITIVE_KEYS as Record<string, string>)[key]
           if (channel) {
-            throw AppError.validation(`key "${key}" 为安全敏感项，请改用通道：${channel}`)
+            throw AppError.validation(
+              t('main.settings.error.securitySensitiveKey', { key, channel })
+            )
           }
-          throw AppError.validation(`未知的设置项 key：${key}`)
+          throw AppError.validation(t('main.settings.error.unknownKey', { key }))
         }
         ctx.dbManager.setSetting(key, value)
         return { saved: true }

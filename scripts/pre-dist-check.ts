@@ -391,7 +391,11 @@ function unpackedCovers(unpack: unknown, mod: string): boolean {
 
 function checkNativeAbiConsistency(): void {
   const pkgPath = path.join(ROOT, 'package.json')
-  let pkg: any
+  let pkg: {
+    devDependencies?: Record<string, string>
+    dependencies?: Record<string, string>
+    build?: { npmRebuild?: boolean; asarUnpack?: unknown[] }
+  }
   try {
     pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
   } catch {

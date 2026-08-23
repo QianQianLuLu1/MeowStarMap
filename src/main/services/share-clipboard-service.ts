@@ -162,8 +162,9 @@ const DETECTION_CONFIGS: Record<string, ChannelDetectionConfig> = {
         exeNames: ['WeChat.exe']
       }
     ],
-    uninstallKeywords: ['Weixin', '微信', 'WeChat'], // TODO: i18n - registry matching keywords (must remain Chinese for DisplayName matching)
-    uninstallExcludeKeywords: ['WeChatMeet', '会议', 'WeMeet', 'QQPCMgr'], // TODO: i18n - registry matching keywords
+    // 关键字保留中文（有意）：用于注册表 DisplayName 匹配（非 UI 文案，翻译会导致检测失效）
+    uninstallKeywords: ['Weixin', '微信', 'WeChat'], // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
+    uninstallExcludeKeywords: ['WeChatMeet', '会议', 'WeMeet', 'QQPCMgr'], // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
     candidateExes: ['Weixin.exe', 'WeChat.exe'],
     commonDirs: [
       '%PROGRAMFILES%\\Tencent\\Weixin',
@@ -228,17 +229,18 @@ const DETECTION_CONFIGS: Record<string, ChannelDetectionConfig> = {
         exeNames: ['Bin\\QQ.exe', 'QQ.exe']
       }
     ],
-    uninstallKeywords: ['QQNT', 'QQ NT', 'QQ9', '腾讯QQ'], // TODO: i18n - registry matching keywords
+    // 关键字保留中文（有意）：用于注册表 DisplayName 匹配（非 UI 文案，翻译会导致检测失效）
+    uninstallKeywords: ['QQNT', 'QQ NT', 'QQ9', '腾讯QQ'], // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
     uninstallExcludeKeywords: [
-      // TODO: i18n - registry matching keywords
+      // 同上：注册表 DisplayName 排除匹配关键字，非 UI 文案
       'QQPCMgr',
-      '电脑管家',
+      '电脑管家', // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
       'QQBrowser',
-      '浏览器',
+      '浏览器', // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
       'QQMusic',
-      '音乐',
+      '音乐', // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
       'QQVideo',
-      '腾讯视频',
+      '腾讯视频', // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
       'Tim'
     ],
     candidateExes: ['QQ.exe', 'Bin\\QQ.exe'],
@@ -260,8 +262,9 @@ const DETECTION_CONFIGS: Record<string, ChannelDetectionConfig> = {
   vivo: {
     // vivo 办公套件：无固定注册表路径，依赖卸载项 + 常见目录
     regQueries: [],
-    uninstallKeywords: ['vivo办公', 'vivo 办公', 'vivooffice', 'vivo-office', 'VivoClient'], // TODO: i18n - registry matching keywords
-    uninstallExcludeKeywords: ['vivo手机助手', 'vivo Assistant', 'vivo Assistant'], // TODO: i18n - registry matching keywords
+    // 关键字保留中文（有意）：用于注册表 DisplayName 匹配（非 UI 文案，翻译会导致检测失效）
+    uninstallKeywords: ['vivo办公', 'vivo 办公', 'vivooffice', 'vivo-office', 'VivoClient'], // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
+    uninstallExcludeKeywords: ['vivo手机助手', 'vivo Assistant', 'vivo Assistant'], // eslint-disable-line no-restricted-syntax -- 注册表匹配关键字，非 UI 文案
     candidateExes: ['vivooffice.exe', 'vivo-office.exe', 'VivoClient.exe', 'vivo.exe'],
     commonDirs: [
       '%PROGRAMFILES%\\vivo\\vivooffice',
@@ -373,7 +376,7 @@ export async function copyFilesToClipboard(
       }
     }
     clipboard.writeBuffer('CF_HDROP', buf)
-    logger.info(`[ShareClipboard] 已复制 ${valid.length} 个文件到剪贴板（跳过 ${skipped} 个）`) // TODO: i18n: internal log
+    logger.info(t('share.log.copiedToClipboard', { count: valid.length, skipped }))
     return {
       success: true,
       count: valid.length,
@@ -384,7 +387,7 @@ export async function copyFilesToClipboard(
           : t('share.message.copiedToClipboard', { count: valid.length })
     }
   } catch (err) {
-    logger.error('[ShareClipboard] 复制失败:', err) // TODO: i18n: internal log
+    logger.error(t('share.log.copyFailed'), err)
     return {
       success: false,
       count: 0,
@@ -770,7 +773,7 @@ async function detectInstalled(
       }
     }
   } catch (err) {
-    logger.warn(`[ShareClipboard] 检测 ${channelId} 安装路径失败:`, err) // TODO: i18n: internal log
+    logger.warn(t('share.log.detectInstallPathFailed', { channelId }), err)
   }
 
   installPathCache[channelId] = {
@@ -779,6 +782,10 @@ async function detectInstalled(
   }
   return { installed: !!installPath, installPath }
 }
+
+// tasklist 中文系统在"无匹配"时输出的提示文本（匹配系统输出，非 UI 文案，有意保留中文）
+// eslint-disable-next-line no-restricted-syntax -- 匹配中文系统 tasklist 的"无任务"输出，非 UI 文案
+const TASKLIST_NO_TASK_ZH_HINT = '没有运行'
 
 /**
  * 检测应用进程是否正在运行
@@ -798,10 +805,12 @@ function detectRunning(processName: string): Promise<boolean> {
       { timeout: 3000, windowsHide: true },
       (err, stdout) => {
         if (err) {
-          // tasklist 在"无匹配"时也可能返回非零退出码
-          // 通过 stdout 判断
-          if (stdout && !stdout.includes('No tasks') && !stdout.includes('没有运行')) {
-            // TODO: i18n - tasklist output matching
+          // tasklist 在"无匹配"时也可能返回非零退出码，通过 stdout 判断
+          if (
+            stdout &&
+            !stdout.includes('No tasks') &&
+            !stdout.includes(TASKLIST_NO_TASK_ZH_HINT)
+          ) {
             // 输出非空且非"无任务"提示，按 CSV 解析
           } else {
             resolve(false)
@@ -865,13 +874,13 @@ export async function launchApp(channelId: string): Promise<{ success: boolean; 
       { timeout: 3000, windowsHide: true },
       (err) => {
         if (err) {
-          logger.error(`[ShareClipboard] 启动 ${channelId} 失败:`, err) // TODO: i18n: internal log
+          logger.error(t('share.log.launchFailed', { channelId }), err)
           resolve({
             success: false,
             message: t('share.message.launchFailed', { reason: err.message })
           })
         } else {
-          logger.info(`[ShareClipboard] 已启动 ${channelId}: ${installPath}`) // TODO: i18n: internal log
+          logger.info(t('share.log.launched', { channelId, installPath }))
           resolve({ success: true, message: t('share.message.launched') })
         }
       }

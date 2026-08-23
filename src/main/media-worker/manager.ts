@@ -5,6 +5,7 @@ import type { ThumbnailQuality } from './worker-protocol'
 import { ProgressThrottle } from '../utils/progress-throttle'
 import { EtaCalculator } from '../utils/eta-calculator'
 import { taskRegistry } from '../utils/task-registry'
+import { t } from '../i18n'
 import type { TaskProgress, TaskType } from '../../shared/types/progress'
 import type { SimilarRowMeta } from './worker-protocol'
 import type { SimilarCandidate } from './bktree-index'
@@ -185,7 +186,7 @@ export class MediaWorkerManager extends EventEmitter {
             'duplicate',
             event.payload.compared,
             event.payload.totalPairs,
-            '标记重复文件中'
+            t('main.mediaWorker.progress.markingDuplicates')
           )
           break
         case 'DUPLICATE_COMPLETE':
@@ -372,16 +373,29 @@ export class MediaWorkerManager extends EventEmitter {
     thumbnailQuality?: ThumbnailQuality
   }): Promise<{ success: boolean; message: string; processed: number; total: number }> {
     if (this.isThumbnailRunning) {
-      return { success: false, message: '缩略图批量生成已在进行中', processed: 0, total: 0 }
+      return {
+        success: false,
+        message: t('main.mediaWorker.error.thumbnailAlreadyRunning'),
+        processed: 0,
+        total: 0
+      }
     }
     if (!this.dbPath) {
-      return { success: false, message: '数据库路径未初始化', processed: 0, total: 0 }
+      return {
+        success: false,
+        message: t('main.scanner.error.dbPathNotInitialized'),
+        processed: 0,
+        total: 0
+      }
     }
 
     this.isThumbnailRunning = true
     // 性能重构 v3：注册到 TaskRegistry，支持 task:cancel 取消
-    this.registerTask(this.thumbnailRuntime, 'batch', '缩略图生成已取消', () =>
-      this.bridge.stopThumbnailBatch()
+    this.registerTask(
+      this.thumbnailRuntime,
+      'batch',
+      t('main.mediaWorker.message.thumbnailCancelled'),
+      () => this.bridge.stopThumbnailBatch()
     )
 
     // 发送任务，等待 THUMBNAIL_COMPLETE
@@ -397,9 +411,9 @@ export class MediaWorkerManager extends EventEmitter {
             this.isThumbnailRunning = false
             r({
               success: false,
-              message: `缩略图批量生成启动失败: ${
-                err instanceof Error ? err.message : String(err)
-              }`,
+              message: t('main.mediaWorker.error.thumbnailStartFailed', {
+                reason: err instanceof Error ? err.message : String(err)
+              }),
               processed: 0,
               total: 0
             })
@@ -428,19 +442,27 @@ export class MediaWorkerManager extends EventEmitter {
     if (this.isPhashRunning) {
       return {
         success: false,
-        message: 'pHash 批量补算已在进行中',
+        message: t('main.mediaWorker.error.phashAlreadyRunning'),
         processed: 0,
         total: 0
       }
     }
     if (!this.dbPath) {
-      return { success: false, message: '数据库路径未初始化', processed: 0, total: 0 }
+      return {
+        success: false,
+        message: t('main.scanner.error.dbPathNotInitialized'),
+        processed: 0,
+        total: 0
+      }
     }
 
     this.isPhashRunning = true
     // 性能重构 v3：注册到 TaskRegistry
-    this.registerTask(this.phashRuntime, 'duplicate', 'pHash 补算已取消', () =>
-      this.bridge.stopPhashBatch()
+    this.registerTask(
+      this.phashRuntime,
+      'duplicate',
+      t('main.mediaWorker.message.phashCancelled'),
+      () => this.bridge.stopPhashBatch()
     )
 
     return new Promise((resolve) => {
@@ -452,7 +474,9 @@ export class MediaWorkerManager extends EventEmitter {
           this.isPhashRunning = false
           r({
             success: false,
-            message: `pHash 批量补算启动失败: ${err instanceof Error ? err.message : String(err)}`,
+            message: t('main.mediaWorker.error.phashStartFailed', {
+              reason: err instanceof Error ? err.message : String(err)
+            }),
             processed: 0,
             total: 0
           })
@@ -479,7 +503,7 @@ export class MediaWorkerManager extends EventEmitter {
     if (this.isDuplicateRunning) {
       return {
         success: false,
-        message: '重复标记已在进行中',
+        message: t('main.mediaWorker.error.duplicateAlreadyRunning'),
         markedDuplicates: 0,
         totalGroups: 0
       }
@@ -487,7 +511,7 @@ export class MediaWorkerManager extends EventEmitter {
     if (!this.dbPath) {
       return {
         success: false,
-        message: '数据库路径未初始化',
+        message: t('main.scanner.error.dbPathNotInitialized'),
         markedDuplicates: 0,
         totalGroups: 0
       }
@@ -495,8 +519,11 @@ export class MediaWorkerManager extends EventEmitter {
 
     this.isDuplicateRunning = true
     // 性能重构 v3：注册到 TaskRegistry
-    this.registerTask(this.duplicateRuntime, 'duplicate', '重复标记已取消', () =>
-      this.bridge.stopDuplicateMark()
+    this.registerTask(
+      this.duplicateRuntime,
+      'duplicate',
+      t('main.mediaWorker.message.duplicateCancelled'),
+      () => this.bridge.stopDuplicateMark()
     )
 
     return new Promise((resolve) => {
@@ -508,7 +535,9 @@ export class MediaWorkerManager extends EventEmitter {
           this.isDuplicateRunning = false
           r({
             success: false,
-            message: `重复标记启动失败: ${err instanceof Error ? err.message : String(err)}`,
+            message: t('main.mediaWorker.error.duplicateStartFailed', {
+              reason: err instanceof Error ? err.message : String(err)
+            }),
             markedDuplicates: 0,
             totalGroups: 0
           })
@@ -537,7 +566,7 @@ export class MediaWorkerManager extends EventEmitter {
     if (this.isSimilarRunning) {
       return {
         success: false,
-        message: '相似检测已在进行中',
+        message: t('main.mediaWorker.error.similarAlreadyRunning'),
         cancelled: false,
         rows: [],
         candidates: []
@@ -546,7 +575,7 @@ export class MediaWorkerManager extends EventEmitter {
     if (!this.dbPath) {
       return {
         success: false,
-        message: '数据库路径未初始化',
+        message: t('main.scanner.error.dbPathNotInitialized'),
         cancelled: false,
         rows: [],
         candidates: []
@@ -554,7 +583,7 @@ export class MediaWorkerManager extends EventEmitter {
     }
     this.isSimilarRunning = true
     // 性能重构 v3：注册到 TaskRegistry，支持 task:cancel 取消
-    this.registerTask(this.similarRuntime, 'duplicate', '相似检测已取消', () =>
+    this.registerTask(this.similarRuntime, 'duplicate', t('duplicates.task.similarCancelled'), () =>
       this.bridge.stopSimilarFind()
     )
 
@@ -569,7 +598,9 @@ export class MediaWorkerManager extends EventEmitter {
           this.isSimilarRunning = false
           r({
             success: false,
-            message: `相似检测启动失败: ${err instanceof Error ? err.message : String(err)}`,
+            message: t('main.mediaWorker.error.similarStartFailed', {
+              reason: err instanceof Error ? err.message : String(err)
+            }),
             cancelled: false,
             rows: [],
             candidates: []

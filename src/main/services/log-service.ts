@@ -4,6 +4,7 @@ import { spawn } from 'child_process'
 import { shell } from 'electron'
 import { logger, FaultRecord, getLogDirectory } from '../utils/logger'
 import { trackProcess } from '../utils/process-registry'
+import { t } from '../i18n'
 
 // 读取所有故障记录（按时间倒序）
 // 业务决策：从所有 faults-*.jsonl 文件读取，文件名按日期倒序遍历
@@ -124,9 +125,9 @@ export async function openLogDirectory(): Promise<{ success: boolean; message: s
     const result = await shell.openPath(getLogDirectory())
     // openPath 在失败时返回错误字符串，成功时返回空字符串
     if (result === '') {
-      return { success: true, message: '已打开日志目录' }
+      return { success: true, message: t('main.logService.message.opened') }
     }
-    return { success: false, message: `打开目录失败: ${result}` }
+    return { success: false, message: t('main.logService.error.openDirFailed', { reason: result }) }
   } catch (err) {
     return { success: false, message: err instanceof Error ? err.message : String(err) }
   }
@@ -147,7 +148,7 @@ export async function exportLogsAsZip(
 
   // 安全校验：目标路径必须是 .zip 扩展名
   if (!targetPath.toLowerCase().endsWith('.zip')) {
-    return { success: false, message: '目标路径必须是 .zip 文件' }
+    return { success: false, message: t('main.logService.error.zipRequired') }
   }
 
   // P1-4：构建临时诊断目录，整合 logs + crashes + startup-errors.log + system-info.json
@@ -213,7 +214,7 @@ export async function exportLogsAsZip(
     )
   } catch (err) {
     // 临时目录构建失败时回退到仅打包 logs 目录
-    logger.error('[Log] 构建诊断包失败，回退到仅打包 logs:', err)
+    logger.error(t('main.logService.log.buildDiagnosticFailed'), err)
   }
 
   return new Promise((resolve) => {
@@ -244,7 +245,10 @@ export async function exportLogsAsZip(
 
     child.on('error', (err) => {
       cleanupTmpDir(tmpDir)
-      resolve({ success: false, message: `启动 tar.exe 失败: ${err.message}` })
+      resolve({
+        success: false,
+        message: t('main.logService.error.tarStartFailed', { reason: err.message })
+      })
     })
 
     child.on('close', async (code) => {
@@ -257,18 +261,21 @@ export async function exportLogsAsZip(
           if (stats.size === 0) {
             resolve({
               success: false,
-              message: '导出失败：生成的压缩包为空（可能源目录无可用文件）'
+              message: t('main.logService.error.emptyArchive')
             })
             return
           }
         } catch {
-          resolve({ success: false, message: '导出失败：目标文件未生成' })
+          resolve({ success: false, message: t('main.logService.error.targetNotGenerated') })
           return
         }
-        resolve({ success: true, message: '诊断包已导出（含日志、崩溃文件、系统信息）' })
+        resolve({ success: true, message: t('main.logService.message.exported') })
       } else {
-        const detail = stderr.trim() || stdout.trim() || '无错误输出'
-        resolve({ success: false, message: `打包失败（退出码 ${code}）: ${detail}` })
+        const detail = stderr.trim() || stdout.trim() || t('main.logService.error.noErrorOutput')
+        resolve({
+          success: false,
+          message: t('main.logService.error.packageFailed', { code: String(code), detail })
+        })
       }
     })
   })

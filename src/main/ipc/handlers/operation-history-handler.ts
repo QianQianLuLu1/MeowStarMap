@@ -4,6 +4,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
+import { t } from '../../i18n'
 
 /**
  * operation-history 域 IPC handler：操作历史持久化（支持跨重启撤销）。
@@ -23,7 +24,10 @@ export function registerOperationHistoryHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([
         z.object({
-          operationType: z.string().min(1, 'operationType 不能为空').max(64),
+          operationType: z
+            .string()
+            .min(1, t('main.operationHistory.validation.operationTypeRequired'))
+            .max(64),
           mediaId: z.number().int().positive().optional(),
           payload: z.unknown(),
           description: z.string().min(1).max(512),
@@ -32,7 +36,7 @@ export function registerOperationHistoryHandlers(ctx: HandlerContext): void {
       ]),
       async ([record]) => {
         const db = ctx.dbManager.getDatabase()
-        if (!db) throw AppError.preconditionFailed('数据库未初始化')
+        if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
 
         // R8：捕获操作发生时对应媒体的 updated_at 快照（若 mediaId 存在且已迁移字段）。
         // 旧库无 updated_at 列时 prepare 抛错，catch 后置 null（跳过冲突检测，兼容老版本）。
@@ -72,7 +76,7 @@ export function registerOperationHistoryHandlers(ctx: HandlerContext): void {
     'operation-history:list',
     wrapHandler(ctx, z.tuple([z.number().int().min(1).max(50).optional()]), async ([limitOpt]) => {
       const db = ctx.dbManager.getDatabase()
-      if (!db) throw AppError.preconditionFailed('数据库未初始化')
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
       const safeLimit = limitOpt ?? 50
       const rows = db
         .prepare(
@@ -106,7 +110,7 @@ export function registerOperationHistoryHandlers(ctx: HandlerContext): void {
     'operation-history:remove',
     wrapHandler(ctx, z.tuple([schemas.positiveIntId]), async ([id]) => {
       const db = ctx.dbManager.getDatabase()
-      if (!db) throw AppError.preconditionFailed('数据库未初始化')
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
       db.prepare('DELETE FROM operation_history WHERE id = ?').run(id)
       return { removed: true }
     })
@@ -117,7 +121,7 @@ export function registerOperationHistoryHandlers(ctx: HandlerContext): void {
     'operation-history:clear',
     wrapHandlerNoArgs(ctx, async () => {
       const db = ctx.dbManager.getDatabase()
-      if (!db) throw AppError.preconditionFailed('数据库未初始化')
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
       db.prepare('DELETE FROM operation_history').run()
       return { cleared: true }
     })
@@ -133,7 +137,7 @@ export function registerOperationHistoryHandlers(ctx: HandlerContext): void {
     'operation-history:checkConflict',
     wrapHandler(ctx, z.tuple([schemas.positiveIntId]), async ([operationId]) => {
       const db = ctx.dbManager.getDatabase()
-      if (!db) throw AppError.preconditionFailed('数据库未初始化')
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
       const row = db
         .prepare('SELECT media_id, snapshot_updated_at FROM operation_history WHERE id = ?')
         .get(operationId) as

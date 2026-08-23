@@ -1,5 +1,6 @@
 import type { AppContext } from './app-context'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 
 /**
  * 向渲染进程发消息的安全封装。
@@ -16,7 +17,7 @@ export function sendToRenderer(ctx: AppContext, channel: string, ...args: unknow
   try {
     wc.send(channel, ...args)
   } catch (err) {
-    logger.warn('[Renderer] webContents.send 失败:', {
+    logger.warn(t('main.rendererBridge.log.sendFailed'), {
       channel,
       error: err instanceof Error ? err.message : String(err)
     })

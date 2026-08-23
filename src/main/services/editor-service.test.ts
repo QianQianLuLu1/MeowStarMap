@@ -88,7 +88,7 @@ vi.mock('fs', async () => {
       if (!store.has(cur)) store.set(cur, { isDir: true, data: Buffer.alloc(0), mtime: Date.now() })
     }
   }
-  const writeFile = (file: string, data: any) => {
+  const writeFile = (file: string, data: unknown) => {
     const f = norm(file)
     ensureParents(f)
     const buf = Buffer.isBuffer(data) ? data : Buffer.from(String(data))
@@ -119,7 +119,7 @@ vi.mock('fs', async () => {
   const stat = (p: string) => {
     const node = store.get(norm(p))
     if (!node) {
-      const e: any = new Error('ENOENT: no such file ' + p)
+      const e: Error & { code?: string } = new Error('ENOENT: no such file ' + p)
       e.code = 'ENOENT'
       throw e
     }
@@ -140,13 +140,13 @@ vi.mock('fs', async () => {
     store.set(p, { isDir: true, data: Buffer.alloc(0), mtime: Date.now() })
     return p
   }
-  const utimes = (p: string, _a: any, m: any) => {
+  const utimes = (p: string, _a: unknown, m: unknown) => {
     const node = store.get(norm(p))
     if (node) node.mtime = m instanceof Date ? m.getTime() : Number(m)
   }
   const memfs = {
     mkdtempSync: mkdtemp,
-    mkdirSync: (d: string, opts?: any) =>
+    mkdirSync: (d: string, opts?: { recursive?: boolean }) =>
       opts?.recursive
         ? mkDirRecursive(d)
         : (ensureParents(norm(d)),
@@ -157,7 +157,7 @@ vi.mock('fs', async () => {
     readdirSync: readdir,
     utimesSync: utimes,
     promises: {
-      mkdir: async (d: string, opts?: any) =>
+      mkdir: async (d: string, opts?: { recursive?: boolean }) =>
         opts?.recursive
           ? mkDirRecursive(d)
           : (ensureParents(norm(d)),
@@ -172,7 +172,7 @@ vi.mock('fs', async () => {
   }
   // 具名导出回退真实 fs，保证传递依赖（如 xmp-metadata-service）加载不报错；
   // default 指向内存实现，editor-service 与测试通过 fs.promises.* 走内存。
-  return { ...(realFs as any), default: memfs, __esModule: true }
+  return { ...realFs, default: memfs, __esModule: true }
 })
 
 // backup-service mock：不打开 better-sqlite3；setDir/getBackupDirectory 内存联动
@@ -188,9 +188,8 @@ vi.mock('./backup-service', () => {
   }
 })
 
-import { editorService, EditorService, type EditorSaveOptions } from './editor-service'
+import { editorService, EditorService } from './editor-service'
 import sharp from 'sharp'
-import { parseDataUrlToBuffer } from '../utils/file-utils'
 import { getExtFromMime } from '../utils/media-constants'
 import { backupService } from './backup-service'
 
@@ -372,9 +371,7 @@ describe('save', () => {
     fresh.init(fakeDbManager as never)
     // mock copyFile 后备份大小与原文件不同（通过 stat mock）
     const origStat = fs.promises.stat
-    let callCount = 0
-    const statSpy = vi.spyOn(fs.promises, 'stat').mockImplementation(async (p: any) => {
-      callCount++
+    const statSpy = vi.spyOn(fs.promises, 'stat').mockImplementation(async (p: fs.PathLike) => {
       const real = await origStat(p as string)
       if (p === mediaFilePath) {
         return real

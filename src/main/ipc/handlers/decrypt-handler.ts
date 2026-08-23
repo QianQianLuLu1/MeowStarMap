@@ -4,6 +4,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, schemas, assertFileReadPath } from '../validator'
 import { isMediaPathAllowed } from '../../app/media-protocol'
 import { logger } from '../../utils/logger'
+import { t } from '../../i18n'
 
 /**
  * decrypt 域 IPC handler：游戏参数 / 相机参数 / 染色分享码 / 家园建造分享码 解密。
@@ -17,7 +18,10 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([
         schemas.filePath,
-        z.string().min(1, 'albumType 不能为空').max(32, 'albumType 长度上限 32'),
+        z
+          .string()
+          .min(1, t('main.decrypt.validation.albumTypeRequired'))
+          .max(32, t('main.decrypt.validation.albumTypeMaxLength')),
         z.string().min(1).max(64).optional()
       ]),
       async ([filePath, albumType, uid]) => {
@@ -27,7 +31,7 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
         if (!isMediaPathAllowed(ctx, filePath)) {
           assertFileReadPath(filePath)
         } else {
-          logger.debug('[decrypt] 命中已索引媒体白名单，跳过 pathGuard 校验:', filePath)
+          logger.debug(t('main.decrypt.log.mediaWhitelistHit'), filePath)
         }
         const { decodeFileParams } = await import('../../services/decryption-service')
 
@@ -61,8 +65,8 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
       z.tuple([
         z
           .string()
-          .min(1, 'jsonText 不能为空')
-          .max(1024 * 1024, 'jsonText 长度上限 1MB')
+          .min(1, t('main.decrypt.validation.jsonTextRequired'))
+          .max(1024 * 1024, t('main.decrypt.validation.jsonTextMaxLength'))
       ]),
       async ([jsonText]) => {
         const { encodeCameraParams } = await import('../../services/decryption-service')
@@ -84,8 +88,8 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
       z.tuple([
         z
           .string()
-          .min(1, 'codeStr 不能为空')
-          .max(1024 * 1024, 'codeStr 长度上限 1MB')
+          .min(1, t('main.decrypt.validation.codeStrRequired'))
+          .max(1024 * 1024, t('main.decrypt.validation.codeStrMaxLength'))
       ]),
       async ([codeStr]) => {
         const { decodeClothDiyShareCode } = await import('../../services/decryption-service')
@@ -111,8 +115,8 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
       z.tuple([
         z
           .string()
-          .min(1, 'codeStr 不能为空')
-          .max(1024 * 1024, 'codeStr 长度上限 1MB')
+          .min(1, t('main.decrypt.validation.codeStrRequired'))
+          .max(1024 * 1024, t('main.decrypt.validation.codeStrMaxLength'))
       ]),
       async ([codeStr]) => {
         const { decodeHomeBuildShareCode } = await import('../../services/decryption-service')
@@ -151,33 +155,8 @@ function resolveUidFromProfiles(ctx: HandlerContext): string | undefined {
     return rows.length === 1 ? rows[0].uid : undefined
   } catch (err) {
     // 数据库查询失败不阻塞解密流程，返回 undefined 让 service 走原有错误路径
-    logger.warn('[decrypt] 查询唯一角色档案 UID 失败，返回 undefined:', err)
+    logger.warn(t('main.decrypt.log.resolveUidFailed'), err)
     return undefined
-  }
-}
-
-/**
- * 获取所有非默认角色档案的 UID 列表。
- * 用于多 UID 遍历尝试解密：当路径无法提取 UID 且无法确定唯一档案时，
- * 逐个尝试所有档案 UID，提高解密成功率。
- */
-function getAllProfileUids(ctx: HandlerContext): string[] {
-  try {
-    const db = ctx.dbManager.getDatabase()
-    if (!db) return []
-
-    const rows = db
-      .prepare(
-        `SELECT uid FROM character_profiles
-         WHERE uid != 'default'
-         ORDER BY created_at ASC`
-      )
-      .all() as Array<{ uid: string }>
-
-    return rows.map((r) => r.uid)
-  } catch (err) {
-    logger.warn('[decrypt] 查询角色档案 UID 列表失败，返回空列表:', err)
-    return []
   }
 }
 
@@ -217,7 +196,7 @@ function getAllKnownUids(ctx: HandlerContext): string[] {
     }
   } catch (err) {
     // 数据库查询失败不阻塞解密流程，返回空列表让 service 走原有错误路径
-    logger.warn('[decrypt] 查询已知 UID 列表失败，返回空列表:', err)
+    logger.warn(t('main.decrypt.log.getKnownUidsFailed'), err)
   }
 
   return Array.from(uidSet)

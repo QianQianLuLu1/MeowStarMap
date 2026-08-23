@@ -4,23 +4,13 @@
  * @coverage data 域 IPC handler（data:clear）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AppError } from '../../../shared/errors/app-error'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
-const {
-  handleMock,
-  showMessageBoxMock,
-  fsReaddirMock,
-  fsRmMock,
-  assertFileReadPathMock,
-  assertFileWritePathMock
-} = vi.hoisted(() => ({
+const { handleMock, showMessageBoxMock, fsReaddirMock, fsRmMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   showMessageBoxMock: vi.fn(),
   fsReaddirMock: vi.fn(),
-  fsRmMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn()
+  fsRmMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -42,27 +32,13 @@ vi.mock('path', async () => {
   return { default: actual }
 })
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(),
-  wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-    try {
-      const data = await handler()
-      return { success: true as const, data }
-    } catch (e) {
-      if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-      return {
-        success: false as const,
-        error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-      }
-    }
-  }),
-  wrapHandlerRaw: vi.fn(),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerDataHandlers } from './data-handler'
+import { assertFileReadPath, assertFileWritePath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
 
 describe('registerDataHandlers', () => {
   beforeEach(() => {

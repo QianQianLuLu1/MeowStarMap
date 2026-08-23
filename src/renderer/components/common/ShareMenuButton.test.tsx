@@ -3,10 +3,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: any) => {
+    t: (key: string, opts?: { name?: string }) => {
       if (opts && opts.name) return `${key}:${opts.name}`
       return key
     }
@@ -14,10 +15,10 @@ vi.mock('react-i18next', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconShare: (p: any) => <svg data-testid="icon-share" {...p} />,
-  IconWeChat: (p: any) => <svg data-testid="icon-wechat" {...p} />,
-  IconQQ: (p: any) => <svg data-testid="icon-qq" {...p} />,
-  IconVivo: (p: any) => <svg data-testid="icon-vivo" {...p} />
+  IconShare: (p: ComponentProps<'svg'>) => <svg data-testid="icon-share" {...p} />,
+  IconWeChat: (p: ComponentProps<'svg'>) => <svg data-testid="icon-wechat" {...p} />,
+  IconQQ: (p: ComponentProps<'svg'>) => <svg data-testid="icon-qq" {...p} />,
+  IconVivo: (p: ComponentProps<'svg'>) => <svg data-testid="icon-vivo" {...p} />
 }))
 
 import { ShareMenuButton } from './ShareMenuButton'

@@ -5,6 +5,7 @@ import type { SearchableDocRow } from '../../shared/types/ipc'
 import { ImportRootRepository, normalizeRootPath } from './import-root-repository'
 import { chunkArray } from './sql-chunk'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 
 /**
  * Slice 6：MediaRepository — media.ts SQL 访问层抽离
@@ -426,7 +427,7 @@ export class MediaRepository {
       roots = new ImportRootRepository(this.db).listEnabledImportRoots()
     } catch (err) {
       logger.warn(
-        '[DB] 读取 import_roots 失败，图库仅放行高清目录:', // TODO: i18n: internal log
+        t('main.db.log.importRootsGalleryFailed'),
         err instanceof Error ? err.message : err
       )
       return []
@@ -445,10 +446,7 @@ export class MediaRepository {
     try {
       roots = new ImportRootRepository(this.db).listAllImportRootPrefixes()
     } catch (err) {
-      logger.warn(
-        '[DB] 读取 import_roots 失败，缓存不额外排除导入根:', // TODO: i18n: internal log
-        err instanceof Error ? err.message : err
-      )
+      logger.warn(t('main.db.log.importRootsCacheFailed'), err instanceof Error ? err.message : err)
       return []
     }
     return this.buildRootLikeParams(roots)
@@ -1201,7 +1199,7 @@ export class MediaRepository {
         }>
       } catch (err) {
         // FTS5 查询语法错误时降级为 LIKE
-        logger.warn('[DB] FTS5 查询失败，降级为 LIKE:', err instanceof Error ? err.message : err)
+        logger.warn(t('main.db.log.fts5QueryFallback'), err instanceof Error ? err.message : err)
       }
     }
 

@@ -4,6 +4,7 @@ import path from 'path'
 import crypto from 'crypto'
 import os from 'os'
 import { app } from 'electron'
+import { t } from '../i18n'
 import sharp from 'sharp'
 import ffmpeg from 'fluent-ffmpeg'
 // C-3：统一文件存在检查与视频扩展名判定
@@ -144,7 +145,7 @@ export class ThumbnailGenerator {
       }
     } catch (err) {
       // 标记失败不应影响缩略图返回值，仅记录日志
-      logger.error('[Thumbnail] markCorrupted 回调执行失败:', err)
+      logger.error(t('main.thumbnail.log.markCorruptedCallbackFailed'), err)
     }
   }
 
@@ -158,7 +159,7 @@ export class ThumbnailGenerator {
         await this.clearCorruptedFn(filePath)
       }
     } catch (err) {
-      logger.warn('[Thumbnail] clearCorrupted 回调执行失败:', err)
+      logger.warn(t('main.thumbnail.log.clearCorruptedCallbackFailed'), err)
     }
   }
 
@@ -355,7 +356,7 @@ export class ThumbnailGenerator {
       await this.maybePersistAccessTimes()
       return result.path
     } catch (error) {
-      logger.error('[Thumbnail] 低质量缩略图生成失败:', error)
+      logger.error(t('main.thumbnail.log.lowQualityFailed'), error)
       return null
     }
   }
@@ -400,7 +401,7 @@ export class ThumbnailGenerator {
       await this.maybePersistAccessTimes()
       return highPath
     } catch (error) {
-      logger.error('[Thumbnail] 高清缩略图生成失败:', error)
+      logger.error(t('main.thumbnail.log.highQualityFailed'), error)
       return null
     }
   }
@@ -454,7 +455,7 @@ export class ThumbnailGenerator {
           // processStandard 内部同步生成 _low（与原 doGenerate 第 421~436 行逻辑一致）
           const result = await this.runSharp('standard', filePath, fileHash)
           if (!result.path) {
-            throw new Error('sharp 缩放失败')
+            throw new Error(t('main.thumbnail.error.sharpResizeFailed'))
           }
           // F-S5：累加新生成文件大小到内存计数器（worker 已回传 size，避免主进程 stat）
           this.totalCacheSize = Math.max(0, this.totalCacheSize) + result.size
@@ -464,7 +465,10 @@ export class ThumbnailGenerator {
         const reason = decodeErr instanceof Error ? decodeErr.message : String(decodeErr)
         await this.markCorrupted(
           filePath,
-          `缩略图解码失败(${isVideo ? '视频' : '图片'}): ${reason}`
+          t('main.thumbnail.log.decodeFailed', {
+            kind: isVideo ? t('main.thumbnail.kindVideo') : t('main.thumbnail.kindImage'),
+            reason
+          })
         )
         return null
       }
@@ -479,7 +483,7 @@ export class ThumbnailGenerator {
       return thumbnailPath
     } catch (error) {
       // 外层兜底：fileHash 计算、stat、目录创建等非解码失败
-      logger.error('[Thumbnail] 缩略图生成失败:', error)
+      logger.error(t('main.thumbnail.log.generateFailed'), error)
       return null
     }
   }
@@ -539,7 +543,7 @@ export class ThumbnailGenerator {
       return { path: null, size: 0 }
     } catch (err) {
       // worker 调用异常（pending reject / 超时 / postMessage 失败）：降级到内联 sharp
-      logger.warn('[Thumbnail] worker 调用失败，降级到内联:', err)
+      logger.warn(t('main.thumbnail.log.workerCallFailed'), err)
       return this.runSharpInline(quality, filePath, fileHash)
     }
   }
@@ -629,7 +633,7 @@ export class ThumbnailGenerator {
         settled = true
         command.kill('SIGKILL')
         untrackFfmpegCommand(command)
-        reject(new Error('ffmpeg 提取视频帧超时'))
+        reject(new Error(t('main.thumbnail.error.ffmpegFrameTimeout')))
       }, 30000)
 
       const command = ffmpeg(videoPath)
@@ -718,7 +722,7 @@ export class ThumbnailGenerator {
       // 文件不存在视为合法首次启动，静默忽略；其他读取错误记录日志
       const code = (err as NodeJS.ErrnoException).code
       if (code !== 'ENOENT') {
-        logger.warn('[Thumbnail] 读取缓存元数据失败，从空开始记录:', err)
+        logger.warn(t('main.thumbnail.log.readCacheMetaFailed'), err)
       }
       return
     }
@@ -727,14 +731,14 @@ export class ThumbnailGenerator {
       data = JSON.parse(raw)
     } catch (err) {
       // R6：JSON 解析失败 → 文件损坏，删除并记录日志（不再静默降级）
-      logger.warn('[Thumbnail] 缓存元数据 JSON 损坏，删除文件并从空开始记录:', err)
+      logger.warn(t('main.thumbnail.log.cacheMetaCorrupted'), err)
       try {
         await fsp.unlink(metaPath)
       } catch (unlinkErr) {
         // 删除失败不阻塞后续流程（可能并发已被清理）
         const code = (unlinkErr as NodeJS.ErrnoException).code
         if (code !== 'ENOENT') {
-          logger.warn('[Thumbnail] 删除损坏的缓存元数据文件失败:', unlinkErr)
+          logger.warn(t('main.thumbnail.log.deleteCorruptedMetaFailed'), unlinkErr)
         }
       }
       return
@@ -776,7 +780,7 @@ export class ThumbnailGenerator {
       await fsp.writeFile(tmpPath, data, 'utf-8')
       await fsp.rename(tmpPath, metaPath)
     } catch (err) {
-      logger.warn('[Thumbnail] 保存缓存元数据失败:', err)
+      logger.warn(t('main.thumbnail.log.saveCacheMetaFailed'), err)
       // 清理可能残留的 .tmp 文件，避免占用磁盘
       try {
         await fsp.unlink(tmpPath)
@@ -784,7 +788,7 @@ export class ThumbnailGenerator {
         // ENOENT 表示 .tmp 未生成或已被 rename，正常情况，忽略
         const code = (unlinkErr as NodeJS.ErrnoException).code
         if (code !== 'ENOENT') {
-          logger.warn('[Thumbnail] 清理 .tmp 残留文件失败:', unlinkErr)
+          logger.warn(t('main.thumbnail.log.cleanTmpFailed'), unlinkErr)
         }
       }
     }
@@ -848,7 +852,7 @@ export class ThumbnailGenerator {
       // F-S5：淘汰后更新计数器
       this.totalCacheSize = totalSize
     } catch (err) {
-      logger.warn('[Thumbnail] 缓存 LRU 清理失败:', err)
+      logger.warn(t('main.thumbnail.log.lruCleanFailed'), err)
     }
   }
 

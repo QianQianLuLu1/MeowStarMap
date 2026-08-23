@@ -13,6 +13,7 @@ import {
 } from '../stores/mediaStore'
 import type { SceneCategoryConfig, SceneTimeConfig } from '../../shared/scene-category'
 import { useUIStore } from '../stores/uiStore'
+import { formatCategoryName } from '../utils/category-name'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { useGlobalToast } from './settings/sections'
@@ -178,19 +179,23 @@ export const CategoriesPage: React.FC = () => {
     return buildTree(null)
   }, [categories])
 
-  const flattenTree = (tree: Category[], depth = 0, collapsed: Set<number>): FlatCategory[] => {
-    return tree.flatMap((cat) => {
-      const children = cat.children || []
-      const self = { ...cat, depth }
-      // U-O9：若该分类被折叠，不展开其子分类
-      if (collapsed.has(cat.id)) return [self]
-      return [self, ...flattenTree(children, depth + 1, collapsed)]
-    })
-  }
+  // 纯函数（仅遍历入参）：包 useCallback 以满足 exhaustive-deps
+  const flattenTree = useCallback(
+    (tree: Category[], depth: number, collapsed: Set<number>): FlatCategory[] => {
+      return tree.flatMap((cat) => {
+        const children = cat.children || []
+        const self = { ...cat, depth }
+        // U-O9：若该分类被折叠，不展开其子分类
+        if (collapsed.has(cat.id)) return [self]
+        return [self, ...flattenTree(children, depth + 1, collapsed)]
+      })
+    },
+    []
+  )
 
   const flatCategories = useMemo(
     () => flattenTree(rootCategories, 0, collapsedIds),
-    [rootCategories, collapsedIds]
+    [flattenTree, rootCategories, collapsedIds]
   )
 
   // U-O9：切换分类折叠状态
@@ -645,7 +650,7 @@ export const CategoriesPage: React.FC = () => {
             {flatCategories.map((cat) => (
               <option key={cat.id} value={cat.id}>
                 {'　'.repeat(cat.depth)}
-                {cat.name}
+                {formatCategoryName(cat)}
               </option>
             ))}
           </select>
@@ -767,7 +772,7 @@ export const CategoriesPage: React.FC = () => {
                       style={{ background: cat.color }}
                     />
                     <span className="font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-                      {cat.name}
+                      {formatCategoryName(cat)}
                     </span>
                     {cat.is_system && (
                       <span

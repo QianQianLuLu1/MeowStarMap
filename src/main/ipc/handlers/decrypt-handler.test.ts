@@ -4,25 +4,20 @@
  * @coverage decrypt 域 IPC handler 注册与执行（decodeFile / encodeCameraParams / decodeClothDiy / decodeHomeBuild）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { AppError } from '../../../shared/errors/app-error'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
 const {
   handleMock,
   decodeFileParamsMock,
   encodeCameraParamsMock,
   decodeClothDiyShareCodeMock,
-  decodeHomeBuildShareCodeMock,
-  assertFileReadPathMock,
-  assertFileWritePathMock
+  decodeHomeBuildShareCodeMock
 } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   decodeFileParamsMock: vi.fn(),
   encodeCameraParamsMock: vi.fn(),
   decodeClothDiyShareCodeMock: vi.fn(),
-  decodeHomeBuildShareCodeMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn()
+  decodeHomeBuildShareCodeMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({ ipcMain: { handle: handleMock, on: vi.fn() } }))
@@ -40,33 +35,13 @@ vi.mock('../../services/decryption-service', () => ({
   decodeHomeBuildShareCode: decodeHomeBuildShareCodeMock
 }))
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn(),
-  wrapHandlerRaw: vi.fn(),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerDecryptHandlers } from './decrypt-handler'
+import { assertFileReadPath, assertFileWritePath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
 
 describe('registerDecryptHandlers', () => {
   beforeEach(() => {

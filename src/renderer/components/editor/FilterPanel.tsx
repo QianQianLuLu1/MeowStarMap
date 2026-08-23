@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FilterPreset,
@@ -8,6 +8,7 @@ import {
   imageToDataUrl
 } from '../../utils/imageProcessor'
 import { getFilterCategories, getPresetsByCategory } from '../../utils/filterPresets'
+import { formatCategoryName } from '../../utils/category-name'
 import { SliderControl } from '../common/SliderControl'
 import { IconFilterPreset } from '../../icons'
 import { runWithConcurrency } from '../../../main/utils/concurrency'
@@ -50,10 +51,14 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
   const [thumbnails, setThumbnails] = useState<Map<string, string>>(new Map())
   const [generating, setGenerating] = useState(false)
   const { t } = useTranslation()
-  const filteredPresets = getPresetsByCategory(filterCategory)
+  // useMemo 稳定引用：作为 generateThumbnails 的依赖，避免每次渲染生成新回调
+  const filteredPresets = useMemo(() => getPresetsByCategory(filterCategory), [filterCategory])
   const categories = getFilterCategories()
   const imageRef = useRef<HTMLImageElement | null>(null)
   const abortRef = useRef(false)
+  // 始终调用最新的 generateThumbnails：图片 onload 时使用最新预设，
+  // 同时避免 [sourceUrl] effect 因预设变化重新触发图片加载
+  const generateThumbnailsRef = useRef<() => Promise<void>>(async () => {})
 
   const loadCustomPresets = async () => {
     if (!window.electronAPI?.editor?.loadPresets) return
@@ -100,7 +105,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     }
     img.onload = () => {
       imageRef.current = img
-      generateThumbnails()
+      generateThumbnailsRef.current()
     }
     img.onerror = () => {
       imageRef.current = null
@@ -116,7 +121,7 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     }
   }, [sourceUrl])
 
-  const generateThumbnails = async () => {
+  const generateThumbnails = useCallback(async () => {
     const img = imageRef.current
     if (!img) return
 
@@ -162,12 +167,16 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
     if (!abortRef.current) {
       setGenerating(false)
     }
-  }
+  }, [filteredPresets, customPresets])
+
+  useEffect(() => {
+    generateThumbnailsRef.current = generateThumbnails
+  }, [generateThumbnails])
 
   useEffect(() => {
     if (!imageRef.current) return
     generateThumbnails()
-  }, [filterCategory, customPresets])
+  }, [generateThumbnails])
 
   const handleSavePreset = async () => {
     if (!onSavePreset) return
@@ -244,9 +253,9 @@ export const FilterPanel: React.FC<FilterPanelProps> = ({
               color: filterCategory === cat.id ? 'white' : 'var(--text-secondary)'
             }}
             onClick={() => setFilterCategory(cat.id)}
-            aria-label={t(cat.name)}
+            aria-label={formatCategoryName(cat)}
           >
-            {t(cat.name)}
+            {formatCategoryName(cat)}
           </button>
         ))}
       </div>

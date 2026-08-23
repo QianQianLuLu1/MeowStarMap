@@ -13,6 +13,7 @@ import {
   getLogStats
 } from '../../services/log-service'
 import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import { t } from '../../i18n'
 
 /**
  * 复刻 index.ts 中 this.getMainWindow() 的行为：
@@ -21,7 +22,7 @@ import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handle
  */
 function requireMainWindow(ctx: HandlerContext): BrowserWindow {
   const win = ctx.getMainWindow() ?? BrowserWindow.getFocusedWindow()
-  if (!win) throw AppError.preconditionFailed('主窗口未初始化')
+  if (!win) throw AppError.preconditionFailed(t('main.error.mainWindowNotInit'))
   return win
 }
 
@@ -38,9 +39,11 @@ export function registerLogHandlers(ctx: HandlerContext): void {
         const faults = await listFaults()
         return { faults }
       } catch (error) {
-        logger.error('[Log] 获取故障列表失败:', error)
+        logger.error(t('main.log.log.listFaultsFailed'), error)
         throw AppError.internal(
-          `获取故障列表失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.log.error.listFaultsFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -54,9 +57,11 @@ export function registerLogHandlers(ctx: HandlerContext): void {
         const fault = await getFaultDetail(id)
         return { fault }
       } catch (error) {
-        logger.error('[Log] 获取故障详情失败:', error)
+        logger.error(t('main.log.log.getFaultDetailFailed'), error)
         throw AppError.internal(
-          `获取故障详情失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.log.error.getFaultDetailFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -82,7 +87,9 @@ export function registerLogHandlers(ctx: HandlerContext): void {
         return await getLogStats()
       } catch (error) {
         throw AppError.internal(
-          `获取日志统计失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.log.error.getStatsFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -97,10 +104,10 @@ export function registerLogHandlers(ctx: HandlerContext): void {
       const defaultName = `wxnn-logs-${new Date().toISOString().slice(0, 10)}.zip`
       const result = await dialog.showSaveDialog(requireMainWindow(ctx), {
         defaultPath: defaultName,
-        filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }]
+        filters: [{ name: t('main.log.dialog.filterZipName'), extensions: ['zip'] }]
       })
       if (result.canceled || !result.filePath) {
-        throw AppError.canceled('用户取消保存')
+        throw AppError.canceled(t('main.log.error.userCanceledSave'))
       }
       return exportLogsAsZip(result.filePath)
     })
@@ -113,12 +120,14 @@ export function registerLogHandlers(ctx: HandlerContext): void {
       try {
         const result = await clearAllLogs()
         if (result.success) {
-          logger.info('[Log] 用户手动清空了所有日志文件')
+          logger.info(t('main.log.log.clearedAll'))
         }
         return result
       } catch (error) {
         throw AppError.internal(
-          `清空日志失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.log.error.clearFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -169,9 +178,11 @@ export function registerLogHandlers(ctx: HandlerContext): void {
           await logFault(faultType, err, context)
           return { reported: true }
         } catch (err) {
-          logger.error('[IPC] log:reportRendererError 处理失败:', err)
+          logger.error(t('main.log.log.reportRendererFailed'), err)
           throw AppError.internal(
-            `上报渲染进程错误失败: ${err instanceof Error ? err.message : String(err)}`
+            t('main.log.error.reportRendererFailed', {
+              reason: err instanceof Error ? err.message : String(err)
+            })
           )
         }
       }

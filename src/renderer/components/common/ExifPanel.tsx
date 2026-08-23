@@ -69,10 +69,7 @@ export const ExifPanel: React.FC<ExifPanelProps> = ({
   const rows = useMemo(() => exifToRows(exif, t), [exif, t])
 
   // 游戏内照片无标准 EXIF，差异化展示提示文案
-  const isGamePhoto =
-    file.media_source === 'game' &&
-    file.album_type !== '其他' &&
-    file.album_type !== t('albumTypes.unknown')
+  const isGamePhoto = file.media_source === 'game' && file.album_type !== t('albumTypes.unknown')
 
   // 主题样式映射
   const isDark = variant === 'dark'

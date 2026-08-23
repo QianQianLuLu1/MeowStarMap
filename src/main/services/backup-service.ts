@@ -7,6 +7,7 @@ import { app } from 'electron'
 import type { DatabaseManager } from '../database/connection'
 import type { TaskScheduler } from '../scheduler/task-scheduler'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 
 // 惰性加载 better-sqlite3：首次调用时才动态 import，使原生模块加载时机推迟到 bootstrapApplication 的 try/catch 内
 // 使用 import() 而非 require()：import() 是 ESM 原生 API，被 Vitest vi.mock 正确拦截
@@ -96,7 +97,7 @@ export class BackupService {
         try {
           await this.autoBackupIfNeeded()
         } catch (err) {
-          logger.error('[Backup] 启动自动备份失败:', err)
+          logger.error(t('main.backup.log.startupAutoBackupFailed'), err)
         }
       }
       if (this.scheduler) {
@@ -123,12 +124,12 @@ export class BackupService {
       const elapsed = Date.now() - new Date(latest.createdAt).getTime()
       if (elapsed < AUTO_BACKUP_MIN_INTERVAL_MS) {
         logger.info(
-          `[Backup] 距上次备份不足 7 天（${Math.floor(elapsed / 86400000)} 天），跳过自动备份`
+          t('main.backup.log.skipAutoBackup', { days: String(Math.floor(elapsed / 86400000)) })
         )
         return
       }
     }
-    logger.info('[Backup] 执行启动自动备份')
+    logger.info(t('main.backup.log.runningStartupAutoBackup'))
     await this.createBackup()
   }
 
@@ -138,11 +139,11 @@ export class BackupService {
     accountUid?: string
   ): Promise<{ success: boolean; backup?: BackupRecord; message?: string }> {
     if (!this.dbManager) {
-      return { success: false, message: '数据库未初始化' }
+      return { success: false, message: t('main.error.databaseNotInit') }
     }
     const db = this.dbManager.getDatabase()
     if (!db) {
-      return { success: false, message: '数据库连接不可用' }
+      return { success: false, message: t('main.backup.error.dbUnavailable') }
     }
 
     try {
@@ -164,14 +165,16 @@ export class BackupService {
         createdAt: stats.mtime.toISOString()
       }
 
-      logger.info(`[Backup] 备份成功: ${filename} (${this.formatSize(stats.size)})`)
+      logger.info(
+        t('main.backup.log.createSuccess', { filename, size: this.formatSize(stats.size) })
+      )
 
       // 清理超出上限的旧备份
       await this.pruneOldBackups()
 
       return { success: true, backup: record }
     } catch (error) {
-      logger.error('[Backup] 创建备份失败:', error)
+      logger.error(t('main.backup.log.createFailed'), error)
       return { success: false, message: error instanceof Error ? error.message : String(error) }
     }
   }
@@ -267,7 +270,7 @@ export class BackupService {
   }> {
     const latest = await this.getLatestValidBackup()
     if (!latest) {
-      return { success: false, message: '无可用备份，无法恢复' }
+      return { success: false, message: t('main.backup.error.noBackupToRestore') }
     }
 
     const tmpPath = `${targetPath}.restoring`
@@ -296,17 +299,17 @@ export class BackupService {
         /* 忽略 */
       }
       const reason = err instanceof Error ? err.message : String(err)
-      logger.error(`[Backup] 从备份恢复失败: ${reason}`)
-      return { success: false, message: `恢复失败: ${reason}` }
+      logger.error(t('main.backup.log.restoreToFailed', { reason }))
+      return { success: false, message: t('main.backup.error.restoreFailedPlain', { reason }) }
     }
 
     // R9：rename 成功后写入后置修复标志。失败不阻塞恢复（rename 已完成，下次启动仍可正常使用）
     await this.markRestoredFlags(targetPath)
 
-    logger.info(`[Backup] 数据库已从备份恢复: ${latest.filename}`)
+    logger.info(t('main.backup.log.restoredToDb', { filename: latest.filename }))
     return {
       success: true,
-      message: `已从备份 ${latest.filename} 恢复`,
+      message: t('main.backup.message.restoredFrom', { filename: latest.filename }),
       sourceBackup: latest
     }
   }
@@ -317,12 +320,12 @@ export class BackupService {
   // P1-A6：恢复成功后立即 app.relaunch() + app.exit()，避免 dbManager 处于关闭状态时 IPC 调用全部失败
   async restoreBackup(filename: string): Promise<{ success: boolean; message?: string }> {
     if (!this.dbManager) {
-      return { success: false, message: '数据库未初始化' }
+      return { success: false, message: t('main.error.databaseNotInit') }
     }
 
     const backupPath = path.join(this.backupDir, filename)
     if (!fs.existsSync(backupPath)) {
-      return { success: false, message: `备份文件不存在: ${filename}` }
+      return { success: false, message: t('main.backup.error.backupNotExist', { filename }) }
     }
 
     // FIX(组18-1): 记录失败点是否已过 dbManager.close()——close 之后任一步失败
@@ -340,7 +343,10 @@ export class BackupService {
       // 若备份文件损坏（磁盘错误、不完整写入等），提前给出明确提示，避免恢复后应用无法启动
       const integrityCheck = await this.verifyBackupIntegrity(backupPath)
       if (!integrityCheck.valid) {
-        return { success: false, message: `备份文件已损坏，无法恢复: ${integrityCheck.reason}` }
+        return {
+          success: false,
+          message: t('main.backup.error.backupCorrupted', { reason: integrityCheck.reason })
+        }
       }
 
       // 关闭当前数据库连接
@@ -372,20 +378,20 @@ export class BackupService {
       // R9：rename 成功后写入后置修复标志。失败不阻塞恢复（rename 已完成，relaunch 后下次启动消费标志）
       await this.markRestoredFlags(dbPath)
 
-      logger.info(`[Backup] 已从备份恢复: ${filename}，准备重启应用`)
+      logger.info(t('main.backup.log.restoreSuccessRelaunching', { filename }))
       // P1-A6：恢复成功后立即重启应用，避免 dbManager 处于关闭状态时 IPC 调用全部失败
       // app.relaunch 会启动新实例，app.exit 触发 before-quit 清理流程（释放单实例锁）
       try {
         app.relaunch()
         app.exit(0)
       } catch (relaunchErr) {
-        logger.error('[Backup] 重启应用失败，请手动重启:', relaunchErr)
-        return { success: true, message: '恢复成功，但自动重启失败，请手动重启应用' }
+        logger.error(t('main.backup.log.relaunchFailed'), relaunchErr)
+        return { success: true, message: t('main.backup.message.restoredButRelaunchFailed') }
       }
       // 理论上 app.exit(0) 后不会执行到这里，保留兜底返回
-      return { success: true, message: '恢复成功，应用正在重启' }
+      return { success: true, message: t('main.backup.message.restoredRelaunching') }
     } catch (error) {
-      logger.error('[Backup] 恢复备份失败:', error)
+      logger.error(t('main.backup.log.restoreFailed'), error)
       // FIX(组18-1): 失败点在 dbManager.close() 之后——应用已处于无数据库状态，
       // 同样 relaunch 重启回到可用状态（P0-A2 原子性保证 rename 失败时原库未受影响，
       // 重启后正常打开原库），不再让用户停留在一个所有 DB IPC 都失败的应用里
@@ -394,11 +400,13 @@ export class BackupService {
           app.relaunch()
           app.exit(1)
         } catch (relaunchErr) {
-          logger.error('[Backup] 失败后重启应用失败，请手动重启:', relaunchErr)
+          logger.error(t('main.backup.log.relaunchAfterFailureFailed'), relaunchErr)
         }
         return {
           success: false,
-          message: `恢复失败: ${error instanceof Error ? error.message : String(error)}，应用将重启以恢复可用状态`
+          message: t('main.backup.error.restoreFailedRelaunch', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         }
       }
       return { success: false, message: error instanceof Error ? error.message : String(error) }
@@ -474,10 +482,10 @@ export class BackupService {
         insertStmt.run('restored_at', JSON.stringify(now))
         insertStmt.run('media_count_dirty', JSON.stringify(1))
       })()
-      logger.info(`[Backup] 已写入后置修复标志: ${dbPath}`)
+      logger.info(t('main.backup.log.repairFlagWritten', { path: dbPath }))
     } catch (err) {
       // 失败不阻塞恢复流程，仅记录日志
-      logger.warn('[Backup] 写入后置修复标志失败（不阻塞恢复）:', err)
+      logger.warn(t('main.backup.log.repairFlagWriteFailed'), err)
     } finally {
       if (probe) {
         try {
@@ -496,14 +504,14 @@ export class BackupService {
     try {
       await fsp.access(backupPath)
     } catch {
-      return { success: false, message: `备份文件不存在: ${filename}` }
+      return { success: false, message: t('main.backup.error.backupNotExist', { filename }) }
     }
     try {
       await fsp.unlink(backupPath)
-      logger.info(`[Backup] 已删除备份: ${filename}`)
+      logger.info(t('main.backup.log.deleted', { filename }))
       return { success: true }
     } catch (error) {
-      logger.error('[Backup] 删除备份失败:', error)
+      logger.error(t('main.backup.log.deleteFailed'), error)
       return { success: false, message: error instanceof Error ? error.message : String(error) }
     }
   }
@@ -518,7 +526,7 @@ export class BackupService {
     for (const record of toDelete) {
       try {
         await fsp.unlink(record.filePath)
-        logger.info(`[Backup] 清理旧备份: ${record.filename}`)
+        logger.info(t('main.backup.log.prunedOld', { filename: record.filename }))
       } catch {
         // 跳过删除失败的文件
       }

@@ -309,10 +309,10 @@ export const GeneralExportSection: React.FC = () => {
     return (
       namingPattern
         .replace(/\{date\}/g, dateStr)
-        .replace(/\{album_type\}/g, '拍摄截图')
+        .replace(/\{album_type\}/g, t('settings.export.previewAlbumType'))
         .replace(/\{uid\}/g, '100123456')
         .replace(/\{original_name\}/g, 'photo_001')
-        .replace(/\{sequence\}/g, '001') + '.扩展名'
+        .replace(/\{sequence\}/g, '001') + t('settings.export.previewExtension')
     )
   })()
 

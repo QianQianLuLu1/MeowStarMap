@@ -11,39 +11,17 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../../handler-context'
-import { AppError } from '../../../../shared/errors/app-error'
 
-const {
-  handleMock,
-  assertFileReadPathMock,
-  isMediaPathAllowedMock,
-  decodeFileParamsMock,
-  loggerDebugMock,
-  schemasProxy
-} = vi.hoisted(() => {
-  const makeChainable = (): any => {
-    const fn: any = () => makeChainable()
-    return new Proxy(fn, {
-      get: (_t, prop) => {
-        if (prop === 'then') return undefined
-        if (typeof prop === 'symbol') return undefined
-        return () => makeChainable()
-      }
-    })
+const { handleMock, isMediaPathAllowedMock, decodeFileParamsMock, loggerDebugMock } = vi.hoisted(
+  () => {
+    return {
+      handleMock: vi.fn(),
+      isMediaPathAllowedMock: vi.fn(),
+      decodeFileParamsMock: vi.fn(),
+      loggerDebugMock: vi.fn()
+    }
   }
-  const schemasProxy: any = new Proxy(
-    {},
-    { get: (_, prop) => (typeof prop === 'symbol' ? undefined : makeChainable()) }
-  )
-  return {
-    handleMock: vi.fn(),
-    assertFileReadPathMock: vi.fn(),
-    isMediaPathAllowedMock: vi.fn(),
-    decodeFileParamsMock: vi.fn(),
-    loggerDebugMock: vi.fn(),
-    schemasProxy
-  }
-})
+)
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() },
@@ -58,44 +36,7 @@ vi.mock('electron', () => ({
   shell: { openExternal: vi.fn() }
 }))
 
-vi.mock('../../validator', () => {
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (_ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((_ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    schemas: schemasProxy,
-    assertFileReadPath: assertFileReadPathMock,
-    assertFileWritePath: vi.fn()
-  }
-})
+vi.mock('../../validator', async () => await import('../../../../../tests/mocks/mock-validator'))
 
 // 复用 media:// 已索引媒体白名单（修复核心）：由测试按分支控制返回值
 vi.mock('../../../app/media-protocol', () => ({
@@ -114,6 +55,9 @@ vi.mock('../../../utils/logger', () => ({
 }))
 
 import { registerDecryptHandlers } from '../decrypt-handler'
+import { assertFileReadPath } from '../../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
 
 function makeCtx(): HandlerContext {
   const dbStub = {

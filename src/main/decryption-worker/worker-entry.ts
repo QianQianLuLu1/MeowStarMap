@@ -19,6 +19,8 @@ import type {
   DecryptionWorkerEvent,
   NetworkDecodeKind
 } from './worker-protocol'
+// utilityProcess 内 electron 不可用，使用无依赖的 zh-CN 查表翻译
+import { t } from '../i18n/worker-safe'
 
 // ============================================================
 // 常量与 C 类型定义（与 nuan5_decryption_ffi.h 一一对应）
@@ -154,7 +156,7 @@ function decodeNetworkSync(
   codeStr: string
 ): { status: number; networkData?: string; errorMessage?: string } {
   if (!boundFns) {
-    return { status: STATUS_JS_ERROR, errorMessage: 'DLL 未初始化（INIT 未完成）' }
+    return { status: STATUS_JS_ERROR, errorMessage: t('main.decryption.error.dllNotInit') }
   }
   const fns = boundFns
   let shareCode: koffi.PointerObject | null = null

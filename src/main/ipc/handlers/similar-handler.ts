@@ -8,6 +8,7 @@ import { pickBestId } from '../../utils/duplicate-scoring'
 import { generatePhashForUnprocessed } from '../../services/thumbnail-phash-service'
 import { MediaRepository } from '../../database/media-repository'
 import { logger } from '../../utils/logger'
+import { t } from '../../i18n'
 
 /**
  * R7：相似检测前的 stale 检测节流间隔（5 分钟）。
@@ -91,7 +92,7 @@ export function registerSimilarHandlers(ctx: HandlerContext): void {
   // 数据库写操作进程拆分：传入 workerBridge 与 dbPath，写方法走独立 utilityProcess
   const getRepo = (): MediaRepository => {
     const db = ctx.dbManager.getDatabase()
-    if (!db) throw AppError.preconditionFailed('数据库未初始化')
+    if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
     return new MediaRepository(db, ctx.dbManager.getWorkerBridge(), ctx.dbManager.getDbPath())
   }
 
@@ -256,7 +257,7 @@ export function registerSimilarHandlers(ctx: HandlerContext): void {
     'media:generatePhash',
     wrapHandlerNoArgs(ctx, async () => {
       const { processed, total } = await generatePhashForUnprocessed(ctx)
-      return { success: true, message: 'pHash 补算完成', processed, total }
+      return { success: true, message: t('main.similar.message.phashDone'), processed, total }
     })
   )
 }

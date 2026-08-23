@@ -454,7 +454,7 @@ export const EditorPage: React.FC = () => {
         'error'
       )
     }
-  }, [applyFilterPreset, pushHistory, showMessage, t])
+  }, [applyFilterPreset, setFilterIntensity, pushHistory, showMessage, t])
 
   const handleSavePreset = useCallback(async () => {
     if (!window.electronAPI || !window.electronAPI.editor?.exportPreset) {

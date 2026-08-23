@@ -71,7 +71,7 @@ export const LanguageSection: React.FC = () => {
         {/* P3：加载中提示 */}
         {switching && (
           <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-            {t('settings.language.loading', { defaultValue: '加载语言包...' })}
+            {t('settings.language.loading')}
           </p>
         )}
 

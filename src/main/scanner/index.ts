@@ -2,6 +2,7 @@ import { EventEmitter } from 'events'
 import { ScannerWorkerBridge } from './scanner-worker-bridge'
 import type { ScanOptions, ScanProgress } from './worker-protocol'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 // 统一 scanner:status 契约（与 preload / 渲染进程共享，避免三端各写一份）
 import type { ScannerStatus } from '../../shared/types/progress'
 
@@ -47,7 +48,7 @@ export class ScannerManager extends EventEmitter {
     //    崩溃合成事件时以失败 resolve，恢复完成若无此事件将无人广播 scanner:complete。
     bridge.setRestoreExecutor(async (options) => {
       if (this.currentStatus.status === 'running') {
-        logger.info('[ScannerManager] 已有扫描在进行，跳过崩溃恢复的扫描重放')
+        logger.info(t('main.scanner.log.skipRestoreReplay'))
         return
       }
       const result = await this.startScan(options)
@@ -87,10 +88,10 @@ export class ScannerManager extends EventEmitter {
     options?: ScanOptions
   ): Promise<{ success: boolean; message: string; filesFound?: number }> {
     if (this.currentStatus.status === 'running') {
-      return { success: false, message: '扫描正在进行中' }
+      return { success: false, message: t('main.scanner.error.scanInProgress') }
     }
     if (!this.dbPath) {
-      return { success: false, message: '数据库路径未初始化' }
+      return { success: false, message: t('main.scanner.error.dbPathNotInitialized') }
     }
 
     this.currentStatus = { scanned: 0, found: 0, currentPath: '', status: 'running' }
@@ -105,7 +106,9 @@ export class ScannerManager extends EventEmitter {
           this.pendingComplete = null
           r({
             success: false,
-            message: `扫描启动失败: ${err instanceof Error ? err.message : String(err)}`
+            message: t('main.scanner.error.scanStartFailed', {
+              reason: err instanceof Error ? err.message : String(err)
+            })
           })
         }
       })

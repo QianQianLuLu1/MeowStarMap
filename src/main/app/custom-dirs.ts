@@ -12,6 +12,7 @@ import {
   SETTING_KEYS
 } from '../utils/dir-manager'
 import { logStartupError } from '../utils/startup-diagnostic'
+import { t } from '../i18n'
 
 /**
  * 4 个自定义目录（backupDir / thumbnailCacheDir / logDir / crashDir）的解析、迁移、副作用初始化。
@@ -25,8 +26,13 @@ import { logStartupError } from '../utils/startup-diagnostic'
  */
 export async function applyCustomDirectories(ctx: AppContext): Promise<void> {
   // P1-A10：通用迁移流程抽取为辅助函数，每个目录仅 1 行调用 + postSetup 回调
-  await applyCustomDir(ctx, 'backupDir', 'backups', MIGRATE_PATTERNS.backupDir, '备份文件', (dir) =>
-    backupService.setDir(dir)
+  await applyCustomDir(
+    ctx,
+    'backupDir',
+    'backups',
+    MIGRATE_PATTERNS.backupDir,
+    t('main.customDirs.label.backupFiles'),
+    (dir) => backupService.setDir(dir)
   )
 
   await applyCustomDir(
@@ -34,7 +40,7 @@ export async function applyCustomDirectories(ctx: AppContext): Promise<void> {
     'thumbnailCacheDir',
     'thumbnails',
     /metadata\.json$/i,
-    '缩略图元数据',
+    t('main.customDirs.label.thumbnailMetadata'),
     (dir) => {
       ctx.thumbnailGen.setDir(dir)
       // 恢复自定义缓存上限（如有）
@@ -45,8 +51,13 @@ export async function applyCustomDirectories(ctx: AppContext): Promise<void> {
     }
   )
 
-  await applyCustomDir(ctx, 'logDir', 'logs', MIGRATE_PATTERNS.logDir, '日志文件', (dir) =>
-    setLogDirectory(dir)
+  await applyCustomDir(
+    ctx,
+    'logDir',
+    'logs',
+    MIGRATE_PATTERNS.logDir,
+    t('main.customDirs.label.logFiles'),
+    (dir) => setLogDirectory(dir)
   )
 
   // crashDir 必须在 crashReporter.start() 之前调用 app.setPath，crashpad 子进程才能正确写入
@@ -55,7 +66,7 @@ export async function applyCustomDirectories(ctx: AppContext): Promise<void> {
     'crashDir',
     'crashes',
     MIGRATE_PATTERNS.crashDir,
-    '崩溃 dump',
+    t('main.customDirs.label.crashDump'),
     (dir) => {
       app.setPath('crashDumps', dir)
       setCrashDirectory(dir)

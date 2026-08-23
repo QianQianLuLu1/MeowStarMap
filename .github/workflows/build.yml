@@ -15,29 +15,60 @@ concurrency:
   cancel-in-progress: true
 
 
+# 镜像加速：全部 job 共享，避免在每个 Install 步骤重复声明
+env:
+  ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
+  ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+
+
 jobs:
   lint-typecheck:
-    name: Lint & Typecheck
-    runs-on: windows-latest
+    name: Lint, Typecheck & Security
+    runs-on: ubuntu-latest
     env:
       TZ: Asia/Hong_Kong
     steps:
       - uses: actions/checkout@v4
+      # 供应链安全：仅 PR 事件运行，审查 PR 中新增/更新的依赖是否存在已知漏洞（high/critical 直接失败）
+      # 注意：若做成独立 job，push 事件下被 skip 的 job 会连带 skip needs 它的下游 job；放同一 job 内用 if 控制
+      - name: Dependency review (PR only)
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         env:
-          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
-          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+          # 双保险：--ignore-scripts 之外再显式跳过 electron 二进制下载
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      # 供应链安全：依赖树审计（audit-ci 内部执行 npm audit），high/critical 漏洞直接失败；
+      # 本 job 是 test/build 的 needs 前置，失败即阻断下游 test / build / 发布
+      # --allowlist 为存量漏洞豁免（豁免项以外新增任何 high/critical 均拦截），需持续跟踪清理：
+      #   tar 链 9 项 + sigstore GHSA-52v5-jr5w-gjxr：pluggable-electron 传递依赖的 npm 内部工具链，
+      #     上游（tar<=7.5.20 / sigstore<=4.1.0）暂无任何修复版本
+      #   electron GHSA-9f4c-93c8-jc8g：40.10.6，修复需升级 electron >= 43.4.1（大版本，待专项升级）
+      #   vitest GHSA-5xrq-8626-4rwp / vite GHSA-fx2h-pf6j-xcff：dev 工具，修复需大版本升级
+      #     （vitest 仅 UI server 模式受影响，vite 仅 dev server 受影响，CI 均不使用）
+      - name: Security audit (audit-ci, fail on high/critical)
+        run: >-
+          npx audit-ci --high --allowlist
+          GHSA-23hp-3jrh-7fpw GHSA-34x7-hfp2-rc4v GHSA-8qq5-rm4j-mr97
+          GHSA-83g3-92jg-28cx GHSA-qffp-2rhf-9h96 GHSA-9ppj-qmqm-q256
+          GHSA-r6q2-hw4h-h46w GHSA-8x88-c5mf-7j5w GHSA-r292-9mhp-454m
+          GHSA-52v5-jr5w-gjxr GHSA-9f4c-93c8-jc8g GHSA-5xrq-8626-4rwp
+          GHSA-fx2h-pf6j-xcff
       - run: npm run lint
+      - name: i18n 守卫（白名单只减不增 / 清零必移除 / key 已同步）
+        run: npm run i18n:guard
       - run: npm run typecheck
 
   test:
     name: Test (shard ${{ matrix.shard }}/10)
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: [lint-typecheck]
     # 护栏：单分片超时，防止挂起耗尽 40 分钟（即便层 2 句柄未修也能兜底）
     timeout-minutes: 15
@@ -54,10 +85,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
         env:
-          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
-          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
+          # 双保险：--ignore-scripts 之外再显式跳过 electron 二进制下载
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
       # pool:forks 已在 vitest.config.ts 锁定；此处按分片跑
       - run: npm test -- --shard=${{ matrix.shard }}/10
 
@@ -76,9 +107,6 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-        env:
-          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
-          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
       - name: Build & publish (release tag)
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: npm run dist:win
@@ -154,8 +182,5 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-        env:
-          ELECTRON_MIRROR: https://github.com/electron/electron/releases/download/
-          ELECTRON_BUILDER_BINARIES_MIRROR: https://github.com/electron-userland/electron-builder-binaries/releases/download/
       - name: Verify clean clone compiles main-process output
         run: npm run build

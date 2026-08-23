@@ -12,6 +12,7 @@ import { livePhotoService } from '../../services/livephoto-service'
 import { logger } from '../../utils/logger'
 // 视频编辑任务类型
 import type { VideoEditRequest, VideoEditBatchRequest } from '../../video-editor/types'
+import { t } from '../../i18n'
 
 // 视频编辑 zod schema（与 VideoEditTask 结构一致，宽松校验，主进程不解析内部 params/watermark）
 const videoEditTaskSchema = z.object({
@@ -118,7 +119,7 @@ export function registerVideoHandlers(ctx: HandlerContext): void {
         assertFileReadPath(filePath)
         assertFileWritePath(targetDir)
         if (endTime <= startTime) {
-          throw AppError.validation('结束时间必须大于开始时间')
+          throw AppError.validation(t('main.video.error.endTimeAfterStart'))
         }
         return ctx.videoService.trimVideo(filePath, startTime, endTime, targetDir)
       }
@@ -151,7 +152,7 @@ export function registerVideoHandlers(ctx: HandlerContext): void {
         try {
           return await livePhotoService.exportLivePhoto(filePath, targetDir)
         } catch (error) {
-          logger.error('[IPC] video:exportLivePhoto 失败:', error)
+          logger.error(t('main.video.log.exportLivePhotoFailed'), error)
           throw error
         }
       }
@@ -173,7 +174,7 @@ export function registerVideoHandlers(ctx: HandlerContext): void {
         return {
           success: true,
           taskId: '',
-          message: '视频编辑成功',
+          message: t('main.video.message.editSuccess'),
           outputPath
         }
       } catch (error) {

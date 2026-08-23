@@ -215,16 +215,16 @@ export const DuplicatesPage: React.FC = () => {
   const handleCancelTask = useCallback(async () => {
     if (!taskProgress?.taskId) return
     if (!window.electronAPI?.task?.cancel) {
-      showMessage('当前环境不支持取消', 'error')
+      showMessage(t('duplicates.task.cancelUnsupported'), 'error')
       return
     }
     try {
       await window.electronAPI.task.cancel(taskProgress.taskId)
-      showMessage('已请求取消，正在停止...', 'info')
+      showMessage(t('duplicates.task.cancelRequested'), 'info')
     } catch (err) {
-      showMessage(err instanceof Error ? err.message : '取消失败', 'error')
+      showMessage(err instanceof Error ? err.message : t('duplicates.task.cancelFailed'), 'error')
     }
-  }, [taskProgress, showMessage])
+  }, [taskProgress, showMessage, t])
 
   const runScan = useCallback(
     async (scanMode: ScanMode, thresh?: number) => {
@@ -251,7 +251,12 @@ export const DuplicatesPage: React.FC = () => {
             : ((await api.findSimilar({ threshold: thresh ?? threshold })) as ScanResult)
         // 性能重构 v3：用户取消时显示「已取消」提示，不当作失败
         if (res.cancelled) {
-          showMessage(scanMode === 'exact' ? '重复检测已取消' : '相似检测已取消', 'info')
+          showMessage(
+            scanMode === 'exact'
+              ? t('duplicates.task.exactCancelled')
+              : t('duplicates.task.similarCancelled'),
+            'info'
+          )
           // 取消后保留之前的 result（若有），这里清空避免显示部分结果
           setResult(null)
           return
@@ -811,7 +816,9 @@ export const DuplicatesPage: React.FC = () => {
                             : t('duplicates.loadingSimilar'))}
                       </span>
                       <span style={{ color: 'var(--text-tertiary)' }}>
-                        {taskProgress.phase === 'cancelled' ? '已取消' : `${taskProgress.percent}%`}
+                        {taskProgress.phase === 'cancelled'
+                          ? t('duplicates.task.cancelled')
+                          : `${taskProgress.percent}%`}
                       </span>
                     </div>
                     <div className="progress-bar">
@@ -832,8 +839,10 @@ export const DuplicatesPage: React.FC = () => {
                       </span>
                       <span style={{ color: 'var(--text-tertiary)' }}>
                         {taskProgress.etaMs && taskProgress.etaMs > 0
-                          ? `剩余 ${formatEta(taskProgress.etaMs)}`
-                          : '计算中...'}
+                          ? t('duplicates.task.remainingTime', {
+                              time: formatEta(taskProgress.etaMs)
+                            })
+                          : t('duplicates.task.calculateEta')}
                       </span>
                     </div>
                     {taskProgress.canCancel && (
@@ -843,7 +852,9 @@ export const DuplicatesPage: React.FC = () => {
                           onClick={() => void handleCancelTask()}
                           disabled={taskProgress.phase === 'cancelled'}
                         >
-                          {taskProgress.phase === 'cancelled' ? '正在取消...' : '取消'}
+                          {taskProgress.phase === 'cancelled'
+                            ? t('duplicates.task.cancelling')
+                            : t('common.cancel')}
                         </button>
                       </div>
                     )}
@@ -1023,8 +1034,12 @@ export const DuplicatesPage: React.FC = () => {
                 className="icon-btn flex-shrink-0"
                 onClick={() => void handleCancelTask()}
                 disabled={taskProgress.phase === 'cancelled'}
-                aria-label="取消任务"
-                title={taskProgress.phase === 'cancelled' ? '正在取消...' : '取消'}
+                aria-label={t('duplicates.task.cancelAria')}
+                title={
+                  taskProgress.phase === 'cancelled'
+                    ? t('duplicates.task.cancelling')
+                    : t('common.cancel')
+                }
               >
                 <IconClose size={14} />
               </button>
@@ -1050,10 +1065,10 @@ export const DuplicatesPage: React.FC = () => {
             </span>
             <span style={{ color: 'var(--text-tertiary)' }}>
               {taskProgress.phase === 'cancelled'
-                ? '正在取消...'
+                ? t('duplicates.task.cancelling')
                 : taskProgress.etaMs && taskProgress.etaMs > 0
-                  ? `剩余 ${formatEta(taskProgress.etaMs)}`
-                  : '计算中...'}
+                  ? t('duplicates.task.remainingTime', { time: formatEta(taskProgress.etaMs) })
+                  : t('duplicates.task.calculateEta')}
             </span>
           </div>
         </div>

@@ -17,6 +17,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 import { WorkerRestartPolicy, type WorkerCrashInfo } from '../utils/worker-restart-policy'
 import { findDllPath } from './dll-path'
 import type {
@@ -84,7 +85,7 @@ export class DecryptionWorkerBridge {
     try {
       dllPath = findDllPath()
     } catch (err) {
-      logger.error('[DecryptionWorker] DLL 路径解析失败，不启动 worker:', err)
+      logger.error(t('main.decryption.log.dllResolveFailed'), err)
       void logger.fault('workerCrash', err instanceof Error ? err : new Error(String(err)), {
         workerName: 'decryption-worker',
         stage: 'dll-not-found'
@@ -115,8 +116,8 @@ export class DecryptionWorkerBridge {
       const init: DecryptionWorkerCommand = { type: 'DECRYPT_WORKER_INIT', payload: { dllPath } }
       this.worker.postMessage(init)
     } catch (err) {
-      logger.error('[DecryptionWorker] 发送 INIT 失败:', err)
-      this.failReadyHandshake('INIT 发送失败（decryption-worker）')
+      logger.error(t('main.decryption.log.initSendFailed'), err)
+      this.failReadyHandshake(t('main.decryption.error.initSendFailed'))
       try {
         this.worker.kill()
       } catch {}
@@ -127,12 +128,12 @@ export class DecryptionWorkerBridge {
     // 15s 握手超时：DLL 加载失败 / ABI 不符 / 进程未起，都由这里兜底
     const readyTimeout = setTimeout(() => {
       if (!this.readyReject) return
-      logger.error('[DecryptionWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败')
-      void logger.fault('workerCrash', new Error('decryption-worker 启动超时'), {
+      logger.error(t('main.decryption.log.readyTimeout'))
+      void logger.fault('workerCrash', new Error(t('main.decryption.error.workerReadyTimeout')), {
         workerName: 'decryption-worker',
         stage: 'ready-timeout'
       })
-      this.failReadyHandshake('后台进程启动失败（decryption-worker 未在限定时间内就绪）')
+      this.failReadyHandshake(t('main.decryption.error.workerStartFailed'))
       try {
         this.worker?.kill()
       } catch {}
@@ -178,9 +179,12 @@ export class DecryptionWorkerBridge {
       const timer = setTimeout(() => {
         this.pending.delete(requestId)
         logger.error(
-          `[DecryptionWorker] 网络解码超时（${REQUEST_TIMEOUT_MS}ms），kill 冻结的 worker（requestId=${requestId}）`
+          t('main.decryption.log.decodeTimeout', {
+            ms: String(REQUEST_TIMEOUT_MS),
+            requestId
+          })
         )
-        void logger.fault('workerCrash', new Error('decryption-worker 网络解码超时'), {
+        void logger.fault('workerCrash', new Error(t('main.decryption.error.decodeTimeout')), {
           workerName: 'decryption-worker',
           stage: 'request-timeout'
         })
@@ -201,7 +205,7 @@ export class DecryptionWorkerBridge {
       } catch (err) {
         clearTimeout(timer)
         this.pending.delete(requestId)
-        logger.warn('[DecryptionWorker] 请求发送失败（worker 可能刚退出）:', err)
+        logger.warn(t('main.decryption.log.requestSendFailed'), err)
         resolve({ ok: false, reason: 'worker-crashed' })
       }
     })
@@ -290,7 +294,10 @@ export class DecryptionWorkerBridge {
 
     if (!status.allowed) {
       logger.error(
-        `[DecryptionWorker] 自动重启次数耗尽（${status.currentCount}/${this.restartPolicy.maxRestartCount}）`
+        t('main.decryption.log.restartExhausted', {
+          current: String(status.currentCount),
+          max: String(this.restartPolicy.maxRestartCount)
+        })
       )
       info.restartAttempted = false
       this.notifyCrash(info)
@@ -298,16 +305,16 @@ export class DecryptionWorkerBridge {
     }
 
     const scheduled = this.restartPolicy.scheduleRestart(async () => {
-      logger.info('[DecryptionWorker] 开始自动重启 worker...')
+      logger.info(t('main.decryption.log.restarting'))
       try {
         await this.ensureWorker()
-        logger.info('[DecryptionWorker] worker 已重新启动')
-        void logger.fault('workerRestart', new Error('decryption-worker 已自动重启'), {
+        logger.info(t('main.decryption.log.restarted'))
+        void logger.fault('workerRestart', new Error(t('main.decryption.error.autoRestarted')), {
           workerName: 'decryption-worker',
           exitCode
         })
       } catch (restartErr) {
-        logger.error('[DecryptionWorker] worker 重启失败:', restartErr)
+        logger.error(t('main.decryption.log.restartFailed'), restartErr)
         void logger.fault(
           'workerRestart',
           restartErr instanceof Error ? restartErr : new Error(String(restartErr)),
@@ -337,7 +344,7 @@ export class DecryptionWorkerBridge {
       try {
         listener(info)
       } catch (err) {
-        logger.error('[DecryptionWorker] 崩溃监听器执行失败:', err)
+        logger.error(t('main.decryption.log.crashListenerFailed'), err)
       }
     }
   }
@@ -358,7 +365,7 @@ export class DecryptionWorkerBridge {
     this.isDisposed = true
     this.restartPolicy.dispose()
     // 早于 return 覆盖 worker 已为 null 的情况：等待握手的调用方必须被终结
-    this.failReadyHandshake('decryption-worker 已释放（dispose）')
+    this.failReadyHandshake(t('main.decryption.error.workerDisposed'))
     this.resolveAllPending('disposed')
     if (!this.worker) return
     try {

@@ -3,10 +3,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { InfoRowPanel, type InfoRow, type ParamGroup } from './InfoRowPanel'
 
 vi.mock('../../icons', () => ({
-  IconCopy: (p: any) => <svg data-testid="icon-copy" {...p} />
+  IconCopy: (p: ComponentProps<'svg'>) => <svg data-testid="icon-copy" {...p} />
 }))
 
 const sampleRows: InfoRow[] = [

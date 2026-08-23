@@ -30,6 +30,7 @@ import exifr from 'exifr'
 import { app } from 'electron'
 import { getUniqueFilePath } from '../utils/file-utils'
 import { isImageExt } from '../utils/media-constants'
+import { t } from '../i18n'
 import {
   EDITOR_METADATA_SCHEMA_VERSION,
   type EditorMetadata
@@ -125,7 +126,7 @@ export function parseXmpPacket(xmpString: string): EditorMetadata | null {
       typeof parsed.params !== 'object' ||
       parsed.params === null
     ) {
-      logger.warn('[XmpMetadata] 解析成功但结构无效，schemaVersion 或 params 缺失')
+      logger.warn(t('main.xmpMetadata.log.invalidStructure'))
       return null
     }
 
@@ -138,7 +139,7 @@ export function parseXmpPacket(xmpString: string): EditorMetadata | null {
 
     return parsed
   } catch (err) {
-    logger.warn('[XmpMetadata] 解析 EditorData 失败:', err)
+    logger.warn(t('main.xmpMetadata.log.parseEditorDataFailed'), err)
     return null
   }
 }
@@ -247,17 +248,17 @@ export async function readMetadataFromFile(filePath: string): Promise<EditorMeta
         typeof parsed.params !== 'object' ||
         parsed.params === null
       ) {
-        logger.warn('[XmpMetadata] 读取成功但结构无效')
+        logger.warn(t('main.xmpMetadata.log.readInvalidStructure'))
         return null
       }
       return parsed
     } catch (err) {
-      logger.warn('[XmpMetadata] 反序列化 EditorData 失败:', err)
+      logger.warn(t('main.xmpMetadata.log.deserializeFailed'), err)
       return null
     }
   } catch (err) {
     // exifr 在无 XMP 段时不抛错而是返回 null，此处仅记录真实异常
-    logger.warn('[XmpMetadata] 读取图片 XMP 失败:', err)
+    logger.warn(t('main.xmpMetadata.log.readFailed'), err)
     return null
   }
 }

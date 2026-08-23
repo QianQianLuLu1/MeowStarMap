@@ -3,14 +3,22 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import { ErrorFallback } from './ErrorFallback'
 
 vi.mock('../../icons', () => ({
-  IconWarning: (p: any) => <svg data-testid="icon-warning" {...p} />,
-  IconRefresh: (p: any) => <svg data-testid="icon-refresh" {...p} />,
-  IconFolderOpen: (p: any) => <svg data-testid="icon-folder" {...p} />,
-  IconCopy: (p: any) => <svg data-testid="icon-copy" {...p} />
+  IconWarning: (p: ComponentProps<'svg'>) => <svg data-testid="icon-warning" {...p} />,
+  IconRefresh: (p: ComponentProps<'svg'>) => <svg data-testid="icon-refresh" {...p} />,
+  IconFolderOpen: (p: ComponentProps<'svg'>) => <svg data-testid="icon-folder" {...p} />,
+  IconCopy: (p: ComponentProps<'svg'>) => <svg data-testid="icon-copy" {...p} />
 }))
+
+/** electronAPI 测试子集：仅挂 log.openDirectory */
+const setLogAPI = (openDirectory: ReturnType<typeof vi.fn>): void => {
+  ;(
+    window as unknown as { electronAPI: { log: { openDirectory: ReturnType<typeof vi.fn> } } }
+  ).electronAPI = { log: { openDirectory } }
+}
 
 const makeError = (over: Partial<Error> = {}): Error => {
   const e = new Error('测试错误')
@@ -55,7 +63,7 @@ describe('ErrorFallback', () => {
 
   it('点击"打开日志目录"调用 electronAPI.log.openDirectory', async () => {
     const openDirectory = vi.fn().mockResolvedValue(undefined)
-    ;(window as any).electronAPI = { log: { openDirectory } }
+    setLogAPI(openDirectory)
 
     render(<ErrorFallback error={makeError()} onRetry={vi.fn()} />)
     await act(async () => {
@@ -176,7 +184,7 @@ describe('ErrorFallback', () => {
   })
 
   it('error.stack 为 undefined 时显示 message', () => {
-    render(<ErrorFallback error={makeError({ stack: undefined } as any)} onRetry={vi.fn()} />)
+    render(<ErrorFallback error={makeError({ stack: undefined })} onRetry={vi.fn()} />)
     fireEvent.click(screen.getByText('显示错误详情'))
     // 详情区 <pre> 渲染 message 兜底（存在多元素匹配，用 getAllByText）
     expect(screen.getAllByText(/测试错误/).length).toBeGreaterThan(0)

@@ -21,6 +21,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 import { WorkerRestartPolicy, type WorkerCrashInfo } from '../utils/worker-restart-policy'
 import type { MediaWorkerCommand, MediaWorkerEvent, ThumbnailQuality } from './worker-protocol'
 
@@ -113,13 +114,13 @@ export class MediaWorkerBridge {
     // 超时保护：15s 内未收到 WORKER_READY 则判启动失败，避免调用方无限等待
     const readyTimeout = setTimeout(() => {
       if (!this.readyReject) return
-      logger.error('[MediaWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败')
-      void logger.fault('workerCrash', new Error('media-worker 启动超时'), {
+      logger.error(t('main.mediaWorker.log.readyTimeout'))
+      void logger.fault('workerCrash', new Error(t('main.mediaWorker.error.workerReadyTimeout')), {
         workerName: 'media-worker',
         stage: 'ready-timeout'
       })
       // 拒绝握手并清理卡死的 worker，使后续调用可重新 fork
-      this.failReadyHandshake('后台进程启动失败（media-worker 未在限定时间内就绪）')
+      this.failReadyHandshake(t('main.mediaWorker.error.workerStartFailed'))
       try {
         this.worker?.kill()
       } catch {}
@@ -231,7 +232,7 @@ export class MediaWorkerBridge {
         type: 'THUMBNAIL_COMPLETE',
         payload: {
           success: false,
-          message: '缩略图批量生成进程异常退出',
+          message: t('main.mediaWorker.error.thumbnailProcessExit'),
           processed: 0,
           total: 0
         }
@@ -244,7 +245,7 @@ export class MediaWorkerBridge {
         type: 'PHASH_COMPLETE',
         payload: {
           success: false,
-          message: 'pHash 批量补算进程异常退出',
+          message: t('main.mediaWorker.error.phashProcessExit'),
           processed: 0,
           total: 0
         }
@@ -257,7 +258,7 @@ export class MediaWorkerBridge {
         type: 'DUPLICATE_COMPLETE',
         payload: {
           success: false,
-          message: '重复标记进程异常退出',
+          message: t('main.mediaWorker.error.duplicateProcessExit'),
           markedDuplicates: 0,
           totalGroups: 0
         }
@@ -270,7 +271,7 @@ export class MediaWorkerBridge {
         type: 'SIMILAR_COMPLETE',
         payload: {
           success: false,
-          message: '相似检测进程异常退出',
+          message: t('main.mediaWorker.error.similarProcessExit'),
           rows: [],
           totalCandidates: 0,
           totalRows: 0
@@ -324,11 +325,11 @@ export class MediaWorkerBridge {
     }
 
     const scheduled = this.restartPolicy.scheduleRestart(async () => {
-      logger.info('[MediaWorker] 开始自动重启 worker...')
+      logger.info(t('main.mediaWorker.log.restarting'))
       try {
         await this.ensureWorker()
-        logger.info('[MediaWorker] worker 已重新启动')
-        void logger.fault('workerRestart', new Error('media-worker 已自动重启'), {
+        logger.info(t('main.mediaWorker.log.restarted'))
+        void logger.fault('workerRestart', new Error(t('main.mediaWorker.error.autoRestarted')), {
           workerName: 'media-worker',
           exitCode,
           restoredTasks: runningTasks
@@ -360,9 +361,9 @@ export class MediaWorkerBridge {
           const { dbPath, cacheDir, thumbnailQuality } = this.lastThumbnailTask
           try {
             await this.startThumbnailBatch(dbPath, cacheDir, thumbnailQuality)
-            logger.info('[MediaWorker] 已恢复缩略图批量生成任务')
+            logger.info(t('main.mediaWorker.log.thumbnailRestored'))
           } catch (restoreErr) {
-            logger.error('[MediaWorker] 恢复缩略图任务失败:', restoreErr)
+            logger.error(t('main.mediaWorker.log.thumbnailRestoreFailed'), restoreErr)
             void logger.fault('workerRestart', restoreErr, {
               workerName: 'media-worker',
               stage: 'restore-thumbnail-failed'
@@ -373,9 +374,9 @@ export class MediaWorkerBridge {
           const { dbPath } = this.lastPhashTask
           try {
             await this.startPhashBatch(dbPath)
-            logger.info('[MediaWorker] 已恢复 pHash 批量补算任务')
+            logger.info(t('main.mediaWorker.log.phashRestored'))
           } catch (restoreErr) {
-            logger.error('[MediaWorker] 恢复 pHash 任务失败:', restoreErr)
+            logger.error(t('main.mediaWorker.log.phashRestoreFailed'), restoreErr)
             void logger.fault('workerRestart', restoreErr, {
               workerName: 'media-worker',
               stage: 'restore-phash-failed'
@@ -386,9 +387,9 @@ export class MediaWorkerBridge {
           const { dbPath } = this.lastDuplicateTask
           try {
             await this.startDuplicateMark(dbPath)
-            logger.info('[MediaWorker] 已恢复重复标记任务')
+            logger.info(t('main.mediaWorker.log.duplicateRestored'))
           } catch (restoreErr) {
-            logger.error('[MediaWorker] 恢复重复标记任务失败:', restoreErr)
+            logger.error(t('main.mediaWorker.log.duplicateRestoreFailed'), restoreErr)
             void logger.fault('workerRestart', restoreErr, {
               workerName: 'media-worker',
               stage: 'restore-duplicate-failed'
@@ -399,9 +400,9 @@ export class MediaWorkerBridge {
           const { dbPath, threshold } = this.lastSimilarTask
           try {
             await this.startSimilarFind(dbPath, threshold)
-            logger.info('[MediaWorker] 已恢复相似检测任务')
+            logger.info(t('main.mediaWorker.log.similarRestored'))
           } catch (restoreErr) {
-            logger.error('[MediaWorker] 恢复相似检测任务失败:', restoreErr)
+            logger.error(t('main.mediaWorker.log.similarRestoreFailed'), restoreErr)
             void logger.fault('workerRestart', restoreErr, {
               workerName: 'media-worker',
               stage: 'restore-similar-failed'
@@ -409,7 +410,7 @@ export class MediaWorkerBridge {
           }
         }
       } catch (restartErr) {
-        logger.error('[MediaWorker] worker 重启失败:', restartErr)
+        logger.error(t('main.mediaWorker.log.restartFailed'), restartErr)
         void logger.fault('workerRestart', restartErr, {
           workerName: 'media-worker',
           stage: 'restart-failed'
@@ -427,7 +428,7 @@ export class MediaWorkerBridge {
       try {
         listener(info)
       } catch (err) {
-        logger.error('[MediaWorker] 崩溃监听器执行失败:', err)
+        logger.error(t('main.mediaWorker.log.crashListenerFailed'), err)
       }
     }
   }
@@ -560,7 +561,7 @@ export class MediaWorkerBridge {
     this.restartPolicy.dispose()
     // dispose 期间若仍有调用方在等待握手，必须 reject（早于 return，覆盖 worker 已为 null 的情况）：
     // 此时 worker 即将被 kill，exit 回调与超时定时器都不会再兜底 reject
-    this.failReadyHandshake('media-worker 已释放（dispose）')
+    this.failReadyHandshake(t('main.mediaWorker.error.workerDisposed'))
     if (!this.worker) return
     try {
       const cmd: MediaWorkerCommand = { type: 'MEDIA_WORKER_DISPOSE' }

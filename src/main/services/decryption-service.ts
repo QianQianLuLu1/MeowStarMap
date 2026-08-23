@@ -704,7 +704,11 @@ function mergeRichCameraParams(camera: CameraParams, json: SocialPhotoJSON): Ric
   // 动作场景
   const pose = photoInfo ? num(pick(photoInfo, 'pose_id', 'poseId', 'PoseId')) : 0
   if (pose !== 0) {
-    logger.debug('[decryption] pose_id:', pose, '— 如需映射名称请补充到 POSE_ID_MAP') // TODO: i18n: internal log
+    logger.debug(
+      '[decryption] pose_id:',
+      pose,
+      t('main.decryption.log.mapHint', { map: 'POSE_ID_MAP' })
+    )
   }
 
   // 定格（从 photo_info.framed_moment 读取，非 0 表示有定格）
@@ -715,8 +719,8 @@ function mergeRichCameraParams(camera: CameraParams, json: SocialPhotoJSON): Ric
     logger.debug(
       '[decryption] framed_moment:',
       framedMoment,
-      '— 如需映射名称请补充到 FRAMED_MOMENT_MAP'
-    ) // TODO: i18n: internal log
+      t('main.decryption.log.mapHint', { map: 'FRAMED_MOMENT_MAP' })
+    )
   }
 
   // portrait_mode 优先从 portrait_mode_handler 读取
@@ -839,7 +843,7 @@ function decodeCameraParamsFromFile(
   // 注意：JSON 中可能包含转义的 \/，需要还原为 /
   const match = step1Text.match(/"CameraParams":"([^"]+)"/)
   if (!match) {
-    logger.warn('[decryption] No CameraParams field found in decrypted JSON') // TODO: i18n: internal log
+    logger.warn(t('main.decryption.log.noCameraParams'))
     return { hasParams: false, error: t('main.decryption.error.cameraParamsNotFound') }
   }
 
@@ -977,7 +981,7 @@ export async function decodeFileParams(
         }
         fileData = await fsp.readFile(filePath)
         logger.info('[decryption] File size:', fileData.length)
-      } catch (e) {
+      } catch {
         return { hasParams: false, error: t('main.decryption.error.fileUnreadable') }
       }
 
@@ -1074,7 +1078,7 @@ export async function decodeFileParams(
           }
       }
     } catch (err) {
-      logger.error('[decryption] Unexpected error:', err) // TODO: i18n: internal log
+      logger.error(t('main.decryption.log.unexpectedError', { op: 'decryption' }), err)
       return {
         hasParams: false,
         error: err instanceof Error ? err.message : t('main.decryption.error.unknown')
@@ -1129,7 +1133,7 @@ export async function encodeCameraParams(jsonText: string): Promise<MediaEncrypt
 
       return { success: true, data: outputBuf }
     } catch (err) {
-      logger.error('[encrypt] Unexpected error:', err) // TODO: i18n: internal log
+      logger.error(t('main.decryption.log.unexpectedError', { op: 'encrypt' }), err)
       return {
         success: false,
         error: err instanceof Error ? err.message : t('main.decryption.error.unknown')
@@ -1193,7 +1197,7 @@ export async function decodeClothDiyShareCode(codeStr: string): Promise<ClothDiy
       }
     })
   } catch (err) {
-    logger.error('[clothDiy] Unexpected error:', err) // TODO: i18n: internal log
+    logger.error(t('main.decryption.log.unexpectedError', { op: 'clothDiy' }), err)
     return {
       success: false,
       error: err instanceof Error ? err.message : t('main.decryption.error.unknown')
@@ -1252,7 +1256,7 @@ export async function decodeHomeBuildShareCode(codeStr: string): Promise<HomeBui
       }
     })
   } catch (err) {
-    logger.error('[homeBuild] Unexpected error:', err) // TODO: i18n: internal log
+    logger.error(t('main.decryption.log.unexpectedError', { op: 'homeBuild' }), err)
     return {
       success: false,
       error: err instanceof Error ? err.message : t('main.decryption.error.unknown')

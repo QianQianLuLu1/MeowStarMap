@@ -38,7 +38,6 @@ vi.mock('electron', () => ({
 // 注意：logger.ts 内部调用 fs.mkdirSync（initLogger）+ fs.promises.appendFile（写日志），
 // 需在 mock 中提供，否则 logger.info/error 会抛 TypeError
 vi.mock('fs', () => {
-  const actual: Record<string, unknown> = {}
   return {
     default: {
       statSync: vi.fn(),

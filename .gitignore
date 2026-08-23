@@ -143,3 +143,11 @@ __probe*.txt
 .trae/
 .review/
 .codebuddy/
+.zcode/
+
+# ===== 测试覆盖率产物（不入仓）=====
+coverage/
+
+# ===== 本地一次性恢复产物（不入仓）=====
+_safe_backup_*/
+/restore-root-files.ps1

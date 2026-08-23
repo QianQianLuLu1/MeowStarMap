@@ -424,14 +424,17 @@ npm run format
 
 Config: `eslint.config.js`
 
-Key rules:
+Key rules (since 2026-08-22 the quality rules below are `error`-level and hard-block commits and CI):
 
-- `@typescript-eslint/no-explicit-any`: `warn` (avoid `any`; warn when unavoidable)
-- `@typescript-eslint/no-unused-vars`: `warn` (unused vars prefixed with `_` are ignored)
+- `@typescript-eslint/no-explicit-any`: `error` (explicit `any` is forbidden; provide a concrete type, or use `unknown` with type narrowing when truly unknown)
+- `@typescript-eslint/no-unused-vars`: `error` (unused vars fail the build; prefix intentionally-kept params/caught errors with `_`)
+- `react-hooks/exhaustive-deps`: `error` (hook dependency arrays must be complete — no missing or unnecessary deps)
+- `no-empty`: `error` (empty blocks forbidden; an empty catch is allowed but must carry a comment or handle the error)
+- `@typescript-eslint/no-unsafe-function-type` / `@typescript-eslint/no-require-imports`: `error` (no `Function` type, no `require()` imports)
 - `react/react-in-jsx-scope`: `off` (React 17+ JSX transform; no need to import React)
-- `no-empty`: `warn` (empty catch allowed; comment recommended)
+- `no-restricted-syntax`: `warn` (i18n guardrail: no hardcoded Chinese or debug console calls; being converged gradually, non-blocking)
 
-Run before commit:
+Run before commit and make sure there are **0 errors**:
 
 ```bash
 npm run lint
@@ -836,12 +839,13 @@ npm run preview:check
 
 ---
 
-## Contact
+## Developer Info / Author & Social Platforms
 
-- **Developer**: QianLu
-- **Social handle**: 纤璐不会玩摄影
-- **Douyin**: [v.douyin.com/XkTzyJeCFIU](https://v.douyin.com/XkTzyJeCFIU/)
-- **Bilibili**: [b23.tv/FtjgFrW](https://b23.tv/FtjgFrW)
+- **Douyin**: 纤璐不会玩摄影 ([profile](https://v.douyin.com/Dx67wYkw48A/))
+- **Xiaohongshu (RED)**: 纤璐不会玩摄影 ([profile](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
+- **Bilibili**: 纤璐不会玩摄影 ([profile](https://b23.tv/zCR5oGE))
+- **GitHub**: [QianQianLuLu1](https://github.com/QianQianLuLu1)
+- **CSDN Blog**: [QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 
 ---
 

@@ -11,11 +11,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 let mockStats: () => Promise<{
   channels: Array<{ mean: number }>
 }>
-let sharpInputPath: string | undefined
 
 vi.mock('sharp', () => {
-  const sharpFn = vi.fn((inputPath: string) => {
-    sharpInputPath = inputPath
+  const sharpFn = vi.fn(() => {
     return {
       resize: vi.fn().mockReturnThis(),
       stats: () => mockStats()
@@ -36,7 +34,6 @@ import { analyzeSceneBrightness, analyzeSceneBrightnessBatch } from './scene-bri
 
 describe('scene-brightness', () => {
   beforeEach(() => {
-    sharpInputPath = undefined
     mockStats = async () => ({ channels: [{ mean: 128 }, { mean: 128 }, { mean: 128 }] })
   })
 

@@ -16,6 +16,7 @@ import { taskRegistry } from '../../utils/task-registry'
 import { ProgressThrottle } from '../../utils/progress-throttle'
 import { EtaCalculator } from '../../utils/eta-calculator'
 import type { TaskProgress } from '../../../shared/types/progress'
+import { t } from '../../i18n'
 
 export function registerWatermarkHandlers(ctx: HandlerContext): void {
   // 水印
@@ -52,7 +53,7 @@ export function registerWatermarkHandlers(ctx: HandlerContext): void {
             current: 0,
             total: 0,
             percent: 0,
-            message: '水印任务已取消',
+            message: t('main.watermark.message.cancelled'),
             startedAt,
             canCancel: false
           })
@@ -97,11 +98,11 @@ export function registerWatermarkHandlers(ctx: HandlerContext): void {
             config as unknown as WatermarkConfig,
             filePaths,
             targetDir,
-            (current, t) => {
+            (current, total) => {
               // 向后兼容：保留 watermark:progress 通道推送（旧监听者忽略新增字段）
-              ctx.getMainWindow()?.webContents.send('watermark:progress', { current, total: t })
+              ctx.getMainWindow()?.webContents.send('watermark:progress', { current, total })
               // 同时推送统一 task:progress 通道（含 ETA + taskId，供新 UI 订阅）
-              pushProgress(current, `添加水印 ${current}/${t}`)
+              pushProgress(current, t('main.watermark.progress.applying', { current, total }))
             },
             controller.signal
           )
@@ -110,9 +111,9 @@ export function registerWatermarkHandlers(ctx: HandlerContext): void {
           if (result.cancelled) {
             // 取消时已由 abort 监听器推送 cancelled 终态，无需再推 done
           } else if (result.success) {
-            pushTerminal('done', result.message || '水印任务完成')
+            pushTerminal('done', result.message || t('main.watermark.message.done'))
           } else {
-            pushTerminal('error', result.message || '水印任务失败')
+            pushTerminal('error', result.message || t('main.watermark.message.failed'))
           }
 
           return {
@@ -138,12 +139,12 @@ export function registerWatermarkHandlers(ctx: HandlerContext): void {
         // config 为 JSON 字符串，限长 256KB 避免恶意超大写入
         z
           .string()
-          .min(1, 'config 不能为空')
-          .max(256 * 1024, 'config 长度上限 256KB')
+          .min(1, t('main.watermark.validation.configRequired'))
+          .max(256 * 1024, t('main.watermark.validation.configMaxLength'))
       ]),
       async ([name, config]) => {
         const db = ctx.dbManager.getDatabase()
-        if (!db) throw AppError.preconditionFailed('数据库未初始化')
+        if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
         const result = db
           .prepare(
             'INSERT INTO watermark_templates (name, config, is_builtin, created_at) VALUES (?, ?, 0, datetime("now"))'
@@ -167,7 +168,7 @@ export function registerWatermarkHandlers(ctx: HandlerContext): void {
     'watermark:deleteTemplate',
     wrapHandler(ctx, z.tuple([schemas.positiveIntId]), async ([id]) => {
       const db = ctx.dbManager.getDatabase()
-      if (!db) throw AppError.preconditionFailed('数据库未初始化')
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
       db.prepare('DELETE FROM watermark_templates WHERE id = ?').run(id)
       return { deleted: true }
     })

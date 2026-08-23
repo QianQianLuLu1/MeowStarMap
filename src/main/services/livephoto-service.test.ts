@@ -69,12 +69,12 @@ let service: LivePhotoService
 beforeEach(() => {
   vi.clearAllMocks()
   // mockReset 清除 once 队列和默认实现，避免跨测试泄漏
-  ;(runFfmpegCommand as any).mockReset()
-  ;(assertDiskSpace as any).mockReset()
-  ;(probeVideoMetadata as any).mockReset()
-  ;(runFfmpegCommand as any).mockResolvedValue(undefined)
-  ;(assertDiskSpace as any).mockResolvedValue(undefined)
-  ;(probeVideoMetadata as any).mockResolvedValue({ duration: 10, width: 1920, height: 1080 })
+  vi.mocked(runFfmpegCommand).mockReset()
+  vi.mocked(assertDiskSpace).mockReset()
+  vi.mocked(probeVideoMetadata).mockReset()
+  vi.mocked(runFfmpegCommand).mockResolvedValue(undefined)
+  vi.mocked(assertDiskSpace).mockResolvedValue(undefined)
+  vi.mocked(probeVideoMetadata).mockResolvedValue({ duration: 10, width: 1920, height: 1080 })
 
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-livephoto-'))
   srcVideo = path.join(tmpRoot, 'src.mp4')
@@ -122,7 +122,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
     await service.exportLivePhoto(srcVideo, outDir, 60_000)
 
     expect(runFfmpegCommand).toHaveBeenCalled()
-    for (const call of (runFfmpegCommand as any).mock.calls) {
+    for (const call of vi.mocked(runFfmpegCommand).mock.calls) {
       expect(call[2]).toBe(60_000)
     }
   })
@@ -145,7 +145,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：assertDiskSpace 抛错时返回失败且不调用 ffmpeg', async () => {
-    ;(assertDiskSpace as any).mockRejectedValue(new Error('磁盘空间不足，需要 100 MB，仅剩 10 MB'))
+    vi.mocked(assertDiskSpace).mockRejectedValue(new Error('磁盘空间不足，需要 100 MB，仅剩 10 MB'))
 
     const r = await service.exportLivePhoto(srcVideo, outDir)
 
@@ -155,7 +155,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：duration=0 抛错"无法读取视频时长"', async () => {
-    ;(probeVideoMetadata as any).mockResolvedValue({ duration: 0 })
+    vi.mocked(probeVideoMetadata).mockResolvedValue({ duration: 0 })
 
     const r = await service.exportLivePhoto(srcVideo, outDir)
 
@@ -165,7 +165,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：duration=undefined 抛错"无法读取视频时长"', async () => {
-    ;(probeVideoMetadata as any).mockResolvedValue({ width: 1920, height: 1080 })
+    vi.mocked(probeVideoMetadata).mockResolvedValue({ width: 1920, height: 1080 })
 
     const r = await service.exportLivePhoto(srcVideo, outDir)
 
@@ -174,7 +174,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：duration 为负数也判为无效', async () => {
-    ;(probeVideoMetadata as any).mockResolvedValue({ duration: -5 })
+    vi.mocked(probeVideoMetadata).mockResolvedValue({ duration: -5 })
 
     const r = await service.exportLivePhoto(srcVideo, outDir)
 
@@ -183,7 +183,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：JPG 拆帧失败时清理已生成的部分输出', async () => {
-    ;(runFfmpegCommand as any)
+    vi.mocked(runFfmpegCommand)
       .mockRejectedValueOnce(new Error('capture failed')) // 第一次调用（JPG）失败
       .mockResolvedValueOnce(undefined) // 不会执行
 
@@ -201,7 +201,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：MOV 转码失败时清理已生成的 JPG 与部分 MOV', async () => {
-    ;(runFfmpegCommand as any)
+    vi.mocked(runFfmpegCommand)
       .mockResolvedValueOnce(undefined) // JPG 成功
       .mockRejectedValueOnce(new Error('transcode failed')) // MOV 失败
 
@@ -214,7 +214,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：cleanupPartial 在文件不存在时静默忽略', async () => {
-    ;(runFfmpegCommand as any).mockRejectedValue(new Error('capture failed'))
+    vi.mocked(runFfmpegCommand).mockRejectedValue(new Error('capture failed'))
 
     // 不预先创建任何文件，cleanupPartial 应静默通过
     const r = await service.exportLivePhoto(srcVideo, outDir)
@@ -224,7 +224,7 @@ describe('LivePhotoService.exportLivePhoto', () => {
   })
 
   it('异常路径：非 Error 对象抛出时使用 String 转换', async () => {
-    ;(probeVideoMetadata as any).mockRejectedValue('string-error')
+    vi.mocked(probeVideoMetadata).mockRejectedValue('string-error')
 
     const r = await service.exportLivePhoto(srcVideo, outDir)
 

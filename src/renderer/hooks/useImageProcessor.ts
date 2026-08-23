@@ -97,7 +97,7 @@ export function useImageProcessor({
         setPreviewUrl(dataUrl)
         setError(null)
       } catch (err) {
-        console.error('预览渲染失败:', err) // TODO: i18n
+        console.error(t('toast.previewRenderFailed'), err)
         if (token === pendingRef.current) {
           setError(err instanceof Error ? err.message : t('toast.previewRenderFailed'))
         }
@@ -113,6 +113,13 @@ export function useImageProcessor({
   useEffect(() => {
     renderPreviewRef.current = renderPreview
   }, [renderPreview])
+
+  // 持有最新的 t：onerror 使用翻译函数但不列入 [source] 依赖，
+  // 避免语言切换触发图片重新加载
+  const tRef = useRef(t)
+  useEffect(() => {
+    tRef.current = t
+  }, [t])
 
   useEffect(() => {
     if (!source) {
@@ -139,7 +146,7 @@ export function useImageProcessor({
     }
     img.onerror = () => {
       setLoading(false)
-      setError(t('toast.imageLoadFailed'))
+      setError(tRef.current('toast.imageLoadFailed'))
     }
     img.src = source
 
@@ -245,7 +252,7 @@ export function useImageProcessor({
         setError(null)
         return dataUrl
       } catch (err) {
-        console.error('导出失败:', err) // TODO: i18n
+        console.error(t('toast.exportFailed'), err)
         setError(err instanceof Error ? err.message : t('toast.exportFailed'))
         return null
       }

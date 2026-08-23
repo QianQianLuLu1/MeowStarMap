@@ -1,6 +1,7 @@
 import { BrowserWindow } from 'electron'
 import type { HandlerContext } from '../handler-context'
 import { AppError } from '../../../shared/errors/app-error'
+import { t } from '../../i18n'
 
 /**
  * 复刻 index.ts 中 this.getMainWindow() 的行为：
@@ -9,6 +10,6 @@ import { AppError } from '../../../shared/errors/app-error'
  */
 export function requireMainWindow(ctx: HandlerContext): BrowserWindow {
   const win = ctx.getMainWindow() ?? BrowserWindow.getFocusedWindow()
-  if (!win) throw AppError.preconditionFailed('主窗口未初始化')
+  if (!win) throw AppError.preconditionFailed(t('main.error.mainWindowNotInit'))
   return win
 }

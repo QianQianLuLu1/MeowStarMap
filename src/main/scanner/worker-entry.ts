@@ -18,7 +18,6 @@
 import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
-import { execFile } from 'child_process'
 // 步骤4：原生模块改为惰性加载，使 ABI 不匹配时崩溃能被 worker 的未捕获异常处理捕获并发送 WORKER_ERROR
 // 而非在模块加载期静默崩溃导致 worker 进程直接消失
 import type DatabaseType from 'better-sqlite3'
@@ -32,6 +31,7 @@ import { probeVideoMetadata } from '../utils/video-probe'
 import { repairLegacyDataV1 } from './repair-legacy-data-v1'
 import { repairLegacyDataV3 } from './repair-legacy-data-v3'
 import { repairLegacyDataV4 } from './repair-legacy-data-v4'
+import { t } from '../i18n/worker-safe'
 // C-G3：共享命名常量（取代魔法数字）
 // TDD 重构：路径分类纯函数抽取到独立文件，便于单元测试（无 electron/sharp/ffmpeg 依赖）
 import {
@@ -83,53 +83,6 @@ const CACHE_DIR_NAMES = new Set([
   'previews',
   '.thumbs',
   'thumb'
-])
-
-// 全盘搜索时跳过的系统目录（小写匹配，避免扫描无意义目录浪费时间）
-const SYSTEM_DIRS_TO_SKIP = new Set([
-  'windows',
-  'programdata',
-  '$recycle.bin',
-  'system volume information',
-  'recovery',
-  'perflogs',
-  'msocache',
-  'config.msi',
-  '$windows.~bt',
-  '$windows.~ws',
-  'intel',
-  'amd',
-  'nvidia corporation',
-  'driverstore',
-  'winsxs',
-  'servicing',
-  'installer',
-  'assembly',
-  'temp',
-  'tmp',
-  'cache',
-  // P0-01：新增更多系统/应用目录跳过，提升全盘搜索性能
-  'appdata',
-  'microsoft',
-  'windowsapps',
-  'packages',
-  'node_modules',
-  '.git',
-  '__pycache__',
-  '.vscode',
-  '.idea',
-  // F-G1：云同步目录跳过——避免扫描 OneDrive/iCloud/Dropbox/Google Drive 照片库
-  // 这些目录中的照片通常已是云端的本地副本，扫描会引入重复索引且占用 OneDrive 下载配额
-  'onedrive',
-  'iclouddrive',
-  'dropbox',
-  'google drive',
-  // 系统程序目录：仅全盘搜索找不到游戏目录时才会遍历，跳过可加速
-  // scanDirectory 不检查 SYSTEM_DIRS_TO_SKIP，用户手动配置的路径不受影响
-  'common files',
-  'common files (x86)',
-  'program files (x86)',
-  'program files'
 ])
 
 // P0-01：全盘文件名签名搜索的并发盘符数限制
@@ -327,14 +280,14 @@ function repairLegacyDataV2(): boolean {
     } catch (markErr) {
       workerLog(
         'warn',
-        '[Scanner] repairLegacyDataV2: 标记迁移状态失败:',
+        t('main.scanner.log.markMigrationV2Failed'),
         markErr instanceof Error ? markErr.message : String(markErr)
       )
     }
   } catch (err) {
     workerLog(
       'error',
-      '[Scanner] repairLegacyDataV2 失败:',
+      t('main.scanner.log.repairV2Failed'),
       err instanceof Error ? err.message : String(err)
     )
     // FIX(组3-4): 返回失败标志，调用方中止后续修复步骤
@@ -417,7 +370,7 @@ async function checkMissingFiles(): Promise<void> {
     // workerLog 对 Error 对象会用 JSON.stringify 丢失 stack，转 message 保留可读信息
     workerLog(
       'error',
-      '[Scanner] 完整性校验失败:',
+      t('main.scanner.log.integrityCheckFailed'),
       error instanceof Error ? error.message : String(error)
     )
   }
@@ -1050,7 +1003,7 @@ async function startScan(
       if (mediaDirs.length === 0) {
         progress.status = 'failed'
         updateScanHistory(scanId, 'failed', 0, 0)
-        return { success: false, message: '全盘扫描未找到任何游戏媒体目录，请手动指定路径' }
+        return { success: false, message: t('main.scanner.error.noMediaDirFound') }
       }
 
       // 方案三：从游戏目录独立发现 UID 并注册到 character_profiles 表
@@ -1124,7 +1077,7 @@ async function startScan(
     if (!targetPath) {
       progress.status = 'failed'
       updateScanHistory(scanId, 'failed', 0, 0)
-      return { success: false, message: '未找到游戏目录，请手动指定或使用全盘扫描' }
+      return { success: false, message: t('main.scanner.error.gameDirNotFound') }
     }
 
     // 单目录扫描（导入向导）：禁用缓存目录跳过与小图片过滤，避免用户导入的文件被误跳过
@@ -1225,7 +1178,7 @@ const HEARTBEAT_INTERVAL_MS = 5000
 const HEARTBEAT_TIMEOUT_MS = 15000
 const heartbeatTimer = setInterval(() => {
   if (Date.now() - lastPingTime > HEARTBEAT_TIMEOUT_MS) {
-    workerLog('error', '主进程心跳超时，worker 自动退出（避免孤儿写入）')
+    workerLog('error', t('main.scanner.log.heartbeatTimeout'))
     shouldStop = true
     cleanupAndExit()
   }

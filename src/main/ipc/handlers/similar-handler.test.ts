@@ -11,7 +11,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
-import { AppError } from '../../../shared/errors/app-error'
 import type { SimilarRowMeta } from '../../media-worker/worker-protocol'
 
 const {
@@ -20,18 +19,8 @@ const {
   pickBestIdMock,
   repoMock,
   generatePhashForUnprocessedMock,
-  mediaWorkerManagerMock,
-  schemasProxy
+  mediaWorkerManagerMock
 } = vi.hoisted(() => {
-  const schemasProxy: any = new Proxy(
-    {},
-    {
-      get: (_t, prop) => {
-        if (typeof prop === 'symbol') return undefined
-        return () => undefined
-      }
-    }
-  )
   return {
     handleMock: vi.fn(),
     showMessageBoxMock: vi.fn(),
@@ -45,8 +34,7 @@ const {
     mediaWorkerManagerMock: {
       startSimilarFind: vi.fn(),
       stopSimilarFind: vi.fn()
-    },
-    schemasProxy
+    }
   }
 })
 
@@ -73,45 +61,7 @@ vi.mock('../../utils/logger', () => ({
   getLogDirectory: vi.fn(() => '/mock/logs')
 }))
 
-vi.mock('../validator', () => {
-  // 测试约定：handler 调用时第一个实参为参数元组，需解包为 zod parseResult.data 形式
-  const unwrap = (args: unknown[]) => (args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-  return {
-    wrapHandler: vi.fn(
-      (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-        async (...args: unknown[]) => {
-          try {
-            const data = await handler(unwrap(args))
-            return { success: true as const, data }
-          } catch (e) {
-            if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-            return {
-              success: false as const,
-              error: {
-                code: 'IPC_INTERNAL_ERROR',
-                message: e instanceof Error ? e.message : String(e)
-              }
-            }
-          }
-        }
-    ),
-    wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-      try {
-        const data = await handler()
-        return { success: true as const, data }
-      } catch (e) {
-        if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-        return {
-          success: false as const,
-          error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-        }
-      }
-    }),
-    schemas: schemasProxy,
-    assertFileReadPath: vi.fn(),
-    assertFileWritePath: vi.fn()
-  }
-})
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerSimilarHandlers } from './similar-handler'
 
@@ -137,13 +87,6 @@ function getHandler(channel: string): (...args: unknown[]) => Promise<unknown> {
     if (call[0] === channel) return call[1]
   }
   throw new Error(`未找到 channel: ${channel}`)
-}
-
-/** 模拟 preload call() 解包 IpcResponse → 返回 data（与 media.test.ts 约定一致） */
-async function simulateCall<T>(handlerResult: unknown): Promise<T> {
-  const res = handlerResult as { success: boolean; data: T; error?: { message: string } }
-  if (res && res.success) return res.data
-  throw new Error(res?.error?.message ?? 'IPC 调用失败')
 }
 
 const rowA: SimilarRowMeta = {

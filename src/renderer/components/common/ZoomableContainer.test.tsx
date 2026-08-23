@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 
 vi.mock('../../hooks/useZoomable', () => ({
   useZoomable: () => ({
@@ -16,7 +17,7 @@ vi.mock('../../hooks/useZoomable', () => ({
 }))
 
 vi.mock('../../icons', () => ({
-  IconReset: (p: any) => <svg data-testid="icon-reset" {...p} />
+  IconReset: (p: ComponentProps<'svg'>) => <svg data-testid="icon-reset" {...p} />
 }))
 
 import { ZoomableContainer } from './ZoomableContainer'
@@ -30,7 +31,7 @@ const mockState = {
 }
 
 vi.mock('../../hooks/useZoomable', () => ({
-  useZoomable: (_opts: any) => ({
+  useZoomable: (_opts: { maxZoom?: number; zoomStep?: number; doubleClickZoom?: number }) => ({
     scale: mockState.scale,
     position: mockState.position,
     dragging: mockState.dragging,

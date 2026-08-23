@@ -6,23 +6,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import path from 'path'
-import type { HandlerContext } from '../handler-context'
 import { AppError } from '../../../shared/errors/app-error'
 import { ImportRootRepository } from '../../database/import-root-repository'
 import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
 
-const {
-  handleMock,
-  generateThumbnailsForUnprocessedMock,
-  assertFileReadPathMock,
-  assertFileWritePathMock,
-  pathGuardMock
-} = vi.hoisted(() => ({
+const { handleMock, generateThumbnailsForUnprocessedMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
-  generateThumbnailsForUnprocessedMock: vi.fn(),
-  assertFileReadPathMock: vi.fn(),
-  assertFileWritePathMock: vi.fn(),
-  pathGuardMock: { registerRoots: vi.fn(), register: vi.fn() }
+  generateThumbnailsForUnprocessedMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -40,65 +30,22 @@ vi.mock('../../utils/logger', () => ({
   getLogDirectory: vi.fn(() => '/mock/logs')
 }))
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn((ctx: unknown, handler: () => unknown) => async () => {
-    try {
-      const data = await handler()
-      return { success: true as const, data }
-    } catch (e) {
-      if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-      return {
-        success: false as const,
-        error: { code: 'IPC_INTERNAL_ERROR', message: e instanceof Error ? e.message : String(e) }
-      }
-    }
-  }),
-  wrapHandlerRaw: vi.fn(
-    (ctx: unknown, handler: (args: unknown[], ctx?: unknown) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(
-            args.length === 1 && Array.isArray(args[0]) ? args[0] : args,
-            ctx
-          )
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock,
-  pathGuard: pathGuardMock
+// scanner:start 的 raw handler 会对 schemas 组合出的 zod schema 真实 safeParse，
+// 故在共享 mock 基础上仅覆盖 schemas 为真实 zod（其余成员沿用共享 mock）
+vi.mock('../validator', async () => ({
+  ...(await import('../../../../tests/mocks/mock-validator')),
+  schemas: createSchemasMock()
 }))
 
 import { registerScannerHandlers } from './scanner-handler'
+import { assertFileReadPath, assertFileWritePath, pathGuard } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
+const assertFileWritePathMock = vi.mocked(assertFileWritePath)
+const pathGuardMock = {
+  registerRoots: vi.mocked(pathGuard.registerRoots),
+  register: vi.mocked(pathGuard.register)
+}
 
 describe('registerScannerHandlers', () => {
   beforeEach(() => {

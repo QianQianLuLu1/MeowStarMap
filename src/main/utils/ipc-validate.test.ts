@@ -261,10 +261,11 @@ describe('ipc-validate', () => {
 
     it('用户主目录下的凭据目录拒绝，普通目录放行', () => {
       const home = os.homedir()
-      expect(isSensitivePath(path.join(home, '.ssh', 'id_rsa'))).toBe(true)
-      expect(isSensitivePath(path.join(home, '.aws', 'credentials'))).toBe(true)
-      expect(isSensitivePath(path.join(home, '.gnupg', 'pubring.kbx'))).toBe(true)
-      expect(isSensitivePath(path.join(home, 'Pictures', 'photo.jpg'))).toBe(false)
+      // path.posix.join 保证 Linux 上拼接出纯逻辑可判定的路径（源码已固化 win32 语义）
+      expect(isSensitivePath(path.posix.join(home, '.ssh', 'id_rsa'))).toBe(true)
+      expect(isSensitivePath(path.posix.join(home, '.aws', 'credentials'))).toBe(true)
+      expect(isSensitivePath(path.posix.join(home, '.gnupg', 'pubring.kbx'))).toBe(true)
+      expect(isSensitivePath(path.posix.join(home, 'Pictures', 'photo.jpg'))).toBe(false)
       // 同名目录不在主目录下时不误伤
       expect(isSensitivePath('D:\\game\\.ssh\\config')).toBe(false)
     })
@@ -272,52 +273,61 @@ describe('ipc-validate', () => {
     it('validateNonSensitivePath 对扩展场景生效', () => {
       expect(validateNonSensitivePath('D:\\Windows\\explorer.exe').valid).toBe(false)
       expect(validateNonSensitivePath('\\\\server\\c$\\Users\\x').valid).toBe(false)
-      expect(validateNonSensitivePath(path.join(os.homedir(), '.ssh', 'config')).valid).toBe(false)
+      expect(validateNonSensitivePath(path.posix.join(os.homedir(), '.ssh', 'config')).valid).toBe(
+        false
+      )
     })
 
-    it('符号链接指向敏感目录时 realpath 复检拒绝（junction 不需要管理员权限）', () => {
-      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nikki-sensitive-'))
-      const linkToSensitive = path.join(tmpDir, 'looks-normal')
-      const normalTarget = path.join(tmpDir, 'normal')
-      const linkToNormal = path.join(tmpDir, 'link-normal')
-      // 假敏感目录：D:\Windows\<unique>，匹配 DRIVE_SYSTEM_DIR_RE（盘符后第一段为 windows），
-      // 避开本机 C:\Windows\System32 被系统锁定导致 junction 创建失败（EBUSY）。
-      // 唯一子目录避免与真实 D:\Windows 冲突，清理时只删自己创建的目录。
-      const fakeSensitiveDir = path.join('D:\\Windows', `nikki-${process.pid}-${Date.now()}`)
-      try {
-        fs.mkdirSync(fakeSensitiveDir, { recursive: true })
-        fs.symlinkSync(fakeSensitiveDir, linkToSensitive, 'junction')
-        expect(validateNonSensitivePath(linkToSensitive).valid).toBe(false)
+    // 依赖真实 Windows 文件系统（junction 符号链接 / D:\Windows 目录），仅 win32 执行；
+    // 源码已用 path.win32 固化语义，其余纯逻辑用例全平台运行。
+    describe.skipIf(process.platform !== 'win32')(
+      '符号链接敏感目录复检（仅 Windows 真实文件系统）',
+      () => {
+        it('符号链接指向敏感目录时 realpath 复检拒绝（junction 不需要管理员权限）', () => {
+          const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nikki-sensitive-'))
+          const linkToSensitive = path.join(tmpDir, 'looks-normal')
+          const normalTarget = path.join(tmpDir, 'normal')
+          const linkToNormal = path.join(tmpDir, 'link-normal')
+          // 假敏感目录：D:\Windows\<unique>，匹配 DRIVE_SYSTEM_DIR_RE（盘符后第一段为 windows），
+          // 避开本机 C:\Windows\System32 被系统锁定导致 junction 创建失败（EBUSY）。
+          // 唯一子目录避免与真实 D:\Windows 冲突，清理时只删自己创建的目录。
+          const fakeSensitiveDir = path.join('D:\\Windows', `nikki-${process.pid}-${Date.now()}`)
+          try {
+            fs.mkdirSync(fakeSensitiveDir, { recursive: true })
+            fs.symlinkSync(fakeSensitiveDir, linkToSensitive, 'junction')
+            expect(validateNonSensitivePath(linkToSensitive).valid).toBe(false)
 
-        // 对照组：junction 指向普通临时目录 → 放行
-        fs.mkdirSync(normalTarget)
-        fs.symlinkSync(normalTarget, linkToNormal, 'junction')
-        expect(validateNonSensitivePath(linkToNormal).valid).toBe(true)
-      } finally {
-        // 先删除 junction 链接（rmdirSync 仅删除重解析点，不跟随目标），
-        // 再逐个删除空目录。不用 fs.rmSync 递归：本机 Node 对非空目录
-        // 的 rmdirSync 静默失败（不抛错也不删除），递归会残留目录。
-        try {
-          fs.rmdirSync(linkToSensitive)
-        } catch {}
-        try {
-          fs.rmdirSync(linkToNormal)
-        } catch {}
-        try {
-          fs.rmdirSync(normalTarget)
-        } catch {}
-        try {
-          fs.rmdirSync(tmpDir)
-        } catch {}
-        // 清理假敏感目录及其空父目录（仅当是我们创建且为空时才删除）
-        try {
-          fs.rmdirSync(fakeSensitiveDir)
-        } catch {}
-        try {
-          fs.rmdirSync('D:\\Windows')
-        } catch {}
+            // 对照组：junction 指向普通临时目录 → 放行
+            fs.mkdirSync(normalTarget)
+            fs.symlinkSync(normalTarget, linkToNormal, 'junction')
+            expect(validateNonSensitivePath(linkToNormal).valid).toBe(true)
+          } finally {
+            // 先删除 junction 链接（rmdirSync 仅删除重解析点，不跟随目标），
+            // 再逐个删除空目录。不用 fs.rmSync 递归：本机 Node 对非空目录
+            // 的 rmdirSync 静默失败（不抛错也不删除），递归会残留目录。
+            try {
+              fs.rmdirSync(linkToSensitive)
+            } catch {}
+            try {
+              fs.rmdirSync(linkToNormal)
+            } catch {}
+            try {
+              fs.rmdirSync(normalTarget)
+            } catch {}
+            try {
+              fs.rmdirSync(tmpDir)
+            } catch {}
+            // 清理假敏感目录及其空父目录（仅当是我们创建且为空时才删除）
+            try {
+              fs.rmdirSync(fakeSensitiveDir)
+            } catch {}
+            try {
+              fs.rmdirSync('D:\\Windows')
+            } catch {}
+          }
+        })
       }
-    })
+    )
   })
 
   describe('validateNumberRange', () => {

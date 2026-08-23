@@ -3,13 +3,14 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 import type { MediaFile } from '../../stores/mediaStore'
 import type { ExifData } from '../../hooks/useExif'
 
 vi.mock('../../icons', () => ({
-  IconCamera: (p: any) => <svg data-testid="icon-camera" {...p} />,
-  IconCopyText: (p: any) => <svg data-testid="icon-copy" {...p} />,
-  IconInfo: (p: any) => <svg data-testid="icon-info" {...p} />
+  IconCamera: (p: ComponentProps<'svg'>) => <svg data-testid="icon-camera" {...p} />,
+  IconCopyText: (p: ComponentProps<'svg'>) => <svg data-testid="icon-copy" {...p} />,
+  IconInfo: (p: ComponentProps<'svg'>) => <svg data-testid="icon-info" {...p} />
 }))
 
 const mockExifResult = {

@@ -22,6 +22,7 @@ import {
   type SearchableDoc
 } from './search-index'
 import { buildSearchableDoc } from './doc-builder'
+import i18n from '../i18n'
 import type { MediaFile } from '../stores/mediaStore'
 
 export type SearchState = 'idle' | 'loading' | 'ready' | 'error'
@@ -79,7 +80,7 @@ class SearchService {
     try {
       // HTML 预览版无 IPC，直接降级到 error（调用方走客户端过滤）
       if (!window.electronAPI?.media?.searchImportIndex) {
-        console.warn('[Search] 无 IPC 环境（HTML 预览版），降级到客户端过滤')
+        console.warn(i18n.t('searchService.log.noIpcFallback'))
         this.setState('error')
         return
       }
@@ -96,7 +97,7 @@ class SearchService {
             const currentSchemaHash = await this.computeSchemaHash()
             if (storedSchemaHash !== currentSchemaHash) {
               console.warn(
-                '[Search] 索引 schema_hash 不匹配，触发重建:',
+                i18n.t('searchService.log.schemaHashMismatch'),
                 `stored=${storedSchemaHash}, current=${currentSchemaHash}`
               )
               await this.rebuild()
@@ -119,14 +120,14 @@ class SearchService {
             return
           } catch (importErr) {
             // 旧索引可能用 fastupdate: true 导出，与新配置不兼容
-            console.warn('[Search] 索引导入失败，降级到全量重建:', importErr)
+            console.warn(i18n.t('searchService.log.importFailedFallback'), importErr)
           }
         }
       }
       // 无缓存或缓存过期或导入失败 → 全量重建
       await this.rebuild()
     } catch (err) {
-      console.error('[Search] 初始化失败，降级到客户端过滤:', err)
+      console.error(i18n.t('searchService.log.initFailedFallback'), err)
       this.setState('error')
     }
   }
@@ -178,7 +179,7 @@ class SearchService {
       await this.persist()
       this.setState('ready')
     } catch (err) {
-      console.error('[Search] 全量重建失败:', err)
+      console.error(i18n.t('searchService.log.rebuildFailed'), err)
       this.setState('error')
     }
   }
@@ -242,7 +243,7 @@ class SearchService {
     this.persistTimer = setTimeout(() => {
       this.persistTimer = null
       void this.persist().catch((err) => {
-        console.warn('[Search] 防抖持久化失败:', err)
+        console.warn(i18n.t('searchService.log.persistDebouncedFailed'), err)
       })
     }, PERSIST_DEBOUNCE_MS)
   }
@@ -280,13 +281,13 @@ class SearchService {
         Math.abs(dbTotal - this.indexedDocCount) > dbTotal * REBUILD_DEVIATION_RATIO
       ) {
         console.warn(
-          '[Search] 索引文档数与数据库不一致，触发重建:',
+          i18n.t('searchService.log.docCountMismatch'),
           `indexed=${this.indexedDocCount}, db=${dbTotal}`
         )
         await this.rebuild()
       }
     } catch (err) {
-      console.warn('[Search] 校验失败:', err)
+      console.warn(i18n.t('searchService.log.verifyFailed'), err)
     }
   }
 

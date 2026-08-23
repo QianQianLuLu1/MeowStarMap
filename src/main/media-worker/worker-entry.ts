@@ -28,6 +28,7 @@ import type DatabaseType from 'better-sqlite3'
 // C-3：统一文件存在检查与视频扩展名判定
 import { pathExists } from '../utils/file-utils'
 import { isVideoExt } from '../utils/media-constants'
+import { t } from '../i18n/worker-safe'
 // P1-A7：统一 ffmpeg 路径解析（asar unpacked 路径自动修正）
 import { ffmpegPath as ffmpegBinaryPath } from '../utils/ffmpeg-paths'
 import { trackFfmpegCommand, untrackFfmpegCommand } from '../utils/process-registry'
@@ -231,7 +232,7 @@ function extractVideoFrame(videoPath: string, outputPath: string): Promise<void>
       settled = true
       command.kill('SIGKILL')
       untrackFfmpegCommand(command)
-      reject(new Error('ffmpeg 提取视频帧超时'))
+      reject(new Error(t('main.thumbnail.error.ffmpegFrameTimeout')))
     }, 30000)
 
     const command = ffmpeg(videoPath)
@@ -362,7 +363,12 @@ async function startThumbnailBatch(
 
     const total = rows.length
     if (total === 0) {
-      return { success: true, message: '无需生成', processed: 0, total: 0 }
+      return {
+        success: true,
+        message: t('main.mediaWorker.message.nothingToGenerate'),
+        processed: 0,
+        total: 0
+      }
     }
 
     const updateStmt = database.prepare(
@@ -455,13 +461,17 @@ async function startThumbnailBatch(
 
     await runWithConcurrency(tasks, THUMBNAIL_CONCURRENCY)
 
-    const message = shouldStopThumbnail ? '已取消' : '完成'
+    const message = shouldStopThumbnail
+      ? t('main.mediaWorker.message.workerTaskCancelled')
+      : t('main.mediaWorker.message.workerTaskDone')
     return { success: true, message, processed, total }
   } catch (error) {
-    workerLog('error', '[Thumbnail] 批量生成失败', error)
+    workerLog('error', t('main.mediaWorker.log.thumbnailBatchFailed'), error)
     return {
       success: false,
-      message: `批量生成失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: t('main.mediaWorker.message.batchGenerateFailed', {
+        reason: error instanceof Error ? error.message : String(error)
+      }),
       processed: 0,
       total: 0
     }
@@ -510,7 +520,7 @@ async function startPhashBatch(dbPath: string): Promise<{
       const duplicatesResult = await markDuplicatesInWorker(database)
       return {
         success: true,
-        message: '无需补算',
+        message: t('main.mediaWorker.message.nothingToPhash'),
         processed: 0,
         total: 0,
         duplicatesResult
@@ -585,13 +595,17 @@ async function startPhashBatch(dbPath: string): Promise<{
     // 若已被取消则跳过 markDuplicates，避免在 phash 未完整时基于部分数据聚类
     const duplicatesResult = shouldStopPhash ? undefined : await markDuplicatesInWorker(database)
 
-    const message = shouldStopPhash ? '已取消' : '完成'
+    const message = shouldStopPhash
+      ? t('main.mediaWorker.message.workerTaskCancelled')
+      : t('main.mediaWorker.message.workerTaskDone')
     return { success: true, message, processed, total, duplicatesResult }
   } catch (error) {
-    workerLog('error', '[pHash] 补算失败', error)
+    workerLog('error', t('main.mediaWorker.log.phashBatchFailed'), error)
     return {
       success: false,
-      message: `补算失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: t('main.mediaWorker.message.phashBatchFailed', {
+        reason: error instanceof Error ? error.message : String(error)
+      }),
       processed: 0,
       total: 0
     }
@@ -614,14 +628,18 @@ async function startDuplicateMark(
     const result = await markDuplicatesInWorker(database)
     return {
       success: true,
-      message: shouldStopDuplicate ? '已取消' : '完成',
+      message: shouldStopDuplicate
+        ? t('main.mediaWorker.message.workerTaskCancelled')
+        : t('main.mediaWorker.message.workerTaskDone'),
       ...result
     }
   } catch (error) {
-    workerLog('error', '[Duplicate] 标记失败', error)
+    workerLog('error', t('main.mediaWorker.log.duplicateMarkFailed'), error)
     return {
       success: false,
-      message: `标记失败: ${error instanceof Error ? error.message : String(error)}`,
+      message: t('main.mediaWorker.message.markFailed', {
+        reason: error instanceof Error ? error.message : String(error)
+      }),
       markedDuplicates: 0,
       totalGroups: 0
     }
@@ -718,7 +736,7 @@ async function markDuplicatesInWorker(
   database.prepare('UPDATE media_files SET is_duplicate = 0, original_id = NULL').run()
 
   if (duplicateGroups.length === 0) {
-    workerLog('info', '[Duplicate] 无重复组')
+    workerLog('info', t('main.mediaWorker.log.duplicateNoGroups'))
     return { markedDuplicates: 0, totalGroups: 0 }
   }
 
@@ -784,7 +802,13 @@ async function startSimilarFind(dbPath: string, threshold: number): Promise<void
       // 不足两张：无候选，直接回传空分组结构
       sendEvent({
         type: 'SIMILAR_COMPLETE',
-        payload: { success: true, message: '无需检测', rows, totalCandidates: 0, totalRows: total }
+        payload: {
+          success: true,
+          message: t('main.mediaWorker.message.nothingToDetect'),
+          rows,
+          totalCandidates: 0,
+          totalRows: total
+        }
       })
       return
     }
@@ -804,7 +828,9 @@ async function startSimilarFind(dbPath: string, threshold: number): Promise<void
       type: 'SIMILAR_COMPLETE',
       payload: {
         success: true,
-        message: result.cancelled ? '已取消' : '完成',
+        message: result.cancelled
+          ? t('main.mediaWorker.message.workerTaskCancelled')
+          : t('main.mediaWorker.message.workerTaskDone'),
         rows: metaRows,
         totalCandidates: result.totalCandidates,
         totalRows: total,
@@ -812,7 +838,7 @@ async function startSimilarFind(dbPath: string, threshold: number): Promise<void
       }
     })
   } catch (error) {
-    workerLog('error', '[Similar] 检索失败', error)
+    workerLog('error', t('main.mediaWorker.log.similarFindFailed'), error)
     sendEvent({
       type: 'SIMILAR_COMPLETE',
       payload: {
@@ -925,7 +951,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
       try {
         await startSimilarFind(msg.payload.dbPath, msg.payload.threshold)
       } catch (err) {
-        workerLog('error', '[Similar] 启动失败', err)
+        workerLog('error', t('main.mediaWorker.log.similarStartFailed'), err)
         sendEvent({
           type: 'SIMILAR_COMPLETE',
           payload: {

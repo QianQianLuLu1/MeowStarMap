@@ -7,17 +7,12 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vites
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { AppError } from '../../../shared/errors/app-error'
-import { createSchemasMock, makeCtx, getHandler } from './_test-helpers'
+import { makeCtx, getHandler } from './_test-helpers'
 
-const { handleMock, assertFileReadPathMock, assertFileWritePathMock, mockAppGetPath } = vi.hoisted(
-  () => ({
-    handleMock: vi.fn(),
-    assertFileReadPathMock: vi.fn(),
-    assertFileWritePathMock: vi.fn(),
-    mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : ''))
-  })
-)
+const { handleMock, mockAppGetPath } = vi.hoisted(() => ({
+  handleMock: vi.fn(),
+  mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : ''))
+}))
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() },
@@ -26,53 +21,12 @@ vi.mock('electron', () => ({
 
 let tmpUserDir: string
 
-vi.mock('../validator', () => ({
-  wrapHandler: vi.fn(
-    (ctx: unknown, _schema: unknown, handler: (args: unknown[]) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(args.length === 1 && Array.isArray(args[0]) ? args[0] : args)
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  wrapHandlerNoArgs: vi.fn(),
-  wrapHandlerRaw: vi.fn(
-    (ctx: unknown, handler: (args: unknown[], ctx?: unknown) => unknown) =>
-      async (...args: unknown[]) => {
-        try {
-          const data = await handler(
-            args.length === 1 && Array.isArray(args[0]) ? args[0] : args,
-            ctx
-          )
-          return { success: true as const, data }
-        } catch (e) {
-          if (e instanceof AppError) return { success: false as const, error: e.toIpcError() }
-          return {
-            success: false as const,
-            error: {
-              code: 'IPC_INTERNAL_ERROR',
-              message: e instanceof Error ? e.message : String(e)
-            }
-          }
-        }
-      }
-  ),
-  schemas: createSchemasMock(),
-  assertFileReadPath: assertFileReadPathMock,
-  assertFileWritePath: assertFileWritePathMock
-}))
+vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
 import { registerSettingsHandlers } from './settings-handler'
+import { assertFileReadPath } from '../validator'
+
+const assertFileReadPathMock = vi.mocked(assertFileReadPath)
 
 describe('registerSettingsHandlers', () => {
   beforeEach(() => {
@@ -81,9 +35,7 @@ describe('registerSettingsHandlers', () => {
 
   beforeAll(() => {
     tmpUserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-pref-'))
-    mockAppGetPath.mockImplementation((name: string) =>
-      name === 'userData' ? tmpUserDir : ''
-    )
+    mockAppGetPath.mockImplementation((name: string) => (name === 'userData' ? tmpUserDir : ''))
   })
 
   afterAll(() => {
@@ -196,27 +148,27 @@ describe('registerSettingsHandlers', () => {
   it('settings:set hardwareAcceleration=false 双写到 userData/gpu-pref.json', async () => {
     const ctx = makeCtx({})
     registerSettingsHandlers(ctx)
-    const result = (await getHandler(handleMock, 'settings:set')([
-      'hardwareAcceleration',
-      false
-    ])) as {
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['hardwareAcceleration', false])) as {
       success: true
       data: { saved: boolean }
     }
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('hardwareAcceleration', false)
     expect(result.data.saved).toBe(true)
-    const pref = JSON.parse(
-      fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')
-    ) as { hardwareAcceleration: boolean }
+    const pref = JSON.parse(fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')) as {
+      hardwareAcceleration: boolean
+    }
     expect(pref.hardwareAcceleration).toBe(false)
   })
 
   it('settings:set hardwareAcceleration 非布尔值 → 被拒且不写镜像', async () => {
     registerSettingsHandlers(makeCtx({}))
-    const result = (await getHandler(handleMock, 'settings:set')([
-      'hardwareAcceleration',
-      'on'
-    ])) as {
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['hardwareAcceleration', 'on'])) as {
       success: false
       error: { code: string }
     }

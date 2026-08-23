@@ -4,6 +4,7 @@ import fs from 'fs'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandlerNoArgs } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
+import { t } from '../../i18n'
 
 /**
  * data 域 IPC handler：本地数据清空。
@@ -15,20 +16,20 @@ export function registerDataHandlers(ctx: HandlerContext): void {
     'data:clear',
     wrapHandlerNoArgs(ctx, async () => {
       const db = ctx.dbManager.getDatabase()
-      if (!db) throw AppError.preconditionFailed('数据库未初始化')
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
 
       // A-S3：高危操作二次确认（清空所有媒体数据不可恢复）
       const confirmResult = await dialog.showMessageBox({
         type: 'warning',
-        buttons: ['取消', '确认清空'],
+        buttons: [t('main.data.dialog.cancel'), t('main.data.dialog.confirmClear')],
         defaultId: 0,
         cancelId: 0,
-        title: '确认清空数据',
-        message: '此操作将清除所有媒体记录、扫描历史、自定义筛选器与水印模板，且不可恢复。',
-        detail: '缩略图缓存也将被清空。是否继续？'
+        title: t('main.data.dialog.clearTitle'),
+        message: t('main.data.dialog.clearMessage'),
+        detail: t('main.data.dialog.clearDetail')
       })
       if (confirmResult.response !== 1) {
-        throw AppError.canceled('用户取消操作')
+        throw AppError.canceled(t('main.media.error.userCanceled'))
       }
 
       const clearAll = db.transaction(() => {
@@ -54,7 +55,7 @@ export function registerDataHandlers(ctx: HandlerContext): void {
       }
 
       ctx.notifyMediaUpdated()
-      return { message: '本地数据已清除' }
+      return { message: t('main.data.message.cleared') }
     })
   )
 }

@@ -4,6 +4,7 @@ import fs from 'fs'
 import { execFile } from 'child_process'
 import { logger } from '../utils/logger'
 import { logStartupError } from '../utils/startup-diagnostic'
+import { t } from '../i18n'
 
 /**
  * 确保桌面快捷方式存在（仅打包环境执行）。
@@ -19,10 +20,11 @@ export async function ensureDesktopShortcut(): Promise<void> {
     // 硬约束：Application must handle custom desktop paths configured via Windows registry
     const desktopPath = await resolveDesktopPath()
     if (!desktopPath) {
-      logger.warn('[App] 无法确定可写的桌面路径，跳过快捷方式创建')
+      logger.warn(t('main.desktopShortcut.log.noWritableDesktop'))
       return
     }
-    const shortcutPath = path.join(desktopPath, '无限暖暖相册管理工具.lnk')
+    // 快捷方式文件名须跨语言保持稳定（与应用名一致），不随 i18n 切换
+    const shortcutPath = path.join(desktopPath, '无限暖暖相册管理工具.lnk') // eslint-disable-line no-restricted-syntax -- 快捷方式文件名须与应用名一致且跨语言稳定，非 UI 文案
     const exePath = app.getPath('exe')
 
     // P2-A9：快捷方式已存在时校验目标有效性——target 指向的 exe 不存在则重建
@@ -49,29 +51,29 @@ export async function ensureDesktopShortcut(): Promise<void> {
     // 硬约束：错误必须被处理，不能静默失败
     const shortcutOpts: Electron.ShortcutDetails = {
       target: exePath,
-      description: '无限暖暖相册管理工具',
+      description: t('main.app.name'),
       icon: exePath,
       iconIndex: 0
     }
     const created = shell.writeShortcutLink(shortcutPath, 'create', shortcutOpts)
     if (created) {
       try {
-        logger.info('[App] 桌面快捷方式已创建')
+        logger.info(t('main.desktopShortcut.log.created'))
       } catch {}
       return
     }
 
     // 桌面不可写或创建失败，fallback 到用户主目录
-    logger.warn('[App] 桌面快捷方式创建失败，尝试 fallback 到用户主目录')
+    logger.warn(t('main.desktopShortcut.log.createFailedFallback'))
     const homePath = app.getPath('home')
-    const fallbackPath = path.join(homePath, '无限暖暖相册管理工具.lnk')
+    const fallbackPath = path.join(homePath, '无限暖暖相册管理工具.lnk') // eslint-disable-line no-restricted-syntax -- 快捷方式文件名须与应用名一致且跨语言稳定，非 UI 文案
     const fallbackCreated = shell.writeShortcutLink(fallbackPath, 'create', shortcutOpts)
     if (fallbackCreated) {
       try {
-        logger.info(`[App] 桌面快捷方式已创建（fallback 到用户主目录: ${homePath}）`)
+        logger.info(t('main.desktopShortcut.log.createdFallback', { path: homePath }))
       } catch {}
     } else {
-      logger.error('[App] 桌面快捷方式创建失败（包括 fallback 到用户主目录）')
+      logger.error(t('main.desktopShortcut.log.createFailedAll'))
     }
   } catch (err) {
     logStartupError('ensureDesktopShortcut', err)

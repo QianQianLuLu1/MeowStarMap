@@ -41,6 +41,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useErrorToast } from './useErrorToast'
 import { ERROR_CODES } from '../../shared/errors/error-codes'
 import { extractUserMessage } from '../../shared/errors/app-error'
+import i18n from '../i18n'
 
 /**
  * IPC 调用返回的结果类型
@@ -203,7 +204,7 @@ export function useIpcCall(options: UseIpcCallOptions = {}): UseIpcCallReturn {
           ? rawError
           : {
               code: ERROR_CODES.INTERNAL_ERROR,
-              message: extractUserMessage(rawError, 'IPC 调用失败') // TODO: i18n
+              message: extractUserMessage(rawError, i18n.t('errorFallback.ipcFailed'))
             }
         setError(ipcError)
 

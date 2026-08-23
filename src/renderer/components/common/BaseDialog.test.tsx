@@ -3,6 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
+import type { ComponentProps } from 'react'
 
 // motion/react 已在 tests/setup.ts 全局 mock（剥离 whileHover/whileTap/layout 等 props）
 
@@ -28,7 +29,7 @@ vi.mock('../../icons', () => ({
 
 // 隔离 IconButton
 vi.mock('./IconButton', () => ({
-  IconButton: ({ children, onClick, ...props }: any) => (
+  IconButton: ({ children, onClick, ...props }: ComponentProps<'button'>) => (
     <button data-testid="icon-button" onClick={onClick} {...props}>
       {children}
     </button>

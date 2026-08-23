@@ -38,6 +38,11 @@ import { useRefreshMedia } from '../hooks/useRefreshMedia'
 import { useFilteredMediaFiles } from '../hooks/useFilteredMediaFiles'
 import { getContextMenuItems } from '../utils/gallery'
 
+/** View Transitions API（Chrome 111+）：以交叉类型窄化探测 startViewTransition（存在性运行时判断） */
+type DocumentWithViewTransitions = Document & {
+  startViewTransition?: (callback: () => void) => unknown
+}
+
 export const GalleryPage: React.FC = () => {
   const { t } = useTranslation()
   // C-O4：用 useShallow 选择器订阅具体字段，避免订阅整个 store 触发过度重渲染
@@ -205,7 +210,10 @@ export const GalleryPage: React.FC = () => {
         setSelectedMediaIds(rangeIds)
       } else {
         // P3-1：给被点击的卡片 img 设置 view-transition-name，供 FullscreenViewer 共享元素过渡
-        if (typeof document !== 'undefined' && (document as any).startViewTransition) {
+        if (
+          typeof document !== 'undefined' &&
+          (document as DocumentWithViewTransitions).startViewTransition
+        ) {
           const sourceImg = (e.currentTarget as HTMLElement).querySelector('img[data-media-id]')
           if (sourceImg) {
             ;(sourceImg as HTMLElement).style.viewTransitionName = 'fullscreen-media'
@@ -358,7 +366,7 @@ export const GalleryPage: React.FC = () => {
         copyResult
       })
     },
-    [showMessage]
+    [showMessage, t]
   )
 
   // T09：单文件分享（来自右键菜单）

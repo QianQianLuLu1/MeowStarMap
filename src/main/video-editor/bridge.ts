@@ -18,6 +18,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../utils/logger'
+import { t } from '../i18n'
 import { ProgressThrottle } from '../utils/progress-throttle'
 import { EtaCalculator } from '../utils/eta-calculator'
 import { taskRegistry } from '../utils/task-registry'
@@ -119,12 +120,12 @@ export class VideoEditorBridge {
     // 超时保护：15s 内未收到 WORKER_READY 则判启动失败，避免调用方无限等待
     const readyTimeout = setTimeout(() => {
       if (!this.readyReject) return
-      logger.error('[VideoEditorWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败')
-      void logger.fault('workerCrash', new Error('video-editor-worker 启动超时'), {
+      logger.error(t('main.videoEditor.log.readyTimeout'))
+      void logger.fault('workerCrash', new Error(t('main.videoEditor.error.workerReadyTimeout')), {
         workerName: 'video-editor-worker',
         stage: 'ready-timeout'
       })
-      this.failReadyHandshake('后台进程启动失败（video-editor-worker 未在限定时间内就绪）')
+      this.failReadyHandshake(t('main.videoEditor.error.workerStartFailed'))
       try {
         this.worker?.kill()
       } catch {}
@@ -223,10 +224,10 @@ export class VideoEditorBridge {
   /** worker 退出处理：合成失败结果，避免主进程卡在等待状态 */
   private handleWorkerExit(code: number): void {
     if (code !== 0) {
-      logger.error(`[VideoEditorWorker] 异常退出，exit code=${code}`)
+      logger.error(t('main.videoEditor.log.abnormalExit', { code: String(code) }))
     }
     // reject 所有 pending promise，避免主进程卡死
-    const errorMsg = '视频编辑进程异常退出'
+    const errorMsg = t('main.videoEditor.error.workerAbnormalExit')
     for (const [, resolver] of this.pendingResolvers) {
       resolver.reject(new Error(errorMsg))
     }
@@ -264,7 +265,7 @@ export class VideoEditorBridge {
     // FIX(组16-1): 同步互斥守卫（在 await 之前置位，JS 单线程保证原子）——
     // 与 editBatch 并发会互相覆盖共享状态，详见 isEditing 字段注释
     if (this.isEditing) {
-      throw new Error('已有视频编辑任务正在进行，请等待完成后再试')
+      throw new Error(t('main.videoEditor.error.taskInProgress'))
     }
     this.isEditing = true
     try {
@@ -296,7 +297,7 @@ export class VideoEditorBridge {
         current: 0,
         total: 0,
         percent: 0,
-        message: '视频编辑已取消',
+        message: t('main.videoEditor.message.editCancelled'),
         startedAt: this.startedAt,
         canCancel: false
       })
@@ -324,7 +325,7 @@ export class VideoEditorBridge {
         current: 1,
         total: 1,
         percent: 100,
-        message: '视频导出成功',
+        message: t('main.videoEditor.message.exportDone'),
         startedAt: this.startedAt,
         canCancel: false
       })
@@ -369,7 +370,7 @@ export class VideoEditorBridge {
 
     // FIX(组16-1): 同步互斥守卫——与 editSingle 并发会互相覆盖共享状态，详见 isEditing 字段注释
     if (this.isEditing) {
-      throw new Error('已有视频编辑任务正在进行，请等待完成后再试')
+      throw new Error(t('main.videoEditor.error.taskInProgress'))
     }
     this.isEditing = true
     try {
@@ -404,7 +405,7 @@ export class VideoEditorBridge {
         current: 0,
         total: tasks.length,
         percent: 0,
-        message: '批量编辑已取消',
+        message: t('main.videoEditor.message.batchCancelled'),
         startedAt: this.startedAt,
         canCancel: false
       })
@@ -436,7 +437,10 @@ export class VideoEditorBridge {
             if (!taskRegistry.isCancelled(taskId)) {
               failedIndexes.push(index)
               logger.warn(
-                `[VideoEditorBridge] 任务 #${index} 失败: ${err instanceof Error ? err.message : String(err)}`
+                t('main.videoEditor.log.batchTaskFailed', {
+                  index: String(index),
+                  reason: err instanceof Error ? err.message : String(err)
+                })
               )
             }
           } finally {
@@ -454,8 +458,11 @@ export class VideoEditorBridge {
           : 'done'
       const message =
         failedIndexes.length === 0
-          ? `批量导出完成（共 ${tasks.length} 个）`
-          : `批量导出完成（成功 ${tasks.length - failedIndexes.length} 个，失败 ${failedIndexes.length} 个）`
+          ? t('main.videoEditor.message.batchDoneAll', { total: String(tasks.length) })
+          : t('main.videoEditor.message.batchDonePartial', {
+              success: String(tasks.length - failedIndexes.length),
+              failed: String(failedIndexes.length)
+            })
       this.progressThrottle.push({
         taskId,
         taskType: BATCH_TASK_TYPE,
@@ -486,7 +493,7 @@ export class VideoEditorBridge {
   async dispose(): Promise<void> {
     // dispose 期间若仍有调用方在等待握手，必须 reject（早于 return，覆盖 worker 已为 null 的情况）：
     // 此时 worker 即将被 kill，exit 回调与超时定时器都不会再兜底 reject
-    this.failReadyHandshake('video-editor-worker 已释放（dispose）')
+    this.failReadyHandshake(t('main.videoEditor.error.workerDisposed'))
     if (!this.worker) return
     try {
       const cmd: VideoEditorCommand = { type: 'EDITOR_DISPOSE' }
@@ -508,7 +515,7 @@ export class VideoEditorBridge {
     }
     // reject 所有 pending promise，避免主进程卡死
     for (const [, resolver] of this.pendingResolvers) {
-      resolver.reject(new Error('应用退出'))
+      resolver.reject(new Error(t('main.videoEditor.error.appExiting')))
     }
     this.pendingResolvers.clear()
     this.progressThrottle.dispose()

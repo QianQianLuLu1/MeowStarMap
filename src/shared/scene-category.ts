@@ -74,6 +74,7 @@ export interface OutfitPreset {
   nameKey: string
 }
 
+/* eslint-disable no-restricted-syntax -- 数据值豁免：下列 id 是写入 media.outfit 列的数据库标识符（等同于用户输入的套装名，不可变更），非 UI 文案；UI 展示一律走 nameKey 的 t() 解析 */
 export const OUTFIT_PRESETS: OutfitPreset[] = [
   // 经典套装
   { id: '初心之吻', nameKey: 'outfit.presets.firstKiss' },
@@ -115,6 +116,7 @@ export const OUTFIT_PRESETS: OutfitPreset[] = [
   { id: '星屑魔法', nameKey: 'outfit.presets.stardustMagic' },
   { id: '蔷薇骑士', nameKey: 'outfit.presets.roseKnight' }
 ]
+/* eslint-enable no-restricted-syntax */
 
 /**
  * 根据文件路径检测游戏场景分类

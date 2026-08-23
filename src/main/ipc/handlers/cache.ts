@@ -7,6 +7,7 @@ import { AppError } from '../../../shared/errors/app-error'
 import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
 import { MediaRepository } from '../../database/media-repository'
 import { MIN_CACHE_LIMIT_BYTES } from '../../thumbnail/generator'
+import { t } from '../../i18n'
 
 /**
  * P0-A1：从 Application.setupIPC() 迁移的缩略图缓存域 IPC handler 集合。
@@ -20,9 +21,11 @@ export function registerCacheHandlers(ctx: HandlerContext): void {
       try {
         return await ctx.thumbnailGen.getCacheStats()
       } catch (error) {
-        logger.error('[Cache] getStats 失败:', error)
+        logger.error(t('main.cache.log.getStatsFailed'), error)
         throw AppError.internal(
-          `获取缓存统计失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.cache.error.getStatsFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -35,9 +38,11 @@ export function registerCacheHandlers(ctx: HandlerContext): void {
       try {
         return await ctx.thumbnailGen.cleanAll()
       } catch (error) {
-        logger.error('[Cache] clean 失败:', error)
+        logger.error(t('main.cache.log.cleanFailed'), error)
         throw AppError.internal(
-          `清理缓存失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.cache.error.cleanFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -71,9 +76,11 @@ export function registerCacheHandlers(ctx: HandlerContext): void {
         const result = await ctx.thumbnailGen.setCacheLimit(limitBytes)
         return result
       } catch (error) {
-        logger.error('[Cache] setLimit 失败:', error)
+        logger.error(t('main.cache.log.setLimitFailed'), error)
         throw AppError.internal(
-          `设置缓存上限失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.cache.error.setLimitFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
@@ -86,9 +93,11 @@ export function registerCacheHandlers(ctx: HandlerContext): void {
       try {
         return await ctx.thumbnailGen.enforceLimitNow()
       } catch (error) {
-        logger.error('[Cache] enforceLimit 失败:', error)
+        logger.error(t('main.cache.log.enforceLimitFailed'), error)
         throw AppError.internal(
-          `触发 LRU 淘汰失败: ${error instanceof Error ? error.message : String(error)}`
+          t('main.cache.error.enforceLimitFailed', {
+            reason: error instanceof Error ? error.message : String(error)
+          })
         )
       }
     })
