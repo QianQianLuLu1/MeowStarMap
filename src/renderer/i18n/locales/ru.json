@@ -1220,6 +1220,7 @@
     "emptyConfirm": "Все {{count}} файлов в корзине будут удалены навсегда.\nФайлы сначала попадут в системную корзину, после чего их нельзя будет восстановить в приложении.\nОчистить корзину?",
     "emptyConfirmTitle": "Очистка корзины",
     "emptyFailed": "Очистка не удалась",
+    "emptySuccess": "Корзина очищена",
     "emptyTitle": "Корзина пуста",
     "itemLabel": "Элемент корзины {{name}}",
     "permanentConfirm": "Выбранные {{count}} файлов будут удалены навсегда.\nФайлы сначала попадут в системную корзину, после чего их нельзя будет восстановить в приложении.\nУдалить?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

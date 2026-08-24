@@ -117,7 +117,8 @@ export default [
   {
     // 测试文件豁免：断言与 fixture 合法包含中文（主进程测试使用真实 zh-CN 语言包做断言），
     // 对测试关闭中文/console 检测。必须置于 src/** 块之后。
-    files: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/__tests__/**'],
+    // Storybook stories 同款豁免：示例文案/文档描述允许中文，与 *.test.* 同等待遇。
+    files: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/__tests__/**', 'src/**/*.stories.tsx'],
     rules: {
       'no-restricted-syntax': 'off'
     }
@@ -173,6 +174,8 @@ export default [
       // 本地备份目录与测试覆盖率产物（不入仓，不参与 lint）
       '_safe_backup_20260821/**',
       'coverage/**',
+      // Storybook 静态构建产物（不入仓，不参与 lint）
+      '**/storybook-static/**',
       '*.log'
     ]
   }

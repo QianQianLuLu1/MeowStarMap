@@ -1220,6 +1220,7 @@
     "emptyConfirm": "Tous les {{count}} éléments de la corbeille seront définitivement supprimés.\nLes fichiers seront d'abord déplacés vers la corbeille système, puis ne pourront plus être récupérés depuis cette application.\nVoulez-vous vider ?",
     "emptyConfirmTitle": "Vider la corbeille",
     "emptyFailed": "Échec du vidage",
+    "emptySuccess": "Corbeille vidée",
     "emptyTitle": "La corbeille est vide",
     "itemLabel": "Élément de corbeille {{name}}",
     "permanentConfirm": "Les {{count}} éléments sélectionnés seront définitivement supprimés.\nLes fichiers seront d'abord déplacés vers la corbeille système, puis ne pourront plus être récupérés depuis cette application.\nVoulez-vous supprimer ?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

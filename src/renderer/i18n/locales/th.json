@@ -1220,6 +1220,7 @@
     "emptyConfirm": "จะลบไฟล์ทั้งหมด {{count}} รายการในถังขยะถาวร\nไฟล์จะถูกย้ายไปถังขยะระบบก่อน หลังจากนั้นจะกู้คืนจากแอปนี้ไม่ได้\nต้องการล้างถังขยะหรือไม่?",
     "emptyConfirmTitle": "ล้างถังขยะ",
     "emptyFailed": "การล้างถังขยะล้มเหลว",
+    "emptySuccess": "ล้างถังขยะแล้ว",
     "emptyTitle": "ถังขยะว่าง",
     "itemLabel": "รายการในถังขยะ {{name}}",
     "permanentConfirm": "จะลบไฟล์ที่เลือก {{count}} รายการถาวร\nไฟล์จะถูกย้ายไปถังขยะระบบก่อน หลังจากนั้นจะกู้คืนจากแอปนี้ไม่ได้\nต้องการลบหรือไม่?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

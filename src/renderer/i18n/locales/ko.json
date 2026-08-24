@@ -1220,6 +1220,7 @@
     "emptyConfirm": "휴지통의 모든 {{count}}개 항목을 영구 삭제합니다.\n파일은 먼저 시스템 휴지통으로 이동되며, 이후 이 앱에서 복원할 수 없습니다.\n비우시겠습니까?",
     "emptyConfirmTitle": "휴지통 비우기",
     "emptyFailed": "비우기 실패",
+    "emptySuccess": "휴지통을 비웠습니다",
     "emptyTitle": "휴지통이 비어 있습니다",
     "itemLabel": "휴지통 항목 {{name}}",
     "permanentConfirm": "선택한 {{count}}개 항목을 완전히 삭제합니다.\n파일은 먼저 시스템 휴지통으로 이동되며, 이후 이 앱에서 복원할 수 없습니다.\n삭제하시겠습니까?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

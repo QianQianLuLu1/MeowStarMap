@@ -1220,6 +1220,7 @@
     "emptyConfirm": "Todos os {{count}} itens da lixeira serão permanentemente excluídos.\nOs arquivos serão primeiro movidos para a lixeira do sistema, e depois não poderão ser recuperados por este aplicativo.\nDeseja esvaziar?",
     "emptyConfirmTitle": "Esvaziar lixeira",
     "emptyFailed": "Falha ao esvaziar",
+    "emptySuccess": "Lixeira esvaziada",
     "emptyTitle": "A lixeira está vazia",
     "itemLabel": "Item da lixeira {{name}}",
     "permanentConfirm": "Os {{count}} itens selecionados serão excluídos definitivamente.\nOs arquivos serão primeiro movidos para a lixeira do sistema, e depois não poderão ser recuperados por este aplicativo.\nDeseja excluir?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

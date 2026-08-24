@@ -96,11 +96,13 @@ export function registerProfileHandlers(ctx: HandlerContext): void {
   )
 
   // P1-04：跨档案转移文件
+  // 与 media:softDelete/restore/permanentDelete 同理：批量入口放开 1000 上限，
+  // 下游 transferFilesToProfile 经 runChunkedTransaction 已按 500 分片
   ipcMain.handle(
     'profile:transferFiles',
     wrapHandler(
       ctx,
-      z.tuple([schemas.mediaIdArray, schemas.uid]),
+      z.tuple([schemas.mediaIdArrayBulk, schemas.uid]),
       async ([mediaIds, targetUid]) => {
         const repo = getRepo()
         const profile = repo.getProfileByUid(targetUid)

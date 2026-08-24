@@ -199,6 +199,8 @@ export const RecycleBinPage: React.FC = () => {
     if (!window.electronAPI?.mediaAction?.emptyRecycleBin) return
     setOperating(true)
     setFailedAction(null)
+    // 缓存主进程返回的成功文案；call() 成功即代表操作成功（失败抛 IpcError 由 error 分支透传）
+    let successMessage = ''
     const final = await staged.run({
       taskType: 'batch',
       title: t('taskProgress.phase.processing'),
@@ -212,8 +214,10 @@ export const RecycleBinPage: React.FC = () => {
         setStage(0)
         setStage(0, 'done')
         setStage(1)
+        // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message, movedCount, missingCount, failedCount }（无 success 字段）；
+        // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError）。
         const result = await window.electronAPI!.mediaAction!.emptyRecycleBin()
-        if (!result.success) throw new Error(result.message)
+        successMessage = result.message ?? ''
         setStage(1, 'done')
         setStage(2)
         setSelectedIds(new Set())
@@ -223,7 +227,7 @@ export const RecycleBinPage: React.FC = () => {
     })
     if (final?.phase === 'error') showMessage(final.message ?? t('recycleBin.emptyFailed'), 'error')
     else if (final && final.phase !== 'cancelled')
-      showMessage(t('recycleBin.emptySuccess'), 'success')
+      showMessage(successMessage || t('recycleBin.emptySuccess'), 'success')
     setOperating(false)
   }, [showMessage, t, staged])
 

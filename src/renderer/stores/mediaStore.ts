@@ -103,6 +103,9 @@ interface MediaState {
     found: number
     currentPath: string
     status: 'idle' | 'running' | 'completed' | 'failed'
+    // D2 去重：本次扫描是否由 ScanButton 手动触发。
+    // 手动失败由 ScanButton 提示详情（含手动路径引导），ScanProgress 据此跳过兜底 Toast 避免双弹
+    manualScan?: boolean
   }
   // 当前编辑的媒体
   editingMedia: MediaFile | null
@@ -146,7 +149,8 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
     scanned: 0,
     found: 0,
     currentPath: '',
-    status: 'idle'
+    status: 'idle',
+    manualScan: false
   },
   editingMedia: null,
   recycleBinFiles: [],

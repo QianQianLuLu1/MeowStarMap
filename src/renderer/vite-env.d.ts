@@ -439,7 +439,7 @@ interface WindowElectronAPI {
     softDelete: (mediaIds: number[]) => Promise<{ success: boolean; message: string }>
     restore: (mediaIds: number[]) => Promise<{ success: boolean; message: string }>
     permanentDelete: (mediaIds: number[]) => Promise<{ success: boolean; message: string }>
-    emptyRecycleBin: () => Promise<{ success: boolean; message: string }>
+    emptyRecycleBin: () => Promise<{ message: string }>
     // T02：丢失记录清理（批量 / 单条）
     cleanupMissing: () => Promise<{ success: boolean; message: string; cleared?: number }>
     removeMissing: (mediaId: number) => Promise<{ success: boolean; message: string }>

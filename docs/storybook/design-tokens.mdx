@@ -1,0 +1,242 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Storybook/设计令牌" />
+
+# 设计令牌（Design Tokens）
+
+本项目所有视觉参数（颜色、阴影、圆角、间距、过渡、毛玻璃模糊半径）都以 CSS 变量形式
+集中声明在 `src/renderer/styles/globals.css` 的 `:root` 中，组件只引用变量、不硬编码具体值。
+**本页色板全部使用 `var(--token)` 实时渲染** —— 切换工具栏「主题」下拉，色板会即时反映主题差异。
+
+主题体系：
+
+- 默认主题：变量直接在 `:root` 声明（`styles/themes/index.ts` 中 `className` 为空）
+- 「柔粉轻奢」主题：`styles/themes/soft-pink-luxury.css` 通过 `.soft-pink-luxury` 类覆盖同名变量
+- 切换机制：`stores/themeStore.ts` 的 `applyThemeClass` 在 `<html>` 上附加 / 移除主题类
+
+## 颜色令牌
+
+半透明令牌（遮罩 / 悬停 / 分隔线）叠放在渐变底上展示实际透明度效果。
+
+export const COLOR_TOKENS = [
+  { token: '--bg-primary', desc: '页面主背景' },
+  { token: '--bg-secondary', desc: '卡片 / 面板背景（半透明）', on: 'gradient' },
+  { token: '--bg-tertiary', desc: '次级容器背景（半透明）', on: 'gradient' },
+  { token: '--text-primary', desc: '主文本' },
+  { token: '--text-secondary', desc: '次要文本' },
+  { token: '--text-tertiary', desc: '辅助 / 占位文本' },
+  { token: '--accent', desc: '品牌强调色' },
+  { token: '--accent-light', desc: '强调色浅档' },
+  { token: '--accent-deep', desc: '强调色深档' },
+  { token: '--accent-soft', desc: '强调色淡背景（12-14% 透明）', on: 'gradient' },
+  { token: '--divider', desc: '分隔线', on: 'gradient' },
+  { token: '--hover-bg', desc: '悬停背景', on: 'gradient' },
+  { token: '--hover-bg-strong', desc: '强悬停背景', on: 'gradient' },
+  { token: '--danger', desc: '危险 / 删除' },
+  { token: '--danger-hover', desc: '危险悬停' },
+  { token: '--danger-bg', desc: '危险淡背景', on: 'gradient' },
+  { token: '--success', desc: '成功' },
+  { token: '--success-deep', desc: '成功深档' },
+  { token: '--favorite', desc: '收藏 / 喜爱（心形）' },
+  { token: '--warning', desc: '警告' },
+  { token: '--warning-bg', desc: '警告淡背景', on: 'gradient' },
+  { token: '--warning-text', desc: '警告背景上的前景文字' },
+  { token: '--text-on-accent', desc: '强调色背景上的文字' },
+  { token: '--text-on-overlay', desc: '遮罩上的高对比文字' },
+  { token: '--text-on-overlay-secondary', desc: '遮罩上的次级文字', on: 'dark' },
+  { token: '--overlay-bg', desc: '遮罩 40%', on: 'gradient' },
+  { token: '--overlay-bg-medium', desc: '遮罩 50%', on: 'gradient' },
+  { token: '--overlay-bg-strong', desc: '遮罩 60%', on: 'gradient' },
+  { token: '--overlay-bg-hover', desc: '遮罩悬停 70%', on: 'gradient' },
+  { token: '--toast-error-bg', desc: 'Toast 错误背景' },
+  { token: '--toast-info-bg', desc: 'Toast 信息背景' },
+  { token: '--toast-success-bg', desc: 'Toast 成功背景' }
+]
+
+export const checker =
+  'linear-gradient(45deg, #d7dbe2 25%, transparent 25%, transparent 75%, #d7dbe2 75%), ' +
+  'linear-gradient(45deg, #d7dbe2 25%, #f2f4f7 25%, #f2f4f7 75%, #d7dbe2 75%)'
+
+export const SwatchGrid = ({ tokens }) => (
+  <div
+    style={{
+      display: 'grid',
+      gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))',
+      gap: 12,
+      margin: '16px 0'
+    }}
+  >
+    {tokens.map((t) => (
+      <div
+        key={t.token}
+        style={{
+          borderRadius: 'var(--radius-md)',
+          border: '1px solid var(--divider)',
+          overflow: 'hidden',
+          background: 'var(--bg-secondary)'
+        }}
+      >
+        <div
+          style={{
+            height: 64,
+            background:
+              t.on === 'gradient'
+                ? `linear-gradient(var(${t.token}), var(${t.token})), ${checker}`
+                : t.on === 'dark'
+                  ? `linear-gradient(var(${t.token}), var(${t.token})), linear-gradient(#3a4150, #3a4150)`
+                  : `var(${t.token})`,
+            backgroundSize: t.on === 'gradient' ? 'auto, 16px 16px' : undefined,
+            borderBottom: '1px solid var(--divider)'
+          }}
+        />
+        <div style={{ padding: '8px 12px' }}>
+          <code style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>
+            {t.token}
+          </code>
+          <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>{t.desc}</div>
+        </div>
+      </div>
+    ))}
+  </div>
+)
+
+<SwatchGrid tokens={COLOR_TOKENS} />
+
+## 阴影令牌
+
+export const ShadowCard = ({ token }) => (
+  <div
+    style={{
+      width: 160,
+      height: 90,
+      borderRadius: 'var(--radius-md)',
+      background: 'var(--bg-primary)',
+      boxShadow: `var(${token})`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      border: '1px solid var(--divider)'
+    }}
+  >
+    <code style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{token}</code>
+  </div>
+)
+
+<div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', margin: '16px 0' }}>
+  <ShadowCard token="--shadow-sm" />
+  <ShadowCard token="--shadow-md" />
+  <ShadowCard token="--shadow-lg" />
+</div>
+
+柔粉主题下阴影带粉色染色（`rgba(226,164,188,…)`），切换主题可对比；柔粉主题还额外提供
+`--glow-pink` / `--glow-pink-sm` 柔光发光变量（仅该主题定义）。
+
+## 圆角令牌
+
+export const RadiusBox = ({ token }) => (
+  <div
+    style={{
+      width: 88,
+      height: 88,
+      borderRadius: `var(${token})`,
+      background: 'var(--accent-soft)',
+      border: '1px solid var(--accent)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
+    }}
+  >
+    <code style={{ fontSize: 12, color: 'var(--accent-deep)' }}>{token}</code>
+  </div>
+)
+
+<div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', margin: '16px 0' }}>
+  <RadiusBox token="--radius-sm" />
+  <RadiusBox token="--radius-md" />
+  <RadiusBox token="--radius-lg" />
+</div>
+
+| 令牌          | 值   | 典型用途               |
+| ------------- | ---- | ---------------------- |
+| `--radius-sm` | 8px  | 小按钮、标签、下拉选项 |
+| `--radius-md` | 12px | 卡片、面板、输入框     |
+| `--radius-lg` | 16px | 大弹窗、媒体卡片       |
+
+## 间距令牌（P1-U8 spacing token 体系）
+
+紧凑模式（`html.compact-mode`）通过整体替换这组 token 生效，组件不感知模式差异。
+
+| 令牌                    | 默认 | 紧凑模式 | 典型用途             |
+| ----------------------- | ---- | -------- | -------------------- |
+| `--space-card-padding`  | 20px | 12px     | `.glass-card` 内边距 |
+| `--space-card-gap`      | 16px | 10px     | 卡片内子元素纵向间距 |
+| `--space-nav-padding-y` | 10px | 6px      | 导航项纵向内边距     |
+| `--space-nav-padding-x` | 16px | 10px     | 导航项横向内边距     |
+| `--space-nav-gap`       | 12px | 8px      | 导航项图标与文字间距 |
+| `--space-toolbar-gap`   | 12px | 8px      | 工具栏元素间距       |
+
+## 过渡令牌
+
+两个主题共用同一套过渡节奏（柔粉主题曾自定义更短时长导致切换后动效不一致，已删除覆盖）。
+下方卡片悬停时应用对应过渡变量，可直观感受三档节奏。
+
+<style>{`
+  .token-demo-transition {
+    transition-property: transform, box-shadow;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .token-demo-transition:hover { transform: translateY(-6px) scale(1.03); box-shadow: var(--shadow-md); }
+`}</style>
+
+export const TransitionCard = ({ token, duration }) => (
+  <div
+    className="token-demo-transition"
+    style={{
+      width: 170,
+      padding: 16,
+      borderRadius: 'var(--radius-md)',
+      background: 'var(--bg-secondary)',
+      border: '1px solid var(--divider)',
+      transitionDuration: duration,
+      cursor: 'pointer'
+    }}
+  >
+    <code style={{ fontSize: 12, color: 'var(--text-primary)', fontWeight: 600 }}>{token}</code>
+    <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 4 }}>{duration}</div>
+    <div style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>悬停我</div>
+  </div>
+)
+
+<div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', margin: '16px 0' }}>
+  <TransitionCard token="--transition-fast" duration="150ms" />
+  <TransitionCard token="--transition-normal" duration="250ms" />
+  <TransitionCard token="--transition-slow" duration="350ms" />
+</div>
+
+## 毛玻璃令牌
+
+`--backdrop-blur` / `--backdrop-blur-sm` 是派生变量（`blur(var(--glass-blur))`），
+`prefers-reduced-motion` / `html.reduce-motion` 下降级时通过覆盖 `--glass-blur*` 固定模糊半径。
+
+| 令牌              | 默认 | 柔粉轻奢 | 用途                    |
+| ----------------- | ---- | -------- | ----------------------- |
+| `--glass-blur`    | 12px | 12px     | 主毛玻璃（面板 / 弹窗） |
+| `--glass-blur-sm` | 8px  | 10px     | 轻量毛玻璃（标题栏等）  |
+
+## 双主题差异一览
+
+| 分组          | 默认主题（浅色简约） | 柔粉轻奢 `soft-pink-luxury`                |
+| ------------- | -------------------- | ------------------------------------------ |
+| 背景          | `#f5f5f5` 中性灰白   | `#fdf9fb` 奶白 + 柔雾渐变                  |
+| 强调色        | `#0078d4` Windows 蓝 | `#e2a4bc` 低饱和柔粉                       |
+| 分隔线 / 悬停 | 中性黑低透明度       | 柔粉染色（`rgba(226,164,188,…)`）          |
+| 阴影          | 中性黑               | 粉色染色阴影                               |
+| 附加变量      | —                    | `--glow-pink` / `--glow-pink-sm` 柔光      |
+| 组件级覆盖    | —                    | 按钮渐变、搜索框光晕、进度条渐变等局部样式 |
+
+约束（来自代码评审沉淀，修改令牌时务必遵守）：
+
+1. 组件禁止硬编码颜色 / 间距 / 圆角，一律引用变量或公共组件类（`.glass-card`、`.btn-primary` 等）；
+2. 主题文件只覆盖变量与必要的组件级差异，不重复声明完整规则与过渡时长；
+3. 毛玻璃必须 `backdrop-filter` 与 `-webkit-backdrop-filter` 双写；
+4. 新增主题需在 `styles/themes/index.ts` 注册，并在 `globals.css` 顶部 `@import` 同名 CSS。

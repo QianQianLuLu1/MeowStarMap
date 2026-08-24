@@ -28,7 +28,7 @@ export function registerShareHandlers(ctx: HandlerContext): void {
   // 启动服务：传入文件路径数组，返回分享 URL 和端口
   ipcMain.handle(
     'share:startWifi',
-    wrapHandler(ctx, z.tuple([schemas.filePathArray]), async ([filePaths]) => {
+    wrapHandler(ctx, z.tuple([schemas.filePathArrayBulk]), async ([filePaths]) => {
       for (const p of filePaths) assertFileReadPath(p)
       const session = await wifiShareService.start(filePaths)
       return {
@@ -58,7 +58,7 @@ export function registerShareHandlers(ctx: HandlerContext): void {
   // Slice 7a：copyFilesToClipboard 已 async，需 await
   ipcMain.handle(
     'share:copyFiles',
-    wrapHandler(ctx, z.tuple([schemas.filePathArray]), async ([filePaths]) => {
+    wrapHandler(ctx, z.tuple([schemas.filePathArrayBulk]), async ([filePaths]) => {
       for (const p of filePaths) assertFileReadPath(p)
       return await copyFilesToClipboard(filePaths)
     })

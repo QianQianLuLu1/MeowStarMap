@@ -1220,6 +1220,7 @@
     "emptyConfirm": "All {{count}} items in the recycle bin will be permanently deleted.\nFiles will be moved to the system recycle bin first, after which they cannot be restored from this app.\nAre you sure you want to empty?",
     "emptyConfirmTitle": "Empty recycle bin",
     "emptyFailed": "Empty failed",
+    "emptySuccess": "Recycle bin emptied",
     "emptyTitle": "Recycle bin is empty",
     "itemLabel": "Recycle bin item {{name}}",
     "permanentConfirm": "The selected {{count}} items will be permanently deleted.\nFiles will be moved to the system recycle bin first, after which they cannot be restored from this app.\nAre you sure you want to delete?",
@@ -2331,6 +2332,7 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "renderer-not-ready": "",
+    "schedulerStuckPaused": "",
     "indexingTimeout": ""
   },
   "lut": {

@@ -479,6 +479,23 @@ describe('registerMediaHandlers', () => {
     expect(result.data.message).toContain('为空')
   })
 
+  it('media:emptyRecycleBin 契约锁：成功返回仅含 message（无 success 字段），渲染端据此信任 call() 解析', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    trashItemMock.mockResolvedValue(undefined)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { message: string; movedCount: number }
+    }
+    // 契约：data 仅含 { message, movedCount, missingCount, failedCount }，不含 success 字段；
+    // preload call() 解包 IpcResponse 只回传 data，渲染端不得读取 result.success（恒为 undefined）。
+    expect(typeof result.data.message).toBe('string')
+    expect(result.data.message.length).toBeGreaterThan(0)
+    expect(result.data).not.toHaveProperty('success')
+    expect('success' in result.data).toBe(false)
+  })
+
   it('media:emptyRecycleBin 用户取消时抛 canceled', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
     showMessageBoxMock.mockResolvedValue({ response: 0 })

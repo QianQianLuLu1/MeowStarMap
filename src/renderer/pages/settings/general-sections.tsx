@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, GlobalToastContext } from './shared'
+import { SectionShell, GlobalToastContext, SettingsToggle } from './shared'
 
 // ============ 通用 ============
 
@@ -48,34 +48,20 @@ export const GeneralStartupSection: React.FC = () => {
       title={t('settings.sections.startup')}
       description={t('settings.startup.description')}
     >
-      <label className="flex items-center justify-between cursor-pointer">
-        <span style={{ color: 'var(--text-primary)' }}>{t('settings.startup.autoScan')}</span>
-        <input
-          type="checkbox"
-          checked={autoScan}
-          onChange={(e) => saveAutoScan(e.target.checked)}
-          className="w-5 h-5"
-        />
-      </label>
-      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-        {t('settings.startup.autoScanDesc')}
-      </p>
+      <SettingsToggle
+        label={t('settings.startup.autoScan')}
+        description={t('settings.startup.autoScanDesc')}
+        checked={autoScan}
+        onChange={(value) => void saveAutoScan(value)}
+      />
 
       {/* GPU 硬件加速开关（关闭后改用软件渲染，规避部分显卡导致的启动崩溃） */}
-      <label className="flex items-center justify-between cursor-pointer mt-4">
-        <span style={{ color: 'var(--text-primary)' }}>
-          {t('settings.startup.hardwareAcceleration')}
-        </span>
-        <input
-          type="checkbox"
-          checked={hardwareAccel}
-          onChange={(e) => saveHardwareAccel(e.target.checked)}
-          className="w-5 h-5"
-        />
-      </label>
-      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-        {t('settings.startup.hardwareAccelerationDesc')}
-      </p>
+      <SettingsToggle
+        label={t('settings.startup.hardwareAcceleration')}
+        description={t('settings.startup.hardwareAccelerationDesc')}
+        checked={hardwareAccel}
+        onChange={(value) => void saveHardwareAccel(value)}
+      />
     </SectionShell>
   )
 }
@@ -127,105 +113,65 @@ export const GeneralFileOpsSection: React.FC = () => {
       description={t('settings.fileops.description')}
     >
       {/* 删除前确认 */}
-      <label className="flex items-center justify-between cursor-pointer">
-        <div>
-          <div style={{ color: 'var(--text-primary)' }}>{t('settings.fileops.deleteConfirm')}</div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.fileops.deleteConfirmDesc')}
-          </div>
-        </div>
-        <input
-          type="checkbox"
-          checked={deleteConfirm}
-          onChange={async (e) => {
-            setDeleteConfirm(e.target.checked)
-            await updateSetting(
-              'fileOps.deleteConfirm',
-              e.target.checked,
-              e.target.checked ? t('toast.deleteConfirmOn') : t('toast.deleteConfirmOff')
-            )
-          }}
-          className="w-5 h-5"
-        />
-      </label>
+      <SettingsToggle
+        label={t('settings.fileops.deleteConfirm')}
+        description={t('settings.fileops.deleteConfirmDesc')}
+        checked={deleteConfirm}
+        onChange={(value) => {
+          setDeleteConfirm(value)
+          void updateSetting(
+            'fileOps.deleteConfirm',
+            value,
+            value ? t('toast.deleteConfirmOn') : t('toast.deleteConfirmOff')
+          )
+        }}
+      />
 
       {/* 永久删除二次确认 */}
-      <label className="flex items-center justify-between cursor-pointer">
-        <div>
-          <div style={{ color: 'var(--text-primary)' }}>
-            {t('settings.fileops.permanentDoubleConfirm')}
-          </div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.fileops.permanentDoubleConfirmDesc')}
-          </div>
-        </div>
-        <input
-          type="checkbox"
-          checked={permanentDeleteDoubleConfirm}
-          onChange={async (e) => {
-            setPermanentDeleteDoubleConfirm(e.target.checked)
-            await updateSetting(
-              'fileOps.permanentDoubleConfirm',
-              e.target.checked,
-              e.target.checked
-                ? t('toast.permanentDoubleConfirmOn')
-                : t('toast.permanentDoubleConfirmOff')
-            )
-          }}
-          className="w-5 h-5"
-        />
-      </label>
+      <SettingsToggle
+        label={t('settings.fileops.permanentDoubleConfirm')}
+        description={t('settings.fileops.permanentDoubleConfirmDesc')}
+        checked={permanentDeleteDoubleConfirm}
+        onChange={(value) => {
+          setPermanentDeleteDoubleConfirm(value)
+          void updateSetting(
+            'fileOps.permanentDoubleConfirm',
+            value,
+            value ? t('toast.permanentDoubleConfirmOn') : t('toast.permanentDoubleConfirmOff')
+          )
+        }}
+      />
 
       {/* 优先软删除 */}
-      <label className="flex items-center justify-between cursor-pointer">
-        <div>
-          <div style={{ color: 'var(--text-primary)' }}>
-            {t('settings.fileops.preferSoftDelete')}
-          </div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.fileops.preferSoftDeleteDesc')}
-          </div>
-        </div>
-        <input
-          type="checkbox"
-          checked={preferSoftDelete}
-          onChange={async (e) => {
-            setPreferSoftDelete(e.target.checked)
-            await updateSetting(
-              'fileOps.preferSoftDelete',
-              e.target.checked,
-              e.target.checked ? t('toast.preferSoftDeleteOn') : t('toast.preferSoftDeleteOff')
-            )
-          }}
-          className="w-5 h-5"
-        />
-      </label>
+      <SettingsToggle
+        label={t('settings.fileops.preferSoftDelete')}
+        description={t('settings.fileops.preferSoftDeleteDesc')}
+        checked={preferSoftDelete}
+        onChange={(value) => {
+          setPreferSoftDelete(value)
+          void updateSetting(
+            'fileOps.preferSoftDelete',
+            value,
+            value ? t('toast.preferSoftDeleteOn') : t('toast.preferSoftDeleteOff')
+          )
+        }}
+      />
 
       {/* 批量操作阈值 */}
       <div className="space-y-2">
-        <label className="flex items-center justify-between cursor-pointer">
-          <div>
-            <div style={{ color: 'var(--text-primary)' }}>
-              {t('settings.fileops.batchThreshold')}
-            </div>
-            <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-              {t('settings.fileops.batchThresholdDesc')}
-            </div>
-          </div>
-          <input
-            type="checkbox"
-            checked={batchThresholdEnabled}
-            onChange={async (e) => {
-              setBatchThresholdEnabled(e.target.checked)
-              await updateSetting(
-                'fileOps.batchThresholdEnabled',
-                e.target.checked,
-                e.target.checked ? t('toast.batchThresholdOn') : t('toast.batchThresholdOff')
-              )
-            }}
-            className="w-5 h-5"
-          />
-        </label>
+        <SettingsToggle
+          label={t('settings.fileops.batchThreshold')}
+          description={t('settings.fileops.batchThresholdDesc')}
+          checked={batchThresholdEnabled}
+          onChange={(value) => {
+            setBatchThresholdEnabled(value)
+            void updateSetting(
+              'fileOps.batchThresholdEnabled',
+              value,
+              value ? t('toast.batchThresholdOn') : t('toast.batchThresholdOff')
+            )
+          }}
+        />
         {batchThresholdEnabled && (
           <div
             className="flex items-center gap-3 p-3 rounded-lg"

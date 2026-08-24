@@ -91,7 +91,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
   // 文件删除（移至回收站）
   ipcMain.handle(
     'file:delete',
-    wrapHandler(ctx, z.tuple([schemas.filePathArray]), async ([filePaths]) => {
+    wrapHandler(ctx, z.tuple([schemas.filePathArrayBulk]), async ([filePaths]) => {
       for (const p of filePaths) assertFileReadPath(p)
       return ctx.fileService.moveToRecycleBin(filePaths)
     })
@@ -104,7 +104,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
     'file:copy',
     wrapHandler(
       ctx,
-      z.tuple([schemas.filePathArray, schemas.filePath]),
+      z.tuple([schemas.filePathArrayBulk, schemas.filePath]),
       async ([sourcePaths, targetDir]) => {
         for (const p of sourcePaths) assertFileReadPath(p)
         assertFileWritePath(targetDir)
@@ -119,7 +119,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
     'file:move',
     wrapHandler(
       ctx,
-      z.tuple([schemas.filePathArray, schemas.filePath]),
+      z.tuple([schemas.filePathArrayBulk, schemas.filePath]),
       async ([sourcePaths, targetDir]) => {
         for (const p of sourcePaths) assertFileReadPath(p)
         assertFileWritePath(targetDir)
@@ -194,7 +194,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
     wrapHandler(
       ctx,
       z.tuple([
-        schemas.filePathArray,
+        schemas.filePathArrayBulk,
         schemas.filePath,
         z
           .object({
@@ -283,7 +283,7 @@ export function registerFileHandlers(ctx: HandlerContext): void {
   // 永久删除（高危操作二次确认）
   ipcMain.handle(
     'file:deletePermanent',
-    wrapHandler(ctx, z.tuple([schemas.filePathArray]), async ([filePaths]) => {
+    wrapHandler(ctx, z.tuple([schemas.filePathArrayBulk]), async ([filePaths]) => {
       for (const p of filePaths) assertFileReadPath(p)
       // A-S3：高危操作二次确认（永久删除文件不可恢复）
       const confirmResult = await dialog.showMessageBox({

@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaStore, refreshMediaAfterScan } from '../../stores/mediaStore'
+import { useGlobalToast } from '../../pages/settings/sections'
 import { TaskProgressOverlay } from '../common/TaskProgressOverlay'
 import type { TaskProgress } from '../../../shared/types/progress'
 
@@ -19,6 +20,7 @@ import type { TaskProgress } from '../../../shared/types/progress'
 const ACCEPTED_TASK_TYPES: TaskProgress['taskType'][] = ['scan', 'indexing', 'batch', 'duplicate']
 export const ScanProgress: React.FC = () => {
   const { t } = useTranslation()
+  const showMessage = useGlobalToast()
   const scanProgress = useMediaStore((state) => state.scanProgress)
   const setScanProgress = useMediaStore((state) => state.setScanProgress)
   const [stopping, setStopping] = useState(false)
@@ -109,7 +111,16 @@ export const ScanProgress: React.FC = () => {
     const api = window.electronAPI?.scanner
     if (!api?.onComplete) return
 
-    const unsubscribe = api.onComplete(() => {
+    const unsubscribe = api.onComplete((result) => {
+      // D2：启动自动扫描失败原先完全静默（首装无游戏/注册表未命中时用户毫无感知），
+      // 此处兜底展示失败原因；手动触发的扫描由 ScanButton.reportScanFailure 提示详情
+      // （含手动路径引导），manualScan 标记用于跳过手动路径，避免双弹
+      if (result && !result.success && !useMediaStore.getState().scanProgress.manualScan) {
+        showMessage(
+          `${t('toast.scanFailed')}: ${result.message || t('toast.unknownError')}`,
+          'error'
+        )
+      }
       // 扫描完成兜底刷新媒体列表（与 ScanButton.onComplete 同理，统一走 refreshMediaAfterScan）
       void refreshMediaAfterScan()
     })
@@ -117,7 +128,7 @@ export const ScanProgress: React.FC = () => {
       if (unsubscribe) unsubscribe()
     }
     // refreshMediaAfterScan 为模块级导入（稳定引用），无需列入依赖数组
-  }, [])
+  }, [showMessage, t])
 
   const handleStop = useCallback(async () => {
     if (stopping) return

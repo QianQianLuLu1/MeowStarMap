@@ -81,6 +81,7 @@ npm run test          # 运行测试
 npm run lint          # 代码检查
 npm run typecheck     # 类型检查
 npm run format        # 格式化代码
+npm run storybook     # 启动组件文档站（Storybook，端口 6006）
 ```
 
 > 详细的开发指南请参阅 [DEVELOPMENT.md](DEVELOPMENT.md)
@@ -112,6 +113,7 @@ src/
 - [DEVELOPMENT.md](DEVELOPMENT.md) — 开发指南
 - [CHANGELOG.md](CHANGELOG.md) — 变更日志
 - [docs/](docs/) — IPC 契约、插件 API、排障手册等
+- [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — 组件文档站（`npm run storybook` 启动，端口 6006）
 
 ### 已知限制
 
@@ -196,6 +198,7 @@ npm run test          # Run tests
 npm run lint          # Lint
 npm run typecheck     # Type check
 npm run format        # Format code
+npm run storybook     # Start the component docs site (Storybook, port 6006)
 ```
 
 > See [DEVELOPMENT.en.md](DEVELOPMENT.en.md) for the full development guide
@@ -227,6 +230,7 @@ src/
 - [DEVELOPMENT.en.md](DEVELOPMENT.en.md) — Development guide
 - [CHANGELOG.md](CHANGELOG.md) — Changelog
 - [docs/](docs/) — IPC contracts, plugin API, troubleshooting, and more
+- [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — Component docs site (`npm run storybook`, port 6006)
 
 ### Known Limitations
 

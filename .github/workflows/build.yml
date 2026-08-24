@@ -8,6 +8,8 @@ on:
       - 'v*'
   pull_request:
     branches: [main]
+  # 手动触发：仅用于单独跑 storybook 文档站构建（其余 job 在手动触发下被 if 守卫跳过）
+  workflow_dispatch:
 
 
 concurrency:
@@ -25,6 +27,8 @@ jobs:
   lint-typecheck:
     name: Lint, Typecheck & Security
     runs-on: ubuntu-latest
+    # 手动触发（workflow_dispatch）仅跑 storybook 文档站，保持既有 job 的原触发行为不变
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     env:
       TZ: Asia/Hong_Kong
     steps:
@@ -70,6 +74,8 @@ jobs:
     name: Test (shard ${{ matrix.shard }}/10)
     runs-on: ubuntu-latest
     needs: [lint-typecheck]
+    # 手动触发（workflow_dispatch）仅跑 storybook 文档站，保持既有 job 的原触发行为不变
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     # 护栏：单分片超时，防止挂起耗尽 40 分钟（即便层 2 句柄未修也能兜底）
     timeout-minutes: 15
     strategy:
@@ -97,6 +103,8 @@ jobs:
     name: Build & Release (Windows x64 NSIS)
     runs-on: windows-latest
     needs: [lint-typecheck, test]
+    # 手动触发（workflow_dispatch）仅跑 storybook 文档站，保持既有 job 的原触发行为不变
+    if: ${{ github.event_name != 'workflow_dispatch' }}
     # 护栏：打包 + 冒烟挂起时兜底，防止流水线无限等待
     timeout-minutes: 40
     steps:
@@ -107,6 +115,11 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
+      # 原 clean-clone-build job 的验证意图：在干净克隆环境优先编译主进程产物，
+      # 漏提交的源文件会在此直接暴露为编译失败，再进入完整打包（dist:win）。
+      # 合并进本 job 前置 step，省去一台独立 windows-latest runner 的 checkout + npm ci 原生编译开销。
+      - name: Verify clean clone compiles main-process output
+        run: npm run build
       - name: Build & publish (release tag)
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: npm run dist:win
@@ -121,6 +134,19 @@ jobs:
       # tag 发布与 PR 两条分支的两个构建步骤之后都会到达此 step，发布前必须冒烟通过
       - name: E2E smoke test on win-unpacked
         run: npm run e2e:smoke
+      # 性能基准回归（docs/perf-regression.md）：冷启动/扫描入库/列表加载/重复检测/缓存统计，
+      # 对照入库基线 e2e/perf-baseline.json 判定，超阈或明显劣化则失败；结果始终归档便于追踪趋势与更新基线
+      - name: Performance baseline regression
+        run: npm run e2e:perf
+      - name: Upload perf results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results
+          path: |
+            .cache/perf/**
+          if-no-files-found: ignore
+          retention-days: 14
       # 失败现场采集：Playwright 截图/视频/trace + 主进程诊断日志，仅冒烟失败时上传
       - name: Upload smoke failure artifacts
         if: failure()
@@ -170,10 +196,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 只依赖仓库里真实提交的文件编译主进程产物：漏提交的源文件会在这里直接暴露为编译失败
-  clean-clone-build:
-    name: Clean Clone Build (主进程产物编译)
-    runs-on: windows-latest
+  # 组件文档站（Storybook）静态构建：独立并行 job，不进入任何现有 job 的 needs 链，
+  # 也不被其他 job 依赖，失败不阻断发布链。
+  # 触发条件：手动触发（workflow_dispatch）+ tag push；Storybook 构建是纯前端产物，
+  # 不涉及 better-sqlite3/sharp 等原生模块，沿用 --ignore-scripts 快速安装。
+  storybook:
+    name: Storybook Docs (组件文档站构建)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
+    # 护栏：文档站构建挂起兜底，防止流水线无限等待
+    timeout-minutes: 20
+    env:
+      TZ: Asia/Hong_Kong
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -181,6 +215,17 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
-      - name: Verify clean clone compiles main-process output
-        run: npm run build
+        run: npm ci --ignore-scripts
+        env:
+          # 双保险：--ignore-scripts 之外再显式跳过 electron 二进制下载
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - name: Build Storybook static site
+        run: npm run build-storybook
+      - name: Upload storybook-static artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: storybook-static
+          path: |
+            storybook-static/**
+          if-no-files-found: error
+          retention-days: 14

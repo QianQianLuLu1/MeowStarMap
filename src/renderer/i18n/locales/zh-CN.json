@@ -1607,6 +1607,7 @@
     "emptyConfirm": "将永久删除回收站中的全部 {{count}} 项文件。\n文件会先移至系统回收站，之后无法从本应用恢复。\n确定要清空吗？",
     "emptyConfirmTitle": "清空回收站",
     "emptyFailed": "清空失败",
+    "emptySuccess": "回收站已清空",
     "emptyTitle": "回收站为空",
     "itemLabel": "回收站项 {{name}}",
     "permanentConfirm": "将彻底删除选中的 {{count}} 项文件。\n文件会先移至系统回收站，之后无法从本应用恢复。\n确定要删除吗？",
@@ -2371,7 +2372,8 @@
     "databaseCorruption": "数据库损坏",
     "databaseRestore": "数据库恢复",
     "indexingTimeout": "建立索引超时",
-    "renderer-not-ready": "渲染进程未就绪"
+    "renderer-not-ready": "渲染进程未就绪",
+    "schedulerStuckPaused": "调度器长时间暂停已强制恢复"
   },
   "albumTypes": {
     "screenshot": "游戏截图",

@@ -139,6 +139,8 @@ export class TaskScheduler extends EventEmitter {
 
   /** 恢复调度器（主窗口 ready-to-show 后调用） */
   resume(): void {
+    // D4 埋点：resume 状态转换是启动扫描触发链路的关键节点，可诊断化
+    logger.info(`[Scheduler] resume：低优先级队列恢复， queued=${this.lowQueue.length}`)
     this.paused = false
     this.pump()
   }

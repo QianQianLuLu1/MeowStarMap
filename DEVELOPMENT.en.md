@@ -15,6 +15,7 @@
 - [5. Code Conventions](#5-code-conventions)
 - [6. Troubleshooting](#6-troubleshooting)
 - [7. Packaging Workflow](#7-packaging-workflow)
+- [8. Component Documentation (Storybook)](#8-component-documentation-storybook)
 
 ---
 
@@ -807,26 +808,65 @@ npm run preview:check
 
 ---
 
+## 8. Component Documentation (Storybook)
+
+The renderer-layer component documentation site is built on Storybook 10 (`@storybook/react-vite`),
+providing Props documentation, state examples and an accessibility panel for every component.
+Usage and authoring conventions: see `docs/Storybook使用指南.md` (Chinese).
+
+### 8.1 Start & Build Commands
+
+Start the local docs site (default port **6006**; hot reload for sources / stories / i18n; can run in parallel with `npm run dev`):
+
+```bash
+npm run storybook
+```
+
+Build the static site (output goes to `storybook-static/`, deployable as-is; CI builds it in the `storybook` job and uploads a same-named artifact):
+
+```bash
+npm run build-storybook
+```
+
+### 8.2 Directory Conventions
+
+| Location                                             | Convention                                                                                                                         |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `.storybook/`                                        | Config root: `main.ts` (story discovery) / `preview.ts` (global decorators + `window.electronAPI` stub) / `decorators/` / `mocks/` |
+| `src/renderer/components/**/*.stories.tsx`           | Stories are **co-located** with component sources (same name, same directory); maintain stories whenever you modify a component    |
+| `docs/storybook/`                                    | MDX guide pages inside the docs site (a11y guide / design tokens / electronAPI mock notes)                                         |
+| `docs/Storybook使用指南.md` / `docs/组件文档规范.md` | In-repo usage guide and authoring spec (Chinese)                                                                                   |
+
+### 8.3 Authoring & Maintenance Conventions (summary)
+
+- New / substantially modified components must ship with stories in the same commit (`docs/组件文档规范.md` §6 incremental rule);
+- Stories must keep states realistic — never fabricate data to hide defects; log source-level issues in `docs/技术债清单.md`;
+- Acceptance baseline: any component with stories must have zero `serious` / `critical` violations in the addon-a11y panel (records in `docs/storybook/accessibility.mdx`).
+
+---
+
 ## Appendix: Common Commands Cheat Sheet
 
-| Task                    | Command                         |
-| ----------------------- | ------------------------------- |
-| Install dependencies    | `npm install`                   |
-| Rebuild native modules  | `npm run rebuild:native`        |
-| Dev mode (exe app)      | `npm run dev`                   |
-| HTML preview            | `npm run preview`               |
-| Type check              | `npm run typecheck`             |
-| Lint                    | `npm run lint`                  |
-| Lint auto-fix           | `npm run lint:fix`              |
-| Code formatting         | `npm run format`                |
-| Run unit tests          | `npm test`                      |
-| Watch tests             | `npm run test:watch`            |
-| Test coverage           | `npm run test:coverage`         |
-| i18n key check          | `npm run i18n:check`            |
-| Preview drift check     | `npm run preview:check`         |
-| Build artifacts         | `npm run build`                 |
-| Build Windows installer | `npm run dist:win`              |
-| Regenerate icon         | `node scripts/generate-icon.js` |
+| Task                      | Command                         |
+| ------------------------- | ------------------------------- |
+| Install dependencies      | `npm install`                   |
+| Rebuild native modules    | `npm run rebuild:native`        |
+| Dev mode (exe app)        | `npm run dev`                   |
+| HTML preview              | `npm run preview`               |
+| Type check                | `npm run typecheck`             |
+| Lint                      | `npm run lint`                  |
+| Lint auto-fix             | `npm run lint:fix`              |
+| Code formatting           | `npm run format`                |
+| Run unit tests            | `npm test`                      |
+| Watch tests               | `npm run test:watch`            |
+| Test coverage             | `npm run test:coverage`         |
+| i18n key check            | `npm run i18n:check`            |
+| Preview drift check       | `npm run preview:check`         |
+| Build artifacts           | `npm run build`                 |
+| Build Windows installer   | `npm run dist:win`              |
+| Regenerate icon           | `node scripts/generate-icon.js` |
+| Start component docs site | `npm run storybook`             |
+| Build docs static site    | `npm run build-storybook`       |
 
 ---
 
@@ -835,6 +875,7 @@ npm run preview:check
 - [README.md](README.md): project overview and features
 - [ARCHITECTURE.md](ARCHITECTURE.md): detailed architecture document
 
+- [docs/Storybook使用指南.md](docs/Storybook使用指南.md): component docs site usage (Chinese)
 - [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md): project architecture overview (Chinese)
 
 ---

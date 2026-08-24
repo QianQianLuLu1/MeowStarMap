@@ -17,10 +17,10 @@ import { useTranslation } from 'react-i18next'
 // 与 about-sections.tsx 保持一致的项目官网
 const GITHUB_URL = 'https://github.com/QianQianLuLu1/NikkiGallery'
 
-type UpdateStage =
+export type UpdateStage =
   'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
 
-interface UpdatePayload {
+export interface UpdatePayload {
   stage: UpdateStage
   version?: string
   percent?: number

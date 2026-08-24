@@ -55,6 +55,25 @@ export const schemas = {
     .min(1, t('main.validator.pathArrayRequired'))
     .max(MAX_PATH_ARRAY_SIZE, t('main.validator.pathArrayMaxLength', { max: MAX_PATH_ARRAY_SIZE })),
 
+  /**
+   * 文件路径批量数组（用于 import:run / file:delete / file:copy / file:move /
+   * file:export / file:deletePermanent / share:startWifi / share:copyFiles /
+   * watermark:apply / editor:batchExportWithMetadata 等批量文件操作）：保留元素级
+   * 校验（非空 + 1-1024 字符），但**去掉 1000 人为上限**——下游 fileService 已逐文件
+   * 独立处理（importFiles 返回 imported/skipped/failed；move/copy/delete 逐文件
+   * try-catch 上报失败），且 handler 仍对每个元素执行 assertFileReadPath /
+   * assertFileWritePath 的 PathGuard 白名单 + 敏感目录黑名单校验。修复「路径数组长度
+   * 上限 1000」批量导入/导出报错。
+   */
+  filePathArrayBulk: z
+    .array(
+      z
+        .string()
+        .min(1, t('main.validator.pathRequired'))
+        .max(MAX_FILE_PATH_LENGTH, t('main.validator.pathMaxLength', { max: MAX_FILE_PATH_LENGTH }))
+    )
+    .min(1, t('main.validator.pathArrayRequired')),
+
   /** mediaId（正整数） */
   mediaId: z.number().int().positive(t('main.validator.mediaIdPositive')),
 

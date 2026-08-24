@@ -1220,6 +1220,7 @@
     "emptyConfirm": "ゴミ箱内のすべての {{count}} 件を完全に削除します。\nファイルはまずシステムのゴミ箱に移動され、その後このアプリから復元できなくなります。\n空にしますか？",
     "emptyConfirmTitle": "ゴミ箱を空にする",
     "emptyFailed": "空にする失敗",
+    "emptySuccess": "ゴミ箱を空にしました",
     "emptyTitle": "ゴミ箱は空です",
     "itemLabel": "ゴミ箱項目 {{name}}",
     "permanentConfirm": "選択した {{count}} 件を完全に削除します。\nファイルはまずシステムのゴミ箱に移動され、その後このアプリから復元できなくなります。\n削除しますか？",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

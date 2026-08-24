@@ -13,6 +13,10 @@ export const ScanButton: React.FC = () => {
   const [scanning, setScanning] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
+  // 手动扫描进行中标记（ref 供 onComplete 回调读取，避免闭包过期）：
+  // 失败详情 Toast（含手动路径引导）仅在手动扫描时由此组件展示，
+  // 启动自动扫描的失败由 ScanProgress 兜底提示，避免双弹
+  const manualScanningRef = useRef(false)
 
   // 扫描失败时向用户展示原因，避免静默空白页
   // 若失败原因为"未找到游戏目录"，追加引导用户手动指定路径的提示
@@ -52,10 +56,14 @@ export const ScanButton: React.FC = () => {
   useEffect(() => {
     if (!window.electronAPI?.scanner?.onComplete) return
     const unsubscribe = window.electronAPI.scanner.onComplete(async (result) => {
+      const wasManualScan = manualScanningRef.current
+      manualScanningRef.current = false
       setScanning(false)
       setScanProgress({ scanning: false, status: result?.success ? 'completed' : 'failed' })
-      // 扫描失败时向用户展示原因，引导自助解决（如手动指定路径）
-      if (result && !result.success) {
+      // 扫描失败时向用户展示原因，引导自助解决（如手动指定路径）。
+      // 仅手动触发的扫描在此展示（含手动路径引导）；启动自动扫描的失败
+      // 由 ScanProgress 兜底提示，避免双弹
+      if (result && !result.success && wasManualScan) {
         reportScanFailure(result.message)
       }
       // 无论扫描成功或失败，都重新加载媒体列表，确保前端与数据库同步（统一走 refreshMediaAfterScan）
@@ -95,7 +103,9 @@ export const ScanButton: React.FC = () => {
     if (!window.electronAPI?.scanner || scanning) return
     setMenuOpen(false)
     setScanning(true)
-    setScanProgress({ scanning: true, status: 'running' })
+    manualScanningRef.current = true
+    // manualScan 标记：ScanProgress 据此跳过失败兜底 Toast（手动失败由本组件提示详情）
+    setScanProgress({ scanning: true, status: 'running', manualScan: true })
 
     // IPC 是否抛异常：抛异常时 onComplete 不会触发，需要 finally 兜底收口
     let ipcThrew = false
@@ -108,14 +118,16 @@ export const ScanButton: React.FC = () => {
           if (!result) {
             // 用户取消选择
             setScanning(false)
-            setScanProgress({ scanning: false, status: 'completed' })
+            manualScanningRef.current = false
+            setScanProgress({ scanning: false, status: 'completed', manualScan: false })
             return
           }
           customPath = result
         } else {
           // 预览版无 IPC，直接取消
           setScanning(false)
-          setScanProgress({ scanning: false, status: 'completed' })
+          manualScanningRef.current = false
+          setScanProgress({ scanning: false, status: 'completed', manualScan: false })
           return
         }
       }
@@ -149,6 +161,7 @@ export const ScanButton: React.FC = () => {
       // 正常成功/失败统一由 onComplete 决定 status，避免 finally 把失败覆盖成 completed
       if (ipcThrew) {
         setScanning(false)
+        manualScanningRef.current = false
         setScanProgress({ scanning: false, status: 'completed' })
       }
     }

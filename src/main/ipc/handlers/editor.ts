@@ -333,7 +333,7 @@ export function registerEditorHandlers(ctx: HandlerContext): void {
     wrapHandler(
       ctx,
       z.tuple([
-        schemas.filePathArray,
+        schemas.filePathArrayBulk,
         editorMetadataInputSchema,
         z
           .object({

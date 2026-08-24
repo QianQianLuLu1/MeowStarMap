@@ -27,7 +27,7 @@ export function registerWatermarkHandlers(ctx: HandlerContext): void {
       z.tuple([
         // config 由 WatermarkService 内部校验，IPC 层仅做基本存在性检查
         z.record(z.string(), z.unknown()),
-        schemas.filePathArray,
+        schemas.filePathArrayBulk,
         schemas.filePath
       ]),
       async ([config, filePaths, targetDir]) => {

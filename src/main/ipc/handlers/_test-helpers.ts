@@ -14,6 +14,8 @@ import type { AppContext } from '../../app/app-context'
 export function createSchemasMock() {
   const filePath = z.string().min(1).max(1024)
   const filePathArray = z.array(filePath).min(1).max(1000)
+  // filePathArrayBulk：去掉 1000 人为上限，与 validator.ts 的 filePathArrayBulk 对齐
+  const filePathArrayBulk = z.array(filePath).min(1)
   const positiveIntId = z.number().int().positive()
   const httpUrl = z
     .string()
@@ -37,6 +39,7 @@ export function createSchemasMock() {
   return {
     filePath,
     filePathArray,
+    filePathArrayBulk,
     positiveIntId,
     httpUrl,
     uiTheme,
@@ -165,6 +168,7 @@ export interface MakeAppCtxOpts extends MakeCtxOpts {
     resume: ReturnType<typeof vi.fn>
     cancelAllLow: ReturnType<typeof vi.fn>
     enqueueLow: ReturnType<typeof vi.fn>
+    isPaused?: ReturnType<typeof vi.fn>
   }
   mediaWorkerManager?: { dispose: ReturnType<typeof vi.fn>; setDbPath: ReturnType<typeof vi.fn> }
   videoEditorBridge?: { dispose: ReturnType<typeof vi.fn> }
@@ -221,7 +225,9 @@ export function makeAppCtx(opts: MakeAppCtxOpts = {}): AppContext {
     pause: vi.fn(),
     resume: vi.fn(),
     cancelAllLow: vi.fn(),
-    enqueueLow: vi.fn(() => Promise.resolve())
+    enqueueLow: vi.fn(() => Promise.resolve()),
+    // 默认未暂停：window-manager 的 15s resume 保险丝触发时无副作用
+    isPaused: vi.fn(() => false)
   }
   const mediaWorkerManager = opts.mediaWorkerManager ?? {
     dispose: vi.fn(),

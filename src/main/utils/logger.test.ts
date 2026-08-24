@@ -55,9 +55,9 @@ describe('logger', () => {
   })
 
   describe('FAULT_TYPE_LABELS', () => {
-    it('包含 16 种故障类型', () => {
+    it('包含 17 种故障类型', () => {
       const keys = Object.keys(FAULT_TYPE_LABELS) as FaultType[]
-      expect(keys.length).toBe(16)
+      expect(keys.length).toBe(17)
     })
 
     it('uncaughtException 标签为"主进程异常"', () => {

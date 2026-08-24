@@ -148,6 +148,9 @@ __probe*.txt
 # ===== 测试覆盖率产物（不入仓）=====
 coverage/
 
+# ===== Storybook 静态构建产物（不入仓）=====
+storybook-static/
+
 # ===== 本地一次性恢复产物（不入仓）=====
 _safe_backup_*/
 /restore-root-files.ps1

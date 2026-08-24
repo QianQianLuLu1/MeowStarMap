@@ -1220,6 +1220,7 @@
     "emptyConfirm": "將永久刪除回收站中的全部 {{count}} 項檔案。\n檔案會先移至系統回收站，之後無法從本應用復原。\n確定要清空嗎？",
     "emptyConfirmTitle": "清空回收站",
     "emptyFailed": "清空失敗",
+    "emptySuccess": "回收站已清空",
     "emptyTitle": "回收站為空",
     "itemLabel": "回收站項 {{name}}",
     "permanentConfirm": "將徹底刪除選中的 {{count}} 項檔案。\n檔案會先移至系統回收站，之後無法從本應用復原。\n確定要刪除嗎？",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

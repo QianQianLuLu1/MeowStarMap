@@ -1220,6 +1220,7 @@
     "emptyConfirm": "Alle {{count}} Elemente im Papierkorb werden dauerhaft gelöscht.\nDateien werden zuerst in den Systempapierkorb verschoben, danach können sie nicht mehr aus dieser App wiederhergestellt werden.\nSicher, dass geleert werden soll?",
     "emptyConfirmTitle": "Papierkorb leeren",
     "emptyFailed": "Leeren fehlgeschlagen",
+    "emptySuccess": "Papierkorb geleert",
     "emptyTitle": "Papierkorb ist leer",
     "itemLabel": "Papierkorb-Element {{name}}",
     "permanentConfirm": "Die ausgewählten {{count}} Elemente werden dauerhaft gelöscht.\nDateien werden zuerst in den Systempapierkorb verschoben, danach können sie nicht mehr aus dieser App wiederhergestellt werden.\nSicher, dass gelöscht werden soll?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

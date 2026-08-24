@@ -976,6 +976,25 @@ async function startScan(
   // P1-A3：每次扫描开始时清空 realpath 缓存
   realpathCache.clear()
 
+  // 2.5 D3：进入目录发现阶段前先发一条初始进度事件。
+  // findMediaDirectories（多盘符 depth-6 签名搜索）慢机器可达数十秒，期间无任何 SCAN_PROGRESS
+  // 会导致渲染端浮窗不出现、task:getActive 快照为 null——右下角在发现阶段完全无反馈
+  try {
+    sendEvent({
+      type: 'SCAN_PROGRESS',
+      // eslint-disable-next-line no-restricted-syntax -- 初始阶段暂无真实路径，状态占位文案（渲染端原样展示当前路径，不翻译）
+      payload: { scanned: 0, found: 0, currentPath: '正在搜索游戏目录…', status: 'running' }
+    })
+  } catch (err) {
+    // 进度事件属于尽力而为，发送失败仅记日志，不中断扫描主流程
+    workerLog(
+      'warn',
+      // eslint-disable-next-line no-restricted-syntax -- 诊断日志，worker 进程早于 i18n 初始化，日志仍须可读
+      '[Scanner] 发送初始进度事件失败',
+      err instanceof Error ? err.message : String(err)
+    )
+  }
+
   // 3. 记录扫描历史
   const scanType = options?.fullScan ? 'full_scan' : options?.incremental ? 'incremental' : 'full'
   const scanId = insertScanHistory(scanType)

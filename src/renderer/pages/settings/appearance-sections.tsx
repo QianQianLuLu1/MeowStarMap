@@ -2,7 +2,7 @@ import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useThemeStore } from '../../stores/themeStore'
 import { themes, type UITheme } from '../../styles/themes'
-import { SectionShell, GlobalToastContext } from './shared'
+import { SectionShell, GlobalToastContext, SettingsToggle } from './shared'
 
 // ============ 外观 ============
 
@@ -164,36 +164,20 @@ export const AppearanceDisplaySection: React.FC = () => {
       </div>
 
       {/* 紧凑模式 */}
-      <label className="flex items-center justify-between cursor-pointer">
-        <div>
-          <div style={{ color: 'var(--text-primary)' }}>{t('settings.display.compactMode')}</div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.display.compactModeDesc')}
-          </div>
-        </div>
-        <input
-          type="checkbox"
-          checked={compactMode}
-          onChange={(e) => handleCompactMode(e.target.checked)}
-          className="w-5 h-5"
-        />
-      </label>
+      <SettingsToggle
+        label={t('settings.display.compactMode')}
+        description={t('settings.display.compactModeDesc')}
+        checked={compactMode}
+        onChange={handleCompactMode}
+      />
 
       {/* 动效减弱 */}
-      <label className="flex items-center justify-between cursor-pointer">
-        <div>
-          <div style={{ color: 'var(--text-primary)' }}>{t('settings.display.reduceMotion')}</div>
-          <div className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
-            {t('settings.display.reduceMotionDesc')}
-          </div>
-        </div>
-        <input
-          type="checkbox"
-          checked={reduceMotion}
-          onChange={(e) => handleReduceMotion(e.target.checked)}
-          className="w-5 h-5"
-        />
-      </label>
+      <SettingsToggle
+        label={t('settings.display.reduceMotion')}
+        description={t('settings.display.reduceMotionDesc')}
+        checked={reduceMotion}
+        onChange={handleReduceMotion}
+      />
     </SectionShell>
   )
 }

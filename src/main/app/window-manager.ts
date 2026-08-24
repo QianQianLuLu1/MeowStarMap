@@ -14,6 +14,10 @@ const CSP_POLICY =
   "default-src 'self'; script-src 'self'; object-src 'none'; " +
   "img-src 'self' media: data:; media-src 'self' media:; style-src 'self' 'unsafe-inline'"
 
+// D1 保险丝：ready-to-show 与 did-finish-load 双兜底均失效的极端情况下，
+// 15s 后强制恢复调度器，避免启动扫描任务因调度器永久暂停而静默不触发
+const SCHEDULER_RESUME_FUSE_MS = 15_000
+
 /**
  * 给默认 session 的所有响应挂上 CSP 响应头。
  * 必须在窗口 loadURL/loadFile 之前调用，否则首个文档请求收不到该头。
@@ -91,6 +95,35 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     }
   })
 
+  // D1 竞态修复：ready-to-show 监听必须在 loadURL 之前注册（Electron 官方要求）。
+  // 打包版经 app:// 本地协议加载极快，事件可能在 loadURL 的 promise resolve 前已发出，
+  // 晚注册会永久错过 → 调度器永不 resume → 启动扫描静默不触发（dev 走 vite 首绘慢，几乎不输掉竞态）。
+  // 首次可见统一入口：done 标志保证 ready-to-show / did-finish-load 兜底两条路径只执行一次
+  let firstVisibleDone = false
+  const resumeFuse = setTimeout(() => {
+    // 触发前检查暂停状态：正常路径已被 resume 时此处为 no-op，避免误报 fault
+    if (!ctx.taskScheduler.isPaused()) return
+    ctx.taskScheduler.resume()
+    logFault(
+      'schedulerStuckPaused',
+      // eslint-disable-next-line no-restricted-syntax -- 诊断错误消息，故障上报用途，无需 i18n
+      new Error('调度器在窗口加载 15s 后仍处于暂停状态，已强制恢复'),
+      { source: 'createMainWindow.resumeFuse' }
+    ).catch(() => {})
+  }, SCHEDULER_RESUME_FUSE_MS)
+  // unref：兜底定时器不应持有事件循环（应用退出不被拖延）
+  resumeFuse.unref?.()
+  const onFirstVisible = (via: string): void => {
+    if (firstVisibleDone) return
+    firstVisibleDone = true
+    clearTimeout(resumeFuse)
+    mainWindow.show()
+    // 分级调度：主窗口显示后恢复调度器，启动期入队的低优先级任务开始执行
+    ctx.taskScheduler.resume()
+    diagLog('WIN', `scheduler resumed via ${via}`)
+  }
+  mainWindow.once('ready-to-show', () => onFirstVisible('ready-to-show'))
+
   // 加载渲染进程
   if (isDev) {
     await mainWindow.loadURL('http://localhost:5173')
@@ -121,6 +154,10 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
       diagLog('WIN', 'did-finish-load: page loaded successfully')
       // GPU 回退状态机：页面成功渲染即清零连续启动失败计数（fallbackActive 保留）
       markBootSuccess()
+      // D1 兜底：ready-to-show 极端未触发时，页面加载完成即显示窗口并恢复调度器
+      if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+        onFirstVisible('did-finish-load')
+      }
     })
     mainWindow.webContents.on('console-message', (details) => {
       // Electron v35+ 改为单一事件对象，level 由数字改为字符串枚举
@@ -179,12 +216,6 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
       throw loadErr
     }
   }
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show()
-    // 分级调度：主窗口显示后恢复调度器，启动期入队的低优先级任务开始执行
-    ctx.taskScheduler.resume()
-  })
 
   // 渲染进程崩溃捕获：P1-6 增强——记录故障日志 + 弹出用户选择对话框
   // 原实现仅记录日志，用户面对白屏毫无感知；改为询问用户是否重新加载

@@ -15,6 +15,7 @@
 - [五、代码规范](#五代码规范)
 - [六、排错方案](#六排错方案)
 - [七、打包流程](#七打包流程)
+- [八、组件文档（Storybook）](#八组件文档storybook)
 
 ---
 
@@ -858,6 +859,42 @@ npm run lint             # ESLint 检查
 
 ---
 
+## 八、组件文档（Storybook）
+
+渲染层组件文档站基于 Storybook 10（`@storybook/react-vite`），提供每个组件的 Props 说明、
+状态示例与无障碍面板。使用与编写规范见 `docs/Storybook使用指南.md`。
+
+### 8.1 启动与构建命令
+
+启动本地文档站（默认端口 **6006**，支持源码 / stories / i18n 热更新，可与 `npm run dev` 并行）：
+
+```bash
+npm run storybook
+```
+
+构建静态站点（产物位于 `storybook-static/`，可直接部署；CI 在 `storybook` job 中构建并上传同名 artifact）：
+
+```bash
+npm run build-storybook
+```
+
+### 8.2 目录约定
+
+| 位置                                                 | 约定                                                                                                            |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `.storybook/`                                        | 配置根目录：`main.ts`（故事发现）/ `preview.ts`（全局装饰与 `window.electronAPI` 桩）/ `decorators/` / `mocks/` |
+| `src/renderer/components/**/*.stories.tsx`           | stories 与组件源码**同置**（同名同目录），修改组件时顺手维护故事                                                |
+| `docs/storybook/`                                    | 文档站内的 MDX 指南页（无障碍指引 / 设计令牌 / electronAPI mock 说明）                                          |
+| `docs/Storybook使用指南.md` / `docs/组件文档规范.md` | 仓库内的使用说明与编写规范                                                                                      |
+
+### 8.3 编写与维护约定（摘要）
+
+- 新增 / 重大修改组件必须随提交附带故事（`docs/组件文档规范.md` §6 增量规则）；
+- 组件在 story 中应保持真实状态，不得硬造假数据掩盖缺陷；源码级问题登记 `docs/技术债清单.md`；
+- 验收基线：带故事的组件在 addon-a11y 面板中零 `serious`/`critical` 违规（实测记录见 `docs/storybook/accessibility.mdx`）。
+
+---
+
 ## 附录：常用命令速查
 
 | 任务                  | 命令                            |
@@ -878,6 +915,8 @@ npm run lint             # ESLint 检查
 | 构建产物              | `npm run build`                 |
 | 打包 Windows 安装程序 | `npm run dist:win`              |
 | 重新生成图标          | `node scripts/generate-icon.js` |
+| 启动组件文档站        | `npm run storybook`             |
+| 构建组件文档静态站点  | `npm run build-storybook`       |
 
 ---
 
@@ -889,6 +928,7 @@ npm run lint             # ESLint 检查
 - [docs/IPC_CONTRACT.md](docs/IPC_CONTRACT.md)：IPC 契约规范
 - [docs/PLUGIN_API.md](docs/PLUGIN_API.md)：插件 API 参考
 - [docs/技术债清单.md](docs/技术债清单.md)：技术债台账
+- [docs/Storybook使用指南.md](docs/Storybook使用指南.md)：组件文档站使用说明
 - [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md)：项目架构全景（零基础导读）
 
 ---

@@ -60,3 +60,52 @@ describe('schemas.mediaIdArray（保留 1000 上限，控制对照）', () => {
     expect(cappedTuple.safeParse([ids(1000)]).success).toBe(true)
   })
 })
+
+// ============================================================================
+// filePathArrayBulk：去掉 filePathArray 的 1000 人为上限，保留元素级校验
+// （非空 + 1-1024 字符）。绝对路径白名单/敏感目录校验在 handler 层
+// （assertFileReadPath）完成，不在此文件覆盖。
+// ============================================================================
+const pathTuple = z.tuple([schemas.filePathArrayBulk])
+const cappedPathTuple = z.tuple([schemas.filePathArray])
+const absPaths = (n: number) =>
+  Array.from({ length: n }, (_, i) => `/mock/dir/file-${String(i).padStart(5, '0')}.jpg`)
+
+describe('schemas.filePathArrayBulk（修复 1000 上限后）', () => {
+  it('接受 1500 个合法路径 —— 修复前会被 1000 上限拒绝', () => {
+    const r = pathTuple.safeParse([absPaths(1500)])
+    expect(r.success).toBe(true)
+    if (r.success) expect((r.data as string[][])[0]).toHaveLength(1500)
+  })
+
+  it('接受正好 1000 / 2000 / 3000 个合法路径', () => {
+    expect(pathTuple.safeParse([absPaths(1000)]).success).toBe(true)
+    expect(pathTuple.safeParse([absPaths(2000)]).success).toBe(true)
+    expect(pathTuple.safeParse([absPaths(3000)]).success).toBe(true)
+  })
+
+  it('空数组仍被 .min(1) 拒绝（安全边界不降）', () => {
+    expect(pathTuple.safeParse([[]]).success).toBe(false)
+  })
+
+  it('含空串 / 非字符串元素仍被元素级校验拒绝', () => {
+    expect(pathTuple.safeParse([['/a.jpg', '', '/b.jpg']]).success).toBe(false)
+    expect(pathTuple.safeParse([['/a.jpg', 123 as unknown as string]]).success).toBe(false)
+  })
+
+  it('元素超过 1024 字符仍被 .max(MAX_FILE_PATH_LENGTH) 拒绝', () => {
+    const long = `/mock/dir/${'x'.repeat(2000)}.jpg`
+    expect(pathTuple.safeParse([[long]]).success).toBe(false)
+  })
+})
+
+describe('schemas.filePathArray（保留 1000 上限，控制对照）', () => {
+  it('合法小数组通过', () => {
+    expect(cappedPathTuple.safeParse([['/a.jpg', '/b.jpg']]).success).toBe(true)
+  })
+
+  it('超过 1000 仍被 .max(1000) 拒绝（确认仅 bulk 变体放宽）', () => {
+    expect(cappedPathTuple.safeParse([absPaths(1001)]).success).toBe(false)
+    expect(cappedPathTuple.safeParse([absPaths(1000)]).success).toBe(true)
+  })
+})

@@ -1220,6 +1220,7 @@
     "emptyConfirm": "Sẽ xóa vĩnh viễn toàn bộ {{count}} tệp trong thùng rác.\nTệp sẽ được chuyển vào thùng rác hệ thống trước, sau đó không thể khôi phục từ ứng dụng này.\nDọn thùng rác?",
     "emptyConfirmTitle": "Dọn thùng rác",
     "emptyFailed": "Dọn thùng rác thất bại",
+    "emptySuccess": "Đã dọn thùng rác",
     "emptyTitle": "Thùng rác trống",
     "itemLabel": "Mục thùng rác {{name}}",
     "permanentConfirm": "Sẽ xóa vĩnh viễn {{count}} tệp đã chọn.\nTệp sẽ được chuyển vào thùng rác hệ thống trước, sau đó không thể khôi phục từ ứng dụng này.\nXóa?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {

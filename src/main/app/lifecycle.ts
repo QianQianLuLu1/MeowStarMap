@@ -396,6 +396,11 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
             .catch((err) => {
               logStartupError('performStartupScan', err)
             })
+          // D4 埋点：入队时调度器若仍暂停，说明窗口 resume 尚未发生（正常时序）；
+          // 打包版现场曾因 resume 竞态导致扫描永不执行，此日志用于链路取证
+          logger.info(
+            `[Startup] startup-scan 已入队 (scheduler paused=${ctx.taskScheduler.isPaused()})`
+          )
         }, STARTUP_SCAN_DELAY_MS)
       )
     }

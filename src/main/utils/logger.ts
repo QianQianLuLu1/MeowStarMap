@@ -27,6 +27,7 @@ export type FaultType =
   | 'databaseRestore' // 数据库从备份恢复
   | 'indexingTimeout' // 索引链整体超时（fire-and-forget 兜底）
   | 'renderer-not-ready' // 渲染进程就绪超时（疑似白屏）
+  | 'schedulerStuckPaused' // 分级调度器长时间暂停被保险丝强制恢复（启动扫描触发链路异常）
 
 // 故障记录（用于 UI 展示）
 // P0-1 改进：扩展字段，每条故障都包含完整的环境信息，便于开发者定位问题
@@ -71,7 +72,8 @@ function buildFaultTypeLabels(): Record<FaultType, string> {
     databaseCorruption: t('faultTypes.databaseCorruption'),
     databaseRestore: t('faultTypes.databaseRestore'),
     indexingTimeout: t('faultTypes.indexingTimeout'),
-    'renderer-not-ready': t('faultTypes.renderer-not-ready')
+    'renderer-not-ready': t('faultTypes.renderer-not-ready'),
+    schedulerStuckPaused: t('faultTypes.schedulerStuckPaused')
   }
 }
 

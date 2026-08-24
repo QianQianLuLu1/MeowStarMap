@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaStore, fetchMediaFromDatabase } from '../../stores/mediaStore'
-import { SectionShell, SettingsCard, GlobalToastContext } from './shared'
+import { SectionShell, SettingsCard, GlobalToastContext, SettingsToggle } from './shared'
 import { BaseDialog } from '../../components/common/BaseDialog'
 import { IconClose } from '../../icons'
 
@@ -166,15 +166,11 @@ export const ScanOptionsSection: React.FC = () => {
 
   return (
     <SectionShell title={t('settings.sections.scanOptions')}>
-      <label className="flex items-center justify-between cursor-pointer">
-        <span style={{ color: 'var(--text-primary)' }}>{t('settings.scan.incremental')}</span>
-        <input
-          type="checkbox"
-          checked={incremental}
-          onChange={(e) => saveIncremental(e.target.checked)}
-          className="w-5 h-5"
-        />
-      </label>
+      <SettingsToggle
+        label={t('settings.scan.incremental')}
+        checked={incremental}
+        onChange={(value) => void saveIncremental(value)}
+      />
       <div className="pt-3 space-y-2" style={{ borderTop: '1px solid var(--divider)' }}>
         <div className="flex items-center justify-between gap-3">
           <div>

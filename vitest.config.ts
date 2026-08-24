@@ -10,9 +10,8 @@ import path from 'path'
  * - 渲染层 zustand store（node 环境）
  * - 渲染层 React 组件（jsdom 环境，配套 @testing-library/react）
  *
- * coverage 采用显式 include 清单（已被测试覆盖的模块逐步纳入）：
- * 清单内模块均已通过 mock Electron / better-sqlite3 / 原生模块实现单元测试；
- * 后续批 2 文件随新测试落地追加。
+ * coverage 全量统计 src 下的源码（all: true，include 匹配 src 内全部 ts/tsx），
+ * 显式排除测试文件、纯类型目录与进程入口壳文件。
  */
 export default defineConfig({
   plugins: [react()],
@@ -38,45 +37,37 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'html'],
-      include: [
-        // 注意：vitest 1.6 v8 provider 下 include 条目不能带 './' 前缀，否则 glob 不匹配、报告为空
-        'src/main/utils/media-constants.ts',
-        'src/shared/scene-category.ts',
-        'src/renderer/utils/game-events.ts',
-        'src/main/utils/phash.ts',
-        'src/main/utils/concurrency.ts',
-        'src/main/utils/file-utils.ts',
-        'src/main/utils/duplicate-scoring.ts',
-        'src/main/database/media-repository.ts',
-        'src/renderer/stores/operationHistoryStore.ts',
-        'src/renderer/stores/mediaStore.ts',
-        'src/renderer/utils/lut.ts',
-        'src/renderer/utils/imageProcessor.ts',
-        // ── 批 1：scanner / media-worker / database（均已通过 mock Electron/better-sqlite3/原生模块实现单测）
-        'src/main/scanner/index.ts',
-        'src/main/scanner/path-classifier.ts',
-        'src/main/scanner/uid-discovery.ts',
-        'src/main/scanner/worker-protocol.ts',
-        'src/main/scanner/scanner-worker-bridge.ts',
-        'src/main/scanner/worker-entry.ts',
-        'src/main/scanner/repair-legacy-data-v1.ts',
-        'src/main/media-worker/bktree-index.ts',
-        'src/main/media-worker/bridge.ts',
-        'src/main/media-worker/manager.ts',
-        'src/main/media-worker/worker-entry.ts',
-        'src/main/media-worker/worker-protocol.ts',
-        'src/main/database/connection.ts',
-        'src/main/database/import-root-repository.ts',
-        'src/main/database/sql-chunk.ts',
-        'src/main/database/worker/database-worker-bridge.ts',
-        // ── 批 2：随新增缺口测试纳入（同样不带 './' 前缀）
-        'src/main/scanner/repair-legacy-data-v3.ts',
-        'src/main/scanner/repair-legacy-data-v4.ts',
-        'src/main/scanner/game-directory-discovery.ts',
-        'src/main/media-worker/bktree-js.ts',
-        'src/main/database/worker/database-worker.ts',
-        'src/main/database/worker/worker-protocol.ts'
+      reporter: ['text', 'html', 'json-summary'],
+      // vitest 1.6 v8 provider：include/exclude 条目不能带 './' 前缀，否则 glob 不匹配、报告为空（历史坑）
+      all: true,
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        // 测试与类型声明（显式声明，不依赖默认值）
+        '**/*.test.ts',
+        '**/*.test.tsx',
+        '**/__tests__/**',
+        '**/*.d.ts',
+        // Storybook 故事文件与故事夹具（展示层样例，非单元测试对象）
+        '**/*.stories.{ts,tsx}',
+        '**/story-fixtures.ts',
+        // 纯类型目录（仅 import type 消费，无运行时代码）
+        'src/shared/types/**',
+        'src/main/types/**',
+        'src/renderer/types/**',
+        // 进程入口/引导壳文件，无法单元测试
+        'src/main/index.ts',
+        'src/main/preload.ts',
+        'src/main/preload-logger.ts',
+        'src/renderer/main.tsx',
+        'src/renderer/App.tsx',
+        'src/renderer/preview-entry.tsx',
+        // 资源目录（如有 .ts 产物）与仓库噪声防护
+        'src/renderer/icons/**',
+        'src/renderer/styles/**',
+        'src/renderer/assets/**',
+        'dist/**',
+        'release/**',
+        'coverage/**'
       ]
     }
   },

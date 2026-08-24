@@ -44,7 +44,7 @@ export function registerImportHandlers(ctx: HandlerContext): void {
     'import:run',
     wrapHandler(
       ctx,
-      z.tuple([schemas.filePathArray, schemas.filePath, importOptionsSchema]),
+      z.tuple([schemas.filePathArrayBulk, schemas.filePath, importOptionsSchema]),
       async ([sourcePaths, targetBaseDir, options]) => {
         // 手动输入的路径未经过 dialog 注册，需显式 register 其所在目录后再校验
         for (const p of sourcePaths) {

@@ -28,13 +28,18 @@ import { render, screen, cleanup, act, fireEvent } from '@testing-library/react'
 
 // mock TaskProgressOverlay：暴露 progress 字段与 onCancel，便于断言传入浮窗的进度与取消链路
 vi.mock('../common/TaskProgressOverlay', () => ({
-  TaskProgressOverlay: (props: { progress: TaskProgress | null; onCancel?: () => void }) => (
+  TaskProgressOverlay: (props: {
+    progress: TaskProgress | null
+    onCancel?: () => void
+    title?: string
+  }) => (
     <div data-testid="task-progress-overlay">
       <span data-testid="overlay-progress">
         {props.progress
           ? `${props.progress.current}/${props.progress.total}/${props.progress.percent}`
           : 'null'}
       </span>
+      {props.title ? <span data-testid="overlay-title">{props.title}</span> : null}
       {props.onCancel ? <button data-testid="overlay-cancel" onClick={props.onCancel} /> : null}
     </div>
   )
@@ -57,6 +62,12 @@ vi.mock('../../stores/mediaStore', async () => {
     refreshMediaAfterScan: refreshMock
   }
 })
+
+// mock useGlobalToast：捕获失败 Toast 的调用（D2 修复断言对象）
+const { showMessageMock } = vi.hoisted(() => ({ showMessageMock: vi.fn() }))
+vi.mock('../../pages/settings/sections', () => ({
+  useGlobalToast: () => showMessageMock
+}))
 
 import { ScanProgress } from './ScanProgress'
 import {
@@ -383,5 +394,116 @@ describe('ScanProgress task:progress 索引进度过滤（fix-indexing-progress�
     })
     // 2.3 门控：无 indexing 伞活动时不并入，避免与 DuplicatesPage 自绘进度双浮窗打架
     expect(screen.queryByTestId('task-progress-overlay')).toBeNull()
+  })
+})
+
+describe('ScanProgress 扫描失败 Toast + task:getActive 快照（fix-startup-autoscan-packaged）', () => {
+  type ScanResult = { success: boolean; message?: string }
+  type ScanCompleteCallback = (result?: ScanResult) => void
+  let onCompleteCallback: ScanCompleteCallback | null = null
+  let getActiveMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    onCompleteCallback = null
+    getActiveMock = vi.fn().mockResolvedValue(null)
+
+    const onCompleteSpy = vi.fn((cb: ScanCompleteCallback) => {
+      onCompleteCallback = cb
+      return vi.fn()
+    })
+    const onProgressSpy = vi.fn((_cb: (progress: unknown) => void) => vi.fn())
+
+    ;(window as unknown as { electronAPI: Record<string, unknown> }).electronAPI = {
+      scanner: { onComplete: onCompleteSpy },
+      task: { onProgress: onProgressSpy, getActive: getActiveMock }
+    }
+
+    // 重置 mediaStore 到默认非扫描状态（manualScan=false 模拟启动自动扫描场景）
+    useMediaStore.setState({
+      scanProgress: {
+        scanning: false,
+        scanned: 0,
+        found: 0,
+        currentPath: '',
+        status: 'idle',
+        manualScan: false
+      }
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('T3：onComplete({success:false}) 触发一次 error Toast（启动自动扫描失败的兜底提示）', async () => {
+    render(<ScanProgress />)
+    expect(onCompleteCallback).not.toBeNull()
+
+    act(() => {
+      onCompleteCallback!({ success: false, message: 'x' })
+    })
+
+    expect(showMessageMock).toHaveBeenCalledTimes(1)
+    // 同款文案结构："扫描失败: <原因>"，类型为 error
+    expect(showMessageMock).toHaveBeenCalledWith(expect.stringContaining(': x'), 'error')
+    // 兜底刷新照常执行
+    await vi.waitFor(() => {
+      expect(refreshMediaAfterScan).toHaveBeenCalled()
+    })
+  })
+
+  it('T3：onComplete({success:true}) 不触发 Toast', () => {
+    render(<ScanProgress />)
+
+    act(() => {
+      onCompleteCallback!({ success: true })
+    })
+
+    expect(showMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('T3：手动触发的扫描（manualScan=true）失败不在此提示，避免与 ScanButton 双弹', () => {
+    useMediaStore.setState({
+      scanProgress: {
+        scanning: true,
+        scanned: 0,
+        found: 0,
+        currentPath: '',
+        status: 'running',
+        manualScan: true
+      }
+    })
+    render(<ScanProgress />)
+
+    act(() => {
+      onCompleteCallback!({ success: false, message: 'x' })
+    })
+
+    expect(showMessageMock).not.toHaveBeenCalled()
+  })
+
+  it('U7：挂载后收到 task:getActive 快照（taskType=scan，发现阶段 scanned=0）即渲染浮窗，不依赖 scanProgress.scanning', async () => {
+    getActiveMock.mockResolvedValue(
+      makeProgress({
+        taskId: 'startup-scan-1',
+        taskType: 'scan',
+        phase: 'processing',
+        current: 0,
+        total: 0,
+        percent: 0,
+        message: '正在搜索游戏目录…'
+      })
+    )
+
+    await act(async () => {
+      render(<ScanProgress />)
+    })
+
+    await vi.waitFor(() => {
+      expect(screen.queryByTestId('task-progress-overlay')).not.toBeNull()
+    })
+    // 发现阶段 message 经 title 透传展示
+    expect(screen.getByTestId('overlay-title').textContent).toBe('正在搜索游戏目录…')
   })
 })

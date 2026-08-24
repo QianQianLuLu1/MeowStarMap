@@ -93,6 +93,7 @@ interface MockWindow {
   loadURL: ReturnType<typeof vi.fn>
   loadFile: ReturnType<typeof vi.fn>
   isDestroyed: ReturnType<typeof vi.fn>
+  isVisible: ReturnType<typeof vi.fn>
   _emit: (event: string, ...args: unknown[]) => void
 }
 
@@ -128,6 +129,7 @@ function createMockWindow(options: unknown): MockWindow {
     loadURL: vi.fn(() => Promise.resolve()),
     loadFile: vi.fn(() => Promise.resolve()),
     isDestroyed: vi.fn(() => false),
+    isVisible: vi.fn(() => false),
     _emit: (event: string, ...args: unknown[]): void => {
       ;(winListeners[event] ?? []).forEach((cb) => cb(...args))
     }
@@ -232,6 +234,59 @@ describe('createMainWindow', () => {
     // 触发 ready-to-show 事件
     lastCreatedWindow!._emit('ready-to-show')
 
+    expect(lastCreatedWindow!.show).toHaveBeenCalledTimes(1)
+    expect(ctx.taskScheduler.resume).toHaveBeenCalledTimes(1)
+  })
+
+  // ============ D1 修复：ready-to-show 注册时序竞态（打包版首装启动扫描不触发的主因） ============
+
+  it('U1. ready-to-show 在 loadURL promise resolve 之前触发（打包版竞态）：仍 show + resume', async () => {
+    const ctx = makeAppCtx()
+    // 模拟打包版 app:// 本地协议加载极快：ready-to-show 在 loadURL 调用内同步发出，
+    // 早于 loadURL 返回的 promise resolve——晚于 loadURL 注册的 once 监听会永久错过该事件
+    BrowserWindowCtorMock.mockImplementation((options: unknown) => {
+      const win = createMockWindow(options)
+      win.loadURL.mockImplementation(() => {
+        win._emit('ready-to-show')
+        return Promise.resolve()
+      })
+      lastCreatedWindow = win
+      return win
+    })
+
+    await createMainWindow(ctx)
+
+    expect(lastCreatedWindow!.show).toHaveBeenCalledTimes(1)
+    expect(ctx.taskScheduler.resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('U2. 正常时序（loadURL resolve 后 emit ready-to-show）：show + resume 各一次，重复触发不叠加', async () => {
+    const ctx = makeAppCtx()
+    await createMainWindow(ctx)
+
+    lastCreatedWindow!._emit('ready-to-show')
+    expect(lastCreatedWindow!.show).toHaveBeenCalledTimes(1)
+    expect(ctx.taskScheduler.resume).toHaveBeenCalledTimes(1)
+
+    // 重复触发（did-finish-load 兜底 + ready-to-show 双路径）不应二次 show/resume
+    lastCreatedWindow!._emit('ready-to-show')
+    expect(lastCreatedWindow!.show).toHaveBeenCalledTimes(1)
+    expect(ctx.taskScheduler.resume).toHaveBeenCalledTimes(1)
+  })
+
+  it('U3. ready-to-show 未触发但 did-finish-load 触发：兜底 show + resume 被调用', async () => {
+    process.env.NODE_ENV = 'production'
+    const ctx = makeAppCtx()
+    await createMainWindow(ctx)
+
+    // 不触发 ready-to-show，仅页面加载完成
+    lastCreatedWindow!.webContents._emit('did-finish-load')
+
+    expect(lastCreatedWindow!.show).toHaveBeenCalledTimes(1)
+    expect(ctx.taskScheduler.resume).toHaveBeenCalledTimes(1)
+
+    // 随后 ready-to-show 再到也不重复执行
+    lastCreatedWindow!._emit('ready-to-show')
     expect(lastCreatedWindow!.show).toHaveBeenCalledTimes(1)
     expect(ctx.taskScheduler.resume).toHaveBeenCalledTimes(1)
   })

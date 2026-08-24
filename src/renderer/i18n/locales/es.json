@@ -1220,6 +1220,7 @@
     "emptyConfirm": "Se eliminarán permanentemente los {{count}} elementos de la papelera.\nLos archivos se moverán primero a la papelera del sistema, después no se podrán restaurar desde esta app.\n¿Seguro que desea vaciar?",
     "emptyConfirmTitle": "Vaciar papelera",
     "emptyFailed": "Vaciado fallido",
+    "emptySuccess": "Papelera vaciada",
     "emptyTitle": "La papelera de reciclaje está vacía",
     "itemLabel": "Elemento de papelera {{name}}",
     "permanentConfirm": "Se eliminarán permanentemente los {{count}} elementos seleccionados.\nLos archivos se moverán primero a la papelera del sistema, después no se podrán restaurar desde esta app.\n¿Seguro que desea eliminar?",
@@ -2331,7 +2332,8 @@
     "databaseCorruption": "",
     "databaseRestore": "",
     "indexingTimeout": "",
-    "renderer-not-ready": ""
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": ""
   },
   "lut": {
     "builtin": {
