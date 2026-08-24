@@ -133,7 +133,7 @@ export const ScanButton: React.FC = () => {
       }
 
       // 从 settings 读取用户在设置页配置的自定义游戏目录并传入
-      // customKnownPaths 在 worker 中作为优先路径校验存在性，命中则跳过全盘签名搜索
+      // customKnownPaths 在 worker 中作为优先路径校验存在性（全盘扫描时高置信命中才跳过签名搜索）
       const savedPaths = (await window.electronAPI.settings.get('customScanPaths', [])) as unknown
       const customKnownPaths =
         Array.isArray(savedPaths) && (savedPaths as string[]).length > 0

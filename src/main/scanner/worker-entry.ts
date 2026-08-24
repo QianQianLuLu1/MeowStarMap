@@ -45,6 +45,7 @@ import { discoverUidsFromGameDirs } from './uid-discovery'
 import {
   searchBySignatureShallow,
   searchByMediaFolderSignatureShallow,
+  searchByInstallTreeSignatureShallow,
   findSteamGamePaths,
   findEpicGamePaths,
   getAvailableDrives,
@@ -87,6 +88,12 @@ const CACHE_DIR_NAMES = new Set([
 
 // P0-01：全盘文件名签名搜索的并发盘符数限制
 const DRIVE_SCAN_CONCURRENCY = 4
+
+// 全盘签名搜索的最大深度。
+// 6 → 覆盖 Steam/Epic 标准安装路径（steamapps/common/InfinityNikki 最深 5 层 + 媒体 2-3 层）；
+// 8 → 额外覆盖官网/WeGame 启动器非标准安装树 `InfinityNikki Launcher\InfinityNikki\X6Game\Saved\GamePlayPhotos\$uid$`
+// （从盘符根出发已达 7-8 层）。tinyglobby 的 fdir maxDepth 为 C 层一次性遍历，8 相对 6 仅线性增加少量目录 IO。
+const SIGNATURE_SEARCH_DEPTH = 8
 
 // ============ worker 模块级状态 ============
 
@@ -165,6 +172,19 @@ function sendEvent(event: WorkerEvent): void {
     process.parentPort?.postMessage(event)
   } catch {
     // parentPort 不可用时丢弃事件
+  }
+}
+
+/**
+ * 目录发现结论日志透传（绕过 workerLog 的 info 屏蔽）。
+ * 仅用于每次扫描至多一条汇总 + N 个目录行（N 通常 < 10）的低频关键诊断信息，
+ * 不改变"逐文件 info 丢弃"的性能决策。
+ */
+function sendScanLogInfo(message: string): void {
+  try {
+    process.parentPort?.postMessage({ type: 'SCAN_LOG', payload: { level: 'info', message } })
+  } catch {
+    // parentPort 不可用时丢弃日志，避免日志本身导致 worker 崩溃
   }
 }
 
@@ -379,22 +399,9 @@ async function checkMissingFiles(): Promise<void> {
 // ============ 游戏目录查找 ============
 
 /**
- * P0-01：查找所有游戏媒体目录（注册表快速路径 + 全盘签名深度搜索）
- *
- * C-G4：原 findGameDirectories 与 findAllMediaDirectories 逻辑完全一致，合并为单一方法。
- *
- * 流程：
- * - 优先路径：用户在设置页手动配置的游戏目录（customPaths），存在即加入结果集
- * - 快速路径：Steam/Epic 注册表查询 + 用户数据目录（AppData 下游戏数据）
- * - 签名搜索：对所有可用盘符执行 depth=6 深度优先搜索
- *   优先匹配媒体特征文件夹（精确），未命中再回退到游戏 exe 签名
- * - 并发扫描多个盘符（并发限制 4），提升搜索速度
- *
- * @param customPaths 用户在设置页手动配置的游戏目录，优先扫描；存在有效目录时跳过全盘搜索
- * @returns 所有匹配的媒体目录列表（去重）
- */
-/**
  * 查找所有游戏媒体目录（注册表快速路径 + 全盘签名深度搜索）。
+ *
+ * C-G4：原 findGameDirectories 与 findAllMediaDirectories 逻辑完全一致，合并为单一方法（P0-01）。
  *
  * P0-01 重构：将"自定义路径"与"自动发现"拆分为两个独立集合，修正两个历史缺陷：
  * - 缺陷 1（抑制发现）：原实现把自定义路径并入 `found`，用 `found.size > 0` 作为跳过全盘搜索的
@@ -403,11 +410,20 @@ async function checkMissingFiles(): Promise<void> {
  * - 缺陷 2（过滤丢弃）：原实现末尾对整个 `found` 做 `infinitynikki` 软过滤，当用户配置的不含该关键字的
  *   自定义路径与某个含 `infinitynikki` 的自动发现目录共存时，自定义路径被整体挤出结果。
  *
- * 修复策略：
+ * 修复策略（批次A R1+R2 更新）：
  * - `customSet`：自定义路径，存在即加入，**恒包含于最终结果**（不会被早退或软过滤剔除）。
- * - `autoSet`：Steam/Epic/AppData/全盘签名搜索发现的目录；早退判断仅基于 `autoSet.size`；
- *   软过滤（`infinitynikki` 关键字）只作用于 `autoSet`，自定义路径永不被挤出。
- * - 最终返回去重后的 `[...customSet, ...filteredAuto]`。
+ * - 快速路径按置信度分组：`registrySet`（Steam/Epic 注册表命中，高置信——注册表项就是
+ *   InfinityNikki 的安装路径）与 `lowConfidenceSet`（getUserDataPaths 命中，低置信——可能
+ *   只是 launcher 缓存而非游戏本体目录）。软过滤（`infinitynikki` 关键字）只作用于二者并集
+ *   （与历史版本对快速路径的处理一致），自定义路径永不被挤出。
+ * - `signatureSet`：全盘签名搜索命中。专属媒体文件夹签名（MEDIA_FOLDER_SIGNATURES，含
+ *   NikkiPhotos_HighQuality 等）已足够精确，恒包含于最终结果、不参与软过滤——旧实现对合并后
+ *   的集合软过滤，launcher 缓存（含 infinitynikki）命中时会把签名搜索发现的中文安装路径等
+ *   非 infinitynikki 目录误剔除，使 forceSignatureSearch 在非 Steam/Epic 标准路径场景失效（R1）。
+ * - forceSignatureSearch 早退规则（R2）：非 force 时快速路径并集非空即早退（与历史行为
+ *   完全一致）；force 时仅 `registrySet`（高置信）非空才早退，低置信命中不早退，避免
+ *   Steam/Epic 首装全盘扫描在注册表已命中时仍做数十秒零收益的 depth-6 搜索。
+ * - 最终返回去重后的 `[...customSet, ...filteredQuick, ...signatureSet]`。
  *
  * 流程：
  * - 优先路径：用户在设置页手动配置的游戏目录（customPaths），存在即加入结果集
@@ -416,16 +432,25 @@ async function checkMissingFiles(): Promise<void> {
  * - 并发扫描多个盘符（并发限制 4），提升搜索速度
  *
  * @param customPaths 用户在设置页手动配置的游戏目录，优先扫描；存在有效目录时恒包含（不抑制全盘搜索）
+ * @param opts.forceSignatureSearch 全盘扫描强制执行签名搜索（高置信注册表命中仍早退，低置信命中不早退）
  * @returns 所有匹配的媒体目录列表（去重）
  */
-export async function findMediaDirectories(customPaths?: string[]): Promise<string[]> {
+export async function findMediaDirectories(
+  customPaths?: string[],
+  opts?: { forceSignatureSearch?: boolean }
+): Promise<string[]> {
   // 自定义路径与自动发现分离：自定义路径恒包含，自动发现用独立计数判断是否跳过全盘搜索
   const customSet = new Set<string>()
-  const autoSet = new Set<string>()
+  // 快速路径按置信度分组（批次A R2）：registrySet 高置信（注册表项即安装路径），
+  // lowConfidenceSet 低置信（可能是 launcher 缓存而非游戏本体目录）
+  const registrySet = new Set<string>()
+  const lowConfidenceSet = new Set<string>()
+  // 签名搜索命中（批次A R1）：专属签名足够精确，恒包含、不参与软过滤
+  const signatureSet = new Set<string>()
 
   // 0. 优先路径：用户自定义游戏目录
   // 用户在设置页手动指定的目录，存在即加入结果集；不存在则跳过（游戏可能未安装但用户预配置）。
-  // 注意：自定义路径不计入 autoSet，因此不会触发下方"跳过全盘签名搜索"的早退，也不会被软过滤剔除。
+  // 注意：自定义路径不计入快速路径集合，因此不会触发下方“跳过全盘签名搜索”的早退，也不会被软过滤剔除。
   if (customPaths && customPaths.length > 0) {
     let validCount = 0
     for (const p of customPaths) {
@@ -443,67 +468,91 @@ export async function findMediaDirectories(customPaths?: string[]): Promise<stri
     }
   }
 
-  // 1. 快速路径：Steam + Epic 注册表查询
-  for (const p of await findSteamGamePaths()) autoSet.add(p)
-  for (const p of await findEpicGamePaths()) autoSet.add(p)
+  // 1. 快速路径（高置信）：Steam + Epic 注册表查询
+  for (const p of await findSteamGamePaths()) registrySet.add(p)
+  for (const p of await findEpicGamePaths()) registrySet.add(p)
 
-  // 2. 快速路径：用户数据目录（AppData 下的游戏数据）
+  // 2. 快速路径（低置信）：用户数据目录（AppData 下的游戏数据）
   // SYSTEM_DIRS_TO_SKIP 跳过 appdata，全盘签名搜索无法进入，必须显式检查
-  for (const p of await getUserDataPaths()) autoSet.add(p)
+  for (const p of await getUserDataPaths()) lowConfidenceSet.add(p)
 
-  // P1-A3：快速路径早退——仅当"自动发现"已找到结果时跳过全盘签名搜索。
-  // 修复：早退条件从 `found.size`（含自定义路径）改为 `autoSet.size`（仅自动发现），
-  // 使一个错误/空的自定义路径不再抑制全盘签名搜索。
-  if (autoSet.size > 0) {
-    workerLog('info', `[Scanner] 快速路径已找到 ${autoSet.size} 个目录，跳过全盘签名搜索`)
+  const quickSet = new Set<string>([...registrySet, ...lowConfidenceSet])
+
+  // P1-A3 + 批次A R2：快速路径早退——
+  // - 非 force：quickSet（注册表 ∪ 用户数据目录）非空即早退，与历史行为完全一致；
+  // - force：仅 registrySet（高置信，注册表项就是 InfinityNikki 安装路径）非空才早退；
+  //   lowConfidenceSet 命中（可能只是 launcher 缓存，T1 场景）不早退，仍执行全盘签名搜索。
+  if (registrySet.size > 0 || (quickSet.size > 0 && !opts?.forceSignatureSearch)) {
+    sendScanLogInfo(
+      opts?.forceSignatureSearch
+        ? `[Scanner] 注册表高置信已找到 ${registrySet.size} 个目录，跳过全盘签名搜索`
+        : `[Scanner] 快速路径已找到 ${quickSet.size} 个目录，跳过全盘签名搜索`
+    )
   } else {
-    // 3. 签名搜索（depth 6，覆盖常见安装路径的媒体目录）
-    // Steam 安装路径 steamapps/common/InfinityNikki 最深 5 层，媒体文件夹在游戏目录下 2-3 层
-    // depth 6 足以覆盖常见安装路径，减少 30%+ 遍历量
+    // T2：进入签名搜索分支时透传结论日志，便于打包版 main.log 诊断目录发现过程
+    sendScanLogInfo(`[Scanner] 全盘签名搜索开始（快速路径已命中 ${quickSet.size} 个目录）`)
+    // 3. 签名搜索（depth 8，覆盖常见安装路径 + 非标准安装树深层媒体目录）
+    // Steam 安装路径 steamapps/common/InfinityNikki 最深 5 层，媒体文件夹在游戏目录下 2-3 层；
+    // 官网/WeGame 启动器安装路径 `InfinityNikki Launcher\InfinityNikki\X6Game\Saved\GamePlayPhotos\$uid$`
+    // 从盘符根出发已达 7-8 层，depth 6 常因边界漏扫。上调至 8 覆盖该非标准安装树，
+    // tinyglobby 的 fdir maxDepth 在 C 层一次性遍历，depth 8 相比 6 仅线性增加少量目录系统调用。
     const drives = await getAvailableDrives()
     const driveTasks = drives.map((drive) => async () => {
       if (shouldStop) return
       // 优先搜索媒体文件夹（精确），找到就不搜索游戏 exe（避免扫描整个游戏目录）
-      const mediaDirs = await searchByMediaFolderSignatureShallow(drive, 6)
+      const mediaDirs = await searchByMediaFolderSignatureShallow(drive, SIGNATURE_SEARCH_DEPTH)
       if (mediaDirs.length > 0) {
-        for (const d of mediaDirs) autoSet.add(d)
-        return
+        for (const d of mediaDirs) signatureSet.add(d)
+      } else {
+        // 媒体文件夹没找到，搜索游戏 exe
+        const gameDir = await searchBySignatureShallow(drive, SIGNATURE_SEARCH_DEPTH)
+        if (gameDir) signatureSet.add(gameDir)
       }
-      // 媒体文件夹没找到，搜索游戏 exe
-      const gameDir = await searchBySignatureShallow(drive, 6)
-      if (gameDir) autoSet.add(gameDir)
+      // 安装树锚点签名：独立补充，不依赖媒体/ exe 命中结果——
+      // 专门覆盖非标准安装树（InfinityNikki Launcher\InfinityNikki\X6Game），
+      // 该场景下既没有 exe 签名、媒体目录又常因 depth 边界被媒体签名漏掉，必须单独兜底。
+      // 命中后返回安装树根（如 `...\InfinityNikki`），scanDirectory 从其递归即可覆盖全部媒体。
+      const treeRoots = await searchByInstallTreeSignatureShallow(drive, SIGNATURE_SEARCH_DEPTH)
+      for (const r of treeRoots) signatureSet.add(r)
     })
     await runWithConcurrency(driveTasks, DRIVE_SCAN_CONCURRENCY)
   } // end of else（全盘签名搜索）
 
-  // 软过滤：优先保留含 'infinitynikki' 的路径，避免中文路径/国际服路径被误剔除。
-  // 修复：软过滤只作用于 autoSet，自定义路径（customSet）永不被含该关键字的目录挤出。
-  // 原因：硬过滤会剔除所有不含 'infinitynikki' 的目录，但用户可能安装在中文路径（如 D:\游戏\无限暖暖\）
-  // 或国际服非标准命名目录。签名搜索（MEDIA_FOLDER_SIGNATURES）已足够精确（含 NikkiPhotos_HighQuality 等专属名称），
-  // 硬过滤是冗余保险。回退策略保证签名命中目录不被无端剔除。
+  // 软过滤（批次A R1）：仅作用于快速路径集合（registrySet ∪ lowConfidenceSet），与历史版本对
+  // 快速路径的处理保持一致（infinitynikki 优先保留，避免其他游戏的目录混入快速结果）。
+  // 签名搜索命中（signatureSet）不参与软过滤——专属签名（含 NikkiPhotos_HighQuality 等）已足够
+  // 精确；旧实现对合并后的集合过滤，launcher 缓存（含 infinitynikki）命中时会把签名搜索发现的
+  // 中文安装路径等非 infinitynikki 目录误剔除（forceSignatureSearch 的目标场景完全落空）。
   // test_media 测试目录与 War Thunder 等其他游戏的 ScreenShot 目录过滤，依赖
   // searchByMediaFolderSignatureShallow 内的 screenshot 上下文校验与后续 repairLegacyData 白名单清理。
-  const infinityNikkiDirs = Array.from(autoSet).filter((p) =>
+  const infinityNikkiDirs = Array.from(quickSet).filter((p) =>
     p.toLowerCase().includes('infinitynikki')
   )
-  const filteredAuto = infinityNikkiDirs.length > 0 ? infinityNikkiDirs : Array.from(autoSet)
+  const filteredQuick = infinityNikkiDirs.length > 0 ? infinityNikkiDirs : Array.from(quickSet)
 
-  if (infinityNikkiDirs.length === 0 && autoSet.size > 0) {
+  if (infinityNikkiDirs.length === 0 && quickSet.size > 0) {
     workerLog(
       'warn',
-      `[Scanner] 未找到含 'infinitynikki' 的路径，回退使用全部 ${autoSet.size} 个签名命中目录`
+      `[Scanner] 快速路径未找到含 'infinitynikki' 的路径，回退使用全部 ${quickSet.size} 个快速路径目录`
     )
   }
 
-  // 合并：自定义路径恒包含；自动发现按软过滤结果并入；整体去重。
-  const result = new Set<string>([...customSet, ...filteredAuto])
-  workerLog(
-    'info',
-    `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 自动发现过滤后 ${filteredAuto.length}）`
+  // 合并（批次A R1）：自定义路径与签名命中恒包含；快速路径按软过滤结果并入；整体去重。
+  const result = new Set<string>([...customSet, ...filteredQuick, ...signatureSet])
+  // T2：目录发现结论日志透传（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
+  sendScanLogInfo(
+    `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 快速路径过滤后 ${filteredQuick.length} + 签名命中 ${signatureSet.size}）`
   )
-  for (const d of result) workerLog('info', `[Scanner]   - ${d}`)
+  // 逐目录日志截断：兑现 sendScanLogInfo “低频白名单”承诺——结果目录数可能很大
+  // （多盘符多签名命中时可达数十个），最多输出前 20 个目录，其余以一条汇总行带过
+  const MAX_LOGGED_DIRS = 20
+  const resultDirs = Array.from(result)
+  for (const d of resultDirs.slice(0, MAX_LOGGED_DIRS)) sendScanLogInfo(`[Scanner]   - ${d}`)
+  if (resultDirs.length > MAX_LOGGED_DIRS) {
+    sendScanLogInfo(`[Scanner]   - （其余 ${resultDirs.length - MAX_LOGGED_DIRS} 个目录略）`)
+  }
 
-  return Array.from(result)
+  return resultDirs
 }
 
 // 注：searchBySignatureShallow / searchByMediaFolderSignatureShallow 已抽取至 ./game-directory-discovery
@@ -1018,7 +1067,11 @@ async function startScan(
     // 修复：原"全量重扫"只是 incremental:false，仍依赖 findGameDirectory 找单个目录
     // 全盘扫描遍历所有盘符查找含媒体特征文件夹的目录并全部扫描，覆盖所有安装场景
     if (options?.fullScan && !options?.path) {
-      const mediaDirs = await findMediaDirectories(options?.customKnownPaths)
+      // T1：全盘扫描强制执行签名搜索——快速路径的 launcher 缓存命中不能当作"游戏目录已找到"，
+      // 游戏装在非 Steam/Epic 标准路径时仍需全盘签名搜索兜底
+      const mediaDirs = await findMediaDirectories(options?.customKnownPaths, {
+        forceSignatureSearch: true
+      })
       if (mediaDirs.length === 0) {
         progress.status = 'failed'
         updateScanHistory(scanId, 'failed', 0, 0)

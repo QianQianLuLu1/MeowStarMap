@@ -43,6 +43,8 @@ const h = vi.hoisted(() => {
 // parentPort 桩：捕获 message 处理器 + postMessage 间谍
 let messageHandler: ((event: { data: unknown }) => void) | undefined
 const postMessageMock = vi.fn()
+// worker-entry 模块引用（beforeAll 动态 import 后赋值，供 U-C 直接调用 findMediaDirectories）
+let workerEntryModule: typeof import('../worker-entry')
 
 // Module._load 挂钩（beforeAll 安装、afterAll 还原）
 type ModuleLoad = (request: string, parent: unknown, isMain: boolean) => unknown
@@ -107,8 +109,8 @@ beforeAll(async () => {
     postMessage: postMessageMock
   }
 
-  // 3. 动态 import（此时全部桩已就绪）
-  await import('../worker-entry')
+  // 3. 动态 import（此时全部桩已就绪），保存模块引用供 U-C 直接调用 findMediaDirectories
+  workerEntryModule = await import('../worker-entry')
 })
 
 afterAll(() => {
@@ -178,5 +180,27 @@ describe('D3：全盘目录发现阶段的初始进度事件', () => {
     postMessageMock.mockImplementation(() => undefined)
     // postMessage 收集行为恢复（供后续断言用），清空调用记录
     postMessageMock.mock.calls.length = 0
+  })
+})
+
+describe('T2：目录发现结论日志透传', () => {
+  it('U-C. findMediaDirectories 的结论日志以 SCAN_LOG info 事件透传到主进程', async () => {
+    postMessageMock.mockClear()
+    h.state.instance = createFakeDb()
+
+    // 桩返回空结果即可走完目录发现全流程（结论日志在函数末尾必定发出）
+    discovery.findSteamGamePaths.mockResolvedValueOnce([])
+
+    await workerEntryModule.findMediaDirectories()
+
+    // 捕获 SCAN_LOG info 事件（修复前 workerLog 对 info 直接丢弃，无任何事件发出 ← RED 断言）
+    const scanLogInfoEvents = postMessageMock.mock.calls
+      .map((c) => c[0] as { type: string; payload?: { level?: string; message?: string } })
+      .filter((e) => e?.type === 'SCAN_LOG' && e.payload?.level === 'info')
+
+    expect(scanLogInfoEvents.length).toBeGreaterThan(0)
+    expect(
+      scanLogInfoEvents.some((e) => e.payload?.message?.includes('findMediaDirectories 搜索结果'))
+    ).toBe(true)
   })
 })

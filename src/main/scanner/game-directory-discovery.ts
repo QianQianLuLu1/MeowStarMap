@@ -35,6 +35,16 @@ const GAME_SIGNATURES = [
   'Launcher.exe'
 ]
 
+// 安装树结构锚点（用于全盘扫描识别非标准安装树，不依赖游戏 exe 或媒体子目录名）
+// 覆盖场景：官网/WeGame 启动器安装路径 `InfinityNikki Launcher\InfinityNikki\X6Game\...`
+// - X6Game：虚幻引擎游戏资源根目录，所有游戏内媒体（ScreenShot / Saved\GamePlayPhotos 等）均在其下；
+//   命中后返回其父目录（即 `...\InfinityNikki`），使 scanDirectory 从安装树根递归即可覆盖全部媒体。
+// - InfinityNikki Launcher：官网/国际服启动器目录本身，命中后返回其父目录（安装树更上一级），
+//   同样可作为扫描根，递归进入其下的 InfinityNikki\X6Game。
+// 注意：X6Game / Launcher 均为通用名，必须经下方上下文校验（父链含 infinitynikki）才能入库，
+// 避免误匹配其他虚幻游戏或无关软件的安装目录。
+const INSTALL_TREE_SIGNATURES = ['X6Game', 'InfinityNikki Launcher']
+
 // 媒体特征文件夹（用于全盘扫描识别游戏媒体目录，不依赖游戏 exe）
 // 只保留无限暖暖专属签名，这些签名在非游戏目录中不会出现
 const MEDIA_FOLDER_SIGNATURES = [
@@ -156,6 +166,62 @@ export async function searchByMediaFolderSignatureShallow(
   }
   // 去重：同一父目录下可能有多个匹配子目录（如 NikkiPhotos_HighQuality + NikkiPhotos_LowQuality）
   return Array.from(new Set(dirs))
+}
+
+/**
+ * 浅层安装树锚点签名搜索（限制深度，定位非标准安装树根）
+ *
+ * 与媒体文件夹签名搜索同理，用 tinyglobby 一次性匹配安装树结构目录（X6Game / InfinityNikki Launcher）。
+ * 这些锚点不依赖游戏 exe，也不依赖深层媒体子目录名，专门覆盖官网/WeGame 启动器安装路径
+ * `InfinityNikki Launcher\InfinityNikki\X6Game\...`：该路径既非 Steam/Epic 标准路径（注册表命中不了），
+ * 又可能缺失 exe 签名（游戏以 X6Game 形态存在），纯媒体子目录签名常因 depth 边界而错过。
+ *
+ * 命中后返回"锚点目录的父目录"作为扫描根，使 scanDirectory 从该根递归即能覆盖
+ * X6Game\ScreenShot、X6Game\Saved\GamePlayPhotos 等全部媒体，比只认深层媒体目录更稳。
+ *
+ * 上下文校验（防误匹配）：X6Game / InfinityNikki Launcher 均为通用名，必须经父链校验——
+ * 要求命中目录的完整路径（含所有祖先）含 `infinitynikki` 关键字，才视为无限暖暖安装树。
+ * 用户的 `InfinityNikki Launcher\InfinityNikki\X6Game`：命中 X6Game 时，其完整路径已含
+ * `infinitynikki`（上级 `InfinityNikki Launcher` 与 `InfinityNikki` 均匹配），可通过校验。
+ *
+ * @param rootPath 搜索根目录（通常是盘符根）
+ * @param maxDepth 最大搜索深度
+ */
+export async function searchByInstallTreeSignatureShallow(
+  rootPath: string,
+  maxDepth: number
+): Promise<string[]> {
+  const pattern = `**/{${INSTALL_TREE_SIGNATURES.join(',')}}`
+  let matches: string[] = []
+  try {
+    matches = await glob(pattern, {
+      cwd: rootPath,
+      absolute: true,
+      onlyDirectories: true,
+      deep: maxDepth,
+      caseSensitiveMatch: false,
+      followSymbolicLinks: false
+    })
+  } catch (err) {
+    workerLog(
+      'warn',
+      `[Scanner] 安装树锚点签名 glob 失败: ${rootPath}`,
+      err instanceof Error ? err.message : String(err)
+    )
+    return []
+  }
+
+  const roots: string[] = []
+  for (const raw of matches) {
+    const match = raw.replace(/[\\/]+$/, '')
+    // 仅当完整路径（含祖先）含 infinitynikki 才视为无限暖暖安装树，避免误匹配其他软件/游戏
+    const normalized = match.replace(/\//g, '\\').toLowerCase()
+    if (!normalized.includes('infinitynikki')) continue
+    // 返回锚点目录的父目录作为扫描根（如 `...\InfinityNikki`），递归即可覆盖其下全部媒体
+    roots.push(path.dirname(match))
+  }
+  // 去重：同一安装树下可能命中 X6Game 与 InfinityNikki Launcher 两个锚点，父目录可能相同
+  return Array.from(new Set(roots))
 }
 
 /**

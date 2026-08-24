@@ -1850,6 +1850,8 @@
     "scanNoGameDir": "",
     "manualPathHint": "",
     "manualPathHintMessage": "",
+    "scanCompletedNoGameShots": "Scan finished: no in-game screenshots found. If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "scanFoundButGalleryEmpty": "Scan finished: {{count}} files found, but none are in-game screenshots (launcher images were saved to the \"Cache\" tab). If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
     "batchDelete": {
       "allSucceeded": "",
       "missingFile": "",
@@ -2527,6 +2529,7 @@
     "cleanupCorruptedFailed": "",
     "cleanupCorruptedTitle": "",
     "emptySubtitle": "",
+    "emptySubtitleScanned": "Scan finished, but no in-game screenshots were found. Try \"Scan specific folder\" in the scan menu, or check the \"Cache\" tab for launcher images",
     "emptyTitle": "",
     "batchDeleteConfirm": "",
     "batchDeleteTitle": "",

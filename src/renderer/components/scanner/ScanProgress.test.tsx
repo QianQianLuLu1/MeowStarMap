@@ -75,6 +75,7 @@ import {
   useMediaStore,
   refreshMediaAfterScan
 } from '../../stores/mediaStore'
+import { useUIStore } from '../../stores/uiStore'
 import type { TaskProgress } from '../../../shared/types/progress'
 
 type CompleteCallback = () => void
@@ -505,5 +506,219 @@ describe('ScanProgress 扫描失败 Toast + task:getActive 快照（fix-startup-
     })
     // 发现阶段 message 经 title 透传展示
     expect(screen.getByTestId('overlay-title').textContent).toBe('正在搜索游戏目录…')
+  })
+})
+
+describe('ScanProgress 扫描成功但图库仍空引导 Toast（T3/D5）', () => {
+  type ScanResult = { success: boolean; message?: string; filesFound?: number }
+  type ScanCompleteCallback = (result?: ScanResult) => void
+  let onCompleteCallback: ScanCompleteCallback | null = null
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    onCompleteCallback = null
+
+    const onCompleteSpy = vi.fn((cb: ScanCompleteCallback) => {
+      onCompleteCallback = cb
+      return vi.fn()
+    })
+    const onProgressSpy = vi.fn((_cb: (progress: unknown) => void) => vi.fn())
+    const getActiveMock = vi.fn().mockResolvedValue(null)
+
+    ;(window as unknown as { electronAPI: Record<string, unknown> }).electronAPI = {
+      scanner: { onComplete: onCompleteSpy },
+      task: { onProgress: onProgressSpy, getActive: getActiveMock }
+    }
+
+    // 重置 mediaStore：非扫描状态 + 空媒体列表（模拟“扫描完成但图库无游戏截图”）
+    useMediaStore.setState({
+      mediaFiles: [],
+      scanProgress: {
+        scanning: false,
+        scanned: 0,
+        found: 0,
+        currentPath: '',
+        status: 'idle',
+        manualScan: false
+      }
+    })
+  })
+
+  afterEach(() => {
+    cleanup()
+  })
+
+  it('U-E：扫描成功（发现 30 个文件）但刷新后图库为空 → 弹 info 引导 Toast（含真实数量），且会话内去重不重复弹', async () => {
+    // 刷新后媒体列表为空（图库按设计过滤启动器缓存图 → 空态）
+    vi.mocked(fetchMediaFromDatabase).mockResolvedValueOnce({
+      files: [],
+      categories: [],
+      total: 0,
+      hasMore: false
+    })
+
+    render(<ScanProgress />)
+    expect(onCompleteCallback).not.toBeNull()
+
+    act(() => {
+      onCompleteCallback!({ success: true, filesFound: 30, message: 'x' })
+    })
+
+    // setup.ts 已初始化 zh-CN i18n，t() 返回真实文案，可断言实际插值后的文案
+    await vi.waitFor(() => {
+      expect(showMessageMock).toHaveBeenCalledWith(
+        expect.stringContaining('扫描完成：发现 30 个文件'),
+        'info'
+      )
+    })
+
+    // 再次触发 onComplete（同参数）：galleryEmptyHintShownRef 去重，info 仍只弹一次
+    act(() => {
+      onCompleteCallback!({ success: true, filesFound: 30, message: 'x' })
+    })
+    // flush 第二次 afterRefresh 的微任务链（此时 refresh 走默认 mock → mediaFiles 非空，且 ref 已置位）
+    await act(async () => {
+      await Promise.resolve()
+    })
+    const infoCalls = showMessageMock.mock.calls.filter(([, type]) => type === 'info')
+    expect(infoCalls).toHaveLength(1)
+  })
+
+  it('U-F①：刷新后图库非空 → 不弹 info 引导 Toast', async () => {
+    // 默认 fetchMock 返回 [{ id: 'mock-file' }]（非空），无需额外 mock
+    render(<ScanProgress />)
+
+    act(() => {
+      onCompleteCallback!({ success: true, filesFound: 30, message: 'x' })
+    })
+
+    await vi.waitFor(() => {
+      expect(refreshMediaAfterScan).toHaveBeenCalled()
+    })
+    // flush afterRefresh 微任务链，确认非空时不弹 info
+    await act(async () => {
+      await Promise.resolve()
+    })
+    const infoCalls = showMessageMock.mock.calls.filter(([, type]) => type === 'info')
+    expect(infoCalls).toHaveLength(0)
+  })
+
+  it('U-F②：success 且 filesFound 缺省 → 弹 scanCompletedNoGameShots 分支文案（info）', async () => {
+    vi.mocked(fetchMediaFromDatabase).mockResolvedValueOnce({
+      files: [],
+      categories: [],
+      total: 0,
+      hasMore: false
+    })
+
+    render(<ScanProgress />)
+
+    act(() => {
+      onCompleteCallback!({ success: true })
+    })
+
+    await vi.waitFor(() => {
+      expect(showMessageMock).toHaveBeenCalledWith(
+        expect.stringContaining('扫描完成：未发现游戏内截图'),
+        'info'
+      )
+    })
+  })
+
+  it('U-F③：success:false → 既有 D2 error Toast 行为不变（不弹 info）', async () => {
+    render(<ScanProgress />)
+
+    act(() => {
+      onCompleteCallback!({ success: false, message: 'x' })
+    })
+
+    // 与既有 D2 用例一致：error Toast 同款文案结构（"扫描失败: x"）
+    expect(showMessageMock).toHaveBeenCalledWith(expect.stringContaining(': x'), 'error')
+    // 兜底刷新照常执行，且失败路径不弹 info 引导
+    await vi.waitFor(() => {
+      expect(refreshMediaAfterScan).toHaveBeenCalled()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    const infoCalls = showMessageMock.mock.calls.filter(([, type]) => type === 'info')
+    expect(infoCalls).toHaveLength(0)
+  })
+})
+
+describe('ScanProgress D5 引导 Toast 视图限定（评审修复批次 B / D1）', () => {
+  type ScanResult = { success: boolean; message?: string; filesFound?: number }
+  type ScanCompleteCallback = (result?: ScanResult) => void
+  let onCompleteCallback: ScanCompleteCallback | null = null
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    onCompleteCallback = null
+
+    const onCompleteSpy = vi.fn((cb: ScanCompleteCallback) => {
+      onCompleteCallback = cb
+      return vi.fn()
+    })
+    const onProgressSpy = vi.fn((_cb: (progress: unknown) => void) => vi.fn())
+    const getActiveMock = vi.fn().mockResolvedValue(null)
+
+    ;(window as unknown as { electronAPI: Record<string, unknown> }).electronAPI = {
+      scanner: { onComplete: onCompleteSpy },
+      task: { onProgress: onProgressSpy, getActive: getActiveMock }
+    }
+
+    // 重置 mediaStore：非扫描状态 + 空媒体列表
+    useMediaStore.setState({
+      mediaFiles: [],
+      scanProgress: {
+        scanning: false,
+        scanned: 0,
+        found: 0,
+        currentPath: '',
+        status: 'idle',
+        manualScan: false
+      }
+    })
+    // 重置视图到默认 gallery（防止其他用例残留非 gallery 视图污染本组判定）
+    useUIStore.setState({ currentView: 'gallery' })
+  })
+
+  afterEach(() => {
+    cleanup()
+    // 恢复默认视图：store 是模块级单例，避免跨 describe 的状态泄漏
+    useUIStore.setState({ currentView: 'gallery' })
+  })
+
+  it('U-H：非 gallery 视图（launcher-cache）下扫描成功且刷新后列表为空 → 不弹 info 引导 Toast', async () => {
+    // 用户停留在空的「缓存」板块：mediaFiles 按 currentView 过滤（launcher 源），
+    // 刷新后为空只代表该板块空，不代表图库空——不应触发「图库仍为空」引导
+    useUIStore.setState({ currentView: 'launcher-cache' })
+    vi.mocked(fetchMediaFromDatabase).mockResolvedValueOnce({
+      files: [],
+      categories: [],
+      total: 0,
+      hasMore: false
+    })
+
+    render(<ScanProgress />)
+    expect(onCompleteCallback).not.toBeNull()
+
+    act(() => {
+      onCompleteCallback!({ success: true, filesFound: 30, message: 'x' })
+    })
+
+    // 兜底刷新照常执行（视图限定只影响 Toast 判定，不影响刷新链路）
+    await vi.waitFor(() => {
+      expect(refreshMediaAfterScan).toHaveBeenCalled()
+    })
+    // flush afterRefresh 完整微任务链：refreshMock 内部 setMediaFiles([]) 后，
+    // 判定代码在 refresh promise resolve 后的续体里同步执行，多 flush 确保已跑完
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    const infoCalls = showMessageMock.mock.calls.filter(([, type]) => type === 'info')
+    expect(infoCalls).toHaveLength(0)
   })
 })

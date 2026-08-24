@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaStore, refreshMediaAfterScan } from '../../stores/mediaStore'
+import { useUIStore } from '../../stores/uiStore'
 import { useGlobalToast } from '../../pages/settings/sections'
 import { TaskProgressOverlay } from '../common/TaskProgressOverlay'
 import type { TaskProgress } from '../../../shared/types/progress'
@@ -31,6 +32,8 @@ export const ScanProgress: React.FC = () => {
   // 索引伞任务是否活动（2.3 门控）：仅在其活动时，batch/duplicate 子阶段进度才并入本浮窗，
   // 防止用户手动重复检测/相似检测（DuplicatesPage 自绘进度）时出现双浮窗打架
   const indexingActiveRef = React.useRef(false)
+  // T3/D5：「扫描成功但图库仍为空」引导 Toast 的会话级去重标记（组件存活期间只提示一次）
+  const galleryEmptyHintShownRef = React.useRef(false)
 
   // 订阅 task:progress：响应 scan / indexing / batch / duplicate 四类活动任务
   // 显示门控已解耦到 taskProgress（见下方 if (!taskProgress)），不再依赖 scanProgress.scanning
@@ -121,8 +124,31 @@ export const ScanProgress: React.FC = () => {
           'error'
         )
       }
-      // 扫描完成兜底刷新媒体列表（与 ScanButton.onComplete 同理，统一走 refreshMediaAfterScan）
-      void refreshMediaAfterScan()
+      // D5：扫描成功但图库仍为空（本机无游戏截图/仅启动器缓存）时首装用户毫无感知，
+      // 误以为自动扫描失败；此处提示真实状态并引导出路。手动成功路径 ScanButton 无成功
+      // Toast，无双弹风险；失败路径由上方 D2 分支处理。
+      // D1（评审修复批次 B）：mediaFiles 是 fetchMediaFromDatabase 按 currentView 过滤后的
+      // 结果（launcher-cache → 仅启动器图；favorites → 仅收藏），非 gallery 视图下列表
+      // 为空只代表该板块空，不代表图库空——引导 Toast 仅在 gallery 视图下判定与弹出。
+      const afterRefresh = async () => {
+        await refreshMediaAfterScan()
+        if (
+          result?.success &&
+          !galleryEmptyHintShownRef.current &&
+          useUIStore.getState().currentView === 'gallery' &&
+          useMediaStore.getState().mediaFiles.length === 0
+        ) {
+          galleryEmptyHintShownRef.current = true
+          const found = Number(result.filesFound)
+          showMessage(
+            Number.isFinite(found) && found > 0
+              ? t('toast.scanFoundButGalleryEmpty', { count: found })
+              : t('toast.scanCompletedNoGameShots'),
+            'info'
+          )
+        }
+      }
+      void afterRefresh()
     })
     return () => {
       if (unsubscribe) unsubscribe()

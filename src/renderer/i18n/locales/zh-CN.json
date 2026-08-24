@@ -2279,6 +2279,8 @@
     "scanNoGameDir": "未找到游戏目录，请尝试手动指定路径",
     "manualPathHint": "未找到游戏目录",
     "manualPathHintMessage": "请在「扫描选项」中选择「指定目录」手动选择游戏安装路径",
+    "scanCompletedNoGameShots": "扫描完成：未发现游戏内截图。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
+    "scanFoundButGalleryEmpty": "扫描完成：发现 {{count}} 个文件，但均不是游戏内截图（启动器图片已收入「缓存」板块）。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
     "imageProcessorCanvasFailed": "无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用",
     "imageProcessorLoadFailed": "加载图片失败: {{src}}"
   },
@@ -2609,6 +2611,7 @@
     "cleanupCorruptedFailed": "清理损坏记录失败",
     "cleanupCorruptedTitle": "清理损坏记录",
     "emptySubtitle": "点击扫描按钮开始扫描游戏截图",
+    "emptySubtitleScanned": "已完成扫描，未发现游戏内截图。可尝试扫描菜单中的「指定目录扫描」，或前往「缓存」板块查看启动器图片",
     "emptyTitle": "暂无媒体文件",
     "batchDeleteConfirm": "确定要将 {{count}} 个文件移至回收站吗？",
     "batchDeleteTitle": "批量删除",

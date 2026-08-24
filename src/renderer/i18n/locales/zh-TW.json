@@ -1850,6 +1850,8 @@
     "scanNoGameDir": "",
     "manualPathHint": "",
     "manualPathHintMessage": "",
+    "scanCompletedNoGameShots": "掃描完成：未發現遊戲內截圖。遊戲截圖目錄未自動識別時，可在掃描選單中選擇「指定目錄掃描」",
+    "scanFoundButGalleryEmpty": "掃描完成：發現 {{count}} 個檔案，但均非遊戲內截圖（啟動器圖片已收入「快取」分區）。遊戲截圖目錄未自動識別時，可在掃描選單中選擇「指定目錄掃描」",
     "batchDelete": {
       "allSucceeded": "",
       "missingFile": "",
@@ -2527,6 +2529,7 @@
     "cleanupCorruptedFailed": "",
     "cleanupCorruptedTitle": "",
     "emptySubtitle": "",
+    "emptySubtitleScanned": "已完成掃描，未發現遊戲內截圖。可嘗試掃描選單中的「指定目錄掃描」，或前往「快取」分區查看啟動器圖片",
     "emptyTitle": "",
     "batchDeleteConfirm": "",
     "batchDeleteTitle": "",

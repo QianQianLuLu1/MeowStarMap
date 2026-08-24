@@ -196,13 +196,17 @@ export class ScannerWorkerBridge {
         break
 
       case 'SCAN_LOG': {
-        // 转发到主进程 logger（warn/error 级别，info 级别已在 worker 内丢弃）
+        // 转发到主进程 logger（error/warn 级别全量转发；info 仅限 worker 侧 sendScanLogInfo
+        // 白名单式发送的目录发现结论等低频诊断日志）
         const logMsg = `[ScannerWorker] ${msg.payload.message}`
         const args = msg.payload.args || []
         if (msg.payload.level === 'error') {
           logger.error(logMsg, ...args)
         } else if (msg.payload.level === 'warn') {
           logger.warn(logMsg, ...args)
+        } else if (msg.payload.level === 'info') {
+          // 目录发现结论等低频 info 透传（worker 侧 sendScanLogInfo 白名单式发送）
+          logger.info(logMsg, ...args)
         }
         break
       }

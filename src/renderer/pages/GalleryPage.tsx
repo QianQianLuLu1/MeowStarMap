@@ -128,6 +128,8 @@ export const GalleryPage: React.FC = () => {
   const [importWizardOpen, setImportWizardOpen] = useState(false)
   // P0-03：智能分组面板展开状态
   const [groupPanelOpen, setGroupPanelOpen] = useState(false)
+  // T4/D5：是否已执行过扫描（区分“从未扫描”与“已扫描但无游戏截图”的空态文案）
+  const [hasScanned, setHasScanned] = useState(false)
   // 图片属性弹窗（含 EXIF 拍摄参数 + 复制按钮）
   const [propertiesDialog, setPropertiesDialog] = useState<{
     open: boolean
@@ -172,6 +174,27 @@ export const GalleryPage: React.FC = () => {
       if (unsubscribe) unsubscribe()
     }
   }, [setMediaFiles])
+
+  // D5：区分“从未扫描”与“已扫描但无游戏截图”——扫描已执行过却仍显示
+  // “点击扫描按钮开始扫描”会误导用户反复扫描；已扫描后切换为引导文案
+  useEffect(() => {
+    const api = window.electronAPI?.scanner
+    if (!api) return
+    if (api.status) {
+      void api
+        .status()
+        .then((s) => {
+          if (s?.status === 'completed' || s?.status === 'failed') setHasScanned(true)
+        })
+        .catch(() => {
+          // 状态查询失败不影响页面渲染，保持默认文案
+        })
+    }
+    const unsubscribe = api.onComplete?.(() => setHasScanned(true))
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
+  }, [])
 
   const fileOperations = useFileOperations({
     filteredFiles,
@@ -573,7 +596,13 @@ export const GalleryPage: React.FC = () => {
         <EmptyState
           icon={<IconImage size={64} strokeWidth="1" className="empty-state-icon" />}
           title={t('galleryPage.emptyTitle')}
-          subtitle={t('galleryPage.emptySubtitle')}
+          subtitle={
+            // D2（评审修复批次 B）：已扫描引导文案仅限 gallery 视图——缓存/收藏等板块的空态
+            // 只是该板块无内容，切换为“前往「缓存」板块”文案会自指矛盾
+            currentView === 'gallery' && hasScanned
+              ? t('galleryPage.emptySubtitleScanned')
+              : t('galleryPage.emptySubtitle')
+          }
         />
       ) : (
         <>

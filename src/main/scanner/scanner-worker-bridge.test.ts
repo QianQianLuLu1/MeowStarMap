@@ -33,11 +33,12 @@ vi.mock('electron', () => ({
 // ---- Mock logger ----
 const mockLoggerError = vi.fn()
 const mockLoggerWarn = vi.fn()
+const mockLoggerInfo = vi.fn()
 vi.mock('../utils/logger', () => ({
   logger: {
     error: (...args: unknown[]) => mockLoggerError(...args),
     warn: (...args: unknown[]) => mockLoggerWarn(...args),
-    info: vi.fn(),
+    info: (...args: unknown[]) => mockLoggerInfo(...args),
     debug: vi.fn(),
     fault: vi.fn()
   }
@@ -356,7 +357,7 @@ describe('ScannerWorkerBridge', () => {
       expect(mockLoggerWarn).toHaveBeenCalledWith('[ScannerWorker] no args')
     })
 
-    it('info 级别应被忽略（不调用 logger.error/warn）', async () => {
+    it('info 级别不误走 error/warn 分支', async () => {
       const p = bridge.startScan('/db', {})
       mockWorker.emit('message', { type: 'WORKER_READY' })
       await p
@@ -365,6 +366,9 @@ describe('ScannerWorkerBridge', () => {
         type: 'SCAN_LOG',
         payload: { level: 'info', message: 'just info' }
       })
+      // T2 后 info 透传 logger.info（目录发现结论日志），需显式断言不丢失
+      expect(mockLoggerInfo).toHaveBeenCalledWith('[ScannerWorker] just info')
+      // 同时不得误走 error/warn 分支
       expect(mockLoggerError).not.toHaveBeenCalled()
       expect(mockLoggerWarn).not.toHaveBeenCalled()
     })
@@ -379,6 +383,22 @@ describe('ScannerWorkerBridge', () => {
         payload: { level: 'error', message: 'err' }
       })
       expect(mockLoggerError).toHaveBeenCalledWith('[ScannerWorker] err')
+    })
+
+    it('U-D. info 级别应透传 logger.info（目录发现结论日志）', async () => {
+      const p = bridge.startScan('/db', {})
+      mockWorker.emit('message', { type: 'WORKER_READY' })
+      await p
+
+      mockWorker.emit('message', {
+        type: 'SCAN_LOG',
+        payload: { level: 'info', message: 'x' }
+      })
+      // 修复前 info 分支不存在 → logger.info 未被调用 ← RED 断言
+      expect(mockLoggerInfo).toHaveBeenCalledWith('[ScannerWorker] x')
+      // info 透传不应误走 error/warn 分支
+      expect(mockLoggerError).not.toHaveBeenCalled()
+      expect(mockLoggerWarn).not.toHaveBeenCalled()
     })
   })
 

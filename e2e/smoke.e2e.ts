@@ -1,10 +1,12 @@
 /**
- * 打包产物运行时冒烟（S1~S6，见 docs/plans/e2e-smoke-playwright.md §2）
+ * 打包产物运行时冒烟（S1~S7，见 docs/plans/e2e-smoke-playwright.md §2）
  *
  * 前置要求：release/win-unpacked 已存在（本地 npm run dist:win；CI 由 build 步骤产出）。
  * 覆盖四个历史回归点：白屏、app:// 路径回退、preload 注入、原生模块（better-sqlite3）。
  */
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
+import fs from 'node:fs/promises'
+import path from 'node:path'
 import {
   launchApp,
   closeApp,
@@ -99,6 +101,28 @@ test.describe('打包产物冒烟（win-unpacked）', () => {
     await new Promise((r) => setTimeout(r, 5_000))
     expect(proc.exitCode).toBeNull()
     expect(await win.evaluate(() => 1)).toBe(1)
+  })
+
+  test('S7 首装自动扫描：扫描执行、完成且目录发现可观测', async () => {
+    test.setTimeout(120_000) // 全盘签名搜索需扫完所有可用盘符，慢机器放宽
+    const logsDir = path.join(launched!.userDataDir, 'logs')
+    await expect
+      .poll(
+        async () => {
+          const names = await fs.readdir(logsDir).catch(() => [] as string[])
+          let content = ''
+          for (const n of names.filter((x) => x.endsWith('.log'))) {
+            content += await fs.readFile(path.join(logsDir, n), 'utf-8').catch(() => '')
+          }
+          return {
+            started: content.includes('[Startup] 开始后台自动扫描'),
+            done: content.includes('[Startup] 扫描完成'),
+            discovery: content.includes('findMediaDirectories 搜索结果')
+          }
+        },
+        { timeout: 90_000, interval: 2_000 }
+      )
+      .toEqual({ started: true, done: true, discovery: true })
   })
 
   test('userData 隔离校验：确认落在临时目录', async () => {
