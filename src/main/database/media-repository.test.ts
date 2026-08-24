@@ -1221,7 +1221,7 @@ describe('MediaRepository', () => {
       // 修复：补建 import_roots 表（与相邻用例一致），否则 listImportRoots 抛错
       // 触发 logger.warn → 测试环境 electron 未 mock → initLogger 崩溃
       db.exec(`
-        CREATE TABLE import_roots (
+        CREATE TABLE IF NOT EXISTS import_roots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           root_path TEXT NOT NULL UNIQUE,
           created_at TEXT NOT NULL,
@@ -1230,6 +1230,78 @@ describe('MediaRepository', () => {
       `)
       const result = repo.listMedia({ page: 0, pageSize: 10, galleryHighQualityOnly: true })
       expect(result.total).toBe(2)
+    })
+
+    it('图库放行 X6Game/ScreenShot 与 X6Game/Video，缓存反向排除这两目录', async () => {
+      // 说明：本测试用 vi.mock 的内存 SQL 引擎不解析 LOWER/REPLACE/LIKE/NOT 组合条件，
+      // 因此这里断言生成的 SQL 文本包含 ScreenShot/Video 放行子句（图库）与反向排除子句（缓存），
+      // 而非行级过滤结果（行级验证需真实 better-sqlite3，见 REPAIR/集成测试）。
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS import_roots (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          root_path TEXT NOT NULL UNIQUE,
+          created_at TEXT NOT NULL,
+          disabled INTEGER NOT NULL DEFAULT 0
+        );
+      `)
+
+      // 图库视图（galleryHighQualityOnly=true）：SQL 必须同时放行 HQ、X6Game/ScreenShot、X6Game/Video
+      const capturedGallery: Array<{ sql: string; params: unknown[] }> = []
+      const originalPrepare = db.prepare.bind(db)
+      vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+        const stmt = originalPrepare(sql)
+        return {
+          ...stmt,
+          all: (...p: unknown[]) => {
+            capturedGallery.push({ sql, params: p })
+            return stmt.all(...p)
+          }
+        }
+      })
+      repo.listMedia({ galleryHighQualityOnly: true })
+      const gallerySelect = capturedGallery.find((c) => c.sql.includes('FROM media_files'))
+      expect(gallerySelect).toBeDefined()
+      expect(gallerySelect!.sql).toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%'"
+      )
+      expect(gallerySelect!.sql).toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/nikkiphotos_highquality/%'"
+      )
+      expect(gallerySelect!.sql).toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'"
+      )
+      expect(gallerySelect!.sql).toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/video/%'"
+      )
+      // 无导入根时仅目录条件，不传参
+      expect(gallerySelect!.params).toEqual([])
+      vi.restoreAllMocks()
+
+      // 缓存视图（mediaSource='launcher'）：SQL 必须反向排除上述三目录（NOT IN GALLERY 对称）
+      const capturedCache: Array<{ sql: string; params: unknown[] }> = []
+      const originalPrepare2 = db.prepare.bind(db)
+      vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+        const stmt = originalPrepare2(sql)
+        return {
+          ...stmt,
+          all: (...p: unknown[]) => {
+            capturedCache.push({ sql, params: p })
+            return stmt.all(...p)
+          }
+        }
+      })
+      repo.listMedia({ mediaSource: 'launcher' })
+      const cacheSelect = capturedCache.find((c) => c.sql.includes('FROM media_files'))
+      expect(cacheSelect).toBeDefined()
+      // 缓存条件内联 NOT (HQ OR screenshot OR video)，与图库放行完全对称
+      expect(cacheSelect!.sql).toContain('NOT (')
+      expect(cacheSelect!.sql).toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'"
+      )
+      expect(cacheSelect!.sql).toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/video/%'"
+      )
+      vi.restoreAllMocks()
     })
 
     it('listMedia galleryHighQualityOnly=true 时导入根前缀参与放行条件', () => {
@@ -1511,7 +1583,7 @@ describe('MediaRepository', () => {
     // 缓存视图（mediaSource=launcher）：所有非 HQ 路径文件均被包含
     // ==========================================================================
     describe('mediaSource=launcher 缓存视图', () => {
-      it('生成包含 NOT_IN_GALLERY_HQ_CONDITION 的 SQL', () => {
+      it('生成包含 NOT_IN_GALLERY_PATH_CONDITION 的 SQL', () => {
         insertMedia(db, { file_path: '/t/1.jpg' })
         // 补建 import_roots 表（与相邻用例一致），否则缓存视图的导入根排除查询抛错触发 logger
         db.exec(`
@@ -1537,7 +1609,7 @@ describe('MediaRepository', () => {
         repo.listMedia({ mediaSource: 'launcher' })
         const select = captured.find((c) => c.sql.includes('FROM media_files'))
         expect(select).toBeDefined()
-        // 缓存视图条件包含 NOT_IN_GALLERY_HQ_CONDITION 反写
+        // 缓存视图条件包含 NOT_IN_GALLERY_PATH_CONDITION 反写（与 GALLERY_PATH_CONDITION 对称）
         expect(select!.sql).toContain(
           "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%'"
         )

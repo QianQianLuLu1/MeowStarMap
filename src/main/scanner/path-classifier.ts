@@ -67,6 +67,12 @@ export function extractMediaSourceFromPath(filePath: string): 'game' | 'launcher
   if (normalized.includes('\\x6game\\saved\\screenshot\\')) {
     return 'launcher'
   }
+  // 语义澄清（无限暖暖标准安装树）：
+  // - X6Game\Saved\ScreenShot\（含 Saved 段）→ launcher（缓存板块，非用户主动拍摄）
+  // - X6Game\ScreenShot\（无 Saved 段，用户主动截取的游戏内截图）→ 走默认分支返回 'game'，归属「图库」
+  // - X6Game\Video\（游戏内视频）→ 同样走默认分支返回 'game'，归属「图库」
+  // 图库放行由 media-repository 的 GALLERY_PATH_CONDITION 显式匹配这两个目录（HQ ∪ X6Game/ScreenShot ∪ X6Game/Video），
+  // 缓存板块反向排除，二者对称。请勿改动默认分支语义，否则会破坏上述图库/缓存归属。
   // 云照片临时缓存目录，文件名为纯数字（如 1654626739.jpeg），非用户拍摄
   if (normalized.includes('\\cloudphotos\\temp\\')) {
     return 'launcher'

@@ -31,6 +31,7 @@ import { probeVideoMetadata } from '../utils/video-probe'
 import { repairLegacyDataV1 } from './repair-legacy-data-v1'
 import { repairLegacyDataV3 } from './repair-legacy-data-v3'
 import { repairLegacyDataV4 } from './repair-legacy-data-v4'
+import { repairLegacyDataV5 } from './repair-legacy-data-v5'
 import { t } from '../i18n/worker-safe'
 // C-G3：共享命名常量（取代魔法数字）
 // TDD 重构：路径分类纯函数抽取到独立文件，便于单元测试（无 electron/sharp/ffmpeg 依赖）
@@ -1061,6 +1062,8 @@ async function startScan(
   if (repairOk && db) repairOk = repairLegacyDataV3(db, workerLog)
   // 修复旧数据 V4：用更新后的 path-classifier 重新分类所有 media_source='launcher' 的记录
   if (repairOk && db) repairLegacyDataV4(db, workerLog)
+  // 修复旧数据 V5：将误归 launcher 的 X6Game/ScreenShot、X6Game/Video 游戏媒体重分类为 game（图库）
+  if (repairOk && db) repairOk = repairLegacyDataV5(db, workerLog)
 
   try {
     // 全盘扫描模式：直接全盘搜索媒体特征文件夹，不依赖游戏目录查找

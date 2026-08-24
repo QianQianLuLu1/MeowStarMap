@@ -68,7 +68,9 @@ const MEDIA_FOLDER_SIGNATURES = [
   'XSdkQrCode',
   'MallPic',
   // 游戏截图（位于 X6Game\ScreenShot，ScreenShot 较通用但配合游戏目录上下文可接受）
-  'ScreenShot'
+  'ScreenShot',
+  // 游戏内视频（位于 X6Game\Video，与 ScreenShot 同级，均为无限暖暖标准安装树下的图库内容）
+  'Video'
 ]
 
 /**
@@ -155,8 +157,9 @@ export async function searchByMediaFolderSignatureShallow(
     const baseName = path.basename(match).toLowerCase()
     // 原始逻辑返回命中文件夹的"父目录"（包含相册集合的目录），故取 dirname
     const dir = path.dirname(match)
-    // ScreenShot 为通用名（Trae skills/screenshot、War Thunder 等均可能误匹配），需路径上下文验证
-    if (baseName === 'screenshot') {
+    // ScreenShot / Video 为通用名（War Thunder、Trae skills/screenshot、各类游戏 Video 等均可能误匹配），
+    // 需路径上下文验证：仅当父目录含 infinitynikki 或 x6game 才视为无限暖暖游戏媒体目录。
+    if (baseName === 'screenshot' || baseName === 'video') {
       const normalizedDir = dir.replace(/\//g, '\\').toLowerCase()
       if (!normalizedDir.includes('infinitynikki') && !normalizedDir.includes('x6game')) {
         continue

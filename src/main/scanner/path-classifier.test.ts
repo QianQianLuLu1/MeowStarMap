@@ -288,6 +288,12 @@ describe('extractMediaSourceFromPath', () => {
     expect(result).toBe('game')
   })
 
+  it('X6Game\\Video 路径不含 Saved/ScreenShot/MallPic 等段时返回 game（归属图库）', () => {
+    // 游戏内视频位于 X6Game\Video，走默认分支返回 game，与 X6Game\ScreenShot 一致归属「图库」
+    const result = extractMediaSourceFromPath('D:\\game\\X6Game\\Video\\clip.mp4')
+    expect(result).toBe('game')
+  })
+
   it('规则顺序：CloudPhotos\\Temp 必须在 CloudPhotos 之前判定', () => {
     // 验证 Temp 子目录优先于 cloud 分类
     expect(extractMediaSourceFromPath('D:\\game\\CloudPhotos\\Temp\\foo.jpg')).toBe('launcher')

@@ -59,12 +59,23 @@ const GALLERY_HQ_PATH_CONDITION =
   "(LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%' AND LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/nikkiphotos_highquality/%')"
 
 /**
- * 缓存板块的反向过滤条件：排除图库板块已覆盖的高质量照片路径。
- * 用于 launcher-cache 视图，使其包含所有非 NikkiPhotos_HighQuality 的文件。
- * 注意：必须与 GALLERY_HQ_PATH_CONDITION 完全对称。
+ * 图库板块的放行条件（HQ ∪ X6Game/ScreenShot ∪ X6Game/Video）：
+ * 既保留原「游戏内高质量照片」语义（GamePlayPhotos/{uid}/NikkiPhotos_HighQuality），
+ * 又新增无限暖暖标准安装树下的游戏内截图（X6Game/ScreenShot）与游戏内视频（X6Game/Video）。
+ * 这两个目录由用户显式定义为「图库」内容，其余非 HQ 路径仍归入「缓存」板块。
+ * 仅由 listMedia 的 galleryHighQualityOnly=true 引用。
  */
-const NOT_IN_GALLERY_HQ_CONDITION =
-  "NOT (LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%' AND LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/nikkiphotos_highquality/%')"
+const GALLERY_PATH_CONDITION =
+  `${GALLERY_HQ_PATH_CONDITION}` +
+  " OR LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'" +
+  " OR LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/video/%'"
+
+/**
+ * 缓存板块的反向过滤条件：排除图库板块已覆盖的所有路径（HQ ∪ X6Game/ScreenShot ∪ X6Game/Video）。
+ * 用于 launcher-cache 视图，使其包含所有不在图库放行范围内的文件。
+ * 注意：必须与 GALLERY_PATH_CONDITION 完全对称（即 NOT (GALLERY_PATH_CONDITION)）。
+ */
+const NOT_IN_GALLERY_PATH_CONDITION = `NOT (${GALLERY_PATH_CONDITION})`
 
 /** 与 GALLERY_HQ_PATH_CONDITION 同口径的路径归一化表达式（小写 + 正斜杠） */
 const NORMALIZED_PATH_EXPR = "LOWER(REPLACE(file_path, '\\', '/'))"
@@ -515,7 +526,7 @@ export class MediaRepository {
           launcherRootLikeParams = computedRootParams
         }
         conditions.push(
-          `(COALESCE(media_source, 'game') = 'launcher' OR COALESCE(media_source, 'game') = 'cloud' OR (COALESCE(media_source, 'game') = 'game' AND ${NOT_IN_GALLERY_HQ_CONDITION}))${rootExclusion}`
+          `(COALESCE(media_source, 'game') = 'launcher' OR COALESCE(media_source, 'game') = 'cloud' OR (COALESCE(media_source, 'game') = 'game' AND ${NOT_IN_GALLERY_PATH_CONDITION}))${rootExclusion}`
         )
       } else {
         conditions.push('media_source = ?')
@@ -533,12 +544,12 @@ export class MediaRepository {
     const importRootLikeParams = galleryHighQualityOnly ? this.buildImportRootLikeParams() : []
     if (galleryHighQualityOnly) {
       if (importRootLikeParams.length === 0) {
-        conditions.push(GALLERY_HQ_PATH_CONDITION)
+        conditions.push(GALLERY_PATH_CONDITION)
       } else {
         const rootConditions = importRootLikeParams
           .map(() => `${NORMALIZED_PATH_EXPR} LIKE ? ESCAPE '${LIKE_ESCAPE_CHAR}'`)
           .join(' OR ')
-        conditions.push(`(${GALLERY_HQ_PATH_CONDITION} OR ${rootConditions})`)
+        conditions.push(`(${GALLERY_PATH_CONDITION} OR ${rootConditions})`)
       }
     }
     if (corruptedOnly) {

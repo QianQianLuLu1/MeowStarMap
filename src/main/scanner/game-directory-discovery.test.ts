@@ -179,6 +179,21 @@ describe('searchByMediaFolderSignatureShallow（媒体文件夹签名浅层搜�
     expect(options).toMatchObject({ onlyDirectories: true, deep: 8 })
   })
 
+  it('Video 签名命中 X6Game\\Video 且出现在 glob 搜索 pattern 中', async () => {
+    mockGlob.mockResolvedValue([
+      'D:\\Game\\X6Game\\Video',
+      'D:\\Game\\X6Game\\ScreenShot',
+      'D:\\Tools\\OtherGame\\Video'
+    ])
+
+    const result = await searchByMediaFolderSignatureShallow('D:\\', 8)
+
+    // X6Game 下的 Video/ScreenShot 保留（合并到同一父目录 X6Game），非游戏上下文 Video 剔除
+    expect(result).toEqual(['D:\\Game\\X6Game'])
+    const [pattern] = mockGlob.mock.calls[0]
+    expect(pattern).toContain('Video')
+  })
+
   it('glob 抛错 → 降级返回空数组且记录 warn', async () => {
     mockGlob.mockRejectedValue(new Error('EPERM'))
 
