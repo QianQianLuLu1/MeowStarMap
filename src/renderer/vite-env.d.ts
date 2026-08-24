@@ -571,7 +571,8 @@ interface WindowElectronAPI {
       corruptedOnly?: boolean
       // 损坏文件容错：hideCorrupted=true 过滤掉 is_corrupted=1 的记录（图库默认视图）
       hideCorrupted?: boolean
-      // 图库板块目录限制：true 时仅返回 ...\GamePlayPhotos\{uid}\NikkiPhotos_HighQuality 下的图片
+      // 图库板块目录限制：true 时仅返回 GamePlayPhotos/{uid}/NikkiPhotos_HighQuality 下的图片，
+      // 以及 X6Game/ScreenShot（游戏内截图）、X6Game/Video（游戏内视频）下的媒体
       galleryHighQualityOnly?: boolean
     }) => Promise<{
       success: boolean

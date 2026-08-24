@@ -3264,6 +3264,8 @@
         "repairV3Failed": "[Scanner] repairLegacyDataV3 失败:",
         "markMigrationV4Failed": "[Scanner] repairLegacyDataV4: 标记迁移状态失败:",
         "repairV4Failed": "[Scanner] repairLegacyDataV4 失败:",
+        "markMigrationV5Failed": "[Scanner] repairLegacyDataV5: 标记迁移状态失败:",
+        "repairV5Failed": "[Scanner] repairLegacyDataV5 失败:",
         "integrityCheckFailed": "[Scanner] 完整性校验失败:",
         "heartbeatTimeout": "主进程心跳超时，worker 自动退出（避免孤儿写入）",
         "bridgeReadyTimeout": "[ScannerWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败",

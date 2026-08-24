@@ -300,7 +300,9 @@ export async function fetchMediaFromDatabase(): Promise<{
     const mediaSource: 'game' | 'launcher' | 'cloud' | undefined = isCacheView
       ? 'launcher'
       : undefined
-    // 图库板块启用高质量照片目录过滤：仅显示 ...GamePlayPhotos/{uid}/NikkiPhotos_HighQuality 下的图片
+    // 图库板块启用高质量照片目录过滤：仅显示 GamePlayPhotos/{uid}/NikkiPhotos_HighQuality 下的图片，
+    // 以及无限暖暖标准安装树下的游戏内截图（X6Game/ScreenShot）与游戏内视频（X6Game/Video）。
+    // 详见 media-repository 的 GALLERY_PATH_CONDITION（HQ ∪ ScreenShot ∪ Video）。
     // 非图库视图（favorites/duplicates/recycle-bin 等）传 false 保持原行为
     const galleryHighQualityOnly = isGalleryView
     const mediaResult = await window.electronAPI.media.list({
@@ -391,6 +393,7 @@ export async function loadMoreMedia(
       ? 'launcher'
       : undefined
     // 与 fetchMediaFromDatabase 保持一致：图库板块启用高质量照片目录过滤
+    // （含 GamePlayPhotos HQ ∪ X6Game/ScreenShot ∪ X6Game/Video，详见 GALLERY_PATH_CONDITION）
     const galleryHighQualityOnly = isGalleryView
     const mediaResult = await window.electronAPI.media.list({
       page,
