@@ -178,7 +178,15 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
             mediaSource: z.enum(['game', 'launcher', 'cloud', 'all']).optional(),
             // 图库板块目录限制：true 时仅返回 ...\GamePlayPhotos\{uid}\NikkiPhotos_HighQuality 下的图片
             // 仅图库（gallery）视图传入；缓存/收藏/回收站/重复等板块不受影响
-            galleryHighQualityOnly: z.boolean().optional()
+            galleryHighQualityOnly: z.boolean().optional(),
+            // 性能重构：keyset 深分页游标（提供则忽略 page/pageSize 走游标分支）
+            cursor: z
+              .object({
+                sortValue: z.union([z.string(), z.number()]).nullable(),
+                id: z.number().int()
+              })
+              .nullable()
+              .optional()
           })
           .optional()
       ]),
@@ -197,7 +205,8 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
           total: result.total,
           page: result.page,
           pageSize: result.pageSize,
-          hasMore: result.hasMore
+          hasMore: result.hasMore,
+          nextCursor: result.nextCursor ?? null
         }
       }
     )

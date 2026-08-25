@@ -612,14 +612,25 @@ export interface SearchBuildDocsOptions {
   since?: string
   /** 限制返回数量（分页拉取，避免单次 IPC 传输过大） */
   limit?: number
-  /** 分页偏移量 */
-  offset?: number
+  /** 游标：仅返回 id > afterId 的记录（0 表示从最小 id 开始）；取代原 offset，消除全量重建 O(n²) */
+  afterId?: number
+  /** 是否一次性计算 total（全表 COUNT）；默认 false，由 hasMore 驱动循环不再需要 total */
+  includeTotal?: boolean
 }
 
 /** search:buildDocs 返回结果 */
 export interface SearchBuildDocsResult {
   docs: SearchableDocRow[]
-  total: number
+  /** 本页实际返回条数（恒等于 docs.length，零成本），用于表达"本页大小"语义 */
+  returned: number
+  /**
+   * 全量总数（COUNT(*) 一次性结果）。
+   * 仅当请求含 `includeTotal: true` 时填充，否则为 `undefined`。
+   * ⚠️ 切勿将其当作"本页条数"读取——未显式请求时它不会回退到 docs.length。
+   * 需要本页条数请改用 `returned`。
+   */
+  total?: number
+  /** 是否还有更多页（docs.length === limit 判定） */
   hasMore: boolean
 }
 

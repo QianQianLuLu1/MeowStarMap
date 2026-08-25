@@ -90,8 +90,9 @@ interface MediaState {
   categories: Category[]
   // 加载状态
   loading: boolean
-  // 无限滚动分页：currentPage 是已加载的最后一页页码（首屏为 0）
-  currentPage: number
+  // 无限滚动 keyset 游标：当前已加载的最后一页游标锚点（首页/复位为 null）
+  // 性能重构：取代旧 currentPage 偏移分页，避免大 OFFSET 全表扫描
+  mediaCursor: { sortValue: string | number | null; id: number } | null
   // 服务端是否还有下一页（由 media.list 的 hasMore 派生）
   hasMoreMedia: boolean
   // 追加加载中标志位，防止滚动到底时重复触发
@@ -114,7 +115,8 @@ interface MediaState {
   recycleBinLoading: boolean
   // 回收站分页：与图库同构（total 来自服务端，用于"全部删除"这类需要真实总量的场景）
   recycleBinTotal: number
-  recycleBinPage: number
+  // 回收站 keyset 游标：取代旧 recycleBinPage 偏移分页
+  recycleBinCursor: { sortValue: string | number | null; id: number } | null
   recycleBinHasMore: boolean
   recycleBinLoadingMore: boolean
   // P0-02：角色档案管理
@@ -141,7 +143,7 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
   mediaFiles: [],
   categories: [],
   loading: false,
-  currentPage: 0,
+  mediaCursor: null,
   hasMoreMedia: false,
   loadingMore: false,
   scanProgress: {
@@ -156,7 +158,7 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
   recycleBinFiles: [],
   recycleBinLoading: false,
   recycleBinTotal: 0,
-  recycleBinPage: 0,
+  recycleBinCursor: null,
   recycleBinHasMore: false,
   recycleBinLoadingMore: false,
   // P0-02：默认显示全部档案
@@ -305,8 +307,9 @@ export async function fetchMediaFromDatabase(): Promise<{
     // 详见 media-repository 的 GALLERY_PATH_CONDITION（HQ ∪ ScreenShot ∪ Video）。
     // 非图库视图（favorites/duplicates/recycle-bin 等）传 false 保持原行为
     const galleryHighQualityOnly = isGalleryView
+    // 性能重构：首屏使用 keyset 游标（cursor=null 即首页），续页由 loadNextMediaPage 推进 mediaCursor
     const mediaResult = await window.electronAPI.media.list({
-      page: 0,
+      cursor: null,
       pageSize: MEDIA_PAGE_SIZE,
       accountUid: currentProfileUid,
       hideDuplicates: !showDuplicates,
@@ -336,10 +339,10 @@ export async function fetchMediaFromDatabase(): Promise<{
       return null
     }
 
-    // 首屏加载即重置分页游标：所有"整表刷新"入口（扫描完成、切换视图、设置页操作等）
-    // 都经过本函数，游标随列表一起复位，避免 loadNextMediaPage 从陈旧页码继续翻页
+    // 首屏加载即重置 keyset 游标：所有"整表刷新"入口（扫描完成、切换视图、设置页操作等）
+    // 都经过本函数，游标随列表一起复位，避免 loadNextMediaPage 从陈旧游标继续翻页
     useMediaStore.setState({
-      currentPage: 0,
+      mediaCursor: mediaResult.nextCursor ?? null,
       hasMoreMedia: mediaResult.hasMore ?? false,
       loadingMore: false
     })
@@ -373,10 +376,15 @@ export async function refreshMediaAfterScan(): Promise<void> {
 }
 
 // 追加加载更多媒体文件（无限滚动）
+// 性能重构：入参由页码 page 改为 keyset 游标 cursor（首页传 null）
 // P0-02：按当前选中的角色档案 UID 过滤
 export async function loadMoreMedia(
-  page: number
-): Promise<{ files: MediaFile[]; hasMore: boolean } | null> {
+  cursor: { sortValue: string | number | null; id: number } | null
+): Promise<{
+  files: MediaFile[]
+  hasMore: boolean
+  nextCursor: { sortValue: string | number | null; id: number } | null
+} | null> {
   if (!window.electronAPI?.media?.list) return null
 
   try {
@@ -395,8 +403,9 @@ export async function loadMoreMedia(
     // 与 fetchMediaFromDatabase 保持一致：图库板块启用高质量照片目录过滤
     // （含 GamePlayPhotos HQ ∪ X6Game/ScreenShot ∪ X6Game/Video，详见 GALLERY_PATH_CONDITION）
     const galleryHighQualityOnly = isGalleryView
+    // 性能重构：续页用 keyset 游标（loadNextMediaPage 传入当前 mediaCursor），避免大 OFFSET
     const mediaResult = await window.electronAPI.media.list({
-      page,
+      cursor,
       pageSize: MEDIA_PAGE_SIZE,
       accountUid: currentProfileUid,
       hideDuplicates: !showDuplicates,
@@ -407,7 +416,8 @@ export async function loadMoreMedia(
     if (!mediaResult.files) return null
     return {
       files: mediaResult.files as MediaFile[],
-      hasMore: mediaResult.hasMore ?? false
+      hasMore: mediaResult.hasMore ?? false,
+      nextCursor: mediaResult.nextCursor ?? null
     }
   } catch (error) {
     console.error(i18n.t('mediaStore.log.loadMoreFailed'), error)
@@ -424,14 +434,14 @@ function dedupeAgainst(existing: MediaFile[], incoming: MediaFile[]): MediaFile[
 // 无限滚动入口：滚动到底时追加下一页并写入 store
 // 与 loadMoreMedia 的分工：loadMoreMedia 只负责取数，本函数负责游标推进、去重追加与并发保护
 export async function loadNextMediaPage(): Promise<void> {
-  const { loadingMore, hasMoreMedia, currentPage } = useMediaStore.getState()
+  const { loadingMore, hasMoreMedia, mediaCursor } = useMediaStore.getState()
   // 并发保护：VirtuosoGrid 的 endReached 在一次触底中可能连续触发多次
   if (loadingMore || !hasMoreMedia) return
 
   useMediaStore.setState({ loadingMore: true })
   try {
-    const nextPage = currentPage + 1
-    const result = await loadMoreMedia(nextPage)
+    // 性能重构：传入当前 keyset 游标（首页为 null，续页为上一页 nextCursor）
+    const result = await loadMoreMedia(mediaCursor)
     // 取数失败时保持游标与 hasMoreMedia 不变，用户再次触底即可重试（错误已由 loadMoreMedia 记录）
     if (!result) return
 
@@ -439,7 +449,8 @@ export async function loadNextMediaPage(): Promise<void> {
     if (freshFiles.length > 0) {
       useMediaStore.getState().addMediaFiles(freshFiles)
     }
-    useMediaStore.setState({ currentPage: nextPage, hasMoreMedia: result.hasMore })
+    // 游标推进：以服务端返回的 nextCursor 锚定下一页（无更多页时为 null）
+    useMediaStore.setState({ mediaCursor: result.nextCursor, hasMoreMedia: result.hasMore })
   } finally {
     useMediaStore.setState({ loadingMore: false })
   }
@@ -471,14 +482,15 @@ export async function loadRecycleBin(): Promise<MediaFile[] | null> {
   try {
     const result = await window.electronAPI.media.list({
       deletedOnly: true,
-      page: 0,
+      cursor: null,
       pageSize: RECYCLE_BIN_PAGE_SIZE
     })
     const files = result.files as MediaFile[]
     useMediaStore.setState({
       recycleBinFiles: files,
       recycleBinTotal: result.total ?? files.length,
-      recycleBinPage: 0,
+      // 性能重构：keyset 游标取代页码
+      recycleBinCursor: result.nextCursor ?? null,
       recycleBinHasMore: result.hasMore ?? false,
       recycleBinLoadingMore: false,
       recycleBinLoading: false
@@ -497,16 +509,16 @@ export async function loadRecycleBin(): Promise<MediaFile[] | null> {
 // 与 loadNextMediaPage 同构，但作用于独立的 recycleBin* 游标，两者互不干扰
 export async function loadNextRecycleBinPage(): Promise<void> {
   if (!window.electronAPI?.media?.list) return
-  const { recycleBinLoadingMore, recycleBinHasMore, recycleBinPage } = useMediaStore.getState()
+  const { recycleBinLoadingMore, recycleBinHasMore, recycleBinCursor } = useMediaStore.getState()
   // 并发保护：Virtuoso 的 endReached 在一次触底中可能连续触发多次
   if (recycleBinLoadingMore || !recycleBinHasMore) return
 
   useMediaStore.setState({ recycleBinLoadingMore: true })
   try {
-    const nextPage = recycleBinPage + 1
+    // 性能重构：续页用 keyset 游标（recycleBinCursor），避免大 OFFSET
     const result = await window.electronAPI.media.list({
       deletedOnly: true,
-      page: nextPage,
+      cursor: recycleBinCursor,
       pageSize: RECYCLE_BIN_PAGE_SIZE
     })
     if (!result?.files) return
@@ -518,7 +530,8 @@ export async function loadNextRecycleBinPage(): Promise<void> {
         ...dedupeAgainst(state.recycleBinFiles, incoming)
       ],
       recycleBinTotal: result.total ?? state.recycleBinTotal,
-      recycleBinPage: nextPage,
+      // 游标推进：以服务端返回的 nextCursor 锚定下一页
+      recycleBinCursor: result.nextCursor ?? null,
       recycleBinHasMore: result.hasMore ?? false
     })
   } catch (error) {

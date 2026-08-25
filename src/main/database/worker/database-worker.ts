@@ -179,9 +179,18 @@ function cleanupDb(): void {
  * 否则 exit 0 被当作正常退出，重启策略与 fault 日志永远不会触发。
  * DB_DISPOSE 等正常退出路径保持 exit 0。
  */
-function cleanupAndExit(exitCode = 0): void {
+function cleanupAndExit(exitCode = 0, graceful = false): void {
   cleanupDb()
-  process.exit(exitCode)
+  if (graceful) {
+    // 新增：DB_DISPOSE 正常退出——先回发确认表示 DB 句柄已释放，主进程据此可安全 rename 还原。
+    // 用 setImmediate 延迟 process.exit，确保 IPC 消息在事件循环中被写出，避免同步 process.exit 截断未发送的消息。
+    try {
+      sendEvent({ type: 'DB_WORKER_DISPOSED' })
+    } catch {}
+    setImmediate(() => process.exit(exitCode))
+  } else {
+    process.exit(exitCode)
+  }
 }
 
 // ============ 消息处理 ============
@@ -252,7 +261,7 @@ process.parentPort?.on('message', (event: { data: unknown }) => {
       break
     }
     case 'DB_DISPOSE': {
-      cleanupAndExit()
+      cleanupAndExit(0, true)
       break
     }
   }

@@ -23,6 +23,8 @@ vi.mock('../repair-legacy-data-v4', () => ({ repairLegacyDataV4: vi.fn() }))
 const discovery = vi.hoisted(() => ({
   findSteamGamePaths: vi.fn(),
   findEpicGamePaths: vi.fn(() => Promise.resolve([])),
+  findGameInstallRootsByPriority: vi.fn(() => Promise.resolve([])),
+  searchByInstallTreeSignatureShallow: vi.fn(() => Promise.resolve([])),
   getUserDataPaths: vi.fn(() => Promise.resolve([])),
   getAvailableDrives: vi.fn(() => Promise.resolve([])),
   searchByMediaFolderSignatureShallow: vi.fn(() => Promise.resolve([])),
@@ -128,7 +130,7 @@ describe('D3：全盘目录发现阶段的初始进度事件', () => {
     const discoveryDeferred = new Promise<string[]>((resolve) => {
       resolveDiscovery = resolve
     })
-    discovery.findSteamGamePaths.mockReturnValueOnce(discoveryDeferred)
+    discovery.findGameInstallRootsByPriority.mockReturnValueOnce(discoveryDeferred)
 
     sendScanStart('fake-initial-progress.db', { fullScan: true })
 
@@ -166,13 +168,13 @@ describe('D3：全盘目录发现阶段的初始进度事件', () => {
       return undefined
     })
 
-    discovery.findSteamGamePaths.mockResolvedValueOnce([])
+    discovery.findGameInstallRootsByPriority.mockResolvedValueOnce([])
 
     sendScanStart('fake-progress-throw.db', { fullScan: true })
 
     // 扫描未被中断：目录发现执行且流程走到 SCAN_COMPLETE
     await waitFor(() => sentEvents('SCAN_COMPLETE').length > 0, 5000, 'SCAN_COMPLETE')
-    expect(discovery.findSteamGamePaths).toHaveBeenCalled()
+    expect(discovery.findGameInstallRootsByPriority).toHaveBeenCalled()
     const complete = sentEvents('SCAN_COMPLETE')[0].payload as { success: boolean }
     expect(complete.success).toBe(false) // 0 目录 → noMediaDirFound，但流程完整收尾
 

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import fs from 'fs'
 import path from 'path'
 import os from 'os'
+import { logger } from '../utils/logger'
 
 /**
  * @layer L2
@@ -24,7 +25,8 @@ vi.mock('../utils/logger', () => ({
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-    debug: vi.fn()
+    debug: vi.fn(),
+    fault: vi.fn()
   }
 }))
 
@@ -290,6 +292,21 @@ describe('deleteBackup', () => {
     expect(r.message).toContain('EACCES')
     unlinkSpy.mockRestore()
   })
+
+  it('FIX(路径穿越): 传入越界 filename（如 ../../escaped.db）被拒绝且不删除任何文件', async () => {
+    // 在 backupDir 之外放置一个"受害者"文件，模拟越界可删除的任意文件
+    const victimPath = path.join(tmpRoot, 'escaped.db')
+    fs.writeFileSync(victimPath, Buffer.alloc(100, 1))
+    try {
+      const r = await backupService.deleteBackup('../escaped.db')
+      expect(r.success).toBe(false)
+      expect(r.message).toContain('越界')
+      // 关键：越界时在 access/unlink 之前已提前拒绝
+      expect(fs.existsSync(victimPath)).toBe(true) // 受害者文件未被删除
+    } finally {
+      /* victimPath 由 afterEach 统一清理 */
+    }
+  })
 })
 
 // ============================================================
@@ -375,6 +392,24 @@ describe('restoreBackup', () => {
       renameSpy.mockRestore()
     }
   })
+
+  it('FIX(路径穿越): 传入越界 filename（如 ../../escaped.db）被拒绝且不触发任何磁盘操作/重启', async () => {
+    // 在 backupDir 之外放置一个"受害者"文件，模拟越界可访问到的任意文件
+    const victimPath = path.join(tmpRoot, 'escaped.db')
+    fs.writeFileSync(victimPath, Buffer.alloc(100, 1))
+    const copySpy = vi.spyOn(fs, 'copyFileSync')
+    try {
+      const r = await backupService.restoreBackup('../escaped.db')
+      expect(r.success).toBe(false)
+      expect(r.message).toContain('越界')
+      // 关键：越界时在 existsSync/integrity_check/copy/rename/relaunch 之前已提前拒绝
+      expect(fs.existsSync(victimPath)).toBe(true) // 受害者文件未被读取/复制/覆盖
+      expect(copySpy).not.toHaveBeenCalled() // 未把越界文件复制为数据库
+      expect(electronApp.relaunch).not.toHaveBeenCalled() // 未触发应用重启
+    } finally {
+      copySpy.mockRestore()
+    }
+  })
 })
 
 // ============================================================
@@ -429,7 +464,7 @@ describe('R9 markRestoredFlags', () => {
     expect(prepareCalls.length).toBeGreaterThanOrEqual(1)
     const sql = prepareCalls[0][0] as string
     expect(sql).toContain('INSERT OR REPLACE INTO app_settings')
-    // run 被调用 4 次，keys 为 need_phash_recheck / need_duplicate_recheck / restored_at / media_count_dirty
+    // run 被调用 4 次，keys 为 need_phash_recheck / need_duplicate_recheck / restored_at / media_count_stale
     const runCalls = (instance!.prepare.mock.results[0].value as { run: ReturnType<typeof vi.fn> })
       .run.mock.calls as unknown[][]
     expect(runCalls).toHaveLength(4)
@@ -437,7 +472,7 @@ describe('R9 markRestoredFlags', () => {
     expect(keys).toContain('need_phash_recheck')
     expect(keys).toContain('need_duplicate_recheck')
     expect(keys).toContain('restored_at')
-    expect(keys).toContain('media_count_dirty')
+    expect(keys).toContain('media_count_stale')
     // 值均为 JSON.stringify(1) 或 ISO 时间戳
     expect(runCalls[0][1]).toBe('1') // JSON.stringify(1) === '1'
   })
@@ -497,6 +532,125 @@ describe('R9 markRestoredFlags', () => {
     const keys = runCalls.map((c) => c[0] as string)
     expect(keys).toContain('need_phash_recheck')
     expect(keys).toContain('restored_at')
+  })
+
+  it('restoreLatestBackupTo 恢复点复检不可用时不覆盖在线库并告警 (H1)', async () => {
+    const fresh = new BackupService()
+    fresh.setDir(backupDir)
+    fresh.init({ getDatabase: () => null, close: vi.fn() } as never)
+
+    const targetPath = path.join(tmpRoot, 'target-unavailable.db')
+    fs.writeFileSync(targetPath, Buffer.from('ONLINE-LIVE-DATA'))
+    const originalContent = fs.readFileSync(targetPath)
+
+    // 模拟 getValidBackups 选中一个候选备份（full 校验通过）
+    const candidate = {
+      filePath: path.join(backupDir, 'wxnn_photo_manager_20260719.db'),
+      filename: 'wxnn_photo_manager_20260719.db',
+      size: 100,
+      createdAt: new Date().toISOString()
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(fresh as any).getValidBackups = vi.fn().mockResolvedValue([candidate])
+    // 恢复点 quick_check 复检失败
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(fresh as any).verifyBackupIntegrity = vi.fn().mockResolvedValue({
+      valid: false,
+      reason: 'mock-corrupt'
+    })
+
+    const r = await fresh.restoreLatestBackupTo(targetPath)
+    expect(r.success).toBe(false)
+    expect(r.reason).toBe('backup-unavailable')
+    // H1：在线库文件未被触碰（未写入损坏备份）
+    expect(fs.readFileSync(targetPath).equals(originalContent)).toBe(true)
+    // 失败分支不应生成 .restoring 临时文件
+    expect(fs.existsSync(`${targetPath}.restoring`)).toBe(false)
+    // 显式告警经 logger.fault 上报
+    expect(logger.fault).toHaveBeenCalled()
+  })
+
+  it('restoreLatestBackupTo 无可用候选时不覆盖在线库并告警 (H1)', async () => {
+    const fresh = new BackupService()
+    fresh.setDir(backupDir)
+    fresh.init({ getDatabase: () => null, close: vi.fn() } as never)
+
+    const targetPath = path.join(tmpRoot, 'target-nobackup.db')
+    fs.writeFileSync(targetPath, Buffer.from('ONLINE-LIVE-DATA'))
+    const originalContent = fs.readFileSync(targetPath)
+
+    // 模拟无任何可用有效备份
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(fresh as any).getValidBackups = vi.fn().mockResolvedValue([])
+
+    const r = await fresh.restoreLatestBackupTo(targetPath)
+    expect(r.success).toBe(false)
+    expect(r.reason).toBe('no-valid-backup')
+    // H1：在线库文件未被触碰
+    expect(fs.readFileSync(targetPath).equals(originalContent)).toBe(true)
+    expect(fs.existsSync(`${targetPath}.restoring`)).toBe(false)
+    expect(logger.fault).toHaveBeenCalled()
+  })
+
+  it('restoreLatestBackupTo 最新候选 IO 失败时应回退到次新候选并成功', async () => {
+    const fresh = new BackupService()
+    fresh.setDir(backupDir)
+    fresh.init({ getDatabase: () => null, close: vi.fn() } as never)
+
+    // 两份有效备份（时间倒序：A 最新，B 次新）
+    makeBackupFile('wxnn_photo_manager_20260720_120000.db', 100, new Date('2026-07-20T12:00:00Z'))
+    makeBackupFile('wxnn_photo_manager_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
+
+    const targetPath = path.join(tmpRoot, 'target-iofallback.db')
+    fs.writeFileSync(targetPath, Buffer.from('ONLINE-LIVE-DATA'))
+
+    // 真实 verifyBackupIntegrity（mock 的 better-sqlite3 返回 ok）使两份均有效。
+    // 模拟最新候选 rename 阶段 IO 失败（EPERM 共享冲突），次新候选成功 → 应回退成功。
+    // 成功分支委托真实 renameWithRetry 实际完成 rename（否则 .restoring 不会被清理）。
+    let renameCalls = 0
+    const svc = fresh as unknown as {
+      renameWithRetry: (from: string, to: string) => Promise<void>
+    }
+    const realRename = svc.renameWithRetry.bind(fresh)
+    svc.renameWithRetry = vi.fn().mockImplementation(async (from: string, to: string) => {
+      renameCalls++
+      if (renameCalls === 1) throw new Error('EPERM mock share violation')
+      return realRename(from, to)
+    })
+
+    const r = await fresh.restoreLatestBackupTo(targetPath)
+    expect(r.success).toBe(true)
+    // 回退到次新候选
+    expect(r.sourceBackup?.filename).toBe('wxnn_photo_manager_20260719_120000.db')
+    // 失败候选的 .restoring 临时文件应已被清理
+    expect(fs.existsSync(`${targetPath}.restoring`)).toBe(false)
+  })
+
+  it('restoreLatestBackupTo 全部有效候选 IO 失败返回 restore-failed 且不覆盖在线库 (H1)', async () => {
+    const fresh = new BackupService()
+    fresh.setDir(backupDir)
+    fresh.init({ getDatabase: () => null, close: vi.fn() } as never)
+
+    makeBackupFile('wxnn_photo_manager_20260720_120000.db', 100, new Date('2026-07-20T12:00:00Z'))
+    makeBackupFile('wxnn_photo_manager_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
+
+    const targetPath = path.join(tmpRoot, 'target-allfail.db')
+    fs.writeFileSync(targetPath, Buffer.from('ONLINE-LIVE-DATA'))
+    const originalContent = fs.readFileSync(targetPath)
+
+    // 所有候选 rename 阶段均失败
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(fresh as any).renameWithRetry = vi
+      .fn()
+      .mockRejectedValue(new Error('EPERM mock share violation'))
+
+    const r = await fresh.restoreLatestBackupTo(targetPath)
+    expect(r.success).toBe(false)
+    expect(r.reason).toBe('restore-failed')
+    // H1：在线库未被任何损坏内容覆盖
+    expect(fs.readFileSync(targetPath).equals(originalContent)).toBe(true)
+    expect(fs.existsSync(`${targetPath}.restoring`)).toBe(false)
+    expect(logger.fault).toHaveBeenCalled()
   })
 })
 

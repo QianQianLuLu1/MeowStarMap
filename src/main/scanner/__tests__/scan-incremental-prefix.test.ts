@@ -17,6 +17,7 @@ import { promises as fsp } from 'fs'
 import os from 'os'
 import path from 'path'
 import Module from 'node:module'
+import { normalizeRootPrefixForLike } from '../integrity-root-filter'
 
 // repairLegacyDataV1/V3/V4 桩掉（与本测试无关，避免依赖 mock db 的复杂行为）
 vi.mock('../../repair-legacy-data-v1', () => ({ repairLegacyDataV1: vi.fn() }))
@@ -149,13 +150,12 @@ describe('组3-5：增量扫描 existingFiles 按扫描根前缀过滤', () => {
       (s) => s.sql.includes('file_path, modified_at FROM media_files') && s.sql.includes('LIKE')
     )
     expect(likeQuery).toBeDefined()
+    // 大小写不敏感范式：LOWER(REPLACE(file_path,'\','/')) LIKE LOWER(?)，与 buildIntegrityRootFilter 同口径
+    expect(likeQuery!.sql).toContain("LOWER(REPLACE(file_path, '\\', '/'))")
+    expect(likeQuery!.sql).toContain('LIKE LOWER(?)')
     expect(likeQuery!.sql).toContain("ESCAPE '\\'")
-    // 预期参数 = 根路径 + 分隔符，经与实现一致的 LIKE 转义后追加 %
-    const expectedPrefix =
-      (fixtureRoot.endsWith(path.sep) ? fixtureRoot : fixtureRoot + path.sep).replace(
-        /[\\%_]/g,
-        (ch) => `\\${ch}`
-      ) + '%'
+    // 参数 = 根路径归一为小写正斜杠前缀，复用与实现一致的共享函数（保证两侧范式完全对称）
+    const expectedPrefix = normalizeRootPrefixForLike(fixtureRoot, path.sep)
     expect(likeQuery!.params[0]).toBe(expectedPrefix)
   })
 })

@@ -3,7 +3,7 @@
  *
  * 主进程 ↔ media worker 之间的消息类型定义。
  * - 主进程 → worker：MediaWorkerCommand（*_START / *_STOP / MEDIA_WORKER_DISPOSE）
- * - worker → 主进程：MediaWorkerEvent（*_PROGRESS / *_COMPLETE / MEDIA_WORKER_LOG / WORKER_READY / WORKER_ERROR）
+ * - worker → 主进程：MediaWorkerEvent（*_PROGRESS / *_COMPLETE / MEDIA_WORKER_LOG / WORKER_READY / WORKER_ERROR / MEDIA_WORKER_DISPOSED）
  *
  * 设计原则：
  * 1. 三类任务（缩略图批量、pHash 批量、重复标记）共用一个 worker 进程，避免多进程开销
@@ -125,3 +125,5 @@ export type MediaWorkerEvent =
     }
   // worker 未捕获异常
   | { type: 'WORKER_ERROR'; payload: { message: string; stack?: string } }
+  // 新增：worker 处理完 MEDIA_WORKER_DISPOSE 并关闭 DB 句柄后回发，主进程据此确认可安全 rename 还原
+  | { type: 'MEDIA_WORKER_DISPOSED' }

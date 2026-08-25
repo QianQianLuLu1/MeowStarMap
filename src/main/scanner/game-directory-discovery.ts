@@ -300,6 +300,27 @@ function getShortcutCandidates(): string[] {
   return candidates
 }
 
+/**
+ * 官方启动器常见安装路径枚举（自定义盘符变体）
+ *
+ * 覆盖用户明确要求枚举的「常见安装路径」：
+ * `C:\Program Files\InfinityNikki Launcher\InfinityNikki\` 及自定义盘符变体
+ * （D:–Z: 由 DRIVE_LETTER_START/END 约束），以及 `Program Files (x86)` 变体。
+ * 仅枚举本机实际可达的盘符（getAvailableDrives）以限制 IO，避免对不存在盘符做无谓 access。
+ * 返回未经 validateGameRoot 校验的候选根目录；调用方须对每个候选做校验后入库。
+ */
+async function getCommonLauncherInstallCandidates(): Promise<string[]> {
+  const candidates: string[] = []
+  const drives = await getAvailableDrives()
+  const programFilesRoots = ['Program Files', 'Program Files (x86)']
+  for (const drive of drives) {
+    for (const pf of programFilesRoots) {
+      candidates.push(path.join(drive, pf, 'InfinityNikki Launcher', 'InfinityNikki'))
+    }
+  }
+  return candidates
+}
+
 // ============ 官方启动器检测函数 ============
 
 /**
@@ -320,6 +341,21 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
 
   const validatedPaths: string[] = []
   const seenPaths = new Set<string>()
+
+  // 0. 常见安装路径枚举（最高优先级补充源）：C:\Program Files\InfinityNikki Launcher\InfinityNikki\
+  //    及自定义盘符变体 + Program Files (x86) 变体；每个候选经 validateGameRoot 校验后入库。
+  if (!shouldStop) {
+    for (const candidate of await getCommonLauncherInstallCandidates()) {
+      if (shouldStop) break
+      const validated = await validateGameRoot(candidate)
+      if (validated && !seenPaths.has(validated.toLowerCase())) {
+        seenPaths.add(validated.toLowerCase())
+        validatedPaths.push(validated)
+        // 枚举命中即返回（官方启动器最高优先级，不继续尝试注册表/配置/快捷方式）
+        return validatedPaths
+      }
+    }
+  }
 
   // 1. 注册表检测（主路径）
   for (const { key, value } of OFFICIAL_LAUNCHER_REG_KEYS) {
@@ -633,6 +669,36 @@ export async function findEpicGamePaths(): Promise<string[]> {
   }
 
   return found
+}
+
+/**
+ * 三渠道根目录定位解析器（启动器 > Steam > Epic，命中即止）
+ *
+ * 按用户强制要求的优先级顺序解析游戏根目录：
+ *   1. 官方启动器版（最高优先级）：常见路径枚举 + 注册表 + 配置 + 桌面快捷方式；
+ *   2. Steam 版：注册表 Uninstall 键 + libraryfolders.vdf；
+ *   3. Epic 版：Launcher 注册表/清单。
+ * 任一渠道返回非空即采用其全部结果并立即返回，不再降级查询后续渠道
+ * （"优先匹配到此渠道后不再降级"）。三渠道全空返回 `[]`，不抛异常。
+ *
+ * 返回的均为「游戏安装根目录」数组（如 `...\InfinityNikki`），由上层 findMediaDirectories
+ * 统一拼接 `X6Game\Saved\GamePlayPhotos` 子路径。非 Windows 平台直接返回空数组。
+ *
+ * @returns 来自首个非空渠道的游戏根目录数组（0 或多个）
+ */
+export async function findGameInstallRootsByPriority(): Promise<string[]> {
+  if (process.platform !== 'win32') return []
+
+  // 1. 官方启动器版（最高优先级）
+  const launcherPaths = await findOfficialLauncherGamePaths()
+  if (launcherPaths.length > 0) return launcherPaths
+
+  // 2. Steam 版（启动器未命中才降级）
+  const steamPaths = await findSteamGamePaths()
+  if (steamPaths.length > 0) return steamPaths
+
+  // 3. Epic 版（最低优先级）
+  return await findEpicGamePaths()
 }
 
 /**

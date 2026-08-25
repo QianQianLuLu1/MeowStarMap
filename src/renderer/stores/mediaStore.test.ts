@@ -440,13 +440,13 @@ describe('mediaStore', () => {
       expect(result).toBeNull()
     })
 
-    it('首次加载使用 page=0, pageSize=500', async () => {
+    it('首次加载使用 keyset 游标（cursor:null）+ pageSize=500', async () => {
       setMockApi()
       await fetchMediaFromDatabase()
       const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
         .electronAPI!.media!.list
-      // 过滤参数（accountUid/hideDuplicates/mediaSource）由 store 状态派生，此处只验证分页
-      expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ page: 0, pageSize: 500 }))
+      // 性能重构：首屏使用 keyset 游标（cursor:null），取代 page=0 偏移分页
+      expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ cursor: null, pageSize: 500 }))
     })
 
     it('图库视图调用 list 时传 galleryHighQualityOnly: true', async () => {
@@ -474,28 +474,35 @@ describe('mediaStore', () => {
   })
 
   describe('loadMoreMedia', () => {
-    it('按指定页码加载更多', async () => {
+    it('按 keyset 游标加载更多（取代页码）', async () => {
       setMockApi({
         media: {
           list: vi.fn().mockResolvedValue({
             files: [makeFile({ id: 'p2-1' })],
-            hasMore: true
+            hasMore: true,
+            nextCursor: { sortValue: '2026-01-01 00:00:00', id: 42 }
           })
         }
       })
-      const result = await loadMoreMedia(2)
+      const result = await loadMoreMedia({ sortValue: '2026-01-02 00:00:00', id: 99 })
       const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
         .electronAPI!.media!.list
-      // 过滤参数（accountUid/hideDuplicates/mediaSource）由 store 状态派生，此处只验证分页
-      expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ page: 2, pageSize: 500 }))
+      // 性能重构：续页改用 cursor 游标，不再传 page/pageSize 偏移
+      expect(mockFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          cursor: { sortValue: '2026-01-02 00:00:00', id: 99 },
+          pageSize: 500
+        })
+      )
       expect(result!.files.length).toBe(1)
       expect(result!.hasMore).toBe(true)
+      expect(result!.nextCursor).toEqual({ sortValue: '2026-01-01 00:00:00', id: 42 })
     })
 
     it('加载更多时图库视图传 galleryHighQualityOnly: true', async () => {
       useUIStore.setState({ currentView: 'gallery' })
       setMockApi()
-      await loadMoreMedia(1)
+      await loadMoreMedia(null)
       const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
         .electronAPI!.media!.list
       expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ galleryHighQualityOnly: true }))
@@ -507,7 +514,7 @@ describe('mediaStore', () => {
           list: vi.fn().mockRejectedValue(new Error('fail'))
         }
       })
-      const result = await loadMoreMedia(1)
+      const result = await loadMoreMedia(null)
       expect(result).toBeNull()
     })
   })
@@ -528,12 +535,13 @@ describe('mediaStore', () => {
       expect(useMediaStore.getState().recycleBinLoading).toBe(false)
     })
 
-    it('调用 list 时传 deletedOnly: true 并从第 0 页开始分页', async () => {
+    it('调用 list 时传 deletedOnly: true 并使用 keyset 游标（cursor:null）分页', async () => {
       setMockApi()
       await loadRecycleBin()
       const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
         .electronAPI!.media!.list
-      expect(mockFn).toHaveBeenCalledWith({ deletedOnly: true, page: 0, pageSize: 200 })
+      // 性能重构：回收站首屏使用 keyset 游标（cursor:null），取代 page=0 偏移分页
+      expect(mockFn).toHaveBeenCalledWith({ deletedOnly: true, cursor: null, pageSize: 200 })
     })
 
     it('加载前设置 recycleBinLoading=true，完成后设为 false', async () => {

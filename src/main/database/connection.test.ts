@@ -73,6 +73,9 @@ class MockDatabase {
   // FIX(组7-1) 用：下次构造以 SQLITE_BUSY 锁错误失败（模拟外部 SQLite 工具/备份软件占用）
   static failNextConstructionWithLock = false
 
+  // H1 用：下次构造以任意指定错误失败（用于模拟权限/磁盘满/ABI 不匹配等分类）
+  static nextConstructionError: Error | null = null
+
   // 可配置的 pragma 失败（用于测试容错）
   static pragmasToFail: string[] = []
 
@@ -100,6 +103,11 @@ class MockDatabase {
       const lockErr = new Error('Mock: SQLITE_BUSY: database is locked')
       ;(lockErr as { code?: string }).code = 'SQLITE_BUSY'
       throw lockErr
+    }
+    if (MockDatabase.nextConstructionError) {
+      const err = MockDatabase.nextConstructionError
+      MockDatabase.nextConstructionError = null
+      throw err
     }
     if (MockDatabase.failAllConstructions) {
       throw new Error('Mock: 数据库打开失败（持续）')
@@ -622,6 +630,7 @@ vi.mock('better-sqlite3', () => ({
 // ============================================================================
 import { DatabaseManager } from './connection'
 import { logger } from '../utils/logger'
+import { backupService } from '../services/backup-service'
 
 // ============================================================================
 // 测试用例
@@ -635,6 +644,7 @@ describe('DatabaseManager', () => {
     MockDatabase.failNextConstruction = false
     MockDatabase.failAllConstructions = false
     MockDatabase.failNextConstructionWithLock = false
+    MockDatabase.nextConstructionError = null
     MockDatabase.pragmasToFail = []
     MockDatabase.integrityFail = null
     MockDatabase.pragmaCalls = []
@@ -954,24 +964,127 @@ describe('DatabaseManager', () => {
       expect(manager.getDatabase()).not.toBeNull()
     })
 
-    it('第一次打开失败时清理 WAL/SHM 后重试成功', async () => {
-      MockDatabase.failNextConstruction = true
+    it('H1: 第一次打开失败时优先走数据保全的 WAL 合并恢复（不删除 WAL/SHM、不覆盖备份）', async () => {
+      // 构造 WAL_CORRUPT 类错误（file is not a database）→ 分类 WAL_CORRUPT → 走数据保全 WAL 合并恢复，重开成功
+      MockDatabase.nextConstructionError = Object.assign(
+        new Error('SQLite3 can only open files that are databases, file is not a database'),
+        { code: '' }
+      )
       vi.mocked(fs.existsSync).mockReturnValue(true)
+      const restoreSpy = vi
+        .spyOn(backupService, 'restoreLatestBackupTo')
+        .mockResolvedValue({ success: false } as never)
       await expect(manager.initialize()).resolves.not.toThrow()
-      // 验证 fs.unlinkSync 被调用（清理 WAL/SHM）
-      expect(fs.unlinkSync).toHaveBeenCalled()
+      // H1：绝不为打开失败删除 -wal/-shm（会丢弃未 checkpoint 的已提交事务）
+      expect(fs.unlinkSync).not.toHaveBeenCalled()
+      // H1：数据保全的 WAL 合并恢复成功，未触发破坏性备份恢复
+      expect(restoreSpy).not.toHaveBeenCalled()
+      expect(manager.getLastRecovery()?.success).toBe(true)
+      expect(manager.getLastRecovery()?.kind).toBe('WAL_CORRUPT')
     })
 
-    it('第一次打开失败且 WAL/SHM 不存在时仍重试', async () => {
-      MockDatabase.failNextConstruction = true
+    it('H1: 第一次打开失败且 WAL/SHM 不存在时仍走 WAL 合并恢复', async () => {
+      // 构造 WAL_CORRUPT 类错误 → 分类 WAL_CORRUPT → 走数据保全 WAL 合并恢复（WAL/SHM 不存在也能 checkpoint）
+      MockDatabase.nextConstructionError = Object.assign(
+        new Error('SQLite3 can only open files that are databases, file is not a database'),
+        { code: '' }
+      )
       vi.mocked(fs.existsSync).mockReturnValue(false)
       await expect(manager.initialize()).resolves.not.toThrow()
+      expect(manager.getLastRecovery()?.kind).toBe('WAL_CORRUPT')
     })
 
-    it('两次打开都失败时抛出包含原始错误和重试错误的合并消息', async () => {
+    it('UNKNOWN（无法归类的打开失败，两次打开都失败）→ 保留现场、不覆盖备份、提示排查', async () => {
+      // 无法归类的通用打开失败 → 分类 UNKNOWN → 已进入 NON_DESTRUCTIVE_KINDS，绝不覆盖在线库
       MockDatabase.failAllConstructions = true
-      await expect(manager.initialize()).rejects.toThrow(/数据库打开失败/)
-      await expect(manager.initialize()).rejects.toThrow(/重试错误/)
+      const restoreSpy = vi
+        .spyOn(backupService, 'restoreLatestBackupTo')
+        .mockResolvedValue({ success: false } as never)
+      await expect(manager.initialize()).rejects.toThrow(/原因未知|打开失败/)
+      expect(restoreSpy).not.toHaveBeenCalled()
+      const rec = manager.getLastRecovery()
+      expect(rec?.nonDestructive).toBe(true)
+      expect(rec?.kind).toBe('UNKNOWN')
+    })
+
+    // ========================================================================
+    // H1: 非破坏性故障不得用备份覆盖在线库（覆盖会丢失自上次备份以来的全部变更）
+    // ========================================================================
+    describe('H1: 非破坏性故障保留现场', () => {
+      const makeErr = (code: string, message: string): Error =>
+        Object.assign(new Error(message), { code })
+
+      it('权限错误(SQLITE_PERM) → 保留在线库、不触发备份恢复、抛出权限提示', async () => {
+        MockDatabase.nextConstructionError = makeErr(
+          'SQLITE_PERM',
+          'SQLITE_PERM: attempt to write a readonly database'
+        )
+        const restoreSpy = vi
+          .spyOn(backupService, 'restoreLatestBackupTo')
+          .mockResolvedValue({ success: false } as never)
+        await expect(manager.initialize()).rejects.toThrow(/权限|permission/i)
+        expect(restoreSpy).not.toHaveBeenCalled()
+        const rec = manager.getLastRecovery()
+        expect(rec?.success).toBe(false)
+        expect(rec?.nonDestructive).toBe(true)
+        expect(rec?.kind).toBe('PERMISSION')
+      })
+
+      it('磁盘满(SQLITE_FULL) → 保留现场、不覆盖备份、抛出磁盘提示', async () => {
+        MockDatabase.nextConstructionError = makeErr(
+          'SQLITE_FULL',
+          'SQLITE_FULL: database or disk is full'
+        )
+        const restoreSpy = vi
+          .spyOn(backupService, 'restoreLatestBackupTo')
+          .mockResolvedValue({ success: false } as never)
+        await expect(manager.initialize()).rejects.toThrow(/磁盘空间不足|disk/i)
+        expect(restoreSpy).not.toHaveBeenCalled()
+        const rec = manager.getLastRecovery()
+        expect(rec?.nonDestructive).toBe(true)
+        expect(rec?.kind).toBe('DISK_FULL')
+      })
+
+      it('ABI 不匹配 → 保留现场、不覆盖备份、提示重新安装', async () => {
+        MockDatabase.nextConstructionError = new Error(
+          'Error: The specified procedure could not be found.\n\\??\\node_modules\\better-sqlite3\\build\\Release\\better_sqlite3.node'
+        )
+        const restoreSpy = vi
+          .spyOn(backupService, 'restoreLatestBackupTo')
+          .mockResolvedValue({ success: false } as never)
+        await expect(manager.initialize()).rejects.toThrow(/重新安装|ABI|better-sqlite3/i)
+        expect(restoreSpy).not.toHaveBeenCalled()
+        const rec = manager.getLastRecovery()
+        expect(rec?.nonDestructive).toBe(true)
+        expect(rec?.kind).toBe('ABI_INCOMPATIBLE')
+      })
+
+      it('WAL_CORRUPT 且 WAL 合并恢复失败时回退破坏性备份恢复（仍会调用恢复）', async () => {
+        // 构造"file is not a database"类错误 → 分类 WAL_CORRUPT；
+        // failAllConstructions 使 runWALRecovery 重开仍失败 → 回退 destructive 覆盖
+        MockDatabase.nextConstructionError = makeErr(
+          '',
+          'SQLite3 can only open files that are databases, file is not a database'
+        )
+        MockDatabase.failAllConstructions = true
+        const restoreSpy = vi
+          .spyOn(backupService, 'restoreLatestBackupTo')
+          .mockResolvedValue({ success: false } as never)
+        await expect(manager.initialize()).rejects.toThrow(/数据库打开失败/)
+        // WAL_CORRUPT 回退属于确认损坏路径，允许调用恢复（H1：仅非损坏类才保留现场）
+        expect(restoreSpy).toHaveBeenCalled()
+      })
+
+      it('真正损坏(integrity 校验失败) → 仍走破坏性备份恢复，并抛出损坏错误', async () => {
+        MockDatabase.pragmasToFail.push('quick_check')
+        MockDatabase.integrityFail = 'full'
+        const restoreSpy = vi
+          .spyOn(backupService, 'restoreLatestBackupTo')
+          .mockResolvedValue({ success: false } as never)
+        await expect(manager.initialize()).rejects.toThrow(/已损坏|无法从备份恢复/)
+        expect(restoreSpy).toHaveBeenCalled()
+        expect(manager.getLastRecovery()?.kind).toBe('CORRUPT')
+      })
     })
 
     it('FIX(组7-1): 锁类错误（SQLITE_BUSY）不删除 WAL/SHM，等待后重试打开成功', async () => {
@@ -1466,12 +1579,36 @@ describe('DatabaseManager', () => {
       // quick_check 抛错 + integrity_check 返回损坏
       MockDatabase.pragmasToFail.push('quick_check')
       MockDatabase.integrityFail = 'full'
-      await expect(manager.initialize()).resolves.not.toThrow()
+      // H1：恢复失败（无可用备份）不再静默继续，改为抛清晰错误（启动失败可诊断优于静默丢数据）
+      await expect(manager.initialize()).rejects.toThrow(/已损坏|无法从备份恢复/)
       expect(MockDatabase.pragmaCalls).toContain('integrity_check')
       // attemptRecovery 被触发：lastRecovery 已记录（无可用备份 → 恢复失败）
       expect(manager.getLastRecovery()).not.toBeNull()
       expect(manager.getLastRecovery()?.success).toBe(false)
       expect(manager.shouldRunFullIntegrityCheck()).toBe(false)
+    })
+
+    it('FIX: 自恢复前显式停止 scanner/database/media worker 以释放 dbPath 句柄', async () => {
+      // quick_check 抛错 + integrity_check 返回损坏 → 进入 attemptRecovery
+      MockDatabase.pragmasToFail.length = 0
+      MockDatabase.pragmasToFail.push('quick_check')
+      MockDatabase.integrityFail = 'full'
+      const dbStop = vi.fn().mockResolvedValue(undefined)
+      const scannerStop = vi.fn().mockResolvedValue(undefined)
+      const mediaStop = vi.fn().mockResolvedValue(undefined)
+      // 模拟"worker 已启动"的假设情形：恢复前三个桥均持有 dbPath 句柄
+      manager.setWorkerBridge({ stopWorkerForRestore: dbStop } as never)
+      manager.setScannerWorkerBridge({ stopWorkerForRestore: scannerStop } as never)
+      manager.setMediaWorkerBridge({ stopWorkerForRestore: mediaStop } as never)
+
+      await expect(manager.initialize()).rejects.toThrow(/已损坏|无法从备份恢复/)
+
+      // 三处持有 dbPath 的 worker 句柄均在 rename 覆盖在线库前被释放
+      expect(dbStop).toHaveBeenCalledTimes(1)
+      expect(scannerStop).toHaveBeenCalledTimes(1)
+      expect(mediaStop).toHaveBeenCalledTimes(1)
+      // 恢复失败（无可用备份）但流程未因句柄冲突提前崩溃
+      expect(manager.getLastRecovery()?.success).toBe(false)
     })
 
     it('FIX(组7-2): 备份恢复失败时还原被挪走的原库，而非在原路径新建空库', async () => {
@@ -1484,7 +1621,7 @@ describe('DatabaseManager', () => {
       vi.spyOn(fs, 'renameSync').mockImplementation(((from: unknown, to: unknown) => {
         renameCalls.push([String(from), String(to)])
       }) as unknown as typeof fs.renameSync)
-      await expect(manager.initialize()).resolves.not.toThrow()
+      await expect(manager.initialize()).rejects.toThrow(/已损坏|无法从备份恢复/)
       expect(manager.getLastRecovery()?.success).toBe(false)
       // 第一次 rename：backupCorruptedDb 把原库挪到 .corrupt-<ts>；
       // 第二次 rename（组7-2 修复）：恢复失败后把副本还原回原路径——不再新建空库
@@ -1499,7 +1636,7 @@ describe('DatabaseManager', () => {
 
     it('quick_check 与 integrity_check 均抛错 → 同步全量失败后仍走恢复流程', async () => {
       MockDatabase.pragmasToFail.push('quick_check', 'integrity_check')
-      await expect(manager.initialize()).resolves.not.toThrow()
+      await expect(manager.initialize()).rejects.toThrow(/已损坏|无法从备份恢复/)
       expect(manager.getLastRecovery()).not.toBeNull()
       expect(manager.shouldRunFullIntegrityCheck()).toBe(false)
     })

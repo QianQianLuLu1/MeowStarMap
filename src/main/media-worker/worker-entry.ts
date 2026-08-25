@@ -960,13 +960,22 @@ function cleanupDb(): void {
  * 非零码退出——原先固定 exit(0) 使 isCrash 恒为 false，attemptAutoRestart 与
  * workerCrash fault 日志永不触发。MEDIA_WORKER_DISPOSE 正常退出保持 exit 0。
  */
-function cleanupAndExit(exitCode = 0): void {
+function cleanupAndExit(exitCode = 0, graceful = false): void {
   cleanupDb()
   // kill 所有 worker 启动的 ffmpeg 子进程（process-registry 在 worker 内是独立实例）
   try {
     killAllProcesses('SIGKILL')
   } catch {}
-  process.exit(exitCode)
+  if (graceful) {
+    // 新增：MEDIA_WORKER_DISPOSE 正常退出——先回发确认表示 DB 句柄已释放，主进程据此可安全 rename 还原。
+    // 用 setImmediate 延迟 process.exit，确保 IPC 消息在事件循环中被写出，避免同步 process.exit 截断未发送的消息。
+    try {
+      sendEvent({ type: 'MEDIA_WORKER_DISPOSED' })
+    } catch {}
+    setImmediate(() => process.exit(exitCode))
+  } else {
+    process.exit(exitCode)
+  }
 }
 
 // ============ 消息处理 ============
@@ -1063,7 +1072,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
       shouldStopSimilar = true
       break
     case 'MEDIA_WORKER_DISPOSE':
-      cleanupAndExit()
+      cleanupAndExit(0, true)
       break
   }
 })

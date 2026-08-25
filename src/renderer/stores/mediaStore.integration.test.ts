@@ -100,7 +100,8 @@ const INITIAL_STATE = {
   mediaFiles: [],
   categories: [],
   loading: false,
-  currentPage: 0,
+  // 性能重构：keyset 游标取代 currentPage
+  mediaCursor: null,
   hasMoreMedia: false,
   loadingMore: false,
   scanProgress: {
@@ -219,11 +220,11 @@ describe('集成：图库 store 端到端链路', () => {
       useMediaStore.getState().setMediaFiles(first!.files)
       expect(useMediaStore.getState().mediaFiles.map((f) => f.id)).toEqual(['1'])
 
-      const more1 = await loadMoreMedia(1)
+      const more1 = await loadMoreMedia(null)
       useMediaStore.getState().addMediaFiles(more1!.files)
       expect(useMediaStore.getState().mediaFiles.map((f) => f.id)).toEqual(['1', '2'])
 
-      const more2 = await loadMoreMedia(2)
+      const more2 = await loadMoreMedia(null)
       useMediaStore.getState().addMediaFiles(more2!.files)
       expect(useMediaStore.getState().mediaFiles.map((f) => f.id)).toEqual(['1', '2', '3'])
       expect(more2!.hasMore).toBe(false)
@@ -246,7 +247,12 @@ describe('集成：图库 store 端到端链路', () => {
         media: {
           list: vi
             .fn()
-            .mockResolvedValueOnce({ files: makePage(1, 500), total: 600, hasMore: true })
+            .mockResolvedValueOnce({
+              files: makePage(1, 500),
+              total: 600,
+              hasMore: true,
+              nextCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 500 }
+            })
             .mockResolvedValueOnce({ files: makePage(501, 100), total: 600, hasMore: false })
         }
       })
@@ -255,6 +261,8 @@ describe('集成：图库 store 端到端链路', () => {
       useMediaStore.getState().setMediaFiles(first!.files)
       expect(useMediaStore.getState().mediaFiles).toHaveLength(500)
       expect(useMediaStore.getState().hasMoreMedia).toBe(true)
+      // 首屏返回 nextCursor，游标已就绪可续页
+      expect(useMediaStore.getState().mediaCursor).not.toBeNull()
 
       await loadNextMediaPage()
 
@@ -263,17 +271,23 @@ describe('集成：图库 store 端到端链路', () => {
       // 第 501 张（索引 500）是第二页的首条，证明追加而非替换
       expect(state.mediaFiles[500].file_name).toBe('img-501.jpg')
       expect(state.mediaFiles[0].file_name).toBe('img-1.jpg')
-      expect(state.currentPage).toBe(1)
+      // 性能重构：末页 hasMore=false → 游标归 null，仍标记无更多页
+      expect(state.mediaCursor).toBeNull()
       expect(state.hasMoreMedia).toBe(false)
       expect(state.loadingMore).toBe(false)
     })
 
-    it('第二页请求带 page=1 / pageSize=500', async () => {
+    it('第二页请求带 keyset 游标（取代 page=1）/ pageSize=500', async () => {
       setMockApi({
         media: {
           list: vi
             .fn()
-            .mockResolvedValueOnce({ files: makePage(1, 500), hasMore: true })
+            // 首屏：返回 nextCursor 锚定第二页起始（id=500）
+            .mockResolvedValueOnce({
+              files: makePage(1, 500),
+              hasMore: true,
+              nextCursor: { sortValue: '2026-01-01 00:00:00', id: 500 }
+            })
             .mockResolvedValueOnce({ files: makePage(501, 100), hasMore: false })
         }
       })
@@ -283,7 +297,13 @@ describe('集成：图库 store 端到端链路', () => {
 
       const listFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
         .electronAPI!.media!.list
-      expect(listFn).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, pageSize: 500 }))
+      // 性能重构：续页请求携带 keyset 游标，而非 page 偏移
+      expect(listFn).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          cursor: { sortValue: '2026-01-01 00:00:00', id: 500 },
+          pageSize: 500
+        })
+      )
     })
 
     it('并发触底只发一次请求（loading 标志位生效）', async () => {
@@ -319,7 +339,12 @@ describe('集成：图库 store 端到端链路', () => {
     it('取数失败时保留游标，允许再次触底重试', async () => {
       const listFn = vi
         .fn()
-        .mockResolvedValueOnce({ files: makePage(1, 500), hasMore: true })
+        // 首屏：返回 nextCursor 锚定第二页起始
+        .mockResolvedValueOnce({
+          files: makePage(1, 500),
+          hasMore: true,
+          nextCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 500 }
+        })
         .mockRejectedValueOnce(new Error('IPC 断开'))
         .mockResolvedValueOnce({ files: makePage(501, 100), hasMore: false })
       setMockApi({ media: { list: listFn } })
@@ -328,14 +353,18 @@ describe('集成：图库 store 端到端链路', () => {
       useMediaStore.getState().setMediaFiles(first!.files)
 
       await loadNextMediaPage()
-      // 失败后游标不前进，仍认为有下一页，且未卡在 loading 态
-      expect(useMediaStore.getState().currentPage).toBe(0)
+      // 失败后游标不前进（仍为首屏 nextCursor），仍认为有下一页，且未卡在 loading 态
+      expect(useMediaStore.getState().mediaCursor).toEqual({
+        sortValue: '2026-01-01T00:00:00.000Z',
+        id: 500
+      })
       expect(useMediaStore.getState().hasMoreMedia).toBe(true)
       expect(useMediaStore.getState().loadingMore).toBe(false)
 
       await loadNextMediaPage()
       expect(useMediaStore.getState().mediaFiles).toHaveLength(600)
-      expect(useMediaStore.getState().currentPage).toBe(1)
+      // 末页 hasMore=false → 游标归 null（未再续页）
+      expect(useMediaStore.getState().mediaCursor).toBeNull()
     })
 
     it('OFFSET 错位导致重复记录时按 id 去重', async () => {

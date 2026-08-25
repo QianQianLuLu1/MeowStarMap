@@ -281,15 +281,17 @@ describe('database-worker 消息分发与生命周期', () => {
     })
   })
 
-  it('DB_DISPOSE → wal_checkpoint(PASSIVE) + close + exit(0)', () => {
+  it('DB_DISPOSE → wal_checkpoint(PASSIVE) + close + 回发 DB_WORKER_DISPOSED + exit(0)', async () => {
     const db = openDb('/data/dispose.db')
 
     const events = emit({ type: 'DB_DISPOSE' })
+    // setImmediate(process.exit) 确保确认消息已写出后再退出，需 flush 一个 macrotask 让 exitSpy 生效
+    await new Promise((r) => setImmediate(r))
 
     expect(db.pragma).toHaveBeenCalledWith('wal_checkpoint(PASSIVE)')
     expect(db.close).toHaveBeenCalledTimes(1)
+    expect(events).toEqual([{ type: 'DB_WORKER_DISPOSED' }])
     expect(exitSpy).toHaveBeenCalledWith(0)
-    expect(events).toHaveLength(0)
   })
 
   it('DB_DISPOSE 后再 DB_EXECUTE → success:false（Database not opened in worker）', () => {

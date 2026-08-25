@@ -3,7 +3,7 @@
  *
  * 主进程 ↔ worker 之间的消息类型定义。
  * - 主进程 → worker：WorkerCommand（SCAN_START / SCAN_STOP / SCAN_DISPOSE）
- * - worker → 主进程：WorkerEvent（SCAN_PROGRESS / SCAN_COMPLETE / SCAN_LOG / WORKER_READY / WORKER_ERROR）
+ * - worker → 主进程：WorkerEvent（SCAN_PROGRESS / SCAN_COMPLETE / SCAN_LOG / WORKER_READY / WORKER_ERROR / WORKER_DISPOSED）
  *
  * ScanOptions / ScanProgress / MediaFile 接口从原 scanner/index.ts 迁移至此，
  * 由 scanner/index.ts re-export，确保外部 import 路径不变。
@@ -35,6 +35,13 @@ export interface ScanProgress {
   etaMs?: number
   /** 任务 ID（用于取消） */
   taskId?: string
+  // 性能重构：文件完整性校验（checkMissingFiles）逐页进度，可选字段旧监听者忽略
+  /** 完整性校验待检查总数（首屏 COUNT 一次） */
+  integrityTotal?: number
+  /** 完整性校验已检查条目数（逐页累加） */
+  integrityScanned?: number
+  /** 完整性校验当前累计缺失条目数 */
+  integrityMissing?: number
 }
 
 export interface MediaFile {
@@ -83,3 +90,5 @@ export type WorkerEvent =
     }
   | { type: 'WORKER_READY' } // worker 启动完成，可用于扫描
   | { type: 'WORKER_ERROR'; payload: { message: string; stack?: string } }
+  // 新增：worker 处理完 SCAN_DISPOSE 并关闭 DB 句柄后回发，主进程据此确认可安全 rename 还原（不再盲等固定时长）
+  | { type: 'WORKER_DISPOSED' }

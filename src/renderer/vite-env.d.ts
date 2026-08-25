@@ -559,6 +559,8 @@ interface WindowElectronAPI {
     list: (options?: {
       page?: number
       pageSize?: number
+      /** keyset 深分页游标：提供则忽略 page/pageSize 走 keyset 分支（性能重构） */
+      cursor?: { sortValue: string | number | null; id: number } | null
       includeDeleted?: boolean
       deletedOnly?: boolean
       sortBy?: string
@@ -582,6 +584,8 @@ interface WindowElectronAPI {
       page?: number
       pageSize?: number
       hasMore?: boolean
+      /** keyset 下一页游标（深分页优先），无更多页时为 null（性能重构） */
+      nextCursor?: { sortValue: string | number | null; id: number } | null
     }>
     // 性能重构 v3：全文搜索文件名（FTS5 优先，LIKE fallback）
     search: (
@@ -658,7 +662,14 @@ interface WindowElectronAPI {
     }>
     // 全文搜索：批量拉取索引文档（启动重建 / 增量拉取）
     // id 为 DB INTEGER 类型，渲染进程与 MediaFile.id（string）对齐时需 String(id)
-    searchBuildDocs: (options?: { since?: string; limit?: number; offset?: number }) => Promise<{
+    searchBuildDocs: (options?: {
+      since?: string
+      limit?: number
+      /** 游标：仅返回 id > afterId 的记录；取代原 offset */
+      afterId?: number
+      /** 是否一次性计算 total（全表 COUNT）；默认 false */
+      includeTotal?: boolean
+    }) => Promise<{
       success: boolean
       message?: string
       docs: Array<{

@@ -253,6 +253,9 @@ export function makeAppCtx(opts: MakeAppCtxOpts = {}): AppContext {
     getLastRecovery: vi.fn(() => null),
     // lifecycle.ts 阶段 1 调用：注入 database worker bridge
     setWorkerBridge: vi.fn(),
+    // lifecycle.ts initialize 之前调用：注入 scanner / media worker bridge（自恢复前释放句柄）
+    setScannerWorkerBridge: vi.fn(),
+    setMediaWorkerBridge: vi.fn(),
     // lifecycle.ts before-quit 调用：动态计算超时（WAL > 10MB 时延长到 5s）
     getWalFileSize: vi.fn(() => 0),
     // 启动性能优化：干净退出标志 / 分级完整性自检

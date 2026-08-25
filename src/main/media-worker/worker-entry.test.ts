@@ -1199,7 +1199,7 @@ describe('worker-entry 消息处理分支', () => {
     }
   })
 
-  it('MEDIA_WORKER_DISPOSE：关闭 DB 并以码 0 退出', async () => {
+  it('MEDIA_WORKER_DISPOSE：关闭 DB、回发 MEDIA_WORKER_DISPOSED、并以码 0 退出', async () => {
     const fake = createFakeDb()
     ctl.currentDb = fake.db
     // 先开一次连接，DISPOSE 时才有 db 可关
@@ -1212,6 +1212,7 @@ describe('worker-entry 消息处理分支', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(fake.closeCount()).toBeGreaterThanOrEqual(1)
     expect(exitSpy).toHaveBeenCalledWith(0)
+    expect(eventsOf(port.messages, 'MEDIA_WORKER_DISPOSED')).toHaveLength(1)
   })
 })
 

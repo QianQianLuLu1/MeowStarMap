@@ -14,7 +14,7 @@
  * - onEvent：订阅 / 取消订阅
  * - handleWorkerMessage：WORKER_READY / SCAN_LOG / SCAN_PROGRESS / SCAN_COMPLETE / WORKER_ERROR
  * - handleWorkerExit：正常退出、异常退出、扫描中退出合成 fakeComplete
- * - dispose：发送 DISPOSE、等待 500ms、kill、异常容错
+ * - dispose：发送 DISPOSE、等待 worker 回发确认（WORKER_DISPOSED，带 2000ms 超时兜底）、kill、异常容错
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
@@ -48,6 +48,8 @@ import { ScannerWorkerBridge } from './scanner-worker-bridge'
 
 /**
  * 创建模拟 worker 对象（EventEmitter + postMessage + kill）
+ * postMessage(SCAN_DISPOSE) 后通过微任务回发 WORKER_DISPOSED，模拟真实 worker 关闭 DB 句柄后的确认行为，
+ * 使 stopWorkerForRestore 走"确认即解除等待"路径（而非盲等超时兜底）。
  */
 function createMockWorker(): UtilityProcess & {
   postMessage: ReturnType<typeof vi.fn>
@@ -57,7 +59,12 @@ function createMockWorker(): UtilityProcess & {
     postMessage: ReturnType<typeof vi.fn>
     kill: ReturnType<typeof vi.fn>
   }
-  emitter.postMessage = vi.fn()
+  emitter.postMessage = vi.fn((cmd: unknown) => {
+    // 模拟 worker 处理完 SCAN_DISPOSE 后关闭 DB 句柄并回发确认（用微任务确保 disposeResolve 已就绪）
+    if (cmd && typeof cmd === 'object' && (cmd as { type?: string }).type === 'SCAN_DISPOSE') {
+      queueMicrotask(() => emitter.emit('message', { type: 'WORKER_DISPOSED' }))
+    }
+  })
   emitter.kill = vi.fn()
   return emitter
 }
@@ -727,5 +734,153 @@ describe('ScannerWorkerBridge', () => {
       await disposePromise
       await assertion
     })
+  })
+})
+
+describe('ScannerWorkerBridge stopWorkerForRestore（自恢复期间可逆停 worker）', () => {
+  let bridge: ScannerWorkerBridge
+  let mockWorker: ReturnType<typeof createMockWorker>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFork.mockReset()
+    mockWorker = createMockWorker()
+    mockFork.mockReturnValue(mockWorker)
+    bridge = new ScannerWorkerBridge()
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    const dp = bridge.dispose().catch(() => {})
+    vi.advanceTimersByTime(500)
+    await dp
+    vi.useRealTimers()
+  })
+
+  it('发送 SCAN_STOP + SCAN_DISPOSE 并 kill，kill 退出不自动重启', async () => {
+    const p = bridge.startScan('/db/path', { incremental: true })
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+    const forkBefore = mockFork.mock.calls.length
+
+    const stopP = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await stopP
+
+    expect(mockWorker.postMessage).toHaveBeenCalledWith({ type: 'SCAN_STOP' })
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+    // 模拟 kill 退出：被 terminatingForRestore 抑制，不应自动重启
+    mockWorker.emit('exit', null, 'SIGTERM')
+    expect(mockFork.mock.calls.length).toBe(forkBefore)
+  })
+
+  it('停止后不置 isDisposed，可重新 startScan 重建连接', async () => {
+    const p = bridge.startScan('/db/path', { incremental: true })
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+
+    const stopP = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await stopP
+    mockWorker.emit('exit', null, 'SIGTERM')
+
+    const mockWorker2 = createMockWorker()
+    mockFork.mockReturnValue(mockWorker2)
+    const p2 = bridge.startScan('/db/path', { incremental: true })
+    mockWorker2.emit('message', { type: 'WORKER_READY' })
+    await p2
+    // 重新 fork 成功 → 证明 isDisposed 未置位、连接可重建
+    expect(mockWorker2.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_START' })
+    )
+  })
+
+  it('无 worker 时 stopWorkerForRestore 为安全 no-op（启动期常见情形）', async () => {
+    await expect(bridge.stopWorkerForRestore()).resolves.toBeUndefined()
+  })
+
+  it('收到 WORKER_DISPOSED 后解除等待并立即 kill（不再盲等固定时长）', async () => {
+    const p = bridge.startScan('/db/path', { incremental: true })
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+
+    // 关闭 auto-ack，手动回发确认，验证确认消息驱动解除等待（而非等 2000ms 超时兜底）
+    mockWorker.postMessage = vi.fn()
+    const stopP = bridge.stopWorkerForRestore()
+    mockWorker.emit('message', { type: 'WORKER_DISPOSED' })
+    await stopP
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+  })
+
+  it('worker 未回发确认时超时兜底仍会 kill（不永久阻塞）', async () => {
+    // 关闭 auto-ack：覆盖 postMessage 使其不回发确认
+    mockWorker.postMessage = vi.fn()
+    const p = bridge.startScan('/db/path', { incremental: true })
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+
+    const stopP = bridge.stopWorkerForRestore()
+    // 不回发确认：推进到 DISPOSE_CONFIRM_TIMEOUT_MS(2000) 触发超时兜底
+    await vi.advanceTimersByTimeAsync(2000)
+    await stopP
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+  })
+})
+
+describe('ScannerWorkerBridge hasLiveWorker（自恢复并发边界探针）', () => {
+  let bridge: ScannerWorkerBridge
+  let mockWorker: ReturnType<typeof createMockWorker>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFork.mockReset()
+    mockWorker = createMockWorker()
+    mockFork.mockReturnValue(mockWorker)
+    bridge = new ScannerWorkerBridge()
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    const dp = bridge.dispose().catch(() => {})
+    vi.advanceTimersByTime(500)
+    await dp
+    vi.useRealTimers()
+  })
+
+  async function bootWorker(): Promise<void> {
+    const p = bridge.startScan('/db/path', { incremental: true })
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+  }
+
+  it('未启动 worker 时返回 false', () => {
+    expect(bridge.hasLiveWorker()).toBe(false)
+  })
+
+  it('worker 启动后返回 true', async () => {
+    await bootWorker()
+    expect(bridge.hasLiveWorker()).toBe(true)
+  })
+
+  it('stopWorkerForRestore 后（已收到 *_DISPOSED 或超时兜底 kill）返回 false', async () => {
+    await bootWorker()
+    expect(bridge.hasLiveWorker()).toBe(true)
+    const stopP = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await stopP
+    expect(bridge.hasLiveWorker()).toBe(false)
   })
 })

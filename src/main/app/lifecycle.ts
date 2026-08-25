@@ -221,6 +221,12 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 阶段 2.2：ctx 在此处提前构造（由 Application 注入），实现迁移到 app/recovery.ts
     registerRecoveryListeners(ctx)
     diagLog('BOOT', 'registerRecoveryListeners done')
+    // 自恢复（attemptRecovery）前注入 scanner / media worker bridge：
+    // 让数据库自恢复在 rename 覆盖在线库前能显式停止这些持有 dbPath 连接的 worker，
+    // 避免 Windows EPERM 共享冲突（databaseWorkerBridge 在 initialize 后才注入，启动期其为 null → 安全 no-op）。
+    // scanner / media worker 为惰性启动，启动期 worker 为 null，stopWorkerForRestore 同样是安全的 no-op。
+    ctx.dbManager.setScannerWorkerBridge(ctx.scannerWorkerBridge)
+    ctx.dbManager.setMediaWorkerBridge(ctx.mediaWorkerBridge)
     try {
       diagLog('BOOT', 'before dbManager.initialize()')
       await ctx.dbManager.initialize()

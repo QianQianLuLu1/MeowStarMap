@@ -36,20 +36,29 @@ export function registerSearchIndexHandlers(ctx: HandlerContext): void {
           .object({
             since: z.string().max(64).optional(),
             limit: z.number().int().positive().max(10000).optional(),
-            offset: z.number().int().min(0).optional()
+            // 性能重构：afterId 游标取代 offset（id > ? 分块，避免全量重建 O(n²)）
+            afterId: z.number().int().min(0).optional(),
+            // 仅校验路径显式要求 total 时才一次性 COUNT，默认不触发全表扫描
+            includeTotal: z.boolean().optional()
           })
           .optional()
       ]),
       async ([options]) => {
         const repo = getRepo()
         const limit = options?.limit ?? 5000
-        const offset = options?.offset ?? 0
-        const rows = repo.getSearchDocs(options?.since, limit, offset)
-        const total = repo.getSearchDocsCount(options?.since)
+        const afterId = options?.afterId ?? 0
+        // since（indexed_at 增量过滤）与 afterId（id 游标）可同时传入，组合安全依赖
+        // media-repository.getSearchDocs 内部 ORDER BY id ASC（结果按 id 严格升序，游标取末返回行 id）。
+        // 组合语义见 getSearchDocs JSDoc；切勿将排序改为时间列，否则增量同步会漏掉中间行。
+        const { docs, hasMore } = repo.getSearchDocs(options?.since, limit, afterId)
+        // returned 恒为本页条数（docs.length，零成本）；total 仅在显式 includeTotal 时做一次性全表 COUNT，
+        // 否则为 undefined——故意不回退到 docs.length，从类型层面强制调用方显式请求全量总数。
+        const total = options?.includeTotal ? repo.getSearchDocsCount(options?.since) : undefined
         return {
-          docs: rows,
+          docs,
+          returned: docs.length,
           total,
-          hasMore: offset + rows.length < total
+          hasMore
         }
       }
     )

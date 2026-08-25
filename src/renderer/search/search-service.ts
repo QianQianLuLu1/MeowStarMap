@@ -148,12 +148,13 @@ class SearchService {
       return
     }
 
-    let offset = 0
+    // 性能重构：用 id 游标（afterId）顺序翻页，取代 offset，避免全量重建 O(n²)
+    let afterId = 0
     try {
       while (true) {
         const result = await window.electronAPI.media.searchBuildDocs({
           limit: REBUILD_PAGE_SIZE,
-          offset
+          afterId
         })
         for (const row of result.docs) {
           // 解析 tags JSON 字段为空格分隔字符串
@@ -171,7 +172,8 @@ class SearchService {
           getSearchIndex().add(doc.id, doc)
         }
         this.indexedDocCount += result.docs.length
-        offset += REBUILD_PAGE_SIZE
+        // 游标推进：下一页从本页最大 id 之后开始（docs 已按 id ASC 排序）
+        afterId = result.docs.length > 0 ? result.docs[result.docs.length - 1].id : afterId
         if (!result.hasMore) break
       }
       // 持久化到 userData
@@ -273,8 +275,15 @@ class SearchService {
    */
   private async validateAndRebuildIfNeeded(): Promise<void> {
     try {
-      const result = await window.electronAPI!.media.searchBuildDocs({ limit: 1 })
+      // 校验路径：显式请求一次性 total（全表 COUNT 仅此一处，全量重建不再每页 COUNT）
+      const result = await window.electronAPI!.media.searchBuildDocs({
+        limit: 1,
+        includeTotal: true
+      })
+      // total 现在为可选字段（仅 includeTotal 时填充）：调用方已请求，正常必有值；
+      // 防御性收窄，避免类型层面把 undefined 当数字参与比较。
       const dbTotal = result.total
+      if (typeof dbTotal !== 'number') return
       // 偏差超过 5% → 重建
       if (
         dbTotal > 0 &&

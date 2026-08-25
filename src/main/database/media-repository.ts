@@ -2,6 +2,7 @@ import type Database from 'better-sqlite3'
 import type { DatabaseWorkerBridge } from './worker/database-worker-bridge'
 import type { DbStatement } from './worker/worker-protocol'
 import type { SearchableDocRow } from '../../shared/types/ipc'
+import type { MediaListCursor } from '../../shared/types/media'
 import { ImportRootRepository, normalizeRootPath } from './import-root-repository'
 import { chunkArray } from './sql-chunk'
 import { logger } from '../utils/logger'
@@ -46,6 +47,16 @@ import { t } from '../i18n'
  * 超过此时长强制走真实 COUNT 并重建缓存，避免长期陈旧。
  */
 const MEDIA_COUNT_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+/**
+ * COUNT 缓存 KV key（app_settings 表）。三个 key 在同一次 SELECT 中读取，避免多次往返。
+ */
+const MEDIA_COUNT_KEY = 'media_count'
+// stale=1 表示 COUNT 缓存过期/失效，listMedia 必须走真实 COUNT 并重建；
+// 0 或缺失表示该 key 不存在（旧库未迁移）时一律视为 stale→触发重建，属预期自修复行为。
+// 命名采用正向语义（stale 而非 dirty），避免 "dirty=1=可用/失效" 的字面歧义。
+const MEDIA_COUNT_STALE_KEY = 'media_count_stale'
+const MEDIA_COUNT_UPDATED_AT_KEY = 'media_count_updated_at'
 
 /**
  * 图库板块目录限制的 WHERE 条件：仅匹配游戏内高质量照片目录
@@ -278,15 +289,23 @@ export interface MediaListOptions {
   // 图库板块目录限制：true 时仅返回 ...\GamePlayPhotos\{uid}\NikkiPhotos_HighQuality 下的图片
   // 仅图库（gallery）视图传入；缓存/收藏/回收站/重复等板块不受影响
   galleryHighQualityOnly?: boolean
+  /**
+   * keyset 深分页游标：提供则忽略 page/pageSize 走 keyset 分支
+   * （`(排序键 < 锚点) OR (排序键 = 锚点 AND id < 锚点id)` ORDER BY 排序键 DESC, id DESC LIMIT）。
+   * 不提供则回退 offset 偏移分页（向后兼容插件桥/perf 脚本）。
+   */
+  cursor?: MediaListCursor | null
 }
 
 export interface MediaListResult {
   rows: MediaRow[]
-  /** 仅在 usePagination=true 时返回 */
+  /** 仅在 usePagination/cursor 模式返回 */
   total?: number
   page?: number
   pageSize?: number
   hasMore?: boolean
+  /** keyset 下一页游标：本页未满（末页）或排序键缺失时为 null */
+  nextCursor?: MediaListCursor | null
 }
 
 // ============================================================================
@@ -318,6 +337,10 @@ export class MediaRepository {
    * 把大 id 数组按 SQL 参数上限分片，逐片套用同一模板生成语句，整体放进一个事务。
    * 分片后仍是一个事务，因此"要么全改要么全不改"的语义不变。
    *
+   * 分片由 {@link chunkArray} 完成（默认 {@link SQL_IN_CHUNK_SIZE}=500，远低于
+   * {@link SQLITE_MAX_VARIABLE_NUMBER}=999 且留 {@link SQL_IN_SAFE_CEILING} 余量），
+   * 确保单条 `IN (...)` 语句的占位符永不触发 "too many SQL variables"。
+   *
    * @param build 接收当前分片及其占位符串，返回该片对应的语句（调用方自行决定参数顺序）
    */
   private async runChunkedTransaction(
@@ -331,6 +354,7 @@ export class MediaRepository {
   /**
    * 分片执行 IN (...) 查询并按分片顺序合并结果。
    * 同步执行（读走主进程连接），与未分片时的返回结构一致。
+   * 同样经 {@link chunkArray} 分片，单条语句占位符数受 {@link SQLITE_MAX_VARIABLE_NUMBER} 约束。
    */
   private queryChunked<T>(
     ids: number[],
@@ -577,6 +601,16 @@ export class MediaRepository {
       conditions[1] === "COALESCE(media_source, 'game') != 'launcher'"
 
     return { whereClause, whereParams, isDefaultView }
+  }
+
+  /**
+   * keyset 续页锚点条件拼接：守卫前导 AND。
+   * whereClause 为空（某 keyset 视图无任何基础过滤）时必须用 'WHERE ' 而非 ' AND '，
+   * 否则会拼出 'FROM media_files AND (...)' 非法 SQL（潜在崩溃）。
+   * 仅在 `cursor !== null` 的续页分支调用；首屏 `cursor === null` 时 keysetClause 直接等于 whereClause，不套用此守卫。
+   */
+  private static buildKeysetClauseWithAnchor(whereClause: string, anchorExpr: string): string {
+    return whereClause ? `${whereClause} AND ${anchorExpr}` : `WHERE ${anchorExpr}`
   }
 
   // ==========================================================================
@@ -843,6 +877,17 @@ export class MediaRepository {
       file_size: 'file_size',
       rating: 'rating'
     }
+    // 数字排序列（INTEGER 亲和性）：其 keyset 锚点 sortValue 运行时为 number。
+    // 归一时对这些列保持 number（防御传入"字符串化数值"），对文本/时间列保持 ISO 字符串。
+    // 复用 VALID_SORT_COLUMNS 派生，新增数字排序列只需在此白名单登记即可自动覆盖（DRY）。
+    const NUMERIC_SORT_COLUMNS = new Set(['rating', 'file_size'])
+    const normalizeSortValue = (
+      sortColumn: string,
+      value: string | number | null
+    ): string | number | null => {
+      if (value === null) return null
+      return NUMERIC_SORT_COLUMNS.has(sortColumn) ? Number(value) : String(value)
+    }
     const deletedOnly = options.deletedOnly === true
     const sortColumn =
       options.sortBy && VALID_SORT_COLUMNS[options.sortBy]
@@ -851,10 +896,84 @@ export class MediaRepository {
           ? 'deleted_at'
           : 'created_at'
     const sortDirection = options.sortOrder === 'asc' ? 'ASC' : 'DESC'
-    const orderBy = `ORDER BY ${sortColumn} ${sortDirection}`
+    // NULL 排序侧：SQLite 将 NULL 视为最小值，ASC 时排首、DESC 时排尾。显式声明该侧（而非依赖默认），
+    // 使 ORDER BY 与 keyset 续页条件共享"同一 NULL 侧"模型（见下方锚点 null 分支），并消除默认行为歧义。
+    // 可空排序列（如 rating INTEGER DEFAULT 0 允许 NULL，DESC 排尾）因此稳定聚集在视图同侧，
+    // 后续按 id tie-breaker 推进时不会跨 NULL/非 NULL 错位。
+    const nullOrder = sortDirection === 'DESC' ? 'ASC' : 'DESC'
+    const orderBy = `ORDER BY ${sortColumn} IS NULL ${nullOrder}, ${sortColumn} ${sortDirection}`
+
+    // 性能重构：keyset 深分页游标。提供 cursor 时忽略 page/pageSize，走
+    // `(排序键 < 锚点) OR (排序键 = 锚点 AND id < 锚点id)` 分支，避免大 OFFSET 全表扫描跳过行。
+    // 仅支持 DESC（图库/回收站等默认视图均为 DESC）；ASC 视图仍回退 offset 路径。
+    // 排序键在已存在组合索引（idx_media_source / idx_media_gallery_uid_type 含 created_at DESC）下可索引 seek。
+    // cursor 优先于 page：同时传入时按 keyset 处理（向后兼容的 page/pageSize 偏移路径仅在无 cursor 时生效）。
+    // 前端首屏传 cursor=null（表示 keyset 第一页，无锚点），续页传 cursor={sortValue,id}；
+    // 插件桥等旧路径不传 cursor（undefined）→ 走 offset 兼容路径。故以"是否显式提供 cursor"区分。
+    // 可空列 null 锚点分支：当锚点 sortValue===null（如 rating 降序排尾的 NULL 行），
+    // 原 `(col < NULL OR col = NULL AND id < ?)` 在 SQL 中恒为 NULL（false）→ 续页返回 0 行、
+    // 分页静默终止、尾部 NULL 行丢失。故 null 锚点走专用分支仅按 id 推进 NULL 行区间。
+    const cursor = options.cursor
+    const useCursor = options.cursor !== undefined && sortDirection === 'DESC'
+
+    // 防御性校验（fail-fast）：keyset 续页逻辑仅针对 DESC 实现（含 NULL 排尾/按 id tie-breaker 模型）。
+    // 若调用方传入 cursor 却使用 ASC，会落入下方 offset 分支并静默忽略 cursor、返回首页数据，
+    // 造成「无限滚动永远停在第一页」的语义错误且难以定位。此处显式抛错，在开发期立即暴露非法组合。
+    // 向后兼容：旧路径（插件桥/perf 脚本）不传 cursor（cursor === undefined）→ 不触发校验，继续走 offset。
+    if (options.cursor !== undefined && sortDirection !== 'DESC') {
+      throw new Error(
+        'keyset cursor only supports DESC sort order; ' +
+          `received cursor with sortOrder='${options.sortOrder ?? 'asc'}'. ` +
+          'Use offset pagination (omit cursor) or switch to sortOrder="desc".'
+      )
+    }
 
     let rawRows: Array<Omit<MediaRow, 'tags'> & { tags: unknown }>
-    if (usePagination) {
+    // keyset 分页参数：WHERE + 游标条件 + LIMIT
+    const keysetParams: unknown[] = [...whereParams]
+    let keysetClause = whereClause
+    // 游标页大小：未传 pageSize 时默认 500（与 offset 路径一致）
+    const pageSz = typeof pageSize === 'number' ? pageSize : 500
+    if (useCursor) {
+      // 续页（cursor 非 null）追加锚点条件：DESC 下取"排序键更小（或同值更小 id）"的行。
+      // 锚点 sortValue===null 时（可空列排尾的 NULL 行），按 ORDER BY 的 NULL 侧模型走专用分支：
+      // 仅取"仍为 NULL 且 id 更小"的行。原 `(col < NULL OR col = NULL AND id < ?)` 恒为 NULL（false）
+      // → 续页 0 行、分页静默终止；专用分支避免漏掉所有 NULL 行。
+      if (cursor !== null) {
+        if (cursor.sortValue === null) {
+          keysetClause = MediaRepository.buildKeysetClauseWithAnchor(
+            whereClause,
+            `(${sortColumn} IS NULL AND id < ?)`
+          )
+          keysetParams.push(cursor.id)
+        } else {
+          // 非 null 锚点：除"排序键更小（或同值更小 id）"外，还需显式纳入排尾的 NULL 行。
+          // DESC 下 NULL 排在最末、尚未翻到；而 SQL 中 `NULL < 锚点` 恒为 unknown（false），
+          // 不能依赖比较选中，必须 OR ... IS NULL 才能继续翻到尾部 NULL 行（否则静默丢尾）。
+          keysetClause = MediaRepository.buildKeysetClauseWithAnchor(
+            whereClause,
+            `(${sortColumn} < ? OR (${sortColumn} = ? AND id < ?) OR ${sortColumn} IS NULL)`
+          )
+          // 按列亲和性显式归一：数字列(rating/file_size)保持 number、文本/时间列保持 ISO 字符串。
+          // 消除"类型谎言"隐患——若开关卡把数值 sortValue 字符串化后传入，
+          // 此处归一可保证 `col < 5`（数字比较）而非 `col < '5'`（字典序/亲和性兜底）的边界错位。
+          const anchor = normalizeSortValue(sortColumn, cursor.sortValue)
+          keysetParams.push(anchor, anchor, cursor.id)
+        }
+      }
+      // 采用 pageSize+1 探针：多取一条用于判定 hasMore，避免末页恰好满时误报 hasMore=true。
+      const cursorLimit = pageSz + 1
+      // 始终附加 id 作为 tie-breaker（DESC/ASC 与排序方向一致），保证同排序键行的分页确定性与游标正确性
+      const orderSuffix = `, id ${sortDirection}`
+      rawRows = this.db
+        .prepare(
+          `SELECT ${selectColumns} FROM media_files ${keysetClause} ${orderBy}${orderSuffix} LIMIT ?`
+        )
+        .all(...keysetParams, cursorLimit) as Array<Omit<MediaRow, 'tags'> & { tags: unknown }>
+    } else if (usePagination) {
+      // OFFSET 偏移分页（含 ASC 排序路径，或旧插件桥/perf 脚本不传 cursor 的兼容路径）：
+      // 仅 bind `pageSize`/`offset`，完全不绑定 sortValue，故与 sortValue 数值类型无关，天然兼容。
+      // ASC 视图不应传 cursor（由上方 fail-fast 拦截），分页顺序由 ORDER BY 决定，无需 keyset 归一。
       const offset = page! * pageSize!
       rawRows = this.db
         .prepare(
@@ -875,7 +994,29 @@ export class MediaRepository {
 
     const result: MediaListResult = { rows }
 
-    if (usePagination) {
+    if (useCursor) {
+      // 探针判定：多取的一条存在 → 还有下一页（末页恰好满也能正确识别）；结果裁掉探针行
+      const hasMore = rows.length > pageSz
+      const pageRows = hasMore ? rows.slice(0, pageSz) : rows
+      result.rows = pageRows
+      result.hasMore = hasMore
+      // 首页（cursor=null）仍需 total 供"全部删除"等场景；续页不再 COUNT（前端用 hasMore 驱动）
+      if (cursor === null || cursor.sortValue === undefined) {
+        // 仅首页计算一次 total（默认视图命中 media_count 缓存，避免 O(n) 扫描）
+        result.total = this.resolveListTotal(whereClause, whereParams, isDefaultView)
+      }
+      if (hasMore) {
+        const last = pageRows[pageRows.length - 1]
+        // 排序键取值：按 sortColumn 读取（created_at/deleted_at/rating 等）。
+        // 数字列(rating/file_size)运行时为 number、文本/时间列为 ISO 字符串；
+        // 可能为 null（可空列排尾的 NULL 行）。下页锚点 sortValue===null 即命中 IS NULL 续页分支，不丢行。
+        const sortValue = (last as unknown as Record<string, unknown>)[sortColumn] as
+          string | number | null
+        result.nextCursor = { sortValue, id: last.id }
+      } else {
+        result.nextCursor = null
+      }
+    } else if (usePagination) {
       let total: number
       if (isDefaultView) {
         // 默认视图：尝试 media_count 缓存
@@ -905,6 +1046,27 @@ export class MediaRepository {
     return result
   }
 
+  /**
+   * 解析 listMedia 的 total（默认视图优先命中 media_count 缓存，否则实时 COUNT）。
+   * 抽离自 listMedia 的 offset/keyset 两条路径，避免重复逻辑。
+   */
+  private resolveListTotal(
+    whereClause: string,
+    whereParams: unknown[],
+    isDefaultView: boolean
+  ): number {
+    if (isDefaultView) {
+      const cached = this.getMediaCountCache()
+      if (cached !== null) return cached
+      const real = this.countMedia(whereClause, whereParams)
+      void this.setMediaCountCache(real).catch(() => {
+        // 重建失败时静默
+      })
+      return real
+    }
+    return this.countMedia(whereClause, whereParams)
+  }
+
   /** COUNT 查询（使用与 listMedia 相同的 WHERE 子句） */
   private countMedia(whereClause: string, whereParams: unknown[]): number {
     const row = this.db
@@ -917,22 +1079,22 @@ export class MediaRepository {
    * 读取 media_count 缓存（app_settings），未缓存/失效/过期返回 null。
    *
    * R5：强一致改造——除 media_count 外同时校验：
-   *   - media_count_dirty = 1：refreshMediaCountCache 失败时显式标记失效，下次读取走真实 COUNT
+   *   - MEDIA_COUNT_STALE_KEY = 1：refreshMediaCountCache 失败时显式标记失效，下次读取走真实 COUNT
    *   - media_count_updated_at：超过 MEDIA_COUNT_CACHE_TTL_MS（24h）强制重建，避免长期陈旧
    *
-   * 三个 key 在同一次 SELECT 中读取，避免多次往返。旧库无 dirty/updated_at 时视为失效（触发首次重建）。
+   * 三个 key 在同一次 SELECT 中读取，避免多次往返。旧库无 stale/updated_at 时视为失效（触发首次重建）。
    */
   private getMediaCountCache(): number | null {
     const rows = this.db
       .prepare('SELECT key, value FROM app_settings WHERE key IN (?, ?, ?)')
-      .all('media_count', 'media_count_dirty', 'media_count_updated_at') as Array<{
+      .all(MEDIA_COUNT_KEY, MEDIA_COUNT_STALE_KEY, MEDIA_COUNT_UPDATED_AT_KEY) as Array<{
       key: string
       value: string
     }>
     if (rows.length === 0) return null
     // 同一 key 多次写入时（INSERT OR REPLACE）以最新值为准
     const map = new Map(rows.map((r) => [r.key, r.value]))
-    const countStr = map.get('media_count')
+    const countStr = map.get(MEDIA_COUNT_KEY)
     if (!countStr) return null
     let count: number
     try {
@@ -941,17 +1103,17 @@ export class MediaRepository {
     } catch {
       return null
     }
-    // dirty 标记：1 表示上次刷新失败，缓存不可信
-    const dirtyStr = map.get('media_count_dirty')
-    if (dirtyStr !== undefined) {
+    // stale 标记：1 表示上次刷新失败/缓存过期，缓存不可信，须走真实 COUNT
+    const staleStr = map.get(MEDIA_COUNT_STALE_KEY)
+    if (staleStr !== undefined) {
       try {
-        if (JSON.parse(dirtyStr) === 1) return null
+        if (JSON.parse(staleStr) === 1) return null
       } catch {
-        // 损坏的 dirty 值视为失效
+        // 损坏的 stale 值视为失效
         return null
       }
     } else {
-      // 旧库无 dirty 字段：视为失效，触发首次重建并补齐字段
+      // 旧库无 stale 字段：视为失效，触发首次重建并补齐字段
       return null
     }
     // TTL 校验：超过 24h 强制重建
@@ -971,34 +1133,34 @@ export class MediaRepository {
   /**
    * 写入 media_count 缓存（async，走 worker 事务）。
    *
-   * R5：原子写入 count + dirty=0 + updated_at=now 三个 key，确保读侧校验始终命中一致的快照。
+   * R5：原子写入 count + stale=0 + updated_at=now 三个 key，确保读侧校验始终命中一致的快照。
    * 取代旧的 setMediaCountCacheSync 同步直写路径。
    */
   async setMediaCountCache(count: number): Promise<void> {
     await this.runTransaction([
       {
         sql: 'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)',
-        params: ['media_count', JSON.stringify(count)]
+        params: [MEDIA_COUNT_KEY, JSON.stringify(count)]
       },
       {
         sql: 'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)',
-        params: ['media_count_dirty', JSON.stringify(0)]
+        params: [MEDIA_COUNT_STALE_KEY, JSON.stringify(0)]
       },
       {
         sql: 'INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)',
-        params: ['media_count_updated_at', JSON.stringify(Date.now())]
+        params: [MEDIA_COUNT_UPDATED_AT_KEY, JSON.stringify(Date.now())]
       }
     ])
   }
 
   /**
-   * R5：标记 media_count 缓存失效（dirty=1）。
-   * refreshMediaCountCache 失败时调用，下次 listMedia 检测到 dirty=1 走真实 COUNT。
+   * R5：标记 media_count 缓存过期（stale=1）。
+   * refreshMediaCountCache 失败时调用，下次 listMedia 检测到 stale=1 走真实 COUNT。
    * 仅写入单 key，不开事务（与正常路径写入复杂度对称即可）。
    */
-  async markMediaCountDirty(): Promise<void> {
+  async markMediaCountStale(): Promise<void> {
     await this.runWrite('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [
-      'media_count_dirty',
+      MEDIA_COUNT_STALE_KEY,
       JSON.stringify(1)
     ])
   }
@@ -1025,7 +1187,7 @@ export class MediaRepository {
    * 与 listMedia 默认视图 WHERE 完全一致（排除 launcher 缓存），避免缓存总数虚高。
    * 统一收口 media_count 的写入逻辑，消除 Application.notifyMediaUpdated 的直接 SQL 双写路径
    *
-   * R5：刷新失败时由调用方（notifyMediaUpdated）通过 markMediaCountDirty 标记失效，
+   * R5：刷新失败时由调用方（notifyMediaUpdated）通过 markMediaCountStale 标记失效，
    * 不再 fire-and-forget 吞错——读侧会回退到真实 COUNT 并尝试重建。
    */
   async refreshMediaCountCache(): Promise<void> {
@@ -1229,32 +1391,71 @@ export class MediaRepository {
    * search:buildDocs — 批量返回索引文档字段
    * 仅 SELECT 搜索所需列（id/file_name/tags/outfit/scene_category/notes/indexed_at）
    * tags 字段保持 DB 原始 JSON 字符串，由调用方按需 join 或分词
-   * @param since 仅返回 indexed_at > since 的记录（增量模式），undefined 表示全量
-   * @param limit  分页大小（建议 5000）
-   * @param offset 分页偏移
+   *
+   * 性能重构：原 `ORDER BY id ASC LIMIT ? OFFSET ?` 在全量重建（10w 行）时逐页丢弃
+   * offset 行，整体退化为 O(n²)。现改为按主键 `id > ?` 游标分块，顺序扫描无 OFFSET
+   * 丢弃，整体降为 O(n)。调用方用上一页末行 `id` 作为下一页 `afterId` 游标，
+   * 以 `docs.length === limit` 判定 `hasMore`，不再每页全表 COUNT。
+   *
+   * ## since 与 afterId 组合语义（务必理解，否则增量同步会漏文档）
+   * - `afterId`：id 游标，仅返回 `id > afterId`（0 表示从最小 id 开始）。
+   * - `since`：时间游标，仅返回 `indexed_at > since`（增量模式；undefined 表示全量）。
+   * - 二者**可同时传入**，组合 WHERE = `id > afterId AND indexed_at > since`，
+   *   且**必须**保持 `ORDER BY id ASC`（见下方不变量断言）。
+   * - 游标推进约定：下一页 `afterId` 必须取「**本页末返回行**的 id」（即本页最大 id），
+   *   不能用其他字段。因为 `since` 过滤只剔除不满足时间的行、不改变 id 顺序，
+   *   末返回行 id 之后的所有 id 区间都尚未扫描，故中间被 `since` 过滤掉的行属**正确跳过，非泄漏**。
+   * - ⚠️ 危险点：组合安全的根因是 `ORDER BY id ASC`。若有人把 ORDER BY 改为时间列
+   *   （如 updated_at/indexed_at），游标锚点（末返回行 id）将不再是最大 id，
+   *   续页 `id > 该锚点` 会漏掉比锚点 id 小、却排在时间视图更后的中间行。本方法末尾的
+   *   不变量断言正是为守卫「结果必须按 id 严格升序」这一组合安全前提。
+   *
+   * @param since   仅返回 indexed_at > since 的记录（增量模式），undefined 表示全量
+   * @param limit   分页大小（建议 5000）
+   * @param afterId 游标：仅返回 id > afterId 的记录（0 表示从最小 id 开始）
    */
-  getSearchDocs(since: string | undefined, limit: number, offset: number): SearchableDocRow[] {
-    const params: unknown[] = []
-    let where = 'is_deleted = 0'
+  getSearchDocs(
+    since: string | undefined,
+    limit: number,
+    afterId: number = 0
+  ): { docs: SearchableDocRow[]; hasMore: boolean } {
+    const params: unknown[] = [afterId]
+    let where = 'is_deleted = 0 AND id > ?'
     if (since) {
       where += ' AND indexed_at > ?'
       params.push(since)
     }
-    params.push(limit, offset)
-    return this.db
+    params.push(limit)
+    const docs = this.db
       .prepare(
         `SELECT id, file_name, tags, outfit, scene_category, notes, indexed_at
          FROM media_files
          WHERE ${where}
          ORDER BY id ASC
-         LIMIT ? OFFSET ?`
+         LIMIT ?`
       )
       .all(...params) as SearchableDocRow[]
+    // 不变量：组合安全依赖 ORDER BY id ASC（见上方 JSDoc）。
+    // 若误将 ORDER BY 改为时间列，since 组合路径会漏掉中间行——此处断言即时暴露回归。
+    for (let i = 1; i < docs.length; i++) {
+      if (docs[i].id <= docs[i - 1].id) {
+        // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+        logger.error('[getSearchDocs] 不变量被破坏：结果未按 id 严格升序返回', {
+          at: i,
+          prevId: docs[i - 1].id,
+          curId: docs[i].id
+        })
+        throw new Error('getSearchDocs MUST return docs strictly ordered by id ASC')
+      }
+    }
+    return { docs, hasMore: docs.length === limit }
   }
 
   /**
-   * search:buildDocs — 返回待索引记录总数（用于分页拉取与启动校验）
-   * 与 getSearchDocs 共用 where 子句
+   * search:buildDocs — 返回待索引记录总数（用于启动校验等一次性场景）
+   * 与 getSearchDocs 共用 where 子句。
+   * 性能重构后，全量重建/增量拉取不再每页调用本方法（改为游标 + hasMore 驱动循环）；
+   * 仅在显式需要 total（如校验路径）时按需调用一次，避免 O(n²) 全表 COUNT。
    */
   getSearchDocsCount(since: string | undefined): number {
     const params: unknown[] = []

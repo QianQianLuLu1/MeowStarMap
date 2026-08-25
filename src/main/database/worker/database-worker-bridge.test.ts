@@ -44,7 +44,12 @@ function createMockWorker(): UtilityProcess & {
     postMessage: ReturnType<typeof vi.fn>
     kill: ReturnType<typeof vi.fn>
   }
-  emitter.postMessage = vi.fn()
+  emitter.postMessage = vi.fn((cmd: unknown) => {
+    // 模拟 worker 处理完 DB_DISPOSE 后关闭 DB 句柄并回发确认（用微任务确保 disposeResolve 已就绪）
+    if (cmd && typeof cmd === 'object' && (cmd as { type?: string }).type === 'DB_DISPOSE') {
+      queueMicrotask(() => emitter.emit('message', { type: 'DB_WORKER_DISPOSED' }))
+    }
+  })
   emitter.kill = vi.fn()
   return emitter
 }
@@ -121,5 +126,165 @@ describe('DatabaseWorkerBridge 写请求超时（组9-2）', () => {
       payload: { requestId: 1, success: true, result: { changes: 1, lastInsertRowid: 1 } }
     })
     await expect(promise).resolves.toEqual({ changes: 1, lastInsertRowid: 1 })
+  })
+})
+
+describe('DatabaseWorkerBridge stopWorkerForRestore（自恢复期间可逆停 worker）', () => {
+  let bridge: DatabaseWorkerBridge
+  let mockWorker: ReturnType<typeof createMockWorker>
+  const dbPath = '/mock/userdata/database/app.db'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFork.mockReset()
+    mockWorker = createMockWorker()
+    mockFork.mockReturnValue(mockWorker)
+    bridge = new DatabaseWorkerBridge()
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    const dp = bridge.dispose().catch(() => {})
+    vi.advanceTimersByTime(500)
+    await dp
+    vi.useRealTimers()
+  })
+
+  async function bootWorker(): Promise<void> {
+    const promise = bridge.execute(dbPath, 'UPDATE t SET a = 1')
+    mockWorker.emit('message', { type: 'DB_READY' })
+    await vi.advanceTimersByTimeAsync(0)
+    mockWorker.emit('message', {
+      type: 'DB_RESULT',
+      payload: { requestId: 1, success: true, result: { changes: 1, lastInsertRowid: 1 } }
+    })
+    await promise
+  }
+
+  it('发送 DB_DISPOSE 并 kill worker，且 kill 触发的 exit 不会自动重启', async () => {
+    await bootWorker()
+    const forkBefore = mockFork.mock.calls.length
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'DB_OPEN' })
+    )
+
+    const p = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await p
+
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'DB_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+    // 模拟 kill 产生的非零码退出（被 terminatingForRestore 抑制，不应自动重启）
+    mockWorker.emit('exit', null, 'SIGTERM')
+    expect(mockFork.mock.calls.length).toBe(forkBefore)
+  })
+
+  it('停止后不置 isDisposed，可经 execute 重新 fork 实现连接重建', async () => {
+    await bootWorker()
+
+    const p = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await p
+    mockWorker.emit('exit', null, 'SIGTERM')
+
+    // 新 worker：验证 isDisposed 未阻断后续启动（否则 ensureWorker 会抛错）
+    const mockWorker2 = createMockWorker()
+    mockFork.mockReturnValue(mockWorker2)
+    const p2 = bridge.execute(dbPath, 'UPDATE t SET a = 2')
+    mockWorker2.emit('message', { type: 'DB_READY' })
+    await vi.advanceTimersByTimeAsync(0)
+    mockWorker2.emit('message', {
+      type: 'DB_RESULT',
+      payload: { requestId: 2, success: true, result: { changes: 1, lastInsertRowid: 1 } }
+    })
+    await expect(p2).resolves.toEqual({ changes: 1, lastInsertRowid: 1 })
+  })
+
+  it('无 worker 时 stopWorkerForRestore 为安全 no-op（启动期常见情形）', async () => {
+    await expect(bridge.stopWorkerForRestore()).resolves.toBeUndefined()
+  })
+
+  it('收到 DB_WORKER_DISPOSED 后解除等待并立即 kill（不再盲等固定时长）', async () => {
+    await bootWorker()
+    // 关闭 auto-ack，手动回发确认，验证确认消息驱动解除等待（而非等 2000ms 超时兜底）
+    mockWorker.postMessage = vi.fn()
+    const p = bridge.stopWorkerForRestore()
+    mockWorker.emit('message', { type: 'DB_WORKER_DISPOSED' })
+    await p
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'DB_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+  })
+
+  it('worker 未回发确认时超时兜底仍会 kill（不永久阻塞）', async () => {
+    await bootWorker()
+    // 关闭 auto-ack：覆盖 postMessage 使其不回发确认
+    mockWorker.postMessage = vi.fn()
+    const p = bridge.stopWorkerForRestore()
+    // 不回发确认：推进到 DISPOSE_CONFIRM_TIMEOUT_MS(2000) 触发超时兜底
+    await vi.advanceTimersByTimeAsync(2000)
+    await p
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'DB_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+  })
+})
+
+describe('DatabaseWorkerBridge hasLiveWorker（自恢复并发边界探针）', () => {
+  let bridge: DatabaseWorkerBridge
+  let mockWorker: ReturnType<typeof createMockWorker>
+  const dbPath = '/mock/userdata/database/app.db'
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFork.mockReset()
+    mockWorker = createMockWorker()
+    mockFork.mockReturnValue(mockWorker)
+    bridge = new DatabaseWorkerBridge()
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    const dp = bridge.dispose().catch(() => {})
+    vi.advanceTimersByTime(500)
+    await dp
+    vi.useRealTimers()
+  })
+
+  async function bootWorker(): Promise<void> {
+    const promise = bridge.execute(dbPath, 'UPDATE t SET a = 1')
+    mockWorker.emit('message', { type: 'DB_READY' })
+    await vi.advanceTimersByTimeAsync(0)
+    mockWorker.emit('message', {
+      type: 'DB_RESULT',
+      payload: { requestId: 1, success: true, result: { changes: 1, lastInsertRowid: 1 } }
+    })
+    await promise
+  }
+
+  it('未启动 worker 时返回 false', () => {
+    expect(bridge.hasLiveWorker()).toBe(false)
+  })
+
+  it('worker 启动后返回 true', async () => {
+    await bootWorker()
+    expect(bridge.hasLiveWorker()).toBe(true)
+  })
+
+  it('stopWorkerForRestore 后（已收到 *_DISPOSED 或超时兜底 kill）返回 false', async () => {
+    await bootWorker()
+    expect(bridge.hasLiveWorker()).toBe(true)
+    const p = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await p
+    expect(bridge.hasLiveWorker()).toBe(false)
   })
 })

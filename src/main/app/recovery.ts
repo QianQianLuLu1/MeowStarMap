@@ -16,6 +16,16 @@ import { t } from '../i18n'
 export function registerRecoveryListeners(ctx: AppContext): void {
   // 数据库恢复监听器
   ctx.dbManager.addRecoveryListener((info) => {
+    // H1：非破坏性故障（锁/权限/磁盘满/ABI 不匹配/未知）——仅提示排查，未覆盖在线库
+    if (info.nonDestructive) {
+      ctx.pendingRecoveryEvents.push({
+        kind: 'database',
+        title: t('main.recovery.title.dbPreserved'),
+        body: t('main.recovery.body.dbPreserved', { detail: info.reason }),
+        nonDestructive: true
+      })
+      return
+    }
     const title = info.success
       ? t('main.recovery.title.dbRecovered')
       : t('main.recovery.title.dbRecoveryFailed')
@@ -125,6 +135,16 @@ export function checkPendingDatabaseRecovery(ctx: AppContext): void {
   // 仅当暂存队列中尚无数据库恢复事件时才补入，避免重复
   const hasDbEvent = ctx.pendingRecoveryEvents.some((e) => e.kind === 'database')
   if (hasDbEvent) return
+  // H1：非破坏性故障仅提示排查，未覆盖在线库
+  if (last.nonDestructive) {
+    ctx.pendingRecoveryEvents.push({
+      kind: 'database',
+      title: t('main.recovery.title.dbPreserved'),
+      body: t('main.recovery.body.dbPreserved', { detail: last.reason }),
+      nonDestructive: true
+    })
+    return
+  }
   const title = last.success
     ? t('main.recovery.title.dbRecovered')
     : t('main.recovery.title.dbRecoveryFailed')

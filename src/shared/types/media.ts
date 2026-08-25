@@ -197,12 +197,37 @@ export interface MediaListOptions {
   sortField?: MediaSortField
   /** 排序方向，默认 'desc' */
   sortOrder?: SortDirection
-  /** 分页偏移量，0-based */
+  /** 分页偏移量，0-based（保留作向后兼容，cursor 优先） */
   offset?: number
   /** 每页数量，null 表示不分页 */
   limit?: number | null
+  /**
+   * keyset 深分页游标：提供则忽略 offset 走 keyset 分支
+   * （`(排序键 < 锚点) OR (排序键 = 锚点 AND id < 锚点id)` ORDER BY 排序键 DESC, id DESC LIMIT）。
+   * 不提供则回退到 offset 偏移分页（向后兼容插件桥/perf 脚本）。
+   *
+   * 约束：cursor 仅对 DESC 排序（sortOrder: 'desc'，默认）生效。若同时传入 cursor 且
+   * sortOrder 为 'asc'，listMedia 会显式抛出错误（fail-fast），而不是静默回退 offset 返回首页数据。
+   * ASC 视图需要分页时请勿传 cursor，改用 offset/limit 或改为 desc。
+   */
+  cursor?: MediaListCursor | null
   /** 图库板块目录限制：true 时仅返回 ...\GamePlayPhotos\{uid}\NikkiPhotos_HighQuality 下的图片 */
   galleryHighQualityOnly?: boolean
+}
+
+/**
+ * keyset 游标：用于深分页避免大 OFFSET 全表扫描。
+ * 锚定在「排序键 + 主键」上，保证确定性排序（排序键相同用 id 作 tie-breaker）。
+ * sortValue 为当前排序列的值，其运行时类型随列亲和性而定：
+ * - 数字列（rating / file_size，INTEGER）为 number；
+ * - 时间/文本列（created_at / modified_at / file_name / deleted_at / indexed_at）为 ISO 字符串；
+ * - null 表示 NULL 排尾场景（如 rating 降序排尾的 NULL 行）。
+ * 注意：此前类型被错写为 string（"类型谎言"），rating 经 IPC 回传实为 number，
+ * 仅赖 SQLite 列亲和性兜底比较；此处改为诚实的 string | number | null。
+ */
+export interface MediaListCursor {
+  sortValue: string | number | null
+  id: number
 }
 
 /**
@@ -217,6 +242,11 @@ export interface MediaListResult {
   offset: number
   /** 当前页数量 */
   limit: number
+  /**
+   * keyset 下一页游标：本页未满（末页）或排序键缺失时为 null；
+   * 调用方以 nextCursor 作为后续请求 cursor 即可深分页，无需 page/offset。
+   */
+  nextCursor?: MediaListCursor | null
 }
 
 // ============================================================================

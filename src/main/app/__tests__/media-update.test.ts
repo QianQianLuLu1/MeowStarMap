@@ -7,16 +7,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
-// MediaRepository mock：构造函数被 spy，refreshMediaCountCache / markMediaCountDirty 返回可控 promise
+// MediaRepository mock：构造函数被 spy，refreshMediaCountCache / markMediaCountStale 返回可控 promise
 // pathGuard mock：registerRoots 被 spy，验证 refreshPathGuardRoots 的注册行为
 const {
   refreshMediaCountCacheMock,
-  markMediaCountDirtyMock,
+  markMediaCountStaleMock,
   MediaRepositoryMock,
   registerRootsMock
 } = vi.hoisted(() => ({
   refreshMediaCountCacheMock: vi.fn(),
-  markMediaCountDirtyMock: vi.fn(),
+  markMediaCountStaleMock: vi.fn(),
   MediaRepositoryMock: vi.fn(),
   registerRootsMock: vi.fn()
 }))
@@ -36,15 +36,15 @@ describe('notifyMediaUpdated', () => {
     vi.useFakeTimers()
     MediaRepositoryMock.mockReset()
     refreshMediaCountCacheMock.mockReset()
-    markMediaCountDirtyMock.mockReset()
+    markMediaCountStaleMock.mockReset()
     registerRootsMock.mockReset()
-    // 默认：MediaRepository 构造返回带 refreshMediaCountCache / markMediaCountDirty 的实例
+    // 默认：MediaRepository 构造返回带 refreshMediaCountCache / markMediaCountStale 的实例
     MediaRepositoryMock.mockImplementation(() => ({
       refreshMediaCountCache: refreshMediaCountCacheMock,
-      markMediaCountDirty: markMediaCountDirtyMock
+      markMediaCountStale: markMediaCountStaleMock
     }))
     refreshMediaCountCacheMock.mockResolvedValue(undefined)
-    markMediaCountDirtyMock.mockResolvedValue(undefined)
+    markMediaCountStaleMock.mockResolvedValue(undefined)
   })
 
   afterEach(() => {
@@ -90,16 +90,16 @@ describe('notifyMediaUpdated', () => {
     expect(ctx.getMediaUpdateTimer()).not.toBeNull()
     // 推进 100ms 触发节流回调，执行 refresh 链
     vi.advanceTimersByTime(100)
-    // R5：刷新失败应触发 markMediaCountDirty（fire-and-forget，需多次 await 刷新微任务链）
+    // R5：刷新失败应触发 markMediaCountStale（fire-and-forget，需多次 await 刷新微任务链）
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
-    expect(markMediaCountDirtyMock).toHaveBeenCalledTimes(1)
+    expect(markMediaCountStaleMock).toHaveBeenCalledTimes(1)
   })
 
-  it('4b. R5 refreshMediaCountCache 失败且 markMediaCountDirty 也失败时不抛错', async () => {
+  it('4b. R5 refreshMediaCountCache 失败且 markMediaCountStale 也失败时不抛错', async () => {
     refreshMediaCountCacheMock.mockRejectedValue(new Error('worker crashed'))
-    markMediaCountDirtyMock.mockRejectedValue(new Error('worker still crashed'))
+    markMediaCountStaleMock.mockRejectedValue(new Error('worker still crashed'))
     const ctx = makeAppCtx()
     expect(() => notifyMediaUpdated(ctx)).not.toThrow()
     // 推进 100ms 触发节流回调，执行 refresh 链
@@ -108,17 +108,17 @@ describe('notifyMediaUpdated', () => {
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
-    expect(markMediaCountDirtyMock).toHaveBeenCalledTimes(1)
+    expect(markMediaCountStaleMock).toHaveBeenCalledTimes(1)
   })
 
-  it('4c. R5 refreshMediaCountCache 成功时不调用 markMediaCountDirty', async () => {
+  it('4c. R5 refreshMediaCountCache 成功时不调用 markMediaCountStale', async () => {
     const ctx = makeAppCtx()
     notifyMediaUpdated(ctx)
     // 推进 100ms 触发节流回调，执行 refresh 链
     vi.advanceTimersByTime(100)
     await Promise.resolve()
     expect(refreshMediaCountCacheMock).toHaveBeenCalledTimes(1)
-    expect(markMediaCountDirtyMock).not.toHaveBeenCalled()
+    expect(markMediaCountStaleMock).not.toHaveBeenCalled()
   })
 
   it('5. 首次调用设置 100ms 节流定时器', () => {

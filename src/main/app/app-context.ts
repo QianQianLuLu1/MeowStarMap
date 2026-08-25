@@ -14,6 +14,8 @@ export interface PendingRecoveryEvent {
   kind: 'database' | 'worker'
   title: string
   body: string
+  /** H1：非破坏性故障，仅提示排查且未覆盖在线库 */
+  nonDestructive?: boolean
 }
 
 /**

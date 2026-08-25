@@ -33,6 +33,10 @@ import { repairLegacyDataV3 } from './repair-legacy-data-v3'
 import { repairLegacyDataV4 } from './repair-legacy-data-v4'
 import { repairLegacyDataV5 } from './repair-legacy-data-v5'
 import { repairLegacyDataV6 } from './repair-legacy-data-v6'
+// T02 修复：文件完整性校验差量过滤（按本次增量扫描覆盖的根目录集合）
+import { buildIntegrityRootFilter, normalizeRootPrefixForLike } from './integrity-root-filter'
+// P2-2：SQLITE_BUSY 感知写入重试封装（包裹批量写入事务，吸收瞬时锁冲突）
+import { executeWriteSafely, walCheckpoint } from './sqlite-retry'
 import { t } from '../i18n/worker-safe'
 // C-G3：共享命名常量（取代魔法数字）
 // TDD 重构：路径分类纯函数抽取到独立文件，便于单元测试（无 electron/sharp/ffmpeg 依赖）
@@ -49,8 +53,7 @@ import {
   searchBySignatureShallow,
   searchByMediaFolderSignatureShallow,
   searchByInstallTreeSignatureShallow,
-  findSteamGamePaths,
-  findEpicGamePaths,
+  findGameInstallRootsByPriority,
   getAvailableDrives,
   getUserDataPaths
 } from './game-directory-discovery'
@@ -348,47 +351,104 @@ function updateScanHistory(id: number, status: string, filesFound: number, files
  * C-F1 修复：原实现使用同步 fs.existsSync 逐条检查，万级文件下阻塞主进程数秒。
  * 现改为 fsp.access 异步 + runWithConcurrency(8) 并发检查，文件存在性检查不再阻塞事件循环。
  * DB 事务仍同步执行（better-sqlite3 特性），但仅在收集完结果后执行一次。
+ *
+ * 性能重构：原实现一次性 `SELECT id, file_path` 全表载入内存，10w+ 媒体时产生巨大内存数组
+ * 且所有并发任务闭包常驻至全部完成。现改为按主键 `id` 分页流式处理——每页仅拉取 PAGE_SIZE
+ * 行，构建该页任务并以 8 路并发检查，整页收齐后再跑一次事务入库；峰值内存由 O(全表) 降为
+ * O(PAGE_SIZE)。逐页通过模块级 `progress` + `emitProgress` 上报完整性校验进度（已检查/缺失/
+ * 总数），UI 可展示缺失文件扫描百分比；节流 500ms 避免高频 IPC。
  */
-async function checkMissingFiles(): Promise<void> {
+// 完整性校验分页大小：单页内存与并发任务数上限，峰值内存 ≈ PAGE_SIZE 行 + 闭包
+const INTEGRITY_PAGE_SIZE = 2000
+// 一致性并发：复用 C-F1 的 8 路 fs.access 并发度
+const INTEGRITY_CONCURRENCY = 8
+
+async function checkMissingFiles(roots?: string[]): Promise<void> {
   if (!db) return
   try {
-    const rows = db
-      .prepare('SELECT id, file_path FROM media_files WHERE is_deleted = 0')
-      .all() as Array<{ id: number; file_path: string }>
+    // T02 修复：增量扫描只扫变更目录，完整性校验应只校验本次覆盖的根集合，
+    // 避免对全库未删除记录逐页 fsp.access（挂外部硬盘/网盘时 I/O 压力明显）。
+    // roots 为 undefined 时回退到全库校验旧语义（向后兼容）；空数组则 0=1 直接跳过。
+    const rootFilter = buildIntegrityRootFilter(roots)
+    const rootWhere = rootFilter ? ` AND (${rootFilter.clause})` : ''
+    const rootParams: unknown[] = rootFilter ? rootFilter.params : []
 
-    if (rows.length === 0) return
+    const total = (
+      db
+        .prepare(`SELECT COUNT(*) AS c FROM media_files WHERE is_deleted = 0${rootWhere}`)
+        .get(...rootParams) as {
+        c: number
+      }
+    ).c
+    if (total === 0) return
 
+    const selectPage = db.prepare(
+      `SELECT id, file_path FROM media_files WHERE is_deleted = 0${rootWhere} AND id > ? ORDER BY id ASC LIMIT ?`
+    )
     const updateMissing = db.prepare(
       'UPDATE media_files SET missing_count = missing_count + 1, is_missing = CASE WHEN missing_count + 1 >= 2 THEN 1 ELSE 0 END WHERE id = ?'
     )
     const updateFound = db.prepare(
       'UPDATE media_files SET missing_count = 0, is_missing = 0 WHERE id = ?'
     )
-    const updateAll = db.transaction((missingIds: number[], foundIds: number[]) => {
+    const updatePage = db.transaction((missingIds: number[], foundIds: number[]) => {
       for (const id of missingIds) updateMissing.run(id)
       for (const id of foundIds) updateFound.run(id)
     })
 
-    // 异步并发检查文件存在性（8 路并发，避免同步 fs.existsSync 阻塞主进程事件循环）
-    const missingIds: number[] = []
-    const foundIds: number[] = []
-    const tasks = rows.map((row) => async () => {
-      try {
-        await fsp.access(row.file_path, fs.constants.R_OK)
-        foundIds.push(row.id)
-      } catch {
-        missingIds.push(row.id)
-      }
-    })
-    await runWithConcurrency(tasks, 8)
-    updateAll(missingIds, foundIds)
+    let lastId = 0
+    let scanned = 0
+    let totalMissing = 0
 
-    if (missingIds.length > 0) {
-      workerLog(
-        'info',
-        `[Scanner] 完整性校验：${missingIds.length} 个文件缺失，${foundIds.length} 个文件存在`
-      )
+    // 初始化进度分母，UI 立即显示完整性校验阶段
+    progress.integrityTotal = total
+    progress.integrityScanned = 0
+    progress.integrityMissing = 0
+    emitProgress(true)
+
+    while (scanned < total) {
+      const rows = selectPage.all(...rootParams, lastId, INTEGRITY_PAGE_SIZE) as Array<{
+        id: number
+        file_path: string
+      }>
+      if (rows.length === 0) break
+
+      // 异步并发检查文件存在性（8 路并发，避免同步 fs.existsSync 阻塞主进程事件循环）
+      const missingIds: number[] = []
+      const foundIds: number[] = []
+      const tasks = rows.map((row) => async () => {
+        try {
+          await fsp.access(row.file_path, fs.constants.R_OK)
+          foundIds.push(row.id)
+        } catch {
+          missingIds.push(row.id)
+        }
+      })
+      await runWithConcurrency(tasks, INTEGRITY_CONCURRENCY)
+      // 整页收齐后再跑一次事务入库（better-sqlite3 同步事务）
+      updatePage(missingIds, foundIds)
+
+      const pageLast = rows[rows.length - 1].id
+      lastId = pageLast
+      scanned += rows.length
+      totalMissing += missingIds.length
+
+      progress.integrityScanned = scanned
+      progress.integrityMissing = totalMissing
+      emitProgress()
+
+      // 外部取消（SCAN_STOP）时提前退出，避免对全表无谓的 fs.access
+      if (shouldStop) break
     }
+
+    // 终态汇总（仅 warn/error 经 workerLog 转发；此处用 sendScanLogInfo 保证低频汇总可见）
+    sendScanLogInfo(
+      `[Scanner] 完整性校验完成：检查 ${scanned}/${total} 个文件，${totalMissing} 个缺失`
+    )
+    // 复位进度字段，避免残留到后续阶段
+    progress.integrityTotal = undefined
+    progress.integrityScanned = undefined
+    progress.integrityMissing = undefined
   } catch (error) {
     // workerLog 对 Error 对象会用 JSON.stringify 丢失 stack，转 message 保留可读信息
     workerLog(
@@ -471,9 +531,9 @@ export async function findMediaDirectories(
     }
   }
 
-  // 1. 快速路径（高置信）：Steam + Epic 注册表查询
-  for (const p of await findSteamGamePaths()) registrySet.add(p)
-  for (const p of await findEpicGamePaths()) registrySet.add(p)
+  // 1. 快速路径（高置信）：按渠道优先级（官方启动器 > Steam > Epic，命中即不再降级）
+  // 解析游戏安装根目录，再统一拼接 X6Game\Saved\GamePlayPhotos 子路径。
+  for (const p of await findGameInstallRootsByPriority()) registrySet.add(p)
 
   // 2. 快速路径（低置信）：用户数据目录（AppData 下的游戏数据）
   // SYSTEM_DIRS_TO_SKIP 跳过 appdata，全盘签名搜索无法进入，必须显式检查
@@ -581,12 +641,16 @@ export async function scanDirectory(
   if (incremental && db) {
     // FIX(组3-5): 仅加载本次扫描根目录下的已有记录——原无 WHERE 全表 SELECT 在单目录
     // 导入时也把整个库拉入内存（万级库每次多一次全表扫描 + Map 构建）。
-    // LIKE 前缀可走 file_path 唯一索引；ESCAPE 转义路径中的 \/%/_ 防止误当通配符，
-    // LIKE 对 ASCII 不区分大小写，兼容 Windows 路径盘符大小写差异
-    const prefix = rootPath.endsWith(path.sep) ? rootPath : rootPath + path.sep
-    const likePattern = prefix.replace(/[\\%_]/g, (ch) => `\\${ch}`) + '%'
+    // 与 buildIntegrityRootFilter 同口径：LOWER(REPLACE(file_path,'\','/')) LIKE LOWER(?)
+    // ESCAPE 转义路径中的 %/_ 防止误当通配符；LOWER 表达式实现全字符大小写一致，
+    // 覆盖 Windows 路径盘符/CJK 大小写差异（stock SQLite 默认 BINARY 排序下裸 LIKE
+    // 仅对 ASCII 不敏感，会漏匹配）。代价：该表达式查询无法走 file_path 唯一索引、
+    // 退化为 media_files 全扫描；因仅校验增量根集合、行量小，可接受。
+    const likePattern = normalizeRootPrefixForLike(rootPath, path.sep)
     const rows = db
-      .prepare("SELECT file_path, modified_at FROM media_files WHERE file_path LIKE ? ESCAPE '\\'")
+      .prepare(
+        "SELECT file_path, modified_at FROM media_files WHERE LOWER(REPLACE(file_path, '\\', '/')) LIKE LOWER(?) ESCAPE '\\'"
+      )
       .all(likePattern) as Array<{
       file_path: string
       modified_at: string
@@ -987,7 +1051,12 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
       }
     })
 
-    insertMany(batch)
+    // P2-2：better-sqlite3 事务已内置 busy_timeout=5000 重试；此处再包裹 SQLITE_BUSY 感知
+    // 退避重试，专门吸收"5 秒内持续冲突"的尾部场景。仅锁错误重试，非锁错误（约束/磁盘满）
+    // 由 executeWriteSafely 立即 rethrow，仍被外层包成 ScanBatchWriteError → 扫描中止。
+    await executeWriteSafely(() => insertMany(batch), {
+      log: (m) => workerLog('warn', m)
+    })
   } catch (err) {
     throw new ScanBatchWriteError(batch.length, err instanceof Error ? err.message : String(err))
   }
@@ -1028,6 +1097,29 @@ function openDatabaseIfNeeded(dbPath: string): void {
   // worker 独有：处理与主进程业务 IPC 的偶发写入冲突
   db.pragma('busy_timeout = 5000')
   currentDbPath = dbPath
+}
+
+/**
+ * 扫描收尾 WAL 检查点：在所有写入阶段完全结束后收缩 WAL 文件。
+ *
+ * 时机约束（关键）：绝不在扫描进行中、worker 仍在写入时调用。
+ * 此处扫描器自身已停止写入，TRUNCATE 只会短暂等待主进程（用户删改）写锁
+ * （通常子秒级）后完成，属可接受行为；若仍失败仅记 warn，不影响扫描结果。
+ * 不改动 openDatabaseIfNeeded 关闭旧连接时的 PASSIVE 检查点（扫描中路径）。
+ */
+async function finalizeScanCheckpoint(): Promise<void> {
+  if (!db) return
+  try {
+    // P2-2：扫描写入已结束，用 TRUNCATE 收缩 WAL 文件（仅在收尾、连接空闲时调用）
+    walCheckpoint(db, 'TRUNCATE')
+  } catch (err) {
+    workerLog(
+      'warn',
+      // eslint-disable-next-line no-restricted-syntax -- 诊断日志，worker 进程早于 i18n 初始化，日志仍须可读
+      '[Scanner] 扫描收尾 WAL checkpoint(TRUNCATE) 失败（不影响扫描结果）',
+      err instanceof Error ? err.message : String(err)
+    )
+  }
 }
 
 /**
@@ -1093,7 +1185,7 @@ async function startScan(
   // 修复旧数据 V5：将误归 launcher 的 X6Game/ScreenShot、X6Game/Video 游戏媒体重分类为 game（图库）
   if (repairOk && db) repairOk = repairLegacyDataV5(db, workerLog)
   // 修复旧数据 V6：为存量 HQ 记录回填游戏原生低清缩略图（thumbnail → 同名 LQ 文件）
-  if (repairOk && db) repairOk = repairLegacyDataV6(db, workerLog)
+  if (repairOk && db) repairOk = await repairLegacyDataV6(db, workerLog)
 
   try {
     // 全盘扫描模式：直接全盘搜索媒体特征文件夹，不依赖游戏目录查找
@@ -1128,12 +1220,15 @@ async function startScan(
       // T02：扫描完成后执行文件完整性校验
       // 全量扫描刚扫完文件必然存在，仅增量扫描需检查文件是否被外部移动/删除
       if (options?.incremental) {
-        await checkMissingFiles()
+        // T02 修复：仅校验本次全盘扫描覆盖的根集合，避免全库磁盘访问
+        await checkMissingFiles(mediaDirs)
       }
 
       progress.status = 'completed'
       updateScanHistory(scanId, 'completed', totalFiles, totalSaved)
 
+      // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
+      await finalizeScanCheckpoint()
       return {
         success: true,
         message: `全盘扫描完成，扫描 ${mediaDirs.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
@@ -1165,11 +1260,14 @@ async function startScan(
 
         // 全量扫描刚扫完文件必然存在，仅增量扫描需检查文件是否被外部移动/删除
         if (options?.incremental) {
-          await checkMissingFiles()
+          // T02 修复：仅校验本次自动发现覆盖的根集合，避免全库磁盘访问
+          await checkMissingFiles(gameDirs)
         }
         progress.status = 'completed'
         updateScanHistory(scanId, 'completed', totalFiles, totalSaved)
 
+        // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
+        await finalizeScanCheckpoint()
         return {
           success: true,
           message: `扫描完成，扫描 ${gameDirs.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
@@ -1191,12 +1289,15 @@ async function startScan(
     // T02：扫描完成后执行文件完整性校验
     // 全量扫描刚扫完文件必然存在，仅增量扫描需检查文件是否被外部移动/删除
     if (options?.incremental) {
-      await checkMissingFiles()
+      // T02 修复：仅校验本次单目录导入覆盖的根，避免全库磁盘访问
+      await checkMissingFiles([targetPath])
     }
 
     progress.status = 'completed'
     updateScanHistory(scanId, 'completed', files.length, savedCount)
 
+    // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
+    await finalizeScanCheckpoint()
     return {
       success: true,
       message: `扫描完成，发现 ${files.length} 个媒体文件，新增 ${savedCount} 个`,
@@ -1222,7 +1323,7 @@ async function startScan(
 // 都可能先后触发本函数：db 已 close 后重复 close 抛错虽被 try 吞掉，但日志混乱；
 // 置位后其余调用直接返回（process.exit 本身幂等，此处只为清理动作只执行一次）
 let isExiting = false
-function cleanupAndExit(): void {
+function cleanupAndExit(graceful = false): void {
   if (isExiting) return
   isExiting = true
   // 停止心跳定时器，避免清理过程中（dispose 停发 ping 导致超时）再次触发本函数
@@ -1240,7 +1341,16 @@ function cleanupAndExit(): void {
   try {
     killAllProcesses('SIGKILL')
   } catch {}
-  process.exit(0)
+  if (graceful) {
+    // 新增：DISPOSE 正常退出——先回发确认表示 DB 句柄已释放，主进程据此可安全 rename 还原。
+    // 用 setImmediate 延迟 process.exit，确保 IPC 消息在事件循环中被写出，避免同步 process.exit 截断未发送的消息。
+    try {
+      sendEvent({ type: 'WORKER_DISPOSED' })
+    } catch {}
+    setImmediate(() => process.exit(0))
+  } else {
+    process.exit(0)
+  }
 }
 
 // ============ 消息处理 ============
@@ -1266,7 +1376,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
   } else if (msg.type === 'SCAN_STOP') {
     shouldStop = true
   } else if (msg.type === 'SCAN_DISPOSE') {
-    cleanupAndExit()
+    cleanupAndExit(true)
   } else if (msg.type === 'WORKER_PING') {
     // R14：收到主进程心跳，刷新时间戳
     lastPingTime = Date.now()

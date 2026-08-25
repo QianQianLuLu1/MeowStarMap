@@ -4,7 +4,7 @@
  * @coverage 迁移幂等早退 / 候选条件（thumbnail NULL 或 %thumbnails%）/ LQ 存在才回填 /
  *           LQ 缺失不回填 / 非游戏行不受影响 / 标记容错 / 异常返回 false
  * @dependencies better-sqlite3（mock，与 repair-legacy-data-v5.test.ts 同源；native 模块为
- *               Electron 编译无法在 vitest/node 运行）+ 真实临时文件（fs.existsSync 走真实磁盘）
+ *               Electron 编译无法在 vitest/node 运行）+ 真实临时文件（fs.promises.access 走真实磁盘）
  * @remarks 验证"存量 HQ 记录回填游戏原生低清缩略图（同名 LQ 文件路径）"的分支行为
  */
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
@@ -29,12 +29,11 @@ interface MockDb {
   _setQueryFailer: (failer: (() => void) | null) => void
 }
 
-// V6 的候选条件（与 repair-legacy-data-v6.ts 中 SQL 完全一致，用于 mock 过滤）
-function isV6Candidate(row: MediaRow): boolean {
-  const thumbnailOk = row.thumbnail === null || row.thumbnail.includes('thumbnails')
-  if (!thumbnailOk) return false
-  const norm = row.file_path.replace(/\\/g, '/').toLowerCase()
-  return /\/x6game\/saved\/gameplayphotos\/.*\/nikkiphotos_highquality\//.test(norm)
+// 复现被测函数 JS 层路径过滤口径（与 repair-legacy-data-v6.ts 的 HQ_GALLERY_RE 一致），
+// 用于断言"非游戏/同名用户目录在候选收窄后仍被 JS 层剔除"（见用例 4）。
+// mock 的 all 仅按 thumbnail 列收窄（与函数内 SQL 一致），不再做路径正则过滤。
+function isThumbnailCandidate(row: MediaRow): boolean {
+  return row.thumbnail === null || (row.thumbnail ?? '').includes('thumbnails')
 }
 
 function createMockDb(opts: { withMigrationsTable?: boolean } = {}): MockDb {
@@ -62,14 +61,14 @@ function createMockDb(opts: { withMigrationsTable?: boolean } = {}): MockDb {
         }
       }
 
-      // V6 的候选查询：(thumbnail IS NULL OR thumbnail LIKE '%thumbnails%') 且 HQ 路径命中
+      // V6 的候选查询：仅按 thumbnail 收窄（IS NULL / 前缀 LIKE），路径特征由被测函数 JS 层过滤
       if (lower.includes('thumbnail is null') && lower.includes('from media_files')) {
         return {
           get: vi.fn(),
           all: vi.fn(() => {
             if (queryFailer) queryFailer()
             return mediaFiles
-              .filter(isV6Candidate)
+              .filter(isThumbnailCandidate)
               .map((f) => ({ id: f.id, file_path: f.file_path }))
           }),
           run: vi.fn()
@@ -161,13 +160,13 @@ afterAll(async () => {
   await fs.promises.rm(tmpRoot, { recursive: true, force: true }).catch(() => {})
 })
 
-describe('repairLegacyDataV6', () => {
-  it('1. 存量 HQ 行 + 同名 LQ 存在 → 回填为 LQ 路径', () => {
+describe('repairLegacyDataV6', async () => {
+  it('1. 存量 HQ 行 + 同名 LQ 存在 → 回填为 LQ 路径', async () => {
     const mock = createMockDb()
     const id = insertRow(mock, hqWithLq, null)
 
     const log = vi.fn()
-    const result = repairLegacyDataV6(mock.db, log)
+    const result = await repairLegacyDataV6(mock.db, log)
 
     expect(result).toBe(true)
     expect(mock._updateCalls).toEqual([{ id, thumbnail: lqOfA }])
@@ -176,12 +175,12 @@ describe('repairLegacyDataV6', () => {
     expect(mock._migrations.has('repair_legacy_data_v6')).toBe(true)
   })
 
-  it('2. LQ 缺失 → 不回填（仍写迁移标记，返回 true）', () => {
+  it('2. LQ 缺失 → 不回填（仍写迁移标记，返回 true）', async () => {
     const mock = createMockDb()
     insertRow(mock, hqNoLq, null)
 
     const log = vi.fn()
-    const result = repairLegacyDataV6(mock.db, log)
+    const result = await repairLegacyDataV6(mock.db, log)
 
     expect(result).toBe(true)
     expect(mock._updateCalls).toHaveLength(0)
@@ -189,12 +188,12 @@ describe('repairLegacyDataV6', () => {
     expect(log).not.toHaveBeenCalled()
   })
 
-  it('3. 幂等：重复执行第二次直接跳过（迁移标记早退）', () => {
+  it('3. 幂等：重复执行第二次直接跳过（迁移标记早退）', async () => {
     const mock = createMockDb()
     insertRow(mock, hqWithLq, null)
 
-    const first = repairLegacyDataV6(mock.db, vi.fn())
-    const second = repairLegacyDataV6(mock.db, vi.fn())
+    const first = await repairLegacyDataV6(mock.db, vi.fn())
+    const second = await repairLegacyDataV6(mock.db, vi.fn())
 
     expect(first).toBe(true)
     expect(second).toBe(true)
@@ -202,7 +201,7 @@ describe('repairLegacyDataV6', () => {
     expect(mock._updateCalls).toHaveLength(1)
   })
 
-  it('4. 非游戏路径行不受影响（无 UPDATE）', () => {
+  it('4. 非游戏路径行不受影响（无 UPDATE）', async () => {
     const mock = createMockDb()
     insertRow(mock, NON_GAME_PATH, null)
     // 评审收紧：同名但无 \X6Game\Saved\ 前缀的用户目录同样不命中候选条件（即使 LQ 存在）
@@ -212,29 +211,29 @@ describe('repairLegacyDataV6', () => {
     insertRow(mock, hqWithLq, lqLinked)
 
     const log = vi.fn()
-    const result = repairLegacyDataV6(mock.db, log)
+    const result = await repairLegacyDataV6(mock.db, log)
 
     expect(result).toBe(true)
     expect(mock._updateCalls).toHaveLength(0)
     expect(log).not.toHaveBeenCalled()
   })
 
-  it('5. thumbnail 指向生成缩略图目录（%thumbnails%）的 HQ 行同样回填', () => {
+  it('5. thumbnail 指向生成缩略图目录（%thumbnails%）的 HQ 行同样回填', async () => {
     const mock = createMockDb()
     const id = insertRow(mock, hqWithLq, 'C:\\userdata\\thumbnails\\abc.jpg')
 
-    const result = repairLegacyDataV6(mock.db, vi.fn())
+    const result = await repairLegacyDataV6(mock.db, vi.fn())
 
     expect(result).toBe(true)
     expect(mock._updateCalls).toEqual([{ id, thumbnail: lqOfA }])
   })
 
-  it('6. schema_migrations 缺失降级：主流程仍执行，标记失败仅 warn', () => {
+  it('6. schema_migrations 缺失降级：主流程仍执行，标记失败仅 warn', async () => {
     const mock = createMockDb({ withMigrationsTable: false })
     insertRow(mock, hqWithLq, null)
 
     const log = vi.fn()
-    const result = repairLegacyDataV6(mock.db, log)
+    const result = await repairLegacyDataV6(mock.db, log)
 
     expect(result).toBe(true)
     expect(mock._updateCalls).toHaveLength(1)
@@ -245,7 +244,7 @@ describe('repairLegacyDataV6', () => {
     )
   })
 
-  it('7. 主流程异常时 log error 且返回 false', () => {
+  it('7. 主流程异常时 log error 且返回 false', async () => {
     const mock = createMockDb()
     insertRow(mock, hqWithLq, null)
     mock._setQueryFailer(() => {
@@ -253,7 +252,7 @@ describe('repairLegacyDataV6', () => {
     })
 
     const log = vi.fn()
-    const result = repairLegacyDataV6(mock.db, log)
+    const result = await repairLegacyDataV6(mock.db, log)
 
     expect(result).toBe(false)
     expect(mock._updateCalls).toHaveLength(0)
@@ -265,7 +264,7 @@ describe('repairLegacyDataV6', () => {
     )
   })
 
-  it('8. 标记迁移 INSERT 失败仅 log warn 且仍返回 true', () => {
+  it('8. 标记迁移 INSERT 失败仅 log warn 且仍返回 true', async () => {
     const mock = createMockDb()
     insertRow(mock, hqWithLq, null)
     mock._setMarkFailer(() => {
@@ -273,7 +272,7 @@ describe('repairLegacyDataV6', () => {
     })
 
     const log = vi.fn()
-    const result = repairLegacyDataV6(mock.db, log)
+    const result = await repairLegacyDataV6(mock.db, log)
 
     expect(result).toBe(true)
     expect(mock._updateCalls).toHaveLength(1)

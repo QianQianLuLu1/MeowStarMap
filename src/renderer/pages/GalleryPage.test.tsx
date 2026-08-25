@@ -208,7 +208,7 @@ describe('GalleryPage 图库空状态区分从未扫描/已扫描无截图（T4/
     const block = galleryPageSrc.slice(blockStart, blockStart + 900)
 
     expect(block).toContain('window.electronAPI?.scanner')
-    expect(block).toContain('api.status()')
+    expect(block).toContain('.status()')
     expect(block).toContain("'completed'")
     expect(block).toContain("'failed'")
     expect(block).toContain('setHasScanned(true)')

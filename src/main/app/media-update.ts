@@ -90,7 +90,7 @@ export function notifyMediaUpdated(ctx: AppContext): void {
       // Slice 7c-fix：写入逻辑收口到 MediaRepository.refreshMediaCountCache，消除双写路径
       // 数据库写操作进程拆分：refreshMediaCountCache 改为 async（写操作走 worker 进程）
       // 此处 fire-and-forget：notifyMediaUpdated 是同步 void 方法，不能 await；缓存更新失败不影响主流程
-      // R5：刷新失败时显式调用 markMediaCountDirty 标记缓存失效，下次 listMedia 检测到 dirty=1
+      // R5：刷新失败时显式调用 markMediaCountStale 标记缓存过期，下次 listMedia 检测到 stale=1
       // 走真实 COUNT 并重建缓存；不再静默吞错让 total 长期陈旧
       try {
         const db = ctx.dbManager.getDatabase()
@@ -102,8 +102,8 @@ export function notifyMediaUpdated(ctx: AppContext): void {
           )
           void repo.refreshMediaCountCache().catch(() => {
             // 刷新失败：标记缓存失效，下次读取回退到真实 COUNT
-            void repo.markMediaCountDirty().catch(() => {
-              // dirty 标记写入也失败（worker 持续故障）：维持现状，下次 listMedia 仍走缓存
+            void repo.markMediaCountStale().catch(() => {
+              // stale 标记写入也失败（worker 持续故障）：维持现状，下次 listMedia 仍走缓存
               // 接受这一最坏情况——DB 写入完全不可用时缓存陈旧是次要问题
             })
           })

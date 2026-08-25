@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { SQLITE_MAX_VARIABLE_NUMBER, SQL_IN_SAFE_CEILING, SQL_IN_CHUNK_SIZE } from './sql-chunk'
 
 /**
  * MediaRepository 单元测试
@@ -319,7 +320,9 @@ class MockDatabase {
     const selectMatch = sql.match(
       /SELECT\s+([\s\S]+?)\s+FROM\s+(\w+)(?:\s+WHERE\s+([\s\S]+?))?(?:\s+GROUP\s+BY\s+([\s\S]+?))?(?:\s+ORDER\s+BY\s+([\s\S]+?))?(?:\s+LIMIT\s+(\d+|\?)(?:\s+OFFSET\s+(\d+|\?))?)?$/i
     )
-    if (!selectMatch) return []
+    if (!selectMatch) {
+      return []
+    }
 
     const [, selectClause, tableName, whereClause, groupByClause, orderByClause, limit, offset] =
       selectMatch
@@ -536,94 +539,202 @@ class MockDatabase {
 
   /**
    * 简化的 WHERE 匹配器
-   * 支持：col = ?、col IS NULL、col IS NOT NULL、col != ''、col > ?、col IN (?, ?, ?)
-   * 支持 AND 连接
+   * 支持：col = ?、col < ?、col > ?、col IS NULL、col IS NOT NULL、col != ''、col IN (?, ?, ?)
+   * 支持 AND 连接，以及顶层 OR 与括号分组（用于 keyset 游标的
+   * `(sortCol < ? OR (sortCol = ? AND id < ?))` 形态）
+   * 参数绑定按出现顺序从 params 头开始消费（与 better-sqlite3 位置参数一致）。
    */
   private matchWhere(row: MockRow, whereClause: string, params: unknown[]): boolean {
-    // 标准化：去除 'WHERE' 前缀（如有）
     const clause = whereClause.trim().replace(/^WHERE\s+/i, '')
-
-    // 拆分 AND（不在括号内）
-    const conditions = clause.split(/\s+AND\s+/i)
-
+    // 顶层 OR 拆分（不在括号内）
+    const orGroups = this.splitTopLevel(clause, /\s+OR\s+/i)
     let paramIdx = 0
-    for (const cond of conditions) {
-      const trimmed = cond.trim()
-      // col = ?
-      if (/^\w+\s*=\s*\?$/.test(trimmed)) {
-        const col = trimmed.split(/\s*=\s*/)[0].trim()
-        if (row[col] !== params[paramIdx++]) return false
+    // 任一 OR 分组为真即整体为真
+    const groupResults = orGroups.map((group) => {
+      const andConds = this.splitTopLevel(group, /\s+AND\s+/i)
+      for (const cond of andConds) {
+        const matched = this.evalCondition(row, cond.trim(), params, paramIdx)
+        if (matched === null) {
+          // 未识别：保守视为真，不推进 paramIdx（交由后续识别条件消费）
+          continue
+        }
+        const [ok, nextIdx] = matched
+        paramIdx = nextIdx
+        if (!ok) return false
       }
-      // col = 'literal'
-      else if (/^\w+\s*=\s*'[^']*'$/.test(trimmed)) {
-        const m = trimmed.match(/^(\w+)\s*=\s*'([^']*)'$/)
-        if (m && row[m[1]] !== m[2]) return false
+      return true
+    })
+    return groupResults.some((r) => r === true)
+  }
+
+  /**
+   * 按分隔符（正则）在「不在括号内」的顶层位置拆分字符串。
+   * 括号深度通过左右括号计数维护；分隔符匹配使用 sticky 正则从当前位置尝试，
+   * 避免逐字符匹配多字符分隔符失败的坑。
+   */
+  private splitTopLevel(input: string, sep: RegExp): string[] {
+    const parts: string[] = []
+    let depth = 0
+    let current = ''
+    // 以 sticky 模式在 i 处尝试匹配分隔符
+    const re = new RegExp(sep.source, sep.flags.includes('g') ? sep.flags : sep.flags + 'y')
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i]
+      if (ch === '(') {
+        depth++
+        current += ch
+        continue
       }
-      // col IN (?, ?, ...)
-      else if (/^\w+\s+IN\s*\(([^)]+)\)$/i.test(trimmed)) {
-        const m = trimmed.match(/^(\w+)\s+IN\s*\(([^)]+)\)$/i)
-        if (!m) return false
-        const col = m[1]
-        const placeholders = m[2].split(',').map((s) => s.trim())
-        const values = placeholders.map(() => params[paramIdx++])
-        if (!values.includes(row[col])) return false
+      if (ch === ')') {
+        depth = Math.max(0, depth - 1)
+        current += ch
+        continue
       }
-      // col IS NULL
-      else if (/^\w+\s+IS\s+NULL$/i.test(trimmed)) {
-        const col = trimmed.split(/\s+/)[0]
-        if (row[col] !== null && row[col] !== undefined) return false
-      }
-      // col IS NOT NULL
-      else if (/^\w+\s+IS\s+NOT\s+NULL$/i.test(trimmed)) {
-        const col = trimmed.split(/\s+/)[0]
-        if (row[col] === null || row[col] === undefined) return false
-      }
-      // col != '' (TEXT NOT NULL DEFAULT '其他')
-      else if (/^\w+\s*!=\s*''$/.test(trimmed)) {
-        const col = trimmed.split(/!=/)[0].trim()
-        if (row[col] === '') return false
-      }
-      // COALESCE(col, 'default') != 'literal' / = 'literal'
-      // 与默认视图 WHERE 一致：NULL 安全，NULL 视为 default
-      else if (/^COALESCE\s*\(\s*(\w+)\s*,\s*'([^']*)'\s*\)\s*(!=|=)\s*'([^']*)'$/i.test(trimmed)) {
-        const m = trimmed.match(
-          /^COALESCE\s*\(\s*(\w+)\s*,\s*'([^']*)'\s*\)\s*(!=|=)\s*'([^']*)'$/i
-        )
-        if (!m) return false
-        const [, col, def, op, literal] = m
-        const val = row[col] === null || row[col] === undefined ? def : row[col]
-        if (op === '!=') {
-          if (val === literal) return false
-        } else {
-          if (val !== literal) return false
+      if (depth === 0) {
+        re.lastIndex = i
+        const m = re.exec(input)
+        if (m && m.index === i) {
+          if (current.trim().length > 0) parts.push(current.trim())
+          current = ''
+          i += m[0].length - 1
+          continue
         }
       }
-      // col = 0 或 col = 1 (数值字面量)
-      else if (/^\w+\s*=\s*\d+$/.test(trimmed)) {
-        const m = trimmed.match(/^(\w+)\s*=\s*(\d+)$/)
-        if (m && row[m[1]] !== parseInt(m[2], 10)) return false
-      }
-      // colExpr LIKE ? ESCAPE '\'（路径前缀匹配，转义符为反斜杠）
-      else if (/^(.+?)\s+LIKE\s+\?\s+ESCAPE\s+'\\'\s*$/i.test(trimmed)) {
-        const m = trimmed.match(/^(.+?)\s+LIKE\s+\?\s+ESCAPE\s+'\\'\s*$/i)
-        if (!m) return false
-        const colExpr = m[1].trim()
-        const pattern = String(params[paramIdx++] ?? '')
-        let leftVal: string
-        if (colExpr === "LOWER(REPLACE(file_path, '\\', '/'))") {
-          leftVal = String(row.file_path ?? '')
-            .replace(/\\/g, '/')
-            .toLowerCase()
-        } else {
-          const colName = colExpr.replace(/^LOWER\(([\w.]+)\)$/i, '$1').trim()
-          leftVal = String(row[colName] ?? '')
-        }
-        if (!likeMatch(leftVal, pattern)) return false
-      }
-      // 其他未识别的条件：保守返回 true（避免误判）
-      // console.warn('未识别的 WHERE 条件:', trimmed)
+      current += ch
     }
-    return true
+    if (current.trim().length > 0) parts.push(current.trim())
+    return parts
+  }
+
+  /**
+   * 求值单个 AND 条件（可能是括号分组）。返回 [匹配结果, 消费参数后的新索引]；
+   * 无法识别则返回 null（调用方保守视为真且不消费参数）。
+   */
+  private evalCondition(
+    row: MockRow,
+    cond: string,
+    params: unknown[],
+    paramIdx: number
+  ): [boolean, number] | null {
+    // 括号分组：( ... ) → 组内按「顶层 OR 再 AND」求值（支持 keyset 的 (a < ? OR (a = ? AND id < ?))）
+    const groupMatch = cond.match(/^\(([\s\S]+)\)$/)
+    if (groupMatch) {
+      const inner = groupMatch[1]
+      const orGroups = this.splitTopLevel(inner, /\s+OR\s+/i)
+      let idx = paramIdx
+      const anyTrue = orGroups.some((g) => {
+        const andConds = this.splitTopLevel(g, /\s+AND\s+/i)
+        for (const c of andConds) {
+          const r = this.evalCondition(row, c.trim(), params, idx)
+          if (r === null) continue
+          idx = r[1]
+          if (!r[0]) return false
+        }
+        return true
+      })
+      return [anyTrue, idx]
+    }
+    // 逻辑非：NOT ( ... ) → 对子分组取反（子分组内仍按 OR/AND 求值）
+    const notMatch = cond.match(/^NOT\s+\(([\s\S]+)\)$/i)
+    if (notMatch) {
+      const inner = notMatch[1]
+      const orGroups = this.splitTopLevel(inner, /\s+OR\s+/i)
+      let idx = paramIdx
+      const anyTrue = orGroups.some((g) => {
+        const andConds = this.splitTopLevel(g, /\s+AND\s+/i)
+        for (const c of andConds) {
+          const r = this.evalCondition(row, c.trim(), params, idx)
+          if (r === null) continue
+          idx = r[1]
+          if (!r[0]) return false
+        }
+        return true
+      })
+      return [!anyTrue, idx]
+    }
+
+    let localIdx = paramIdx
+
+    // col < ? / col > ?（含 NULL 安全：NULL 视为最小，任何比较为 false 一侧）
+    let m = cond.match(/^(\w+)\s*(<|>)\s*\?$/)
+    if (m) {
+      const col = m[1]
+      const op = m[2]
+      const val = row[col]
+      const cmp = params[localIdx++]
+      if (val === null || val === undefined) return [false, localIdx]
+      const cmpStr = String(cmp)
+      const valStr = String(val)
+      const less = valStr < cmpStr
+      const greater = valStr > cmpStr
+      // 字典序比较（created_at 为 ISO 文本，id 为数值但统一按字符串比较不影响排序语义）
+      if (op === '<') return [less, localIdx]
+      return [greater, localIdx]
+    }
+    // col = ?
+    m = cond.match(/^(\w+)\s*=\s*\?$/)
+    if (m) {
+      const col = m[1]
+      return [row[col] === params[localIdx++], localIdx]
+    }
+    // col = 'literal'
+    m = cond.match(/^(\w+)\s*=\s*'([^']*)'$/)
+    if (m) {
+      return [row[m[1]] === m[2], localIdx]
+    }
+    // col IN (?, ?, ...)
+    m = cond.match(/^(\w+)\s+IN\s*\(([^)]+)\)$/i)
+    if (m) {
+      const col = m[1]
+      const placeholders = m[2].split(',').map((s) => s.trim())
+      const values = placeholders.map(() => params[localIdx++])
+      return [values.includes(row[col]), localIdx]
+    }
+    // col IS NULL
+    if (/^\w+\s+IS\s+NULL$/i.test(cond)) {
+      const col = cond.split(/\s+/)[0]
+      return [row[col] === null || row[col] === undefined, localIdx]
+    }
+    // col IS NOT NULL
+    if (/^\w+\s+IS\s+NOT\s+NULL$/i.test(cond)) {
+      const col = cond.split(/\s+/)[0]
+      return [!(row[col] === null || row[col] === undefined), localIdx]
+    }
+    // col != ''
+    if (/^\w+\s*!=\s*''$/.test(cond)) {
+      const col = cond.split(/!=/)[0].trim()
+      return [row[col] !== '', localIdx]
+    }
+    // COALESCE(col, 'default') != 'literal' / = 'literal'
+    m = cond.match(/^COALESCE\s*\(\s*(\w+)\s*,\s*'([^']*)'\s*\)\s*(!=|=)\s*'([^']*)'$/i)
+    if (m) {
+      const [, col, def, op, literal] = m
+      const val = row[col] === null || row[col] === undefined ? def : row[col]
+      return [op === '!=' ? val !== literal : val === literal, localIdx]
+    }
+    // col = 0 或 col = 1
+    m = cond.match(/^(\w+)\s*=\s*(\d+)$/)
+    if (m) {
+      return [row[m[1]] === parseInt(m[2], 10), localIdx]
+    }
+    // colExpr LIKE ? ESCAPE '\'
+    m = cond.match(/^(.+?)\s+LIKE\s+\?\s+ESCAPE\s+'\\'\s*$/i)
+    if (m) {
+      const colExpr = m[1].trim()
+      const pattern = String(params[localIdx++] ?? '')
+      let leftVal: string
+      if (colExpr === "LOWER(REPLACE(file_path, '\\', '/'))") {
+        leftVal = String(row.file_path ?? '')
+          .replace(/\\/g, '/')
+          .toLowerCase()
+      } else {
+        const colName = colExpr.replace(/^LOWER\(([\w.]+)\)$/i, '$1').trim()
+        leftVal = String(row[colName] ?? '')
+      }
+      return [likeMatch(leftVal, pattern), localIdx]
+    }
+    // 未识别：返回 null（调用方保守视为真）
+    return null
   }
 }
 
@@ -1194,6 +1305,42 @@ describe('MediaRepository', () => {
       expect(result.rows[0].file_path).toBe('/t/2.jpg')
     })
 
+    it('listMedia 传入 cursor 但 sortOrder=asc 应抛错（而非静默回退 offset 首页）', () => {
+      insertMedia(db, { file_path: '/t/1.jpg', is_deleted: 0 })
+      // cursor 与 ASC 混用是非法的 keyset 组合：必须显式抛错，不能静默忽略 cursor 返回首页数据
+      expect(() =>
+        repo.listMedia({ cursor: { sortValue: '2026-01-01 00:00:00', id: 1 }, sortOrder: 'asc' })
+      ).toThrow(/keyset cursor only supports DESC sort order/)
+    })
+
+    it('listMedia 不传 cursor（asc）走 offset 兼容路径不抛错', () => {
+      insertMedia(db, { file_path: '/t/1.jpg', is_deleted: 0 })
+      // 仅 asc 但无 cursor → 旧 offset 兼容路径，向后兼容插件桥/perf 脚本
+      expect(() => repo.listMedia({ sortOrder: 'asc', page: 0, pageSize: 10 })).not.toThrow()
+    })
+
+    // 回归：keyset 续页锚点拼接须守卫前导 AND。whereClause 为空（某 keyset 视图无基础过滤）
+    // 时必须用 'WHERE ' 而非 ' AND '，否则会拼出 'FROM media_files AND (...)' 非法 SQL（潜在崩溃）。
+    // 该分支经公共 API 当前不可达（所有 keyset 视图均带基础过滤），故直接对纯函数做单测触达。
+    describe('buildKeysetClauseWithAnchor 前导 AND 守卫', () => {
+      const buildKeysetClauseWithAnchor = (
+        MediaRepository as unknown as {
+          buildKeysetClauseWithAnchor(whereClause: string, anchorExpr: string): string
+        }
+      ).buildKeysetClauseWithAnchor
+      const anchor = '(rating IS NULL AND id < ?)'
+
+      it('空 whereClause 时使用 WHERE 前缀（避免 FROM media_files AND (...)）', () => {
+        expect(buildKeysetClauseWithAnchor('', anchor)).toBe(`WHERE ${anchor}`)
+      })
+
+      it('非空 whereClause 时使用 AND 前缀（保持现有视图行为）', () => {
+        expect(buildKeysetClauseWithAnchor('WHERE is_deleted = 0', anchor)).toBe(
+          `WHERE is_deleted = 0 AND ${anchor}`
+        )
+      })
+    })
+
     it('listMedia 分页：usePagination=true 时返回 total/page/pageSize', () => {
       for (let i = 0; i < 5; i++) {
         insertMedia(db, { file_path: `/t/${i}.jpg`, is_deleted: 0 })
@@ -1203,6 +1350,319 @@ describe('MediaRepository', () => {
       expect(result.total).toBe(5)
       expect(result.page).toBe(0)
       expect(result.pageSize).toBe(2)
+    })
+
+    // 性能重构：keyset 深分页游标（created_at DESC, id DESC）
+    it('listMedia keyset 游标：首页返回 nextCursor，续页按游标推进', () => {
+      const created: string[] = []
+      for (let i = 0; i < 5; i++) {
+        const c = `2026-01-0${i + 1} 00:00:00`
+        created.push(c)
+        insertMedia(db, { file_path: `/t/${i}.jpg`, created_at: c, is_deleted: 0 })
+      }
+      // 首页 cursor=null
+      const p1 = repo.listMedia({ cursor: null, pageSize: 2 })
+      expect(p1.rows).toHaveLength(2)
+      expect(p1.hasMore).toBe(true)
+      expect(p1.nextCursor).not.toBeNull()
+      // 首页应为 created_at 最新两条（DESC）：2026-01-05、2026-01-04
+      expect(p1.rows[0].file_path).toBe('/t/4.jpg')
+      expect(p1.rows[1].file_path).toBe('/t/3.jpg')
+
+      // 续页：用首页末行 (2026-01-04, id) 作游标
+      const p2 = repo.listMedia({ cursor: p1.nextCursor, pageSize: 2 })
+      expect(p2.rows).toHaveLength(2)
+      // 跳过已展示的两条，剩下 created_at=01-03 / 01-02
+      expect(p2.rows[0].file_path).toBe('/t/2.jpg')
+      expect(p2.rows[1].file_path).toBe('/t/1.jpg')
+      // p2 仍有下一页（id0 未取完）→ hasMore=true 且 nextCursor 非空
+      expect(p2.hasMore).toBe(true)
+      expect(p2.nextCursor).not.toBeNull()
+      // 第三页取尽剩余（id0），nextCursor 归 null
+      const p3 = repo.listMedia({ cursor: p2.nextCursor, pageSize: 2 })
+      expect(p3.rows.map((r) => r.file_path)).toEqual(['/t/0.jpg'])
+      expect(p3.hasMore).toBe(false)
+      expect(p3.nextCursor).toBeNull()
+    })
+
+    it('listMedia keyset 游标：同排序键用 id 作 tie-breaker 去重', () => {
+      // 同一 created_at 的多条记录，游标按 (created_at, id) 精确推进，避免重复/遗漏
+      for (let i = 0; i < 4; i++) {
+        insertMedia(db, {
+          file_path: `/t/${i}.jpg`,
+          created_at: '2026-01-01 00:00:00',
+          is_deleted: 0
+        })
+      }
+      const p1 = repo.listMedia({ cursor: null, pageSize: 2 })
+      expect(p1.rows).toHaveLength(2)
+      expect(p1.nextCursor?.sortValue).toBe('2026-01-01 00:00:00')
+      const p2 = repo.listMedia({ cursor: p1.nextCursor, pageSize: 2 })
+      // 续页不应重复首页两条，且收齐剩余两条（id2, id1）
+      const ids1 = new Set(p1.rows.map((r) => r.id))
+      const ids2 = new Set(p2.rows.map((r) => r.id))
+      expect([...ids1].some((id) => ids2.has(id))).toBe(false)
+      expect(p2.rows).toHaveLength(2)
+      // 同排序键下 id 作 tie-breaker：4 行分两页恰好取尽 → p2 为末页
+      expect(p2.hasMore).toBe(false)
+      expect(p2.nextCursor).toBeNull()
+    })
+
+    it('listMedia keyset 游标：首页返回 total（命中默认视图缓存优先）', async () => {
+      await repo.setMediaCountCache(7)
+      for (let i = 0; i < 3; i++) {
+        insertMedia(db, { file_path: `/t/${i}.jpg`, is_deleted: 0 })
+      }
+      const p1 = repo.listMedia({ cursor: null, pageSize: 2 })
+      // 首页 total 取缓存值（避免 O(n) COUNT），续页不再返回 total
+      expect(p1.total).toBe(7)
+      const p2 = repo.listMedia({ cursor: p1.nextCursor, pageSize: 2 })
+      expect(p2.total).toBeUndefined()
+      expect(p2.nextCursor).toBeNull()
+    })
+
+    it('listMedia 同时传 page 与 cursor 时优先使用 cursor（keyset）', () => {
+      for (let i = 0; i < 4; i++) {
+        insertMedia(db, {
+          file_path: `/t/${i}.jpg`,
+          created_at: `2026-01-0${i + 1} 00:00:00`,
+          is_deleted: 0
+        })
+      }
+      const r = repo.listMedia({
+        page: 0,
+        pageSize: 4,
+        cursor: { sortValue: '2026-01-04 00:00:00', id: 999 }
+      })
+      // 不应返回 created_at=01-04 及更新的 01-05（被游标排除）
+      expect(
+        r.rows.every(
+          (row) =>
+            row.created_at < '2026-01-04 00:00:00' ||
+            (row.created_at === '2026-01-04 00:00:00' && row.id < 999)
+        )
+      ).toBe(true)
+    })
+
+    // 回归：可空排序列（rating 允许 NULL）按 DESC 排尾，keyset 续页锚点 sortValue===null 时
+    // 不能静默丢行。旧实现 `(rating < NULL OR rating = NULL AND id < ?)` 在 SQL 中恒为 NULL（false）
+    // → 末页返回 0 行、分页提前终止、尾部 NULL 行丢失。修复后 null 锚点走专用 IS NULL 分支。
+    it('listMedia keyset 游标：rating 降序含 NULL 行，续页不丢尾', () => {
+      // 非 NULL 评分 5/4/3/2/1 各一行 + 两行 rating NULL（共 7 行）
+      const ratings: Array<number | null> = [5, 4, null, 3, 2, null, 1]
+      ratings.forEach((r, i) => {
+        insertMedia(db, { file_path: `/t/${i}.jpg`, rating: r, is_deleted: 0 })
+      })
+      // 逐页翻完，收集全部 id，验证无重复、无遗漏（含排尾的 NULL 行）
+      const seen = new Set<number>()
+      let cursor: { sortValue: string | number | null; id: number } | null = null
+      let pages = 0
+      do {
+        const page = repo.listMedia({ cursor, pageSize: 2, sortBy: 'rating', sortOrder: 'desc' })
+        page.rows.forEach((row) => {
+          expect(seen.has(row.id)).toBe(false)
+          seen.add(row.id)
+        })
+        cursor = page.nextCursor
+        pages++
+      } while (cursor !== null && pages < 20)
+      expect(seen.size).toBe(7)
+    })
+
+    it('listMedia keyset 游标：rating 排尾 NULL 行按 id 推进（null 锚点分支）', () => {
+      // 三行 rating NULL（id 递增），确保 NULL 行聚集在 rating DESC 视图末位
+      for (let i = 0; i < 3; i++) {
+        insertMedia(db, { file_path: `/null/${i}.jpg`, rating: null, is_deleted: 0 })
+      }
+      insertMedia(db, { file_path: `/r5.jpg`, rating: 5, is_deleted: 0 })
+      // 取最大 NULL 行 id（DESC + id DESC → 最大 id 排前）作为锚点
+      const allRows = repo.listMedia({
+        cursor: null,
+        pageSize: 100,
+        sortBy: 'rating',
+        sortOrder: 'desc'
+      }).rows
+      const nullRows = allRows.filter((r) => r.rating === null)
+      expect(nullRows.length).toBe(3)
+      const maxId = nullRows[0].id
+      // 以 null 锚点 + 最大 NULL 行 id 续页（pageSize=1 强制分页）：应返回 id 更小的一个 NULL 行，且仍有后续
+      const page = repo.listMedia({
+        cursor: { sortValue: null, id: maxId },
+        pageSize: 1,
+        sortBy: 'rating',
+        sortOrder: 'desc'
+      })
+      expect(page.rows.length).toBe(1)
+      expect(page.rows[0].rating).toBeNull()
+      expect(page.rows[0].id).toBeLessThan(maxId)
+      expect(page.nextCursor).not.toBeNull()
+    })
+
+    // 回归：rating DESC keyset 续页的 sortValue 实为 number（修复"类型谎言"）。
+    // 验证① 续页游标 nextCursor.sortValue 运行时为 number；
+    // 验证② 即使传入"字符串化数值"（'3'）也能经 normalizeSortValue 归一为数字比较，
+    //       与传入真实 number 3 的结果一致，消除 `col < '3'` vs `col < 3` 边界错位隐患。
+    it('listMedia keyset 游标：rating DESC 续页 sortValue 为 number，字符串化数值被归一', () => {
+      // 注意：数据不含 rating=3 的行，使锚点 3 的 DESC 视图严格只剩 rating<3 的行（2、1），
+      // 避免 keyset `(rating = ? AND id < ?)` 把 rating=3 行本身也纳入，干扰断言。
+      const ratings = [5, 4, 2, 1]
+      ratings.forEach((r, i) => {
+        insertMedia(db, { file_path: `/num/${i}.jpg`, rating: r, is_deleted: 0 })
+      })
+      // 首页：rating=5 那行，nextCursor.sortValue 应为 number（非 string）
+      const p1 = repo.listMedia({ cursor: null, pageSize: 1, sortBy: 'rating', sortOrder: 'desc' })
+      expect(p1.rows[0].rating).toBe(5)
+      expect(typeof p1.nextCursor!.sortValue).toBe('number')
+      expect(p1.nextCursor!.sortValue).toBe(5)
+      // 用字符串化数值 '3' 作为锚点（模拟某路径把 number 字符串化），与真实 number 3 结果应一致
+      const byString = repo.listMedia({
+        cursor: { sortValue: '3', id: Number.MAX_SAFE_INTEGER },
+        pageSize: 10,
+        sortBy: 'rating',
+        sortOrder: 'desc'
+      })
+      const byNumber = repo.listMedia({
+        cursor: { sortValue: 3, id: Number.MAX_SAFE_INTEGER },
+        pageSize: 10,
+        sortBy: 'rating',
+        sortOrder: 'desc'
+      })
+      const idsString = byString.rows.map((r) => r.id).sort((a, b) => a - b)
+      const idsNumber = byNumber.rows.map((r) => r.id).sort((a, b) => a - b)
+      expect(idsString).toEqual(idsNumber)
+      // 锚点 rating=3 的 DESC 视图应仅返回 rating<3 的行（2 与 1），不含 4/5
+      expect(byNumber.rows.length).toBe(2)
+      expect(byNumber.rows.every((r) => r.rating < 3)).toBe(true)
+    })
+
+    // 确认：非 cursor 的 OFFSET/ASC fallback 分支完全不依赖 sortValue（仅 bind page/offset），
+    // 与 sortValue 数值类型无关。此处验证 ASC + OFFSET 分页机制正确（total/hasMore/无重叠覆盖），
+    // 以及 ASC 视图不读 sortValue（由 fail-fast 校验拦 cursor，已另有用例覆盖）。
+    it('listMedia OFFSET/ASC 分支不依赖 sortValue（偏移分页机制正确）', () => {
+      const ratings = [3, 1, 2, 5, 4]
+      const ids = ratings.map((r, i) =>
+        insertMedia(db, { file_path: `/asc/${i}.jpg`, rating: r, is_deleted: 0 })
+      )
+      const all = new Set(ids)
+      // ASC + offset 分页，跨页聚合（MockDatabase 不做 SQL 排序，仅校验分页机制，不校验顺序）
+      const collected = new Set<number>()
+      let hasMore = true
+      let pageNum = 0
+      let total = 0
+      while (hasMore && pageNum < 10) {
+        const page = repo.listMedia({
+          page: pageNum,
+          pageSize: 2,
+          sortBy: 'rating',
+          sortOrder: 'asc'
+        })
+        if (pageNum === 0) total = page.total
+        page.rows.forEach((row) => {
+          expect(collected.has(row.id)).toBe(false)
+          collected.add(row.id)
+        })
+        hasMore = page.hasMore
+        pageNum++
+      }
+      expect(total).toBe(5)
+      expect(collected.size).toBe(5)
+      // 跨页聚合应恰好覆盖全部 5 行，无重复、无遗漏（证明 OFFSET 推进与 sortValue 无关）
+      expect([...collected].sort((a, b) => a - b)).toEqual([...all].sort((a, b) => a - b))
+    })
+
+    // 性能重构：getSearchDocs 按主键 id 游标分块（取代 OFFSET），hasMore 由 docs.length===limit 判定
+    it('getSearchDocs 按 id 游标分块且 hasMore 由 docs.length===limit 判定', () => {
+      for (let i = 0; i < 5; i++) {
+        insertMedia(db, { file_path: `/t/${i}.jpg`, is_deleted: 0 })
+      }
+      const p1 = repo.getSearchDocs(undefined, 2, 0)
+      expect(p1.docs).toHaveLength(2)
+      expect(p1.hasMore).toBe(true)
+      // 游标推进：下一页从本页最大 id 之后开始
+      const maxId = p1.docs[p1.docs.length - 1].id
+      const p2 = repo.getSearchDocs(undefined, 2, maxId)
+      expect(p2.docs).toHaveLength(2)
+      // 不重复首页两条
+      const ids1 = new Set(p1.docs.map((d) => d.id))
+      expect(p2.docs.some((d) => ids1.has(d.id))).toBe(false)
+      const p3 = repo.getSearchDocs(undefined, 2, p2.docs[p2.docs.length - 1].id)
+      expect(p3.docs).toHaveLength(1)
+      expect(p3.hasMore).toBe(false)
+    })
+
+    it('getSearchDocs since 过滤 + 游标：仅返回 indexed_at > since 且 id > afterId', () => {
+      insertMedia(db, {
+        file_path: '/a.jpg',
+        file_name: '/a.jpg',
+        indexed_at: '2026-01-01 00:00:00',
+        is_deleted: 0
+      })
+      insertMedia(db, {
+        file_path: '/b.jpg',
+        file_name: '/b.jpg',
+        indexed_at: '2026-02-01 00:00:00',
+        is_deleted: 0
+      })
+      insertMedia(db, {
+        file_path: '/c.jpg',
+        file_name: '/c.jpg',
+        indexed_at: '2026-03-01 00:00:00',
+        is_deleted: 0
+      })
+      const since = '2026-01-15 00:00:00'
+      const p1 = repo.getSearchDocs(since, 10, 0)
+      // 排除 /a.jpg（indexed_at 不 > since）；按 id ASC 返回 b、c
+      expect(p1.docs.map((d) => d.file_name)).toEqual(['/b.jpg', '/c.jpg'])
+      expect(p1.hasMore).toBe(false)
+    })
+
+    // 回归：since 过滤掉「中间行」时，按 id 游标翻页必须无漏无重
+    // 构造 id 连续但 indexed_at 交错的数据：id 1/3/5 的 indexed_at ≤ since（被过滤），
+    // 2/4/6/7 的 indexed_at > since（保留）。用 limit=3 强制分页，验证翻过被过滤的
+    // 中间行（id 3、5）后仍能继续命中后续合格行，不会因 id > 末返回行而漏掉 4/6/7。
+    it('getSearchDocs since+afterId 组合：中间行被过滤时按 id 游标翻页无漏无重', () => {
+      const indexedAt = [
+        '2026-01-01 00:00:00', // id1  ≤ since → 过滤
+        '2026-02-01 00:00:00', // id2  > since → 保留
+        '2026-01-01 00:00:00', // id3  ≤ since → 过滤（中间行）
+        '2026-03-01 00:00:00', // id4  > since → 保留
+        '2026-01-01 00:00:00', // id5  ≤ since → 过滤（中间行）
+        '2026-04-01 00:00:00', // id6  > since → 保留
+        '2026-05-01 00:00:00' // id7  > since → 保留
+      ]
+      const ids = indexedAt.map((ia, i) =>
+        insertMedia(db, {
+          file_path: `/n${i + 1}.jpg`,
+          file_name: `/n${i + 1}.jpg`,
+          indexed_at: ia,
+          is_deleted: 0
+        })
+      )
+      const since = '2026-01-15 00:00:00'
+      const expectedKept = [ids[1], ids[3], ids[5], ids[6]] // 2,4,6,7
+
+      const all: number[] = []
+      let afterId = 0
+      let pages = 0
+      while (pages < 10) {
+        const res = repo.getSearchDocs(since, 3, afterId)
+        // 每页内部严格按 id 升序（不变量由仓储断言守卫）
+        for (let i = 1; i < res.docs.length; i++) {
+          expect(res.docs[i].id).toBeGreaterThan(res.docs[i - 1].id)
+        }
+        for (const d of res.docs) all.push(d.id)
+        afterId = res.docs.length > 0 ? res.docs[res.docs.length - 1].id : afterId
+        pages++
+        if (!res.hasMore) break
+      }
+
+      // 无重复、无漏：恰好返回全部 4 条合格行
+      expect([...new Set(all)]).toEqual(expect.arrayContaining(expectedKept))
+      expect(all).toHaveLength(expectedKept.length)
+      expect(all).toEqual(expectedKept)
+      // 被 since 过滤的中间行（id1/3/5）不得出现
+      const filtered = [ids[0], ids[2], ids[4]]
+      expect(all.some((id) => filtered.includes(id))).toBe(false)
     })
 
     it('listMedia 默认视图命中 media_count 缓存', async () => {
@@ -1661,8 +2121,8 @@ describe('MediaRepository', () => {
       })
 
       it('缓存在 isDefaultView 正确判定：mediaSource=launcher 脱离默认视图', async () => {
-        insertMedia(db, { file_path: '/t/1.jpg' })
-        insertMedia(db, { file_path: '/t/2.jpg' })
+        insertMedia(db, { file_path: '/t/1.jpg', media_source: 'launcher' })
+        insertMedia(db, { file_path: '/t/2.jpg', media_source: 'launcher' })
         await repo.setMediaCountCache(99)
         // mediaSource='launcher' 触发缓存视图条件，非默认视图走实时 COUNT
         db.exec(`
@@ -1673,42 +2133,42 @@ describe('MediaRepository', () => {
           );
         `)
         const result = repo.listMedia({ page: 0, pageSize: 10, mediaSource: 'launcher' })
-        // mock 放行全部行，但实时 COUNT 返回实际行数（=2），而非缓存值 99
+        // 非默认视图走实时 COUNT（=2），而非命中缓存值 99
         expect(result.total).toBe(2)
       })
     })
-    // R5：media_count 强一致改造（dirty 标记 + TTL + markMediaCountDirty）
+    // R5：media_count 强一致改造（stale 标记 + TTL + markMediaCountStale）
     // ==========================================================================
     describe('R5 media_count 强一致', () => {
       it('setMediaCountCache 原子写入 count/dirty/updated_at 三个 key', async () => {
         await repo.setMediaCountCache(7)
         const rows = db
           .prepare('SELECT key, value FROM app_settings WHERE key IN (?, ?, ?)')
-          .all('media_count', 'media_count_dirty', 'media_count_updated_at') as Array<{
+          .all('media_count', 'media_count_stale', 'media_count_updated_at') as Array<{
           key: string
           value: string
         }>
         const map = new Map(rows.map((r) => [r.key, r.value]))
         expect(map.get('media_count')).toBe('7')
-        expect(map.get('media_count_dirty')).toBe('0')
+        expect(map.get('media_count_stale')).toBe('0')
         expect(map.has('media_count_updated_at')).toBe(true)
       })
 
-      it('markMediaCountDirty 标记后 listMedia 走真实 COUNT 而非缓存', async () => {
+      it('markMediaCountStale 标记后 listMedia 走真实 COUNT 而非缓存', async () => {
         insertMedia(db, { file_path: '/t/1.jpg' })
         insertMedia(db, { file_path: '/t/2.jpg' })
         await repo.setMediaCountCache(99) // 缓存写为 99，但真实只有 2 条
-        await repo.markMediaCountDirty()
+        await repo.markMediaCountStale()
         const result = repo.listMedia({ page: 0, pageSize: 10 })
-        // dirty=1 → 缓存失效 → 走真实 COUNT
+        // stale=1 → 缓存失效 → 走真实 COUNT
         expect(result.total).toBe(2)
       })
 
-      it('markMediaCountDirty 后再次 setMediaCountCache 清除 dirty 标记', async () => {
+      it('markMediaCountStale 后再次 setMediaCountCache 清除 stale 标记', async () => {
         insertMedia(db, { file_path: '/t/1.jpg' })
         await repo.setMediaCountCache(50)
-        await repo.markMediaCountDirty()
-        // 重建缓存：dirty 应被重置为 0
+        await repo.markMediaCountStale()
+        // 重建缓存：stale 应被重置为 0
         await repo.setMediaCountCache(1)
         const result = repo.listMedia({ page: 0, pageSize: 10 })
         expect(result.total).toBe(1) // 命中缓存（1），不再走 COUNT
@@ -1736,7 +2196,7 @@ describe('MediaRepository', () => {
           JSON.stringify(99)
         )
         db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
-          'media_count_dirty',
+          'media_count_stale',
           JSON.stringify(0)
         )
         db.prepare('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)').run(
@@ -1757,13 +2217,13 @@ describe('MediaRepository', () => {
         // 二次读取应命中缓存
         const cachedRows = db
           .prepare('SELECT key, value FROM app_settings WHERE key IN (?, ?, ?)')
-          .all('media_count', 'media_count_dirty', 'media_count_updated_at') as Array<{
+          .all('media_count', 'media_count_stale', 'media_count_updated_at') as Array<{
           key: string
           value: string
         }>
         const map = new Map(cachedRows.map((r) => [r.key, r.value]))
         expect(map.get('media_count')).toBe('1')
-        expect(map.get('media_count_dirty')).toBe('0')
+        expect(map.get('media_count_stale')).toBe('0')
       })
     })
 
@@ -2503,7 +2963,7 @@ describe('MediaRepository', () => {
       }
     }
 
-    it('hardDeleteBatch 2000 个 id 全部删除，且每条 SQL 占位符 <= 500', async () => {
+    it('hardDeleteBatch 2000 个 id 全部删除，且每条 SQL 占位符 <= SQLITE_MAX_VARIABLE_NUMBER', async () => {
       const ids = insertBulk(BULK_COUNT)
       const sqls = await captureSql('DELETE FROM media_files WHERE id IN', () =>
         repo.hardDeleteBatch(ids)
@@ -2511,7 +2971,9 @@ describe('MediaRepository', () => {
 
       expect(sqls).toHaveLength(BULK_COUNT / CHUNK_SIZE)
       for (const sql of sqls) {
+        // 单条 IN 占位符必须远低于 999 上限，杜绝 "too many SQL variables"
         expect(inClauseSize(sql)).toBeLessThanOrEqual(CHUNK_SIZE)
+        expect(inClauseSize(sql)).toBeLessThan(SQLITE_MAX_VARIABLE_NUMBER)
       }
       const { count } = db.prepare('SELECT COUNT(*) as count FROM media_files').get() as {
         count: number
@@ -2526,10 +2988,38 @@ describe('MediaRepository', () => {
       )
 
       expect(sqls).toHaveLength(BULK_COUNT / CHUNK_SIZE)
+      for (const sql of sqls) {
+        // UPDATE 还额外带 is_deleted / deleted_at 绑定，故 IN 占位符须留余量
+        expect(inClauseSize(sql)).toBeLessThan(SQLITE_MAX_VARIABLE_NUMBER)
+      }
       const { count } = db
         .prepare('SELECT COUNT(*) as count FROM media_files WHERE is_deleted = 1')
         .get() as { count: number }
       expect(count).toBe(BULK_COUNT)
+    })
+
+    it('restoreBatch 2000 个 id 全部恢复，且每条 SQL 占位符 <= SQLITE_MAX_VARIABLE_NUMBER', async () => {
+      const ids = insertBulk(BULK_COUNT).map((id) => {
+        // 先软删，再恢复
+        db.prepare('UPDATE media_files SET is_deleted = 1, deleted_at = ? WHERE id = ?').run(
+          '2024-01-01 10:00:00',
+          id
+        )
+        return id
+      })
+      const sqls = await captureSql('UPDATE media_files SET is_deleted = 0', () =>
+        repo.restoreBatch(ids)
+      )
+
+      expect(sqls).toHaveLength(BULK_COUNT / CHUNK_SIZE)
+      for (const sql of sqls) {
+        expect(inClauseSize(sql)).toBeLessThanOrEqual(CHUNK_SIZE)
+        expect(inClauseSize(sql)).toBeLessThan(SQLITE_MAX_VARIABLE_NUMBER)
+      }
+      const { count } = db
+        .prepare('SELECT COUNT(*) as count FROM media_files WHERE is_deleted = 1')
+        .get() as { count: number }
+      expect(count).toBe(0)
     })
 
     it('getMediaPathsByIds 2000 个 id 查询结果完整合并', () => {
@@ -2558,6 +3048,26 @@ describe('MediaRepository', () => {
         repo.hardDeleteBatch(ids)
       )
       expect(sqls.map(inClauseSize)).toEqual([CHUNK_SIZE, 1])
+    })
+
+    it('1500 个 id（跨越 999 上限）分片为 3 片，单条不触上限', async () => {
+      const ids = insertBulk(1500)
+      const sqls = await captureSql('DELETE FROM media_files WHERE id IN', () =>
+        repo.hardDeleteBatch(ids)
+      )
+      expect(sqls).toHaveLength(3)
+      for (const sql of sqls) {
+        expect(inClauseSize(sql)).toBeLessThan(SQLITE_MAX_VARIABLE_NUMBER)
+      }
+      const { count } = db.prepare('SELECT COUNT(*) as count FROM media_files').get() as {
+        count: number
+      }
+      expect(count).toBe(0)
+    })
+
+    it('常量级不变量：SQL_IN_CHUNK_SIZE < SQL_IN_SAFE_CEILING < SQLITE_MAX_VARIABLE_NUMBER', () => {
+      expect(SQL_IN_CHUNK_SIZE).toBeLessThan(SQL_IN_SAFE_CEILING)
+      expect(SQL_IN_SAFE_CEILING).toBeLessThan(SQLITE_MAX_VARIABLE_NUMBER)
     })
   })
 

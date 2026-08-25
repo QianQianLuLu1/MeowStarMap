@@ -14,7 +14,7 @@
  * - onEvent：订阅 / 取消订阅 / 多 handler
  * - handleWorkerMessage：WORKER_READY / MEDIA_WORKER_LOG / 三类 PROGRESS / 三类 COMPLETE / WORKER_ERROR
  * - handleWorkerExit：正常/异常退出、三类任务运行中合成 fakeComplete
- * - dispose：DISPOSE → 500ms → kill、异常容错
+ * - dispose：DISPOSE → 等待 worker 回发确认（MEDIA_WORKER_DISPOSED，带 2000ms 超时兜底）→ kill、异常容错
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'events'
@@ -54,7 +54,16 @@ function createMockWorker(): UtilityProcess & {
     postMessage: ReturnType<typeof vi.fn>
     kill: ReturnType<typeof vi.fn>
   }
-  emitter.postMessage = vi.fn()
+  emitter.postMessage = vi.fn((cmd: unknown) => {
+    // 模拟 worker 处理完 MEDIA_WORKER_DISPOSE 后关闭 DB 句柄并回发确认（用微任务确保 disposeResolve 已就绪）
+    if (
+      cmd &&
+      typeof cmd === 'object' &&
+      (cmd as { type?: string }).type === 'MEDIA_WORKER_DISPOSE'
+    ) {
+      queueMicrotask(() => emitter.emit('message', { type: 'MEDIA_WORKER_DISPOSED' }))
+    }
+  })
   emitter.kill = vi.fn()
   return emitter
 }
@@ -898,5 +907,152 @@ describe('MediaWorkerBridge', () => {
       )
       expect(startCalls).toHaveLength(1) // 仅崩溃前用户发起的那一次
     })
+  })
+})
+
+describe('MediaWorkerBridge stopWorkerForRestore（自恢复期间可逆停 worker）', () => {
+  let bridge: MediaWorkerBridge
+  let mockWorker: ReturnType<typeof createMockWorker>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFork.mockReset()
+    mockWorker = createMockWorker()
+    mockFork.mockReturnValue(mockWorker)
+    bridge = new MediaWorkerBridge()
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    const dp = bridge.dispose().catch(() => {})
+    vi.advanceTimersByTime(500)
+    await dp
+    vi.useRealTimers()
+  })
+
+  it('发送 MEDIA_WORKER_DISPOSE 并 kill，kill 退出不自动重启', async () => {
+    const p = bridge.startThumbnailBatch('/db', '/cache', 'high')
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+    const forkBefore = mockFork.mock.calls.length
+
+    const stopP = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await stopP
+
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'MEDIA_WORKER_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+    // 模拟 kill 退出：被 terminatingForRestore 抑制，不应自动重启
+    mockWorker.emit('exit', null, 'SIGTERM')
+    expect(mockFork.mock.calls.length).toBe(forkBefore)
+  })
+
+  it('停止后不置 isDisposed，可重新 startThumbnailBatch 重建连接', async () => {
+    const p = bridge.startThumbnailBatch('/db', '/cache', 'high')
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+
+    const stopP = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await stopP
+    mockWorker.emit('exit', null, 'SIGTERM')
+
+    const mockWorker2 = createMockWorker()
+    mockFork.mockReturnValue(mockWorker2)
+    const p2 = bridge.startThumbnailBatch('/db', '/cache', 'high')
+    mockWorker2.emit('message', { type: 'WORKER_READY' })
+    await p2
+    // 重新 fork 成功 → 证明 isDisposed 未置位、连接可重建
+    expect(mockWorker2.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'THUMBNAIL_BATCH_START' })
+    )
+  })
+
+  it('无 worker 时 stopWorkerForRestore 为安全 no-op（启动期常见情形）', async () => {
+    await expect(bridge.stopWorkerForRestore()).resolves.toBeUndefined()
+  })
+
+  it('收到 MEDIA_WORKER_DISPOSED 后解除等待并立即 kill（不再盲等固定时长）', async () => {
+    const p = bridge.startThumbnailBatch('/db', '/cache', 'high')
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+
+    // 关闭 auto-ack，手动回发确认，验证确认消息驱动解除等待（而非等 2000ms 超时兜底）
+    mockWorker.postMessage = vi.fn()
+    const stopP = bridge.stopWorkerForRestore()
+    mockWorker.emit('message', { type: 'MEDIA_WORKER_DISPOSED' })
+    await stopP
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'MEDIA_WORKER_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+  })
+
+  it('worker 未回发确认时超时兜底仍会 kill（不永久阻塞）', async () => {
+    // 关闭 auto-ack：覆盖 postMessage 使其不回发确认
+    mockWorker.postMessage = vi.fn()
+    const p = bridge.startThumbnailBatch('/db', '/cache', 'high')
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+
+    const stopP = bridge.stopWorkerForRestore()
+    // 不回发确认：推进到 DISPOSE_CONFIRM_TIMEOUT_MS(2000) 触发超时兜底
+    await vi.advanceTimersByTimeAsync(2000)
+    await stopP
+    expect(mockWorker.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'MEDIA_WORKER_DISPOSE' })
+    )
+    expect(mockWorker.kill).toHaveBeenCalled()
+  })
+})
+
+describe('MediaWorkerBridge hasLiveWorker（自恢复并发边界探针）', () => {
+  let bridge: MediaWorkerBridge
+  let mockWorker: ReturnType<typeof createMockWorker>
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFork.mockReset()
+    mockWorker = createMockWorker()
+    mockFork.mockReturnValue(mockWorker)
+    bridge = new MediaWorkerBridge()
+    vi.useFakeTimers()
+  })
+
+  afterEach(async () => {
+    vi.useRealTimers()
+    vi.useFakeTimers()
+    const dp = bridge.dispose().catch(() => {})
+    vi.advanceTimersByTime(500)
+    await dp
+    vi.useRealTimers()
+  })
+
+  async function bootWorker(): Promise<void> {
+    const p = bridge.startThumbnailBatch('/db', '/cache', 'high')
+    mockWorker.emit('message', { type: 'WORKER_READY' })
+    await p
+  }
+
+  it('未启动 worker 时返回 false', () => {
+    expect(bridge.hasLiveWorker()).toBe(false)
+  })
+
+  it('worker 启动后返回 true', async () => {
+    await bootWorker()
+    expect(bridge.hasLiveWorker()).toBe(true)
+  })
+
+  it('stopWorkerForRestore 后（已收到 *_DISPOSED 或超时兜底 kill）返回 false', async () => {
+    await bootWorker()
+    expect(bridge.hasLiveWorker()).toBe(true)
+    const stopP = bridge.stopWorkerForRestore()
+    await vi.advanceTimersByTimeAsync(500)
+    await stopP
+    expect(bridge.hasLiveWorker()).toBe(false)
   })
 })

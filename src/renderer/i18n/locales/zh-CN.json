@@ -2892,6 +2892,11 @@
         "lockedByOtherProgram": "数据库文件被其他程序锁定（请关闭正在占用该文件的 SQLite 工具/备份软件后重启应用）: {{error}}\n重试错误：{{retryError}}",
         "openFailedAfterRecovery": "数据库打开失败（已尝试清理 WAL/SHM 与从备份恢复）：{{error}}\n重试错误：{{retryError}}",
         "initFailedNullHandle": "数据库初始化失败：db 句柄为 null",
+        "abiIncompatible": "数据库引擎（better-sqlite3）加载失败，可能与当前应用版本或原生模块不兼容。我们未改动您的数据库文件。请重新安装应用，或重建原生模块（rebuild native module，例如执行 npm rebuild better-sqlite3）后重试。错误：{{error}}",
+        "unknown": "数据库打开失败（原因未知）。我们未改动您的数据库文件，已保留现场供排查。请检查数据库文件是否损坏、磁盘空间与文件权限是否正常，或尝试重启/重新安装应用后重试。错误：{{error}}",
+        "permissionDenied": "数据库文件无写入权限（可能被其他程序占用或权限不足）。我们未改动您的数据库文件。请关闭占用该文件的程序或检查文件权限后重启应用。错误：{{error}}",
+        "diskFull": "磁盘空间不足，无法打开数据库。我们未改动您的数据库文件。请释放磁盘空间后重启应用。错误：{{error}}",
+        "databaseCorrupted": "数据库文件已损坏且无法从备份恢复：{{reason}}\n我们已保留损坏文件供排查，未做其他改动。",
         "migrationFailedRolledBack": "数据库迁移失败，已回滚到迁移前状态：{{error}}",
         "migrationRolledBackToBackup": "数据库迁移失败，已回滚到迁移前备份：{{filename}}",
         "rollbackToBackupFailed": "回滚到迁移前备份失败：{{error}}",
@@ -3120,6 +3125,7 @@
         "noBackupToRestore": "无可用备份，无法恢复",
         "restoreFailedPlain": "恢复失败: {{reason}}",
         "backupNotExist": "备份文件不存在: {{filename}}",
+        "pathTraversalDenied": "备份路径越界，已拒绝: {{filename}}",
         "backupCorrupted": "备份文件已损坏，无法恢复: {{reason}}",
         "restoreFailedRelaunch": "恢复失败: {{reason}}，应用将重启以恢复可用状态"
       },
@@ -3449,11 +3455,13 @@
     "recovery": {
       "title": {
         "dbRecovered": "数据库已自动恢复",
-        "dbRecoveryFailed": "数据库恢复失败"
+        "dbRecoveryFailed": "数据库恢复失败",
+        "dbPreserved": "数据库启动失败（未改动您的数据）"
       },
       "body": {
         "sourceBackup": "来源备份：{{filename}}",
-        "corruptedBackupPath": "损坏数据库已备份至：{{path}}"
+        "corruptedBackupPath": "损坏数据库已备份至：{{path}}",
+        "dbPreserved": "{{detail}}"
       },
       "worker": {
         "title": {

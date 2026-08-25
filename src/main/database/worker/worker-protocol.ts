@@ -86,3 +86,5 @@ export type DbWorkerEvent =
     }
   // worker 未捕获异常
   | { type: 'DB_WORKER_ERROR'; payload: { message: string; stack?: string } }
+  // 新增：worker 处理完 DB_DISPOSE 并关闭 DB 句柄后回发，主进程据此确认可安全 rename 还原
+  | { type: 'DB_WORKER_DISPOSED' }

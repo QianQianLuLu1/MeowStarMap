@@ -15,6 +15,8 @@ export const mediaAPI = {
   list: (options?: {
     page?: number
     pageSize?: number
+    /** keyset 深分页游标：提供则忽略 page/pageSize 走 keyset 分支（性能重构） */
+    cursor?: { sortValue: string | number | null; id: number } | null
     includeDeleted?: boolean
     deletedOnly?: boolean
     sortBy?: string
@@ -51,8 +53,13 @@ export const mediaAPI = {
   search: (keyword: string, limit?: number) =>
     call<MediaSearchResult>('media:search', keyword, limit),
   // 全文搜索：批量拉取索引文档（启动重建 / 增量拉取）
-  searchBuildDocs: (options?: { since?: string; limit?: number; offset?: number }) =>
-    call<MediaSearchBuildDocsResult>('search:buildDocs', options),
+  // 性能重构：afterId 游标取代 offset；includeTotal 控制是否一次性 COUNT total
+  searchBuildDocs: (options?: {
+    since?: string
+    limit?: number
+    afterId?: number
+    includeTotal?: boolean
+  }) => call<MediaSearchBuildDocsResult>('search:buildDocs', options),
   // 全文搜索：导出索引片段到 userData（持久化）
   searchExportIndex: (segments: Array<{ key: string; data: string }>, schemaHash?: string) =>
     call<MediaSearchExportIndexResult>('search:exportIndex', { segments, schemaHash }),

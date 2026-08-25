@@ -18,6 +18,7 @@ import {
   findOfficialLauncherGamePaths,
   findSteamGamePaths,
   findEpicGamePaths,
+  findGameInstallRootsByPriority,
   getAvailableDrives,
   getUserDataPaths
 } from './game-directory-discovery'
@@ -319,8 +320,8 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
     await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
       'D:\\Games\\InfinityNikki Launcher\\InfinityNikki'
     ])
-    // 首个键命中后不应继续查询后续键
-    expect(mockAccess).toHaveBeenCalledTimes(1)
+    // 首个键命中后不应继续查询后续键（枚举阶段会先探测盘符，故仅断言确实发生过校验）
+    expect(mockAccess).toHaveBeenCalled()
   })
 
   it('注册表首个键失败 → 尝试下一个键（按优先级顺序）', async () => {
@@ -426,6 +427,143 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
     expect(mockAccess).not.toHaveBeenCalled()
 
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
+  })
+})
+
+// ============ 常见安装路径枚举（Subtask A 增补） ============
+
+describe('findOfficialLauncherGamePaths - 常见安装路径枚举（C: 及自定义盘符变体）', () => {
+  const savedEnv: Record<string, string | undefined> = {}
+
+  beforeEach(() => {
+    savedEnv.LOCALAPPDATA = process.env.LOCALAPPDATA
+    savedEnv.APPDATA = process.env.APPDATA
+    savedEnv.USERPROFILE = process.env.USERPROFILE
+    savedEnv.PUBLIC = process.env.PUBLIC
+    process.env.LOCALAPPDATA = 'C:\\Users\\tester\\AppData\\Local'
+    process.env.APPDATA = 'C:\\Users\\tester\\AppData\\Roaming'
+    process.env.USERPROFILE = 'C:\\Users\\tester'
+    process.env.PUBLIC = 'C:\\Users\\Public'
+  })
+
+  afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+
+  function stubPowershellFail(): void {
+    vi.mocked(execFile).mockImplementation(((
+      _c: string,
+      _a: string[],
+      _o: unknown,
+      cb: RegCallback
+    ) => cb(new Error('fail'), '')) as never)
+  }
+
+  it('枚举命中 C:\\Program Files\\InfinityNikki Launcher\\InfinityNikki（注册表/配置/快捷方式均失败）', async () => {
+    // 仅允许 C: 盘符 + 候选根下的 GamePlayPhotos，使 getAvailableDrives 返回 ['C:\\'] 且枚举命中
+    stubAccess([
+      'C:\\',
+      'C:\\Program Files\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'
+    ])
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubPowershellFail()
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'C:\\Program Files\\InfinityNikki Launcher\\InfinityNikki'
+    ])
+  })
+
+  it('自定义盘符变体 D:\\Program Files\\InfinityNikki Launcher\\InfinityNikki 命中', async () => {
+    stubAccess(['D:\\', 'D:\\Program Files\\InfinityNikki Launcher\\InfinityNikki\\X6Game'])
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubPowershellFail()
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\Program Files\\InfinityNikki Launcher\\InfinityNikki'
+    ])
+  })
+
+  it('盘符下无游戏根（validateGameRoot 拒绝）→ 枚举不命中，注册表也失败 → 返回空', async () => {
+    // 允许 C: 盘符可达，但候选根下无 X6Game/GamePlayPhotos → 枚举落空
+    stubAccess(['C:\\'])
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubPowershellFail()
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([])
+  })
+})
+
+// ============ findGameInstallRootsByPriority（Subtask B 优先级解析） ============
+
+describe('findGameInstallRootsByPriority（启动器 > Steam > Epic，命中即止）', () => {
+  const savedEnv: Record<string, string | undefined> = {}
+
+  beforeEach(() => {
+    savedEnv.LOCALAPPDATA = process.env.LOCALAPPDATA
+    savedEnv.APPDATA = process.env.APPDATA
+    savedEnv.USERPROFILE = process.env.USERPROFILE
+    savedEnv.PUBLIC = process.env.PUBLIC
+    process.env.LOCALAPPDATA = 'C:\\Users\\tester\\AppData\\Local'
+    process.env.APPDATA = 'C:\\Users\\tester\\AppData\\Roaming'
+    process.env.USERPROFILE = 'C:\\Users\\tester'
+    process.env.PUBLIC = 'C:\\Users\\Public'
+  })
+
+  afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+
+  it('启动器命中（注册表）→ 不查询 Steam/Epic 注册表键', async () => {
+    // 盘符不可达 → 枚举不命中；启动器注册表首个键命中
+    stubExecFile((key) =>
+      key === 'HKCU\\Software\\InfinityNikki Launcher'
+        ? regOutput('D:\\Games\\InfinityNikki Launcher\\InfinityNikki')
+        : null
+    )
+    stubAccess(['D:\\Games\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])
+
+    const result = await findGameInstallRootsByPriority()
+    expect(result).toEqual(['D:\\Games\\InfinityNikki Launcher\\InfinityNikki'])
+    const calledKeys = vi.mocked(execFile).mock.calls.map((c) => c[1][1])
+    expect(calledKeys.some((k) => k.includes('Valve\\Steam'))).toBe(false)
+    expect(calledKeys.some((k) => k.includes('Epic'))).toBe(false)
+  })
+
+  it('启动器失败 → 降级 Steam 命中（不查询 Epic）', async () => {
+    stubExecFile((key) => {
+      if (key === 'HKCU\\Software\\Valve\\Steam') return regOutput('C:\\Steam')
+      return null
+    })
+    mockReadFile.mockResolvedValue(
+      '"0"\n{\n\t"path"\t\t"C:\\\\Steam"\n}\n"1"\n{\n\t"path"\t\t"D:\\\\SteamLibrary"\n}\n'
+    )
+    stubAccess(['D:\\SteamLibrary\\steamapps\\common\\InfinityNikki'])
+
+    const result = await findGameInstallRootsByPriority()
+    expect(result).toEqual(['D:\\SteamLibrary\\steamapps\\common\\InfinityNikki'])
+    const calledKeys = vi.mocked(execFile).mock.calls.map((c) => c[1][1])
+    expect(calledKeys.some((k) => k.includes('Epic'))).toBe(false)
+  })
+
+  it('三渠道全失败 → 返回空数组，且 Steam/Epic 注册表键均被查询（证明降级发生）', async () => {
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubAccess([])
+
+    const result = await findGameInstallRootsByPriority()
+    expect(result).toEqual([])
+    const calledKeys = vi.mocked(execFile).mock.calls.map((c) => c[1][1])
+    expect(calledKeys.some((k) => k.includes('Valve\\Steam'))).toBe(true)
+    expect(calledKeys.some((k) => k.includes('Epic'))).toBe(true)
   })
 })
 

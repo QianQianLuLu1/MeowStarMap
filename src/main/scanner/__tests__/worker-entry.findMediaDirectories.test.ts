@@ -21,6 +21,7 @@ vi.mock('../game-directory-discovery', () => ({
   searchByInstallTreeSignatureShallow: vi.fn(),
   findSteamGamePaths: vi.fn(),
   findEpicGamePaths: vi.fn(),
+  findGameInstallRootsByPriority: vi.fn(),
   getAvailableDrives: vi.fn(),
   getUserDataPaths: vi.fn()
 }))
@@ -56,6 +57,12 @@ function stubDiscovery(opts: {
 }) {
   discovery.findSteamGamePaths.mockResolvedValue(opts.steam ?? [])
   discovery.findEpicGamePaths.mockResolvedValue(opts.epic ?? [])
+  // findMediaDirectories 现通过渠道优先级解析器统一获取游戏根目录（启动器 > Steam > Epic）；
+  // 集成测试中以 steam+epic 解析结果等价替代（启动器渠道在此 mock 中置空）。
+  discovery.findGameInstallRootsByPriority.mockResolvedValue([
+    ...(opts.steam ?? []),
+    ...(opts.epic ?? [])
+  ])
   discovery.getUserDataPaths.mockResolvedValue(opts.userData ?? [])
   discovery.getAvailableDrives.mockResolvedValue(opts.drives ?? [])
   discovery.searchByMediaFolderSignatureShallow.mockResolvedValue(opts.mediaFolder ?? [])

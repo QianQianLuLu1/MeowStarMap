@@ -307,6 +307,8 @@ export interface MediaListResult {
   total: number
   page: number
   pageSize: number
+  /** keyset 下一页游标（深分页优先），无更多页时为 null */
+  nextCursor?: { sortValue: string | number | null; id: number } | null
 }
 export interface GroupCountsResult {
   groups: Array<{ key: string; count: number; label?: string }>
@@ -327,7 +329,16 @@ export interface MediaSearchDocRow {
 }
 export interface MediaSearchBuildDocsResult {
   docs: MediaSearchDocRow[]
-  total: number
+  /** 本页实际返回条数（恒等于 docs.length，零成本），用于表达"本页大小"语义 */
+  returned: number
+  /**
+   * 全量总数（COUNT(*) 一次性结果）。
+   * 仅当请求含 `includeTotal: true` 时填充，否则为 `undefined`。
+   * ⚠️ 切勿将其当作"本页条数"读取——未显式请求时它不会回退到 docs.length。
+   * 需要本页条数请改用 `returned`。
+   */
+  total?: number
+  /** 是否还有更多页（docs.length === limit 判定） */
   hasMore: boolean
 }
 export interface MediaSearchExportIndexResult {

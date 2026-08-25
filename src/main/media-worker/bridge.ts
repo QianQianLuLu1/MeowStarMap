@@ -28,6 +28,9 @@ import type { MediaWorkerCommand, MediaWorkerEvent, ThumbnailQuality } from './w
 /** WORKER_READY 握手超时：worker 启动不应超过 15s，超时即判启动失败 */
 const READY_TIMEOUT_MS = 15_000
 
+/** DISPOSE 确认等待超时兜底：远大于原 500ms，覆盖大库 WAL checkpoint 关闭耗时；超时仍走 kill */
+const DISPOSE_CONFIRM_TIMEOUT_MS = 2000
+
 export class MediaWorkerBridge {
   private worker: UtilityProcess | null = null
   private messageHandlers: ((event: MediaWorkerEvent) => void)[] = []
@@ -68,6 +71,19 @@ export class MediaWorkerBridge {
     | null = null
   // dispose 标志：避免 dispose 后再触发重启
   private isDisposed = false
+  // 自恢复期间停止 worker 的标志：stopWorkerForRestore 置位、对应 exit 处理完后复位。
+  // 用于抑制 kill 兜底触发的非零码退出被误判为崩溃而自动重启。
+  private terminatingForRestore = false
+  // stopWorkerForRestore 等待 worker 回发 MEDIA_WORKER_DISPOSED 确认的 resolver（带超时兜底）
+  private disposeResolve: (() => void) | null = null
+  /**
+   * 自恢复并发边界探针：worker 进程是否仍存活（持有 dbPath 文件句柄）。
+   * stopWorkerForRestore 末尾已置 this.worker = null（即便 *_DISPOSED 超时兜底走 kill 亦然），
+   * 调用方在 await stopWorkerForRestore 后据此断言句柄已释放、rename 覆盖 dbPath 前无进程占用。
+   */
+  hasLiveWorker(): boolean {
+    return this.worker !== null
+  }
 
   /**
    * 终结等待中的 WORKER_READY 握手：一律 reject，绝不只置 null。
@@ -200,6 +216,11 @@ export class MediaWorkerBridge {
         this.messageHandlers.forEach((h) => h(msg))
         break
 
+      case 'MEDIA_WORKER_DISPOSED':
+        // 新增：worker 已关闭 DB 句柄，解除 stopWorkerForRestore 的等待（随后 kill 兜底）
+        this.disposeResolve?.()
+        break
+
       case 'WORKER_ERROR':
         logger.error(`[MediaWorker] 异常: ${msg.payload.message}`, msg.payload.stack ?? '')
         break
@@ -283,14 +304,18 @@ export class MediaWorkerBridge {
     // worker 在就绪前退出：reject 而非空置，避免 await ensureWorker 永久挂起
     this.failReadyHandshake('worker exited before ready')
 
-    // 异常退出 + 未 dispose：尝试自动重启并恢复运行中的任务
-    if (isCrash && !this.isDisposed) {
+    // 异常退出 + 未 dispose + 非自恢复停止：尝试自动重启并恢复运行中的任务
+    if (isCrash && !this.isDisposed && !this.terminatingForRestore) {
       this.attemptAutoRestart(code, {
         thumbnail: wasThumbnailRunning,
         phash: wasPhashRunning,
         duplicate: wasDuplicateRunning,
         similar: wasSimilarRunning
       })
+    }
+    // 自恢复停止（stopWorkerForRestore）触发的退出：清除标志，允许后续正常启动/重启
+    if (this.terminatingForRestore) {
+      this.terminatingForRestore = false
     }
   }
 
@@ -553,21 +578,44 @@ export class MediaWorkerBridge {
   }
 
   /**
-   * 主进程退出前调用：发送 DISPOSE → 等待 500ms → 强制 kill。
-   * worker 收到 DISPOSE 后会主动关闭 DB + kill 子进程 + 退出。
+   * 数据库自恢复期间停止 worker（可逆，不置 isDisposed）。
+   *
+   * 释放本 bridge 对 dbPath 持有的 better-sqlite3 句柄，避免 Windows 上用 rename 覆盖在线库时因其他
+   * 进程占用目标文件而 EPERM 失败。与 dispose 不同：不置 isDisposed，被停止的 worker 会在下次
+   * ensureWorker 时重新 fork 并打开还原后的库，实现"重启 worker 重建连接"。
+   *
+   * 握手拒绝交由 exit 回调兜底（handleWorkerExit），避免引入新的 i18n key。
    */
-  async dispose(): Promise<void> {
-    this.isDisposed = true
-    this.restartPolicy.dispose()
-    // dispose 期间若仍有调用方在等待握手，必须 reject（早于 return，覆盖 worker 已为 null 的情况）：
-    // 此时 worker 即将被 kill，exit 回调与超时定时器都不会再兜底 reject
-    this.failReadyHandshake(t('main.mediaWorker.error.workerDisposed'))
-    if (!this.worker) return
+  /**
+   * 等待 worker 在处理完 MEDIA_WORKER_DISPOSE 后回发 MEDIA_WORKER_DISPOSED 确认：DB 句柄已释放，主进程可安全 rename 还原。
+   * 超时（worker 崩溃/卡死未能确认）即 resolve，交由 stopWorkerForRestore 的 kill 兜底。
+   */
+  private waitForWorkerDisposed(timeoutMs: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const timer = setTimeout(() => {
+        this.disposeResolve = null
+        resolve()
+      }, timeoutMs)
+      this.disposeResolve = () => {
+        clearTimeout(timer)
+        this.disposeResolve = null
+        resolve()
+      }
+    })
+  }
+
+  async stopWorkerForRestore(): Promise<void> {
+    if (!this.worker) {
+      this.terminatingForRestore = false
+      return
+    }
+    this.terminatingForRestore = true
     try {
       const cmd: MediaWorkerCommand = { type: 'MEDIA_WORKER_DISPOSE' }
       this.worker.postMessage(cmd)
-      // 给 worker 500ms 时间清理（关闭 DB + kill 子进程）
-      await new Promise((resolve) => setTimeout(resolve, 500))
+      // 等待 worker 关闭 DB 句柄后回发的 MEDIA_WORKER_DISPOSED 确认（带超时兜底），
+      // 不再盲等固定 500ms——确认到达即可立即 kill，避免恢复 rename 时句柄仍被 OS 短暂持有。
+      await this.waitForWorkerDisposed(DISPOSE_CONFIRM_TIMEOUT_MS)
     } catch {
       // postMessage 失败忽略，后续 kill 兜底
     }
@@ -580,5 +628,19 @@ export class MediaWorkerBridge {
     this.isPhashRunning = false
     this.isDuplicateRunning = false
     this.isSimilarRunning = false
+  }
+
+  /**
+   * 主进程退出前调用：发送 DISPOSE → 等待 500ms → 强制 kill。
+   * worker 收到 DISPOSE 后会主动关闭 DB + kill 子进程 + 退出。
+   * 复用 stopWorkerForRestore 的停进程逻辑，并追加 isDisposed（致命，不可复用）。
+   */
+  async dispose(): Promise<void> {
+    if (this.isDisposed) return
+    this.isDisposed = true
+    this.restartPolicy.dispose()
+    await this.stopWorkerForRestore()
+    // dispose 语义：握手以 workerDisposed 拒绝（stopWorkerForRestore 已先行拒绝，此处保证最终消息一致）
+    this.failReadyHandshake(t('main.mediaWorker.error.workerDisposed'))
   }
 }

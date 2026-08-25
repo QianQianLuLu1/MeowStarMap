@@ -768,7 +768,7 @@ export function notifyInterruptedScan(ctx: AppContext): void {
  * 设计要点：
  * - phash 重算与 duplicate 重新标记均通过低优先级队列执行，不阻塞启动。
  * - 失败仅 logger.warn，不抛错——后置修复是"尽力而为"，用户可手动触发兜底。
- * - media_count_dirty 标志由 R5 的 listMedia 读侧消费，此处不处理。
+ * - media_count_stale 标志由 R5 的 listMedia 读侧消费，此处不处理。
  */
 export async function runPostRestoreRepair(ctx: AppContext): Promise<void> {
   const db = ctx.dbManager.getDatabase()

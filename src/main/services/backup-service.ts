@@ -8,6 +8,11 @@ import type { DatabaseManager } from '../database/connection'
 import type { TaskScheduler } from '../scheduler/task-scheduler'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
+// 目录越界（路径穿越）校验原语：断言解析后路径仍位于某目录内，Windows 大小写不敏感
+import { isPathUnderDir } from '../utils/ipc-validate'
+// 注意：此处不 import media-repository 的 MEDIA_COUNT_STALE_KEY 常量，避免跨模块循环依赖导致
+// 命名绑定在测试环境下求值异常。与 media-repository 的 app_settings KV key 保持字面量一致：
+// 'media_count_stale'（1=缓存过期需重算，0/缺失=缓存可用）。
 
 // 惰性加载 better-sqlite3：首次调用时才动态 import，使原生模块加载时机推迟到 bootstrapApplication 的 try/catch 内
 // 使用 import() 而非 require()：import() 是 ESM 原生 API，被 Vitest vi.mock 正确拦截
@@ -227,55 +232,75 @@ export class BackupService {
   }
 
   /**
-   * 获取最近一份有效备份（含完整性校验）。
-   * 用于数据库自恢复流程：依次校验最新备份，找到第一个未损坏的返回路径。
-   * @returns { filePath, filename } 或 null（无可用备份）
+   * 获取全部有效备份（含完整性校验），按时间倒序（最新在前）。
+   * 用于数据库自恢复流程：遍历所有未损坏的备份，按时间从新到旧逐个尝试还原（IO 回退）。
+   * @returns 通过 integrity_check 的备份记录数组（可能为空）
    */
-  async getLatestValidBackup(): Promise<{ filePath: string; filename: string } | null> {
+  private async getValidBackups(): Promise<BackupRecord[]> {
     const records = await this.listBackups()
+    const valid: BackupRecord[] = []
     for (const record of records) {
       const check = await this.verifyBackupIntegrity(record.filePath)
       if (check.valid) {
-        return { filePath: record.filePath, filename: record.filename }
+        valid.push(record)
+      } else {
+        logger.warn(`[Backup] 备份已损坏，跳过: ${record.filename} - ${check.reason}`)
       }
-      logger.warn(`[Backup] 备份已损坏，跳过: ${record.filename} - ${check.reason}`)
     }
-    return null
+    return valid
   }
 
   /**
-   * 数据库自恢复：将最近的有效备份复制到目标路径（不重启应用）。
-   *
-   * 调用方（DatabaseManager）职责：
-   * 1. 关闭当前数据库连接
-   * 2. 备份损坏的 db 文件（重命名为 .corrupt-<timestamp>）
-   * 3. 调用本方法恢复
-   * 4. 重新打开数据库 + 重新注入 worker bridge
-   *
-   * 本方法职责：
-   * - 仅做"复制备份 → 原子 rename 覆盖目标路径"
-   * - 清理残留的 WAL/SHM
-   * - 不重启应用（与 restoreBackup 不同，后者面向用户主动恢复场景）
-   *
-   * R9：恢复后在目标 DB 写入"后置修复标志"（need_phash_recheck / need_duplicate_recheck /
-   * restored_at / media_count_dirty），下次启动由 runPostRestoreRepair 消费并触发重算。
-   *
-   * @param targetPath 目标数据库文件路径（即 dbManager.dbPath）
-   * @returns { success, message, sourceBackup? } 失败时 message 含原因
+   * 获取最近一份有效备份（含完整性校验）。
+   * 用于需要"单个最新有效备份"的场景（如用户主动 restoreBackup）。
+   * 自恢复流程改用 getValidBackups + 遍历（见 restoreLatestBackupTo）以支持 IO 回退。
+   * @returns { filePath, filename } 或 null（无可用备份）
    */
-  async restoreLatestBackupTo(targetPath: string): Promise<{
-    success: boolean
-    message: string
-    sourceBackup?: { filePath: string; filename: string }
-  }> {
-    const latest = await this.getLatestValidBackup()
-    if (!latest) {
-      return { success: false, message: t('main.backup.error.noBackupToRestore') }
+  async getLatestValidBackup(): Promise<{ filePath: string; filename: string } | null> {
+    const valid = await this.getValidBackups()
+    return valid.length > 0 ? { filePath: valid[0].filePath, filename: valid[0].filename } : null
+  }
+
+  /**
+   * 尝试从单个备份还原到目标路径（不重启应用）。
+   *
+   * IO 回退设计：本方法对"写盘前复检不通过（backup-unavailable）"与"写盘阶段 IO 失败
+   * （restore-failed）"均返回结构化失败（不向上抛），由 restoreLatestBackupTo 决定是否
+   * 继续尝试下一个有效候选。无论何种失败，在线库 targetPath 都不会被损坏内容触碰
+   * （H1 非破坏性优先）。
+   *
+   * @returns 成功 { success:true, sourceBackup }；失败 { success:false, reason, message }
+   */
+  private async attemptRestoreFrom(
+    targetPath: string,
+    record: BackupRecord
+  ): Promise<
+    | { success: true; sourceBackup: { filePath: string; filename: string } }
+    | { success: false; reason: 'backup-unavailable' | 'restore-failed'; message: string }
+  > {
+    // 恢复点二次确认：在 copy 前对选定备份做一次轻量 quick_check，防御 getValidBackups
+    // 到 copy 之间备份被外部改动、或所选备份与在线库同源损坏的场景（用户建议的"快速校验"）。
+    // 此分支同样在任何写盘之前，在线库文件不被触碰，满足 H1"非破坏性优先"。
+    const recheck = await this.verifyBackupIntegrity(record.filePath, 'quick')
+    if (!recheck.valid) {
+      logger.warn(
+        `[Backup] 恢复点复检不可用，按 H1 保留在线库、跳过覆盖: ${record.filename} - ${recheck.reason ?? ''}`
+      )
+      void logger.fault('databaseRestore', new Error('backup-unavailable'), {
+        stage: 'restore-backup-unavailable',
+        dbPath: targetPath,
+        filename: record.filename
+      })
+      return {
+        success: false,
+        reason: 'backup-unavailable',
+        message: t('main.backup.error.backupCorrupted', { reason: recheck.reason ?? '' })
+      }
     }
 
     const tmpPath = `${targetPath}.restoring`
     try {
-      await fsp.copyFile(latest.filePath, tmpPath)
+      await fsp.copyFile(record.filePath, tmpPath)
       // 清理旧的 WAL/SHM，避免旧事务日志干扰新数据库
       const walPath = `${targetPath}-wal`
       const shmPath = `${targetPath}-shm`
@@ -289,8 +314,9 @@ export class BackupService {
       } catch {
         /* SHM 可能不存在 */
       }
-      // 同盘 rename 是原子操作
-      await fsp.rename(tmpPath, targetPath)
+      // 同盘 rename 是原子操作。句柄可能仍被 OS 短暂持有（即便 worker 已确认释放 DB 句柄），
+      // 故对 EPERM/EBUSY 做有限重试兜底，避免时序抖动误报失败。
+      await this.renameWithRetry(tmpPath, targetPath)
     } catch (err) {
       // 清理临时文件
       try {
@@ -300,18 +326,182 @@ export class BackupService {
       }
       const reason = err instanceof Error ? err.message : String(err)
       logger.error(t('main.backup.log.restoreToFailed', { reason }))
-      return { success: false, message: t('main.backup.error.restoreFailedPlain', { reason }) }
+      // 诊断增强：Windows 上目标文件被其他进程（database/scanner/media worker）占用时会以 EPERM
+      // 失败。还原前已由 DatabaseManager.attemptRecovery 显式停止这些 worker 释放句柄；此处给出明确提示，
+      // 便于"手动恢复"等其它触发路径在失败时能定位到根因，而非仅记日志吞掉。
+      const isShareViolation = /EPERM|EBUSY|share|in use|占用|being used/i.test(reason)
+      const hint = isShareViolation
+        ? // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+          '（目标文件被其他进程占用，恢复前请先停止数据库/扫描/媒体 worker 以释放句柄）'
+        : ''
+      return {
+        success: false,
+        reason: 'restore-failed',
+        message: t('main.backup.error.restoreFailedPlain', { reason }) + hint
+      }
     }
 
     // R9：rename 成功后写入后置修复标志。失败不阻塞恢复（rename 已完成，下次启动仍可正常使用）
     await this.markRestoredFlags(targetPath)
 
-    logger.info(t('main.backup.log.restoredToDb', { filename: latest.filename }))
+    logger.info(t('main.backup.log.restoredToDb', { filename: record.filename }))
     return {
       success: true,
-      message: t('main.backup.message.restoredFrom', { filename: latest.filename }),
-      sourceBackup: latest
+      sourceBackup: { filePath: record.filePath, filename: record.filename }
     }
+  }
+
+  /**
+   * 数据库自恢复：将有效备份复制到目标路径（不重启应用）。
+   *
+   * 调用方（DatabaseManager）职责：
+   * 1. 关闭当前数据库连接
+   * 2. 备份损坏的 db 文件（重命名为 .corrupt-<timestamp>）
+   * 3. 调用本方法恢复
+   * 4. 重新打开数据库 + 重新注入 worker bridge
+   *
+   * 本方法职责：
+   * - 遍历全部有效备份，逐个尝试"复制备份 → 原子 rename 覆盖目标路径"（IO 回退）
+   * - 首个 copy/rename 成功的候选即返回；某候选 IO 失败时记录告警并继续更早的候选
+   * - 清理残留的 WAL/SHM
+   * - 不重启应用（与 restoreBackup 不同，后者面向用户主动恢复场景）
+   *
+   * R9：恢复后在目标 DB 写入"后置修复标志"（need_phash_recheck / need_duplicate_recheck /
+   * restored_at / media_count_stale），下次启动由 runPostRestoreRepair 消费并触发重算。
+   *
+   * @param targetPath 目标数据库文件路径（即 dbManager.dbPath）
+   * @returns { success, message, sourceBackup? } 失败时 message 含原因
+   */
+  async restoreLatestBackupTo(targetPath: string): Promise<{
+    success: boolean
+    message: string
+    sourceBackup?: { filePath: string; filename: string }
+    /**
+     * 结构化失败原因（向后兼容，调用方仅判 success）：
+     * - 'no-valid-backup'：无任何可用备份（保留在线库，不覆盖）
+     * - 'backup-unavailable'：恢复点 quick_check 复检不可用（保留在线库，不覆盖）
+     * - 'restore-failed'：全部有效候选 copy/rename 等 IO 均失败（在线库未被损坏内容写入）
+     */
+    reason?: 'no-valid-backup' | 'backup-unavailable' | 'restore-failed'
+  }> {
+    const candidates = await this.getValidBackups()
+    if (candidates.length === 0) {
+      // H1：无任何可用有效备份——绝不用损坏数据覆盖在线库，保留现场并显式告警。
+      // 此分支在任何写盘之前，在线库文件不被触碰；上层 attemptRecovery 会据此把 .corrupt
+      // 副本还原回原路径重新打开，天然"保留在线库"。
+      // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+      logger.warn('[Backup] 无可用有效备份，按 H1 保留在线库、跳过恢复')
+      void logger.fault('databaseRestore', new Error('no-valid-backup'), {
+        stage: 'restore-no-valid-backup',
+        dbPath: targetPath
+      })
+      return {
+        success: false,
+        reason: 'no-valid-backup',
+        message: t('main.backup.error.noBackupToRestore')
+      }
+    }
+
+    // IO 回退：按时间倒序遍历全部有效候选，逐个尝试还原，首个成功即返回；
+    // 某候选在写盘前复检不通过或写盘阶段 IO 失败时记录告警并继续下一候选。
+    // 无论成败，在线库 targetPath 都不会被损坏内容触碰（H1 非破坏性优先）。
+    const failedReasons: string[] = []
+    // 区分两类失败以维持精确语义（与单候选时代一致，避免误报）：
+    // - 候选在写盘前 quick 复检不通过 → backup-unavailable
+    // - 候选在 copy/rename 写盘阶段 IO 失败 → restore-failed
+    // 只要出现过任一候选的 IO 失败（restore-failed），最终即归为 restore-failed；
+    // 仅当全部候选都卡在写盘前复检时，才归为 backup-unavailable。
+    let sawRestoreFailed = false
+    for (const candidate of candidates) {
+      const result = await this.attemptRestoreFrom(targetPath, candidate)
+      if (result.success) {
+        return {
+          success: true,
+          message: t('main.backup.message.restoredFrom', {
+            filename: result.sourceBackup.filename
+          }),
+          sourceBackup: result.sourceBackup
+        }
+      }
+      if (result.reason === 'restore-failed') {
+        sawRestoreFailed = true
+      }
+      logger.warn(
+        `[Backup] 候选备份还原失败，尝试更早备份: ${candidate.filename} - ${result.message}`
+      )
+      failedReasons.push(`${candidate.filename}: ${result.message}`)
+    }
+
+    // 全部有效候选均失败：根据失败类型聚合返回，且在线库未被任何损坏内容覆盖（H1 不变）。
+    const aggregated = failedReasons.join('; ')
+    const finalReason: 'backup-unavailable' | 'restore-failed' = sawRestoreFailed
+      ? 'restore-failed'
+      : 'backup-unavailable'
+    logger.error(t('main.backup.log.restoreToFailed', { reason: aggregated }))
+    void logger.fault('databaseRestore', new Error('all-candidates-restore-failed'), {
+      stage: 'restore-all-candidates-failed',
+      dbPath: targetPath,
+      candidateCount: candidates.length,
+      finalReason
+    })
+    return {
+      success: false,
+      reason: finalReason,
+      message: t('main.backup.error.restoreFailedPlain', { reason: aggregated })
+    }
+  }
+
+  /**
+   * 原子 rename 覆盖目标库；句柄可能仍被 OS 短暂持有（即便 worker 已确认释放 DB 句柄），
+   * 故对 EPERM/EBUSY 做有限重试兜底，避免时序抖动导致的恢复误报失败。
+   *
+   * 前置条件（调用方须保证）：rename 覆盖 targetPath（即在线库 dbPath）前，所有持有该文件句柄的
+   * utilityProcess worker（scanner / database / media）均已 stopWorkerForRestore 并释放句柄，
+   * 且主进程 db 连接已 close。否则 Windows 上"目标文件被其他进程打开"会导致 EPERM 共享冲突，
+   * 有限重试仍可能失败。该前置条件由 DatabaseManager.attemptRecovery 在调用本函数前 await 三 worker
+   * stopWorkerForRestore（并已 await 到 *_DISPOSED 确认）来保证。
+   */
+  private async renameWithRetry(tmpPath: string, targetPath: string): Promise<void> {
+    const retries = 3
+    const delayMs = 100
+    let lastErr: unknown
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        await fsp.rename(tmpPath, targetPath)
+        return
+      } catch (err) {
+        lastErr = err
+        const code = (err as { code?: unknown } | null)?.code
+        const shareViolation =
+          code === 'EPERM' ||
+          code === 'EBUSY' ||
+          /EPERM|EBUSY|share|in use|占用|being used/i.test(
+            err instanceof Error ? err.message : String(err)
+          )
+        // 非共享冲突，或已耗尽重试次数：不再重试，上报原错误由调用方给出提示
+        if (!shareViolation || attempt === retries) break
+        await new Promise((r) => setTimeout(r, delayMs))
+      }
+    }
+    throw lastErr
+  }
+
+  /**
+   * 将外部传入的 filename 组合到备份目录并校验其解析后是否仍位于备份目录内，
+   * 防止路径穿越（如 "../../something.db"）访问/读取/覆盖任意文件。
+   * @param filename 外部传入的备份文件名
+   * @returns 校验通过返回解析后的绝对路径；越界则携带错误信息拒绝
+   */
+  private resolveSafeBackupPath(
+    filename: string
+  ): { ok: true; path: string } | { ok: false; message: string } {
+    const resolved = path.resolve(this.backupDir, filename)
+    if (!isPathUnderDir(resolved, this.backupDir)) {
+      const message = t('main.backup.error.pathTraversalDenied', { filename })
+      logger.warn(`[backup] 拒绝越界备份路径: ${filename} -> ${resolved}`)
+      return { ok: false, message }
+    }
+    return { ok: true, path: resolved }
   }
 
   // 从备份恢复数据库（恢复后自动重启应用）
@@ -323,7 +513,11 @@ export class BackupService {
       return { success: false, message: t('main.error.databaseNotInit') }
     }
 
-    const backupPath = path.join(this.backupDir, filename)
+    const safe = this.resolveSafeBackupPath(filename)
+    if (!safe.ok) {
+      return { success: false, message: safe.message }
+    }
+    const backupPath = safe.path
     if (!fs.existsSync(backupPath)) {
       return { success: false, message: t('main.backup.error.backupNotExist', { filename }) }
     }
@@ -418,25 +612,34 @@ export class BackupService {
    * 用 better-sqlite3 以只读模式临时打开备份文件，执行 PRAGMA integrity_check
    * 返回 { valid: true } 或 { valid: false, reason: string }
    */
+  /**
+   * P0-A3：校验备份文件完整性
+   * 用 better-sqlite3 以只读模式临时打开备份文件，执行 PRAGMA 完整性校验。
+   * - mode='full'（默认）：PRAGMA integrity_check，全量深度校验（getLatestValidBackup / restoreBackup 使用）
+   * - mode='quick'：PRAGMA quick_check，毫秒级轻量校验，用于恢复点二次确认（不放大启动自愈 IO）
+   * 返回 { valid: true } 或 { valid: false, reason: string }
+   */
   private async verifyBackupIntegrity(
-    backupPath: string
+    backupPath: string,
+    mode: 'quick' | 'full' = 'full'
   ): Promise<{ valid: boolean; reason?: string }> {
     let probe: DatabaseType.Database | null = null
     try {
       // 以只读模式打开，避免修改备份文件
       const Database = await getDatabaseImpl()
       probe = new Database(backupPath, { readonly: true, fileMustExist: true })
-      const result = probe.pragma('integrity_check', { simple: true })
-      // integrity_check 返回 'ok' 字符串表示通过，返回数组表示有错误
+      const pragmaName = mode === 'quick' ? 'quick_check' : 'integrity_check'
+      const result = probe.pragma(pragmaName, { simple: true })
+      // 两种校验均返回 'ok' 字符串表示通过，返回数组表示有错误
       if (result === 'ok') {
         return { valid: true }
       }
       const reason = Array.isArray(result) ? result.join('; ') : String(result)
-      logger.error(`[Backup] 备份文件完整性校验失败: ${backupPath} - ${reason}`)
+      logger.error(`[Backup] 备份文件完整性校验失败(${mode}): ${backupPath} - ${reason}`)
       return { valid: false, reason }
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error)
-      logger.error(`[Backup] 备份文件无法打开或已损坏: ${backupPath} - ${reason}`)
+      logger.error(`[Backup] 备份文件无法打开或已损坏(${mode}): ${backupPath} - ${reason}`)
       return { valid: false, reason }
     } finally {
       // 确保关闭临时连接，避免文件句柄泄漏
@@ -457,7 +660,7 @@ export class BackupService {
    * - need_phash_recheck = 1：触发 phash 重算（R7 的 mtime 检测会自动识别 stale 记录）
    * - need_duplicate_recheck = 1：触发 markDuplicates 重新标记重复文件
    * - restored_at = ISO 时间戳：供 UI 显示"已从备份恢复"
-   * - media_count_dirty = 1：复用 R5 失效机制，强制下次 listMedia 走真实 COUNT
+   * - media_count_stale = 1：复用 R5 失效机制，强制下次 listMedia 走真实 COUNT
    *
    * 设计要点：
    * - 调用时机：dbManager 已关闭、目标 DB 文件已 atomic rename 完成后
@@ -480,7 +683,7 @@ export class BackupService {
         insertStmt.run('need_phash_recheck', JSON.stringify(1))
         insertStmt.run('need_duplicate_recheck', JSON.stringify(1))
         insertStmt.run('restored_at', JSON.stringify(now))
-        insertStmt.run('media_count_dirty', JSON.stringify(1))
+        insertStmt.run('media_count_stale', JSON.stringify(1))
       })()
       logger.info(t('main.backup.log.repairFlagWritten', { path: dbPath }))
     } catch (err) {
@@ -500,7 +703,11 @@ export class BackupService {
   // 删除指定备份
   // P1-A10：改为 fsp 异步 API
   async deleteBackup(filename: string): Promise<{ success: boolean; message?: string }> {
-    const backupPath = path.join(this.backupDir, filename)
+    const safe = this.resolveSafeBackupPath(filename)
+    if (!safe.ok) {
+      return { success: false, message: safe.message }
+    }
+    const backupPath = safe.path
     try {
       await fsp.access(backupPath)
     } catch {

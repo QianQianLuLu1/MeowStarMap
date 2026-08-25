@@ -9,6 +9,8 @@ import { logger } from '../utils/logger'
 import { backupService } from '../services/backup-service'
 import { diagLog } from '../utils/startup-diagnostic'
 import type { DatabaseWorkerBridge } from './worker/database-worker-bridge'
+import type { ScannerWorkerBridge } from '../scanner/scanner-worker-bridge'
+import type { MediaWorkerBridge } from '../media-worker/bridge'
 import type { DbRunResult } from './worker/worker-protocol'
 import { t } from '../i18n'
 
@@ -32,6 +34,9 @@ export type DatabaseRecoveryListener = (info: {
   reason: string
   sourceBackup?: { filePath: string; filename: string }
   corruptedBackupPath?: string
+  kind?: DbFailureKind
+  /** true=非破坏性故障，已保留在线库未覆盖，仅提示排查 */
+  nonDestructive?: boolean
 }) => void
 
 /** FIX(组7-1): 判定 better-sqlite3 打开失败是否为锁类错误（暂时性，不可删除 WAL/SHM） */
@@ -39,6 +44,73 @@ function isSqliteLockError(err: unknown): boolean {
   const code = (err as { code?: unknown } | null)?.code
   const text = `${typeof code === 'string' ? code : ''} ${err instanceof Error ? err.message : String(err)}`
   return /SQLITE_(BUSY|LOCKED)/i.test(text)
+}
+
+/**
+ * H1：数据库初始化失败分类——决定走「破坏性备份恢复（覆盖在线库）」还是「保留现场」。
+ * 仅在 CORRUPT / WAL_CORRUPT 回退时才允许用备份覆盖在线库；其余一律保留现场。
+ */
+export enum DbFailureKind {
+  CORRUPT = 'CORRUPT',
+  WAL_CORRUPT = 'WAL_CORRUPT',
+  LOCKED = 'LOCKED',
+  PERMISSION = 'PERMISSION',
+  DISK_FULL = 'DISK_FULL',
+  ABI_INCOMPATIBLE = 'ABI_INCOMPATIBLE',
+  UNKNOWN = 'UNKNOWN'
+}
+
+/**
+ * H1：这些失败类型绝不能用备份覆盖在线库，且连 WAL 合并恢复都无意义——直接保留现场并提示用户。
+ * 覆盖会用最近一份备份（间隔 7 天，首次启动可能无备份）静默替换当前库，丢失上次备份以来的全部变更；
+ * 其中 ABI 不匹配靠恢复备份无法修复（schema 相同、同 better-sqlite3 版本），权限/磁盘满/锁与"库是否损坏"无关，
+ * 未知（UNKNOWN）打开失败同理——同源备份无法修复，盲目 restore 只会反复无效覆盖，故同样保留现场供排查。
+ * 注意：CORRUPT / WAL_CORRUPT 不在此集合——它们会先走数据保全的 runWALRecovery（WAL checkpoint），
+ * 仅当合并失败且在线库确实损坏（isLiveDatabaseIntact 门禁）时才回退破坏性备份覆盖。
+ */
+const NON_DESTRUCTIVE_KINDS = new Set<DbFailureKind>([
+  DbFailureKind.LOCKED,
+  DbFailureKind.PERMISSION,
+  DbFailureKind.DISK_FULL,
+  DbFailureKind.ABI_INCOMPATIBLE,
+  DbFailureKind.UNKNOWN
+])
+
+/** H1：依据 better-sqlite3 抛错（err.code / 消息关键字）分类初始化失败类型 */
+function classifyDbFailure(err: unknown): DbFailureKind {
+  const code = (err as { code?: unknown } | null)?.code
+  const message = err instanceof Error ? err.message : String(err)
+  const text = `${typeof code === 'string' ? code : ''} ${message}`.toLowerCase()
+  if (/sqlite_(busy|locked)/i.test(text) || isSqliteLockError(err)) return DbFailureKind.LOCKED
+  if (/sqlite_perm/i.test(text) || /eacces/i.test(text) || /permission denied/i.test(message))
+    return DbFailureKind.PERMISSION
+  if (
+    /sqlite_full/i.test(text) ||
+    /enospc/i.test(text) ||
+    /no space/i.test(text) ||
+    /disk.*full/i.test(text)
+  )
+    return DbFailureKind.DISK_FULL
+  if (
+    /node_module_version/i.test(text) ||
+    /the specified procedure could not be found/i.test(message) ||
+    /cannot find module/i.test(text) ||
+    /\bab(i)?\b.*(?:mismatch|incompatible|version)/i.test(text)
+  )
+    return DbFailureKind.ABI_INCOMPATIBLE
+  // 明确的损坏信号（数据库磁盘镜像损坏 / 非数据库文件）→ 走 WAL 合并恢复优先，失败再备份恢复
+  if (
+    /sqlite_(corrupt|notadb)/i.test(text) ||
+    /database disk image is malformed/i.test(message) ||
+    /file is not a database/i.test(message)
+  )
+    return DbFailureKind.WAL_CORRUPT
+  // 无法归类且库打不开：保守地当作「未知」——保留现场供排查，而非用备份覆盖
+  return DbFailureKind.UNKNOWN
+}
+
+function errToText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
 }
 
 export class DatabaseManager {
@@ -53,6 +125,13 @@ export class DatabaseManager {
    * - 未注入时（如测试场景），MediaRepository 降级为同步直写主进程 db
    */
   private workerBridge: DatabaseWorkerBridge | null = null
+  /**
+   * scanner / media worker 桥接（可选）。
+   * 用于数据库自恢复（attemptRecovery）前显式停止这些持有 dbPath 连接的 worker，
+   * 避免 Windows 上 rename 覆盖在线库时的 EPERM 共享冲突。不参与 close()。
+   */
+  private scannerWorkerBridge: ScannerWorkerBridge | null = null
+  private mediaWorkerBridge: MediaWorkerBridge | null = null
   /** 数据库恢复事件监听器（由 Application 注入） */
   private recoveryListeners: DatabaseRecoveryListener[] = []
   /** 最近一次恢复记录（供 Application 在 initialize 后查询并弹窗） */
@@ -61,6 +140,9 @@ export class DatabaseManager {
     reason: string
     sourceBackup?: { filePath: string; filename: string }
     corruptedBackupPath?: string
+    kind?: DbFailureKind
+    /** true=非破坏性故障，已保留在线库未覆盖，仅提示排查 */
+    nonDestructive?: boolean
     timestamp: string
   } | null = null
   // 启动性能优化：本次 initialize 是否已同步执行过全量 integrity_check
@@ -87,6 +169,16 @@ export class DatabaseManager {
   /** 获取已注入的 worker 桥接（MediaRepository 写操作使用） */
   getWorkerBridge(): DatabaseWorkerBridge | null {
     return this.workerBridge
+  }
+
+  /** 注入 scanner worker 桥接：自恢复前需停止其 dbPath 句柄 */
+  setScannerWorkerBridge(bridge: ScannerWorkerBridge | null): void {
+    this.scannerWorkerBridge = bridge
+  }
+
+  /** 注入 media worker 桥接：自恢复前需停止其 dbPath 句柄 */
+  setMediaWorkerBridge(bridge: MediaWorkerBridge | null): void {
+    this.mediaWorkerBridge = bridge
   }
 
   /** 获取数据库文件路径（worker 桥接 ensureWorker 时需要） */
@@ -154,32 +246,43 @@ export class DatabaseManager {
           )
         }
       } else {
-        // 检查是否 WAL/SHM 文件损坏（删除后重试一次）
-        const walPath = this.dbPath + '-wal'
-        const shmPath = this.dbPath + '-shm'
-        try {
-          if (fs.existsSync(walPath)) fs.unlinkSync(walPath)
-          if (fs.existsSync(shmPath)) fs.unlinkSync(shmPath)
-          this.db = new Database(this.dbPath)
-        } catch (retryErr) {
-          // 仍失败：尝试从备份恢复（数据库文件可能已损坏到无法打开）
-          logger.error(t('main.db.log.openFailedTryingBackup'), err)
-          const recovered = await this.attemptRecovery(
-            t('main.db.recovery.openFailed', {
-              error: err instanceof Error ? err.message : String(err)
+        // H1：非锁错误——先分类，绝不为非损坏失败用备份覆盖在线库（覆盖会丢失自上次备份以来的全部变更）
+        const kind = classifyDbFailure(err)
+        if (NON_DESTRUCTIVE_KINDS.has(kind)) {
+          // 锁/权限/磁盘满/ABI 不匹配/未知：保留在线库原文件，记录恢复事件并抛清晰错误供排查
+          if (this.db) {
+            try {
+              this.db.close()
+            } catch {
+              /* 忽略 */
+            }
+          }
+          this.db = null
+          this.lastRecovery = {
+            success: false,
+            reason: t('main.db.recovery.openFailed', { error: errToText(err) }),
+            kind,
+            nonDestructive: true,
+            timestamp: new Date().toISOString()
+          }
+          this.notifyRecovery()
+          throw new Error(this.nonDestructiveErrorMessage(kind, err))
+        }
+        // 疑似损坏（WAL_CORRUPT 或 CORRUPT 类）：优先走数据保全的 WAL 合并恢复，失败再备份恢复。
+        // 不预先删除 -wal/-shm（否则会丢弃尚未 checkpoint 的已提交事务，造成健康库丢最近写入）。
+        const recovered = await this.attemptRecovery({
+          reason: t('main.db.recovery.openFailed', { error: errToText(err) }),
+          kind: DbFailureKind.WAL_CORRUPT
+        })
+        if (!recovered) {
+          throw new Error(
+            t('main.db.error.openFailedAfterRecovery', {
+              error: errToText(err),
+              retryError: errToText(err)
             })
           )
-          if (!recovered) {
-            // 恢复失败：抛出原始错误 + 重试错误，方便诊断
-            throw new Error(
-              t('main.db.error.openFailedAfterRecovery', {
-                error: err instanceof Error ? err.message : String(err),
-                retryError: retryErr instanceof Error ? retryErr.message : String(retryErr)
-              })
-            )
-          }
-          // 恢复成功后 this.db 已由 attemptRecovery 重新打开
         }
+        // 恢复成功后 this.db 已由 attemptRecovery 重新打开
       }
     }
 
@@ -200,13 +303,18 @@ export class DatabaseManager {
         logger.error(
           t('main.db.recovery.integrityCheckFailed', { reason: integrityResult.reason ?? '' })
         )
-        const recovered = await this.attemptRecovery(
-          t('main.db.recovery.integrityCheckFailed', { reason: integrityResult.reason ?? '' })
-        )
+        const recovered = await this.attemptRecovery({
+          reason: t('main.db.recovery.integrityCheckFailed', {
+            reason: integrityResult.reason ?? ''
+          }),
+          kind: DbFailureKind.CORRUPT
+        })
         if (!recovered) {
-          // 恢复失败：保留 db 句柄让上层继续（迁移等流程会暴露具体错误）
-          // 不直接抛错，避免阻塞应用启动——用户可通过诊断包反馈
-          logger.error(t('main.db.log.autoRecoveryFailed'))
+          // H1：恢复失败（无可用备份或覆盖后仍打不开）→ 抛清晰错误。
+          // 启动失败可诊断优于静默继续（原静默逻辑会带着可能损坏的 db 句柄继续，风险更高）。
+          throw new Error(
+            t('main.db.error.databaseCorrupted', { reason: integrityResult.reason ?? '' })
+          )
         }
       }
     } else if (isFreshDb) {
@@ -357,11 +465,81 @@ export class DatabaseManager {
   }
 
   /**
-   * 自动恢复流程：备份损坏文件 → 从最近有效备份恢复 → 重新打开 db。
-   * @param reason 恢复触发原因（用于日志与事件通知）
-   * @returns true=恢复成功并已重新打开 db；false=恢复失败（无可用备份或恢复异常）
+   * 自动恢复流程：H1 收窄「破坏性备份恢复」触发条件。
+   * - 仅当 kind 为 CORRUPT（integrity 校验已确认损坏）或 WAL_CORRUPT 回退（WAL 合并恢复失败）时，
+   *   才用最近备份覆盖在线库；
+   * - 锁/权限/磁盘满/ABI 不匹配/未知等非损坏失败 → 保留在线库原文件，仅记录事件并向上抛错；
+   * - WAL 损坏优先走数据保全的 runWALRecovery（WAL checkpoint 合并回主库），失败才回退备份恢复；
+   * - 任何走向破坏性恢复的路径前，对在线库跑只读 integrity_check 门禁：若库完好则保留现场、不覆盖。
+   * @param opts.reason 恢复触发原因（用于日志与事件通知）
+   * @param opts.kind 失败分类（决定破坏性恢复与否）
+   * @returns true=已成功恢复并重新打开 db；false=未恢复（非破坏性保留现场 / 无可用备份 / 恢复异常）
    */
-  private async attemptRecovery(_reason: string): Promise<boolean> {
+  private async attemptRecovery(opts: { reason: string; kind: DbFailureKind }): Promise<boolean> {
+    const { reason, kind } = opts
+
+    // H1：非损坏型失败（锁/权限/磁盘满/ABI 不匹配/未知）——绝不覆盖在线库，保留现场供排查
+    if (NON_DESTRUCTIVE_KINDS.has(kind)) {
+      if (this.db) {
+        try {
+          this.db.close()
+        } catch {
+          /* 忽略 */
+        }
+      }
+      this.db = null
+      this.lastRecovery = {
+        success: false,
+        reason,
+        kind,
+        nonDestructive: true,
+        timestamp: new Date().toISOString()
+      }
+      this.notifyRecovery()
+      logger.error(
+        `[DB] 非破坏性数据库故障（${kind}），按 H1 保留在线库、未执行备份覆盖: ${reason}`
+      )
+      return false
+    }
+
+    // H1：WAL 损坏优先走数据保全的轻量 WAL 合并恢复（checkpoint 把已提交事务合并回主库）
+    if (kind === DbFailureKind.WAL_CORRUPT) {
+      const walRecovered = await this.runWALRecovery()
+      if (walRecovered) {
+        this.lastRecovery = {
+          success: true,
+          reason: `${reason}（WAL 合并恢复，未使用备份覆盖）`,
+          kind,
+          timestamp: new Date().toISOString()
+        }
+        this.notifyRecovery()
+        // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+        logger.info('[DB] WAL 合并恢复成功，已保全未 checkpoint 的已提交事务')
+        return true
+      }
+      // WAL 合并恢复失败 → 回退破坏性备份恢复
+      // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+      logger.warn('[DB] WAL 合并恢复失败，回退破坏性备份恢复')
+    }
+
+    // 破坏性恢复（仅 CORRUPT / WAL_CORRUPT 回退）：先对在线库做只读 integrity_check 门禁。
+    // kind 为 CORRUPT（integrity 路径已确认损坏）直接走恢复；其余（WAL 回退）若库实际完好则保留现场。
+    if (kind !== DbFailureKind.CORRUPT) {
+      // 注意 isLiveDatabaseIntact 为异步函数，必须 await——否则 Promise 永远为真值会导致门禁失效
+      if (await this.isLiveDatabaseIntact()) {
+        this.lastRecovery = {
+          success: false,
+          reason: `${reason}（在线库 integrity_check 通过，按 H1 保留现场、不覆盖）`,
+          kind,
+          nonDestructive: true,
+          timestamp: new Date().toISOString()
+        }
+        this.notifyRecovery()
+        logger.error(`[DB] 在线库 integrity_check 通过，按 H1 保留现场、不覆盖: ${reason}`)
+        return false
+      }
+    }
+
     // 1. 关闭当前 db 句柄（即使已损坏也需关闭，避免文件锁阻塞 rename）
     try {
       this.db?.close()
@@ -369,6 +547,58 @@ export class DatabaseManager {
       logger.warn(t('main.db.log.closeCorruptedFailed'), err)
     }
     this.db = null
+
+    // 1.5 释放所有持有 dbPath 连接的 worker 句柄（scanner / database / media 三个 utilityProcess worker）。
+    // 若不先停止，Windows 上对"被其他进程打开的文件"执行 rename 会因 EPERM（共享冲突）失败，
+    // 导致恢复失败且损坏库留在原地；更严重的是 rename 之后 runPostRestoreRepair 又会用
+    // new Database(dbPath) 打开第三个连接，若旧 worker 句柄仍在，后续写入会落到被改名挪走的旧文件，造成数据分叉。
+    // 此处仅停止进程、不置 isDisposed（stopWorkerForRestore 可逆），被停止的 worker 会在下次使用时
+    // 经 ensureWorker(dbPath) 重新 fork 并打开还原后的库，即"重启 worker 重建连接"。
+    // 启动期各 worker 尚未启动（worker 为 null）→ 此处为安全 no-op；同时覆盖"worker 已运行"的假设情形。
+    logger.info(
+      // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+      '[DBManager] 自恢复前停止 worker 以释放 dbPath 句柄（避免 rename 共享冲突）：' +
+        `scanner=${this.scannerWorkerBridge ? 'stop' : 'n/a'}, ` +
+        `database=${this.workerBridge ? 'stop' : 'n/a'}, ` +
+        `media=${this.mediaWorkerBridge ? 'stop' : 'n/a'}`
+    )
+    await Promise.all([
+      this.workerBridge?.stopWorkerForRestore(),
+      this.scannerWorkerBridge?.stopWorkerForRestore(),
+      this.mediaWorkerBridge?.stopWorkerForRestore()
+    ])
+
+    // 正确性边界确认：上方已 await 三个 worker 的 stopWorkerForRestore，各自在收到
+    // *_DISPOSED 确认（或 2s 超时兜底 kill）后才置内部 this.worker = null。故此刻 dbPath
+    // 句柄应已被所有持有它的进程释放，rename 覆盖前不应再有进程占用该文件（Windows 共享冲突 EPERM）。
+    const liveWorkers = [
+      this.workerBridge,
+      this.scannerWorkerBridge,
+      this.mediaWorkerBridge
+    ].filter(
+      (b) =>
+        !!b &&
+        typeof (b as { hasLiveWorker?: () => boolean }).hasLiveWorker === 'function' &&
+        (b as { hasLiveWorker: () => boolean }).hasLiveWorker()
+    )
+    logger.info(
+      `[DBManager] 自恢复前 worker 句柄释放确认：liveWorkers=${liveWorkers.length}（期望 0），` +
+        // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+        'rename 覆盖 dbPath 前不应有进程持有该文件句柄'
+    )
+    // dev 下 fail-fast：任一 worker 仍存活（hasLiveWorker=true，即未被实际停止）则记录 fault 并抛错，
+    // 使恢复进入既有失败分支（保留在线库、H1 提示），而非静默 EPERM 导致恢复失败且损坏库留原地。
+    if (!app.isPackaged && liveWorkers.length > 0) {
+      const err = new Error(
+        `[DBManager] 自恢复并发边界被破坏：仍有 ${liveWorkers.length} 个 worker 未停止即准备 rename 覆盖 dbPath（${this.dbPath}），可能导致 Windows EPERM`
+      )
+      void logger.fault('databaseRestore', err, {
+        dbPath: this.dbPath,
+        stage: 'worker-handle-not-released',
+        liveWorkerCount: liveWorkers.length
+      })
+      throw err
+    }
 
     // 2. 兜底初始化 backupService 的 backupDir
     // 时序：DatabaseManager.initialize() 在 backupService.init() 之前调用，
@@ -385,6 +615,7 @@ export class DatabaseManager {
       const failureInfo = {
         success: false,
         reason: restoreResult.message,
+        kind,
         corruptedBackupPath,
         timestamp: new Date().toISOString()
       }
@@ -427,6 +658,7 @@ export class DatabaseManager {
         reason: t('main.db.recovery.reopenFailed', {
           error: reopenErr instanceof Error ? reopenErr.message : String(reopenErr)
         }),
+        kind,
         sourceBackup: restoreResult.sourceBackup,
         corruptedBackupPath,
         timestamp: new Date().toISOString()
@@ -445,6 +677,7 @@ export class DatabaseManager {
     const successInfo = {
       success: true,
       reason: restoreResult.message,
+      kind,
       sourceBackup: restoreResult.sourceBackup,
       corruptedBackupPath,
       timestamp: new Date().toISOString()
@@ -462,6 +695,96 @@ export class DatabaseManager {
     )
     this.notifyRecovery(successInfo)
     return true
+  }
+
+  /**
+   * H1：轻量 WAL 合并恢复——用独立连接对在线库执行 wal_checkpoint(TRUNCATE)，
+   * 把已提交但尚未 checkpoint 的 WAL 事务合并回主库文件，并清理 -wal/-shm。
+   * 数据保全（优于用 7 天前的备份覆盖）；仅当 WAL 损坏导致无法打开时调用。
+   * @returns true=合并成功并已重新打开 db；false=合并失败（需回退破坏性备份恢复）
+   */
+  private async runWALRecovery(): Promise<boolean> {
+    try {
+      const Database = this.databaseCtor ?? (await getDatabaseImpl())
+      if (this.db) {
+        try {
+          this.db.close()
+        } catch {
+          /* 忽略 */
+        }
+      }
+      this.db = null
+      // 独立连接执行 checkpoint；TRUNCATE 会把 WAL 内容写回主库并重置 WAL 文件
+      const tmp = new Database(this.dbPath)
+      try {
+        tmp.pragma('wal_checkpoint(TRUNCATE)')
+      } finally {
+        try {
+          tmp.close()
+        } catch {
+          /* 忽略 */
+        }
+      }
+      // 重新以正常句柄打开合并后的主库
+      this.db = new Database(this.dbPath)
+      return true
+    } catch (err) {
+      // eslint-disable-next-line no-restricted-syntax -- 诊断日志
+      logger.error('[DB] runWALRecovery 失败，将回退破坏性备份恢复:', err)
+      if (this.db) {
+        try {
+          this.db.close()
+        } catch {
+          /* 忽略 */
+        }
+      }
+      this.db = null
+      return false
+    }
+  }
+
+  /**
+   * H1：对在线库做只读 integrity_check 门禁（不修改在线文件）。
+   * 用于判断「疑似损坏」是否真实——库完好则不应被备份覆盖。
+   * @returns true=在线库 integrity_check 通过（完好）；false=无法打开或校验未通过
+   */
+  private async isLiveDatabaseIntact(): Promise<boolean> {
+    try {
+      const Database = this.databaseCtor ?? (await getDatabaseImpl())
+      const tmp = new Database(this.dbPath, { readonly: true, fileMustExist: true })
+      try {
+        const res = tmp.pragma('integrity_check', { simple: true })
+        return res === 'ok'
+      } finally {
+        try {
+          tmp.close()
+        } catch {
+          /* 忽略 */
+        }
+      }
+    } catch {
+      // 无法只读打开/校验 → 视为不完好，允许破坏性恢复
+      return false
+    }
+  }
+
+  /** H1：非破坏性失败的错误文案（含分类提示，供 bootstrapApplication 错误页展示） */
+  private nonDestructiveErrorMessage(kind: DbFailureKind, err: unknown): string {
+    const detail = errToText(err)
+    switch (kind) {
+      case DbFailureKind.ABI_INCOMPATIBLE:
+        return t('main.db.error.abiIncompatible', { error: detail })
+      case DbFailureKind.PERMISSION:
+        return t('main.db.error.permissionDenied', { error: detail })
+      case DbFailureKind.DISK_FULL:
+        return t('main.db.error.diskFull', { error: detail })
+      case DbFailureKind.LOCKED:
+        return t('main.db.error.lockedByOtherProgram', { error: detail, retryError: detail })
+      case DbFailureKind.UNKNOWN:
+        return t('main.db.error.unknown', { error: detail })
+      default:
+        return t('main.db.error.openFailedAfterRecovery', { error: detail, retryError: detail })
+    }
   }
 
   /**
