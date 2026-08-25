@@ -6,16 +6,21 @@ import { refreshPathGuardRoots } from './media-update'
 // IPC handler 注册函数（按域拆分后）
 import { registerMediaMetadataHandlers } from '../ipc/handlers/media-handler'
 import { registerMediaLifecycleHandlers } from '../ipc/handlers/media-lifecycle-handler'
+import { registerMediaCleanupHandlers } from '../ipc/handlers/media-cleanup-handler'
 import { registerDuplicateHandlers } from '../ipc/handlers/duplicate-handler'
 import { registerSimilarHandlers } from '../ipc/handlers/similar-handler'
 import { registerSearchIndexHandlers } from '../ipc/handlers/search-index-handler'
 import { registerCategoryHandlers } from '../ipc/handlers/category-handler'
 import { registerProfileHandlers } from '../ipc/handlers/profile-handler'
 import { registerFileHandlers } from '../ipc/handlers/file'
+import { registerFileRenameHandlers } from '../ipc/handlers/file-rename-handler'
+import { registerFileExportHandlers } from '../ipc/handlers/file-export-handler'
 import { registerExportPrefHandlers } from '../ipc/handlers/export-pref-handler'
 import { registerVideoHandlers } from '../ipc/handlers/video'
 import { registerWatermarkHandlers } from '../ipc/handlers/watermark'
 import { registerEditorHandlers } from '../ipc/handlers/editor'
+import { registerEditorPresetHandlers } from '../ipc/handlers/editor-preset-handler'
+import { registerEditorMetadataHandlers } from '../ipc/handlers/editor-metadata-handler'
 import { registerBackupHandlers } from '../ipc/handlers/backup'
 import { registerCacheHandlers } from '../ipc/handlers/cache'
 import { registerLogHandlers } from '../ipc/handlers/log'
@@ -34,7 +39,8 @@ import { registerAppHandlers } from '../ipc/handlers/app-handler'
 import { registerOperationHistoryHandlers } from '../ipc/handlers/operation-history-handler'
 import { registerTaskHandlers } from '../ipc/handlers/task-handler'
 import { registerShareHandlers } from '../ipc/handlers/share'
-import { registerPluginHandlers } from '../ipc/handlers/plugin'
+import { registerPluginManagementHandlers } from '../ipc/handlers/plugin'
+import { registerPluginBridgeHandlers } from '../ipc/handlers/plugin-bridge-handler'
 import { logger } from '../utils/logger'
 
 // C-G7：扫描进度监听器用具名函数引用，避免 removeAllListeners('progress')
@@ -74,16 +80,21 @@ export function setupIPC(ctx: AppContext): void {
 
   registerMediaMetadataHandlers(ctx)
   registerMediaLifecycleHandlers(ctx)
+  registerMediaCleanupHandlers(ctx)
   registerDuplicateHandlers(ctx)
   registerSimilarHandlers(ctx)
   registerSearchIndexHandlers(ctx)
   registerCategoryHandlers(ctx)
   registerProfileHandlers(ctx)
   registerFileHandlers(ctx)
+  registerFileRenameHandlers(ctx)
+  registerFileExportHandlers(ctx)
   registerExportPrefHandlers(ctx)
   registerVideoHandlers(ctx)
   registerWatermarkHandlers(ctx)
   registerEditorHandlers(ctx)
+  registerEditorPresetHandlers(ctx)
+  registerEditorMetadataHandlers(ctx)
   registerBackupHandlers(ctx)
   registerCacheHandlers(ctx)
   registerLogHandlers(ctx)
@@ -103,7 +114,8 @@ export function setupIPC(ctx: AppContext): void {
   registerTaskHandlers(ctx)
   registerShareHandlers(ctx)
   // 插件系统：注册插件管理 + 能力桥 IPC handler（不修改任何现有通道）
-  registerPluginHandlers(ctx)
+  registerPluginManagementHandlers(ctx)
+  registerPluginBridgeHandlers(ctx)
 
   // IPC 安全加固：初始化 pathGuard 的 userData 目录白名单
   // 必须在 app.whenReady() 之后调用，app.getPath('userData') 才可用

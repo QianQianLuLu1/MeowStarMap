@@ -9,7 +9,9 @@ import { describe, it, expect } from 'vitest'
 import {
   extractUidFromPath,
   extractAlbumTypeFromPath,
-  extractMediaSourceFromPath
+  extractMediaSourceFromPath,
+  isGamePlayPhotosPath,
+  resolveNativeThumbnailPath
 } from './path-classifier'
 
 describe('extractUidFromPath', () => {
@@ -310,5 +312,96 @@ describe('extractMediaSourceFromPath', () => {
       const result = extractMediaSourceFromPath(p)
       expect(['game', 'launcher', 'cloud']).toContain(result)
     }
+  })
+})
+
+describe('isGamePlayPhotosPath', () => {
+  it('反斜杠 GamePlayPhotos 路径返回 true', () => {
+    const p =
+      'D:\\Game\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos\\123456789\\NikkiPhotos_HighQuality\\photo.jpg'
+    expect(isGamePlayPhotosPath(p)).toBe(true)
+  })
+
+  it('正斜杠 GamePlayPhotos 路径返回 true', () => {
+    expect(isGamePlayPhotosPath('D:/Game/X6Game/Saved/GamePlayPhotos/123456789/photo.jpg')).toBe(
+      true
+    )
+  })
+
+  it('大小写不敏感（全小写/全大写均命中）', () => {
+    expect(isGamePlayPhotosPath('D:\\game\\gameplayphotos\\123456789\\photo.jpg')).toBe(true)
+    expect(isGamePlayPhotosPath('D:\\game\\GAMEPLAYPHOTOS\\123456789\\photo.jpg')).toBe(true)
+    expect(isGamePlayPhotosPath('d:/GAME/GamePlayPhotos/123456789/photo.jpg')).toBe(true)
+  })
+
+  it('非游戏拍照路径返回 false', () => {
+    expect(isGamePlayPhotosPath('D:\\photos\\vacation.jpg')).toBe(false)
+    expect(isGamePlayPhotosPath('D:\\game\\X6Game\\Saved\\ScreenShot\\a.jpg')).toBe(false)
+    expect(isGamePlayPhotosPath('D:\\game\\CloudPhotos\\12345678\\photo.jpg')).toBe(false)
+  })
+
+  it('仅含 GamePlayPhotos 但无尾部分隔符时返回 false', () => {
+    expect(isGamePlayPhotosPath('D:\\game\\GamePlayPhotos')).toBe(false)
+  })
+
+  it('空字符串返回 false 且不抛异常', () => {
+    expect(() => isGamePlayPhotosPath('')).not.toThrow()
+    expect(isGamePlayPhotosPath('')).toBe(false)
+  })
+})
+
+describe('resolveNativeThumbnailPath', () => {
+  it('① 反斜杠 HQ 路径 → 返回同名 LowQuality 路径（其余部分原样保留）', () => {
+    const hq =
+      'D:\\Game\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos\\123456789\\NikkiPhotos_HighQuality\\photo.jpg'
+    expect(resolveNativeThumbnailPath(hq)).toBe(
+      'D:\\Game\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos\\123456789\\NikkiPhotos_LowQuality\\photo.jpg'
+    )
+  })
+
+  it('② 正斜杠变体 → 返回正斜杠形态的 LowQuality 路径', () => {
+    const hq = 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/photo.jpg'
+    expect(resolveNativeThumbnailPath(hq)).toBe(
+      'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_LowQuality/photo.jpg'
+    )
+  })
+
+  it('③ 非 HQ 目录段（Collage / X6Game/ScreenShot）→ null', () => {
+    // 游戏拍照根下的非 HQ 子目录（如 Collage）：含 gameplayphotos 但无 highquality 段
+    expect(
+      resolveNativeThumbnailPath(
+        'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\123456789\\Collage\\photo.jpg'
+      )
+    ).toBeNull()
+    // LowQuality 自身不推导（避免自指）
+    expect(
+      resolveNativeThumbnailPath(
+        'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\123456789\\NikkiPhotos_LowQuality\\photo.jpg'
+      )
+    ).toBeNull()
+    // 游戏内置截图目录（非拍照体系，无 LowQuality 同名文件）
+    expect(resolveNativeThumbnailPath('D:\\Game\\X6Game\\ScreenShot\\a.jpg')).toBeNull()
+    expect(resolveNativeThumbnailPath('D:/Game/X6Game/Saved/ScreenShot/a.jpg')).toBeNull()
+  })
+
+  it('④ 非 gameplayphotos 路径与空串 → null', () => {
+    expect(resolveNativeThumbnailPath('D:\\photos\\NikkiPhotos_HighQuality\\photo.jpg')).toBeNull()
+    expect(resolveNativeThumbnailPath('D:\\game\\CloudPhotos\\12345678\\photo.jpg')).toBeNull()
+    expect(() => resolveNativeThumbnailPath('')).not.toThrow()
+    expect(resolveNativeThumbnailPath('')).toBeNull()
+  })
+
+  it('HQ 目录段大小写异常时仍可定位，替换段用标准拼写且保留原分隔符', () => {
+    expect(
+      resolveNativeThumbnailPath(
+        'D:\\game\\GAMEPLAYPHOTOS\\123456789\\nikkiPHOTOS_highquality\\photo.jpg'
+      )
+    ).toBe('D:\\game\\GAMEPLAYPHOTOS\\123456789\\NikkiPhotos_LowQuality\\photo.jpg')
+  })
+
+  it('混合分隔符路径：前后分隔符各自按原位置形态保留', () => {
+    expect(
+      resolveNativeThumbnailPath('D:/Game/GamePlayPhotos\\123456789/NikkiPhotos_HighQuality\\p.jpg')
+    ).toBe('D:/Game/GamePlayPhotos\\123456789/NikkiPhotos_LowQuality\\p.jpg')
   })
 })

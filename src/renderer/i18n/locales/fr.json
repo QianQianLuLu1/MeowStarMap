@@ -3601,7 +3601,10 @@
         "workerStartFailed": "",
         "workerDisposed": "",
         "sharpResizeFailed": "",
-        "ffmpegFrameTimeout": ""
+        "ffmpegFrameTimeout": "",
+        "videoPathRequired": "",
+        "outputPathRequired": "",
+        "ffmpegEmptyOutput": ""
       },
       "kindVideo": "",
       "kindImage": ""

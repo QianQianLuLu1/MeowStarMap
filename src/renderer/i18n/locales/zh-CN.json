@@ -3603,7 +3603,10 @@
         "workerStartFailed": "后台进程启动失败（thumbnail-worker 未在限定时间内就绪）",
         "workerDisposed": "thumbnail-worker 已释放（dispose）",
         "sharpResizeFailed": "sharp 缩放失败",
-        "ffmpegFrameTimeout": "ffmpeg 提取视频帧超时"
+        "ffmpegFrameTimeout": "ffmpeg 提取视频帧超时",
+        "videoPathRequired": "extractVideoFrame: videoPath 必填",
+        "outputPathRequired": "extractVideoFrame: outputPath 必填",
+        "ffmpegEmptyOutput": "ffmpeg 输出为空文件"
       },
       "kindVideo": "视频",
       "kindImage": "图片"

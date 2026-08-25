@@ -58,8 +58,19 @@ vi.mock('../../utils/logger', () => ({
 
 vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
-import { registerEditorHandlers } from './editor'
+import { registerEditorHandlers as registerEditorSaveHandlers } from './editor'
+import { registerEditorPresetHandlers } from './editor-preset-handler'
+import { registerEditorMetadataHandlers } from './editor-metadata-handler'
 import { assertFileWritePath } from '../validator'
+
+// 拆分后保留兼容包装：等价于原 registerEditorHandlers(ctx) 的全量注册。
+// 调用顺序与原通道注册顺序一致（save/saveAs → 滤镜预设 → XMP 元数据），
+// 保证「应注册 10 个 editor channel」的顺序断言继续通过。
+function registerEditorHandlers(ctx: HandlerContext): void {
+  registerEditorSaveHandlers(ctx)
+  registerEditorPresetHandlers(ctx)
+  registerEditorMetadataHandlers(ctx)
+}
 
 interface DbStub {
   prepare: ReturnType<typeof vi.fn>

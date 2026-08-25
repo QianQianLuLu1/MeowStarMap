@@ -220,42 +220,92 @@ async function getFileHash(filePath: string, stats: fs.Stats): Promise<string> {
   }
 }
 
+// 视频抽帧最大可寻址秒数（参数校验上限），避免传入异常 seek 值
+const VIDEO_SEEK_MAX_SECONDS = 60
+// 0s 抽帧失败后的重试位置（秒）
+const VIDEO_RETRY_SEEK_SECONDS = 1
+
 /**
  * 提取视频第一帧（ffmpeg，与主进程 ThumbnailGenerator.extractVideoFrame 一致）。
- * 30 秒超时保护，超时后 kill 子进程避免 ffmpeg 累积泄漏。
+ * - 入参校验：路径非空、seek 在合法区间。
+ * - 输出校验：end 后确认输出文件存在且字节数 > 0，避免把 0 字节/损坏文件当成功缓存。
+ * - 超时保护：30s 后 kill 子进程并 reject，防止 ffmpeg 进程泄漏。
+ * - 0s 抽帧失败时重试 1s 处帧（首帧黑屏/装饰帧或解码抖动场景）。
  */
 function extractVideoFrame(videoPath: string, outputPath: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return extractVideoFrameAtSeek(videoPath, outputPath, 0).catch((firstErr) => {
+    workerLog(
+      'warn',
+      `[Thumbnail] ffmpeg 抽帧 0s 失败 (${firstErr?.message}); 重试 ${VIDEO_RETRY_SEEK_SECONDS}s (path: ${videoPath})`
+    )
+    return extractVideoFrameAtSeek(videoPath, outputPath, VIDEO_RETRY_SEEK_SECONDS)
+  })
+}
+
+function extractVideoFrameAtSeek(
+  videoPath: string,
+  outputPath: string,
+  seekSeconds: number
+): Promise<void> {
+  // --- 参数校验 ---
+  if (!videoPath || typeof videoPath !== 'string') {
+    return Promise.reject(new Error(t('main.thumbnail.error.videoPathRequired')))
+  }
+  if (!outputPath || typeof outputPath !== 'string') {
+    return Promise.reject(new Error(t('main.thumbnail.error.outputPathRequired')))
+  }
+  if (!Number.isFinite(seekSeconds) || seekSeconds < 0 || seekSeconds > VIDEO_SEEK_MAX_SECONDS) {
+    return Promise.reject(
+      new Error(`extractVideoFrame: seekSeconds 超出 [0, ${VIDEO_SEEK_MAX_SECONDS}]`)
+    )
+  }
+
+  return new Promise<void>((resolve, reject) => {
     let settled = false
+    const cleanup = (cmd: ReturnType<typeof ffmpeg>): void => {
+      clearTimeout(timeout)
+      untrackFfmpegCommand(cmd)
+    }
     const timeout = setTimeout(() => {
       if (settled) return
       settled = true
       command.kill('SIGKILL')
-      untrackFfmpegCommand(command)
+      cleanup(command)
       reject(new Error(t('main.thumbnail.error.ffmpegFrameTimeout')))
     }, 30000)
 
     const command = ffmpeg(videoPath)
       .setFfmpegPath(ffmpegBinaryPath)
-      .seekInput(0)
+      .seekInput(seekSeconds)
       .frames(1)
       .output(outputPath)
       .outputOptions(
         '-vf',
-        `scale=${STANDARD_MAX_WIDTH}:${STANDARD_MAX_HEIGHT}:force_original_aspect_ratio=decrease`
+        `scale=${STANDARD_MAX_WIDTH}:${STANDARD_MAX_HEIGHT}:force_original_aspect_ratio=decrease`,
+        '-f',
+        'image2',
+        '-update',
+        '1'
       )
-      .on('end', () => {
+      .on('end', async () => {
         if (settled) return
         settled = true
-        clearTimeout(timeout)
-        untrackFfmpegCommand(command)
-        resolve()
+        cleanup(command)
+        // --- 输出校验：文件必须存在且非空 ---
+        try {
+          const stat = await fsp.stat(outputPath)
+          if (!stat.isFile() || stat.size <= 0) {
+            throw new Error(t('main.thumbnail.error.ffmpegEmptyOutput'))
+          }
+          resolve()
+        } catch (statErr) {
+          reject(statErr instanceof Error ? statErr : new Error(String(statErr)))
+        }
       })
       .on('error', (err) => {
         if (settled) return
         settled = true
-        clearTimeout(timeout)
-        untrackFfmpegCommand(command)
+        cleanup(command)
         reject(err)
       })
 
@@ -355,9 +405,13 @@ async function startThumbnailBatch(
   const database = openDatabaseIfNeeded(dbPath)
 
   try {
+    // GamePlayPhotos 豁免：该目录下的文件已有游戏原生低清缩略图（同名文件位于兄弟目录
+    // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径，永不触发缩略图生成。
+    // 归一化口径与 media-repository.ts NORMALIZED_PATH_EXPR 完全一致（小写 + 正斜杠子串匹配）。
+    // SQLite 字符串字面量不处理反斜杠，'\' 即单个反斜杠。
     const rows = database
       .prepare(
-        'SELECT id, file_path, file_type FROM media_files WHERE thumbnail IS NULL OR width IS NULL OR height IS NULL'
+        "SELECT id, file_path, file_type FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/gameplayphotos/%'"
       )
       .all() as Array<{ id: number; file_path: string; file_type: string }>
 

@@ -32,13 +32,15 @@ import { repairLegacyDataV1 } from './repair-legacy-data-v1'
 import { repairLegacyDataV3 } from './repair-legacy-data-v3'
 import { repairLegacyDataV4 } from './repair-legacy-data-v4'
 import { repairLegacyDataV5 } from './repair-legacy-data-v5'
+import { repairLegacyDataV6 } from './repair-legacy-data-v6'
 import { t } from '../i18n/worker-safe'
 // C-G3：共享命名常量（取代魔法数字）
 // TDD 重构：路径分类纯函数抽取到独立文件，便于单元测试（无 electron/sharp/ffmpeg 依赖）
 import {
   extractUidFromPath,
   extractAlbumTypeFromPath,
-  extractMediaSourceFromPath
+  extractMediaSourceFromPath,
+  resolveNativeThumbnailPath
 } from './path-classifier'
 // 方案三：独立游戏目录 UID 发现机制（对齐上游 nikki_albums）
 import { discoverUidsFromGameDirs } from './uid-discovery'
@@ -687,6 +689,24 @@ export async function scanDirectory(
               // 方案二：自动注册发现的 UID 到 character_profiles 表
               const discoveredUid = extractUidFromPath(fullPath)
               autoRegisterUid(discoveredUid)
+              // 扫描入库关联游戏原生缩略图：HQ 图片可推导出同名 LQ 低清文件，
+              // 存在且可读时直接填充 thumbnail（不再触发缩略图生成）；
+              // access 失败仅记 warn 日志、不填（保持现状走常规生成），不中断扫描。
+              // 视频分支不填（LQ 目录仅含同名图片）。
+              let nativeThumbnail: string | undefined
+              const nativeThumbPath = resolveNativeThumbnailPath(fullPath)
+              if (nativeThumbPath) {
+                try {
+                  await fsp.access(nativeThumbPath, fs.constants.R_OK)
+                  nativeThumbnail = nativeThumbPath
+                } catch (thumbErr) {
+                  workerLog(
+                    'warn',
+                    `[Scanner] 原生低清缩略图不可访问，跳过缩略图关联: ${nativeThumbPath}`,
+                    thumbErr instanceof Error ? thumbErr.message : String(thumbErr)
+                  )
+                }
+              }
               await addFile({
                 file_path: fullPath,
                 file_name: entry.name,
@@ -708,7 +728,9 @@ export async function scanDirectory(
                 // P0-03：根据父文件夹名映射相册类型
                 album_type: extractAlbumTypeFromPath(fullPath),
                 // 区分游戏内拍摄与启动器缓存
-                media_source: extractMediaSourceFromPath(fullPath)
+                media_source: extractMediaSourceFromPath(fullPath),
+                // 游戏原生缩略图（LQ 同名文件，仅当存在且可读时填充）
+                thumbnail: nativeThumbnail
               })
               progress.found++
             }
@@ -897,8 +919,8 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
     if (!insertStmtCache) {
       insertStmtCache = db.prepare(`
       INSERT INTO media_files
-      (file_path, file_name, file_type, file_ext, file_size, width, height, duration, created_at, modified_at, source_path, indexed_at, tags, category_id, rating, is_favorite, notes, scene_category, scene_time, outfit, account_uid, album_type, media_source)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, 0, 0, '', ?, ?, ?, ?, ?, ?)
+      (file_path, file_name, file_type, file_ext, file_size, width, height, duration, created_at, modified_at, source_path, indexed_at, tags, category_id, rating, is_favorite, notes, scene_category, scene_time, outfit, account_uid, album_type, media_source, thumbnail)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, 0, 0, '', ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(file_path) DO UPDATE SET
         file_name = excluded.file_name,
         file_type = excluded.file_type,
@@ -915,6 +937,10 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
         account_uid = excluded.account_uid,
         album_type = excluded.album_type,
         media_source = excluded.media_source,
+        -- 游戏原生缩略图：本批未关联到原生缩略图（NULL）时保留已有值，
+        -- 避免增量重扫时把已关联/已生成的缩略图覆盖回 NULL；
+        -- 存量未关联的 HQ 记录由 repairLegacyDataV6 迁移补回填。
+        thumbnail = COALESCE(excluded.thumbnail, media_files.thumbnail),
         -- FIX(组3-2): 扫描刚物理确认文件存在，缺失计数与标记必须归零——ON CONFLICT 不重置该列时，
         -- 记录删除重建/外部移动后扫回/DB 迁移残留的旧 missing_count 会让下次完整性校验
         -- 首次 access 失败即置 is_missing=1，跳过"连续两次缺失"防抖缓冲
@@ -954,7 +980,9 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
           // P0-03：游戏相册类型
           file.album_type,
           // 媒体来源：game 或 launcher
-          file.media_source
+          file.media_source,
+          // 游戏原生缩略图路径（未关联时为 NULL，走常规缩略图生成）
+          file.thumbnail ?? null
         )
       }
     })
@@ -1064,6 +1092,8 @@ async function startScan(
   if (repairOk && db) repairLegacyDataV4(db, workerLog)
   // 修复旧数据 V5：将误归 launcher 的 X6Game/ScreenShot、X6Game/Video 游戏媒体重分类为 game（图库）
   if (repairOk && db) repairOk = repairLegacyDataV5(db, workerLog)
+  // 修复旧数据 V6：为存量 HQ 记录回填游戏原生低清缩略图（thumbnail → 同名 LQ 文件）
+  if (repairOk && db) repairOk = repairLegacyDataV6(db, workerLog)
 
   try {
     // 全盘扫描模式：直接全盘搜索媒体特征文件夹，不依赖游戏目录查找

@@ -5,6 +5,7 @@ node_modules/
 # ===== Build output =====
 dist/
 release/
+build1.out
 # Playwright 冒烟测试产物（截图/视频/诊断日志）
 test-results/
 playwright-report/

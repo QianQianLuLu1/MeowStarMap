@@ -121,6 +121,7 @@ vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-v
 
 import { registerMediaMetadataHandlers } from './media-handler'
 import { registerMediaLifecycleHandlers } from './media-lifecycle-handler'
+import { registerMediaCleanupHandlers } from './media-cleanup-handler'
 import { registerDuplicateHandlers } from './duplicate-handler'
 import { registerSimilarHandlers } from './similar-handler'
 import { registerSearchIndexHandlers } from './search-index-handler'
@@ -131,6 +132,7 @@ import { registerProfileHandlers } from './profile-handler'
 function registerMediaHandlers(ctx: HandlerContext): void {
   registerMediaMetadataHandlers(ctx)
   registerMediaLifecycleHandlers(ctx)
+  registerMediaCleanupHandlers(ctx)
   registerDuplicateHandlers(ctx)
   registerSimilarHandlers(ctx)
   registerSearchIndexHandlers(ctx)

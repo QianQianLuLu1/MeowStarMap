@@ -21,6 +21,40 @@ import type { MediaFile } from '../../stores/mediaStore'
 // 普通屏（DPR < 2）下完全不影响现有 low/standard 双档位逻辑
 const HIGH_DPI_MODE = typeof window !== 'undefined' && window.devicePixelRatio >= 2
 
+// 前置守卫：后端会把游戏原生缩略图路径直接填入 thumbnail（形如
+// .../GamePlayPhotos/{uid}/NikkiPhotos_LowQuality|HighQuality/xxx.jpg），
+// 这类路径不适用缓存命名规则（_low/_high）改写，否则会推导出不存在的路径导致 404。
+// 路径分隔符可能是反斜杠或正斜杠，且目录名大小写不保证，统一小写归一化后匹配。
+const isNativeGameThumbnail = (thumbnail: string): boolean => {
+  const lower = thumbnail.toLowerCase()
+  return lower.includes('nikkiphotos_lowquality') || lower.includes('nikkiphotos_highquality')
+}
+
+// P1-03：从标准缩略图路径推导低质量路径（缓存命名规则：${hash}.jpg → ${hash}_low.jpg）
+// 原生游戏缩略图路径返回 null，组件直接使用原 thumbnail 路径显示
+export const toLowQualityUrl = (thumbnail: string | undefined): string | null => {
+  if (!thumbnail) return null
+  if (isNativeGameThumbnail(thumbnail)) return null
+  if (thumbnail.endsWith('.jpg')) {
+    return thumbnail.slice(0, -4) + '_low.jpg'
+  }
+  return null
+}
+
+// 高清档位路径推导：${hash}.jpg → ${hash}_high.jpg
+export const toHighQualityUrl = (thumbnail: string | undefined): string | null => {
+  if (!thumbnail) return null
+  if (isNativeGameThumbnail(thumbnail)) return null
+  if (
+    thumbnail.endsWith('.jpg') &&
+    !thumbnail.endsWith('_low.jpg') &&
+    !thumbnail.endsWith('_high.jpg')
+  ) {
+    return thumbnail.slice(0, -4) + '_high.jpg'
+  }
+  return null
+}
+
 interface VirtualImageGridProps {
   items: MediaFile[]
   selectedIds: string[]
@@ -137,27 +171,8 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     // 通过 rangeChanged 跟踪当前可视区间，用于触发标准质量升级
     const visibleRangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 })
 
-    // P1-03：从标准缩略图路径推导低质量路径（缓存命名规则：${hash}.jpg → ${hash}_low.jpg）
-    const toLowQualityUrl = useCallback((thumbnail: string | undefined): string | null => {
-      if (!thumbnail) return null
-      if (thumbnail.endsWith('.jpg')) {
-        return thumbnail.slice(0, -4) + '_low.jpg'
-      }
-      return null
-    }, [])
-
-    // 高清档位路径推导：${hash}.jpg → ${hash}_high.jpg
-    const toHighQualityUrl = useCallback((thumbnail: string | undefined): string | null => {
-      if (!thumbnail) return null
-      if (
-        thumbnail.endsWith('.jpg') &&
-        !thumbnail.endsWith('_low.jpg') &&
-        !thumbnail.endsWith('_high.jpg')
-      ) {
-        return thumbnail.slice(0, -4) + '_high.jpg'
-      }
-      return null
-    }, [])
+    // P1-03 / 高清档位路径推导抽为模块级纯函数 toLowQualityUrl / toHighQualityUrl
+    //（含游戏原生缩略图路径守卫），推导返回 null 时直接使用原 thumbnail 路径显示。
 
     // U-G16：挂载时检测触屏能力（matchMedia 优先，回退到 ontouchstart）
     useEffect(() => {
@@ -341,7 +356,12 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           }}
           itemContent={(index, file) => {
             const isSelected = selectedSet.has(file.id)
-            const standardUrl = toFileUrl(file.thumbnail || file.file_path)
+            // 视频文件无缩略图时，不得使用原视频文件作为 <img> 源（加载视频进 img 必触发
+            // onError 显示警告图标）。仅在确有 thumbnail 时才用文件源；图片类型才允许回退
+            // 到原文件路径，保证无缩略图的视频稳定降级为视频占位图标而非裂图。
+            const standardUrl = toFileUrl(
+              file.file_type === 'video' ? file.thumbnail : file.thumbnail || file.file_path
+            )
             const useHighQuality = highQualityIds.has(file.id)
             const lowUrl = toLowQualityUrl(file.thumbnail)
             const highUrl = HIGH_DPI_MODE ? toHighQualityUrl(file.thumbnail) : null

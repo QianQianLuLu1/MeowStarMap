@@ -55,7 +55,7 @@ vi.mock('../../../utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(), fault: vi.fn() }
 }))
 
-import { registerPluginHandlers } from '../plugin'
+import { registerPluginBridgeHandlers } from '../plugin-bridge-handler'
 
 /** 从 handleMock 中取出指定 channel 的包装后 handler */
 function getHandler(channel: string): (event: unknown, ...args: unknown[]) => Promise<unknown> {
@@ -68,13 +68,13 @@ describe('plugin:db.query 表白名单（组6-2）', () => {
   const prepareMock = vi.fn(() => ({ all: vi.fn(() => [{ id: 1 }]) }))
   const ctx = {
     dbManager: { getDatabase: () => ({ prepare: prepareMock }) }
-  } as unknown as Parameters<typeof registerPluginHandlers>[0]
+  } as unknown as Parameters<typeof registerPluginBridgeHandlers>[0]
 
   beforeEach(() => {
     handleMock.mockClear()
     assertPluginPermissionMock.mockReset()
     prepareMock.mockClear()
-    registerPluginHandlers(ctx)
+    registerPluginBridgeHandlers(ctx)
   })
 
   it('合法查询（白名单表 + 参数绑定）通过校验并执行', async () => {

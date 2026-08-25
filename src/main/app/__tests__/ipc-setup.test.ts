@@ -2,29 +2,34 @@
  * @layer L3
  * @module src/main/app/ipc-setup
  * @coverage setupIPC / bindScanProgressListener / injectCorruptedMarkers
- * @dependencies 31 个 registerXxxHandlers、pathGuard.initUserDataDir、database/media-repository、utils/logger
+ * @dependencies 37 个 registerXxxHandlers、pathGuard.initUserDataDir、database/media-repository、utils/logger
  *
  * 难点：
- * 1. 31 个 registerXxxHandlers 全部 mock 为 vi.fn()，需 vi.mock 批量 stub
+ * 1. 37 个 registerXxxHandlers 全部 mock 为 vi.fn()，需 vi.mock 批量 stub
  * 2. bindScanProgressListener 用 WeakMap 缓存监听器引用，第二次调用应 removeListener 旧的再 on
  * 3. injectCorruptedMarkers 内部 new MediaRepository(db, workerBridge, dbPath) 后调用 getMediaIdByPath / markCorrupted / clearCorrupted
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
-// 共享 mock：30 个 registerXxxHandlers
+// 共享 mock：37 个 registerXxxHandlers
 const handlerMocks = vi.hoisted(() => ({
   registerMediaMetadataHandlers: vi.fn(),
   registerMediaLifecycleHandlers: vi.fn(),
+  registerMediaCleanupHandlers: vi.fn(),
   registerDuplicateHandlers: vi.fn(),
   registerSimilarHandlers: vi.fn(),
   registerSearchIndexHandlers: vi.fn(),
   registerCategoryHandlers: vi.fn(),
   registerProfileHandlers: vi.fn(),
   registerFileHandlers: vi.fn(),
+  registerFileRenameHandlers: vi.fn(),
+  registerFileExportHandlers: vi.fn(),
   registerVideoHandlers: vi.fn(),
   registerWatermarkHandlers: vi.fn(),
   registerEditorHandlers: vi.fn(),
+  registerEditorPresetHandlers: vi.fn(),
+  registerEditorMetadataHandlers: vi.fn(),
   registerBackupHandlers: vi.fn(),
   registerCacheHandlers: vi.fn(),
   registerLogHandlers: vi.fn(),
@@ -42,7 +47,8 @@ const handlerMocks = vi.hoisted(() => ({
   registerOperationHistoryHandlers: vi.fn(),
   registerTaskHandlers: vi.fn(),
   registerShareHandlers: vi.fn(),
-  registerPluginHandlers: vi.fn(),
+  registerPluginManagementHandlers: vi.fn(),
+  registerPluginBridgeHandlers: vi.fn(),
   registerExportPrefHandlers: vi.fn(),
   registerImportRootHandlers: vi.fn(),
   initUserDataDir: vi.fn(),
@@ -57,6 +63,9 @@ vi.mock('../../ipc/handlers/media-handler', () => ({
 }))
 vi.mock('../../ipc/handlers/media-lifecycle-handler', () => ({
   registerMediaLifecycleHandlers: handlerMocks.registerMediaLifecycleHandlers
+}))
+vi.mock('../../ipc/handlers/media-cleanup-handler', () => ({
+  registerMediaCleanupHandlers: handlerMocks.registerMediaCleanupHandlers
 }))
 vi.mock('../../ipc/handlers/duplicate-handler', () => ({
   registerDuplicateHandlers: handlerMocks.registerDuplicateHandlers
@@ -76,6 +85,12 @@ vi.mock('../../ipc/handlers/profile-handler', () => ({
 vi.mock('../../ipc/handlers/file', () => ({
   registerFileHandlers: handlerMocks.registerFileHandlers
 }))
+vi.mock('../../ipc/handlers/file-rename-handler', () => ({
+  registerFileRenameHandlers: handlerMocks.registerFileRenameHandlers
+}))
+vi.mock('../../ipc/handlers/file-export-handler', () => ({
+  registerFileExportHandlers: handlerMocks.registerFileExportHandlers
+}))
 vi.mock('../../ipc/handlers/video', () => ({
   registerVideoHandlers: handlerMocks.registerVideoHandlers
 }))
@@ -84,6 +99,12 @@ vi.mock('../../ipc/handlers/watermark', () => ({
 }))
 vi.mock('../../ipc/handlers/editor', () => ({
   registerEditorHandlers: handlerMocks.registerEditorHandlers
+}))
+vi.mock('../../ipc/handlers/editor-preset-handler', () => ({
+  registerEditorPresetHandlers: handlerMocks.registerEditorPresetHandlers
+}))
+vi.mock('../../ipc/handlers/editor-metadata-handler', () => ({
+  registerEditorMetadataHandlers: handlerMocks.registerEditorMetadataHandlers
 }))
 vi.mock('../../ipc/handlers/backup', () => ({
   registerBackupHandlers: handlerMocks.registerBackupHandlers
@@ -137,7 +158,10 @@ vi.mock('../../ipc/handlers/share', () => ({
   registerShareHandlers: handlerMocks.registerShareHandlers
 }))
 vi.mock('../../ipc/handlers/plugin', () => ({
-  registerPluginHandlers: handlerMocks.registerPluginHandlers
+  registerPluginManagementHandlers: handlerMocks.registerPluginManagementHandlers
+}))
+vi.mock('../../ipc/handlers/plugin-bridge-handler', () => ({
+  registerPluginBridgeHandlers: handlerMocks.registerPluginBridgeHandlers
 }))
 vi.mock('../../ipc/handlers/export-pref-handler', () => ({
   registerExportPrefHandlers: handlerMocks.registerExportPrefHandlers
@@ -268,18 +292,23 @@ describe('setupIPC', () => {
 
     setupIPC(ctx)
 
-    // 30 个 registerXxxHandlers
+    // 37 个 registerXxxHandlers
     expect(handlerMocks.registerMediaMetadataHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerMediaLifecycleHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerMediaCleanupHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerDuplicateHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerSimilarHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerSearchIndexHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerCategoryHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerProfileHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerFileHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerFileRenameHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerFileExportHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerVideoHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerWatermarkHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerEditorHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerEditorPresetHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerEditorMetadataHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerBackupHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerCacheHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerLogHandlers).toHaveBeenCalledWith(ctx)
@@ -297,7 +326,8 @@ describe('setupIPC', () => {
     expect(handlerMocks.registerOperationHistoryHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerTaskHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerShareHandlers).toHaveBeenCalledWith(ctx)
-    expect(handlerMocks.registerPluginHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerPluginManagementHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerPluginBridgeHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerExportPrefHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerImportRootHandlers).toHaveBeenCalledWith(ctx)
   })

@@ -59,6 +59,12 @@ const ctl = vi.hoisted(() => ({
   bktreeImpl: null as null | ((opts: BkSearchOpts) => unknown),
   /** fluent-ffmpeg run 是否触发 error 回调 */
   ffmpegFail: false,
+  /** fluent-ffmpeg 抽帧模式：'ok' 成功写文件 | 'fail' 失败 | 'retryThenOk' 0s失败1s成功 */
+  ffmpegMode: 'ok' as 'ok' | 'fail' | 'retryThenOk',
+  /** 已捕获的 output 路径（run 时写入） */
+  ffmpegOutputPath: '' as string,
+  /** 记录每次 run 的 seekInput 值 */
+  ffmpegSeeks: [] as number[],
   /** better-sqlite3 假构造函数当前返回的 db 实例（逐用例注入） */
   currentDb: null as unknown,
   /** 记录假构造函数的每次 dbPath 调用 */
@@ -76,15 +82,24 @@ vi.mock('sharp', () => {
 })
 
 // fluent-ffmpeg：链式命令 mock；run 后异步触发 end/error（受控）
+// 成功时向捕获到的 output 路径真实写入一个非空 JPG，使 end 后的输出校验通过。
 vi.mock('fluent-ffmpeg', () => {
+  const fs = require('fs')
+  const path = require('path')
   const createCommand = (): Record<string, unknown> => {
     const handlers: Record<string, (err?: Error) => void> = {}
     const cmd: Record<string, unknown> = {}
     const chain = (): Record<string, unknown> => cmd
     cmd.setFfmpegPath = chain
-    cmd.seekInput = chain
+    cmd.seekInput = (s: number) => {
+      ctl.ffmpegSeeks.push(s)
+      return cmd
+    }
     cmd.frames = chain
-    cmd.output = chain
+    cmd.output = (p: string) => {
+      ctl.ffmpegOutputPath = p
+      return cmd
+    }
     cmd.outputOptions = chain
     cmd.on = (event: string, cb: (err?: Error) => void) => {
       handlers[event] = cb
@@ -92,8 +107,22 @@ vi.mock('fluent-ffmpeg', () => {
     }
     cmd.run = () => {
       setTimeout(() => {
-        if (ctl.ffmpegFail) handlers.error?.(new Error('ffmpeg 抽帧失败（mock）'))
-        else handlers.end?.()
+        if (ctl.ffmpegMode === 'fail') {
+          handlers.error?.(new Error('ffmpeg 抽帧失败（mock）'))
+          return
+        }
+        if (ctl.ffmpegMode === 'retryThenOk' && ctl.ffmpegSeeks.length <= 1) {
+          // 第 1 次（seek 0）失败，第 2 次（seek 1）成功
+          handlers.error?.(new Error('ffmpeg 抽帧失败（mock 重试）'))
+          return
+        }
+        try {
+          fs.mkdirSync(path.dirname(ctl.ffmpegOutputPath), { recursive: true })
+          fs.writeFileSync(ctl.ffmpegOutputPath, Buffer.alloc(48, 0xff))
+          handlers.end?.()
+        } catch (e) {
+          handlers.error?.(e instanceof Error ? e : new Error(String(e)))
+        }
       }, 0)
     }
     cmd.kill = () => undefined
@@ -400,7 +429,8 @@ describe('worker-entry 消息处理分支', () => {
     ctl.phashImpl = null
     ctl.hammingImpl = null
     ctl.bktreeImpl = null
-    ctl.ffmpegFail = false
+    ctl.ffmpegMode = 'ok'
+    ctl.ffmpegSeeks = []
     // 统一重置 better-sqlite3 假构造器：个别用例（如惰性加载失败）会临时切换 impl，
     // 若其断言失败提前中断，遗留的脏 impl 会污染后续用例，故恢复动作前置到此处
     hook.setImpl(FakeDatabaseCtor)
@@ -488,6 +518,51 @@ describe('worker-entry 消息处理分支', () => {
     port.emitMessage({ type: 'SIMILAR_STOP' })
     const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
+  })
+
+  it('GamePlayPhotos 豁免：批次查询追加归一化排除条件，仅普通图片被处理', async () => {
+    // 3 行数据：普通图片 / GamePlayPhotos HQ 图片 / GamePlayPhotos 视频，
+    // 三者 thumbnail/width/height 均为 NULL（由 selectImpl 返回模拟）
+    const rows = [
+      thumbRow(1, mediaFiles[0]),
+      {
+        id: 2,
+        file_path: 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/p.jpg',
+        file_type: 'image'
+      },
+      {
+        id: 3,
+        file_path: 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/xxx/v.mp4',
+        file_type: 'video'
+      }
+    ]
+    let selectSql = ''
+    // 假 db 按 SQL 路由：模拟 SQLite 执行归一化排除条件后的返回行集，
+    // 若 worker 的 SQL 缺少豁免条件则无法过滤，后续 processed 计数会暂露差异
+    const fake = createFakeDb((sql) => {
+      if (!sql.includes('thumbnail IS NULL')) return []
+      selectSql = sql
+      if (!sql.includes("NOT LIKE '%/gameplayphotos/%'")) return rows
+      return rows.filter(
+        (r) => !r.file_path.replace(/\\/g, '/').toLowerCase().includes('/gameplayphotos/')
+      )
+    })
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'gameplay-exempt.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    // SQL 形态断言：归一化排除条件与 media-repository NORMALIZED_PATH_EXPR 同口径
+    expect(selectSql).toContain('(thumbnail IS NULL OR width IS NULL OR height IS NULL)')
+    expect(selectSql).toContain(
+      "LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/gameplayphotos/%'"
+    )
+    // 行为断言：仅普通图片行被处理并写库（updateStmt args 末位为 row id）
+    expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
+    const updates = fake.runs.filter((r) => r.sql.startsWith('UPDATE media_files SET width'))
+    expect(updates).toHaveLength(1)
+    expect(updates[0].args[6]).toBe(1)
   })
 
   it('单文件处理抛错 → MEDIA_WORKER_LOG 上报并跳过，不影响后续文件', async () => {
@@ -856,7 +931,7 @@ describe('worker-entry 消息处理分支', () => {
   })
 
   it('视频抽帧失败 → 缩略图为 null 但不阻断批次', async () => {
-    ctl.ffmpegFail = true
+    ctl.ffmpegMode = 'fail'
     const videoFile = path.join(tmpRoot, 'clip-bad.mp4')
     fs.writeFileSync(videoFile, 'fake-video-content-bad')
     const rows = [{ id: 1, file_path: videoFile, file_type: 'video' }]
@@ -870,6 +945,27 @@ describe('worker-entry 消息处理分支', () => {
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
     const update = fake.runs.find((r) => r.sql.startsWith('UPDATE media_files SET width'))
     expect(update?.args[2]).toBeNull()
+  })
+
+  it('视频 0s 抽帧失败但 1s 重试成功 → 缩略图非空且按 0s→1s 重试', async () => {
+    ctl.ffmpegMode = 'retryThenOk'
+    ctl.ffmpegSeeks = []
+    const videoFile = path.join(tmpRoot, 'clip-retry.mp4')
+    fs.writeFileSync(videoFile, 'fake-video-content-retry')
+    const rows = [{ id: 1, file_path: videoFile, file_type: 'video' }]
+    const fake = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? rows : []))
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'video-retry.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    expect(evt.payload).toMatchObject({ success: true, processed: 1, total: 1 })
+    const update = fake.runs.find((r) => r.sql.startsWith('UPDATE media_files SET width'))
+    // 重试成功，应写出有效缩略图路径
+    expect(String(update?.args[2])).toMatch(/\.jpg$/)
+    // 断言先尝试 0s 再重试 1s
+    expect(ctl.ffmpegSeeks).toEqual([0, 1])
   })
 
   // ── 进度 500ms 节流 ──
