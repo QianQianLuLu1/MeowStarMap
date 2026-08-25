@@ -317,6 +317,8 @@ async function getCommonLauncherInstallCandidates(): Promise<string[]> {
     for (const pf of programFilesRoots) {
       candidates.push(path.join(drive, pf, 'InfinityNikki Launcher', 'InfinityNikki'))
     }
+    // spec 第 3 变体：自定义盘符根直接安装（无 Program Files 前缀），如 D:\InfinityNikki Launcher\InfinityNikki\
+    candidates.push(path.join(drive, 'InfinityNikki Launcher', 'InfinityNikki'))
   }
   return candidates
 }
@@ -596,20 +598,46 @@ export async function findSteamGamePaths(): Promise<string[]> {
     // VDF 文件不存在或读取失败，仅用 Steam 主目录
   }
 
-  const found: string[] = []
+  const found = new Set<string>()
   // 在每个 Steam 库的 steamapps/common/InfinityNikki 下查找特征文件
   for (const libPath of libraryPaths) {
     if (shouldStop) break
     const gamePath = path.join(libPath, 'steamapps', 'common', 'InfinityNikki')
     try {
       await fsp.access(gamePath, fs.constants.F_OK)
-      found.push(gamePath)
+      found.add(gamePath)
     } catch {
       // 该库下无 InfinityNikki
     }
   }
 
-  return found
+  // 补充源：Steam 卸载信息键 "Steam App 2732520" 的 InstallLocation（spec 指定来源）。
+  // 与 libraryfolders.vdf 解析「两者并存」去重合并，覆盖 VDF 缺失/布局异常场景；
+  // 注册表查询失败或键缺失返回 null（不抛异常），由下方 access 校验兜底。
+  const uninstallPath = await querySteamApp2732520InstallLocation()
+  if (uninstallPath) {
+    try {
+      await fsp.access(uninstallPath, fs.constants.F_OK)
+      found.add(uninstallPath)
+    } catch {
+      // 该路径不存在
+    }
+  }
+
+  return Array.from(found)
+}
+
+/**
+ * 读取 Steam 卸载信息键 "Steam App 2732520" 的 InstallLocation（spec 指定来源）。
+ * 与 querySteamInstallPath + libraryfolders.vdf 解析「两者并存」：本函数直接给出游戏安装根目录，
+ * 作为 libraryfolders 的兜底/补充来源，覆盖 VDF 缺失或布局异常场景。
+ * 复用 queryRegistryValue（已处理 REG_EXPAND_SZ 的 %VAR% 展开）；查询失败/键缺失返回 null，不抛异常。
+ */
+async function querySteamApp2732520InstallLocation(): Promise<string | null> {
+  return queryRegistryValue(
+    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App 2732520',
+    'InstallLocation'
+  )
 }
 
 /**
@@ -619,56 +647,93 @@ export async function findSteamGamePaths(): Promise<string[]> {
 export async function findEpicGamePaths(): Promise<string[]> {
   if (process.platform !== 'win32') return []
 
-  const found: string[] = []
+  const epicRoots = new Set<string>()
   const regKeys = [
     { key: 'HKCU\\Software\\Epic Games\\EOS', value: 'InstallPath' },
     { key: 'HKLM\\SOFTWARE\\WOW6432Node\\Epic Games\\EOS', value: 'InstallPath' }
   ]
 
-  const epicPaths = new Set<string>()
   for (const { key, value } of regKeys) {
     try {
-      const result = await new Promise<string | null>((resolve) => {
-        execFile(
-          'reg',
-          ['query', key, '/v', value],
-          { timeout: 3000, windowsHide: true },
-          (err, stdout) => {
-            if (err) {
-              resolve(null)
-              return
-            }
-            const lines = stdout.split(/\r?\n/)
-            for (const line of lines) {
-              const m = line.match(/REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/i)
-              if (m) {
-                resolve(m[1].trim())
-                return
-              }
-            }
-            resolve(null)
-          }
-        )
-      })
-      if (result) epicPaths.add(result)
+      const result = await queryRegistryValue(key, value)
+      if (result) epicRoots.add(result)
     } catch {
       // 该注册表键查询失败
     }
   }
 
   // 在每个 Epic 安装路径下查找 InfinityNikki
-  for (const epicPath of epicPaths) {
+  const found = new Set<string>()
+  for (const epicPath of epicRoots) {
     if (shouldStop) break
     const gamePath = path.join(epicPath, 'InfinityNikki')
     try {
       await fsp.access(gamePath, fs.constants.F_OK)
-      found.push(gamePath)
+      found.add(gamePath)
     } catch {
       // 该路径下无 InfinityNikki
     }
   }
 
-  return found
+  // 补充源：Epic 清单文件（spec 指定的"清单文件"定位方式），与 EOS 注册表「两者并存」去重合并
+  for (const manifestPath of await parseEpicManifests()) {
+    found.add(manifestPath)
+  }
+
+  return Array.from(found)
+}
+
+/**
+ * 解析 Epic 清单文件定位无限暖暖安装目录（spec 指定的"清单文件"方式）。
+ * 清单位于 C:\ProgramData\Epic\EpicGamesLauncher\Data\Manifests\*.item|*.json（JSON 格式，
+ * 含 InstallLocation / AppName / DisplayName 字段）。仅采纳 InstallLocation 指向实际存在目录
+ * 且确属 InfinityNikki 的清单。清单目录不存在 / 读取失败 / 解析异常均降级返回空，不抛异常、不中断整体。
+ */
+async function parseEpicManifests(): Promise<string[]> {
+  const programData = process.env.ProgramData || 'C:\\ProgramData'
+  const manifestsDir = path.join(programData, 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests')
+
+  let files: string[]
+  try {
+    const entries = await fsp.readdir(manifestsDir)
+    files = Array.isArray(entries) ? entries : []
+  } catch {
+    return []
+  }
+
+  const results: string[] = []
+  for (const file of files) {
+    if (shouldStop) break
+    if (!file.toLowerCase().endsWith('.item') && !file.toLowerCase().endsWith('.json')) {
+      continue
+    }
+    const filePath = path.join(manifestsDir, file)
+    try {
+      const content = await fsp.readFile(filePath, 'utf-8')
+      const json = JSON.parse(content) as {
+        InstallLocation?: string
+        AppName?: string
+        DisplayName?: string
+      }
+      const installLocation = json?.InstallLocation
+      if (
+        installLocation &&
+        (installLocation.toLowerCase().includes('infinitynikki') ||
+          (json.AppName || '').toLowerCase().includes('infinitynikki'))
+      ) {
+        const resolved = path.resolve(installLocation)
+        try {
+          await fsp.access(resolved, fs.constants.F_OK)
+          results.push(resolved)
+        } catch {
+          // 清单声明的安装目录不存在
+        }
+      }
+    } catch {
+      // 单文件解析失败，跳过
+    }
+  }
+  return results
 }
 
 /**

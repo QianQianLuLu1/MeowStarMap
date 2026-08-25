@@ -254,6 +254,46 @@ describe('findSteamGamePaths（Steam 注册表 + VDF 快速路径）', () => {
     await expect(findSteamGamePaths()).resolves.toEqual([])
     expect(mockAccess).not.toHaveBeenCalled()
   })
+
+  it('Steam App 2732520 卸载键 InstallLocation 命中（libraryfolders 无结果时仍返回）', async () => {
+    stubExecFile((key) =>
+      key === 'HKCU\\Software\\Valve\\Steam'
+        ? regOutput('C:\\Steam')
+        : key === 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App 2732520'
+          ? regOutput('D:\\AltSteam\\InfinityNikki')
+          : null
+    )
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubAccess(['D:\\AltSteam\\InfinityNikki'])
+
+    await expect(findSteamGamePaths()).resolves.toEqual(['D:\\AltSteam\\InfinityNikki'])
+  })
+
+  it('libraryfolders 与 2732520 键指向同一路径 → 去重为 1 条', async () => {
+    stubExecFile((key) =>
+      key === 'HKCU\\Software\\Valve\\Steam'
+        ? regOutput('C:\\Steam')
+        : key === 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\Steam App 2732520'
+          ? regOutput('D:\\SteamLibrary\\steamapps\\common\\InfinityNikki')
+          : null
+    )
+    mockReadFile.mockResolvedValue('"0"\n{\n\t"path"\t\t"D:\\\\SteamLibrary"\n}\n')
+    stubAccess(['D:\\SteamLibrary\\steamapps\\common\\InfinityNikki'])
+
+    await expect(findSteamGamePaths()).resolves.toEqual([
+      'D:\\SteamLibrary\\steamapps\\common\\InfinityNikki'
+    ])
+  })
+
+  it('2732520 键缺失/查询失败 → 不抛异常，仅由 libraryfolders 兜底', async () => {
+    stubExecFile((key) => (key === 'HKCU\\Software\\Valve\\Steam' ? regOutput('C:\\Steam') : null))
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubAccess(['C:\\Steam\\steamapps\\common\\InfinityNikki'])
+
+    await expect(findSteamGamePaths()).resolves.toEqual([
+      'C:\\Steam\\steamapps\\common\\InfinityNikki'
+    ])
+  })
 })
 
 // ============ findEpicGamePaths ============
@@ -283,6 +323,40 @@ describe('findEpicGamePaths（Epic 注册表快速路径）', () => {
 
     await expect(findEpicGamePaths()).resolves.toEqual([])
     expect(mockAccess).not.toHaveBeenCalled()
+  })
+
+  it('Epic 清单文件 InstallLocation 命中（注册表失败时仍返回）', async () => {
+    stubExecFile(() => null)
+    mockReaddir.mockResolvedValue(['InfinityNikki.item'])
+    mockReadFile.mockImplementation((p: unknown) =>
+      String(p).includes('InfinityNikki.item')
+        ? Promise.resolve(JSON.stringify({ InstallLocation: 'E:\\EpicGames\\InfinityNikki' }))
+        : Promise.reject(new Error('ENOENT'))
+    )
+    stubAccess(['E:\\EpicGames\\InfinityNikki'])
+
+    await expect(findEpicGamePaths()).resolves.toEqual(['E:\\EpicGames\\InfinityNikki'])
+  })
+
+  it('清单 InstallLocation 非 InfinityNikki → 忽略', async () => {
+    stubExecFile(() => null)
+    mockReaddir.mockResolvedValue(['OtherGame.item'])
+    mockReadFile.mockImplementation((p: unknown) =>
+      String(p).includes('OtherGame.item')
+        ? Promise.resolve(JSON.stringify({ InstallLocation: 'C:\\Games\\OtherGame' }))
+        : Promise.reject(new Error('ENOENT'))
+    )
+    stubAccess([])
+
+    await expect(findEpicGamePaths()).resolves.toEqual([])
+  })
+
+  it('清单目录不存在（readdir 失败）→ 降级返回空，不抛异常', async () => {
+    stubExecFile(() => null)
+    mockReaddir.mockRejectedValue(new Error('ENOENT'))
+    stubAccess([])
+
+    await expect(findEpicGamePaths()).resolves.toEqual([])
   })
 })
 
@@ -496,6 +570,18 @@ describe('findOfficialLauncherGamePaths - 常见安装路径枚举（C: 及自�
     stubPowershellFail()
 
     await expect(findOfficialLauncherGamePaths()).resolves.toEqual([])
+  })
+
+  it('自定义盘符根直接安装 D:\\InfinityNikki Launcher\\InfinityNikki（无 Program Files 前缀）命中', async () => {
+    // 仅允许 D: 盘符 + 盘符根变体候选下的 X6Game，使枚举命中 spec 一.1 第 3 变体
+    stubAccess(['D:\\', 'D:\\InfinityNikki Launcher\\InfinityNikki\\X6Game'])
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubPowershellFail()
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\InfinityNikki Launcher\\InfinityNikki'
+    ])
   })
 })
 
