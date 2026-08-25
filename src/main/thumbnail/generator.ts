@@ -305,10 +305,20 @@ export class ThumbnailGenerator {
   async generate(filePath: string, quality?: 'low' | 'standard' | 'high'): Promise<string | null> {
     // GamePlayPhotos 豁免：该目录下的文件已有游戏原生低清缩略图（同名文件位于兄弟目录
     // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径。
-    // 入口直接早退：不做任何解码/生成/写盘；HQ 路径映射为原生 LQ 路径，
-    // 其余游戏拍照路径（无原生缩略图可推导）返回原路径兜底。
+    // 入口直接早退：不做任何解码/生成/写盘；用 access(R_OK) 校验推导出的原生 LQ 路径，
+    // 存在 → 返回原生路径；不存在或不可推导（含视频）→ 返回 null（维持“失败返回 null”
+    // 旧语义）：绝不回退原路径、绝不触发生成——该路径下禁用生成是硬性需求。
     if (isGamePlayPhotosPath(filePath)) {
-      return resolveNativeThumbnailPath(filePath) ?? filePath
+      const native = resolveNativeThumbnailPath(filePath)
+      if (native) {
+        try {
+          await fsp.access(native, fs.constants.R_OK)
+          return native
+        } catch {
+          // 原生 LQ 不可读：落入下方统一返回 null（不回退原路径、不触发生成）
+        }
+      }
+      return null
     }
 
     // F-S4 修复：低质量模式原直接调用 doGenerateLow 不经过 generatingLocks，

@@ -27,9 +27,9 @@ import { resolveNativeThumbnailPath } from './path-classifier'
 
 type LogLevel = 'info' | 'warn' | 'error'
 
-// 归一化后（小写 + 正斜杠）的 HQ 路径命中条件：
-// ...\GamePlayPhotos\{任意中间段（如数字 UID）}\NikkiPhotos_HighQuality\...
-const HQ_GALLERY_LIKE = '%/gameplayphotos/%/nikkiphotos_highquality/%'
+// 归一化后（小写 + 正斜杠）的 HQ 路径命中条件（评审收紧：完整游戏目录特征）：
+// ...\X6Game\Saved\GamePlayPhotos\{任意中间段（如数字 UID）}\NikkiPhotos_HighQuality\...
+const HQ_GALLERY_LIKE = '%/x6game/saved/gameplayphotos/%/nikkiphotos_highquality/%'
 
 export function repairLegacyDataV6(
   db: DatabaseType.Database,

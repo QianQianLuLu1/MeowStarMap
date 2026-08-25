@@ -89,18 +89,21 @@ export function extractMediaSourceFromPath(filePath: string): 'game' | 'launcher
  * 判断路径是否属于游戏内拍照目录（GamePlayPhotos）
  *
  * 归一化口径与 extractMediaSourceFromPath 一致：正斜杠统一为反斜杠 + 小写后子串匹配。
+ * 评审收紧：必须命中完整游戏目录特征 \X6Game\Saved\GamePlayPhotos\，
+ * 防止用户自建的同名目录（如 C:\backup\GamePlayPhotos\）被误豁免。
  * 空串返回 false，不抛异常。
  */
 export function isGamePlayPhotosPath(filePath: string): boolean {
   if (!filePath) return false
   const normalized = filePath.replace(/\//g, '\\').toLowerCase()
-  return normalized.includes('\\gameplayphotos\\')
+  return normalized.includes('\\x6game\\saved\\gameplayphotos\\')
 }
 
 /**
  * 由 HQ（高清原图）路径推导同名的游戏原生 LQ（低清缩略图）路径。
  *
- * 仅当路径含 \GamePlayPhotos\ 且含 \NikkiPhotos_HighQuality\ 目录段时生效：
+ * 仅当路径含完整游戏目录特征 \X6Game\Saved\GamePlayPhotos\ 且含 \NikkiPhotos_HighQuality\
+ * 目录段时生效（评审收紧：同名用户目录不推导）：
  * 在归一化（小写 + 反斜杠）字符串上大小写不敏感定位 HQ 目录段，再映射回原路径
  * 同位置替换为 NikkiPhotos_LowQuality；原路径其余部分的大小写与正/反斜杠分隔符
  * 原样保留（前/后分隔符各自取原路径对应位置的字符）。若原目录段大小写异常，
@@ -112,7 +115,7 @@ export function resolveNativeThumbnailPath(hqPath: string): string | null {
   if (!hqPath) return null
   // 归一化只做 /→\ 与小写转换，字符串长度不变，索引与原路径一一对应
   const normalized = hqPath.replace(/\//g, '\\').toLowerCase()
-  if (!normalized.includes('\\gameplayphotos\\')) return null
+  if (!normalized.includes('\\x6game\\saved\\gameplayphotos\\')) return null
   const HQ_SEGMENT = '\\nikkiphotos_highquality\\'
   const idx = normalized.indexOf(HQ_SEGMENT)
   if (idx === -1) return null

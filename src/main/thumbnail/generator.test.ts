@@ -278,36 +278,61 @@ describe('ThumbnailGenerator GamePlayPhotos 原生缩略图豁免', () => {
     }
   })
 
-  it('GamePlayPhotos HQ 路径 → 早退返回原生 LQ 路径，零解码/零写盘', async () => {
-    // 源文件故意不存在：若误入原生成逻辑，pathExists 检查会返回 null，
-    // 因此非 null 且等于原生 LQ 路径即可证明早退生效
-    const hqPath =
-      'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\123456789\\NikkiPhotos_HighQuality\\p.jpg'
+  it('GamePlayPhotos HQ 路径且原生 LQ 存在 → 早退返回 LQ 路径，零解码/零写盘', async () => {
+    // 在临时目录构造真实的 GamePlayPhotos 目录结构：仅创建 LQ 文件（早退只校验 LQ 存在）
+    const gpRoot = path.join(tmpCacheDir, 'X6Game', 'Saved', 'GamePlayPhotos', '123456789')
+    const hqPath = path.join(gpRoot, 'NikkiPhotos_HighQuality', 'p.jpg')
+    const lqPath = path.join(gpRoot, 'NikkiPhotos_LowQuality', 'p.jpg')
+    fs.mkdirSync(path.dirname(lqPath), { recursive: true })
+    fs.writeFileSync(lqPath, Buffer.alloc(32, 0xff))
+
     const result = await gen.generate(hqPath)
-    expect(result).toBe(
-      'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\123456789\\NikkiPhotos_LowQuality\\p.jpg'
-    )
-    // 底层解码/写盘函数未被调用：sharp 零调用、ffmpeg 零抽帧、缓存目录无缩略图产物
+    expect(result).toBe(lqPath)
+    // 底层解码/写盘函数未被调用：sharp 零调用、ffmpeg 零抽帧、缓存目录无缩略图产物（_low/_high/.jpg）
     expect(ctl.sharpCalls).toHaveLength(0)
     expect(ctl.seeks).toHaveLength(0)
     expect(ctl.written).toHaveLength(0)
     expect(fs.readdirSync(tmpCacheDir).filter((n) => n.endsWith('.jpg'))).toHaveLength(0)
   })
 
-  it('GamePlayPhotos 非 HQ 路径（视频子目录）→ 早退返回原路径兜底', async () => {
+  it('GamePlayPhotos HQ 路径但原生 LQ 缺失 → 早退返回 null（不生成、不回退原路径）', async () => {
+    // LQ 文件故意不创建：评审修正后的早退语义——原生缩略图失效时返回 null
+    // （维持“失败返回 null”旧语义），绝不回退原路径、绝不触发常规生成流程
+    const hqPath = path.join(
+      tmpCacheDir,
+      'X6Game',
+      'Saved',
+      'GamePlayPhotos',
+      '123456789',
+      'NikkiPhotos_HighQuality',
+      'missing-lq.jpg'
+    )
+    const result = await gen.generate(hqPath)
+    expect(result).toBeNull()
+    // 同样零解码/零写盘：不回退到常规生成流程（该路径禁用生成是硬性需求）
+    expect(ctl.sharpCalls).toHaveLength(0)
+    expect(ctl.seeks).toHaveLength(0)
+    expect(ctl.written).toHaveLength(0)
+  })
+
+  it('GamePlayPhotos 非 HQ 路径（视频子目录）→ 无原生缩略图可推导，早退返回 null', async () => {
     const videoPath = 'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\123456789\\xxx\\v.mp4'
     const result = await gen.generate(videoPath)
-    expect(result).toBe(videoPath)
+    // 视频不返回原路径（避免把视频原路径当缩略图），统一返回 null 且不触发生成
+    expect(result).toBeNull()
     expect(ctl.sharpCalls).toHaveLength(0)
     expect(ctl.seeks).toHaveLength(0)
   })
 
-  it('正斜杠形态的 HQ 路径同样命中豁免（大小写不敏感）', async () => {
-    const hqPath = 'd:/game/x6game/saved/gameplayphotos/123456789/nikkiPhotos_HighQuality/p.jpg'
+  it('正斜杠形态的 HQ 路径（LQ 存在）同样命中豁免（大小写不敏感）', async () => {
+    const gpRoot = path.join(tmpCacheDir, 'game', 'x6game', 'saved', 'gameplayphotos', '987654321')
+    const hqPath = `${gpRoot}/nikkiPhotos_HighQuality/p.jpg`.replace(/\\/g, '/')
+    const lqPath = path.join(gpRoot, 'NikkiPhotos_LowQuality', 'p.jpg')
+    fs.mkdirSync(path.dirname(lqPath), { recursive: true })
+    fs.writeFileSync(lqPath, Buffer.alloc(16, 0xff))
     const result = await gen.generate(hqPath)
-    expect(result).toBe(
-      'd:/game/x6game/saved/gameplayphotos/123456789/NikkiPhotos_LowQuality/p.jpg'
-    )
+    // 早退保留原路径的分隔符形态（正斜杠进正斜杠出）
+    expect(result).toBe(lqPath.replace(/\\/g, '/'))
     expect(ctl.sharpCalls).toHaveLength(0)
   })
 

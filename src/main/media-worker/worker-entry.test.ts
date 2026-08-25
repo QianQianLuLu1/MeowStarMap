@@ -51,6 +51,9 @@ interface BkSearchOpts {
 const ctl = vi.hoisted(() => ({
   /** sharp toFile 延迟 ms：fake timers 节流用例模拟慢速缩略图生成 */
   sharpToFileDelayMs: 0,
+  /** sharp metadata 实现覆写（尺寸补读损坏文件跳过用例注入失败） */
+  sharpMetadataImpl: null as
+    null | ((filePath: string) => Promise<{ width?: number; height?: number }>),
   /** calculatePHash 实现覆写（按文件注入失败） */
   phashImpl: null as null | ((filePath: string) => Promise<string | null>),
   /** hammingDistance 实现覆写（控制聚类结果/统计调用次数） */
@@ -71,14 +74,20 @@ const ctl = vi.hoisted(() => ({
   dbCtorCalls: [] as string[]
 }))
 
-// sharp：链式 mock；metadata 固定尺寸，toFile 支持受控延迟（节流用例）
+// sharp：链式 mock；metadata 固定尺寸（可逐用例覆写注入失败），toFile 支持受控延迟（节流用例）
 vi.mock('sharp', () => {
-  const chain: Record<string, unknown> = {}
-  chain.resize = () => chain
-  chain.jpeg = () => chain
-  chain.metadata = () => Promise.resolve({ width: 1920, height: 1080 })
-  chain.toFile = () => new Promise((resolve) => setTimeout(resolve, ctl.sharpToFileDelayMs))
-  return { default: () => chain }
+  const chainFor = (filePath?: string): Record<string, unknown> => {
+    const chain: Record<string, unknown> = {}
+    chain.resize = () => chain
+    chain.jpeg = () => chain
+    chain.metadata = () =>
+      ctl.sharpMetadataImpl
+        ? ctl.sharpMetadataImpl(filePath ?? '')
+        : Promise.resolve({ width: 1920, height: 1080 })
+    chain.toFile = () => new Promise((resolve) => setTimeout(resolve, ctl.sharpToFileDelayMs))
+    return chain
+  }
+  return { default: (filePath?: string) => chainFor(filePath) }
 })
 
 // fluent-ffmpeg：链式命令 mock；run 后异步触发 end/error（受控）
@@ -538,13 +547,18 @@ describe('worker-entry 消息处理分支', () => {
     ]
     let selectSql = ''
     // 假 db 按 SQL 路由：模拟 SQLite 执行归一化排除条件后的返回行集，
-    // 若 worker 的 SQL 缺少豁免条件则无法过滤，后续 processed 计数会暂露差异
+    // 若 worker 的 SQL 缺少豁免条件则无法过滤，后续 processed 计数会暂露差异。
+    // 路由区分生成阶段（NOT LIKE）与尺寸补读阶段（LIKE）：补读阶段不返回行，
+    // 使本用例仅观察生成阶段行为。
     const fake = createFakeDb((sql) => {
+      if (sql.includes("LIKE '%/x6game/saved/gameplayphotos/%'") && !sql.includes('NOT LIKE'))
+        return []
       if (!sql.includes('thumbnail IS NULL')) return []
       selectSql = sql
-      if (!sql.includes("NOT LIKE '%/gameplayphotos/%'")) return rows
+      if (!sql.includes("NOT LIKE '%/x6game/saved/gameplayphotos/%'")) return rows
       return rows.filter(
-        (r) => !r.file_path.replace(/\\/g, '/').toLowerCase().includes('/gameplayphotos/')
+        (r) =>
+          !r.file_path.replace(/\\/g, '/').toLowerCase().includes('/x6game/saved/gameplayphotos/')
       )
     })
     ctl.currentDb = fake.db
@@ -553,16 +567,138 @@ describe('worker-entry 消息处理分支', () => {
       payload: { dbPath: 'gameplay-exempt.db', cacheDir, thumbnailQuality: 'standard' }
     })
     const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
-    // SQL 形态断言：归一化排除条件与 media-repository NORMALIZED_PATH_EXPR 同口径
+    // SQL 形态断言：收紧后的完整游戏目录特征排除条件，口径同 media-repository NORMALIZED_PATH_EXPR
     expect(selectSql).toContain('(thumbnail IS NULL OR width IS NULL OR height IS NULL)')
     expect(selectSql).toContain(
-      "LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/gameplayphotos/%'"
+      "LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%'"
     )
-    // 行为断言：仅普通图片行被处理并写库（updateStmt args 末位为 row id）
+    // 行为断言：仅普通图片行被处理并写库（生成阶段 UPDATE 含 thumbnail 列，args 末位为 row id）
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
-    const updates = fake.runs.filter((r) => r.sql.startsWith('UPDATE media_files SET width'))
+    const updates = fake.runs.filter((r) =>
+      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+    )
     expect(updates).toHaveLength(1)
     expect(updates[0].args[6]).toBe(1)
+  })
+
+  it('同名但非游戏路径（无 \\X6Game\\Saved\\ 前缀）不被排除，正常生成（评审收紧）', async () => {
+    // C:/backup/GamePlayPhotos/a.jpg：含 gameplayphotos 段但非完整游戏目录特征，
+    // 收紧后不得被豁免，应像普通图片一样正常生成并写库（含尺寸补读阶段也不命中）
+    const rows = [
+      {
+        id: 1,
+        file_path: 'C:/backup/GamePlayPhotos/a.jpg',
+        file_type: 'image'
+      }
+    ]
+    const fake = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? rows : []))
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'same-name-user.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
+    const updates = fake.runs.filter((r) =>
+      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+    )
+    expect(updates).toHaveLength(1)
+    expect(updates[0].args[6]).toBe(1)
+  })
+
+  it('尺寸补读阶段：游戏图片仅回填 width/height，不写 thumbnail、不触发生成（评审修复）', async () => {
+    // 生成阶段返回空（普通行无待处理项），尺寸补读阶段返回 2 行游戏图片（尺寸缺失）
+    let dimSql = ''
+    const dimRows = [
+      {
+        id: 11,
+        file_path: 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/a.jpg'
+      },
+      {
+        id: 12,
+        file_path: 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/b.jpg'
+      }
+    ]
+    const fake = createFakeDb((sql) => {
+      if (sql.includes('thumbnail IS NULL')) return []
+      if (
+        sql.includes("file_type = 'image'") &&
+        sql.includes("LIKE '%/x6game/saved/gameplayphotos/%'")
+      ) {
+        dimSql = sql
+        return dimRows
+      }
+      return []
+    })
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'dim-backfill.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    // 补读查询形态断言：仅图片行 + 尺寸缺失 + 完整游戏目录特征命中（视频行不处理）
+    expect(dimSql).toContain("file_type = 'image'")
+    expect(dimSql).toContain('(width IS NULL OR height IS NULL)')
+    expect(dimSql).toContain("LIKE '%/x6game/saved/gameplayphotos/%'")
+    // 仅写尺寸：独立 UPDATE 语句（不含 thumbnail/phash 列），参数为 [width, height, id]
+    const dimUpdates = fake.runs.filter((r) =>
+      r.sql.startsWith('UPDATE media_files SET width = ?, height = ? WHERE id = ?')
+    )
+    expect(dimUpdates).toHaveLength(2)
+    expect(dimUpdates.map((u) => u.args)).toEqual([
+      [1920, 1080, 11],
+      [1920, 1080, 12]
+    ])
+    // 不触发生成：无含 thumbnail 列的 UPDATE、无缩略图产物写盘（toFile 零调用）
+    expect(
+      fake.runs.filter((r) =>
+        r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+      )
+    ).toHaveLength(0)
+    // 进度计数并入 total：补读 2 行均计入 processed/total
+    expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
+  })
+
+  it('尺寸补读阶段：损坏文件跳过不中断，其余行正常补读（评审修复）', async () => {
+    // 损坏文件（id=21）metadata 抛错 → 跳过不写库、不中断批次；正常行（id=22）仍补读成功。
+    const brokenPath =
+      'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/broken.jpg'
+    const okPath = 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/ok.jpg'
+    ctl.sharpMetadataImpl = (p) =>
+      p === brokenPath
+        ? Promise.reject(new Error('Input file is missing or corrupt'))
+        : Promise.resolve({ width: 800, height: 600 })
+    const dimRows = [
+      { id: 21, file_path: brokenPath },
+      { id: 22, file_path: okPath }
+    ]
+    const fake = createFakeDb((sql) => {
+      if (sql.includes('thumbnail IS NULL')) return []
+      if (
+        sql.includes("file_type = 'image'") &&
+        sql.includes("LIKE '%/x6game/saved/gameplayphotos/%'")
+      ) {
+        return dimRows
+      }
+      return []
+    })
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'dim-skip.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    ctl.sharpMetadataImpl = null
+    // 批次仍报成功：损坏行被跳过，仅正常行写库（无 id=21 的 UPDATE）
+    expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 2 })
+    const dimUpdates = fake.runs.filter((r) =>
+      r.sql.startsWith('UPDATE media_files SET width = ?, height = ? WHERE id = ?')
+    )
+    expect(dimUpdates).toHaveLength(1)
+    expect(dimUpdates[0].args).toEqual([800, 600, 22])
+    // 失败日志上报（workerLog warn 转发）
+    const logs = eventsOf(port.messages, 'MEDIA_WORKER_LOG')
+    expect(logs.some((l) => String(l.payload.message).includes('尺寸补读失败'))).toBe(true)
   })
 
   it('单文件处理抛错 → MEDIA_WORKER_LOG 上报并跳过，不影响后续文件', async () => {

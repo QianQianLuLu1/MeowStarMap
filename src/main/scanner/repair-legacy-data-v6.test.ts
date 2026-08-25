@@ -34,7 +34,7 @@ function isV6Candidate(row: MediaRow): boolean {
   const thumbnailOk = row.thumbnail === null || row.thumbnail.includes('thumbnails')
   if (!thumbnailOk) return false
   const norm = row.file_path.replace(/\\/g, '/').toLowerCase()
-  return /\/gameplayphotos\/.*\/nikkiphotos_highquality\//.test(norm)
+  return /\/x6game\/saved\/gameplayphotos\/.*\/nikkiphotos_highquality\//.test(norm)
 }
 
 function createMockDb(opts: { withMigrationsTable?: boolean } = {}): MockDb {
@@ -139,6 +139,8 @@ let lqOfA: string
 let hqNoLq: string
 // 非游戏路径图片（仅路径用于行数据，文件不必真实存在）
 const NON_GAME_PATH = 'D:\\photos\\vacation\\c.jpg'
+// 评审收紧：含 gameplayphotos 但无完整游戏目录特征的同名用户目录（不应命中候选条件）
+const SAME_NAME_USER_PATH = 'C:\\backup\\GamePlayPhotos\\123456789\\NikkiPhotos_HighQuality\\a.jpg'
 
 beforeAll(async () => {
   tmpRoot = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'nikki-repair-v6-'))
@@ -203,6 +205,8 @@ describe('repairLegacyDataV6', () => {
   it('4. 非游戏路径行不受影响（无 UPDATE）', () => {
     const mock = createMockDb()
     insertRow(mock, NON_GAME_PATH, null)
+    // 评审收紧：同名但无 \X6Game\Saved\ 前缀的用户目录同样不命中候选条件（即使 LQ 存在）
+    insertRow(mock, SAME_NAME_USER_PATH, null)
     // 已关联原生缩略图的 HQ 行也不应再被选中（不命中候选条件）
     const lqLinked = hqWithLq.replace('a.jpg', 'linked.jpg')
     insertRow(mock, hqWithLq, lqLinked)

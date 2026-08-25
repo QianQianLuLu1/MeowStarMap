@@ -3264,6 +3264,8 @@
         "repairV3Failed": "",
         "markMigrationV4Failed": "",
         "repairV4Failed": "",
+        "markMigrationV5Failed": "",
+        "repairV5Failed": "",
         "integrityCheckFailed": "",
         "heartbeatTimeout": "",
         "bridgeReadyTimeout": "",

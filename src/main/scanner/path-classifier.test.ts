@@ -328,10 +328,25 @@ describe('isGamePlayPhotosPath', () => {
     )
   })
 
-  it('大小写不敏感（全小写/全大写均命中）', () => {
-    expect(isGamePlayPhotosPath('D:\\game\\gameplayphotos\\123456789\\photo.jpg')).toBe(true)
-    expect(isGamePlayPhotosPath('D:\\game\\GAMEPLAYPHOTOS\\123456789\\photo.jpg')).toBe(true)
-    expect(isGamePlayPhotosPath('d:/GAME/GamePlayPhotos/123456789/photo.jpg')).toBe(true)
+  it('大小写不敏感（完整签名下全小写/全大写均命中）', () => {
+    expect(
+      isGamePlayPhotosPath('D:\\game\\x6game\\saved\\gameplayphotos\\123456789\\photo.jpg')
+    ).toBe(true)
+    expect(
+      isGamePlayPhotosPath('D:\\game\\X6GAME\\SAVED\\GAMEPLAYPHOTOS\\123456789\\photo.jpg')
+    ).toBe(true)
+    expect(isGamePlayPhotosPath('d:/game/X6Game/Saved/GamePlayPhotos/123456789/photo.jpg')).toBe(
+      true
+    )
+  })
+
+  it('仅含 gameplayphotos 但无 x6game/saved 前缀的同名用户目录不命中（评审收紧）', () => {
+    expect(isGamePlayPhotosPath('C:\\backup\\GamePlayPhotos\\a.jpg')).toBe(false)
+    expect(isGamePlayPhotosPath('D:\\game\\gameplayphotos\\123456789\\photo.jpg')).toBe(false)
+    expect(isGamePlayPhotosPath('D:\\x6game\\GamePlayPhotos\\123456789\\photo.jpg')).toBe(false)
+    expect(isGamePlayPhotosPath('D:/x6game/savedphotos/gameplayphotos/123456789/photo.jpg')).toBe(
+      false
+    )
   })
 
   it('非游戏拍照路径返回 false', () => {
@@ -384,9 +399,15 @@ describe('resolveNativeThumbnailPath', () => {
     expect(resolveNativeThumbnailPath('D:/Game/X6Game/Saved/ScreenShot/a.jpg')).toBeNull()
   })
 
-  it('④ 非 gameplayphotos 路径与空串 → null', () => {
+  it('④ 非游戏拍照路径与空串 → null', () => {
     expect(resolveNativeThumbnailPath('D:\\photos\\NikkiPhotos_HighQuality\\photo.jpg')).toBeNull()
     expect(resolveNativeThumbnailPath('D:\\game\\CloudPhotos\\12345678\\photo.jpg')).toBeNull()
+    // 评审收紧：含 HQ 段但无完整游戏目录特征的同名用户目录不推导（即使 LQ 真实存在）
+    expect(
+      resolveNativeThumbnailPath(
+        'C:\\backup\\GamePlayPhotos\\123456789\\NikkiPhotos_HighQuality\\photo.jpg'
+      )
+    ).toBeNull()
     expect(() => resolveNativeThumbnailPath('')).not.toThrow()
     expect(resolveNativeThumbnailPath('')).toBeNull()
   })
@@ -394,14 +415,16 @@ describe('resolveNativeThumbnailPath', () => {
   it('HQ 目录段大小写异常时仍可定位，替换段用标准拼写且保留原分隔符', () => {
     expect(
       resolveNativeThumbnailPath(
-        'D:\\game\\GAMEPLAYPHOTOS\\123456789\\nikkiPHOTOS_highquality\\photo.jpg'
+        'D:\\game\\X6GAME\\SAVED\\GAMEPLAYPHOTOS\\123456789\\nikkiPHOTOS_highquality\\photo.jpg'
       )
-    ).toBe('D:\\game\\GAMEPLAYPHOTOS\\123456789\\NikkiPhotos_LowQuality\\photo.jpg')
+    ).toBe('D:\\game\\X6GAME\\SAVED\\GAMEPLAYPHOTOS\\123456789\\NikkiPhotos_LowQuality\\photo.jpg')
   })
 
   it('混合分隔符路径：前后分隔符各自按原位置形态保留', () => {
     expect(
-      resolveNativeThumbnailPath('D:/Game/GamePlayPhotos\\123456789/NikkiPhotos_HighQuality\\p.jpg')
-    ).toBe('D:/Game/GamePlayPhotos\\123456789/NikkiPhotos_LowQuality\\p.jpg')
+      resolveNativeThumbnailPath(
+        'D:/Game/X6Game/Saved\\GamePlayPhotos\\123456789/NikkiPhotos_HighQuality\\p.jpg'
+      )
+    ).toBe('D:/Game/X6Game/Saved\\GamePlayPhotos\\123456789/NikkiPhotos_LowQuality\\p.jpg')
   })
 })

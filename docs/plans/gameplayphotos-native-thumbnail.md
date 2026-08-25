@@ -231,3 +231,15 @@ npx vitest run      # 全量单元测试
 npm run typecheck   # 全量类型检查
 npx eslint          # 代码规范检查
 ```
+
+### 评审修复记录（2026-08-25 追加）
+
+两位评审员对方案复审后提出 4 项修复，本轮一次性落地：
+
+1. **签名收紧为完整游戏目录特征**：`isGamePlayPhotosPath` / `resolveNativeThumbnailPath` 命中条件从含 `\gameplayphotos\` 收紧为 `\x6game\saved\gameplayphotos\`（归一化口径不变：正斜杠→反斜杠 + 小写）；media-worker 批量排除、`repair-legacy-data-v6` 候选 LIKE、启动统计 `THUMB_QUERY` 三处 SQL 同步收紧，防止用户自建同名目录（如 `C:\backup\GamePlayPhotos\`）被误豁免。
+2. **生成器早退语义修正**：早退分支改用 `fsp.access(native, R_OK)` 校验原生 LQ 存在性；存在→返回原生路径，不存在或不可推导（含视频）→返回 `null`（维持“失败返回 null”旧语义），绝不回退原路径、绝不触发生成——该路径下禁用生成是硬性需求。
+3. **新增尺寸补读阶段**：豁免不得连带放弃尺寸回填。`startThumbnailBatch` 改为两阶段：生成阶段维持收紧排除；新增补读阶段对命中完整签名且 `width/height` 缺失的图片行仅用 `sharp(file_path).metadata()` 读尺寸后 `UPDATE width/height`（不动 thumbnail、不算 phash、不写缓存），单行失败跳过不中断，进度计数并入 total；视频行不处理（扫描时已由 ffprobe 写入）。
+4. **启动统计口径同步**：`startup-tasks.ts` 的 `THUMB_QUERY` 追加与生成阶段相同的收紧排除条件，两处口径保持一致。
+
+- **涉及文件**：`src/main/scanner/path-classifier.ts`、`src/main/scanner/repair-legacy-data-v6.ts`、`src/main/thumbnail/generator.ts`、`src/main/media-worker/worker-entry.ts`、`src/main/app/startup-tasks.ts`。
+- **对应测试同步更新**：`path-classifier.test.ts`（新增同名用户目录不命中反例）、`worker-entry.test.ts`（排除用例改完整签名 + 同名非游戏路径不排除 + 尺寸补读/损坏跳过用例）、`generator.test.ts`（失效返回 null、视频返回 null）、`repair-legacy-data-v6.test.ts` 与 `startup-tasks.test.ts` 断言同步收紧。

@@ -290,8 +290,10 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
 }
 
 /** 扫描后长任务三阶段各自的总量统计 SQL（与 media-worker 内部判定保持一致） */
+// GamePlayPhotos 豁免：与 media-worker/worker-entry.ts 缩略图批次查询同口径的归一化排除
+// （口径同 media-repository.ts NORMALIZED_PATH_EXPR），避免永不处理的行计入进度分母导致进度条虚高。
 const THUMB_QUERY =
-  'SELECT COUNT(*) as count FROM media_files WHERE thumbnail IS NULL OR width IS NULL OR height IS NULL'
+  "SELECT COUNT(*) as count FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%'"
 const PHASH_QUERY =
   "SELECT COUNT(*) as count FROM media_files WHERE file_type = 'image' AND is_deleted = 0"
 const SCENE_QUERY =

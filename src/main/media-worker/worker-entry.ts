@@ -407,15 +407,26 @@ async function startThumbnailBatch(
   try {
     // GamePlayPhotos 豁免：该目录下的文件已有游戏原生低清缩略图（同名文件位于兄弟目录
     // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径，永不触发缩略图生成。
+    // 评审收紧：完整游戏目录特征 \X6Game\Saved\GamePlayPhotos\，防止同名用户目录误伤。
     // 归一化口径与 media-repository.ts NORMALIZED_PATH_EXPR 完全一致（小写 + 正斜杠子串匹配）。
     // SQLite 字符串字面量不处理反斜杠，'\' 即单个反斜杠。
     const rows = database
       .prepare(
-        "SELECT id, file_path, file_type FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/gameplayphotos/%'"
+        "SELECT id, file_path, file_type FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%'"
       )
       .all() as Array<{ id: number; file_path: string; file_type: string }>
 
-    const total = rows.length
+    // 尺寸补读阶段（评审修复：豁免不得连带放弃尺寸回填）：
+    // 生成阶段将游戏图片排除后，其 width/height 会永久为 NULL，导致瀑布流/按尺寸排序降级。
+    // 此处仅对游戏图片行补读尺寸：sharp metadata 读宽高后 UPDATE，不动 thumbnail、
+    // 不算 phash、不写缓存；视频行不处理（视频尺寸扫描时已由 ffprobe 写入）。
+    const dimRows = database
+      .prepare(
+        "SELECT id, file_path FROM media_files WHERE file_type = 'image' AND (width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/saved/gameplayphotos/%'"
+      )
+      .all() as Array<{ id: number; file_path: string }>
+
+    const total = rows.length + dimRows.length
     if (total === 0) {
       return {
         success: true,
@@ -514,6 +525,26 @@ async function startThumbnailBatch(
     })
 
     await runWithConcurrency(tasks, THUMBNAIL_CONCURRENCY)
+
+    // --- 尺寸补读阶段：串行逐行补读游戏图片尺寸，单行失败跳过不中断，进度并入 total ---
+    if (dimRows.length > 0) {
+      const dimUpdateStmt = database.prepare(
+        'UPDATE media_files SET width = ?, height = ? WHERE id = ?'
+      )
+      for (const row of dimRows) {
+        if (shouldStopThumbnail) break
+        try {
+          const metadata = await sharp(row.file_path).metadata()
+          if (metadata?.width && metadata?.height) {
+            dimUpdateStmt.run(metadata.width, metadata.height, row.id)
+            processed++
+          }
+        } catch (err) {
+          // 单行补读失败（文件损坏/不可读等）：跳过不中断批次，下次仍可重试
+          workerLog('warn', `[Thumbnail] 游戏图片尺寸补读失败: ${row.file_path}`, err)
+        }
+      }
+    }
 
     const message = shouldStopThumbnail
       ? t('main.mediaWorker.message.workerTaskCancelled')

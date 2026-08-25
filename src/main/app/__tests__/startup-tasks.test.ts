@@ -619,6 +619,42 @@ describe('runPostScanIndexing watchdog', () => {
       vi.useRealTimers()
     }
   })
+
+  it('W3. 缩略图进度分母统计 SQL 含 GamePlayPhotos 归一化排除条件（与 media-worker 口径一致）', () => {
+    const db = makeDb({ scanHistoryCount: 0 })
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 10 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn()
+    }
+    const mwm = makeMediaWorkerManager()
+    mwm.startThumbnailBatch.mockReturnValue(new Promise(() => {}))
+    const ctx = makeAppCtx({
+      db,
+      scannerManager,
+      mainWindow: makeMainWindow(),
+      mediaWorkerManager: injectMediaWorkerManager(mwm)
+    })
+
+    const registerSpy = vi.spyOn(taskRegistry, 'register')
+    void runPostScanIndexing(ctx, 10)
+    const taskId = registerSpy.mock.calls[0][0] as string
+    registerSpy.mockRestore()
+
+    // countUnprocessed 在索引链入口同步执行，THUMB_QUERY 可直接从 prepare 桩捕获；
+    // 排除条件与 media-worker/worker-entry.ts 缩略图批次查询完全同口径，
+    // 避免永不处理的 GamePlayPhotos 行计入总量导致进度条虚高
+    const sqls = db.prepare.mock.calls.map((c) => String(c[0]))
+    const thumbCount = sqls.find((s) => s.includes('COUNT') && s.includes('thumbnail IS NULL'))
+    expect(thumbCount).toBeDefined()
+    expect(thumbCount).toContain('(thumbnail IS NULL OR width IS NULL OR height IS NULL)')
+    expect(thumbCount).toContain(
+      "LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%'"
+    )
+
+    // 取消任务清理 watchdog，避免遗留定时器污染后续用例
+    taskRegistry.cancel(taskId)
+  })
 })
 
 // ============================================================================
