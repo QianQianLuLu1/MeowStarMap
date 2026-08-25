@@ -15,6 +15,7 @@ import { workerLog } from './worker-entry'
 import {
   searchBySignatureShallow,
   searchByMediaFolderSignatureShallow,
+  findOfficialLauncherGamePaths,
   findSteamGamePaths,
   findEpicGamePaths,
   getAvailableDrives,
@@ -281,6 +282,150 @@ describe('findEpicGamePaths（Epic 注册表快速路径）', () => {
 
     await expect(findEpicGamePaths()).resolves.toEqual([])
     expect(mockAccess).not.toHaveBeenCalled()
+  })
+})
+
+// ============ findOfficialLauncherGamePaths ============
+
+describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () => {
+  const savedEnv: Record<string, string | undefined> = {}
+
+  beforeEach(() => {
+    savedEnv.LOCALAPPDATA = process.env.LOCALAPPDATA
+    savedEnv.APPDATA = process.env.APPDATA
+    savedEnv.USERPROFILE = process.env.USERPROFILE
+    savedEnv.PUBLIC = process.env.PUBLIC
+    process.env.LOCALAPPDATA = 'C:\\Users\\tester\\AppData\\Local'
+    process.env.APPDATA = 'C:\\Users\\tester\\AppData\\Roaming'
+    process.env.USERPROFILE = 'C:\\Users\\tester'
+    process.env.PUBLIC = 'C:\\Users\\Public'
+  })
+
+  afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k]
+      else process.env[k] = v
+    }
+  })
+
+  it('注册表首个键命中 + 路径验证通过 → 返回验证后的路径', async () => {
+    stubExecFile((key) =>
+      key === 'HKCU\\Software\\InfinityNikki Launcher'
+        ? regOutput('D:\\Games\\InfinityNikki Launcher\\InfinityNikki')
+        : null
+    )
+    stubAccess(['D:\\Games\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\Games\\InfinityNikki Launcher\\InfinityNikki'
+    ])
+    // 首个键命中后不应继续查询后续键
+    expect(mockAccess).toHaveBeenCalledTimes(1)
+  })
+
+  it('注册表首个键失败 → 尝试下一个键（按优先级顺序）', async () => {
+    stubExecFile((key) =>
+      key === 'HKLM\\SOFTWARE\\WOW6432Node\\InfinityNikki Launcher'
+        ? regOutput('E:\\InfinityNikki')
+        : null
+    )
+    stubAccess(['E:\\InfinityNikki\\X6Game'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['E:\\InfinityNikki'])
+  })
+
+  it('注册表全部失败 → 降级到配置文件解析（INI 格式）', async () => {
+    stubExecFile(() => null)
+    mockReadFile.mockImplementation((p: unknown) => {
+      if (p === 'C:\\Users\\tester\\AppData\\Local\\InfinityNikki Launcher\\config.ini') {
+        return Promise.resolve('[Game]\nInstallPath=F:\\Games\\InfinityNikki\n')
+      }
+      return Promise.reject(new Error('ENOENT'))
+    })
+    stubAccess(['F:\\Games\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['F:\\Games\\InfinityNikki'])
+  })
+
+  it('注册表全部失败 → 降级到配置文件解析（JSON 格式）', async () => {
+    stubExecFile(() => null)
+    mockReadFile.mockImplementation((p: unknown) => {
+      const filePath = String(p)
+      if (filePath.includes('settings.json')) {
+        return Promise.resolve('{"game": {"installPath": "G:\\InfinityNikki"}}')
+      }
+      return Promise.reject(new Error('ENOENT'))
+    })
+    stubAccess(['G:\\InfinityNikki\\X6Game'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['G:\\InfinityNikki'])
+  })
+
+  it('注册表+配置文件均失败 → 降级到快捷方式解析', async () => {
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    // PowerShell 解析快捷方式：第一个参数是命令名，第二个是 args 数组
+    vi.mocked(execFile).mockImplementation(((
+      cmd: string,
+      _args: string[],
+      _opts: unknown,
+      cb: RegCallback
+    ) => {
+      // 模拟 powershell 输出快捷方式目标路径
+      if (cmd === 'powershell' || cmd === 'pwsh') {
+        cb(null, 'H:\\InfinityNikki\\InfinityNikki.exe')
+      } else {
+        cb(new Error('reg query failed'), '')
+      }
+    }) as never)
+    stubAccess(['H:\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['H:\\InfinityNikki'])
+  })
+
+  it('路径验证失败（GamePlayPhotos 和 X6Game 都不存在）→ 继续尝试其他候选', async () => {
+    stubExecFile((key) =>
+      key === 'HKCU\\Software\\InfinityNikki Launcher'
+        ? regOutput('X:\\InvalidPath')
+        : key === 'HKLM\\SOFTWARE\\WOW6432Node\\InfinityNikki Launcher'
+          ? regOutput('Y:\\ValidPath')
+          : null
+    )
+    stubAccess(['Y:\\ValidPath\\X6Game'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['Y:\\ValidPath'])
+  })
+
+  it('所有检测方式均失败 → 返回空数组', async () => {
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    // PowerShell 也失败
+    vi.mocked(execFile).mockImplementation(((
+      _cmd: string,
+      _args: string[],
+      _opts: unknown,
+      cb: RegCallback
+    ) => {
+      cb(new Error('File not found'), '')
+    }) as never)
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([])
+  })
+
+  it('shouldStop=true → 检测中止，返回空数组', async () => {
+    workerState.shouldStop = true
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([])
+    expect(mockAccess).not.toHaveBeenCalled()
+  })
+
+  it('非 Windows 平台 → 直接返回空数组', async () => {
+    Object.defineProperty(process, 'platform', { value: 'darwin', configurable: true })
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([])
+    expect(mockAccess).not.toHaveBeenCalled()
+
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
   })
 })
 

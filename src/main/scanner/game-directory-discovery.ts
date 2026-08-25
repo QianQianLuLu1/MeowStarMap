@@ -73,6 +73,10 @@ const MEDIA_FOLDER_SIGNATURES = [
   'Video'
 ]
 
+// 游戏快捷方式文件名（中文）
+// eslint-disable-next-line no-restricted-syntax
+const GAME_SHORTCUT_CN = '\u65e0\u9650\u6696\u6696.lnk'
+
 /**
  * 浅层签名搜索（限制深度，快速定位常见安装路径）
  *
@@ -225,6 +229,303 @@ export async function searchByInstallTreeSignatureShallow(
   }
   // 去重：同一安装树下可能命中 X6Game 与 InfinityNikki Launcher 两个锚点，父目录可能相同
   return Array.from(new Set(roots))
+}
+
+// ============ 官方启动器检测常量 ============
+
+/**
+ * 官方启动器注册表候选键（按优先级排序）
+ * 覆盖常见安装位置：用户级/机器级/卸载信息/国际服变体
+ */
+const OFFICIAL_LAUNCHER_REG_KEYS: Array<{ key: string; value: string }> = [
+  // 官方启动器安装路径（最常见）
+  { key: 'HKCU\\Software\\InfinityNikki Launcher', value: 'InstallPath' },
+  { key: 'HKLM\\SOFTWARE\\WOW6432Node\\InfinityNikki Launcher', value: 'InstallPath' },
+  { key: 'HKLM\\SOFTWARE\\InfinityNikki Launcher', value: 'InstallPath' },
+  // 卸载信息中的安装位置
+  {
+    key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
+    value: 'InstallLocation'
+  },
+  {
+    key: 'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
+    value: 'InstallLocation'
+  },
+  {
+    key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
+    value: 'InstallLocation'
+  },
+  // 国际服变体
+  { key: 'HKCU\\Software\\InfinityNikkiGlobal Launcher', value: 'InstallPath' },
+  { key: 'HKLM\\SOFTWARE\\WOW6432Node\\InfinityNikkiGlobal Launcher', value: 'InstallPath' }
+]
+
+/**
+ * 启动器配置文件候选路径（环境变量展开）
+ * 注册表检测失败时的辅助路径
+ */
+function getLauncherConfigCandidates(): string[] {
+  const candidates: string[] = []
+  const localAppData = process.env.LOCALAPPDATA || ''
+  const appData = process.env.APPDATA || ''
+
+  if (localAppData) {
+    candidates.push(path.join(localAppData, 'InfinityNikki Launcher', 'config.ini'))
+    candidates.push(path.join(localAppData, 'InfinityNikki Launcher', 'settings.json'))
+  }
+  if (appData) {
+    candidates.push(path.join(appData, 'InfinityNikki Launcher', 'config.ini'))
+    candidates.push(path.join(appData, 'InfinityNikki Launcher', 'settings.json'))
+  }
+  return candidates
+}
+
+/**
+ * 桌面快捷方式候选路径（环境变量展开）
+ * 配置文件解析失败时的兜底路径
+ */
+function getShortcutCandidates(): string[] {
+  const candidates: string[] = []
+  const userProfile = process.env.USERPROFILE || ''
+  const publicDir = process.env.PUBLIC || ''
+
+  if (userProfile) {
+    candidates.push(path.join(userProfile, 'Desktop', GAME_SHORTCUT_CN))
+    candidates.push(path.join(userProfile, 'Desktop', 'InfinityNikki.lnk'))
+  }
+  if (publicDir) {
+    candidates.push(path.join(publicDir, 'Desktop', GAME_SHORTCUT_CN))
+    candidates.push(path.join(publicDir, 'Desktop', 'InfinityNikki.lnk'))
+  }
+  return candidates
+}
+
+// ============ 官方启动器检测函数 ============
+
+/**
+ * 通过官方启动器注册表查找游戏安装路径（P0，最高优先级）
+ *
+ * 三重检测策略（按优先级）：
+ * 1. 注册表检测：枚举 8 个候选键，按优先级顺序尝试
+ * 2. 配置文件解析：INI/JSON 格式，支持 InstallPath 字段
+ * 3. 快捷方式反向定位：PowerShell 解析 .lnk 目标路径
+ *
+ * 所有候选路径必须经过 validateGameRoot 验证后才返回。
+ * 非 Windows 平台直接返回空数组。
+ *
+ * @returns 游戏根目录路径数组（通常 0 或 1 个）
+ */
+export async function findOfficialLauncherGamePaths(): Promise<string[]> {
+  if (process.platform !== 'win32') return []
+
+  const validatedPaths: string[] = []
+  const seenPaths = new Set<string>()
+
+  // 1. 注册表检测（主路径）
+  for (const { key, value } of OFFICIAL_LAUNCHER_REG_KEYS) {
+    if (shouldStop) break
+    const regPath = await queryRegistryValue(key, value)
+    if (regPath) {
+      const validated = await validateGameRoot(regPath)
+      if (validated && !seenPaths.has(validated.toLowerCase())) {
+        seenPaths.add(validated.toLowerCase())
+        validatedPaths.push(validated)
+        // 注册表命中即返回（最高优先级，不继续尝试其他键）
+        return validatedPaths
+      }
+    }
+  }
+
+  // 2. 配置文件解析（辅助路径）
+  for (const configPath of getLauncherConfigCandidates()) {
+    if (shouldStop) break
+    const configInstallPath = await parseLauncherConfig(configPath)
+    if (configInstallPath) {
+      const validated = await validateGameRoot(configInstallPath)
+      if (validated && !seenPaths.has(validated.toLowerCase())) {
+        seenPaths.add(validated.toLowerCase())
+        validatedPaths.push(validated)
+        return validatedPaths
+      }
+    }
+  }
+
+  // 3. 快捷方式反向定位（兜底）
+  for (const shortcutPath of getShortcutCandidates()) {
+    if (shouldStop) break
+    const targetPath = await resolveShortcutTarget(shortcutPath)
+    if (targetPath) {
+      // 快捷方式指向的是 exe，取其父目录作为候选根
+      const candidateRoot = path.dirname(targetPath)
+      const validated = await validateGameRoot(candidateRoot)
+      if (validated && !seenPaths.has(validated.toLowerCase())) {
+        seenPaths.add(validated.toLowerCase())
+        validatedPaths.push(validated)
+        return validatedPaths
+      }
+    }
+  }
+
+  return validatedPaths
+}
+
+/**
+ * 查询 Windows 注册表键值
+ * @param key 注册表键路径（如 HKCU\Software\...）
+ * @param value 值名称（如 InstallPath）
+ * @returns 注册表值字符串，失败时返回 null
+ */
+async function queryRegistryValue(key: string, value: string): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    try {
+      execFile(
+        'reg',
+        ['query', key, '/v', value],
+        { timeout: 3000, windowsHide: true },
+        (err, stdout) => {
+          if (err) {
+            resolve(null)
+            return
+          }
+          const lines = stdout.split(/\r?\n/)
+          for (const line of lines) {
+            const m = line.match(/REG_(?:SZ|EXPAND_SZ)\s+(.+?)\s*$/i)
+            if (m) {
+              // 展开环境变量（如 %ProgramFiles%）
+              const rawValue = m[1].trim()
+              const expanded = rawValue.replace(
+                /%([^%]+)%/g,
+                (_, varName) => process.env[varName] || ''
+              )
+              resolve(expanded)
+              return
+            }
+          }
+          resolve(null)
+        }
+      )
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+/**
+ * 解析启动器配置文件（支持 INI 和 JSON 格式）
+ * @param configPath 配置文件完整路径
+ * @returns InstallPath 值，解析失败时返回 null
+ */
+async function parseLauncherConfig(configPath: string): Promise<string | null> {
+  try {
+    const content = await fsp.readFile(configPath, 'utf-8')
+    const ext = path.extname(configPath).toLowerCase()
+
+    if (ext === '.json') {
+      // JSON 格式解析
+      try {
+        const json = JSON.parse(content)
+        // 支持多种可能的字段路径
+        const installPath = json?.game?.installPath || json?.installPath || json?.gamePath
+        return installPath || null
+      } catch {
+        return null
+      }
+    } else {
+      // INI 格式解析（简化版，不引入新依赖）
+      const lines = content.split(/\r?\n/)
+      let inGameSection = false
+      for (const line of lines) {
+        const trimmed = line.trim()
+        // 检测 [Game] 段
+        if (trimmed.toLowerCase() === '[game]') {
+          inGameSection = true
+          continue
+        }
+        // 遇到新段则退出
+        if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+          inGameSection = false
+          continue
+        }
+        // 在 [Game] 段中查找 InstallPath
+        if (inGameSection) {
+          const match = trimmed.match(/^installpath\s*=\s*(.+)$/i)
+          if (match) {
+            return match[1].trim()
+          }
+        }
+      }
+      // 未找到 [Game] 段时，全局搜索 InstallPath
+      for (const line of lines) {
+        const match = line.trim().match(/^installpath\s*=\s*(.+)$/i)
+        if (match) {
+          return match[1].trim()
+        }
+      }
+      return null
+    }
+  } catch {
+    // 文件不存在或读取失败
+    return null
+  }
+}
+
+/**
+ * 解析 Windows 快捷方式 (.lnk) 目标路径
+ * 使用 PowerShell + WScript.Shell COM 对象
+ * @param shortcutPath 快捷方式完整路径
+ * @returns 目标路径字符串，失败时返回 null
+ */
+async function resolveShortcutTarget(shortcutPath: string): Promise<string | null> {
+  return new Promise<string | null>((resolve) => {
+    try {
+      const psCommand = `$shell = New-Object -ComObject WScript.Shell; $shortcut = $shell.CreateShortcut('${shortcutPath.replace(/'/g, "''")}'); $shortcut.TargetPath`
+      execFile(
+        'powershell',
+        ['-NoProfile', '-Command', psCommand],
+        { timeout: 3000, windowsHide: true },
+        (err, stdout) => {
+          if (err) {
+            resolve(null)
+            return
+          }
+          const targetPath = stdout.trim()
+          if (targetPath) {
+            resolve(targetPath)
+          } else {
+            resolve(null)
+          }
+        }
+      )
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+/**
+ * 验证候选游戏根目录是否有效
+ * 验证逻辑：检查 GamePlayPhotos 子目录或 X6Game 目录是否存在
+ * @param candidatePath 候选游戏根目录路径
+ * @returns 验证通过返回原路径，失败返回 null
+ */
+async function validateGameRoot(candidatePath: string): Promise<string | null> {
+  if (!candidatePath || typeof candidatePath !== 'string') return null
+
+  // 验证 GamePlayPhotos 子目录存在
+  const gamePlayPhotosPath = path.join(candidatePath, 'X6Game', 'Saved', 'GamePlayPhotos')
+  try {
+    await fsp.access(gamePlayPhotosPath, fs.constants.F_OK)
+    return candidatePath
+  } catch {
+    // 备选：验证 X6Game 目录存在
+    const x6gamePath = path.join(candidatePath, 'X6Game')
+    try {
+      await fsp.access(x6gamePath, fs.constants.F_OK)
+      return candidatePath
+    } catch {
+      return null
+    }
+  }
 }
 
 /**
