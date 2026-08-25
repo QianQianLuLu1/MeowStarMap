@@ -23,8 +23,9 @@ export type MediaType = 'image' | 'video'
  * - game：游戏内拍摄
  * - launcher：启动器缓存
  * - cloud：用户云相册（CloudPhotos 非 Temp 子目录）
+ * - local_screenshot：系统/启动器截图（X6Game/ScreenShot 无Saved段），独立归类为本地截图
  */
-export type MediaSource = 'game' | 'launcher' | 'cloud'
+export type MediaSource = 'game' | 'launcher' | 'cloud' | 'local_screenshot'
 
 /**
  * 场景时段枚举

@@ -36,21 +36,24 @@ export function extractAlbumTypeFromPath(filePath: string): string {
 }
 
 /**
- * 从文件路径识别媒体来源：'game'（用户拍摄）/ 'launcher'（启动器/游戏缓存）/ 'cloud'（用户云相册）
+ * 从文件路径识别媒体来源：'game'（用户拍摄）/ 'launcher'（启动器/游戏缓存）/ 'cloud'（用户云相册）/ 'local_screenshot'（系统/启动器截图）
  *
  * 判定规则（顺序敏感）：
  * 1. 路径含 "Launcher\cache" → launcher（启动器缓存目录，如登录页背景、活动图）
  * 2. 路径含 "\MallPic\" → launcher（游戏内商城缓存素材，非用户拍摄）
  * 3. 路径含 "\X6Game\Saved\ScreenShot\" → launcher（游戏内置截图，非拍照功能拍摄）
- * 4. 路径含 "\CloudPhotos\Temp\" → launcher（云照片临时缓存，可能是浏览他人照片的缓存）
- * 5. 路径含 "\CloudPhotos\" 且不含 "\CloudPhotos\Temp\" → cloud（用户自己的云相册）
- * 6. 其余 → game（用户使用游戏内拍照功能拍摄的照片）
+ * 4. 路径含 "\X6Game\ScreenShot\"（无Saved段） → local_screenshot（系统/启动器截图，不属于游戏内官方相册）
+ * 5. 路径含 "\CloudPhotos\Temp\" → launcher（云照片临时缓存，可能是浏览他人照片的缓存）
+ * 6. 路径含 "\CloudPhotos\" 且不含 "\CloudPhotos\Temp\" → cloud（用户自己的云相册）
+ * 7. 其余 → game（用户使用游戏内拍照功能拍摄的照片，主要来自GamePlayPhotos路径）
  *
- * 注意：规则 4 必须在规则 5 之前，避免 Temp 路径被误归为 cloud
+ * 注意：规则 5 必须在规则 6 之前，避免 Temp 路径被误归为 cloud
  * 修复说明：原实现含宽泛的 \cache\、\thumbnail、\preview\、\temp\ 匹配，会误判用户存放于
  * 含上述关键词目录下的正常照片为 launcher，已移除该宽泛匹配
  */
-export function extractMediaSourceFromPath(filePath: string): 'game' | 'launcher' | 'cloud' {
+export function extractMediaSourceFromPath(
+  filePath: string
+): 'game' | 'launcher' | 'cloud' | 'local_screenshot' {
   // 路径分隔符统一为反斜杠（Windows），便于子串匹配
   const normalized = filePath.replace(/\//g, '\\').toLowerCase()
   if (normalized.includes('launcher\\cache')) {
@@ -69,10 +72,15 @@ export function extractMediaSourceFromPath(filePath: string): 'game' | 'launcher
   }
   // 语义澄清（无限暖暖标准安装树）：
   // - X6Game\Saved\ScreenShot\（含 Saved 段）→ launcher（缓存板块，非用户主动拍摄）
-  // - X6Game\ScreenShot\（无 Saved 段，用户主动截取的游戏内截图）→ 走默认分支返回 'game'，归属「图库」
-  // - X6Game\Video\（游戏内视频）→ 同样走默认分支返回 'game'，归属「图库」
-  // 图库放行由 media-repository 的 GALLERY_PATH_CONDITION 显式匹配这两个目录（HQ ∪ X6Game/ScreenShot ∪ X6Game/Video），
-  // 缓存板块反向排除，二者对称。请勿改动默认分支语义，否则会破坏上述图库/缓存归属。
+  // - X6Game\ScreenShot\（无 Saved 段，系统/启动器截图）→ local_screenshot（独立归类为本地截图，不关联任何游戏UID）
+  // - X6Game\Video\（游戏内视频）→ 同样走默认分支返回 'game'，归属「官方游戏相册」
+  // 仅当路径含X6Game\ScreenShot且不含Saved段时才归类为local_screenshot，避免误匹配其他路径
+  if (
+    normalized.includes('\\x6game\\screenshot\\') &&
+    !normalized.includes('\\x6game\\saved\\screenshot\\')
+  ) {
+    return 'local_screenshot'
+  }
   // 云照片临时缓存目录，文件名为纯数字（如 1654626739.jpeg），非用户拍摄
   if (normalized.includes('\\cloudphotos\\temp\\')) {
     return 'launcher'

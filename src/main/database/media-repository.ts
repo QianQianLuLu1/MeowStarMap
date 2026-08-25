@@ -59,15 +59,14 @@ const GALLERY_HQ_PATH_CONDITION =
   "(LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%' AND LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/nikkiphotos_highquality/%')"
 
 /**
- * 图库板块的放行条件（HQ ∪ X6Game/ScreenShot ∪ X6Game/Video）：
- * 既保留原「游戏内高质量照片」语义（GamePlayPhotos/{uid}/NikkiPhotos_HighQuality），
- * 又新增无限暖暖标准安装树下的游戏内截图（X6Game/ScreenShot）与游戏内视频（X6Game/Video）。
- * 这两个目录由用户显式定义为「图库」内容，其余非 HQ 路径仍归入「缓存」板块。
+ * 图库板块的放行条件（HQ ∪ X6Game/Video）：
+ * 1. 游戏内高质量照片目录：GamePlayPhotos/{uid}/NikkiPhotos_HighQuality，即官方游戏相册主路径
+ * 2. 游戏内视频目录：X6Game/Video，游戏内录制的视频内容
+ * 注意：X6Game/ScreenShot 路径已独立归类为本地截图，不再属于游戏相册，不在此条件范围内
  * 仅由 listMedia 的 galleryHighQualityOnly=true 引用。
  */
 const GALLERY_PATH_CONDITION =
   `${GALLERY_HQ_PATH_CONDITION}` +
-  " OR LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'" +
   " OR LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/video/%'"
 
 /**
@@ -258,7 +257,7 @@ export interface GroupCountRow {
 // ============================================================================
 
 export type MediaSortOrder = 'asc' | 'desc'
-export type MediaSourceFilter = 'game' | 'launcher' | 'cloud' | 'all'
+export type MediaSourceFilter = 'game' | 'launcher' | 'cloud' | 'local_screenshot' | 'all'
 export type GroupDimension = 'album_type' | 'scene_category' | 'scene_time' | 'outfit' | 'file_type'
 
 export interface MediaListOptions {

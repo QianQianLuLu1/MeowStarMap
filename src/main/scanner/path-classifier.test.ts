@@ -284,10 +284,10 @@ describe('extractMediaSourceFromPath', () => {
     expect(extractMediaSourceFromPath('D:\\game\\cloudphotos\\temp\\cache.jpeg')).toBe('launcher')
   })
 
-  it('X6Game\\ScreenShot 不含 Saved 段时返回 game（不匹配规则 3）', () => {
-    // 当前实现要求 \\x6game\\saved\\screenshot\\，缺少 saved 段不匹配
+  it('X6Game\\ScreenShot 不含 Saved 段时返回 local_screenshot（系统/启动器截图）', () => {
+    // X6Game/ScreenShot 无Saved段，归类为本地截图，不属于游戏官方相册
     const result = extractMediaSourceFromPath('D:\\game\\X6Game\\ScreenShot\\foo.jpg')
-    expect(result).toBe('game')
+    expect(result).toBe('local_screenshot')
   })
 
   it('X6Game\\Video 路径不含 Saved/ScreenShot/MallPic 等段时返回 game（归属图库）', () => {

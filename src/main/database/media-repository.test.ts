@@ -1232,10 +1232,10 @@ describe('MediaRepository', () => {
       expect(result.total).toBe(2)
     })
 
-    it('图库放行 X6Game/ScreenShot 与 X6Game/Video，缓存反向排除这两目录', async () => {
+    it('图库放行 X6Game/Video，不匹配 ScreenShot；缓存反向排除这两个目录', async () => {
       // 说明：本测试用 vi.mock 的内存 SQL 引擎不解析 LOWER/REPLACE/LIKE/NOT 组合条件，
-      // 因此这里断言生成的 SQL 文本包含 ScreenShot/Video 放行子句（图库）与反向排除子句（缓存），
-      // 而非行级过滤结果（行级验证需真实 better-sqlite3，见 REPAIR/集成测试）。
+      // 因此这里断言生成的 SQL 文本包含 Video 放行子句（图库），不包含 ScreenShot 子句，
+      // 缓存视图反向排除 Video 目录，而非行级过滤结果（行级验证需真实 better-sqlite3，见 REPAIR/集成测试）。
       db.exec(`
         CREATE TABLE IF NOT EXISTS import_roots (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1268,16 +1268,17 @@ describe('MediaRepository', () => {
         "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/nikkiphotos_highquality/%'"
       )
       expect(gallerySelect!.sql).toContain(
-        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'"
-      )
-      expect(gallerySelect!.sql).toContain(
         "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/video/%'"
+      )
+      // 验证不包含ScreenShot路径的匹配
+      expect(gallerySelect!.sql).not.toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'"
       )
       // 无导入根时仅目录条件，不传参
       expect(gallerySelect!.params).toEqual([])
       vi.restoreAllMocks()
 
-      // 缓存视图（mediaSource='launcher'）：SQL 必须反向排除上述三目录（NOT IN GALLERY 对称）
+      // 缓存视图（mediaSource='launcher'）：SQL 必须反向排除上述两目录（NOT IN GALLERY 对称）
       const capturedCache: Array<{ sql: string; params: unknown[] }> = []
       const originalPrepare2 = db.prepare.bind(db)
       vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
@@ -1293,13 +1294,14 @@ describe('MediaRepository', () => {
       repo.listMedia({ mediaSource: 'launcher' })
       const cacheSelect = capturedCache.find((c) => c.sql.includes('FROM media_files'))
       expect(cacheSelect).toBeDefined()
-      // 缓存条件内联 NOT (HQ OR screenshot OR video)，与图库放行完全对称
+      // 缓存条件内联 NOT (HQ OR video)，与图库放行完全对称，不包含screenshot路径
       expect(cacheSelect!.sql).toContain('NOT (')
       expect(cacheSelect!.sql).toContain(
-        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'"
-      )
-      expect(cacheSelect!.sql).toContain(
         "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/video/%'"
+      )
+      // 验证不包含ScreenShot路径的排除匹配
+      expect(cacheSelect!.sql).not.toContain(
+        "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/screenshot/%'"
       )
       vi.restoreAllMocks()
     })

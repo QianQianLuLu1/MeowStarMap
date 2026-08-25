@@ -59,8 +59,8 @@ export interface MediaFile {
   account_uid: string
   // P0-03：游戏相册类型（扫描时根据父文件夹名映射填充）
   album_type: string
-  // 媒体来源：'game'（游戏内拍摄）/ 'launcher'（启动器缓存）/ 'cloud'（用户云相册，CloudPhotos 非 Temp 子目录）
-  media_source: 'game' | 'launcher' | 'cloud'
+  // 媒体来源：'game'（游戏内拍摄）/ 'launcher'（启动器缓存）/ 'cloud'（用户云相册，CloudPhotos 非 Temp 子目录）/ 'local_screenshot'（系统/启动器截图，X6Game/ScreenShot 无Saved段）
+  media_source: 'game' | 'launcher' | 'cloud' | 'local_screenshot'
   // 游戏原生缩略图路径（NikkiPhotos_LowQuality 同名文件）：扫描时直接关联，
   // 仅当该文件存在且可读时填充；未填充时走常规缩略图生成流程
   thumbnail?: string
