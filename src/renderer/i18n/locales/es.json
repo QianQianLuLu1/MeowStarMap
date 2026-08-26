@@ -2615,6 +2615,7 @@
     "routeRetry": "",
     "zoneTitle": "",
     "zoneRetry": "",
+    "zoneDegraded": "",
     "ipcFailed": ""
   },
   "infoPanel": {

@@ -21,6 +21,8 @@ import { GalleryToolbar } from '../components/gallery/GalleryToolbar'
 import { BatchActions } from '../components/gallery/BatchActions'
 import { EmptyState } from '../components/common/EmptyState'
 import { IconImage } from '../icons'
+import { ErrorBoundary } from '../components/common/ErrorBoundary'
+import { ZoneErrorFallback } from '../components/common/ErrorFallback'
 import { ScanProgress } from '../components/scanner/ScanProgress'
 import { RenameDialog } from '../components/gallery/RenameDialog'
 import { WatermarkDialog } from '../components/gallery/WatermarkDialog'
@@ -90,7 +92,59 @@ export const GalleryPage: React.FC = () => {
   const showMessage = useGlobalToast()
   const refreshMedia = useRefreshMedia()
   const { inputValue, setInputValue } = useGallerySearch()
-  const filteredFiles = useFilteredMediaFiles()
+  const filteredFilesSource = useFilteredMediaFiles()
+  const filteredFiles = useMemo(
+    () => (Array.isArray(filteredFilesSource) ? filteredFilesSource : []),
+    [filteredFilesSource]
+  )
+
+  // 稳定因子：订阅筛选/排序/搜索条件，用于派生 resetKeys 签名。
+  // 纳入后，即使同一 viewMode 下数据条件变化也能自动重置错误态（避免仅 viewMode 切换才重置的盲区）。
+  const filterState = useUIStore(
+    useShallow((s) => ({
+      filterType: s.filterType,
+      searchQuery: s.searchQuery,
+      sortBy: s.sortBy,
+      sortOrder: s.sortOrder,
+      showMissingOnly: s.showMissingOnly,
+      showCorruptedOnly: s.showCorruptedOnly,
+      showDuplicates: s.showDuplicates,
+      selectedSceneCategories: s.selectedSceneCategories,
+      selectedSceneTimes: s.selectedSceneTimes,
+      filterOutfit: s.filterOutfit,
+      currentCategoryId: s.currentCategoryId,
+      filterDateRange: s.filterDateRange,
+      filterRating: s.filterRating,
+      groupDimension: s.groupDimension,
+      selectedGroupKey: s.selectedGroupKey
+    }))
+  )
+
+  // 当前筛选/排序/搜索条件的稳定签名，作为 ErrorBoundary resetKeys 的稳定因子之一
+  const filterSignature = useMemo(
+    () =>
+      [
+        filterState.filterType,
+        filterState.searchQuery,
+        filterState.sortBy,
+        filterState.sortOrder,
+        currentView,
+        filterState.showMissingOnly,
+        filterState.showCorruptedOnly,
+        filterState.showDuplicates,
+        filterState.selectedSceneCategories,
+        filterState.selectedSceneTimes,
+        filterState.filterOutfit,
+        filterState.currentCategoryId,
+        filterState.filterDateRange,
+        filterState.filterRating,
+        filterState.groupDimension,
+        filterState.selectedGroupKey
+      ]
+        .map((v) => (Array.isArray(v) ? JSON.stringify(v) : String(v)))
+        .join('|'),
+    [filterState, currentView]
+  )
 
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean
@@ -605,7 +659,11 @@ export const GalleryPage: React.FC = () => {
           }
         />
       ) : (
-        <>
+        <ErrorBoundary
+          resetKeys={[viewMode, filterSignature]}
+          maxRetries={3}
+          fallback={(props) => <ZoneErrorFallback {...props} reset={props.reset} />}
+        >
           {viewMode === 'grid' && (
             <VirtualImageGrid
               items={filteredFiles}
@@ -652,7 +710,7 @@ export const GalleryPage: React.FC = () => {
               onContextMenu={handleContextMenu}
             />
           )}
-        </>
+        </ErrorBoundary>
       )}
 
       {/* 批量操作工具栏 */}

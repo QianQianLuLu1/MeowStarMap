@@ -141,7 +141,7 @@ const MediaCardActions: React.FC<{
 const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGridProps>(
   (props, ref) => {
     const {
-      items,
+      items: rawItems,
       selectedIds,
       onSelect,
       onHover,
@@ -153,6 +153,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
       loadingMore = false,
       hasMore = false
     } = props
+    // 参数校验：items 必须为数组，非数组降级为空，杜绝脏数据进入 VirtuosoGrid
+    // 用 useMemo 包裹，避免每次渲染重建引用导致下游 useCallback/useEffect 依赖抖动
+    const items = useMemo(() => (Array.isArray(rawItems) ? rawItems : []), [rawItems])
     const { t } = useTranslation()
     const wrapperRef = useRef<HTMLDivElement>(null)
     const [columns, setColumns] = useState(4)
@@ -347,8 +350,8 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           data={items}
           computeItemKey={(_, file) => file.id}
           components={gridComponents}
-          overscan={400}
-          increaseViewportBy={{ top: 200, bottom: 200 }}
+          overscan={150}
+          increaseViewportBy={{ top: 100, bottom: 100 }}
           endReached={onEndReached}
           rangeChanged={(range) => {
             visibleRangeRef.current = range

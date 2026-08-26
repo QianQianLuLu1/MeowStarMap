@@ -247,6 +247,10 @@ interface BoundaryFallbackProps {
   error: Error
   reset: () => void
   componentStack?: string
+  /** 已重试次数（reset 每次调用 +1） */
+  retryCount: number
+  /** 最大重试次数，达到后 fallback 应给出降级提示而非无限重试 */
+  maxRetries: number
 }
 
 /**
@@ -293,9 +297,16 @@ export const RouteErrorFallback: React.FC<BoundaryFallbackProps> = ({ error, res
  * 区域级 fallback：小占位块，仅替换出错区域，不影响周围布局
  * 用于图片/视频渲染、插件面板、编辑器 canvas 等高危区域
  */
-export const ZoneErrorFallback: React.FC<BoundaryFallbackProps> = ({ error, reset }) => {
+export const ZoneErrorFallback: React.FC<BoundaryFallbackProps> = ({
+  error,
+  reset,
+  retryCount,
+  maxRetries
+}) => {
   const { t } = useTranslation()
   const summary = error.message.slice(0, 200)
+  // 达到最大重试次数后转为降级提示，避免「重试仍炸」的死循环体验
+  const degraded = retryCount >= maxRetries
   return (
     <div
       className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg w-full h-full"
@@ -311,18 +322,26 @@ export const ZoneErrorFallback: React.FC<BoundaryFallbackProps> = ({ error, rese
       >
         {summary}
       </span>
+      {degraded && (
+        <span
+          className="text-xs text-center"
+          style={{ color: 'var(--text-secondary)', maxWidth: '100%' }}
+        >
+          {t('errorFallback.zoneDegraded')}
+        </span>
+      )}
       <button
         type="button"
         onClick={reset}
         className="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium"
         style={{
-          background: 'var(--accent)',
-          color: 'var(--text-on-accent)',
-          border: '1px solid var(--accent)',
+          background: degraded ? 'var(--hover-bg)' : 'var(--accent)',
+          color: degraded ? 'var(--text-primary)' : 'var(--text-on-accent)',
+          border: '1px solid var(--divider)',
           cursor: 'pointer'
         }}
       >
-        <IconRefresh size={12} color="var(--text-on-accent)" />
+        <IconRefresh size={12} color={degraded ? 'var(--text-primary)' : 'var(--text-on-accent)'} />
         {t('errorFallback.zoneRetry')}
       </button>
     </div>

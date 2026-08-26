@@ -461,6 +461,7 @@
     "routeRetry": "重试",
     "zoneTitle": "该区域加载失败",
     "zoneRetry": "重试",
+    "zoneDegraded": "多次重试仍失败，请切换视图或重新打开此板块",
     "ipcFailed": "IPC 调用失败"
   },
   "dialog": {

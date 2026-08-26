@@ -7,6 +7,10 @@ export interface ErrorBoundaryFallbackProps {
   reset: () => void
   /** 组件栈信息（ErrorBoundary componentDidCatch 提供） */
   componentStack?: string
+  /** 已重试次数（reset 每次调用 +1），供 fallback 判断是否超过上限 */
+  retryCount: number
+  /** 最大重试次数，达到后 fallback 应给出降级提示而非无限重试 */
+  maxRetries: number
 }
 
 interface ErrorBoundaryProps {
@@ -21,6 +25,11 @@ interface ErrorBoundaryProps {
    * fallback 组件内部可使用 hooks（如 useTranslation）
    */
   fallback?: React.FC<ErrorBoundaryFallbackProps>
+  /**
+   * 最大重试次数。达到上限后 fallback 收到 retryCount>=maxRetries，
+   * 应渲染降级提示而非无限「重试」按钮。仅对传了 fallback 的区域/路由级边界有意义。
+   */
+  maxRetries?: number
 }
 
 interface ErrorBoundaryState {
@@ -114,7 +123,15 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
     if (hasError && error) {
       if (this.props.fallback) {
         const Fallback = this.props.fallback
-        return <Fallback error={error} reset={this.resetBoundary} componentStack={componentStack} />
+        return (
+          <Fallback
+            error={error}
+            reset={this.resetBoundary}
+            componentStack={componentStack}
+            retryCount={retryCount}
+            maxRetries={this.props.maxRetries ?? 3}
+          />
+        )
       }
       return (
         <ErrorFallback error={error} onRetry={this.handleRetry} componentStack={componentStack} />
