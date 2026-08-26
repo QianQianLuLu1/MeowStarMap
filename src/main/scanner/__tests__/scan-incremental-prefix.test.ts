@@ -180,6 +180,11 @@ describe('组3-6：cleanupAndExit 重入保护', () => {
       sendMessage({ type: 'SCAN_DISPOSE' })
       sendMessage({ type: 'SCAN_DISPOSE' })
 
+      // cleanupAndExit 回发确认后 setImmediate(() => process.exit(0))：等待宏任务落定，
+      // 使延迟的 process.exit 在 exitSpy 仍生效时触发（避免 finally 恢复后真实 exit 抛异常）
+      await new Promise((r) => setImmediate(r))
+      await new Promise((r) => setTimeout(r, 0))
+
       expect(captured.closeCount - baseline).toBe(1)
       expect(exitSpy).toHaveBeenCalledTimes(1)
     } finally {

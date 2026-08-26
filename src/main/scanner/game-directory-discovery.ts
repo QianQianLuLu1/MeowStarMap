@@ -1,15 +1,15 @@
 /**
- * 游戏媒体目录发现（注册表快速路径 + 全盘签名深度搜索）。
+ * 游戏媒体目录发现（注册表快速路径 + 有限盘符枚举兜底）。
  *
  * 从 worker-entry.ts 抽取为独立模块，目的：
  * - 便于单元测试：测试可用 vi.mock('../game-directory-discovery') 桩替换全部发现函数，避免真实盘符/注册表 IO；
  * - 保持 worker-entry.ts 的 findMediaDirectories 契约不变（返回 string[]），调用方无感。
  *
- * 共享依赖（shouldStop / workerLog / 签名常量）从 worker-entry 导入均为"调用期"使用，
+ * 共享依赖（shouldStop / workerLog）从 worker-entry 导入均为"调用期"使用，
  * 循环依赖在 ESM 下安全（模块求值期不读取这些绑定）。
  *
  * 依赖（五要素）：
- * - 依赖声明：仅复用 fs / fs.promises / path / child_process / tinyglobby / '../utils/concurrency' / '../utils/constants' / worker-entry，
+ * - 依赖声明：仅复用 fs / fs.promises / path / child_process / '../utils/concurrency' / '../utils/constants' / worker-entry，
  *   不新增任何 npm 包 / IPC 通道 / 数据库表。
  * - 启动说明：无副作用，纯函数集合，导入即就绪。
  * - 错误处理：单盘遍历异常 / vdf 读取失败 / 注册表查询失败均降级返回空，由其他路径/盘符兜底，不中断整体扫描。
@@ -20,216 +20,14 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
 import { execFile } from 'child_process'
-// 全盘签名扫描：用 tinyglobby（Vite 同款，基于 fdir + picomatch，零依赖）替换手写 fs.readdir 递归
-import { glob } from 'tinyglobby'
+
 import { DRIVE_LETTER_START, DRIVE_LETTER_END } from '../utils/constants'
 // 循环依赖：以下绑定仅在函数体内（调用期）读取，模块求值期不访问，ESM 安全
-import { shouldStop, workerLog } from './worker-entry'
-
-// 游戏 exe 特征签名（用于全盘签名搜索定位游戏安装根目录）
-const GAME_SIGNATURES = [
-  'InfinityNikki.exe',
-  'NikkiLauncher.exe',
-  'GameConfig.ini',
-  'InfinityNikkiLauncher.exe',
-  'Launcher.exe'
-]
-
-// 安装树结构锚点（用于全盘扫描识别非标准安装树，不依赖游戏 exe 或媒体子目录名）
-// 覆盖场景：官网/WeGame 启动器安装路径 `InfinityNikki Launcher\InfinityNikki\X6Game\...`
-// - X6Game：虚幻引擎游戏资源根目录，所有游戏内媒体（ScreenShot / Saved\GamePlayPhotos 等）均在其下；
-//   命中后返回其父目录（即 `...\InfinityNikki`），使 scanDirectory 从安装树根递归即可覆盖全部媒体。
-// - InfinityNikki Launcher：官网/国际服启动器目录本身，命中后返回其父目录（安装树更上一级），
-//   同样可作为扫描根，递归进入其下的 InfinityNikki\X6Game。
-// 注意：X6Game / Launcher 均为通用名，必须经下方上下文校验（父链含 infinitynikki）才能入库，
-// 避免误匹配其他虚幻游戏或无关软件的安装目录。
-const INSTALL_TREE_SIGNATURES = ['X6Game', 'InfinityNikki Launcher']
-
-// 媒体特征文件夹（用于全盘扫描识别游戏媒体目录，不依赖游戏 exe）
-// 只保留无限暖暖专属签名，这些签名在非游戏目录中不会出现
-const MEDIA_FOLDER_SIGNATURES = [
-  // 游戏内主要相册（位于 X6Game\Saved\GamePlayPhotos\$uid$\ 下）
-  // 这些是无限暖暖专属命名，不会误匹配
-  'NikkiPhotos_HighQuality',
-  'NikkiPhotos_LowQuality',
-  'MagazinePhotos',
-  'ClockInPhoto',
-  'CloudPhotos',
-  'CloudPhotos_LowQuality',
-  // 拼图相册父目录（GamePlayPhotos\$uid$\Collage\）
-  'Collage',
-  // 其他游戏内相册（位于 X6Game\Saved\ 下，均为无限暖暖专属命名）
-  'CustomAvatar',
-  'CustomCard',
-  'CustomHomeBoardPhoto',
-  'HomeTemplate',
-  'PlantDyeing',
-  'DIY',
-  'XSdkQrCode',
-  'MallPic',
-  // 游戏截图（位于 X6Game\ScreenShot，ScreenShot 较通用但配合游戏目录上下文可接受）
-  'ScreenShot',
-  // 游戏内视频（位于 X6Game\Video，与 ScreenShot 同级，均为无限暖暖标准安装树下的图库内容）
-  'Video'
-]
+import { shouldStop } from './worker-entry'
 
 // 游戏快捷方式文件名（中文）
 // eslint-disable-next-line no-restricted-syntax
 const GAME_SHORTCUT_CN = '\u65e0\u9650\u6696\u6696.lnk'
-
-/**
- * 浅层签名搜索（限制深度，快速定位常见安装路径）
- *
- * 为何用 tinyglobby 替换手写递归：原 searchBySignature 逐目录调用 fs.readdir 递归遍历，
- * 每个目录一次系统调用，全盘扫描时 IO 往返极多。tinyglobby（Vite 同款，基于 fdir + picomatch，零依赖）
- * 在 C 层一次性完成目录遍历与模式匹配，并用 brace 一次性匹配全部游戏 exe 签名，显著降低系统调用次数。
- * 遍历中单目录读取失败由 fdir 内部静默处理（tinyglobby 无 suppressErrors 选项），不会中断整体扫描。
- *
- * @param rootPath 搜索根目录（通常是盘符根）
- * @param maxDepth 最大搜索深度
- */
-export async function searchBySignatureShallow(
-  rootPath: string,
-  maxDepth: number
-): Promise<string | null> {
-  const pattern = `**/{${GAME_SIGNATURES.join(',')}}`
-  let matches: string[] = []
-  try {
-    // onlyFiles 默认 true；全小写签名 + caseSensitiveMatch:false 抵消 Windows 大小写差异
-    matches = await glob(pattern, {
-      cwd: rootPath,
-      absolute: true,
-      onlyFiles: true,
-      deep: maxDepth,
-      caseSensitiveMatch: false,
-      followSymbolicLinks: false
-    })
-  } catch (err) {
-    // 单盘遍历异常不应中断全盘扫描；记录后降级返回空，由其他盘符/快速路径兜底
-    workerLog(
-      'warn',
-      `[Scanner] 游戏 exe 签名 glob 失败: ${rootPath}`,
-      err instanceof Error ? err.message : String(err)
-    )
-    return null
-  }
-  if (matches.length === 0) return null
-  // 原始逻辑命中 exe 时返回"所在目录"（path.dirname）且首匹配即停止（stop:true）。
-  // glob 返回所有命中 exe 的完整路径，取排序后首个的父目录，等价于原首匹配语义。
-  matches.sort()
-  return path.dirname(matches[0].replace(/[\\/]+$/, ''))
-}
-
-/**
- * 浅层媒体文件夹签名搜索（限制深度，快速定位常见媒体目录）
- *
- * 与 searchBySignatureShallow 同理，用 tinyglobby 一次性匹配全部媒体特征文件夹签名，
- * 取代逐层 fs.readdir 递归。命中目录继续做"游戏媒体特征签名校验"：ScreenShot 为通用名，
- * 仍需路径上下文验证（仅当父目录含 InfinityNikki 或 X6Game 才视为游戏截图目录）。
- *
- * @param rootPath 搜索根目录（通常是盘符根）
- * @param maxDepth 最大搜索深度
- */
-export async function searchByMediaFolderSignatureShallow(
-  rootPath: string,
-  maxDepth: number
-): Promise<string[]> {
-  const pattern = `**/{${MEDIA_FOLDER_SIGNATURES.join(',')}}`
-  let matches: string[] = []
-  try {
-    matches = await glob(pattern, {
-      cwd: rootPath,
-      absolute: true,
-      onlyDirectories: true,
-      deep: maxDepth,
-      caseSensitiveMatch: false,
-      followSymbolicLinks: false
-    })
-  } catch (err) {
-    workerLog(
-      'warn',
-      `[Scanner] 媒体文件夹签名 glob 失败: ${rootPath}`,
-      err instanceof Error ? err.message : String(err)
-    )
-    return []
-  }
-
-  const dirs: string[] = []
-  for (const raw of matches) {
-    // glob 目录结果可能带尾斜杠，统一去除后处理（path.basename/dirname 对尾斜杠不敏感，但保持返回一致）
-    const match = raw.replace(/[\\/]+$/, '')
-    const baseName = path.basename(match).toLowerCase()
-    // 原始逻辑返回命中文件夹的"父目录"（包含相册集合的目录），故取 dirname
-    const dir = path.dirname(match)
-    // ScreenShot / Video 为通用名（War Thunder、Trae skills/screenshot、各类游戏 Video 等均可能误匹配），
-    // 需路径上下文验证：仅当父目录含 infinitynikki 或 x6game 才视为无限暖暖游戏媒体目录。
-    if (baseName === 'screenshot' || baseName === 'video') {
-      const normalizedDir = dir.replace(/\//g, '\\').toLowerCase()
-      if (!normalizedDir.includes('infinitynikki') && !normalizedDir.includes('x6game')) {
-        continue
-      }
-    }
-    dirs.push(dir)
-  }
-  // 去重：同一父目录下可能有多个匹配子目录（如 NikkiPhotos_HighQuality + NikkiPhotos_LowQuality）
-  return Array.from(new Set(dirs))
-}
-
-/**
- * 浅层安装树锚点签名搜索（限制深度，定位非标准安装树根）
- *
- * 与媒体文件夹签名搜索同理，用 tinyglobby 一次性匹配安装树结构目录（X6Game / InfinityNikki Launcher）。
- * 这些锚点不依赖游戏 exe，也不依赖深层媒体子目录名，专门覆盖官网/WeGame 启动器安装路径
- * `InfinityNikki Launcher\InfinityNikki\X6Game\...`：该路径既非 Steam/Epic 标准路径（注册表命中不了），
- * 又可能缺失 exe 签名（游戏以 X6Game 形态存在），纯媒体子目录签名常因 depth 边界而错过。
- *
- * 命中后返回"锚点目录的父目录"作为扫描根，使 scanDirectory 从该根递归即能覆盖
- * X6Game\ScreenShot、X6Game\Saved\GamePlayPhotos 等全部媒体，比只认深层媒体目录更稳。
- *
- * 上下文校验（防误匹配）：X6Game / InfinityNikki Launcher 均为通用名，必须经父链校验——
- * 要求命中目录的完整路径（含所有祖先）含 `infinitynikki` 关键字，才视为无限暖暖安装树。
- * 用户的 `InfinityNikki Launcher\InfinityNikki\X6Game`：命中 X6Game 时，其完整路径已含
- * `infinitynikki`（上级 `InfinityNikki Launcher` 与 `InfinityNikki` 均匹配），可通过校验。
- *
- * @param rootPath 搜索根目录（通常是盘符根）
- * @param maxDepth 最大搜索深度
- */
-export async function searchByInstallTreeSignatureShallow(
-  rootPath: string,
-  maxDepth: number
-): Promise<string[]> {
-  const pattern = `**/{${INSTALL_TREE_SIGNATURES.join(',')}}`
-  let matches: string[] = []
-  try {
-    matches = await glob(pattern, {
-      cwd: rootPath,
-      absolute: true,
-      onlyDirectories: true,
-      deep: maxDepth,
-      caseSensitiveMatch: false,
-      followSymbolicLinks: false
-    })
-  } catch (err) {
-    workerLog(
-      'warn',
-      `[Scanner] 安装树锚点签名 glob 失败: ${rootPath}`,
-      err instanceof Error ? err.message : String(err)
-    )
-    return []
-  }
-
-  const roots: string[] = []
-  for (const raw of matches) {
-    const match = raw.replace(/[\\/]+$/, '')
-    // 仅当完整路径（含祖先）含 infinitynikki 才视为无限暖暖安装树，避免误匹配其他软件/游戏
-    const normalized = match.replace(/\//g, '\\').toLowerCase()
-    if (!normalized.includes('infinitynikki')) continue
-    // 返回锚点目录的父目录作为扫描根（如 `...\InfinityNikki`），递归即可覆盖其下全部媒体
-    roots.push(path.dirname(match))
-  }
-  // 去重：同一安装树下可能命中 X6Game 与 InfinityNikki Launcher 两个锚点，父目录可能相同
-  return Array.from(new Set(roots))
-}
 
 // ============ 官方启动器检测常量 ============
 
@@ -360,17 +158,40 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
   }
 
   // 1. 注册表检测（主路径）
+  // 规范一.1：注册表 InstallPath 视为"启动器目录"，游戏根 = 启动器目录 + InfinityNikki，
+  // 或启动器目录下 config.json / game_settings.ini 的 game_install_path（优先）。
   for (const { key, value } of OFFICIAL_LAUNCHER_REG_KEYS) {
     if (shouldStop) break
-    const regPath = await queryRegistryValue(key, value)
-    if (regPath) {
-      const validated = await validateGameRoot(regPath)
-      if (validated && !seenPaths.has(validated.toLowerCase())) {
-        seenPaths.add(validated.toLowerCase())
-        validatedPaths.push(validated)
-        // 注册表命中即返回（最高优先级，不继续尝试其他键）
-        return validatedPaths
+    const launcherPath = await queryRegistryValue(key, value)
+    if (!launcherPath) continue
+    // 候选 A：启动器目录下配置文件直读 game_install_path（config.json / game_settings.ini / settings.json / config.ini）
+    const configCandidates = [
+      path.join(launcherPath, 'config.json'),
+      path.join(launcherPath, 'game_settings.ini'),
+      path.join(launcherPath, 'settings.json'),
+      path.join(launcherPath, 'config.ini')
+    ]
+    let resolvedFromConfig = false
+    for (const cfg of configCandidates) {
+      const cfgRoot = await parseLauncherConfig(cfg)
+      if (cfgRoot) {
+        const validated = await validateGameRoot(cfgRoot)
+        if (validated && !seenPaths.has(validated.toLowerCase())) {
+          seenPaths.add(validated.toLowerCase())
+          validatedPaths.push(validated)
+          resolvedFromConfig = true
+          break
+        }
       }
+    }
+    if (resolvedFromConfig) return validatedPaths
+    // 候选 B：启动器目录 + InfinityNikki（规范一.1.3 兜底）
+    const inferredRoot = path.join(launcherPath, 'InfinityNikki')
+    const validatedInferred = await validateGameRoot(inferredRoot)
+    if (validatedInferred && !seenPaths.has(validatedInferred.toLowerCase())) {
+      seenPaths.add(validatedInferred.toLowerCase())
+      validatedPaths.push(validatedInferred)
+      return validatedPaths
     }
   }
 
@@ -463,7 +284,8 @@ async function parseLauncherConfig(configPath: string): Promise<string | null> {
       try {
         const json = JSON.parse(content)
         // 支持多种可能的字段路径
-        const installPath = json?.game?.installPath || json?.installPath || json?.gamePath
+        const installPath =
+          json?.game_install_path || json?.game?.installPath || json?.installPath || json?.gamePath
         return installPath || null
       } catch {
         return null
@@ -484,17 +306,17 @@ async function parseLauncherConfig(configPath: string): Promise<string | null> {
           inGameSection = false
           continue
         }
-        // 在 [Game] 段中查找 InstallPath
+        // 在 [Game] 段中查找 InstallPath / game_install_path
         if (inGameSection) {
-          const match = trimmed.match(/^installpath\s*=\s*(.+)$/i)
+          const match = trimmed.match(/^(installpath|game_install_path)\s*=\s*(.+)$/i)
           if (match) {
-            return match[1].trim()
+            return match[2].trim()
           }
         }
       }
-      // 未找到 [Game] 段时，全局搜索 InstallPath
+      // 未找到 [Game] 段时，全局搜索 InstallPath / game_install_path
       for (const line of lines) {
-        const match = line.trim().match(/^installpath\s*=\s*(.+)$/i)
+        const match = line.trim().match(/^(installpath|game_install_path)\s*=\s*(.+)$/i)
         if (match) {
           return match[1].trim()
         }

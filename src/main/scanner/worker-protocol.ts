@@ -71,6 +71,11 @@ export interface MediaFile {
   // 游戏原生缩略图路径（NikkiPhotos_LowQuality 同名文件）：扫描时直接关联，
   // 仅当该文件存在且可读时填充；未填充时走常规缩略图生成流程
   thumbnail?: string
+  // 内嵌 XMP 元数据（wxnn 命名空间 EditorData 的 JSON 字符串）。
+  // 仅当图片携带本应用编辑器写入的 XMP 时非空；游戏原生截图无此元数据，恒为 NULL。
+  // 差距标注：游戏原生 nuan5_params（相机参数/世界坐标/搭配）解码为独立任务，
+  // 不在本次复刻范围（待 nikki_albums 运行时对比后移植 Rust 解码器），不臆造。
+  editor_metadata?: string | null
 }
 
 // ============ 主进程 → worker ============

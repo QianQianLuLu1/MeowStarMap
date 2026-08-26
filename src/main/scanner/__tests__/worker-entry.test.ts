@@ -24,11 +24,8 @@ const discovery = vi.hoisted(() => ({
   findSteamGamePaths: vi.fn(),
   findEpicGamePaths: vi.fn(() => Promise.resolve([])),
   findGameInstallRootsByPriority: vi.fn(() => Promise.resolve([])),
-  searchByInstallTreeSignatureShallow: vi.fn(() => Promise.resolve([])),
   getUserDataPaths: vi.fn(() => Promise.resolve([])),
-  getAvailableDrives: vi.fn(() => Promise.resolve([])),
-  searchByMediaFolderSignatureShallow: vi.fn(() => Promise.resolve([])),
-  searchBySignatureShallow: vi.fn(() => Promise.resolve(null))
+  getAvailableDrives: vi.fn(() => Promise.resolve([]))
 }))
 
 vi.mock('../game-directory-discovery', () => discovery)

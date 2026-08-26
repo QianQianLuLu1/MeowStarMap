@@ -10,11 +10,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
 import fsp from 'fs/promises'
 import { execFile } from 'child_process'
-import { glob } from 'tinyglobby'
-import { workerLog } from './worker-entry'
 import {
-  searchBySignatureShallow,
-  searchByMediaFolderSignatureShallow,
   findOfficialLauncherGamePaths,
   findSteamGamePaths,
   findEpicGamePaths,
@@ -44,10 +40,6 @@ vi.mock('child_process', () => ({
   execFile: vi.fn()
 }))
 
-vi.mock('tinyglobby', () => ({
-  glob: vi.fn()
-}))
-
 vi.mock('./worker-entry', () => ({
   get shouldStop() {
     return workerState.shouldStop
@@ -60,8 +52,6 @@ vi.mock('./worker-entry', () => ({
 const mockAccess = vi.mocked(fsp.access)
 const mockReadFile = vi.mocked(fsp.readFile)
 const mockReaddir = vi.mocked(fsp.readdir)
-const mockGlob = vi.mocked(glob)
-const mockWorkerLog = vi.mocked(workerLog)
 
 /** process.platform 强制 win32（被测函数非 win32 直接返回空），afterAll 还原 */
 let originalPlatform: PropertyDescriptor | undefined
@@ -116,97 +106,6 @@ function stubExecFile(responder: (key: string) => string | null): void {
 function regOutput(value: string): string {
   return `HKEY_X\\SomeKey\n    ValueName    REG_SZ    ${value}\n`
 }
-
-// ============ searchBySignatureShallow ============
-
-describe('searchBySignatureShallow（游戏 exe 签名浅层搜索）', () => {
-  it('命中签名 → 返回排序后首个匹配文件所在目录', async () => {
-    mockGlob.mockResolvedValue([
-      'D:\\Games\\InfinityNikki\\InfinityNikki.exe',
-      'C:\\Other\\Launcher.exe'
-    ])
-
-    const result = await searchBySignatureShallow('D:\\', 4)
-
-    expect(result).toBe('C:\\Other')
-    expect(mockGlob).toHaveBeenCalledTimes(1)
-    const [pattern, options] = mockGlob.mock.calls[0]
-    expect(pattern).toContain('InfinityNikki.exe')
-    expect(pattern).toContain('Launcher.exe')
-    expect(options).toMatchObject({
-      cwd: 'D:\\',
-      absolute: true,
-      onlyFiles: true,
-      deep: 4,
-      caseSensitiveMatch: false,
-      followSymbolicLinks: false
-    })
-  })
-
-  it('无命中 → 返回 null', async () => {
-    mockGlob.mockResolvedValue([])
-
-    await expect(searchBySignatureShallow('E:\\', 3)).resolves.toBeNull()
-  })
-
-  it('glob 抛错 → 降级返回 null 且记录 warn（单盘异常不中断整体扫描）', async () => {
-    mockGlob.mockRejectedValue(new Error('EBUSY'))
-
-    await expect(searchBySignatureShallow('F:\\', 3)).resolves.toBeNull()
-    expect(mockWorkerLog).toHaveBeenCalledWith(
-      'warn',
-      expect.stringContaining('游戏 exe 签名 glob 失败'),
-      'EBUSY'
-    )
-  })
-})
-
-// ============ searchByMediaFolderSignatureShallow ============
-
-describe('searchByMediaFolderSignatureShallow（媒体文件夹签名浅层搜索）', () => {
-  it('返回命中目录的父目录，同父目录去重，ScreenShot 需游戏上下文校验', async () => {
-    mockGlob.mockResolvedValue([
-      'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\uid1\\NikkiPhotos_HighQuality',
-      'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\uid1\\NikkiPhotos_LowQuality',
-      'D:\\Game\\X6Game\\ScreenShot',
-      'D:\\Tools\\WarThunder\\ScreenShot'
-    ])
-
-    const result = await searchByMediaFolderSignatureShallow('D:\\', 8)
-
-    // 同父目录两个相册签名去重为 1；X6Game 下 ScreenShot 保留；非游戏上下文 ScreenShot 剔除
-    expect(result).toEqual(['D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\uid1', 'D:\\Game\\X6Game'])
-    const [pattern, options] = mockGlob.mock.calls[0]
-    expect(pattern).toContain('NikkiPhotos_HighQuality')
-    expect(options).toMatchObject({ onlyDirectories: true, deep: 8 })
-  })
-
-  it('Video 签名命中 X6Game\\Video 且出现在 glob 搜索 pattern 中', async () => {
-    mockGlob.mockResolvedValue([
-      'D:\\Game\\X6Game\\Video',
-      'D:\\Game\\X6Game\\ScreenShot',
-      'D:\\Tools\\OtherGame\\Video'
-    ])
-
-    const result = await searchByMediaFolderSignatureShallow('D:\\', 8)
-
-    // X6Game 下的 Video/ScreenShot 保留（合并到同一父目录 X6Game），非游戏上下文 Video 剔除
-    expect(result).toEqual(['D:\\Game\\X6Game'])
-    const [pattern] = mockGlob.mock.calls[0]
-    expect(pattern).toContain('Video')
-  })
-
-  it('glob 抛错 → 降级返回空数组且记录 warn', async () => {
-    mockGlob.mockRejectedValue(new Error('EPERM'))
-
-    await expect(searchByMediaFolderSignatureShallow('G:\\', 5)).resolves.toEqual([])
-    expect(mockWorkerLog).toHaveBeenCalledWith(
-      'warn',
-      expect.stringContaining('媒体文件夹签名 glob 失败'),
-      'EPERM'
-    )
-  })
-})
 
 // ============ findSteamGamePaths ============
 
@@ -383,10 +282,10 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
     }
   })
 
-  it('注册表首个键命中 + 路径验证通过 → 返回验证后的路径', async () => {
+  it('注册表首个键命中（InstallPath=启动器目录）→ 拼接 InfinityNikki 返回游戏根', async () => {
     stubExecFile((key) =>
       key === 'HKCU\\Software\\InfinityNikki Launcher'
-        ? regOutput('D:\\Games\\InfinityNikki Launcher\\InfinityNikki')
+        ? regOutput('D:\\Games\\InfinityNikki Launcher')
         : null
     )
     stubAccess(['D:\\Games\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])
@@ -394,8 +293,30 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
     await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
       'D:\\Games\\InfinityNikki Launcher\\InfinityNikki'
     ])
-    // 首个键命中后不应继续查询后续键（枚举阶段会先探测盘符，故仅断言确实发生过校验）
     expect(mockAccess).toHaveBeenCalled()
+  })
+
+  it('注册表 InstallPath=启动器目录 + 启动器目录 config.game_install_path 直读优先于拼接 InfinityNikki', async () => {
+    stubExecFile((key) =>
+      key === 'HKCU\\Software\\InfinityNikki Launcher'
+        ? regOutput('D:\\Games\\InfinityNikki Launcher')
+        : null
+    )
+    // 启动器目录下的 config.json 直读 game_install_path 指向独立根
+    mockReadFile.mockImplementation((p: unknown) => {
+      const filePath = String(p)
+      if (filePath === 'D:\\Games\\InfinityNikki Launcher\\config.json') {
+        return Promise.resolve('{"game_install_path": "E:\\\\CustomGame"}')
+      }
+      return Promise.reject(new Error('ENOENT'))
+    })
+    stubAccess([
+      'E:\\CustomGame\\X6Game\\Saved\\GamePlayPhotos',
+      'D:\\Games\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'
+    ])
+
+    // config 直读优先：返回 E:\CustomGame，而非拼接的 D:\Games\InfinityNikki Launcher\InfinityNikki
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['E:\\CustomGame'])
   })
 
   it('注册表首个键失败 → 尝试下一个键（按优先级顺序）', async () => {
@@ -404,9 +325,11 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
         ? regOutput('E:\\InfinityNikki')
         : null
     )
-    stubAccess(['E:\\InfinityNikki\\X6Game'])
+    stubAccess(['E:\\InfinityNikki\\InfinityNikki\\X6Game'])
 
-    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['E:\\InfinityNikki'])
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'E:\\InfinityNikki\\InfinityNikki'
+    ])
   })
 
   it('注册表全部失败 → 降级到配置文件解析（INI 格式）', async () => {
@@ -427,7 +350,7 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
     mockReadFile.mockImplementation((p: unknown) => {
       const filePath = String(p)
       if (filePath.includes('settings.json')) {
-        return Promise.resolve('{"game": {"installPath": "G:\\InfinityNikki"}}')
+        return Promise.resolve('{"game": {"installPath": "G:\\\\InfinityNikki"}}')
       }
       return Promise.reject(new Error('ENOENT'))
     })
@@ -458,7 +381,7 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
     await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['H:\\InfinityNikki'])
   })
 
-  it('路径验证失败（GamePlayPhotos 和 X6Game 都不存在）→ 继续尝试其他候选', async () => {
+  it('路径验证失败（启动器目录拼接后仍无 X6Game）→ 继续尝试其他候选', async () => {
     stubExecFile((key) =>
       key === 'HKCU\\Software\\InfinityNikki Launcher'
         ? regOutput('X:\\InvalidPath')
@@ -466,9 +389,9 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
           ? regOutput('Y:\\ValidPath')
           : null
     )
-    stubAccess(['Y:\\ValidPath\\X6Game'])
+    stubAccess(['Y:\\ValidPath\\InfinityNikki\\X6Game'])
 
-    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['Y:\\ValidPath'])
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual(['Y:\\ValidPath\\InfinityNikki'])
   })
 
   it('所有检测方式均失败 → 返回空数组', async () => {
@@ -608,11 +531,11 @@ describe('findGameInstallRootsByPriority（启动器 > Steam > Epic，命中即�
     }
   })
 
-  it('启动器命中（注册表）→ 不查询 Steam/Epic 注册表键', async () => {
-    // 盘符不可达 → 枚举不命中；启动器注册表首个键命中
+  it('启动器命中（注册表 InstallPath=启动器目录）→ 不查询 Steam/Epic 注册表键', async () => {
+    // 盘符不可达 → 枚举不命中；启动器注册表首个键命中（InstallPath 视为启动器目录）
     stubExecFile((key) =>
       key === 'HKCU\\Software\\InfinityNikki Launcher'
-        ? regOutput('D:\\Games\\InfinityNikki Launcher\\InfinityNikki')
+        ? regOutput('D:\\Games\\InfinityNikki Launcher')
         : null
     )
     stubAccess(['D:\\Games\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])

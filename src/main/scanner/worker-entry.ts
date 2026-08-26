@@ -46,17 +46,14 @@ import {
   extractMediaSourceFromPath,
   resolveNativeThumbnailPath
 } from './path-classifier'
+// 子任务7：复用现有 XMP 服务读取高清图内嵌元数据（wxnn 命名空间 EditorData）。
+// 游戏原生截图无此 XMP，readMetadataFromFile 返回 null；差距标注见本文件图片分支注释。
+import { readMetadataFromFile } from '../services/xmp-metadata-service'
 // 方案三：独立游戏目录 UID 发现机制（对齐上游 nikki_albums）
 import { discoverUidsFromGameDirs } from './uid-discovery'
 // P0-01：游戏目录发现函数抽取为独立模块，便于单元测试 vi.mock 桩替换（循环依赖仅调用期使用，ESM 安全）
-import {
-  searchBySignatureShallow,
-  searchByMediaFolderSignatureShallow,
-  searchByInstallTreeSignatureShallow,
-  findGameInstallRootsByPriority,
-  getAvailableDrives,
-  getUserDataPaths
-} from './game-directory-discovery'
+import { findGameInstallRootsByPriority, getUserDataPaths } from './game-directory-discovery'
+import { resolveGamePlayPhotosScanRoots } from './gameplayphotos-root'
 // P2-1：复用主进程已有的 asar 解包路径修正工具，确保 worker 加载 better-sqlite3 与主进程行为一致
 import { resolveAsarUnpackedPath } from '../utils/ffmpeg-paths'
 // 子进程注册表：worker 退出时 kill 所有活跃的 ffmpeg/ffprobe 子进程
@@ -91,15 +88,6 @@ const CACHE_DIR_NAMES = new Set([
   '.thumbs',
   'thumb'
 ])
-
-// P0-01：全盘文件名签名搜索的并发盘符数限制
-const DRIVE_SCAN_CONCURRENCY = 4
-
-// 全盘签名搜索的最大深度。
-// 6 → 覆盖 Steam/Epic 标准安装路径（steamapps/common/InfinityNikki 最深 5 层 + 媒体 2-3 层）；
-// 8 → 额外覆盖官网/WeGame 启动器非标准安装树 `InfinityNikki Launcher\InfinityNikki\X6Game\Saved\GamePlayPhotos\$uid$`
-// （从盘符根出发已达 7-8 层）。tinyglobby 的 fdir maxDepth 为 C 层一次性遍历，8 相对 6 仅线性增加少量目录 IO。
-const SIGNATURE_SEARCH_DEPTH = 8
 
 // ============ worker 模块级状态 ============
 
@@ -479,37 +467,25 @@ async function checkMissingFiles(roots?: string[]): Promise<void> {
  *   InfinityNikki 的安装路径）与 `lowConfidenceSet`（getUserDataPaths 命中，低置信——可能
  *   只是 launcher 缓存而非游戏本体目录）。软过滤（`infinitynikki` 关键字）只作用于二者并集
  *   （与历史版本对快速路径的处理一致），自定义路径永不被挤出。
- * - `signatureSet`：全盘签名搜索命中。专属媒体文件夹签名（MEDIA_FOLDER_SIGNATURES，含
- *   NikkiPhotos_HighQuality 等）已足够精确，恒包含于最终结果、不参与软过滤——旧实现对合并后
- *   的集合软过滤，launcher 缓存（含 infinitynikki）命中时会把签名搜索发现的中文安装路径等
- *   非 infinitynikki 目录误剔除，使 forceSignatureSearch 在非 Steam/Epic 标准路径场景失效（R1）。
- * - forceSignatureSearch 早退规则（R2）：非 force 时快速路径并集非空即早退（与历史行为
- *   完全一致）；force 时仅 `registrySet`（高置信）非空才早退，低置信命中不早退，避免
- *   Steam/Epic 首装全盘扫描在注册表已命中时仍做数十秒零收益的 depth-6 搜索。
- * - 最终返回去重后的 `[...customSet, ...filteredQuick, ...signatureSet]`。
+ * - 软过滤（`infinitynikki` 关键字）只作用于自动发现目录并集，自定义路径永不被挤出。
+ * - 最终返回去重后的 `[...customSet, ...filteredQuick]`。
  *
  * 流程：
  * - 优先路径：用户在设置页手动配置的游戏目录（customPaths），存在即加入结果集
  * - 快速路径：Steam/Epic 注册表查询 + 用户数据目录（AppData 下游戏数据）
- * - 签名搜索：对所有可用盘符执行 depth=6 深度优先搜索（仅当自动发现为空时执行）
- * - 并发扫描多个盘符（并发限制 4），提升搜索速度
+ * - 自动发现：Steam/Epic 注册表 + 用户数据目录 + 有限盘符枚举兜底（见 game-directory-discovery）
  *
  * @param customPaths 用户在设置页手动配置的游戏目录，优先扫描；存在有效目录时恒包含（不抑制全盘搜索）
- * @param opts.forceSignatureSearch 全盘扫描强制执行签名搜索（高置信注册表命中仍早退，低置信命中不早退）
+
  * @returns 所有匹配的媒体目录列表（去重）
  */
-export async function findMediaDirectories(
-  customPaths?: string[],
-  opts?: { forceSignatureSearch?: boolean }
-): Promise<string[]> {
+export async function findMediaDirectories(customPaths?: string[]): Promise<string[]> {
   // 自定义路径与自动发现分离：自定义路径恒包含，自动发现用独立计数判断是否跳过全盘搜索
   const customSet = new Set<string>()
   // 快速路径按置信度分组（批次A R2）：registrySet 高置信（注册表项即安装路径），
   // lowConfidenceSet 低置信（可能是 launcher 缓存而非游戏本体目录）
   const registrySet = new Set<string>()
   const lowConfidenceSet = new Set<string>()
-  // 签名搜索命中（批次A R1）：专属签名足够精确，恒包含、不参与软过滤
-  const signatureSet = new Set<string>()
 
   // 0. 优先路径：用户自定义游戏目录
   // 用户在设置页手动指定的目录，存在即加入结果集；不存在则跳过（游戏可能未安装但用户预配置）。
@@ -541,53 +517,13 @@ export async function findMediaDirectories(
 
   const quickSet = new Set<string>([...registrySet, ...lowConfidenceSet])
 
-  // P1-A3 + 批次A R2：快速路径早退——
-  // - 非 force：quickSet（注册表 ∪ 用户数据目录）非空即早退，与历史行为完全一致；
-  // - force：仅 registrySet（高置信，注册表项就是 InfinityNikki 安装路径）非空才早退；
-  //   lowConfidenceSet 命中（可能只是 launcher 缓存，T1 场景）不早退，仍执行全盘签名搜索。
-  if (registrySet.size > 0 || (quickSet.size > 0 && !opts?.forceSignatureSearch)) {
-    sendScanLogInfo(
-      opts?.forceSignatureSearch
-        ? `[Scanner] 注册表高置信已找到 ${registrySet.size} 个目录，跳过全盘签名搜索`
-        : `[Scanner] 快速路径已找到 ${quickSet.size} 个目录，跳过全盘签名搜索`
-    )
-  } else {
-    // T2：进入签名搜索分支时透传结论日志，便于打包版 main.log 诊断目录发现过程
-    sendScanLogInfo(`[Scanner] 全盘签名搜索开始（快速路径已命中 ${quickSet.size} 个目录）`)
-    // 3. 签名搜索（depth 8，覆盖常见安装路径 + 非标准安装树深层媒体目录）
-    // Steam 安装路径 steamapps/common/InfinityNikki 最深 5 层，媒体文件夹在游戏目录下 2-3 层；
-    // 官网/WeGame 启动器安装路径 `InfinityNikki Launcher\InfinityNikki\X6Game\Saved\GamePlayPhotos\$uid$`
-    // 从盘符根出发已达 7-8 层，depth 6 常因边界漏扫。上调至 8 覆盖该非标准安装树，
-    // tinyglobby 的 fdir maxDepth 在 C 层一次性遍历，depth 8 相比 6 仅线性增加少量目录系统调用。
-    const drives = await getAvailableDrives()
-    const driveTasks = drives.map((drive) => async () => {
-      if (shouldStop) return
-      // 优先搜索媒体文件夹（精确），找到就不搜索游戏 exe（避免扫描整个游戏目录）
-      const mediaDirs = await searchByMediaFolderSignatureShallow(drive, SIGNATURE_SEARCH_DEPTH)
-      if (mediaDirs.length > 0) {
-        for (const d of mediaDirs) signatureSet.add(d)
-      } else {
-        // 媒体文件夹没找到，搜索游戏 exe
-        const gameDir = await searchBySignatureShallow(drive, SIGNATURE_SEARCH_DEPTH)
-        if (gameDir) signatureSet.add(gameDir)
-      }
-      // 安装树锚点签名：独立补充，不依赖媒体/ exe 命中结果——
-      // 专门覆盖非标准安装树（InfinityNikki Launcher\InfinityNikki\X6Game），
-      // 该场景下既没有 exe 签名、媒体目录又常因 depth 边界被媒体签名漏掉，必须单独兜底。
-      // 命中后返回安装树根（如 `...\InfinityNikki`），scanDirectory 从其递归即可覆盖全部媒体。
-      const treeRoots = await searchByInstallTreeSignatureShallow(drive, SIGNATURE_SEARCH_DEPTH)
-      for (const r of treeRoots) signatureSet.add(r)
-    })
-    await runWithConcurrency(driveTasks, DRIVE_SCAN_CONCURRENCY)
-  } // end of else（全盘签名搜索）
+  // 目录发现结论日志（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
+  sendScanLogInfo(
+    `[Scanner] 快速路径已找到 ${quickSet.size} 个目录（注册表 ${registrySet.size} + 用户数据 ${lowConfidenceSet.size}）`
+  )
 
-  // 软过滤（批次A R1）：仅作用于快速路径集合（registrySet ∪ lowConfidenceSet），与历史版本对
-  // 快速路径的处理保持一致（infinitynikki 优先保留，避免其他游戏的目录混入快速结果）。
-  // 签名搜索命中（signatureSet）不参与软过滤——专属签名（含 NikkiPhotos_HighQuality 等）已足够
-  // 精确；旧实现对合并后的集合过滤，launcher 缓存（含 infinitynikki）命中时会把签名搜索发现的
-  // 中文安装路径等非 infinitynikki 目录误剔除（forceSignatureSearch 的目标场景完全落空）。
-  // test_media 测试目录与 War Thunder 等其他游戏的 ScreenShot 目录过滤，依赖
-  // searchByMediaFolderSignatureShallow 内的 screenshot 上下文校验与后续 repairLegacyData 白名单清理。
+  // 软过滤：仅保留"含 infinitynikki 关键字"的自动发现目录（防误匹配其他软件/游戏）；
+  // 无命中时回退保留全部自动目录（避免漏掉非标准命名路径）。
   const infinityNikkiDirs = Array.from(quickSet).filter((p) =>
     p.toLowerCase().includes('infinitynikki')
   )
@@ -600,11 +536,11 @@ export async function findMediaDirectories(
     )
   }
 
-  // 合并（批次A R1）：自定义路径与签名命中恒包含；快速路径按软过滤结果并入；整体去重。
-  const result = new Set<string>([...customSet, ...filteredQuick, ...signatureSet])
+  // 合并：自定义路径（恒包含）+ 软过滤后的自动目录；整体去重。
+  const result = new Set<string>([...customSet, ...filteredQuick])
   // T2：目录发现结论日志透传（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
   sendScanLogInfo(
-    `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 快速路径过滤后 ${filteredQuick.length} + 签名命中 ${signatureSet.size}）`
+    `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 快速路径过滤后 ${filteredQuick.length}）`
   )
   // 逐目录日志截断：兑现 sendScanLogInfo “低频白名单”承诺——结果目录数可能很大
   // （多盘符多签名命中时可达数十个），最多输出前 20 个目录，其余以一条汇总行带过
@@ -618,7 +554,7 @@ export async function findMediaDirectories(
   return resultDirs
 }
 
-// 注：searchBySignatureShallow / searchByMediaFolderSignatureShallow 已抽取至 ./game-directory-discovery
+// 注：游戏目录发现逻辑（注册表/Steam/Epic/用户数据/有限盘符枚举）已抽取至 ./game-directory-discovery
 // （便于单元测试用 vi.mock 桩替换，避免真实盘符/注册表 IO）。
 
 // 注：findSteamGamePaths 已抽取至 ./game-directory-discovery
@@ -771,6 +707,24 @@ export async function scanDirectory(
                   )
                 }
               }
+              // 子任务7：复用现有 XMP 服务读取高清图内嵌元数据（wxnn 命名空间 EditorData）。
+              // 游戏原生截图不含此 XMP，readMetadataFromFile 返回 null，editor_metadata 恒为 NULL。
+              // 差距标注：游戏原生 nuan5_params（相机参数/世界坐标/搭配）解码为独立任务，
+              // 不在本次复刻范围（待 nikki_albums 运行时对比后移植 Rust 解码器），不臆造。
+              let editorMetadata: string | null | undefined
+              try {
+                const meta = await readMetadataFromFile(fullPath)
+                editorMetadata = meta ? JSON.stringify(meta) : null
+              } catch (metaErr) {
+                // 元数据读取失败（无 XMP / 解析异常）不中断扫描；thumbnail 走常规生成兜底
+                workerLog(
+                  'warn',
+                  `[Scanner] 读取内嵌元数据失败，跳过: ${fullPath}`,
+                  metaErr instanceof Error ? metaErr.message : String(metaErr)
+                )
+                editorMetadata = null
+              }
+
               await addFile({
                 file_path: fullPath,
                 file_name: entry.name,
@@ -794,7 +748,9 @@ export async function scanDirectory(
                 // 区分游戏内拍摄与启动器缓存
                 media_source: extractMediaSourceFromPath(fullPath),
                 // 游戏原生缩略图（LQ 同名文件，仅当存在且可读时填充）
-                thumbnail: nativeThumbnail
+                thumbnail: nativeThumbnail,
+                // 内嵌 XMP 元数据（wxnn 命名空间 EditorData JSON），游戏原生截图为 NULL
+                editor_metadata: editorMetadata
               })
               progress.found++
             }
@@ -983,8 +939,8 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
     if (!insertStmtCache) {
       insertStmtCache = db.prepare(`
       INSERT INTO media_files
-      (file_path, file_name, file_type, file_ext, file_size, width, height, duration, created_at, modified_at, source_path, indexed_at, tags, category_id, rating, is_favorite, notes, scene_category, scene_time, outfit, account_uid, album_type, media_source, thumbnail)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, 0, 0, '', ?, ?, ?, ?, ?, ?, ?)
+      (file_path, file_name, file_type, file_ext, file_size, width, height, duration, created_at, modified_at, source_path, indexed_at, tags, category_id, rating, is_favorite, notes, scene_category, scene_time, outfit, account_uid, album_type, media_source, thumbnail, editor_metadata)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '[]', NULL, 0, 0, '', ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(file_path) DO UPDATE SET
         file_name = excluded.file_name,
         file_type = excluded.file_type,
@@ -1005,6 +961,8 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
         -- 避免增量重扫时把已关联/已生成的缩略图覆盖回 NULL；
         -- 存量未关联的 HQ 记录由 repairLegacyDataV6 迁移补回填。
         thumbnail = COALESCE(excluded.thumbnail, media_files.thumbnail),
+        -- 子任务7：内嵌 XMP 元数据随扫描刷新（无则 NULL）
+        editor_metadata = excluded.editor_metadata,
         -- FIX(组3-2): 扫描刚物理确认文件存在，缺失计数与标记必须归零——ON CONFLICT 不重置该列时，
         -- 记录删除重建/外部移动后扫回/DB 迁移残留的旧 missing_count 会让下次完整性校验
         -- 首次 access 失败即置 is_missing=1，跳过"连续两次缺失"防抖缓冲
@@ -1046,7 +1004,9 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
           // 媒体来源：game 或 launcher
           file.media_source,
           // 游戏原生缩略图路径（未关联时为 NULL，走常规缩略图生成）
-          file.thumbnail ?? null
+          file.thumbnail ?? null,
+          // 内嵌 XMP 元数据（无则为 NULL）
+          file.editor_metadata ?? null
         )
       }
     })
@@ -1190,26 +1150,25 @@ async function startScan(
   try {
     // 全盘扫描模式：直接全盘搜索媒体特征文件夹，不依赖游戏目录查找
     // 修复：原"全量重扫"只是 incremental:false，仍依赖 findGameDirectory 找单个目录
-    // 全盘扫描遍历所有盘符查找含媒体特征文件夹的目录并全部扫描，覆盖所有安装场景
+    // 全盘扫描：仍依赖自动发现（注册表/Steam/Epic/用户数据/有限盘符枚举）定位游戏目录，
+    // 不再执行全盘签名搜索——与 nikki_albums 一致，命中即停、不做全盘递归。
     if (options?.fullScan && !options?.path) {
-      // T1：全盘扫描强制执行签名搜索——快速路径的 launcher 缓存命中不能当作"游戏目录已找到"，
-      // 游戏装在非 Steam/Epic 标准路径时仍需全盘签名搜索兜底
-      const mediaDirs = await findMediaDirectories(options?.customKnownPaths, {
-        forceSignatureSearch: true
-      })
-      if (mediaDirs.length === 0) {
+      const mediaDirs = await findMediaDirectories(options?.customKnownPaths)
+      // 子任务3：统一出口拼接 X6Game\Saved\GamePlayPhotos，仅扫描该子树（对齐 nikki_albums）
+      const scanRoots = await resolveGamePlayPhotosScanRoots(mediaDirs, workerLog)
+      if (scanRoots.length === 0) {
         progress.status = 'failed'
         updateScanHistory(scanId, 'failed', 0, 0)
         return { success: false, message: t('main.scanner.error.noMediaDirFound') }
       }
 
-      // 方案三：从游戏目录独立发现 UID 并注册到 character_profiles 表
-      const discoveredUids = discoverUidsFromGameDirs(mediaDirs, workerLog)
+      // 方案三：从 GamePlayPhotos 目录独立发现 UID 并注册到 character_profiles 表
+      const discoveredUids = discoverUidsFromGameDirs(scanRoots, workerLog)
       for (const uid of discoveredUids) autoRegisterUid(uid)
 
       let totalFiles = 0
       let totalSaved = 0
-      for (const dir of mediaDirs) {
+      for (const dir of scanRoots) {
         if (shouldStop) break
         progress.currentPath = dir
         const { files, savedCount } = await scanDirectory(dir, options?.incremental)
@@ -1221,7 +1180,7 @@ async function startScan(
       // 全量扫描刚扫完文件必然存在，仅增量扫描需检查文件是否被外部移动/删除
       if (options?.incremental) {
         // T02 修复：仅校验本次全盘扫描覆盖的根集合，避免全库磁盘访问
-        await checkMissingFiles(mediaDirs)
+        await checkMissingFiles(scanRoots)
       }
 
       progress.status = 'completed'
@@ -1231,7 +1190,7 @@ async function startScan(
       await finalizeScanCheckpoint()
       return {
         success: true,
-        message: `全盘扫描完成，扫描 ${mediaDirs.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
+        message: `全盘扫描完成，扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
         filesFound: totalFiles
       }
     }
@@ -1242,15 +1201,17 @@ async function startScan(
       // F-O1：优先使用用户自定义路径，回退到默认 KNOWN_PATHS
       // 修复：findGameDirectory 改为 findMediaDirectories 返回所有匹配目录
       const gameDirs = await findMediaDirectories(options?.customKnownPaths)
-      if (gameDirs.length > 0) {
-        // 方案三：从游戏目录独立发现 UID 并注册到 character_profiles 表
-        const discoveredUids = discoverUidsFromGameDirs(gameDirs, workerLog)
+      // 子任务3：统一出口拼接 X6Game\Saved\GamePlayPhotos，仅扫描该子树（对齐 nikki_albums）
+      const scanRoots = await resolveGamePlayPhotosScanRoots(gameDirs, workerLog)
+      if (scanRoots.length > 0) {
+        // 方案三：从 GamePlayPhotos 目录独立发现 UID 并注册到 character_profiles 表
+        const discoveredUids = discoverUidsFromGameDirs(scanRoots, workerLog)
         for (const uid of discoveredUids) autoRegisterUid(uid)
 
-        // 扫描所有找到的游戏目录（修复：原版只扫描第一个）
+        // 扫描所有找到的 GamePlayPhotos 目录（修复：原版只扫描第一个）
         let totalFiles = 0
         let totalSaved = 0
-        for (const dir of gameDirs) {
+        for (const dir of scanRoots) {
           if (shouldStop) break
           progress.currentPath = dir
           const { files, savedCount } = await scanDirectory(dir, options?.incremental)
@@ -1261,7 +1222,7 @@ async function startScan(
         // 全量扫描刚扫完文件必然存在，仅增量扫描需检查文件是否被外部移动/删除
         if (options?.incremental) {
           // T02 修复：仅校验本次自动发现覆盖的根集合，避免全库磁盘访问
-          await checkMissingFiles(gameDirs)
+          await checkMissingFiles(scanRoots)
         }
         progress.status = 'completed'
         updateScanHistory(scanId, 'completed', totalFiles, totalSaved)
@@ -1270,7 +1231,7 @@ async function startScan(
         await finalizeScanCheckpoint()
         return {
           success: true,
-          message: `扫描完成，扫描 ${gameDirs.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
+          message: `扫描完成，扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
           filesFound: totalFiles
         }
       }
