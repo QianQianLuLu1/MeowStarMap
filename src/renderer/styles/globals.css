@@ -402,6 +402,25 @@ body {
   overflow: hidden;
 }
 
+/* BatchActions 文字按钮：覆盖 .icon-btn 固定 36px 宽度，允许随标签自适应，
+   避免中文标签被 .icon-btn 的 overflow:hidden 裁掉（导出到默认→出到到 等） */
+.batch-act-btn {
+  width: auto;
+  min-width: 36px;
+  flex-shrink: 0;
+}
+
+/* 隐藏滚动条：用于底部批量操作栏水平滚动时保持玻璃拟态视觉干净。
+   不支持的浏览器优雅降级为系统滚动条，不影响功能。 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 .icon-btn:hover {
   background: var(--hover-bg);
   color: var(--text-primary);

@@ -57,7 +57,7 @@ export const ShareMenuButton: React.FC<ShareMenuButtonProps> = ({
     <div ref={ref} className="relative">
       <button
         type="button"
-        className={`icon-btn ${sizeClass} w-auto gap-1`}
+        className={`icon-btn batch-act-btn ${sizeClass} gap-1`}
         disabled={disabled}
         title={title ?? effectiveLabel}
         aria-haspopup="menu"

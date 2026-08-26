@@ -65,7 +65,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
   return (
     <div
       ref={actionsRef}
-      className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40 flex-wrap justify-center max-w-[calc(100vw-32px)]"
+      className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40 flex-nowrap overflow-x-auto scrollbar-hide max-w-[calc(100vw-32px)]"
       style={{ bottom: '44px', animation: 'slideInBottom 200ms ease-out' }}
       role="toolbar"
       aria-label={t('batch.actions.ariaLabel')}
@@ -78,7 +78,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       </span>
       <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--divider)' }} />
       <button
-        className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onSelectAll}
         aria-label={t('batch.actions.selectAll')}
       >
@@ -86,7 +86,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         {t('batch.actions.selectAll')}
       </button>
       <button
-        className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onInvertSelection}
         aria-label={t('batch.actions.invertSelection')}
       >
@@ -95,7 +95,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       </button>
       <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--divider)' }} />
       <button
-        className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onDelete}
         aria-label={t('batch.actions.delete')}
       >
@@ -103,7 +103,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         {t('batch.actions.delete')}
       </button>
       <button
-        className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onExport}
         aria-label={t('batch.actions.export')}
         title={t('batch.actions.exportSelectDir')}
@@ -113,7 +113,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       </button>
       {onExportToDefault && (
         <button
-          className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+          className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
           onClick={onExportToDefault}
           aria-label={t('batch.actions.exportToDefault')}
           title={t('batch.actions.exportToDefaultHint')}
@@ -124,7 +124,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         </button>
       )}
       <button
-        className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onMove}
         aria-label={t('batch.actions.move')}
       >
@@ -132,7 +132,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         {t('batch.actions.move')}
       </button>
       <button
-        className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onWatermark}
         aria-label={t('batch.actions.watermark')}
       >
@@ -141,7 +141,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       </button>
       {onBatchRename && (
         <button
-          className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+          className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
           onClick={onBatchRename}
           aria-label={t('batch.actions.renameAria')}
           title={t('batch.actions.renameHint')}
@@ -152,7 +152,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       )}
       {onCategorize && (
         <button
-          className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+          className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
           onClick={onCategorize}
           aria-label={t('batch.actions.categorize')}
         >
@@ -173,7 +173,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       )}
       {onShareWifi && (
         <button
-          className="icon-btn text-sm px-3 w-auto gap-1 whitespace-nowrap flex-shrink-0"
+          className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
           onClick={onShareWifi}
           aria-label={t('batch.actions.wifiShare')}
           title={t('batch.actions.wifiShareHint')}
@@ -224,7 +224,7 @@ const ProfileTransferMenu: React.FC<{
     <div ref={ref} className="relative">
       <button
         type="button"
-        className="icon-btn text-sm px-3 w-auto gap-1"
+        className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         aria-haspopup="menu"
         aria-expanded={open}
         title={t('batch.actions.transferToProfileHint')}
