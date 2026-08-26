@@ -135,3 +135,47 @@ export function resolveNativeThumbnailPath(hqPath: string): string | null {
   const after = hqPath.slice(idx + HQ_SEGMENT.length)
   return `${before}${leadingSep}NikkiPhotos_LowQuality${trailingSep}${after}`
 }
+
+/**
+ * P0-02 根因修复：账号 UID 合法性闸门。
+ *
+ * 背景：extractUidFromPath 用宽松正则 /[\\/](\d{6,12})[\\/]/ 从任意路径段提取 UID，
+ * 会命中时间戳（如 ScreenShot\1700000000\a.jpg）、活动 ID、嵌套数字目录等虚拟数字段，
+ * 直接注册即产生无媒体文件的「虚拟档案」，导致设置-档案管理列表显示与真实检测路径不符。
+ *
+ * 闸门语义（与 worker-entry.scanDirectory 两处分支一致）：
+ * - validUids 为空（null/undefined/空 Set）：保留旧行为，原样返回 rawUid（向后兼容导入向导单目录扫描）。
+ *   空 Set 无意义（discoverUidsFromGameDirs 返回 []，即全新账号未拍照或目录 IO/权限异常被吞），
+ *   若误判为「有效空集闸门」会令所有文件归 default 并跳过注册，造成静默零档案写入退化，故回退旧行为。
+ * - rawUid 为 'default'：始终返回 'default'（调用方据此决定是否 autoRegisterUid）。
+ * - 否则：命中真实 UID 集合（来自 discoverUidsFromGameDirs，即 GamePlayPhotos 一级纯数字子目录）
+ *   则返回 rawUid；否则视为虚拟数字段，归 'default' 且不注册档案。
+ *
+ * 纯函数、无副作用，不依赖 electron，可独立单元测试。
+ */
+export function gateAccountUid(rawUid: string, validUids?: Set<string> | null): string {
+  if (!validUids || validUids.size === 0) return rawUid // 空允许集无意义，回退旧行为
+  if (rawUid === 'default') return 'default'
+  return validUids.has(rawUid) ? rawUid : 'default'
+}
+
+/**
+ * P0-02 可观测性：判定某次闸门拦截是否「应被计入诊断计数 gatedVirtualUidCount」。
+ *
+ * 命中条件需同时满足：
+ * - rawUid !== 'default'：路径本身含 UID 段（否则归 default 是合法的「路径本无 UID」）；
+ * - gatedUid === 'default'：闸门结果为 default（即被拦截）；
+ * - validUids 非空：闸门确实生效（空集合时 gateAccountUid 回退旧行为，不拦截）。
+ *
+ * 该判定精确区分「路径本无 UID（合法归 default）」与「路径含虚拟段被拦截归 default」，
+ * 仅在后者累加计数，供 SCAN_COMPLETE 上报并与 nikki_albums 核对。
+ *
+ * 纯函数、无副作用，便于独立单元测试。
+ */
+export function isGatedVirtualUid(
+  rawUid: string,
+  gatedUid: string,
+  validUids?: Set<string> | null
+): boolean {
+  return rawUid !== 'default' && gatedUid === 'default' && !!validUids && validUids.size > 0
+}

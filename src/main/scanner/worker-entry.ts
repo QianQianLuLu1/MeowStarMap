@@ -44,6 +44,8 @@ import {
   extractUidFromPath,
   extractAlbumTypeFromPath,
   extractMediaSourceFromPath,
+  gateAccountUid,
+  isGatedVirtualUid,
   resolveNativeThumbnailPath
 } from './path-classifier'
 // 子任务7：复用现有 XMP 服务读取高清图内嵌元数据（wxnn 命名空间 EditorData）。
@@ -149,6 +151,11 @@ let insertProfileStmtCache: DatabaseType.Statement | null = null
 // 生命周期：每次 startScan 开始时清空
 const realpathCache = new Map<string, string>()
 
+// P0-02 可观测性：被虚拟 UID 闸门拦截（路径含时间戳/活动ID等虚拟段、非 'default' 来源、未命中允许集）
+// 归 'default' 的累计计数。用于区分「路径本无 UID（合法）」与「虚拟段被拦截」，便于事后与 nikki_albums 核对。
+// 每次 startScan 开始时归零，跨多个扫描根累计。
+let gatedVirtualUidCount = 0
+
 // ============ worker log 转发 ============
 
 /**
@@ -214,6 +221,42 @@ async function cachedRealpath(dir: string): Promise<string> {
   const real = await fsp.realpath(dir)
   realpathCache.set(dir, real)
   return real
+}
+
+// ============ P0-02 虚拟 UID 闸门可观测性 ============
+
+/**
+ * 对比 gateAccountUid 的返回值与原 rawUid：命中「原非 default、但结果为 default、且允许集非空」
+ * 时累加诊断计数 gatedVirtualUidCount（代表该路径含虚拟 UID 段被拦截，而非合法无 UID）。
+ * @param rawUid extractUidFromPath 的原始返回值（'default' 表示路径无 UID 段）
+ * @param gatedUid gateAccountUid 的闸门结果
+ * @param validUids 允许集（discoverUidsFromGameDirs 发现的真实 UID）；空/未提供时闸门不生效，不计数
+ */
+function observeUidGate(rawUid: string, gatedUid: string, validUids?: Set<string> | null): void {
+  if (isGatedVirtualUid(rawUid, gatedUid, validUids)) {
+    gatedVirtualUidCount++
+  }
+}
+
+/**
+ * 统一构造 SCAN_COMPLETE 结果：附带 gatedVirtualUidCount，并在计数 > 0 时输出一条汇总诊断日志
+ * （逐条打日志会淹没 IPC/日志，故仅在扫描结束汇总一次）。
+ */
+function makeScanCompleteResult(
+  success: boolean,
+  message: string,
+  filesFound?: number
+): { success: boolean; message: string; filesFound?: number; gatedVirtualUidCount?: number } {
+  if (gatedVirtualUidCount > 0) {
+    sendScanLogEntry({
+      stage: 'uid-gate',
+      level: 'info',
+      kind: 'ok',
+      message: `[UID-Gate] 本次扫描有 ${gatedVirtualUidCount} 个含虚拟 UID 段（时间戳/活动ID/嵌套数字目录）的路径被闸门拦截归 default`,
+      detail: { gatedVirtualUidCount }
+    })
+  }
+  return { success, message, filesFound, gatedVirtualUidCount }
 }
 
 // ============ 修复旧数据 ============
@@ -563,7 +606,12 @@ export async function scanDirectory(
   rootPath: string,
   incremental?: boolean,
   // 单目录扫描（导入向导）传 false 可禁用缓存目录跳过与小图片过滤，避免用户文件被误跳过
-  applyFilters = true
+  applyFilters = true,
+  // P0-02 根因修复：真实 UID 集合（来自 discoverUidsFromGameDirs，即 GamePlayPhotos 一级纯数字子目录）。
+  // 为空（null/undefined）保留旧行为；非空时，extractUidFromPath 的宽松命中若不在该集合内，
+  // 视为路径中的时间戳/活动ID/嵌套数字目录等虚拟数字段，归 'default' 且不注册档案，
+  // 从源头阻止虚拟 UID 写入 character_profiles（解密降级/历史修复依赖 extractUidFromPath 通用契约，不在本处收紧）。
+  validUids?: Set<string> | null
 ): Promise<{ files: MediaFile[]; savedCount: number }> {
   const files: MediaFile[] = []
   let savedCount = 0
@@ -696,9 +744,15 @@ export async function scanDirectory(
               pendingVideos.push({ fullPath, ext, entryName: entry.name, stats })
             } else {
               // P0-02：根据路径识别角色档案 UID
-              // 方案二：自动注册发现的 UID 到 character_profiles 表
-              const discoveredUid = extractUidFromPath(fullPath)
-              autoRegisterUid(discoveredUid)
+              // 根因修复闸门：extractUidFromPath 用宽松正则 /[\\/](\d{6,12})[\\/]/ 可能命中
+              // 路径中任意数字段（时间戳/活动ID/嵌套数字目录），形成虚拟 UID。
+              // gateAccountUid 仅当命中真实 UID 集合（discoverUidsFromGameDirs 发现，
+              // 即 GamePlayPhotos 一级纯数字子目录）或为 'default' 时采用；否则归 'default'
+              // 且不注册档案，从源头阻断虚拟档案写入。
+              const rawUid = extractUidFromPath(fullPath)
+              const discoveredUid = gateAccountUid(rawUid, validUids)
+              observeUidGate(rawUid, discoveredUid, validUids)
+              if (discoveredUid !== 'default') autoRegisterUid(discoveredUid)
               // 扫描入库关联游戏原生缩略图：HQ 图片可推导出同名 LQ 低清文件，
               // 存在且可读时直接填充 thumbnail（不再触发缩略图生成）；
               // access 失败仅记 warn 日志、不填（保持现状走常规生成），不中断扫描。
@@ -803,9 +857,11 @@ export async function scanDirectory(
       workerLog('error', `[Scanner] 跳过视频元数据读取失败: ${fullPath}`, videoCorruptedReason)
     }
     // P0-02：根据路径识别角色档案 UID
-    // 方案二：自动注册发现的 UID 到 character_profiles 表
-    const discoveredUid = extractUidFromPath(fullPath)
-    autoRegisterUid(discoveredUid)
+    // 根因修复闸门（同图片分支）：复用 gateAccountUid 仅当命中真实 UID 集合或为 'default' 时采用
+    const rawUid = extractUidFromPath(fullPath)
+    const discoveredUid = gateAccountUid(rawUid, validUids)
+    observeUidGate(rawUid, discoveredUid, validUids)
+    if (discoveredUid !== 'default') autoRegisterUid(discoveredUid)
     await addFile({
       file_path: fullPath,
       file_name: entryName,
@@ -1110,15 +1166,23 @@ async function finalizeScanCheckpoint(): Promise<void> {
 async function startScan(
   dbPath: string,
   options: ScanOptions
-): Promise<{ success: boolean; message: string; filesFound?: number }> {
+): Promise<{
+  success: boolean
+  message: string
+  filesFound?: number
+  gatedVirtualUidCount?: number
+}> {
+  // 0. 重置虚拟 UID 闸门诊断计数（必须在最早返回路径之前，避免带入上一次扫描的残留值）
+  gatedVirtualUidCount = 0
+
   // 1. 打开 DB（如未打开或路径变化）
   try {
     openDatabaseIfNeeded(dbPath)
   } catch (err) {
-    return {
-      success: false,
-      message: `数据库打开失败: ${err instanceof Error ? err.message : String(err)}`
-    }
+    return makeScanCompleteResult(
+      false,
+      `数据库打开失败: ${err instanceof Error ? err.message : String(err)}`
+    )
   }
 
   // 2. 重置状态
@@ -1180,7 +1244,7 @@ async function startScan(
       if (scanRoots.length === 0) {
         progress.status = 'failed'
         updateScanHistory(scanId, 'failed', 0, 0)
-        return { success: false, message: t('main.scanner.error.noMediaDirFound') }
+        return makeScanCompleteResult(false, t('main.scanner.error.noMediaDirFound'))
       }
 
       // 方案三：从 GamePlayPhotos 目录独立发现 UID 并注册到 character_profiles 表
@@ -1192,7 +1256,9 @@ async function startScan(
       for (const dir of scanRoots) {
         if (shouldStop) break
         progress.currentPath = dir
-        const { files, savedCount } = await scanDirectory(dir, options?.incremental)
+        // 方案 B（防御纵深）：发现为空时显式传 null 而非空 Set，让 gate 走「无闸门」分支
+        const uidGate = discoveredUids.length > 0 ? new Set(discoveredUids) : null
+        const { files, savedCount } = await scanDirectory(dir, options?.incremental, true, uidGate)
         totalFiles += files.length
         totalSaved += savedCount
       }
@@ -1217,11 +1283,11 @@ async function startScan(
 
       // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
       await finalizeScanCheckpoint()
-      return {
-        success: true,
-        message: `全盘扫描完成，扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
-        filesFound: totalFiles
-      }
+      return makeScanCompleteResult(
+        true,
+        `全盘扫描完成，扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
+        totalFiles
+      )
     }
 
     let targetPath: string | null | undefined = options?.path
@@ -1243,7 +1309,14 @@ async function startScan(
         for (const dir of scanRoots) {
           if (shouldStop) break
           progress.currentPath = dir
-          const { files, savedCount } = await scanDirectory(dir, options?.incremental)
+          // 方案 B（防御纵深）：发现为空时显式传 null 而非空 Set，让 gate 走「无闸门」分支
+          const uidGate = discoveredUids.length > 0 ? new Set(discoveredUids) : null
+          const { files, savedCount } = await scanDirectory(
+            dir,
+            options?.incremental,
+            true,
+            uidGate
+          )
           totalFiles += files.length
           totalSaved += savedCount
         }
@@ -1258,11 +1331,11 @@ async function startScan(
 
         // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
         await finalizeScanCheckpoint()
-        return {
-          success: true,
-          message: `扫描完成，扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
-          filesFound: totalFiles
-        }
+        return makeScanCompleteResult(
+          true,
+          `扫描完成，扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
+          totalFiles
+        )
       }
       targetPath = null
     }
@@ -1270,7 +1343,7 @@ async function startScan(
     if (!targetPath) {
       progress.status = 'failed'
       updateScanHistory(scanId, 'failed', 0, 0)
-      return { success: false, message: t('main.scanner.error.gameDirNotFound') }
+      return makeScanCompleteResult(false, t('main.scanner.error.gameDirNotFound'))
     }
 
     // 单目录扫描（导入向导）：禁用缓存目录跳过与小图片过滤，避免用户导入的文件被误跳过
@@ -1288,18 +1361,18 @@ async function startScan(
 
     // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
     await finalizeScanCheckpoint()
-    return {
-      success: true,
-      message: `扫描完成，发现 ${files.length} 个媒体文件，新增 ${savedCount} 个`,
-      filesFound: files.length
-    }
+    return makeScanCompleteResult(
+      true,
+      `扫描完成，发现 ${files.length} 个媒体文件，新增 ${savedCount} 个`,
+      files.length
+    )
   } catch (error) {
     progress.status = 'failed'
     updateScanHistory(scanId, 'failed', progress.found, 0)
-    return {
-      success: false,
-      message: `扫描失败: ${error instanceof Error ? error.message : String(error)}`
-    }
+    return makeScanCompleteResult(
+      false,
+      `扫描失败: ${error instanceof Error ? error.message : String(error)}`
+    )
   }
 }
 

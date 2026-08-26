@@ -88,7 +88,16 @@ export type WorkerCommand =
 // ============ worker → 主进程 ============
 export type WorkerEvent =
   | { type: 'SCAN_PROGRESS'; payload: ScanProgress }
-  | { type: 'SCAN_COMPLETE'; payload: { success: boolean; message: string; filesFound?: number } }
+  | {
+      type: 'SCAN_COMPLETE'
+      payload: {
+        success: boolean
+        message: string
+        filesFound?: number
+        // P0-02 可观测性：本次扫描被虚拟 UID 闸门拦截（路径含时间戳/活动ID等虚拟段、未命中允许集）归 default 的路径数
+        gatedVirtualUidCount?: number
+      }
+    }
   | {
       type: 'SCAN_LOG'
       payload: {
