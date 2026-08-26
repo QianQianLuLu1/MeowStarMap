@@ -8,7 +8,7 @@
  * 所有 UI 文案走 i18n（diagnostics.scan.*），无硬编码中文。
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useI18n } from '../../../i18n'
+import { useTranslation } from 'react-i18next'
 
 const KIND_META: Record<string, { dot: string; ring: string }> = {
   ok: { dot: 'bg-emerald-400', ring: 'ring-emerald-400/30' },
@@ -46,7 +46,7 @@ function formatTime(ts: number): string {
 }
 
 export function ScanLogDiagnosticSection() {
-  const { t } = useI18n()
+  const { t } = useTranslation()
   const [entries, setEntries] = useState<ScanLogEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [autoRefresh, setAutoRefresh] = useState(false)
