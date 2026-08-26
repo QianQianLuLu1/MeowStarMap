@@ -52,8 +52,21 @@ import { readMetadataFromFile } from '../services/xmp-metadata-service'
 // 方案三：独立游戏目录 UID 发现机制（对齐上游 nikki_albums）
 import { discoverUidsFromGameDirs } from './uid-discovery'
 // P0-01：游戏目录发现函数抽取为独立模块，便于单元测试 vi.mock 桩替换（循环依赖仅调用期使用，ESM 安全）
-import { findGameInstallRootsByPriority, getUserDataPaths } from './game-directory-discovery'
+import { findGameInstallRootsByPriority } from './game-directory-discovery'
 import { resolveGamePlayPhotosScanRoots } from './gameplayphotos-root'
+
+// spec 三：GamePlayPhotos 子树强制遍历豁免判定（纯函数，便于单测）。
+// 返回 true 表示该根目录下的「缓存子目录跳过」与「小图过滤」均不生效，
+// 强制递归遍历全部层级与文件，与 nikki_albums 遍历行为一致；
+// ScreenShot 等其他来源返回 false，仍走原过滤逻辑。
+// 注意：isGamePlayPhotosPath 要求尾部带分隔符（面向文件路径），而扫描根本身即
+// ...\X6Game\Saved\GamePlayPhotos（无尾部分隔符），故此处同时匹配根目录与所有后代子路径。
+export function isGamePlayPhotosScanExempt(rootPath: string): boolean {
+  if (!rootPath) return false
+  const normalized = rootPath.replace(/\//g, '\\').toLowerCase()
+  const seg = '\\x6game\\saved\\gameplayphotos'
+  return normalized === seg || normalized.endsWith(seg) || normalized.includes(seg + '\\')
+}
 // P2-1：复用主进程已有的 asar 解包路径修正工具，确保 worker 加载 better-sqlite3 与主进程行为一致
 import { resolveAsarUnpackedPath } from '../utils/ffmpeg-paths'
 // 子进程注册表：worker 退出时 kill 所有活跃的 ffmpeg/ffprobe 子进程
@@ -461,35 +474,32 @@ async function checkMissingFiles(roots?: string[]): Promise<void> {
  * - 缺陷 2（过滤丢弃）：原实现末尾对整个 `found` 做 `infinitynikki` 软过滤，当用户配置的不含该关键字的
  *   自定义路径与某个含 `infinitynikki` 的自动发现目录共存时，自定义路径被整体挤出结果。
  *
- * 修复策略（批次A R1+R2 更新）：
- * - `customSet`：自定义路径，存在即加入，**恒包含于最终结果**（不会被早退或软过滤剔除）。
- * - 快速路径按置信度分组：`registrySet`（Steam/Epic 注册表命中，高置信——注册表项就是
- *   InfinityNikki 的安装路径）与 `lowConfidenceSet`（getUserDataPaths 命中，低置信——可能
- *   只是 launcher 缓存而非游戏本体目录）。软过滤（`infinitynikki` 关键字）只作用于二者并集
- *   （与历史版本对快速路径的处理一致），自定义路径永不被挤出。
- * - 软过滤（`infinitynikki` 关键字）只作用于自动发现目录并集，自定义路径永不被挤出。
- * - 最终返回去重后的 `[...customSet, ...filteredQuick]`。
+ * 强制对齐 nikki_albums（spec 二/三）：
+ * - `customSet`：用户自定义路径，存在即加入，**恒包含于最终结果**。
+ * - `registrySet`：仅来自 `findGameInstallRootsByPriority`（官方启动器 > Steam > Epic，命中即止，
+ *   且每个根目录均经 validateGameRoot 校验）。不引入用户数据/AppData/全盘枚举等其它来源，
+ *   避免引入 nikki_albums 不含的目录导致扫描数量不一致。
+ * - 移除历史版本的软过滤（`infinitynikki` 关键字过滤）与低置信用户数据通道，完全遵循
+ *   "直接访问 GamePlayPhotos 路径、忽略任何目录过滤"的规范。
+ * - 最终返回去重后的 `[...customSet, ...registrySet]`。
  *
  * 流程：
  * - 优先路径：用户在设置页手动配置的游戏目录（customPaths），存在即加入结果集
- * - 快速路径：Steam/Epic 注册表查询 + 用户数据目录（AppData 下游戏数据）
- * - 自动发现：Steam/Epic 注册表 + 用户数据目录 + 有限盘符枚举兜底（见 game-directory-discovery）
+ * - （已移除：用户数据 / 全盘扫描通道，仅保留三渠道游戏根目录定位）
+ * - 自动发现：仅三渠道游戏根目录定位（见 game-directory-discovery），不做全盘扫描
  *
- * @param customPaths 用户在设置页手动配置的游戏目录，优先扫描；存在有效目录时恒包含（不抑制全盘搜索）
+ * @param customPaths 用户在设置页手动配置的游戏目录，优先扫描；存在有效目录时恒包含
 
- * @returns 所有匹配的媒体目录列表（去重）
+ * @returns 所有匹配的游戏根目录列表（去重），由上层 resolveGamePlayPhotosScanRoots 拼接 GamePlayPhotos 子路径
  */
 export async function findMediaDirectories(customPaths?: string[]): Promise<string[]> {
-  // 自定义路径与自动发现分离：自定义路径恒包含，自动发现用独立计数判断是否跳过全盘搜索
+  // spec 二/三：仅返回用户自定义路径 + 三渠道游戏根目录，不经过目录过滤、不做全盘扫描。
   const customSet = new Set<string>()
-  // 快速路径按置信度分组（批次A R2）：registrySet 高置信（注册表项即安装路径），
-  // lowConfidenceSet 低置信（可能是 launcher 缓存而非游戏本体目录）
   const registrySet = new Set<string>()
-  const lowConfidenceSet = new Set<string>()
 
   // 0. 优先路径：用户自定义游戏目录
   // 用户在设置页手动指定的目录，存在即加入结果集；不存在则跳过（游戏可能未安装但用户预配置）。
-  // 注意：自定义路径不计入快速路径集合，因此不会触发下方“跳过全盘签名搜索”的早退，也不会被软过滤剔除。
+  // 注意：自定义路径不计入自动发现集合，恒包含于最终结果，不会被任何过滤剔除。
   if (customPaths && customPaths.length > 0) {
     let validCount = 0
     for (const p of customPaths) {
@@ -511,36 +521,12 @@ export async function findMediaDirectories(customPaths?: string[]): Promise<stri
   // 解析游戏安装根目录，再统一拼接 X6Game\Saved\GamePlayPhotos 子路径。
   for (const p of await findGameInstallRootsByPriority()) registrySet.add(p)
 
-  // 2. 快速路径（低置信）：用户数据目录（AppData 下的游戏数据）
-  // SYSTEM_DIRS_TO_SKIP 跳过 appdata，全盘签名搜索无法进入，必须显式检查
-  for (const p of await getUserDataPaths()) lowConfidenceSet.add(p)
-
-  const quickSet = new Set<string>([...registrySet, ...lowConfidenceSet])
-
-  // 目录发现结论日志（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
-  sendScanLogInfo(
-    `[Scanner] 快速路径已找到 ${quickSet.size} 个目录（注册表 ${registrySet.size} + 用户数据 ${lowConfidenceSet.size}）`
-  )
-
-  // 软过滤：仅保留"含 infinitynikki 关键字"的自动发现目录（防误匹配其他软件/游戏）；
-  // 无命中时回退保留全部自动目录（避免漏掉非标准命名路径）。
-  const infinityNikkiDirs = Array.from(quickSet).filter((p) =>
-    p.toLowerCase().includes('infinitynikki')
-  )
-  const filteredQuick = infinityNikkiDirs.length > 0 ? infinityNikkiDirs : Array.from(quickSet)
-
-  if (infinityNikkiDirs.length === 0 && quickSet.size > 0) {
-    workerLog(
-      'warn',
-      `[Scanner] 快速路径未找到含 'infinitynikki' 的路径，回退使用全部 ${quickSet.size} 个快速路径目录`
-    )
-  }
-
-  // 合并：自定义路径（恒包含）+ 软过滤后的自动目录；整体去重。
-  const result = new Set<string>([...customSet, ...filteredQuick])
+  // 合并：自定义路径（恒包含）+ 三渠道游戏根目录；整体去重。
+  // 不再引入用户数据 / AppData / 全盘扫描通道（spec 二：不做全盘扫描、不经目录过滤）。
+  const result = new Set<string>([...customSet, ...registrySet])
   // T2：目录发现结论日志透传（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
   sendScanLogInfo(
-    `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 快速路径过滤后 ${filteredQuick.length}）`
+    `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 三渠道 ${registrySet.size}）`
   )
   // 逐目录日志截断：兑现 sendScanLogInfo “低频白名单”承诺——结果目录数可能很大
   // （多盘符多签名命中时可达数十个），最多输出前 20 个目录，其余以一条汇总行带过
@@ -622,6 +608,10 @@ export async function scanDirectory(
 
   // A-S5：符号链接环检测——记录已访问目录的真实路径
   const visitedRealPaths = new Set<string>()
+  // spec 三：GamePlayPhotos 子树强制遍历豁免——忽略 HIDDEN/SYSTEM 属性，
+  // 不跳过任何子目录层级、不过滤任何文件（含缓存子目录与小图），与 nikki_albums 一致。
+  // 该豁免仅对确认为 GamePlayPhotos 根的路径生效；ScreenShot 等其他来源仍走原过滤逻辑。
+  const exemptGamePlayPhotos = isGamePlayPhotosScanExempt(rootPath)
   // F-G1：进度更新改为时间节流（每 500ms emit 一次），小目录也能及时反馈
   lastProgressEmit = 0
 
@@ -658,7 +648,12 @@ export async function scanDirectory(
           if (entry.isSymbolicLink()) continue
           // P0修复：跳过缓存子目录（Cache/Temp/Thumbnail/Preview 等），避免缓存图片入库
           // 单目录扫描（applyFilters=false）时不跳过，保留用户自命名的同名子目录
-          if (applyFilters && CACHE_DIR_NAMES.has(entry.name.toLowerCase())) continue
+          if (
+            applyFilters &&
+            !exemptGamePlayPhotos &&
+            CACHE_DIR_NAMES.has(entry.name.toLowerCase())
+          )
+            continue
           await scan(fullPath, depth + 1)
         } else if (entry.isFile()) {
           const ext = path.extname(entry.name).toLowerCase()
@@ -666,7 +661,12 @@ export async function scanDirectory(
             const stats = await fsp.stat(fullPath)
             // P0修复：过滤过小的图片文件（缓存缩略图通常 < 5KB，游戏照片通常 > 200KB）
             // 单目录扫描（applyFilters=false）时不过滤，保留用户导入的小图片
-            if (applyFilters && !VIDEO_EXTENSIONS.has(ext) && stats.size < 5 * 1024) {
+            if (
+              applyFilters &&
+              !exemptGamePlayPhotos &&
+              !VIDEO_EXTENSIONS.has(ext) &&
+              stats.size < 5 * 1024
+            ) {
               continue
             }
 

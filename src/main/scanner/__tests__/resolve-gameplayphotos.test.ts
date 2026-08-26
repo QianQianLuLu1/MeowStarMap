@@ -19,6 +19,12 @@ vi.mock('fs/promises', () => ({
 
 const GPP_SUFFIX = 'X6Game\\Saved\\GamePlayPhotos'
 
+// 缺失根目录时 resolveGamePlayPhotosScanRoots 会记录 logger.warn，
+// 触发 initLogger → app.getPath('userData')；本文件未依赖生产 electron，需 mock 以避免崩溃。
+vi.mock('electron', () => ({
+  app: { getPath: () => process.cwd() }
+}))
+
 describe('resolveGamePlayPhotosScanRoots', () => {
   beforeEach(() => {
     vi.clearAllMocks()

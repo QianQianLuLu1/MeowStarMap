@@ -511,7 +511,7 @@ export async function findEpicGamePaths(): Promise<string[]> {
  * 含 InstallLocation / AppName / DisplayName 字段）。仅采纳 InstallLocation 指向实际存在目录
  * 且确属 InfinityNikki 的清单。清单目录不存在 / 读取失败 / 解析异常均降级返回空，不抛异常、不中断整体。
  */
-async function parseEpicManifests(): Promise<string[]> {
+export async function parseEpicManifests(): Promise<string[]> {
   const programData = process.env.ProgramData || 'C:\\ProgramData'
   const manifestsDir = path.join(programData, 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests')
 
