@@ -946,6 +946,11 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
   // 如未来索引数量超过 20 个，需重新评估写入性能
   // FIX(组3-1): prepare 与事务执行抛错均包装为 ScanBatchWriteError 向上传播
   try {
+    // 游戏目录树路径口径（小写+正斜杠），用于重扫时复位被软删的游戏媒体。
+    // 仅覆盖自动发现的游戏安装树（GamePlayPhotos / X6Game）；导入根（用户自定义目录）路径不匹配，
+    // 其软删除状态仍被尊重，不会被误复位。
+    const RESCAN_RESTORE_GAME_TREE =
+      "(LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%' OR LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/%')"
     if (!insertStmtCache) {
       insertStmtCache = db.prepare(`
       INSERT INTO media_files
@@ -977,7 +982,13 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
         -- 记录删除重建/外部移动后扫回/DB 迁移残留的旧 missing_count 会让下次完整性校验
         -- 首次 access 失败即置 is_missing=1，跳过"连续两次缺失"防抖缓冲
         missing_count = 0,
-        is_missing = 0
+        is_missing = 0,
+        -- FIX(图库修复): 重扫物理确认文件仍存在时，若记录此前被软删除（如移除扫描源触发
+        -- softDeleteByRootPath 整批软删了自动发现的游戏媒体），对位于游戏目录树（GamePlayPhotos/
+        -- X6Game）下的记录复位 is_deleted=0，使其随重扫回到图库；导入根（用户自定义目录）媒体路径
+        -- 不匹配本模式，仍尊重其软删除状态，避免"游戏照片被删后重扫也无法恢复"的卡死。
+        is_deleted = CASE WHEN ${RESCAN_RESTORE_GAME_TREE} THEN 0 ELSE is_deleted END,
+        deleted_at = CASE WHEN ${RESCAN_RESTORE_GAME_TREE} THEN NULL ELSE deleted_at END
       -- F-O1：scene_time 和 outfit 不在 ON CONFLICT 更新列表中，避免覆盖用户手动设置
       -- P0-02：account_uid 在 ON CONFLICT 时更新（路径变更可能导致 UID 变化）
       -- P0-03：album_type 在 ON CONFLICT 时更新（父目录变更可能导致相册类型变化）
