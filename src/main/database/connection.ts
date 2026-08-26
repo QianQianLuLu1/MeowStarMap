@@ -1857,6 +1857,9 @@ export class DatabaseManager {
 
     // 1. 添加字段（safeEnsureColumn 区分"列已存在"和其他错误，R16 列已存在时补回填默认值）
     this.safeEnsureColumn('media_files', 'scene_category TEXT')
+    // 子任务7：内嵌 XMP 元数据列（wxnn 命名空间 EditorData JSON）。
+    // 游戏原生截图不含此元数据故恒为 NULL；列已存在时 safeEnsureColumn 静默跳过。
+    this.safeEnsureColumn('media_files', 'editor_metadata TEXT')
 
     // 2. 创建索引（索引创建已统一在 runMigrations 末尾处理，此处不再重复）
 
