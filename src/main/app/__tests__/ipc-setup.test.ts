@@ -51,6 +51,7 @@ const handlerMocks = vi.hoisted(() => ({
   registerPluginBridgeHandlers: vi.fn(),
   registerExportPrefHandlers: vi.fn(),
   registerImportRootHandlers: vi.fn(),
+  registerScanLogHandlers: vi.fn(),
   initUserDataDir: vi.fn(),
   refreshPathGuardRoots: vi.fn(),
   MediaRepositoryMock: vi.fn(),
@@ -168,6 +169,9 @@ vi.mock('../../ipc/handlers/export-pref-handler', () => ({
 }))
 vi.mock('../../ipc/handlers/import-root-handler', () => ({
   registerImportRootHandlers: handlerMocks.registerImportRootHandlers
+}))
+vi.mock('../../ipc/handlers/scan-log-handler', () => ({
+  registerScanLogHandlers: handlerMocks.registerScanLogHandlers
 }))
 vi.mock('../../ipc/validator', () => ({
   pathGuard: { initUserDataDir: handlerMocks.initUserDataDir }
@@ -292,9 +296,10 @@ describe('setupIPC', () => {
 
     setupIPC(ctx)
 
-    // 37 个 registerXxxHandlers
+    // 38 个 registerXxxHandlers
     expect(handlerMocks.registerMediaMetadataHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerMediaLifecycleHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerScanLogHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerMediaCleanupHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerDuplicateHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerSimilarHandlers).toHaveBeenCalledWith(ctx)

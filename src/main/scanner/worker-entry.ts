@@ -187,13 +187,8 @@ function sendEvent(event: WorkerEvent): void {
  * 仅用于每次扫描至多一条汇总 + N 个目录行（N 通常 < 10）的低频关键诊断信息，
  * 不改变"逐文件 info 丢弃"的性能决策。
  */
-function sendScanLogInfo(message: string): void {
-  try {
-    process.parentPort?.postMessage({ type: 'SCAN_LOG', payload: { level: 'info', message } })
-  } catch {
-    // parentPort 不可用时丢弃日志，避免日志本身导致 worker 崩溃
-  }
-}
+// 全链路诊断日志发送器（抽到 scan-logger 避免与 game-directory-discovery 循环依赖）
+import { sendScanLogInfo, sendScanLogEntry } from './scan-logger'
 
 // ============ 进度推送（保持原 500ms 节流） ============
 
@@ -493,6 +488,13 @@ async function checkMissingFiles(roots?: string[]): Promise<void> {
  * @returns 所有匹配的游戏根目录列表（去重），由上层 resolveGamePlayPhotosScanRoots 拼接 GamePlayPhotos 子路径
  */
 export async function findMediaDirectories(customPaths?: string[]): Promise<string[]> {
+  // 全链路诊断：扫描启动节点
+  sendScanLogEntry({
+    stage: 'scan-start',
+    level: 'info',
+    kind: 'ok',
+    message: `开始查找游戏安装目录`
+  })
   // spec 二/三：仅返回用户自定义路径 + 三渠道游戏根目录，不经过目录过滤、不做全盘扫描。
   const customSet = new Set<string>()
   const registrySet = new Set<string>()
@@ -524,14 +526,22 @@ export async function findMediaDirectories(customPaths?: string[]): Promise<stri
   // 合并：自定义路径（恒包含）+ 三渠道游戏根目录；整体去重。
   // 不再引入用户数据 / AppData / 全盘扫描通道（spec 二：不做全盘扫描、不经目录过滤）。
   const result = new Set<string>([...customSet, ...registrySet])
+  const resultDirs = Array.from(result)
   // T2：目录发现结论日志透传（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
   sendScanLogInfo(
     `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 三渠道 ${registrySet.size}）`
   )
+  // 全链路诊断：目录遍历结果节点
+  sendScanLogEntry({
+    stage: 'dir-traverse',
+    level: result.size > 0 ? 'info' : 'warn',
+    kind: result.size > 0 ? 'ok' : 'empty',
+    message: `找到游戏安装目录 ${result.size} 个（自定义 ${customSet.size} + 三渠道 ${registrySet.size}）`,
+    detail: resultDirs
+  })
   // 逐目录日志截断：兑现 sendScanLogInfo “低频白名单”承诺——结果目录数可能很大
   // （多盘符多签名命中时可达数十个），最多输出前 20 个目录，其余以一条汇总行带过
   const MAX_LOGGED_DIRS = 20
-  const resultDirs = Array.from(result)
   for (const d of resultDirs.slice(0, MAX_LOGGED_DIRS)) sendScanLogInfo(`[Scanner]   - ${d}`)
   if (resultDirs.length > MAX_LOGGED_DIRS) {
     sendScanLogInfo(`[Scanner]   - （其余 ${resultDirs.length - MAX_LOGGED_DIRS} 个目录略）`)
@@ -1185,6 +1195,14 @@ async function startScan(
 
       progress.status = 'completed'
       updateScanHistory(scanId, 'completed', totalFiles, totalSaved)
+      // 全链路诊断：文件扫描汇总节点
+      sendScanLogEntry({
+        stage: 'file-scan',
+        level: 'info',
+        kind: 'ok',
+        message: `共扫描 ${scanRoots.length} 个目录，发现 ${totalFiles} 个媒体文件，新增 ${totalSaved} 个`,
+        detail: { scanRoots, totalFiles, totalSaved }
+      })
 
       // P2-2：扫描写入已结束，收缩 WAL 文件（绝不放在批量写入循环中）
       await finalizeScanCheckpoint()

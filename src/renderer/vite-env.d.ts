@@ -140,6 +140,9 @@ interface WindowElectronAPI {
     ) => () => void
     // R12：扫描半可见性提示——主进程检测到 interrupted 扫描记录时广播
     onInterrupted: (callback: (payload: { count: number }) => void) => () => void
+    // 全链路诊断：读取结构化扫描轨迹 / 清空
+    getScanLog: () => Promise<ScanLogEntry[]>
+    clearScanLog: () => Promise<{ ok: boolean }>
   }
   decrypt: {
     decodeFile: (
@@ -1101,6 +1104,18 @@ declare module 'react' {
 // vite.preview.config.ts 定义为 true（预览版分支保留）
 declare global {
   const __PREVIEW__: boolean
+
+  // 全链路扫描诊断日志条目（与 scan-log-store.ts 保持一致，全局可见供诊断组件使用）
+  type ScanLogKind = 'path-missing' | 'permission' | 'empty' | 'ok' | 'other'
+  interface ScanLogEntry {
+    id: number
+    ts: number
+    stage: string
+    level: 'info' | 'warn' | 'error'
+    kind: ScanLogKind
+    message: string
+    detail?: unknown
+  }
 }
 
 export {}

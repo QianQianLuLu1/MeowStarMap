@@ -1994,7 +1994,7 @@
       "pathLimit": "最多 {{max}} 个游戏目录",
       "pathRemove": "移除",
       "pathRemoved": "已移除游戏目录",
-      "pathsDescription": "手动指定游戏安装目录，扫描时优先搜索这些路径",
+      "pathsDescription": "手动指定游戏安装目录（或相册 GamePlayPhotos 文件夹），扫描时优先搜索这些路径。当自动扫描失效时，可在此手动指定目录作为兜底。",
       "sceneTimeDesc": "基于图像亮度直方图自动识别日景/夜景/黎明/黄昏",
       "sceneTimeTitle": "场景时段分析",
       "importRootsTitle": "指定目录",
@@ -2025,6 +2025,7 @@
       "dataClear": "清除数据",
       "diagnosticsCrash": "崩溃报告",
       "diagnosticsLogs": "日志管理",
+      "scanDiagnostic": "扫描链路诊断",
       "display": "字体与显示",
       "exportWorkflow": "导出工作流",
       "fileops": "文件操作",
@@ -2663,6 +2664,19 @@
         "plugin": "插件进程",
         "unknown": "未知进程"
       }
+    },
+    "scan": {
+      "title": "扫描链路诊断",
+      "legendOk": "成功",
+      "legendPathMissing": "路径不存在",
+      "legendPermission": "权限不足",
+      "legendEmpty": "目录为空",
+      "legendInfo": "信息",
+      "emptyHint": "运行一次扫描后，此处显示从「扫描启动」到「文件扫描」的全流程诊断轨迹。",
+      "autoRefresh": "自动刷新",
+      "refresh": "刷新",
+      "copy": "复制",
+      "clear": "清空"
     }
   },
   "main": {

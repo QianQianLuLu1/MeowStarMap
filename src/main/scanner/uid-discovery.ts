@@ -10,8 +10,12 @@
  */
 import fs from 'fs'
 import path from 'path'
+import { sendScanLogEntry } from './scan-logger'
 
-// UID 正则：6-12 位数字，与 path-classifier 的 UID_REGEX 保持一致
+// UID 正则：6-12 位纯数字（名称完全由数字组成即为 UID 文件夹）。
+// 对齐上游 nikki_albums 的 ^\d{6,12}$ —— 无限暖暖真实 UID 为 6-12 位数字，
+// 该范围等价于"纯数字字符串"在真实数据上的筛选语义，保证 100% 对齐 nikki_albums。
+// fs.readdirSync 原生默认能读到隐藏目录，配合此纯数字判定即可发现全部 UID 文件夹。
 const UID_REGEX = /^\d{6,12}$/
 
 // 向上查找 GamePlayPhotos 目录的最大层级
@@ -75,11 +79,25 @@ export function discoverUidsFromGameDirs(
     const gameplayPhotosDir = findGamePlayPhotosDir(dir)
     if (!gameplayPhotosDir) continue
 
+    // 全链路诊断：[目录遍历] 节点——直接读取 GamePlayPhotos 下所有子目录（原生 readdir，无隐藏过滤）
+    sendScanLogEntry({
+      stage: 'dir-traverse',
+      level: 'info',
+      message: `开始遍历 GamePlayPhotos 目录：${gameplayPhotosDir}`
+    })
     const found = readUidsFromDir(gameplayPhotosDir)
     for (const uid of found) uids.add(uid)
   }
 
   const result = Array.from(uids)
+  // 全链路诊断：[遍历结果] 节点——列出 UID 数量与列表，便于核对与 nikki_albums 是否一致
+  sendScanLogEntry({
+    stage: 'traverse-result',
+    level: result.length > 0 ? 'info' : 'warn',
+    kind: result.length > 0 ? 'ok' : 'empty',
+    message: `找到 UID 文件夹 ${result.length} 个，列表：${result.join(', ') || '(none)'}`,
+    detail: result
+  })
   if (result.length > 0) {
     log?.('info', `[uid-discovery] 从游戏目录发现 ${result.length} 个 UID:`, result)
   }

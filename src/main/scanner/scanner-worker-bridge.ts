@@ -22,6 +22,8 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import path from 'path'
 import { logger } from '../utils/logger'
+import { scanLogStore } from './scan-log-store'
+import { promptAdminRelaunch } from '../app/permission'
 import { t } from '../i18n'
 import { ProgressThrottle } from '../utils/progress-throttle'
 import { EtaCalculator } from '../utils/eta-calculator'
@@ -223,6 +225,22 @@ export class ScannerWorkerBridge {
         } else if (msg.payload.level === 'info') {
           // 目录发现结论等低频 info 透传（worker 侧 sendScanLogInfo 白名单式发送）
           logger.info(logMsg, ...args)
+        }
+        // 全链路诊断：同时落结构化日志仓库，供诊断工具页时间线回放
+        // stage/kind 优先用 worker 显式携带；否则从 message 的 [xxx] 前缀解析，缺省回退 'Scanner'
+        const stageMatch = msg.payload.stage ?? msg.payload.message.match(/^\[([^\]]+)\]/)?.[1]
+        const kind = msg.payload.kind ?? 'other'
+        scanLogStore.append({
+          stage: stageMatch || 'Scanner',
+          level: msg.payload.level,
+          kind,
+          message: msg.payload.message,
+          detail: msg.payload.detail ?? (args.length ? args : undefined)
+        })
+        // 权限不足（EACCES/EPERM）时，在主进程弹窗提示用户以管理员身份重启（需求四.4）
+        // promptAdminRelaunch 内置幂等保护，单次会话只提示一次
+        if (kind === 'permission') {
+          void promptAdminRelaunch()
         }
         break
       }

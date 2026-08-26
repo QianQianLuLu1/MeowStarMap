@@ -15,6 +15,7 @@ import {
   DataClearSection,
   DiagnosticsLogsSection,
   DiagnosticsCrashSection,
+  ScanLogDiagnosticSection,
   AboutInfoSection,
   AboutContactSection,
   AboutLicenseSection,
@@ -125,6 +126,11 @@ const SETTINGS_GROUPS: GroupDef[] = [
     id: 'diagnostics',
     nameKey: 'settings.groups.diagnostics',
     sections: [
+      {
+        id: 'diagnostics-scan',
+        nameKey: 'settings.sections.scanDiagnostic',
+        component: ScanLogDiagnosticSection
+      },
       {
         id: 'diagnostics-logs',
         nameKey: 'settings.sections.diagnosticsLogs',

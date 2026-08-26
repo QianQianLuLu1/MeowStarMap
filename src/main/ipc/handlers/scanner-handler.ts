@@ -11,6 +11,7 @@ import {
 } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { logger } from '../../utils/logger'
+import { scanLogStore } from '../../scanner/scan-log-store'
 // P1-A1：4 组函数抽取到共享服务模块，启动路径与 IPC 路径共用同一份实现
 import { generateThumbnailsForUnprocessed } from '../../services/thumbnail-phash-service'
 import { ImportRootRepository } from '../../database/import-root-repository'
@@ -117,6 +118,8 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
           throw AppError.validation(t('main.scanner.error.validationFailed', { reason: message }))
         }
         const options = parsed.data
+        // 全链路诊断：每次扫描启动重置诊断日志轨迹
+        scanLogStore.startRun()
         // 路径白名单校验：失败同样要广播 complete，否则前端停在"正在扫描"
         // FIX(组1-1): 校验必须先于 registerRoots 执行——原先先登记 scanRoots 再校验，
         // 而登记的恰是待校验的路径（options.path 与 customKnownPaths 的 resolve 结果），

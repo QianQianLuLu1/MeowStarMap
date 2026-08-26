@@ -24,6 +24,8 @@ import { execFile } from 'child_process'
 import { DRIVE_LETTER_START, DRIVE_LETTER_END } from '../utils/constants'
 // 循环依赖：以下绑定仅在函数体内（调用期）读取，模块求值期不访问，ESM 安全
 import { shouldStop } from './worker-entry'
+import { sendScanLogEntry } from './scan-logger'
+import { classifyFsError } from './scan-log-store'
 
 // 游戏快捷方式文件名（中文）
 // eslint-disable-next-line no-restricted-syntax
@@ -35,19 +37,45 @@ const GAME_SHORTCUT_CN = '\u65e0\u9650\u6696\u6696.lnk'
  * 官方启动器注册表候选键（按优先级排序）
  * 覆盖常见安装位置：用户级/机器级/卸载信息/国际服变体
  */
-const OFFICIAL_LAUNCHER_REG_KEYS: Array<{ key: string; value: string }> = [
-  // 官方启动器安装路径（最常见）
-  { key: 'HKCU\\Software\\InfinityNikki Launcher', value: 'InstallPath' },
-  { key: 'HKLM\\SOFTWARE\\WOW6432Node\\InfinityNikki Launcher', value: 'InstallPath' },
-  { key: 'HKLM\\SOFTWARE\\InfinityNikki Launcher', value: 'InstallPath' },
-  // 卸载信息中的安装位置
+const OFFICIAL_LAUNCHER_REG_KEYS: Array<{
+  key: string
+  value: string
+  /** 诊断阶段标签，用于全链路时间线节点命名 */
+  stage: string
+  /** true=强制 64 位注册表视图（KEY_WOW64_64KEY 等效），绕过 WOW64 32 位重定向 */
+  use64Bit?: boolean
+}> = [
+  // 官方启动器：优先读当前用户 HKCU（无 WOW64 重定向问题）
+  {
+    key: 'HKCU\\Software\\InfinityNikki Launcher',
+    value: 'InstallPath',
+    stage: 'registry-hkcu'
+  },
+  // HKLM 64 位视图（KEY_WOW64_64KEY）：官方启动器 64 位安装主路径
+  {
+    key: 'HKLM\\SOFTWARE\\InfinityNikki Launcher',
+    value: 'InstallPath',
+    stage: 'registry-hklm64',
+    use64Bit: true
+  },
+  // HKLM 32 位视图兜底（WOW6432Node）：仅当 64 位视图查不到时回退
+  {
+    key: 'HKLM\\SOFTWARE\\WOW6432Node\\InfinityNikki Launcher',
+    value: 'InstallPath',
+    stage: 'registry-hklm32'
+  },
+  // 卸载信息中的安装位置（用户级）
   {
     key: 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
-    value: 'InstallLocation'
+    value: 'InstallLocation',
+    stage: 'registry-uninstall-hkcu'
   },
+  // 卸载信息中的安装位置（机器级 64 位视图）
   {
-    key: 'HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
-    value: 'InstallLocation'
+    key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
+    value: 'InstallLocation',
+    stage: 'registry-uninstall-hklm64',
+    use64Bit: true
   },
   {
     key: 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\InfinityNikki',
@@ -160,10 +188,32 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
   // 1. 注册表检测（主路径）
   // 规范一.1：注册表 InstallPath 视为"启动器目录"，游戏根 = 启动器目录 + InfinityNikki，
   // 或启动器目录下 config.json / game_settings.ini 的 game_install_path（优先）。
-  for (const { key, value } of OFFICIAL_LAUNCHER_REG_KEYS) {
+  for (const { key, value, stage, use64Bit } of OFFICIAL_LAUNCHER_REG_KEYS) {
     if (shouldStop) break
-    const launcherPath = await queryRegistryValue(key, value)
-    if (!launcherPath) continue
+    // 全链路诊断：[注册表] 节点——区分路径不存在 / 权限 / 其他
+    sendScanLogEntry({
+      stage,
+      level: 'info',
+      message: `读取注册表：${key} / ${value}${use64Bit ? ' (force 64-bit view)' : ''}`
+    })
+    const launcherPath = await queryRegistryValue(key, value, { use64BitView: use64Bit })
+    if (!launcherPath) {
+      sendScanLogEntry({
+        stage,
+        level: 'warn',
+        kind: 'path-missing',
+        message: `注册表项不存在或无 InstallPath：${key}`
+      })
+      continue
+    }
+    sendScanLogEntry({
+      stage,
+      level: 'info',
+      kind: 'ok',
+      message: `注册表读取成功，启动器目录：${launcherPath}`,
+      detail: { key, launcherPath }
+    })
+
     // 候选 A：启动器目录下配置文件直读 game_install_path（config.json / game_settings.ini / settings.json / config.ini）
     const configCandidates = [
       path.join(launcherPath, 'config.json'),
@@ -173,8 +223,17 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
     ]
     let resolvedFromConfig = false
     for (const cfg of configCandidates) {
+      // 全链路诊断：[配置文件] 节点
+      sendScanLogEntry({ stage: 'config', level: 'info', message: `解析配置文件：${cfg}` })
       const cfgRoot = await parseLauncherConfig(cfg)
       if (cfgRoot) {
+        sendScanLogEntry({
+          stage: 'config',
+          level: 'info',
+          kind: 'ok',
+          message: `配置文件读取游戏路径：${cfgRoot}`,
+          detail: { cfg, cfgRoot }
+        })
         const validated = await validateGameRoot(cfgRoot)
         if (validated && !seenPaths.has(validated.toLowerCase())) {
           seenPaths.add(validated.toLowerCase())
@@ -182,11 +241,25 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
           resolvedFromConfig = true
           break
         }
+      } else {
+        sendScanLogEntry({
+          stage: 'config',
+          level: 'warn',
+          kind: 'path-missing',
+          message: `配置文件无有效 game_install_path：${cfg}`
+        })
       }
     }
     if (resolvedFromConfig) return validatedPaths
+
     // 候选 B：启动器目录 + InfinityNikki（规范一.1.3 兜底）
+    // 全链路诊断：[路径拼接] 节点——必须拼接一层 \InfinityNikki 才是游戏根
     const inferredRoot = path.join(launcherPath, 'InfinityNikki')
+    sendScanLogEntry({
+      stage: 'path-join',
+      level: 'info',
+      message: `拼接游戏根目录（启动器目录 + \\InfinityNikki）：${inferredRoot}`
+    })
     const validatedInferred = await validateGameRoot(inferredRoot)
     if (validatedInferred && !seenPaths.has(validatedInferred.toLowerCase())) {
       seenPaths.add(validatedInferred.toLowerCase())
@@ -232,13 +305,21 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
  * 查询 Windows 注册表键值
  * @param key 注册表键路径（如 HKCU\Software\...）
  * @param value 值名称（如 InstallPath）
+ * @param opts.use64BitView 为 true 时显式调用 64 位 reg.exe（C:\Windows\System32\reg.exe），
+ *   等价 KEY_WOW64_64KEY，强制访问 64 位注册表视图，绕过 WOW64 32 位重定向。
  * @returns 注册表值字符串，失败时返回 null
  */
-async function queryRegistryValue(key: string, value: string): Promise<string | null> {
+async function queryRegistryValue(
+  key: string,
+  value: string,
+  opts?: { use64BitView?: boolean }
+): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     try {
+      // 默认用 PATH 中的 reg；强制 64 位视图时直接用 System32 下的 64 位 reg.exe
+      const regCmd = opts?.use64BitView ? 'C:\\Windows\\System32\\reg.exe' : 'reg'
       execFile(
-        'reg',
+        regCmd,
         ['query', key, '/v', value],
         { timeout: 3000, windowsHide: true },
         (err, stdout) => {
@@ -371,18 +452,47 @@ async function resolveShortcutTarget(shortcutPath: string): Promise<string | nul
 async function validateGameRoot(candidatePath: string): Promise<string | null> {
   if (!candidatePath || typeof candidatePath !== 'string') return null
 
-  // 验证 GamePlayPhotos 子目录存在
+  // 全链路诊断：[目标路径] 节点——最终目标相册路径必须严格等于
+  // [游戏根]\X6Game\Saved\GamePlayPhotos
   const gamePlayPhotosPath = path.join(candidatePath, 'X6Game', 'Saved', 'GamePlayPhotos')
+  sendScanLogEntry({
+    stage: 'target-path',
+    level: 'info',
+    message: `拼接目标相册路径：${gamePlayPhotosPath}`
+  })
   try {
     await fsp.access(gamePlayPhotosPath, fs.constants.F_OK)
+    sendScanLogEntry({
+      stage: 'path-existence',
+      level: 'info',
+      kind: 'ok',
+      message: `目标路径存在：${gamePlayPhotosPath}`
+    })
     return candidatePath
-  } catch {
-    // 备选：验证 X6Game 目录存在
+  } catch (err) {
+    // 备选：验证 X6Game 目录存在（路径错误时继续下一个定位方式，不打断整体扫描）
     const x6gamePath = path.join(candidatePath, 'X6Game')
     try {
       await fsp.access(x6gamePath, fs.constants.F_OK)
+      sendScanLogEntry({
+        stage: 'path-existence',
+        level: 'warn',
+        kind: 'empty',
+        message: `GamePlayPhotos 不存在但 X6Game 存在（路径可能错误，已降级）：${x6gamePath}`
+      })
       return candidatePath
-    } catch {
+    } catch (err2) {
+      const kind2 = classifyFsError(err2)
+      sendScanLogEntry({
+        stage: 'path-existence',
+        level: 'warn',
+        kind: kind2,
+        message:
+          kind2 === 'permission'
+            ? `访问被拒绝（权限不足）：${gamePlayPhotosPath}`
+            : `路径不存在：${gamePlayPhotosPath}`,
+        detail: String(err)
+      })
       return null
     }
   }

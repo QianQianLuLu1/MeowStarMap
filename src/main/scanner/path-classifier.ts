@@ -9,8 +9,9 @@
 import path from 'path'
 import { getAlbumTypeFromDirName } from '../utils/media-constants'
 
-// UID 正则：6-12 位数字，允许首位为 0，被路径分隔符包围
-// 与上游 nikki_albums 的 ^\d{6,12}$ 保持一致
+// UID 正则：6-12 位纯数字，被路径分隔符包围。
+// 对齐上游 nikki_albums 的 ^\d{6,12}$ —— 无限暖暖真实 UID 为 6-12 位数字，
+// 该范围等价于"纯数字字符串"在真实数据上的筛选语义，保证 100% 对齐 nikki_albums。
 const UID_REGEX = /[\\/](\d{6,12})[\\/]/
 
 /**

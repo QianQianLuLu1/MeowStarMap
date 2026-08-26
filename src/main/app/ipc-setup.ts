@@ -26,7 +26,10 @@ import { registerCacheHandlers } from '../ipc/handlers/cache'
 import { registerLogHandlers } from '../ipc/handlers/log'
 import { registerCrashHandlers } from '../ipc/handlers/crash'
 import { registerScannerHandlers } from '../ipc/handlers/scanner-handler'
+import { registerScanLogHandlers } from '../ipc/handlers/scan-log-handler'
+import { scanLogStore } from '../scanner/scan-log-store'
 import { registerDecryptHandlers } from '../ipc/handlers/decrypt-handler'
+import path from 'path'
 import { registerThumbnailHandlers } from '../ipc/handlers/thumbnail-handler'
 import { registerThemeHandlers } from '../ipc/handlers/theme-handler'
 import { registerShellHandlers } from '../ipc/handlers/shell-handler'
@@ -100,6 +103,7 @@ export function setupIPC(ctx: AppContext): void {
   registerLogHandlers(ctx)
   registerCrashHandlers(ctx)
   registerScannerHandlers(ctx)
+  registerScanLogHandlers(ctx)
   registerDecryptHandlers(ctx)
   registerThumbnailHandlers(ctx)
   registerThemeHandlers(ctx)
@@ -123,6 +127,18 @@ export function setupIPC(ctx: AppContext): void {
   // 覆盖场景：用户主目录下的所有路径默认允许（Documents\InfinityNikki 等）
   // 系统敏感目录（C:\Windows\System32 等）作为黑名单兜底始终拒绝
   pathGuard.initUserDataDir()
+
+  // 全链路诊断：注入落盘路径（userData/scan-log.jsonl），使诊断日志持久化可回放
+  // 惰性 require electron（主进程运行时可用；node 测试环境无 electron 时静默降级为仅内存）
+  try {
+    const electron = require('electron')
+    const userDataPath = electron.app?.getPath?.('userData')
+    if (typeof userDataPath === 'string') {
+      scanLogStore.setLogFilePath(path.join(userDataPath, 'scan-log.jsonl'))
+    }
+  } catch {
+    // userData 不可用时退化为仅内存（诊断日志不影响主流程）
+  }
 
   // 补接线：把已扫描的媒体根目录注册进 pathGuard，避免媒体在非主目录盘时被默认拒绝
   refreshPathGuardRoots(ctx)

@@ -1629,7 +1629,8 @@
       "startup": "시작 동작",
       "theme": "테마",
       "scanPaths": "",
-      "importRoots": ""
+      "importRoots": "",
+      "scanDiagnostic": "扫描链路诊断"
     },
     "startup": {
       "autoScan": "시작 시 자동 스캔",
@@ -2581,6 +2582,19 @@
         "plugin": "",
         "unknown": ""
       }
+    },
+    "scan": {
+      "title": "扫描链路诊断",
+      "legendOk": "成功",
+      "legendPathMissing": "路径不存在",
+      "legendPermission": "权限不足",
+      "legendEmpty": "目录为空",
+      "legendInfo": "信息",
+      "emptyHint": "运行一次扫描后，此处显示从「扫描启动」到「文件扫描」的全流程诊断轨迹。",
+      "autoRefresh": "自动刷新",
+      "refresh": "刷新",
+      "copy": "复制",
+      "clear": "清空"
     }
   },
   "errorFallback": {

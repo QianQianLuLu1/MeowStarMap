@@ -91,7 +91,15 @@ export type WorkerEvent =
   | { type: 'SCAN_COMPLETE'; payload: { success: boolean; message: string; filesFound?: number } }
   | {
       type: 'SCAN_LOG'
-      payload: { level: 'info' | 'warn' | 'error'; message: string; args?: unknown[] }
+      payload: {
+        level: 'info' | 'warn' | 'error'
+        message: string
+        args?: unknown[]
+        // 全链路诊断结构化字段（可选，旧发送方仅传 level/message）
+        stage?: string
+        kind?: 'path-missing' | 'permission' | 'empty' | 'ok' | 'other'
+        detail?: unknown
+      }
     }
   | { type: 'WORKER_READY' } // worker 启动完成，可用于扫描
   | { type: 'WORKER_ERROR'; payload: { message: string; stack?: string } }
