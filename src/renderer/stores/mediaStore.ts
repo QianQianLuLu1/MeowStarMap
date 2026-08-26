@@ -70,6 +70,8 @@ export interface CharacterProfile {
   avatar: string | null
   created_at: string
   last_active_at: string | null
+  /** 该 UID 是否在媒体表中存在真实文件，用于区分真实档案与扫描残留的虚拟档案 */
+  hasMedia: boolean
 }
 
 export interface Category {
@@ -299,9 +301,12 @@ export async function fetchMediaFromDatabase(): Promise<{
     const currentView = useUIStore.getState().currentView
     const isGalleryView = currentView === 'gallery'
     const isCacheView = currentView === 'launcher-cache'
-    const mediaSource: 'game' | 'launcher' | 'cloud' | undefined = isCacheView
+    const isScreenshotsView = currentView === 'screenshots'
+    const mediaSource: 'game' | 'launcher' | 'cloud' | 'local_screenshot' | undefined = isCacheView
       ? 'launcher'
-      : undefined
+      : isScreenshotsView
+        ? 'local_screenshot'
+        : undefined
     // 图库板块启用高质量照片目录过滤：仅显示 GamePlayPhotos/{uid}/NikkiPhotos_HighQuality 下的图片，
     // 以及无限暖暖标准安装树下的游戏内截图（X6Game/ScreenShot）与游戏内视频（X6Game/Video）。
     // 详见 media-repository 的 GALLERY_PATH_CONDITION（HQ ∪ ScreenShot ∪ Video）。
@@ -397,9 +402,12 @@ export async function loadMoreMedia(
     const currentView = useUIStore.getState().currentView
     const isGalleryView = currentView === 'gallery'
     const isCacheView = currentView === 'launcher-cache'
-    const mediaSource: 'game' | 'launcher' | 'cloud' | undefined = isCacheView
+    const isScreenshotsView = currentView === 'screenshots'
+    const mediaSource: 'game' | 'launcher' | 'cloud' | 'local_screenshot' | undefined = isCacheView
       ? 'launcher'
-      : undefined
+      : isScreenshotsView
+        ? 'local_screenshot'
+        : undefined
     // 与 fetchMediaFromDatabase 保持一致：图库板块启用高质量照片目录过滤
     // （含 GamePlayPhotos HQ ∪ X6Game/ScreenShot ∪ X6Game/Video，详见 GALLERY_PATH_CONDITION）
     const galleryHighQualityOnly = isGalleryView

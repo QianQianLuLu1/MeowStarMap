@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "บันทึกเรโซแนนซ์",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "กลุ่มอัจฉริยะ",
     "storage": "พื้นที่จัดเก็บ",
     "switchProfile": "สลับโปรไฟล์",
-    "videos": "วิดีโอ"
+    "videos": "วิดีโอ",
+    "screenshots": "ภาพหน้าจอ"
   },
   "outfit": {
     "collectedHint": "ชุดที่มีภาพในฐานข้อมูล",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "บันทึกเรโซแนนซ์ Nikki",
+    "subtitle": "บันทึกเรโซแนนซ์และผู้ช่วยแต่งกาย Infinity Nikki · เร็วๆ นี้"
   }
 }

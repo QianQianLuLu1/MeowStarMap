@@ -239,6 +239,8 @@ export interface ProfileRow {
   avatar: string | null
   created_at: string
   last_active_at: string | null
+  /** 该 UID 是否在媒体表 media_files 中存在真实账号文件（account_uid 命中）。用于区分真实档案与扫描残留的虚拟档案。 */
+  hasMedia: boolean
 }
 
 /** 角色档案基础统计 */
@@ -1604,13 +1606,22 @@ export class MediaRepository {
   // Profiles (character_profiles + media_files.account_uid)
   // ==========================================================================
 
-  /** profile:list — 查询全角色档案（按 created_at 升序） */
+  /** profile:list — 查询全角色档案（按 created_at 升序），并派生 hasMedia 标记（media_files 中是否存在该 UID 的真实文件） */
   listProfiles(): ProfileRow[] {
-    return this.db
+    const rows = this.db
       .prepare(
         'SELECT uid, nickname, avatar, created_at, last_active_at FROM character_profiles ORDER BY created_at ASC'
       )
       .all() as ProfileRow[]
+    // 取 media_files 中出现过的 account_uid 集合，内存标记 hasMedia，避免 DISTINCT/子查询在受限引擎下的兼容问题
+    const mediaUids = new Set(
+      (
+        this.db
+          .prepare('SELECT account_uid FROM media_files WHERE account_uid IS NOT NULL')
+          .all() as Array<{ account_uid: string }>
+      ).map((r) => r.account_uid)
+    )
+    return rows.map((r) => ({ ...r, hasMedia: mediaUids.has(r.uid) }))
   }
 
   /** profile:add — 新增角色档案 */

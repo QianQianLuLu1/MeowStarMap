@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "Resonanz",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "Intelligente Gruppe",
     "storage": "Speicher",
     "switchProfile": "Profil wechseln",
-    "videos": "Videos"
+    "videos": "Videos",
+    "screenshots": "Screenshots"
   },
   "outfit": {
     "collectedHint": "Outfits mit Fotos in der Datenbank",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Nikki-Resonanzbuch",
+    "subtitle": "Infinity Nikki Resonanz-Protokoll & Styling-Assistent · Bald verfügbar"
   }
 }

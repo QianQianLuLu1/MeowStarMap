@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "共鳴錄",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "智慧群組",
     "storage": "佔用",
     "switchProfile": "切換角色檔案",
-    "videos": "影片"
+    "videos": "影片",
+    "screenshots": "截圖"
   },
   "outfit": {
     "collectedHint": "資料庫中有照片的套裝",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "無限暖暖",
+    "title": "暖暖共鳴錄",
+    "subtitle": "無限暖暖共鳴記錄與搭配助手 即將上線"
   }
 }

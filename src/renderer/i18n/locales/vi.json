@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "Cộng Hưởng",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "Nhóm thông minh",
     "storage": "Lưu trữ",
     "switchProfile": "Chuyển hồ sơ",
-    "videos": "Video"
+    "videos": "Video",
+    "screenshots": "Ảnh chụp màn hình"
   },
   "outfit": {
     "collectedHint": "Trang phục có ảnh trong cơ sở dữ liệu",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Nhật ký Cộng hưởng Nikki",
+    "subtitle": "Nhật ký cộng hưởng và trợ lý phối đồ Infinity Nikki · Sắp ra mắt"
   }
 }

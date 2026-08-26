@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "Résonance",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "Groupe intelligent",
     "storage": "Stockage",
     "switchProfile": "Changer de profil",
-    "videos": "Vidéos"
+    "videos": "Vidéos",
+    "screenshots": "Captures"
   },
   "outfit": {
     "collectedHint": "Tenues avec photos dans la base de données",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Journal de résonance Nikki",
+    "subtitle": "Journal de résonance et assistant de stylisme Infinity Nikki · Bientôt disponible"
   }
 }

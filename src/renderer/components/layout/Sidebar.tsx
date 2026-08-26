@@ -17,7 +17,9 @@ import {
   IconDuplicate,
   IconChevronLeft,
   IconChevronDown,
-  IconImage
+  IconImage,
+  IconCamera,
+  IconMessage
 } from '../../icons'
 // P1-4：侧边栏动画预设
 import { springSoft } from '../../utils/motionPresets'
@@ -30,7 +32,9 @@ const SIDEBAR_GROUP_OPTIONS = GROUP_DIMENSION_OPTIONS.filter((opt) => opt.value 
 // P2-01：navItems label 改为 i18n key，渲染时通过 t() 翻译
 const navItems: { id: ViewLevel; labelKey: string; icon: React.ReactNode }[] = [
   { id: 'gallery', labelKey: 'nav.gallery', icon: <IconGallery size={20} /> },
+  { id: 'screenshots', labelKey: 'nav.screenshots', icon: <IconCamera size={20} /> },
   { id: 'favorites', labelKey: 'nav.favorites', icon: <IconStar size={20} /> },
+  { id: 'resonance-records', labelKey: 'nav.resonanceRecords', icon: <IconMessage size={20} /> },
   { id: 'launcher-cache', labelKey: 'nav.launcherCache', icon: <IconImage size={20} /> },
   { id: 'categories', labelKey: 'nav.categories', icon: <IconList size={20} /> },
   { id: 'duplicates', labelKey: 'nav.duplicates', icon: <IconDuplicate size={20} /> },

@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "共鳴録",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "スマートグループ",
     "storage": "容量",
     "switchProfile": "プロフィール切替",
-    "videos": "動画"
+    "videos": "動画",
+    "screenshots": "スクリーンショット"
   },
   "outfit": {
     "collectedHint": "データベースに写真があるコーデ",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "インフィニティニキ",
+    "title": "ニキ共鳴録",
+    "subtitle": "インフィニティニキの共鳴記録とコーディネートアシスタント・近日公開"
   }
 }

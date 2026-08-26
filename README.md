@@ -115,11 +115,6 @@ src/
 - [docs/](docs/) — IPC 契约、插件 API、排障手册等
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — 组件文档站（`npm run storybook` 启动，端口 6006）
 
-### 已知限制
-
-- **Live Photo 导出**：导出的 JPG 未写入 Apple MakerNote ContentIdentifier，经 iCloud 同步后可能丢失配对（数据线本地导入正常）
-- **Live Photo 转码**：H.264 + AAC MOV 转码较耗时，单次默认超时 10 分钟
-
 ### 开发者信息 / 作者与社交平台
 
 - **抖音**：纤璐不会玩摄影 ([主页链接](https://v.douyin.com/Dx67wYkw48A/))
@@ -231,11 +226,6 @@ src/
 - [CHANGELOG.md](CHANGELOG.md) — Changelog
 - [docs/](docs/) — IPC contracts, plugin API, troubleshooting, and more
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — Component docs site (`npm run storybook`, port 6006)
-
-### Known Limitations
-
-- **Live Photo Export**: Exported JPGs lack Apple MakerNote ContentIdentifier; iCloud sync may break pairing (local USB import works normally)
-- **Live Photo Transcoding**: H.264 + AAC MOV transcoding is time-consuming; default timeout is 10 minutes
 
 ### Developer Info / Author & Social Platforms
 

@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "Resonancia",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "Grupo inteligente",
     "storage": "Almacenamiento",
     "switchProfile": "Cambiar perfil",
-    "videos": "Videos"
+    "videos": "Videos",
+    "screenshots": "Capturas"
   },
   "outfit": {
     "collectedHint": "Atuendos con fotos en la base de datos",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Diario de resonancia Nikki",
+    "subtitle": "Registro de resonancia y asistente de atuendo Infinity Nikki · Próximamente"
   }
 }

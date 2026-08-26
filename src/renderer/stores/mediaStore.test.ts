@@ -471,6 +471,18 @@ describe('mediaStore', () => {
         expect.objectContaining({ galleryHighQualityOnly: false })
       )
     })
+
+    it("截图视图（screenshots）调用 list 时传 mediaSource:'local_screenshot' 且 galleryHighQualityOnly:false", async () => {
+      useUIStore.setState({ currentView: 'screenshots' })
+      setMockApi()
+      await fetchMediaFromDatabase()
+      const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
+        .electronAPI!.media!.list
+      // 截图板块复用 launcher-cache 过滤模式，仅展示 X6Game/ScreenShot 路径下媒体（media_source='local_screenshot'）
+      expect(mockFn).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaSource: 'local_screenshot', galleryHighQualityOnly: false })
+      )
+    })
   })
 
   describe('loadMoreMedia', () => {
@@ -506,6 +518,17 @@ describe('mediaStore', () => {
       const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
         .electronAPI!.media!.list
       expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ galleryHighQualityOnly: true }))
+    })
+
+    it("加载更多时截图视图传 mediaSource:'local_screenshot'", async () => {
+      useUIStore.setState({ currentView: 'screenshots' })
+      setMockApi()
+      await loadMoreMedia(null)
+      const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
+        .electronAPI!.media!.list
+      expect(mockFn).toHaveBeenCalledWith(
+        expect.objectContaining({ mediaSource: 'local_screenshot' })
+      )
     })
 
     it('加载失败返回 null', async () => {

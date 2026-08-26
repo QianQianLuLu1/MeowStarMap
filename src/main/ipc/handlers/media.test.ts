@@ -998,6 +998,34 @@ describe('registerMediaHandlers', () => {
     expect(result.data.profiles).toHaveLength(1)
   })
 
+  it('profile:list 透传档案 hasMedia 标记（真实/虚拟区分）', async () => {
+    repoMock.listProfiles.mockReturnValue([
+      {
+        uid: 'u1',
+        nickname: 'n1',
+        avatar: null,
+        created_at: '2024-01-01',
+        last_active_at: null,
+        hasMedia: true
+      },
+      {
+        uid: 'ghost',
+        nickname: 'g',
+        avatar: null,
+        created_at: '2024-01-02',
+        last_active_at: null,
+        hasMedia: false
+      }
+    ])
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('profile:list')()) as {
+      success: true
+      data: { profiles: Array<{ uid: string; hasMedia: boolean }> }
+    }
+    expect(result.data.profiles.find((p) => p.uid === 'u1')?.hasMedia).toBe(true)
+    expect(result.data.profiles.find((p) => p.uid === 'ghost')?.hasMedia).toBe(false)
+  })
+
   it('profile:add 成功时返回 { added: true }', async () => {
     repoMock.addProfile.mockImplementation(() => {})
     registerMediaHandlers(makeCtx())

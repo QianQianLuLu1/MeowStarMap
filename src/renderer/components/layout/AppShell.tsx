@@ -31,6 +31,8 @@ function getViewStatusLabel(view: ViewLevel, t: TFunction): string {
       return t('appShell.viewStatus.duplicates')
     case 'launcher-cache':
       return t('appShell.viewStatus.launcherCache')
+    case 'screenshots':
+      return t('nav.screenshots')
     default:
       return ''
   }
@@ -110,6 +112,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         break
       case 'duplicates':
         rightText = t('appShell.duplicatesHint')
+        break
+      case 'resonance-records':
+        rightText = t('nav.resonanceRecords')
         break
     }
     return { leftText, rightText }

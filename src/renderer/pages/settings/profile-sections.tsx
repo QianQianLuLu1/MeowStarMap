@@ -123,13 +123,16 @@ export const ProfileManageSection: React.FC = () => {
       return
     }
     if (!confirm(t('profileAction.deleteConfirm', { uid }))) return
-    const res = await window.electronAPI.profile.delete(uid)
-    if (res.success) {
+    // preload call() 在 IPC 失败时抛出 IpcError，成功时返回业务 data（{deleted:true}）而非 {success,...}。
+    // 故此处须用 try/catch 捕获真实错误，而非判断 res.success（该字段在此契约下恒为假，会导致所有删除都被误报为"删除失败"）。
+    try {
+      await window.electronAPI.profile.delete(uid)
       showMessage(t('profileAction.deleted'))
       if (selectedUid === uid) setSelectedUid('default')
       await refreshProfiles()
-    } else {
-      showMessage(res.message || t('profileAction.deleteFailed'), 'error')
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      showMessage(msg || t('profileAction.deleteFailed'), 'error')
     }
   }
 
@@ -152,6 +155,38 @@ export const ProfileManageSection: React.FC = () => {
 
   const getSceneLabel = (key: string): string => t(`sceneLabel.${key}`, { defaultValue: key })
   const getTimeLabel = (key: string): string => t(`timeLabel.${key}`, { defaultValue: key })
+
+  // 虚拟档案：扫描自动注册但 media_files 中无对应真实文件的残留 UID（hasMedia=false 且非 default）
+  const virtualProfiles = profiles.filter((p) => p.hasMedia === false && p.uid !== 'default')
+
+  // 一键清理所有虚拟档案：逐个调用删除（后端对无媒体 UID 同样可幂等删除），最后统一刷新
+  const handleCleanupVirtual = async () => {
+    if (virtualProfiles.length === 0) {
+      showMessage(t('settings.profile.noVirtual'))
+      return
+    }
+    if (!window.electronAPI?.profile?.delete) {
+      showMessage(t('profileAction.unsupported'), 'error')
+      return
+    }
+    if (!confirm(t('settings.profile.cleanupVirtualConfirm', { count: virtualProfiles.length }))) {
+      return
+    }
+    let failed = 0
+    for (const p of virtualProfiles) {
+      try {
+        await window.electronAPI.profile.delete(p.uid)
+      } catch {
+        failed += 1
+      }
+    }
+    await refreshProfiles()
+    if (failed === 0) {
+      showMessage(t('settings.profile.cleanupDone', { count: virtualProfiles.length }))
+    } else {
+      showMessage(t('settings.profile.cleanupPartial', { failed }), 'error')
+    }
+  }
 
   const totalTimeCount = stats?.timeDistribution.reduce((sum, t) => sum + t.cnt, 0) ?? 0
 
@@ -187,9 +222,21 @@ export const ProfileManageSection: React.FC = () => {
 
       {/* 档案列表 */}
       <div className="space-y-2">
-        <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-          {t('settings.profile.list')}
-        </p>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {t('settings.profile.list')}
+          </p>
+          {virtualProfiles.length > 0 && (
+            <button
+              type="button"
+              className="text-xs px-2 py-1 rounded transition-colors"
+              style={{ background: 'var(--bg-tertiary)', color: 'var(--text-tertiary)' }}
+              onClick={handleCleanupVirtual}
+            >
+              {t('settings.profile.cleanupVirtual')}
+            </button>
+          )}
+        </div>
         {profiles.length === 0 ? (
           <p className="text-sm text-center py-3" style={{ color: 'var(--text-tertiary)' }}>
             {t('settings.profile.empty')}
@@ -253,6 +300,17 @@ export const ProfileManageSection: React.FC = () => {
                         </p>
                         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                           UID: {p.uid}
+                          {!p.hasMedia && p.uid !== 'default' && (
+                            <span
+                              className="ml-2 px-1.5 py-0.5 rounded text-[10px]"
+                              style={{
+                                background: 'var(--bg-tertiary)',
+                                color: 'var(--text-tertiary)'
+                              }}
+                            >
+                              {t('settings.profile.virtualBadge')}
+                            </span>
+                          )}
                         </p>
                       </>
                     )}

@@ -95,6 +95,19 @@ describe('useFilteredMediaFiles', () => {
       expect(result.current).toHaveLength(1)
       expect(result.current[0].id).toBe('1')
     })
+
+    it('screenshots 视图展示全部媒体（与图库同构，不做 is_favorite 过滤）', () => {
+      const files = [
+        makeFile({ id: '1', is_favorite: true, media_source: 'local_screenshot' }),
+        makeFile({ id: '2', is_favorite: false, media_source: 'local_screenshot' }),
+        makeFile({ id: '3', media_source: 'game' })
+      ]
+      useMediaStore.setState({ mediaFiles: files })
+      resetUIStore({ currentView: 'screenshots' })
+      const { result } = renderHook(() => useFilteredMediaFiles())
+      // 截图视图仅由 mediaStore 的 mediaSource 过滤驱动；hook 层不二次裁剪（与图库一致）
+      expect(result.current).toHaveLength(3)
+    })
   })
 
   describe('丢失文件', () => {

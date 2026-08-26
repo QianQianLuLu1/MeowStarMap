@@ -22,8 +22,14 @@ interface ViewTransitionLike {
 
 function getViewTransitionStarter(): ((callback: () => void) => ViewTransitionLike) | undefined {
   if (typeof document === 'undefined') return undefined
-  return (document as Document & { startViewTransition?: (cb: () => void) => ViewTransitionLike })
-    .startViewTransition
+  const doc = document as Document & {
+    startViewTransition?: (cb: () => void) => ViewTransitionLike
+  }
+  // P3-1：必须通过 document.startViewTransition 调用，保持 this 绑定。
+  // 若直接返回 doc.startViewTransition 引用再独立调用，会因丢失 this 抛出
+  // "TypeError: Illegal invocation"，导致 openFullscreen 中断、全屏查看器无法打开。
+  if (typeof doc.startViewTransition !== 'function') return undefined
+  return (callback: () => void) => doc.startViewTransition!(callback)
 }
 
 export type ViewLevel =
@@ -36,6 +42,8 @@ export type ViewLevel =
   | 'favorites'
   | 'duplicates'
   | 'launcher-cache'
+  | 'resonance-records'
+  | 'screenshots'
 export type ViewMode = 'grid' | 'list' | 'timeline' | 'masonry' | 'event-timeline'
 export type FilterType = 'all' | 'image' | 'video'
 export type SortBy = 'date' | 'name' | 'size' | 'resolution' | 'rating'
@@ -341,18 +349,32 @@ export const useUIStore = create<UIState>()(
       setShowDuplicates: (show) => set({ showDuplicates: show }),
 
       openFullscreen: (index) => {
+        // 参数校验：index 必须为有限非负数
+        if (!Number.isFinite(index) || index < 0) {
+          return
+        }
         // P3-1：用 View Transitions API 实现共享元素过渡（缩略图→全屏图放大）
         // 调用方需在调用前给源卡片 img 设置 view-transition-name: 'fullscreen-media'
         const apply = () => {
-          // 清除源元素的 view-transition-name，避免新快照与 FullscreenViewer img 冲突
-          document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
-            ;(el as HTMLElement).style.viewTransitionName = ''
-          })
+          // 状态置位优先：即便后续 DOM/过渡操作异常，全屏也必定打开
           set({ fullscreenOpen: true, fullscreenIndex: index })
+          try {
+            // 清除源元素的 view-transition-name，避免新快照与 FullscreenViewer img 冲突
+            document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
+              ;(el as HTMLElement).style.viewTransitionName = ''
+            })
+          } catch {
+            /* 无视 DOM 清理失败，全屏状态已置位 */
+          }
         }
         const startViewTransition = getViewTransitionStarter()
         if (startViewTransition && !document.documentElement.classList.contains('reduce-motion')) {
-          startViewTransition(apply)
+          try {
+            startViewTransition(apply)
+          } catch {
+            // View Transitions 调用失败（不支持/抛错）降级为直接打开
+            apply()
+          }
         } else {
           apply()
         }
@@ -362,26 +384,41 @@ export const useUIStore = create<UIState>()(
         // P3-1：关闭时实现反向共享元素过渡（全屏图→缩略图缩小）
         const { fullscreenTargetImg } = get()
         const apply = () => {
-          // 移除 FullscreenViewer img 的 view-transition-name（旧快照已有，新快照不需要）
-          const fullscreenImg = document.querySelector('[data-fullscreen-img]')
-          if (fullscreenImg) {
-            ;(fullscreenImg as HTMLElement).style.viewTransitionName = ''
-          }
-          // 给目标卡片 img 设置 view-transition-name（新快照中有，旧快照中没有）
-          if (fullscreenTargetImg) {
-            fullscreenTargetImg.style.viewTransitionName = 'fullscreen-media'
-          }
+          // 状态置位优先
           set({ fullscreenOpen: false, fullscreenTargetImg: null })
+          try {
+            // 移除 FullscreenViewer img 的 view-transition-name（旧快照已有，新快照不需要）
+            const fullscreenImg = document.querySelector('[data-fullscreen-img]')
+            if (fullscreenImg) {
+              ;(fullscreenImg as HTMLElement).style.viewTransitionName = ''
+            }
+            // 给目标卡片 img 设置 view-transition-name（新快照中有，旧快照中没有）
+            if (fullscreenTargetImg) {
+              fullscreenTargetImg.style.viewTransitionName = 'fullscreen-media'
+            }
+          } catch {
+            /* 无视 DOM 清理失败，关闭状态已置位 */
+          }
         }
         const startViewTransition = getViewTransitionStarter()
         if (startViewTransition && !document.documentElement.classList.contains('reduce-motion')) {
-          const transition = startViewTransition(apply)
-          // 过渡完成后清除残留的 view-transition-name
-          transition.finished.finally(() => {
-            document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
-              ;(el as HTMLElement).style.viewTransitionName = ''
-            })
-          })
+          try {
+            const transition = startViewTransition(apply)
+            // 过渡完成后清除残留的 view-transition-name
+            transition.finished
+              .finally(() => {
+                try {
+                  document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
+                    ;(el as HTMLElement).style.viewTransitionName = ''
+                  })
+                } catch {
+                  /* 无视清理失败 */
+                }
+              })
+              .catch(() => {})
+          } catch {
+            apply()
+          }
         } else {
           apply()
         }

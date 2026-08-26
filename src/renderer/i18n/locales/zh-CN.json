@@ -20,6 +20,7 @@
       "duplicates": "重复文件检测",
       "editor": "编辑器",
       "favorites": "收藏",
+      "resonanceRecords": "共鸣录",
       "gallery": "图库",
       "launcherCache": "缓存",
       "recycleBin": "回收站",
@@ -1509,7 +1510,8 @@
     "smartGroup": "智能分组",
     "storage": "占用",
     "switchProfile": "切换角色档案",
-    "videos": "视频"
+    "videos": "视频",
+    "screenshots": "截图"
   },
   "outfit": {
     "collectedHint": "数据库中有照片的套装",
@@ -1980,7 +1982,13 @@
       "timeTop": "时段偏好",
       "totalFiles": "总文件数",
       "uidPlaceholder": "UID（8-12 位数字）",
-      "videos": "视频"
+      "videos": "视频",
+      "virtualBadge": "无媒体（虚拟）",
+      "cleanupVirtual": "清理虚拟档案",
+      "cleanupVirtualConfirm": "确定清理 {{count}} 个无媒体的虚拟档案吗？这些档案是扫描时自动注册但实际不存在对应媒体文件。",
+      "noVirtual": "没有需要清理的虚拟档案",
+      "cleanupDone": "已清理 {{count}} 个虚拟档案",
+      "cleanupPartial": "清理完成，但 {{failed}} 个虚拟档案删除失败"
     },
     "scan": {
       "addPath": "添加游戏目录",
@@ -3969,5 +3977,10 @@
       "installFailed": "[UpdateDialog] 安装更新失败:",
       "openOfficialFailed": "[UpdateDialog] 打开官网失败:"
     }
+  },
+  "resonance": {
+    "brand": "无限暖暖",
+    "title": "暖暖共鸣录",
+    "subtitle": "无限暖暖共鸣记录与搭配助手 即将上线"
   }
 }

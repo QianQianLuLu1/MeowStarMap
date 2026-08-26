@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "공명록",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "스마트 그룹",
     "storage": "용량",
     "switchProfile": "프로필 전환",
-    "videos": "동영상"
+    "videos": "동영상",
+    "screenshots": "스크린샷"
   },
   "outfit": {
     "collectedHint": "데이터베이스에 사진이 있는 코디",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "인피니티 니키",
+    "title": "니키 공명록",
+    "subtitle": "인피니티 니키 공명 기록 및 코디 어시스턴트 · 곧 출시"
   }
 }

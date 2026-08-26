@@ -2137,6 +2137,44 @@ describe('MediaRepository', () => {
         expect(result.total).toBe(2)
       })
     })
+
+    describe('mediaSource=local_screenshot 截图视图', () => {
+      it('mediaSource=local_screenshot 仅返回本地截图（X6Game/ScreenShot）媒体', () => {
+        insertMedia(db, {
+          file_path: '/t/local.jpg',
+          media_source: 'local_screenshot',
+          is_deleted: 0
+        })
+        insertMedia(db, { file_path: '/t/game.jpg', media_source: 'game', is_deleted: 0 })
+        insertMedia(db, { file_path: '/t/launcher.jpg', media_source: 'launcher', is_deleted: 0 })
+        const result = repo.listMedia({ mediaSource: 'local_screenshot' })
+        expect(result.rows).toHaveLength(1)
+        expect(result.rows[0].media_source).toBe('local_screenshot')
+      })
+
+      it('生成 media_source = ? 参数化过滤（参数含 local_screenshot，不内联）', () => {
+        insertMedia(db, { file_path: '/t/1.jpg', media_source: 'local_screenshot' })
+        const captured: Array<{ sql: string; params: unknown[] }> = []
+        const originalPrepare = db.prepare.bind(db)
+        vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+          const stmt = originalPrepare(sql)
+          return {
+            ...stmt,
+            all: (...p: unknown[]) => {
+              captured.push({ sql, params: p })
+              return stmt.all(...p)
+            }
+          }
+        })
+        repo.listMedia({ mediaSource: 'local_screenshot' })
+        const select = captured.find((c) => c.sql.includes('FROM media_files'))
+        expect(select).toBeDefined()
+        // 非 launcher 的具体 source 走精确匹配分支：media_source = ?
+        expect(select!.sql).toContain('media_source = ?')
+        expect(select!.params).toContain('local_screenshot')
+      })
+    })
+
     // R5：media_count 强一致改造（stale 标记 + TTL + markMediaCountStale）
     // ==========================================================================
     describe('R5 media_count 强一致', () => {
@@ -2669,6 +2707,19 @@ describe('MediaRepository', () => {
       insertProfile(db, { uid: 'a', nickname: 'A', created_at: '2024-01-01 10:00:00' })
       const result = repo.listProfiles()
       expect(result.map((p) => p.uid)).toEqual(['a', 'b'])
+    })
+
+    it('listProfiles 为存在媒体文件的 UID 派生 hasMedia=true，否则为 false', () => {
+      insertProfile(db, { uid: 'real', nickname: '真档案' })
+      insertProfile(db, { uid: 'ghost', nickname: '虚拟档案' })
+      insertMedia(db, { file_path: '/t/1.jpg', account_uid: 'real' })
+      const result = repo.listProfiles()
+      expect(result.find((p) => p.uid === 'real')?.hasMedia).toBe(true)
+      expect(result.find((p) => p.uid === 'ghost')?.hasMedia).toBe(false)
+    })
+
+    it('deleteProfileAndReassign 对不存在的 UID 幂等成功（不抛错）', async () => {
+      await expect(repo.deleteProfileAndReassign('not-exist')).resolves.toBeUndefined()
     })
 
     it('addProfile 新增后 listProfiles 能查到', async () => {

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore, type SlideshowConfig } from '../../stores/uiStore'
 import { useMediaStore, toFileUrl, type MediaFile } from '../../stores/mediaStore'
+import { needsAnonymousCors } from '../../utils/file'
 import { useToast } from '../../hooks/useToast'
 import { useFavoriteToggle } from '../../hooks/useFavoriteToggle'
 // DU3：幻灯片播放逻辑统一到 useSlideshow hook
@@ -35,6 +36,7 @@ interface FullscreenViewerProps {
 export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFiles }) => {
   const { t } = useTranslation()
   const fullscreenOpen = useUIStore((s) => s.fullscreenOpen)
+  const [imgError, setImgError] = useState(false)
   const fullscreenIndex = useUIStore((s) => s.fullscreenIndex)
   const closeFullscreen = useUIStore((s) => s.closeFullscreen)
   const deleteMediaFiles = useMediaStore((s) => s.deleteMediaFiles)
@@ -67,6 +69,10 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   const [showInfoPanel, setShowInfoPanel] = useState(false)
 
   const currentFile = filteredFiles[fullscreenIndex]
+  const fileUrl = toFileUrl(currentFile?.file_path)
+  useEffect(() => {
+    setImgError(false)
+  }, [fileUrl])
 
   const navigate = useCallback(
     (delta: number) => {
@@ -279,12 +285,17 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     }
   }
 
-  const fileUrl = toFileUrl(currentFile.file_path)
   const title = t('gallery.fullscreen.title', {
     fileName: currentFile.file_name,
     current: fullscreenIndex + 1,
     total: filteredFiles.length
   })
+  const renderError = (
+    <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-[var(--text-on-overlay)]">
+      <span className="text-sm opacity-80">{t('gallery.imageLoadFailed')}</span>
+      <span className="max-w-md truncate text-xs opacity-50">{currentFile.file_name}</span>
+    </div>
+  )
 
   return (
     <div
@@ -303,9 +314,11 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
         className="relative w-full h-full flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
-        {currentFile.file_type === 'video' ? (
+        {!fileUrl ? (
+          renderError
+        ) : currentFile.file_type === 'video' ? (
           <VideoPlayer
-            src={fileUrl || ''}
+            src={fileUrl}
             controls
             autoPlay
             className="max-w-full max-h-full"
@@ -315,13 +328,17 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               }
             }}
           />
+        ) : imgError ? (
+          renderError
         ) : (
           <img
-            src={fileUrl || undefined}
+            src={fileUrl}
             alt={currentFile.file_name}
             className="max-w-full max-h-full object-contain"
             draggable={false}
             data-fullscreen-img
+            crossOrigin={needsAnonymousCors(fileUrl) ? 'anonymous' : undefined}
+            onError={() => setImgError(true)}
             style={{ viewTransitionName: 'fullscreen-media' }}
           />
         )}

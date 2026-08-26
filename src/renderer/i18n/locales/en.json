@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "Resonance",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "Smart Group",
     "storage": "Storage",
     "switchProfile": "Switch Profile",
-    "videos": "Videos"
+    "videos": "Videos",
+    "screenshots": "Screenshots"
   },
   "outfit": {
     "collectedHint": "Outfits with photos in database",
@@ -1573,7 +1575,13 @@
       "timeTop": "Time preferences",
       "totalFiles": "Total files",
       "uidPlaceholder": "UID (8-12 digits)",
-      "videos": "Videos"
+      "videos": "Videos",
+      "virtualBadge": "No media (virtual)",
+      "cleanupVirtual": "Clean virtual profiles",
+      "cleanupVirtualConfirm": "Clean up {{count}} virtual profiles with no media? These were auto-registered during scanning but have no actual media files.",
+      "noVirtual": "No virtual profiles to clean",
+      "cleanupDone": "Cleaned {{count}} virtual profiles",
+      "cleanupPartial": "Cleanup finished, but {{failed}} virtual profiles failed to delete"
     },
     "scan": {
       "addPath": "Add Game Directory",
@@ -3969,5 +3977,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Nikki Resonance Records",
+    "subtitle": "Infinity Nikki resonance log & styling assistant · Coming soon"
   }
 }

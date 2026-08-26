@@ -20,6 +20,7 @@
       "duplicates": "",
       "editor": "",
       "favorites": "",
+      "resonanceRecords": "Резонанс",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1122,7 +1123,8 @@
     "smartGroup": "Умная группа",
     "storage": "Хранилище",
     "switchProfile": "Сменить профиль",
-    "videos": "Видео"
+    "videos": "Видео",
+    "screenshots": "Скриншоты"
   },
   "outfit": {
     "collectedHint": "Костюмы с фото в базе данных",
@@ -3969,5 +3971,10 @@
       "installFailed": "",
       "openOfficialFailed": ""
     }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Журнал резонанса Nikki",
+    "subtitle": "Журнал резонанса и помощник по образам Infinity Nikki · Скоро"
   }
 }
