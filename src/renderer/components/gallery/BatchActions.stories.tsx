@@ -65,3 +65,17 @@ export const FullFeatured: Story = {
 export const AllSelected: Story = {
   args: { count: 128, total: 128 }
 }
+
+/** 窄视口降级：将预览视口收窄至 ≤640px，标签文字隐藏仅留图标（title/aria-label 保留完整语义） */
+export const IconOnlyNarrow: Story = {
+  args: {
+    count: 42,
+    onCategorize: fn(),
+    onShareWifi: fn(),
+    onShareClipboard: fn(),
+    onBatchRename: fn(),
+    onExportToDefault: fn(),
+    profiles: [{ uid: 'default', nickname: '默认档案' }],
+    onTransferToProfile: fn()
+  }
+}

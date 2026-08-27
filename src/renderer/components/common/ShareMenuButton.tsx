@@ -65,7 +65,7 @@ export const ShareMenuButton: React.FC<ShareMenuButtonProps> = ({
         onClick={() => setOpen((v) => !v)}
       >
         <IconShare size={size === 'sm' ? 14 : 16} />
-        {effectiveLabel}
+        <span className="batch-act-label">{effectiveLabel}</span>
       </button>
       {open && (
         <div

@@ -9,8 +9,9 @@
  *   导致中文标签被裁剪（导出到默认→出到到、WiFi 分享→WiFi 分 1）。
  *
  * 修复方案（见 BatchActions.tsx / globals.css）：
- *   1. 容器改为 flex-nowrap + overflow-x-auto + scrollbar-hide（单行可滚动、隐藏滚动条）；
- *   2. 新增 .batch-act-btn 裸 CSS 类覆盖 .icon-btn 的固定宽度，使按钮随标签自适应。
+ *   1. 容器改为 flex-nowrap + overflow-x-auto + .batch-actions-root（单行滚动，细滚动条可发现性，移除 scrollbar-hide）；
+ *   2. .icon-btn.batch-act-btn 组合选择器覆盖 .icon-btn 的固定宽度与 overflow:hidden，使按钮随标签自适应且文字不被裁；
+ *   3. 文字按钮标签包裹 .batch-act-label，≤640px 窄屏下隐藏文字仅留图标（title/aria-label 保留语义）。
  *
  * 验收维度：渲染 / 无障碍 / 条件渲染 / 交互 / 样式挂载点（防回归）。
  * i18n 由 tests/setup.ts 全局初始化，t() 返回真实中文，断言与用户可见文案对齐。
@@ -47,10 +48,11 @@ describe('BatchActions — 渲染', () => {
     expect(screen.getByRole('toolbar')).toBeTruthy()
   })
 
-  it('T02 容器应用单行滚动 + 隐藏滚动条类（防回归：不再 flex-wrap 触发换行裁剪）', () => {
+  it('T02 容器应用单行滚动 + 细滚动条根类（防回归：不再 flex-wrap 触发换行裁剪）', () => {
     render(<BatchActions {...baseProps} />)
     const toolbar = screen.getByRole('toolbar')
-    expect(toolbar.className).toContain('scrollbar-hide')
+    expect(toolbar.className).toContain('batch-actions-root')
+    expect(toolbar.className).not.toContain('scrollbar-hide')
     expect(toolbar.className).toContain('overflow-x-auto')
     expect(toolbar.className).toContain('flex-nowrap')
     expect(toolbar.className).not.toContain('flex-wrap')
@@ -102,6 +104,12 @@ describe('BatchActions — 渲染', () => {
     expect(screen.queryByText('转移到档案')).toBeNull()
     expect(screen.queryByText('WiFi 分享')).toBeNull()
     expect(screen.queryByText('分享')).toBeNull()
+  })
+
+  it('T11 文字按钮渲染 .batch-act-label 包裹（窄屏响应式降级锚点）', () => {
+    render(<BatchActions {...baseProps} />)
+    const selectAll = screen.getByText('全选')
+    expect(selectAll.className).toContain('batch-act-label')
   })
 })
 

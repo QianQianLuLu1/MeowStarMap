@@ -65,7 +65,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
   return (
     <div
       ref={actionsRef}
-      className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40 flex-nowrap overflow-x-auto scrollbar-hide max-w-[calc(100vw-32px)]"
+      className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40 flex-nowrap overflow-x-auto batch-actions-root max-w-[calc(100vw-32px)]"
       style={{ bottom: '44px', animation: 'slideInBottom 200ms ease-out' }}
       role="toolbar"
       aria-label={t('batch.actions.ariaLabel')}
@@ -83,7 +83,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         aria-label={t('batch.actions.selectAll')}
       >
         <IconSelectAll size={14} />
-        {t('batch.actions.selectAll')}
+        <span className="batch-act-label">{t('batch.actions.selectAll')}</span>
       </button>
       <button
         className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
@@ -91,7 +91,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         aria-label={t('batch.actions.invertSelection')}
       >
         <IconInvertSelection size={14} />
-        {t('batch.actions.invertSelection')}
+        <span className="batch-act-label">{t('batch.actions.invertSelection')}</span>
       </button>
       <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--divider)' }} />
       <button
@@ -100,7 +100,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         aria-label={t('batch.actions.delete')}
       >
         <IconDelete size={14} />
-        {t('batch.actions.delete')}
+        <span className="batch-act-label">{t('batch.actions.delete')}</span>
       </button>
       <button
         className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
@@ -109,7 +109,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         title={t('batch.actions.exportSelectDir')}
       >
         <IconExport size={14} />
-        {t('batch.actions.export')}
+        <span className="batch-act-label">{t('batch.actions.export')}</span>
       </button>
       {onExportToDefault && (
         <button
@@ -120,7 +120,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
           style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
         >
           <IconExport size={14} />
-          {t('batch.actions.exportToDefault')}
+          <span className="batch-act-label">{t('batch.actions.exportToDefault')}</span>
         </button>
       )}
       <button
@@ -129,7 +129,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         aria-label={t('batch.actions.move')}
       >
         <IconMove size={14} />
-        {t('batch.actions.move')}
+        <span className="batch-act-label">{t('batch.actions.move')}</span>
       </button>
       <button
         className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
@@ -137,7 +137,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
         aria-label={t('batch.actions.watermark')}
       >
         <IconWatermark size={14} />
-        {t('batch.actions.watermark')}
+        <span className="batch-act-label">{t('batch.actions.watermark')}</span>
       </button>
       {onBatchRename && (
         <button
@@ -147,7 +147,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
           title={t('batch.actions.renameHint')}
         >
           <IconRename size={14} />
-          {t('batch.actions.rename')}
+          <span className="batch-act-label">{t('batch.actions.rename')}</span>
         </button>
       )}
       {onCategorize && (
@@ -157,7 +157,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
           aria-label={t('batch.actions.categorize')}
         >
           <IconCategory size={14} />
-          {t('batch.actions.categorize')}
+          <span className="batch-act-label">{t('batch.actions.categorize')}</span>
         </button>
       )}
       {/* P1-04：转移到档案——下拉式选择目标档案 */}
@@ -179,7 +179,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
           title={t('batch.actions.wifiShareHint')}
         >
           <IconShare size={14} />
-          {t('batch.actions.wifiShare')}
+          <span className="batch-act-label">{t('batch.actions.wifiShare')}</span>
         </button>
       )}
       <div className="w-px h-5 mx-1 flex-shrink-0" style={{ background: 'var(--divider)' }} />
@@ -231,7 +231,7 @@ const ProfileTransferMenu: React.FC<{
         onClick={() => setOpen((v) => !v)}
       >
         <IconCategory size={14} />
-        {t('batch.actions.transferToProfile')}
+        <span className="batch-act-label">{t('batch.actions.transferToProfile')}</span>
       </button>
       {open && (
         <div

@@ -1,51 +1,108 @@
-import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Virtuoso } from 'react-virtuoso'
+// 复用成熟开源方案 masonic 的布局内核（usePositioner / useResizeObserver / useMasonry），
+// 仅自行提供「容器内滚动」的 scrollTop/height 数据源，避免自实现绝对定位与虚拟化。
+import { useMasonry, usePositioner, useResizeObserver } from 'masonic'
 import { toFileUrl } from '../../utils/file'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { useFailedImages } from '../../hooks/useFailedImages'
+import { useContainerSize } from '../../hooks/useContainerSize'
 import type { MediaFile } from '../../stores/mediaStore'
 
 interface MasonryViewProps {
   files: MediaFile[]
-  selectedIds: string[]
-  onSelect: (id: string, index: number, event: React.MouseEvent) => void
-  onContextMenu: (event: React.MouseEvent, file: MediaFile) => void
+  /** 可选；缺失时默认空数组，不影响渲染 */
+  selectedIds?: string[]
+  /** 可选；缺失时点击 no-op */
+  onSelect?: (id: string, index: number, event: React.MouseEvent) => void
+  /** 可选；缺失时右键 no-op */
+  onContextMenu?: (event: React.MouseEvent, file: MediaFile) => void
 }
 
 const GAP = 16
 const MIN_COL_WIDTH = 220
-// 每个虚拟"段"的高度：将瀑布流按垂直带切片，每个 band 作为一个 Virtuoso item 渲染
-// band 内的 item 仍用绝对定位保留真瀑布流布局
-const BAND_HEIGHT = 600
 
-interface ItemLayout {
-  index: number
-  file: MediaFile
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-interface Band {
-  start: number
-  height: number
-  items: ItemLayout[]
-}
-
+// 复用原断点逻辑，保证与 Grid 视图一致的响应式列数
 function getColumns(width: number): number {
   if (width <= 0) return 1
   return Math.max(1, Math.floor((width + GAP) / (MIN_COL_WIDTH + GAP)))
 }
 
-// 性能重构 v3 改造项一：MasonryView 迁移至 react-virtuoso
-// 策略：保留原贪心最短列算法计算真瀑布流位置，按垂直 band 切片交给 Virtuoso 虚拟化
-// - 每个 band 高度 BAND_HEIGHT，包含所有与该 y 区间重叠的 item
-// - band 内 item 绝对定位到 band 顶部，保留瀑布流视觉效果
-// - 保留：多选、右键菜单、丢失文件角标、文件名条
+interface MasonryContextValue {
+  selectedSet: Set<string>
+  onSelect: (id: string, index: number, event: React.MouseEvent) => void
+  onContextMenu: (event: React.MouseEvent, file: MediaFile) => void
+  failedImages: Set<string>
+  markFailed: (id: string) => void
+}
+
+const MasonryContext = React.createContext<MasonryContextValue | null>(null)
+
+function MasonryCard({ index, data }: { index: number; width: number; data: MediaFile }) {
+  const ctx = React.useContext(MasonryContext)
+  if (!ctx) return null
+  const { selectedSet, onSelect, onContextMenu, failedImages, markFailed } = ctx
+
+  const file = data
+  const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
+  const isSelected = selectedSet.has(file.id)
+  const isMissing = file.is_missing === true
+  const isCorrupted = file.is_corrupted === true
+  const hasError = failedImages.has(file.id)
+  const showThumb = !isCorrupted && !!thumbUrl && !hasError
+
+  const aspect = file.width && file.height ? file.height / file.width : 1
+  const clampedAspect = Math.max(0.3, Math.min(3, aspect))
+
+  return (
+    <div
+      data-media-id={file.id}
+      className={`media-card relative ${isSelected ? 'ring-2 ring-offset-2' : ''}`}
+      style={{
+        width: '100%',
+        background: 'var(--bg-tertiary)',
+        opacity: isMissing ? 0.45 : 1,
+        cursor: 'pointer',
+        ...(isSelected ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties) : {})
+      }}
+      onClick={(e) => onSelect(file.id, index, e)}
+      onContextMenu={(e) => onContextMenu(e, file)}
+    >
+      <div
+        className="relative w-full overflow-hidden rounded-xl"
+        style={{ background: 'var(--bg-tertiary)', aspectRatio: `1 / ${clampedAspect}` }}
+      >
+        {isMissing && <MissingBadge />}
+        {isCorrupted && <CorruptedBadge reason={file.corrupted_reason} />}
+        {showThumb ? (
+          <img
+            data-testid="thumb"
+            src={thumbUrl}
+            alt={file.file_name}
+            className="absolute inset-0 w-full h-full object-cover"
+            loading="lazy"
+            draggable={false}
+            onError={() => markFailed(file.id)}
+          />
+        ) : null}
+        <MediaThumbPlaceholder
+          fileType={file.file_type}
+          hasError={hasError || isCorrupted}
+          visible={!showThumb}
+        />
+      </div>
+      <div
+        className="absolute bottom-0 left-0 right-0 p-2 text-xs truncate"
+        style={{ color: 'var(--text-secondary)', background: 'var(--overlay-gradient-bottom)' }}
+      >
+        {file.file_name}
+      </div>
+    </div>
+  )
+}
+
 export const MasonryView: React.FC<MasonryViewProps> = ({
   files,
   selectedIds,
@@ -53,168 +110,88 @@ export const MasonryView: React.FC<MasonryViewProps> = ({
   onContextMenu
 }) => {
   const { t } = useTranslation()
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(800)
-  const { failedImages, markFailed } = useFailedImages(files)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  // 复用项目已有 hook 获取容器可见宽高（clientWidth/Height，已排除滚动条）
+  const { width, height } = useContainerSize(scrollRef)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [isScrolling, setIsScrolling] = useState(false)
+  const scrollTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
 
-  // 监听容器尺寸
-  useEffect(() => {
-    const el = wrapperRef.current
+  // —— 参数校验（不提前 return，保证所有 Hook 调用顺序稳定）——
+  const safeFiles = useMemo<MediaFile[]>(() => {
+    if (!Array.isArray(files)) {
+      console.warn('[MasonryView] files must be an array; rendered empty container')
+      return []
+    }
+    return files.filter((f) => f && typeof f.id === 'string')
+  }, [files])
+
+  const safeOnSelect = typeof onSelect === 'function' ? onSelect : () => {}
+  const safeOnContextMenu = typeof onContextMenu === 'function' ? onContextMenu : () => {}
+
+  const { failedImages, markFailed } = useFailedImages(safeFiles)
+  const selectedSet = useMemo(() => new Set(selectedIds || []), [selectedIds])
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current
     if (!el) return
-    const update = () => setWidth(el.clientWidth)
-    update()
-    const observer = new ResizeObserver(update)
-    observer.observe(el)
-    window.addEventListener('resize', update)
+    setScrollTop(el.scrollTop)
+    setIsScrolling(true)
+    if (scrollTimer.current) clearTimeout(scrollTimer.current)
+    // 滚动停止后关闭 isScrolling，恢复 pointer-events
+    scrollTimer.current = setTimeout(() => setIsScrolling(false), 120)
+  }, [])
+
+  useEffect(() => {
     return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', update)
+      if (scrollTimer.current) clearTimeout(scrollTimer.current)
     }
   }, [])
 
-  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
-
-  // 计算完整 masonry 布局：贪心算法放入当前最短列
-  const layouts = useMemo<ItemLayout[]>(() => {
-    const cols = getColumns(width)
-    if (cols <= 0 || files.length === 0) return []
-
-    const colWidth = (width - (cols - 1) * GAP) / cols
-    const colHeights = new Array(cols).fill(0)
-    const result: ItemLayout[] = []
-
-    files.forEach((file, index) => {
-      const aspect = file.width && file.height ? file.height / file.width : 1
-      const clampedAspect = Math.max(0.3, Math.min(3, aspect))
-      const itemHeight = colWidth * clampedAspect
-
-      let minCol = 0
-      for (let c = 1; c < cols; c++) {
-        if (colHeights[c] < colHeights[minCol]) minCol = c
-      }
-
-      const x = minCol * (colWidth + GAP)
-      const y = colHeights[minCol]
-
-      result.push({ index, file, x, y, width: colWidth, height: itemHeight })
-      colHeights[minCol] = y + itemHeight + GAP
-    })
-
-    return result
-  }, [files, width])
-
-  // 按垂直 band 切片：每个 band 包含所有与 [start, start+BAND_HEIGHT) 重叠的 item
-  const bands = useMemo<Band[]>(() => {
-    if (layouts.length === 0) return []
-    const maxBottom = layouts.reduce((max, item) => Math.max(max, item.y + item.height), 0)
-    const bandCount = Math.ceil(maxBottom / BAND_HEIGHT)
-    const result: Band[] = []
-
-    for (let i = 0; i < bandCount; i++) {
-      const start = i * BAND_HEIGHT
-      const end = start + BAND_HEIGHT
-      const bandItems = layouts.filter((item) => {
-        return item.y + item.height >= start && item.y < end
-      })
-      if (bandItems.length === 0) continue
-      const bandBottom = bandItems.reduce((max, item) => Math.max(max, item.y + item.height), 0)
-      result.push({
-        start,
-        height: Math.max(BAND_HEIGHT, bandBottom - start),
-        items: bandItems
-      })
-    }
-
-    return result
-  }, [layouts])
-
-  const handleClick = useCallback(
-    (file: MediaFile, index: number, e: React.MouseEvent) => {
-      onSelect(file.id, index, e)
+  const columnCount = getColumns(width)
+  // 仅当 files 或容器宽度变化时重建 positioner（清空缓存），避免索引错位（masonic dev 守卫）
+  const positioner = usePositioner(
+    {
+      width: width || 1,
+      columnCount,
+      columnGutter: GAP,
+      rowGutter: GAP
     },
-    [onSelect]
+    [safeFiles, width]
   )
+  const resizeObserver = useResizeObserver(positioner)
+
+  const masonry = useMasonry({
+    positioner,
+    resizeObserver,
+    items: safeFiles,
+    height: height || 0,
+    scrollTop,
+    isScrolling,
+    itemKey: (data) => data.id,
+    overscanBy: 3,
+    render: MasonryCard
+  })
 
   return (
-    <div
-      ref={wrapperRef}
-      className="flex-1 min-h-0 overflow-hidden"
-      role="feed"
-      aria-label={t('gallery.masonry.ariaLabel')}
+    <MasonryContext.Provider
+      value={{
+        selectedSet,
+        onSelect: safeOnSelect,
+        onContextMenu: safeOnContextMenu,
+        failedImages,
+        markFailed
+      }}
     >
-      <Virtuoso
-        data={bands}
-        computeItemKey={(index) => `band-${bands[index]?.start ?? index}`}
-        defaultItemHeight={BAND_HEIGHT}
-        overscan={BAND_HEIGHT * 2}
-        increaseViewportBy={{ top: BAND_HEIGHT, bottom: BAND_HEIGHT }}
-        itemContent={(_, band) => (
-          <div style={{ position: 'relative', height: band.height, marginBottom: 0 }}>
-            {band.items.map((item) => {
-              const { file, index, x, y, width: itemWidth, height: itemHeight } = item
-              const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
-              const isSelected = selectedSet.has(file.id)
-              const isMissing = file.is_missing === true
-              // 损坏文件容错：损坏文件不显示缩略图，仅显示占位图 + 损坏角标
-              const isCorrupted = file.is_corrupted === true
-              const hasError = failedImages.has(file.id)
-              const showThumb = !isCorrupted && !!thumbUrl && !hasError
-              return (
-                <div
-                  key={file.id}
-                  className={`media-card ${isSelected ? 'ring-2 ring-offset-2' : ''}`}
-                  style={{
-                    position: 'absolute',
-                    left: x,
-                    top: y - band.start,
-                    width: itemWidth,
-                    height: itemHeight,
-                    background: 'var(--bg-tertiary)',
-                    opacity: isMissing ? 0.45 : 1,
-                    ...(isSelected
-                      ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties)
-                      : {})
-                  }}
-                  onClick={(e) => handleClick(file, index, e)}
-                  onContextMenu={(e) => onContextMenu(e, file)}
-                >
-                  <div
-                    className="relative w-full h-full overflow-hidden rounded-xl"
-                    style={{ background: 'var(--bg-tertiary)' }}
-                  >
-                    {isMissing && <MissingBadge />}
-                    {isCorrupted && <CorruptedBadge reason={file.corrupted_reason} />}
-                    {showThumb ? (
-                      <img
-                        src={thumbUrl}
-                        alt={file.file_name}
-                        className="absolute inset-0 w-full h-full object-cover"
-                        loading="lazy"
-                        draggable={false}
-                        onError={() => markFailed(file.id)}
-                      />
-                    ) : null}
-                    <MediaThumbPlaceholder
-                      fileType={file.file_type}
-                      hasError={hasError || isCorrupted}
-                      visible={!showThumb}
-                    />
-                  </div>
-                  <div
-                    className="absolute bottom-0 left-0 right-0 p-2 text-xs truncate"
-                    style={{
-                      color: 'var(--text-secondary)',
-                      background: 'var(--overlay-gradient-bottom)'
-                    }}
-                  >
-                    {file.file_name}
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      />
-    </div>
+      <div
+        ref={scrollRef}
+        onScroll={handleScroll}
+        className="flex-1 min-h-0 overflow-auto"
+        role="feed"
+        aria-label={t('gallery.masonry.ariaLabel')}
+      >
+        {masonry}
+      </div>
+    </MasonryContext.Provider>
   )
 }

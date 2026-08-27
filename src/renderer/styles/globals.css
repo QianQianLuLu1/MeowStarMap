@@ -402,12 +402,13 @@ body {
   overflow: hidden;
 }
 
-/* BatchActions 文字按钮：覆盖 .icon-btn 固定 36px 宽度，允许随标签自适应，
-   避免中文标签被 .icon-btn 的 overflow:hidden 裁掉（导出到默认→出到到 等） */
-.batch-act-btn {
+/* BatchActions 文字按钮：组合选择器提高特异性，覆盖 .icon-btn 的固定 width 与
+   overflow:hidden，确保中文标签（导出到默认等）完整可见、不被裁切 */
+.icon-btn.batch-act-btn {
   width: auto;
   min-width: 36px;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 /* 隐藏滚动条：用于底部批量操作栏水平滚动时保持玻璃拟态视觉干净。
@@ -419,6 +420,30 @@ body {
 
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
+}
+
+/* 批量操作栏容器：细滚动条（保持毛玻璃视觉，同时提供横向滚动的可发现性）。
+   容器默认隐藏滚动条，hover 时显示细滚动条提示可滚动。 */
+.batch-actions-root {
+  scrollbar-width: thin;
+  scrollbar-color: var(--divider) transparent;
+}
+.batch-actions-root::-webkit-scrollbar {
+  height: 4px;
+}
+.batch-actions-root::-webkit-scrollbar-track {
+  background: transparent;
+}
+.batch-actions-root::-webkit-scrollbar-thumb {
+  background: var(--divider);
+  border-radius: 9999px;
+}
+
+/* 窄屏响应式降级：仅显示图标，标签文字隐藏（title/aria-label 保留完整语义） */
+@media (max-width: 640px) {
+  .batch-actions-root .batch-act-label {
+    display: none;
+  }
 }
 
 .icon-btn:hover {
