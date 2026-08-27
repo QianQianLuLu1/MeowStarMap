@@ -41,6 +41,7 @@ tsconfig.tsbuildinfo
 
 # ===== Logs =====
 *.log
+*.err
 logs/
 
 # ===== Runtime data =====
