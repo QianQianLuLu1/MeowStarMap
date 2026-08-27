@@ -375,6 +375,17 @@ function checkUnpackedNativeBinaries(): void {
   const koffi = findFirstFile(nm, ['@koromix', 'koffi-win32-x64'], /koffi\.node$/)
   if (koffi) pass('koffi 二进制存在: ' + path.relative(ROOT, koffi))
   else fail('koffi 二进制缺失（@koromix/koffi-win32-x64 未安装，检查 npm 是否带 --no-optional）')
+
+  // 5) VC++ 2015-2022 运行库 DLL（better-sqlite3/koffi/sharp/libvips 动态链接，干净 Windows 缺之即静默崩溃）
+  //    afterPack 钩子已将这 4 个 DLL 复制到与 electron.exe 同级的 appOutDir 根。
+  //    appOutDir = <app.asar.unpacked 的上两级目录>（.../resources/app.asar.unpacked → .../appName-x64）。
+  const appOutDir = path.dirname(path.dirname(unpackedRoot))
+  const vcDlls = ['vcruntime140.dll', 'vcruntime140_1.dll', 'msvcp140.dll', 'concrt140.dll']
+  for (const dll of vcDlls) {
+    const p = path.join(appOutDir, dll)
+    if (fs.existsSync(p)) pass('VC++ 运行库随包: ' + dll)
+    else fail('VC++ 运行库缺失（afterPack 未复制？）: ' + path.relative(ROOT, p))
+  }
 }
 
 // ===== 原生模块 ABI 一致性闸门（防 NODE_MODULE_VERSION 错位）=====
@@ -453,11 +464,63 @@ function checkNativeAbiConsistency(): void {
   )
 }
 
+// ===== VC++ 运行库随包配置闸门（防“漏带运行库被发版”）=====
+// afterPack 钩子把 VC++ 2015-2022 x64 运行库 DLL 复制到与 electron.exe 同级；
+// 此处校验配置已接线且钩子脚本存在，把“干净 Windows 双击无响应”的前置条件在打包前卡住。
+function checkVcRuntimeAfterPackConfigured(): void {
+  const pkgPath = path.join(ROOT, 'package.json')
+  let pkg: { build?: { afterPack?: string } }
+  try {
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+  } catch {
+    fail('无法读取 package.json，VC++ 随包配置闸门跳过')
+    return
+  }
+  const afterPack = pkg.build?.afterPack
+  if (typeof afterPack !== 'string' || afterPack.length === 0) {
+    fail(
+      'build.afterPack 未配置，VC++ 运行库不会随包，干净 Windows 将静默崩溃，请配置 scripts/after-pack-vc-runtime.cjs'
+    )
+    return
+  }
+  const hookPath = path.join(ROOT, afterPack)
+  if (!fs.existsSync(hookPath)) {
+    fail(`build.afterPack 指向的钩子脚本不存在: ${afterPack}`)
+    return
+  }
+  pass(`VC++ 运行库随包钩子已接线: ${afterPack}`)
+}
+
+// ===== 管理员清单闸门（降杀软误杀 + 去 UAC 摩擦）=====
+// requireAdministrator 清单是杀软强力启发式特征，且强制每次启动弹 UAC，
+// 既增加误杀概率又造成"权限不足"错觉。本闸门在打包前 / 解包后均拦截该回归，
+// 确保产物以 asInvoker 运行（默认当前用户身份，userData 属其可写位置）。
+function checkNoAdminManifest(): void {
+  const pkgPath = path.join(ROOT, 'package.json')
+  let pkg: { build?: { win?: { requestedExecutionLevel?: string } } }
+  try {
+    pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+  } catch {
+    fail('无法读取 package.json，管理员清单闸门跳过')
+    return
+  }
+  const level = pkg.build?.win?.requestedExecutionLevel
+  if (level === 'requireAdministrator') {
+    fail(
+      'build.win.requestedExecutionLevel 为 requireAdministrator：该清单是杀软强力启发式特征且强制 UAC，' +
+        '请改为 "asInvoker"（默认当前用户身份运行，兼容多用户权限体系）。'
+    )
+    return
+  }
+  pass(`管理员清单闸门通过：requestedExecutionLevel=${level ?? '(缺省 asInvoker)'}`)
+}
+
 function main(): void {
   // 解包后校验模式：仅执行原生二进制存在性检查，不跑打包前 11 项
   if (process.argv.includes('--verify-asar')) {
     console.log('\n[pre-dist-check] 解包后原生二进制校验\n')
     checkUnpackedNativeBinaries()
+    checkNoAdminManifest()
     console.log('')
     if (failed) {
       console.error('[pre-dist-check] ❌ 解包二进制校验失败，禁止发布。\n')
@@ -600,6 +663,12 @@ function main(): void {
 
   // 12. 原生模块 ABI 一致性闸门（防 NODE_MODULE_VERSION 错位）
   checkNativeAbiConsistency()
+
+  // 12.5 VC++ 运行库随包钩子接线闸门（防“漏带运行库被发版”）
+  checkVcRuntimeAfterPackConfigured()
+
+  // 12.7 管理员清单闸门（降杀软误杀 + 去 UAC 摩擦，防 requireAdministrator 回归）
+  checkNoAdminManifest()
 
   // 结果
   console.log('')
