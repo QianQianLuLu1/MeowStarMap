@@ -12,6 +12,8 @@
 import fs from 'fs'
 import ffmpegStatic from 'ffmpeg-static'
 import ffprobeStatic from 'ffprobe-static'
+import { hasNonAsciiPath } from './path-safety'
+import { diagLog } from './startup-diagnostic'
 
 /**
  * asar 打包后，require('ffmpeg-static') 返回 asar 内部路径，
@@ -32,7 +34,19 @@ export function resolveAsarUnpackedPath(p: string): string {
 function resolveBinaryPath(candidate: string | undefined | null, fallback: string): string {
   if (!candidate) return fallback
   const resolved = resolveAsarUnpackedPath(candidate)
-  return fs.existsSync(resolved) ? resolved : fallback
+  if (fs.existsSync(resolved)) {
+    // 安装路径含中文/特殊字符时，本地二进制路径含特殊字符，spawn 易失败，
+    // 降级到系统 PATH 上的同名可执行文件（path-safety 已做非 ASCII 判定）
+    if (hasNonAsciiPath(resolved)) {
+      diagLog(
+        'FFMPEG',
+        `binary path contains non-ASCII chars, fall back to system PATH: ${resolved}`
+      )
+      return fallback
+    }
+    return resolved
+  }
+  return fallback
 }
 
 export const ffmpegPath: string = resolveBinaryPath(ffmpegStatic, 'ffmpeg')
