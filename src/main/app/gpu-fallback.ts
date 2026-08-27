@@ -18,10 +18,12 @@ import { t } from '../i18n'
  * - fallbackActive：回退激活标记（一旦置位保留，用户更新显卡驱动后
  *   手动删除该文件即可恢复硬件加速）
  *
- * 恢复时序：启动1 GPU 崩溃被 child-process-gone 观测 → 同步落盘
- * fallbackActive → 主进程被 FATAL 杀死；启动2 读到标记 → whenReady 前
- * app.disableHardwareAcceleration() → 软件渲染正常启动。
- * 观测事件若早于监听器注册而丢失，则由 consecutiveFailures>=2 阈值兜底。
+ * 恢复时序（崩溃检测 → 自动降级 → 重启自愈）：
+ *  启动1 GPU/渲染进程崩溃被观测 → requestSelfHeal 同步落盘 fallbackActive
+ *  → 若本次为硬件加速启动则 app.relaunch+app.exit 自动重启进入软件渲染；
+ *  启动2 读到标记 → whenReady 前 app.disableHardwareAcceleration() → 软件渲染正常启动。
+ * 若主进程被 FATAL 杀死来不及自愈重启，则靠 consecutiveFailures>=2 阈值
+ * 在用户下次手动启动时兜底。观测事件若早于监听器注册而丢失亦由该阈值兜底。
  *
  * 全部文件读写 try/catch 容错：无文件/损坏 JSON/userData 不可写 →
  * 视为默认状态（不禁用、不计数），绝不阻塞启动。
@@ -36,6 +38,13 @@ interface GpuFallbackState {
 }
 
 const DEFAULT_STATE: GpuFallbackState = { consecutiveFailures: 0, fallbackActive: false }
+
+/** 启动决策缓存：shouldDisableHardwareAcceleration 首次（index.ts 顶层、ready 前）计算后缓存，
+ * 供 requestSelfHeal 判定"本次是否为硬件加速启动"——仅硬件加速启动崩溃才自动重启自愈。 */
+let bootDecisionCache: boolean | null = null
+
+/** 首绘是否完成（did-finish-load 成功即标记），用于区分"启动期崩溃"与"运行中崩溃"。 */
+let appBooted = false
 
 function getStatePath(): string {
   return path.join(app.getPath('userData'), 'gpu-fallback.json')
@@ -110,14 +119,19 @@ export function writeHardwareAccelPref(value: boolean): void {
 /**
  * whenReady 前调用：本次启动是否应禁用硬件加速。
  * 决策优先级：
+ *  0) 开发/测试强制：NIKKI_FORCE_GPU_COMPAT==='1' → 强制软件渲染（仅用于验证降级路径）；
  *  1) 用户显式关闭（pref===false）→ 绝对优先，强制软件渲染；
  *  2) 未关闭时，崩溃自愈逻辑优先于"用户开启"：若真实 GPU 崩溃已落盘
  *     fallbackActive（或连续失败达阈值），仍回退软件渲染，避免启用后
  *     反复崩溃白屏。用户开启仅通过 writeHardwareAccelPref(true) 清空
- *     fallbackActive 来获得一次干净重试，故正常启动会落入下方返回 false。
- *  3) 无偏好且无崩溃标记 → 启用硬件加速。
+ *     fallbackActive 来获得一次干净重试，故正常启动会落入下方返回 false；
+ *  3) 无偏好且无崩溃标记 → 启用硬件加速（默认保留硬件加速，不牺牲性能）。
+ *
+ * 注意：本函数保持纯函数（每次从磁盘重读），以便既有状态机测试可重复调用；
+ * 启动决策仅由 recordBootDecision() 在 index.ts 顶层缓存一次，供 requestSelfHeal 使用。
  */
 export function shouldDisableHardwareAcceleration(): boolean {
+  if (process.env.NIKKI_FORCE_GPU_COMPAT === '1') return true
   const pref = readHardwareAccelPref()
   if (pref === false) return true
   const state = readState()
@@ -129,14 +143,41 @@ export function shouldDisableHardwareAcceleration(): boolean {
   return false
 }
 
+/**
+ * 记录本次启动的硬件加速决策（index.ts 顶层、ready 前调用一次）。
+ * 结果缓存于 bootDecisionCache，供 requestSelfHeal 判定"本次是否为硬件加速启动"，
+ * 从而决定是否自动重启自愈。
+ * @returns 是否应禁用硬件加速（即进入兼容模式）
+ */
+export function recordBootDecision(): boolean {
+  bootDecisionCache = shouldDisableHardwareAcceleration()
+  return bootDecisionCache
+}
+
+/** 本次启动是否已进入兼容模式（即已禁用硬件加速）。 */
+export function wasBootInCompatMode(): boolean {
+  return bootDecisionCache === true
+}
+
 /** whenReady 后、创建窗口前调用：登记一次启动尝试（失败计数 +1） */
 export function markBootAttempt(): void {
   const state = readState()
   writeState({ ...state, consecutiveFailures: state.consecutiveFailures + 1 })
 }
 
+/** 标记首绘完成（did-finish-load 成功时调用），退出启动期 */
+export function markAppBooted(): void {
+  appBooted = true
+}
+
+/** 是否仍处于启动期（首绘前）。true 表示渲染进程崩溃发生在启动阶段。 */
+export function isStartupPhase(): boolean {
+  return !appBooted
+}
+
 /** did-finish-load 时调用：启动成功，清零失败计数（fallbackActive 保留） */
 export function markBootSuccess(): void {
+  markAppBooted()
   const state = readState()
   if (state.consecutiveFailures === 0) return // 幂等：避免重复写盘
   writeState({ ...state, consecutiveFailures: 0 })
@@ -152,17 +193,46 @@ export function markGpuProcessCrash(reason: string, exitCode: number): void {
 }
 
 /**
+ * 崩溃自愈入口：先同步落盘回退标记（抢在 FATAL 前），再决定是否自动重启。
+ * 仅当"本次为硬件加速启动"（bootDecisionCache===false）才 app.relaunch+app.exit
+ * 自动重启进入软件渲染；若本次已是兼容模式仍崩，则不重启并返回 false，
+ * 交由调用方现有错误对话框处理，避免无限重启死循环。
+ * relaunch/exit 全程 try/catch：失败仅保留落盘标记，靠 consecutiveFailures>=2
+ * 阈值跨手动启动兜底。
+ * @returns 是否已触发自动重启
+ */
+export function requestSelfHeal(reason: string, exitCode: number): boolean {
+  markGpuProcessCrash(reason, exitCode)
+  // 已兼容模式仍崩：不再自动重启，避免死循环（由调用方错误对话框兜底）
+  if (bootDecisionCache === true) return false
+  try {
+    app.releaseSingleInstanceLock?.()
+  } catch {
+    // 单实例锁释放失败不影响自愈重启
+  }
+  try {
+    app.relaunch()
+    app.exit(0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
  * whenReady 内、首个窗口创建前注册：观测 GPU 子进程崩溃。
- * 仅记日志与落盘标记，不干预进程存活（主进程去留由 Chromium 决定）。
+ * 记日志并触发 requestSelfHeal（落盘 + 自动重启进入软件渲染）。
  */
 export function setupGpuProcessWatcher(): void {
   app.on('child-process-gone', (_event, details) => {
     if (details.type !== 'GPU') return
-    markGpuProcessCrash(String(details.reason ?? 'unknown'), details.exitCode ?? -1)
+    const reason = String(details.reason ?? 'unknown')
+    const exitCode = details.exitCode ?? -1
     try {
       logger.error(t('main.gpu.log.processCrashFallback'), details)
     } catch {
       // logger 未初始化时仅依赖 diagLog，不重抛
     }
+    requestSelfHeal(reason, exitCode)
   })
 }

@@ -5,7 +5,7 @@ import type { AppContext } from './app-context'
 import { logger } from '../utils/logger'
 import { logFault } from '../utils/logger'
 import { logStartupError, diagLog } from '../utils/startup-diagnostic'
-import { markBootSuccess } from './gpu-fallback'
+import { markBootSuccess, requestSelfHeal, isStartupPhase } from './gpu-fallback'
 import { t } from '../i18n'
 
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
@@ -229,6 +229,14 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     try {
       logger?.error?.(t('main.window.log.rendererCrashed'), details)
     } catch {}
+
+    // 启动期（首绘前）渲染进程崩溃：接入 GPU 降级自愈链，自动重启进入软件渲染，
+    // 直接解决"双击无窗口、无弹窗直接退出"——无需用户手动重开或点对话框。
+    if (isStartupPhase()) {
+      const healed = requestSelfHeal(details.reason ?? 'unknown', details.exitCode ?? -1)
+      if (healed) return // 已自动重启进入兼容模式，跳过对话框
+      // 已兼容模式仍崩：fallback 失败，继续走错误对话框（避免死循环）
+    }
 
     // P1-6：弹窗询问用户是否重新加载（崩溃后窗口可能已不可用，需先销毁重建）
     if (!mainWindow || mainWindow.isDestroyed()) return

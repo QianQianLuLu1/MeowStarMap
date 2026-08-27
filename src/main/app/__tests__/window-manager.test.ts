@@ -21,7 +21,9 @@ const {
   loggerErrorMock,
   BrowserWindowCtorMock,
   getFocusedWindowMock,
-  markBootSuccessMock
+  markBootSuccessMock,
+  requestSelfHealMock,
+  isStartupPhaseMock
 } = vi.hoisted(() => ({
   showMessageBoxMock: vi.fn(),
   appQuitMock: vi.fn(),
@@ -30,7 +32,9 @@ const {
   loggerErrorMock: vi.fn(),
   BrowserWindowCtorMock: vi.fn(),
   getFocusedWindowMock: vi.fn(() => null),
-  markBootSuccessMock: vi.fn()
+  markBootSuccessMock: vi.fn(),
+  requestSelfHealMock: vi.fn(() => false),
+  isStartupPhaseMock: vi.fn(() => false)
 }))
 
 vi.mock('electron', () => ({
@@ -68,7 +72,9 @@ vi.mock('../../utils/startup-diagnostic', () => ({
 }))
 
 vi.mock('../gpu-fallback', () => ({
-  markBootSuccess: markBootSuccessMock
+  markBootSuccess: markBootSuccessMock,
+  requestSelfHeal: requestSelfHealMock,
+  isStartupPhase: isStartupPhaseMock
 }))
 
 import { createMainWindow, getMainWindow } from '../window-manager'
@@ -149,6 +155,11 @@ beforeEach(() => {
   BrowserWindowCtorMock.mockReset()
   getFocusedWindowMock.mockReset()
   markBootSuccessMock.mockReset()
+  requestSelfHealMock.mockReset()
+  isStartupPhaseMock.mockReset()
+  // 默认：非启动期、且自愈不触发（维持既有 dialog 流程）
+  isStartupPhaseMock.mockReturnValue(false)
+  requestSelfHealMock.mockReturnValue(false)
 
   // 默认：getFocusedWindow 返回 null
   getFocusedWindowMock.mockReturnValue(null)
@@ -431,6 +442,41 @@ describe('createMainWindow', () => {
     lastCreatedWindow!.webContents._emit('did-finish-load')
 
     expect(markBootSuccessMock).not.toHaveBeenCalled()
+  })
+
+  it('17. 启动期（首绘前）render-process-gone → 调用 requestSelfHeal 自愈且跳过对话框', async () => {
+    await createMainWindow(makeAppCtx())
+    isStartupPhaseMock.mockReturnValue(true)
+    requestSelfHealMock.mockReturnValue(true) // 已触发自动重启
+
+    lastCreatedWindow!.webContents._emit(
+      'render-process-gone',
+      {},
+      { reason: 'crashed', exitCode: 1 }
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(requestSelfHealMock).toHaveBeenCalledWith('crashed', 1)
+    // 自愈重启：跳过用户对话框、不退出应用
+    expect(showMessageBoxMock).not.toHaveBeenCalled()
+    expect(appQuitMock).not.toHaveBeenCalled()
+  })
+
+  it('18. 启动期崩溃但已兼容模式仍崩（requestSelfHeal 返回 false）→ 回退到错误对话框', async () => {
+    await createMainWindow(makeAppCtx())
+    isStartupPhaseMock.mockReturnValue(true)
+    requestSelfHealMock.mockReturnValue(false) // 已兼容模式仍崩，不自愈
+
+    lastCreatedWindow!.webContents._emit(
+      'render-process-gone',
+      {},
+      { reason: 'crashed', exitCode: 1 }
+    )
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    // 自愈失败：仍走既有对话框 UX，避免无限重启
+    expect(requestSelfHealMock).toHaveBeenCalledWith('crashed', 1)
+    expect(showMessageBoxMock).toHaveBeenCalledTimes(1)
   })
 })
 

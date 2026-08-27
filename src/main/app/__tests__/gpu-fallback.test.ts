@@ -14,9 +14,20 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-const { mockGetPath, mockAppOn, diagLogMock, loggerErrorMock } = vi.hoisted(() => ({
+const {
+  mockGetPath,
+  mockAppOn,
+  mockRelaunch,
+  mockExit,
+  mockReleaseLock,
+  diagLogMock,
+  loggerErrorMock
+} = vi.hoisted(() => ({
   mockGetPath: vi.fn(),
   mockAppOn: vi.fn(),
+  mockRelaunch: vi.fn(),
+  mockExit: vi.fn(),
+  mockReleaseLock: vi.fn(),
   diagLogMock: vi.fn(),
   loggerErrorMock: vi.fn()
 }))
@@ -24,7 +35,10 @@ const { mockGetPath, mockAppOn, diagLogMock, loggerErrorMock } = vi.hoisted(() =
 vi.mock('electron', () => ({
   app: {
     getPath: mockGetPath,
-    on: mockAppOn
+    on: mockAppOn,
+    relaunch: mockRelaunch,
+    exit: mockExit,
+    releaseSingleInstanceLock: mockReleaseLock
   }
 }))
 
@@ -43,7 +57,9 @@ import {
   markBootAttempt,
   markBootSuccess,
   markGpuProcessCrash,
-  setupGpuProcessWatcher
+  setupGpuProcessWatcher,
+  recordBootDecision,
+  requestSelfHeal
 } from '../gpu-fallback'
 
 let tmpDir: string
@@ -72,8 +88,12 @@ beforeEach(() => {
   tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-fb-'))
   mockGetPath.mockReset().mockReturnValue(tmpDir)
   mockAppOn.mockReset()
+  mockRelaunch.mockReset()
+  mockExit.mockReset()
+  mockReleaseLock.mockReset()
   diagLogMock.mockReset()
   loggerErrorMock.mockReset()
+  if (process.env.NIKKI_FORCE_GPU_COMPAT) delete process.env.NIKKI_FORCE_GPU_COMPAT
 })
 
 afterEach(() => {
@@ -215,5 +235,29 @@ describe('gpu-fallback 用户偏好镜像', () => {
     writePref({ hardwareAcceleration: 'yes' }) // 字段非布尔
     expect(readHardwareAccelPref()).toBeUndefined()
     expect(() => shouldDisableHardwareAcceleration()).not.toThrow()
+  })
+})
+
+describe('gpu-fallback 自愈重启（requestSelfHeal）', () => {
+  it('a. NIKKI_FORCE_GPU_COMPAT=1 → shouldDisableHardwareAcceleration 强制 true', () => {
+    process.env.NIKKI_FORCE_GPU_COMPAT = '1'
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+  })
+
+  it('b. 硬件加速启动崩溃 → requestSelfHeal 标记并自动重启（relaunch+exit）', () => {
+    expect(recordBootDecision()).toBe(false) // 硬件加速启动
+    const healed = requestSelfHeal('crashed', 1)
+    expect(healed).toBe(true)
+    expect(mockRelaunch).toHaveBeenCalledTimes(1)
+    expect(mockExit).toHaveBeenCalledWith(0)
+    expect(readRaw().fallbackActive).toBe(true)
+  })
+
+  it('c. 已兼容模式仍崩溃 → requestSelfHeal 不重启（防死循环）', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true })
+    expect(recordBootDecision()).toBe(true) // 已兼容模式
+    const healed = requestSelfHeal('crashed', 1)
+    expect(healed).toBe(false)
+    expect(mockRelaunch).not.toHaveBeenCalled()
   })
 })
