@@ -21,7 +21,7 @@ vi.mock('electron', () => ({
 }))
 
 // 在 vi.mock 之后导入 electron，使 app/shell 指向 mock 实例便于断言
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 
 import {
   initCrashDir,
@@ -79,17 +79,13 @@ describe('initCrashDir', () => {
     expect(initCrashDir()).toBe(crashDir)
   })
 
-  it('目录不存在时自动创建', () => {
-    // 源码：initCrashDir 仅在内部 crashDir 为 falsy 时走 app.getPath('userData') 拼接路径并创建目录
-    // beforeEach 已通过 setCrashDirectory 设置内部 crashDir 为非空字符串，会导致 initCrashDir 短路返回
-    // 此处用 setCrashDirectory('') 把内部 crashDir 置为 falsy，重新触发创建分支
-    const freshParent = path.join(tmpRoot, 'fresh-userdata')
-    const freshCrashesDir = path.join(freshParent, 'crashes')
-    vi.mocked(app.getPath).mockReturnValueOnce(freshParent)
+  it('目录不存在时自动创建（用户友好目录）', () => {
+    // 源码：initCrashDir 在内部 crashDir 为 falsy 时默认输出到用户友好目录
+    // （文档/NikkiGallery/Diagnostics），并经 getUserFacingDiagDir 自动创建目录
     setCrashDirectory('')
-    expect(fs.existsSync(freshCrashesDir)).toBe(false)
-    initCrashDir()
-    expect(fs.existsSync(freshCrashesDir)).toBe(true)
+    const dir = initCrashDir()
+    expect(dir).toMatch(/NikkiGallery[\\/]Diagnostics$/)
+    expect(fs.existsSync(dir)).toBe(true)
   })
 
   it('目录已存在时不抛错', () => {

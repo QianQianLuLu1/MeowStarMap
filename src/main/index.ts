@@ -1,12 +1,18 @@
-import { app, protocol, dialog, shell } from 'electron'
+import { app, protocol } from 'electron'
 import path from 'path'
-import { diagLog, logStartupError } from './utils/startup-diagnostic'
+import fs from 'fs'
+import { diagLog, logStartupError, getStartupLogPathValue } from './utils/startup-diagnostic'
+import { verifyCriticalNativeModules, showFatalStartupErrorBox } from './app/native-load-guard'
+import { reportEarlyFatal, getUserFacingDiagDir } from './utils/early-crash-guard'
+import { verifyStartupEnvironment } from './app/startup-environment'
 import { electronLogger } from './utils/logger'
 import { registerRendererProtocol } from './app/renderer-protocol'
 import {
-  shouldDisableHardwareAcceleration,
+  recordBootDecision,
   markBootAttempt,
-  setupGpuProcessWatcher
+  setupGpuProcessWatcher,
+  requestSelfHeal,
+  wasBootInCompatMode
 } from './app/gpu-fallback'
 import { t } from './i18n'
 
@@ -14,11 +20,12 @@ import { t } from './i18n'
 // 必须放在任何可能抛错的模块级代码（registerSchemesAsPrivileged 等）之前：
 // 若在模块加载期抛错但处理器未注册，Electron 会弹阻塞式模态框导致启动挂起。
 // 提前注册可将"挂起"变成"记录诊断日志"。
-// 注意：此处只记 diagLog、不退出进程——真正的处理（弹窗 + logFault + 退出兜底）
-// 由 src/main/app/error-handlers.ts 统一负责（单一入口，在 lifecycle 中注册）。
-// 若在此提前 app.exit(1)，会抢在诊断处理器之前杀死进程，使 logFault 诊断链路成为死代码。
+// 启动最早期全局异常捕获：error-handlers.ts 在 app.initialize() 阶段才注册，
+// 此前（含原生模块加载、环境检测、窗口创建前）任何崩溃都在此兜底——同步落盘 +
+// 不依赖 i18n / 渲染进程的原生弹框 + 退出进程。中心化到 early-crash-guard.reportEarlyFatal，
+// 与 error-handlers 共用去重守卫，避免重复弹窗 / 退出。
 process.on('uncaughtException', (err) => {
-  diagLog('INDEX', `uncaughtException: ${err.message}\n${err.stack}`)
+  reportEarlyFatal(err, { stage: 'index.uncaughtException' })
 })
 process.on('unhandledRejection', (reason) => {
   diagLog('INDEX', `unhandledRejection: ${String(reason)}`)
@@ -28,6 +35,18 @@ process.on('unhandledRejection', (reason) => {
   // 避免一条边缘异步路径导致扫描进度/用户数据丢失。
 })
 
+// 崩溃转储目录用户友好化：文档/NikkiGallery/Diagnostics（须在 crashReporter.start 前设定）
+try {
+  app.setPath('crashDumps', getUserFacingDiagDir())
+} catch {
+  // crashDumps 路径不可用时沿用 electron 默认
+}
+
+// 验证专用：模拟启动最早期崩溃，验证 reportEarlyFatal 弹框+日志（仅 === '1'，默认关闭）
+if (process.env.NIKKI_EARLY_CRASH_SIM === '1') {
+  throw new Error('NIKKI_EARLY_CRASH_SIM triggered simulated early crash')
+}
+
 diagLog('INDEX', '=== index.ts loaded ===')
 
 // GPU 崩溃自动回退（VS Code 模式）：部分机器 GPU 进程无法运行时，Chromium 会以
@@ -35,7 +54,7 @@ diagLog('INDEX', '=== index.ts loaded ===')
 // ERR_FAILED(-2) 白屏（app:// 协议层无关，2026-08-19 用户机 54 个 dump 裁决）。
 // 上次已激活回退（GPU 崩溃标记或连续启动失败≥2）→ 本次启动禁用硬件加速。
 // 必须在 app ready 之前调用 disableHardwareAcceleration 才生效。
-if (shouldDisableHardwareAcceleration()) {
+if (recordBootDecision()) {
   app.disableHardwareAcceleration()
   diagLog('INDEX', 'gpu-fallback active: hardware acceleration DISABLED for this boot')
   try {
@@ -83,6 +102,31 @@ diagLog('INDEX', 'protocol.registerSchemesAsPrivileged done')
 app.whenReady().then(async () => {
   diagLog('INDEX', 'app.whenReady() fired')
 
+  // 原生模块加载预检：在加载 Application 之前确保 better-sqlite3 / koffi / sharp 可在本环境加载。
+  // 缺失 VC++ 运行库 / ABI 不匹配 / 解包缺失都会在此被捕获并弹出可操作提示，避免静默崩溃（双击无响应、无弹窗）。
+  if (!verifyCriticalNativeModules()) {
+    try {
+      app.releaseSingleInstanceLock?.()
+    } catch {}
+    app.exit(1)
+    return
+  }
+
+  // 启动期环境检测：安装路径特殊字符（仅提示）+ userData 可写性（阻塞）。
+  // 不可写（权限不足 / 杀毒软件拦截）时弹双语友好引导并终止启动，替代静默失败。
+  if (
+    !verifyStartupEnvironment({
+      getExecPath: () => process.execPath,
+      getUserDataPath: () => app.getPath('userData')
+    })
+  ) {
+    try {
+      app.releaseSingleInstanceLock?.()
+    } catch {}
+    app.exit(1)
+    return
+  }
+
   // 首个窗口导航前注册 app:// 处理器（此时 session 已可用）
   registerRendererProtocol()
   diagLog('INDEX', 'registerRendererProtocol done')
@@ -93,6 +137,14 @@ app.whenReady().then(async () => {
   setupGpuProcessWatcher()
   diagLog('INDEX', 'gpu-fallback attempt marked, watcher registered')
 
+  // 开发/测试：模拟 GPU 崩溃以演示"崩溃→自动降级→重启自愈"链路。
+  // 仅当本次为硬件加速启动（未禁用）时触发一次；进入兼容模式后的启动不再触发，避免死循环。
+  if (process.env.NIKKI_GPU_SIMULATE_CRASH === '1' && !wasBootInCompatMode()) {
+    diagLog('INDEX', 'NIKKI_GPU_SIMULATE_CRASH=1 → simulate GPU crash to exercise self-heal')
+    requestSelfHeal('simulated-gpu-crash', 1)
+    return
+  }
+
   try {
     diagLog('INDEX', 'before import Application')
     const { Application } = await import('./app/application')
@@ -101,27 +153,20 @@ app.whenReady().then(async () => {
     diagLog('INDEX', 'Application constructed, before initialize()')
     await application.initialize()
     diagLog('INDEX', 'Application.initialize() completed')
+    // 启动成功标记：供纯净系统 / CI 断言启动成功（见 docs/plans/fix-native-silent-launch.md）
+    try {
+      fs.writeFileSync(path.join(app.getPath('userData'), 'boot-ok.marker'), 'ok')
+    } catch {}
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     const stack = err instanceof Error ? err.stack : ''
     diagLog('INDEX', `FATAL ERROR in startup: ${msg}\n${stack}`)
     logStartupError('index.ts app.whenReady', err)
-    // 崩溃发生在 registerGlobalErrorHandlers 注册之前，必须在此兜底
-    const logPath = path.join(app.getPath('userData'), 'startup-errors.log')
-    try {
-      const result = await dialog.showMessageBox({
-        type: 'error',
-        title: t('main.index.dialog.startupFailedTitle'),
-        message: t('main.index.dialog.startupFailedMessage'),
-        detail: t('main.index.dialog.startupFailedDetail', { message: msg, logPath }),
-        buttons: [t('main.dialog.startupFailed.openLogDir'), t('main.index.dialog.exit')]
-      })
-      if (result.response === 0) {
-        await shell.openPath(path.dirname(logPath))
-      }
-    } catch {
-      // 弹窗失败时忽略
-    }
+    // 崩溃发生在 registerGlobalErrorHandlers 注册之前，必须在此兜底。
+    // 改用不依赖 i18n 的同步弹窗（修复原 t() 在 i18n 未就绪时二次抛错 → 无弹窗）。
+    // 日志路径统一到用户友好目录（文档/NikkiGallery/Diagnostics），普通用户易查找
+    const logPath = getStartupLogPathValue()
+    showFatalStartupErrorBox(err, logPath)
     try {
       app.releaseSingleInstanceLock?.()
     } catch {

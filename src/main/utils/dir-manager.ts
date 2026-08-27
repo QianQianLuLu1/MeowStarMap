@@ -4,6 +4,7 @@ import fsp from 'fs/promises'
 import { app } from 'electron'
 import type { DatabaseManager } from '../database/connection'
 import { logger } from './logger'
+import { getUserFacingDiagDir } from './user-diag-path'
 
 // 自定义目录设置项 key（统一 camelCase 命名规范）
 export const SETTING_KEYS = {
@@ -33,12 +34,17 @@ export function resolveCustomDir(
   if (custom && isValidDir(custom)) {
     return custom
   }
+  // 崩溃转储默认输出到用户友好目录（文档/NikkiGallery/Diagnostics），避免藏在 AppData；
+  // 与 index.ts 早期 app.setPath('crashDumps', ...) 及 crash-service.initCrashDir 对齐
+  if (key === 'crashDir') {
+    return getUserFacingDiagDir()
+  }
   return path.join(app.getPath('userData'), DEFAULT_SUBDIRS[key])
 }
 
 // 校验目录可写：存在、是目录、可写
 // P2-C10：原实现仅校验存在性和 isDirectory，注释承诺"校验可写"未兑现，导致只读目录被误认为有效
-function isValidDir(dir: string): boolean {
+export function isValidDir(dir: string): boolean {
   try {
     if (!fs.existsSync(dir)) return false
     if (!fs.statSync(dir).isDirectory()) return false

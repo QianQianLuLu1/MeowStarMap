@@ -1,8 +1,9 @@
 import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
-import { app, shell } from 'electron'
+import { shell } from 'electron'
 import { t } from '../i18n'
+import { getUserFacingDiagDir } from '../utils/user-diag-path'
 
 // T13：崩溃 dump 文件保留份数上限（建议 ≤ 20 份，避免磁盘占用膨胀）
 // P2-2：从 20 调整为 10（够用且节省空间）
@@ -34,12 +35,10 @@ let crashDir: string | null = null
  */
 export function initCrashDir(): string {
   if (crashDir) return crashDir
-  crashDir = path.join(app.getPath('userData'), 'crashes')
-  try {
-    fs.mkdirSync(crashDir, { recursive: true })
-  } catch {
-    // 目录创建失败不抛错，后续操作会回退到空列表
-  }
+  // 崩溃转储统一到用户友好目录（文档/NikkiGallery/Diagnostics），
+  // 与 index.ts 早期 app.setPath('crashDumps', ...) 保持一致，
+  // 确保 crashpad 实际写入位置 == crash-service 读取/列举位置。
+  crashDir = getUserFacingDiagDir()
   return crashDir
 }
 

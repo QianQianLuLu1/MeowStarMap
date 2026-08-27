@@ -10,19 +10,20 @@
  * 即便 dbManager / logger 都未初始化，也能记录失败原因
  */
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
-import { app } from 'electron'
+import { getUserFacingDiagDir } from './user-diag-path'
 
 let startupLogPath: string | null = null
 
 function getStartupLogPath(): string {
   if (startupLogPath) return startupLogPath
   try {
-    const userData = app.getPath('userData')
-    startupLogPath = path.join(userData, 'startup-errors.log')
+    // 用户友好目录：文档/NikkiGallery/Diagnostics（非隐藏，普通用户易查找）
+    startupLogPath = path.join(getUserFacingDiagDir(), 'startup-errors.log')
   } catch {
-    // 极端情况：app.getPath 失败，回退到 os.tmpdir
-    startupLogPath = path.join(require('os').tmpdir(), 'wxnn-startup-errors.log')
+    // 极端情况：getUserFacingDiagDir 失败，回退到 os.tmpdir
+    startupLogPath = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
   }
   return startupLogPath
 }
@@ -30,59 +31,20 @@ function getStartupLogPath(): string {
 let diagLogPath: string | null = null
 
 /**
- * 获取诊断日志路径
+ * 获取诊断日志路径。
  *
- * 关键修复：原 _diag 函数用 process.cwd()，打包后双击 exe 启动时
- * cwd = C:\Windows\System32，无写入权限，导致 try/catch 静默吞掉日志
- *
- * 路径选择优先级（确保 app.whenReady() 之前也能写入）：
- * 1. app.getPath('userData')/diag.log — whenReady 之后可用
- * 2. process.env.APPDATA/wxnn-photo-manager/diag.log — whenReady 之前可用的 Windows fallback
- * 3. os.tmpdir()/wxnn-diag.log — 最后兜底
- *
- * 注意：app.getPath('userData') 在 app.whenReady() 之前调用会抛错
- * "Cannot create app data folder before app.whenReady()"
- * 所以 index.ts 中在 whenReady 之前调用 diagLog 时，会走 fallback 2
+ * 统一输出到用户友好目录（getUserFacingDiagDir）：
+ *   文档/NikkiGallery/Diagnostics/diag.log
+ * 而非隐藏的 AppData，确保普通用户在启动失败时也能轻松找到日志。
  */
 function getDiagLogPath(): string {
   if (diagLogPath) return diagLogPath
-  // 优先尝试 app.getPath('userData')（whenReady 之后可用）
   try {
-    const userData = app.getPath('userData')
-    try {
-      if (!fs.existsSync(userData)) {
-        fs.mkdirSync(userData, { recursive: true })
-      }
-    } catch {}
-    diagLogPath = path.join(userData, 'diag.log')
-    return diagLogPath
+    diagLogPath = path.join(getUserFacingDiagDir(), 'diag.log')
   } catch {
-    // app.whenReady() 之前调用 app.getPath('userData') 会抛错。
-    // 注意：此处 fallback 不缓存（diagLogPath 保持 null），否则首次调用（whenReady 前）
-    // 会永久缓存 APPDATA，导致 app 运行期间 diag.log 永远落在 %APPDATA%，与
-    // --user-data-dir 临时目录 / e2e 采集假设不符。一旦 whenReady 后 userData 可用，
-    // 下一次调用立即切回 userData\diag.log。
-    // fallback 1：用 process.env.APPDATA（Windows 上一定存在）
-    try {
-      const appData = process.env.APPDATA
-      if (appData) {
-        const dir = path.join(appData, 'wxnn-photo-manager')
-        try {
-          if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true })
-          }
-        } catch {}
-        return path.join(dir, 'diag.log')
-      }
-    } catch {}
-    // fallback 2：os.tmpdir()
-    try {
-      return path.join(require('os').tmpdir(), 'wxnn-diag.log')
-    } catch {
-      // 最终兜底：用当前目录（虽然打包后可能无权限，但至少不会抛错）
-      return 'diag.log'
-    }
+    diagLogPath = path.join(os.tmpdir(), 'NikkiGallery-diag.log')
   }
+  return diagLogPath
 }
 
 /**

@@ -14,18 +14,24 @@ const {
   appExitMock,
   showErrorBoxMock,
   releaseLockMock,
+  shellShowItemInFolderMock,
   logFaultMock,
   logFaultSyncMock,
   getLogDirectoryMock,
-  logStartupErrorMock
+  logStartupErrorMock,
+  diagLogMock,
+  getLogDirectorySafeMock
 } = vi.hoisted(() => ({
   appExitMock: vi.fn(),
   showErrorBoxMock: vi.fn(),
   releaseLockMock: vi.fn(),
+  shellShowItemInFolderMock: vi.fn(),
   logFaultMock: vi.fn(),
   logFaultSyncMock: vi.fn(),
   getLogDirectoryMock: vi.fn(() => '/mock/logs'),
-  logStartupErrorMock: vi.fn()
+  logStartupErrorMock: vi.fn(),
+  diagLogMock: vi.fn(),
+  getLogDirectorySafeMock: vi.fn(() => '/mock/logs')
 }))
 
 vi.mock('electron', () => ({
@@ -35,6 +41,9 @@ vi.mock('electron', () => ({
   },
   dialog: {
     showErrorBox: showErrorBoxMock
+  },
+  shell: {
+    showItemInFolder: shellShowItemInFolderMock
   }
 }))
 
@@ -45,7 +54,9 @@ vi.mock('../../utils/logger', () => ({
 }))
 
 vi.mock('../../utils/startup-diagnostic', () => ({
-  logStartupError: logStartupErrorMock
+  logStartupError: logStartupErrorMock,
+  diagLog: diagLogMock,
+  getLogDirectorySafe: getLogDirectorySafeMock
 }))
 
 // 捕获 process.on 注册的监听器：用 mockImplementation 拦截，避免污染真实 process 事件
@@ -60,13 +71,17 @@ beforeEach(async () => {
   appExitMock.mockReset()
   showErrorBoxMock.mockReset()
   releaseLockMock.mockReset()
+  shellShowItemInFolderMock.mockReset()
   logFaultMock.mockReset()
   logFaultSyncMock.mockReset()
   getLogDirectoryMock.mockReset()
   logStartupErrorMock.mockReset()
+  diagLogMock.mockReset()
+  getLogDirectorySafeMock.mockReset()
 
   // 默认返回值
   getLogDirectoryMock.mockReturnValue('/mock/logs')
+  getLogDirectorySafeMock.mockReturnValue('/mock/logs')
   logFaultMock.mockResolvedValue(undefined)
   logFaultSyncMock.mockReturnValue('mock-fault-id')
 
@@ -105,14 +120,19 @@ describe('registerGlobalErrorHandlers', () => {
     expect(logStartupErrorMock).toHaveBeenCalledWith('uncaughtException', err)
   })
 
-  it('3. 首次 uncaughtException 弹出 dialog.showErrorBox，消息含 err.message', () => {
+  it('3. 首次 uncaughtException 弹出不依赖 i18n 的错误框，消息含 err.message 与用户友好日志路径', () => {
     const err = new Error('boom-first')
     uncaughtExceptionListener!(err)
     expect(showErrorBoxMock).toHaveBeenCalledTimes(1)
     const message = showErrorBoxMock.mock.calls[0][1] as string
     expect(message).toContain('boom-first')
-    // 含日志路径
-    expect(message).toContain('/mock/logs')
+    // 用户友好目录（文档/NikkiGallery/Diagnostics），不再指向隐藏 AppData
+    expect(message).toContain('NikkiGallery')
+    expect(message).toContain('启动失败')
+    // 崩溃后高亮日志文件（资源管理器定位）
+    expect(shellShowItemInFolderMock).toHaveBeenCalledWith(
+      expect.stringContaining('startup-errors.log')
+    )
   })
 
   it('4. 第二次 uncaughtException 不再弹窗（hasShownRuntimeErrorDialog 闭包状态）', () => {
@@ -159,13 +179,13 @@ describe('registerGlobalErrorHandlers', () => {
     expect(appExitMock).toHaveBeenCalledWith(1)
   })
 
-  it('10. getLogDirectory 抛错时弹窗消息含 "<未知>"', () => {
+  it('10. getLogDirectory 抛错时仍弹出友好错误框（不再依赖 t()/getLogDirectory）', () => {
     getLogDirectoryMock.mockImplementation(() => {
       throw new Error('log dir not initialized')
     })
     uncaughtExceptionListener!(new Error('trigger'))
     expect(showErrorBoxMock).toHaveBeenCalledTimes(1)
     const message = showErrorBoxMock.mock.calls[0][1] as string
-    expect(message).toContain('<未知>')
+    expect(message).toContain('NikkiGallery')
   })
 })

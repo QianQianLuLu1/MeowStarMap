@@ -12,6 +12,23 @@ import fsp from 'fs/promises'
 import path from 'path'
 import os from 'os'
 
+// 用 vi.hoisted 暴露可在 vi.mock 工厂内访问的可变基准目录
+const { getTmpBase, setTmpBase } = vi.hoisted(() => {
+  let base = ''
+  return {
+    getTmpBase: () => base,
+    setTmpBase: (b: string) => {
+      base = b
+    }
+  }
+})
+
+// 仅覆写 os.homedir，使其落到测试临时目录，避免 fallback 路径在真实用户目录下建目录
+vi.mock('os', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('os')>()
+  return { ...actual, homedir: () => getTmpBase() || actual.homedir() }
+})
+
 // 当前用例的 mock userData 路径
 let mockUserData: string
 // 当前用例的 mock app.getPath 实现（每个用例独立以便测试抛错场景）
@@ -34,11 +51,12 @@ describe('startup-diagnostic', () => {
 
   beforeEach(async () => {
     tmpBase = await fsp.mkdtemp(path.join(os.tmpdir(), 'wxnn-startup-test-'))
+    setTmpBase(tmpBase)
     mockUserData = path.join(tmpBase, 'userData')
     await fsp.mkdir(mockUserData, { recursive: true })
     mockGetPathImpl = (name: string) => {
       if (name === 'userData') return mockUserData
-      return `/mock/${name}`
+      return path.join(tmpBase, name)
     }
     // 重置模块缓存，确保 startupLogPath 重新计算
     vi.resetModules()
@@ -52,10 +70,11 @@ describe('startup-diagnostic', () => {
   })
 
   describe('getStartupLogPathValue', () => {
-    it('返回 userData/startup-errors.log 路径', async () => {
+    it('返回用户友好目录下的 startup-errors.log 路径', async () => {
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
-      expect(p).toBe(path.join(mockUserData, 'startup-errors.log'))
+      // 关键：日志落在用户友好的 NikkiGallery/Diagnostics，而非隐藏的 AppData
+      expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
     })
 
     it('多次调用返回相同路径（缓存）', async () => {
@@ -65,14 +84,14 @@ describe('startup-diagnostic', () => {
       expect(p1).toBe(p2)
     })
 
-    it('app.getPath 抛错时回退到 os.tmpdir', async () => {
+    it('app.getPath 抛错时回退到用户友好目录（文档/NikkiGallery/Diagnostics）', async () => {
       // 配置 getPath 抛错（模拟 app 未就绪）
       mockGetPathImpl = () => {
         throw new Error('app not ready')
       }
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
-      expect(p).toBe(path.join(os.tmpdir(), 'wxnn-startup-errors.log'))
+      expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
     })
   })
 
@@ -174,7 +193,7 @@ describe('startup-diagnostic', () => {
       expect(content).toContain('first-write')
     })
 
-    it('app.getPath 抛错时回退到 os.tmpdir 仍能写入', async () => {
+    it('app.getPath 抛错时回退到用户友好目录仍能写入', async () => {
       mockGetPathImpl = () => {
         throw new Error('app not ready')
       }
@@ -182,7 +201,7 @@ describe('startup-diagnostic', () => {
       // 即使 getPath 抛错，logStartupError 也不应抛错
       expect(() => logStartupError('fallback', new Error('test'))).not.toThrow()
       const logPath = getStartupLogPathValue()
-      expect(logPath).toBe(path.join(os.tmpdir(), 'wxnn-startup-errors.log'))
+      expect(logPath).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
       // 清理可能存在的临时文件
       if (fs.existsSync(logPath)) {
         fs.unlinkSync(logPath)
