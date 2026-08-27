@@ -115,6 +115,31 @@ export default [
     }
   },
   {
+    // 原生模块加载预检：在 i18n 初始化之前运行，必须能在 i18n 不可用时弹出可读的中文错误提示，
+    // 否则会重现“原生模块加载失败 → t() 二次抛错 → 无弹窗”的静默崩溃。与 logger.ts 同款豁免。
+    files: ['src/main/app/native-load-guard.ts'],
+    rules: {
+      'no-restricted-syntax': 'off'
+    }
+  },
+  {
+    // 启动期环境检测：在 i18n 初始化之前运行（app.whenReady 内、加载 Application 之前），
+    // 检测 userData 可写性与安装路径特殊字符，必须能在 i18n 不可用时弹出可读的中文双语引导，
+    // 否则会重现“权限/路径问题 → t() 二次抛错 → 静默失败”。与 native-load-guard.ts 同款豁免。
+    files: ['src/main/app/startup-environment.ts'],
+    rules: {
+      'no-restricted-syntax': 'off'
+    }
+  },
+  {
+    // 启动最早期致命处理：在 i18n 初始化之前即可运行，必须能在 i18n 不可用时弹出可读的中文双语错误提示，
+    // 否则会重现“启动早期崩溃 → t() 二次抛错 → 无弹窗”的静默崩溃。与 native-load-guard.ts 同款豁免。
+    files: ['src/main/utils/early-crash-guard.ts'],
+    rules: {
+      'no-restricted-syntax': 'off'
+    }
+  },
+  {
     // 测试文件豁免：断言与 fixture 合法包含中文（主进程测试使用真实 zh-CN 语言包做断言），
     // 对测试关闭中文/console 检测。必须置于 src/** 块之后。
     // Storybook stories 同款豁免：示例文案/文档描述允许中文，与 *.test.* 同等待遇。

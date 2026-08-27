@@ -108,6 +108,7 @@
     "fluent-ffmpeg": "^2.1.3",
     "i18next": "^26.3.6",
     "koffi": "^3.1.1",
+    "masonic": "^4.1.0",
     "motion": "^12.42.2",
     "network-address": "^1.1.2",
     "pluggable-electron": "^1.0.0",
@@ -233,6 +234,7 @@
     "npmRebuild": true,
     "asar": true,
     "compression": "maximum",
+    "afterPack": "scripts/after-pack-vc-runtime.cjs",
     "artifactName": "NikkiGallery-Setup-${version}.${ext}",
     "win": {
       "target": [
@@ -246,7 +248,7 @@
       "icon": "resources/icons/icon.ico",
       "signAndEditExecutable": false,
       "verifyUpdateCodeSignature": false,
-      "requestedExecutionLevel": "requireAdministrator"
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
