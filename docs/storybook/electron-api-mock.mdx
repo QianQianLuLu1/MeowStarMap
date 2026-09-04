@@ -1,0 +1,113 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Storybook/ElectronAPI 桩" />
+
+# window.electronAPI 全局桩机制
+
+Storybook 中没有 Electron 主进程，所有渲染层组件通过 `window.electronAPI?.xxx.yyy()`
+可选链访问的 IPC 能力由一个全局安全桩（`.storybook/mocks/electron-api.ts`）兜底。
+
+## 桩是什么
+
+`.storybook/preview.ts` 启动时调用 `installElectronApiMock()`：仅当 `window.electronAPI`
+缺失时，挂载一个**双层 Proxy**：
+
+- 第一层：任意命名空间（`app` / `media` / `file` / `scanner` / …）都返回一个子 Proxy；
+- 第二层：命名空间下任意方法调用都会 `console.debug('[storybook] electronAPI.<ns>.<method>() called')`
+  并 `resolve(undefined)`。
+
+效果：任何组件在故事中挂载、点击触发 IPC 都不会抛错，最坏情况是拿到 `undefined`
+后走组件自身的兜底分支（空数据 / 错误提示）。
+
+```ts
+// .storybook/mocks/electron-api.ts（核心逻辑示意）
+export function createElectronApiMock() {
+  return new Proxy(
+    {},
+    {
+      get(target, prop) {
+        const namespace = String(prop)
+        return new Proxy(
+          {},
+          {
+            get(_inner, method) {
+              return (...args) => {
+                console.debug(
+                  `[storybook] electronAPI.${namespace}.${String(method)}() called`,
+                  args
+                )
+                return Promise.resolve(undefined)
+              }
+            }
+          }
+        )
+      }
+    }
+  )
+}
+```
+
+## 什么时候需要覆盖桩
+
+桩默认 `resolve(undefined)`，只能保证"不崩"。当故事需要**具体返回值**才能展示有意义的
+状态时（更新推送、扫描进度、删除结果等），在 story 内覆盖。**覆盖规则见 `docs/组件文档规范.md` §4**，
+要点如下：
+
+1. **整体替换**：桩是双层 Proxy 且没有 `set` trap，直接写属性（如 `window.electronAPI!.app = {...}`）
+   会被静默丢弃。必须整体替换 `window.electronAPI`；
+2. **还原**：在 `beforeEach` 返回的清理函数中还原回原桩对象，避免污染其他故事；
+3. **注明**：在故事注释或 `parameters.docs.description` 中写明用到的命名空间与方法
+   （如 `app.onUpdate`、`log.exportZip`）。
+
+```tsx
+// 覆盖模板（参考 UpdateDialog.stories.tsx 的 mockAppNamespace 写法）
+type Win = { electronAPI?: Record<string, unknown> }
+
+function mockAppNamespace() {
+  return () => {
+    const w = window as unknown as Win
+    const prevApi = w.electronAPI // 保存原桩
+    w.electronAPI = {
+      app: {
+        onUpdate: (cb) => {
+          const timer = setTimeout(
+            () => cb({ stage: 'available', version: '2.4.0', releaseNotes: '- 演示' }),
+            50
+          )
+          return () => clearTimeout(timer)
+        },
+        downloadUpdate: async () => undefined,
+        installUpdate: async () => undefined
+      },
+      shell: { openExternal: async () => undefined }
+    }
+    return () => {
+      w.electronAPI = prevApi // 清理时还原，避免污染其他故事
+    }
+  }
+}
+
+export const Available: Story = {
+  beforeEach: mockAppNamespace()
+}
+```
+
+## 已被现有故事覆盖的命名空间示例
+
+| 故事文件                 | 覆盖的命名空间与方法                                                              | 目的                 |
+| ------------------------ | --------------------------------------------------------------------------------- | -------------------- |
+| `UpdateDialog.stories`   | `app.onUpdate` / `app.downloadUpdate` / `app.installUpdate`、`shell.openExternal` | 推送更新状态机各阶段 |
+| `FeedbackDialog.stories` | `log.*`（反馈日志上报）                                                           | 演示反馈提交流程     |
+
+其余大量故事直接依赖全局桩的默认行为（`resolve(undefined)`），无需覆盖：
+
+- `GalleryToolbar.stories` 的扫描按钮：`scanner.onProgress` / `scanner.onComplete` 注册后无事件推送，静态安全；
+- `Sidebar.stories` 挂载时的 `profile.list`：返回 `undefined` 后组件捕获异常回退为空档案列表；
+- `TagManager.stories` 的 `mediaAction.updateTags`：resolve 后本地 store 即时更新，交互可演示；
+- `FullscreenViewer.stories` 的 `file.delete` / `dialog.selectDirectory`：仅在点击时触碰，桩兜底不抛错。
+
+## 相关约定（组件源码侧）
+
+- 组件源码一律以可选链 `window.electronAPI?.xxx.yyy()` 访问 IPC，story 不得假设真实主进程存在；
+- 媒体资源在故事中使用 data URL 占位，不使用真实本地路径与 `media://` 协议
+  （`toFileUrl()` 对 `data:` / `blob:` 前缀原样返回，见 `src/renderer/utils/file.ts`）。

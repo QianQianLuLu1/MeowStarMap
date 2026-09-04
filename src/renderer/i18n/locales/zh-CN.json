@@ -1,0 +1,4219 @@
+{
+  "appShell": {
+    "categoriesSummary": "共 {{count}} 个分类",
+    "detailPosition": "{{current}} / {{total}}",
+    "duplicatesHint": "扫描并清理重复文件",
+    "editorMode": "编辑模式（按 Esc 退出全屏）",
+    "favoritesSummary": "收藏 {{count}} 项",
+    "feedbackButton": "反馈",
+    "gallerySummary": "共 {{total}} 个文件（图片 {{images}} · 视频 {{videos}}）",
+    "imagesVideosSummary": "图片 {{images}} · 视频 {{videos}}",
+    "ready": "准备就绪",
+    "recycleBinHint": "文件可恢复或彻底删除",
+    "recycleBinSummary": "回收站 {{count}} 项",
+    "selectedCount": "已选择 {{count}} 项",
+    "settingsHint": "配置应用偏好",
+    "storageUsage": "占用 {{size}}",
+    "viewStatus": {
+      "categories": "分类管理",
+      "detail": "详情",
+      "duplicates": "重复文件检测",
+      "editor": "编辑器",
+      "favorites": "收藏",
+      "resonanceRecords": "共鸣录",
+      "gallery": "图库",
+      "launcherCache": "缓存",
+      "recycleBin": "回收站",
+      "settings": "设置"
+    }
+  },
+  "categories": {
+    "iconLabel": {
+      "calendar": "日期",
+      "camera": "相机",
+      "folder": "文件夹",
+      "heart": "喜欢",
+      "image": "图片",
+      "location": "地点",
+      "palette": "调色",
+      "sparkles": "精选",
+      "star": "收藏",
+      "tag": "标签",
+      "user": "人物",
+      "video": "视频"
+    },
+    "page": {
+      "title": "分类管理",
+      "assign": {
+        "emptyMedia": "暂无媒体文件",
+        "failedToast": "归类失败",
+        "nextPage": "下一页",
+        "noMatch": "未找到匹配的文件",
+        "pageRange": "第 {{start}}-{{end}} 项，共 {{total}} 项",
+        "prevPage": "上一页",
+        "searchPlaceholder": "搜索文件名...",
+        "subtitle": "选择要归入「{{name}}」的媒体文件",
+        "successToast": "已更新 {{count}} 个文件的分类",
+        "title": "归类媒体"
+      },
+      "create": {
+        "colorTitle": "选择颜色",
+        "failedToast": "创建失败",
+        "namePlaceholder": "分类名称",
+        "noParent": "无父分类",
+        "submit": "创建",
+        "successToast": "分类创建成功",
+        "title": "新建分类"
+      },
+      "delete": {
+        "confirmMessage": "确定删除分类 \"{{name}}\" 吗？关联的媒体文件不会被删除。",
+        "confirmTitle": "删除分类",
+        "failedToast": "删除失败",
+        "successToast": "分类删除成功"
+      },
+      "list": {
+        "assignMedia": "归类媒体",
+        "collapse": "折叠子分类",
+        "dragHint": "拖拽到其他分类上可设置为子分类",
+        "edit": "编辑",
+        "expand": "展开子分类",
+        "hierarchyFailedToast": "调整失败",
+        "hierarchySuccessToast": "分类层级调整成功",
+        "iconTitle": "图标: {{icon}}",
+        "invalidDragToast": "不能将分类拖入其子分类中",
+        "itemCount": "{{count}} 项",
+        "moveDown": "下移",
+        "moveUp": "上移",
+        "reorderFailedToast": "排序调整失败",
+        "subCategoryCount": "+{{count}} 子分类",
+        "systemDragDisabled": "系统分类不支持拖拽",
+        "systemTag": "系统",
+        "title": "分类列表（拖拽可调整层级，点击箭头折叠/展开）"
+      },
+      "scene": {
+        "clearFilter": "清除筛选",
+        "multiSelectHint": "按住 Ctrl / Cmd 点击可多选",
+        "selectAll": "全选游戏分类",
+        "tip": "提示：按住 Ctrl / Cmd 点击可同时选择多个场景分类；点击后自动跳转图库并应用筛选。",
+        "title": "游戏内场景",
+        "unselectAll": "取消全选"
+      },
+      "sceneTime": {
+        "analyzeButton": "分析时段",
+        "analyzedToast": "已分析 {{count}} 张图片的场景时段",
+        "analyzingButton": "分析中…",
+        "analyzeFailedToast": "分析失败",
+        "clearFilter": "清除筛选",
+        "multiSelectHint": "按住 Ctrl / Cmd 点击可多选",
+        "selectAll": "全选时段",
+        "subtitle": "基于图像亮度自动识别，可在「设置 → 扫描」中触发批量分析",
+        "tip": "提示：场景时段需先在「设置」中执行批量分析才会生成；分析仅针对图片，视频不参与。",
+        "title": "场景时段",
+        "unselectAll": "取消全选"
+      },
+      "update": {
+        "failedToast": "更新失败",
+        "successToast": "分类更新成功"
+      }
+    },
+    "system": {
+      "people": "人物",
+      "location": "地点",
+      "scene": "场景",
+      "screenshot": "截图",
+      "recording": "录屏",
+      "recent": "最近",
+      "favorite": "收藏"
+    }
+  },
+  "common": {
+    "all": "全部",
+    "apply": "应用",
+    "back": "返回",
+    "cancel": "取消",
+    "clear": "清除",
+    "close": "关闭",
+    "confirm": "确认",
+    "contextMenu": {
+      "ariaLabel": "上下文菜单",
+      "submenuAriaLabel": "{{label}} 子菜单"
+    },
+    "copied": "已复制",
+    "copy": "复制",
+    "corruptedBadge": {
+      "label": "已损坏",
+      "labelSm": "损坏",
+      "title": "文件损坏，无法读取",
+      "titleWithReason": "文件损坏：{{reason}}"
+    },
+    "default": "默认",
+    "delete": "删除",
+    "error": "错误",
+    "export": "导出",
+    "failed": "失败",
+    "feedbackDialog": {
+      "attachLogsLabel": "附带最近日志（推荐，便于定位问题）",
+      "attachSystemInfoLabel": "附带系统信息（版本、操作系统、硬件）",
+      "attachmentsLabel": "附加信息",
+      "closeAriaLabel": "关闭",
+      "contactLabel": "联系方式",
+      "copyFailed": "复制失败，请手动选择文本",
+      "copySuccess": "{{label}} 已复制到剪贴板",
+      "descriptionLabel": "问题描述",
+      "descriptionPlaceholder": "请简要描述您遇到的问题（可选）...",
+      "exportButton": "导出诊断包",
+      "exportFailed": "导出失败",
+      "exportHint": "诊断包包含日志、崩溃文件、系统信息，导出后可通过下方联系方式反馈给开发者。",
+      "exportSuccess": "诊断包已导出，请通过下方联系方式反馈给开发者",
+      "exporting": "正在导出...",
+      "githubCopyHint": "点击复制链接",
+      "githubLabel": "GitHub Issues",
+      "githubName": "GitHub Issues 链接",
+      "githubValue": "https://github.com/your-repo/issues",
+      "qqGroupCopyHint": "点击复制群号",
+      "qqGroupLabel": "QQ 群",
+      "qqGroupName": "QQ 群号",
+      "qqGroupValue": "QQ群: 123456789",
+      "title": "问题反馈"
+    },
+    "import": "导入",
+    "invertSelection": "反选",
+    "loadFailed": "加载失败",
+    "loading": "加载中...",
+    "missingBadge": {
+      "label": "已丢失",
+      "labelSm": "丢失"
+    },
+    "move": "移动",
+    "no": "否",
+    "ok": "确定",
+    "processing": "处理中...",
+    "propertiesDialog": {
+      "basic": {
+        "createdAt": "创建时间",
+        "modifiedAt": "修改时间",
+        "name": "名称",
+        "path": "路径",
+        "resolution": "分辨率",
+        "size": "大小",
+        "type": "类型",
+        "typeImage": "图片",
+        "typeVideo": "视频"
+      },
+      "copied": "已复制",
+      "copyAll": "复制全部",
+      "copyAllTitle": "复制完整属性信息",
+      "copySection": {
+        "aperture": "光圈",
+        "cameraModel": "相机型号",
+        "dateTaken": "拍摄时间",
+        "fileInfo": "=== 文件信息 ===",
+        "focalLength": "焦距",
+        "lens": "镜头",
+        "originalSize": "原始尺寸",
+        "shootingParams": "=== 拍摄参数 ===",
+        "shutter": "快门速度"
+      },
+      "openLocation": "所在位置",
+      "openLocationTitle": "在资源管理器中显示",
+      "title": "文件属性"
+    },
+    "refresh": "刷新",
+    "rename": "重命名",
+    "reset": "重置",
+    "restore": "恢复",
+    "retry": "重试",
+    "save": "保存",
+    "search": "搜索",
+    "select": "选择",
+    "selectAll": "全选",
+    "shareCodeDecoder": {
+      "apiUnavailable": "API 不可用",
+      "closeAriaLabel": "关闭",
+      "decodeButton": "解码",
+      "decodeSuccess": "解码成功",
+      "decoding": "正在解码...",
+      "descriptions": {
+        "clothDiy": "染色分享码可从游戏内染色功能获取。网络解码需要连接游戏服务器，离线状态下仅可提取时间戳和 UID。",
+        "homeBuild": "家园建造分享码可从游戏内家园建造功能获取。网络解码需要连接游戏服务器。",
+        "mediaEncrypt": "将相机参数 JSON 加密为密文（Base64 格式）。可用于测试解密流程或创建自定义参数。"
+      },
+      "encryptButton": "加密",
+      "encryptSuccess": "加密成功",
+      "operationFailed": "操作失败",
+      "placeholders": {
+        "clothDiy": "粘贴游戏内染色分享码...",
+        "homeBuild": "粘贴游戏内家园建造分享码...",
+        "mediaEncrypt": "粘贴相机参数 JSON..."
+      },
+      "result": {
+        "encryptedResult": "加密结果 (Base64)",
+        "networkData": "网络数据",
+        "networkUnavailable": "网络解码不可用（可能需要联网）",
+        "serverId": "服务器 ID",
+        "timestamp": "时间戳"
+      },
+      "tabs": {
+        "clothDiy": "染色分享码",
+        "homeBuild": "家园建造码",
+        "mediaEncrypt": "相机参数加密"
+      },
+      "title": "分享码工具",
+      "unknownError": "未知错误"
+    },
+    "success": "成功",
+    "warning": "警告",
+    "yes": "是"
+  },
+  "detail": {
+    "actions": {
+      "backToGallery": "返回图库",
+      "deleteConfirmMessage": "确定将 \"{{fileName}}\" 移至回收站吗？",
+      "deleteFailed": "删除失败",
+      "deleteTitle": "删除文件",
+      "edit": "编辑",
+      "operationFailed": "操作失败",
+      "ratingAria": "评分 {{n}}",
+      "ratingFailed": "评分失败",
+      "saveAs": "另存为",
+      "saveAsFailed": "另存为失败",
+      "saveAsSuccess": "另存为成功",
+      "tags": "标签"
+    },
+    "editorMetadata": {
+      "exportedAt": "导出时间",
+      "filter": "滤镜",
+      "intensity": "强度",
+      "loading": "正在读取编辑参数...",
+      "lut": "LUT",
+      "restore": "恢复到编辑器",
+      "restoreTooltip": "将此图片的编辑参数恢复到编辑器中继续调整",
+      "title": "编辑参数",
+      "watermark": "水印",
+      "yes": "已应用"
+    },
+    "emptyTitle": "未选择媒体文件",
+    "dressing": {
+      "copyHeader": "=== 搭配 ===",
+      "emptyText": "此图片未包含搭配信息",
+      "eureka": {
+        "label": "祝福闪光"
+      },
+      "loadingText": "正在解析搭配信息...",
+      "title": "搭配"
+    },
+    "exif": {
+      "aperture": "光圈",
+      "cameraModel": "相机型号",
+      "copied": "已复制",
+      "copyAriaLabel": "复制相机参数",
+      "copyFullTitle": "复制完整相机参数",
+      "copyLabel": "复制参数",
+      "emptyText": "此图片未包含相机参数信息",
+      "errorPrefix": "EXIF 解析失败",
+      "focalLength": "焦距",
+      "gamePhotoEmpty": "游戏内照片不包含 EXIF 数据，请查看下方游戏参数",
+      "gps": "拍摄位置",
+      "lens": "镜头",
+      "dateTaken": "拍摄时间",
+      "loadingText": "正在解析相机参数...",
+      "originalSize": "原始尺寸",
+      "panelTitle": "拍摄参数",
+      "shutter": "快门速度",
+      "title": "EXIF 信息",
+      "viewOnMap": "在地图中查看"
+    },
+    "fields": {
+      "favorite": "收藏",
+      "favorited": "已收藏",
+      "notFavorited": "未收藏",
+      "sceneTime": "场景时段",
+      "type": "类型"
+    },
+    "interaction": {
+      "carrier": {
+        "label": "载具"
+      },
+      "copyHeader": "=== 交互物 ===",
+      "emptyText": "此图片未包含交互物信息",
+      "format": {
+        "location": "位置",
+        "rotation": "旋转",
+        "scale": "缩放"
+      },
+      "loadingText": "正在解析交互物信息...",
+      "mount": {
+        "label": "坐骑"
+      },
+      "none": "无",
+      "object": {
+        "label": "交互物{{n}}"
+      },
+      "title": "交互物"
+    },
+    "missing": {
+      "removeFailed": "移除失败",
+      "removeFromLibrary": "从库中移除",
+      "removeSuccess": "已从库中移除丢失记录",
+      "warningText": "文件已被移动或删除，无法正常显示。建议从库中移除该记录。"
+    },
+    "nikki": {
+      "copyHeader": "=== 暖暖信息 ===",
+      "emptyText": "此图片未包含暖暖信息",
+      "giantState": {
+        "label": "巨大化",
+        "off": "未开启",
+        "on": "已开启"
+      },
+      "hidden": {
+        "label": "隐藏暖暖",
+        "off": "未隐藏",
+        "on": "已隐藏"
+      },
+      "loadingText": "正在解析暖暖信息...",
+      "location": {
+        "label": "位置"
+      },
+      "rotation": {
+        "label": "旋转"
+      },
+      "scale": {
+        "label": "缩放"
+      },
+      "title": "暖暖信息"
+    },
+    "outfit": {
+      "add": "添加",
+      "clearFailed": "清除套装失败",
+      "edit": "编辑",
+      "emptyValue": "未标注套装",
+      "inputPlaceholder": "输入套装名称或从下方选择",
+      "maxLengthError": "套装名称不能超过 100 字符",
+      "saveFailed": "保存套装失败",
+      "selectPresetPlaceholder": "从预设中选择…",
+      "title": "套装标注"
+    },
+    "photography": {
+      "copyHeader": "=== 拍摄信息 ===",
+      "date": {
+        "dayValue": "第 {{day}} 天",
+        "label": "拍摄日期"
+      },
+      "edit": {
+        "edited": "已编辑",
+        "editedWithDetails": "已编辑（{{details}}）",
+        "label": "是否编辑",
+        "notEdited": "未编辑",
+        "sticker": "贴纸",
+        "text": "文字"
+      },
+      "emptyText": "此图片未包含拍摄信息",
+      "loadingText": "正在解析拍摄信息...",
+      "location": {
+        "label": "拍摄地点"
+      },
+      "photoWall": {
+        "joinedValue": "已加入 ({{count}} 张)",
+        "label": "照片墙",
+        "notJoined": "未加入"
+      },
+      "task": {
+        "interactiveFallback": "拍摄任务(#{{tag}})",
+        "label": "拍摄任务",
+        "none": "无任务",
+        "puzzleFallback": "错位摄影(#{{tag}})",
+        "risk": "惊险拍摄"
+      },
+      "time": {
+        "label": "拍摄时间"
+      },
+      "title": "拍摄信息",
+      "weather": {
+        "label": "天气",
+        "typeValue": "类型 {{type}}"
+      }
+    },
+    "video": {
+      "codec": "编码",
+      "duration": "时长",
+      "frameRate": "帧率",
+      "title": "视频信息"
+    },
+    "zoomable": {
+      "ariaLabel": "查看大图，滚轮缩放，双击重置",
+      "resetButton": "复位",
+      "resetZoom": "重置缩放"
+    }
+  },
+  "errorFallback": {
+    "componentStack": "组件堆栈:",
+    "copied": "已复制",
+    "copyError": "复制错误信息",
+    "errorMessage": "错误消息:",
+    "errorStack": "错误堆栈:",
+    "hideDetail": "隐藏错误详情",
+    "openLogDir": "打开日志目录",
+    "reload": "重新加载",
+    "showDetail": "显示错误详情",
+    "subtitle": "应用遇到未预期的错误，已自动记录到日志",
+    "title": "页面加载失败",
+    "routeTitle": "该页面加载出错",
+    "routeRetry": "重试",
+    "zoneTitle": "该区域加载失败",
+    "zoneRetry": "重试",
+    "zoneDegraded": "多次重试仍失败，请切换视图或重新打开此板块",
+    "ipcFailed": "IPC 调用失败"
+  },
+  "dialog": {
+    "exportFormat": "格式转换",
+    "exportLivePhoto": "导出 Live Photo",
+    "exportSpeed": "导出调速视频",
+    "exportTrim": "导出裁剪视频",
+    "sameFormat": "目标格式与原格式相同",
+    "selectDirUnsupported": "当前环境不支持选择目录",
+    "trimTooShort": "裁剪区间过短，请调整起止时间"
+  },
+  "duplicates": {
+    "ariaCollapse": "折叠分组",
+    "ariaCollapseBtn": "折叠",
+    "ariaExpand": "展开分组",
+    "ariaExpandBtn": "展开",
+    "ariaGroupToggle": "重复文件 {{name}}",
+    "backToGallery": "返回图库",
+    "confirmMessage": "将把选中的 {{count}} 个{{type}}移至回收站。\n此操作可通过回收站恢复，但会从图库中隐藏。\n确定继续吗？",
+    "confirmTitle": "移至回收站",
+    "emptyExact": "已扫描 {{count}} 个文件，全部唯一",
+    "emptySimilarCompared": "已比对 {{count}} 张图片，未发现相似组",
+    "emptySimilarNoPhash": "尚无图片计算 pHash，请点击「补算 pHash」",
+    "exactDesc": "完全相同文件（基于内容 hash）",
+    "favoriteTooltip": "已收藏",
+    "foundGroups": "发现 {{groups}} 组{{type}}，共 {{files}} 个文件",
+    "groupExact": "{{count}} 个相同文件",
+    "groupImageTag": "图片",
+    "groupReleasable": "可释放",
+    "groupSelected": "已选 {{count}}",
+    "groupSimilar": "{{count}} 张相似图片",
+    "groupSingleSize": "单个 {{size}}",
+    "groupVideoTag": "视频",
+    "loadingExact": "正在读取文件并计算 hash，请稍候…",
+    "loadingHintExact": "大文件较多时可能需要数秒",
+    "loadingHintSimilar": "图片较多时为 O(n²) 比较，请耐心等待",
+    "loadingSimilar": "正在比对感知哈希，请稍候…",
+    "markButton": "智能标记重复",
+    "markCompleted": "重复标记完成：{{groups}} 组，{{marked}} 个重复文件已隐藏",
+    "markFailed": "重复标记失败",
+    "markNoGroups": "未发现重复组（pHash 极严格阈值 ≤2）",
+    "markingButton": "标记中…",
+    "modeExact": "精确重复",
+    "modeLabel": "检测模式",
+    "modeSimilar": "相似检测",
+    "moveToTrash": "移至回收站",
+    "noDuplicates": "未发现重复文件",
+    "noFilesSelected": "未选择任何文件",
+    "noSimilar": "未发现相似图片",
+    "phashAllDone": "无可补算的图片，所有图片均已计算 pHash",
+    "phashButton": "补算 pHash",
+    "phashCalculating": "补算中…",
+    "phashCompleted": "pHash 补算完成：处理 {{processed}}/{{total}} 张",
+    "phashFailed": "pHash 补算失败",
+    "phashRecalcNow": "立即补算 pHash",
+    "pleaseSelect": "请先选择要删除的文件",
+    "ratingTooltip": "评分 {{rating}}",
+    "recommendKeep": "推荐保留",
+    "recommendTooltip": "评分推荐保留：分辨率+文件大小+拍摄时间+收藏加权",
+    "rescan": "重新扫描",
+    "scanFailed": "扫描失败",
+    "selectedToDelete": "已选择 {{count}} 项待删除",
+    "similarDesc": "视觉相似图片（基于感知哈希）· 仅图片参与",
+    "strategy": {
+      "bestQuality": "保留最佳画质",
+      "favorited": "保留收藏",
+      "largest": "保留最大",
+      "newest": "保留最新",
+      "smallest": "保留最小"
+    },
+    "strategyAll": "全部{{label}}",
+    "strategyApplied": "已按\"{{strategy}}\"策略选中 {{count}} 个文件",
+    "strategyTooltipBest": "按评分（分辨率+文件大小+拍摄时间+收藏）推荐保留，选中其余",
+    "strategyTooltipFavorited": "每组优先保留收藏的文件，选中其余",
+    "strategyTooltipGroupBest": "按评分推荐保留最佳画质（分辨率+文件大小+拍摄时间+收藏）",
+    "strategyTooltipGroupFavorited": "保留组内收藏",
+    "strategyTooltipGroupLargest": "保留组内最大",
+    "strategyTooltipGroupNewest": "保留组内最新",
+    "strategyTooltipLargest": "每组保留最大的文件，选中其余",
+    "strategyTooltipNewest": "每组保留最新修改的文件，选中其余",
+    "subtitleExact": "基于完整 sha256 内容 hash 精确检测",
+    "subtitleFailed": "扫描失败",
+    "subtitleMeta": "扫描 {{scanned}} 个文件 · 发现 {{groups}} 组{{type}} · 可释放 {{size}}",
+    "subtitleScanningExact": "正在计算文件 hash…",
+    "subtitleScanningSimilar": "正在比对感知哈希…",
+    "subtitleSimilar": "基于 pHash 感知哈希 + 汉明距离相似聚类",
+    "subtitleSimilarMeta": "阈值 {{threshold}} · 已哈希 {{hashed}}",
+    "threshold": {
+      "default": "默认",
+      "defaultHint": "同一场景/构图",
+      "loose": "宽松",
+      "looseHint": "相似主体/色调",
+      "veryLoose": "极宽松",
+      "veryLooseHint": "可能误判较多",
+      "veryStrict": "极严格",
+      "veryStrictHint": "几乎相同（仅细微差异）"
+    },
+    "thresholdGroupLabel": "相似度阈值",
+    "thresholdLabel": "相似度",
+    "titleExact": "重复文件检测",
+    "titleSimilar": "相似图片检测",
+    "toolbarLabel": "重复文件操作",
+    "typeExact": "重复",
+    "typeSimilar": "相似",
+    "unsupported": "当前环境不支持检测",
+    "unsupportedDelete": "当前环境不支持删除",
+    "unsupportedExact": "当前环境不支持重复检测",
+    "unsupportedMark": "当前环境不支持重复标记",
+    "unsupportedPhash": "当前环境不支持 pHash 补算",
+    "unsupportedSimilar": "当前环境不支持相似检测",
+    "videoBadge": "视频",
+    "task": {
+      "calculateEta": "计算中...",
+      "cancel": "取消",
+      "cancelAria": "取消任务",
+      "cancelFailed": "取消失败",
+      "cancelRequested": "已请求取消，正在停止...",
+      "cancelUnsupported": "当前环境不支持取消",
+      "cancelled": "已取消",
+      "cancelling": "正在取消...",
+      "exactCancelled": "重复检测已取消",
+      "remainingTime": "剩余 {{time}}",
+      "similarCancelled": "相似检测已取消"
+    }
+  },
+  "editor": {
+    "basic": {
+      "blacks": "黑色色阶",
+      "brightness": "亮度",
+      "clarity": "清晰度",
+      "contrast": "对比度",
+      "dehaze": "去雾",
+      "denoise": "降噪",
+      "highlights": "高光",
+      "saturation": "饱和度",
+      "shadows": "阴影",
+      "sharpen": "锐化",
+      "temperature": "色温",
+      "tint": "色调",
+      "vibrance": "自然饱和度",
+      "whites": "白色色阶"
+    },
+    "batchApply": {
+      "calculating": "计算中...",
+      "cancelAria": "取消任务",
+      "cancelRequested": "已请求取消，正在停止...",
+      "cancelledMessage": "已取消：成功 {{success}} 项，失败 {{failed}} 项。原图已自动备份，可在编辑历史中回退。",
+      "cancelledToast": "批量应用已取消",
+      "completedAll": "批量应用完成：成功处理 {{success}} 项。原图已自动备份，可在编辑历史中回退。",
+      "completedToast": "批量应用完成",
+      "completedWithFailures": "批量应用完成：成功 {{success}} 项，失败 {{failed}} 项。原图已自动备份，可在编辑历史中回退。",
+      "confirmMessage": "将当前调整/滤镜/水印应用到选中的 {{count}} 张图片。每张图片保存前会自动备份原图，可在编辑历史中回退。确定要继续吗？",
+      "confirmStart": "开始应用",
+      "confirmTitle": "批量应用编辑参数",
+      "failedCount": "失败 {{count}} 项",
+      "invalidPathError": "路径无效: {{fileName}}",
+      "loadFailedError": "加载失败: {{fileName}}",
+      "noSelectionError": "请先在图库中选择要批量应用的图片",
+      "preparing": "准备中...",
+      "processingHint": "正在将当前调整/滤镜/水印应用到选中的图片，每张图片保存前会自动备份原图，请勿关闭窗口。",
+      "processingLabel": "正在处理：{{current}} / {{total}}",
+      "remainingLabel": "剩余 {{time}}",
+      "throughputSuffix": " · {{n}}/s",
+      "title": "批量应用编辑参数"
+    },
+    "compare": {
+      "edited": "编辑后",
+      "loading": "加载中...",
+      "original": "原图"
+    },
+    "colorWheel": {
+      "ariaLabel": "色相轮，点击或拖动可选择色相"
+    },
+    "histogram": {
+      "ariaLabel": "RGB 通道亮度直方图",
+      "error": "无法生成直方图"
+    },
+    "hsl": {
+      "balance": "平衡",
+      "blue": "蓝色",
+      "bluePurple": "蓝紫",
+      "cyan": "青色",
+      "green": "绿色",
+      "highlights": "高光",
+      "hue": "色相",
+      "lightness": "明度",
+      "magenta": "洋红",
+      "orange": "橙色",
+      "purple": "紫色",
+      "red": "红色",
+      "saturation": "饱和度",
+      "shadows": "阴影",
+      "skin": "肤色",
+      "warm": "暖色",
+      "yellow": "黄色",
+      "yellowGreen": "黄绿"
+    },
+    "metadata": {
+      "batchExported": "批量导出完成：成功 {{success}} 项",
+      "batchExportedWithFailures": "批量导出完成：成功 {{success}} 项，失败 {{failed}} 项",
+      "exportFailed": "导出含参数副本失败",
+      "exported": "已导出含参数副本",
+      "restoreFailed": "恢复编辑参数失败",
+      "restored": "已从 {{fileName}} 的 XMP 元数据恢复编辑参数",
+      "unavailable": "当前环境不支持导出含参数副本"
+    },
+    "lut": {
+      "clear": "清除 LUT",
+      "deleteAria": "删除 {{name}}",
+      "deleteTitle": "删除此 LUT",
+      "import": "导入 .cube"
+    },
+    "page": {
+      "clipboardEmpty": "剪贴板为空",
+      "customPresetDefault": "自定义预设",
+      "editedFileSuffix": "{{name}}_编辑",
+      "exportFailed": "导出失败",
+      "imageLoadFailed": "无法加载图片",
+      "importedPresetDefault": "导入预设",
+      "paramsCopied": "已复制编辑参数",
+      "paramsPasted": "已粘贴编辑参数",
+      "pasteFailed": "粘贴参数失败",
+      "presetExportFailed": "预设导出失败",
+      "presetExportSuccess": "预设导出成功",
+      "presetExportUnsupported": "当前环境不支持导出预设",
+      "presetImportFailed": "预设导入失败",
+      "presetImportSuccess": "预设导入成功",
+      "presetImportUnsupported": "当前环境不支持导入预设",
+      "presetSaveFailed": "预设保存失败",
+      "presetSaveSuccess": "预设保存成功",
+      "presetSaveUnsupported": "当前环境不支持保存预设"
+    },
+    "recover": {
+      "discard": "丢弃",
+      "discarded": "已丢弃暂存的编辑结果",
+      "download": "下载到本地",
+      "downloadSuffix": "{{name}}_编辑恢复.jpg",
+      "downloaded": "编辑结果已下载",
+      "message": "上次保存失败，编辑结果已暂存（{{fileName}}，{{time}}）。是否下载到本地？",
+      "storeFailed": "保存失败，且编辑结果过大无法暂存，请重新编辑后保存",
+      "stored": "保存失败，编辑结果已暂存，下次进入编辑器时可下载恢复",
+      "title": "恢复未保存的编辑结果"
+    },
+    "shortcuts": {
+      "desc": {
+        "compareOriginal": "对比原图",
+        "copyParams": "复制编辑参数",
+        "fullscreenToggle": "切换全屏编辑模式",
+        "pasteParams": "粘贴编辑参数",
+        "redo": "重做",
+        "save": "保存编辑结果",
+        "saveAs": "另存为",
+        "togglePanel": "显示/隐藏快捷键面板",
+        "undo": "撤销"
+      },
+      "title": "编辑器快捷键"
+    },
+    "tabs": {
+      "basic": "基础",
+      "collapsePanel": "折叠面板",
+      "curves": "曲线",
+      "expandPanel": "展开面板",
+      "filters": "滤镜",
+      "hsl": "HSL",
+      "lut": "LUT",
+      "split": "分离",
+      "watermark": "水印"
+    },
+    "toneCurve": {
+      "ariaLabel": "{{channel}} 曲线编辑器，按住并拖动可调整控制点",
+      "channelB": "蓝",
+      "channelG": "绿",
+      "channelR": "红",
+      "channelRgb": "RGB",
+      "curveLabel": "{{channel}} 曲线",
+      "inputOutput": "输入 {{input}}  输出 {{output}}",
+      "reset": "重置"
+    },
+    "toolbar": {
+      "applyToSelected": "应用到选中({{count}})",
+      "applyToSelectedAria": "应用到选中的 {{count}} 张图片",
+      "applyToSelectedTooltip": "将当前调整/滤镜/水印应用到选中的 {{count}} 张图片",
+      "applying": "应用中...",
+      "back": "返回",
+      "compare": "对比",
+      "compareHold": "按住对比原图",
+      "copyParams": "复制参数",
+      "exportWithMetadata": "导出含参数副本",
+      "exportWithMetadataTooltip": "将当前调色/滤镜/LUT/水印参数写入图片 XMP 元数据，导出副本（不修改原图），支持后续一键恢复",
+      "exportingWithMetadata": "导出中...",
+      "fullscreenEnter": "全屏编辑 (F11)",
+      "fullscreenEnterAria": "全屏编辑",
+      "fullscreenExit": "退出全屏 (F11)",
+      "fullscreenExitAria": "退出全屏",
+      "pasteParams": "粘贴参数",
+      "redo": "重做",
+      "reset": "重置",
+      "save": "保存",
+      "saveAs": "另存为",
+      "saving": "保存中...",
+      "shortcuts": "快捷键说明 (?)",
+      "splitCompare": "分屏对比",
+      "splitCompareAria": "分屏对比",
+      "splitCompareTooltip": "切换左右分屏对比模式（左原图右编辑效果）",
+      "undo": "撤销"
+    }
+  },
+  "enums": {
+    "aperture": {
+      "1": "光圈 F1",
+      "2": "光圈 F2",
+      "3": "光圈 F3",
+      "4": "光圈 F4",
+      "5": "光圈 F5",
+      "6": "光圈 F6",
+      "7": "光圈 F7",
+      "8": "光圈 F8",
+      "9": "光圈 F9",
+      "10": "光圈 F10",
+      "11": "光圈 F11",
+      "12": "光圈 F12",
+      "13": "光圈 F13",
+      "14": "光圈 F14",
+      "15": "光圈 F15",
+      "neg1": "未设置"
+    },
+    "clothState": {
+      "0": "原始",
+      "1": "进化",
+      "2": "焕新",
+      "3": "进化+焕新",
+      "4": "升华",
+      "5": "进化+升华",
+      "9": "特殊"
+    },
+    "clothType": {
+      "0": "未知",
+      "10": "发型",
+      "20": "连衣裙",
+      "30": "上衣",
+      "41": "下装",
+      "50": "袜子",
+      "60": "鞋子",
+      "71": "耳饰",
+      "72": "颈饰",
+      "73": "面饰",
+      "74": "头饰",
+      "75": "手套",
+      "76": "手持",
+      "77": "背饰",
+      "78": "翼饰",
+      "79": "尾饰",
+      "80": "妆容",
+      "81": "嘴唇",
+      "82": "眼睛",
+      "83": "眉毛",
+      "84": "皮肤",
+      "85": "脸型",
+      "86": "美甲",
+      "90": "光环",
+      "92": "特效",
+      "93": "拍照动作",
+      "94": "滤镜",
+      "95": "贴纸",
+      "96": "相框",
+      "97": "文字",
+      "unknown": "未知"
+    },
+    "colorPalette": {
+      "0": "色盘 0",
+      "1": "色盘 1",
+      "2": "色盘 2",
+      "3": "色盘 3",
+      "4": "色盘 4",
+      "5": "色盘 5",
+      "6": "色盘 6",
+      "7": "色盘 7",
+      "8": "色盘 8",
+      "9": "色盘 9",
+      "10": "色盘 10",
+      "11": "色盘 11",
+      "12": "色盘 12",
+      "13": "色盘 13",
+      "14": "色盘 14",
+      "15": "色盘 15",
+      "16": "色盘 16",
+      "17": "色盘 17",
+      "18": "色盘 18"
+    },
+    "colorSwatch": {
+      "0": "色格 0",
+      "1": "色格 1",
+      "2": "色格 2",
+      "3": "色格 3",
+      "4": "色格 4",
+      "5": "色格 5",
+      "6": "色格 6",
+      "7": "色格 7",
+      "8": "色格 8"
+    },
+    "eurekaAttachment": {
+      "0": "无",
+      "1": "头部",
+      "2": "胸部",
+      "3": "腰部"
+    },
+    "eurekaColor": {
+      "0": "红色",
+      "1": "橙色",
+      "2": "黄色",
+      "3": "绿色",
+      "4": "青色",
+      "5": "蓝色",
+      "6": "紫色",
+      "7": "粉色",
+      "8": "白色",
+      "9": "黑色"
+    },
+    "expedition": {
+      "101020301": "石树田无人区",
+      "101020302": "愿望梦境仓库",
+      "101020303": "古花镇印记",
+      "101020304": "微风绿野",
+      "101020305": "福梨之野",
+      "101020306": "纪念日谷",
+      "101020307": "诺诺的隐秘洞窟",
+      "101020308": "古花镇"
+    },
+    "filter": {
+      "Fresh_001": "清新 01",
+      "Fresh_002": "清新 02",
+      "Fresh_003": "清新 03",
+      "Fresh_004": "清新 04",
+      "Fresh_005": "清新 05",
+      "None": "无",
+      "Vibe_001": "氛围 01",
+      "Vibe_002": "氛围 02",
+      "Vibe_003": "氛围 03",
+      "Vibe_004": "氛围 04",
+      "Vibe_005": "氛围 05",
+      "Vibe_009": "氛围 09",
+      "Weather_001": "天气 01",
+      "Weather_002": "天气 02",
+      "Weather_003": "天气 03",
+      "Weather_004": "天气 04"
+    },
+    "framedMoment": {
+      "0": "无"
+    },
+    "interactive": {
+      "206001": "拍摄任务 1",
+      "261003": "拍摄任务 2",
+      "42031201": "拍摄任务 3",
+      "42031202": "拍摄任务 4",
+      "42031203": "拍摄任务 5"
+    },
+    "light": {
+      "DirectionLight_B": "底部方向光",
+      "DirectionLight_L": "左侧方向光",
+      "DirectionLight_R": "右侧方向光",
+      "DirectionLight_T": "顶部方向光",
+      "HueEdgeLight_001_L": "彩色边缘光 01 左",
+      "HueEdgeLight_001_R": "彩色边缘光 01 右",
+      "HueEdgeLight_002_L": "彩色边缘光 02 左",
+      "HueEdgeLight_002_R": "彩色边缘光 02 右",
+      "HueEdgeLight_003_L": "彩色边缘光 03 左",
+      "HueEdgeLight_003_R": "彩色边缘光 03 右",
+      "HueEdgeLight_004_L": "彩色边缘光 04 左",
+      "HueEdgeLight_004_R": "彩色边缘光 04 右",
+      "None": "无",
+      "VibeLight_001": "氛围光 01",
+      "VibeLight_002": "氛围光 02",
+      "VibeLight_003": "氛围光 03",
+      "VibeLight_004": "氛围光 04"
+    },
+    "poseId": {
+      "0": "无"
+    },
+    "puzzle": {
+      "30": "错位摄影 1",
+      "31": "错位摄影 2",
+      "neg1": "未设置"
+    },
+    "weather": {
+      "0": "晴朗",
+      "2": "阴天",
+      "4": "雨",
+      "7": "雪",
+      "neg1": "未设置"
+    }
+  },
+  "filter": {
+    "applyPresetAria": "应用滤镜预设 {{name}}",
+    "category": {
+      "all": "全部",
+      "artistic": "艺术",
+      "cinematic": "电影",
+      "custom": "自定义",
+      "natural": "自然",
+      "vintage": "复古"
+    },
+    "deleteCustomAria": "删除自定义预设",
+    "exportAria": "导出当前预设为 JSON",
+    "exportJson": "导出 JSON",
+    "generatingPreview": "正在生成滤镜预览...",
+    "importAria": "从 JSON 文件导入预设",
+    "importJson": "导入 JSON",
+    "intensity": "滤镜强度",
+    "namePlaceholder": "预设名称...",
+    "preset": {
+      "natural-1": "原生",
+      "natural-2": "清新",
+      "natural-3": "日系",
+      "natural-4": "森系",
+      "natural-5": "明亮",
+      "vintage-1": "复古",
+      "vintage-2": "胶片",
+      "vintage-3": "怀旧",
+      "vintage-4": "褪色",
+      "vintage-5": "LOMO",
+      "artistic-1": "黑白",
+      "artistic-2": "单色",
+      "artistic-3": "蓝调",
+      "artistic-4": "红外",
+      "artistic-5": "色调分离",
+      "cinematic-1": "电影",
+      "cinematic-2": "戏剧",
+      "cinematic-3": "暖金",
+      "cinematic-4": "冷银",
+      "cinematic-5": "橙青"
+    },
+    "save": "保存",
+    "saveCurrentAria": "保存当前参数为自定义预设",
+    "saving": "保存中..."
+  },
+  "gallery": {
+    "contextMenu": {
+      "copyTo": "复制到",
+      "delete": "删除",
+      "deletePermanent": "永久删除",
+      "edit": "编辑",
+      "export": "导出",
+      "favorite": "收藏",
+      "moveTo": "移动到",
+      "open": "打开",
+      "openLocation": "打开文件所在位置",
+      "properties": "属性",
+      "rename": "重命名",
+      "saveAs": "另存为",
+      "selectAllInCategory": "全选当前分类",
+      "share": "分享",
+      "shareToQQ": "分享到QQ",
+      "shareToVivo": "分享到vivo办公套件",
+      "shareToWechat": "分享到微信",
+      "unfavorite": "取消收藏"
+    },
+    "fullscreen": {
+      "ariaLabel": "全屏查看：{{fileName}}",
+      "closeTitle": "关闭 (Esc)",
+      "deleteConfirmMessage": "确定将 \"{{fileName}}\" 移至回收站吗？",
+      "favoriteTitle": "收藏",
+      "hideInfoTitle": "隐藏图片信息",
+      "infoPanelCloseAria": "关闭相机参数面板",
+      "infoPanelTitle": "图片信息",
+      "intervalOption": "{{n}} 秒",
+      "intervalTitle": "播放间隔",
+      "nextAriaLabel": "下一张",
+      "prevAriaLabel": "上一张",
+      "saveAsFailed": "另存为失败",
+      "saveAsTitle": "另存为",
+      "showInfoTitle": "查看图片信息",
+      "slideshowMinImages": "至少需要 2 张图片才能播放幻灯片",
+      "slideshowPauseAria": "暂停幻灯片",
+      "slideshowPauseTitle": "暂停幻灯片 (空格)",
+      "slideshowPlayAria": "播放幻灯片",
+      "slideshowPlayTitle": "播放幻灯片 (空格)",
+      "title": "{{fileName}} ({{current}} / {{total}})",
+      "unfavoriteTitle": "取消收藏"
+    },
+    "eventTimeline": {
+      "ariaLabel": "活动时间轴",
+      "emptyHint": "暂无照片可按版本分组",
+      "itemCount": "{{count}} 项",
+      "unknownPeriodDesc": "文件拍摄时间早于游戏开服或无法识别",
+      "unknownPeriodName": "未知时期",
+      "versionBadge": "版本更新"
+    },
+    "masonry": {
+      "ariaLabel": "瀑布流视图"
+    },
+    "renameDialog": {
+      "cancel": "取消",
+      "confirm": "确定",
+      "emptyError": "文件名不能为空",
+      "invalidCharsError": "文件名不能包含以下字符：\\ / : * ? \" < > |",
+      "title": "重命名"
+    },
+    "tagManager": {
+      "addButton": "添加",
+      "commonTags": "常用标签",
+      "duplicateToast": "标签已存在",
+      "emptyHint": "暂无标签",
+      "inputPlaceholder": "输入新标签...",
+      "presetTags": {
+        "battle": "战斗",
+        "drama": "剧情",
+        "equipment": "装备",
+        "explore": "探索",
+        "landscape": "风景",
+        "people": "人物",
+        "screenshot": "截图"
+      },
+      "title": "管理标签"
+    },
+    "timeline": {
+      "ariaLabel": "时间线",
+      "itemCount": "{{count}} 项"
+    },
+    "virtualGrid": {
+      "ariaLabel": "图片网格",
+      "deleteAria": "删除",
+      "deleteTitle": "删除",
+      "editAria": "编辑",
+      "editTitle": "编辑",
+      "favoriteAria": "收藏",
+      "favoriteTitle": "收藏",
+      "loadingMore": "加载中…",
+      "noMore": "没有更多了",
+      "unfavoriteAria": "取消收藏",
+      "unfavoriteTitle": "取消收藏"
+    },
+    "watermarkDialog": {
+      "cancel": "取消",
+      "cancelTask": "取消任务",
+      "closeAria": "关闭",
+      "computing": "计算中...",
+      "processing": "处理中...",
+      "processingHint": "处理进度",
+      "remaining": "剩余 {{time}}",
+      "startAdd": "开始添加",
+      "title": "批量添加水印"
+    },
+    "import": {
+      "browse": "浏览",
+      "categorize": {
+        "byDate": {
+          "desc": "YYYY-MM-DD 子目录",
+          "label": "按日期"
+        },
+        "byMonth": {
+          "desc": "YYYY-MM 子目录",
+          "label": "按月份"
+        },
+        "flat": {
+          "desc": "全部放入目标目录",
+          "label": "不分类"
+        }
+      },
+      "categorizeLabel": "目录分类",
+      "conflict": {
+        "overwrite": {
+          "desc": "直接替换目标文件",
+          "label": "覆盖"
+        },
+        "rename": {
+          "desc": "追加 _1/_2 后缀",
+          "label": "自动重命名"
+        },
+        "skip": {
+          "desc": "目标已存在则不导入",
+          "label": "跳过"
+        }
+      },
+      "conflictLabel": "同名文件冲突处理",
+      "deselectAll": "取消全选",
+      "errors": {
+        "importFailed": "导入失败",
+        "loadFailed": "加载失败",
+        "readSourceFailed": "无法读取源目录"
+      },
+      "finish": "完成",
+      "imagesCount": "{{count}} 张图片",
+      "importing": "正在导入…",
+      "indexingHint": "目录已登记，正在后台建立索引，稍后可在图库查看。",
+      "naming": {
+        "date": {
+          "desc": "YYYYMMDD_HHmmss.ext",
+          "label": "拍摄日期"
+        },
+        "keep": {
+          "desc": "保持源文件名不变",
+          "label": "保留原名"
+        },
+        "seq": {
+          "desc": "0001.ext、0002.ext 递增",
+          "label": "序号"
+        }
+      },
+      "namingRuleLabel": "命名规则",
+      "nextStep": "下一步",
+      "prevStep": "上一步",
+      "progressLabel": "{{current}} / {{total}}",
+      "resultImported": "成功导入",
+      "resultSkipped": "跳过",
+      "scanHint": "将递归扫描所选文件夹及其子目录中的所有图片和视频文件",
+      "scanResult": "扫描结果",
+      "scanSummary": "共 {{count}} 个媒体文件，总大小 {{size}}",
+      "scanning": "正在扫描源目录…",
+      "selectionSummary": "已选 {{selected}} / {{total}} 个，总大小 {{size}}",
+      "sourceDirLabel": "源文件夹路径",
+      "sourceDirPlaceholder": "选择或输入源文件夹路径",
+      "startImport": "开始导入",
+      "step1": "步骤 1/3：选择源文件夹",
+      "step2": "步骤 2/3：预览并选择待导入文件",
+      "step3": "步骤 3/3：配置导入规则并执行",
+      "summaryDiskSpace": "磁盘空间预估",
+      "summaryFiles": "待导入文件",
+      "summaryFilesValue": "{{count}} 个（{{size}}）",
+      "targetDirLabel": "目标目录（导入到此处）",
+      "targetDirPlaceholder": "选择目标目录",
+      "title": "文件导入向导",
+      "videosCount": "{{count}} 个视频"
+    },
+    "slideshow": {
+      "ariaLabel": "幻灯片播放",
+      "exitAriaLabel": "退出幻灯片",
+      "exitTitle": "退出 (Esc)",
+      "intervalLabel": "播放间隔",
+      "intervalPreset": {
+        "10s": "10 秒",
+        "1s": "1 秒",
+        "3s": "3 秒",
+        "5s": "5 秒"
+      },
+      "loopLabel": "循环播放",
+      "nextTitle": "下一张 (→)",
+      "orderLabel": "播放顺序",
+      "orderPreset": {
+        "sequence": "顺序",
+        "shuffle": "随机"
+      },
+      "pauseAriaLabel": "暂停",
+      "pauseTitle": "暂停 (空格)",
+      "playAriaLabel": "播放",
+      "playTitle": "播放 (空格)",
+      "prevTitle": "上一张 (←)",
+      "progress": "{{current}} / {{total}}",
+      "settingsAriaLabel": "播放设置",
+      "settingsCloseAriaLabel": "关闭设置",
+      "settingsPanelTitle": "播放设置",
+      "settingsTitle": "播放设置 (S)",
+      "shortcutsHint": "快捷键：空格 播放/暂停 · ← → 切换 · S 设置 · Esc 退出",
+      "shuffleBadge": "随机",
+      "skipVideoLabel": "跳过视频（仅播图片）",
+      "title": "幻灯片播放",
+      "transitionLabel": "过渡动画",
+      "transitionPreset": {
+        "fade": "淡入淡出",
+        "none": "无",
+        "slide": "左右滑动"
+      }
+    },
+    "smartGroup": {
+      "dimensionDesc": {
+        "albumType": "基于游戏内父文件夹名自动识别（如 ScreenShot → 游戏截图），共 22 类",
+        "fileType": "按文件类型分组：图片 / 视频",
+        "outfit": "基于手动套装标注分组，未标注的文件不计入分组",
+        "sceneCategory": "基于文件路径与场景识别算法自动分类",
+        "sceneTime": "基于图像亮度直方图分析时段（日间/黄昏/夜间/黎明）"
+      },
+      "emptyHint": "暂无分组数据，请先扫描媒体文件",
+      "fileType": {
+        "image": "图片",
+        "video": "视频"
+      }
+    },
+    "toolbar": {
+      "cleanupCorrupted": "清理损坏记录",
+      "cleanupCorruptedTitle": "一次性清除所有标记为损坏的数据库记录（仅删除索引，不删除源文件）",
+      "corruptedOnly": "仅看损坏",
+      "corruptedOnlyTitle": "只显示文件存在但内容无法读取/解码的损坏记录",
+      "dateLabel": "日期",
+      "dateRange": {
+        "clear": "清除日期",
+        "endLabel": "结束日期",
+        "startLabel": "开始日期"
+      },
+      "filterType": {
+        "all": "全部",
+        "image": "图片",
+        "video": "视频"
+      },
+      "importTitle": "导入文件",
+      "missingOnly": "仅看丢失",
+      "missingOnlyTitle": "只显示文件已被外部删除的记录",
+      "rating": {
+        "all": "全部",
+        "label": "评分",
+        "star1Plus": "1星+",
+        "star2Plus": "2星+",
+        "star3Plus": "3星+",
+        "star4Plus": "4星+",
+        "star5": "5星",
+        "starNPlus": "{{n}}星+"
+      },
+      "searchPlaceholder": "搜索文件名/标签/套装/场景/备注...",
+      "shareTitle": "复制到剪贴板并分享到微信/QQ/vivo",
+      "sortBy": {
+        "date": "日期",
+        "name": "名称",
+        "rating": "评分",
+        "resolution": "分辨率",
+        "size": "大小"
+      },
+      "viewMode": {
+        "eventTimeline": "活动时间轴",
+        "grid": "网格视图",
+        "list": "列表视图",
+        "masonry": "瀑布流视图",
+        "timeline": "时间线视图"
+      }
+    },
+    "search": {
+      "log": {
+        "indexNotReadyFallback": "[Search] 索引未就绪，回退到本地搜索:"
+      }
+    },
+    "media": {
+      "log": {
+        "refreshNullFailed": "[useRefreshMedia] fetchMediaFromDatabase 返回 null，媒体数据加载失败"
+      }
+    }
+  },
+  "group": {
+    "albumType": "相册类型",
+    "all": "全部",
+    "fileType": "类型",
+    "none": "不分组",
+    "other": "其他",
+    "outfit": "套装",
+    "sceneCategory": "场景",
+    "sceneTime": "时段",
+    "title": "智能分组",
+    "log": {
+      "loadCountsFailed": "[SmartGroupPanel] 加载分组统计失败:"
+    }
+  },
+  "infoPanel": {
+    "copied": "已复制",
+    "copyAriaLabel": "复制{{title}}",
+    "copyDefault": "复制",
+    "copyTitle": "复制{{title}}",
+    "emptyDefault": "此图片未包含相关信息",
+    "errorPrefixDefault": "信息解析失败",
+    "loadingDefault": "正在解析...",
+    "paramNotContained": "不包含该参数"
+  },
+  "locations": {
+    "Miraland": "奇迹大陆",
+    "HeartcraftKingdom": "筑心王国",
+    "Wishfield": "心愿原野",
+    "MemorialMountains": "纪念山地",
+    "OldFlorawishMemorial": "古花愿镇纪念公园",
+    "StylistGuildMemorial": "搭配师协会纪念旧址",
+    "Florawish": "花愿镇",
+    "DreamwovenRuins": "栖愿遗迹",
+    "FortuneFalls": "福鸣瀑布",
+    "GreatWishtreeSquare": "大许愿树广场",
+    "LakesideDistrict": "湖畔街区",
+    "OutskirtsForest": "镇郊林区",
+    "BreezyMeadow": "微风绿野",
+    "AbandonedFanaticWisherCamp": "废弃疯愿之子营地",
+    "BreezyMeadowActivityArea": "绿野活动区",
+    "BugSongHills": "虫鸣花坡",
+    "CiciaHighlands": "花树高地",
+    "HeartcraftKingdomOutpost": "筑心王国边境哨所",
+    "LakesideHill": "河畔山地",
+    "MeadowWharf": "绿野货运码头",
+    "QueenPalaceRuins": "女王行宫遗迹",
+    "RelicHill": "遗迹山坡",
+    "SleepyFishHills": "悠悠草坡",
+    "SwanGazebo": "天鹅羽亭",
+    "Stoneville": "小石树田村",
+    "DyeWorkshop": "染织工坊",
+    "FlowerFieldsResidence": "花田民居",
+    "RockfallValley": "落石谷",
+    "StonevilleMarket": "村口集市",
+    "AbandonedDistrict": "石树田无人区",
+    "ChooChooStation": "呜呜车站",
+    "GoldenFields": "麦浪农场",
+    "MarketOfMirth": "欢乐市集",
+    "Prosperville": "丰饶古村",
+    "RippleEstate": "涟漪庄园",
+    "StellarFishingGround": "星空钓场",
+    "Stonecrown": "石之冠",
+    "WindriderMill": "乘风磨坊",
+    "WishingWoods": "祈愿树林",
+    "BrookwoodForest": "溪声林地",
+    "CavernOfWishes": "心愿洞窟",
+    "FallenWishHighlands": "殒愿山岭",
+    "GrandTreeValley": "大树谷",
+    "SacredMountains": "圣山",
+    "ValleyOfBlossoms": "圣地花谷",
+    "FireworkIsles": "花焰群岛",
+    "ClearheartLake": "澄净湖",
+    "CrescentMoonRuins": "月角遗迹区",
+    "FlamingForest": "焰光森林",
+    "RelicIsles": "遗迹群岛",
+    "SongbreezeHighland": "聆风高地",
+    "SparkheartIsland": "焰心岛",
+    "SerenityIsland": "无忧岛",
+    "OldRuins": "古老的废墟",
+    "Soakville": "布露村",
+    "SoakvilleOutskirts": "布露村郊外",
+    "Steamville": "蒸汽维尔",
+    "DanqingIsland": "丹青屿",
+    "BackMountain": "后山",
+    "BambooGrove": "竹林",
+    "Inkville": "墨缘乡",
+    "InkwashStream": "洗墨涧",
+    "LoongPagoda": "奉龙塔",
+    "LoongPeak": "栖龙峰",
+    "ReedblossomShore": "芦花水畔",
+    "DanqingRealm": "丹青之境",
+    "GreenBambooGrove": "青竹林地",
+    "InkPool": "墨池",
+    "InkshorePlain": "临墨坪",
+    "WildfieldWaterside": "野郊水畔",
+    "TerraAlliance": "大地联盟",
+    "Itzaland": "伊赞之土",
+    "ItzalandCanyon": "伊地峡谷",
+    "ElderwoodForest": "巨木之森",
+    "BehemothObservationSite": "巨兽观测点",
+    "Coliseum": "巨兽堡垒",
+    "ElderwoodShade": "古木荫地",
+    "ElderwoodWharf": "巨森码头",
+    "ForestOfSlumber": "安眠之林",
+    "ForgottenStreet": "遗忘旧街",
+    "GiantVineForest": "巨藤之林",
+    "LeafRiver": "叶子河",
+    "MothershroomWoods": "母菇林地",
+    "ParkyaCraterLake": "帕克亚火山湖",
+    "Pottsville": "陶罐村",
+    "RockvilleRuins": "岩村遗址",
+    "ShellIsland": "壳壳岛",
+    "Shroomville": "菇菇聚落",
+    "SnailRanch": "蜗牛农场",
+    "SpiraWaterfall": "蜗牛城瀑布",
+    "TitanGraveyard": "大拉姆居落",
+    "TitansOutpostRuins": "巨兽前哨废墟",
+    "Spira": "蜗牛城",
+    "Spira1F": "蜗牛城一层",
+    "Spira2F": "蜗牛城二层",
+    "Spira3F": "蜗牛城三层",
+    "SpiraShelldome": "蜗牛城壳顶",
+    "Boneyard": "埋骨地",
+    "BluePools": "蓝池",
+    "Cultivarium": "修习所",
+    "DragonRuins": "龙埙遗所",
+    "DragonrestFlowerfield": "龙息花田",
+    "GlimmeringLake": "微光湖",
+    "GreatLumieville": "大卢米维尔",
+    "HealingGround": "疗愈地",
+    "HollowbreathPassage": "幽息廊道",
+    "LonestoneShore": "孤石滩",
+    "SoulSpring": "甜泉",
+    "WanxiangRealm": "万相境",
+    "CaiYeMarket": "彩靥城集市",
+    "CaiYeOutskirts": "彩靥城近郊",
+    "DazzlebloomMeadow": "迷花甸",
+    "DeepValleySpring": "深谷幽泉",
+    "JiuhuaPavilion": "九华阙",
+    "JiuhuaPenitentiary": "九华监",
+    "ValleyPath": "峡谷山径",
+    "WhereWoodEchoes": "悲木空鸣地",
+    "EmpireOfLight": "光芒帝国",
+    "StarhailFederation": "慕星联邦",
+    "LinlangEmpire": "琳琅帝国",
+    "TwinmoonKingdom": "双月王国",
+    "WhalePort": "孤鲸港",
+    "Umbraso": "影谷议会国",
+    "SeaOfStars": "星海",
+    "Crystalvale": "晶簇之谷",
+    "DreamStarIsles": "梦幻星岛",
+    "Starshore": "繁星之滨",
+    "UnboundWharf": "无界码头",
+    "Home": "家园",
+    "DockArea": "码头区域"
+  },
+  "logAction": {
+    "backupDeleted": "备份已删除",
+    "backupFailed": "备份失败",
+    "backupSuccess": "备份创建成功",
+    "backupSuccessWithProfile": "备份创建成功（档案 {{name}}）",
+    "cleanFailed": "清理失败",
+    "cleanMissingError": "清理丢失记录失败",
+    "cleanMissingFailed": "清理失败",
+    "cleanMissingSuccess": "已清理 {{count}} 条丢失记录",
+    "cleanSuccess": "已清理 {{count}} 个文件，释放 {{size}}",
+    "clearData": "本地数据已清除",
+    "clearDataFailed": "清除数据失败",
+    "clearFailed": "清空失败",
+    "clearSuccess": "日志已清空",
+    "compactModeOff": "已关闭紧凑模式",
+    "compactModeOn": "已开启紧凑模式",
+    "copyFailed": "复制失败，请手动选择文本复制",
+    "copySuccess": "已复制到剪贴板",
+    "deleteFailed": "删除失败",
+    "enforceEvicted": "LRU 淘汰 {{count}} 个最久未访问的缩略图",
+    "enforceFailed": "检查失败",
+    "enforceNoop": "缓存未超限，无需淘汰",
+    "exportFailed": "导出失败",
+    "exportSuccess": "日志已导出",
+    "fontSizeSet": "字号已设为{{label}}",
+    "incrementalOff": "已关闭增量扫描",
+    "incrementalOn": "已开启增量扫描",
+    "limitSet": "上限已调整为 {{gb}}GB",
+    "limitSetEvicted": "上限已调整为 {{gb}}GB，LRU 淘汰 {{count}} 个文件",
+    "limitSetFailed": "设置失败",
+    "loadStatsFailed": "加载缓存统计失败",
+    "openDirFailed": "打开目录失败",
+    "qqCopied": "QQ 群号已复制到剪贴板",
+    "qqCopyFailed": "复制失败，请手动选择群号复制",
+    "reduceMotionOff": "已关闭动效减弱",
+    "reduceMotionOn": "已开启动效减弱",
+    "restoreFailed": "恢复失败",
+    "restoreSuccess": "恢复成功，请重启应用",
+    "sceneAnalyzeFailed": "分析失败",
+    "sceneAnalyzed": "已分析 {{count}} 张图片的场景时段",
+    "settingFailed": "设置失败",
+    "themeChanged": "主题已切换"
+  },
+  "nav": {
+    "allProfiles": "全部档案",
+    "alreadyAtTop": "已在最顶层",
+    "backToTop": "返回上一级",
+    "categories": "分类",
+    "collapse": "折叠",
+    "duplicates": "重复文件",
+    "expand": "展开",
+    "favorites": "收藏",
+    "gallery": "图库",
+    "images": "图片",
+    "launcherCache": "缓存",
+    "menu": "菜单",
+    "recycleBin": "回收站",
+    "resonanceRecords": "共鸣录",
+    "settings": "设置",
+    "smartGroup": "智能分组",
+    "storage": "占用",
+    "switchProfile": "切换角色档案",
+    "videos": "视频",
+    "screenshots": "截图"
+  },
+  "outfit": {
+    "collectedHint": "数据库中有照片的套装",
+    "collectedLabel": "已收集套装",
+    "collectedSection": "已收集套装（{{count}}）",
+    "count": "{{count}} 张",
+    "customSection": "自定义套装（{{count}}）",
+    "emptyHint": "暂无套装数据，请在详情页为照片标注套装",
+    "filtered": "已筛选「{{outfit}}」的照片",
+    "latestShot": "最新拍摄",
+    "loadFailed": "加载失败",
+    "loadStatsFailed": "加载套装统计失败",
+    "loading": "正在加载套装统计…",
+    "locked": "未解锁",
+    "noData": "暂无数据",
+    "photosCount": "{{count}} 张照片",
+    "presetTotalHint": "内置套装预设库",
+    "presetTotalLabel": "预设套装总数",
+    "progressLabel": "收集进度",
+    "progressValue": "{{collected}} / {{total}}",
+    "refresh": "刷新",
+    "refreshStats": "重新统计",
+    "summary": "已收集 {{collected}} 套 · 预设 {{presets}} 套 · 收集进度 {{progress}}%",
+    "title": "套装图鉴",
+    "topOutfitLabel": "最完整套装",
+    "uncollectedHint": "尚未收集到「{{outfit}}」的照片",
+    "uncollectedSection": "未收集套装（{{count}}）",
+    "unsupported": "当前环境不支持套装图鉴",
+    "viewOutfitPhotos": "查看「{{outfit}}」的所有照片",
+    "presets": {
+      "amberCharm": "琥珀之韵",
+      "ancientElegance": "古风雅韵",
+      "auroraPhantom": "极光幻影",
+      "brilliantGalaxy": "璀璨星河",
+      "butterflyEffect": "蝴蝶效应",
+      "campusDays": "校园时光",
+      "cherryBlossomLover": "樱花恋人",
+      "cloudSinger": "云端歌者",
+      "cloudWalk": "云端漫步",
+      "crystalOath": "水晶誓约",
+      "desertRose": "沙漠玫瑰",
+      "emeraldOath": "翡翠之誓",
+      "fairyTale": "童话物语",
+      "firstKiss": "初心之吻",
+      "floralGirl": "花漾少女",
+      "futureTech": "未来科技",
+      "glazeDream": "琉璃梦境",
+      "islandHoliday": "海岛假日",
+      "moonlightSonata": "月光奏鸣曲",
+      "morningLight": "晨光微露",
+      "newYearSplendor": "新年华彩",
+      "nightPoem": "夜色诗篇",
+      "oceanMystery": "海蓝之谜",
+      "roseGarden": "玫瑰园",
+      "roseKnight": "蔷薇骑士",
+      "seaOfStars": "星之海",
+      "snowElf": "雪地精灵",
+      "snowlandTrain": "雪国列车",
+      "springWaltz": "春之圆舞曲",
+      "stardustMagic": "星屑魔法",
+      "summerBreeze": "夏日微风",
+      "urbanBeauty": "都市丽人",
+      "wisteriaWhisper": "紫藤花语",
+      "winterSnow": "冬雪皑皑",
+      "autumnLeaves": "秋叶翩跹"
+    }
+  },
+  "profile": {
+    "defaultProfile": "默认档案",
+    "transferToProfile": "转移到档案"
+  },
+  "profileAction": {
+    "createFailed": "创建失败",
+    "created": "档案已创建",
+    "defaultCannotDelete": "默认档案不可删除",
+    "deleteConfirm": "确认删除档案 {{uid}}？该档案下的文件将迁移到默认档案。",
+    "deleteFailed": "删除失败",
+    "deleted": "档案已删除",
+    "nicknameRequired": "昵称不能为空",
+    "nicknameUpdated": "昵称已更新",
+    "switchFailed": "切换失败",
+    "switched": "已切换档案",
+    "uidExists": "该 UID 已存在",
+    "uidInvalid": "UID 仅允许字母和数字",
+    "uidRequired": "请输入 UID",
+    "unsupported": "当前环境不支持档案管理",
+    "updateFailed": "更新失败"
+  },
+  "recycleBin": {
+    "backToGallery": "返回图库",
+    "clearSelection": "清除选择",
+    "confirmEmpty": "清空",
+    "deleteFailed": "删除失败",
+    "empty": "清空回收站",
+    "emptyConfirm": "将永久删除回收站中的全部 {{count}} 项文件。\n文件会先移至系统回收站，之后无法从本应用恢复。\n确定要清空吗？",
+    "emptyConfirmTitle": "清空回收站",
+    "emptyFailed": "清空失败",
+    "emptySuccess": "回收站已清空",
+    "emptyTitle": "回收站为空",
+    "itemLabel": "回收站项 {{name}}",
+    "permanentConfirm": "将彻底删除选中的 {{count}} 项文件。\n文件会先移至系统回收站，之后无法从本应用恢复。\n确定要删除吗？",
+    "permanentConfirmTitle": "彻底删除",
+    "permanentDelete": "彻底删除",
+    "permanentDeleteSelected": "彻底删除选中项",
+    "permanentHint": "彻底删除后文件将移至系统回收站",
+    "restore": "恢复",
+    "restoreFailed": "恢复失败",
+    "restoreSelected": "恢复选中项",
+    "retryDelete": "重试删除",
+    "retryEmpty": "重试清空",
+    "retryRestore": "重试恢复",
+    "selectToDelete": "请选择要删除的项目",
+    "selectToRestore": "请选择要恢复的项目",
+    "selectedCount": "已选择 {{count}} 项",
+    "summary": "{{count}} 项 · 共 {{size}}",
+    "summaryWithHint": "{{count}} 项 · 共 {{size}} · 彻底删除后文件将移至系统回收站",
+    "title": "回收站",
+    "toolbarLabel": "回收站操作",
+    "videoBadge": "视频"
+  },
+  "sceneLabel": {
+    "location": "地点",
+    "other": "其他",
+    "portrait": "人物",
+    "recording": "录屏",
+    "scene": "场景",
+    "screenshot": "截图",
+    "unknown": "未知"
+  },
+  "sceneCategory": {
+    "collage": "趣拼海报原图",
+    "other": "其他",
+    "screenshot": "截图",
+    "thumbnail": "缩略图",
+    "travelJournal": "旅行手账",
+    "worldTour": "世界巡游"
+  },
+  "sceneTime": {
+    "dawn": "晨景",
+    "dawnDesc": "中等亮度，偏暖色调",
+    "day": "日景",
+    "dayDesc": "高亮度，明亮场景",
+    "dusk": "暮景",
+    "duskDesc": "中等亮度，偏冷色调",
+    "night": "夜景",
+    "nightDesc": "低亮度，暗色调场景",
+    "unknown": "未分析",
+    "unknownDesc": "视频文件或分析失败"
+  },
+  "settings": {
+    "about": {
+      "alias": "（全网同名）",
+      "appName": "应用名称",
+      "appValue": "无限暖暖相册管理工具",
+      "authorLabel": "作者：QianLu",
+      "bilibili": "哔哩哔哩",
+      "buildTools": "构建工具链",
+      "checkUpdate": "检查更新",
+      "checkUpdateHint": "自动检查更新，发现新版本后可在应用内下载并安装",
+      "updateTitle": "更新",
+      "updateNetworkBusy": "当前网络繁忙，点击确定跳转官网",
+      "updateNoNewVersion": "当前已是最新版本",
+      "contactDesc": "GitHub 仓库、QQ 群与社交媒体",
+      "contactTitle": "联系方式",
+      "copyGroup": "复制群号",
+      "copyright": "© 2026 QianLu. All rights reserved.",
+      "depDesc": {
+        "autoAnimate": "列表 FLIP 动画库（零侵入增删重排过渡）",
+        "betterSqlite3": "同步 SQLite 数据库驱动",
+        "electron": "跨平台桌面应用框架",
+        "exifr": "EXIF 元数据解析",
+        "ffmpegStatic": "FFmpeg 二进制（视频处理）",
+        "ffprobeStatic": "FFprobe 二进制（视频元数据）",
+        "fluentFfmpeg": "FFmpeg Node.js 封装",
+        "gongeouNikkiTracker": "「共鸣录」板块中的共鸣记录、我的衣橱、导入数据与个人统计等本地功能，部分实现参考并复用了开源项目 gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）（作者：dastrokes，MIT License）中可离线运行的源码，已获原作者授权。特此致谢。",
+        "motion": "React 动画库（弹簧物理、退出动画、布局动画）",
+        "react": "UI 渲染库",
+        "reactDom": "React DOM 渲染器",
+        "sharp": "高性能图像处理（缩略图生成）",
+        "zustand": "轻量级状态管理"
+      },
+      "depDescTodo": {
+        "gongeous": "（此致谢条目在其他语言中暂为英文占位，待后续版本翻译）"
+      },
+      "devCredit": "开发者：纤璐不会玩摄影",
+      "developer": "开发者",
+      "douyin": "抖音",
+      "githubRepo": "GitHub 仓库",
+      "licenseApache": "• Apache-2.0：允许自由使用，需保留版权与专利授权",
+      "licenseDesc": "依赖列表与 License 信息",
+      "licenseGpl": "• GPL-3.0：使用或修改后的代码必须同样开源",
+      "licenseMit": "• MIT：允许自由使用、修改、分发，需保留版权声明",
+      "licenseNote": "许可证说明",
+      "licenseTitle": "致谢与开源协议",
+      "open": "打开",
+      "projectIntro": "本软件基于上述开源项目构建，感谢所有开源社区的贡献者。软件本身遵循 MIT 协议开源，欢迎自由使用、修改和分发。",
+      "qqGroup": "QQ 群",
+      "repo": "仓库地址",
+      "repoLabel": "仓库：",
+      "runtimeDeps": "运行时依赖",
+      "socialMedia": "开发者社交媒体",
+      "techStack": "技术栈",
+      "toolDesc": {
+        "electronBuilder": "Electron 打包工具",
+        "eslint": "代码规范检查",
+        "tailwindCss": "原子化 CSS 框架",
+        "typeScript": "类型系统",
+        "vite": "前端构建工具",
+        "vitest": "单元测试框架"
+      },
+      "version": "版本号",
+      "versionLabel": "版本：v{{version}}",
+      "xiaohongshu": "小红书"
+    },
+    "backup": {
+      "archiveTag": "档案：{{name}}",
+      "create": "立即备份",
+      "creating": "备份中…",
+      "delete": "删除",
+      "empty": "暂无备份记录",
+      "emptyHint": "点击「立即备份」创建第一份备份",
+      "hint": "应用启动后会自动检查备份（距上次备份超过 7 天才执行），保留最近 5 份，超出自动清理最旧备份。恢复操作会覆盖当前数据库，需重启应用生效。按档案备份仅文件名加入 UID 后缀以便识别，实际内容仍为整库（还原不会丢失其他档案数据）。",
+      "loading": "加载中…",
+      "modifyDir": "修改目录",
+      "openDir": "打开目录",
+      "records": "备份记录（按时间倒序）",
+      "refresh": "刷新",
+      "restartLater": "稍后手动重启",
+      "restartNow": "立即重启",
+      "restartTitle": "重启应用",
+      "restore": "恢复",
+      "restoreConfirm": "确定要从此备份恢复吗？恢复操作会覆盖当前数据库的所有数据，恢复后需要重启应用才能生效。",
+      "restoreTitle": "恢复数据库",
+      "storageLocation": "备份存储位置",
+      "total": "共 {{count}} 份",
+      "wholeDb": "整库备份",
+      "log": {
+        "loadBackupsFailed": "加载备份列表失败:"
+      }
+    },
+    "cache": {
+      "cacheLimit": "缓存上限",
+      "cacheLocation": "缩略图缓存位置",
+      "cleanAll": "清理全部",
+      "cleanConfirm": "确定要清理全部 {{count}} 个缩略图缓存吗？\n（占用 {{size}}，清理后访问图片会重新生成）",
+      "cleanTitle": "清理全部缩略图",
+      "confirmClean": "确认清理",
+      "currentUsage": "当前占用",
+      "enforceLru": "立即 LRU 检查",
+      "fileCount": "{{count}} 个文件",
+      "hint": "提示：清理后再次访问被清理的图片会自动重新生成缩略图。LRU 淘汰不会影响原图，仅清理缓存。",
+      "limit": "上限",
+      "lruHint": "超限自动 LRU 淘汰",
+      "modifyDir": "修改目录",
+      "noData": "暂无数据",
+      "openDir": "打开目录",
+      "refreshStats": "刷新统计",
+      "usage": "使用率",
+      "strategyTitle": "淘汰策略",
+      "strategyDesc": "缓存超限时自动删除最久未访问的缩略图，访问记录跨重启保留。",
+      "invalidLimit": "请输入 0.1~100 之间的数值",
+      "customLimitHint": "GB（按回车应用）"
+    },
+    "clear": {
+      "cleanMissing": "清理丢失记录",
+      "cleaning": "清理中...",
+      "clearConfirm": "确定要清除所有本地数据吗？此操作将删除数据库记录、扫描历史、标签和设置，但不会影响原始媒体文件。",
+      "clearLocal": "清除本地数据",
+      "clearTitle": "清除本地数据",
+      "missingConfirm": "确定要清除所有标记为\"已丢失\"的记录吗？此操作仅删除数据库索引，不会影响其他正常文件，且不可撤销。",
+      "missingConfirmTitle": "清理丢失记录",
+      "missingDesc": "扫描时若发现文件已被外部删除（连续两次未找到），会标记为\"已丢失\"。点击下方按钮可一次性清除所有丢失记录，仅删除数据库索引，不影响其他正常文件。",
+      "missingTitle": "清理丢失记录"
+    },
+    "crash": {
+      "clear": "清空记录",
+      "clearConfirm": "确定要清空所有崩溃 dump 文件吗？此操作将永久删除所有崩溃记录，无法恢复。",
+      "clearDisabled": "暂无崩溃记录可清空",
+      "clearTitle": "清空崩溃记录",
+      "clearing": "清空中…",
+      "crashFiles": "崩溃文件",
+      "crashReason": "崩溃原因",
+      "desc": "自动收集进程崩溃 dump 文件，便于问题反馈与排查",
+      "empty": "暂无崩溃记录",
+      "emptyLoading": "暂无崩溃记录，加载中…",
+      "emptyStable": "暂无崩溃记录，软件运行稳定",
+      "hint": "崩溃 dump 文件由 Electron crashpad 自动生成，保留最近 10 份且超过 30 天自动清理。仅记录进程崩溃信息，不含用户隐私数据。",
+      "listCount": "共 {{count}} 个",
+      "listTitle": "崩溃记录（按时间倒序）",
+      "modifyDir": "修改目录",
+      "oldest": "最早记录",
+      "openDir": "打开目录",
+      "processMain": "主进程",
+      "processOther": "其他",
+      "processRenderer": "渲染进程",
+      "refresh": "刷新",
+      "size": "大小",
+      "storageLocation": "崩溃文件存储位置",
+      "storageUsage": "占用空间",
+      "title": "崩溃报告",
+      "topFrame": "顶层栈帧",
+      "userDataPath": "userData/crashes/"
+    },
+    "display": {
+      "compactMode": "紧凑模式",
+      "compactModeDesc": "减小卡片内边距和元素间距，单屏显示更多内容",
+      "fontSize": "字号大小",
+      "fontSizeHint": "调整界面文字大小，影响所有页面与对话框",
+      "fontSizeLarge": "大",
+      "fontSizeNormal": "标准",
+      "fontSizeSmall": "小",
+      "fontSizeXLarge": "特大",
+      "reduceMotion": "动效减弱",
+      "reduceMotionDesc": "关闭过渡动画和悬停效果，提升低性能设备响应速度"
+    },
+    "export": {
+      "clearDir": "清除",
+      "defaultDir": "默认导出路径",
+      "defaultDirHint": "配置后，批量导出可一键导出到此路径，无需每次选择目录",
+      "defaultDirPlaceholder": "未配置（导出时将询问目标目录）",
+      "description": "默认导出路径与智能命名规则",
+      "namingPattern": "导出命名规则",
+      "namingPatternEmpty": "留空则使用原文件名；命名冲突时自动追加序号",
+      "namingPatternHint": "支持变量：{date} 当前日期 · {album_type} 相册类型 · {uid} 角色UID · {original_name} 原文件名 · {sequence} 序号",
+      "namingPatternPlaceholder": "如：{date}_{album_type}_{original_name}",
+      "preview": "预览",
+      "previewEmpty": "原文件名.扩展名",
+      "selectDir": "选择",
+      "title": "导出工作流",
+      "previewAlbumType": "拍摄截图",
+      "previewExtension": ".扩展名"
+    },
+    "fileops": {
+      "batchThreshold": "批量操作阈值",
+      "batchThresholdDesc": "选中文件超过此数量时弹出二次确认",
+      "deleteConfirm": "删除前确认",
+      "deleteConfirmDesc": "删除文件时弹出确认对话框，避免误删",
+      "description": "删除确认、批量操作阈值等文件操作偏好",
+      "permanentDoubleConfirm": "永久删除二次确认",
+      "permanentDoubleConfirmDesc": "使用 Shift+Delete 永久删除时再次弹出确认",
+      "preferSoftDelete": "优先使用软删除",
+      "preferSoftDeleteDesc": "删除时默认移至回收站，可在回收站恢复",
+      "thresholdCount": "阈值数量",
+      "title": "文件操作"
+    },
+    "groups": {
+      "about": "关于",
+      "appearance": "外观",
+      "data": "数据管理",
+      "diagnostics": "日志与诊断",
+      "general": "通用",
+      "plugins": "插件",
+      "profile": "角色档案",
+      "scan": "扫描",
+      "tools": "工具"
+    },
+    "language": {
+      "auto": "跟随系统",
+      "description": "切换界面显示语言",
+      "restartHint": "部分文本可能需要重启应用才能完全刷新",
+      "title": "语言",
+      "loading": "加载语言包..."
+    },
+    "logs": {
+      "aggregateTooltip": "切换到聚合视图（相同错误合并显示）",
+      "clear": "清空日志",
+      "clearConfirm": "确定要清空所有历史日志吗？此操作将永久删除所有故障记录和日志文件，无法恢复。",
+      "clearDisabled": "暂无日志可清空",
+      "clearTitle": "清空日志",
+      "clearing": "清空中…",
+      "copy": "复制",
+      "copySample": "复制样本",
+      "dayTooltip": "{{date}}：{{count}} 条故障",
+      "desc": "自动记录软件运行异常，便于问题反馈与排查",
+      "empty": "暂无故障记录",
+      "emptyHint": "软件运行过程中的异常会自动记录到此",
+      "expandFault": "展开故障详情: {{summary}}",
+      "expandSample": "展开聚合详情: {{summary}}",
+      "export": "导出日志",
+      "exportDisabled": "暂无日志可导出",
+      "exporting": "导出中…",
+      "faultId": "故障 ID: {{id}}",
+      "faultTotal": "故障总数",
+      "firstSeen": "首次: {{time}}",
+      "fullLog": "完整日志内容",
+      "hint": "日志按日期自动滚动存储，总占用上限 2GB 且超过 90 天自动清理。仅记录软件运行信息，不含用户隐私数据。",
+      "lastSeen": "最近: {{time}}",
+      "listAggregate": "故障聚合（按次数降序）",
+      "listCount": "共 {{count}} 条",
+      "listCountWithGroup": "共 {{count}} 条 · {{groups}} 组",
+      "listTimeline": "故障记录（按时间倒序）",
+      "logFiles": "日志文件",
+      "modifyDir": "修改目录",
+      "notInit": "未初始化",
+      "occurrenceCount": "出现次数: {{count}}",
+      "openDir": "打开目录",
+      "refresh": "刷新",
+      "sampleDetail": "样本详情（最近一条）",
+      "sourceFile": "来源文件: {{file}}",
+      "storageLocation": "日志存储位置",
+      "storageUsage": "占用空间",
+      "switchAggregate": "聚合",
+      "switchTimeline": "时间序",
+      "timelineTooltip": "切换到时间序视图",
+      "title": "日志管理",
+      "totalLabel": "总计: {{count}}",
+      "trendTitle": "错误趋势（最近 14 天）",
+      "trendTotal": "共 {{count}} 条"
+    },
+    "plugin": {
+      "checkUpdate": "检查更新",
+      "description": "管理已安装的扩展插件，支持启用、禁用、卸载与安装新插件",
+      "detail": "详情",
+      "detailTitle": "插件详情 - {{name}}",
+      "disable": "禁用",
+      "disabled": "插件 {{name}} 已禁用",
+      "empty": "暂无已安装插件",
+      "enable": "启用",
+      "enabled": "插件 {{name}} 已启用",
+      "fieldActivationPoints": "激活点",
+      "fieldActive": "状态",
+      "fieldAuthor": "作者",
+      "fieldDescription": "描述",
+      "fieldError": "错误信息",
+      "fieldExtensionPoints": "扩展点",
+      "fieldLicense": "协议",
+      "fieldMain": "入口",
+      "fieldPermissions": "权限",
+      "fieldVersion": "版本",
+      "install": "安装插件",
+      "installHint": "请输入 npm 包名或本地 .tgz 文件路径",
+      "installPlaceholder": "如：custom-watermark-template 或 C:\\path\\to\\plugin.tgz",
+      "installTitle": "安装插件",
+      "installed": "插件安装成功",
+      "noUpdate": "插件 {{name}} 已是最新版本",
+      "notAvailable": "不可用（预览版）",
+      "statusDisabled": "已禁用",
+      "statusEnabled": "已启用",
+      "statusError": "加载错误",
+      "storagePath": "插件存储目录",
+      "storagePathDesc": "插件文件存放的本地目录路径",
+      "uninstall": "卸载",
+      "uninstallConfirm": "确认卸载插件 {{name}}？卸载后插件及其扩展将不再可用。",
+      "uninstallTitle": "卸载插件",
+      "uninstalled": "插件 {{name}} 已卸载",
+      "update": "更新",
+      "updateConfirm": "发现新版本 {{version}}，是否更新插件 {{name}}？",
+      "updateTitle": "更新插件",
+      "updated": "插件 {{name}} 更新成功"
+    },
+    "profile": {
+      "add": "添加",
+      "addProfile": "新增档案",
+      "cancel": "取消",
+      "deleteProfile": "删除档案",
+      "editNickname": "编辑昵称",
+      "empty": "暂无档案",
+      "images": "图片",
+      "list": "档案列表",
+      "loading": "加载中…",
+      "nicknamePlaceholder": "昵称（可选）",
+      "noData": "暂无数据",
+      "outfitTop": "套装偏好 Top 5",
+      "photos": "{{count}} 张",
+      "photosWithPercent": "{{count}} 张（{{percent}}%）",
+      "save": "保存",
+      "sceneTop": "场景偏好 Top 5",
+      "shotRange": "拍摄时间范围：",
+      "stats": "拍摄统计（{{name}}）",
+      "storageUsage": "存储占用",
+      "switchTo": "切换到此档案",
+      "timeTop": "时段偏好",
+      "totalFiles": "总文件数",
+      "uidPlaceholder": "UID（8-12 位数字）",
+      "videos": "视频",
+      "virtualBadge": "无媒体（虚拟）",
+      "cleanupVirtual": "清理虚拟档案",
+      "cleanupVirtualConfirm": "确定清理 {{count}} 个无媒体的虚拟档案吗？这些档案是扫描时自动注册但实际不存在对应媒体文件。",
+      "noVirtual": "没有需要清理的虚拟档案",
+      "cleanupDone": "已清理 {{count}} 个虚拟档案",
+      "cleanupPartial": "清理完成，但 {{failed}} 个虚拟档案删除失败"
+    },
+    "scan": {
+      "addPath": "添加游戏目录",
+      "adding": "添加中…",
+      "analyzeNow": "立即分析",
+      "analyzing": "分析中…",
+      "emptyPaths": "未配置自定义游戏目录，扫描器将自动全盘搜索游戏特征文件",
+      "incremental": "增量扫描",
+      "pathAdded": "已添加游戏目录",
+      "pathExists": "该目录已存在",
+      "pathLimit": "最多 {{max}} 个游戏目录",
+      "pathRemove": "移除",
+      "pathRemoved": "已移除游戏目录",
+      "pathsDescription": "手动指定游戏安装目录（或相册 GamePlayPhotos 文件夹），扫描时优先搜索这些路径。当自动扫描失效时，可在此手动指定目录作为兜底。",
+      "sceneTimeDesc": "基于图像亮度直方图自动识别日景/夜景/黎明/黄昏",
+      "sceneTimeTitle": "场景时段分析",
+      "importRootsTitle": "指定目录",
+      "importRootsDescription": "通过“指定目录扫描”登记的目录，可在此移除其管理权限",
+      "importRootsEmpty": "尚未登记任何指定目录",
+      "importRootsLoading": "加载中…",
+      "importRootsRemove": "移除该指定目录",
+      "importRootsManageHint": "已通过“指定目录扫描”登记的目录请在“指定目录”中管理",
+      "importRootsConfirmTitle": "移除指定目录",
+      "importRootsConfirmBody": "将移除目录“{{path}}”的登记。是否同时清除其媒体索引记录？",
+      "importRootsConfirmClearRecords": "同时清除该目录的媒体索引记录（移入回收站，可恢复）",
+      "importRootsClearRecordsHint": "提示：勾选则媒体移入回收站（可恢复）；不勾选则保留记录，但其在“图库”与“缓存”板块均不再显示（关闭目录的数据仍在库中，可经重新扫描恢复）。",
+      "importRootsConfirmCancel": "取消",
+      "importRootsConfirmRemove": "确认移除",
+      "importRootsRemoving": "移除中…",
+      "importRootsRemovedOnly": "已移出管理",
+      "importRootsRemovedWithCleared": "已移出管理并清除 {{count}} 条媒体记录",
+      "importRootsClearFailed": "已移出管理，但清除该目录的媒体索引记录失败，媒体记录仍保留在库中",
+      "importRootsRemoveFailed": "移除指定目录失败",
+      "importRootsLoadFailed": "加载指定目录失败",
+      "importRootsAdd": "添加指定目录",
+      "importRootsAddScanning": "正在扫描指定目录…",
+      "importRootsAddSuccess": "已添加指定目录：{{path}}",
+      "importRootsAddFailed": "指定目录扫描失败：{{reason}}",
+      "gameRootsDescription": "列出本机探测到的全部游戏安装目录，勾选参与扫描的目录；存在多个目录时默认选中修改时间最新且含官方相册的那个。",
+      "gameRootsLoading": "正在检测游戏目录…",
+      "gameRootsEmpty": "未检测到任何游戏安装目录，请在「游戏目录」中手动添加，或使用下方的手动兜底扫描。",
+      "gameRootsLoadFailed": "检测游戏目录失败：{{reason}}",
+      "gameRootsRetry": "重试",
+      "gameRootsSaved": "已保存扫描目录选择",
+      "hasGamePlayPhotos": "含官方相册",
+      "noGamePlayPhotos": "未检出官方相册",
+      "sourceCustom": "手动添加",
+      "sourceOfficial": "官方启动器",
+      "sourceSteam": "Steam",
+      "sourceEpic": "Epic",
+      "fallbackDescription": "自动定位失败时，可手动选择目录并立即扫描；所选目录会自动保存，下次启动优先扫描（支持多个）。",
+      "fallbackPickGameRoot": "选择游戏安装根目录",
+      "fallbackPickAlbumDir": "直接选择 GamePlayPhotos 文件夹",
+      "fallbackRootNoAlbum": "该目录下未检出官方相册（GamePlayPhotos），请确认选择的是包含 X6Game 的游戏安装根目录",
+      "fallbackScanSuccess": "扫描完成，发现 {{count}} 个媒体文件",
+      "fallbackScanFailed": "扫描失败：{{reason}}",
+      "fallbackScanHint": "可改用「直接选择 GamePlayPhotos 文件夹」，或在「扫描链路诊断」中导出日志后反馈。",
+      "fallbackHint": "一级兜底选择包含 X6Game 的游戏安装根目录（程序自动拼接 GamePlayPhotos）；二级兜底直接选择 GamePlayPhotos 文件夹。若提示权限不足（E003），可点击「以管理员身份重启」。",
+      "relaunchAsAdmin": "以管理员身份重启",
+      "elevating": "正在以管理员身份重启…",
+      "elevateFailed": "提权重启失败：{{reason}}"
+    },
+    "sections": {
+      "aboutContact": "联系方式",
+      "aboutInfo": "应用信息",
+      "aboutLicense": "致谢与开源协议",
+      "dataBackup": "数据库备份",
+      "dataCache": "缓存管理",
+      "dataClear": "清除数据",
+      "diagnosticsCrash": "崩溃报告",
+      "diagnosticsLogs": "日志管理",
+      "scanDiagnostic": "扫描链路诊断",
+      "display": "字体与显示",
+      "exportWorkflow": "导出工作流",
+      "fileops": "文件操作",
+      "language": "语言",
+      "pluginManage": "插件管理",
+      "profileManage": "档案管理",
+      "scanOptions": "扫描选项",
+      "scanPaths": "游戏目录",
+      "gameRoots": "检测到的游戏目录",
+      "scanFallback": "手动兜底扫描",
+      "importRoots": "指定目录",
+      "shareCode": "分享码工具",
+      "startup": "启动行为",
+      "theme": "主题"
+    },
+    "startup": {
+      "autoScan": "启动时自动扫描",
+      "autoScanDesc": "开启后，应用启动时将自动扫描游戏路径中的新增媒体文件。",
+      "description": "应用启动时的自动行为配置",
+      "title": "启动行为",
+      "hardwareAcceleration": "GPU 硬件加速",
+      "hardwareAccelerationDesc": "关闭后改用软件渲染，可规避部分显卡导致的启动崩溃。修改后需重启应用生效。",
+      "hardwareAccelerationRestartHint": "GPU 硬件加速设置已保存，需要重启应用才能生效。是否立即重启？",
+      "restartNow": "立即重启",
+      "restartLater": "稍后重启"
+    },
+    "theme": {
+      "desc": "切换后实时生效，主题偏好会自动保存到本地配置。",
+      "label": "界面主题"
+    },
+    "title": "设置",
+    "tools": {
+      "shareCode": {
+        "decoder": "分享码解码器",
+        "decoderDesc": "解码游戏内染色分享码、家园建造分享码，或加密相机参数。支持提取时间戳、UID、服务器 ID 等元数据。",
+        "openTool": "打开工具"
+      }
+    },
+    "navigation": {
+      "ariaLabel": "设置导航"
+    },
+    "plugins": {
+      "error": {
+        "unavailable": "插件系统不可用（预览版无 IPC）"
+      }
+    }
+  },
+  "share": {
+    "guide": {
+      "channels": {
+        "qq": "QQ",
+        "vivo": "vivo办公套件",
+        "wechat": "微信"
+      },
+      "failed": "分享失败",
+      "guides": {
+        "qq": {
+          "notInstalled": "未检测到 QQ 安装\n文件已复制到剪贴板，可手动打开软件后粘贴发送",
+          "notRunning": "✅ 文件已复制到剪贴板\n检测到 QQ 未运行，点击下方按钮启动后粘贴发送",
+          "running": "✅ 文件已复制到剪贴板\n请打开 QQ 聊天窗口，按 Ctrl+V 粘贴发送"
+        },
+        "vivo": {
+          "notInstalled": "未检测到 vivo 办公套件安装\n文件已复制到剪贴板，可手动打开软件后粘贴同步",
+          "notRunning": "✅ 文件已复制到剪贴板\n检测到 vivo 办公套件未运行，点击下方按钮启动后粘贴同步",
+          "running": "✅ 文件已复制到剪贴板\n请打开 vivo 办公套件，按 Ctrl+V 粘贴同步到手机"
+        },
+        "wechat": {
+          "notInstalled": "未检测到微信安装\n文件已复制到剪贴板，可手动打开软件后粘贴发送",
+          "notRunning": "✅ 文件已复制到剪贴板\n检测到微信未运行，点击下方按钮启动后粘贴发送",
+          "running": "✅ 文件已复制到剪贴板\n请打开微信聊天窗口，按 Ctrl+V 粘贴发送"
+        }
+      },
+      "known": "知道了",
+      "launchFailed": "启动失败",
+      "launchSuccess": "已启动，请等待窗口加载完成后粘贴",
+      "launching": "正在启动...",
+      "open": "打开{{name}}",
+      "shareTo": "分享到{{name}}",
+      "skipped": "（已跳过 {{count}} 个不可访问的文件）"
+    },
+    "menu": {
+      "label": "分享",
+      "toQQ": "分享到QQ",
+      "toVivo": "分享到vivo办公套件",
+      "toWechat": "分享到微信"
+    },
+    "message": {
+      "allInaccessible": "所有文件均不可访问，请检查文件是否存在",
+      "copiedToClipboard": "已复制 {{count}} 个文件到剪贴板",
+      "copiedWithSkipped": "已复制 {{count}} 个文件（跳过 {{skipped}} 个不可访问）",
+      "copyFailed": "复制失败: {{reason}}",
+      "exeNotExist": "可执行文件不存在",
+      "launched": "已启动",
+      "launchFailed": "启动失败: {{reason}}",
+      "noFilesSelected": "未选择任何文件",
+      "notInstalled": "未检测到该软件安装",
+      "unsupportedPlatform": "当前平台不支持 CF_HDROP 剪贴板写入"
+    },
+    "wifi": {
+      "accessUrl": "手机浏览器访问以下地址",
+      "copyPin": "复制 PIN",
+      "copyPinFailed": "复制失败，请手动记录",
+      "copyUrl": "复制地址",
+      "copyUrlFailed": "复制失败，请手动选择地址复制",
+      "fileCount": "文件数",
+      "noFiles": "请先选择要分享的文件",
+      "pin": "访问 PIN 码",
+      "pinCopied": "PIN 码已复制",
+      "port": "端口",
+      "remainTime": "剩余时间",
+      "restart": "重启服务",
+      "restartButton": "重新启动",
+      "restartTitle": "重新启动服务（更换端口）",
+      "startFailed": "启动失败",
+      "started": "分享服务已启动，端口 {{port}}",
+      "starting": "正在启动分享服务…",
+      "stop": "停止分享",
+      "stopFailed": "停止失败",
+      "stopped": "分享服务已停止",
+      "timeoutClosed": "分享服务已超时自动关闭",
+      "tips": {
+        "firewall": "· 首次启动若被防火墙拦截，请允许 Node 通过",
+        "lanOnly": "· 服务仅本局域网可访问，不会暴露公网",
+        "pinAuth": "· 手机端首次访问需输入 PIN 码认证",
+        "sameWifi": "· 确保手机与电脑连接同一 WiFi",
+        "timeout": "· 超时自动关闭，也可手动停止"
+      },
+      "title": "WiFi 局域网分享",
+      "unsupported": "当前环境不支持 WiFi 分享",
+      "urlCopied": "地址已复制到剪贴板"
+    },
+    "log": {
+      "copiedToClipboard": "[ShareClipboard] 已复制 {{count}} 个文件到剪贴板（跳过 {{skipped}} 个）",
+      "copyFailed": "[ShareClipboard] 复制失败:",
+      "detectInstallPathFailed": "[ShareClipboard] 检测 {{channelId}} 安装路径失败:",
+      "launchFailed": "[ShareClipboard] 启动 {{channelId}} 失败:",
+      "launched": "[ShareClipboard] 已启动 {{channelId}}: {{installPath}}"
+    }
+  },
+  "timeLabel": {
+    "dawn": "黎明",
+    "day": "日间",
+    "dusk": "黄昏",
+    "night": "夜间",
+    "unknown": "未知"
+  },
+  "titleBar": {
+    "appTitle": "无限暖暖相册管理工具"
+  },
+  "taskProgress": {
+    "calculating": "计算中...",
+    "cancel": "取消任务",
+    "phase": {
+      "cancelled": "已取消",
+      "done": "已完成",
+      "error": "出错",
+      "finalizing": "收尾中...",
+      "preparing": "准备中...",
+      "processing": "处理中..."
+    },
+    "remaining": "剩余 {{time}}"
+  },
+  "toast": {
+    "autoScanOff": "已关闭启动时自动扫描",
+    "autoScanOn": "已开启启动时自动扫描",
+    "gpuOff": "已关闭 GPU 硬件加速（重启后生效）",
+    "gpuOn": "已开启 GPU 硬件加速（重启后生效）",
+    "batchDelete": {
+      "allSucceeded": "已将 {{count}} 个文件移至回收站",
+      "missingFile": "找不到该文件的记录（id: {{id}}）",
+      "partial": "成功 {{succeeded}} 个，失败 {{failed}} 个"
+    },
+    "batchExportFailed": "批量导出失败",
+    "batchMoveFailed": "批量移动失败",
+    "batchRenameFailed": "批量重命名失败",
+    "batchRenameUnsupported": "当前环境不支持批量重命名",
+    "batchThresholdOff": "已关闭批量操作阈值",
+    "batchThresholdOn": "已开启批量操作阈值",
+    "batchThresholdSet": "批量操作阈值已设为 {{count}}",
+    "cancelFailed": "取消失败",
+    "cancelRequested": "已请求取消，正在停止...",
+    "cancelUnsupported": "当前环境不支持取消",
+    "copyFailed": "复制失败",
+    "copyUnsupported": "当前环境不支持复制",
+    "decodeFailed": "解码失败",
+    "defaultDirCleared": "已清除默认导出路径",
+    "defaultDirSet": "默认导出路径已设为 {{dir}}",
+    "deleteConfirmOff": "已关闭删除前确认",
+    "deleteConfirmOn": "已开启删除前确认",
+    "deleteFailed": "删除失败",
+    "deleteFileTitle": "删除文件",
+    "deleteUnsupported": "当前环境不支持删除",
+    "exportFailed": "导出失败",
+    "exportUnsupported": "当前环境不支持导出",
+    "favorite": "收藏",
+    "favoriteFailed": "收藏操作失败",
+    "fileProperties": {
+      "resolutionDash": "—",
+      "template": "名称：{{name}}\n路径：{{path}}\n类型：{{type}}\n大小：{{size}}\n分辨率：{{resolution}}\n创建时间：{{createdAt}}",
+      "typeImage": "图片",
+      "typeVideo": "视频"
+    },
+    "imageLoadFailed": "图片加载失败",
+    "invalidIds": "选中文件 id 无效",
+    "ipcCallFailed": "IPC 调用失败",
+    "languageChanged": "语言已切换为 {{lang}}",
+    "mediaLoadFailed": "媒体数据加载失败，请重试或检查数据库",
+    "moveFailed": "移动失败",
+    "moveToRecycleConfirm": "确定要将 \"{{name}}\" 移至回收站吗？",
+    "moveUnsupported": "当前环境不支持移动",
+    "noCancellableTask": "当前没有可取消的水印任务",
+    "noDefaultExportDir": "未配置默认导出路径，请先在设置中配置",
+    "noSelectionTransfer": "未选择要转移的文件",
+    "noWatermarkSelection": "未选择可添加水印的图片",
+    "permanentDeleteConfirm": "确定要永久删除 \"{{name}}\" 吗？此操作不可恢复。",
+    "permanentDeleteTitle": "永久删除",
+    "permanentDoubleConfirmOff": "已关闭永久删除二次确认",
+    "permanentDoubleConfirmOn": "已开启永久删除二次确认",
+    "preferSoftDeleteOff": "已关闭优先软删除",
+    "preferSoftDeleteOn": "已开启优先软删除",
+    "previewRenderFailed": "预览渲染失败",
+    "renameFailed": "重命名失败",
+    "renameUnsupported": "当前环境不支持重命名",
+    "saveAsFailed": "另存为失败",
+    "saveAsUnsupported": "当前环境不支持另存为",
+    "transferError": "跨档案转移失败",
+    "transferFailed": "转移失败",
+    "transferSuccess": "转移成功",
+    "transferUnsupported": "当前环境不支持跨档案转移",
+    "backup": {
+      "restored": "已从备份恢复，正在校验数据"
+    },
+    "scanInterrupted": "上次扫描未完成，部分文件可能未入库，建议重新扫描",
+    "undo": {
+      "failed": "撤销失败",
+      "favorite": "收藏 \"{{name}}\"",
+      "move": "移动 \"{{name}}\"",
+      "moveToRecycle": "移动 \"{{name}}\" 到回收站",
+      "none": "没有可撤销的操作",
+      "permanentDelete": "永久删除 \"{{name}}\"",
+      "rename": "重命名 \"{{oldName}}\" 为 \"{{newName}}\"",
+      "undone": "已撤销：{{description}}",
+      "unfavorite": "取消收藏 \"{{name}}\"",
+      "conflictPrompt": "该文件已被修改，是否仍要撤销？"
+    },
+    "undoUnsupported": "当前环境不支持撤销",
+    "unfavorite": "取消收藏",
+    "unknownError": "未知错误",
+    "watermarkCancelled": "水印任务已取消",
+    "watermarkFailed": "批量水印失败",
+    "watermarkNotConfigured": "请先配置水印",
+    "watermarkUnsupported": "当前环境不支持批量水印",
+    "scanFailed": "扫描失败",
+    "scanNoGameDir": "未找到游戏目录，请尝试手动指定路径",
+    "manualPathHint": "未找到游戏目录",
+    "manualPathHintMessage": "请在「扫描选项」中选择「指定目录」手动选择游戏安装路径",
+    "scanCompletedNoGameShots": "扫描完成：未发现游戏内截图。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
+    "scanFoundButGalleryEmpty": "扫描完成：发现 {{count}} 个文件，但均不是游戏内截图（启动器图片已收入「缓存」板块）。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
+    "imageProcessorCanvasFailed": "无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用",
+    "imageProcessorLoadFailed": "加载图片失败: {{src}}"
+  },
+  "video": {
+    "applyEdit": "应用并导出",
+    "backToDetail": "返回详情",
+    "color": "调色",
+    "colorDesc": "调整亮度/对比度/饱和度/色温/色调，参数在导出时通过 ffmpeg 滤镜应用到视频。",
+    "colorNoPreview": "预览不实时套用调色与水印，参数将在导出时一次性应用。",
+    "confirmExport": "将视频转换为 {{format}} 格式？转换需重编码，耗时较长。",
+    "confirmLivePhoto": "将视频导出为 Apple Live Photo（JPG + MOV 配对文件）？转码耗时较长，生成的文件可在 iPhone 上识别为 Live Photo。",
+    "confirmSpeed": "将以 {{speed}}x 速度导出新视频文件？预计时长 {{duration}}",
+    "confirmTrim": "将裁剪区间 {{start}} - {{end}}（时长 {{duration}}）导出为新视频文件？",
+    "customSpeed": "自定义速度",
+    "editFailed": "视频编辑失败",
+    "editSuccess": "视频编辑成功",
+    "editorUnsupported": "当前环境不支持视频编辑（缺少 utilityProcess）",
+    "endLabel": "终点",
+    "endLtStart": "终点不能小于或等于起点",
+    "estimatedDuration": "预计时长",
+    "exportDesc": "将当前视频转换为其他格式。转换需重编码，处理时间取决于视频时长。GIF 会丢失音频。",
+    "exportFormats": {
+      "avi": "无损但体积大",
+      "gif": "动图，无声",
+      "mov": "Apple QuickTime",
+      "mp4": "通用兼容性最佳",
+      "webm": "Web 友好，体积小"
+    },
+    "exportMode": "导出",
+    "exportVideo": "导出视频",
+    "fastMotionLabel": "4.0x 快放",
+    "formatConvert": "格式转换",
+    "gifWarning": "GIF 格式仅保留视频画面，音频将被丢弃；同时为控制体积，分辨率和帧率会自动降低。",
+    "jumpToEnd": "跳到终点",
+    "jumpToStart": "跳到起点",
+    "livePhoto": {
+      "button": "导出 Live Photo",
+      "desc": "生成 JPG（封面）+ MOV（动态）配对文件，可在 iPhone 上识别为 Live Photo。",
+      "limitation": "已知限制：JPG 未写入 Apple MakerNote ContentIdentifier，iCloud 同步可能丢失配对，本地导入正常。",
+      "title": "导出为 Live Photo"
+    },
+    "notes": {
+      "noModifyOriginal": "导出生成新文件，不修改原视频",
+      "reencode": "调速需重编码，耗时较长",
+      "streamCopy": "裁剪使用流复制（同编码），速度快",
+      "supportedFormats": "支持 mp4/mov/avi/mkv/webm/wmv"
+    },
+    "notesTitle": "说明",
+    "originalFormat": "原始格式",
+    "originalSpeedLabel": "1.0x 原速",
+    "outputDuration": "输出时长",
+    "playPause": "播放/暂停",
+    "previewSpeed": "预览速度",
+    "processing": "处理中...",
+    "readMetadataFailed": "读取视频元数据失败",
+    "resetColor": "重置调色",
+    "selectDirAndExport": "选择目录并导出",
+    "selectedRange": "选中区间",
+    "setToCurrent": "设为当前位置",
+    "slowMotionLabel": "0.25x 慢放",
+    "speed": "调速",
+    "speedChange": "速度变化",
+    "speedDesc": "选择目标速度（0.25x - 4.0x）。调速需要重编码，处理时间较长。预览时可实时查看效果。",
+    "speedFast": "快 {{n}}倍",
+    "speedOriginal": "原速",
+    "speedSlow": "慢 {{n}}倍",
+    "startGtEnd": "起点不能大于或等于终点",
+    "startLabel": "起点",
+    "targetFormat": "目标格式",
+    "trim": "裁剪",
+    "trimDesc": "拖动滑块或在播放过程中点击按钮设置起止时间。裁剪会输出新文件，不修改原视频。",
+    "trimmedDuration": "裁剪后时长",
+    "unknown": "未知",
+    "unknownCodec": "未知编码",
+    "watermark": "水印",
+    "watermarkDesc": "配置文字或图片水印，参数在导出时通过 ffmpeg drawtext/overlay 滤镜叠加到视频。"
+  },
+  "faultTypes": {
+    "uncaughtException": "主进程异常",
+    "unhandledRejection": "Promise 未处理",
+    "rendererCrash": "渲染进程崩溃",
+    "rendererError": "渲染层错误",
+    "ipcError": "IPC 处理错误",
+    "manual": "手动记录",
+    "rendererComponent": "组件渲染异常",
+    "rendererPromise": "渲染层 Promise",
+    "rendererResource": "资源加载失败",
+    "exitDiagnosis": "退出诊断",
+    "workerCrash": "Worker 进程崩溃",
+    "workerRestart": "Worker 自动重启",
+    "databaseCorruption": "数据库损坏",
+    "databaseRestore": "数据库恢复",
+    "indexingTimeout": "建立索引超时",
+    "renderer-not-ready": "渲染进程未就绪",
+    "schedulerStuckPaused": "调度器长时间暂停已强制恢复",
+    "navigation-blocked": "导航已被拦截"
+  },
+  "albumTypes": {
+    "screenshot": "游戏截图",
+    "nikkiphotos_highquality": "高质量照片",
+    "nikkiphotos_lowquality": "低质量照片",
+    "videos": "游戏视频",
+    "magazinephotos": "杂志照",
+    "clockinphoto": "打卡照",
+    "cloudphotos": "云照片",
+    "cloudphotos_lowquality": "低质量云照片",
+    "collage": "拼图",
+    "highquality": "高质量拼图",
+    "lowquality": "低质量拼图",
+    "collagephoto": "拼图照片",
+    "customavatar": "自定义头像",
+    "customcard": "自定义名片",
+    "customhomeboardphoto": "主页照片",
+    "hometemplate": "主页模板",
+    "plantdyeing": "植物染色",
+    "diy": "DIY",
+    "xsdkqrcode": "二维码",
+    "mallpic": "商城图",
+    "video": "外部视频",
+    "movies": "游戏视频资源",
+    "profilephoto": "个人照",
+    "posephoto": "姿势照",
+    "groupphoto": "合影",
+    "storyphoto": "故事照",
+    "landscapephoto": "风景照",
+    "selfiephoto": "自拍",
+    "autophoto": "自动拍照",
+    "photostudio": "摄影棚",
+    "photoframe": "相框照",
+    "adventurephoto": "冒险照",
+    "diaryphoto": "日记照",
+    "activityphoto": "活动照",
+    "eventphoto": "事件照",
+    "festivalphoto": "节日照",
+    "missionphoto": "任务照",
+    "videoclip": "视频剪辑",
+    "custom": "自定义",
+    "unknown": "其他"
+  },
+  "lut": {
+    "builtin": {
+      "identity": "原色",
+      "tealOrange": "青橙电影",
+      "warmVintage": "暖调复古",
+      "coolDrama": "冷调戏剧",
+      "highContrast": "高对比"
+    },
+    "log": {
+      "persistFailed": "[LutPanel] 自定义 LUT 持久化失败:"
+    }
+  },
+  "watermark": {
+    "blendMode": {
+      "multiply": "正片叠底",
+      "normal": "正常",
+      "overlay": "叠加",
+      "screen": "滤色",
+      "softLight": "柔光"
+    },
+    "bold": "加粗",
+    "boldOff": "取消加粗",
+    "color": "颜色",
+    "deleteTemplateAria": "删除模板 {{name}}",
+    "deleteText": "删除",
+    "font": "字体",
+    "fontMicrosoftYaHei": "微软雅黑",
+    "fontMonospace": "等宽",
+    "fontSansSerif": "无衬线",
+    "fontSerif": "衬线",
+    "height": "高度",
+    "horizontalSpacing": "水平间距",
+    "imageMode": "图片水印",
+    "imagePreviewAlt": "水印预览",
+    "imageSelectButton": "选择",
+    "imageSelectPlaceholder": "选择 PNG 透明图片",
+    "imageWatermark": "水印图片",
+    "italic": "斜体",
+    "italicOff": "取消斜体",
+    "margin": "边距",
+    "opacity": "透明度",
+    "pluginTemplateImage": "图片",
+    "pluginTemplateText": "文字",
+    "pluginTemplates": "插件模板",
+    "position": "位置",
+    "positionBottomCenter": "中下",
+    "positionBottomLeft": "左下",
+    "positionBottomRight": "右下",
+    "positionCenter": "居中",
+    "positionCenterLeft": "左中",
+    "positionCenterRight": "右中",
+    "positionTopCenter": "中上",
+    "positionTopLeft": "左上",
+    "positionTopRight": "右上",
+    "presetAria": "应用{{name}}样式",
+    "presets": "样式预设",
+    "rotation": "旋转",
+    "saveTemplateAria": "保存水印模板",
+    "size": "大小",
+    "stylePresetCopyright": "版权水印",
+    "stylePresetCopyrightDesc": "居中半透明版权声明",
+    "stylePresetDateLabel": "日期标签",
+    "stylePresetDateLabelDesc": "右上角半透明日期标签",
+    "stylePresetPolaroid": "拍立得",
+    "stylePresetPolaroidDesc": "底部白色边框配文字",
+    "stylePresetSignature": "签名水印",
+    "stylePresetSignatureDesc": "右下角手写风格签名",
+    "templateNamePlaceholder": "模板名称",
+    "templates": "水印模板",
+    "text": "文字内容",
+    "textMode": "文字水印",
+    "textPlaceholder": "支持变量：{filename} {date} {time}",
+    "tileMode": "平铺模式",
+    "underline": "下划线",
+    "underlineOff": "取消下划线",
+    "verticalSpacing": "垂直间距",
+    "width": "宽度",
+    "log": {
+      "saveTemplateFailed": "保存水印模板失败:",
+      "deleteTemplateFailed": "删除水印模板失败:"
+    }
+  },
+  "camera": {
+    "aperture": "光圈",
+    "bloomIntensity": "光晕",
+    "bloomThreshold": "柔光范围",
+    "brightness": "亮度",
+    "cameraInfo": "相机信息",
+    "cameraLoc": "相机位置",
+    "cameraPitch": "镜头俯仰",
+    "cameraYaw": "镜头偏航",
+    "comparison": "镜头与构图",
+    "contrast": "对比度",
+    "copyCode": "复制参数代码",
+    "empty": "此图片未包含相机参数",
+    "errorPrefix": "参数解析失败",
+    "exposure": "曝光",
+    "filter": "滤镜",
+    "framedMoment": "定格",
+    "highlights": "高光",
+    "hidden": "已隐藏",
+    "light": "灯光",
+    "loading": "正在解析相机参数...",
+    "momoHidden": "隐藏大喵",
+    "notHidden": "未隐藏",
+    "optic": "光学与光效",
+    "pose": "动作场景",
+    "rawParams": "=== 原始参数 ===",
+    "scene": "场景与特效",
+    "sectionAdjust": "画面调节",
+    "shadows": "阴影",
+    "softIntensity": "柔光强度",
+    "unknown": "未知",
+    "vibrance": "自然饱和度",
+    "yes": "是",
+    "no": "否",
+    "saturation": "饱和度",
+    "zoom": "缩放",
+    "focalLength": "焦距",
+    "lensRotation": "镜头旋转",
+    "portraitMode": "竖构图",
+    "copyHeader": "=== 相机参数代码 ===",
+    "copyEnvHeader": "--- 环境信息 ---",
+    "copyErrorHeader": "--- 错误详情 ---",
+    "copyFaultId": "故障 ID: {{id}}",
+    "copyTime": "时间: {{time}}",
+    "copyType": "类型: {{type}}",
+    "copySummary": "摘要: {{summary}}",
+    "copyAppVersion": "应用版本: {{version}}",
+    "copyElectron": "Electron: {{version}}",
+    "copyNode": "Node: {{version}}",
+    "copyPlatform": "平台: {{platform}}",
+    "copyPidUptime": "PID: {{pid}}  运行时长: {{uptime}}s"
+  },
+  "batch": {
+    "actions": {
+      "ariaLabel": "批量操作",
+      "categorize": "分类",
+      "clearSelection": "清除选择",
+      "delete": "删除",
+      "export": "导出",
+      "exportSelectDir": "选择目录导出",
+      "exportToDefault": "导出到默认",
+      "exportToDefaultHint": "一键导出到默认文件夹（按命名规则自动重命名）",
+      "invertSelection": "反选",
+      "move": "移动",
+      "rename": "重命名",
+      "renameAria": "批量重命名",
+      "renameHint": "批量重命名",
+      "selectedCount": "{{count}} / {{total}} 项已选择",
+      "share": "分享",
+      "shareClipboardTitle": "复制到剪贴板并分享到微信/QQ/vivo",
+      "transferToProfile": "转移到档案",
+      "transferToProfileHint": "将选中文件转移到其他角色档案",
+      "watermark": "水印",
+      "wifiShare": "WiFi 分享",
+      "wifiShareHint": "WiFi 局域网分享",
+      "selectAll": "全选"
+    },
+    "rename": {
+      "cancel": "取消",
+      "confirmButton": "重命名 {{count}} 个文件",
+      "description": "共 {{count}} 个文件，冲突时自动追加 _1/_2 后缀",
+      "emptyError": "模板不能为空",
+      "examplePlaceholder": "例如：{date}_{seq}",
+      "invalidError": "模板不能包含 \\ / : * ? \" < > |",
+      "moreFiles": "... 还有 {{count}} 个文件",
+      "previewLabel": "预览（前 {{count}} 个）：",
+      "previewError": "解析后文件名包含非法字符",
+      "templateLabel": "命名模板",
+      "title": "批量重命名",
+      "varClickHint": "点击插入变量：",
+      "varDate": "日期",
+      "varDateDesc": "拍摄日期 YYYYMMDD",
+      "varOriginal": "原名",
+      "varOriginalDesc": "原始文件名（不含扩展名）",
+      "varOutfit": "套装",
+      "varOutfitDesc": "套装名，无标注为 unknown",
+      "varScene": "场景",
+      "varSceneDesc": "场景分类",
+      "varSeq": "序号",
+      "varSeqDesc": "从 1 开始递增",
+      "varTime": "时间",
+      "varTimeDesc": "拍摄时间 HHmmss"
+    }
+  },
+  "galleryPage": {
+    "cleanupCorruptedConfirm": "确定要清除所有标记为\"已损坏\"的记录吗？\n\n此操作仅删除数据库索引，不会删除源文件，且不可撤销。\n损坏记录通常由图片解码失败或视频元数据解析失败触发。",
+    "cleanupCorruptedCount": "已清理 {{count}} 条损坏记录",
+    "cleanupCorruptedFailed": "清理损坏记录失败",
+    "cleanupCorruptedTitle": "清理损坏记录",
+    "emptySubtitle": "点击扫描按钮开始扫描游戏截图",
+    "emptySubtitleScanned": "已完成扫描，未发现游戏内截图。可尝试扫描菜单中的「指定目录扫描」，或前往「缓存」板块查看启动器图片",
+    "emptyTitle": "暂无媒体文件",
+    "batchDeleteConfirm": "确定要将 {{count}} 个文件移至回收站吗？",
+    "batchDeleteTitle": "批量删除",
+    "confirmCancel": "取消",
+    "confirmOK": "确认",
+    "openLocationFailed": "打开文件所在位置失败",
+    "noPlayableMedia": "当前没有可播放的媒体文件",
+    "selectShareFirst": "请先选择要分享的媒体文件",
+    "selectShareFilesFirst": "请先选择要分享的文件",
+    "shareUnavailable": "分享接口不可用",
+    "showDuplicates": "显示重复",
+    "showDuplicatesChecked": "✓ 显示重复",
+    "showDuplicatesOff": "当前隐藏已标记的重复文件",
+    "showDuplicatesOn": "当前显示全部文件（含重复标记）",
+    "smartGroup": "智能分组",
+    "smartGroupToggle": "切换智能分组面板"
+  },
+  "diagnostics": {
+    "logs": {
+      "clearAllHint": "清空所有历史日志",
+      "copyAppVersion": "应用版本: {{version}}",
+      "copyElectron": "Electron: {{version}}",
+      "copyEnvInfoTitle": "--- 环境信息 ---",
+      "copyErrorDetailTitle": "--- 错误详情 ---",
+      "copyFaultId": "=== 故障 ID: {{id}} ===",
+      "copyNode": "Node: {{version}}",
+      "copyPid": "PID: {{pid}}  运行时长: {{uptime}}",
+      "copyPlatform": "平台: {{platform}} {{osVersion}}",
+      "copySummary": "摘要: {{summary}}",
+      "copyTime": "时间: {{time}}",
+      "copyType": "类型: {{type}}",
+      "exportAllHint": "导出全部日志为 ZIP 压缩包",
+      "refreshAria": "刷新日志",
+      "refreshHint": "刷新故障列表",
+      "sampleId": "样本 ID: {{id}}",
+      "unknown": "未知",
+      "loadFailed": "加载日志数据失败:",
+      "loadCrashesFailed": "加载崩溃报告数据失败:"
+    },
+    "crash": {
+      "clearAllHint": "清空所有崩溃 dump 文件",
+      "refreshAria": "刷新崩溃记录",
+      "refreshHint": "刷新崩溃列表",
+      "processType": {
+        "main": "主进程",
+        "renderer": "渲染进程",
+        "gpu": "GPU 进程",
+        "utility": "工具进程",
+        "plugin": "插件进程",
+        "unknown": "未知进程"
+      }
+    },
+    "scan": {
+      "title": "扫描链路诊断",
+      "legendOk": "成功",
+      "legendPathMissing": "路径不存在",
+      "legendPermission": "权限不足",
+      "legendEmpty": "目录为空",
+      "legendInfo": "信息",
+      "emptyHint": "运行一次扫描后，此处显示从「扫描启动」到「文件扫描」的全流程诊断轨迹。",
+      "autoRefresh": "自动刷新",
+      "refresh": "刷新",
+      "copy": "复制",
+      "clear": "清空",
+      "export": "导出诊断日志",
+      "exportAll": "导出全部日志(zip)",
+      "exportedTo": "已导出到 {{path}}",
+      "exportFailed": "导出失败: {{reason}}",
+      "errorCodeHint": "错误码 E001–E005 对应定位失败/子目录缺失/权限不足/无 UID/读取失败，导出日志可附于工单"
+    }
+  },
+  "main": {
+    "dialog": {
+      "instanceRunning": {
+        "title": "已有实例运行",
+        "message": "应用已在运行中",
+        "detail": "可能是之前的进程异常未退出，导致单实例锁未释放。\n\n点击\"清理并重启\"将自动结束所有残留进程并重启应用；\n点击\"手动处理\"将打开任务管理器供您手动结束进程；\n点击\"退出\"将直接关闭本窗口。",
+        "cleanupButton": "清理并重启",
+        "manualButton": "手动处理",
+        "exitButton": "退出"
+      },
+      "cleanupFailed": {
+        "title": "清理失败",
+        "message": "未能自动结束残留进程",
+        "detail": "可能原因：\n• 残留进程以管理员权限运行\n• PowerShell 执行策略限制\n• 安全软件拦截\n\n请手动打开任务管理器，结束所有\"无限暖暖相册管理工具\"进程后重试。",
+        "openTaskManager": "打开任务管理器"
+      },
+      "startupFailed": {
+        "title": "无限暖暖相册管理工具启动失败",
+        "message": "软件启动时遇到错误",
+        "detail": "{{message}}\n\n错误详情已记录到：\n{{logPath}}\n\n如反复出现，请将日志反馈给开发者。",
+        "openLogDir": "打开日志目录"
+      },
+      "validation": {
+        "messageRequired": "message 不能为空"
+      },
+      "defaultOk": "确定"
+    },
+    "error": {
+      "mainWindowNotInit": "主窗口未初始化",
+      "databaseNotInit": "数据库未初始化"
+    },
+    "editor": {
+      "dialog": {
+        "filterPresetName": "滤镜预设"
+      },
+      "error": {
+        "userCanceledSave": "用户取消保存",
+        "userCanceledSelect": "用户取消选择",
+        "userCanceledExportDir": "用户取消选择导出目录",
+        "jsonParseFailed": "JSON 解析失败",
+        "presetFormatInvalid": "预设格式无效",
+        "onlyIndexedPath": "安全限制：只能保存到已索引的媒体文件路径"
+      },
+      "validation": {
+        "nameRequired": "name 不能为空",
+        "nameMaxLength": "name 长度上限 128",
+        "categoryRequired": "category 不能为空",
+        "categoryMaxLength": "category 长度上限 64",
+        "dataUrlRequired": "dataUrl 不能为空",
+        "dataUrlMaxLength": "dataUrl 长度上限 200MB",
+        "fileNameInvalid": "文件名非法，请更换后重试"
+      },
+      "log": {
+        "cleanupSnapshotsDone": "[Editor] 清理 {{deleted}} 个旧快照，剩余 {{remaining}} 个",
+        "cleanupSnapshotsFailed": "[Editor] 清理旧快照失败:",
+        "backupSizeMismatch": "[Editor] 备份大小不匹配（原 {{original}} vs 备份 {{backup}}），删除不完整备份",
+        "backupFailed": "[Editor] 备份原图失败，继续保存:",
+        "backupSizeChanged": "[Editor] 备份大小已变化（原 {{original}} vs 当前 {{backup}}），拒绝恢复以避免原图损坏",
+        "restoredFromBackup": "[Editor] 写入失败，已从备份恢复原图",
+        "restoreFailed": "[Editor] 写入失败且恢复备份也失败:",
+        "recordHistoryFailed": "[Editor] 记录编辑历史失败:"
+      }
+    },
+    "plugin": {
+      "error": {
+        "notFound": "插件 {{name}} 不存在",
+        "filePathInvalid": "filePath 参数无效",
+        "filePathsInvalid": "filePaths 参数无效",
+        "targetDirInvalid": "targetDir 参数无效",
+        "fileNameInvalid": "fileName 参数无效",
+        "sqlInvalid": "sql 参数无效",
+        "selectOnly": "仅允许 SELECT 查询",
+        "tableNotInWhitelist": "查询的表不在白名单内",
+        "configInvalid": "config 参数无效",
+        "taskIdInvalid": "taskId 参数无效",
+        "currentTotalInvalid": "current/total 参数无效",
+        "notInitialized": "插件系统未初始化",
+        "noSpecifiers": "未指定要安装的插件"
+      },
+      "dialog": {
+        "installConfirmTitle": "插件安装确认",
+        "installConfirmMessage": "即将安装以下插件：",
+        "installConfirmDetail": "{{list}}\n\n插件拥有您授予的能力权限（如读写文件、应用水印等）。\n仅安装来自可信来源的插件。\n\n是否继续安装？",
+        "install": "安装"
+      }
+    },
+    "media": {
+      "dialog": {
+        "cancel": "取消",
+        "confirmDelete": "确认删除",
+        "confirmEmpty": "确认清空",
+        "permanentDeleteTitle": "确认彻底删除",
+        "permanentDeleteMessage": "即将彻底删除 {{count}} 项媒体，此操作不可恢复。",
+        "permanentDeleteDetail": "文件将被移至系统回收站，记录将从数据库永久清除。是否继续？",
+        "emptyRecycleBinTitle": "确认清空回收站",
+        "emptyRecycleBinMessage": "回收站中有 {{count}} 项媒体，清空后不可恢复。"
+      },
+      "error": {
+        "userCanceled": "用户取消操作",
+        "missingNotFound": "记录不存在或文件未标记为丢失",
+        "corruptedNotFound": "记录不存在或文件未标记为损坏"
+      },
+      "message": {
+        "softDeleted": "已将 {{count}} 项移至回收站",
+        "restored": "已恢复 {{count}} 项",
+        "permanentDeleted": "已彻底删除 {{count}} 项",
+        "permanentDeletePartial": "已彻底删除 {{deleted}} 项（{{failed}} 项移至回收站失败，已保留记录供手动处理）",
+        "recycleBinEmpty": "回收站为空，无需清理",
+        "recycleBinEmptied": "已清空回收站（共 {{count}} 项）",
+        "cleanedMissing": "已清理 {{count}} 条丢失记录",
+        "missingRemoved": "已从库中移除丢失记录",
+        "cleanedCorrupted": "已清理 {{count}} 条损坏记录",
+        "corruptedRemoved": "已从库中移除损坏记录",
+        "nothingToAnalyze": "没有需要分析的图片",
+        "sceneTimeAnalyzed": "已分析 {{count}} 张图片的场景时段"
+      },
+      "log": {
+        "recycleBinMoveFailed": "[RecycleBin] 移至系统回收站失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
+        "recycleBinMoveOmitted": " …(另 {{count}} 项)"
+      },
+      "validation": {
+        "tagsMax": "标签数量超过上限 100",
+        "notesMaxLength": "notes 长度必须在 0-10000 之间",
+        "outfitMaxLength": "outfit 长度必须在 0-100 之间"
+      }
+    },
+    "validator": {
+      "pathRequired": "路径不能为空",
+      "pathMaxLength": "路径长度上限 {{max}} 字符",
+      "pathArrayRequired": "路径数组不能为空",
+      "pathArrayMaxLength": "路径数组长度上限 {{max}}",
+      "mediaIdPositive": "mediaId 必须是正整数",
+      "mediaIdsRequired": "mediaId 数组不能为空",
+      "mediaIdsMaxLength": "mediaIds 数量超过上限 {{max}}",
+      "ratingRange": "评分必须在 0-5 之间",
+      "idPositive": "ID 必须是正整数",
+      "stringRequired": "字符串不能为空",
+      "stringMaxLength": "字符串长度上限 {{max}}",
+      "stringControlChars": "字符串不能包含控制字符",
+      "uidRequired": "UID 不能为空",
+      "uidMaxLength": "UID 长度上限 32 字符",
+      "uidAlphanumeric": "UID 只能包含字母和数字",
+      "urlRequired": "URL 不能为空",
+      "urlMaxLength": "URL 长度上限 2048 字符",
+      "urlInvalid": "URL 格式无效",
+      "urlHttpOnly": "仅允许 http/https 协议",
+      "backupFilenameInvalid": "备份文件名格式无效",
+      "limitBytesPositive": "缓存上限必须是正有限数",
+      "pathNotAllowed": "路径不在白名单内，禁止 {{op}} 操作",
+      "opWrite": "写入",
+      "opRead": "读取",
+      "paramValidationFailed": "参数校验失败：{{message}}",
+      "log": {
+        "handlerUncaught": "[IPC] handler 未捕获错误:"
+      },
+      "arrayStringRequired": "参数必须是字符串数组",
+      "ipcPathArrayMaxLength": "路径数量超过上限 {{max}}",
+      "pathStringLength": "路径必须是 1-{{max}} 字符的字符串",
+      "pathMustAbsolute": "路径必须是绝对路径: {{path}}",
+      "numberFinite": "{{name}} 必须是有限数字",
+      "numberRange": "{{name}} 必须在 {{min}}-{{max}} 范围内",
+      "intRequired": "{{name}} 必须是整数",
+      "stringTypeRequired": "{{name}} 必须是字符串",
+      "stringLengthRange": "{{name}} 长度必须在 1-{{max}} 之间",
+      "mediaIdsArrayRequired": "mediaIds 必须是数组",
+      "mediaIdsNotEmpty": "mediaIds 不能为空",
+      "tagNameStringRequired": "标签名必须是字符串",
+      "tagNameLength": "标签名长度必须在 1-{{max}} 之间",
+      "tagNameControlChars": "标签名包含非法控制字符",
+      "urlLength": "URL 长度必须在 1-2048 之间",
+      "protocolNotAllowed": "不允许的协议: {{protocol}}",
+      "urlInvalidLiteral": "无效的 URL",
+      "presetObjectRequired": "预设格式无效，应为 JSON 对象",
+      "presetNameRequired": "缺少有效的 name 字段",
+      "presetCategoryRequired": "缺少有效的 category 字段",
+      "presetParamsRequired": "缺少有效的 params 对象"
+    },
+    "db": {
+      "recovery": {
+        "openFailed": "数据库打开失败：{{error}}",
+        "integrityCheckFailed": "完整性校验失败：{{reason}}",
+        "dbHandleNull": "数据库句柄为空",
+        "reopenFailed": "恢复后重新打开数据库失败：{{error}}"
+      },
+      "log": {
+        "lockRetrySucceeded": "[DB] 数据库被外部进程短暂锁定，等待后重试打开成功",
+        "openFailedTryingBackup": "[DB] 数据库打开失败，尝试从备份恢复:",
+        "autoRecoveryFailed": "[DB] 自动恢复失败，应用将以可能损坏的数据库继续启动",
+        "autoVacuumFailed": "[DB] auto_vacuum 设置失败（已忽略）:",
+        "pragmaOptimizeFailed": "[DB] PRAGMA optimize 失败（已忽略）:",
+        "integrityCheckFault": "integrity_check 失败: {{reason}}",
+        "writeCleanExitMarkerFailed": "[DB] 写入干净退出标志失败（已忽略）:",
+        "closeCorruptedFailed": "[DB] 关闭损坏 db 时出错（已忽略）:",
+        "restoreFailedReverted": "[DB] 备份恢复失败，已还原原数据库文件（可能仍损坏）:",
+        "reopenAfterRestoreFailFailed": "[DB] 恢复失败后重新打开 db 也失败:",
+        "reopenAfterRestoreFailed": "[DB] 恢复后重新打开 db 失败:",
+        "autoRestored": "数据库已自动恢复：{{message}}",
+        "corruptDbRenamed": "[DB] 损坏数据库已重命名: {{path}}",
+        "corruptDbCopied": "[DB] 损坏数据库已复制并删除原文件: {{path}}",
+        "corruptDbBackupFailed": "[DB] 备份损坏数据库失败:",
+        "recoveryListenerFailed": "[DB] 恢复监听器执行失败:",
+        "preMigrationBackupCreated": "[DB] 迁移前备份已生成: {{path}}",
+        "preMigrationBackupFailed": "[DB] 迁移前备份失败（已忽略，仍由事务回滚保证原子性）:",
+        "migrationFailedTxRolledBack": "[DB] 迁移失败，事务已回滚: {{message}}",
+        "migrationFailedNoBackup": "[DB] 迁移失败且数据库已不可用，但没有可用的迁移前备份",
+        "operationHistoryCleanupFailed": "[DB] F-G8 清理 operation_history 失败（已忽略）:",
+        "indexExistsIgnored": "[DB] 索引已存在（已忽略）: {{stmt}}",
+        "v3IndexExistsIgnored": "[DB] v3 索引已存在（已忽略）: {{sql}}",
+        "fts5Unavailable": "[DB] FTS5 不可用（已降级为 LIKE 查询）:",
+        "v3MigrationDone": "[DB] v3 索引优化迁移完成",
+        "v3MigrationFailed": "[DB] v3 索引优化迁移失败，将回滚整个迁移事务:",
+        "backfillApplied": "[DB] R16 回填列默认值: {{table}}.{{column}} = {{value}}，影响 {{rows}} 行",
+        "backfillFailed": "[DB] R16 回填列默认值失败: {{sql}}",
+        "systemCategoryKeyMigrationFailed": "[DB] 系统分类/默认档案 key 化迁移失败（已忽略，UI 将原样显示旧名称）:",
+        "sceneCategoryMigrated": "[Database] 已迁移 {{count}} 条记录的 scene_category",
+        "sceneCategoryMigrationFailed": "[Database] scene_category 迁移失败，将回滚整个迁移事务:",
+        "settingTypeMismatch": "[Database] 设置项 \"{{key}}\" 类型不符，回退到默认值",
+        "exitOptimizeFailed": "[Database] 退出时 PRAGMA optimize 失败（已忽略）:",
+        "walCheckpointFailed": "[Database] WAL checkpoint 失败:",
+        "importRootsGalleryFailed": "[DB] 读取 import_roots 失败，图库仅放行高清目录:",
+        "importRootsCacheFailed": "[DB] 读取 import_roots 失败，缓存不额外排除导入根:",
+        "fts5QueryFallback": "[DB] FTS5 查询失败，降级为 LIKE:"
+      },
+      "error": {
+        "lockedByOtherProgram": "数据库文件被其他程序锁定（请关闭正在占用该文件的 SQLite 工具/备份软件后重启应用）: {{error}}\n重试错误：{{retryError}}",
+        "openFailedAfterRecovery": "数据库打开失败（已尝试清理 WAL/SHM 与从备份恢复）：{{error}}\n重试错误：{{retryError}}",
+        "initFailedNullHandle": "数据库初始化失败：db 句柄为 null",
+        "abiIncompatible": "数据库引擎（better-sqlite3）加载失败，可能与当前应用版本或原生模块不兼容。我们未改动您的数据库文件。请重新安装应用，或重建原生模块（rebuild native module，例如执行 npm rebuild better-sqlite3）后重试。错误：{{error}}",
+        "unknown": "数据库打开失败（原因未知）。我们未改动您的数据库文件，已保留现场供排查。请检查数据库文件是否损坏、磁盘空间与文件权限是否正常，或尝试重启/重新安装应用后重试。错误：{{error}}",
+        "permissionDenied": "数据库文件无写入权限（可能被其他程序占用或权限不足）。我们未改动您的数据库文件。请关闭占用该文件的程序或检查文件权限后重启应用。错误：{{error}}",
+        "diskFull": "磁盘空间不足，无法打开数据库。我们未改动您的数据库文件。请释放磁盘空间后重启应用。错误：{{error}}",
+        "databaseCorrupted": "数据库文件已损坏且无法从备份恢复：{{reason}}\n我们已保留损坏文件供排查，未做其他改动。",
+        "migrationFailedRolledBack": "数据库迁移失败，已回滚到迁移前状态：{{error}}",
+        "migrationRolledBackToBackup": "数据库迁移失败，已回滚到迁移前备份：{{filename}}",
+        "rollbackToBackupFailed": "回滚到迁移前备份失败：{{error}}",
+        "indexCreationFailed": "索引创建失败: {{stmt}} -> {{error}}",
+        "v3IndexCreationFailed": "v3 索引创建失败: {{sql}} -> {{error}}",
+        "addColumnFailed": "添加列失败: ALTER TABLE {{tableName}} ADD COLUMN {{columnDef}} -> {{msg}}"
+      }
+    },
+    "file": {
+      "action": {
+        "copy": "复制",
+        "move": "移动",
+        "rename": "重命名",
+        "export": "导出"
+      },
+      "error": {
+        "busy": "{{action}}失败：文件被其他程序占用，请关闭相关程序后重试",
+        "permission": "{{action}}失败：文件被锁定或权限不足，请确认文件未被占用且有写入权限",
+        "generic": "{{action}}失败: {{error}}",
+        "invalidChars": "文件名包含非法字符",
+        "pathReference": "文件名不能为路径引用",
+        "invalidSeparator": "文件名包含非法路径分隔符",
+        "targetExists": "目标位置已存在同名文件",
+        "invalidName": "文件名无效",
+        "fileTooLarge": "文件大小 {{size}} 超过限制 {{limit}} 字节",
+        "noOutputDir": "未选择输出目录",
+        "noDefaultExportDir": "未配置默认导出路径，请先在设置中配置"
+      },
+      "message": {
+        "movedToRecycleBin": "已将 {{count}} 个文件移至回收站",
+        "deleteFailed": "删除失败: {{error}}",
+        "copied": "已复制 {{count}} 个文件",
+        "moved": "已移动 {{count}} 个文件",
+        "renameSuccess": "重命名成功",
+        "batchRenameAllSuccess": "成功重命名 {{count}} 个文件",
+        "batchRenamePartial": "成功 {{success}} 个，失败 {{failed}} 个",
+        "exported": "已导出 {{count}} 个文件",
+        "saveAsSuccess": "另存为成功",
+        "saveAsFailed": "另存为失败: {{error}}",
+        "deletePermanentPartial": "部分删除失败（成功 {{success}}/{{total}}）: {{failed}}",
+        "deletedPermanent": "已永久删除 {{count}} 个文件",
+        "saveSuccess": "保存成功",
+        "saveFailed": "保存失败: {{error}}",
+        "notDirectory": "所选路径不是目录",
+        "cannotAccessDir": "无法访问源目录",
+        "insufficientDiskSpace": "磁盘空间不足",
+        "targetExists": "目标已存在同名文件",
+        "importComplete": "导入完成：成功 {{success}} 个，跳过 {{skipped}} 个，失败 {{failed}} 个",
+        "editedImageFileName": "编辑图片_{{timestamp}}"
+      },
+      "log": {
+        "exifReadFailed": "[Exif] 读取失败:",
+        "dbSyncFailed": "[File] DB 同步失败，尝试反向回滚磁盘:",
+        "pendingRenamesRecordFailed": "[File] 写入 pending_renames 补偿表失败:",
+        "exportMetadataFallback": "[file:export] 查询元数据失败，回退到无变量命名:"
+      },
+      "validation": {
+        "operationsRequired": "操作列表为空",
+        "operationsMax": "操作数量超过上限"
+      },
+      "dialog": {
+        "permanentDeleteTitle": "确认永久删除",
+        "permanentDeleteMessage": "即将永久删除 {{count}} 个文件，此操作不可恢复。",
+        "permanentDeleteDetail": "文件将被直接删除（不进入回收站）。是否继续？"
+      }
+    },
+    "gameEvents": {
+      "versionDescription": "v{{version}} 版本"
+    },
+    "decryption": {
+      "error": {
+        "abiMismatch": "ABI 版本不匹配：DLL 报告 {{actual}}，预期 {{expected}}。请更新 nuan5_decryption.dll 或联系开发者。",
+        "step1Failed": "Step 1 失败 (status={{status}})",
+        "cameraParamsNotFound": "未找到 CameraParams 字段",
+        "step3Failed": "Step 3 失败 (status={{status}})",
+        "cameraParamsInvalid": "相机参数格式无法识别",
+        "fileTooLarge": "文件过大（{{size}} 字节），超过 {{limit}} 字节上限",
+        "fileUnreadable": "无法读取文件",
+        "uidMissing": "未识别到角色 UID，请在设置 → 角色档案中添加你的游戏 UID",
+        "cameraKeyFailed": "Camera 密钥创建失败",
+        "unknown": "未知错误",
+        "encryptFailed": "加密失败 (status={{status}})",
+        "invalidClothDiyCode": "无效的染色分享码",
+        "networkDecodeFailed": "网络解码失败",
+        "networkTimeout": "网络解码超时（已降级，其余字段仍可用）",
+        "networkUnavailable": "网络解码不可用（可能需要联网）",
+        "invalidHomeBuildCode": "无效的家园建造分享码",
+        "ffiNotInit": "FFI 未初始化",
+        "findNoEndFlagHint": "解密密钥可能不匹配，请在设置→角色档案中确认游戏 UID",
+        "uidRequired": "未能获取有效的游戏 UID 进行解密。{{hint}}",
+        "dllNotInit": "DLL 未初始化（INIT 未完成）",
+        "initSendFailed": "INIT 发送失败（decryption-worker）",
+        "workerReadyTimeout": "decryption-worker 启动超时",
+        "workerStartFailed": "后台进程启动失败（decryption-worker 未在限定时间内就绪）",
+        "decodeTimeout": "decryption-worker 网络解码超时",
+        "autoRestarted": "decryption-worker 已自动重启",
+        "workerDisposed": "decryption-worker 已释放（dispose）"
+      },
+      "log": {
+        "mapHint": "— 如需映射名称请补充到 {{map}}",
+        "noCameraParams": "[decryption] 解密后的 JSON 中未找到 CameraParams 字段",
+        "unexpectedError": "[{{op}}] 发生意外错误:",
+        "dllResolveFailed": "[DecryptionWorker] DLL 路径解析失败，不启动 worker:",
+        "initSendFailed": "[DecryptionWorker] 发送 INIT 失败:",
+        "readyTimeout": "[DecryptionWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败",
+        "decodeTimeout": "[DecryptionWorker] 网络解码超时（{{ms}}ms），kill 冻结的 worker（requestId={{requestId}}）",
+        "requestSendFailed": "[DecryptionWorker] 请求发送失败（worker 可能刚退出）:",
+        "restartExhausted": "[DecryptionWorker] 自动重启次数耗尽（{{current}}/{{max}}）",
+        "restarting": "[DecryptionWorker] 开始自动重启 worker...",
+        "restarted": "[DecryptionWorker] worker 已重新启动",
+        "restartFailed": "[DecryptionWorker] worker 重启失败:",
+        "crashListenerFailed": "[DecryptionWorker] 崩溃监听器执行失败:"
+      }
+    },
+    "lifecycle": {
+      "log": {
+        "crashReporterStarted": "[Crash] crashReporter 已启动，dump 目录: {{dir}}",
+        "crashReporterFailed": "[Crash] crashReporter 启动失败:",
+        "backupInitFailed": "[Backup] 初始化失败:",
+        "themeCleanupFailed": "[App] 主题/清理修复失败:",
+        "selfCheckFailed": "后台完整性自检失败: {{reason}}",
+        "unknownReason": "未知原因",
+        "crashCleanFailed": "[Crash] 清理过期崩溃文件失败:",
+        "forceExitReasonWal": "WAL 文件较大",
+        "forceExitReasonDefault": "默认",
+        "startupFailed": "[App] 启动失败:"
+      }
+    },
+    "autoUpdate": {
+      "log": {
+        "devSkip": "[AutoUpdate] 开发模式跳过初始化",
+        "updateError": "[AutoUpdate] 更新出错:",
+        "initialized": "[AutoUpdate] 初始化完成，provider 由 electron-builder publish 配置决定",
+        "checkFailed": "[AutoUpdate] checkForUpdates 失败:",
+        "downloadFailed": "[AutoUpdate] downloadUpdate 失败:"
+      }
+    },
+    "log": {
+      "dialog": {
+        "filterZipName": "ZIP 压缩包"
+      },
+      "error": {
+        "listFaultsFailed": "获取故障列表失败: {{reason}}",
+        "getFaultDetailFailed": "获取故障详情失败: {{reason}}",
+        "getStatsFailed": "获取日志统计失败: {{reason}}",
+        "userCanceledSave": "用户取消保存",
+        "clearFailed": "清空日志失败: {{reason}}",
+        "reportRendererFailed": "上报渲染进程错误失败: {{reason}}"
+      },
+      "log": {
+        "listFaultsFailed": "[Log] 获取故障列表失败:",
+        "getFaultDetailFailed": "[Log] 获取故障详情失败:",
+        "clearedAll": "[Log] 用户手动清空了所有日志文件",
+        "reportRendererFailed": "[IPC] log:reportRendererError 处理失败:"
+      }
+    },
+    "cleanup": {
+      "log": {
+        "exitDiagnosisSummary": "进程退出诊断"
+      }
+    },
+    "gpu": {
+      "log": {
+        "processCrashFallback": "[GPU] GPU 子进程崩溃，下次启动将回退软件渲染:"
+      }
+    },
+    "rendererBridge": {
+      "log": {
+        "sendFailed": "[Renderer] webContents.send 失败:"
+      }
+    },
+    "rendererProtocol": {
+      "error": {
+        "calledBeforeReady": "registerRendererProtocol 在 app.whenReady() 之前被调用"
+      }
+    },
+    "setDir": {
+      "message": {
+        "resetToDefault": "已恢复为默认目录，需要重启应用才能生效。是否立即重启？"
+      },
+      "error": {
+        "resetFailed": "恢复默认失败：{{reason}}"
+      }
+    },
+    "disk": {
+      "error": {
+        "insufficient": "磁盘空间不足，需要 {{need}} MB，仅剩 {{avail}} MB"
+      },
+      "keyword": {
+        "insufficient": "磁盘空间不足"
+      }
+    },
+    "fileUtils": {
+      "error": {
+        "invalidDataUrl": "无效的 DataURL"
+      }
+    },
+    "backup": {
+      "log": {
+        "createIpcFailed": "[Backup] 创建备份 IPC 失败:",
+        "listFailed": "[Backup] 列出备份失败:",
+        "restoreIpcFailed": "[Backup] 恢复备份 IPC 失败:",
+        "startupAutoBackupFailed": "[Backup] 启动自动备份失败:",
+        "skipAutoBackup": "[Backup] 距上次备份不足 7 天（{{days}} 天），跳过自动备份",
+        "runningStartupAutoBackup": "[Backup] 执行启动自动备份",
+        "createSuccess": "[Backup] 备份成功: {{filename}} ({{size}})",
+        "createFailed": "[Backup] 创建备份失败:",
+        "restoreToFailed": "[Backup] 从备份恢复失败: {{reason}}",
+        "restoredToDb": "[Backup] 数据库已从备份恢复: {{filename}}",
+        "restoreSuccessRelaunching": "[Backup] 已从备份恢复: {{filename}}，准备重启应用",
+        "relaunchFailed": "[Backup] 重启应用失败，请手动重启:",
+        "restoreFailed": "[Backup] 恢复备份失败:",
+        "relaunchAfterFailureFailed": "[Backup] 失败后重启应用失败，请手动重启:",
+        "repairFlagWritten": "[Backup] 已写入后置修复标志: {{path}}",
+        "repairFlagWriteFailed": "[Backup] 写入后置修复标志失败（不阻塞恢复）:",
+        "deleted": "[Backup] 已删除备份: {{filename}}",
+        "deleteFailed": "[Backup] 删除备份失败:",
+        "prunedOld": "[Backup] 清理旧备份: {{filename}}"
+      },
+      "error": {
+        "createFailed": "创建备份失败: {{reason}}",
+        "listFailed": "列出备份失败: {{reason}}",
+        "restoreFailed": "恢复备份失败: {{reason}}",
+        "deleteFailed": "删除备份失败: {{reason}}",
+        "dbUnavailable": "数据库连接不可用",
+        "noBackupToRestore": "无可用备份，无法恢复",
+        "restoreFailedPlain": "恢复失败: {{reason}}",
+        "backupNotExist": "备份文件不存在: {{filename}}",
+        "pathTraversalDenied": "备份路径越界，已拒绝: {{filename}}",
+        "backupCorrupted": "备份文件已损坏，无法恢复: {{reason}}",
+        "restoreFailedRelaunch": "恢复失败: {{reason}}，应用将重启以恢复可用状态"
+      },
+      "message": {
+        "restoredFrom": "已从备份 {{filename}} 恢复",
+        "restoredButRelaunchFailed": "恢复成功，但自动重启失败，请手动重启应用",
+        "restoredRelaunching": "恢复成功，应用正在重启"
+      }
+    },
+    "cache": {
+      "log": {
+        "getStatsFailed": "[Cache] getStats 失败:",
+        "cleanFailed": "[Cache] clean 失败:",
+        "setLimitFailed": "[Cache] setLimit 失败:",
+        "enforceLimitFailed": "[Cache] enforceLimit 失败:"
+      },
+      "error": {
+        "getStatsFailed": "获取缓存统计失败: {{reason}}",
+        "cleanFailed": "清理缓存失败: {{reason}}",
+        "setLimitFailed": "设置缓存上限失败: {{reason}}",
+        "enforceLimitFailed": "触发 LRU 淘汰失败: {{reason}}"
+      }
+    },
+    "category": {
+      "error": {
+        "noUpdatableFields": "没有可更新的字段",
+        "systemCategoryUndeletable": "系统分类不允许删除",
+        "ordersRequired": "orders 不能为空",
+        "ordersMax": "orders 数量超过上限 500"
+      }
+    },
+    "crash": {
+      "log": {
+        "listFailed": "[Crash] 列出崩溃文件失败:",
+        "clearedAll": "[Crash] 用户手动清空了所有崩溃 dump 文件"
+      },
+      "error": {
+        "listFailed": "列出崩溃文件失败: {{reason}}",
+        "getStatsFailed": "获取崩溃统计失败: {{reason}}",
+        "clearFailed": "清空崩溃文件失败: {{reason}}",
+        "openDirFailed": "无法打开目录: {{reason}}"
+      },
+      "message": {
+        "nativeCrash": "原生崩溃（Minidump 格式）",
+        "unknownFormat": "未知崩溃文件格式",
+        "opened": "已打开崩溃目录"
+      }
+    },
+    "data": {
+      "dialog": {
+        "cancel": "取消",
+        "confirmClear": "确认清空",
+        "clearTitle": "确认清空数据",
+        "clearMessage": "此操作将清除所有媒体记录、扫描历史、自定义筛选器与水印模板，且不可恢复。",
+        "clearDetail": "缩略图缓存也将被清空。是否继续？"
+      },
+      "message": {
+        "cleared": "本地数据已清除"
+      }
+    },
+    "decrypt": {
+      "validation": {
+        "albumTypeRequired": "albumType 不能为空",
+        "albumTypeMaxLength": "albumType 长度上限 32",
+        "jsonTextRequired": "jsonText 不能为空",
+        "jsonTextMaxLength": "jsonText 长度上限 1MB",
+        "codeStrRequired": "codeStr 不能为空",
+        "codeStrMaxLength": "codeStr 长度上限 1MB"
+      },
+      "log": {
+        "mediaWhitelistHit": "[decrypt] 命中已索引媒体白名单，跳过 pathGuard 校验:",
+        "resolveUidFailed": "[decrypt] 查询唯一角色档案 UID 失败，返回 undefined:",
+        "getKnownUidsFailed": "[decrypt] 查询已知 UID 列表失败，返回空列表:"
+      }
+    },
+    "duplicate": {
+      "message": {
+        "cancelled": "重复检测已取消",
+        "markDone": "重复标记完成"
+      },
+      "progress": {
+        "hashDoneGrouping": "指纹计算完成，分组中...",
+        "hashing": "计算文件指纹 {{current}}/{{total}}",
+        "done": "重复检测完成，共 {{count}} 组"
+      }
+    },
+    "exportPref": {
+      "validation": {
+        "namingMaxLength": "命名规则长度上限 256",
+        "namingNoSeparator": "命名规则不得包含路径分隔符",
+        "namingNoParentDir": "命名规则不得包含 \"..\""
+      }
+    },
+    "import": {
+      "error": {
+        "registerRootOrScanFailed": "登记导入根或触发扫描失败: {{reason}}",
+        "importFailed": "导入失败: {{reason}}"
+      },
+      "log": {
+        "registerRootOrScanFailed": "[Import] 登记导入根或触发扫描失败（已复制文件不受影响）:",
+        "importFailed": "[Import] 导入失败:"
+      }
+    },
+    "importRoot": {
+      "log": {
+        "removeFailed": "[ImportRoot] 移除导入根失败:",
+        "clearRecordsFailed": "[ImportRoot] 清除目录媒体索引记录失败（指定目录已移除）:"
+      },
+      "error": {
+        "removeFailed": "移除指定目录失败: {{reason}}"
+      }
+    },
+    "operationHistory": {
+      "validation": {
+        "operationTypeRequired": "operationType 不能为空"
+      }
+    },
+    "profile": {
+      "error": {
+        "uidExists": "该 UID 已存在",
+        "defaultUndeletable": "默认档案不可删除",
+        "targetNotFound": "目标档案 {{uid}} 不存在"
+      },
+      "message": {
+        "transferred": "已转移 {{count}} 个文件到档案 {{uid}}"
+      }
+    },
+    "scanLog": {
+      "error": {
+        "exportCanceled": "已取消导出扫描诊断日志",
+        "exportFailed": "导出扫描诊断日志失败: {{reason}}"
+      }
+    },
+    "scanner": {
+      "validation": {
+        "customPathsMax": "自定义路径数量上限 64"
+      },
+      "log": {
+        "postScanThumbFailed": "[scanner] 扫描后缩略图/phash 生成失败:",
+        "registerImportRootFailed": "[scanner:start] 登记导入根失败（不影响扫描结果）:",
+        "startFailed": "[scanner:start] 失败:",
+        "skipRestoreReplay": "[ScannerManager] 已有扫描在进行，跳过崩溃恢复的扫描重放",
+        "markMigrationV1FailedRetry": "[Scanner] repairLegacyData: 标记迁移状态失败，下次将重复执行:",
+        "repairV1Failed": "[Scanner] repairLegacyData 失败:",
+        "markMigrationV2Failed": "[Scanner] repairLegacyDataV2: 标记迁移状态失败:",
+        "repairV2Failed": "[Scanner] repairLegacyDataV2 失败:",
+        "markMigrationV3Failed": "[Scanner] repairLegacyDataV3: 标记迁移状态失败:",
+        "repairV3Failed": "[Scanner] repairLegacyDataV3 失败:",
+        "markMigrationV4Failed": "[Scanner] repairLegacyDataV4: 标记迁移状态失败:",
+        "repairV4Failed": "[Scanner] repairLegacyDataV4 失败:",
+        "markMigrationV5Failed": "[Scanner] repairLegacyDataV5: 标记迁移状态失败:",
+        "repairV5Failed": "[Scanner] repairLegacyDataV5 失败:",
+        "integrityCheckFailed": "[Scanner] 完整性校验失败:",
+        "heartbeatTimeout": "主进程心跳超时，worker 自动退出（避免孤儿写入）",
+        "bridgeReadyTimeout": "[ScannerWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败",
+        "bridgeRestarting": "[ScannerWorker] 开始自动重启 worker...",
+        "bridgeRestarted": "[ScannerWorker] worker 已重新启动",
+        "scanTaskRestored": "[ScannerWorker] 已恢复扫描任务",
+        "scanTaskRestoreFailed": "[ScannerWorker] 恢复扫描任务失败:",
+        "bridgeRestartFailed": "[ScannerWorker] worker 重启失败:",
+        "bridgeCrashListenerFailed": "[ScannerWorker] 崩溃监听器执行失败:"
+      },
+      "error": {
+        "validationFailed": "参数校验失败: {{reason}}",
+        "pathCheckFailed": "路径校验失败: {{reason}}",
+        "scanFailed": "扫描失败: {{reason}}",
+        "scanInProgress": "扫描正在进行中",
+        "dbPathNotInitialized": "数据库路径未初始化",
+        "scanStartFailed": "扫描启动失败: {{reason}}",
+        "noMediaDirFound": "全盘扫描未找到任何游戏媒体目录，请手动指定路径",
+        "gameDirNotFound": "未找到游戏目录，请手动指定或使用全盘扫描",
+        "workerReadyTimeout": "scanner-worker 启动超时",
+        "workerStartFailed": "后台进程启动失败（scanner-worker 未在限定时间内就绪）",
+        "scanProcessExit": "扫描进程异常退出",
+        "autoRestarted": "scanner-worker 已自动重启",
+        "duplicateScanStart": "扫描正在进行中，忽略重复的 SCAN_START",
+        "workerDisposed": "scanner-worker 已释放（dispose）"
+      },
+      "message": {
+        "scanCancelled": "扫描已取消"
+      }
+    },
+    "searchIndex": {
+      "validation": {
+        "segmentsMax": "索引片段数量超过上限 50"
+      },
+      "error": {
+        "persistFailed": "搜索索引持久化失败"
+      },
+      "log": {
+        "importReadFailed": "[Search] 索引文件读取失败，将触发重建:"
+      }
+    },
+    "settings": {
+      "error": {
+        "customPathsNotArray": "customScanPaths 必须是字符串数组",
+        "customPathsMax": "自定义扫描路径数量上限 {{max}}",
+        "customPathsEmptyItem": "customScanPaths 存在空或非字符串项",
+        "validationFailed": "参数校验失败: {{reason}}",
+        "valueTooLarge": "设置值过大（上限 1MB）",
+        "valueNotSerializable": "设置值无法序列化",
+        "hwAccelNotBoolean": "hardwareAcceleration 必须是布尔值",
+        "securitySensitiveKey": "key \"{{key}}\" 为安全敏感项，请改用通道：{{channel}}",
+        "unknownKey": "未知的设置项 key：{{key}}"
+      },
+      "validation": {
+        "keyRequired": "key 不能为空",
+        "keyMaxLength": "key 长度上限 128"
+      }
+    },
+    "readStream": {
+      "log": {
+        "streamErrorDestroyed": "[ReadStream] 读流异常，已销毁:"
+      }
+    },
+    "share": {
+      "log": {
+        "detectAppFailed": "[Share] detectApp 失败:",
+        "launchAppFailed": "[Share] launchApp 失败:",
+        "rejectedNonLan": "[WifiShare] 拒绝非局域网访问：{{addr}}",
+        "pinLocked": "[WifiShare] PIN 失败 {{count}} 次，锁定 {{minutes}} 分钟",
+        "authSuccess": "[WifiShare] PIN 认证成功，颁发 token：{{token}}...",
+        "readFailed": "[WifiShare] 读取文件失败：{{path}}"
+      },
+      "error": {
+        "launchAppFailed": "启动应用失败: {{reason}}",
+        "noFilesToShare": "没有可分享的文件"
+      },
+      "http": {
+        "serviceNotStarted": "服务未启动",
+        "forbiddenNonLan": "禁止访问：非局域网来源",
+        "fileNotFound": "文件不存在",
+        "pathNotFound": "路径不存在",
+        "authTitle": "需要认证",
+        "authPrompt": "请输入 PIN 码",
+        "authHint": "请向分享者询问 6 位数字 PIN 码",
+        "pinPlaceholder": "6 位数字",
+        "authSubmit": "验证",
+        "networkError": "网络错误",
+        "tooManyAttempts": "尝试次数过多，请 {{seconds}} 秒后再试",
+        "locked": "PIN 错误次数过多，已锁定 {{minutes}} 分钟",
+        "pinWrong": "PIN 码错误，剩余 {{count}} 次机会",
+        "authSuccess": "认证成功",
+        "readFailed": "读取文件失败"
+      }
+    },
+    "shell": {
+      "error": {
+        "pathMustBeAbsolute": "路径必须为绝对路径",
+        "sensitiveDirForbidden": "出于安全考虑，不允许操作系统敏感目录",
+        "executableForbidden": "出于安全考虑，不允许通过 shell:openPath 打开可执行或脚本文件",
+        "openExternalFailed": "打开外部链接失败: {{reason}}",
+        "openPathFailed": "打开目录失败: {{reason}}",
+        "showItemFailed": "打开文件所在位置失败: {{reason}}"
+      }
+    },
+    "similar": {
+      "message": {
+        "phashDone": "pHash 补算完成"
+      }
+    },
+    "task": {
+      "validation": {
+        "taskIdRequired": "taskId 不能为空",
+        "taskIdMaxLength": "taskId 长度上限 128"
+      },
+      "keyword": {
+        "canceled": "取消",
+        "alreadyRunning": "已在进行中"
+      }
+    },
+    "video": {
+      "error": {
+        "endTimeAfterStart": "结束时间必须大于开始时间"
+      },
+      "log": {
+        "exportLivePhotoFailed": "[IPC] video:exportLivePhoto 失败:"
+      },
+      "message": {
+        "editSuccess": "视频编辑成功"
+      }
+    },
+    "watermark": {
+      "message": {
+        "cancelled": "水印任务已取消",
+        "done": "水印任务完成",
+        "failed": "水印任务失败"
+      },
+      "progress": {
+        "applying": "添加水印 {{current}}/{{total}}"
+      },
+      "validation": {
+        "configRequired": "config 不能为空",
+        "configMaxLength": "config 长度上限 256KB"
+      }
+    },
+    "customDirs": {
+      "label": {
+        "backupFiles": "备份文件",
+        "thumbnailMetadata": "缩略图元数据",
+        "logFiles": "日志文件",
+        "crashDump": "崩溃 dump"
+      }
+    },
+    "desktopShortcut": {
+      "log": {
+        "noWritableDesktop": "[App] 无法确定可写的桌面路径，跳过快捷方式创建",
+        "created": "[App] 桌面快捷方式已创建",
+        "createFailedFallback": "[App] 桌面快捷方式创建失败，尝试 fallback 到用户主目录",
+        "createdFallback": "[App] 桌面快捷方式已创建（fallback 到用户主目录: {{path}}）",
+        "createFailedAll": "[App] 桌面快捷方式创建失败（包括 fallback 到用户主目录）"
+      }
+    },
+    "app": {
+      "name": "无限暖暖相册管理工具"
+    },
+    "errorHandlers": {
+      "unknownPath": "<未知>",
+      "dialog": {
+        "errorTitle": "应用遇到错误",
+        "errorBody": "应用遇到未预期的错误：\n\n{{message}}\n\n错误详情已记录到日志。建议：\n1. 保存当前工作后重启应用\n2. 如反复出现，请在设置→诊断中导出诊断包反馈给开发者\n\n日志路径：{{logPath}}",
+        "frequentErrorTitle": "应用频繁出现错误",
+        "frequentErrorMessage": "应用在短时间内多次出现未处理的错误，建议重启应用以恢复稳定",
+        "frequentErrorDetail": "错误详情已记录到日志。\n\n日志路径：{{logPath}}",
+        "restartApp": "重启应用",
+        "continueUsing": "继续使用"
+      }
+    },
+    "mediaProtocol": {
+      "log": {
+        "missingPathParam": "[Media Protocol] 缺少 path 参数:",
+        "realpathFailed": "[Media Protocol] realpath 解析失败（文件不存在或无权限）:",
+        "denyNotWhitelisted": "[Media Protocol] 拒绝访问白名单外文件:",
+        "fileNotFoundOrNoPerm": "[Media Protocol] 文件不存在或无权限:",
+        "handleRequestFailed": "[Media Protocol] 处理请求失败:",
+        "whitelistCheckFailed": "[Media Protocol] 白名单校验失败:"
+      }
+    },
+    "recovery": {
+      "title": {
+        "dbRecovered": "数据库已自动恢复",
+        "dbRecoveryFailed": "数据库恢复失败",
+        "dbPreserved": "数据库启动失败（未改动您的数据）"
+      },
+      "body": {
+        "sourceBackup": "来源备份：{{filename}}",
+        "corruptedBackupPath": "损坏数据库已备份至：{{path}}",
+        "dbPreserved": "{{detail}}"
+      },
+      "worker": {
+        "title": {
+          "startupTimeout": "{{label}} 启动失败",
+          "restarted": "{{label}} 已自动重启",
+          "restartExhausted": "{{label}} 重启次数耗尽",
+          "exited": "{{label}} 异常退出"
+        },
+        "body": {
+          "crashTime": "发生时间：{{time}}",
+          "exitCode": "退出码：{{code}}",
+          "crashedAt": "崩溃时间：{{time}}",
+          "restartCount": "重启次数：{{count}} / {{state}}",
+          "startupTimeoutHint": "后台进程未在限定时间内就绪，相关任务已停止等待。请重试或重启应用。",
+          "restartedHint": "系统已自动重启 worker 进程，相关任务将尝试恢复。",
+          "exhaustedHint": "worker 多次崩溃，已停止自动重启。相关功能可能不可用，请重启应用。"
+        },
+        "state": {
+          "exhausted": "已耗尽",
+          "continuable": "允许继续"
+        },
+        "label": {
+          "scanner": "扫描进程",
+          "database": "数据库写进程",
+          "media": "媒体处理进程",
+          "decryption": "解密网络解码进程"
+        }
+      },
+      "log": {
+        "repairFailed": "[App] {{label}} 崩溃后主动修复失败:",
+        "showDialogFailed": "[App] 弹出恢复事件提示失败:"
+      }
+    },
+    "window": {
+      "reason": {
+        "rendererNotReady": "渲染进程 8s 内未上报就绪：疑似白屏（CORS/crossorigin 或模块加载失败）"
+      },
+      "dialog": {
+        "diagTitle": "启动诊断",
+        "rendererFailed": "应用未能正常渲染",
+        "rendererFailedDetail": "{{reason}}\n\n已自动打开开发者工具，请查看 Console 中的 CORS / 模块加载报错。\n诊断日志路径：userData/diag.log",
+        "gotIt": "我知道了",
+        "crashTitle": "页面崩溃",
+        "crashMessage": "页面已崩溃，需要重新加载",
+        "crashDetail": "崩溃原因：{{reason}}\n退出代码：{{exitCode}}\n\n错误详情已记录到日志，建议重新加载页面继续使用。",
+        "reload": "重新加载",
+        "closeApp": "关闭应用"
+      },
+      "log": {
+        "rendererCrashed": "[Renderer] 渲染进程崩溃:"
+      }
+    },
+    "index": {
+      "log": {
+        "gpuFallbackActive": "[GPU] 检测到 GPU 崩溃回退标记，本次启动已禁用硬件加速（软件渲染）"
+      },
+      "dialog": {
+        "startupFailedTitle": "应用启动失败",
+        "startupFailedMessage": "应用启动失败，请将日志反馈给开发者",
+        "startupFailedDetail": "错误：{{message}}\n\n日志路径：{{logPath}}",
+        "exit": "退出"
+      }
+    },
+    "startup": {
+      "log": {
+        "scanComplete": "[Startup] 扫描完成:",
+        "indexingTaskError": "[Startup] 索引任务异常:",
+        "autoScanFailed": "[Startup] 自动扫描失败:",
+        "thumbnailAlreadyRunning": "[Thumbnail] 缩略图生成已在进行中，跳过本次触发",
+        "thumbnailBatchFailed": "[Thumbnail] 批量生成失败:",
+        "phashStartFailed": "[pHash] 启动补算失败:",
+        "indexingFailed": "[Startup] 索引任务失败:",
+        "sceneAnalysisNone": "[Startup] 场景时段分析：无待分析图片",
+        "sceneAnalysisFailed": "[Startup] 场景时段分析失败:",
+        "orphanCleanupFailed": "[Thumbnail Cleanup] 清理孤儿缩略图失败:",
+        "readPendingRenamesFailed": "[Startup] 读取 pending_renames 失败:",
+        "cleanupScanHistoryFailed": "[Startup] 清理 scan_history 孤儿记录失败:",
+        "notifyScanInterruptedFailed": "[Startup] 通知 UI 扫描中断事件失败:",
+        "detectInterruptedFailed": "[Startup] 检测 interrupted 扫描记录失败:",
+        "clearRecoveryFlagsFailed": "[Startup] 清除后置修复标志失败:",
+        "notifyBackupRestoredFailed": "[Startup] 通知 UI 备份恢复事件失败:",
+        "postRestorePhashFailed": "[Startup] 备份恢复后 phash 重算失败:",
+        "postRestoreDuplicateFailed": "[Startup] 备份恢复后 duplicate 重新标记失败:"
+      },
+      "error": {
+        "indexingTotalTimeout": "索引任务整体超时"
+      },
+      "index": {
+        "timeoutStopped": "建立索引超时，已停止",
+        "cancelled": "已取消建立索引",
+        "preparing": "正在准备建立索引…",
+        "analyzingSceneTime": "正在建立索引：分析场景时段",
+        "finalizing": "正在完成索引收尾…",
+        "done": "已完成缩略图与索引建立",
+        "errorStopped": "建立索引失败"
+      }
+    },
+    "livephoto": {
+      "error": {
+        "invalidVideo": "无法读取视频时长，可能不是有效视频文件",
+        "exportFailed": "Live Photo 导出失败: {{reason}}"
+      },
+      "message": {
+        "exportSuccess": "Live Photo 导出成功"
+      }
+    },
+    "logService": {
+      "message": {
+        "opened": "已打开日志目录",
+        "exported": "诊断包已导出（含日志、崩溃文件、系统信息）"
+      },
+      "error": {
+        "openDirFailed": "打开目录失败: {{reason}}",
+        "zipRequired": "目标路径必须是 .zip 文件",
+        "emptyArchive": "导出失败：生成的压缩包为空（可能源目录无可用文件）",
+        "targetNotGenerated": "导出失败：目标文件未生成",
+        "noErrorOutput": "无错误输出",
+        "tarStartFailed": "启动 tar.exe 失败: {{reason}}",
+        "packageFailed": "打包失败（退出码 {{code}}）: {{detail}}"
+      },
+      "log": {
+        "buildDiagnosticFailed": "[Log] 构建诊断包失败，回退到仅打包 logs:"
+      }
+    },
+    "thumbnail": {
+      "log": {
+        "forkFailed": "[ThumbnailWorker] fork 失败，降级到主进程内联:",
+        "readyTimeout": "[ThumbnailWorker] WORKER_READY 超时（10s），降级到主进程内联",
+        "handshakeFailed": "[ThumbnailWorker] 启动握手失败，本次请求降级到主进程内联:",
+        "markCorruptedCallbackFailed": "[Thumbnail] markCorrupted 回调执行失败:",
+        "clearCorruptedCallbackFailed": "[Thumbnail] clearCorrupted 回调执行失败:",
+        "lowQualityFailed": "[Thumbnail] 低质量缩略图生成失败:",
+        "highQualityFailed": "[Thumbnail] 高清缩略图生成失败:",
+        "decodeFailed": "缩略图解码失败({{kind}}): {{reason}}",
+        "generateFailed": "[Thumbnail] 缩略图生成失败:",
+        "workerCallFailed": "[Thumbnail] worker 调用失败，降级到内联:",
+        "readCacheMetaFailed": "[Thumbnail] 读取缓存元数据失败，从空开始记录:",
+        "cacheMetaCorrupted": "[Thumbnail] 缓存元数据 JSON 损坏，删除文件并从空开始记录:",
+        "deleteCorruptedMetaFailed": "[Thumbnail] 删除损坏的缓存元数据文件失败:",
+        "saveCacheMetaFailed": "[Thumbnail] 保存缓存元数据失败:",
+        "cleanTmpFailed": "[Thumbnail] 清理 .tmp 残留文件失败:",
+        "lruCleanFailed": "[Thumbnail] 缓存 LRU 清理失败:"
+      },
+      "error": {
+        "workerForkFailed": "thumbnail-worker fork 失败",
+        "workerReadyTimeout": "thumbnail-worker WORKER_READY 超时",
+        "workerStartFailed": "后台进程启动失败（thumbnail-worker 未在限定时间内就绪）",
+        "workerDisposed": "thumbnail-worker 已释放（dispose）",
+        "sharpResizeFailed": "sharp 缩放失败",
+        "ffmpegFrameTimeout": "ffmpeg 提取视频帧超时",
+        "videoPathRequired": "extractVideoFrame: videoPath 必填",
+        "outputPathRequired": "extractVideoFrame: outputPath 必填",
+        "ffmpegEmptyOutput": "ffmpeg 输出为空文件"
+      },
+      "kindVideo": "视频",
+      "kindImage": "图片"
+    },
+    "xmpMetadata": {
+      "log": {
+        "invalidStructure": "[XmpMetadata] 解析成功但结构无效，schemaVersion 或 params 缺失",
+        "parseEditorDataFailed": "[XmpMetadata] 解析 EditorData 失败:",
+        "readInvalidStructure": "[XmpMetadata] 读取成功但结构无效",
+        "deserializeFailed": "[XmpMetadata] 反序列化 EditorData 失败:",
+        "readFailed": "[XmpMetadata] 读取图片 XMP 失败:"
+      }
+    },
+    "videoEditor": {
+      "log": {
+        "editStopReceived": "收到 EDIT_STOP 指令，已终止当前 ffmpeg 任务",
+        "readyTimeout": "[VideoEditorWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败",
+        "abnormalExit": "[VideoEditorWorker] 异常退出，exit code={{code}}",
+        "batchTaskFailed": "[VideoEditorBridge] 任务 #{{index}} 失败: {{reason}}"
+      },
+      "error": {
+        "inputPathRequired": "输入路径不能为空",
+        "outputPathRequired": "输出路径不能为空",
+        "unsupportedSpeed": "不支持的速度 {{speed}}x（范围 {{min}}-{{max}}）",
+        "cancelledByUser": "用户取消任务",
+        "taskCancelledSkipped": "任务已取消: 批量取消后跳过排队任务",
+        "taskCancelled": "任务已取消: {{reason}}",
+        "exportFailed": "视频导出失败: {{reason}}",
+        "workerReadyTimeout": "video-editor-worker 启动超时",
+        "workerStartFailed": "后台进程启动失败（video-editor-worker 未在限定时间内就绪）",
+        "workerAbnormalExit": "视频编辑进程异常退出",
+        "taskInProgress": "已有视频编辑任务正在进行，请等待完成后再试",
+        "workerDisposed": "video-editor-worker 已释放（dispose）",
+        "appExiting": "应用退出"
+      },
+      "message": {
+        "progressStart": "开始处理 {{current}}/{{total}}",
+        "progressDone": "完成 {{current}}/{{total}}",
+        "exportSuccess": "视频导出成功: {{filename}}",
+        "editCancelled": "视频编辑已取消",
+        "exportDone": "视频导出成功",
+        "batchCancelled": "批量编辑已取消",
+        "batchDoneAll": "批量导出完成（共 {{total}} 个）",
+        "batchDonePartial": "批量导出完成（成功 {{success}} 个，失败 {{failed}} 个）"
+      }
+    },
+    "thumbnailPhash": {
+      "log": {
+        "phashFailed": "[pHash] 补算失败:",
+        "duplicateMarkFailed": "[Duplicate] 标记失败:"
+      }
+    },
+    "videoService": {
+      "log": {
+        "markingCorrupted": "[VideoService] 视频处理失败，标记为损坏: {{path}}",
+        "markCorruptedCallbackFailed": "[VideoService] markCorrupted 回调执行失败:",
+        "metadataReadFailed": "视频元数据读取失败: {{reason}}",
+        "exportTask": "视频导出",
+        "exportFailed": "[VideoService] 视频导出失败: {{path}}",
+        "exportDecodeFailed": "视频导出解码失败: {{reason}}",
+        "frameCaptureTask": "帧截图",
+        "frameCaptureFailed": "[VideoService] 帧截图失败: {{path}}",
+        "frameCaptureDecodeFailed": "视频帧截图解码失败: {{reason}}",
+        "trimTask": "视频裁剪",
+        "trimFailed": "[VideoService] 视频裁剪失败: {{path}}",
+        "trimDecodeFailed": "视频裁剪解码失败: {{reason}}",
+        "speedTask": "视频调速",
+        "speedFailed": "[VideoService] 视频调速失败: {{path}}",
+        "speedDecodeFailed": "视频调速解码失败: {{reason}}"
+      },
+      "error": {
+        "exportFailed": "视频导出失败: {{reason}}",
+        "frameCaptureFailed": "帧截图失败: {{reason}}",
+        "trimFailed": "视频裁剪失败: {{reason}}",
+        "speedFailed": "视频调速失败: {{reason}}"
+      },
+      "message": {
+        "exportSuccess": "视频导出成功",
+        "frameCaptureSuccess": "帧截图保存成功",
+        "trimSuccess": "视频裁剪成功",
+        "speedSuccess": "视频调速成功"
+      }
+    },
+    "mediaWorker": {
+      "progress": {
+        "markingDuplicates": "标记重复文件中"
+      },
+      "error": {
+        "thumbnailAlreadyRunning": "缩略图批量生成已在进行中",
+        "thumbnailStartFailed": "缩略图批量生成启动失败: {{reason}}",
+        "phashAlreadyRunning": "pHash 批量补算已在进行中",
+        "phashStartFailed": "pHash 批量补算启动失败: {{reason}}",
+        "duplicateAlreadyRunning": "重复标记已在进行中",
+        "duplicateStartFailed": "重复标记启动失败: {{reason}}",
+        "similarAlreadyRunning": "相似检测已在进行中",
+        "similarStartFailed": "相似检测启动失败: {{reason}}",
+        "workerReadyTimeout": "media-worker 启动超时",
+        "workerStartFailed": "后台进程启动失败（media-worker 未在限定时间内就绪）",
+        "thumbnailProcessExit": "缩略图批量生成进程异常退出",
+        "phashProcessExit": "pHash 批量补算进程异常退出",
+        "duplicateProcessExit": "重复标记进程异常退出",
+        "similarProcessExit": "相似检测进程异常退出",
+        "autoRestarted": "media-worker 已自动重启",
+        "workerDisposed": "media-worker 已释放（dispose）"
+      },
+      "message": {
+        "thumbnailCancelled": "缩略图生成已取消",
+        "phashCancelled": "pHash 补算已取消",
+        "duplicateCancelled": "重复标记已取消",
+        "workerTaskCancelled": "已取消",
+        "workerTaskDone": "完成",
+        "nothingToGenerate": "无需生成",
+        "nothingToPhash": "无需补算",
+        "nothingToDetect": "无需检测",
+        "batchGenerateFailed": "批量生成失败: {{reason}}",
+        "phashBatchFailed": "补算失败: {{reason}}",
+        "markFailed": "标记失败: {{reason}}"
+      },
+      "log": {
+        "readyTimeout": "[MediaWorker] 启动超时（15s 未收到 WORKER_READY），判为启动失败",
+        "restarting": "[MediaWorker] 开始自动重启 worker...",
+        "restarted": "[MediaWorker] worker 已重新启动",
+        "thumbnailRestored": "[MediaWorker] 已恢复缩略图批量生成任务",
+        "thumbnailRestoreFailed": "[MediaWorker] 恢复缩略图任务失败:",
+        "phashRestored": "[MediaWorker] 已恢复 pHash 批量补算任务",
+        "phashRestoreFailed": "[MediaWorker] 恢复 pHash 任务失败:",
+        "duplicateRestored": "[MediaWorker] 已恢复重复标记任务",
+        "duplicateRestoreFailed": "[MediaWorker] 恢复重复标记任务失败:",
+        "similarRestored": "[MediaWorker] 已恢复相似检测任务",
+        "similarRestoreFailed": "[MediaWorker] 恢复相似检测任务失败:",
+        "restartFailed": "[MediaWorker] worker 重启失败:",
+        "crashListenerFailed": "[MediaWorker] 崩溃监听器执行失败:",
+        "thumbnailBatchFailed": "[Thumbnail] 批量生成失败",
+        "phashBatchFailed": "[pHash] 补算失败",
+        "duplicateMarkFailed": "[Duplicate] 标记失败",
+        "duplicateNoGroups": "[Duplicate] 无重复组",
+        "similarFindFailed": "[Similar] 检索失败",
+        "similarStartFailed": "[Similar] 启动失败"
+      }
+    },
+    "databaseWorker": {
+      "log": {
+        "restarting": "[DBWorker] 开始自动重启 worker...",
+        "restartedWithDb": "[DBWorker] worker 已重新启动并打开 db",
+        "restartedPendingOpen": "[DBWorker] worker 已重新启动（待 DB_OPEN）",
+        "restartFailed": "[DBWorker] worker 重启失败:",
+        "crashListenerFailed": "[DBWorker] 崩溃监听器执行失败:"
+      },
+      "error": {
+        "bridgeDisposed": "DatabaseWorkerBridge 已 dispose，无法发起写请求",
+        "writeFailed": "[DBWorker] 写操作失败: {{message}} | SQL: {{sql}}",
+        "unknown": "未知错误",
+        "autoRestarted": "database-worker 已自动重启",
+        "handshakeAborted": "[DBWorker] bridge disposed，握手中止",
+        "requestsAborted": "[DBWorker] bridge disposed，写请求被中止"
+      }
+    },
+    "resonance": {
+      "error": {
+        "recordExists": "记录已存在（同一卡池、同一时间、同一物品）",
+        "recordNotFound": "记录不存在或已被删除",
+        "importFileNotReadable": "导入文件不存在或不可读取：{{path}}",
+        "importFileNotFile": "路径不是文件：{{path}}",
+        "importFileTooLarge": "导入文件过大（{{size}} 字节，超出上限）",
+        "importFileReadFailed": "读取导入文件失败：{{reason}}",
+        "exportDirMissing": "导出目录不存在：{{path}}",
+        "exportNotJson": "导出文件扩展名必须为 .json：{{path}}",
+        "exportWriteFailed": "写入导出文件失败：{{reason}}"
+      },
+      "log": {
+        "exported": "共鸣录数据已导出（{{count}} 条记录）"
+      }
+    }
+  },
+  "appError": {
+    "canceled": "用户取消操作",
+    "database": "数据库操作失败，请稍后重试",
+    "fileSystem": "文件操作失败，请检查文件权限或磁盘空间",
+    "internal": "操作失败，请稍后重试或联系开发者",
+    "fallback": "操作失败"
+  },
+  "app": {
+    "log": {
+      "pluginBootstrapFailed": "[App] 插件系统引导失败:"
+    }
+  },
+  "mock": {
+    "log": {
+      "skipInstall": "[preview-mock] window.electronAPI 已存在，跳过 Mock 注入"
+    },
+    "feature": {
+      "fileScan": "文件扫描",
+      "fileDelete": "文件删除",
+      "fileDeletePermanent": "文件永久删除",
+      "fileCopy": "文件复制",
+      "fileMove": "文件移动",
+      "fileRename": "文件重命名",
+      "batchRename": "批量重命名",
+      "fileExport": "文件导出",
+      "fileSaveAs": "文件另存为",
+      "exportWithMetadata": "含元数据导出",
+      "batchExportWithMetadata": "批量含元数据导出",
+      "watermarkApply": "水印应用到文件",
+      "videoExport": "视频导出",
+      "videoCaptureFrame": "视频截帧",
+      "videoTrim": "视频裁剪",
+      "videoSpeed": "视频调速",
+      "livePhotoExport": "Live Photo 导出",
+      "videoEdit": "视频编辑",
+      "videoEditBatch": "批量视频编辑",
+      "clearDatabase": "清空数据库",
+      "createBackup": "创建备份",
+      "restoreBackup": "恢复备份",
+      "deleteBackup": "删除备份",
+      "appRelaunch": "应用重启",
+      "decryptFile": "游戏参数解密",
+      "encryptCameraParams": "相机参数加密",
+      "decodeClothDiy": "染色分享码解码",
+      "decodeHomeBuild": "家园建造分享码解码",
+      "pluginDetail": "插件详情查询",
+      "pluginInstall": "插件安装",
+      "pluginUninstall": "插件卸载",
+      "pluginToggle": "插件启用/停用",
+      "wifiShare": "WiFi 分享",
+      "resonanceAddRecord": "共鸣录手动补录",
+      "resonanceUpdateRecord": "共鸣录编辑记录",
+      "resonanceDeleteRecord": "共鸣录删除记录",
+      "resonanceReadImport": "共鸣录导入文件",
+      "resonanceCommitImport": "共鸣录提交导入",
+      "resonanceExport": "共鸣录导出数据",
+      "resonanceUpdateWardrobe": "共鸣录更新衣橱",
+      "resonanceClearAll": "共鸣录清空数据"
+    },
+    "message": {
+      "browserDownloadTriggered": "已触发浏览器下载",
+      "downloadFailed": "下载失败：{{reason}}",
+      "openLocalPath": "预览版不支持打开本地路径",
+      "showInFolder": "预览版不支持在资源管理器中显示",
+      "unsupportedShort": "预览版不支持",
+      "openDirectory": "预览版不支持打开目录",
+      "exportLogs": "预览版不支持导出日志",
+      "clearLogs": "预览版不支持清空日志",
+      "clearCrashReports": "预览版不支持清空崩溃报告",
+      "importPreview": "预览版不支持导入预览",
+      "importFiles": "预览版不支持文件导入",
+      "copyToClipboard": "预览版不支持复制到剪贴板",
+      "launchExternalApp": "预览版不支持启动外部应用",
+      "phashDone": "pHash 已计算完成",
+      "duplicatesMarked": "已标记 {{count}} 个重复文件",
+      "batchAnalysisUnsupported": "预览版不支持批量分析",
+      "softDeleted": "已软删除 {{count}} 条",
+      "restored": "已恢复 {{count}} 条",
+      "permanentDeleted": "已彻底删除 {{count}} 条",
+      "recycleBinCleared": "已清空 {{count}} 条",
+      "noMissingFiles": "预览版无丢失文件",
+      "noCorruptedFiles": "预览版无损坏文件",
+      "exportFileUnsupported": "预览版不支持导出文件",
+      "importFileUnsupported": "预览版不支持导入文件",
+      "noRestartNeeded": "预览版无需重启",
+      "videoMetadataUnsupported": "预览版不支持视频元数据读取"
+    }
+  },
+  "scanProgress": {
+    "log": {
+      "getActiveFailed": "[ScanProgress] task.getActive 拉取快照失败:",
+      "stopFailed": "停止扫描失败:"
+    },
+    "stopping": "正在停止...",
+    "scanning": "正在扫描...",
+    "foundFiles": "已找到 {{count}} 个文件"
+  },
+  "plugins": {
+    "log": {
+      "facadeNotReady": "[PluginRuntime] pluggable-electron facade 未就绪，跳过插件系统初始化",
+      "registerActiveFailed": "[PluginRuntime] registerActive 失败:",
+      "triggerInitFailed": "[PluginRuntime] activationPoints.trigger(\"init\") 部分失败:",
+      "bootstrapFailed": "[PluginRuntime] 插件系统初始化失败:",
+      "i18nInjectFailed": "[PluginRuntime] i18n 注入失败:"
+    }
+  },
+  "themes": {
+    "default": "默认简约",
+    "softPinkLuxury": "柔粉轻奢"
+  },
+  "globalErrorHandler": {
+    "log": {
+      "errorEventFailed": "[GlobalErrorHandler] error 事件处理失败:",
+      "rejectionEventFailed": "[GlobalErrorHandler] unhandledrejection 事件处理失败:"
+    }
+  },
+  "scanButton": {
+    "incrementalDesc": "仅扫描新增文件",
+    "full": "自动定位游戏目录",
+    "fullDesc": "文件名签名全盘搜索游戏媒体",
+    "custom": "指定目录",
+    "customDesc": "手动选择目录扫描（兜底）"
+  },
+  "videoPlayer": {
+    "restoredTo": "已恢复至 {{time}}",
+    "exitFullscreen": "退出全屏",
+    "fullscreenPlayback": "全屏播放",
+    "fullscreen": "全屏",
+    "captureFrame": "截取当前帧",
+    "capture": "截图"
+  },
+  "searchService": {
+    "log": {
+      "noIpcFallback": "[Search] 无 IPC 环境（HTML 预览版），降级到客户端过滤",
+      "schemaHashMismatch": "[Search] 索引 schema_hash 不匹配，触发重建:",
+      "importFailedFallback": "[Search] 索引导入失败，降级到全量重建:",
+      "initFailedFallback": "[Search] 初始化失败，降级到客户端过滤:",
+      "rebuildFailed": "[Search] 全量重建失败:",
+      "persistDebouncedFailed": "[Search] 防抖持久化失败:",
+      "docCountMismatch": "[Search] 索引文档数与数据库不一致，触发重建:",
+      "verifyFailed": "[Search] 校验失败:"
+    }
+  },
+  "mediaStore": {
+    "log": {
+      "persistFailed": "[updateMediaFileAndPersist] 持久化失败:",
+      "noElectronApi": "[fetchMediaFromDatabase] electronAPI 不可用: media.list=",
+      "mediaListNull": "[fetchMediaFromDatabase] media.list 返回 null/undefined",
+      "filesEmpty": "[fetchMediaFromDatabase] mediaResult.files 为空, mediaResult=",
+      "categoryListNull": "[fetchMediaFromDatabase] category.list 返回 null/undefined",
+      "categoriesEmpty": "[fetchMediaFromDatabase] categoryResult.categories 为空",
+      "fetchError": "[fetchMediaFromDatabase] 异常:",
+      "loadMoreFailed": "加载更多媒体文件失败:",
+      "loadProfilesFailed": "加载角色档案失败:",
+      "loadRecycleBinFailed": "加载回收站失败:",
+      "loadRecycleBinMoreFailed": "加载回收站下一页失败:"
+    }
+  },
+  "operationHistory": {
+    "log": {
+      "dbWriteFailed": "[OperationHistory] 写入数据库失败:",
+      "conflictCheckFailed": "[OperationHistory] 冲突检测失败，跳过:",
+      "dbRemoveFailed": "[OperationHistory] 从数据库删除失败:",
+      "dbClearFailed": "[OperationHistory] 清空数据库失败:",
+      "dbLoadFailed": "[OperationHistory] 从数据库加载失败:"
+    },
+    "error": {
+      "dbSaveFailedFull": "操作历史保存失败：{{reason}}，重启后该操作不可撤销",
+      "handlerNotRegistered": "未注册 {{type}} 的撤销处理器",
+      "recordCorrupted": "操作记录已损坏，无法撤销"
+    }
+  },
+  "updateDialog": {
+    "checking": "正在检查更新…",
+    "downloading": "正在下载更新",
+    "downloadingVersion": "正在下载更新 v{{version}}",
+    "ariaLabel": "应用更新",
+    "foundNewVersion": "发现新版本",
+    "availablePrompt": "有可用更新，是否下载并安装？",
+    "later": "稍后",
+    "downloadNow": "下载更新",
+    "downloadedTitle": "更新已下载完成",
+    "downloadedPrompt": "新版本已准备就绪，重启应用后生效。",
+    "restartLater": "稍后重启",
+    "installAndRestart": "安装并重启",
+    "log": {
+      "downloadFailed": "[UpdateDialog] 下载更新失败:",
+      "installFailed": "[UpdateDialog] 安装更新失败:",
+      "openOfficialFailed": "[UpdateDialog] 打开官网失败:"
+    }
+  },
+  "resonance": {
+    "brand": "无限暖暖",
+    "title": "暖暖共鸣录",
+    "subtitle": "无限暖暖共鸣记录与搭配助手 即将上线",
+    "error": {
+      "importJsonParseFailed": "文件不是有效的 JSON，请确认导出文件未损坏",
+      "importInvalidStructure": "文件结构不符合共鸣录导入格式（支持 gongeo.us 导出的 JSON）",
+      "importTooManyRecords": "文件记录数超出上限，请拆分后导入",
+      "invalidReason": {
+        "invalidShape": "数据行结构不正确",
+        "invalidTimestamp": "时间格式无效",
+        "invalidItemId": "物品 id 无效",
+        "invalidOutfitId": "套装 id 无效",
+        "invalidEvoLevel": "进化等级无效（应为 0-4）"
+      }
+    },
+    "tab": {
+      "records": "共鸣记录",
+      "wardrobe": "我的衣橱",
+      "import": "导入数据",
+      "stats": "个人统计"
+    },
+    "records": {
+      "bannerLabel": "卡池",
+      "bannerType1": "常驻池",
+      "bannerType2": "限定池",
+      "bannerType3": "4★限定池",
+      "addRecord": "补录",
+      "addTitle": "手动补录",
+      "editTimeTitle": "修改补录时间",
+      "itemLabel": "获得物品",
+      "timeLabel": "获得时间",
+      "selectItem": "请选择获得物品",
+      "fiveStarItems": "5★ 套装部件",
+      "fourStarItems": "4★ 套装部件",
+      "totalPulls": "总抽数 {{count}}",
+      "pity5Star": "距上次5★ {{count}} 抽",
+      "pity4Star": "距上次4★ {{count}} 抽",
+      "pullNo": "第 {{n}} 抽",
+      "editBadge": "补录",
+      "listEmpty": "暂无共鸣记录",
+      "listEmptyHint": "点击右上角「补录」手动添加，或在「导入数据」页导入 gongeo.us 导出的 JSON 文件",
+      "deleteTitle": "删除记录",
+      "deleteMessage": "此操作不可撤销。",
+      "invalidTime": "时间格式无效，请重新选择",
+      "invalidInput": "输入未通过校验，请检查表单"
+    },
+    "toast": {
+      "added": "已添加：{{name}}",
+      "updated": "已更新补录时间",
+      "deleted": "已删除记录"
+    },
+    "wardrobe": {
+      "cat": {
+        "item": "部件",
+        "makeup": "妆容",
+        "momo": "Momo",
+        "prop": "道具",
+        "eurekaColor": "共鸣色"
+      },
+      "searchPlaceholder": "搜索名称",
+      "statusFilterLabel": "拥有状态",
+      "statusAll": "全部状态",
+      "statusOwned": "已拥有",
+      "statusMissing": "未拥有",
+      "qualityFilterLabel": "稀有度",
+      "qualityAll": "全部稀有度",
+      "summaryOwned": "已拥有 {{owned}} / {{total}}",
+      "looseSet": "散件（未归属套装）",
+      "outfitStatus": {
+        "owned": "已集齐",
+        "partial": "集齐中",
+        "missing": "未收集"
+      },
+      "quickOwned": "全部拥有",
+      "quickMissing": "全部取消",
+      "inferButton": "从共鸣记录推断",
+      "inferTitle": "从共鸣记录推断衣橱",
+      "inferMessage": "将根据共鸣记录与卡池进度推断已获得的物品：部件 {{items}} 件、妆容 {{makeups}} 件、Momo {{momo}} 件、道具 {{props}} 件。\n\n推断按保守规则估算（限定池进度与抽数阈值），可能少于实际拥有；已拥有的记录不会被改动。是否继续？",
+      "inferResult": "已标记 {{count}} 项为拥有",
+      "inferNothing": "没有可新增的推断结果",
+      "inferBusy": "推断中…",
+      "catalogUnavailable": "图鉴数据加载失败",
+      "catalogUnavailableHint": "静态图鉴文件缺失或损坏，请重新安装或更新软件",
+      "loading": "正在加载图鉴数据…",
+      "empty": "暂无匹配的物品",
+      "emptyHint": "尝试调整搜索关键词或筛选条件"
+    },
+    "import": {
+      "importSection": "导入数据",
+      "pickFile": "选择 JSON 文件",
+      "previewing": "正在解析文件…",
+      "formatLegacy": "旧版格式",
+      "formatCurrent": "当前格式",
+      "versionLabel": "文件版本：{{version}}",
+      "versionUnknown": "未声明版本",
+      "versionMismatchWarn": "文件声明版本高于当前支持版本，可能存在不兼容字段；可选择尝试兼容导入或放弃。",
+      "compatImport": "尝试兼容导入",
+      "abandon": "放弃",
+      "sectionPulls": "抽卡记录",
+      "sectionEdits": "手动补录",
+      "sectionPearpal": "Pearpal 手账",
+      "sectionEvo": "进化覆盖",
+      "sectionWardrobe": "衣橱拥有状态",
+      "countsAdded": "新增 {{count}} 条",
+      "countsDuplicate": "重复（跳过）{{count}} 条",
+      "countsInvalid": "无效（跳过）{{count}} 条",
+      "invalidSamplesTitle": "无效记录示例：",
+      "invalidMore": "…等 {{count}} 条无效记录已跳过",
+      "includeWardrobeLabel": "同时导入衣橱拥有状态（全量覆盖）",
+      "commit": "开始导入",
+      "cancelCommit": "取消导入",
+      "cancelled": "已取消导入；已写入部分保留，重复导入可安全补齐",
+      "commitDone": "导入完成，共写入 {{count}} 条记录",
+      "progressLabel": "{{current}} / {{total}}",
+      "exportSection": "导出数据",
+      "exportPulls": "抽卡记录",
+      "exportEdits": "手动补录",
+      "exportPearpal": "Pearpal 手账",
+      "exportEvo": "进化覆盖",
+      "exportWardrobe": "衣橱拥有状态",
+      "exportButton": "导出 JSON",
+      "exportDone": "已导出 {{count}} 条记录",
+      "exportNothing": "没有可导出的内容，请勾选导出内容或先录入数据",
+      "dangerSection": "危险操作",
+      "clearButton": "清空全部共鸣数据",
+      "clearTitle": "清空全部共鸣数据",
+      "clearMessage": "将删除全部共鸣记录、衣橱与统计相关数据，且不可恢复。是否继续？",
+      "clearDone": "已清空全部共鸣数据",
+      "snapshotNote": "内置图鉴与百分位为静态快照，不会自动更新",
+      "snapshotMeta": "内置图鉴/百分位为静态快照（游戏版本 {{version}} · 图鉴生成于 {{catalogDate}} · 百分位生成于 {{percentileDate}}），不会自动更新"
+    },
+    "stats": {
+      "emptyTitle": "暂无统计数据",
+      "emptyHint": "先在「共鸣记录」补录或在「导入数据」页导入记录后即可查看",
+      "totalPulls": "总抽数",
+      "total5Star": "5★ 部件",
+      "total4Star": "4★ 部件",
+      "avg5StarPulls": "平均出货（每 5★）",
+      "banners5Star": "限定池抽数（池数）",
+      "banners4Star": "4★ 限定池抽数（池数）",
+      "outfits5Star": "已获 5★ 套装",
+      "outfits4Star": "已获 4★ 套装",
+      "luckTitle": "欧非分析",
+      "luckTier": "档位 {{tier}} / 6",
+      "luckSnapshotNote": "百分位为社区静态快照（生成于 {{date}}），不会自动更新，仅供参考",
+      "distributionTitle": "出货分布",
+      "dist5Star": "5★（按第 N 抽出货）",
+      "dist4Star": "4★（按第 N 抽出货）",
+      "activityTitle": "抽取活动（按卡池累计）",
+      "rankingTitle": "按卡池明细",
+      "ranking5Star": "限定池（5★）",
+      "ranking4Star": "4★ 限定池",
+      "rankingEmpty": "暂无可统计的卡池数据",
+      "colBanner": "卡池",
+      "colPulls": "总抽数",
+      "colAvg": "平均出货",
+      "colPercentile": "百分位"
+    }
+  }
+}

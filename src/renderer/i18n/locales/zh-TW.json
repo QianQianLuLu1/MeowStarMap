@@ -1,0 +1,4211 @@
+{
+  "appShell": {
+    "categoriesSummary": "",
+    "detailPosition": "",
+    "duplicatesHint": "",
+    "editorMode": "",
+    "favoritesSummary": "",
+    "feedbackButton": "",
+    "gallerySummary": "",
+    "imagesVideosSummary": "",
+    "ready": "",
+    "recycleBinHint": "",
+    "recycleBinSummary": "",
+    "selectedCount": "",
+    "settingsHint": "",
+    "storageUsage": "",
+    "viewStatus": {
+      "categories": "",
+      "detail": "",
+      "duplicates": "",
+      "editor": "",
+      "favorites": "",
+      "resonanceRecords": "共鳴錄",
+      "gallery": "",
+      "launcherCache": "",
+      "recycleBin": "",
+      "settings": ""
+    }
+  },
+  "categories": {
+    "iconLabel": {
+      "calendar": "日期",
+      "camera": "相機",
+      "folder": "資料夾",
+      "heart": "喜歡",
+      "image": "圖片",
+      "location": "地點",
+      "palette": "調色",
+      "sparkles": "精選",
+      "star": "收藏",
+      "tag": "標籤",
+      "user": "人物",
+      "video": "影片"
+    },
+    "page": {
+      "title": "",
+      "assign": {
+        "emptyMedia": "",
+        "failedToast": "",
+        "nextPage": "",
+        "noMatch": "",
+        "pageRange": "",
+        "prevPage": "",
+        "searchPlaceholder": "",
+        "subtitle": "",
+        "successToast": "",
+        "title": ""
+      },
+      "create": {
+        "colorTitle": "",
+        "failedToast": "",
+        "namePlaceholder": "",
+        "noParent": "",
+        "submit": "",
+        "successToast": "",
+        "title": ""
+      },
+      "delete": {
+        "confirmMessage": "",
+        "confirmTitle": "",
+        "failedToast": "",
+        "successToast": ""
+      },
+      "list": {
+        "assignMedia": "",
+        "collapse": "",
+        "dragHint": "",
+        "edit": "",
+        "expand": "",
+        "hierarchyFailedToast": "",
+        "hierarchySuccessToast": "",
+        "iconTitle": "",
+        "invalidDragToast": "",
+        "itemCount": "",
+        "moveDown": "",
+        "moveUp": "",
+        "reorderFailedToast": "",
+        "subCategoryCount": "",
+        "systemDragDisabled": "",
+        "systemTag": "",
+        "title": ""
+      },
+      "scene": {
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "sceneTime": {
+        "analyzeButton": "",
+        "analyzedToast": "",
+        "analyzingButton": "",
+        "analyzeFailedToast": "",
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "subtitle": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "update": {
+        "failedToast": "",
+        "successToast": ""
+      }
+    },
+    "system": {
+      "people": "",
+      "location": "",
+      "scene": "",
+      "screenshot": "",
+      "recording": "",
+      "recent": "",
+      "favorite": ""
+    }
+  },
+  "common": {
+    "all": "全部",
+    "apply": "套用",
+    "back": "返回",
+    "cancel": "取消",
+    "clear": "清除",
+    "close": "關閉",
+    "contextMenu": {
+      "ariaLabel": "情境選單",
+      "submenuAriaLabel": "{{label}} 子選單"
+    },
+    "copy": "複製",
+    "default": "預設",
+    "delete": "刪除",
+    "error": "錯誤",
+    "export": "匯出",
+    "failed": "失敗",
+    "feedbackDialog": {
+      "attachLogsLabel": "附帶最近日誌（推薦，便於定位問題）",
+      "attachSystemInfoLabel": "附帶系統資訊（版本、作業系統、硬體）",
+      "attachmentsLabel": "附加資訊",
+      "closeAriaLabel": "關閉",
+      "contactLabel": "聯絡方式",
+      "copyFailed": "複製失敗，請手動選擇文字",
+      "copySuccess": "{{label}} 已複製到剪貼簿",
+      "descriptionLabel": "問題描述",
+      "descriptionPlaceholder": "請簡要描述您遇到的問題（可選）...",
+      "exportButton": "匯出診斷包",
+      "exportFailed": "匯出失敗",
+      "exportHint": "診斷包包含日誌、崩潰檔案、系統資訊，匯出後可透過下方聯絡方式回饋給開發者。",
+      "exportSuccess": "診斷包已匯出，請透過下方聯絡方式回饋給開發者",
+      "exporting": "正在匯出...",
+      "githubCopyHint": "點擊複製連結",
+      "githubLabel": "GitHub Issues",
+      "githubName": "GitHub Issues 連結",
+      "githubValue": "https://github.com/your-repo/issues",
+      "qqGroupCopyHint": "點擊複製群號",
+      "qqGroupLabel": "QQ 群",
+      "qqGroupName": "QQ 群號",
+      "qqGroupValue": "QQ群: 123456789",
+      "title": "問題回饋"
+    },
+    "import": "匯入",
+    "invertSelection": "反轉選取",
+    "loading": "載入中...",
+    "move": "移動",
+    "no": "否",
+    "ok": "確定",
+    "processing": "處理中...",
+    "propertiesDialog": {
+      "basic": {
+        "createdAt": "建立時間",
+        "modifiedAt": "修改時間",
+        "name": "名稱",
+        "path": "路徑",
+        "resolution": "解析度",
+        "size": "大小",
+        "type": "類型",
+        "typeImage": "圖片",
+        "typeVideo": "影片"
+      },
+      "copied": "已複製",
+      "copyAll": "複製全部",
+      "copyAllTitle": "複製完整屬性資訊",
+      "copySection": {
+        "aperture": "光圈",
+        "cameraModel": "相機型號",
+        "dateTaken": "拍攝時間",
+        "fileInfo": "=== 檔案資訊 ===",
+        "focalLength": "焦距",
+        "lens": "鏡頭",
+        "originalSize": "原始尺寸",
+        "shootingParams": "=== 拍攝參數 ===",
+        "shutter": "快門速度"
+      },
+      "openLocation": "所在位置",
+      "openLocationTitle": "在檔案總管中顯示",
+      "title": "檔案屬性"
+    },
+    "refresh": "重新整理",
+    "rename": "重新命名",
+    "reset": "重設",
+    "restore": "還原",
+    "retry": "重試",
+    "save": "儲存",
+    "search": "搜尋",
+    "select": "選擇",
+    "selectAll": "全選",
+    "shareCodeDecoder": {
+      "apiUnavailable": "API 不可用",
+      "closeAriaLabel": "關閉",
+      "decodeButton": "解碼",
+      "decodeSuccess": "解碼成功",
+      "decoding": "正在解碼...",
+      "descriptions": {
+        "clothDiy": "染色分享碼可從遊戲內染色功能取得。網路解碼需要連接遊戲伺服器，離線狀態下僅可提取時間戳和 UID。",
+        "homeBuild": "家園建造分享碼可從遊戲內家園建造功能取得。網路解碼需要連接遊戲伺服器。",
+        "mediaEncrypt": "將相機參數 JSON 加密為密文（Base64 格式）。可用於測試解密流程或建立自訂參數。"
+      },
+      "encryptButton": "加密",
+      "encryptSuccess": "加密成功",
+      "operationFailed": "操作失敗",
+      "placeholders": {
+        "clothDiy": "貼上遊戲內染色分享碼...",
+        "homeBuild": "貼上遊戲內家園建造分享碼...",
+        "mediaEncrypt": "貼上相機參數 JSON..."
+      },
+      "result": {
+        "encryptedResult": "加密結果 (Base64)",
+        "networkData": "網路資料",
+        "networkUnavailable": "網路解碼不可用（可能需要聯網）",
+        "serverId": "伺服器 ID",
+        "timestamp": "時間戳"
+      },
+      "tabs": {
+        "clothDiy": "染色分享碼",
+        "homeBuild": "家園建造碼",
+        "mediaEncrypt": "相機參數加密"
+      },
+      "title": "分享碼工具",
+      "unknownError": "未知錯誤"
+    },
+    "success": "成功",
+    "warning": "警告",
+    "yes": "是",
+    "confirm": "",
+    "copied": "",
+    "corruptedBadge": {
+      "label": "",
+      "labelSm": "",
+      "title": "",
+      "titleWithReason": ""
+    },
+    "loadFailed": "",
+    "missingBadge": {
+      "label": "",
+      "labelSm": ""
+    }
+  },
+  "detail": {
+    "actions": {
+      "backToGallery": "",
+      "deleteConfirmMessage": "",
+      "deleteFailed": "",
+      "deleteTitle": "",
+      "edit": "",
+      "operationFailed": "",
+      "ratingAria": "",
+      "ratingFailed": "",
+      "saveAs": "",
+      "saveAsFailed": "",
+      "saveAsSuccess": "",
+      "tags": ""
+    },
+    "editorMetadata": {
+      "exportedAt": "",
+      "filter": "",
+      "intensity": "",
+      "loading": "",
+      "lut": "",
+      "restore": "",
+      "restoreTooltip": "",
+      "title": "",
+      "watermark": "",
+      "yes": ""
+    },
+    "emptyTitle": "",
+    "exif": {
+      "gps": "",
+      "title": "",
+      "viewOnMap": "",
+      "aperture": "",
+      "cameraModel": "",
+      "copied": "",
+      "copyAriaLabel": "",
+      "copyFullTitle": "",
+      "copyLabel": "",
+      "emptyText": "",
+      "errorPrefix": "",
+      "focalLength": "",
+      "lens": "",
+      "dateTaken": "",
+      "loadingText": "",
+      "originalSize": "",
+      "panelTitle": "",
+      "shutter": "",
+      "gamePhotoEmpty": ""
+    },
+    "fields": {
+      "favorite": "",
+      "favorited": "",
+      "notFavorited": "",
+      "sceneTime": "",
+      "type": ""
+    },
+    "missing": {
+      "removeFailed": "",
+      "removeFromLibrary": "",
+      "removeSuccess": "",
+      "warningText": ""
+    },
+    "outfit": {
+      "add": "",
+      "clearFailed": "",
+      "edit": "",
+      "emptyValue": "",
+      "inputPlaceholder": "",
+      "maxLengthError": "",
+      "saveFailed": "",
+      "selectPresetPlaceholder": "",
+      "title": ""
+    },
+    "video": {
+      "codec": "",
+      "duration": "",
+      "frameRate": "",
+      "title": ""
+    },
+    "zoomable": {
+      "ariaLabel": "",
+      "resetButton": "",
+      "resetZoom": ""
+    },
+    "dressing": {
+      "copyHeader": "",
+      "emptyText": "",
+      "eureka": {
+        "label": ""
+      },
+      "loadingText": "",
+      "title": ""
+    },
+    "interaction": {
+      "carrier": {
+        "label": ""
+      },
+      "copyHeader": "",
+      "emptyText": "",
+      "format": {
+        "location": "",
+        "rotation": "",
+        "scale": ""
+      },
+      "loadingText": "",
+      "mount": {
+        "label": ""
+      },
+      "none": "",
+      "object": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "nikki": {
+      "copyHeader": "",
+      "emptyText": "",
+      "giantState": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "hidden": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "rotation": {
+        "label": ""
+      },
+      "scale": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "photography": {
+      "copyHeader": "",
+      "date": {
+        "dayValue": "",
+        "label": ""
+      },
+      "edit": {
+        "edited": "",
+        "editedWithDetails": "",
+        "label": "",
+        "notEdited": "",
+        "sticker": "",
+        "text": ""
+      },
+      "emptyText": "",
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "photoWall": {
+        "joinedValue": "",
+        "label": "",
+        "notJoined": ""
+      },
+      "task": {
+        "interactiveFallback": "",
+        "label": "",
+        "none": "",
+        "puzzleFallback": "",
+        "risk": ""
+      },
+      "time": {
+        "label": ""
+      },
+      "title": "",
+      "weather": {
+        "label": "",
+        "typeValue": ""
+      }
+    }
+  },
+  "dialog": {
+    "exportFormat": "格式轉換",
+    "exportLivePhoto": "匯出 Live Photo",
+    "exportSpeed": "匯出調速影片",
+    "exportTrim": "匯出裁剪影片",
+    "sameFormat": "目標格式與原格式相同",
+    "selectDirUnsupported": "目前環境不支援選擇目錄",
+    "trimTooShort": "裁剪區間過短，請調整起止時間"
+  },
+  "duplicates": {
+    "strategy": {
+      "bestQuality": "",
+      "favorited": "",
+      "largest": "",
+      "newest": "",
+      "smallest": ""
+    },
+    "threshold": {
+      "default": "",
+      "defaultHint": "",
+      "loose": "",
+      "looseHint": "",
+      "veryLoose": "",
+      "veryLooseHint": "",
+      "veryStrict": "",
+      "veryStrictHint": ""
+    },
+    "task": {
+      "calculateEta": "",
+      "cancel": "",
+      "cancelAria": "",
+      "cancelFailed": "",
+      "cancelRequested": "",
+      "cancelUnsupported": "",
+      "cancelled": "",
+      "cancelling": "",
+      "exactCancelled": "",
+      "remainingTime": "",
+      "similarCancelled": ""
+    },
+    "ariaCollapse": "",
+    "ariaCollapseBtn": "",
+    "ariaExpand": "",
+    "ariaExpandBtn": "",
+    "ariaGroupToggle": "",
+    "backToGallery": "",
+    "confirmMessage": "",
+    "confirmTitle": "",
+    "emptyExact": "",
+    "emptySimilarCompared": "",
+    "emptySimilarNoPhash": "",
+    "exactDesc": "",
+    "favoriteTooltip": "",
+    "foundGroups": "",
+    "groupExact": "",
+    "groupImageTag": "",
+    "groupReleasable": "",
+    "groupSelected": "",
+    "groupSimilar": "",
+    "groupSingleSize": "",
+    "groupVideoTag": "",
+    "loadingExact": "",
+    "loadingHintExact": "",
+    "loadingHintSimilar": "",
+    "loadingSimilar": "",
+    "markButton": "",
+    "markCompleted": "",
+    "markFailed": "",
+    "markNoGroups": "",
+    "markingButton": "",
+    "modeExact": "",
+    "modeLabel": "",
+    "modeSimilar": "",
+    "moveToTrash": "",
+    "noDuplicates": "",
+    "noFilesSelected": "",
+    "noSimilar": "",
+    "phashAllDone": "",
+    "phashButton": "",
+    "phashCalculating": "",
+    "phashCompleted": "",
+    "phashFailed": "",
+    "phashRecalcNow": "",
+    "pleaseSelect": "",
+    "ratingTooltip": "",
+    "recommendKeep": "",
+    "recommendTooltip": "",
+    "rescan": "",
+    "scanFailed": "",
+    "selectedToDelete": "",
+    "similarDesc": "",
+    "strategyAll": "",
+    "strategyApplied": "",
+    "strategyTooltipBest": "",
+    "strategyTooltipFavorited": "",
+    "strategyTooltipGroupBest": "",
+    "strategyTooltipGroupFavorited": "",
+    "strategyTooltipGroupLargest": "",
+    "strategyTooltipGroupNewest": "",
+    "strategyTooltipLargest": "",
+    "strategyTooltipNewest": "",
+    "subtitleExact": "",
+    "subtitleFailed": "",
+    "subtitleMeta": "",
+    "subtitleScanningExact": "",
+    "subtitleScanningSimilar": "",
+    "subtitleSimilar": "",
+    "subtitleSimilarMeta": "",
+    "thresholdGroupLabel": "",
+    "thresholdLabel": "",
+    "titleExact": "",
+    "titleSimilar": "",
+    "toolbarLabel": "",
+    "typeExact": "",
+    "typeSimilar": "",
+    "unsupported": "",
+    "unsupportedDelete": "",
+    "unsupportedExact": "",
+    "unsupportedMark": "",
+    "unsupportedPhash": "",
+    "unsupportedSimilar": "",
+    "videoBadge": ""
+  },
+  "editor": {
+    "basic": {
+      "blacks": "黑色色階",
+      "brightness": "亮度",
+      "clarity": "清晰度",
+      "contrast": "對比度",
+      "dehaze": "除霧",
+      "denoise": "降噪",
+      "highlights": "亮部",
+      "saturation": "飽和度",
+      "shadows": "陰影",
+      "sharpen": "銳利化",
+      "temperature": "色溫",
+      "tint": "色調",
+      "vibrance": "自然飽和度",
+      "whites": "白色色階"
+    },
+    "batchApply": {
+      "calculating": "",
+      "cancelAria": "",
+      "cancelRequested": "",
+      "cancelledMessage": "",
+      "cancelledToast": "",
+      "completedAll": "",
+      "completedToast": "",
+      "completedWithFailures": "",
+      "confirmMessage": "",
+      "confirmStart": "",
+      "confirmTitle": "",
+      "failedCount": "",
+      "invalidPathError": "",
+      "loadFailedError": "",
+      "noSelectionError": "",
+      "preparing": "",
+      "processingHint": "",
+      "processingLabel": "",
+      "remainingLabel": "",
+      "throughputSuffix": "",
+      "title": ""
+    },
+    "compare": {
+      "edited": "編輯後",
+      "loading": "載入中...",
+      "original": "原圖"
+    },
+    "hsl": {
+      "balance": "平衡",
+      "blue": "藍色",
+      "bluePurple": "藍紫",
+      "cyan": "青色",
+      "green": "綠色",
+      "highlights": "亮部",
+      "hue": "色相",
+      "lightness": "明度",
+      "magenta": "洋紅",
+      "orange": "橘色",
+      "purple": "紫色",
+      "red": "紅色",
+      "saturation": "飽和度",
+      "shadows": "陰影",
+      "skin": "膚色",
+      "warm": "暖色",
+      "yellow": "黃色",
+      "yellowGreen": "黃綠"
+    },
+    "metadata": {
+      "batchExported": "",
+      "batchExportedWithFailures": "",
+      "exportFailed": "",
+      "exported": "",
+      "restoreFailed": "",
+      "restored": "",
+      "unavailable": ""
+    },
+    "page": {
+      "clipboardEmpty": "",
+      "customPresetDefault": "",
+      "editedFileSuffix": "",
+      "exportFailed": "",
+      "imageLoadFailed": "",
+      "importedPresetDefault": "",
+      "paramsCopied": "",
+      "paramsPasted": "",
+      "pasteFailed": "",
+      "presetExportFailed": "",
+      "presetExportSuccess": "",
+      "presetExportUnsupported": "",
+      "presetImportFailed": "",
+      "presetImportSuccess": "",
+      "presetImportUnsupported": "",
+      "presetSaveFailed": "",
+      "presetSaveSuccess": "",
+      "presetSaveUnsupported": ""
+    },
+    "recover": {
+      "discard": "捨棄",
+      "discarded": "已捨棄暫存的編輯結果",
+      "download": "下載到本機",
+      "downloadSuffix": "",
+      "downloaded": "編輯結果已下載",
+      "message": "上次儲存失敗，編輯結果已暫存（{{fileName}}，{{time}}）。是否下載到本機？",
+      "storeFailed": "儲存失敗，且編輯結果過大無法暫存，請重新編輯後儲存",
+      "stored": "儲存失敗，編輯結果已暫存，下次進入編輯器時可下載復原",
+      "title": "復原未儲存的編輯結果"
+    },
+    "shortcuts": {
+      "desc": {
+        "compareOriginal": "",
+        "copyParams": "",
+        "fullscreenToggle": "",
+        "pasteParams": "",
+        "redo": "",
+        "save": "",
+        "saveAs": "",
+        "togglePanel": "",
+        "undo": ""
+      },
+      "title": ""
+    },
+    "tabs": {
+      "basic": "基礎",
+      "collapsePanel": "摺疊面板",
+      "curves": "曲線",
+      "expandPanel": "展開面板",
+      "filters": "濾鏡",
+      "hsl": "HSL",
+      "lut": "LUT",
+      "split": "分離",
+      "watermark": "浮水印"
+    },
+    "toolbar": {
+      "applyToSelected": "套用至選中({{count}})",
+      "applyToSelectedAria": "套用至選中的 {{count}} 張圖片",
+      "applyToSelectedTooltip": "將目前調整/濾鏡/浮水印套用至選中的 {{count}} 張圖片",
+      "applying": "套用中...",
+      "back": "返回",
+      "compare": "對比",
+      "compareHold": "按住對比原圖",
+      "copyParams": "複製參數",
+      "exportWithMetadata": "",
+      "exportWithMetadataTooltip": "",
+      "exportingWithMetadata": "",
+      "fullscreenEnter": "全螢幕編輯 (F11)",
+      "fullscreenEnterAria": "全螢幕編輯",
+      "fullscreenExit": "結束全螢幕 (F11)",
+      "fullscreenExitAria": "結束全螢幕",
+      "pasteParams": "貼上參數",
+      "redo": "重做",
+      "reset": "重設",
+      "save": "儲存",
+      "saveAs": "另存新檔",
+      "saving": "儲存中...",
+      "shortcuts": "快捷鍵說明 (?)",
+      "splitCompare": "分屏對比",
+      "splitCompareAria": "分屏對比",
+      "splitCompareTooltip": "切換左右分屏對比模式（左原圖右編輯效果）",
+      "undo": "復原"
+    },
+    "colorWheel": {
+      "ariaLabel": ""
+    },
+    "histogram": {
+      "ariaLabel": "",
+      "error": ""
+    },
+    "lut": {
+      "clear": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "import": ""
+    },
+    "toneCurve": {
+      "ariaLabel": "",
+      "channelB": "",
+      "channelG": "",
+      "channelR": "",
+      "channelRgb": "",
+      "curveLabel": "",
+      "inputOutput": "",
+      "reset": ""
+    }
+  },
+  "gallery": {
+    "fullscreen": {
+      "ariaLabel": "",
+      "closeTitle": "",
+      "deleteConfirmMessage": "",
+      "favoriteTitle": "",
+      "hideInfoTitle": "",
+      "infoPanelCloseAria": "",
+      "infoPanelTitle": "",
+      "intervalOption": "",
+      "intervalTitle": "",
+      "nextAriaLabel": "",
+      "prevAriaLabel": "",
+      "saveAsFailed": "",
+      "saveAsTitle": "",
+      "showInfoTitle": "",
+      "slideshowMinImages": "",
+      "slideshowPauseAria": "",
+      "slideshowPauseTitle": "",
+      "slideshowPlayAria": "",
+      "slideshowPlayTitle": "",
+      "title": "",
+      "unfavoriteTitle": ""
+    },
+    "import": {
+      "browse": "",
+      "categorize": {
+        "byDate": {
+          "desc": "",
+          "label": ""
+        },
+        "byMonth": {
+          "desc": "",
+          "label": ""
+        },
+        "flat": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "categorizeLabel": "",
+      "conflict": {
+        "overwrite": {
+          "desc": "",
+          "label": ""
+        },
+        "rename": {
+          "desc": "",
+          "label": ""
+        },
+        "skip": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "conflictLabel": "",
+      "deselectAll": "",
+      "errors": {
+        "importFailed": "",
+        "loadFailed": "",
+        "readSourceFailed": ""
+      },
+      "finish": "",
+      "imagesCount": "",
+      "importing": "",
+      "naming": {
+        "date": {
+          "desc": "",
+          "label": ""
+        },
+        "keep": {
+          "desc": "",
+          "label": ""
+        },
+        "seq": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "namingRuleLabel": "",
+      "nextStep": "",
+      "prevStep": "",
+      "progressLabel": "",
+      "resultImported": "",
+      "resultSkipped": "",
+      "scanHint": "",
+      "scanResult": "",
+      "scanSummary": "",
+      "scanning": "",
+      "selectionSummary": "",
+      "sourceDirLabel": "",
+      "sourceDirPlaceholder": "",
+      "startImport": "",
+      "step1": "",
+      "step2": "",
+      "step3": "",
+      "summaryDiskSpace": "",
+      "summaryFiles": "",
+      "summaryFilesValue": "",
+      "targetDirLabel": "",
+      "targetDirPlaceholder": "",
+      "title": "",
+      "videosCount": "",
+      "indexingHint": ""
+    },
+    "slideshow": {
+      "ariaLabel": "",
+      "exitAriaLabel": "",
+      "exitTitle": "",
+      "intervalLabel": "",
+      "intervalPreset": {
+        "10s": "",
+        "1s": "",
+        "3s": "",
+        "5s": ""
+      },
+      "loopLabel": "",
+      "nextTitle": "",
+      "orderLabel": "",
+      "orderPreset": {
+        "sequence": "",
+        "shuffle": ""
+      },
+      "pauseAriaLabel": "",
+      "pauseTitle": "",
+      "playAriaLabel": "",
+      "playTitle": "",
+      "prevTitle": "",
+      "progress": "",
+      "settingsAriaLabel": "",
+      "settingsCloseAriaLabel": "",
+      "settingsPanelTitle": "",
+      "settingsTitle": "",
+      "shortcutsHint": "",
+      "shuffleBadge": "",
+      "skipVideoLabel": "",
+      "title": "",
+      "transitionLabel": "",
+      "transitionPreset": {
+        "fade": "",
+        "none": "",
+        "slide": ""
+      }
+    },
+    "smartGroup": {
+      "dimensionDesc": {
+        "albumType": "",
+        "fileType": "",
+        "outfit": "",
+        "sceneCategory": "",
+        "sceneTime": ""
+      },
+      "emptyHint": "",
+      "fileType": {
+        "image": "",
+        "video": ""
+      }
+    },
+    "toolbar": {
+      "cleanupCorrupted": "",
+      "cleanupCorruptedTitle": "",
+      "corruptedOnly": "",
+      "corruptedOnlyTitle": "",
+      "dateLabel": "",
+      "dateRange": {
+        "clear": "",
+        "endLabel": "",
+        "startLabel": ""
+      },
+      "filterType": {
+        "all": "",
+        "image": "",
+        "video": ""
+      },
+      "importTitle": "",
+      "missingOnly": "",
+      "missingOnlyTitle": "",
+      "rating": {
+        "all": "",
+        "label": "",
+        "star1Plus": "",
+        "star2Plus": "",
+        "star3Plus": "",
+        "star4Plus": "",
+        "star5": "",
+        "starNPlus": ""
+      },
+      "searchPlaceholder": "",
+      "shareTitle": "",
+      "sortBy": {
+        "date": "",
+        "name": "",
+        "rating": "",
+        "resolution": "",
+        "size": ""
+      },
+      "viewMode": {
+        "eventTimeline": "",
+        "grid": "",
+        "list": "",
+        "masonry": "",
+        "timeline": ""
+      }
+    },
+    "contextMenu": {
+      "copyTo": "",
+      "delete": "",
+      "deletePermanent": "",
+      "edit": "",
+      "export": "",
+      "favorite": "",
+      "moveTo": "",
+      "open": "",
+      "openLocation": "",
+      "properties": "",
+      "rename": "",
+      "saveAs": "",
+      "selectAllInCategory": "",
+      "share": "",
+      "shareToQQ": "",
+      "shareToVivo": "",
+      "shareToWechat": "",
+      "unfavorite": ""
+    },
+    "eventTimeline": {
+      "ariaLabel": "",
+      "emptyHint": "",
+      "itemCount": "",
+      "unknownPeriodDesc": "",
+      "unknownPeriodName": "",
+      "versionBadge": ""
+    },
+    "masonry": {
+      "ariaLabel": ""
+    },
+    "renameDialog": {
+      "cancel": "",
+      "confirm": "",
+      "emptyError": "",
+      "invalidCharsError": "",
+      "title": ""
+    },
+    "tagManager": {
+      "addButton": "",
+      "commonTags": "",
+      "duplicateToast": "",
+      "emptyHint": "",
+      "inputPlaceholder": "",
+      "presetTags": {
+        "battle": "",
+        "drama": "",
+        "equipment": "",
+        "explore": "",
+        "landscape": "",
+        "people": "",
+        "screenshot": ""
+      },
+      "title": ""
+    },
+    "timeline": {
+      "ariaLabel": "",
+      "itemCount": ""
+    },
+    "virtualGrid": {
+      "ariaLabel": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "editAria": "",
+      "editTitle": "",
+      "favoriteAria": "",
+      "favoriteTitle": "",
+      "loadingMore": "載入中…",
+      "noMore": "沒有更多了",
+      "unfavoriteAria": "",
+      "unfavoriteTitle": ""
+    },
+    "watermarkDialog": {
+      "cancel": "",
+      "cancelTask": "",
+      "closeAria": "",
+      "computing": "",
+      "processing": "",
+      "processingHint": "",
+      "remaining": "",
+      "startAdd": "",
+      "title": ""
+    },
+    "search": {
+      "log": {
+        "indexNotReadyFallback": ""
+      }
+    },
+    "media": {
+      "log": {
+        "refreshNullFailed": ""
+      }
+    }
+  },
+  "group": {
+    "albumType": "相簿類型",
+    "all": "全部",
+    "fileType": "類型",
+    "none": "不分組",
+    "other": "其他",
+    "outfit": "套裝",
+    "sceneCategory": "場景",
+    "sceneTime": "時段",
+    "title": "智慧群組",
+    "log": {
+      "loadCountsFailed": ""
+    }
+  },
+  "logAction": {
+    "backupDeleted": "備份已刪除",
+    "backupFailed": "備份失敗",
+    "backupSuccess": "備份建立成功",
+    "backupSuccessWithProfile": "備份建立成功（檔案 {{name}}）",
+    "cleanFailed": "清理失敗",
+    "cleanMissingError": "清理丟失記錄失敗",
+    "cleanMissingFailed": "清理失敗",
+    "cleanMissingSuccess": "已清理 {{count}} 條丟失記錄",
+    "cleanSuccess": "已清理 {{count}} 個檔案，釋放 {{size}}",
+    "clearData": "本地資料已清除",
+    "clearDataFailed": "清除資料失敗",
+    "clearFailed": "清空失敗",
+    "clearSuccess": "日誌已清空",
+    "compactModeOff": "已關閉緊湊模式",
+    "compactModeOn": "已開啟緊湊模式",
+    "copyFailed": "複製失敗，請手動選擇文字複製",
+    "copySuccess": "已複製到剪貼簿",
+    "deleteFailed": "刪除失敗",
+    "enforceEvicted": "LRU 淘汰 {{count}} 個最久未存取的縮圖",
+    "enforceFailed": "檢查失敗",
+    "enforceNoop": "快取未超限，無需淘汰",
+    "exportFailed": "匯出失敗",
+    "exportSuccess": "日誌已匯出",
+    "fontSizeSet": "字型已設為{{label}}",
+    "incrementalOff": "已關閉增量掃描",
+    "incrementalOn": "已開啟增量掃描",
+    "limitSet": "上限已調整為 {{gb}}GB",
+    "limitSetEvicted": "上限已調整為 {{gb}}GB，LRU 淘汰 {{count}} 個檔案",
+    "limitSetFailed": "設定失敗",
+    "loadStatsFailed": "載入快取統計失敗",
+    "openDirFailed": "開啟目錄失敗",
+    "qqCopied": "QQ 群號已複製到剪貼簿",
+    "qqCopyFailed": "複製失敗，請手動選擇群號複製",
+    "reduceMotionOff": "已關閉動效減弱",
+    "reduceMotionOn": "已開啟動效減弱",
+    "restoreFailed": "還原失敗",
+    "restoreSuccess": "還原成功，請重新啟動應用",
+    "sceneAnalyzeFailed": "分析失敗",
+    "sceneAnalyzed": "已分析 {{count}} 張圖片的場景時段",
+    "settingFailed": "設定失敗",
+    "themeChanged": "主題已切換"
+  },
+  "nav": {
+    "allProfiles": "全部檔案",
+    "alreadyAtTop": "已在最頂層",
+    "backToTop": "返回上一層",
+    "categories": "分類",
+    "collapse": "摺疊",
+    "duplicates": "重複檔案",
+    "expand": "展開",
+    "favorites": "收藏",
+    "gallery": "圖庫",
+    "images": "圖片",
+    "launcherCache": "啟動器快取",
+    "menu": "選單",
+    "recycleBin": "資源回收筒",
+    "resonanceRecords": "共鳴錄",
+    "settings": "設定",
+    "smartGroup": "智慧群組",
+    "storage": "佔用",
+    "switchProfile": "切換角色檔案",
+    "videos": "影片",
+    "screenshots": "截圖"
+  },
+  "outfit": {
+    "collectedHint": "資料庫中有照片的套裝",
+    "collectedLabel": "已收集套裝",
+    "collectedSection": "已收集套裝（{{count}}）",
+    "count": "{{count}} 張",
+    "customSection": "自訂套裝（{{count}}）",
+    "emptyHint": "暫無套裝資料，請在詳情頁為照片標註套裝",
+    "filtered": "已篩選「{{outfit}}」的照片",
+    "latestShot": "最新拍攝",
+    "loadFailed": "載入失敗",
+    "loadStatsFailed": "載入套裝統計失敗",
+    "loading": "正在載入套裝統計…",
+    "locked": "未解鎖",
+    "noData": "暫無資料",
+    "photosCount": "{{count}} 張照片",
+    "presetTotalHint": "內建套裝預設庫",
+    "presetTotalLabel": "預設套裝總數",
+    "progressLabel": "收集進度",
+    "progressValue": "{{collected}} / {{total}}",
+    "refresh": "重新整理",
+    "refreshStats": "重新統計",
+    "summary": "已收集 {{collected}} 套 · 預設 {{presets}} 套 · 收集進度 {{progress}}%",
+    "title": "套裝圖鑑",
+    "topOutfitLabel": "最完整套裝",
+    "uncollectedHint": "尚未收集到「{{outfit}}」的照片",
+    "uncollectedSection": "未收集套裝（{{count}}）",
+    "unsupported": "目前環境不支援套裝圖鑑",
+    "viewOutfitPhotos": "檢視「{{outfit}}」的所有照片",
+    "presets": {
+      "amberCharm": "",
+      "ancientElegance": "",
+      "auroraPhantom": "",
+      "brilliantGalaxy": "",
+      "butterflyEffect": "",
+      "campusDays": "",
+      "cherryBlossomLover": "",
+      "cloudSinger": "",
+      "cloudWalk": "",
+      "crystalOath": "",
+      "desertRose": "",
+      "emeraldOath": "",
+      "fairyTale": "",
+      "firstKiss": "",
+      "floralGirl": "",
+      "futureTech": "",
+      "glazeDream": "",
+      "islandHoliday": "",
+      "moonlightSonata": "",
+      "morningLight": "",
+      "newYearSplendor": "",
+      "nightPoem": "",
+      "oceanMystery": "",
+      "roseGarden": "",
+      "roseKnight": "",
+      "seaOfStars": "",
+      "snowElf": "",
+      "snowlandTrain": "",
+      "springWaltz": "",
+      "stardustMagic": "",
+      "summerBreeze": "",
+      "urbanBeauty": "",
+      "wisteriaWhisper": "",
+      "winterSnow": "",
+      "autumnLeaves": ""
+    }
+  },
+  "profile": {
+    "defaultProfile": "預設檔案",
+    "transferToProfile": "轉移到檔案"
+  },
+  "profileAction": {
+    "createFailed": "建立失敗",
+    "created": "檔案已建立",
+    "defaultCannotDelete": "預設檔案不可刪除",
+    "deleteConfirm": "確認刪除檔案 {{uid}}？該檔案下的檔案將遷移到預設檔案。",
+    "deleteFailed": "刪除失敗",
+    "deleted": "檔案已刪除",
+    "nicknameRequired": "暱稱不能為空",
+    "nicknameUpdated": "暱稱已更新",
+    "switchFailed": "切換失敗",
+    "switched": "已切換檔案",
+    "uidExists": "該 UID 已存在",
+    "uidInvalid": "UID 僅允許字母和數字",
+    "uidRequired": "請輸入 UID",
+    "unsupported": "目前環境不支援檔案管理",
+    "updateFailed": "更新失敗"
+  },
+  "recycleBin": {
+    "backToGallery": "返回圖庫",
+    "clearSelection": "清除選擇",
+    "confirmEmpty": "清空",
+    "deleteFailed": "刪除失敗",
+    "empty": "清空回收站",
+    "emptyConfirm": "將永久刪除回收站中的全部 {{count}} 項檔案。\n檔案會先移至系統回收站，之後無法從本應用復原。\n確定要清空嗎？",
+    "emptyConfirmTitle": "清空回收站",
+    "emptyFailed": "清空失敗",
+    "emptySuccess": "回收站已清空",
+    "emptyTitle": "回收站為空",
+    "itemLabel": "回收站項 {{name}}",
+    "permanentConfirm": "將徹底刪除選中的 {{count}} 項檔案。\n檔案會先移至系統回收站，之後無法從本應用復原。\n確定要刪除嗎？",
+    "permanentConfirmTitle": "徹底刪除",
+    "permanentDelete": "徹底刪除",
+    "permanentDeleteSelected": "徹底刪除選中項",
+    "permanentHint": "徹底刪除後檔案將移至系統回收站",
+    "restore": "復原",
+    "restoreFailed": "復原失敗",
+    "restoreSelected": "復原選中項",
+    "retryDelete": "重試刪除",
+    "retryEmpty": "重試清空",
+    "retryRestore": "重試復原",
+    "selectToDelete": "請選擇要刪除的項目",
+    "selectToRestore": "請選擇要復原的項目",
+    "selectedCount": "已選擇 {{count}} 項",
+    "summary": "{{count}} 項 · 共 {{size}}",
+    "summaryWithHint": "{{count}} 項 · 共 {{size}} · 徹底刪除後檔案將移至系統回收站",
+    "title": "回收站",
+    "toolbarLabel": "回收站操作",
+    "videoBadge": "影片"
+  },
+  "sceneLabel": {
+    "location": "地點",
+    "other": "其他",
+    "portrait": "人物",
+    "recording": "錄屏",
+    "scene": "場景",
+    "screenshot": "截圖",
+    "unknown": "未知"
+  },
+  "settings": {
+    "about": {
+      "alias": "（全網同名）",
+      "appName": "應用名稱",
+      "appValue": "無限暖暖相簿管理工具",
+      "authorLabel": "作者：QianLu",
+      "bilibili": "嗶哩嗶哩",
+      "buildTools": "建置工具鏈",
+      "checkUpdate": "檢查更新",
+      "checkUpdateHint": "自動檢查更新，發現新版本後可在應用程式內下載並安裝",
+      "contactDesc": "GitHub 倉庫、QQ 群與社群媒體",
+      "contactTitle": "聯絡方式",
+      "copyGroup": "複製群號",
+      "copyright": "© 2026 QianLu. All rights reserved.",
+      "devCredit": "開發者：纖璐不會玩攝影",
+      "developer": "開發者",
+      "douyin": "抖音",
+      "githubRepo": "GitHub 倉庫",
+      "licenseApache": "• Apache-2.0：允許自由使用，需保留版權與專利授權",
+      "licenseDesc": "依賴列表與 License 資訊",
+      "licenseGpl": "• GPL-3.0：使用或修改後的程式碼必須同樣開源",
+      "licenseMit": "• MIT：允許自由使用、修改、分發，需保留版權聲明",
+      "licenseNote": "授權說明",
+      "licenseTitle": "致謝與開源授權",
+      "open": "開啟",
+      "projectIntro": "本軟體基於上述開源專案構建，感謝所有開源社群的貢獻者。軟體本身遵循 MIT 授權開源，歡迎自由使用、修改和分發。",
+      "qqGroup": "QQ 群",
+      "repo": "倉庫地址",
+      "repoLabel": "倉庫：",
+      "runtimeDeps": "執行時依賴",
+      "socialMedia": "開發者社群媒體",
+      "techStack": "技術棧",
+      "version": "版本號",
+      "versionLabel": "版本：v{{version}}",
+      "xiaohongshu": "小紅書",
+      "depDesc": {
+        "autoAnimate": "",
+        "betterSqlite3": "",
+        "electron": "",
+        "exifr": "",
+        "ffmpegStatic": "",
+        "ffprobeStatic": "",
+        "fluentFfmpeg": "",
+        "motion": "",
+        "react": "",
+        "reactDom": "",
+        "sharp": "",
+        "zustand": "",
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+      },
+      "toolDesc": {
+        "electronBuilder": "",
+        "eslint": "",
+        "tailwindCss": "",
+        "typeScript": "",
+        "vite": "",
+        "vitest": ""
+      },
+      "updateTitle": "更新",
+      "updateNetworkBusy": "當前網路繁忙，點擊確定跳轉官網",
+      "updateNoNewVersion": "當前已是最新版本",
+      "depDescTodo": {
+        "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
+      }
+    },
+    "backup": {
+      "archiveTag": "檔案：{{name}}",
+      "create": "立即備份",
+      "creating": "備份中…",
+      "delete": "刪除",
+      "empty": "暫無備份記錄",
+      "emptyHint": "點擊「立即備份」建立第一份備份",
+      "hint": "應用啟動後會自動檢查備份（距上次備份超過 7 天才執行），保留最近 5 份，超出自動清理最舊備份。還原操作會覆蓋當前資料庫，需重新啟動應用生效。按檔案備份僅檔名加入 UID 後綴以便識別，實際內容仍為整庫（還原不會丟失其他檔案資料）。",
+      "loading": "載入中…",
+      "modifyDir": "修改目錄",
+      "openDir": "開啟目錄",
+      "records": "備份記錄（按時間倒序）",
+      "refresh": "重新整理",
+      "restartLater": "稍後手動重新啟動",
+      "restartNow": "立即重新啟動",
+      "restartTitle": "重新啟動應用",
+      "restore": "還原",
+      "restoreConfirm": "確定要從此備份還原嗎？還原操作會覆蓋當前資料庫的所有資料，還原後需要重新啟動應用才能生效。",
+      "restoreTitle": "還原資料庫",
+      "storageLocation": "備份儲存位置",
+      "total": "共 {{count}} 份",
+      "wholeDb": "整庫備份",
+      "log": {
+        "loadBackupsFailed": ""
+      }
+    },
+    "cache": {
+      "cacheLimit": "快取上限",
+      "cacheLocation": "縮圖快取位置",
+      "cleanAll": "清理全部",
+      "cleanConfirm": "確定要清理全部 {{count}} 個縮圖快取嗎？\n（佔用 {{size}}，清理後存取圖片會重新生成）",
+      "cleanTitle": "清理全部縮圖",
+      "confirmClean": "確認清理",
+      "currentUsage": "目前佔用",
+      "enforceLru": "立即 LRU 檢查",
+      "fileCount": "{{count}} 個檔案",
+      "hint": "提示：清理後再次存取被清理的圖片會自動重新生成縮圖。LRU 淘汰不會影響原圖，僅清理快取。",
+      "limit": "上限",
+      "lruHint": "超限自動 LRU 淘汰",
+      "modifyDir": "修改目錄",
+      "noData": "暫無資料",
+      "openDir": "開啟目錄",
+      "refreshStats": "重新整理統計",
+      "usage": "使用率",
+      "strategyTitle": "",
+      "strategyDesc": "",
+      "invalidLimit": "",
+      "customLimitHint": ""
+    },
+    "clear": {
+      "cleanMissing": "清理丟失記錄",
+      "cleaning": "清理中...",
+      "clearConfirm": "確定要清除所有本地資料嗎？此操作將刪除資料庫記錄、掃描歷史、標籤和設定，但不會影響原始媒體檔案。",
+      "clearLocal": "清除本地資料",
+      "clearTitle": "清除本地資料",
+      "missingConfirm": "確定要清除所有標記為\"已丟失\"的記錄嗎？此操作僅刪除資料庫索引，不會影響其他正常檔案，且不可撤銷。",
+      "missingConfirmTitle": "清理丟失記錄",
+      "missingDesc": "掃描時若發現檔案已被外部刪除（連續兩次未找到），會標記為\"已丟失\"。點擊下方按鈕可一次性清除所有丟失記錄，僅刪除資料庫索引，不影響其他正常檔案。",
+      "missingTitle": "清理丟失記錄"
+    },
+    "crash": {
+      "clear": "清空記錄",
+      "clearConfirm": "確定要清空所有崩潰 dump 檔案嗎？此操作將永久刪除所有崩潰記錄，無法恢復。",
+      "clearDisabled": "暫無崩潰記錄可清空",
+      "clearTitle": "清空崩潰記錄",
+      "clearing": "清空中…",
+      "crashFiles": "崩潰檔案",
+      "crashReason": "崩潰原因",
+      "desc": "自動收集程序崩潰 dump 檔案，便於問題反饋與排查",
+      "empty": "暫無崩潰記錄",
+      "emptyLoading": "暫無崩潰記錄，載入中…",
+      "emptyStable": "暫無崩潰記錄，軟體執行穩定",
+      "hint": "崩潰 dump 檔案由 Electron crashpad 自動生成，保留最近 10 份且超過 30 天自動清理。僅記錄程序崩潰資訊，不含使用者隱私資料。",
+      "listCount": "共 {{count}} 個",
+      "listTitle": "崩潰記錄（按時間倒序）",
+      "modifyDir": "修改目錄",
+      "oldest": "最早記錄",
+      "openDir": "開啟目錄",
+      "processMain": "主程序",
+      "processOther": "其他",
+      "processRenderer": "渲染程序",
+      "refresh": "重新整理",
+      "size": "大小",
+      "storageLocation": "崩潰檔案儲存位置",
+      "storageUsage": "佔用空間",
+      "title": "崩潰報告",
+      "topFrame": "頂層堆疊幀",
+      "userDataPath": "userData/crashes/"
+    },
+    "display": {
+      "compactMode": "緊湊模式",
+      "compactModeDesc": "減小卡片內邊距和元素間距，單屏顯示更多內容",
+      "fontSize": "字型大小",
+      "fontSizeHint": "調整介面文字大小，影響所有頁面與對話框",
+      "fontSizeLarge": "大",
+      "fontSizeNormal": "標準",
+      "fontSizeSmall": "小",
+      "fontSizeXLarge": "特大",
+      "reduceMotion": "動效減弱",
+      "reduceMotionDesc": "關閉過渡動畫和懸停效果，提升低效能裝置回應速度"
+    },
+    "export": {
+      "clearDir": "清除",
+      "defaultDir": "預設匯出路徑",
+      "defaultDirHint": "設定後,批次匯出可一鍵匯出到此路徑,無需每次選擇目錄",
+      "defaultDirPlaceholder": "未設定(匯出時將詢問目標目錄)",
+      "description": "預設匯出路徑與智慧命名規則",
+      "namingPattern": "匯出命名規則",
+      "namingPatternEmpty": "留空則使用原檔名;命名衝突時自動追加序號",
+      "namingPatternHint": "支援變數: {date} 當前日期 · {album_type} 相簿類型 · {uid} 角色UID · {original_name} 原檔名 · {sequence} 序號",
+      "namingPatternPlaceholder": "如: {date}_{album_type}_{original_name}",
+      "preview": "預覽",
+      "previewEmpty": "原檔名.副檔名",
+      "selectDir": "選擇",
+      "title": "匯出工作流程",
+      "previewAlbumType": "",
+      "previewExtension": ""
+    },
+    "fileops": {
+      "batchThreshold": "批次操作閾值",
+      "batchThresholdDesc": "選中檔案超過此數量時彈出二次確認",
+      "deleteConfirm": "刪除前確認",
+      "deleteConfirmDesc": "刪除檔案時彈出確認對話框,避免誤刪",
+      "description": "刪除確認、批次操作閾值等檔案操作偏好",
+      "permanentDoubleConfirm": "永久刪除二次確認",
+      "permanentDoubleConfirmDesc": "使用 Shift+Delete 永久刪除時再次彈出確認",
+      "preferSoftDelete": "優先使用軟刪除",
+      "preferSoftDeleteDesc": "刪除時預設移至資源回收筒,可在資源回收筒還原",
+      "thresholdCount": "閾值數量",
+      "title": "檔案操作"
+    },
+    "groups": {
+      "about": "關於",
+      "appearance": "外觀",
+      "data": "資料管理",
+      "diagnostics": "日誌與診斷",
+      "general": "一般",
+      "plugins": "",
+      "profile": "角色檔案",
+      "scan": "掃描",
+      "tools": "工具"
+    },
+    "language": {
+      "auto": "跟隨系統",
+      "description": "切換介面顯示語言",
+      "restartHint": "部分文字可能需要重新啟動應用才能完全重新整理",
+      "title": "語言",
+      "loading": ""
+    },
+    "logs": {
+      "aggregateTooltip": "切換到聚合視圖（相同錯誤合併顯示）",
+      "clear": "清空日誌",
+      "clearConfirm": "確定要清空所有歷史日誌嗎？此操作將永久刪除所有故障記錄和日誌檔案，無法恢復。",
+      "clearDisabled": "暫無日誌可清空",
+      "clearTitle": "清空日誌",
+      "clearing": "清空中…",
+      "copy": "複製",
+      "copySample": "複製樣本",
+      "dayTooltip": "{{date}}：{{count}} 條故障",
+      "desc": "自動記錄軟體執行異常，便於問題反饋與排查",
+      "empty": "暫無故障記錄",
+      "emptyHint": "軟體執行過程中的異常會自動記錄到此",
+      "expandFault": "展開故障詳情: {{summary}}",
+      "expandSample": "展開聚合詳情: {{summary}}",
+      "export": "匯出日誌",
+      "exportDisabled": "暫無日誌可匯出",
+      "exporting": "匯出中…",
+      "faultId": "故障 ID: {{id}}",
+      "faultTotal": "故障總數",
+      "firstSeen": "首次: {{time}}",
+      "fullLog": "完整日誌內容",
+      "hint": "日誌按日期自動滾動儲存，總佔用上限 2GB 且超過 90 天自動清理。僅記錄軟體執行資訊，不含使用者隱私資料。",
+      "lastSeen": "最近: {{time}}",
+      "listAggregate": "故障聚合（按次數降序）",
+      "listCount": "共 {{count}} 條",
+      "listCountWithGroup": "共 {{count}} 條 · {{groups}} 組",
+      "listTimeline": "故障記錄（按時間倒序）",
+      "logFiles": "日誌檔案",
+      "modifyDir": "修改目錄",
+      "notInit": "未初始化",
+      "occurrenceCount": "出現次數: {{count}}",
+      "openDir": "開啟目錄",
+      "refresh": "重新整理",
+      "sampleDetail": "樣本詳情（最近一條）",
+      "sourceFile": "來源檔案: {{file}}",
+      "storageLocation": "日誌儲存位置",
+      "storageUsage": "佔用空間",
+      "switchAggregate": "聚合",
+      "switchTimeline": "時間序",
+      "timelineTooltip": "切換到時間序視圖",
+      "title": "日誌管理",
+      "totalLabel": "總計: {{count}}",
+      "trendTitle": "錯誤趨勢（最近 14 天）",
+      "trendTotal": "共 {{count}} 條"
+    },
+    "plugin": {
+      "checkUpdate": "",
+      "description": "",
+      "detail": "",
+      "detailTitle": "",
+      "disable": "",
+      "disabled": "",
+      "empty": "",
+      "enable": "",
+      "enabled": "",
+      "fieldActivationPoints": "",
+      "fieldActive": "",
+      "fieldAuthor": "",
+      "fieldDescription": "",
+      "fieldError": "",
+      "fieldExtensionPoints": "",
+      "fieldLicense": "",
+      "fieldMain": "",
+      "fieldPermissions": "",
+      "fieldVersion": "",
+      "install": "",
+      "installHint": "",
+      "installPlaceholder": "",
+      "installTitle": "",
+      "installed": "",
+      "noUpdate": "",
+      "notAvailable": "",
+      "statusDisabled": "",
+      "statusEnabled": "",
+      "statusError": "",
+      "storagePath": "",
+      "storagePathDesc": "",
+      "uninstall": "",
+      "uninstallConfirm": "",
+      "uninstallTitle": "",
+      "uninstalled": "",
+      "update": "",
+      "updateConfirm": "",
+      "updateTitle": "",
+      "updated": ""
+    },
+    "profile": {
+      "add": "新增",
+      "addProfile": "新增檔案",
+      "cancel": "取消",
+      "deleteProfile": "刪除檔案",
+      "editNickname": "編輯暱稱",
+      "empty": "暫無檔案",
+      "images": "圖片",
+      "list": "檔案列表",
+      "loading": "載入中…",
+      "nicknamePlaceholder": "暱稱（可選）",
+      "noData": "暫無資料",
+      "outfitTop": "套裝偏好 Top 5",
+      "photos": "{{count}} 張",
+      "photosWithPercent": "{{count}} 張（{{percent}}%）",
+      "save": "儲存",
+      "sceneTop": "場景偏好 Top 5",
+      "shotRange": "拍攝時間範圍：",
+      "stats": "拍攝統計（{{name}}）",
+      "storageUsage": "儲存佔用",
+      "switchTo": "切換到此檔案",
+      "timeTop": "時段偏好",
+      "totalFiles": "總檔案數",
+      "uidPlaceholder": "UID（8-12 位數字）",
+      "videos": "影片",
+      "virtualBadge": "無媒體（虛擬）",
+      "cleanupVirtual": "清理虛擬檔案",
+      "cleanupVirtualConfirm": "確定清理 {{count}} 個無媒體的虛擬檔案嗎？這些檔案是掃描時自動註冊但實際不存在對應媒體檔案。",
+      "noVirtual": "沒有需要清理的虛擬檔案",
+      "cleanupDone": "已清理 {{count}} 個虛擬檔案",
+      "cleanupPartial": "清理完成，但 {{failed}} 個虛擬檔案刪除失敗"
+    },
+    "scan": {
+      "analyzeNow": "立即分析",
+      "analyzing": "分析中…",
+      "incremental": "增量掃描",
+      "sceneTimeDesc": "基於影像亮度直方圖自動識別日景/夜景/黎明/黃昏",
+      "sceneTimeTitle": "場景時段分析",
+      "addPath": "新增遊戲目錄",
+      "adding": "新增中…",
+      "emptyPaths": "未設定自訂遊戲目錄，掃描器將自動搜尋遊戲特徵檔案",
+      "pathAdded": "已新增遊戲目錄",
+      "pathExists": "該目錄已存在",
+      "pathLimit": "最多 {{max}} 個遊戲目錄",
+      "pathRemove": "移除",
+      "pathRemoved": "已移除遊戲目錄",
+      "pathsDescription": "手動指定遊戲安裝目錄（或相簿 GamePlayPhotos 資料夾），掃描時優先搜尋這些路徑。當自動掃描失效時，可在此手動指定目錄作為後備。",
+      "importRootsTitle": "指定目錄",
+      "importRootsDescription": "透過「指定目錄掃描」登記的目錄，可在此移除其管理權限",
+      "importRootsEmpty": "尚未登記任何指定目錄",
+      "importRootsLoading": "載入中…",
+      "importRootsRemove": "移除該指定目錄",
+      "importRootsManageHint": "已透過「指定目錄掃描」登記的目錄，請在「指定目錄」中管理",
+      "importRootsConfirmTitle": "移除指定目錄",
+      "importRootsConfirmBody": "將移除目錄「{{path}}」的登記。是否同時清除其媒體索引記錄？",
+      "importRootsConfirmClearRecords": "同時清除該目錄的媒體索引記錄（移入資源回收筒，可復原）",
+      "importRootsClearRecordsHint": "提示：勾選則媒體移入資源回收筒（可復原）；不勾選則保留記錄，但其在「圖庫」與「快取」板塊均不再顯示（關閉目錄的資料仍在庫中，可經重新掃描復原）。",
+      "importRootsConfirmCancel": "取消",
+      "importRootsConfirmRemove": "確認移除",
+      "importRootsRemoving": "移除中…",
+      "importRootsRemovedOnly": "已移出管理",
+      "importRootsRemovedWithCleared": "已移出管理並清除 {{count}} 筆媒體記錄",
+      "importRootsClearFailed": "已移出管理，但清除該目錄的媒體索引記錄失敗，媒體記錄仍保留在庫中",
+      "importRootsRemoveFailed": "移除指定目錄失敗",
+      "importRootsLoadFailed": "載入指定目錄失敗",
+      "importRootsAdd": "新增指定目錄",
+      "importRootsAddScanning": "正在掃描指定目錄…",
+      "importRootsAddSuccess": "已新增指定目錄：{{path}}",
+      "importRootsAddFailed": "指定目錄掃描失敗：{{reason}}",
+      "gameRootsDescription": "列出本機偵測到的全部遊戲安裝目錄，勾選要參與掃描的目錄；存在多個目錄時預設選中修改時間最新且含官方相簿的那個。",
+      "gameRootsLoading": "正在偵測遊戲目錄…",
+      "gameRootsEmpty": "未偵測到任何遊戲安裝目錄，請在「遊戲目錄」中手動新增，或使用下方的手動後備掃描。",
+      "gameRootsLoadFailed": "偵測遊戲目錄失敗：{{reason}}",
+      "gameRootsRetry": "重試",
+      "gameRootsSaved": "已儲存掃描目錄選擇",
+      "hasGamePlayPhotos": "含官方相簿",
+      "noGamePlayPhotos": "未偵測出官方相簿",
+      "sourceCustom": "手動新增",
+      "sourceOfficial": "官方啟動器",
+      "sourceSteam": "Steam",
+      "sourceEpic": "Epic",
+      "fallbackDescription": "自動定位失敗時，可手動選擇目錄並立即掃描；所選目錄會自動儲存，下次啟動優先掃描（支援多個）。",
+      "fallbackPickGameRoot": "選擇遊戲安裝根目錄",
+      "fallbackPickAlbumDir": "直接選擇 GamePlayPhotos 資料夾",
+      "fallbackRootNoAlbum": "該目錄下未偵測出官方相簿（GamePlayPhotos），請確認選擇的是包含 X6Game 的遊戲安裝根目錄",
+      "fallbackScanSuccess": "掃描完成，發現 {{count}} 個媒體檔案",
+      "fallbackScanFailed": "掃描失敗：{{reason}}",
+      "fallbackScanHint": "可改用「直接選擇 GamePlayPhotos 資料夾」，或在「掃描鏈路診斷」中匯出日誌後回報。",
+      "fallbackHint": "一級後備選擇包含 X6Game 的遊戲安裝根目錄（程式自動拼接 GamePlayPhotos）；二級後備直接選擇 GamePlayPhotos 資料夾。若提示權限不足（E003），可點擊「以系統管理員身分重新啟動」。",
+      "relaunchAsAdmin": "以系統管理員身分重新啟動",
+      "elevating": "正在以系統管理員身分重新啟動…",
+      "elevateFailed": "提權重新啟動失敗：{{reason}}"
+    },
+    "sections": {
+      "aboutContact": "聯絡方式",
+      "aboutInfo": "應用資訊",
+      "aboutLicense": "致謝與開源授權",
+      "dataBackup": "資料庫備份",
+      "dataCache": "快取管理",
+      "dataClear": "清除資料",
+      "diagnosticsCrash": "崩潰報告",
+      "diagnosticsLogs": "日誌管理",
+      "display": "字型與顯示",
+      "exportWorkflow": "匯出工作流程",
+      "fileops": "檔案操作",
+      "language": "語言",
+      "pluginManage": "",
+      "profileManage": "檔案管理",
+      "scanOptions": "掃描選項",
+      "shareCode": "分享碼工具",
+      "startup": "啟動行為",
+      "theme": "主題",
+      "scanPaths": "",
+      "importRoots": "",
+      "scanDiagnostic": "扫描链路诊断",
+      "gameRoots": "",
+      "scanFallback": ""
+    },
+    "startup": {
+      "autoScan": "啟動時自動掃描",
+      "autoScanDesc": "開啟後,應用啟動時將自動掃描遊戲路徑中的新增媒體檔案。",
+      "hardwareAcceleration": "GPU 硬體加速",
+      "hardwareAccelerationDesc": "關閉後改用軟體渲染，可規避部分顯示卡導致的啟動崩潰。修改後需重新啟動應用程式生效。",
+      "hardwareAccelerationRestartHint": "GPU 硬體加速設定已儲存，需要重新啟動應用程式才能生效。是否立即重新啟動？",
+      "restartNow": "立即重新啟動",
+      "restartLater": "稍後重新啟動",
+      "description": "應用啟動時的自動行為設定",
+      "title": "啟動行為"
+    },
+    "theme": {
+      "desc": "切換後即時生效，主題偏好會自動儲存到本地設定。",
+      "label": "介面主題"
+    },
+    "title": "設定",
+    "tools": {
+      "shareCode": {
+        "decoder": "分享碼解碼器",
+        "decoderDesc": "解碼遊戲內染色分享碼、家園建造分享碼，或加密相機參數。支援提取時間戳、UID、伺服器 ID 等元資料。",
+        "openTool": "開啟工具"
+      }
+    },
+    "navigation": {
+      "ariaLabel": ""
+    },
+    "plugins": {
+      "error": {
+        "unavailable": ""
+      }
+    }
+  },
+  "share": {
+    "guide": {
+      "channels": {
+        "qq": "QQ",
+        "vivo": "vivo辦公套件",
+        "wechat": "微信"
+      },
+      "failed": "分享失敗",
+      "guides": {
+        "qq": {
+          "notInstalled": "未偵測到 QQ 安裝\n檔案已複製到剪貼簿，可手動開啟軟體後貼上傳送",
+          "notRunning": "✅ 檔案已複製到剪貼簿\n偵測到 QQ 未執行，點擊下方按鈕啟動後貼上傳送",
+          "running": "✅ 檔案已複製到剪貼簿\n請開啟 QQ 聊天視窗，按 Ctrl+V 貼上傳送"
+        },
+        "vivo": {
+          "notInstalled": "未偵測到 vivo 辦公套件安裝\n檔案已複製到剪貼簿，可手動開啟軟體後貼上同步",
+          "notRunning": "✅ 檔案已複製到剪貼簿\n偵測到 vivo 辦公套件未執行，點擊下方按鈕啟動後貼上同步",
+          "running": "✅ 檔案已複製到剪貼簿\n請開啟 vivo 辦公套件，按 Ctrl+V 貼上同步到手機"
+        },
+        "wechat": {
+          "notInstalled": "未偵測到微信安裝\n檔案已複製到剪貼簿，可手動開啟軟體後貼上傳送",
+          "notRunning": "✅ 檔案已複製到剪貼簿\n偵測到微信未執行，點擊下方按鈕啟動後貼上傳送",
+          "running": "✅ 檔案已複製到剪貼簿\n請開啟微信聊天視窗，按 Ctrl+V 貼上傳送"
+        }
+      },
+      "known": "知道了",
+      "launchFailed": "啟動失敗",
+      "launchSuccess": "已啟動，請等待視窗載入完成後貼上",
+      "launching": "正在啟動...",
+      "open": "開啟{{name}}",
+      "shareTo": "分享到{{name}}",
+      "skipped": "（已跳過 {{count}} 個不可存取的檔案）"
+    },
+    "menu": {
+      "label": "分享",
+      "toQQ": "分享到QQ",
+      "toVivo": "分享到vivo辦公套件",
+      "toWechat": "分享到微信"
+    },
+    "wifi": {
+      "accessUrl": "手機瀏覽器存取以下位址",
+      "copyPin": "複製 PIN",
+      "copyPinFailed": "複製失敗，請手動記錄",
+      "copyUrl": "複製位址",
+      "copyUrlFailed": "複製失敗，請手動選擇位址複製",
+      "fileCount": "檔案數",
+      "noFiles": "請先選擇要分享的檔案",
+      "pin": "存取 PIN 碼",
+      "pinCopied": "PIN 碼已複製",
+      "port": "連接埠",
+      "remainTime": "剩餘時間",
+      "restart": "重新啟動服務",
+      "restartButton": "重新啟動",
+      "restartTitle": "重新啟動服務（更換連接埠）",
+      "startFailed": "啟動失敗",
+      "started": "分享服務已啟動，連接埠 {{port}}",
+      "starting": "正在啟動分享服務…",
+      "stop": "停止分享",
+      "stopFailed": "停止失敗",
+      "stopped": "分享服務已停止",
+      "timeoutClosed": "分享服務已超時自動關閉",
+      "tips": {
+        "firewall": "· 首次啟動若被防火牆攔截，請允許 Node 透過",
+        "lanOnly": "· 服務僅本區域網可存取，不會暴露公網",
+        "pinAuth": "· 手機端首次存取需輸入 PIN 碼認證",
+        "sameWifi": "· 確保手機與電腦連接同一 WiFi",
+        "timeout": "· 超時自動關閉，也可手動停止"
+      },
+      "title": "WiFi 區域網分享",
+      "unsupported": "目前環境不支援 WiFi 分享",
+      "urlCopied": "位址已複製到剪貼簿"
+    },
+    "message": {
+      "allInaccessible": "",
+      "copiedToClipboard": "",
+      "copiedWithSkipped": "",
+      "copyFailed": "",
+      "exeNotExist": "",
+      "launched": "",
+      "launchFailed": "",
+      "noFilesSelected": "",
+      "notInstalled": "",
+      "unsupportedPlatform": ""
+    },
+    "log": {
+      "copiedToClipboard": "",
+      "copyFailed": "",
+      "detectInstallPathFailed": "",
+      "launchFailed": "",
+      "launched": ""
+    }
+  },
+  "timeLabel": {
+    "dawn": "黎明",
+    "day": "日間",
+    "dusk": "黃昏",
+    "night": "夜間",
+    "unknown": "未知"
+  },
+  "titleBar": {
+    "appTitle": "無限暖暖相簿管理工具"
+  },
+  "toast": {
+    "autoScanOff": "已關閉啟動時自動掃描",
+    "autoScanOn": "已開啟啟動時自動掃描",
+    "gpuOn": "已開啟 GPU 硬體加速（重新啟動後生效）",
+    "gpuOff": "已關閉 GPU 硬體加速（重新啟動後生效）",
+    "batchThresholdOff": "已關閉批次操作閾值",
+    "batchThresholdOn": "已開啟批次操作閾值",
+    "batchThresholdSet": "批次操作閾值已設為 {{count}}",
+    "defaultDirCleared": "已清除預設匯出路徑",
+    "defaultDirSet": "預設匯出路徑已設為 {{dir}}",
+    "deleteConfirmOff": "已關閉刪除前確認",
+    "deleteConfirmOn": "已開啟刪除前確認",
+    "invalidIds": "選中檔案 id 無效",
+    "languageChanged": "語言已切換為 {{lang}}",
+    "noSelectionTransfer": "未選擇要轉移的檔案",
+    "permanentDoubleConfirmOff": "已關閉永久刪除二次確認",
+    "permanentDoubleConfirmOn": "已開啟永久刪除二次確認",
+    "preferSoftDeleteOff": "已關閉優先軟刪除",
+    "preferSoftDeleteOn": "已開啟優先軟刪除",
+    "transferError": "跨檔案轉移失敗",
+    "transferFailed": "轉移失敗",
+    "transferSuccess": "轉移成功",
+    "transferUnsupported": "目前環境不支援跨檔案轉移",
+    "batchExportFailed": "",
+    "batchMoveFailed": "",
+    "batchRenameFailed": "",
+    "batchRenameUnsupported": "",
+    "cancelFailed": "",
+    "cancelRequested": "",
+    "cancelUnsupported": "",
+    "copyFailed": "",
+    "copyUnsupported": "",
+    "decodeFailed": "",
+    "deleteFailed": "",
+    "deleteFileTitle": "",
+    "deleteUnsupported": "",
+    "exportFailed": "",
+    "exportUnsupported": "",
+    "favorite": "",
+    "favoriteFailed": "",
+    "fileProperties": {
+      "resolutionDash": "",
+      "template": "",
+      "typeImage": "",
+      "typeVideo": ""
+    },
+    "imageLoadFailed": "",
+    "ipcCallFailed": "",
+    "mediaLoadFailed": "",
+    "moveFailed": "",
+    "moveToRecycleConfirm": "",
+    "moveUnsupported": "",
+    "noCancellableTask": "",
+    "noDefaultExportDir": "",
+    "noWatermarkSelection": "",
+    "permanentDeleteConfirm": "",
+    "permanentDeleteTitle": "",
+    "previewRenderFailed": "",
+    "renameFailed": "",
+    "renameUnsupported": "",
+    "saveAsFailed": "",
+    "saveAsUnsupported": "",
+    "undo": {
+      "failed": "",
+      "favorite": "",
+      "move": "",
+      "moveToRecycle": "",
+      "none": "",
+      "permanentDelete": "",
+      "rename": "",
+      "undone": "",
+      "unfavorite": "",
+      "conflictPrompt": ""
+    },
+    "undoUnsupported": "",
+    "unfavorite": "",
+    "unknownError": "",
+    "watermarkCancelled": "",
+    "watermarkFailed": "",
+    "watermarkNotConfigured": "",
+    "watermarkUnsupported": "",
+    "scanFailed": "",
+    "scanNoGameDir": "",
+    "manualPathHint": "",
+    "manualPathHintMessage": "",
+    "scanCompletedNoGameShots": "掃描完成：未發現遊戲內截圖。遊戲截圖目錄未自動識別時，可在掃描選單中選擇「指定目錄掃描」",
+    "scanFoundButGalleryEmpty": "掃描完成：發現 {{count}} 個檔案，但均非遊戲內截圖（啟動器圖片已收入「快取」分區）。遊戲截圖目錄未自動識別時，可在掃描選單中選擇「指定目錄掃描」",
+    "batchDelete": {
+      "allSucceeded": "",
+      "missingFile": "",
+      "partial": ""
+    },
+    "backup": {
+      "restored": ""
+    },
+    "scanInterrupted": "",
+    "imageProcessorCanvasFailed": "",
+    "imageProcessorLoadFailed": ""
+  },
+  "video": {
+    "applyEdit": "",
+    "backToDetail": "返回詳情",
+    "color": "",
+    "colorDesc": "",
+    "colorNoPreview": "",
+    "confirmExport": "將影片轉換為 {{format}} 格式？轉換需重編碼，耗時較長。",
+    "confirmLivePhoto": "將影片匯出為 Apple Live Photo（JPG + MOV 配對檔案）？轉碼耗時較長，生成的檔案可在 iPhone 上識別為 Live Photo。",
+    "confirmSpeed": "將以 {{speed}}x 速度匯出新影片檔案？預計時長 {{duration}}",
+    "confirmTrim": "將裁剪區間 {{start}} - {{end}}（時長 {{duration}}）匯出為新影片檔案？",
+    "customSpeed": "自訂速度",
+    "editFailed": "",
+    "editSuccess": "",
+    "editorUnsupported": "",
+    "endLabel": "終點",
+    "endLtStart": "終點不能小於或等於起點",
+    "estimatedDuration": "預計時長",
+    "exportDesc": "將目前影片轉換為其他格式。轉換需重編碼，處理時間取決於影片時長。GIF 會丟失音訊。",
+    "exportFormats": {
+      "avi": "無損但體積大",
+      "gif": "動圖，無聲",
+      "mov": "Apple QuickTime",
+      "mp4": "通用相容性最佳",
+      "webm": "Web 友好，體積小"
+    },
+    "exportMode": "匯出",
+    "exportVideo": "匯出影片",
+    "fastMotionLabel": "4.0x 快放",
+    "formatConvert": "格式轉換",
+    "gifWarning": "GIF 格式僅保留影片畫面，音訊將被丟棄；同時為控制體積，解析度和幀率會自動降低。",
+    "jumpToEnd": "跳到終點",
+    "jumpToStart": "跳到起點",
+    "livePhoto": {
+      "button": "匯出 Live Photo",
+      "desc": "生成 JPG（封面）+ MOV（動態）配對檔案，可在 iPhone 上識別為 Live Photo。",
+      "limitation": "已知限制：JPG 未寫入 Apple MakerNote ContentIdentifier，iCloud 同步可能丟失配對，本地匯入正常。",
+      "title": "匯出為 Live Photo"
+    },
+    "notes": {
+      "noModifyOriginal": "匯出生成新檔案，不修改原影片",
+      "reencode": "調速需重編碼，耗時較長",
+      "streamCopy": "裁剪使用串流複製（同編碼），速度快",
+      "supportedFormats": "支援 mp4/mov/avi/mkv/webm/wmv"
+    },
+    "notesTitle": "說明",
+    "originalFormat": "原始格式",
+    "originalSpeedLabel": "1.0x 原速",
+    "outputDuration": "輸出時長",
+    "playPause": "播放/暫停",
+    "previewSpeed": "預覽速度",
+    "processing": "處理中...",
+    "readMetadataFailed": "讀取影片元資料失敗",
+    "resetColor": "",
+    "selectDirAndExport": "選擇目錄並匯出",
+    "selectedRange": "選中區間",
+    "setToCurrent": "設為目前位置",
+    "slowMotionLabel": "0.25x 慢放",
+    "speed": "調速",
+    "speedChange": "速度變化",
+    "speedDesc": "選擇目標速度（0.25x - 4.0x）。調速需要重編碼，處理時間較長。預覽時可即時檢視效果。",
+    "speedFast": "快 {{n}}倍",
+    "speedOriginal": "原速",
+    "speedSlow": "慢 {{n}}倍",
+    "startGtEnd": "起點不能大於或等於終點",
+    "startLabel": "起點",
+    "targetFormat": "目標格式",
+    "trim": "裁剪",
+    "trimDesc": "拖動滑桿或在播放過程中點擊按鈕設定起止時間。裁剪會輸出新檔案，不修改原影片。",
+    "trimmedDuration": "裁剪後時長",
+    "unknown": "未知",
+    "unknownCodec": "未知編碼",
+    "watermark": "",
+    "watermarkDesc": ""
+  },
+  "enums": {
+    "aperture": {
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "neg1": ""
+    },
+    "clothState": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "9": ""
+    },
+    "clothType": {
+      "0": "",
+      "10": "",
+      "20": "",
+      "30": "",
+      "41": "",
+      "50": "",
+      "60": "",
+      "71": "",
+      "72": "",
+      "73": "",
+      "74": "",
+      "75": "",
+      "76": "",
+      "77": "",
+      "78": "",
+      "79": "",
+      "80": "",
+      "81": "",
+      "82": "",
+      "83": "",
+      "84": "",
+      "85": "",
+      "86": "",
+      "90": "",
+      "92": "",
+      "93": "",
+      "94": "",
+      "95": "",
+      "96": "",
+      "97": "",
+      "unknown": ""
+    },
+    "colorPalette": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "16": "",
+      "17": "",
+      "18": ""
+    },
+    "colorSwatch": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": ""
+    },
+    "eurekaAttachment": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": ""
+    },
+    "eurekaColor": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": ""
+    },
+    "expedition": {
+      "101020301": "",
+      "101020302": "",
+      "101020303": "",
+      "101020304": "",
+      "101020305": "",
+      "101020306": "",
+      "101020307": "",
+      "101020308": ""
+    },
+    "filter": {
+      "Fresh_001": "",
+      "Fresh_002": "",
+      "Fresh_003": "",
+      "Fresh_004": "",
+      "Fresh_005": "",
+      "None": "",
+      "Vibe_001": "",
+      "Vibe_002": "",
+      "Vibe_003": "",
+      "Vibe_004": "",
+      "Vibe_005": "",
+      "Vibe_009": "",
+      "Weather_001": "",
+      "Weather_002": "",
+      "Weather_003": "",
+      "Weather_004": ""
+    },
+    "framedMoment": {
+      "0": ""
+    },
+    "interactive": {
+      "206001": "",
+      "261003": "",
+      "42031201": "",
+      "42031202": "",
+      "42031203": ""
+    },
+    "light": {
+      "DirectionLight_B": "",
+      "DirectionLight_L": "",
+      "DirectionLight_R": "",
+      "DirectionLight_T": "",
+      "HueEdgeLight_001_L": "",
+      "HueEdgeLight_001_R": "",
+      "HueEdgeLight_002_L": "",
+      "HueEdgeLight_002_R": "",
+      "HueEdgeLight_003_L": "",
+      "HueEdgeLight_003_R": "",
+      "HueEdgeLight_004_L": "",
+      "HueEdgeLight_004_R": "",
+      "None": "",
+      "VibeLight_001": "",
+      "VibeLight_002": "",
+      "VibeLight_003": "",
+      "VibeLight_004": ""
+    },
+    "poseId": {
+      "0": ""
+    },
+    "puzzle": {
+      "30": "",
+      "31": "",
+      "neg1": ""
+    },
+    "weather": {
+      "0": "",
+      "2": "",
+      "4": "",
+      "7": "",
+      "neg1": ""
+    }
+  },
+  "filter": {
+    "applyPresetAria": "",
+    "category": {
+      "all": "",
+      "artistic": "",
+      "cinematic": "",
+      "custom": "",
+      "natural": "",
+      "vintage": ""
+    },
+    "preset": {
+      "natural-1": "",
+      "natural-2": "",
+      "natural-3": "",
+      "natural-4": "",
+      "natural-5": "",
+      "vintage-1": "",
+      "vintage-2": "",
+      "vintage-3": "",
+      "vintage-4": "",
+      "vintage-5": "",
+      "artistic-1": "",
+      "artistic-2": "",
+      "artistic-3": "",
+      "artistic-4": "",
+      "artistic-5": "",
+      "cinematic-1": "",
+      "cinematic-2": "",
+      "cinematic-3": "",
+      "cinematic-4": "",
+      "cinematic-5": ""
+    },
+    "deleteCustomAria": "",
+    "exportAria": "",
+    "exportJson": "",
+    "generatingPreview": "",
+    "importAria": "",
+    "importJson": "",
+    "intensity": "",
+    "namePlaceholder": "",
+    "save": "",
+    "saveCurrentAria": "",
+    "saving": ""
+  },
+  "locations": {
+    "Miraland": "",
+    "HeartcraftKingdom": "",
+    "Wishfield": "",
+    "MemorialMountains": "",
+    "OldFlorawishMemorial": "",
+    "StylistGuildMemorial": "",
+    "Florawish": "",
+    "DreamwovenRuins": "",
+    "FortuneFalls": "",
+    "GreatWishtreeSquare": "",
+    "LakesideDistrict": "",
+    "OutskirtsForest": "",
+    "BreezyMeadow": "",
+    "AbandonedFanaticWisherCamp": "",
+    "BreezyMeadowActivityArea": "",
+    "BugSongHills": "",
+    "CiciaHighlands": "",
+    "HeartcraftKingdomOutpost": "",
+    "LakesideHill": "",
+    "MeadowWharf": "",
+    "QueenPalaceRuins": "",
+    "RelicHill": "",
+    "SleepyFishHills": "",
+    "SwanGazebo": "",
+    "Stoneville": "",
+    "DyeWorkshop": "",
+    "FlowerFieldsResidence": "",
+    "RockfallValley": "",
+    "StonevilleMarket": "",
+    "AbandonedDistrict": "",
+    "ChooChooStation": "",
+    "GoldenFields": "",
+    "MarketOfMirth": "",
+    "Prosperville": "",
+    "RippleEstate": "",
+    "StellarFishingGround": "",
+    "Stonecrown": "",
+    "WindriderMill": "",
+    "WishingWoods": "",
+    "BrookwoodForest": "",
+    "CavernOfWishes": "",
+    "FallenWishHighlands": "",
+    "GrandTreeValley": "",
+    "SacredMountains": "",
+    "ValleyOfBlossoms": "",
+    "FireworkIsles": "",
+    "ClearheartLake": "",
+    "CrescentMoonRuins": "",
+    "FlamingForest": "",
+    "RelicIsles": "",
+    "SongbreezeHighland": "",
+    "SparkheartIsland": "",
+    "SerenityIsland": "",
+    "OldRuins": "",
+    "Soakville": "",
+    "SoakvilleOutskirts": "",
+    "Steamville": "",
+    "DanqingIsland": "",
+    "BackMountain": "",
+    "BambooGrove": "",
+    "Inkville": "",
+    "InkwashStream": "",
+    "LoongPagoda": "",
+    "LoongPeak": "",
+    "ReedblossomShore": "",
+    "DanqingRealm": "",
+    "GreenBambooGrove": "",
+    "InkPool": "",
+    "InkshorePlain": "",
+    "WildfieldWaterside": "",
+    "TerraAlliance": "",
+    "Itzaland": "",
+    "ItzalandCanyon": "",
+    "ElderwoodForest": "",
+    "BehemothObservationSite": "",
+    "Coliseum": "",
+    "ElderwoodShade": "",
+    "ElderwoodWharf": "",
+    "ForestOfSlumber": "",
+    "ForgottenStreet": "",
+    "GiantVineForest": "",
+    "LeafRiver": "",
+    "MothershroomWoods": "",
+    "ParkyaCraterLake": "",
+    "Pottsville": "",
+    "RockvilleRuins": "",
+    "ShellIsland": "",
+    "Shroomville": "",
+    "SnailRanch": "",
+    "SpiraWaterfall": "",
+    "TitanGraveyard": "",
+    "TitansOutpostRuins": "",
+    "Spira": "",
+    "Spira1F": "",
+    "Spira2F": "",
+    "Spira3F": "",
+    "SpiraShelldome": "",
+    "Boneyard": "",
+    "BluePools": "",
+    "Cultivarium": "",
+    "DragonRuins": "",
+    "DragonrestFlowerfield": "",
+    "GlimmeringLake": "",
+    "GreatLumieville": "",
+    "HealingGround": "",
+    "HollowbreathPassage": "",
+    "LonestoneShore": "",
+    "SoulSpring": "",
+    "WanxiangRealm": "",
+    "CaiYeMarket": "",
+    "CaiYeOutskirts": "",
+    "DazzlebloomMeadow": "",
+    "DeepValleySpring": "",
+    "JiuhuaPavilion": "",
+    "JiuhuaPenitentiary": "",
+    "ValleyPath": "",
+    "WhereWoodEchoes": "",
+    "EmpireOfLight": "",
+    "StarhailFederation": "",
+    "LinlangEmpire": "",
+    "TwinmoonKingdom": "",
+    "WhalePort": "",
+    "Umbraso": "",
+    "SeaOfStars": "",
+    "Crystalvale": "",
+    "DreamStarIsles": "",
+    "Starshore": "",
+    "UnboundWharf": "",
+    "Home": "",
+    "DockArea": ""
+  },
+  "sceneCategory": {
+    "collage": "",
+    "other": "",
+    "screenshot": "",
+    "thumbnail": "",
+    "travelJournal": "",
+    "worldTour": ""
+  },
+  "sceneTime": {
+    "dawn": "",
+    "dawnDesc": "",
+    "day": "",
+    "dayDesc": "",
+    "dusk": "",
+    "duskDesc": "",
+    "night": "",
+    "nightDesc": "",
+    "unknown": "",
+    "unknownDesc": ""
+  },
+  "faultTypes": {
+    "uncaughtException": "",
+    "unhandledRejection": "",
+    "rendererCrash": "",
+    "rendererError": "",
+    "ipcError": "",
+    "manual": "",
+    "rendererComponent": "",
+    "rendererPromise": "",
+    "rendererResource": "",
+    "exitDiagnosis": "",
+    "workerCrash": "",
+    "workerRestart": "",
+    "databaseCorruption": "",
+    "databaseRestore": "",
+    "indexingTimeout": "",
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": "",
+    "navigation-blocked": ""
+  },
+  "lut": {
+    "builtin": {
+      "identity": "",
+      "tealOrange": "",
+      "warmVintage": "",
+      "coolDrama": "",
+      "highContrast": ""
+    },
+    "log": {
+      "persistFailed": ""
+    }
+  },
+  "watermark": {
+    "blendMode": {
+      "multiply": "",
+      "normal": "",
+      "overlay": "",
+      "screen": "",
+      "softLight": ""
+    },
+    "bold": "",
+    "boldOff": "",
+    "color": "",
+    "deleteTemplateAria": "",
+    "deleteText": "",
+    "font": "",
+    "fontMicrosoftYaHei": "",
+    "fontMonospace": "",
+    "fontSansSerif": "",
+    "fontSerif": "",
+    "height": "",
+    "horizontalSpacing": "",
+    "imageMode": "",
+    "imagePreviewAlt": "",
+    "imageSelectButton": "",
+    "imageSelectPlaceholder": "",
+    "imageWatermark": "",
+    "italic": "",
+    "italicOff": "",
+    "margin": "",
+    "opacity": "",
+    "pluginTemplateImage": "",
+    "pluginTemplateText": "",
+    "pluginTemplates": "",
+    "position": "",
+    "positionBottomCenter": "",
+    "positionBottomLeft": "",
+    "positionBottomRight": "",
+    "positionCenter": "",
+    "positionCenterLeft": "",
+    "positionCenterRight": "",
+    "positionTopCenter": "",
+    "positionTopLeft": "",
+    "positionTopRight": "",
+    "presetAria": "",
+    "presets": "",
+    "rotation": "",
+    "saveTemplateAria": "",
+    "size": "",
+    "stylePresetCopyright": "",
+    "stylePresetCopyrightDesc": "",
+    "stylePresetDateLabel": "",
+    "stylePresetDateLabelDesc": "",
+    "stylePresetPolaroid": "",
+    "stylePresetPolaroidDesc": "",
+    "stylePresetSignature": "",
+    "stylePresetSignatureDesc": "",
+    "templateNamePlaceholder": "",
+    "templates": "",
+    "text": "",
+    "textMode": "",
+    "textPlaceholder": "",
+    "tileMode": "",
+    "underline": "",
+    "underlineOff": "",
+    "verticalSpacing": "",
+    "width": "",
+    "log": {
+      "saveTemplateFailed": "",
+      "deleteTemplateFailed": ""
+    }
+  },
+  "camera": {
+    "aperture": "",
+    "bloomIntensity": "",
+    "bloomThreshold": "",
+    "brightness": "",
+    "cameraInfo": "",
+    "cameraLoc": "",
+    "cameraPitch": "",
+    "cameraYaw": "",
+    "comparison": "",
+    "contrast": "",
+    "copyCode": "",
+    "empty": "",
+    "errorPrefix": "",
+    "exposure": "",
+    "filter": "",
+    "framedMoment": "",
+    "highlights": "",
+    "hidden": "",
+    "light": "",
+    "loading": "",
+    "momoHidden": "",
+    "notHidden": "",
+    "optic": "",
+    "pose": "",
+    "rawParams": "",
+    "scene": "",
+    "sectionAdjust": "",
+    "shadows": "",
+    "softIntensity": "",
+    "unknown": "",
+    "vibrance": "",
+    "yes": "",
+    "no": "",
+    "saturation": "",
+    "zoom": "",
+    "focalLength": "",
+    "lensRotation": "",
+    "portraitMode": "",
+    "copyHeader": "",
+    "copyEnvHeader": "",
+    "copyErrorHeader": "",
+    "copyFaultId": "",
+    "copyTime": "",
+    "copyType": "",
+    "copySummary": "",
+    "copyAppVersion": "",
+    "copyElectron": "",
+    "copyNode": "",
+    "copyPlatform": "",
+    "copyPidUptime": ""
+  },
+  "batch": {
+    "actions": {
+      "ariaLabel": "",
+      "categorize": "",
+      "clearSelection": "",
+      "delete": "",
+      "export": "",
+      "exportSelectDir": "",
+      "exportToDefault": "",
+      "exportToDefaultHint": "",
+      "invertSelection": "",
+      "move": "",
+      "rename": "",
+      "renameAria": "",
+      "renameHint": "",
+      "selectedCount": "",
+      "share": "",
+      "shareClipboardTitle": "",
+      "transferToProfile": "",
+      "transferToProfileHint": "",
+      "watermark": "",
+      "wifiShare": "",
+      "wifiShareHint": "",
+      "selectAll": ""
+    },
+    "rename": {
+      "cancel": "",
+      "confirmButton": "",
+      "description": "",
+      "emptyError": "",
+      "examplePlaceholder": "",
+      "invalidError": "",
+      "moreFiles": "",
+      "previewLabel": "",
+      "previewError": "",
+      "templateLabel": "",
+      "title": "",
+      "varClickHint": "",
+      "varDate": "",
+      "varDateDesc": "",
+      "varOriginal": "",
+      "varOriginalDesc": "",
+      "varOutfit": "",
+      "varOutfitDesc": "",
+      "varScene": "",
+      "varSceneDesc": "",
+      "varSeq": "",
+      "varSeqDesc": "",
+      "varTime": "",
+      "varTimeDesc": ""
+    }
+  },
+  "galleryPage": {
+    "cleanupCorruptedConfirm": "",
+    "cleanupCorruptedCount": "",
+    "cleanupCorruptedFailed": "",
+    "cleanupCorruptedTitle": "",
+    "emptySubtitle": "",
+    "emptySubtitleScanned": "已完成掃描，未發現遊戲內截圖。可嘗試掃描選單中的「指定目錄掃描」，或前往「快取」分區查看啟動器圖片",
+    "emptyTitle": "",
+    "batchDeleteConfirm": "",
+    "batchDeleteTitle": "",
+    "confirmCancel": "",
+    "confirmOK": "",
+    "openLocationFailed": "",
+    "noPlayableMedia": "",
+    "selectShareFirst": "",
+    "selectShareFilesFirst": "",
+    "shareUnavailable": "",
+    "showDuplicates": "",
+    "showDuplicatesChecked": "",
+    "showDuplicatesOff": "",
+    "showDuplicatesOn": "",
+    "smartGroup": "",
+    "smartGroupToggle": ""
+  },
+  "diagnostics": {
+    "logs": {
+      "clearAllHint": "",
+      "copyAppVersion": "",
+      "copyElectron": "",
+      "copyEnvInfoTitle": "",
+      "copyErrorDetailTitle": "",
+      "copyFaultId": "",
+      "copyNode": "",
+      "copyPid": "",
+      "copyPlatform": "",
+      "copySummary": "",
+      "copyTime": "",
+      "copyType": "",
+      "exportAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "sampleId": "",
+      "unknown": "",
+      "loadFailed": "",
+      "loadCrashesFailed": ""
+    },
+    "crash": {
+      "clearAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "processType": {
+        "main": "",
+        "renderer": "",
+        "gpu": "",
+        "utility": "",
+        "plugin": "",
+        "unknown": ""
+      }
+    },
+    "scan": {
+      "title": "掃描鏈路診斷",
+      "legendOk": "成功",
+      "legendPathMissing": "路徑不存在",
+      "legendPermission": "權限不足",
+      "legendEmpty": "目錄為空",
+      "legendInfo": "資訊",
+      "emptyHint": "執行一次掃描後，此處顯示從「掃描啟動」到「檔案掃描」的全流程診斷軌跡。",
+      "autoRefresh": "自動重新整理",
+      "refresh": "重新整理",
+      "copy": "複製",
+      "clear": "清空",
+      "export": "匯出診斷日誌",
+      "exportAll": "匯出全部日誌(zip)",
+      "exportedTo": "已匯出到 {{path}}",
+      "exportFailed": "匯出失敗: {{reason}}",
+      "errorCodeHint": "錯誤碼 E001–E005 對應定位失敗/子目錄缺失/權限不足/無 UID/讀取失敗，匯出日誌可附於工單"
+    }
+  },
+  "errorFallback": {
+    "componentStack": "",
+    "copied": "",
+    "copyError": "",
+    "errorMessage": "",
+    "errorStack": "",
+    "hideDetail": "",
+    "openLogDir": "",
+    "reload": "",
+    "showDetail": "",
+    "subtitle": "",
+    "title": "",
+    "routeTitle": "",
+    "routeRetry": "",
+    "zoneTitle": "",
+    "zoneRetry": "",
+    "zoneDegraded": "",
+    "ipcFailed": ""
+  },
+  "infoPanel": {
+    "copied": "",
+    "copyAriaLabel": "",
+    "copyDefault": "",
+    "copyTitle": "",
+    "emptyDefault": "",
+    "errorPrefixDefault": "",
+    "loadingDefault": "",
+    "paramNotContained": "不包含該參數"
+  },
+  "taskProgress": {
+    "calculating": "",
+    "cancel": "",
+    "phase": {
+      "cancelled": "",
+      "done": "",
+      "error": "",
+      "finalizing": "",
+      "preparing": "",
+      "processing": ""
+    },
+    "remaining": ""
+  },
+  "albumTypes": {
+    "screenshot": "",
+    "nikkiphotos_highquality": "",
+    "nikkiphotos_lowquality": "",
+    "videos": "",
+    "magazinephotos": "",
+    "clockinphoto": "",
+    "cloudphotos": "",
+    "cloudphotos_lowquality": "",
+    "collage": "",
+    "highquality": "",
+    "lowquality": "",
+    "collagephoto": "",
+    "customavatar": "",
+    "customcard": "",
+    "customhomeboardphoto": "",
+    "hometemplate": "",
+    "plantdyeing": "",
+    "diy": "",
+    "xsdkqrcode": "",
+    "mallpic": "",
+    "video": "",
+    "movies": "",
+    "profilephoto": "",
+    "posephoto": "",
+    "groupphoto": "",
+    "storyphoto": "",
+    "landscapephoto": "",
+    "selfiephoto": "",
+    "autophoto": "",
+    "photostudio": "",
+    "photoframe": "",
+    "adventurephoto": "",
+    "diaryphoto": "",
+    "activityphoto": "",
+    "eventphoto": "",
+    "festivalphoto": "",
+    "missionphoto": "",
+    "videoclip": "",
+    "custom": "",
+    "unknown": ""
+  },
+  "main": {
+    "dialog": {
+      "instanceRunning": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "cleanupButton": "",
+        "manualButton": "",
+        "exitButton": ""
+      },
+      "cleanupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openTaskManager": ""
+      },
+      "startupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openLogDir": ""
+      },
+      "validation": {
+        "messageRequired": ""
+      },
+      "defaultOk": ""
+    },
+    "error": {
+      "mainWindowNotInit": "",
+      "databaseNotInit": ""
+    },
+    "editor": {
+      "dialog": {
+        "filterPresetName": ""
+      },
+      "error": {
+        "userCanceledSave": "",
+        "userCanceledSelect": "",
+        "userCanceledExportDir": "",
+        "jsonParseFailed": "",
+        "presetFormatInvalid": "",
+        "onlyIndexedPath": ""
+      },
+      "validation": {
+        "nameRequired": "",
+        "nameMaxLength": "",
+        "categoryRequired": "",
+        "categoryMaxLength": "",
+        "dataUrlRequired": "",
+        "dataUrlMaxLength": "",
+        "fileNameInvalid": ""
+      },
+      "log": {
+        "cleanupSnapshotsDone": "",
+        "cleanupSnapshotsFailed": "",
+        "backupSizeMismatch": "",
+        "backupFailed": "",
+        "backupSizeChanged": "",
+        "restoredFromBackup": "",
+        "restoreFailed": "",
+        "recordHistoryFailed": ""
+      }
+    },
+    "plugin": {
+      "error": {
+        "notFound": "",
+        "filePathInvalid": "",
+        "filePathsInvalid": "",
+        "targetDirInvalid": "",
+        "fileNameInvalid": "",
+        "sqlInvalid": "",
+        "selectOnly": "",
+        "tableNotInWhitelist": "",
+        "configInvalid": "",
+        "taskIdInvalid": "",
+        "currentTotalInvalid": "",
+        "notInitialized": "",
+        "noSpecifiers": ""
+      },
+      "dialog": {
+        "installConfirmTitle": "",
+        "installConfirmMessage": "",
+        "installConfirmDetail": "",
+        "install": ""
+      }
+    },
+    "media": {
+      "dialog": {
+        "cancel": "",
+        "confirmDelete": "",
+        "confirmEmpty": "",
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": "",
+        "emptyRecycleBinTitle": "",
+        "emptyRecycleBinMessage": ""
+      },
+      "error": {
+        "userCanceled": "",
+        "missingNotFound": "",
+        "corruptedNotFound": ""
+      },
+      "message": {
+        "softDeleted": "",
+        "restored": "",
+        "permanentDeleted": "",
+        "permanentDeletePartial": "",
+        "recycleBinEmpty": "",
+        "recycleBinEmptied": "",
+        "cleanedMissing": "",
+        "missingRemoved": "",
+        "cleanedCorrupted": "",
+        "corruptedRemoved": "",
+        "nothingToAnalyze": "",
+        "sceneTimeAnalyzed": ""
+      },
+      "log": {
+        "recycleBinMoveFailed": "",
+        "recycleBinMoveOmitted": ""
+      },
+      "validation": {
+        "tagsMax": "",
+        "notesMaxLength": "",
+        "outfitMaxLength": ""
+      }
+    },
+    "validator": {
+      "pathRequired": "",
+      "pathMaxLength": "",
+      "pathArrayRequired": "",
+      "pathArrayMaxLength": "",
+      "mediaIdPositive": "",
+      "mediaIdsRequired": "",
+      "mediaIdsMaxLength": "",
+      "ratingRange": "",
+      "idPositive": "",
+      "stringRequired": "",
+      "stringMaxLength": "",
+      "stringControlChars": "",
+      "uidRequired": "",
+      "uidMaxLength": "",
+      "uidAlphanumeric": "",
+      "urlRequired": "",
+      "urlMaxLength": "",
+      "urlInvalid": "",
+      "urlHttpOnly": "",
+      "backupFilenameInvalid": "",
+      "limitBytesPositive": "",
+      "pathNotAllowed": "路徑不在白名單內，禁止 {{op}} 操作",
+      "opWrite": "寫入",
+      "opRead": "讀取",
+      "paramValidationFailed": "",
+      "log": {
+        "handlerUncaught": ""
+      },
+      "arrayStringRequired": "",
+      "ipcPathArrayMaxLength": "",
+      "pathStringLength": "",
+      "pathMustAbsolute": "",
+      "numberFinite": "",
+      "numberRange": "",
+      "intRequired": "",
+      "stringTypeRequired": "",
+      "stringLengthRange": "",
+      "mediaIdsArrayRequired": "",
+      "mediaIdsNotEmpty": "",
+      "tagNameStringRequired": "",
+      "tagNameLength": "",
+      "tagNameControlChars": "",
+      "urlLength": "",
+      "protocolNotAllowed": "",
+      "urlInvalidLiteral": "",
+      "presetObjectRequired": "",
+      "presetNameRequired": "",
+      "presetCategoryRequired": "",
+      "presetParamsRequired": ""
+    },
+    "db": {
+      "recovery": {
+        "openFailed": "",
+        "integrityCheckFailed": "",
+        "dbHandleNull": "",
+        "reopenFailed": ""
+      },
+      "log": {
+        "lockRetrySucceeded": "",
+        "openFailedTryingBackup": "",
+        "autoRecoveryFailed": "",
+        "autoVacuumFailed": "",
+        "pragmaOptimizeFailed": "",
+        "integrityCheckFault": "",
+        "writeCleanExitMarkerFailed": "",
+        "closeCorruptedFailed": "",
+        "restoreFailedReverted": "",
+        "reopenAfterRestoreFailFailed": "",
+        "reopenAfterRestoreFailed": "",
+        "autoRestored": "",
+        "corruptDbRenamed": "",
+        "corruptDbCopied": "",
+        "corruptDbBackupFailed": "",
+        "recoveryListenerFailed": "",
+        "preMigrationBackupCreated": "",
+        "preMigrationBackupFailed": "",
+        "migrationFailedTxRolledBack": "",
+        "migrationFailedNoBackup": "",
+        "operationHistoryCleanupFailed": "",
+        "indexExistsIgnored": "",
+        "v3IndexExistsIgnored": "",
+        "fts5Unavailable": "",
+        "v3MigrationDone": "",
+        "v3MigrationFailed": "",
+        "backfillApplied": "",
+        "backfillFailed": "",
+        "systemCategoryKeyMigrationFailed": "",
+        "sceneCategoryMigrated": "",
+        "sceneCategoryMigrationFailed": "",
+        "settingTypeMismatch": "",
+        "exitOptimizeFailed": "",
+        "walCheckpointFailed": "",
+        "importRootsGalleryFailed": "",
+        "importRootsCacheFailed": "",
+        "fts5QueryFallback": ""
+      },
+      "error": {
+        "lockedByOtherProgram": "",
+        "openFailedAfterRecovery": "",
+        "initFailedNullHandle": "",
+        "migrationFailedRolledBack": "",
+        "migrationRolledBackToBackup": "",
+        "rollbackToBackupFailed": "",
+        "indexCreationFailed": "",
+        "v3IndexCreationFailed": "",
+        "addColumnFailed": "",
+        "abiIncompatible": "",
+        "permissionDenied": "",
+        "diskFull": "",
+        "databaseCorrupted": "",
+        "unknown": ""
+      }
+    },
+    "file": {
+      "action": {
+        "copy": "",
+        "move": "",
+        "rename": "",
+        "export": ""
+      },
+      "error": {
+        "busy": "",
+        "permission": "",
+        "generic": "",
+        "invalidChars": "",
+        "pathReference": "",
+        "invalidSeparator": "",
+        "targetExists": "",
+        "invalidName": "",
+        "fileTooLarge": "",
+        "noOutputDir": "",
+        "noDefaultExportDir": ""
+      },
+      "message": {
+        "movedToRecycleBin": "",
+        "deleteFailed": "",
+        "copied": "",
+        "moved": "",
+        "renameSuccess": "",
+        "batchRenameAllSuccess": "",
+        "batchRenamePartial": "",
+        "exported": "",
+        "saveAsSuccess": "",
+        "saveAsFailed": "",
+        "deletePermanentPartial": "",
+        "deletedPermanent": "",
+        "saveSuccess": "",
+        "saveFailed": "",
+        "notDirectory": "",
+        "cannotAccessDir": "",
+        "insufficientDiskSpace": "",
+        "targetExists": "",
+        "importComplete": "",
+        "editedImageFileName": ""
+      },
+      "log": {
+        "exifReadFailed": "",
+        "dbSyncFailed": "",
+        "pendingRenamesRecordFailed": "",
+        "exportMetadataFallback": ""
+      },
+      "validation": {
+        "operationsRequired": "",
+        "operationsMax": ""
+      },
+      "dialog": {
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": ""
+      }
+    },
+    "gameEvents": {
+      "versionDescription": ""
+    },
+    "decryption": {
+      "error": {
+        "abiMismatch": "",
+        "step1Failed": "",
+        "cameraParamsNotFound": "",
+        "step3Failed": "",
+        "cameraParamsInvalid": "",
+        "fileTooLarge": "",
+        "fileUnreadable": "",
+        "uidMissing": "",
+        "cameraKeyFailed": "",
+        "unknown": "",
+        "encryptFailed": "",
+        "invalidClothDiyCode": "",
+        "networkDecodeFailed": "",
+        "networkTimeout": "網路解碼逾時（已降級，其餘欄位仍可用）",
+        "networkUnavailable": "網路解碼不可用（可能需要聯網）",
+        "invalidHomeBuildCode": "",
+        "ffiNotInit": "",
+        "findNoEndFlagHint": "解密金鑰可能不匹配，請在設定→角色檔案中確認遊戲 UID",
+        "uidRequired": "",
+        "dllNotInit": "",
+        "initSendFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "decodeTimeout": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "log": {
+        "mapHint": "",
+        "noCameraParams": "",
+        "unexpectedError": "",
+        "dllResolveFailed": "",
+        "initSendFailed": "",
+        "readyTimeout": "",
+        "decodeTimeout": "",
+        "requestSendFailed": "",
+        "restartExhausted": "",
+        "restarting": "",
+        "restarted": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      }
+    },
+    "lifecycle": {
+      "log": {
+        "crashReporterStarted": "",
+        "crashReporterFailed": "",
+        "backupInitFailed": "",
+        "themeCleanupFailed": "",
+        "selfCheckFailed": "",
+        "unknownReason": "",
+        "crashCleanFailed": "",
+        "forceExitReasonWal": "",
+        "forceExitReasonDefault": "",
+        "startupFailed": ""
+      }
+    },
+    "autoUpdate": {
+      "log": {
+        "devSkip": "",
+        "updateError": "",
+        "initialized": "",
+        "checkFailed": "",
+        "downloadFailed": ""
+      }
+    },
+    "log": {
+      "dialog": {
+        "filterZipName": ""
+      },
+      "error": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "getStatsFailed": "",
+        "userCanceledSave": "",
+        "clearFailed": "",
+        "reportRendererFailed": ""
+      },
+      "log": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "clearedAll": "",
+        "reportRendererFailed": ""
+      }
+    },
+    "cleanup": {
+      "log": {
+        "exitDiagnosisSummary": ""
+      }
+    },
+    "gpu": {
+      "log": {
+        "processCrashFallback": ""
+      }
+    },
+    "rendererBridge": {
+      "log": {
+        "sendFailed": ""
+      }
+    },
+    "rendererProtocol": {
+      "error": {
+        "calledBeforeReady": ""
+      }
+    },
+    "setDir": {
+      "message": {
+        "resetToDefault": ""
+      },
+      "error": {
+        "resetFailed": ""
+      }
+    },
+    "disk": {
+      "error": {
+        "insufficient": ""
+      },
+      "keyword": {
+        "insufficient": ""
+      }
+    },
+    "fileUtils": {
+      "error": {
+        "invalidDataUrl": ""
+      }
+    },
+    "backup": {
+      "log": {
+        "createIpcFailed": "",
+        "listFailed": "",
+        "restoreIpcFailed": "",
+        "startupAutoBackupFailed": "",
+        "skipAutoBackup": "",
+        "runningStartupAutoBackup": "",
+        "createSuccess": "",
+        "createFailed": "",
+        "restoreToFailed": "",
+        "restoredToDb": "",
+        "restoreSuccessRelaunching": "",
+        "relaunchFailed": "",
+        "restoreFailed": "",
+        "relaunchAfterFailureFailed": "",
+        "repairFlagWritten": "",
+        "repairFlagWriteFailed": "",
+        "deleted": "",
+        "deleteFailed": "",
+        "prunedOld": ""
+      },
+      "error": {
+        "createFailed": "",
+        "listFailed": "",
+        "restoreFailed": "",
+        "deleteFailed": "",
+        "dbUnavailable": "",
+        "noBackupToRestore": "",
+        "restoreFailedPlain": "",
+        "backupNotExist": "",
+        "backupCorrupted": "",
+        "restoreFailedRelaunch": "",
+        "pathTraversalDenied": ""
+      },
+      "message": {
+        "restoredFrom": "",
+        "restoredButRelaunchFailed": "",
+        "restoredRelaunching": ""
+      }
+    },
+    "cache": {
+      "log": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      },
+      "error": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      }
+    },
+    "category": {
+      "error": {
+        "noUpdatableFields": "",
+        "systemCategoryUndeletable": "",
+        "ordersRequired": "",
+        "ordersMax": ""
+      }
+    },
+    "crash": {
+      "log": {
+        "listFailed": "",
+        "clearedAll": ""
+      },
+      "error": {
+        "listFailed": "",
+        "getStatsFailed": "",
+        "clearFailed": "",
+        "openDirFailed": ""
+      },
+      "message": {
+        "nativeCrash": "",
+        "unknownFormat": "",
+        "opened": ""
+      }
+    },
+    "data": {
+      "dialog": {
+        "cancel": "",
+        "confirmClear": "",
+        "clearTitle": "",
+        "clearMessage": "",
+        "clearDetail": ""
+      },
+      "message": {
+        "cleared": ""
+      }
+    },
+    "decrypt": {
+      "validation": {
+        "albumTypeRequired": "",
+        "albumTypeMaxLength": "",
+        "jsonTextRequired": "",
+        "jsonTextMaxLength": "",
+        "codeStrRequired": "",
+        "codeStrMaxLength": ""
+      },
+      "log": {
+        "mediaWhitelistHit": "",
+        "resolveUidFailed": "",
+        "getKnownUidsFailed": ""
+      }
+    },
+    "duplicate": {
+      "message": {
+        "cancelled": "",
+        "markDone": ""
+      },
+      "progress": {
+        "hashDoneGrouping": "",
+        "hashing": "",
+        "done": ""
+      }
+    },
+    "exportPref": {
+      "validation": {
+        "namingMaxLength": "",
+        "namingNoSeparator": "",
+        "namingNoParentDir": ""
+      }
+    },
+    "import": {
+      "error": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      },
+      "log": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      }
+    },
+    "importRoot": {
+      "log": {
+        "removeFailed": "",
+        "clearRecordsFailed": ""
+      },
+      "error": {
+        "removeFailed": ""
+      }
+    },
+    "operationHistory": {
+      "validation": {
+        "operationTypeRequired": ""
+      }
+    },
+    "profile": {
+      "error": {
+        "uidExists": "",
+        "defaultUndeletable": "",
+        "targetNotFound": ""
+      },
+      "message": {
+        "transferred": ""
+      }
+    },
+    "scanner": {
+      "validation": {
+        "customPathsMax": ""
+      },
+      "log": {
+        "postScanThumbFailed": "",
+        "registerImportRootFailed": "",
+        "startFailed": "",
+        "skipRestoreReplay": "",
+        "markMigrationV1FailedRetry": "",
+        "repairV1Failed": "",
+        "markMigrationV2Failed": "",
+        "repairV2Failed": "",
+        "markMigrationV3Failed": "",
+        "repairV3Failed": "",
+        "markMigrationV4Failed": "",
+        "repairV4Failed": "",
+        "markMigrationV5Failed": "",
+        "repairV5Failed": "",
+        "integrityCheckFailed": "",
+        "heartbeatTimeout": "",
+        "bridgeReadyTimeout": "",
+        "bridgeRestarting": "",
+        "bridgeRestarted": "",
+        "scanTaskRestored": "",
+        "scanTaskRestoreFailed": "",
+        "bridgeRestartFailed": "",
+        "bridgeCrashListenerFailed": ""
+      },
+      "error": {
+        "validationFailed": "",
+        "pathCheckFailed": "",
+        "scanFailed": "",
+        "scanInProgress": "",
+        "dbPathNotInitialized": "",
+        "scanStartFailed": "",
+        "noMediaDirFound": "",
+        "gameDirNotFound": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "scanProcessExit": "",
+        "autoRestarted": "",
+        "duplicateScanStart": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "scanCancelled": ""
+      }
+    },
+    "searchIndex": {
+      "validation": {
+        "segmentsMax": ""
+      },
+      "error": {
+        "persistFailed": ""
+      },
+      "log": {
+        "importReadFailed": ""
+      }
+    },
+    "settings": {
+      "error": {
+        "customPathsNotArray": "",
+        "customPathsMax": "",
+        "customPathsEmptyItem": "",
+        "validationFailed": "",
+        "valueTooLarge": "",
+        "valueNotSerializable": "",
+        "hwAccelNotBoolean": "",
+        "securitySensitiveKey": "",
+        "unknownKey": ""
+      },
+      "validation": {
+        "keyRequired": "",
+        "keyMaxLength": ""
+      }
+    },
+    "share": {
+      "log": {
+        "detectAppFailed": "",
+        "launchAppFailed": "",
+        "rejectedNonLan": "",
+        "pinLocked": "",
+        "authSuccess": "",
+        "readFailed": ""
+      },
+      "error": {
+        "launchAppFailed": "",
+        "noFilesToShare": ""
+      },
+      "http": {
+        "serviceNotStarted": "",
+        "forbiddenNonLan": "",
+        "fileNotFound": "",
+        "pathNotFound": "",
+        "authTitle": "",
+        "authPrompt": "",
+        "authHint": "",
+        "pinPlaceholder": "",
+        "authSubmit": "",
+        "networkError": "",
+        "tooManyAttempts": "",
+        "locked": "",
+        "pinWrong": "",
+        "authSuccess": "",
+        "readFailed": ""
+      }
+    },
+    "shell": {
+      "error": {
+        "pathMustBeAbsolute": "",
+        "sensitiveDirForbidden": "",
+        "executableForbidden": "",
+        "openExternalFailed": "",
+        "openPathFailed": "",
+        "showItemFailed": ""
+      }
+    },
+    "similar": {
+      "message": {
+        "phashDone": ""
+      }
+    },
+    "task": {
+      "validation": {
+        "taskIdRequired": "",
+        "taskIdMaxLength": ""
+      },
+      "keyword": {
+        "canceled": "",
+        "alreadyRunning": ""
+      }
+    },
+    "video": {
+      "error": {
+        "endTimeAfterStart": ""
+      },
+      "log": {
+        "exportLivePhotoFailed": ""
+      },
+      "message": {
+        "editSuccess": ""
+      }
+    },
+    "watermark": {
+      "message": {
+        "cancelled": "",
+        "done": "",
+        "failed": ""
+      },
+      "progress": {
+        "applying": ""
+      },
+      "validation": {
+        "configRequired": "",
+        "configMaxLength": ""
+      }
+    },
+    "customDirs": {
+      "label": {
+        "backupFiles": "",
+        "thumbnailMetadata": "",
+        "logFiles": "",
+        "crashDump": ""
+      }
+    },
+    "desktopShortcut": {
+      "log": {
+        "noWritableDesktop": "",
+        "created": "",
+        "createFailedFallback": "",
+        "createdFallback": "",
+        "createFailedAll": ""
+      }
+    },
+    "app": {
+      "name": ""
+    },
+    "errorHandlers": {
+      "unknownPath": "",
+      "dialog": {
+        "errorTitle": "",
+        "errorBody": "",
+        "frequentErrorTitle": "",
+        "frequentErrorMessage": "",
+        "frequentErrorDetail": "",
+        "restartApp": "",
+        "continueUsing": ""
+      }
+    },
+    "mediaProtocol": {
+      "log": {
+        "missingPathParam": "",
+        "realpathFailed": "",
+        "denyNotWhitelisted": "",
+        "fileNotFoundOrNoPerm": "",
+        "handleRequestFailed": "",
+        "whitelistCheckFailed": ""
+      }
+    },
+    "recovery": {
+      "title": {
+        "dbRecovered": "",
+        "dbRecoveryFailed": "",
+        "dbPreserved": ""
+      },
+      "body": {
+        "sourceBackup": "",
+        "corruptedBackupPath": "",
+        "dbPreserved": ""
+      },
+      "worker": {
+        "title": {
+          "startupTimeout": "",
+          "restarted": "",
+          "restartExhausted": "",
+          "exited": ""
+        },
+        "body": {
+          "crashTime": "",
+          "exitCode": "",
+          "crashedAt": "",
+          "restartCount": "",
+          "startupTimeoutHint": "",
+          "restartedHint": "",
+          "exhaustedHint": ""
+        },
+        "state": {
+          "exhausted": "",
+          "continuable": ""
+        },
+        "label": {
+          "scanner": "",
+          "database": "",
+          "media": "",
+          "decryption": ""
+        }
+      },
+      "log": {
+        "repairFailed": "",
+        "showDialogFailed": ""
+      }
+    },
+    "window": {
+      "reason": {
+        "rendererNotReady": ""
+      },
+      "dialog": {
+        "diagTitle": "",
+        "rendererFailed": "",
+        "rendererFailedDetail": "",
+        "gotIt": "",
+        "crashTitle": "",
+        "crashMessage": "",
+        "crashDetail": "",
+        "reload": "",
+        "closeApp": ""
+      },
+      "log": {
+        "rendererCrashed": ""
+      }
+    },
+    "index": {
+      "log": {
+        "gpuFallbackActive": ""
+      },
+      "dialog": {
+        "startupFailedTitle": "",
+        "startupFailedMessage": "",
+        "startupFailedDetail": "",
+        "exit": ""
+      }
+    },
+    "startup": {
+      "log": {
+        "scanComplete": "",
+        "indexingTaskError": "",
+        "autoScanFailed": "",
+        "thumbnailAlreadyRunning": "",
+        "thumbnailBatchFailed": "",
+        "phashStartFailed": "",
+        "indexingFailed": "",
+        "sceneAnalysisNone": "",
+        "sceneAnalysisFailed": "",
+        "orphanCleanupFailed": "",
+        "readPendingRenamesFailed": "",
+        "cleanupScanHistoryFailed": "",
+        "notifyScanInterruptedFailed": "",
+        "detectInterruptedFailed": "",
+        "clearRecoveryFlagsFailed": "",
+        "notifyBackupRestoredFailed": "",
+        "postRestorePhashFailed": "",
+        "postRestoreDuplicateFailed": ""
+      },
+      "error": {
+        "indexingTotalTimeout": ""
+      },
+      "index": {
+        "timeoutStopped": "",
+        "cancelled": "",
+        "preparing": "",
+        "analyzingSceneTime": "",
+        "finalizing": "",
+        "done": "",
+        "errorStopped": ""
+      }
+    },
+    "livephoto": {
+      "error": {
+        "invalidVideo": "",
+        "exportFailed": ""
+      },
+      "message": {
+        "exportSuccess": ""
+      }
+    },
+    "logService": {
+      "message": {
+        "opened": "",
+        "exported": ""
+      },
+      "error": {
+        "openDirFailed": "",
+        "zipRequired": "",
+        "emptyArchive": "",
+        "targetNotGenerated": "",
+        "noErrorOutput": "",
+        "tarStartFailed": "",
+        "packageFailed": ""
+      },
+      "log": {
+        "buildDiagnosticFailed": ""
+      }
+    },
+    "thumbnail": {
+      "log": {
+        "forkFailed": "",
+        "readyTimeout": "",
+        "handshakeFailed": "",
+        "markCorruptedCallbackFailed": "",
+        "clearCorruptedCallbackFailed": "",
+        "lowQualityFailed": "",
+        "highQualityFailed": "",
+        "decodeFailed": "",
+        "generateFailed": "",
+        "workerCallFailed": "",
+        "readCacheMetaFailed": "",
+        "cacheMetaCorrupted": "",
+        "deleteCorruptedMetaFailed": "",
+        "saveCacheMetaFailed": "",
+        "cleanTmpFailed": "",
+        "lruCleanFailed": ""
+      },
+      "error": {
+        "workerForkFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerDisposed": "",
+        "sharpResizeFailed": "",
+        "ffmpegFrameTimeout": "",
+        "videoPathRequired": "",
+        "outputPathRequired": "",
+        "ffmpegEmptyOutput": ""
+      },
+      "kindVideo": "",
+      "kindImage": ""
+    },
+    "xmpMetadata": {
+      "log": {
+        "invalidStructure": "",
+        "parseEditorDataFailed": "",
+        "readInvalidStructure": "",
+        "deserializeFailed": "",
+        "readFailed": ""
+      }
+    },
+    "videoEditor": {
+      "log": {
+        "editStopReceived": "",
+        "readyTimeout": "",
+        "abnormalExit": "",
+        "batchTaskFailed": ""
+      },
+      "error": {
+        "inputPathRequired": "",
+        "outputPathRequired": "",
+        "unsupportedSpeed": "",
+        "cancelledByUser": "",
+        "taskCancelledSkipped": "",
+        "taskCancelled": "",
+        "exportFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerAbnormalExit": "",
+        "taskInProgress": "",
+        "workerDisposed": "",
+        "appExiting": ""
+      },
+      "message": {
+        "progressStart": "",
+        "progressDone": "",
+        "exportSuccess": "",
+        "editCancelled": "",
+        "exportDone": "",
+        "batchCancelled": "",
+        "batchDoneAll": "",
+        "batchDonePartial": ""
+      }
+    },
+    "thumbnailPhash": {
+      "log": {
+        "phashFailed": "",
+        "duplicateMarkFailed": ""
+      }
+    },
+    "videoService": {
+      "log": {
+        "markingCorrupted": "",
+        "markCorruptedCallbackFailed": "",
+        "metadataReadFailed": "",
+        "exportTask": "",
+        "exportFailed": "",
+        "exportDecodeFailed": "",
+        "frameCaptureTask": "",
+        "frameCaptureFailed": "",
+        "frameCaptureDecodeFailed": "",
+        "trimTask": "",
+        "trimFailed": "",
+        "trimDecodeFailed": "",
+        "speedTask": "",
+        "speedFailed": "",
+        "speedDecodeFailed": ""
+      },
+      "error": {
+        "exportFailed": "",
+        "frameCaptureFailed": "",
+        "trimFailed": "",
+        "speedFailed": ""
+      },
+      "message": {
+        "exportSuccess": "",
+        "frameCaptureSuccess": "",
+        "trimSuccess": "",
+        "speedSuccess": ""
+      }
+    },
+    "mediaWorker": {
+      "progress": {
+        "markingDuplicates": ""
+      },
+      "error": {
+        "thumbnailAlreadyRunning": "",
+        "thumbnailStartFailed": "",
+        "phashAlreadyRunning": "",
+        "phashStartFailed": "",
+        "duplicateAlreadyRunning": "",
+        "duplicateStartFailed": "",
+        "similarAlreadyRunning": "",
+        "similarStartFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "thumbnailProcessExit": "",
+        "phashProcessExit": "",
+        "duplicateProcessExit": "",
+        "similarProcessExit": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "thumbnailCancelled": "",
+        "phashCancelled": "",
+        "duplicateCancelled": "",
+        "workerTaskCancelled": "",
+        "workerTaskDone": "",
+        "nothingToGenerate": "",
+        "nothingToPhash": "",
+        "nothingToDetect": "",
+        "batchGenerateFailed": "",
+        "phashBatchFailed": "",
+        "markFailed": ""
+      },
+      "log": {
+        "readyTimeout": "",
+        "restarting": "",
+        "restarted": "",
+        "thumbnailRestored": "",
+        "thumbnailRestoreFailed": "",
+        "phashRestored": "",
+        "phashRestoreFailed": "",
+        "duplicateRestored": "",
+        "duplicateRestoreFailed": "",
+        "similarRestored": "",
+        "similarRestoreFailed": "",
+        "restartFailed": "",
+        "crashListenerFailed": "",
+        "thumbnailBatchFailed": "",
+        "phashBatchFailed": "",
+        "duplicateMarkFailed": "",
+        "duplicateNoGroups": "",
+        "similarFindFailed": "",
+        "similarStartFailed": ""
+      }
+    },
+    "databaseWorker": {
+      "log": {
+        "restarting": "",
+        "restartedWithDb": "",
+        "restartedPendingOpen": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      },
+      "error": {
+        "bridgeDisposed": "",
+        "writeFailed": "",
+        "unknown": "",
+        "autoRestarted": "",
+        "handshakeAborted": "",
+        "requestsAborted": ""
+      }
+    },
+    "readStream": {
+      "log": {
+        "streamErrorDestroyed": ""
+      }
+    },
+    "scanLog": {
+      "error": {
+        "exportCanceled": "",
+        "exportFailed": ""
+      }
+    },
+    "resonance": {
+      "error": {
+        "recordExists": "記錄已存在（同一卡池、同一時間、同一物品）",
+        "recordNotFound": "記錄不存在或已被刪除",
+        "importFileNotReadable": "匯入檔案不存在或不可讀取：{{path}}",
+        "importFileNotFile": "路徑不是檔案：{{path}}",
+        "importFileTooLarge": "匯入檔案過大（{{size}} 位元組，超出上限）",
+        "importFileReadFailed": "讀取匯入檔案失敗：{{reason}}",
+        "exportDirMissing": "匯出目錄不存在：{{path}}",
+        "exportNotJson": "匯出檔案副檔名必須為 .json：{{path}}",
+        "exportWriteFailed": "寫入匯出檔案失敗：{{reason}}"
+      },
+      "log": {
+        "exported": "共鳴錄資料已匯出（{{count}} 條記錄）"
+      }
+    }
+  },
+  "appError": {
+    "canceled": "",
+    "database": "",
+    "fileSystem": "",
+    "internal": "",
+    "fallback": ""
+  },
+  "app": {
+    "log": {
+      "pluginBootstrapFailed": ""
+    }
+  },
+  "mock": {
+    "log": {
+      "skipInstall": ""
+    },
+    "feature": {
+      "fileScan": "",
+      "fileDelete": "",
+      "fileDeletePermanent": "",
+      "fileCopy": "",
+      "fileMove": "",
+      "fileRename": "",
+      "batchRename": "",
+      "fileExport": "",
+      "fileSaveAs": "",
+      "exportWithMetadata": "",
+      "batchExportWithMetadata": "",
+      "watermarkApply": "",
+      "videoExport": "",
+      "videoCaptureFrame": "",
+      "videoTrim": "",
+      "videoSpeed": "",
+      "livePhotoExport": "",
+      "videoEdit": "",
+      "videoEditBatch": "",
+      "clearDatabase": "",
+      "createBackup": "",
+      "restoreBackup": "",
+      "deleteBackup": "",
+      "appRelaunch": "",
+      "decryptFile": "",
+      "encryptCameraParams": "",
+      "decodeClothDiy": "",
+      "decodeHomeBuild": "",
+      "pluginDetail": "",
+      "pluginInstall": "",
+      "pluginUninstall": "",
+      "pluginToggle": "",
+      "wifiShare": ""
+    },
+    "message": {
+      "browserDownloadTriggered": "",
+      "downloadFailed": "",
+      "openLocalPath": "",
+      "showInFolder": "",
+      "unsupportedShort": "",
+      "openDirectory": "",
+      "exportLogs": "",
+      "clearLogs": "",
+      "clearCrashReports": "",
+      "importPreview": "",
+      "importFiles": "",
+      "copyToClipboard": "",
+      "launchExternalApp": "",
+      "phashDone": "",
+      "duplicatesMarked": "",
+      "batchAnalysisUnsupported": "",
+      "softDeleted": "",
+      "restored": "",
+      "permanentDeleted": "",
+      "recycleBinCleared": "",
+      "noMissingFiles": "",
+      "noCorruptedFiles": "",
+      "exportFileUnsupported": "",
+      "importFileUnsupported": "",
+      "noRestartNeeded": "",
+      "videoMetadataUnsupported": ""
+    }
+  },
+  "scanProgress": {
+    "log": {
+      "getActiveFailed": "",
+      "stopFailed": ""
+    },
+    "stopping": "",
+    "scanning": "",
+    "foundFiles": ""
+  },
+  "plugins": {
+    "log": {
+      "facadeNotReady": "",
+      "registerActiveFailed": "",
+      "triggerInitFailed": "",
+      "bootstrapFailed": "",
+      "i18nInjectFailed": ""
+    }
+  },
+  "themes": {
+    "default": "",
+    "softPinkLuxury": ""
+  },
+  "globalErrorHandler": {
+    "log": {
+      "errorEventFailed": "",
+      "rejectionEventFailed": ""
+    }
+  },
+  "scanButton": {
+    "incrementalDesc": "",
+    "full": "",
+    "fullDesc": "",
+    "custom": "",
+    "customDesc": ""
+  },
+  "videoPlayer": {
+    "restoredTo": "",
+    "exitFullscreen": "",
+    "fullscreenPlayback": "",
+    "fullscreen": "",
+    "captureFrame": "",
+    "capture": ""
+  },
+  "searchService": {
+    "log": {
+      "noIpcFallback": "",
+      "schemaHashMismatch": "",
+      "importFailedFallback": "",
+      "initFailedFallback": "",
+      "rebuildFailed": "",
+      "persistDebouncedFailed": "",
+      "docCountMismatch": "",
+      "verifyFailed": ""
+    }
+  },
+  "mediaStore": {
+    "log": {
+      "persistFailed": "",
+      "noElectronApi": "",
+      "mediaListNull": "",
+      "filesEmpty": "",
+      "categoryListNull": "",
+      "categoriesEmpty": "",
+      "fetchError": "",
+      "loadMoreFailed": "",
+      "loadProfilesFailed": "",
+      "loadRecycleBinFailed": "",
+      "loadRecycleBinMoreFailed": ""
+    }
+  },
+  "operationHistory": {
+    "log": {
+      "dbWriteFailed": "",
+      "conflictCheckFailed": "",
+      "dbRemoveFailed": "",
+      "dbClearFailed": "",
+      "dbLoadFailed": ""
+    },
+    "error": {
+      "dbSaveFailedFull": "",
+      "handlerNotRegistered": "",
+      "recordCorrupted": ""
+    }
+  },
+  "updateDialog": {
+    "checking": "",
+    "downloading": "",
+    "downloadingVersion": "",
+    "ariaLabel": "",
+    "foundNewVersion": "",
+    "availablePrompt": "",
+    "later": "",
+    "downloadNow": "",
+    "downloadedTitle": "",
+    "downloadedPrompt": "",
+    "restartLater": "",
+    "installAndRestart": "",
+    "log": {
+      "downloadFailed": "",
+      "installFailed": "",
+      "openOfficialFailed": ""
+    }
+  },
+  "resonance": {
+    "brand": "無限暖暖",
+    "title": "暖暖共鳴錄",
+    "subtitle": "無限暖暖共鳴記錄與搭配助手 即將上線",
+    "error": {
+      "importJsonParseFailed": "檔案不是有效的 JSON，請確認匯出檔案未損壞",
+      "importInvalidStructure": "檔案結構不符合共鳴錄匯入格式（支援 gongeo.us 匯出的 JSON）",
+      "importTooManyRecords": "檔案記錄數超出上限，請拆分後匯入",
+      "invalidReason": {
+        "invalidShape": "資料行結構不正確",
+        "invalidTimestamp": "時間格式無效",
+        "invalidItemId": "物品 id 無效",
+        "invalidOutfitId": "套裝 id 無效",
+        "invalidEvoLevel": "進化等級無效（應為 0-4）"
+      }
+    },
+    "tab": {
+      "records": "共鳴記錄",
+      "wardrobe": "我的衣櫥",
+      "import": "匯入資料",
+      "stats": "個人統計"
+    },
+    "records": {
+      "bannerLabel": "卡池",
+      "bannerType1": "常駐池",
+      "bannerType2": "限定池",
+      "bannerType3": "4★限定池",
+      "addRecord": "補錄",
+      "addTitle": "手動補錄",
+      "editTimeTitle": "修改補錄時間",
+      "itemLabel": "獲得物品",
+      "timeLabel": "獲得時間",
+      "selectItem": "請選擇獲得物品",
+      "fiveStarItems": "5★ 套裝部件",
+      "fourStarItems": "4★ 套裝部件",
+      "totalPulls": "總抽取次數 {{count}}",
+      "pity5Star": "距上個 5★ {{count}} 抽",
+      "pity4Star": "距上個 4★ {{count}} 抽",
+      "pullNo": "第 {{n}} 抽",
+      "editBadge": "補錄",
+      "listEmpty": "暫無共鳴記錄",
+      "listEmptyHint": "點擊右上角「補錄」手動新增，或在「匯入資料」頁匯入 gongeo.us 匯出的 JSON 檔案",
+      "deleteTitle": "刪除記錄",
+      "deleteMessage": "此操作無法復原。",
+      "invalidTime": "時間格式無效，請重新選擇",
+      "invalidInput": "輸入未通過校驗，請檢查表單"
+    },
+    "toast": {
+      "added": "已新增：{{name}}",
+      "updated": "已更新補錄時間",
+      "deleted": "已刪除記錄"
+    },
+    "wardrobe": {
+      "cat": {
+        "item": "部件",
+        "makeup": "妝容",
+        "momo": "Momo",
+        "prop": "道具",
+        "eurekaColor": "共鳴色"
+      },
+      "searchPlaceholder": "搜尋名稱",
+      "statusFilterLabel": "擁有狀態",
+      "statusAll": "全部狀態",
+      "statusOwned": "已擁有",
+      "statusMissing": "未擁有",
+      "qualityFilterLabel": "稀有度",
+      "qualityAll": "全部稀有度",
+      "summaryOwned": "已擁有 {{owned}} / {{total}}",
+      "looseSet": "散件（未歸屬套裝）",
+      "outfitStatus": {
+        "owned": "已集齊",
+        "partial": "集齊中",
+        "missing": "未收集"
+      },
+      "quickOwned": "全部擁有",
+      "quickMissing": "全部取消",
+      "inferButton": "從共鳴記錄推斷",
+      "inferTitle": "從共鳴記錄推斷衣櫥",
+      "inferMessage": "將根據共鳴記錄與卡池進度推斷已獲得的物品：部件 {{items}} 件、妝容 {{makeups}} 件、Momo {{momo}} 件、道具 {{props}} 件。\n\n推斷按保守規則估算（限定池進度與抽取次數門檻），可能少於實際擁有；已擁有的記錄不會被改動。是否繼續？",
+      "inferResult": "已標記 {{count}} 項為擁有",
+      "inferNothing": "沒有可新增的推斷結果",
+      "inferBusy": "推斷中…",
+      "catalogUnavailable": "圖鑑資料載入失敗",
+      "catalogUnavailableHint": "靜態圖鑑檔案缺失或損壞，請重新安裝或更新軟體",
+      "loading": "正在載入圖鑑資料…",
+      "empty": "暫無符合的物品",
+      "emptyHint": "嘗試調整搜尋關鍵字或篩選條件"
+    },
+    "import": {
+      "importSection": "匯入資料",
+      "pickFile": "選擇 JSON 檔案",
+      "previewing": "正在解析檔案…",
+      "formatLegacy": "舊版格式",
+      "formatCurrent": "當前格式",
+      "versionLabel": "檔案版本：{{version}}",
+      "versionUnknown": "未宣告版本",
+      "versionMismatchWarn": "檔案宣告版本高於目前支援版本，可能存在不相容欄位；可選擇嘗試相容匯入或放棄。",
+      "compatImport": "嘗試相容匯入",
+      "abandon": "放棄",
+      "sectionPulls": "抽卡記錄",
+      "sectionEdits": "手動補錄",
+      "sectionPearpal": "Pearpal 手帳",
+      "sectionEvo": "進化覆寫",
+      "sectionWardrobe": "衣櫥擁有狀態",
+      "countsAdded": "新增 {{count}} 條",
+      "countsDuplicate": "重複（跳過）{{count}} 條",
+      "countsInvalid": "無效（跳過）{{count}} 條",
+      "invalidSamplesTitle": "無效記錄示例：",
+      "invalidMore": "…等 {{count}} 條無效記錄已跳過",
+      "includeWardrobeLabel": "同時匯入衣櫥擁有狀態（全量覆寫）",
+      "commit": "開始匯入",
+      "cancelCommit": "取消匯入",
+      "cancelled": "已取消匯入；已寫入部分保留，重複匯入可安全補齊",
+      "commitDone": "匯入完成，共寫入 {{count}} 條記錄",
+      "progressLabel": "{{current}} / {{total}}",
+      "exportSection": "匯出資料",
+      "exportPulls": "抽卡記錄",
+      "exportEdits": "手動補錄",
+      "exportPearpal": "Pearpal 手帳",
+      "exportEvo": "進化覆寫",
+      "exportWardrobe": "衣櫥擁有狀態",
+      "exportButton": "匯出 JSON",
+      "exportDone": "已匯出 {{count}} 條記錄",
+      "exportNothing": "沒有可匯出的內容，請勾選匯出內容或先錄入資料",
+      "dangerSection": "危險操作",
+      "clearButton": "清空全部共鳴資料",
+      "clearTitle": "清空全部共鳴資料",
+      "clearMessage": "將刪除全部共鳴記錄、衣櫥與統計相關資料，且無法復原。是否繼續？",
+      "clearDone": "已清空全部共鳴資料",
+      "snapshotNote": "內建圖鑑與百分位為靜態快照，不會自動更新",
+      "snapshotMeta": "內建圖鑑/百分位為靜態快照（遊戲版本 {{version}} · 圖鑑生成於 {{catalogDate}} · 百分位生成於 {{percentileDate}}），不會自動更新"
+    },
+    "stats": {
+      "emptyTitle": "暫無統計資料",
+      "emptyHint": "先在「共鳴記錄」補錄或在「匯入資料」頁匯入記錄後即可查看",
+      "totalPulls": "總抽取次數",
+      "total5Star": "5★ 部件",
+      "total4Star": "4★ 部件",
+      "avg5StarPulls": "平均出貨（每 5★）",
+      "banners5Star": "限定池抽取次數",
+      "banners4Star": "4★ 限定池抽取次數",
+      "outfits5Star": "已獲 5★ 套裝",
+      "outfits4Star": "已獲 4★ 套裝",
+      "luckTitle": "歐非分析",
+      "luckTier": "檔位 {{tier}} / 6",
+      "luckSnapshotNote": "百分位為社區靜態快照（生成於 {{date}}），不會自動更新，僅供參考",
+      "distributionTitle": "出貨分布",
+      "dist5Star": "5★（按第 N 抽獲得）",
+      "dist4Star": "4★（按第 N 抽獲得）",
+      "activityTitle": "抽取活動（按卡池累計）",
+      "rankingTitle": "按卡池明細",
+      "ranking5Star": "限定池（5★）",
+      "ranking4Star": "4★ 限定池",
+      "rankingEmpty": "暫無可統計的卡池資料",
+      "colBanner": "卡池",
+      "colPulls": "總抽取次數",
+      "colAvg": "平均出貨",
+      "colPercentile": "百分位"
+    }
+  }
+}

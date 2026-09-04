@@ -1,0 +1,955 @@
+/* 主题样式文件：新增主题只需引入对应的 CSS 文件（必须置于最前，符合 CSS @import 规则） */
+@import './themes/soft-pink-luxury.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* P2-U1：移除 @property --glass-blur 注册——项目无 transition 引用该属性，
+   注册的可动画化特性未被使用，属于多余声明。--glass-blur 保留为普通 CSS 变量，
+   reduce-motion 仍可通过覆盖变量值固定模糊半径 */
+
+/* CSS 变量体系 */
+:root {
+  /* 默认简约主题变量（与原始浅色 UI 完全一致） */
+  --bg-primary: #f5f5f5;
+  --bg-secondary: rgba(255, 255, 255, 0.75);
+  --bg-tertiary: rgba(255, 255, 255, 0.5);
+  --text-primary: #1a1a1a;
+  --text-secondary: #666666;
+  --text-tertiary: #999999;
+  --accent: #0078d4;
+  --accent-light: #60cdff;
+  /* P1-U3：新增 --accent-soft 变量，消除各组件中 rgba(108,92,231,0.12) 紫色历史回退色 */
+  --accent-soft: rgba(0, 120, 212, 0.12);
+  /* P2-U13：补充 --accent-deep 默认值，与 soft-pink-luxury 主题对齐，供 Tailwind accent-deep 类名使用 */
+  --accent-deep: #005a9e;
+  --divider: rgba(0, 0, 0, 0.06);
+  --hover-bg: rgba(0, 0, 0, 0.04);
+  --hover-bg-strong: rgba(0, 0, 0, 0.08);
+  /* P1-U7：统一半透明遮罩色，消除各 Dialog 组件中 0.35/0.4/0.5 三档不一致 */
+  --overlay-bg: rgba(0, 0, 0, 0.4);
+  --overlay-bg-medium: rgba(0, 0, 0, 0.5);
+  --overlay-bg-strong: rgba(0, 0, 0, 0.6);
+  --overlay-bg-hover: rgba(0, 0, 0, 0.7);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  /* 毛玻璃模糊半径变量——reduce-motion 通过覆盖此值固定模糊度 */
+  --glass-blur: 12px;
+  --glass-blur-sm: 8px;
+  --backdrop-blur: blur(var(--glass-blur));
+  --backdrop-blur-sm: blur(var(--glass-blur-sm));
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* P1-U8：spacing token 体系，紧凑模式通过切换 token 值全局生效，避免逐类 !important 覆盖 */
+  --space-card-padding: 20px;
+  --space-card-gap: 16px;
+  --space-nav-padding-y: 10px;
+  --space-nav-padding-x: 16px;
+  --space-nav-gap: 12px;
+  --space-toolbar-gap: 12px;
+  /* 语义化功能色 */
+  --danger: #ef4444;
+  --danger-hover: #dc2626;
+  --danger-bg: rgba(239, 68, 68, 0.12);
+  --success: #10b981;
+  /* P2-U2：收藏/喜爱色与成功深色统一为变量，消除多处硬编码 */
+  --favorite: #fd79a8;
+  --success-deep: #16a34a;
+  /* P1-U6：硬编码颜色 token 化——新增语义变量 */
+  /* Toast 三态背景（原 Toast.tsx 内联硬编码 rgba） */
+  --toast-error-bg: rgba(239, 68, 68, 0.92);
+  --toast-info-bg: rgba(30, 41, 59, 0.88);
+  --toast-success-bg: rgba(99, 102, 241, 0.92);
+  /* accent 背景上的文字色（如 btn-primary 内的图标/文字） */
+  --text-on-accent: #ffffff;
+  /* 半透明遮罩上的高对比文字色（如媒体卡片悬停时的底部信息） */
+  --text-on-overlay: #ffffff;
+  /* 半透明遮罩上的次级文字色（如文件大小等辅助信息，原 text-white/70） */
+  --text-on-overlay-secondary: rgba(255, 255, 255, 0.7);
+  /* 警告色（事件时间线等场景） */
+  --warning: #f59e0b;
+  --warning-bg: rgba(245, 158, 11, 0.15);
+  /* U11：警告色文字（用于 warning-bg 背景上的前景文字，原硬编码 #d97706） */
+  --warning-text: #d97706;
+  /* 媒体卡片底部渐变遮罩（用于悬停时显示文件名等信息） */
+  --overlay-gradient-bottom: linear-gradient(transparent, rgba(0, 0, 0, 0.5));
+}
+
+input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+/* 基础样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family:
+    'Segoe UI',
+    'Microsoft YaHei',
+    system-ui,
+    -apple-system,
+    sans-serif;
+  font-size: var(--font-size-base, 14px);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* 用户可调字号（通过设置页字体与显示 section 控制 --font-size-base） */
+html.font-size-small {
+  --font-size-base: 12px;
+}
+html.font-size-normal {
+  --font-size-base: 14px;
+}
+html.font-size-large {
+  --font-size-base: 16px;
+}
+html.font-size-xlarge {
+  --font-size-base: 18px;
+}
+
+/* P1-U8：紧凑模式——通过 spacing token 切换全局生效，覆盖更多组件 */
+html.compact-mode {
+  --space-card-padding: 12px;
+  --space-card-gap: 10px;
+  --space-nav-padding-y: 6px;
+  --space-nav-padding-x: 10px;
+  --space-nav-gap: 8px;
+  --space-toolbar-gap: 8px;
+}
+/* Tailwind p-5/space-y-* 等类无法被 token 覆盖，需显式 !important 覆盖 */
+html.compact-mode .glass-card {
+  padding: var(--space-card-padding) !important;
+}
+html.compact-mode .glass-card > * + * {
+  margin-top: var(--space-card-gap) !important;
+}
+html.compact-mode .nav-item {
+  padding: var(--space-nav-padding-y) var(--space-nav-padding-x) !important;
+  gap: var(--space-nav-gap) !important;
+}
+/* P1-U8：扩展覆盖 GalleryToolbar/EditorTabs 等组件根容器间距 */
+html.compact-mode .gallery-toolbar {
+  gap: var(--space-toolbar-gap) !important;
+}
+html.compact-mode .editor-tabs {
+  gap: var(--space-card-gap) !important;
+}
+
+/* 动效减弱：用户手动开启（与系统 prefers-reduced-motion 并存） */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+/* P0-1：动效减弱时禁用 --glass-blur 过渡，悬停不改变模糊半径 */
+html.reduce-motion .glass-card,
+html.reduce-motion .glass-panel,
+html.reduce-motion .title-bar {
+  --glass-blur: 12px;
+  --glass-blur-sm: 8px;
+}
+html.reduce-motion.soft-pink-luxury .glass-card,
+html.reduce-motion.soft-pink-luxury .glass-panel,
+html.reduce-motion.soft-pink-luxury .title-bar {
+  --glass-blur: 12px;
+  --glass-blur-sm: 10px;
+}
+html.reduce-motion .page-enter,
+html.reduce-motion .modal-enter {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+html.reduce-motion .skeleton {
+  animation: none !important;
+}
+html.reduce-motion .media-card:hover,
+html.reduce-motion .media-card:hover img,
+html.reduce-motion .btn-primary:hover,
+html.reduce-motion .btn-danger:hover,
+html.reduce-motion .btn-secondary:hover,
+html.reduce-motion .icon-btn:hover,
+html.reduce-motion .category-tag:hover,
+html.reduce-motion .social-btn:hover,
+html.reduce-motion .motion-hover-scale-lg:hover,
+html.reduce-motion .motion-hover-scale-lg:active,
+html.reduce-motion .motion-hover-scale-sm:hover,
+html.reduce-motion .motion-hover-scale-sm:active,
+html.reduce-motion .motion-hover-scale-cta:hover,
+html.reduce-motion .motion-hover-scale-cta:active,
+html.reduce-motion .settings-elastic-switch:active .settings-elastic-switch-knob {
+  transform: none !important;
+}
+
+body {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+  transition: background var(--transition-normal);
+}
+
+/* P0 修复：自定义组件类包裹进 @layer components，让 Tailwind utilities（.fixed/.absolute 等）
+   能正常覆盖组件类中的 position 属性。
+   原 .glass-panel/.glass-card 的 position: relative 作为未分层 CSS，
+   优先级高于 @layer utilities 中的 .fixed，导致 ContextMenu 等浮动组件定位失效。 */
+@layer components {
+  /* 标题栏 */
+  /* P2-U3：原硬编码 rgba(245, 245, 245, 0.6)，改用 color-mix 从 --bg-primary 派生半透明 */
+  /* 修复：transition: all 改为具体属性，避免 backdrop-filter 被纳入过渡 */
+  .title-bar {
+    background: color-mix(in srgb, var(--bg-primary) 60%, transparent);
+    backdrop-filter: var(--backdrop-blur-sm);
+    -webkit-backdrop-filter: var(--backdrop-blur-sm);
+    border-bottom: 1px solid transparent;
+    transition:
+      background var(--transition-normal),
+      border-color var(--transition-normal);
+  }
+
+  /* 底部状态栏 */
+  .status-bar {
+    transition: all var(--transition-normal);
+  }
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(153, 153, 153, 0.3);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(102, 102, 102, 0.5);
+}
+
+/* 选中文字样式 */
+::selection {
+  background: var(--accent);
+  color: white;
+}
+
+/* 玻璃拟态卡片基础类 */
+/* 修复：移除 will-change（会创建合成层破坏 backdrop-filter），
+   transition: all 改为具体属性（避免 backdrop-filter 被纳入过渡） */
+/* P0 修复：包裹进 @layer components，让 .fixed/.absolute 等工具类可覆盖 position: relative */
+@layer components {
+  .glass-card {
+    position: relative;
+    background: var(--bg-secondary);
+    backdrop-filter: var(--backdrop-blur);
+    -webkit-backdrop-filter: var(--backdrop-blur);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--divider);
+    box-shadow: var(--shadow-md);
+    transition:
+      transform var(--transition-normal),
+      box-shadow var(--transition-normal),
+      background var(--transition-normal),
+      border-color var(--transition-normal);
+  }
+
+  /* C 阶段：侧边栏微渐变背景，为毛玻璃提供可模糊的彩色内容 */
+  .sidebar-gradient {
+    background: linear-gradient(180deg, #edf1f7 0%, #f5f5f5 100%);
+  }
+
+  /* 修复：移除 data-view-level 分级透明度降低规则 */
+  /* 原方案在二/三级界面降低背景透明度（0.55-0.65）配合 30px blur 导致背景内容极度模糊 */
+  /* 现已将 blur 降到 12px，二/三级界面保持与一级界面相同的背景透明度即可 */
+
+  /* 玻璃拟态面板 */
+  /* 修复：transition: all 改为具体属性，避免 backdrop-filter 被纳入过渡 */
+  .glass-panel {
+    position: relative;
+    background: var(--bg-secondary);
+    backdrop-filter: var(--backdrop-blur-sm);
+    -webkit-backdrop-filter: var(--backdrop-blur-sm);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--divider);
+    box-shadow: var(--shadow-sm);
+    transition:
+      transform var(--transition-normal),
+      box-shadow var(--transition-normal),
+      background var(--transition-normal),
+      border-color var(--transition-normal);
+  }
+}
+
+/* 按钮基础样式 */
+.btn-primary {
+  background: var(--accent);
+  color: white;
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.btn-primary:hover {
+  filter: brightness(1.1);
+  transform: scale(1.03);
+}
+
+.btn-primary:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 2px;
+}
+
+/* U-G4：危险操作按钮（删除/清空等） */
+.btn-danger {
+  background: var(--danger);
+  color: white;
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.btn-danger:hover {
+  background: var(--danger-hover);
+  filter: brightness(1.1);
+  transform: scale(1.03);
+}
+
+.btn-danger:focus-visible {
+  outline: 2px solid #fca5a5;
+  outline-offset: 2px;
+}
+
+.btn-secondary {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-secondary:hover {
+  background: var(--hover-bg-strong);
+  transform: translateY(-1px);
+}
+
+.btn-secondary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 图标按钮 */
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 200ms ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+/* BatchActions 文字按钮：组合选择器提高特异性，覆盖 .icon-btn 的固定 width 与
+   overflow:hidden，确保中文标签（导出到默认等）完整可见、不被裁切 */
+.icon-btn.batch-act-btn {
+  width: auto;
+  min-width: 36px;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+/* 隐藏滚动条：用于底部批量操作栏水平滚动时保持玻璃拟态视觉干净。
+   不支持的浏览器优雅降级为系统滚动条，不影响功能。 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 批量操作栏容器：细滚动条（保持毛玻璃视觉，同时提供横向滚动的可发现性）。
+   常驻 4px 细滚动条（Firefox: scrollbar-width:thin；WebKit: 4px 高），hover 时
+   滚动条颜色加深更清晰，提示用户可横向滚动。容器 bottom:44px 留出底部空间，
+   细条位于容器底部内侧，不会被 -translate-y 裁切。 */
+.batch-actions-root {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(120, 120, 120, 0.5) transparent;
+}
+.batch-actions-root::-webkit-scrollbar {
+  height: 4px;
+}
+.batch-actions-root::-webkit-scrollbar-track {
+  background: transparent;
+}
+.batch-actions-root::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 120, 0.5);
+  border-radius: 9999px;
+}
+/* hover 时滚动条更清晰，强化「可横向滚动」的可发现性 */
+.batch-actions-root:hover {
+  scrollbar-color: rgba(80, 80, 80, 0.85) transparent;
+}
+.batch-actions-root:hover::-webkit-scrollbar-thumb {
+  background: rgba(80, 80, 80, 0.85);
+}
+
+/* 响应式降级（图标化）：覆盖不同窗口宽度与系统缩放组合下的文字溢出盲区。
+   两级断点：
+   - ≤960px（中屏/小窗/分屏）：长中文标签（导出到默认、WiFi 分享等）在 150%/175%
+     系统缩放下物理密度抬升易溢出，统一隐藏文字仅留图标，避免只能靠横滚的尴尬。
+   - ≤640px（窄屏/移动）：更极限场景，语义一致。
+   title / aria-label 始终保留完整可读文案（无障碍兜底）。 */
+@media (max-width: 960px) {
+  .batch-actions-root .batch-act-label {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .batch-actions-root .batch-act-label {
+    display: none;
+  }
+}
+
+.icon-btn:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+  transform: scale(1.1);
+}
+
+.icon-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* 社交媒体图标按钮 */
+.social-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  cursor: pointer;
+  border: none;
+  color: var(--text-primary);
+}
+
+.social-btn:hover {
+  transform: translateY(-2px);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.social-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* 按钮涟漪效果 */
+.btn-primary::after,
+.btn-danger::after,
+.btn-secondary::after,
+.icon-btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  transition:
+    width 0.4s ease-out,
+    height 0.4s ease-out,
+    opacity 0.4s ease-out;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.btn-primary:active::after,
+.btn-danger:active::after,
+.btn-secondary:active::after,
+.icon-btn:active::after {
+  width: 250%;
+  height: 250%;
+  opacity: 1;
+  transition: 0s;
+}
+
+/* 输入框样式 */
+.input-field {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+  outline: none;
+  width: 100%;
+}
+
+.input-field:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+}
+
+.input-field::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* P2-U7/P2-U8：统一的 disabled 视觉降级，消除各按钮/输入框 disabled 态不一致 */
+.btn-primary:disabled,
+.btn-danger:disabled,
+.btn-secondary:disabled,
+.icon-btn:disabled,
+.input-field:disabled,
+.select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+  pointer-events: none;
+}
+
+/* P0-2：motion.button → 原生 button 的 hover/active 微交互类
+   替代 whileHover/whileTap 的 spring 缩放，使用 cubic-bezier 接近 Fluent Design 连接动画。
+   compositor 线程处理 transform，不影响 React 渲染，避免 React 19 props 泄漏 DOM 警告。 */
+.motion-hover-scale-lg,
+.motion-hover-scale-sm,
+.motion-hover-scale-cta {
+  transition: transform 220ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform;
+}
+.motion-hover-scale-lg:hover {
+  transform: scale(1.1);
+}
+.motion-hover-scale-lg:active {
+  transform: scale(0.9);
+}
+.motion-hover-scale-sm:hover {
+  transform: scale(1.02);
+}
+.motion-hover-scale-sm:active {
+  transform: scale(0.98);
+}
+.motion-hover-scale-cta:hover {
+  transform: scale(1.03);
+}
+.motion-hover-scale-cta:active {
+  transform: scale(0.97);
+}
+
+/* 设置板块「弹性开关」：滑块按下（拖动起步）时横向拉伸，松开落位后回弹至原宽。
+   与上方 .motion-hover-scale-* 同族——交互态微动画统一走 CSS，
+   由 compositor 线程合成 transform，不触发 React 重渲染。
+   轨道 44×24 + 滑块 18px；关闭态滑块 left:3px，开启态 left:23px（44-18-3）。 */
+.settings-elastic-switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--divider);
+  cursor: pointer;
+  transition:
+    background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.settings-elastic-switch[aria-checked='true'] {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.settings-elastic-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.settings-elastic-switch:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.settings-elastic-switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+  /* 关闭态锚定左端：拉伸向右生长，不溢出轨道 */
+  transform-origin: left center;
+  /* 过冲曲线（控制点 y=1.56 > 1）：松开时掠过原宽再回落，形成"有质量"的回弹 */
+  transition:
+    left 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  will-change: left, transform;
+}
+.settings-elastic-switch[aria-checked='true'] .settings-elastic-switch-knob {
+  left: 23px;
+  /* 开启态锚定右端：拉伸向左生长，同样不溢出轨道 */
+  transform-origin: right center;
+}
+/* 拖动起步（按下）：滑块横向拉伸；松开移除 :active 后由上方过冲曲线回弹 */
+.settings-elastic-switch:active:not(:disabled) .settings-elastic-switch-knob {
+  transform: scaleX(1.35);
+}
+
+/* 搜索框 */
+.search-input {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--text-tertiary);
+}
+
+.search-input:focus {
+  border-color: var(--accent);
+}
+
+/* 动画关键帧 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* D：页面切换过渡——轻微缩放+淡入
+   原方案用 filter:blur 做 OriginOS 6 风格高斯模糊，但 filter 会创建合成层，
+   破坏子元素 backdrop-filter，导致动画结束后毛玻璃依然模糊。去掉 filter。*/
+/* P0 修复：to 状态改为 transform: none 而非 scale(1)。
+   scale(1) 虽视觉无变化，但仍会创建包含块（containing block），
+   导致子元素 position: fixed 相对该 div 而非视口定位。
+   配合 animation-fill-mode: forwards，动画结束后 transform: scale(1) 残留，
+   子元素的 fixed 定位持续失效。改为 none 不创建包含块。 */
+@keyframes pageBlurIn {
+  from {
+    transform: scale(1.02);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+@keyframes slideInBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* 页面过渡动画类：轻微缩放+淡入 */
+/* 修复：移除 will-change，动画结束后类会被 JS 移除，不需要持续提示合成层 */
+.page-enter {
+  animation: pageBlurIn 250ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modal-enter {
+  animation: scaleIn 250ms cubic-bezier(0, 0, 0.2, 1) forwards;
+}
+
+/* 图片卡片悬停效果 */
+.media-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  will-change: transform;
+}
+
+.media-card:hover {
+  transform: scale(1.02);
+  box-shadow: var(--shadow-lg);
+}
+
+.media-card:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid var(--accent);
+  pointer-events: none;
+}
+
+.media-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease-out;
+}
+
+.media-card:hover img {
+  transform: scale(1.05);
+}
+
+/* 导航菜单项 */
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  position: relative;
+  will-change: background-color;
+}
+
+.nav-item:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--hover-bg);
+  color: var(--accent);
+}
+
+.nav-item.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--accent);
+  border-radius: 0 2px 2px 0;
+  transition: height 200ms ease-out;
+}
+
+/* 分类标签 */
+.category-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+  border: 1px solid var(--divider);
+}
+
+.category-tag:hover {
+  transform: scale(1.05);
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.category-tag.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+/* 进度条 */
+.progress-bar {
+  height: 4px;
+  background: var(--divider);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 300ms ease-out;
+}
+
+/* 骨架屏 */
+/* P2-U11：抽取 skeleton 渐变色为变量，主题文件只需覆盖变量值 */
+:root {
+  --skeleton-from: var(--bg-tertiary);
+  --skeleton-to: var(--hover-bg);
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 25%,
+    var(--skeleton-to) 50%,
+    var(--skeleton-from) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* 拖拽区域 */
+.drag-over {
+  border: 2px dashed var(--accent) !important;
+  background: rgba(0, 120, 212, 0.05) !important;
+}
+
+/* 禁用选择 */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 单行省略 */
+.ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 多行省略 */
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* U-O2：prefers-reduced-motion 适配——尊重用户系统偏好，降级所有动画与过渡 */
+/* P2-U9：用 :not(.reduce-motion) 限定，避免与上方 html.reduce-motion 手动开启规则重复应用。
+   手动开启 reduce-motion 时由上方规则覆盖（含 --glass-blur 固定等额外降级） */
+@media (prefers-reduced-motion: reduce) {
+  html:not(.reduce-motion) *,
+  html:not(.reduce-motion) *::before,
+  html:not(.reduce-motion) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  html:not(.reduce-motion) .page-enter,
+  html:not(.reduce-motion) .modal-enter {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  html:not(.reduce-motion) .skeleton {
+    animation: none !important;
+  }
+
+  html:not(.reduce-motion) .media-card:hover,
+  html:not(.reduce-motion) .media-card:hover img,
+  html:not(.reduce-motion) .btn-primary:hover,
+  html:not(.reduce-motion) .btn-danger:hover,
+  html:not(.reduce-motion) .btn-secondary:hover,
+  html:not(.reduce-motion) .icon-btn:hover,
+  html:not(.reduce-motion) .category-tag:hover,
+  html:not(.reduce-motion) .social-btn:hover,
+  html:not(.reduce-motion) .motion-hover-scale-lg:hover,
+  html:not(.reduce-motion) .motion-hover-scale-lg:active,
+  html:not(.reduce-motion) .motion-hover-scale-sm:hover,
+  html:not(.reduce-motion) .motion-hover-scale-sm:active,
+  html:not(.reduce-motion) .motion-hover-scale-cta:hover,
+  html:not(.reduce-motion) .motion-hover-scale-cta:active {
+    transform: none !important;
+  }
+}

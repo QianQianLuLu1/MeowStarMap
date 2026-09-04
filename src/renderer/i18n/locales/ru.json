@@ -1,0 +1,4211 @@
+{
+  "appShell": {
+    "categoriesSummary": "",
+    "detailPosition": "",
+    "duplicatesHint": "",
+    "editorMode": "",
+    "favoritesSummary": "",
+    "feedbackButton": "",
+    "gallerySummary": "",
+    "imagesVideosSummary": "",
+    "ready": "",
+    "recycleBinHint": "",
+    "recycleBinSummary": "",
+    "selectedCount": "",
+    "settingsHint": "",
+    "storageUsage": "",
+    "viewStatus": {
+      "categories": "",
+      "detail": "",
+      "duplicates": "",
+      "editor": "",
+      "favorites": "",
+      "resonanceRecords": "Резонанс",
+      "gallery": "",
+      "launcherCache": "",
+      "recycleBin": "",
+      "settings": ""
+    }
+  },
+  "categories": {
+    "iconLabel": {
+      "calendar": "Дата",
+      "camera": "Камера",
+      "folder": "Папка",
+      "heart": "Нравится",
+      "image": "Изображение",
+      "location": "Место",
+      "palette": "Палитра",
+      "sparkles": "Избранное",
+      "star": "Избранное",
+      "tag": "Тег",
+      "user": "Человек",
+      "video": "Видео"
+    },
+    "page": {
+      "title": "",
+      "assign": {
+        "emptyMedia": "",
+        "failedToast": "",
+        "nextPage": "",
+        "noMatch": "",
+        "pageRange": "",
+        "prevPage": "",
+        "searchPlaceholder": "",
+        "subtitle": "",
+        "successToast": "",
+        "title": ""
+      },
+      "create": {
+        "colorTitle": "",
+        "failedToast": "",
+        "namePlaceholder": "",
+        "noParent": "",
+        "submit": "",
+        "successToast": "",
+        "title": ""
+      },
+      "delete": {
+        "confirmMessage": "",
+        "confirmTitle": "",
+        "failedToast": "",
+        "successToast": ""
+      },
+      "list": {
+        "assignMedia": "",
+        "collapse": "",
+        "dragHint": "",
+        "edit": "",
+        "expand": "",
+        "hierarchyFailedToast": "",
+        "hierarchySuccessToast": "",
+        "iconTitle": "",
+        "invalidDragToast": "",
+        "itemCount": "",
+        "moveDown": "",
+        "moveUp": "",
+        "reorderFailedToast": "",
+        "subCategoryCount": "",
+        "systemDragDisabled": "",
+        "systemTag": "",
+        "title": ""
+      },
+      "scene": {
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "sceneTime": {
+        "analyzeButton": "",
+        "analyzedToast": "",
+        "analyzingButton": "",
+        "analyzeFailedToast": "",
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "subtitle": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "update": {
+        "failedToast": "",
+        "successToast": ""
+      }
+    },
+    "system": {
+      "people": "",
+      "location": "",
+      "scene": "",
+      "screenshot": "",
+      "recording": "",
+      "recent": "",
+      "favorite": ""
+    }
+  },
+  "common": {
+    "all": "Все",
+    "apply": "Применить",
+    "back": "Назад",
+    "cancel": "Отмена",
+    "clear": "Очистить",
+    "close": "Закрыть",
+    "contextMenu": {
+      "ariaLabel": "Контекстное меню",
+      "submenuAriaLabel": "Подменю {{label}}"
+    },
+    "copy": "Копировать",
+    "default": "По умолчанию",
+    "delete": "Удалить",
+    "error": "Ошибка",
+    "export": "Экспорт",
+    "failed": "Ошибка",
+    "feedbackDialog": {
+      "attachLogsLabel": "Включить недавние логи (рекомендуется, помогает диагностировать проблему)",
+      "attachSystemInfoLabel": "Включить информацию о системе (версия, ОС, оборудование)",
+      "attachmentsLabel": "Вложения",
+      "closeAriaLabel": "Закрыть",
+      "contactLabel": "Контакты",
+      "copyFailed": "Ошибка копирования, выберите текст вручную",
+      "copySuccess": "{{label}} скопировано в буфер обмена",
+      "descriptionLabel": "Описание проблемы",
+      "descriptionPlaceholder": "Кратко опишите возникшую проблему (необязательно)...",
+      "exportButton": "Экспортировать диагностический пакет",
+      "exportFailed": "Ошибка экспорта",
+      "exportHint": "Диагностический пакет содержит логи, файлы сбоев и информацию о системе. После экспорта его можно отправить разработчику через указанные ниже контакты.",
+      "exportSuccess": "Диагностический пакет экспортирован, отправьте его разработчику через указанные ниже контакты",
+      "exporting": "Экспорт...",
+      "githubCopyHint": "Нажмите, чтобы скопировать ссылку",
+      "githubLabel": "GitHub Issues",
+      "githubName": "Ссылка GitHub Issues",
+      "githubValue": "https://github.com/your-repo/issues",
+      "qqGroupCopyHint": "Нажмите, чтобы скопировать номер группы",
+      "qqGroupLabel": "QQ группа",
+      "qqGroupName": "Номер QQ группы",
+      "qqGroupValue": "QQ Group: 123456789",
+      "title": "Обратная связь"
+    },
+    "import": "Импорт",
+    "invertSelection": "Инвертировать выбор",
+    "loading": "Загрузка...",
+    "move": "Переместить",
+    "no": "Нет",
+    "ok": "OK",
+    "processing": "Обработка...",
+    "propertiesDialog": {
+      "basic": {
+        "createdAt": "Создан",
+        "modifiedAt": "Изменён",
+        "name": "Имя",
+        "path": "Путь",
+        "resolution": "Разрешение",
+        "size": "Размер",
+        "type": "Тип",
+        "typeImage": "Изображение",
+        "typeVideo": "Видео"
+      },
+      "copied": "Скопировано",
+      "copyAll": "Копировать всё",
+      "copyAllTitle": "Копировать все свойства",
+      "copySection": {
+        "aperture": "Диафрагма",
+        "cameraModel": "Модель камеры",
+        "dateTaken": "Дата съёмки",
+        "fileInfo": "=== Информация о файле ===",
+        "focalLength": "Фокусное расстояние",
+        "lens": "Объектив",
+        "originalSize": "Исходный размер",
+        "shootingParams": "=== Параметры съёмки ===",
+        "shutter": "Выдержка"
+      },
+      "openLocation": "Расположение",
+      "openLocationTitle": "Показать в проводнике",
+      "title": "Свойства файла"
+    },
+    "refresh": "Обновить",
+    "rename": "Переименовать",
+    "reset": "Сбросить",
+    "restore": "Восстановить",
+    "retry": "Повторить",
+    "save": "Сохранить",
+    "search": "Поиск",
+    "select": "Выбрать",
+    "selectAll": "Выбрать все",
+    "shareCodeDecoder": {
+      "apiUnavailable": "API недоступен",
+      "closeAriaLabel": "Закрыть",
+      "decodeButton": "Декодировать",
+      "decodeSuccess": "Декодирование выполнено",
+      "decoding": "Декодирование...",
+      "descriptions": {
+        "clothDiy": "Коды окрашивания можно получить из функции окрашивания в игре. Сетевое декодирование требует подключения к серверу игры; в автономном режиме можно извлечь только метку времени и UID.",
+        "homeBuild": "Коды постройки дома можно получить из функции постройки дома в игре. Сетевое декодирование требует подключения к серверу игры.",
+        "mediaEncrypt": "Шифрует JSON параметров камеры в шифртекст (формат Base64). Полезно для тестирования потока расшифровки или создания пользовательских параметров."
+      },
+      "encryptButton": "Зашифровать",
+      "encryptSuccess": "Шифрование выполнено",
+      "operationFailed": "Операция не удалась",
+      "placeholders": {
+        "clothDiy": "Вставьте код окрашивания из игры...",
+        "homeBuild": "Вставьте код постройки дома из игры...",
+        "mediaEncrypt": "Вставьте JSON параметров камеры..."
+      },
+      "result": {
+        "encryptedResult": "Зашифрованный результат (Base64)",
+        "networkData": "Сетевые данные",
+        "networkUnavailable": "Сетевое декодирование недоступно (может потребоваться интернет)",
+        "serverId": "ID сервера",
+        "timestamp": "Метка времени"
+      },
+      "tabs": {
+        "clothDiy": "Код окрашивания",
+        "homeBuild": "Код постройки дома",
+        "mediaEncrypt": "Шифрование параметров камеры"
+      },
+      "title": "Инструменты кода обмена",
+      "unknownError": "Неизвестная ошибка"
+    },
+    "success": "Успех",
+    "warning": "Предупреждение",
+    "yes": "Да",
+    "confirm": "",
+    "copied": "",
+    "corruptedBadge": {
+      "label": "",
+      "labelSm": "",
+      "title": "",
+      "titleWithReason": ""
+    },
+    "loadFailed": "",
+    "missingBadge": {
+      "label": "",
+      "labelSm": ""
+    }
+  },
+  "detail": {
+    "actions": {
+      "backToGallery": "",
+      "deleteConfirmMessage": "",
+      "deleteFailed": "",
+      "deleteTitle": "",
+      "edit": "",
+      "operationFailed": "",
+      "ratingAria": "",
+      "ratingFailed": "",
+      "saveAs": "",
+      "saveAsFailed": "",
+      "saveAsSuccess": "",
+      "tags": ""
+    },
+    "editorMetadata": {
+      "exportedAt": "",
+      "filter": "",
+      "intensity": "",
+      "loading": "",
+      "lut": "",
+      "restore": "",
+      "restoreTooltip": "",
+      "title": "",
+      "watermark": "",
+      "yes": ""
+    },
+    "emptyTitle": "",
+    "exif": {
+      "gps": "",
+      "title": "",
+      "viewOnMap": "",
+      "aperture": "",
+      "cameraModel": "",
+      "copied": "",
+      "copyAriaLabel": "",
+      "copyFullTitle": "",
+      "copyLabel": "",
+      "emptyText": "",
+      "errorPrefix": "",
+      "focalLength": "",
+      "lens": "",
+      "dateTaken": "",
+      "loadingText": "",
+      "originalSize": "",
+      "panelTitle": "",
+      "shutter": "",
+      "gamePhotoEmpty": ""
+    },
+    "fields": {
+      "favorite": "",
+      "favorited": "",
+      "notFavorited": "",
+      "sceneTime": "",
+      "type": ""
+    },
+    "missing": {
+      "removeFailed": "",
+      "removeFromLibrary": "",
+      "removeSuccess": "",
+      "warningText": ""
+    },
+    "outfit": {
+      "add": "",
+      "clearFailed": "",
+      "edit": "",
+      "emptyValue": "",
+      "inputPlaceholder": "",
+      "maxLengthError": "",
+      "saveFailed": "",
+      "selectPresetPlaceholder": "",
+      "title": ""
+    },
+    "video": {
+      "codec": "",
+      "duration": "",
+      "frameRate": "",
+      "title": ""
+    },
+    "zoomable": {
+      "ariaLabel": "",
+      "resetButton": "",
+      "resetZoom": ""
+    },
+    "dressing": {
+      "copyHeader": "",
+      "emptyText": "",
+      "eureka": {
+        "label": ""
+      },
+      "loadingText": "",
+      "title": ""
+    },
+    "interaction": {
+      "carrier": {
+        "label": ""
+      },
+      "copyHeader": "",
+      "emptyText": "",
+      "format": {
+        "location": "",
+        "rotation": "",
+        "scale": ""
+      },
+      "loadingText": "",
+      "mount": {
+        "label": ""
+      },
+      "none": "",
+      "object": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "nikki": {
+      "copyHeader": "",
+      "emptyText": "",
+      "giantState": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "hidden": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "rotation": {
+        "label": ""
+      },
+      "scale": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "photography": {
+      "copyHeader": "",
+      "date": {
+        "dayValue": "",
+        "label": ""
+      },
+      "edit": {
+        "edited": "",
+        "editedWithDetails": "",
+        "label": "",
+        "notEdited": "",
+        "sticker": "",
+        "text": ""
+      },
+      "emptyText": "",
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "photoWall": {
+        "joinedValue": "",
+        "label": "",
+        "notJoined": ""
+      },
+      "task": {
+        "interactiveFallback": "",
+        "label": "",
+        "none": "",
+        "puzzleFallback": "",
+        "risk": ""
+      },
+      "time": {
+        "label": ""
+      },
+      "title": "",
+      "weather": {
+        "label": "",
+        "typeValue": ""
+      }
+    }
+  },
+  "dialog": {
+    "exportFormat": "Преобразование формата",
+    "exportLivePhoto": "Экспорт Live Photo",
+    "exportSpeed": "Экспорт видео с настроенной скоростью",
+    "exportTrim": "Экспорт обрезанного видео",
+    "sameFormat": "Целевой формат совпадает с исходным форматом",
+    "selectDirUnsupported": "Выбор каталога не поддерживается в этой среде",
+    "trimTooShort": "Диапазон обрезки слишком короткий, настройте время начала/окончания"
+  },
+  "duplicates": {
+    "strategy": {
+      "bestQuality": "",
+      "favorited": "",
+      "largest": "",
+      "newest": "",
+      "smallest": ""
+    },
+    "threshold": {
+      "default": "",
+      "defaultHint": "",
+      "loose": "",
+      "looseHint": "",
+      "veryLoose": "",
+      "veryLooseHint": "",
+      "veryStrict": "",
+      "veryStrictHint": ""
+    },
+    "task": {
+      "calculateEta": "",
+      "cancel": "",
+      "cancelAria": "",
+      "cancelFailed": "",
+      "cancelRequested": "",
+      "cancelUnsupported": "",
+      "cancelled": "",
+      "cancelling": "",
+      "exactCancelled": "",
+      "remainingTime": "",
+      "similarCancelled": ""
+    },
+    "ariaCollapse": "",
+    "ariaCollapseBtn": "",
+    "ariaExpand": "",
+    "ariaExpandBtn": "",
+    "ariaGroupToggle": "",
+    "backToGallery": "",
+    "confirmMessage": "",
+    "confirmTitle": "",
+    "emptyExact": "",
+    "emptySimilarCompared": "",
+    "emptySimilarNoPhash": "",
+    "exactDesc": "",
+    "favoriteTooltip": "",
+    "foundGroups": "",
+    "groupExact": "",
+    "groupImageTag": "",
+    "groupReleasable": "",
+    "groupSelected": "",
+    "groupSimilar": "",
+    "groupSingleSize": "",
+    "groupVideoTag": "",
+    "loadingExact": "",
+    "loadingHintExact": "",
+    "loadingHintSimilar": "",
+    "loadingSimilar": "",
+    "markButton": "",
+    "markCompleted": "",
+    "markFailed": "",
+    "markNoGroups": "",
+    "markingButton": "",
+    "modeExact": "",
+    "modeLabel": "",
+    "modeSimilar": "",
+    "moveToTrash": "",
+    "noDuplicates": "",
+    "noFilesSelected": "",
+    "noSimilar": "",
+    "phashAllDone": "",
+    "phashButton": "",
+    "phashCalculating": "",
+    "phashCompleted": "",
+    "phashFailed": "",
+    "phashRecalcNow": "",
+    "pleaseSelect": "",
+    "ratingTooltip": "",
+    "recommendKeep": "",
+    "recommendTooltip": "",
+    "rescan": "",
+    "scanFailed": "",
+    "selectedToDelete": "",
+    "similarDesc": "",
+    "strategyAll": "",
+    "strategyApplied": "",
+    "strategyTooltipBest": "",
+    "strategyTooltipFavorited": "",
+    "strategyTooltipGroupBest": "",
+    "strategyTooltipGroupFavorited": "",
+    "strategyTooltipGroupLargest": "",
+    "strategyTooltipGroupNewest": "",
+    "strategyTooltipLargest": "",
+    "strategyTooltipNewest": "",
+    "subtitleExact": "",
+    "subtitleFailed": "",
+    "subtitleMeta": "",
+    "subtitleScanningExact": "",
+    "subtitleScanningSimilar": "",
+    "subtitleSimilar": "",
+    "subtitleSimilarMeta": "",
+    "thresholdGroupLabel": "",
+    "thresholdLabel": "",
+    "titleExact": "",
+    "titleSimilar": "",
+    "toolbarLabel": "",
+    "typeExact": "",
+    "typeSimilar": "",
+    "unsupported": "",
+    "unsupportedDelete": "",
+    "unsupportedExact": "",
+    "unsupportedMark": "",
+    "unsupportedPhash": "",
+    "unsupportedSimilar": "",
+    "videoBadge": ""
+  },
+  "editor": {
+    "basic": {
+      "blacks": "Чёрные",
+      "brightness": "Яркость",
+      "clarity": "Чёткость",
+      "contrast": "Контраст",
+      "dehaze": "Убрать дымку",
+      "denoise": "Шумоподавление",
+      "highlights": "Света",
+      "saturation": "Насыщенность",
+      "shadows": "Тени",
+      "sharpen": "Резкость",
+      "temperature": "Температура",
+      "tint": "Оттенок",
+      "vibrance": "Естественная насыщенность",
+      "whites": "Белые"
+    },
+    "batchApply": {
+      "calculating": "",
+      "cancelAria": "",
+      "cancelRequested": "",
+      "cancelledMessage": "",
+      "cancelledToast": "",
+      "completedAll": "",
+      "completedToast": "",
+      "completedWithFailures": "",
+      "confirmMessage": "",
+      "confirmStart": "",
+      "confirmTitle": "",
+      "failedCount": "",
+      "invalidPathError": "",
+      "loadFailedError": "",
+      "noSelectionError": "",
+      "preparing": "",
+      "processingHint": "",
+      "processingLabel": "",
+      "remainingLabel": "",
+      "throughputSuffix": "",
+      "title": ""
+    },
+    "compare": {
+      "edited": "После редактирования",
+      "loading": "Загрузка...",
+      "original": "Оригинал"
+    },
+    "hsl": {
+      "balance": "Баланс",
+      "blue": "Синий",
+      "bluePurple": "Сине-фиолетовый",
+      "cyan": "Голубой",
+      "green": "Зелёный",
+      "highlights": "Света",
+      "hue": "Оттенок",
+      "lightness": "Светлота",
+      "magenta": "Пурпурный",
+      "orange": "Оранжевый",
+      "purple": "Фиолетовый",
+      "red": "Красный",
+      "saturation": "Насыщенность",
+      "shadows": "Тени",
+      "skin": "Кожа",
+      "warm": "Тёплые",
+      "yellow": "Жёлтый",
+      "yellowGreen": "Жёлто-зелёный"
+    },
+    "metadata": {
+      "batchExported": "",
+      "batchExportedWithFailures": "",
+      "exportFailed": "",
+      "exported": "",
+      "restoreFailed": "",
+      "restored": "",
+      "unavailable": ""
+    },
+    "page": {
+      "clipboardEmpty": "",
+      "customPresetDefault": "",
+      "editedFileSuffix": "",
+      "exportFailed": "",
+      "imageLoadFailed": "",
+      "importedPresetDefault": "",
+      "paramsCopied": "",
+      "paramsPasted": "",
+      "pasteFailed": "",
+      "presetExportFailed": "",
+      "presetExportSuccess": "",
+      "presetExportUnsupported": "",
+      "presetImportFailed": "",
+      "presetImportSuccess": "",
+      "presetImportUnsupported": "",
+      "presetSaveFailed": "",
+      "presetSaveSuccess": "",
+      "presetSaveUnsupported": ""
+    },
+    "recover": {
+      "discard": "Отклонить",
+      "discarded": "Временные результаты редактирования отклонены",
+      "download": "Скачать на устройство",
+      "downloadSuffix": "",
+      "downloaded": "Результаты редактирования скачаны",
+      "message": "Последнее сохранение не удалось, результаты редактирования сохранены во временном хранилище ({{fileName}}, {{time}}). Скачать на устройство?",
+      "storeFailed": "Сохранение не удалось, и результаты слишком велики для временного хранилища, пожалуйста, отредактируйте и сохраните снова",
+      "stored": "Сохранение не удалось, результаты редактирования сохранены во временном хранилище, их можно скачать при следующем запуске редактора",
+      "title": "Восстановить несохранённые результаты редактирования"
+    },
+    "shortcuts": {
+      "desc": {
+        "compareOriginal": "",
+        "copyParams": "",
+        "fullscreenToggle": "",
+        "pasteParams": "",
+        "redo": "",
+        "save": "",
+        "saveAs": "",
+        "togglePanel": "",
+        "undo": ""
+      },
+      "title": ""
+    },
+    "tabs": {
+      "basic": "Основные",
+      "collapsePanel": "Свернуть панель",
+      "curves": "Кривые",
+      "expandPanel": "Развернуть панель",
+      "filters": "Фильтры",
+      "hsl": "HSL",
+      "lut": "LUT",
+      "split": "Разделение",
+      "watermark": "Водяной знак"
+    },
+    "toolbar": {
+      "applyToSelected": "Применить к выбранным ({{count}})",
+      "applyToSelectedAria": "Применить к {{count}} выбранным изображениям",
+      "applyToSelectedTooltip": "Применить текущие настройки/фильтры/водяные знаки к {{count}} выбранным изображениям",
+      "applying": "Применение...",
+      "back": "Назад",
+      "compare": "Сравнить",
+      "compareHold": "Удерживайте для сравнения с оригиналом",
+      "copyParams": "Копировать параметры",
+      "exportWithMetadata": "",
+      "exportWithMetadataTooltip": "",
+      "exportingWithMetadata": "",
+      "fullscreenEnter": "Полноэкранный режим (F11)",
+      "fullscreenEnterAria": "Полноэкранный режим",
+      "fullscreenExit": "Выйти из полноэкранного (F11)",
+      "fullscreenExitAria": "Выйти из полноэкранного",
+      "pasteParams": "Вставить параметры",
+      "redo": "Вернуть",
+      "reset": "Сбросить",
+      "save": "Сохранить",
+      "saveAs": "Сохранить как",
+      "saving": "Сохранение...",
+      "shortcuts": "Горячие клавиши (?)",
+      "splitCompare": "Разделённое сравнение",
+      "splitCompareAria": "Разделённое сравнение",
+      "splitCompareTooltip": "Переключить режим разделённого сравнения (слева: оригинал, справа: после редактирования)",
+      "undo": "Отменить"
+    },
+    "colorWheel": {
+      "ariaLabel": ""
+    },
+    "histogram": {
+      "ariaLabel": "",
+      "error": ""
+    },
+    "lut": {
+      "clear": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "import": ""
+    },
+    "toneCurve": {
+      "ariaLabel": "",
+      "channelB": "",
+      "channelG": "",
+      "channelR": "",
+      "channelRgb": "",
+      "curveLabel": "",
+      "inputOutput": "",
+      "reset": ""
+    }
+  },
+  "gallery": {
+    "fullscreen": {
+      "ariaLabel": "",
+      "closeTitle": "",
+      "deleteConfirmMessage": "",
+      "favoriteTitle": "",
+      "hideInfoTitle": "",
+      "infoPanelCloseAria": "",
+      "infoPanelTitle": "",
+      "intervalOption": "",
+      "intervalTitle": "",
+      "nextAriaLabel": "",
+      "prevAriaLabel": "",
+      "saveAsFailed": "",
+      "saveAsTitle": "",
+      "showInfoTitle": "",
+      "slideshowMinImages": "",
+      "slideshowPauseAria": "",
+      "slideshowPauseTitle": "",
+      "slideshowPlayAria": "",
+      "slideshowPlayTitle": "",
+      "title": "",
+      "unfavoriteTitle": ""
+    },
+    "import": {
+      "browse": "",
+      "categorize": {
+        "byDate": {
+          "desc": "",
+          "label": ""
+        },
+        "byMonth": {
+          "desc": "",
+          "label": ""
+        },
+        "flat": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "categorizeLabel": "",
+      "conflict": {
+        "overwrite": {
+          "desc": "",
+          "label": ""
+        },
+        "rename": {
+          "desc": "",
+          "label": ""
+        },
+        "skip": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "conflictLabel": "",
+      "deselectAll": "",
+      "errors": {
+        "importFailed": "",
+        "loadFailed": "",
+        "readSourceFailed": ""
+      },
+      "finish": "",
+      "imagesCount": "",
+      "importing": "",
+      "naming": {
+        "date": {
+          "desc": "",
+          "label": ""
+        },
+        "keep": {
+          "desc": "",
+          "label": ""
+        },
+        "seq": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "namingRuleLabel": "",
+      "nextStep": "",
+      "prevStep": "",
+      "progressLabel": "",
+      "resultImported": "",
+      "resultSkipped": "",
+      "scanHint": "",
+      "scanResult": "",
+      "scanSummary": "",
+      "scanning": "",
+      "selectionSummary": "",
+      "sourceDirLabel": "",
+      "sourceDirPlaceholder": "",
+      "startImport": "",
+      "step1": "",
+      "step2": "",
+      "step3": "",
+      "summaryDiskSpace": "",
+      "summaryFiles": "",
+      "summaryFilesValue": "",
+      "targetDirLabel": "",
+      "targetDirPlaceholder": "",
+      "title": "",
+      "videosCount": "",
+      "indexingHint": ""
+    },
+    "slideshow": {
+      "ariaLabel": "",
+      "exitAriaLabel": "",
+      "exitTitle": "",
+      "intervalLabel": "",
+      "intervalPreset": {
+        "10s": "",
+        "1s": "",
+        "3s": "",
+        "5s": ""
+      },
+      "loopLabel": "",
+      "nextTitle": "",
+      "orderLabel": "",
+      "orderPreset": {
+        "sequence": "",
+        "shuffle": ""
+      },
+      "pauseAriaLabel": "",
+      "pauseTitle": "",
+      "playAriaLabel": "",
+      "playTitle": "",
+      "prevTitle": "",
+      "progress": "",
+      "settingsAriaLabel": "",
+      "settingsCloseAriaLabel": "",
+      "settingsPanelTitle": "",
+      "settingsTitle": "",
+      "shortcutsHint": "",
+      "shuffleBadge": "",
+      "skipVideoLabel": "",
+      "title": "",
+      "transitionLabel": "",
+      "transitionPreset": {
+        "fade": "",
+        "none": "",
+        "slide": ""
+      }
+    },
+    "smartGroup": {
+      "dimensionDesc": {
+        "albumType": "",
+        "fileType": "",
+        "outfit": "",
+        "sceneCategory": "",
+        "sceneTime": ""
+      },
+      "emptyHint": "",
+      "fileType": {
+        "image": "",
+        "video": ""
+      }
+    },
+    "toolbar": {
+      "cleanupCorrupted": "",
+      "cleanupCorruptedTitle": "",
+      "corruptedOnly": "",
+      "corruptedOnlyTitle": "",
+      "dateLabel": "",
+      "dateRange": {
+        "clear": "",
+        "endLabel": "",
+        "startLabel": ""
+      },
+      "filterType": {
+        "all": "",
+        "image": "",
+        "video": ""
+      },
+      "importTitle": "",
+      "missingOnly": "",
+      "missingOnlyTitle": "",
+      "rating": {
+        "all": "",
+        "label": "",
+        "star1Plus": "",
+        "star2Plus": "",
+        "star3Plus": "",
+        "star4Plus": "",
+        "star5": "",
+        "starNPlus": ""
+      },
+      "searchPlaceholder": "",
+      "shareTitle": "",
+      "sortBy": {
+        "date": "",
+        "name": "",
+        "rating": "",
+        "resolution": "",
+        "size": ""
+      },
+      "viewMode": {
+        "eventTimeline": "",
+        "grid": "",
+        "list": "",
+        "masonry": "",
+        "timeline": ""
+      }
+    },
+    "contextMenu": {
+      "copyTo": "",
+      "delete": "",
+      "deletePermanent": "",
+      "edit": "",
+      "export": "",
+      "favorite": "",
+      "moveTo": "",
+      "open": "",
+      "openLocation": "",
+      "properties": "",
+      "rename": "",
+      "saveAs": "",
+      "selectAllInCategory": "",
+      "share": "",
+      "shareToQQ": "",
+      "shareToVivo": "",
+      "shareToWechat": "",
+      "unfavorite": ""
+    },
+    "eventTimeline": {
+      "ariaLabel": "",
+      "emptyHint": "",
+      "itemCount": "",
+      "unknownPeriodDesc": "",
+      "unknownPeriodName": "",
+      "versionBadge": ""
+    },
+    "masonry": {
+      "ariaLabel": ""
+    },
+    "renameDialog": {
+      "cancel": "",
+      "confirm": "",
+      "emptyError": "",
+      "invalidCharsError": "",
+      "title": ""
+    },
+    "tagManager": {
+      "addButton": "",
+      "commonTags": "",
+      "duplicateToast": "",
+      "emptyHint": "",
+      "inputPlaceholder": "",
+      "presetTags": {
+        "battle": "",
+        "drama": "",
+        "equipment": "",
+        "explore": "",
+        "landscape": "",
+        "people": "",
+        "screenshot": ""
+      },
+      "title": ""
+    },
+    "timeline": {
+      "ariaLabel": "",
+      "itemCount": ""
+    },
+    "virtualGrid": {
+      "ariaLabel": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "editAria": "",
+      "editTitle": "",
+      "favoriteAria": "",
+      "favoriteTitle": "",
+      "loadingMore": "Загрузка…",
+      "noMore": "Больше нет элементов",
+      "unfavoriteAria": "",
+      "unfavoriteTitle": ""
+    },
+    "watermarkDialog": {
+      "cancel": "",
+      "cancelTask": "",
+      "closeAria": "",
+      "computing": "",
+      "processing": "",
+      "processingHint": "",
+      "remaining": "",
+      "startAdd": "",
+      "title": ""
+    },
+    "search": {
+      "log": {
+        "indexNotReadyFallback": ""
+      }
+    },
+    "media": {
+      "log": {
+        "refreshNullFailed": ""
+      }
+    }
+  },
+  "group": {
+    "albumType": "Тип альбома",
+    "all": "Все",
+    "fileType": "Тип файла",
+    "none": "Без группировки",
+    "other": "Другое",
+    "outfit": "Наряд",
+    "sceneCategory": "Сцена",
+    "sceneTime": "Время суток",
+    "title": "Умная группа",
+    "log": {
+      "loadCountsFailed": ""
+    }
+  },
+  "logAction": {
+    "backupDeleted": "Резервная копия удалена",
+    "backupFailed": "Создание резервной копии не удалось",
+    "backupSuccess": "Резервная копия успешно создана",
+    "backupSuccessWithProfile": "Резервная копия успешно создана (профиль {{name}})",
+    "cleanFailed": "Очистка не удалась",
+    "cleanMissingError": "Очистка потерянных записей не удалась",
+    "cleanMissingFailed": "Очистка не удалась",
+    "cleanMissingSuccess": "{{count}} потерянных записей очищено",
+    "cleanSuccess": "{{count}} файлов очищено, {{size}} освобождено",
+    "clearData": "Локальные данные очищены",
+    "clearDataFailed": "Очистка данных не удалась",
+    "clearFailed": "Очистка не удалась",
+    "clearSuccess": "Журналы очищены",
+    "compactModeOff": "Компактный режим выключен",
+    "compactModeOn": "Компактный режим включен",
+    "copyFailed": "Копирование не удалось, выберите текст вручную для копирования",
+    "copySuccess": "Скопировано в буфер обмена",
+    "deleteFailed": "Удаление не удалось",
+    "enforceEvicted": "LRU вытеснил {{count}} наименее используемых миниатюр",
+    "enforceFailed": "Проверка не удалась",
+    "enforceNoop": "Кэш ниже лимита, вытеснение не требуется",
+    "exportFailed": "Экспорт не удался",
+    "exportSuccess": "Журналы экспортированы",
+    "fontSizeSet": "Размер шрифта установлен на {{label}}",
+    "incrementalOff": "Инкрементальное сканирование выключено",
+    "incrementalOn": "Инкрементальное сканирование включено",
+    "limitSet": "Лимит установлен на {{gb}}ГБ",
+    "limitSetEvicted": "Лимит установлен на {{gb}}ГБ, LRU вытеснил {{count}} файлов",
+    "limitSetFailed": "Настройка не удалась",
+    "loadStatsFailed": "Не удалось загрузить статистику кэша",
+    "openDirFailed": "Не удалось открыть каталог",
+    "qqCopied": "Номер группы QQ скопирован в буфер обмена",
+    "qqCopyFailed": "Копирование не удалось, выберите номер группы вручную для копирования",
+    "reduceMotionOff": "Уменьшение анимаций выключено",
+    "reduceMotionOn": "Уменьшение анимаций включено",
+    "restoreFailed": "Восстановление не удалось",
+    "restoreSuccess": "Восстановление успешно, перезапустите приложение",
+    "sceneAnalyzeFailed": "Анализ не удался",
+    "sceneAnalyzed": "Время сцены проанализировано для {{count}} изображений",
+    "settingFailed": "Настройка не удалась",
+    "themeChanged": "Тема изменена"
+  },
+  "nav": {
+    "allProfiles": "Все профили",
+    "alreadyAtTop": "Уже на верхнем уровне",
+    "backToTop": "Назад",
+    "categories": "Категории",
+    "collapse": "Свернуть",
+    "duplicates": "Дубликаты",
+    "expand": "Развернуть",
+    "favorites": "Избранное",
+    "gallery": "Галерея",
+    "images": "Изображения",
+    "launcherCache": "Кэш лаунчера",
+    "menu": "Меню",
+    "recycleBin": "Корзина",
+    "resonanceRecords": "Резонанс",
+    "settings": "Настройки",
+    "smartGroup": "Умная группа",
+    "storage": "Хранилище",
+    "switchProfile": "Сменить профиль",
+    "videos": "Видео",
+    "screenshots": "Скриншоты"
+  },
+  "outfit": {
+    "collectedHint": "Костюмы с фото в базе данных",
+    "collectedLabel": "Собранные костюмы",
+    "collectedSection": "Собранные ({{count}})",
+    "count": "{{count}} шт.",
+    "customSection": "Пользовательские ({{count}})",
+    "emptyHint": "Нет данных о костюмах, отметьте фото на странице сведений",
+    "filtered": "Фото отфильтрованы по «{{outfit}}»",
+    "latestShot": "Последняя съёмка",
+    "loadFailed": "Загрузка не удалась",
+    "loadStatsFailed": "Загрузка статистики не удалась",
+    "loading": "Загрузка статистики костюмов…",
+    "locked": "Заблокировано",
+    "noData": "Нет данных",
+    "photosCount": "{{count}} фото",
+    "presetTotalHint": "Встроенная библиотека пресетов",
+    "presetTotalLabel": "Всего пресетов костюмов",
+    "progressLabel": "Прогресс сбора",
+    "progressValue": "{{collected}} / {{total}}",
+    "refresh": "Обновить",
+    "refreshStats": "Пересчитать",
+    "summary": "Собрано {{collected}} · пресетов {{presets}} · прогресс {{progress}}%",
+    "title": "Каталог костюмов",
+    "topOutfitLabel": "Самый полный костюм",
+    "uncollectedHint": "Фото костюма «{{outfit}}» ещё не собраны",
+    "uncollectedSection": "Несобранные ({{count}})",
+    "unsupported": "Текущая среда не поддерживает каталог костюмов",
+    "viewOutfitPhotos": "Все фото костюма «{{outfit}}»",
+    "presets": {
+      "amberCharm": "",
+      "ancientElegance": "",
+      "auroraPhantom": "",
+      "brilliantGalaxy": "",
+      "butterflyEffect": "",
+      "campusDays": "",
+      "cherryBlossomLover": "",
+      "cloudSinger": "",
+      "cloudWalk": "",
+      "crystalOath": "",
+      "desertRose": "",
+      "emeraldOath": "",
+      "fairyTale": "",
+      "firstKiss": "",
+      "floralGirl": "",
+      "futureTech": "",
+      "glazeDream": "",
+      "islandHoliday": "",
+      "moonlightSonata": "",
+      "morningLight": "",
+      "newYearSplendor": "",
+      "nightPoem": "",
+      "oceanMystery": "",
+      "roseGarden": "",
+      "roseKnight": "",
+      "seaOfStars": "",
+      "snowElf": "",
+      "snowlandTrain": "",
+      "springWaltz": "",
+      "stardustMagic": "",
+      "summerBreeze": "",
+      "urbanBeauty": "",
+      "wisteriaWhisper": "",
+      "winterSnow": "",
+      "autumnLeaves": ""
+    }
+  },
+  "profile": {
+    "defaultProfile": "Профиль по умолчанию",
+    "transferToProfile": "Перенести в профиль"
+  },
+  "profileAction": {
+    "createFailed": "Создание не удалось",
+    "created": "Профиль создан",
+    "defaultCannotDelete": "Профиль по умолчанию не может быть удален",
+    "deleteConfirm": "Удалить профиль {{uid}}? Файлы этого профиля будут перемещены в профиль по умолчанию.",
+    "deleteFailed": "Удаление не удалось",
+    "deleted": "Профиль удален",
+    "nicknameRequired": "Псевдоним не может быть пустым",
+    "nicknameUpdated": "Псевдоним обновлен",
+    "switchFailed": "Изменение не удалось",
+    "switched": "Профиль изменен",
+    "uidExists": "Этот UID уже существует",
+    "uidInvalid": "UID допускает только буквы и цифры",
+    "uidRequired": "Пожалуйста, введите UID",
+    "unsupported": "Управление профилями не поддерживается в этой среде",
+    "updateFailed": "Обновление не удалось"
+  },
+  "recycleBin": {
+    "backToGallery": "Вернуться в галерею",
+    "clearSelection": "Снять выделение",
+    "confirmEmpty": "Очистить",
+    "deleteFailed": "Удаление не удалось",
+    "empty": "Очистить корзину",
+    "emptyConfirm": "Все {{count}} файлов в корзине будут удалены навсегда.\nФайлы сначала попадут в системную корзину, после чего их нельзя будет восстановить в приложении.\nОчистить корзину?",
+    "emptyConfirmTitle": "Очистка корзины",
+    "emptyFailed": "Очистка не удалась",
+    "emptySuccess": "Корзина очищена",
+    "emptyTitle": "Корзина пуста",
+    "itemLabel": "Элемент корзины {{name}}",
+    "permanentConfirm": "Выбранные {{count}} файлов будут удалены навсегда.\nФайлы сначала попадут в системную корзину, после чего их нельзя будет восстановить в приложении.\nУдалить?",
+    "permanentConfirmTitle": "Окончательное удаление",
+    "permanentDelete": "Окончательно удалить",
+    "permanentDeleteSelected": "Окончательно удалить выбранные",
+    "permanentHint": "После окончательного удаления файлы попадут в системную корзину",
+    "restore": "Восстановить",
+    "restoreFailed": "Восстановление не удалось",
+    "restoreSelected": "Восстановить выбранные",
+    "retryDelete": "Повторить удаление",
+    "retryEmpty": "Повторить очистку",
+    "retryRestore": "Повторить восстановление",
+    "selectToDelete": "Выберите элементы для удаления",
+    "selectToRestore": "Выберите элементы для восстановления",
+    "selectedCount": "Выбрано {{count}} шт.",
+    "summary": "{{count}} шт. · всего {{size}}",
+    "summaryWithHint": "{{count}} шт. · всего {{size}} · после окончательного удаления файлы попадут в системную корзину",
+    "title": "Корзина",
+    "toolbarLabel": "Операции с корзиной",
+    "videoBadge": "Видео"
+  },
+  "sceneLabel": {
+    "location": "Местоположение",
+    "other": "Другое",
+    "portrait": "Портрет",
+    "recording": "Запись",
+    "scene": "Сцена",
+    "screenshot": "Скриншот",
+    "unknown": "Неизвестно"
+  },
+  "settings": {
+    "about": {
+      "alias": "(одинаковое имя на всех платформах)",
+      "appName": "Имя приложения",
+      "appValue": "Менеджер альбома фотографий WXNN",
+      "authorLabel": "Автор: QianLu",
+      "bilibili": "Bilibili",
+      "buildTools": "Инструменты сборки",
+      "checkUpdate": "Проверить обновления",
+      "checkUpdateHint": "Открывает репозиторий GitHub в браузере; скачайте последнюю версию вручную",
+      "contactDesc": "Репозиторий GitHub, группа QQ и социальные сети",
+      "contactTitle": "Контакты",
+      "copyGroup": "Копировать номер группы",
+      "copyright": "© 2026 QianLu. Все права защищены.",
+      "devCredit": "Разработчик: 纖璐不會玩攝影",
+      "developer": "Разработчик",
+      "douyin": "Douyin",
+      "githubRepo": "Репозиторий GitHub",
+      "licenseApache": "• Apache-2.0: Свободное использование; необходимо сохранять авторские права и патентную лицензию",
+      "licenseDesc": "Зависимости и информация о лицензии",
+      "licenseGpl": "• GPL-3.0: Код, использующий или изменяющий его, также должен быть открытым",
+      "licenseMit": "• MIT: Свободное использование, изменение и распространение; необходимо сохранять уведомление об авторских правах",
+      "licenseNote": "Примечания к лицензии",
+      "licenseTitle": "Благодарности и лицензия",
+      "open": "Открыть",
+      "projectIntro": "Эта программа построена на вышеуказанных проектах с открытым исходным кодом. Спасибо всем участникам сообщества open-source. Сама программа имеет открытый исходный код по лицензии MIT; свободное использование, изменение и распространение приветствуются.",
+      "qqGroup": "Группа QQ",
+      "repo": "Репозиторий",
+      "repoLabel": "Репозиторий:",
+      "runtimeDeps": "Зависимости времени выполнения",
+      "socialMedia": "Социальные сети разработчика",
+      "techStack": "Технологический стек",
+      "version": "Версия",
+      "versionLabel": "Версия: v{{version}}",
+      "xiaohongshu": "Xiaohongshu",
+      "depDesc": {
+        "autoAnimate": "",
+        "betterSqlite3": "",
+        "electron": "",
+        "exifr": "",
+        "ffmpegStatic": "",
+        "ffprobeStatic": "",
+        "fluentFfmpeg": "",
+        "motion": "",
+        "react": "",
+        "reactDom": "",
+        "sharp": "",
+        "zustand": "",
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+      },
+      "toolDesc": {
+        "electronBuilder": "",
+        "eslint": "",
+        "tailwindCss": "",
+        "typeScript": "",
+        "vite": "",
+        "vitest": ""
+      },
+      "updateTitle": "Обновление",
+      "updateNetworkBusy": "Сеть перегружена. Нажмите OK, чтобы открыть официальный сайт.",
+      "updateNoNewVersion": "У вас уже установлена последняя версия",
+      "depDescTodo": {
+        "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
+      }
+    },
+    "backup": {
+      "archiveTag": "Профиль: {{name}}",
+      "create": "Создать резервную копию",
+      "creating": "Создание резервной копии…",
+      "delete": "Удалить",
+      "empty": "Нет записей резервных копий",
+      "emptyHint": "Нажмите \"Создать резервную копию\" для создания первой резервной копии",
+      "hint": "Приложение проверяет резервные копии при запуске (выполняет, если последняя резервная копия старше 7 дней), сохраняет 5 последних, автоматически очищает старые. Восстановление перезаписывает текущую базу данных; требуется перезапуск. Резервное копирование по профилю только добавляет суффикс UID к имени файла для идентификации; содержимое остается полной базой данных (восстановление не теряет данные других профилей).",
+      "loading": "Загрузка…",
+      "modifyDir": "Изменить каталог",
+      "openDir": "Открыть каталог",
+      "records": "Записи резервных копий (сначала новые)",
+      "refresh": "Обновить",
+      "restartLater": "Перезапустить позже вручную",
+      "restartNow": "Перезапустить сейчас",
+      "restartTitle": "Перезапустить приложение",
+      "restore": "Восстановить",
+      "restoreConfirm": "Восстановить из этой резервной копии? Это действие перезапишет все данные текущей базы данных; перезапустите приложение после восстановления.",
+      "restoreTitle": "Восстановить базу данных",
+      "storageLocation": "Место хранения резервных копий",
+      "total": "{{count}} резервных копий",
+      "wholeDb": "Полная резервная копия базы данных",
+      "log": {
+        "loadBackupsFailed": ""
+      }
+    },
+    "cache": {
+      "cacheLimit": "Лимит кэша",
+      "cacheLocation": "Местоположение кэша миниатюр",
+      "cleanAll": "Очистить всё",
+      "cleanConfirm": "Очистить все {{count}} кэшей миниатюр?\n({{size}} используется, очищенные изображения будут регенерированы при доступе)",
+      "cleanTitle": "Очистить все миниатюры",
+      "confirmClean": "Подтвердить очистку",
+      "currentUsage": "Текущее использование",
+      "enforceLru": "Выполнить проверку LRU сейчас",
+      "fileCount": "{{count}} файлов",
+      "hint": "Подсказка: После очистки доступ к очищенным изображениям автоматически регенерирует миниатюры. Вытеснение LRU не влияет на оригинальные изображения, только на кэш.",
+      "limit": "Лимит",
+      "lruHint": "Автоматическое вытеснение LRU при превышении",
+      "modifyDir": "Изменить каталог",
+      "noData": "Нет данных",
+      "openDir": "Открыть каталог",
+      "refreshStats": "Обновить статистику",
+      "usage": "Коэффициент использования",
+      "strategyTitle": "",
+      "strategyDesc": "",
+      "invalidLimit": "",
+      "customLimitHint": ""
+    },
+    "clear": {
+      "cleanMissing": "Очистить потерянные записи",
+      "cleaning": "Очистка...",
+      "clearConfirm": "Очистить все локальные данные? Это действие удалит записи базы данных, историю сканирования, теги и настройки, но не повлияет на оригинальные медиафайлы.",
+      "clearLocal": "Очистить локальные данные",
+      "clearTitle": "Очистить локальные данные",
+      "missingConfirm": "Очистить все записи, помеченные как \"потерянные\"? Это действие удаляет только индекс базы данных, не влияет на другие нормальные файлы и необратимо.",
+      "missingConfirmTitle": "Очистить потерянные записи",
+      "missingDesc": "Если во время сканирования файл обнаружен как удаленный извне (не найден два раза подряд), он помечается как \"потерянный\". Нажмите ниже, чтобы очистить все потерянные записи сразу; удаляется только индекс базы данных, нормальные файлы не затрагиваются.",
+      "missingTitle": "Очистить потерянные записи"
+    },
+    "crash": {
+      "clear": "Очистить записи",
+      "clearConfirm": "Очистить все файлы дампов сбоев? Это действие навсегда удалит все записи сбоев, необратимо.",
+      "clearDisabled": "Нет записей сбоев для очистки",
+      "clearTitle": "Очистить записи сбоев",
+      "clearing": "Очистка…",
+      "crashFiles": "Файлы сбоев",
+      "crashReason": "Причина сбоя",
+      "desc": "Автоматически собирает файлы дампов сбоев процесса, полезно для обратной связи и устранения неполадок",
+      "empty": "Нет записей сбоев",
+      "emptyLoading": "Нет записей сбоев, загрузка…",
+      "emptyStable": "Нет записей сбоев, программа работает стабильно",
+      "hint": "Файлы дампов сбоев создаются автоматически Electron crashpad, сохраняет 10 последних, автоматическая очистка через 30 дней. Записывается только информация о сбоях процесса, без данных о приватности пользователя.",
+      "listCount": "{{count}} записей",
+      "listTitle": "Записи сбоев (сначала новые)",
+      "modifyDir": "Изменить каталог",
+      "oldest": "Самая старая запись",
+      "openDir": "Открыть каталог",
+      "processMain": "Основной процесс",
+      "processOther": "Другое",
+      "processRenderer": "Процесс рендеринга",
+      "refresh": "Обновить",
+      "size": "Размер",
+      "storageLocation": "Место хранения файлов сбоев",
+      "storageUsage": "Использование пространства",
+      "title": "Отчеты о сбоях",
+      "topFrame": "Верхний кадр стека",
+      "userDataPath": "userData/crashes/"
+    },
+    "display": {
+      "compactMode": "Компактный режим",
+      "compactModeDesc": "Уменьшить отступы карточек и интервалы элементов для отображения большего содержимого",
+      "fontSize": "Размер шрифта",
+      "fontSizeHint": "Настроить размер текста интерфейса, влияет на все страницы и диалоги",
+      "fontSizeLarge": "Большой",
+      "fontSizeNormal": "Обычный",
+      "fontSizeSmall": "Малый",
+      "fontSizeXLarge": "Очень большой",
+      "reduceMotion": "Уменьшить анимации",
+      "reduceMotionDesc": "Отключить переходы и эффекты наведения для улучшения отклика на устройствах с низкой производительностью"
+    },
+    "export": {
+      "clearDir": "Очистить",
+      "defaultDir": "Путь экспорта по умолчанию",
+      "defaultDirHint": "После настройки пакетный экспорт можно выполнять в один клик в этот путь, без необходимости выбирать каталог каждый раз",
+      "defaultDirPlaceholder": "Не настроено (целевой каталог будет запрошен при экспорте)",
+      "description": "Путь экспорта по умолчанию и правила умного именования",
+      "namingPattern": "Правило именования экспорта",
+      "namingPatternEmpty": "Оставьте пустым для использования исходного имени файла; автоматическое добавление порядкового номера при конфликте имен",
+      "namingPatternHint": "Переменные: {date} текущая дата · {album_type} тип альбома · {uid} UID профиля · {original_name} исходное имя файла · {sequence} порядковый номер",
+      "namingPatternPlaceholder": "напр.: {date}_{album_type}_{original_name}",
+      "preview": "Предпросмотр",
+      "previewEmpty": "исходное_имя_файла.расширение",
+      "selectDir": "Выбрать",
+      "title": "Рабочий процесс экспорта",
+      "previewAlbumType": "",
+      "previewExtension": ""
+    },
+    "fileops": {
+      "batchThreshold": "Порог пакетной операции",
+      "batchThresholdDesc": "Показывать вторичное подтверждение, когда выбранных файлов больше этого количества",
+      "deleteConfirm": "Подтверждение перед удалением",
+      "deleteConfirmDesc": "Показывать диалог подтверждения при удалении файлов во избежание случайного удаления",
+      "description": "Подтверждение удаления, порог пакетных операций и другие настройки",
+      "permanentDoubleConfirm": "Двойное подтверждение безвозвратного удаления",
+      "permanentDoubleConfirmDesc": "Показывать подтверждение снова при использовании Shift+Delete для безвозвратного удаления",
+      "preferSoftDelete": "Предпочитать мягкое удаление",
+      "preferSoftDeleteDesc": "По умолчанию перемещать в корзину, можно восстановить из корзины",
+      "thresholdCount": "Количество порога",
+      "title": "Файловые операции"
+    },
+    "groups": {
+      "about": "О программе",
+      "appearance": "Внешний вид",
+      "data": "Управление данными",
+      "diagnostics": "Журналы и диагностика",
+      "general": "Общие",
+      "plugins": "",
+      "profile": "Профили",
+      "scan": "Сканирование",
+      "tools": "Инструменты"
+    },
+    "language": {
+      "auto": "Следовать системе",
+      "description": "Переключить язык отображения интерфейса",
+      "restartHint": "Некоторые тексты могут потребовать перезапуска приложения для полного обновления",
+      "title": "Язык",
+      "loading": ""
+    },
+    "logs": {
+      "aggregateTooltip": "Переключиться на агрегированный вид (одинаковые ошибки объединены)",
+      "clear": "Очистить журналы",
+      "clearConfirm": "Очистить все исторические журналы? Это действие навсегда удалит все записи сбоев и файлы журналов, необратимо.",
+      "clearDisabled": "Нет журналов для очистки",
+      "clearTitle": "Очистить журналы",
+      "clearing": "Очистка…",
+      "copy": "Копировать",
+      "copySample": "Копировать образец",
+      "dayTooltip": "{{date}}: {{count}} сбоев",
+      "desc": "Автоматически записывает исключения при выполнении программы, полезно для обратной связи и устранения неполадок",
+      "empty": "Нет записей сбоев",
+      "emptyHint": "Исключения во время выполнения программы автоматически записываются здесь",
+      "expandFault": "Развернуть детали сбоя: {{summary}}",
+      "expandSample": "Развернуть детали агрегата: {{summary}}",
+      "export": "Экспорт журналов",
+      "exportDisabled": "Нет журналов для экспорта",
+      "exporting": "Экспорт…",
+      "faultId": "ID сбоя: {{id}}",
+      "faultTotal": "Всего сбоев",
+      "firstSeen": "Первый: {{time}}",
+      "fullLog": "Полное содержимое журнала",
+      "hint": "Журналы автоматически ротируются по дате, общий лимит 2ГБ, автоматическая очистка через 90 дней. Записывается только информация о выполнении программы, без данных о приватности пользователя.",
+      "lastSeen": "Последний: {{time}}",
+      "listAggregate": "Агрегация сбоев (по убыванию количества)",
+      "listCount": "{{count}} записей",
+      "listCountWithGroup": "{{count}} записей · {{groups}} групп",
+      "listTimeline": "Записи сбоев (сначала новые)",
+      "logFiles": "Файлы журналов",
+      "modifyDir": "Изменить каталог",
+      "notInit": "Не инициализировано",
+      "occurrenceCount": "Количество: {{count}}",
+      "openDir": "Открыть каталог",
+      "refresh": "Обновить",
+      "sampleDetail": "Детали образца (последний)",
+      "sourceFile": "Исходный файл: {{file}}",
+      "storageLocation": "Место хранения журналов",
+      "storageUsage": "Использование пространства",
+      "switchAggregate": "Агрегированно",
+      "switchTimeline": "Хронологически",
+      "timelineTooltip": "Переключиться на хронологический вид",
+      "title": "Управление журналами",
+      "totalLabel": "Всего: {{count}}",
+      "trendTitle": "Тенденция ошибок (последние 14 дней)",
+      "trendTotal": "{{count}} записей"
+    },
+    "plugin": {
+      "checkUpdate": "",
+      "description": "",
+      "detail": "",
+      "detailTitle": "",
+      "disable": "",
+      "disabled": "",
+      "empty": "",
+      "enable": "",
+      "enabled": "",
+      "fieldActivationPoints": "",
+      "fieldActive": "",
+      "fieldAuthor": "",
+      "fieldDescription": "",
+      "fieldError": "",
+      "fieldExtensionPoints": "",
+      "fieldLicense": "",
+      "fieldMain": "",
+      "fieldPermissions": "",
+      "fieldVersion": "",
+      "install": "",
+      "installHint": "",
+      "installPlaceholder": "",
+      "installTitle": "",
+      "installed": "",
+      "noUpdate": "",
+      "notAvailable": "",
+      "statusDisabled": "",
+      "statusEnabled": "",
+      "statusError": "",
+      "storagePath": "",
+      "storagePathDesc": "",
+      "uninstall": "",
+      "uninstallConfirm": "",
+      "uninstallTitle": "",
+      "uninstalled": "",
+      "update": "",
+      "updateConfirm": "",
+      "updateTitle": "",
+      "updated": ""
+    },
+    "profile": {
+      "add": "Добавить",
+      "addProfile": "Добавить профиль",
+      "cancel": "Отмена",
+      "deleteProfile": "Удалить профиль",
+      "editNickname": "Изменить псевдоним",
+      "empty": "Нет профилей",
+      "images": "Изображения",
+      "list": "Список профилей",
+      "loading": "Загрузка…",
+      "nicknamePlaceholder": "Псевдоним (необязательно)",
+      "noData": "Нет данных",
+      "outfitTop": "Топ-5 предпочтений нарядов",
+      "photos": "{{count}} фото",
+      "photosWithPercent": "{{count}} фото ({{percent}}%)",
+      "save": "Сохранить",
+      "sceneTop": "Топ-5 предпочтений сцен",
+      "shotRange": "Период съемки:",
+      "stats": "Статистика съемки ({{name}})",
+      "storageUsage": "Использование хранилища",
+      "switchTo": "Переключиться на этот профиль",
+      "timeTop": "Предпочтения по времени",
+      "totalFiles": "Всего файлов",
+      "uidPlaceholder": "UID (8-12 цифр)",
+      "videos": "Видео",
+      "virtualBadge": "Нет медиа (виртуальный)",
+      "cleanupVirtual": "Очистить виртуальные профили",
+      "cleanupVirtualConfirm": "Очистить виртуальные профили без медиа ({{count}} шт.)? Они были зарегистрированы автоматически при сканировании, но реальных медиафайлов не имеют.",
+      "noVirtual": "Нет виртуальных профилей для очистки",
+      "cleanupDone": "Очищено виртуальных профилей: {{count}}",
+      "cleanupPartial": "Очистка завершена, но не удалось удалить виртуальных профилей: {{failed}}"
+    },
+    "scan": {
+      "analyzeNow": "Анализировать сейчас",
+      "analyzing": "Анализ…",
+      "incremental": "Инкрементальное сканирование",
+      "sceneTimeDesc": "Автоматическое распознавание дня/ночи/рассвета/заката на основе гистограммы яркости изображения",
+      "sceneTimeTitle": "Анализ времени сцены",
+      "addPath": "Добавить каталог игры",
+      "adding": "Добавление…",
+      "emptyPaths": "Пользовательские каталоги игры не заданы; сканер автоматически выполнит поиск характерных файлов игры",
+      "pathAdded": "Каталог игры добавлен",
+      "pathExists": "Такой каталог уже существует",
+      "pathLimit": "Не более {{max}} каталогов игры",
+      "pathRemove": "Удалить",
+      "pathRemoved": "Каталог игры удалён",
+      "pathsDescription": "Укажите вручную каталог установки игры (или папку альбома GamePlayPhotos) — при сканировании эти пути проверяются в первую очередь. Если автоматический поиск не сработает, здесь можно вручную задать каталог в качестве резервного.",
+      "importRootsTitle": "Указанные каталоги",
+      "importRootsDescription": "Каталоги, зарегистрированные через «Сканирование указанного каталога», можно исключить из управления здесь",
+      "importRootsEmpty": "Указанные каталоги ещё не зарегистрированы",
+      "importRootsLoading": "Загрузка…",
+      "importRootsRemove": "Убрать этот указанный каталог",
+      "importRootsManageHint": "Каталоги, зарегистрированные через «Сканирование указанного каталога», управляются в разделе «Указанные каталоги»",
+      "importRootsConfirmTitle": "Убрать указанный каталог",
+      "importRootsConfirmBody": "Регистрация каталога «{{path}}» будет удалена. Также очистить записи индекса медиафайлов?",
+      "importRootsConfirmClearRecords": "Также очистить записи индекса медиафайлов этого каталога (переместить в корзину, можно восстановить)",
+      "importRootsClearRecordsHint": "Подсказка: если отметить, медиафайлы будут перемещены в корзину (восстановимо); если нет — записи сохранятся, но исчезнут из «Галереи» и «Кэша» (данные закрытого каталога остаются в базе и восстанавливаются повторным сканированием).",
+      "importRootsConfirmCancel": "Отмена",
+      "importRootsConfirmRemove": "Подтвердить удаление",
+      "importRootsRemoving": "Удаление…",
+      "importRootsRemovedOnly": "Исключён из управления",
+      "importRootsRemovedWithCleared": "Исключён из управления, удалено записей медиафайлов: {{count}}",
+      "importRootsClearFailed": "Каталог исключён из управления, но очистить записи индекса медиафайлов не удалось; записи остались в базе",
+      "importRootsRemoveFailed": "Не удалось убрать указанный каталог",
+      "importRootsLoadFailed": "Не удалось загрузить указанные каталоги",
+      "importRootsAdd": "Добавить каталог",
+      "importRootsAddScanning": "Сканирование указанного каталога…",
+      "importRootsAddSuccess": "Каталог добавлен: {{path}}",
+      "importRootsAddFailed": "Не удалось просканировать каталог: {{reason}}",
+      "gameRootsDescription": "Показывает все обнаруженные на этом компьютере каталоги установки игры; отметьте те, что будут участвовать в сканировании. Если каталогов несколько, по умолчанию выбирается самый свежий по времени изменения, содержащий официальный альбом.",
+      "gameRootsLoading": "Поиск каталогов игры…",
+      "gameRootsEmpty": "Каталоги установки игры не обнаружены. Добавьте вручную в разделе «Каталоги игры» или воспользуйтесь ручным резервным сканированием ниже.",
+      "gameRootsLoadFailed": "Ошибка поиска каталогов игры: {{reason}}",
+      "gameRootsRetry": "Повторить",
+      "gameRootsSaved": "Выбор каталогов сканирования сохранён",
+      "hasGamePlayPhotos": "Есть официальный альбом",
+      "noGamePlayPhotos": "Официальный альбом не обнаружен",
+      "sourceCustom": "Добавлено вручную",
+      "sourceOfficial": "Официальный лаунчер",
+      "sourceSteam": "Steam",
+      "sourceEpic": "Epic",
+      "fallbackDescription": "Если автоматическое определение не удалось, можно вручную выбрать каталог и сразу просканировать; выбранный каталог сохраняется автоматически и при следующем запуске сканируется первым (поддерживается несколько).",
+      "fallbackPickGameRoot": "Выбрать корневой каталог установки игры",
+      "fallbackPickAlbumDir": "Выбрать папку GamePlayPhotos напрямую",
+      "fallbackRootNoAlbum": "В этом каталоге не обнаружен официальный альбом (GamePlayPhotos). Убедитесь, что выбран корневой каталог установки игры, содержащий X6Game",
+      "fallbackScanSuccess": "Сканирование завершено, найдено файлов: {{count}}",
+      "fallbackScanFailed": "Ошибка сканирования: {{reason}}",
+      "fallbackScanHint": "Можно выбрать «Выбрать папку GamePlayPhotos напрямую» или экспортировать журналы в «Диагностике сканирования» и сообщить нам.",
+      "fallbackHint": "Резерв первого уровня: выберите корневой каталог установки с X6Game (GamePlayPhotos добавится автоматически); резерв второго уровня: выберите папку GamePlayPhotos напрямую. При сообщении о нехватке прав (E003) нажмите «Перезапустить от имени администратора».",
+      "relaunchAsAdmin": "Перезапустить от имени администратора",
+      "elevating": "Перезапуск от имени администратора…",
+      "elevateFailed": "Ошибка перезапуска с повышением прав: {{reason}}"
+    },
+    "sections": {
+      "aboutContact": "Контакты",
+      "aboutInfo": "Информация о приложении",
+      "aboutLicense": "Благодарности и лицензия с открытым исходным кодом",
+      "dataBackup": "Резервное копирование базы данных",
+      "dataCache": "Управление кэшем",
+      "dataClear": "Очистка данных",
+      "diagnosticsCrash": "Отчеты о сбоях",
+      "diagnosticsLogs": "Управление журналами",
+      "display": "Шрифт и отображение",
+      "exportWorkflow": "Рабочий процесс экспорта",
+      "fileops": "Файловые операции",
+      "language": "Язык",
+      "pluginManage": "",
+      "profileManage": "Управление профилями",
+      "scanOptions": "Параметры сканирования",
+      "shareCode": "Инструменты кода обмена",
+      "startup": "Поведение при запуске",
+      "theme": "Тема",
+      "scanPaths": "",
+      "importRoots": "",
+      "scanDiagnostic": "扫描链路诊断",
+      "gameRoots": "",
+      "scanFallback": ""
+    },
+    "startup": {
+      "autoScan": "Автоматическое сканирование при запуске",
+      "autoScanDesc": "Если включено, приложение будет автоматически сканировать пути игры на наличие новых медиафайлов при запуске.",
+      "hardwareAcceleration": "Аппаратное ускорение GPU",
+      "hardwareAccelerationDesc": "При отключении используется программный рендеринг, чтобы избежать сбоев запуска на некоторых видеокартах. Для применения требуется перезапуск.",
+      "hardwareAccelerationRestartHint": "Настройка аппаратного ускорения GPU сохранена. Чтобы применить, перезапустите приложение. Перезапустить сейчас?",
+      "restartNow": "Перезапустить сейчас",
+      "restartLater": "Позже",
+      "description": "Конфигурация автоматического поведения при запуске приложения",
+      "title": "Поведение при запуске"
+    },
+    "theme": {
+      "desc": "Вступает в силу немедленно; предпочтение темы сохраняется автоматически в локальной конфигурации.",
+      "label": "Тема интерфейса"
+    },
+    "title": "Настройки",
+    "tools": {
+      "shareCode": {
+        "decoder": "Декодер кода обмена",
+        "decoderDesc": "Декодирует внутриигровые коды обмена покраской, коды обмена постройками дома или шифрует параметры камеры. Поддерживает извлечение метаданных, таких как временные метки, UID и ID сервера.",
+        "openTool": "Открыть инструмент"
+      }
+    },
+    "navigation": {
+      "ariaLabel": ""
+    },
+    "plugins": {
+      "error": {
+        "unavailable": ""
+      }
+    }
+  },
+  "share": {
+    "guide": {
+      "channels": {
+        "qq": "QQ",
+        "vivo": "vivo Office Suite",
+        "wechat": "WeChat"
+      },
+      "failed": "Не удалось поделиться",
+      "guides": {
+        "qq": {
+          "notInstalled": "QQ не обнаружен\nФайлы скопированы в буфер обмена, откройте приложение вручную и вставьте",
+          "notRunning": "✅ Файлы скопированы в буфер обмена\nQQ не запущен, нажмите кнопку ниже для запуска и вставки",
+          "running": "✅ Файлы скопированы в буфер обмена\nОткройте окно чата QQ, нажмите Ctrl+V для вставки и отправки"
+        },
+        "vivo": {
+          "notInstalled": "vivo Office Suite не обнаружен\nФайлы скопированы в буфер обмена, откройте приложение вручную и вставьте",
+          "notRunning": "✅ Файлы скопированы в буфер обмена\nvivo Office Suite не запущен, нажмите кнопку ниже для запуска и вставки",
+          "running": "✅ Файлы скопированы в буфер обмена\nОткройте vivo Office Suite, нажмите Ctrl+V для вставки и синхронизации с телефоном"
+        },
+        "wechat": {
+          "notInstalled": "WeChat не обнаружен\nФайлы скопированы в буфер обмена, откройте приложение вручную и вставьте",
+          "notRunning": "✅ Файлы скопированы в буфер обмена\nWeChat не запущен, нажмите кнопку ниже для запуска и вставки",
+          "running": "✅ Файлы скопированы в буфер обмена\nОткройте окно чата WeChat, нажмите Ctrl+V для вставки и отправки"
+        }
+      },
+      "known": "Понятно",
+      "launchFailed": "Не удалось запустить",
+      "launchSuccess": "Запущено, дождитесь загрузки окна и вставьте",
+      "launching": "Запуск...",
+      "open": "Открыть {{name}}",
+      "shareTo": "Поделиться в {{name}}",
+      "skipped": "({{count}} недоступных файлов пропущено)"
+    },
+    "menu": {
+      "label": "Поделиться",
+      "toQQ": "Поделиться в QQ",
+      "toVivo": "Поделиться в vivo Office Suite",
+      "toWechat": "Поделиться в WeChat"
+    },
+    "wifi": {
+      "accessUrl": "Откройте следующий URL в браузере телефона",
+      "copyPin": "Копировать PIN",
+      "copyPinFailed": "Копирование не удалось, запишите вручную",
+      "copyUrl": "Копировать URL",
+      "copyUrlFailed": "Копирование не удалось, выберите и скопируйте URL вручную",
+      "fileCount": "Файлов",
+      "noFiles": "Сначала выберите файлы для обмена",
+      "pin": "PIN-код доступа",
+      "pinCopied": "PIN-код скопирован",
+      "port": "Порт",
+      "remainTime": "Осталось",
+      "restart": "Перезапустить службу",
+      "restartButton": "Перезапустить",
+      "restartTitle": "Перезапустить службу (сменить порт)",
+      "startFailed": "Не удалось запустить",
+      "started": "Служба обмена запущена, порт {{port}}",
+      "starting": "Запуск службы обмена...",
+      "stop": "Остановить обмен",
+      "stopFailed": "Не удалось остановить",
+      "stopped": "Служба обмена остановлена",
+      "timeoutClosed": "Служба обмена закрыта по тайм-ауту",
+      "tips": {
+        "firewall": "· При первом запуске, если блокируется брандмауэром, разрешите Node",
+        "lanOnly": "· Служба работает только в локальной сети, не доступна из интернета",
+        "pinAuth": "· При первом доступе с телефона требуется PIN-код",
+        "sameWifi": "· Убедитесь, что телефон и компьютер в одной WiFi сети",
+        "timeout": "· Автоматическое закрытие по тайм-ауту, или остановите вручную"
+      },
+      "title": "WiFi обмен по локальной сети",
+      "unsupported": "WiFi обмен не поддерживается в этой среде",
+      "urlCopied": "URL скопирован в буфер обмена"
+    },
+    "message": {
+      "allInaccessible": "",
+      "copiedToClipboard": "",
+      "copiedWithSkipped": "",
+      "copyFailed": "",
+      "exeNotExist": "",
+      "launched": "",
+      "launchFailed": "",
+      "noFilesSelected": "",
+      "notInstalled": "",
+      "unsupportedPlatform": ""
+    },
+    "log": {
+      "copiedToClipboard": "",
+      "copyFailed": "",
+      "detectInstallPathFailed": "",
+      "launchFailed": "",
+      "launched": ""
+    }
+  },
+  "timeLabel": {
+    "dawn": "Рассвет",
+    "day": "День",
+    "dusk": "Закат",
+    "night": "Ночь",
+    "unknown": "Неизвестно"
+  },
+  "titleBar": {
+    "appTitle": "Менеджер фотоальбома WXNN"
+  },
+  "toast": {
+    "autoScanOff": "Автоматическое сканирование при запуске отключено",
+    "autoScanOn": "Автоматическое сканирование при запуске включено",
+    "gpuOn": "Аппаратное ускорение GPU включено (применяется после перезапуска)",
+    "gpuOff": "Аппаратное ускорение GPU отключено (применяется после перезапуска)",
+    "batchThresholdOff": "Порог пакетной операции отключен",
+    "batchThresholdOn": "Порог пакетной операции включен",
+    "batchThresholdSet": "Порог пакетной операции установлен на {{count}}",
+    "defaultDirCleared": "Путь экспорта по умолчанию очищен",
+    "defaultDirSet": "Путь экспорта по умолчанию установлен на {{dir}}",
+    "deleteConfirmOff": "Подтверждение перед удалением отключено",
+    "deleteConfirmOn": "Подтверждение перед удалением включено",
+    "invalidIds": "Выбранные ID файлов недействительны",
+    "languageChanged": "Язык изменен на {{lang}}",
+    "noSelectionTransfer": "Не выбраны файлы для переноса",
+    "permanentDoubleConfirmOff": "Двойное подтверждение безвозвратного удаления отключено",
+    "permanentDoubleConfirmOn": "Двойное подтверждение безвозвратного удаления включено",
+    "preferSoftDeleteOff": "Предпочтение мягкого удаления отключено",
+    "preferSoftDeleteOn": "Предпочтение мягкого удаления включено",
+    "transferError": "Ошибка переноса между профилями",
+    "transferFailed": "Перенос не удался",
+    "transferSuccess": "Перенос выполнен успешно",
+    "transferUnsupported": "Перенос между профилями не поддерживается в этой среде",
+    "batchExportFailed": "",
+    "batchMoveFailed": "",
+    "batchRenameFailed": "",
+    "batchRenameUnsupported": "",
+    "cancelFailed": "",
+    "cancelRequested": "",
+    "cancelUnsupported": "",
+    "copyFailed": "",
+    "copyUnsupported": "",
+    "decodeFailed": "",
+    "deleteFailed": "",
+    "deleteFileTitle": "",
+    "deleteUnsupported": "",
+    "exportFailed": "",
+    "exportUnsupported": "",
+    "favorite": "",
+    "favoriteFailed": "",
+    "fileProperties": {
+      "resolutionDash": "",
+      "template": "",
+      "typeImage": "",
+      "typeVideo": ""
+    },
+    "imageLoadFailed": "",
+    "ipcCallFailed": "",
+    "mediaLoadFailed": "",
+    "moveFailed": "",
+    "moveToRecycleConfirm": "",
+    "moveUnsupported": "",
+    "noCancellableTask": "",
+    "noDefaultExportDir": "",
+    "noWatermarkSelection": "",
+    "permanentDeleteConfirm": "",
+    "permanentDeleteTitle": "",
+    "previewRenderFailed": "",
+    "renameFailed": "",
+    "renameUnsupported": "",
+    "saveAsFailed": "",
+    "saveAsUnsupported": "",
+    "undo": {
+      "failed": "",
+      "favorite": "",
+      "move": "",
+      "moveToRecycle": "",
+      "none": "",
+      "permanentDelete": "",
+      "rename": "",
+      "undone": "",
+      "unfavorite": "",
+      "conflictPrompt": ""
+    },
+    "undoUnsupported": "",
+    "unfavorite": "",
+    "unknownError": "",
+    "watermarkCancelled": "",
+    "watermarkFailed": "",
+    "watermarkNotConfigured": "",
+    "watermarkUnsupported": "",
+    "scanFailed": "",
+    "scanNoGameDir": "",
+    "manualPathHint": "",
+    "manualPathHintMessage": "",
+    "scanCompletedNoGameShots": "Scan finished: no in-game screenshots found. If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "scanFoundButGalleryEmpty": "Scan finished: {{count}} files found, but none are in-game screenshots (launcher images were saved to the \"Cache\" tab). If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "batchDelete": {
+      "allSucceeded": "",
+      "missingFile": "",
+      "partial": ""
+    },
+    "backup": {
+      "restored": ""
+    },
+    "scanInterrupted": "",
+    "imageProcessorCanvasFailed": "",
+    "imageProcessorLoadFailed": ""
+  },
+  "video": {
+    "applyEdit": "",
+    "backToDetail": "Вернуться к деталям",
+    "color": "",
+    "colorDesc": "",
+    "colorNoPreview": "",
+    "confirmExport": "Конвертировать видео в формат {{format}}? Требуется перекодирование, занимает время.",
+    "confirmLivePhoto": "Экспортировать видео как Apple Live Photo (парные файлы JPG + MOV)? Кодирование занимает время, файлы распознаются как Live Photo на iPhone.",
+    "confirmSpeed": "Экспортировать новое видео со скоростью {{speed}}x? Предполагаемая длительность {{duration}}",
+    "confirmTrim": "Экспортировать диапазон обрезки {{start}} - {{end}} (длительность {{duration}}) как новый видеофайл?",
+    "customSpeed": "Пользовательская скорость",
+    "editFailed": "",
+    "editSuccess": "",
+    "editorUnsupported": "",
+    "endLabel": "Конец",
+    "endLtStart": "Время окончания не может быть меньше или равно времени начала",
+    "estimatedDuration": "Предполагаемая длительность",
+    "exportDesc": "Конвертировать текущее видео в другой формат. Конвертация требует перекодирования, время зависит от длительности видео. GIF теряет аудио.",
+    "exportFormats": {
+      "avi": "Без потерь, но большой",
+      "gif": "Анимированный, без звука",
+      "mov": "Apple QuickTime",
+      "mp4": "Лучшая общая совместимость",
+      "webm": "Дружелюбный к Web, небольшой размер"
+    },
+    "exportMode": "Экспорт",
+    "exportVideo": "Экспорт видео",
+    "fastMotionLabel": "4.0x Ускоренно",
+    "formatConvert": "Формат",
+    "gifWarning": "Формат GIF сохраняет только кадры видео, аудио будет отброшено; разрешение и частота кадров снижаются для контроля размера файла.",
+    "jumpToEnd": "Перейти к концу",
+    "jumpToStart": "Перейти к началу",
+    "livePhoto": {
+      "button": "Экспорт Live Photo",
+      "desc": "Создает парные файлы JPG (обложка) + MOV (движение), распознаваемые как Live Photo на iPhone.",
+      "limitation": "Известное ограничение: JPG не включает Apple MakerNote ContentIdentifier; синхронизация iCloud может потерять сопоставление, локальный импорт работает нормально.",
+      "title": "Экспортировать как Live Photo"
+    },
+    "notes": {
+      "noModifyOriginal": "Экспорт создает новые файлы, исходное видео не изменяется",
+      "reencode": "Изменение скорости требует перекодирования, занимает больше времени",
+      "streamCopy": "Обрезка использует копирование потока (тот же кодек), быстро",
+      "supportedFormats": "Поддерживает mp4/mov/avi/mkv/webm/wmv"
+    },
+    "notesTitle": "Примечания",
+    "originalFormat": "Исходный формат",
+    "originalSpeedLabel": "1.0x Оригинал",
+    "outputDuration": "Длительность вывода",
+    "playPause": "Воспроизведение/Пауза",
+    "previewSpeed": "Скорость предпросмотра",
+    "processing": "Обработка...",
+    "readMetadataFailed": "Не удалось прочитать метаданные видео",
+    "resetColor": "",
+    "selectDirAndExport": "Выбрать каталог и экспортировать",
+    "selectedRange": "Выбранный диапазон",
+    "setToCurrent": "Установить текущую позицию",
+    "slowMotionLabel": "0.25x Замедленно",
+    "speed": "Скорость",
+    "speedChange": "Изменение скорости",
+    "speedDesc": "Выберите целевую скорость (0.25x - 4.0x). Изменение скорости требует перекодирования, занимает больше времени. Предпросмотр показывает эффект в реальном времени.",
+    "speedFast": "Быстро {{n}}x",
+    "speedOriginal": "Оригинал",
+    "speedSlow": "Медленно {{n}}x",
+    "startGtEnd": "Время начала не может быть больше или равно времени окончания",
+    "startLabel": "Начало",
+    "targetFormat": "Целевой формат",
+    "trim": "Обрезка",
+    "trimDesc": "Перетащите ползунки или нажмите кнопки во время воспроизведения, чтобы установить время начала/окончания. Обрезка создает новый файл без изменения исходного видео.",
+    "trimmedDuration": "Длительность после обрезки",
+    "unknown": "Неизвестно",
+    "unknownCodec": "Неизвестный кодек",
+    "watermark": "",
+    "watermarkDesc": ""
+  },
+  "enums": {
+    "aperture": {
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "neg1": ""
+    },
+    "clothState": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "9": ""
+    },
+    "clothType": {
+      "0": "",
+      "10": "",
+      "20": "",
+      "30": "",
+      "41": "",
+      "50": "",
+      "60": "",
+      "71": "",
+      "72": "",
+      "73": "",
+      "74": "",
+      "75": "",
+      "76": "",
+      "77": "",
+      "78": "",
+      "79": "",
+      "80": "",
+      "81": "",
+      "82": "",
+      "83": "",
+      "84": "",
+      "85": "",
+      "86": "",
+      "90": "",
+      "92": "",
+      "93": "",
+      "94": "",
+      "95": "",
+      "96": "",
+      "97": "",
+      "unknown": ""
+    },
+    "colorPalette": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "16": "",
+      "17": "",
+      "18": ""
+    },
+    "colorSwatch": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": ""
+    },
+    "eurekaAttachment": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": ""
+    },
+    "eurekaColor": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": ""
+    },
+    "expedition": {
+      "101020301": "",
+      "101020302": "",
+      "101020303": "",
+      "101020304": "",
+      "101020305": "",
+      "101020306": "",
+      "101020307": "",
+      "101020308": ""
+    },
+    "filter": {
+      "Fresh_001": "",
+      "Fresh_002": "",
+      "Fresh_003": "",
+      "Fresh_004": "",
+      "Fresh_005": "",
+      "None": "",
+      "Vibe_001": "",
+      "Vibe_002": "",
+      "Vibe_003": "",
+      "Vibe_004": "",
+      "Vibe_005": "",
+      "Vibe_009": "",
+      "Weather_001": "",
+      "Weather_002": "",
+      "Weather_003": "",
+      "Weather_004": ""
+    },
+    "framedMoment": {
+      "0": ""
+    },
+    "interactive": {
+      "206001": "",
+      "261003": "",
+      "42031201": "",
+      "42031202": "",
+      "42031203": ""
+    },
+    "light": {
+      "DirectionLight_B": "",
+      "DirectionLight_L": "",
+      "DirectionLight_R": "",
+      "DirectionLight_T": "",
+      "HueEdgeLight_001_L": "",
+      "HueEdgeLight_001_R": "",
+      "HueEdgeLight_002_L": "",
+      "HueEdgeLight_002_R": "",
+      "HueEdgeLight_003_L": "",
+      "HueEdgeLight_003_R": "",
+      "HueEdgeLight_004_L": "",
+      "HueEdgeLight_004_R": "",
+      "None": "",
+      "VibeLight_001": "",
+      "VibeLight_002": "",
+      "VibeLight_003": "",
+      "VibeLight_004": ""
+    },
+    "poseId": {
+      "0": ""
+    },
+    "puzzle": {
+      "30": "",
+      "31": "",
+      "neg1": ""
+    },
+    "weather": {
+      "0": "",
+      "2": "",
+      "4": "",
+      "7": "",
+      "neg1": ""
+    }
+  },
+  "filter": {
+    "applyPresetAria": "",
+    "category": {
+      "all": "",
+      "artistic": "",
+      "cinematic": "",
+      "custom": "",
+      "natural": "",
+      "vintage": ""
+    },
+    "preset": {
+      "natural-1": "",
+      "natural-2": "",
+      "natural-3": "",
+      "natural-4": "",
+      "natural-5": "",
+      "vintage-1": "",
+      "vintage-2": "",
+      "vintage-3": "",
+      "vintage-4": "",
+      "vintage-5": "",
+      "artistic-1": "",
+      "artistic-2": "",
+      "artistic-3": "",
+      "artistic-4": "",
+      "artistic-5": "",
+      "cinematic-1": "",
+      "cinematic-2": "",
+      "cinematic-3": "",
+      "cinematic-4": "",
+      "cinematic-5": ""
+    },
+    "deleteCustomAria": "",
+    "exportAria": "",
+    "exportJson": "",
+    "generatingPreview": "",
+    "importAria": "",
+    "importJson": "",
+    "intensity": "",
+    "namePlaceholder": "",
+    "save": "",
+    "saveCurrentAria": "",
+    "saving": ""
+  },
+  "locations": {
+    "Miraland": "",
+    "HeartcraftKingdom": "",
+    "Wishfield": "",
+    "MemorialMountains": "",
+    "OldFlorawishMemorial": "",
+    "StylistGuildMemorial": "",
+    "Florawish": "",
+    "DreamwovenRuins": "",
+    "FortuneFalls": "",
+    "GreatWishtreeSquare": "",
+    "LakesideDistrict": "",
+    "OutskirtsForest": "",
+    "BreezyMeadow": "",
+    "AbandonedFanaticWisherCamp": "",
+    "BreezyMeadowActivityArea": "",
+    "BugSongHills": "",
+    "CiciaHighlands": "",
+    "HeartcraftKingdomOutpost": "",
+    "LakesideHill": "",
+    "MeadowWharf": "",
+    "QueenPalaceRuins": "",
+    "RelicHill": "",
+    "SleepyFishHills": "",
+    "SwanGazebo": "",
+    "Stoneville": "",
+    "DyeWorkshop": "",
+    "FlowerFieldsResidence": "",
+    "RockfallValley": "",
+    "StonevilleMarket": "",
+    "AbandonedDistrict": "",
+    "ChooChooStation": "",
+    "GoldenFields": "",
+    "MarketOfMirth": "",
+    "Prosperville": "",
+    "RippleEstate": "",
+    "StellarFishingGround": "",
+    "Stonecrown": "",
+    "WindriderMill": "",
+    "WishingWoods": "",
+    "BrookwoodForest": "",
+    "CavernOfWishes": "",
+    "FallenWishHighlands": "",
+    "GrandTreeValley": "",
+    "SacredMountains": "",
+    "ValleyOfBlossoms": "",
+    "FireworkIsles": "",
+    "ClearheartLake": "",
+    "CrescentMoonRuins": "",
+    "FlamingForest": "",
+    "RelicIsles": "",
+    "SongbreezeHighland": "",
+    "SparkheartIsland": "",
+    "SerenityIsland": "",
+    "OldRuins": "",
+    "Soakville": "",
+    "SoakvilleOutskirts": "",
+    "Steamville": "",
+    "DanqingIsland": "",
+    "BackMountain": "",
+    "BambooGrove": "",
+    "Inkville": "",
+    "InkwashStream": "",
+    "LoongPagoda": "",
+    "LoongPeak": "",
+    "ReedblossomShore": "",
+    "DanqingRealm": "",
+    "GreenBambooGrove": "",
+    "InkPool": "",
+    "InkshorePlain": "",
+    "WildfieldWaterside": "",
+    "TerraAlliance": "",
+    "Itzaland": "",
+    "ItzalandCanyon": "",
+    "ElderwoodForest": "",
+    "BehemothObservationSite": "",
+    "Coliseum": "",
+    "ElderwoodShade": "",
+    "ElderwoodWharf": "",
+    "ForestOfSlumber": "",
+    "ForgottenStreet": "",
+    "GiantVineForest": "",
+    "LeafRiver": "",
+    "MothershroomWoods": "",
+    "ParkyaCraterLake": "",
+    "Pottsville": "",
+    "RockvilleRuins": "",
+    "ShellIsland": "",
+    "Shroomville": "",
+    "SnailRanch": "",
+    "SpiraWaterfall": "",
+    "TitanGraveyard": "",
+    "TitansOutpostRuins": "",
+    "Spira": "",
+    "Spira1F": "",
+    "Spira2F": "",
+    "Spira3F": "",
+    "SpiraShelldome": "",
+    "Boneyard": "",
+    "BluePools": "",
+    "Cultivarium": "",
+    "DragonRuins": "",
+    "DragonrestFlowerfield": "",
+    "GlimmeringLake": "",
+    "GreatLumieville": "",
+    "HealingGround": "",
+    "HollowbreathPassage": "",
+    "LonestoneShore": "",
+    "SoulSpring": "",
+    "WanxiangRealm": "",
+    "CaiYeMarket": "",
+    "CaiYeOutskirts": "",
+    "DazzlebloomMeadow": "",
+    "DeepValleySpring": "",
+    "JiuhuaPavilion": "",
+    "JiuhuaPenitentiary": "",
+    "ValleyPath": "",
+    "WhereWoodEchoes": "",
+    "EmpireOfLight": "",
+    "StarhailFederation": "",
+    "LinlangEmpire": "",
+    "TwinmoonKingdom": "",
+    "WhalePort": "",
+    "Umbraso": "",
+    "SeaOfStars": "",
+    "Crystalvale": "",
+    "DreamStarIsles": "",
+    "Starshore": "",
+    "UnboundWharf": "",
+    "Home": "",
+    "DockArea": ""
+  },
+  "sceneCategory": {
+    "collage": "",
+    "other": "",
+    "screenshot": "",
+    "thumbnail": "",
+    "travelJournal": "",
+    "worldTour": ""
+  },
+  "sceneTime": {
+    "dawn": "",
+    "dawnDesc": "",
+    "day": "",
+    "dayDesc": "",
+    "dusk": "",
+    "duskDesc": "",
+    "night": "",
+    "nightDesc": "",
+    "unknown": "",
+    "unknownDesc": ""
+  },
+  "faultTypes": {
+    "uncaughtException": "",
+    "unhandledRejection": "",
+    "rendererCrash": "",
+    "rendererError": "",
+    "ipcError": "",
+    "manual": "",
+    "rendererComponent": "",
+    "rendererPromise": "",
+    "rendererResource": "",
+    "exitDiagnosis": "",
+    "workerCrash": "",
+    "workerRestart": "",
+    "databaseCorruption": "",
+    "databaseRestore": "",
+    "indexingTimeout": "",
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": "",
+    "navigation-blocked": ""
+  },
+  "lut": {
+    "builtin": {
+      "identity": "",
+      "tealOrange": "",
+      "warmVintage": "",
+      "coolDrama": "",
+      "highContrast": ""
+    },
+    "log": {
+      "persistFailed": ""
+    }
+  },
+  "watermark": {
+    "blendMode": {
+      "multiply": "",
+      "normal": "",
+      "overlay": "",
+      "screen": "",
+      "softLight": ""
+    },
+    "bold": "",
+    "boldOff": "",
+    "color": "",
+    "deleteTemplateAria": "",
+    "deleteText": "",
+    "font": "",
+    "fontMicrosoftYaHei": "",
+    "fontMonospace": "",
+    "fontSansSerif": "",
+    "fontSerif": "",
+    "height": "",
+    "horizontalSpacing": "",
+    "imageMode": "",
+    "imagePreviewAlt": "",
+    "imageSelectButton": "",
+    "imageSelectPlaceholder": "",
+    "imageWatermark": "",
+    "italic": "",
+    "italicOff": "",
+    "margin": "",
+    "opacity": "",
+    "pluginTemplateImage": "",
+    "pluginTemplateText": "",
+    "pluginTemplates": "",
+    "position": "",
+    "positionBottomCenter": "",
+    "positionBottomLeft": "",
+    "positionBottomRight": "",
+    "positionCenter": "",
+    "positionCenterLeft": "",
+    "positionCenterRight": "",
+    "positionTopCenter": "",
+    "positionTopLeft": "",
+    "positionTopRight": "",
+    "presetAria": "",
+    "presets": "",
+    "rotation": "",
+    "saveTemplateAria": "",
+    "size": "",
+    "stylePresetCopyright": "",
+    "stylePresetCopyrightDesc": "",
+    "stylePresetDateLabel": "",
+    "stylePresetDateLabelDesc": "",
+    "stylePresetPolaroid": "",
+    "stylePresetPolaroidDesc": "",
+    "stylePresetSignature": "",
+    "stylePresetSignatureDesc": "",
+    "templateNamePlaceholder": "",
+    "templates": "",
+    "text": "",
+    "textMode": "",
+    "textPlaceholder": "",
+    "tileMode": "",
+    "underline": "",
+    "underlineOff": "",
+    "verticalSpacing": "",
+    "width": "",
+    "log": {
+      "saveTemplateFailed": "",
+      "deleteTemplateFailed": ""
+    }
+  },
+  "camera": {
+    "aperture": "",
+    "bloomIntensity": "",
+    "bloomThreshold": "",
+    "brightness": "",
+    "cameraInfo": "",
+    "cameraLoc": "",
+    "cameraPitch": "",
+    "cameraYaw": "",
+    "comparison": "",
+    "contrast": "",
+    "copyCode": "",
+    "empty": "",
+    "errorPrefix": "",
+    "exposure": "",
+    "filter": "",
+    "framedMoment": "",
+    "highlights": "",
+    "hidden": "",
+    "light": "",
+    "loading": "",
+    "momoHidden": "",
+    "notHidden": "",
+    "optic": "",
+    "pose": "",
+    "rawParams": "",
+    "scene": "",
+    "sectionAdjust": "",
+    "shadows": "",
+    "softIntensity": "",
+    "unknown": "",
+    "vibrance": "",
+    "yes": "",
+    "no": "",
+    "saturation": "",
+    "zoom": "",
+    "focalLength": "",
+    "lensRotation": "",
+    "portraitMode": "",
+    "copyHeader": "",
+    "copyEnvHeader": "",
+    "copyErrorHeader": "",
+    "copyFaultId": "",
+    "copyTime": "",
+    "copyType": "",
+    "copySummary": "",
+    "copyAppVersion": "",
+    "copyElectron": "",
+    "copyNode": "",
+    "copyPlatform": "",
+    "copyPidUptime": ""
+  },
+  "batch": {
+    "actions": {
+      "ariaLabel": "",
+      "categorize": "",
+      "clearSelection": "",
+      "delete": "",
+      "export": "",
+      "exportSelectDir": "",
+      "exportToDefault": "",
+      "exportToDefaultHint": "",
+      "invertSelection": "",
+      "move": "",
+      "rename": "",
+      "renameAria": "",
+      "renameHint": "",
+      "selectedCount": "",
+      "share": "",
+      "shareClipboardTitle": "",
+      "transferToProfile": "",
+      "transferToProfileHint": "",
+      "watermark": "",
+      "wifiShare": "",
+      "wifiShareHint": "",
+      "selectAll": ""
+    },
+    "rename": {
+      "cancel": "",
+      "confirmButton": "",
+      "description": "",
+      "emptyError": "",
+      "examplePlaceholder": "",
+      "invalidError": "",
+      "moreFiles": "",
+      "previewLabel": "",
+      "previewError": "",
+      "templateLabel": "",
+      "title": "",
+      "varClickHint": "",
+      "varDate": "",
+      "varDateDesc": "",
+      "varOriginal": "",
+      "varOriginalDesc": "",
+      "varOutfit": "",
+      "varOutfitDesc": "",
+      "varScene": "",
+      "varSceneDesc": "",
+      "varSeq": "",
+      "varSeqDesc": "",
+      "varTime": "",
+      "varTimeDesc": ""
+    }
+  },
+  "galleryPage": {
+    "cleanupCorruptedConfirm": "",
+    "cleanupCorruptedCount": "",
+    "cleanupCorruptedFailed": "",
+    "cleanupCorruptedTitle": "",
+    "emptySubtitle": "",
+    "emptySubtitleScanned": "Scan finished, but no in-game screenshots were found. Try \"Scan specific folder\" in the scan menu, or check the \"Cache\" tab for launcher images",
+    "emptyTitle": "",
+    "batchDeleteConfirm": "",
+    "batchDeleteTitle": "",
+    "confirmCancel": "",
+    "confirmOK": "",
+    "openLocationFailed": "",
+    "noPlayableMedia": "",
+    "selectShareFirst": "",
+    "selectShareFilesFirst": "",
+    "shareUnavailable": "",
+    "showDuplicates": "",
+    "showDuplicatesChecked": "",
+    "showDuplicatesOff": "",
+    "showDuplicatesOn": "",
+    "smartGroup": "",
+    "smartGroupToggle": ""
+  },
+  "diagnostics": {
+    "logs": {
+      "clearAllHint": "",
+      "copyAppVersion": "",
+      "copyElectron": "",
+      "copyEnvInfoTitle": "",
+      "copyErrorDetailTitle": "",
+      "copyFaultId": "",
+      "copyNode": "",
+      "copyPid": "",
+      "copyPlatform": "",
+      "copySummary": "",
+      "copyTime": "",
+      "copyType": "",
+      "exportAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "sampleId": "",
+      "unknown": "",
+      "loadFailed": "",
+      "loadCrashesFailed": ""
+    },
+    "crash": {
+      "clearAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "processType": {
+        "main": "",
+        "renderer": "",
+        "gpu": "",
+        "utility": "",
+        "plugin": "",
+        "unknown": ""
+      }
+    },
+    "scan": {
+      "title": "Диагностика сканирования",
+      "legendOk": "Успешно",
+      "legendPathMissing": "Путь не найден",
+      "legendPermission": "Недостаточно прав",
+      "legendEmpty": "Каталог пуст",
+      "legendInfo": "Информация",
+      "emptyHint": "После запуска сканирования здесь отобразится полная диагностическая хронология от «Запуска сканирования» до «Сканирования файлов».",
+      "autoRefresh": "Автообновление",
+      "refresh": "Обновить",
+      "copy": "Копировать",
+      "clear": "Очистить",
+      "export": "Экспортировать журнал диагностики",
+      "exportAll": "Экспортировать все журналы (zip)",
+      "exportedTo": "Экспортировано в {{path}}",
+      "exportFailed": "Ошибка экспорта: {{reason}}",
+      "errorCodeHint": "Коды ошибок E001–E005: не найден путь/нет подкаталога/нет прав/нет UID/ошибка чтения. Экспортированный журнал можно приложить к обращению"
+    }
+  },
+  "errorFallback": {
+    "componentStack": "",
+    "copied": "",
+    "copyError": "",
+    "errorMessage": "",
+    "errorStack": "",
+    "hideDetail": "",
+    "openLogDir": "",
+    "reload": "",
+    "showDetail": "",
+    "subtitle": "",
+    "title": "",
+    "routeTitle": "",
+    "routeRetry": "",
+    "zoneTitle": "",
+    "zoneRetry": "",
+    "zoneDegraded": "",
+    "ipcFailed": ""
+  },
+  "infoPanel": {
+    "copied": "",
+    "copyAriaLabel": "",
+    "copyDefault": "",
+    "copyTitle": "",
+    "emptyDefault": "",
+    "errorPrefixDefault": "",
+    "loadingDefault": "",
+    "paramNotContained": "Этот файл не содержит запрошенный параметр"
+  },
+  "taskProgress": {
+    "calculating": "",
+    "cancel": "",
+    "phase": {
+      "cancelled": "",
+      "done": "",
+      "error": "",
+      "finalizing": "",
+      "preparing": "",
+      "processing": ""
+    },
+    "remaining": ""
+  },
+  "albumTypes": {
+    "screenshot": "",
+    "nikkiphotos_highquality": "",
+    "nikkiphotos_lowquality": "",
+    "videos": "",
+    "magazinephotos": "",
+    "clockinphoto": "",
+    "cloudphotos": "",
+    "cloudphotos_lowquality": "",
+    "collage": "",
+    "highquality": "",
+    "lowquality": "",
+    "collagephoto": "",
+    "customavatar": "",
+    "customcard": "",
+    "customhomeboardphoto": "",
+    "hometemplate": "",
+    "plantdyeing": "",
+    "diy": "",
+    "xsdkqrcode": "",
+    "mallpic": "",
+    "video": "",
+    "movies": "",
+    "profilephoto": "",
+    "posephoto": "",
+    "groupphoto": "",
+    "storyphoto": "",
+    "landscapephoto": "",
+    "selfiephoto": "",
+    "autophoto": "",
+    "photostudio": "",
+    "photoframe": "",
+    "adventurephoto": "",
+    "diaryphoto": "",
+    "activityphoto": "",
+    "eventphoto": "",
+    "festivalphoto": "",
+    "missionphoto": "",
+    "videoclip": "",
+    "custom": "",
+    "unknown": ""
+  },
+  "main": {
+    "dialog": {
+      "instanceRunning": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "cleanupButton": "",
+        "manualButton": "",
+        "exitButton": ""
+      },
+      "cleanupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openTaskManager": ""
+      },
+      "startupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openLogDir": ""
+      },
+      "validation": {
+        "messageRequired": ""
+      },
+      "defaultOk": ""
+    },
+    "error": {
+      "mainWindowNotInit": "",
+      "databaseNotInit": ""
+    },
+    "editor": {
+      "dialog": {
+        "filterPresetName": ""
+      },
+      "error": {
+        "userCanceledSave": "",
+        "userCanceledSelect": "",
+        "userCanceledExportDir": "",
+        "jsonParseFailed": "",
+        "presetFormatInvalid": "",
+        "onlyIndexedPath": ""
+      },
+      "validation": {
+        "nameRequired": "",
+        "nameMaxLength": "",
+        "categoryRequired": "",
+        "categoryMaxLength": "",
+        "dataUrlRequired": "",
+        "dataUrlMaxLength": "",
+        "fileNameInvalid": ""
+      },
+      "log": {
+        "cleanupSnapshotsDone": "",
+        "cleanupSnapshotsFailed": "",
+        "backupSizeMismatch": "",
+        "backupFailed": "",
+        "backupSizeChanged": "",
+        "restoredFromBackup": "",
+        "restoreFailed": "",
+        "recordHistoryFailed": ""
+      }
+    },
+    "plugin": {
+      "error": {
+        "notFound": "",
+        "filePathInvalid": "",
+        "filePathsInvalid": "",
+        "targetDirInvalid": "",
+        "fileNameInvalid": "",
+        "sqlInvalid": "",
+        "selectOnly": "",
+        "tableNotInWhitelist": "",
+        "configInvalid": "",
+        "taskIdInvalid": "",
+        "currentTotalInvalid": "",
+        "notInitialized": "",
+        "noSpecifiers": ""
+      },
+      "dialog": {
+        "installConfirmTitle": "",
+        "installConfirmMessage": "",
+        "installConfirmDetail": "",
+        "install": ""
+      }
+    },
+    "media": {
+      "dialog": {
+        "cancel": "",
+        "confirmDelete": "",
+        "confirmEmpty": "",
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": "",
+        "emptyRecycleBinTitle": "",
+        "emptyRecycleBinMessage": ""
+      },
+      "error": {
+        "userCanceled": "",
+        "missingNotFound": "",
+        "corruptedNotFound": ""
+      },
+      "message": {
+        "softDeleted": "",
+        "restored": "",
+        "permanentDeleted": "",
+        "permanentDeletePartial": "",
+        "recycleBinEmpty": "",
+        "recycleBinEmptied": "",
+        "cleanedMissing": "",
+        "missingRemoved": "",
+        "cleanedCorrupted": "",
+        "corruptedRemoved": "",
+        "nothingToAnalyze": "",
+        "sceneTimeAnalyzed": ""
+      },
+      "log": {
+        "recycleBinMoveFailed": "",
+        "recycleBinMoveOmitted": ""
+      },
+      "validation": {
+        "tagsMax": "",
+        "notesMaxLength": "",
+        "outfitMaxLength": ""
+      }
+    },
+    "validator": {
+      "pathRequired": "",
+      "pathMaxLength": "",
+      "pathArrayRequired": "",
+      "pathArrayMaxLength": "",
+      "mediaIdPositive": "",
+      "mediaIdsRequired": "",
+      "mediaIdsMaxLength": "",
+      "ratingRange": "",
+      "idPositive": "",
+      "stringRequired": "",
+      "stringMaxLength": "",
+      "stringControlChars": "",
+      "uidRequired": "",
+      "uidMaxLength": "",
+      "uidAlphanumeric": "",
+      "urlRequired": "",
+      "urlMaxLength": "",
+      "urlInvalid": "",
+      "urlHttpOnly": "",
+      "backupFilenameInvalid": "",
+      "limitBytesPositive": "",
+      "pathNotAllowed": "Path is not in the whitelist, {{op}} operation is forbidden",
+      "opWrite": "write",
+      "opRead": "read",
+      "paramValidationFailed": "",
+      "log": {
+        "handlerUncaught": ""
+      },
+      "arrayStringRequired": "",
+      "ipcPathArrayMaxLength": "",
+      "pathStringLength": "",
+      "pathMustAbsolute": "",
+      "numberFinite": "",
+      "numberRange": "",
+      "intRequired": "",
+      "stringTypeRequired": "",
+      "stringLengthRange": "",
+      "mediaIdsArrayRequired": "",
+      "mediaIdsNotEmpty": "",
+      "tagNameStringRequired": "",
+      "tagNameLength": "",
+      "tagNameControlChars": "",
+      "urlLength": "",
+      "protocolNotAllowed": "",
+      "urlInvalidLiteral": "",
+      "presetObjectRequired": "",
+      "presetNameRequired": "",
+      "presetCategoryRequired": "",
+      "presetParamsRequired": ""
+    },
+    "db": {
+      "recovery": {
+        "openFailed": "",
+        "integrityCheckFailed": "",
+        "dbHandleNull": "",
+        "reopenFailed": ""
+      },
+      "log": {
+        "lockRetrySucceeded": "",
+        "openFailedTryingBackup": "",
+        "autoRecoveryFailed": "",
+        "autoVacuumFailed": "",
+        "pragmaOptimizeFailed": "",
+        "integrityCheckFault": "",
+        "writeCleanExitMarkerFailed": "",
+        "closeCorruptedFailed": "",
+        "restoreFailedReverted": "",
+        "reopenAfterRestoreFailFailed": "",
+        "reopenAfterRestoreFailed": "",
+        "autoRestored": "",
+        "corruptDbRenamed": "",
+        "corruptDbCopied": "",
+        "corruptDbBackupFailed": "",
+        "recoveryListenerFailed": "",
+        "preMigrationBackupCreated": "",
+        "preMigrationBackupFailed": "",
+        "migrationFailedTxRolledBack": "",
+        "migrationFailedNoBackup": "",
+        "operationHistoryCleanupFailed": "",
+        "indexExistsIgnored": "",
+        "v3IndexExistsIgnored": "",
+        "fts5Unavailable": "",
+        "v3MigrationDone": "",
+        "v3MigrationFailed": "",
+        "backfillApplied": "",
+        "backfillFailed": "",
+        "systemCategoryKeyMigrationFailed": "",
+        "sceneCategoryMigrated": "",
+        "sceneCategoryMigrationFailed": "",
+        "settingTypeMismatch": "",
+        "exitOptimizeFailed": "",
+        "walCheckpointFailed": "",
+        "importRootsGalleryFailed": "",
+        "importRootsCacheFailed": "",
+        "fts5QueryFallback": ""
+      },
+      "error": {
+        "lockedByOtherProgram": "",
+        "openFailedAfterRecovery": "",
+        "initFailedNullHandle": "",
+        "migrationFailedRolledBack": "",
+        "migrationRolledBackToBackup": "",
+        "rollbackToBackupFailed": "",
+        "indexCreationFailed": "",
+        "v3IndexCreationFailed": "",
+        "addColumnFailed": "",
+        "abiIncompatible": "",
+        "permissionDenied": "",
+        "diskFull": "",
+        "databaseCorrupted": "",
+        "unknown": ""
+      }
+    },
+    "file": {
+      "action": {
+        "copy": "",
+        "move": "",
+        "rename": "",
+        "export": ""
+      },
+      "error": {
+        "busy": "",
+        "permission": "",
+        "generic": "",
+        "invalidChars": "",
+        "pathReference": "",
+        "invalidSeparator": "",
+        "targetExists": "",
+        "invalidName": "",
+        "fileTooLarge": "",
+        "noOutputDir": "",
+        "noDefaultExportDir": ""
+      },
+      "message": {
+        "movedToRecycleBin": "",
+        "deleteFailed": "",
+        "copied": "",
+        "moved": "",
+        "renameSuccess": "",
+        "batchRenameAllSuccess": "",
+        "batchRenamePartial": "",
+        "exported": "",
+        "saveAsSuccess": "",
+        "saveAsFailed": "",
+        "deletePermanentPartial": "",
+        "deletedPermanent": "",
+        "saveSuccess": "",
+        "saveFailed": "",
+        "notDirectory": "",
+        "cannotAccessDir": "",
+        "insufficientDiskSpace": "",
+        "targetExists": "",
+        "importComplete": "",
+        "editedImageFileName": ""
+      },
+      "log": {
+        "exifReadFailed": "",
+        "dbSyncFailed": "",
+        "pendingRenamesRecordFailed": "",
+        "exportMetadataFallback": ""
+      },
+      "validation": {
+        "operationsRequired": "",
+        "operationsMax": ""
+      },
+      "dialog": {
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": ""
+      }
+    },
+    "gameEvents": {
+      "versionDescription": ""
+    },
+    "decryption": {
+      "error": {
+        "abiMismatch": "",
+        "step1Failed": "",
+        "cameraParamsNotFound": "",
+        "step3Failed": "",
+        "cameraParamsInvalid": "",
+        "fileTooLarge": "",
+        "fileUnreadable": "",
+        "uidMissing": "",
+        "cameraKeyFailed": "",
+        "unknown": "",
+        "encryptFailed": "",
+        "invalidClothDiyCode": "",
+        "networkDecodeFailed": "",
+        "networkTimeout": "Тайм-аут сетевого декодирования (пониженный режим; остальные поля доступны)",
+        "networkUnavailable": "Сетевое декодирование недоступно (может потребоваться интернет)",
+        "invalidHomeBuildCode": "",
+        "ffiNotInit": "",
+        "findNoEndFlagHint": "",
+        "uidRequired": "",
+        "dllNotInit": "",
+        "initSendFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "decodeTimeout": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "log": {
+        "mapHint": "",
+        "noCameraParams": "",
+        "unexpectedError": "",
+        "dllResolveFailed": "",
+        "initSendFailed": "",
+        "readyTimeout": "",
+        "decodeTimeout": "",
+        "requestSendFailed": "",
+        "restartExhausted": "",
+        "restarting": "",
+        "restarted": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      }
+    },
+    "lifecycle": {
+      "log": {
+        "crashReporterStarted": "",
+        "crashReporterFailed": "",
+        "backupInitFailed": "",
+        "themeCleanupFailed": "",
+        "selfCheckFailed": "",
+        "unknownReason": "",
+        "crashCleanFailed": "",
+        "forceExitReasonWal": "",
+        "forceExitReasonDefault": "",
+        "startupFailed": ""
+      }
+    },
+    "autoUpdate": {
+      "log": {
+        "devSkip": "",
+        "updateError": "",
+        "initialized": "",
+        "checkFailed": "",
+        "downloadFailed": ""
+      }
+    },
+    "log": {
+      "dialog": {
+        "filterZipName": ""
+      },
+      "error": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "getStatsFailed": "",
+        "userCanceledSave": "",
+        "clearFailed": "",
+        "reportRendererFailed": ""
+      },
+      "log": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "clearedAll": "",
+        "reportRendererFailed": ""
+      }
+    },
+    "cleanup": {
+      "log": {
+        "exitDiagnosisSummary": ""
+      }
+    },
+    "gpu": {
+      "log": {
+        "processCrashFallback": ""
+      }
+    },
+    "rendererBridge": {
+      "log": {
+        "sendFailed": ""
+      }
+    },
+    "rendererProtocol": {
+      "error": {
+        "calledBeforeReady": ""
+      }
+    },
+    "setDir": {
+      "message": {
+        "resetToDefault": ""
+      },
+      "error": {
+        "resetFailed": ""
+      }
+    },
+    "disk": {
+      "error": {
+        "insufficient": ""
+      },
+      "keyword": {
+        "insufficient": ""
+      }
+    },
+    "fileUtils": {
+      "error": {
+        "invalidDataUrl": ""
+      }
+    },
+    "backup": {
+      "log": {
+        "createIpcFailed": "",
+        "listFailed": "",
+        "restoreIpcFailed": "",
+        "startupAutoBackupFailed": "",
+        "skipAutoBackup": "",
+        "runningStartupAutoBackup": "",
+        "createSuccess": "",
+        "createFailed": "",
+        "restoreToFailed": "",
+        "restoredToDb": "",
+        "restoreSuccessRelaunching": "",
+        "relaunchFailed": "",
+        "restoreFailed": "",
+        "relaunchAfterFailureFailed": "",
+        "repairFlagWritten": "",
+        "repairFlagWriteFailed": "",
+        "deleted": "",
+        "deleteFailed": "",
+        "prunedOld": ""
+      },
+      "error": {
+        "createFailed": "",
+        "listFailed": "",
+        "restoreFailed": "",
+        "deleteFailed": "",
+        "dbUnavailable": "",
+        "noBackupToRestore": "",
+        "restoreFailedPlain": "",
+        "backupNotExist": "",
+        "backupCorrupted": "",
+        "restoreFailedRelaunch": "",
+        "pathTraversalDenied": ""
+      },
+      "message": {
+        "restoredFrom": "",
+        "restoredButRelaunchFailed": "",
+        "restoredRelaunching": ""
+      }
+    },
+    "cache": {
+      "log": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      },
+      "error": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      }
+    },
+    "category": {
+      "error": {
+        "noUpdatableFields": "",
+        "systemCategoryUndeletable": "",
+        "ordersRequired": "",
+        "ordersMax": ""
+      }
+    },
+    "crash": {
+      "log": {
+        "listFailed": "",
+        "clearedAll": ""
+      },
+      "error": {
+        "listFailed": "",
+        "getStatsFailed": "",
+        "clearFailed": "",
+        "openDirFailed": ""
+      },
+      "message": {
+        "nativeCrash": "",
+        "unknownFormat": "",
+        "opened": ""
+      }
+    },
+    "data": {
+      "dialog": {
+        "cancel": "",
+        "confirmClear": "",
+        "clearTitle": "",
+        "clearMessage": "",
+        "clearDetail": ""
+      },
+      "message": {
+        "cleared": ""
+      }
+    },
+    "decrypt": {
+      "validation": {
+        "albumTypeRequired": "",
+        "albumTypeMaxLength": "",
+        "jsonTextRequired": "",
+        "jsonTextMaxLength": "",
+        "codeStrRequired": "",
+        "codeStrMaxLength": ""
+      },
+      "log": {
+        "mediaWhitelistHit": "",
+        "resolveUidFailed": "",
+        "getKnownUidsFailed": ""
+      }
+    },
+    "duplicate": {
+      "message": {
+        "cancelled": "",
+        "markDone": ""
+      },
+      "progress": {
+        "hashDoneGrouping": "",
+        "hashing": "",
+        "done": ""
+      }
+    },
+    "exportPref": {
+      "validation": {
+        "namingMaxLength": "",
+        "namingNoSeparator": "",
+        "namingNoParentDir": ""
+      }
+    },
+    "import": {
+      "error": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      },
+      "log": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      }
+    },
+    "importRoot": {
+      "log": {
+        "removeFailed": "",
+        "clearRecordsFailed": ""
+      },
+      "error": {
+        "removeFailed": ""
+      }
+    },
+    "operationHistory": {
+      "validation": {
+        "operationTypeRequired": ""
+      }
+    },
+    "profile": {
+      "error": {
+        "uidExists": "",
+        "defaultUndeletable": "",
+        "targetNotFound": ""
+      },
+      "message": {
+        "transferred": ""
+      }
+    },
+    "scanner": {
+      "validation": {
+        "customPathsMax": ""
+      },
+      "log": {
+        "postScanThumbFailed": "",
+        "registerImportRootFailed": "",
+        "startFailed": "",
+        "skipRestoreReplay": "",
+        "markMigrationV1FailedRetry": "",
+        "repairV1Failed": "",
+        "markMigrationV2Failed": "",
+        "repairV2Failed": "",
+        "markMigrationV3Failed": "",
+        "repairV3Failed": "",
+        "markMigrationV4Failed": "",
+        "repairV4Failed": "",
+        "markMigrationV5Failed": "",
+        "repairV5Failed": "",
+        "integrityCheckFailed": "",
+        "heartbeatTimeout": "",
+        "bridgeReadyTimeout": "",
+        "bridgeRestarting": "",
+        "bridgeRestarted": "",
+        "scanTaskRestored": "",
+        "scanTaskRestoreFailed": "",
+        "bridgeRestartFailed": "",
+        "bridgeCrashListenerFailed": ""
+      },
+      "error": {
+        "validationFailed": "",
+        "pathCheckFailed": "",
+        "scanFailed": "",
+        "scanInProgress": "",
+        "dbPathNotInitialized": "",
+        "scanStartFailed": "",
+        "noMediaDirFound": "",
+        "gameDirNotFound": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "scanProcessExit": "",
+        "autoRestarted": "",
+        "duplicateScanStart": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "scanCancelled": ""
+      }
+    },
+    "searchIndex": {
+      "validation": {
+        "segmentsMax": ""
+      },
+      "error": {
+        "persistFailed": ""
+      },
+      "log": {
+        "importReadFailed": ""
+      }
+    },
+    "settings": {
+      "error": {
+        "customPathsNotArray": "",
+        "customPathsMax": "",
+        "customPathsEmptyItem": "",
+        "validationFailed": "",
+        "valueTooLarge": "",
+        "valueNotSerializable": "",
+        "hwAccelNotBoolean": "",
+        "securitySensitiveKey": "",
+        "unknownKey": ""
+      },
+      "validation": {
+        "keyRequired": "",
+        "keyMaxLength": ""
+      }
+    },
+    "share": {
+      "log": {
+        "detectAppFailed": "",
+        "launchAppFailed": "",
+        "rejectedNonLan": "",
+        "pinLocked": "",
+        "authSuccess": "",
+        "readFailed": ""
+      },
+      "error": {
+        "launchAppFailed": "",
+        "noFilesToShare": ""
+      },
+      "http": {
+        "serviceNotStarted": "",
+        "forbiddenNonLan": "",
+        "fileNotFound": "",
+        "pathNotFound": "",
+        "authTitle": "",
+        "authPrompt": "",
+        "authHint": "",
+        "pinPlaceholder": "",
+        "authSubmit": "",
+        "networkError": "",
+        "tooManyAttempts": "",
+        "locked": "",
+        "pinWrong": "",
+        "authSuccess": "",
+        "readFailed": ""
+      }
+    },
+    "shell": {
+      "error": {
+        "pathMustBeAbsolute": "",
+        "sensitiveDirForbidden": "",
+        "executableForbidden": "",
+        "openExternalFailed": "",
+        "openPathFailed": "",
+        "showItemFailed": ""
+      }
+    },
+    "similar": {
+      "message": {
+        "phashDone": ""
+      }
+    },
+    "task": {
+      "validation": {
+        "taskIdRequired": "",
+        "taskIdMaxLength": ""
+      },
+      "keyword": {
+        "canceled": "",
+        "alreadyRunning": ""
+      }
+    },
+    "video": {
+      "error": {
+        "endTimeAfterStart": ""
+      },
+      "log": {
+        "exportLivePhotoFailed": ""
+      },
+      "message": {
+        "editSuccess": ""
+      }
+    },
+    "watermark": {
+      "message": {
+        "cancelled": "",
+        "done": "",
+        "failed": ""
+      },
+      "progress": {
+        "applying": ""
+      },
+      "validation": {
+        "configRequired": "",
+        "configMaxLength": ""
+      }
+    },
+    "customDirs": {
+      "label": {
+        "backupFiles": "",
+        "thumbnailMetadata": "",
+        "logFiles": "",
+        "crashDump": ""
+      }
+    },
+    "desktopShortcut": {
+      "log": {
+        "noWritableDesktop": "",
+        "created": "",
+        "createFailedFallback": "",
+        "createdFallback": "",
+        "createFailedAll": ""
+      }
+    },
+    "app": {
+      "name": ""
+    },
+    "errorHandlers": {
+      "unknownPath": "",
+      "dialog": {
+        "errorTitle": "",
+        "errorBody": "",
+        "frequentErrorTitle": "",
+        "frequentErrorMessage": "",
+        "frequentErrorDetail": "",
+        "restartApp": "",
+        "continueUsing": ""
+      }
+    },
+    "mediaProtocol": {
+      "log": {
+        "missingPathParam": "",
+        "realpathFailed": "",
+        "denyNotWhitelisted": "",
+        "fileNotFoundOrNoPerm": "",
+        "handleRequestFailed": "",
+        "whitelistCheckFailed": ""
+      }
+    },
+    "recovery": {
+      "title": {
+        "dbRecovered": "",
+        "dbRecoveryFailed": "",
+        "dbPreserved": ""
+      },
+      "body": {
+        "sourceBackup": "",
+        "corruptedBackupPath": "",
+        "dbPreserved": ""
+      },
+      "worker": {
+        "title": {
+          "startupTimeout": "",
+          "restarted": "",
+          "restartExhausted": "",
+          "exited": ""
+        },
+        "body": {
+          "crashTime": "",
+          "exitCode": "",
+          "crashedAt": "",
+          "restartCount": "",
+          "startupTimeoutHint": "",
+          "restartedHint": "",
+          "exhaustedHint": ""
+        },
+        "state": {
+          "exhausted": "",
+          "continuable": ""
+        },
+        "label": {
+          "scanner": "",
+          "database": "",
+          "media": "",
+          "decryption": ""
+        }
+      },
+      "log": {
+        "repairFailed": "",
+        "showDialogFailed": ""
+      }
+    },
+    "window": {
+      "reason": {
+        "rendererNotReady": ""
+      },
+      "dialog": {
+        "diagTitle": "",
+        "rendererFailed": "",
+        "rendererFailedDetail": "",
+        "gotIt": "",
+        "crashTitle": "",
+        "crashMessage": "",
+        "crashDetail": "",
+        "reload": "",
+        "closeApp": ""
+      },
+      "log": {
+        "rendererCrashed": ""
+      }
+    },
+    "index": {
+      "log": {
+        "gpuFallbackActive": ""
+      },
+      "dialog": {
+        "startupFailedTitle": "",
+        "startupFailedMessage": "",
+        "startupFailedDetail": "",
+        "exit": ""
+      }
+    },
+    "startup": {
+      "log": {
+        "scanComplete": "",
+        "indexingTaskError": "",
+        "autoScanFailed": "",
+        "thumbnailAlreadyRunning": "",
+        "thumbnailBatchFailed": "",
+        "phashStartFailed": "",
+        "indexingFailed": "",
+        "sceneAnalysisNone": "",
+        "sceneAnalysisFailed": "",
+        "orphanCleanupFailed": "",
+        "readPendingRenamesFailed": "",
+        "cleanupScanHistoryFailed": "",
+        "notifyScanInterruptedFailed": "",
+        "detectInterruptedFailed": "",
+        "clearRecoveryFlagsFailed": "",
+        "notifyBackupRestoredFailed": "",
+        "postRestorePhashFailed": "",
+        "postRestoreDuplicateFailed": ""
+      },
+      "error": {
+        "indexingTotalTimeout": ""
+      },
+      "index": {
+        "timeoutStopped": "",
+        "cancelled": "",
+        "preparing": "",
+        "analyzingSceneTime": "",
+        "finalizing": "",
+        "done": "",
+        "errorStopped": ""
+      }
+    },
+    "livephoto": {
+      "error": {
+        "invalidVideo": "",
+        "exportFailed": ""
+      },
+      "message": {
+        "exportSuccess": ""
+      }
+    },
+    "logService": {
+      "message": {
+        "opened": "",
+        "exported": ""
+      },
+      "error": {
+        "openDirFailed": "",
+        "zipRequired": "",
+        "emptyArchive": "",
+        "targetNotGenerated": "",
+        "noErrorOutput": "",
+        "tarStartFailed": "",
+        "packageFailed": ""
+      },
+      "log": {
+        "buildDiagnosticFailed": ""
+      }
+    },
+    "thumbnail": {
+      "log": {
+        "forkFailed": "",
+        "readyTimeout": "",
+        "handshakeFailed": "",
+        "markCorruptedCallbackFailed": "",
+        "clearCorruptedCallbackFailed": "",
+        "lowQualityFailed": "",
+        "highQualityFailed": "",
+        "decodeFailed": "",
+        "generateFailed": "",
+        "workerCallFailed": "",
+        "readCacheMetaFailed": "",
+        "cacheMetaCorrupted": "",
+        "deleteCorruptedMetaFailed": "",
+        "saveCacheMetaFailed": "",
+        "cleanTmpFailed": "",
+        "lruCleanFailed": ""
+      },
+      "error": {
+        "workerForkFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerDisposed": "",
+        "sharpResizeFailed": "",
+        "ffmpegFrameTimeout": "",
+        "videoPathRequired": "",
+        "outputPathRequired": "",
+        "ffmpegEmptyOutput": ""
+      },
+      "kindVideo": "",
+      "kindImage": ""
+    },
+    "xmpMetadata": {
+      "log": {
+        "invalidStructure": "",
+        "parseEditorDataFailed": "",
+        "readInvalidStructure": "",
+        "deserializeFailed": "",
+        "readFailed": ""
+      }
+    },
+    "videoEditor": {
+      "log": {
+        "editStopReceived": "",
+        "readyTimeout": "",
+        "abnormalExit": "",
+        "batchTaskFailed": ""
+      },
+      "error": {
+        "inputPathRequired": "",
+        "outputPathRequired": "",
+        "unsupportedSpeed": "",
+        "cancelledByUser": "",
+        "taskCancelledSkipped": "",
+        "taskCancelled": "",
+        "exportFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerAbnormalExit": "",
+        "taskInProgress": "",
+        "workerDisposed": "",
+        "appExiting": ""
+      },
+      "message": {
+        "progressStart": "",
+        "progressDone": "",
+        "exportSuccess": "",
+        "editCancelled": "",
+        "exportDone": "",
+        "batchCancelled": "",
+        "batchDoneAll": "",
+        "batchDonePartial": ""
+      }
+    },
+    "thumbnailPhash": {
+      "log": {
+        "phashFailed": "",
+        "duplicateMarkFailed": ""
+      }
+    },
+    "videoService": {
+      "log": {
+        "markingCorrupted": "",
+        "markCorruptedCallbackFailed": "",
+        "metadataReadFailed": "",
+        "exportTask": "",
+        "exportFailed": "",
+        "exportDecodeFailed": "",
+        "frameCaptureTask": "",
+        "frameCaptureFailed": "",
+        "frameCaptureDecodeFailed": "",
+        "trimTask": "",
+        "trimFailed": "",
+        "trimDecodeFailed": "",
+        "speedTask": "",
+        "speedFailed": "",
+        "speedDecodeFailed": ""
+      },
+      "error": {
+        "exportFailed": "",
+        "frameCaptureFailed": "",
+        "trimFailed": "",
+        "speedFailed": ""
+      },
+      "message": {
+        "exportSuccess": "",
+        "frameCaptureSuccess": "",
+        "trimSuccess": "",
+        "speedSuccess": ""
+      }
+    },
+    "mediaWorker": {
+      "progress": {
+        "markingDuplicates": ""
+      },
+      "error": {
+        "thumbnailAlreadyRunning": "",
+        "thumbnailStartFailed": "",
+        "phashAlreadyRunning": "",
+        "phashStartFailed": "",
+        "duplicateAlreadyRunning": "",
+        "duplicateStartFailed": "",
+        "similarAlreadyRunning": "",
+        "similarStartFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "thumbnailProcessExit": "",
+        "phashProcessExit": "",
+        "duplicateProcessExit": "",
+        "similarProcessExit": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "thumbnailCancelled": "",
+        "phashCancelled": "",
+        "duplicateCancelled": "",
+        "workerTaskCancelled": "",
+        "workerTaskDone": "",
+        "nothingToGenerate": "",
+        "nothingToPhash": "",
+        "nothingToDetect": "",
+        "batchGenerateFailed": "",
+        "phashBatchFailed": "",
+        "markFailed": ""
+      },
+      "log": {
+        "readyTimeout": "",
+        "restarting": "",
+        "restarted": "",
+        "thumbnailRestored": "",
+        "thumbnailRestoreFailed": "",
+        "phashRestored": "",
+        "phashRestoreFailed": "",
+        "duplicateRestored": "",
+        "duplicateRestoreFailed": "",
+        "similarRestored": "",
+        "similarRestoreFailed": "",
+        "restartFailed": "",
+        "crashListenerFailed": "",
+        "thumbnailBatchFailed": "",
+        "phashBatchFailed": "",
+        "duplicateMarkFailed": "",
+        "duplicateNoGroups": "",
+        "similarFindFailed": "",
+        "similarStartFailed": ""
+      }
+    },
+    "databaseWorker": {
+      "log": {
+        "restarting": "",
+        "restartedWithDb": "",
+        "restartedPendingOpen": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      },
+      "error": {
+        "bridgeDisposed": "",
+        "writeFailed": "",
+        "unknown": "",
+        "autoRestarted": "",
+        "handshakeAborted": "",
+        "requestsAborted": ""
+      }
+    },
+    "readStream": {
+      "log": {
+        "streamErrorDestroyed": ""
+      }
+    },
+    "scanLog": {
+      "error": {
+        "exportCanceled": "",
+        "exportFailed": ""
+      }
+    },
+    "resonance": {
+      "error": {
+        "recordExists": "Запись уже существует (тот же баннер, то же время, тот же предмет)",
+        "recordNotFound": "Запись не найдена или уже удалена",
+        "importFileNotReadable": "Файл импорта не существует или недоступен для чтения: {{path}}",
+        "importFileNotFile": "Путь не является файлом: {{path}}",
+        "importFileTooLarge": "Файл импорта слишком велик ({{size}} байт, превышен лимит)",
+        "importFileReadFailed": "Не удалось прочитать файл импорта: {{reason}}",
+        "exportDirMissing": "Каталог экспорта не существует: {{path}}",
+        "exportNotJson": "Расширение файла экспорта должно быть .json: {{path}}",
+        "exportWriteFailed": "Не удалось записать файл экспорта: {{reason}}"
+      },
+      "log": {
+        "exported": "Данные резонанса экспортированы (записей: {{count}})"
+      }
+    }
+  },
+  "appError": {
+    "canceled": "",
+    "database": "",
+    "fileSystem": "",
+    "internal": "",
+    "fallback": ""
+  },
+  "app": {
+    "log": {
+      "pluginBootstrapFailed": ""
+    }
+  },
+  "mock": {
+    "log": {
+      "skipInstall": ""
+    },
+    "feature": {
+      "fileScan": "",
+      "fileDelete": "",
+      "fileDeletePermanent": "",
+      "fileCopy": "",
+      "fileMove": "",
+      "fileRename": "",
+      "batchRename": "",
+      "fileExport": "",
+      "fileSaveAs": "",
+      "exportWithMetadata": "",
+      "batchExportWithMetadata": "",
+      "watermarkApply": "",
+      "videoExport": "",
+      "videoCaptureFrame": "",
+      "videoTrim": "",
+      "videoSpeed": "",
+      "livePhotoExport": "",
+      "videoEdit": "",
+      "videoEditBatch": "",
+      "clearDatabase": "",
+      "createBackup": "",
+      "restoreBackup": "",
+      "deleteBackup": "",
+      "appRelaunch": "",
+      "decryptFile": "",
+      "encryptCameraParams": "",
+      "decodeClothDiy": "",
+      "decodeHomeBuild": "",
+      "pluginDetail": "",
+      "pluginInstall": "",
+      "pluginUninstall": "",
+      "pluginToggle": "",
+      "wifiShare": ""
+    },
+    "message": {
+      "browserDownloadTriggered": "",
+      "downloadFailed": "",
+      "openLocalPath": "",
+      "showInFolder": "",
+      "unsupportedShort": "",
+      "openDirectory": "",
+      "exportLogs": "",
+      "clearLogs": "",
+      "clearCrashReports": "",
+      "importPreview": "",
+      "importFiles": "",
+      "copyToClipboard": "",
+      "launchExternalApp": "",
+      "phashDone": "",
+      "duplicatesMarked": "",
+      "batchAnalysisUnsupported": "",
+      "softDeleted": "",
+      "restored": "",
+      "permanentDeleted": "",
+      "recycleBinCleared": "",
+      "noMissingFiles": "",
+      "noCorruptedFiles": "",
+      "exportFileUnsupported": "",
+      "importFileUnsupported": "",
+      "noRestartNeeded": "",
+      "videoMetadataUnsupported": ""
+    }
+  },
+  "scanProgress": {
+    "log": {
+      "getActiveFailed": "",
+      "stopFailed": ""
+    },
+    "stopping": "",
+    "scanning": "",
+    "foundFiles": ""
+  },
+  "plugins": {
+    "log": {
+      "facadeNotReady": "",
+      "registerActiveFailed": "",
+      "triggerInitFailed": "",
+      "bootstrapFailed": "",
+      "i18nInjectFailed": ""
+    }
+  },
+  "themes": {
+    "default": "",
+    "softPinkLuxury": ""
+  },
+  "globalErrorHandler": {
+    "log": {
+      "errorEventFailed": "",
+      "rejectionEventFailed": ""
+    }
+  },
+  "scanButton": {
+    "incrementalDesc": "",
+    "full": "",
+    "fullDesc": "",
+    "custom": "",
+    "customDesc": ""
+  },
+  "videoPlayer": {
+    "restoredTo": "",
+    "exitFullscreen": "",
+    "fullscreenPlayback": "",
+    "fullscreen": "",
+    "captureFrame": "",
+    "capture": ""
+  },
+  "searchService": {
+    "log": {
+      "noIpcFallback": "",
+      "schemaHashMismatch": "",
+      "importFailedFallback": "",
+      "initFailedFallback": "",
+      "rebuildFailed": "",
+      "persistDebouncedFailed": "",
+      "docCountMismatch": "",
+      "verifyFailed": ""
+    }
+  },
+  "mediaStore": {
+    "log": {
+      "persistFailed": "",
+      "noElectronApi": "",
+      "mediaListNull": "",
+      "filesEmpty": "",
+      "categoryListNull": "",
+      "categoriesEmpty": "",
+      "fetchError": "",
+      "loadMoreFailed": "",
+      "loadProfilesFailed": "",
+      "loadRecycleBinFailed": "",
+      "loadRecycleBinMoreFailed": ""
+    }
+  },
+  "operationHistory": {
+    "log": {
+      "dbWriteFailed": "",
+      "conflictCheckFailed": "",
+      "dbRemoveFailed": "",
+      "dbClearFailed": "",
+      "dbLoadFailed": ""
+    },
+    "error": {
+      "dbSaveFailedFull": "",
+      "handlerNotRegistered": "",
+      "recordCorrupted": ""
+    }
+  },
+  "updateDialog": {
+    "checking": "",
+    "downloading": "",
+    "downloadingVersion": "",
+    "ariaLabel": "",
+    "foundNewVersion": "",
+    "availablePrompt": "",
+    "later": "",
+    "downloadNow": "",
+    "downloadedTitle": "",
+    "downloadedPrompt": "",
+    "restartLater": "",
+    "installAndRestart": "",
+    "log": {
+      "downloadFailed": "",
+      "installFailed": "",
+      "openOfficialFailed": ""
+    }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Журнал резонанса Nikki",
+    "subtitle": "Журнал резонанса и помощник по образам Infinity Nikki · Скоро",
+    "error": {
+      "importJsonParseFailed": "Файл не является корректным JSON. Убедитесь, что файл экспорта не повреждён",
+      "importInvalidStructure": "Структура файла не соответствует формату импорта резонанса (поддерживается JSON от gongeo.us)",
+      "importTooManyRecords": "В файле слишком много записей. Разделите его и импортируйте снова",
+      "invalidReason": {
+        "invalidShape": "Неверная структура записи",
+        "invalidTimestamp": "Неверный формат времени",
+        "invalidItemId": "Неверный id предмета",
+        "invalidOutfitId": "Неверный id наряда",
+        "invalidEvoLevel": "Неверный уровень эволюции (ожидается 0-4)"
+      }
+    },
+    "tab": {
+      "records": "Записи резонанса",
+      "wardrobe": "Мой гардероб",
+      "import": "Импорт данных",
+      "stats": "Личная статистика"
+    },
+    "records": {
+      "bannerLabel": "Баннер",
+      "bannerType1": "Стандартный баннер",
+      "bannerType2": "Лимитированный баннер",
+      "bannerType3": "Лимитированный баннер 4★",
+      "addRecord": "Добавить запись",
+      "addTitle": "Добавить запись вручную",
+      "editTimeTitle": "Изменить время записи",
+      "itemLabel": "Полученный предмет",
+      "timeLabel": "Время получения",
+      "selectItem": "Выберите полученный предмет",
+      "fiveStarItems": "Части наряда 5★",
+      "fourStarItems": "Части наряда 4★",
+      "totalPulls": "Всего молитв: {{count}}",
+      "pity5Star": "С последнего 5★: {{count}} молитв",
+      "pity4Star": "С последнего 4★: {{count}} молитв",
+      "pullNo": "Молитва № {{n}}",
+      "editBadge": "Вручную",
+      "listEmpty": "Записей резонанса пока нет",
+      "listEmptyHint": "Нажмите «Добавить запись» в правом верхнем углу или импортируйте JSON-файл, экспортированный с gongeo.us, на странице «Импорт данных»",
+      "deleteTitle": "Удалить запись",
+      "deleteMessage": "Это действие нельзя отменить.",
+      "invalidTime": "Неверный формат времени. Выберите снова",
+      "invalidInput": "Ввод не прошёл проверку. Проверьте форму"
+    },
+    "toast": {
+      "added": "Добавлено: {{name}}",
+      "updated": "Время записи обновлено",
+      "deleted": "Запись удалена"
+    },
+    "wardrobe": {
+      "cat": {
+        "item": "Части",
+        "makeup": "Макияж",
+        "momo": "Момо",
+        "prop": "Предметы",
+        "eurekaColor": "Цвета эврики"
+      },
+      "searchPlaceholder": "Поиск по названию",
+      "statusFilterLabel": "Статус владения",
+      "statusAll": "Все статусы",
+      "statusOwned": "Есть",
+      "statusMissing": "Нет",
+      "qualityFilterLabel": "Редкость",
+      "qualityAll": "Все редкости",
+      "summaryOwned": "Есть {{owned}} / {{total}}",
+      "looseSet": "Отдельные части (без наряда)",
+      "outfitStatus": {
+        "owned": "Собран",
+        "partial": "Собирается",
+        "missing": "Не собран"
+      },
+      "quickOwned": "Отметить все как имеющиеся",
+      "quickMissing": "Снять все",
+      "inferButton": "Вывести из записей",
+      "inferTitle": "Вывести гардероб из записей резонанса",
+      "inferMessage": "Полученные предметы будут выведены из записей резонанса и прогресса баннеров: частей {{items}}, макияжа {{makeups}}, Момо {{momo}}, предметов {{props}}.\n\nВывод использует консервативные правила (прогресс лимитированных баннеров и пороги молитв) и может быть меньше фактического владения; существующие записи не изменятся. Продолжить?",
+      "inferResult": "Отмечено как имеющееся: {{count}}",
+      "inferNothing": "Нет новых данных для вывода",
+      "inferBusy": "Вывод…",
+      "catalogUnavailable": "Не удалось загрузить данные каталога",
+      "catalogUnavailableHint": "Статические файлы каталога отсутствуют или повреждены. Переустановите или обновите приложение",
+      "loading": "Загрузка данных каталога…",
+      "empty": "Нет подходящих предметов",
+      "emptyHint": "Попробуйте изменить поисковый запрос или фильтры"
+    },
+    "import": {
+      "importSection": "Импорт данных",
+      "pickFile": "Выбрать JSON-файл",
+      "previewing": "Разбор файла…",
+      "formatLegacy": "Старый формат",
+      "formatCurrent": "Текущий формат",
+      "versionLabel": "Версия файла: {{version}}",
+      "versionUnknown": "Версия не указана",
+      "versionMismatchWarn": "Файл объявляет более новую версию, чем поддерживается; возможны несовместимые поля. Можно попробовать совместимый импорт или отказаться.",
+      "compatImport": "Попробовать совместимый импорт",
+      "abandon": "Отказаться",
+      "sectionPulls": "Записи молитв",
+      "sectionEdits": "Ручные записи",
+      "sectionPearpal": "Журнал Pearpal",
+      "sectionEvo": "Переопределения эволюции",
+      "sectionWardrobe": "Владение гардеробом",
+      "countsAdded": "Новых: {{count}}",
+      "countsDuplicate": "Дубликатов (пропущено): {{count}}",
+      "countsInvalid": "Некорректных (пропущено): {{count}}",
+      "invalidSamplesTitle": "Примеры некорректных записей:",
+      "invalidMore": "…и ещё {{count}} некорректных записей пропущено",
+      "includeWardrobeLabel": "Также импортировать владение гардеробом (полная перезапись)",
+      "commit": "Начать импорт",
+      "cancelCommit": "Отменить импорт",
+      "cancelled": "Импорт отменён; уже записанные пакеты сохранены. Повторный импорт безопасен",
+      "commitDone": "Импорт завершён, записей: {{count}}",
+      "progressLabel": "{{current}} / {{total}}",
+      "exportSection": "Экспорт данных",
+      "exportPulls": "Записи молитв",
+      "exportEdits": "Ручные записи",
+      "exportPearpal": "Журнал Pearpal",
+      "exportEvo": "Переопределения эволюции",
+      "exportWardrobe": "Владение гардеробом",
+      "exportButton": "Экспортировать JSON",
+      "exportDone": "Экспортировано записей: {{count}}",
+      "exportNothing": "Нет данных для экспорта. Выберите содержимое или сначала введите данные",
+      "dangerSection": "Опасная зона",
+      "clearButton": "Очистить все данные резонанса",
+      "clearTitle": "Очистить все данные резонанса",
+      "clearMessage": "Все записи резонанса, гардероб и статистика будут безвозвратно удалены. Продолжить?",
+      "clearDone": "Все данные резонанса очищены",
+      "snapshotNote": "Встроенные каталог и перцентили — статические снимки и не обновляются автоматически",
+      "snapshotMeta": "Встроенные каталог/перцентили — статические снимки (версия игры {{version}} · каталог от {{catalogDate}} · перцентили от {{percentileDate}}), не обновляются автоматически"
+    },
+    "stats": {
+      "emptyTitle": "Статистики пока нет",
+      "emptyHint": "Сначала добавьте записи на странице «Записи резонанса» или импортируйте их на странице «Импорт данных»",
+      "totalPulls": "Всего молитв",
+      "total5Star": "Части 5★",
+      "total4Star": "Части 4★",
+      "avg5StarPulls": "В среднем молитв на 5★",
+      "banners5Star": "Молитвы в лимитированных баннерах",
+      "banners4Star": "Молитвы в баннерах 4★",
+      "outfits5Star": "Получено нарядов 5★",
+      "outfits4Star": "Получено нарядов 4★",
+      "luckTitle": "Анализ удачи",
+      "luckTier": "Уровень {{tier}} / 6",
+      "luckSnapshotNote": "Перцентили взяты из статического снимка сообщества (создан {{date}}), не обновляются автоматически и приведены только для справки",
+      "distributionTitle": "Распределение молитв",
+      "dist5Star": "5★ (по номеру молитвы)",
+      "dist4Star": "4★ (по номеру молитвы)",
+      "activityTitle": "Активность молитв (накопительно по баннерам)",
+      "rankingTitle": "Детали по баннерам",
+      "ranking5Star": "Лимитированные баннеры (5★)",
+      "ranking4Star": "Лимитированные баннеры 4★",
+      "rankingEmpty": "Нет данных баннеров для анализа",
+      "colBanner": "Баннер",
+      "colPulls": "Молитвы",
+      "colAvg": "В среднем",
+      "colPercentile": "Перцентиль"
+    }
+  }
+}

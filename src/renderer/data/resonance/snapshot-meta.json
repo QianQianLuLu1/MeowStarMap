@@ -1,0 +1,28 @@
+{
+  "source": "gongeo.us-nikki-tracker",
+  "sourceUrl": "https://github.com/dastrokes/gongeo.us-nikki-tracker",
+  "sourceLicense": "MIT",
+  "sourceAuthor": "dastrokes",
+  "branch": "master",
+  "generatedAt": "2026-08-29T11:36:09.247Z",
+  "gameVersion": "2.9.1",
+  "catalogGeneratedAt": "2026-08-28T01:28:27.725Z",
+  "percentileGeneratedAt": "2026-03-15T01:40:43Z",
+  "latestBannerId": 73,
+  "catalogParts": [
+    "items",
+    "outfits",
+    "makeups",
+    "momo",
+    "eurekas",
+    "props",
+    "outfitItems",
+    "makeupItems",
+    "makeupOutfits",
+    "momoOutfits",
+    "palettes"
+  ],
+  "totalCatalogEntries": 10676,
+  "snapshotNote": "静态快照，不会自动更新；过期仅影响新增卡池/物品显示与百分位参考值，不影响已有数据计算。",
+  "todo": "数据更新需重新克隆源仓库并重跑本脚本与 generate-resonance-names.ts"
+}

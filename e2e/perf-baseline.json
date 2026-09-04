@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "recordedAt": "2026-08-23T14:59:05.625Z",
+  "environment": "win32-x64 (本地开发机实测；CI windows-latest 硬件更慢，容忍系数已按跨环境放宽)",
+  "datasetImages": 1500,
+  "metrics": {
+    "cold-start-first-paint": {
+      "maxMs": 15000,
+      "baselineValue": 2106.52,
+      "regressionFactor": 3
+    },
+    "scan-ingest": {
+      "maxMs": 30000,
+      "baselineValue": 414.29,
+      "regressionFactor": 3
+    },
+    "scan-throughput": {
+      "minThroughput": 150,
+      "baselineValue": 3620.64,
+      "regressionFactor": 5
+    },
+    "media-list-page100": {
+      "maxMs": 1000,
+      "baselineValue": 7.8,
+      "regressionFactor": 10
+    },
+    "media-list-page500": {
+      "maxMs": 1000,
+      "baselineValue": 10.3,
+      "regressionFactor": 10
+    },
+    "find-duplicates": {
+      "maxMs": 60000,
+      "baselineValue": 1010.27,
+      "regressionFactor": 3
+    },
+    "find-duplicates-throughput": {
+      "minThroughput": 100,
+      "baselineValue": 1484.75,
+      "regressionFactor": 3
+    },
+    "cache-get-stats": {
+      "maxMs": 1000,
+      "baselineValue": 0.7,
+      "regressionFactor": 50
+    }
+  }
+}

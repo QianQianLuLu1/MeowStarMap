@@ -1,0 +1,264 @@
+{
+  "name": "wxnn-photo-manager",
+  "version": "2.5.0-beta",
+  "description": "无限暖暖相册管理工具",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/QianQianLuLu1/NikkiGallery.git"
+  },
+  "homepage": "https://github.com/QianQianLuLu1/NikkiGallery",
+  "bugs": {
+    "url": "https://github.com/QianQianLuLu1/NikkiGallery/issues"
+  },
+  "keywords": [
+    "electron",
+    "react",
+    "typescript",
+    "photo-gallery",
+    "infinity-nikki",
+    "game-photos",
+    "image-organizer",
+    "desktop-app"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "private": true,
+  "type": "module",
+  "main": "dist/main/main/app/index.js",
+  "author": "QianLu",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "clean": "node -e \"const fs=require('fs');const p=require('path');['dist/renderer/assets','dist/main'].forEach(d=>{const fp=p.join(__dirname,d);if(fs.existsSync(fp)){fs.rmSync(fp,{recursive:true,force:true});console.log('[clean] removed '+d)}})\"",
+    "build": "npm run clean && electron-vite build && node -e \"require('fs').writeFileSync('dist/main/package.json',JSON.stringify({type:'commonjs'}))\"",
+    "build:preview": "vite build --config vite.preview.config.ts",
+    "preview": "electron-vite preview",
+    "dist": "npm run build && electron-builder --publish never",
+    "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+    "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:main": "vitest run src/main",
+    "test:renderer": "vitest run src/renderer",
+    "test:db": "vitest run src/main/database",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build -o storybook-static",
+    "i18n:check": "tsx scripts/check-i18n-keys.ts",
+    "i18n:extract": "babel --config-file ./babel.extract.config.cjs \"src/renderer/**/*.{ts,tsx}\" --quiet",
+    "i18n:extract:gallery": "babel --config-file ./babel.extract.config.cjs \"src/renderer/components/gallery/**/*.tsx\" \"src/renderer/pages/{DetailPage,EditorPage}.tsx\" \"src/renderer/components/{layout/AppShell,editor/BatchApplyDialog,editor/ShortcutsModal}.tsx\" --quiet",
+    "i18n:status": "tsx scripts/i18n/whitelist-status.ts",
+    "i18n:extract-legacy": "tsx scripts/i18n/extract-i18n.ts",
+    "i18n:prune-whitelist": "tsx scripts/i18n/prune-whitelist.ts",
+    "i18n:codemod": "tsx scripts/i18n/codemod.ts",
+    "i18n:guard": "tsx scripts/i18n/guard.ts",
+    "sync-i18n-keys": "tsx scripts/sync-i18n-keys.ts",
+    "preview:check": "tsx scripts/check-preview-drift.ts",
+    "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
+    "e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep-invert @perf",
+    "e2e:perf": "playwright test --config e2e/playwright.config.ts --grep @perf",
+    "dist:win:smoke": "npm run dist:win && npm run e2e:smoke",
+    "dist:win:perf": "npm run dist:win && npm run e2e:perf",
+    "perf:save-baseline": "tsx scripts/perf-test/save-perf-baseline.ts",
+    "typecheck:e2e": "tsc --noEmit -p e2e",
+    "commit": "cz",
+    "commitlint": "commitlint --from=HEAD~1 --to=HEAD",
+    "commitlint:check": "commitlint --edit",
+    "prepare": "husky || true"
+  },
+  "config": {
+    "commitizen": {
+      "path": "cz-conventional-changelog"
+    }
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    ".storybook/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/**/*.{js,jsx,json,css,md}": [
+      "prettier --write"
+    ],
+    "scripts/**/*.{ts,js}": [
+      "prettier --write"
+    ],
+    "*.{ts,js,json,md}": [
+      "prettier --write"
+    ]
+  },
+  "dependencies": {
+    "@formkit/auto-animate": "^0.10.0",
+    "better-sqlite3": "^12.11.1",
+    "electron-log": "^5.4.4",
+    "electron-updater": "^6.8.9",
+    "exifr": "^7.1.3",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
+    "flexsearch": "^0.8.212",
+    "fluent-ffmpeg": "^2.1.3",
+    "i18next": "^26.3.6",
+    "koffi": "^3.1.1",
+    "masonic": "^4.1.0",
+    "motion": "^12.42.2",
+    "network-address": "^1.1.2",
+    "pluggable-electron": "^1.0.0",
+    "react": "^19.2.7",
+    "react-compare-slider": "^4.0.0",
+    "react-dom": "^19.2.7",
+    "react-i18next": "^17.0.10",
+    "react-virtuoso": "^4.18.11",
+    "sanitize-filename": "^1.6.4",
+    "sharp": "^0.35.3",
+    "tinyglobby": "^0.2.17",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.29.7",
+    "@babel/core": "^7.29.7",
+    "@babel/preset-react": "^7.29.7",
+    "@babel/preset-typescript": "^7.29.7",
+    "@commitlint/cli": "^19.6.1",
+    "@commitlint/config-conventional": "^19.6.0",
+    "@electron/rebuild": "^4.2.0",
+    "@eslint/js": "^9.7.0",
+    "@playwright/test": "^1.62.1",
+    "@storybook/addon-a11y": "^10.5.9",
+    "@storybook/addon-docs": "^10.5.10",
+    "@storybook/react-vite": "^10.5.10",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/fluent-ffmpeg": "^2.1.28",
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^1.6.1",
+    "audit-ci": "^7.1.0",
+    "autoprefixer": "^10.5.4",
+    "babel-plugin-i18next-extract": "^1.1.0",
+    "commitizen": "^4.3.1",
+    "cz-conventional-changelog": "^3.3.0",
+    "electron": "40.10.6",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "eslint": "^9.7.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.7.0",
+    "husky": "^9.1.7",
+    "jsdom": "^29.1.1",
+    "lint-staged": "^15.3.0",
+    "png-to-ico": "^3.0.2",
+    "postcss": "^8.5.20",
+    "prettier": "^3.9.5",
+    "storybook": "^10.5.10",
+    "tailwindcss": "^3.4.19",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.64.0",
+    "vite": "^5.4.21",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^1.6.1"
+  },
+  "build": {
+    "appId": "com.qianlu.wxnn-photo-manager",
+    "productName": "无限暖暖相册管理工具",
+    "directories": {
+      "output": "release"
+    },
+    "publish": [
+      {
+        "provider": "github"
+      }
+    ],
+    "files": [
+      "dist/**/*",
+      "resources/**/*",
+      "!**/node_modules/@img/sharp-darwin-*",
+      "!**/node_modules/@img/sharp-linux-*",
+      "!**/node_modules/@img/sharp-libvips-linux-*",
+      "!**/node_modules/@img/sharp-android-*",
+      "!**/node_modules/@img/sharp-wasm32",
+      "!**/node_modules/ffmpeg-static/darwin/**",
+      "!**/node_modules/ffmpeg-static/linux/**",
+      "!**/node_modules/ffmpeg-static/macOS/**",
+      "!**/node_modules/ffprobe-static/bin/darwin/**",
+      "!**/node_modules/ffprobe-static/bin/linux/**",
+      "!**/node_modules/@types/**",
+      "!**/node_modules/@vitejs/**",
+      "!**/node_modules/@vitest/**",
+      "!**/node_modules/eslint/**",
+      "!**/node_modules/prettier/**",
+      "!**/node_modules/typescript/**",
+      "!**/node_modules/tailwindcss/**",
+      "!**/node_modules/postcss/**",
+      "!**/node_modules/husky/**",
+      "!**/node_modules/commitlint/**",
+      "!**/node_modules/commitizen/**",
+      "!**/node_modules/@commitlint/**",
+      "!**/node_modules/@testing-library/**",
+      "!**/node_modules/jsdom/**",
+      "!**/node_modules/@electron/rebuild/**",
+      "!**/dist/**/*.map",
+      "!**/dist/**/*.d.ts",
+      "!**/dist/**/*.tsbuildinfo"
+    ],
+    "asarUnpack": [
+      "**/ffmpeg-static/**",
+      "**/ffprobe-static/**",
+      "**/better-sqlite3/**",
+      "**/bindings/**",
+      "**/file-uri-to-path/**",
+      "**/sharp/**",
+      "**/@img/**",
+      "**/koffi/**",
+      "**/@koromix/**",
+      "**/nuan5_decryption.dll"
+    ],
+    "npmRebuild": true,
+    "asar": true,
+    "compression": "maximum",
+    "afterPack": "scripts/after-pack-vc-runtime.cjs",
+    "artifactName": "NikkiGallery-Setup-${version}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icons/icon.ico",
+      "signAndEditExecutable": false,
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "无限暖暖相册管理工具"
+    }
+  },
+  "optionalDependencies": {
+    "@img/sharp-libvips-win32-x64": "^1.3.2"
+  }
+}

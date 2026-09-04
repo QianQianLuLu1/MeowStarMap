@@ -1,0 +1,79 @@
+import { Meta } from '@storybook/addon-docs/blocks'
+
+<Meta title="Storybook/无障碍指引" />
+
+# 无障碍（a11y）指引
+
+本项目已接入 `@storybook/addon-a11y`（基于 axe-core）。每个组件的故事页底部都有
+Accessibility 面板，开发新组件 / 修改既有组件时应当把它当作第一道验收关卡。
+
+## addon-a11y 面板用法
+
+1. 打开任意 story 的 Canvas 或 Docs 页；
+2. 底部面板切换到 **Accessibility** 标签；
+3. 面板分三部分：
+   - **Result**：axe 扫描结果，按 `Violations`（违规）/ `Passes`（通过）/ `Incomplete`（需人工确认）分组；
+   - 每条违规标注 **impact**（critical / serious / moderate / minor）与命中节点，点击可在画布中高亮；
+   - **About**：当前规则的说明链接。
+4. 切换工具栏的「主题」与「语言」后重新查看面板——对比度与文案相关违规可能随主题 / 语言变化。
+
+> 注意：axe 是启发式扫描，能覆盖约 40% 的无障碍问题；焦点顺序、屏幕阅读器语义、
+> 动效舒适度等需要人工核查（见下方清单）。
+
+## 项目要求
+
+以下要求适用于所有渲染层组件，也是新增组件故事 `parameters.docs.description` 中
+「无障碍要点」一栏必须说明的内容：
+
+1. **可交互控件必须有无障碍名称**：图标按钮一律带 `aria-label`（走既有 i18n key，
+   如 `gallery.toolbar.importTitle`）；纯图标且无文本的按钮不允许只有 `title`；
+2. **键盘可达**：
+   - 所有操作可经 Tab 到达，焦点态可见（项目焦点样式基于 `var(--accent)` outline）；
+   - 网格 / 列表视图实现方向键导航（`VirtualImageGrid`：↑↓←→/Home/End/Enter/Space；`ListView`：↑↓/Enter/Space）；
+   - 弹窗使用 `BaseDialog`：打开时焦点移入（`initialFocusRef`），Esc 关闭，焦点陷阱；
+3. **语义角色**：
+   - 弹窗：`role="dialog"` + `aria-modal` + `aria-label`/`aria-labelledby`；
+   - 工具栏：`role="toolbar"` + `aria-label`（见 `BatchActions`）;
+   - 开关型按钮：`aria-pressed`；下拉：`aria-haspopup` + `aria-expanded`，选项 `role="option"` + `aria-selected`；
+   - 网格：`role="grid"` / `role="gridcell"` + `aria-selected`；
+4. **对比度**：
+   - 前景 / 背景一律使用设计令牌（见「设计令牌」文档页），禁止硬编码颜色；
+   - 深色遮罩上的文字使用 `--text-on-overlay`（白）与 `--text-on-overlay-secondary`（70% 白），
+     仅用于大字号辅助信息；正文必须用 `--text-primary` / `--text-secondary`；
+5. **动效降级**：全局支持 `prefers-reduced-motion` 与手动 `html.reduce-motion`，
+   动画、过渡与毛玻璃模糊变化均被禁用 / 固定；新组件动画不得绕过该机制；
+6. **状态双通道**：丢失 / 损坏等状态除颜色与透明度外，必须辅以角标或图标
+   （`MissingBadge` / `CorruptedBadge` / `MediaThumbPlaceholder`），不单靠颜色传达。
+
+## 验收基线
+
+- **已覆盖组件零 serious 违规**：每个带故事的组件，其全部 story 在 addon-a11y 面板中
+  不允许出现 impact 为 `serious` 或 `critical` 的违规；`moderate` / `minor` 登记到
+  `docs/技术债清单.md` 后允许暂缓；
+- 组件源码发现无障碍缺陷时遵循组件文档规范 §6：登记技术债，不在 story 里硬造不真实的状态掩盖；
+- 新增 / 重大修改组件必须随提交附带故事（规范 §6 增量规则），Accessibility 面板随即可查。
+
+## 本阶段抽查记录（阶段 3b，2026-08）
+
+对已构建的 Storybook（`npm run build-storybook` 产物）用无头浏览器 + axe-core
+抽查 12 个代表性 story。`moderate` 的 `landmark-one-main` / `page-has-heading-one` /
+`region` 为 Storybook iframe 预览环境噪音，不计入组件结论。
+
+**零 serious / critical 通过**：
+`Gallery/BatchActions` Default 与 FullFeatured、`Gallery/GalleryToolbar` Default、
+`Gallery/FullscreenViewer` Default、`Gallery/MediaThumbPlaceholder` ImagePlaceholder、
+`Layout/AppShell` GalleryView、`Layout/TitleBar` Default。
+
+**发现组件源码级违规（按规范 §6 仅登记技术债，未修改组件源码）**：
+
+| 故事                                   | 违规（impact）                                                                                                                                                        | 命中位置                                                        |
+| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `Gallery/GalleryToolbar` FiltersActive | `color-contrast`（serious）                                                                                                                                           | 「仅看丢失」激活态按钮（内联 `--danger-bg` / `--danger-hover`） |
+| `Gallery/ListView` Default             | `aria-allowed-attr`（critical）：`listitem` 不支持 `aria-selected`；`aria-required-parent`（critical）：`listitem` 缺 `role="list"` 父级；`color-contrast`（serious） | 各行容器；丢失文件行文字                                        |
+| `Gallery/VirtualImageGrid` Default     | `aria-required-children` / `aria-required-parent`（critical）：`role="grid"` 与 `gridcell` 中间缺少 `row` 层；`color-contrast`（serious）                             | `.flex-1[role=grid]`；CorruptedBadge                            |
+| `Gallery/TagManager` WithTags          | `button-name`（critical）：标签删除小按钮无可识别文本                                                                                                                 | 各标签行删除按钮                                                |
+| `Layout/Sidebar` Expanded              | `color-contrast`（serious）                                                                                                                                           | `.active` 导航项文本、统计提示文本                              |
+
+后续回归请在上述 story 上复跑面板扫描；组件源码修复后违规应自动消失，
+无需调整故事数据。另：`Gallery/VirtualImageGrid` 初次挂载时观察到 Virtuoso 瞬时
+`Maximum call stack size exceeded`（可自愈，不影响渲染），为第三方库行为，一并登记。

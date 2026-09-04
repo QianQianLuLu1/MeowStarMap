@@ -1,0 +1,94 @@
+# ============================================================
+# 提交信息模板（Commit Message Template）
+# 配合 commitlint.config.js 与 husky commit-msg 钩子使用
+# 详见 docs/code-comment-rule.md 第九节「提交规范」
+# ============================================================
+#
+# 提交格式：
+#   <type>(<scope>): <subject>
+#   <空行>
+#   <body>
+#   <空行>
+#   <footer>
+#
+# type（必填，小写）：
+#   feat        新功能
+#   fix         bug 修复
+#   docs        文档变更（README、docs/、代码注释规范等）
+#   style       代码格式（不影响功能：空格、分号、换行等）
+#   refactor    重构（既不是新增功能，也不是修复 bug）
+#   perf        性能优化
+#   test        测试相关
+#   build       构建系统或外部依赖变更
+#   ci          CI 配置
+#   chore       杂项（不修改 src 或测试的其他变更）
+#   revert      回滚某个之前的 commit
+#   i18n        国际化资源变更（locales/*.json）
+#   release     版本发布相关
+#
+# scope（选填，小写）：
+#   main        主进程相关
+#   renderer    渲染进程相关
+#   shared      共享类型与工具
+#   scanner     扫描器模块
+#   ipc         IPC 处理器
+#   db          数据库
+#   editor      图片/视频编辑器
+#   gallery     相册浏览
+#   video       视频处理
+#   share       分享功能
+#   watermark   水印功能
+#   i18n        国际化
+#   theme       主题
+#   comments    注释清理（配合 docs/code-comment-rule.md）
+#   deps        依赖升级
+#   config      项目配置
+#
+# subject（必填）：
+#   - 中文描述，简洁清晰
+#   - 不以句号结尾
+#   - 不超过 72 字符
+#   - 使用祈使句：「新增扫描器」而非「新增了扫描器」
+#
+# body（选填）：
+#   - 解释「为什么」做这次改动，而不是「做了什么」（diff 已经说明）
+#   - 每行不超过 120 字符
+#   - 多条要点用「- 」开头
+#
+# footer（选填）：
+#   - BREAKING CHANGE: 描述破坏性变更
+#   - Closes #123, #456    关联 issue
+#   - Refs #789            引用 issue
+#   - Co-Authored-By: Name <email>  协作者
+#
+# 示例 1（简单）：
+#   feat(scanner): 新增 Epic 游戏目录自动检测
+#
+# 示例 2（完整）：
+#   fix(db): 修复扫描完成后未触发 scanner:complete 事件
+#
+#   - scanner-worker-bridge 在异常分支未调用 sendComplete
+#   - 导致 UI 长时间停留在「扫描中」状态
+#   - 增加 finally 块确保事件总被发送
+#
+#   Closes #142
+#   Refs: docs/dev-docs/全盘扫描模块进程拆分实施计划.md
+#
+# 示例 3（破坏性变更）：
+#   refactor(ipc)!: 重构 share: detectApp 返回结构
+#
+#   - 将 installed/running 合并为 status 枚举
+#   - 渲染进程需同步更新，详见迁移指南
+#
+#   BREAKING CHANGE: share:detectApp 返回 { status, installPath } 而非 { installed, running, installPath }
+#
+# ============================================================
+# 以下为模板起始行（删除本提示后开始书写）：
+#
+
+# type(scope): subject
+#
+# - body 要点 1
+# - body 要点 2
+#
+# Closes #issue

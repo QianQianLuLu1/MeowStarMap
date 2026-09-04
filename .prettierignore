@@ -1,0 +1,12 @@
+dist/
+release/
+node_modules/
+node20/
+*.min.js
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+src/renderer/assets/cloth-names.json
+src/renderer/assets/outfit-names.json
+# 共鸣录生成静态数据（scripts/generate-resonance-*.ts 产物，保持生成格式）
+src/renderer/data/resonance/

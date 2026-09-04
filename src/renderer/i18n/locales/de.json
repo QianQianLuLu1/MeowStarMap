@@ -1,0 +1,4211 @@
+{
+  "appShell": {
+    "categoriesSummary": "",
+    "detailPosition": "",
+    "duplicatesHint": "",
+    "editorMode": "",
+    "favoritesSummary": "",
+    "feedbackButton": "",
+    "gallerySummary": "",
+    "imagesVideosSummary": "",
+    "ready": "",
+    "recycleBinHint": "",
+    "recycleBinSummary": "",
+    "selectedCount": "",
+    "settingsHint": "",
+    "storageUsage": "",
+    "viewStatus": {
+      "categories": "",
+      "detail": "",
+      "duplicates": "",
+      "editor": "",
+      "favorites": "",
+      "resonanceRecords": "Resonanz",
+      "gallery": "",
+      "launcherCache": "",
+      "recycleBin": "",
+      "settings": ""
+    }
+  },
+  "categories": {
+    "iconLabel": {
+      "calendar": "Datum",
+      "camera": "Kamera",
+      "folder": "Ordner",
+      "heart": "Gefällt mir",
+      "image": "Bild",
+      "location": "Ort",
+      "palette": "Palette",
+      "sparkles": "Empfohlen",
+      "star": "Favorit",
+      "tag": "Tag",
+      "user": "Person",
+      "video": "Video"
+    },
+    "page": {
+      "title": "",
+      "assign": {
+        "emptyMedia": "",
+        "failedToast": "",
+        "nextPage": "",
+        "noMatch": "",
+        "pageRange": "",
+        "prevPage": "",
+        "searchPlaceholder": "",
+        "subtitle": "",
+        "successToast": "",
+        "title": ""
+      },
+      "create": {
+        "colorTitle": "",
+        "failedToast": "",
+        "namePlaceholder": "",
+        "noParent": "",
+        "submit": "",
+        "successToast": "",
+        "title": ""
+      },
+      "delete": {
+        "confirmMessage": "",
+        "confirmTitle": "",
+        "failedToast": "",
+        "successToast": ""
+      },
+      "list": {
+        "assignMedia": "",
+        "collapse": "",
+        "dragHint": "",
+        "edit": "",
+        "expand": "",
+        "hierarchyFailedToast": "",
+        "hierarchySuccessToast": "",
+        "iconTitle": "",
+        "invalidDragToast": "",
+        "itemCount": "",
+        "moveDown": "",
+        "moveUp": "",
+        "reorderFailedToast": "",
+        "subCategoryCount": "",
+        "systemDragDisabled": "",
+        "systemTag": "",
+        "title": ""
+      },
+      "scene": {
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "sceneTime": {
+        "analyzeButton": "",
+        "analyzedToast": "",
+        "analyzingButton": "",
+        "analyzeFailedToast": "",
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "subtitle": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "update": {
+        "failedToast": "",
+        "successToast": ""
+      }
+    },
+    "system": {
+      "people": "",
+      "location": "",
+      "scene": "",
+      "screenshot": "",
+      "recording": "",
+      "recent": "",
+      "favorite": ""
+    }
+  },
+  "common": {
+    "all": "Alle",
+    "apply": "Anwenden",
+    "back": "Zurück",
+    "cancel": "Abbrechen",
+    "clear": "Leeren",
+    "close": "Schließen",
+    "contextMenu": {
+      "ariaLabel": "Kontextmenü",
+      "submenuAriaLabel": "{{label}} Untermenü"
+    },
+    "copy": "Kopieren",
+    "default": "Standard",
+    "delete": "Löschen",
+    "error": "Fehler",
+    "export": "Exportieren",
+    "failed": "Fehlgeschlagen",
+    "feedbackDialog": {
+      "attachLogsLabel": "Letzte Protokolle einschließen (empfohlen, hilft bei der Problemdiagnose)",
+      "attachSystemInfoLabel": "Systeminformationen einschließen (Version, OS, Hardware)",
+      "attachmentsLabel": "Anhänge",
+      "closeAriaLabel": "Schließen",
+      "contactLabel": "Kontakt",
+      "copyFailed": "Kopieren fehlgeschlagen, bitte Text manuell auswählen",
+      "copySuccess": "{{label}} in die Zwischenablage kopiert",
+      "descriptionLabel": "Problembeschreibung",
+      "descriptionPlaceholder": "Beschreiben Sie kurz das aufgetretene Problem (optional)...",
+      "exportButton": "Diagnose-Bundle exportieren",
+      "exportFailed": "Export fehlgeschlagen",
+      "exportHint": "Das Diagnose-Bundle enthält Protokolle, Absturzdateien und Systeminformationen. Nach dem Export können Sie es über die untenstehenden Kontaktmöglichkeiten an den Entwickler senden.",
+      "exportSuccess": "Diagnose-Bundle exportiert, bitte über die untenstehenden Kontaktmöglichkeiten an den Entwickler senden",
+      "exporting": "Exportiere...",
+      "githubCopyHint": "Klicken, um Link zu kopieren",
+      "githubLabel": "GitHub Issues",
+      "githubName": "GitHub Issues Link",
+      "githubValue": "https://github.com/your-repo/issues",
+      "qqGroupCopyHint": "Klicken, um Gruppennummer zu kopieren",
+      "qqGroupLabel": "QQ-Gruppe",
+      "qqGroupName": "QQ-Gruppennummer",
+      "qqGroupValue": "QQ Group: 123456789",
+      "title": "Feedback"
+    },
+    "import": "Importieren",
+    "invertSelection": "Auswahl umkehren",
+    "loading": "Laden...",
+    "move": "Verschieben",
+    "no": "Nein",
+    "ok": "OK",
+    "processing": "Verarbeitung...",
+    "propertiesDialog": {
+      "basic": {
+        "createdAt": "Erstellt",
+        "modifiedAt": "Geändert",
+        "name": "Name",
+        "path": "Pfad",
+        "resolution": "Auflösung",
+        "size": "Größe",
+        "type": "Typ",
+        "typeImage": "Bild",
+        "typeVideo": "Video"
+      },
+      "copied": "Kopiert",
+      "copyAll": "Alle kopieren",
+      "copyAllTitle": "Alle Eigenschaften kopieren",
+      "copySection": {
+        "aperture": "Blende",
+        "cameraModel": "Kameramodell",
+        "dateTaken": "Aufnahmedatum",
+        "fileInfo": "=== Datei-Info ===",
+        "focalLength": "Brennweite",
+        "lens": "Objektiv",
+        "originalSize": "Originalgröße",
+        "shootingParams": "=== Aufnahmeparameter ===",
+        "shutter": "Verschlusszeit"
+      },
+      "openLocation": "Speicherort",
+      "openLocationTitle": "Im Explorer anzeigen",
+      "title": "Dateieigenschaften"
+    },
+    "refresh": "Aktualisieren",
+    "rename": "Umbenennen",
+    "reset": "Zurücksetzen",
+    "restore": "Wiederherstellen",
+    "retry": "Erneut versuchen",
+    "save": "Speichern",
+    "search": "Suchen",
+    "select": "Auswählen",
+    "selectAll": "Alle auswählen",
+    "shareCodeDecoder": {
+      "apiUnavailable": "API nicht verfügbar",
+      "closeAriaLabel": "Schließen",
+      "decodeButton": "Dekodieren",
+      "decodeSuccess": "Dekodierung erfolgreich",
+      "decoding": "Dekodiere...",
+      "descriptions": {
+        "clothDiy": "Färbungs-Freigabecodes können aus der Färbungsfunktion im Spiel abgerufen werden. Die Netzwerkdekodierung erfordert eine Verbindung zum Spielserver; offline können nur Zeitstempel und UID extrahiert werden.",
+        "homeBuild": "Hausbau-Freigabecodes können aus der Hausbaufunktion im Spiel abgerufen werden. Die Netzwerkdekodierung erfordert eine Verbindung zum Spielserver.",
+        "mediaEncrypt": "Verschlüsselt die Kameraparameter-JSON in Chiffretext (Base64-Format). Nützlich zum Testen des Entschlüsselungsflusses oder zum Erstellen benutzerdefinierter Parameter."
+      },
+      "encryptButton": "Verschlüsseln",
+      "encryptSuccess": "Verschlüsselung erfolgreich",
+      "operationFailed": "Vorgang fehlgeschlagen",
+      "placeholders": {
+        "clothDiy": "Freigabecode für Färbung im Spiel einfügen...",
+        "homeBuild": "Freigabecode für Hausbau im Spiel einfügen...",
+        "mediaEncrypt": "Kameraparameter-JSON einfügen..."
+      },
+      "result": {
+        "encryptedResult": "Verschlüsseltes Ergebnis (Base64)",
+        "networkData": "Netzwerkdaten",
+        "networkUnavailable": "Netzwerkdekodierung nicht verfügbar (möglicherweise Internet erforderlich)",
+        "serverId": "Server-ID",
+        "timestamp": "Zeitstempel"
+      },
+      "tabs": {
+        "clothDiy": "Färbungs-Freigabecode",
+        "homeBuild": "Hausbau-Code",
+        "mediaEncrypt": "Kameraparameter-Verschlüsselung"
+      },
+      "title": "Freigabecode-Werkzeuge",
+      "unknownError": "Unbekannter Fehler"
+    },
+    "success": "Erfolg",
+    "warning": "Warnung",
+    "yes": "Ja",
+    "confirm": "",
+    "copied": "",
+    "corruptedBadge": {
+      "label": "",
+      "labelSm": "",
+      "title": "",
+      "titleWithReason": ""
+    },
+    "loadFailed": "",
+    "missingBadge": {
+      "label": "",
+      "labelSm": ""
+    }
+  },
+  "detail": {
+    "actions": {
+      "backToGallery": "",
+      "deleteConfirmMessage": "",
+      "deleteFailed": "",
+      "deleteTitle": "",
+      "edit": "",
+      "operationFailed": "",
+      "ratingAria": "",
+      "ratingFailed": "",
+      "saveAs": "",
+      "saveAsFailed": "",
+      "saveAsSuccess": "",
+      "tags": ""
+    },
+    "editorMetadata": {
+      "exportedAt": "",
+      "filter": "",
+      "intensity": "",
+      "loading": "",
+      "lut": "",
+      "restore": "",
+      "restoreTooltip": "",
+      "title": "",
+      "watermark": "",
+      "yes": ""
+    },
+    "emptyTitle": "",
+    "exif": {
+      "gps": "",
+      "title": "",
+      "viewOnMap": "",
+      "aperture": "",
+      "cameraModel": "",
+      "copied": "",
+      "copyAriaLabel": "",
+      "copyFullTitle": "",
+      "copyLabel": "",
+      "emptyText": "",
+      "errorPrefix": "",
+      "focalLength": "",
+      "lens": "",
+      "dateTaken": "",
+      "loadingText": "",
+      "originalSize": "",
+      "panelTitle": "",
+      "shutter": "",
+      "gamePhotoEmpty": ""
+    },
+    "fields": {
+      "favorite": "",
+      "favorited": "",
+      "notFavorited": "",
+      "sceneTime": "",
+      "type": ""
+    },
+    "missing": {
+      "removeFailed": "",
+      "removeFromLibrary": "",
+      "removeSuccess": "",
+      "warningText": ""
+    },
+    "outfit": {
+      "add": "",
+      "clearFailed": "",
+      "edit": "",
+      "emptyValue": "",
+      "inputPlaceholder": "",
+      "maxLengthError": "",
+      "saveFailed": "",
+      "selectPresetPlaceholder": "",
+      "title": ""
+    },
+    "video": {
+      "codec": "",
+      "duration": "",
+      "frameRate": "",
+      "title": ""
+    },
+    "zoomable": {
+      "ariaLabel": "",
+      "resetButton": "",
+      "resetZoom": ""
+    },
+    "dressing": {
+      "copyHeader": "",
+      "emptyText": "",
+      "eureka": {
+        "label": ""
+      },
+      "loadingText": "",
+      "title": ""
+    },
+    "interaction": {
+      "carrier": {
+        "label": ""
+      },
+      "copyHeader": "",
+      "emptyText": "",
+      "format": {
+        "location": "",
+        "rotation": "",
+        "scale": ""
+      },
+      "loadingText": "",
+      "mount": {
+        "label": ""
+      },
+      "none": "",
+      "object": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "nikki": {
+      "copyHeader": "",
+      "emptyText": "",
+      "giantState": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "hidden": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "rotation": {
+        "label": ""
+      },
+      "scale": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "photography": {
+      "copyHeader": "",
+      "date": {
+        "dayValue": "",
+        "label": ""
+      },
+      "edit": {
+        "edited": "",
+        "editedWithDetails": "",
+        "label": "",
+        "notEdited": "",
+        "sticker": "",
+        "text": ""
+      },
+      "emptyText": "",
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "photoWall": {
+        "joinedValue": "",
+        "label": "",
+        "notJoined": ""
+      },
+      "task": {
+        "interactiveFallback": "",
+        "label": "",
+        "none": "",
+        "puzzleFallback": "",
+        "risk": ""
+      },
+      "time": {
+        "label": ""
+      },
+      "title": "",
+      "weather": {
+        "label": "",
+        "typeValue": ""
+      }
+    }
+  },
+  "dialog": {
+    "exportFormat": "Formatkonvertierung",
+    "exportLivePhoto": "Live Photo exportieren",
+    "exportSpeed": "Video mit angepasster Geschwindigkeit exportieren",
+    "exportTrim": "Zugeschnittenes Video exportieren",
+    "sameFormat": "Zielformat stimmt mit dem Originalformat überein",
+    "selectDirUnsupported": "Verzeichnisauswahl wird in dieser Umgebung nicht unterstützt",
+    "trimTooShort": "Zuschneidebereich zu kurz, bitte Start-/Endzeit anpassen"
+  },
+  "duplicates": {
+    "strategy": {
+      "bestQuality": "",
+      "favorited": "",
+      "largest": "",
+      "newest": "",
+      "smallest": ""
+    },
+    "threshold": {
+      "default": "",
+      "defaultHint": "",
+      "loose": "",
+      "looseHint": "",
+      "veryLoose": "",
+      "veryLooseHint": "",
+      "veryStrict": "",
+      "veryStrictHint": ""
+    },
+    "task": {
+      "calculateEta": "",
+      "cancel": "",
+      "cancelAria": "",
+      "cancelFailed": "",
+      "cancelRequested": "",
+      "cancelUnsupported": "",
+      "cancelled": "",
+      "cancelling": "",
+      "exactCancelled": "",
+      "remainingTime": "",
+      "similarCancelled": ""
+    },
+    "ariaCollapse": "",
+    "ariaCollapseBtn": "",
+    "ariaExpand": "",
+    "ariaExpandBtn": "",
+    "ariaGroupToggle": "",
+    "backToGallery": "",
+    "confirmMessage": "",
+    "confirmTitle": "",
+    "emptyExact": "",
+    "emptySimilarCompared": "",
+    "emptySimilarNoPhash": "",
+    "exactDesc": "",
+    "favoriteTooltip": "",
+    "foundGroups": "",
+    "groupExact": "",
+    "groupImageTag": "",
+    "groupReleasable": "",
+    "groupSelected": "",
+    "groupSimilar": "",
+    "groupSingleSize": "",
+    "groupVideoTag": "",
+    "loadingExact": "",
+    "loadingHintExact": "",
+    "loadingHintSimilar": "",
+    "loadingSimilar": "",
+    "markButton": "",
+    "markCompleted": "",
+    "markFailed": "",
+    "markNoGroups": "",
+    "markingButton": "",
+    "modeExact": "",
+    "modeLabel": "",
+    "modeSimilar": "",
+    "moveToTrash": "",
+    "noDuplicates": "",
+    "noFilesSelected": "",
+    "noSimilar": "",
+    "phashAllDone": "",
+    "phashButton": "",
+    "phashCalculating": "",
+    "phashCompleted": "",
+    "phashFailed": "",
+    "phashRecalcNow": "",
+    "pleaseSelect": "",
+    "ratingTooltip": "",
+    "recommendKeep": "",
+    "recommendTooltip": "",
+    "rescan": "",
+    "scanFailed": "",
+    "selectedToDelete": "",
+    "similarDesc": "",
+    "strategyAll": "",
+    "strategyApplied": "",
+    "strategyTooltipBest": "",
+    "strategyTooltipFavorited": "",
+    "strategyTooltipGroupBest": "",
+    "strategyTooltipGroupFavorited": "",
+    "strategyTooltipGroupLargest": "",
+    "strategyTooltipGroupNewest": "",
+    "strategyTooltipLargest": "",
+    "strategyTooltipNewest": "",
+    "subtitleExact": "",
+    "subtitleFailed": "",
+    "subtitleMeta": "",
+    "subtitleScanningExact": "",
+    "subtitleScanningSimilar": "",
+    "subtitleSimilar": "",
+    "subtitleSimilarMeta": "",
+    "thresholdGroupLabel": "",
+    "thresholdLabel": "",
+    "titleExact": "",
+    "titleSimilar": "",
+    "toolbarLabel": "",
+    "typeExact": "",
+    "typeSimilar": "",
+    "unsupported": "",
+    "unsupportedDelete": "",
+    "unsupportedExact": "",
+    "unsupportedMark": "",
+    "unsupportedPhash": "",
+    "unsupportedSimilar": "",
+    "videoBadge": ""
+  },
+  "editor": {
+    "basic": {
+      "blacks": "Schwarz",
+      "brightness": "Helligkeit",
+      "clarity": "Klarheit",
+      "contrast": "Kontrast",
+      "dehaze": "Nebel entfernen",
+      "denoise": "Rauschunterdrückung",
+      "highlights": "Lichter",
+      "saturation": "Sättigung",
+      "shadows": "Schatten",
+      "sharpen": "Schärfen",
+      "temperature": "Temperatur",
+      "tint": "Tönung",
+      "vibrance": "Natürliche Sättigung",
+      "whites": "Weiß"
+    },
+    "batchApply": {
+      "calculating": "",
+      "cancelAria": "",
+      "cancelRequested": "",
+      "cancelledMessage": "",
+      "cancelledToast": "",
+      "completedAll": "",
+      "completedToast": "",
+      "completedWithFailures": "",
+      "confirmMessage": "",
+      "confirmStart": "",
+      "confirmTitle": "",
+      "failedCount": "",
+      "invalidPathError": "",
+      "loadFailedError": "",
+      "noSelectionError": "",
+      "preparing": "",
+      "processingHint": "",
+      "processingLabel": "",
+      "remainingLabel": "",
+      "throughputSuffix": "",
+      "title": ""
+    },
+    "compare": {
+      "edited": "Bearbeitet",
+      "loading": "Laden...",
+      "original": "Original"
+    },
+    "hsl": {
+      "balance": "Balance",
+      "blue": "Blau",
+      "bluePurple": "Blaulila",
+      "cyan": "Cyan",
+      "green": "Grün",
+      "highlights": "Lichter",
+      "hue": "Farbton",
+      "lightness": "Helligkeit",
+      "magenta": "Magenta",
+      "orange": "Orange",
+      "purple": "Lila",
+      "red": "Rot",
+      "saturation": "Sättigung",
+      "shadows": "Schatten",
+      "skin": "Hautfarbe",
+      "warm": "Warm",
+      "yellow": "Gelb",
+      "yellowGreen": "Gelbgrün"
+    },
+    "metadata": {
+      "batchExported": "",
+      "batchExportedWithFailures": "",
+      "exportFailed": "",
+      "exported": "",
+      "restoreFailed": "",
+      "restored": "",
+      "unavailable": ""
+    },
+    "page": {
+      "clipboardEmpty": "",
+      "customPresetDefault": "",
+      "editedFileSuffix": "",
+      "exportFailed": "",
+      "imageLoadFailed": "",
+      "importedPresetDefault": "",
+      "paramsCopied": "",
+      "paramsPasted": "",
+      "pasteFailed": "",
+      "presetExportFailed": "",
+      "presetExportSuccess": "",
+      "presetExportUnsupported": "",
+      "presetImportFailed": "",
+      "presetImportSuccess": "",
+      "presetImportUnsupported": "",
+      "presetSaveFailed": "",
+      "presetSaveSuccess": "",
+      "presetSaveUnsupported": ""
+    },
+    "recover": {
+      "discard": "Verwerfen",
+      "discarded": "Zwischengespeicherte Bearbeitung verworfen",
+      "download": "Lokal herunterladen",
+      "downloadSuffix": "",
+      "downloaded": "Bearbeitung heruntergeladen",
+      "message": "Letztes Speichern fehlgeschlagen, Bearbeitung wurde zwischengespeichert ({{fileName}}, {{time}}). Lokal herunterladen?",
+      "storeFailed": "Speichern fehlgeschlagen, Bearbeitung zu groß zum Zwischenspeichern, bitte neu bearbeiten und speichern",
+      "stored": "Speichern fehlgeschlagen, Bearbeitung zwischengespeichert, kann beim nächsten Öffnen des Editors heruntergeladen werden",
+      "title": "Ungespeicherte Bearbeitung wiederherstellen"
+    },
+    "shortcuts": {
+      "desc": {
+        "compareOriginal": "",
+        "copyParams": "",
+        "fullscreenToggle": "",
+        "pasteParams": "",
+        "redo": "",
+        "save": "",
+        "saveAs": "",
+        "togglePanel": "",
+        "undo": ""
+      },
+      "title": ""
+    },
+    "tabs": {
+      "basic": "Basis",
+      "collapsePanel": "Panel zuklappen",
+      "curves": "Kurven",
+      "expandPanel": "Panel aufklappen",
+      "filters": "Filter",
+      "hsl": "HSL",
+      "lut": "LUT",
+      "split": "Tönung",
+      "watermark": "Wasserzeichen"
+    },
+    "toolbar": {
+      "applyToSelected": "Auf Auswahl anwenden ({{count}})",
+      "applyToSelectedAria": "Auf {{count}} ausgewählte Bilder anwenden",
+      "applyToSelectedTooltip": "Aktuelle Anpassungen/Filter/Wasserzeichen auf {{count}} ausgewählte Bilder anwenden",
+      "applying": "Anwenden...",
+      "back": "Zurück",
+      "compare": "Vergleichen",
+      "compareHold": "Halten für Originalvergleich",
+      "copyParams": "Parameter kopieren",
+      "exportWithMetadata": "",
+      "exportWithMetadataTooltip": "",
+      "exportingWithMetadata": "",
+      "fullscreenEnter": "Vollbildbearbeitung (F11)",
+      "fullscreenEnterAria": "Vollbildbearbeitung",
+      "fullscreenExit": "Vollbild verlassen (F11)",
+      "fullscreenExitAria": "Vollbild verlassen",
+      "pasteParams": "Parameter einfügen",
+      "redo": "Wiederholen",
+      "reset": "Zurücksetzen",
+      "save": "Speichern",
+      "saveAs": "Speichern unter",
+      "saving": "Speichern...",
+      "shortcuts": "Tastenkürzel (?)",
+      "splitCompare": "Geteilte Vergleich",
+      "splitCompareAria": "Geteilte Vergleich",
+      "splitCompareTooltip": "Geteilten Vergleichsmodus umschalten (links: Original, rechts: bearbeitet)",
+      "undo": "Rückgängig"
+    },
+    "colorWheel": {
+      "ariaLabel": ""
+    },
+    "histogram": {
+      "ariaLabel": "",
+      "error": ""
+    },
+    "lut": {
+      "clear": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "import": ""
+    },
+    "toneCurve": {
+      "ariaLabel": "",
+      "channelB": "",
+      "channelG": "",
+      "channelR": "",
+      "channelRgb": "",
+      "curveLabel": "",
+      "inputOutput": "",
+      "reset": ""
+    }
+  },
+  "gallery": {
+    "fullscreen": {
+      "ariaLabel": "",
+      "closeTitle": "",
+      "deleteConfirmMessage": "",
+      "favoriteTitle": "",
+      "hideInfoTitle": "",
+      "infoPanelCloseAria": "",
+      "infoPanelTitle": "",
+      "intervalOption": "",
+      "intervalTitle": "",
+      "nextAriaLabel": "",
+      "prevAriaLabel": "",
+      "saveAsFailed": "",
+      "saveAsTitle": "",
+      "showInfoTitle": "",
+      "slideshowMinImages": "",
+      "slideshowPauseAria": "",
+      "slideshowPauseTitle": "",
+      "slideshowPlayAria": "",
+      "slideshowPlayTitle": "",
+      "title": "",
+      "unfavoriteTitle": ""
+    },
+    "import": {
+      "browse": "",
+      "categorize": {
+        "byDate": {
+          "desc": "",
+          "label": ""
+        },
+        "byMonth": {
+          "desc": "",
+          "label": ""
+        },
+        "flat": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "categorizeLabel": "",
+      "conflict": {
+        "overwrite": {
+          "desc": "",
+          "label": ""
+        },
+        "rename": {
+          "desc": "",
+          "label": ""
+        },
+        "skip": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "conflictLabel": "",
+      "deselectAll": "",
+      "errors": {
+        "importFailed": "",
+        "loadFailed": "",
+        "readSourceFailed": ""
+      },
+      "finish": "",
+      "imagesCount": "",
+      "importing": "",
+      "naming": {
+        "date": {
+          "desc": "",
+          "label": ""
+        },
+        "keep": {
+          "desc": "",
+          "label": ""
+        },
+        "seq": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "namingRuleLabel": "",
+      "nextStep": "",
+      "prevStep": "",
+      "progressLabel": "",
+      "resultImported": "",
+      "resultSkipped": "",
+      "scanHint": "",
+      "scanResult": "",
+      "scanSummary": "",
+      "scanning": "",
+      "selectionSummary": "",
+      "sourceDirLabel": "",
+      "sourceDirPlaceholder": "",
+      "startImport": "",
+      "step1": "",
+      "step2": "",
+      "step3": "",
+      "summaryDiskSpace": "",
+      "summaryFiles": "",
+      "summaryFilesValue": "",
+      "targetDirLabel": "",
+      "targetDirPlaceholder": "",
+      "title": "",
+      "videosCount": "",
+      "indexingHint": ""
+    },
+    "slideshow": {
+      "ariaLabel": "",
+      "exitAriaLabel": "",
+      "exitTitle": "",
+      "intervalLabel": "",
+      "intervalPreset": {
+        "10s": "",
+        "1s": "",
+        "3s": "",
+        "5s": ""
+      },
+      "loopLabel": "",
+      "nextTitle": "",
+      "orderLabel": "",
+      "orderPreset": {
+        "sequence": "",
+        "shuffle": ""
+      },
+      "pauseAriaLabel": "",
+      "pauseTitle": "",
+      "playAriaLabel": "",
+      "playTitle": "",
+      "prevTitle": "",
+      "progress": "",
+      "settingsAriaLabel": "",
+      "settingsCloseAriaLabel": "",
+      "settingsPanelTitle": "",
+      "settingsTitle": "",
+      "shortcutsHint": "",
+      "shuffleBadge": "",
+      "skipVideoLabel": "",
+      "title": "",
+      "transitionLabel": "",
+      "transitionPreset": {
+        "fade": "",
+        "none": "",
+        "slide": ""
+      }
+    },
+    "smartGroup": {
+      "dimensionDesc": {
+        "albumType": "",
+        "fileType": "",
+        "outfit": "",
+        "sceneCategory": "",
+        "sceneTime": ""
+      },
+      "emptyHint": "",
+      "fileType": {
+        "image": "",
+        "video": ""
+      }
+    },
+    "toolbar": {
+      "cleanupCorrupted": "",
+      "cleanupCorruptedTitle": "",
+      "corruptedOnly": "",
+      "corruptedOnlyTitle": "",
+      "dateLabel": "",
+      "dateRange": {
+        "clear": "",
+        "endLabel": "",
+        "startLabel": ""
+      },
+      "filterType": {
+        "all": "",
+        "image": "",
+        "video": ""
+      },
+      "importTitle": "",
+      "missingOnly": "",
+      "missingOnlyTitle": "",
+      "rating": {
+        "all": "",
+        "label": "",
+        "star1Plus": "",
+        "star2Plus": "",
+        "star3Plus": "",
+        "star4Plus": "",
+        "star5": "",
+        "starNPlus": ""
+      },
+      "searchPlaceholder": "",
+      "shareTitle": "",
+      "sortBy": {
+        "date": "",
+        "name": "",
+        "rating": "",
+        "resolution": "",
+        "size": ""
+      },
+      "viewMode": {
+        "eventTimeline": "",
+        "grid": "",
+        "list": "",
+        "masonry": "",
+        "timeline": ""
+      }
+    },
+    "contextMenu": {
+      "copyTo": "",
+      "delete": "",
+      "deletePermanent": "",
+      "edit": "",
+      "export": "",
+      "favorite": "",
+      "moveTo": "",
+      "open": "",
+      "openLocation": "",
+      "properties": "",
+      "rename": "",
+      "saveAs": "",
+      "selectAllInCategory": "",
+      "share": "",
+      "shareToQQ": "",
+      "shareToVivo": "",
+      "shareToWechat": "",
+      "unfavorite": ""
+    },
+    "eventTimeline": {
+      "ariaLabel": "",
+      "emptyHint": "",
+      "itemCount": "",
+      "unknownPeriodDesc": "",
+      "unknownPeriodName": "",
+      "versionBadge": ""
+    },
+    "masonry": {
+      "ariaLabel": ""
+    },
+    "renameDialog": {
+      "cancel": "",
+      "confirm": "",
+      "emptyError": "",
+      "invalidCharsError": "",
+      "title": ""
+    },
+    "tagManager": {
+      "addButton": "",
+      "commonTags": "",
+      "duplicateToast": "",
+      "emptyHint": "",
+      "inputPlaceholder": "",
+      "presetTags": {
+        "battle": "",
+        "drama": "",
+        "equipment": "",
+        "explore": "",
+        "landscape": "",
+        "people": "",
+        "screenshot": ""
+      },
+      "title": ""
+    },
+    "timeline": {
+      "ariaLabel": "",
+      "itemCount": ""
+    },
+    "virtualGrid": {
+      "ariaLabel": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "editAria": "",
+      "editTitle": "",
+      "favoriteAria": "",
+      "favoriteTitle": "",
+      "loadingMore": "Wird geladen…",
+      "noMore": "Keine weiteren Elemente",
+      "unfavoriteAria": "",
+      "unfavoriteTitle": ""
+    },
+    "watermarkDialog": {
+      "cancel": "",
+      "cancelTask": "",
+      "closeAria": "",
+      "computing": "",
+      "processing": "",
+      "processingHint": "",
+      "remaining": "",
+      "startAdd": "",
+      "title": ""
+    },
+    "search": {
+      "log": {
+        "indexNotReadyFallback": ""
+      }
+    },
+    "media": {
+      "log": {
+        "refreshNullFailed": ""
+      }
+    }
+  },
+  "group": {
+    "albumType": "Albumtyp",
+    "all": "Alle",
+    "fileType": "Dateityp",
+    "none": "Keine Gruppierung",
+    "other": "Sonstige",
+    "outfit": "Outfit",
+    "sceneCategory": "Szene",
+    "sceneTime": "Tageszeit",
+    "title": "Intelligente Gruppe",
+    "log": {
+      "loadCountsFailed": ""
+    }
+  },
+  "logAction": {
+    "backupDeleted": "Backup gelöscht",
+    "backupFailed": "Backup fehlgeschlagen",
+    "backupSuccess": "Backup erfolgreich erstellt",
+    "backupSuccessWithProfile": "Backup erfolgreich erstellt (Profil {{name}})",
+    "cleanFailed": "Bereinigung fehlgeschlagen",
+    "cleanMissingError": "Bereinigung fehlender Einträge fehlgeschlagen",
+    "cleanMissingFailed": "Bereinigung fehlgeschlagen",
+    "cleanMissingSuccess": "{{count}} fehlende Einträge bereinigt",
+    "cleanSuccess": "{{count}} Dateien bereinigt, {{size}} freigegeben",
+    "clearData": "Lokale Daten gelöscht",
+    "clearDataFailed": "Daten löschen fehlgeschlagen",
+    "clearFailed": "Leeren fehlgeschlagen",
+    "clearSuccess": "Protokoll geleert",
+    "compactModeOff": "Kompaktmodus deaktiviert",
+    "compactModeOn": "Kompaktmodus aktiviert",
+    "copyFailed": "Kopieren fehlgeschlagen, bitte Text manuell auswählen und kopieren",
+    "copySuccess": "In Zwischenablage kopiert",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "enforceEvicted": "LRU hat {{count}} am längsten nicht verwendete Thumbnails ausgelagert",
+    "enforceFailed": "Prüfung fehlgeschlagen",
+    "enforceNoop": "Cache unter Limit, keine Auslagerung erforderlich",
+    "exportFailed": "Export fehlgeschlagen",
+    "exportSuccess": "Protokoll exportiert",
+    "fontSizeSet": "Schriftgröße auf {{label}} gesetzt",
+    "incrementalOff": "Inkrementeller Scan deaktiviert",
+    "incrementalOn": "Inkrementeller Scan aktiviert",
+    "limitSet": "Limit auf {{gb}}GB gesetzt",
+    "limitSetEvicted": "Limit auf {{gb}}GB gesetzt, LRU hat {{count}} Dateien ausgelagert",
+    "limitSetFailed": "Einstellung fehlgeschlagen",
+    "loadStatsFailed": "Cache-Statistiken laden fehlgeschlagen",
+    "openDirFailed": "Verzeichnis öffnen fehlgeschlagen",
+    "qqCopied": "QQ-Gruppennummer in Zwischenablage kopiert",
+    "qqCopyFailed": "Kopieren fehlgeschlagen, bitte Gruppennummer manuell auswählen und kopieren",
+    "reduceMotionOff": "Animationen reduzieren deaktiviert",
+    "reduceMotionOn": "Animationen reduzieren aktiviert",
+    "restoreFailed": "Wiederherstellung fehlgeschlagen",
+    "restoreSuccess": "Wiederherstellung erfolgreich, bitte App neustarten",
+    "sceneAnalyzeFailed": "Analyse fehlgeschlagen",
+    "sceneAnalyzed": "Szenenzeit für {{count}} Bilder analysiert",
+    "settingFailed": "Einstellung fehlgeschlagen",
+    "themeChanged": "Design gewechselt"
+  },
+  "nav": {
+    "allProfiles": "Alle Profile",
+    "alreadyAtTop": "Bereits auf oberster Ebene",
+    "backToTop": "Zurück",
+    "categories": "Kategorien",
+    "collapse": "Einklappen",
+    "duplicates": "Duplikate",
+    "expand": "Ausklappen",
+    "favorites": "Favoriten",
+    "gallery": "Galerie",
+    "images": "Bilder",
+    "launcherCache": "Launcher-Cache",
+    "menu": "Menü",
+    "recycleBin": "Papierkorb",
+    "resonanceRecords": "Resonanz",
+    "settings": "Einstellungen",
+    "smartGroup": "Intelligente Gruppe",
+    "storage": "Speicher",
+    "switchProfile": "Profil wechseln",
+    "videos": "Videos",
+    "screenshots": "Screenshots"
+  },
+  "outfit": {
+    "collectedHint": "Outfits mit Fotos in der Datenbank",
+    "collectedLabel": "Gesammelte Outfits",
+    "collectedSection": "Gesammelte Outfits ({{count}})",
+    "count": "{{count}} Stück",
+    "customSection": "Benutzerdefinierte Outfits ({{count}})",
+    "emptyHint": "Noch keine Outfit-Daten, bitte Outfits für Fotos auf der Detailseite markieren",
+    "filtered": "Gefilterte Fotos von \"{{outfit}}\"",
+    "latestShot": "Neueste Aufnahme",
+    "loadFailed": "Laden fehlgeschlagen",
+    "loadStatsFailed": "Outfit-Statistiken konnten nicht geladen werden",
+    "loading": "Outfit-Statistiken werden geladen…",
+    "locked": "Gesperrt",
+    "noData": "Noch keine Daten",
+    "photosCount": "{{count}} Fotos",
+    "presetTotalHint": "Integrierte Outfit-Preset-Bibliothek",
+    "presetTotalLabel": "Preset-Outfits gesamt",
+    "progressLabel": "Sammelfortschritt",
+    "progressValue": "{{collected}} / {{total}}",
+    "refresh": "Aktualisieren",
+    "refreshStats": "Neu zählen",
+    "summary": "{{collected}} Outfits gesammelt · {{presets}} Preset-Outfits · Sammelfortschritt {{progress}}%",
+    "title": "Outfit-Galerie",
+    "topOutfitLabel": "Vollständigstes Outfit",
+    "uncollectedHint": "Noch keine Fotos von \"{{outfit}}\" gesammelt",
+    "uncollectedSection": "Nicht gesammelte Outfits ({{count}})",
+    "unsupported": "Outfit-Galerie in aktueller Umgebung nicht unterstützt",
+    "viewOutfitPhotos": "Alle Fotos von \"{{outfit}}\" anzeigen",
+    "presets": {
+      "amberCharm": "",
+      "ancientElegance": "",
+      "auroraPhantom": "",
+      "brilliantGalaxy": "",
+      "butterflyEffect": "",
+      "campusDays": "",
+      "cherryBlossomLover": "",
+      "cloudSinger": "",
+      "cloudWalk": "",
+      "crystalOath": "",
+      "desertRose": "",
+      "emeraldOath": "",
+      "fairyTale": "",
+      "firstKiss": "",
+      "floralGirl": "",
+      "futureTech": "",
+      "glazeDream": "",
+      "islandHoliday": "",
+      "moonlightSonata": "",
+      "morningLight": "",
+      "newYearSplendor": "",
+      "nightPoem": "",
+      "oceanMystery": "",
+      "roseGarden": "",
+      "roseKnight": "",
+      "seaOfStars": "",
+      "snowElf": "",
+      "snowlandTrain": "",
+      "springWaltz": "",
+      "stardustMagic": "",
+      "summerBreeze": "",
+      "urbanBeauty": "",
+      "wisteriaWhisper": "",
+      "winterSnow": "",
+      "autumnLeaves": ""
+    }
+  },
+  "profile": {
+    "defaultProfile": "Standardprofil",
+    "transferToProfile": "Zum Profil transferieren"
+  },
+  "profileAction": {
+    "createFailed": "Erstellung fehlgeschlagen",
+    "created": "Profil erstellt",
+    "defaultCannotDelete": "Standardprofil kann nicht gelöscht werden",
+    "deleteConfirm": "Profil {{uid}} löschen? Dateien unter diesem Profil werden ins Standardprofil verschoben.",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "deleted": "Profil gelöscht",
+    "nicknameRequired": "Spitzname darf nicht leer sein",
+    "nicknameUpdated": "Spitzname aktualisiert",
+    "switchFailed": "Wechseln fehlgeschlagen",
+    "switched": "Profil gewechselt",
+    "uidExists": "Diese UID existiert bereits",
+    "uidInvalid": "UID erlaubt nur Buchstaben und Zahlen",
+    "uidRequired": "Bitte UID eingeben",
+    "unsupported": "Profilverwaltung wird in dieser Umgebung nicht unterstützt",
+    "updateFailed": "Aktualisierung fehlgeschlagen"
+  },
+  "recycleBin": {
+    "backToGallery": "Zurück zur Galerie",
+    "clearSelection": "Auswahl aufheben",
+    "confirmEmpty": "Leeren",
+    "deleteFailed": "Löschen fehlgeschlagen",
+    "empty": "Papierkorb leeren",
+    "emptyConfirm": "Alle {{count}} Elemente im Papierkorb werden dauerhaft gelöscht.\nDateien werden zuerst in den Systempapierkorb verschoben, danach können sie nicht mehr aus dieser App wiederhergestellt werden.\nSicher, dass geleert werden soll?",
+    "emptyConfirmTitle": "Papierkorb leeren",
+    "emptyFailed": "Leeren fehlgeschlagen",
+    "emptySuccess": "Papierkorb geleert",
+    "emptyTitle": "Papierkorb ist leer",
+    "itemLabel": "Papierkorb-Element {{name}}",
+    "permanentConfirm": "Die ausgewählten {{count}} Elemente werden dauerhaft gelöscht.\nDateien werden zuerst in den Systempapierkorb verschoben, danach können sie nicht mehr aus dieser App wiederhergestellt werden.\nSicher, dass gelöscht werden soll?",
+    "permanentConfirmTitle": "Dauerhaft löschen",
+    "permanentDelete": "Dauerhaft löschen",
+    "permanentDeleteSelected": "Auswahl dauerhaft löschen",
+    "permanentHint": "Dateien werden nach dauerhaftem Löschen in den Systempapierkorb verschoben",
+    "restore": "Wiederherstellen",
+    "restoreFailed": "Wiederherstellung fehlgeschlagen",
+    "restoreSelected": "Auswahl wiederherstellen",
+    "retryDelete": "Löschen wiederholen",
+    "retryEmpty": "Leeren wiederholen",
+    "retryRestore": "Wiederherstellung wiederholen",
+    "selectToDelete": "Bitte Elemente zum Löschen auswählen",
+    "selectToRestore": "Bitte Elemente zum Wiederherstellen auswählen",
+    "selectedCount": "{{count}} Elemente ausgewählt",
+    "summary": "{{count}} Elemente · {{size}} gesamt",
+    "summaryWithHint": "{{count}} Elemente · {{size}} gesamt · Dateien werden nach dauerhaftem Löschen in den Systempapierkorb verschoben",
+    "title": "Papierkorb",
+    "toolbarLabel": "Papierkorb-Aktionen",
+    "videoBadge": "Video"
+  },
+  "sceneLabel": {
+    "location": "Ort",
+    "other": "Sonstige",
+    "portrait": "Porträt",
+    "recording": "Aufnahme",
+    "scene": "Szene",
+    "screenshot": "Screenshot",
+    "unknown": "Unbekannt"
+  },
+  "settings": {
+    "about": {
+      "alias": "(gleicher Name auf allen Plattformen)",
+      "appName": "App-Name",
+      "appValue": "WXNN Fotoalbum-Manager",
+      "authorLabel": "Autor: QianLu",
+      "bilibili": "Bilibili",
+      "buildTools": "Build-Toolchain",
+      "checkUpdate": "Auf Updates prüfen",
+      "checkUpdateHint": "Öffnet das GitHub-Repository im Browser; bitte neueste Version manuell herunterladen",
+      "updateTitle": "Aktualisierung",
+      "updateNetworkBusy": "Netzwerk ist ausgelastet. Klicken Sie auf OK, um zur Website zu gelangen.",
+      "updateNoNewVersion": "Sie verwenden bereits die neueste Version",
+      "contactDesc": "GitHub-Repository, QQ-Gruppe und soziale Medien",
+      "contactTitle": "Kontakt",
+      "copyGroup": "Gruppennummer kopieren",
+      "copyright": "© 2026 QianLu. All rights reserved.",
+      "devCredit": "Entwickler: 纖璐不會玩攝影",
+      "developer": "Entwickler",
+      "douyin": "Douyin",
+      "githubRepo": "GitHub-Repository",
+      "licenseApache": "• Apache-2.0: Freie Nutzung; Urheberrecht und Patentlizenz müssen erhalten bleiben",
+      "licenseDesc": "Abhängigkeiten und Lizenzinformationen",
+      "licenseGpl": "• GPL-3.0: Code, der diese verwendet oder ändert, muss ebenfalls Open-Source sein",
+      "licenseMit": "• MIT: Freie Nutzung, Änderung, Verbreitung; Urheberrechtshinweis muss erhalten bleiben",
+      "licenseNote": "Lizenzhinweise",
+      "licenseTitle": "Danksagung & Lizenz",
+      "open": "Öffnen",
+      "projectIntro": "Diese Software basiert auf den oben genannten Open-Source-Projekten. Danke an alle Open-Source-Community-Mitwirkenden. Die Software selbst ist unter der MIT-Lizenz Open-Source; freie Nutzung, Änderung und Verbreitung willkommen.",
+      "qqGroup": "QQ-Gruppe",
+      "repo": "Repository",
+      "repoLabel": "Repository:",
+      "runtimeDeps": "Laufzeitabhängigkeiten",
+      "socialMedia": "Entwickler soziale Medien",
+      "techStack": "Tech-Stack",
+      "version": "Version",
+      "versionLabel": "Version: v{{version}}",
+      "xiaohongshu": "Xiaohongshu",
+      "depDesc": {
+        "autoAnimate": "",
+        "betterSqlite3": "",
+        "electron": "",
+        "exifr": "",
+        "ffmpegStatic": "",
+        "ffprobeStatic": "",
+        "fluentFfmpeg": "",
+        "motion": "",
+        "react": "",
+        "reactDom": "",
+        "sharp": "",
+        "zustand": "",
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+      },
+      "toolDesc": {
+        "electronBuilder": "",
+        "eslint": "",
+        "tailwindCss": "",
+        "typeScript": "",
+        "vite": "",
+        "vitest": ""
+      },
+      "depDescTodo": {
+        "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
+      }
+    },
+    "backup": {
+      "archiveTag": "Profil: {{name}}",
+      "create": "Jetzt sichern",
+      "creating": "Sichern…",
+      "delete": "Löschen",
+      "empty": "Keine Backup-Aufzeichnungen",
+      "emptyHint": "Klicken Sie auf \"Jetzt sichern\", um das erste Backup zu erstellen",
+      "hint": "Die App prüft beim Start automatisch Backups (führt nur aus, wenn letztes Backup über 7 Tage zurückliegt), behält die 5 neuesten, ältere werden automatisch bereinigt. Wiederherstellung überschreibt die aktuelle Datenbank; Neustart erforderlich. Profilbezogenes Backup fügt nur UID-Suffix zum Dateinamen hinzu; Inhalt ist weiterhin die gesamte Datenbank (Wiederherstellung verliert keine anderen Profildaten).",
+      "loading": "Laden…",
+      "modifyDir": "Verzeichnis ändern",
+      "openDir": "Verzeichnis öffnen",
+      "records": "Backup-Aufzeichnungen (neueste zuerst)",
+      "refresh": "Aktualisieren",
+      "restartLater": "Später manuell neustarten",
+      "restartNow": "Jetzt neustarten",
+      "restartTitle": "App neustarten",
+      "restore": "Wiederherstellen",
+      "restoreConfirm": "Aus diesem Backup wiederherstellen? Dies überschreibt alle Daten der aktuellen Datenbank; App-Neustart nach Wiederherstellung erforderlich.",
+      "restoreTitle": "Datenbank wiederherstellen",
+      "storageLocation": "Backup-Speicherort",
+      "total": "{{count}} Backups",
+      "wholeDb": "Vollständige Datenbanksicherung",
+      "log": {
+        "loadBackupsFailed": ""
+      }
+    },
+    "cache": {
+      "cacheLimit": "Cache-Limit",
+      "cacheLocation": "Thumbnail-Cache-Speicherort",
+      "cleanAll": "Alle bereinigen",
+      "cleanConfirm": "Alle {{count}} Thumbnail-Caches bereinigen?\n({{size}} belegt, bereinigte Bilder werden bei Zugriff neu generiert)",
+      "cleanTitle": "Alle Thumbnails bereinigen",
+      "confirmClean": "Bereinigung bestätigen",
+      "currentUsage": "Aktuelle Nutzung",
+      "enforceLru": "LRU-Prüfung jetzt ausführen",
+      "fileCount": "{{count}} Dateien",
+      "hint": "Tipp: Nach Bereinigung werden Thumbnails bei erneutem Zugriff automatisch neu generiert. LRU-Auslagerung betrifft nicht die Originalbilder, nur den Cache.",
+      "limit": "Limit",
+      "lruHint": "Automatische LRU-Auslagerung bei Überschreitung",
+      "modifyDir": "Verzeichnis ändern",
+      "noData": "Keine Daten",
+      "openDir": "Verzeichnis öffnen",
+      "refreshStats": "Statistiken aktualisieren",
+      "usage": "Nutzungsrate",
+      "strategyTitle": "",
+      "strategyDesc": "",
+      "invalidLimit": "",
+      "customLimitHint": ""
+    },
+    "clear": {
+      "cleanMissing": "Fehlende Einträge bereinigen",
+      "cleaning": "Bereinige...",
+      "clearConfirm": "Alle lokalen Daten löschen? Dies löscht Datenbankeinträge, Scan-Verlauf, Tags und Einstellungen, betrifft aber nicht die Originalmedien-Dateien.",
+      "clearLocal": "Lokale Daten löschen",
+      "clearTitle": "Lokale Daten löschen",
+      "missingConfirm": "Alle als \"fehlend\" markierten Einträge löschen? Dies löscht nur den Datenbankindex, betrifft keine anderen normalen Dateien und ist nicht umkehrbar.",
+      "missingConfirmTitle": "Fehlende Einträge bereinigen",
+      "missingDesc": "Wenn beim Scannen festgestellt wird, dass eine Datei extern gelöscht wurde (zweimal hintereinander nicht gefunden), wird sie als \"fehlend\" markiert. Klicken Sie unten, um alle fehlenden Einträge auf einmal zu löschen; nur der Datenbankindex wird gelöscht, normale Dateien sind nicht betroffen.",
+      "missingTitle": "Fehlende Einträge bereinigen"
+    },
+    "crash": {
+      "clear": "Einträge löschen",
+      "clearConfirm": "Alle Absturz-Dump-Dateien löschen? Dies löscht dauerhaft alle Absturzberichte, kann nicht wiederhergestellt werden.",
+      "clearDisabled": "Keine Absturzberichte zum Löschen",
+      "clearTitle": "Absturzberichte löschen",
+      "clearing": "Lösche…",
+      "crashFiles": "Absturzdateien",
+      "crashReason": "Absturzursache",
+      "desc": "Automatische Sammlung von Prozessabsturz-Dump-Dateien, praktisch für Feedback und Fehlerbehebung",
+      "empty": "Keine Absturzberichte",
+      "emptyLoading": "Keine Absturzberichte, laden…",
+      "emptyStable": "Keine Absturzberichte, Software läuft stabil",
+      "hint": "Absturz-Dump-Dateien werden von Electron crashpad automatisch generiert, die 10 neuesten werden behalten, automatische Bereinigung nach 30 Tagen. Nur Prozessabsturzinformationen, keine Benutzerdaten.",
+      "listCount": "{{count}} Einträge",
+      "listTitle": "Absturzberichte (neueste zuerst)",
+      "modifyDir": "Verzeichnis ändern",
+      "oldest": "Ältester Eintrag",
+      "openDir": "Verzeichnis öffnen",
+      "processMain": "Hauptprozess",
+      "processOther": "Sonstige",
+      "processRenderer": "Renderer-Prozess",
+      "refresh": "Aktualisieren",
+      "size": "Größe",
+      "storageLocation": "Absturzdatei-Speicherort",
+      "storageUsage": "Speichernutzung",
+      "title": "Absturzberichte",
+      "topFrame": "Oberster Stack-Frame",
+      "userDataPath": "userData/crashes/"
+    },
+    "display": {
+      "compactMode": "Kompaktmodus",
+      "compactModeDesc": "Kartenabstand und Elementabstand reduzieren, um mehr Inhalt pro Bildschirm anzuzeigen",
+      "fontSize": "Schriftgröße",
+      "fontSizeHint": "Schriftgröße der Oberfläche anpassen, betrifft alle Seiten und Dialoge",
+      "fontSizeLarge": "Groß",
+      "fontSizeNormal": "Standard",
+      "fontSizeSmall": "Klein",
+      "fontSizeXLarge": "Sehr groß",
+      "reduceMotion": "Animationen reduzieren",
+      "reduceMotionDesc": "Übergangsanimationen und Hover-Effekte deaktivieren, Reaktionsgeschwindigkeit auf leistungsschwachen Geräten verbessern"
+    },
+    "export": {
+      "clearDir": "Leeren",
+      "defaultDir": "Standard-Exportpfad",
+      "defaultDirHint": "Nach Konfiguration kann der Stapelexport mit einem Klick in diesen Pfad erfolgen, ohne jedes Mal ein Verzeichnis wählen zu müssen",
+      "defaultDirPlaceholder": "Nicht konfiguriert (Zielverzeichnis wird beim Export abgefragt)",
+      "description": "Standard-Exportpfad und intelligente Benennungsregeln",
+      "namingPattern": "Export-Benennungsregel",
+      "namingPatternEmpty": "Leer lassen, um den ursprünglichen Dateinamen zu verwenden; bei Namenskonflikt automatisch Sequenznummer anhängen",
+      "namingPatternHint": "Variablen: {date} aktuelles Datum · {album_type} Albumtyp · {uid} Profil-UID · {original_name} ursprünglicher Dateiname · {sequence} Sequenznummer",
+      "namingPatternPlaceholder": "z.B.: {date}_{album_type}_{original_name}",
+      "preview": "Vorschau",
+      "previewEmpty": "ursprünglicher_dateiname.erweiterung",
+      "selectDir": "Auswählen",
+      "title": "Export-Workflow",
+      "previewAlbumType": "",
+      "previewExtension": ""
+    },
+    "fileops": {
+      "batchThreshold": "Schwellenwert für Stapelverarbeitung",
+      "batchThresholdDesc": "Sekundäre Bestätigung anzeigen, wenn ausgewählte Dateien diesen Wert überschreiten",
+      "deleteConfirm": "Vor dem Löschen bestätigen",
+      "deleteConfirmDesc": "Bestätigungsdialog beim Löschen von Dateien anzeigen, um versehentliches Löschen zu vermeiden",
+      "description": "Löschbestätigung, Schwellenwerte für Stapelverarbeitung und andere Dateioperationseinstellungen",
+      "permanentDoubleConfirm": "Doppelte Bestätigung für dauerhaftes Löschen",
+      "permanentDoubleConfirmDesc": "Bei Verwendung von Shift+Delete für dauerhaftes Löschen erneut bestätigen",
+      "preferSoftDelete": "Vorläufiges Löschen bevorzugen",
+      "preferSoftDeleteDesc": "Standardmäßig in den Papierkorb verschieben, aus dem Papierkorb wiederherstellbar",
+      "thresholdCount": "Schwellenwert",
+      "title": "Dateioperationen"
+    },
+    "groups": {
+      "about": "Über",
+      "appearance": "Erscheinungsbild",
+      "data": "Datenverwaltung",
+      "diagnostics": "Protokolle & Diagnose",
+      "general": "Allgemein",
+      "plugins": "",
+      "profile": "Profile",
+      "scan": "Scannen",
+      "tools": "Werkzeuge"
+    },
+    "language": {
+      "auto": "System folgen",
+      "description": "Anzeigesprache der Oberfläche ändern",
+      "restartHint": "Einige Texte benötigen möglicherweise einen Neustart der App, um vollständig aktualisiert zu werden",
+      "title": "Sprache",
+      "loading": ""
+    },
+    "logs": {
+      "aggregateTooltip": "Zur Aggregationsansicht wechseln (gleiche Fehler zusammengeführt)",
+      "clear": "Protokoll leeren",
+      "clearConfirm": "Alle historischen Protokolle leeren? Dies löscht dauerhaft alle Fehlereinträge und Protokolldateien, kann nicht wiederhergestellt werden.",
+      "clearDisabled": "Keine Protokolle zum Leeren",
+      "clearTitle": "Protokoll leeren",
+      "clearing": "Leere…",
+      "copy": "Kopieren",
+      "copySample": "Beispiel kopieren",
+      "dayTooltip": "{{date}}: {{count}} Fehler",
+      "desc": "Automatische Aufzeichnung von Software-Ausführungsausnahmen, praktisch für Feedback und Fehlerbehebung",
+      "empty": "Keine Fehlereinträge",
+      "emptyHint": "Ausnahmen während der Software-Ausführung werden hier automatisch aufgezeichnet",
+      "expandFault": "Fehlerdetails erweitern: {{summary}}",
+      "expandSample": "Aggregationsdetails erweitern: {{summary}}",
+      "export": "Protokoll exportieren",
+      "exportDisabled": "Keine Protokolle zum Exportieren",
+      "exporting": "Exportiere…",
+      "faultId": "Fehler-ID: {{id}}",
+      "faultTotal": "Fehler gesamt",
+      "firstSeen": "Erstmalig: {{time}}",
+      "fullLog": "Vollständiger Protokollinhalt",
+      "hint": "Protokolle werden nach Datum automatisch rotiert, Gesamtgrößenlimit 2GB, automatische Bereinigung nach 90 Tagen. Nur Software-Ausführungsinformationen, keine Benutzerdaten.",
+      "lastSeen": "Zuletzt: {{time}}",
+      "listAggregate": "Fehleraggregation (nach Anzahl absteigend)",
+      "listCount": "{{count}} Einträge",
+      "listCountWithGroup": "{{count}} Einträge · {{groups}} Gruppen",
+      "listTimeline": "Fehlereinträge (neueste zuerst)",
+      "logFiles": "Protokolldateien",
+      "modifyDir": "Verzeichnis ändern",
+      "notInit": "Nicht initialisiert",
+      "occurrenceCount": "Vorkommen: {{count}}",
+      "openDir": "Verzeichnis öffnen",
+      "refresh": "Aktualisieren",
+      "sampleDetail": "Beispieldetails (neueste)",
+      "sourceFile": "Quelldatei: {{file}}",
+      "storageLocation": "Protokoll-Speicherort",
+      "storageUsage": "Speichernutzung",
+      "switchAggregate": "Aggregation",
+      "switchTimeline": "Chronologisch",
+      "timelineTooltip": "Zur chronologischen Ansicht wechseln",
+      "title": "Protokollverwaltung",
+      "totalLabel": "Gesamt: {{count}}",
+      "trendTitle": "Fehlertrend (letzte 14 Tage)",
+      "trendTotal": "{{count}} Einträge"
+    },
+    "plugin": {
+      "checkUpdate": "",
+      "description": "",
+      "detail": "",
+      "detailTitle": "",
+      "disable": "",
+      "disabled": "",
+      "empty": "",
+      "enable": "",
+      "enabled": "",
+      "fieldActivationPoints": "",
+      "fieldActive": "",
+      "fieldAuthor": "",
+      "fieldDescription": "",
+      "fieldError": "",
+      "fieldExtensionPoints": "",
+      "fieldLicense": "",
+      "fieldMain": "",
+      "fieldPermissions": "",
+      "fieldVersion": "",
+      "install": "",
+      "installHint": "",
+      "installPlaceholder": "",
+      "installTitle": "",
+      "installed": "",
+      "noUpdate": "",
+      "notAvailable": "",
+      "statusDisabled": "",
+      "statusEnabled": "",
+      "statusError": "",
+      "storagePath": "",
+      "storagePathDesc": "",
+      "uninstall": "",
+      "uninstallConfirm": "",
+      "uninstallTitle": "",
+      "uninstalled": "",
+      "update": "",
+      "updateConfirm": "",
+      "updateTitle": "",
+      "updated": ""
+    },
+    "profile": {
+      "add": "Hinzufügen",
+      "addProfile": "Profil hinzufügen",
+      "cancel": "Abbrechen",
+      "deleteProfile": "Profil löschen",
+      "editNickname": "Spitzname bearbeiten",
+      "empty": "Keine Profile",
+      "images": "Bilder",
+      "list": "Profilliste",
+      "loading": "Laden…",
+      "nicknamePlaceholder": "Spitzname (optional)",
+      "noData": "Keine Daten",
+      "outfitTop": "Outfit-Präferenzen Top 5",
+      "photos": "{{count}} Fotos",
+      "photosWithPercent": "{{count}} Fotos ({{percent}}%)",
+      "save": "Speichern",
+      "sceneTop": "Szenen-Präferenzen Top 5",
+      "shotRange": "Aufnahmezeitraum:",
+      "stats": "Aufnahmestatistiken ({{name}})",
+      "storageUsage": "Speichernutzung",
+      "switchTo": "Zu diesem Profil wechseln",
+      "timeTop": "Zeit-Präferenzen",
+      "totalFiles": "Gesamte Dateien",
+      "uidPlaceholder": "UID (8-12 Ziffern)",
+      "videos": "Videos",
+      "virtualBadge": "Keine Medien (virtuell)",
+      "cleanupVirtual": "Virtuelle Profile bereinigen",
+      "cleanupVirtualConfirm": "{{count}} virtuelle Profile ohne Medien bereinigen? Diese wurden beim Scannen automatisch registriert, haben aber keine tatsächlichen Mediendateien.",
+      "noVirtual": "Keine virtuellen Profile zu bereinigen",
+      "cleanupDone": "{{count}} virtuelle Profile bereinigt",
+      "cleanupPartial": "Bereinigung abgeschlossen, aber {{failed}} virtuelle Profile konnten nicht gelöscht werden"
+    },
+    "scan": {
+      "analyzeNow": "Jetzt analysieren",
+      "analyzing": "Analysiere…",
+      "incremental": "Inkrementeller Scan",
+      "sceneTimeDesc": "Automatische Erkennung von Tag/Nacht/Morgen/Dämmerung basierend auf Bildhelligkeit-Histogramm",
+      "sceneTimeTitle": "Szenen-Zeitanalyse",
+      "addPath": "Spielverzeichnis hinzufügen",
+      "adding": "Wird hinzugefügt…",
+      "emptyPaths": "Keine benutzerdefinierten Spielverzeichnisse konfiguriert. Der Scanner sucht automatisch nach Spielsignaturdateien",
+      "pathAdded": "Spielverzeichnis hinzugefügt",
+      "pathExists": "Dieses Verzeichnis existiert bereits",
+      "pathLimit": "Maximal {{max}} Spielverzeichnisse",
+      "pathRemove": "Entfernen",
+      "pathRemoved": "Spielverzeichnis entfernt",
+      "pathsDescription": "Spielinstallationsverzeichnisse (oder den Albumordner GamePlayPhotos) manuell angeben. Diese Pfade werden beim Scannen vorrangig durchsucht. Bei fehlgeschlagener automatischer Suche können Sie hier manuell ein Verzeichnis als Rückfallebene angeben.",
+      "importRootsTitle": "Angegebene Verzeichnisse",
+      "importRootsDescription": "Über „Scan mit angegebenem Verzeichnis“ registrierte Verzeichnisse können hier aus der Verwaltung entfernt werden",
+      "importRootsEmpty": "Noch keine angegebenen Verzeichnisse registriert",
+      "importRootsLoading": "Wird geladen…",
+      "importRootsRemove": "Dieses angegebene Verzeichnis entfernen",
+      "importRootsManageHint": "Über „Scan mit angegebenem Verzeichnis“ registrierte Verzeichnisse werden unter „Angegebene Verzeichnisse“ verwaltet",
+      "importRootsConfirmTitle": "Angegebenes Verzeichnis entfernen",
+      "importRootsConfirmBody": "Die Registrierung des Verzeichnisses „{{path}}“ wird entfernt. Medienindex-Einträge ebenfalls löschen?",
+      "importRootsConfirmClearRecords": "Medienindex-Einträge dieses Verzeichnisses ebenfalls löschen (in den Papierkorb verschieben, wiederherstellbar)",
+      "importRootsClearRecordsHint": "Hinweis: Bei Aktivierung werden Medien in den Papierkorb verschoben (wiederherstellbar). Ohne Aktivierung bleiben die Einträge erhalten, werden aber weder in „Galerie“ noch in „Cache“ angezeigt (Daten geschlossener Verzeichnisse bleiben in der Bibliothek und können durch erneutes Scannen wiederhergestellt werden).",
+      "importRootsConfirmCancel": "Abbrechen",
+      "importRootsConfirmRemove": "Entfernen bestätigen",
+      "importRootsRemoving": "Wird entfernt…",
+      "importRootsRemovedOnly": "Aus der Verwaltung entfernt",
+      "importRootsRemovedWithCleared": "Aus der Verwaltung entfernt und {{count}} Medieneinträge gelöscht",
+      "importRootsClearFailed": "Aus der Verwaltung entfernt, jedoch konnten die Medienindex-Einträge dieses Verzeichnisses nicht gelöscht werden. Die Einträge bleiben in der Bibliothek",
+      "importRootsRemoveFailed": "Entfernen des angegebenen Verzeichnisses fehlgeschlagen",
+      "importRootsLoadFailed": "Laden der angegebenen Verzeichnisse fehlgeschlagen",
+      "importRootsAdd": "Verzeichnis hinzufügen",
+      "importRootsAddScanning": "Angegebenes Verzeichnis wird gescannt…",
+      "importRootsAddSuccess": "Verzeichnis hinzugefügt: {{path}}",
+      "importRootsAddFailed": "Scan des Verzeichnisses fehlgeschlagen: {{reason}}",
+      "gameRootsDescription": "Listet alle auf diesem Rechner erkannten Spielinstallationsverzeichnisse auf; wählen Sie die am Scan teilnehmenden Verzeichnisse aus. Bei mehreren Verzeichnissen wird standardmäßig das zuletzt geänderte mit offiziellem Album ausgewählt.",
+      "gameRootsLoading": "Spielverzeichnisse werden erkannt…",
+      "gameRootsEmpty": "Kein Spielinstallationsverzeichnis erkannt. Bitte unter „Spielverzeichnisse“ manuell hinzufügen oder die manuelle Rückfall-Scanfunktion unten verwenden.",
+      "gameRootsLoadFailed": "Erkennung der Spielverzeichnisse fehlgeschlagen: {{reason}}",
+      "gameRootsRetry": "Wiederholen",
+      "gameRootsSaved": "Scan-Verzeichnisauswahl gespeichert",
+      "hasGamePlayPhotos": "Offizielles Album vorhanden",
+      "noGamePlayPhotos": "Kein offizielles Album erkannt",
+      "sourceCustom": "Manuell hinzugefügt",
+      "sourceOfficial": "Offizieller Launcher",
+      "sourceSteam": "Steam",
+      "sourceEpic": "Epic",
+      "fallbackDescription": "Schlägt die automatische Ortung fehl, können Sie ein Verzeichnis manuell wählen und sofort scannen. Das gewählte Verzeichnis wird automatisch gespeichert und beim nächsten Start vorrangig gescannt (mehrere möglich).",
+      "fallbackPickGameRoot": "Spielinstallations-Stammverzeichnis wählen",
+      "fallbackPickAlbumDir": "GamePlayPhotos-Ordner direkt wählen",
+      "fallbackRootNoAlbum": "In diesem Verzeichnis wurde kein offizielles Album (GamePlayPhotos) erkannt. Bitte bestätigen Sie, dass ein Spielinstallations-Stammverzeichnis mit X6Game gewählt wurde",
+      "fallbackScanSuccess": "Scan abgeschlossen, {{count}} Mediendateien gefunden",
+      "fallbackScanFailed": "Scan fehlgeschlagen: {{reason}}",
+      "fallbackScanHint": "Sie können stattdessen „GamePlayPhotos-Ordner direkt wählen“ verwenden oder in der Scan-Diagnose Protokolle exportieren und uns zurückmelden.",
+      "fallbackHint": "Rückfallebene 1: Spielinstallations-Stammverzeichnis mit X6Game wählen (GamePlayPhotos wird automatisch ergänzt); Rückfallebene 2: GamePlayPhotos-Ordner direkt wählen. Bei fehlender Berechtigung (E003) können Sie auf „Als Administrator neu starten“ klicken.",
+      "relaunchAsAdmin": "Als Administrator neu starten",
+      "elevating": "Neustart als Administrator läuft…",
+      "elevateFailed": "Neustart mit erhöhten Rechten fehlgeschlagen: {{reason}}"
+    },
+    "sections": {
+      "aboutContact": "Kontakt",
+      "aboutInfo": "App-Informationen",
+      "aboutLicense": "Danksagung & Open-Source-Lizenz",
+      "dataBackup": "Datenbanksicherung",
+      "dataCache": "Cache-Verwaltung",
+      "dataClear": "Daten löschen",
+      "diagnosticsCrash": "Absturzberichte",
+      "diagnosticsLogs": "Protokollverwaltung",
+      "display": "Schriftart & Anzeige",
+      "exportWorkflow": "Export-Workflow",
+      "fileops": "Dateioperationen",
+      "language": "Sprache",
+      "pluginManage": "",
+      "profileManage": "Profilverwaltung",
+      "scanOptions": "Scan-Optionen",
+      "shareCode": "Share-Code-Werkzeuge",
+      "startup": "Startverhalten",
+      "theme": "Design",
+      "scanPaths": "",
+      "importRoots": "",
+      "scanDiagnostic": "扫描链路诊断",
+      "gameRoots": "",
+      "scanFallback": ""
+    },
+    "startup": {
+      "autoScan": "Beim Start automatisch scannen",
+      "autoScanDesc": "Wenn aktiviert, scannt die App beim Start automatisch die Spielpfade nach neuen Mediendateien.",
+      "hardwareAcceleration": "GPU-Hardwarebeschleunigung",
+      "hardwareAccelerationDesc": "Bei Deaktivierung wird Software-Rendering verwendet, um Startabstürze auf einigen Grafikkarten zu vermeiden. Zum Übernehmen neu starten.",
+      "hardwareAccelerationRestartHint": "Die GPU-Hardwarebeschleunigungs-Einstellung wurde gespeichert. Zum Übernehmen muss die App neu gestartet werden. Jetzt neu starten?",
+      "restartNow": "Jetzt neu starten",
+      "restartLater": "Später",
+      "description": "Automatische Verhaltenskonfiguration beim App-Start",
+      "title": "Startverhalten"
+    },
+    "theme": {
+      "desc": "Wirkt sofort; Design-Einstellung wird automatisch in lokaler Konfiguration gespeichert.",
+      "label": "Oberflächendesign"
+    },
+    "title": "Einstellungen",
+    "tools": {
+      "shareCode": {
+        "decoder": "Share-Code-Decoder",
+        "decoderDesc": "Dekodiert In-Game-Färbe-Share-Codes, Home-Build-Share-Codes oder verschlüsselt Kameraparameter. Unterstützt die Extraktion von Metadaten wie Zeitstempel, UID und Server-ID.",
+        "openTool": "Werkzeug öffnen"
+      }
+    },
+    "navigation": {
+      "ariaLabel": ""
+    },
+    "plugins": {
+      "error": {
+        "unavailable": ""
+      }
+    }
+  },
+  "share": {
+    "guide": {
+      "channels": {
+        "qq": "QQ",
+        "vivo": "vivo Office Suite",
+        "wechat": "WeChat"
+      },
+      "failed": "Teilen fehlgeschlagen",
+      "guides": {
+        "qq": {
+          "notInstalled": "QQ nicht erkannt\nDateien in Zwischenablage kopiert, App manuell öffnen und einfügen",
+          "notRunning": "✅ Dateien in Zwischenablage kopiert\nQQ läuft nicht, auf Button unten klicken zum Starten und Einfügen",
+          "running": "✅ Dateien in Zwischenablage kopiert\nQQ-Chat-Fenster öffnen, Strg+V drücken zum Einfügen und Senden"
+        },
+        "vivo": {
+          "notInstalled": "vivo Office Suite nicht erkannt\nDateien in Zwischenablage kopiert, App manuell öffnen und einfügen",
+          "notRunning": "✅ Dateien in Zwischenablage kopiert\nvivo Office Suite läuft nicht, auf Button unten klicken zum Starten und Einfügen",
+          "running": "✅ Dateien in Zwischenablage kopiert\nvivo Office Suite öffnen, Strg+V drücken zum Einfügen und Synchronisieren mit Telefon"
+        },
+        "wechat": {
+          "notInstalled": "WeChat nicht erkannt\nDateien in Zwischenablage kopiert, App manuell öffnen und einfügen",
+          "notRunning": "✅ Dateien in Zwischenablage kopiert\nWeChat läuft nicht, auf Button unten klicken zum Starten und Einfügen",
+          "running": "✅ Dateien in Zwischenablage kopiert\nWeChat-Chat-Fenster öffnen, Strg+V drücken zum Einfügen und Senden"
+        }
+      },
+      "known": "Verstanden",
+      "launchFailed": "Start fehlgeschlagen",
+      "launchSuccess": "Gestartet, bitte warten Sie, bis das Fenster geladen ist, und fügen Sie dann ein",
+      "launching": "Starte...",
+      "open": "{{name}} öffnen",
+      "shareTo": "In {{name}} teilen",
+      "skipped": "({{count}} nicht zugängliche Dateien übersprungen)"
+    },
+    "menu": {
+      "label": "Teilen",
+      "toQQ": "In QQ teilen",
+      "toVivo": "In vivo Office Suite teilen",
+      "toWechat": "In WeChat teilen"
+    },
+    "wifi": {
+      "accessUrl": "Greifen Sie über den Handybrowser auf die folgende URL zu",
+      "copyPin": "PIN kopieren",
+      "copyPinFailed": "Kopieren fehlgeschlagen, bitte manuell notieren",
+      "copyUrl": "URL kopieren",
+      "copyUrlFailed": "Kopieren fehlgeschlagen, bitte URL manuell auswählen und kopieren",
+      "fileCount": "Dateien",
+      "noFiles": "Bitte zuerst Dateien zum Teilen auswählen",
+      "pin": "Zugangs-PIN",
+      "pinCopied": "PIN kopiert",
+      "port": "Port",
+      "remainTime": "Verbleibende Zeit",
+      "restart": "Dienst neustarten",
+      "restartButton": "Neustarten",
+      "restartTitle": "Dienst neustarten (Port wechseln)",
+      "startFailed": "Start fehlgeschlagen",
+      "started": "Freigabedienst gestartet, Port {{port}}",
+      "starting": "Freigabedienst wird gestartet...",
+      "stop": "Freigabe stoppen",
+      "stopFailed": "Stopp fehlgeschlagen",
+      "stopped": "Freigabedienst gestoppt",
+      "timeoutClosed": "Freigabedienst durch Timeout automatisch geschlossen",
+      "tips": {
+        "firewall": "· Falls beim ersten Start von der Firewall blockiert, Node durchlassen",
+        "lanOnly": "· Dienst nur im LAN, nicht öffentlich exponiert",
+        "pinAuth": "· PIN beim ersten Zugriff vom Handy erforderlich",
+        "sameWifi": "· Sicherstellen, dass Handy und Computer im selben WLAN sind",
+        "timeout": "· Automatisches Schließen bei Timeout, oder manuell stoppen"
+      },
+      "title": "WLAN-Freigabe im lokalen Netzwerk",
+      "unsupported": "WLAN-Freigabe in dieser Umgebung nicht unterstützt",
+      "urlCopied": "URL in Zwischenablage kopiert"
+    },
+    "message": {
+      "allInaccessible": "",
+      "copiedToClipboard": "",
+      "copiedWithSkipped": "",
+      "copyFailed": "",
+      "exeNotExist": "",
+      "launched": "",
+      "launchFailed": "",
+      "noFilesSelected": "",
+      "notInstalled": "",
+      "unsupportedPlatform": ""
+    },
+    "log": {
+      "copiedToClipboard": "",
+      "copyFailed": "",
+      "detectInstallPathFailed": "",
+      "launchFailed": "",
+      "launched": ""
+    }
+  },
+  "timeLabel": {
+    "dawn": "Morgendämmerung",
+    "day": "Tag",
+    "dusk": "Abenddämmerung",
+    "night": "Nacht",
+    "unknown": "Unbekannt"
+  },
+  "titleBar": {
+    "appTitle": "WXNN Fotoverwaltungs-Tool"
+  },
+  "toast": {
+    "autoScanOff": "Automatischer Scan beim Start deaktiviert",
+    "autoScanOn": "Automatischer Scan beim Start aktiviert",
+    "gpuOn": "GPU-Hardwarebeschleunigung aktiviert (nach Neustart wirksam)",
+    "gpuOff": "GPU-Hardwarebeschleunigung deaktiviert (nach Neustart wirksam)",
+    "batchThresholdOff": "Schwellenwert für Stapelverarbeitung deaktiviert",
+    "batchThresholdOn": "Schwellenwert für Stapelverarbeitung aktiviert",
+    "batchThresholdSet": "Schwellenwert für Stapelverarbeitung auf {{count}} gesetzt",
+    "defaultDirCleared": "Standard-Exportpfad geleert",
+    "defaultDirSet": "Standard-Exportpfad auf {{dir}} gesetzt",
+    "deleteConfirmOff": "Löschbestätigung deaktiviert",
+    "deleteConfirmOn": "Löschbestätigung aktiviert",
+    "invalidIds": "Ausgewählte Datei-IDs sind ungültig",
+    "languageChanged": "Sprache auf {{lang}} geändert",
+    "noSelectionTransfer": "Keine Dateien für den Transfer ausgewählt",
+    "permanentDoubleConfirmOff": "Doppelte Bestätigung für dauerhaftes Löschen deaktiviert",
+    "permanentDoubleConfirmOn": "Doppelte Bestätigung für dauerhaftes Löschen aktiviert",
+    "preferSoftDeleteOff": "Bevorzugung vorläufigen Löschens deaktiviert",
+    "preferSoftDeleteOn": "Bevorzugung vorläufigen Löschens aktiviert",
+    "transferError": "Profilübergreifender Transfer fehlgeschlagen",
+    "transferFailed": "Transfer fehlgeschlagen",
+    "transferSuccess": "Transfer erfolgreich",
+    "transferUnsupported": "Profilübergreifender Transfer wird in dieser Umgebung nicht unterstützt",
+    "batchExportFailed": "",
+    "batchMoveFailed": "",
+    "batchRenameFailed": "",
+    "batchRenameUnsupported": "",
+    "cancelFailed": "",
+    "cancelRequested": "",
+    "cancelUnsupported": "",
+    "copyFailed": "",
+    "copyUnsupported": "",
+    "decodeFailed": "",
+    "deleteFailed": "",
+    "deleteFileTitle": "",
+    "deleteUnsupported": "",
+    "exportFailed": "",
+    "exportUnsupported": "",
+    "favorite": "",
+    "favoriteFailed": "",
+    "fileProperties": {
+      "resolutionDash": "",
+      "template": "",
+      "typeImage": "",
+      "typeVideo": ""
+    },
+    "imageLoadFailed": "",
+    "ipcCallFailed": "",
+    "mediaLoadFailed": "",
+    "moveFailed": "",
+    "moveToRecycleConfirm": "",
+    "moveUnsupported": "",
+    "noCancellableTask": "",
+    "noDefaultExportDir": "",
+    "noWatermarkSelection": "",
+    "permanentDeleteConfirm": "",
+    "permanentDeleteTitle": "",
+    "previewRenderFailed": "",
+    "renameFailed": "",
+    "renameUnsupported": "",
+    "saveAsFailed": "",
+    "saveAsUnsupported": "",
+    "undo": {
+      "failed": "",
+      "favorite": "",
+      "move": "",
+      "moveToRecycle": "",
+      "none": "",
+      "permanentDelete": "",
+      "rename": "",
+      "undone": "",
+      "unfavorite": "",
+      "conflictPrompt": ""
+    },
+    "undoUnsupported": "",
+    "unfavorite": "",
+    "unknownError": "",
+    "watermarkCancelled": "",
+    "watermarkFailed": "",
+    "watermarkNotConfigured": "",
+    "watermarkUnsupported": "",
+    "scanFailed": "",
+    "scanNoGameDir": "",
+    "manualPathHint": "",
+    "manualPathHintMessage": "",
+    "scanCompletedNoGameShots": "Scan finished: no in-game screenshots found. If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "scanFoundButGalleryEmpty": "Scan finished: {{count}} files found, but none are in-game screenshots (launcher images were saved to the \"Cache\" tab). If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "batchDelete": {
+      "allSucceeded": "",
+      "missingFile": "",
+      "partial": ""
+    },
+    "backup": {
+      "restored": ""
+    },
+    "scanInterrupted": "",
+    "imageProcessorCanvasFailed": "",
+    "imageProcessorLoadFailed": ""
+  },
+  "video": {
+    "applyEdit": "",
+    "backToDetail": "Zurück zu Details",
+    "color": "",
+    "colorDesc": "",
+    "colorNoPreview": "",
+    "confirmExport": "Video in {{format}} Format konvertieren? Neukodierung erforderlich, dauert.",
+    "confirmLivePhoto": "Video als Apple Live Photo exportieren (JPG + MOV Paar-Dateien)? Kodierung dauert, Dateien werden auf iPhone als Live Photo erkannt.",
+    "confirmSpeed": "Neues Video mit {{speed}}x Geschwindigkeit exportieren? Geschätzte Dauer {{duration}}",
+    "confirmTrim": "Zuschneidebereich {{start}} - {{end}} (Dauer {{duration}}) als neue Videodatei exportieren?",
+    "customSpeed": "Benutzerdefinierte Geschwindigkeit",
+    "editFailed": "",
+    "editSuccess": "",
+    "editorUnsupported": "",
+    "endLabel": "Ende",
+    "endLtStart": "Endzeit darf nicht kleiner oder gleich der Startzeit sein",
+    "estimatedDuration": "Geschätzte Dauer",
+    "exportDesc": "Aktuelles Video in ein anderes Format konvertieren. Konvertierung erfordert Neukodierung, Zeit hängt von Videodauer ab. GIF verliert Audio.",
+    "exportFormats": {
+      "avi": "Verlustfrei aber groß",
+      "gif": "Animiert, ohne Audio",
+      "mov": "Apple QuickTime",
+      "mp4": "Beste allgemeine Kompatibilität",
+      "webm": "Web-freundlich, kleine Größe"
+    },
+    "exportMode": "Exportieren",
+    "exportVideo": "Video exportieren",
+    "fastMotionLabel": "4.0x Schnell",
+    "formatConvert": "Format",
+    "gifWarning": "GIF-Format behält nur Videobilder, Audio wird verworfen; Auflösung und Bildrate werden reduziert, um die Dateigröße zu steuern.",
+    "jumpToEnd": "Zum Ende springen",
+    "jumpToStart": "Zum Start springen",
+    "livePhoto": {
+      "button": "Live Photo exportieren",
+      "desc": "Erzeugt JPG (Cover) + MOV (Motion) Paar-Dateien, auf iPhone als Live Photo erkennbar.",
+      "limitation": "Bekannte Einschränkung: JPG enthält kein Apple MakerNote ContentIdentifier; iCloud-Synchronisation kann Paarung verlieren, lokaler Import funktioniert normal.",
+      "title": "Als Live Photo exportieren"
+    },
+    "notes": {
+      "noModifyOriginal": "Export erzeugt neue Dateien, Originalvideo wird nicht verändert",
+      "reencode": "Geschwindigkeitsänderung erfordert Neukodierung, dauert länger",
+      "streamCopy": "Zuschneiden verwendet Stream-Kopie (gleiche Kodierung), schnell",
+      "supportedFormats": "Unterstützt mp4/mov/avi/mkv/webm/wmv"
+    },
+    "notesTitle": "Hinweise",
+    "originalFormat": "Originalformat",
+    "originalSpeedLabel": "1.0x Original",
+    "outputDuration": "Ausgabe-Dauer",
+    "playPause": "Wiedergabe/Pause",
+    "previewSpeed": "Vorschau-Geschwindigkeit",
+    "processing": "Verarbeitung...",
+    "readMetadataFailed": "Video-Metadaten konnten nicht gelesen werden",
+    "resetColor": "",
+    "selectDirAndExport": "Verzeichnis auswählen und exportieren",
+    "selectedRange": "Ausgewählter Bereich",
+    "setToCurrent": "Auf aktuelle Position setzen",
+    "slowMotionLabel": "0.25x Langsam",
+    "speed": "Geschwindigkeit",
+    "speedChange": "Geschwindigkeitsänderung",
+    "speedDesc": "Zielgeschwindigkeit wählen (0.25x - 4.0x). Geschwindigkeitsänderung erfordert Neukodierung, dauert länger. Vorschau zeigt Echtzeit-Effekt.",
+    "speedFast": "Schnell {{n}}x",
+    "speedOriginal": "Original",
+    "speedSlow": "Langsam {{n}}x",
+    "startGtEnd": "Startzeit darf nicht größer oder gleich der Endzeit sein",
+    "startLabel": "Start",
+    "targetFormat": "Zielformat",
+    "trim": "Zuschneiden",
+    "trimDesc": "Schieber ziehen oder während der Wiedergabe auf Buttons klicken, um Start-/Endzeit zu setzen. Zuschneiden erzeugt eine neue Datei, ohne das Originalvideo zu verändern.",
+    "trimmedDuration": "Zugeschnittene Dauer",
+    "unknown": "Unbekannt",
+    "unknownCodec": "Unbekannter Codec",
+    "watermark": "",
+    "watermarkDesc": ""
+  },
+  "enums": {
+    "aperture": {
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "neg1": ""
+    },
+    "clothState": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "9": ""
+    },
+    "clothType": {
+      "0": "",
+      "10": "",
+      "20": "",
+      "30": "",
+      "41": "",
+      "50": "",
+      "60": "",
+      "71": "",
+      "72": "",
+      "73": "",
+      "74": "",
+      "75": "",
+      "76": "",
+      "77": "",
+      "78": "",
+      "79": "",
+      "80": "",
+      "81": "",
+      "82": "",
+      "83": "",
+      "84": "",
+      "85": "",
+      "86": "",
+      "90": "",
+      "92": "",
+      "93": "",
+      "94": "",
+      "95": "",
+      "96": "",
+      "97": "",
+      "unknown": ""
+    },
+    "colorPalette": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "16": "",
+      "17": "",
+      "18": ""
+    },
+    "colorSwatch": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": ""
+    },
+    "eurekaAttachment": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": ""
+    },
+    "eurekaColor": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": ""
+    },
+    "expedition": {
+      "101020301": "",
+      "101020302": "",
+      "101020303": "",
+      "101020304": "",
+      "101020305": "",
+      "101020306": "",
+      "101020307": "",
+      "101020308": ""
+    },
+    "filter": {
+      "Fresh_001": "",
+      "Fresh_002": "",
+      "Fresh_003": "",
+      "Fresh_004": "",
+      "Fresh_005": "",
+      "None": "",
+      "Vibe_001": "",
+      "Vibe_002": "",
+      "Vibe_003": "",
+      "Vibe_004": "",
+      "Vibe_005": "",
+      "Vibe_009": "",
+      "Weather_001": "",
+      "Weather_002": "",
+      "Weather_003": "",
+      "Weather_004": ""
+    },
+    "framedMoment": {
+      "0": ""
+    },
+    "interactive": {
+      "206001": "",
+      "261003": "",
+      "42031201": "",
+      "42031202": "",
+      "42031203": ""
+    },
+    "light": {
+      "DirectionLight_B": "",
+      "DirectionLight_L": "",
+      "DirectionLight_R": "",
+      "DirectionLight_T": "",
+      "HueEdgeLight_001_L": "",
+      "HueEdgeLight_001_R": "",
+      "HueEdgeLight_002_L": "",
+      "HueEdgeLight_002_R": "",
+      "HueEdgeLight_003_L": "",
+      "HueEdgeLight_003_R": "",
+      "HueEdgeLight_004_L": "",
+      "HueEdgeLight_004_R": "",
+      "None": "",
+      "VibeLight_001": "",
+      "VibeLight_002": "",
+      "VibeLight_003": "",
+      "VibeLight_004": ""
+    },
+    "poseId": {
+      "0": ""
+    },
+    "puzzle": {
+      "30": "",
+      "31": "",
+      "neg1": ""
+    },
+    "weather": {
+      "0": "",
+      "2": "",
+      "4": "",
+      "7": "",
+      "neg1": ""
+    }
+  },
+  "filter": {
+    "applyPresetAria": "",
+    "category": {
+      "all": "",
+      "artistic": "",
+      "cinematic": "",
+      "custom": "",
+      "natural": "",
+      "vintage": ""
+    },
+    "preset": {
+      "natural-1": "",
+      "natural-2": "",
+      "natural-3": "",
+      "natural-4": "",
+      "natural-5": "",
+      "vintage-1": "",
+      "vintage-2": "",
+      "vintage-3": "",
+      "vintage-4": "",
+      "vintage-5": "",
+      "artistic-1": "",
+      "artistic-2": "",
+      "artistic-3": "",
+      "artistic-4": "",
+      "artistic-5": "",
+      "cinematic-1": "",
+      "cinematic-2": "",
+      "cinematic-3": "",
+      "cinematic-4": "",
+      "cinematic-5": ""
+    },
+    "deleteCustomAria": "",
+    "exportAria": "",
+    "exportJson": "",
+    "generatingPreview": "",
+    "importAria": "",
+    "importJson": "",
+    "intensity": "",
+    "namePlaceholder": "",
+    "save": "",
+    "saveCurrentAria": "",
+    "saving": ""
+  },
+  "locations": {
+    "Miraland": "",
+    "HeartcraftKingdom": "",
+    "Wishfield": "",
+    "MemorialMountains": "",
+    "OldFlorawishMemorial": "",
+    "StylistGuildMemorial": "",
+    "Florawish": "",
+    "DreamwovenRuins": "",
+    "FortuneFalls": "",
+    "GreatWishtreeSquare": "",
+    "LakesideDistrict": "",
+    "OutskirtsForest": "",
+    "BreezyMeadow": "",
+    "AbandonedFanaticWisherCamp": "",
+    "BreezyMeadowActivityArea": "",
+    "BugSongHills": "",
+    "CiciaHighlands": "",
+    "HeartcraftKingdomOutpost": "",
+    "LakesideHill": "",
+    "MeadowWharf": "",
+    "QueenPalaceRuins": "",
+    "RelicHill": "",
+    "SleepyFishHills": "",
+    "SwanGazebo": "",
+    "Stoneville": "",
+    "DyeWorkshop": "",
+    "FlowerFieldsResidence": "",
+    "RockfallValley": "",
+    "StonevilleMarket": "",
+    "AbandonedDistrict": "",
+    "ChooChooStation": "",
+    "GoldenFields": "",
+    "MarketOfMirth": "",
+    "Prosperville": "",
+    "RippleEstate": "",
+    "StellarFishingGround": "",
+    "Stonecrown": "",
+    "WindriderMill": "",
+    "WishingWoods": "",
+    "BrookwoodForest": "",
+    "CavernOfWishes": "",
+    "FallenWishHighlands": "",
+    "GrandTreeValley": "",
+    "SacredMountains": "",
+    "ValleyOfBlossoms": "",
+    "FireworkIsles": "",
+    "ClearheartLake": "",
+    "CrescentMoonRuins": "",
+    "FlamingForest": "",
+    "RelicIsles": "",
+    "SongbreezeHighland": "",
+    "SparkheartIsland": "",
+    "SerenityIsland": "",
+    "OldRuins": "",
+    "Soakville": "",
+    "SoakvilleOutskirts": "",
+    "Steamville": "",
+    "DanqingIsland": "",
+    "BackMountain": "",
+    "BambooGrove": "",
+    "Inkville": "",
+    "InkwashStream": "",
+    "LoongPagoda": "",
+    "LoongPeak": "",
+    "ReedblossomShore": "",
+    "DanqingRealm": "",
+    "GreenBambooGrove": "",
+    "InkPool": "",
+    "InkshorePlain": "",
+    "WildfieldWaterside": "",
+    "TerraAlliance": "",
+    "Itzaland": "",
+    "ItzalandCanyon": "",
+    "ElderwoodForest": "",
+    "BehemothObservationSite": "",
+    "Coliseum": "",
+    "ElderwoodShade": "",
+    "ElderwoodWharf": "",
+    "ForestOfSlumber": "",
+    "ForgottenStreet": "",
+    "GiantVineForest": "",
+    "LeafRiver": "",
+    "MothershroomWoods": "",
+    "ParkyaCraterLake": "",
+    "Pottsville": "",
+    "RockvilleRuins": "",
+    "ShellIsland": "",
+    "Shroomville": "",
+    "SnailRanch": "",
+    "SpiraWaterfall": "",
+    "TitanGraveyard": "",
+    "TitansOutpostRuins": "",
+    "Spira": "",
+    "Spira1F": "",
+    "Spira2F": "",
+    "Spira3F": "",
+    "SpiraShelldome": "",
+    "Boneyard": "",
+    "BluePools": "",
+    "Cultivarium": "",
+    "DragonRuins": "",
+    "DragonrestFlowerfield": "",
+    "GlimmeringLake": "",
+    "GreatLumieville": "",
+    "HealingGround": "",
+    "HollowbreathPassage": "",
+    "LonestoneShore": "",
+    "SoulSpring": "",
+    "WanxiangRealm": "",
+    "CaiYeMarket": "",
+    "CaiYeOutskirts": "",
+    "DazzlebloomMeadow": "",
+    "DeepValleySpring": "",
+    "JiuhuaPavilion": "",
+    "JiuhuaPenitentiary": "",
+    "ValleyPath": "",
+    "WhereWoodEchoes": "",
+    "EmpireOfLight": "",
+    "StarhailFederation": "",
+    "LinlangEmpire": "",
+    "TwinmoonKingdom": "",
+    "WhalePort": "",
+    "Umbraso": "",
+    "SeaOfStars": "",
+    "Crystalvale": "",
+    "DreamStarIsles": "",
+    "Starshore": "",
+    "UnboundWharf": "",
+    "Home": "",
+    "DockArea": ""
+  },
+  "sceneCategory": {
+    "collage": "",
+    "other": "",
+    "screenshot": "",
+    "thumbnail": "",
+    "travelJournal": "",
+    "worldTour": ""
+  },
+  "sceneTime": {
+    "dawn": "",
+    "dawnDesc": "",
+    "day": "",
+    "dayDesc": "",
+    "dusk": "",
+    "duskDesc": "",
+    "night": "",
+    "nightDesc": "",
+    "unknown": "",
+    "unknownDesc": ""
+  },
+  "faultTypes": {
+    "uncaughtException": "",
+    "unhandledRejection": "",
+    "rendererCrash": "",
+    "rendererError": "",
+    "ipcError": "",
+    "manual": "",
+    "rendererComponent": "",
+    "rendererPromise": "",
+    "rendererResource": "",
+    "exitDiagnosis": "",
+    "workerCrash": "",
+    "workerRestart": "",
+    "databaseCorruption": "",
+    "databaseRestore": "",
+    "indexingTimeout": "",
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": "",
+    "navigation-blocked": ""
+  },
+  "lut": {
+    "builtin": {
+      "identity": "",
+      "tealOrange": "",
+      "warmVintage": "",
+      "coolDrama": "",
+      "highContrast": ""
+    },
+    "log": {
+      "persistFailed": ""
+    }
+  },
+  "watermark": {
+    "blendMode": {
+      "multiply": "",
+      "normal": "",
+      "overlay": "",
+      "screen": "",
+      "softLight": ""
+    },
+    "bold": "",
+    "boldOff": "",
+    "color": "",
+    "deleteTemplateAria": "",
+    "deleteText": "",
+    "font": "",
+    "fontMicrosoftYaHei": "",
+    "fontMonospace": "",
+    "fontSansSerif": "",
+    "fontSerif": "",
+    "height": "",
+    "horizontalSpacing": "",
+    "imageMode": "",
+    "imagePreviewAlt": "",
+    "imageSelectButton": "",
+    "imageSelectPlaceholder": "",
+    "imageWatermark": "",
+    "italic": "",
+    "italicOff": "",
+    "margin": "",
+    "opacity": "",
+    "pluginTemplateImage": "",
+    "pluginTemplateText": "",
+    "pluginTemplates": "",
+    "position": "",
+    "positionBottomCenter": "",
+    "positionBottomLeft": "",
+    "positionBottomRight": "",
+    "positionCenter": "",
+    "positionCenterLeft": "",
+    "positionCenterRight": "",
+    "positionTopCenter": "",
+    "positionTopLeft": "",
+    "positionTopRight": "",
+    "presetAria": "",
+    "presets": "",
+    "rotation": "",
+    "saveTemplateAria": "",
+    "size": "",
+    "stylePresetCopyright": "",
+    "stylePresetCopyrightDesc": "",
+    "stylePresetDateLabel": "",
+    "stylePresetDateLabelDesc": "",
+    "stylePresetPolaroid": "",
+    "stylePresetPolaroidDesc": "",
+    "stylePresetSignature": "",
+    "stylePresetSignatureDesc": "",
+    "templateNamePlaceholder": "",
+    "templates": "",
+    "text": "",
+    "textMode": "",
+    "textPlaceholder": "",
+    "tileMode": "",
+    "underline": "",
+    "underlineOff": "",
+    "verticalSpacing": "",
+    "width": "",
+    "log": {
+      "saveTemplateFailed": "",
+      "deleteTemplateFailed": ""
+    }
+  },
+  "camera": {
+    "aperture": "",
+    "bloomIntensity": "",
+    "bloomThreshold": "",
+    "brightness": "",
+    "cameraInfo": "",
+    "cameraLoc": "",
+    "cameraPitch": "",
+    "cameraYaw": "",
+    "comparison": "",
+    "contrast": "",
+    "copyCode": "",
+    "empty": "",
+    "errorPrefix": "",
+    "exposure": "",
+    "filter": "",
+    "framedMoment": "",
+    "highlights": "",
+    "hidden": "",
+    "light": "",
+    "loading": "",
+    "momoHidden": "",
+    "notHidden": "",
+    "optic": "",
+    "pose": "",
+    "rawParams": "",
+    "scene": "",
+    "sectionAdjust": "",
+    "shadows": "",
+    "softIntensity": "",
+    "unknown": "",
+    "vibrance": "",
+    "yes": "",
+    "no": "",
+    "saturation": "",
+    "zoom": "",
+    "focalLength": "",
+    "lensRotation": "",
+    "portraitMode": "",
+    "copyHeader": "",
+    "copyEnvHeader": "",
+    "copyErrorHeader": "",
+    "copyFaultId": "",
+    "copyTime": "",
+    "copyType": "",
+    "copySummary": "",
+    "copyAppVersion": "",
+    "copyElectron": "",
+    "copyNode": "",
+    "copyPlatform": "",
+    "copyPidUptime": ""
+  },
+  "batch": {
+    "actions": {
+      "ariaLabel": "",
+      "categorize": "",
+      "clearSelection": "",
+      "delete": "",
+      "export": "",
+      "exportSelectDir": "",
+      "exportToDefault": "",
+      "exportToDefaultHint": "",
+      "invertSelection": "",
+      "move": "",
+      "rename": "",
+      "renameAria": "",
+      "renameHint": "",
+      "selectedCount": "",
+      "share": "",
+      "shareClipboardTitle": "",
+      "transferToProfile": "",
+      "transferToProfileHint": "",
+      "watermark": "",
+      "wifiShare": "",
+      "wifiShareHint": "",
+      "selectAll": ""
+    },
+    "rename": {
+      "cancel": "",
+      "confirmButton": "",
+      "description": "",
+      "emptyError": "",
+      "examplePlaceholder": "",
+      "invalidError": "",
+      "moreFiles": "",
+      "previewLabel": "",
+      "previewError": "",
+      "templateLabel": "",
+      "title": "",
+      "varClickHint": "",
+      "varDate": "",
+      "varDateDesc": "",
+      "varOriginal": "",
+      "varOriginalDesc": "",
+      "varOutfit": "",
+      "varOutfitDesc": "",
+      "varScene": "",
+      "varSceneDesc": "",
+      "varSeq": "",
+      "varSeqDesc": "",
+      "varTime": "",
+      "varTimeDesc": ""
+    }
+  },
+  "galleryPage": {
+    "cleanupCorruptedConfirm": "",
+    "cleanupCorruptedCount": "",
+    "cleanupCorruptedFailed": "",
+    "cleanupCorruptedTitle": "",
+    "emptySubtitle": "",
+    "emptySubtitleScanned": "Scan finished, but no in-game screenshots were found. Try \"Scan specific folder\" in the scan menu, or check the \"Cache\" tab for launcher images",
+    "emptyTitle": "",
+    "batchDeleteConfirm": "",
+    "batchDeleteTitle": "",
+    "confirmCancel": "",
+    "confirmOK": "",
+    "openLocationFailed": "",
+    "noPlayableMedia": "",
+    "selectShareFirst": "",
+    "selectShareFilesFirst": "",
+    "shareUnavailable": "",
+    "showDuplicates": "",
+    "showDuplicatesChecked": "",
+    "showDuplicatesOff": "",
+    "showDuplicatesOn": "",
+    "smartGroup": "",
+    "smartGroupToggle": ""
+  },
+  "diagnostics": {
+    "logs": {
+      "clearAllHint": "",
+      "copyAppVersion": "",
+      "copyElectron": "",
+      "copyEnvInfoTitle": "",
+      "copyErrorDetailTitle": "",
+      "copyFaultId": "",
+      "copyNode": "",
+      "copyPid": "",
+      "copyPlatform": "",
+      "copySummary": "",
+      "copyTime": "",
+      "copyType": "",
+      "exportAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "sampleId": "",
+      "unknown": "",
+      "loadFailed": "",
+      "loadCrashesFailed": ""
+    },
+    "crash": {
+      "clearAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "processType": {
+        "main": "",
+        "renderer": "",
+        "gpu": "",
+        "utility": "",
+        "plugin": "",
+        "unknown": ""
+      }
+    },
+    "scan": {
+      "title": "Scan-Diagnose",
+      "legendOk": "Erfolg",
+      "legendPathMissing": "Pfad fehlt",
+      "legendPermission": "Keine Berechtigung",
+      "legendEmpty": "Verzeichnis leer",
+      "legendInfo": "Info",
+      "emptyHint": "Nach einem Scan-Vorgang erscheint hier die vollständige Diagnose-Timeline von „Scanstart“ bis „Datei-Scan“.",
+      "autoRefresh": "Automatisch aktualisieren",
+      "refresh": "Aktualisieren",
+      "copy": "Kopieren",
+      "clear": "Leeren",
+      "export": "Diagnoseprotokoll exportieren",
+      "exportAll": "Alle Protokolle exportieren (zip)",
+      "exportedTo": "Exportiert nach {{path}}",
+      "exportFailed": "Export fehlgeschlagen: {{reason}}",
+      "errorCodeHint": "Fehlercodes E001–E005 stehen für Ortung fehlgeschlagen/Unterverzeichnis fehlt/keine Berechtigung/keine UID/Lesen fehlgeschlagen. Exportierte Protokolle können dem Ticket beigefügt werden"
+    }
+  },
+  "errorFallback": {
+    "componentStack": "",
+    "copied": "",
+    "copyError": "",
+    "errorMessage": "",
+    "errorStack": "",
+    "hideDetail": "",
+    "openLogDir": "",
+    "reload": "",
+    "showDetail": "",
+    "subtitle": "",
+    "title": "",
+    "routeTitle": "",
+    "routeRetry": "",
+    "zoneTitle": "",
+    "zoneRetry": "",
+    "zoneDegraded": "",
+    "ipcFailed": ""
+  },
+  "infoPanel": {
+    "copied": "",
+    "copyAriaLabel": "",
+    "copyDefault": "",
+    "copyTitle": "",
+    "emptyDefault": "",
+    "errorPrefixDefault": "",
+    "loadingDefault": "",
+    "paramNotContained": "Diese Datei enthält den angefragten Parameter nicht"
+  },
+  "taskProgress": {
+    "calculating": "",
+    "cancel": "",
+    "phase": {
+      "cancelled": "",
+      "done": "",
+      "error": "",
+      "finalizing": "",
+      "preparing": "",
+      "processing": ""
+    },
+    "remaining": ""
+  },
+  "albumTypes": {
+    "screenshot": "",
+    "nikkiphotos_highquality": "",
+    "nikkiphotos_lowquality": "",
+    "videos": "",
+    "magazinephotos": "",
+    "clockinphoto": "",
+    "cloudphotos": "",
+    "cloudphotos_lowquality": "",
+    "collage": "",
+    "highquality": "",
+    "lowquality": "",
+    "collagephoto": "",
+    "customavatar": "",
+    "customcard": "",
+    "customhomeboardphoto": "",
+    "hometemplate": "",
+    "plantdyeing": "",
+    "diy": "",
+    "xsdkqrcode": "",
+    "mallpic": "",
+    "video": "",
+    "movies": "",
+    "profilephoto": "",
+    "posephoto": "",
+    "groupphoto": "",
+    "storyphoto": "",
+    "landscapephoto": "",
+    "selfiephoto": "",
+    "autophoto": "",
+    "photostudio": "",
+    "photoframe": "",
+    "adventurephoto": "",
+    "diaryphoto": "",
+    "activityphoto": "",
+    "eventphoto": "",
+    "festivalphoto": "",
+    "missionphoto": "",
+    "videoclip": "",
+    "custom": "",
+    "unknown": ""
+  },
+  "main": {
+    "dialog": {
+      "instanceRunning": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "cleanupButton": "",
+        "manualButton": "",
+        "exitButton": ""
+      },
+      "cleanupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openTaskManager": ""
+      },
+      "startupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openLogDir": ""
+      },
+      "validation": {
+        "messageRequired": ""
+      },
+      "defaultOk": ""
+    },
+    "error": {
+      "mainWindowNotInit": "",
+      "databaseNotInit": ""
+    },
+    "editor": {
+      "dialog": {
+        "filterPresetName": ""
+      },
+      "error": {
+        "userCanceledSave": "",
+        "userCanceledSelect": "",
+        "userCanceledExportDir": "",
+        "jsonParseFailed": "",
+        "presetFormatInvalid": "",
+        "onlyIndexedPath": ""
+      },
+      "validation": {
+        "nameRequired": "",
+        "nameMaxLength": "",
+        "categoryRequired": "",
+        "categoryMaxLength": "",
+        "dataUrlRequired": "",
+        "dataUrlMaxLength": "",
+        "fileNameInvalid": ""
+      },
+      "log": {
+        "cleanupSnapshotsDone": "",
+        "cleanupSnapshotsFailed": "",
+        "backupSizeMismatch": "",
+        "backupFailed": "",
+        "backupSizeChanged": "",
+        "restoredFromBackup": "",
+        "restoreFailed": "",
+        "recordHistoryFailed": ""
+      }
+    },
+    "plugin": {
+      "error": {
+        "notFound": "",
+        "filePathInvalid": "",
+        "filePathsInvalid": "",
+        "targetDirInvalid": "",
+        "fileNameInvalid": "",
+        "sqlInvalid": "",
+        "selectOnly": "",
+        "tableNotInWhitelist": "",
+        "configInvalid": "",
+        "taskIdInvalid": "",
+        "currentTotalInvalid": "",
+        "notInitialized": "",
+        "noSpecifiers": ""
+      },
+      "dialog": {
+        "installConfirmTitle": "",
+        "installConfirmMessage": "",
+        "installConfirmDetail": "",
+        "install": ""
+      }
+    },
+    "media": {
+      "dialog": {
+        "cancel": "",
+        "confirmDelete": "",
+        "confirmEmpty": "",
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": "",
+        "emptyRecycleBinTitle": "",
+        "emptyRecycleBinMessage": ""
+      },
+      "error": {
+        "userCanceled": "",
+        "missingNotFound": "",
+        "corruptedNotFound": ""
+      },
+      "message": {
+        "softDeleted": "",
+        "restored": "",
+        "permanentDeleted": "",
+        "permanentDeletePartial": "",
+        "recycleBinEmpty": "",
+        "recycleBinEmptied": "",
+        "cleanedMissing": "",
+        "missingRemoved": "",
+        "cleanedCorrupted": "",
+        "corruptedRemoved": "",
+        "nothingToAnalyze": "",
+        "sceneTimeAnalyzed": ""
+      },
+      "log": {
+        "recycleBinMoveFailed": "",
+        "recycleBinMoveOmitted": ""
+      },
+      "validation": {
+        "tagsMax": "",
+        "notesMaxLength": "",
+        "outfitMaxLength": ""
+      }
+    },
+    "validator": {
+      "pathRequired": "",
+      "pathMaxLength": "",
+      "pathArrayRequired": "",
+      "pathArrayMaxLength": "",
+      "mediaIdPositive": "",
+      "mediaIdsRequired": "",
+      "mediaIdsMaxLength": "",
+      "ratingRange": "",
+      "idPositive": "",
+      "stringRequired": "",
+      "stringMaxLength": "",
+      "stringControlChars": "",
+      "uidRequired": "",
+      "uidMaxLength": "",
+      "uidAlphanumeric": "",
+      "urlRequired": "",
+      "urlMaxLength": "",
+      "urlInvalid": "",
+      "urlHttpOnly": "",
+      "backupFilenameInvalid": "",
+      "limitBytesPositive": "",
+      "pathNotAllowed": "Path is not in the whitelist, {{op}} operation is forbidden",
+      "opWrite": "write",
+      "opRead": "read",
+      "paramValidationFailed": "",
+      "log": {
+        "handlerUncaught": ""
+      },
+      "arrayStringRequired": "",
+      "ipcPathArrayMaxLength": "",
+      "pathStringLength": "",
+      "pathMustAbsolute": "",
+      "numberFinite": "",
+      "numberRange": "",
+      "intRequired": "",
+      "stringTypeRequired": "",
+      "stringLengthRange": "",
+      "mediaIdsArrayRequired": "",
+      "mediaIdsNotEmpty": "",
+      "tagNameStringRequired": "",
+      "tagNameLength": "",
+      "tagNameControlChars": "",
+      "urlLength": "",
+      "protocolNotAllowed": "",
+      "urlInvalidLiteral": "",
+      "presetObjectRequired": "",
+      "presetNameRequired": "",
+      "presetCategoryRequired": "",
+      "presetParamsRequired": ""
+    },
+    "db": {
+      "recovery": {
+        "openFailed": "",
+        "integrityCheckFailed": "",
+        "dbHandleNull": "",
+        "reopenFailed": ""
+      },
+      "log": {
+        "lockRetrySucceeded": "",
+        "openFailedTryingBackup": "",
+        "autoRecoveryFailed": "",
+        "autoVacuumFailed": "",
+        "pragmaOptimizeFailed": "",
+        "integrityCheckFault": "",
+        "writeCleanExitMarkerFailed": "",
+        "closeCorruptedFailed": "",
+        "restoreFailedReverted": "",
+        "reopenAfterRestoreFailFailed": "",
+        "reopenAfterRestoreFailed": "",
+        "autoRestored": "",
+        "corruptDbRenamed": "",
+        "corruptDbCopied": "",
+        "corruptDbBackupFailed": "",
+        "recoveryListenerFailed": "",
+        "preMigrationBackupCreated": "",
+        "preMigrationBackupFailed": "",
+        "migrationFailedTxRolledBack": "",
+        "migrationFailedNoBackup": "",
+        "operationHistoryCleanupFailed": "",
+        "indexExistsIgnored": "",
+        "v3IndexExistsIgnored": "",
+        "fts5Unavailable": "",
+        "v3MigrationDone": "",
+        "v3MigrationFailed": "",
+        "backfillApplied": "",
+        "backfillFailed": "",
+        "systemCategoryKeyMigrationFailed": "",
+        "sceneCategoryMigrated": "",
+        "sceneCategoryMigrationFailed": "",
+        "settingTypeMismatch": "",
+        "exitOptimizeFailed": "",
+        "walCheckpointFailed": "",
+        "importRootsGalleryFailed": "",
+        "importRootsCacheFailed": "",
+        "fts5QueryFallback": ""
+      },
+      "error": {
+        "lockedByOtherProgram": "",
+        "openFailedAfterRecovery": "",
+        "initFailedNullHandle": "",
+        "migrationFailedRolledBack": "",
+        "migrationRolledBackToBackup": "",
+        "rollbackToBackupFailed": "",
+        "indexCreationFailed": "",
+        "v3IndexCreationFailed": "",
+        "addColumnFailed": "",
+        "abiIncompatible": "",
+        "permissionDenied": "",
+        "diskFull": "",
+        "databaseCorrupted": "",
+        "unknown": ""
+      }
+    },
+    "file": {
+      "action": {
+        "copy": "",
+        "move": "",
+        "rename": "",
+        "export": ""
+      },
+      "error": {
+        "busy": "",
+        "permission": "",
+        "generic": "",
+        "invalidChars": "",
+        "pathReference": "",
+        "invalidSeparator": "",
+        "targetExists": "",
+        "invalidName": "",
+        "fileTooLarge": "",
+        "noOutputDir": "",
+        "noDefaultExportDir": ""
+      },
+      "message": {
+        "movedToRecycleBin": "",
+        "deleteFailed": "",
+        "copied": "",
+        "moved": "",
+        "renameSuccess": "",
+        "batchRenameAllSuccess": "",
+        "batchRenamePartial": "",
+        "exported": "",
+        "saveAsSuccess": "",
+        "saveAsFailed": "",
+        "deletePermanentPartial": "",
+        "deletedPermanent": "",
+        "saveSuccess": "",
+        "saveFailed": "",
+        "notDirectory": "",
+        "cannotAccessDir": "",
+        "insufficientDiskSpace": "",
+        "targetExists": "",
+        "importComplete": "",
+        "editedImageFileName": ""
+      },
+      "log": {
+        "exifReadFailed": "",
+        "dbSyncFailed": "",
+        "pendingRenamesRecordFailed": "",
+        "exportMetadataFallback": ""
+      },
+      "validation": {
+        "operationsRequired": "",
+        "operationsMax": ""
+      },
+      "dialog": {
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": ""
+      }
+    },
+    "gameEvents": {
+      "versionDescription": ""
+    },
+    "decryption": {
+      "error": {
+        "abiMismatch": "",
+        "step1Failed": "",
+        "cameraParamsNotFound": "",
+        "step3Failed": "",
+        "cameraParamsInvalid": "",
+        "fileTooLarge": "",
+        "fileUnreadable": "",
+        "uidMissing": "",
+        "cameraKeyFailed": "",
+        "unknown": "",
+        "encryptFailed": "",
+        "invalidClothDiyCode": "",
+        "networkDecodeFailed": "",
+        "networkTimeout": "Netzwerk-Decodierung zeitüberschreitung (herabgestuft; andere Felder verfügbar)",
+        "networkUnavailable": "Netzwerkdekodierung nicht verfügbar (möglicherweise Internet erforderlich)",
+        "invalidHomeBuildCode": "",
+        "ffiNotInit": "",
+        "findNoEndFlagHint": "",
+        "uidRequired": "",
+        "dllNotInit": "",
+        "initSendFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "decodeTimeout": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "log": {
+        "mapHint": "",
+        "noCameraParams": "",
+        "unexpectedError": "",
+        "dllResolveFailed": "",
+        "initSendFailed": "",
+        "readyTimeout": "",
+        "decodeTimeout": "",
+        "requestSendFailed": "",
+        "restartExhausted": "",
+        "restarting": "",
+        "restarted": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      }
+    },
+    "lifecycle": {
+      "log": {
+        "crashReporterStarted": "",
+        "crashReporterFailed": "",
+        "backupInitFailed": "",
+        "themeCleanupFailed": "",
+        "selfCheckFailed": "",
+        "unknownReason": "",
+        "crashCleanFailed": "",
+        "forceExitReasonWal": "",
+        "forceExitReasonDefault": "",
+        "startupFailed": ""
+      }
+    },
+    "autoUpdate": {
+      "log": {
+        "devSkip": "",
+        "updateError": "",
+        "initialized": "",
+        "checkFailed": "",
+        "downloadFailed": ""
+      }
+    },
+    "log": {
+      "dialog": {
+        "filterZipName": ""
+      },
+      "error": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "getStatsFailed": "",
+        "userCanceledSave": "",
+        "clearFailed": "",
+        "reportRendererFailed": ""
+      },
+      "log": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "clearedAll": "",
+        "reportRendererFailed": ""
+      }
+    },
+    "cleanup": {
+      "log": {
+        "exitDiagnosisSummary": ""
+      }
+    },
+    "gpu": {
+      "log": {
+        "processCrashFallback": ""
+      }
+    },
+    "rendererBridge": {
+      "log": {
+        "sendFailed": ""
+      }
+    },
+    "rendererProtocol": {
+      "error": {
+        "calledBeforeReady": ""
+      }
+    },
+    "setDir": {
+      "message": {
+        "resetToDefault": ""
+      },
+      "error": {
+        "resetFailed": ""
+      }
+    },
+    "disk": {
+      "error": {
+        "insufficient": ""
+      },
+      "keyword": {
+        "insufficient": ""
+      }
+    },
+    "fileUtils": {
+      "error": {
+        "invalidDataUrl": ""
+      }
+    },
+    "backup": {
+      "log": {
+        "createIpcFailed": "",
+        "listFailed": "",
+        "restoreIpcFailed": "",
+        "startupAutoBackupFailed": "",
+        "skipAutoBackup": "",
+        "runningStartupAutoBackup": "",
+        "createSuccess": "",
+        "createFailed": "",
+        "restoreToFailed": "",
+        "restoredToDb": "",
+        "restoreSuccessRelaunching": "",
+        "relaunchFailed": "",
+        "restoreFailed": "",
+        "relaunchAfterFailureFailed": "",
+        "repairFlagWritten": "",
+        "repairFlagWriteFailed": "",
+        "deleted": "",
+        "deleteFailed": "",
+        "prunedOld": ""
+      },
+      "error": {
+        "createFailed": "",
+        "listFailed": "",
+        "restoreFailed": "",
+        "deleteFailed": "",
+        "dbUnavailable": "",
+        "noBackupToRestore": "",
+        "restoreFailedPlain": "",
+        "backupNotExist": "",
+        "backupCorrupted": "",
+        "restoreFailedRelaunch": "",
+        "pathTraversalDenied": ""
+      },
+      "message": {
+        "restoredFrom": "",
+        "restoredButRelaunchFailed": "",
+        "restoredRelaunching": ""
+      }
+    },
+    "cache": {
+      "log": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      },
+      "error": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      }
+    },
+    "category": {
+      "error": {
+        "noUpdatableFields": "",
+        "systemCategoryUndeletable": "",
+        "ordersRequired": "",
+        "ordersMax": ""
+      }
+    },
+    "crash": {
+      "log": {
+        "listFailed": "",
+        "clearedAll": ""
+      },
+      "error": {
+        "listFailed": "",
+        "getStatsFailed": "",
+        "clearFailed": "",
+        "openDirFailed": ""
+      },
+      "message": {
+        "nativeCrash": "",
+        "unknownFormat": "",
+        "opened": ""
+      }
+    },
+    "data": {
+      "dialog": {
+        "cancel": "",
+        "confirmClear": "",
+        "clearTitle": "",
+        "clearMessage": "",
+        "clearDetail": ""
+      },
+      "message": {
+        "cleared": ""
+      }
+    },
+    "decrypt": {
+      "validation": {
+        "albumTypeRequired": "",
+        "albumTypeMaxLength": "",
+        "jsonTextRequired": "",
+        "jsonTextMaxLength": "",
+        "codeStrRequired": "",
+        "codeStrMaxLength": ""
+      },
+      "log": {
+        "mediaWhitelistHit": "",
+        "resolveUidFailed": "",
+        "getKnownUidsFailed": ""
+      }
+    },
+    "duplicate": {
+      "message": {
+        "cancelled": "",
+        "markDone": ""
+      },
+      "progress": {
+        "hashDoneGrouping": "",
+        "hashing": "",
+        "done": ""
+      }
+    },
+    "exportPref": {
+      "validation": {
+        "namingMaxLength": "",
+        "namingNoSeparator": "",
+        "namingNoParentDir": ""
+      }
+    },
+    "import": {
+      "error": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      },
+      "log": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      }
+    },
+    "importRoot": {
+      "log": {
+        "removeFailed": "",
+        "clearRecordsFailed": ""
+      },
+      "error": {
+        "removeFailed": ""
+      }
+    },
+    "operationHistory": {
+      "validation": {
+        "operationTypeRequired": ""
+      }
+    },
+    "profile": {
+      "error": {
+        "uidExists": "",
+        "defaultUndeletable": "",
+        "targetNotFound": ""
+      },
+      "message": {
+        "transferred": ""
+      }
+    },
+    "scanner": {
+      "validation": {
+        "customPathsMax": ""
+      },
+      "log": {
+        "postScanThumbFailed": "",
+        "registerImportRootFailed": "",
+        "startFailed": "",
+        "skipRestoreReplay": "",
+        "markMigrationV1FailedRetry": "",
+        "repairV1Failed": "",
+        "markMigrationV2Failed": "",
+        "repairV2Failed": "",
+        "markMigrationV3Failed": "",
+        "repairV3Failed": "",
+        "markMigrationV4Failed": "",
+        "repairV4Failed": "",
+        "markMigrationV5Failed": "",
+        "repairV5Failed": "",
+        "integrityCheckFailed": "",
+        "heartbeatTimeout": "",
+        "bridgeReadyTimeout": "",
+        "bridgeRestarting": "",
+        "bridgeRestarted": "",
+        "scanTaskRestored": "",
+        "scanTaskRestoreFailed": "",
+        "bridgeRestartFailed": "",
+        "bridgeCrashListenerFailed": ""
+      },
+      "error": {
+        "validationFailed": "",
+        "pathCheckFailed": "",
+        "scanFailed": "",
+        "scanInProgress": "",
+        "dbPathNotInitialized": "",
+        "scanStartFailed": "",
+        "noMediaDirFound": "",
+        "gameDirNotFound": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "scanProcessExit": "",
+        "autoRestarted": "",
+        "duplicateScanStart": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "scanCancelled": ""
+      }
+    },
+    "searchIndex": {
+      "validation": {
+        "segmentsMax": ""
+      },
+      "error": {
+        "persistFailed": ""
+      },
+      "log": {
+        "importReadFailed": ""
+      }
+    },
+    "settings": {
+      "error": {
+        "customPathsNotArray": "",
+        "customPathsMax": "",
+        "customPathsEmptyItem": "",
+        "validationFailed": "",
+        "valueTooLarge": "",
+        "valueNotSerializable": "",
+        "hwAccelNotBoolean": "",
+        "securitySensitiveKey": "",
+        "unknownKey": ""
+      },
+      "validation": {
+        "keyRequired": "",
+        "keyMaxLength": ""
+      }
+    },
+    "share": {
+      "log": {
+        "detectAppFailed": "",
+        "launchAppFailed": "",
+        "rejectedNonLan": "",
+        "pinLocked": "",
+        "authSuccess": "",
+        "readFailed": ""
+      },
+      "error": {
+        "launchAppFailed": "",
+        "noFilesToShare": ""
+      },
+      "http": {
+        "serviceNotStarted": "",
+        "forbiddenNonLan": "",
+        "fileNotFound": "",
+        "pathNotFound": "",
+        "authTitle": "",
+        "authPrompt": "",
+        "authHint": "",
+        "pinPlaceholder": "",
+        "authSubmit": "",
+        "networkError": "",
+        "tooManyAttempts": "",
+        "locked": "",
+        "pinWrong": "",
+        "authSuccess": "",
+        "readFailed": ""
+      }
+    },
+    "shell": {
+      "error": {
+        "pathMustBeAbsolute": "",
+        "sensitiveDirForbidden": "",
+        "executableForbidden": "",
+        "openExternalFailed": "",
+        "openPathFailed": "",
+        "showItemFailed": ""
+      }
+    },
+    "similar": {
+      "message": {
+        "phashDone": ""
+      }
+    },
+    "task": {
+      "validation": {
+        "taskIdRequired": "",
+        "taskIdMaxLength": ""
+      },
+      "keyword": {
+        "canceled": "",
+        "alreadyRunning": ""
+      }
+    },
+    "video": {
+      "error": {
+        "endTimeAfterStart": ""
+      },
+      "log": {
+        "exportLivePhotoFailed": ""
+      },
+      "message": {
+        "editSuccess": ""
+      }
+    },
+    "watermark": {
+      "message": {
+        "cancelled": "",
+        "done": "",
+        "failed": ""
+      },
+      "progress": {
+        "applying": ""
+      },
+      "validation": {
+        "configRequired": "",
+        "configMaxLength": ""
+      }
+    },
+    "customDirs": {
+      "label": {
+        "backupFiles": "",
+        "thumbnailMetadata": "",
+        "logFiles": "",
+        "crashDump": ""
+      }
+    },
+    "desktopShortcut": {
+      "log": {
+        "noWritableDesktop": "",
+        "created": "",
+        "createFailedFallback": "",
+        "createdFallback": "",
+        "createFailedAll": ""
+      }
+    },
+    "app": {
+      "name": ""
+    },
+    "errorHandlers": {
+      "unknownPath": "",
+      "dialog": {
+        "errorTitle": "",
+        "errorBody": "",
+        "frequentErrorTitle": "",
+        "frequentErrorMessage": "",
+        "frequentErrorDetail": "",
+        "restartApp": "",
+        "continueUsing": ""
+      }
+    },
+    "mediaProtocol": {
+      "log": {
+        "missingPathParam": "",
+        "realpathFailed": "",
+        "denyNotWhitelisted": "",
+        "fileNotFoundOrNoPerm": "",
+        "handleRequestFailed": "",
+        "whitelistCheckFailed": ""
+      }
+    },
+    "recovery": {
+      "title": {
+        "dbRecovered": "",
+        "dbRecoveryFailed": "",
+        "dbPreserved": ""
+      },
+      "body": {
+        "sourceBackup": "",
+        "corruptedBackupPath": "",
+        "dbPreserved": ""
+      },
+      "worker": {
+        "title": {
+          "startupTimeout": "",
+          "restarted": "",
+          "restartExhausted": "",
+          "exited": ""
+        },
+        "body": {
+          "crashTime": "",
+          "exitCode": "",
+          "crashedAt": "",
+          "restartCount": "",
+          "startupTimeoutHint": "",
+          "restartedHint": "",
+          "exhaustedHint": ""
+        },
+        "state": {
+          "exhausted": "",
+          "continuable": ""
+        },
+        "label": {
+          "scanner": "",
+          "database": "",
+          "media": "",
+          "decryption": ""
+        }
+      },
+      "log": {
+        "repairFailed": "",
+        "showDialogFailed": ""
+      }
+    },
+    "window": {
+      "reason": {
+        "rendererNotReady": ""
+      },
+      "dialog": {
+        "diagTitle": "",
+        "rendererFailed": "",
+        "rendererFailedDetail": "",
+        "gotIt": "",
+        "crashTitle": "",
+        "crashMessage": "",
+        "crashDetail": "",
+        "reload": "",
+        "closeApp": ""
+      },
+      "log": {
+        "rendererCrashed": ""
+      }
+    },
+    "index": {
+      "log": {
+        "gpuFallbackActive": ""
+      },
+      "dialog": {
+        "startupFailedTitle": "",
+        "startupFailedMessage": "",
+        "startupFailedDetail": "",
+        "exit": ""
+      }
+    },
+    "startup": {
+      "log": {
+        "scanComplete": "",
+        "indexingTaskError": "",
+        "autoScanFailed": "",
+        "thumbnailAlreadyRunning": "",
+        "thumbnailBatchFailed": "",
+        "phashStartFailed": "",
+        "indexingFailed": "",
+        "sceneAnalysisNone": "",
+        "sceneAnalysisFailed": "",
+        "orphanCleanupFailed": "",
+        "readPendingRenamesFailed": "",
+        "cleanupScanHistoryFailed": "",
+        "notifyScanInterruptedFailed": "",
+        "detectInterruptedFailed": "",
+        "clearRecoveryFlagsFailed": "",
+        "notifyBackupRestoredFailed": "",
+        "postRestorePhashFailed": "",
+        "postRestoreDuplicateFailed": ""
+      },
+      "error": {
+        "indexingTotalTimeout": ""
+      },
+      "index": {
+        "timeoutStopped": "",
+        "cancelled": "",
+        "preparing": "",
+        "analyzingSceneTime": "",
+        "finalizing": "",
+        "done": "",
+        "errorStopped": ""
+      }
+    },
+    "livephoto": {
+      "error": {
+        "invalidVideo": "",
+        "exportFailed": ""
+      },
+      "message": {
+        "exportSuccess": ""
+      }
+    },
+    "logService": {
+      "message": {
+        "opened": "",
+        "exported": ""
+      },
+      "error": {
+        "openDirFailed": "",
+        "zipRequired": "",
+        "emptyArchive": "",
+        "targetNotGenerated": "",
+        "noErrorOutput": "",
+        "tarStartFailed": "",
+        "packageFailed": ""
+      },
+      "log": {
+        "buildDiagnosticFailed": ""
+      }
+    },
+    "thumbnail": {
+      "log": {
+        "forkFailed": "",
+        "readyTimeout": "",
+        "handshakeFailed": "",
+        "markCorruptedCallbackFailed": "",
+        "clearCorruptedCallbackFailed": "",
+        "lowQualityFailed": "",
+        "highQualityFailed": "",
+        "decodeFailed": "",
+        "generateFailed": "",
+        "workerCallFailed": "",
+        "readCacheMetaFailed": "",
+        "cacheMetaCorrupted": "",
+        "deleteCorruptedMetaFailed": "",
+        "saveCacheMetaFailed": "",
+        "cleanTmpFailed": "",
+        "lruCleanFailed": ""
+      },
+      "error": {
+        "workerForkFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerDisposed": "",
+        "sharpResizeFailed": "",
+        "ffmpegFrameTimeout": "",
+        "videoPathRequired": "",
+        "outputPathRequired": "",
+        "ffmpegEmptyOutput": ""
+      },
+      "kindVideo": "",
+      "kindImage": ""
+    },
+    "xmpMetadata": {
+      "log": {
+        "invalidStructure": "",
+        "parseEditorDataFailed": "",
+        "readInvalidStructure": "",
+        "deserializeFailed": "",
+        "readFailed": ""
+      }
+    },
+    "videoEditor": {
+      "log": {
+        "editStopReceived": "",
+        "readyTimeout": "",
+        "abnormalExit": "",
+        "batchTaskFailed": ""
+      },
+      "error": {
+        "inputPathRequired": "",
+        "outputPathRequired": "",
+        "unsupportedSpeed": "",
+        "cancelledByUser": "",
+        "taskCancelledSkipped": "",
+        "taskCancelled": "",
+        "exportFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerAbnormalExit": "",
+        "taskInProgress": "",
+        "workerDisposed": "",
+        "appExiting": ""
+      },
+      "message": {
+        "progressStart": "",
+        "progressDone": "",
+        "exportSuccess": "",
+        "editCancelled": "",
+        "exportDone": "",
+        "batchCancelled": "",
+        "batchDoneAll": "",
+        "batchDonePartial": ""
+      }
+    },
+    "thumbnailPhash": {
+      "log": {
+        "phashFailed": "",
+        "duplicateMarkFailed": ""
+      }
+    },
+    "videoService": {
+      "log": {
+        "markingCorrupted": "",
+        "markCorruptedCallbackFailed": "",
+        "metadataReadFailed": "",
+        "exportTask": "",
+        "exportFailed": "",
+        "exportDecodeFailed": "",
+        "frameCaptureTask": "",
+        "frameCaptureFailed": "",
+        "frameCaptureDecodeFailed": "",
+        "trimTask": "",
+        "trimFailed": "",
+        "trimDecodeFailed": "",
+        "speedTask": "",
+        "speedFailed": "",
+        "speedDecodeFailed": ""
+      },
+      "error": {
+        "exportFailed": "",
+        "frameCaptureFailed": "",
+        "trimFailed": "",
+        "speedFailed": ""
+      },
+      "message": {
+        "exportSuccess": "",
+        "frameCaptureSuccess": "",
+        "trimSuccess": "",
+        "speedSuccess": ""
+      }
+    },
+    "mediaWorker": {
+      "progress": {
+        "markingDuplicates": ""
+      },
+      "error": {
+        "thumbnailAlreadyRunning": "",
+        "thumbnailStartFailed": "",
+        "phashAlreadyRunning": "",
+        "phashStartFailed": "",
+        "duplicateAlreadyRunning": "",
+        "duplicateStartFailed": "",
+        "similarAlreadyRunning": "",
+        "similarStartFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "thumbnailProcessExit": "",
+        "phashProcessExit": "",
+        "duplicateProcessExit": "",
+        "similarProcessExit": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "thumbnailCancelled": "",
+        "phashCancelled": "",
+        "duplicateCancelled": "",
+        "workerTaskCancelled": "",
+        "workerTaskDone": "",
+        "nothingToGenerate": "",
+        "nothingToPhash": "",
+        "nothingToDetect": "",
+        "batchGenerateFailed": "",
+        "phashBatchFailed": "",
+        "markFailed": ""
+      },
+      "log": {
+        "readyTimeout": "",
+        "restarting": "",
+        "restarted": "",
+        "thumbnailRestored": "",
+        "thumbnailRestoreFailed": "",
+        "phashRestored": "",
+        "phashRestoreFailed": "",
+        "duplicateRestored": "",
+        "duplicateRestoreFailed": "",
+        "similarRestored": "",
+        "similarRestoreFailed": "",
+        "restartFailed": "",
+        "crashListenerFailed": "",
+        "thumbnailBatchFailed": "",
+        "phashBatchFailed": "",
+        "duplicateMarkFailed": "",
+        "duplicateNoGroups": "",
+        "similarFindFailed": "",
+        "similarStartFailed": ""
+      }
+    },
+    "databaseWorker": {
+      "log": {
+        "restarting": "",
+        "restartedWithDb": "",
+        "restartedPendingOpen": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      },
+      "error": {
+        "bridgeDisposed": "",
+        "writeFailed": "",
+        "unknown": "",
+        "autoRestarted": "",
+        "handshakeAborted": "",
+        "requestsAborted": ""
+      }
+    },
+    "readStream": {
+      "log": {
+        "streamErrorDestroyed": ""
+      }
+    },
+    "scanLog": {
+      "error": {
+        "exportCanceled": "",
+        "exportFailed": ""
+      }
+    },
+    "resonance": {
+      "error": {
+        "recordExists": "Eintrag existiert bereits (gleiche Banner, gleiche Zeit, gleiches Objekt)",
+        "recordNotFound": "Eintrag nicht gefunden oder bereits gelöscht",
+        "importFileNotReadable": "Importdatei existiert nicht oder ist nicht lesbar: {{path}}",
+        "importFileNotFile": "Der Pfad ist keine Datei: {{path}}",
+        "importFileTooLarge": "Importdatei ist zu groß ({{size}} Bytes, Limit überschritten)",
+        "importFileReadFailed": "Fehler beim Lesen der Importdatei: {{reason}}",
+        "exportDirMissing": "Exportverzeichnis existiert nicht: {{path}}",
+        "exportNotJson": "Dateierweiterung für Export muss .json sein: {{path}}",
+        "exportWriteFailed": "Fehler beim Schreiben der Exportdatei: {{reason}}"
+      },
+      "log": {
+        "exported": "Resonanzdaten exportiert ({{count}} Einträge)"
+      }
+    }
+  },
+  "appError": {
+    "canceled": "",
+    "database": "",
+    "fileSystem": "",
+    "internal": "",
+    "fallback": ""
+  },
+  "app": {
+    "log": {
+      "pluginBootstrapFailed": ""
+    }
+  },
+  "mock": {
+    "log": {
+      "skipInstall": ""
+    },
+    "feature": {
+      "fileScan": "",
+      "fileDelete": "",
+      "fileDeletePermanent": "",
+      "fileCopy": "",
+      "fileMove": "",
+      "fileRename": "",
+      "batchRename": "",
+      "fileExport": "",
+      "fileSaveAs": "",
+      "exportWithMetadata": "",
+      "batchExportWithMetadata": "",
+      "watermarkApply": "",
+      "videoExport": "",
+      "videoCaptureFrame": "",
+      "videoTrim": "",
+      "videoSpeed": "",
+      "livePhotoExport": "",
+      "videoEdit": "",
+      "videoEditBatch": "",
+      "clearDatabase": "",
+      "createBackup": "",
+      "restoreBackup": "",
+      "deleteBackup": "",
+      "appRelaunch": "",
+      "decryptFile": "",
+      "encryptCameraParams": "",
+      "decodeClothDiy": "",
+      "decodeHomeBuild": "",
+      "pluginDetail": "",
+      "pluginInstall": "",
+      "pluginUninstall": "",
+      "pluginToggle": "",
+      "wifiShare": ""
+    },
+    "message": {
+      "browserDownloadTriggered": "",
+      "downloadFailed": "",
+      "openLocalPath": "",
+      "showInFolder": "",
+      "unsupportedShort": "",
+      "openDirectory": "",
+      "exportLogs": "",
+      "clearLogs": "",
+      "clearCrashReports": "",
+      "importPreview": "",
+      "importFiles": "",
+      "copyToClipboard": "",
+      "launchExternalApp": "",
+      "phashDone": "",
+      "duplicatesMarked": "",
+      "batchAnalysisUnsupported": "",
+      "softDeleted": "",
+      "restored": "",
+      "permanentDeleted": "",
+      "recycleBinCleared": "",
+      "noMissingFiles": "",
+      "noCorruptedFiles": "",
+      "exportFileUnsupported": "",
+      "importFileUnsupported": "",
+      "noRestartNeeded": "",
+      "videoMetadataUnsupported": ""
+    }
+  },
+  "scanProgress": {
+    "log": {
+      "getActiveFailed": "",
+      "stopFailed": ""
+    },
+    "stopping": "",
+    "scanning": "",
+    "foundFiles": ""
+  },
+  "plugins": {
+    "log": {
+      "facadeNotReady": "",
+      "registerActiveFailed": "",
+      "triggerInitFailed": "",
+      "bootstrapFailed": "",
+      "i18nInjectFailed": ""
+    }
+  },
+  "themes": {
+    "default": "",
+    "softPinkLuxury": ""
+  },
+  "globalErrorHandler": {
+    "log": {
+      "errorEventFailed": "",
+      "rejectionEventFailed": ""
+    }
+  },
+  "scanButton": {
+    "incrementalDesc": "",
+    "full": "",
+    "fullDesc": "",
+    "custom": "",
+    "customDesc": ""
+  },
+  "videoPlayer": {
+    "restoredTo": "",
+    "exitFullscreen": "",
+    "fullscreenPlayback": "",
+    "fullscreen": "",
+    "captureFrame": "",
+    "capture": ""
+  },
+  "searchService": {
+    "log": {
+      "noIpcFallback": "",
+      "schemaHashMismatch": "",
+      "importFailedFallback": "",
+      "initFailedFallback": "",
+      "rebuildFailed": "",
+      "persistDebouncedFailed": "",
+      "docCountMismatch": "",
+      "verifyFailed": ""
+    }
+  },
+  "mediaStore": {
+    "log": {
+      "persistFailed": "",
+      "noElectronApi": "",
+      "mediaListNull": "",
+      "filesEmpty": "",
+      "categoryListNull": "",
+      "categoriesEmpty": "",
+      "fetchError": "",
+      "loadMoreFailed": "",
+      "loadProfilesFailed": "",
+      "loadRecycleBinFailed": "",
+      "loadRecycleBinMoreFailed": ""
+    }
+  },
+  "operationHistory": {
+    "log": {
+      "dbWriteFailed": "",
+      "conflictCheckFailed": "",
+      "dbRemoveFailed": "",
+      "dbClearFailed": "",
+      "dbLoadFailed": ""
+    },
+    "error": {
+      "dbSaveFailedFull": "",
+      "handlerNotRegistered": "",
+      "recordCorrupted": ""
+    }
+  },
+  "updateDialog": {
+    "checking": "",
+    "downloading": "",
+    "downloadingVersion": "",
+    "ariaLabel": "",
+    "foundNewVersion": "",
+    "availablePrompt": "",
+    "later": "",
+    "downloadNow": "",
+    "downloadedTitle": "",
+    "downloadedPrompt": "",
+    "restartLater": "",
+    "installAndRestart": "",
+    "log": {
+      "downloadFailed": "",
+      "installFailed": "",
+      "openOfficialFailed": ""
+    }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Nikki-Resonanzbuch",
+    "subtitle": "Infinity Nikki Resonanz-Protokoll & Styling-Assistent · Bald verfügbar",
+    "error": {
+      "importJsonParseFailed": "Die Datei ist kein gültiges JSON. Bitte prüfen Sie, ob die Exportdatei beschädigt ist",
+      "importInvalidStructure": "Dateistruktur entspricht nicht dem Resonanz-Importformat (unterstützt JSON von gongeo.us)",
+      "importTooManyRecords": "Die Datei enthält zu viele Einträge. Bitte teilen Sie sie und importieren Sie erneut",
+      "invalidReason": {
+        "invalidShape": "Ungültiges Datensatzformat",
+        "invalidTimestamp": "Ungültiges Zeitformat",
+        "invalidItemId": "Ungültige Objekt-ID",
+        "invalidOutfitId": "Ungültige Outfit-ID",
+        "invalidEvoLevel": "Ungültige Evolutionsstufe (erwartet 0-4)"
+      }
+    },
+    "tab": {
+      "records": "Resonanzverlauf",
+      "wardrobe": "Mein Kleiderschrank",
+      "import": "Datenimport",
+      "stats": "Persönliche Statistik"
+    },
+    "records": {
+      "bannerLabel": "Banner",
+      "bannerType1": "Standard-Banner",
+      "bannerType2": "Limitiertes Banner",
+      "bannerType3": "4★ limitiertes Banner",
+      "addRecord": "Eintrag hinzufügen",
+      "addTitle": "Eintrag manuell hinzufügen",
+      "editTimeTitle": "Eintragszeit bearbeiten",
+      "itemLabel": "Erhaltenes Objekt",
+      "timeLabel": "Erhalten am",
+      "selectItem": "Bitte erhaltenes Objekt wählen",
+      "fiveStarItems": "5★ Outfit-Teile",
+      "fourStarItems": "4★ Outfit-Teile",
+      "totalPulls": "Züge insgesamt {{count}}",
+      "pity5Star": "{{count}} Züge seit letztem 5★",
+      "pity4Star": "{{count}} Züge seit letztem 4★",
+      "pullNo": "Zug Nr. {{n}}",
+      "editBadge": "Manuell",
+      "listEmpty": "Noch keine Resonanzeinträge",
+      "listEmptyHint": "Klicken Sie oben rechts auf „Eintrag hinzufügen“ oder importieren Sie eine JSON-Datei von gongeo.us auf der Seite „Datenimport“",
+      "deleteTitle": "Eintrag löschen",
+      "deleteMessage": "Diese Aktion kann nicht rückgängig gemacht werden.",
+      "invalidTime": "Ungültiges Zeitformat. Bitte erneut wählen",
+      "invalidInput": "Eingabe hat die Prüfung nicht bestanden. Bitte Formular überprüfen"
+    },
+    "toast": {
+      "added": "Hinzugefügt: {{name}}",
+      "updated": "Eintragszeit aktualisiert",
+      "deleted": "Eintrag gelöscht"
+    },
+    "wardrobe": {
+      "cat": {
+        "item": "Teile",
+        "makeup": "Make-up",
+        "momo": "Momo",
+        "prop": "Requisiten",
+        "eurekaColor": "Eureka-Farben"
+      },
+      "searchPlaceholder": "Nach Name suchen",
+      "statusFilterLabel": "Besitzstatus",
+      "statusAll": "Alle Status",
+      "statusOwned": "Im Besitz",
+      "statusMissing": "Nicht im Besitz",
+      "qualityFilterLabel": "Seltenheit",
+      "qualityAll": "Alle Seltenheiten",
+      "summaryOwned": "Im Besitz {{owned}} / {{total}}",
+      "looseSet": "Einzelteile (keinem Outfit zugeordnet)",
+      "outfitStatus": {
+        "owned": "Vollständig",
+        "partial": "In Arbeit",
+        "missing": "Nicht gesammelt"
+      },
+      "quickOwned": "Alle als besitzt markieren",
+      "quickMissing": "Alle entfernen",
+      "inferButton": "Aus Verlauf ableiten",
+      "inferTitle": "Kleiderschrank aus Resonanzverlauf ableiten",
+      "inferMessage": "Dadurch werden erhaltene Objekte aus dem Resonanzverlauf und Bannerfortschritt abgeleitet: {{items}} Teile, {{makeups}} Make-ups, {{momo}} Momo, {{props}} Requisiten.\n\nDie Ableitung nutzt konservative Regeln (Bannerfortschritt und Zug-Schwellenwerte) und kann niedriger ausfallen als der tatsächliche Besitz; bestehende Einträge werden nicht geändert. Fortfahren?",
+      "inferResult": "{{count}} Objekte als besitzt markiert",
+      "inferNothing": "Keine neuen Ableitungen vorhanden",
+      "inferBusy": "Ableitung läuft…",
+      "catalogUnavailable": "Katalogdaten konnten nicht geladen werden",
+      "catalogUnavailableHint": "Statische Katalogdateien fehlen oder sind beschädigt. Bitte App neu installieren oder aktualisieren",
+      "loading": "Katalogdaten werden geladen…",
+      "empty": "Keine passenden Objekte",
+      "emptyHint": "Suchbegriff oder Filter anpassen"
+    },
+    "import": {
+      "importSection": "Datenimport",
+      "pickFile": "JSON-Datei wählen",
+      "previewing": "Datei wird analysiert…",
+      "formatLegacy": "Altes Format",
+      "formatCurrent": "Aktuelles Format",
+      "versionLabel": "Dateiversion: {{version}}",
+      "versionUnknown": "Keine Version angegeben",
+      "versionMismatchWarn": "Die Datei deklariert eine neuere Version als derzeit unterstützt; Felder könnten inkompatibel sein. Sie können einen kompatiblen Import versuchen oder abbrechen.",
+      "compatImport": "Kompatiblen Import versuchen",
+      "abandon": "Abbrechen",
+      "sectionPulls": "Zug-Verlauf",
+      "sectionEdits": "Manuelle Einträge",
+      "sectionPearpal": "Pearpal-Journal",
+      "sectionEvo": "Evolutions-Übersteuerungen",
+      "sectionWardrobe": "Kleiderschrank-Besitz",
+      "countsAdded": "{{count}} neu",
+      "countsDuplicate": "{{count}} Duplikate (übersprungen)",
+      "countsInvalid": "{{count}} ungültig (übersprungen)",
+      "invalidSamplesTitle": "Beispiele ungültiger Einträge:",
+      "invalidMore": "…und {{count}} weitere ungültige Einträge übersprungen",
+      "includeWardrobeLabel": "Kleiderschrank-Besitz ebenfalls importieren (vollständige Übernahme)",
+      "commit": "Import starten",
+      "cancelCommit": "Import abbrechen",
+      "cancelled": "Import abgebrochen; bereits geschriebene Teile bleiben erhalten. Erneuter Import ist gefahrlos",
+      "commitDone": "Import abgeschlossen, {{count}} Einträge geschrieben",
+      "progressLabel": "{{current}} / {{total}}",
+      "exportSection": "Datenexport",
+      "exportPulls": "Zug-Verlauf",
+      "exportEdits": "Manuelle Einträge",
+      "exportPearpal": "Pearpal-Journal",
+      "exportEvo": "Evolutions-Übersteuerungen",
+      "exportWardrobe": "Kleiderschrank-Besitz",
+      "exportButton": "JSON exportieren",
+      "exportDone": "{{count}} Einträge exportiert",
+      "exportNothing": "Nichts zu exportieren. Bitte Inhalt wählen oder zuerst Daten erfassen",
+      "dangerSection": "Gefahrenzone",
+      "clearButton": "Alle Resonanzdaten löschen",
+      "clearTitle": "Alle Resonanzdaten löschen",
+      "clearMessage": "Alle Resonanzeinträge, Kleiderschrank- und Statistikdaten werden dauerhaft gelöscht. Fortfahren?",
+      "clearDone": "Alle Resonanzdaten gelöscht",
+      "snapshotNote": "Der mitgelieferte Katalog und die Perzentildaten sind statische Schnappschüsse und werden nicht automatisch aktualisiert",
+      "snapshotMeta": "Mitgelieferter Katalog/Perzentile sind statische Schnappschüsse (Spielversion {{version}} · Katalog vom {{catalogDate}} · Perzentile vom {{percentileDate}}) und werden nicht automatisch aktualisiert"
+    },
+    "stats": {
+      "emptyTitle": "Noch keine Statistiken",
+      "emptyHint": "Zuerst auf der Seite „Resonanzverlauf“ Einträge hinzufügen oder auf „Datenimport“ importieren",
+      "totalPulls": "Züge insgesamt",
+      "total5Star": "5★-Teile",
+      "total4Star": "4★-Teile",
+      "avg5StarPulls": "Ø Züge pro 5★",
+      "banners5Star": "Limitierte Banner-Züge",
+      "banners4Star": "4★-Banner-Züge",
+      "outfits5Star": "Erhaltene 5★-Outfits",
+      "outfits4Star": "Erhaltene 4★-Outfits",
+      "luckTitle": "Glück-Analyse",
+      "luckTier": "Stufe {{tier}} / 6",
+      "luckSnapshotNote": "Perzentile stammen aus einem Community-Statischen-Schnappschuss (erstellt {{date}}), werden nicht automatisch aktualisiert und dienen nur als Referenz",
+      "distributionTitle": "Zug-Verteilung",
+      "dist5Star": "5★ (nach Zugnummer)",
+      "dist4Star": "4★ (nach Zugnummer)",
+      "activityTitle": "Zug-Aktivität (kumuliert pro Banner)",
+      "rankingTitle": "Details pro Banner",
+      "ranking5Star": "Limitierte Banner (5★)",
+      "ranking4Star": "4★ limitierte Banner",
+      "rankingEmpty": "Noch keine Banner-Daten für die Analyse",
+      "colBanner": "Banner",
+      "colPulls": "Züge",
+      "colAvg": "Ø Züge",
+      "colPercentile": "Perzentil"
+    }
+  }
+}

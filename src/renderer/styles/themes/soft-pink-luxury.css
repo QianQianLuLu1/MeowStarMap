@@ -1,0 +1,342 @@
+/* ============================================
+   「柔粉轻奢」主题样式
+   奶白基底 + 低饱和柔粉点缀 + 柔焦玻璃材质 + 柔光分层光影
+   ============================================ */
+
+.soft-pink-luxury {
+  /* 色彩体系 */
+  --bg-primary: #fdf9fb;
+  --bg-secondary: rgba(255, 253, 254, 0.78);
+  --bg-tertiary: rgba(255, 250, 252, 0.55);
+  --text-primary: #2d2a2e;
+  --text-secondary: #6b656e;
+  --text-tertiary: #9a939d;
+  --accent: #e2a4bc;
+  --accent-light: #f5d7e3;
+  --accent-deep: #cf8ba8;
+  /* P1-U3：柔粉主题 accent-soft 覆盖，与主题色保持一致 */
+  --accent-soft: rgba(226, 164, 188, 0.14);
+  --divider: rgba(226, 164, 188, 0.14);
+  --hover-bg: rgba(226, 164, 188, 0.08);
+  --hover-bg-strong: rgba(226, 164, 188, 0.16);
+  --shadow-sm: 0 2px 10px rgba(226, 164, 188, 0.08);
+  --shadow-md: 0 4px 22px rgba(226, 164, 188, 0.12);
+  --shadow-lg: 0 8px 34px rgba(226, 164, 188, 0.18);
+  /* P0-1：粉色主题覆盖 --glass-blur，--backdrop-blur 自动引用更新后的值 */
+  /* 修复：18px 仍偏强，降到 12px 保持微妙毛玻璃 */
+  --glass-blur: 12px;
+  --glass-blur-sm: 10px;
+  --backdrop-blur: blur(var(--glass-blur));
+  --backdrop-blur-sm: blur(var(--glass-blur-sm));
+  /* P1-U2：删除 --transition-fast/normal/slow 覆盖，与 globals.css 默认值保持一致
+     原值 180ms/200ms/300ms 与 globals.css 150ms/250ms/350ms 偏差 30-50ms，
+     切换主题后所有按钮/卡片过渡节奏不一致 */
+
+  /* 柔光发光变量 */
+  --glow-pink: 0 0 18px rgba(226, 164, 188, 0.35);
+  --glow-pink-sm: 0 0 10px rgba(226, 164, 188, 0.25);
+}
+
+/* 主背景：柔雾奶白渐变 */
+.soft-pink-luxury body {
+  background: linear-gradient(180deg, #fdf9fb 0%, #f7f0f4 100%);
+}
+
+/* C 阶段：侧边栏微粉渐变，配合毛玻璃 */
+.soft-pink-luxury .sidebar-gradient {
+  background: linear-gradient(180deg, #f9eef3 0%, #fdf9fb 100%);
+}
+
+/* 修复：移除 data-view-level 分级透明度降低规则，统一使用默认背景透明度 */
+
+/* 选中文字 */
+.soft-pink-luxury ::selection {
+  background: rgba(226, 164, 188, 0.35);
+  color: #2d2a2e;
+}
+
+/* 标题栏：奶白哑光亚克力 + 淡粉微光内边框 */
+.soft-pink-luxury .title-bar {
+  background: rgba(255, 253, 254, 0.68);
+  backdrop-filter: var(--backdrop-blur-sm);
+  -webkit-backdrop-filter: var(--backdrop-blur-sm);
+  border-bottom: 1px solid rgba(226, 164, 188, 0.14);
+  box-shadow: 0 4px 18px rgba(226, 164, 188, 0.1);
+}
+
+/* 底部状态栏：优雅无衬线 + 淡粉数字强调 */
+.soft-pink-luxury .status-bar {
+  background: rgba(255, 253, 254, 0.55);
+  backdrop-filter: var(--backdrop-blur-sm);
+  -webkit-backdrop-filter: var(--backdrop-blur-sm);
+  border-top: 1px solid rgba(226, 164, 188, 0.12);
+  font-family: 'Segoe UI', 'SF Pro Display', 'Microsoft YaHei', system-ui, sans-serif;
+  letter-spacing: 0.01em;
+}
+
+.soft-pink-luxury .status-bar .stat-number {
+  color: var(--accent);
+  text-shadow: 0 0 10px rgba(226, 164, 188, 0.35);
+  font-weight: 600;
+}
+
+/* 玻璃拟态面板 / 卡片：奶白哑光亚克力 + 淡粉微光内边框 */
+.soft-pink-luxury .glass-panel,
+.soft-pink-luxury .glass-card {
+  background: rgba(255, 253, 254, 0.72);
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid rgba(226, 164, 188, 0.18);
+  /* P0-2：粉色主题高光偏暖色 */
+  box-shadow:
+    0 8px 30px rgba(226, 164, 188, 0.12),
+    inset 0 1px 0 rgba(255, 240, 245, 0.6),
+    inset 0 -1px 0 rgba(226, 164, 188, 0.05);
+}
+
+.soft-pink-luxury .glass-card:hover {
+  /* P0-1：粉色主题悬停时增强模糊（比默认主题增幅小，保持柔和） */
+  --glass-blur: 16px;
+  box-shadow:
+    0 12px 38px rgba(226, 164, 188, 0.18),
+    inset 0 1px 0 rgba(255, 240, 245, 0.7),
+    inset 0 -1px 0 rgba(226, 164, 188, 0.06);
+}
+
+/* 滚动条：细款浅粉色 + 拖动高亮 */
+.soft-pink-luxury ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.soft-pink-luxury ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.soft-pink-luxury ::-webkit-scrollbar-thumb {
+  background: rgba(226, 164, 188, 0.25);
+  border-radius: 3px;
+}
+
+.soft-pink-luxury ::-webkit-scrollbar-thumb:hover {
+  background: rgba(226, 164, 188, 0.45);
+}
+
+.soft-pink-luxury ::-webkit-scrollbar-thumb:active {
+  background: rgba(226, 164, 188, 0.65);
+}
+
+/* 按钮 */
+/* P2-C：.btn-primary 保留（linear-gradient 渐变无法用变量表达）
+   P1-U14：删除 transition: all 180ms ease-out 覆盖，统一使用 globals.css 的 var(--transition-fast) */
+.soft-pink-luxury .btn-primary {
+  background: linear-gradient(135deg, #e2a4bc 0%, #d98da9 100%);
+  box-shadow: 0 4px 14px rgba(226, 164, 188, 0.28);
+}
+
+.soft-pink-luxury .btn-primary:hover {
+  filter: brightness(1.08);
+  box-shadow: 0 6px 20px rgba(226, 164, 188, 0.4);
+  transform: translateY(-1px);
+}
+
+.soft-pink-luxury .btn-primary:focus-visible {
+  outline: 2px solid var(--accent-light);
+  outline-offset: 2px;
+}
+
+/* P2-C：.btn-secondary 已通过 --hover-bg/--divider 变量覆盖，仅保留 hover 特殊阴影 */
+.soft-pink-luxury .btn-secondary:hover {
+  border-color: rgba(226, 164, 188, 0.4);
+  box-shadow: 0 4px 14px rgba(226, 164, 188, 0.15);
+  transform: translateY(-1px);
+}
+
+/* P2-C：.icon-btn 已通过 --text-secondary/--hover-bg 变量覆盖，仅保留 active 特殊光晕 */
+.soft-pink-luxury .icon-btn:hover {
+  color: var(--accent-deep);
+  box-shadow: 0 0 12px rgba(226, 164, 188, 0.12);
+}
+
+.soft-pink-luxury .icon-btn.active {
+  background: rgba(226, 164, 188, 0.14);
+  color: var(--accent-deep);
+  box-shadow: 0 0 12px rgba(226, 164, 188, 0.14);
+}
+
+/* 输入框 */
+/* P2-C：.input-field 已通过 --bg-tertiary/--divider 变量覆盖，仅保留 focus 特殊光晕 */
+.soft-pink-luxury .input-field:focus {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px rgba(226, 164, 188, 0.1),
+    0 0 14px rgba(226, 164, 188, 0.18);
+}
+
+/* 搜索框：淡粉色光晕聚焦动效（keyframes 特例保留） */
+.soft-pink-luxury .search-input:focus {
+  border-color: transparent;
+  background: rgba(255, 253, 254, 0.8);
+  box-shadow:
+    0 0 0 1px rgba(226, 164, 188, 0.45),
+    0 0 18px rgba(226, 164, 188, 0.2),
+    inset 0 0 12px rgba(226, 164, 188, 0.04);
+  animation: searchGlowPink 2.5s ease-in-out infinite;
+}
+
+@keyframes searchGlowPink {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(226, 164, 188, 0.45),
+      0 0 18px rgba(226, 164, 188, 0.2),
+      inset 0 0 12px rgba(226, 164, 188, 0.04);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(226, 164, 188, 0.65),
+      0 0 26px rgba(226, 164, 188, 0.32),
+      inset 0 0 16px rgba(226, 164, 188, 0.06);
+  }
+}
+
+/* 导航菜单 */
+/* P2-C：.nav-item color/hover 已通过 --text-secondary/--hover-bg 变量覆盖，仅保留 active 特殊光晕 */
+.soft-pink-luxury .nav-item.active {
+  background: rgba(226, 164, 188, 0.12);
+  color: var(--accent-deep);
+}
+
+.soft-pink-luxury .nav-item.active::before {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+}
+
+/* 分类标签 */
+/* P2-C：.category-tag color/hover/背景已通过变量覆盖，仅保留 active 特殊光晕 */
+.soft-pink-luxury .category-tag.active {
+  background: rgba(226, 164, 188, 0.18);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  box-shadow: 0 0 14px rgba(226, 164, 188, 0.18);
+}
+
+/* 媒体卡片：悬停上浮 + 淡粉色柔光晕染 */
+/* P1-U14：删除 transition: all 180ms ease-out 覆盖，统一使用 globals.css 的 200ms ease-out */
+.soft-pink-luxury .media-card {
+  box-shadow: 0 4px 14px rgba(226, 164, 188, 0.1);
+}
+
+.soft-pink-luxury .media-card:hover {
+  transform: scale(1.02) translateY(-2px);
+  box-shadow:
+    0 0 22px rgba(226, 164, 188, 0.22),
+    0 8px 26px rgba(226, 164, 188, 0.16);
+}
+
+.soft-pink-luxury .media-card:hover::after {
+  border-color: rgba(226, 164, 188, 0.55);
+  box-shadow: inset 0 0 16px rgba(226, 164, 188, 0.1);
+}
+
+/* 进度条 */
+.soft-pink-luxury .progress-bar-fill {
+  background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
+  box-shadow: 0 0 8px rgba(226, 164, 188, 0.35);
+}
+
+/* P2-U11：原 .soft-pink-luxury .skeleton 重复声明完整规则，
+   改为只覆盖 --skeleton-from/to 变量值，消除重复 */
+.soft-pink-luxury {
+  --skeleton-from: rgba(255, 253, 254, 0.65);
+  --skeleton-to: rgba(226, 164, 188, 0.1);
+}
+
+/* 空状态图标：柔粉色线条微光 */
+.soft-pink-luxury .empty-state-icon {
+  filter: drop-shadow(0 0 8px rgba(226, 164, 188, 0.3));
+  animation: pinkPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes pinkPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* 弹窗、右键菜单：奶白半透明毛玻璃 + 淡粉描边 */
+.soft-pink-luxury [role='dialog'] .glass-card,
+.soft-pink-luxury [role='menu'] {
+  background: rgba(255, 253, 254, 0.88);
+  /* P0-1：弹窗用局部 --glass-blur 覆盖，backdrop-filter 自动引用 */
+  --glass-blur: 16px;
+  backdrop-filter: var(--backdrop-blur);
+  -webkit-backdrop-filter: var(--backdrop-blur);
+  border: 1px solid rgba(226, 164, 188, 0.2);
+  box-shadow:
+    0 16px 44px rgba(226, 164, 188, 0.18),
+    0 0 26px rgba(226, 164, 188, 0.08);
+}
+
+/* 页面过渡增强：与默认主题一致（轻微缩放+淡入）
+   P1-U14：删除冗余的 .page-enter 和 .modal-enter 规则
+   globals.css 已定义 .page-enter (pageBlurIn 250ms) 和 .modal-enter (scaleIn 250ms)
+   主题文件无需重复声明，避免与默认主题 250ms 不一致（原 .modal-enter 为 200ms） */
+
+/* 拖拽区域 */
+.soft-pink-luxury .drag-over {
+  border: 2px dashed var(--accent) !important;
+  background: rgba(226, 164, 188, 0.06) !important;
+  box-shadow: 0 0 18px rgba(226, 164, 188, 0.18);
+}
+
+/* 社交媒体按钮 */
+/* P1-U14：删除 transition: all 180ms ease-out 覆盖，统一使用 globals.css 的 0.2s ease */
+.soft-pink-luxury .social-btn {
+  background: rgba(226, 164, 188, 0.08);
+  border: 1px solid rgba(226, 164, 188, 0.12);
+  color: var(--text-secondary);
+}
+
+.soft-pink-luxury .social-btn:hover {
+  background: rgba(226, 164, 188, 0.15);
+  border-color: rgba(226, 164, 188, 0.3);
+  color: var(--accent-deep);
+  box-shadow: 0 0 12px rgba(226, 164, 188, 0.12);
+}
+
+/* 开关 / checkbox：开启时烟粉色填充 + 微光 */
+.soft-pink-luxury input[type='checkbox'] {
+  accent-color: var(--accent);
+}
+
+.soft-pink-luxury input[type='checkbox']:checked {
+  filter: drop-shadow(0 0 4px rgba(226, 164, 188, 0.5));
+}
+
+/* 下拉选择框 */
+/* P1-U14：transition 改用 var(--transition-fast) token，避免硬编码 180ms */
+.soft-pink-luxury select {
+  background: rgba(255, 253, 254, 0.65);
+  color: var(--text-primary);
+  border: 1px solid rgba(226, 164, 188, 0.18);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.soft-pink-luxury select:focus {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px rgba(226, 164, 188, 0.1),
+    0 0 12px rgba(226, 164, 188, 0.16);
+  outline: none;
+}
+
+.soft-pink-luxury select option {
+  background: #fffafc;
+  color: var(--text-primary);
+}

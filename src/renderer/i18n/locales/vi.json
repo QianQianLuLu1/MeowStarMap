@@ -1,0 +1,4211 @@
+{
+  "appShell": {
+    "categoriesSummary": "",
+    "detailPosition": "",
+    "duplicatesHint": "",
+    "editorMode": "",
+    "favoritesSummary": "",
+    "feedbackButton": "",
+    "gallerySummary": "",
+    "imagesVideosSummary": "",
+    "ready": "",
+    "recycleBinHint": "",
+    "recycleBinSummary": "",
+    "selectedCount": "",
+    "settingsHint": "",
+    "storageUsage": "",
+    "viewStatus": {
+      "categories": "",
+      "detail": "",
+      "duplicates": "",
+      "editor": "",
+      "favorites": "",
+      "resonanceRecords": "Cộng Hưởng",
+      "gallery": "",
+      "launcherCache": "",
+      "recycleBin": "",
+      "settings": ""
+    }
+  },
+  "categories": {
+    "iconLabel": {
+      "calendar": "Ngày",
+      "camera": "Máy ảnh",
+      "folder": "Thư mục",
+      "heart": "Thích",
+      "image": "Ảnh",
+      "location": "Địa điểm",
+      "palette": "Bảng màu",
+      "sparkles": "Tuyển chọn",
+      "star": "Yêu thích",
+      "tag": "Thẻ",
+      "user": "Nhân vật",
+      "video": "Video"
+    },
+    "page": {
+      "title": "",
+      "assign": {
+        "emptyMedia": "",
+        "failedToast": "",
+        "nextPage": "",
+        "noMatch": "",
+        "pageRange": "",
+        "prevPage": "",
+        "searchPlaceholder": "",
+        "subtitle": "",
+        "successToast": "",
+        "title": ""
+      },
+      "create": {
+        "colorTitle": "",
+        "failedToast": "",
+        "namePlaceholder": "",
+        "noParent": "",
+        "submit": "",
+        "successToast": "",
+        "title": ""
+      },
+      "delete": {
+        "confirmMessage": "",
+        "confirmTitle": "",
+        "failedToast": "",
+        "successToast": ""
+      },
+      "list": {
+        "assignMedia": "",
+        "collapse": "",
+        "dragHint": "",
+        "edit": "",
+        "expand": "",
+        "hierarchyFailedToast": "",
+        "hierarchySuccessToast": "",
+        "iconTitle": "",
+        "invalidDragToast": "",
+        "itemCount": "",
+        "moveDown": "",
+        "moveUp": "",
+        "reorderFailedToast": "",
+        "subCategoryCount": "",
+        "systemDragDisabled": "",
+        "systemTag": "",
+        "title": ""
+      },
+      "scene": {
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "sceneTime": {
+        "analyzeButton": "",
+        "analyzedToast": "",
+        "analyzingButton": "",
+        "analyzeFailedToast": "",
+        "clearFilter": "",
+        "multiSelectHint": "",
+        "selectAll": "",
+        "subtitle": "",
+        "tip": "",
+        "title": "",
+        "unselectAll": ""
+      },
+      "update": {
+        "failedToast": "",
+        "successToast": ""
+      }
+    },
+    "system": {
+      "people": "",
+      "location": "",
+      "scene": "",
+      "screenshot": "",
+      "recording": "",
+      "recent": "",
+      "favorite": ""
+    }
+  },
+  "common": {
+    "all": "Tất cả",
+    "apply": "Áp dụng",
+    "back": "Quay lại",
+    "cancel": "Hủy",
+    "clear": "Xóa",
+    "close": "Đóng",
+    "contextMenu": {
+      "ariaLabel": "Menu ngữ cảnh",
+      "submenuAriaLabel": "Menu con {{label}}"
+    },
+    "copy": "Sao chép",
+    "default": "Mặc định",
+    "delete": "Xóa",
+    "error": "Lỗi",
+    "export": "Xuất",
+    "failed": "Thất bại",
+    "feedbackDialog": {
+      "attachLogsLabel": "Đính kèm nhật ký gần đây (khuyến nghị, giúp chẩn đoán vấn đề)",
+      "attachSystemInfoLabel": "Đính kèm thông tin hệ thống (phiên bản, OS, phần cứng)",
+      "attachmentsLabel": "Tệp đính kèm",
+      "closeAriaLabel": "Đóng",
+      "contactLabel": "Liên hệ",
+      "copyFailed": "Sao chép thất bại, vui lòng chọn văn bản thủ công",
+      "copySuccess": "Đã sao chép {{label}} vào clipboard",
+      "descriptionLabel": "Mô tả vấn đề",
+      "descriptionPlaceholder": "Mô tả ngắn gọn vấn đề bạn gặp phải (tùy chọn)...",
+      "exportButton": "Xuất gói chẩn đoán",
+      "exportFailed": "Xuất thất bại",
+      "exportHint": "Gói chẩn đoán chứa nhật ký, tệp sự cố và thông tin hệ thống. Sau khi xuất, bạn có thể gửi cho nhà phát triển qua các phương thức liên hệ bên dưới.",
+      "exportSuccess": "Đã xuất gói chẩn đoán, vui lòng gửi cho nhà phát triển qua các phương thức liên hệ bên dưới",
+      "exporting": "Đang xuất...",
+      "githubCopyHint": "Nhấp để sao chép liên kết",
+      "githubLabel": "GitHub Issues",
+      "githubName": "Liên kết GitHub Issues",
+      "githubValue": "https://github.com/your-repo/issues",
+      "qqGroupCopyHint": "Nhấp để sao chép số nhóm",
+      "qqGroupLabel": "Nhóm QQ",
+      "qqGroupName": "Số nhóm QQ",
+      "qqGroupValue": "QQ Group: 123456789",
+      "title": "Phản hồi"
+    },
+    "import": "Nhập",
+    "invertSelection": "Đảo ngược lựa chọn",
+    "loading": "Đang tải...",
+    "move": "Di chuyển",
+    "no": "Không",
+    "ok": "OK",
+    "processing": "Đang xử lý...",
+    "propertiesDialog": {
+      "basic": {
+        "createdAt": "Ngày tạo",
+        "modifiedAt": "Ngày sửa đổi",
+        "name": "Tên",
+        "path": "Đường dẫn",
+        "resolution": "Độ phân giải",
+        "size": "Kích thước",
+        "type": "Loại",
+        "typeImage": "Hình ảnh",
+        "typeVideo": "Video"
+      },
+      "copied": "Đã sao chép",
+      "copyAll": "Sao chép tất cả",
+      "copyAllTitle": "Sao chép toàn bộ thuộc tính",
+      "copySection": {
+        "aperture": "Khẩu độ",
+        "cameraModel": "Mẫu máy ảnh",
+        "dateTaken": "Ngày chụp",
+        "fileInfo": "=== Thông tin tệp ===",
+        "focalLength": "Tiêu cự",
+        "lens": "Ống kính",
+        "originalSize": "Kích thước gốc",
+        "shootingParams": "=== Tham số chụp ===",
+        "shutter": "Tốc độ màn trập"
+      },
+      "openLocation": "Vị trí",
+      "openLocationTitle": "Hiển thị trong Explorer",
+      "title": "Thuộc tính tệp"
+    },
+    "refresh": "Làm mới",
+    "rename": "Đổi tên",
+    "reset": "Đặt lại",
+    "restore": "Khôi phục",
+    "retry": "Thử lại",
+    "save": "Lưu",
+    "search": "Tìm kiếm",
+    "select": "Chọn",
+    "selectAll": "Chọn tất cả",
+    "shareCodeDecoder": {
+      "apiUnavailable": "API không khả dụng",
+      "closeAriaLabel": "Đóng",
+      "decodeButton": "Giải mã",
+      "decodeSuccess": "Giải mã thành công",
+      "decoding": "Đang giải mã...",
+      "descriptions": {
+        "clothDiy": "Mã chia sẻ nhuộm màu có thể lấy từ tính năng nhuộm màu trong game. Giải mã mạng yêu cầu kết nối đến máy chủ game; ngoại tuyến chỉ có thể trích xuất dấu thời gian và UID.",
+        "homeBuild": "Mã chia sẻ xây nhà có thể lấy từ tính năng xây nhà trong game. Giải mã mạng yêu cầu kết nối đến máy chủ game.",
+        "mediaEncrypt": "Mã hóa JSON tham số máy ảnh thành văn bản mã hóa (định dạng Base64). Hữu ích để thử nghiệm quy trình giải mã hoặc tạo tham số tùy chỉnh."
+      },
+      "encryptButton": "Mã hóa",
+      "encryptSuccess": "Mã hóa thành công",
+      "operationFailed": "Thao tác thất bại",
+      "placeholders": {
+        "clothDiy": "Dán mã chia sẻ nhuộm màu trong game...",
+        "homeBuild": "Dán mã chia sẻ xây nhà trong game...",
+        "mediaEncrypt": "Dán JSON tham số máy ảnh..."
+      },
+      "result": {
+        "encryptedResult": "Kết quả đã mã hóa (Base64)",
+        "networkData": "Dữ liệu mạng",
+        "networkUnavailable": "Giải mã mạng không khả dụng (có thể cần Internet)",
+        "serverId": "ID máy chủ",
+        "timestamp": "Dấu thời gian"
+      },
+      "tabs": {
+        "clothDiy": "Mã chia sẻ nhuộm màu",
+        "homeBuild": "Mã xây nhà",
+        "mediaEncrypt": "Mã hóa tham số máy ảnh"
+      },
+      "title": "Công cụ mã chia sẻ",
+      "unknownError": "Lỗi không xác định"
+    },
+    "success": "Thành công",
+    "warning": "Cảnh báo",
+    "yes": "Có",
+    "confirm": "",
+    "copied": "",
+    "corruptedBadge": {
+      "label": "",
+      "labelSm": "",
+      "title": "",
+      "titleWithReason": ""
+    },
+    "loadFailed": "",
+    "missingBadge": {
+      "label": "",
+      "labelSm": ""
+    }
+  },
+  "detail": {
+    "actions": {
+      "backToGallery": "",
+      "deleteConfirmMessage": "",
+      "deleteFailed": "",
+      "deleteTitle": "",
+      "edit": "",
+      "operationFailed": "",
+      "ratingAria": "",
+      "ratingFailed": "",
+      "saveAs": "",
+      "saveAsFailed": "",
+      "saveAsSuccess": "",
+      "tags": ""
+    },
+    "editorMetadata": {
+      "exportedAt": "",
+      "filter": "",
+      "intensity": "",
+      "loading": "",
+      "lut": "",
+      "restore": "",
+      "restoreTooltip": "",
+      "title": "",
+      "watermark": "",
+      "yes": ""
+    },
+    "emptyTitle": "",
+    "exif": {
+      "gps": "",
+      "title": "",
+      "viewOnMap": "",
+      "aperture": "",
+      "cameraModel": "",
+      "copied": "",
+      "copyAriaLabel": "",
+      "copyFullTitle": "",
+      "copyLabel": "",
+      "emptyText": "",
+      "errorPrefix": "",
+      "focalLength": "",
+      "lens": "",
+      "dateTaken": "",
+      "loadingText": "",
+      "originalSize": "",
+      "panelTitle": "",
+      "shutter": "",
+      "gamePhotoEmpty": ""
+    },
+    "fields": {
+      "favorite": "",
+      "favorited": "",
+      "notFavorited": "",
+      "sceneTime": "",
+      "type": ""
+    },
+    "missing": {
+      "removeFailed": "",
+      "removeFromLibrary": "",
+      "removeSuccess": "",
+      "warningText": ""
+    },
+    "outfit": {
+      "add": "",
+      "clearFailed": "",
+      "edit": "",
+      "emptyValue": "",
+      "inputPlaceholder": "",
+      "maxLengthError": "",
+      "saveFailed": "",
+      "selectPresetPlaceholder": "",
+      "title": ""
+    },
+    "video": {
+      "codec": "",
+      "duration": "",
+      "frameRate": "",
+      "title": ""
+    },
+    "zoomable": {
+      "ariaLabel": "",
+      "resetButton": "",
+      "resetZoom": ""
+    },
+    "dressing": {
+      "copyHeader": "",
+      "emptyText": "",
+      "eureka": {
+        "label": ""
+      },
+      "loadingText": "",
+      "title": ""
+    },
+    "interaction": {
+      "carrier": {
+        "label": ""
+      },
+      "copyHeader": "",
+      "emptyText": "",
+      "format": {
+        "location": "",
+        "rotation": "",
+        "scale": ""
+      },
+      "loadingText": "",
+      "mount": {
+        "label": ""
+      },
+      "none": "",
+      "object": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "nikki": {
+      "copyHeader": "",
+      "emptyText": "",
+      "giantState": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "hidden": {
+        "label": "",
+        "off": "",
+        "on": ""
+      },
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "rotation": {
+        "label": ""
+      },
+      "scale": {
+        "label": ""
+      },
+      "title": ""
+    },
+    "photography": {
+      "copyHeader": "",
+      "date": {
+        "dayValue": "",
+        "label": ""
+      },
+      "edit": {
+        "edited": "",
+        "editedWithDetails": "",
+        "label": "",
+        "notEdited": "",
+        "sticker": "",
+        "text": ""
+      },
+      "emptyText": "",
+      "loadingText": "",
+      "location": {
+        "label": ""
+      },
+      "photoWall": {
+        "joinedValue": "",
+        "label": "",
+        "notJoined": ""
+      },
+      "task": {
+        "interactiveFallback": "",
+        "label": "",
+        "none": "",
+        "puzzleFallback": "",
+        "risk": ""
+      },
+      "time": {
+        "label": ""
+      },
+      "title": "",
+      "weather": {
+        "label": "",
+        "typeValue": ""
+      }
+    }
+  },
+  "dialog": {
+    "exportFormat": "Chuyển đổi định dạng",
+    "exportLivePhoto": "Xuất Live Photo",
+    "exportSpeed": "Xuất video đã điều chỉnh tốc độ",
+    "exportTrim": "Xuất video đã cắt",
+    "sameFormat": "Định dạng đích giống với định dạng gốc",
+    "selectDirUnsupported": "Chọn thư mục không được hỗ trợ trong môi trường này",
+    "trimTooShort": "Phạm vi cắt quá ngắn, vui lòng điều chỉnh thời gian bắt đầu/kết thúc"
+  },
+  "duplicates": {
+    "strategy": {
+      "bestQuality": "",
+      "favorited": "",
+      "largest": "",
+      "newest": "",
+      "smallest": ""
+    },
+    "threshold": {
+      "default": "",
+      "defaultHint": "",
+      "loose": "",
+      "looseHint": "",
+      "veryLoose": "",
+      "veryLooseHint": "",
+      "veryStrict": "",
+      "veryStrictHint": ""
+    },
+    "task": {
+      "calculateEta": "",
+      "cancel": "",
+      "cancelAria": "",
+      "cancelFailed": "",
+      "cancelRequested": "",
+      "cancelUnsupported": "",
+      "cancelled": "",
+      "cancelling": "",
+      "exactCancelled": "",
+      "remainingTime": "",
+      "similarCancelled": ""
+    },
+    "ariaCollapse": "",
+    "ariaCollapseBtn": "",
+    "ariaExpand": "",
+    "ariaExpandBtn": "",
+    "ariaGroupToggle": "",
+    "backToGallery": "",
+    "confirmMessage": "",
+    "confirmTitle": "",
+    "emptyExact": "",
+    "emptySimilarCompared": "",
+    "emptySimilarNoPhash": "",
+    "exactDesc": "",
+    "favoriteTooltip": "",
+    "foundGroups": "",
+    "groupExact": "",
+    "groupImageTag": "",
+    "groupReleasable": "",
+    "groupSelected": "",
+    "groupSimilar": "",
+    "groupSingleSize": "",
+    "groupVideoTag": "",
+    "loadingExact": "",
+    "loadingHintExact": "",
+    "loadingHintSimilar": "",
+    "loadingSimilar": "",
+    "markButton": "",
+    "markCompleted": "",
+    "markFailed": "",
+    "markNoGroups": "",
+    "markingButton": "",
+    "modeExact": "",
+    "modeLabel": "",
+    "modeSimilar": "",
+    "moveToTrash": "",
+    "noDuplicates": "",
+    "noFilesSelected": "",
+    "noSimilar": "",
+    "phashAllDone": "",
+    "phashButton": "",
+    "phashCalculating": "",
+    "phashCompleted": "",
+    "phashFailed": "",
+    "phashRecalcNow": "",
+    "pleaseSelect": "",
+    "ratingTooltip": "",
+    "recommendKeep": "",
+    "recommendTooltip": "",
+    "rescan": "",
+    "scanFailed": "",
+    "selectedToDelete": "",
+    "similarDesc": "",
+    "strategyAll": "",
+    "strategyApplied": "",
+    "strategyTooltipBest": "",
+    "strategyTooltipFavorited": "",
+    "strategyTooltipGroupBest": "",
+    "strategyTooltipGroupFavorited": "",
+    "strategyTooltipGroupLargest": "",
+    "strategyTooltipGroupNewest": "",
+    "strategyTooltipLargest": "",
+    "strategyTooltipNewest": "",
+    "subtitleExact": "",
+    "subtitleFailed": "",
+    "subtitleMeta": "",
+    "subtitleScanningExact": "",
+    "subtitleScanningSimilar": "",
+    "subtitleSimilar": "",
+    "subtitleSimilarMeta": "",
+    "thresholdGroupLabel": "",
+    "thresholdLabel": "",
+    "titleExact": "",
+    "titleSimilar": "",
+    "toolbarLabel": "",
+    "typeExact": "",
+    "typeSimilar": "",
+    "unsupported": "",
+    "unsupportedDelete": "",
+    "unsupportedExact": "",
+    "unsupportedMark": "",
+    "unsupportedPhash": "",
+    "unsupportedSimilar": "",
+    "videoBadge": ""
+  },
+  "editor": {
+    "basic": {
+      "blacks": "Cấp đen",
+      "brightness": "Độ sáng",
+      "clarity": "Độ rõ",
+      "contrast": "Tương phản",
+      "dehaze": "Khử sương mù",
+      "denoise": "Giảm nhiễu",
+      "highlights": "Điểm sáng",
+      "saturation": "Bão hòa",
+      "shadows": "Điểm tối",
+      "sharpen": "Tăng độ nét",
+      "temperature": "Nhiệt độ màu",
+      "tint": "Sắc độ",
+      "vibrance": "Bão hòa tự nhiên",
+      "whites": "Cấp trắng"
+    },
+    "batchApply": {
+      "calculating": "",
+      "cancelAria": "",
+      "cancelRequested": "",
+      "cancelledMessage": "",
+      "cancelledToast": "",
+      "completedAll": "",
+      "completedToast": "",
+      "completedWithFailures": "",
+      "confirmMessage": "",
+      "confirmStart": "",
+      "confirmTitle": "",
+      "failedCount": "",
+      "invalidPathError": "",
+      "loadFailedError": "",
+      "noSelectionError": "",
+      "preparing": "",
+      "processingHint": "",
+      "processingLabel": "",
+      "remainingLabel": "",
+      "throughputSuffix": "",
+      "title": ""
+    },
+    "compare": {
+      "edited": "Đã chỉnh",
+      "loading": "Đang tải...",
+      "original": "Gốc"
+    },
+    "hsl": {
+      "balance": "Cân bằng",
+      "blue": "Xanh dương",
+      "bluePurple": "Xanh tím",
+      "cyan": "Lục lam",
+      "green": "Xanh lá",
+      "highlights": "Điểm sáng",
+      "hue": "Sắc độ",
+      "lightness": "Độ sáng",
+      "magenta": "Hồng sẫm",
+      "orange": "Cam",
+      "purple": "Tím",
+      "red": "Đỏ",
+      "saturation": "Bão hòa",
+      "shadows": "Điểm tối",
+      "skin": "Da",
+      "warm": "Ấm",
+      "yellow": "Vàng",
+      "yellowGreen": "Vàng xanh"
+    },
+    "metadata": {
+      "batchExported": "",
+      "batchExportedWithFailures": "",
+      "exportFailed": "",
+      "exported": "",
+      "restoreFailed": "",
+      "restored": "",
+      "unavailable": ""
+    },
+    "page": {
+      "clipboardEmpty": "",
+      "customPresetDefault": "",
+      "editedFileSuffix": "",
+      "exportFailed": "",
+      "imageLoadFailed": "",
+      "importedPresetDefault": "",
+      "paramsCopied": "",
+      "paramsPasted": "",
+      "pasteFailed": "",
+      "presetExportFailed": "",
+      "presetExportSuccess": "",
+      "presetExportUnsupported": "",
+      "presetImportFailed": "",
+      "presetImportSuccess": "",
+      "presetImportUnsupported": "",
+      "presetSaveFailed": "",
+      "presetSaveSuccess": "",
+      "presetSaveUnsupported": ""
+    },
+    "recover": {
+      "discard": "Bỏ",
+      "discarded": "Đã bỏ kết quả chỉnh sửa tạm lưu",
+      "download": "Tải xuống máy",
+      "downloadSuffix": "",
+      "downloaded": "Đã tải xuống kết quả chỉnh sửa",
+      "message": "Lần lưu trước thất bại, kết quả chỉnh sửa đã được tạm lưu ({{fileName}}, {{time}}). Tải xuống máy?",
+      "storeFailed": "Lưu thất bại, và kết quả chỉnh sửa quá lớn không thể tạm lưu, vui lòng chỉnh sửa lại và lưu",
+      "stored": "Lưu thất bại, kết quả chỉnh sửa đã được tạm lưu, có thể tải xuống để khôi phục khi vào trình chỉnh sửa lần sau",
+      "title": "Khôi phục kết quả chỉnh sửa chưa lưu"
+    },
+    "shortcuts": {
+      "desc": {
+        "compareOriginal": "",
+        "copyParams": "",
+        "fullscreenToggle": "",
+        "pasteParams": "",
+        "redo": "",
+        "save": "",
+        "saveAs": "",
+        "togglePanel": "",
+        "undo": ""
+      },
+      "title": ""
+    },
+    "tabs": {
+      "basic": "Cơ bản",
+      "collapsePanel": "Thu gọn bảng",
+      "curves": "Đường cong",
+      "expandPanel": "Mở rộng bảng",
+      "filters": "Bộ lọc",
+      "hsl": "HSL",
+      "lut": "LUT",
+      "split": "Tách",
+      "watermark": "Hình mờ"
+    },
+    "toolbar": {
+      "applyToSelected": "Áp dụng cho đã chọn ({{count}})",
+      "applyToSelectedAria": "Áp dụng cho {{count}} ảnh đã chọn",
+      "applyToSelectedTooltip": "Áp dụng chỉnh sửa/bộ lọc/hình mờ hiện tại cho {{count}} ảnh đã chọn",
+      "applying": "Đang áp dụng...",
+      "back": "Quay lại",
+      "compare": "So sánh",
+      "compareHold": "Giữ để so sánh ảnh gốc",
+      "copyParams": "Sao chép tham số",
+      "exportWithMetadata": "",
+      "exportWithMetadataTooltip": "",
+      "exportingWithMetadata": "",
+      "fullscreenEnter": "Chỉnh sửa toàn màn hình (F11)",
+      "fullscreenEnterAria": "Chỉnh sửa toàn màn hình",
+      "fullscreenExit": "Thoát toàn màn hình (F11)",
+      "fullscreenExitAria": "Thoát toàn màn hình",
+      "pasteParams": "Dán tham số",
+      "redo": "Làm lại",
+      "reset": "Đặt lại",
+      "save": "Lưu",
+      "saveAs": "Lưu thành",
+      "saving": "Đang lưu...",
+      "shortcuts": "Phím tắt (?)",
+      "splitCompare": "So sánh chia đôi",
+      "splitCompareAria": "So sánh chia đôi",
+      "splitCompareTooltip": "Chuyển đổi chế độ so sánh chia đôi (trái: gốc, phải: đã chỉnh)",
+      "undo": "Hoàn tác"
+    },
+    "colorWheel": {
+      "ariaLabel": ""
+    },
+    "histogram": {
+      "ariaLabel": "",
+      "error": ""
+    },
+    "lut": {
+      "clear": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "import": ""
+    },
+    "toneCurve": {
+      "ariaLabel": "",
+      "channelB": "",
+      "channelG": "",
+      "channelR": "",
+      "channelRgb": "",
+      "curveLabel": "",
+      "inputOutput": "",
+      "reset": ""
+    }
+  },
+  "gallery": {
+    "fullscreen": {
+      "ariaLabel": "",
+      "closeTitle": "",
+      "deleteConfirmMessage": "",
+      "favoriteTitle": "",
+      "hideInfoTitle": "",
+      "infoPanelCloseAria": "",
+      "infoPanelTitle": "",
+      "intervalOption": "",
+      "intervalTitle": "",
+      "nextAriaLabel": "",
+      "prevAriaLabel": "",
+      "saveAsFailed": "",
+      "saveAsTitle": "",
+      "showInfoTitle": "",
+      "slideshowMinImages": "",
+      "slideshowPauseAria": "",
+      "slideshowPauseTitle": "",
+      "slideshowPlayAria": "",
+      "slideshowPlayTitle": "",
+      "title": "",
+      "unfavoriteTitle": ""
+    },
+    "import": {
+      "browse": "",
+      "categorize": {
+        "byDate": {
+          "desc": "",
+          "label": ""
+        },
+        "byMonth": {
+          "desc": "",
+          "label": ""
+        },
+        "flat": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "categorizeLabel": "",
+      "conflict": {
+        "overwrite": {
+          "desc": "",
+          "label": ""
+        },
+        "rename": {
+          "desc": "",
+          "label": ""
+        },
+        "skip": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "conflictLabel": "",
+      "deselectAll": "",
+      "errors": {
+        "importFailed": "",
+        "loadFailed": "",
+        "readSourceFailed": ""
+      },
+      "finish": "",
+      "imagesCount": "",
+      "importing": "",
+      "naming": {
+        "date": {
+          "desc": "",
+          "label": ""
+        },
+        "keep": {
+          "desc": "",
+          "label": ""
+        },
+        "seq": {
+          "desc": "",
+          "label": ""
+        }
+      },
+      "namingRuleLabel": "",
+      "nextStep": "",
+      "prevStep": "",
+      "progressLabel": "",
+      "resultImported": "",
+      "resultSkipped": "",
+      "scanHint": "",
+      "scanResult": "",
+      "scanSummary": "",
+      "scanning": "",
+      "selectionSummary": "",
+      "sourceDirLabel": "",
+      "sourceDirPlaceholder": "",
+      "startImport": "",
+      "step1": "",
+      "step2": "",
+      "step3": "",
+      "summaryDiskSpace": "",
+      "summaryFiles": "",
+      "summaryFilesValue": "",
+      "targetDirLabel": "",
+      "targetDirPlaceholder": "",
+      "title": "",
+      "videosCount": "",
+      "indexingHint": ""
+    },
+    "slideshow": {
+      "ariaLabel": "",
+      "exitAriaLabel": "",
+      "exitTitle": "",
+      "intervalLabel": "",
+      "intervalPreset": {
+        "10s": "",
+        "1s": "",
+        "3s": "",
+        "5s": ""
+      },
+      "loopLabel": "",
+      "nextTitle": "",
+      "orderLabel": "",
+      "orderPreset": {
+        "sequence": "",
+        "shuffle": ""
+      },
+      "pauseAriaLabel": "",
+      "pauseTitle": "",
+      "playAriaLabel": "",
+      "playTitle": "",
+      "prevTitle": "",
+      "progress": "",
+      "settingsAriaLabel": "",
+      "settingsCloseAriaLabel": "",
+      "settingsPanelTitle": "",
+      "settingsTitle": "",
+      "shortcutsHint": "",
+      "shuffleBadge": "",
+      "skipVideoLabel": "",
+      "title": "",
+      "transitionLabel": "",
+      "transitionPreset": {
+        "fade": "",
+        "none": "",
+        "slide": ""
+      }
+    },
+    "smartGroup": {
+      "dimensionDesc": {
+        "albumType": "",
+        "fileType": "",
+        "outfit": "",
+        "sceneCategory": "",
+        "sceneTime": ""
+      },
+      "emptyHint": "",
+      "fileType": {
+        "image": "",
+        "video": ""
+      }
+    },
+    "toolbar": {
+      "cleanupCorrupted": "",
+      "cleanupCorruptedTitle": "",
+      "corruptedOnly": "",
+      "corruptedOnlyTitle": "",
+      "dateLabel": "",
+      "dateRange": {
+        "clear": "",
+        "endLabel": "",
+        "startLabel": ""
+      },
+      "filterType": {
+        "all": "",
+        "image": "",
+        "video": ""
+      },
+      "importTitle": "",
+      "missingOnly": "",
+      "missingOnlyTitle": "",
+      "rating": {
+        "all": "",
+        "label": "",
+        "star1Plus": "",
+        "star2Plus": "",
+        "star3Plus": "",
+        "star4Plus": "",
+        "star5": "",
+        "starNPlus": ""
+      },
+      "searchPlaceholder": "",
+      "shareTitle": "",
+      "sortBy": {
+        "date": "",
+        "name": "",
+        "rating": "",
+        "resolution": "",
+        "size": ""
+      },
+      "viewMode": {
+        "eventTimeline": "",
+        "grid": "",
+        "list": "",
+        "masonry": "",
+        "timeline": ""
+      }
+    },
+    "contextMenu": {
+      "copyTo": "",
+      "delete": "",
+      "deletePermanent": "",
+      "edit": "",
+      "export": "",
+      "favorite": "",
+      "moveTo": "",
+      "open": "",
+      "openLocation": "",
+      "properties": "",
+      "rename": "",
+      "saveAs": "",
+      "selectAllInCategory": "",
+      "share": "",
+      "shareToQQ": "",
+      "shareToVivo": "",
+      "shareToWechat": "",
+      "unfavorite": ""
+    },
+    "eventTimeline": {
+      "ariaLabel": "",
+      "emptyHint": "",
+      "itemCount": "",
+      "unknownPeriodDesc": "",
+      "unknownPeriodName": "",
+      "versionBadge": ""
+    },
+    "masonry": {
+      "ariaLabel": ""
+    },
+    "renameDialog": {
+      "cancel": "",
+      "confirm": "",
+      "emptyError": "",
+      "invalidCharsError": "",
+      "title": ""
+    },
+    "tagManager": {
+      "addButton": "",
+      "commonTags": "",
+      "duplicateToast": "",
+      "emptyHint": "",
+      "inputPlaceholder": "",
+      "presetTags": {
+        "battle": "",
+        "drama": "",
+        "equipment": "",
+        "explore": "",
+        "landscape": "",
+        "people": "",
+        "screenshot": ""
+      },
+      "title": ""
+    },
+    "timeline": {
+      "ariaLabel": "",
+      "itemCount": ""
+    },
+    "virtualGrid": {
+      "ariaLabel": "",
+      "deleteAria": "",
+      "deleteTitle": "",
+      "editAria": "",
+      "editTitle": "",
+      "favoriteAria": "",
+      "favoriteTitle": "",
+      "loadingMore": "Đang tải…",
+      "noMore": "Không còn mục nào",
+      "unfavoriteAria": "",
+      "unfavoriteTitle": ""
+    },
+    "watermarkDialog": {
+      "cancel": "",
+      "cancelTask": "",
+      "closeAria": "",
+      "computing": "",
+      "processing": "",
+      "processingHint": "",
+      "remaining": "",
+      "startAdd": "",
+      "title": ""
+    },
+    "search": {
+      "log": {
+        "indexNotReadyFallback": ""
+      }
+    },
+    "media": {
+      "log": {
+        "refreshNullFailed": ""
+      }
+    }
+  },
+  "group": {
+    "albumType": "Loại album",
+    "all": "Tất cả",
+    "fileType": "Loại tệp",
+    "none": "Không nhóm",
+    "other": "Khác",
+    "outfit": "Trang phục",
+    "sceneCategory": "Cảnh",
+    "sceneTime": "Thời điểm",
+    "title": "Nhóm thông minh",
+    "log": {
+      "loadCountsFailed": ""
+    }
+  },
+  "logAction": {
+    "backupDeleted": "Đã xóa sao lưu",
+    "backupFailed": "Sao lưu thất bại",
+    "backupSuccess": "Tạo sao lưu thành công",
+    "backupSuccessWithProfile": "Tạo sao lưu thành công (hồ sơ {{name}})",
+    "cleanFailed": "Xóa thất bại",
+    "cleanMissingError": "Xóa bản ghi bị mất thất bại",
+    "cleanMissingFailed": "Xóa thất bại",
+    "cleanMissingSuccess": "Đã xóa {{count}} bản ghi bị mất",
+    "cleanSuccess": "Đã xóa {{count}} tệp, giải phóng {{size}}",
+    "clearData": "Đã xóa dữ liệu cục bộ",
+    "clearDataFailed": "Xóa dữ liệu thất bại",
+    "clearFailed": "Xóa thất bại",
+    "clearSuccess": "Đã xóa nhật ký",
+    "compactModeOff": "Đã tắt chế độ thu gọn",
+    "compactModeOn": "Đã bật chế độ thu gọn",
+    "copyFailed": "Sao chép thất bại, vui lòng chọn văn bản thủ công để sao chép",
+    "copySuccess": "Đã sao chép vào clipboard",
+    "deleteFailed": "Xóa thất bại",
+    "enforceEvicted": "LRU đã loại bỏ {{count}} hình thu nhỏ ít sử dụng nhất",
+    "enforceFailed": "Kiểm tra thất bại",
+    "enforceNoop": "Bộ nhớ đệm dưới giới hạn, không cần loại bỏ",
+    "exportFailed": "Xuất thất bại",
+    "exportSuccess": "Đã xuất nhật ký",
+    "fontSizeSet": "Kích thước phông chữ đặt thành {{label}}",
+    "incrementalOff": "Đã tắt quét tăng dần",
+    "incrementalOn": "Đã bật quét tăng dần",
+    "limitSet": "Đã điều chỉnh giới hạn thành {{gb}}GB",
+    "limitSetEvicted": "Đã điều chỉnh giới hạn thành {{gb}}GB, LRU loại bỏ {{count}} tệp",
+    "limitSetFailed": "Cài đặt thất bại",
+    "loadStatsFailed": "Không thể tải thống kê bộ nhớ đệm",
+    "openDirFailed": "Không thể mở thư mục",
+    "qqCopied": "Đã sao chép số nhóm QQ vào clipboard",
+    "qqCopyFailed": "Sao chép thất bại, vui lòng chọn số nhóm thủ công để sao chép",
+    "reduceMotionOff": "Đã tắt giảm hoạt ảnh",
+    "reduceMotionOn": "Đã bật giảm hoạt ảnh",
+    "restoreFailed": "Khôi phục thất bại",
+    "restoreSuccess": "Khôi phục thành công, vui lòng khởi động lại ứng dụng",
+    "sceneAnalyzeFailed": "Phân tích thất bại",
+    "sceneAnalyzed": "Đã phân tích thời gian cảnh cho {{count}} hình ảnh",
+    "settingFailed": "Cài đặt thất bại",
+    "themeChanged": "Đã thay đổi chủ đề"
+  },
+  "nav": {
+    "allProfiles": "Tất cả hồ sơ",
+    "alreadyAtTop": "Đã ở cấp cao nhất",
+    "backToTop": "Quay lại",
+    "categories": "Danh mục",
+    "collapse": "Thu gọn",
+    "duplicates": "Trùng lặp",
+    "expand": "Mở rộng",
+    "favorites": "Yêu thích",
+    "gallery": "Thư viện",
+    "images": "Hình ảnh",
+    "launcherCache": "Bộ nhớ đệm launcher",
+    "menu": "Menu",
+    "recycleBin": "Thùng rác",
+    "resonanceRecords": "Cộng Hưởng",
+    "settings": "Cài đặt",
+    "smartGroup": "Nhóm thông minh",
+    "storage": "Lưu trữ",
+    "switchProfile": "Chuyển hồ sơ",
+    "videos": "Video",
+    "screenshots": "Ảnh chụp màn hình"
+  },
+  "outfit": {
+    "collectedHint": "Trang phục có ảnh trong cơ sở dữ liệu",
+    "collectedLabel": "Trang phục đã sưu tầm",
+    "collectedSection": "Đã sưu tầm ({{count}})",
+    "count": "{{count}} bộ",
+    "customSection": "Tùy chỉnh ({{count}})",
+    "emptyHint": "Chưa có dữ liệu trang phục, vui lòng đánh dấu trang phục cho ảnh ở trang chi tiết",
+    "filtered": "Đã lọc ảnh của「{{outfit}}」",
+    "latestShot": "Chụp mới nhất",
+    "loadFailed": "Tải thất bại",
+    "loadStatsFailed": "Tải thống kê trang phục thất bại",
+    "loading": "Đang tải thống kê trang phục…",
+    "locked": "Chưa mở khóa",
+    "noData": "Chưa có dữ liệu",
+    "photosCount": "{{count}} ảnh",
+    "presetTotalHint": "Thư viện thiết lập sẵn tích hợp",
+    "presetTotalLabel": "Tổng số trang phục thiết lập sẵn",
+    "progressLabel": "Tiến độ sưu tầm",
+    "progressValue": "{{collected}} / {{total}}",
+    "refresh": "Làm mới",
+    "refreshStats": "Thống kê lại",
+    "summary": "Đã sưu tầm {{collected}} bộ · thiết lập sẵn {{presets}} bộ · tiến độ {{progress}}%",
+    "title": "Danh mục trang phục",
+    "topOutfitLabel": "Trang phục đầy đủ nhất",
+    "uncollectedHint": "Chưa sưu tầm ảnh của「{{outfit}}」",
+    "uncollectedSection": "Chưa sưu tầm ({{count}})",
+    "unsupported": "Môi trường hiện tại không hỗ trợ danh mục trang phục",
+    "viewOutfitPhotos": "Xem tất cả ảnh của「{{outfit}}」",
+    "presets": {
+      "amberCharm": "",
+      "ancientElegance": "",
+      "auroraPhantom": "",
+      "brilliantGalaxy": "",
+      "butterflyEffect": "",
+      "campusDays": "",
+      "cherryBlossomLover": "",
+      "cloudSinger": "",
+      "cloudWalk": "",
+      "crystalOath": "",
+      "desertRose": "",
+      "emeraldOath": "",
+      "fairyTale": "",
+      "firstKiss": "",
+      "floralGirl": "",
+      "futureTech": "",
+      "glazeDream": "",
+      "islandHoliday": "",
+      "moonlightSonata": "",
+      "morningLight": "",
+      "newYearSplendor": "",
+      "nightPoem": "",
+      "oceanMystery": "",
+      "roseGarden": "",
+      "roseKnight": "",
+      "seaOfStars": "",
+      "snowElf": "",
+      "snowlandTrain": "",
+      "springWaltz": "",
+      "stardustMagic": "",
+      "summerBreeze": "",
+      "urbanBeauty": "",
+      "wisteriaWhisper": "",
+      "winterSnow": "",
+      "autumnLeaves": ""
+    }
+  },
+  "profile": {
+    "defaultProfile": "Hồ sơ mặc định",
+    "transferToProfile": "Chuyển giao đến hồ sơ"
+  },
+  "profileAction": {
+    "createFailed": "Tạo thất bại",
+    "created": "Đã tạo hồ sơ",
+    "defaultCannotDelete": "Không thể xóa hồ sơ mặc định",
+    "deleteConfirm": "Xóa hồ sơ {{uid}}? Các tệp dưới hồ sơ này sẽ được chuyển sang hồ sơ mặc định.",
+    "deleteFailed": "Xóa thất bại",
+    "deleted": "Đã xóa hồ sơ",
+    "nicknameRequired": "Biệt danh không được để trống",
+    "nicknameUpdated": "Đã cập nhật biệt danh",
+    "switchFailed": "Chuyển thất bại",
+    "switched": "Đã chuyển hồ sơ",
+    "uidExists": "UID này đã tồn tại",
+    "uidInvalid": "UID chỉ cho phép chữ cái và số",
+    "uidRequired": "Vui lòng nhập UID",
+    "unsupported": "Quản lý hồ sơ không được hỗ trợ trong môi trường này",
+    "updateFailed": "Cập nhật thất bại"
+  },
+  "recycleBin": {
+    "backToGallery": "Về thư viện",
+    "clearSelection": "Bỏ chọn",
+    "confirmEmpty": "Dọn",
+    "deleteFailed": "Xóa thất bại",
+    "empty": "Dọn thùng rác",
+    "emptyConfirm": "Sẽ xóa vĩnh viễn toàn bộ {{count}} tệp trong thùng rác.\nTệp sẽ được chuyển vào thùng rác hệ thống trước, sau đó không thể khôi phục từ ứng dụng này.\nDọn thùng rác?",
+    "emptyConfirmTitle": "Dọn thùng rác",
+    "emptyFailed": "Dọn thùng rác thất bại",
+    "emptySuccess": "Đã dọn thùng rác",
+    "emptyTitle": "Thùng rác trống",
+    "itemLabel": "Mục thùng rác {{name}}",
+    "permanentConfirm": "Sẽ xóa vĩnh viễn {{count}} tệp đã chọn.\nTệp sẽ được chuyển vào thùng rác hệ thống trước, sau đó không thể khôi phục từ ứng dụng này.\nXóa?",
+    "permanentConfirmTitle": "Xóa vĩnh viễn",
+    "permanentDelete": "Xóa vĩnh viễn",
+    "permanentDeleteSelected": "Xóa vĩnh viễn mục đã chọn",
+    "permanentHint": "Sau khi xóa vĩnh viễn tệp sẽ được chuyển vào thùng rác hệ thống",
+    "restore": "Khôi phục",
+    "restoreFailed": "Khôi phục thất bại",
+    "restoreSelected": "Khôi phục mục đã chọn",
+    "retryDelete": "Thử xóa lại",
+    "retryEmpty": "Thử dọn lại",
+    "retryRestore": "Thử khôi phục lại",
+    "selectToDelete": "Vui lòng chọn mục cần xóa",
+    "selectToRestore": "Vui lòng chọn mục cần khôi phục",
+    "selectedCount": "Đã chọn {{count}} mục",
+    "summary": "{{count}} mục · tổng {{size}}",
+    "summaryWithHint": "{{count}} mục · tổng {{size}} · sau khi xóa vĩnh viễn tệp sẽ được chuyển vào thùng rác hệ thống",
+    "title": "Thùng rác",
+    "toolbarLabel": "Thao tác thùng rác",
+    "videoBadge": "Video"
+  },
+  "sceneLabel": {
+    "location": "Vị trí",
+    "other": "Khác",
+    "portrait": "Chân dung",
+    "recording": "Ghi hình",
+    "scene": "Cảnh",
+    "screenshot": "Ảnh chụp màn hình",
+    "unknown": "Không xác định"
+  },
+  "settings": {
+    "about": {
+      "alias": "(cùng tên trên tất cả các nền tảng)",
+      "appName": "Tên ứng dụng",
+      "appValue": "Công cụ quản lý album ảnh WXNN",
+      "authorLabel": "Tác giả: QianLu",
+      "bilibili": "Bilibili",
+      "buildTools": "Bộ công cụ build",
+      "checkUpdate": "Kiểm tra cập nhật",
+      "checkUpdateHint": "Mở kho GitHub trong trình duyệt; tải xuống phiên bản mới nhất thủ công",
+      "contactDesc": "Kho GitHub, nhóm QQ và mạng xã hội",
+      "contactTitle": "Liên hệ",
+      "copyGroup": "Sao chép số nhóm",
+      "copyright": "© 2026 QianLu. Giữ mọi quyền.",
+      "devCredit": "Nhà phát triển: 纖璐不會玩攝影",
+      "developer": "Nhà phát triển",
+      "douyin": "Douyin",
+      "githubRepo": "Kho GitHub",
+      "licenseApache": "• Apache-2.0: Sử dụng tự do; phải giữ bản quyền và cấp phép sáng chế",
+      "licenseDesc": "Phụ thuộc và thông tin giấy phép",
+      "licenseGpl": "• GPL-3.0: Mã sử dụng hoặc sửa đổi nó cũng phải là mã nguồn mở",
+      "licenseMit": "• MIT: Sử dụng, sửa đổi và phân phối tự do; phải giữ thông báo bản quyền",
+      "licenseNote": "Ghi chú giấy phép",
+      "licenseTitle": "Cảm ơn và giấy phép",
+      "open": "Mở",
+      "projectIntro": "Phần mềm này được xây dựng trên các dự án mã nguồn mở ở trên. Cảm ơn tất cả những người đóng góp cho cộng đồng mã nguồn mở. Bản thân phần mềm là mã nguồn mở theo giấy phép MIT; chào đón sử dụng, sửa đổi và phân phối tự do.",
+      "qqGroup": "Nhóm QQ",
+      "repo": "Kho lưu trữ",
+      "repoLabel": "Kho lưu trữ:",
+      "runtimeDeps": "Phụ thuộc thời gian chạy",
+      "socialMedia": "Mạng xã hội của nhà phát triển",
+      "techStack": "Công nghệ sử dụng",
+      "version": "Phiên bản",
+      "versionLabel": "Phiên bản: v{{version}}",
+      "xiaohongshu": "Xiaohongshu",
+      "depDesc": {
+        "autoAnimate": "",
+        "betterSqlite3": "",
+        "electron": "",
+        "exifr": "",
+        "ffmpegStatic": "",
+        "ffprobeStatic": "",
+        "fluentFfmpeg": "",
+        "motion": "",
+        "react": "",
+        "reactDom": "",
+        "sharp": "",
+        "zustand": "",
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+      },
+      "toolDesc": {
+        "electronBuilder": "",
+        "eslint": "",
+        "tailwindCss": "",
+        "typeScript": "",
+        "vite": "",
+        "vitest": ""
+      },
+      "updateTitle": "Cập nhật",
+      "updateNetworkBusy": "Mạng đang bận. Nhấn OK để mở trang chủ.",
+      "updateNoNewVersion": "Bạn đã dùng phiên bản mới nhất",
+      "depDescTodo": {
+        "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
+      }
+    },
+    "backup": {
+      "archiveTag": "Hồ sơ: {{name}}",
+      "create": "Sao lưu ngay",
+      "creating": "Đang sao lưu…",
+      "delete": "Xóa",
+      "empty": "Không có bản ghi sao lưu",
+      "emptyHint": "Nhấp vào \"Sao lưu ngay\" để tạo bản sao lưu đầu tiên",
+      "hint": "Ứng dụng kiểm tra bản sao lưu khi khởi động (thực thi nếu bản sao lưu cuối cùng đã hơn 7 ngày), giữ 5 bản mới nhất, tự động xóa các bản cũ. Khôi phục sẽ ghi đè cơ sở dữ liệu hiện tại; cần khởi động lại. Sao lưu theo hồ sơ chỉ thêm hậu tố UID vào tên tệp để nhận dạng; nội dung vẫn là toàn bộ cơ sở dữ liệu (khôi phục không làm mất dữ liệu của các hồ sơ khác).",
+      "loading": "Đang tải…",
+      "modifyDir": "Thay đổi thư mục",
+      "openDir": "Mở thư mục",
+      "records": "Bản ghi sao lưu (mới nhất trước)",
+      "refresh": "Làm mới",
+      "restartLater": "Khởi động lại thủ công sau",
+      "restartNow": "Khởi động lại ngay",
+      "restartTitle": "Khởi động lại ứng dụng",
+      "restore": "Khôi phục",
+      "restoreConfirm": "Khôi phục từ bản sao lưu này? Hành động này sẽ ghi đè tất cả dữ liệu của cơ sở dữ liệu hiện tại; khởi động lại ứng dụng sau khi khôi phục để có hiệu lực.",
+      "restoreTitle": "Khôi phục cơ sở dữ liệu",
+      "storageLocation": "Vị trí lưu trữ bản sao lưu",
+      "total": "{{count}} bản sao lưu",
+      "wholeDb": "Sao lưu toàn bộ cơ sở dữ liệu",
+      "log": {
+        "loadBackupsFailed": ""
+      }
+    },
+    "cache": {
+      "cacheLimit": "Giới hạn bộ nhớ đệm",
+      "cacheLocation": "Vị trí bộ nhớ đệm hình thu nhỏ",
+      "cleanAll": "Xóa tất cả",
+      "cleanConfirm": "Xóa tất cả {{count}} bộ nhớ đệm hình thu nhỏ?\n({{size}} đang sử dụng, hình ảnh đã xóa sẽ được tạo lại khi truy cập)",
+      "cleanTitle": "Xóa tất cả hình thu nhỏ",
+      "confirmClean": "Xác nhận xóa",
+      "currentUsage": "Sử dụng hiện tại",
+      "enforceLru": "Thực hiện kiểm tra LRU ngay",
+      "fileCount": "{{count}} tệp",
+      "hint": "Mẹo: Sau khi xóa, truy cập hình ảnh đã xóa sẽ tự động tạo lại hình thu nhỏ. Loại bỏ LRU không ảnh hưởng đến hình ảnh gốc, chỉ bộ nhớ đệm.",
+      "limit": "Giới hạn",
+      "lruHint": "Tự động loại bỏ LRU khi vượt quá",
+      "modifyDir": "Thay đổi thư mục",
+      "noData": "Không có dữ liệu",
+      "openDir": "Mở thư mục",
+      "refreshStats": "Làm mới thống kê",
+      "usage": "Tỷ lệ sử dụng",
+      "strategyTitle": "",
+      "strategyDesc": "",
+      "invalidLimit": "",
+      "customLimitHint": ""
+    },
+    "clear": {
+      "cleanMissing": "Xóa bản ghi bị mất",
+      "cleaning": "Đang xóa...",
+      "clearConfirm": "Xóa tất cả dữ liệu cục bộ? Hành động này sẽ xóa bản ghi cơ sở dữ liệu, lịch sử quét, thẻ và cài đặt, nhưng không ảnh hưởng đến tệp phương tiện gốc.",
+      "clearLocal": "Xóa dữ liệu cục bộ",
+      "clearTitle": "Xóa dữ liệu cục bộ",
+      "missingConfirm": "Xóa tất cả bản ghi được đánh dấu là \"mất\"? Hành động này chỉ xóa chỉ mục cơ sở dữ liệu, không ảnh hưởng đến các tệp bình thường khác và không thể hoàn tác.",
+      "missingConfirmTitle": "Xóa bản ghi bị mất",
+      "missingDesc": "Nếu trong quá trình quét phát hiện tệp bị xóa bên ngoài (không tìm thấy hai lần liên tiếp), tệp sẽ được đánh dấu là \"mất\". Nhấp vào bên dưới để xóa tất cả bản ghi bị mất cùng lúc; chỉ xóa chỉ mục cơ sở dữ liệu, không ảnh hưởng đến tệp bình thường.",
+      "missingTitle": "Xóa bản ghi bị mất"
+    },
+    "crash": {
+      "clear": "Xóa bản ghi",
+      "clearConfirm": "Xóa tất cả tệp đổ bộ sự cố? Hành động này sẽ xóa vĩnh viễn tất cả bản ghi sự cố, không thể khôi phục.",
+      "clearDisabled": "Không có bản ghi sự cố để xóa",
+      "clearTitle": "Xóa bản ghi sự cố",
+      "clearing": "Đang xóa…",
+      "crashFiles": "Tệp sự cố",
+      "crashReason": "Nguyên nhân sự cố",
+      "desc": "Tự động thu thập tệp đổ bộ sự cố tiến trình, hữu ích cho phản hồi và khắc phục sự cố",
+      "empty": "Không có bản ghi sự cố",
+      "emptyLoading": "Không có bản ghi sự cố, đang tải…",
+      "emptyStable": "Không có bản ghi sự cố, phần mềm hoạt động ổn định",
+      "hint": "Tệp đổ bộ sự cố được tạo tự động bởi Electron crashpad, giữ 10 bản mới nhất, tự động xóa sau 30 ngày. Chỉ ghi lại thông tin sự cố tiến trình, không có dữ liệu quyền riêng tư của người dùng.",
+      "listCount": "{{count}} bản ghi",
+      "listTitle": "Bản ghi sự cố (mới nhất trước)",
+      "modifyDir": "Thay đổi thư mục",
+      "oldest": "Bản ghi cũ nhất",
+      "openDir": "Mở thư mục",
+      "processMain": "Tiến trình chính",
+      "processOther": "Khác",
+      "processRenderer": "Tiến trình kết xuất",
+      "refresh": "Làm mới",
+      "size": "Kích thước",
+      "storageLocation": "Vị trí lưu trữ tệp sự cố",
+      "storageUsage": "Sử dụng không gian",
+      "title": "Báo cáo sự cố",
+      "topFrame": "Khung ngăn xếp trên cùng",
+      "userDataPath": "userData/crashes/"
+    },
+    "display": {
+      "compactMode": "Chế độ thu gọn",
+      "compactModeDesc": "Giảm khoảng đệm của thẻ và khoảng cách giữa các phần tử để hiển thị nhiều nội dung hơn trên mỗi màn hình",
+      "fontSize": "Kích thước phông chữ",
+      "fontSizeHint": "Điều chỉnh kích thước văn bản giao diện, ảnh hưởng đến tất cả các trang và hộp thoại",
+      "fontSizeLarge": "Lớn",
+      "fontSizeNormal": "Bình thường",
+      "fontSizeSmall": "Nhỏ",
+      "fontSizeXLarge": "Rất lớn",
+      "reduceMotion": "Giảm hoạt ảnh",
+      "reduceMotionDesc": "Tắt hiệu ứng chuyển tiếp và hover để cải thiện khả năng phản hồi trên các thiết bị hiệu suất thấp"
+    },
+    "export": {
+      "clearDir": "Xóa",
+      "defaultDir": "Đường dẫn xuất mặc định",
+      "defaultDirHint": "Sau khi cấu hình, xuất hàng loạt có thể được thực hiện bằng một cú nhấp vào đường dẫn này, không cần chọn thư mục mỗi lần",
+      "defaultDirPlaceholder": "Chưa cấu hình (thư mục đích sẽ được hỏi khi xuất)",
+      "description": "Đường dẫn xuất mặc định và quy tắc đặt tên thông minh",
+      "namingPattern": "Quy tắc đặt tên xuất",
+      "namingPatternEmpty": "Để trống để sử dụng tên tệp gốc; tự động thêm số thứ tự khi xung đột đặt tên",
+      "namingPatternHint": "Biến: {date} ngày hiện tại · {album_type} loại album · {uid} UID hồ sơ · {original_name} tên tệp gốc · {sequence} số thứ tự",
+      "namingPatternPlaceholder": "vd: {date}_{album_type}_{original_name}",
+      "preview": "Xem trước",
+      "previewEmpty": "ten_tep_goc.phan_mo_rong",
+      "selectDir": "Chọn",
+      "title": "Quy trình xuất",
+      "previewAlbumType": "",
+      "previewExtension": ""
+    },
+    "fileops": {
+      "batchThreshold": "Ngưỡng thao tác hàng loạt",
+      "batchThresholdDesc": "Hiển thị xác nhận thứ cấp khi tệp được chọn vượt quá số lượng này",
+      "deleteConfirm": "Xác nhận trước khi xóa",
+      "deleteConfirmDesc": "Hiển thị hộp thoại xác nhận khi xóa tệp để tránh xóa nhầm",
+      "description": "Xác nhận xóa, ngưỡng thao tác hàng loạt và các tùy chọn thao tác tệp khác",
+      "permanentDoubleConfirm": "Xác nhận hai lần cho xóa vĩnh viễn",
+      "permanentDoubleConfirmDesc": "Hiển thị xác nhận lại khi sử dụng Shift+Delete để xóa vĩnh viễn",
+      "preferSoftDelete": "Ưu tiên xóa mềm",
+      "preferSoftDeleteDesc": "Di chuyển vào thùng rác theo mặc định, có thể khôi phục từ thùng rác",
+      "thresholdCount": "Số lượng ngưỡng",
+      "title": "Thao tác tệp"
+    },
+    "groups": {
+      "about": "Giới thiệu",
+      "appearance": "Giao diện",
+      "data": "Quản lý dữ liệu",
+      "diagnostics": "Nhật ký & chẩn đoán",
+      "general": "Chung",
+      "plugins": "",
+      "profile": "Hồ sơ",
+      "scan": "Quét",
+      "tools": "Công cụ"
+    },
+    "language": {
+      "auto": "Theo hệ thống",
+      "description": "Chuyển đổi ngôn ngữ hiển thị giao diện",
+      "restartHint": "Một số văn bản có thể cần khởi động lại ứng dụng để làm mới hoàn toàn",
+      "title": "Ngôn ngữ",
+      "loading": ""
+    },
+    "logs": {
+      "aggregateTooltip": "Chuyển sang chế độ xem tổng hợp (cùng lỗi được gộp)",
+      "clear": "Xóa nhật ký",
+      "clearConfirm": "Xóa tất cả nhật ký lịch sử? Hành động này sẽ xóa vĩnh viễn tất cả bản ghi lỗi và tệp nhật ký, không thể khôi phục.",
+      "clearDisabled": "Không có nhật ký để xóa",
+      "clearTitle": "Xóa nhật ký",
+      "clearing": "Đang xóa…",
+      "copy": "Sao chép",
+      "copySample": "Sao chép mẫu",
+      "dayTooltip": "{{date}}: {{count}} lỗi",
+      "desc": "Tự động ghi lại các ngoại lệ khi chạy phần mềm, hữu ích cho phản hồi và khắc phục sự cố",
+      "empty": "Không có bản ghi lỗi",
+      "emptyHint": "Các ngoại lệ khi chạy phần mềm được tự động ghi lại tại đây",
+      "expandFault": "Mở rộng chi tiết lỗi: {{summary}}",
+      "expandSample": "Mở rộng chi tiết tổng hợp: {{summary}}",
+      "export": "Xuất nhật ký",
+      "exportDisabled": "Không có nhật ký để xuất",
+      "exporting": "Đang xuất…",
+      "faultId": "ID lỗi: {{id}}",
+      "faultTotal": "Tổng số lỗi",
+      "firstSeen": "Đầu tiên: {{time}}",
+      "fullLog": "Nội dung nhật ký đầy đủ",
+      "hint": "Nhật ký được tự động luân chuyển theo ngày, tổng giới hạn 2GB, tự động xóa sau 90 ngày. Chỉ ghi lại thông tin chạy phần mềm, không có dữ liệu quyền riêng tư của người dùng.",
+      "lastSeen": "Cuối cùng: {{time}}",
+      "listAggregate": "Tổng hợp lỗi (theo số lượng giảm dần)",
+      "listCount": "{{count}} mục",
+      "listCountWithGroup": "{{count}} mục · {{groups}} nhóm",
+      "listTimeline": "Bản ghi lỗi (mới nhất trước)",
+      "logFiles": "Tệp nhật ký",
+      "modifyDir": "Thay đổi thư mục",
+      "notInit": "Chưa khởi tạo",
+      "occurrenceCount": "Số lần xuất hiện: {{count}}",
+      "openDir": "Mở thư mục",
+      "refresh": "Làm mới",
+      "sampleDetail": "Chi tiết mẫu (mới nhất)",
+      "sourceFile": "Tệp nguồn: {{file}}",
+      "storageLocation": "Vị trí lưu trữ nhật ký",
+      "storageUsage": "Sử dụng không gian",
+      "switchAggregate": "Tổng hợp",
+      "switchTimeline": "Theo dòng thời gian",
+      "timelineTooltip": "Chuyển sang chế độ xem theo dòng thời gian",
+      "title": "Quản lý nhật ký",
+      "totalLabel": "Tổng cộng: {{count}}",
+      "trendTitle": "Xu hướng lỗi (14 ngày gần đây)",
+      "trendTotal": "{{count}} mục"
+    },
+    "plugin": {
+      "checkUpdate": "",
+      "description": "",
+      "detail": "",
+      "detailTitle": "",
+      "disable": "",
+      "disabled": "",
+      "empty": "",
+      "enable": "",
+      "enabled": "",
+      "fieldActivationPoints": "",
+      "fieldActive": "",
+      "fieldAuthor": "",
+      "fieldDescription": "",
+      "fieldError": "",
+      "fieldExtensionPoints": "",
+      "fieldLicense": "",
+      "fieldMain": "",
+      "fieldPermissions": "",
+      "fieldVersion": "",
+      "install": "",
+      "installHint": "",
+      "installPlaceholder": "",
+      "installTitle": "",
+      "installed": "",
+      "noUpdate": "",
+      "notAvailable": "",
+      "statusDisabled": "",
+      "statusEnabled": "",
+      "statusError": "",
+      "storagePath": "",
+      "storagePathDesc": "",
+      "uninstall": "",
+      "uninstallConfirm": "",
+      "uninstallTitle": "",
+      "uninstalled": "",
+      "update": "",
+      "updateConfirm": "",
+      "updateTitle": "",
+      "updated": ""
+    },
+    "profile": {
+      "add": "Thêm",
+      "addProfile": "Thêm hồ sơ",
+      "cancel": "Hủy",
+      "deleteProfile": "Xóa hồ sơ",
+      "editNickname": "Sửa biệt danh",
+      "empty": "Không có hồ sơ",
+      "images": "Hình ảnh",
+      "list": "Danh sách hồ sơ",
+      "loading": "Đang tải…",
+      "nicknamePlaceholder": "Biệt danh (tùy chọn)",
+      "noData": "Không có dữ liệu",
+      "outfitTop": "Thị hiếu trang phục Top 5",
+      "photos": "{{count}} ảnh",
+      "photosWithPercent": "{{count}} ảnh ({{percent}}%)",
+      "save": "Lưu",
+      "sceneTop": "Thị hiếu cảnh Top 5",
+      "shotRange": "Khoảng thời gian chụp:",
+      "stats": "Thống kê chụp ({{name}})",
+      "storageUsage": "Sử dụng lưu trữ",
+      "switchTo": "Chuyển sang hồ sơ này",
+      "timeTop": "Thị hiếu thời gian",
+      "totalFiles": "Tổng số tệp",
+      "uidPlaceholder": "UID (8-12 chữ số)",
+      "videos": "Video",
+      "virtualBadge": "Không có phương tiện (ảo)",
+      "cleanupVirtual": "Dọn hồ sơ ảo",
+      "cleanupVirtualConfirm": "Dọn {{count}} hồ sơ ảo không có phương tiện? Chúng được đăng ký tự động khi quét nhưng không có tệp phương tiện thực tế.",
+      "noVirtual": "Không có hồ sơ ảo cần dọn",
+      "cleanupDone": "Đã dọn {{count}} hồ sơ ảo",
+      "cleanupPartial": "Đã dọn xong, nhưng {{failed}} hồ sơ ảo xóa không thành công"
+    },
+    "scan": {
+      "analyzeNow": "Phân tích ngay",
+      "analyzing": "Đang phân tích…",
+      "incremental": "Quét tăng dần",
+      "sceneTimeDesc": "Tự động nhận dạng ngày/đêm/bình minh/hoàng hôn dựa trên biểu đồ độ sáng của hình ảnh",
+      "sceneTimeTitle": "Phân tích thời gian cảnh",
+      "addPath": "Thêm thư mục trò chơi",
+      "adding": "Đang thêm…",
+      "emptyPaths": "Chưa cấu hình thư mục trò chơi tùy chỉnh, trình quét sẽ tự động tìm kiếm các tệp đặc trưng của trò chơi",
+      "pathAdded": "Đã thêm thư mục trò chơi",
+      "pathExists": "Thư mục này đã tồn tại",
+      "pathLimit": "Tối đa {{max}} thư mục trò chơi",
+      "pathRemove": "Gỡ bỏ",
+      "pathRemoved": "Đã gỡ bỏ thư mục trò chơi",
+      "pathsDescription": "Chỉ định thủ công thư mục cài đặt trò chơi (hoặc thư mục album GamePlayPhotos); khi quét sẽ tìm kiếm các đường dẫn này trước. Khi quét tự động thất bại, có thể chỉ định thư mục dự phòng tại đây.",
+      "importRootsTitle": "Thư mục chỉ định",
+      "importRootsDescription": "Các thư mục đã đăng ký qua \"Quét thư mục chỉ định\" có thể gỡ khỏi quản lý tại đây",
+      "importRootsEmpty": "Chưa đăng ký thư mục chỉ định nào",
+      "importRootsLoading": "Đang tải…",
+      "importRootsRemove": "Gỡ thư mục chỉ định này",
+      "importRootsManageHint": "Các thư mục đã đăng ký qua \"Quét thư mục chỉ định\" vui lòng quản lý trong \"Thư mục chỉ định\"",
+      "importRootsConfirmTitle": "Gỡ thư mục chỉ định",
+      "importRootsConfirmBody": "Sẽ gỡ đăng ký thư mục \"{{path}}\". Có xóa luôn các bản ghi chỉ mục phương tiện không?",
+      "importRootsConfirmClearRecords": "Xóa luôn các bản ghi chỉ mục phương tiện của thư mục này (chuyển vào thùng rác, có thể khôi phục)",
+      "importRootsClearRecordsHint": "Gợi ý: nếu tích chọn, phương tiện sẽ được chuyển vào thùng rác (có thể khôi phục); nếu không tích, bản ghi được giữ lại nhưng sẽ không hiển thị trong \"Thư viện\" và \"Bộ nhớ đệm\" (dữ liệu của thư mục đã đóng vẫn còn trong kho, có thể khôi phục bằng cách quét lại).",
+      "importRootsConfirmCancel": "Hủy",
+      "importRootsConfirmRemove": "Xác nhận gỡ bỏ",
+      "importRootsRemoving": "Đang gỡ…",
+      "importRootsRemovedOnly": "Đã gỡ khỏi quản lý",
+      "importRootsRemovedWithCleared": "Đã gỡ khỏi quản lý và xóa {{count}} bản ghi phương tiện",
+      "importRootsClearFailed": "Đã gỡ khỏi quản lý nhưng xóa bản ghi chỉ mục phương tiện của thư mục này thất bại, bản ghi vẫn còn trong kho",
+      "importRootsRemoveFailed": "Gỡ thư mục chỉ định thất bại",
+      "importRootsLoadFailed": "Tải thư mục chỉ định thất bại",
+      "importRootsAdd": "Thêm thư mục chỉ định",
+      "importRootsAddScanning": "Đang quét thư mục chỉ định…",
+      "importRootsAddSuccess": "Đã thêm thư mục: {{path}}",
+      "importRootsAddFailed": "Quét thư mục thất bại: {{reason}}",
+      "gameRootsDescription": "Liệt kê tất cả thư mục cài đặt trò chơi được phát hiện trên máy này; tích chọn các thư mục tham gia quét. Nếu có nhiều thư mục, mặc định chọn thư mục có thời gian sửa đổi mới nhất và chứa album chính thức.",
+      "gameRootsLoading": "Đang phát hiện thư mục trò chơi…",
+      "gameRootsEmpty": "Không phát hiện thư mục cài đặt trò chơi nào. Hãy thêm thủ công trong \"Thư mục trò chơi\" hoặc dùng quét dự phòng thủ công bên dưới.",
+      "gameRootsLoadFailed": "Phát hiện thư mục trò chơi thất bại: {{reason}}",
+      "gameRootsRetry": "Thử lại",
+      "gameRootsSaved": "Đã lưu lựa chọn thư mục quét",
+      "hasGamePlayPhotos": "Có album chính thức",
+      "noGamePlayPhotos": "Không phát hiện album chính thức",
+      "sourceCustom": "Thêm thủ công",
+      "sourceOfficial": "Launcher chính thức",
+      "sourceSteam": "Steam",
+      "sourceEpic": "Epic",
+      "fallbackDescription": "Khi định vị tự động thất bại, có thể chọn thư mục thủ công và quét ngay; thư mục đã chọn sẽ được lưu tự động và được quét ưu tiên ở lần khởi động sau (hỗ trợ nhiều thư mục).",
+      "fallbackPickGameRoot": "Chọn thư mục gốc cài đặt trò chơi",
+      "fallbackPickAlbumDir": "Chọn trực tiếp thư mục GamePlayPhotos",
+      "fallbackRootNoAlbum": "Không phát hiện album chính thức (GamePlayPhotos) trong thư mục này. Vui lòng xác nhận đã chọn thư mục gốc cài đặt trò chơi chứa X6Game",
+      "fallbackScanSuccess": "Quét hoàn tất, tìm thấy {{count}} tệp phương tiện",
+      "fallbackScanFailed": "Quét thất bại: {{reason}}",
+      "fallbackScanHint": "Có thể dùng \"Chọn trực tiếp thư mục GamePlayPhotos\", hoặc xuất nhật ký trong \"Chẩn đoán quét\" rồi phản hồi cho chúng tôi.",
+      "fallbackHint": "Dự phòng cấp một: chọn thư mục gốc cài đặt trò chơi chứa X6Game (chương trình tự nối GamePlayPhotos); dự phòng cấp hai: chọn trực tiếp thư mục GamePlayPhotos. Nếu báo không đủ quyền (E003), có thể nhấp \"Khởi động lại với quyền quản trị viên\".",
+      "relaunchAsAdmin": "Khởi động lại với quyền quản trị viên",
+      "elevating": "Đang khởi động lại với quyền quản trị viên…",
+      "elevateFailed": "Khởi động lại với quyền nâng cao thất bại: {{reason}}"
+    },
+    "sections": {
+      "aboutContact": "Liên hệ",
+      "aboutInfo": "Thông tin ứng dụng",
+      "aboutLicense": "Cảm ơn & giấy phép mã nguồn mở",
+      "dataBackup": "Sao lưu cơ sở dữ liệu",
+      "dataCache": "Quản lý bộ nhớ đệm",
+      "dataClear": "Xóa dữ liệu",
+      "diagnosticsCrash": "Báo cáo sự cố",
+      "diagnosticsLogs": "Quản lý nhật ký",
+      "display": "Phông chữ & hiển thị",
+      "exportWorkflow": "Quy trình xuất",
+      "fileops": "Thao tác tệp",
+      "language": "Ngôn ngữ",
+      "pluginManage": "",
+      "profileManage": "Quản lý hồ sơ",
+      "scanOptions": "Tùy chọn quét",
+      "shareCode": "Công cụ mã chia sẻ",
+      "startup": "Hành vi khởi động",
+      "theme": "Chủ đề",
+      "scanPaths": "",
+      "importRoots": "",
+      "scanDiagnostic": "扫描链路诊断",
+      "gameRoots": "",
+      "scanFallback": ""
+    },
+    "startup": {
+      "autoScan": "Tự động quét khi khởi động",
+      "autoScanDesc": "Khi được bật, ứng dụng sẽ tự động quét đường dẫn trò chơi để tìm tệp phương tiện mới khi khởi động.",
+      "hardwareAcceleration": "Tăng tốc phần cứng GPU",
+      "hardwareAccelerationDesc": "Khi tắt, ứng dụng dùng render bằng phần mềm để tránh lỗi khởi động trên một số GPU. Cần khởi động lại để áp dụng.",
+      "hardwareAccelerationRestartHint": "Đã lưu cài đặt tăng tốc phần cứng GPU. Khởi động lại ứng dụng để áp dụng. Khởi động lại ngay?",
+      "restartNow": "Khởi động lại ngay",
+      "restartLater": "Để sau",
+      "description": "Cấu hình hành vi tự động khi khởi động ứng dụng",
+      "title": "Hành vi khởi động"
+    },
+    "theme": {
+      "desc": "Có hiệu lực ngay lập tức; tùy chọn chủ đề được lưu tự động trong cấu hình cục bộ.",
+      "label": "Chủ đề giao diện"
+    },
+    "title": "Cài đặt",
+    "tools": {
+      "shareCode": {
+        "decoder": "Trình giải mã mã chia sẻ",
+        "decoderDesc": "Giải mã mã chia sẻ nhuộm màu trong trò chơi, mã chia sẻ xây dựng nhà, hoặc mã hóa tham số máy ảnh. Hỗ trợ trích xuất siêu dữ liệu như dấu thời gian, UID và ID máy chủ.",
+        "openTool": "Mở công cụ"
+      }
+    },
+    "navigation": {
+      "ariaLabel": ""
+    },
+    "plugins": {
+      "error": {
+        "unavailable": ""
+      }
+    }
+  },
+  "share": {
+    "guide": {
+      "channels": {
+        "qq": "QQ",
+        "vivo": "vivo Office Suite",
+        "wechat": "WeChat"
+      },
+      "failed": "Chia sẻ thất bại",
+      "guides": {
+        "qq": {
+          "notInstalled": "Không phát hiện QQ đã cài đặt\nTệp đã sao chép vào clipboard, có thể mở ứng dụng thủ công và dán",
+          "notRunning": "✅ Đã sao chép tệp vào clipboard\nQQ không chạy, nhấp nút bên dưới để khởi động và dán",
+          "running": "✅ Đã sao chép tệp vào clipboard\nMở cửa sổ trò chuyện QQ, nhấn Ctrl+V để dán và gửi"
+        },
+        "vivo": {
+          "notInstalled": "Không phát hiện vivo Office Suite đã cài đặt\nTệp đã sao chép vào clipboard, có thể mở ứng dụng thủ công và dán",
+          "notRunning": "✅ Đã sao chép tệp vào clipboard\nvivo Office Suite không chạy, nhấp nút bên dưới để khởi động và dán",
+          "running": "✅ Đã sao chép tệp vào clipboard\nMở vivo Office Suite, nhấn Ctrl+V để dán và đồng bộ với điện thoại"
+        },
+        "wechat": {
+          "notInstalled": "Không phát hiện WeChat đã cài đặt\nTệp đã sao chép vào clipboard, có thể mở ứng dụng thủ công và dán",
+          "notRunning": "✅ Đã sao chép tệp vào clipboard\nWeChat không chạy, nhấp nút bên dưới để khởi động và dán",
+          "running": "✅ Đã sao chép tệp vào clipboard\nMở cửa sổ trò chuyện WeChat, nhấn Ctrl+V để dán và gửi"
+        }
+      },
+      "known": "Đã hiểu",
+      "launchFailed": "Khởi động thất bại",
+      "launchSuccess": "Đã khởi động, vui lòng đợi cửa sổ tải xong rồi dán",
+      "launching": "Đang khởi động...",
+      "open": "Mở {{name}}",
+      "shareTo": "Chia sẻ đến {{name}}",
+      "skipped": "(đã bỏ qua {{count}} tệp không thể truy cập)"
+    },
+    "menu": {
+      "label": "Chia sẻ",
+      "toQQ": "Chia sẻ đến QQ",
+      "toVivo": "Chia sẻ đến vivo Office Suite",
+      "toWechat": "Chia sẻ đến WeChat"
+    },
+    "wifi": {
+      "accessUrl": "Truy cập URL sau từ trình duyệt điện thoại",
+      "copyPin": "Sao chép PIN",
+      "copyPinFailed": "Sao chép thất bại, vui lòng ghi chú thủ công",
+      "copyUrl": "Sao chép URL",
+      "copyUrlFailed": "Sao chép thất bại, vui lòng chọn và sao chép URL thủ công",
+      "fileCount": "Tệp",
+      "noFiles": "Vui lòng chọn tệp để chia sẻ trước",
+      "pin": "PIN truy cập",
+      "pinCopied": "Đã sao chép PIN",
+      "port": "Cổng",
+      "remainTime": "Còn lại",
+      "restart": "Khởi động lại dịch vụ",
+      "restartButton": "Khởi động lại",
+      "restartTitle": "Khởi động lại dịch vụ (đổi cổng)",
+      "startFailed": "Khởi động thất bại",
+      "started": "Dịch vụ chia sẻ đã khởi động, cổng {{port}}",
+      "starting": "Đang khởi động dịch vụ chia sẻ...",
+      "stop": "Dừng chia sẻ",
+      "stopFailed": "Dừng thất bại",
+      "stopped": "Dịch vụ chia sẻ đã dừng",
+      "timeoutClosed": "Dịch vụ chia sẻ đã hết thời gian và tự động đóng",
+      "tips": {
+        "firewall": "· Nếu bị chặn bởi tường lửa khi khởi động lần đầu, cho phép Node đi qua",
+        "lanOnly": "· Dịch vụ chỉ trong LAN, không mở ra công cộng",
+        "pinAuth": "· Yêu cầu PIN cho lần truy cập đầu tiên từ điện thoại",
+        "sameWifi": "· Đảm bảo điện thoại và máy tính cùng kết nối WiFi",
+        "timeout": "· Tự động đóng khi hết thời gian, hoặc dừng thủ công"
+      },
+      "title": "Chia sẻ qua WiFi LAN",
+      "unsupported": "Chia sẻ WiFi không được hỗ trợ trong môi trường này",
+      "urlCopied": "Đã sao chép URL vào clipboard"
+    },
+    "message": {
+      "allInaccessible": "",
+      "copiedToClipboard": "",
+      "copiedWithSkipped": "",
+      "copyFailed": "",
+      "exeNotExist": "",
+      "launched": "",
+      "launchFailed": "",
+      "noFilesSelected": "",
+      "notInstalled": "",
+      "unsupportedPlatform": ""
+    },
+    "log": {
+      "copiedToClipboard": "",
+      "copyFailed": "",
+      "detectInstallPathFailed": "",
+      "launchFailed": "",
+      "launched": ""
+    }
+  },
+  "timeLabel": {
+    "dawn": "Bình minh",
+    "day": "Ngày",
+    "dusk": "Hoàng hôn",
+    "night": "Đêm",
+    "unknown": "Không xác định"
+  },
+  "titleBar": {
+    "appTitle": "Công cụ quản lý album ảnh WXNN"
+  },
+  "toast": {
+    "autoScanOff": "Đã tắt tự động quét khi khởi động",
+    "autoScanOn": "Đã bật tự động quét khi khởi động",
+    "gpuOn": "Đã bật tăng tốc phần cứng GPU (áp dụng sau khi khởi động lại)",
+    "gpuOff": "Đã tắt tăng tốc phần cứng GPU (áp dụng sau khi khởi động lại)",
+    "batchThresholdOff": "Đã tắt ngưỡng thao tác hàng loạt",
+    "batchThresholdOn": "Đã bật ngưỡng thao tác hàng loạt",
+    "batchThresholdSet": "Ngưỡng thao tác hàng loạt đã được đặt thành {{count}}",
+    "defaultDirCleared": "Đường dẫn xuất mặc định đã được xóa",
+    "defaultDirSet": "Đường dẫn xuất mặc định đã được đặt thành {{dir}}",
+    "deleteConfirmOff": "Đã tắt xác nhận trước khi xóa",
+    "deleteConfirmOn": "Đã bật xác nhận trước khi xóa",
+    "invalidIds": "ID tệp đã chọn không hợp lệ",
+    "languageChanged": "Ngôn ngữ đã được chuyển sang {{lang}}",
+    "noSelectionTransfer": "Chưa chọn tệp để chuyển giao",
+    "permanentDoubleConfirmOff": "Đã tắt xác nhận hai lần cho xóa vĩnh viễn",
+    "permanentDoubleConfirmOn": "Đã bật xác nhận hai lần cho xóa vĩnh viễn",
+    "preferSoftDeleteOff": "Đã tắt ưu tiên xóa mềm",
+    "preferSoftDeleteOn": "Đã bật ưu tiên xóa mềm",
+    "transferError": "Chuyển giao giữa các hồ sơ thất bại",
+    "transferFailed": "Chuyển giao thất bại",
+    "transferSuccess": "Chuyển giao thành công",
+    "transferUnsupported": "Chuyển giao giữa các hồ sơ không được hỗ trợ trong môi trường này",
+    "batchExportFailed": "",
+    "batchMoveFailed": "",
+    "batchRenameFailed": "",
+    "batchRenameUnsupported": "",
+    "cancelFailed": "",
+    "cancelRequested": "",
+    "cancelUnsupported": "",
+    "copyFailed": "",
+    "copyUnsupported": "",
+    "decodeFailed": "",
+    "deleteFailed": "",
+    "deleteFileTitle": "",
+    "deleteUnsupported": "",
+    "exportFailed": "",
+    "exportUnsupported": "",
+    "favorite": "",
+    "favoriteFailed": "",
+    "fileProperties": {
+      "resolutionDash": "",
+      "template": "",
+      "typeImage": "",
+      "typeVideo": ""
+    },
+    "imageLoadFailed": "",
+    "ipcCallFailed": "",
+    "mediaLoadFailed": "",
+    "moveFailed": "",
+    "moveToRecycleConfirm": "",
+    "moveUnsupported": "",
+    "noCancellableTask": "",
+    "noDefaultExportDir": "",
+    "noWatermarkSelection": "",
+    "permanentDeleteConfirm": "",
+    "permanentDeleteTitle": "",
+    "previewRenderFailed": "",
+    "renameFailed": "",
+    "renameUnsupported": "",
+    "saveAsFailed": "",
+    "saveAsUnsupported": "",
+    "undo": {
+      "failed": "",
+      "favorite": "",
+      "move": "",
+      "moveToRecycle": "",
+      "none": "",
+      "permanentDelete": "",
+      "rename": "",
+      "undone": "",
+      "unfavorite": "",
+      "conflictPrompt": ""
+    },
+    "undoUnsupported": "",
+    "unfavorite": "",
+    "unknownError": "",
+    "watermarkCancelled": "",
+    "watermarkFailed": "",
+    "watermarkNotConfigured": "",
+    "watermarkUnsupported": "",
+    "scanFailed": "",
+    "scanNoGameDir": "",
+    "manualPathHint": "",
+    "manualPathHintMessage": "",
+    "scanCompletedNoGameShots": "Scan finished: no in-game screenshots found. If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "scanFoundButGalleryEmpty": "Scan finished: {{count}} files found, but none are in-game screenshots (launcher images were saved to the \"Cache\" tab). If your screenshot folder was not detected, use \"Scan specific folder\" in the scan menu",
+    "batchDelete": {
+      "allSucceeded": "",
+      "missingFile": "",
+      "partial": ""
+    },
+    "backup": {
+      "restored": ""
+    },
+    "scanInterrupted": "",
+    "imageProcessorCanvasFailed": "",
+    "imageProcessorLoadFailed": ""
+  },
+  "video": {
+    "applyEdit": "",
+    "backToDetail": "Quay lại chi tiết",
+    "color": "",
+    "colorDesc": "",
+    "colorNoPreview": "",
+    "confirmExport": "Chuyển đổi video sang định dạng {{format}}? Cần mã hóa lại, mất thời gian.",
+    "confirmLivePhoto": "Xuất video dưới dạng Apple Live Photo (tệp ghép JPG + MOV)? Mã hóa mất thời gian, tệp có thể nhận dạng là Live Photo trên iPhone.",
+    "confirmSpeed": "Xuất video mới ở tốc độ {{speed}}x? Thời lượng ước tính {{duration}}",
+    "confirmTrim": "Xuất phạm vi cắt {{start}} - {{end}} (thời lượng {{duration}}) thành tệp video mới?",
+    "customSpeed": "Tốc độ tùy chỉnh",
+    "editFailed": "",
+    "editSuccess": "",
+    "editorUnsupported": "",
+    "endLabel": "Kết thúc",
+    "endLtStart": "Thời gian kết thúc không được nhỏ hơn hoặc bằng thời gian bắt đầu",
+    "estimatedDuration": "Thời lượng ước tính",
+    "exportDesc": "Chuyển đổi video hiện tại sang định dạng khác. Chuyển đổi cần mã hóa lại, thời gian phụ thuộc vào thời lượng video. GIF sẽ mất âm thanh.",
+    "exportFormats": {
+      "avi": "Không mất dữ liệu nhưng kích thước lớn",
+      "gif": "Ảnh động, không có âm thanh",
+      "mov": "Apple QuickTime",
+      "mp4": "Khả năng tương thích chung tốt nhất",
+      "webm": "Thân thiện với web, kích thước nhỏ"
+    },
+    "exportMode": "Xuất",
+    "exportVideo": "Xuất video",
+    "fastMotionLabel": "4.0x Nhanh",
+    "formatConvert": "Chuyển đổi định dạng",
+    "gifWarning": "Định dạng GIF chỉ giữ lại khung hình video, âm thanh sẽ bị loại bỏ; độ phân giải và tốc độ khung hình được giảm để kiểm soát kích thước tệp.",
+    "jumpToEnd": "Nhảy đến kết thúc",
+    "jumpToStart": "Nhảy đến bắt đầu",
+    "livePhoto": {
+      "button": "Xuất Live Photo",
+      "desc": "Tạo các tệp ghép JPG (bìa) + MOV (chuyển động), có thể nhận dạng là Live Photo trên iPhone.",
+      "limitation": "Hạn chế đã biết: JPG không bao gồm Apple MakerNote ContentIdentifier; đồng bộ hóa iCloud có thể mất ghép nối, nhập cục bộ hoạt động bình thường.",
+      "title": "Xuất dưới dạng Live Photo"
+    },
+    "notes": {
+      "noModifyOriginal": "Xuất tạo tệp mới, không sửa đổi video gốc",
+      "reencode": "Điều chỉnh tốc độ cần mã hóa lại, mất nhiều thời gian hơn",
+      "streamCopy": "Cắt sử dụng sao chép luồng (cùng mã hóa), nhanh",
+      "supportedFormats": "Hỗ trợ mp4/mov/avi/mkv/webm/wmv"
+    },
+    "notesTitle": "Ghi chú",
+    "originalFormat": "Định dạng gốc",
+    "originalSpeedLabel": "1.0x Gốc",
+    "outputDuration": "Thời lượng đầu ra",
+    "playPause": "Phát/Tạm dừng",
+    "previewSpeed": "Tốc độ xem trước",
+    "processing": "Đang xử lý...",
+    "readMetadataFailed": "Không thể đọc siêu dữ liệu video",
+    "resetColor": "",
+    "selectDirAndExport": "Chọn thư mục và xuất",
+    "selectedRange": "Phạm vi đã chọn",
+    "setToCurrent": "Đặt thành vị trí hiện tại",
+    "slowMotionLabel": "0.25x Chậm",
+    "speed": "Tốc độ",
+    "speedChange": "Thay đổi tốc độ",
+    "speedDesc": "Chọn tốc độ đích (0.25x - 4.0x). Điều chỉnh tốc độ cần mã hóa lại, mất nhiều thời gian hơn. Xem trước hiển thị hiệu ứng thời gian thực.",
+    "speedFast": "Nhanh {{n}}x",
+    "speedOriginal": "Tốc độ gốc",
+    "speedSlow": "Chậm {{n}}x",
+    "startGtEnd": "Thời gian bắt đầu không được lớn hơn hoặc bằng thời gian kết thúc",
+    "startLabel": "Bắt đầu",
+    "targetFormat": "Định dạng đích",
+    "trim": "Cắt",
+    "trimDesc": "Kéo thanh trượt hoặc nhấp nút trong khi phát để đặt thời gian bắt đầu/kết thúc. Cắt sẽ tạo tệp mới mà không sửa đổi video gốc.",
+    "trimmedDuration": "Thời lượng đã cắt",
+    "unknown": "Không xác định",
+    "unknownCodec": "Codec không xác định",
+    "watermark": "",
+    "watermarkDesc": ""
+  },
+  "enums": {
+    "aperture": {
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "neg1": ""
+    },
+    "clothState": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "9": ""
+    },
+    "clothType": {
+      "0": "",
+      "10": "",
+      "20": "",
+      "30": "",
+      "41": "",
+      "50": "",
+      "60": "",
+      "71": "",
+      "72": "",
+      "73": "",
+      "74": "",
+      "75": "",
+      "76": "",
+      "77": "",
+      "78": "",
+      "79": "",
+      "80": "",
+      "81": "",
+      "82": "",
+      "83": "",
+      "84": "",
+      "85": "",
+      "86": "",
+      "90": "",
+      "92": "",
+      "93": "",
+      "94": "",
+      "95": "",
+      "96": "",
+      "97": "",
+      "unknown": ""
+    },
+    "colorPalette": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": "",
+      "10": "",
+      "11": "",
+      "12": "",
+      "13": "",
+      "14": "",
+      "15": "",
+      "16": "",
+      "17": "",
+      "18": ""
+    },
+    "colorSwatch": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": ""
+    },
+    "eurekaAttachment": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": ""
+    },
+    "eurekaColor": {
+      "0": "",
+      "1": "",
+      "2": "",
+      "3": "",
+      "4": "",
+      "5": "",
+      "6": "",
+      "7": "",
+      "8": "",
+      "9": ""
+    },
+    "expedition": {
+      "101020301": "",
+      "101020302": "",
+      "101020303": "",
+      "101020304": "",
+      "101020305": "",
+      "101020306": "",
+      "101020307": "",
+      "101020308": ""
+    },
+    "filter": {
+      "Fresh_001": "",
+      "Fresh_002": "",
+      "Fresh_003": "",
+      "Fresh_004": "",
+      "Fresh_005": "",
+      "None": "",
+      "Vibe_001": "",
+      "Vibe_002": "",
+      "Vibe_003": "",
+      "Vibe_004": "",
+      "Vibe_005": "",
+      "Vibe_009": "",
+      "Weather_001": "",
+      "Weather_002": "",
+      "Weather_003": "",
+      "Weather_004": ""
+    },
+    "framedMoment": {
+      "0": ""
+    },
+    "interactive": {
+      "206001": "",
+      "261003": "",
+      "42031201": "",
+      "42031202": "",
+      "42031203": ""
+    },
+    "light": {
+      "DirectionLight_B": "",
+      "DirectionLight_L": "",
+      "DirectionLight_R": "",
+      "DirectionLight_T": "",
+      "HueEdgeLight_001_L": "",
+      "HueEdgeLight_001_R": "",
+      "HueEdgeLight_002_L": "",
+      "HueEdgeLight_002_R": "",
+      "HueEdgeLight_003_L": "",
+      "HueEdgeLight_003_R": "",
+      "HueEdgeLight_004_L": "",
+      "HueEdgeLight_004_R": "",
+      "None": "",
+      "VibeLight_001": "",
+      "VibeLight_002": "",
+      "VibeLight_003": "",
+      "VibeLight_004": ""
+    },
+    "poseId": {
+      "0": ""
+    },
+    "puzzle": {
+      "30": "",
+      "31": "",
+      "neg1": ""
+    },
+    "weather": {
+      "0": "",
+      "2": "",
+      "4": "",
+      "7": "",
+      "neg1": ""
+    }
+  },
+  "filter": {
+    "applyPresetAria": "",
+    "category": {
+      "all": "",
+      "artistic": "",
+      "cinematic": "",
+      "custom": "",
+      "natural": "",
+      "vintage": ""
+    },
+    "preset": {
+      "natural-1": "",
+      "natural-2": "",
+      "natural-3": "",
+      "natural-4": "",
+      "natural-5": "",
+      "vintage-1": "",
+      "vintage-2": "",
+      "vintage-3": "",
+      "vintage-4": "",
+      "vintage-5": "",
+      "artistic-1": "",
+      "artistic-2": "",
+      "artistic-3": "",
+      "artistic-4": "",
+      "artistic-5": "",
+      "cinematic-1": "",
+      "cinematic-2": "",
+      "cinematic-3": "",
+      "cinematic-4": "",
+      "cinematic-5": ""
+    },
+    "deleteCustomAria": "",
+    "exportAria": "",
+    "exportJson": "",
+    "generatingPreview": "",
+    "importAria": "",
+    "importJson": "",
+    "intensity": "",
+    "namePlaceholder": "",
+    "save": "",
+    "saveCurrentAria": "",
+    "saving": ""
+  },
+  "locations": {
+    "Miraland": "",
+    "HeartcraftKingdom": "",
+    "Wishfield": "",
+    "MemorialMountains": "",
+    "OldFlorawishMemorial": "",
+    "StylistGuildMemorial": "",
+    "Florawish": "",
+    "DreamwovenRuins": "",
+    "FortuneFalls": "",
+    "GreatWishtreeSquare": "",
+    "LakesideDistrict": "",
+    "OutskirtsForest": "",
+    "BreezyMeadow": "",
+    "AbandonedFanaticWisherCamp": "",
+    "BreezyMeadowActivityArea": "",
+    "BugSongHills": "",
+    "CiciaHighlands": "",
+    "HeartcraftKingdomOutpost": "",
+    "LakesideHill": "",
+    "MeadowWharf": "",
+    "QueenPalaceRuins": "",
+    "RelicHill": "",
+    "SleepyFishHills": "",
+    "SwanGazebo": "",
+    "Stoneville": "",
+    "DyeWorkshop": "",
+    "FlowerFieldsResidence": "",
+    "RockfallValley": "",
+    "StonevilleMarket": "",
+    "AbandonedDistrict": "",
+    "ChooChooStation": "",
+    "GoldenFields": "",
+    "MarketOfMirth": "",
+    "Prosperville": "",
+    "RippleEstate": "",
+    "StellarFishingGround": "",
+    "Stonecrown": "",
+    "WindriderMill": "",
+    "WishingWoods": "",
+    "BrookwoodForest": "",
+    "CavernOfWishes": "",
+    "FallenWishHighlands": "",
+    "GrandTreeValley": "",
+    "SacredMountains": "",
+    "ValleyOfBlossoms": "",
+    "FireworkIsles": "",
+    "ClearheartLake": "",
+    "CrescentMoonRuins": "",
+    "FlamingForest": "",
+    "RelicIsles": "",
+    "SongbreezeHighland": "",
+    "SparkheartIsland": "",
+    "SerenityIsland": "",
+    "OldRuins": "",
+    "Soakville": "",
+    "SoakvilleOutskirts": "",
+    "Steamville": "",
+    "DanqingIsland": "",
+    "BackMountain": "",
+    "BambooGrove": "",
+    "Inkville": "",
+    "InkwashStream": "",
+    "LoongPagoda": "",
+    "LoongPeak": "",
+    "ReedblossomShore": "",
+    "DanqingRealm": "",
+    "GreenBambooGrove": "",
+    "InkPool": "",
+    "InkshorePlain": "",
+    "WildfieldWaterside": "",
+    "TerraAlliance": "",
+    "Itzaland": "",
+    "ItzalandCanyon": "",
+    "ElderwoodForest": "",
+    "BehemothObservationSite": "",
+    "Coliseum": "",
+    "ElderwoodShade": "",
+    "ElderwoodWharf": "",
+    "ForestOfSlumber": "",
+    "ForgottenStreet": "",
+    "GiantVineForest": "",
+    "LeafRiver": "",
+    "MothershroomWoods": "",
+    "ParkyaCraterLake": "",
+    "Pottsville": "",
+    "RockvilleRuins": "",
+    "ShellIsland": "",
+    "Shroomville": "",
+    "SnailRanch": "",
+    "SpiraWaterfall": "",
+    "TitanGraveyard": "",
+    "TitansOutpostRuins": "",
+    "Spira": "",
+    "Spira1F": "",
+    "Spira2F": "",
+    "Spira3F": "",
+    "SpiraShelldome": "",
+    "Boneyard": "",
+    "BluePools": "",
+    "Cultivarium": "",
+    "DragonRuins": "",
+    "DragonrestFlowerfield": "",
+    "GlimmeringLake": "",
+    "GreatLumieville": "",
+    "HealingGround": "",
+    "HollowbreathPassage": "",
+    "LonestoneShore": "",
+    "SoulSpring": "",
+    "WanxiangRealm": "",
+    "CaiYeMarket": "",
+    "CaiYeOutskirts": "",
+    "DazzlebloomMeadow": "",
+    "DeepValleySpring": "",
+    "JiuhuaPavilion": "",
+    "JiuhuaPenitentiary": "",
+    "ValleyPath": "",
+    "WhereWoodEchoes": "",
+    "EmpireOfLight": "",
+    "StarhailFederation": "",
+    "LinlangEmpire": "",
+    "TwinmoonKingdom": "",
+    "WhalePort": "",
+    "Umbraso": "",
+    "SeaOfStars": "",
+    "Crystalvale": "",
+    "DreamStarIsles": "",
+    "Starshore": "",
+    "UnboundWharf": "",
+    "Home": "",
+    "DockArea": ""
+  },
+  "sceneCategory": {
+    "collage": "",
+    "other": "",
+    "screenshot": "",
+    "thumbnail": "",
+    "travelJournal": "",
+    "worldTour": ""
+  },
+  "sceneTime": {
+    "dawn": "",
+    "dawnDesc": "",
+    "day": "",
+    "dayDesc": "",
+    "dusk": "",
+    "duskDesc": "",
+    "night": "",
+    "nightDesc": "",
+    "unknown": "",
+    "unknownDesc": ""
+  },
+  "faultTypes": {
+    "uncaughtException": "",
+    "unhandledRejection": "",
+    "rendererCrash": "",
+    "rendererError": "",
+    "ipcError": "",
+    "manual": "",
+    "rendererComponent": "",
+    "rendererPromise": "",
+    "rendererResource": "",
+    "exitDiagnosis": "",
+    "workerCrash": "",
+    "workerRestart": "",
+    "databaseCorruption": "",
+    "databaseRestore": "",
+    "indexingTimeout": "",
+    "renderer-not-ready": "",
+    "schedulerStuckPaused": "",
+    "navigation-blocked": ""
+  },
+  "lut": {
+    "builtin": {
+      "identity": "",
+      "tealOrange": "",
+      "warmVintage": "",
+      "coolDrama": "",
+      "highContrast": ""
+    },
+    "log": {
+      "persistFailed": ""
+    }
+  },
+  "watermark": {
+    "blendMode": {
+      "multiply": "",
+      "normal": "",
+      "overlay": "",
+      "screen": "",
+      "softLight": ""
+    },
+    "bold": "",
+    "boldOff": "",
+    "color": "",
+    "deleteTemplateAria": "",
+    "deleteText": "",
+    "font": "",
+    "fontMicrosoftYaHei": "",
+    "fontMonospace": "",
+    "fontSansSerif": "",
+    "fontSerif": "",
+    "height": "",
+    "horizontalSpacing": "",
+    "imageMode": "",
+    "imagePreviewAlt": "",
+    "imageSelectButton": "",
+    "imageSelectPlaceholder": "",
+    "imageWatermark": "",
+    "italic": "",
+    "italicOff": "",
+    "margin": "",
+    "opacity": "",
+    "pluginTemplateImage": "",
+    "pluginTemplateText": "",
+    "pluginTemplates": "",
+    "position": "",
+    "positionBottomCenter": "",
+    "positionBottomLeft": "",
+    "positionBottomRight": "",
+    "positionCenter": "",
+    "positionCenterLeft": "",
+    "positionCenterRight": "",
+    "positionTopCenter": "",
+    "positionTopLeft": "",
+    "positionTopRight": "",
+    "presetAria": "",
+    "presets": "",
+    "rotation": "",
+    "saveTemplateAria": "",
+    "size": "",
+    "stylePresetCopyright": "",
+    "stylePresetCopyrightDesc": "",
+    "stylePresetDateLabel": "",
+    "stylePresetDateLabelDesc": "",
+    "stylePresetPolaroid": "",
+    "stylePresetPolaroidDesc": "",
+    "stylePresetSignature": "",
+    "stylePresetSignatureDesc": "",
+    "templateNamePlaceholder": "",
+    "templates": "",
+    "text": "",
+    "textMode": "",
+    "textPlaceholder": "",
+    "tileMode": "",
+    "underline": "",
+    "underlineOff": "",
+    "verticalSpacing": "",
+    "width": "",
+    "log": {
+      "saveTemplateFailed": "",
+      "deleteTemplateFailed": ""
+    }
+  },
+  "camera": {
+    "aperture": "",
+    "bloomIntensity": "",
+    "bloomThreshold": "",
+    "brightness": "",
+    "cameraInfo": "",
+    "cameraLoc": "",
+    "cameraPitch": "",
+    "cameraYaw": "",
+    "comparison": "",
+    "contrast": "",
+    "copyCode": "",
+    "empty": "",
+    "errorPrefix": "",
+    "exposure": "",
+    "filter": "",
+    "framedMoment": "",
+    "highlights": "",
+    "hidden": "",
+    "light": "",
+    "loading": "",
+    "momoHidden": "",
+    "notHidden": "",
+    "optic": "",
+    "pose": "",
+    "rawParams": "",
+    "scene": "",
+    "sectionAdjust": "",
+    "shadows": "",
+    "softIntensity": "",
+    "unknown": "",
+    "vibrance": "",
+    "yes": "",
+    "no": "",
+    "saturation": "",
+    "zoom": "",
+    "focalLength": "",
+    "lensRotation": "",
+    "portraitMode": "",
+    "copyHeader": "",
+    "copyEnvHeader": "",
+    "copyErrorHeader": "",
+    "copyFaultId": "",
+    "copyTime": "",
+    "copyType": "",
+    "copySummary": "",
+    "copyAppVersion": "",
+    "copyElectron": "",
+    "copyNode": "",
+    "copyPlatform": "",
+    "copyPidUptime": ""
+  },
+  "batch": {
+    "actions": {
+      "ariaLabel": "",
+      "categorize": "",
+      "clearSelection": "",
+      "delete": "",
+      "export": "",
+      "exportSelectDir": "",
+      "exportToDefault": "",
+      "exportToDefaultHint": "",
+      "invertSelection": "",
+      "move": "",
+      "rename": "",
+      "renameAria": "",
+      "renameHint": "",
+      "selectedCount": "",
+      "share": "",
+      "shareClipboardTitle": "",
+      "transferToProfile": "",
+      "transferToProfileHint": "",
+      "watermark": "",
+      "wifiShare": "",
+      "wifiShareHint": "",
+      "selectAll": ""
+    },
+    "rename": {
+      "cancel": "",
+      "confirmButton": "",
+      "description": "",
+      "emptyError": "",
+      "examplePlaceholder": "",
+      "invalidError": "",
+      "moreFiles": "",
+      "previewLabel": "",
+      "previewError": "",
+      "templateLabel": "",
+      "title": "",
+      "varClickHint": "",
+      "varDate": "",
+      "varDateDesc": "",
+      "varOriginal": "",
+      "varOriginalDesc": "",
+      "varOutfit": "",
+      "varOutfitDesc": "",
+      "varScene": "",
+      "varSceneDesc": "",
+      "varSeq": "",
+      "varSeqDesc": "",
+      "varTime": "",
+      "varTimeDesc": ""
+    }
+  },
+  "galleryPage": {
+    "cleanupCorruptedConfirm": "",
+    "cleanupCorruptedCount": "",
+    "cleanupCorruptedFailed": "",
+    "cleanupCorruptedTitle": "",
+    "emptySubtitle": "",
+    "emptySubtitleScanned": "Scan finished, but no in-game screenshots were found. Try \"Scan specific folder\" in the scan menu, or check the \"Cache\" tab for launcher images",
+    "emptyTitle": "",
+    "batchDeleteConfirm": "",
+    "batchDeleteTitle": "",
+    "confirmCancel": "",
+    "confirmOK": "",
+    "openLocationFailed": "",
+    "noPlayableMedia": "",
+    "selectShareFirst": "",
+    "selectShareFilesFirst": "",
+    "shareUnavailable": "",
+    "showDuplicates": "",
+    "showDuplicatesChecked": "",
+    "showDuplicatesOff": "",
+    "showDuplicatesOn": "",
+    "smartGroup": "",
+    "smartGroupToggle": ""
+  },
+  "diagnostics": {
+    "logs": {
+      "clearAllHint": "",
+      "copyAppVersion": "",
+      "copyElectron": "",
+      "copyEnvInfoTitle": "",
+      "copyErrorDetailTitle": "",
+      "copyFaultId": "",
+      "copyNode": "",
+      "copyPid": "",
+      "copyPlatform": "",
+      "copySummary": "",
+      "copyTime": "",
+      "copyType": "",
+      "exportAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "sampleId": "",
+      "unknown": "",
+      "loadFailed": "",
+      "loadCrashesFailed": ""
+    },
+    "crash": {
+      "clearAllHint": "",
+      "refreshAria": "",
+      "refreshHint": "",
+      "processType": {
+        "main": "",
+        "renderer": "",
+        "gpu": "",
+        "utility": "",
+        "plugin": "",
+        "unknown": ""
+      }
+    },
+    "scan": {
+      "title": "Chẩn đoán quét",
+      "legendOk": "Thành công",
+      "legendPathMissing": "Không tìm thấy đường dẫn",
+      "legendPermission": "Không đủ quyền",
+      "legendEmpty": "Thư mục trống",
+      "legendInfo": "Thông tin",
+      "emptyHint": "Sau khi chạy quét một lần, toàn bộ dòng thời gian chẩn đoán từ \"Bắt đầu quét\" đến \"Quét tệp\" sẽ hiển thị tại đây.",
+      "autoRefresh": "Tự động làm mới",
+      "refresh": "Làm mới",
+      "copy": "Sao chép",
+      "clear": "Xóa sạch",
+      "export": "Xuất nhật ký chẩn đoán",
+      "exportAll": "Xuất tất cả nhật ký (zip)",
+      "exportedTo": "Đã xuất tới {{path}}",
+      "exportFailed": "Xuất thất bại: {{reason}}",
+      "errorCodeHint": "Mã lỗi E001–E005 tương ứng với định vị thất bại/thiếu thư mục con/không đủ quyền/không có UID/lỗi đọc. Nhật ký xuất ra có thể đính kèm vào ticket"
+    }
+  },
+  "errorFallback": {
+    "componentStack": "",
+    "copied": "",
+    "copyError": "",
+    "errorMessage": "",
+    "errorStack": "",
+    "hideDetail": "",
+    "openLogDir": "",
+    "reload": "",
+    "showDetail": "",
+    "subtitle": "",
+    "title": "",
+    "routeTitle": "",
+    "routeRetry": "",
+    "zoneTitle": "",
+    "zoneRetry": "",
+    "zoneDegraded": "",
+    "ipcFailed": ""
+  },
+  "infoPanel": {
+    "copied": "",
+    "copyAriaLabel": "",
+    "copyDefault": "",
+    "copyTitle": "",
+    "emptyDefault": "",
+    "errorPrefixDefault": "",
+    "loadingDefault": "",
+    "paramNotContained": "Tệp này không chứa tham số được yêu cầu"
+  },
+  "taskProgress": {
+    "calculating": "",
+    "cancel": "",
+    "phase": {
+      "cancelled": "",
+      "done": "",
+      "error": "",
+      "finalizing": "",
+      "preparing": "",
+      "processing": ""
+    },
+    "remaining": ""
+  },
+  "albumTypes": {
+    "screenshot": "",
+    "nikkiphotos_highquality": "",
+    "nikkiphotos_lowquality": "",
+    "videos": "",
+    "magazinephotos": "",
+    "clockinphoto": "",
+    "cloudphotos": "",
+    "cloudphotos_lowquality": "",
+    "collage": "",
+    "highquality": "",
+    "lowquality": "",
+    "collagephoto": "",
+    "customavatar": "",
+    "customcard": "",
+    "customhomeboardphoto": "",
+    "hometemplate": "",
+    "plantdyeing": "",
+    "diy": "",
+    "xsdkqrcode": "",
+    "mallpic": "",
+    "video": "",
+    "movies": "",
+    "profilephoto": "",
+    "posephoto": "",
+    "groupphoto": "",
+    "storyphoto": "",
+    "landscapephoto": "",
+    "selfiephoto": "",
+    "autophoto": "",
+    "photostudio": "",
+    "photoframe": "",
+    "adventurephoto": "",
+    "diaryphoto": "",
+    "activityphoto": "",
+    "eventphoto": "",
+    "festivalphoto": "",
+    "missionphoto": "",
+    "videoclip": "",
+    "custom": "",
+    "unknown": ""
+  },
+  "main": {
+    "dialog": {
+      "instanceRunning": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "cleanupButton": "",
+        "manualButton": "",
+        "exitButton": ""
+      },
+      "cleanupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openTaskManager": ""
+      },
+      "startupFailed": {
+        "title": "",
+        "message": "",
+        "detail": "",
+        "openLogDir": ""
+      },
+      "validation": {
+        "messageRequired": ""
+      },
+      "defaultOk": ""
+    },
+    "error": {
+      "mainWindowNotInit": "",
+      "databaseNotInit": ""
+    },
+    "editor": {
+      "dialog": {
+        "filterPresetName": ""
+      },
+      "error": {
+        "userCanceledSave": "",
+        "userCanceledSelect": "",
+        "userCanceledExportDir": "",
+        "jsonParseFailed": "",
+        "presetFormatInvalid": "",
+        "onlyIndexedPath": ""
+      },
+      "validation": {
+        "nameRequired": "",
+        "nameMaxLength": "",
+        "categoryRequired": "",
+        "categoryMaxLength": "",
+        "dataUrlRequired": "",
+        "dataUrlMaxLength": "",
+        "fileNameInvalid": ""
+      },
+      "log": {
+        "cleanupSnapshotsDone": "",
+        "cleanupSnapshotsFailed": "",
+        "backupSizeMismatch": "",
+        "backupFailed": "",
+        "backupSizeChanged": "",
+        "restoredFromBackup": "",
+        "restoreFailed": "",
+        "recordHistoryFailed": ""
+      }
+    },
+    "plugin": {
+      "error": {
+        "notFound": "",
+        "filePathInvalid": "",
+        "filePathsInvalid": "",
+        "targetDirInvalid": "",
+        "fileNameInvalid": "",
+        "sqlInvalid": "",
+        "selectOnly": "",
+        "tableNotInWhitelist": "",
+        "configInvalid": "",
+        "taskIdInvalid": "",
+        "currentTotalInvalid": "",
+        "notInitialized": "",
+        "noSpecifiers": ""
+      },
+      "dialog": {
+        "installConfirmTitle": "",
+        "installConfirmMessage": "",
+        "installConfirmDetail": "",
+        "install": ""
+      }
+    },
+    "media": {
+      "dialog": {
+        "cancel": "",
+        "confirmDelete": "",
+        "confirmEmpty": "",
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": "",
+        "emptyRecycleBinTitle": "",
+        "emptyRecycleBinMessage": ""
+      },
+      "error": {
+        "userCanceled": "",
+        "missingNotFound": "",
+        "corruptedNotFound": ""
+      },
+      "message": {
+        "softDeleted": "",
+        "restored": "",
+        "permanentDeleted": "",
+        "permanentDeletePartial": "",
+        "recycleBinEmpty": "",
+        "recycleBinEmptied": "",
+        "cleanedMissing": "",
+        "missingRemoved": "",
+        "cleanedCorrupted": "",
+        "corruptedRemoved": "",
+        "nothingToAnalyze": "",
+        "sceneTimeAnalyzed": ""
+      },
+      "log": {
+        "recycleBinMoveFailed": "",
+        "recycleBinMoveOmitted": ""
+      },
+      "validation": {
+        "tagsMax": "",
+        "notesMaxLength": "",
+        "outfitMaxLength": ""
+      }
+    },
+    "validator": {
+      "pathRequired": "",
+      "pathMaxLength": "",
+      "pathArrayRequired": "",
+      "pathArrayMaxLength": "",
+      "mediaIdPositive": "",
+      "mediaIdsRequired": "",
+      "mediaIdsMaxLength": "",
+      "ratingRange": "",
+      "idPositive": "",
+      "stringRequired": "",
+      "stringMaxLength": "",
+      "stringControlChars": "",
+      "uidRequired": "",
+      "uidMaxLength": "",
+      "uidAlphanumeric": "",
+      "urlRequired": "",
+      "urlMaxLength": "",
+      "urlInvalid": "",
+      "urlHttpOnly": "",
+      "backupFilenameInvalid": "",
+      "limitBytesPositive": "",
+      "pathNotAllowed": "Path is not in the whitelist, {{op}} operation is forbidden",
+      "opWrite": "write",
+      "opRead": "read",
+      "paramValidationFailed": "",
+      "log": {
+        "handlerUncaught": ""
+      },
+      "arrayStringRequired": "",
+      "ipcPathArrayMaxLength": "",
+      "pathStringLength": "",
+      "pathMustAbsolute": "",
+      "numberFinite": "",
+      "numberRange": "",
+      "intRequired": "",
+      "stringTypeRequired": "",
+      "stringLengthRange": "",
+      "mediaIdsArrayRequired": "",
+      "mediaIdsNotEmpty": "",
+      "tagNameStringRequired": "",
+      "tagNameLength": "",
+      "tagNameControlChars": "",
+      "urlLength": "",
+      "protocolNotAllowed": "",
+      "urlInvalidLiteral": "",
+      "presetObjectRequired": "",
+      "presetNameRequired": "",
+      "presetCategoryRequired": "",
+      "presetParamsRequired": ""
+    },
+    "db": {
+      "recovery": {
+        "openFailed": "",
+        "integrityCheckFailed": "",
+        "dbHandleNull": "",
+        "reopenFailed": ""
+      },
+      "log": {
+        "lockRetrySucceeded": "",
+        "openFailedTryingBackup": "",
+        "autoRecoveryFailed": "",
+        "autoVacuumFailed": "",
+        "pragmaOptimizeFailed": "",
+        "integrityCheckFault": "",
+        "writeCleanExitMarkerFailed": "",
+        "closeCorruptedFailed": "",
+        "restoreFailedReverted": "",
+        "reopenAfterRestoreFailFailed": "",
+        "reopenAfterRestoreFailed": "",
+        "autoRestored": "",
+        "corruptDbRenamed": "",
+        "corruptDbCopied": "",
+        "corruptDbBackupFailed": "",
+        "recoveryListenerFailed": "",
+        "preMigrationBackupCreated": "",
+        "preMigrationBackupFailed": "",
+        "migrationFailedTxRolledBack": "",
+        "migrationFailedNoBackup": "",
+        "operationHistoryCleanupFailed": "",
+        "indexExistsIgnored": "",
+        "v3IndexExistsIgnored": "",
+        "fts5Unavailable": "",
+        "v3MigrationDone": "",
+        "v3MigrationFailed": "",
+        "backfillApplied": "",
+        "backfillFailed": "",
+        "systemCategoryKeyMigrationFailed": "",
+        "sceneCategoryMigrated": "",
+        "sceneCategoryMigrationFailed": "",
+        "settingTypeMismatch": "",
+        "exitOptimizeFailed": "",
+        "walCheckpointFailed": "",
+        "importRootsGalleryFailed": "",
+        "importRootsCacheFailed": "",
+        "fts5QueryFallback": ""
+      },
+      "error": {
+        "lockedByOtherProgram": "",
+        "openFailedAfterRecovery": "",
+        "initFailedNullHandle": "",
+        "migrationFailedRolledBack": "",
+        "migrationRolledBackToBackup": "",
+        "rollbackToBackupFailed": "",
+        "indexCreationFailed": "",
+        "v3IndexCreationFailed": "",
+        "addColumnFailed": "",
+        "abiIncompatible": "",
+        "permissionDenied": "",
+        "diskFull": "",
+        "databaseCorrupted": "",
+        "unknown": ""
+      }
+    },
+    "file": {
+      "action": {
+        "copy": "",
+        "move": "",
+        "rename": "",
+        "export": ""
+      },
+      "error": {
+        "busy": "",
+        "permission": "",
+        "generic": "",
+        "invalidChars": "",
+        "pathReference": "",
+        "invalidSeparator": "",
+        "targetExists": "",
+        "invalidName": "",
+        "fileTooLarge": "",
+        "noOutputDir": "",
+        "noDefaultExportDir": ""
+      },
+      "message": {
+        "movedToRecycleBin": "",
+        "deleteFailed": "",
+        "copied": "",
+        "moved": "",
+        "renameSuccess": "",
+        "batchRenameAllSuccess": "",
+        "batchRenamePartial": "",
+        "exported": "",
+        "saveAsSuccess": "",
+        "saveAsFailed": "",
+        "deletePermanentPartial": "",
+        "deletedPermanent": "",
+        "saveSuccess": "",
+        "saveFailed": "",
+        "notDirectory": "",
+        "cannotAccessDir": "",
+        "insufficientDiskSpace": "",
+        "targetExists": "",
+        "importComplete": "",
+        "editedImageFileName": ""
+      },
+      "log": {
+        "exifReadFailed": "",
+        "dbSyncFailed": "",
+        "pendingRenamesRecordFailed": "",
+        "exportMetadataFallback": ""
+      },
+      "validation": {
+        "operationsRequired": "",
+        "operationsMax": ""
+      },
+      "dialog": {
+        "permanentDeleteTitle": "",
+        "permanentDeleteMessage": "",
+        "permanentDeleteDetail": ""
+      }
+    },
+    "gameEvents": {
+      "versionDescription": ""
+    },
+    "decryption": {
+      "error": {
+        "abiMismatch": "",
+        "step1Failed": "",
+        "cameraParamsNotFound": "",
+        "step3Failed": "",
+        "cameraParamsInvalid": "",
+        "fileTooLarge": "",
+        "fileUnreadable": "",
+        "uidMissing": "",
+        "cameraKeyFailed": "",
+        "unknown": "",
+        "encryptFailed": "",
+        "invalidClothDiyCode": "",
+        "networkDecodeFailed": "",
+        "networkTimeout": "Hết thời gian giải mã mạng (đã giảm cấp; các trường khác vẫn dùng được)",
+        "networkUnavailable": "Giải mã mạng không khả dụng (có thể cần Internet)",
+        "invalidHomeBuildCode": "",
+        "ffiNotInit": "",
+        "findNoEndFlagHint": "",
+        "uidRequired": "",
+        "dllNotInit": "",
+        "initSendFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "decodeTimeout": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "log": {
+        "mapHint": "",
+        "noCameraParams": "",
+        "unexpectedError": "",
+        "dllResolveFailed": "",
+        "initSendFailed": "",
+        "readyTimeout": "",
+        "decodeTimeout": "",
+        "requestSendFailed": "",
+        "restartExhausted": "",
+        "restarting": "",
+        "restarted": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      }
+    },
+    "lifecycle": {
+      "log": {
+        "crashReporterStarted": "",
+        "crashReporterFailed": "",
+        "backupInitFailed": "",
+        "themeCleanupFailed": "",
+        "selfCheckFailed": "",
+        "unknownReason": "",
+        "crashCleanFailed": "",
+        "forceExitReasonWal": "",
+        "forceExitReasonDefault": "",
+        "startupFailed": ""
+      }
+    },
+    "autoUpdate": {
+      "log": {
+        "devSkip": "",
+        "updateError": "",
+        "initialized": "",
+        "checkFailed": "",
+        "downloadFailed": ""
+      }
+    },
+    "log": {
+      "dialog": {
+        "filterZipName": ""
+      },
+      "error": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "getStatsFailed": "",
+        "userCanceledSave": "",
+        "clearFailed": "",
+        "reportRendererFailed": ""
+      },
+      "log": {
+        "listFaultsFailed": "",
+        "getFaultDetailFailed": "",
+        "clearedAll": "",
+        "reportRendererFailed": ""
+      }
+    },
+    "cleanup": {
+      "log": {
+        "exitDiagnosisSummary": ""
+      }
+    },
+    "gpu": {
+      "log": {
+        "processCrashFallback": ""
+      }
+    },
+    "rendererBridge": {
+      "log": {
+        "sendFailed": ""
+      }
+    },
+    "rendererProtocol": {
+      "error": {
+        "calledBeforeReady": ""
+      }
+    },
+    "setDir": {
+      "message": {
+        "resetToDefault": ""
+      },
+      "error": {
+        "resetFailed": ""
+      }
+    },
+    "disk": {
+      "error": {
+        "insufficient": ""
+      },
+      "keyword": {
+        "insufficient": ""
+      }
+    },
+    "fileUtils": {
+      "error": {
+        "invalidDataUrl": ""
+      }
+    },
+    "backup": {
+      "log": {
+        "createIpcFailed": "",
+        "listFailed": "",
+        "restoreIpcFailed": "",
+        "startupAutoBackupFailed": "",
+        "skipAutoBackup": "",
+        "runningStartupAutoBackup": "",
+        "createSuccess": "",
+        "createFailed": "",
+        "restoreToFailed": "",
+        "restoredToDb": "",
+        "restoreSuccessRelaunching": "",
+        "relaunchFailed": "",
+        "restoreFailed": "",
+        "relaunchAfterFailureFailed": "",
+        "repairFlagWritten": "",
+        "repairFlagWriteFailed": "",
+        "deleted": "",
+        "deleteFailed": "",
+        "prunedOld": ""
+      },
+      "error": {
+        "createFailed": "",
+        "listFailed": "",
+        "restoreFailed": "",
+        "deleteFailed": "",
+        "dbUnavailable": "",
+        "noBackupToRestore": "",
+        "restoreFailedPlain": "",
+        "backupNotExist": "",
+        "backupCorrupted": "",
+        "restoreFailedRelaunch": "",
+        "pathTraversalDenied": ""
+      },
+      "message": {
+        "restoredFrom": "",
+        "restoredButRelaunchFailed": "",
+        "restoredRelaunching": ""
+      }
+    },
+    "cache": {
+      "log": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      },
+      "error": {
+        "getStatsFailed": "",
+        "cleanFailed": "",
+        "setLimitFailed": "",
+        "enforceLimitFailed": ""
+      }
+    },
+    "category": {
+      "error": {
+        "noUpdatableFields": "",
+        "systemCategoryUndeletable": "",
+        "ordersRequired": "",
+        "ordersMax": ""
+      }
+    },
+    "crash": {
+      "log": {
+        "listFailed": "",
+        "clearedAll": ""
+      },
+      "error": {
+        "listFailed": "",
+        "getStatsFailed": "",
+        "clearFailed": "",
+        "openDirFailed": ""
+      },
+      "message": {
+        "nativeCrash": "",
+        "unknownFormat": "",
+        "opened": ""
+      }
+    },
+    "data": {
+      "dialog": {
+        "cancel": "",
+        "confirmClear": "",
+        "clearTitle": "",
+        "clearMessage": "",
+        "clearDetail": ""
+      },
+      "message": {
+        "cleared": ""
+      }
+    },
+    "decrypt": {
+      "validation": {
+        "albumTypeRequired": "",
+        "albumTypeMaxLength": "",
+        "jsonTextRequired": "",
+        "jsonTextMaxLength": "",
+        "codeStrRequired": "",
+        "codeStrMaxLength": ""
+      },
+      "log": {
+        "mediaWhitelistHit": "",
+        "resolveUidFailed": "",
+        "getKnownUidsFailed": ""
+      }
+    },
+    "duplicate": {
+      "message": {
+        "cancelled": "",
+        "markDone": ""
+      },
+      "progress": {
+        "hashDoneGrouping": "",
+        "hashing": "",
+        "done": ""
+      }
+    },
+    "exportPref": {
+      "validation": {
+        "namingMaxLength": "",
+        "namingNoSeparator": "",
+        "namingNoParentDir": ""
+      }
+    },
+    "import": {
+      "error": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      },
+      "log": {
+        "registerRootOrScanFailed": "",
+        "importFailed": ""
+      }
+    },
+    "importRoot": {
+      "log": {
+        "removeFailed": "",
+        "clearRecordsFailed": ""
+      },
+      "error": {
+        "removeFailed": ""
+      }
+    },
+    "operationHistory": {
+      "validation": {
+        "operationTypeRequired": ""
+      }
+    },
+    "profile": {
+      "error": {
+        "uidExists": "",
+        "defaultUndeletable": "",
+        "targetNotFound": ""
+      },
+      "message": {
+        "transferred": ""
+      }
+    },
+    "scanner": {
+      "validation": {
+        "customPathsMax": ""
+      },
+      "log": {
+        "postScanThumbFailed": "",
+        "registerImportRootFailed": "",
+        "startFailed": "",
+        "skipRestoreReplay": "",
+        "markMigrationV1FailedRetry": "",
+        "repairV1Failed": "",
+        "markMigrationV2Failed": "",
+        "repairV2Failed": "",
+        "markMigrationV3Failed": "",
+        "repairV3Failed": "",
+        "markMigrationV4Failed": "",
+        "repairV4Failed": "",
+        "markMigrationV5Failed": "",
+        "repairV5Failed": "",
+        "integrityCheckFailed": "",
+        "heartbeatTimeout": "",
+        "bridgeReadyTimeout": "",
+        "bridgeRestarting": "",
+        "bridgeRestarted": "",
+        "scanTaskRestored": "",
+        "scanTaskRestoreFailed": "",
+        "bridgeRestartFailed": "",
+        "bridgeCrashListenerFailed": ""
+      },
+      "error": {
+        "validationFailed": "",
+        "pathCheckFailed": "",
+        "scanFailed": "",
+        "scanInProgress": "",
+        "dbPathNotInitialized": "",
+        "scanStartFailed": "",
+        "noMediaDirFound": "",
+        "gameDirNotFound": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "scanProcessExit": "",
+        "autoRestarted": "",
+        "duplicateScanStart": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "scanCancelled": ""
+      }
+    },
+    "searchIndex": {
+      "validation": {
+        "segmentsMax": ""
+      },
+      "error": {
+        "persistFailed": ""
+      },
+      "log": {
+        "importReadFailed": ""
+      }
+    },
+    "settings": {
+      "error": {
+        "customPathsNotArray": "",
+        "customPathsMax": "",
+        "customPathsEmptyItem": "",
+        "validationFailed": "",
+        "valueTooLarge": "",
+        "valueNotSerializable": "",
+        "hwAccelNotBoolean": "",
+        "securitySensitiveKey": "",
+        "unknownKey": ""
+      },
+      "validation": {
+        "keyRequired": "",
+        "keyMaxLength": ""
+      }
+    },
+    "share": {
+      "log": {
+        "detectAppFailed": "",
+        "launchAppFailed": "",
+        "rejectedNonLan": "",
+        "pinLocked": "",
+        "authSuccess": "",
+        "readFailed": ""
+      },
+      "error": {
+        "launchAppFailed": "",
+        "noFilesToShare": ""
+      },
+      "http": {
+        "serviceNotStarted": "",
+        "forbiddenNonLan": "",
+        "fileNotFound": "",
+        "pathNotFound": "",
+        "authTitle": "",
+        "authPrompt": "",
+        "authHint": "",
+        "pinPlaceholder": "",
+        "authSubmit": "",
+        "networkError": "",
+        "tooManyAttempts": "",
+        "locked": "",
+        "pinWrong": "",
+        "authSuccess": "",
+        "readFailed": ""
+      }
+    },
+    "shell": {
+      "error": {
+        "pathMustBeAbsolute": "",
+        "sensitiveDirForbidden": "",
+        "executableForbidden": "",
+        "openExternalFailed": "",
+        "openPathFailed": "",
+        "showItemFailed": ""
+      }
+    },
+    "similar": {
+      "message": {
+        "phashDone": ""
+      }
+    },
+    "task": {
+      "validation": {
+        "taskIdRequired": "",
+        "taskIdMaxLength": ""
+      },
+      "keyword": {
+        "canceled": "",
+        "alreadyRunning": ""
+      }
+    },
+    "video": {
+      "error": {
+        "endTimeAfterStart": ""
+      },
+      "log": {
+        "exportLivePhotoFailed": ""
+      },
+      "message": {
+        "editSuccess": ""
+      }
+    },
+    "watermark": {
+      "message": {
+        "cancelled": "",
+        "done": "",
+        "failed": ""
+      },
+      "progress": {
+        "applying": ""
+      },
+      "validation": {
+        "configRequired": "",
+        "configMaxLength": ""
+      }
+    },
+    "customDirs": {
+      "label": {
+        "backupFiles": "",
+        "thumbnailMetadata": "",
+        "logFiles": "",
+        "crashDump": ""
+      }
+    },
+    "desktopShortcut": {
+      "log": {
+        "noWritableDesktop": "",
+        "created": "",
+        "createFailedFallback": "",
+        "createdFallback": "",
+        "createFailedAll": ""
+      }
+    },
+    "app": {
+      "name": ""
+    },
+    "errorHandlers": {
+      "unknownPath": "",
+      "dialog": {
+        "errorTitle": "",
+        "errorBody": "",
+        "frequentErrorTitle": "",
+        "frequentErrorMessage": "",
+        "frequentErrorDetail": "",
+        "restartApp": "",
+        "continueUsing": ""
+      }
+    },
+    "mediaProtocol": {
+      "log": {
+        "missingPathParam": "",
+        "realpathFailed": "",
+        "denyNotWhitelisted": "",
+        "fileNotFoundOrNoPerm": "",
+        "handleRequestFailed": "",
+        "whitelistCheckFailed": ""
+      }
+    },
+    "recovery": {
+      "title": {
+        "dbRecovered": "",
+        "dbRecoveryFailed": "",
+        "dbPreserved": ""
+      },
+      "body": {
+        "sourceBackup": "",
+        "corruptedBackupPath": "",
+        "dbPreserved": ""
+      },
+      "worker": {
+        "title": {
+          "startupTimeout": "",
+          "restarted": "",
+          "restartExhausted": "",
+          "exited": ""
+        },
+        "body": {
+          "crashTime": "",
+          "exitCode": "",
+          "crashedAt": "",
+          "restartCount": "",
+          "startupTimeoutHint": "",
+          "restartedHint": "",
+          "exhaustedHint": ""
+        },
+        "state": {
+          "exhausted": "",
+          "continuable": ""
+        },
+        "label": {
+          "scanner": "",
+          "database": "",
+          "media": "",
+          "decryption": ""
+        }
+      },
+      "log": {
+        "repairFailed": "",
+        "showDialogFailed": ""
+      }
+    },
+    "window": {
+      "reason": {
+        "rendererNotReady": ""
+      },
+      "dialog": {
+        "diagTitle": "",
+        "rendererFailed": "",
+        "rendererFailedDetail": "",
+        "gotIt": "",
+        "crashTitle": "",
+        "crashMessage": "",
+        "crashDetail": "",
+        "reload": "",
+        "closeApp": ""
+      },
+      "log": {
+        "rendererCrashed": ""
+      }
+    },
+    "index": {
+      "log": {
+        "gpuFallbackActive": ""
+      },
+      "dialog": {
+        "startupFailedTitle": "",
+        "startupFailedMessage": "",
+        "startupFailedDetail": "",
+        "exit": ""
+      }
+    },
+    "startup": {
+      "log": {
+        "scanComplete": "",
+        "indexingTaskError": "",
+        "autoScanFailed": "",
+        "thumbnailAlreadyRunning": "",
+        "thumbnailBatchFailed": "",
+        "phashStartFailed": "",
+        "indexingFailed": "",
+        "sceneAnalysisNone": "",
+        "sceneAnalysisFailed": "",
+        "orphanCleanupFailed": "",
+        "readPendingRenamesFailed": "",
+        "cleanupScanHistoryFailed": "",
+        "notifyScanInterruptedFailed": "",
+        "detectInterruptedFailed": "",
+        "clearRecoveryFlagsFailed": "",
+        "notifyBackupRestoredFailed": "",
+        "postRestorePhashFailed": "",
+        "postRestoreDuplicateFailed": ""
+      },
+      "error": {
+        "indexingTotalTimeout": ""
+      },
+      "index": {
+        "timeoutStopped": "",
+        "cancelled": "",
+        "preparing": "",
+        "analyzingSceneTime": "",
+        "finalizing": "",
+        "done": "",
+        "errorStopped": ""
+      }
+    },
+    "livephoto": {
+      "error": {
+        "invalidVideo": "",
+        "exportFailed": ""
+      },
+      "message": {
+        "exportSuccess": ""
+      }
+    },
+    "logService": {
+      "message": {
+        "opened": "",
+        "exported": ""
+      },
+      "error": {
+        "openDirFailed": "",
+        "zipRequired": "",
+        "emptyArchive": "",
+        "targetNotGenerated": "",
+        "noErrorOutput": "",
+        "tarStartFailed": "",
+        "packageFailed": ""
+      },
+      "log": {
+        "buildDiagnosticFailed": ""
+      }
+    },
+    "thumbnail": {
+      "log": {
+        "forkFailed": "",
+        "readyTimeout": "",
+        "handshakeFailed": "",
+        "markCorruptedCallbackFailed": "",
+        "clearCorruptedCallbackFailed": "",
+        "lowQualityFailed": "",
+        "highQualityFailed": "",
+        "decodeFailed": "",
+        "generateFailed": "",
+        "workerCallFailed": "",
+        "readCacheMetaFailed": "",
+        "cacheMetaCorrupted": "",
+        "deleteCorruptedMetaFailed": "",
+        "saveCacheMetaFailed": "",
+        "cleanTmpFailed": "",
+        "lruCleanFailed": ""
+      },
+      "error": {
+        "workerForkFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerDisposed": "",
+        "sharpResizeFailed": "",
+        "ffmpegFrameTimeout": "",
+        "videoPathRequired": "",
+        "outputPathRequired": "",
+        "ffmpegEmptyOutput": ""
+      },
+      "kindVideo": "",
+      "kindImage": ""
+    },
+    "xmpMetadata": {
+      "log": {
+        "invalidStructure": "",
+        "parseEditorDataFailed": "",
+        "readInvalidStructure": "",
+        "deserializeFailed": "",
+        "readFailed": ""
+      }
+    },
+    "videoEditor": {
+      "log": {
+        "editStopReceived": "",
+        "readyTimeout": "",
+        "abnormalExit": "",
+        "batchTaskFailed": ""
+      },
+      "error": {
+        "inputPathRequired": "",
+        "outputPathRequired": "",
+        "unsupportedSpeed": "",
+        "cancelledByUser": "",
+        "taskCancelledSkipped": "",
+        "taskCancelled": "",
+        "exportFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "workerAbnormalExit": "",
+        "taskInProgress": "",
+        "workerDisposed": "",
+        "appExiting": ""
+      },
+      "message": {
+        "progressStart": "",
+        "progressDone": "",
+        "exportSuccess": "",
+        "editCancelled": "",
+        "exportDone": "",
+        "batchCancelled": "",
+        "batchDoneAll": "",
+        "batchDonePartial": ""
+      }
+    },
+    "thumbnailPhash": {
+      "log": {
+        "phashFailed": "",
+        "duplicateMarkFailed": ""
+      }
+    },
+    "videoService": {
+      "log": {
+        "markingCorrupted": "",
+        "markCorruptedCallbackFailed": "",
+        "metadataReadFailed": "",
+        "exportTask": "",
+        "exportFailed": "",
+        "exportDecodeFailed": "",
+        "frameCaptureTask": "",
+        "frameCaptureFailed": "",
+        "frameCaptureDecodeFailed": "",
+        "trimTask": "",
+        "trimFailed": "",
+        "trimDecodeFailed": "",
+        "speedTask": "",
+        "speedFailed": "",
+        "speedDecodeFailed": ""
+      },
+      "error": {
+        "exportFailed": "",
+        "frameCaptureFailed": "",
+        "trimFailed": "",
+        "speedFailed": ""
+      },
+      "message": {
+        "exportSuccess": "",
+        "frameCaptureSuccess": "",
+        "trimSuccess": "",
+        "speedSuccess": ""
+      }
+    },
+    "mediaWorker": {
+      "progress": {
+        "markingDuplicates": ""
+      },
+      "error": {
+        "thumbnailAlreadyRunning": "",
+        "thumbnailStartFailed": "",
+        "phashAlreadyRunning": "",
+        "phashStartFailed": "",
+        "duplicateAlreadyRunning": "",
+        "duplicateStartFailed": "",
+        "similarAlreadyRunning": "",
+        "similarStartFailed": "",
+        "workerReadyTimeout": "",
+        "workerStartFailed": "",
+        "thumbnailProcessExit": "",
+        "phashProcessExit": "",
+        "duplicateProcessExit": "",
+        "similarProcessExit": "",
+        "autoRestarted": "",
+        "workerDisposed": ""
+      },
+      "message": {
+        "thumbnailCancelled": "",
+        "phashCancelled": "",
+        "duplicateCancelled": "",
+        "workerTaskCancelled": "",
+        "workerTaskDone": "",
+        "nothingToGenerate": "",
+        "nothingToPhash": "",
+        "nothingToDetect": "",
+        "batchGenerateFailed": "",
+        "phashBatchFailed": "",
+        "markFailed": ""
+      },
+      "log": {
+        "readyTimeout": "",
+        "restarting": "",
+        "restarted": "",
+        "thumbnailRestored": "",
+        "thumbnailRestoreFailed": "",
+        "phashRestored": "",
+        "phashRestoreFailed": "",
+        "duplicateRestored": "",
+        "duplicateRestoreFailed": "",
+        "similarRestored": "",
+        "similarRestoreFailed": "",
+        "restartFailed": "",
+        "crashListenerFailed": "",
+        "thumbnailBatchFailed": "",
+        "phashBatchFailed": "",
+        "duplicateMarkFailed": "",
+        "duplicateNoGroups": "",
+        "similarFindFailed": "",
+        "similarStartFailed": ""
+      }
+    },
+    "databaseWorker": {
+      "log": {
+        "restarting": "",
+        "restartedWithDb": "",
+        "restartedPendingOpen": "",
+        "restartFailed": "",
+        "crashListenerFailed": ""
+      },
+      "error": {
+        "bridgeDisposed": "",
+        "writeFailed": "",
+        "unknown": "",
+        "autoRestarted": "",
+        "handshakeAborted": "",
+        "requestsAborted": ""
+      }
+    },
+    "readStream": {
+      "log": {
+        "streamErrorDestroyed": ""
+      }
+    },
+    "scanLog": {
+      "error": {
+        "exportCanceled": "",
+        "exportFailed": ""
+      }
+    },
+    "resonance": {
+      "error": {
+        "recordExists": "Record already exists (same banner, same time, same item)",
+        "recordNotFound": "Record not found or already deleted",
+        "importFileNotReadable": "Import file does not exist or cannot be read: {{path}}",
+        "importFileNotFile": "Path is not a file: {{path}}",
+        "importFileTooLarge": "Import file is too large ({{size}} bytes, exceeding the limit)",
+        "importFileReadFailed": "Failed to read the import file: {{reason}}",
+        "exportDirMissing": "Export directory does not exist: {{path}}",
+        "exportNotJson": "Export file extension must be .json: {{path}}",
+        "exportWriteFailed": "Failed to write the export file: {{reason}}"
+      },
+      "log": {
+        "exported": "Resonance data exported ({{count}} records)"
+      }
+    }
+  },
+  "appError": {
+    "canceled": "",
+    "database": "",
+    "fileSystem": "",
+    "internal": "",
+    "fallback": ""
+  },
+  "app": {
+    "log": {
+      "pluginBootstrapFailed": ""
+    }
+  },
+  "mock": {
+    "log": {
+      "skipInstall": ""
+    },
+    "feature": {
+      "fileScan": "",
+      "fileDelete": "",
+      "fileDeletePermanent": "",
+      "fileCopy": "",
+      "fileMove": "",
+      "fileRename": "",
+      "batchRename": "",
+      "fileExport": "",
+      "fileSaveAs": "",
+      "exportWithMetadata": "",
+      "batchExportWithMetadata": "",
+      "watermarkApply": "",
+      "videoExport": "",
+      "videoCaptureFrame": "",
+      "videoTrim": "",
+      "videoSpeed": "",
+      "livePhotoExport": "",
+      "videoEdit": "",
+      "videoEditBatch": "",
+      "clearDatabase": "",
+      "createBackup": "",
+      "restoreBackup": "",
+      "deleteBackup": "",
+      "appRelaunch": "",
+      "decryptFile": "",
+      "encryptCameraParams": "",
+      "decodeClothDiy": "",
+      "decodeHomeBuild": "",
+      "pluginDetail": "",
+      "pluginInstall": "",
+      "pluginUninstall": "",
+      "pluginToggle": "",
+      "wifiShare": ""
+    },
+    "message": {
+      "browserDownloadTriggered": "",
+      "downloadFailed": "",
+      "openLocalPath": "",
+      "showInFolder": "",
+      "unsupportedShort": "",
+      "openDirectory": "",
+      "exportLogs": "",
+      "clearLogs": "",
+      "clearCrashReports": "",
+      "importPreview": "",
+      "importFiles": "",
+      "copyToClipboard": "",
+      "launchExternalApp": "",
+      "phashDone": "",
+      "duplicatesMarked": "",
+      "batchAnalysisUnsupported": "",
+      "softDeleted": "",
+      "restored": "",
+      "permanentDeleted": "",
+      "recycleBinCleared": "",
+      "noMissingFiles": "",
+      "noCorruptedFiles": "",
+      "exportFileUnsupported": "",
+      "importFileUnsupported": "",
+      "noRestartNeeded": "",
+      "videoMetadataUnsupported": ""
+    }
+  },
+  "scanProgress": {
+    "log": {
+      "getActiveFailed": "",
+      "stopFailed": ""
+    },
+    "stopping": "",
+    "scanning": "",
+    "foundFiles": ""
+  },
+  "plugins": {
+    "log": {
+      "facadeNotReady": "",
+      "registerActiveFailed": "",
+      "triggerInitFailed": "",
+      "bootstrapFailed": "",
+      "i18nInjectFailed": ""
+    }
+  },
+  "themes": {
+    "default": "",
+    "softPinkLuxury": ""
+  },
+  "globalErrorHandler": {
+    "log": {
+      "errorEventFailed": "",
+      "rejectionEventFailed": ""
+    }
+  },
+  "scanButton": {
+    "incrementalDesc": "",
+    "full": "",
+    "fullDesc": "",
+    "custom": "",
+    "customDesc": ""
+  },
+  "videoPlayer": {
+    "restoredTo": "",
+    "exitFullscreen": "",
+    "fullscreenPlayback": "",
+    "fullscreen": "",
+    "captureFrame": "",
+    "capture": ""
+  },
+  "searchService": {
+    "log": {
+      "noIpcFallback": "",
+      "schemaHashMismatch": "",
+      "importFailedFallback": "",
+      "initFailedFallback": "",
+      "rebuildFailed": "",
+      "persistDebouncedFailed": "",
+      "docCountMismatch": "",
+      "verifyFailed": ""
+    }
+  },
+  "mediaStore": {
+    "log": {
+      "persistFailed": "",
+      "noElectronApi": "",
+      "mediaListNull": "",
+      "filesEmpty": "",
+      "categoryListNull": "",
+      "categoriesEmpty": "",
+      "fetchError": "",
+      "loadMoreFailed": "",
+      "loadProfilesFailed": "",
+      "loadRecycleBinFailed": "",
+      "loadRecycleBinMoreFailed": ""
+    }
+  },
+  "operationHistory": {
+    "log": {
+      "dbWriteFailed": "",
+      "conflictCheckFailed": "",
+      "dbRemoveFailed": "",
+      "dbClearFailed": "",
+      "dbLoadFailed": ""
+    },
+    "error": {
+      "dbSaveFailedFull": "",
+      "handlerNotRegistered": "",
+      "recordCorrupted": ""
+    }
+  },
+  "updateDialog": {
+    "checking": "",
+    "downloading": "",
+    "downloadingVersion": "",
+    "ariaLabel": "",
+    "foundNewVersion": "",
+    "availablePrompt": "",
+    "later": "",
+    "downloadNow": "",
+    "downloadedTitle": "",
+    "downloadedPrompt": "",
+    "restartLater": "",
+    "installAndRestart": "",
+    "log": {
+      "downloadFailed": "",
+      "installFailed": "",
+      "openOfficialFailed": ""
+    }
+  },
+  "resonance": {
+    "brand": "Infinity Nikki",
+    "title": "Nhật ký Cộng hưởng Nikki",
+    "subtitle": "Nhật ký cộng hưởng và trợ lý phối đồ Infinity Nikki · Sắp ra mắt",
+    "error": {
+      "importJsonParseFailed": "The file is not valid JSON. Please make sure the exported file is not corrupted",
+      "importInvalidStructure": "File structure does not match the resonance import format (supports JSON exported from gongeo.us)",
+      "importTooManyRecords": "The file contains too many records. Please split it and import again",
+      "invalidReason": {
+        "invalidShape": "Invalid record shape",
+        "invalidTimestamp": "Invalid timestamp format",
+        "invalidItemId": "Invalid item id",
+        "invalidOutfitId": "Invalid outfit id",
+        "invalidEvoLevel": "Invalid evolution level (expected 0-4)"
+      }
+    },
+    "tab": {
+      "records": "Resonance Records",
+      "wardrobe": "My Wardrobe",
+      "import": "Import Data",
+      "stats": "Personal Statistics"
+    },
+    "records": {
+      "bannerLabel": "Banner",
+      "bannerType1": "Standard Banner",
+      "bannerType2": "Limited Banner",
+      "bannerType3": "4★ Limited Banner",
+      "addRecord": "Add Record",
+      "addTitle": "Add Record Manually",
+      "editTimeTitle": "Edit Record Time",
+      "itemLabel": "Obtained Item",
+      "timeLabel": "Obtained At",
+      "selectItem": "Select the obtained item",
+      "fiveStarItems": "5★ Outfit Pieces",
+      "fourStarItems": "4★ Outfit Pieces",
+      "totalPulls": "Total pulls {{count}}",
+      "pity5Star": "{{count}} pulls since last 5★",
+      "pity4Star": "{{count}} pulls since last 4★",
+      "pullNo": "Pull #{{n}}",
+      "editBadge": "Manual",
+      "listEmpty": "No resonance records yet",
+      "listEmptyHint": "Click \"Add Record\" in the top right to add manually, or import a JSON file exported from gongeo.us on the \"Import Data\" page",
+      "deleteTitle": "Delete Record",
+      "deleteMessage": "This action cannot be undone.",
+      "invalidTime": "Invalid time format. Please choose again",
+      "invalidInput": "Input failed validation. Please check the form"
+    },
+    "toast": {
+      "added": "Added: {{name}}",
+      "updated": "Record time updated",
+      "deleted": "Record deleted"
+    },
+    "wardrobe": {
+      "cat": {
+        "item": "Pieces",
+        "makeup": "Makeup",
+        "momo": "Momo",
+        "prop": "Props",
+        "eurekaColor": "Eureka Colors"
+      },
+      "searchPlaceholder": "Search by name",
+      "statusFilterLabel": "Ownership",
+      "statusAll": "All statuses",
+      "statusOwned": "Owned",
+      "statusMissing": "Not owned",
+      "qualityFilterLabel": "Rarity",
+      "qualityAll": "All rarities",
+      "summaryOwned": "Owned {{owned}} / {{total}}",
+      "looseSet": "Standalone pieces (not in an outfit)",
+      "outfitStatus": {
+        "owned": "Complete",
+        "partial": "In progress",
+        "missing": "Not collected"
+      },
+      "quickOwned": "Mark all owned",
+      "quickMissing": "Clear all",
+      "inferButton": "Infer from records",
+      "inferTitle": "Infer wardrobe from resonance records",
+      "inferMessage": "This will infer obtained items from your resonance records and banner progress: {{items}} pieces, {{makeups}} makeups, {{momo}} Momo, {{props}} props.\n\nThe inference uses conservative rules (limited banner progress and pull thresholds) and may be lower than actual ownership; existing records will not be modified. Continue?",
+      "inferResult": "Marked {{count}} items as owned",
+      "inferNothing": "Nothing new to infer",
+      "inferBusy": "Inferring…",
+      "catalogUnavailable": "Failed to load catalog data",
+      "catalogUnavailableHint": "Static catalog files are missing or corrupted. Please reinstall or update the app",
+      "loading": "Loading catalog data…",
+      "empty": "No matching items",
+      "emptyHint": "Try adjusting the search keyword or filters"
+    },
+    "import": {
+      "importSection": "Import Data",
+      "pickFile": "Choose JSON file",
+      "previewing": "Parsing file…",
+      "formatLegacy": "Legacy format",
+      "formatCurrent": "Current format",
+      "versionLabel": "File version: {{version}}",
+      "versionUnknown": "No version declared",
+      "versionMismatchWarn": "The file declares a newer version than currently supported; fields may be incompatible. You can try compatible import or abandon.",
+      "compatImport": "Try compatible import",
+      "abandon": "Abandon",
+      "sectionPulls": "Pull records",
+      "sectionEdits": "Manual records",
+      "sectionPearpal": "Pearpal journal",
+      "sectionEvo": "Evolution overrides",
+      "sectionWardrobe": "Wardrobe ownership",
+      "countsAdded": "{{count}} to add",
+      "countsDuplicate": "{{count}} duplicates (skipped)",
+      "countsInvalid": "{{count}} invalid (skipped)",
+      "invalidSamplesTitle": "Examples of invalid records:",
+      "invalidMore": "…and {{count}} more invalid records skipped",
+      "includeWardrobeLabel": "Also import wardrobe ownership (full overwrite)",
+      "commit": "Start import",
+      "cancelCommit": "Cancel import",
+      "cancelled": "Import cancelled; already written batches are kept. Re-importing is safe",
+      "commitDone": "Import finished, {{count}} records written",
+      "progressLabel": "{{current}} / {{total}}",
+      "exportSection": "Export Data",
+      "exportPulls": "Pull records",
+      "exportEdits": "Manual records",
+      "exportPearpal": "Pearpal journal",
+      "exportEvo": "Evolution overrides",
+      "exportWardrobe": "Wardrobe ownership",
+      "exportButton": "Export JSON",
+      "exportDone": "Exported {{count}} records",
+      "exportNothing": "Nothing to export. Select content or enter data first",
+      "dangerSection": "Danger Zone",
+      "clearButton": "Clear all resonance data",
+      "clearTitle": "Clear all resonance data",
+      "clearMessage": "All resonance records, wardrobe and statistics data will be permanently deleted. Continue?",
+      "clearDone": "All resonance data cleared",
+      "snapshotNote": "The bundled catalog and percentile data are static snapshots and do not update automatically",
+      "snapshotMeta": "Bundled catalog/percentile data are static snapshots (game version {{version}} · catalog generated {{catalogDate}} · percentile generated {{percentileDate}}) and do not update automatically"
+    },
+    "stats": {
+      "emptyTitle": "No statistics yet",
+      "emptyHint": "Add records on the \"Resonance Records\" page or import them on the \"Import Data\" page first",
+      "totalPulls": "Total pulls",
+      "total5Star": "5★ pieces",
+      "total4Star": "4★ pieces",
+      "avg5StarPulls": "Avg. pulls per 5★",
+      "banners5Star": "Limited banner pulls",
+      "banners4Star": "4★ banner pulls",
+      "outfits5Star": "5★ outfits obtained",
+      "outfits4Star": "4★ outfits obtained",
+      "luckTitle": "Luck Analysis",
+      "luckTier": "Tier {{tier}} / 6",
+      "luckSnapshotNote": "Percentiles come from a community static snapshot (generated {{date}}), do not update automatically, and are for reference only",
+      "distributionTitle": "Pull Distribution",
+      "dist5Star": "5★ (by pull count to obtain)",
+      "dist4Star": "4★ (by pull count to obtain)",
+      "activityTitle": "Pull Activity (cumulative by banner)",
+      "rankingTitle": "Per-banner Details",
+      "ranking5Star": "Limited banners (5★)",
+      "ranking4Star": "4★ limited banners",
+      "rankingEmpty": "No banner data to analyze yet",
+      "colBanner": "Banner",
+      "colPulls": "Total pulls",
+      "colAvg": "Avg. pulls",
+      "colPercentile": "Percentile"
+    }
+  }
+}
