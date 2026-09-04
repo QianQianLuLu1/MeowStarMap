@@ -1,5 +1,6 @@
 import path from 'path'
 import fs from 'fs'
+import { session } from 'electron'
 import type { AppContext } from './app-context'
 import { sendToRenderer } from './renderer-bridge'
 import { ImportRootRepository } from '../database/import-root-repository'
@@ -12,6 +13,7 @@ import { THUMBNAIL_CONCURRENCY, CACHE_METADATA_FILENAME } from '../utils/constan
 // FIX(组19-1): 孤儿缩略图清理需豁免 LRU 元数据文件与 _low/_high 变体，见 cleanupOrphanThumbnails
 import { runWithConcurrency } from '../utils/concurrency'
 import { pathExists } from '../utils/file-utils'
+import { isBlankCachedThumbnail } from '../utils/video-frame'
 import { logger } from '../utils/logger'
 import { setActiveIndexingTask } from '../utils/active-task-store'
 import { ProgressThrottle } from '../utils/progress-throttle'
@@ -585,8 +587,51 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
   })
   await runWithConcurrency(repairTasks, THUMBNAIL_CONCURRENCY)
 
-  if (missingCount > 0 || repairedCount > 0) {
-    logger.info(`[Cleanup] 标记 ${missingCount} 条缺失记录，修复 ${repairedCount} 条缩略图记录`)
+  // ── 视频纯白缩略图存量自愈（fix-video-thumbnail-white-frame 收尾）──
+  // seek 阶梯已阻止新白帧，但历史落盘的纯白 ${hash}.jpg 从未被触发重建：
+  // 批量任务只选 thumbnail IS NULL、渲染层 generate() 被 HIGH_DPI/!thumbnail 门控、
+  // 本函数原 rowsToRepair 只覆盖缺尺寸/悬空。此处对存量视频白帧主动触发一次 generate()，
+  // 命中 doGenerate 缓存分支的自愈逻辑重建 standard 帧并删除重建 _low 副本。
+  // 直接调 generate、不走 processThumbnailForRow、不写库：自愈后 ${hash}.jpg 路径不变，
+  // 同时规避 processThumbnailForRow 的 updateStmt 参数不匹配隐患。
+  let healedBlankCount = 0
+  const blankVideoHealTasks = validRows
+    .filter((row) => row.file_type === 'video' && row.thumbnail != null)
+    .map((row) => async () => {
+      try {
+        const thumb = row.thumbnail
+        if (!thumb) return
+        const resolvedThumb = path.resolve(thumb)
+        if (await isBlankCachedThumbnail(resolvedThumb)) {
+          await ctx.thumbnailGen.generate(row.file_path)
+          // 复检 DB 实际指向的缩略图：仅当确实由白变非白才计数。
+          // 覆盖三种“未真正自愈”：generate 返回 null、三位点全白仍保留白帧、内容 hash 漂移（DB 仍指旧白图）。
+          // 从而全白视频不再每次启动误触发全局 clearCache，healedBlankCount 语义收敛为“真正白→真帧的转换数”。
+          if (!(await isBlankCachedThumbnail(resolvedThumb))) {
+            healedBlankCount++
+          }
+        }
+      } catch (err) {
+        logger.warn(`[Cleanup] 视频纯白缩略图自愈失败: ${row.file_path}`, err)
+      }
+    })
+  await runWithConcurrency(blankVideoHealTasks, THUMBNAIL_CONCURRENCY)
+
+  // media:// 对缩略图响应设了 Cache-Control: max-age=31536000（一年强缓存），
+  // 自愈就地覆盖同名文件、URL 不变，Chromium HTTP 缓存可能仍返回旧白图字节。
+  // 仅当本次确有自愈时清一次会话 HTTP 缓存，保证渲染层取到重建后的帧。
+  if (healedBlankCount > 0) {
+    try {
+      await session.defaultSession.clearCache()
+    } catch (err) {
+      logger.warn(`[Cleanup] 清理 HTTP 缓存失败，缩略图自愈可能需重启后生效`, err)
+    }
+  }
+
+  if (missingCount > 0 || repairedCount > 0 || healedBlankCount > 0) {
+    logger.info(
+      `[Cleanup] 标记 ${missingCount} 条缺失记录，修复 ${repairedCount} 条缩略图记录，自愈 ${healedBlankCount} 张纯白视频缩略图`
+    )
     sendToRenderer(ctx, 'media:updated')
   }
 

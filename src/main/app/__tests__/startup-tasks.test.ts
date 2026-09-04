@@ -26,7 +26,9 @@ const {
   pathExistsMock,
   fsReaddirMock,
   fsRmMock,
-  fsConstantsMock
+  fsConstantsMock,
+  isBlankCachedThumbnailMock,
+  clearCacheMock
 } = vi.hoisted(() => ({
   processThumbnailForRowMock: vi.fn(),
   generatePhashForUnprocessedMock: vi.fn(),
@@ -41,7 +43,11 @@ const {
   pathExistsMock: vi.fn(),
   fsReaddirMock: vi.fn(),
   fsRmMock: vi.fn(),
-  fsConstantsMock: { F_OK: 0, R_OK: 4, W_OK: 2 }
+  fsConstantsMock: { F_OK: 0, R_OK: 4, W_OK: 2 },
+  // 存量纯白视频缩略图自愈判定（fix-video-thumbnail-white-frame 收尾）
+  isBlankCachedThumbnailMock: vi.fn(),
+  // media:// 一年强缓存击穿：session.defaultSession.clearCache
+  clearCacheMock: vi.fn()
 }))
 
 vi.mock('../../services/thumbnail-phash-service', () => ({
@@ -86,9 +92,16 @@ vi.mock('../../utils/scene-brightness', () => ({
   analyzeSceneBrightness: analyzeSceneBrightnessMock
 }))
 
+// 存量纯白视频缩略图自愈：cleanupAndRepairDatabase 用 isBlankCachedThumbnail 判定磁盘白帧
+vi.mock('../../utils/video-frame', () => ({
+  isBlankCachedThumbnail: isBlankCachedThumbnailMock
+}))
+
 // progress-throttle 经电子 BrowserWindow.getAllWindows 推送；测试中无窗口，返回空数组即可
+// session.defaultSession.clearCache：自愈发生后击穿 media:// 一年强缓存
 vi.mock('electron', () => ({
-  BrowserWindow: { getAllWindows: () => [] }
+  BrowserWindow: { getAllWindows: () => [] },
+  session: { defaultSession: { clearCache: clearCacheMock } }
 }))
 
 // cleanupOrphanThumbnails 用 fs.promises.readdir / rm；access 由 pathExists(已单独 mock) 接管
@@ -236,6 +249,11 @@ beforeEach(() => {
   loggerFaultMock.mockReset()
   fsReaddirMock.mockReset()
   fsRmMock.mockReset()
+  // 默认非纯白（自愈不触发）；白帧场景由具体用例逐条覆盖
+  isBlankCachedThumbnailMock.mockReset()
+  isBlankCachedThumbnailMock.mockResolvedValue(false)
+  clearCacheMock.mockReset()
+  clearCacheMock.mockResolvedValue(undefined)
 
   generatePhashForUnprocessedMock.mockResolvedValue({ processed: 0, total: 0 })
   processThumbnailForRowMock.mockResolvedValue(true)
@@ -968,6 +986,386 @@ describe('cleanupAndRepairDatabase', () => {
     await cleanupAndRepairDatabase(ctx)
 
     expect(mainWindow.webContents.send).not.toHaveBeenCalled()
+  })
+
+  // ==========================================================================
+  // 存量纯白视频缩略图启动自愈（fix-video-thumbnail-white-frame 收尾）
+  // 白帧 thumbnail 非空、尺寸齐全、源文件存在 → 既不进 rowsToRepair 也非悬空，
+  // 原实现永远不会对其调用 generate()，白帧永久留存。以下用例锁定自愈阶段。
+  // ==========================================================================
+  it('V1. video 行 + isBlankCachedThumbnail=true → 自愈调用 generate(file_path)', async () => {
+    const rows = [
+      {
+        id: 10,
+        file_path: '/videos/a.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/abc.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/abc.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    // 源文件与缩略图均存在 → 尺寸齐全不进 rowsToRepair、thumbnail 非悬空
+    pathExistsMock.mockResolvedValue(true)
+    // 首检 true（判定为白帧触发自愈）、复检 false（白→真帧转换成功）
+    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    // 自愈阶段直接以源文件路径调用 generate()，命中 doGenerate 缓存自愈分支
+    expect(generateMock).toHaveBeenCalledWith('/videos/a.mp4')
+    expect(generateMock).toHaveBeenCalledTimes(1)
+    // 白帧行走自愈而非 rowsToRepair，不应经 processThumbnailForRow
+    expect(processThumbnailForRowMock).not.toHaveBeenCalled()
+  })
+
+  it('V2. image 行不进入自愈候选（即使 isBlankCachedThumbnail=true 也不调 generate）', async () => {
+    const rows = [
+      {
+        id: 11,
+        file_path: '/img/x.jpg',
+        file_type: 'image',
+        thumbnail: '/cache/x.jpg',
+        width: 100,
+        height: 100
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/x.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(true)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(generateMock).not.toHaveBeenCalled()
+  })
+
+  it('V3. video 行但 isBlankCachedThumbnail=false → 不调用 generate', async () => {
+    const rows = [
+      {
+        id: 12,
+        file_path: '/videos/b.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/b.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/b.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(false)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(generateMock).not.toHaveBeenCalled()
+  })
+
+  it('V4. video 行 thumbnail=null → 不进入自愈候选', async () => {
+    const rows = [
+      {
+        id: 13,
+        file_path: '/videos/c.mp4',
+        file_type: 'video',
+        thumbnail: null,
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/c.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(true)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(generateMock).not.toHaveBeenCalled()
+  })
+
+  it('V5. generate() 抛错 → 被捕获、函数不 reject、logger.warn 记录自愈失败', async () => {
+    const rows = [
+      {
+        id: 14,
+        file_path: '/videos/d.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/d.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockRejectedValue(new Error('ffmpeg boom'))
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(true)
+    fsReaddirMock.mockResolvedValue([])
+
+    await expect(cleanupAndRepairDatabase(ctx)).resolves.toBeUndefined()
+    expect(generateMock).toHaveBeenCalledWith('/videos/d.mp4')
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('视频纯白缩略图自愈失败'),
+      expect.any(Error)
+    )
+  })
+
+  it('C1. 自愈发生（healedBlankCount>0）→ 击穿 HTTP 缓存并广播 media:updated', async () => {
+    const rows = [
+      {
+        id: 15,
+        file_path: '/videos/e.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/e.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/e.jpg')
+    const mainWindow = makeMainWindow()
+    const ctx = makeAppCtx({
+      db,
+      mainWindow,
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    // 首检 true、复检 false → healedBlankCount=1，触发缓存击穿与广播
+    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    // media:// 一年强缓存需被击穿，否则磁盘自愈对渲染层不可见
+    expect(clearCacheMock).toHaveBeenCalledTimes(1)
+    // 自愈后驱动渲染层刷新
+    expect(mainWindow.webContents.send).toHaveBeenCalledWith('media:updated')
+  })
+
+  it('C2. 无白帧（isBlankCachedThumbnail 全 false）→ clearCache 不被调用', async () => {
+    const rows = [
+      {
+        id: 16,
+        file_path: '/videos/f.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/f.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/f.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(false)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(generateMock).not.toHaveBeenCalled()
+    expect(clearCacheMock).not.toHaveBeenCalled()
+  })
+
+  it('C3. clearCache() 抛错 → 被捕获、函数不 reject、logger.warn 记录', async () => {
+    const rows = [
+      {
+        id: 17,
+        file_path: '/videos/g.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/g.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/g.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    // 首检 true、复检 false → healedBlankCount=1，进入 clearCache 分支（抛错）
+    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    fsReaddirMock.mockResolvedValue([])
+    clearCacheMock.mockRejectedValue(new Error('clearCache boom'))
+
+    await expect(cleanupAndRepairDatabase(ctx)).resolves.toBeUndefined()
+    expect(clearCacheMock).toHaveBeenCalledTimes(1)
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('清理 HTTP 缓存失败'),
+      expect.any(Error)
+    )
+  })
+
+  // ==========================================================================
+  // M1 收敛：healedBlankCount 仅在“白→非白”真正发生时计数（复检 DB 实际指向的缩略图）
+  // 覆盖三种“未真正自愈”：generate 返回 null、三位点全白仍保留白帧、内容 hash 漂移。
+  // ==========================================================================
+  it('N1. 首检白、复检仍白（generate 返回 null 未真正修复）→ 不计数、不击穿缓存、不广播', async () => {
+    const rows = [
+      {
+        id: 18,
+        file_path: '/videos/h.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/h.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    // generate 返回 null（源不可读 / GamePlayPhotos 早退 / 解码失败）
+    const generateMock = vi.fn().mockResolvedValue(null)
+    const mainWindow = makeMainWindow()
+    const ctx = makeAppCtx({
+      db,
+      mainWindow,
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    // 首检 true 触发自愈；复检仍 true → DB 指向的缩略图仍为白帧，未真正自愈
+    isBlankCachedThumbnailMock.mockResolvedValue(true)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(generateMock).toHaveBeenCalledTimes(1)
+    // healedBlankCount 未自增 → 不触发全局 clearCache、不因 heal 广播 media:updated
+    expect(clearCacheMock).not.toHaveBeenCalled()
+    expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('media:updated')
+  })
+
+  it('N2. 首检白、generate 返回路径但复检仍白（三位点全白 / hash 漂移）→ 不计数、不击穿缓存', async () => {
+    const rows = [
+      {
+        id: 19,
+        file_path: '/videos/i.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/i.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    // generate 返回非 null 新 hash 路径，但复检 DB 指向的旧缩略图仍为白帧（全白视频 / hash 漂移）
+    const generateMock = vi.fn().mockResolvedValue('/cache/i_newhash.jpg')
+    const mainWindow = makeMainWindow()
+    const ctx = makeAppCtx({
+      db,
+      mainWindow,
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(true)
+    fsReaddirMock.mockResolvedValue([])
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(generateMock).toHaveBeenCalledTimes(1)
+    expect(clearCacheMock).not.toHaveBeenCalled()
+    expect(mainWindow.webContents.send).not.toHaveBeenCalledWith('media:updated')
+  })
+
+  it('N3. isBlankCachedThumbnail 首检 reject → 被 try/catch 吞掉、函数不 reject、不中断、logger.warn', async () => {
+    const rows = [
+      {
+        id: 20,
+        file_path: '/videos/j.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/j.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/j.jpg')
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockRejectedValue(new Error('stat boom'))
+    fsReaddirMock.mockResolvedValue([])
+
+    await expect(cleanupAndRepairDatabase(ctx)).resolves.toBeUndefined()
+    // 判定异常 → 未触发自愈、未计数
+    expect(generateMock).not.toHaveBeenCalled()
+    expect(clearCacheMock).not.toHaveBeenCalled()
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('视频纯白缩略图自愈失败'),
+      expect.any(Error)
+    )
+  })
+
+  it('N4. 顺序断言：clearCache 早于 sendToRenderer(media:updated)', async () => {
+    const rows = [
+      {
+        id: 21,
+        file_path: '/videos/k.mp4',
+        file_type: 'video',
+        thumbnail: '/cache/k.jpg',
+        width: 1920,
+        height: 1080
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const generateMock = vi.fn().mockResolvedValue('/cache/k.jpg')
+    const mainWindow = makeMainWindow()
+    const ctx = makeAppCtx({
+      db,
+      mainWindow,
+      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
+    fsReaddirMock.mockResolvedValue([])
+
+    // 共享调用序：记录 clearCache 与 media:updated 的先后（锁定 Ryan 认定的正确时序）
+    const calls: string[] = []
+    clearCacheMock.mockImplementation(async () => {
+      calls.push('clearCache')
+    })
+    mainWindow.webContents.send.mockImplementation((channel: string) => {
+      if (channel === 'media:updated') calls.push('media:updated')
+    })
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(calls).toContain('clearCache')
+    expect(calls).toContain('media:updated')
+    expect(calls.indexOf('clearCache')).toBeLessThan(calls.indexOf('media:updated'))
   })
 })
 
