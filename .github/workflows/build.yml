@@ -131,7 +131,7 @@ jobs:
         run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # 打包产物运行时冒烟（docs/plans/e2e-smoke-playwright.md）：
+      # 打包产物运行时冒烟（docs/archive/plans/e2e-smoke-playwright.md）：
       # tag 发布与 PR 两条分支的两个构建步骤之后都会到达此 step，发布前必须冒烟通过
       - name: E2E smoke test on win-unpacked
         run: npm run e2e:smoke

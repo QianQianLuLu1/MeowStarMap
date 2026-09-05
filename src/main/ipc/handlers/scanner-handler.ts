@@ -61,7 +61,6 @@ function assertScanPathsAllowed(options?: { path?: string; customKnownPaths?: st
   // 修复敏感目录黑名单误拦显式选择的系统目录（如装在 X:\Program Files 的游戏根）；
   // 渲染进程伪造的路径（未经对话框，无任何 IPC 可写入标记集合）不命中，
   // 仍走 assertFileReadPath 完整白名单 + 黑名单校验，防自助提权链不放宽。
-  // 见 docs/plans/fix-specified-dir-whitelist.md
   if (options?.path && !pathGuard.isUserPicked(options.path)) assertFileReadPath(options.path)
   for (const p of options?.customKnownPaths ?? []) {
     if (!pathGuard.isUserPicked(p)) assertFileReadPath(p)

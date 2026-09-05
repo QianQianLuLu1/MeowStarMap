@@ -1,5 +1,5 @@
 /**
- * 打包产物运行时冒烟（S1~S7，见 docs/plans/e2e-smoke-playwright.md §2）
+ * 打包产物运行时冒烟（S1~S7，见 docs/archive/plans/e2e-smoke-playwright.md §2）
  *
  * 前置要求：release/win-unpacked 已存在（本地 npm run dist:win；CI 由 build 步骤产出）。
  * 覆盖四个历史回归点：白屏、app:// 路径回退、preload 注入、原生模块（better-sqlite3）。

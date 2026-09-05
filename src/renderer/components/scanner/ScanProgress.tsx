@@ -12,7 +12,7 @@ import type { TaskProgress } from '../../../shared/types/progress'
 //   - 保留 scanProgress（mediaStore）作为显示开关与 fallback：
 //     ScanButton 仍通过 scanner:progress 推送 scanned/found/currentPath
 //   - 取消按钮优先调用 task.cancel(taskId)（统一通道），fallback 到 scanner.stop()
-// 索引进度修复（docs/plans/fix-indexing-progress.md）：
+// 索引进度修复：
 //   - 过滤条件扩展到 batch/duplicate（worker 逐张真实进度），解决索引浮窗长期停在 0%
 //   - batch/duplicate 自带 current/total/percent/eta，归一显示到本浮窗
 //   - 终态清除仅针对 scan/indexing；batch/duplicate 终态是单阶段收尾，不清空、由下一阶段覆盖

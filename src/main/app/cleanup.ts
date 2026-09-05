@@ -143,7 +143,7 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
     // 启动性能优化：db close 成功（WAL checkpoint 完成）后写「干净退出」标志
     // 崩溃/强杀/超时强制退出（force-exit-timeout 的 app.exit(1)）走不到此 →
     // 标志缺失 = 上次非干净退出 → 下次启动后台全量 integrity_check 复核
-    // （docs/plans/startup-perf.md §1.2：侧车文件 {dbPath}.clean-exit）
+    // （docs/archive/plans/startup-perf.md §1.2：侧车文件 {dbPath}.clean-exit）
     ctx.dbManager.markCleanExit()
     // 退出取证收尾：删除心跳文件，下次启动不误报异常终止（DB close 成功 = 走到正常清理链）
     markCleanShutdown()

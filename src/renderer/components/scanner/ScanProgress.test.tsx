@@ -7,7 +7,7 @@
  * @remarks 任务 4（P1）验证：ScanProgress 挂载时订阅 scanner.onComplete，
  *   回调内统一调用 refreshMediaAfterScan 刷新媒体列表（fetchMediaFromDatabase + setMediaFiles），
  *   作为 GalleryPage 订阅链路的兜底。
- *   索引进度修复（docs/plans/fix-indexing-progress.md §5）：
+ *   索引进度修复：
  *   - 过滤条件扩展到 batch/duplicate，归一显示 worker 真实进度（§2.1/2.2）
  *   - 终态清除收紧仅针对 scan/indexing（§2.3）
  *   - batch/duplicate 不覆盖取消目标 taskIdRef（§2.4）

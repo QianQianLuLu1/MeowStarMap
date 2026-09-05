@@ -283,7 +283,7 @@ export class DatabaseManager {
 
     // 完整性校验分级（启动性能优化）：检测数据库逻辑/物理损坏，损坏时自动从备份恢复
     // 时机：在 PRAGMA 设置前执行，避免在损坏的库上设置 WAL 等模式导致二次问题
-    // 分级策略（docs/plans/startup-perf.md）：
+    // 分级策略（docs/archive/plans/startup-perf.md）：
     //   1. quick_check 快速路径（毫秒级）永远同步执行——兜底安全网，即使标志逻辑漏判也能抓住绝大多数损坏
     //   2. quick_check 失败 → 全量 integrity_check 同步执行 + attemptRecovery（保持「启动即发现损坏」）
     //   3. quick_check 通过 + 非全新库 + 上次非干净退出（clean-exit 标志缺失）→ 跳过同步，
@@ -415,7 +415,7 @@ export class DatabaseManager {
 
   /**
    * 干净退出标志文件路径（侧车文件，{dbPath}.clean-exit）。
-   * 选型见 docs/plans/startup-perf.md §1.2：损坏探测信号必须在 DB 不可读时仍可用，
+   * 选型见 docs/archive/plans/startup-perf.md §1.2：损坏探测信号必须在 DB 不可读时仍可用，
    * 故不用 app_settings 表，独立于数据库文件。
    */
   private getCleanExitMarkerPath(): string {

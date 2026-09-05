@@ -11,7 +11,7 @@
  * 不执行真实 zod 校验，因此「参数校验」语义只能在本文件（真实 schema）覆盖。
  *
  * 另覆盖 PathGuard 的 userPicked（用户显式选择即授权）语义：registrUserPicked 登记 +
- * isUserPicked 归一化前缀匹配 + 与 roots 联动（见 docs/plans/fix-specified-dir-whitelist.md）。
+ * isUserPicked 归一化前缀匹配 + 与 roots 联动。
  */
 import { describe, it, expect, vi } from 'vitest'
 import { z } from 'zod'

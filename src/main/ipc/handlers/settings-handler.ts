@@ -30,7 +30,7 @@ function assertCustomScanPaths(value: unknown): void {
     }
     // userPicked（对话框显式选择）短路：ScanFallbackSection/ScanPathsSection 选系统目录
     // 后经此持久化是唯一合法写入来源，用户显式授权不受敏感目录黑名单误拦；
-    // 伪造路径（未命中标记）仍走完整校验。见 docs/plans/fix-specified-dir-whitelist.md
+    // 伪造路径（未命中标记）仍走完整校验。
     if (!pathGuard.isUserPicked(p)) assertFileReadPath(p)
   }
 }

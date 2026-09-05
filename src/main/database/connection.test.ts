@@ -1550,7 +1550,7 @@ describe('DatabaseManager', () => {
 
   // ==========================================================================
   // 启动性能优化：完整性自检分级（quick_check 快速路径 + 干净退出标志）
-  // 场景矩阵（docs/plans/startup-perf.md §1.3）：
+  // 场景矩阵（docs/archive/plans/startup-perf.md §1.3）：
   //   quick_check 失败 → 同步全量 + recovery（启动即发现损坏）
   //   quick_check 通过 + 标志缺失 → 返回 need，由 lifecycle 后台复核
   //   quick_check 通过 + 标志存在 → 完全跳过全量（最常见路径）

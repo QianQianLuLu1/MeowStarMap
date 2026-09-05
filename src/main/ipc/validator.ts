@@ -215,7 +215,6 @@ class PathGuard {
    * 用户在对话框中显式选中目录属真实授权行为，scanner:start / settings:set
    * 对命中集合的路径短路放行，避免敏感目录黑名单误拦用户显式选择的系统目录
    * （如装在 X:\Program Files 的游戏根）。渲染进程无任何 IPC 可写入该集合。
-   * 见 docs/plans/fix-specified-dir-whitelist.md
    */
   registerUserPicked(p: string): void {
     this.register(p)

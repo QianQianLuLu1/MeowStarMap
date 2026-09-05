@@ -32,7 +32,7 @@ export function registerDialogHandlers(ctx: HandlerContext): void {
       if (result.canceled) return null
       // 选中目录登记白名单（否则 import 链路在路径校验处被拒）并标记 userPicked
       // （用户显式选择即授权：registerUserPicked 内部联动 register，避免敏感目录
-      // 黑名单误拦用户显式选择的系统目录，见 docs/plans/fix-specified-dir-whitelist.md）
+      // 黑名单误拦用户显式选择的系统目录）
       for (const p of result.filePaths) {
         if (p) pathGuard.registerUserPicked(p)
       }

@@ -1,6 +1,6 @@
 // 侧边栏第 4 项 nav.resonanceRecords 语言包完整性回归测试
 // 背景：该 key 曾在 12 个语言包全部缺失，导致侧边栏直接渲染原始 key 文本
-// 'nav.resonanceRecords'（见 docs/nav-resonance-records-rename-plan.md）。
+// 'nav.resonanceRecords'。
 import { describe, expect, it } from 'vitest'
 import zhCN from './zh-CN.json'
 import zhTW from './zh-TW.json'

@@ -9,7 +9,7 @@
  */
 
 /** 启动自动扫描延迟（毫秒），等待窗口 ready-to-show 后再开始 */
-// 启动性能优化（docs/plans/startup-perf.md 方案 A）：1500 → 5000，
+// 启动性能优化（docs/archive/plans/startup-perf.md 方案 A）：1500 → 5000，
 // 把自动扫描 + 链式缩略图/pHash/场景分析推迟到窗口出现 5s 后，缓解冷启动负担
 // （LRU +5000 / 崩溃清理 +6000 / 自动更新 +8000 的梯度随之整体后移）
 export const STARTUP_SCAN_DELAY_MS = 5000

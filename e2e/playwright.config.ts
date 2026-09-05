@@ -1,7 +1,7 @@
 import { defineConfig } from '@playwright/test'
 
 /**
- * 打包产物运行时冒烟配置（详见 docs/plans/e2e-smoke-playwright.md §5）
+ * 打包产物运行时冒烟配置（详见 docs/archive/plans/e2e-smoke-playwright.md §5）
  *
  * - testMatch 限定 *.e2e.ts：与 vitest 的 *.test.ts 约定天然隔离，vitest 不会误跑
  * - fullyParallel=false + workers=1：单实例串行，避免多开 Electron 抢 userData

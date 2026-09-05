@@ -413,7 +413,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 启动性能优化：上次非干净退出时，全量 integrity_check 延后到低优先级队列后台执行
     // （initialize 内的 quick_check 快速路径已同步完成；此处仅「双保险」复核，
     // 与启动扫描同为 low 队列 FIFO 串行，不阻塞窗口出现；同步 PRAGMA 不可被抢占中断，
-    // 取舍见 docs/plans/startup-perf.md §2）
+    // 取舍见 docs/archive/plans/startup-perf.md §2）
     if (ctx.dbManager.shouldRunFullIntegrityCheck()) {
       ctx.startupTimers.push(
         setTimeout(() => {

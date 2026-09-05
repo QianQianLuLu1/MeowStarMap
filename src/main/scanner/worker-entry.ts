@@ -1583,7 +1583,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
  * 仅在真实 utilityProcess 环境启动：本文件是 worker 入口，模块顶层副作用必须以
  * process.parentPort 存在为前提——若被主进程 chunk 误引用（无 parentPort、永远收不到
  * WORKER_PING），看门狗会在启动 15s 后以 process.exit(0) 静默杀死主进程
- * （2026-08-29 打包版闪退根因，取证见 docs/plans/2026-08-29-packaged-crash-forensics-fix.md）。
+ * （2026-08-29 打包版闪退根因，取证报告见提交历史）。
  */
 const HEARTBEAT_INTERVAL_MS = 5000
 const HEARTBEAT_TIMEOUT_MS = 15000

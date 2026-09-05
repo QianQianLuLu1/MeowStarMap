@@ -184,7 +184,7 @@ app.whenReady().then(async () => {
     await application.initialize()
     diagLog('INDEX', 'Application.initialize() completed')
     markExitStage('initialized')
-    // 启动成功标记：供纯净系统 / CI 断言启动成功（见 docs/plans/fix-native-silent-launch.md）
+    // 启动成功标记：供纯净系统 / CI 断言启动成功
     try {
       fs.writeFileSync(path.join(app.getPath('userData'), 'boot-ok.marker'), 'ok')
     } catch {}
