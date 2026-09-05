@@ -639,6 +639,69 @@ describe('worker-entry 消息处理分支', () => {
     expect(updates[0].args[6]).toBe(1)
   })
 
+  it("GamePlayPhotos 视频例外：批次查询放行视频行（OR file_type = 'video'），图片仍被排除（fix-gameplayphotos-video-thumbnail-null 节点3）", async () => {
+    // 回归背景：NOT LIKE 豁免本意只放过「已有原生 LQ 缩略图」的游戏照片，却把 Videos/ 子树的
+    // 视频一并排除——它们 thumbnail 为 NULL 且无其他补算链路，「缓存/重复文件」板块纯白占位。
+    // 视频行路径必须真实存在（生成阶段走真实 fsp/内容 hash + ffmpeg mock 抽帧），
+    // 故在临时目录构造 X6Game/Saved/GamePlayPhotos/.../Videos 目录结构。
+    const gpVideoDir = path.join(
+      tmpRoot,
+      'X6Game',
+      'Saved',
+      'GamePlayPhotos',
+      '123456789',
+      'Videos',
+      '1001'
+    )
+    fs.mkdirSync(gpVideoDir, { recursive: true })
+    const videoFile = path.join(gpVideoDir, '1001.Mp4')
+    fs.writeFileSync(videoFile, 'fake-video-content')
+    const rows = [
+      thumbRow(1, mediaFiles[0]),
+      {
+        id: 2,
+        file_path: 'D:/Game/X6Game/Saved/GamePlayPhotos/123456789/NikkiPhotos_HighQuality/p.jpg',
+        file_type: 'image'
+      },
+      { id: 3, file_path: videoFile, file_type: 'video' }
+    ]
+    let selectSql = ''
+    // 假 db 按 SQL 路由，模拟「视频例外」语义：视频行不适用豁免，图片行仍被排除；
+    // 尺寸补读阶段（仅图片 + LIKE）不返回行，使本用例仅观察生成阶段行为。
+    const fake = createFakeDb((sql) => {
+      if (sql.includes("LIKE '%/x6game/saved/gameplayphotos/%'") && !sql.includes('NOT LIKE'))
+        return []
+      if (!sql.includes('thumbnail IS NULL')) return []
+      selectSql = sql
+      if (!sql.includes("NOT LIKE '%/x6game/saved/gameplayphotos/%'")) return rows
+      return rows.filter(
+        (r) =>
+          r.file_type === 'video' ||
+          !r.file_path.replace(/\\/g, '/').toLowerCase().includes('/x6game/saved/gameplayphotos/')
+      )
+    })
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'gameplay-video.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    // SQL 形态断言：两条 NOT LIKE 各自携带视频例外，口径与 startup-tasks THUMB_QUERY 一致
+    expect(selectSql).toContain(
+      "(LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%' OR file_type = 'video')"
+    )
+    expect(selectSql).toContain(
+      "(LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/gameplayphotos/%' OR file_type = 'video')"
+    )
+    // 行为断言：普通图片 + GamePlayPhotos 视频各写库一次；GamePlayPhotos 图片行仍被排除
+    expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
+    const updates = fake.runs.filter((r) =>
+      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+    )
+    expect(updates).toHaveLength(2)
+    expect(updates.map((u) => u.args[6]).sort()).toEqual([1, 3])
+  })
+
   it('尺寸补读：无 Saved 变体路径同样回填 width/height，不生成缩略图', async () => {
     let dimSql = ''
     const dimRows = [

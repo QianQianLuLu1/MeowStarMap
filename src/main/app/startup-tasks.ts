@@ -292,10 +292,12 @@ export async function runPostScanIndexing(ctx: AppContext, filesFound: number): 
 }
 
 /** 扫描后长任务三阶段各自的总量统计 SQL（与 media-worker 内部判定保持一致） */
-// GamePlayPhotos 豁免：与 media-worker/worker-entry.ts 缩略图批次查询同口径的归一化排除
+// GamePlayPhotos 豁免（仅图片）：与 media-worker/worker-entry.ts 缩略图批次查询同口径的归一化排除
 // （口径同 media-repository.ts NORMALIZED_PATH_EXPR），避免永不处理的行计入进度分母导致进度条虚高。
+// 视频例外（fix-gameplayphotos-video-thumbnail-null 节点3）：Videos/ 子树的视频无原生低清缩略图，
+// 必须计入分母并由批量任务实际处理，两条 NOT LIKE 各自携带 OR file_type = 'video'。
 const THUMB_QUERY =
-  "SELECT COUNT(*) as count FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%' AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/gameplayphotos/%'"
+  "SELECT COUNT(*) as count FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND (LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%' OR file_type = 'video') AND (LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/gameplayphotos/%' OR file_type = 'video')"
 const PHASH_QUERY =
   "SELECT COUNT(*) as count FROM media_files WHERE file_type = 'image' AND is_deleted = 0"
 const SCENE_QUERY =
@@ -573,7 +575,12 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
   const rowsToRepair = validRows.filter((row) => {
     const needsDimensions = row.width == null || row.height == null
     const thumbnailDangling = danglingThumbnailIds.has(row.id)
-    return needsDimensions || thumbnailDangling
+    // fix-gameplayphotos-video-thumbnail-null 节点3b：thumbnail 为 NULL 的视频行纳入启动修复。
+    // 批量补算被 runPostScanIndexing 的 filesFound>0 门控跳过（增量扫描 0 新增时不跑），
+    // 这类行（GamePlayPhotos Videos/ 游戏视频扫描入库即 thumbnail=NULL 且尺寸齐全）
+    // 若不在此处接管将永远无人补算，表现为「缓存/重复文件」板块视频纯白占位。
+    const missingThumbnailVideo = row.file_type === 'video' && row.thumbnail == null
+    return needsDimensions || thumbnailDangling || missingThumbnailVideo
   })
 
   const repairTasks = rowsToRepair.map((row) => async () => {
@@ -592,8 +599,8 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
   // 批量任务只选 thumbnail IS NULL、渲染层 generate() 被 HIGH_DPI/!thumbnail 门控、
   // 本函数原 rowsToRepair 只覆盖缺尺寸/悬空。此处对存量视频白帧主动触发一次 generate()，
   // 命中 doGenerate 缓存分支的自愈逻辑重建 standard 帧并删除重建 _low 副本。
-  // 直接调 generate、不走 processThumbnailForRow、不写库：自愈后 ${hash}.jpg 路径不变，
-  // 同时规避 processThumbnailForRow 的 updateStmt 参数不匹配隐患。
+  // 直接调 generate、不写库：自愈后 ${hash}.jpg 路径不变，无需更新 DB 指向
+  // （processThumbnailForRow 的 updateStmt 参数不匹配隐患已于 fix-gameplayphotos-video-thumbnail-null 节点1 修复）。
   let healedBlankCount = 0
   const blankVideoHealTasks = validRows
     .filter((row) => row.file_type === 'video' && row.thumbnail != null)

@@ -379,13 +379,34 @@ describe('ThumbnailGenerator GamePlayPhotos 原生缩略图豁免', () => {
     expect(ctl.written).toHaveLength(0)
   })
 
-  it('GamePlayPhotos 非 HQ 路径（视频子目录）→ 无原生缩略图可推导，早退返回 null', async () => {
-    const videoPath = 'D:\\Game\\X6Game\\Saved\\GamePlayPhotos\\123456789\\xxx\\v.mp4'
+  it('GamePlayPhotos 视频子目录 → 不适用图片豁免，走正常 seek 阶梯抽帧生成（fix-gameplayphotos-video-thumbnail-null 节点2）', async () => {
+    // 回归背景：Videos/ 子树的视频没有原生低清缩略图，历史上被图片豁免一并拦死（generate 恒返回
+    // null），导致批量补算/重复页按需生成全部拿不到缩略图，「缓存/重复文件」板块视频纯白占位。
+    // 真实游戏文件扩展名为大写 .Mp4：豁免判定必须先小写化再判 isVideoExt。
+    // 注：无 Saved 变体（\X6Game\GamePlayPhotos\）不被 isGamePlayPhotosPath 命中、本就放行，
+    // 其排除属批量 SQL 范畴（见 worker-entry.test.ts 节点3 用例）。
+    resetCtl('ok', 64)
+    const gpVideoDir = path.join(
+      tmpCacheDir,
+      'X6Game',
+      'Saved',
+      'GamePlayPhotos',
+      '123456789',
+      'Videos',
+      '1001'
+    )
+    fs.mkdirSync(gpVideoDir, { recursive: true })
+    const videoPath = path.join(gpVideoDir, '1001.Mp4')
+    fs.writeFileSync(videoPath, Buffer.alloc(1024, 0x00))
+
     const result = await gen.generate(videoPath)
-    // 视频不返回原路径（避免把视频原路径当缩略图），统一返回 null 且不触发生成
-    expect(result).toBeNull()
-    expect(ctl.sharpCalls).toHaveLength(0)
-    expect(ctl.seeks).toHaveLength(0)
+    // 必须产出缓存目录内的缩略图文件（0s 首帧非纯色，一次抽帧成功）
+    expect(result).not.toBeNull()
+    expect(String(result)).toContain(tmpCacheDir)
+    expect(fs.existsSync(result as string)).toBe(true)
+    expect(ctl.seeks).toEqual([0])
+    // 视频原文件不经 sharp 解码（ffmpeg 抽帧链路）；sharp 仅用于从标准帧缩放 _low 副本
+    expect(ctl.sharpCalls).not.toContain(videoPath)
   })
 
   it('正斜杠形态的 HQ 路径（LQ 存在）同样命中豁免（大小写不敏感）', async () => {

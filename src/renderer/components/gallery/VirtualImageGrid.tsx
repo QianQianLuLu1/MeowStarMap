@@ -13,6 +13,7 @@ import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { useFailedImages } from '../../hooks/useFailedImages'
+import { useVideoThumbGenerate } from '../../hooks/useVideoThumbGenerate'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
 
@@ -163,6 +164,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     // P1-U10：failedImages 状态管理 + items 变化时自动清空
     const { failedImages, markFailed } = useFailedImages(items)
+    // fix-gameplayphotos-video-thumbnail-null 节点4：无缩略图视频按需生成
+    // （对齐 DuplicatesPage DuplicateFileCard 模式；模块级缓存单次守卫，失败不重试）
+    const generatedThumbs = useVideoThumbGenerate(items)
     // U-G16：触屏设备无 hover 事件，需始终显示快捷操作按钮
     const [isTouchDevice, setIsTouchDevice] = useState(false)
     const gap = 16
@@ -360,14 +364,19 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           itemContent={(index, file) => {
             const isSelected = selectedSet.has(file.id)
             // 视频文件无缩略图时，不得使用原视频文件作为 <img> 源（加载视频进 img 必触发
-            // onError 显示警告图标）。仅在确有 thumbnail 时才用文件源；图片类型才允许回退
-            // 到原文件路径，保证无缩略图的视频稳定降级为视频占位图标而非裂图。
+            // onError 显示警告图标）。仅在确有 thumbnail（或按需生成已返回）时才用文件源；
+            // 图片类型才允许回退到原文件路径，保证无缩略图的视频稳定降级为视频占位图标而非裂图。
+            // fix-gameplayphotos-video-thumbnail-null 节点4：video 缺 thumbnail 时由
+            // useVideoThumbGenerate 按需生成一次，生成完成就地显示（未返回前维持占位图标）。
+            const generatedThumb =
+              file.file_type === 'video' ? generatedThumbs.get(file.file_path) : undefined
+            const effectiveThumbnail = file.thumbnail ?? generatedThumb
             const standardUrl = toFileUrl(
-              file.file_type === 'video' ? file.thumbnail : file.thumbnail || file.file_path
+              file.file_type === 'video' ? effectiveThumbnail : effectiveThumbnail || file.file_path
             )
             const useHighQuality = highQualityIds.has(file.id)
-            const lowUrl = toLowQualityUrl(file.thumbnail)
-            const highUrl = HIGH_DPI_MODE ? toHighQualityUrl(file.thumbnail) : null
+            const lowUrl = toLowQualityUrl(effectiveThumbnail)
+            const highUrl = HIGH_DPI_MODE ? toHighQualityUrl(effectiveThumbnail) : null
             const thumbUrl =
               useHighQuality || !lowUrl
                 ? standardUrl

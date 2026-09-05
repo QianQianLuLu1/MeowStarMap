@@ -1,0 +1,69 @@
+# AGENTS.md
+
+本文件为 Agent 与新协作者提供项目速览。修改项目结构或脚本时请同步更新。
+
+## 项目概述
+
+**wxnn-photo-manager**（无限暖暖相册管理工具，v2.5.0-beta）——面向《无限暖暖》玩家的本地桌面相册管理器：扫描、浏览、编辑、整理、分享游戏照片。目标平台 Windows x64。
+
+技术栈：Electron 40 + React 19 + TypeScript 5.9（strict）+ Zustand + Tailwind CSS 3 + better-sqlite3 + sharp + fluent-ffmpeg + i18next。构建工具为 electron-vite + electron-builder。
+
+## 核心架构
+
+Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立的 `src/preload` 目录**）：
+
+- **主进程**：入口 `src/main/index.ts`，负责窗口、IPC、数据库、扫描与后台 worker。
+- **Preload**：入口 `src/main/preload.ts`（另有 `src/main/preload-logger.ts`），通过 `contextBridge.exposeInMainWorld` 暴露 `window.*` 桥（含对不受信任文档的门控）。IPC 契约（通道名/方法签名）必须保持稳定，详见 `docs/IPC_CONTRACT.md`。
+- **渲染进程**：入口 `src/renderer/main.tsx` + `src/renderer/index.html`；另有预览入口 `src/renderer/preview-entry.tsx`（经 `vite.preview.config.ts` 构建）。
+
+**IPC 模式**：主进程在 `src/main/ipc/handlers/*.ts` 中按领域一个文件注册 `ipcMain.handle`，配套共享的 `handler-context.ts`、输入校验 `validator.ts` 与 `media-read-guard.ts`；渲染层一律经 `window.*` 桥调用；主/渲染共享的类型与错误定义在 `src/shared/`。
+
+**构建产物**：electron-builder（NSIS win x64）输出到 `release/`；打包入口为 `dist/main/main/app/index.js`。
+
+## 关键模块导航
+
+### `src/main/`（主进程）
+
+- `app/` — 应用引导
+- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate 等约 15 个域）
+- `database/` — better-sqlite3 连接与仓储（media、resonance、import-root 等）
+- `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享等业务服务
+- `scanner/`、`thumbnail/`、`scheduler/` — 照片扫描与缩略图流水线
+- `media-worker/`、`decryption-worker/` — 后台 worker；解密依赖 koffi + `nuan5_decryption.dll`
+- `video-editor/`、`plugins/`、`i18n/`、`types/`、`utils/`
+
+### `src/renderer/`（渲染进程）
+
+- `pages/` — Gallery、Detail、Editor、Duplicates、Categories、OutfitGallery、RecycleBin、ResonanceRecords、Settings
+- `stores/` — Zustand 状态（mediaStore、resonanceStore、uiStore、themeStore 等）
+- `components/`（common/editor/gallery/layout/resonance/scanner/video）、`hooks/`、`search/`、`i18n/`、`plugins/`、`preview/`
+
+### `src/shared/`（主/渲染共享契约）
+
+- `types/`、`errors/`、`utils/`、`settings-keys.ts`、`scene-category.ts`、`dimension.ts`
+
+其他：`docs/`（含 `IPC_CONTRACT.md`、`PLUGIN_API.md`）、`e2e/`（Playwright）、`scripts/`、`plugins-samples/`。
+
+## 常用命令
+
+```bash
+npm run dev          # electron-vite dev 开发启动
+npm run build        # 清理 + electron-vite build
+npm run dist:win     # 打包 Windows 安装包（含预检查与产物校验）
+
+npm test             # vitest run（变体：test:watch / test:coverage / test:main / test:renderer / test:db）
+npm run typecheck    # tsc -b
+npm run lint         # eslint .（lint:fix 自动修复）
+npm run format       # prettier
+
+npm run e2e:smoke    # Playwright 冒烟测试（perf 为性能用例）
+```
+
+## 编码约定
+
+- TypeScript `strict: true`；主进程与脚本有独立 tsconfig。
+- ESLint 9 flat config（`eslint.config.js`）+ Prettier；提交前经 husky + lint-staged 校验。
+- 提交信息遵循 Conventional Commits（commitlint；可用 `npm run commit` 走 commitizen）。
+- 单元测试与源码同目录，命名 `*.test.ts(x)`（Vitest）。
+- 修改 IPC（通道名、preload 暴露、handler 签名）时必须同步更新 `docs/IPC_CONTRACT.md` 并保持向后兼容。
+- 代码注释与文档以中文为主；UI 文案走 i18next（zh/en），勿硬编码用户可见文本。

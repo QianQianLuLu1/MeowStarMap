@@ -311,12 +311,16 @@ export class ThumbnailGenerator {
   }
 
   async generate(filePath: string, quality?: 'low' | 'standard' | 'high'): Promise<string | null> {
-    // GamePlayPhotos 豁免：该目录下的文件已有游戏原生低清缩略图（同名文件位于兄弟目录
+    // GamePlayPhotos 豁免（仅图片）：该目录下的游戏照片已有游戏原生低清缩略图（同名文件位于兄弟目录
     // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径。
     // 入口直接早退：不做任何解码/生成/写盘；用 access(R_OK) 校验推导出的原生 LQ 路径，
-    // 存在 → 返回原生路径；不存在或不可推导（含视频）→ 返回 null（维持“失败返回 null”
-    // 旧语义）：绝不回退原路径、绝不触发生成——该路径下禁用生成是硬性需求。
-    if (isGamePlayPhotosPath(filePath)) {
+    // 存在 → 返回原生路径；不存在或不可推导 → 返回 null（维持“失败返回 null”
+    // 旧语义）：绝不回退原路径、绝不触发生成——该路径下对图片禁用生成是硬性需求。
+    // 视频例外（fix-gameplayphotos-video-thumbnail-null 节点2）：该目录 Videos/ 子树的视频
+    // 没有原生低清缩略图，历史上被本豁免一并拦死（恒返回 null），令批量补算与重复页按需生成
+    // 全部拿不到缩略图、「缓存/重复文件」板块视频纯白占位——视频必须放行走正常 seek 阶梯抽帧。
+    const ext = path.extname(filePath).toLowerCase()
+    if (isGamePlayPhotosPath(filePath) && !isVideoExt(ext)) {
       const native = resolveNativeThumbnailPath(filePath)
       if (native) {
         try {

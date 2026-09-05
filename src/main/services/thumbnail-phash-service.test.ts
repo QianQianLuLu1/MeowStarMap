@@ -155,7 +155,12 @@ afterEach(() => {
 // ============================================================
 
 describe('processThumbnailForRow', () => {
-  it('image 类型：并行 sharp.metadata + thumbnailGen.generate + calculatePHash 并调用 updateStmt.run', async () => {
+  // 绑定契约：唯一调用方 cleanupAndRepairDatabase（startup-tasks.ts）传入的 UPDATE 语句为
+  // 'UPDATE media_files SET width = ?, height = ?, thumbnail = ? WHERE id = ?'（4 占位符）。
+  // 回归防护（fix-gameplayphotos-video-thumbnail-null 节点1）：此前 run 以 5 参（多传 phash）
+  // 执行该语句触发 better-sqlite3 RangeError，且被 try/catch 吞掉，
+  // 导致启动修复路径对每条记录静默失败、视频 NULL 缩略图永远修不上。
+  it('image 类型：并行 sharp.metadata + thumbnailGen.generate，updateStmt.run 绑定 4 参（不含 phash）', async () => {
     const ctx = makeCtx()
     const stmt = makeUpdateStmt()
 
@@ -169,8 +174,21 @@ describe('processThumbnailForRow', () => {
     expect(r).toBe(true)
     expect(sharp).toHaveBeenCalledWith(imagePath)
     expect(ctx.thumbnailGen.generate).toHaveBeenCalledWith(imagePath)
-    expect(calculatePHash).toHaveBeenCalledWith(imagePath)
-    expect(stmt.run).toHaveBeenCalledWith(1920, 1080, '/cache/thumb.jpg', 'phash-abcdef', 1)
+    expect(stmt.run).toHaveBeenCalledWith(1920, 1080, '/cache/thumb.jpg', 1)
+  })
+
+  it('pHash 不参与修复路径：calculatePHash 不被调用（由 worker 批量任务统一带 mtime/size 补算）', async () => {
+    const ctx = makeCtx()
+    const stmt = makeUpdateStmt()
+
+    await processThumbnailForRow(
+      ctx,
+      { id: 11, file_path: imagePath, file_type: 'image' },
+      stmt as unknown as SqlStmt
+    )
+
+    expect(calculatePHash).not.toHaveBeenCalled()
+    expect(stmt.run).toHaveBeenCalledWith(1920, 1080, '/cache/thumb.jpg', 11)
   })
 
   it('image 类型：sharp.metadata 抛错时 metadata=null 但仍正常处理（catch 兜底）', async () => {
@@ -187,7 +205,7 @@ describe('processThumbnailForRow', () => {
     )
 
     expect(r).toBe(true)
-    expect(stmt.run).toHaveBeenCalledWith(null, null, '/cache/thumb.jpg', 'phash-abcdef', 2)
+    expect(stmt.run).toHaveBeenCalledWith(null, null, '/cache/thumb.jpg', 2)
   })
 
   it('image 类型：thumbnailGen.generate 返回 null 时 thumbnailPath=null', async () => {
@@ -201,10 +219,10 @@ describe('processThumbnailForRow', () => {
     )
 
     expect(r).toBe(true)
-    expect(stmt.run).toHaveBeenCalledWith(1920, 1080, null, 'phash-abcdef', 3)
+    expect(stmt.run).toHaveBeenCalledWith(1920, 1080, null, 3)
   })
 
-  it('video 类型：仅调用 thumbnailGen.generate，不计算 phash', async () => {
+  it('video 类型：仅调用 thumbnailGen.generate，updateStmt.run 绑定 4 参且不计算 phash', async () => {
     const ctx = makeCtx()
     const stmt = makeUpdateStmt()
 
@@ -217,7 +235,7 @@ describe('processThumbnailForRow', () => {
     expect(r).toBe(true)
     expect(ctx.thumbnailGen.generate).toHaveBeenCalledWith(videoPath)
     expect(calculatePHash).not.toHaveBeenCalled()
-    expect(stmt.run).toHaveBeenCalledWith(null, null, '/cache/thumb.jpg', null, 4)
+    expect(stmt.run).toHaveBeenCalledWith(null, null, '/cache/thumb.jpg', 4)
   })
 
   it('video 类型：thumbnailGen.generate 抛错时返回 false', async () => {
@@ -249,22 +267,7 @@ describe('processThumbnailForRow', () => {
     expect(r).toBe(true)
     expect(ctx.thumbnailGen.generate).not.toHaveBeenCalled()
     expect(calculatePHash).not.toHaveBeenCalled()
-    expect(stmt.run).toHaveBeenCalledWith(null, null, null, null, 6)
-  })
-
-  it('image 类型：calculatePHash 抛错时整个 try 失败，返回 false', async () => {
-    vi.mocked(calculatePHash).mockRejectedValue(new Error('phash failed'))
-    const ctx = makeCtx()
-    const stmt = makeUpdateStmt()
-
-    const r = await processThumbnailForRow(
-      ctx,
-      { id: 7, file_path: imagePath, file_type: 'image' },
-      stmt as unknown as SqlStmt
-    )
-
-    expect(r).toBe(false)
-    expect(stmt.run).not.toHaveBeenCalled()
+    expect(stmt.run).toHaveBeenCalledWith(null, null, null, 6)
   })
 })
 

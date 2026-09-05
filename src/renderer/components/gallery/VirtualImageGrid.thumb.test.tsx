@@ -67,15 +67,23 @@ describe('VirtualImageGrid 视频缩略图裂图防护（fix-gallery-video-thumb
     )
   })
 
-  it('视频类型改用仅 thumbnail 的构造（无缩略图时返回空，触发视频占位图标）', () => {
+  it('视频类型改用「thumbnail ?? 按需生成结果」的构造（无缩略图且未生成完成时返回空，触发视频占位图标）', () => {
+    // fix-gameplayphotos-video-thumbnail-null 节点4：effectiveThumbnail = file.thumbnail ?? 生成结果
     expect(code).toContain(
-      "file.file_type === 'video' ? file.thumbnail : file.thumbnail || file.file_path"
+      "file.file_type === 'video' ? effectiveThumbnail : effectiveThumbnail || file.file_path"
     )
   })
 
   it('图片类型仍保留 file.file_path 作为回退源（不破坏图片缩略图）', () => {
     // 断言三元表达式保留了 image 分支的 || file.file_path 回退
-    expect(code).toMatch(/file\.thumbnail \|\| file\.file_path/)
+    expect(code).toMatch(/effectiveThumbnail \|\| file\.file_path/)
+  })
+
+  it('无缩略图的视频接入按需生成 hook（useVideoThumbGenerate）', () => {
+    // fix-gameplayphotos-video-thumbnail-null 节点4：网格对 thumbnail 为空的视频触发一次
+    // thumbnail:generate（与 DuplicatesPage DuplicateFileCard 已验证模式对齐），生成完成后就地显示
+    expect(code).toContain('useVideoThumbGenerate(items)')
+    expect(code).toContain('const effectiveThumbnail = file.thumbnail ?? generatedThumb')
   })
 })
 

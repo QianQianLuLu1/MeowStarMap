@@ -1,7 +1,6 @@
 import sharp from 'sharp'
 import type Database from 'better-sqlite3'
 import type { HandlerContext } from '../ipc/handler-context'
-import { calculatePHash } from '../utils/phash'
 import type { TaskPriority } from '../scheduler/task-scheduler'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
@@ -25,7 +24,14 @@ import { t } from '../i18n'
  * - 低优先级任务通过闭包变量传递结果（enqueueLow 返回 Promise<void>）
  */
 
-/** 单条媒体记录的缩略图/尺寸/pHash 处理（成功返回 true） */
+/** 单条媒体记录的缩略图/尺寸处理（成功返回 true）
+ *
+ * 绑定契约：调用方（cleanupAndRepairDatabase）传入的 UPDATE 语句为
+ * 'UPDATE media_files SET width = ?, height = ?, thumbnail = ? WHERE id = ?'（4 占位符），
+ * 本函数必须以 4 参 run —— 此前多绑一个 phash 曾触发 better-sqlite3 RangeError
+ * 且被 catch 吞掉，令启动修复路径对每条记录静默失败。
+ * pHash 不在此处写：由 worker 批量任务统一补算（带 phash_mtime/phash_file_size 供 stale 检测）。
+ */
 export async function processThumbnailForRow(
   ctx: HandlerContext,
   row: { id: number; file_path: string; file_type: string },
@@ -35,30 +41,26 @@ export async function processThumbnailForRow(
     let width: number | null = null
     let height: number | null = null
     let thumbnailPath: string | null = null
-    let phash: string | null = null
 
     if (row.file_type === 'image') {
       // C-G7：原实现 sharp 加载原图 3 次（metadata/generate/phash）串行执行
-      // 优化为 Promise.all 并行执行，总耗时 = max(三操作) 而非 sum
-      // metadata 只读文件头极轻量；generate 和 calculatePHash 各自完整解码，并行后重叠 IO/CPU
-      const [metadata, thumbResult, phashResult] = await Promise.all([
+      // 优化为 Promise.all 并行执行，总耗时 = max(各操作) 而非 sum
+      // metadata 只读文件头极轻量；generate 完整解码，并行后重叠 IO/CPU
+      const [metadata, thumbResult] = await Promise.all([
         sharp(row.file_path)
           .metadata()
           .catch(() => null),
-        ctx.thumbnailGen.generate(row.file_path),
-        calculatePHash(row.file_path)
+        ctx.thumbnailGen.generate(row.file_path)
       ])
       width = metadata?.width ?? null
       height = metadata?.height ?? null
       thumbnailPath = thumbResult
-      // T05：同步计算 pHash（仅图片，视频不计算）
-      phash = phashResult
     } else if (row.file_type === 'video') {
       // 视频文件使用 ffmpeg 提取第一帧缩略图
       thumbnailPath = await ctx.thumbnailGen.generate(row.file_path)
     }
 
-    updateStmt.run(width, height, thumbnailPath, phash, row.id)
+    updateStmt.run(width, height, thumbnailPath, row.id)
     return true
   } catch (error) {
     logger.error(`[Thumbnail] 处理文件失败 ${row.file_path}:`, error)

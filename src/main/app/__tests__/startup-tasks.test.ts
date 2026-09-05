@@ -673,6 +673,44 @@ describe('runPostScanIndexing watchdog', () => {
     // 取消任务清理 watchdog，避免遗留定时器污染后续用例
     taskRegistry.cancel(taskId)
   })
+
+  it('W4. 缩略图进度分母统计 SQL 放行 GamePlayPhotos 视频行（与 media-worker 批量口径一致）', () => {
+    // fix-gameplayphotos-video-thumbnail-null 节点3：NOT LIKE 豁免仅适用于「已有原生 LQ 缩略图」
+    // 的图片，Videos/ 子树的视频（thumbnail 为 NULL）必须计入分母并被批量任务实际处理，
+    // 否则进度条与实际可处理行不一致，且视频缩略图永远补不上。
+    const db = makeDb({ scanHistoryCount: 0 })
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 10 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn()
+    }
+    const mwm = makeMediaWorkerManager()
+    mwm.startThumbnailBatch.mockReturnValue(new Promise(() => {}))
+    const ctx = makeAppCtx({
+      db,
+      scannerManager,
+      mainWindow: makeMainWindow(),
+      mediaWorkerManager: injectMediaWorkerManager(mwm)
+    })
+
+    const registerSpy = vi.spyOn(taskRegistry, 'register')
+    void runPostScanIndexing(ctx, 10)
+    const taskId = registerSpy.mock.calls[0][0] as string
+    registerSpy.mockRestore()
+
+    const sqls = db.prepare.mock.calls.map((c) => String(c[0]))
+    const thumbCount = sqls.find((s) => s.includes('COUNT') && s.includes('thumbnail IS NULL'))
+    expect(thumbCount).toBeDefined()
+    expect(thumbCount).toContain(
+      "(LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%' OR file_type = 'video')"
+    )
+    expect(thumbCount).toContain(
+      "(LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/gameplayphotos/%' OR file_type = 'video')"
+    )
+
+    // 取消任务清理 watchdog，避免遗留定时器污染后续用例
+    taskRegistry.cancel(taskId)
+  })
 })
 
 // ============================================================================
@@ -915,6 +953,64 @@ describe('cleanupAndRepairDatabase', () => {
       ctx,
       { id: 2, file_path: '/img/exists.jpg', file_type: 'image' },
       expect.objectContaining({ run: updateRun })
+    )
+  })
+
+  it('20b. 第二阶段修复纳入 thumbnail 为 NULL 的视频行（存量补算兜底，filesFound=0 时批量不跑）', async () => {
+    // fix-gameplayphotos-video-thumbnail-null 节点3b：GamePlayPhotos 下 Videos/ 的游戏视频
+    // 扫描入库时 thumbnail 即为 NULL、尺寸齐全——原 rowsToRepair 条件（缺尺寸/悬空缩略图）
+    // 不覆盖；批量补算又被 runPostScanIndexing 的 filesFound>0 门控跳过（增量扫描 0 新增），
+    // 导致永远无人补算、「缓存/重复文件」板块纯白占位。启动必跑的修复路径必须接管这类行。
+    // 图片行 thumbnail NULL 但尺寸齐全维持原状（GamePlayPhotos 原生 LQ 缺失的图片不应每次启动重试）。
+    const rows = [
+      {
+        id: 31,
+        file_path: 'H:/game/X6Game/Saved/GamePlayPhotos/1/Videos/a/a.Mp4',
+        file_type: 'video',
+        thumbnail: null,
+        width: 3840,
+        height: 2160
+      },
+      {
+        id: 32,
+        file_path: 'H:/game/X6Game/Saved/GamePlayPhotos/1/NikkiPhotos_HighQuality/p.jpg',
+        file_type: 'image',
+        thumbnail: null,
+        width: 3840,
+        height: 2160
+      }
+    ]
+    const db = makeDb({ mediaRows: rows })
+    const updateRun = vi.fn()
+    db.prepare.mockImplementation((sql: string) => {
+      if (sql.includes('UPDATE media_files SET width')) {
+        return { get: vi.fn(), all: vi.fn(), run: updateRun }
+      }
+      return {
+        get: vi.fn(),
+        all: vi.fn(() => rows),
+        run: vi.fn()
+      }
+    })
+    const ctx = makeAppCtx({ db, mainWindow: makeMainWindow() })
+    pathExistsMock.mockResolvedValue(true)
+    processThumbnailForRowMock.mockResolvedValue(true)
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(processThumbnailForRowMock).toHaveBeenCalledWith(
+      ctx,
+      {
+        id: 31,
+        file_path: 'H:/game/X6Game/Saved/GamePlayPhotos/1/Videos/a/a.Mp4',
+        file_type: 'video'
+      },
+      expect.objectContaining({ run: updateRun })
+    )
+    expect(processThumbnailForRowMock).not.toHaveBeenCalledWith(
+      ctx,
+      expect.objectContaining({ id: 32 }),
+      expect.anything()
     )
   })
 

@@ -468,15 +468,18 @@ async function startThumbnailBatch(
   const database = openDatabaseIfNeeded(dbPath)
 
   try {
-    // GamePlayPhotos 豁免：该目录下的文件已有游戏原生低清缩略图（同名文件位于兄弟目录
+    // GamePlayPhotos 豁免（仅图片）：该目录下的游戏图片已有游戏原生低清缩略图（同名文件位于兄弟目录
     // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径，永不触发缩略图生成。
     // 评审收紧：完整游戏目录特征 \X6Game\Saved\GamePlayPhotos\，防止同名用户目录误伤。
     // 需求二.2：追加无 Saved 的兼容变体 \X6Game\GamePlayPhotos\（两者互斥，需并列排除）。
+    // 视频例外（fix-gameplayphotos-video-thumbnail-null 节点3）：Videos/ 子树的视频没有原生低清
+    // 缩略图，历史上被本豁免一并排除导致 thumbnail 永远为 NULL（「缓存/重复文件」板块纯白占位），
+    // 必须放行进入本批次走 seek 阶梯抽帧补算。口径与 startup-tasks.ts THUMB_QUERY 保持一致。
     // 归一化口径与 media-repository.ts NORMALIZED_PATH_EXPR 完全一致（小写 + 正斜杠子串匹配）。
     // SQLite 字符串字面量不处理反斜杠，'\' 即单个反斜杠。
     const rows = database
       .prepare(
-        "SELECT id, file_path, file_type FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%' AND LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/gameplayphotos/%'"
+        "SELECT id, file_path, file_type FROM media_files WHERE (thumbnail IS NULL OR width IS NULL OR height IS NULL) AND (LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/saved/gameplayphotos/%' OR file_type = 'video') AND (LOWER(REPLACE(file_path, '\\', '/')) NOT LIKE '%/x6game/gameplayphotos/%' OR file_type = 'video')"
       )
       .all() as Array<{ id: number; file_path: string; file_type: string }>
 
