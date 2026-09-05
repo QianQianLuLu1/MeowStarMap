@@ -116,6 +116,7 @@ src/
 - [CHANGELOG.md](CHANGELOG.md) — 变更日志
 - [docs/](docs/) — IPC 契约、插件 API、排障手册等
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — 组件文档站（`npm run storybook` 启动，端口 6006）
+- [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md) — 面向玩家的图文使用教程
 
 ### 开发者信息 / 作者与社交平台
 
@@ -231,6 +232,7 @@ src/
 - [CHANGELOG.md](CHANGELOG.md) — Changelog
 - [docs/](docs/) — IPC contracts, plugin API, troubleshooting, and more
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — Component docs site (`npm run storybook`, port 6006)
+- [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md) — Illustrated user guide (in Chinese)
 
 ### Developer Info / Author & Social Platforms
 
