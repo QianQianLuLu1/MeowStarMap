@@ -1,0 +1,56 @@
+[
+  {
+    "id": 1,
+    "name": "精选",
+    "icon": "⭐",
+    "color": "#FFD700",
+    "sort_order": 1,
+    "parent_id": null,
+    "is_system": true
+  },
+  {
+    "id": 2,
+    "name": "街拍",
+    "icon": "🏙️",
+    "color": "#6B7280",
+    "sort_order": 2,
+    "parent_id": null,
+    "is_system": false
+  },
+  {
+    "id": 3,
+    "name": "夜景",
+    "icon": "🌙",
+    "color": "#4F46E5",
+    "sort_order": 3,
+    "parent_id": null,
+    "is_system": false
+  },
+  {
+    "id": 4,
+    "name": "套装",
+    "icon": "👗",
+    "color": "#EC4899",
+    "sort_order": 4,
+    "parent_id": null,
+    "is_system": false
+  },
+  {
+    "id": 5,
+    "name": "杂志",
+    "icon": "📸",
+    "color": "#10B981",
+    "sort_order": 5,
+    "parent_id": null,
+    "is_system": false
+  },
+  {
+    "id": 6,
+    "name": "其他",
+    "icon": "📁",
+    "color": "#888888",
+    "sort_order": 6,
+    "parent_id": null,
+    "is_system": false
+  }
+]

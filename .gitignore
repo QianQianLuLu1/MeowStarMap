@@ -89,9 +89,9 @@ Desktop.ini
 .env.local
 .env.*.local
 
-# ===== Vite preview build intermediary (local only) =====
+# ===== Vite preview build intermediary (local only，仅根目录产物；勿匹配 src/renderer/preview/ 源码) =====
 preview.html
-preview/
+/preview/
 
 # ===== Test temp files (tsconfck/vitest typecheck temp copies) =====
 vitest.config.ts.timestamp-*.mjs
@@ -187,3 +187,6 @@ dist-ssr/
 .vitest/
 playwright/.cache/
 *.local
+
+# ===== 教程派生的大体积 HTML（约 30MB，由 md 版生成，不入仓）=====
+/docs/tutorial/用户使用教程.html

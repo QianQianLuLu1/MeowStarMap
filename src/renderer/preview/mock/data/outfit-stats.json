@@ -1,0 +1,32 @@
+[
+  {
+    "outfit": "晨曦之歌",
+    "count": 5,
+    "firstCreatedAt": "2026-06-29T11:15:00.000Z",
+    "lastCreatedAt": "2026-07-15T14:30:00.000Z"
+  },
+  {
+    "outfit": "星光礼服",
+    "count": 4,
+    "firstCreatedAt": "2026-06-26T13:30:00.000Z",
+    "lastCreatedAt": "2026-07-14T10:15:00.000Z"
+  },
+  {
+    "outfit": "月光协奏曲",
+    "count": 4,
+    "firstCreatedAt": "2026-06-27T20:00:00.000Z",
+    "lastCreatedAt": "2026-07-13T18:45:00.000Z"
+  },
+  {
+    "outfit": "花海漫游",
+    "count": 4,
+    "firstCreatedAt": "2026-06-28T08:30:00.000Z",
+    "lastCreatedAt": "2026-07-11T16:00:00.000Z"
+  },
+  {
+    "outfit": "（未标注）",
+    "count": 3,
+    "firstCreatedAt": "2026-07-03T17:30:00.000Z",
+    "lastCreatedAt": "2026-07-12T09:20:00.000Z"
+  }
+]

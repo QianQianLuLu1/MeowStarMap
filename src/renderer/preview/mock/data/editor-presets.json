@@ -1,0 +1,34 @@
+[
+  {
+    "id": "preset-1",
+    "name": "明亮",
+    "category": "基础",
+    "params": { "brightness": 15, "contrast": 5, "saturation": 0, "exposure": 0 },
+    "isBuiltin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "preset-2",
+    "name": "暖阳",
+    "category": "色彩",
+    "params": { "brightness": 10, "contrast": 0, "saturation": 10, "temperature": 15 },
+    "isBuiltin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "preset-3",
+    "name": "冷调",
+    "category": "色彩",
+    "params": { "brightness": 0, "contrast": 5, "saturation": -5, "temperature": -15 },
+    "isBuiltin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  },
+  {
+    "id": "preset-4",
+    "name": "高对比",
+    "category": "基础",
+    "params": { "brightness": 0, "contrast": 25, "saturation": 5, "exposure": 0 },
+    "isBuiltin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z"
+  }
+]
