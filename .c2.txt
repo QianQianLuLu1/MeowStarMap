@@ -1,0 +1,6 @@
+docs(tutorial): 入库单文件版教程并补充子模块导航文档
+
+- 新增 docs/tutorial/用户使用教程-单文件版.md（图文内联的单文件版本，便于离线分发）。
+- docs/tutorial/用户使用教程.md 结尾版本说明改为粗体，与单文件版保持一致。
+- 新增 src/renderer/AGENTS.md 与 src/main/ipc/handlers/AGENTS.md，补齐渲染层与
+  IPC handler 目录的模块导航说明。

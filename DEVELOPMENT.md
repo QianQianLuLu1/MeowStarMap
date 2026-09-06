@@ -2,7 +2,7 @@
 
 > 面向零基础开发者的「无限暖暖相册管理工具」上手文档。
 > 所有命令均可直接复制到 PowerShell 终端运行。
-> 项目代号：`wxnn-photo-manager` / 应用名：NikkiGallery / 当前版本：2.5.0-beta / 平台：Windows x64
+> 项目代号：`wxnn-photo-manager` / 应用名：NikkiGallery / 当前版本：2.5.0 / 平台：Windows x64
 
 ---
 
@@ -773,7 +773,7 @@ npx electron-builder --win --publish never
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.0-beta.exe       # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
+├── NikkiGallery-Setup-2.5.0.exe       # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
 └── builder-effective-config.yaml             # 打包配置快照
 ```
 
@@ -814,7 +814,7 @@ node scripts/generate-icon.js
 
 ### 7.7 安装与测试
 
-1. 双击 `release\NikkiGallery-Setup-2.5.0-beta.exe` 安装
+1. 双击 `release\NikkiGallery-Setup-2.5.0.exe` 安装
 2. 安装完成后从开始菜单或桌面快捷方式启动
 3. 首次启动会触发全盘扫描定位游戏目录（首次扫描较慢，请耐心等待）
 4. 程序会自动在桌面创建快捷方式（若已存在则跳过）
@@ -825,7 +825,7 @@ node scripts/generate-icon.js
 
 - **不要随意修改版本号**，除非用户明确要求
 - 版本号定义在 `package.json` 的 `version` 字段（同时决定安装程序文件名：`NikkiGallery-Setup-<version>.exe`）
-- 当前版本：`2.5.0-beta`
+- 当前版本：`2.5.0`
 - 改版本号后，`README.md` 的版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 的「当前版本」、本文档头部版本号需同步修改
 
 修改版本号示例（仅在用户要求时执行）：

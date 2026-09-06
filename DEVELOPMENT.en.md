@@ -2,7 +2,7 @@
 
 > A beginner-friendly development guide for "Infinity Nikki Photo Manager" (NikkiGallery).
 > All commands can be copied directly into a PowerShell terminal.
-> Project codename: `wxnn-photo-manager` / App name: NikkiGallery / Current version: 2.5.0-beta / Platform: Windows x64
+> Project codename: `wxnn-photo-manager` / App name: NikkiGallery / Current version: 2.5.0 / Platform: Windows x64
 
 ---
 
@@ -751,7 +751,7 @@ After packaging:
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.0-beta.exe       # NSIS installer (artifactName: NikkiGallery-Setup-${version}.${ext})
+├── NikkiGallery-Setup-2.5.0.exe       # NSIS installer (artifactName: NikkiGallery-Setup-${version}.${ext})
 └── builder-effective-config.yaml             # build config snapshot
 ```
 
@@ -792,7 +792,7 @@ node scripts/generate-icon.js
 
 ### 7.7 Install and Test
 
-1. Double-click `release\NikkiGallery-Setup-2.5.0-beta.exe` to install
+1. Double-click `release\NikkiGallery-Setup-2.5.0.exe` to install
 2. Launch from Start menu or desktop shortcut
 3. On first launch a full-disk scan runs to locate the game directory (first scan is slow; please be patient)
 4. A desktop shortcut is created automatically (skipped if it already exists)
@@ -801,7 +801,7 @@ node scripts/generate-icon.js
 
 - **Do not change the version number** unless explicitly requested
 - Version is in `package.json` `version` field; it also determines the installer filename: `NikkiGallery-Setup-<version>.exe`
-- Current version: `2.5.0-beta`
+- Current version: `2.5.0`
 - After changing it, also update the version badge in `README.md` and the "Current Version" field in `ARCHITECTURE.md` / `ARCHITECTURE.en.md` and the header of this guide
 
 Example (only when explicitly requested):

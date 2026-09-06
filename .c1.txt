@@ -1,0 +1,8 @@
+feat(preview): 新增渲染层预览入口与 IPC mock 体系
+
+- 新增 src/renderer/preview/index.html 与 mock/ 目录（database / event /
+  filesystem / resonance / install / ipc-error 与 9 份样例数据），使 UI 可在无
+  Electron 主进程的环境下独立预览与联调。
+- .gitignore 收紧 preview 规则：preview/ 改为 /preview/，仅忽略根目录产物，
+  避免误匹配 src/renderer/preview/ 源码；并精确忽略由 md 派生、约 30MB 的
+  docs/tutorial/用户使用教程.html（不入库）。

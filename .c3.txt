@@ -1,0 +1,7 @@
+chore(release): 版本号定为 2.5.0 并清理旧截图
+
+- package.json 与全部文档（README 徽章、ARCHITECTURE 中英、DEVELOPMENT 中英、
+  AGENTS.md、教程）版本号统一由 2.5.0-beta 定为 2.5.0。
+- CHANGELOG 将 2.5.0-beta 条目重命名为 [2.5.0] - 2026-09-06，并同步条目正文中的
+  版本表述。
+- 移除 docs/screenshots 下 11 张已被新版界面取代的旧截图。
