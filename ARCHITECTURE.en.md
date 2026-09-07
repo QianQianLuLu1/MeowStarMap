@@ -4,8 +4,8 @@
 > **Application Name**: NikkiGallery (无限暖暖相册管理工具)
 > **Current Version**: 2.5.0
 > **Platform**: Windows x64
-> **Document Version**: 1.3
-> **Last Updated**: 2026-08-30
+> **Document Version**: 1.4
+> **Last Updated**: 2026-09-06
 
 ---
 
@@ -17,7 +17,7 @@
 - [4. Directory Structure](#4-directory-structure)
 - [5. Main Process Module Responsibilities (src/main)](#5-main-process-module-responsibilitiessrcmain)
 - [6. Renderer Process Module Responsibilities (src/renderer)](#6-renderer-process-module-responsibilitiessrcrenderer)
-- [7. Shared Modules (src/shared and src/common)](#7-shared-modules-srcshared-and-srccommon)
+- [7. Shared Modules (src/shared)](#7-shared-modules-srcshared)
 - [8. Data Flow](#8-data-flow)
 - [9. Database Architecture](#9-database-architecture)
 - [10. Security and Observability](#10-security-and-observability)
@@ -96,7 +96,7 @@ The project uses the in-house `concurrency.ts` (`runWithConcurrency`). Reason: p
 
 #### Why utilityProcess instead of worker_threads?
 
-Electron 30 provides the `utilityProcess` API with process-level isolation, independent event loop, and independent V8 context — better suited for CPU-intensive tasks (sharp thumbnails, pHash computation) than worker_threads. The three workers (scanner / database / media) are independent; a single crash does not affect the main process.
+Electron 40 provides the `utilityProcess` API with process-level isolation, independent event loop, and independent V8 context — better suited for CPU-intensive tasks (sharp thumbnails, pHash computation) than worker_threads. The five workers (scanner / database / media / thumbnail / video) are independent; a single crash does not affect the main process.
 
 #### Why better-sqlite3 instead of sqlite3?
 
@@ -119,7 +119,7 @@ node-ffi-napi is no longer maintained. koffi is the modern replacement with bett
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ BrowserWindow │  │  IPC Handlers│  │  media:// Protocol    │  │
-│  │  (Renderer)   │  │(~15 domains) │  │  (Path Whitelist)     │  │
+│  │  (Renderer)   │  │(~40 handlers)│  │  (Path Whitelist)     │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
@@ -154,21 +154,26 @@ node-ffi-napi is no longer maintained. koffi is the modern replacement with bett
                    │  .db (SQLite WAL)    │
                    │  userData/database/  │
                    └─────────────────────┘
+
+   (Two additional utilityProcesses: thumbnail-worker — sharp scaling;
+     video-worker — video-editing FFmpeg execution, see §5.6 / §5.12)
 ```
 
 ### 3.2 Process Responsibility Matrix
 
-| Process             | Entry                                         | Responsibilities                                                                                                                                   | Communication                              |
-| ------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **Main Process**    | `src/main/index.ts`                           | BrowserWindow management, IPC handler registration, media:// protocol, nativeTheme sync, single-instance lock, startup orchestration, exit cleanup | ipcMain.handle / webContents.send          |
-| **Renderer**        | `src/renderer/main.tsx`                       | UI rendering, user interaction, state management                                                                                                   | window.electronAPI (preload contextBridge) |
-| **scanner-worker**  | `src/main/scanner/worker-entry.ts`            | Full/incremental/signature scanning, file metadata extraction, missing detection, legacy data repair                                               | utilityProcess.parentPort                  |
-| **database-worker** | `src/main/database/worker/database-worker.ts` | Handles all `media_files` / `categories` / `character_profiles` write operations (INSERT/UPDATE/DELETE/transactions)                               | utilityProcess.parentPort                  |
-| **media-worker**    | `src/main/media-worker/worker-entry.ts`       | Thumbnail batch generation (sharp), pHash batch computation (DCT-II), duplicate marking (Union-Find)                                               | utilityProcess.parentPort                  |
+| Process              | Entry                                         | Responsibilities                                                                                                                                   | Communication                              |
+| -------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **Main Process**     | `src/main/index.ts`                           | BrowserWindow management, IPC handler registration, media:// protocol, nativeTheme sync, single-instance lock, startup orchestration, exit cleanup | ipcMain.handle / webContents.send          |
+| **Renderer**         | `src/renderer/main.tsx`                       | UI rendering, user interaction, state management                                                                                                   | window.electronAPI (preload contextBridge) |
+| **scanner-worker**   | `src/main/scanner/worker-entry.ts`            | Full/incremental/signature scanning, file metadata extraction, missing detection, legacy data repair                                               | utilityProcess.parentPort                  |
+| **database-worker**  | `src/main/database/worker/database-worker.ts` | Handles all `media_files` / `categories` / `character_profiles` write operations (INSERT/UPDATE/DELETE/transactions)                               | utilityProcess.parentPort                  |
+| **media-worker**     | `src/main/media-worker/worker-entry.ts`       | Thumbnail batch generation (sharp), pHash batch computation (DCT-II), duplicate marking (Union-Find)                                               | utilityProcess.parentPort                  |
+| **thumbnail-worker** | `src/main/thumbnail/worker-entry.ts`          | sharp scaling implementation (CPU-intensive part migrated from ThumbnailGenerator)                                                                 | utilityProcess.parentPort                  |
+| **video-worker**     | `src/main/video-editor/worker-entry.ts`       | FFmpeg command construction and execution for video editing, with progress reporting                                                               | utilityProcess.parentPort                  |
 
 ### 3.3 Communication Protocols
 
-The three utilityProcesses use a consistent pattern but independent message protocols. All messages are serializable JSON.
+The five utilityProcesses use a consistent pattern but independent message protocols. All messages are serializable JSON. The protocols below cover scanner / database / media; thumbnail-worker (`THUMBNAIL_PROCESS_START` / `THUMBNAIL_WORKER_DISPOSE` → `WORKER_READY` / `THUMBNAIL_PROCESS_COMPLETE`) and video-worker (`EDIT_START` / `EDIT_STOP` / `EDITOR_DISPOSE` → `WORKER_READY` / `EDIT_PROGRESS` / `EDIT_COMPLETE`) are defined in `src/main/thumbnail/worker-protocol.ts` and `src/main/video-editor/worker-protocol.ts`.
 
 #### scanner-worker Protocol
 
@@ -263,7 +268,7 @@ The three utilityProcesses use a consistent pattern but independent message prot
 14. ensureDesktopShortcut() (packaged env only, fire-and-forget)
 
 15. Post-startup delayed tasks (taskScheduler.enqueueLow):
-    ├─ STARTUP_SCAN_DELAY_MS (1500ms) → performStartupScan()
+    ├─ STARTUP_SCAN_DELAY_MS (5000ms) → performStartupScan()
     ├─ +5s → thumbnailGen.enforceLimitNow()
     └─ +6s → enforceCrashLimit()
     Concurrent: thumbnailGen.startLruBackgroundTask() (every 5 min)
@@ -319,59 +324,81 @@ The three utilityProcesses use a consistent pattern but independent message prot
 ```
 wxnn-photo-manager/
 ├── docs/                              # Project documentation
-│   ├── dev-docs/                      # Dev docs (plans, reports, specs)
+│   ├── archive/                       # Archived docs (plans, reports, specs, old architecture docs)
+│   ├── i18n/                          # i18n refactor SOP and whitelist status snapshot
+│   ├── plans/                         # Recent implementation plans and reports
 │   ├── screenshots/                   # Screenshots
-│   ├── 项目架构全景.md
-│   └── v2.3.0 Release Notes.md
+│   ├── storybook/                     # Storybook MDX guides
+│   ├── tutorial/                      # User tutorial (MD + single-file edition)
+│   └── IPC_CONTRACT.md / PLUGIN_API.md etc.
 ├── resources/                         # App resources
 │   ├── icons/                         # App icons (ico/svg)
 │   └── nuan5_decryption.dll           # Game photo param decryption DLL
 ├── scripts/                           # Build helper scripts
+│   ├── after-pack-vc-runtime.cjs      # afterPack VC++ runtime copy
+│   ├── pre-dist-check.ts              # Pre-package check (artifact timestamps/fixpoints/git clean)
+│   ├── check-doc-versions.ts          # README Electron version consistency check
 │   ├── check-i18n-keys.ts             # i18n key completeness check
 │   ├── check-preview-drift.ts         # HTML preview drift check
 │   ├── generate-icon.js               # Icon generation
-│   └── perf-test/                     # Performance tests
+│   ├── copy-resonance-thumbnails.ts / generate-resonance-*.ts / sync-i18n-keys.ts
+│   ├── electron-browser-stub.js       # electron stub for preview / Storybook
+│   ├── i18n/                          # i18n extraction/guard scripts
+│   └── perf-test/                     # Performance baseline scripts
 ├── src/
-│   ├── common/                        # Cross-process utilities (pure functions, no Node/Electron deps)
-│   │   └── utils/
-│   │       ├── date.ts / format.ts / id.ts / object.ts / path.ts / string.ts
-│   │       └── index.ts
 │   ├── main/                          # Main process
-│   │   ├── app/                       # App lifecycle management (14 files)
-│   │   │   ├── application.ts         # App main class
-│   │   │   ├── lifecycle.ts           # Lifecycle management
+│   │   ├── app/                       # App lifecycle management (23 source files)
+│   │   │   ├── application.ts         # App main class (phased orchestration)
+│   │   │   ├── lifecycle.ts           # Lifecycle management (single-instance lock etc.)
 │   │   │   ├── cleanup.ts             # Exit cleanup
 │   │   │   ├── startup-tasks.ts       # Startup tasks
+│   │   │   ├── startup-environment.ts # Startup environment checks
 │   │   │   ├── window-manager.ts      # Window management
+│   │   │   ├── navigation-guard.ts    # Navigation trust check (will-navigate interception)
 │   │   │   ├── desktop-shortcut.ts    # Desktop shortcut
 │   │   │   ├── error-handlers.ts      # Error handling
 │   │   │   ├── ipc-setup.ts           # IPC registration orchestration
 │   │   │   ├── media-protocol.ts      # media:// protocol
+│   │   │   ├── renderer-protocol.ts   # app:// renderer document protocol
+│   │   │   ├── renderer-bridge.ts     # Renderer event bridge
 │   │   │   ├── media-update.ts        # Media update notification
 │   │   │   ├── recovery.ts            # Recovery logic
 │   │   │   ├── theme.ts               # Theme sync
 │   │   │   ├── custom-dirs.ts         # Custom directory management
+│   │   │   ├── auto-update.ts         # Auto update
+│   │   │   ├── exit-forensics.ts      # Exit forensics
+│   │   │   ├── gpu-fallback.ts        # GPU fallback decision
+│   │   │   ├── native-load-guard.ts   # Native module load pre-check
+│   │   │   ├── permission.ts          # Permission management
 │   │   │   └── app-context.ts         # App context
 │   │   ├── database/                  # Database layer
 │   │   │   ├── connection.ts          # DatabaseManager
 │   │   │   ├── media-repository.ts    # MediaRepository (SQL access layer)
+│   │   │   ├── resonance-repository.ts # Resonance repository
+│   │   │   ├── import-root-repository.ts # Import-root repository
+│   │   │   ├── sql-chunk.ts           # SQL chunking utility
 │   │   │   └── worker/                # database-worker (utilityProcess)
 │   │   ├── scanner/                   # Scanner
 │   │   │   ├── index.ts               # ScannerManager (thin shell)
 │   │   │   ├── scanner-worker-bridge.ts
 │   │   │   ├── path-classifier.ts     # Path classification pure functions
+│   │   │   ├── scan-channels.ts       # Scan channel orchestration
+│   │   │   ├── game-directory-discovery.ts # Three-channel game directory discovery
+│   │   │   ├── repair-legacy-data-v1..v6.ts # Legacy data repair series
 │   │   │   ├── worker-entry.ts        # scanner-worker entry
 │   │   │   └── worker-protocol.ts
 │   │   ├── media-worker/              # media-worker (thumbnail/pHash/duplicate)
 │   │   │   ├── manager.ts             # MediaWorkerManager (thin shell)
 │   │   │   ├── bridge.ts
+│   │   │   ├── bktree-index.ts / bktree-js.ts # pHash BK-tree index
 │   │   │   ├── worker-entry.ts
 │   │   │   └── worker-protocol.ts
 │   │   ├── scheduler/
 │   │   │   └── task-scheduler.ts      # Priority task scheduler queue
 │   │   ├── thumbnail/
-│   │   │   └── generator.ts           # ThumbnailGenerator (single generation + LRU)
-│   │   ├── services/                  # Business service layer (12 services)
+│   │   │   ├── generator.ts           # ThumbnailGenerator (single generation + LRU)
+│   │   │   └── worker-*.ts            # thumbnail-worker (utilityProcess: sharp scaling)
+│   │   ├── services/                  # Business service layer (13 services)
 │   │   │   ├── file-service.ts
 │   │   │   ├── video-service.ts
 │   │   │   ├── watermark-service.ts
@@ -383,21 +410,26 @@ wxnn-photo-manager/
 │   │   │   ├── share-wifi-service.ts
 │   │   │   ├── thumbnail-phash-service.ts
 │   │   │   ├── decryption-service.ts
+│   │   │   ├── xmp-metadata-service.ts
 │   │   │   └── log-service.ts
 │   │   ├── ipc/                       # IPC layer
 │   │   │   ├── handler-context.ts     # Dependency injection context
 │   │   │   ├── validator.ts           # wrapHandler + PathGuard + schemas
-│   │   │   └── handlers/              # ~15 domains + set-dir-handler factory (30 files)
-│   │   │       ├── media-handler.ts / media-lifecycle-handler.ts
-│   │   │       ├── file.ts / video.ts / watermark.ts / editor.ts
+│   │   │   ├── media-read-guard.ts    # assertMediaReadPath (with realpath re-check)
+│   │   │   └── handlers/              # ~40 domain files (incl. set-dir-handler factory and _shared helpers)
+│   │   │       ├── media-handler.ts / media-lifecycle-handler.ts / media-cleanup-handler.ts
+│   │   │       ├── file.ts / file-export-handler.ts / file-rename-handler.ts
+│   │   │       ├── video.ts / watermark.ts / editor.ts
+│   │   │       ├── editor-metadata-handler.ts / editor-preset-handler.ts / export-pref-handler.ts
 │   │   │       ├── backup.ts / cache.ts / log.ts / crash.ts
-│   │   │       ├── share.ts / scanner-handler.ts / shell-handler.ts
+│   │   │       ├── share.ts / scanner-handler.ts / scan-log-handler.ts / shell-handler.ts
 │   │   │       ├── app-handler.ts / settings-handler.ts / theme-handler.ts
-│   │   │       ├── dialog-handler.ts / import-handler.ts / data-handler.ts
+│   │   │       ├── dialog-handler.ts / import-handler.ts / import-root-handler.ts / data-handler.ts
 │   │   │       ├── decrypt-handler.ts / duplicate-handler.ts / similar-handler.ts
 │   │   │       ├── operation-history-handler.ts / task-handler.ts
 │   │   │       ├── profile-handler.ts / search-index-handler.ts
-│   │   │       ├── thumbnail-handler.ts / category-handler.ts / plugin.ts
+│   │   │       ├── thumbnail-handler.ts / category-handler.ts / plugin.ts / plugin-bridge-handler.ts
+│   │   │       ├── resonance-handler.ts
 │   │   │       └── set-dir-handler.ts
 │   │   ├── plugins/                   # Plugin host
 │   │   │   ├── plugin-host.ts         # Plugin loading and lifecycle
@@ -406,23 +438,28 @@ wxnn-photo-manager/
 │   │   │   ├── bridge.ts              # Main process bridge
 │   │   │   ├── filter-builder.ts      # FFmpeg filter construction
 │   │   │   ├── watermark-builder.ts   # Watermark overlay
+│   │   │   ├── types.ts               # Video editing type definitions
 │   │   │   ├── worker-entry.ts        # Worker process entry
 │   │   │   └── worker-protocol.ts     # Message protocol
 │   │   ├── i18n/                      # Main process i18n
-│   │   │   └── index.ts
-│   │   ├── utils/                     # Main process utilities (17 modules)
-│   │   │   ├── concurrency.ts / constants.ts / dir-manager.ts
-│   │   │   ├── disk.ts / duplicate-scoring.ts / ffmpeg-paths.ts
-│   │   │   ├── ffmpeg-runner.ts / file-utils.ts / game-events.ts
-│   │   │   ├── ipc-validate.ts / logger.ts / media-constants.ts
-│   │   │   ├── phash.ts / process-registry.ts / safe-execute.ts
-│   │   │   ├── scene-brightness.ts / scene-category.ts
-│   │   │   ├── startup-diagnostic.ts / video-probe.ts
+│   │   │   ├── index.ts
+│   │   │   └── worker-safe.ts         # Worker-side pure lookup translation
+│   │   ├── utils/                     # Main process utilities (26 modules)
+│   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
+│   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
+│   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
+│   │   │   ├── logger.ts / managed-read-stream.ts / media-constants.ts / path-safety.ts
+│   │   │   ├── phash.ts / process-registry.ts / progress-throttle.ts
+│   │   │   ├── scene-brightness.ts / startup-diagnostic.ts
+│   │   │   ├── task-registry.ts / user-diag-path.ts / video-frame.ts / video-probe.ts
+│   │   │   └── worker-restart-policy.ts
 │   │   ├── types/                     # Main process type declarations
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
 │   │   │   ├── ffprobe-static.d.ts / koffi.d.ts
-│   │   ├── index.ts                   # Main process entry (Application class)
-│   │   ├── preload.ts                 # preload script (contextBridge)
+│   │   ├── index.ts                   # Main process entry (early guards + protocol registration + Application bootstrap)
+│   │   ├── preload.ts                 # preload entry (assembly + contextBridge exposure)
+│   │   ├── preload-logger.ts          # Renderer log forwarding preload
+│   │   ├── preload/                   # preload split modules (ipc base layer / plugin-bridge / api/ 29 namespaces)
 │   │   └── tsconfig.json
 │   ├── renderer/                      # Renderer process
 │   │   ├── assets/                    # Static assets
@@ -433,16 +470,18 @@ wxnn-photo-manager/
 │   │   │   ├── editor/                # Editor components (12)
 │   │   │   ├── gallery/               # Gallery components (16)
 │   │   │   ├── layout/                # Layout components (AppShell/Sidebar/TitleBar)
+│   │   │   ├── resonance/             # Resonance Records view components
 │   │   │   ├── scanner/               # Scanner components (ScanButton/ScanProgress)
 │   │   │   └── video/                 # VideoPlayer
-│   │   ├── hooks/                     # 22 custom hooks
+│   │   ├── data/resonance/            # Resonance static data (catalog/banners/percentile/12-language names/thumbnails)
+│   │   ├── hooks/                     # 23 custom hooks
 │   │   ├── i18n/                      # Internationalization
 │   │   │   ├── index.ts
 │   │   │   └── locales/               # 12 language JSON files
-│   │   ├── icons/                     # 73 SVG icons centrally managed
+│   │   ├── icons/                     # 74 SVG icons centrally managed (single file)
 │   │   │   └── index.tsx
-│   │   ├── pages/                     # 8 pages
-│   │   │   ├── settings/              # Settings page 8 sections
+│   │   ├── pages/                     # 9 pages
+│   │   │   ├── settings/              # Settings page sections (split by group)
 │   │   │   ├── GalleryPage.tsx
 │   │   │   ├── CategoriesPage.tsx
 │   │   │   ├── DetailPage.tsx
@@ -450,21 +489,25 @@ wxnn-photo-manager/
 │   │   │   ├── EditorPage.tsx
 │   │   │   ├── OutfitGalleryPage.tsx
 │   │   │   ├── RecycleBinPage.tsx
+│   │   │   ├── ResonanceRecordsPage.tsx
 │   │   │   └── SettingsPage.tsx
 │   │   ├── plugins/                  # Plugin runtime (plugin-runtime.ts)
 │   │   ├── preview/                   # Preview mock data and install scripts
-│   │   │   ├── mock/                  # Mock data (media/categories/profiles...)
+│   │   │   ├── index.html             # Preview entry HTML
+│   │   │   ├── mock/                  # Mock data (media/categories/resonance...)
 │   │   │   └── install.ts             # Preview environment setup
 │   │   ├── search/                    # Full-text search index
 │   │   │   ├── search-index.ts        # FlexSearch index management
 │   │   │   ├── search-service.ts      # Search service
 │   │   │   ├── doc-builder.ts         # Document builder
 │   │   │   └── use-search-index.ts    # Search hook
-│   │   ├── stores/                    # 4 Zustand stores
+│   │   ├── stores/                    # 6 Zustand stores
 │   │   │   ├── mediaStore.ts
 │   │   │   ├── uiStore.ts
 │   │   │   ├── themeStore.ts
-│   │   │   └── operationHistoryStore.ts
+│   │   │   ├── operationHistoryStore.ts
+│   │   │   ├── resonanceStore.ts
+│   │   │   └── pluginStore.ts
 │   │   ├── styles/
 │   │   │   ├── globals.css            # Global styles + CSS variables
 │   │   │   └── themes/
@@ -472,33 +515,41 @@ wxnn-photo-manager/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 17 utility files
+│   │   ├── utils/                     # 23 utility files (incl. resonance/ subdir of pure functions)
 │   │   ├── App.tsx                    # App root component
 │   │   ├── main.tsx                   # Renderer process entry
+│   │   ├── preview-entry.tsx          # Preview entry
 │   │   ├── index.html
 │   │   └── vite-env.d.ts
 │   └── shared/                        # Cross-process shared layer
 │       ├── errors/
 │       │   ├── app-error.ts           # AppError class and 6 subclasses
 │       │   └── error-codes.ts         # Error codes and category mapping
-│       ├── types/                     # Shared type definitions (8 domains)
+│       ├── types/                     # Shared type definitions (14 domain modules + index)
 │       │   ├── media.ts / category.ts / profile.ts / editor.ts
 │       │   ├── watermark.ts / settings.ts / ipc.ts / ipc-types.ts
+│       │   ├── progress.ts / plugin.ts / editor-metadata.ts / duplicate.ts
+│       │   ├── resonance.ts / electron-api.ts
 │       │   └── index.ts
+│       ├── utils/                     # concurrency.ts / taskStages.ts
+│       ├── settings-keys.ts           # Renderer-writable preference key whitelist
 │       ├── dimension.ts               # Smart grouping dimensions
 │       └── scene-category.ts          # Game scene categories
 ├── tests/
-│   └── setup.ts
+│   ├── setup.ts
+│   └── mocks/                         # electron / sqlite / parent-port test stubs
 ├── tools/                             # Auxiliary tools
 │   ├── image-decode-analysis/
 │   └── scripts/
 ├── .gitignore / .npmrc / .prettierrc / .prettierignore
+├── .husky/ / commitlint.config.cjs    # Git hooks and commit validation
+├── electron.vite.config.ts            # Main/preload/renderer three-segment build config
+├── vite.preview.config.ts             # Single-file preview build config
 ├── eslint.config.js
 ├── package.json
-├── postcss.config.js
+├── postcss.config.cjs
 ├── tailwind.config.ts
 ├── tsconfig.json / tsconfig.scripts.json
-├── vite.config.ts
 ├── vitest.config.ts
 └── README.md
 ```
@@ -509,9 +560,19 @@ wxnn-photo-manager/
 
 ### 5.1 Entry and Lifecycle
 
-#### `index.ts` — Application Class
+#### `index.ts` — Bootstrap
 
-The main process core entry, responsible for:
+The earliest main-process entry, responsible for:
+
+- **Earliest exception capture**: uncaughtException / unhandledRejection persisted to startup-errors.log via startup-diagnostic
+- **crashDumps redirection**: crash dumps output to `Documents/NikkiGallery/Diagnostics` (`user-diag-path.ts`); Chromium native log persisted with rotation
+- **GPU fallback decision**: `recordBootDecision()` → `disableHardwareAcceleration()` when required
+- **Protocol privilege declaration**: `registerSchemesAsPrivileged` registers media:// and app://
+- **Application bootstrap**: after `app.whenReady()`, dynamically imports Application from `app/application.ts` and calls `initialize()`
+
+#### `app/application.ts` — Application Class (Phased Orchestration)
+
+`Application.initialize()` orchestrates the following (module implementations in §5.10):
 
 - **Single-instance lock management**: `requestSingleInstanceLock` + 3 retries + three-option dialog (Clean & Restart / Manual / Exit)
 - **Phased initialization**: DB → custom directories → logger → crash → backup → IPC → window → theme → post-startup tasks
@@ -522,12 +583,20 @@ The main process core entry, responsible for:
 - **Database cleanup & repair**: Stale record deletion + missing thumbnail repair + orphan thumbnail cleanup
 - **before-quit async cleanup**: Includes WAL checkpoint + child process kill + worker dispose + force timeout fallback
 
-#### `preload.ts` — contextBridge Bridge Layer
+#### `preload.ts` + `preload/` — contextBridge Bridge Layer
 
-- Exposes `electronAPI` namespace to `window`, with methods across 13 domains
-- Unified IPC entry `call<T>(channel, ...args)`: unwraps `IpcResponse<T>`, throws `IpcError` on failure
-- Exposes `IpcError` class for renderer-side `instanceof` checks
-- Type declarations merged into the `Window` interface
+Namespace-oriented split refactor (Aug 2026): the original 1176-line monolithic file was split into an
+entry assembly plus a module tree by functional domain. The external contract (global names / method
+signatures / channel strings) is unchanged, guarded by unit tests (`preload/__tests__/`).
+
+- `preload.ts` entry: assembles `electronAPI` (reportReady + 29 namespaces) and performs 5 `exposeInMainWorld`
+  calls — all gated by `exposeIfTrusted()`: untrusted documents (origin not app:// / media:// / dev 5173) get zero exposure
+- `preload/ipc.ts`: `IpcError` class + unified call entry `call<T>(channel, ...args)` (unwraps `IpcResponse<T>`, throws `IpcError` on failure) + `subscribe` event helper
+- `preload/api/*.ts`: one namespace object per file (`scannerAPI`, `fileAPI`…); methods and channel strings are verbatim identical to pre-split
+- `preload/plugin-bridge.ts`: plugin capability bridge (`window.pluginAPI`) and the `__setPluginI18nT` injection point
+- `preload/origin-guard.ts`: document origin self-check (second defense line); allow-set mirrors `app/navigation-guard.ts`
+- Business DTO type snapshots live in `src/shared/types/electron-api.ts` (the preload layer no longer inlines type definitions)
+- Zero-dependency constraint enforced mechanically by tests: only `electron` allowed at runtime; shared imports must be type-only
 
 ### 5.2 Database Layer (database/)
 
@@ -565,7 +634,7 @@ Lazily forks worker, forwards `SCAN_START/STOP/DISPOSE`, receives worker events.
 
 Three functions jointly determine `media_source` / `album_type` / `account_uid` for each photo on ingest:
 
-- `extractUidFromPath` — UID regex `[\\/]([1-9]\d{7,11})[\\/]`
+- `extractUidFromPath` — UID regex `[\\/](\d{6,12})[\\/]`; inside the GamePlayPhotos subtree the anchor regex (`GPP_ANCHOR_UID`) takes priority; returns `'default'` when unmatched
 - `extractAlbumTypeFromPath` — Parent directory name matches `ALBUM_TYPE_MAP` (22 game album folders)
 - `extractMediaSourceFromPath` — Order-sensitive rules: `launcher\cache` / `\MallPic\` / `\X6Game\Saved\ScreenShot\` / `\CloudPhotos\Temp\` → launcher; `\CloudPhotos\` → cloud; else → game
 
@@ -599,7 +668,7 @@ Lazily forks worker, forwards 7 command types, receives 9 event types and dispat
 
 #### `task-scheduler.ts` — TaskScheduler
 
-Main-process side priority task scheduler, layered above the three utilityProcesses:
+Main-process side priority task scheduler, layered above the utilityProcess workers:
 
 - **High priority** (`runHighPriority<T>`): User-initiated; runs immediately; can preempt running low-priority tasks (via `cancel` callback, max wait 2000ms)
 - **Low priority** (`enqueueLow`): Background-initiated; FIFO queue; serial execution (`maxLowConcurrency = 1`); pumps when high-priority is idle
@@ -632,6 +701,7 @@ Main-process side priority task scheduler, layered above the three utilityProces
 | **ThumbnailPhashService**        | 4 shared functions (startup path and IPC path share one impl); forwards to media-worker                                                                             |
 | **DecryptionService**            | Game photo param decryption (koffi calls nuan5_decryption.dll, ABI validation + async mutex serialization)                                                          |
 | **LogService**                   | Fault record management (faults-*.jsonl reading, cache invalidation, ZIP export)                                                                                    |
+| **XmpMetadataService**           | XMP metadata write/read (serializes EditorMetadata into a custom `wxnn:` namespace XMP packet; single and batch writes)                                             |
 
 ### 5.8 IPC Layer (ipc/)
 
@@ -665,28 +735,36 @@ Three major capabilities:
 
 3. **`schemas`** common zod schema collection: `filePath` / `filePathArray` / `mediaId` / `mediaIdArray` / `rating` / `positiveIntId` / `shortString` / `uid` / `httpUrl` / `uiTheme` / `thumbnailQuality` / `backupFilename` / `shortId` / `cacheLimitBytes`
 
-#### `handlers/` — 15 Domains + Factory (30 files)
+#### `handlers/` — ~40 Domain Files (incl. set-dir-handler factory and `_shared` helpers)
 
 | Module                         | Responsibilities                                                                                                                                                                      |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `media-handler.ts`             | Media domain (list/findDuplicates/findSimilar/getGroupCounts/rating/favorite/tags/notes/category/outfit/softDelete/restore/permanentDelete/empty/missing cleanup/outfit almanac etc.) |
 | `media-lifecycle-handler.ts`   | Media lifecycle management (missing detection/repair/cleanup)                                                                                                                         |
-| `file.ts`                      | File ops (delete/copy/move/rename/batchRename/export/saveAs/getExif); path whitelist validation                                                                                       |
+| `media-cleanup-handler.ts`     | Missing and corrupted record cleanup (cleanupMissing/removeMissing/cleanupCorrupted/removeCorrupted)                                                                                  |
+| `file.ts`                      | File ops (delete/copy/getExif); path whitelist validation                                                                                                                             |
+| `file-export-handler.ts`       | File export / save-as (file:export with default dir and naming rules / file:saveAs)                                                                                                   |
+| `file-rename-handler.ts`       | File rename / move (file:move / file:rename / file:batchRename)                                                                                                                       |
 | `video.ts`                     | Video (thumbnail/metadata/export/captureFrame/trim/changeSpeed/exportLivePhoto)                                                                                                       |
 | `watermark.ts`                 | Watermark (apply/saveTemplate/loadTemplates/deleteTemplate + progress push)                                                                                                           |
 | `editor.ts`                    | Editor (save/saveAs/preset CRUD/importPresetFromFile/exportPresetToFile)                                                                                                              |
+| `editor-metadata-handler.ts`   | Editor XMP metadata (export copy with params + one-click edit param restore)                                                                                                          |
+| `editor-preset-handler.ts`     | Filter presets (persist / JSON file import-export / list / delete)                                                                                                                    |
+| `export-pref-handler.ts`       | Export preference read/write                                                                                                                                                          |
 | `backup.ts`                    | Backup (create/list/restore/delete + setDir/resetDir/getDir)                                                                                                                          |
 | `cache.ts`                     | Cache (getStats/clean/setLimit/enforceLimit + setDir/resetDir/getDir)                                                                                                                 |
 | `log.ts`                       | Logs (listFaults/getDetail/openDir/exportZip/clear/getStats + setDir/resetDir/getDir + reportRendererError)                                                                           |
 | `crash.ts`                     | Crash (list/stats/openDir/clear + setDir/resetDir/getDir)                                                                                                                             |
 | `share.ts`                     | Share (startWifi/stop/getStatus + copyFiles/detectApp/launchApp)                                                                                                                      |
 | `scanner-handler.ts`           | Scanner (start/stop/status)                                                                                                                                                           |
+| `scan-log-handler.ts`          | Scan diagnostic logs (read-only query and export for the diagnostics tool page)                                                                                                       |
 | `shell-handler.ts`             | System operations (openPath/showItemInFolder/openExternal)                                                                                                                            |
 | `app-handler.ts`               | App info (getStatus/getVersions)                                                                                                                                                      |
 | `settings-handler.ts`          | App settings read/write (get/set)                                                                                                                                                     |
 | `theme-handler.ts`             | Theme switching (set)                                                                                                                                                                 |
 | `dialog-handler.ts`            | File/directory selection dialogs (openFile/openDirectory)                                                                                                                             |
 | `import-handler.ts`            | File import (importFiles)                                                                                                                                                             |
+| `import-root-handler.ts`       | Import root directory management                                                                                                                                                      |
 | `data-handler.ts`              | Data management (clear/reset)                                                                                                                                                         |
 | `decrypt-handler.ts`           | Game parameter decryption                                                                                                                                                             |
 | `duplicate-handler.ts`         | Duplicate detection                                                                                                                                                                   |
@@ -698,52 +776,69 @@ Three major capabilities:
 | `thumbnail-handler.ts`         | Thumbnail generation                                                                                                                                                                  |
 | `category-handler.ts`          | Category management                                                                                                                                                                   |
 | `plugin.ts`                    | Plugin management                                                                                                                                                                     |
+| `plugin-bridge-handler.ts`     | Plugin capability bridge (controlled media/db/fs/watermark/task/i18n calls, with `permission-guard` validation)                                                                       |
+| `resonance-handler.ts`         | Resonance Records (9 channels: getData/manual record CRUD/readImportFile/commitImport/export/updateWardrobe/clearAll)                                                                 |
 | `set-dir-handler.ts`           | Factory: `registerSetDirHandler` / `registerResetDirHandler`; eliminates 4 isomorphic templates                                                                                       |
 
 ### 5.9 Utility Layer (utils/)
 
-| File                    | Responsibilities                                                                                                              |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `concurrency.ts`        | In-house concurrency control (`runWithConcurrency`); replaces p-limit to avoid ESM/CJS compatibility                          |
-| `constants.ts`          | Main process global named constants (STARTUP_SCAN_DELAY_MS=1500, THUMBNAIL_CONCURRENCY=4, MEDIA_CACHE_TTL_MS=5min etc.)       |
-| `dir-manager.ts`        | Custom directory management (4 features with configurable paths); `resolveCustomDir` / `ensureDir` / `migrateDirFiles`        |
-| `disk.ts`               | Disk space check `assertDiskSpace` (based on `fsp.statfs`)                                                                    |
-| `duplicate-scoring.ts`  | Smart dedupe scoring (4 dims: resolution 40 + file size 30 + capture time 20 + favorite weight 10)                            |
-| `ffmpeg-paths.ts`       | Unified ffmpeg/ffprobe binary path resolver; `resolveAsarUnpackedPath` replaces `app.asar` → `app.asar.unpacked`              |
-| `ffmpeg-runner.ts`      | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                   |
-| `file-utils.ts`         | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)           |
-| `game-events.ts`        | Infinity Nikki version and event timeline (GAME_VERSIONS / GAME_EVENTS)                                                       |
-| `ipc-validate.ts`       | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                      |
-| `logger.ts`             | Log management (10 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                         |
-| `media-constants.ts`    | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                     |
-| `phash.ts`              | Perceptual hash computation (8x8 DCT-II 64-bit hash, precomputed cosine matrix)                                               |
-| `process-registry.ts`   | Global active child process registry (trackProcess/trackFfmpegCommand/killAllProcesses, 60s fallback cleanup)                 |
-| `safe-execute.ts`       | Main process global exception execution utility (safeExecute/resultToIpcResponse/databaseErrorMapper/fileSystemErrorMapper)   |
-| `scene-brightness.ts`   | Image brightness histogram-based scene time analysis (sharp.stats() + BT.601 weighting)                                       |
-| `scene-category.ts`     | Scene category re-export bridge (source in shared/scene-category.ts)                                                          |
-| `startup-diagnostic.ts` | Startup diagnostics (independent error recording before logger ready; writes to `userData/startup-errors.log`, 100KB rolling) |
-| `video-probe.ts`        | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                              |
+| File                       | Responsibilities                                                                                                                                        |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `active-task-store.ts`     | Active task state store (for task progress query and cancellation)                                                                                      |
+| `concurrency.ts`           | In-house concurrency control (`runWithConcurrency`); replaces p-limit to avoid ESM/CJS compatibility                                                    |
+| `constants.ts`             | Main process global named constants (STARTUP_SCAN_DELAY_MS=5000, THUMBNAIL_CONCURRENCY=4, MEDIA_CACHE_TTL_MS=5min etc.)                                 |
+| `dir-manager.ts`           | Custom directory management (4 features with configurable paths); `resolveCustomDir` / `ensureDir` / `migrateDirFiles`                                  |
+| `disk.ts`                  | Disk space check `assertDiskSpace` (based on `fsp.statfs`)                                                                                              |
+| `duplicate-scoring.ts`     | Smart dedupe scoring (4 dims: resolution 40 + file size 30 + capture time 20 + favorite weight 10)                                                      |
+| `early-crash-guard.ts`     | Early fatal error reporting (`reportEarlyFatal`: persist diagLog + showErrorBox + release single-instance lock + exit)                                  |
+| `ffmpeg-paths.ts`          | Unified ffmpeg/ffprobe binary path resolver; `resolveAsarUnpackedPath` replaces `app.asar` → `app.asar.unpacked`                                        |
+| `ffmpeg-runner.ts`         | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                                             |
+| `file-utils.ts`            | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)                                     |
+| `ipc-validate.ts`          | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                                                |
+| `logger.ts`                | Log management (10 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                                   |
+| `managed-read-stream.ts`   | File read-stream lifecycle utility (`createManagedReadStream`: error listener + AbortSignal cancellation + fd release)                                  |
+| `media-constants.ts`       | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                                               |
+| `path-safety.ts`           | Path safety utilities (sensitive dir detection / read-only dir detection etc.)                                                                          |
+| `phash.ts`                 | Perceptual hash computation (8x8 DCT-II 64-bit hash, precomputed cosine matrix)                                                                         |
+| `process-registry.ts`      | Global active child process registry (trackProcess/trackFfmpegCommand/killAllProcesses, 60s fallback cleanup)                                           |
+| `progress-throttle.ts`     | Task progress push throttling                                                                                                                           |
+| `scene-brightness.ts`      | Image brightness histogram-based scene time analysis (sharp.stats() + BT.601 weighting)                                                                 |
+| `startup-diagnostic.ts`    | Startup diagnostics (independent error recording before logger ready; writes to `Documents/NikkiGallery/Diagnostics/startup-errors.log`, 100KB rolling) |
+| `task-registry.ts`         | Task registry (background task registration and query)                                                                                                  |
+| `user-diag-path.ts`        | User-friendly diagnostics directory resolution (`Documents/NikkiGallery/Diagnostics`)                                                                   |
+| `video-frame.ts`           | Video frame extraction utility                                                                                                                          |
+| `video-probe.ts`           | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                                                        |
+| `worker-restart-policy.ts` | Worker restart policy (crash restart count / backoff decision)                                                                                          |
 
 ### 5.10 App Lifecycle Management (app/)
 
-Lifecycle management module extracted from the Application class in `index.ts`, with 14 files each handling a specific responsibility:
+Application orchestration layer bootstrapped from `index.ts`, with 23 source files each handling a specific responsibility:
 
-| File                  | Responsibilities                                                                                   |
-| --------------------- | -------------------------------------------------------------------------------------------------- |
-| `application.ts`      | App main class; orchestrates initialization and shutdown                                           |
-| `lifecycle.ts`        | Lifecycle management (single-instance lock, ready/before-quit/will-quit event orchestration)       |
-| `cleanup.ts`          | Exit cleanup (WAL checkpoint + subprocess kill + worker dispose + forced timeout fallback)         |
-| `startup-tasks.ts`    | Post-startup tasks (auto-scan, database repair, thumbnail completion)                              |
-| `window-manager.ts`   | Window management (creation, ready-to-show, minimize/restore/close handling)                       |
-| `desktop-shortcut.ts` | Desktop shortcut auto-repair (detect missing and recreate)                                         |
-| `error-handlers.ts`   | Global error handling (uncaughtException, unhandledRejection, render-process-gone)                 |
-| `ipc-setup.ts`        | IPC registration orchestration (constructs HandlerContext and calls register functions per domain) |
-| `media-protocol.ts`   | media:// protocol registration and whitelist (5-layer LRU cached path validation)                  |
-| `media-update.ts`     | Media update notification (throttled 100ms, notifies renderer via webContents.send to refresh)     |
-| `recovery.ts`         | Recovery logic (database repair and state restoration after abnormal exit)                         |
-| `theme.ts`            | Theme sync (applyUITheme syncs nativeTheme + TitleBarOverlay + setBackgroundColor)                 |
-| `custom-dirs.ts`      | Custom directory management (resolve/ensure/migrate for 4 configurable paths)                      |
-| `app-context.ts`      | App context (globally shared app state and dependency container)                                   |
+| File                     | Responsibilities                                                                                          |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `application.ts`         | App main class; orchestrates initialization and shutdown                                                  |
+| `lifecycle.ts`           | Lifecycle management (single-instance lock, ready/before-quit/will-quit event orchestration)              |
+| `cleanup.ts`             | Exit cleanup (WAL checkpoint + subprocess kill + worker dispose + forced timeout fallback)                |
+| `startup-tasks.ts`       | Post-startup tasks (auto-scan, database repair, thumbnail completion)                                     |
+| `startup-environment.ts` | Startup environment checks (native dependency / path availability)                                        |
+| `window-manager.ts`      | Window management (creation, ready-to-show, minimize/restore/close handling)                              |
+| `navigation-guard.ts`    | Main window navigation trust check (app:// / media:// + dev 5173; intercepts and logs navigation-blocked) |
+| `desktop-shortcut.ts`    | Desktop shortcut auto-repair (detect missing and recreate)                                                |
+| `error-handlers.ts`      | Global error handling (uncaughtException, unhandledRejection, render-process-gone)                        |
+| `ipc-setup.ts`           | IPC registration orchestration (constructs HandlerContext and calls register functions per domain)        |
+| `media-protocol.ts`      | media:// protocol registration and whitelist (5-layer LRU cached path validation)                         |
+| `renderer-protocol.ts`   | app:// renderer document protocol registration                                                            |
+| `renderer-bridge.ts`     | Renderer event bridge (main process → renderer event push)                                                |
+| `media-update.ts`        | Media update notification (throttled 100ms, notifies renderer via webContents.send to refresh)            |
+| `recovery.ts`            | Recovery logic (database repair and state restoration after abnormal exit)                                |
+| `theme.ts`               | Theme sync (applyUITheme syncs nativeTheme + TitleBarOverlay + setBackgroundColor)                        |
+| `custom-dirs.ts`         | Custom directory management (resolve/ensure/migrate for 4 configurable paths)                             |
+| `auto-update.ts`         | Auto update (electron-updater)                                                                            |
+| `exit-forensics.ts`      | Exit forensics (abnormal exit scene recording)                                                            |
+| `gpu-fallback.ts`        | GPU fallback decision (disable hardware acceleration on GPU anomalies)                                    |
+| `native-load-guard.ts`   | Native module load pre-check (VC++ runtime etc.; showErrorBox on failure)                                 |
+| `permission.ts`          | System permission management                                                                              |
+| `app-context.ts`         | App context (globally shared app state and dependency container)                                          |
 
 ### 5.11 Plugin Host (plugins/)
 
@@ -767,9 +862,10 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 
 ### 5.13 Main Process i18n (i18n/)
 
-| File       | Responsibilities                                                                              |
-| ---------- | --------------------------------------------------------------------------------------------- |
-| `index.ts` | Main process i18n entry; provides multi-language support for main process logs/error messages |
+| File             | Responsibilities                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------- |
+| `index.ts`       | Main process i18n entry; provides multi-language support for main process logs/error messages |
+| `worker-safe.ts` | Worker-process-safe pure lookup translation (no i18next instance dependency)                  |
 
 ---
 
@@ -785,9 +881,9 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 
 #### `App.tsx`
 
-- **Custom view routing** (not React Router); switches 9 views via `useUIStore.currentView`: `gallery / detail / editor / categories / settings / recycle-bin / favorites / duplicates / launcher-cache`
+- **Custom view routing** (not React Router); switches 11 views via `useUIStore.currentView`: `gallery / detail / editor / categories / settings / recycle-bin / favorites / duplicates / launcher-cache / resonance-records / screenshots`
 - **keep-alive mode**: `ALL_VIEWS` array + `visitedViews` Set; visited pages stay mounted, hidden via `display:none`; avoids losing scroll position / retriggering `fetchMediaFromDatabase` on view switch
-- **View level mapping**: `VIEW_LEVEL_MAP` classifies views into 4 levels for frosted-glass layering
+- **View level mapping**: `VIEW_LEVEL_MAP` classifies views into 3 levels (level-1 views / detail / editor) for frosted-glass layering
 - **Page transition animation**: `page-enter` CSS class (8px right shift + fade in, 220ms); `onAnimationEnd` removes `will-change`
 - **Top-level side effects**: useRefreshMedia / useFilteredMediaFiles / useGlobalUndo / applyThemeClass / display preference application / operation history loading
 - **Bridge component**: `OperationHistoryErrorBridge` rendered inside `GlobalToastProvider`
@@ -806,27 +902,30 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | **SettingsPage**                 | Settings center. Left nav + right section content; `activeSection` persisted to localStorage                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | **ResonanceRecordsPage** (2.5.0) | Resonance Records. Four switchable views — pull records (73 banners, manual entry / edit time / delete, virtual scrolling), My Wardrobe (five-category ownership, outfit completion progress, name search and filters, batch select, "infer from pull records"), import & export (parse preview → added/duplicate/invalid counts with per-item location → batched transactional commit with visible, cancellable progress), personal stats (overview cards, luck percentile, SVG distribution histogram, per-banner cumulative curve and detail table) |
 
-#### `pages/settings/` — 8 Sections
+#### `pages/settings/` — Section Files (split by settings group)
 
-| File                       | Section                                                              |
-| -------------------------- | -------------------------------------------------------------------- |
-| `shared.tsx`               | GlobalToastProvider / useGlobalToast / SectionShell / common types   |
-| `general-sections.tsx`     | GeneralStartupSection / GeneralFileOpsSection / GeneralExportSection |
-| `appearance-sections.tsx`  | AppearanceThemeSection / AppearanceDisplaySection                    |
-| `scan-sections.tsx`        | ScanOptionsSection                                                   |
-| `profile-sections.tsx`     | ProfileManageSection                                                 |
-| `data-sections.tsx`        | DataBackupSection / DataCacheSection / DataClearSection              |
-| `diagnostics-sections.tsx` | DiagnosticsLogsSection / DiagnosticsCrashSection                     |
-| `about-sections.tsx`       | AboutInfoSection / AboutContactSection / AboutLicenseSection         |
-| `language-sections.tsx`    | LanguageSection                                                      |
-| `tools-sections.tsx`       | ToolsShareCodeSection                                                |
+| File                              | Section                                                                                             |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `shared.tsx`                      | GlobalToastProvider / useGlobalToast / SectionShell / common types                                  |
+| `sections.tsx`                    | Unified re-export entry (keeps external import paths unchanged)                                     |
+| `general-sections.tsx`            | GeneralStartupSection / GeneralFileOpsSection / GeneralExportSection                                |
+| `appearance-sections.tsx`         | AppearanceThemeSection / AppearanceDisplaySection                                                   |
+| `scan-sections.tsx`               | ScanPathsSection / GameRootsSection / ScanFallbackSection / ScanOptionsSection / ImportRootsSection |
+| `scan-log-diagnostic-section.tsx` | Scan log diagnostics Section                                                                        |
+| `profile-sections.tsx`            | ProfileManageSection                                                                                |
+| `plugin-sections.tsx`             | PluginManageSection                                                                                 |
+| `data-sections.tsx`               | DataBackupSection / DataCacheSection / DataClearSection                                             |
+| `diagnostics-sections.tsx`        | DiagnosticsLogsSection / DiagnosticsCrashSection                                                    |
+| `about-sections.tsx`              | AboutInfoSection / AboutContactSection / AboutLicenseSection                                        |
+| `language-sections.tsx`           | LanguageSection                                                                                     |
+| `tools-sections.tsx`              | ToolsShareCodeSection                                                                               |
 
 ### 6.3 Layout Components (components/layout/)
 
 | Component    | Responsibilities                                                                                                                                                                                     |
 | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **AppShell** | Overall layout skeleton. TitleBar (top) + Sidebar (left) + main (content) + bottom status bar                                                                                                        |
-| **Sidebar**  | Side bar. Collapsible (motion.aside width animation 64↔220). Contains back-to-top button, character profile switcher, 7 main nav items, smart grouping quick panel (gallery view only), bottom stats |
+| **Sidebar**  | Side bar. Collapsible (motion.aside width animation 64↔220). Contains back-to-top button, character profile switcher, 9 main nav items, smart grouping quick panel (gallery view only), bottom stats |
 | **TitleBar** | Top title bar. Fixed height 40px, `app-drag` class (Electron drag region), shows app icon + i18n title                                                                                               |
 
 ### 6.4 Common Components (components/common/)
@@ -907,7 +1006,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | Component            | Responsibilities                                                                                                               |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | **EditorToolbar**    | Editor top toolbar (undo/redo/reset/compare/shortcuts/fullscreen/exit/save as/save/copy params/paste params/apply to selected) |
-| **EditorTabs**       | Editor right-side tab container (6 tabs: basic/hsl/curves/split/filters/lut/watermark)                                         |
+| **EditorTabs**       | Editor right-side tab container (7 tabs: basic/hsl/curves/split/filters/lut/watermark)                                         |
 | **FilterPanel**      | Filter panel (getFilterCategories + getPresetsByCategory, concurrent 4-way thumbnail generation)                               |
 | **LutPanel**         | LUT panel (built-in LUT + custom .cube file import, localStorage persistence)                                                  |
 | **ToneCurve**        | Curve adjustment (RGB/R/G/B four channels, Canvas drawing, drag control points)                                                |
@@ -925,40 +1024,42 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **scanner/ScanProgress**: Scan progress bar (scanned/found/currentPath + stop button)
 - **video/VideoPlayer**: Video player (playback progress persisted to localStorage by src hash)
 
-### 6.8 Custom Hooks (22)
+### 6.8 Custom Hooks (23)
 
-#### Media Operation Class (6)
+#### Media Operation Class (7)
 
 - **useFileOperations**: File ops core hook (delete/move/rename/copy/favorite toggle/property update); registers 4 undoHandlers
 - **useBatchOperations**: Batch ops hook (watermark/batch rename state management)
+- **useVideoThumbGenerate**: Video thumbnail generation hook (module-level single-shot guard prevents request storms; shared across component instances)
 - **useFavoriteToggle**: Favorite toggle hook (optimistic update + failure rollback + pushHistory)
 - **useFilteredMediaFiles**: Filter+sort+group hook (module-level cache avoids duplicate computation across components)
 - **useGallerySearch**: Search input hook (250ms debounce)
 - **useRefreshMedia**: Refresh media hook (wraps fetchMediaFromDatabase)
 
-#### UI Interaction Class (9)
+#### UI Interaction Class (7)
 
 - **useToast**: Toast management hook (max 3, FIFO eviction, crypto.randomUUID for id)
 - **useZoomable**: Zoom/pan interaction hook (wheel zoom, drag pan, double-click reset)
 - **useSlideshow**: Slideshow playback hook (isPlaying state, interval timer lifecycle)
 - **useFocusTrap**: Modal focus trap hook (Tab/Shift+Tab cycle, Esc close)
-- **useContainerSize**: Container size listener hook (ResizeObserver + window resize double guarantee)
-- **useVirtualScroll**: Virtual scroll hook (list/grid variants useVirtualGrid)
+- **useContainerSize**: Container size listener hook (ResizeObserver + window resize double guarantee; includes virtual scroll variant useVirtualGrid)
 - **useFailedImages**: Thumbnail load failure management hook
 - **useErrorToast**: Error Toast hook (decides toast type by category, auto-reports non-user-facing errors)
 
-#### Editor Class (3)
+#### Editor Class (4)
 
 - **useEditHistory**: Edit history stack hook (50 cap, historyIndex synced to ref to avoid same-cycle multi-push truncation)
 - **useEditorShortcuts**: Editor shortcuts hook (Ctrl+Z/Y/S/Shift+S/Shift+C/Shift+V/F11/?)
 - **useImageProcessor**: Image processing hook (80ms debounce preview, max preview 1400px, max export 4096px, JPEG quality 0.92/0.95)
+- **useWatermark**: Watermark config state hook (text/image config updates and tiling toggle)
 
-#### IPC Call and Global Class (4)
+#### IPC Call and Global Class (5)
 
 - **useIpcCall**: IPC call wrapper hook (auto manages loading/error capture/toast display/generic preservation/idempotent safety)
 - **useExif**: EXIF load hook
 - **useGameParams**: Game params load hook (LRU + TTL cache, 200 entries / 5 min)
 - **useGlobalUndo**: Global undo hook (App top-level registers Ctrl+Z, active in non-editor views, skips when input focused)
+- **useStagedTask**: Staged task progress hook (drives TaskProgress stage states and item progress, throttled pushes, carries a cancellation signal)
 
 ### 6.9 State Management (stores/)
 
@@ -968,18 +1069,21 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | **mediaStore**            | No (in-memory)                                           | Media data: mediaFiles/categories/loading/scanProgress/editingMedia/recycleBinFiles, currentProfileUid/profiles. Pure reducer actions + async action `updateMediaFileAndPersist` (IPC persist first, then update local)                                                                                                                                                                                          |
 | **themeStore**            | `wxnn-ui-theme`                                          | Theme management (setTheme + applyThemeClass, auto-derives all non-empty classNames from themes config)                                                                                                                                                                                                                                                                                                          |
 | **operationHistoryStore** | No (in-memory + IPC persists to operation_history table) | Global operation history. 50 cap, 9 OperationTypes, type-dispatched UndoHandler registry (module-level Map), database write failure callback Set subscription, loadFromDatabase startup load                                                                                                                                                                                                                     |
+| **resonanceStore**        | No (in-memory)                                           | Resonance Records data (records / wardrobe / stats and import-export state); added in 2.5.0                                                                                                                                                                                                                                                                                                                      |
+| **pluginStore**           | No (in-memory)                                           | Plugin runtime state (installed/enabled plugin list, in-progress install/uninstall operation flags and error info)                                                                                                                                                                                                                                                                                               |
 
 ### 6.10 Utility Functions (utils/)
 
-| Category             | File                                                                                 | Purpose                                                                                                     |
-| -------------------- | ------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| Formatting           | `format.ts` / `date.ts`                                                              | Byte formatting, date formatting                                                                            |
-| File Paths           | `file.ts`                                                                            | toFileUrl / getDirName / joinPath                                                                           |
-| Image Processing     | `imageProcessor.ts`                                                                  | Core processing pipeline (HSL/Curves/SplitTone/Watermark algorithms + processImageData)                     |
-| Filters              | `filter.ts` / `filterPresets.ts` / `lut.ts` / `editor-colors.ts`                     | mergeFilterParams, 6 category presets, 3D LUT parse and apply, CHANNEL_COLORS                               |
-| Game Data            | `enum-mappings.ts` / `cloth-name-lookup.ts` / `location-data.ts` / `location-map.ts` | Game enum → Chinese mapping, clothing/outfit name lookup, location hierarchy, coordinate → location mapping |
-| Business Helpers     | `group-field.ts` / `gallery.tsx` / `responsive.ts`                                   | Group field extraction, context menu construction, responsive column count                                  |
-| Animation and Errors | `motionPresets.ts` / `global-error-handler.ts` / `fault-colors.ts`                   | Motion animation presets, global error fallback, fault type metadata                                        |
+| Category             | File                                                                                                                       | Purpose                                                                                                                                       |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Formatting           | `format.ts` / `date.ts`                                                                                                    | Byte formatting, date formatting                                                                                                              |
+| File Paths           | `file.ts`                                                                                                                  | toFileUrl / getDirName / joinPath                                                                                                             |
+| Image Processing     | `imageProcessor.ts`                                                                                                        | Core processing pipeline (HSL/Curves/SplitTone/Watermark algorithms + processImageData)                                                       |
+| Filters              | `filter.ts` / `filterPresets.ts` / `lut.ts` / `editor-colors.ts`                                                           | mergeFilterParams, 6 category presets, 3D LUT parse and apply, CHANNEL_COLORS                                                                 |
+| Game Data            | `enum-mappings.ts` / `cloth-name-lookup.ts` / `location-data.ts` / `location-map.ts`                                       | Game enum → Chinese mapping, clothing/outfit name lookup, location hierarchy, coordinate → location mapping                                   |
+| Business Helpers     | `group-field.ts` / `gallery.tsx` / `responsive.ts` / `category-name.ts` / `duplicateContextMenu.ts` / `scan-exclusions.ts` | Group field extraction, context menu construction, responsive column count, category name resolution, duplicate context menu, scan exclusions |
+| Share and Events     | `share.ts` / `game-events.ts`                                                                                              | Share helpers, game event mapping                                                                                                             |
+| Animation and Errors | `motionPresets.ts` / `global-error-handler.ts` / `fault-colors.ts`                                                         | Motion animation presets, global error fallback, fault type metadata                                                                          |
 
 ### 6.11 Internationalization (i18n/)
 
@@ -1013,7 +1117,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 
 ### 6.13 Icon Management (icons/)
 
-- **Single-file centralized management of all icons**, exports 73 icon components
+- **Single-file centralized management of all icons**, exports 74 icon components
 - Based on `BaseIcon` unified wrapper: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">`, follows Feather/Lucide style
 - `IconProps` interface extends `React.SVGProps<SVGSVGElement>` + `size?: number` (default 16)
 - Categorized by purpose: Action (17) / View (5) / Navigation (7) / Editor (10) / Media (5) / Status (4) / File Ops (5) / Category & Tag (3) / Share Channel (4) / Import-Export (2) / Playback Control (2) / Social Platform (3) / Other (7)
@@ -1052,22 +1156,28 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 
 ---
 
-## 7. Shared Modules (src/shared and src/common)
+## 7. Shared Modules (src/shared)
 
 ### 7.1 Shared Types (shared/types/)
 
-`src/shared/types/index.ts` is the unified export entry, aggregating 8 domain type modules. All adopt the "database row (XxxRow, snake_case) ↔ renderer model (Xxx, camelCase)" dual-track system.
+`src/shared/types/index.ts` is the unified export entry, aggregating 14 domain type modules. All adopt the "database row (XxxRow, snake_case) ↔ renderer model (Xxx, camelCase)" dual-track system.
 
-| File             | Core Types                                                                                                                                                                                                                                                            |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **media.ts**     | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile` (27 fields) / `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                         |
-| **category.ts**  | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon` (7 enums)                                                                                                                                                              |
-| **profile.ts**   | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                       |
-| **editor.ts**    | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (13 op types) / `OperationHistoryRow`                                                                        |
-| **watermark.ts** | `WatermarkPosition` (9 + custom) / `WatermarkStyle` (5 types) / `BlendMode` (16 types) / `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                   |
-| **settings.ts**  | `AppSettingRow` / `SettingKey` (29 key enums) / `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap` (key → TS type mapping) / `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                               |
-| **ipc.ts**       | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (13 domains ~60 channel name constants) |
-| **ipc-types.ts** | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (9 IPC_* error codes)                                                                                             |
+| File                   | Core Types                                                                                                                                                                                                                                                            |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile` (27 fields) / `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                         |
+| **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon` (7 enums)                                                                                                                                                              |
+| **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                       |
+| **editor.ts**          | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (13 op types) / `OperationHistoryRow`                                                                        |
+| **watermark.ts**       | `WatermarkPosition` (9 + custom) / `WatermarkStyle` (5 types) / `BlendMode` (16 types) / `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                   |
+| **settings.ts**        | `AppSettingRow` / `SettingKey` (29 key enums) / `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap` (key → TS type mapping) / `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                               |
+| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (13 domains ~60 channel name constants) |
+| **ipc-types.ts**       | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (9 IPC_* error codes)                                                                                             |
+| **progress.ts**        | `TaskType` (7 task types: scan/duplicate/batch/watermark/import/video-edit/indexing), `TaskPhase` (6 phases), unified task progress state (pushed via the main-process `task:progress` channel)                                                                       |
+| **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` capability list / business extension point constants and extension response types                                                                                                                                         |
+| **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / XMP self-describing serialization structures for color, filter, LUT and watermark params                                                                                                                                           |
+| **duplicate.ts**       | `DuplicateItem` / duplicate-similarity domain types (main-process handler return contract, consumed by DuplicatesPage)                                                                                                                                                |
+| **resonance.ts**       | Resonance domain types + zod schemas + import limit constants (added in 2.5.0)                                                                                                                                                                                        |
+| **electron-api.ts**    | Type snapshots of preload `electronAPI` namespace method signatures and DTOs (the preload layer does not inline type definitions)                                                                                                                                     |
 
 ### 7.2 Error Architecture (shared/errors/)
 
@@ -1104,18 +1214,10 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 - **`OUTFIT_PRESETS`**: 34 Infinity Nikki preset outfit names
 - Core functions: `detectSceneCategory(filePath)` / `getSceneCategoryLabel` / `getSceneTimeLabel`
 
-### 7.4 Common Utilities (common/utils/)
+### 7.4 Common Utilities (renderer/utils/)
 
-`src/common/utils/index.ts` re-exports 6 pure function modules. Main and renderer share the same implementation; none depend on Node/Electron/DOM APIs.
-
-| File        | Exported Functions                                                                                                     | Purpose                                                           |
-| ----------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `string.ts` | `pad(n, len=2)` / `truncate(s, maxLen=20)`                                                                             | Number padding, string ellipsis truncation                        |
-| `date.ts`   | `formatDate` / `formatDateTime` / `formatTimestamp` / `formatCompactTimestamp` / `formatDateOrDash` / `formatDuration` | Unified Date/string/number input; NaN/Infinity safe fallback      |
-| `format.ts` | `formatSize(bytes, decimals=2)` / `formatFileSize`                                                                     | Bytes → B/KB/MB/GB/TB                                             |
-| `id.ts`     | `generateId(prefix?)`                                                                                                  | Prefer `crypto.randomUUID()`, fallback `${Date.now()}-${rand36}`  |
-| `object.ts` | `deepClone<T>(value)`                                                                                                  | Prefer `structuredClone`, fallback `JSON.parse(JSON.stringify())` |
-| `path.ts`   | `getDirName` / `joinPath` / `getExtName` / `getBaseName`                                                               | Pure string path ops; compatible with Windows `\` and POSIX `/`   |
+`src/common/utils/` was originally a cross-process shared pure-utility module; it had no production references (dead code) and was removed entirely during the lightweight optimization pass.
+Formatting / date / ETA utilities are consolidated in `src/renderer/utils/` (`format.ts` / `date.ts` etc.), while main-process utilities are cohesive in `src/main/utils/`.
 
 ---
 
@@ -1155,7 +1257,7 @@ better-sqlite3 (WAL mode, wxnn_photo_manager.db)
 1. **Renderer** `mediaStore.ts` calls `window.electronAPI.media.list({ page, pageSize, accountUid, albumType, hideDuplicates, ... })`
 2. **preload.ts** `media.list = (options) => call<MediaListResult>('media:list', options)`
 3. **`call<T>`** internally: `ipcRenderer.invoke('media:list', options)` → receives `IpcResponse<MediaListResult>` → returns `data` on success, `throw new IpcError(...)` on failure
-4. **Main process** `ipc/handlers/media.ts`:
+4. **Main process** `ipc/handlers/media-handler.ts`:
    ```ts
    ipcMain.handle('media:list',
      wrapHandler(ctx, z.tuple([z.object({...}).optional()]),
@@ -1318,7 +1420,7 @@ components / pages (display)
 - `contextIsolation: true` — context isolation
 - `nodeIntegration: false` — disable Node integration
 - `sandbox: true` — sandbox mode
-- `protocol.registerSchemesAsPrivileged` — media:// protocol privilege declaration
+- `protocol.registerSchemesAsPrivileged` — media:// and app:// protocol privilege declaration
 
 #### 10.1.2 IPC Path Whitelist (PathGuard)
 
@@ -1356,7 +1458,7 @@ components / pages (display)
 #### 10.2.2 Startup Diagnostics (startup-diagnostic.ts)
 
 - Provides independent error recording capability before logger system is ready
-- Directly writes to `userData/startup-errors.log`
+- Directly writes to `Documents/NikkiGallery/Diagnostics/startup-errors.log` (tmpdir fallback)
 - 100KB rolling cap
 
 #### 10.2.3 Crash Reports (crash-service.ts)
@@ -1414,7 +1516,22 @@ components / pages (display)
 "dist": "npm run build && electron-builder --publish never",
 "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
 "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts",
-"verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar"
+"verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
+"typecheck": "tsc -b",
+"typecheck:e2e": "tsc --noEmit -p e2e",
+"lint / lint:fix": "eslint . (--fix for auto-fix)",
+"format / format:check": "prettier (covers src / scripts / .storybook / root)",
+"test / test:watch / test:coverage / test:main / test:renderer / test:db": "vitest (directory variants)",
+"i18n:check / i18n:extract / i18n:extract:gallery / i18n:status / i18n:extract-legacy / i18n:prune-whitelist / i18n:codemod / i18n:guard / sync-i18n-keys": "i18n script family (scripts/i18n/)",
+"preview:check": "tsx scripts/check-preview-drift.ts",
+"e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep-invert @perf",
+"e2e:perf": "playwright test --config e2e/playwright.config.ts --grep @perf",
+"dist:win:smoke / dist:win:perf": "package + smoke / perf one-shot",
+"perf:save-baseline": "tsx scripts/perf-test/save-perf-baseline.ts",
+"storybook": "storybook dev -p 6006",
+"build-storybook": "storybook build -o storybook-static",
+"commit": "cz (commitizen interactive commit)",
+"commitlint / commitlint:check": "commitlint message validation"
 ```
 
 > Removed legacy scripts: `build:main` / `build:renderer` (now handled by `electron-vite`) and `rebuild:native`
@@ -1423,12 +1540,15 @@ components / pages (display)
 
 ### 11.2 Build Configuration
 
-#### `vite.config.ts` (Renderer)
+#### `electron.vite.config.ts` (Main / preload / renderer three-segment)
 
-- `base: './'` — relative paths, convenient for `file://` loading
-- `root: './src/renderer'`, `build.outDir: '../../dist/renderer'`
-- `resolve.alias`: `@` → renderer, `@main` → main, `@common` → common
-- dev port 5173
+- **main**: 6 lib entries (`index` / `scanner-worker` / `media-worker` / `thumbnail-worker` / `video-worker` / `database-worker`, each a worker-entry.ts), outDir `dist/main/main/app`, CJS output; `writeCommonjsShim()` writes `dist/main/package.json {"type":"commonjs"}`
+- **preload**: entry `src/main/preload.ts`, outDir `dist/main/main`, define injects `__NIKKI_PRELOAD_DEV__`
+- **renderer**: `root: './src/renderer'`, dev port 5173 (strictPort), outDir `dist/renderer`; `resolve.alias`: `@` → renderer, `@main` → main, `@common` → common (`src/common` removed; alias kept as legacy), `electron` → `scripts/electron-browser-stub.js`; define injects `__PREVIEW__: false`
+
+#### `vite.preview.config.ts` (Single-file preview)
+
+- `vite-plugin-singlefile` full-inline bundling, outputs root `preview.html`; define injects `__PREVIEW__: true`
 
 #### `tsconfig.json` (Root, Renderer)
 
@@ -1456,14 +1576,14 @@ components / pages (display)
 - `productName: 无限暖暖相册管理工具`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**: 5 native module types unpacked to disk — `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `sharp` / `@img` / `koffi` / `nuan5_decryption.dll`
+- **`asarUnpack`**: 10 native dependency entries unpacked to disk — `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
 - **Windows NSIS**: x64, non-one-click, allows custom install dir, force create desktop shortcut + start menu shortcut
 - `signAndEditExecutable: false` / `verifyUpdateCodeSignature: false` — code signing not enabled
 
 ### 11.3 Build Flow
 
 1. `clean` — delete `dist/renderer/assets` and `dist/main`
-2. `electron-vite build` — compiles the main process (`src/main` + `shared/` + `common/`, CJS) → `dist/main/`, and bundles the React app with Vite → `dist/renderer/`; then writes `dist/main/package.json` (`{"type":"commonjs"}`)
+2. `electron-vite build` — compiles the main process (`src/main` + `shared/`, CJS) → `dist/main/`, and bundles the React app with Vite → `dist/renderer/`; then writes `dist/main/package.json` (`{"type":"commonjs"}`)
 3. `pre-dist-check` — verifies main / renderer artifact timestamp gap ≤ 5 minutes, that key fixpoints are compiled in, and that the Git working tree is clean; also verifies the Electron version in `README.md` matches `package.json` (a mismatch blocks packaging)
 4. `electron-builder --win --publish never` — packages the NSIS installer per `package.json#build` into `release/` as `NikkiGallery-Setup-<version>.exe`; the afterPack hook `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe`
 5. `verify:dist` — `pre-dist-check --verify-asar`, asserting runtime dependencies such as the VC++ runtime are bundled
@@ -1532,7 +1652,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 ### 12.5 Native Binary Dependencies
 
-- `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `sharp` / `@img` / `koffi` / `nuan5_decryption.dll` must be unpacked via `asarUnpack`
+- `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` must be unpacked via `asarUnpack`
 - ffmpeg/ffprobe paths must replace `app.asar` → `app.asar.unpacked` via the `native-path.ts` utility
 
 ### 12.6 Scanner Constraints
@@ -1565,9 +1685,9 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 ### 12.9 Log Constraints
 
 - Log files must not contain user privacy data
-- Log storage must not exceed 5GB; auto-deletes oldest on overflow
+- Log storage must not exceed 2GB; oldest-by-mtime eviction on overflow (see §10.2.1)
 - Log files named by date; auto-rolling storage
-- Crash dump files limited to 20 most recent; older files auto-cleaned
+- Crash dump files limited to 10 most recent; older files auto-cleaned (see §10.2.3)
 
 ### 12.10 App Initialization Constraints
 
@@ -1660,9 +1780,9 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 ## Appendix A: Core Design Patterns
 
-### A.1 Three-Process Isolation
+### A.1 Multi-Process Isolation
 
-DB writes / scanning / thumbnail+pHash+duplicate detection each run in an independent utilityProcess, avoiding main process event loop blocking.
+DB writes / scanning / thumbnail+pHash+duplicate detection / sharp scaling / video editing each run in an independent utilityProcess, avoiding main process event loop blocking.
 
 ### A.2 Priority Scheduling
 
@@ -1730,32 +1850,39 @@ Theme switching with zero JS re-render.
 
 ### B.1 Entry and Config
 
-| File                     | Purpose                                |
-| ------------------------ | -------------------------------------- |
-| `src/main/index.ts`      | Main process entry (Application class) |
-| `src/main/preload.ts`    | preload script (contextBridge)         |
-| `src/renderer/main.tsx`  | Renderer process entry                 |
-| `src/renderer/App.tsx`   | App root component                     |
-| `package.json`           | Dependencies and build config          |
-| `vite.config.ts`         | Vite build config                      |
-| `tsconfig.json`          | TypeScript config (root, renderer)     |
-| `src/main/tsconfig.json` | TypeScript config (main process)       |
-| `tailwind.config.ts`     | Tailwind config                        |
-| `eslint.config.js`       | ESLint config                          |
+| File                      | Purpose                                                                           |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `src/main/index.ts`       | Main process entry (early guards + protocol registration + Application bootstrap) |
+| `src/main/preload.ts`     | preload entry (assembly + contextBridge; module tree in `src/main/preload/`)      |
+| `src/renderer/main.tsx`   | Renderer process entry                                                            |
+| `src/renderer/App.tsx`    | App root component                                                                |
+| `package.json`            | Dependencies and build config                                                     |
+| `electron.vite.config.ts` | Main/preload/renderer three-segment build config                                  |
+| `vite.preview.config.ts`  | Single-file preview build config                                                  |
+| `tsconfig.json`           | TypeScript config (root, renderer)                                                |
+| `src/main/tsconfig.json`  | TypeScript config (main process)                                                  |
+| `tailwind.config.ts`      | Tailwind config                                                                   |
+| `eslint.config.js`        | ESLint config                                                                     |
 
 ### B.2 Types and Errors
 
-| File                               | Purpose                                              |
-| ---------------------------------- | ---------------------------------------------------- |
-| `src/shared/types/index.ts`        | Shared types unified export                          |
-| `src/shared/types/media.ts`        | Media domain types                                   |
-| `src/shared/types/ipc.ts`          | IPC domain types + IPC_CHANNELS registry             |
-| `src/shared/types/ipc-types.ts`    | IpcResponse / IpcError contract layer                |
-| `src/shared/errors/app-error.ts`   | AppError class and 6 subclasses                      |
-| `src/shared/errors/error-codes.ts` | Error codes and category mapping                     |
-| `src/shared/dimension.ts`          | Smart grouping dimensions                            |
-| `src/shared/scene-category.ts`     | Game scene categories                                |
-| `src/shared/types/resonance.ts`    | Resonance domain types + zod schemas + import limits |     |
+| File                                  | Purpose                                              |
+| ------------------------------------- | ---------------------------------------------------- |
+| `src/shared/types/index.ts`           | Shared types unified export                          |
+| `src/shared/types/media.ts`           | Media domain types                                   |
+| `src/shared/types/ipc.ts`             | IPC domain types + IPC_CHANNELS registry             |
+| `src/shared/types/ipc-types.ts`       | IpcResponse / IpcError contract layer                |
+| `src/shared/types/progress.ts`        | Task progress state protocol                         |
+| `src/shared/types/plugin.ts`          | Plugin system shared types                           |
+| `src/shared/types/editor-metadata.ts` | Editor params XMP serialization types                |
+| `src/shared/types/duplicate.ts`       | Duplicate/similarity domain types                    |
+| `src/shared/types/electron-api.ts`    | Preload electronAPI DTO type snapshots               |
+| `src/shared/settings-keys.ts`         | Renderer-writable key whitelist + sensitive key list |
+| `src/shared/errors/app-error.ts`      | AppError class and 6 subclasses                      |
+| `src/shared/errors/error-codes.ts`    | Error codes and category mapping                     |
+| `src/shared/dimension.ts`             | Smart grouping dimensions                            |
+| `src/shared/scene-category.ts`        | Game scene categories                                |
+| `src/shared/types/resonance.ts`       | Resonance domain types + zod schemas + import limits |     |
 
 ### B.3 Main Process Core
 
@@ -1813,7 +1940,7 @@ Theme switching with zero JS re-render.
 | `src/renderer/i18n/index.ts`                           | i18n entry                                                                                                       |
 | `src/renderer/styles/globals.css`                      | Global styles + CSS variables                                                                                    |
 | `src/renderer/styles/themes/index.ts`                  | Theme config center                                                                                              |
-| `src/renderer/icons/index.tsx`                         | 73 SVG icons centrally managed                                                                                   |
+| `src/renderer/icons/index.tsx`                         | 74 SVG icons centrally managed                                                                                   |
 | `src/renderer/pages/ResonanceRecordsPage.tsx`          | Resonance Records page (records / wardrobe / import-export / stats)                                              |
 | `src/renderer/stores/resonanceStore.ts`                | Resonance store                                                                                                  |
 | `src/renderer/components/resonance/`                   | Resonance views (Records / Wardrobe / ImportExport / Stats / AddRecordDialog)                                    |

@@ -4,8 +4,8 @@
 > **应用名称**：无限暖暖相册管理工具（NikkiGallery）
 > **当前版本**：2.5.0
 > **平台**：Windows x64
-> **文档版本**：1.3
-> **最后更新**：2026-08-30
+> **文档版本**：1.4
+> **最后更新**：2026-09-06
 
 ---
 
@@ -17,7 +17,7 @@
 - [4. 目录结构](#4-目录结构)
 - [5. 主进程模块职责（src/main）](#5-主进程模块职责srcmain)
 - [6. 渲染进程模块职责（src/renderer）](#6-渲染进程模块职责srcrenderer)
-- [7. 共享模块（src/shared 与 src/common）](#7-共享模块srcshared-与-srccommon)
+- [7. 共享模块（src/shared）](#7-共享模块srcshared)
 - [8. 数据流](#8-数据流)
 - [9. 数据库架构](#9-数据库架构)
 - [10. 安全与可观测性](#10-安全与可观测性)
@@ -96,7 +96,7 @@
 
 #### 为什么用 utilityProcess 而不是 worker_threads？
 
-Electron 40 提供 `utilityProcess` API，独立进程级隔离、独立事件循环、独立 V8 上下文，比 worker_threads 更适合 CPU 密集型任务（如 sharp 缩略图、pHash 计算）。三个 worker（scanner / database / media）各自独立，单个崩溃不影响主进程。
+Electron 40 提供 `utilityProcess` API，独立进程级隔离、独立事件循环、独立 V8 上下文，比 worker_threads 更适合 CPU 密集型任务（如 sharp 缩略图、pHash 计算）。五个 worker（scanner / database / media / thumbnail / video）各自独立，单个崩溃不影响主进程。
 
 #### 为什么用 better-sqlite3 而不是 sqlite3？
 
@@ -119,7 +119,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ BrowserWindow │  │  IPC Handlers│  │  media:// Protocol    │  │
-│  │  (Renderer)   │  │(~15 domains) │  │  (Path Whitelist)     │  │
+│  │  (Renderer)   │  │(~40 handlers)│  │  (Path Whitelist)     │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
@@ -154,21 +154,26 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
                    │  .db (SQLite WAL)    │
                    │  userData/database/  │
                    └─────────────────────┘
+
+   （另有两个 utilityProcess：thumbnail-worker —— sharp 缩放；
+     video-worker —— 视频编辑 FFmpeg 执行，见 §5.6 / §5.12）
 ```
 
 ### 3.2 进程职责矩阵
 
-| 进程                | 入口                                          | 职责                                                                                                | 通信方式                                   |
-| ------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **主进程**          | `src/main/index.ts`                           | BrowserWindow 管理、IPC handler 注册、media:// 协议、nativeTheme 同步、单实例锁、启动编排、退出清理 | ipcMain.handle / webContents.send          |
-| **Renderer**        | `src/renderer/main.tsx`                       | UI 渲染、用户交互、状态管理                                                                         | window.electronAPI (preload contextBridge) |
-| **scanner-worker**  | `src/main/scanner/worker-entry.ts`            | 全盘/增量/签名扫描、文件元数据提取、缺失检测、旧数据修复                                            | utilityProcess.parentPort                  |
-| **database-worker** | `src/main/database/worker/database-worker.ts` | 承接所有 `media_files` / `categories` / `character_profiles` 写操作（INSERT/UPDATE/DELETE/事务）    | utilityProcess.parentPort                  |
-| **media-worker**    | `src/main/media-worker/worker-entry.ts`       | 缩略图批量生成（sharp）、pHash 批量补算（DCT-II）、重复标记（Union-Find）                           | utilityProcess.parentPort                  |
+| 进程                 | 入口                                          | 职责                                                                                                | 通信方式                                   |
+| -------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **主进程**           | `src/main/index.ts`                           | BrowserWindow 管理、IPC handler 注册、media:// 协议、nativeTheme 同步、单实例锁、启动编排、退出清理 | ipcMain.handle / webContents.send          |
+| **Renderer**         | `src/renderer/main.tsx`                       | UI 渲染、用户交互、状态管理                                                                         | window.electronAPI (preload contextBridge) |
+| **scanner-worker**   | `src/main/scanner/worker-entry.ts`            | 全盘/增量/签名扫描、文件元数据提取、缺失检测、旧数据修复                                            | utilityProcess.parentPort                  |
+| **database-worker**  | `src/main/database/worker/database-worker.ts` | 承接所有 `media_files` / `categories` / `character_profiles` 写操作（INSERT/UPDATE/DELETE/事务）    | utilityProcess.parentPort                  |
+| **media-worker**     | `src/main/media-worker/worker-entry.ts`       | 缩略图批量生成（sharp）、pHash 批量补算（DCT-II）、重复标记（Union-Find）                           | utilityProcess.parentPort                  |
+| **thumbnail-worker** | `src/main/thumbnail/worker-entry.ts`          | sharp 缩放实现（迁移自 ThumbnailGenerator 的 CPU 密集部分）                                         | utilityProcess.parentPort                  |
+| **video-worker**     | `src/main/video-editor/worker-entry.ts`       | 视频编辑的 FFmpeg 命令构建与执行、进度上报                                                          | utilityProcess.parentPort                  |
 
 ### 3.3 通信协议
 
-三个 utilityProcess 采用模式一致但协议独立的消息格式，所有消息均为可序列化 JSON。
+五个 utilityProcess 采用模式一致但协议独立的消息格式，所有消息均为可序列化 JSON。以下列出 scanner / database / media 三者的协议；thumbnail-worker（`THUMBNAIL_PROCESS_START` / `THUMBNAIL_WORKER_DISPOSE` → `WORKER_READY` / `THUMBNAIL_PROCESS_COMPLETE`）与 video-worker（`EDIT_START` / `EDIT_STOP` / `EDITOR_DISPOSE` → `WORKER_READY` / `EDIT_PROGRESS` / `EDIT_COMPLETE`）的协议定义见 `src/main/thumbnail/worker-protocol.ts` 与 `src/main/video-editor/worker-protocol.ts`。
 
 #### scanner-worker 协议
 
@@ -263,7 +268,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 14. ensureDesktopShortcut()（仅 packaged 环境，fire-and-forget）
 
 15. 启动后延迟任务（taskScheduler.enqueueLow）：
-    ├─ STARTUP_SCAN_DELAY_MS (1500ms) → performStartupScan()
+    ├─ STARTUP_SCAN_DELAY_MS (5000ms) → performStartupScan()
     ├─ +5s → thumbnailGen.enforceLimitNow()
     └─ +6s → enforceCrashLimit()
     同时：thumbnailGen.startLruBackgroundTask()（每 5 分钟）
@@ -320,58 +325,80 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 wxnn-photo-manager/
 ├── docs/                              # 项目文档
 │   ├── archive/                       # 历史归档文档（计划、报告、规范、旧架构文档）
+│   ├── i18n/                          # i18n 改造 SOP 与白名单状态快照
+│   ├── plans/                         # 近期实施计划与报告
 │   ├── screenshots/                   # 截图
-│   ├── archive/项目架构全景.md
-│   └── v2.3.0 Release Notes.md
+│   ├── storybook/                     # Storybook MDX 指南
+│   ├── tutorial/                      # 用户使用教程（MD + 单文件版）
+│   └── IPC_CONTRACT.md / PLUGIN_API.md 等
 ├── resources/                         # 应用资源
 │   ├── icons/                         # 应用图标（ico/svg）
 │   └── nuan5_decryption.dll           # 游戏图片参数解密 DLL
 ├── scripts/                           # 构建辅助脚本
+│   ├── after-pack-vc-runtime.cjs      # afterPack 复制 VC++ 运行库
+│   ├── pre-dist-check.ts              # 打包预检查（产物时间戳/修复点/Git 干净）
+│   ├── check-doc-versions.ts          # README Electron 版本一致性校验
 │   ├── check-i18n-keys.ts             # i18n 键完整性检查
 │   ├── check-preview-drift.ts         # HTML 预览版漂移检查
 │   ├── generate-icon.js               # 图标生成
-│   └── perf-test/                     # 性能测试
+│   ├── copy-resonance-thumbnails.ts / generate-resonance-*.ts / sync-i18n-keys.ts
+│   ├── electron-browser-stub.js       # 预览版 / Storybook 的 electron 桩
+│   ├── i18n/                          # i18n 提取/守护脚本
+│   └── perf-test/                     # 性能基线脚本
 ├── src/
-│   ├── common/                        # 跨进程通用工具（纯函数，无 Node/Electron 依赖）
-│   │   └── utils/
-│   │       ├── date.ts / format.ts / id.ts / object.ts / path.ts / string.ts
-│   │       └── index.ts
 │   ├── main/                          # 主进程
-│   │   ├── app/                       # 应用生命周期管理（14 个文件）
-│   │   │   ├── application.ts         # 应用主类
-│   │   │   ├── lifecycle.ts           # 生命周期管理
+│   │   ├── app/                       # 应用生命周期管理（23 个源文件）
+│   │   │   ├── application.ts         # 应用主类（阶段化编排）
+│   │   │   ├── lifecycle.ts           # 生命周期管理（单实例锁等）
 │   │   │   ├── cleanup.ts             # 退出清理
 │   │   │   ├── startup-tasks.ts       # 启动任务
+│   │   │   ├── startup-environment.ts # 启动环境检测
 │   │   │   ├── window-manager.ts      # 窗口管理
+│   │   │   ├── navigation-guard.ts    # 导航授信判定（will-navigate 拦截）
 │   │   │   ├── desktop-shortcut.ts    # 桌面快捷方式
 │   │   │   ├── error-handlers.ts      # 错误处理
 │   │   │   ├── ipc-setup.ts           # IPC 注册编排
 │   │   │   ├── media-protocol.ts      # media:// 协议
+│   │   │   ├── renderer-protocol.ts   # app:// 渲染文档协议
+│   │   │   ├── renderer-bridge.ts     # 渲染层事件桥
 │   │   │   ├── media-update.ts        # 媒体更新通知
 │   │   │   ├── recovery.ts            # 恢复逻辑
 │   │   │   ├── theme.ts               # 主题同步
 │   │   │   ├── custom-dirs.ts         # 自定义目录
+│   │   │   ├── auto-update.ts         # 自动更新
+│   │   │   ├── exit-forensics.ts      # 退出取证
+│   │   │   ├── gpu-fallback.ts        # GPU 回退决策
+│   │   │   ├── native-load-guard.ts   # 原生模块加载预检
+│   │   │   ├── permission.ts          # 权限管理
 │   │   │   └── app-context.ts         # 应用上下文
 │   │   ├── database/                  # 数据库层
 │   │   │   ├── connection.ts          # DatabaseManager
 │   │   │   ├── media-repository.ts    # MediaRepository（SQL 访问层）
+│   │   │   ├── resonance-repository.ts # 共鸣录 Repository
+│   │   │   ├── import-root-repository.ts # 导入根目录 Repository
+│   │   │   ├── sql-chunk.ts           # SQL 分块工具
 │   │   │   └── worker/                # database-worker（utilityProcess）
 │   │   ├── scanner/                   # 扫描器
 │   │   │   ├── index.ts               # ScannerManager（薄壳）
 │   │   │   ├── scanner-worker-bridge.ts
 │   │   │   ├── path-classifier.ts     # 路径分类纯函数
+│   │   │   ├── scan-channels.ts       # 扫描通道编排
+│   │   │   ├── game-directory-discovery.ts # 游戏目录三渠道发现
+│   │   │   ├── repair-legacy-data-v1..v6.ts # 旧数据修复系列
 │   │   │   ├── worker-entry.ts        # scanner-worker 入口
 │   │   │   └── worker-protocol.ts
 │   │   ├── media-worker/              # media-worker（缩略图/pHash/重复检测）
 │   │   │   ├── manager.ts             # MediaWorkerManager（薄壳）
 │   │   │   ├── bridge.ts
+│   │   │   ├── bktree-index.ts / bktree-js.ts # pHash BK-树索引
 │   │   │   ├── worker-entry.ts
 │   │   │   └── worker-protocol.ts
 │   │   ├── scheduler/
 │   │   │   └── task-scheduler.ts      # 分级任务调度队列
 │   │   ├── thumbnail/
-│   │   │   └── generator.ts           # ThumbnailGenerator（单条生成 + LRU）
-│   │   ├── services/                  # 业务服务层（12 个 service）
+│   │   │   ├── generator.ts           # ThumbnailGenerator（单条生成 + LRU）
+│   │   │   └── worker-*.ts            # thumbnail-worker（utilityProcess：sharp 缩放）
+│   │   ├── services/                  # 业务服务层（13 个 service）
 │   │   │   ├── file-service.ts
 │   │   │   ├── video-service.ts
 │   │   │   ├── watermark-service.ts
@@ -383,21 +410,26 @@ wxnn-photo-manager/
 │   │   │   ├── share-wifi-service.ts
 │   │   │   ├── thumbnail-phash-service.ts
 │   │   │   ├── decryption-service.ts
+│   │   │   ├── xmp-metadata-service.ts
 │   │   │   └── log-service.ts
 │   │   ├── ipc/                       # IPC 层
 │   │   │   ├── handler-context.ts     # 依赖注入上下文
 │   │   │   ├── validator.ts           # wrapHandler + PathGuard + schemas
-│   │   │   └── handlers/              # ~15 个域 + set-dir-handler 工厂（30 个文件）
-│   │   │       ├── media-handler.ts / media-lifecycle-handler.ts
-│   │   │       ├── file.ts / video.ts / watermark.ts / editor.ts
+│   │   │   ├── media-read-guard.ts    # assertMediaReadPath（含 realpath 复检）
+│   │   │   └── handlers/              # 约 40 个域文件（含 set-dir-handler 工厂与 _shared 辅助）
+│   │   │       ├── media-handler.ts / media-lifecycle-handler.ts / media-cleanup-handler.ts
+│   │   │       ├── file.ts / file-export-handler.ts / file-rename-handler.ts
+│   │   │       ├── video.ts / watermark.ts / editor.ts
+│   │   │       ├── editor-metadata-handler.ts / editor-preset-handler.ts / export-pref-handler.ts
 │   │   │       ├── backup.ts / cache.ts / log.ts / crash.ts
-│   │   │       ├── share.ts / scanner-handler.ts / shell-handler.ts
+│   │   │       ├── share.ts / scanner-handler.ts / scan-log-handler.ts / shell-handler.ts
 │   │   │       ├── app-handler.ts / settings-handler.ts / theme-handler.ts
-│   │   │       ├── dialog-handler.ts / import-handler.ts / data-handler.ts
+│   │   │       ├── dialog-handler.ts / import-handler.ts / import-root-handler.ts / data-handler.ts
 │   │   │       ├── decrypt-handler.ts / duplicate-handler.ts / similar-handler.ts
 │   │   │       ├── operation-history-handler.ts / task-handler.ts
 │   │   │       ├── profile-handler.ts / search-index-handler.ts
-│   │   │       ├── thumbnail-handler.ts / category-handler.ts / plugin.ts
+│   │   │       ├── thumbnail-handler.ts / category-handler.ts / plugin.ts / plugin-bridge-handler.ts
+│   │   │       ├── resonance-handler.ts
 │   │   │       └── set-dir-handler.ts
 │   │   ├── plugins/                   # 插件宿主
 │   │   │   ├── plugin-host.ts         # 插件加载与生命周期
@@ -406,24 +438,28 @@ wxnn-photo-manager/
 │   │   │   ├── bridge.ts              # 主进程侧桥接层
 │   │   │   ├── filter-builder.ts      # FFmpeg 滤镜构建
 │   │   │   ├── watermark-builder.ts   # 水印叠加
+│   │   │   ├── types.ts               # 视频编辑类型定义
 │   │   │   ├── worker-entry.ts        # worker 进程入口
 │   │   │   └── worker-protocol.ts     # 消息协议
 │   │   ├── i18n/                      # 主进程国际化
-│   │   │   └── index.ts
-│   │   ├── utils/                     # 主进程工具（17 个模块）
-│   │   │   ├── concurrency.ts / constants.ts / dir-manager.ts
-│   │   │   ├── disk.ts / duplicate-scoring.ts / ffmpeg-paths.ts
-│   │   │   ├── ffmpeg-runner.ts / file-utils.ts / eta-calculator.ts
-│   │   │   ├── ipc-validate.ts / logger.ts / media-constants.ts
-│   │   │   ├── phash.ts / process-registry.ts / task-registry.ts
-│   │   │   ├── scene-brightness.ts / scene-category.ts
-│   │   │   ├── startup-diagnostic.ts / video-probe.ts
+│   │   │   ├── index.ts
+│   │   │   └── worker-safe.ts         # worker 内纯查表翻译
+│   │   ├── utils/                     # 主进程工具（26 个模块）
+│   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
+│   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
+│   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
+│   │   │   ├── logger.ts / managed-read-stream.ts / media-constants.ts / path-safety.ts
+│   │   │   ├── phash.ts / process-registry.ts / progress-throttle.ts
+│   │   │   ├── scene-brightness.ts / startup-diagnostic.ts
+│   │   │   ├── task-registry.ts / user-diag-path.ts / video-frame.ts / video-probe.ts
+│   │   │   └── worker-restart-policy.ts
 │   │   ├── types/                     # 主进程类型声明
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
 │   │   │   ├── ffprobe-static.d.ts / koffi.d.ts
-│   │   ├── index.ts                   # 主进程入口（Application 类）
+│   │   ├── index.ts                   # 主进程入口（早期防护 + 协议注册 + 启动 Application）
 │   │   ├── preload.ts                 # preload 入口（装配 + contextBridge 暴露）
-│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 28 个命名空间）
+│   │   ├── preload-logger.ts          # 渲染层日志转发 preload
+│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 29 个命名空间）
 │   │   └── tsconfig.json
 │   ├── renderer/                      # 渲染进程
 │   │   ├── assets/                    # 静态资源
@@ -434,16 +470,18 @@ wxnn-photo-manager/
 │   │   │   ├── editor/                # 编辑器组件（12 个）
 │   │   │   ├── gallery/               # 画廊组件（16 个）
 │   │   │   ├── layout/                # 布局组件（AppShell/Sidebar/TitleBar）
+│   │   │   ├── resonance/             # 共鸣录视图组件
 │   │   │   ├── scanner/               # 扫描组件（ScanButton/ScanProgress）
 │   │   │   └── video/                 # VideoPlayer
-│   │   ├── hooks/                     # 22 个自定义 hooks
+│   │   ├── data/resonance/            # 共鸣录静态数据（图鉴/卡池/百分位/12 语言名/缩略图）
+│   │   ├── hooks/                     # 23 个自定义 hooks
 │   │   ├── i18n/                      # 国际化
 │   │   │   ├── index.ts
 │   │   │   └── locales/               # 12 种语言 JSON
-│   │   ├── icons/                     # 73 个 SVG 图标集中管理
+│   │   ├── icons/                     # 74 个 SVG 图标集中管理（单文件）
 │   │   │   └── index.tsx
-│   │   ├── pages/                     # 8 个页面
-│   │   │   ├── settings/              # 设置页 8 个 section
+│   │   ├── pages/                     # 9 个页面
+│   │   │   ├── settings/              # 设置页 sections（按分组拆分文件）
 │   │   │   ├── GalleryPage.tsx
 │   │   │   ├── CategoriesPage.tsx
 │   │   │   ├── DetailPage.tsx
@@ -451,21 +489,25 @@ wxnn-photo-manager/
 │   │   │   ├── EditorPage.tsx
 │   │   │   ├── OutfitGalleryPage.tsx
 │   │   │   ├── RecycleBinPage.tsx
+│   │   │   ├── ResonanceRecordsPage.tsx
 │   │   │   └── SettingsPage.tsx
 │   │   ├── plugins/                  # 插件运行时（plugin-runtime.ts）
 │   │   ├── preview/                   # 预览版 mock 数据与安装脚本
-│   │   │   ├── mock/                  # mock 数据（media/categories/profiles...）
+│   │   │   ├── index.html             # 预览版入口 HTML
+│   │   │   ├── mock/                  # mock 数据（media/categories/resonance...）
 │   │   │   └── install.ts             # 预览环境安装
 │   │   ├── search/                    # 全文搜索索引
 │   │   │   ├── search-index.ts        # FlexSearch 索引管理
 │   │   │   ├── search-service.ts      # 搜索服务
 │   │   │   ├── doc-builder.ts         # 文档构建器
 │   │   │   └── use-search-index.ts    # 搜索 hook
-│   │   ├── stores/                    # 4 个 Zustand store
+│   │   ├── stores/                    # 6 个 Zustand store
 │   │   │   ├── mediaStore.ts
 │   │   │   ├── uiStore.ts
 │   │   │   ├── themeStore.ts
-│   │   │   └── operationHistoryStore.ts
+│   │   │   ├── operationHistoryStore.ts
+│   │   │   ├── resonanceStore.ts
+│   │   │   └── pluginStore.ts
 │   │   ├── styles/
 │   │   │   ├── globals.css            # 全局样式 + CSS 变量
 │   │   │   └── themes/
@@ -473,33 +515,41 @@ wxnn-photo-manager/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 17 个工具函数文件
+│   │   ├── utils/                     # 23 个工具函数文件（含 resonance/ 共鸣录纯函数子目录）
 │   │   ├── App.tsx                    # 应用根组件
 │   │   ├── main.tsx                   # 渲染进程入口
+│   │   ├── preview-entry.tsx          # 预览版入口
 │   │   ├── index.html
 │   │   └── vite-env.d.ts
 │   └── shared/                        # 跨进程共享层
 │       ├── errors/
 │       │   ├── app-error.ts           # AppError 类与 6 个子类
 │       │   └── error-codes.ts         # 错误码与类别映射
-│       ├── types/                     # 共享类型定义（8 个域）
+│       ├── types/                     # 共享类型定义（14 个域模块 + index）
 │       │   ├── media.ts / category.ts / profile.ts / editor.ts
 │       │   ├── watermark.ts / settings.ts / ipc.ts / ipc-types.ts
+│       │   ├── progress.ts / plugin.ts / editor-metadata.ts / duplicate.ts
+│       │   ├── resonance.ts / electron-api.ts
 │       │   └── index.ts
+│       ├── utils/                     # concurrency.ts / taskStages.ts
+│       ├── settings-keys.ts           # 渲染层可写偏好 key 白名单
 │       ├── dimension.ts               # 智能分组维度
 │       └── scene-category.ts          # 游戏场景分类
 ├── tests/
-│   └── setup.ts
+│   ├── setup.ts
+│   └── mocks/                         # electron / sqlite / parent-port 等测试桩
 ├── tools/                             # 辅助工具
 │   ├── image-decode-analysis/
 │   └── scripts/
 ├── .gitignore / .npmrc / .prettierrc / .prettierignore
+├── .husky/ / commitlint.config.cjs    # Git 钩子与提交校验
+├── electron.vite.config.ts            # 主/preload/renderer 三段式构建配置
+├── vite.preview.config.ts             # 单文件预览版构建配置
 ├── eslint.config.js
 ├── package.json
-├── postcss.config.js
+├── postcss.config.cjs
 ├── tailwind.config.ts
 ├── tsconfig.json / tsconfig.scripts.json
-├── vite.config.ts
 ├── vitest.config.ts
 └── README.md
 ```
@@ -510,9 +560,19 @@ wxnn-photo-manager/
 
 ### 5.1 入口与生命周期
 
-#### `index.ts` — Application 类
+#### `index.ts` — 启动引导
 
-主进程核心入口，承担：
+主进程最早期入口，承担：
+
+- **最早期异常捕获**：uncaughtException / unhandledRejection 经 startup-diagnostic 落盘 startup-errors.log
+- **crashDumps 重定向**：崩溃 dump 输出到 用户文档/NikkiGallery/Diagnostics（`user-diag-path.ts`），Chromium 原生日志落盘与轮转
+- **GPU 回退决策**：`recordBootDecision()` → 必要时 `disableHardwareAcceleration()`
+- **协议特权声明**：`registerSchemesAsPrivileged` 注册 media:// 与 app://
+- **启动 Application**：`app.whenReady()` 后动态 import `app/application.ts` 的 Application 并 `initialize()`
+
+#### `app/application.ts` — Application 类（阶段化编排）
+
+`Application.initialize()` 编排以下职责（各模块实现见 §5.10）：
 
 - **单实例锁管理**：`requestSingleInstanceLock` + 3 次重试 + 三选项对话框（清理并重启 / 手动处理 / 退出）
 - **阶段化初始化**：DB → 自定义目录 → logger → crash → backup → IPC → 窗口 → 主题 → 启动后任务
@@ -528,7 +588,7 @@ wxnn-photo-manager/
 2026-08 命名空间化拆分重构：原 1176 行单体文件拆为入口装配 + 按功能域的模块树，
 对外契约（全局名 / 方法签名 / 通道字符串）不变，并有单元测试守护（`preload/__tests__/`）。
 
-- `preload.ts` 入口：装配 `electronAPI`（reportReady + 28 个命名空间）并执行 5 个 `exposeInMainWorld`
+- `preload.ts` 入口：装配 `electronAPI`（reportReady + 29 个命名空间）并执行 5 个 `exposeInMainWorld`
   ——全部经 `exposeIfTrusted()` 门禁：非授信文档（origin 非 app:// / media:// / dev 5173）零暴露
 - `preload/ipc.ts`：`IpcError` 类 + 统一调用入口 `call<T>(channel, ...args)`（解包 `IpcResponse<T>`，失败抛 `IpcError`）+ `subscribe` 事件订阅助手
 - `preload/api/*.ts`：每文件一个命名空间对象（`scannerAPI`、`fileAPI`…），方法与通道字符串与拆分前逐字一致
@@ -573,7 +633,7 @@ wxnn-photo-manager/
 
 三个函数共同决定每张照片入库时的 `media_source`/`album_type`/`account_uid`：
 
-- `extractUidFromPath` — UID 正则 `[\\/]([1-9]\d{7,11})[\\/]`
+- `extractUidFromPath` — UID 正则 `[\\/](\d{6,12})[\\/]`；GamePlayPhotos 子树内优先用锚点正则（`GPP_ANCHOR_UID`），未匹配返回 `'default'`
 - `extractAlbumTypeFromPath` — 父目录名匹配 `ALBUM_TYPE_MAP`（22 个游戏相册文件夹）
 - `extractMediaSourceFromPath` — 顺序敏感规则：`launcher\cache` / `\MallPic\` / `\X6Game\Saved\ScreenShot\` / `\CloudPhotos\Temp\` → launcher；`\CloudPhotos\` → cloud；其余 → game
 
@@ -607,7 +667,7 @@ wxnn-photo-manager/
 
 #### `task-scheduler.ts` — TaskScheduler
 
-主进程侧分级任务调度队列，在三个 utilityProcess 之上提供优先级管控：
+主进程侧分级任务调度队列，在各 utilityProcess worker 之上提供优先级管控：
 
 - **高优先级**（`runHighPriority<T>`）：用户主动触发，立即执行，可抢占正在运行的低优先级任务（通过 `cancel` 回调，最多等待 2000ms）
 - **低优先级**（`enqueueLow`）：后台自动触发，FIFO 入队，串行执行（`maxLowConcurrency = 1`），等高优先级空闲时 pump
@@ -640,6 +700,7 @@ wxnn-photo-manager/
 | **ThumbnailPhashService**    | 4 组共享函数（启动路径与 IPC 路径共用），转发到 media-worker                                                                      |
 | **DecryptionService**        | 游戏图片参数解密（koffi 调用 nuan5_decryption.dll，ABI 校验 + async mutex 串行化）                                                |
 | **LogService**               | 故障记录管理（faults-*.jsonl 读取，缓存失效机制，ZIP 导出）                                                                       |
+| **XmpMetadataService**       | XMP 元数据写入/读取（EditorMetadata 序列化为自定义命名空间 `wxnn:` 的 XMP packet，支持单图与批量写入）                            |
 
 ### 5.8 IPC 层（ipc/）
 
@@ -673,28 +734,36 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 3. **`schemas`** 通用 zod schema 集合：`filePath` / `filePathArray` / `mediaId` / `mediaIdArray` / `rating` / `positiveIntId` / `shortString` / `uid` / `httpUrl` / `uiTheme` / `thumbnailQuality` / `backupFilename` / `shortId` / `cacheLimitBytes`
 
-#### `handlers/` — 15 个域 + 工厂（30 个文件）
+#### `handlers/` — 约 40 个域文件（含 set-dir-handler 工厂与 `_shared` 辅助）
 
 | 模块                           | 职责                                                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `media-handler.ts`             | 媒体域（list/findDuplicates/findSimilar/getGroupCounts/评分/收藏/标签/笔记/分类/套装/软删除/恢复/彻底删除/清空/丢失清理/套装图鉴等） |
 | `media-lifecycle-handler.ts`   | 媒体生命周期管理（缺失检测/修复/清理）                                                                                               |
-| `file.ts`                      | 文件操作（delete/copy/move/rename/batchRename/export/saveAs/getExif），路径白名单校验                                                |
+| `media-cleanup-handler.ts`     | 丢失与损坏记录清理（cleanupMissing/removeMissing/cleanupCorrupted/removeCorrupted）                                                  |
+| `file.ts`                      | 文件操作（delete/copy/getExif），路径白名单校验                                                                                      |
+| `file-export-handler.ts`       | 文件导出 / 另存为（file:export 支持默认目录与命名规则 / file:saveAs）                                                                |
+| `file-rename-handler.ts`       | 文件重命名 / 移动（file:move / file:rename / file:batchRename）                                                                      |
 | `video.ts`                     | 视频（thumbnail/metadata/export/captureFrame/trim/changeSpeed/exportLivePhoto）                                                      |
 | `watermark.ts`                 | 水印（apply/saveTemplate/loadTemplates/deleteTemplate + progress 推送）                                                              |
 | `editor.ts`                    | 编辑器（save/saveAs/preset CRUD/importPresetFromFile/exportPresetToFile）                                                            |
+| `editor-metadata-handler.ts`   | 编辑器 XMP 元数据（导出含参数副本 + 一键恢复编辑参数）                                                                               |
+| `editor-preset-handler.ts`     | 滤镜预设（入库 / JSON 文件导出导入 / 列表 / 删除）                                                                                   |
+| `export-pref-handler.ts`       | 导出偏好读写                                                                                                                         |
 | `backup.ts`                    | 备份（create/list/restore/delete + setDir/resetDir/getDir）                                                                          |
 | `cache.ts`                     | 缓存（getStats/clean/setLimit/enforceLimit + setDir/resetDir/getDir）                                                                |
 | `log.ts`                       | 日志（listFaults/getDetail/openDir/exportZip/clear/getStats + setDir/resetDir/getDir + reportRendererError）                         |
 | `crash.ts`                     | 崩溃（list/stats/openDir/clear + setDir/resetDir/getDir）                                                                            |
 | `share.ts`                     | 分享（startWifi/stop/getStatus + copyFiles/detectApp/launchApp）                                                                     |
 | `scanner-handler.ts`           | 扫描器（start/stop/status）                                                                                                          |
+| `scan-log-handler.ts`          | 扫描诊断日志（只读查询与导出，供诊断工具页回放/导出全链路扫描日志）                                                                  |
 | `shell-handler.ts`             | 系统操作（openPath/showItemInFolder/openExternal）                                                                                   |
 | `app-handler.ts`               | 应用信息（getStatus/getVersions）                                                                                                    |
 | `settings-handler.ts`          | 应用设置读写（get/set）                                                                                                              |
 | `theme-handler.ts`             | 主题切换（set）                                                                                                                      |
 | `dialog-handler.ts`            | 文件/目录选择对话框（openFile/openDirectory）                                                                                        |
 | `import-handler.ts`            | 文件导入（importFiles）                                                                                                              |
+| `import-root-handler.ts`       | 导入根目录管理                                                                                                                       |
 | `data-handler.ts`              | 数据管理（清除/重置）                                                                                                                |
 | `decrypt-handler.ts`           | 游戏参数解密                                                                                                                         |
 | `duplicate-handler.ts`         | 重复检测                                                                                                                             |
@@ -706,30 +775,39 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | `thumbnail-handler.ts`         | 缩略图生成                                                                                                                           |
 | `category-handler.ts`          | 分类管理                                                                                                                             |
 | `plugin.ts`                    | 插件管理                                                                                                                             |
+| `plugin-bridge-handler.ts`     | 插件能力桥（media/db/fs/watermark/task/i18n 受控调用，配合 `permission-guard` 校验）                                                 |
+| `resonance-handler.ts`         | 共鸣录（9 个通道：getData/手动记录 CRUD/readImportFile/commitImport/export/updateWardrobe/clearAll）                                 |
 | `set-dir-handler.ts`           | 工厂：`registerSetDirHandler` / `registerResetDirHandler`，消除 4 个文件同构模板                                                     |
 
 ### 5.9 工具层（utils/）
 
-| 文件                     | 职责                                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------ |
-| `concurrency.ts`         | 自研并发控制（`runWithConcurrency`），替代 p-limit 避免 ESM/CJS 兼容问题                                     |
-| `constants.ts`           | 主进程全局命名常量（STARTUP_SCAN_DELAY_MS=1500、THUMBNAIL_CONCURRENCY=4、MEDIA_CACHE_TTL_MS=5min 等）        |
-| `dir-manager.ts`         | 自定义目录管理（4 个功能可配置路径），`resolveCustomDir` / `ensureDir` / `migrateDirFiles`                   |
-| `disk.ts`                | 磁盘空间检查 `assertDiskSpace`（基于 `fsp.statfs`）                                                          |
-| `duplicate-scoring.ts`   | 智能去重评分（4 维：分辨率 40 + 文件大小 30 + 拍摄时间 20 + 收藏加权 10）                                    |
-| `ffmpeg-paths.ts`        | 统一 ffmpeg/ffprobe 二进制路径解析，`resolveAsarUnpackedPath` 替换 `app.asar` → `app.asar.unpacked`          |
-| `ffmpeg-runner.ts`       | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                   |
-| `file-utils.ts`          | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash） |
-| `ipc-validate.ts`        | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                       |
-| `logger.ts`              | 日志管理（10 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                           |
-| `managed-read-stream.ts` | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                   |
-| `media-constants.ts`     | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                         |
-| `phash.ts`               | 感知哈希计算（8x8 DCT-II 64 位 hash，预计算余弦矩阵）                                                        |
-| `process-registry.ts`    | 全局活跃子进程注册表（trackProcess/trackFfmpegCommand/killAllProcesses，60s 兜底清理）                       |
-| `scene-brightness.ts`    | 基于图像亮度直方图的场景时段分析（sharp.stats() + BT.601 加权）                                              |
-| `scene-category.ts`      | 场景分类 re-export 桥接（源在 shared/scene-category.ts）                                                     |
-| `startup-diagnostic.ts`  | 启动诊断（logger 就绪前的独立错误记录，写入 `userData/startup-errors.log`，100KB 滚动）                      |
-| `video-probe.ts`         | 共享 ffprobe 实现（probeVideoMetadata，安全解析 "30000/1001" 帧率格式）                                      |
+| 文件                       | 职责                                                                                                             |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `active-task-store.ts`     | 活跃任务状态存储（供任务进度查询与取消）                                                                         |
+| `concurrency.ts`           | 自研并发控制（`runWithConcurrency`），替代 p-limit 避免 ESM/CJS 兼容问题                                         |
+| `constants.ts`             | 主进程全局命名常量（STARTUP_SCAN_DELAY_MS=5000、THUMBNAIL_CONCURRENCY=4、MEDIA_CACHE_TTL_MS=5min 等）            |
+| `dir-manager.ts`           | 自定义目录管理（4 个功能可配置路径），`resolveCustomDir` / `ensureDir` / `migrateDirFiles`                       |
+| `disk.ts`                  | 磁盘空间检查 `assertDiskSpace`（基于 `fsp.statfs`）                                                              |
+| `duplicate-scoring.ts`     | 智能去重评分（4 维：分辨率 40 + 文件大小 30 + 拍摄时间 20 + 收藏加权 10）                                        |
+| `early-crash-guard.ts`     | 早期致命错误上报（`reportEarlyFatal`：落盘 diagLog + showErrorBox + 释放单实例锁 + exit）                        |
+| `ffmpeg-paths.ts`          | 统一 ffmpeg/ffprobe 二进制路径解析，`resolveAsarUnpackedPath` 替换 `app.asar` → `app.asar.unpacked`              |
+| `ffmpeg-runner.ts`         | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                       |
+| `file-utils.ts`            | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash）     |
+| `ipc-validate.ts`          | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                           |
+| `logger.ts`                | 日志管理（10 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                               |
+| `managed-read-stream.ts`   | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                       |
+| `media-constants.ts`       | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                             |
+| `path-safety.ts`           | 路径安全工具（敏感目录判定 / 只读目录检测等）                                                                    |
+| `phash.ts`                 | 感知哈希计算（8x8 DCT-II 64 位 hash，预计算余弦矩阵）                                                            |
+| `process-registry.ts`      | 全局活跃子进程注册表（trackProcess/trackFfmpegCommand/killAllProcesses，60s 兜底清理）                           |
+| `progress-throttle.ts`     | 任务进度推送节流                                                                                                 |
+| `scene-brightness.ts`      | 基于图像亮度直方图的场景时段分析（sharp.stats() + BT.601 加权）                                                  |
+| `startup-diagnostic.ts`    | 启动诊断（logger 就绪前的独立错误记录，写入 `用户文档/NikkiGallery/Diagnostics/startup-errors.log`，100KB 滚动） |
+| `task-registry.ts`         | 任务注册表（后台任务登记与查询）                                                                                 |
+| `user-diag-path.ts`        | 用户友好诊断目录定位（`文档/NikkiGallery/Diagnostics`）                                                          |
+| `video-frame.ts`           | 视频帧提取工具                                                                                                   |
+| `video-probe.ts`           | 共享 ffprobe 实现（probeVideoMetadata，安全解析 "30000/1001" 帧率格式）                                          |
+| `worker-restart-policy.ts` | worker 重启策略（崩溃后重启次数/退避判定）                                                                       |
 
 **读流约束**：任何把本地文件流写出去的场景（`media://` 协议、WiFi 分享下载/缩略图）都必须走
 `createManagedReadStream`，禁止裸写 `fs.createReadStream(path).pipe(dest)`——`pipe()` 一返回外层
@@ -739,25 +817,33 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.10 应用生命周期管理（app/）
 
-从 `index.ts` 的 Application 类中拆分出的生命周期管理模块，14 个文件各司其职：
+从 `index.ts` 引导启动的 Application 编排层，23 个源文件各司其职：
 
-| 文件                  | 职责                                                                             |
-| --------------------- | -------------------------------------------------------------------------------- |
-| `application.ts`      | 应用主类，编排初始化与退出流程                                                   |
-| `lifecycle.ts`        | 生命周期管理（单实例锁、ready/before-quit/will-quit 事件编排）                   |
-| `cleanup.ts`          | 退出清理（WAL checkpoint + 子进程 kill + worker dispose + 强制超时兜底）         |
-| `startup-tasks.ts`    | 启动后任务（自动扫描、数据库修复、缩略图补全）                                   |
-| `window-manager.ts`   | 窗口管理（创建、ready-to-show、最小化/恢复/关闭处理）                            |
-| `navigation-guard.ts` | 主窗口导航授信判定（app:// / media:// + dev 5173；拦截写 navigation-blocked）    |
-| `desktop-shortcut.ts` | 桌面快捷方式自动补建（检测缺失并重建）                                           |
-| `error-handlers.ts`   | 全局错误处理（uncaughtException、unhandledRejection、render-process-gone）       |
-| `ipc-setup.ts`        | IPC 注册编排（构造 HandlerContext 并按域调用 register 函数）                     |
-| `media-protocol.ts`   | media:// 协议注册与白名单（5 层 LRU 缓存路径校验）                               |
-| `media-update.ts`     | 媒体更新通知（节流 100ms 后通过 webContents.send 通知渲染层刷新）                |
-| `recovery.ts`         | 恢复逻辑（异常退出后的数据库修复与状态恢复）                                     |
-| `theme.ts`            | 主题同步（applyUITheme 同步 nativeTheme + TitleBarOverlay + setBackgroundColor） |
-| `custom-dirs.ts`      | 自定义目录管理（4 个功能可配置路径的 resolve/ensure/migrate）                    |
-| `app-context.ts`      | 应用上下文（全局共享的应用状态与依赖容器）                                       |
+| 文件                     | 职责                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------- |
+| `application.ts`         | 应用主类，编排初始化与退出流程                                                   |
+| `lifecycle.ts`           | 生命周期管理（单实例锁、ready/before-quit/will-quit 事件编排）                   |
+| `cleanup.ts`             | 退出清理（WAL checkpoint + 子进程 kill + worker dispose + 强制超时兜底）         |
+| `startup-tasks.ts`       | 启动后任务（自动扫描、数据库修复、缩略图补全）                                   |
+| `startup-environment.ts` | 启动环境检测（原生依赖/路径可用性校验）                                          |
+| `window-manager.ts`      | 窗口管理（创建、ready-to-show、最小化/恢复/关闭处理）                            |
+| `navigation-guard.ts`    | 主窗口导航授信判定（app:// / media:// + dev 5173；拦截写 navigation-blocked）    |
+| `desktop-shortcut.ts`    | 桌面快捷方式自动补建（检测缺失并重建）                                           |
+| `error-handlers.ts`      | 全局错误处理（uncaughtException、unhandledRejection、render-process-gone）       |
+| `ipc-setup.ts`           | IPC 注册编排（构造 HandlerContext 并按域调用 register 函数）                     |
+| `media-protocol.ts`      | media:// 协议注册与白名单（5 层 LRU 缓存路径校验）                               |
+| `renderer-protocol.ts`   | app:// 渲染文档协议注册                                                          |
+| `renderer-bridge.ts`     | 渲染层事件桥（主进程 → 渲染层事件推送）                                          |
+| `media-update.ts`        | 媒体更新通知（节流 100ms 后通过 webContents.send 通知渲染层刷新）                |
+| `recovery.ts`            | 恢复逻辑（异常退出后的数据库修复与状态恢复）                                     |
+| `theme.ts`               | 主题同步（applyUITheme 同步 nativeTheme + TitleBarOverlay + setBackgroundColor） |
+| `custom-dirs.ts`         | 自定义目录管理（4 个功能可配置路径的 resolve/ensure/migrate）                    |
+| `auto-update.ts`         | 自动更新（electron-updater）                                                     |
+| `exit-forensics.ts`      | 退出取证（异常退出现场记录）                                                     |
+| `gpu-fallback.ts`        | GPU 回退决策（GPU 异常时禁用硬件加速）                                           |
+| `native-load-guard.ts`   | 原生模块加载预检（VC++ 运行库等，失败 showErrorBox）                             |
+| `permission.ts`          | 系统权限管理                                                                     |
+| `app-context.ts`         | 应用上下文（全局共享的应用状态与依赖容器）                                       |
 
 ### 5.11 插件宿主（plugins/）
 
@@ -781,9 +867,10 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.13 主进程国际化（i18n/）
 
-| 文件       | 职责                                                  |
-| ---------- | ----------------------------------------------------- |
-| `index.ts` | 主进程国际化入口，为主进程日志/错误消息提供多语言支持 |
+| 文件             | 职责                                                  |
+| ---------------- | ----------------------------------------------------- |
+| `index.ts`       | 主进程国际化入口，为主进程日志/错误消息提供多语言支持 |
+| `worker-safe.ts` | worker 进程内可用的纯查表翻译（不依赖 i18next 实例）  |
 
 ---
 
@@ -799,9 +886,9 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 #### `App.tsx`
 
-- **自定义视图路由**（非 React Router），通过 `useUIStore.currentView` 切换 9 个视图：`gallery / detail / editor / categories / settings / recycle-bin / favorites / duplicates / launcher-cache`
+- **自定义视图路由**（非 React Router），通过 `useUIStore.currentView` 切换 11 个视图：`gallery / detail / editor / categories / settings / recycle-bin / favorites / duplicates / launcher-cache / resonance-records / screenshots`
 - **keep-alive 模式**：`ALL_VIEWS` 数组 + `visitedViews` Set，已访问页面保持挂载、用 `display:none` 隐藏，避免视图切换丢失滚动/重复触发 `fetchMediaFromDatabase`
-- **视图层级映射**：`VIEW_LEVEL_MAP` 将视图分为 4 级，用于毛玻璃分层
+- **视图层级映射**：`VIEW_LEVEL_MAP` 将视图分为 3 级（一级视图 / detail / editor），用于毛玻璃分层
 - **页面切换动画**：`page-enter` CSS 类（8px 右移 + 淡入，220ms），`onAnimationEnd` 移除 `will-change`
 - **顶层副作用**：useRefreshMedia / useFilteredMediaFiles / useGlobalUndo / applyThemeClass / display 偏好应用 / 操作历史加载
 - **桥接组件**：`OperationHistoryErrorBridge` 在 `GlobalToastProvider` 内部渲染
@@ -820,27 +907,30 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | **SettingsPage**                  | 设置中心。左侧分组导航 + 右侧 section 内容，`activeSection` 持久化到 localStorage                                                                                                                                                                                                                                             |
 | **ResonanceRecordsPage**（2.5.0） | 共鸣录。四个视图切换——共鸣记录（73 卡池浏览、手动补录 / 改时间 / 删除、虚拟滚动）、我的衣橱（五分类拥有状态、套装聚合进度、名称搜索与筛选、批量勾选、「从共鸣记录推断」）、导入导出（解析预览 → 新增/重复/无效计数与逐条定位 → 分批事务提交、进度可视可取消）、个人统计（总览卡、欧非百分位、SVG 直方图、按卡池曲线与明细表） |
 
-#### `pages/settings/` — 8 个 Section
+#### `pages/settings/` — Section 文件（按设置分组拆分）
 
-| 文件                       | Section                                                              |
-| -------------------------- | -------------------------------------------------------------------- |
-| `shared.tsx`               | GlobalToastProvider / useGlobalToast / SectionShell / 通用类型       |
-| `general-sections.tsx`     | GeneralStartupSection / GeneralFileOpsSection / GeneralExportSection |
-| `appearance-sections.tsx`  | AppearanceThemeSection / AppearanceDisplaySection                    |
-| `scan-sections.tsx`        | ScanOptionsSection                                                   |
-| `profile-sections.tsx`     | ProfileManageSection                                                 |
-| `data-sections.tsx`        | DataBackupSection / DataCacheSection / DataClearSection              |
-| `diagnostics-sections.tsx` | DiagnosticsLogsSection / DiagnosticsCrashSection                     |
-| `about-sections.tsx`       | AboutInfoSection / AboutContactSection / AboutLicenseSection         |
-| `language-sections.tsx`    | LanguageSection                                                      |
-| `tools-sections.tsx`       | ToolsShareCodeSection                                                |
+| 文件                              | Section                                                                                             |
+| --------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `shared.tsx`                      | GlobalToastProvider / useGlobalToast / SectionShell / 通用类型                                      |
+| `sections.tsx`                    | 统一导出入口（re-export 各分组 Section，保持对外导入路径不变）                                      |
+| `general-sections.tsx`            | GeneralStartupSection / GeneralFileOpsSection / GeneralExportSection                                |
+| `appearance-sections.tsx`         | AppearanceThemeSection / AppearanceDisplaySection                                                   |
+| `scan-sections.tsx`               | ScanPathsSection / GameRootsSection / ScanFallbackSection / ScanOptionsSection / ImportRootsSection |
+| `scan-log-diagnostic-section.tsx` | 扫描日志诊断 Section                                                                                |
+| `profile-sections.tsx`            | ProfileManageSection                                                                                |
+| `plugin-sections.tsx`             | PluginManageSection                                                                                 |
+| `data-sections.tsx`               | DataBackupSection / DataCacheSection / DataClearSection                                             |
+| `diagnostics-sections.tsx`        | DiagnosticsLogsSection / DiagnosticsCrashSection                                                    |
+| `about-sections.tsx`              | AboutInfoSection / AboutContactSection / AboutLicenseSection                                        |
+| `language-sections.tsx`           | LanguageSection                                                                                     |
+| `tools-sections.tsx`              | ToolsShareCodeSection                                                                               |
 
 ### 6.3 布局组件（components/layout/）
 
 | 组件         | 职责                                                                                                                                         |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | **AppShell** | 整体布局骨架。TitleBar（顶）+ Sidebar（左）+ main（内容区）+ 底部状态栏                                                                      |
-| **Sidebar**  | 侧边栏。可折叠（motion.aside 宽度动画 64↔220）。含返回栈顶按钮、角色档案切换器、7 个主导航项、智能分组快捷面板（gallery 视图专属）、底部统计 |
+| **Sidebar**  | 侧边栏。可折叠（motion.aside 宽度动画 64↔220）。含返回栈顶按钮、角色档案切换器、9 个主导航项、智能分组快捷面板（gallery 视图专属）、底部统计 |
 | **TitleBar** | 顶部标题栏。固定高度 40px、`app-drag` 类（Electron 拖拽区域）、显示应用图标 + i18n 标题                                                      |
 
 ### 6.4 通用组件（components/common/）
@@ -921,7 +1011,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | 组件                 | 职责                                                                                              |
 | -------------------- | ------------------------------------------------------------------------------------------------- |
 | **EditorToolbar**    | 编辑器顶部工具栏（撤销/重做/重置/对比/快捷键/全屏/退出/另存为/保存/复制参数/粘贴参数/应用到选中） |
-| **EditorTabs**       | 编辑器右侧 Tab 容器（6 Tab：basic/hsl/curves/split/filters/lut/watermark）                        |
+| **EditorTabs**       | 编辑器右侧 Tab 容器（7 个 Tab：basic/hsl/curves/split/filters/lut/watermark）                     |
 | **FilterPanel**      | 滤镜面板（getFilterCategories + getPresetsByCategory，并发 4 路生成缩略图）                       |
 | **LutPanel**         | LUT 面板（内置 LUT + 自定义 .cube 文件导入，localStorage 持久化）                                 |
 | **ToneCurve**        | 曲线调整（RGB/R/G/B 四通道、Canvas 绘制、拖拽控制点）                                             |
@@ -939,40 +1029,42 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **scanner/ScanProgress**：扫描进度条（scanned/found/currentPath + 停止按钮）
 - **video/VideoPlayer**：视频播放器（播放进度按 src 哈希持久化到 localStorage）
 
-### 6.8 自定义 Hooks（22 个）
+### 6.8 自定义 Hooks（23 个）
 
-#### 媒体操作类（6 个）
+#### 媒体操作类（7 个）
 
 - **useFileOperations**：文件操作核心 hook（删除/移动/重命名/复制/收藏切换/属性更新），注册 4 个 undoHandler
 - **useBatchOperations**：批量操作 hook（水印/批量重命名状态管理）
+- **useVideoThumbGenerate**：视频缩略图生成 hook（模块级单次守卫防请求风暴，跨组件实例共享）
 - **useFavoriteToggle**：收藏切换 hook（乐观更新 + 失败回滚 + pushHistory）
 - **useFilteredMediaFiles**：筛选+排序+分组 hook（module-level 缓存避免多组件重复计算）
 - **useGallerySearch**：搜索输入 hook（250ms 防抖）
 - **useRefreshMedia**：刷新媒体 hook（封装 fetchMediaFromDatabase）
 
-#### UI 交互类（9 个）
+#### UI 交互类（7 个）
 
 - **useToast**：Toast 管理 hook（最多 3 条 FIFO 淘汰、crypto.randomUUID 生成 id）
 - **useZoomable**：缩放/平移交互 hook（滚轮缩放、拖拽平移、双击复位）
 - **useSlideshow**：幻灯片播放 hook（isPlaying 状态、interval 计时器生命周期）
 - **useFocusTrap**：模态框焦点陷阱 hook（Tab/Shift+Tab 循环、Esc 关闭）
-- **useContainerSize**：容器尺寸监听 hook（ResizeObserver + window resize 双保险）
-- **useVirtualScroll**：虚拟滚动 hook（列表/网格两种变体 useVirtualGrid）
+- **useContainerSize**：容器尺寸监听 hook（ResizeObserver + window resize 双保险，含虚拟滚动变体 useVirtualGrid）
 - **useFailedImages**：缩略图加载失败管理 hook
 - **useErrorToast**：错误 Toast hook（按类别决定 toast 类型、自动上报非用户面错误）
 
-#### 编辑器类（3 个）
+#### 编辑器类（4 个）
 
 - **useEditHistory**：编辑历史栈 hook（50 上限、historyIndex 同步更新 ref 避免同周期多次 push 错误截断）
 - **useEditorShortcuts**：编辑器快捷键 hook（Ctrl+Z/Y/S/Shift+S/Shift+C/Shift/V/F11/?）
 - **useImageProcessor**：图片处理 hook（防抖 80ms 预览、最大预览 1400px、最大导出 4096px、JPEG 质量 0.92/0.95）
+- **useWatermark**：水印配置状态 hook（文字/图片配置更新与平铺切换）
 
-#### IPC 调用与全局类（4 个）
+#### IPC 调用与全局类（5 个）
 
 - **useIpcCall**：IPC 调用包装 hook（自动管理 loading/错误捕获/toast 显示/泛型保留/幂等安全）
 - **useExif**：EXIF 加载 hook
 - **useGameParams**：游戏参数加载 hook（LRU + TTL 缓存，200 条/5 分钟）
 - **useGlobalUndo**：全局撤销 hook（App 顶层注册 Ctrl+Z、非编辑器视图生效、输入框聚焦时跳过）
+- **useStagedTask**：阶段化任务进度 hook（驱动 TaskProgress 阶段状态与条目进度、节流推送、携带取消信号）
 
 ### 6.9 状态管理（stores/）
 
@@ -982,18 +1074,21 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | **mediaStore**            | 否（内存）                                     | 媒体数据：mediaFiles/categories/loading/scanProgress/editingMedia/recycleBinFiles、currentProfileUid/profiles。纯 reducer actions + 异步 action `updateMediaFileAndPersist`（先 IPC 持久化再更新本地）                                                                                                                                                                                  |
 | **themeStore**            | `wxnn-ui-theme`                                | 主题管理（setTheme + applyThemeClass，从 themes 配置自动派生所有非空 className）                                                                                                                                                                                                                                                                                                        |
 | **operationHistoryStore** | 否（内存 + IPC 持久化到 operation_history 表） | 全局操作历史。50 上限、9 种 OperationType、按 type 分发的 UndoHandler 注册表（模块级 Map）、数据库写入失败回调 Set 订阅、loadFromDatabase 启动加载                                                                                                                                                                                                                                      |
+| **resonanceStore**        | 否（内存）                                     | 共鸣录数据（记录/衣橱/统计与导入导出状态），2.5.0 新增                                                                                                                                                                                                                                                                                                                                  |
+| **pluginStore**           | 否（内存）                                     | 插件运行时状态（已安装/启用插件列表、安装卸载等操作进行中标志与错误信息）                                                                                                                                                                                                                                                                                                               |
 
 ### 6.10 工具函数（utils/）
 
-| 类别       | 文件                                                                                 | 用途                                                                   |
-| ---------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| 格式化     | `format.ts` / `date.ts`                                                              | 字节格式化、日期格式化                                                 |
-| 文件路径   | `file.ts`                                                                            | toFileUrl / getDirName / joinPath                                      |
-| 图像处理   | `imageProcessor.ts`                                                                  | 核心处理管线（HSL/Curves/SplitTone/Watermark 算法 + processImageData） |
-| 滤镜       | `filter.ts` / `filterPresets.ts` / `lut.ts` / `editor-colors.ts`                     | mergeFilterParams、6 分类预设、3D LUT 解析与应用、CHANNEL_COLORS       |
-| 游戏数据   | `enum-mappings.ts` / `cloth-name-lookup.ts` / `location-data.ts` / `location-map.ts` | 游戏枚举→中文映射、服装/套装名查找、地点层级、坐标→地点映射            |
-| 业务辅助   | `group-field.ts` / `gallery.tsx` / `responsive.ts`                                   | 分组字段提取、右键菜单构建、响应式列数                                 |
-| 动画与错误 | `motionPresets.ts` / `global-error-handler.ts` / `fault-colors.ts`                   | Motion 动画预设、全局错误兜底、故障类型元数据                          |
+| 类别       | 文件                                                                                                                       | 用途                                                                             |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| 格式化     | `format.ts` / `date.ts`                                                                                                    | 字节格式化、日期格式化                                                           |
+| 文件路径   | `file.ts`                                                                                                                  | toFileUrl / getDirName / joinPath                                                |
+| 图像处理   | `imageProcessor.ts`                                                                                                        | 核心处理管线（HSL/Curves/SplitTone/Watermark 算法 + processImageData）           |
+| 滤镜       | `filter.ts` / `filterPresets.ts` / `lut.ts` / `editor-colors.ts`                                                           | mergeFilterParams、6 分类预设、3D LUT 解析与应用、CHANNEL_COLORS                 |
+| 游戏数据   | `enum-mappings.ts` / `cloth-name-lookup.ts` / `location-data.ts` / `location-map.ts`                                       | 游戏枚举→中文映射、服装/套装名查找、地点层级、坐标→地点映射                      |
+| 业务辅助   | `group-field.ts` / `gallery.tsx` / `responsive.ts` / `category-name.ts` / `duplicateContextMenu.ts` / `scan-exclusions.ts` | 分组字段提取、右键菜单构建、响应式列数、分类名解析、重复文件右键菜单、扫描排除项 |
+| 分享与事件 | `share.ts` / `game-events.ts`                                                                                              | 分享辅助、游戏事件映射                                                           |
+| 动画与错误 | `motionPresets.ts` / `global-error-handler.ts` / `fault-colors.ts`                                                         | Motion 动画预设、全局错误兜底、故障类型元数据                                    |
 
 ### 6.11 国际化（i18n/）
 
@@ -1027,7 +1122,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 6.13 图标管理（icons/）
 
-- **单一文件集中管理所有图标**，导出 73 个图标组件
+- **单一文件集中管理所有图标**，导出 74 个图标组件
 - 基于 `BaseIcon` 统一封装：`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">`，符合 Feather/Lucide 风格
 - `IconProps` 接口继承 `React.SVGProps<SVGSVGElement>` + `size?: number`（默认 16）
 - 按用途分类：操作类（17）/ 视图类（5）/ 导航类（7）/ 编辑类（10）/ 媒体类（5）/ 状态类（4）/ 文件操作类（5）/ 分类与标签类（3）/ 分享渠道类（4）/ 导入导出类（2）/ 播放控制类（2）/ 社交平台类（3）/ 其他（7）
@@ -1070,7 +1165,7 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 
 ### 7.1 共享类型（shared/types/）
 
-`src/shared/types/index.ts` 作为统一导出入口，汇总 12 个域类型模块，全部采用"数据库行（XxxRow，蛇形）↔ 渲染模型（Xxx，驼峰）"双轨制。
+`src/shared/types/index.ts` 作为统一导出入口，汇总 14 个域类型模块，全部采用"数据库行（XxxRow，蛇形）↔ 渲染模型（Xxx，驼峰）"双轨制。
 
 | 文件                   | 核心类型                                                                                                                                                                                                                                            |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1086,6 +1181,8 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 | **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` 能力权限清单 / 业务扩展点常量与扩展响应类型                                                                                                                                                             |
 | **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / 调色、滤镜、LUT、水印参数的 XMP 自描述序列化结构                                                                                                                                                                 |
 | **duplicate.ts**       | `DuplicateItem` / 重复相似检测域类型（主进程 handler 返回值契约，渲染层 DuplicatesPage 消费）                                                                                                                                                       |
+| **resonance.ts**       | 共鸣录域类型 + zod schema + 导入上限常量（2.5.0 新增）                                                                                                                                                                                              |
+| **electron-api.ts**    | preload `electronAPI` 各命名空间方法签名与 DTO 类型快照（preload 层不内联类型定义）                                                                                                                                                                 |
 
 另注：`src/shared/settings-keys.ts` 定义渲染层可经 `settings:set` 自由写入的偏好 key 白名单（`RENDERER_PREF_KEYS`）与安全敏感 key 拒绝清单（`SECURITY_SENSITIVE_KEYS`）。
 
@@ -1167,7 +1264,7 @@ better-sqlite3 (WAL 模式，wxnn_photo_manager.db)
 1. **渲染层** `mediaStore.ts` 调用 `window.electronAPI.media.list({ page, pageSize, accountUid, albumType, hideDuplicates, ... })`
 2. **preload.ts** `media.list = (options) => call<MediaListResult>('media:list', options)`
 3. **`call<T>`** 内部：`ipcRenderer.invoke('media:list', options)` → 收到 `IpcResponse<MediaListResult>` → 成功返回 `data`，失败 `throw new IpcError(...)`
-4. **主进程** `ipc/handlers/media.ts`：
+4. **主进程** `ipc/handlers/media-handler.ts`：
    ```ts
    ipcMain.handle('media:list',
      wrapHandler(ctx, z.tuple([z.object({...}).optional()]),
@@ -1330,7 +1427,7 @@ components / pages (展示)
 - `contextIsolation: true` —— 上下文隔离
 - `nodeIntegration: false` —— 禁用 Node 集成
 - `sandbox: true` —— 沙箱模式
-- `protocol.registerSchemesAsPrivileged` —— media:// 协议特权声明
+- `protocol.registerSchemesAsPrivileged` —— media:// 与 app:// 协议特权声明
 
 #### 10.1.2 导航防护与 preload 授信源
 
@@ -1447,7 +1544,22 @@ components / pages (展示)
 "dist": "npm run build && electron-builder --publish never",
 "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
 "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts",
-"verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar"
+"verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
+"typecheck": "tsc -b",
+"typecheck:e2e": "tsc --noEmit -p e2e",
+"lint / lint:fix": "eslint .（--fix 自动修复）",
+"format / format:check": "prettier（覆盖 src / scripts / .storybook / 根目录）",
+"test / test:watch / test:coverage / test:main / test:renderer / test:db": "vitest（按目录变体）",
+"i18n:check / i18n:extract / i18n:extract:gallery / i18n:status / i18n:extract-legacy / i18n:prune-whitelist / i18n:codemod / i18n:guard / sync-i18n-keys": "i18n 脚本族（scripts/i18n/）",
+"preview:check": "tsx scripts/check-preview-drift.ts",
+"e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep-invert @perf",
+"e2e:perf": "playwright test --config e2e/playwright.config.ts --grep @perf",
+"dist:win:smoke / dist:win:perf": "打包 + 冒烟 / 性能用例一键执行",
+"perf:save-baseline": "tsx scripts/perf-test/save-perf-baseline.ts",
+"storybook": "storybook dev -p 6006",
+"build-storybook": "storybook build -o storybook-static",
+"commit": "cz（commitizen 交互式提交）",
+"commitlint / commitlint:check": "commitlint 提交信息校验"
 ```
 
 > 已移除的历史脚本：`build:main` / `build:renderer`（现由 `electron-vite` 统一编译与打包）、`rebuild:native`
@@ -1455,12 +1567,15 @@ components / pages (展示)
 
 ### 11.2 构建配置
 
-#### `vite.config.ts`（渲染进程）
+#### `electron.vite.config.ts`（主/preload/renderer 三段式）
 
-- `base: './'` —— 相对路径，便于 `file://` 加载
-- `root: './src/renderer'`、`build.outDir: '../../dist/renderer'`
-- `resolve.alias`：`@` → renderer、`@main` → main、`@common` → common
-- dev 端口 5173
+- **main**：lib 多入口 6 个（`index` / `scanner-worker` / `media-worker` / `thumbnail-worker` / `video-worker` / `database-worker`，各自 worker-entry.ts），outDir `dist/main/main/app`，CJS 输出；`writeCommonjsShim()` 写入 `dist/main/package.json {"type":"commonjs"}`
+- **preload**：entry `src/main/preload.ts`，outDir `dist/main/main`，define 注入 `__NIKKI_PRELOAD_DEV__`
+- **renderer**：`root: './src/renderer'`、dev 端口 5173（strictPort）、outDir `dist/renderer`；`resolve.alias`：`@` → renderer、`@main` → main、`@common` → common（`src/common` 已移除，别名仅为历史遗留），`electron` → `scripts/electron-browser-stub.js`；define 注入 `__PREVIEW__: false`
+
+#### `vite.preview.config.ts`（单文件预览版）
+
+- `vite-plugin-singlefile` 全内联打包，产出根目录 `preview.html`；define 注入 `__PREVIEW__: true`
 
 #### `tsconfig.json`（根，渲染进程）
 
@@ -1488,14 +1603,14 @@ components / pages (展示)
 - `productName: 无限暖暖相册管理工具`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**：5 类 native 模块解包到磁盘 —— `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `sharp` / `@img` / `koffi` / `nuan5_decryption.dll`
+- **`asarUnpack`**：10 项 native 依赖解包到磁盘 —— `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
 - **Windows NSIS**：x64、非 one-click、允许自定义安装目录、强制创建桌面快捷方式 + 开始菜单快捷方式
 - `signAndEditExecutable: false` / `verifyUpdateCodeSignature: false` —— 未启用代码签名
 
 ### 11.3 构建流程
 
 1. `clean` —— 删除 `dist/renderer/assets` 与 `dist/main`
-2. `electron-vite build` —— 编译主进程（`src/main` + `shared/` + `common/`，CJS）→ `dist/main/`，同时用 Vite 打包 React 应用 → `dist/renderer/`；随后写入 `dist/main/package.json`（`{"type":"commonjs"}`）
+2. `electron-vite build` —— 编译主进程（`src/main` + `shared/`，CJS）→ `dist/main/`，同时用 Vite 打包 React 应用 → `dist/renderer/`；随后写入 `dist/main/package.json`（`{"type":"commonjs"}`）
 3. `pre-dist-check` —— 校验 main / renderer 产物时间戳差 ≤5 分钟、关键修复点已编入产物、Git 工作区干净；并校验 `README.md` 中的 Electron 版本与 `package.json` 一致（不一致即阻断打包）
 4. `electron-builder --win --publish never` —— 按 `package.json#build` 配置打包 NSIS 安装包到 `release/`，产物名 `NikkiGallery-Setup-<version>.exe`；afterPack 阶段由 `scripts/after-pack-vc-runtime.cjs` 将 `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` 复制到 `electron.exe` 同级
 5. `verify:dist` —— `pre-dist-check --verify-asar`，断言 VC++ 运行库等原生依赖已随包
@@ -1564,7 +1679,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 
 ### 12.5 原生二进制依赖
 
-- `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `sharp` / `@img` / `koffi` / `nuan5_decryption.dll` 必须通过 `asarUnpack` 解包
+- `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` 必须通过 `asarUnpack` 解包
 - ffmpeg/ffprobe 路径必须通过 `native-path.ts` 工具替换 `app.asar` → `app.asar.unpacked`
 
 ### 12.6 扫描器约束
@@ -1692,9 +1807,9 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 
 ## 附录 A：核心设计模式
 
-### A.1 三进程隔离
+### A.1 多进程隔离
 
-DB 写 / 扫描 / 缩略图+pHash+重复检测 各自独立 utilityProcess，避免阻塞主进程事件循环。
+DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各自独立 utilityProcess，避免阻塞主进程事件循环。
 
 ### A.2 分级调度
 
@@ -1762,18 +1877,19 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 各自独立 utilityProcess，避
 
 ### B.1 入口与配置
 
-| 文件                     | 用途                                                                    |
-| ------------------------ | ----------------------------------------------------------------------- |
-| `src/main/index.ts`      | 主进程入口（Application 类）                                            |
-| `src/main/preload.ts`    | preload 入口（装配 + contextBridge 暴露；模块树见 `src/main/preload/`） |
-| `src/renderer/main.tsx`  | 渲染进程入口                                                            |
-| `src/renderer/App.tsx`   | 应用根组件                                                              |
-| `package.json`           | 依赖与构建配置                                                          |
-| `vite.config.ts`         | Vite 构建配置                                                           |
-| `tsconfig.json`          | TypeScript 配置（根，渲染进程）                                         |
-| `src/main/tsconfig.json` | TypeScript 配置（主进程）                                               |
-| `tailwind.config.ts`     | Tailwind 配置                                                           |
-| `eslint.config.js`       | ESLint 配置                                                             |
+| 文件                      | 用途                                                                    |
+| ------------------------- | ----------------------------------------------------------------------- |
+| `src/main/index.ts`       | 主进程入口（Application 类）                                            |
+| `src/main/preload.ts`     | preload 入口（装配 + contextBridge 暴露；模块树见 `src/main/preload/`） |
+| `src/renderer/main.tsx`   | 渲染进程入口                                                            |
+| `src/renderer/App.tsx`    | 应用根组件                                                              |
+| `package.json`            | 依赖与构建配置                                                          |
+| `electron.vite.config.ts` | 主/preload/renderer 三段式构建配置                                      |
+| `vite.preview.config.ts`  | 单文件预览版构建配置                                                    |
+| `tsconfig.json`           | TypeScript 配置（根，渲染进程）                                         |
+| `src/main/tsconfig.json`  | TypeScript 配置（主进程）                                               |
+| `tailwind.config.ts`      | Tailwind 配置                                                           |
+| `eslint.config.js`        | ESLint 配置                                                             |
 
 ### B.2 类型与错误
 
@@ -1850,7 +1966,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 各自独立 utilityProcess，避
 | `src/renderer/i18n/index.ts`                           | i18n 入口                                                                        |
 | `src/renderer/styles/globals.css`                      | 全局样式 + CSS 变量                                                              |
 | `src/renderer/styles/themes/index.ts`                  | 主题配置中心                                                                     |
-| `src/renderer/icons/index.tsx`                         | 73 个 SVG 图标集中管理                                                           |
+| `src/renderer/icons/index.tsx`                         | 74 个 SVG 图标集中管理                                                           |
 | `src/renderer/pages/ResonanceRecordsPage.tsx`          | 共鸣录页面（记录 / 衣橱 / 导入导出 / 统计）                                      |
 | `src/renderer/stores/resonanceStore.ts`                | 共鸣录 store                                                                     |
 | `src/renderer/components/resonance/`                   | 共鸣录视图组件（Records / Wardrobe / ImportExport / Stats / AddRecordDialog）    |
@@ -1880,12 +1996,12 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 各自独立 utilityProcess，避
 
 ### C.2 质量门禁脚本
 
-- `typecheck`（tsc --noEmit）、`lint`（eslint）、`test`（vitest run）、`format`（prettier）、`i18n:check`、`preview:check`、`pre-dist-check`。
+- `typecheck`（tsc -b）、`lint`（eslint）、`test`（vitest run）、`format`（prettier）、`i18n:check`、`preview:check`、`pre-dist-check`。
 
 ### C.3 测试规模
 
-- Vitest 1.6，231 个测试文件 / 4082 个用例（2026-08 基线）。
-- 既有环境性失败（非回归，勿误判）：`path-safety.test.ts` 的「只读目录返回 false」（Windows 上 `chmod 0o444` 对目录不生效）、`GalleryStackOverflow.test.tsx`（jsdom + virtuoso 递归）。
+- Vitest 1.6，263 个测试文件 / 4476 个用例（2026-09-06 实测，全绿）。
+- 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---
 

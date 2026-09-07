@@ -72,8 +72,8 @@ cd "h:\<username>\Documents\WXNN XiangCe2"
 npm install
 ```
 
-> 项目 `.npmrc` 已配置 Electron 与 electron-builder 国内镜像（npmmirror），无需额外操作。
-> `legacy-peer-deps=true` 已启用，避免 React 19 与旧版本依赖冲突。
+> 项目 `.npmrc` 当前仅含注释、无有效配置；Electron 与 electron-builder 的国内镜像通过环境变量注入
+> （`ELECTRON_MIRROR` / `ELECTRON_BUILDER_BINARIES_MIRROR`，见 [6.1](#61-npm-install-失败)）。
 
 ### 2.3 重建原生模块（首次安装或切换 Node 版本后必做）
 
@@ -158,14 +158,14 @@ npm run dist:win:smoke
 WXNN XiangCe/
 ├── src/
 │   ├── main/                  # Electron 主进程（Node 环境）
-│   │   ├── index.ts           # 主入口，启动应用、创建窗口、注册 IPC
+│   │   ├── index.ts           # 主入口（早期防护 + 协议注册 + 启动 Application）
 │   │   ├── preload.ts         # 预加载脚本入口：装配各命名空间并暴露 electronAPI（2026-08 拆分重构）
 │   │   ├── preload-logger.ts  # preload 专用零依赖日志（禁止引入主进程 logger/i18n/app）
 │   │   ├── preload/           # preload 拆分模块（按功能域命名空间化）
 │   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
 │   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
-│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 28 个文件，每文件导出 <key>API 对象）
-│   │   ├── app/               # 应用生命周期管理（14 个文件）
+│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 29 个文件，每文件导出 <key>API 对象）
+│   │   ├── app/               # 应用生命周期管理（23 个源文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
 │   │   │   ├── cleanup.ts           # 退出清理
@@ -179,6 +179,8 @@ WXNN XiangCe/
 │   │   ├── database/          # SQLite 数据库管理
 │   │   │   ├── connection.ts        # 数据库连接与表结构初始化
 │   │   │   ├── media-repository.ts  # 媒体文件 CRUD
+│   │   │   ├── resonance-repository.ts # 共鸣录 Repository（2.5.0）
+│   │   │   ├── import-root-repository.ts # 导入根目录 Repository
 │   │   │   └── worker/             # 数据库写操作进程拆分（utilityProcess）
 │   │   ├── scanner/           # 文件扫描器
 │   │   │   ├── index.ts             # 扫描器薄壳管理器
@@ -188,7 +190,7 @@ WXNN XiangCe/
 │   │   ├── scheduler/         # 分级任务调度队列
 │   │   ├── services/          # 业务服务层（文件/视频/水印/分享/备份...）
 │   │   ├── thumbnail/         # 缩略图生成器（基于 sharp）
-│   │   ├── ipc/handlers/      # IPC 通道处理函数（按业务分文件，约 30 个）
+│   │   ├── ipc/handlers/      # IPC 通道处理函数（按业务分文件，约 40 个）
 │   │   ├── plugins/           # 插件宿主（plugin-host/permission-guard）
 │   │   ├── video-editor/      # 视频编辑器子进程（bridge/filter-builder/watermark-builder）
 │   │   ├── i18n/              # 主进程国际化
@@ -206,6 +208,7 @@ WXNN XiangCe/
 │   │   │   ├── editor/             # 图片编辑器组件
 │   │   │   ├── gallery/            # 图库视图组件
 │   │   │   ├── layout/             # 布局组件（AppShell/Sidebar/TitleBar）
+│   │   │   ├── resonance/          # 共鸣录视图组件（2.5.0）
 │   │   │   ├── scanner/            # 扫描进度组件
 │   │   │   └── video/              # 视频播放器
 │   │   ├── pages/             # 页面组件
@@ -217,6 +220,7 @@ WXNN XiangCe/
 │   │   │   ├── DuplicatesPage.tsx  # 重复检测
 │   │   │   ├── RecycleBinPage.tsx  # 回收站
 │   │   │   ├── OutfitGalleryPage.tsx # 套装图鉴页
+│   │   │   ├── ResonanceRecordsPage.tsx # 共鸣录（2.5.0）
 │   │   │   └── settings/           # 设置页各分块
 │   │   ├── hooks/             # 自定义 React Hooks
 │   │   ├── stores/            # Zustand 状态管理
@@ -232,12 +236,11 @@ WXNN XiangCe/
 │   ├── shared/                # 跨进程共享代码（主进程与渲染进程共用）
 │   │   ├── types/             # 共享类型定义
 │   │   ├── errors/            # 统一错误码与 AppError 类
-│   │   ├── dimension.ts       # 画面尺寸常量
+│   │   ├── utils/             # 跨进程共享纯函数（concurrency/taskStages）
+│   │   ├── settings-keys.ts   # 渲染层可写偏好 key 白名单
+│   │   ├── dimension.ts       # 智能分组维度定义
 │   │   └── scene-category.ts  # 场景分类定义
 │   │
-│   └── common/                # 通用工具（与 Electron 无关，纯 JS）
-│       └── utils/             # formatSize/generateId/deepClone 等纯函数
-│
 ├── resources/                 # 应用资源
 │   ├── icons/                 # 应用图标（.ico/.svg）
 │   └── nuan5_decryption.dll   # 游戏内照片参数解密库
@@ -257,12 +260,13 @@ WXNN XiangCe/
 ├── package.json               # 依赖与脚本定义
 ├── tsconfig.json              # 渲染层 TypeScript 配置
 ├── tsconfig.scripts.json      # 脚本 TypeScript 配置
-├── vite.config.ts             # Vite 配置（端口 5173，根目录 src/renderer）
+├── electron.vite.config.ts    # 主/preload/renderer 三段式构建配置（renderer 端口 5173，根目录 src/renderer）
+├── vite.preview.config.ts     # 单文件预览版构建配置
 ├── vitest.config.ts           # Vitest 测试配置
 ├── eslint.config.js           # ESLint 规则
 ├── .prettierrc                # Prettier 格式化规则
 ├── tailwind.config.ts         # Tailwind CSS 配置
-├── postcss.config.js          # PostCSS 配置
+├── postcss.config.cjs         # PostCSS 配置
 └── ARCHITECTURE.md            # 架构文档（详细版）
 ```
 
@@ -271,8 +275,8 @@ WXNN XiangCe/
 - **路径别名**：
   - `@/*` → `src/renderer/*`
   - `@main/*` → `src/main/*`
-  - `@common/*` → `src/common/*`
-- **进程隔离**：主进程代码不能直接 import 渲染层，反之亦然；共享代码放 `src/shared/` 或 `src/common/`
+  - `@common/*` → `src/common/*`（`src/common` 已移除，该别名仅在配置中保留为历史遗留，新代码不要使用）
+- **进程隔离**：主进程代码不能直接 import 渲染层，反之亦然；共享代码放 `src/shared/`
 - **HTML 预览版**：`preview.html` 与 exe 程序**同步迭代**，界面/功能必须保持一致
 
 ---
@@ -321,16 +325,16 @@ explorer "$env:APPDATA\wxnn-photo-manager\logs"
 
 主要日志文件：
 
-- `app.log`：应用运行日志
-- `startup-errors.log`：启动错误日志
-- `faults.log`：故障记录（10 类 FaultType）
+- `main.log`：应用运行日志
+- `faults-YYYY-MM-DD.jsonl`：故障记录（10 类 FaultType，按日期滚动）
+- `startup-errors.log`：启动错误日志（位于 userData 根目录或 `用户文档\NikkiGallery\Diagnostics\`，100KB 滚动）
 
 ### 4.5 查看数据库
 
 数据库文件位于：
 
 ```
-%APPDATA%\wxnn-photo-manager\wxnn_photo_manager.db
+%APPDATA%\wxnn-photo-manager\database\wxnn_photo_manager.db
 ```
 
 推荐使用 [DB Browser for SQLite](https://sqlitebrowser.org/) 打开查看。
@@ -467,7 +471,7 @@ npm run format
 - `no-empty`：`error`（空块禁止；空 catch 允许但必须加注释说明或进行处理）
 - `@typescript-eslint/no-unsafe-function-type` / `@typescript-eslint/no-require-imports`：`error`（禁止 `Function` 类型和 `require()` 导入）
 - `react/react-in-jsx-scope`：`off`（React 17+ JSX 转换无需 import React）
-- `no-restricted-syntax`：`error`（i18n 护栏：禁止硬编码中文与调试用 console 调用，2026-08-22 起硬阻断。存量技术债文件在 `eslint.config.js` 的 legacy 白名单块中降级为 `warn` 渐进收敛，修复一个文件就从白名单删除一个；测试文件整体豁免——断言/fixture 合法包含中文）
+- `no-restricted-syntax`：`error`（i18n 护栏：禁止硬编码中文与调试用 console 调用，2026-08-22 起硬阻断。历史上的 legacy 白名单已于 2026-08-23 全量清偿并从 `eslint.config.js` 删除；测试文件整体豁免——断言/fixture 合法包含中文）
 
 提交前请先运行并确保 **0 error**：
 
@@ -500,7 +504,7 @@ npm run lint
 
 ### 5.5 代码组织原则
 
-- **复用优先**：动手前先查 `src/common/utils/` 与 `src/renderer/components/common/` 是否已有实现
+- **复用优先**：动手前先查 `src/shared/utils/` 与 `src/renderer/components/common/` 是否已有实现
 - **小步快走**：每次只改一个功能点，跑测试验证后再继续
 - **只解决当前问题**：不为未来投机设计，不为不存在的需求写代码
 - **函数要小**：参数少、嵌套浅，大了就拆
@@ -605,7 +609,7 @@ npm run typecheck
 
 **常见错误**：
 
-- `Cannot find module '@common/utils'`：路径别名未生效，检查 `tsconfig.json` 的 `paths`
+- `Cannot find module '@/components/...'`：路径别名未生效，检查 `tsconfig.json` 的 `paths`
 - `Property 'xxx' does not exist on type ...`：接口未定义字段，到 `src/shared/types/` 添加
 - `Type 'undefined' is not assignable to ...`：变量可能为 undefined，加判空或 `??` 默认值
 
@@ -635,23 +639,23 @@ npx vitest run --reporter=verbose
 1. 确认游戏已生成截图（`...\InfinityNikki\Saved\ScreenShot\` 等目录有文件）
 2. 在程序「设置 → 扫描」点击「立即扫描」
 3. 手动添加游戏目录到自定义扫描路径
-4. 查看 `%APPDATA%\wxnn-photo-manager\logs\app.log` 是否有错误
+4. 查看 `%APPDATA%\wxnn-photo-manager\logs\main.log` 是否有错误
 
 ### 6.7 应用崩溃闪退
 
-崩溃 dump 位于：
+崩溃 dump 位于（应用启动时已重定向到用户文档目录，避免藏在 AppData）：
 
 ```
-%APPDATA%\wxnn-photo-manager\Crashpad\
+%USERPROFILE%\Documents\NikkiGallery\Diagnostics\
 ```
 
 PowerShell 打开：
 
 ```powershell
-explorer "$env:APPDATA\wxnn-photo-manager\Crashpad"
+explorer "$env:USERPROFILE\Documents\NikkiGallery\Diagnostics"
 ```
 
-> 崩溃文件保留最近 20 份，旧的自动清理。
+> 崩溃文件保留最近 10 份且超过 30 天自动清理。
 
 ### 6.8 应用启动失败（启动对话框报错）
 
@@ -692,8 +696,8 @@ Get-Process | Where-Object { $_.ProcessName -like '*wxnn*' -or $_.ProcessName -l
 ### 6.10 更多排障
 
 - 崩溃与启动问题：见上方 6.6 - 6.9 节
-- 日志位置：`%APPDATA%\wxnn-photo-manager\logs\`（`app.log` 常规日志、`startup-errors.log` 启动错误）
-- 崩溃 dump：`%APPDATA%\wxnn-photo-manager\Crashpad\`
+- 日志位置：`%APPDATA%\wxnn-photo-manager\logs\`（`main.log` 常规日志、`faults-*.jsonl` 故障记录；`startup-errors.log` 启动错误）
+- 崩溃 dump：`%USERPROFILE%\Documents\NikkiGallery\Diagnostics\`
 - 诊断包导出：设置 → 诊断 → 一键导出诊断包
 
 ---
@@ -722,12 +726,12 @@ npm test
 
 **门禁基线（改动后以此为参照，判断是不是自己引入的问题）**：
 
-| 命令                   | 基线结果                                                                                                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`    | **exit 0，零错误**                                                                                                                                                                                  |
-| `npm run lint`         | exit 1，但仅 16 个问题且全部落在 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处历史文件；若只报这三处即视为通过                                              |
-| `npm run format:check` | exit 0；注意 lint-staged 会对根目录 `*.md` 跑 `prettier --write`，改完大文档建议单独 `npx prettier --check <file>`                                                                                  |
-| `npm test`             | 全量 231 文件 / 4082 用例，仅 2 个既有环境性失败：`path-safety.test.ts` 的「只读目录返回 false」（Windows 上 `chmod 0o444` 对目录不生效）、`GalleryStackOverflow.test.tsx`（jsdom + virtuoso 递归） |
+| 命令                   | 基线结果                                                                                                                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`    | **exit 0，零错误**                                                                                                                                                                              |
+| `npm run lint`         | exit 1，但仅 16 个问题且全部落在 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处历史文件；若只报这三处即视为通过（2026-08 基线，未随 2.5.0 文档同步复测） |
+| `npm run format:check` | exit 0；注意 lint-staged 会对根目录 `*.md` 跑 `prettier --write`，改完大文档建议单独 `npx prettier --check <file>`                                                                              |
+| `npm test`             | 全量 263 文件 / 4476 用例，**全绿**（2026-09-06 实测；历史基线中的 `path-safety.test.ts` 与 `GalleryStackOverflow.test.tsx` 两个环境性失败已在 2.5.0 修复）                                     |
 
 ### 7.2 完整打包命令
 
@@ -798,9 +802,12 @@ release/
 **/ffmpeg-static/**
 **/ffprobe-static/**
 **/better-sqlite3/**
+**/bindings/**
+**/file-uri-to-path/**
 **/sharp/**
 **/@img/**
 **/koffi/**
+**/@koromix/**
 **/nuan5_decryption.dll
 ```
 
@@ -944,7 +951,7 @@ npm run build-storybook
 
 - [README.md](README.md)：项目简介与功能特性
 - [ARCHITECTURE.md](ARCHITECTURE.md)：架构文档（详细版）
-- [docs/USER_GUIDE.md](docs/USER_GUIDE.md)：用户使用指南
+- [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md)：用户使用指南
 - [docs/IPC_CONTRACT.md](docs/IPC_CONTRACT.md)：IPC 契约规范
 - [docs/PLUGIN_API.md](docs/PLUGIN_API.md)：插件 API 参考
 - [docs/技术债清单.md](docs/技术债清单.md)：技术债台账

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+### Documentation | 文档
+
+- 全量文档与代码库一致性同步：`ARCHITECTURE.md` / `ARCHITECTURE.en.md`（§4 目录树、utilityProcess 五 worker、preload 29 命名空间、UID 正则、services/stores/pages/hooks/icons 计数、§11 构建脚本与 electron.vite.config.ts、asarUnpack 10 项、附录 C 测试规模）、`DEVELOPMENT.md` / `DEVELOPMENT.en.md`（.npmrc 现状、日志/数据库/崩溃 dump 实际路径、门禁基线实测、asarUnpack、USER_GUIDE 死链）、`README.md`（clone 目录名、目录结构去除已移除的 `src/common`）、`AGENTS.md`（handler 域数量）、`docs/PLUGIN_API.md`（插件 IPC facade 实际暴露面、死链清理）、`docs/i18n/fix-sop.md`（补历史标记）
+
 ---
 
 ## [2.5.0] - 2026-09-06
@@ -32,11 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ### Changed | 变更
 
-- 测试同步：ipc-setup 契约测试更新为 39 个 registerXxxHandlers、preload 装配测试更新为 30 个命名空间（随共鸣录接入而新增）
+- 测试同步：ipc-setup 契约测试更新为 39 个 registerXxxHandlers、preload 装配测试更新为 reportReady + 29 个命名空间（共 30 键，随共鸣录接入而新增）
 
 ### Fixed | 修复
 
-- 测试修复：`GalleryStackOverflow` 边界用例适配 React 19.2「并发渲染出错中止并同步恢复」语义（props 驱动抛错替代闭包计数器，stub 全局 `reportError` 静默恢复上报），消除用例失败与 vitest 未处理错误；`path-safety` 「只读目录」用例改为模拟 `fs.accessSync` 的 W_OK 拒绝（Windows 上 `chmod 0o444` 对目录不生效导致的环境依赖失败），全量 4400 用例稳定全绿
+- 测试修复：`GalleryStackOverflow` 边界用例适配 React 19.2「并发渲染出错中止并同步恢复」语义（props 驱动抛错替代闭包计数器，stub 全局 `reportError` 静默恢复上报），消除用例失败与 vitest 未处理错误；`path-safety` 「只读目录」用例改为模拟 `fs.accessSync` 的 W_OK 拒绝（Windows 上 `chmod 0o444` 对目录不生效导致的环境依赖失败），全量 4476 用例稳定全绿
 - 修复手动补录成功提示缺失翻译：`AddRecordDialog` 改用 `resonance.toast.added` 并补齐 12 语言包（原 `resonance.records.toastAdded` 不存在于任何语言包，运行时显示原始 key）
 
 ### Removed | 移除
@@ -247,7 +251,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 <!-- 在文件末尾维护版本号锚点链接，便于自动跳转 -->
 
-[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.3.5...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.3.5...v2.5.0
 [2.3.5]: https://github.com/QianQianLuLu1/NikkiGallery/releases/tag/v2.3.5
 [2.3.0]: https://github.com/QianQianLuLu1/NikkiGallery/releases/tag/v2.3.0
 [2.2.0]: https://github.com/QianQianLuLu1/NikkiGallery/releases/tag/v2.2.0

@@ -72,8 +72,8 @@ cd "h:\<username>\Documents\WXNN XiangCe2"
 npm install
 ```
 
-> The `.npmrc` file already configures Electron and electron-builder to use a Chinese mirror (npmmirror); no extra setup needed.
-> `legacy-peer-deps=true` is enabled to avoid React 19 / older dependency conflicts.
+> The project `.npmrc` currently contains comments only (no effective config); Electron and electron-builder
+> mirrors are injected via environment variables (`ELECTRON_MIRROR` / `ELECTRON_BUILDER_BINARIES_MIRROR`, see [6.1](#61-npm-install-fails)).
 
 ### 2.3 Rebuild Native Modules (after first install or after switching Node versions)
 
@@ -133,17 +133,39 @@ npm run dist:win
 
 See [7. Packaging Workflow](#7-packaging-workflow).
 
+### 2.8 Packaged-App Smoke Test (E2E)
+
+Runtime smoke test against the `release/win-unpacked/` artifact (Playwright `_electron.launch`):
+verifies non-white-screen startup, `app://` protocol loading, preload injection, IPC/SQLite probes and startup stability.
+
+```bash
+# Prerequisite: release/win-unpacked exists (run npm run dist:win first)
+npm run e2e:smoke
+
+# One shot: package + smoke
+npm run dist:win:smoke
+```
+
+- Tests & config: `e2e/smoke.e2e.ts` / `e2e/playwright.config.ts`; design doc in `docs/archive/plans/e2e-smoke-playwright.md`
+- CI runs it automatically after the build job; failures upload screenshots and main-process logs (artifact `e2e-smoke-failure`)
+- Before a release, also walk through the manual checklist in `docs/manual-smoke-checklist.md` (items that need real samples: scanning/decryption/editing etc.)
+
 ---
 
 ## 3. Directory Layout
 
 ```
-WXNN XiangCe2/
+WXNN XiangCe/
 ├── src/
 │   ├── main/                  # Electron main process (Node environment)
-│   │   ├── index.ts           # Main entry; starts app, creates windows, registers IPC
-│   │   ├── preload.ts         # Preload script; exposes electronAPI to renderer
-│   │   ├── app/               # App lifecycle management (14 files)
+│   │   ├── index.ts           # Main entry (early guards + protocol registration + Application bootstrap)
+│   │   ├── preload.ts         # Preload entry: assembles namespaces and exposes electronAPI (split refactor, Aug 2026)
+│   │   ├── preload-logger.ts  # Zero-dependency preload logger (must not import main logger/i18n/app)
+│   │   ├── preload/           # Preload split modules (namespaced by domain)
+│   │   │   ├── ipc.ts               # IpcError class + call<T> unwrapping + subscribe event helper
+│   │   │   ├── plugin-bridge.ts     # Plugin capability bridge (window.pluginAPI) + i18n.t injection point
+│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 29 files; each exports a <key>API object)
+│   │   ├── app/               # App lifecycle management (23 source files)
 │   │   │   ├── application.ts       # App main class
 │   │   │   ├── lifecycle.ts         # Lifecycle management
 │   │   │   ├── cleanup.ts           # Exit cleanup
@@ -153,10 +175,12 @@ WXNN XiangCe2/
 │   │   │   ├── error-handlers.ts    # Error handling
 │   │   │   ├── ipc-setup.ts         # IPC registration orchestration
 │   │   │   ├── media-protocol.ts    # media:// protocol
-│   │   │   └── ...                  # media-update/recovery/theme etc.
+│   │   │   └── ...                  # media-update/recovery/theme/auto-update/gpu-fallback etc.
 │   │   ├── database/          # SQLite database management
 │   │   │   ├── connection.ts        # DB connection and schema init
 │   │   │   ├── media-repository.ts  # Media CRUD
+│   │   │   ├── resonance-repository.ts # Resonance repository (2.5.0)
+│   │   │   ├── import-root-repository.ts # Import-root repository
 │   │   │   └── worker/             # DB write operations split into utilityProcess
 │   │   ├── scanner/           # File scanner
 │   │   │   ├── index.ts             # Scanner manager (thin shell)
@@ -164,9 +188,9 @@ WXNN XiangCe2/
 │   │   │   └── path-classifier.ts   # Path classification (game/launcher/cloud...)
 │   │   ├── media-worker/      # Thumbnail / pHash / duplicate detection subprocess
 │   │   ├── scheduler/         # Priority-based task scheduler
-│   │   ├── services/          # Business services (file/video/watermark/share/backup...)
+│   │   ├── services/          # Business services (file/video/watermark/share/backup/xmp...)
 │   │   ├── thumbnail/         # Thumbnail generator (sharp-based)
-│   │   ├── ipc/handlers/      # IPC channel handlers (one file per domain, ~30 files)
+│   │   ├── ipc/handlers/      # IPC channel handlers (one file per domain, ~40 files)
 │   │   ├── plugins/           # Plugin host (plugin-host/permission-guard)
 │   │   ├── video-editor/      # Video editor subprocess (bridge/filter-builder/watermark-builder)
 │   │   ├── i18n/              # Main-process internationalization
@@ -184,6 +208,7 @@ WXNN XiangCe2/
 │   │   │   ├── editor/             # Image editor components
 │   │   │   ├── gallery/            # Gallery view components
 │   │   │   ├── layout/             # Layout (AppShell/Sidebar/TitleBar)
+│   │   │   ├── resonance/          # Resonance Records view components (2.5.0)
 │   │   │   ├── scanner/            # Scan progress components
 │   │   │   └── video/              # Video player
 │   │   ├── pages/             # Page components
@@ -195,6 +220,7 @@ WXNN XiangCe2/
 │   │   │   ├── DuplicatesPage.tsx  # Duplicate detection
 │   │   │   ├── RecycleBinPage.tsx  # Recycle bin
 │   │   │   ├── OutfitGalleryPage.tsx # Outfit gallery
+│   │   │   ├── ResonanceRecordsPage.tsx # Resonance Records (2.5.0)
 │   │   │   └── settings/           # Settings sub-sections
 │   │   ├── hooks/             # Custom React Hooks
 │   │   ├── stores/            # Zustand state management
@@ -210,12 +236,11 @@ WXNN XiangCe2/
 │   ├── shared/                # Cross-process shared code (used by both main & renderer)
 │   │   ├── types/             # Shared type definitions
 │   │   ├── errors/            # Unified error codes and AppError class
-│   │   ├── dimension.ts       # Layout dimension constants
+│   │   ├── utils/             # Cross-process pure functions (concurrency/taskStages)
+│   │   ├── settings-keys.ts   # Renderer-writable preference key whitelist
+│   │   ├── dimension.ts       # Smart grouping dimension definitions
 │   │   └── scene-category.ts  # Scene category definitions
 │   │
-│   └── common/                # Generic utils (Electron-agnostic, pure JS)
-│       └── utils/             # Pure functions: formatSize/generateId/deepClone...
-│
 ├── resources/                 # App resources
 │   ├── icons/                 # App icons (.ico/.svg)
 │   └── nuan5_decryption.dll   # In-game photo parameter decryption library
@@ -227,19 +252,22 @@ WXNN XiangCe2/
 │   └── perf-test/             # Performance tests
 │
 ├── docs/                      # Documentation
-│   ├── dev-docs/              # Dev docs (troubleshooting, contribution, etc.)
+│   ├── plans/                 # In-progress fix/feature plans
+│   ├── archive/               # Completed historical plans and reports
+│   ├── tutorial/              # User tutorial
 │   └── screenshots/           # Screenshots
 │
 ├── tests/                     # Test setup
 ├── package.json               # Dependencies and scripts
 ├── tsconfig.json              # Renderer TypeScript config
 ├── tsconfig.scripts.json     # Script TypeScript config
-├── vite.config.ts             # Vite config (port 5173, root src/renderer)
+├── electron.vite.config.ts    # Main/preload/renderer three-segment build config (renderer port 5173, root src/renderer)
+├── vite.preview.config.ts     # Single-file preview build config
 ├── vitest.config.ts           # Vitest config
 ├── eslint.config.js           # ESLint rules
 ├── .prettierrc                # Prettier formatting rules
 ├── tailwind.config.ts         # Tailwind CSS config
-├── postcss.config.js         # PostCSS config
+├── postcss.config.cjs         # PostCSS config
 └── ARCHITECTURE.md            # Architecture document (detailed)
 ```
 
@@ -248,8 +276,8 @@ WXNN XiangCe2/
 - **Path aliases**:
   - `@/*` → `src/renderer/*`
   - `@main/*` → `src/main/*`
-  - `@common/*` → `src/common/*`
-- **Process isolation**: main-process code cannot import renderer code, and vice versa; shared code lives in `src/shared/` or `src/common/`
+  - `@common/*` → `src/common/*` (`src/common` has been removed; the alias survives in configs as legacy only — do not use it in new code)
+- **Process isolation**: main-process code cannot import renderer code, and vice versa; shared code lives in `src/shared/`
 - **HTML preview**: `preview.html` is iterated in sync with the exe app; UI/features must stay consistent
 
 ---
@@ -298,16 +326,16 @@ explorer "$env:APPDATA\wxnn-photo-manager\logs"
 
 Key log files:
 
-- `app.log`: application log
-- `startup-errors.log`: startup error log
-- `faults.log`: fault records (10 FaultType categories)
+- `main.log`: application log
+- `faults-YYYY-MM-DD.jsonl`: fault records (10 FaultType categories, rolled by date)
+- `startup-errors.log`: startup error log (in the userData root or `Documents\NikkiGallery\Diagnostics\`, 100KB rolling)
 
 ### 4.5 Inspect the Database
 
 The database file is at:
 
 ```
-%APPDATA%\wxnn-photo-manager\wxnn_photo_manager.db
+%APPDATA%\wxnn-photo-manager\database\wxnn_photo_manager.db
 ```
 
 Use [DB Browser for SQLite](https://sqlitebrowser.org/) to open and inspect it.
@@ -444,7 +472,7 @@ Key rules (since 2026-08-22 the quality rules below are `error`-level and hard-b
 - `no-empty`: `error` (empty blocks forbidden; an empty catch is allowed but must carry a comment or handle the error)
 - `@typescript-eslint/no-unsafe-function-type` / `@typescript-eslint/no-require-imports`: `error` (no `Function` type, no `require()` imports)
 - `react/react-in-jsx-scope`: `off` (React 17+ JSX transform; no need to import React)
-- `no-restricted-syntax`: `warn` (i18n guardrail: no hardcoded Chinese or debug console calls; being converged gradually, non-blocking)
+- `no-restricted-syntax`: `error` (i18n guardrail: no hardcoded Chinese or debug console calls; hard-blocked since 2026-08-22. The historical legacy whitelist was fully cleared and removed from `eslint.config.js` on 2026-08-23; test files are exempt wholesale — assertions/fixtures may legitimately contain Chinese)
 
 Run before commit and make sure there are **0 errors**:
 
@@ -477,7 +505,7 @@ npm run lint
 
 ### 5.5 Code Organization Principles
 
-- **Reuse first**: before writing anything, check `src/common/utils/` and `src/renderer/components/common/` for existing implementations
+- **Reuse first**: before writing anything, check `src/shared/utils/` and `src/renderer/components/common/` for existing implementations
 - **Small steps**: one feature point per change; run tests before moving on
 - **Solve only the current problem**: no speculative future-proofing; no code for non-existent requirements
 - **Small functions**: few params, shallow nesting; split when large
@@ -582,7 +610,7 @@ npm run typecheck
 
 **Common errors**:
 
-- `Cannot find module '@common/utils'`: path alias not resolving; check `tsconfig.json` `paths`
+- `Cannot find module '@/components/...'`: path alias not resolving; check `tsconfig.json` `paths`
 - `Property 'xxx' does not exist on type ...`: interface missing a field; add it under `src/shared/types/`
 - `Type 'undefined' is not assignable to ...`: variable may be undefined; add a null check or `??` default
 
@@ -614,25 +642,25 @@ Quick checks:
 1. Confirm the game has produced screenshots (e.g. `...\InfinityNikki\Saved\ScreenShot\` contains files)
 2. In Settings → Scan, click "Scan now"
 3. Manually add the game directory to custom scan paths
-4. Check `%APPDATA%\wxnn-photo-manager\logs\app.log` for errors
+4. Check `%APPDATA%\wxnn-photo-manager\logs\main.log` for errors
 
 ### 6.7 App crashes / exits immediately
 
 See the troubleshooting manual for "Crash / exit".
 
-Crash dumps are at:
+Crash dumps are at (the app redirects them to the user's Documents folder at startup, keeping them out of AppData):
 
 ```
-%APPDATA%\wxnn-photo-manager\Crashpad\
+%USERPROFILE%\Documents\NikkiGallery\Diagnostics\
 ```
 
 Open in PowerShell:
 
 ```powershell
-explorer "$env:APPDATA\wxnn-photo-manager\Crashpad"
+explorer "$env:USERPROFILE\Documents\NikkiGallery\Diagnostics"
 ```
 
-> The 20 most recent crash files are retained; older ones are auto-cleaned.
+> The 10 most recent crash files are retained, and files older than 30 days are auto-cleaned.
 
 ### 6.8 Startup failure (error dialog at launch)
 
@@ -700,12 +728,12 @@ npm test
 
 **Gate baselines** (use these to tell whether a failure is pre-existing or one you just introduced):
 
-| Command                | Baseline                                                                                                                                                                                                                                                         |
-| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`    | **exit 0, zero errors**                                                                                                                                                                                                                                          |
-| `npm run lint`         | exit 1 with only 16 issues, all in three legacy locations: `.cache/`, `e2e/fullscreen-diagnose.e2e.ts`, `scripts/after-pack-vc-runtime.cjs`. If lint reports only these three, treat it as passing                                                               |
-| `npm run format:check` | exit 0. Note lint-staged runs `prettier --write` on root `*.md`; after editing large docs, run `npx prettier --check <file>` on just that file                                                                                                                   |
-| `npm test`             | 231 files / 4082 tests with only 2 known environment-dependent failures: the "read-only directory returns false" case in `path-safety.test.ts` (`chmod 0o444` does not block writes on Windows) and `GalleryStackOverflow.test.tsx` (jsdom + virtuoso recursion) |
+| Command                | Baseline                                                                                                                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`    | **exit 0, zero errors**                                                                                                                                                                            |
+| `npm run lint`         | exit 1 with only 16 issues, all in three legacy locations: `.cache/`, `e2e/fullscreen-diagnose.e2e.ts`, `scripts/after-pack-vc-runtime.cjs`. If lint reports only these three, treat it as passing |
+| `npm run format:check` | exit 0. Note lint-staged runs `prettier --write` on root `*.md`; after editing large docs, run `npx prettier --check <file>` on just that file                                                     |
+| `npm test`             | 263 files / 4476 tests, **all green** (measured 2026-09-06; the two historical environment-dependent failures — `path-safety.test.ts` and `GalleryStackOverflow.test.tsx` — were fixed in 2.5.0)   |
 
 ### 7.2 Full Build Command
 
@@ -776,9 +804,12 @@ release/
 **/ffmpeg-static/**
 **/ffprobe-static/**
 **/better-sqlite3/**
+**/bindings/**
+**/file-uri-to-path/**
 **/sharp/**
 **/@img/**
 **/koffi/**
+**/@koromix/**
 **/nuan5_decryption.dll
 ```
 
@@ -796,6 +827,8 @@ node scripts/generate-icon.js
 2. Launch from Start menu or desktop shortcut
 3. On first launch a full-disk scan runs to locate the game directory (first scan is slow; please be patient)
 4. A desktop shortcut is created automatically (skipped if it already exists)
+5. Before release, run the automated smoke test first: `npm run e2e:smoke` (requires `npm run dist:win` beforehand)
+6. Then walk through the manual smoke checklist in `docs/manual-smoke-checklist.md` (scanning / thumbnails / decryption / edit & export etc.)
 
 ### 7.8 Version Number Management
 
@@ -894,7 +927,10 @@ npm run build-storybook
 
 - [README.md](README.md): project overview and features
 - [ARCHITECTURE.md](ARCHITECTURE.md): detailed architecture document
-
+- [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md): user guide (Chinese)
+- [docs/IPC_CONTRACT.md](docs/IPC_CONTRACT.md): IPC contract spec
+- [docs/PLUGIN_API.md](docs/PLUGIN_API.md): plugin API reference
+- [docs/技术债清单.md](docs/技术债清单.md): tech debt ledger (Chinese)
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md): component docs site usage (Chinese)
 - [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md): project architecture overview (Chinese)
 

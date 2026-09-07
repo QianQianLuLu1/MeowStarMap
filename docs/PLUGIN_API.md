@@ -1,6 +1,6 @@
 # NikkiGallery 插件开发 API 文档
 
-> 版本：v1.0 ｜ 对应 NikkiGallery v2.3.0+ ｜ 核心框架：[pluggable-electron](https://github.com/dutchigor/pluggable-electron) v1.0.0
+> 版本：v1.0 ｜ 对应 NikkiGallery v2.3.0+（经核对在 v2.5.0 仍然有效）｜ 核心框架：[pluggable-electron](https://github.com/dutchigor/pluggable-electron) v1.0.0
 
 本文档面向 NikkiGallery 插件开发者，描述插件包格式、生命周期、可用的 API 与扩展点。
 
@@ -514,16 +514,12 @@ window.pluginAPI.i18n.t(
 
 ## 8. 插件管理 facade API（window.pluggableElectronIpc）
 
-由 pluggable-electron facade 自动暴露，用于插件管理操作。一般插件不直接使用，由 NikkiGallery 插件管理界面调用。
+由 pluggable-electron facade 自动暴露。**当前仅暴露两个只读查询方法**——插件管理界面（安装 / 卸载 / 更新 / 启停）统一走 `window.electronAPI.plugin`（见下），变更类操作已刻意不通过 facade 暴露（主进程侧对应的 pluggable 路由也已摘除）：
 
 ```typescript
 interface PluggableElectronIpc {
-  install(plugins: unknown[]): Promise<unknown>
-  uninstall(plugins: unknown[], reload?: boolean): Promise<unknown>
-  getActive(): Promise<unknown>
-  update(plugins: unknown[], reload?: boolean): Promise<unknown>
-  updatesAvailable(plugin: unknown[]): Promise<unknown>
-  toggleActive(plugin: unknown, active: boolean): Promise<unknown>
+  getActive(): Promise<unknown> // pluggable:getActivePlugins
+  updatesAvailable(plugin: unknown[]): Promise<unknown> // pluggable:updatesAvailable
 }
 ```
 
@@ -575,12 +571,12 @@ interface PluginManagementAPI {
 
 ### 10.1 沙箱分层模型
 
-| 层级 | 机制                      | 说明                                                                  |
-| ---- | ------------------------- | --------------------------------------------------------------------- |
-| L1   | Electron 渲染进程安全配置 | `contextIsolation: true` + `nodeIntegration: false` + `sandbox: true` |
-| L2   | pluggable-electron facade | 插件管理仅通过 IPC facade，渲染进程无 Node 权限                       |
-| L3   | NikkiGallery 权限声明     | 插件 package.json 声明 permissions（缺省为 `[]`），能力桥调用前校验   |
-| L4   | pathGuard 路径白名单      | 文件操作受限于白名单目录                                              |
+| 层级 | 机制                      | 说明                                                                                                                   |
+| ---- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| L1   | Electron 渲染进程安全配置 | `contextIsolation: true` + `nodeIntegration: false` + `sandbox: true`                                                  |
+| L2   | pluggable-electron facade | facade 仅暴露只读查询（getActive / updatesAvailable），管理变更走受控的 `electronAPI.plugin` IPC；渲染进程无 Node 权限 |
+| L3   | NikkiGallery 权限声明     | 插件 package.json 声明 permissions（缺省为 `[]`），能力桥调用前校验                                                    |
+| L4   | pathGuard 路径白名单      | 文件操作受限于白名单目录                                                                                               |
 
 ### 10.2 安全建议
 
@@ -735,5 +731,6 @@ export function init(extensionPoints) {
 ## 附录：参考资源
 
 - [pluggable-electron 官方文档](https://github.com/dutchigor/pluggable-electron)
-- [NikkiGallery 插件系统设计文档](./PLUGIN_SYSTEM_PLAN.md)
 - [示例插件源码](../plugins-samples/custom-watermark-template/)
+
+> 早期的《NikkiGallery 插件系统设计文档》（`docs/PLUGIN_SYSTEM_PLAN.md`）已从仓库移除，设计要点已并入本文档。

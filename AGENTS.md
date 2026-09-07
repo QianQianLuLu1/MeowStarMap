@@ -25,7 +25,7 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 ### `src/main/`（主进程）
 
 - `app/` — 应用引导
-- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate 等约 15 个域）
+- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、resonance 等约 40 个域文件）
 - `database/` — better-sqlite3 连接与仓储（media、resonance、import-root 等）
 - `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享等业务服务
 - `scanner/`、`thumbnail/`、`scheduler/` — 照片扫描与缩略图流水线

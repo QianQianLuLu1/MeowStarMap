@@ -644,7 +644,7 @@ export const databaseMock = {
 
   // 应用版本
   app: {
-    getVersion: async () => '2.3.0'
+    getVersion: async () => '2.5.0'
   },
 
   // 操作历史

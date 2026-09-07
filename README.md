@@ -69,7 +69,7 @@
 
 ```bash
 git clone <repo-url>
-cd wxnn-photo-manager
+cd NikkiGallery
 npm install          # 安装依赖
 npm run dev          # 启动开发模式
 npm run dist:win     # 打包 Windows 安装包
@@ -93,18 +93,17 @@ npm run storybook     # 启动组件文档站（Storybook，端口 6006）
 src/
 ├── main/          # Electron 主进程（IPC 通信、数据库、扫描器、服务层）
 │   ├── database/      # SQLite + 写入子进程
-│   ├── ipc/           # IPC 通道处理（~30 个文件）
+│   ├── ipc/           # IPC 通道处理（~40 个文件）
 │   ├── scanner/       # 文件扫描器（含子进程）
 │   ├── services/      # 业务服务层（13 个服务）
 │   └── media-worker/  # 缩略图 / pHash / 重复检测子进程
 ├── renderer/      # 渲染进程（React 前端）
-│   ├── components/    # 通用 / 编辑器 / 图库 / 布局组件
+│   ├── components/    # 通用 / 编辑器 / 图库 / 布局 / 共鸣录 / 扫描 / 视频组件
 │   ├── pages/         # 页面与设置分区
 │   ├── stores/        # Zustand 状态管理
 │   ├── data/          # 共鸣录静态数据（图鉴 / 卡池 / 百分位快照 / 12 语言名称 / 卡池缩略图）
 │   └── i18n/          # 12 种语言文件
-├── shared/        # 跨进程共享类型与错误码
-└── common/        # 通用纯函数工具
+└── shared/        # 跨进程共享类型与错误码
 ```
 
 > 完整架构说明请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)
@@ -185,7 +184,7 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 
 ```bash
 git clone <repo-url>
-cd wxnn-photo-manager
+cd NikkiGallery
 npm install          # Install dependencies
 npm run dev          # Start dev mode
 npm run dist:win     # Build Windows installer
@@ -209,18 +208,17 @@ npm run storybook     # Start the component docs site (Storybook, port 6006)
 src/
 ├── main/          # Electron main process (IPC, database, scanner, services)
 │   ├── database/      # SQLite + write worker
-│   ├── ipc/           # IPC channel handlers (~30 files)
+│   ├── ipc/           # IPC channel handlers (~40 files)
 │   ├── scanner/       # File scanner (with worker)
 │   ├── services/      # Business service layer (13 services)
 │   └── media-worker/  # Thumbnail / pHash / duplicate detection worker
 ├── renderer/      # Renderer process (React frontend)
-│   ├── components/    # Common / editor / gallery / layout components
+│   ├── components/    # Common / editor / gallery / layout / resonance / scanner / video components
 │   ├── pages/         # Pages & settings sections
 │   ├── stores/        # Zustand state management
 │   ├── data/          # Resonance static data (catalog / banners / percentile snapshot / 12-language names / banner thumbnails)
 │   └── i18n/          # 12 language files
-├── shared/        # Cross-process shared types & error codes
-└── common/        # Common pure utility functions
+└── shared/        # Cross-process shared types & error codes
 ```
 
 > See [ARCHITECTURE.en.md](ARCHITECTURE.en.md) for the full architecture document
