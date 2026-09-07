@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* eslint-disable @typescript-eslint/no-require-imports -- CommonJS 脚本需 require Node 内置模块 */
+ 
 'use strict'
 /**
  * 手动复现 / 复位 GPU 兼容模式（崩溃自愈）标记文件。

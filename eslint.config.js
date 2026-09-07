@@ -53,6 +53,14 @@ export default [
       'react-hooks/exhaustive-deps': 'error'
     }
   },
+  // .cjs 是 CommonJS 文件，require() 是其唯一合法导入方式
+  // （electron-builder 钩子 scripts/after-pack-vc-runtime.cjs 必须使用 CJS）。
+  {
+    files: ['**/*.cjs'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off'
+    }
+  },
   // no-undef 仅对 JS 文件生效：TS 文件由 typescript-eslint 推荐配置已关掉
   // （no-undef 在 TS 中不可靠），不在这里重新打开，以免在 TS 文件上产生大量误报。
   {
@@ -201,7 +209,11 @@ export default [
       'coverage/**',
       // Storybook 静态构建产物（不入仓，不参与 lint）
       '**/storybook-static/**',
-      '*.log'
+      '*.log',
+      // 本地工具缓存目录（.gitignore 已忽略，CI 干净环境不存在；加入避免本地 lint 误报，
+      // 保持本地 `npm run lint` 与 CI 行为一致）
+      '.cache/**',
+      '.qoder/**'
     ]
   }
 ]

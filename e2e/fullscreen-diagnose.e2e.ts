@@ -58,12 +58,12 @@ test('图库全屏预览诊断：点击缩略图 → 捕获 media:// 状态与 C
   }
 
   const cellCount = gridReady ? await win.locator('[role="gridcell"]').count() : 0
-  // eslint-disable-next-line no-console
+
   console.log(`[DIAG] gridReady=${gridReady} gridcellCount=${cellCount}`)
 
   let dialogAppeared = false
   let imgSrc: string | null = null
-  let mediaStatusBeforeClick = mediaResponses.length
+  const mediaStatusBeforeClick = mediaResponses.length
 
   if (cellCount > 0) {
     // 点击第一张缩略图
@@ -85,19 +85,18 @@ test('图库全屏预览诊断：点击缩略图 → 捕获 media:// 状态与 C
     }
   }
 
-  // eslint-disable-next-line no-console
   console.log(`[DIAG] dialogAppeared=${dialogAppeared}`)
-  // eslint-disable-next-line no-console
+
   console.log(`[DIAG] fullscreenImgSrc=${imgSrc ? imgSrc.slice(0, 160) : 'null'}`)
-  // eslint-disable-next-line no-console
+
   console.log(
     `[DIAG] mediaResponses(count=${mediaResponses.length}, newSinceClick=${
       mediaResponses.length - mediaStatusBeforeClick
     })=${JSON.stringify(mediaResponses.slice(-10))}`
   )
-  // eslint-disable-next-line no-console
+
   console.log(`[DIAG] consoleErrors=${JSON.stringify(consoleErrors.slice(0, 30))}`)
-  // eslint-disable-next-line no-console
+
   console.log(`[DIAG] pageErrors=${JSON.stringify(pageErrors.slice(0, 30))}`)
 
   // 诊断探针：不强断言通过，仅确保采集到关键信号，避免 CI 误判

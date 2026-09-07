@@ -3914,7 +3914,15 @@
       "pluginInstall": "",
       "pluginUninstall": "",
       "pluginToggle": "",
-      "wifiShare": ""
+      "wifiShare": "",
+      "resonanceAddRecord": "",
+      "resonanceUpdateRecord": "",
+      "resonanceDeleteRecord": "",
+      "resonanceReadImport": "",
+      "resonanceCommitImport": "",
+      "resonanceExport": "",
+      "resonanceUpdateWardrobe": "",
+      "resonanceClearAll": ""
     },
     "message": {
       "browserDownloadTriggered": "",
