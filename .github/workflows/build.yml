@@ -32,7 +32,7 @@ jobs:
     env:
       TZ: Asia/Hong_Kong
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       # 供应链安全：仅 PR 事件运行，审查 PR 中新增/更新的依赖是否存在已知漏洞（high/critical 直接失败）
       # 注意：若做成独立 job，push 事件下被 skip 的 job 会连带 skip needs 它的下游 job；放同一 job 内用 if 控制
       - name: Dependency review (PR only)
@@ -40,7 +40,7 @@ jobs:
         uses: actions/dependency-review-action@v4
         with:
           fail-on-severity: high
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -57,6 +57,9 @@ jobs:
       #   electron GHSA-9f4c-93c8-jc8g：40.10.6，修复需升级 electron >= 43.4.1（大版本，待专项升级）
       #   vitest GHSA-5xrq-8626-4rwp / vite GHSA-fx2h-pf6j-xcff：dev 工具，修复需大版本升级
       #     （vitest 仅 UI server 模式受影响，vite 仅 dev server 受影响，CI 均不使用）
+      #   2026-09 新披露批次 15 项：dev 工具链传递依赖（fast-uri×4 / brace-expansion×3 /
+      #     browserslist×2 / undici / glob / nanoid / js-yaml / ip-address），生产代码未直接引入，
+      #     修复均需上游（vitest / swagger / esbuild 链）大版本升级，待专项治理
       - name: Security audit (audit-ci, fail on high/critical)
         run: >-
           npx audit-ci --high --allowlist
@@ -65,6 +68,11 @@ jobs:
           GHSA-r6q2-hw4h-h46w GHSA-8x88-c5mf-7j5w GHSA-r292-9mhp-454m
           GHSA-52v5-jr5w-gjxr GHSA-9f4c-93c8-jc8g GHSA-5xrq-8626-4rwp
           GHSA-fx2h-pf6j-xcff
+          GHSA-2v37-7h3g-55p8 GHSA-3jxr-9vmj-r5cp GHSA-4cwx-7wf7-3272
+          GHSA-5j98-mcp5-4vw2 GHSA-5jgf-p345-68v8 GHSA-5p4m-2wfm-xmqj
+          GHSA-73wf-gq98-2v4g GHSA-7p8r-x3mc-p8w7 GHSA-c83g-rgw3-j3cx
+          GHSA-f65p-4m7j-42xc GHSA-fph4-wmhf-6fwf GHSA-jqff-g426-hqxp
+          GHSA-mh99-v99m-4gvg GHSA-mwp4-54f8-5fhr GHSA-rgw5-rvv9-x895
           --registry=https://registry.npmjs.org
       - run: npm run lint
       - name: i18n 守卫（白名单只减不增 / 清零必移除 / key 已同步）
@@ -86,8 +94,8 @@ jobs:
     env:
       TZ: Asia/Hong_Kong
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -109,8 +117,8 @@ jobs:
     # 护栏：打包 + 冒烟挂起时兜底，防止流水线无限等待
     timeout-minutes: 40
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
@@ -210,8 +218,8 @@ jobs:
     env:
       TZ: Asia/Hong_Kong
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'npm'
