@@ -9,8 +9,8 @@
 import { BrowserWindow, ipcMain, dialog } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
-import { wrapHandler, schemas, assertFileReadPath, assertFileWritePath } from '../validator'
-import { assertMediaReadPath } from '../media-read-guard'
+import { wrapHandler, schemas, assertFileWritePath } from '../validator'
+import { assertMediaReadPath, assertMediaAccessPath } from '../media-read-guard'
 import { AppError } from '../../../shared/errors/app-error'
 // P1-M：编辑器服务（sharp pipeline 与备份/写入逻辑）
 import { editorService, buildEditorMetadata } from '../../services/editor-service'
@@ -57,7 +57,10 @@ export function registerEditorMetadataHandlers(ctx: HandlerContext): void {
           .optional()
       ]),
       async ([sourcePath, metadataInput, options]) => {
-        assertFileReadPath(sourcePath)
+        // 已入库媒体读路径（userPicked → 媒体白名单 → PathGuard 兜底，与 media://
+        // 展示授权同口径）：游戏装在 Program Files 等敏感目录时，图库可正常展示的
+        // 照片不得在导出副本时被 PathGuard 拒绝（「路径不在白名单内，禁止读取操作」）
+        assertMediaAccessPath(ctx, sourcePath)
 
         // 解析目标目录：优先使用调用方传入的，未传则弹对话框选择
         let targetDir = options?.targetDir
@@ -123,7 +126,7 @@ export function registerEditorMetadataHandlers(ctx: HandlerContext): void {
           .required({ targetDir: true })
       ]),
       async ([sourcePaths, metadataInput, options]) => {
-        for (const p of sourcePaths) assertFileReadPath(p)
+        for (const p of sourcePaths) assertMediaAccessPath(ctx, p)
         assertFileWritePath(options.targetDir)
 
         const filter: EditorMetadataFilter | null = metadataInput.filter

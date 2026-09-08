@@ -137,3 +137,185 @@ describe('editor:readMetadata（双层读路径白名单校验）', () => {
     expect(editorService.readMetadata).toHaveBeenCalledWith(`${ROOT}\\not-indexed.jpg`)
   })
 })
+
+// ============================================================================
+// editor:exportWithMetadata / editor:batchExportWithMetadata 源图读路径校验
+//
+// 回归 Bug：编辑页「导出含参数副本」→ 用户在系统对话框选完保存目录后失败，
+// 提示「路径不在白名单内，禁止 读取 操作」（op=read，定位在源图读校验而非
+// 目标目录写校验）。源图是图库中已入库、media:// 可正常展示并在编辑器中打开的
+// 媒体，却因 PathGuard 敏感目录黑名单（官方启动器默认装在 Program Files）或
+// 目录未登记为白名单根，被裸 assertFileReadPath 拒绝。
+//
+// 模式与上方 editor:readMetadata 一致：../validator 不 mock（pathGuard 真实），
+// isMediaPathAllowed 由用例按分支控制；A1/A2/B1/B2 为本次 Bug 的红灯用例。
+// ============================================================================
+const METADATA_INPUT = {
+  params: { zoom: 1 },
+  filter: null,
+  filterIntensity: 100,
+  watermark: null
+}
+// 官方启动器默认安装形态：Program Files 命中 isSensitivePath 黑名单
+const PF_SOURCE =
+  'C:\\Program Files\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos\\12345678\\NikkiPhotos_HighQuality\\photo.jpg'
+// 已入库但目录未登记为 pathGuard 根
+const UNREGISTERED_SOURCE = 'D:/games/InfinityNikki/photo/001.jpg'
+
+function mockExportOk(): void {
+  editorService.exportWithMetadata.mockReset().mockResolvedValue({
+    success: true,
+    message: '已导出含参数副本: photo_编辑.jpg',
+    outputPath: `${ROOT}\\photo_编辑.jpg`
+  })
+}
+
+function mockBatchExportOk(): void {
+  editorService.batchExportWithMetadata.mockReset().mockResolvedValue({
+    success: true,
+    successCount: 1,
+    failedCount: 0,
+    outputPaths: [`${ROOT}\\photo_编辑.jpg`],
+    failures: [],
+    message: '批量导出完成：成功 1 张'
+  })
+}
+
+describe('editor:exportWithMetadata（源图读路径白名单校验）', () => {
+  beforeEach(() => {
+    handleMock.mockClear()
+    isMediaPathAllowedMock.mockReset()
+    mockExportOk()
+    pathGuard.register(ROOT)
+    registerEditorMetadataHandlers(makeCtx())
+  })
+
+  it('A1 已入库媒体位于 Program Files（敏感目录形态）时导出成功', async () => {
+    isMediaPathAllowedMock.mockReturnValue(true)
+
+    const res = (await getHandler('editor:exportWithMetadata')({}, PF_SOURCE, METADATA_INPUT, {
+      targetDir: ROOT,
+      format: 'jpg',
+      quality: 95
+    })) as IpcResponseLike
+
+    expect(res.success).toBe(true)
+    expect(editorService.exportWithMetadata).toHaveBeenCalledTimes(1)
+    expect(editorService.exportWithMetadata).toHaveBeenCalledWith(
+      PF_SOURCE,
+      expect.anything(),
+      expect.objectContaining({ targetDir: ROOT, format: 'jpg', quality: 95 })
+    )
+  })
+
+  it('A2 已入库但未登记进 pathGuard 根的媒体导出成功', async () => {
+    isMediaPathAllowedMock.mockReturnValue(true)
+
+    const res = (await getHandler('editor:exportWithMetadata')(
+      {},
+      UNREGISTERED_SOURCE,
+      METADATA_INPUT,
+      { targetDir: ROOT, format: 'jpg', quality: 95 }
+    )) as IpcResponseLike
+
+    expect(res.success).toBe(true)
+    expect(editorService.exportWithMetadata).toHaveBeenCalledWith(
+      UNREGISTERED_SOURCE,
+      expect.anything(),
+      expect.objectContaining({ targetDir: ROOT })
+    )
+  })
+
+  it('A3 越权路径（双白名单均不命中）返回 IPC_PATH_FORBIDDEN 且服务层零调用', async () => {
+    isMediaPathAllowedMock.mockReturnValue(false)
+
+    const res = (await getHandler('editor:exportWithMetadata')(
+      {},
+      'C:\\Windows\\System32\\drivers\\etc\\hosts',
+      METADATA_INPUT,
+      { targetDir: ROOT }
+    )) as IpcResponseLike
+
+    expect(res.success).toBe(false)
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+    expect(editorService.exportWithMetadata).not.toHaveBeenCalled()
+  })
+
+  it('A4 目标目录经系统对话框登记（userPicked）时写入校验通过', async () => {
+    isMediaPathAllowedMock.mockReturnValue(true)
+    const picked = 'E:\\picked\\out'
+    pathGuard.registerUserPicked(picked)
+
+    const res = (await getHandler('editor:exportWithMetadata')(
+      {},
+      UNREGISTERED_SOURCE,
+      METADATA_INPUT,
+      { targetDir: picked }
+    )) as IpcResponseLike
+
+    expect(res.success).toBe(true)
+    expect(editorService.exportWithMetadata).toHaveBeenCalledWith(
+      UNREGISTERED_SOURCE,
+      expect.anything(),
+      expect.objectContaining({ targetDir: picked })
+    )
+  })
+
+  it('A5 未命中媒体白名单但路径在已注册根下时兜底成功', async () => {
+    isMediaPathAllowedMock.mockReturnValue(false)
+
+    const res = (await getHandler('editor:exportWithMetadata')(
+      {},
+      `${ROOT}\\not-indexed.jpg`,
+      METADATA_INPUT,
+      { targetDir: ROOT }
+    )) as IpcResponseLike
+
+    expect(res.success).toBe(true)
+    expect(editorService.exportWithMetadata).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('editor:batchExportWithMetadata（源图读路径白名单校验）', () => {
+  beforeEach(() => {
+    handleMock.mockClear()
+    isMediaPathAllowedMock.mockReset()
+    mockBatchExportOk()
+    pathGuard.register(ROOT)
+    registerEditorMetadataHandlers(makeCtx())
+  })
+
+  it('B1 已入库媒体（Program Files 形态）批量导出成功', async () => {
+    isMediaPathAllowedMock.mockReturnValue(true)
+
+    const res = (await getHandler('editor:batchExportWithMetadata')(
+      {},
+      [PF_SOURCE, UNREGISTERED_SOURCE],
+      METADATA_INPUT,
+      { targetDir: ROOT, format: 'jpg', quality: 95 }
+    )) as IpcResponseLike
+
+    expect(res.success).toBe(true)
+    expect(editorService.batchExportWithMetadata).toHaveBeenCalledTimes(1)
+    expect(editorService.batchExportWithMetadata).toHaveBeenCalledWith(
+      [PF_SOURCE, UNREGISTERED_SOURCE],
+      expect.anything(),
+      expect.objectContaining({ targetDir: ROOT, format: 'jpg', quality: 95 })
+    )
+  })
+
+  it('B2 批次中含 1 条越权路径时整批拒绝且服务层零调用', async () => {
+    isMediaPathAllowedMock.mockReturnValue(false)
+
+    const res = (await getHandler('editor:batchExportWithMetadata')(
+      {},
+      [`${ROOT}\\ok.jpg`, 'C:\\Windows\\System32\\drivers\\etc\\hosts'],
+      METADATA_INPUT,
+      { targetDir: ROOT }
+    )) as IpcResponseLike
+
+    expect(res.success).toBe(false)
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+    expect(editorService.batchExportWithMetadata).not.toHaveBeenCalled()
+  })
+})

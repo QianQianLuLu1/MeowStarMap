@@ -85,14 +85,38 @@ export function assertMediaReadPath(ctx: HandlerContext, filePath: string): void
 }
 
 /**
+ * 断言「已授权媒体」路径安全（三级校验：userPicked → 媒体白名单 → PathGuard 兜底）。
+ *
+ * 与 `assertMediaReadPath` 的**关键差异：不做 isSensitivePath 前置闸门**。
+ * 原因（与 media:// 展示授权同口径）：官方启动器默认把游戏装在
+ * `C:\Program Files\InfinityNikki Launcher\InfinityNikki`（见
+ * `scanner/game-directory-discovery.ts` 的 getCommonLauncherInstallCandidates），
+ * 该目录命中敏感目录黑名单，PathGuard 恒拒绝；而 media://（isMediaPathAllowed）
+ * 无此闸门，照片在图库可正常显示、在编辑器可正常打开——于是出现「看得见、
+ * 读不了」：编辑页「导出含参数副本」选完保存目录后失败并提示
+ * 「路径不在白名单内，禁止 读取 操作」。本守卫用于消除该口径不一致。
+ *
+ * 安全边界：
+ * - 判定集合仅为「DB 已索引的 file_path / 已索引 source_path 下的媒体扩展名文件」，
+ *   渲染层本就能经 media:// 读取其完整字节，主进程读取不产生新的暴露面；
+ * - 未入库路径（含敏感目录下未入库文件）仍回落 assertFileReadPath，由
+ *   PathGuard + 黑名单拒绝，不放宽既有约束；
+ * - 零 IO：userPicked 为纯字符串匹配，isMediaPathAllowed 自带 5 分钟 TTL 缓存；
+ * - 不做 realpath 复检：敏感目录下的真实路径仍在敏感目录，复检会把上述修复打回
+ *   原形；残留面（已索引媒体目录内的符号链接指向非敏感普通文件）与
+ *   `assertMediaDeletePath` 的既有取舍一致。
+ */
+export function assertMediaAccessPath(ctx: HandlerContext, filePath: string): void {
+  if (pathGuard.isUserPicked(filePath)) return
+  if (isMediaPathAllowed(ctx, filePath)) return
+  assertFileReadPath(filePath)
+}
+
+/**
  * 断言删除路径安全（删除通道三级校验：userPicked → 媒体白名单 → PathGuard 兜底）。
  *
- * 供 file:delete / file:deletePermanent 等删除类通道使用，与
- * `assertMediaReadPath` 的差异：删除的是「DB 中已展示的媒体」这一窄集合，
- * 因此快路径不做 isSensitivePath 前置闸门——否则游戏装在
- * Program Files / ProgramData 等系统目录形态下时，已入库媒体
- * （media:// 可正常展示、media:permanentDelete 可直接彻底删除）
- * 却无法经 file:delete 移入回收站（删除白名单口径不一致）。
+ * 供 file:delete / file:deletePermanent 等删除类通道使用，判定实现委托
+ * `assertMediaAccessPath`（与导出类读通道共用，避免两份重复实现）。
  *
  * 1. pathGuard.isUserPicked 命中 → 放行：用户在系统对话框中显式选中目录属
  *    真实授权行为，与 scanner:start / settings:set 对 userPicked 的短路同语义；
@@ -110,7 +134,5 @@ export function assertMediaReadPath(ctx: HandlerContext, filePath: string): void
  * - isMediaPathAllowed 内部异常时保守返回 false，异常路径一律回落 PathGuard。
  */
 export function assertMediaDeletePath(ctx: HandlerContext, filePath: string): void {
-  if (pathGuard.isUserPicked(filePath)) return
-  if (isMediaPathAllowed(ctx, filePath)) return
-  assertFileReadPath(filePath)
+  assertMediaAccessPath(ctx, filePath)
 }

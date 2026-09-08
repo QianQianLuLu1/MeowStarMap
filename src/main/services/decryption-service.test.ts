@@ -351,6 +351,106 @@ describe('decodeFileParams', () => {
 })
 
 // ============================================================
+// parseCameraParams 灯光/滤镜 None 判定（经 decodeFileParams 全链路）
+// Bug：灯光/滤镜实际为"无"时，属性面板显示 "None" (50%) / "None" (100%)
+// 根因：None 判定仅匹配精确字面量 'None'，带引号/空白/大小写变体漏过检查
+// ============================================================
+
+describe('decodeFileParams → parseCameraParams 灯光/滤镜 None 判定', () => {
+  /**
+   * 构造 31 元素参数数组：idx17/18=灯光 id/强度，idx29/30=滤镜 id/强度，其余填 0
+   */
+  function makeCameraArray(
+    lightId: unknown,
+    lightStrength: unknown,
+    filterId: unknown,
+    filterStrength: unknown
+  ): string {
+    const arr: unknown[] = Array.from({ length: 31 }, (_, i) => (i === 1 ? 1 : 0))
+    arr[17] = lightId
+    arr[18] = lightStrength
+    arr[29] = filterId
+    arr[30] = filterStrength
+    return JSON.stringify(arr)
+  }
+
+  /** 全链路驱动：mock koffi（step1 JSON + step3 参数文本）后执行 decodeFileParams */
+  async function decodeWithStep3(step3Text: string) {
+    setupAbiVersion()
+    const f = path.join(tmpRoot, 'a.jpg')
+    fs.writeFileSync(f, Buffer.alloc(10))
+
+    const step1Json = JSON.stringify({
+      social_photo: { photo_info: {}, time: { day: 1, hour: 10, min: 30, sec: 0 } },
+      CameraParams: 'YmFzZTY0UGFyYW1z'
+    })
+    const step1Bytes = Buffer.from(step1Json, 'utf-8')
+    const step3Bytes = Buffer.from(step3Text, 'utf-8')
+
+    decodeFn.mockImplementation((_ptr: unknown, _type: string, len: number) => {
+      if (len === step3Bytes.length) return Array.from(step3Bytes)
+      return Array.from(step1Bytes.subarray(0, Math.min(len, step1Bytes.length)))
+    })
+
+    mockFns['media_key_from_str'] = vi.fn().mockReturnValue({ _key: 'uid' })
+    mockFns['media_key_camera_param'] = vi.fn().mockReturnValue({ _key: 'camera' })
+    mockFns['media_decode_file_bytes_unchecked'] = vi.fn().mockReturnValue({
+      status: 0,
+      bytes: { data: {}, len: step1Bytes.length, cap: step1Bytes.length + 16 }
+    })
+    mockFns['media_decrypt'] = vi.fn().mockReturnValue({
+      status: 0,
+      bytes: { data: {}, len: step3Bytes.length, cap: step3Bytes.length + 16 }
+    })
+    mockFns['free_c_bytes'] = vi.fn()
+    mockFns['free_media_key'] = vi.fn()
+
+    return decodeFileParams(f, 'NikkiPhotos', 'default')
+  }
+
+  it('灯光/滤镜 id 为带引号的 "None" 时按"无"处理（light/filter 为 undefined）', async () => {
+    const r = await decodeWithStep3(makeCameraArray('"None"', 0.5, '"None"', 1))
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.light).toBeUndefined()
+    expect(r.camera?.filter).toBeUndefined()
+  })
+
+  it('None 变体（含空白/大小写）时 light/filter 为 undefined', async () => {
+    const r = await decodeWithStep3(makeCameraArray(' NONE ', 0.5, 'None', 1))
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.light).toBeUndefined()
+    expect(r.camera?.filter).toBeUndefined()
+  })
+
+  it('逗号分隔分支中带引号的 "None" 同样按"无"处理', async () => {
+    // 31 段逗号文本：idx17/18=灯光，idx29/30=滤镜，其余填 0（idx1=1 人像模式）
+    const parts: string[] = Array.from({ length: 31 }, (_, i) => (i === 1 ? '1' : '0'))
+    parts[17] = '"None"'
+    parts[18] = '0.5'
+    parts[29] = '"None"'
+    parts[30] = '1'
+    const r = await decodeWithStep3(parts.join(','))
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.light).toBeUndefined()
+    expect(r.camera?.filter).toBeUndefined()
+  })
+
+  it('非 None 的真实 id 剥离包裹引号并保留强度', async () => {
+    const r = await decodeWithStep3(makeCameraArray('"VibeLight_001"', 0.8, '"Fresh_001"', 0.6))
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.light).toEqual({ id: 'VibeLight_001', strength: 0.8 })
+    expect(r.camera?.filter).toEqual({ id: 'Fresh_001', strength: 0.6 })
+  })
+
+  it('精确字面量 None 的既有行为不回退（light/filter 为 undefined）', async () => {
+    const r = await decodeWithStep3(makeCameraArray('None', 0.5, 'None', 1))
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.light).toBeUndefined()
+    expect(r.camera?.filter).toBeUndefined()
+  })
+})
+
+// ============================================================
 // encodeCameraParams
 // ============================================================
 

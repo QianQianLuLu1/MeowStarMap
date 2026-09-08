@@ -81,7 +81,11 @@ vi.mock('./validator', async (importOriginal) => {
   }
 })
 
-import { assertMediaReadPath, assertMediaDeletePath } from './media-read-guard'
+import {
+  assertMediaReadPath,
+  assertMediaDeletePath,
+  assertMediaAccessPath
+} from './media-read-guard'
 import { assertFileReadPath, pathGuard } from './validator'
 import { AppError } from '../../shared/errors/app-error'
 
@@ -316,6 +320,48 @@ describe('assertMediaDeletePath 删除路径三级校验（userPicked → 媒体
     isMediaPathAllowedMock.mockReturnValue(false)
 
     expect(() => assertMediaDeletePath(makeCtx(), 'relative/a.jpg')).toThrow(AppError)
+    expect(assertFileReadPathMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('assertMediaAccessPath 已授权媒体三级校验（导出/删除共用）', () => {
+  beforeEach(() => {
+    assertFileReadPathMock.mockClear()
+    isMediaPathAllowedMock.mockReset()
+    loggerDebugMock.mockClear()
+  })
+
+  it('X1 userPicked 命中放行，assertFileReadPath 零调用', () => {
+    isMediaPathAllowedMock.mockReturnValue(false)
+    pathGuard.registerUserPicked('E:/export-picked-root')
+
+    expect(() =>
+      assertMediaAccessPath(makeCtx(), 'E:/export-picked-root/photo/001.jpg')
+    ).not.toThrow()
+    expect(assertFileReadPathMock).not.toHaveBeenCalled()
+  })
+
+  it('X2 敏感目录（Program Files）下已入库媒体放行：导出副本不再被黑名单硬拒', () => {
+    // 本次 Bug 的守卫级复现：官方启动器默认安装形态命中 isSensitivePath，
+    // assertMediaReadPath 因敏感闸门回落 PathGuard 被拒，本守卫无该闸门故放行
+    isMediaPathAllowedMock.mockReturnValue(true)
+    const launcherPhoto =
+      'C:/Program Files/InfinityNikki Launcher/InfinityNikki/X6Game/Saved/GamePlayPhotos/12345678/NikkiPhotos_HighQuality/photo.jpg'
+
+    expect(() => assertMediaAccessPath(makeCtx(), launcherPhoto)).not.toThrow()
+    expect(assertFileReadPathMock).not.toHaveBeenCalled()
+  })
+
+  it('X3 双白名单未命中回落 PathGuard 兜底并拒绝', () => {
+    isMediaPathAllowedMock.mockReturnValue(false)
+
+    try {
+      assertMediaAccessPath(makeCtx(), 'Z:/unregistered/file.jpg')
+      expect.unreachable('未入库且未注册路径必须被拒绝')
+    } catch (e) {
+      expect(e).toBeInstanceOf(AppError)
+      expect((e as AppError).code).toBe('IPC_PATH_FORBIDDEN')
+    }
     expect(assertFileReadPathMock).toHaveBeenCalledTimes(1)
   })
 })

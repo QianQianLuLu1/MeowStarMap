@@ -304,6 +304,23 @@ async function decodeNetworkGraceful(
 // 参数解析（参考 nikki_albums converter.rs，非头文件内容）
 // ============================================================
 
+/**
+ * 归一化相机参数中的字符串 id：去首尾空白、剥离包裹引号。
+ * 真实解密数据中"无"的表示可能是带引号/含空白的 'None' 变体（属性面板曾显示 "None" (50%)），
+ * 统一归一化后做 None 判定，非 None 的真实 id 也同步剥引号以保证 i18n 映射命中。
+ */
+function normalizeParamId(v: unknown): string {
+  return String(v ?? '')
+    .trim()
+    .replace(/^['"]+|['"]+$/g, '')
+    .trim()
+}
+
+/** 灯光/滤镜 id 是否表示"无"（大小写不敏感） */
+function isNoneParam(v: unknown): boolean {
+  return normalizeParamId(v).toLowerCase() === 'none'
+}
+
 function parseCameraParams(text: string): CameraParams | undefined {
   if (!text) return undefined
 
@@ -338,12 +355,12 @@ function parseCameraParams(text: string): CameraParams | undefined {
     bloomThreshold: Number(arr[21]) || 0,
     portraitMode: Number(arr[1]) === 1,
     filter:
-      arr[29] && arr[29] !== 'None'
-        ? { id: String(arr[29]), strength: Number(arr[30]) || 0 }
+      arr[29] && !isNoneParam(arr[29])
+        ? { id: normalizeParamId(arr[29]), strength: Number(arr[30]) || 0 }
         : undefined,
     light:
-      arr[17] && arr[17] !== 'None'
-        ? { id: String(arr[17]), strength: Number(arr[18]) || 0 }
+      arr[17] && !isNoneParam(arr[17])
+        ? { id: normalizeParamId(arr[17]), strength: Number(arr[18]) || 0 }
         : undefined,
     rawParams: text
   }
