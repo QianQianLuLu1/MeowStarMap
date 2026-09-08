@@ -952,7 +952,9 @@
         "list": "",
         "masonry": "",
         "timeline": ""
-      }
+      },
+      "exitMultiSelect": "",
+      "multiSelect": ""
     },
     "contextMenu": {
       "copyTo": "",
@@ -2538,7 +2540,8 @@
       "watermark": "",
       "wifiShare": "",
       "wifiShareHint": "",
-      "selectAll": ""
+      "selectAll": "",
+      "deselectAll": ""
     },
     "rename": {
       "cancel": "",

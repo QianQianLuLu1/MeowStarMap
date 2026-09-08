@@ -1249,6 +1249,7 @@
         "endLabel": "结束日期",
         "startLabel": "开始日期"
       },
+      "exitMultiSelect": "退出选择",
       "filterType": {
         "all": "全部",
         "image": "图片",
@@ -1257,6 +1258,7 @@
       "importTitle": "导入文件",
       "missingOnly": "仅看丢失",
       "missingOnlyTitle": "只显示文件已被外部删除的记录",
+      "multiSelect": "选择",
       "rating": {
         "all": "全部",
         "label": "评分",
@@ -2605,6 +2607,7 @@
       "categorize": "分类",
       "clearSelection": "清除选择",
       "delete": "删除",
+      "deselectAll": "取消全选",
       "export": "导出",
       "exportSelectDir": "选择目录导出",
       "exportToDefault": "导出到默认",
