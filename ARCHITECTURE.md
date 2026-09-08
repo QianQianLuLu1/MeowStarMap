@@ -2,7 +2,7 @@
 
 > **项目代号**：`wxnn-photo-manager`
 > **应用名称**：无限暖暖相册管理工具（NikkiGallery）
-> **当前版本**：2.5.0
+> **当前版本**：2.5.1
 > **平台**：Windows x64
 > **文档版本**：1.4
 > **最后更新**：2026-09-06
@@ -1652,7 +1652,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 ### 12.2 版本号约束
 
 - **版本号必须保持不变，除非用户明确要求**
-- 当前版本：2.5.0
+- 当前版本：2.5.1
 - 改版本号需同步：`package.json` 的 `version`、`README.md` 版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 头部与 §12.2、`DEVELOPMENT.md` / `DEVELOPMENT.en.md` 头部与 §7.8；安装程序文件名由 `artifactName` 模板自动跟随（`NikkiGallery-Setup-${version}.exe`）
 
 ### 12.3 性能红线

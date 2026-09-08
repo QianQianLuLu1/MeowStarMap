@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.1] - 2026-09-08
+
+### Fixed | 修复
+
+- 修复图库非网格视图在条目数较多（约 500 条）时的展示异常，并补充过滤后条目计数测试（`useFilteredMediaFiles` 及新增 `useFilteredMediaFiles.count.test.ts`）
+
+---
+
 ## [2.5.0] - 2026-09-06
 
 ### Added | 新增
@@ -251,7 +259,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 <!-- 在文件末尾维护版本号锚点链接，便于自动跳转 -->
 
-[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...HEAD
+[2.5.1]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.3.5...v2.5.0
 [2.3.5]: https://github.com/QianQianLuLu1/NikkiGallery/releases/tag/v2.3.5
 [2.3.0]: https://github.com/QianQianLuLu1/NikkiGallery/releases/tag/v2.3.0

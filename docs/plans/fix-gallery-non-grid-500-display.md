@@ -46,7 +46,7 @@ todos:
 
 ## 3. 修改方案
 
-### 3.1 修改文件清单（共 2 个文件，均为干净文件——不在他人未提交改动范围内）
+### 3.1 修改文件清单（共 2 个文件；2026-09-08 复核：工作区干净（HEAD `c21f4fe`），基线子集测试 mediaStore.test 42 项 + mediaStore.integration + search-service.test 10 项共 66/66 全部通过）
 
 **文件 1：`src/renderer/hooks/useFilteredMediaFiles.ts`**（复用 FIX 组20-1 既有的"逐页拉齐"机制，约 +3 行）
 
@@ -71,8 +71,8 @@ useEffect(() => {
 
 ### 3.2 已评估并否决的备选方案
 
-- **方案 B（否决）**：给 4 个视图组件逐一新增 `onEndReached` props + 滚动哨兵。理由：改动面 5 个文件、需在 4 个非虚拟化组件各自实现触底检测，且其中 `ListView/TimelineView/MasonryView/EventTimelineView/VirtualImageGrid` 多数处于他人未提交改动区（git status 脏文件），冲突风险高，违背最小化原则。
-- **方案 C（否决）**：在 `GalleryPage` 加 effect。理由：`GalleryPage.tsx` 是他人未提交改动的脏文件，且 hook 内修改与组20-1 机制天然同构、无需触碰页面组件。
+- **方案 B（否决）**：给 4 个视图组件逐一新增 `onEndReached` props + 滚动哨兵。理由：改动面 5 个文件，需在 4 个非网格视图组件各自实现/透传触底检测（其中 TimelineView/EventTimelineView 虽基于 Virtuoso 但未暴露 endReached props，ListView/MasonryView 为普通列表渲染），违背最小化原则。
+- **方案 C（否决）**：在 `GalleryPage` 加 effect。理由：hook 内修改与组20-1 机制天然同构，无需触碰页面组件；且 hook 同时被 DetailPage / FullscreenViewer 消费，修复可一并覆盖。
 
 ### 3.3 附带收益说明
 
@@ -111,4 +111,32 @@ useEffect(() => {
 - **并发保护**：复用 `loadNextMediaPage` 内部 `loadingMore` 标志（L446-447），多次触底/重渲染安全。
 - **回收站隔离**：保留 `currentView !== 'recycle-bin'` 守卫，回收站独立游标不受影响。
 - **大数据量边界**：10,000 条 = 19 次追加 IPC，均为 keyset 游标查询（可索引 seek），符合"10,000 以内"预期；非网格视图本就非虚拟化渲染，与既有筛选拉齐行为一致。
-- **禁区声明**：本次不触碰 git status 中他人未提交的 32 个脏文件（含 GalleryPage.tsx、各视图组件、uiStore.ts 等）；仅改动上列 2 个干净文件。
+- **禁区声明**：2026-09-08 复核时工作区干净（HEAD `c21f4fe`，无未提交改动）；本次仍仅改动上列 2 个文件，不触碰其他任何文件。
+
+## 6. 执行记录（2026-09-08）
+
+### 红灯证据（修复前）
+
+`npx vitest run src/renderer/hooks/useFilteredMediaFiles.test.ts src/renderer/hooks/useFilteredMediaFiles.count.test.ts`：
+
+- `useFilteredMediaFiles.test.ts`：2 failed —— `viewMode=list 无筛选且 hasMoreMedia=true 时触发全库加载`、`viewMode=timeline 同样触发全库加载`（`expected "spy" to be called at least once`，即未触发 `loadNextMediaPage`）
+- `useFilteredMediaFiles.count.test.ts`：2 failed —— `expected … to have a length of 600 but got 500`、`expected … to have a length of 1200 but got 500`（Bug 稳定复现）
+- 3 个守护用例（grid 不触发 / hasMore=false 不触发）修复前即通过
+
+### 绿灯与回归结果
+
+| 验证项                  | 命令                                                       | 结果                                         |
+| ----------------------- | ---------------------------------------------------------- | -------------------------------------------- |
+| 子集（hook + 测试）     | `npx vitest run src/renderer/hooks/useFilteredMediaFiles*` | 47/47 通过                                   |
+| 相邻模块（stores 分页） | `npx vitest run src/renderer/stores`                       | 116/116 通过                                 |
+| 全量单测                | `npm test`                                                 | **270 文件 / 4545 用例全部通过**，无新增失败 |
+| 类型检查                | `npm run typecheck`（tsc -b）                              | 通过                                         |
+| 静态检查                | `npm run lint`（eslint .）                                 | 0 违规                                       |
+| E2E 冒烟                | `npm run e2e:smoke`                                        | 9/9 通过（16.3s）                            |
+
+### 改动清单（3 个源文件 + 1 个计划文档）
+
+1. `src/renderer/hooks/useFilteredMediaFiles.ts`：订阅 `uiStore.viewMode`，全库拉齐条件扩展为 `isFilteringActive \|\| viewMode !== 'grid'`（约 +8 行含注释）
+2. `src/renderer/hooks/useFilteredMediaFiles.test.ts`：新增 describe「非网格视图全库加载」（4 用例）
+3. `src/renderer/hooks/useFilteredMediaFiles.count.test.ts`：新建端到端计数验收（600/1200/grid 守护，3 用例）
+4. `docs/plans/fix-gallery-non-grid-500-display.md`：修正陈旧的脏文件表述、补充基线与本执行记录

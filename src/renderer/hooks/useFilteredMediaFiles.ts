@@ -106,12 +106,19 @@ export function useFilteredMediaFiles(): MediaFile[] {
     rangeStart !== null ||
     rangeEnd !== null ||
     (filterRating !== null && filterRating > 0)
+  // 修复（fix-gallery-non-grid-500-display，计划见 docs/plans/）：GalleryPage 仅 grid 视图
+  // 接线了 VirtualImageGrid 的 onEndReached 触底加载；list/timeline/masonry/event-timeline
+  // 无任何分页入口，无筛选条件时 mediaFiles 永远停在首屏 500 条——即"扫描 >500 个时 UI 仅
+  // 显示 500 个"。视图模式非 grid 时同样逐页拉齐全库（复用 loadNextMediaPage 的并发保护/
+  // 去重/游标推进），每页追加驱动本 effect 再触发，直至 hasMoreMedia=false。
+  const viewMode = useUIStore((s) => s.viewMode)
+  const shouldPullAll = isFilteringActive || viewMode !== 'grid'
   useEffect(() => {
     // 回收站视图使用独立的 recycleBinFiles 数据源，不在此触发全库加载
-    if (isFilteringActive && hasMoreMedia && currentView !== 'recycle-bin') {
+    if (shouldPullAll && hasMoreMedia && currentView !== 'recycle-bin') {
       void loadNextMediaPage()
     }
-  }, [isFilteringActive, hasMoreMedia, mediaCount, currentView])
+  }, [shouldPullAll, hasMoreMedia, mediaCount, currentView])
 
   return useMemo(() => {
     // 命中缓存：所有依赖引用均未变化时直接返回上次结果

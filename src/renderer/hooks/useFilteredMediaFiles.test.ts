@@ -553,4 +553,53 @@ describe('useFilteredMediaFiles', () => {
       expect(loadNextMediaPageMock).not.toHaveBeenCalled()
     })
   })
+
+  // 修复「扫描媒体超过 500 个时 UI 仅显示 500 个」：
+  // 非网格视图（list/timeline/masonry/event-timeline）无触底加载入口，
+  // 无筛选条件时应同样逐页拉齐全库（计划：docs/plans/fix-gallery-non-grid-500-display.md）
+  describe('非网格视图全库加载（fix-gallery-non-grid-500-display）', () => {
+    beforeEach(() => {
+      loadNextMediaPageMock.mockClear()
+    })
+
+    it('viewMode=list 无筛选且 hasMoreMedia=true 时触发全库加载', () => {
+      useMediaStore.setState({
+        mediaFiles: [makeFile({ id: '1' })],
+        hasMoreMedia: true
+      })
+      resetUIStore({ viewMode: 'list' })
+      renderHook(() => useFilteredMediaFiles())
+      expect(loadNextMediaPageMock).toHaveBeenCalled()
+    })
+
+    it('viewMode=timeline 同样触发全库加载', () => {
+      useMediaStore.setState({
+        mediaFiles: [makeFile({ id: '1' })],
+        hasMoreMedia: true
+      })
+      resetUIStore({ viewMode: 'timeline' })
+      renderHook(() => useFilteredMediaFiles())
+      expect(loadNextMediaPageMock).toHaveBeenCalled()
+    })
+
+    it('viewMode=grid 无筛选时不触发（守护首屏分页行为，防回归）', () => {
+      useMediaStore.setState({
+        mediaFiles: [makeFile({ id: '1' })],
+        hasMoreMedia: true
+      })
+      resetUIStore({ viewMode: 'grid' })
+      renderHook(() => useFilteredMediaFiles())
+      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+    })
+
+    it('viewMode=list 但已加载完毕（hasMoreMedia=false）时不触发', () => {
+      useMediaStore.setState({
+        mediaFiles: [makeFile({ id: '1' })],
+        hasMoreMedia: false
+      })
+      resetUIStore({ viewMode: 'list' })
+      renderHook(() => useFilteredMediaFiles())
+      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+    })
+  })
 })
