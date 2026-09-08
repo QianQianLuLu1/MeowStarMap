@@ -5,10 +5,10 @@ import {
   useMediaStore,
   loadRecycleBin,
   loadNextRecycleBinPage,
-  fetchMediaFromDatabase,
   toFileUrl,
   type MediaFile
 } from '../stores/mediaStore'
+import { useRefreshMedia } from '../hooks/useRefreshMedia'
 import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
@@ -64,6 +64,8 @@ export const RecycleBinPage: React.FC = () => {
   const columns = getAutoFillColumns(width - PAGE_PADDING_X * 2, MIN_ITEM_WIDTH, GRID_GAP)
   // 阶段步骤进度编排（回收站永久删除 / 清空回收站）
   const staged = useStagedTask()
+  // 图库刷新写回：useRefreshMedia 封装「取数 + 写 store + 失败重试」
+  const refreshMedia = useRefreshMedia()
 
   useEffect(() => {
     loadRecycleBin()
@@ -108,24 +110,23 @@ export const RecycleBinPage: React.FC = () => {
     setFailedAction(null)
     try {
       const ids = Array.from(selectedIds).map((id) => Number(id))
+      // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message }（无 success 字段）；
+      // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError），
+      // 对齐 handleEmptyRecycleBin 的修复模式（#fix-empty-recycle-bin-contract / #fix-restore-sync）
       const result = await window.electronAPI.mediaAction.restore(ids)
-      showMessage(result.message, result.success ? 'success' : 'error')
-      if (result.success) {
-        setSelectedIds(new Set())
-        await loadRecycleBin()
-        // 恢复后刷新图库（图库的 mediaFiles 需重新加载以包含恢复的记录）
-        await fetchMediaFromDatabase()
-      } else {
-        // F-B1：失败时记录操作类型，供用户重试
-        setFailedAction('restore')
-      }
+      setSelectedIds(new Set())
+      await loadRecycleBin()
+      // 恢复后刷新图库并写回 store：fetchMediaFromDatabase 是纯取数函数，
+      // 丢弃返回值不会更新 mediaFiles，必须经 useRefreshMedia 写回
+      await refreshMedia()
+      showMessage(result.message, 'success')
     } catch (error) {
       showMessage(error instanceof Error ? error.message : t('recycleBin.restoreFailed'), 'error')
       setFailedAction('restore')
     } finally {
       setOperating(false)
     }
-  }, [selectedIds, showMessage, t])
+  }, [selectedIds, showMessage, t, refreshMedia])
 
   // 彻底删除选中项（移至系统回收站 + 删除数据库记录），带阶段步骤进度 + 可取消
   const handlePermanentDelete = useCallback(async () => {

@@ -340,6 +340,21 @@ export const DuplicatesPage: React.FC = () => {
     onRefreshMedia: () => runScan(mode)
   })
 
+  // FIX(dup-fullscreen)：「打开」必须把重复文件列表连同下标一并交给全屏查看器，
+  // 否则 FullscreenViewer 按图库 filteredFiles 解释下标会显示别的文件/越界不打开
+  const selectMedia = useUIStore((s) => s.selectMedia)
+  const openFullscreen = useUIStore((s) => s.openFullscreen)
+  const handleOpenDuplicate = useCallback(
+    (file: MediaFile) => {
+      selectMedia(file.id)
+      openFullscreen(
+        allFiles.findIndex((f) => f.id === file.id),
+        allFiles
+      )
+    },
+    [allFiles, selectMedia, openFullscreen]
+  )
+
   const groupIdById = useMemo(() => {
     const m = new Map<number, number>()
     ;(result?.duplicates ?? []).forEach((group, gIdx) => {
@@ -456,7 +471,7 @@ export const DuplicatesPage: React.FC = () => {
 
   const contextMenuActions = useMemo<GalleryContextMenuActions>(
     () => ({
-      onOpen: fileOperations.handleOpen,
+      onOpen: handleOpenDuplicate,
       onEdit: fileOperations.handleEdit,
       onSaveAs: fileOperations.handleSaveAs,
       onExport: handleExportSingle,
@@ -473,6 +488,7 @@ export const DuplicatesPage: React.FC = () => {
     }),
     [
       fileOperations,
+      handleOpenDuplicate,
       handleExportSingle,
       handleRenameOpen,
       handleShowProperties,
