@@ -25,6 +25,8 @@ export interface BatchActionsProps {
   onDelete: () => void
   onClear: () => void
   onSelectAll: () => void
+  /** 可选；全选按钮文案。默认 `batch.actions.selectAll`，已全选时父级可传「取消全选」 */
+  selectAllLabel?: string
   onInvertSelection: () => void
   onCategorize?: () => void
   // T08：WiFi 局域网分享
@@ -49,6 +51,7 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
   onDelete,
   onClear,
   onSelectAll,
+  selectAllLabel,
   onInvertSelection,
   onCategorize,
   onShareWifi,
@@ -80,10 +83,10 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
       <button
         className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"
         onClick={onSelectAll}
-        aria-label={t('batch.actions.selectAll')}
+        aria-label={selectAllLabel ?? t('batch.actions.selectAll')}
       >
         <IconSelectAll size={14} />
-        <span className="batch-act-label">{t('batch.actions.selectAll')}</span>
+        <span className="batch-act-label">{selectAllLabel ?? t('batch.actions.selectAll')}</span>
       </button>
       <button
         className="icon-btn batch-act-btn text-sm px-3 gap-1 whitespace-nowrap"

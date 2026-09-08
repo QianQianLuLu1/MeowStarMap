@@ -15,7 +15,8 @@ import {
   IconEvent,
   IconSlideshow,
   IconImport,
-  IconDelete
+  IconDelete,
+  IconSelectAll
 } from '../../icons'
 import { ShareMenuButton } from '../common/ShareMenuButton'
 import type { ShareChannelId } from '../common/ShareGuideDialog'
@@ -71,6 +72,10 @@ interface GalleryToolbarProps {
   // 损坏文件容错：批量清理入口，仅在 showCorruptedOnly=true 时由父组件传入
   // 父组件负责显示确认对话框并调用 mediaAction.cleanupCorrupted()
   onCleanupCorrupted?: () => void
+  // 多选模式：当前是否处于多选态（由父组件持有，避免两处状态源）
+  multiSelectMode?: boolean
+  // 多选模式：进入 / 退出切换入口，不传则隐藏按钮
+  onToggleMultiSelect?: () => void
 }
 
 export const GalleryToolbar: React.FC<GalleryToolbarProps> = ({
@@ -79,7 +84,9 @@ export const GalleryToolbar: React.FC<GalleryToolbarProps> = ({
   onShareClipboard,
   onSlideshow,
   onImport,
-  onCleanupCorrupted
+  onCleanupCorrupted,
+  multiSelectMode = false,
+  onToggleMultiSelect
 }) => {
   const {
     viewMode,
@@ -341,6 +348,36 @@ export const GalleryToolbar: React.FC<GalleryToolbarProps> = ({
       </div>
 
       <div className="flex items-center gap-3">
+        {onToggleMultiSelect && (
+          <button
+            type="button"
+            className="icon-btn text-sm px-3 gap-1"
+            onClick={onToggleMultiSelect}
+            aria-pressed={multiSelectMode}
+            aria-label={
+              multiSelectMode
+                ? t('gallery.toolbar.exitMultiSelect')
+                : t('gallery.toolbar.multiSelect')
+            }
+            title={
+              multiSelectMode
+                ? t('gallery.toolbar.exitMultiSelect')
+                : t('gallery.toolbar.multiSelect')
+            }
+            style={
+              multiSelectMode
+                ? { background: 'var(--accent)', color: 'var(--text-on-accent, #fff)' }
+                : undefined
+            }
+          >
+            <IconSelectAll size={16} />
+            <span className="hidden sm:inline">
+              {multiSelectMode
+                ? t('gallery.toolbar.exitMultiSelect')
+                : t('gallery.toolbar.multiSelect')}
+            </span>
+          </button>
+        )}
         {onImport && (
           <button
             className="icon-btn"

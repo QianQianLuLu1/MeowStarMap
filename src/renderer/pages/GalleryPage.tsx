@@ -38,6 +38,7 @@ import { useGallerySearch } from '../hooks/useGallerySearch'
 import { useGlobalToast } from './settings/sections'
 import { useRefreshMedia } from '../hooks/useRefreshMedia'
 import { useFilteredMediaFiles } from '../hooks/useFilteredMediaFiles'
+import { useMultiSelection } from '../hooks/useMultiSelection'
 import { getContextMenuItems } from '../utils/gallery'
 import { runClipboardShare } from '../utils/share'
 
@@ -98,6 +99,9 @@ export const GalleryPage: React.FC = () => {
     () => (Array.isArray(filteredFilesSource) ? filteredFilesSource : []),
     [filteredFilesSource]
   )
+  // 多选模式：进入/退出、单项勾选、全选/取消全选、反选（图库 / 截图 / 收藏 共用）
+  const selection = useMultiSelection({ files: filteredFiles })
+  const { multiSelectMode, isAllSelected } = selection
 
   // 稳定因子：订阅筛选/排序/搜索条件，用于派生 resetKeys 签名。
   // 纳入后，即使同一 viewMode 下数据条件变化也能自动重置错误态（避免仅 viewMode 切换才重置的盲区）。
@@ -286,6 +290,9 @@ export const GalleryPage: React.FC = () => {
         const end = Math.max(lastIndex, fileIndex)
         const rangeIds = filteredFiles.slice(start, end + 1).map((f) => f.id)
         setSelectedMediaIds(rangeIds)
+      } else if (multiSelectMode) {
+        // 多选模式下裸点等价于切换选中：不得打开全屏，否则用户无法连续勾选
+        toggleMediaSelection(id)
       } else {
         // P3-1：给被点击的卡片 img 设置 view-transition-name，供 FullscreenViewer 共享元素过渡
         if (
@@ -307,13 +314,15 @@ export const GalleryPage: React.FC = () => {
       selectMedia,
       setSelectedMediaIds,
       toggleMediaSelection,
-      openFullscreen
+      openFullscreen,
+      multiSelectMode
     ]
   )
 
+  // 全选 / 取消全选切换：已全选时点击清空（BatchActions 的「全选」按钮依赖此语义）
   const handleSelectAll = useCallback(() => {
-    setSelectedMediaIds(filteredFiles.map((f) => f.id))
-  }, [filteredFiles, setSelectedMediaIds])
+    selection.toggleSelectAll()
+  }, [selection])
 
   const handleSelectAllInCategory = useCallback(() => {
     if (!contextMenu) return
@@ -585,6 +594,8 @@ export const GalleryPage: React.FC = () => {
         onSlideshow={filteredFiles.length > 0 ? handleStartSlideshow : undefined}
         onImport={() => setImportWizardOpen(true)}
         onCleanupCorrupted={handleCleanupCorrupted}
+        multiSelectMode={multiSelectMode}
+        onToggleMultiSelect={selection.toggleMultiSelectMode}
       />
 
       {/* P0-03：智能分组面板切换按钮 + P1-01：显示重复开关 */}
@@ -666,6 +677,8 @@ export const GalleryPage: React.FC = () => {
               onEndReached={handleEndReached}
               loadingMore={loadingMore}
               hasMore={hasMoreMedia}
+              multiSelectMode={multiSelectMode}
+              onToggleSelection={selection.toggle}
             />
           )}
           {viewMode === 'list' && (
@@ -673,8 +686,9 @@ export const GalleryPage: React.FC = () => {
               files={filteredFiles}
               selectedIds={selectedMediaIds}
               onSelect={handleGridItemClick}
-              onToggleSelection={toggleMediaSelection}
+              onToggleSelection={selection.toggle}
               onContextMenu={handleContextMenu}
+              multiSelectMode={multiSelectMode}
             />
           )}
           {viewMode === 'timeline' && (
@@ -682,6 +696,10 @@ export const GalleryPage: React.FC = () => {
               files={filteredFiles}
               onOpen={fileOperations.handleOpen}
               onContextMenu={handleContextMenu}
+              selectedIds={selectedMediaIds}
+              onSelect={handleGridItemClick}
+              multiSelectMode={multiSelectMode}
+              onToggleSelection={selection.toggle}
             />
           )}
           {viewMode === 'masonry' && (
@@ -690,6 +708,8 @@ export const GalleryPage: React.FC = () => {
               selectedIds={selectedMediaIds}
               onSelect={handleGridItemClick}
               onContextMenu={handleContextMenu}
+              multiSelectMode={multiSelectMode}
+              onToggleSelection={selection.toggle}
             />
           )}
           {viewMode === 'event-timeline' && (
@@ -697,6 +717,10 @@ export const GalleryPage: React.FC = () => {
               files={filteredFiles}
               onOpen={fileOperations.handleOpen}
               onContextMenu={handleContextMenu}
+              selectedIds={selectedMediaIds}
+              onSelect={handleGridItemClick}
+              multiSelectMode={multiSelectMode}
+              onToggleSelection={selection.toggle}
             />
           )}
         </ErrorBoundary>
@@ -711,8 +735,11 @@ export const GalleryPage: React.FC = () => {
           onMove={batchOperations.handleBatchMove}
           onWatermark={() => batchOperations.setWatermarkDialog(true)}
           onDelete={handleBatchDelete}
-          onClear={clearSelection}
+          onClear={selection.exit}
           onSelectAll={handleSelectAll}
+          selectAllLabel={
+            isAllSelected ? t('batch.actions.deselectAll') : t('batch.actions.selectAll')
+          }
           onInvertSelection={handleInvertSelection}
           onShareWifi={handleBatchShareWifi}
           onShareClipboard={handleShareBatch}

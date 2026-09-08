@@ -6,6 +6,7 @@ import { formatDate } from '../../utils/date'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
+import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -14,6 +15,17 @@ interface TimelineViewProps {
   files: MediaFile[]
   onOpen: (file: MediaFile) => void
   onContextMenu: (event: React.MouseEvent, file: MediaFile) => void
+  /** 可选；选中项 id 列表（多选模式下用于勾选框与描边） */
+  selectedIds?: string[]
+  /**
+   * 可选；多选模式下的卡片点击回调（裸点语义：切换选中而非打开全屏）。
+   * 未提供时卡片点击仍走 onOpen。
+   */
+  onSelect?: (id: string, index: number, event: React.MouseEvent | React.KeyboardEvent) => void
+  /** 可选；true 时卡片渲染可见勾选框（默认 false，保证既有调用点行为不变） */
+  multiSelectMode?: boolean
+  /** 可选；勾选框点击回调（点击不冒泡到卡片） */
+  onToggleSelection?: (id: string) => void
 }
 
 const GROUP_HEADER_HEIGHT = 48
@@ -27,11 +39,23 @@ const ITEM_HEIGHT = 180
 type RenderUnit =
   { kind: 'header'; date: string; count: number } | { kind: 'row'; files: MediaFile[] }
 
-export const TimelineView: React.FC<TimelineViewProps> = ({ files, onOpen, onContextMenu }) => {
+export const TimelineView: React.FC<TimelineViewProps> = ({
+  files,
+  onOpen,
+  onContextMenu,
+  selectedIds,
+  onSelect,
+  multiSelectMode = false,
+  onToggleSelection
+}) => {
   const { t } = useTranslation()
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const { failedImages, markFailed } = useFailedImages(files)
+  // 扁平化渲染单元丢失了原始下标，用 id → 下标映射把正确的 index 交回给 onSelect
+  // （GalleryPage 的 Shift 区间选择与 openFullscreen 都依赖 files 内的真实下标）
+  const indexById = useMemo(() => new Map(files.map((f, i) => [f.id, i])), [files])
+  const selectedSet = useMemo(() => new Set(selectedIds || []), [selectedIds])
 
   // 响应式列数：监听 wrapper 尺寸
   useEffect(() => {
@@ -137,21 +161,39 @@ export const TimelineView: React.FC<TimelineViewProps> = ({ files, onOpen, onCon
                 // 损坏文件容错：损坏文件不显示缩略图，仅显示占位图 + 损坏角标
                 const isCorrupted = file.is_corrupted === true
                 const showThumb = !isCorrupted && !!thumbUrl && !hasError
+                const isSelected = selectedSet.has(file.id)
+                const fileIndex = indexById.get(file.id) ?? -1
                 return (
                   <div
                     key={file.id}
-                    className="media-card aspect-square"
+                    className={`media-card aspect-square ${
+                      multiSelectMode ? 'relative ' : ''
+                    }${isSelected ? 'ring-2 ring-offset-2' : ''}`}
                     style={{
                       background: 'var(--bg-tertiary)',
                       height: ITEM_HEIGHT,
-                      opacity: isMissing ? 0.45 : 1
+                      opacity: isMissing ? 0.45 : 1,
+                      ...(isSelected
+                        ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties)
+                        : {})
                     }}
-                    onClick={() => onOpen(file)}
+                    onClick={(e) =>
+                      multiSelectMode && onSelect ? onSelect(file.id, fileIndex, e) : onOpen(file)
+                    }
                     onContextMenu={(e) => onContextMenu(e, file)}
                     role="article"
                     tabIndex={0}
                     onKeyDown={(e) => handleKeyDown(file, e)}
+                    aria-selected={isSelected}
                   >
+                    {multiSelectMode && (
+                      <MediaCheckbox
+                        checked={isSelected}
+                        onChange={() => onToggleSelection?.(file.id)}
+                        label={file.file_name}
+                        className="absolute top-2 left-2 z-10"
+                      />
+                    )}
                     <div
                       className="w-full h-full flex items-center justify-center relative overflow-hidden rounded-xl"
                       style={{ background: 'var(--bg-tertiary)' }}

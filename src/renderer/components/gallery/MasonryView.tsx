@@ -7,6 +7,7 @@ import { toFileUrl } from '../../utils/file'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
+import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { useContainerSize } from '../../hooks/useContainerSize'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -19,6 +20,10 @@ interface MasonryViewProps {
   onSelect?: (id: string, index: number, event: React.MouseEvent) => void
   /** 可选；缺失时右键 no-op */
   onContextMenu?: (event: React.MouseEvent, file: MediaFile) => void
+  /** 可选；true 时卡片渲染可见勾选框（默认 false，保证既有调用点行为不变） */
+  multiSelectMode?: boolean
+  /** 可选；勾选框点击回调（与卡片点击解耦，勾选框点击不会冒泡到卡片） */
+  onToggleSelection?: (id: string) => void
 }
 
 const GAP = 16
@@ -36,6 +41,8 @@ interface MasonryContextValue {
   onContextMenu: (event: React.MouseEvent, file: MediaFile) => void
   failedImages: Set<string>
   markFailed: (id: string) => void
+  multiSelectMode: boolean
+  onToggleSelection: (id: string) => void
 }
 
 const MasonryContext = React.createContext<MasonryContextValue | null>(null)
@@ -43,7 +50,8 @@ const MasonryContext = React.createContext<MasonryContextValue | null>(null)
 function MasonryCard({ index, data }: { index: number; width: number; data: MediaFile }) {
   const ctx = React.useContext(MasonryContext)
   if (!ctx) return null
-  const { selectedSet, onSelect, onContextMenu, failedImages, markFailed } = ctx
+  const { selectedSet, onSelect, onContextMenu, failedImages, markFailed, multiSelectMode } = ctx
+  const onToggleSelection = ctx.onToggleSelection
 
   const file = data
   const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
@@ -70,6 +78,14 @@ function MasonryCard({ index, data }: { index: number; width: number; data: Medi
       onClick={(e) => onSelect(file.id, index, e)}
       onContextMenu={(e) => onContextMenu(e, file)}
     >
+      {multiSelectMode && (
+        <MediaCheckbox
+          checked={isSelected}
+          onChange={() => onToggleSelection(file.id)}
+          label={file.file_name}
+          className="absolute top-2 left-2 z-10"
+        />
+      )}
       <div
         className="relative w-full overflow-hidden rounded-xl"
         style={{ background: 'var(--bg-tertiary)', aspectRatio: `1 / ${clampedAspect}` }}
@@ -107,7 +123,9 @@ export const MasonryView: React.FC<MasonryViewProps> = ({
   files,
   selectedIds,
   onSelect,
-  onContextMenu
+  onContextMenu,
+  multiSelectMode = false,
+  onToggleSelection
 }) => {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -128,6 +146,8 @@ export const MasonryView: React.FC<MasonryViewProps> = ({
 
   const safeOnSelect = typeof onSelect === 'function' ? onSelect : () => {}
   const safeOnContextMenu = typeof onContextMenu === 'function' ? onContextMenu : () => {}
+  const safeOnToggleSelection =
+    typeof onToggleSelection === 'function' ? onToggleSelection : () => {}
 
   const { failedImages, markFailed } = useFailedImages(safeFiles)
   const selectedSet = useMemo(() => new Set(selectedIds || []), [selectedIds])
@@ -180,7 +200,9 @@ export const MasonryView: React.FC<MasonryViewProps> = ({
         onSelect: safeOnSelect,
         onContextMenu: safeOnContextMenu,
         failedImages,
-        markFailed
+        markFailed,
+        multiSelectMode,
+        onToggleSelection: safeOnToggleSelection
       }}
     >
       <div

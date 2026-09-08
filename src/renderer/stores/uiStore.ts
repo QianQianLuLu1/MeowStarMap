@@ -45,6 +45,18 @@ export type ViewLevel =
   | 'resonance-records'
   | 'screenshots'
 export type ViewMode = 'grid' | 'list' | 'timeline' | 'masonry' | 'event-timeline'
+
+/**
+ * 支持多选的媒体板块集合：图库 / 截图 / 收藏（含启动器缓存）。
+ * 三者复用同一个 GalleryPage 与同一份 selectedMediaIds，切换时必须清理选中态，
+ * 否则会把 A 板块选中的 id 带到 B 板块（B 板块无这些 id，但批量操作栏会残留常驻）。
+ */
+const MULTI_SELECT_VIEWS = new Set<ViewLevel>([
+  'gallery',
+  'screenshots',
+  'favorites',
+  'launcher-cache'
+])
 export type FilterType = 'all' | 'image' | 'video'
 export type SortBy = 'date' | 'name' | 'size' | 'resolution' | 'rating'
 
@@ -89,6 +101,9 @@ interface UIState {
   sidebarCollapsed: boolean
   // 选中的媒体文件ID列表（多选）；当前焦点派生自 selectedMediaIds[0]（见 selectFocusedMediaId）
   selectedMediaIds: string[]
+  // 多选模式开关：true 时卡片显示可见勾选框，点击卡片等价于切换选中而非打开全屏。
+  // 属于临时交互状态，不持久化（与 selectedMediaIds 一致，重启后重置为 false）
+  multiSelectMode: boolean
   // 当前分类ID
   currentCategoryId: number | null
   // 搜索关键词
@@ -122,6 +137,9 @@ interface UIState {
   // 全屏浏览状态
   fullscreenOpen: boolean
   fullscreenIndex: number
+  // FIX(dup-fullscreen)：打开全屏时显式指定的文件列表（如重复文件页的摊平列表）；
+  // null = 使用图库 filteredFiles（图库/详情页路径语义不变）。仅内存态，不持久化
+  fullscreenFiles: import('../stores/mediaStore').MediaFile[] | null
   // P3-1：关闭全屏时的共享元素过渡目标 img（卡片缩略图 DOM 引用）
   fullscreenTargetImg: HTMLElement | null
   // T11：幻灯片播放状态
@@ -137,6 +155,7 @@ interface UIState {
   toggleMediaSelection: (id: string) => void
   setSelectedMediaIds: (ids: string[]) => void
   clearSelection: () => void
+  setMultiSelectMode: (on: boolean) => void
   setCategory: (id: number | null) => void
   setSearchQuery: (query: string) => void
   setSortBy: (sort: SortBy) => void
@@ -165,7 +184,7 @@ interface UIState {
   setSelectedGroupKey: (key: string) => void
   // P1-01：切换显示重复项
   setShowDuplicates: (show: boolean) => void
-  openFullscreen: (index: number) => void
+  openFullscreen: (index: number, files?: import('../stores/mediaStore').MediaFile[]) => void
   closeFullscreen: () => void
   // T11：幻灯片播放 actions
   openSlideshow: (startIndex: number) => void
@@ -183,6 +202,7 @@ export const useUIStore = create<UIState>()(
       viewStack: ['gallery'],
       sidebarCollapsed: false,
       selectedMediaIds: [],
+      multiSelectMode: false,
       currentCategoryId: null,
       searchQuery: '',
       sortBy: 'date',
@@ -206,6 +226,7 @@ export const useUIStore = create<UIState>()(
       showDuplicates: false,
       fullscreenOpen: false,
       fullscreenIndex: 0,
+      fullscreenFiles: null,
       fullscreenTargetImg: null,
       // T11：幻灯片默认配置——顺序播放、3秒间隔、淡入淡出、关闭循环、跳过视频
       slideshowOpen: false,
@@ -222,12 +243,17 @@ export const useUIStore = create<UIState>()(
       setPendingEditorMetadata: (data) => set({ pendingEditorMetadata: data }),
 
       navigateTo: (view) => {
-        const { viewStack } = get()
+        const { viewStack, multiSelectMode, selectedMediaIds } = get()
         if (viewStack[viewStack.length - 1] !== view) {
+          // 多选态跨板块隔离：切换到任一媒体板块时清空选中并退出多选模式，
+          // 避免图库 / 截图 / 收藏 共用同一份 selectedMediaIds 造成选中态串味
+          const resetSelection =
+            MULTI_SELECT_VIEWS.has(view) && (multiSelectMode || selectedMediaIds.length > 0)
           // 页面切换改用 CSS page-enter 动画（View Transitions 的整页快照交叉淡入会产生闪烁）
           set({
             currentView: view,
-            viewStack: [...viewStack, view]
+            viewStack: [...viewStack, view],
+            ...(resetSelection ? { selectedMediaIds: [], multiSelectMode: false } : {})
           })
         }
       },
@@ -262,6 +288,9 @@ export const useUIStore = create<UIState>()(
       },
 
       clearSelection: () => set({ selectedMediaIds: [] }),
+
+      setMultiSelectMode: (on) =>
+        set(on ? { multiSelectMode: true } : { multiSelectMode: false, selectedMediaIds: [] }),
 
       setCategory: (id) => set({ currentCategoryId: id }),
 
@@ -348,7 +377,7 @@ export const useUIStore = create<UIState>()(
       // P1-01：切换显示重复项
       setShowDuplicates: (show) => set({ showDuplicates: show }),
 
-      openFullscreen: (index) => {
+      openFullscreen: (index, files) => {
         // 参数校验：index 必须为有限非负数
         if (!Number.isFinite(index) || index < 0) {
           return
@@ -357,7 +386,8 @@ export const useUIStore = create<UIState>()(
         // 调用方需在调用前给源卡片 img 设置 view-transition-name: 'fullscreen-media'
         const apply = () => {
           // 状态置位优先：即便后续 DOM/过渡操作异常，全屏也必定打开
-          set({ fullscreenOpen: true, fullscreenIndex: index })
+          // FIX(dup-fullscreen)：同携带打开时所在的文件列表，FullscreenViewer 优先使用
+          set({ fullscreenOpen: true, fullscreenIndex: index, fullscreenFiles: files ?? null })
           try {
             // 清除源元素的 view-transition-name，避免新快照与 FullscreenViewer img 冲突
             document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
@@ -385,7 +415,7 @@ export const useUIStore = create<UIState>()(
         const { fullscreenTargetImg } = get()
         const apply = () => {
           // 状态置位优先
-          set({ fullscreenOpen: false, fullscreenTargetImg: null })
+          set({ fullscreenOpen: false, fullscreenTargetImg: null, fullscreenFiles: null })
           try {
             // 移除 FullscreenViewer img 的 view-transition-name（旧快照已有，新快照不需要）
             const fullscreenImg = document.querySelector('[data-fullscreen-img]')

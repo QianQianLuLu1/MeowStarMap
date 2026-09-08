@@ -38,6 +38,8 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   const fullscreenOpen = useUIStore((s) => s.fullscreenOpen)
   const [imgError, setImgError] = useState(false)
   const fullscreenIndex = useUIStore((s) => s.fullscreenIndex)
+  // FIX(dup-fullscreen)：非图库入口（如重复文件页）打开时显式携带的文件列表，优先于 props
+  const fullscreenFiles = useUIStore((s) => s.fullscreenFiles)
   const closeFullscreen = useUIStore((s) => s.closeFullscreen)
   const deleteMediaFiles = useMediaStore((s) => s.deleteMediaFiles)
   const { messages, showMessage, dismiss } = useToast()
@@ -68,7 +70,10 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   // EXIF 信息浮层显示开关（独立于 showControls，避免读 EXIF 时面板自动隐藏）
   const [showInfoPanel, setShowInfoPanel] = useState(false)
 
-  const currentFile = filteredFiles[fullscreenIndex]
+  // FIX(dup-fullscreen)：显示、导航、幻灯片、删除回退、标题统一以 activeFiles 为源，
+  // 避免重复文件页的下标错位到图库列表（fullscreenFiles 为 null 时维持图库语义）
+  const activeFiles = fullscreenFiles ?? filteredFiles
+  const currentFile = activeFiles[fullscreenIndex]
   const fileUrl = toFileUrl(currentFile?.file_path)
   useEffect(() => {
     setImgError(false)
@@ -77,13 +82,13 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   const navigate = useCallback(
     (delta: number) => {
       const newIndex = fullscreenIndex + delta
-      if (newIndex >= 0 && newIndex < filteredFiles.length) {
+      if (newIndex >= 0 && newIndex < activeFiles.length) {
         useUIStore.setState({ fullscreenIndex: newIndex })
         // 切换图片时关闭 EXIF 浮层，避免显示上一张的参数
         setShowInfoPanel(false)
       }
     },
-    [fullscreenIndex, filteredFiles.length]
+    [fullscreenIndex, activeFiles.length]
   )
 
   // DU3：幻灯片播放逻辑使用共享 hook（原 stopSlideshow/startSlideshow/toggleSlideshow 三函数合并）
@@ -93,13 +98,13 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     interval: playInterval,
     onTick: useCallback(() => {
       const idx = useUIStore.getState().fullscreenIndex
-      if (idx >= filteredFiles.length - 1) {
+      if (idx >= activeFiles.length - 1) {
         // 播放到最后一张，停止（FullscreenViewer 不循环）
         slideshowRef.current?.stop()
       } else {
         useUIStore.setState({ fullscreenIndex: idx + 1 })
       }
-    }, [filteredFiles.length])
+    }, [activeFiles.length])
   })
   useEffect(() => {
     slideshowRef.current = slideshow
@@ -107,12 +112,12 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
 
   // F-S10：开始幻灯片播放（包装 slideshow.start，增加最少 2 张校验）
   const startSlideshow = useCallback(() => {
-    if (filteredFiles.length <= 1) {
+    if (activeFiles.length <= 1) {
       showMessage(t('gallery.fullscreen.slideshowMinImages'), 'info')
       return
     }
     slideshow.start()
-  }, [filteredFiles.length, showMessage, slideshow, t])
+  }, [activeFiles.length, showMessage, slideshow, t])
 
   const toggleSlideshow = useCallback(() => {
     if (slideshow.isPlaying) {
@@ -141,7 +146,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               // P1-C10：从 store 获取最新 index，避免闭包中 fullscreenIndex 过期
               // 同时基于当前 filteredFiles.length 计算剩余（props 可能未更新，但有 useEffect 兜底）
               const currentIndex = useUIStore.getState().fullscreenIndex
-              const remaining = filteredFiles.length - 1
+              const remaining = activeFiles.length - 1
               if (remaining <= 0) {
                 closeFullscreen()
               } else {
@@ -162,7 +167,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
         }
       })
     },
-    [filteredFiles.length, deleteMediaFiles, closeFullscreen, showMessage, t]
+    [activeFiles.length, deleteMediaFiles, closeFullscreen, showMessage, t]
   )
 
   // P3-1：关闭全屏时查找目标卡片 img，用于共享元素过渡（全屏图→缩略图缩小）
@@ -288,7 +293,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   const title = t('gallery.fullscreen.title', {
     fileName: currentFile.file_name,
     current: fullscreenIndex + 1,
-    total: filteredFiles.length
+    total: activeFiles.length
   })
   const renderError = (
     <div className="flex h-full w-full flex-col items-center justify-center gap-2 px-6 text-center text-[var(--text-on-overlay)]">

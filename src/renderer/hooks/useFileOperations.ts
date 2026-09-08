@@ -93,10 +93,12 @@ export function useFileOperations(options: UseFileOperationsOptions) {
         if (!window.electronAPI) return { success: false, message: t('toast.undoUnsupported') }
         const { mediaId } = payload as { mediaId: number }
         try {
+          // preload call() 解包 IpcResponse 只回传 data（{ message }，无 success 字段），
+          // 成功 = 未抛 IpcError；缺陷写法读取恒为 undefined 的 undoResult.success
+          // 会导致撤销恢复误报失败并跳过图库刷新（#fix-restore-sync）
           const undoResult = await window.electronAPI.mediaAction.restore([mediaId])
-          if (!undoResult.success) return { success: false, message: undoResult.message }
           await onRefreshMedia()
-          return { success: true }
+          return { success: true, message: undoResult.message }
         } catch (err) {
           return { success: false, message: err instanceof Error ? err.message : String(err) }
         }

@@ -7,6 +7,7 @@ import { IconStar } from '../../icons'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
+import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import type { MediaFile } from '../../stores/mediaStore'
 
@@ -16,6 +17,8 @@ interface ListViewProps {
   onSelect: (id: string, index: number, event: React.MouseEvent | React.KeyboardEvent) => void
   onToggleSelection: (id: string) => void
   onContextMenu: (event: React.MouseEvent, file: MediaFile) => void
+  /** 可选；true 时行首渲染可见勾选框（默认 false，保证既有调用点行为不变） */
+  multiSelectMode?: boolean
 }
 
 const ITEM_HEIGHT = 72
@@ -25,7 +28,10 @@ const GAP = 8
 // - 用 Virtuoso 替换自研 useVirtualScroll，万级文件滚动帧率 ≥ 55 FPS
 // - 保留：多选（Ctrl/Cmd/Shift）、键盘 ↑↓ 导航、滚动位置记忆、丢失文件角标、缩略图降级
 const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
-  ({ files, selectedIds, onSelect, onToggleSelection, onContextMenu }, ref) => {
+  (
+    { files, selectedIds, onSelect, onToggleSelection, onContextMenu, multiSelectMode = false },
+    ref
+  ) => {
     const { failedImages, markFailed } = useFailedImages(files)
     const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
 
@@ -85,6 +91,14 @@ const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
               role="listitem"
               aria-selected={isSelected}
             >
+              {multiSelectMode && (
+                <MediaCheckbox
+                  checked={isSelected}
+                  onChange={() => onToggleSelection(file.id)}
+                  label={file.file_name}
+                  className="flex-shrink-0"
+                />
+              )}
               <div
                 className="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0 relative overflow-hidden"
                 style={{

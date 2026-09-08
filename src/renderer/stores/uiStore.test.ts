@@ -114,6 +114,70 @@ describe('uiStore 默认状态与行为', () => {
 })
 
 /**
+ * 多选模式（图库 / 截图 / 收藏 三大板块）
+ * @coverage multiSelectMode 默认关闭、可切换、跨板块清理、不持久化
+ */
+describe('uiStore 多选模式（multiSelectMode）', () => {
+  afterEach(() => {
+    useUIStore.setState({
+      multiSelectMode: false,
+      selectedMediaIds: [],
+      currentView: 'gallery',
+      viewStack: ['gallery']
+    })
+  })
+
+  it('multiSelectMode 默认值应为 false', () => {
+    expect(useUIStore.getState().multiSelectMode).toBe(false)
+  })
+
+  it('setMultiSelectMode 应能开启与关闭多选模式', () => {
+    useUIStore.getState().setMultiSelectMode(true)
+    expect(useUIStore.getState().multiSelectMode).toBe(true)
+    useUIStore.getState().setMultiSelectMode(false)
+    expect(useUIStore.getState().multiSelectMode).toBe(false)
+  })
+
+  it('在三大板块之间切换应清空选中并退出多选模式', () => {
+    const store = useUIStore.getState()
+    store.setMultiSelectMode(true)
+    store.setSelectedMediaIds(['1', '2'])
+    useUIStore.getState().navigateTo('screenshots')
+    expect(useUIStore.getState().selectedMediaIds).toEqual([])
+    expect(useUIStore.getState().multiSelectMode).toBe(false)
+
+    // 收藏板块同样需要清理
+    const s2 = useUIStore.getState()
+    s2.setMultiSelectMode(true)
+    s2.setSelectedMediaIds(['3'])
+    useUIStore.getState().navigateTo('favorites')
+    expect(useUIStore.getState().selectedMediaIds).toEqual([])
+    expect(useUIStore.getState().multiSelectMode).toBe(false)
+  })
+
+  it('同一板块内重复 navigateTo 不触发清理（保留选中态）', () => {
+    const store = useUIStore.getState()
+    store.navigateTo('gallery')
+    store.setMultiSelectMode(true)
+    store.setSelectedMediaIds(['7'])
+    useUIStore.getState().navigateTo('gallery')
+    expect(useUIStore.getState().selectedMediaIds).toEqual(['7'])
+    expect(useUIStore.getState().multiSelectMode).toBe(true)
+  })
+
+  it('multiSelectMode 不应被持久化，且初始状态声明为 false', () => {
+    const partializeBody = stripComments(extractPartializeBody(uiStoreSrc))
+    expect(
+      partializeBody,
+      'partialize 不应含 multiSelectMode（临时交互状态不应持久化）'
+    ).not.toContain('multiSelectMode')
+    expect(uiStoreSrc, 'uiStore 初始状态应声明 multiSelectMode: false').toMatch(
+      /multiSelectMode:\s*false/
+    )
+  })
+})
+
+/**
  * 根因回归：openFullscreen 必须通过 document.startViewTransition 调用并保持 this 绑定。
  * 脱离 this 调用原生方法会抛 "TypeError: Illegal invocation"，导致 set(fullscreenOpen:true)
  * 永不执行、全屏查看器无法打开。jsdom 默认不存在 startViewTransition，此处用模拟原生

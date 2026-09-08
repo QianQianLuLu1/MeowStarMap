@@ -12,6 +12,7 @@ import { IconEdit, IconFavorite, IconDelete } from '../../icons'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
+import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { useVideoThumbGenerate } from '../../hooks/useVideoThumbGenerate'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
@@ -69,6 +70,10 @@ interface VirtualImageGridProps {
   onEndReached?: () => void
   loadingMore?: boolean
   hasMore?: boolean
+  /** 可选；true 时卡片渲染可见勾选框（默认 false，保证既有调用点行为不变） */
+  multiSelectMode?: boolean
+  /** 可选；勾选框点击回调（点击不冒泡到卡片，不会触发打开全屏） */
+  onToggleSelection?: (id: string) => void
 }
 
 // P1-U11：抽取 MediaCardActions 消除 hover/touch 两套按钮组重复
@@ -152,7 +157,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
       onDelete,
       onEndReached,
       loadingMore = false,
-      hasMore = false
+      hasMore = false,
+      multiSelectMode = false,
+      onToggleSelection
     } = props
     // 参数校验：items 必须为数组，非数组降级为空，杜绝脏数据进入 VirtuosoGrid
     // 用 useMemo 包裹，避免每次渲染重建引用导致下游 useCallback/useEffect 依赖抖动
@@ -391,7 +398,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             const showThumb = !isCorrupted && !!thumbUrl && !hasError
             return (
               <div
-                className={`media-card aspect-square ${isSelected ? 'ring-2 ring-offset-2' : ''}`}
+                className={`media-card aspect-square ${multiSelectMode ? 'relative ' : ''}${
+                  isSelected ? 'ring-2 ring-offset-2' : ''
+                }`}
                 style={{
                   background: 'var(--bg-tertiary)',
                   ...(isSelected
@@ -416,6 +425,14 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
                 role="gridcell"
                 aria-selected={isSelected}
               >
+                {multiSelectMode && (
+                  <MediaCheckbox
+                    checked={isSelected}
+                    onChange={() => onToggleSelection?.(file.id)}
+                    label={file.file_name}
+                    className="absolute top-2 left-2 z-10"
+                  />
+                )}
                 <div
                   className="w-full h-full flex items-center justify-center relative overflow-hidden rounded-xl"
                   style={{ background: 'var(--bg-tertiary)' }}
