@@ -13,6 +13,8 @@ import {
   type WatermarkConfig
 } from '../utils/imageProcessor'
 import { mergeFilterParams } from '../utils/filter'
+import { resolveExportEncoding } from '../utils/export-encoding'
+import { computePreviewMaxSize, estimateInitialPreviewMaxSize } from '../utils/preview-resolution'
 import { useEditHistory, type AdjustmentState } from '../hooks/useEditHistory'
 // P0-C1：编辑保存后清理游戏参数缓存，避免显示旧 EXIF/参数
 import { clearAllGameParamsCache } from '../hooks/useGameParams'
@@ -64,6 +66,42 @@ export const EditorPage: React.FC = () => {
     [media]
   )
 
+  // FIX(预览清晰度)：预览长边预算由「显示区 × devicePixelRatio × 缩放倍数」推导。
+  // 修复前固定 1400 —— 2x 屏或放大查看时位图被浏览器上采样，是预览发虚的根因。
+  const previewBoxRef = useRef<HTMLDivElement | null>(null)
+  const [previewBox, setPreviewBox] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0
+  })
+  const [previewScale, setPreviewScale] = useState(1)
+
+  useEffect(() => {
+    const el = previewBoxRef.current
+    if (!el) return
+    const update = () => {
+      const rect = el.getBoundingClientRect()
+      setPreviewBox({ width: rect.width, height: rect.height })
+    }
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const previewMaxSize = useMemo(() => {
+    // 容器尚未测量：用窗口尺寸估算，避免首帧退回过低分辨率
+    if (previewBox.width <= 0 || previewBox.height <= 0) {
+      return estimateInitialPreviewMaxSize(typeof window === 'undefined' ? null : window)
+    }
+    return computePreviewMaxSize(
+      previewBox.width,
+      previewBox.height,
+      typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1,
+      previewScale
+    )
+  }, [previewBox.width, previewBox.height, previewScale])
+
   const {
     loading,
     error: processorError,
@@ -83,7 +121,7 @@ export const EditorPage: React.FC = () => {
     originalUrl,
     reset,
     exportDataUrl
-  } = useImageProcessor({ source: sourceUrl, maxPreviewSize: 1400 })
+  } = useImageProcessor({ source: sourceUrl, maxPreviewSize: previewMaxSize })
 
   const [activeTab, setActiveTab] = useState<EditorTabId>('basic')
   const [compareMode, setCompareMode] = useState(false)
@@ -292,7 +330,8 @@ export const EditorPage: React.FC = () => {
     if (!media || !window.electronAPI) return
     setSaving(true)
     try {
-      const dataUrl = await exportDataUrl(true)
+      // 显式指定 jpeg：另存为固定使用 .jpg 扩展名，PNG 源若不覆盖会产出「.jpg 扩展名的 PNG 字节」
+      const dataUrl = await exportDataUrl(true, 'image/jpeg')
       if (!dataUrl) throw new Error(t('editor.page.exportFailed'))
       const directory = await window.electronAPI.dialog.selectDirectory()
       if (!directory) {
@@ -577,10 +616,11 @@ export const EditorPage: React.FC = () => {
             )
           im.src = imgUrl
         })
-        // 2. 应用编辑参数 + 水印
-        const imageData = await processImageData(img, mergedParams, { maxSize: 4096, watermark })
-        // 3. 导出 dataUrl
-        const dataUrl = await imageToDataUrl(imageData, 'image/jpeg', 0.95)
+        // 2. 应用编辑参数 + 水印（不限制尺寸：修复前钳到 4096，长边更大的原片被静默降采样写回原路径）
+        const imageData = await processImageData(img, mergedParams, { watermark })
+        // 3. 导出 dataUrl：编码跟随目标扩展名，避免 PNG 目标被写成有损 JPEG
+        const { mimeType, quality } = resolveExportEncoding(target.file_ext)
+        const dataUrl = await imageToDataUrl(imageData, mimeType, quality)
         if (!dataUrl) throw new Error(t('editor.page.exportFailed'))
         // 4. 调用 editor:save（主进程会备份原图并记录编辑历史）
         const result = await window.electronAPI.editor.save(target.file_path, dataUrl, {
@@ -755,6 +795,7 @@ export const EditorPage: React.FC = () => {
         <Histogram imageSrc={previewUrl} className="mb-3" />
 
         <div
+          ref={previewBoxRef}
           className="flex-1 flex items-center justify-center relative overflow-hidden rounded-2xl"
           style={{ background: 'var(--bg-tertiary)' }}
         >
@@ -783,6 +824,7 @@ export const EditorPage: React.FC = () => {
                 <ZoomablePreview
                   src={compareMode ? originalUrl || previewUrl : previewUrl}
                   alt={media.file_name}
+                  onScaleChange={setPreviewScale}
                 />
               )}
             </ErrorBoundary>
@@ -873,14 +915,17 @@ export const EditorPage: React.FC = () => {
 interface ZoomablePreviewProps {
   src: string
   alt: string
+  /** 缩放变化回调：驱动预览分辨率随放大倍数提升 */
+  onScaleChange?: (scale: number) => void
 }
 
-const ZoomablePreview: React.FC<ZoomablePreviewProps> = ({ src, alt }) => {
+const ZoomablePreview: React.FC<ZoomablePreviewProps> = ({ src, alt, onScaleChange }) => {
   return (
     <ZoomableContainer
       maxZoom={8}
       resetVariant="text"
       containerClassName="flex items-center justify-center w-full h-full overflow-hidden relative"
+      onScaleChange={onScaleChange}
     >
       <img src={src} alt={alt} className="max-w-full max-h-full object-contain" draggable={false} />
     </ZoomableContainer>

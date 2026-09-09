@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @vitest-environment jsdom
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -200,5 +200,43 @@ describe('ZoomableContainer', () => {
     )
     expect(screen.getByText('200%')).toBeTruthy()
     expect(screen.getByText('复位')).toBeTruthy()
+  })
+
+  describe('onScaleChange（编辑器据此提升预览分辨率）', () => {
+    it('挂载时以当前 scale 回调一次', () => {
+      const onScaleChange = vi.fn()
+      render(
+        <ZoomableContainer onScaleChange={onScaleChange}>
+          <div data-testid="child" />
+        </ZoomableContainer>
+      )
+      expect(onScaleChange).toHaveBeenCalledWith(1)
+    })
+
+    it('scale 变化时回调新值', () => {
+      const onScaleChange = vi.fn()
+      const { rerender } = render(
+        <ZoomableContainer onScaleChange={onScaleChange}>
+          <div data-testid="child" />
+        </ZoomableContainer>
+      )
+      mockState.scale = 4
+      rerender(
+        <ZoomableContainer onScaleChange={onScaleChange}>
+          <div data-testid="child" />
+        </ZoomableContainer>
+      )
+      expect(onScaleChange).toHaveBeenLastCalledWith(4)
+    })
+
+    it('未传 onScaleChange 时零副作用（既有调用方不受影响）', () => {
+      expect(() =>
+        render(
+          <ZoomableContainer>
+            <div data-testid="child" />
+          </ZoomableContainer>
+        )
+      ).not.toThrow()
+    })
   })
 })

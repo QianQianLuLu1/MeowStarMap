@@ -20,6 +20,7 @@ import type Database from 'better-sqlite3'
 import { backupService } from './backup-service'
 import { parseDataUrlToBuffer, getUniqueFilePath } from '../utils/file-utils'
 import { getExtFromMime } from '../utils/media-constants'
+import { resolveSaveStrategy, getLosslessEncodeOptions } from '../utils/image-encode'
 import { t } from '../i18n'
 import type { DatabaseManager } from '../database/connection'
 import { MediaRepository } from '../database/media-repository'
@@ -157,8 +158,14 @@ export class EditorService {
     }
 
     const { buffer, mimeType } = parseDataUrlToBuffer(dataUrl)
-    const format = options?.format || getExtFromMime(mimeType)
-    const quality = options?.quality ?? 92
+    // FIX(导出降质)：目标格式与渲染层产出一致时直接写盘，不再走 sharp 重编码。
+    // 原实现无论是否需要转换都调用 sharp 编码一次，叠加渲染层 canvas 的一次编码，
+    // 形成「双代损失」；PNG 分支还会因 quality<100 触发调色板量化。
+    const requestedFormat = options?.format || getExtFromMime(mimeType)
+    const { sourceFormat, targetFormat, needsTranscode } = resolveSaveStrategy(
+      mimeType,
+      requestedFormat
+    )
 
     // P1-A6：备份到独立子目录 editor-snapshots，避免污染数据库备份列表
     // F-S7 修复：原实现不校验备份完整性，磁盘满时备份可能不完整，
@@ -189,17 +196,38 @@ export class EditorService {
       logger.warn(t('main.editor.log.backupFailed'), backupError)
     }
 
-    // 写入新文件（sharp pipeline 处理格式转换与质量压缩）
+    // 写入新文件：同格式直写（零二次编码），跨格式走 sharp 无损/最高质量转码
     try {
-      let pipeline = sharp(buffer)
-      if (format === 'jpg' || format === 'jpeg') {
-        pipeline = pipeline.jpeg({ quality, progressive: true, mozjpeg: true })
-      } else if (format === 'png') {
-        pipeline = pipeline.png({ quality: Math.min(quality, 100) })
-      } else if (format === 'webp') {
-        pipeline = pipeline.webp({ quality })
+      if (needsTranscode) {
+        const encodeOptions = getLosslessEncodeOptions(targetFormat)
+        let pipeline = sharp(buffer)
+        if (targetFormat === 'jpg') {
+          pipeline = pipeline.jpeg(encodeOptions as import('sharp').JpegOptions)
+        } else if (targetFormat === 'png') {
+          pipeline = pipeline.png(encodeOptions as import('sharp').PngOptions)
+        } else if (targetFormat === 'webp') {
+          pipeline = pipeline.webp(encodeOptions as import('sharp').WebpOptions)
+        }
+        logger.info(
+          t('main.editor.log.transcode', {
+            from: sourceFormat || 'unknown',
+            to: targetFormat,
+            size: String(buffer.length)
+          })
+        )
+        await pipeline.toFile(normalizedFilePath)
+      } else {
+        if (!buffer || buffer.length === 0) {
+          throw new Error(t('main.editor.error.emptyImageData'))
+        }
+        await fs.promises.writeFile(normalizedFilePath, buffer)
+        logger.info(
+          t('main.editor.log.directWriteNoReencode', {
+            format: targetFormat || 'unknown',
+            size: String(buffer.length)
+          })
+        )
       }
-      await pipeline.toFile(normalizedFilePath)
     } catch (writeError) {
       // 写入失败时尝试从备份恢复（恢复前再次校验备份完整性）
       if (backupCreated) {

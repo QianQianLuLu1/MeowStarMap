@@ -2773,7 +2773,8 @@
         "userCanceledExportDir": "用户取消选择导出目录",
         "jsonParseFailed": "JSON 解析失败",
         "presetFormatInvalid": "预设格式无效",
-        "onlyIndexedPath": "安全限制：只能保存到已索引的媒体文件路径"
+        "onlyIndexedPath": "安全限制：只能保存到已索引的媒体文件路径",
+        "emptyImageData": "图片数据为空，拒绝写入以避免损坏原图"
       },
       "validation": {
         "nameRequired": "name 不能为空",
@@ -2792,7 +2793,9 @@
         "backupSizeChanged": "[Editor] 备份大小已变化（原 {{original}} vs 当前 {{backup}}），拒绝恢复以避免原图损坏",
         "restoredFromBackup": "[Editor] 写入失败，已从备份恢复原图",
         "restoreFailed": "[Editor] 写入失败且恢复备份也失败:",
-        "recordHistoryFailed": "[Editor] 记录编辑历史失败:"
+        "recordHistoryFailed": "[Editor] 记录编辑历史失败:",
+        "directWriteNoReencode": "[Editor] 目标格式一致（{{format}}，{{size}} 字节），直接写盘跳过二次编码",
+        "transcode": "[Editor] 格式转码 {{from}} → {{to}}（{{size}} 字节），使用无损/最高质量参数"
       }
     },
     "plugin": {

@@ -152,6 +152,11 @@ vi.mock('fs', async () => {
         : (ensureParents(norm(d)),
           store.set(norm(d), { isDir: true, data: Buffer.alloc(0), mtime: Date.now() })),
     writeFileSync: writeFile,
+    readFileSync: (p: string) => {
+      const node = store.get(norm(p))
+      if (!node) throw new Error(`ENOENT: ${p}`)
+      return node.data
+    },
     existsSync: exists,
     rmSync: rm,
     readdirSync: readdir,
@@ -165,6 +170,8 @@ vi.mock('fs', async () => {
       stat: async (p: string) => stat(p),
       copyFile: async (s: string, d: string) => copyFile(s, d),
       readdir: async (dir: string) => readdir(dir),
+      // 同格式直写路径使用 fs.promises.writeFile（真实 fs 具备，此处补齐内存实现）
+      writeFile: async (p: string, data: unknown) => writeFile(p, data),
       unlink: async (p: string) => {
         store.delete(norm(p))
       }
@@ -189,7 +196,9 @@ vi.mock('./backup-service', () => {
 })
 
 import { editorService, EditorService } from './editor-service'
+import { resolveSaveStrategy, getLosslessEncodeOptions } from '../utils/image-encode'
 import sharp from 'sharp'
+import { parseDataUrlToBuffer } from '../utils/file-utils'
 import { getExtFromMime } from '../utils/media-constants'
 import { backupService } from './backup-service'
 
@@ -357,8 +366,9 @@ describe('save', () => {
       toFile: vi.fn().mockRejectedValue(new Error('write failed'))
     } as never)
     // save 不捕获 toFile 错误，向上抛
+    // 注：同格式（jpeg→jpg）现已走直写不再经过 sharp，故用跨格式（png→jpg）触发转码路径
     await expect(
-      fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'jpg' })
+      fresh.save(mediaFilePath, 'data:image/png;base64,AAA=', { format: 'jpg' })
     ).rejects.toThrow('write failed')
     // 原文件应保持不变（备份恢复）
     expect(fs.existsSync(mediaFilePath)).toBe(true)
@@ -437,6 +447,145 @@ describe('save', () => {
     fresh.init(fakeDbManager as never)
     const r = await fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'jpg' })
     expect(r.success).toBe(true)
+  })
+})
+
+// ============================================================
+// 导出保真：零二次编码 / 无损转码（导出降质修复）
+// ============================================================
+
+describe('save 导出保真（零二次编码）', () => {
+  function newService(mediaId: number): EditorService {
+    setupDbWithMediaRow(mediaId)
+    const fresh = new EditorService()
+    fresh.init(createFakeDbManager(mockDb) as never)
+    return fresh
+  }
+
+  function makeChain() {
+    return {
+      jpeg: vi.fn().mockReturnThis(),
+      png: vi.fn().mockReturnThis(),
+      webp: vi.fn().mockReturnThis(),
+      toFile: vi.fn().mockResolvedValue(undefined)
+    }
+  }
+
+  it('目标格式与 dataUrl 格式一致时直接写盘，完全不经过 sharp', async () => {
+    const fresh = newService(30)
+    const r = await fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'jpg' })
+    expect(r.success).toBe(true)
+    expect(sharp).not.toHaveBeenCalled()
+  })
+
+  it('直写时落盘字节与渲染层输出完全一致（无二次编码 → 分辨率必然不变）', async () => {
+    const fresh = newService(31)
+    await fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'jpg' })
+    expect(fs.readFileSync(mediaFilePath).toString()).toBe('fake-image-data')
+  })
+
+  it('跨格式转码到 png 使用无损参数（palette:false 关闭调色板量化）', async () => {
+    const fresh = newService(32)
+    const chain = makeChain()
+    vi.mocked(sharp).mockReturnValue(chain as never)
+    const r = await fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'png' })
+    expect(r.success).toBe(true)
+    expect(sharp).toHaveBeenCalled()
+    expect(chain.png).toHaveBeenCalledWith(
+      expect.objectContaining({ palette: false, compressionLevel: 9, quality: 100 })
+    )
+  })
+
+  it('跨格式转码到 jpeg 使用最高质量与 4:4:4 色度采样', async () => {
+    const fresh = newService(33)
+    const chain = makeChain()
+    vi.mocked(sharp).mockReturnValue(chain as never)
+    const r = await fresh.save(mediaFilePath, 'data:image/png;base64,AAA=', { format: 'jpg' })
+    expect(r.success).toBe(true)
+    expect(chain.jpeg).toHaveBeenCalledWith(
+      expect.objectContaining({ quality: 100, chromaSubsampling: '4:4:4' })
+    )
+  })
+
+  it('空 buffer 时抛错并从备份恢复，不写入空文件', async () => {
+    const fresh = newService(34)
+    vi.mocked(parseDataUrlToBuffer).mockReturnValueOnce({
+      buffer: Buffer.alloc(0),
+      mimeType: 'image/jpeg'
+    })
+    await expect(
+      fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'jpg' })
+    ).rejects.toThrow()
+    expect(fs.readFileSync(mediaFilePath).toString()).toBe('original-jpeg-bytes')
+  })
+
+  it('未知目标格式（无对应编码器）回落直写，不崩溃', async () => {
+    const fresh = newService(35)
+    const r = await fresh.save(mediaFilePath, 'data:image/jpeg;base64,AAA=', { format: 'gif' })
+    expect(r.success).toBe(true)
+    expect(sharp).not.toHaveBeenCalled()
+  })
+})
+
+describe('resolveSaveStrategy', () => {
+  it('同格式无需转码', () => {
+    expect(resolveSaveStrategy('image/jpeg', 'jpg').needsTranscode).toBe(false)
+  })
+
+  it('jpeg 与 jpg 视为同一格式', () => {
+    expect(resolveSaveStrategy('image/jpeg', 'jpeg').needsTranscode).toBe(false)
+  })
+
+  it('大小写与前导点不敏感', () => {
+    expect(resolveSaveStrategy('image/PNG', '.PNG').needsTranscode).toBe(false)
+  })
+
+  it('未指定目标格式时沿用 dataUrl 格式', () => {
+    const r = resolveSaveStrategy('image/webp')
+    expect(r.targetFormat).toBe('webp')
+    expect(r.needsTranscode).toBe(false)
+  })
+
+  it('跨格式需要转码', () => {
+    const r = resolveSaveStrategy('image/png', 'jpg')
+    expect(r.sourceFormat).toBe('png')
+    expect(r.targetFormat).toBe('jpg')
+    expect(r.needsTranscode).toBe(true)
+  })
+
+  it('未知目标格式回落直写（避免无编码器时写出损坏文件）', () => {
+    expect(resolveSaveStrategy('image/jpeg', 'gif').needsTranscode).toBe(false)
+  })
+
+  it('未知源格式时按目标格式转码', () => {
+    expect(resolveSaveStrategy('', 'jpg').needsTranscode).toBe(true)
+  })
+})
+
+describe('getLosslessEncodeOptions', () => {
+  it('jpg：最高质量 + 4:4:4 色度采样', () => {
+    expect(getLosslessEncodeOptions('jpg')).toMatchObject({
+      quality: 100,
+      chromaSubsampling: '4:4:4'
+    })
+  })
+
+  it('png：关闭调色板量化（quality<100 会触发有损量化）', () => {
+    expect(getLosslessEncodeOptions('png')).toMatchObject({
+      palette: false,
+      compressionLevel: 9
+    })
+  })
+
+  it('webp：近无损 + 最高质量', () => {
+    expect(getLosslessEncodeOptions('webp')).toMatchObject({
+      quality: 100,
+      nearLossless: true
+    })
+  })
+
+  it('未知格式返回 null', () => {
+    expect(getLosslessEncodeOptions('gif')).toBeNull()
   })
 })
 

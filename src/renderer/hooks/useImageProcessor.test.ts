@@ -51,6 +51,40 @@ import { processImageData, imageToDataUrl, defaultFilterParams } from '../utils/
 const mockProcessImageData = processImageData as ReturnType<typeof vi.fn>
 const mockImageToDataUrl = imageToDataUrl as ReturnType<typeof vi.fn>
 
+const SOURCE = 'media://file?path=a%2Fb.jpg'
+
+/**
+ * 渲染 hook 并让内部 new Image() 立即触发 onload（jsdom 不会真正解码图片），
+ * 再推进防抖定时器完成一次预览渲染
+ */
+async function renderWithLoadedImage(source: string = SOURCE, maxPreviewSize?: number) {
+  const OriginalImage = global.Image
+  const img = new OriginalImage()
+  const imgSpy = vi.spyOn(global, 'Image').mockImplementation(() => img)
+  const { result } = renderHook(() =>
+    maxPreviewSize === undefined
+      ? useImageProcessor({ source })
+      : useImageProcessor({ source, maxPreviewSize })
+  )
+  await act(async () => {
+    img.dispatchEvent(new Event('load'))
+    vi.advanceTimersByTime(500)
+    await Promise.resolve()
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+  return { result, restore: () => imgSpy.mockRestore() }
+}
+
+/** 取得实际传给 processImageData 的 maxSize */
+async function capturePreviewMaxSize(maxPreviewSize?: number): Promise<number> {
+  const { restore } = await renderWithLoadedImage(SOURCE, maxPreviewSize)
+  const options = mockProcessImageData.mock.calls[0]?.[2] as { maxSize: number } | undefined
+  restore()
+  return options?.maxSize as number
+}
+
 describe('useImageProcessor', () => {
   beforeEach(() => {
     vi.useFakeTimers()
@@ -330,6 +364,83 @@ describe('useImageProcessor', () => {
       expect(imgSpy).toHaveBeenCalled()
       expect(capturedCrossOrigin).toBe('anonymous')
       imgSpy.mockRestore()
+    })
+  })
+
+  describe('预览尺寸预算（预览模糊回归）', () => {
+    // 复现 Bug：修复前默认把预览长边硬钳到 1400，2x 屏或放大查看时位图被浏览器
+    // 上采样而发虚。修复后预览尺寸由调用方按「显示区 × DPR × 缩放」给定。
+    it('默认不限制预览尺寸（Infinity），不再钳到 1400', async () => {
+      const maxSize = await capturePreviewMaxSize(undefined)
+      expect(maxSize).toBe(Number.POSITIVE_INFINITY)
+    })
+
+    it('显式传入的预算原样透传（如 2600）', async () => {
+      const maxSize = await capturePreviewMaxSize(2600)
+      expect(maxSize).toBe(2600)
+    })
+
+    it.each([
+      ['0', 0],
+      ['负数', -5],
+      ['NaN', NaN]
+    ])('非法预算 %s 回落为不限制，而非静默降级', async (_name, value) => {
+      const maxSize = await capturePreviewMaxSize(value)
+      expect(maxSize).toBe(Number.POSITIVE_INFINITY)
+    })
+  })
+
+  describe('exportDataUrl 编码质量（导出降质回归）', () => {
+    it('jpg 源 fullSize 导出：分辨率不限制 + 最高质量 1', async () => {
+      const { result, restore } = await renderWithLoadedImage()
+      mockImageToDataUrl.mockClear()
+
+      await act(async () => {
+        await result.current.exportDataUrl(true)
+      })
+
+      const lastOptions = mockProcessImageData.mock.calls[
+        mockProcessImageData.mock.calls.length - 1
+      ][2] as { maxSize: number }
+      expect(lastOptions.maxSize).toBe(Number.POSITIVE_INFINITY)
+      expect(mockImageToDataUrl).toHaveBeenCalledWith(expect.anything(), 'image/jpeg', 1)
+      restore()
+    })
+
+    it('png 源 fullSize 导出：使用 image/png 且质量 1', async () => {
+      const { result, restore } = await renderWithLoadedImage('media://file?path=a%2Fb.png')
+      mockImageToDataUrl.mockClear()
+
+      await act(async () => {
+        await result.current.exportDataUrl(true)
+      })
+
+      expect(mockImageToDataUrl).toHaveBeenCalledWith(expect.anything(), 'image/png', 1)
+      restore()
+    })
+
+    it('mimeTypeOverride 生效（另存为 jpg 场景）', async () => {
+      const { result, restore } = await renderWithLoadedImage('media://file?path=a%2Fb.png')
+      mockImageToDataUrl.mockClear()
+
+      await act(async () => {
+        await result.current.exportDataUrl(true, 'image/jpeg')
+      })
+
+      expect(mockImageToDataUrl).toHaveBeenCalledWith(expect.anything(), 'image/jpeg', 1)
+      restore()
+    })
+
+    it('非法 mimeTypeOverride 回落 image/jpeg', async () => {
+      const { result, restore } = await renderWithLoadedImage()
+      mockImageToDataUrl.mockClear()
+
+      await act(async () => {
+        await result.current.exportDataUrl(true, 'text/plain')
+      })
+
+      expect(mockImageToDataUrl).toHaveBeenCalledWith(expect.anything(), 'image/jpeg', 1)
+      restore()
     })
   })
 })

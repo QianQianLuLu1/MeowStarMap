@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useZoomable } from '../../hooks/useZoomable'
 import { IconReset } from '../../icons'
@@ -23,6 +23,11 @@ interface ZoomableContainerProps {
   containerStyle?: React.CSSProperties
   /** aria-label，用于无障碍 */
   ariaLabel?: string
+  /**
+   * 缩放倍数变化回调。可选：编辑器据此按「显示区 × DPR × 缩放」重算预览分辨率，
+   * 放大查看时提升预览清晰度；不传则零副作用。
+   */
+  onScaleChange?: (scale: number) => void
 }
 
 export const ZoomableContainer: React.FC<ZoomableContainerProps> = ({
@@ -32,12 +37,22 @@ export const ZoomableContainer: React.FC<ZoomableContainerProps> = ({
   children,
   containerClassName,
   containerStyle,
-  ariaLabel
+  ariaLabel,
+  onScaleChange
 }) => {
   const { t } = useTranslation()
   const { scale, position, dragging, dragStartPos, containerRef, handlers, reset } = useZoomable({
     maxZoom
   })
+
+  // 用 ref 持有最新回调：避免因调用方传入内联箭头函数而每次渲染都触发同步
+  const onScaleChangeRef = useRef(onScaleChange)
+  useEffect(() => {
+    onScaleChangeRef.current = onScaleChange
+  }, [onScaleChange])
+  useEffect(() => {
+    onScaleChangeRef.current?.(scale)
+  }, [scale])
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {

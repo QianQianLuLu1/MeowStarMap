@@ -30,6 +30,7 @@ import exifr from 'exifr'
 import { app } from 'electron'
 import { getUniqueFilePath } from '../utils/file-utils'
 import { isImageExt } from '../utils/media-constants'
+import { getLosslessEncodeOptions } from '../utils/image-encode'
 import { t } from '../i18n'
 import {
   EDITOR_METADATA_SCHEMA_VERSION,
@@ -172,7 +173,6 @@ export async function writeMetadataToFile(
 
   // 格式优先级：options.format > 源文件扩展名
   const format = options.format ?? (ext.replace('.', '') as 'jpg' | 'jpeg' | 'png' | 'webp')
-  const quality = options.quality ?? 92
 
   // sharp 0.35 的 WriteableMetadata 类型声明未包含 xmp 字段，但运行时已支持
   // 用扩展类型 + 变量声明绕过 excess property check
@@ -180,14 +180,18 @@ export async function writeMetadataToFile(
   const metadataOptions: WriteableMetadataWithXmp = { xmp: xmpBuffer }
   let pipeline = sharp(sourcePath).withMetadata(metadataOptions)
 
-  if (format === 'jpg' || format === 'jpeg') {
-    pipeline = pipeline.jpeg({ quality, progressive: true, mozjpeg: true })
-  } else if (format === 'png') {
-    pipeline = pipeline.png({ quality: Math.min(quality, 100), progressive: true })
-  } else if (format === 'webp') {
-    pipeline = pipeline.webp({ quality })
-  } else {
+  // FIX(导出降质)：与 editor-service 共用同一套无损/最高质量编码参数。
+  // 原实现 quality 默认 92 且 png({quality<100}) 会触发调色板量化（有损）。
+  const encodeOptions = getLosslessEncodeOptions(format)
+  if (!encodeOptions) {
     throw new Error(`不支持的输出格式: ${format}`)
+  }
+  if (format === 'jpg' || format === 'jpeg') {
+    pipeline = pipeline.jpeg(encodeOptions as import('sharp').JpegOptions)
+  } else if (format === 'png') {
+    pipeline = pipeline.png(encodeOptions as import('sharp').PngOptions)
+  } else if (format === 'webp') {
+    pipeline = pipeline.webp(encodeOptions as import('sharp').WebpOptions)
   }
 
   await pipeline.toFile(targetPath)

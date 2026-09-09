@@ -12,16 +12,32 @@ import {
 } from '../utils/imageProcessor'
 import { mergeFilterParams } from '../utils/filter'
 import { needsAnonymousCors } from '../utils/file'
+import { resolveExportEncoding } from '../utils/export-encoding'
+import { FALLBACK_PREVIEW_MAX_SIZE } from '../utils/preview-resolution'
 
 // C-G3：命名常量取代魔法数字
-/** 预览图最大边长（像素），兼顾预览清晰度与渲染性能 */
-const DEFAULT_MAX_PREVIEW_SIZE = 1400
+/**
+ * 预览长边预算默认值：不限制。
+ *
+ * FIX(预览清晰度)：原为固定 1400 —— 3840×2160 只剩 34% 像素、6000×4000 只剩 12%，
+ * 再被预览容器 object-contain + scale(≤8) 上采样到全屏，是预览发虚的根因。
+ * 现在由调用方按「显示区 × DPR × 缩放」计算预算传入；缺省表示按原图分辨率渲染。
+ */
+const DEFAULT_MAX_PREVIEW_SIZE = Number.POSITIVE_INFINITY
 /** 预览渲染防抖延迟（毫秒），滑块拖动时避免频繁渲染 */
 const PREVIEW_DEBOUNCE_MS = 80
-/** JPEG 预览质量（0-1） */
-const PREVIEW_JPEG_QUALITY = 0.92
-/** 导出 JPEG 质量（0-1） */
-const EXPORT_JPEG_QUALITY = 0.95
+/** JPEG 预览质量（0-1）；预览仅供显示，0.95 已无明显编码痕迹 */
+const PREVIEW_JPEG_QUALITY = 0.95
+
+/**
+ * 归一化预览长边预算：仅有限正数有效，其余（undefined/0/负数/NaN/Infinity）视为不限制。
+ * 此前 0/NaN 会被下游 `options.maxSize || 1600` 静默改成 1600，造成意外降分辨率。
+ */
+function normalizeMaxPreviewSize(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : Number.POSITIVE_INFINITY
+}
 
 interface UseImageProcessorOptions {
   source: string | null
@@ -86,9 +102,10 @@ export function useImageProcessor({
 
     debounceTimerRef.current = setTimeout(async () => {
       const token = ++pendingRef.current
+      const maxSize = normalizeMaxPreviewSize(maxPreviewSize)
       try {
         const imageData = await processImageData(img, mergedParams, {
-          maxSize: maxPreviewSize,
+          maxSize,
           watermark
         })
         if (token !== pendingRef.current) return
@@ -97,7 +114,26 @@ export function useImageProcessor({
         setPreviewUrl(dataUrl)
         setError(null)
       } catch (err) {
-        console.error(t('toast.previewRenderFailed'), err)
+        // 兜底：超大图按原图分辨率渲染可能因内存/画布上限失败，降级到兜底预算重试一次
+        if (maxSize !== FALLBACK_PREVIEW_MAX_SIZE) {
+          try {
+            const fallbackData = await processImageData(img, mergedParams, {
+              maxSize: FALLBACK_PREVIEW_MAX_SIZE,
+              watermark
+            })
+            if (token !== pendingRef.current) return
+            const dataUrl = await imageToDataUrl(fallbackData, 'image/jpeg', PREVIEW_JPEG_QUALITY)
+            if (token !== pendingRef.current) return
+            console.warn('[useImageProcessor] preview render degraded to fallback size', err)
+            setPreviewUrl(dataUrl)
+            setError(null)
+            return
+          } catch (fallbackErr) {
+            console.error(t('toast.previewRenderFailed'), fallbackErr)
+          }
+        } else {
+          console.error(t('toast.previewRenderFailed'), err)
+        }
         if (token === pendingRef.current) {
           setError(err instanceof Error ? err.message : t('toast.previewRenderFailed'))
         }
@@ -227,27 +263,14 @@ export function useImageProcessor({
           // 长边超过 4096 的相机原片（如 6000×4000）会被静默降采样后写回原路径，
           // 用户无从知晓分辨率已损失。原图经 Image 解码时完整位图已驻留内存，
           // 同尺寸 canvas 输出不改变内存量级；预览路径仍由 maxPreviewSize 限制
-          maxSize: fullSize ? Number.POSITIVE_INFINITY : maxPreviewSize,
+          maxSize: fullSize ? Number.POSITIVE_INFINITY : normalizeMaxPreviewSize(maxPreviewSize),
           watermark
         })
         // P2-C11：优先使用调用方传入的 mimeTypeOverride；否则从 source URL 解析扩展名。
-        // blob:/data: URL 无可靠扩展名，解析会误判为 jpeg，调用方可通过 mimeTypeOverride 显式指定
-        type ImageFormat = 'image/jpeg' | 'image/png' | 'image/webp'
-        let mimeType: ImageFormat
-        let quality: number
-        if (mimeTypeOverride) {
-          // 非法值降级为 jpeg，避免 TS 联合类型越界
-          mimeType = (['image/jpeg', 'image/png', 'image/webp'] as const).includes(
-            mimeTypeOverride as ImageFormat
-          )
-            ? (mimeTypeOverride as ImageFormat)
-            : 'image/jpeg'
-          quality = mimeType === 'image/png' ? 1 : EXPORT_JPEG_QUALITY
-        } else {
-          const ext = source ? source.split('.').pop()?.toLowerCase().split('?')[0] : ''
-          mimeType = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
-          quality = ext === 'png' ? 1 : EXPORT_JPEG_QUALITY
-        }
+        // blob:/data: URL 无可靠扩展名，解析会误判为 jpeg，调用方可通过 mimeTypeOverride 显式指定。
+        // 编码参数统一由 resolveExportEncoding 决定，非法值回落 image/jpeg
+        const extFromSource = source ? (source.split('.').pop() ?? '') : ''
+        const { mimeType, quality } = resolveExportEncoding(mimeTypeOverride ?? extFromSource)
         const dataUrl = await imageToDataUrl(imageData, mimeType, quality)
         setError(null)
         return dataUrl

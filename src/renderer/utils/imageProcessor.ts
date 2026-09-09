@@ -496,13 +496,43 @@ export function applySplitTone(
   return hslToRgb(h, s, l)
 }
 
+/**
+ * 用 createImageBitmap 做高质量重采样；环境不支持或失败时返回 null，由调用方回退 drawImage
+ */
+async function createResampledBitmap(
+  source: ImageBitmap | HTMLImageElement | HTMLCanvasElement,
+  width: number,
+  height: number
+): Promise<ImageBitmap | null> {
+  if (typeof createImageBitmap !== 'function') return null
+  try {
+    return await createImageBitmap(source as ImageBitmapSource, {
+      resizeWidth: width,
+      resizeHeight: height,
+      resizeQuality: 'high'
+    })
+  } catch (error) {
+    console.warn('[imageProcessor] createImageBitmap resample failed, fallback to drawImage', error)
+    return null
+  }
+}
+
 export async function processImageData(
   source: ImageBitmap | HTMLImageElement | HTMLCanvasElement,
   params: FilterParams,
   options: ProcessOptions = {}
 ): Promise<ImageData> {
   const canvas = document.createElement('canvas')
-  const maxSize = options.maxSize || 1600
+  // FIX(预览清晰度)：maxSize 仅接受有限正数。原实现 `options.maxSize || 1600` 会把
+  // undefined/0/负数/NaN 静默改成 1600，是预览分辨率被意外降级的隐藏入口；
+  // 现在这些值一律视为「不限制」，是否限制由调用方显式决定。
+  const requestedMaxSize = options.maxSize
+  const maxSize =
+    typeof requestedMaxSize === 'number' &&
+    Number.isFinite(requestedMaxSize) &&
+    requestedMaxSize > 0
+      ? requestedMaxSize
+      : Number.POSITIVE_INFINITY
   interface SizableSource {
     width: number
     height: number
@@ -511,8 +541,10 @@ export async function processImageData(
   }
 
   const src = source as SizableSource
-  let width = src.width || src.videoWidth || 0
-  let height = src.height || src.videoHeight || 0
+  const naturalWidth = src.width || src.videoWidth || 0
+  const naturalHeight = src.height || src.videoHeight || 0
+  let width = naturalWidth
+  let height = naturalHeight
 
   if (width > maxSize || height > maxSize) {
     const ratio = Math.min(maxSize / width, maxSize / height)
@@ -525,7 +557,28 @@ export async function processImageData(
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
   if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
-  ctx.drawImage(source, 0, 0, width, height)
+  // FIX(预览清晰度)：开启高质量重采样。此前未设置任何平滑参数，浏览器默认低质量
+  // 滤波在大比例缩小时会明显软化并产生锯齿。
+  ctx.imageSmoothingEnabled = true
+  ctx.imageSmoothingQuality = 'high'
+
+  if (width !== naturalWidth || height !== naturalHeight) {
+    // 需要重采样：优先 createImageBitmap 的高质量缩放（Chromium 内置实现，可脱离主线程）；
+    // 环境不支持或失败时回退 drawImage（已开启 imageSmoothingQuality=high）
+    const bitmap = await createResampledBitmap(source, width, height)
+    if (bitmap) {
+      try {
+        ctx.drawImage(bitmap, 0, 0)
+      } finally {
+        bitmap.close?.()
+      }
+    } else {
+      ctx.drawImage(source, 0, 0, width, height)
+    }
+  } else {
+    // 1:1 直绘：不传目标宽高，完全跳过重采样，保证与原图逐像素一致
+    ctx.drawImage(source, 0, 0)
+  }
 
   let imageData = ctx.getImageData(0, 0, width, height)
   const data = imageData.data

@@ -2773,7 +2773,8 @@
         "userCanceledExportDir": "",
         "jsonParseFailed": "",
         "presetFormatInvalid": "",
-        "onlyIndexedPath": ""
+        "onlyIndexedPath": "",
+        "emptyImageData": ""
       },
       "validation": {
         "nameRequired": "",
@@ -2792,7 +2793,9 @@
         "backupSizeChanged": "",
         "restoredFromBackup": "",
         "restoreFailed": "",
-        "recordHistoryFailed": ""
+        "recordHistoryFailed": "",
+        "directWriteNoReencode": "",
+        "transcode": ""
       }
     },
     "plugin": {
