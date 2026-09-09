@@ -41,11 +41,8 @@ import { useFilteredMediaFiles } from '../hooks/useFilteredMediaFiles'
 import { useMultiSelection } from '../hooks/useMultiSelection'
 import { getContextMenuItems } from '../utils/gallery'
 import { runClipboardShare } from '../utils/share'
-
-/** View Transitions API（Chrome 111+）：以交叉类型窄化探测 startViewTransition（存在性运行时判断） */
-type DocumentWithViewTransitions = Document & {
-  startViewTransition?: (callback: () => void) => unknown
-}
+// P3-1 / RC5：共享元素过渡源元素的登记交由统一模块负责（含能力判定与 O(1) 清理）
+import { markFullscreenSource } from '../utils/view-transition'
 
 export const GalleryPage: React.FC = () => {
   const { t } = useTranslation()
@@ -294,16 +291,8 @@ export const GalleryPage: React.FC = () => {
         // 多选模式下裸点等价于切换选中：不得打开全屏，否则用户无法连续勾选
         toggleMediaSelection(id)
       } else {
-        // P3-1：给被点击的卡片 img 设置 view-transition-name，供 FullscreenViewer 共享元素过渡
-        if (
-          typeof document !== 'undefined' &&
-          (document as DocumentWithViewTransitions).startViewTransition
-        ) {
-          const sourceImg = (e.currentTarget as HTMLElement).querySelector('img[data-media-id]')
-          if (sourceImg) {
-            ;(sourceImg as HTMLElement).style.viewTransitionName = 'fullscreen-media'
-          }
-        }
+        // P3-1：登记被点击卡片的 img 为共享元素过渡源（内部自带能力判定与旧引用清理）
+        markFullscreenSource((e.currentTarget as HTMLElement).querySelector('img[data-media-id]'))
         selectMedia(id)
         openFullscreen(fileIndex)
       }

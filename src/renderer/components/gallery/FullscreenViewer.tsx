@@ -79,6 +79,38 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     setImgError(false)
   }, [fileUrl])
 
+  // RC2：动画窗口内只渲染已被引擎缓存的缩略图，原图用离屏 Image 预解码就绪后再原子换源。
+  // 直接以数 MB 的 4K 原图作 src 会带来三个问题：① 新快照拍摄时原图尚未加载、固有尺寸
+  // 未知，共享元素 group 的起终点尺寸失真；② 加载完成触发重排，正在进行的放大动画被撕裂；
+  // ③ 解码任务被摊进 ~250ms 的共享元素动画窗口，直接吃掉动画帧。
+  // 占位图必须以原图同样的宽高比撑满同一个盒子，否则换源瞬间会「先小后跳」。
+  // 原图 ratio 由 width/height 元数据提供；缺失时不具备占位条件，退回旧行为（直接用原图）。
+  const hasBoxMetadata = Boolean(currentFile?.width && currentFile?.height)
+  const thumbUrl =
+    hasBoxMetadata && currentFile?.thumbnail ? toFileUrl(currentFile.thumbnail) : null
+  const initialUrl = thumbUrl && thumbUrl !== fileUrl ? thumbUrl : fileUrl
+  const [displayUrl, setDisplayUrl] = useState<string | null>(initialUrl)
+  useEffect(() => {
+    setDisplayUrl(initialUrl)
+    // 无缩略图可先行时（已是原图）无需换源
+    if (!fileUrl || initialUrl === fileUrl) return
+    let cancelled = false
+    const probe = new Image()
+    probe.src = fileUrl
+    // decode() 缺失时降级为「加载完成即换」；预解码失败同样换源，
+    // 绝不因预解码失败把本可显示的图片判为加载失败
+    const ready: Promise<unknown> =
+      typeof probe.decode === 'function' ? probe.decode() : Promise.reject(new Error('no decode'))
+    void ready
+      .catch(() => undefined)
+      .then(() => {
+        if (!cancelled) setDisplayUrl(fileUrl)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [fileUrl, initialUrl])
+
   const navigate = useCallback(
     (delta: number) => {
       const newIndex = fullscreenIndex + delta
@@ -337,13 +369,23 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
           renderError
         ) : (
           <img
-            src={fileUrl}
+            src={displayUrl ?? fileUrl ?? ''}
+            // 占位阶段按原图宽高比撑满盒子，使「缩略图 → 原图」换源零布局变化
+            width={displayUrl !== fileUrl ? currentFile.width : undefined}
+            height={displayUrl !== fileUrl ? currentFile.height : undefined}
             alt={currentFile.file_name}
             className="max-w-full max-h-full object-contain"
             draggable={false}
             data-fullscreen-img
-            crossOrigin={needsAnonymousCors(fileUrl) ? 'anonymous' : undefined}
-            onError={() => setImgError(true)}
+            crossOrigin={needsAnonymousCors(displayUrl ?? fileUrl ?? '') ? 'anonymous' : undefined}
+            onError={() => {
+              // 缩略图失败不等于图片不可用：先升级为原图，原图再失败才进错误占位
+              if (displayUrl !== fileUrl) {
+                setDisplayUrl(fileUrl)
+              } else {
+                setImgError(true)
+              }
+            }}
             style={{ viewTransitionName: 'fullscreen-media' }}
           />
         )}

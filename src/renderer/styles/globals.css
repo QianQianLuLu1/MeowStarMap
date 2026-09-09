@@ -743,6 +743,35 @@ body {
   animation: scaleIn 250ms cubic-bezier(0, 0, 0.2, 1) forwards;
 }
 
+/* E：全屏预览共享元素过渡（view-transition-name: fullscreen-media）合成优化
+   背景：进入全屏时的过渡原先完全依赖 UA 默认动画。默认动画会同时驱动 group 的 transform
+   与尺寸，并让 old/new 两个快照按组尺寸逐帧重新采样——对一张最终铺满视口的 4K 截图而言
+   等于逐帧重栅格化，是掉帧的直接来源之一。此处按 Chromium 官方「宽高比不一致的共享元素」
+   配方处理：
+   - group 承担形变，显式给出更短时长与匀速缓动；
+   - old/new 固定铺满 group 并按 contain 呈现（源是网格里的 cover 裁切，目标是 contain，
+     两者宽高比不同），关闭默认交叉淡入淡出以避免两帧叠加错位；
+   - root 整页快照的合成成本最高，把它的 cross-fade 窗口收短。 */
+::view-transition-group(fullscreen-media) {
+  animation-duration: 220ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+::view-transition-old(fullscreen-media),
+::view-transition-new(fullscreen-media) {
+  animation: none;
+  mix-blend-mode: normal;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  overflow: clip;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 140ms;
+}
+
 /* 图片卡片悬停效果 */
 .media-card {
   position: relative;

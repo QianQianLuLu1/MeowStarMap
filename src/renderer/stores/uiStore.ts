@@ -1,5 +1,12 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { flushSync } from 'react-dom'
+// RC1/RC3：全屏共享元素过渡的能力判定与标记生命周期收敛为独立模块，消除散落三处的重复判定
+import {
+  canUseViewTransition,
+  clearFullscreenSource,
+  markFullscreenSource
+} from '../utils/view-transition'
 // C-S2：从 shared 直接导入场景分类，不再经 mediaStore 中转，消除 uiStore ↔ mediaStore 循环依赖
 import type {
   SceneCategory,
@@ -21,15 +28,32 @@ interface ViewTransitionLike {
 }
 
 function getViewTransitionStarter(): ((callback: () => void) => ViewTransitionLike) | undefined {
-  if (typeof document === 'undefined') return undefined
+  // 能力判定（含 SSR、不支持、动效减弱）统一由 utils/view-transition 负责
+  if (!canUseViewTransition()) return undefined
   const doc = document as Document & {
-    startViewTransition?: (cb: () => void) => ViewTransitionLike
+    startViewTransition: (cb: () => void) => ViewTransitionLike
   }
   // P3-1：必须通过 document.startViewTransition 调用，保持 this 绑定。
   // 若直接返回 doc.startViewTransition 引用再独立调用，会因丢失 this 抛出
   // "TypeError: Illegal invocation"，导致 openFullscreen 中断、全屏查看器无法打开。
-  if (typeof doc.startViewTransition !== 'function') return undefined
-  return (callback: () => void) => doc.startViewTransition!(callback)
+  return (callback: () => void) => doc.startViewTransition(callback)
+}
+
+/**
+ * RC1：把状态写入强制为「同步提交」。
+ *
+ * View Transitions 的回调被浏览器在捕获旧快照之后调用，此时已脱离 React 事件批处理上下文，
+ * React 会按默认 lane 异步调度渲染；而浏览器在回调返回后的下一渲染机会即捕获新快照。
+ * 二者赛跑会让新快照抓到尚未挂载 FullscreenViewer 的旧画面，并把 React render 摊进动画
+ * 窗口导致掉帧。故此处用 flushSync 在回调返回前完成提交；flushSync 不可用（渲染期调用等
+ * 场景）时回落普通提交，保证状态必然置位，不阻断全屏开关。
+ */
+function commitFullscreenState(patch: () => void): void {
+  try {
+    flushSync(patch)
+  } catch {
+    patch()
+  }
 }
 
 export type ViewLevel =
@@ -382,23 +406,27 @@ export const useUIStore = create<UIState>()(
         if (!Number.isFinite(index) || index < 0) {
           return
         }
+        // 参数校验：files 必须是数组（非数组一律视为「沿用图库 filteredFiles」；
+        // 数组为空或 index 越界会造成 activeFiles[index] 为 undefined、
+        // 组件早退返回 null，即用户感知的「点了没反应」，应在此拦截
+        const explicitFiles = Array.isArray(files) ? files : null
+        if (explicitFiles && index >= explicitFiles.length) {
+          return
+        }
         // P3-1：用 View Transitions API 实现共享元素过渡（缩略图→全屏图放大）
         // 调用方需在调用前给源卡片 img 设置 view-transition-name: 'fullscreen-media'
         const apply = () => {
           // 状态置位优先：即便后续 DOM/过渡操作异常，全屏也必定打开
           // FIX(dup-fullscreen)：同携带打开时所在的文件列表，FullscreenViewer 优先使用
-          set({ fullscreenOpen: true, fullscreenIndex: index, fullscreenFiles: files ?? null })
-          try {
-            // 清除源元素的 view-transition-name，避免新快照与 FullscreenViewer img 冲突
-            document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
-              ;(el as HTMLElement).style.viewTransitionName = ''
-            })
-          } catch {
-            /* 无视 DOM 清理失败，全屏状态已置位 */
-          }
+          // RC1：在回调返回前同步提交，保证新快照能抓到已挂载的全屏查看器
+          commitFullscreenState(() => {
+            set({ fullscreenOpen: true, fullscreenIndex: index, fullscreenFiles: explicitFiles })
+          })
+          // RC3：仅清理已登记的源元素引用，避免全文档 style 子串扫描
+          clearFullscreenSource()
         }
         const startViewTransition = getViewTransitionStarter()
-        if (startViewTransition && !document.documentElement.classList.contains('reduce-motion')) {
+        if (startViewTransition) {
           try {
             startViewTransition(apply)
           } catch {
@@ -413,37 +441,27 @@ export const useUIStore = create<UIState>()(
       closeFullscreen: () => {
         // P3-1：关闭时实现反向共享元素过渡（全屏图→缩略图缩小）
         const { fullscreenTargetImg } = get()
+        let transitionSupported = false
         const apply = () => {
           // 状态置位优先
-          set({ fullscreenOpen: false, fullscreenTargetImg: null, fullscreenFiles: null })
-          try {
-            // 移除 FullscreenViewer img 的 view-transition-name（旧快照已有，新快照不需要）
-            const fullscreenImg = document.querySelector('[data-fullscreen-img]')
-            if (fullscreenImg) {
-              ;(fullscreenImg as HTMLElement).style.viewTransitionName = ''
-            }
-            // 给目标卡片 img 设置 view-transition-name（新快照中有，旧快照中没有）
-            if (fullscreenTargetImg) {
-              fullscreenTargetImg.style.viewTransitionName = 'fullscreen-media'
-            }
-          } catch {
-            /* 无视 DOM 清理失败，关闭状态已置位 */
+          // RC1：同样在回调返回前同步提交
+          commitFullscreenState(() => {
+            set({ fullscreenOpen: false, fullscreenTargetImg: null, fullscreenFiles: null })
+          })
+          // 仅在确有过渡时才给目标卡片打标记；不支持时打了没人清理会残留 view-transition-name
+          if (transitionSupported) {
+            markFullscreenSource(fullscreenTargetImg)
           }
         }
         const startViewTransition = getViewTransitionStarter()
-        if (startViewTransition && !document.documentElement.classList.contains('reduce-motion')) {
+        transitionSupported = startViewTransition !== undefined
+        if (startViewTransition) {
           try {
             const transition = startViewTransition(apply)
-            // 过渡完成后清除残留的 view-transition-name
+            // 过渡完成后清除残留的 view-transition-name（O(1)，仅按登记引用）
             transition.finished
               .finally(() => {
-                try {
-                  document.querySelectorAll('[style*="view-transition-name"]').forEach((el) => {
-                    ;(el as HTMLElement).style.viewTransitionName = ''
-                  })
-                } catch {
-                  /* 无视清理失败 */
-                }
+                clearFullscreenSource()
               })
               .catch(() => {})
           } catch {
