@@ -514,12 +514,16 @@ export const DuplicatesPage: React.FC = () => {
         showMessage(t('toast.deleteFailed'), 'error')
         return
       }
+      // #fix-permanent-delete-error-toast：preload call() 成功只返回 data
+      // （{ message, deletedCount, failedCount }，无 success 字段），失败会抛 IpcError；
+      // 不可读取 res.success 判定（恒 undefined → 恒走 error 分支误报删除失败且不刷新），
+      // 部分失败以 failedCount 判定
       const res = await api.permanentDelete(ids)
-      if (res.success) {
+      if (res.failedCount > 0) {
+        showMessage(res.message, 'error')
+      } else {
         showMessage(res.message, 'success')
         await runScan(mode)
-      } else {
-        showMessage(res.message, 'error')
       }
     } else {
       const api = window.electronAPI?.mediaAction

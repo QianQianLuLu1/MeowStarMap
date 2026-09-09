@@ -1231,6 +1231,7 @@
     "permanentConfirm": "Sẽ xóa vĩnh viễn {{count}} tệp đã chọn.\nTệp sẽ được chuyển vào thùng rác hệ thống trước, sau đó không thể khôi phục từ ứng dụng này.\nXóa?",
     "permanentConfirmTitle": "Xóa vĩnh viễn",
     "permanentDelete": "Xóa vĩnh viễn",
+    "permanentDeleteSuccess": "Đã xóa vĩnh viễn {{count}} mục",
     "permanentDeleteSelected": "Xóa vĩnh viễn mục đã chọn",
     "permanentHint": "Sau khi xóa vĩnh viễn tệp sẽ được chuyển vào thùng rác hệ thống",
     "restore": "Khôi phục",

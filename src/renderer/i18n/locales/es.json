@@ -1231,6 +1231,7 @@
     "permanentConfirm": "Se eliminarán permanentemente los {{count}} elementos seleccionados.\nLos archivos se moverán primero a la papelera del sistema, después no se podrán restaurar desde esta app.\n¿Seguro que desea eliminar?",
     "permanentConfirmTitle": "Eliminar permanentemente",
     "permanentDelete": "Eliminar permanentemente",
+    "permanentDeleteSuccess": "{{count}} elemento(s) eliminado(s) permanentemente",
     "permanentDeleteSelected": "Eliminar selección permanentemente",
     "permanentHint": "Los archivos se moverán a la papelera del sistema tras el eliminado permanente",
     "restore": "Restaurar",

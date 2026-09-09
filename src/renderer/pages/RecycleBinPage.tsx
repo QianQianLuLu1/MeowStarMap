@@ -160,8 +160,12 @@ export const RecycleBinPage: React.FC = () => {
               e.name = 'AbortError'
               throw e
             }
+            // #fix-permanent-delete-error-toast：preload call() 成功只返回 data
+            // （media:permanentDelete → { message, deletedCount, failedCount }，无 success 字段），
+            // 失败会抛 IpcError；不可读取 r.success 判定（恒 undefined → 每项恒判失败），
+            // 部分失败以 failedCount 判定
             const r = await window.electronAPI!.mediaAction!.permanentDelete([Number(id)])
-            if (!r.success) throw new Error(r.message)
+            if (r.failedCount > 0) throw new Error(r.message)
           },
           (done) => tick(done, ids.length),
           signal
@@ -177,10 +181,16 @@ export const RecycleBinPage: React.FC = () => {
         if (!anyFailed) {
           setSelectedIds(new Set())
           await loadRecycleBin()
+          setStage(2, 'done')
         } else {
           setFailedAction('permanent')
+          // #fix-permanent-delete-error-toast：部分失败时向 run() 抛出首个失败原因，
+          // 使 final.phase='error' → Toast 透传具体错误文案（原实现吞错后仍显示成功文案）
+          const firstReason = settled.find((s) => s.status === 'rejected')?.reason
+          throw firstReason instanceof Error
+            ? firstReason
+            : new Error(String(firstReason ?? t('recycleBin.deleteFailed')))
         }
-        setStage(2, 'done')
       }
     })
     if (final?.phase === 'cancelled') {
@@ -190,7 +200,7 @@ export const RecycleBinPage: React.FC = () => {
     } else if (final && final.stages?.some((s) => s.status === 'failed')) {
       showMessage(t('recycleBin.deleteFailed'), 'error')
     } else {
-      showMessage(t('recycleBin.permanentDeleteSuccess'), 'success')
+      showMessage(t('recycleBin.permanentDeleteSuccess', { count: ids.length }), 'success')
     }
     setOperating(false)
   }, [selectedIds, showMessage, t, staged])

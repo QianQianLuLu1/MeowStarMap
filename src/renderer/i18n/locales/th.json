@@ -1231,6 +1231,7 @@
     "permanentConfirm": "จะลบไฟล์ที่เลือก {{count}} รายการถาวร\nไฟล์จะถูกย้ายไปถังขยะระบบก่อน หลังจากนั้นจะกู้คืนจากแอปนี้ไม่ได้\nต้องการลบหรือไม่?",
     "permanentConfirmTitle": "ลบถาวร",
     "permanentDelete": "ลบถาวร",
+    "permanentDeleteSuccess": "ลบถาวรแล้ว {{count}} รายการ",
     "permanentDeleteSelected": "ลบถาวรรายการที่เลือก",
     "permanentHint": "หลังลบถาวรไฟล์จะถูกย้ายไปถังขยะระบบ",
     "restore": "กู้คืน",

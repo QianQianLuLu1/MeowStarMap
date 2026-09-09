@@ -464,7 +464,10 @@ interface WindowElectronAPI {
     delete: (mediaId: number) => Promise<{ success: boolean; message?: string }>
     softDelete: (mediaIds: number[]) => Promise<{ success: boolean; message: string }>
     restore: (mediaIds: number[]) => Promise<{ success: boolean; message: string }>
-    permanentDelete: (mediaIds: number[]) => Promise<{ success: boolean; message: string }>
+    // #fix-permanent-delete-error-toast：与主进程真实 data 对齐（无 success 字段，部分失败以 failedCount 判定）
+    permanentDelete: (
+      mediaIds: number[]
+    ) => Promise<{ message: string; deletedCount: number; failedCount: number }>
     emptyRecycleBin: () => Promise<{ message: string }>
     // T02：丢失记录清理（批量 / 单条）
     cleanupMissing: () => Promise<{ success: boolean; message: string; cleared?: number }>

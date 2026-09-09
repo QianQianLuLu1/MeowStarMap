@@ -1231,6 +1231,7 @@
     "permanentConfirm": "선택한 {{count}}개 항목을 완전히 삭제합니다.\n파일은 먼저 시스템 휴지통으로 이동되며, 이후 이 앱에서 복원할 수 없습니다.\n삭제하시겠습니까?",
     "permanentConfirmTitle": "완전 삭제",
     "permanentDelete": "완전 삭제",
+    "permanentDeleteSuccess": "{{count}}개 항목을 완전히 삭제했습니다",
     "permanentDeleteSelected": "선택 항목 완전 삭제",
     "permanentHint": "완전 삭제 후 파일은 시스템 휴지통으로 이동합니다",
     "restore": "복원",

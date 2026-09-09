@@ -1231,6 +1231,7 @@
     "permanentConfirm": "將徹底刪除選中的 {{count}} 項檔案。\n檔案會先移至系統回收站，之後無法從本應用復原。\n確定要刪除嗎？",
     "permanentConfirmTitle": "徹底刪除",
     "permanentDelete": "徹底刪除",
+    "permanentDeleteSuccess": "已徹底刪除 {{count}} 項",
     "permanentDeleteSelected": "徹底刪除選中項",
     "permanentHint": "徹底刪除後檔案將移至系統回收站",
     "restore": "復原",

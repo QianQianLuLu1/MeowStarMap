@@ -26,8 +26,12 @@ export const mediaActionAPI = {
   // F-S6 回收站：软删除/恢复/彻底删除/清空
   softDelete: (mediaIds: number[]) => call<{ message: string }>('media:softDelete', mediaIds),
   restore: (mediaIds: number[]) => call<{ message: string }>('media:restore', mediaIds),
+  // #fix-permanent-delete-error-toast：返回类型与主进程真实 data 对齐（含 deletedCount/failedCount）
   permanentDelete: (mediaIds: number[]) =>
-    call<{ message: string }>('media:permanentDelete', mediaIds),
+    call<{ message: string; deletedCount: number; failedCount: number }>(
+      'media:permanentDelete',
+      mediaIds
+    ),
   emptyRecycleBin: () => call<{ message: string }>('media:emptyRecycleBin'),
   // T02：丢失记录清理（批量 / 单条）
   cleanupMissing: () => call<{ cleaned: number }>('media:cleanupMissing'),

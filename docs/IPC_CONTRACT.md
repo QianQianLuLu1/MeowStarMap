@@ -165,6 +165,70 @@ wrapHandler(ctx, schema, handler) =>
 }
 ```
 
+### 2.6 `file:deletePermanent`
+
+| 属性         | 值                                                                                        |
+| ------------ | ----------------------------------------------------------------------------------------- |
+| 通道         | `file:deletePermanent`                                                                    |
+| Handler 文件 | `src/main/ipc/handlers/file.ts`                                                           |
+| 参数         | `string[]`（绝对路径数组，`filePathArrayBulk` 校验 + `assertMediaDeletePath` 三级白名单） |
+| 返回类型     | `{ success: boolean; message: string }`（`FileService.deletePermanent`）                  |
+
+**确认语义（#fix-permanent-delete-error-toast）**：二次确认由渲染端 ConfirmDialog 承担（调用方：图库 `GalleryPage`）。主进程**不再弹出原生 `dialog.showMessageBox`**（原实现重复确认，且取消时向渲染端抛 `IPC_CANCELED` 误报错误）。渲染端按 preload `call()` 契约消费：成功收到 `{ success, message }`，失败抛 `IpcError`。
+
+### 2.7 `media:permanentDelete`
+
+| 属性         | 值                                                               |
+| ------------ | ---------------------------------------------------------------- |
+| 通道         | `media:permanentDelete`                                          |
+| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts`               |
+| 参数         | `number[]`（媒体 id 数组，`mediaIdArrayBulk` 校验）              |
+| 返回类型     | `{ message: string; deletedCount: number; failedCount: number }` |
+
+**返回值结构**：
+
+```ts
+{
+  message: string,      // 成功 '已彻底删除 N 项'；部分失败 '已彻底删除 N 项，M 项失败'
+  deletedCount: number, // 已物理删除 DB 记录数（含文件已不存在的项）
+  failedCount: number   // 文件物理删除失败且文件仍存在的项数（渲染端据此判定部分失败）
+}
+```
+
+**确认语义与行为（#fix-permanent-delete-error-toast / #fix-recyclebin-permanent-delete）**：
+
+- 二次确认由渲染端 ConfirmDialog 承担（调用方：回收站 `RecycleBinPage`、重复页 `DuplicatesPage`）。主进程**不再弹出原生 `dialog.showMessageBox`**，也不再抛 `IPC_CANCELED`。
+- 三阶段事务不变（软删标记 → 物理删除文件 → 硬删 DB）；阶段 4：对已删除记录的缩略图执行 best-effort 清理，**仅限应用缩略图缓存目录内**的文件（游戏原生 LQ 等外部路径不触碰），失败仅记录日志不影响返回值。
+- **#fix-recyclebin-permanent-delete 行为变更**：阶段 2 原用 `shell.trashItem`（仅把文件移入系统回收站，磁盘不释放，且 Windows Shell 大批量下有实测瞬时失败），现改为 `fsp.unlink` 直接物理删除；三态判定（成功/missing/failed）与重试/熔断/聚合日志机制沿用 `_trash-utils.ts` 不变。
+- 渲染端按 preload `call()` 契约消费：成功收到 data，失败抛 `IpcError`；部分失败以 `failedCount > 0` 判定。
+
+### 2.8 `media:emptyRecycleBin`
+
+| 属性         | 值                                                                                   |
+| ------------ | ------------------------------------------------------------------------------------ |
+| 通道         | `media:emptyRecycleBin`                                                              |
+| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts`                                   |
+| 参数         | 无（`wrapHandlerNoArgs`）                                                            |
+| 返回类型     | `{ message: string; movedCount: number; missingCount: number; failedCount: number }` |
+
+**返回值结构**：
+
+```ts
+{
+  message: string,      // 为空 '回收站为空，无需清理'；成功 '已清空回收站（共 N 项）'；部分失败 '已彻底删除 N 项，M 项失败'
+  movedCount: number,   // 成功物理删除的文件数（#fix-recyclebin-permanent-delete 前语义为移入系统回收站数）
+  missingCount: number, // 文件已不存在（原路径 ENOENT）的项数
+  failedCount: number   // 物理删除失败且文件仍存在的项数（DB 记录保留供重试，渲染端据此判定部分失败）
+}
+```
+
+**确认语义与行为（#fix-recyclebin-permanent-delete）**：
+
+- 主进程保留原生 `dialog.showMessageBox` 二次确认（A-S3 高危操作，不在本次 Bug 修复范围）；用户取消抛 `IPC_CANCELED`。
+- 文件处理：对每条软删除记录的 `file_path` 执行 `fsp.unlink` **物理删除**（原 `shell.trashItem` 仅移入系统回收站，磁盘不释放）；软删除记录经 `getSoftDeletedMediaPaths` 返回（含 `thumbnail` 列）。三态判定沿用 `_trash-utils.ts`：成功 / missing（仅删 DB）/ failed（文件仍存在，DB 保留供重试）。
+- 阶段 4（本次新增）：对已删除 DB 记录的缩略图执行 best-effort 清理，**仅限应用缩略图缓存目录内**的文件（游戏原生 LQ 等外部路径不触碰）。
+- 渲染端按 preload `call()` 契约消费：成功收到 data（不含 `success` 字段），失败抛 `IpcError`；`RecycleBinPage` 仅消费 `message` 与 `failedCount`。
+
 ## 3. 共享类型定义
 
 所有跨进程共享的类型定义在 `src/shared/types/duplicate.ts`，通过 `src/shared/types/index.ts` 统一导出。

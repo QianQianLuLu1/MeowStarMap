@@ -19,7 +19,7 @@ import { t } from '../i18n'
  * 设计目标：
  *   1. 将 media.ts 中 34 个 IPC handler 内联的 SQL 全部集中到此 Repository
  *   2. Repository 仅负责 SQL 访问（prepare/run/all/get/transaction），不含 IPC、不含副作用
- *      （dialog/shell.trashItem/fs.access/notifyMediaUpdated 均留在 handler）
+ *      （dialog/fs.unlink 与缩略图清理/notifyMediaUpdated 均留在 handler 或 _trash-utils）
  *   3. Repository 是测试接缝（seam）：可对内存数据库（new Database(':memory:')）实例化
  *      并验证 SQL 行为，无需 mock Electron API
  *   4. 行为等价：所有 SQL 字符串、placeholder 顺序、事务边界、缓存读写均与原 media.ts 一致
@@ -222,6 +222,8 @@ export interface OriginalRow {
 export interface IdPathRow {
   id: number
   file_path: string
+  /** #fix-permanent-delete-error-toast：缩略图路径（getMediaPathsByIds 返回，用于删除后清理缓存） */
+  thumbnail?: string | null
 }
 
 /** 分类表行 */
@@ -1272,19 +1274,19 @@ export class MediaRepository {
       .all() as IdPathRow[]
   }
 
-  /** media:permanentDelete / media:emptyRecycleBin — 查询文件路径 */
+  /** media:permanentDelete / media:emptyRecycleBin — 查询文件路径（含缩略图，供删除后清理缓存） */
   getMediaPathsByIds(mediaIds: number[]): IdPathRow[] {
     if (mediaIds.length === 0) return []
     return this.queryChunked<IdPathRow>(mediaIds, (ids, placeholders) => ({
-      sql: `SELECT id, file_path FROM media_files WHERE id IN (${placeholders})`,
+      sql: `SELECT id, file_path, thumbnail FROM media_files WHERE id IN (${placeholders})`,
       params: ids
     }))
   }
 
-  /** media:emptyRecycleBin — 查询所有软删除记录 */
+  /** media:emptyRecycleBin — 查询所有软删除记录（含缩略图，供删除 DB 记录后清理缓存 #fix-recyclebin-permanent-delete） */
   getSoftDeletedMediaPaths(): IdPathRow[] {
     return this.db
-      .prepare('SELECT id, file_path FROM media_files WHERE is_deleted = 1')
+      .prepare('SELECT id, file_path, thumbnail FROM media_files WHERE is_deleted = 1')
       .all() as IdPathRow[]
   }
 

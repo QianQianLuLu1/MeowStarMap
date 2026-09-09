@@ -1231,6 +1231,7 @@
     "permanentConfirm": "Die ausgewählten {{count}} Elemente werden dauerhaft gelöscht.\nDateien werden zuerst in den Systempapierkorb verschoben, danach können sie nicht mehr aus dieser App wiederhergestellt werden.\nSicher, dass gelöscht werden soll?",
     "permanentConfirmTitle": "Dauerhaft löschen",
     "permanentDelete": "Dauerhaft löschen",
+    "permanentDeleteSuccess": "{{count}} Element(e) endgültig gelöscht",
     "permanentDeleteSelected": "Auswahl dauerhaft löschen",
     "permanentHint": "Dateien werden nach dauerhaftem Löschen in den Systempapierkorb verschoben",
     "restore": "Wiederherstellen",

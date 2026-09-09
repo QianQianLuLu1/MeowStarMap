@@ -1231,6 +1231,7 @@
     "permanentConfirm": "Os {{count}} itens selecionados serão excluídos definitivamente.\nOs arquivos serão primeiro movidos para a lixeira do sistema, e depois não poderão ser recuperados por este aplicativo.\nDeseja excluir?",
     "permanentConfirmTitle": "Excluir definitivamente",
     "permanentDelete": "Excluir definitivamente",
+    "permanentDeleteSuccess": "{{count}} item(ns) excluído(s) permanentemente",
     "permanentDeleteSelected": "Excluir selecionados definitivamente",
     "permanentHint": "Após exclusão definitiva, os arquivos serão movidos para a lixeira do sistema",
     "restore": "Restaurar",

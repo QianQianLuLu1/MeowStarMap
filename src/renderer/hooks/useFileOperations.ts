@@ -287,8 +287,10 @@ export function useFileOperations(options: UseFileOperationsOptions) {
               toastType = 'success'
               setStage(0, 'done')
               setStage(1)
-              const dbRes = await api.mediaAction.delete(Number(file.id))
-              if (!dbRes.success) throw new Error(dbRes.message)
+              // #fix-permanent-delete-error-toast：preload call() 成功只返回 data
+              // （media:delete → { deleted: true }，无 success 字段），失败会抛 IpcError
+              // 由 staged.run 捕获；不可读取 result.success 判定（恒 undefined → 删除成功却误报失败）
+              await api.mediaAction.delete(Number(file.id))
               setStage(1, 'done')
               setStage(2)
               deleteMediaFiles([file.id])

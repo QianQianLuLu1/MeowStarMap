@@ -1,9 +1,10 @@
 /**
  * 媒体生命周期域 IPC handler：删除 / 恢复 / 回收站
  *
- * 覆盖：物理删除 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
- * 彻底删除与清空回收站含 dialog 二次确认；彻底删除采用三阶段事务保证 DB 与文件系统一致。
- * 回收站批量操作工具见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
+ * 覆盖：物理删除记录 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
+ * 彻底删除采用三阶段事务保证 DB 与文件系统一致，二次确认由渲染端 ConfirmDialog 承担；
+ * 清空回收站仍含 dialog 二次确认。
+ * 回收站批量操作工具（含缩略图清理）见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
  */
 import { ipcMain, dialog } from 'electron'
 import { z } from 'zod'
@@ -11,13 +12,13 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
-import { trashBatch } from './_trash-utils'
+import { unlinkBatch, cleanupThumbnailsForRows } from './_trash-utils'
 import { t } from '../../i18n'
 
 /**
  * 媒体生命周期域 IPC handler
  *
- * 覆盖：物理删除 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
+ * 覆盖：物理删除记录 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
  * 彻底删除与清空回收站含 dialog 二次确认；彻底删除采用三阶段事务保证 DB 与文件系统一致。
  */
 export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
@@ -32,7 +33,11 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
   ipcMain.handle(
     'media:delete',
     wrapHandler(ctx, z.tuple([schemas.mediaId]), async ([mediaId]) => {
-      await getRepo().hardDelete(mediaId)
+      const repo = getRepo()
+      // #fix-permanent-delete-error-toast：物理删除前先取缩略图路径，删除记录后清理缓存
+      const rows = repo.getMediaPathsByIds([mediaId])
+      await repo.hardDelete(mediaId)
+      await cleanupThumbnailsForRows(rows, ctx.thumbnailGen.getCacheDir())
       ctx.notifyMediaUpdated()
       return { deleted: true }
     })
@@ -61,39 +66,36 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     })
   )
 
-  // F-S6 回收站：彻底删除（高危操作二次确认 + 三阶段事务）
+  // F-S6 回收站：彻底删除（三阶段事务；二次确认由渲染端 ConfirmDialog 承担）
   ipcMain.handle(
     'media:permanentDelete',
     wrapHandler(ctx, z.tuple([schemas.mediaIdArrayBulk]), async ([mediaIds]) => {
-      // A-S3：高危操作二次确认（彻底删除不可恢复）
-      const confirmResult = await dialog.showMessageBox({
-        type: 'warning',
-        buttons: [t('main.media.dialog.cancel'), t('main.media.dialog.confirmDelete')],
-        defaultId: 0,
-        cancelId: 0,
-        title: t('main.media.dialog.permanentDeleteTitle'),
-        message: t('main.media.dialog.permanentDeleteMessage', { count: mediaIds.length }),
-        detail: t('main.media.dialog.permanentDeleteDetail')
-      })
-      if (confirmResult.response !== 1) {
-        throw AppError.canceled(t('main.media.error.userCanceled'))
-      }
+      // #fix-permanent-delete-error-toast：原实现在此处再弹一次原生 dialog 二次确认，
+      // 但全部渲染端调用方（图库/回收站/重复页）已在调用前经 ConfirmDialog 确认过——
+      // 用户需重复确认，回收站批量场景每个 id 弹一次；取消时还会向渲染端抛
+      // canceled 误报「出错」。二次确认职责回归渲染端，主进程不再弹窗。
 
       const repo = getRepo()
-      // 查询文件路径
+      // 查询文件路径（含缩略图，供阶段 4 清理缓存）
       const rows = repo.getMediaPathsByIds(mediaIds)
 
-      // F-S1 三阶段：①事务软删除标记 ②异步 trashItem ③事务物理删除已处理记录
+      // F-S1 三阶段：①事务软删除标记 ②逐个物理删除文件（fsp.unlink） ③事务物理删除已处理记录
       // 保证 DB 与文件系统一致：中断后 DB 仍有 is_deleted=1 记录，用户可重试
 
       // 阶段1：幂等软删除标记
       await repo.softDeleteForPermanentDelete(rows.map((r) => r.id))
 
-      // 阶段2：逐个移至系统回收站，区分「成功」「文件已不存在」「失败」
-      const { idsToDelete, failedPaths } = await trashBatch(rows)
+      // 阶段2：逐个物理删除文件（#fix-recyclebin-permanent-delete：
+      // 原用 shell.trashItem 只是把文件移入系统回收站，磁盘不释放；现改 fsp.unlink 真正删除），
+      // 区分「成功」「文件已不存在」「失败」
+      const { idsToDelete, failedPaths } = await unlinkBatch(rows)
 
       // 阶段3：事务中物理删除已成功处理的记录
       await repo.hardDeleteBatch(idsToDelete)
+
+      // 阶段4：清理已删除记录的缩略图缓存（best-effort，仅应用缓存目录内）
+      const deletedRows = rows.filter((r) => idsToDelete.includes(r.id))
+      await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir())
 
       ctx.notifyMediaUpdated()
       const msg =
@@ -132,10 +134,17 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
         throw AppError.canceled(t('main.media.error.userCanceled'))
       }
 
-      // B1 修复：trashItem 失败且文件仍存在时，不删除 DB 记录，保留供用户重试。
-      // 仅当 trashItem 成功 或 文件已不存在（DB 踪迹已无对应实体）时才删除 DB。
-      const { idsToDelete, movedCount, missingCount, failedPaths } = await trashBatch(rows)
+      // B1 修复：文件删除失败且文件仍存在时，不删除 DB 记录，保留供用户重试。
+      // 仅当文件物理删除成功 或 文件已不存在（DB 踪迹已无对应实体）时才删除 DB。
+      const { idsToDelete, movedCount, missingCount, failedPaths } = await unlinkBatch(rows)
       await repo.hardDeleteBatch(idsToDelete)
+
+      // #fix-recyclebin-permanent-delete：阶段 4 清理已删除记录的缩略图缓存
+      // （与 media:permanentDelete 阶段 4 同构，best-effort 仅应用缓存目录内）——
+      // 修复前缺失此阶段，清空回收站后缩略图缓存文件残留为孤儿。
+      const deletedRows = rows.filter((r) => idsToDelete.includes(r.id))
+      await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir())
+
       ctx.notifyMediaUpdated()
       const msg =
         failedPaths.length > 0

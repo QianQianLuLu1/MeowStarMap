@@ -250,15 +250,17 @@ describe('file:delete / file:deletePermanent 删除白名单对齐（assertMedia
     expect(fileService.moveToRecycleBin).not.toHaveBeenCalled()
   })
 
-  it('D4 已入库媒体（敏感目录形态）经 file:deletePermanent 删除成功（二次确认后）', async () => {
+  it('D4 已入库媒体（敏感目录形态）经 file:deletePermanent 删除成功（不再弹原生确认）', async () => {
     isMediaPathAllowedMock.mockReturnValue(true)
-    vi.mocked(dialog.showMessageBox).mockResolvedValue({ response: 1 } as never)
+    // #fix-permanent-delete-error-toast：渲染端 ConfirmDialog 已承担二次确认，
+    // 主进程不得再弹原生对话框（修复前用户需重复确认，取消时还会误报错误）
     const steamPhoto =
       'C:\\Program Files (x86)\\Steam\\steamapps\\common\\InfinityNikki\\X6Game\\ScreenShot\\002.jpg'
 
     const res = (await getHandler('file:deletePermanent')({}, [steamPhoto])) as IpcResponseLike
     expect(res.success).toBe(true)
     expect(fileService.deletePermanent).toHaveBeenCalledWith([steamPhoto])
+    expect(dialog.showMessageBox).not.toHaveBeenCalled()
   })
 
   it('D5 file:copy 源路径不接入删除守卫（通道口径不变）', async () => {

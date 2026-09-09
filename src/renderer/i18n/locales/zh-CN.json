@@ -1620,6 +1620,7 @@
     "permanentConfirm": "将彻底删除选中的 {{count}} 项文件。\n文件会先移至系统回收站，之后无法从本应用恢复。\n确定要删除吗？",
     "permanentConfirmTitle": "彻底删除",
     "permanentDelete": "彻底删除",
+    "permanentDeleteSuccess": "已彻底删除 {{count}} 项",
     "permanentDeleteSelected": "彻底删除选中项",
     "permanentHint": "彻底删除后文件将移至系统回收站",
     "restore": "恢复",
@@ -2828,7 +2829,7 @@
         "confirmEmpty": "确认清空",
         "permanentDeleteTitle": "确认彻底删除",
         "permanentDeleteMessage": "即将彻底删除 {{count}} 项媒体，此操作不可恢复。",
-        "permanentDeleteDetail": "文件将被移至系统回收站，记录将从数据库永久清除。是否继续？",
+        "permanentDeleteDetail": "文件将被直接删除（不进入回收站），记录将从数据库永久清除。是否继续？",
         "emptyRecycleBinTitle": "确认清空回收站",
         "emptyRecycleBinMessage": "回收站中有 {{count}} 项媒体，清空后不可恢复。"
       },
@@ -2841,7 +2842,7 @@
         "softDeleted": "已将 {{count}} 项移至回收站",
         "restored": "已恢复 {{count}} 项",
         "permanentDeleted": "已彻底删除 {{count}} 项",
-        "permanentDeletePartial": "已彻底删除 {{deleted}} 项（{{failed}} 项移至回收站失败，已保留记录供手动处理）",
+        "permanentDeletePartial": "已彻底删除 {{deleted}} 项（{{failed}} 项删除失败，已保留记录供手动处理）",
         "recycleBinEmpty": "回收站为空，无需清理",
         "recycleBinEmptied": "已清空回收站（共 {{count}} 项）",
         "cleanedMissing": "已清理 {{count}} 条丢失记录",
@@ -2852,7 +2853,7 @@
         "sceneTimeAnalyzed": "已分析 {{count}} 张图片的场景时段"
       },
       "log": {
-        "recycleBinMoveFailed": "[RecycleBin] 移至系统回收站失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
+        "recycleBinMoveFailed": "[RecycleBin] 物理删除失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
         "recycleBinMoveOmitted": " …(另 {{count}} 项)"
       },
       "validation": {

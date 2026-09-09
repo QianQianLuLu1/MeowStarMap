@@ -1231,6 +1231,7 @@
     "permanentConfirm": "選択した {{count}} 件を完全に削除します。\nファイルはまずシステムのゴミ箱に移動され、その後このアプリから復元できなくなります。\n削除しますか？",
     "permanentConfirmTitle": "完全削除",
     "permanentDelete": "完全削除",
+    "permanentDeleteSuccess": "{{count}} 件を完全に削除しました",
     "permanentDeleteSelected": "選択項目を完全削除",
     "permanentHint": "完全削除後、ファイルはシステムのゴミ箱に移動します",
     "restore": "復元",

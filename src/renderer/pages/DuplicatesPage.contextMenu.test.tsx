@@ -44,6 +44,11 @@ vi.mock('../components/common/PropertiesDialog', () => ({ PropertiesDialog: () =
 vi.mock('../components/gallery/RenameDialog', () => ({ RenameDialog: () => null }))
 vi.mock('../components/common/TaskProgressOverlay', () => ({ TaskProgressOverlay: () => null }))
 vi.mock('../components/common/EmptyState', () => ({ EmptyState: () => null }))
+// #fix-permanent-delete-error-toast：捕获全局 Toast 调用，断言删除结果提示的类型与文案
+const showMessageMock = vi.hoisted(() => vi.fn())
+vi.mock('./settings/sections', () => ({
+  useGlobalToast: () => showMessageMock
+}))
 // 仅当 open 为真时渲染确认按钮，便于触发 onConfirm
 vi.mock('../components/common/ConfirmDialog', () => ({
   ConfirmDialog: ({ open, onConfirm }: { open: boolean; onConfirm: () => void }) =>
@@ -100,7 +105,9 @@ const electron = {
   mediaAction: {
     updateFavorite: vi.fn().mockResolvedValue({ success: true, is_favorite: true, message: '' }),
     softDelete: vi.fn().mockResolvedValue({ success: true, message: '' }),
-    deletePermanently: vi.fn().mockResolvedValue({ success: true, message: '' })
+    // #fix-permanent-delete-error-toast：修正方法名（真实 preload API 为 permanentDelete）
+    // 并使用真实契约 data：media:permanentDelete 返回 { message, deletedCount, failedCount }（无 success）
+    permanentDelete: vi.fn().mockResolvedValue({ message: '', deletedCount: 0, failedCount: 0 })
   },
   shell: { showItemInFolder: vi.fn().mockResolvedValue(undefined) },
   share: {
@@ -198,5 +205,56 @@ describe('重复文件板块右键菜单（复用图库实现）', () => {
     await waitFor(() => {
       expect(electron.mediaAction.softDelete).toHaveBeenCalledWith([1])
     })
+  })
+
+  // #fix-permanent-delete-error-toast：修复前渲染端误读 call() 契约（读不存在的 res.success），
+  // 删除成功也走 error 分支：Toast 类型恒为 error 且不刷新列表
+  it('点击「永久删除」经确认调用 mediaAction.permanentDelete 并提示成功、刷新列表', async () => {
+    electron.mediaAction.permanentDelete.mockResolvedValue({
+      message: '已彻底删除 1 项',
+      deletedCount: 1,
+      failedCount: 0
+    })
+    render(<DuplicatesPage />)
+    await waitFor(() => expect(firstCard()).toBeTruthy())
+    fireEvent.contextMenu(firstCard())
+    await waitFor(() => expect(screen.getByText('永久删除')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('永久删除'))
+
+    await waitFor(() => expect(screen.getByTestId('confirm-ok')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('confirm-ok'))
+
+    await waitFor(() => {
+      expect(electron.mediaAction.permanentDelete).toHaveBeenCalledWith([1])
+    })
+    await waitFor(() => {
+      expect(showMessageMock).toHaveBeenCalledWith('已彻底删除 1 项', 'success')
+    })
+    // 删除成功后应重新扫描刷新列表（修复前走 error 分支不刷新）
+    await waitFor(() => {
+      expect(electron.media.findDuplicates).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  it('点击「永久删除」部分失败时提示错误且不刷新', async () => {
+    electron.mediaAction.permanentDelete.mockResolvedValue({
+      message: '已彻底删除 0 项，1 项失败',
+      deletedCount: 0,
+      failedCount: 1
+    })
+    render(<DuplicatesPage />)
+    await waitFor(() => expect(firstCard()).toBeTruthy())
+    fireEvent.contextMenu(firstCard())
+    await waitFor(() => expect(screen.getByText('永久删除')).toBeInTheDocument())
+
+    fireEvent.click(screen.getByText('永久删除'))
+    await waitFor(() => expect(screen.getByTestId('confirm-ok')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('confirm-ok'))
+
+    await waitFor(() => {
+      expect(showMessageMock).toHaveBeenCalledWith('已彻底删除 0 项，1 项失败', 'error')
+    })
+    expect(electron.media.findDuplicates).toHaveBeenCalledTimes(1)
   })
 })

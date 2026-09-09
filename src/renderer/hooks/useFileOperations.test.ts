@@ -473,7 +473,9 @@ describe('useFileOperations', () => {
 
     it('永久删除成功后 deleteMediaFiles（不 pushHistory）', async () => {
       api.file.deletePermanent.mockResolvedValue({ success: true, message: '已永久删除' })
-      api.mediaAction.delete.mockResolvedValue({ success: true })
+      // #fix-permanent-delete-error-toast：media:delete 真实契约是 { deleted: true }（无 success 字段），
+      // 旧 mock { success: true } 掩盖了渲染端误读 call() 返回契约的 Bug（删除成功却弹 error Toast）
+      api.mediaAction.delete.mockResolvedValue({ deleted: true })
       const file = makeFile({ id: '10', file_path: '/src/img.jpg' })
       useMediaStore.setState({ mediaFiles: [file] })
       const { result } = renderHook(() =>
@@ -495,6 +497,51 @@ describe('useFileOperations', () => {
       expect(useMediaStore.getState().mediaFiles).toHaveLength(0)
       expect(useOperationHistoryStore.getState().stack).toHaveLength(0)
       expect(onShowMessage).toHaveBeenCalledWith('已永久删除', 'success')
+    })
+
+    it('永久删除失败（success:false）时透传错误且不 deleteMediaFiles', async () => {
+      api.file.deletePermanent.mockResolvedValue({ success: false, message: '权限被拒绝' })
+      const file = makeFile({ id: '11', file_path: '/src/img.jpg' })
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderHook(() =>
+        useFileOperations({
+          filteredFiles: [file],
+          onShowMessage,
+          onRefreshMedia
+        })
+      )
+      let config: { onConfirm: () => Promise<void> }
+      act(() => {
+        config = result.current.getDeleteConfirm(file, true)
+      })
+      await act(async () => {
+        await config!.onConfirm()
+      })
+      expect(api.mediaAction.delete).not.toHaveBeenCalled()
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(1)
+      expect(onShowMessage).toHaveBeenCalledWith(expect.stringContaining('权限被拒绝'), 'error')
+    })
+
+    it('永久删除时数据库删除抛 IpcError 仍显示错误（错误透传不被削弱）', async () => {
+      api.file.deletePermanent.mockResolvedValue({ success: true, message: '已永久删除' })
+      api.mediaAction.delete.mockRejectedValue(new Error('数据库被锁定'))
+      const file = makeFile({ id: '12', file_path: '/src/img.jpg' })
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderHook(() =>
+        useFileOperations({
+          filteredFiles: [file],
+          onShowMessage,
+          onRefreshMedia
+        })
+      )
+      let config: { onConfirm: () => Promise<void> }
+      act(() => {
+        config = result.current.getDeleteConfirm(file, true)
+      })
+      await act(async () => {
+        await config!.onConfirm()
+      })
+      expect(onShowMessage).toHaveBeenCalledWith(expect.stringContaining('数据库被锁定'), 'error')
     })
 
     it('onConfirm reject 时显示兜底错误', async () => {

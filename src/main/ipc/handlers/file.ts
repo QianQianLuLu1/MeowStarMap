@@ -1,11 +1,9 @@
-import { ipcMain, dialog } from 'electron'
+import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { ExifData } from '../../types/file'
 import { wrapHandler, schemas, assertFileReadPath, assertFileWritePath } from '../validator'
 import { assertMediaReadPath, assertMediaDeletePath } from '../media-read-guard'
-import { AppError } from '../../../shared/errors/app-error'
-import { t } from '../../i18n'
 
 /**
  * 文件操作域 IPC handler：删除 / 复制 / 永久删除 / EXIF
@@ -46,25 +44,15 @@ export function registerFileHandlers(ctx: HandlerContext): void {
     )
   )
 
-  // 永久删除（高危操作二次确认）
+  // 永久删除（高危操作；二次确认由渲染端 ConfirmDialog 承担）
+  // #fix-permanent-delete-error-toast：原实现在此处再弹一次原生 dialog 二次确认，
+  // 但渲染端调用方已在调用前经 ConfirmDialog 确认过——用户需重复确认，
+  // 且在原生弹窗取消时会向渲染端抛 canceled 误报「出错」Toast。主进程不再弹窗。
   ipcMain.handle(
     'file:deletePermanent',
     wrapHandler(ctx, z.tuple([schemas.filePathArrayBulk]), async ([filePaths]) => {
       // 删除通道三级校验：userPicked → 已入库媒体白名单 → PathGuard 兜底（与 file:delete 同口径）
       for (const p of filePaths) assertMediaDeletePath(ctx, p)
-      // A-S3：高危操作二次确认（永久删除文件不可恢复）
-      const confirmResult = await dialog.showMessageBox({
-        type: 'warning',
-        buttons: [t('main.media.dialog.cancel'), t('main.media.dialog.confirmDelete')],
-        defaultId: 0,
-        cancelId: 0,
-        title: t('main.file.dialog.permanentDeleteTitle'),
-        message: t('main.file.dialog.permanentDeleteMessage', { count: filePaths.length }),
-        detail: t('main.file.dialog.permanentDeleteDetail')
-      })
-      if (confirmResult.response !== 1) {
-        throw AppError.canceled(t('main.media.error.userCanceled'))
-      }
       return ctx.fileService.deletePermanent(filePaths)
     })
   )

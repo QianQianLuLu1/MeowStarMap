@@ -2344,12 +2344,20 @@ describe('MediaRepository', () => {
       expect(result.map((r) => r.file_path).sort()).toEqual(['/t/1.jpg', '/t/2.jpg'])
     })
 
-    it('getSoftDeletedMediaPaths 仅返回 is_deleted=1 的记录', () => {
+    it('getSoftDeletedMediaPaths 仅返回 is_deleted=1 的记录（含缩略图，供清空回收站后清理缓存）', () => {
       insertMedia(db, { file_path: '/t/1.jpg', is_deleted: 0 })
-      insertMedia(db, { file_path: '/t/2.jpg', is_deleted: 1 })
+      insertMedia(db, {
+        file_path: '/t/2.jpg',
+        is_deleted: 1,
+        thumbnail: 'C:\\cache\\thumbnails\\t2.jpg'
+      })
       insertMedia(db, { file_path: '/t/3.jpg', is_deleted: 1 })
       const result = repo.getSoftDeletedMediaPaths()
       expect(result).toHaveLength(2)
+      // #fix-recyclebin-permanent-delete：返回行必须携带 thumbnail，
+      // 供 media:emptyRecycleBin 删除 DB 记录后清理缩略图缓存
+      const row2 = result.find((r) => r.file_path === '/t/2.jpg')
+      expect(row2?.thumbnail).toBe('C:\\cache\\thumbnails\\t2.jpg')
     })
 
     it('getOutfitAggStats 按套装分组统计', () => {

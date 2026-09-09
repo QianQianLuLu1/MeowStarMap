@@ -1231,6 +1231,7 @@
     "permanentConfirm": "The selected {{count}} items will be permanently deleted.\nFiles will be moved to the system recycle bin first, after which they cannot be restored from this app.\nAre you sure you want to delete?",
     "permanentConfirmTitle": "Permanently delete",
     "permanentDelete": "Permanently delete",
+    "permanentDeleteSuccess": "Permanently deleted {{count}} item(s)",
     "permanentDeleteSelected": "Permanently delete selected",
     "permanentHint": "Files will be moved to system recycle bin after permanent deletion",
     "restore": "Restore",

@@ -1231,6 +1231,7 @@
     "permanentConfirm": "Les {{count}} éléments sélectionnés seront définitivement supprimés.\nLes fichiers seront d'abord déplacés vers la corbeille système, puis ne pourront plus être récupérés depuis cette application.\nVoulez-vous supprimer ?",
     "permanentConfirmTitle": "Suppression définitive",
     "permanentDelete": "Supprimer définitivement",
+    "permanentDeleteSuccess": "{{count}} élément(s) supprimé(s) définitivement",
     "permanentDeleteSelected": "Supprimer définitivement la sélection",
     "permanentHint": "Après suppression définitive, les fichiers seront déplacés vers la corbeille système",
     "restore": "Restaurer",
