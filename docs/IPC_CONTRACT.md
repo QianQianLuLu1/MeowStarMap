@@ -198,7 +198,8 @@ wrapHandler(ctx, schema, handler) =>
 **确认语义与行为（#fix-permanent-delete-error-toast / #fix-recyclebin-permanent-delete）**：
 
 - 二次确认由渲染端 ConfirmDialog 承担（调用方：回收站 `RecycleBinPage`、重复页 `DuplicatesPage`）。主进程**不再弹出原生 `dialog.showMessageBox`**，也不再抛 `IPC_CANCELED`。
-- 三阶段事务不变（软删标记 → 物理删除文件 → 硬删 DB）；阶段 4：对已删除记录的缩略图执行 best-effort 清理，**仅限应用缩略图缓存目录内**的文件（游戏原生 LQ 等外部路径不触碰），失败仅记录日志不影响返回值。
+- 三阶段事务不变（软删标记 → 物理删除文件 → 硬删 DB）；阶段 4：对已删除记录的缩略图执行 best-effort 清理，范围见下方 #fix-gallery-delete-thumbnail-cleanup 行为变更，失败仅记录日志不影响返回值。
+- **#fix-gallery-delete-thumbnail-cleanup 行为变更**：阶段 4 清理范围从「仅缓存目录内 thumbnail 列指向的单一文件」扩展为两类：① 缓存缩略图三档位（thumbnail 位于缓存目录内 → 引用文件 + `${hash}.jpg`/`${hash}_low.jpg`/`${hash}_high.jpg`）；② 游戏原生 LQ 文件（由 `file_path` 经 `resolveNativeThumbnailPath` 严格推导：须同时命中 `\X6Game\Saved\GamePlayPhotos\` 与 `\NikkiPhotos_HighQuality\` 目录段，thumbnail 列不作依据），并联动硬删该 LQ 的 DB 记录（LQ 文件本身也是入库媒体记录，避免悬空记录）。返回值结构不变。
 - **#fix-recyclebin-permanent-delete 行为变更**：阶段 2 原用 `shell.trashItem`（仅把文件移入系统回收站，磁盘不释放，且 Windows Shell 大批量下有实测瞬时失败），现改为 `fsp.unlink` 直接物理删除；三态判定（成功/missing/failed）与重试/熔断/聚合日志机制沿用 `_trash-utils.ts` 不变。
 - 渲染端按 preload `call()` 契约消费：成功收到 data，失败抛 `IpcError`；部分失败以 `failedCount > 0` 判定。
 
@@ -226,8 +227,19 @@ wrapHandler(ctx, schema, handler) =>
 
 - 主进程保留原生 `dialog.showMessageBox` 二次确认（A-S3 高危操作，不在本次 Bug 修复范围）；用户取消抛 `IPC_CANCELED`。
 - 文件处理：对每条软删除记录的 `file_path` 执行 `fsp.unlink` **物理删除**（原 `shell.trashItem` 仅移入系统回收站，磁盘不释放）；软删除记录经 `getSoftDeletedMediaPaths` 返回（含 `thumbnail` 列）。三态判定沿用 `_trash-utils.ts`：成功 / missing（仅删 DB）/ failed（文件仍存在，DB 保留供重试）。
-- 阶段 4（本次新增）：对已删除 DB 记录的缩略图执行 best-effort 清理，**仅限应用缩略图缓存目录内**的文件（游戏原生 LQ 等外部路径不触碰）。
+- 阶段 4（本次新增）：对已删除 DB 记录的缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 严格推导的原生 LQ 及其 DB 记录）。
 - 渲染端按 preload `call()` 契约消费：成功收到 data（不含 `success` 字段），失败抛 `IpcError`；`RecycleBinPage` 仅消费 `message` 与 `failedCount`。
+
+### 2.9 `media:delete`
+
+| 属性         | 值                                                 |
+| ------------ | -------------------------------------------------- |
+| 通道         | `media:delete`                                     |
+| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts` |
+| 参数         | `number`（单条媒体 id，`schemas.mediaId` 校验）    |
+| 返回类型     | `{ deleted: true }`                                |
+
+**行为（#fix-gallery-delete-thumbnail-cleanup）**：硬删单条 DB 记录（`hardDelete`）后，对其关联缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 由 `file_path` 严格推导的游戏原生 LQ 文件及其 DB 记录）。调用方：图库永久删除链路（`file:deletePermanent` 成功后调用，`useFileOperations.ts`）、详情页与全屏查看器的删除（源文件先移入系统回收站）。缩略图清理失败仅记录日志，不影响返回值。
 
 ## 3. 共享类型定义
 

@@ -4,7 +4,7 @@
  * 覆盖：物理删除记录 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
  * 彻底删除采用三阶段事务保证 DB 与文件系统一致，二次确认由渲染端 ConfirmDialog 承担；
  * 清空回收站仍含 dialog 二次确认。
- * 回收站批量操作工具（含缩略图清理）见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
+ * 回收站批量操作工具（含缩略图清理：缓存三档位 + 原生 LQ 及其 DB 记录）见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
  */
 import { ipcMain, dialog } from 'electron'
 import { z } from 'zod'
@@ -12,7 +12,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
-import { unlinkBatch, cleanupThumbnailsForRows } from './_trash-utils'
+import { unlinkBatch, cleanupThumbnailsForRows, makeNativeThumbRecordCleaner } from './_trash-utils'
 import { t } from '../../i18n'
 
 /**
@@ -35,9 +35,13 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     wrapHandler(ctx, z.tuple([schemas.mediaId]), async ([mediaId]) => {
       const repo = getRepo()
       // #fix-permanent-delete-error-toast：物理删除前先取缩略图路径，删除记录后清理缓存
+      // #fix-gallery-delete-thumbnail-cleanup：清理范围扩展为缓存三档位 + 严格推导的游戏原生 LQ
+      //（LQ 文件本身也是入库媒体记录，删除后同步硬删其 DB 记录，避免悬空记录）
       const rows = repo.getMediaPathsByIds([mediaId])
       await repo.hardDelete(mediaId)
-      await cleanupThumbnailsForRows(rows, ctx.thumbnailGen.getCacheDir())
+      await cleanupThumbnailsForRows(rows, ctx.thumbnailGen.getCacheDir(), {
+        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
+      })
       ctx.notifyMediaUpdated()
       return { deleted: true }
     })
@@ -93,9 +97,12 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       // 阶段3：事务中物理删除已成功处理的记录
       await repo.hardDeleteBatch(idsToDelete)
 
-      // 阶段4：清理已删除记录的缩略图缓存（best-effort，仅应用缓存目录内）
+      // 阶段 4：清理已删除记录的缩略图（best-effort；#fix-gallery-delete-thumbnail-cleanup：
+      // 缓存三档位 + 由 file_path 严格推导的游戏原生 LQ 文件及其 DB 记录）
       const deletedRows = rows.filter((r) => idsToDelete.includes(r.id))
-      await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir())
+      await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir(), {
+        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
+      })
 
       ctx.notifyMediaUpdated()
       const msg =
@@ -139,11 +146,15 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       const { idsToDelete, movedCount, missingCount, failedPaths } = await unlinkBatch(rows)
       await repo.hardDeleteBatch(idsToDelete)
 
-      // #fix-recyclebin-permanent-delete：阶段 4 清理已删除记录的缩略图缓存
-      // （与 media:permanentDelete 阶段 4 同构，best-effort 仅应用缓存目录内）——
+      // #fix-recyclebin-permanent-delete：阶段 4 清理已删除记录的缩略图
+      //（与 media:permanentDelete 阶段 4 同构，best-effort）——
       // 修复前缺失此阶段，清空回收站后缩略图缓存文件残留为孤儿。
+      // #fix-gallery-delete-thumbnail-cleanup：清理范围扩展为缓存三档位 +
+      // 由 file_path 严格推导的游戏原生 LQ 文件及其 DB 记录。
       const deletedRows = rows.filter((r) => idsToDelete.includes(r.id))
-      await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir())
+      await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir(), {
+        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
+      })
 
       ctx.notifyMediaUpdated()
       const msg =

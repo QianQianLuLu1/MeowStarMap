@@ -73,6 +73,8 @@ const {
       getMediaForSceneAnalysis: vi.fn().mockReturnValue([]),
       getMediaPathsByIds: vi.fn().mockReturnValue([]),
       getSoftDeletedMediaPaths: vi.fn().mockReturnValue([]),
+      // #fix-gallery-delete-thumbnail-cleanup：原生 LQ 记录联动硬删（按路径查 id）
+      getMediaIdByPath: vi.fn().mockReturnValue(undefined),
       listMedia: vi
         .fn()
         .mockReturnValue({ rows: [], total: 0, page: 1, pageSize: 50, hasMore: false }),
@@ -225,6 +227,7 @@ describe('registerMediaHandlers', () => {
     repoMock.getMediaForSceneAnalysis.mockReturnValue([])
     repoMock.getMediaPathsByIds.mockReturnValue([])
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([])
+    repoMock.getMediaIdByPath.mockReturnValue(undefined)
     repoMock.listMedia.mockReturnValue({
       rows: [],
       total: 0,
@@ -361,6 +364,36 @@ describe('registerMediaHandlers', () => {
     expect(unlinkMock).not.toHaveBeenCalled()
   })
 
+  // #fix-gallery-delete-thumbnail-cleanup 红灯 B1：永久删除 DB 记录后，除缓存缩略图外，
+  // 还必须清理由 file_path 严格推导的游戏原生 LQ 缩略图文件，并同步硬删该 LQ 的 DB 记录
+  //（LQ 文件本身也是入库媒体记录，scene_category='thumbnail'，只删文件会留悬空记录）。
+  it('media:delete 永久删除后清理原生 LQ 缩略图文件并硬删其 DB 记录', async () => {
+    const hq = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_HighQuality\\p.jpg'
+    const lq = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_LowQuality\\p.jpg'
+    repoMock.getMediaPathsByIds.mockReturnValue([{ id: 7, file_path: hq, thumbnail: lq }])
+    repoMock.getMediaIdByPath.mockReturnValue(99)
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:delete')([7])) as { success: boolean }
+    expect(result.success).toBe(true)
+    expect(unlinkMock).toHaveBeenCalledWith(lq)
+    expect(repoMock.getMediaIdByPath).toHaveBeenCalledWith(lq)
+    expect(repoMock.hardDelete).toHaveBeenCalledWith(99)
+  })
+
+  // #fix-gallery-delete-thumbnail-cleanup 红灯 B2：缓存缩略图三档位（引用文件 + _low + _high）一并清理
+  it('media:delete 永久删除后同时清理缓存缩略图 _low/_high 档位', async () => {
+    repoMock.getMediaPathsByIds.mockReturnValue([
+      { id: 8, file_path: 'C:\\media\\x.jpg', thumbnail: 'C:\\cache\\thumbnails\\t8.jpg' }
+    ])
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    await getHandler('media:delete')([8])
+    expect(unlinkMock).toHaveBeenCalledWith('C:\\cache\\thumbnails\\t8.jpg')
+    expect(unlinkMock).toHaveBeenCalledWith('C:\\cache\\thumbnails\\t8_low.jpg')
+    expect(unlinkMock).toHaveBeenCalledWith('C:\\cache\\thumbnails\\t8_high.jpg')
+  })
+
   it('media:softDelete 批量软删除并返回消息', async () => {
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:softDelete')([[1, 2, 3]])) as {
@@ -460,6 +493,25 @@ describe('registerMediaHandlers', () => {
     expect(unlinkMock).not.toHaveBeenCalledWith(
       'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\NikkiPhotos_LowQuality\\b.jpg'
     )
+  })
+
+  // #fix-gallery-delete-thumbnail-cleanup 红灯 B3：阶段 4 还须清理由 file_path 严格推导的
+  // 原生 LQ 缩略图文件并硬删其 DB 记录（本用例 file_path 命中 GPP+HQ 推导规则，
+  // 与上一用例的非 GPP file_path 形成策略边界对照）
+  it('media:permanentDelete 阶段 4 清理原生 LQ 文件并硬删其 DB 记录', async () => {
+    const hq = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_HighQuality\\p.jpg'
+    const lq = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_LowQuality\\p.jpg'
+    repoMock.getMediaPathsByIds.mockReturnValue([{ id: 1, file_path: hq, thumbnail: lq }])
+    repoMock.getMediaIdByPath.mockReturnValue(88)
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:permanentDelete')([[1]])) as {
+      success: boolean
+    }
+    expect(result.success).toBe(true)
+    expect(unlinkMock).toHaveBeenCalledWith(lq)
+    expect(repoMock.getMediaIdByPath).toHaveBeenCalledWith(lq)
+    expect(repoMock.hardDelete).toHaveBeenCalledWith(88)
   })
 
   it('media:permanentDelete 删除失败但文件不存在时仍硬删（计 missing）', async () => {
@@ -655,6 +707,23 @@ describe('registerMediaHandlers', () => {
     expect(unlinkMock).not.toHaveBeenCalledWith(
       'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\NikkiPhotos_LowQuality\\b.jpg'
     )
+  })
+
+  // #fix-gallery-delete-thumbnail-cleanup 红灯 B4：清空回收站阶段 4 同 permanentDelete，
+  // 须清理原生 LQ 文件并硬删其 DB 记录（file_path 命中 GPP+HQ 推导规则的行）
+  it('media:emptyRecycleBin 阶段 4 清理原生 LQ 文件并硬删其 DB 记录', async () => {
+    const hq = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_HighQuality\\p.jpg'
+    const lq = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_LowQuality\\p.jpg'
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: hq, thumbnail: lq }])
+    repoMock.getMediaIdByPath.mockReturnValue(66)
+    showMessageBoxMock.mockResolvedValue({ response: 1 })
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as { success: boolean }
+    expect(result.success).toBe(true)
+    expect(unlinkMock).toHaveBeenCalledWith(lq)
+    expect(repoMock.getMediaIdByPath).toHaveBeenCalledWith(lq)
+    expect(repoMock.hardDelete).toHaveBeenCalledWith(66)
   })
 
   // B1 修复回归：三态覆盖——成功 / 文件不存在 / 失败（文件仍存在）
