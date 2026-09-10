@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useUIStore, type SlideshowConfig } from '../../stores/uiStore'
 import { useMediaStore, toFileUrl, type MediaFile } from '../../stores/mediaStore'
 import { needsAnonymousCors } from '../../utils/file'
+import { getLastFullscreenSource, whenTransitionSettled } from '../../utils/view-transition'
 import { useToast } from '../../hooks/useToast'
 import { useFavoriteToggle } from '../../hooks/useFavoriteToggle'
 // DU3：幻灯片播放逻辑统一到 useSlideshow hook
@@ -101,11 +102,12 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     // 绝不因预解码失败把本可显示的图片判为加载失败
     const ready: Promise<unknown> =
       typeof probe.decode === 'function' ? probe.decode() : Promise.reject(new Error('no decode'))
-    void ready
-      .catch(() => undefined)
-      .then(() => {
-        if (!cancelled) setDisplayUrl(fileUrl)
-      })
+    // G2：换源条件为「decode 完成 且 当前过渡已结束」。冷加载的 4K 图若在
+    // ~220ms 共享元素动画窗口内完成解码并换源，解码+重绘会直接吃掉动画帧。
+    // 无活动过渡（降级路径）时 whenTransitionSettled() 立即 resolve，行为不变。
+    void Promise.all([ready.catch(() => undefined), whenTransitionSettled()]).then(() => {
+      if (!cancelled) setDisplayUrl(fileUrl)
+    })
     return () => {
       cancelled = true
     }
@@ -205,8 +207,16 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   // P3-1：关闭全屏时查找目标卡片 img，用于共享元素过渡（全屏图→缩略图缩小）
   const handleClose = useCallback(() => {
     if (currentFile) {
-      const targetImg = document.querySelector(`img[data-media-id="${currentFile.id}"]`)
-      useUIStore.setState({ fullscreenTargetImg: targetImg as HTMLElement | null })
+      // G3：优先复用打开路径登记的源元素（O(1)）。该决策发生在 closeFullscreen
+      // 触发旧快照拍摄的临界窗口之前，原先的全文档 `img[data-media-id=…]` 属性
+      // 选择器遍历（keep-alive 多页 + 虚拟网格，千级节点）是关闭动画起点的同步开销。
+      // 登记元素已被虚拟列表回收、或已翻页导致 id 不符时，回落原查询保证目标正确。
+      const cached = getLastFullscreenSource()
+      const targetImg =
+        cached?.dataset.mediaId === String(currentFile.id)
+          ? cached
+          : (document.querySelector(`img[data-media-id="${currentFile.id}"]`) as HTMLElement | null)
+      useUIStore.setState({ fullscreenTargetImg: targetImg })
     }
     closeFullscreen()
   }, [currentFile, closeFullscreen])
@@ -548,7 +558,9 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
             <IconChevronLeft size={24} />
           </button>
         )}
-        {fullscreenIndex < filteredFiles.length - 1 && (
+        {/* G6：显隐判据必须与 navigate 的边界一致——都以 activeFiles（当前生效列表）
+            为准。重复文件页等显式携带 files 的入口，filteredFiles 只是图库兜底列表 */}
+        {fullscreenIndex < activeFiles.length - 1 && (
           <button
             className="absolute right-4 top-1/2 -translate-y-1/2 icon-btn text-[var(--text-on-overlay)]"
             onClick={() => navigate(1)}

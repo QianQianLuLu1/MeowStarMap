@@ -18,6 +18,12 @@ import { FullscreenViewer } from './FullscreenViewer'
 import { useUIStore } from '../../stores/uiStore'
 import { useMediaStore, type MediaFile } from '../../stores/mediaStore'
 import { toFileUrl } from '../../utils/file'
+import {
+  setActiveTransition,
+  whenTransitionSettled,
+  markFullscreenSource,
+  releaseFullscreenSource
+} from '../../utils/view-transition'
 
 /** decode 行为开关：resolve / reject / pending（手动推进） */
 type DecodeMode = 'resolve' | 'reject' | 'pending'
@@ -235,5 +241,237 @@ describe('FullscreenViewer 首图策略（RC2：缩略图先行）', () => {
     // 原图也失败才进入错误态
     fireEvent.error(currentImg() as HTMLImageElement)
     expect(currentImg()).toBeNull()
+  })
+})
+
+describe('FullscreenViewer 换源时机（G2：避开过渡动画窗口）', () => {
+  afterEach(() => {
+    setActiveTransition(null)
+  })
+
+  it('核心：decode 已就绪但过渡未结束时不得提前换源', async () => {
+    let resolveFinished: (() => void) | null = null
+    setActiveTransition({
+      finished: new Promise<void>((resolve) => {
+        resolveFinished = resolve
+      })
+    })
+    decodeMode = 'pending'
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+    expect(currentImg()?.getAttribute('src')).toBe(thumbUrlA)
+
+    // 手动推进 decode resolve（decode 已就绪），过渡保持 pending：
+    // 旧实现此刻即换源（4K 解码/重绘落在动画窗口内）→ 本断言红灯
+    await act(async () => {
+      pendingResolvers[0]?.()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    expect(currentImg()?.getAttribute('src'), '过渡未结束前不得换源').toBe(thumbUrlA)
+
+    // 过渡结束后才允许换源
+    act(() => {
+      resolveFinished?.()
+    })
+    await waitFor(() => expect(currentImg()?.getAttribute('src')).toBe(fullUrlA))
+  })
+
+  it('异常：transition.finished 被拒绝时仍完成换源，且无未处理拒绝', async () => {
+    let rejectFinished: ((err: Error) => void) | null = null
+    setActiveTransition({
+      finished: new Promise<void>((_resolve, reject) => {
+        rejectFinished = reject
+      })
+    })
+    decodeMode = 'pending'
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+
+    await act(async () => {
+      pendingResolvers[0]?.()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    expect(currentImg()?.getAttribute('src'), '过渡未结束前不得换源').toBe(thumbUrlA)
+
+    await act(async () => {
+      rejectFinished?.(new Error('transition skipped'))
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    await waitFor(() => expect(currentImg()?.getAttribute('src')).toBe(fullUrlA))
+  })
+
+  it('边界：无 active transition 时行为与既有路径一致（decode 后即可换源）', async () => {
+    decodeMode = 'pending'
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+
+    await act(async () => {
+      pendingResolvers[0]?.()
+      for (let i = 0; i < 5; i++) await Promise.resolve()
+    })
+    await waitFor(() => expect(currentImg()?.getAttribute('src')).toBe(fullUrlA))
+    expect(whenTransitionSettled()).not.toBeNull()
+  })
+})
+
+describe('FullscreenViewer 关闭路径（G3：复用登记引用，零快照窗口查询）', () => {
+  /** 模拟图库网格中的卡片缩略图（FullscreenViewer 按该属性定位缩小目标） */
+  function makeCardImg(id: string): HTMLElement {
+    const img = document.createElement('img')
+    img.setAttribute('data-media-id', id)
+    document.body.appendChild(img)
+    return img
+  }
+
+  /**
+   * 注入可控的 View Transitions 桩：closeFullscreen 消费 fullscreenTargetImg 时
+   * 会给目标打上 view-transition-name 标记（finish 前可观测）。
+   * 注意 closeFullscreen 的 apply() 会把 fullscreenTargetImg 清成 null（读完即清），
+   * 因此「找到的目标是否正确」只能通过标记观测。
+   */
+  function installPendingFinishedStarter(): void {
+    const doc = document as unknown as {
+      startViewTransition?: (cb: () => void) => { finished: Promise<void> }
+    }
+    doc.startViewTransition = (cb: () => void) => {
+      cb()
+      return { finished: new Promise<void>(() => {}) }
+    }
+  }
+
+  afterEach(() => {
+    releaseFullscreenSource()
+    setActiveTransition(null)
+    const doc = document as unknown as { startViewTransition?: unknown }
+    delete doc.startViewTransition
+  })
+
+  it('核心：未翻页直接关闭时，不得发起 data-media-id 全文档查询', async () => {
+    // 打开路径已登记被点击卡片的 img（GalleryPage markFullscreenSource），
+    // 关闭应按引用复用；全文档属性选择器遍历发生在旧快照拍摄前的临界窗口内
+    const cardImg = makeCardImg('a')
+    markFullscreenSource(cardImg)
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+
+    const spy = vi.spyOn(document, 'querySelector')
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'Escape' })
+    })
+
+    expect(
+      spy.mock.calls.filter(([selector]) => String(selector).includes('data-media-id')),
+      '关闭应复用打开时登记的源元素，不得回退全文档属性选择器查询'
+    ).toEqual([])
+    spy.mockRestore()
+    expect(useUIStore.getState().fullscreenOpen).toBe(false)
+  })
+
+  it('正常：关闭时 closeFullscreen 消费的目标是登记的卡片 img', async () => {
+    const cardImg = makeCardImg('a')
+    markFullscreenSource(cardImg)
+    installPendingFinishedStarter()
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'Escape' })
+    })
+    expect(useUIStore.getState().fullscreenOpen).toBe(false)
+    expect(cardImg.style.viewTransitionName, '缩小目标应为登记的卡片 img').toBe('fullscreen-media')
+  })
+
+  it('边界：登记元素已脱离 DOM（虚拟列表回收）时回落查询且不抛错', async () => {
+    const stale = makeCardImg('a')
+    markFullscreenSource(stale)
+    stale.remove()
+    const fallback = makeCardImg('a')
+    installPendingFinishedStarter()
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'Escape' })
+    })
+    expect(fallback.style.viewTransitionName, '应回落查询到仍在文档中的卡片').toBe(
+      'fullscreen-media'
+    )
+  })
+
+  it('边界：翻页后关闭，缩小目标为当前文件的卡片 img 而非登记的旧卡片', async () => {
+    const cardA = makeCardImg('a')
+    const cardB = makeCardImg('b')
+    markFullscreenSource(cardA)
+    installPendingFinishedStarter()
+    render(<FullscreenViewer filteredFiles={[fileWithThumb, secondFileWithThumb]} />)
+    openFullscreen([fileWithThumb, secondFileWithThumb], 0)
+
+    act(() => {
+      useUIStore.setState({ fullscreenIndex: 1 })
+    })
+    await act(async () => {
+      fireEvent.keyDown(window, { key: 'Escape' })
+    })
+    expect(cardB.style.viewTransitionName, '应回落查询到当前文件 b 的卡片').toBe('fullscreen-media')
+    expect(cardA.style.viewTransitionName).toBe('')
+  })
+
+  it('异常：从未登记源元素时关闭不抛错且状态正确', async () => {
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb])
+
+    await expect(
+      act(async () => {
+        fireEvent.keyDown(window, { key: 'Escape' })
+      })
+    ).resolves.toBeUndefined()
+    expect(useUIStore.getState().fullscreenOpen).toBe(false)
+    expect(useUIStore.getState().fullscreenTargetImg).toBeNull()
+  })
+})
+
+describe('FullscreenViewer 导航按钮显隐（G6：以 activeFiles 为判据）', () => {
+  const tenFiles = Array.from({ length: 10 }, (_, i) =>
+    file(`g6-${i}`, `g6-${i}.jpg`, `C:\\cache\\g6-${i}_thumb.jpg`)
+  )
+  const threeFiles = tenFiles.slice(0, 3)
+
+  function navButtons(): { prev: number; next: number } {
+    const prev = document.querySelectorAll('button[class*="left-4"]').length
+    const next = document.querySelectorAll('button[class*="right-4"]').length
+    return { prev, next }
+  }
+
+  it('核心：重复文件页语义（fullscreenFiles 3 个、props 10 个）在末张时不得显示下一张', () => {
+    // 修复前按钮用 filteredFiles.length（10）判断：index=2 时 2 < 9 → 错误显示，
+    // 点击后 navigate 却以 activeFiles.length（3）拦截，出现「按钮在但无效」
+    render(<FullscreenViewer filteredFiles={tenFiles} />)
+    openFullscreen(threeFiles, 2)
+    expect(useUIStore.getState().fullscreenFiles).toBe(threeFiles)
+
+    expect(navButtons().prev, 'index=2 应显示上一张').toBe(1)
+    expect(navButtons().next, '已是 activeFiles 末张，下一张不得显示').toBe(0)
+  })
+
+  it('边界：同一 fixture 非末张时下一张仍应显示（防过度修正）', () => {
+    render(<FullscreenViewer filteredFiles={tenFiles} />)
+    openFullscreen(threeFiles, 1)
+    expect(navButtons().prev).toBe(1)
+    expect(navButtons().next).toBe(1)
+  })
+
+  it('边界：图库语义（fullscreenFiles 为 null）沿用 filteredFiles 判断', () => {
+    render(<FullscreenViewer filteredFiles={tenFiles} />)
+    openFullscreen(tenFiles, 9)
+    expect(useUIStore.getState().fullscreenFiles).toBe(tenFiles)
+    expect(navButtons().next, 'filteredFiles 即 activeFiles，末张不显示').toBe(0)
+  })
+
+  it('边界：仅 1 个文件时上一张与下一张均不显示', () => {
+    render(<FullscreenViewer filteredFiles={[fileWithThumb]} />)
+    openFullscreen([fileWithThumb], 0)
+    const buttons = navButtons()
+    expect(buttons.prev).toBe(0)
+    expect(buttons.next).toBe(0)
   })
 })

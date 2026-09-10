@@ -5,7 +5,9 @@ import { flushSync } from 'react-dom'
 import {
   canUseViewTransition,
   clearFullscreenSource,
-  markFullscreenSource
+  markFullscreenSource,
+  releaseFullscreenSource,
+  setActiveTransition
 } from '../utils/view-transition'
 // C-S2：从 shared 直接导入场景分类，不再经 mediaStore 中转，消除 uiStore ↔ mediaStore 循环依赖
 import type {
@@ -428,12 +430,16 @@ export const useUIStore = create<UIState>()(
         const startViewTransition = getViewTransitionStarter()
         if (startViewTransition) {
           try {
-            startViewTransition(apply)
+            const transition = startViewTransition(apply)
+            // G2：登记进行中的过渡，原图换源（FullscreenViewer）据此避开动画窗口
+            setActiveTransition(transition)
           } catch {
             // View Transitions 调用失败（不支持/抛错）降级为直接打开
+            setActiveTransition(null)
             apply()
           }
         } else {
+          setActiveTransition(null)
           apply()
         }
       },
@@ -458,16 +464,23 @@ export const useUIStore = create<UIState>()(
         if (startViewTransition) {
           try {
             const transition = startViewTransition(apply)
+            // G2：关闭同样产生过渡（反向共享元素），登记供换源约束使用
+            setActiveTransition(transition)
             // 过渡完成后清除残留的 view-transition-name（O(1)，仅按登记引用）
             transition.finished
               .finally(() => {
                 clearFullscreenSource()
+                // G3：关闭后组件已卸载，释放记忆的源元素引用与注册表，避免悬挂引用
+                releaseFullscreenSource()
+                setActiveTransition(null)
               })
               .catch(() => {})
           } catch {
+            setActiveTransition(null)
             apply()
           }
         } else {
+          setActiveTransition(null)
           apply()
         }
       },

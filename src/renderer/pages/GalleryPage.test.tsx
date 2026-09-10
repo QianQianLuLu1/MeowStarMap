@@ -378,3 +378,46 @@ describe('GalleryPage 图库空状态区分从未扫描/已扫描无截图（T4/
     expect(screen.getByTestId('empty-state-subtitle').textContent).not.toContain('已完成扫描')
   })
 })
+
+describe('GalleryPage 打开全屏的提交时序（G5：选中态重渲染移出过渡窗口）', () => {
+  // 单文件卡片点击分支：markFullscreenSource → selectMedia → openFullscreen。
+  // 切片从登记语句到 openFullscreen 调用结束，覆盖该分支的全部写操作
+  const markIdx = galleryPageSrc.indexOf('markFullscreenSource(')
+  const openCallIdx = galleryPageSrc.indexOf('openFullscreen(fileIndex)')
+  const clickBranch =
+    markIdx >= 0 && openCallIdx > markIdx
+      ? galleryPageSrc.slice(markIdx, openCallIdx + 'openFullscreen(fileIndex)'.length)
+      : ''
+
+  it('核心：selectMedia 的提交必须先于 openFullscreen 且被 flushSync 包裹', () => {
+    expect(clickBranch, '未找到单文件点击分支切片').not.toBe('')
+    // openFullscreen 内部用 flushSync 同步提交，若 selectMedia 的重渲染留在
+    // 常规调度里，会被这份 flushSync 一并拖进 View Transitions 的新快照窗口，
+    // 整屏网格重渲染与动画起点同帧 → 掉帧
+    expect(
+      clickBranch.includes('flushSync'),
+      'selectMedia 必须用 flushSync 提前提交到过渡启动之前'
+    ).toBe(true)
+    expect(
+      clickBranch.indexOf('selectMedia(id)'),
+      'selectMedia 应在 flushSync 之后、openFullscreen 之前出现'
+    ).toBeGreaterThan(clickBranch.indexOf('flushSync'))
+  })
+
+  it('边界：共享元素源登记不得被误删', () => {
+    expect(clickBranch, '未找到单文件点击分支切片').not.toBe('')
+    expect(
+      (clickBranch.match(/markFullscreenSource\(/g) ?? []).length,
+      'markFullscreenSource 恰好一次'
+    ).toBe(1)
+  })
+
+  it('边界：selectMedia 的全部调用点必须位于 openFullscreen 之前（不得先 open 再 select）', () => {
+    // 允许 flushSync 主路径 + catch 兜底的双写形态，但任何写入都不得晚于过渡启动
+    expect(clickBranch, '未找到单文件点击分支切片').not.toBe('')
+    const lastSelect = clickBranch.lastIndexOf('selectMedia(id)')
+    const openAt = clickBranch.indexOf('openFullscreen(fileIndex)')
+    expect(lastSelect).toBeGreaterThan(-1)
+    expect(lastSelect < openAt, '发现晚于 openFullscreen 的 selectMedia 写入').toBe(true)
+  })
+})

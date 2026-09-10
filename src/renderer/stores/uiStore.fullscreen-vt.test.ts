@@ -18,6 +18,7 @@ import { createElement } from 'react'
 import { render, cleanup, act } from '@testing-library/react'
 import { useUIStore } from './uiStore'
 import type { MediaFile } from './mediaStore'
+import { whenTransitionSettled } from '../utils/view-transition'
 
 /** vi.mock 工厂在模块求值阶段执行，需用 vi.hoisted 提前声明可变开关 */
 const control = vi.hoisted(() => ({
@@ -118,6 +119,61 @@ describe('openFullscreen：View Transitions 同步提交契约（RC1）', () => 
     })
     expect(useUIStore.getState().fullscreenFiles).toBe(files)
     expect(useUIStore.getState().fullscreenIndex).toBe(1)
+  })
+})
+
+describe('active transition 注册表（G2：换源须避开动画窗口）', () => {
+  it('openFullscreen 注册进行中的过渡，finished 落定后换源约束才解除', async () => {
+    let resolveFinished: (() => void) | null = null
+    installStarter((cb) => {
+      cb()
+      return {
+        finished: new Promise<void>((resolve) => {
+          resolveFinished = resolve
+        })
+      }
+    })
+
+    act(() => {
+      useUIStore.getState().openFullscreen(0, [makeFile('a.jpg')])
+    })
+    expect(useUIStore.getState().fullscreenOpen).toBe(true)
+
+    let settled = false
+    void whenTransitionSettled().then(() => {
+      settled = true
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(settled, '过渡未结束前不得视为已结束（否则换源落在动画窗口内）').toBe(false)
+
+    await act(async () => {
+      resolveFinished?.()
+      await Promise.resolve()
+    })
+    expect(settled).toBe(true)
+  })
+
+  it('closeFullscreen 后注册表清空（不悬挂已结束过渡的引用）', async () => {
+    // beforeEach 默认 starter 返回已 resolve 的 finished
+    act(() => {
+      useUIStore.getState().openFullscreen(0, [makeFile('a.jpg')])
+    })
+    act(() => {
+      useUIStore.getState().closeFullscreen()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    let settled = false
+    void whenTransitionSettled().then(() => {
+      settled = true
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(settled).toBe(true)
   })
 })
 

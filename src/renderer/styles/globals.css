@@ -773,13 +773,17 @@ body {
 }
 
 /* 图片卡片悬停效果 */
+/* G4：移除常驻 will-change（图层爆炸）——.media-card 被网格/列表/瀑布流/时间线
+   批量实例化，虚拟列表同屏数十至上百个，每个常驻 will-change 都是无条件合成层：
+   View Transitions 拍 root 快照须逐一光栅化全部层（过渡起点掉帧），且长期占用
+   GPU 显存。悬停仅做 transform 缩放，合成器会在其变化期间自动提层。
+   与下方毛玻璃卡片 / .page-enter 移除 will-change 的先例同一手法 */
 .media-card {
   position: relative;
   overflow: hidden;
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all 200ms ease-out;
-  will-change: transform;
 }
 
 .media-card:hover {
@@ -818,7 +822,8 @@ body {
   cursor: pointer;
   transition: all 200ms ease-out;
   position: relative;
-  will-change: background-color;
+  /* G4：will-change: background-color 是无效声明——background-color 不参与合成，
+     提层没有加速收益，只白白增加层与显存 */
 }
 
 .nav-item:hover {

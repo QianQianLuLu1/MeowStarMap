@@ -149,3 +149,49 @@ describe('view-transition：共享元素标记生命周期', () => {
     expect(() => clearFullscreenSource()).not.toThrow()
   })
 })
+
+describe('view-transition：系统动效偏好 prefers-reduced-motion（G1）', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('异常（核心）：系统开启 prefers-reduced-motion → 不使用 View Transitions', () => {
+    // 背景：::view-transition-* 伪元素不受 globals.css 的
+    // @media (prefers-reduced-motion: reduce) 规则约束（选择器不匹配伪元素），
+    // 系统级「显示动画关闭」必须在 JS 侧判定后直接不启动过渡
+    installStarter(() => ({ finished: Promise.resolve() }))
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
+    expect(canUseViewTransition()).toBe(false)
+  })
+
+  it('正常：系统未开启 prefers-reduced-motion → 不误伤正常用户', () => {
+    installStarter(() => ({ finished: Promise.resolve() }))
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: false }))
+    expect(canUseViewTransition()).toBe(true)
+  })
+
+  it('边界：matchMedia 不存在（SSR / node 环境）→ 回落其余判定且不抛错', () => {
+    installStarter(() => ({ finished: Promise.resolve() }))
+    vi.stubGlobal('matchMedia', undefined)
+    expect(() => canUseViewTransition()).not.toThrow()
+    expect(canUseViewTransition()).toBe(true)
+  })
+
+  it('边界：matchMedia 调用抛错 → 不外泄且不误伤', () => {
+    installStarter(() => ({ finished: Promise.resolve() }))
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => {
+        throw new Error('matchMedia boom')
+      })
+    )
+    expect(() => canUseViewTransition()).not.toThrow()
+    expect(canUseViewTransition()).toBe(true)
+  })
+
+  it('边界：doc 传 null 且系统动效减弱 → false 且不抛错', () => {
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({ matches: true }))
+    expect(() => canUseViewTransition(null)).not.toThrow()
+    expect(canUseViewTransition(null)).toBe(false)
+  })
+})

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { flushSync } from 'react-dom'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
 import { useUIStore } from '../stores/uiStore'
@@ -293,7 +294,15 @@ export const GalleryPage: React.FC = () => {
       } else {
         // P3-1：登记被点击卡片的 img 为共享元素过渡源（内部自带能力判定与旧引用清理）
         markFullscreenSource((e.currentTarget as HTMLElement).querySelector('img[data-media-id]'))
-        selectMedia(id)
+        // G5：选中态的 DOM 提交必须先于过渡启动完成——openFullscreen 内部的 flushSync
+        // 会把常规调度中待处理的整屏网格重渲染一并拖进 View Transitions 的
+        // 新快照窗口，与动画起点同帧导致掉帧。flushSync 在 React 渲染期等场景
+        // 会抛错，此时回落普通提交保证选中状态必然置位
+        try {
+          flushSync(() => selectMedia(id))
+        } catch {
+          selectMedia(id)
+        }
         openFullscreen(fileIndex)
       }
     },
