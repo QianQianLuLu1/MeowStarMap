@@ -9,6 +9,7 @@ import { generatePhashForUnprocessed } from '../../services/thumbnail-phash-serv
 import { MediaRepository } from '../../database/media-repository'
 import { logger } from '../../utils/logger'
 import { t } from '../../i18n'
+import { minOf } from '../../../shared/utils/extremum'
 
 /**
  * R7：相似检测前的 stale 检测节流间隔（5 分钟）。
@@ -206,13 +207,13 @@ export function registerSimilarHandlers(ctx: HandlerContext): void {
           )
           similarGroups.push(groupRows)
           totalFiles += groupRows.length
-          const minSize = Math.min(...groupRows.map((r) => r.file_size))
+          const minSize = minOf(groupRows, (r) => r.file_size)
           wastedBytes += minSize * (groupRows.length - 1)
         }
 
         similarGroups.sort((a, b) => {
-          const wa = Math.min(...a.map((r) => r.file_size)) * (a.length - 1)
-          const wb = Math.min(...b.map((r) => r.file_size)) * (b.length - 1)
+          const wa = minOf(a, (r) => r.file_size) * (a.length - 1)
+          const wb = minOf(b, (r) => r.file_size) * (b.length - 1)
           return wb - wa
         })
 

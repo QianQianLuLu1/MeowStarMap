@@ -250,4 +250,42 @@ describe('media:findSimilar（迁移到 media-worker 后）', () => {
     expect(result.data.message).toContain('boom')
     expect(result.data.totalGroups).toBe(0)
   })
+
+  it('超大单组（N=200000 行全部相连）不应触发 Maximum call stack size exceeded', async () => {
+    const N = 200_000
+    repoMock.getPhashCount.mockReturnValue(N)
+    pickBestIdMock.mockReturnValue(1)
+    const rows: SimilarRowMeta[] = []
+    for (let i = 1; i <= N; i++) {
+      rows.push({
+        id: i,
+        file_path: `/f${i}`,
+        file_name: `f${i}`,
+        file_type: 'image',
+        file_size: 100 + (i % 2),
+        modified_at: '2026-01-01',
+        width: 1,
+        height: 1,
+        is_favorite: 0,
+        rating: 0
+      })
+    }
+    // 链式相连：1-2-...-N 全部聚成单一超大组
+    const candidates: Array<{ a: number; b: number; dist: number }> = []
+    for (let i = 1; i < N; i++) candidates.push({ a: i, b: i + 1, dist: 3 })
+    mediaWorkerManagerMock.startSimilarFind.mockResolvedValue({
+      success: true,
+      message: 'ok',
+      cancelled: false,
+      rows,
+      candidates
+    })
+    registerSimilarHandlers(makeCtx())
+    const result = (await getHandler('media:findSimilar')([{ threshold: 5 }])) as {
+      success: boolean
+      data: ScanResult
+    }
+    expect(result.data.totalGroups).toBe(1)
+    expect(result.data.totalFiles).toBe(N)
+  })
 })

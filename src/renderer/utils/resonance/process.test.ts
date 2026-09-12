@@ -8,7 +8,7 @@ import {
   processPearpalData,
   type ProcessDeps
 } from './process'
-import type { Banner, PullRecord } from './types'
+import type { Banner, PearpalTrackerItem, PullRecord } from './types'
 
 /**
  * 合成卡池环境。算法约定：物品 id 末 4 位 + 前缀 1 推导套装 id，因此
@@ -244,6 +244,29 @@ describe('processPearpalData', () => {
       new Date()
     )
     expect(processed['99']).toBeUndefined()
+  })
+})
+
+describe('processPearpalData 超大列表', () => {
+  const deps = makeDeps()
+  it('超大单卡池（N=200000 条）不应触发 Maximum call stack size exceeded', () => {
+    const N = 200_000
+    const items: PearpalTrackerItem[] = []
+    for (let i = 0; i < N; i++) {
+      items.push({
+        card_pool_id: '2',
+        pool_cnt: i,
+        result: '1020100001',
+        times_from_last_five_stars: 0,
+        times_from_last_four_stars: 0,
+        rarity: '5'
+      })
+    }
+    const processed = processPearpalData({ 2: items }, deps, new Date('2025-06-01T12:00:00Z'))
+    const banner = processed['2']!
+    expect(banner).toBeDefined()
+    // totalPulls = max(pool_cnt) + 1 = (N - 1) + 1 = N
+    expect(banner.stats.totalPulls).toBe(N)
   })
 })
 

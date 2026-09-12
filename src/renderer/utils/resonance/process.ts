@@ -23,6 +23,7 @@ import type {
   PullRecord,
   ProcessDeps
 } from './types'
+import { maxOf } from '../../../shared/utils/extremum'
 
 // 供既有测试与调用方沿用原导入路径
 export type { ProcessDeps } from './types'
@@ -421,7 +422,7 @@ export function processPearpalData(
       }
     })
 
-    const totalPulls = Math.max(...items.map((item) => item.pool_cnt + 1))
+    const totalPulls = maxOf(items, (item) => item.pool_cnt + 1)
 
     const pulledItemIds = new Set(processedPulls.map((pull) => pull.itemId))
     const outfits: OutfitStatus[] = []

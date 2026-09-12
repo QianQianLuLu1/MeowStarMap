@@ -10,6 +10,8 @@
  * - 基础测试：见 src/renderer/pages/settings/ScanGameRootsSection.test.tsx。
  */
 
+import { maxOf } from '../../shared/utils/extremum'
+
 /** 用户自定义游戏目录（三级兜底持久化，支持多条） */
 export const CUSTOM_SCAN_PATHS_KEY = 'customScanPaths'
 /** 用户在「游戏目录」分区取消勾选的目录，扫描时作为 excludedPaths 传入 */
@@ -96,7 +98,7 @@ export function pickDefaultSelectedPaths(
   if (!Array.isArray(candidates) || candidates.length === 0) return new Set<string>()
   const withAlbum = candidates.filter((c) => c.hasGamePlayPhotos)
   const pool = withAlbum.length > 0 ? withAlbum : candidates
-  const max = Math.max(...pool.map((c) => c.mtimeMs))
+  const max = maxOf(pool, (c) => c.mtimeMs)
   // 全部 mtime 为 0（读取失败/不可 stat）时无法区分新旧，全部勾选
   const selected = max === 0 ? pool : pool.filter((c) => c.mtimeMs === max)
   return new Set(selected.map((c) => c.path))
