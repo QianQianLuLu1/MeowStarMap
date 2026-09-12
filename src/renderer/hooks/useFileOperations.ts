@@ -112,11 +112,9 @@ export function useFileOperations(options: UseFileOperationsOptions) {
           return { success: false, message: t('toast.undoUnsupported') }
         const { originalFavorite } = payload as { originalFavorite: boolean }
         try {
-          const undoResult = await window.electronAPI.mediaAction.updateFavorite(
-            Number(mediaId),
-            originalFavorite
-          )
-          if (!undoResult.success) return { success: false, message: undoResult.message }
+          // preload call() 解包 IpcResponse 为 data（{ updated: true }），失败抛 IpcError。
+          // 复用与 useFavoriteToggle 一致的契约，不再误判恒为 undefined 的 undoResult.success。
+          await window.electronAPI.mediaAction.updateFavorite(Number(mediaId), originalFavorite)
           updateMediaFile(mediaId, { is_favorite: originalFavorite })
           return { success: true }
         } catch (err) {

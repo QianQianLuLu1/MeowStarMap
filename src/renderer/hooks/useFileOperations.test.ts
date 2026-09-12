@@ -813,6 +813,75 @@ describe('useFileOperations', () => {
       expect(undoResult.success).toBe(true)
       expect(api.mediaAction.updateFavorite).toHaveBeenCalledWith(14, true)
     })
+
+    // 回归：preload call() 真实解包响应为 { updated: true }（无 success 字段）。
+    // 修复前 favorite_toggle 撤销 handler 误判 undoResult.success 恒 undefined → 撤销恒报失败且跳过 store 回写。
+    // 修复后应视为成功：undoResult.success=true 且 updateMediaFile 被调用。
+    it('favorite_toggle handler 用真实响应 { updated: true } 撤销成功（回归）', async () => {
+      api.mediaAction.updateFavorite.mockResolvedValue({ updated: true })
+      const updateMediaFileSpy = vi.spyOn(useMediaStore.getState(), 'updateMediaFile')
+      const file = makeFile({ id: '15', is_favorite: false })
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderHook(() =>
+        useFileOperations({
+          filteredFiles: [file],
+          onShowMessage,
+          onRefreshMedia
+        })
+      )
+      useOperationHistoryStore.setState({
+        stack: [
+          {
+            localId: '1',
+            type: 'favorite_toggle',
+            description: 'test',
+            payload: { originalFavorite: true },
+            mediaId: '15',
+            createdAt: Date.now()
+          }
+        ]
+      })
+      act(() => {
+        result.current.handleOpen(file)
+      })
+      const undoResult = await useOperationHistoryStore.getState().undo()
+      expect(undoResult.success).toBe(true)
+      expect(api.mediaAction.updateFavorite).toHaveBeenCalledWith(15, true)
+      expect(updateMediaFileSpy).toHaveBeenCalledWith('15', { is_favorite: true })
+      updateMediaFileSpy.mockRestore()
+    })
+
+    // 异常路径：updateFavorite reject 时撤销失败并返回错误信息
+    it('favorite_toggle handler 在 updateFavorite reject 时撤销失败', async () => {
+      api.mediaAction.updateFavorite.mockRejectedValue(new Error('db error'))
+      const file = makeFile({ id: '16' })
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderHook(() =>
+        useFileOperations({
+          filteredFiles: [file],
+          onShowMessage,
+          onRefreshMedia
+        })
+      )
+      useOperationHistoryStore.setState({
+        stack: [
+          {
+            localId: '1',
+            type: 'favorite_toggle',
+            description: 'test',
+            payload: { originalFavorite: false },
+            mediaId: '16',
+            createdAt: Date.now()
+          }
+        ]
+      })
+      act(() => {
+        result.current.handleOpen(file)
+      })
+      const undoResult = await useOperationHistoryStore.getState().undo()
+      expect(undoResult.success).toBe(false)
+      expect(undoResult.message).toContain('db error')
+    })
   })
 
   describe('返回值结构', () => {

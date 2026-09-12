@@ -112,11 +112,27 @@ describe('useFavoriteToggle', () => {
       expect(pushHistorySpy.mock.calls[0][0].description as string).toContain('收藏')
       expect(pushHistorySpy.mock.calls[0][0].description as string).toContain('photo.jpg')
     })
+
+    // 回归：preload call() 真实解包响应为 { updated: true }（无 success 字段）。
+    // 修复前 useFavoriteToggle 误判 result.success 恒 undefined → 抛 "undefined" 并弹红 Toast。
+    // 修复后应视为成功：不弹错误 Toast 且 pushHistory 正常。
+    it('preload 真实响应 { updated: true } 时不弹错误 Toast（回归）', async () => {
+      updateFavorite.mockResolvedValue({ updated: true })
+      const onShowMessage = vi.fn()
+      const { result } = renderHook(() => useFavoriteToggle(onShowMessage))
+      const file = makeFile({ is_favorite: false })
+      await act(async () => {
+        await result.current(file)
+      })
+      expect(updateFavorite).toHaveBeenCalledWith(1, true)
+      expect(onShowMessage).not.toHaveBeenCalled()
+      expect(pushHistorySpy).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('真实环境 - 失败路径', () => {
-    it('result.success=false 时回滚并触发 onShowMessage', async () => {
-      updateFavorite.mockResolvedValue({ success: false, message: '数据库写入失败' })
+    it('updateFavorite reject(IpcError) 时回滚并触发 onShowMessage', async () => {
+      updateFavorite.mockRejectedValue(new Error('数据库写入失败'))
       const onShowMessage = vi.fn()
       const { result } = renderHook(() => useFavoriteToggle(onShowMessage))
       const file = makeFile({ is_favorite: false })

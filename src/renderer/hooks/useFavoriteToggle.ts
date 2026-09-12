@@ -27,8 +27,9 @@ export function useFavoriteToggle(onShowMessage?: ShowMessage) {
       const next = !file.is_favorite
       updateMediaFile(file.id, { is_favorite: next })
       try {
-        const result = await window.electronAPI.mediaAction.updateFavorite(Number(file.id), next)
-        if (!result.success) throw new Error(result.message)
+        // preload call() 已解包 IpcResponse 为 data（{ updated: true }）并把失败改为抛 IpcError，
+        // 此处不应再读取不存在的 result.success/result.message。
+        await window.electronAPI.mediaAction.updateFavorite(Number(file.id), next)
         pushHistory({
           type: 'favorite_toggle',
           description: next
