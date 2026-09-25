@@ -5,9 +5,26 @@
  * @dependencies mock: electron (app/dialog/shell)、startup-diagnostic、logger
  * @remarks 每个用例 vi.resetModules + 动态 import，确保 reportEarlyFatal 的模块级去重/退出守卫回到初值
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
+
+// 模拟 startup-diagnostic 的真实落盘行为：logStartupError 写入 getStartupLogPathValue() 指向的文件
+const { getDiagTmpDir, setDiagTmpDir, getDiagWriteOk, setDiagWriteOk } = vi.hoisted(() => {
+  let dir = ''
+  let writeOk = true
+  return {
+    getDiagTmpDir: () => dir,
+    setDiagTmpDir: (v: string) => {
+      dir = v
+    },
+    getDiagWriteOk: () => writeOk,
+    setDiagWriteOk: (v: boolean) => {
+      writeOk = v
+    }
+  }
+})
 
 vi.mock('electron', () => ({
   app: {
@@ -24,17 +41,37 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('./startup-diagnostic', () => ({
-  logStartupError: vi.fn(),
-  diagLog: vi.fn()
+  logStartupError: vi.fn((stage: string, err: unknown) => {
+    if (!getDiagWriteOk()) return
+    try {
+      fs.appendFileSync(
+        path.join(getDiagTmpDir(), 'startup-errors.log'),
+        `[${stage}] ${String(err)}\n`
+      )
+    } catch {
+      /* 模拟落盘失败 */
+    }
+  }),
+  diagLog: vi.fn(),
+  getStartupLogPathValue: vi.fn(() => path.join(getDiagTmpDir(), 'startup-errors.log'))
 }))
 
 vi.mock('./logger', () => ({
   logFaultSync: vi.fn(() => 'mock-fault-id')
 }))
 
+let tmpDiag = ''
+
 beforeEach(() => {
   vi.resetModules()
   vi.clearAllMocks()
+  tmpDiag = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-ecg-diag-'))
+  setDiagTmpDir(tmpDiag)
+  setDiagWriteOk(true)
+})
+
+afterEach(() => {
+  fs.rmSync(tmpDiag, { recursive: true, force: true })
 })
 
 describe('getUserFacingDiagDir', () => {
@@ -151,5 +188,75 @@ describe('reportEarlyFatal', () => {
     reportEarlyFatal(new Error('second'), { deps })
     expect(showErrorBox).toHaveBeenCalledTimes(1)
     expect(exitApp).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('reportEarlyFatal 诊断日志可定位（回归：弹窗路径下必须能找到日志）', () => {
+  it('不注入 getDiagDir 时弹窗展示路径 === 真实落盘路径，且文件存在', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    reportEarlyFatal(new Error('boom'), { deps: { showErrorBox } })
+
+    const expected = path.join(tmpDiag, 'startup-errors.log')
+    const content = showErrorBox.mock.calls[0][1] as string
+    expect(content).toContain(expected)
+    expect(fs.existsSync(expected)).toBe(true)
+  })
+
+  it('落盘校验失败时改展示 tmpdir 应急日志，且该文件存在', async () => {
+    setDiagWriteOk(false)
+    const emergency = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
+    try {
+      fs.rmSync(emergency, { force: true })
+    } catch {
+      /* 首次运行文件不存在 */
+    }
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    reportEarlyFatal(new Error('boom-no-write'), { deps: { showErrorBox } })
+
+    const content = showErrorBox.mock.calls[0][1] as string
+    expect(content).toContain(emergency)
+    expect(fs.existsSync(emergency)).toBe(true)
+  })
+})
+
+describe('reportEarlyFatal 子进程 spawn 类错误分级', () => {
+  function makeSpawnError(): Error {
+    return Object.assign(new Error('spawn EFTYPE'), {
+      code: 'EFTYPE',
+      syscall: 'spawn EFTYPE',
+      path: 'tar.exe',
+      spawnargs: ['-c', '--format=zip']
+    })
+  }
+
+  it('已开窗口时降级为非致命：只弹「程序出错」，不释放锁不退出', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    const exitApp = vi.fn()
+    const releaseLock = vi.fn()
+
+    reportEarlyFatal(makeSpawnError(), {
+      deps: { showErrorBox, exitApp, releaseLock, hasMainWindow: () => true }
+    })
+
+    expect(showErrorBox).toHaveBeenCalledTimes(1)
+    expect(String(showErrorBox.mock.calls[0][0])).toContain('程序出错')
+    expect(releaseLock).not.toHaveBeenCalled()
+    expect(exitApp).not.toHaveBeenCalled()
+  })
+
+  it('未开窗口（启动期）时仍按致命处理：弹「启动失败」并退出', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    const exitApp = vi.fn()
+
+    reportEarlyFatal(makeSpawnError(), {
+      deps: { showErrorBox, exitApp, hasMainWindow: () => false }
+    })
+
+    expect(String(showErrorBox.mock.calls[0][0])).toContain('启动失败')
+    expect(exitApp).toHaveBeenCalledWith(1)
   })
 })

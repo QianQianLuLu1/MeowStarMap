@@ -3870,6 +3870,17 @@
       "log": {
         "exported": "共鳴錄資料已匯出（{{count}} 條記錄）"
       }
+    },
+    "zip": {
+      "error": {
+        "sourceMissing": "",
+        "targetMissing": "",
+        "targetParentMissing": "",
+        "timeout": "",
+        "writeFailed": "",
+        "emptyArchive": "",
+        "targetNotGenerated": ""
+      }
     }
   },
   "appError": {

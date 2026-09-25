@@ -8,8 +8,9 @@ import os from 'os'
  * @module src/main/services/log-service
  * @coverage listFaults / listFaultsPaged / invalidateFaultsCache / getFaultDetail /
  *           openLogDirectory / exportLogsAsZip / clearAllLogs / getLogStats
- * @dependencies electron.shell, logger(getLogDirectory + FaultRecord), crash-service, process-registry, child_process.spawn
- * @remarks 使用真实 fs + 临时日志目录；Mock electron.shell + spawn
+ * @dependencies electron.shell, logger(getLogDirectory + FaultRecord), crash-service, startup-diagnostic, utils/zip-archive
+ * @remarks 使用真实 fs + 临时日志目录；Mock electron.shell + startup-diagnostic。
+ *          导出用例断言真实 zip 产物（不再 mock 子进程）
  */
 
 // ============================================================
@@ -32,7 +33,8 @@ vi.mock('electron', () => ({
   },
   app: {
     getVersion: vi.fn(() => '1.0.0-test'),
-    getName: vi.fn(() => 'wxnn-test')
+    getName: vi.fn(() => 'wxnn-test'),
+    getPath: vi.fn((name: string) => `/mock/${name}`)
   }
 }))
 
@@ -41,43 +43,11 @@ vi.mock('./crash-service', () => ({
   getCrashDirectory: vi.fn(() => '')
 }))
 
-// process-registry mock（trackProcess 直接返回传入的 child）
-vi.mock('../utils/process-registry', () => ({
-  trackProcess: vi.fn((child: unknown) => child),
-  untrackFfmpegCommand: vi.fn()
-}))
-
-// child_process.spawn mock：构造一个伪 EventEmitter
-const mockSpawnChild = () => {
-  const handlers: Record<string, (...args: unknown[]) => void> = {}
-  return {
-    stderr: { on: (ev: string, cb: (...a: unknown[]) => void) => (handlers[`stderr_${ev}`] = cb) },
-    stdout: { on: (ev: string, cb: (...a: unknown[]) => void) => (handlers[`stdout_${ev}`] = cb) },
-    on: (ev: string, cb: (...a: unknown[]) => void) => (handlers[ev] = cb),
-    _handlers: handlers,
-    _emitStderr: function (data: string) {
-      this._handlers.stderr_data?.(data)
-    },
-    _emitStdout: function (data: string) {
-      this._handlers.stdout_data?.(data)
-    },
-    _emitError: function (err: Error) {
-      this._handlers.error?.(err)
-    },
-    _emitClose: function (code: number) {
-      this._handlers.close?.(code)
-    }
-  }
-}
-
-let lastSpawnArgs: unknown[] | null = null
-let lastSpawnChild: ReturnType<typeof mockSpawnChild> | null = null
-vi.mock('child_process', () => ({
-  spawn: vi.fn((...args: unknown[]) => {
-    lastSpawnArgs = args
-    lastSpawnChild = mockSpawnChild()
-    return lastSpawnChild
-  })
+// startup-diagnostic mock：导出时会复制启动日志，须指向临时目录避免污染真实用户目录
+let mockStartupLogPath = ''
+vi.mock('../utils/startup-diagnostic', () => ({
+  getStartupLogPathValue: vi.fn(() => mockStartupLogPath),
+  logStartupError: vi.fn()
 }))
 
 // ============================================================
@@ -94,7 +64,7 @@ import {
   getLogStats
 } from './log-service'
 import { shell } from 'electron'
-import { spawn } from 'child_process'
+import { getStartupLogPathValue } from '../utils/startup-diagnostic'
 
 // ============================================================
 // Helpers
@@ -141,21 +111,13 @@ function makeFault(id: string, timestamp: string): FaultJson {
 
 let tmpRoot: string
 
-// 等待 spawn 被调用并返回 child mock 对象
-// 源码 exportLogsAsZip 在调用 spawn 之前有大量 fs.promises 异步操作，
-// 单次 setImmediate 等待不足以让 spawn 被调用，所以使用 vi.waitFor 轮询
-async function waitForSpawn(): Promise<ReturnType<typeof mockSpawnChild>> {
-  await vi.waitFor(() => {
-    expect(spawn).toHaveBeenCalled()
-  })
-  return lastSpawnChild!
-}
-
 beforeEach(() => {
   vi.clearAllMocks()
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-log-'))
   mockLogDir = path.join(tmpRoot, 'logs')
   fs.mkdirSync(mockLogDir, { recursive: true })
+  mockStartupLogPath = path.join(tmpRoot, 'startup-errors.log')
+  fs.writeFileSync(mockStartupLogPath, '[STAGE: boot] simulated startup failure', 'utf-8')
   // 每个测试前失效缓存
   invalidateFaultsCache()
 })
@@ -420,94 +382,72 @@ describe('exportLogsAsZip', () => {
     const r = await exportLogsAsZip(path.join(tmpRoot, 'output.txt'))
     expect(r.success).toBe(false)
     expect(r.message).toContain('必须是 .zip 文件')
-    expect(spawn).not.toHaveBeenCalled()
   })
 
-  it('大写 .ZIP 扩展名也接受', async () => {
+  it('正常：进程内打包生成非空 zip（不再依赖 tar.exe）', async () => {
+    fs.writeFileSync(path.join(mockLogDir, 'app.log'), 'log-line', 'utf-8')
+    writeFaultsFile('faults-2026-07-19.jsonl', [makeFault('a', '2026-07-19T10:00:00Z')])
+    const target = path.join(tmpRoot, 'out.zip')
+
+    const r = await exportLogsAsZip(target)
+
+    expect(r.success).toBe(true)
+    expect(r.message).toContain('诊断包已导出')
+    expect(fs.existsSync(target)).toBe(true)
+    expect(fs.statSync(target).size).toBeGreaterThan(0)
+    // zip 魔数 PK
+    expect(fs.readFileSync(target).subarray(0, 2).toString('latin1')).toBe('PK')
+  })
+
+  it('正常：大写 .ZIP 扩展名也接受', async () => {
     const target = path.join(tmpRoot, 'out.ZIP')
-    // 预先生成输出文件，让 close(code=0) 后 stat 校验通过
-    fs.writeFileSync(target, Buffer.from('fake-zip-content'))
 
-    const promise = exportLogsAsZip(target)
-    // 源码在 spawn 之前有大量 fs.promises 异步操作，需轮询等待 spawn 被调用
-    const child = await waitForSpawn()
-    child._emitClose(0)
+    const r = await exportLogsAsZip(target)
 
-    const r = await promise
     expect(r.success).toBe(true)
-    expect(r.message).toContain('诊断包已导出')
+    expect(fs.statSync(target).size).toBeGreaterThan(0)
   })
 
-  it('tar.exe 成功（code=0）+ 输出文件非空时返回 success=true', async () => {
-    const target = path.join(tmpRoot, 'out.zip')
-    // 预先生成输出文件
-    fs.writeFileSync(target, Buffer.from('fake-zip-content'))
+  it('正常：启动日志从 getStartupLogPathValue() 复制（路径单一真相源）', async () => {
+    const r = await exportLogsAsZip(path.join(tmpRoot, 'out.zip'))
 
-    const promise = exportLogsAsZip(target)
-    const child = await waitForSpawn()
-    child._emitClose(0)
-
-    const r = await promise
     expect(r.success).toBe(true)
-    expect(r.message).toContain('诊断包已导出')
+    expect(getStartupLogPathValue).toHaveBeenCalled()
   })
 
-  it('tar.exe 成功但输出文件为空时返回 success=false', async () => {
-    const target = path.join(tmpRoot, 'out.zip')
-    // 不创建输出文件，让 fs.promises.stat 抛 ENOENT 触发"目标文件未生成"分支
-
-    const promise = exportLogsAsZip(target)
-    const child = await waitForSpawn()
-    child._emitClose(0)
-
-    const r = await promise
+  it('异常：目标父目录不存在时返回 success=false', async () => {
+    const r = await exportLogsAsZip(path.join(tmpRoot, 'missing-dir', 'out.zip'))
     expect(r.success).toBe(false)
-    expect(r.message).toContain('目标文件未生成')
+    expect(r.message.length).toBeGreaterThan(0)
   })
 
-  it('tar.exe 退出码非 0 时返回 success=false 与 stderr', async () => {
-    const target = path.join(tmpRoot, 'out.zip')
-    fs.writeFileSync(target, Buffer.from('x'))
+  it('边界：日志目录为空时仍导出成功（含 manifest/system-info）', async () => {
+    const target = path.join(tmpRoot, 'empty.zip')
 
-    const promise = exportLogsAsZip(target)
-    const child = await waitForSpawn()
-    child._emitStderr('tar: error occurred')
-    child._emitClose(2)
+    const r = await exportLogsAsZip(target)
 
-    const r = await promise
-    expect(r.success).toBe(false)
-    expect(r.message).toContain('退出码 2')
-    expect(r.message).toContain('tar: error occurred')
+    expect(r.success).toBe(true)
+    expect(fs.statSync(target).size).toBeGreaterThan(0)
   })
 
-  it('tar.exe 启动失败（error 事件）时返回 success=false', async () => {
-    const target = path.join(tmpRoot, 'out.zip')
+  it('边界：启动日志文件不存在时导出仍成功', async () => {
+    fs.rmSync(mockStartupLogPath, { force: true })
+    const target = path.join(tmpRoot, 'no-startup-log.zip')
 
-    const promise = exportLogsAsZip(target)
-    const child = await waitForSpawn()
-    child._emitError(new Error('spawn ENOENT'))
+    const r = await exportLogsAsZip(target)
 
-    const r = await promise
-    expect(r.success).toBe(false)
-    expect(r.message).toContain('启动 tar.exe 失败')
-    expect(r.message).toContain('spawn ENOENT')
+    expect(r.success).toBe(true)
   })
 
-  it('调用 spawn 时使用 tar.exe 命令与 zip 格式', async () => {
-    const target = path.join(tmpRoot, 'out.zip')
-    fs.writeFileSync(target, Buffer.from('x'))
+  it('边界：日志复制失败时仍导出成功（含 manifest/system-info）', async () => {
+    const copySpy = vi.spyOn(fs.promises, 'copyFile').mockRejectedValue(new Error('copy denied'))
+    const target = path.join(tmpRoot, 'partial.zip')
 
-    const promise = exportLogsAsZip(target)
-    const child = await waitForSpawn()
-    child._emitClose(0)
-    await promise
+    const r = await exportLogsAsZip(target)
 
-    expect(spawn).toHaveBeenCalled()
-    expect(lastSpawnArgs![0]).toBe('tar.exe')
-    expect(lastSpawnArgs![1]).toContain('-c')
-    expect(lastSpawnArgs![1]).toContain('--format=zip')
-    expect(lastSpawnArgs![1]).toContain('-f')
-    expect(lastSpawnArgs![1]).toContain(target)
+    copySpy.mockRestore()
+    expect(r.success).toBe(true)
+    expect(fs.statSync(target).size).toBeGreaterThan(0)
   })
 })
 

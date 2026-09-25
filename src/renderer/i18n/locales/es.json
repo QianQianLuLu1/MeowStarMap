@@ -3870,6 +3870,17 @@
       "log": {
         "exported": "Datos de resonancia exportados ({{count}} registros)"
       }
+    },
+    "zip": {
+      "error": {
+        "sourceMissing": "",
+        "targetMissing": "",
+        "targetParentMissing": "",
+        "timeout": "",
+        "writeFailed": "",
+        "emptyArchive": "",
+        "targetNotGenerated": ""
+      }
     }
   },
   "appError": {

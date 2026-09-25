@@ -19,6 +19,21 @@ export interface UserDiagDirDeps {
   getTmpdir?: () => string
 }
 
+/**
+ * 全局「文档」目录提供器。
+ *
+ * 本模块是零依赖叶子模块（不 import electron），但诊断目录必须统一到
+ * 「文档/NikkiGallery/Diagnostics」：早期实现中只有弹窗侧注入了 documents，
+ * 写盘侧未注入 → 弹窗指向 Documents、日志实际落在 homedir，用户找不到日志。
+ * 由主进程入口（src/main/index.ts）注册 app.getPath('documents')，
+ * 使所有调用方（含 startup-diagnostic 写盘）自动共享同一候选。
+ */
+let documentsPathProvider: (() => string) | null = null
+
+export function setDocumentsPathProvider(fn: (() => string) | null): void {
+  documentsPathProvider = fn
+}
+
 function tryMkdir(dir: string): boolean {
   try {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
@@ -37,7 +52,7 @@ function tryMkdir(dir: string): boolean {
  * 任何候选抛错都被吞掉，不阻塞启动；终极兜底返回 tmpdir 候选字符串。
  */
 export function getUserFacingDiagDir(deps: UserDiagDirDeps = {}): string {
-  const getDocs = deps.getDocumentsPath
+  const getDocs = deps.getDocumentsPath ?? documentsPathProvider ?? undefined
   const getHome = deps.getHomedir ?? (() => os.homedir())
   const getTmp = deps.getTmpdir ?? (() => os.tmpdir())
 

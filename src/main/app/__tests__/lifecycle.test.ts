@@ -43,6 +43,8 @@ const m = vi.hoisted(() => {
     execFileMock: vi.fn(),
     execFileSyncMock: vi.fn(() => ''),
     execMock: vi.fn(),
+    // 启动日志路径（诊断目录单一真相源）
+    getStartupLogPathValueMock: vi.fn(() => '/mock/NikkiGallery/Diagnostics/startup-errors.log'),
 
     // app 内部模块
     registerGlobalErrorHandlersMock: vi.fn(),
@@ -193,7 +195,8 @@ vi.mock('../../utils/logger', () => ({
 }))
 vi.mock('../../utils/startup-diagnostic', () => ({
   logStartupError: m.logStartupErrorMock,
-  diagLog: vi.fn()
+  diagLog: vi.fn(),
+  getStartupLogPathValue: m.getStartupLogPathValueMock
 }))
 vi.mock('../../utils/process-registry', () => ({
   getProcessRegistryStats: m.getProcessRegistryStatsMock
@@ -417,6 +420,36 @@ describe('lifecycle - bootstrapApplication', () => {
       expect(m.execMock).toHaveBeenCalledWith('taskmgr', { windowsHide: false })
       // 之后 app.quit
       expect(m.appQuitMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('6b. exec("taskmgr") 启动失败时错误被 error 监听记录，不冒泡为未捕获异常', async () => {
+      vi.useFakeTimers()
+      m.requestSingleInstanceLockMock.mockReturnValue(false)
+      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 1 })
+      // exec 返回带 on() 的子进程句柄
+      const onMock = vi.fn()
+      m.execMock.mockReturnValueOnce({ on: onMock })
+
+      const ctx = makeLifecycleCtx()
+
+      const promise = bootstrapApplication(ctx)
+      await vi.advanceTimersByTimeAsync(3000)
+      await vi.advanceTimersByTimeAsync(0)
+      await promise
+
+      expect(m.execMock).toHaveBeenCalledWith('taskmgr', { windowsHide: false })
+      // 必须挂载 error 监听：否则 spawn 失败（如 taskmgr 被禁用）会冒泡成
+      // uncaughtException → reportEarlyFatal → 假「启动失败 / 程序已退出」
+      const errorCall = onMock.mock.calls.find((c) => c[0] === 'error')
+      expect(errorCall).toBeDefined()
+
+      const spawnErr = Object.assign(new Error('spawn EFTYPE'), {
+        code: 'EFTYPE',
+        syscall: 'spawn EFTYPE'
+      })
+      const handler = errorCall![1] as (e: unknown) => void
+      expect(() => handler(spawnErr)).not.toThrow()
+      expect(m.logStartupErrorMock).toHaveBeenCalledWith('exec-taskmgr', spawnErr)
     })
 
     it('7. 用户选"退出"，调用 app.quit()', async () => {
@@ -928,9 +961,10 @@ describe('lifecycle - bootstrapApplication', () => {
       await bootstrapApplication(ctx)
 
       expect(m.shellOpenPathMock).toHaveBeenCalledTimes(1)
-      // openPath 路径含 userData
+      // 日志路径统一到诊断目录单一真相源 getStartupLogPathValue()（此前指向 userData，
+      // 与 logStartupError 真实落盘路径不一致，用户在弹窗目录下找不到日志）
       const openPathArg = m.shellOpenPathMock.mock.calls[0][0]
-      expect(openPathArg).toContain('userData')
+      expect(openPathArg).toBe('/mock/NikkiGallery/Diagnostics')
     })
 
     it('35. lockAcquired=true 时 dbManager.close + releaseSingleInstanceLock + app.exit(1) 被调用', async () => {

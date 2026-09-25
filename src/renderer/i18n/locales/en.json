@@ -3664,6 +3664,17 @@
         "buildDiagnosticFailed": ""
       }
     },
+    "zip": {
+      "error": {
+        "sourceMissing": "Pack failed: source directory missing or not a directory: {{dir}}",
+        "targetMissing": "Pack failed: invalid target path (must be absolute): {{path}}",
+        "targetParentMissing": "Pack failed: target directory does not exist: {{dir}}",
+        "timeout": "Pack timed out ({{ms}}ms), export cancelled",
+        "writeFailed": "Failed to write archive: {{reason}}",
+        "emptyArchive": "Pack failed: generated archive is empty",
+        "targetNotGenerated": "Pack failed: target file was not generated"
+      }
+    },
     "thumbnail": {
       "log": {
         "forkFailed": "",

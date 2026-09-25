@@ -3669,6 +3669,17 @@
         "buildDiagnosticFailed": "[Log] 构建诊断包失败，回退到仅打包 logs:"
       }
     },
+    "zip": {
+      "error": {
+        "sourceMissing": "打包失败：源目录不存在或不是目录: {{dir}}",
+        "targetMissing": "打包失败：目标路径无效（必须为绝对路径）: {{path}}",
+        "targetParentMissing": "打包失败：目标目录不存在: {{dir}}",
+        "timeout": "打包超时（{{ms}}ms），已取消本次导出",
+        "writeFailed": "写入压缩包失败: {{reason}}",
+        "emptyArchive": "打包失败：生成的压缩包为空",
+        "targetNotGenerated": "打包失败：目标文件未生成"
+      }
+    },
     "thumbnail": {
       "log": {
         "forkFailed": "[ThumbnailWorker] fork 失败，降级到主进程内联:",

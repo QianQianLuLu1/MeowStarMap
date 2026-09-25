@@ -46,6 +46,12 @@ async function loadModule() {
   return mod
 }
 
+// 诊断目录单一真相源：注册「文档」目录提供器（生产由 src/main/index.ts 注册 app.getPath('documents')）
+async function registerDocumentsProvider() {
+  const { setDocumentsPathProvider } = await import('./user-diag-path')
+  setDocumentsPathProvider(() => mockGetPathImpl('documents'))
+}
+
 describe('startup-diagnostic', () => {
   let tmpBase: string
 
@@ -60,11 +66,14 @@ describe('startup-diagnostic', () => {
     }
     // 重置模块缓存，确保 startupLogPath 重新计算
     vi.resetModules()
+    await registerDocumentsProvider()
     // 清空 getPath 调用记录
     vi.mocked(await import('electron')).app.getPath.mockClear()
   })
 
   afterEach(async () => {
+    const { setDocumentsPathProvider } = await import('./user-diag-path')
+    setDocumentsPathProvider(null)
     await fsp.rm(tmpBase, { recursive: true, force: true })
     vi.restoreAllMocks()
   })
@@ -92,6 +101,53 @@ describe('startup-diagnostic', () => {
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
       expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
+    })
+  })
+
+  describe('诊断目录单一真相源（回归：弹窗展示路径必须等于真实落盘路径）', () => {
+    it('documents 可用时日志落在 文档/NikkiGallery/Diagnostics', async () => {
+      const { getStartupLogPathValue } = await loadModule()
+      const p = getStartupLogPathValue()
+      expect(p).toBe(
+        path.join(tmpBase, 'documents', 'NikkiGallery', 'Diagnostics', 'startup-errors.log')
+      )
+    })
+
+    it('documents 抛错时不再使用 documents 候选（回落 homedir/tmpdir）', async () => {
+      mockGetPathImpl = (name: string) => {
+        if (name === 'documents') throw new Error('app not ready')
+        return path.join(tmpBase, name)
+      }
+      const { getStartupLogPathValue } = await loadModule()
+      const p = getStartupLogPathValue()
+      expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
+      expect(p).not.toContain(path.join(tmpBase, 'documents'))
+    })
+  })
+
+  describe('logStartupError errno 摘要（回归：spawn 类错误须可定位到可执行文件）', () => {
+    it('Error 携带 errno 字段时记录 [errno] 摘要行', async () => {
+      const { logStartupError, readStartupErrors } = await loadModule()
+      const err = Object.assign(new Error('spawn EFTYPE'), {
+        code: 'EFTYPE',
+        errno: -1,
+        syscall: 'spawn EFTYPE',
+        path: 'tar.exe',
+        spawnargs: ['-c', '--format=zip']
+      })
+      logStartupError('export', err)
+      const content = readStartupErrors()
+      expect(content).toContain('[errno]')
+      expect(content).toContain('code=EFTYPE')
+      expect(content).toContain('syscall=spawn EFTYPE')
+      expect(content).toContain('path=tar.exe')
+      expect(content).toContain('spawnargs=')
+    })
+
+    it('非 Error 值不产生 [errno] 摘要行（保持既有行为）', async () => {
+      const { logStartupError, readStartupErrors } = await loadModule()
+      logStartupError('plain', 'just a string')
+      expect(readStartupErrors()).not.toContain('[errno]')
     })
   })
 

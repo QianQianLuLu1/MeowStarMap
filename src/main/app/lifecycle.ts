@@ -7,7 +7,7 @@ import { editorService } from '../services/editor-service'
 import { STARTUP_SCAN_DELAY_MS } from '../utils/constants'
 import { initLogger, logger } from '../utils/logger'
 import { initCrashDir, enforceCrashLimit, getCrashDirectory } from '../services/crash-service'
-import { logStartupError, diagLog } from '../utils/startup-diagnostic'
+import { logStartupError, diagLog, getStartupLogPathValue } from '../utils/startup-diagnostic'
 import { getProcessRegistryStats } from '../utils/process-registry'
 import { pluginHost } from '../plugins/plugin-host'
 // 阶段 2.2：app 内部模块
@@ -162,8 +162,13 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
                 })
                 .then((r) => {
                   if (r.response === 0) {
+                    // 必须显式挂 error 监听：exec 返回的子进程无 error 监听时，
+                    // spawn 失败（如 taskmgr 被组策略禁用）会冒泡成 uncaughtException
+                    // → 假「启动失败 / 程序已退出」弹窗
                     try {
-                      exec('taskmgr', { windowsHide: false })
+                      exec('taskmgr', { windowsHide: false }).on('error', (e) => {
+                        logStartupError('exec-taskmgr', e)
+                      })
                     } catch {}
                   }
                 })
@@ -182,8 +187,11 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
           return
         } else if (result.response === 1) {
           // 手动处理：打开任务管理器
+          // 同上：必须挂 error 监听，避免 spawn 失败冒泡为 uncaughtException
           try {
-            exec('taskmgr', { windowsHide: false })
+            exec('taskmgr', { windowsHide: false }).on('error', (e) => {
+              logStartupError('exec-taskmgr', e)
+            })
           } catch {}
         }
       } catch (err) {
@@ -567,7 +575,8 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 原实现仅能"确定"关闭，用户拿到错误后还得手动去找日志路径，体验差
     try {
       const errMsg = fatalErr instanceof Error ? fatalErr.message : String(fatalErr)
-      const startupLogPath = path.join(app.getPath('userData'), 'startup-errors.log')
+      // 与 logStartupError 真实落盘路径同源（此前指向 userData，与弹窗/实际写入不一致）
+      const startupLogPath = getStartupLogPathValue()
       const result = await dialog.showMessageBox({
         type: 'error',
         title: t('main.dialog.startupFailed.title'),

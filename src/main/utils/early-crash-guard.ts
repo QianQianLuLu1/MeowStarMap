@@ -13,14 +13,17 @@
  *
  * 注意：本模块不反向 import native-load-guard / error-handlers，避免循环依赖。
  */
-import { app, dialog, shell } from 'electron'
+import { app, dialog, shell, BrowserWindow } from 'electron'
+import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { getUserFacingDiagDir } from './user-diag-path'
-import { diagLog, logStartupError } from './startup-diagnostic'
+import { diagLog, logStartupError, getStartupLogPathValue } from './startup-diagnostic'
 import { logFaultSync } from './logger'
 
 const FATAL_TITLE = '启动失败 / Startup Failed'
 const NONFATAL_TITLE = '程序出错 / Runtime Error'
+const STARTUP_LOG_BASENAME = 'startup-errors.log'
 
 export interface EarlyCrashDeps {
   showErrorBox?: (title: string, content: string) => void
@@ -32,19 +35,62 @@ export interface EarlyCrashDeps {
   exitApp?: (code: number) => void
   releaseLock?: () => void
   shellShowItemInFolder?: (p: string) => void
+  /** 是否已存在主窗口。注入便于单测；默认读 BrowserWindow.getAllWindows()。 */
+  hasMainWindow?: () => boolean
 }
 
-function resolveDiagDir(deps: EarlyCrashDeps): string {
-  if (deps.getDiagDir) return deps.getDiagDir()
-  return getUserFacingDiagDir({
-    getDocumentsPath: () => {
-      try {
-        return app.getPath('documents')
-      } catch {
-        return ''
-      }
-    }
-  })
+/**
+ * 弹窗展示的启动日志路径必须与 logStartupError 的真实落盘路径同源。
+ *
+ * 背景：此前展示端按「文档/NikkiGallery/Diagnostics」计算、写入端却回落到
+ * 「<homedir>/NikkiGallery/Diagnostics」，用户在弹窗给出的目录下找不到日志。
+ * 未注入 getDiagDir（生产路径）时统一取 getStartupLogPathValue()。
+ */
+function resolveLogPath(deps: EarlyCrashDeps): string {
+  if (deps.getDiagDir) return path.join(deps.getDiagDir(), STARTUP_LOG_BASENAME)
+  return getStartupLogPathValue()
+}
+
+/**
+ * 落盘存在性校验：日志没写出来却给了路径，用户必然找不到。
+ * 校验失败时退到 tmpdir 应急文件并改展示该路径；仍失败返回 null（调用方展示原路径）。
+ */
+function ensureStartupLogExists(logPath: string, message: string, stack: string): string | null {
+  try {
+    if (fs.existsSync(logPath)) return logPath
+  } catch {
+    // 无法判定存在性时按“不存在”处理
+  }
+  const emergencyPath = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
+  try {
+    fs.writeFileSync(
+      emergencyPath,
+      `[${new Date().toISOString()}] [STAGE: emergency-fallback] ${message}\n${stack}\n`,
+      'utf8'
+    )
+    return emergencyPath
+  } catch {
+    return null
+  }
+}
+
+/**
+ * 判定是否为「子进程启动失败」（Node 对此类错误设置 syscall='spawn <code>'）。
+ * 典型：`spawn EFTYPE`（ERROR_BAD_EXE_FORMAT，目标不是有效的 Win32 可执行文件）。
+ */
+function isChildProcessSpawnError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as NodeJS.ErrnoException
+  if (typeof e.syscall === 'string' && /^spawn/i.test(e.syscall)) return true
+  return e.code === 'EFTYPE'
+}
+
+function defaultHasMainWindow(): boolean {
+  try {
+    return BrowserWindow.getAllWindows().length > 0
+  } catch {
+    return false
+  }
 }
 
 function toMessage(err: unknown): { message: string; stack: string } {
@@ -135,13 +181,25 @@ export function reportEarlyFatal(
       }
     })
   const stage = opts.stage ?? 'early-crash'
+  const { message, stack } = toMessage(err)
+
+  // 子进程启动失败（如 spawn EFTYPE）在应用已开窗口后不应杀死整个应用：
+  // 未挂 error 监听的子进程会把该错误冒泡为 uncaughtException，表现为
+  // 「启动失败 / 程序已退出」的假致命弹窗（现场问题）。启动期（尚无窗口）仍按致命处理。
+  if (isChildProcessSpawnError(err) && (deps.hasMainWindow ?? defaultHasMainWindow)()) {
+    try {
+      diag('SPAWN-NONFATAL', `stage=${stage} ${message}\n${stack}`)
+    } catch {
+      /* 忽略 */
+    }
+    showNonFatalErrorBox(err, { deps })
+    return
+  }
 
   if (hasReported) return
   hasReported = true
 
-  const dir = resolveDiagDir(deps)
-  const logPath = path.join(dir, 'startup-errors.log')
-  const { message, stack } = toMessage(err)
+  let logPath = resolveLogPath(deps)
 
   try {
     logStartupErr(stage, err)
@@ -157,6 +215,11 @@ export function reportEarlyFatal(
     logFault('uncaughtException', err, { stage })
   } catch {
     /* 日志失败不影响退出 */
+  }
+  // 仅生产路径做落盘校验：注入 getDiagDir 为单测场景，磁盘上本无该文件
+  if (!deps.getDiagDir) {
+    const verifiedPath = ensureStartupLogExists(logPath, message, stack)
+    if (verifiedPath) logPath = verifiedPath
   }
   showErrorBox(FATAL_TITLE, buildFatalContent(message, stack, logPath))
   try {
@@ -198,8 +261,7 @@ export function showFatalStartupErrorBox(
         /* 忽略 */
       }
     })
-  const dir = resolveDiagDir(deps)
-  const logPath = opts.logPath ?? path.join(dir, 'startup-errors.log')
+  const logPath = opts.logPath ?? resolveLogPath(deps)
   const { message, stack } = toMessage(err)
   // 仅弹框，不退出（调用方负责 app.exit）
   showErrorBox(FATAL_TITLE, buildFatalContent(message, stack, logPath))
@@ -233,8 +295,7 @@ export function showNonFatalErrorBox(err: unknown, opts: { deps?: EarlyCrashDeps
         /* 忽略 */
       }
     })
-  const dir = resolveDiagDir(deps)
-  const logPath = path.join(dir, 'startup-errors.log')
+  const logPath = resolveLogPath(deps)
   const { message } = toMessage(err)
   showErrorBox(NONFATAL_TITLE, buildNonFatalContent(message, logPath))
   try {

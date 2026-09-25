@@ -56,7 +56,9 @@ vi.mock('../../utils/logger', () => ({
 vi.mock('../../utils/startup-diagnostic', () => ({
   logStartupError: logStartupErrorMock,
   diagLog: diagLogMock,
-  getLogDirectorySafe: getLogDirectorySafeMock
+  getLogDirectorySafe: getLogDirectorySafeMock,
+  // early-crash-guard 弹窗展示路径与写盘路径同源，需提供该 getter
+  getStartupLogPathValue: vi.fn(() => '/mock/NikkiGallery/Diagnostics/startup-errors.log')
 }))
 
 // 捕获 process.on 注册的监听器：用 mockImplementation 拦截，避免污染真实 process 事件

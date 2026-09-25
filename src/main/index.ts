@@ -4,6 +4,7 @@ import fs from 'fs'
 import { diagLog, logStartupError, getStartupLogPathValue } from './utils/startup-diagnostic'
 import { verifyCriticalNativeModules, showFatalStartupErrorBox } from './app/native-load-guard'
 import { reportEarlyFatal, getUserFacingDiagDir } from './utils/early-crash-guard'
+import { setDocumentsPathProvider } from './utils/user-diag-path'
 import { verifyStartupEnvironment } from './app/startup-environment'
 import { electronLogger } from './utils/logger'
 import { registerRendererProtocol } from './app/renderer-protocol'
@@ -35,6 +36,14 @@ process.on('unhandledRejection', (reason) => {
   // 不再直接 app.exit(1)：非致命的游离 rejection 不应杀死整个应用，
   // 避免一条边缘异步路径导致扫描进度/用户数据丢失。
 })
+
+// 诊断目录单一真相源：注册「文档」目录，使启动日志落盘路径与致命弹窗展示路径同源
+// （此前写盘侧未拿到 documents 候选，弹窗指向 Documents 而日志写在 homedir，用户找不到日志）
+try {
+  setDocumentsPathProvider(() => app.getPath('documents'))
+} catch {
+  // 不可用时保持未注册，由 user-diag-path 回落到 homedir / tmpdir 候选
+}
 
 // 崩溃转储目录用户友好化：文档/NikkiGallery/Diagnostics（须在 crashReporter.start 前设定）
 try {

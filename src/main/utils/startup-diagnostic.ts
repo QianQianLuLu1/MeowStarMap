@@ -16,11 +16,23 @@ import { getUserFacingDiagDir } from './user-diag-path'
 
 let startupLogPath: string | null = null
 
+/**
+ * 诊断目录单一真相源：启动日志与 diag.log 一律走 getUserFacingDiagDir()。
+ *
+ * documents 候选由主进程入口通过 setDocumentsPathProvider(() => app.getPath('documents'))
+ * 注册，使「写盘路径」与「弹窗展示路径」严格同源。
+ * 修复前本模块未注入 documents，真实落盘回落到 <homedir>/NikkiGallery/Diagnostics，
+ * 而弹窗仍展示 文档/NikkiGallery/Diagnostics → 用户在弹窗路径下找不到日志。
+ */
+function resolveDiagDir(): string {
+  return getUserFacingDiagDir()
+}
+
 function getStartupLogPath(): string {
   if (startupLogPath) return startupLogPath
   try {
     // 用户友好目录：文档/NikkiGallery/Diagnostics（非隐藏，普通用户易查找）
-    startupLogPath = path.join(getUserFacingDiagDir(), 'startup-errors.log')
+    startupLogPath = path.join(resolveDiagDir(), 'startup-errors.log')
   } catch {
     // 极端情况：getUserFacingDiagDir 失败，回退到 os.tmpdir
     startupLogPath = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
@@ -40,7 +52,7 @@ let diagLogPath: string | null = null
 function getDiagLogPath(): string {
   if (diagLogPath) return diagLogPath
   try {
-    diagLogPath = path.join(getUserFacingDiagDir(), 'diag.log')
+    diagLogPath = path.join(resolveDiagDir(), 'diag.log')
   } catch {
     diagLogPath = path.join(os.tmpdir(), 'NikkiGallery-diag.log')
   }
@@ -66,6 +78,24 @@ export function diagLog(tag: string, msg: string): void {
 }
 
 /**
+ * 提取 errno 摘要（code / errno / syscall / path / spawnargs）。
+ *
+ * 目的：子进程启动失败（现场问题 `spawn EFTYPE`）的 message 不含目标可执行文件，
+ * 仅凭 message + stack 无法判断是哪个二进制失败，故单独追加一行可检索摘要。
+ */
+function summarizeErrno(error: unknown): string {
+  if (!error || typeof error !== 'object') return ''
+  const e = error as NodeJS.ErrnoException & { spawnargs?: unknown }
+  const parts: string[] = []
+  if (e.code) parts.push(`code=${e.code}`)
+  if (e.errno !== undefined && e.errno !== null) parts.push(`errno=${String(e.errno)}`)
+  if (e.syscall) parts.push(`syscall=${e.syscall}`)
+  if (e.path) parts.push(`path=${e.path}`)
+  if (Array.isArray(e.spawnargs)) parts.push(`spawnargs=${JSON.stringify(e.spawnargs)}`)
+  return parts.length > 0 ? `[errno] ${parts.join(' ')}` : ''
+}
+
+/**
  * 记录启动错误到独立文件（不依赖 logger 系统）
  * 即使 dbManager 未初始化、logger 未初始化，也能记录
  */
@@ -74,7 +104,8 @@ export function logStartupError(stage: string, error: unknown): void {
     const logPath = getStartupLogPath()
     const timestamp = new Date().toISOString()
     const errStr = error instanceof Error ? `${error.message}\n${error.stack || ''}` : String(error)
-    const line = `[${timestamp}] [STAGE: ${stage}] ${errStr}\n`
+    const errnoLine = summarizeErrno(error)
+    const line = `[${timestamp}] [STAGE: ${stage}] ${errStr}${errnoLine ? `\n${errnoLine}` : ''}\n`
     // 追加写入，最多保留 100KB
     try {
       const stat = fs.statSync(logPath)

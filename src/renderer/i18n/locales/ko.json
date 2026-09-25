@@ -3870,6 +3870,17 @@
       "log": {
         "exported": "공명 데이터를 내보냈습니다({{count}}개 기록)"
       }
+    },
+    "zip": {
+      "error": {
+        "sourceMissing": "",
+        "targetMissing": "",
+        "targetParentMissing": "",
+        "timeout": "",
+        "writeFailed": "",
+        "emptyArchive": "",
+        "targetNotGenerated": ""
+      }
     }
   },
   "appError": {

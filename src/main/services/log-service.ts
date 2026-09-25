@@ -1,9 +1,9 @@
 import fs from 'fs'
 import path from 'path'
-import { spawn } from 'child_process'
 import { shell } from 'electron'
 import { logger, FaultRecord, getLogDirectory } from '../utils/logger'
-import { trackProcess } from '../utils/process-registry'
+import { createZipFromDirectory } from '../utils/zip-archive'
+import { getStartupLogPathValue } from '../utils/startup-diagnostic'
 import { t } from '../i18n'
 
 // 读取所有故障记录（按时间倒序）
@@ -139,8 +139,9 @@ export async function openLogDirectory(): Promise<{ success: boolean; message: s
 //   - crashes/      所有崩溃 dump 文件
 //   - startup-errors.log  启动错误日志
 //   - system-info.json    自动生成的系统环境信息
-// 业务决策：使用 Windows PowerShell 的 Compress-Archive cmdlet
-// 这是 Windows 系统原生能力，无需引入额外 npm 依赖
+// 业务决策：进程内流式压缩（archiver，纯 JS），不再调用外部 tar.exe
+// 原因：tar.exe 在部分机器不可用（spawn EFTYPE），且子进程路径难以保证结果可达，
+//       现实现恒有结果（成功 / 失败 / 超时），UI 不会永久停留在「正在导出」
 export async function exportLogsAsZip(
   targetPath: string
 ): Promise<{ success: boolean; message: string }> {
@@ -184,8 +185,10 @@ export async function exportLogsAsZip(
     }
 
     // 3. 复制 startup-errors.log
+    // 路径必须走 getStartupLogPathValue()（诊断目录单一真相源）：
+    // 此前按 logDir/.. 计算，指向 userData，与真实落盘（文档/NikkiGallery/Diagnostics）不一致
     try {
-      const startupLogPath = path.join(logDir, '..', 'startup-errors.log')
+      const startupLogPath = getStartupLogPathValue()
       if (fs.existsSync(startupLogPath)) {
         await fs.promises.copyFile(startupLogPath, path.join(tmpDir, 'startup-errors.log'))
       }
@@ -217,68 +220,22 @@ export async function exportLogsAsZip(
     logger.error(t('main.logService.log.buildDiagnosticFailed'), err)
   }
 
-  return new Promise((resolve) => {
-    // 优先打包临时诊断目录，失败时回退到仅 logs 目录
-    const sourceDir = fs.existsSync(tmpDir) ? tmpDir : logDir
+  // 优先打包临时诊断目录，失败时回退到仅 logs 目录
+  const sourceDir = fs.existsSync(tmpDir) ? tmpDir : logDir
 
-    // 修复：放弃 PowerShell Compress-Archive，改用 Windows 10 1803+ 自带的 tar.exe
-    // 原因：
-    //   1) Compress-Archive -LiteralPath '...\*' 中 -LiteralPath 不解释通配符 *，静默失败
-    //   2) PowerShell 执行策略在某些系统上会阻止命令执行
-    //   3) tar.exe 是系统原生工具，不依赖 PowerShell，更快更可靠
-    // tar.exe 命令：--format=zip 指定 zip 格式，-C 切换到源目录，. 打包当前目录所有内容
-    const child = trackProcess(
-      spawn('tar.exe', ['-c', '--format=zip', '-f', targetPath, '-C', sourceDir, '.'], {
-        windowsHide: true
-      })
-    )
+  // 打包方式：进程内流式压缩（utils/zip-archive → archiver），不再 spawn 外部 tar.exe。
+  // 原因：tar.exe 在部分机器上不可用，spawn 抛 `EFTYPE`（ERROR_BAD_EXE_FORMAT），
+  // 且原实现无超时与兜底，Promise 可能永不 settle → UI 永久停在「正在导出」。
+  // createZipFromDirectory 保证任何分支（含超时）都 resolve。
+  const zipResult = await createZipFromDirectory(sourceDir, targetPath)
 
-    let stderr = ''
-    let stdout = ''
-    child.stderr.on('data', (data) => {
-      stderr += data.toString()
-    })
-    // 监听 stdout 避免 pipe buffer 填满阻塞子进程
-    child.stdout.on('data', (data) => {
-      stdout += data.toString()
-    })
+  // 无论成功与否都清理临时目录
+  await cleanupTmpDir(tmpDir)
 
-    child.on('error', (err) => {
-      cleanupTmpDir(tmpDir)
-      resolve({
-        success: false,
-        message: t('main.logService.error.tarStartFailed', { reason: err.message })
-      })
-    })
-
-    child.on('close', async (code) => {
-      cleanupTmpDir(tmpDir)
-      if (code === 0) {
-        // 验证目标文件确实已生成且非空
-        try {
-          // Bug #08-C6：同步 fs.statSync 改为 await fs.promises.stat，避免阻塞主进程事件循环
-          const stats = await fs.promises.stat(targetPath)
-          if (stats.size === 0) {
-            resolve({
-              success: false,
-              message: t('main.logService.error.emptyArchive')
-            })
-            return
-          }
-        } catch {
-          resolve({ success: false, message: t('main.logService.error.targetNotGenerated') })
-          return
-        }
-        resolve({ success: true, message: t('main.logService.message.exported') })
-      } else {
-        const detail = stderr.trim() || stdout.trim() || t('main.logService.error.noErrorOutput')
-        resolve({
-          success: false,
-          message: t('main.logService.error.packageFailed', { code: String(code), detail })
-        })
-      }
-    })
-  })
+  if (!zipResult.success) {
+    return { success: false, message: zipResult.message }
+  }
+  return { success: true, message: t('main.logService.message.exported') }
 }
 
 /** 清理临时诊断目录 */
