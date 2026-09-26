@@ -47,6 +47,11 @@ vi.mock('./process-registry', () => ({
   untrackFfmpegCommand: (...args: unknown[]) => untrackFfmpegCommandMock(...args)
 }))
 
+const maybeLogSpawnErrorMock = vi.fn()
+vi.mock('./spawn-error-log', () => ({
+  maybeLogSpawnError: (...args: unknown[]) => maybeLogSpawnErrorMock(...args)
+}))
+
 import { probeVideoMetadata } from './video-probe'
 import ffmpeg from 'fluent-ffmpeg'
 
@@ -58,6 +63,7 @@ describe('video-probe', () => {
     mockCommand = createMockCommand()
     trackFfmpegCommandMock.mockClear()
     untrackFfmpegCommandMock.mockClear()
+    maybeLogSpawnErrorMock.mockClear()
     ffmpegMock.mockClear()
   })
 
@@ -133,6 +139,19 @@ describe('video-probe', () => {
         // 预期 reject
       }
       expect(untrackFfmpegCommandMock).toHaveBeenCalledWith(mockCommand)
+    })
+
+    it('ffprobe 回调为 spawn 类错误时调用 maybeLogSpawnError（传原始错误对象）', async () => {
+      const spawnErr = Object.assign(new Error('spawn EFTYPE'), {
+        code: 'EFTYPE',
+        syscall: 'spawn ffprobe'
+      }) as NodeJS.ErrnoException
+      const promise = probeVideoMetadata('/video.mp4', 5000)
+      mockCommand._invokeFfprobe(spawnErr, null)
+      await expect(promise).rejects.toThrow('读取视频元数据失败 /video.mp4')
+      expect(maybeLogSpawnErrorMock).toHaveBeenCalledTimes(1)
+      // 必须传原始 err（保留 code/path/spawnargs），包装后的 Error 会丢字段
+      expect(maybeLogSpawnErrorMock).toHaveBeenCalledWith('video-probe', spawnErr)
     })
 
     it('超时后调用 kill SIGKILL', async () => {

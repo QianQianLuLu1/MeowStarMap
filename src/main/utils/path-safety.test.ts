@@ -1,7 +1,7 @@
 /**
  * @layer L1
  * @module src/main/utils/path-safety
- * @coverage hasNonAsciiPath/ensureWritableDir/resolveSafeBinaryPath
+ * @coverage hasNonAsciiPath/ensureWritableDir/resolveSafeBinaryPath/hasWindowsExecutableHeader
  * @dependencies mock: electron (app), 使用真实 fs 与 os.tmpdir
  * @remarks 使用真实 fs 写入临时目录，验证特殊字符判定与目录可写性
  */
@@ -16,7 +16,12 @@ vi.mock('electron', () => ({
   }
 }))
 
-import { hasNonAsciiPath, ensureWritableDir, resolveSafeBinaryPath } from './path-safety'
+import {
+  hasNonAsciiPath,
+  ensureWritableDir,
+  resolveSafeBinaryPath,
+  hasWindowsExecutableHeader
+} from './path-safety'
 
 const tmpDirs: string[] = []
 
@@ -93,5 +98,56 @@ describe('resolveSafeBinaryPath', () => {
     const candidate = path.join(dir, 'bin.exe')
     fs.writeFileSync(candidate, 'x')
     expect(resolveSafeBinaryPath(candidate, 'fallback')).toBe(candidate)
+  })
+})
+
+describe('hasWindowsExecutableHeader', () => {
+  it('MZ 头二进制文件返回 true（正常）', () => {
+    const dir = makeTmpDir()
+    const file = path.join(dir, 'ffmpeg.exe')
+    // 'MZ' DOS 头 + 任意后续内容，模拟真实 PE
+    fs.writeFileSync(file, Buffer.from([0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00]))
+    expect(hasWindowsExecutableHeader(file)).toBe(true)
+  })
+  it('文本占位文件（杀软替换场景）返回 false（异常）', () => {
+    const dir = makeTmpDir()
+    const file = path.join(dir, 'ffmpeg.exe')
+    fs.writeFileSync(file, 'This program is blocked by your antivirus.', 'utf8')
+    expect(hasWindowsExecutableHeader(file)).toBe(false)
+  })
+  it('0 字节文件返回 false（异常）', () => {
+    const dir = makeTmpDir()
+    const file = path.join(dir, 'ffmpeg.exe')
+    fs.writeFileSync(file, '')
+    expect(hasWindowsExecutableHeader(file)).toBe(false)
+  })
+  it('目录返回 false（异常）', () => {
+    const dir = makeTmpDir()
+    expect(hasWindowsExecutableHeader(dir)).toBe(false)
+  })
+  it('不存在的路径返回 false（异常）', () => {
+    expect(hasWindowsExecutableHeader(path.join(os.tmpdir(), 'not-exist-at-all.bin'))).toBe(false)
+  })
+  it('空串返回 false（参数校验）', () => {
+    expect(hasWindowsExecutableHeader('')).toBe(false)
+  })
+  it('恰 2 字节 MZ 返回 true（边界）', () => {
+    const dir = makeTmpDir()
+    const file = path.join(dir, 'tiny.exe')
+    fs.writeFileSync(file, Buffer.from([0x4d, 0x5a]))
+    expect(hasWindowsExecutableHeader(file)).toBe(true)
+  })
+  it('仅 1 字节 M 返回 false（边界）', () => {
+    const dir = makeTmpDir()
+    const file = path.join(dir, 'tiny.exe')
+    fs.writeFileSync(file, Buffer.from([0x4d]))
+    expect(hasWindowsExecutableHeader(file)).toBe(false)
+  })
+  it('非 MZ 开头的二进制返回 false（边界）', () => {
+    const dir = makeTmpDir()
+    const file = path.join(dir, 'elf.bin')
+    // ELF 魔数 0x7f 'ELF'，非 Windows PE
+    fs.writeFileSync(file, Buffer.from([0x7f, 0x45, 0x4c, 0x46]))
+    expect(hasWindowsExecutableHeader(file)).toBe(false)
   })
 })

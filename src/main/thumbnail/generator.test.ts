@@ -121,6 +121,10 @@ vi.mock('../utils/process-registry', () => ({
   untrackFfmpegCommand: () => undefined,
   killAllProcesses: () => undefined
 }))
+const maybeLogSpawnErrorMock = vi.fn()
+vi.mock('../utils/spawn-error-log', () => ({
+  maybeLogSpawnError: (...args: unknown[]) => maybeLogSpawnErrorMock(...args)
+}))
 vi.mock('../utils/ffmpeg-paths', () => ({ ffmpegPath: 'ffmpeg', ffprobePath: 'ffprobe' }))
 vi.mock('sharp', () => ({
   default: (input?: string) => {
@@ -214,6 +218,18 @@ describe('ThumbnailGenerator 视频抽帧加固', () => {
     expect(result).toBeNull()
     expect(markSpy).toHaveBeenCalledTimes(1)
     // 失败兜底：不会留下伪缩略图文件（即使 hash 命中也只在成功分支写）
+  })
+
+  it('ffmpeg error 路径：每次 error 都将原始错误交给 maybeLogSpawnError 落盘诊断', async () => {
+    maybeLogSpawnErrorMock.mockClear()
+    resetCtl('fail')
+    await gen.generate(sourceVideo)
+    // 阶梯 3 个位点全部失败 → 3 次 error，均带来源标签
+    expect(maybeLogSpawnErrorMock).toHaveBeenCalledTimes(3)
+    expect(maybeLogSpawnErrorMock.mock.calls.every((c) => c[0] === 'thumbnail-generator')).toBe(
+      true
+    )
+    expect(maybeLogSpawnErrorMock.mock.calls[0][1]).toBeInstanceOf(Error)
   })
 
   it('0 字节输出路径：end 后 stat 校验失败，generate 返回 null', async () => {

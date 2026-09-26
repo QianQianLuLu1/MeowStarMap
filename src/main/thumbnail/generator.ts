@@ -13,6 +13,7 @@ import { isVideoExt } from '../utils/media-constants'
 // P1-A7：统一从 ffmpeg-paths 导入，消除重复路径解析
 import { ffmpegPath as ffmpegBinaryPath } from '../utils/ffmpeg-paths'
 import { trackFfmpegCommand, untrackFfmpegCommand } from '../utils/process-registry'
+import { maybeLogSpawnError } from '../utils/spawn-error-log'
 // 损坏文件容错：错误日志写入 + 标记回调
 import { logger } from '../utils/logger'
 // 缩略图 worker 化：主进程↔worker 桥接层（注入式，未注入时降级到内联 sharp）
@@ -801,6 +802,8 @@ export class ThumbnailGenerator {
           if (settled) return
           settled = true
           cleanup(command)
+          // spawn EFTYPE/ENOENT 等子进程错误落盘诊断（阶梯重试会吞掉末次以外的错误）
+          maybeLogSpawnError('thumbnail-generator', err)
           reject(err)
         })
 

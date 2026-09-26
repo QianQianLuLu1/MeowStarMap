@@ -11,6 +11,7 @@
 import ffmpeg from 'fluent-ffmpeg'
 import { ffmpegPath as ffmpegBinaryPath } from './ffmpeg-paths'
 import { trackFfmpegCommand, untrackFfmpegCommand } from './process-registry'
+import { maybeLogSpawnError } from './spawn-error-log'
 
 /**
  * 执行 ffmpeg 命令并返回 Promise。
@@ -49,6 +50,8 @@ export function runFfmpegCommand(
       .on('error', (err) => {
         clearTimeout(timeout)
         untrackFfmpegCommand(command)
+        // spawn EFTYPE/ENOENT 等子进程错误落盘诊断，否则被局部捕获后无痕迹可查
+        maybeLogSpawnError('ffmpeg-runner', err)
         reject(err)
       })
       .run()

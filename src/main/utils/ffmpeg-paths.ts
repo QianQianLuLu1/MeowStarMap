@@ -12,7 +12,7 @@
 import fs from 'fs'
 import ffmpegStatic from 'ffmpeg-static'
 import ffprobeStatic from 'ffprobe-static'
-import { hasNonAsciiPath } from './path-safety'
+import { hasNonAsciiPath, hasWindowsExecutableHeader } from './path-safety'
 import { diagLog } from './startup-diagnostic'
 
 /**
@@ -41,6 +41,16 @@ function resolveBinaryPath(candidate: string | undefined | null, fallback: strin
       diagLog(
         'FFMPEG',
         `binary path contains non-ASCII chars, fall back to system PATH: ${resolved}`
+      )
+      return fallback
+    }
+    // PE 魔数预检：existsSync 无法识别"文件被杀软隔离/替换成 0 字节或文本占位"的场景，
+    // 直接 spawn 会得到 spawn EFTYPE（ERROR_BAD_EXE_FORMAT），故非 PE 一律降级 PATH。
+    // EFTYPE 是 Win32 错误 193，预检仅限 win32 生效，避免 Linux/macOS 的 ELF 二进制被误判
+    if (process.platform === 'win32' && !hasWindowsExecutableHeader(resolved)) {
+      diagLog(
+        'FFMPEG',
+        `bundled binary is not a valid Win32 PE (possibly quarantined or replaced by antivirus), fall back to system PATH: ${resolved}`
       )
       return fallback
     }

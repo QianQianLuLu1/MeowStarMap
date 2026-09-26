@@ -48,6 +48,11 @@ vi.mock('./process-registry', () => ({
   untrackFfmpegCommand: (...args: unknown[]) => untrackFfmpegCommandMock(...args)
 }))
 
+const maybeLogSpawnErrorMock = vi.fn()
+vi.mock('./spawn-error-log', () => ({
+  maybeLogSpawnError: (...args: unknown[]) => maybeLogSpawnErrorMock(...args)
+}))
+
 import { runFfmpegCommand } from './ffmpeg-runner'
 import ffmpeg from 'fluent-ffmpeg'
 
@@ -60,6 +65,7 @@ describe('ffmpeg-runner', () => {
     mockCommand = createMockCommand()
     trackFfmpegCommandMock.mockClear()
     untrackFfmpegCommandMock.mockClear()
+    maybeLogSpawnErrorMock.mockClear()
     ffmpegMock.mockClear()
   })
 
@@ -122,6 +128,18 @@ describe('ffmpeg-runner', () => {
       const promise = runFfmpegCommand('/input.mp4', (cmd) => cmd, 5000)
       mockCommand._emit('error', error)
       await expect(promise).rejects.toBe(error)
+    })
+
+    it('error 事件携带 spawn 类错误时调用 maybeLogSpawnError 落盘诊断', async () => {
+      const spawnErr = Object.assign(new Error('spawn EFTYPE'), {
+        code: 'EFTYPE',
+        syscall: 'spawn ffmpeg'
+      }) as NodeJS.ErrnoException
+      const promise = runFfmpegCommand('/input.mp4', (cmd) => cmd, 5000)
+      mockCommand._emit('error', spawnErr)
+      await expect(promise).rejects.toBe(spawnErr)
+      expect(maybeLogSpawnErrorMock).toHaveBeenCalledTimes(1)
+      expect(maybeLogSpawnErrorMock).toHaveBeenCalledWith('ffmpeg-runner', spawnErr)
     })
 
     it('error 事件触发后调用 untrackFfmpegCommand', async () => {

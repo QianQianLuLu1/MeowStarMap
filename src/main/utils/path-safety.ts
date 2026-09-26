@@ -65,3 +65,31 @@ export function resolveSafeBinaryPath(candidate: string, fallback: string): stri
   }
   return fallback
 }
+
+/**
+ * 校验文件是否为 Windows PE 可执行文件（前 2 字节 "MZ" 魔数）。
+ *
+ * 背景：现场 `spawn EFTYPE` = CreateProcess 错误 193（ERROR_BAD_EXE_FORMAT），
+ * 常见诱因是杀软隔离/替换二进制后留下 0 字节或文本占位文件——fs.existsSync 仍为 true，
+ * spawn 时才失败。故对随包二进制在 spawn 前做魔数预检。
+ *
+ * 任何异常（不存在 / 目录 / 权限 / 读取失败 / size < 2）一律返回 false，由调用方走降级。
+ * 注意：仅识别 Windows PE（本项目目标平台 win32）；Linux/macOS ELF 不在识别范围。
+ */
+export function hasWindowsExecutableHeader(filePath: string): boolean {
+  if (!filePath) return false
+  try {
+    const stat = fs.statSync(filePath)
+    if (!stat.isFile() || stat.size < 2) return false
+    const fd = fs.openSync(filePath, 'r')
+    try {
+      const header = Buffer.alloc(2)
+      const bytesRead = fs.readSync(fd, header, 0, 2, 0)
+      return bytesRead === 2 && header[0] === 0x4d && header[1] === 0x5a
+    } finally {
+      fs.closeSync(fd)
+    }
+  } catch {
+    return false
+  }
+}

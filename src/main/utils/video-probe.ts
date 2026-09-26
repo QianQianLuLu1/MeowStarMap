@@ -2,6 +2,7 @@ import ffmpeg from 'fluent-ffmpeg'
 // P1-A7：统一从 ffmpeg-paths 导入，消除重复路径解析
 import { ffprobePath as ffprobeBinaryPath } from './ffmpeg-paths'
 import { trackFfmpegCommand, untrackFfmpegCommand } from './process-registry'
+import { maybeLogSpawnError } from './spawn-error-log'
 
 /**
  * 建议改#1：抽取自 scanner.getVideoMetadata 与 VideoService.getMetadata 的共享 ffprobe 实现。
@@ -52,6 +53,8 @@ export function probeVideoMetadata(
       clearTimeout(timeout)
       untrackFfmpegCommand(command)
       if (err) {
+        // 用原始 err（含 code/path/spawnargs）记录 spawn 类错误，reject 包装后字段会丢失
+        maybeLogSpawnError('video-probe', err)
         return reject(new Error(`读取视频元数据失败 ${filePath}: ${err.message}`))
       }
       const videoStream = data.streams.find((s) => s.codec_type === 'video')
