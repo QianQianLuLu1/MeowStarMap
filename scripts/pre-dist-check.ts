@@ -553,13 +553,14 @@ function main(): void {
   }
 
   // 1.6 各 utilityProcess worker 入口存在（打包后由 electron-vite 单独产出到 dist/main/main/app/，
-  //     4 个 bridge 改为用区分性文件名 fork；任一缺失 → worker 无法启动，扫描/缩略图/视频等功能失效）
+  //     6 个 bridge 均用区分性文件名 fork；任一缺失 → worker 无法启动，扫描/缩略图/视频/解码等功能失效）
   const workerEntries = [
     'scanner-worker.js',
     'media-worker.js',
     'thumbnail-worker.js',
     'video-worker.js',
-    'database-worker.js'
+    'database-worker.js',
+    'decryption-worker.js'
   ]
   for (const w of workerEntries) {
     const wp = path.join(DIST_MAIN, 'app', w)

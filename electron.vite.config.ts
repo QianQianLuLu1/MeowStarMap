@@ -79,16 +79,17 @@ export default defineConfig({
       emptyOutDir: true,
       lib: {
         // 单一 main 入口会把所有 bridge 打包进 app/application.js，其 __dirname 变为 dist/main/main/app/；
-        // 而 scanner/media/thumbnail/video 的 worker-entry.ts 是各自独立的 utilityProcess 入口，
+        // 而 scanner/media/thumbnail/video/decryption 的 worker-entry.ts 是各自独立的 utilityProcess 入口，
         // 旧 tsc 布局下靠“与 bridge 同目录”的相对路径 fork。打包后必须把它们各自单独产出到 app/，
-        // 并让 bridge 用区分性文件名 fork，否则 4 个 worker 会指向同一个不存在的 worker-entry.js。
+        // 并让 bridge 用区分性文件名 fork，否则 worker 会指向同一个不存在的 worker-entry.js。
         entry: {
           index: 'src/main/index.ts',
           'scanner-worker': 'src/main/scanner/worker-entry.ts',
           'media-worker': 'src/main/media-worker/worker-entry.ts',
           'thumbnail-worker': 'src/main/thumbnail/worker-entry.ts',
           'video-worker': 'src/main/video-editor/worker-entry.ts',
-          'database-worker': 'src/main/database/worker/database-worker.ts'
+          'database-worker': 'src/main/database/worker/database-worker.ts',
+          'decryption-worker': 'src/main/decryption-worker/worker-entry.ts'
         },
         formats: ['cjs'],
         // 多入口：每个入口输出为 <name>.js（index.js / scanner-worker.js / ...）
