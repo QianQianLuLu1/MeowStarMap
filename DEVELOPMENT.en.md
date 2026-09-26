@@ -555,6 +555,13 @@ All four must pass before commit.
    npm config set registry https://registry.npmmirror.com
    ```
 
+   > Note: Chinese mirrors such as npmmirror do not implement npm's audit API
+   > (`/-/npm/v1/security/*`); after switching, `npm audit` fails with a 404
+   > (`audit endpoint returned an error`). Run dependency audits with
+   > `npm run audit` (audit-ci against the official registry; allowlist in the
+   > root `audit-ci.jsonc`). See
+   > [docs/troubleshooting-npm-audit-mirror.md](docs/troubleshooting-npm-audit-mirror.md).
+
 2. Clean and reinstall:
 
    ```bash

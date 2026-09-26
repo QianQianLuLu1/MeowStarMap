@@ -554,6 +554,11 @@ npm test
    npm config set registry https://registry.npmmirror.com
    ```
 
+   > 注意：npmmirror 等国内镜像未实现 npm 审计接口（`/-/npm/v1/security/*`），切到镜像后
+   > `npm audit` 会报 404（`audit endpoint returned an error`）。依赖审计请使用
+   > `npm run audit`（走官方 registry 的 audit-ci，豁免清单见根目录 `audit-ci.jsonc`），
+   > 详见 [docs/troubleshooting-npm-audit-mirror.md](docs/troubleshooting-npm-audit-mirror.md)。
+
 2. 清理缓存重装：
 
    ```bash

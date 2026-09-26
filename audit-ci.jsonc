@@ -1,0 +1,55 @@
+// npm 依赖审计配置（audit-ci 7.1.0，配置键与 CLI 参数一一对应，参见 node_modules/audit-ci/README.md）
+// 本文件是漏洞豁免清单的唯一事实来源：CI（.github/workflows/build.yml 的 Security audit 步骤）
+// 与本地 `npm run audit` 共用，勿在两处分别维护。
+// registry 固定官方源：npmmirror 等国内镜像未实现 /-/npm/v1/security/* 审计端点，
+// 直接 `npm audit` 会报 404，详见 docs/troubleshooting-npm-audit-mirror.md。
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  // 仅 high/critical 漏洞失败；low/moderate 不阻断
+  "high": true,
+  "registry": "https://registry.npmjs.org",
+  // 存量漏洞豁免（豁免项以外新增任何 high/critical 均拦截），需持续跟踪清理：
+  //   tar 链 9 项 + sigstore GHSA-52v5-jr5w-gjxr：pluggable-electron 传递依赖的 npm 内部工具链，
+  //     上游（tar<=7.5.20 / sigstore<=4.1.0）暂无任何修复版本
+  //   electron GHSA-9f4c-93c8-jc8g：40.10.6，修复需升级 electron >= 43.4.1（大版本，待专项升级）
+  //   vitest GHSA-5xrq-8626-4rwp / vite GHSA-fx2h-pf6j-xcff：dev 工具，修复需大版本升级
+  //     （vitest 仅 UI server 模式受影响，vite 仅 dev server 受影响，CI 均不使用）
+  //   2026-09 新披露批次 15 项：dev 工具链传递依赖（fast-uri×4 / brace-expansion×3 /
+  //     browserslist×2 / undici / glob / nanoid / js-yaml / ip-address），生产代码未直接引入，
+  //     修复均需上游（vitest / swagger / esbuild 链）大版本升级，待专项治理
+  "allowlist": [
+    // —— tar 链 9 项
+    "GHSA-23hp-3jrh-7fpw",
+    "GHSA-34x7-hfp2-rc4v",
+    "GHSA-8qq5-rm4j-mr97",
+    "GHSA-83g3-92jg-28cx",
+    "GHSA-qffp-2rhf-9h96",
+    "GHSA-9ppj-qmqm-q256",
+    "GHSA-r6q2-hw4h-h46w",
+    "GHSA-8x88-c5mf-7j5w",
+    "GHSA-r292-9mhp-454m",
+    // —— sigstore 1 项
+    "GHSA-52v5-jr5w-gjxr",
+    // —— electron 1 项
+    "GHSA-9f4c-93c8-jc8g",
+    // —— vitest / vite 2 项
+    "GHSA-5xrq-8626-4rwp",
+    "GHSA-fx2h-pf6j-xcff",
+    // —— 2026-09 新披露批次 15 项
+    "GHSA-2v37-7h3g-55p8",
+    "GHSA-3jxr-9vmj-r5cp",
+    "GHSA-4cwx-7wf7-3272",
+    "GHSA-5j98-mcp5-4vw2",
+    "GHSA-5jgf-p345-68v8",
+    "GHSA-5p4m-2wfm-xmqj",
+    "GHSA-73wf-gq98-2v4g",
+    "GHSA-7p8r-x3mc-p8w7",
+    "GHSA-c83g-rgw3-j3cx",
+    "GHSA-f65p-4m7j-42xc",
+    "GHSA-fph4-wmhf-6fwf",
+    "GHSA-jqff-g426-hqxp",
+    "GHSA-mh99-v99m-4gvg",
+    "GHSA-mwp4-54f8-5fhr",
+    "GHSA-rgw5-rvv9-x895"
+  ]
+}

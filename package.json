@@ -37,6 +37,8 @@
     "dist": "npm run build && electron-builder --publish never",
     "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
     "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts",
+    "audit": "audit-ci --config ./audit-ci.jsonc",
+    "audit:fix": "npm audit fix --registry=https://registry.npmjs.org",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",

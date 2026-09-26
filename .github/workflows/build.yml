@@ -51,29 +51,11 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
       # 供应链安全：依赖树审计（audit-ci 内部执行 npm audit），high/critical 漏洞直接失败；
       # 本 job 是 test/build 的 needs 前置，失败即阻断下游 test / build / 发布
-      # --allowlist 为存量漏洞豁免（豁免项以外新增任何 high/critical 均拦截），需持续跟踪清理：
-      #   tar 链 9 项 + sigstore GHSA-52v5-jr5w-gjxr：pluggable-electron 传递依赖的 npm 内部工具链，
-      #     上游（tar<=7.5.20 / sigstore<=4.1.0）暂无任何修复版本
-      #   electron GHSA-9f4c-93c8-jc8g：40.10.6，修复需升级 electron >= 43.4.1（大版本，待专项升级）
-      #   vitest GHSA-5xrq-8626-4rwp / vite GHSA-fx2h-pf6j-xcff：dev 工具，修复需大版本升级
-      #     （vitest 仅 UI server 模式受影响，vite 仅 dev server 受影响，CI 均不使用）
-      #   2026-09 新披露批次 15 项：dev 工具链传递依赖（fast-uri×4 / brace-expansion×3 /
-      #     browserslist×2 / undici / glob / nanoid / js-yaml / ip-address），生产代码未直接引入，
-      #     修复均需上游（vitest / swagger / esbuild 链）大版本升级，待专项治理
+      # 豁免清单（allowlist）与 registry 覆盖统一维护在根目录 audit-ci.jsonc（唯一事实来源，
+      # 本地 `npm run audit` 共用；npmmirror 等镜像未实现审计端点，故固定走官方源），
+      # 详见 docs/troubleshooting-npm-audit-mirror.md
       - name: Security audit (audit-ci, fail on high/critical)
-        run: >-
-          npx audit-ci --high --allowlist
-          GHSA-23hp-3jrh-7fpw GHSA-34x7-hfp2-rc4v GHSA-8qq5-rm4j-mr97
-          GHSA-83g3-92jg-28cx GHSA-qffp-2rhf-9h96 GHSA-9ppj-qmqm-q256
-          GHSA-r6q2-hw4h-h46w GHSA-8x88-c5mf-7j5w GHSA-r292-9mhp-454m
-          GHSA-52v5-jr5w-gjxr GHSA-9f4c-93c8-jc8g GHSA-5xrq-8626-4rwp
-          GHSA-fx2h-pf6j-xcff
-          GHSA-2v37-7h3g-55p8 GHSA-3jxr-9vmj-r5cp GHSA-4cwx-7wf7-3272
-          GHSA-5j98-mcp5-4vw2 GHSA-5jgf-p345-68v8 GHSA-5p4m-2wfm-xmqj
-          GHSA-73wf-gq98-2v4g GHSA-7p8r-x3mc-p8w7 GHSA-c83g-rgw3-j3cx
-          GHSA-f65p-4m7j-42xc GHSA-fph4-wmhf-6fwf GHSA-jqff-g426-hqxp
-          GHSA-mh99-v99m-4gvg GHSA-mwp4-54f8-5fhr GHSA-rgw5-rvv9-x895
-          --registry=https://registry.npmjs.org
+        run: npx audit-ci --config ./audit-ci.jsonc
       - run: npm run lint
       - name: i18n 守卫（白名单只减不增 / 清零必移除 / key 已同步）
         run: npm run i18n:guard
