@@ -74,8 +74,8 @@ npm run e2e:smoke    # Playwright 冒烟测试（perf 为性能用例）
 ## 编码约定
 
 - TypeScript `strict: true`；主进程与脚本有独立 tsconfig。
-- ESLint 9 flat config（`eslint.config.js`）+ Prettier；提交前经 husky + lint-staged 校验。
-- 提交信息遵循 Conventional Commits（commitlint；可用 `npm run commit` 走 commitizen）。
+- ESLint 9 flat config（`eslint.config.js`）+ Prettier。
+- 提交信息遵循 Conventional Commits，经 husky（commit-msg 钩子）+ commitlint 校验；规范详情见 `.qoder/rules/project-conventions.md` 的「提交校验流程」节。
 - 单元测试与源码同目录，命名 `*.test.ts(x)`（Vitest）。
-- 修改 IPC（通道名、preload 暴露、handler 签名）时必须同步更新 `docs/IPC_CONTRACT.md` 并保持向后兼容。
 - 代码注释与文档以中文为主；UI 文案走 i18next（zh/en），勿硬编码用户可见文本。
+- 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、提交校验流程等）见 `.qoder/rules/project-conventions.md`。

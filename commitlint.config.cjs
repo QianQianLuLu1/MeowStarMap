@@ -2,7 +2,7 @@
  * commitlint 配置
  * 基于 Conventional Commits 1.0.0 + 项目实际模块定制
  * 文档：https://commitlint.js.org/reference/rules.html
- * 提交规范：详见 .gitmessage 模板与 docs/code-comment-rule.md 第九节
+ * 提交规范：详见 .qoder/rules/project-conventions.md「提交校验流程」节与 .gitmessage 模板
  */
 
 module.exports = {
