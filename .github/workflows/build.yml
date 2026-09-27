@@ -163,10 +163,12 @@ jobs:
         id: release-body
         shell: bash
         run: |
-          if [ -f "RELEASE_NOTES_v2.3.5.md" ]; then
+          TAG_VERSION="${GITHUB_REF#refs/tags/}"
+          RELEASE_NOTES_FILE="RELEASE_NOTES_${TAG_VERSION}.md"
+          if [ -f "$RELEASE_NOTES_FILE" ]; then
             {
               echo "body<<EOF"
-              cat "RELEASE_NOTES_v2.3.5.md"
+              cat "$RELEASE_NOTES_FILE"
               echo "EOF"
             } >> "$GITHUB_OUTPUT"
             echo "generate=false" >> "$GITHUB_OUTPUT"
