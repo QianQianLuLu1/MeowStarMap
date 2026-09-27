@@ -28,7 +28,8 @@ const {
   fsRmMock,
   fsConstantsMock,
   isBlankCachedThumbnailMock,
-  clearCacheMock
+  clearCacheMock,
+  markExitStageMock
 } = vi.hoisted(() => ({
   processThumbnailForRowMock: vi.fn(),
   generatePhashForUnprocessedMock: vi.fn(),
@@ -47,7 +48,9 @@ const {
   // 存量纯白视频缩略图自愈判定（fix-video-thumbnail-white-frame 收尾）
   isBlankCachedThumbnailMock: vi.fn(),
   // media:// 一年强缓存击穿：session.defaultSession.clearCache
-  clearCacheMock: vi.fn()
+  clearCacheMock: vi.fn(),
+  // [DEBUG-a4f2] 退出取证阶段打点：扫描/索引窗口的精细阶段（崩溃定位用）
+  markExitStageMock: vi.fn()
 }))
 
 vi.mock('../../services/thumbnail-phash-service', () => ({
@@ -95,6 +98,11 @@ vi.mock('../../utils/scene-brightness', () => ({
 // 存量纯白视频缩略图自愈：cleanupAndRepairDatabase 用 isBlankCachedThumbnail 判定磁盘白帧
 vi.mock('../../utils/video-frame', () => ({
   isBlankCachedThumbnail: isBlankCachedThumbnailMock
+}))
+
+// 退出取证：markExitStage 阶段打点（崩溃时 heartbeat.json 的 stage 字段来源）
+vi.mock('../exit-forensics', () => ({
+  markExitStage: markExitStageMock
 }))
 
 // progress-throttle 经电子 BrowserWindow.getAllWindows 推送；测试中无窗口，返回空数组即可
@@ -254,6 +262,7 @@ beforeEach(() => {
   isBlankCachedThumbnailMock.mockResolvedValue(false)
   clearCacheMock.mockReset()
   clearCacheMock.mockResolvedValue(undefined)
+  markExitStageMock.mockReset()
 
   generatePhashForUnprocessedMock.mockResolvedValue({ processed: 0, total: 0 })
   processThumbnailForRowMock.mockResolvedValue(true)
@@ -1599,5 +1608,51 @@ describe('notifyInterruptedScan', () => {
       expect.any(Error)
     )
     expect(mainWindow.webContents.send).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================================
+// exit-forensics 阶段打点（2026-09-27 打包版闪退取证：崩溃发生在启动扫描/索引窗口，
+// 但 markExitStage 仅有 boot/when-ready/initialized/cleanup 四个里程碑，
+// heartbeat.json 的 stage 停留在 'initialized'，无法定位崩溃处于哪个子阶段）
+// ============================================================================
+describe('exit-forensics 阶段打点', () => {
+  it('32. performStartupScan 开始时标记 startup-scan 阶段', async () => {
+    const db = makeDb({ scanHistoryCount: 5 })
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 0 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn()
+    }
+    const ctx = makeAppCtx({ db, scannerManager, mainWindow: makeMainWindow() })
+
+    await performStartupScan(ctx)
+
+    expect(markExitStageMock).toHaveBeenCalledWith('startup-scan')
+  })
+
+  it('33. 索引链启动时标记 post-scan-indexing 阶段', async () => {
+    const ctx = makeAppCtx({ db: makeDb({}), mainWindow: makeMainWindow() })
+    const mwm = makeMediaWorkerManager()
+    ;(ctx as unknown as { mediaWorkerManager: unknown }).mediaWorkerManager = mwm
+
+    await runPostScanIndexing(ctx, 0)
+
+    expect(markExitStageMock).toHaveBeenCalledWith('post-scan-indexing')
+  })
+
+  it('34. 场景时段分析启动时标记 scene-analysis 阶段', async () => {
+    const db = makeDb({
+      mediaRows: [
+        { id: 1, file_path: 'C:\\img\\a.jpeg' },
+        { id: 2, file_path: 'C:\\img\\b.jpeg' }
+      ]
+    })
+    const ctx = makeAppCtx({ db, mainWindow: makeMainWindow() })
+
+    await autoAnalyzeSceneTime(ctx)
+
+    expect(markExitStageMock).toHaveBeenCalledWith('scene-analysis')
+    expect(analyzeSceneBrightnessMock).toHaveBeenCalledTimes(2)
   })
 })

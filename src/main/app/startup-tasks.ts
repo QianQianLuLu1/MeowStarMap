@@ -22,6 +22,10 @@ import { taskRegistry } from '../utils/task-registry'
 import type Database from 'better-sqlite3'
 import type { TaskProgress } from '../../shared/types/progress'
 import { t } from '../i18n'
+// 2026-09-27 打包版闪退取证：崩溃落在启动扫描/索引窗口，但 exit-forensics 只有
+// initialized/cleanup 两个里程碑。在此窗口内补精细阶段打点，使下一次崩溃时
+// heartbeat.json 的 stage 能直接定位到 startup-scan / post-scan-indexing / scene-analysis。
+import { markExitStage } from './exit-forensics'
 
 /**
  * 启动时后台执行一次自动扫描。
@@ -33,6 +37,7 @@ import { t } from '../i18n'
  */
 export async function performStartupScan(ctx: AppContext): Promise<void> {
   try {
+    markExitStage('startup-scan')
     // 修复：首次启动默认使用全盘扫描
     // 原版默认 incremental:true，若游戏目录查找失败则用户看不到任何媒体
     // 全盘扫描直接搜索所有盘符的媒体特征文件夹，覆盖所有安装场景
@@ -126,6 +131,7 @@ const INDEXING_TOTAL_TIMEOUT_MS = 10 * 60_000
  * - 调用语义与改造前一致（向后兼容既有测试契约）：缩略图仅当 filesFound>0 执行；pHash reject 仍记日志。
  */
 export async function runPostScanIndexing(ctx: AppContext, filesFound: number): Promise<void> {
+  markExitStage('post-scan-indexing')
   const taskId = `indexing-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const startedAt = Date.now()
 
@@ -344,6 +350,7 @@ export async function autoAnalyzeSceneTime(
   // 避免两套 abort 判断分散。用户取消时不再广播 media:updated（外层据此区分"完成"与"取消"）。
   const externalSignal = opts?.signal
   const report = opts?.report
+  markExitStage('scene-analysis')
   const controller = new AbortController()
   const totalTimer = setTimeout(() => controller.abort(), SCENE_TOTAL_TIMEOUT_MS)
   // 整体超时定时器不阻止进程退出（后台启动任务不应持有 event loop）
