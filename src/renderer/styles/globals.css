@@ -38,8 +38,11 @@
   /* 毛玻璃模糊半径变量——reduce-motion 通过覆盖此值固定模糊度 */
   --glass-blur: 12px;
   --glass-blur-sm: 8px;
-  --backdrop-blur: blur(var(--glass-blur));
-  --backdrop-blur-sm: blur(var(--glass-blur-sm));
+  /* 液态玻璃透色饱和度：backdrop-filter 附加 saturate 提升玻璃折射质感。
+     设置页「轻度增强」（html.glass-lite）降档并隐藏环境光斑 */
+  --glass-saturate: 1.5;
+  --backdrop-blur: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+  --backdrop-blur-sm: blur(var(--glass-blur-sm)) saturate(var(--glass-saturate));
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
@@ -192,6 +195,8 @@ html.reduce-motion .motion-hover-scale-sm:hover,
 html.reduce-motion .motion-hover-scale-sm:active,
 html.reduce-motion .motion-hover-scale-cta:hover,
 html.reduce-motion .motion-hover-scale-cta:active,
+html.reduce-motion .card-hover:hover,
+html.reduce-motion .card-hover:active,
 html.reduce-motion .settings-elastic-switch:active .settings-elastic-switch-knob {
   transform: none !important;
 }
@@ -264,7 +269,10 @@ body {
     -webkit-backdrop-filter: var(--backdrop-blur);
     border-radius: var(--radius-lg);
     border: 1px solid var(--divider);
-    box-shadow: var(--shadow-md);
+    /* 内侧顶部 1px 高光模拟玻璃上缘反光；柔粉主题有自带高光的完整覆盖，不冲突 */
+    box-shadow:
+      var(--shadow-md),
+      inset 0 1px 0 rgba(255, 255, 255, 0.35);
     transition:
       transform var(--transition-normal),
       box-shadow var(--transition-normal),
@@ -274,6 +282,9 @@ body {
 
   /* C 阶段：侧边栏微渐变背景，为毛玻璃提供可模糊的彩色内容 */
   .sidebar-gradient {
+    /* 层叠上下文根：使子级 .ambient-bg（z-index:-1）画在本层背景之上、内容之下，
+       而非被本层不透明背景盖住；TitleBar 须位于本容器内以维持弹窗遮罩(z-[100])盖住标题栏的顺序 */
+    isolation: isolate;
     background: linear-gradient(180deg, #edf1f7 0%, #f5f5f5 100%);
   }
 
@@ -290,12 +301,147 @@ body {
     -webkit-backdrop-filter: var(--backdrop-blur-sm);
     border-radius: var(--radius-md);
     border: 1px solid var(--divider);
-    box-shadow: var(--shadow-sm);
+    box-shadow:
+      var(--shadow-sm),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25);
     transition:
       transform var(--transition-normal),
       box-shadow var(--transition-normal),
       background var(--transition-normal),
       border-color var(--transition-normal);
+  }
+
+  /* 液态玻璃环境光斑：为毛玻璃提供可折射的彩色内容（「明显流动感」档，默认）。
+     颜色由 --accent 派生，双主题自适应；仅 transform 漂移动画（compositor 合成）。
+     z-index:-1 使其画在 .sidebar-gradient 父背景之上、静态内容之下。
+     全局仅 AppShell 一处实例，3 个常驻动画元素的 will-change 属合理使用。 */
+  .ambient-bg {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .ambient-blob {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform;
+  }
+
+  .ambient-blob-a {
+    width: 42vw;
+    height: 42vw;
+    min-width: 480px;
+    min-height: 480px;
+    top: -12%;
+    left: 18%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--accent) 16%, transparent) 0%,
+      transparent 70%
+    );
+    animation: ambient-drift-a 26s ease-in-out infinite alternate;
+  }
+
+  .ambient-blob-b {
+    width: 36vw;
+    height: 36vw;
+    min-width: 420px;
+    min-height: 420px;
+    bottom: -14%;
+    right: 8%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--accent) 12%, transparent) 0%,
+      transparent 70%
+    );
+    animation: ambient-drift-b 34s ease-in-out infinite alternate;
+  }
+
+  .ambient-blob-c {
+    width: 28vw;
+    height: 28vw;
+    min-width: 360px;
+    min-height: 360px;
+    top: 32%;
+    left: -10%;
+    background: radial-gradient(
+      circle,
+      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+      transparent 70%
+    );
+    animation: ambient-drift-a 40s ease-in-out infinite alternate-reverse;
+  }
+}
+
+@keyframes ambient-drift-a {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(6vw, 4vh, 0) scale(1.12);
+  }
+}
+
+@keyframes ambient-drift-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+  to {
+    transform: translate3d(-5vw, -6vh, 0) scale(0.94);
+  }
+}
+
+/* 设置页「玻璃效果：轻度增强」档：隐藏光斑层 + 降低透色饱和度（ html 根类由设置项切换） */
+html.glass-lite {
+  --glass-saturate: 1.15;
+}
+
+html.glass-lite .ambient-bg {
+  display: none;
+}
+
+/* 卡片悬停微交互（信息面板/统计卡/分组卡等信息模块专用）：
+   上浮 + 阴影加深 + 边框 accent 高亮，active 轻微下压。
+   过渡含 opacity，兼容选中态淡出；含 box-shadow，兼容选中描边环切换。
+   对话框/右键菜单/Toast 等浮层容器一律不得使用本类。 */
+.card-hover {
+  transition:
+    transform var(--transition-normal),
+    box-shadow var(--transition-normal),
+    border-color var(--transition-normal),
+    opacity var(--transition-normal);
+}
+
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.card-hover:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* 系统级「降低透明度」偏好：玻璃材质退化为实底、光斑隐藏（a11y 兜底，
+   !important 用于覆盖柔粉主题更高特异性的 backdrop-filter/background 声明） */
+@media (prefers-reduced-transparency: reduce) {
+  .glass-card,
+  .glass-panel,
+  .title-bar,
+  .status-bar,
+  .soft-pink-luxury .glass-card,
+  .soft-pink-luxury .glass-panel,
+  .soft-pink-luxury .title-bar,
+  .soft-pink-luxury .status-bar {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--bg-primary) !important;
+  }
+
+  .ambient-bg {
+    display: none !important;
   }
 }
 
@@ -983,7 +1129,9 @@ body {
   html:not(.reduce-motion) .motion-hover-scale-sm:hover,
   html:not(.reduce-motion) .motion-hover-scale-sm:active,
   html:not(.reduce-motion) .motion-hover-scale-cta:hover,
-  html:not(.reduce-motion) .motion-hover-scale-cta:active {
+  html:not(.reduce-motion) .motion-hover-scale-cta:active,
+  html:not(.reduce-motion) .card-hover:hover,
+  html:not(.reduce-motion) .card-hover:active {
     transform: none !important;
   }
 }

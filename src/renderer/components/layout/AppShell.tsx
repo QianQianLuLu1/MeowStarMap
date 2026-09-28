@@ -134,8 +134,17 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       className="h-screen w-screen flex flex-col overflow-hidden"
       style={{ background: 'var(--bg-primary)' }}
     >
-      <TitleBar />
+      {/* TitleBar 置于 sidebar-gradient（层叠上下文根）之内：保持 fixed z-50 标题栏
+          与容器内联全屏浮层（BaseDialog z-[100] 等）的「遮罩盖住标题栏」顺序不变；
+          fixed 包含块不受 isolation 影响，定位与裁剪行为均与原先一致 */}
       <div className="flex-1 flex pt-10 overflow-hidden sidebar-gradient">
+        <TitleBar />
+        {/* 液态玻璃环境光斑：为毛玻璃卡片提供可折射的彩色背景（设置「轻度增强」时整层隐藏） */}
+        <div className="ambient-bg" aria-hidden="true">
+          <span className="ambient-blob ambient-blob-a" />
+          <span className="ambient-blob ambient-blob-b" />
+          <span className="ambient-blob ambient-blob-c" />
+        </div>
         <Sidebar />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5">{children}</div>

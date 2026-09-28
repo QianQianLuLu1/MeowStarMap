@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "Analyse fehlgeschlagen",
     "sceneAnalyzed": "Szenenzeit für {{count}} Bilder analysiert",
     "settingFailed": "Einstellung fehlgeschlagen",
-    "themeChanged": "Design gewechselt"
+    "themeChanged": "Design gewechselt",
+    "glassEffectSet": "Glaseffekt auf {{label}} geändert"
   },
   "nav": {
     "allProfiles": "Alle Profile",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "Klein",
       "fontSizeXLarge": "Sehr groß",
       "reduceMotion": "Animationen reduzieren",
-      "reduceMotionDesc": "Übergangsanimationen und Hover-Effekte deaktivieren, Reaktionsgeschwindigkeit auf leistungsschwachen Geräten verbessern"
+      "reduceMotionDesc": "Übergangsanimationen und Hover-Effekte deaktivieren, Reaktionsgeschwindigkeit auf leistungsschwachen Geräten verbessern",
+      "glassEffect": "Glaseffekt",
+      "glassEffectHint": "„Ausgeprägte Fluidität\" fügt Glas-Karten ambiente Lichtflecken und höhere Farbsättigung hinzu; „Dezente Verstärkung\" blendet die Flecken aus und senkt die Sättigung – bei geringerer Last.",
+      "glassEffectLite": "Dezente Verstärkung",
+      "glassEffectRich": "Ausgeprägte Fluidität"
     },
     "export": {
       "clearDir": "Leeren",

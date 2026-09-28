@@ -26,6 +26,7 @@ import {
 } from '../icons'
 import { ContextMenu } from '../components/common/ContextMenu'
 import { MediaThumbnail } from '../components/common/MediaThumbnail'
+import { SkeletonList } from '../components/common/Skeleton'
 import { getContextMenuItems, type GalleryContextMenuActions } from '../utils/gallery'
 import { useFileOperations } from '../hooks/useFileOperations'
 import { PropertiesDialog } from '../components/common/PropertiesDialog'
@@ -1036,24 +1037,23 @@ export const DuplicatesPage: React.FC = () => {
       <div ref={contentRef} className="flex-1 min-h-0 overflow-hidden">
         {!showGroupList && (
           <div className="h-full overflow-auto p-6">
-            {/* 加载中 + 进度条 */}
+            {/* 加载中：分组骨架（与结果列表同形）+ 进度条 */}
             {scanning && (
               <div
-                className="flex flex-col items-center justify-center h-full"
+                className="flex flex-col items-center justify-center h-full gap-4"
                 style={{ color: 'var(--text-tertiary)' }}
               >
-                <div
-                  className="w-10 h-10 border-2 border-current border-t-transparent rounded-full animate-spin mb-4"
-                  style={{ color: 'var(--accent)' }}
-                />
                 <p className="text-sm">
                   {mode === 'exact' ? t('duplicates.loadingExact') : t('duplicates.loadingSimilar')}
                 </p>
-                <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>
+                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   {mode === 'exact'
                     ? t('duplicates.loadingHintExact')
                     : t('duplicates.loadingHintSimilar')}
                 </p>
+                <div className="w-full max-w-2xl">
+                  <SkeletonList rows={3} />
+                </div>
                 {/* 性能重构 v3：实时进度条（仅当收到 task:progress 时显示） */}
                 {taskProgress && taskProgress.phase !== 'done' && (
                   <div className="mt-6 w-80 max-w-full">
@@ -1613,7 +1613,7 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
 
   return (
     <div
-      className="glass-card overflow-hidden cursor-pointer transition-all"
+      className="glass-card card-hover overflow-hidden cursor-pointer"
       style={{
         borderRadius: '12px',
         boxShadow: selected

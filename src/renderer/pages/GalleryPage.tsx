@@ -21,6 +21,7 @@ import { EventTimelineView } from '../components/gallery/EventTimelineView'
 import { GalleryToolbar } from '../components/gallery/GalleryToolbar'
 import { BatchActions } from '../components/gallery/BatchActions'
 import { EmptyState } from '../components/common/EmptyState'
+import { SkeletonGrid } from '../components/common/Skeleton'
 import { IconImage } from '../icons'
 import { ErrorBoundary } from '../components/common/ErrorBoundary'
 import { ZoneErrorFallback } from '../components/common/ErrorFallback'
@@ -572,15 +573,7 @@ export const GalleryPage: React.FC = () => {
 
   // P2-F：仅在初次加载（无已渲染数据）时显示骨架，避免卸载已渲染的虚拟列表丢失滚动位置
   if (loading && filteredFiles.length === 0) {
-    return (
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="aspect-square rounded-xl skeleton" />
-          ))}
-        </div>
-      </div>
-    )
+    return <SkeletonGrid count={12} />
   }
 
   return (
@@ -646,7 +639,7 @@ export const GalleryPage: React.FC = () => {
       {/* 文件列表 */}
       {filteredFiles.length === 0 ? (
         <EmptyState
-          icon={<IconImage size={64} strokeWidth="1" className="empty-state-icon" />}
+          icon={<IconImage size={64} strokeWidth="1" />}
           title={t('galleryPage.emptyTitle')}
           subtitle={
             // D2（评审修复批次 B）：已扫描引导文案仅限 gallery 视图——缓存/收藏等板块的空态

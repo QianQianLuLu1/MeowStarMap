@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "Échec de l'analyse",
     "sceneAnalyzed": "Temps de scène analysé pour {{count}} images",
     "settingFailed": "Échec du paramétrage",
-    "themeChanged": "Thème basculé"
+    "themeChanged": "Thème basculé",
+    "glassEffectSet": "Effet de verre défini sur {{label}}"
   },
   "nav": {
     "allProfiles": "Tous les profils",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "Petit",
       "fontSizeXLarge": "Très grand",
       "reduceMotion": "Réduire les animations",
-      "reduceMotionDesc": "Désactiver les transitions et effets de survol pour améliorer la réactivité sur les appareils peu performants"
+      "reduceMotionDesc": "Désactiver les transitions et effets de survol pour améliorer la réactivité sur les appareils peu performants",
+      "glassEffect": "Effet de verre",
+      "glassEffectHint": "« Flux prononcé » ajoute des taches de lumière ambiantes et une saturation accrue derrière les cartes en verre ; « Subtil » masque les taches et réduit la saturation pour de meilleures performances.",
+      "glassEffectLite": "Subtil",
+      "glassEffectRich": "Flux prononcé"
     },
     "export": {
       "clearDir": "Effacer",

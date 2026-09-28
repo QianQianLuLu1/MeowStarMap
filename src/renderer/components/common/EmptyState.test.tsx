@@ -102,4 +102,9 @@ describe('EmptyState', () => {
     render(<EmptyState status="error" icon={<span data-testid="err-icon">⚠️</span>} />)
     expect(screen.getByTestId('err-icon')).toBeTruthy()
   })
+
+  it('icon 容器挂 empty-state-icon 类（柔粉主题柔光动画挂载点）', () => {
+    const { container } = render(<EmptyState icon={<span>📷</span>} />)
+    expect(container.querySelector('.empty-state-icon')).toBeTruthy()
+  })
 })

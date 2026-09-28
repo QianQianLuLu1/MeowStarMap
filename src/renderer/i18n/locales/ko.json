@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "분석 실패",
     "sceneAnalyzed": "{{count}}장 이미지의 장면 시간대 분석",
     "settingFailed": "설정 실패",
-    "themeChanged": "테마가 전환되었습니다"
+    "themeChanged": "테마가 전환되었습니다",
+    "glassEffectSet": "유리 효과가 {{label}}(으)로 변경되었습니다"
   },
   "nav": {
     "allProfiles": "전체 프로필",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "작게",
       "fontSizeXLarge": "아주 크게",
       "reduceMotion": "모션 감소",
-      "reduceMotionDesc": "전환 애니메이션과 호버 효과 비활성화, 저성능 기기 응답 속도 향상"
+      "reduceMotionDesc": "전환 애니메이션과 호버 효과 비활성화, 저성능 기기 응답 속도 향상",
+      "glassEffect": "유리 효과",
+      "glassEffectHint": "'뚜렷한 유동감'은 유리 카드에 환경광 반점과 높은 채도를 더합니다. '절제된 강화'는 반점을 숨기고 채도를 낮춰 성능 부담이 적습니다.",
+      "glassEffectLite": "절제된 강화",
+      "glassEffectRich": "뚜렷한 유동감"
     },
     "export": {
       "clearDir": "지우기",

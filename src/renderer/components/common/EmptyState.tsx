@@ -65,7 +65,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
 
   return (
     <div
-      className="flex flex-col items-center justify-center h-full gap-2"
+      className="flex flex-col items-center justify-center h-full gap-3"
       style={{ color: 'var(--text-tertiary)' }}
     >
       {isLoading ? (
@@ -73,7 +73,10 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
           <Spinner size={spinnerSize} />
         </div>
       ) : (
-        icon && <div className="mb-2 opacity-60">{icon}</div>
+        icon && (
+          // empty-state-icon：柔粉主题在此类上挂柔光+呼吸动画（themes/soft-pink-luxury.css），默认主题无额外效果
+          <div className="empty-state-icon mb-2 opacity-60">{icon}</div>
+        )
       )}
       <p className="text-base">{displayTitle}</p>
       {subtitle && <p className="text-sm opacity-80">{subtitle}</p>}

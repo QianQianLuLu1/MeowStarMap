@@ -13,6 +13,7 @@ import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { EmptyState } from '../components/common/EmptyState'
+import { SkeletonGrid } from '../components/common/Skeleton'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
 import { useStagedTask } from '../hooks/useStagedTask'
 import { settleWithConcurrency } from '../../shared/utils/concurrency'
@@ -355,11 +356,8 @@ export const RecycleBinPage: React.FC = () => {
       {/* 内容区：列表虚拟化 + 触底分页，回收站堆积上万条时仍只挂载可视区 DOM */}
       <div ref={contentRef} className="flex-1 min-h-0 overflow-hidden">
         {recycleBinLoading && (
-          <div className="flex items-center justify-center h-32">
-            <div
-              className="w-8 h-8 border-2 border-current border-t-transparent rounded-full animate-spin"
-              style={{ color: 'var(--accent)' }}
-            />
+          <div className="p-6">
+            <SkeletonGrid count={8} aspect="video" />
           </div>
         )}
 
@@ -500,7 +498,7 @@ const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({ file, selected
 
   return (
     <div
-      className={`glass-card overflow-hidden cursor-pointer transition-all ${selected ? 'ring-2' : ''}`}
+      className={`glass-card card-hover overflow-hidden cursor-pointer ${selected ? 'ring-2' : ''}`}
       style={{
         borderRadius: '12px',
         boxShadow: selected ? '0 0 0 2px var(--accent)' : '0 4px 20px rgba(0,0,0,0.08)'

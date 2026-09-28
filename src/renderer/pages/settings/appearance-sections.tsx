@@ -71,12 +71,23 @@ const applyReduceMotion = (enabled: boolean) => {
   document.documentElement.classList.toggle('reduce-motion', enabled)
 }
 
+// 玻璃效果档位：rich（明显流动感，默认）| lite（轻度增强）；非法值按 rich 处理
+export type GlassEffect = 'rich' | 'lite'
+
+export const normalizeGlassEffect = (value: unknown): GlassEffect =>
+  value === 'lite' ? 'lite' : 'rich'
+
+const applyGlassEffect = (effect: GlassEffect) => {
+  document.documentElement.classList.toggle('glass-lite', effect === 'lite')
+}
+
 export const AppearanceDisplaySection: React.FC = () => {
   const { t } = useTranslation()
   const showMessage = useContext(GlobalToastContext)
   const [fontSize, setFontSize] = useState<FontSize>('normal')
   const [compactMode, setCompactMode] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
+  const [glassEffect, setGlassEffect] = useState<GlassEffect>('rich')
 
   useEffect(() => {
     const load = async () => {
@@ -96,6 +107,11 @@ export const AppearanceDisplaySection: React.FC = () => {
       )) as boolean
       setReduceMotion(motion)
       applyReduceMotion(motion)
+      const glass = normalizeGlassEffect(
+        await window.electronAPI.settings.get('display.glassEffect', 'rich')
+      )
+      setGlassEffect(glass)
+      applyGlassEffect(glass)
     }
     load()
   }, [])
@@ -125,6 +141,21 @@ export const AppearanceDisplaySection: React.FC = () => {
     applyReduceMotion(enabled)
     if (window.electronAPI) await window.electronAPI.settings.set('display.reduceMotion', enabled)
     showMessage(enabled ? t('logAction.reduceMotionOn') : t('logAction.reduceMotionOff'))
+  }
+
+  const handleGlassEffect = async (effect: GlassEffect) => {
+    setGlassEffect(effect)
+    applyGlassEffect(effect)
+    if (window.electronAPI) await window.electronAPI.settings.set('display.glassEffect', effect)
+    showMessage(
+      t('logAction.glassEffectSet', {
+        label: t(
+          effect === 'lite'
+            ? 'settings.display.glassEffectLite'
+            : 'settings.display.glassEffectRich'
+        )
+      })
+    )
   }
 
   const sizeOptions: { value: FontSize; label: string; sample: string }[] = [
@@ -178,6 +209,41 @@ export const AppearanceDisplaySection: React.FC = () => {
         checked={reduceMotion}
         onChange={handleReduceMotion}
       />
+
+      {/* 玻璃效果：明显流动感（默认，含环境光斑）/ 轻度增强（低饱和无光斑） */}
+      <div className="space-y-2">
+        <div style={{ color: 'var(--text-primary)' }}>{t('settings.display.glassEffect')}</div>
+        <div className="grid grid-cols-2 gap-2">
+          {(['rich', 'lite'] as const).map((opt) => {
+            const active = glassEffect === opt
+            return (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => handleGlassEffect(opt)}
+                className="p-3 rounded-lg text-center transition-all"
+                style={{
+                  background: active ? 'var(--accent)' : 'var(--bg-tertiary)',
+                  color: active ? 'var(--text-on-accent)' : 'var(--text-primary)',
+                  border: active ? '1px solid var(--accent)' : '1px solid transparent'
+                }}
+                aria-pressed={active}
+              >
+                <div className="font-medium text-sm">
+                  {t(
+                    opt === 'rich'
+                      ? 'settings.display.glassEffectRich'
+                      : 'settings.display.glassEffectLite'
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          {t('settings.display.glassEffectHint')}
+        </p>
+      </div>
     </SectionShell>
   )
 }

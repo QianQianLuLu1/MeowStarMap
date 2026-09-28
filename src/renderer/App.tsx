@@ -244,6 +244,12 @@ const App: React.FC = () => {
           false
         )) as boolean
         html.classList.toggle('reduce-motion', motion)
+        // 玻璃效果档位：rich（默认，明显流动感）| lite（轻度增强）；非法值按 rich 处理
+        const glass = (await window.electronAPI.settings.get(
+          'display.glassEffect',
+          'rich'
+        )) as string
+        html.classList.toggle('glass-lite', glass === 'lite')
       } catch {
         // 预览版无 IPC，静默忽略
       }

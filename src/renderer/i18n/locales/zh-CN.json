@@ -1478,6 +1478,7 @@
     "exportFailed": "导出失败",
     "exportSuccess": "日志已导出",
     "fontSizeSet": "字号已设为{{label}}",
+    "glassEffectSet": "玻璃效果已切换为 {{label}}",
     "incrementalOff": "已关闭增量扫描",
     "incrementalOn": "已开启增量扫描",
     "limitSet": "上限已调整为 {{gb}}GB",
@@ -1830,6 +1831,10 @@
       "fontSizeNormal": "标准",
       "fontSizeSmall": "小",
       "fontSizeXLarge": "特大",
+      "glassEffect": "玻璃效果",
+      "glassEffectHint": "「明显流动感」为玻璃卡片附加环境光斑与更高透色饱和度；「轻度增强」隐藏光斑并降低饱和度，性能开销更低",
+      "glassEffectLite": "轻度增强",
+      "glassEffectRich": "明显流动感",
       "reduceMotion": "动效减弱",
       "reduceMotionDesc": "关闭过渡动画和悬停效果，提升低性能设备响应速度"
     },

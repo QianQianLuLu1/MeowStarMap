@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "分析失敗",
     "sceneAnalyzed": "{{count}} 枚の画像のシーン時間帯を分析",
     "settingFailed": "設定失敗",
-    "themeChanged": "テーマを切り替えました"
+    "themeChanged": "テーマを切り替えました",
+    "glassEffectSet": "ガラス効果を{{label}}に変更しました"
   },
   "nav": {
     "allProfiles": "全プロファイル",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "小",
       "fontSizeXLarge": "特大",
       "reduceMotion": "モーション軽減",
-      "reduceMotionDesc": "トランジションアニメーションとホバー効果を無効化、低性能デバイスの応答速度を向上"
+      "reduceMotionDesc": "トランジションアニメーションとホバー効果を無効化、低性能デバイスの応答速度を向上",
+      "glassEffect": "ガラス効果",
+      "glassEffectHint": "「はっきりした流動感」はガラスカードに環境光の光斑と高い彩度を加えます。「軽めの強調」は光斑を隠して彩度を下げ、動作負荷が軽くなります。",
+      "glassEffectLite": "軽めの強調",
+      "glassEffectRich": "はっきりした流動感"
     },
     "export": {
       "clearDir": "クリア",

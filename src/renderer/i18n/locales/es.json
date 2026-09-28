@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "Análisis fallido",
     "sceneAnalyzed": "Tiempo de escena analizado para {{count}} imágenes",
     "settingFailed": "Configuración fallida",
-    "themeChanged": "Tema cambiado"
+    "themeChanged": "Tema cambiado",
+    "glassEffectSet": "Efecto de vidrio cambiado a {{label}}"
   },
   "nav": {
     "allProfiles": "Todos los perfiles",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "Pequeño",
       "fontSizeXLarge": "Muy grande",
       "reduceMotion": "Reducir movimiento",
-      "reduceMotionDesc": "Desactivar transiciones y efectos de hover para mejorar la respuesta en dispositivos de bajo rendimiento"
+      "reduceMotionDesc": "Desactivar transiciones y efectos de hover para mejorar la respuesta en dispositivos de bajo rendimiento",
+      "glassEffect": "Efecto de vidrio",
+      "glassEffectHint": "«Flujo pronunciado» añade destellos ambientales y mayor saturación detrás de las tarjetas de cristal; «Sutil» oculta los destellos y reduce la saturación, con menor coste de rendimiento.",
+      "glassEffectLite": "Sutil",
+      "glassEffectRich": "Flujo pronunciado"
     },
     "export": {
       "clearDir": "Borrar",

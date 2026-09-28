@@ -15,6 +15,7 @@ import { VideoPlayer } from '../components/video/VideoPlayer'
 import { useGlobalToast } from './settings/sections'
 import { useExif } from '../hooks/useExif'
 import { EmptyState } from '../components/common/EmptyState'
+import { SkeletonDetail } from '../components/common/Skeleton'
 import { ZoomableContainer } from '../components/common/ZoomableContainer'
 import { formatFileSize } from '../utils/format'
 import { formatDateTime } from '../utils/date'
@@ -32,6 +33,7 @@ export const DetailPage: React.FC = () => {
   const openFullscreen = useUIStore((s) => s.openFullscreen)
   const setPendingEditorMetadata = useUIStore((s) => s.setPendingEditorMetadata)
   const mediaFiles = useMediaStore((s) => s.mediaFiles)
+  const mediaLoading = useMediaStore((s) => s.loading)
   const deleteMediaFiles = useMediaStore((s) => s.deleteMediaFiles)
   const filteredFiles = useFilteredMediaFiles()
   const media = mediaFiles.find((f) => f.id === selectedMediaId)
@@ -167,6 +169,11 @@ export const DetailPage: React.FC = () => {
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
   }, [showTagManager, media, filteredFiles, currentIndex, navigateToIndex, navigateTo])
+
+  if (!media && mediaLoading) {
+    // 加载中：详情页布局骨架（与最终布局同形，避免跳变）
+    return <SkeletonDetail />
+  }
 
   if (!media) {
     // U-S6：使用 EmptyState 统一空态

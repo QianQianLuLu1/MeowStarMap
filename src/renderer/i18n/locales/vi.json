@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "Phân tích thất bại",
     "sceneAnalyzed": "Đã phân tích thời gian cảnh cho {{count}} hình ảnh",
     "settingFailed": "Cài đặt thất bại",
-    "themeChanged": "Đã thay đổi chủ đề"
+    "themeChanged": "Đã thay đổi chủ đề",
+    "glassEffectSet": "Đã đổi hiệu ứng kính thành {{label}}"
   },
   "nav": {
     "allProfiles": "Tất cả hồ sơ",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "Nhỏ",
       "fontSizeXLarge": "Rất lớn",
       "reduceMotion": "Giảm hoạt ảnh",
-      "reduceMotionDesc": "Tắt hiệu ứng chuyển tiếp và hover để cải thiện khả năng phản hồi trên các thiết bị hiệu suất thấp"
+      "reduceMotionDesc": "Tắt hiệu ứng chuyển tiếp và hover để cải thiện khả năng phản hồi trên các thiết bị hiệu suất thấp",
+      "glassEffect": "Hiệu ứng kính",
+      "glassEffectHint": "\"Dòng chảy rõ nét\" thêm các vệt sáng môi trường và độ bão hòa cao hơn phía sau thẻ kính; \"Nhẹ nhàng\" ẩn các vệt sáng và giảm độ bão hòa, ít tốn hiệu năng hơn.",
+      "glassEffectLite": "Nhẹ nhàng",
+      "glassEffectRich": "Dòng chảy rõ nét"
     },
     "export": {
       "clearDir": "Xóa",

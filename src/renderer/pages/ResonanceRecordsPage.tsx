@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '../components/common/EmptyState'
+import { SkeletonGrid } from '../components/common/Skeleton'
 import { RecordsView } from '../components/resonance/RecordsView'
 import { WardrobeView } from '../components/resonance/WardrobeView'
 import { ImportExportView } from '../components/resonance/ImportExportView'
@@ -14,7 +15,7 @@ import {
 
 /**
  * 共鸣录页面容器：首次挂载懒加载本地数据（store 去重），顶部按钮组切换四个子页。
- * 加载/错误态统一走 EmptyState（错误提供重试 CTA），不白屏不静默。
+ * 加载态走 SkeletonGrid 骨架，错误态走 EmptyState（提供重试 CTA），不白屏不静默。
  */
 
 const TAB_ITEMS: Array<{ id: ResonanceTab; labelKey: string; icon: React.ReactNode }> = [
@@ -46,7 +47,7 @@ export const ResonanceRecordsPage: React.FC = () => {
         />
       )
     }
-    if (!loaded || loading) return <EmptyState status="loading" />
+    if (!loaded || loading) return <SkeletonGrid count={8} />
     switch (activeTab) {
       case 'records':
         return <RecordsView />

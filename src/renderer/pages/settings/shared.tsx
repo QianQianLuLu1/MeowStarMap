@@ -84,7 +84,7 @@ export const SectionShell: React.FC<{
   description?: string
   children: React.ReactNode
 }> = ({ title, description, children }) => (
-  <div className="glass-card p-5 space-y-4">
+  <div className="glass-card card-hover p-5 space-y-4">
     <div>
       <h3 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
         {title}

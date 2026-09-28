@@ -1105,7 +1105,8 @@
     "sceneAnalyzeFailed": "分析失敗",
     "sceneAnalyzed": "已分析 {{count}} 張圖片的場景時段",
     "settingFailed": "設定失敗",
-    "themeChanged": "主題已切換"
+    "themeChanged": "主題已切換",
+    "glassEffectSet": "玻璃效果已切換為 {{label}}"
   },
   "nav": {
     "allProfiles": "全部檔案",
@@ -1422,7 +1423,11 @@
       "fontSizeSmall": "小",
       "fontSizeXLarge": "特大",
       "reduceMotion": "動效減弱",
-      "reduceMotionDesc": "關閉過渡動畫和懸停效果，提升低效能裝置回應速度"
+      "reduceMotionDesc": "關閉過渡動畫和懸停效果，提升低效能裝置回應速度",
+      "glassEffect": "玻璃效果",
+      "glassEffectHint": "「明顯流動感」為玻璃卡片附加環境光斑與更高透色飽和度；「輕度增強」隱藏光斑並降低飽和度，效能開銷更低",
+      "glassEffectLite": "輕度增強",
+      "glassEffectRich": "明顯流動感"
     },
     "export": {
       "clearDir": "清除",
