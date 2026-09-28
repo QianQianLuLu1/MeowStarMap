@@ -131,6 +131,8 @@ function buildNonFatalContent(message: string, logPath: string): string {
 // 去重 / 退出竞态守卫：多个 uncaughtException 监听器（index 早期 + error-handlers）共享
 let hasReported = false
 let isExiting = false
+// 非致命弹框去重守卫：避免双监听器 + 视频抽帧阶梯导致多次模态框阻塞主进程
+let hasShownNonFatal = false
 
 /**
  * 完整致命处理：落盘 + 弹框 + 释放单实例锁 + 退出进程。
@@ -191,6 +193,13 @@ export function reportEarlyFatal(
       diag('SPAWN-NONFATAL', `stage=${stage} ${message}\n${stack}`)
     } catch {
       /* 忽略 */
+    }
+    // 补落盘：弹窗文案指向 startup-errors.log，该分支必须实际写入本次错误详情，
+    // 否则用户按弹窗提示打开日志却看不到对应条目。
+    try {
+      logStartupErr(stage, err)
+    } catch {
+      /* 落盘失败不阻塞后续弹框 */
     }
     showNonFatalErrorBox(err, { deps })
     return
@@ -277,6 +286,21 @@ export function showFatalStartupErrorBox(
  */
 export function showNonFatalErrorBox(err: unknown, opts: { deps?: EarlyCrashDeps } = {}): void {
   const deps = opts.deps ?? {}
+  const diag = deps.diagLog ?? diagLog
+  const { message } = toMessage(err)
+
+  // 去重守卫：多个 uncaughtException 监听器 + 视频抽帧阶梯会在短时间内多次触发，
+  // 模态框会阻塞主进程导致级联卡顿。首次弹框后置位，后续调用仅写 diagLog 保留可观测性。
+  if (hasShownNonFatal) {
+    try {
+      diag('SPAWN-NONFATAL-DEDUP', `skipped duplicate dialog: ${message}`)
+    } catch {
+      /* 忽略 */
+    }
+    return
+  }
+  hasShownNonFatal = true
+
   const showErrorBox =
     deps.showErrorBox ??
     ((t: string, c: string) => {
@@ -296,7 +320,6 @@ export function showNonFatalErrorBox(err: unknown, opts: { deps?: EarlyCrashDeps
       }
     })
   const logPath = resolveLogPath(deps)
-  const { message } = toMessage(err)
   showErrorBox(NONFATAL_TITLE, buildNonFatalContent(message, logPath))
   try {
     showItem(logPath)

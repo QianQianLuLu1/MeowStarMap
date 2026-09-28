@@ -259,4 +259,31 @@ describe('reportEarlyFatal 子进程 spawn 类错误分级', () => {
     expect(String(showErrorBox.mock.calls[0][0])).toContain('启动失败')
     expect(exitApp).toHaveBeenCalledWith(1)
   })
+
+  it('非致命去重：同一进程内连续 spawn 错误只弹一次模态框', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    const deps = { showErrorBox, hasMainWindow: () => true, getDiagDir: () => '/mock/diag' }
+
+    // 模拟 index.ts 与 error-handlers.ts 双监听器同时触发
+    reportEarlyFatal(makeSpawnError(), { deps })
+    reportEarlyFatal(makeSpawnError(), { deps })
+
+    // 去重守卫应确保仅弹一次框
+    expect(showErrorBox).toHaveBeenCalledTimes(1)
+  })
+
+  it('非致命分支补落盘：spawn 降级时仍写 startup-errors.log', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const { logStartupError } = await import('./startup-diagnostic')
+    const showErrorBox = vi.fn()
+
+    reportEarlyFatal(makeSpawnError(), {
+      stage: 'video-extract',
+      deps: { showErrorBox, hasMainWindow: () => true }
+    })
+
+    // 弹窗指向 startup-errors.log，该日志必须包含本次错误
+    expect(logStartupError).toHaveBeenCalledWith('video-extract', expect.any(Error))
+  })
 })

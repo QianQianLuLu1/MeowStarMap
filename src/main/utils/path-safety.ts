@@ -93,3 +93,92 @@ export function hasWindowsExecutableHeader(filePath: string): boolean {
     return false
   }
 }
+
+/**
+ * 校验文件是否为结构完整的 Windows PE 可执行文件（节表不超出文件大小）。
+ *
+ * 背景：hasWindowsExecutableHeader 仅检查 2 字节 MZ 魔数，无法识别“MZ/PE 头合法但
+ * 节表尺寸超过文件实际大小”的截断二进制（如 ffmpeg.exe 被杀软截断后头仍完好）。
+ * 本函数通过读取 DOS 头→PE 签名→COFF 头→节表，求 maxRawEnd 并与 fileSize 对比，
+ * 可精确识别此类截断场景。
+ *
+ * 算法：
+ * 1) 参数校验：空串/非文件/size<64 → false
+ * 2) 读取头部足够字节（前 4KB 覆盖绝大多数 PE）
+ * 3) 解析 e_lfanew、PE 签名、COFF 头、节表
+ * 4) 求 maxRawEnd = max(PointerToRawData + SizeOfRawData)
+ * 5) maxRawEnd > fileSize → false（截断）
+ *
+ * 任何异常（不存在/目录/权限/读取失败）一律返回 false，由调用方走降级。
+ */
+export function hasValidPeStructure(filePath: string): boolean {
+  if (!filePath) return false
+  try {
+    const stat = fs.statSync(filePath)
+    if (!stat.isFile() || stat.size < 64) return false
+    const fileSize = stat.size
+
+    // 读取前 4KB（覆盖 DOS 头 + PE 头 + 节表，绝大多数 PE 足够）
+    const readSize = Math.min(4096, fileSize)
+    const fd = fs.openSync(filePath, 'r')
+    let header: Buffer
+    try {
+      header = Buffer.alloc(readSize)
+      const bytesRead = fs.readSync(fd, header, 0, readSize, 0)
+      if (bytesRead < 64) return false
+      // 如果实际读取少于预期，截断 buffer
+      if (bytesRead < readSize) header = header.subarray(0, bytesRead)
+    } finally {
+      fs.closeSync(fd)
+    }
+
+    // DOS 头 offset 0x3C: e_lfanew (little-endian uint32)
+    const e_lfanew = header.readUInt32LE(0x3c)
+    // e_lfanew 必须在已读范围内，且至少需要 4(PE sig) + 20(COFF) = 24 字节
+    if (e_lfanew < 0 || e_lfanew + 24 > header.length) return false
+
+    // PE 签名校验: "PE\0\0" (50 45 00 00)
+    if (
+      header[e_lfanew] !== 0x50 ||
+      header[e_lfanew + 1] !== 0x45 ||
+      header[e_lfanew + 2] !== 0x00 ||
+      header[e_lfanew + 3] !== 0x00
+    ) {
+      return false
+    }
+
+    // COFF 头（e_lfanew+4 起，20 字节）
+    const machine = header.readUInt16LE(e_lfanew + 4)
+    // 接受 x64(0x8664) 和 x86(0x014c)，其他架构不在本项目目标范围
+    if (machine !== 0x8664 && machine !== 0x014c) return false
+
+    const numberOfSections = header.readUInt16LE(e_lfanew + 6)
+    const sizeOfOptionalHeader = header.readUInt16LE(e_lfanew + 20)
+
+    // 节表起始位置
+    const sectionTableStart = e_lfanew + 24 + sizeOfOptionalHeader
+
+    // 节表必须在已读范围内
+    const sectionTableEnd = sectionTableStart + numberOfSections * 40
+    if (sectionTableEnd > header.length) return false
+
+    // 遍历节表项，求 maxRawEnd
+    let maxRawEnd = 0
+    for (let i = 0; i < numberOfSections; i++) {
+      const entryOffset = sectionTableStart + i * 40
+      // 越界保护（理论上已经检查过，但防御性编程）
+      if (entryOffset + 24 > header.length) return false
+      const sizeOfRawData = header.readUInt32LE(entryOffset + 16)
+      const pointerToRawData = header.readUInt32LE(entryOffset + 20)
+      const rawEnd = pointerToRawData + sizeOfRawData
+      if (rawEnd > maxRawEnd) maxRawEnd = rawEnd
+    }
+
+    // 核心判定：节表声明的数据范围超出文件实际大小 → 截断
+    if (maxRawEnd > fileSize) return false
+
+    return true
+  } catch {
+    return false
+  }
+}

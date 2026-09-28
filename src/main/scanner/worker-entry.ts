@@ -85,6 +85,7 @@ export function isGamePlayPhotosScanExempt(rootPath: string): boolean {
 import { resolveAsarUnpackedPath } from '../utils/ffmpeg-paths'
 // 子进程注册表：worker 退出时 kill 所有活跃的 ffmpeg/ffprobe 子进程
 import { killAllProcesses } from '../utils/process-registry'
+import { installFfmpegSpawnGuard } from '../utils/fluent-ffmpeg-shim'
 import type {
   WorkerCommand,
   WorkerEvent,
@@ -92,6 +93,10 @@ import type {
   ScanProgress,
   MediaFile
 } from './worker-protocol'
+
+// fluent-ffmpeg spawn 逃逸垫片：本 worker 任何 ffmpeg .run()/探测之前尽早安装（幂等）。
+// 将损坏二进制导致的 spawn 同步抛错（EFTYPE）收敛为回调错误，避免 worker 进程崩溃。
+installFfmpegSpawnGuard()
 
 // ============ 常量（保持原值，禁止改值） ============
 

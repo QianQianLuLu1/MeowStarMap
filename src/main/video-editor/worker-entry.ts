@@ -20,6 +20,11 @@ import { buildWatermarkFilter } from './watermark-builder'
 import type { VideoEditTaskPayload } from './worker-protocol'
 import type { VideoEditorCommand, VideoEditorEvent } from './worker-protocol'
 import type { VideoEditTask } from './types'
+import { installFfmpegSpawnGuard } from '../utils/fluent-ffmpeg-shim'
+
+// fluent-ffmpeg spawn 逃逸垫片：本 worker 任何 ffmpeg .run() 之前尽早安装（幂等）。
+// 将损坏二进制导致的 spawn 同步抛错（EFTYPE）收敛为回调错误，避免 worker 进程崩溃。
+installFfmpegSpawnGuard()
 
 // ============ 常量 ============
 

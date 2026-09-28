@@ -16,6 +16,7 @@ import {
   wasBootInCompatMode
 } from './app/gpu-fallback'
 import { initExitForensics, markExitStage } from './app/exit-forensics'
+import { installFfmpegSpawnGuard } from './utils/fluent-ffmpeg-shim'
 import { t } from './i18n'
 
 // 捕获未处理异常和未处理的 Promise 拒绝。
@@ -36,6 +37,10 @@ process.on('unhandledRejection', (reason) => {
   // 不再直接 app.exit(1)：非致命的游离 rejection 不应杀死整个应用，
   // 避免一条边缘异步路径导致扫描进度/用户数据丢失。
 })
+
+// fluent-ffmpeg spawn 逃逸垫片：主进程内任何 ffmpeg .run()/能力探测之前尽早安装。
+// 将损坏二进制导致的 spawn 同步抛错（EFTYPE）收敛为回调错误，避免升级为致命弹窗。
+installFfmpegSpawnGuard()
 
 // 诊断目录单一真相源：注册「文档」目录，使启动日志落盘路径与致命弹窗展示路径同源
 // （此前写盘侧未拿到 documents 候选，弹窗指向 Documents 而日志写在 homedir，用户找不到日志）

@@ -46,6 +46,11 @@ import type {
   ThumbnailQuality,
   SimilarRowMeta
 } from './worker-protocol'
+import { installFfmpegSpawnGuard } from '../utils/fluent-ffmpeg-shim'
+
+// fluent-ffmpeg spawn 逃逸垫片：本 worker 任何 ffmpeg 抽帧 .run() 之前尽早安装（幂等）。
+// 将损坏二进制导致的 spawn 同步抛错（EFTYPE）收敛为回调错误，避免视频缩略图链路崩溃。
+installFfmpegSpawnGuard()
 
 // ============ 常量（与主进程 ThumbnailGenerator 保持一致，确保文件名/质量相同） ============
 
