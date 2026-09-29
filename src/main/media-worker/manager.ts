@@ -44,6 +44,11 @@ function generateTaskId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+// 缩略图批量进度的渲染层广播节流窗口（THUMBNAIL_OPTIMIZATION_PLAN 节点1）：
+// 批量进行中周期性通知渲染层刷新，使新落盘缩略图逐步可见，
+// 不再等整批完成才有一次 media:updated（可视项「模糊数十秒才清晰」的主因）。
+const THUMBNAIL_BROADCAST_THROTTLE_MS = 2000
+
 /**
  * 缩略图 / pHash / 重复检测管理器（薄壳）
  *
@@ -67,6 +72,10 @@ function generateTaskId(prefix: string): string {
 export class MediaWorkerManager extends EventEmitter {
   private bridge: MediaWorkerBridge
   private dbPath = ''
+  // 缩略图进度渲染层广播（THUMBNAIL_OPTIMIZATION_PLAN 节点1）：由 Application 注入，
+  // 未注入时行为与现状完全一致（不订阅、不调用）
+  private thumbnailProgressNotifier: (() => void) | null = null
+  private lastThumbnailBroadcastAt = 0
   // 三类任务各自的 pendingPromise resolver
   private pendingThumbnailComplete:
     | ((result: { success: boolean; message: string; processed: number; total: number }) => void)
@@ -134,12 +143,46 @@ export class MediaWorkerManager extends EventEmitter {
     })
   }
 
+  /**
+   * 注入缩略图批量的渲染层广播回调（THUMBNAIL_OPTIMIZATION_PLAN 节点1）。
+   * 由 Application 装配为 `() => sendToRenderer(ctx, 'media:updated')`；
+   * 传 null 可解除注入（回到「仅批量结束广播一次」的旧行为）。
+   */
+  setThumbnailProgressNotifier(fn: (() => void) | null): void {
+    this.thumbnailProgressNotifier = fn
+  }
+
+  /** 节流通知渲染层刷新：窗口（2s）内的后续进度合并为一次 */
+  private notifyThumbnailProgressThrottled(): void {
+    if (!this.thumbnailProgressNotifier) return
+    const now = Date.now()
+    if (now - this.lastThumbnailBroadcastAt < THUMBNAIL_BROADCAST_THROTTLE_MS) return
+    this.lastThumbnailBroadcastAt = now
+    try {
+      this.thumbnailProgressNotifier()
+    } catch {
+      // 广播失败不影响批处理主流程
+    }
+  }
+
+  /** 批量结束时立即补发一次并重置节流窗口（覆盖崩溃恢复等无外层广播的路径，尾部数据不丢） */
+  private notifyThumbnailBatchSettled(): void {
+    this.lastThumbnailBroadcastAt = 0
+    if (!this.thumbnailProgressNotifier) return
+    try {
+      this.thumbnailProgressNotifier()
+    } catch {
+      // 广播失败不影响批处理主流程
+    }
+  }
+
   /** 订阅 worker 事件，转发为 EventEmitter + 推送统一 task:progress */
   private subscribeBridgeEvents(): void {
     this.unsubscribe = this.bridge.onEvent((event) => {
       switch (event.type) {
         case 'THUMBNAIL_PROGRESS':
           this.emit('thumbnail:progress', { ...event.payload })
+          this.notifyThumbnailProgressThrottled()
           this.handleProgress(
             this.thumbnailRuntime,
             'batch',
@@ -151,6 +194,7 @@ export class MediaWorkerManager extends EventEmitter {
         case 'THUMBNAIL_COMPLETE':
           this.isThumbnailRunning = false
           this.emit('thumbnail:complete', event.payload)
+          this.notifyThumbnailBatchSettled()
           this.handleComplete(this.thumbnailRuntime, event.payload.success, event.payload.message)
           if (this.pendingThumbnailComplete) {
             const resolve = this.pendingThumbnailComplete

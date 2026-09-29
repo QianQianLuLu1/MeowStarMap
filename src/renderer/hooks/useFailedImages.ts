@@ -11,11 +11,12 @@ import { useCallback, useEffect, useState } from 'react'
  * 抽取后各减约 8-12 行，并顺带修复 TimelineView / EventTimelineView 遗漏的清空逻辑。
  *
  * @param dep 触发清空的依赖项（通常是 files / items 数组引用）
- * @returns `{ failedImages, markFailed }`
+ * @returns `{ failedImages, markFailed, clearFailed }`
  */
 export function useFailedImages<T>(dep: T): {
   failedImages: Set<string>
   markFailed: (id: string) => void
+  clearFailed: (id: string) => void
 } {
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set())
 
@@ -28,5 +29,16 @@ export function useFailedImages<T>(dep: T): {
     setFailedImages((prev) => new Set(prev).add(id))
   }, [])
 
-  return { failedImages, markFailed }
+  // THUMBNAIL_OPTIMIZATION_PLAN 节点2：按需重建成功后清除单个失败标记，
+  // 使同 URL 立即重试（LRU 驱逐 / 批量未生成场景）；id 不在集合中时为 no-op
+  const clearFailed = useCallback((id: string) => {
+    setFailedImages((prev) => {
+      if (!prev.has(id)) return prev
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }, [])
+
+  return { failedImages, markFailed, clearFailed }
 }

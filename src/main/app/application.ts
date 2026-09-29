@@ -24,6 +24,7 @@ import { VideoService } from '../services/video-service'
 import { WatermarkService } from '../services/watermark-service'
 import type { AppContext, PendingRecoveryEvent } from './app-context'
 import { notifyMediaUpdated as notifyMediaUpdatedFn } from './media-update'
+import { sendToRenderer } from './renderer-bridge'
 import { applyUITheme as applyUIThemeFn } from './theme'
 import { invalidateMediaPathCache as invalidateMediaPathCacheFn } from './media-protocol'
 import { bootstrapApplication } from './lifecycle'
@@ -164,6 +165,12 @@ export class Application {
         this.mediaUpdateTimer = t
       }
     }
+    // 缩略图批量进度的渲染层节流广播（THUMBNAIL_OPTIMIZATION_PLAN 节点1）：
+    // 批量进行中周期性推送 media:updated，使新落盘缩略图随生成进度逐步可见，
+    // 不再等整批完成才有一次刷新（可视项「模糊数十秒才清晰」的主因）。
+    this.mediaWorkerManager.setThumbnailProgressNotifier(() => {
+      sendToRenderer(ctx, 'media:updated')
+    })
     return ctx
   }
 }

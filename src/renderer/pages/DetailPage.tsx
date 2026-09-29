@@ -17,6 +17,8 @@ import { useExif } from '../hooks/useExif'
 import { EmptyState } from '../components/common/EmptyState'
 import { SkeletonDetail } from '../components/common/Skeleton'
 import { ZoomableContainer } from '../components/common/ZoomableContainer'
+// THUMBNAIL_OPTIMIZATION_PLAN 节点4：主图渐进加载——低清底图先行、原图 onLoad 淡入
+import { toLowQualityUrl } from '../components/gallery/VirtualImageGrid'
 import { formatFileSize } from '../utils/format'
 import { formatDateTime } from '../utils/date'
 import { IconChevronLeft, IconChevronRight, IconStar, IconTag, IconWarning } from '../icons'
@@ -187,6 +189,11 @@ export const DetailPage: React.FC = () => {
   }
 
   const fileUrl = toFileUrl(media.file_path)
+  // 节点4：由 thumbnail 推导低清底图（64px）；游戏原生缩略图路径推导为 null → 行为与现状一致
+  const thumbPlaceholderUrl = (() => {
+    const low = toLowQualityUrl(media.thumbnail)
+    return low ? toFileUrl(low) : null
+  })()
 
   const handleDelete = async () => {
     if (!window.electronAPI) return
@@ -405,6 +412,7 @@ export const DetailPage: React.FC = () => {
           src={fileUrl || ''}
           alt={media.file_name}
           isVideo={media.file_type === 'video'}
+          placeholderSrc={thumbPlaceholderUrl}
           onClick={() => {
             if (currentIndex >= 0) openFullscreen(currentIndex)
           }}
@@ -818,11 +826,28 @@ interface ZoomableImageProps {
   alt: string
   isVideo: boolean
   onClick: () => void
+  /**
+   * 可选：低清缩略图底图 URL（THUMBNAIL_OPTIMIZATION_PLAN 节点4）。
+   * 传入时原图 onLoad 前先显示底图，onLoad 后 200ms 淡入并卸载底图，
+   * 消除详情页打开/切换时数 MB 原图的空白等待；缺省（无缩略图/视频）行为与现状一致。
+   */
+  placeholderSrc?: string | null
 }
 
 // P1-U12：复用 ZoomableContainer 共享组件，仅保留内容渲染差异（图片/视频）
-const ZoomableImage: React.FC<ZoomableImageProps> = ({ src, alt, isVideo, onClick }) => {
+export const ZoomableImage: React.FC<ZoomableImageProps> = ({
+  src,
+  alt,
+  isVideo,
+  onClick,
+  placeholderSrc
+}) => {
   const { t } = useTranslation()
+  const [originalLoaded, setOriginalLoaded] = useState(false)
+  // 换图时重置淡入状态
+  useEffect(() => {
+    setOriginalLoaded(false)
+  }, [src])
   return (
     <ZoomableContainer
       maxZoom={5}
@@ -835,12 +860,28 @@ const ZoomableImage: React.FC<ZoomableImageProps> = ({ src, alt, isVideo, onClic
       {isVideo ? (
         <VideoPlayer src={src} controls className="max-w-full max-h-full" />
       ) : (
-        <img
-          src={src || undefined}
-          alt={alt}
-          className="max-w-full max-h-full object-contain"
-          draggable={false}
-        />
+        <>
+          {placeholderSrc && !originalLoaded && (
+            <img
+              src={placeholderSrc}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full object-contain"
+              draggable={false}
+              decoding="async"
+            />
+          )}
+          <img
+            src={src || undefined}
+            alt={alt}
+            className={`max-w-full max-h-full object-contain transition-opacity duration-200 ${
+              originalLoaded || !placeholderSrc ? 'opacity-100' : 'opacity-0'
+            }`}
+            draggable={false}
+            decoding="async"
+            onLoad={() => setOriginalLoaded(true)}
+          />
+        </>
       )}
     </ZoomableContainer>
   )

@@ -6,6 +6,8 @@ import { needsAnonymousCors } from '../../utils/file'
 import { getLastFullscreenSource, whenTransitionSettled } from '../../utils/view-transition'
 import { useToast } from '../../hooks/useToast'
 import { useFavoriteToggle } from '../../hooks/useFavoriteToggle'
+// THUMBNAIL_OPTIMIZATION_PLAN 节点4：邻近项原图预热，翻页即点即显
+import { useNeighborPrefetch } from '../../hooks/useNeighborPrefetch'
 // DU3：幻灯片播放逻辑统一到 useSlideshow hook
 import { useSlideshow, type UseSlideshowReturn } from '../../hooks/useSlideshow'
 import { Toast } from '../common/Toast'
@@ -112,6 +114,10 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
       cancelled = true
     }
   }, [fileUrl, initialUrl])
+
+  // THUMBNAIL_OPTIMIZATION_PLAN 节点4：邻近项原图预热——当前项变化时预热前后各一张，
+  // 翻页时字节已入 HTTP 缓存（原图一年强缓存），基本即点即显。仅在打开状态预热。
+  useNeighborPrefetch(activeFiles, fullscreenIndex, fullscreenOpen)
 
   const navigate = useCallback(
     (delta: number) => {

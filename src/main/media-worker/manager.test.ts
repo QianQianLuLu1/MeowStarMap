@@ -695,4 +695,95 @@ describe('MediaWorkerManager', () => {
       await restored
     })
   })
+
+  // ============ 缩略图进度节流广播（THUMBNAIL_OPTIMIZATION_PLAN 节点1） ============
+  // 批量进行中周期性通知渲染层刷新（media:updated），使新落盘缩略图逐步可见，
+  // 不再等整批完成才有一次刷新（可视项「模糊数十秒才清晰」的主因）。
+  describe('thumbnailProgressNotifier（进度节流广播）', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    function emitProgress(processed: number) {
+      emitBridgeEvent({
+        type: 'THUMBNAIL_PROGRESS',
+        payload: { processed, total: 10, currentFile: '/a.jpg' }
+      })
+    }
+
+    function emitComplete(processed: number) {
+      emitBridgeEvent({
+        type: 'THUMBNAIL_COMPLETE',
+        payload: { success: true, message: 'done', processed, total: 10 }
+      })
+    }
+
+    it('注入 notifier 后，首个 THUMBNAIL_PROGRESS 应立即通知', () => {
+      manager.setDbPath('/db')
+      const notifier = vi.fn()
+      manager.setThumbnailProgressNotifier(notifier)
+      const p = manager.startThumbnailBatch({ cacheDir: '/cache' })
+      emitProgress(1)
+      expect(notifier).toHaveBeenCalledTimes(1)
+      emitComplete(1)
+      return p
+    })
+
+    it('节流窗口（2s）内连续进度只通知一次', () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+      manager.setDbPath('/db')
+      const notifier = vi.fn()
+      manager.setThumbnailProgressNotifier(notifier)
+      const p = manager.startThumbnailBatch({ cacheDir: '/cache' })
+      emitProgress(1)
+      emitProgress(2)
+      emitProgress(3)
+      expect(notifier).toHaveBeenCalledTimes(1)
+      emitComplete(3)
+      return p
+    })
+
+    it('窗口过期（≥2s）后的新进度应再次通知', () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+      manager.setDbPath('/db')
+      const notifier = vi.fn()
+      manager.setThumbnailProgressNotifier(notifier)
+      const p = manager.startThumbnailBatch({ cacheDir: '/cache' })
+      emitProgress(1)
+      expect(notifier).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(2000)
+      emitProgress(4)
+      expect(notifier).toHaveBeenCalledTimes(2)
+      emitComplete(4)
+      return p
+    })
+
+    it('未注入 notifier 时收到进度不应调用、不应抛错', () => {
+      manager.setDbPath('/db')
+      const p = manager.startThumbnailBatch({ cacheDir: '/cache' })
+      expect(() => emitProgress(1)).not.toThrow()
+      emitComplete(1)
+      return p
+    })
+
+    it('THUMBNAIL_COMPLETE 应立即补一次通知并重置节流窗口', () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'Date'] })
+      manager.setDbPath('/db')
+      const notifier = vi.fn()
+      manager.setThumbnailProgressNotifier(notifier)
+      const p = manager.startThumbnailBatch({ cacheDir: '/cache' })
+      emitProgress(1)
+      expect(notifier).toHaveBeenCalledTimes(1)
+      emitComplete(10)
+      // 完成立即补发，批量尾部数据不因节流丢失（覆盖 worker 崩溃恢复等无外层广播的路径）
+      expect(notifier).toHaveBeenCalledTimes(2)
+      vi.advanceTimersByTime(1)
+      // 下一批任务的进度不被上一批的节流窗口压制
+      const p2 = manager.startThumbnailBatch({ cacheDir: '/cache' })
+      emitProgress(1)
+      expect(notifier).toHaveBeenCalledTimes(3)
+      emitComplete(1)
+      return Promise.all([p, p2])
+    })
+  })
 })

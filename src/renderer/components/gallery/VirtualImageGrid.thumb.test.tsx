@@ -36,14 +36,23 @@ vi.mock('../common/MissingBadge', () => ({ MissingBadge: () => null }))
 vi.mock('../common/CorruptedBadge', () => ({ CorruptedBadge: () => null }))
 vi.mock('./MediaThumbPlaceholder', () => ({ MediaThumbPlaceholder: () => null }))
 vi.mock('../../hooks/useFailedImages', () => ({
-  useFailedImages: () => ({ failedImages: new Set(), markFailed: () => {} })
+  useFailedImages: () => ({
+    failedImages: new Set(),
+    markFailed: () => {},
+    clearFailed: () => {}
+  })
 }))
 vi.mock('../../utils/responsive', () => ({
   getResponsiveColumns: () => 4,
   DEFAULT_COLUMNS_BREAKPOINTS: {}
 }))
 
-import { toLowQualityUrl, toHighQualityUrl, pickThumbnailUrl } from './VirtualImageGrid'
+import {
+  toLowQualityUrl,
+  toHighQualityUrl,
+  pickThumbnailUrl,
+  resolveEffectiveThumbnail
+} from './VirtualImageGrid'
 const src = fs.readFileSync(
   path.resolve(process.cwd(), 'src', 'renderer', 'components', 'gallery', 'VirtualImageGrid.tsx'),
   'utf-8'
@@ -66,23 +75,128 @@ describe('VirtualImageGrid 视频缩略图裂图防护（fix-gallery-video-thumb
     )
   })
 
-  it('视频类型改用「thumbnail ?? 按需生成结果」的构造（无缩略图且未生成完成时返回空，触发视频占位图标）', () => {
-    // fix-gameplayphotos-video-thumbnail-null 节点4：effectiveThumbnail = file.thumbnail ?? 生成结果
+  it('缩略图源统一由 resolveEffectiveThumbnail 判定（THUMBNAIL_OPTIMIZATION_PLAN 节点2）', () => {
+    // effectiveThumbnail = thumbnail > 按需生成结果 > （图片生成失败时）原文件兜底 > null 占位
+    expect(code).toContain('resolveEffectiveThumbnail({')
     expect(code).toContain(
-      "file.file_type === 'video' ? effectiveThumbnail : effectiveThumbnail || file.file_path"
+      "const standardUrl = (effectiveThumbnail && toFileUrl(effectiveThumbnail)) || ''"
     )
   })
 
-  it('图片类型仍保留 file.file_path 作为回退源（不破坏图片缩略图）', () => {
-    // 断言三元表达式保留了 image 分支的 || file.file_path 回退
-    expect(code).toMatch(/effectiveThumbnail \|\| file\.file_path/)
+  it('图片类型不再在「生成中」直载原文件（消除数 MB 原图拉伸当缩略图 + IO 争抢）', () => {
+    // 旧写法 effectiveThumbnail || file.file_path 在 thumbnail=NULL 时直载原图；
+    // 新写法仅当「图片且生成失败」时由 resolveEffectiveThumbnail 内部兜底原文件
+    expect(code).not.toMatch(/effectiveThumbnail \|\| file\.file_path/)
   })
 
-  it('无缩略图的视频接入按需生成 hook（useVideoThumbGenerate）', () => {
-    // fix-gameplayphotos-video-thumbnail-null 节点4：网格对 thumbnail 为空的视频触发一次
-    // thumbnail:generate（与 DuplicatesPage DuplicateFileCard 已验证模式对齐），生成完成后就地显示
-    expect(code).toContain('useVideoThumbGenerate(items)')
-    expect(code).toContain('const effectiveThumbnail = file.thumbnail ?? generatedThumb')
+  it('缺缩略图项接入可视区按需生成（不再整表触发 useVideoThumbGenerate）', () => {
+    // 节点2：对齐 useVideoThumbGenerate 已验证模式，但触发范围收敛到可视区，
+    // 消除万级视频库一次性发起全部 IPC 在主进程 decodeLimiter 排长队的隐性瓶颈
+    expect(code).not.toContain('useVideoThumbGenerate')
+    expect(code).toContain('onDemandThumbPromises')
+    expect(code).toContain('ensureOnDemandThumbnail')
+  })
+})
+
+/**
+ * 缩略图源判定纯函数（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
+ *
+ * 缺陷现象：thumbnail=NULL（刚导入/批量未达）的图片卡片直载数 MB 原图拉伸当缩略图，
+ * 与后台批量任务争抢磁盘 IO，「模糊→清晰」被放大到数秒~数十秒。
+ * 修复优先级：DB thumbnail > 按需生成结果 >（仅图片且生成失败）原文件兜底 > null（占位）；
+ * 视频绝不返回原视频路径（<img> 无法解码视频，回退必裂图）。
+ */
+describe('resolveEffectiveThumbnail 缩略图源判定', () => {
+  it('正常：有 DB thumbnail → 直接使用', () => {
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'image',
+        thumbnail: 'C:/cache/abc.jpg',
+        generatedPath: undefined,
+        generateFailed: false,
+        filePath: 'D:/photos/a.jpg'
+      })
+    ).toBe('C:/cache/abc.jpg')
+  })
+
+  it('正常：无 thumbnail，按需生成成功 → 使用生成结果', () => {
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'image',
+        thumbnail: null,
+        generatedPath: 'C:/cache/abc.jpg',
+        generateFailed: false,
+        filePath: 'D:/photos/a.jpg'
+      })
+    ).toBe('C:/cache/abc.jpg')
+  })
+
+  it('正常：图片无 thumbnail 且生成失败 → 回退原文件（保留旧行为兜底）', () => {
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'image',
+        thumbnail: null,
+        generatedPath: undefined,
+        generateFailed: true,
+        filePath: 'D:/photos/a.jpg'
+      })
+    ).toBe('D:/photos/a.jpg')
+  })
+
+  it('异常：视频无 thumbnail 且生成失败 → null（绝不返回视频路径）', () => {
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'video',
+        thumbnail: null,
+        generatedPath: undefined,
+        generateFailed: true,
+        filePath: 'D:/videos/a.mp4'
+      })
+    ).toBeNull()
+  })
+
+  it('边界：无 thumbnail、生成中（无结果）→ null（占位图标）', () => {
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'image',
+        thumbnail: null,
+        generatedPath: undefined,
+        generateFailed: false,
+        filePath: 'D:/photos/a.jpg'
+      })
+    ).toBeNull()
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'video',
+        thumbnail: undefined,
+        generatedPath: undefined,
+        generateFailed: false,
+        filePath: 'D:/videos/a.mp4'
+      })
+    ).toBeNull()
+  })
+
+  it('边界：filePath 为空字符串时即使图片生成失败也不回退 → null', () => {
+    expect(
+      resolveEffectiveThumbnail({
+        fileType: 'image',
+        thumbnail: null,
+        generatedPath: undefined,
+        generateFailed: true,
+        filePath: ''
+      })
+    ).toBeNull()
+  })
+})
+
+describe('按需生成机制源码结构（THUMBNAIL_OPTIMIZATION_PLAN 节点2）', () => {
+  it('单次守卫：同一 file_path 只触发一次 thumbnail:generate（Promise Map 缓存）', () => {
+    expect(code).toContain('onDemandThumbPromises.has(')
+    expect(code).toContain('onDemandThumbPromises.set(')
+  })
+
+  it('standard 404（LRU 驱逐等）时同样触发重建，成功后 clearFailed 以原 URL 重试', () => {
+    expect(code).toContain('clearFailed')
   })
 })
 

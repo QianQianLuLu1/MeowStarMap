@@ -13,8 +13,8 @@ import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
+import { TieredCardImage } from './TieredCardImage'
 import { useFailedImages } from '../../hooks/useFailedImages'
-import { useVideoThumbGenerate } from '../../hooks/useVideoThumbGenerate'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
 
@@ -66,6 +66,35 @@ export const pickThumbnailUrl = (params: {
 }): string | null => {
   const showLow = !!params.lowUrl && (!params.upgraded || params.standardFailed)
   return showLow ? params.lowUrl : params.standardUrl
+}
+
+// 按需生成单次守卫：file_path → 生成 Promise（含失败结果），虚拟列表复挂载/重复进入
+// 可视区不重复触发 IPC。与 useVideoThumbGenerate 的 videoThumbGenerateCache 同语义，
+// 覆盖图片与视频两类（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
+const onDemandThumbPromises = new Map<string, Promise<string | null>>()
+
+/**
+ * 网格卡片缩略图源判定（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
+ *
+ * 优先级：DB thumbnail > 按需生成结果 >（仅图片且生成失败时）原文件兜底 > null（占位）。
+ * - thumbnail=NULL 且生成中/未触发：返回 null → 占位图标。不再直载数 MB 原图拉伸当缩略图
+ *   （原图直载与后台批量任务争抢磁盘 IO，是「模糊数秒~数十秒才清晰」的放大器）。
+ * - 图片生成失败（文件损坏/不可读）时回退原文件，保留旧行为兜底；视频绝不返回原视频路径
+ *   （<img> 无法解码视频，回退必裂图，对齐 useVideoThumbGenerate 不变量）。
+ */
+export const resolveEffectiveThumbnail = (params: {
+  fileType: 'image' | 'video'
+  thumbnail: string | null | undefined
+  generatedPath: string | undefined
+  generateFailed: boolean
+  filePath: string
+}): string | null => {
+  if (params.thumbnail) return params.thumbnail
+  if (params.generatedPath) return params.generatedPath
+  if (params.fileType === 'image' && params.generateFailed && params.filePath) {
+    return params.filePath
+  }
+  return null
 }
 
 interface VirtualImageGridProps {
@@ -181,15 +210,20 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     const [hoveredId, setHoveredId] = useState<string | null>(null)
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     // P1-U10：failedImages 状态管理 + items 变化时自动清空
-    const { failedImages, markFailed } = useFailedImages(items)
+    const { failedImages, markFailed, clearFailed } = useFailedImages(items)
     // fix-thumbnail-loading-latency 节点3：standard 加载失败集合（同样随 items 变化清空）。
     // standard 404（后台批量尚未生成）时回退显示低清而非死胡同 markFailed，
     // items 刷新（media:updated）后集合清空 → 自动重试 standard。
-    const { failedImages: standardFailedIds, markFailed: markStandardFailed } =
-      useFailedImages(items)
-    // fix-gameplayphotos-video-thumbnail-null 节点4：无缩略图视频按需生成
-    // （对齐 DuplicatesPage DuplicateFileCard 模式；模块级缓存单次守卫，失败不重试）
-    const generatedThumbs = useVideoThumbGenerate(items)
+    const {
+      failedImages: standardFailedIds,
+      markFailed: markStandardFailed,
+      clearFailed: clearStandardFailed
+    } = useFailedImages(items)
+    // THUMBNAIL_OPTIMIZATION_PLAN 节点2：可视区按需生成结果（图片+视频统一）。
+    // onDemandThumbs: file_path → 生成成功的缩略图路径；onDemandFailed: 生成失败集合
+    // （失败不重试，防请求风暴；图片失败时经 resolveEffectiveThumbnail 回退原图）。
+    const [onDemandThumbs, setOnDemandThumbs] = useState<Map<string, string>>(() => new Map())
+    const [onDemandFailed, setOnDemandFailed] = useState<Set<string>>(() => new Set())
     // U-G16：触屏设备无 hover 事件，需始终显示快捷操作按钮
     const [isTouchDevice, setIsTouchDevice] = useState(false)
     const gap = 16
@@ -230,6 +264,52 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
       }
     }, [])
 
+    // 可视区按需生成（THUMBNAIL_OPTIMIZATION_PLAN 节点2）：
+    // - thumbnail=NULL 的项（图片+视频统一）就地生成 standard 缩略图，生成是磁盘缓存优先：
+    //   批量/上一会话已生成的项立即返回，批量未达的项就地补齐，不再等待整批完成后的
+    //   media:updated 全量刷新；
+    // - standard 404（LRU 驱逐等）的项同样触发重建，成功后清除失败标记让原 URL 立即重试。
+    const ensureOnDemandThumbnail = useCallback(
+      (file: MediaFile) => {
+        const filePath = file.file_path
+        if (typeof filePath !== 'string' || filePath.length === 0) return
+        if (onDemandThumbPromises.has(filePath)) return
+        const generate = window.electronAPI?.thumbnail?.generate
+        if (typeof generate !== 'function') return
+        const promise = (async () => {
+          try {
+            return await generate(filePath)
+          } catch {
+            return null
+          }
+        })()
+        onDemandThumbPromises.set(filePath, promise)
+        void promise.then((result) => {
+          if (!result) {
+            setOnDemandFailed((prev) => new Set(prev).add(filePath))
+            return
+          }
+          setOnDemandThumbs((prev) => {
+            if (prev.has(filePath)) return prev
+            const next = new Map(prev)
+            next.set(filePath, result)
+            return next
+          })
+          setOnDemandFailed((prev) => {
+            if (!prev.has(filePath)) return prev
+            const next = new Set(prev)
+            next.delete(filePath)
+            return next
+          })
+          // 重建成功：清除该卡片两类失败标记（集合无此 id 时为 no-op），
+          // 使 standard URL（磁盘上已重新存在）立即重试
+          clearFailed(file.id)
+          clearStandardFailed(file.id)
+        })
+      },
+      [clearFailed, clearStandardFailed]
+    )
+
     // P1-03：滚动停止 300ms 后，把当前可见项切换到标准质量
     const triggerHighQualityUpgrade = useCallback(() => {
       if (scrollTimerRef.current !== null) {
@@ -248,8 +328,15 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           }
           return next
         })
+        // 节点2：可视区缺缩略图的项按需生成一次（磁盘缓存优先，单次守卫防风暴）
+        for (let i = startIndex; i <= endIndex; i++) {
+          const file = items[i]
+          if (file && !file.thumbnail) {
+            ensureOnDemandThumbnail(file)
+          }
+        }
       }, 300)
-    }, [items])
+    }, [items, ensureOnDemandThumbnail])
 
     // 清理滚动定时器
     useEffect(() => {
@@ -372,20 +459,25 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           }}
           itemContent={(index, file) => {
             const isSelected = selectedSet.has(file.id)
-            // 视频文件无缩略图时，不得使用原视频文件作为 <img> 源（加载视频进 img 必触发
-            // onError 显示警告图标）。仅在确有 thumbnail（或按需生成已返回）时才用文件源；
-            // 图片类型才允许回退到原文件路径，保证无缩略图的视频稳定降级为视频占位图标而非裂图。
-            // fix-gameplayphotos-video-thumbnail-null 节点4：video 缺 thumbnail 时由
-            // useVideoThumbGenerate 按需生成一次，生成完成就地显示（未返回前维持占位图标）。
-            const generatedThumb =
-              file.file_type === 'video' ? generatedThumbs.get(file.file_path) : undefined
-            const effectiveThumbnail = file.thumbnail ?? generatedThumb
-            const standardUrl = toFileUrl(
-              file.file_type === 'video' ? effectiveThumbnail : effectiveThumbnail || file.file_path
-            )
+            // THUMBNAIL_OPTIMIZATION_PLAN 节点2：缩略图源统一由 resolveEffectiveThumbnail 判定
+            // （DB thumbnail > 可视区按需生成结果 > 图片生成失败时原文件兜底 > null 占位）。
+            // 视频文件无缩略图时不得使用原视频文件作为 <img> 源（加载视频进 img 必触发
+            // onError 显示警告图标）；thumbnail=NULL 且生成中时图片/视频统一显示占位图标，
+            // 不再直载数 MB 原图拉伸当缩略图（与后台批量任务争抢磁盘 IO）。
+            const generatedThumb = onDemandThumbs.get(file.file_path)
+            const effectiveThumbnail = resolveEffectiveThumbnail({
+              fileType: file.file_type,
+              thumbnail: file.thumbnail,
+              generatedPath: generatedThumb,
+              generateFailed: onDemandFailed.has(file.file_path),
+              filePath: file.file_path
+            })
+            const standardUrl = (effectiveThumbnail && toFileUrl(effectiveThumbnail)) || ''
             const useHighQuality = highQualityIds.has(file.id)
             const standardFailed = standardFailedIds.has(file.id)
-            const lowUrl = toLowQualityUrl(effectiveThumbnail)
+            // _low/_high 仅对缓存命名路径推导（DB thumbnail 或按需生成结果）；
+            // 生成失败兜底的原始文件路径不参与，避免对源文件推导出不存在的 _low 404 往返
+            const lowUrl = toLowQualityUrl(file.thumbnail ?? generatedThumb)
             const lowUrlResolved = lowUrl ? toFileUrl(lowUrl) : null
             const thumbUrl = pickThumbnailUrl({
               lowUrl: lowUrlResolved,
@@ -445,26 +537,30 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
                   {isMissing && <MissingBadge />}
                   {isCorrupted && <CorruptedBadge reason={file.corrupted_reason} />}
                   {showThumb ? (
-                    <img
-                      src={thumbUrl}
+                    <TieredCardImage
+                      lowUrl={lowUrlResolved}
+                      standardUrl={standardUrl}
+                      showStandard={!showingLow}
                       alt={file.file_name}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      loading="lazy"
-                      draggable={false}
-                      data-media-id={file.id}
-                      onError={() => {
-                        // 档位回退链（fix-thumbnail-loading-latency 节点3）：
-                        // 低清失败 → 立即升级 standard；standard 失败且有低清可退 →
-                        // markStandardFailed 回退低清（待 items 刷新自动重试，不再死胡同）；
-                        // 回退后的低清再失败、或无低清可退 → markFailed 终止为占位图标。
-                        if (showingLow) {
-                          if (standardFailed) {
-                            markFailed(file.id)
-                          } else {
-                            setHighQualityIds((prev) => new Set(prev).add(file.id))
-                          }
-                        } else if (lowUrl) {
+                      dataMediaId={file.id}
+                      onLowError={() => {
+                        // 低清为主显源时失败（档位回退链，fix-thumbnail-loading-latency 节点3）：
+                        // 升级 standard；回退后的低清再失败 → markFailed 终止为占位图标，
+                        // 并就地按需重建（节点2），成功后清除标记以原 URL 重试。
+                        if (standardFailed) {
+                          markFailed(file.id)
+                          ensureOnDemandThumbnail(file)
+                        } else {
+                          setHighQualityIds((prev) => new Set(prev).add(file.id))
+                        }
+                      }}
+                      onStandardError={() => {
+                        // standard 为主显源时失败（后台批量未生成/LRU 驱逐）→
+                        // markStandardFailed 回退低清（待 items 刷新自动重试，不再死胡同）
+                        // 并就地按需重建（节点2）；无低清可退 → markFailed 终止为占位图标。
+                        if (lowUrl) {
                           markStandardFailed(file.id)
+                          ensureOnDemandThumbnail(file)
                         } else {
                           markFailed(file.id)
                         }
