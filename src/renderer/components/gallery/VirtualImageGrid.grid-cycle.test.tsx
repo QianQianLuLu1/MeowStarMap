@@ -1,0 +1,188 @@
+/**
+ * @vitest-environment jsdom
+ * @module src/renderer/components/gallery/VirtualImageGrid
+ * @remarks 针对图库主页 `Maximum call stack size exceeded` 的回归测试。
+ *
+ * 背景（取证过程见 docs/plans/2026-09-29-fix-gallery-stack-overflow.md）：
+ * 渲染进程故障日志中的堆栈（274747-long/2026-09-29 v2.5.1）全部落在
+ * react-virtuoso 代码块的响应式内核上：
+ *   U() 发布 → at()(combineLatest) 输入处理器 → M() 再发布 → gridDimensions(2904)
+ * 即第三方网格响应式图内部的「发布 → 订阅 → 再发布」同歩回路。
+ * 该回路由「测量值重新发布」驱动，本项目侧有两个放大器：
+ *  ① components 引用随 columns 变化而变更 → React 重建 List 子树 → 测量重发布；
+ *  ② 同一网格同时传入 overscan 与 increaseViewportBy 两个视口放大旋钮。
+ *
+ * 本文件用「记录型 VirtuosoGrid 探针」在 jsdom 下对这两个放大器做确定性断言，
+ * 修复前必须红灯；同时保留正常/异常/边界三类场景，防止修复引入回归。
+ */
+import React from 'react'
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
+import { render, act } from '@testing-library/react'
+import type { MediaFile } from '../../stores/mediaStore'
+import { VirtualImageGrid } from './VirtualImageGrid'
+
+// —— 记录型 react-virtuoso 探针：透传渲染，并把每次渲染收到的 props 收集起来 ——
+const virtuosoRecords = vi.hoisted(() => ({ list: [] as Array<Record<string, unknown>> }))
+
+const { VirtuosoGridMock } = vi.hoisted(() => {
+  const ReactLib = require('react') as typeof React
+  const VirtuosoGrid = (props: Record<string, unknown>) => {
+    virtuosoRecords.list.push(props)
+    const data = (props.data as MediaFile[] | undefined) ?? []
+    const itemContent = props.itemContent as
+      ((index: number, item: MediaFile) => React.ReactNode) | undefined
+    const computeItemKey = props.computeItemKey as
+      ((index: number, item: MediaFile) => string | number) | undefined
+    return ReactLib.createElement(
+      'div',
+      { role: 'grid' },
+      data
+        .slice(0, 60)
+        .map((item, i) =>
+          ReactLib.createElement(
+            'div',
+            { key: computeItemKey ? computeItemKey(i, item) : i },
+            itemContent ? itemContent(i, item) : null
+          )
+        )
+    )
+  }
+  return { VirtuosoGridMock: VirtuosoGrid }
+})
+vi.mock('react-virtuoso', () => ({ VirtuosoGrid: VirtuosoGridMock }))
+
+// jsdom 下 clientWidth 恒为 0，此处用原型 getter 注入可控宽度以驱动响应式列数 effect
+let fakeClientWidth = 1200
+
+beforeAll(() => {
+  vi.stubGlobal('reportError', vi.fn())
+  global.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver
+  Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+    configurable: true,
+    get() {
+      return fakeClientWidth
+    }
+  })
+  if (!window.matchMedia) {
+    // @ts-expect-error 测试环境补 matchMedia
+    window.matchMedia = vi.fn(() => ({
+      matches: false,
+      addEventListener() {},
+      removeEventListener() {},
+      addListener() {},
+      removeListener() {}
+    }))
+  }
+})
+
+beforeEach(() => {
+  virtuosoRecords.list = []
+  fakeClientWidth = 1200
+})
+
+const makeItems = (n: number): MediaFile[] =>
+  Array.from({ length: n }, (_, i) => ({
+    id: `f${i}`,
+    file_type: i % 3 === 0 ? 'video' : 'image',
+    thumbnail: `/t/${i}.jpg`,
+    file_path: `/p/${i}.jpg`,
+    file_name: `file${i}.jpg`,
+    file_size: 1024 * (i + 1),
+    is_favorite: false,
+    is_missing: false,
+    is_corrupted: false,
+    duration: i % 3 === 0 ? 30 : undefined
+  })) as unknown as MediaFile[]
+
+const baseProps = {
+  selectedIds: [] as string[],
+  onSelect: () => {},
+  onHover: () => {},
+  onContextMenu: () => {}
+}
+
+describe('VirtualImageGrid — 网格测量回路回归（Maximum call stack size exceeded）', () => {
+  it('① components 引用在 columns 变化时必须保持稳定（不得重建 List 子树）', () => {
+    render(<VirtualImageGrid items={makeItems(3000)} {...baseProps} />)
+
+    expect(virtuosoRecords.list.length).toBeGreaterThan(0)
+    const before = virtuosoRecords.list[virtuosoRecords.list.length - 1].components as
+      Record<string, unknown> | undefined
+    expect(before?.List).toBeTypeOf('function')
+
+    // 宽度从 1200 → 700（列数 5 → 3），触发 ResizeObserver / resize 驱动的 setColumns
+    fakeClientWidth = 700
+    act(() => {
+      window.dispatchEvent(new Event('resize'))
+    })
+
+    const after = virtuosoRecords.list[virtuosoRecords.list.length - 1].components as
+      Record<string, unknown> | undefined
+    // 引用必须前后一致：不一致会让 react-virtuoso 卸载重建整个 List 子树，
+    // 触发 itemDimensions/gap/viewport 测量重新发布，把网格推入测量回路。
+    expect(after?.List).toBe(before?.List)
+
+    // 引用稳定的同时，列数仍须跟随宽度更新（证明 ref 化没有让布局失效）：
+    // 700px → DEFAULT_COLUMNS_BREAKPOINTS 命中 480 档 → 3 列
+    const List = (after as { List: React.ComponentType }).List as unknown as React.FC
+    const { container } = render(<List />)
+    const template =
+      (container.firstElementChild as HTMLElement | null)?.style?.gridTemplateColumns ?? ''
+    expect(template).toContain('repeat(3,')
+  })
+
+  it('② 不得同时向同一 VirtuosoGrid 传入 overscan 与 increaseViewportBy', () => {
+    render(<VirtualImageGrid items={makeItems(3000)} {...baseProps} />)
+    const props = virtuosoRecords.list[virtuosoRecords.list.length - 1]
+    const hasOverscan = props.overscan !== undefined
+    const hasIncreaseViewportBy = props.increaseViewportBy !== undefined
+    // 两个视口放大旋钮叠加会让网格维度计算的可见区间远超实际需求，放大环路不收敛窗口
+    expect(hasOverscan && hasIncreaseViewportBy).toBe(false)
+  })
+})
+
+describe('VirtualImageGrid — 正常 / 异常 / 边界', () => {
+  it('③ 正常：3000 条数据挂载成功且首屏卡片可见，不抛 RangeError', () => {
+    let renderError: unknown = null
+    let cardCount = 0
+    let hasGrid = false
+    try {
+      const { container } = render(<VirtualImageGrid items={makeItems(3000)} {...baseProps} />)
+      hasGrid = container.querySelector('[role="grid"]') !== null
+      cardCount = container.querySelectorAll('.media-card').length
+    } catch (e) {
+      renderError = e
+    }
+    expect(String((renderError as Error)?.message ?? '')).not.toMatch(
+      /Maximum call stack size exceeded/
+    )
+    expect(renderError).toBeNull()
+    expect(hasGrid).toBe(true)
+    expect(cardCount).toBeGreaterThan(0)
+  })
+
+  it('④ 异常：items 非数组（null）时降级为空且不抛错', () => {
+    expect(() =>
+      render(<VirtualImageGrid items={null as unknown as MediaFile[]} {...baseProps} />)
+    ).not.toThrow()
+  })
+
+  it('⑤ 边界：宽度退化为 0 时自定义 List 的列数仍为有限正整数', () => {
+    fakeClientWidth = 0
+    render(<VirtualImageGrid items={makeItems(10)} {...baseProps} />)
+    const components = virtuosoRecords.list[virtuosoRecords.list.length - 1].components as {
+      List: React.ComponentType
+    }
+    const List = components.List as unknown as React.FC
+    const { container } = render(<List />)
+    const grid = container.firstElementChild as HTMLElement | null
+    const template = grid?.style?.gridTemplateColumns ?? ''
+    const matched = template.match(/repeat\((\d+)/)
+    expect(matched).not.toBeNull()
+    expect(Number(matched?.[1])).toBeGreaterThanOrEqual(1)
+  })
+})

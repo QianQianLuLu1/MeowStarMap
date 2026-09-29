@@ -73,6 +73,9 @@ export const pickThumbnailUrl = (params: {
 // 覆盖图片与视频两类（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
 const onDemandThumbPromises = new Map<string, Promise<string | null>>()
 
+// 视口外扩展范围：提到模块级常量，避免每次渲染产生新对象引用导致第三方系统反复重订阅
+const VIEWPORT_INCREASE = { top: 100, bottom: 100 } as const
+
 /**
  * 网格卡片缩略图源判定（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
  *
@@ -358,6 +361,17 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             ? null
             : t('gallery.virtualGrid.noMore')
 
+    // 修复 Maximum call stack size exceeded（取证见
+    // docs/plans/2026-09-29-fix-gallery-stack-overflow.md）：
+    // react-virtuoso 的 components 一旦变更引用，其内部 List / Footer 的组件类型随之改变，
+    // React 会卸载并重建整个列表子树，使 itemDimensions / gap / viewport 测量重新发布；
+    // 而网格维度计算又以「已渲染可见区间」为输入，由此形成「测量 → 重渲染 → 再测量」
+    // 的回路（堆栈表现为 U() 发布 → at() 输入处理器 → M() 再发布 → gridDimensions）。
+    // 响应式列数 / 页脚文案是高频变化源，故改为经 ref 读取，令 components 引用恒定不变；
+    // List 自身每次重渲染仍会取到最新 columns，布局行为不变。
+    const latestRef = useRef({ columns, footerText })
+    latestRef.current = { columns, footerText }
+
     // 自定义 List 组件：响应式 grid 布局
     // React 19 允许 ref 作为普通 prop，无需 forwardRef
     const gridComponents = useMemo(
@@ -369,7 +383,7 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             style={{
               ...style,
               display: 'grid',
-              gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+              gridTemplateColumns: `repeat(${latestRef.current.columns}, minmax(0, 1fr))`,
               gap: `${gap}px`
             }}
             {...rest}
@@ -378,18 +392,18 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           </div>
         ),
         Footer: () =>
-          footerText === null ? null : (
+          latestRef.current.footerText === null ? null : (
             <div
               className="py-4 text-center text-xs"
               style={{ color: 'var(--text-secondary)' }}
               role="status"
               aria-live="polite"
             >
-              {footerText}
+              {latestRef.current.footerText}
             </div>
           )
       }),
-      [columns, gap, footerText]
+      [gap]
     )
 
     // 键盘导航：保留 ↑↓←→/Home/End/Enter/Space
@@ -450,8 +464,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           data={items}
           computeItemKey={(_, file) => file.id}
           components={gridComponents}
-          overscan={150}
-          increaseViewportBy={{ top: 100, bottom: 100 }}
+          // 不再叠加 overscan：increaseViewportBy 已提供视口外扩展，两者并用会让网格
+          // 维度计算的可见区间远超需求，放大上述测量回路的不收敛窗口
+          increaseViewportBy={VIEWPORT_INCREASE}
           endReached={onEndReached}
           rangeChanged={(range) => {
             visibleRangeRef.current = range
