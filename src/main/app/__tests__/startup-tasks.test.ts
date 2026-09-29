@@ -1242,7 +1242,7 @@ describe('cleanupAndRepairDatabase', () => {
     )
   })
 
-  it('C1. 自愈发生（healedBlankCount>0）→ 击穿 HTTP 缓存并广播 media:updated', async () => {
+  it('C1. 自愈发生（healedBlankCount>0）→ 不再清理 HTTP 缓存（ETag 协商缓存取代），仍广播 media:updated', async () => {
     const rows = [
       {
         id: 15,
@@ -1262,15 +1262,17 @@ describe('cleanupAndRepairDatabase', () => {
       thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
     })
     pathExistsMock.mockResolvedValue(true)
-    // 首检 true、复检 false → healedBlankCount=1，触发缓存击穿与广播
+    // 首检 true、复检 false → healedBlankCount=1，触发广播
     isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
     fsReaddirMock.mockResolvedValue([])
 
     await cleanupAndRepairDatabase(ctx)
 
-    // media:// 一年强缓存需被击穿，否则磁盘自愈对渲染层不可见
-    expect(clearCacheMock).toHaveBeenCalledTimes(1)
-    // 自愈后驱动渲染层刷新
+    // fix-thumbnail-loading-latency 节点2：media:// 缩略图已改 ETag 协商缓存（media-protocol.ts），
+    // 自愈覆盖同名文件后渲染层 revalidate 即可拿到新字节；clearCache 会清空整个会话缓存
+    // 造成启动后请求风暴，故必须移除，任何自愈场景都不得调用。
+    expect(clearCacheMock).not.toHaveBeenCalled()
+    // 自愈后仍需驱动渲染层刷新
     expect(mainWindow.webContents.send).toHaveBeenCalledWith('media:updated')
   })
 
@@ -1302,37 +1304,9 @@ describe('cleanupAndRepairDatabase', () => {
     expect(clearCacheMock).not.toHaveBeenCalled()
   })
 
-  it('C3. clearCache() 抛错 → 被捕获、函数不 reject、logger.warn 记录', async () => {
-    const rows = [
-      {
-        id: 17,
-        file_path: '/videos/g.mp4',
-        file_type: 'video',
-        thumbnail: '/cache/g.jpg',
-        width: 1920,
-        height: 1080
-      }
-    ]
-    const db = makeDb({ mediaRows: rows })
-    const generateMock = vi.fn().mockResolvedValue('/cache/g.jpg')
-    const ctx = makeAppCtx({
-      db,
-      mainWindow: makeMainWindow(),
-      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
-    })
-    pathExistsMock.mockResolvedValue(true)
-    // 首检 true、复检 false → healedBlankCount=1，进入 clearCache 分支（抛错）
-    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
-    fsReaddirMock.mockResolvedValue([])
-    clearCacheMock.mockRejectedValue(new Error('clearCache boom'))
-
-    await expect(cleanupAndRepairDatabase(ctx)).resolves.toBeUndefined()
-    expect(clearCacheMock).toHaveBeenCalledTimes(1)
-    expect(loggerWarnMock).toHaveBeenCalledWith(
-      expect.stringContaining('清理 HTTP 缓存失败'),
-      expect.any(Error)
-    )
-  })
+  // 说明：原 C3「clearCache() 抛错被捕获」与 N4「clearCache 早于 media:updated 时序」
+  // 随 fix-thumbnail-loading-latency 节点2 移除 clearCache 一并删除——被测代码路径已不存在，
+  // 自愈链路不再有任何缓存清理调用（C1/C2/N1/N2/N3 的 not.toHaveBeenCalled 断言继续守住该约束）。
 
   // ==========================================================================
   // M1 收敛：healedBlankCount 仅在“白→非白”真正发生时计数（复检 DB 实际指向的缩略图）
@@ -1432,45 +1406,6 @@ describe('cleanupAndRepairDatabase', () => {
       expect.stringContaining('视频纯白缩略图自愈失败'),
       expect.any(Error)
     )
-  })
-
-  it('N4. 顺序断言：clearCache 早于 sendToRenderer(media:updated)', async () => {
-    const rows = [
-      {
-        id: 21,
-        file_path: '/videos/k.mp4',
-        file_type: 'video',
-        thumbnail: '/cache/k.jpg',
-        width: 1920,
-        height: 1080
-      }
-    ]
-    const db = makeDb({ mediaRows: rows })
-    const generateMock = vi.fn().mockResolvedValue('/cache/k.jpg')
-    const mainWindow = makeMainWindow()
-    const ctx = makeAppCtx({
-      db,
-      mainWindow,
-      thumbnailGen: { generate: generateMock, getCacheDir: vi.fn(() => '/thumb') }
-    })
-    pathExistsMock.mockResolvedValue(true)
-    isBlankCachedThumbnailMock.mockResolvedValueOnce(true).mockResolvedValueOnce(false)
-    fsReaddirMock.mockResolvedValue([])
-
-    // 共享调用序：记录 clearCache 与 media:updated 的先后（锁定 Ryan 认定的正确时序）
-    const calls: string[] = []
-    clearCacheMock.mockImplementation(async () => {
-      calls.push('clearCache')
-    })
-    mainWindow.webContents.send.mockImplementation((channel: string) => {
-      if (channel === 'media:updated') calls.push('media:updated')
-    })
-
-    await cleanupAndRepairDatabase(ctx)
-
-    expect(calls).toContain('clearCache')
-    expect(calls).toContain('media:updated')
-    expect(calls.indexOf('clearCache')).toBeLessThan(calls.indexOf('media:updated'))
   })
 })
 

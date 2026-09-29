@@ -1,6 +1,5 @@
 import path from 'path'
 import fs from 'fs'
-import { session } from 'electron'
 import type { AppContext } from './app-context'
 import { sendToRenderer } from './renderer-bridge'
 import { ImportRootRepository } from '../database/import-root-repository'
@@ -631,16 +630,10 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
     })
   await runWithConcurrency(blankVideoHealTasks, THUMBNAIL_CONCURRENCY)
 
-  // media:// 对缩略图响应设了 Cache-Control: max-age=31536000（一年强缓存），
-  // 自愈就地覆盖同名文件、URL 不变，Chromium HTTP 缓存可能仍返回旧白图字节。
-  // 仅当本次确有自愈时清一次会话 HTTP 缓存，保证渲染层取到重建后的帧。
-  if (healedBlankCount > 0) {
-    try {
-      await session.defaultSession.clearCache()
-    } catch (err) {
-      logger.warn(`[Cleanup] 清理 HTTP 缓存失败，缩略图自愈可能需重启后生效`, err)
-    }
-  }
+  // fix-thumbnail-loading-latency 节点2：不再调用 session.defaultSession.clearCache()。
+  // media:// 缩略图响应已改为 ETag 协商缓存（media-protocol.ts），自愈就地覆盖同名文件后
+  // 渲染层 revalidate 即可拿到新字节；此前"自愈后清空整个会话缓存"的补救会一次性失效
+  // 全部已缓存资源（原图/视频一并重拉），造成启动后请求风暴，故移除。
 
   if (missingCount > 0 || repairedCount > 0 || healedBlankCount > 0) {
     logger.info(

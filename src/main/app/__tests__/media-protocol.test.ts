@@ -77,7 +77,8 @@ let mediaHandler:
 // 构造 mock 请求
 function makeRequest(
   urlPath: string,
-  range?: string
+  range?: string,
+  ifNoneMatch?: string
 ): {
   url: string
   headers: { get: (n: string) => string | null }
@@ -86,7 +87,9 @@ function makeRequest(
     url: `media://x?path=${encodeURIComponent(urlPath)}`,
     headers: {
       get: (name: string): string | null => {
-        if (name.toLowerCase() === 'range') return range ?? null
+        const lower = name.toLowerCase()
+        if (lower === 'range') return range ?? null
+        if (lower === 'if-none-match') return ifNoneMatch ?? null
         return null
       }
     }
@@ -532,5 +535,98 @@ describe('registerMediaProtocol', () => {
 
     const response = await handler!(makeRequest(targetPath))
     expect(response.status).toBe(500)
+  })
+})
+
+/**
+ * 缩略图协商缓存（ETag/304）——fix-thumbnail-loading-latency 节点1。
+ *
+ * 背景：media:// 对缩略图响应原为一年强缓存（max-age=31536000）且无内容指纹，
+ * 白帧自愈/重生成就地覆盖同名 ${hash}.jpg 后 URL 不变，渲染层持续命中旧字节。
+ * 修复：缩略图缓存目录内的响应改为 `max-age=0, must-revalidate` + ETag（mtime+size），
+ * 命中 If-None-Match 回 304；原图/视频/Range 206 分支保持原样。
+ */
+describe('缩略图协商缓存（ETag/304）', () => {
+  /** 注册并捕获 handler，stat 返回带 mtimeMs 的 mock 值 */
+  async function setup(
+    statValue: Record<string, unknown> = { size: 4096, mtimeMs: 1700000000000 }
+  ) {
+    const cacheDir = '/mock/cache'
+    const ctx = makeAppCtx({
+      thumbnailGen: { getCacheDir: vi.fn(() => cacheDir), generate: vi.fn() }
+    })
+    registerMediaProtocol(ctx)
+    const handler = protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+    fsStatMock.mockResolvedValue(statValue as unknown as { size: number })
+    return { handler: handler!, thumbPath: `${cacheDir}${path.sep}abc123.jpg` }
+  }
+
+  it('19. 缩略图 200 响应带 ETag 与 must-revalidate 协商缓存头', async () => {
+    const { handler, thumbPath } = await setup()
+    const response = await handler(makeRequest(thumbPath))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate')
+    const etag = response.headers.get('ETag')
+    expect(etag).toBeTruthy()
+    expect(etag).toMatch(/^W\//) // 弱校验器（mtime+size，非内容哈希）
+  })
+
+  it('20. 二次请求 If-None-Match 匹配当前 ETag → 304（不创建读流）', async () => {
+    const { handler, thumbPath } = await setup()
+    const first = await handler(makeRequest(thumbPath))
+    const etag = first.headers.get('ETag')
+    expect(etag).toBeTruthy()
+
+    fsCreateReadStreamMock.mockClear()
+    const second = await handler(makeRequest(thumbPath, undefined, etag!))
+    expect(second.status).toBe(304)
+    expect(await second.text()).toBe('')
+    expect(second.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate')
+    // 304 不应读文件流（零 IO，stat 已有）
+    expect(fsCreateReadStreamMock).not.toHaveBeenCalled()
+  })
+
+  it('21. If-None-Match 不匹配 → 200（fail-open）', async () => {
+    const { handler, thumbPath } = await setup()
+    const response = await handler(makeRequest(thumbPath, undefined, 'W/"deadbeef-beef"'))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('ETag')).toBeTruthy()
+  })
+
+  it('22. stat 缺少 mtimeMs 时不抛错，ETag 兜底生成', async () => {
+    const { handler, thumbPath } = await setup({ size: 4096 })
+    const response = await handler(makeRequest(thumbPath))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('ETag')).toBeTruthy()
+  })
+
+  it('23. 回归守卫：非缩略图路径保持一年强缓存且无 ETag', async () => {
+    const targetPath = path.resolve('/indexed/photo.jpg')
+    const db = makeDb((sql, param) => {
+      if (sql.includes('file_path') && param === targetPath) return { 1: 1 }
+      return undefined
+    })
+    const ctx = makeAppCtx({ db })
+    registerMediaProtocol(ctx)
+    const handler = protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+    fsStatMock.mockResolvedValue({ size: 5000, mtimeMs: 1700000000000 })
+
+    const response = await handler(makeRequest(targetPath))
+    expect(response.status).toBe(200)
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000')
+    expect(response.headers.get('ETag')).toBeNull()
+  })
+
+  it('24. 回归守卫：缩略图带 Range 头仍走 206 分支（原头不变）', async () => {
+    const { handler, thumbPath } = await setup({ size: 10000, mtimeMs: 1700000000000 })
+    const response = await handler(makeRequest(thumbPath, 'bytes=0-1023'))
+    expect(response.status).toBe(206)
+    expect(response.headers.get('Content-Range')).toBe('bytes 0-1023/10000')
+    // 206 分支保持原强缓存头（缩略图 <img> 请求不会携带 Range）
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000')
   })
 })

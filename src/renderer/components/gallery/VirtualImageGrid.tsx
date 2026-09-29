@@ -18,11 +18,6 @@ import { useVideoThumbGenerate } from '../../hooks/useVideoThumbGenerate'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
 
-// 高分屏检测：DPR ≥ 2 时启用高清缩略图档位（512px）
-// 模块加载时一次性检测，避免每次渲染都读取 devicePixelRatio
-// 普通屏（DPR < 2）下完全不影响现有 low/standard 双档位逻辑
-const HIGH_DPI_MODE = typeof window !== 'undefined' && window.devicePixelRatio >= 2
-
 // 前置守卫：后端会把游戏原生缩略图路径直接填入 thumbnail（形如
 // .../GamePlayPhotos/{uid}/NikkiPhotos_LowQuality|HighQuality/xxx.jpg），
 // 这类路径不适用缓存命名规则（_low/_high）改写，否则会推导出不存在的路径导致 404。
@@ -55,6 +50,22 @@ export const toHighQualityUrl = (thumbnail: string | undefined): string | null =
     return thumbnail.slice(0, -4) + '_high.jpg'
   }
   return null
+}
+
+// 档位选择纯函数（fix-thumbnail-loading-latency 节点3）：
+// 未升级 → 低清（64px 快速出图）；升级（停滚 300ms）→ standard（320px，唯一升级目标档）；
+// 升级后 standard 加载失败（如后台批量尚未生成 404）→ 回退低清（standardFailed 标记），
+// 待 items 刷新（useFailedImages 随 items 变化清空）自动重试，不再出现 markFailed 死胡同。
+// 此前 DPR≥2 首请求打在基本不存在的 _high.jpg 上必 404 一次、且升级后反而从 512px
+// 回落到 320px，均已随投机 _high 档位一并移除（命名契约函数 toHighQualityUrl 保留）。
+export const pickThumbnailUrl = (params: {
+  lowUrl: string | null
+  standardUrl: string | null
+  upgraded: boolean
+  standardFailed: boolean
+}): string | null => {
+  const showLow = !!params.lowUrl && (!params.upgraded || params.standardFailed)
+  return showLow ? params.lowUrl : params.standardUrl
 }
 
 interface VirtualImageGridProps {
@@ -171,6 +182,11 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     // P1-U10：failedImages 状态管理 + items 变化时自动清空
     const { failedImages, markFailed } = useFailedImages(items)
+    // fix-thumbnail-loading-latency 节点3：standard 加载失败集合（同样随 items 变化清空）。
+    // standard 404（后台批量尚未生成）时回退显示低清而非死胡同 markFailed，
+    // items 刷新（media:updated）后集合清空 → 自动重试 standard。
+    const { failedImages: standardFailedIds, markFailed: markStandardFailed } =
+      useFailedImages(items)
     // fix-gameplayphotos-video-thumbnail-null 节点4：无缩略图视频按需生成
     // （对齐 DuplicatesPage DuplicateFileCard 模式；模块级缓存单次守卫，失败不重试）
     const generatedThumbs = useVideoThumbGenerate(items)
@@ -234,20 +250,6 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
         })
       }, 300)
     }, [items])
-
-    // 高分屏下后台预生成高清缩略图（512px），仅对可见区间前 20 项触发
-    useEffect(() => {
-      if (!HIGH_DPI_MODE) return
-      const generate = window.electronAPI?.thumbnail?.generate
-      if (!generate) return
-      const { startIndex, endIndex } = visibleRangeRef.current
-      const upper = Math.min(endIndex, startIndex + 20)
-      for (let i = startIndex; i <= upper; i++) {
-        const file = items[i]
-        if (!file?.thumbnail) continue
-        generate(file.file_path, 'high').catch(() => {})
-      }
-    }, [items, columns])
 
     // 清理滚动定时器
     useEffect(() => {
@@ -382,14 +384,17 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
               file.file_type === 'video' ? effectiveThumbnail : effectiveThumbnail || file.file_path
             )
             const useHighQuality = highQualityIds.has(file.id)
+            const standardFailed = standardFailedIds.has(file.id)
             const lowUrl = toLowQualityUrl(effectiveThumbnail)
-            const highUrl = HIGH_DPI_MODE ? toHighQualityUrl(effectiveThumbnail) : null
-            const thumbUrl =
-              useHighQuality || !lowUrl
-                ? standardUrl
-                : highUrl
-                  ? toFileUrl(highUrl)
-                  : toFileUrl(lowUrl)
+            const lowUrlResolved = lowUrl ? toFileUrl(lowUrl) : null
+            const thumbUrl = pickThumbnailUrl({
+              lowUrl: lowUrlResolved,
+              standardUrl,
+              upgraded: useHighQuality,
+              standardFailed
+            })
+            // 当前是否显示低清档（onError 回退链判定用）
+            const showingLow = thumbUrl !== null && thumbUrl === lowUrlResolved
             const isFocused = index === focusedIndex
             const hasError = failedImages.has(file.id)
             const isMissing = file.is_missing === true
@@ -448,8 +453,18 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
                       draggable={false}
                       data-media-id={file.id}
                       onError={() => {
-                        if (!useHighQuality && lowUrl) {
-                          setHighQualityIds((prev) => new Set(prev).add(file.id))
+                        // 档位回退链（fix-thumbnail-loading-latency 节点3）：
+                        // 低清失败 → 立即升级 standard；standard 失败且有低清可退 →
+                        // markStandardFailed 回退低清（待 items 刷新自动重试，不再死胡同）；
+                        // 回退后的低清再失败、或无低清可退 → markFailed 终止为占位图标。
+                        if (showingLow) {
+                          if (standardFailed) {
+                            markFailed(file.id)
+                          } else {
+                            setHighQualityIds((prev) => new Set(prev).add(file.id))
+                          }
+                        } else if (lowUrl) {
+                          markStandardFailed(file.id)
                         } else {
                           markFailed(file.id)
                         }

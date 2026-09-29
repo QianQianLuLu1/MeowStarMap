@@ -43,8 +43,7 @@ vi.mock('../../utils/responsive', () => ({
   DEFAULT_COLUMNS_BREAKPOINTS: {}
 }))
 
-import { toLowQualityUrl, toHighQualityUrl } from './VirtualImageGrid'
-
+import { toLowQualityUrl, toHighQualityUrl, pickThumbnailUrl } from './VirtualImageGrid'
 const src = fs.readFileSync(
   path.resolve(process.cwd(), 'src', 'renderer', 'components', 'gallery', 'VirtualImageGrid.tsx'),
   'utf-8'
@@ -127,5 +126,79 @@ describe('toHighQualityUrl 游戏原生缩略图路径守卫', () => {
     expect(toHighQualityUrl('C:/t/abc.png')).toBeNull()
     expect(toHighQualityUrl(undefined)).toBeNull()
     expect(toLowQualityUrl(undefined)).toBeNull()
+  })
+})
+
+/**
+ * 缩略图档位状态机（fix-thumbnail-loading-latency 节点3）。
+ *
+ * 缺陷现象：① 图片缩略图先模糊，standard 未生成时 404 → markFailed 死胡同（警告图标、
+ * 无重试），要等 media:updated 全量刷新才恢复清晰；② DPR≥2 首请求打在基本不存在的
+ * _high.jpg 上必 404 一次，且升级后反而从 512px 回落到 320px（档位写反）。
+ * 修复：档位选择收敛为纯函数 pickThumbnailUrl——未升级（或升级失败回退）用低清，
+ * 升级用 standard；onError 回退链 low→standard→low→markFailed（standard 失败不再死胡同，
+ * 回退低清等待 items 刷新自动重试）；移除 HIGH_DPI_MODE 投机 _high 请求与预生成 effect。
+ */
+describe('pickThumbnailUrl 档位选择（low → standard，standard 失败回退 low）', () => {
+  const low = 'media://file?path=abc_low.jpg'
+  const std = 'media://file?path=abc.jpg'
+
+  it('正常：有低清且未升级 → 低清（首屏快速出图）', () => {
+    expect(
+      pickThumbnailUrl({ lowUrl: low, standardUrl: std, upgraded: false, standardFailed: false })
+    ).toBe(low)
+  })
+
+  it('正常：升级 → standard（停滚 300ms 后切换的唯一目标档）', () => {
+    expect(
+      pickThumbnailUrl({ lowUrl: low, standardUrl: std, upgraded: true, standardFailed: false })
+    ).toBe(std)
+  })
+
+  it('正常：无低清（游戏原生缩略图）→ 恒用 standard', () => {
+    expect(
+      pickThumbnailUrl({ lowUrl: null, standardUrl: std, upgraded: false, standardFailed: false })
+    ).toBe(std)
+    expect(
+      pickThumbnailUrl({ lowUrl: null, standardUrl: std, upgraded: true, standardFailed: false })
+    ).toBe(std)
+  })
+
+  it('边界：升级后 standard 加载失败 → 回退低清（不再死胡同，待 items 刷新重试）', () => {
+    expect(
+      pickThumbnailUrl({ lowUrl: low, standardUrl: std, upgraded: true, standardFailed: true })
+    ).toBe(low)
+  })
+
+  it('边界：standard 失败但无低清可退 → standard（交给 onError 终止为 markFailed）', () => {
+    expect(
+      pickThumbnailUrl({ lowUrl: null, standardUrl: std, upgraded: true, standardFailed: true })
+    ).toBe(std)
+  })
+
+  it('异常：lowUrl 与 standardUrl 全空 → null（组件层由占位图标兜底）', () => {
+    expect(
+      pickThumbnailUrl({ lowUrl: null, standardUrl: null, upgraded: false, standardFailed: false })
+    ).toBeNull()
+    expect(
+      pickThumbnailUrl({ lowUrl: null, standardUrl: null, upgraded: true, standardFailed: true })
+    ).toBeNull()
+  })
+})
+
+describe('档位状态机源码结构（fix-thumbnail-loading-latency 节点3）', () => {
+  it('不再存在 HIGH_DPI_MODE 投机 _high 首请求与高分屏预生成 effect', () => {
+    expect(code).not.toContain('HIGH_DPI_MODE')
+    expect(code).not.toContain("generate(file.file_path, 'high')")
+  })
+
+  it('standard 加载失败走 markStandardFailed 回退链（而非 markFailed 死胡同）', () => {
+    expect(code).toContain('markStandardFailed')
+    // 回退链终止条件仍在：回退后的低清再失败才 markFailed
+    expect(code).toContain('markFailed')
+  })
+
+  it('standardFailed 集合随 items 变化自动清空（media:updated 刷新后可重试）', () => {
+    expect(code).toContain('useFailedImages(items)')
   })
 })

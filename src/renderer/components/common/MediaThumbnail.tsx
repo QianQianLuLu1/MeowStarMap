@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { MissingBadge } from './MissingBadge'
 import { CorruptedBadge } from './CorruptedBadge'
 import { MediaThumbPlaceholder } from '../gallery/MediaThumbPlaceholder'
@@ -22,6 +22,12 @@ interface MediaThumbnailProps {
   className?: string
   /** img 元素的类名（默认 'absolute inset-0 w-full h-full object-cover'） */
   imgClassName?: string
+  /**
+   * 低清回退源（可选，fix-thumbnail-loading-latency 节点4）：
+   * src 加载失败且提供本源时切换显示一次（如 standard 404 时回退 64px _low），
+   * fallback 再失败才显示占位（防循环）。未提供/为 null 时保持既有行为（直接显示占位）。
+   */
+  fallbackSrc?: string | null
   /** 点击回调 */
   onClick?: () => void
   /** 右键回调 */
@@ -64,14 +70,23 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   badgeSize = 'md',
   className = '',
   imgClassName = 'absolute inset-0 w-full h-full object-cover',
+  fallbackSrc = null,
   onClick,
   onContextMenu
 }) => {
   // 加载错误状态：src 非空但加载失败时显示警告图标
   const [hasError, setHasError] = useState(false)
+  // 是否已切换到 fallbackSrc（仅切换一次；src 变化时复位，避免复用卡片沿用旧档位）
+  const [usedFallback, setUsedFallback] = useState(false)
+  useEffect(() => {
+    setUsedFallback(false)
+  }, [src])
+
+  // 当前生效源：src 失败且提供了 fallbackSrc 时切换（fallbackSrc 为 null 等价于未提供）
+  const activeSrc = usedFallback && fallbackSrc ? fallbackSrc : src
   // 损坏文件容错：损坏文件不显示缩略图（避免再次触发解码失败），直接显示占位图
-  // 非损坏文件正常逻辑：有 src 且未出错时显示缩略图
-  const showThumb = !isCorrupted && !!src && !hasError
+  // 非损坏文件正常逻辑：有源且未出错时显示缩略图
+  const showThumb = !isCorrupted && !!activeSrc && !hasError
 
   return (
     <div
@@ -88,11 +103,18 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       {/* 缩略图（损坏文件跳过加载） */}
       {showThumb && (
         <img
-          src={src}
+          src={activeSrc ?? undefined}
           alt={alt}
           className={imgClassName}
           loading="lazy"
-          onError={() => setHasError(true)}
+          onError={() => {
+            // 档位回退链：首次失败且有低清可退 → 切换 fallbackSrc；回退后再失败（或无低清）→ 终止为占位
+            if (!usedFallback && fallbackSrc && !hasError) {
+              setUsedFallback(true)
+            } else {
+              setHasError(true)
+            }
+          }}
         />
       )}
 

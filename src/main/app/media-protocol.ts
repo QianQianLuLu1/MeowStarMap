@@ -31,6 +31,42 @@ const MEDIA_PATH_CACHE_MAX = 1000
 const realpathCache: Map<string, string> = new Map()
 const REALPATH_CACHE_MAX = 5000
 
+// 缓存策略（fix-thumbnail-loading-latency 节点1）：
+// - 缩略图：协商缓存。自愈/重生成就地覆盖同名文件（内容 hash 命名，URL 不变），
+//   一年强缓存会让渲染层持续命中旧字节（视频白帧长期不消失的机制性根因）。
+// - 原图/视频：保持一年强缓存（用户文件内容不可变假设，视频播放 Range 性能不受影响）。
+const THUMBNAIL_CACHE_CONTROL = 'public, max-age=0, must-revalidate'
+const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000'
+
+/**
+ * 由 stat 结果构造缩略图弱 ETag（mtimeMs + size 十六进制）。
+ * mtimeMs 缺失（mock/异常 stat 结果）时以 0 兜底，不抛错——最坏情况是 304 判定失效回 200。
+ */
+function buildThumbnailEtag(fileStat: { mtimeMs?: number }, fileSize: number): string {
+  const mtime =
+    typeof fileStat.mtimeMs === 'number' && Number.isFinite(fileStat.mtimeMs)
+      ? Math.round(fileStat.mtimeMs)
+      : 0
+  return `W/"${mtime.toString(16)}-${fileSize.toString(16)}"`
+}
+
+/**
+ * If-None-Match 匹配：支持多值列表、W/ 前缀与引号差异、`*` 通配。
+ * 解析失败/不匹配一律返回 false（fail-open 回 200，绝不因头部异常拒绝服务）。
+ */
+function etagMatches(ifNoneMatch: string, etag: string): boolean {
+  const normalize = (value: string): string =>
+    value
+      .trim()
+      .replace(/^W\//i, '')
+      .replace(/^"(.*)"$/, '$1')
+  return ifNoneMatch.split(',').some((candidate) => {
+    const c = normalize(candidate)
+    if (!c) return false
+    return c === '*' || c === normalize(etag)
+  })
+}
+
 /**
  * 注册 media:// 协议 handler（支持视频 Range 请求 + 图片流式响应）。
  * 将渲染进程的图片/视频请求映射到本地文件，受白名单校验保护。
@@ -83,6 +119,28 @@ export function registerMediaProtocol(ctx: AppContext): void {
       // 都避免整文件读入内存。原实现为两段逐字复制的分支，Range 越界 bug 也因此出现两次。
       const fileStat = await fs.promises.stat(realPath)
       const fileSize = fileStat.size
+
+      // 缩略图协商缓存：白帧自愈/重新生成时会就地覆盖同名文件（内容 hash 命名，URL 不变），
+      // 一年强缓存会让渲染层持续命中旧字节（典型表现：视频白帧长期不消失）。
+      // 仅对缩略图缓存目录内的响应改用 ETag 协商缓存（未变 304 零字节，变更 200 新字节）；
+      // 原图/视频为用户文件，保持一年强缓存。修复详见 docs/plans/2026-09-29-fix-thumbnail-loading-latency.md
+      const isThumbnail = isPathUnderDir(realPath, path.resolve(ctx.thumbnailGen.getCacheDir()))
+      const thumbnailEtag = isThumbnail ? buildThumbnailEtag(fileStat, fileSize) : null
+      if (thumbnailEtag) {
+        const ifNoneMatch = request.headers.get('if-none-match')
+        if (ifNoneMatch && etagMatches(ifNoneMatch, thumbnailEtag)) {
+          return new Response(null, {
+            status: 304,
+            headers: {
+              ETag: thumbnailEtag,
+              'Cache-Control': THUMBNAIL_CACHE_CONTROL,
+              // media:// 相对 app://renderer 页面为跨源，canvas 消费需 CORS 放行（对齐 renderer-protocol.ts）
+              'Access-Control-Allow-Origin': '*'
+            }
+          })
+        }
+      }
+
       const range = parseRangeHeader(request.headers.get('range'), fileSize)
 
       // Range 越界：必须回 416 且不能带负数 Content-Length，否则渲染进程会拿到损坏响应
@@ -105,7 +163,7 @@ export function registerMediaProtocol(ctx: AppContext): void {
             'Content-Range': `bytes ${range.start}-${range.end}/${fileSize}`,
             'Content-Length': String(range.end - range.start + 1),
             'Accept-Ranges': 'bytes',
-            'Cache-Control': 'public, max-age=31536000',
+            'Cache-Control': IMMUTABLE_CACHE_CONTROL,
             // media:// 相对 app://renderer 页面为跨源，canvas 消费需 CORS 放行（对齐 renderer-protocol.ts）
             'Access-Control-Allow-Origin': '*'
           }
@@ -119,7 +177,9 @@ export function registerMediaProtocol(ctx: AppContext): void {
           'Content-Type': mimeType,
           'Content-Length': String(fileSize),
           'Accept-Ranges': 'bytes',
-          'Cache-Control': 'public, max-age=31536000',
+          // 缩略图走协商缓存（自愈覆盖同名文件后必须对渲染层可见）；原图/视频保持一年强缓存
+          'Cache-Control': thumbnailEtag ? THUMBNAIL_CACHE_CONTROL : IMMUTABLE_CACHE_CONTROL,
+          ...(thumbnailEtag ? { ETag: thumbnailEtag } : {}),
           // media:// 相对 app://renderer 页面为跨源，canvas 消费需 CORS 放行（对齐 renderer-protocol.ts）
           'Access-Control-Allow-Origin': '*'
         }

@@ -26,6 +26,8 @@ import {
 } from '../icons'
 import { ContextMenu } from '../components/common/ContextMenu'
 import { MediaThumbnail } from '../components/common/MediaThumbnail'
+// fix-thumbnail-loading-latency 节点4：图片 standard 加载失败时回退低清档（复用网格档位命名纯函数）
+import { toLowQualityUrl } from '../components/gallery/VirtualImageGrid'
 import { SkeletonList } from '../components/common/Skeleton'
 import { getContextMenuItems, type GalleryContextMenuActions } from '../utils/gallery'
 import { useFileOperations } from '../hooks/useFileOperations'
@@ -1611,6 +1613,12 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
 
   const thumbSrc = generatedSrc ?? baseSrc
 
+  // fix-thumbnail-loading-latency 节点4：standard 加载失败（后台批量尚未生成 → media:// 404）时
+  // 回退 64px 低清缩略图而非死胡同警告图标。仅图片提供；游戏原生缩略图/无 _low 可推导时
+  // toLowQualityUrl 返回 null（fallbackSrc=null，行为与此前一致）。视频走上方按需生成链路，不回退。
+  const fallbackSrc =
+    file.file_type === 'image' ? toFileUrl(toLowQualityUrl(file.thumbnail ?? undefined)) : null
+
   return (
     <div
       className="glass-card card-hover overflow-hidden cursor-pointer"
@@ -1644,6 +1652,7 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
           src={thumbSrc}
           alt={file.file_name}
           fileType={file.file_type === 'video' ? 'video' : 'image'}
+          fallbackSrc={fallbackSrc}
         />
         {/* 选中标记 */}
         <div

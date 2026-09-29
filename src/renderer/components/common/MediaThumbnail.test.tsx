@@ -143,3 +143,49 @@ describe('MediaThumbnail', () => {
     expect(cls).toContain('object-cover')
   })
 })
+
+/**
+ * 可选 fallbackSrc 低清回退（fix-thumbnail-loading-latency 节点4）：
+ * src 加载失败且提供 fallbackSrc 时切换显示一次（重复文件页 standard 404 时回退 64px 低清，
+ * 不再死胡同警告图标）；fallback 再失败才终止为占位；未提供时保持既有行为不变。
+ */
+describe('MediaThumbnail｜fallbackSrc 低清回退', () => {
+  it('src 加载失败且有 fallbackSrc → 切换到 fallbackSrc（不死胡同警告图标）', () => {
+    render(
+      <MediaThumbnail
+        src="media://std.jpg"
+        alt="x"
+        fileType="image"
+        fallbackSrc="media://low.jpg"
+      />
+    )
+    expect(screen.getByAltText('x').getAttribute('src')).toBe('media://std.jpg')
+    fireEvent.error(screen.getByAltText('x'))
+    expect(screen.getByAltText('x').getAttribute('src')).toBe('media://low.jpg')
+    // 未终止为失败占位
+    expect(screen.queryByTestId('placeholder')).toBeNull()
+  })
+
+  it('fallbackSrc 也加载失败 → 移除 img 显示失败占位（防循环，仅切换一次）', () => {
+    render(
+      <MediaThumbnail
+        src="media://std.jpg"
+        alt="x"
+        fileType="image"
+        fallbackSrc="media://low.jpg"
+      />
+    )
+    fireEvent.error(screen.getByAltText('x'))
+    expect(screen.getByAltText('x').getAttribute('src')).toBe('media://low.jpg')
+    fireEvent.error(screen.getByAltText('x'))
+    expect(screen.queryByAltText('x')).toBeNull()
+    expect(screen.getByTestId('placeholder').getAttribute('data-has-error')).toBe('true')
+  })
+
+  it('fallbackSrc 为 null → 等价于未提供，onError 直接显示失败占位（游戏原生缩略图无 _low 场景）', () => {
+    render(<MediaThumbnail src="media://std.jpg" alt="x" fileType="image" fallbackSrc={null} />)
+    fireEvent.error(screen.getByAltText('x'))
+    expect(screen.queryByAltText('x')).toBeNull()
+    expect(screen.getByTestId('placeholder').getAttribute('data-has-error')).toBe('true')
+  })
+})
