@@ -18,6 +18,8 @@ import fsp from 'fs/promises'
 import path from 'path'
 import sharp from 'sharp'
 import { pathExists } from '../utils/file-utils'
+// N2 原子落盘：临时文件 + rename 替换，消除 media:// 半截读取（裂图）
+import { writeFileAtomic } from '../utils/atomic-file'
 import type {
   ThumbnailWorkerCommand,
   ThumbnailWorkerEvent,
@@ -65,25 +67,29 @@ async function processStandard(
   const { filePath, fileHash, cacheDir } = input
   const thumbnailPath = path.join(cacheDir, `${fileHash}.jpg`)
 
-  await sharp(filePath)
-    .resize(STANDARD_MAX_WIDTH, STANDARD_MAX_HEIGHT, {
-      fit: 'inside',
-      withoutEnlargement: true
-    })
-    .jpeg({ quality: STANDARD_QUALITY, progressive: true })
-    .toFile(thumbnailPath)
+  await writeFileAtomic(thumbnailPath, (tmp) =>
+    sharp(filePath)
+      .resize(STANDARD_MAX_WIDTH, STANDARD_MAX_HEIGHT, {
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: STANDARD_QUALITY, progressive: true })
+      .toFile(tmp)
+  )
 
   // 同步生成 _low（与主进程 doGenerate 一致）
   const lowPath = path.join(cacheDir, `${fileHash}_low.jpg`)
   if (!(await pathExists(lowPath))) {
     try {
-      await sharp(thumbnailPath)
-        .resize(LOW_MAX_WIDTH, LOW_MAX_HEIGHT, {
-          fit: 'inside',
-          withoutEnlargement: true
-        })
-        .jpeg({ quality: LOW_QUALITY })
-        .toFile(lowPath)
+      await writeFileAtomic(lowPath, (tmp) =>
+        sharp(thumbnailPath)
+          .resize(LOW_MAX_WIDTH, LOW_MAX_HEIGHT, {
+            fit: 'inside',
+            withoutEnlargement: true
+          })
+          .jpeg({ quality: LOW_QUALITY })
+          .toFile(tmp)
+      )
     } catch {
       // 低质量生成失败不影响标准缩略图返回（与主进程行为一致）
     }
@@ -103,13 +109,15 @@ async function processLow(input: ThumbnailProcessInput): Promise<{ path: string;
   const standardPath = path.join(cacheDir, `${fileHash}.jpg`)
   const sourcePath = (await pathExists(standardPath)) ? standardPath : filePath
 
-  await sharp(sourcePath)
-    .resize(LOW_MAX_WIDTH, LOW_MAX_HEIGHT, {
-      fit: 'inside',
-      withoutEnlargement: true
-    })
-    .jpeg({ quality: LOW_QUALITY })
-    .toFile(lowPath)
+  await writeFileAtomic(lowPath, (tmp) =>
+    sharp(sourcePath)
+      .resize(LOW_MAX_WIDTH, LOW_MAX_HEIGHT, {
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: LOW_QUALITY })
+      .toFile(tmp)
+  )
 
   const size = (await fsp.stat(lowPath).catch(() => ({ size: 0 }))).size
   return { path: lowPath, size }
@@ -123,13 +131,15 @@ async function processHigh(input: ThumbnailProcessInput): Promise<{ path: string
   const { filePath, fileHash, cacheDir } = input
   const highPath = path.join(cacheDir, `${fileHash}_high.jpg`)
 
-  await sharp(filePath)
-    .resize(HIGH_MAX_WIDTH, HIGH_MAX_HEIGHT, {
-      fit: 'inside',
-      withoutEnlargement: true
-    })
-    .jpeg({ quality: HIGH_QUALITY, progressive: true })
-    .toFile(highPath)
+  await writeFileAtomic(highPath, (tmp) =>
+    sharp(filePath)
+      .resize(HIGH_MAX_WIDTH, HIGH_MAX_HEIGHT, {
+        fit: 'inside',
+        withoutEnlargement: true
+      })
+      .jpeg({ quality: HIGH_QUALITY, progressive: true })
+      .toFile(tmp)
+  )
 
   const size = (await fsp.stat(highPath).catch(() => ({ size: 0 }))).size
   return { path: highPath, size }

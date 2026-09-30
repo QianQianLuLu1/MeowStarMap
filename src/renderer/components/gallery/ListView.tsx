@@ -1,6 +1,6 @@
 import React, { forwardRef, useCallback, useMemo } from 'react'
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
-import { toFileUrl } from '../../utils/file'
+import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
 import { formatFileSize } from '../../utils/format'
 import { formatDate } from '../../utils/date'
 import { IconStar } from '../../icons'
@@ -66,7 +66,7 @@ const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
         overscan={400}
         increaseViewportBy={{ top: 200, bottom: 200 }}
         itemContent={(index, file) => {
-          const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
+          const thumbUrl = resolveThumbnailSrc(file)
           const isSelected = selectedSet.has(file.id)
           const hasError = failedImages.has(file.id)
           const isMissing = file.is_missing === true

@@ -63,8 +63,8 @@ const ctl = vi.hoisted(() => ({
   bktreeImpl: null as null | ((opts: BkSearchOpts) => unknown),
   /** fluent-ffmpeg run 是否触发 error 回调 */
   ffmpegFail: false,
-  /** fluent-ffmpeg 抽帧模式：'ok' 成功写文件 | 'fail' 失败 | 'retryThenOk' 0s失败1s成功 */
-  ffmpegMode: 'ok' as 'ok' | 'fail' | 'retryThenOk',
+  /** fluent-ffmpeg 抽帧模式：'ok' 成功写文件 | 'fail' 失败 | 'retryThenOk' 0s失败1s成功 | 'blankBlankThenFail' 0s/1s成功3s失败（N4 短视频兜底） */
+  ffmpegMode: 'ok' as 'ok' | 'fail' | 'retryThenOk' | 'blankBlankThenFail',
   /** 已捕获的 output 路径（run 时写入） */
   ffmpegOutputPath: '' as string,
   /** 记录每次 run 的 seekInput 值 */
@@ -92,7 +92,19 @@ vi.mock('sharp', () => {
       ctl.sharpMetadataImpl
         ? ctl.sharpMetadataImpl(filePath ?? '')
         : Promise.resolve({ width: 1920, height: 1080 })
-    chain.toFile = () => new Promise((resolve) => setTimeout(resolve, ctl.sharpToFileDelayMs))
+    chain.toFile = (p: string) =>
+      new Promise((resolve) =>
+        setTimeout(() => {
+          // N2 原子落盘后 toFile 目标是临时文件，rename 替换要求其真实存在（与 ffmpeg mock 同原则）
+          try {
+            fs.mkdirSync(path.dirname(p), { recursive: true })
+            fs.writeFileSync(p, Buffer.alloc(16, 0xff))
+          } catch {
+            /* 忽略：极端情况下目录不可写，由 rename 失败上抛 */
+          }
+          resolve(undefined)
+        }, ctl.sharpToFileDelayMs)
+      )
     // 纯色判定链路：resize(...).stats()，由 ctl 控制返回的通道标准差
     chain.stats = () => {
       const stdev = ctl.statsStdevQueue.length
@@ -133,6 +145,11 @@ vi.mock('fluent-ffmpeg', () => {
       setTimeout(() => {
         if (ctl.ffmpegMode === 'fail') {
           handlers.error?.(new Error('ffmpeg 抽帧失败（mock）'))
+          return
+        }
+        if (ctl.ffmpegMode === 'blankBlankThenFail' && ctl.ffmpegSeeks.length > 2) {
+          // N4：0s/1s 成功（写入文件，纯色由 statsStdevQueue 判定），末位点 3s 超出短视频时长失败
+          handlers.error?.(new Error('ffmpeg 抽帧失败（mock 末位点超时长）'))
           return
         }
         if (ctl.ffmpegMode === 'retryThenOk' && ctl.ffmpegSeeks.length <= 1) {
@@ -592,7 +609,7 @@ describe('worker-entry 消息处理分支', () => {
     // 行为断言：仅普通图片行被处理并写库（生成阶段 UPDATE 含 thumbnail 列，args 末位为 row id）
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
     const updates = fake.runs.filter((r) =>
-      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+      r.sql.startsWith('UPDATE media_files SET width = COALESCE')
     )
     expect(updates).toHaveLength(1)
     expect(updates[0].args[6]).toBe(1)
@@ -633,7 +650,7 @@ describe('worker-entry 消息处理分支', () => {
     // 行为断言：仅普通图片行被处理
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
     const updates = fake.runs.filter((r) =>
-      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+      r.sql.startsWith('UPDATE media_files SET width = COALESCE')
     )
     expect(updates).toHaveLength(1)
     expect(updates[0].args[6]).toBe(1)
@@ -696,7 +713,7 @@ describe('worker-entry 消息处理分支', () => {
     // 行为断言：普通图片 + GamePlayPhotos 视频各写库一次；GamePlayPhotos 图片行仍被排除
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
     const updates = fake.runs.filter((r) =>
-      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+      r.sql.startsWith('UPDATE media_files SET width = COALESCE')
     )
     expect(updates).toHaveLength(2)
     expect(updates.map((u) => u.args[6]).sort()).toEqual([1, 3])
@@ -740,9 +757,7 @@ describe('worker-entry 消息处理分支', () => {
       [1920, 1080, 32]
     ])
     expect(
-      fake.runs.filter((r) =>
-        r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
-      )
+      fake.runs.filter((r) => r.sql.startsWith('UPDATE media_files SET width = COALESCE'))
     ).toHaveLength(0)
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
   })
@@ -766,7 +781,7 @@ describe('worker-entry 消息处理分支', () => {
     const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 1, total: 1 })
     const updates = fake.runs.filter((r) =>
-      r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
+      r.sql.startsWith('UPDATE media_files SET width = COALESCE')
     )
     expect(updates).toHaveLength(1)
     expect(updates[0].args[6]).toBe(1)
@@ -817,9 +832,7 @@ describe('worker-entry 消息处理分支', () => {
     ])
     // 不触发生成：无含 thumbnail 列的 UPDATE、无缩略图产物写盘（toFile 零调用）
     expect(
-      fake.runs.filter((r) =>
-        r.sql.startsWith('UPDATE media_files SET width = ?, height = ?, thumbnail = ?')
-      )
+      fake.runs.filter((r) => r.sql.startsWith('UPDATE media_files SET width = COALESCE'))
     ).toHaveLength(0)
     // 进度计数并入 total：补读 2 行均计入 processed/total
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
@@ -1288,6 +1301,33 @@ describe('worker-entry 消息处理分支', () => {
     expect(ctl.ffmpegSeeks).toEqual([0, 1])
   })
 
+  it('N4 短视频兜底：0s/1s 纯色且 3s 失败 → 保留已有帧算成功，不再整行跳过', async () => {
+    // 缺陷：时长 <3s 且片头淡入的视频，末位点 3s seek 空输出抛错 → generate 失败 →
+    // withFileTimeout 返回 null → 整行跳过不写库，且 thumbnail 恒 NULL 每轮批量反复重试，
+    // 配合一次失败即标损坏的旧行为文件直接从图库消失。
+    ctl.ffmpegMode = 'blankBlankThenFail'
+    ctl.statsStdevQueue = [0, 0] // 0s、1s 均判定为纯色 → 推进到 3s
+    ctl.ffmpegSeeks = []
+    const videoFile = path.join(tmpRoot, 'clip-short.mp4')
+    fs.writeFileSync(videoFile, 'fake-video-content-short')
+    const rows = [{ id: 1, file_path: videoFile, file_type: 'video' }]
+    const fake = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? rows : []))
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'video-short.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    expect(evt.payload).toMatchObject({ success: true, processed: 1, total: 1 })
+    expect(ctl.ffmpegSeeks).toEqual([0, 1, 3])
+    // 关键断言：旧行为在末位点失败后整次生成失败，UPDATE 以 thumbnail=NULL 入库（数据自伤）；
+    // 修复后保留 1s 成功帧返回真实路径，且该缩略图文件真实存在
+    const update = fake.runs.find((r) => r.sql.startsWith('UPDATE media_files SET width'))
+    expect(update).toBeTruthy()
+    expect(String(update!.args[2])).toMatch(/\.jpg$/)
+    expect(fs.existsSync(String(update!.args[2]))).toBe(true)
+  })
+
   it('视频缓存命中纯白帧 → 自愈重建标准帧并丢弃白色 _low 副本', async () => {
     // 复刻 worker 的 getFileHash：sha256(文件前 1MB) 取前 16 位
     const content = 'fake-video-content-cached-white'
@@ -1316,8 +1356,35 @@ describe('worker-entry 消息处理分支', () => {
     expect(evt.payload).toMatchObject({ success: true, processed: 1, total: 1 })
     // 命中缓存未直接返回：触发了一次重建抽帧
     expect(ctl.ffmpegSeeks.length).toBeGreaterThan(0)
-    // 白色低清副本被丢弃，网格不会再命中它（sharp mock 的 toFile 不写盘，故只断言删除）
-    expect(fs.existsSync(cachedLow)).toBe(false)
+    // 旧的白色 _low 副本被丢弃。N2 原子落盘后 writeLowFromStandard 会真实重建新鲜副本
+    // （sharp mock 的 toFile 真实写盘），故断言「不再命中旧白色内容」而非「文件不存在」
+    expect(fs.existsSync(cachedLow)).toBe(true)
+    expect(fs.readFileSync(cachedLow).equals(Buffer.alloc(64, 0x00))).toBe(false)
+  })
+
+  it('N3 防覆写：批量 UPDATE 对全部数据列使用 COALESCE 守卫（生成失败不抹掉已有值）', async () => {
+    // 缺陷：批量查询选中「thumbnail IS NULL OR width IS NULL OR height IS NULL」的行，
+    // 若某行 thumbnail 有效但缺尺寸，而生成本次失败（thumbnailPath=null），
+    // 旧 UPDATE 会把有效 thumbnail 连同 phash 一起覆写为 NULL（数据自伤）。
+    // 修复：SQL 层 COALESCE(?, col)——入参为 NULL 时回退为列的现值。
+    const rows = [thumbRow(1, mediaFiles[0])]
+    const fake = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? rows : []))
+    ctl.currentDb = fake.db
+    port.emitMessage({
+      type: 'THUMBNAIL_BATCH_START',
+      payload: { dbPath: 'n3-coalesce.db', cacheDir, thumbnailQuality: 'standard' }
+    })
+    await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+    const update = fake.runs.find((r) => r.sql.startsWith('UPDATE media_files SET width'))
+    expect(update).toBeTruthy()
+    expect(update!.sql).toContain('width = COALESCE(?, width)')
+    expect(update!.sql).toContain('height = COALESCE(?, height)')
+    expect(update!.sql).toContain('thumbnail = COALESCE(?, thumbnail)')
+    expect(update!.sql).toContain('phash = COALESCE(?, phash)')
+    expect(update!.sql).toContain('phash_mtime = COALESCE(?, phash_mtime)')
+    expect(update!.sql).toContain('phash_file_size = COALESCE(?, phash_file_size)')
+    // 参数契约不变：7 参（6 数据列 + id），无需改动调用侧
+    expect(update!.args).toHaveLength(7)
   })
 
   // ── 进度 500ms 节流 ──
@@ -1333,6 +1400,11 @@ describe('worker-entry 消息处理分支', () => {
 
   /** 预热批 + 600ms 等待：重置模块级节流时间戳，并清空消息队列 */
   async function warmProgressThrottle(): Promise<void> {
+    // N2 原子落盘后 sharp mock 的 toFile 真实写盘：跨用例残留的缓存文件会让后续
+    // 用例任务命中缓存瞬时完成，破坏本组用例「真实生成耗时」的时序假设。
+    // 故预热前清空缓存目录，与「节流时间戳只受本用例控制」的预热目的一致。
+    fs.rmSync(cacheDir, { recursive: true, force: true })
+    fs.mkdirSync(cacheDir, { recursive: true })
     const warmRow = thumbRow(1, mediaFiles[0])
     const warmFake = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? [warmRow] : []))
     ctl.currentDb = warmFake.db

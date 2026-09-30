@@ -258,7 +258,7 @@ export async function updateMediaFileAndPersist(
 // 修复 A-G1/F-S3/C-S1：使用分页加载，避免万级文件一次性加载导致 OOM
 // 首次加载第一页（500 条），后续可通过 loadMoreMedia 追加加载
 // P0-02：按当前选中的角色档案 UID 过滤
-const MEDIA_PAGE_SIZE = 500
+export const MEDIA_PAGE_SIZE = 500
 
 /**
  * 从数据库查询媒体文件与分类列表（纯查询，不写 store）。
@@ -266,8 +266,12 @@ const MEDIA_PAGE_SIZE = 500
  * 本函数只负责取数：函数体内没有任何 set(...) 调用，返回 { files, categories, total, hasMore } 或 null。
  * 调用方必须自行把结果写入 store（setMediaFiles / setCategories），否则 UI 不会更新。
  * 推荐直接使用 useRefreshMedia hook，它已封装「取数 + 写 store + 失败重试」，可杜绝返回值被丢弃。
+ *
+ * @param options.limit 覆盖默认页大小（N6）：media:updated 整表刷新入口传入
+ *   max(MEDIA_PAGE_SIZE, 当前已加载条数)，避免已滚到第 N 页的列表被首页 500 条
+ *   整体替换而闪回开头；游标逻辑不受影响（仍以 cursor=null 取首页语义刷新）。
  */
-export async function fetchMediaFromDatabase(): Promise<{
+export async function fetchMediaFromDatabase(options?: { limit?: number }): Promise<{
   files: MediaFile[]
   categories: Category[]
   total?: number
@@ -315,7 +319,7 @@ export async function fetchMediaFromDatabase(): Promise<{
     // 性能重构：首屏使用 keyset 游标（cursor=null 即首页），续页由 loadNextMediaPage 推进 mediaCursor
     const mediaResult = await window.electronAPI.media.list({
       cursor: null,
-      pageSize: MEDIA_PAGE_SIZE,
+      pageSize: options?.limit ?? MEDIA_PAGE_SIZE,
       accountUid: currentProfileUid,
       hideDuplicates: !showDuplicates,
       corruptedOnly: showCorruptedOnly,

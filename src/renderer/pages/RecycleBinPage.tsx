@@ -5,9 +5,9 @@ import {
   useMediaStore,
   loadRecycleBin,
   loadNextRecycleBinPage,
-  toFileUrl,
   type MediaFile
 } from '../stores/mediaStore'
+import { resolveThumbnailSrc } from '../utils/thumbnail-src'
 import { useRefreshMedia } from '../hooks/useRefreshMedia'
 import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
@@ -488,13 +488,11 @@ const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({ file, selected
   // Windows 路径时，new URL 会把盘符「C:」当作 scheme 解析（protocol === 'c:'）且不抛异常，
   // 于是 catch 分支失效、返回畸形 URL，最终被 Chromium 当作 file:/// 拒绝加载
   // （Not allowed to load local resource，日志实测 570 次裂图）。
-  // 改用项目统一的 toFileUrl（同 VirtualImageGrid / TimelineView），其已正确处理
-  // media:// / blob: / data: / file:// 前缀与 Electron 环境转换；
+  // FIX(N1): 再改用 resolveThumbnailSrc（同 VirtualImageGrid 不变量）——旧写法
+  // `toFileUrl(file.thumbnail || file.file_path)` 对 thumbnail 为空的视频会回退用视频文件
+  // 本身作 <img> 源必裂图，现统一判定：DB thumbnail > （仅图片）原文件 > null（图标占位）；
   // media 协议白名单（media-protocol.ts）已放行缩略图缓存目录，故无需改协议层。
-  const thumbUrl = useMemo(
-    () => toFileUrl(file.thumbnail || file.file_path),
-    [file.thumbnail, file.file_path]
-  )
+  const thumbUrl = useMemo(() => resolveThumbnailSrc(file), [file])
 
   return (
     <div

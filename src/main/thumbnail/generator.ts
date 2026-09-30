@@ -27,6 +27,8 @@ import { CACHE_METADATA_FILENAME } from '../utils/constants'
 import { isGamePlayPhotosPath, resolveNativeThumbnailPath } from '../scanner/path-classifier'
 // 纯色帧判定（修复视频缩略图纯白）：无 i18n / logger 依赖，主进程与 media worker 共用
 import { isBlankImageFile, isBlankCachedThumbnail } from '../utils/video-frame'
+// N2 原子落盘：临时文件 + rename 替换，消除 media:// 半截读取（裂图）与跨进程并发写撕裂
+import { writeFileAtomic, tempSiblingPath, removeTempFileQuietly } from '../utils/atomic-file'
 
 /**
  * 损坏文件标记回调类型。
@@ -623,51 +625,59 @@ export class ThumbnailGenerator {
         const lowPath = path.join(this.cacheDir, `${fileHash}_low.jpg`)
         const standardPath = path.join(this.cacheDir, `${fileHash}.jpg`)
         const sourcePath = (await pathExists(standardPath)) ? standardPath : filePath
-        await sharp(sourcePath)
-          .resize(this.lowMaxWidth, this.lowMaxHeight, {
-            fit: 'inside',
-            withoutEnlargement: true
-          })
-          .jpeg({ quality: this.lowQuality })
-          .toFile(lowPath)
+        await writeFileAtomic(lowPath, (tmp) =>
+          sharp(sourcePath)
+            .resize(this.lowMaxWidth, this.lowMaxHeight, {
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .jpeg({ quality: this.lowQuality })
+            .toFile(tmp)
+        )
         const size = (await fsp.stat(lowPath).catch(() => ({ size: 0 }))).size
         return { path: lowPath, size }
       }
 
       if (quality === 'high') {
         const highPath = path.join(this.cacheDir, `${fileHash}_high.jpg`)
-        await sharp(filePath)
-          .resize(this.highMaxWidth, this.highMaxHeight, {
-            fit: 'inside',
-            withoutEnlargement: true
-          })
-          .jpeg({ quality: this.highQuality, progressive: true })
-          .toFile(highPath)
+        await writeFileAtomic(highPath, (tmp) =>
+          sharp(filePath)
+            .resize(this.highMaxWidth, this.highMaxHeight, {
+              fit: 'inside',
+              withoutEnlargement: true
+            })
+            .jpeg({ quality: this.highQuality, progressive: true })
+            .toFile(tmp)
+        )
         const size = (await fsp.stat(highPath).catch(() => ({ size: 0 }))).size
         return { path: highPath, size }
       }
 
       // standard：生成标准档位 + 同步生成 _low（与原 doGenerate 一致）
       const thumbnailPath = path.join(this.cacheDir, `${fileHash}.jpg`)
-      await sharp(filePath)
-        .resize(this.maxWidth, this.maxHeight, {
-          fit: 'inside',
-          withoutEnlargement: true
-        })
-        .jpeg({ quality: this.quality, progressive: true })
-        .toFile(thumbnailPath)
+      await writeFileAtomic(thumbnailPath, (tmp) =>
+        sharp(filePath)
+          .resize(this.maxWidth, this.maxHeight, {
+            fit: 'inside',
+            withoutEnlargement: true
+          })
+          .jpeg({ quality: this.quality, progressive: true })
+          .toFile(tmp)
+      )
 
       // 同步生成 _low：从刚生成的标准缩略图缩放（更快），失败不阻断主流程
       const lowPath = path.join(this.cacheDir, `${fileHash}_low.jpg`)
       if (!(await pathExists(lowPath))) {
         try {
-          await sharp(thumbnailPath)
-            .resize(this.lowMaxWidth, this.lowMaxHeight, {
-              fit: 'inside',
-              withoutEnlargement: true
-            })
-            .jpeg({ quality: this.lowQuality })
-            .toFile(lowPath)
+          await writeFileAtomic(lowPath, (tmp) =>
+            sharp(thumbnailPath)
+              .resize(this.lowMaxWidth, this.lowMaxHeight, {
+                fit: 'inside',
+                withoutEnlargement: true
+              })
+              .jpeg({ quality: this.lowQuality })
+              .toFile(tmp)
+          )
         } catch {
           // 低质量生成失败不影响标准缩略图返回
         }
@@ -699,13 +709,25 @@ export class ThumbnailGenerator {
   private async extractVideoFrame(videoPath: string, outputPath: string): Promise<void> {
     const ladder = [0, VIDEO_RETRY_SEEK_SECONDS, VIDEO_THIRD_SEEK_SECONDS]
     let lastError: unknown = null
+    // N4 短视频兜底：是否已有成功落盘的帧
+    let haveFrame = false
 
     for (let i = 0; i < ladder.length; i++) {
       const seek = ladder[i]
       try {
         await this.extractVideoFrameAtSeek(videoPath, outputPath, seek)
+        haveFrame = true
       } catch (err) {
         lastError = err
+        if (i === ladder.length - 1 && haveFrame) {
+          // 末位点（3s）失败但此前已有成功帧：时长 <3s 的视频 seek 3s 会空输出抛错，
+          // 若据此判失败会连同 markCorrupted 把完好短视频从图库隐藏。
+          // 降级优于失败——保留末次成功帧返回（可能是纯色帧，交给白帧自愈后续处理）。
+          logger.warn(
+            `[ThumbnailGenerator] 末位抽帧失败但已保留 ${ladder[i - 1]}s 成功帧 (path: ${videoPath})`
+          )
+          return
+        }
         if (i < ladder.length - 1) {
           logger.warn(
             `[ThumbnailGenerator] ffmpeg 抽帧 ${seek}s 失败 (${(err as Error)?.message}); 重试 ${
@@ -754,18 +776,22 @@ export class ThumbnailGenerator {
     return new Promise<void>((resolve, reject) => {
       const ffmpegPath = ffmpegBinaryPath
       let settled = false
+      // N2 原子落盘：ffmpeg 输出到同目录临时文件，校验通过后 rename 替换最终路径，
+      // 避免 media:// 流式读到半截帧文件（裂图）与跨进程并发写撕裂
+      const tmpOutputPath = tempSiblingPath(outputPath)
 
       const cleanup = (cmd: ReturnType<typeof import('fluent-ffmpeg')>) => {
         clearTimeout(timeout)
         untrackFfmpegCommand(cmd)
       }
 
-      // 30 秒超时保护：超时后必须 kill 子进程，避免 ffmpeg 累积泄漏
+      // 30 秒超时保护：超时后必须 kill 子进程，避免 ffmpeg 进程泄漏
       const timeout = setTimeout(() => {
         if (settled) return
         settled = true
         command.kill('SIGKILL')
         cleanup(command)
+        void removeTempFileQuietly(tmpOutputPath)
         reject(new Error(t('main.thumbnail.error.ffmpegFrameTimeout')))
       }, 30000)
 
@@ -773,7 +799,7 @@ export class ThumbnailGenerator {
         .setFfmpegPath(ffmpegPath)
         .seekInput(seekSeconds)
         .frames(1)
-        .output(outputPath)
+        .output(tmpOutputPath)
         .outputOptions(
           '-vf',
           `scale=${this.maxWidth}:${this.maxHeight}:force_original_aspect_ratio=decrease`,
@@ -787,14 +813,16 @@ export class ThumbnailGenerator {
           if (settled) return
           settled = true
           cleanup(command)
-          // --- 输出校验：文件必须存在且非空 ---
+          // --- 输出校验：临时文件必须存在且非空，通过后原子替换最终路径 ---
           try {
-            const stat = await fsp.stat(outputPath)
+            const stat = await fsp.stat(tmpOutputPath)
             if (!stat.isFile() || stat.size <= 0) {
               throw new Error(t('main.thumbnail.error.ffmpegEmptyOutput'))
             }
+            await fsp.rename(tmpOutputPath, outputPath)
             resolve()
           } catch (statErr) {
+            await removeTempFileQuietly(tmpOutputPath)
             reject(statErr instanceof Error ? statErr : new Error(String(statErr)))
           }
         })
@@ -804,6 +832,7 @@ export class ThumbnailGenerator {
           cleanup(command)
           // spawn EFTYPE/ENOENT 等子进程错误落盘诊断（阶梯重试会吞掉末次以外的错误）
           maybeLogSpawnError('thumbnail-generator', err)
+          void removeTempFileQuietly(tmpOutputPath)
           reject(err)
         })
 
@@ -839,11 +868,13 @@ export class ThumbnailGenerator {
       this.contentHashCache.set(filePath, { hash: hashHex, mtime, size })
       return hashHex
     } catch (err) {
-      // 读取失败时降级为路径+mtime hash，保证功能可用
+      // 读取失败时降级为路径+mtime+size hash，保证功能可用
+      // N8：与 media-worker/worker-entry.ts 的降级公式保持一致（补 size），
+      // 否则同一文件在两侧得到不同缩略图文件名，缓存互不命中、重复生成
       logger.warn(`[Thumbnail] 内容 hash 计算失败，降级为路径 hash: ${filePath}`, err)
       const fallback = crypto
         .createHash('sha256')
-        .update(`${filePath}:${mtime}`)
+        .update(`${filePath}:${mtime}:${size}`)
         .digest('hex')
         .slice(0, 16)
       return fallback

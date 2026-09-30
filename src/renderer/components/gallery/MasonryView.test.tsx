@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import fs from 'fs'
+import path from 'path'
 import { MasonryView } from './MasonryView'
 import type { MediaFile } from '../../stores/mediaStore'
 
@@ -84,5 +86,57 @@ describe('MasonryView', () => {
     // 该卡片的缩略图被移除，降级为占位图；其余卡片不受影响
     expect(card.querySelector('[data-testid="thumb"]')).toBeNull()
     expect(document.querySelectorAll('[data-testid="thumb"]').length).toBe(11)
+  })
+})
+
+/**
+ * 缩略图源统一（fix-thumbnail-display-and-latency N1）。
+ * 缺陷：`toFileUrl(file.thumbnail || file.file_path)` 对 thumbnail 为空的视频回退用
+ * 「原视频文件」作 <img> 源 → 浏览器无法解码视频必裂图（网格视图已有同类修复，
+ * 本组用例同步防护瀑布流视图）。
+ */
+describe('MasonryView 缩略图源（N1）', () => {
+  const makeVideo = (overrides: Record<string, unknown>): MediaFile =>
+    ({
+      ...makeFile('v1', 200, 300),
+      file_name: 'clip01.mp4',
+      file_path: '/tmp/v1.mp4',
+      file_type: 'video',
+      ...overrides
+    }) as unknown as MediaFile
+
+  it('异常：视频无缩略图 → 不得以视频文件作 <img> 源（裂图根因）', () => {
+    render(
+      <MasonryView
+        files={[makeVideo({ thumbnail: undefined })]}
+        selectedIds={[]}
+        onSelect={() => {}}
+      />
+    )
+    expect(document.querySelector('[data-testid="thumb"]')).toBeNull()
+  })
+
+  it('正常：视频有缩略图 → img 正常渲染', () => {
+    render(
+      <MasonryView
+        files={[makeVideo({ thumbnail: '/cache/abc.jpg' })]}
+        selectedIds={[]}
+        onSelect={() => {}}
+      />
+    )
+    expect(document.querySelector('[data-testid="thumb"]')).toBeTruthy()
+  })
+
+  it('结构：不得存在「thumbnail || file_path」旧回退写法，统一走 resolveThumbnailSrc', () => {
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/renderer/components/gallery/MasonryView.tsx'),
+      'utf-8'
+    )
+    const code = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n')
+    expect(code).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
+    expect(code).toContain('resolveThumbnailSrc(file)')
   })
 })

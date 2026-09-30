@@ -837,15 +837,18 @@ export class MediaRepository {
   // ==========================================================================
 
   /**
-   * 标记文件为损坏（is_corrupted=1）并记录原因。
-   * - 累加 corrupted_count，达到阈值（1 次）后置 is_corrupted=1
-   * - 与 missing_count 防抖机制不同：损坏是确定性的（解码失败不会自愈），无需防抖
+   * 标记文件为损坏并记录原因。
+   * - 累加 corrupted_count，达到阈值（3 次）后置 is_corrupted=1
+   * - N4 防误标（fix-thumbnail-display-and-latency）：解码失败可能是瞬时的（ffmpeg 30s×3
+   *   超时、磁盘繁忙、外置盘唤醒慢），一次失败即隐藏会让完好文件从图库消失。
+   *   改为 corrupted_count 连续累计，仅当累计达 3 次才置 is_corrupted=1；
+   *   解码成功路径 clearCorrupted 已将计数归零。
    * - reason 截断为 200 字符，避免过长错误信息占用存储
    */
   async markCorrupted(mediaId: number, reason: string): Promise<void> {
     const truncatedReason = reason.slice(0, 200)
     await this.runWrite(
-      'UPDATE media_files SET is_corrupted = 1, corrupted_count = corrupted_count + 1, corrupted_reason = ? WHERE id = ?',
+      'UPDATE media_files SET corrupted_count = corrupted_count + 1, is_corrupted = CASE WHEN corrupted_count + 1 >= 3 THEN 1 ELSE is_corrupted END, corrupted_reason = ? WHERE id = ?',
       [truncatedReason, mediaId]
     )
   }
@@ -858,6 +861,20 @@ export class MediaRepository {
     await this.runWrite(
       'UPDATE media_files SET is_corrupted = 0, corrupted_count = 0, corrupted_reason = NULL WHERE id = ?',
       [mediaId]
+    )
+  }
+
+  /**
+   * 按文件路径条件清除损坏标记（N5，fix-thumbnail-display-and-latency）。
+   * 缩略图缓存命中/生成成功路径每次都会触发清除回调：旧实现先 SELECT id 再无条件
+   * UPDATE，大库滚动时每张可见卡附一次跨 worker-bridge 的 SELECT+UPDATE 写。
+   * 改为单条条件 UPDATE：仅命中 is_corrupted=1 的行，未损坏行零写、且省去 SELECT。
+   * 路径不存在（未入库文件）时 changes=0，静默无副作用。
+   */
+  async clearCorruptedByPath(filePath: string): Promise<void> {
+    await this.runWrite(
+      'UPDATE media_files SET is_corrupted = 0, corrupted_count = 0, corrupted_reason = NULL WHERE file_path = ? AND is_corrupted = 1',
+      [filePath]
     )
   }
 

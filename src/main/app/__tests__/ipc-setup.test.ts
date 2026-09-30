@@ -471,17 +471,22 @@ describe('injectCorruptedMarkers', () => {
     expect(handlerMocks.loggerErrorMock).toHaveBeenCalled()
   })
 
-  it('13. clearCorruptedFn 调用 repo.clearCorrupted', async () => {
+  it('13. clearCorruptedFn 单条条件写库（N5：不再 SELECT id，未损坏行零写）', async () => {
+    // 旧行为：getMediaIdByPath(SELECT) + clearCorrupted(UPDATE) 两步无条件执行——
+    // 缓存命中/生成成功路径每张可见卡都附一次跨 worker-bridge 的 SELECT+UPDATE，
+    // 系统性拖慢大库滚动。新契约：clearCorruptedByPath 单条条件 UPDATE，
+    // WHERE file_path = ? AND is_corrupted = 1，未损坏行零写、且省去 SELECT。
     const setCorruptedMarker = vi.fn()
     const ctx = makeAppCtx({ thumbnailGenExt: { setCorruptedMarker } })
     const db = { prepare: vi.fn() }
     ctx.dbManager.getDatabase.mockReturnValue(db)
     const getMediaIdByPath = vi.fn(() => 99)
-    const clearCorrupted = vi.fn().mockResolvedValue(undefined)
+    const clearCorruptedByPath = vi.fn().mockResolvedValue(undefined)
     handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
       getMediaIdByPath,
       markCorrupted: vi.fn(),
-      clearCorrupted
+      clearCorrupted: vi.fn(),
+      clearCorruptedByPath
     }))
 
     injectCorruptedMarkers(ctx)
@@ -489,8 +494,30 @@ describe('injectCorruptedMarkers', () => {
 
     await clearFn('/img/ok.jpg')
 
-    expect(getMediaIdByPath).toHaveBeenCalledWith('/img/ok.jpg')
-    expect(clearCorrupted).toHaveBeenCalledWith(99)
+    expect(clearCorruptedByPath).toHaveBeenCalledWith('/img/ok.jpg')
+    // N5 性能点：不再按路径查 mediaId（消除每次命中路径的 SELECT）
+    expect(getMediaIdByPath).not.toHaveBeenCalled()
+  })
+
+  it('13b. clearCorruptedFn 内部抛错时仅 logger.warn 不向上传播', async () => {
+    const setCorruptedMarker = vi.fn()
+    const ctx = makeAppCtx({ thumbnailGenExt: { setCorruptedMarker } })
+    const db = { prepare: vi.fn() }
+    ctx.dbManager.getDatabase.mockReturnValue(db)
+    handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
+      getMediaIdByPath: vi.fn(),
+      markCorrupted: vi.fn(),
+      clearCorrupted: vi.fn(),
+      clearCorruptedByPath: vi.fn(() => {
+        throw new Error('db error')
+      })
+    }))
+
+    injectCorruptedMarkers(ctx)
+    const clearFn = setCorruptedMarker.mock.calls[0][1] as (filePath: string) => Promise<void>
+
+    await expect(clearFn('/img.jpg')).resolves.toBeUndefined()
+    expect(handlerMocks.loggerWarnMock).toHaveBeenCalled()
   })
 
   it('14. db 为 null 时 markCorruptedFn 直接返回', async () => {

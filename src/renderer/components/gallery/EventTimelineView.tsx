@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
-import { toFileUrl } from '../../utils/file'
+import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
 import { IconEvent } from '../../icons'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
@@ -250,7 +250,7 @@ export const EventTimelineView: React.FC<EventTimelineViewProps> = ({
               }}
             >
               {unit.files.map((file) => {
-                const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
+                const thumbUrl = resolveThumbnailSrc(file)
                 const hasError = failedImages.has(file.id)
                 const isMissing = file.is_missing === true
                 // 损坏文件容错：损坏文件不显示缩略图，仅显示占位图 + 损坏角标

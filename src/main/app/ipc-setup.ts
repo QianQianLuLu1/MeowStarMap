@@ -186,7 +186,11 @@ export function injectCorruptedMarkers(ctx: AppContext): void {
   }
 
   /**
-   * 根据 file_path 查询 mediaId 并执行 clearCorrupted。
+   * 按路径单条条件清除损坏标记（N5）。
+   * 旧实现先 SELECT mediaId 再无条件 clearCorrupted——缓存命中/生成成功路径每张
+   * 可见卡都附一次跨 worker-bridge 的 SELECT+UPDATE，大库滚动时系统性拖慢加载。
+   * 改为 clearCorruptedByPath（WHERE file_path = ? AND is_corrupted = 1）：
+   * 未损坏行零写、未入库路径零副作用、省去 SELECT。
    * 失败仅记录日志，不抛错（清除标记失败不影响缩略图正常返回）。
    */
   const clearCorruptedFn: (filePath: string) => Promise<void> = async (filePath) => {
@@ -194,9 +198,7 @@ export function injectCorruptedMarkers(ctx: AppContext): void {
     if (!db) return
     try {
       const repo = new MediaRepository(db, workerBridge, dbPath)
-      const mediaId = repo.getMediaIdByPath(filePath)
-      if (mediaId === undefined) return
-      await repo.clearCorrupted(mediaId)
+      await repo.clearCorruptedByPath(filePath)
     } catch (err) {
       logger.warn(`[App] clearCorrupted 回调失败: ${filePath}`, err)
     }

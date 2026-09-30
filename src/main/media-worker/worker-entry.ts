@@ -37,6 +37,8 @@ import { runWithConcurrency } from '../utils/concurrency'
 import { THUMBNAIL_CONCURRENCY } from '../utils/constants'
 // 纯色帧判定（修复视频缩略图纯白）：无 i18n / logger 依赖，主进程与 media worker 共用
 import { isBlankImageFile, isBlankCachedThumbnail } from '../utils/video-frame'
+// N2 原子落盘：临时文件 + rename 替换，消除 media:// 半截读取（裂图）与双写者竞态
+import { writeFileAtomic, tempSiblingPath, removeTempFileQuietly } from '../utils/atomic-file'
 import { calculatePHash, hammingDistance } from '../utils/phash'
 import { pickBestId } from '../utils/duplicate-scoring'
 import { buildAndSearch } from './bktree-index'
@@ -255,13 +257,26 @@ const blankHealedHashes: Set<string> = new Set()
 async function extractVideoFrame(videoPath: string, outputPath: string): Promise<void> {
   const ladder = [0, VIDEO_RETRY_SEEK_SECONDS, VIDEO_THIRD_SEEK_SECONDS]
   let lastError: unknown = null
+  // N4 短视频兜底：是否已有成功落盘的帧
+  let haveFrame = false
 
   for (let i = 0; i < ladder.length; i++) {
     const seek = ladder[i]
     try {
       await extractVideoFrameAtSeek(videoPath, outputPath, seek)
+      haveFrame = true
     } catch (err) {
       lastError = err
+      if (i === ladder.length - 1 && haveFrame) {
+        // 末位点（3s）失败但此前已有成功帧：时长 <3s 的视频 seek 3s 会空输出抛错，
+        // 若据此判失败会让该行 thumbnail 恒 NULL、每轮批量反复重试。
+        // 降级优于失败——保留末次成功帧返回（可能是纯色帧，交给白帧自愈后续处理）。
+        workerLog(
+          'warn',
+          `[Thumbnail] 末位抽帧失败但已保留 ${ladder[i - 1]}s 成功帧 (path: ${videoPath})`
+        )
+        return
+      }
       if (i < ladder.length - 1) {
         workerLog(
           'warn',
@@ -292,13 +307,15 @@ async function extractVideoFrame(videoPath: string, outputPath: string): Promise
 async function writeLowFromStandard(thumbnailPath: string, lowPath: string): Promise<void> {
   if (await pathExists(lowPath)) return
   try {
-    await sharp(thumbnailPath)
-      .resize(LOW_MAX_WIDTH, LOW_MAX_HEIGHT, {
-        fit: 'inside',
-        withoutEnlargement: true
-      })
-      .jpeg({ quality: LOW_QUALITY })
-      .toFile(lowPath)
+    await writeFileAtomic(lowPath, (tmp) =>
+      sharp(thumbnailPath)
+        .resize(LOW_MAX_WIDTH, LOW_MAX_HEIGHT, {
+          fit: 'inside',
+          withoutEnlargement: true
+        })
+        .jpeg({ quality: LOW_QUALITY })
+        .toFile(tmp)
+    )
   } catch {
     // 低质量生成失败不影响标准缩略图返回
   }
@@ -324,6 +341,8 @@ function extractVideoFrameAtSeek(
 
   return new Promise<void>((resolve, reject) => {
     let settled = false
+    // N2 原子落盘：ffmpeg 输出到同目录临时文件，校验通过后 rename 替换最终路径
+    const tmpOutputPath = tempSiblingPath(outputPath)
     const cleanup = (cmd: ReturnType<typeof ffmpeg>): void => {
       clearTimeout(timeout)
       untrackFfmpegCommand(cmd)
@@ -333,6 +352,7 @@ function extractVideoFrameAtSeek(
       settled = true
       command.kill('SIGKILL')
       cleanup(command)
+      void removeTempFileQuietly(tmpOutputPath)
       reject(new Error(t('main.thumbnail.error.ffmpegFrameTimeout')))
     }, 30000)
 
@@ -340,7 +360,7 @@ function extractVideoFrameAtSeek(
       .setFfmpegPath(ffmpegBinaryPath)
       .seekInput(seekSeconds)
       .frames(1)
-      .output(outputPath)
+      .output(tmpOutputPath)
       .outputOptions(
         '-vf',
         `scale=${STANDARD_MAX_WIDTH}:${STANDARD_MAX_HEIGHT}:force_original_aspect_ratio=decrease`,
@@ -353,14 +373,16 @@ function extractVideoFrameAtSeek(
         if (settled) return
         settled = true
         cleanup(command)
-        // --- 输出校验：文件必须存在且非空 ---
+        // --- 输出校验：临时文件必须存在且非空，通过后原子替换最终路径 ---
         try {
-          const stat = await fsp.stat(outputPath)
+          const stat = await fsp.stat(tmpOutputPath)
           if (!stat.isFile() || stat.size <= 0) {
             throw new Error(t('main.thumbnail.error.ffmpegEmptyOutput'))
           }
+          await fsp.rename(tmpOutputPath, outputPath)
           resolve()
         } catch (statErr) {
+          await removeTempFileQuietly(tmpOutputPath)
           reject(statErr instanceof Error ? statErr : new Error(String(statErr)))
         }
       })
@@ -368,6 +390,7 @@ function extractVideoFrameAtSeek(
         if (settled) return
         settled = true
         cleanup(command)
+        void removeTempFileQuietly(tmpOutputPath)
         reject(err)
       })
 
@@ -434,13 +457,15 @@ async function generateThumbnailInWorker(
     if (isVideo) {
       await extractVideoFrame(filePath, thumbnailPath)
     } else {
-      await sharp(filePath)
-        .resize(STANDARD_MAX_WIDTH, STANDARD_MAX_HEIGHT, {
-          fit: 'inside',
-          withoutEnlargement: true
-        })
-        .jpeg({ quality: STANDARD_QUALITY, progressive: true })
-        .toFile(thumbnailPath)
+      await writeFileAtomic(thumbnailPath, (tmp) =>
+        sharp(filePath)
+          .resize(STANDARD_MAX_WIDTH, STANDARD_MAX_HEIGHT, {
+            fit: 'inside',
+            withoutEnlargement: true
+          })
+          .jpeg({ quality: STANDARD_QUALITY, progressive: true })
+          .toFile(tmp)
+      )
     }
 
     // 同步生成低质量版本（64px, q30），失败不阻断主流程
@@ -509,8 +534,11 @@ async function startThumbnailBatch(
       }
     }
 
+    // N3 防覆写：COALESCE(?, col)——本批只选「thumbnail/width/height 缺失」的行，
+    // 生成部分失败（如 thumbnailPath=null 但 metadata 成功）时，NULL 入参回退为列现值，
+    // 不得把库中已有的有效 thumbnail/phash 覆写为 NULL（数据自伤）
     const updateStmt = database.prepare(
-      'UPDATE media_files SET width = ?, height = ?, thumbnail = ?, phash = ?, phash_mtime = ?, phash_file_size = ? WHERE id = ?'
+      'UPDATE media_files SET width = COALESCE(?, width), height = COALESCE(?, height), thumbnail = COALESCE(?, thumbnail), phash = COALESCE(?, phash), phash_mtime = COALESCE(?, phash_mtime), phash_file_size = COALESCE(?, phash_file_size) WHERE id = ?'
     )
 
     let processed = 0

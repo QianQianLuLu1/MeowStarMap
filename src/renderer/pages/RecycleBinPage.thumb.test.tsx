@@ -43,8 +43,11 @@ describe('RecycleBinPage 缩略图 URL 构造契约（缺陷B）', () => {
     expect(recycleBinPageCode).not.toMatch(/new URL\([^)]*'media:\/\/'\)/)
   })
 
-  it('缩略图应统一经 toFileUrl 转换（与 VirtualImageGrid / TimelineView 一致）', () => {
-    expect(recycleBinPageCode).toContain('toFileUrl(file.thumbnail || file.file_path)')
+  it('缩略图源统一经 resolveThumbnailSrc 判定（N1：视频无缩略图不回退原文件防裂图）', () => {
+    // 旧契约「toFileUrl(file.thumbnail || file.file_path)」把视频文件本身当 <img> 源，
+    // 是视频裂图根因（对齐 VirtualImageGrid.resolveEffectiveThumbnail 不变量），已废除
+    expect(recycleBinPageCode).toContain('resolveThumbnailSrc(file)')
+    expect(recycleBinPageCode).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
   })
 })
 

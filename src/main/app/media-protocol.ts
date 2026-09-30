@@ -31,11 +31,14 @@ const MEDIA_PATH_CACHE_MAX = 1000
 const realpathCache: Map<string, string> = new Map()
 const REALPATH_CACHE_MAX = 5000
 
-// 缓存策略（fix-thumbnail-loading-latency 节点1）：
-// - 缩略图：协商缓存。自愈/重生成就地覆盖同名文件（内容 hash 命名，URL 不变），
+// 缓存策略（fix-thumbnail-loading-latency 节点1 + N7 放宽）：
+// - 缩略图：ETag 协商缓存。自愈/重生成就地覆盖同名文件（内容 hash 命名，URL 不变），
 //   一年强缓存会让渲染层持续命中旧字节（视频白帧长期不消失的机制性根因）。
+//   N7：max-age 0 → 300——内容 hash 命名下 URL 基本不变，5 分钟内同一 URL 直接命中
+//   本地缓存，消除滚动/广播期间每张可见卡回主进程 stat+ETag 的往返；代价是自愈重建
+//   同名文件后浏览器最长 5 分钟后才看到新字节（权衡已确认接受）。
 // - 原图/视频：保持一年强缓存（用户文件内容不可变假设，视频播放 Range 性能不受影响）。
-const THUMBNAIL_CACHE_CONTROL = 'public, max-age=0, must-revalidate'
+const THUMBNAIL_CACHE_CONTROL = 'public, max-age=300, must-revalidate'
 const IMMUTABLE_CACHE_CONTROL = 'public, max-age=31536000'
 
 /**

@@ -449,6 +449,18 @@ describe('mediaStore', () => {
       expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ cursor: null, pageSize: 500 }))
     })
 
+    it('N6：limit 覆盖默认页大小（media:updated 刷新保持已加载深度）', async () => {
+      // 缺陷：media:updated 广播（扫描/批量缩略图期间高频）触发整表刷新时只取首页
+      // 500 条并整体替换——已滚到第 N 页的用户列表瞬间缩回 500 条、游标被重置
+      // （列表闪回开头）。修复：GalleryPage 传 limit = max(500, 当前已加载条数)，
+      // 本函数透传为 pageSize，游标逻辑不变。
+      setMockApi()
+      await fetchMediaFromDatabase({ limit: 1200 })
+      const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
+        .electronAPI!.media!.list
+      expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ cursor: null, pageSize: 1200 }))
+    })
+
     it('图库视图调用 list 时传 galleryHighQualityOnly: true', async () => {
       useUIStore.setState({ currentView: 'gallery' })
       setMockApi()

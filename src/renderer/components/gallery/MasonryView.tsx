@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 // 复用成熟开源方案 masonic 的布局内核（usePositioner / useResizeObserver / useMasonry），
 // 仅自行提供「容器内滚动」的 scrollTop/height 数据源，避免自实现绝对定位与虚拟化。
 import { useMasonry, usePositioner, useResizeObserver } from 'masonic'
-import { toFileUrl } from '../../utils/file'
+import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
@@ -54,7 +54,7 @@ function MasonryCard({ index, data }: { index: number; width: number; data: Medi
   const onToggleSelection = ctx.onToggleSelection
 
   const file = data
-  const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
+  const thumbUrl = resolveThumbnailSrc(file)
   const isSelected = selectedSet.has(file.id)
   const isMissing = file.is_missing === true
   const isCorrupted = file.is_corrupted === true

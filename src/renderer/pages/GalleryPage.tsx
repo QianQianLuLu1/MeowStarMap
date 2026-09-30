@@ -7,7 +7,8 @@ import {
   useMediaStore,
   type MediaFile,
   fetchMediaFromDatabase,
-  loadNextMediaPage
+  loadNextMediaPage,
+  MEDIA_PAGE_SIZE
 } from '../stores/mediaStore'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
@@ -218,9 +219,14 @@ export const GalleryPage: React.FC = () => {
 
   // useEffect 2：全局订阅 media:updated，仅注册一次（不依赖 currentView/showCorruptedOnly）
   // 拆分目的：避免依赖变化时解绑订阅，导致扫描完成通知丢失
+  // N6：刷新以「已加载深度」取数（limit = max(500, 当前条数)）——扫描/批量缩略图期间
+  // 广播高频触发整表刷新，若只取首页 500 条会整体替换已加载列表并重置游标，
+  // 用户视图瞬间闪回开头；以当前深度取数可保持滚动位置与列表稳定。
   useEffect(() => {
     const unsubscribe = window.electronAPI?.media?.onUpdated(() => {
-      fetchMediaFromDatabase()
+      fetchMediaFromDatabase({
+        limit: Math.max(MEDIA_PAGE_SIZE, useMediaStore.getState().mediaFiles.length)
+      })
         .then((result) => {
           if (result) setMediaFiles(result.files)
         })

@@ -529,7 +529,10 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
     'UPDATE media_files SET missing_count = missing_count + 1, is_missing = CASE WHEN missing_count + 1 >= 2 THEN 1 ELSE 0 END WHERE id = ?'
   )
   const updateStmt = db.prepare(
-    'UPDATE media_files SET width = ?, height = ?, thumbnail = ? WHERE id = ?'
+    // N3 防覆写：COALESCE(?, col)——修复行含「thumbnail 有效但缺尺寸」的情况，
+    // processThumbnailForRow 在 generate 失败时以 null 调用 run，
+    // COALESCE 使 NULL 入参回退为列现值，不把已有有效 thumbnail 覆写为 NULL
+    'UPDATE media_files SET width = COALESCE(?, width), height = COALESCE(?, height), thumbnail = COALESCE(?, thumbnail) WHERE id = ?'
   )
   const markMissingAll = db.transaction((ids: number[]) => {
     for (const id of ids) markMissingStmt.run(id)

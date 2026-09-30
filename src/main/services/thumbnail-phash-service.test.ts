@@ -269,6 +269,25 @@ describe('processThumbnailForRow', () => {
     expect(calculatePHash).not.toHaveBeenCalled()
     expect(stmt.run).toHaveBeenCalledWith(null, null, null, 6)
   })
+
+  it('N3 防覆写：启动修复 UPDATE（调用方 startup-tasks.ts）对数据列使用 COALESCE 守卫', () => {
+    // 绑定契约（见上方 describe 头注）：修复 UPDATE 的 SQL 由调用方 cleanupAndRepairDatabase
+    // 构造并传入。processThumbnailForRow 在 generate 失败时以 null 调用 run——若 SQL 无
+    // COALESCE 守卫，会把「thumbnail 有效但缺尺寸」行的已有 thumbnail 覆写为 NULL（数据自伤）。
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/main/app/startup-tasks.ts'),
+      'utf-8'
+    )
+    const code = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n')
+    expect(code).toContain('width = COALESCE(?, width)')
+    expect(code).toContain('height = COALESCE(?, height)')
+    expect(code).toContain('thumbnail = COALESCE(?, thumbnail)')
+    // 旧裸赋值形态不得残留
+    expect(code).not.toContain('thumbnail = ?')
+  })
 })
 
 // ============================================================

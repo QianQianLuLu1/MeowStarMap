@@ -152,6 +152,17 @@ describe('GalleryPage useEffect 拆分契约（任务 3）', () => {
     expect(subscribeBlock).toContain('setMediaFiles')
   })
 
+  it('useEffect 2：N6 刷新保持已加载深度（limit = max(500, 当前长度)）', () => {
+    // 缺陷：media:updated 整表刷新只取首页 500 条并整体替换 + 游标重置，
+    // 已滚到第 N 页的列表瞬间闪回开头；失败集清空引发重试风暴。
+    const subscribeMarker = '全局订阅 media:updated，仅注册一次'
+    const subscribeBlockStart = galleryPageSrc.indexOf(subscribeMarker)
+    const subscribeBlock = galleryPageSrc.slice(subscribeBlockStart, subscribeBlockStart + 800)
+
+    expect(subscribeBlock).toContain('limit: Math.max(MEDIA_PAGE_SIZE')
+    expect(subscribeBlock).toContain('mediaFiles.length')
+  })
+
   it('useEffect 2：cleanup 应解绑订阅（unsubscribe）', () => {
     const subscribeMarker = '全局订阅 media:updated，仅注册一次'
     const subscribeBlockStart = galleryPageSrc.indexOf(subscribeMarker)

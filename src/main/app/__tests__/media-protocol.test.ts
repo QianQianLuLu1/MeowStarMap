@@ -539,12 +539,15 @@ describe('registerMediaProtocol', () => {
 })
 
 /**
- * 缩略图协商缓存（ETag/304）——fix-thumbnail-loading-latency 节点1。
+ * 缩略图协商缓存（ETag/304）——fix-thumbnail-loading-latency 节点1 + N7 放宽。
  *
  * 背景：media:// 对缩略图响应原为一年强缓存（max-age=31536000）且无内容指纹，
  * 白帧自愈/重生成就地覆盖同名 ${hash}.jpg 后 URL 不变，渲染层持续命中旧字节。
- * 修复：缩略图缓存目录内的响应改为 `max-age=0, must-revalidate` + ETag（mtime+size），
+ * 修复：缩略图缓存目录内的响应改为 ETag（mtime+size）协商缓存，
  * 命中 If-None-Match 回 304；原图/视频/Range 206 分支保持原样。
+ * N7：max-age 0 → 300——缩略图按内容 hash 命名、URL 基本不变，5 分钟内同一 URL
+ * 直接命中本地缓存，消除滚动/广播期间每张可见卡回主进程 stat+ETag 的往返；
+ * 代价是自愈重建同名文件后浏览器最长 5 分钟才看到新字节（用户已确认接受）。
  */
 describe('缩略图协商缓存（ETag/304）', () => {
   /** 注册并捕获 handler，stat 返回带 mtimeMs 的 mock 值 */
@@ -563,11 +566,11 @@ describe('缩略图协商缓存（ETag/304）', () => {
     return { handler: handler!, thumbPath: `${cacheDir}${path.sep}abc123.jpg` }
   }
 
-  it('19. 缩略图 200 响应带 ETag 与 must-revalidate 协商缓存头', async () => {
+  it('19. 缩略图 200 响应带 ETag 与 max-age=300 协商缓存头', async () => {
     const { handler, thumbPath } = await setup()
     const response = await handler(makeRequest(thumbPath))
     expect(response.status).toBe(200)
-    expect(response.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate')
+    expect(response.headers.get('Cache-Control')).toBe('public, max-age=300, must-revalidate')
     const etag = response.headers.get('ETag')
     expect(etag).toBeTruthy()
     expect(etag).toMatch(/^W\//) // 弱校验器（mtime+size，非内容哈希）
@@ -583,7 +586,7 @@ describe('缩略图协商缓存（ETag/304）', () => {
     const second = await handler(makeRequest(thumbPath, undefined, etag!))
     expect(second.status).toBe(304)
     expect(await second.text()).toBe('')
-    expect(second.headers.get('Cache-Control')).toBe('public, max-age=0, must-revalidate')
+    expect(second.headers.get('Cache-Control')).toBe('public, max-age=300, must-revalidate')
     // 304 不应读文件流（零 IO，stat 已有）
     expect(fsCreateReadStreamMock).not.toHaveBeenCalled()
   })

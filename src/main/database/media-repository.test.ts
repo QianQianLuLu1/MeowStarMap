@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import fs from 'fs'
+import path from 'path'
 import { SQLITE_MAX_VARIABLE_NUMBER, SQL_IN_SAFE_CEILING, SQL_IN_CHUNK_SIZE } from './sql-chunk'
 
 /**
@@ -3286,5 +3288,55 @@ describe('MediaRepository', () => {
       // syncRun 将 params 作为单个数组参数传入 run，故 captured.params 为 [[...]]
       expect(captured[0].params[0]).toEqual(['h:/my\\_photos/%'])
     })
+  })
+})
+
+// ============================================================================
+// N4 损坏标记阈值（fix-thumbnail-display-and-latency）
+// ============================================================================
+describe('markCorrupted 阈值（N4：连续 3 次失败才隐藏文件）', () => {
+  // 缺陷：任何一次解码失败（含 ffmpeg 30s×3 超时、磁盘繁忙等瞬时故障）即置
+  // is_corrupted=1，图库默认视图过滤之 → 完好文件从图库消失。
+  // 修复语义：corrupted_count 累计，仅当连续失败达 3 次才置位；成功路径
+  // clearCorrupted 已将计数归零。内存 SQL 引擎不支持 UPDATE 内 CASE WHEN，
+  // 沿仓库结构断言先例锁定 SQL 形态（同 startup-tasks missing_count ≥2 防抖写法）。
+  it('markCorrupted 的 SQL 以 corrupted_count 累计 + CASE WHEN(>=3) 置位 is_corrupted', () => {
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/main/database/media-repository.ts'),
+      'utf-8'
+    )
+    const code = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n')
+    expect(code).toContain('corrupted_count = corrupted_count + 1')
+    expect(code).toContain(
+      'is_corrupted = CASE WHEN corrupted_count + 1 >= 3 THEN 1 ELSE is_corrupted END'
+    )
+    // 旧的一次失败即置位形态不得残留
+    expect(code).not.toContain('SET is_corrupted = 1, corrupted_count')
+  })
+})
+
+// ============================================================================
+// N5 clearCorrupted 条件化（fix-thumbnail-display-and-latency）
+// ============================================================================
+describe('clearCorruptedByPath（N5：单条条件 UPDATE）', () => {
+  it('按 file_path 条件清除，且仅命中 is_corrupted=1 的行（未损坏行零写）', () => {
+    // 依赖：generate 缓存命中/成功路径每次都调 clear 回调；旧实现先 SELECT id 再无条件
+    // UPDATE，大库滚动时每张可见卡附一次跨 worker-bridge 的 SELECT+UPDATE。
+    // 新契约：单条 UPDATE ... WHERE file_path = ? AND is_corrupted = 1（含计数归零）。
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/main/database/media-repository.ts'),
+      'utf-8'
+    )
+    const code = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n')
+    expect(code).toContain('clearCorruptedByPath')
+    expect(code).toContain(
+      'UPDATE media_files SET is_corrupted = 0, corrupted_count = 0, corrupted_reason = NULL WHERE file_path = ? AND is_corrupted = 1'
+    )
   })
 })

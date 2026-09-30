@@ -19,7 +19,8 @@ import crypto from 'crypto'
 // ---- 共享控制态（vi.hoisted 提升，mock 工厂内可引用） ----
 const ctl = vi.hoisted(() => ({
   /** 抽帧结果模式 */
-  mode: 'ok' as 'ok' | 'fail' | 'zeroByte' | 'retryThenOk' | 'hang',
+  mode: 'ok' as
+    'ok' | 'fail' | 'zeroByte' | 'retryThenOk' | 'hang' | 'partialThenFail' | 'blankBlankThenFail',
   /** 单次 writeFile 的字节数（zeroByte 模式强制 0） */
   outputSize: 64,
   /** 已捕获的 output 路径（run 时写入） */
@@ -36,7 +37,13 @@ const ctl = vi.hoisted(() => ({
    */
   statsStdev: 50,
   /** stdev 序列：非空时按序消费，用于构造「首个位点纯色、后续位点有内容」场景 */
-  statsStdevQueue: [] as number[]
+  statsStdevQueue: [] as number[],
+  /** sharp toFile 写盘失败注入（N2 原子落盘用例）：先写部分字节再抛错，模拟撕裂写 */
+  sharpFail: false,
+  /** sharpFail 时预写的部分字节数 */
+  sharpPartialBytes: 8,
+  /** sharp toFile 实际收到的目标路径（断言「临时文件 → rename」原子替换） */
+  toFileTargets: [] as string[]
 }))
 
 // 重置控制态
@@ -49,6 +56,9 @@ function resetCtl(mode: typeof ctl.mode = 'ok', size = 64) {
   ctl.sharpCalls = []
   ctl.statsStdev = 50
   ctl.statsStdevQueue = []
+  ctl.sharpFail = false
+  ctl.sharpPartialBytes = 8
+  ctl.toFileTargets = []
 }
 
 // ---- electron（仅提供 userData 路径） ----
@@ -88,14 +98,27 @@ vi.mock('fluent-ffmpeg', () => {
       }
       // 决定本次 run 的行为（写入字节数由 ctl.mode 在 setTimeout 内判定，无需单独标志）
       let willFail = false
-      if (ctl.mode === 'fail') {
+      if (ctl.mode === 'fail' || ctl.mode === 'partialThenFail') {
         willFail = true
       } else if (ctl.mode === 'retryThenOk') {
         // 第一次（seek 0）失败，第二次（seek 1）成功
         willFail = ctl.seeks.length <= 1
+      } else if (ctl.mode === 'blankBlankThenFail') {
+        // N4：0s/1s 成功（写入文件，由 statsStdevQueue 判定纯色），3s（超出短视频时长）失败
+        willFail = ctl.seeks.length > 2
       }
       setTimeout(() => {
         if (willFail) {
+          // N2：partialThenFail 模拟「半截文件已落盘再报错」的撕裂写场景
+          if (ctl.mode === 'partialThenFail') {
+            try {
+              fs.mkdirSync(path.dirname(ctl.outputPath), { recursive: true })
+              fs.writeFileSync(ctl.outputPath, Buffer.alloc(32, 0x33))
+              ctl.written.push(ctl.outputPath)
+            } catch {
+              /* 忽略 */
+            }
+          }
           handlers.error?.(new Error('ffmpeg 抽帧失败（mock）'))
           return
         }
@@ -131,7 +154,13 @@ vi.mock('sharp', () => ({
     ctl.sharpCalls.push(input ?? '')
     // toFile 真实写盘：自愈用例需要据此断言 _low 副本被刷新（而非仅被删除）
     const toFile = (p: string) => {
+      ctl.toFileTargets.push(p)
       fs.mkdirSync(path.dirname(p), { recursive: true })
+      // N2：注入撕裂写——先落半截字节再中断
+      if (ctl.sharpFail) {
+        fs.writeFileSync(p, Buffer.alloc(ctl.sharpPartialBytes, 0x33))
+        return Promise.reject(new Error('sharp 写盘中断（mock）'))
+      }
       fs.writeFileSync(p, Buffer.alloc(16, 0xff))
       return Promise.resolve({ size: 16 })
     }
@@ -445,5 +474,133 @@ describe('ThumbnailGenerator GamePlayPhotos 原生缩略图豁免', () => {
     expect(result).not.toBeNull()
     expect(String(result)).toContain(tmpCacheDir)
     expect(ctl.sharpCalls).toContain(src)
+  })
+})
+
+/**
+ * 原子落盘回归（fix-thumbnail-display-and-latency N2）。
+ *
+ * 缺陷：缩略图直接写最终路径、无 temp+rename——渲染进程经 media:// 流式读取可能读到
+ * 半截 JPEG（裂图）；主进程按需生成、media-worker 批量、白帧自愈三方对同一
+ * ${hash}.jpg 无跨进程互斥，并发写同名文件放大撕裂概率。
+ * 修复：先写同目录 `.tmp-` 临时文件，成功后 rename 原子替换；任何失败清理临时文件，
+ * 最终路径要么是旧完整文件、要么是新完整文件。
+ */
+describe('ThumbnailGenerator 原子落盘（N2）', () => {
+  let gen: ThumbnailGenerator
+  let tmpCacheDir: string
+
+  const hashOf = (buf: Buffer) => crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16)
+
+  beforeEach(() => {
+    gen = new ThumbnailGenerator()
+    tmpCacheDir = path.join(
+      os.tmpdir(),
+      'wxnn-thumb-gen-test',
+      `cache-atomic-${process.pid}-${Math.random().toString(36).slice(2)}`
+    )
+    fs.mkdirSync(tmpCacheDir, { recursive: true })
+    gen.setDir(tmpCacheDir)
+  })
+
+  afterEach(() => {
+    try {
+      fs.rmSync(tmpCacheDir, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+  })
+
+  const noTmpResidue = () => fs.readdirSync(tmpCacheDir).filter((n) => n.includes('.tmp-'))
+
+  it('异常：图片 sharp 写盘中断 → 最终缩略图路径不得残留半截文件', async () => {
+    const buf = Buffer.alloc(512, 0x00)
+    const src = path.join(tmpCacheDir, 'broken.png')
+    fs.writeFileSync(src, buf)
+    resetCtl('ok')
+    ctl.sharpFail = true
+    const result = await gen.generate(src)
+    expect(result).toBeNull()
+    expect(fs.existsSync(path.join(tmpCacheDir, `${hashOf(buf)}.jpg`))).toBe(false)
+    expect(noTmpResidue()).toHaveLength(0)
+  })
+
+  it('正常：图片成功路径 sharp 写入 .tmp- 临时文件后原子替换，最终路径完整', async () => {
+    const buf = Buffer.alloc(512, 0x00)
+    const src = path.join(tmpCacheDir, 'ok.png')
+    fs.writeFileSync(src, buf)
+    resetCtl('ok')
+    const result = await gen.generate(src)
+    const finalPath = path.join(tmpCacheDir, `${hashOf(buf)}.jpg`)
+    expect(result).toBe(finalPath)
+    expect(fs.existsSync(finalPath)).toBe(true)
+    // toFile 的写入目标必须是临时路径，而非最终路径
+    expect(ctl.toFileTargets[0]).toContain('.tmp-')
+    expect(ctl.toFileTargets[0]).not.toBe(finalPath)
+    expect(noTmpResidue()).toHaveLength(0)
+  })
+
+  it('异常：ffmpeg 抽帧部分字节写入后 error → 最终路径不得残留半截文件', async () => {
+    resetCtl('partialThenFail')
+    const buf = Buffer.alloc(1024, 0x00)
+    const src = path.join(tmpCacheDir, 'torn.mp4')
+    fs.writeFileSync(src, buf)
+    const result = await gen.generate(src)
+    expect(result).toBeNull()
+    expect(fs.existsSync(path.join(tmpCacheDir, `${hashOf(buf)}.jpg`))).toBe(false)
+    expect(noTmpResidue()).toHaveLength(0)
+  })
+
+  it('正常：视频成功路径 ffmpeg 输出 .tmp- 临时文件后原子替换', async () => {
+    resetCtl('ok', 64)
+    const result = await gen.generate(sourceVideoPath(tmpCacheDir))
+    expect(result).not.toBeNull()
+    expect(fs.existsSync(result as string)).toBe(true)
+    expect(ctl.written[0]).toContain('.tmp-')
+    expect(ctl.written[0]).not.toBe(result)
+    expect(noTmpResidue()).toHaveLength(0)
+  })
+
+  it('N4 短视频兜底：0s/1s 均纯色且 3s 超出时长失败 → 保留已有帧，不标损坏', async () => {
+    // 缺陷：时长 <3s 且片头淡入的视频，阶梯 0s/1s 抽到纯色帧继续前进，
+    // 末位点 3s seek 超出时长 → ffmpeg 空输出抛错 → 整个 generate 判失败并
+    // markCorrupted → 文件从图库消失，且 thumbnail 恒 NULL 每轮批量反复重试。
+    // 修复：末位点失败但此前已有成功帧时保留该帧返回（降级优于失败）。
+    resetCtl('blankBlankThenFail', 64)
+    ctl.statsStdevQueue = [0, 0] // 0s、1s 均判定为纯色 → 推进到 3s
+    const markSpy = vi.fn()
+    gen.setCorruptedMarker(markSpy, null)
+    const result = await gen.generate(sourceVideoPath(tmpCacheDir))
+    expect(ctl.seeks).toEqual([0, 1, 3])
+    expect(result).not.toBeNull()
+    expect(fs.existsSync(result as string)).toBe(true)
+    expect(markSpy).not.toHaveBeenCalled()
+  })
+})
+
+/** 在指定缓存目录内构造一个存在的「视频」源文件（与主 describe 的 beforeEach 同构） */
+function sourceVideoPath(dir: string): string {
+  const p = path.join(dir, 'sample.mp4')
+  if (!fs.existsSync(p)) {
+    fs.writeFileSync(p, Buffer.alloc(1024, 0x00))
+  }
+  return p
+}
+
+// ============================================================================
+// N8 微项（fix-thumbnail-display-and-latency）
+// ============================================================================
+describe('N8：主进程与 worker 降级 hash 公式一致', () => {
+  // 缺陷：内容 hash 读取失败时，主进程降级公式缺 size（${filePath}:${mtime}）、
+  // worker 含 size（${filePath}:${mtime}:${size}）——同一文件在两侧得到不同
+  // 缩略图文件名，缓存互不命中、重复生成。统一为含 size 的形态。
+  it('两侧降级 hash 公式均为 `${filePath}:${mtime}:${size}`', () => {
+    const read = (p: string) => fs.readFileSync(path.resolve(process.cwd(), p), 'utf-8')
+    const generatorSrc = read('src/main/thumbnail/generator.ts')
+    const workerSrc = read('src/main/media-worker/worker-entry.ts')
+    expect(generatorSrc).toContain('`${filePath}:${mtime}:${size}`')
+    expect(workerSrc).toContain('`${filePath}:${mtime}:${size}`')
+    // 旧的主进程缺 size 形态不得残留
+    expect(generatorSrc).not.toContain('.update(`${filePath}:${mtime}`)')
   })
 })

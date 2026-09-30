@@ -1,7 +1,7 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
-import { toFileUrl } from '../../utils/file'
+import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
 import { formatDate } from '../../utils/date'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
@@ -123,7 +123,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         data={units}
         computeItemKey={(index) => {
           const unit = units[index]
-          return unit.kind === 'header' ? `header-${unit.date}` : `row-${index}`
+          // N8：行 key 以行内首个文件 id 命名（空行兜底 index）。此前用 `row-${index}`，
+          // 插入/删除文件后所有行下标整体移位 → 行子树整屏重挂载、行内缩略图重新请求
+          return unit.kind === 'header'
+            ? `header-${unit.date}`
+            : `row-${unit.files[0]?.id ?? index}`
         }}
         defaultItemHeight={ITEM_HEIGHT + GAP_Y}
         overscan={400}
@@ -155,7 +159,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               }}
             >
               {unit.files.map((file) => {
-                const thumbUrl = toFileUrl(file.thumbnail || file.file_path)
+                const thumbUrl = resolveThumbnailSrc(file)
                 const hasError = failedImages.has(file.id)
                 const isMissing = file.is_missing === true
                 // 损坏文件容错：损坏文件不显示缩略图，仅显示占位图 + 损坏角标
