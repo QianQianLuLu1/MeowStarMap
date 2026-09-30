@@ -14,9 +14,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+---
+
+## [2.5.2] - 2026-09-30
+
+### Added | 新增
+
+- 图库新增骨架屏组件族，外观设置新增「液态玻璃」风格选项
+- 图库缩略图分级加载（低/中/高档位）与滚动邻居预取，长列表浏览更流畅
+
+### Changed | 变更
+
+- decryption-worker 接入构建产物与打包前检查；npm audit 豁免清单迁移至 `audit-ci.jsonc`，统一本地与 CI 审计口径
+
+### Fixed | 修复
+
+- 重构图片预览与导出链路，消除编辑器预览与导出模糊
+- 修复全屏预览过渡动画卡顿与掉帧，并完善换源卡顿与关闭登记
+- 修复图库 VirtualImageGrid 与大数据数组展开求值两处栈溢出崩溃
+- 修复收藏切换与撤销对 IpcResponse 的错误解包
+- 修复回收站永久删除误弹错误 Toast 及清空回收站后条目残留
+- 删除媒体时同步清理关联缩略图档位与原生 LQ，避免孤儿文件
+- 修复第三方平台 Ctrl+V 无法粘贴分享文件；分享图标更换为 Lucide share-2 并加固触发器防压缩
+- 修复打包版视频缩略图缺失与 spawn EFTYPE 弹窗：ffmpeg/ffprobe 增加 Windows PE 魔数预检与 spawn 错误诊断落盘
+- 修复打包版缩略图加载慢：引入 ETag 协商缓存并完善档位回退链
+- 统一五视图缩略图源，修复半截写入、失败覆写、损坏误标与孤儿误删
+- 按需缩略图生成结果回写数据库，修复缓存命中回填与视频封面裂图
+- 统一启动诊断日志路径，修复诊断包导出卡死，并在启动扫描、索引与场景分析阶段插入精细打点
+
+### Security | 安全
+
+- 升级 sharp 与 @xmldom/xmldom 修复高危漏洞，lockfile 全量切回 registry.npmjs.org 官方源
+
 ### Documentation | 文档
 
 - 全量文档与代码库一致性同步：`ARCHITECTURE.md` / `ARCHITECTURE.en.md`（§4 目录树、utilityProcess 五 worker、preload 29 命名空间、UID 正则、services/stores/pages/hooks/icons 计数、§11 构建脚本与 electron.vite.config.ts、asarUnpack 10 项、附录 C 测试规模）、`DEVELOPMENT.md` / `DEVELOPMENT.en.md`（.npmrc 现状、日志/数据库/崩溃 dump 实际路径、门禁基线实测、asarUnpack、USER_GUIDE 死链）、`README.md`（clone 目录名、目录结构去除已移除的 `src/common`）、`AGENTS.md`（handler 域数量）、`docs/PLUGIN_API.md`（插件 IPC facade 实际暴露面、死链清理）、`docs/i18n/fix-sop.md`（补历史标记）
+- 统一提交规范文档引用至 `.qoder/rules/project-conventions.md`；登记 Electron 40 EOL 供应链通告债务并立案升级专项
+- 新增多份实施计划与诊断文档（缩略图持久化闭环、spawn EFTYPE、全屏过渡、编辑器预览模糊、剪贴板分享等）
 
 ---
 
@@ -259,7 +293,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 <!-- 在文件末尾维护版本号锚点链接，便于自动跳转 -->
 
-[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.2...HEAD
+[2.5.2]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.3.5...v2.5.0
 [2.3.5]: https://github.com/QianQianLuLu1/NikkiGallery/releases/tag/v2.3.5

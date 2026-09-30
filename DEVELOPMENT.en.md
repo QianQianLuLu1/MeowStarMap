@@ -2,7 +2,7 @@
 
 > A beginner-friendly development guide for "Infinity Nikki Photo Manager" (NikkiGallery).
 > All commands can be copied directly into a PowerShell terminal.
-> Project codename: `wxnn-photo-manager` / App name: NikkiGallery / Current version: 2.5.1 / Platform: Windows x64
+> Project codename: `wxnn-photo-manager` / App name: NikkiGallery / Current version: 2.5.2 / Platform: Windows x64
 
 ---
 
@@ -841,7 +841,7 @@ node scripts/generate-icon.js
 
 - **Do not change the version number** unless explicitly requested
 - Version is in `package.json` `version` field; it also determines the installer filename: `NikkiGallery-Setup-<version>.exe`
-- Current version: `2.5.1`
+- Current version: `2.5.2`
 - After changing it, also update the version badge in `README.md` and the "Current Version" field in `ARCHITECTURE.md` / `ARCHITECTURE.en.md` and the header of this guide
 
 Example (only when explicitly requested):
