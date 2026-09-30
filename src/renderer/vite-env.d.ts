@@ -41,6 +41,8 @@ interface OutfitStat {
   latestCreatedAt: string
   coverFilePath: string
   coverThumbnail: string | null
+  /** N3：封面行媒体类型——视频封面无缩略图时渲染占位，绝不把视频文件当 <img> src */
+  coverFileType: 'image' | 'video' | null
 }
 
 // 日志管理：故障类型与故障记录（与主进程 logger.ts 保持同步）

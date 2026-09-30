@@ -1,6 +1,6 @@
 # 修复缩略图缓存持久化闭环与按需生成回填（3 节点 TDD）
 
-- 状态：实施中（2026-09-30）
+- 状态：已实施（2026-09-30，3 节点全部红→绿闭环通过；全量回归 4961 用例通过（基线 4943 + 新增 18），typecheck / lint / prettier 通过，`dist:win` 退出码 0 + `e2e:smoke` 9/9 通过。`npm run audit`（audit-ci）拦到的 4 条 electron high 通告为既有债务（docs/plans/2026-09-30-electron-40-eol-security-upgrade.md，commit a715d40 已立案专项），本次零依赖变更、lockfile 未动、无新增漏洞）
 - 创建日期：2026-09-30
 - 用户已确认决策：开工前先提交批次一（commit 414dfd0）；全局校验含 `dist:win` + `e2e:smoke`。
 - 关联前篇：[2026-09-30-fix-thumbnail-display-and-latency.md](./2026-09-30-fix-thumbnail-display-and-latency.md)（批次一，8 节点，已实施）、[THUMBNAIL_OPTIMIZATION_PLAN.md](../../../THUMBNAIL_OPTIMIZATION_PLAN.md)（结构参照）

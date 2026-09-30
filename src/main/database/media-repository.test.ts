@@ -3289,6 +3289,76 @@ describe('MediaRepository', () => {
       expect(captured[0].params[0]).toEqual(['h:/my\\_photos/%'])
     })
   })
+
+  // ==========================================================================
+  // N2 按需生成结果回写（fix-thumbnail-persist-and-ondemand）
+  // ==========================================================================
+  describe('setThumbnailIfNull（N2：按需生成结果仅填补 NULL 行）', () => {
+    // 缺陷：thumbnail:generate 按需生成结果只存渲染层组件 state，DB thumbnail 保持 NULL
+    // → 该行生成的缓存文件不在启动孤儿清理白名单（thumbnail IS NOT NULL）内，
+    // 每次启动被当孤儿删除、下个会话重新生成，形成"每次启动重复生成"死循环。
+    it('正常：thumbnail 为 NULL 的行被填补且返回 true', async () => {
+      insertMedia(db, { file_path: '/test/ondemand.jpg' }) // thumbnail 默认 null
+      await expect(
+        repo.setThumbnailIfNull('/test/ondemand.jpg', '/cache/ondemand.jpg')
+      ).resolves.toBe(true)
+      const row = db
+        .prepare('SELECT thumbnail FROM media_files WHERE file_path = ?')
+        .get('/test/ondemand.jpg') as { thumbnail: string }
+      expect(row.thumbnail).toBe('/cache/ondemand.jpg')
+    })
+
+    it('边界：thumbnail 已有值（扫描写入的游戏原生 LQ / 批量生成路径）→ 不覆盖且返回 false', async () => {
+      insertMedia(db, {
+        file_path: '/test/native.jpg',
+        thumbnail: '/game/NikkiPhotos_LowQuality/x.jpg'
+      })
+      await expect(repo.setThumbnailIfNull('/test/native.jpg', '/cache/new.jpg')).resolves.toBe(
+        false
+      )
+      const row = db
+        .prepare('SELECT thumbnail FROM media_files WHERE file_path = ?')
+        .get('/test/native.jpg') as { thumbnail: string }
+      expect(row.thumbnail).toBe('/game/NikkiPhotos_LowQuality/x.jpg')
+    })
+
+    it('异常：file_path 不存在 → 返回 false（零写，不抛错）', async () => {
+      await expect(repo.setThumbnailIfNull('/test/missing.jpg', '/cache/x.jpg')).resolves.toBe(
+        false
+      )
+    })
+  })
+
+  // ==========================================================================
+  // N3 套装封面 file_type（fix-thumbnail-persist-and-ondemand）
+  // ==========================================================================
+  describe('getLatestOutfitMedia（N3：封面行需带 file_type）', () => {
+    // 缺陷：套装图鉴封面取"最新一张"，用户可给视频打套装标签；渲染层无法区分
+    // 封面是图片还是视频 → 视频封面（常无缩略图）把视频文件当 <img> src 裂图。
+    it('正常：返回每个套装最新一张且携带 file_type', () => {
+      insertMedia(db, {
+        file_path: '/test/old.jpg',
+        outfit: '测试套装',
+        created_at: '2024-01-01 10:00:00'
+      })
+      insertMedia(db, {
+        file_path: '/test/new.mp4',
+        file_type: 'video',
+        file_ext: '.mp4',
+        outfit: '测试套装',
+        created_at: '2024-06-01 10:00:00'
+      })
+      const row = repo.getLatestOutfitMedia('测试套装')
+      expect(row?.file_path).toBe('/test/new.mp4')
+      expect(row?.file_type).toBe('video')
+    })
+
+    it('边界：封面行为图片时 file_type=image；无该套装行 → undefined', () => {
+      insertMedia(db, { file_path: '/test/p.jpg', outfit: '测试套装B' })
+      expect(repo.getLatestOutfitMedia('测试套装B')?.file_type).toBe('image')
+      expect(repo.getLatestOutfitMedia('不存在的套装')).toBeUndefined()
+    })
+  })
 })
 
 // ============================================================================

@@ -271,23 +271,15 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     // - thumbnail=NULL 的项（图片+视频统一）就地生成 standard 缩略图，生成是磁盘缓存优先：
     //   批量/上一会话已生成的项立即返回，批量未达的项就地补齐，不再等待整批完成后的
     //   media:updated 全量刷新；
-    // - standard 404（LRU 驱逐等）的项同样触发重建，成功后清除失败标记让原 URL 立即重试。
+    // - standard 404（LRU 驱逐等）的项同样触发重建，成功后清除失败标记让原 URL 立即重试；
+    // - 缓存命中（fix-thumbnail-persist-and-ondemand N1）：卡片滚出视区时组件卸载会丢
+    //   onDemandThumbs state，滚回时 Map 命中的既有 promise 必须把已 resolved 的结果
+    //   回填新实例（applyResult 幂等），否则显示占位直到下一次 media:updated 全量刷新。
     const ensureOnDemandThumbnail = useCallback(
       (file: MediaFile) => {
         const filePath = file.file_path
         if (typeof filePath !== 'string' || filePath.length === 0) return
-        if (onDemandThumbPromises.has(filePath)) return
-        const generate = window.electronAPI?.thumbnail?.generate
-        if (typeof generate !== 'function') return
-        const promise = (async () => {
-          try {
-            return await generate(filePath)
-          } catch {
-            return null
-          }
-        })()
-        onDemandThumbPromises.set(filePath, promise)
-        void promise.then((result) => {
+        const applyResult = (result: string | null) => {
           if (!result) {
             setOnDemandFailed((prev) => new Set(prev).add(filePath))
             return
@@ -308,7 +300,25 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           // 使 standard URL（磁盘上已重新存在）立即重试
           clearFailed(file.id)
           clearStandardFailed(file.id)
-        })
+        }
+        // Map 命中：复用既有 promise 去重（同一 file_path 只发起一次生成），
+        // 同时回填结果——直接 return 会让新挂载的实例拿不到已生成的缩略图
+        const existing = onDemandThumbPromises.get(filePath)
+        if (existing) {
+          void existing.then(applyResult)
+          return
+        }
+        const generate = window.electronAPI?.thumbnail?.generate
+        if (typeof generate !== 'function') return
+        const promise = (async () => {
+          try {
+            return await generate(filePath)
+          } catch {
+            return null
+          }
+        })()
+        onDemandThumbPromises.set(filePath, promise)
+        void promise.then(applyResult)
       },
       [clearFailed, clearStandardFailed]
     )

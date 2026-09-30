@@ -5,8 +5,22 @@ import { OUTFIT_PRESETS } from '../stores/mediaStore'
 import { useGlobalToast } from './settings/sections'
 import { toFileUrl } from '../utils/file'
 import { formatDate } from '../utils/date'
-import { IconOutfit, IconRefresh, IconImage, IconLock } from '../icons'
+import { IconOutfit, IconRefresh, IconImage, IconLock, IconVideo } from '../icons'
 import type { OutfitStat } from '../../shared/scene-category'
+
+/**
+ * 套装封面源判定（N3，fix-thumbnail-persist-and-ondemand）：
+ * 封面缩略图优先；无缩略图且封面行是视频 → null（渲染视频占位图标，绝不把视频文件
+ * 当 <img> src——<img> 无法解码视频必裂图，还会把整个视频当图片下载）；图片无缩略图
+ * → 回退原文件（现状保留）。coverFileType 缺失（旧数据）按图片处理。
+ */
+export function resolveOutfitCoverSrc(
+  stat: Pick<OutfitStat, 'coverFilePath' | 'coverThumbnail' | 'coverFileType'>
+): string | null {
+  if (stat.coverThumbnail) return toFileUrl(stat.coverThumbnail)
+  if (stat.coverFileType === 'video') return null
+  return stat.coverFilePath ? toFileUrl(stat.coverFilePath) : null
+}
 
 // 统计卡片：单个指标展示
 const StatCard: React.FC<{
@@ -35,7 +49,7 @@ const StatCard: React.FC<{
 // 已收集套装卡片
 const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = ({ stat, onClick }) => {
   const { t } = useTranslation()
-  const cover = toFileUrl(stat.coverThumbnail || stat.coverFilePath)
+  const cover = resolveOutfitCoverSrc(stat)
   return (
     <button
       className="glass-card text-left flex flex-col overflow-hidden group"
@@ -59,7 +73,7 @@ const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = ({ stat,
             className="w-full h-full flex items-center justify-center"
             style={{ color: 'var(--text-tertiary)' }}
           >
-            <IconImage size={32} />
+            {stat.coverFileType === 'video' ? <IconVideo size={32} /> : <IconImage size={32} />}
           </div>
         )}
         <div

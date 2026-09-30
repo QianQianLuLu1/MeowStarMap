@@ -185,6 +185,8 @@ export interface OutfitAggRow {
 export interface OutfitLatestRow {
   file_path: string
   thumbnail: string | null
+  /** N3：封面行媒体类型（'image' | 'video' | null）——渲染层据此守卫视频封面裂图 */
+  file_type: string | null
 }
 
 /** 重复分组查询行（is_duplicate=1 的文件） */
@@ -878,6 +880,22 @@ export class MediaRepository {
     )
   }
 
+  /**
+   * 按需生成结果回写（N2，fix-thumbnail-persist-and-ondemand）。
+   * thumbnail:generate 的结果原先只存渲染层组件 state：DB thumbnail 保持 NULL 的行
+   * 不在启动孤儿清理白名单（thumbnail IS NOT NULL）内，其缓存文件每次启动被当孤儿
+   * 删除、下个会话重新生成。回写仅填补 thumbnail 仍为 NULL 的行——扫描写入的游戏
+   * 原生 LQ 路径 / 批量生成路径绝不覆盖。file_path 有 UNIQUE 索引，单行命中。
+   * 路径不存在（未入库文件）时 changes=0，返回 false。
+   */
+  async setThumbnailIfNull(filePath: string, thumbnailPath: string): Promise<boolean> {
+    const result = await this.runWrite(
+      'UPDATE media_files SET thumbnail = ? WHERE file_path = ? AND thumbnail IS NULL',
+      [thumbnailPath, filePath]
+    )
+    return result.changes > 0
+  }
+
   /** media:cleanupCorrupted — 清理所有 is_corrupted=1 的记录，返回删除条数 */
   async cleanupCorruptedRecords(): Promise<number> {
     const result = await this.runWrite('DELETE FROM media_files WHERE is_corrupted = 1')
@@ -1320,11 +1338,11 @@ export class MediaRepository {
       .all() as OutfitAggRow[]
   }
 
-  /** media:getOutfitStats — 取每个套装最新一张作为封面 */
+  /** media:getOutfitStats — 取每个套装最新一张作为封面（含 file_type，供视频封面守卫） */
   getLatestOutfitMedia(outfit: string): OutfitLatestRow | undefined {
     return this.db
       .prepare(
-        'SELECT file_path, thumbnail FROM media_files WHERE outfit = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1'
+        'SELECT file_path, thumbnail, file_type FROM media_files WHERE outfit = ? AND is_deleted = 0 ORDER BY created_at DESC LIMIT 1'
       )
       .get(outfit) as OutfitLatestRow | undefined
   }

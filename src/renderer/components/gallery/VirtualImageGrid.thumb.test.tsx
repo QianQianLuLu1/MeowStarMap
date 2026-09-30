@@ -191,8 +191,19 @@ describe('resolveEffectiveThumbnail 缩略图源判定', () => {
 
 describe('按需生成机制源码结构（THUMBNAIL_OPTIMIZATION_PLAN 节点2）', () => {
   it('单次守卫：同一 file_path 只触发一次 thumbnail:generate（Promise Map 缓存）', () => {
-    expect(code).toContain('onDemandThumbPromises.has(')
+    // N1：守卫从 has() 直接 return 改为 get() 复用既有 promise——单次生成语义不变
+    expect(code).toContain('onDemandThumbPromises.get(filePath)')
     expect(code).toContain('onDemandThumbPromises.set(')
+  })
+
+  it('缓存命中回填（fix-thumbnail-persist-and-ondemand N1）：Map 命中不再裸 return', () => {
+    // 缺陷：旧写法 if (onDemandThumbPromises.has(filePath)) return —— 卡片滚出视区时
+    // 组件卸载丢掉 onDemandThumbs state，滚回时 Map 命中直接返回，已生成的缩略图
+    // 不回填新实例 → 显示占位直到下一次 media:updated 全量刷新。
+    // 修复：命中分支必须挂 applyResult 把已 resolved 的结果回填新实例 state。
+    expect(code).not.toMatch(/if \(onDemandThumbPromises\.has\(filePath\)\) return/)
+    expect(code).toMatch(/existing\.then\(applyResult\)/)
+    expect(code).toMatch(/promise\.then\(applyResult\)/)
   })
 
   it('standard 404（LRU 驱逐等）时同样触发重建，成功后 clearFailed 以原 URL 重试', () => {

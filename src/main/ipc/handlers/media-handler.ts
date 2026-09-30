@@ -146,7 +146,10 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
           count: row.count,
           latestCreatedAt: row.latest_created,
           coverFilePath: latest?.file_path || '',
-          coverThumbnail: latest?.thumbnail || null
+          coverThumbnail: latest?.thumbnail || null,
+          // N3：透传封面行媒体类型，渲染层据此守卫视频封面裂图（NULL 按图片处理）
+          coverFileType:
+            latest?.file_type === 'video' ? 'video' : latest?.file_type === 'image' ? 'image' : null
         })
       }
       return { stats }

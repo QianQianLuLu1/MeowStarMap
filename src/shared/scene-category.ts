@@ -174,6 +174,8 @@ export function getSceneTimeKeys(): SceneTime[] {
  * - latestCreatedAt：该套装最新一张的拍摄时间（ISO 字符串）
  * - coverFilePath：封面图原文件路径（取最新一张）
  * - coverThumbnail：封面缩略图（file:// 或 data: URL）
+ * - coverFileType：封面行媒体类型（N3：视频封面无缩略图时渲染层渲染占位，绝不
+ *   把视频文件当 <img> src）；NULL/未知值按图片处理（兼容旧数据）
  */
 export interface OutfitStat {
   outfit: string
@@ -181,4 +183,5 @@ export interface OutfitStat {
   latestCreatedAt: string
   coverFilePath: string
   coverThumbnail: string | null
+  coverFileType: 'image' | 'video' | null
 }
