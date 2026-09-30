@@ -154,6 +154,14 @@ describe('ShareMenuButton', () => {
     const btn = screen.getByRole('button')
     expect(btn.className).toContain('whitespace-nowrap')
   })
+
+  it('触发器包装层带 flex-shrink-0（批量栏溢出时不被压缩挤压图标，防回归）', () => {
+    render(<ShareMenuButton onSelect={vi.fn()} />)
+    const btn = screen.getByRole('button')
+    // 包装层是批量操作栏 flex 容器的直接子项；兄弟按钮均经 .icon-btn.batch-act-btn
+    // 获得 flex-shrink:0，包装层必须显式对齐，否则空间紧张时优先被压缩
+    expect(btn.parentElement?.className).toContain('flex-shrink-0')
+  })
 })
 
 // 修复专项：菜单经 portal 渲染到 body，且按 menuPosition 向上/向下展开、视口钳制

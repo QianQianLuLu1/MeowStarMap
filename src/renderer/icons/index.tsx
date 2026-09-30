@@ -467,13 +467,18 @@ export const IconRestore: React.FC<IconProps> = (props) => (
   </BaseIcon>
 )
 
-// T08：WiFi 分享图标（WiFi 信号 + 共享箭头）
+// T08：分享图标（Lucide share-2 三节点网络，业界通用分享符号）
+// 字形来源：lucide-static v1.49.0 icons/share-2.svg（ISC License，与仓库 MIT 兼容）
+// https://github.com/lucide-icons/lucide
+// 选型原因：原「WiFi 弧线 + 圆点」手绘字形外弧悬空截断、观感如被遮挡一半；
+// 该字形全部笔画位于描边安全区内（范围 [3,21]×[2,22]），无 viewBox 裁剪风险
 export const IconShare: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>
-    <path d="M12 3a17 17 0 0 1 12 5" />
-    <path d="M12 8a12 12 0 0 1 8 3" />
-    <path d="M12 13a7 7 0 0 1 4 2" />
-    <circle cx="12" cy="18" r="1.5" />
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
   </BaseIcon>
 )
 

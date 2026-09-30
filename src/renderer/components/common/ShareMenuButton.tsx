@@ -100,8 +100,10 @@ export const ShareMenuButton: React.FC<ShareMenuButtonProps> = ({
 
   const sizeClass = size === 'sm' ? 'text-sm px-3' : 'text-sm px-4 py-2'
 
+  // flex-shrink-0：与批量栏兄弟按钮（.icon-btn.batch-act-btn）的 flex-shrink:0 对齐，
+  // 防止容器溢出时该包装层被优先压缩而挤压图标与文字
   return (
-    <div ref={triggerRef} className="relative">
+    <div ref={triggerRef} className="relative flex-shrink-0">
       <button
         type="button"
         className={`icon-btn batch-act-btn ${sizeClass} gap-1 whitespace-nowrap`}
