@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import path from 'path'
 import fs from 'fs'
 import { clipboard } from 'electron'
+import { execFile } from 'child_process'
 
 /**
  * Slice 7a：share-clipboard-service 同步 fs API 异步化 — characterization tests
@@ -11,12 +12,12 @@ import { clipboard } from 'electron'
  *
  * 测试接缝（seam）：
  *   - 公共导出：copyFilesToClipboard, filterValidPaths, findExeInDir
- *   - 通过 mock fs / electron 观察行为，不依赖内部实现
+ *   - 通过 mock fs / electron / child_process 观察行为，不依赖内部实现
  *
  * 边界场景：
  *   - filterValidPaths：空数组 / 全存在 / 全不存在 / 混合 / 路径是目录
  *   - findExeInDir：空目录 / 目录不存在 / 是文件非目录 / 第一个 exe 存在 / 第二个 exe 存在 / 都不存在
- *   - copyFilesToClipboard：空数组 / 全不存在 / 全存在 / 混合 / clipboard 抛错 / stat 抛错
+ *   - copyFilesToClipboard：空数组 / 全不存在 / 全存在 / 混合 / powershell 失败 / stat 抛错
  */
 
 // ============================================================
@@ -76,10 +77,53 @@ function mockStats(
   return { isFile: () => isFile, isDirectory: () => isDirectory }
 }
 
+/** 每次 execFile 调用中 child.stdin.end 收到的载荷（stdin 传入的路径 Base64 列表），按调用顺序存放 */
+let stdinPayloads: string[]
+
+/** mock execFile：powershell 调用成功，并记录 stdin 载荷 */
+function mockPowershellSuccess(): void {
+  stdinPayloads = []
+  vi.mocked(execFile).mockImplementation(((_cmd, _args, _opts, cb) => {
+    const callback = (typeof _opts === 'function' ? _opts : cb) as (
+      err: Error | null,
+      stdout?: string
+    ) => void
+    callback(null, '', '')
+    return {
+      stdin: {
+        end: (data?: string) => {
+          if (typeof data === 'string') stdinPayloads.push(data)
+          return undefined
+        }
+      }
+    } as never
+  }) as never)
+}
+
+type ExecFileCall = [string, string[], { timeout: number; windowsHide: boolean }]
+
+/** 解码第 N 次 execFile 调用的 -EncodedCommand 参数（UTF-16LE Base64 → 脚本文本） */
+function decodeEncodedCommand(callIndex = 0): string {
+  const [, args] = vi.mocked(execFile).mock.calls[callIndex] as unknown as ExecFileCall
+  const idx = args.indexOf('-EncodedCommand')
+  expect(idx).toBeGreaterThanOrEqual(0)
+  return Buffer.from(args[idx + 1], 'base64').toString('utf16le')
+}
+
+/** 解码第 N 次 execFile 调用的 stdin 载荷 → 路径数组 */
+function decodeStdinPaths(callIndex = 0): string[] {
+  return stdinPayloads[callIndex]
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => Buffer.from(line.trim(), 'base64').toString('utf8'))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
-  // 默认 clipboard.writeBuffer 不抛错
+  // 默认 clipboard.writeBuffer 不抛错（保留 mock 以断言新实现不再调用它）
   vi.mocked(clipboard.writeBuffer).mockImplementation(() => {})
+  // 默认 powershell 调用成功（copyFilesToClipboard 成功路径测试的公共前置）
+  mockPowershellSuccess()
 })
 
 // ============================================================
@@ -200,7 +244,7 @@ describe('findExeInDir', () => {
 // ============================================================
 
 describe('copyFilesToClipboard', () => {
-  // buildHdropBuffer 依赖 process.platform === 'win32'，非 win32 返回 null 导致 success=false
+  // 写入路径依赖 process.platform === 'win32'（非 win32 走"平台不支持"分支）
   // copyFilesToClipboard 的成功路径测试需 mock process.platform
   const originalPlatform = process.platform
 
@@ -212,7 +256,7 @@ describe('copyFilesToClipboard', () => {
     Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
   })
 
-  it('空数组 → 失败，count=0, skipped=0', async () => {
+  it('空数组 → 失败，count=0, skipped=0，不调用 powershell', async () => {
     const r = await copyFilesToClipboard([])
     expect(r).toEqual({
       success: false,
@@ -220,6 +264,7 @@ describe('copyFilesToClipboard', () => {
       skipped: 0,
       message: '未选择任何文件'
     })
+    expect(execFile).not.toHaveBeenCalled()
     expect(clipboard.writeBuffer).not.toHaveBeenCalled()
   })
 
@@ -232,29 +277,58 @@ describe('copyFilesToClipboard', () => {
       success: false,
       count: 0
     })
+    expect(execFile).not.toHaveBeenCalled()
   })
 
-  it('全部文件不存在 → 失败，skipped=N', async () => {
+  it('全部文件不存在 → 失败，skipped=N，不调用 powershell', async () => {
     vi.mocked(fs.promises.stat).mockRejectedValue(new Error('ENOENT') as never)
     const r = await copyFilesToClipboard(['C:\\a.jpg', 'C:\\b.jpg'])
     expect(r.success).toBe(false)
     expect(r.count).toBe(0)
     expect(r.skipped).toBe(2)
     expect(r.message).toContain('不可访问')
+    expect(execFile).not.toHaveBeenCalled()
     expect(clipboard.writeBuffer).not.toHaveBeenCalled()
   })
 
-  it('全部文件存在 → 成功，count=N, skipped=0', async () => {
+  it('回归修复（2026-09-30）：成功复制必须经 PowerShell SetFileDropList 写入标准 CF_HDROP，不得使用 clipboard.writeBuffer', async () => {
+    // 旧实现缺陷：clipboard.writeBuffer('CF_HDROP') 经 RegisterClipboardFormat 只会注册
+    // 同名自定义格式（0xC000+），永不命中标准 CF_HDROP(15)，微信/QQ Ctrl+V 无内容
+    vi.mocked(fs.promises.stat).mockResolvedValue(mockStats(true, false) as never)
+
+    const r = await copyFilesToClipboard(['C:\\photos\\a.jpg'])
+
+    expect(r.success).toBe(true)
+    expect(clipboard.writeBuffer).not.toHaveBeenCalled()
+
+    expect(execFile).toHaveBeenCalledTimes(1)
+    const call = vi.mocked(execFile).mock.calls[0] as unknown as ExecFileCall
+    expect(call[0].toLowerCase()).toMatch(/powershell\.exe$/)
+    expect(call[1].slice(0, 4)).toEqual([
+      '-NoProfile',
+      '-NonInteractive',
+      '-STA',
+      '-EncodedCommand'
+    ])
+    expect(call[2]).toMatchObject({ timeout: 10000, windowsHide: true })
+
+    const script = decodeEncodedCommand(0)
+    expect(script).toContain('System.Windows.Forms')
+    expect(script).toContain('SetFileDropList')
+    expect(decodeStdinPaths(0)).toEqual(['C:\\photos\\a.jpg'])
+  })
+
+  it('全部文件存在 → 成功，count=N, skipped=0，stdin 含全部路径', async () => {
     vi.mocked(fs.promises.stat).mockResolvedValue(mockStats(true, false) as never)
     const r = await copyFilesToClipboard(['C:\\a.jpg', 'C:\\b.jpg'])
     expect(r.success).toBe(true)
     expect(r.count).toBe(2)
     expect(r.skipped).toBe(0)
     expect(r.message).toContain('已复制 2 个文件')
-    expect(clipboard.writeBuffer).toHaveBeenCalledTimes(1)
+    expect(decodeStdinPaths(0)).toEqual(['C:\\a.jpg', 'C:\\b.jpg'])
   })
 
-  it('混合存在与不存在 → 成功，count=M, skipped=K', async () => {
+  it('混合存在与不存在 → 成功，count=M, skipped=K，stdin 只含有效路径', async () => {
     vi.mocked(fs.promises.stat)
       .mockResolvedValueOnce(mockStats(true, false) as never)
       .mockRejectedValueOnce(new Error('ENOENT') as never)
@@ -264,19 +338,37 @@ describe('copyFilesToClipboard', () => {
     expect(r.count).toBe(2)
     expect(r.skipped).toBe(1)
     expect(r.message).toContain('跳过 1')
-    expect(clipboard.writeBuffer).toHaveBeenCalledTimes(1)
+    expect(decodeStdinPaths(0)).toEqual(['C:\\a.jpg', 'C:\\c.jpg'])
   })
 
-  it('clipboard.writeBuffer 抛错 → 失败，message 含复制失败', async () => {
+  it('powershell 调用失败/超时 → 失败，message 含复制失败', async () => {
     vi.mocked(fs.promises.stat).mockResolvedValue(mockStats(true, false) as never)
-    vi.mocked(clipboard.writeBuffer).mockImplementation(() => {
-      throw new Error('clipboard locked')
-    })
+    vi.mocked(execFile).mockImplementation(((_cmd, _args, _opts, cb) => {
+      const callback = (typeof _opts === 'function' ? _opts : cb) as (
+        err: Error | null,
+        stdout?: string
+      ) => void
+      callback(new Error('command timed out'), '')
+      return { stdin: { end: () => undefined } } as never
+    }) as never)
     const r = await copyFilesToClipboard(['C:\\a.jpg'])
     expect(r.success).toBe(false)
     expect(r.count).toBe(0)
     expect(r.message).toContain('复制失败')
-    expect(r.message).toContain('clipboard locked')
+    expect(r.message).toContain('command timed out')
+  })
+
+  it('边界：中文/空格/单引号路径经 stdin Base64 往返无损，且不进入命令行', async () => {
+    vi.mocked(fs.promises.stat).mockResolvedValue(mockStats(true, false) as never)
+    const weirdPath = "D:\\无限暖暖 相册\\照片 'a'&1.jpg"
+
+    const r = await copyFilesToClipboard([weirdPath])
+
+    expect(r.success).toBe(true)
+    expect(decodeStdinPaths(0)).toEqual([weirdPath])
+    // 路径不进入命令行参数，杜绝引号转义与注入面
+    const call = vi.mocked(execFile).mock.calls[0] as unknown as ExecFileCall
+    expect(call[1].join(' ')).not.toContain(weirdPath)
   })
 
   it('单个文件存在 → 成功', async () => {

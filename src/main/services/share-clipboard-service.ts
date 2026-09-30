@@ -1,11 +1,15 @@
 /**
  * T09：剪贴板分享服务
- * 将选中的图片/视频文件以 CF_HDROP 格式写入 Windows 剪贴板
+ * 将选中的图片/视频文件以标准 CF_HDROP 格式写入 Windows 剪贴板
  * 支持微信 / QQ / vivo办公套件 等所有支持文件粘贴的应用
  *
- * CF_HDROP 缓冲区结构：
- *   DROPFILES 头（20 字节：pFiles=20, ptX=0, ptY=0, fNC=0, fWide=1）
- *   + UTF-16LE 文件路径列表（以 \0 分隔，双 \0 结尾）
+ * 写入机制（2026-09-30 修复"第三方平台 Ctrl+V 无法粘贴"）：
+ *   Electron 的 clipboard.writeBuffer('CF_HDROP') 经 RegisterClipboardFormat 只能注册
+ *   同名自定义格式（ID 0xC000+），永远不会命中标准 CF_HDROP(15)，导致微信/QQ 读不到文件。
+ *   改为调用系统内置 PowerShell（绝对路径）执行 .NET WinForms Clipboard.SetFileDropList
+ *   （内部 OleSetClipboard + OleFlushClipboard），写入与资源管理器"复制文件"等价的
+ *   标准 CF_HDROP，PowerShell 进程退出后数据仍保留。文件路径经 stdin 逐行传
+ *   UTF-8 Base64，规避引号转义与 32k 命令行长度限制。
  *
  * 通用化检测策略（确保任意 Windows 机器都能正确识别已安装软件）：
  *   每个渠道按优先级依次尝试以下 4 类来源，任一命中即视为已安装：
@@ -23,15 +27,11 @@
  *     2) 已安装未运行   → 显示"打开 XX"按钮，启动后引导粘贴
  *     3) 未安装         → "未检测到 XX，文件已复制到剪贴板"
  */
-import { clipboard } from 'electron'
 import fs from 'fs'
 import path from 'path'
 import { execFile } from 'child_process'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
-
-// DROPFILES 结构体大小（20 字节）
-const DROPFILES_SIZE = 20
 
 // F4 修复：installPathCache TTL（5 分钟）
 // 避免用户安装/卸载应用后缓存长期失效，导致 UI 显示状态不准
@@ -286,26 +286,46 @@ const DETECTION_CONFIGS: Record<string, ChannelDetectionConfig> = {
 // 通用工具函数
 // =============================================================
 
+// Windows 内置 PowerShell 固定字面量路径。
+// 安全约束（Mimosa L2）：不读取 SystemRoot/windir 等环境变量，避免环境注入决定被执行的程序；
+// Windows 10/11 的 Windows 目录恒为 C:\Windows，极少数非默认部署下 execFile 报 ENOENT，
+// 走既有"复制失败"分支，绝不回退到 PATH 查找（防 PATH 劫持）
+const POWERSHELL_EXE = 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe'
+
+// 固定脚本：从 stdin 逐行读取 Base64(UTF-8) 路径 → SetFileDropList 写入标准 CF_HDROP。
+// 路径不进命令行：stdin 载荷仅含 [A-Za-z0-9+/=\n]（Base64 纯 ASCII，任何控制台编码下解码一致），
+// 无引号转义与注入面，且不受 32k argv 长度限制
+const SET_FILE_DROP_LIST_SCRIPT = [
+  'Add-Type -AssemblyName System.Windows.Forms',
+  '$L = New-Object System.Collections.Specialized.StringCollection',
+  'foreach($line in [Console]::In.ReadToEnd() -split "`n") {',
+  '  $t = $line.Trim()',
+  '  if ($t) { [void]$L.Add([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($t))) }',
+  '}',
+  '[System.Windows.Forms.Clipboard]::SetFileDropList($L)'
+].join('\n')
+
 /**
- * 构造 CF_HDROP 格式的 Buffer
- * 仅 Windows 平台使用；非 Windows 返回 null
+ * 经系统内置 PowerShell 调用 .NET Clipboard.SetFileDropList 写入标准 CF_HDROP
+ * 文件路径经 stdin 逐行传 UTF-8 Base64；超时 10s；隐藏窗口
  */
-function buildHdropBuffer(filePaths: string[]): Buffer | null {
-  if (process.platform !== 'win32' || filePaths.length === 0) return null
-
-  // 拼接 UTF-16LE 路径列表，每条以 \0 分隔，末尾双 \0
-  const pathsStr = filePaths.join('\0') + '\0\0'
-  const pathsBuf = Buffer.from(pathsStr, 'utf16le')
-
-  // DROPFILES 头：20 字节
-  const header = Buffer.alloc(DROPFILES_SIZE, 0)
-  header.writeUInt32LE(DROPFILES_SIZE, 0) // pFiles
-  header.writeUInt32LE(0, 4) // pt.x
-  header.writeUInt32LE(0, 8) // pt.y
-  header.writeUInt32LE(0, 12) // fNC = 0
-  header.writeUInt32LE(1, 16) // fWide = 1（UTF-16）
-
-  return Buffer.concat([header, pathsBuf])
+async function writeHdropViaPowerShell(filePaths: string[]): Promise<void> {
+  const payload = filePaths.map((p) => Buffer.from(p, 'utf8').toString('base64')).join('\n') + '\n'
+  await new Promise<void>((resolve, reject) => {
+    const child = execFile(
+      POWERSHELL_EXE,
+      [
+        '-NoProfile',
+        '-NonInteractive',
+        '-STA',
+        '-EncodedCommand',
+        Buffer.from(SET_FILE_DROP_LIST_SCRIPT, 'utf16le').toString('base64')
+      ],
+      { timeout: 10000, windowsHide: true },
+      (err) => (err ? reject(err) : resolve())
+    )
+    child.stdin?.end(payload)
+  })
 }
 
 /**
@@ -365,17 +385,17 @@ export async function copyFilesToClipboard(
     }
   }
 
-  try {
-    const buf = buildHdropBuffer(valid)
-    if (!buf) {
-      return {
-        success: false,
-        count: 0,
-        skipped,
-        message: t('share.message.unsupportedPlatform')
-      }
+  if (process.platform !== 'win32') {
+    return {
+      success: false,
+      count: 0,
+      skipped,
+      message: t('share.message.unsupportedPlatform')
     }
-    clipboard.writeBuffer('CF_HDROP', buf)
+  }
+
+  try {
+    await writeHdropViaPowerShell(valid)
     logger.info(t('share.log.copiedToClipboard', { count: valid.length, skipped }))
     return {
       success: true,

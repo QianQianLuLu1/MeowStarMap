@@ -6,7 +6,7 @@ import { clipboard } from 'electron'
 /**
  * 集成测试：剪贴板分享服务端到端链路
  *
- * 范围：覆盖「选中文件 → 校验 → 过滤 → 构造 CF_HDROP → 写入剪贴板」完整链路，
+ * 范围：覆盖「选中文件 → 校验 → 过滤 → PowerShell SetFileDropList 写入标准 CF_HDROP」完整链路，
  *      以及「应用状态检测 → 缓存 → TTL 失效」生命周期。
  *
  * 与现有 share-clipboard-service.test.ts（characterization 单元测试）的区别：
@@ -68,6 +68,8 @@ beforeEach(async () => {
   Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
   vi.mocked(clipboard.writeBuffer).mockImplementation(() => {})
   vi.mocked(fs.promises.appendFile).mockResolvedValue(undefined as never)
+  // 默认 powershell 写剪贴板成功（copyFilesToClipboard 成功路径的公共前置）
+  mockPowershellSuccess()
   shareService = await import('./share-clipboard-service')
 })
 
@@ -96,13 +98,54 @@ function mockAllExternalCommandsFail(): void {
   })
 }
 
+/** 每次 execFile 调用中 child.stdin.end 收到的载荷（stdin 传入的路径 Base64 列表），按调用顺序存放 */
+let stdinPayloads: string[]
+
+/** mock execFile：powershell 写剪贴板成功，并记录 stdin 载荷 */
+function mockPowershellSuccess(): void {
+  stdinPayloads = []
+  vi.mocked(execFile).mockImplementation(((_cmd, _args, _opts, cb) => {
+    const callback = (typeof _opts === 'function' ? _opts : cb) as (
+      err: Error | null,
+      stdout?: string
+    ) => void
+    callback(null, '', '')
+    return {
+      stdin: {
+        end: (data?: string) => {
+          if (typeof data === 'string') stdinPayloads.push(data)
+          return undefined
+        }
+      }
+    } as never
+  }) as never)
+}
+
+type ExecFileCall = [string, string[], { timeout: number; windowsHide: boolean }]
+
+/** 解码第 N 次 execFile 调用的 -EncodedCommand 参数（UTF-16LE Base64 → 脚本文本） */
+function decodeEncodedCommand(callIndex = 0): string {
+  const [, args] = vi.mocked(execFile).mock.calls[callIndex] as unknown as ExecFileCall
+  const idx = args.indexOf('-EncodedCommand')
+  expect(idx).toBeGreaterThanOrEqual(0)
+  return Buffer.from(args[idx + 1], 'base64').toString('utf16le')
+}
+
+/** 解码第 N 次 execFile 调用的 stdin 载荷 → 路径数组 */
+function decodeStdinPaths(callIndex = 0): string[] {
+  return stdinPayloads[callIndex]
+    .split('\n')
+    .filter((line) => line.trim())
+    .map((line) => Buffer.from(line.trim(), 'base64').toString('utf8'))
+}
+
 // ============================================================
 // 集成测试用例
 // ============================================================
 
 describe('集成：剪贴板分享端到端链路', () => {
   describe('正常流程：选中文件 → 校验 → 写入剪贴板', () => {
-    it('3 个文件（2 存在 + 1 不存在）→ 成功复制 2 个，跳过 1 个，HDROP 缓冲区结构正确', async () => {
+    it('3 个文件（2 存在 + 1 不存在）→ 成功复制 2 个，跳过 1 个，stdin 载荷只含有效路径', async () => {
       vi.mocked(fs.promises.stat)
         .mockResolvedValueOnce(mockStats(true) as never)
         .mockResolvedValueOnce(mockStats(true) as never)
@@ -121,18 +164,21 @@ describe('集成：剪贴板分享端到端链路', () => {
         message: expect.stringContaining('已复制 2 个文件')
       })
 
-      expect(clipboard.writeBuffer).toHaveBeenCalledTimes(1)
-      expect(clipboard.writeBuffer).toHaveBeenCalledWith('CF_HDROP', expect.any(Buffer))
+      // 写入机制：不得使用 clipboard.writeBuffer（只会注册同名自定义格式），
+      // 必须经系统 PowerShell + SetFileDropList，路径经 stdin Base64 传递
+      expect(clipboard.writeBuffer).not.toHaveBeenCalled()
+      expect(execFile).toHaveBeenCalledTimes(1)
 
-      // 验证 HDROP 缓冲区结构：DROPFILES 头 20 字节 + UTF-16LE 路径
-      const buf = vi.mocked(clipboard.writeBuffer).mock.calls[0][1] as Buffer
-      expect(buf.length).toBeGreaterThanOrEqual(20)
-      expect(buf.readUInt32LE(0)).toBe(20) // pFiles 偏移
-      expect(buf.readUInt32LE(16)).toBe(1) // fWide = 1（UTF-16）
-      const pathsSection = buf.subarray(20).toString('utf16le')
-      expect(pathsSection).toContain('a.jpg')
-      expect(pathsSection).toContain('b.mp4')
-      expect(pathsSection).not.toContain('missing.jpg')
+      const call = vi.mocked(execFile).mock.calls[0] as unknown as ExecFileCall
+      expect(call[0].toLowerCase()).toMatch(/powershell\.exe$/)
+      expect(call[1].slice(0, 4)).toEqual([
+        '-NoProfile',
+        '-NonInteractive',
+        '-STA',
+        '-EncodedCommand'
+      ])
+      expect(decodeEncodedCommand(0)).toContain('SetFileDropList')
+      expect(decodeStdinPaths(0)).toEqual(['C:\\photos\\a.jpg', 'C:\\photos\\b.mp4'])
     })
 
     it('完整链路：filterValidPaths 与 copyFilesToClipboard 行为一致', async () => {
@@ -153,7 +199,7 @@ describe('集成：剪贴板分享端到端链路', () => {
   // 边界 1：并发调用（用户连点"分享"按钮）
   // ============================================================
   describe('边界 1：并发调用 copyFilesToClipboard', () => {
-    it('5 次并发调用 → 每次独立完成，clipboard.writeBuffer 被调用 5 次', async () => {
+    it('5 次并发调用 → 每次独立完成，各自独立调用 powershell 写入对应路径', async () => {
       vi.mocked(fs.promises.stat).mockResolvedValue(mockStats(true) as never)
 
       const calls = Array.from({ length: 5 }, (_, i) =>
@@ -163,11 +209,9 @@ describe('集成：剪贴板分享端到端链路', () => {
 
       expect(results.every((r) => r.success)).toBe(true)
       expect(results.map((r) => r.count)).toEqual([1, 1, 1, 1, 1])
-      expect(clipboard.writeBuffer).toHaveBeenCalledTimes(5)
+      expect(execFile).toHaveBeenCalledTimes(5)
       for (let i = 0; i < 5; i++) {
-        const buf = vi.mocked(clipboard.writeBuffer).mock.calls[i][1] as Buffer
-        const pathsSection = buf.subarray(20).toString('utf16le')
-        expect(pathsSection).toContain(`photo${i}.jpg`)
+        expect(decodeStdinPaths(i)).toEqual([`C:\\photo${i}.jpg`])
       }
     })
 
@@ -191,7 +235,7 @@ describe('集成：剪贴板分享端到端链路', () => {
       expect(results.map((r) => r.success)).toEqual([true, false, true, false, true])
       expect(results.map((r) => r.count)).toEqual([1, 0, 1, 0, 1])
       expect(results.map((r) => r.skipped)).toEqual([0, 1, 0, 1, 0])
-      expect(clipboard.writeBuffer).toHaveBeenCalledTimes(3)
+      expect(execFile).toHaveBeenCalledTimes(3)
     })
   })
 
@@ -244,7 +288,7 @@ describe('集成：剪贴板分享端到端链路', () => {
   // 边界 3：非 win32 平台不支持 CF_HDROP
   // ============================================================
   describe('边界 3：非 win32 平台兜底', () => {
-    it('linux 平台 → copyFilesToClipboard 返回平台不支持，clipboard 不被调用', async () => {
+    it('linux 平台 → copyFilesToClipboard 返回平台不支持，不调用 powershell', async () => {
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
       vi.mocked(fs.promises.stat).mockResolvedValue(mockStats(true) as never)
 
@@ -252,7 +296,7 @@ describe('集成：剪贴板分享端到端链路', () => {
 
       expect(result.success).toBe(false)
       expect(result.message).toContain('当前平台不支持 CF_HDROP')
-      expect(clipboard.writeBuffer).not.toHaveBeenCalled()
+      expect(execFile).not.toHaveBeenCalled()
     })
 
     it('darwin 平台 → getAppStatus 返回未安装，不调用任何 Windows 命令', async () => {
@@ -270,19 +314,19 @@ describe('集成：剪贴板分享端到端链路', () => {
       // win32：成功
       const r1 = await shareService.copyFilesToClipboard(['C:\\a.jpg'])
       expect(r1.success).toBe(true)
-      expect(clipboard.writeBuffer).toHaveBeenCalledTimes(1)
+      expect(execFile).toHaveBeenCalledTimes(1)
 
       // 切到 linux：失败
       Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
       const r2 = await shareService.copyFilesToClipboard(['C:\\a.jpg'])
       expect(r2.success).toBe(false)
-      expect(clipboard.writeBuffer).toHaveBeenCalledTimes(1)
+      expect(execFile).toHaveBeenCalledTimes(1)
 
       // 切回 win32：再次成功
       Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
       const r3 = await shareService.copyFilesToClipboard(['C:\\a.jpg'])
       expect(r3.success).toBe(true)
-      expect(clipboard.writeBuffer).toHaveBeenCalledTimes(2)
+      expect(execFile).toHaveBeenCalledTimes(2)
     })
   })
 })
