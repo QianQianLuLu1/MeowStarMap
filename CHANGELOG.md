@@ -16,6 +16,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.3] - 2026-10-01
+
+### Added | 新增
+
+- 通用 UI 组件族落地 common 层（Button/Checkbox/Drawer/FloatingActionBar/FormField/PageHeader/Progress/SegmentedControl/Select/Switch/ToastProvider/Tooltip）及零依赖 `cn` 类名工具，均附带行为级测试与 Storybook stories
+- 外观设置新增「氛围颗粒纹理」与「漂浮几何体」独立开关（`display.ambientGrain` / `display.ambientShapes`，12 种语言文案同步）
+- 动效预设新增列表级联入场 `staggerContainer` / `staggerItem`
+
+### Changed | 变更
+
+- 页面接入通用组件：Duplicates/RecycleBin 底部操作栏统一为 FloatingActionBar，ResonanceRecords 页签改用 SegmentedControl，设置页 Select/Toast 全面迁移
+- Tailwind 圆角/阴影/字体/动画/缓动令牌与 globals.css CSS 变量完全对齐，全项目统一圆角与阴影体系；状态栏样式收敛至 CSS 层
+- 无障碍增强：SegmentedControl 补方向键导航与 roving tabindex，Tooltip 补 aria-describedby 关联与 Escape 退出，全局 focus-visible 焦点描边
+
+### Fixed | 修复
+
+- 修复底部操作栏层级过高（z-60）遮挡全局 Toast 与任务进度浮层的回归
+- 修复 Drawer 硬编码标题 id 导致双抽屉并开时 aria-labelledby 串号
+- 修复 FormField 错误态下 aria-describedby 悬空指向未渲染的 helper 文案
+- 预览 mock 的 uiTheme 写入改为与 zustand persist 同构 JSON，消除主题设置回滚隐患
+
+---
+
 ## [2.5.2] - 2026-09-30
 
 ### Added | 新增
@@ -293,7 +316,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 <!-- 在文件末尾维护版本号锚点链接，便于自动跳转 -->
 
-[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.2...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.3...HEAD
+[2.5.3]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.2...v2.5.3
 [2.5.2]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...v2.5.1
 [2.5.0]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.3.5...v2.5.0
