@@ -1959,6 +1959,26 @@ Theme switching with zero JS re-render.
 
 ---
 
+## Appendix C: Project Overview Supplementary Notes
+
+> This section is condensed from `docs/PROJECT-OVERVIEW.md` (the original file has been deleted); only points not duplicated in this document are kept.
+
+### C.1 Dual-Form Delivery
+
+- **exe installer** (electron-builder): the full desktop application.
+- **Single-file HTML preview** (vite-plugin-singlefile + mock IPC): shares the same UI and interactions for install-free preview; the exe build and the preview build must iterate in sync and keep identical versions.
+
+### C.2 Quality Gate Scripts
+
+- `typecheck` (tsc -b), `lint` (eslint), `test` (vitest run), `format` (prettier), `i18n:check`, `preview:check`, `pre-dist-check`.
+
+### C.3 Test Scale
+
+- Vitest 1.6, 263 test files / 4476 cases (measured 2026-09-06, all green).
+- The two environment-related failures in the historical baseline (`path-safety.test.ts` read-only-directory case, `GalleryStackOverflow.test.tsx`) were fixed in 2.5.0; there are currently no pre-existing failures.
+
+---
+
 **End of Document**
 
 ## Developer Info / Author & Social Platforms
