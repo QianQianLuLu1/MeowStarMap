@@ -325,11 +325,11 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 wxnn-photo-manager/
 ├── docs/                              # 项目文档
 │   ├── archive/                       # 历史归档文档（计划、报告、规范、旧架构文档）
-│   ├── i18n/                          # i18n 改造 SOP 与白名单状态快照
+│   ├── i18n/                          # i18n 改造 SOP（终态快照已归档）
 │   ├── plans/                         # 近期实施计划与报告
 │   ├── screenshots/                   # 截图
 │   ├── storybook/                     # Storybook MDX 指南
-│   ├── tutorial/                      # 用户使用教程（MD + 单文件版）
+│   ├── tutorial/                      # 用户使用教程（MD 版）
 │   └── IPC_CONTRACT.md / PLUGIN_API.md 等
 ├── resources/                         # 应用资源
 │   ├── icons/                         # 应用图标（ico/svg）

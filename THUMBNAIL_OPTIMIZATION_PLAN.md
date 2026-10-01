@@ -2,7 +2,7 @@
 
 - 状态：已实施（2026-09-29，全部节点红→绿闭环通过；全量回归 292 文件 / 4887 用例通过，lint / typecheck / audit 通过）
 - 创建日期：2026-09-29
-- 关联前篇：[docs/plans/2026-09-29-fix-thumbnail-loading-latency.md](docs/plans/2026-09-29-fix-thumbnail-loading-latency.md)（已修复「死胡同/缓存风暴/高分屏错档」，本篇接手其「已知限制」中遗留的等待时长与过渡体验问题）
+- 关联前篇：[docs/plans/2026-09-29-fix-thumbnail-loading-latency.md](docs/archive/plans/2026-09-29-fix-thumbnail-loading-latency.md)（已修复「死胡同/缓存风暴/高分屏错档」，本篇接手其「已知限制」中遗留的等待时长与过渡体验问题）
 
 ## 1. 根因分析（已逐行读码核实的证据链）
 

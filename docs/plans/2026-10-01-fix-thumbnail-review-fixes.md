@@ -2,7 +2,7 @@
 
 - 状态：已实施（2026-10-01，T0–T7 全部红→绿闭环通过；全局回归见第 7 节）
 - 创建日期：2026-10-01
-- 关联前篇：[2026-09-30-fix-thumbnail-skeleton-reveal.md](./2026-09-30-fix-thumbnail-skeleton-reveal.md)（本批次未提交改动的原计划）
+- 关联前篇：[2026-09-30-fix-thumbnail-skeleton-reveal.md](../archive/plans/2026-09-30-fix-thumbnail-skeleton-reveal.md)（本批次未提交改动的原计划）
 - 背景：对该批次未提交改动做全面代码审查（主进程 / 渲染进程 / 版本与构建三通道并行 + 逐行复核），发现 1 个 P1 缺陷与若干 P2 问题。本计划按「最小化改动 / 优先复用 / TDD 红-绿 / 分步验证」原则修复。
 
 ## 0. 审查结论摘要

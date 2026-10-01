@@ -1,7 +1,7 @@
 # i18n 存量技术债改造标准操作流程（SOP）
 
-> **历史文档（2026-08-22）**：本文所述 legacy 白名单已于 2026-08-23 全量清偿（终态见
-> [`docs/i18n/whitelist-status.md`](./whitelist-status.md)），`eslint.config.js` 中的白名单块已删除，
+> **历史文档（2026-08-22）**：本文所述 legacy 白名单已于 2026-08-23 全量清偿（终态快照已归档至
+> `docs/archive/whitelist-status.md`），`eslint.config.js` 中的白名单块已删除，
 > §3 中"从 legacy 白名单 files 数组删除该路径"一步已无可操作对象。本文仅作为历史 SOP 保留。
 
 > 适用对象：`eslint.config.js` 中 `legacy` 白名单块的 43 个存量文件（截至 2026-08-22 共 **464** 处

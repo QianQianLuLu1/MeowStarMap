@@ -1,6 +1,6 @@
 # 打包版"启动后扫描阶段闪退"排查报告
 
-> 实施计划见 [packaged-scan-crash-diagnosis-plan.md](packaged-scan-crash-diagnosis-plan.md)。排查日期：2026-09-27。
+> 实施计划见 [packaged-scan-crash-diagnosis-plan.md](archive/packaged-scan-crash-diagnosis-plan.md)（已归档，不入仓）。排查日期：2026-09-27。
 
 ## 1. 结论速览
 
