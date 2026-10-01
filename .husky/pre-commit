@@ -1,11 +1,15 @@
 # ============================================================
 # pre-commit 钩子
-# 钩子职责：对暂存区文件运行 lint-staged（eslint + prettier）
-# 跳过策略：当 commit message 包含 [skip lint] 时本钩子仍执行（仅 commit-msg 可被跳过）
-# 失败处理：lint-staged 任一步骤失败即阻止提交
-# 详见：docs/code-comment-rule.md 第七节「批量清理操作步骤」
+# 钩子职责：
+#   1. lint-staged — 对暂存文件运行 eslint + prettier + 相关单测
+#   2. typecheck   — tsc -b 全项目类型检查（增量构建，通常 < 5s）
+#   3. （测试已通过 lint-staged 增量执行，无需全量跑）
+# 跳过策略：本钩子始终完整执行（[skip lint] 仅跳过 commit-msg）
+# 失败处理：任一步骤失败即阻止提交
+# 详见：.qoder/rules/project-conventions.md
 # ============================================================
 
+# ── Step 1: lint-staged（eslint + prettier + 相关测试） ──
 npx --no-install lint-staged || (
   echo ""
   echo "================================================"
@@ -15,3 +19,18 @@ npx --no-install lint-staged || (
   echo "================================================"
   exit 1
 )
+
+# ── 仅当暂存区包含 TS/TSX 文件时执行类型检查 ──
+if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.tsx?$'; then
+  # ── Step 2: typecheck（tsc -b 增量构建） ──
+  echo "[pre-commit] 运行类型检查..."
+  npx --no-install tsc -b || (
+    echo ""
+    echo "================================================"
+    echo " [pre-commit] TypeScript 类型检查未通过"
+    echo " 请修复类型错误后重新提交"
+    echo " 提示：npm run typecheck 可查看详情"
+    echo "================================================"
+    exit 1
+  )
+fi
