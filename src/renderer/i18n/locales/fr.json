@@ -1425,6 +1425,10 @@
       "reduceMotion": "Réduire les animations",
       "reduceMotionDesc": "Désactiver les transitions et effets de survol pour améliorer la réactivité sur les appareils peu performants",
       "glassEffect": "Effet de verre",
+      "ambientGrain": "Texture granuleuse",
+      "ambientGrainDesc": "Ajoute un grain subtil à l'arrière-plan (inactif en mode léger)",
+      "ambientShapes": "Formes flottantes",
+      "ambientShapesDesc": "Formes géométriques dérivant lentement pour plus de profondeur (inactif en mode léger)",
       "glassEffectHint": "« Flux prononcé » ajoute des taches de lumière ambiantes et une saturation accrue derrière les cartes en verre ; « Subtil » masque les taches et réduit la saturation pour de meilleures performances.",
       "glassEffectLite": "Subtil",
       "glassEffectRich": "Flux prononcé"

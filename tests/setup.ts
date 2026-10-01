@@ -196,7 +196,9 @@ vi.mock('motion/react', async () => {
     LayoutGroup: ({ children }: { children?: React.ReactNode }) =>
       (children ?? null) as React.ReactNode,
     MotionConfig: ({ children }: { children?: React.ReactNode }) =>
-      (children ?? null) as React.ReactNode
+      (children ?? null) as React.ReactNode,
+    // 视觉体系 v3：SegmentedControl 等组件消费 reduced-motion 感知；测试环境默认无减弱
+    useReducedMotion: () => false
   }
 })
 

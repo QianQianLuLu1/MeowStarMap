@@ -27,14 +27,32 @@
   --divider: rgba(0, 0, 0, 0.06);
   --hover-bg: rgba(0, 0, 0, 0.04);
   --hover-bg-strong: rgba(0, 0, 0, 0.08);
+  /* 视觉体系 v3：玻璃表面渐变与极细边框
+     --surface-glass* 为半透明白渐变，叠在 --bg-* 之上构成「液态玻璃」面板底色；
+     --border-subtle/strong 从文字色派生，双主题自适应的极细边框 */
+  --surface-glass: linear-gradient(155deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.32));
+  --surface-glass-strong: linear-gradient(
+    155deg,
+    rgba(255, 255, 255, 0.78),
+    rgba(255, 255, 255, 0.5)
+  );
+  --border-subtle: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  --border-strong: color-mix(in srgb, var(--text-primary) 14%, transparent);
+  /* 聚焦光环：输入类控件 focus 的 accent 光晕（替代散落的硬编码 rgba） */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
   /* P1-U7：统一半透明遮罩色，消除各 Dialog 组件中 0.35/0.4/0.5 三档不一致 */
   --overlay-bg: rgba(0, 0, 0, 0.4);
   --overlay-bg-medium: rgba(0, 0, 0, 0.5);
   --overlay-bg-strong: rgba(0, 0, 0, 0.6);
   --overlay-bg-hover: rgba(0, 0, 0, 0.7);
-  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
-  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.08);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  /* 视觉体系 v3：多层柔和阴影——冷灰蓝色调化（贴合浅色玻璃底色，不用纯黑投影），
+     双层结构 = 近距贴地阴影 + 远距环境阴影，营造悬浮感与空间深度；
+     变量名 sm/md/lg 保持兼容，新增 xs/xl 两档 */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 2px 8px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 2px 6px rgba(15, 23, 42, 0.05), 0 8px 24px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 4px 12px rgba(15, 23, 42, 0.06), 0 16px 40px rgba(15, 23, 42, 0.1);
+  --shadow-xl: 0 8px 24px rgba(15, 23, 42, 0.08), 0 28px 64px rgba(15, 23, 42, 0.14);
   /* 毛玻璃模糊半径变量——reduce-motion 通过覆盖此值固定模糊度 */
   --glass-blur: 12px;
   --glass-blur-sm: 8px;
@@ -46,9 +64,17 @@
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-pill: 999px;
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* 动效曲线令牌：standard=通用过渡；emphasized=强调进入（减速收尾）；
+     spring=带过冲的弹性回弹（开关/药丸切换等「有质量」的微交互） */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   /* P1-U8：spacing token 体系，紧凑模式通过切换 token 值全局生效，避免逐类 !important 覆盖 */
   --space-card-padding: 20px;
   --space-card-gap: 16px;
@@ -56,6 +82,17 @@
   --space-nav-padding-x: 16px;
   --space-nav-gap: 12px;
   --space-toolbar-gap: 12px;
+  /* 通用间距刻度（4px 基），供新组件消费；既有 --space-<语义> 令牌保留 */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  /* 背景颗粒纹理：feTurbulence 噪点图平铺于固定底层，opacity 可由设置关闭；
+     --texture-grain 为内联 SVG data-URI，零外部资源 */
+  --grain-opacity: 0.035;
+  --texture-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
   /* 语义化功能色 */
   --danger: #ef4444;
   --danger-hover: #dc2626;
@@ -97,6 +134,7 @@ input[type='checkbox'] {
 
 html {
   font-family:
+    'Segoe UI Variable Text',
     'Segoe UI',
     'Microsoft YaHei',
     system-ui,
@@ -228,8 +266,19 @@ body {
 
   /* 底部状态栏 */
   .status-bar {
+    background: color-mix(in srgb, var(--bg-primary) 55%, transparent);
+    backdrop-filter: var(--backdrop-blur-sm);
+    -webkit-backdrop-filter: var(--backdrop-blur-sm);
+    border-top: 1px solid var(--divider);
     transition: all var(--transition-normal);
   }
+}
+
+/* 统一键盘焦点可见性基线：未自定义 focus-visible 的可交互元素获得 accent 描边。
+   .btn-*/
+.icon-btn/.select/.input-field 等已有专属规则（类选择器特异性更高）不受影响 */ :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* 滚动条样式 */
@@ -373,6 +422,60 @@ body {
     );
     animation: ambient-drift-a 40s ease-in-out infinite alternate-reverse;
   }
+
+  /* 视觉体系 v3：背景颗粒纹理层——feTurbulence 噪点平铺（--texture-grain），
+     极低透明度消除纯色渐变的呆板；置于 .ambient-bg 内，随容器被 glass-lite /
+     reduce-transparency 整层隐藏，用户可经设置（html.grain-off）单独关闭 */
+  .ambient-grain {
+    position: absolute;
+    inset: 0;
+    background-image: var(--texture-grain);
+    background-size: 160px 160px;
+    opacity: var(--grain-opacity);
+  }
+
+  /* 视觉体系 v3：漂浮几何体——极低透明度描边形状缓慢漂移/旋转，
+     增强空间纵深；仅 transform 动画（compositor 合成），用户可经
+     设置（html.shapes-off）单独关闭 */
+  .ambient-shapes {
+    position: absolute;
+    inset: 0;
+  }
+
+  .ambient-shape {
+    position: absolute;
+    will-change: transform;
+  }
+
+  .ambient-shape-a {
+    width: 200px;
+    height: 200px;
+    top: 14%;
+    right: 22%;
+    border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+    border-radius: 32%;
+    animation: ambient-float-a 46s ease-in-out infinite alternate;
+  }
+
+  .ambient-shape-b {
+    width: 140px;
+    height: 140px;
+    bottom: 20%;
+    left: 16%;
+    border: 1px solid color-mix(in srgb, var(--accent) 14%, transparent);
+    border-radius: 50%;
+    animation: ambient-float-b 38s ease-in-out infinite alternate;
+  }
+
+  .ambient-shape-c {
+    width: 90px;
+    height: 90px;
+    top: 52%;
+    right: 9%;
+    background: color-mix(in srgb, var(--accent) 6%, transparent);
+    border-radius: 18%;
+    animation: ambient-float-a 52s ease-in-out infinite alternate-reverse;
+  }
 }
 
 @keyframes ambient-drift-a {
@@ -391,6 +494,34 @@ body {
   to {
     transform: translate3d(-5vw, -6vh, 0) scale(0.94);
   }
+}
+
+@keyframes ambient-float-a {
+  from {
+    transform: translate3d(0, 0, 0) rotate(-6deg);
+  }
+  to {
+    transform: translate3d(3vw, -3vh, 0) rotate(14deg);
+  }
+}
+
+@keyframes ambient-float-b {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2.5vw, 2.5vh, 0) scale(1.08);
+  }
+}
+
+/* 氛围层设置开关：颗粒纹理 / 漂浮几何体可独立关闭（App.tsx 启动与设置页切换时挂根类）。
+   glass-lite 与 prefers-reduced-transparency 已将整个 .ambient-bg 隐藏，无需重复处理 */
+html.grain-off .ambient-grain {
+  display: none;
+}
+
+html.shapes-off .ambient-shapes {
+  display: none;
 }
 
 /* 设置页「玻璃效果：轻度增强」档：隐藏光斑层 + 降低透色饱和度（ html 根类由设置项切换） */
@@ -529,6 +660,46 @@ html.glass-lite .ambient-bg {
 .btn-secondary:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* 视觉体系 v3：ghost 变体与尺寸修饰符（供 Button 组件组合消费）。
+   置于 .btn-* 基类之后，同特异性下后者生效 */
+.btn-ghost {
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-ghost:hover {
+  background: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.btn-ghost:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-sm {
+  padding: 4px 12px;
+  font-size: 12px;
+  gap: 4px;
+}
+
+.btn-lg {
+  padding: 10px 24px;
+  font-size: 15px;
 }
 
 /* 图标按钮 */
@@ -695,11 +866,41 @@ html.glass-lite .ambient-bg {
 
 .input-field:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.15);
+  box-shadow: var(--focus-ring);
 }
 
 .input-field::placeholder {
   color: var(--text-tertiary);
+}
+
+/* 视觉体系 v3：统一原生 select 基类（此前仅有 .select:disabled 规则而无基类）。
+   下拉箭头由 Select 组件以 IconChevronDown 绝对定位提供，基类只负责收窄外观 */
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  padding: 8px 32px 8px 14px;
+  color: var(--text-primary);
+  font-size: 14px;
+  transition: all var(--transition-fast);
+  outline: none;
+  cursor: pointer;
+}
+
+.select:hover {
+  border-color: var(--border-strong);
+}
+
+.select:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+}
+
+.select option {
+  background: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 /* P2-U7/P2-U8：统一的 disabled 视觉降级，消除各按钮/输入框 disabled 态不一致 */
@@ -828,7 +1029,7 @@ html.glass-lite .ambient-bg {
   }
 }
 
-/* D：页面切换过渡——轻微缩放+淡入
+/* D：页面切换过渡——轻微缩放+下沉回弹+淡入
    原方案用 filter:blur 做 OriginOS 6 风格高斯模糊，但 filter 会创建合成层，
    破坏子元素 backdrop-filter，导致动画结束后毛玻璃依然模糊。去掉 filter。*/
 /* P0 修复：to 状态改为 transform: none 而非 scale(1)。
@@ -838,7 +1039,7 @@ html.glass-lite .ambient-bg {
    子元素的 fixed 定位持续失效。改为 none 不创建包含块。 */
 @keyframes pageBlurIn {
   from {
-    transform: scale(1.02);
+    transform: scale(1.015) translateY(8px);
     opacity: 0;
   }
   to {
@@ -879,10 +1080,10 @@ html.glass-lite .ambient-bg {
   }
 }
 
-/* 页面过渡动画类：轻微缩放+淡入 */
+/* 页面过渡动画类：轻微缩放+下沉回弹+淡入（强调曲线减速收尾） */
 /* 修复：移除 will-change，动画结束后类会被 JS 移除，不需要持续提示合成层 */
 .page-enter {
-  animation: pageBlurIn 250ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: pageBlurIn 280ms var(--ease-emphasized) forwards;
 }
 
 .modal-enter {
@@ -978,7 +1179,7 @@ html.glass-lite .ambient-bg {
 }
 
 .nav-item.active {
-  background: var(--hover-bg);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
@@ -992,6 +1193,8 @@ html.glass-lite .ambient-bg {
   height: 20px;
   background: var(--accent);
   border-radius: 0 2px 2px 0;
+  /* 激活指示条微光：accent 柔光晕染，与玻璃材质呼应 */
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 45%, transparent);
   transition: height 200ms ease-out;
 }
 
@@ -1038,6 +1241,24 @@ html.glass-lite .ambient-bg {
   transition: width 300ms ease-out;
 }
 
+/* 视觉体系 v3：不定态进度（任务量未知时）。translateX 以自身宽度为基准，
+   -110% → 300% 保证填条完整扫过轨道 */
+.progress-bar-fill-indeterminate {
+  width: 36%;
+  background: var(--accent);
+  border-radius: 2px;
+  animation: progress-indeterminate 1.4s var(--ease-standard) infinite;
+}
+
+@keyframes progress-indeterminate {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}
+
 /* 骨架屏 */
 /* P2-U11：抽取 skeleton 渐变色为变量，主题文件只需覆盖变量值 */
 :root {
@@ -1068,7 +1289,7 @@ html.glass-lite .ambient-bg {
 /* 拖拽区域 */
 .drag-over {
   border: 2px dashed var(--accent) !important;
-  background: rgba(0, 120, 212, 0.05) !important;
+  background: color-mix(in srgb, var(--accent) 6%, transparent) !important;
 }
 
 /* 禁用选择 */

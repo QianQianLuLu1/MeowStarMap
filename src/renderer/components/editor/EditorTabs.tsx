@@ -150,7 +150,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({
               className={`w-9 h-9 rounded-md text-xs font-medium transition-all flex items-center justify-center ${activeTab === tab.id ? 'active' : ''}`}
               style={{
                 background: activeTab === tab.id ? 'var(--accent)' : 'transparent',
-                color: activeTab === tab.id ? 'white' : 'var(--text-secondary)'
+                color: activeTab === tab.id ? 'var(--text-on-accent)' : 'var(--text-secondary)'
               }}
               onClick={() => {
                 onTabChange(tab.id)
@@ -181,7 +181,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({
               className={`flex-1 py-2 px-1 rounded-md text-xs font-medium transition-all ${activeTab === tab.id ? 'active' : ''}`}
               style={{
                 background: activeTab === tab.id ? 'var(--accent)' : 'transparent',
-                color: activeTab === tab.id ? 'white' : 'var(--text-secondary)'
+                color: activeTab === tab.id ? 'var(--text-on-accent)' : 'var(--text-secondary)'
               }}
               onClick={() => onTabChange(tab.id)}
             >

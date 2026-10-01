@@ -15,6 +15,8 @@ import type { SceneCategoryConfig, SceneTimeConfig } from '../../shared/scene-ca
 import { useUIStore } from '../stores/uiStore'
 import { formatCategoryName } from '../utils/category-name'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
+import { PageHeader } from '../components/common/PageHeader'
+import { Select } from '../components/common/Select'
 import { useFocusTrap } from '../hooks/useFocusTrap'
 import { useGlobalToast } from './settings/sections'
 import {
@@ -25,6 +27,7 @@ import {
   IconDelete,
   IconSearch,
   IconFolderOpen,
+  IconList,
   IconImage,
   IconVideo,
   IconStar,
@@ -488,9 +491,8 @@ export const CategoriesPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-3xl mx-auto h-full overflow-y-auto">
-      <h2 className="text-2xl font-semibold" style={{ color: 'var(--text-primary)' }}>
-        {t('categories.page.title')}
-      </h2>
+      {/* 视觉体系 v3：统一页头（原裸 h2） */}
+      <PageHeader icon={<IconList size={20} />} title={t('categories.page.title')} />
 
       {/* 游戏内场景分类 */}
       <div className="glass-card p-5 space-y-4">
@@ -628,23 +630,23 @@ export const CategoriesPage: React.FC = () => {
             className="w-12 h-10 rounded cursor-pointer"
             title={t('categories.page.create.colorTitle')}
           />
-          <select
+          <Select
             value={newIcon}
             onChange={(e) => setNewIcon(e.target.value)}
-            className="input-field text-sm"
-            style={{ minWidth: '140px' }}
+            className="min-w-[140px]"
+            aria-label={t('categories.page.create.title')}
           >
             {ICON_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {t(opt.labelKey)}
               </option>
             ))}
-          </select>
-          <select
-            value={newParentId}
+          </Select>
+          <Select
+            value={String(newParentId)}
             onChange={(e) => setNewParentId(e.target.value ? Number(e.target.value) : '')}
-            className="input-field text-sm"
-            style={{ minWidth: '140px' }}
+            className="min-w-[140px]"
+            aria-label={t('categories.page.create.noParent')}
           >
             <option value="">{t('categories.page.create.noParent')}</option>
             {flatCategories.map((cat) => (
@@ -653,7 +655,7 @@ export const CategoriesPage: React.FC = () => {
                 {formatCategoryName(cat)}
               </option>
             ))}
-          </select>
+          </Select>
           <button className="btn-primary" onClick={handleCreate}>
             {t('categories.page.create.submit')}
           </button>
@@ -706,18 +708,18 @@ export const CategoriesPage: React.FC = () => {
                     onChange={(e) => setEditing({ ...editing, color: e.target.value })}
                     className="w-10 h-9 rounded cursor-pointer"
                   />
-                  <select
+                  <Select
                     value={editing.icon || 'folder'}
                     onChange={(e) => setEditing({ ...editing, icon: e.target.value })}
-                    className="input-field text-sm"
-                    style={{ minWidth: '120px' }}
+                    className="min-w-[120px]"
+                    aria-label={t('categories.page.list.title')}
                   >
                     {ICON_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
                         {t(opt.labelKey)}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <button className="btn-primary text-sm" onClick={handleUpdate}>
                     {t('common.save')}
                   </button>

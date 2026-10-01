@@ -1425,6 +1425,10 @@
       "reduceMotion": "Giảm hoạt ảnh",
       "reduceMotionDesc": "Tắt hiệu ứng chuyển tiếp và hover để cải thiện khả năng phản hồi trên các thiết bị hiệu suất thấp",
       "glassEffect": "Hiệu ứng kính",
+      "ambientGrain": "Kết cấu hạt",
+      "ambientGrainDesc": "Hạt nhiễu tinh tế cho nền, tăng chất liệu (không hiệu quả ở chế độ nhẹ)",
+      "ambientShapes": "Hình khối trôi nổi",
+      "ambientShapesDesc": "Các hình khối trôi chậm tạo chiều sâu không gian (không hiệu quả ở chế độ nhẹ)",
       "glassEffectHint": "\"Dòng chảy rõ nét\" thêm các vệt sáng môi trường và độ bão hòa cao hơn phía sau thẻ kính; \"Nhẹ nhàng\" ẩn các vệt sáng và giảm độ bão hòa, ít tốn hiệu năng hơn.",
       "glassEffectLite": "Nhẹ nhàng",
       "glassEffectRich": "Dòng chảy rõ nét"

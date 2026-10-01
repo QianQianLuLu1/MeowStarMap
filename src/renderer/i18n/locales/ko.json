@@ -1425,6 +1425,10 @@
       "reduceMotion": "모션 감소",
       "reduceMotionDesc": "전환 애니메이션과 호버 효과 비활성화, 저성능 기기 응답 속도 향상",
       "glassEffect": "유리 효과",
+      "ambientGrain": "그레인 텍스처",
+      "ambientGrainDesc": "배경에 미세한 노이즈 질감을 더합니다 (라이트 모드에서는 비활성)",
+      "ambientShapes": "플로팅 도형",
+      "ambientShapesDesc": "배경에 천천히 떠다니는 도형으로 깊이감을 더합니다 (라이트 모드에서는 비활성)",
       "glassEffectHint": "'뚜렷한 유동감'은 유리 카드에 환경광 반점과 높은 채도를 더합니다. '절제된 강화'는 반점을 숨기고 채도를 낮춰 성능 부담이 적습니다.",
       "glassEffectLite": "절제된 강화",
       "glassEffectRich": "뚜렷한 유동감"

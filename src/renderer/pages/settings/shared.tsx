@@ -1,6 +1,4 @@
-import React, { useContext, createContext, useId } from 'react'
-import { useToast, type ToastType, type ToastMessage } from '../../hooks/useToast'
-import { Toast } from '../../components/common/Toast'
+import React, { useId } from 'react'
 // P1-I：formatSize/formatTimestamp 统一到 utils，shared 仅作 re-export 保持外部接口不变
 import { formatSize } from '../../utils/format'
 import { formatTimestamp } from '../../utils/date'
@@ -9,34 +7,14 @@ import { FAULT_TYPE_META, type FaultType } from '../../utils/fault-colors'
 
 export { formatSize, formatTimestamp, FAULT_TYPE_META, type FaultType }
 
-// ============ 全局 Toast Context ============
-// P0-3：从 SettingsToastProvider 提升为 GlobalToastProvider，覆盖所有页面
-// U6：内部 Context 同步重命名为 GlobalToastContext，与 Provider/Hook 语义一致
-// 所有页面共享同一个 Toast 实例，避免每个页面各自渲染 Toast
-type ShowMessageFn = (text: string, type?: ToastType, action?: ToastMessage['action']) => void
-const GlobalToastContext = createContext<ShowMessageFn>(() => {})
-
-/**
- * 全局 Toast Provider（P0-3 改进，原 SettingsToastProvider）
- * 应在 App.tsx 根节点包裹，让 Gallery / Detail / Editor / Categories / RecycleBin / Duplicates 等所有页面都能使用 Toast
- */
-export const GlobalToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { messages, showMessage, dismiss } = useToast()
-  return (
-    <GlobalToastContext.Provider value={showMessage}>
-      {children}
-      <Toast messages={messages} onDismiss={dismiss} />
-    </GlobalToastContext.Provider>
-  )
-}
-
-/** 全局 Toast Hook，任意页面可调用获取 showMessage */
-export function useGlobalToast(): ShowMessageFn {
-  return useContext(GlobalToastContext)
-}
-
-// 暴露内部 Context 供同目录 Section 组件直接消费（避免重复创建 Context）
-export { GlobalToastContext }
+// ============ 全局 Toast Context（视觉体系 v3 迁移） ============
+// 实现已迁至 components/common/ToastProvider.tsx（Toast 是全局反馈设施而非设置页专属，
+// 消除页面对 settings 目录的模块归属错位）。此处保留 re-export，既有调用点零改动。
+export {
+  GlobalToastProvider,
+  useGlobalToast,
+  GlobalToastContext
+} from '../../components/common/ToastProvider'
 
 // ============ 共享类型与工具 ============
 

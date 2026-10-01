@@ -81,3 +81,25 @@ export const slideRightVariants: Variants = {
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: 40 }
 }
+
+/**
+ * 视觉体系 v3：列表级联入场容器——配合 staggerItem 使用，子项依次错峰进入。
+ * staggerChildren 间隔 45ms 控制节奏，delayChildren 让容器先落位再带动子项。
+ * 仅用于页面级/区块级少量元素（工具栏、信息面板组）；
+ * 虚拟列表（Virtuoso/masonic/网格）禁止逐项动画。
+ */
+export const staggerContainer: Variants = {
+  initial: {},
+  animate: {
+    transition: { staggerChildren: 0.045, delayChildren: 0.06 }
+  }
+}
+
+/**
+ * 视觉体系 v3：列表级联入场子项——上移淡入，复用 springSoft。
+ * 必须作为 staggerContainer 的直接 motion 子元素使用。
+ */
+export const staggerItem: Variants = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0, transition: springSoft }
+}

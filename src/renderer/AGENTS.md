@@ -39,8 +39,20 @@ React 19 + TypeScript（strict）+ Zustand + Tailwind CSS 3 + i18next 的前端�
 ## 3. 主题系统（CSS 变量优先）
 
 - 主题注册中心：`styles/themes/index.ts` 定义 `UITheme` 联合类型、`themes: ThemeConfig[]`、`getThemeConfig()`。**新增主题两步**：① 在 `themes` 数组注册 `{ id, nameKey, className }`；② 添加同名 CSS 变量赋值文件（如 `styles/themes/soft-pink-luxury.css`）并在 `globals.css` 引入。主题切换通过 `document.documentElement` 上挂/摘 `className` 实现，切换逻辑在 `themeStore` 的 `applyThemeClass`（已按 `themes` 自动派生 className 列表，无需手动维护）。
+- **主题变量块的选择器必须写 `html.<主题类>`**（如 `soft-pink-luxury.css` 的两个变量块）：主题文件经 `@import` 位于 `globals.css` 的 `:root` 之前，同特异性（0,1,0）下后源序的 `:root` 会整块压掉主题变量覆写；`html.` 前缀（0,1,1）保证变量真正生效。块内的 scoped 规则（`.soft-pink-luxury .glass-card` 等）特异性已足够，无需改动。
 - 颜色/背景/边框/强调色 **必须** 走 CSS 变量或 `tailwind.config.ts` 已 extend 的 token（`accent`、`bg-primary/secondary/tertiary`、`text-primary/secondary/tertiary` 等，均映射到 `var(--*)`）。优先写 Tailwind 类名（`className="text-primary bg-tertiary"`）；仅动态计算/内联覆盖时用 `style={{ color: 'var(--text-primary)' }}`（见 `pages/settings/appearance-sections.tsx`、`tools-sections.tsx`）。
 - **禁止**：硬编码 `#xxxxxx`/`rgb()`/`hsl()` 色值、在 tsx 里定义局部色值常量对象、用 `dark:` 前缀手写两套颜色（主题靠 CSS 变量重写，`dark:` 不适用）。允许例外须注释说明原因：缩略图/渐变上的纯白纯黑对比色、SVG/Canvas 内部色、仅限调试面板用的 Tailwind 灰色系。
+- **设计令牌清单（视觉体系 v3，定义于 `globals.css :root`）**：
+  - 表面/边框：`--surface-glass(-strong)`（玻璃面板渐变底色）、`--border-subtle/strong`（极细边框）、`--focus-ring`（输入聚焦光环）
+  - 阴影：`--shadow-xs/sm/md/lg/xl`（多层冷灰蓝色调化阴影，双层结构 = 贴地 + 环境）
+  - 圆角：`--radius-sm/md/lg/xl/pill`（Tailwind `rounded-*` 已全部映射到这些变量，勿再用 Tailwind 默认值语义理解）
+  - 动效曲线：`--ease-standard/emphasized/decelerate/spring`（CSS 侧）；motion 侧统一走 `utils/motionPresets.ts`（含 `staggerContainer/staggerItem` 级联入场），禁止组件内硬编码
+  - 间距：`--space-1/2/3/4/6/8`（4px 基）与既有语义 `--space-card-*`/`--space-nav-*`/`--space-toolbar-gap` 并存
+  - 纹理：`--texture-grain`（内联 SVG 噪点 data-URI）+ `--grain-opacity`
+  - 工具：`utils/cn.ts` 的 `cn()` 为类名拼接统一入口（零依赖）
+- **基础组件（`components/common/`，新 UI 一律复用，不再手写等价结构）**：`Button`（变体/尺寸/loading）、`Switch`/`Checkbox`/`Select`（统一表单控件）、`SegmentedControl`（药丸切换，radiogroup 语义）、`Tooltip`（portal + 视口钳制，替代原生 `title`）、`Drawer`（侧滑抽屉）、`Progress`（确定/不定态）、`PageHeader`（统一页头）、`FloatingActionBar`（底部浮动操作栏）、`FormField`（label 上置 + helper/error + aria 关联）、`ToastProvider`（全局 Toast Context，`pages/settings/shared.tsx` 仅保留 re-export）。
+- **氛围层**（`AppShell` 内 `.ambient-bg`，全局唯一实例）：环境光斑（`.ambient-blob-*`）+ 漂浮几何体（`.ambient-shape-*`）+ 颗粒纹理（`.ambient-grain`）。用户可经设置开关（`display.ambientGrain`/`display.ambientShapes`，App.tsx 启动时挂 `html.grain-off`/`html.shapes-off`）独立关闭；`html.glass-lite` 与 `prefers-reduced-transparency` 整层隐藏，`reduce-motion` 下动画静止。改动氛围层时必须维持这条降级链。
+- **性能红线**：虚拟列表（Virtuoso/masonic/VirtualImageGrid）内禁逐项入场动画；动效仅限 transform/opacity；毛玻璃容器避免 `filter`（会破坏子级 backdrop-filter）。
 
 ## 4. i18n 使用（`i18n/`）
 

@@ -7,6 +7,7 @@ import { toFileUrl } from '../utils/file'
 import { formatDate } from '../utils/date'
 import { IconOutfit, IconRefresh, IconImage, IconLock, IconVideo } from '../icons'
 import { ThumbReveal } from '../components/common/ThumbReveal'
+import { PageHeader } from '../components/common/PageHeader'
 import type { OutfitStat } from '../../shared/scene-category'
 
 /**
@@ -30,7 +31,10 @@ const StatCard: React.FC<{
   hint?: string
   accent?: string
 }> = ({ label, value, hint, accent }) => (
-  <div className="glass-card p-4 flex flex-col gap-1" style={{ borderRadius: 16, minWidth: 0 }}>
+  <div
+    className="glass-card p-4 flex flex-col gap-1"
+    style={{ borderRadius: 'var(--radius-lg)', minWidth: 0 }}
+  >
     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
       {label}
     </span>
@@ -64,7 +68,11 @@ export const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = (
   return (
     <button
       className="glass-card text-left flex flex-col overflow-hidden group"
-      style={{ borderRadius: 16, border: '1px solid var(--divider)', cursor: 'pointer' }}
+      style={{
+        borderRadius: 'var(--radius-lg)',
+        border: '1px solid var(--divider)',
+        cursor: 'pointer'
+      }}
       onClick={onClick}
       title={t('outfit.viewOutfitPhotos', { outfit: stat.outfit })}
     >
@@ -121,7 +129,7 @@ const UncollectedCard: React.FC<{ nameKey: string }> = ({ nameKey }) => {
     <div
       className="flex flex-col items-center justify-center p-6 gap-2"
       style={{
-        borderRadius: 16,
+        borderRadius: 'var(--radius-lg)',
         background: 'var(--bg-tertiary)',
         border: '1px dashed var(--divider)',
         aspectRatio: '1 / 1',
@@ -206,37 +214,30 @@ export const OutfitGalleryPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* 顶部标题栏 */}
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: '1px solid var(--divider)' }}
-      >
-        <div className="flex items-center gap-3">
-          <IconOutfit size={22} />
-          <div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {t('outfit.title')}
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              {loading
-                ? t('outfit.loading')
-                : t('outfit.summary', {
-                    collected: totalCollected,
-                    presets: totalPresets,
-                    progress: progressPercent
-                  })}
-            </p>
-          </div>
-        </div>
-        <button
-          className="btn-secondary text-sm"
-          onClick={() => void loadStats()}
-          disabled={loading}
-          title={t('outfit.refreshStats')}
-        >
-          <IconRefresh size={14} className="mr-1" /> {t('outfit.refresh')}
-        </button>
-      </div>
+      {/* 顶部标题栏（视觉体系 v3：统一 PageHeader） */}
+      <PageHeader
+        icon={<IconOutfit size={20} />}
+        title={t('outfit.title')}
+        subtitle={
+          loading
+            ? t('outfit.loading')
+            : t('outfit.summary', {
+                collected: totalCollected,
+                presets: totalPresets,
+                progress: progressPercent
+              })
+        }
+        actions={
+          <button
+            className="btn-secondary text-sm"
+            onClick={() => void loadStats()}
+            disabled={loading}
+            title={t('outfit.refreshStats')}
+          >
+            <IconRefresh size={14} className="mr-1" /> {t('outfit.refresh')}
+          </button>
+        }
+      />
 
       {/* 滚动内容区 */}
       <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
@@ -277,10 +278,7 @@ export const OutfitGalleryPage: React.FC = () => {
             {t('outfit.collectedSection', { count: collectedCount })}
           </h3>
           {stats.length === 0 && !loading ? (
-            <div
-              className="glass-card flex flex-col items-center justify-center py-12 gap-2"
-              style={{ borderRadius: 16 }}
-            >
+            <div className="glass-card flex flex-col items-center justify-center py-12 gap-2">
               <IconOutfit size={36} style={{ color: 'var(--text-tertiary)' }} />
               <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>
                 {t('outfit.emptyHint')}

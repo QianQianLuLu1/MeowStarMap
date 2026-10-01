@@ -1425,6 +1425,10 @@
       "reduceMotion": "動效減弱",
       "reduceMotionDesc": "關閉過渡動畫和懸停效果，提升低效能裝置回應速度",
       "glassEffect": "玻璃效果",
+      "ambientGrain": "顆粒紋理",
+      "ambientGrainDesc": "背景細膩雜點紋理，增強畫面質感（「輕度增強」檔下不生效）",
+      "ambientShapes": "漂浮幾何體",
+      "ambientShapesDesc": "背景緩慢漂浮的幾何形狀，增強空間縱深（「輕度增強」檔下不生效）",
       "glassEffectHint": "「明顯流動感」為玻璃卡片附加環境光斑與更高透色飽和度；「輕度增強」隱藏光斑並降低飽和度，效能開銷更低",
       "glassEffectLite": "輕度增強",
       "glassEffectRich": "明顯流動感"

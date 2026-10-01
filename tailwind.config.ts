@@ -21,9 +21,44 @@ const config: Config = {
         'danger-hover': 'var(--danger-hover)',
         success: 'var(--success)'
       },
+      // 视觉体系 v3：圆角/阴影令牌进 Tailwind——覆盖默认值使 rounded-*/shadow-* 与
+      // globals.css 的 --radius-*/--shadow-* 完全一致，全项目单一圆角与阴影体系
+      borderRadius: {
+        sm: 'var(--radius-sm)',
+        md: 'var(--radius-md)',
+        lg: 'var(--radius-lg)',
+        xl: 'var(--radius-xl)',
+        pill: 'var(--radius-pill)'
+      },
+      boxShadow: {
+        xs: 'var(--shadow-xs)',
+        sm: 'var(--shadow-sm)',
+        md: 'var(--shadow-md)',
+        lg: 'var(--shadow-lg)',
+        xl: 'var(--shadow-xl)'
+      },
+      fontFamily: {
+        sans: [
+          'Segoe UI Variable Text',
+          'Segoe UI',
+          'Microsoft YaHei',
+          'system-ui',
+          '-apple-system',
+          'sans-serif'
+        ]
+      },
+      // 动画类（animate-fade-in 等）引用 globals.css 中已定义的全局 @keyframes，
+      // 此处不重复声明关键帧，避免同名 keyframes 双份定义
+      animation: {
+        'fade-in': 'fadeIn 250ms cubic-bezier(0.4, 0, 0.2, 1) forwards',
+        'scale-in': 'scaleIn 250ms cubic-bezier(0, 0, 0.2, 1) forwards',
+        'slide-in-bottom': 'slideInBottom 300ms cubic-bezier(0, 0, 0.2, 1) forwards'
+      },
       transitionTimingFunction: {
         win11: 'cubic-bezier(0.4, 0, 0.2, 1)',
-        'win11-decelerate': 'cubic-bezier(0.0, 0, 0.2, 1)'
+        'win11-decelerate': 'cubic-bezier(0.0, 0, 0.2, 1)',
+        emphasized: 'cubic-bezier(0.2, 0, 0, 1)',
+        spring: 'cubic-bezier(0.34, 1.56, 0.64, 1)'
       }
     }
   },

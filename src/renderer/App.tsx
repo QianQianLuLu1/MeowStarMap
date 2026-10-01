@@ -257,6 +257,17 @@ const App: React.FC = () => {
           'rich'
         )) as string
         html.classList.toggle('glass-lite', glass === 'lite')
+        // 视觉体系 v3：氛围层细项开关（默认开启，关闭时挂对应根类隐藏）
+        const ambientGrain = (await window.electronAPI.settings.get(
+          'display.ambientGrain',
+          true
+        )) as boolean
+        html.classList.toggle('grain-off', ambientGrain === false)
+        const ambientShapes = (await window.electronAPI.settings.get(
+          'display.ambientShapes',
+          true
+        )) as boolean
+        html.classList.toggle('shapes-off', ambientShapes === false)
       } catch {
         // 预览版无 IPC，静默忽略
       }

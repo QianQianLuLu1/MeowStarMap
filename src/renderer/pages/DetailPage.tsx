@@ -385,7 +385,10 @@ export const DetailPage: React.FC = () => {
         {media.is_missing === true && (
           <div
             className="mb-4 p-3 rounded-xl flex items-center justify-between gap-3"
-            style={{ background: 'var(--danger-bg)', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+            style={{
+              background: 'var(--danger-bg)',
+              border: '1px solid color-mix(in srgb, var(--danger) 30%, transparent)'
+            }}
           >
             <div
               className="flex items-center gap-2 text-sm"
@@ -398,7 +401,7 @@ export const DetailPage: React.FC = () => {
               className="btn-secondary text-xs flex-shrink-0"
               style={{
                 background: 'var(--danger-hover)',
-                color: 'white',
+                color: 'var(--text-on-accent)',
                 borderColor: 'var(--danger-hover)'
               }}
               onClick={handleRemoveFromLibrary}
@@ -431,6 +434,7 @@ export const DetailPage: React.FC = () => {
             {Array.from({ length: 5 }).map((_, i) => (
               <button
                 key={i}
+                className="motion-hover-scale-sm"
                 onClick={() => updateRating(i + 1)}
                 aria-label={t('detail.actions.ratingAria', { n: i + 1 })}
               >

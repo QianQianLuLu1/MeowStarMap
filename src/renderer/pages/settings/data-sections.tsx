@@ -6,6 +6,7 @@ import {
   type CharacterProfile
 } from '../../stores/mediaStore'
 import { ConfirmDialog } from '../../components/common/ConfirmDialog'
+import { Select } from '../../components/common/Select'
 import {
   SectionShell,
   GlobalToastContext,
@@ -129,14 +130,9 @@ export const DataBackupSection: React.FC = () => {
           <button className="btn-secondary text-sm" onClick={loadBackups} disabled={loading}>
             {loading ? t('settings.backup.loading') : t('settings.backup.refresh')}
           </button>
-          {/* P1-04：按档案备份——选择档案后备份文件名加入 _{uid} 后缀 */}
-          <select
-            className="text-sm px-3 py-1.5 rounded-lg border"
-            style={{
-              background: 'var(--bg-tertiary)',
-              color: 'var(--text-primary)',
-              borderColor: 'var(--divider)'
-            }}
+          {/* P1-04：按档案备份——选择档案后备份文件名加入 _{uid} 后缀（视觉体系 v3：统一 Select） */}
+          <Select
+            className="min-w-[160px]"
             value={selectedProfileUid}
             onChange={(e) => setSelectedProfileUid(e.target.value)}
             title={t('settings.backup.wholeDb')}
@@ -147,7 +143,7 @@ export const DataBackupSection: React.FC = () => {
                 {p.nickname}（{p.uid}）
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* 备份目录 */}

@@ -29,6 +29,9 @@ import { MediaThumbnail } from '../components/common/MediaThumbnail'
 // fix-thumbnail-loading-latency 节点4：图片 standard 加载失败时回退低清档（复用网格档位命名纯函数）
 import { toLowQualityUrl } from '../components/gallery/VirtualImageGrid'
 import { SkeletonList } from '../components/common/Skeleton'
+import { PageHeader } from '../components/common/PageHeader'
+import { FloatingActionBar } from '../components/common/FloatingActionBar'
+import { Spinner } from '../components/common/Spinner'
 import { getContextMenuItems, type GalleryContextMenuActions } from '../utils/gallery'
 import { useFileOperations } from '../hooks/useFileOperations'
 import { PropertiesDialog } from '../components/common/PropertiesDialog'
@@ -873,85 +876,76 @@ export const DuplicatesPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* 顶部标题栏 */}
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: '1px solid var(--divider)' }}
-      >
-        <div className="flex items-center gap-3">
-          {mode === 'exact' ? <IconDuplicate size={22} /> : <IconCompare size={22} />}
-          <div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {mode === 'exact' ? t('duplicates.titleExact') : t('duplicates.titleSimilar')}
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              {subtitle}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {result && result.success && result.totalGroups > 0 && !scanning && (
-            <>
+      {/* 顶部标题栏（视觉体系 v3：统一 PageHeader） */}
+      <PageHeader
+        icon={mode === 'exact' ? <IconDuplicate size={20} /> : <IconCompare size={20} />}
+        title={mode === 'exact' ? t('duplicates.titleExact') : t('duplicates.titleSimilar')}
+        subtitle={subtitle}
+        actions={
+          <>
+            {result && result.success && result.totalGroups > 0 && !scanning && (
+              <>
+                <button
+                  className="btn-secondary text-sm"
+                  onClick={() => applyStrategyToAll('best_quality')}
+                  title={t('duplicates.strategyTooltipBest')}
+                >
+                  {t('duplicates.strategyAll', { label: t('duplicates.strategy.bestQuality') })}
+                </button>
+                <button
+                  className="btn-secondary text-sm"
+                  onClick={() => applyStrategyToAll('newest')}
+                  title={t('duplicates.strategyTooltipNewest')}
+                >
+                  {t('duplicates.strategyAll', { label: t('duplicates.strategy.newest') })}
+                </button>
+                <button
+                  className="btn-secondary text-sm"
+                  onClick={() => applyStrategyToAll('largest')}
+                  title={t('duplicates.strategyTooltipLargest')}
+                >
+                  {t('duplicates.strategyAll', { label: t('duplicates.strategy.largest') })}
+                </button>
+                <button
+                  className="btn-secondary text-sm"
+                  onClick={() => applyStrategyToAll('favorited')}
+                  title={t('duplicates.strategyTooltipFavorited')}
+                >
+                  {t('duplicates.strategyAll', { label: t('duplicates.strategy.favorited') })}
+                </button>
+                <div className="w-px h-5 mx-1" style={{ background: 'var(--divider)' }} />
+              </>
+            )}
+            {mode === 'similar' && (
               <button
                 className="btn-secondary text-sm"
-                onClick={() => applyStrategyToAll('best_quality')}
-                title={t('duplicates.strategyTooltipBest')}
+                onClick={() => void handleGeneratePhash()}
+                disabled={generatingPhash || scanning}
+                title={t('duplicates.phashButton')}
               >
-                {t('duplicates.strategyAll', { label: t('duplicates.strategy.bestQuality') })}
+                {generatingPhash ? t('duplicates.phashCalculating') : t('duplicates.phashButton')}
               </button>
-              <button
-                className="btn-secondary text-sm"
-                onClick={() => applyStrategyToAll('newest')}
-                title={t('duplicates.strategyTooltipNewest')}
-              >
-                {t('duplicates.strategyAll', { label: t('duplicates.strategy.newest') })}
-              </button>
-              <button
-                className="btn-secondary text-sm"
-                onClick={() => applyStrategyToAll('largest')}
-                title={t('duplicates.strategyTooltipLargest')}
-              >
-                {t('duplicates.strategyAll', { label: t('duplicates.strategy.largest') })}
-              </button>
-              <button
-                className="btn-secondary text-sm"
-                onClick={() => applyStrategyToAll('favorited')}
-                title={t('duplicates.strategyTooltipFavorited')}
-              >
-                {t('duplicates.strategyAll', { label: t('duplicates.strategy.favorited') })}
-              </button>
-              <div className="w-px h-5 mx-1" style={{ background: 'var(--divider)' }} />
-            </>
-          )}
-          {mode === 'similar' && (
+            )}
+            {/* P1-01：手动触发重复标记（标记后图库默认隐藏 is_duplicate=1） */}
             <button
               className="btn-secondary text-sm"
-              onClick={() => void handleGeneratePhash()}
-              disabled={generatingPhash || scanning}
-              title={t('duplicates.phashButton')}
+              onClick={() => void handleMarkDuplicates()}
+              disabled={markingDuplicates || scanning || generatingPhash}
+              title={t('duplicates.markButton')}
             >
-              {generatingPhash ? t('duplicates.phashCalculating') : t('duplicates.phashButton')}
+              {markingDuplicates ? t('duplicates.markingButton') : t('duplicates.markButton')}
             </button>
-          )}
-          {/* P1-01：手动触发重复标记（标记后图库默认隐藏 is_duplicate=1） */}
-          <button
-            className="btn-secondary text-sm"
-            onClick={() => void handleMarkDuplicates()}
-            disabled={markingDuplicates || scanning || generatingPhash}
-            title={t('duplicates.markButton')}
-          >
-            {markingDuplicates ? t('duplicates.markingButton') : t('duplicates.markButton')}
-          </button>
-          <button
-            className="btn-secondary text-sm"
-            onClick={() => void runScan(mode)}
-            disabled={scanning}
-            title={t('duplicates.rescan')}
-          >
-            <IconRefresh size={14} className="mr-1" /> {t('duplicates.rescan')}
-          </button>
-        </div>
-      </div>
+            <button
+              className="btn-secondary text-sm"
+              onClick={() => void runScan(mode)}
+              disabled={scanning}
+              title={t('duplicates.rescan')}
+            >
+              <IconRefresh size={14} className="mr-1" /> {t('duplicates.rescan')}
+            </button>
+          </>
+        }
+      />
 
       {/* T05：模式切换 + 阈值档位条 */}
       <div
@@ -972,7 +966,7 @@ export const DuplicatesPage: React.FC = () => {
             className="px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1.5"
             style={{
               background: mode === 'exact' ? 'var(--accent)' : 'transparent',
-              color: mode === 'exact' ? '#fff' : 'var(--text-secondary)',
+              color: mode === 'exact' ? 'var(--text-on-accent)' : 'var(--text-secondary)',
               cursor: scanning || generatingPhash ? 'not-allowed' : 'pointer'
             }}
           >
@@ -986,7 +980,7 @@ export const DuplicatesPage: React.FC = () => {
             className="px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1.5"
             style={{
               background: mode === 'similar' ? 'var(--accent)' : 'transparent',
-              color: mode === 'similar' ? '#fff' : 'var(--text-secondary)',
+              color: mode === 'similar' ? 'var(--text-on-accent)' : 'var(--text-secondary)',
               cursor: scanning || generatingPhash ? 'not-allowed' : 'pointer'
             }}
           >
@@ -1208,14 +1202,9 @@ export const DuplicatesPage: React.FC = () => {
           />
         )}
       </div>
-      {/* 底部操作栏（有选中项时显示） */}
+      {/* 底部操作栏（有选中项时显示；视觉体系 v3：统一 FloatingActionBar 容器） */}
       {selectedToDelete.size > 0 && (
-        <div
-          className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40"
-          style={{ bottom: '44px', animation: 'slideInBottom 200ms ease-out' }}
-          role="toolbar"
-          aria-label={t('duplicates.toolbarLabel')}
-        >
+        <FloatingActionBar ariaLabel={t('duplicates.toolbarLabel')}>
           <span className="text-sm font-medium px-2" style={{ color: 'var(--text-primary)' }}>
             {t('duplicates.selectedToDelete', { count: selectedToDelete.size })}
           </span>
@@ -1239,7 +1228,7 @@ export const DuplicatesPage: React.FC = () => {
           >
             <IconClose size={14} />
           </button>
-        </div>
+        </FloatingActionBar>
       )}
 
       <ConfirmDialog
@@ -1263,17 +1252,14 @@ export const DuplicatesPage: React.FC = () => {
           style={{
             width: 320,
             borderRadius: 16,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.16)',
-            animation: 'slideInBottom 200ms ease-out'
+            boxShadow: 'var(--shadow-xl)',
+            animation: 'slideInBottom 250ms var(--ease-decelerate, cubic-bezier(0, 0, 0.2, 1))'
           }}
           role="status"
           aria-live="polite"
         >
           <div className="flex items-center gap-3 mb-2">
-            <div
-              className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin flex-shrink-0"
-              style={{ color: 'var(--accent)' }}
-            />
+            <Spinner size="sm" color="var(--accent)" />
             <span
               className="flex-1 text-sm font-medium truncate"
               style={{ color: 'var(--text-primary)' }}
@@ -1664,11 +1650,14 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
         >
           {selected && <IconCheck size={14} strokeWidth={3} stroke="white" />}
         </div>
-        {/* 收藏 / 评分角标 */}
+        {/* 收藏 / 评分角标（视觉体系 v3：琥珀色走 warning 令牌） */}
         {(file.is_favorite || file.rating > 0) && (
           <div
             className="absolute top-2 right-2 px-1.5 py-0.5 rounded-full flex items-center gap-1 text-xs"
-            style={{ background: 'rgba(255,184,0,0.92)', color: '#fff' }}
+            style={{
+              background: 'color-mix(in srgb, var(--warning) 92%, transparent)',
+              color: 'var(--text-on-accent)'
+            }}
             title={
               file.is_favorite
                 ? t('duplicates.favoriteTooltip')
@@ -1679,11 +1668,11 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
             {file.rating > 0 && <span>{file.rating}</span>}
           </div>
         )}
-        {/* 视频角标 */}
+        {/* 视频角标（缩略图上的遮罩角标：走 overlay 令牌） */}
         {file.file_type === 'video' && (
           <div
             className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-xs"
-            style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+            style={{ background: 'var(--overlay-bg-strong)', color: 'var(--text-on-overlay)' }}
           >
             {t('duplicates.videoBadge')}
           </div>
@@ -1694,8 +1683,8 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
             className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-xs font-medium"
             style={{
               background: 'var(--accent)',
-              color: '#fff',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.2)'
+              color: 'var(--text-on-accent)',
+              boxShadow: 'var(--shadow-xs)'
             }}
             title={t('duplicates.recommendTooltip')}
           >

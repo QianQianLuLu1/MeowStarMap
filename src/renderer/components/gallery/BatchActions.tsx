@@ -68,8 +68,11 @@ export const BatchActions: React.FC<BatchActionsProps> = ({
   return (
     <div
       ref={actionsRef}
-      className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40 flex-nowrap overflow-x-auto batch-actions-root max-w-[calc(100vw-32px)]"
-      style={{ bottom: '44px', animation: 'slideInBottom 200ms ease-out' }}
+      className="fixed left-1/2 -translate-x-1/2 glass-card shadow-xl px-4 py-2 flex items-center gap-2 z-40 flex-nowrap overflow-x-auto batch-actions-root max-w-[calc(100vw-32px)]"
+      style={{
+        bottom: '44px',
+        animation: 'slideInBottom 250ms var(--ease-decelerate, cubic-bezier(0, 0, 0.2, 1))'
+      }}
       role="toolbar"
       aria-label={t('batch.actions.ariaLabel')}
     >

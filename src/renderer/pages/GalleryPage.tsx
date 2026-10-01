@@ -601,7 +601,7 @@ export const GalleryPage: React.FC = () => {
           className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105 flex items-center gap-1"
           style={{
             background: groupPanelOpen ? 'var(--accent)' : 'var(--bg-tertiary)',
-            color: groupPanelOpen ? 'white' : 'var(--text-secondary)',
+            color: groupPanelOpen ? 'var(--text-on-accent)' : 'var(--text-secondary)',
             border: 'none',
             cursor: 'pointer',
             fontWeight: groupPanelOpen ? 600 : 400
@@ -617,7 +617,7 @@ export const GalleryPage: React.FC = () => {
           className="px-3 py-1.5 text-xs rounded-full transition-all hover:scale-105 flex items-center gap-1"
           style={{
             background: showDuplicates ? 'var(--accent)' : 'var(--bg-tertiary)',
-            color: showDuplicates ? 'white' : 'var(--text-secondary)',
+            color: showDuplicates ? 'var(--text-on-accent)' : 'var(--text-secondary)',
             border: 'none',
             cursor: 'pointer',
             fontWeight: showDuplicates ? 600 : 400

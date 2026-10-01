@@ -1425,6 +1425,10 @@
       "reduceMotion": "モーション軽減",
       "reduceMotionDesc": "トランジションアニメーションとホバー効果を無効化、低性能デバイスの応答速度を向上",
       "glassEffect": "ガラス効果",
+      "ambientGrain": "グレインテクスチャ",
+      "ambientGrainDesc": "背景に細かなノイズ質感を加えます（ライトモードでは無効）",
+      "ambientShapes": "浮遊シェイプ",
+      "ambientShapesDesc": "背景にゆっくり漂う幾何学シェイプで奥行きを演出します（ライトモードでは無効）",
       "glassEffectHint": "「はっきりした流動感」はガラスカードに環境光の光斑と高い彩度を加えます。「軽めの強調」は光斑を隠して彩度を下げ、動作負荷が軽くなります。",
       "glassEffectLite": "軽めの強調",
       "glassEffectRich": "はっきりした流動感"

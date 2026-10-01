@@ -6,6 +6,7 @@ import React, { useState, useEffect, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SectionShell, GlobalToastContext } from './shared'
 import { SUPPORTED_LANGUAGES, changeLanguage, getCurrentLanguage } from '../../i18n'
+import { Select } from '../../components/common/Select'
 
 export const LanguageSection: React.FC = () => {
   const { t } = useTranslation()
@@ -49,24 +50,19 @@ export const LanguageSection: React.FC = () => {
       description={t('settings.language.description')}
     >
       <div className="space-y-2">
-        {/* 语言下拉选择器 */}
-        <select
+        {/* 语言下拉选择器（视觉体系 v3：统一 Select 组件） */}
+        <Select
           value={selected}
           onChange={(e) => handleSelect(e.target.value)}
           disabled={switching}
-          className="w-full px-3 py-2 text-sm rounded-lg disabled:opacity-60"
-          style={{
-            background: 'var(--bg-tertiary)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--divider)'
-          }}
+          className="w-full"
         >
           {SUPPORTED_LANGUAGES.map((lang) => (
             <option key={lang.code} value={lang.code}>
               {lang.label} {lang.englishName !== lang.label ? `(${lang.englishName})` : ''}
             </option>
           ))}
-        </select>
+        </Select>
 
         {/* P3：加载中提示 */}
         {switching && (

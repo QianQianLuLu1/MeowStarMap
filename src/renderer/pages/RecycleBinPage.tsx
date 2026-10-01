@@ -16,6 +16,8 @@ import { EmptyState } from '../components/common/EmptyState'
 import { SkeletonGrid } from '../components/common/Skeleton'
 import { ThumbReveal } from '../components/common/ThumbReveal'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
+import { PageHeader } from '../components/common/PageHeader'
+import { FloatingActionBar } from '../components/common/FloatingActionBar'
 import { useStagedTask } from '../hooks/useStagedTask'
 import { settleWithConcurrency } from '../../shared/utils/concurrency'
 import { useContainerSize } from '../hooks/useContainerSize'
@@ -304,55 +306,48 @@ export const RecycleBinPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
-      {/* 顶部标题栏 */}
-      <div
-        className="flex items-center justify-between px-6 py-4"
-        style={{ borderBottom: '1px solid var(--divider)' }}
-      >
-        <div className="flex items-center gap-3">
-          <IconTrash size={22} />
-          <div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {t('recycleBin.title')}
-            </h2>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
-              {totalCount > 0
-                ? t('recycleBin.summaryWithHint', {
-                    count: totalCount,
-                    size: formatFileSize(totalSize)
-                  })
-                : t('recycleBin.summary', {
-                    count: totalCount,
-                    size: formatFileSize(totalSize)
-                  })}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="btn-secondary text-sm"
-            onClick={selectAll}
-            disabled={recycleBinFiles.length === 0}
-          >
-            <IconSelectAll size={14} className="mr-1" /> {t('common.selectAll')}
-          </button>
-          <button
-            className="btn-secondary text-sm"
-            onClick={invertSelection}
-            disabled={recycleBinFiles.length === 0}
-          >
-            <IconInvertSelection size={14} className="mr-1" /> {t('common.invertSelection')}
-          </button>
-          <button
-            className="btn-secondary text-sm"
-            onClick={() => setConfirm({ open: true, type: 'empty' })}
-            disabled={recycleBinFiles.length === 0 || operating}
-            style={{ color: 'var(--danger)' }}
-          >
-            {t('recycleBin.empty')}
-          </button>
-        </div>
-      </div>
+      {/* 顶部标题栏（视觉体系 v3：统一 PageHeader） */}
+      <PageHeader
+        icon={<IconTrash size={20} />}
+        title={t('recycleBin.title')}
+        subtitle={
+          totalCount > 0
+            ? t('recycleBin.summaryWithHint', {
+                count: totalCount,
+                size: formatFileSize(totalSize)
+              })
+            : t('recycleBin.summary', {
+                count: totalCount,
+                size: formatFileSize(totalSize)
+              })
+        }
+        actions={
+          <>
+            <button
+              className="btn-secondary text-sm"
+              onClick={selectAll}
+              disabled={recycleBinFiles.length === 0}
+            >
+              <IconSelectAll size={14} className="mr-1" /> {t('common.selectAll')}
+            </button>
+            <button
+              className="btn-secondary text-sm"
+              onClick={invertSelection}
+              disabled={recycleBinFiles.length === 0}
+            >
+              <IconInvertSelection size={14} className="mr-1" /> {t('common.invertSelection')}
+            </button>
+            <button
+              className="btn-secondary text-sm"
+              onClick={() => setConfirm({ open: true, type: 'empty' })}
+              disabled={recycleBinFiles.length === 0 || operating}
+              style={{ color: 'var(--danger)' }}
+            >
+              {t('recycleBin.empty')}
+            </button>
+          </>
+        }
+      />
 
       {/* 内容区：列表虚拟化 + 触底分页，回收站堆积上万条时仍只挂载可视区 DOM */}
       <div ref={contentRef} className="flex-1 min-h-0 overflow-hidden">
@@ -392,14 +387,9 @@ export const RecycleBinPage: React.FC = () => {
         )}
       </div>
 
-      {/* 底部操作栏（有选中项时显示） */}
+      {/* 底部操作栏（有选中项时显示；视觉体系 v3：统一 FloatingActionBar 容器） */}
       {selectedIds.size > 0 && (
-        <div
-          className="fixed left-1/2 -translate-x-1/2 glass-card px-4 py-2 flex items-center gap-2 z-40"
-          style={{ bottom: '44px', animation: 'slideInBottom 200ms ease-out' }}
-          role="toolbar"
-          aria-label={t('recycleBin.toolbarLabel')}
-        >
+        <FloatingActionBar ariaLabel={t('recycleBin.toolbarLabel')}>
           <span className="text-sm font-medium px-2" style={{ color: 'var(--text-primary)' }}>
             {t('recycleBin.selectedCount', { count: selectedIds.size })}
           </span>
@@ -431,7 +421,7 @@ export const RecycleBinPage: React.FC = () => {
                 className="btn-primary text-sm"
                 onClick={handleRetry}
                 disabled={operating}
-                style={{ background: 'var(--warning, #f59e0b)' }}
+                style={{ background: 'var(--warning)' }}
               >
                 {failedAction === 'restore' && t('recycleBin.retryRestore')}
                 {failedAction === 'permanent' && t('recycleBin.retryDelete')}
@@ -447,7 +437,7 @@ export const RecycleBinPage: React.FC = () => {
           >
             <IconClose size={14} />
           </button>
-        </div>
+        </FloatingActionBar>
       )}
 
       <ConfirmDialog
@@ -552,11 +542,11 @@ export const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({
         >
           {selected && <IconCheck size={14} strokeWidth={3} stroke="white" />}
         </div>
-        {/* 文件类型角标 */}
+        {/* 文件类型角标（缩略图上的遮罩角标：走 overlay 令牌） */}
         {file.file_type === 'video' && (
           <div
             className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded text-xs"
-            style={{ background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+            style={{ background: 'var(--overlay-bg-strong)', color: 'var(--text-on-overlay)' }}
           >
             {t('recycleBin.videoBadge')}
           </div>

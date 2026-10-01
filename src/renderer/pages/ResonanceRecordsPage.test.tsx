@@ -56,10 +56,10 @@ describe('ResonanceRecordsPage 容器', () => {
     render(<ResonanceRecordsPage />)
     expect(screen.getByText('无限暖暖')).toBeTruthy()
     expect(screen.getByText('暖暖共鸣录')).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '共鸣记录' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '我的衣橱' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '导入数据' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: '个人统计' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '共鸣记录' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '我的衣橱' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '导入数据' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: '个人统计' })).toBeTruthy()
   })
 
   it('首次挂载触发数据懒加载，加载完成后进入默认子页', async () => {
@@ -68,7 +68,7 @@ describe('ResonanceRecordsPage 容器', () => {
     render(<ResonanceRecordsPage />)
     await waitFor(() => expect(getData).toHaveBeenCalledTimes(1))
     await waitFor(() =>
-      expect(screen.getByRole('tab', { name: '共鸣记录' }).getAttribute('aria-selected')).toBe(
+      expect(screen.getByRole('radio', { name: '共鸣记录' }).getAttribute('aria-checked')).toBe(
         'true'
       )
     )
@@ -77,10 +77,12 @@ describe('ResonanceRecordsPage 容器', () => {
   it('点击子页按钮切换视图', async () => {
     render(<ResonanceRecordsPage />)
     await waitFor(() => expect(useResonanceStore.getState().loaded).toBe(true))
-    fireEvent.click(screen.getByRole('tab', { name: '我的衣橱' }))
+    fireEvent.click(screen.getByRole('radio', { name: '我的衣橱' }))
     expect(useResonanceStore.getState().activeTab).toBe('wardrobe')
-    expect(screen.getByRole('tab', { name: '我的衣橱' }).getAttribute('aria-selected')).toBe('true')
-    fireEvent.click(screen.getByRole('tab', { name: '个人统计' }))
+    expect(screen.getByRole('radio', { name: '我的衣橱' }).getAttribute('aria-checked')).toBe(
+      'true'
+    )
+    fireEvent.click(screen.getByRole('radio', { name: '个人统计' }))
     expect(useResonanceStore.getState().activeTab).toBe('stats')
   })
 
@@ -91,7 +93,7 @@ describe('ResonanceRecordsPage 容器', () => {
     await waitFor(() => expect(useResonanceStore.getState().loaded).toBe(true))
     unmount()
     render(<ResonanceRecordsPage />)
-    await waitFor(() => expect(screen.getByRole('tab', { name: '共鸣记录' })).toBeTruthy())
+    await waitFor(() => expect(screen.getByRole('radio', { name: '共鸣记录' })).toBeTruthy())
     expect(getData).toHaveBeenCalledTimes(1)
   })
 

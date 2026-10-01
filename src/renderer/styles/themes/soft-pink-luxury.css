@@ -3,7 +3,9 @@
    奶白基底 + 低饱和柔粉点缀 + 柔焦玻璃材质 + 柔光分层光影
    ============================================ */
 
-.soft-pink-luxury {
+/* 变量块用 html. 前缀提升特异性（0,1,1)：@import 位于 globals 的 :root 之前，
+   同特异性下后源序的 :root 会整块压掉主题变量覆写（实测 accent/阴影/颗粒均未生效） */
+html.soft-pink-luxury {
   /* 色彩体系 */
   --bg-primary: #fdf9fb;
   --bg-secondary: rgba(255, 253, 254, 0.78);
@@ -22,6 +24,18 @@
   --shadow-sm: 0 2px 10px rgba(226, 164, 188, 0.08);
   --shadow-md: 0 4px 22px rgba(226, 164, 188, 0.12);
   --shadow-lg: 0 8px 34px rgba(226, 164, 188, 0.18);
+  /* 视觉体系 v3：新增令牌的柔粉同步（与 globals.css 令牌一一对应）。
+     --shadow-xs/xl 补齐五档阴影；--surface-glass* 换为奶白-淡粉渐变；
+     --border-subtle/strong、--focus-ring、--ease-*、--space-N 从默认值派生，无需覆写 */
+  --shadow-xs: 0 1px 2px rgba(226, 164, 188, 0.06);
+  --shadow-xl: 0 8px 26px rgba(226, 164, 188, 0.16), 0 28px 64px rgba(226, 164, 188, 0.22);
+  --surface-glass: linear-gradient(155deg, rgba(255, 253, 254, 0.62), rgba(255, 240, 245, 0.36));
+  --surface-glass-strong: linear-gradient(
+    155deg,
+    rgba(255, 253, 254, 0.82),
+    rgba(255, 240, 245, 0.55)
+  );
+  --grain-opacity: 0.03;
   /* P0-1：粉色主题覆盖 --glass-blur，--backdrop-blur 自动引用更新后的值 */
   /* 修复：18px 仍偏强，降到 12px 保持微妙毛玻璃 */
   --glass-blur: 12px;
@@ -247,7 +261,7 @@
 
 /* P2-U11：原 .soft-pink-luxury .skeleton 重复声明完整规则，
    改为只覆盖 --skeleton-from/to 变量值，消除重复 */
-.soft-pink-luxury {
+html.soft-pink-luxury {
   --skeleton-from: rgba(255, 253, 254, 0.65);
   --skeleton-to: rgba(226, 164, 188, 0.1);
 }

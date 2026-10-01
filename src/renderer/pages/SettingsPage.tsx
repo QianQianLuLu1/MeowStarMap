@@ -252,7 +252,8 @@ export const SettingsPage: React.FC = () => {
                         key={section.id}
                         className="w-full text-left px-3 py-2 text-sm rounded-lg transition-all"
                         style={{
-                          background: isActive ? 'var(--bg-tertiary)' : 'transparent',
+                          // 视觉体系 v3：激活态与 Sidebar 一致（accent-soft 底 + accent 字）
+                          background: isActive ? 'var(--accent-soft)' : 'transparent',
                           color: isActive ? 'var(--accent)' : 'var(--text-primary)',
                           fontWeight: isActive ? 500 : 400
                         }}

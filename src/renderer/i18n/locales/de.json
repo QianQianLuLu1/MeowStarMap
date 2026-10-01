@@ -1425,6 +1425,10 @@
       "reduceMotion": "Animationen reduzieren",
       "reduceMotionDesc": "Übergangsanimationen und Hover-Effekte deaktivieren, Reaktionsgeschwindigkeit auf leistungsschwachen Geräten verbessern",
       "glassEffect": "Glaseffekt",
+      "ambientGrain": "Körnung",
+      "ambientGrainDesc": "Dezentes Korn im Hintergrund für mehr Textur (im Light-Modus inaktiv)",
+      "ambientShapes": "Schwebende Formen",
+      "ambientShapesDesc": "Langsam treibende Formen für räumliche Tiefe (im Light-Modus inaktiv)",
       "glassEffectHint": "„Ausgeprägte Fluidität\" fügt Glas-Karten ambiente Lichtflecken und höhere Farbsättigung hinzu; „Dezente Verstärkung\" blendet die Flecken aus und senkt die Sättigung – bei geringerer Last.",
       "glassEffectLite": "Dezente Verstärkung",
       "glassEffectRich": "Ausgeprägte Fluidität"

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useThemeStore } from '../../stores/themeStore'
 import { themes, type UITheme } from '../../styles/themes'
+import { Select } from '../../components/common/Select'
 import { SectionShell, GlobalToastContext, SettingsToggle } from './shared'
 
 // ============ 外观 ============
@@ -24,15 +25,10 @@ export const AppearanceThemeSection: React.FC = () => {
     <SectionShell title={t('settings.sections.theme')} description={t('settings.theme.desc')}>
       <div className="flex items-center justify-between gap-4">
         <span style={{ color: 'var(--text-primary)' }}>{t('settings.theme.label')}</span>
-        <select
+        <Select
           value={theme}
           onChange={(e) => saveTheme(e.target.value as UITheme)}
-          className="px-3 py-2 text-sm rounded-lg min-w-[140px]"
-          style={{
-            background: 'var(--bg-tertiary)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--divider)'
-          }}
+          className="min-w-[140px]"
           aria-label={t('settings.theme.label')}
         >
           {themes.map((th) => (
@@ -40,7 +36,7 @@ export const AppearanceThemeSection: React.FC = () => {
               {t(th.nameKey)}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
       <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
         {t('settings.theme.desc')}
@@ -81,6 +77,15 @@ const applyGlassEffect = (effect: GlassEffect) => {
   document.documentElement.classList.toggle('glass-lite', effect === 'lite')
 }
 
+// 视觉体系 v3：氛围层细项开关（颗粒纹理 / 漂浮几何体，默认开启；关闭时挂根类隐藏）
+const applyAmbientGrain = (enabled: boolean) => {
+  document.documentElement.classList.toggle('grain-off', !enabled)
+}
+
+const applyAmbientShapes = (enabled: boolean) => {
+  document.documentElement.classList.toggle('shapes-off', !enabled)
+}
+
 export const AppearanceDisplaySection: React.FC = () => {
   const { t } = useTranslation()
   const showMessage = useContext(GlobalToastContext)
@@ -88,6 +93,8 @@ export const AppearanceDisplaySection: React.FC = () => {
   const [compactMode, setCompactMode] = useState(false)
   const [reduceMotion, setReduceMotion] = useState(false)
   const [glassEffect, setGlassEffect] = useState<GlassEffect>('rich')
+  const [ambientGrain, setAmbientGrain] = useState(true)
+  const [ambientShapes, setAmbientShapes] = useState(true)
 
   useEffect(() => {
     const load = async () => {
@@ -112,6 +119,15 @@ export const AppearanceDisplaySection: React.FC = () => {
       )
       setGlassEffect(glass)
       applyGlassEffect(glass)
+      const grain = (await window.electronAPI.settings.get('display.ambientGrain', true)) as boolean
+      setAmbientGrain(grain !== false)
+      applyAmbientGrain(grain !== false)
+      const shapes = (await window.electronAPI.settings.get(
+        'display.ambientShapes',
+        true
+      )) as boolean
+      setAmbientShapes(shapes !== false)
+      applyAmbientShapes(shapes !== false)
     }
     load()
   }, [])
@@ -156,6 +172,18 @@ export const AppearanceDisplaySection: React.FC = () => {
         )
       })
     )
+  }
+
+  const handleAmbientGrain = async (enabled: boolean) => {
+    setAmbientGrain(enabled)
+    applyAmbientGrain(enabled)
+    if (window.electronAPI) await window.electronAPI.settings.set('display.ambientGrain', enabled)
+  }
+
+  const handleAmbientShapes = async (enabled: boolean) => {
+    setAmbientShapes(enabled)
+    applyAmbientShapes(enabled)
+    if (window.electronAPI) await window.electronAPI.settings.set('display.ambientShapes', enabled)
   }
 
   const sizeOptions: { value: FontSize; label: string; sample: string }[] = [
@@ -244,6 +272,23 @@ export const AppearanceDisplaySection: React.FC = () => {
           {t('settings.display.glassEffectHint')}
         </p>
       </div>
+
+      {/* 视觉体系 v3：氛围层细项（「玻璃效果：轻度增强」档下整层隐藏，此处开关为 rich 档细分控制） */}
+      <SettingsToggle
+        label={t('settings.display.ambientGrain')}
+        description={t('settings.display.ambientGrainDesc')}
+        checked={ambientGrain}
+        onChange={handleAmbientGrain}
+        disabled={glassEffect === 'lite'}
+      />
+
+      <SettingsToggle
+        label={t('settings.display.ambientShapes')}
+        description={t('settings.display.ambientShapesDesc')}
+        checked={ambientShapes}
+        onChange={handleAmbientShapes}
+        disabled={glassEffect === 'lite'}
+      />
     </SectionShell>
   )
 }

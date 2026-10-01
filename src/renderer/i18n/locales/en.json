@@ -1425,6 +1425,10 @@
       "reduceMotion": "Reduce motion",
       "reduceMotionDesc": "Disable transitions and hover effects to improve responsiveness on low-end devices",
       "glassEffect": "Glass effect",
+      "ambientGrain": "Grain texture",
+      "ambientGrainDesc": "Subtle noise texture on the background for a richer look (inactive under the lite glass mode)",
+      "ambientShapes": "Floating shapes",
+      "ambientShapesDesc": "Slowly drifting geometric shapes that add depth (inactive under the lite glass mode)",
       "glassEffectHint": "\"Vivid flow\" adds ambient light blobs and higher color saturation behind glass cards; \"Subtle\" hides the blobs and lowers saturation for better performance.",
       "glassEffectLite": "Subtle",
       "glassEffectRich": "Vivid flow"

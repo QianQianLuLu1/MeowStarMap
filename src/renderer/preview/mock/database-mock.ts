@@ -625,16 +625,33 @@ export const databaseMock = {
   uiTheme: {
     get: async () => {
       try {
-        const theme =
-          (localStorage.getItem('wxnn-ui-theme') as 'default' | 'soft-pink-luxury') || 'default'
-        return { theme }
+        const raw = localStorage.getItem('wxnn-ui-theme')
+        if (!raw) return { theme: 'default' as const }
+        // themeStore 经 zustand persist 以 JSON 格式写同一个 key；
+        // 兼容裸值（旧版本 mock set 写入的历史数据）与 persist JSON（{"state":{"theme":...}}）两种形态，
+        // 否则 App 的 uiTheme.get 同步效果会把刚设置的主题回滚为默认
+        let theme: string = raw
+        try {
+          const parsed = JSON.parse(raw) as { state?: { theme?: string } }
+          if (parsed && typeof parsed === 'object' && parsed.state?.theme) {
+            theme = parsed.state.theme
+          }
+        } catch {
+          // 非 JSON：保持裸值
+        }
+        return {
+          theme: (theme === 'soft-pink-luxury' ? theme : 'default') as
+            'default' | 'soft-pink-luxury'
+        }
       } catch {
         return { theme: 'default' as const }
       }
     },
     set: async (theme: 'default' | 'soft-pink-luxury') => {
       try {
-        localStorage.setItem('wxnn-ui-theme', theme)
+        // 与 themeStore 的 zustand persist 同构写 JSON（默认 version 0），
+        // 避免裸值覆盖 persist JSON 后重启解析失败回滚为默认主题
+        localStorage.setItem('wxnn-ui-theme', JSON.stringify({ state: { theme }, version: 0 }))
       } catch {
         // 静默忽略
       }

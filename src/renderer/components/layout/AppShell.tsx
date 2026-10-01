@@ -139,18 +139,26 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
           fixed 包含块不受 isolation 影响，定位与裁剪行为均与原先一致 */}
       <div className="flex-1 flex pt-10 overflow-hidden sidebar-gradient">
         <TitleBar />
-        {/* 液态玻璃环境光斑：为毛玻璃卡片提供可折射的彩色背景（设置「轻度增强」时整层隐藏） */}
+        {/* 液态玻璃环境氛围层：光斑（毛玻璃折射源）+ 颗粒纹理 + 漂浮几何体。
+            颗粒/几何体可经设置（html.grain-off / html.shapes-off）独立关闭，
+            「玻璃效果：轻度增强」与系统降低透明度时整层隐藏 */}
         <div className="ambient-bg" aria-hidden="true">
           <span className="ambient-blob ambient-blob-a" />
           <span className="ambient-blob ambient-blob-b" />
           <span className="ambient-blob ambient-blob-c" />
+          <span className="ambient-shapes">
+            <span className="ambient-shape ambient-shape-a" />
+            <span className="ambient-shape ambient-shape-b" />
+            <span className="ambient-shape ambient-shape-c" />
+          </span>
+          <span className="ambient-grain" />
         </div>
         <Sidebar />
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5">{children}</div>
           <div
             className="h-8 flex items-center justify-between px-4 text-xs status-bar"
-            style={{ color: 'var(--text-secondary)', borderTop: '1px solid var(--divider)' }}
+            style={{ color: 'var(--text-secondary)' }}
           >
             <span>{status.leftText}</span>
             <div className="flex items-center gap-3">

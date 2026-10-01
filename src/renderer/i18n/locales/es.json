@@ -1425,6 +1425,10 @@
       "reduceMotion": "Reducir movimiento",
       "reduceMotionDesc": "Desactivar transiciones y efectos de hover para mejorar la respuesta en dispositivos de bajo rendimiento",
       "glassEffect": "Efecto de vidrio",
+      "ambientGrain": "Textura granulada",
+      "ambientGrainDesc": "Grano sutil en el fondo para más textura (inactivo en modo ligero)",
+      "ambientShapes": "Formas flotantes",
+      "ambientShapesDesc": "Formas geométricas que derivan lentamente y añaden profundidad (inactivo en modo ligero)",
       "glassEffectHint": "«Flujo pronunciado» añade destellos ambientales y mayor saturación detrás de las tarjetas de cristal; «Sutil» oculta los destellos y reduce la saturación, con menor coste de rendimiento.",
       "glassEffectLite": "Sutil",
       "glassEffectRich": "Flujo pronunciado"

@@ -8,6 +8,8 @@ export const RENDERER_PREF_KEYS = [
   'display.compactMode',
   'display.reduceMotion',
   'display.glassEffect',
+  'display.ambientGrain',
+  'display.ambientShapes',
   'fileOps.deleteConfirm',
   'fileOps.permanentDoubleConfirm',
   'fileOps.batchThreshold',
