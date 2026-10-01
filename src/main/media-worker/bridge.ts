@@ -71,6 +71,8 @@ export class MediaWorkerBridge {
     | null = null
   // dispose 标志：避免 dispose 后再触发重启
   private isDisposed = false
+  // N2 批量让位状态记忆：worker 崩溃重启 / 惰性启动后补发，保证新 worker 进程持有最新状态
+  private batchYieldActive = false
   // 自恢复期间停止 worker 的标志：stopWorkerForRestore 置位、对应 exit 处理完后复位。
   // 用于抑制 kill 兜底触发的非零码退出被误判为崩溃而自动重启。
   private terminatingForRestore = false
@@ -500,6 +502,8 @@ export class MediaWorkerBridge {
       payload: { dbPath, cacheDir, thumbnailQuality }
     }
     this.worker!.postMessage(cmd)
+    // N2：新 worker 进程不持有让位标志，启动批次后补发当前状态（含崩溃自动重启恢复路径）
+    this.setBatchYield(this.batchYieldActive)
   }
 
   /** 发送 pHash 批量补算指令 */
@@ -543,6 +547,24 @@ export class MediaWorkerBridge {
     if (!this.worker) return
     const cmd: MediaWorkerCommand = { type: 'THUMBNAIL_STOP' }
     this.worker.postMessage(cmd)
+  }
+
+  /**
+   * 发送批量让位开关（fix-thumbnail-skeleton-reveal N2）：
+   * active=true 表示主进程有可视区按需生成在途，worker 批量条目间插入延迟。
+   * worker 未启动时为 no-op（下次 THUMBNAIL_BATCH_START 后由 startThumbnailBatch
+   * 末尾补发当前状态，覆盖惰性启动与崩溃自动重启两条路径）；
+   * postMessage 失败仅忽略——让位是性能优化，不因发送失败中断批量任务。
+   */
+  setBatchYield(active: boolean): void {
+    this.batchYieldActive = active
+    if (!this.worker) return
+    try {
+      const cmd: MediaWorkerCommand = { type: 'MEDIA_WORKER_BATCH_YIELD', payload: { active } }
+      this.worker.postMessage(cmd)
+    } catch (err) {
+      logger.warn(`[MediaWorker] 批量让位命令发送失败（不影响批量任务）`, err)
+    }
   }
 
   /** 发送 pHash 取消指令 */

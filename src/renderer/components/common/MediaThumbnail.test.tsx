@@ -189,3 +189,61 @@ describe('MediaThumbnail｜fallbackSrc 低清回退', () => {
     expect(screen.getByTestId('placeholder').getAttribute('data-has-error')).toBe('true')
   })
 })
+
+/**
+ * 骨架门控直显（fix-thumbnail-skeleton-reveal N5）：
+ * img onLoad 完成前保持透明并显示骨架动画层（"加载中"≠"失败"）；onLoad 后骨架卸载、
+ * img 200ms 淡入直显——消灭"渐进加载可见过程"。失败仍走占位图标（错误态，非加载态）。
+ */
+describe('MediaThumbnail｜骨架门控直显（fix-thumbnail-skeleton-reveal N5）', () => {
+  it('未 onLoad 前：img 透明（opacity-0）+ 骨架层显示，占位图标不显示', () => {
+    render(<MediaThumbnail src="media://std.jpg" alt="x" fileType="image" />)
+    expect(screen.getByAltText('x').className).toContain('opacity-0')
+    expect(screen.getByAltText('x').className).not.toContain('opacity-100')
+    expect(screen.getByTestId('media-thumbnail-skeleton')).toBeTruthy()
+    expect(screen.queryByTestId('placeholder')).toBeNull()
+  })
+
+  it('onLoad 后：骨架卸载、img 淡入为 opacity-100', () => {
+    render(<MediaThumbnail src="media://std.jpg" alt="x" fileType="image" />)
+    fireEvent.load(screen.getByAltText('x'))
+    expect(screen.getByAltText('x').className).toContain('opacity-100')
+    expect(screen.getByAltText('x').className).not.toContain('opacity-0')
+    expect(screen.queryByTestId('media-thumbnail-skeleton')).toBeNull()
+  })
+
+  it('onError 后：骨架卸载、显示失败占位（错误终态 ≠ 加载态）', () => {
+    render(<MediaThumbnail src="bad.jpg" alt="x" fileType="image" />)
+    fireEvent.error(screen.getByAltText('x'))
+    expect(screen.queryByTestId('media-thumbnail-skeleton')).toBeNull()
+    expect(screen.getByTestId('placeholder')).toBeTruthy()
+  })
+
+  it('src 变化（含 fallbackSrc 切换）：重置回未加载骨架态', () => {
+    const { rerender } = render(<MediaThumbnail src="media://a.jpg" alt="x" fileType="image" />)
+    fireEvent.load(screen.getByAltText('x'))
+    expect(screen.queryByTestId('media-thumbnail-skeleton')).toBeNull()
+    rerender(<MediaThumbnail src="media://b.jpg" alt="x" fileType="image" />)
+    expect(screen.getByTestId('media-thumbnail-skeleton')).toBeTruthy()
+    expect(screen.getByAltText('x').className).toContain('opacity-0')
+  })
+
+  it('竞态（审查修复 T3）：换源后旧源的迟到 load 不得撤掉新源骨架', () => {
+    const { rerender, container } = render(
+      <MediaThumbnail src="media://a.jpg" alt="x" fileType="image" />
+    )
+    const firstImg = screen.getByAltText('x')
+    fireEvent.load(firstImg)
+    expect(screen.queryByTestId('media-thumbnail-skeleton')).toBeNull()
+
+    rerender(<MediaThumbnail src="media://b.jpg" alt="x" fileType="image" />)
+    expect(screen.getByTestId('media-thumbnail-skeleton')).toBeTruthy()
+    // 旧源 A 的 load 事件迟到（换源前已入队，目标为换源前的 img 元素）：
+    // 不得让尚未加载完成的新源 B 提前撤骨架露出空白/旧像素
+    fireEvent.load(firstImg)
+    expect(screen.getByTestId('media-thumbnail-skeleton')).toBeTruthy()
+    expect(screen.getByAltText('x').className).toContain('opacity-0')
+    // 迟到事件的目标元素已被新 src 的元素替换（换源即重挂载）
+    expect(container.querySelector('img')).not.toBe(firstImg)
+  })
+})

@@ -14,10 +14,13 @@
  *
  * 本文件用「记录型 VirtuosoGrid 探针」在 jsdom 下对这两个放大器做确定性断言，
  * 修复前必须红灯；同时保留正常/异常/边界三类场景，防止修复引入回归。
+ *
+ * 2026-10-01 审查修复 T1（docs/plans/2026-10-01-fix-thumbnail-review-fixes.md）：
+ * 错误链终点闭环行为测试复用本文件的真渲染探针（见文末 describe）。
  */
 import React from 'react'
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest'
-import { render, act } from '@testing-library/react'
+import { render, act, fireEvent, waitFor } from '@testing-library/react'
 import type { MediaFile } from '../../stores/mediaStore'
 import { VirtualImageGrid } from './VirtualImageGrid'
 
@@ -184,5 +187,71 @@ describe('VirtualImageGrid — 正常 / 异常 / 边界', () => {
     const matched = template.match(/repeat\((\d+)/)
     expect(matched).not.toBeNull()
     expect(Number(matched?.[1])).toBeGreaterThanOrEqual(1)
+  })
+})
+
+// —— 审查修复 T1：错误链终点闭环（docs/plans/2026-10-01-fix-thumbnail-review-fixes.md）——
+// 缺陷：DB thumbnail 非空但 404 时 onError 就地重建；重建失败不改变 URL（不会再有
+// 第二次 onError）→ markFailed 永不执行；重建成功但 &r=N 重载仍 404 的二次 onError
+// 走 Map 命中分支无动作 → 两种场景卡片都永久卡在骨架态，占位警告图标永不出现。
+describe('VirtualImageGrid — 错误链终点闭环（审查修复 T1）', () => {
+  let generateMock: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    generateMock = vi.fn()
+    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+      thumbnail: { generate: generateMock }
+    }
+  })
+
+  const makeErrorChainItem = (id: string, filePath: string): MediaFile =>
+    ({
+      id,
+      file_type: 'image',
+      thumbnail: filePath.replace('/p/', '/t/'),
+      file_path: filePath,
+      file_name: 'photo.jpg',
+      file_size: 1024,
+      is_favorite: false,
+      is_missing: false,
+      is_corrupted: false
+    }) as unknown as MediaFile
+
+  // 失败终态断言：ThumbReveal（img + 骨架）卸载，MediaThumbPlaceholder 警告图标可见
+  const expectTerminalPlaceholder = async (container: HTMLElement) => {
+    await waitFor(() => {
+      expect(container.querySelector('img')).toBeNull()
+      expect(container.querySelector('.skeleton')).toBeNull()
+      expect(container.querySelector('svg')).not.toBeNull()
+    })
+  }
+
+  it('① 异常：standard 404 + 就地重建失败 → 终止为占位警告图标（不得永久卡骨架）', async () => {
+    // 重建失败：generate 返回 null，URL 不变不会再触发第二次 onError
+    generateMock.mockResolvedValue(null)
+    const { container } = render(
+      <VirtualImageGrid items={[makeErrorChainItem('f-err-a', '/p/a.jpg')]} {...baseProps} />
+    )
+    const img = container.querySelector('img') as HTMLImageElement
+    expect(img).toBeTruthy()
+    fireEvent.error(img)
+    await expectTerminalPlaceholder(container)
+  })
+
+  it('② 异常：重建成功但重载仍 404（二次 onError）→ 终止为占位警告图标', async () => {
+    // 重建"成功"返回同路径 → bump 重试代次强制重载，但重载仍 404
+    generateMock.mockResolvedValue('/t/b.jpg')
+    const { container } = render(
+      <VirtualImageGrid items={[makeErrorChainItem('f-err-b', '/p/b.jpg')]} {...baseProps} />
+    )
+    fireEvent.error(container.querySelector('img') as HTMLImageElement)
+    // 先确认重建链路生效：src 以 &r=1 强制重载（可观察）
+    await waitFor(() => {
+      const reloaded = container.querySelector('img') as HTMLImageElement | null
+      expect(reloaded?.getAttribute('src')).toContain('&r=1')
+    })
+    // 重载仍 404：二次 onError 必须落占位，而非停留骨架
+    fireEvent.error(container.querySelector('img') as HTMLImageElement)
+    await expectTerminalPlaceholder(container)
   })
 })

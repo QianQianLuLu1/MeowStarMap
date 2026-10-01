@@ -3,7 +3,8 @@
  * @layer L3
  * @module src/renderer/components/gallery/VirtualImageGrid
  * @coverage 图库视频缩略图裂图回归防护（fix-gallery-video-thumbnail）；
- *   缩略图路径推导纯函数（游戏原生缩略图路径守卫 + 缓存命名规则回归）
+ *   缩略图路径推导纯函数（游戏原生缩略图路径守卫 + 缓存命名规则回归）；
+ *   骨架门控直显接入结构断言（fix-thumbnail-skeleton-reveal N4）
  * @dependencies fs（源码结构检查）、./VirtualImageGrid（toLowQualityUrl/toHighQualityUrl 纯函数）
  * @remarks
  *   缺陷现象：图库中部分视频缩略图显示警告/裂图图标。
@@ -35,6 +36,7 @@ vi.mock('../../icons', () => ({
 vi.mock('../common/MissingBadge', () => ({ MissingBadge: () => null }))
 vi.mock('../common/CorruptedBadge', () => ({ CorruptedBadge: () => null }))
 vi.mock('./MediaThumbPlaceholder', () => ({ MediaThumbPlaceholder: () => null }))
+vi.mock('../common/ThumbReveal', () => ({ ThumbReveal: () => null }))
 vi.mock('../../hooks/useFailedImages', () => ({
   useFailedImages: () => ({
     failedImages: new Set(),
@@ -47,12 +49,7 @@ vi.mock('../../utils/responsive', () => ({
   DEFAULT_COLUMNS_BREAKPOINTS: {}
 }))
 
-import {
-  toLowQualityUrl,
-  toHighQualityUrl,
-  pickThumbnailUrl,
-  resolveEffectiveThumbnail
-} from './VirtualImageGrid'
+import { toLowQualityUrl, toHighQualityUrl, resolveEffectiveThumbnail } from './VirtualImageGrid'
 const src = fs.readFileSync(
   path.resolve(process.cwd(), 'src', 'renderer', 'components', 'gallery', 'VirtualImageGrid.tsx'),
   'utf-8'
@@ -78,9 +75,8 @@ describe('VirtualImageGrid 视频缩略图裂图防护（fix-gallery-video-thumb
   it('缩略图源统一由 resolveEffectiveThumbnail 判定（THUMBNAIL_OPTIMIZATION_PLAN 节点2）', () => {
     // effectiveThumbnail = thumbnail > 按需生成结果 > （图片生成失败时）原文件兜底 > null 占位
     expect(code).toContain('resolveEffectiveThumbnail({')
-    expect(code).toContain(
-      "const standardUrl = (effectiveThumbnail && toFileUrl(effectiveThumbnail)) || ''"
-    )
+    expect(code).toContain('const standardUrl =')
+    expect(code).toContain('toFileUrl(effectiveThumbnail)')
   })
 
   it('图片类型不再在「生成中」直载原文件（消除数 MB 原图拉伸当缩略图 + IO 争抢）', () => {
@@ -95,6 +91,41 @@ describe('VirtualImageGrid 视频缩略图裂图防护（fix-gallery-video-thumb
     expect(code).not.toContain('useVideoThumbGenerate')
     expect(code).toContain('onDemandThumbPromises')
     expect(code).toContain('ensureOnDemandThumbnail')
+  })
+})
+
+describe('骨架门控直显接入（fix-thumbnail-skeleton-reveal N4）', () => {
+  it('模糊档位机已废除：不再存在 pickThumbnailUrl / TieredCardImage / 低清垫底交叉淡入', () => {
+    // 旧"白屏→模糊→清晰"管线：64px 低清图垫底 + 停滚 300ms 升级 standard 交叉淡入，
+    // 即使清晰图已在磁盘也要先模糊。新管线：standard 直接进 ThumbReveal 骨架门控。
+    expect(code).not.toContain('pickThumbnailUrl')
+    expect(code).not.toContain('TieredCardImage')
+    expect(code).not.toContain('showingLow')
+    expect(code).not.toContain('lowUrlResolved')
+  })
+
+  it('清晰图统一经 ThumbReveal 骨架门控直显（未 onLoad 前不显示图片内容）', () => {
+    expect(code).toContain('<ThumbReveal')
+  })
+
+  it('highQualityIds 档位升级集合已移除（standard 不再等待停滚升级）', () => {
+    expect(code).not.toContain('highQualityIds')
+    expect(code).not.toContain('setHighQualityIds')
+  })
+
+  it('重试代次机制存在：standard 失败就地重建成功后以 &r=N 强制重载（media:// 路径由内容 hash 决定，重建不改路径）', () => {
+    expect(code).toContain('thumbRetryNonce')
+    expect(code).toMatch(/&r=\$\{/)
+  })
+
+  it('生成中待显骨架：无 URL 且未失败/未损坏的项显示骨架动画而非静态图标', () => {
+    // "白屏"之二：thumbnail=NULL 生成中只有灰底+图标干等 → 改为骨架动画
+    expect(code).toContain('showSkeleton')
+  })
+
+  it('standard 失败新链：就地重建 + 重试代次，不再回退低清显示', () => {
+    expect(code).not.toContain('markStandardFailed')
+    expect(code).not.toContain('standardFailedIds')
   })
 })
 
@@ -155,7 +186,7 @@ describe('resolveEffectiveThumbnail 缩略图源判定', () => {
     ).toBeNull()
   })
 
-  it('边界：无 thumbnail、生成中（无结果）→ null（占位图标）', () => {
+  it('边界：无 thumbnail、生成中（无结果）→ null（骨架/占位）', () => {
     expect(
       resolveEffectiveThumbnail({
         fileType: 'image',
@@ -201,12 +232,13 @@ describe('按需生成机制源码结构（THUMBNAIL_OPTIMIZATION_PLAN 节点2�
     // 组件卸载丢掉 onDemandThumbs state，滚回时 Map 命中直接返回，已生成的缩略图
     // 不回填新实例 → 显示占位直到下一次 media:updated 全量刷新。
     // 修复：命中分支必须挂 applyResult 把已 resolved 的结果回填新实例 state。
+    // N4：applyResult 增加 bumpRetry 参数——Map 命中不递增重试代次（防无限重载循环）
     expect(code).not.toMatch(/if \(onDemandThumbPromises\.has\(filePath\)\) return/)
-    expect(code).toMatch(/existing\.then\(applyResult\)/)
-    expect(code).toMatch(/promise\.then\(applyResult\)/)
+    expect(code).toMatch(/existing\.then\(\(r\) => applyResult\(r, false\)\)/)
+    expect(code).toMatch(/promise\.then\(\(r\) => applyResult\(r, true\)\)/)
   })
 
-  it('standard 404（LRU 驱逐等）时同样触发重建，成功后 clearFailed 以原 URL 重试', () => {
+  it('重建成功清除失败标记让原 URL 立即重试（clearFailed）', () => {
     expect(code).toContain('clearFailed')
   })
 })
@@ -251,79 +283,5 @@ describe('toHighQualityUrl 游戏原生缩略图路径守卫', () => {
     expect(toHighQualityUrl('C:/t/abc.png')).toBeNull()
     expect(toHighQualityUrl(undefined)).toBeNull()
     expect(toLowQualityUrl(undefined)).toBeNull()
-  })
-})
-
-/**
- * 缩略图档位状态机（fix-thumbnail-loading-latency 节点3）。
- *
- * 缺陷现象：① 图片缩略图先模糊，standard 未生成时 404 → markFailed 死胡同（警告图标、
- * 无重试），要等 media:updated 全量刷新才恢复清晰；② DPR≥2 首请求打在基本不存在的
- * _high.jpg 上必 404 一次，且升级后反而从 512px 回落到 320px（档位写反）。
- * 修复：档位选择收敛为纯函数 pickThumbnailUrl——未升级（或升级失败回退）用低清，
- * 升级用 standard；onError 回退链 low→standard→low→markFailed（standard 失败不再死胡同，
- * 回退低清等待 items 刷新自动重试）；移除 HIGH_DPI_MODE 投机 _high 请求与预生成 effect。
- */
-describe('pickThumbnailUrl 档位选择（low → standard，standard 失败回退 low）', () => {
-  const low = 'media://file?path=abc_low.jpg'
-  const std = 'media://file?path=abc.jpg'
-
-  it('正常：有低清且未升级 → 低清（首屏快速出图）', () => {
-    expect(
-      pickThumbnailUrl({ lowUrl: low, standardUrl: std, upgraded: false, standardFailed: false })
-    ).toBe(low)
-  })
-
-  it('正常：升级 → standard（停滚 300ms 后切换的唯一目标档）', () => {
-    expect(
-      pickThumbnailUrl({ lowUrl: low, standardUrl: std, upgraded: true, standardFailed: false })
-    ).toBe(std)
-  })
-
-  it('正常：无低清（游戏原生缩略图）→ 恒用 standard', () => {
-    expect(
-      pickThumbnailUrl({ lowUrl: null, standardUrl: std, upgraded: false, standardFailed: false })
-    ).toBe(std)
-    expect(
-      pickThumbnailUrl({ lowUrl: null, standardUrl: std, upgraded: true, standardFailed: false })
-    ).toBe(std)
-  })
-
-  it('边界：升级后 standard 加载失败 → 回退低清（不再死胡同，待 items 刷新重试）', () => {
-    expect(
-      pickThumbnailUrl({ lowUrl: low, standardUrl: std, upgraded: true, standardFailed: true })
-    ).toBe(low)
-  })
-
-  it('边界：standard 失败但无低清可退 → standard（交给 onError 终止为 markFailed）', () => {
-    expect(
-      pickThumbnailUrl({ lowUrl: null, standardUrl: std, upgraded: true, standardFailed: true })
-    ).toBe(std)
-  })
-
-  it('异常：lowUrl 与 standardUrl 全空 → null（组件层由占位图标兜底）', () => {
-    expect(
-      pickThumbnailUrl({ lowUrl: null, standardUrl: null, upgraded: false, standardFailed: false })
-    ).toBeNull()
-    expect(
-      pickThumbnailUrl({ lowUrl: null, standardUrl: null, upgraded: true, standardFailed: true })
-    ).toBeNull()
-  })
-})
-
-describe('档位状态机源码结构（fix-thumbnail-loading-latency 节点3）', () => {
-  it('不再存在 HIGH_DPI_MODE 投机 _high 首请求与高分屏预生成 effect', () => {
-    expect(code).not.toContain('HIGH_DPI_MODE')
-    expect(code).not.toContain("generate(file.file_path, 'high')")
-  })
-
-  it('standard 加载失败走 markStandardFailed 回退链（而非 markFailed 死胡同）', () => {
-    expect(code).toContain('markStandardFailed')
-    // 回退链终止条件仍在：回退后的低清再失败才 markFailed
-    expect(code).toContain('markFailed')
-  })
-
-  it('standardFailed 集合随 items 变化自动清空（media:updated 刷新后可重试）', () => {
-    expect(code).toContain('useFailedImages(items)')
   })
 })

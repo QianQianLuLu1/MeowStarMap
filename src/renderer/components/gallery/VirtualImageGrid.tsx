@@ -13,7 +13,7 @@ import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
-import { TieredCardImage } from './TieredCardImage'
+import { ThumbReveal } from '../common/ThumbReveal'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -28,7 +28,9 @@ const isNativeGameThumbnail = (thumbnail: string): boolean => {
 }
 
 // P1-03：从标准缩略图路径推导低质量路径（缓存命名规则：${hash}.jpg → ${hash}_low.jpg）
-// 原生游戏缩略图路径返回 null，组件直接使用原 thumbnail 路径显示
+// 原生游戏缩略图路径返回 null，组件直接使用原 thumbnail 路径显示。
+// fix-thumbnail-skeleton-reveal N4：网格显示已废除低清档（模糊中间态移除），
+// 本导出保留供 DetailPage 占位底图与 DuplicatesPage 失败回退（fallbackSrc）使用。
 export const toLowQualityUrl = (thumbnail: string | undefined): string | null => {
   if (!thumbnail) return null
   if (isNativeGameThumbnail(thumbnail)) return null
@@ -38,7 +40,7 @@ export const toLowQualityUrl = (thumbnail: string | undefined): string | null =>
   return null
 }
 
-// 高清档位路径推导：${hash}.jpg → ${hash}_high.jpg
+// 高清档位路径推导：${hash}.jpg → ${hash}_high.jpg（命名契约函数，_high 投机档已移除）
 export const toHighQualityUrl = (thumbnail: string | undefined): string | null => {
   if (!thumbnail) return null
   if (isNativeGameThumbnail(thumbnail)) return null
@@ -52,21 +54,9 @@ export const toHighQualityUrl = (thumbnail: string | undefined): string | null =
   return null
 }
 
-// 档位选择纯函数（fix-thumbnail-loading-latency 节点3）：
-// 未升级 → 低清（64px 快速出图）；升级（停滚 300ms）→ standard（320px，唯一升级目标档）；
-// 升级后 standard 加载失败（如后台批量尚未生成 404）→ 回退低清（standardFailed 标记），
-// 待 items 刷新（useFailedImages 随 items 变化清空）自动重试，不再出现 markFailed 死胡同。
-// 此前 DPR≥2 首请求打在基本不存在的 _high.jpg 上必 404 一次、且升级后反而从 512px
-// 回落到 320px，均已随投机 _high 档位一并移除（命名契约函数 toHighQualityUrl 保留）。
-export const pickThumbnailUrl = (params: {
-  lowUrl: string | null
-  standardUrl: string | null
-  upgraded: boolean
-  standardFailed: boolean
-}): string | null => {
-  const showLow = !!params.lowUrl && (!params.upgraded || params.standardFailed)
-  return showLow ? params.lowUrl : params.standardUrl
-}
+// fix-thumbnail-skeleton-reveal N4：低清→standard 档位状态机（pickThumbnailUrl 等）
+// 已整体移除——模糊中间态废除后，卡片唯一显示源就是 standard（清晰图），
+// 由 ThumbReveal 做"骨架 → onLoad 后 200ms 淡入"门控直显。
 
 // 按需生成单次守卫：file_path → 生成 Promise（含失败结果），虚拟列表复挂载/重复进入
 // 可视区不重复触发 IPC。与 useVideoThumbGenerate 的 videoThumbGenerateCache 同语义，
@@ -185,8 +175,9 @@ const MediaCardActions: React.FC<{
 
 // 性能重构 v3 改造项一：VirtualImageGrid 迁移至 react-virtuoso VirtuosoGrid
 // - 用 VirtuosoGrid 替换自研 useVirtualGrid，万级文件滚动帧率 ≥ 55 FPS
-// - 保留：多选（Ctrl/Cmd/Shift）、键盘 ↑↓←→/Home/End/Enter/Space、缩略图分级加载（low/standard/high）
-// - 保留：滚动停止后切换标准质量、高分屏后台预生成 512px 高清档、触屏常驻操作按钮、收藏徽标、视频时长徽标
+// - 保留：多选（Ctrl/Cmd/Shift）、键盘 ↑↓←→/Home/End/Enter/Space、可视区按需生成
+// - fix-thumbnail-skeleton-reveal N4：低清/standard 分级加载改为 ThumbReveal 骨架门控
+//   直显（模糊中间态废除）；触屏常驻操作按钮、收藏徽标、视频时长徽标不变
 const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGridProps>(
   (props, ref) => {
     const {
@@ -214,28 +205,28 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     // P1-U10：failedImages 状态管理 + items 变化时自动清空
     const { failedImages, markFailed, clearFailed } = useFailedImages(items)
-    // fix-thumbnail-loading-latency 节点3：standard 加载失败集合（同样随 items 变化清空）。
-    // standard 404（后台批量尚未生成）时回退显示低清而非死胡同 markFailed，
-    // items 刷新（media:updated）后集合清空 → 自动重试 standard。
-    const {
-      failedImages: standardFailedIds,
-      markFailed: markStandardFailed,
-      clearFailed: clearStandardFailed
-    } = useFailedImages(items)
     // THUMBNAIL_OPTIMIZATION_PLAN 节点2：可视区按需生成结果（图片+视频统一）。
     // onDemandThumbs: file_path → 生成成功的缩略图路径；onDemandFailed: 生成失败集合
     // （失败不重试，防请求风暴；图片失败时经 resolveEffectiveThumbnail 回退原图）。
     const [onDemandThumbs, setOnDemandThumbs] = useState<Map<string, string>>(() => new Map())
     const [onDemandFailed, setOnDemandFailed] = useState<Set<string>>(() => new Set())
+    // fix-thumbnail-skeleton-reveal N4：standard 重试代次（file_path → nonce）。
+    // media:// 缩略图路径由内容 hash 决定，LRU 驱逐/重建后路径不变；<img> 对同一 src
+    // 失败后不会自动重试，重建成功时 +1 并在 src 追加 &r=N 强制重新加载。
+    const [thumbRetryNonce, setThumbRetryNonce] = useState<Map<string, number>>(() => new Map())
+    // 审查修复 T1：本会话已触发过就地重建的卡片（file.id）。单次语义与 onDemandFailed
+    // 一致（失败不重试，防请求风暴）；重建后仍无法加载即终止为占位警告图标：
+    // - 重建失败：URL 不变 → 不会有第二次 onError，由 applyResult(null) 直接 markFailed；
+    // - 重建成功但 &r=N 重载仍失败：第二次 onError 命中本集合 → markFailed。
+    const [standardRebuildTried, setStandardRebuildTried] = useState<Set<string>>(() => new Set())
     // U-G16：触屏设备无 hover 事件，需始终显示快捷操作按钮
     const [isTouchDevice, setIsTouchDevice] = useState(false)
     const gap = 16
 
-    // P1-03：缩略图分级加载——首屏用低质量（64px），滚动停止 300ms 后替换为标准质量（320px）
-    // highQualityIds 记录已切换到标准质量的文件 id；滚动中不切换，避免抖动
-    const [highQualityIds, setHighQualityIds] = useState<Set<string>>(new Set())
+    // 可视区按需生成调度（N4：原"停滚 300ms 升级 standard"中的档位升级已废除，
+    // 防抖仅用于缺缩略图项的按需生成触发，避免快速滚动期间的 IPC 风暴）
     const scrollTimerRef = useRef<number | null>(null)
-    // 通过 rangeChanged 跟踪当前可视区间，用于触发标准质量升级
+    // 通过 rangeChanged 跟踪当前可视区间
     const visibleRangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 })
 
     // P1-03 / 高清档位路径推导抽为模块级纯函数 toLowQualityUrl / toHighQualityUrl
@@ -271,17 +262,25 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     // - thumbnail=NULL 的项（图片+视频统一）就地生成 standard 缩略图，生成是磁盘缓存优先：
     //   批量/上一会话已生成的项立即返回，批量未达的项就地补齐，不再等待整批完成后的
     //   media:updated 全量刷新；
-    // - standard 404（LRU 驱逐等）的项同样触发重建，成功后清除失败标记让原 URL 立即重试；
+    // - standard 404（LRU 驱逐等）的项同样触发重建，成功后 bump 重试代次让原路径
+    //   以 &r=N 强制重载（N4：路径由内容 hash 决定，重建不改路径，必须换 URL 才能重试）；
     // - 缓存命中（fix-thumbnail-persist-and-ondemand N1）：卡片滚出视区时组件卸载会丢
     //   onDemandThumbs state，滚回时 Map 命中的既有 promise 必须把已 resolved 的结果
     //   回填新实例（applyResult 幂等），否则显示占位直到下一次 media:updated 全量刷新。
     const ensureOnDemandThumbnail = useCallback(
-      (file: MediaFile) => {
+      (file: MediaFile, onRebuildFailMarkId?: string) => {
         const filePath = file.file_path
         if (typeof filePath !== 'string' || filePath.length === 0) return
-        const applyResult = (result: string | null) => {
+        // bumpRetry：仅真正新发起 IPC 生成的成功路径才递增重试代次。Map 命中（复用
+        // 既有 promise）时递增会造成"失败 → 原样重试 → 再失败 → 再递增"的无限重载循环
+        const applyResult = (result: string | null, bumpRetry: boolean) => {
           if (!result) {
             setOnDemandFailed((prev) => new Set(prev).add(filePath))
+            // 审查修复 T1：img 错误链触发的重建失败时 URL 不变，不会再有第二次
+            // onError，必须就地 markFailed 终止为占位警告图标（否则卡片永久卡骨架）
+            if (onRebuildFailMarkId) {
+              markFailed(onRebuildFailMarkId)
+            }
             return
           }
           setOnDemandThumbs((prev) => {
@@ -296,16 +295,23 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             next.delete(filePath)
             return next
           })
-          // 重建成功：清除该卡片两类失败标记（集合无此 id 时为 no-op），
-          // 使 standard URL（磁盘上已重新存在）立即重试
+          if (bumpRetry) {
+            // N4：重建成功 → 重试代次 +1。若该卡片此前因 standard 404 挂在骨架态，
+            // nonce 变化会生成新的 &r=N src 强制重载；首次生成的卡片仅多了无效参数，无副作用
+            setThumbRetryNonce((prev) => {
+              const next = new Map(prev)
+              next.set(filePath, (prev.get(filePath) ?? 0) + 1)
+              return next
+            })
+          }
+          // 重建成功：清除该卡片失败标记，使 standard URL 立即重试
           clearFailed(file.id)
-          clearStandardFailed(file.id)
         }
         // Map 命中：复用既有 promise 去重（同一 file_path 只发起一次生成），
         // 同时回填结果——直接 return 会让新挂载的实例拿不到已生成的缩略图
         const existing = onDemandThumbPromises.get(filePath)
         if (existing) {
-          void existing.then(applyResult)
+          void existing.then((r) => applyResult(r, false))
           return
         }
         const generate = window.electronAPI?.thumbnail?.generate
@@ -318,29 +324,20 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           }
         })()
         onDemandThumbPromises.set(filePath, promise)
-        void promise.then(applyResult)
+        void promise.then((r) => applyResult(r, true))
       },
-      [clearFailed, clearStandardFailed]
+      [clearFailed, markFailed]
     )
 
-    // P1-03：滚动停止 300ms 后，把当前可见项切换到标准质量
-    const triggerHighQualityUpgrade = useCallback(() => {
+    // 可视区调度（停滚 300ms 防抖）：对可视区内缺缩略图的项触发按需生成。
+    // N4：原"切换到标准质量"的档位升级已废除（standard 即唯一显示源，挂载即加载）
+    const scheduleOnDemandGeneration = useCallback(() => {
       if (scrollTimerRef.current !== null) {
         window.clearTimeout(scrollTimerRef.current)
       }
       scrollTimerRef.current = window.setTimeout(() => {
         const { startIndex, endIndex } = visibleRangeRef.current
         if (endIndex <= startIndex) return
-        setHighQualityIds((prev) => {
-          const next = new Set(prev)
-          for (let i = startIndex; i <= endIndex; i++) {
-            const file = items[i]
-            if (file?.thumbnail && !next.has(file.id)) {
-              next.add(file.id)
-            }
-          }
-          return next
-        })
         // 节点2：可视区缺缩略图的项按需生成一次（磁盘缓存优先，单次守卫防风暴）
         for (let i = startIndex; i <= endIndex; i++) {
           const file = items[i]
@@ -480,44 +477,42 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           endReached={onEndReached}
           rangeChanged={(range) => {
             visibleRangeRef.current = range
-            triggerHighQualityUpgrade()
+            scheduleOnDemandGeneration()
           }}
           itemContent={(index, file) => {
             const isSelected = selectedSet.has(file.id)
             // THUMBNAIL_OPTIMIZATION_PLAN 节点2：缩略图源统一由 resolveEffectiveThumbnail 判定
             // （DB thumbnail > 可视区按需生成结果 > 图片生成失败时原文件兜底 > null 占位）。
             // 视频文件无缩略图时不得使用原视频文件作为 <img> 源（加载视频进 img 必触发
-            // onError 显示警告图标）；thumbnail=NULL 且生成中时图片/视频统一显示占位图标，
-            // 不再直载数 MB 原图拉伸当缩略图（与后台批量任务争抢磁盘 IO）。
+            // onError 显示警告图标）。
+            // fix-thumbnail-skeleton-reveal N4：standard（清晰图）即唯一显示源，
+            // 未 onLoad 前由 ThumbReveal 显示骨架动画，不再有低清垫底/模糊中间态；
+            // thumbnail=NULL 且生成中时同样显示骨架动画（而非静态图标干等）。
             const generatedThumb = onDemandThumbs.get(file.file_path)
+            const generateFailed = onDemandFailed.has(file.file_path)
             const effectiveThumbnail = resolveEffectiveThumbnail({
               fileType: file.file_type,
               thumbnail: file.thumbnail,
               generatedPath: generatedThumb,
-              generateFailed: onDemandFailed.has(file.file_path),
+              generateFailed,
               filePath: file.file_path
             })
-            const standardUrl = (effectiveThumbnail && toFileUrl(effectiveThumbnail)) || ''
-            const useHighQuality = highQualityIds.has(file.id)
-            const standardFailed = standardFailedIds.has(file.id)
-            // _low/_high 仅对缓存命名路径推导（DB thumbnail 或按需生成结果）；
-            // 生成失败兜底的原始文件路径不参与，避免对源文件推导出不存在的 _low 404 往返
-            const lowUrl = toLowQualityUrl(file.thumbnail ?? generatedThumb)
-            const lowUrlResolved = lowUrl ? toFileUrl(lowUrl) : null
-            const thumbUrl = pickThumbnailUrl({
-              lowUrl: lowUrlResolved,
-              standardUrl,
-              upgraded: useHighQuality,
-              standardFailed
-            })
-            // 当前是否显示低清档（onError 回退链判定用）
-            const showingLow = thumbUrl !== null && thumbUrl === lowUrlResolved
+            // 重试代次：standard 404 后就地重建成功时 +1，src 追加 &r=N 强制重载
+            // （media:// 缩略图路径由内容 hash 决定，重建不改路径）
+            const retryNonce = thumbRetryNonce.get(file.file_path) ?? 0
+            const standardUrl = effectiveThumbnail
+              ? toFileUrl(effectiveThumbnail) + (retryNonce > 0 ? `&r=${retryNonce}` : '')
+              : ''
             const isFocused = index === focusedIndex
             const hasError = failedImages.has(file.id)
             const isMissing = file.is_missing === true
             // 损坏文件容错：损坏文件不显示缩略图，仅显示占位图 + 损坏角标
             const isCorrupted = file.is_corrupted === true
-            const showThumb = !isCorrupted && !!thumbUrl && !hasError
+            const showThumb = !isCorrupted && !!standardUrl && !hasError
+            // 生成中待显骨架：无可用缩略图 URL 且尚未进入失败终态的项（thumbnail=NULL
+            // 生成排队中/在途）显示骨架动画——"加载中"与"失败"是两种状态，后者才显示图标
+            const showSkeleton =
+              !showThumb && !hasError && !isCorrupted && !generateFailed && !!file.file_path
             return (
               <div
                 className={`media-card aspect-square ${multiSelectMode ? 'relative ' : ''}${
@@ -562,40 +557,37 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
                   {isMissing && <MissingBadge />}
                   {isCorrupted && <CorruptedBadge reason={file.corrupted_reason} />}
                   {showThumb ? (
-                    <TieredCardImage
-                      lowUrl={lowUrlResolved}
-                      standardUrl={standardUrl}
-                      showStandard={!showingLow}
+                    <ThumbReveal
+                      src={standardUrl}
                       alt={file.file_name}
                       dataMediaId={file.id}
-                      onLowError={() => {
-                        // 低清为主显源时失败（档位回退链，fix-thumbnail-loading-latency 节点3）：
-                        // 升级 standard；回退后的低清再失败 → markFailed 终止为占位图标，
-                        // 并就地按需重建（节点2），成功后清除标记以原 URL 重试。
-                        if (standardFailed) {
+                      onError={() => {
+                        // standard 失败（后台批量未生成 404 / LRU 驱逐）：保持骨架态并就地
+                        // 按需重建（节点2）。重建成功 → applyResult bump 重试代次，以 &r=N
+                        // 强制重载。终止条件（审查修复 T1）：生成已失败过（generateFailed），
+                        // 或本会话已对该卡触发过重建（重载再失败说明源本身不可用）→
+                        // markFailed 终止为占位警告图标，等 media:updated 刷新（损坏标记/
+                        // 新缩略图）后经 items 变化自动重试。
+                        if (generateFailed || standardRebuildTried.has(file.id)) {
                           markFailed(file.id)
-                          ensureOnDemandThumbnail(file)
-                        } else {
-                          setHighQualityIds((prev) => new Set(prev).add(file.id))
+                          return
                         }
+                        setStandardRebuildTried((prev) => new Set(prev).add(file.id))
+                        ensureOnDemandThumbnail(file, file.id)
                       }}
-                      onStandardError={() => {
-                        // standard 为主显源时失败（后台批量未生成/LRU 驱逐）→
-                        // markStandardFailed 回退低清（待 items 刷新自动重试，不再死胡同）
-                        // 并就地按需重建（节点2）；无低清可退 → markFailed 终止为占位图标。
-                        if (lowUrl) {
-                          markStandardFailed(file.id)
-                          ensureOnDemandThumbnail(file)
-                        } else {
-                          markFailed(file.id)
-                        }
-                      }}
+                    />
+                  ) : showSkeleton ? (
+                    // 生成中/加载中骨架动画（复用 globals.css .skeleton，颜色走主题变量）
+                    <div
+                      data-testid="thumb-reveal-skeleton"
+                      className="skeleton absolute inset-0"
+                      aria-hidden="true"
                     />
                   ) : null}
                   <MediaThumbPlaceholder
                     fileType={file.file_type}
                     hasError={hasError || isCorrupted}
-                    visible={!showThumb}
+                    visible={!showThumb && !showSkeleton}
                   />
 
                   {hoveredId === file.id && (

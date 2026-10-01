@@ -76,6 +76,17 @@ const DECODE_CONCURRENCY = Math.max(1, os.cpus().length) * 2
  */
 const decodeLimiter = createConcurrencyLimiter(DECODE_CONCURRENCY)
 
+/**
+ * 视频抽帧独立信号量（fix-thumbnail-skeleton-reveal N1）：
+ * ffmpeg 抽帧（含纯白自愈）不再与图片 sharp 解码共用 decodeLimiter——
+ * 慢视频走 0/1/3s seek 阶梯（每次 30s 超时）会长时间占满解码许可，
+ * 把可视区按需生成的图片全部堵在队列后（表现为数十秒白屏）。
+ * 固定并发 2：足够覆盖可视区连续视频封面生成，同时比原"视频挤占 decodeLimiter
+ * 全部槽位（最多 CPU×2）"更保守，防止单进程 ffmpeg spawn 数量失控。
+ */
+const VIDEO_DECODE_CONCURRENCY = 2
+const videoLimiter = createConcurrencyLimiter(VIDEO_DECODE_CONCURRENCY)
+
 export class ThumbnailGenerator {
   private cacheDir: string
   private maxWidth = 320
@@ -95,6 +106,12 @@ export class ThumbnailGenerator {
   // 修复 C-S3：并发生成同一文件的缩略图时存在竞态条件
   // 使用 Map<string, Promise> 作为互斥锁，相同 filePath 的并发请求复用同一个 Promise
   private generatingLocks: Map<string, Promise<string | null>> = new Map()
+
+  // N2 批量让位：主进程 generate() 在途请求计数（含 low/high 档与启动自愈；
+  // 后台批量在 worker 进程内生成、不经过该入口，因此该计数即"用户正在等待"的信号）。
+  // 0 ↔ >0 跳变时通知监听方（Application 装配为 MediaWorkerManager.setBatchYield）。
+  private onDemandPending = 0
+  private onDemandListener: ((active: boolean) => void) | null = null
 
   // A-S8：内容 hash 内存缓存，避免每次都读文件
   // key: filePath，value: { hash, mtime, size }，mtime/size 变化时重新计算
@@ -150,6 +167,25 @@ export class ThumbnailGenerator {
   setCorruptedMarker(mark: CorruptedMarkerFn | null, clear: CorruptedClearFn | null): void {
     this.markCorruptedFn = mark
     this.clearCorruptedFn = clear
+  }
+
+  /**
+   * 注入按需活动监听（N2，由 Application 装配为 MediaWorkerManager.setBatchYield）：
+   * generate() 在途计数 0 ↔ >0 跳变时回调 active。监听回调抛错仅吞掉，
+   * 不影响生成主流程（让位是性能优化，不是正确性依赖）。
+   */
+  setOnDemandActivityListener(listener: ((active: boolean) => void) | null): void {
+    this.onDemandListener = listener
+  }
+
+  /** 按需在途计数增减并按需通知监听方（仅在空闲 ↔ 忙碌边界回调，避免每文件抖动） */
+  private bumpOnDemandPending(delta: 1 | -1): void {
+    this.onDemandPending = Math.max(0, this.onDemandPending + delta)
+    try {
+      this.onDemandListener?.(this.onDemandPending > 0)
+    } catch {
+      // 监听回调异常不影响生成主流程
+    }
   }
 
   /**
@@ -314,6 +350,22 @@ export class ThumbnailGenerator {
   }
 
   async generate(filePath: string, quality?: 'low' | 'standard' | 'high'): Promise<string | null> {
+    // N2 批量让位（fix-thumbnail-skeleton-reveal）：主进程 generate 入口即"按需/自愈"请求
+    // （后台批量在 worker 进程内部生成，不经过此入口），在途计数 >0 时通知监听方（manager →
+    // worker）让后台批量任务让位。GamePlayPhotos 早退路径同样计入（快速 settle，零解码）。
+    this.bumpOnDemandPending(1)
+    try {
+      return await this.generateLocked(filePath, quality)
+    } finally {
+      this.bumpOnDemandPending(-1)
+    }
+  }
+
+  /** generate 的实际实现（进入前已计入按需在途计数） */
+  private async generateLocked(
+    filePath: string,
+    quality?: 'low' | 'standard' | 'high'
+  ): Promise<string | null> {
     // GamePlayPhotos 豁免（仅图片）：该目录下的游戏照片已有游戏原生低清缩略图（同名文件位于兄弟目录
     // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径。
     // 入口直接早退：不做任何解码/生成/写盘；用 access(R_OK) 校验推导出的原生 LQ 路径，
@@ -482,7 +534,8 @@ export class ThumbnailGenerator {
         ) {
           this.blankHealedHashes.add(fileHash)
           try {
-            await decodeLimiter(() => this.extractVideoFrame(filePath, thumbnailPath))
+            // N1：视频抽帧走独立 videoLimiter，不再挤占图片解码许可（慢视频会堵死图片队列）
+            await videoLimiter(() => this.extractVideoFrame(filePath, thumbnailPath))
             // 丢弃同源的白色低清副本并重建：网格优先展示 _low，只修标准档位仍会显示白图
             const lowPath = path.join(this.cacheDir, `${fileHash}_low.jpg`)
             await fsp.rm(lowPath, { force: true })
@@ -503,10 +556,11 @@ export class ThumbnailGenerator {
       // 不影响外层缓存计数与 LRU 逻辑，也不影响其他文件的缩略图生成
       try {
         if (isVideo) {
-          // 视频仍走主进程 ffmpeg（async spawn 子进程，不阻塞事件循环，无需迁移到 worker）
-          // 与 runSharp 共用同一信号量：ffmpeg 子进程单个内存开销高于 sharp，
-          // 不限流时滚动视频库会同时 spawn 数十个进程。此分支与 runSharp 互斥，只取一次许可。
-          await decodeLimiter(() => this.extractVideoFrame(filePath, thumbnailPath))
+          // 视频仍走主进程 ffmpeg（async spawn 子进程，不阻塞事件循环，无需迁移到 worker）。
+          // N1（fix-thumbnail-skeleton-reveal）：视频抽帧走独立 videoLimiter，不再挤占
+          // 图片解码许可——慢视频走 0/1/3s seek 阶梯（每次 30s 超时）最长可占用通道 90s，
+          // 共用 decodeLimiter 时会把可视区按需生成的图片全部堵在队列后。
+          await videoLimiter(() => this.extractVideoFrame(filePath, thumbnailPath))
           // FIX(组10-1): 视频帧提取落盘后 stat 累加内存计数器（sharp 分支由 worker 回传 size，
           // 视频分支此前完全漏记，使 totalCacheSize 长期偏低、LRU 清理触发滞后）
           const videoSize = (await fsp.stat(thumbnailPath).catch(() => ({ size: 0 }))).size

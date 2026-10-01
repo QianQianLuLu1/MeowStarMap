@@ -135,6 +135,13 @@ let shouldStopDuplicate = false
 // 相似检测独立取消标志
 let shouldStopSimilar = false
 
+// N2 批量让位（fix-thumbnail-skeleton-reveal）：主进程可视区按需生成在途时置位，
+// 批量条目启动前插入延迟，把 CPU 优先让给用户正在等待的生成。延迟取 200ms——
+// 单文件吞吐降速约 1/(1+200ms/单文件耗时)，对批量总时长影响温和，而对按需生成的
+// 即时性收益明显；活跃状态切换在下一个条目边界生效，不打断在途任务。
+let batchYieldActive = false
+const BATCH_YIELD_DELAY_MS = 200
+
 // 进度推送节流（500ms，与 scanner worker 一致）
 let lastThumbnailProgressEmit = 0
 let lastPhashProgressEmit = 0
@@ -545,6 +552,12 @@ async function startThumbnailBatch(
     let lastProgressProcessed = 0
 
     const tasks = rows.map((row) => async () => {
+      // N2 批量让位：条目启动前检查让位标志，活跃时延迟再取任务（不打断在途任务，
+      // 标志在条目边界生效）。放在 shouldStopThumbnail 检查之前：取消不会被丢失，
+      // 只是让位激活时最多延迟 BATCH_YIELD_DELAY_MS 后在下一行检查生效。
+      if (batchYieldActive) {
+        await new Promise<void>((resolve) => setTimeout(resolve, BATCH_YIELD_DELAY_MS))
+      }
       if (shouldStopThumbnail) return
 
       // 单文件加超时兜底：超时/失败返回 null → 跳过该行，不写 DB、不计数，由下次批次重试
@@ -1171,6 +1184,10 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
       break
     case 'SIMILAR_STOP':
       shouldStopSimilar = true
+      break
+    case 'MEDIA_WORKER_BATCH_YIELD':
+      // N2 批量让位：主进程按需生成在途（active=true）时批量条目间插入延迟
+      batchYieldActive = msg.payload?.active === true
       break
     case 'MEDIA_WORKER_DISPOSE':
       cleanupAndExit(0, true)

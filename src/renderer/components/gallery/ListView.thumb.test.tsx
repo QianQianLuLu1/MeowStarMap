@@ -12,7 +12,7 @@
  */
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, cleanup } from '@testing-library/react'
+import { render, cleanup, fireEvent } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -110,5 +110,32 @@ describe('ListView 缩略图源（N1）', () => {
       .join('\n')
     expect(code).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
     expect(code).toContain('resolveThumbnailSrc(file)')
+  })
+})
+
+describe('ListView 骨架门控直显（fix-thumbnail-skeleton-reveal N5）', () => {
+  it('行为：img 加载完成前显示骨架动画层，onLoad 后骨架卸载', () => {
+    const { container } = renderRow(makeFile({ thumbnail: 'C:/cache/abc.jpg', file_name: 'v.mp4' }))
+    const img = container.querySelector('img') as HTMLImageElement
+    // 未加载：img 已挂载（发起请求）但透明，骨架层可见
+    expect(img.className).toContain('opacity-0')
+    expect(container.querySelector('.skeleton')).toBeTruthy()
+    // 加载完成：骨架卸载，img 淡入
+    fireEvent.load(img)
+    expect(img.className).toContain('opacity-100')
+    expect(container.querySelector('.skeleton')).toBeNull()
+  })
+
+  it('结构：裸 <img> 已替换为 ThumbReveal 骨架门控组件', () => {
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/renderer/components/gallery/ListView.tsx'),
+      'utf-8'
+    )
+    const code = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n')
+    expect(code).toContain('<ThumbReveal')
+    expect(code).not.toContain('<img')
   })
 })

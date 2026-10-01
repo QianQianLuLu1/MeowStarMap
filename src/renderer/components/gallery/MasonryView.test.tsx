@@ -140,3 +140,32 @@ describe('MasonryView 缩略图源（N1）', () => {
     expect(code).toContain('resolveThumbnailSrc(file)')
   })
 })
+
+describe('MasonryView 骨架门控直显（fix-thumbnail-skeleton-reveal N5）', () => {
+  it('img 加载完成前显示骨架动画层，onLoad 后骨架卸载、img 淡入', () => {
+    render(<MasonryView files={files} selectedIds={[]} onSelect={() => {}} />)
+    const card = document.querySelector('[data-media-id="1"]') as HTMLElement
+    const img = card.querySelector('[data-testid="thumb"]') as HTMLImageElement
+    expect(img).toBeTruthy()
+    // 未加载：img 透明 + 该卡片骨架层可见
+    expect(img.className).toContain('opacity-0')
+    expect(card.querySelector('.skeleton')).toBeTruthy()
+    // 加载完成：该卡片骨架卸载（其余未 load 的卡片骨架保留）
+    fireEvent.load(img)
+    expect(img.className).toContain('opacity-100')
+    expect(card.querySelector('.skeleton')).toBeNull()
+  })
+
+  it('结构：裸 <img> 已替换为 ThumbReveal 骨架门控组件', () => {
+    const src = fs.readFileSync(
+      path.resolve(process.cwd(), 'src/renderer/components/gallery/MasonryView.tsx'),
+      'utf-8'
+    )
+    const code = src
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n')
+    expect(code).toContain('<ThumbReveal')
+    expect(code).not.toContain('<img')
+  })
+})

@@ -53,6 +53,9 @@ export type MediaWorkerCommand =
   | { type: 'PHASH_STOP' }
   | { type: 'DUPLICATE_STOP' }
   | { type: 'SIMILAR_STOP' }
+  // 批量让位（fix-thumbnail-skeleton-reveal N2）：主进程有可视区按需生成在途时，
+  // worker 批量任务在条目启动前插入延迟，把 CPU 优先让给用户正在等待的生成
+  | { type: 'MEDIA_WORKER_BATCH_YIELD'; payload: { active: boolean } }
   // 主进程退出前调用，worker 主动清理并退出
   | { type: 'MEDIA_WORKER_DISPOSE' }
 

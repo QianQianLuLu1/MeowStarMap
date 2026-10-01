@@ -563,6 +563,49 @@ describe('worker-entry 消息处理分支', () => {
     expect(evt.payload).toMatchObject({ success: true, message: '完成', processed: 2, total: 2 })
   })
 
+  it('MEDIA_WORKER_BATCH_YIELD：让位激活时批量条目启动前插入延迟，解除后恢复全速（N2）', async () => {
+    try {
+      const rows = [
+        thumbRow(1, mediaFiles[0]),
+        thumbRow(2, mediaFiles[1]),
+        thumbRow(3, mediaFiles[2])
+      ]
+      // 让位激活：命令先于批次到达，每行任务启动前都检查让位标志并等待延迟。
+      // 注意本文件将 runWithConcurrency mock 为串行执行（"取消/节流"用例需要任务粒度
+      // 确定性介入），因此 3 行依次各等一次让位延迟，而非并发 4 同时启动
+      port.emitMessage({ type: 'MEDIA_WORKER_BATCH_YIELD', payload: { active: true } })
+      const fakeOn = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? rows : []))
+      ctl.currentDb = fakeOn.db
+      const yieldStartedAt = Date.now()
+      port.emitMessage({
+        type: 'THUMBNAIL_BATCH_START',
+        payload: { dbPath: 'thumb-yield-on.db', cacheDir, thumbnailQuality: 'standard' }
+      })
+      await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+      const yieldElapsed = Date.now() - yieldStartedAt
+      // 让位延迟 200ms：批次总耗时必须 ≥ 延迟值（现状无该命令处理 → 立即完成 → 断言失败红灯）
+      expect(yieldElapsed).toBeGreaterThanOrEqual(200)
+
+      // 解除让位：同样 3 行的批次应无明显延迟完成
+      port.messages.splice(0)
+      port.emitMessage({ type: 'MEDIA_WORKER_BATCH_YIELD', payload: { active: false } })
+      const fakeOff = createFakeDb((sql) => (sql.includes('thumbnail IS NULL') ? rows : []))
+      ctl.currentDb = fakeOff.db
+      const resumedAt = Date.now()
+      port.emitMessage({
+        type: 'THUMBNAIL_BATCH_START',
+        payload: { dbPath: 'thumb-yield-off.db', cacheDir, thumbnailQuality: 'standard' }
+      })
+      await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
+      expect(Date.now() - resumedAt).toBeLessThan(200)
+    } finally {
+      // 防状态残留：若中途断言失败提前退出，worker 模块级让位标志会残留 true，
+      // 同文件后续用例每条目多等 200ms（拖慢且引入隐患），此处强制复位
+      port.messages.splice(0)
+      port.emitMessage({ type: 'MEDIA_WORKER_BATCH_YIELD', payload: { active: false } })
+    }
+  })
+
   it('GamePlayPhotos 豁免：批次查询追加归一化排除条件，仅普通图片被处理', async () => {
     // 3 行数据：普通图片 / GamePlayPhotos HQ 图片 / GamePlayPhotos 视频，
     // 三者 thumbnail/width/height 均为 NULL（由 selectImpl 返回模拟）

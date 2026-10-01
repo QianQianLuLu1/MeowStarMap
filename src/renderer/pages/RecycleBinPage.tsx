@@ -14,6 +14,7 @@ import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { EmptyState } from '../components/common/EmptyState'
 import { SkeletonGrid } from '../components/common/Skeleton'
+import { ThumbReveal } from '../components/common/ThumbReveal'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
 import { useStagedTask } from '../hooks/useStagedTask'
 import { settleWithConcurrency } from '../../shared/utils/concurrency'
@@ -482,7 +483,12 @@ interface RecycleBinItemProps {
   onToggle: (id: string) => void
 }
 
-const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({ file, selected, onToggle }) => {
+// 导出仅供测试直测，行为与内部使用完全一致
+export const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({
+  file,
+  selected,
+  onToggle
+}) => {
   const { t } = useTranslation()
   // FIX(B-thumb): 原用 new URL(thumbnail, 'media://') 构造缩略图 URL。thumbnail 为绝对
   // Windows 路径时，new URL 会把盘符「C:」当作 scheme 解析（protocol === 'c:'）且不抛异常，
@@ -493,6 +499,13 @@ const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({ file, selected
   // 本身作 <img> 源必裂图，现统一判定：DB thumbnail > （仅图片）原文件 > null（图标占位）；
   // media 协议白名单（media-protocol.ts）已放行缩略图缓存目录，故无需改协议层。
   const thumbUrl = useMemo(() => resolveThumbnailSrc(file), [file])
+  // N5 骨架门控：加载失败回退图标占位（原卡片无 onError 处理，不引入跨卡片失败集合）。
+  // 审查修复 T5：thumbUrl 变化（同 id 条目数据刷新后缩略图补齐，Virtuoso 复用实例）
+  // 时复位失败态，否则旧失败标记粘滞导致新缩略图永不显示。
+  const [thumbFailed, setThumbFailed] = useState(false)
+  useEffect(() => {
+    setThumbFailed(false)
+  }, [thumbUrl])
 
   return (
     <div
@@ -517,13 +530,12 @@ const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({ file, selected
         className="relative aspect-square flex items-center justify-center"
         style={{ background: 'var(--bg-tertiary)' }}
       >
-        {thumbUrl ? (
-          <img
+        {thumbUrl && !thumbFailed ? (
+          <ThumbReveal
             src={thumbUrl}
             alt={file.file_name}
             className="w-full h-full object-cover"
-            loading="lazy"
-            draggable={false}
+            onError={() => setThumbFailed(true)}
           />
         ) : (
           <div style={{ color: 'var(--text-tertiary)' }}>

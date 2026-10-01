@@ -31,6 +31,12 @@ describe.each(['TimelineView.tsx', 'EventTimelineView.tsx'])('%s 缩略图源结
   it('缩略图源统一走 resolveThumbnailSrc', () => {
     expect(readGallerySource(name)).toContain('resolveThumbnailSrc(file)')
   })
+
+  it('骨架门控直显（fix-thumbnail-skeleton-reveal N5）：裸 <img> 已替换为 ThumbReveal', () => {
+    const code = readGallerySource(name)
+    expect(code).toContain('<ThumbReveal')
+    expect(code).not.toContain('<img')
+  })
 })
 
 // ============================================================================

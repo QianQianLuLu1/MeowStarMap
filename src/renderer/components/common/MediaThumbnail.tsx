@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { MissingBadge } from './MissingBadge'
 import { CorruptedBadge } from './CorruptedBadge'
 import { MediaThumbPlaceholder } from '../gallery/MediaThumbPlaceholder'
@@ -78,12 +78,34 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
   const [hasError, setHasError] = useState(false)
   // 是否已切换到 fallbackSrc（仅切换一次；src 变化时复位，避免复用卡片沿用旧档位）
   const [usedFallback, setUsedFallback] = useState(false)
-  useEffect(() => {
+  // 骨架门控（fix-thumbnail-skeleton-reveal N5）：img onLoad 完成前保持透明并显示骨架
+  // 动画层——"加载中"与"失败"是两种状态，失败才显示占位图标
+  const [loaded, setLoaded] = useState(false)
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  // 渲染期复位（审查修复 T3）：useEffect 复位发生在浏览器绘制之后，换源那一帧会以旧
+  // loaded/usedFallback 态渲染新 src（旧图闪现一帧），且旧源迟到的 load/error 事件可能
+  // 命中新源——React 官方 "adjusting state during render" 模式保证首个渲染帧即正确状态，
+  // 配合 img key={activeSrc} 重挂载让旧源事件失效。
+  const [prevSrc, setPrevSrc] = useState(src)
+  if (prevSrc !== src) {
+    setPrevSrc(src)
     setUsedFallback(false)
-  }, [src])
+  }
 
   // 当前生效源：src 失败且提供了 fallbackSrc 时切换（fallbackSrc 为 null 等价于未提供）
   const activeSrc = usedFallback && fallbackSrc ? fallbackSrc : src
+  // 生效源变化（含 fallback 切换、复用卡片换源）→ 渲染期重置为未加载骨架态
+  const [prevActiveSrc, setPrevActiveSrc] = useState(activeSrc)
+  if (prevActiveSrc !== activeSrc) {
+    setPrevActiveSrc(activeSrc)
+    setLoaded(false)
+  }
+  // 缓存命中兜底：load 事件可能早于 React 事件绑定，complete 自检避免卡在骨架态
+  useEffect(() => {
+    const img = imgRef.current
+    if (img?.complete && img.naturalWidth > 0) setLoaded(true)
+  }, [activeSrc])
   // 损坏文件容错：损坏文件不显示缩略图（避免再次触发解码失败），直接显示占位图
   // 非损坏文件正常逻辑：有源且未出错时显示缩略图
   const showThumb = !isCorrupted && !!activeSrc && !hasError
@@ -100,22 +122,36 @@ export const MediaThumbnail: React.FC<MediaThumbnailProps> = ({
       {/* 损坏文件容错：损坏角标（橙色，区分丢失的红色） */}
       {isCorrupted && <CorruptedBadge size={badgeSize} reason={corruptedReason} />}
 
-      {/* 缩略图（损坏文件跳过加载） */}
+      {/* 缩略图（损坏文件跳过加载；onLoad 前透明由骨架层占位） */}
       {showThumb && (
-        <img
-          src={activeSrc ?? undefined}
-          alt={alt}
-          className={imgClassName}
-          loading="lazy"
-          onError={() => {
-            // 档位回退链：首次失败且有低清可退 → 切换 fallbackSrc；回退后再失败（或无低清）→ 终止为占位
-            if (!usedFallback && fallbackSrc && !hasError) {
-              setUsedFallback(true)
-            } else {
-              setHasError(true)
-            }
-          }}
-        />
+        <>
+          <img
+            key={activeSrc}
+            ref={imgRef}
+            src={activeSrc ?? undefined}
+            alt={alt}
+            className={`${imgClassName} transition-opacity duration-200 ${
+              loaded ? 'opacity-100' : 'opacity-0'
+            }`}
+            loading="lazy"
+            onLoad={() => setLoaded(true)}
+            onError={() => {
+              // 档位回退链：首次失败且有低清可退 → 切换 fallbackSrc；回退后再失败（或无低清）→ 终止为占位
+              if (!usedFallback && fallbackSrc && !hasError) {
+                setUsedFallback(true)
+              } else {
+                setHasError(true)
+              }
+            }}
+          />
+          {!loaded && (
+            <div
+              data-testid="media-thumbnail-skeleton"
+              className="skeleton absolute inset-0"
+              aria-hidden="true"
+            />
+          )}
+        </>
       )}
 
       {/* 占位/失败图标（损坏文件、无缩略图或加载失败时显示） */}

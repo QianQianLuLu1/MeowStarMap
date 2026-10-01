@@ -7,6 +7,7 @@ import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
+import { ThumbReveal } from '../common/ThumbReveal'
 import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { useContainerSize } from '../../hooks/useContainerSize'
@@ -93,13 +94,10 @@ function MasonryCard({ index, data }: { index: number; width: number; data: Medi
         {isMissing && <MissingBadge />}
         {isCorrupted && <CorruptedBadge reason={file.corrupted_reason} />}
         {showThumb ? (
-          <img
-            data-testid="thumb"
-            src={thumbUrl}
+          <ThumbReveal
+            src={thumbUrl ?? ''}
             alt={file.file_name}
-            className="absolute inset-0 w-full h-full object-cover"
-            loading="lazy"
-            draggable={false}
+            dataTestId="thumb"
             onError={() => markFailed(file.id)}
           />
         ) : null}

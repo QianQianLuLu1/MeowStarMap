@@ -15,9 +15,12 @@
  *   源码结构性检查模式，并补充 toFileUrl 的行为断言（该函数此前无测试覆盖）。
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { render, fireEvent } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import { toFileUrl } from '../utils/file'
+import type { MediaFile } from '../stores/mediaStore'
+import { RecycleBinItemComponent } from './RecycleBinPage'
 
 const recycleBinPageSrc = fs.readFileSync(
   path.resolve(process.cwd(), 'src', 'renderer', 'pages', 'RecycleBinPage.tsx'),
@@ -48,6 +51,11 @@ describe('RecycleBinPage 缩略图 URL 构造契约（缺陷B）', () => {
     // 是视频裂图根因（对齐 VirtualImageGrid.resolveEffectiveThumbnail 不变量），已废除
     expect(recycleBinPageCode).toContain('resolveThumbnailSrc(file)')
     expect(recycleBinPageCode).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
+  })
+
+  it('骨架门控直显（fix-thumbnail-skeleton-reveal N5）：裸 <img> 已替换为 ThumbReveal', () => {
+    expect(recycleBinPageCode).toContain('<ThumbReveal')
+    expect(recycleBinPageCode).not.toContain('<img')
   })
 })
 
@@ -86,5 +94,60 @@ describe('toFileUrl 对绝对 Windows 路径的行为（缺陷B 根因验证）'
     expect(toFileUrl(null)).toBeNull()
     expect(toFileUrl(undefined)).toBeNull()
     expect(toFileUrl('')).toBeNull()
+  })
+})
+
+describe('RecycleBinItem thumbFailed 失败态复位（审查修复 T5）', () => {
+  const makeFile = (thumbnail: string | null): MediaFile =>
+    ({
+      id: 'f1',
+      file_name: 'photo.jpg',
+      file_path: 'D:/photos/photo.jpg',
+      file_type: 'image',
+      file_ext: '.jpg',
+      file_size: 1024,
+      created_at: '2026-01-01T00:00:00',
+      modified_at: '2026-01-01T00:00:00',
+      deleted_at: '2026-01-02T00:00:00',
+      tags: [],
+      rating: 0,
+      is_favorite: false,
+      notes: '',
+      is_missing: false,
+      is_corrupted: false,
+      thumbnail
+    }) as unknown as MediaFile
+
+  const renderItem = (file: MediaFile) =>
+    render(<RecycleBinItemComponent file={file} selected={false} onToggle={() => {}} />)
+
+  it('异常后恢复：缩略图加载失败 → 图标占位；同 id 条目缩略图补齐后必须恢复加载', () => {
+    // Virtuoso 以 computeItemKey={file.id} 复用实例：数据刷新（恢复/重扫描后缩略图
+    // 补齐）= 同一实例收到新 file。thumbFailed 若不复位，新缩略图永不显示、停留图标态。
+    const { rerender, container } = renderItem(makeFile('C:/cache/missing.jpg'))
+    const img = container.querySelector('img') as HTMLImageElement
+    expect(img).toBeTruthy()
+    // 缩略图加载失败 → 回退图标占位（img 卸载）
+    fireEvent.error(img)
+    expect(container.querySelector('img')).toBeNull()
+
+    // 同 id 条目换新缩略图重渲染：失败态必须随 thumbUrl 变化复位，恢复 ThumbReveal 分支
+    rerender(
+      <RecycleBinItemComponent
+        file={makeFile('C:/cache/fixed.jpg')}
+        selected={false}
+        onToggle={() => {}}
+      />
+    )
+    const reloaded = container.querySelector('img') as HTMLImageElement | null
+    expect(reloaded).toBeTruthy()
+    expect(reloaded?.getAttribute('src')).toBe(toFileUrl('C:/cache/fixed.jpg'))
+  })
+
+  it('边界：thumbnail 为 null 且为图片 → resolveThumbnailSrc 回退原文件，img 仍渲染', () => {
+    const { container } = renderItem(makeFile(null))
+    const img = container.querySelector('img') as HTMLImageElement | null
+    expect(img).toBeTruthy()
+    expect(img?.getAttribute('src')).toBe(toFileUrl('D:/photos/photo.jpg'))
   })
 })

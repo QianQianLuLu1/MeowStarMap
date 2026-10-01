@@ -8,6 +8,7 @@ import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
+import { ThumbReveal } from '../common/ThumbReveal'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import type { MediaFile } from '../../stores/mediaStore'
 
@@ -109,12 +110,9 @@ const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
                 {isMissing && <MissingBadge size="sm" />}
                 {isCorrupted && <CorruptedBadge size="sm" reason={file.corrupted_reason} />}
                 {showThumb ? (
-                  <img
-                    src={thumbUrl}
+                  <ThumbReveal
+                    src={thumbUrl ?? ''}
                     alt={file.file_name}
-                    className="absolute inset-0 w-full h-full object-cover"
-                    loading="lazy"
-                    draggable={false}
                     onError={() => markFailed(file.id)}
                   />
                 ) : null}

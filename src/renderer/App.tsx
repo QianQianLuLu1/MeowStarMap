@@ -52,10 +52,17 @@ const ResonanceRecordsPage = lazy(() =>
 
 // 浅色轻量 Suspense fallback：仅加载期占位一屏，无毛玻璃无重资源。
 // 内联 <style> 只在首次挂载时注入一次，后续复用；避免依赖全局动画类。
+// fix-thumbnail-skeleton-reveal N6：背景与 spinner 颜色改用主题变量——
+// 硬编码 #fff/#e5e7eb/#94a3b8 在暗色主题下路由首次切换会白屏闪烁
 const PageFallback: React.FC = () => (
   <div
     className="h-full w-full"
-    style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}
+    style={{
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg-primary)'
+    }}
   >
     <div
       aria-label="loading"
@@ -63,8 +70,8 @@ const PageFallback: React.FC = () => (
         width: 24,
         height: 24,
         borderRadius: '50%',
-        border: '2px solid #e5e7eb',
-        borderTopColor: '#94a3b8',
+        border: '2px solid var(--bg-tertiary)',
+        borderTopColor: 'var(--text-secondary)',
         animation: 'p1-page-spin 0.7s linear infinite'
       }}
     />

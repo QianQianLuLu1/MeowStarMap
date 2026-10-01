@@ -671,6 +671,16 @@ export class MediaWorkerManager extends EventEmitter {
     this.bridge.stopThumbnailBatch()
   }
 
+  /**
+   * 批量让位开关（fix-thumbnail-skeleton-reveal N2）：
+   * 由 Application 装配为 ThumbnailGenerator 按需活动监听——主进程有可视区按需
+   * 生成在途时 active=true，worker 批量条目间插入延迟；恢复空闲时置回 false。
+   * worker 未启动时 bridge 侧为 no-op，启动批次时由 startThumbnailBatch 补发当前状态。
+   */
+  setBatchYield(active: boolean): void {
+    this.bridge.setBatchYield(active)
+  }
+
   /** 取消 pHash 批量补算（保留向后兼容） */
   stopPhashBatch(): void {
     this.bridge.stopPhashBatch()

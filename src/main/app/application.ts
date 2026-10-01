@@ -91,6 +91,11 @@ export class Application {
     // worker 在首次 processImage 调用时惰性 fork，构造阶段不启动 worker
     this.thumbnailWorkerBridge = new ThumbnailWorkerBridge()
     this.thumbnailGen.setWorkerBridge(this.thumbnailWorkerBridge)
+    // N2 批量让位（fix-thumbnail-skeleton-reveal）：主进程有按需生成在途时，
+    // 通知 media-worker 后台批量在条目间插入延迟，把 CPU 优先让给可视区生成
+    this.thumbnailGen.setOnDemandActivityListener((active) =>
+      this.mediaWorkerManager.setBatchYield(active)
+    )
 
     this.fileService = new FileService()
     this.videoService = new VideoService()

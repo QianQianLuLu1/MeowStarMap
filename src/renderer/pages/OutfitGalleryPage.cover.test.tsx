@@ -16,8 +16,10 @@
  *   行为用例直测导出的纯函数 + 源码结构断言锁定 OutfitCard 不再出现旧模式。
  */
 import { describe, it, expect, vi } from 'vitest'
+import { render, fireEvent } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
+import type { OutfitStat } from '../../shared/scene-category'
 
 // 行为用例仅导入模块级纯函数，不渲染组件；mock 掉页面周边依赖，保证模块可独立加载
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k: string) => k }) }))
@@ -33,7 +35,7 @@ vi.mock('../icons', () => ({
   IconVideo: () => null
 }))
 
-import { resolveOutfitCoverSrc } from './OutfitGalleryPage'
+import { OutfitCard, resolveOutfitCoverSrc } from './OutfitGalleryPage'
 import { toFileUrl } from '../utils/file'
 
 const src = fs.readFileSync(
@@ -102,5 +104,46 @@ describe('OutfitCard 源码结构（N3）', () => {
   it('封面经 resolveOutfitCoverSrc 判定，视频占位用 IconVideo', () => {
     expect(code).toContain('resolveOutfitCoverSrc(stat)')
     expect(code).toContain('IconVideo')
+  })
+
+  it('骨架门控直显（fix-thumbnail-skeleton-reveal N5）：封面裸 <img> 已替换为 ThumbReveal', () => {
+    expect(code).toContain('<ThumbReveal')
+    expect(code).not.toContain('<img')
+  })
+})
+
+describe('OutfitCard coverFailed 失败态复位（审查修复 T4）', () => {
+  const makeStat = (coverThumbnail: string | null): OutfitStat => ({
+    outfit: 'rebirth',
+    count: 3,
+    latestCreatedAt: '2026-01-01T00:00:00',
+    coverFilePath: 'D:/media/cover.jpg',
+    coverThumbnail,
+    coverFileType: 'image'
+  })
+
+  it('异常后恢复：封面加载失败 → 图标占位；更换封面（重扫描）后必须恢复加载新封面', () => {
+    // OutfitCard 以 key={stat.outfit} 复用实例：重扫描后同一套装换封面 =
+    // 同一实例收到新 stat。coverFailed 若不复位，新封面永不显示、停留图标态。
+    const { rerender, container } = render(
+      <OutfitCard stat={makeStat('C:/cache/old.jpg')} onClick={() => {}} />
+    )
+    expect(container.querySelector('img')).toBeTruthy()
+    // 封面加载失败 → 回退图标占位（img 卸载）
+    fireEvent.error(container.querySelector('img') as HTMLImageElement)
+    expect(container.querySelector('img')).toBeNull()
+
+    // 同套装换新封面重渲染：失败态必须随 cover 变化复位，恢复 ThumbReveal 分支
+    rerender(<OutfitCard stat={makeStat('C:/cache/new.jpg')} onClick={() => {}} />)
+    const img = container.querySelector('img') as HTMLImageElement | null
+    expect(img).toBeTruthy()
+    expect(img?.getAttribute('src')).toBe(toFileUrl('C:/cache/new.jpg'))
+  })
+
+  it('边界：视频封面且无缩略图 → cover 为 null，始终图标占位，不渲染 img', () => {
+    const { container } = render(
+      <OutfitCard stat={{ ...makeStat(null), coverFileType: 'video' }} onClick={() => {}} />
+    )
+    expect(container.querySelector('img')).toBeNull()
   })
 })

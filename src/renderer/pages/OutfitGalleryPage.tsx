@@ -6,6 +6,7 @@ import { useGlobalToast } from './settings/sections'
 import { toFileUrl } from '../utils/file'
 import { formatDate } from '../utils/date'
 import { IconOutfit, IconRefresh, IconImage, IconLock, IconVideo } from '../icons'
+import { ThumbReveal } from '../components/common/ThumbReveal'
 import type { OutfitStat } from '../../shared/scene-category'
 
 /**
@@ -46,10 +47,20 @@ const StatCard: React.FC<{
 
 // P1-I：formatDate 已统一到 utils/date.ts，直接 import 引入
 
-// 已收集套装卡片
-const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = ({ stat, onClick }) => {
+// 已收集套装卡片（导出仅供测试直测，行为与内部使用完全一致）
+export const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = ({
+  stat,
+  onClick
+}) => {
   const { t } = useTranslation()
   const cover = resolveOutfitCoverSrc(stat)
+  // N5 骨架门控：封面加载失败回退图标占位（避免骨架卡死；原实现无 onError 处理）。
+  // 审查修复 T4：cover 变化（重扫描换封面，同 key 实例复用）时复位失败态，
+  // 否则旧失败标记粘滞导致新封面永不显示。
+  const [coverFailed, setCoverFailed] = useState(false)
+  useEffect(() => {
+    setCoverFailed(false)
+  }, [cover])
   return (
     <button
       className="glass-card text-left flex flex-col overflow-hidden group"
@@ -61,13 +72,15 @@ const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = ({ stat,
         className="relative overflow-hidden"
         style={{ aspectRatio: '4 / 3', background: 'var(--bg-tertiary)' }}
       >
-        {cover ? (
-          <img
-            src={cover}
-            alt={stat.outfit}
-            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
+        {cover && !coverFailed ? (
+          <div className="w-full h-full transition-transform duration-300 group-hover:scale-105">
+            <ThumbReveal
+              src={cover}
+              alt={stat.outfit}
+              className="w-full h-full object-cover"
+              onError={() => setCoverFailed(true)}
+            />
+          </div>
         ) : (
           <div
             className="w-full h-full flex items-center justify-center"

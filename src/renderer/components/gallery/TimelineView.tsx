@@ -6,6 +6,7 @@ import { formatDate } from '../../utils/date'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
+import { ThumbReveal } from '../common/ThumbReveal'
 import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
@@ -205,12 +206,9 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                       {isMissing && <MissingBadge />}
                       {isCorrupted && <CorruptedBadge reason={file.corrupted_reason} />}
                       {showThumb ? (
-                        <img
-                          src={thumbUrl}
+                        <ThumbReveal
+                          src={thumbUrl ?? ''}
                           alt={file.file_name}
-                          className="absolute inset-0 w-full h-full object-cover"
-                          loading="lazy"
-                          draggable={false}
                           onError={() => markFailed(file.id)}
                         />
                       ) : null}
