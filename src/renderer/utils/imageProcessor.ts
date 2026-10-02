@@ -1,4 +1,5 @@
 import i18n from '../i18n'
+import { InternalError } from '../../shared/errors/app-error'
 
 export type HSLColorKey =
   | 'red'
@@ -556,7 +557,7 @@ export async function processImageData(
   canvas.height = height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
+  if (!ctx) throw new InternalError(i18n.t('toast.imageProcessorCanvasFailed'))
   // FIX(预览清晰度)：开启高质量重采样。此前未设置任何平滑参数，浏览器默认低质量
   // 滤波在大比例缩小时会明显软化并产生锯齿。
   ctx.imageSmoothingEnabled = true
@@ -947,7 +948,7 @@ async function applyWatermark(imageData: ImageData, config: WatermarkConfig): Pr
   canvas.height = imageData.height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
+  if (!ctx) throw new InternalError(i18n.t('toast.imageProcessorCanvasFailed'))
   ctx.putImageData(imageData, 0, 0)
 
   const cw = imageData.width
@@ -1004,7 +1005,7 @@ export async function imageToDataUrl(
   canvas.height = imageData.height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new Error(i18n.t('toast.imageProcessorCanvasFailed'))
+  if (!ctx) throw new InternalError(i18n.t('toast.imageProcessorCanvasFailed'))
   ctx.putImageData(imageData, 0, 0)
   return canvas.toDataURL(format, quality)
 }

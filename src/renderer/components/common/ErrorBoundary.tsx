@@ -66,6 +66,7 @@ const areResetKeysEqual = (a?: unknown[], b?: unknown[]): boolean => {
   return true
 }
 
+// eslint-disable-next-line no-restricted-syntax -- React Error Boundary 必须使用 class 组件（依赖 componentDidCatch / getDerivedStateFromError 生命周期），函数式组件目前无法替代
 export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   constructor(props: ErrorBoundaryProps) {
     super(props)

@@ -18,6 +18,7 @@ import { computePreviewMaxSize, estimateInitialPreviewMaxSize } from '../utils/p
 import { useEditHistory, type AdjustmentState } from '../hooks/useEditHistory'
 // P0-C1：编辑保存后清理游戏参数缓存，避免显示旧 EXIF/参数
 import { clearAllGameParamsCache } from '../hooks/useGameParams'
+import { InternalError } from '../../shared/errors/app-error'
 import { useEditorShortcuts } from '../hooks/useEditorShortcuts'
 import { useGlobalToast } from './settings/sections'
 import { useRefreshMedia } from '../hooks/useRefreshMedia'
@@ -289,7 +290,7 @@ export const EditorPage: React.FC = () => {
     setSaving(true)
     try {
       const dataUrl = await exportDataUrl(true)
-      if (!dataUrl) throw new Error(t('editor.page.exportFailed'))
+      if (!dataUrl) throw new InternalError(t('editor.page.exportFailed'))
       const result = await window.electronAPI.editor.save(media.file_path, dataUrl, {
         format: media.file_ext.replace('.', '') || 'jpg',
         quality: 95
@@ -332,7 +333,7 @@ export const EditorPage: React.FC = () => {
     try {
       // 显式指定 jpeg：另存为固定使用 .jpg 扩展名，PNG 源若不覆盖会产出「.jpg 扩展名的 PNG 字节」
       const dataUrl = await exportDataUrl(true, 'image/jpeg')
-      if (!dataUrl) throw new Error(t('editor.page.exportFailed'))
+      if (!dataUrl) throw new InternalError(t('editor.page.exportFailed'))
       const directory = await window.electronAPI.dialog.selectDirectory()
       if (!directory) {
         setSaving(false)
@@ -605,7 +606,9 @@ export const EditorPage: React.FC = () => {
         // 1. 加载图片为 Image 对象
         const imgUrl = toFileUrl(target.file_path)
         if (!imgUrl)
-          throw new Error(t('editor.batchApply.invalidPathError', { fileName: target.file_name }))
+          throw new InternalError(
+            t('editor.batchApply.invalidPathError', { fileName: target.file_name })
+          )
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
           const im = new Image()
           im.crossOrigin = 'anonymous'
@@ -621,7 +624,7 @@ export const EditorPage: React.FC = () => {
         // 3. 导出 dataUrl：编码跟随目标扩展名，避免 PNG 目标被写成有损 JPEG
         const { mimeType, quality } = resolveExportEncoding(target.file_ext)
         const dataUrl = await imageToDataUrl(imageData, mimeType, quality)
-        if (!dataUrl) throw new Error(t('editor.page.exportFailed'))
+        if (!dataUrl) throw new InternalError(t('editor.page.exportFailed'))
         // 4. 调用 editor:save（主进程会备份原图并记录编辑历史）
         const result = await window.electronAPI.editor.save(target.file_path, dataUrl, {
           format: target.file_ext.replace('.', '') || 'jpg',

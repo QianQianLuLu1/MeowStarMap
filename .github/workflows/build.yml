@@ -33,6 +33,9 @@ jobs:
       TZ: Asia/Hong_Kong
     steps:
       - uses: actions/checkout@v5
+        with:
+          # PR 场景需完整历史以校验所有 PR commits；push 事件保持默认浅克隆
+          fetch-depth: ${{ github.event_name == 'pull_request' && 0 || 1 }}
       # 供应链安全：仅 PR 事件运行，审查 PR 中新增/更新的依赖是否存在已知漏洞（high/critical 直接失败）
       # 注意：若做成独立 job，push 事件下被 skip 的 job 会连带 skip needs 它的下游 job；放同一 job 内用 if 控制
       - name: Dependency review (PR only)
@@ -57,6 +60,9 @@ jobs:
       - name: Security audit (audit-ci, fail on high/critical)
         run: npx audit-ci --config ./audit-ci.jsonc
       - run: npm run lint
+      - name: Commitlint（校验 PR 提交信息规范）
+        if: ${{ github.event_name == 'pull_request' }}
+        run: npx commitlint --from "${{ github.event.pull_request.base.sha }}" --to "${{ github.event.pull_request.head.sha }}" --verbose
       - name: i18n 守卫（白名单只减不增 / 清零必移除 / key 已同步）
         run: npm run i18n:guard
       - run: npm run typecheck

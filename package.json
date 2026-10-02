@@ -90,6 +90,10 @@
       "eslint --fix",
       "prettier --write"
     ],
+    "e2e/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
     "src/**/*.{js,jsx,json,css,md}": [
       "prettier --write"
     ],

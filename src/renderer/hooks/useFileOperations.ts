@@ -7,6 +7,7 @@ import type { ToastType } from './useToast'
 import { useFavoriteToggle } from './useFavoriteToggle'
 import { useStagedTask } from './useStagedTask'
 import { settleWithConcurrency } from '../../shared/utils/concurrency'
+import { InternalError } from '../../shared/errors/app-error'
 import { formatFileSize } from '../utils/format'
 import { formatDate } from '../utils/date'
 // DU1：路径工具统一到 utils/file.ts
@@ -280,7 +281,7 @@ export function useFileOperations(options: UseFileOperationsOptions) {
             if (permanent) {
               setStage(0)
               const result = await api.file.deletePermanent([file.file_path])
-              if (!result.success) throw new Error(result.message)
+              if (!result.success) throw new InternalError(result.message)
               toastText = result.message
               toastType = 'success'
               setStage(0, 'done')
@@ -296,13 +297,13 @@ export function useFileOperations(options: UseFileOperationsOptions) {
             } else {
               setStage(0)
               const result = await api.file.delete([file.file_path])
-              if (!result.success) throw new Error(result.message)
+              if (!result.success) throw new InternalError(result.message)
               toastText = result.message
               toastType = 'success'
               setStage(0, 'done')
               setStage(1)
               const dbRes = await api.mediaAction.softDelete([Number(file.id)])
-              if (!dbRes.success) throw new Error(dbRes.message)
+              if (!dbRes.success) throw new InternalError(dbRes.message)
               setStage(1, 'done')
               setStage(2)
               deleteMediaFiles([file.id])
@@ -373,11 +374,11 @@ export function useFileOperations(options: UseFileOperationsOptions) {
             async (id) => {
               if (signal.aborted) throw makeAbort()
               const filePath = pathById.get(id)
-              if (!filePath) throw new Error(t('toast.batchDelete.missingFile', { id }))
+              if (!filePath) throw new InternalError(t('toast.batchDelete.missingFile', { id }))
               const fileResult = await api.file.delete([filePath])
-              if (!fileResult.success) throw new Error(fileResult.message)
+              if (!fileResult.success) throw new InternalError(fileResult.message)
               const dbResult = await api.mediaAction.softDelete([Number(id)])
-              if (!dbResult.success) throw new Error(dbResult.message)
+              if (!dbResult.success) throw new InternalError(dbResult.message)
             },
             (done) => tick(done, ids.length),
             signal

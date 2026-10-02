@@ -13,6 +13,7 @@ import { fetchMediaFromDatabase } from '../stores/mediaStore'
 import type { TaskProgress } from '../../shared/types/progress'
 import type { DuplicateItem, ScanResult } from '../../shared/types/duplicate'
 import { useStagedTask } from '../hooks/useStagedTask'
+import { InternalError } from '../../shared/errors/app-error'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
 import {
   IconDuplicate,
@@ -775,7 +776,7 @@ export const DuplicatesPage: React.FC = () => {
           setStage(0, 'done')
           setStage(1)
           const res = await window.electronAPI!.mediaAction!.softDelete(ids)
-          if (!res.success) throw new Error(res.message)
+          if (!res.success) throw new InternalError(res.message)
           toastText = res.message
           setStage(1, 'done')
           setStage(2)

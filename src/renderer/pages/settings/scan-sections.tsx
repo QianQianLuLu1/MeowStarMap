@@ -13,6 +13,7 @@ import {
   markGameRootsInitialized,
   pickDefaultSelectedPaths
 } from '../../utils/scan-exclusions'
+import { AppError } from '../../../shared/errors/app-error'
 
 // ============ 扫描与路径 ============
 
@@ -169,7 +170,7 @@ export const GameRootsSection: React.FC = () => {
       const custom = await loadCustomScanPaths()
       const savedExcluded = await loadExcludedScanPaths()
       if (!window.electronAPI?.scanner?.detectGameRoots) {
-        throw new Error('IPC_UNAVAILABLE')
+        throw AppError.preconditionFailed('IPC_UNAVAILABLE')
       }
       const list = await window.electronAPI.scanner.detectGameRoots({
         customPaths: custom.length > 0 ? custom : undefined

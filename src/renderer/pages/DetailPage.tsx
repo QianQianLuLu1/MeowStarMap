@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { TagManager } from '../components/gallery/TagManager'
 import { VideoPlayer } from '../components/video/VideoPlayer'
 import { useGlobalToast } from './settings/sections'
+import { InternalError } from '../../shared/errors/app-error'
 import { useExif } from '../hooks/useExif'
 import { EmptyState } from '../components/common/EmptyState'
 import { SkeletonDetail } from '../components/common/Skeleton'
@@ -241,7 +242,8 @@ export const DetailPage: React.FC = () => {
     useMediaStore.getState().updateMediaFile(media.id, { is_favorite: next })
     try {
       const result = await updateMediaFileAndPersist(media.id, { is_favorite: next })
-      if (!result.success) throw new Error(result.message)
+      if (!result.success)
+        throw new InternalError(result.message ?? t('detail.actions.operationFailed'))
     } catch (error) {
       // 失败回滚
       useMediaStore.getState().updateMediaFile(media.id, { is_favorite: media.is_favorite })
@@ -259,7 +261,8 @@ export const DetailPage: React.FC = () => {
     useMediaStore.getState().updateMediaFile(media.id, { rating })
     try {
       const result = await updateMediaFileAndPersist(media.id, { rating })
-      if (!result.success) throw new Error(result.message)
+      if (!result.success)
+        throw new InternalError(result.message ?? t('detail.actions.ratingFailed'))
     } catch (error) {
       // 失败回滚
       useMediaStore.getState().updateMediaFile(media.id, { rating: prevRating })
@@ -289,7 +292,7 @@ export const DetailPage: React.FC = () => {
     setEditingOutfit(false)
     try {
       const result = await updateMediaFileAndPersist(media.id, { outfit: trimmed })
-      if (!result.success) throw new Error(result.message)
+      if (!result.success) throw new InternalError(result.message ?? t('detail.outfit.saveFailed'))
     } catch (error) {
       // 失败回滚
       useMediaStore.getState().updateMediaFile(media.id, { outfit: prevOutfit })
@@ -306,7 +309,7 @@ export const DetailPage: React.FC = () => {
     setOutfitInput('')
     try {
       const result = await updateMediaFileAndPersist(media.id, { outfit: '' })
-      if (!result.success) throw new Error(result.message)
+      if (!result.success) throw new InternalError(result.message ?? t('detail.outfit.clearFailed'))
     } catch (error) {
       useMediaStore.getState().updateMediaFile(media.id, { outfit: prevOutfit })
       showMessage(error instanceof Error ? error.message : t('detail.outfit.clearFailed'), 'error')

@@ -113,6 +113,116 @@ export default [
       }
     }
   },
+  // ============ 渲染进程专属约定护栏（project-conventions.md §1-§4） ============
+  // 在 src/** 块之后覆盖 no-restricted-syntax，同时保留 i18n 护栏并追加以下禁令：
+  //   §1 禁止渲染层 import('electron') / import ... from 'electron'
+  //   §2 禁止 throw new Error（应使用 AppError 家族）
+  //   §3 禁止 JSX 中硬编码 #xxxxxx 色值（应使用 CSS 变量 / Tailwind token）
+  //   §4 禁止 class extends React.Component（必须使用函数式组件 + Hooks）
+  {
+    files: ['src/renderer/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        // —— 复用 i18n 护栏（中文硬编码 + console 调试噪声）——
+        ...i18nGuardSelectors,
+        // §1 禁止渲染层导入 electron（一律经 preload 桥）
+        {
+          selector: "ImportDeclaration[source.value='electron']",
+          message:
+            '渲染层禁止直接 import electron，请通过 window.electronAPI（preload 桥）访问主进程能力'
+        },
+        {
+          selector: "ImportExpression[source.value='electron']",
+          message:
+            '渲染层禁止动态 import("electron")，请通过 window.electronAPI（preload 桥）访问主进程能力'
+        },
+        // §2 禁止 throw new Error（应使用 AppError 家族，见 src/shared/errors/app-error.ts）
+        {
+          selector: 'ThrowStatement > NewExpression[callee.name="Error"]',
+          message:
+            '禁止 throw new Error()，请使用 src/shared/errors/app-error.ts 中的 AppError 家族（ValidationError / NotFoundError / PermissionError 等）'
+        },
+        // §3 禁止 JSX 属性中硬编码 #xxxxxx 色值（应使用 CSS 变量 / Tailwind token）
+        {
+          selector: 'JSXAttribute > Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+          message:
+            '禁止在 JSX 中硬编码十六进制色值，请使用 CSS 变量（var(--*)）或 Tailwind 语义 token（如 text-primary / bg-accent）'
+        },
+        // §4 禁止 class 组件（必须使用函数式组件 + Hooks）
+        {
+          selector:
+            'ClassDeclaration[superClass.object.name="React"][superClass.property.name="Component"]',
+          message: '禁止 class 组件，请使用 React 函数式组件 + Hooks（React.FC 或裸函数）'
+        },
+        {
+          selector:
+            'ClassExpression[superClass.object.name="React"][superClass.property.name="Component"]',
+          message: '禁止 class 组件，请使用 React 函数式组件 + Hooks（React.FC 或裸函数）'
+        }
+      ]
+    }
+  },
+  // ============ 主进程 IPC handler 约定护栏（project-conventions.md §1） ============
+  // 自定义规则：ipcMain.handle 的第二个参数必须为 wrapHandler / wrapHandlerNoArgs / wrapHandlerRaw 调用，
+  // 禁止裸注册（绕过参数校验与统一响应包装）。
+  // no-restricted-syntax 无法表达"第二参数必须是某函数调用"的条件逻辑，故使用自定义规则。
+  {
+    plugins: {
+      local: {
+        meta: { name: 'local', version: '0.0.0' },
+        rules: {
+          'ipc-handler-wrap': {
+            meta: {
+              type: 'problem',
+              docs: {
+                description:
+                  'IPC handler 必须使用 wrapHandler / wrapHandlerNoArgs / wrapHandlerRaw 包装，禁止裸调 ipcMain.handle'
+              }
+            },
+            create(context) {
+              const WRAP_NAMES = new Set(['wrapHandler', 'wrapHandlerNoArgs', 'wrapHandlerRaw'])
+              return {
+                CallExpression(node) {
+                  const callee = node.callee
+                  if (
+                    callee.type !== 'MemberExpression' ||
+                    callee.object.type !== 'Identifier' ||
+                    callee.object.name !== 'ipcMain' ||
+                    callee.property.type !== 'Identifier' ||
+                    callee.property.name !== 'handle'
+                  ) {
+                    return
+                  }
+                  if (node.arguments.length < 2) return
+                  const handlerArg = node.arguments[1]
+                  if (
+                    handlerArg.type === 'CallExpression' &&
+                    handlerArg.callee.type === 'Identifier' &&
+                    WRAP_NAMES.has(handlerArg.callee.name)
+                  ) {
+                    return
+                  }
+                  context.report({
+                    node: handlerArg,
+                    message:
+                      'ipcMain.handle 的 handler 必须使用 wrapHandler / wrapHandlerNoArgs / wrapHandlerRaw 包装（来自 src/main/ipc/validator.ts），禁止裸调异步函数'
+                  })
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  {
+    files: ['src/main/ipc/handlers/*.ts'],
+    ignores: ['src/main/ipc/handlers/_*.ts', 'src/main/ipc/handlers/*.test.ts'],
+    rules: {
+      'local/ipc-handler-wrap': 'error'
+    }
+  },
   {
     // 日志实现文件：logger 自身依赖 console 作为兜底输出（磁盘满/权限问题的最后暴露渠道），
     // 其中的中文 console.* 文案为有意保留项（i18n 不可用时日志仍需可读，且 logger 初始化早于 i18n），

@@ -12,6 +12,7 @@ import { MAX_COMMIT_BATCH_ROWS } from '../../shared/types/resonance'
 import type { ParsedImportData, ImportInvalidRecord } from '../utils/resonance/importParse'
 import { parseImportFileText, countImportDiff } from '../utils/resonance/importParse'
 import { buildExportPayload } from '../utils/resonance/exportPayload'
+import { InternalError } from '../../shared/errors/app-error'
 
 /**
  * 共鸣录 store：状态为纯数据 + 纯 reducer；所有 IPC 副作用在模块级异步函数中
@@ -111,7 +112,7 @@ export const useResonanceStore = create<ResonanceState>((set) => ({
 
 function api(): NonNullable<typeof window.electronAPI>['resonance'] {
   const resonance = window.electronAPI?.resonance
-  if (!resonance) throw new Error('electronAPI.resonance unavailable')
+  if (!resonance) throw new InternalError('electronAPI.resonance unavailable')
   return resonance
 }
 
@@ -214,7 +215,7 @@ export interface CommitImportOptions {
 /** 将解析结果按批次送主进程写入；返回实际新增写入行数 */
 export async function commitPendingImport(options: CommitImportOptions): Promise<number> {
   const parsed = useResonanceStore.getState().pendingImport
-  if (!parsed) throw new Error('resonance import: pendingImport is empty')
+  if (!parsed) throw new InternalError('resonance import: pendingImport is empty')
 
   const pullRows = Object.entries(parsed.pulls).flatMap(([bannerId, list]) =>
     list.map(([obtainedAt, itemId]) => ({ bannerId, itemId, obtainedAt }))

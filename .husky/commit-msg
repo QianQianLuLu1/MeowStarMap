@@ -1,7 +1,7 @@
 # ============================================================
 # commit-msg 钩子
 # 钩子职责：校验提交信息是否符合 Conventional Commits 规范
-# 配置文件：commitlint.config.js
+# 配置文件：commitlint.config.cjs
 # 模板文件：.gitmessage（通过 git config commit.template 启用）
 # 失败处理：校验失败即阻止提交，输出错误详情
 # 详见：.qoder/rules/project-conventions.md「提交校验流程」节与 .gitmessage 模板

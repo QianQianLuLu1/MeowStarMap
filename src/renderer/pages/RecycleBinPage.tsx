@@ -13,6 +13,7 @@ import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { EmptyState } from '../components/common/EmptyState'
+import { InternalError } from '../../shared/errors/app-error'
 import { SkeletonGrid } from '../components/common/Skeleton'
 import { ThumbReveal } from '../components/common/ThumbReveal'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
@@ -169,7 +170,7 @@ export const RecycleBinPage: React.FC = () => {
             // 失败会抛 IpcError；不可读取 r.success 判定（恒 undefined → 每项恒判失败），
             // 部分失败以 failedCount 判定
             const r = await window.electronAPI!.mediaAction!.permanentDelete([Number(id)])
-            if (r.failedCount > 0) throw new Error(r.message)
+            if (r.failedCount > 0) throw new InternalError(r.message)
           },
           (done) => tick(done, ids.length),
           signal
