@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('electronAPI 包含全部 30 个键（reportReady + 29 个命名空间）', () => {
+  it('electronAPI 包含全部 31 个键（reportReady + 30 个命名空间）', () => {
     const electronAPI = getExposed<Record<string, unknown>>('electronAPI')
     expect(Object.keys(electronAPI).sort()).toEqual(
       [
@@ -102,7 +102,8 @@ describe('preload 装配完整性', () => {
         'operationHistory',
         'decrypt',
         'plugin',
-        'resonance'
+        'resonance',
+        'favorites'
       ].sort()
     )
   })

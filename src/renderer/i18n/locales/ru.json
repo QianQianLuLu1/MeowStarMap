@@ -2773,6 +2773,10 @@
       "mainWindowNotInit": "",
       "databaseNotInit": ""
     },
+    "favorites": {
+      "alreadyExists": "",
+      "notFound": ""
+    },
     "editor": {
       "dialog": {
         "filterPresetName": ""

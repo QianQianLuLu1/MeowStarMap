@@ -2,17 +2,17 @@
  * @layer L3
  * @module src/main/app/ipc-setup
  * @coverage setupIPC / bindScanProgressListener / injectCorruptedMarkers
- * @dependencies 39 个 registerXxxHandlers、pathGuard.initUserDataDir、database/media-repository、utils/logger
+ * @dependencies 40 个 registerXxxHandlers、pathGuard.initUserDataDir、database/media-repository、utils/logger
  *
  * 难点：
- * 1. 39 个 registerXxxHandlers 全部 mock 为 vi.fn()，需 vi.mock 批量 stub
+ * 1. 40 个 registerXxxHandlers 全部 mock 为 vi.fn()，需 vi.mock 批量 stub
  * 2. bindScanProgressListener 用 WeakMap 缓存监听器引用，第二次调用应 removeListener 旧的再 on
  * 3. injectCorruptedMarkers 内部 new MediaRepository(db, workerBridge, dbPath) 后调用 getMediaIdByPath / markCorrupted / clearCorrupted
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
-// 共享 mock：39 个 registerXxxHandlers
+// 共享 mock：40 个 registerXxxHandlers
 const handlerMocks = vi.hoisted(() => ({
   registerMediaMetadataHandlers: vi.fn(),
   registerMediaLifecycleHandlers: vi.fn(),
@@ -49,6 +49,7 @@ const handlerMocks = vi.hoisted(() => ({
   registerShareHandlers: vi.fn(),
   registerPluginManagementHandlers: vi.fn(),
   registerPluginBridgeHandlers: vi.fn(),
+  registerFavoritesHandlers: vi.fn(),
   registerExportPrefHandlers: vi.fn(),
   registerImportRootHandlers: vi.fn(),
   registerScanLogHandlers: vi.fn(),
@@ -164,6 +165,9 @@ vi.mock('../../ipc/handlers/plugin', () => ({
 }))
 vi.mock('../../ipc/handlers/plugin-bridge-handler', () => ({
   registerPluginBridgeHandlers: handlerMocks.registerPluginBridgeHandlers
+}))
+vi.mock('../../ipc/handlers/favorites-handler', () => ({
+  registerFavoritesHandlers: handlerMocks.registerFavoritesHandlers
 }))
 vi.mock('../../ipc/handlers/export-pref-handler', () => ({
   registerExportPrefHandlers: handlerMocks.registerExportPrefHandlers
@@ -295,12 +299,12 @@ describe('bindScanProgressListener', () => {
 // setupIPC
 // ============================================================================
 describe('setupIPC', () => {
-  it('5. 调用所有 39 个 registerXxxHandlers', () => {
+  it('5. 调用所有 40 个 registerXxxHandlers', () => {
     const ctx = makeAppCtx({ scannerManager: makeScannerManagerWithProgress() })
 
     setupIPC(ctx)
 
-    // 39 个 registerXxxHandlers
+    // 40 个 registerXxxHandlers
     expect(handlerMocks.registerMediaMetadataHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerMediaLifecycleHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerScanLogHandlers).toHaveBeenCalledWith(ctx)
@@ -337,6 +341,7 @@ describe('setupIPC', () => {
     expect(handlerMocks.registerShareHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerPluginManagementHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerPluginBridgeHandlers).toHaveBeenCalledWith(ctx)
+    expect(handlerMocks.registerFavoritesHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerExportPrefHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerImportRootHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerResonanceHandlers).toHaveBeenCalledWith(ctx)

@@ -1341,6 +1341,9 @@ export class DatabaseManager {
       'CREATE INDEX IF NOT EXISTS idx_media_files_outfit_agg ON media_files(is_deleted, outfit)',
       // 场景时段分析：scene_time=? AND file_type=? AND is_deleted=0
       'CREATE INDEX IF NOT EXISTS idx_media_files_scene_analysis ON media_files(scene_time, file_type, is_deleted)',
+      // ===== 收藏夹示例域（对应 ipc/handlers/favorites-handler.ts 的 favorites:* 通道） =====
+      // 纯新增表、CREATE TABLE IF NOT EXISTS 幂等；media_id UNIQUE 兜底"已在收藏夹"不变量
+      'CREATE TABLE IF NOT EXISTS favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, media_id INTEGER NOT NULL UNIQUE, created_at TEXT NOT NULL)',
       // ===== 共鸣录板块（gongeo.us-nikki-tracker 逻辑复用，MIT） =====
       // 共鸣录 5 张新表：抽卡记录 / 手动补录 / Pearpal 承接 / 进化覆盖 / 衣橱拥有项。
       // 纯新增表、CREATE TABLE IF NOT EXISTS 幂等，无数据回填（不需要版本标记）；

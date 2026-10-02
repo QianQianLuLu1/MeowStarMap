@@ -266,3 +266,68 @@ wrapHandler(ctx, schema, handler) =>
 ## 5. 历史教训
 
 **2026-07-31 「扫描失败」bug**：handler 返回值缺少 `success` 字段，导致前端 `res.success` 为 `undefined`（falsy），所有扫描操作均被误判为失败。根因是 IPC 双层 success 结构中，内层 data 的 `success` 字段与外层 IpcResponse 的 `success` 字段容易混淆，且测试仅验证了外层。
+
+## 6. 收藏夹域（示例）
+
+### 6.1 `favorites:list`
+
+| 属性         | 值                                           |
+| ------------ | -------------------------------------------- |
+| 通道         | `favorites:list`                             |
+| Handler 文件 | `src/main/ipc/handlers/favorites-handler.ts` |
+| 参数         | 无                                           |
+| 返回类型     | `{ favorites: FavoriteItem[] }`              |
+
+**返回值结构**：
+
+```typescript
+{
+  favorites: Array<{
+    id: number
+    media_id: number
+    created_at: string
+  }>
+}
+```
+
+### 6.2 `favorites:add`
+
+| 属性         | 值                                           |
+| ------------ | -------------------------------------------- |
+| 通道         | `favorites:add`                              |
+| Handler 文件 | `src/main/ipc/handlers/favorites-handler.ts` |
+| 参数         | `mediaId: number`                            |
+| 返回类型     | `{ id: number }`                             |
+
+**返回值结构**：
+
+```typescript
+{
+  id: number // 新创建的收藏记录 ID
+}
+```
+
+**错误处理**：
+
+- 媒体已在收藏夹中：抛出 `ValidationError`
+
+### 6.3 `favorites:remove`
+
+| 属性         | 值                                           |
+| ------------ | -------------------------------------------- |
+| 通道         | `favorites:remove`                           |
+| Handler 文件 | `src/main/ipc/handlers/favorites-handler.ts` |
+| 参数         | `mediaId: number`                            |
+| 返回类型     | `{ removed: boolean }`                       |
+
+**返回值结构**：
+
+```typescript
+{
+  removed: true
+}
+```
+
+**错误处理**：
+
+- 收藏夹中不存在该媒体：抛出 `NotFoundError`

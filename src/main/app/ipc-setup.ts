@@ -45,6 +45,7 @@ import { registerTaskHandlers } from '../ipc/handlers/task-handler'
 import { registerShareHandlers } from '../ipc/handlers/share'
 import { registerPluginManagementHandlers } from '../ipc/handlers/plugin'
 import { registerPluginBridgeHandlers } from '../ipc/handlers/plugin-bridge-handler'
+import { registerFavoritesHandlers } from '../ipc/handlers/favorites-handler'
 import { logger } from '../utils/logger'
 
 // C-G7：扫描进度监听器用具名函数引用，避免 removeAllListeners('progress')
@@ -123,6 +124,8 @@ export function setupIPC(ctx: AppContext): void {
   // 插件系统：注册插件管理 + 能力桥 IPC handler（不修改任何现有通道）
   registerPluginManagementHandlers(ctx)
   registerPluginBridgeHandlers(ctx)
+  // 收藏夹（示例）
+  registerFavoritesHandlers(ctx)
 
   // IPC 安全加固：初始化 pathGuard 的 userData 目录白名单
   // 必须在 app.whenReady() 之后调用，app.getPath('userData') 才可用

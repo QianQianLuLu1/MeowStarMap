@@ -478,3 +478,11 @@ export interface TaskCancelResult {
   cancelled: boolean
   taskId: string
 }
+
+// ============ 收藏夹（示例） ============
+
+export interface FavoriteItem {
+  id: number
+  media_id: number
+  created_at: string
+}

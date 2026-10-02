@@ -42,6 +42,7 @@ import { resonanceAPI } from './preload/api/resonance'
 import { operationHistoryAPI } from './preload/api/operation-history'
 import { decryptAPI } from './preload/api/decrypt'
 import { pluginAPI } from './preload/api/plugin'
+import { favoritesAPI } from './preload/api/favorites'
 
 // ============ 暴露给渲染进程的 API ============
 // 所有方法返回 Promise<T>（T 为业务数据类型），失败时抛出 IpcError
@@ -116,7 +117,9 @@ const electronAPI = {
   // 游戏参数解密
   decrypt: decryptAPI,
   // 插件系统管理（与主进程 pluginHost 通信，能力桥通过 window.pluginAPI 独立暴露）
-  plugin: pluginAPI
+  plugin: pluginAPI,
+  // 收藏夹（示例）
+  favorites: favoritesAPI
 }
 
 // ============ 文档源自检：非授信文档不授予 IPC 桥（第二层防线） ============

@@ -2773,6 +2773,10 @@
       "mainWindowNotInit": "主窗口未初始化",
       "databaseNotInit": "数据库未初始化"
     },
+    "favorites": {
+      "alreadyExists": "媒体 {{mediaId}} 已在收藏夹中",
+      "notFound": "收藏夹中不存在媒体 {{mediaId}}"
+    },
     "editor": {
       "dialog": {
         "filterPresetName": "滤镜预设"
