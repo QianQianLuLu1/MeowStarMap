@@ -66,6 +66,40 @@ jobs:
       - name: i18n 守卫（白名单只减不增 / 清零必移除 / key 已同步）
         run: npm run i18n:guard
       - run: npm run typecheck
+      # 技术债修复跟踪：当 PR 变更的源码文件命中 docs/debt-registry.json 中已登记的技术债条目时，
+      # 输出 ::warning:: 注解提醒开发者关闭对应 Issue 并更新技术债清单（提醒性质，不阻断 CI）
+      - name: Tech debt fix tracker
+        if: ${{ github.event_name == 'pull_request' }}
+        run: npx tsx scripts/debt/check-debt-fix.ts
+      # IPC 契约交叉校验：当 IPC handler 或 preload 桥文件变更时，强制要求同步更新 docs/IPC_CONTRACT.md
+      # 若 PR 已标注 skip-contract 标签则跳过（适用于纯重构、不影响通道语义的改动）
+      - name: IPC contract sync check
+        if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'skip-contract') }}
+        shell: bash
+        run: |
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+          # 获取 diff 中变更的文件列表（含新增、修改、删除）
+          CHANGED=$(git diff --name-only --diff-filter=ACMR "$BASE"..."$HEAD")
+          # 检查是否存在 IPC handler 或 preload 桥文件变更
+          IPC_CHANGED=$(echo "$CHANGED" | grep -E '^src/main/ipc/handlers/.*\.ts$|^src/main/preload/.*\.ts$' || true)
+          if [ -n "$IPC_CHANGED" ]; then
+            # 存在 IPC 文件变更，检查 docs/IPC_CONTRACT.md 是否也在 diff 中
+            CONTRACT_CHANGED=$(echo "$CHANGED" | grep -E '^docs/IPC_CONTRACT\.md$' || true)
+            if [ -z "$CONTRACT_CHANGED" ]; then
+              echo "::error::IPC handler/preload 文件已变更，但 docs/IPC_CONTRACT.md 未同步更新。"
+              echo ""
+              echo "变更的 IPC 文件："
+              echo "$IPC_CHANGED"
+              echo ""
+              echo "请同步更新 docs/IPC_CONTRACT.md 并保持向后兼容，"
+              echo "或在 PR 上添加 skip-contract 标签（仅适用于不影响通道语义的改动）。"
+              exit 1
+            fi
+            echo "✓ IPC 文件变更已伴随 IPC_CONTRACT.md 更新"
+          else
+            echo "✓ 无 IPC handler/preload 文件变更，跳过契约校验"
+          fi
 
   test:
     name: Test (shard ${{ matrix.shard }}/10)
