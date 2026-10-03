@@ -142,6 +142,9 @@ __probe*.txt
 
 # ===== 本地 AI 工具产物（不得入仓）=====
 .mimosa/
+.mimosa-feedback-report.md
+/scripts/mimosa-*.ps1
+/scripts/write-bridge-report.ps1
 .trae/
 .review/
 .review_*.txt
