@@ -399,12 +399,11 @@ export const SlideshowPlayer: React.FC<SlideshowPlayerProps> = ({ filteredFiles 
         {/* 设置抽屉 */}
         {showSettings && (
           <div
-            className="absolute right-6 top-1/2 -translate-y-1/2 w-72 rounded-2xl p-5 space-y-4 z-10"
+            className="absolute right-6 top-1/2 -translate-y-1/2 w-72 rounded-2xl p-5 space-y-4 z-10 text-white"
             style={{
               background: 'rgba(30, 30, 30, 0.92)',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(255,255,255,0.1)',
-              color: '#fff'
+              border: '1px solid rgba(255,255,255,0.1)'
             }}
             onClick={(e) => e.stopPropagation()}
           >

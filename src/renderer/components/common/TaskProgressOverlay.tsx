@@ -69,7 +69,7 @@ const StageIcon: React.FC<{ status: TaskStageStatus }> = ({ status }) => {
         viewBox="0 0 14 14"
         fill="none"
         aria-hidden="true"
-        style={{ color: '#22c55e' }}
+        style={{ color: 'var(--success)' }}
       >
         <path
           d="M3 7.5L6 10.5L11 4"

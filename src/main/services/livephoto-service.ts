@@ -7,6 +7,7 @@ import { getUniqueFilePath } from '../utils/file-utils'
 import { assertDiskSpace } from '../utils/disk'
 import { probeVideoMetadata } from '../utils/video-probe'
 import { logger } from '../utils/logger'
+import { ValidationError } from '../../shared/errors/app-error'
 import { t } from '../i18n'
 
 // Live Photo 转码耗时较长，超时放宽到 10 分钟
@@ -50,7 +51,7 @@ export class LivePhotoService {
       // 探测视频元数据（用于 JPG 分辨率对齐 + 时长日志）
       const meta = await probeVideoMetadata(filePath, 30000)
       if (!meta.duration || meta.duration <= 0) {
-        throw new Error(t('main.livephoto.error.invalidVideo'))
+        throw new ValidationError(t('main.livephoto.error.invalidVideo'))
       }
 
       // 生成 ContentIdentifier UUID（小写无连字符，符合 Apple 规范）

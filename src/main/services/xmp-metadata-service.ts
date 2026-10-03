@@ -28,6 +28,7 @@ import path from 'path'
 import sharp from 'sharp'
 import exifr from 'exifr'
 import { app } from 'electron'
+import { ValidationError, NotFoundError } from '../../shared/errors/app-error'
 import { getUniqueFilePath } from '../utils/file-utils'
 import { isImageExt } from '../utils/media-constants'
 import { getLosslessEncodeOptions } from '../utils/image-encode'
@@ -165,7 +166,7 @@ export async function writeMetadataToFile(
 ): Promise<boolean> {
   const ext = path.extname(sourcePath).toLowerCase()
   if (!isImageExt(ext)) {
-    throw new Error(`不支持的图片格式: ${ext}`)
+    throw new ValidationError(`不支持的图片格式: ${ext}`)
   }
 
   const xmpPacket = buildXmpPacket(metadata)
@@ -184,7 +185,7 @@ export async function writeMetadataToFile(
   // 原实现 quality 默认 92 且 png({quality<100}) 会触发调色板量化（有损）。
   const encodeOptions = getLosslessEncodeOptions(format)
   if (!encodeOptions) {
-    throw new Error(`不支持的输出格式: ${format}`)
+    throw new ValidationError(`不支持的输出格式: ${format}`)
   }
   if (format === 'jpg' || format === 'jpeg') {
     pipeline = pipeline.jpeg(encodeOptions as import('sharp').JpegOptions)
@@ -339,6 +340,6 @@ export function getAppVersion(): string {
  */
 export function ensureFileExists(filePath: string): void {
   if (!fs.existsSync(filePath)) {
-    throw new Error(`源文件不存在: ${filePath}`)
+    throw new NotFoundError(`源文件不存在: ${filePath}`)
   }
 }

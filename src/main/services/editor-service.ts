@@ -22,6 +22,7 @@ import { parseDataUrlToBuffer, getUniqueFilePath } from '../utils/file-utils'
 import { getExtFromMime } from '../utils/media-constants'
 import { resolveSaveStrategy, getLosslessEncodeOptions } from '../utils/image-encode'
 import { t } from '../i18n'
+import { ValidationError } from '../../shared/errors/app-error'
 import type { DatabaseManager } from '../database/connection'
 import { MediaRepository } from '../database/media-repository'
 import type { TaskScheduler } from '../scheduler/task-scheduler'
@@ -218,7 +219,7 @@ export class EditorService {
         await pipeline.toFile(normalizedFilePath)
       } else {
         if (!buffer || buffer.length === 0) {
-          throw new Error(t('main.editor.error.emptyImageData'))
+          throw new ValidationError(t('main.editor.error.emptyImageData'))
         }
         await fs.promises.writeFile(normalizedFilePath, buffer)
         logger.info(

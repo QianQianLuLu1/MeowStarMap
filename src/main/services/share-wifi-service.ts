@@ -15,6 +15,7 @@ import fs from 'fs'
 import crypto from 'crypto'
 import { randomInt } from 'node:crypto'
 import { logger } from '../utils/logger'
+import { ValidationError } from '../../shared/errors/app-error'
 import { t } from '../i18n'
 // P2-A：统一使用 media-constants 的 getMimeType（单一权威来源）
 import { getMimeType } from '../utils/media-constants'
@@ -89,7 +90,7 @@ class WifiShareService {
 
     const fileInfos = await this.collectFiles(files)
     if (fileInfos.length === 0) {
-      throw new Error(t('main.share.error.noFilesToShare'))
+      throw new ValidationError(t('main.share.error.noFilesToShare'))
     }
 
     // P0-C / F-S3：生成 6 位数字 PIN 码（原 4 位强度不足）

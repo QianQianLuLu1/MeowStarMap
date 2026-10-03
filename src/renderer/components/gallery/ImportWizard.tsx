@@ -468,7 +468,7 @@ export const ImportWizard: React.FC<ImportWizardProps> = ({ open, onClose }) => 
                 className="p-3 rounded-lg text-center"
                 style={{ background: 'rgba(234, 88, 12, 0.12)' }}
               >
-                <div className="text-lg font-semibold" style={{ color: '#ea580c' }}>
+                <div className="text-lg font-semibold" style={{ color: 'var(--warning-text)' }}>
                   {result.skipped.length}
                 </div>
                 <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>

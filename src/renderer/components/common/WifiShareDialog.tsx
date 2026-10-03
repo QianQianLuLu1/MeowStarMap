@@ -258,7 +258,7 @@ export const WifiShareDialog: React.FC<WifiShareDialogProps> = ({ open, filePath
 
           <div
             className="text-xs p-3 rounded-lg"
-            style={{ background: 'rgba(255,184,0,0.08)', color: '#9a6c00' }}
+            style={{ background: 'rgba(255,184,0,0.08)', color: 'var(--warning-text)' }}
           >
             <p>{t('share.wifi.tips.sameWifi')}</p>
             <p>{t('share.wifi.tips.firewall')}</p>

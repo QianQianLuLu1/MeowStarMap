@@ -647,8 +647,8 @@ export const WardrobeView: React.FC = () => {
           >
             {entity.owned && (
               <span
-                className="text-xs font-bold"
-                style={{ color: '#fff', textShadow: '0 0 3px rgba(0,0,0,.8)' }}
+                className="text-xs font-bold text-white"
+                style={{ textShadow: '0 0 3px rgba(0,0,0,.8)' }}
               >
                 ✓
               </span>

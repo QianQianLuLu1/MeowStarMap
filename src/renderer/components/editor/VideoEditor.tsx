@@ -853,7 +853,7 @@ export const VideoEditor: React.FC<VideoEditorProps> = ({ media, onExit }) => {
               {exportFormat === 'gif' && (
                 <div
                   className="p-2.5 rounded-lg text-xs leading-relaxed"
-                  style={{ background: 'rgba(255, 184, 0, 0.08)', color: '#9a6c00' }}
+                  style={{ background: 'rgba(255, 184, 0, 0.08)', color: 'var(--warning-text)' }}
                 >
                   {t('video.gifWarning')}
                 </div>

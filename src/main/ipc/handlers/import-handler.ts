@@ -68,7 +68,7 @@ export function registerImportHandlers(ctx: HandlerContext): void {
             // 失败仅记日志，不影响已复制文件与导入成功返回（阶段 0 已登记白名单，此处无需再 register）
             try {
               const db = ctx.dbManager.getDatabase()
-              if (!db) throw new Error(t('main.error.databaseNotInit'))
+              if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
               const importRootRepo = new ImportRootRepository(
                 db,
                 ctx.dbManager.getWorkerBridge(),

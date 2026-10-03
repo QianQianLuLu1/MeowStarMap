@@ -160,7 +160,7 @@ export const AboutContactSection: React.FC = () => {
         style={{ background: 'var(--bg-tertiary)' }}
       >
         <div className="flex items-center gap-3">
-          <IconQQ size={24} style={{ color: '#12B7F5' }} />
+          <IconQQ size={24} className="text-[#12B7F5]" />
           <div>
             <div className="text-sm" style={{ color: 'var(--text-primary)' }}>
               {t('settings.about.qqGroup')}

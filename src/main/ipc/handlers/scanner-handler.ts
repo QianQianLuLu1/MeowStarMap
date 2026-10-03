@@ -92,7 +92,7 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
     if (result.success && options?.path) {
       try {
         const db = ctx.dbManager.getDatabase()
-        if (!db) throw new Error(t('main.error.databaseNotInit'))
+        if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
         const importRootRepo = new ImportRootRepository(
           db,
           ctx.dbManager.getWorkerBridge(),

@@ -122,6 +122,19 @@ export default [
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
     rules: {
+      // §1 语义级拦截：禁止渲染层导入 electron 模块（静态 import 与动态 import() 均拦截）
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'electron',
+              message:
+                '渲染层禁止直接 import electron，请通过 window.electronAPI（preload 桥）访问主进程能力'
+            }
+          ]
+        }
+      ],
       'no-restricted-syntax': [
         'error',
         // —— 复用 i18n 护栏（中文硬编码 + console 调试噪声）——
@@ -149,6 +162,20 @@ export default [
           message:
             '禁止在 JSX 中硬编码十六进制色值，请使用 CSS 变量（var(--*)）或 Tailwind 语义 token（如 text-primary / bg-accent）'
         },
+        // §3-a 禁止 style 属性对象中硬编码色值（如 style={{ color: '#f00' }}）
+        {
+          selector:
+            'JSXAttribute[name.name="style"] JSXExpressionContainer > ObjectExpression Property > Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+          message:
+            '禁止在 style 内联对象中硬编码十六进制色值，请使用 CSS 变量（如 style={{ color: "var(--text-primary)" }}）'
+        },
+        // §3-b 禁止色值常量对象中硬编码色值（如 const COLORS = { danger: '#ff0000' }）
+        {
+          selector:
+            'VariableDeclarator[id.name=/^(COLOR|COLORS|Color|Colors|THEME|THEMES|Theme|Themes|PALETTE|PALETTES|Palette|Palettes)$/][init.type="ObjectExpression"] Literal[value=/^#[0-9a-fA-F]{3,8}$/]',
+          message:
+            '禁止在色值常量对象中硬编码十六进制色值，请使用 CSS 变量（var(--*)）或 Tailwind 语义 token'
+        },
         // §4 禁止 class 组件（必须使用函数式组件 + Hooks）
         {
           selector:
@@ -159,6 +186,52 @@ export default [
           selector:
             'ClassExpression[superClass.object.name="React"][superClass.property.name="Component"]',
           message: '禁止 class 组件，请使用 React 函数式组件 + Hooks（React.FC 或裸函数）'
+        }
+      ]
+    }
+  },
+  // ============ Preload 桥装配层约定护栏（project-conventions.md §1） ============
+  // 禁止在 preload 子模块中裸调 ipcRenderer.invoke（一律经 ipc.ts 的 call<T>() 解包）；
+  // 禁止绕过 exposeIfTrusted 直接调 contextBridge.exposeInMainWorld（跳过 origin 门禁）。
+  // ipc.ts 是中央 IPC 基础层，合法使用 ipcRenderer.invoke，通过 ignores 豁免。
+  {
+    files: ['src/main/preload/**/*.ts'],
+    ignores: ['src/main/preload/ipc.ts', 'src/main/preload/__tests__/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...i18nGuardSelectors,
+        // §1 禁止裸调 ipcRenderer.invoke（一律经 ipc.ts 的 call<T>() 解包）
+        {
+          selector: "MemberExpression[object.name='ipcRenderer'][property.name='invoke']",
+          message:
+            'preload 子模块禁止裸调 ipcRenderer.invoke，请统一使用 src/main/preload/ipc.ts 的 call<T>() 函数'
+        },
+        // §1 禁止绕过 exposeIfTrusted 直接暴露全局（跳过非授信文档 origin 门禁）
+        {
+          selector:
+            "CallExpression[callee.object.name='contextBridge'][callee.property.name='exposeInMainWorld']",
+          message:
+            'preload 子模块禁止直接调用 contextBridge.exposeInMainWorld，请统一通过 preload.ts 的 exposeIfTrusted() 暴露（确保 origin 门禁生效）'
+        }
+      ]
+    }
+  },
+  // ============ 主进程 handler / service 约定护栏（project-conventions.md §2） ============
+  // 禁止 throw new Error()，引导使用 AppError 家族（DatabaseError / ValidationError 等）。
+  // 与 renderer 块同理，需复用 i18n 护栏（flat config 后块覆盖前块的 no-restricted-syntax）。
+  // 测试文件在下方 tests/__tests__ 块豁免（断言 fixture 合法使用原生 Error）。
+  {
+    files: ['src/main/ipc/handlers/**/*.ts', 'src/main/services/**/*.ts'],
+    ignores: ['src/main/ipc/handlers/_*.ts', 'src/main/ipc/handlers/**/*.test.ts'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        ...i18nGuardSelectors,
+        {
+          selector: 'ThrowStatement > NewExpression[callee.name="Error"]',
+          message:
+            '禁止 throw new Error()，请使用 src/shared/errors/app-error.ts 中的 AppError 家族（DatabaseError / ValidationError / NotFoundError / PermissionError / FileSystemError / InternalError）'
         }
       ]
     }

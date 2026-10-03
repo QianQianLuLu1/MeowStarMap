@@ -23,7 +23,7 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
     'import:roots',
     wrapHandlerNoArgs(ctx, async (c) => {
       const db = c.dbManager.getDatabase()
-      if (!db) throw new Error(t('main.error.databaseNotInit'))
+      if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
       const repo = new ImportRootRepository(
         db,
         c.dbManager.getWorkerBridge(),
@@ -43,7 +43,7 @@ export function registerImportRootHandlers(ctx: HandlerContext): void {
       z.tuple([schemas.filePath, z.boolean()]),
       async ([rootPath, clearRecords], c) => {
         const db = c.dbManager.getDatabase()
-        if (!db) throw new Error(t('main.error.databaseNotInit'))
+        if (!db) throw AppError.preconditionFailed(t('main.error.databaseNotInit'))
         const importRootRepo = new ImportRootRepository(
           db,
           c.dbManager.getWorkerBridge(),

@@ -7,7 +7,13 @@ import type { ExportOptions, ExifData, ExportFileMetadata } from '../types/file'
 // C-3：统一文件工具函数与媒体常量；C-G2：moveFile 替代 fs-extra.move
 import { pathExists, getUniqueFilePath, parseDataUrlToBuffer, moveFile } from '../utils/file-utils'
 import { assertFileWritePath, pathGuard } from '../ipc/validator'
-import { isAppError } from '../../shared/errors/app-error'
+import {
+  AppError,
+  isAppError,
+  ValidationError,
+  FileSystemError
+} from '../../shared/errors/app-error'
+import { ERROR_CODES } from '../../shared/errors/error-codes'
 import { isImageExt, MEDIA_EXTENSIONS, isVideoExt } from '../utils/media-constants'
 import { assertDiskSpace } from '../utils/disk'
 import { t } from '../i18n'
@@ -208,17 +214,17 @@ export class FileService {
       // 防止路径遍历：文件名不得包含路径分隔符和上级目录引用
       const invalidChars = /[<>:"\\|?*/]/
       if (invalidChars.test(newName)) {
-        throw new Error(t('main.file.error.invalidChars'))
+        throw new ValidationError(t('main.file.error.invalidChars'))
       }
       // 额外检查：禁止纯点号名称和包含 .. 的路径遍历尝试
       const trimmedName = newName.trim()
       if (trimmedName === '.' || trimmedName === '..' || trimmedName.includes('..')) {
-        throw new Error(t('main.file.error.pathReference'))
+        throw new ValidationError(t('main.file.error.pathReference'))
       }
       // 使用 path.basename 确保最终文件名不含路径
       const safeName = path.basename(trimmedName)
       if (safeName !== trimmedName) {
-        throw new Error(t('main.file.error.invalidSeparator'))
+        throw new ValidationError(t('main.file.error.invalidSeparator'))
       }
 
       const dir = path.dirname(oldPath)
@@ -226,7 +232,7 @@ export class FileService {
       const newPath = path.join(dir, safeName + ext)
 
       if (await pathExists(newPath)) {
-        throw new Error(t('main.file.error.targetExists'))
+        throw new FileSystemError(t('main.file.error.targetExists'))
       }
 
       await moveFile(oldPath, newPath)
@@ -262,7 +268,7 @@ export class FileService {
       try {
         const invalidChars = /[<>:"\\|?*/]/
         if (invalidChars.test(op.newName)) {
-          throw new Error(t('main.file.error.invalidChars'))
+          throw new ValidationError(t('main.file.error.invalidChars'))
         }
         const trimmedName = op.newName.trim()
         if (
@@ -271,11 +277,11 @@ export class FileService {
           trimmedName === '..' ||
           trimmedName.includes('..')
         ) {
-          throw new Error(t('main.file.error.invalidName'))
+          throw new ValidationError(t('main.file.error.invalidName'))
         }
         const safeName = path.basename(trimmedName)
         if (safeName !== trimmedName) {
-          throw new Error(t('main.file.error.invalidSeparator'))
+          throw new ValidationError(t('main.file.error.invalidSeparator'))
         }
 
         const dir = path.dirname(op.oldPath)
@@ -491,7 +497,7 @@ export class FileService {
       // 安全限制：防止写入超大文件耗尽磁盘
       const MAX_DATA_URL_SIZE = 100 * 1024 * 1024 // 100MB
       if (buffer.length > MAX_DATA_URL_SIZE) {
-        throw new Error(
+        throw new ValidationError(
           t('main.file.error.fileTooLarge', { size: buffer.length, limit: MAX_DATA_URL_SIZE })
         )
       }
@@ -499,7 +505,7 @@ export class FileService {
       let targetDir = options.directory
       if (!targetDir) {
         const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
-        if (result.canceled) throw new Error(t('main.file.error.noOutputDir'))
+        if (result.canceled) throw AppError.canceled(t('main.file.error.noOutputDir'))
         targetDir = result.filePaths[0]
         // 用户在原生对话框里亲自选的目录视为授权，登记白名单后下方校验才不会误拒
         pathGuard.register(targetDir)
@@ -519,8 +525,15 @@ export class FileService {
       await fsp.writeFile(targetPath, buffer)
       return { success: true, message: t('main.file.message.saveSuccess'), filePath: targetPath }
     } catch (error) {
-      // 路径拦截等 AppError 必须向上抛给 IPC 层，不能降级成 success:false 被静默吞掉
-      if (isAppError(error)) throw error
+      // 路径拦截等安全类 AppError 必须向上抛给 IPC 层，不能降级成 success:false 被静默吞掉；
+      // 入参类失败（超大文件 / 用户取消）按既有契约降级为结果对象返回
+      if (
+        isAppError(error) &&
+        error.code !== ERROR_CODES.VALIDATION_ERROR &&
+        error.code !== ERROR_CODES.CANCELED
+      ) {
+        throw error
+      }
       return {
         success: false,
         message: t('main.file.message.saveFailed', {

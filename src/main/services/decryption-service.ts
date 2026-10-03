@@ -19,6 +19,7 @@ import koffi from 'koffi'
 import fsp from 'fs/promises'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
+import { InternalError } from '../../shared/errors/app-error'
 import { findDllPath } from '../decryption-worker/dll-path'
 import type { DecryptionWorkerBridge } from '../decryption-worker/bridge'
 import type { NetworkDecodeKind, NetworkDecodeResult } from '../decryption-worker/worker-protocol'
@@ -152,9 +153,13 @@ function getLib(): koffi.IKoffiLib {
       /* ignore */
     }
     lib = null
-    throw new Error(
-      t('main.decryption.error.abiMismatch', { actual: ver, expected: EXPECTED_ABI_VERSION })
-    )
+    // DLL 与应用版本不配套属环境级部署问题，归 InternalError（兜底/第三方库错误）；
+    // 显式 userMessage 携带具体 ABI 提示，避免 InternalError 默认兜底文案掩盖可行动信息
+    const abiMismatchMsg = t('main.decryption.error.abiMismatch', {
+      actual: ver,
+      expected: EXPECTED_ABI_VERSION
+    })
+    throw new InternalError(abiMismatchMsg, undefined, { userMessage: abiMismatchMsg })
   }
 
   return lib

@@ -11,6 +11,7 @@ import { runFfmpegCommand } from '../utils/ffmpeg-runner'
 // 损坏文件容错：错误日志写入 + 标记回调
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
+import { ValidationError, FileSystemError } from '../../shared/errors/app-error'
 import type { CorruptedMarkerFn } from '../thumbnail/generator'
 
 // 修复 C-S4：超时时间可配置，默认值按操作类型区分
@@ -233,7 +234,8 @@ export class VideoService {
     try {
       // 参数校验
       if (startTime < 0 || endTime <= startTime) {
-        throw new Error(`无效的裁剪区间：startTime=${startTime}, endTime=${endTime}`)
+        // 技术原因串经 trimFailed 模板拼给用户，测试与数据耦合依赖 zh-CN 原文（同下方磁盘空间不足）
+        throw new ValidationError(`无效的裁剪区间: startTime=${startTime}, endTime=${endTime}`)
       }
       const duration = endTime - startTime
 
@@ -248,11 +250,11 @@ export class VideoService {
           const needMB = (srcStat.size / 1024 / 1024).toFixed(1)
           const availMB = (available / 1024 / 1024).toFixed(1)
           // 错误文案与下方 includes('磁盘空间不足') 判定构成固定协议，保持 zh-CN 原文（数据耦合）
-          throw new Error(`磁盘空间不足，需要 ${needMB} MB，仅剩 ${availMB} MB`)
+          throw new FileSystemError(`磁盘空间不足，需要 ${needMB} MB，仅剩 ${availMB} MB`)
         }
       } catch (error) {
         // 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
-        // eslint-disable-next-line no-restricted-syntax -- 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
+        // eslint-disable-next-line no-restricted-syntax -- includes 匹配用 zh-CN 数据耦合，非 UI 文案
         if (error instanceof Error && error.message.includes('磁盘空间不足')) throw error
       }
 
@@ -312,7 +314,7 @@ export class VideoService {
     try {
       // 参数校验
       if (speed < MIN_SPEED || speed > MAX_SPEED) {
-        throw new Error(
+        throw new ValidationError(
           t('main.videoEditor.error.unsupportedSpeed', {
             speed: String(speed),
             min: String(MIN_SPEED),
@@ -333,11 +335,11 @@ export class VideoService {
           const needMB = (required / 1024 / 1024).toFixed(1)
           const availMB = (available / 1024 / 1024).toFixed(1)
           // 错误文案与下方 includes('磁盘空间不足') 判定构成固定协议，保持 zh-CN 原文（数据耦合）
-          throw new Error(`磁盘空间不足，需要 ${needMB} MB，仅剩 ${availMB} MB`)
+          throw new FileSystemError(`磁盘空间不足，需要 ${needMB} MB，仅剩 ${availMB} MB`)
         }
       } catch (error) {
         // 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
-        // eslint-disable-next-line no-restricted-syntax -- 匹配上方 throw 的固定 zh-CN 消息（数据耦合，非 UI 文案）
+        // eslint-disable-next-line no-restricted-syntax -- includes 匹配用 zh-CN 数据耦合，非 UI 文案
         if (error instanceof Error && error.message.includes('磁盘空间不足')) throw error
       }
 
