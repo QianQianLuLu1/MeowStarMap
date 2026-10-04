@@ -68,7 +68,15 @@ export default defineConfig({
         'dist/**',
         'release/**',
         'coverage/**'
-      ]
+      ],
+      // 覆盖率门控阈值：基于 2026-10 基线（statements 69.94% / branches 81.43% / functions 68.55% / lines 69.94%），
+      // 取整后设为下限；后续随测试补全逐步提升至 80% 目标。CI 中 vitest --coverage 超阈值即失败阻断。
+      thresholds: {
+        statements: 69,
+        branches: 80,
+        functions: 68,
+        lines: 69
+      }
     }
   },
   resolve: {

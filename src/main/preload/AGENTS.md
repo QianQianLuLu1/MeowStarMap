@@ -1,6 +1,6 @@
 # AGENTS.md — `src/main/preload`（Preload 桥装配层）
 
-本文件为 Agent 与新协作者提供 **preload 模块级** 速览与约定。顶层项目速览见根目录 [`AGENTS.md`](../../../AGENTS.md)；IPC 白名单与 AppError 两条硬性约定见 always-on 规则 `project-conventions.md`；通道名/方法签名契约见 [`docs/IPC_CONTRACT.md`](../../../docs/IPC_CONTRACT.md)；handler 注册侧见 [`src/main/ipc/handlers/AGENTS.md`](../ipc/handlers/AGENTS.md)；渲染层调用侧见 [`src/renderer/AGENTS.md`](../../renderer/AGENTS.md)。本文件只补 **本目录内** 的装配与门禁落地方式。
+本文件为 Agent 与新协作者提供 **preload 模块级** 速览与约定。顶层项目速览见根目录 [`AGENTS.md`](../../../AGENTS.md)；IPC 白名单与 AppError 两条硬性约定见 [`docs/CODING_CONVENTIONS.md`](../../../docs/CODING_CONVENTIONS.md)（唯一真相源；IDE 的 always-on 规则文件仅为它的本地镜像）；通道名/方法签名契约见 [`docs/IPC_CONTRACT.md`](../../../docs/IPC_CONTRACT.md)；handler 注册侧见 [`src/main/ipc/handlers/AGENTS.md`](../ipc/handlers/AGENTS.md)；渲染层调用侧见 [`src/renderer/AGENTS.md`](../../renderer/AGENTS.md)。本文件只补 **本目录内** 的装配与门禁落地方式。
 
 ## 模块概述
 

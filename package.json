@@ -31,6 +31,7 @@
   "scripts": {
     "dev": "electron-vite dev",
     "clean": "node -e \"const fs=require('fs');const p=require('path');['dist/renderer/assets','dist/main'].forEach(d=>{const fp=p.join(__dirname,d);if(fs.existsSync(fp)){fs.rmSync(fp,{recursive:true,force:true});console.log('[clean] removed '+d)}})\"",
+    "reset": "tsx scripts/reset.ts",
     "build": "npm run clean && electron-vite build && node -e \"require('fs').writeFileSync('dist/main/package.json',JSON.stringify({type:'commonjs'}))\"",
     "build:preview": "vite build --config vite.preview.config.ts",
     "preview": "electron-vite preview",
@@ -75,6 +76,9 @@
     "commit": "cz",
     "commitlint": "commitlint --from=HEAD~1 --to=HEAD",
     "commitlint:check": "commitlint --edit",
+    "doctor": "tsx scripts/doctor.ts",
+    "verify": "tsx scripts/verify-changes.ts",
+    "verify:staged": "tsx scripts/verify-changes.ts --staged",
     "prepare": "husky || true"
   },
   "config": {

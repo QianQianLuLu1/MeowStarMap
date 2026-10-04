@@ -4,7 +4,7 @@
 # 配置文件：commitlint.config.cjs
 # 模板文件：.gitmessage（通过 git config commit.template 启用）
 # 失败处理：校验失败即阻止提交，输出错误详情
-# 详见：.qoder/rules/project-conventions.md「提交校验流程」节与 .gitmessage 模板
+# 详见：docs/CODING_CONVENTIONS.md「校验与提交」节与 .gitmessage 模板
 # ============================================================
 
 # Windows 环境下 commit-msg 文件路径作为 $1 传入
@@ -30,7 +30,7 @@ npx --no-install commitlint --edit "$1" || (
   echo "   fix(db): 修复扫描完成后未触发 scanner:complete 事件"
   echo "   chore(comments): 清理 src/main/services 冗余注释"
   echo ""
-  echo " 详见：.qoder/rules/project-conventions.md「提交校验流程」节 / .gitmessage 模板"
+  echo " 详见：docs/CODING_CONVENTIONS.md「校验与提交」节 / .gitmessage 模板"
   echo " 或使用交互式提交：npm run commit"
   echo "================================================"
   exit 1

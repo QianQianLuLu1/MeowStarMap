@@ -2,35 +2,69 @@
 # pre-commit 钩子
 # 钩子职责：
 #   1. lint-staged — 对暂存文件运行 eslint + prettier + 相关单测
-#   2. typecheck   — tsc -b 全项目类型检查（增量构建，通常 < 5s）
-#   3. （测试已通过 lint-staged 增量执行，无需全量跑）
+#   2. core-gate   — 核心路径授权闸门（scripts/core-path-gate.ts，对暂存 diff 判定授权注释）
+#   3. typecheck   — tsc -b 全项目类型检查（增量构建，通常 < 5s）
 # 跳过策略：本钩子始终完整执行（[skip lint] 仅跳过 commit-msg）
 # 失败处理：任一步骤失败即阻止提交
-# 详见：.qoder/rules/project-conventions.md
+# 输出约定：每步以 [PRE-COMMIT] 前缀标记阶段结果，供 Agent 解析
+# 详见：AGENTS.md「核心路径保护」与 AGENTS.md「verify 与 pre-commit 闸门的差异」
 # ============================================================
 
+echo "[PRE-COMMIT] ▶ 开始验证（lint-staged + core-gate + typecheck）"
+
 # ── Step 1: lint-staged（eslint + prettier + 相关测试） ──
-npx --no-install lint-staged || (
+echo "[PRE-COMMIT] ▶ Step 1/3: lint-staged（eslint + prettier + 相关单测）"
+npx --no-install lint-staged
+LINT_STATUS=$?
+if [ $LINT_STATUS -ne 0 ]; then
   echo ""
+  echo "[PRE-COMMIT] ✗ Step 1/3 FAILED — lint-staged 检查未通过"
+  echo "[PRE-COMMIT] 诊断：请运行 npm run lint:fix 自动修复，或手动修复上述错误"
   echo "================================================"
   echo " [pre-commit] lint-staged 检查未通过"
   echo " 请修复上述错误后重新提交"
   echo " 提示：npm run lint:fix 可自动修复部分问题"
   echo "================================================"
   exit 1
-)
+fi
+echo "[PRE-COMMIT] ✓ Step 1/3 PASSED — lint-staged 通过"
+
+# ── 仅当暂存区包含受保护路径文件时执行核心路径授权闸门 ──
+# 受保护文件存在实质改动时，暂存 diff 必须同批新增含真实原因的 @core-change 授权注释
+echo "[PRE-COMMIT] ▶ Step 2/3: 核心路径授权闸门 (core-path-gate --staged)"
+npx --no-install tsx scripts/core-path-gate.ts --staged
+GATE_STATUS=$?
+if [ $GATE_STATUS -ne 0 ]; then
+  echo ""
+  echo "[PRE-COMMIT] ✗ Step 2/3 FAILED — 核心路径授权闸门未通过"
+  echo "[PRE-COMMIT] 诊断：为存在实质改动的受保护文件（preload/api、ipc/handlers、services、shared/errors），"
+  echo "[PRE-COMMIT] 在本次暂存改动中新增/替换一条顶部注释 \"// @core-change: <本次真实中文原因>\""
+  echo "[PRE-COMMIT] 口径详见 AGENTS.md「核心路径保护」"
+  echo "================================================"
+  exit 1
+fi
+echo "[PRE-COMMIT] ✓ Step 2/3 PASSED — 核心路径授权闸门通过"
 
 # ── 仅当暂存区包含 TS/TSX 文件时执行类型检查 ──
 if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.tsx?$'; then
-  # ── Step 2: typecheck（tsc -b 增量构建） ──
-  echo "[pre-commit] 运行类型检查..."
-  npx --no-install tsc -b || (
+  # ── Step 3: typecheck（tsc -b 增量构建） ──
+  echo "[PRE-COMMIT] ▶ Step 3/3: TypeScript 类型检查 (tsc -b)"
+  npx --no-install tsc -b
+  TC_STATUS=$?
+  if [ $TC_STATUS -ne 0 ]; then
     echo ""
+    echo "[PRE-COMMIT] ✗ Step 3/3 FAILED — TypeScript 类型检查未通过"
+    echo "[PRE-COMMIT] 诊断：请运行 npm run typecheck 查看详情，修复类型错误后重新提交"
     echo "================================================"
     echo " [pre-commit] TypeScript 类型检查未通过"
     echo " 请修复类型错误后重新提交"
     echo " 提示：npm run typecheck 可查看详情"
     echo "================================================"
     exit 1
-  )
+  fi
+  echo "[PRE-COMMIT] ✓ Step 3/3 PASSED — typecheck 通过"
+else
+  echo "[PRE-COMMIT] ⊘ Step 3/3 SKIPPED — 暂存区无 TS/TSX 文件"
 fi
+
+echo "[PRE-COMMIT] ✓ 全部验证通过 — 可以提交"

@@ -1,6 +1,6 @@
 # AGENTS.md — `src/main/services`（主进程业务服务层）
 
-本文件为 Agent 与新协作者提供 **services 模块级** 速览与约定。顶层项目速览见根目录 [`AGENTS.md`](../../../AGENTS.md)；IPC handler 注册层约定见 [`../ipc/handlers/AGENTS.md`](../ipc/handlers/AGENTS.md)；AppError 错误分类与 CSS 变量等硬性约定见 always-on 规则 `project-conventions.md`。本文件只补 **本目录内** 的服务设计与依赖约定。
+本文件为 Agent 与新协作者提供 **services 模块级** 速览与约定。顶层项目速览见根目录 [`AGENTS.md`](../../../AGENTS.md)；IPC handler 注册层约定见 [`../ipc/handlers/AGENTS.md`](../ipc/handlers/AGENTS.md)；AppError 错误分类与 CSS 变量等硬性约定见 [`docs/CODING_CONVENTIONS.md`](../../../docs/CODING_CONVENTIONS.md)（唯一真相源；IDE 的 always-on 规则文件仅为它的本地镜像）。本文件只补 **本目录内** 的服务设计与依赖约定。
 
 ## 模块概述
 

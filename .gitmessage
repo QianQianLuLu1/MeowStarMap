@@ -1,7 +1,7 @@
 # ============================================================
 # 提交信息模板（Commit Message Template）
-# 配合 commitlint.config.js 与 husky commit-msg 钩子使用
-# 详见 .qoder/rules/project-conventions.md「提交校验流程」节与 commitlint.config.cjs
+# 配合 commitlint.config.cjs 与 husky commit-msg 钩子使用
+# 详见 docs/CODING_CONVENTIONS.md「校验与提交」节与 commitlint.config.cjs
 # ============================================================
 #
 # 提交格式：

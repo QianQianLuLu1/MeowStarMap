@@ -113,7 +113,7 @@ export default [
       }
     }
   },
-  // ============ 渲染进程专属约定护栏（project-conventions.md §1-§4） ============
+  // ============ 渲染进程专属约定护栏（docs/CODING_CONVENTIONS.md §1-§4） ============
   // 在 src/** 块之后覆盖 no-restricted-syntax，同时保留 i18n 护栏并追加以下禁令：
   //   §1 禁止渲染层 import('electron') / import ... from 'electron'
   //   §2 禁止 throw new Error（应使用 AppError 家族）
@@ -190,7 +190,7 @@ export default [
       ]
     }
   },
-  // ============ Preload 桥装配层约定护栏（project-conventions.md §1） ============
+  // ============ Preload 桥装配层约定护栏（docs/CODING_CONVENTIONS.md §1） ============
   // 禁止在 preload 子模块中裸调 ipcRenderer.invoke（一律经 ipc.ts 的 call<T>() 解包）；
   // 禁止绕过 exposeIfTrusted 直接调 contextBridge.exposeInMainWorld（跳过 origin 门禁）。
   // ipc.ts 是中央 IPC 基础层，合法使用 ipcRenderer.invoke，通过 ignores 豁免。
@@ -217,7 +217,20 @@ export default [
       ]
     }
   },
-  // ============ 主进程 handler / service 约定护栏（project-conventions.md §2） ============
+  // ============ 核心路径保护（preload API 命名空间） ============
+  // 两层闸门（详见 AGENTS.md「核心路径保护」）：
+  //   ① local/core-path-guard 为静态格式护栏：@core-change 授权注释存在与否不强制，
+  //     存在时校验「至多一条、原因非空、不得为批量占位文案」；
+  //   ② 授权判定由提交面闸门（scripts/core-path-gate.ts，接入 .husky/pre-commit 与
+  //     npm run verify）对本次 diff 判定：实质改动必须同批新增含真实原因的授权注释。
+  {
+    files: ['src/main/preload/api/**/*.ts'],
+    ignores: ['src/main/preload/api/**/*.test.ts'],
+    rules: {
+      'local/core-path-guard': 'error'
+    }
+  },
+  // ============ 主进程 handler / service 约定护栏（docs/CODING_CONVENTIONS.md §2） ============
   // 禁止 throw new Error()，引导使用 AppError 家族（DatabaseError / ValidationError 等）。
   // 与 renderer 块同理，需复用 i18n 护栏（flat config 后块覆盖前块的 no-restricted-syntax）。
   // 测试文件在下方 tests/__tests__ 块豁免（断言 fixture 合法使用原生 Error）。
@@ -233,10 +246,22 @@ export default [
           message:
             '禁止 throw new Error()，请使用 src/shared/errors/app-error.ts 中的 AppError 家族（DatabaseError / ValidationError / NotFoundError / PermissionError / FileSystemError / InternalError）'
         }
-      ]
+      ],
+      'local/core-path-guard': 'error'
     }
   },
-  // ============ 主进程 IPC handler 约定护栏（project-conventions.md §1） ============
+  // ============ 核心路径保护（共享错误定义） ============
+  // 两层闸门口径同 preload/api 块：本规则做注释格式护栏（存在不强制），
+  // 授权判定由提交面闸门 scripts/core-path-gate.ts 对本次 diff 执行。
+  // 这些文件定义了跨进程统一错误基类与错误码，任何变更都影响全局错误处理契约。
+  {
+    files: ['src/shared/errors/**/*.ts'],
+    ignores: ['src/shared/errors/**/*.test.ts'],
+    rules: {
+      'local/core-path-guard': 'error'
+    }
+  },
+  // ============ 主进程 IPC handler 约定护栏（docs/CODING_CONVENTIONS.md §1） ============
   // 自定义规则：ipcMain.handle 的第二个参数必须为 wrapHandler / wrapHandlerNoArgs / wrapHandlerRaw 调用，
   // 禁止裸注册（绕过参数校验与统一响应包装）。
   // no-restricted-syntax 无法表达"第二参数必须是某函数调用"的条件逻辑，故使用自定义规则。
@@ -281,6 +306,56 @@ export default [
                     message:
                       'ipcMain.handle 的 handler 必须使用 wrapHandler / wrapHandlerNoArgs / wrapHandlerRaw 包装（来自 src/main/ipc/validator.ts），禁止裸调异步函数'
                   })
+                }
+              }
+            }
+          },
+          // 核心路径保护（静态格式护栏）：@core-change 授权注释存在与否不强制（授权与否由
+          // 提交面闸门 scripts/core-path-gate.ts 对本次 diff 判定，见 AGENTS.md「核心路径保护」）；
+          // 一旦存在，则校验格式：至多一条（顶部 5 行内）、原因非空、不得为批量占位文案。
+          'core-path-guard': {
+            meta: {
+              type: 'problem',
+              docs: {
+                description:
+                  '核心路径 @core-change 授权注释格式护栏：至多一条、原因非空、不得为批量占位文案（存在与否不强制，授权判定见 AGENTS.md「核心路径保护」）'
+              }
+            },
+            create(context) {
+              return {
+                Program(node) {
+                  const authComments = (node.comments || []).filter(
+                    (c) =>
+                      c.type === 'Line' && c.loc.start.line <= 5 && /@core-change:/.test(c.value)
+                  )
+                  if (authComments.length === 0) return
+                  if (authComments.length > 1) {
+                    context.report({
+                      node,
+                      loc: authComments[1].loc,
+                      message:
+                        '核心路径授权注释至多保留一条（顶部 5 行内），请合并为本次变更的唯一原因（见 AGENTS.md「核心路径保护」）'
+                    })
+                    return
+                  }
+                  const reason = authComments[0].value.replace(/^.*@core-change:\s*/, '').trim()
+                  if (reason === '') {
+                    context.report({
+                      node,
+                      loc: authComments[0].loc,
+                      message:
+                        '@core-change 授权注释缺少变更原因：请写明本次真实变更原因（见 AGENTS.md「核心路径保护」）'
+                    })
+                    return
+                  }
+                  if (reason === '核心路径保护规则初始化') {
+                    context.report({
+                      node,
+                      loc: authComments[0].loc,
+                      message:
+                        '@core-change 原因不得使用批量初始化占位文案，请替换为本次真实变更原因（见 AGENTS.md「核心路径保护」）'
+                    })
+                  }
                 }
               }
             }
@@ -336,7 +411,9 @@ export default [
     // Storybook stories 同款豁免：示例文案/文档描述允许中文，与 *.test.* 同等待遇。
     files: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/__tests__/**', 'src/**/*.stories.tsx'],
     rules: {
-      'no-restricted-syntax': 'off'
+      'no-restricted-syntax': 'off',
+      // 核心路径保护规则在测试文件中豁免（测试 fixture 不需要授权注释）
+      'local/core-path-guard': 'off'
     }
   },
   // ============ i18n 存量技术债白名单（已全量清偿，2026-08-23） ============

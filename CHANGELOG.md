@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+### Changed | 变更
+
+- **提交前指引与实际闸门对齐**：`scripts/verify-changes.ts`（`npm run verify` / `verify:staged`）新增只读格式检查（`prettier --check`，行尾不参与判定），检查集与 `.husky/pre-commit` 对齐但仍不改动任何文件；新增 `scripts/verify-format-scope.ts`（从 `package.json` 的 `lint-staged` 键推导钩子格式作用域）及其单测（含配置契约测试）
+- `AGENTS.md`「变更后验证工作流」新增「verify 与 pre-commit 闸门的差异」表（钩子会 `eslint --fix` / `prettier --write` 改写并重新暂存，verify 只读且单测范围为超集），`.qoder/rules/project-conventions.md`「校验与提交」同步口径；本地钩子与 CI 的既有拦截均未放宽
+- 根目录 `AGENTS.md` / `CHANGELOG.md` 的表格列宽按 lint-staged 的 `*.{ts,js,json,md}` → `prettier --write` 规则归一（该规则在暂存这两个文件时本来就会改写它们，提前清偿以免提交时静默变动）
+- **编码约定真相源入仓**：新增 `docs/CODING_CONVENTIONS.md`（纳入版本控制）承接四条硬约定与「校验与提交」口径；`.qoder/rules/project-conventions.md` 降级为它的本地镜像（IDE `trigger: always_on` 注入用，仍随 `.gitignore` 的 `.qoder/` 不入库）。`AGENTS.md`、`commitlint.config.cjs`、`.gitmessage`、`.husky/commit-msg`（含提交被拒时打印给用户的文案）与 `eslint.config.js` 的段注释全部改指 docs 真相源，并订正章节名「提交校验流程」→「校验与提交」
+- 6 个模块级 `AGENTS.md`（`scripts/`、`src/main/{app,database,media-worker,thumbnail,utils}/`）随根 `AGENTS.md` 作为同一提交单元入仓，消除导航表指向仓库外文件；全部 12 个模块级 `AGENTS.md` 首段的“见 always-on 规则 `project-conventions.md`”改指 `docs/CODING_CONVENTIONS.md`（含 `scripts/AGENTS.md` 顶层链接相对层级写错为 `../../AGENTS.md` 的修正），`scripts/__tests__/verify-format-scope.test.ts` 去掉「干净克隆下不存在则跳过」的 `it.skipIf`，改为对 docs 真相源强制断言，并新增三项守护：被跟踪指引（含从导航表动态解析的模块级 `AGENTS.md`）断链拦截、导航表逐行可解析、镜像正文区与真相源逐字一致。本次未新增也未放宽任何 CI 或钩子拦截
+
 ---
 
 ## [2.5.3] - 2026-10-01
