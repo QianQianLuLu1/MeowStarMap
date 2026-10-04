@@ -12,7 +12,7 @@
 
 # 项目编码约定（Project Conventions）
 
-适用范围：本仓库全部代码改动。以下四条约定为**硬性规则**，PR 与自动化检查会拒绝违反项。若确需例外，必须在改动处附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记。
+适用范围：本仓库全部代码改动。以下五条约定为**硬性规则**，PR 与自动化检查会拒绝违反项。若确需例外，必须在改动处附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记。
 
 ---
 
@@ -118,9 +118,29 @@
 
 ---
 
+## 5. 源文件编码：UTF-8 无 BOM，行尾 LF
+
+**规则**
+
+- `src/`、`scripts/`、`e2e/`、`.storybook/` 与仓库根配置文件的**非测试**源码一律以 **UTF-8 无 BOM** 保存。承载位是 `eslint.config.js` 全局代码块中的 `unicode-bom: ['error', 'never']`：CI 全量 `npm run lint` 硬阻断。`.husky/pre-commit` 只对 lint-staged 中含 `eslint --fix` 任务的键（`src/`、`.storybook/`、`e2e/` 下的 TS/TSX）自动剥离 BOM（该规则 `fixable: 'whitespace'`）；`scripts/**` 与仓库根配置仅跑 prettier，其 BOM 会被钩子硬拦截，需按本节清偿方式手工修复。
+- 行尾口径沿用既有约定，不另起炉灶：`.prettierrc` 固定 `endOfLine: "lf"`，git index 恒为 LF；本机 `core.autocrlf=true` 只影响工作区表现，不改变提交内容。因此脚本化的只读格式检查必须传 `prettier --check --end-of-line auto`——**该参数只豁免行尾，不豁免 BOM**。
+- 编码与行尾约定**只此一套口径**：仓库不新增 `.gitattributes`，避免与上一段的 `--end-of-line auto` 形成两套判定（若将来改为固定 LF，必须同时去掉 `--end-of-line auto`，否则真实行尾违规会被放过）。
+
+**允许的例外**（须附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记）
+
+- 存量 11 个 `src/renderer/components/common/*.test.tsx` 在 HEAD 中即带 BOM，已在 `eslint.config.js` 的测试/stories 豁免块降为 `warn` 渐进收敛（登记为 DEBT-030）；清偿方式为 `npx eslint --fix src/renderer/components/common/*.test.tsx`，随后删除该降级行让测试文件回到 `error`。
+
+**禁止**
+
+- ❌ 用脚本/工具批量改写源码后以带 BOM 编码写回。Windows PowerShell 的 `Set-Content -Encoding utf8` / `Out-File -Encoding utf8` 与部分编辑器的「UTF-8 with BOM」都会引入 BOM；批量改写必须显式无 BOM（例：`[IO.File]::WriteAllText($path, $text, (New-Object System.Text.UTF8Encoding($false)))`）。
+- ❌ 在 LF 文件里混入单行 CRLF（BOM 注入通常伴随首行 `\r\n`，两者是同一类缺陷）。
+- ❌ 为绕过拦截而关掉源码块的 `unicode-bom`，或给非测试源码加文件级 `/* eslint-disable unicode-bom */`。
+
+---
+
 ## 校验与提交
 
-- 本地 `pre-commit` 钩子对暂存文件运行 lint-staged（eslint + prettier + 相关单测），并在暂存含 TS/TSX 时执行 `tsc -b` 增量类型检查，任一失败即阻止提交。CI 中 `lint-typecheck` job 强制全量 `npm run lint`、`npm run typecheck` 与 `npm run i18n:guard`，`test` job（10 分片并行）强制全量 `npm test`，均必须通过。
+- 本地 `pre-commit` 钩子对暂存文件运行 lint-staged（eslint + prettier + 相关单测），并在暂存含 TS/TSX 时执行 `tsc -b` 增量类型检查，任一失败即阻止提交。CI 中 `lint-typecheck` job 强制全量 `npm run lint`、`npm run typecheck` 与 `npm run i18n:guard`，`test` job（10 分片并行）强制全量 `npm test`，`coverage` job 强制 `npm run test:coverage` 覆盖率阈值门控（未达 `vitest.config.ts` 阈值即阻断 `build` job），均必须通过。
 - 钩子与自查命令的分工必须说清：`.husky/pre-commit` **会改动文件**（`eslint --fix` + `prettier --write` 改写并重新暂存）；`npm run verify` / `verify:staged`（`scripts/verify-changes.ts`）是**只读**检查集（`tsc -b` + `eslint` 不带 `--fix` + `prettier --check` + 相关单测），格式检查作用域取自 `package.json` 的 `lint-staged` 中含 `prettier` 任务的键。因此 verify 通过不代表提交时文件内容不变，逐项差异见 `AGENTS.md`「verify 与 pre-commit 闸门的差异」；不得为对齐两侧而放宽钩子或 CI 的既有拦截。
 - 修改 IPC / 错误码 / 主题变量时，PR 描述必须列出：受影响的通道清单、`docs/IPC_CONTRACT.md` 是否更新、是否有 i18n key 新增（`npm run i18n:guard`）。
 - Commit message 遵循 Conventional Commits（`feat:` / `fix:` / `refactor:` / `chore:` / `docs:`）。

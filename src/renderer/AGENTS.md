@@ -1,6 +1,6 @@
 # AGENTS.md — `src/renderer`（渲染进程）
 
-本文件为 Agent 与新协作者提供 **渲染进程模块级** 速览与约定。顶层项目速览见根目录 [`AGENTS.md`](../../AGENTS.md)；四条硬性编码约定（IPC / AppError / CSS 变量 / 函数式组件）见 [`docs/CODING_CONVENTIONS.md`](../../docs/CODING_CONVENTIONS.md)（唯一真相源；IDE 的 always-on 规则文件仅为它的本地镜像）。本文件只补充 **本模块内** 的落地细节与目录导航，不重复规则原文。
+本文件为 Agent 与新协作者提供 **渲染进程模块级** 速览与约定。顶层项目速览见根目录 [`AGENTS.md`](../../AGENTS.md)；五条硬性编码约定（IPC / AppError / CSS 变量 / 函数式组件 / 源文件编码）见 [`docs/CODING_CONVENTIONS.md`](../../docs/CODING_CONVENTIONS.md)（唯一真相源；IDE 的 always-on 规则文件仅为它的本地镜像）。本文件只补充 **本模块内** 的落地细节与目录导航，不重复规则原文。
 
 ## 模块概述
 

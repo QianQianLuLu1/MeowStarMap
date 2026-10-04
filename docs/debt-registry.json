@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-02",
+  "updatedAt": "2026-10-04",
   "items": [
     {
       "id": "DEBT-001",
@@ -361,6 +361,30 @@
       "description": "pre-dist-check 增加 ffmpeg/ffprobe 完整性发布闸门；worker-entry.ts 补 maybeLogSpawnError 对齐；resolveSafeBinaryPath 死代码清理；双 uncaughtException 监听器合并；isChildProcessSpawnError 两份实现统一",
       "files": ["scripts/pre-dist-check.ts", "src/main/media-worker/worker-entry.ts"],
       "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-030",
+      "category": "encoding",
+      "section": 13,
+      "status": "open",
+      "priority": "low",
+      "title": "11 个组件测试文件带 UTF-8 BOM（unicode-bom 降为 warn）",
+      "description": "存量 BOM 已在 HEAD 中；docs/CODING_CONVENTIONS.md §5 约定非测试源码一律无 BOM，由 eslint.config.js 的 unicode-bom: ['error','never'] 硬阻断，仅这 11 个测试文件在测试/stories 豁免块降为 warn。清偿：npx eslint --fix src/renderer/components/common/*.test.tsx 后删除该降级行回到 error，并移除本条",
+      "files": [
+        "src/renderer/components/common/ConfirmDialog.test.tsx",
+        "src/renderer/components/common/ContextMenu.test.tsx",
+        "src/renderer/components/common/ErrorBoundary.test.tsx",
+        "src/renderer/components/common/ErrorFallback.test.tsx",
+        "src/renderer/components/common/ExifPanel.test.tsx",
+        "src/renderer/components/common/IconButton.test.tsx",
+        "src/renderer/components/common/InfoRowPanel.test.tsx",
+        "src/renderer/components/common/MediaThumbnail.test.tsx",
+        "src/renderer/components/common/MissingBadge.test.tsx",
+        "src/renderer/components/common/ShareCodeDecoderDialog.test.tsx",
+        "src/renderer/components/common/SliderControl.test.tsx"
+      ],
+      "lines": [1],
       "issue": false
     }
   ]

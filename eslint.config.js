@@ -50,7 +50,15 @@ export default [
       ],
       '@typescript-eslint/no-require-imports': 'error',
       '@typescript-eslint/no-unsafe-function-type': 'error',
-      'react-hooks/exhaustive-deps': 'error'
+      'react-hooks/exhaustive-deps': 'error',
+      // 源文件编码约定（docs/CODING_CONVENTIONS.md §5）：一律 UTF-8 无 BOM。
+      // 背景：脚本化批量改写（@core-change 注释注入那一类操作）曾把受保护目录文件写成
+      // 带 BOM + 首行 CRLF；行尾差异被 verify 的 prettier --end-of-line auto 豁免（本机
+      // core.autocrlf=true 下工作区 CRLF 不改变提交内容），而 BOM 是真实内容差异，
+      // 必须由本规则确定性拦截。已验证 eslint-config-prettier 不含 unicode-bom，
+      // 不会与 prettier 互相抵消；该规则 meta.fixable = 'whitespace'，
+      // pre-commit 的 eslint --fix 会自动剥离，CI 的全量 npm run lint 硬阻断。
+      'unicode-bom': ['error', 'never']
     }
   },
   // .cjs 是 CommonJS 文件，require() 是其唯一合法导入方式
@@ -413,7 +421,15 @@ export default [
     rules: {
       'no-restricted-syntax': 'off',
       // 核心路径保护规则在测试文件中豁免（测试 fixture 不需要授权注释）
-      'local/core-path-guard': 'off'
+      'local/core-path-guard': 'off',
+      // 存量例外（原因/影响面/回滚方案，登记于 docs/技术债清单.md DEBT-030）：
+      // HEAD 中已有 11 个 src/renderer/components/common/*.test.tsx 带 UTF-8 BOM。
+      // 原因：这些文件在提交时即含 BOM，本次不改动其内容；影响面：仅测试与 stories
+      // 文件降为 warn 渐进收敛，非测试源码（含 4 个受保护目录、scripts、e2e、根配置）
+      // 仍受上方 error 硬阻断，非测试文件新增 BOM 会直接报错。
+      // 清偿与回归：跑 `npx eslint --fix src/renderer/components/common/*.test.tsx` 剥离
+      // BOM 后删除本行，让测试文件同样回到 error；参照 i18n 白名单先例，修复一个删一个。
+      'unicode-bom': 'warn'
     }
   },
   // ============ i18n 存量技术债白名单（已全量清偿，2026-08-23） ============
