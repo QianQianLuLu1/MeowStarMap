@@ -129,11 +129,43 @@ jobs:
       # pool:forks 已在 vitest.config.ts 锁定；此处按分片跑
       - run: npm test -- --shard=${{ matrix.shard }}/10
 
+  # 覆盖率门控：全量跑一遍 --coverage，低于 vitest.config.ts 中 thresholds 即失败阻断。
+  # 与分片 test job 独立，避免覆盖率数据分散在多个分片无法聚合；失败时与 lint-typecheck 同等严格度阻断 build。
+  coverage:
+    name: Coverage Gate
+    runs-on: ubuntu-latest
+    needs: [lint-typecheck]
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    timeout-minutes: 15
+    env:
+      TZ: Asia/Hong_Kong
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - name: Run coverage with thresholds
+        run: npm run test:coverage
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/**
+            !coverage/.tmp/**
+          if-no-files-found: ignore
+          retention-days: 14
 
   build:
     name: Build & Release (Windows x64 NSIS)
     runs-on: windows-latest
-    needs: [lint-typecheck, test]
+    needs: [lint-typecheck, test, coverage]
     # 手动触发（workflow_dispatch）仅跑 storybook 文档站，保持既有 job 的原触发行为不变
     if: ${{ github.event_name != 'workflow_dispatch' }}
     # 护栏：打包 + 冒烟挂起时兜底，防止流水线无限等待
