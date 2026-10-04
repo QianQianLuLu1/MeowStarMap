@@ -127,6 +127,7 @@ vite.config.ts.timestamp-*.mjs
 .tc.txt
 .tmp-*.txt
 .tmp-*.err
+.tmp-*.json
 .vitest-debug.txt
 vitest-result.txt
 
@@ -145,6 +146,7 @@ __probe*.txt
 .mimosa-feedback-report.md
 /scripts/mimosa-*.ps1
 /scripts/write-bridge-report.ps1
+/scripts/fix-harness-memory-path.ps1
 .trae/
 .review/
 .review_*.txt
