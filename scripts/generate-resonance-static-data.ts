@@ -146,7 +146,7 @@ async function main(): Promise<void> {
 
   // 6) 百分位快照 + 元数据
   const percentileRaw = fs.readFileSync(path.join(source, 'data', 'percentile.json'), 'utf8')
-  const percentile = JSON.parse(percentileRaw) as { generated_at?: string }
+  const percentile = JSON.parse(percentileRaw) as { generated_at?: string; metrics?: unknown }
   if (!percentile?.metrics) throw new Error('percentile.json 结构异常')
   fs.writeFileSync(path.join(outDir, 'percentile.json'), JSON.stringify(percentile))
 

@@ -1,14 +1,18 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
+    // 允许 TS 文件导入 JS 模块（core-path-gate.test.ts 导入 eslint.config.js）
+    "allowJs": true,
     "noEmit": true
   },
+  "include": ["scripts/**/*.ts"],
+  // perf-baseline.ts 是粘贴到 DevTools Console 运行的浏览器脚本（依赖 window.electronAPI），
+  // 不属于 Node 工具链范围，从 scripts 类型检查排除。
+  "exclude": ["scripts/perf-test/perf-baseline.ts"],
   "ts-node": {
     "transpileOnly": true,
-    "esm": false
+    "esm": true
   }
 }

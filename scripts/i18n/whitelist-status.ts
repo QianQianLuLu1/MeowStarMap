@@ -45,7 +45,7 @@ function moduleOf(file: string): string {
   return parts[0] ?? 'unknown'
 }
 
-function buildReport(whitelist: string[], statMap: Map<string, FileStat>): Report {
+function buildReport(_whitelist: string[], statMap: Map<string, FileStat>): Report {
   const files: FileStat[] = [...statMap.values()].sort(
     (a, b) => b.violations - a.violations || a.file.localeCompare(b.file)
   )

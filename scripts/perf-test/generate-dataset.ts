@@ -4,10 +4,10 @@
  * 用途：在指定目录生成大量占位媒体文件（图片/视频），用于性能压力测试
  *
  * 用法：
- *   npx ts-node --project tsconfig.scripts.json scripts/perf-test/generate-dataset.ts <目标目录> [图片数] [视频数]
+ *   npx tsx scripts/perf-test/generate-dataset.ts <目标目录> [图片数] [视频数]
  *
  * 示例：
- *   npx ts-node --project tsconfig.scripts.json scripts/perf-test/generate-dataset.ts ./perf-data 10000 5000
+ *   npx tsx scripts/perf-test/generate-dataset.ts ./perf-data 10000 5000
  *
  * 说明：
  * - 生成的图片为最小有效 JPEG（1x1 像素），仅用于扫描入库测试，不验证缩略图生成
@@ -142,12 +142,8 @@ async function generateDataset(
 // CLI 入口
 const args = process.argv.slice(2)
 if (args.length < 1) {
-  console.log(
-    '用法: npx ts-node --project tsconfig.scripts.json scripts/perf-test/generate-dataset.ts <目标目录> [图片数] [视频数]'
-  )
-  console.log(
-    '示例: npx ts-node --project tsconfig.scripts.json scripts/perf-test/generate-dataset.ts ./perf-data 10000 5000'
-  )
+  console.log('用法: npx tsx scripts/perf-test/generate-dataset.ts <目标目录> [图片数] [视频数]')
+  console.log('示例: npx tsx scripts/perf-test/generate-dataset.ts ./perf-data 10000 5000')
   process.exit(0)
 }
 

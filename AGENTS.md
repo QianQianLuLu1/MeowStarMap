@@ -93,7 +93,7 @@ npm run build        # 清理 + electron-vite build
 npm run dist:win     # 打包 Windows 安装包（含预检查与产物校验）
 
 npm test             # vitest run（变体：test:watch / test:coverage / test:main / test:renderer / test:db）
-npm run typecheck    # tsc -b
+npm run typecheck    # tsc -b（src 层）+ tsc -p tsconfig.scripts.json（scripts/ 工具层）；local verify/pre-commit 只跑前者，CI 跑全量
 npm run lint         # eslint .（lint:fix 自动修复）
 npm run format       # prettier
 npm run verify       # 变更后只读验证（typecheck + eslint 只读 + prettier --check + 相关单测；不改动文件）

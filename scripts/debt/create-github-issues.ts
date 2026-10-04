@@ -173,8 +173,8 @@ function createIssue(item: DebtItem, dryRun: boolean): number | null {
 }
 
 function main(): void {
-  const backfillOnly = args.includes('--backfill-only')
   const args = process.argv.slice(2)
+  const backfillOnly = args.includes('--backfill-only')
   const dryRun = args.includes('--dry-run')
   const filterId = args.find((a) => a.startsWith('DEBT-'))
 
