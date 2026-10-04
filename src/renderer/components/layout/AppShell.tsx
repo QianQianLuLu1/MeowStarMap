@@ -3,6 +3,9 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Sidebar } from './Sidebar'
 import { TitleBar } from './TitleBar'
+// 液态玻璃：折射滤镜 defs（全局单例）+ 滚动进度/亮度档位信号
+import { LiquidGlassDefs } from './LiquidGlassDefs'
+import { useGlassScrollSignal } from '../../hooks/useGlassScrollSignal'
 import { useUIStore, selectFocusedMediaId, type ViewLevel } from '../../stores/uiStore'
 import { useMediaStore } from '../../stores/mediaStore'
 import { formatSize } from '../../utils/format'
@@ -48,6 +51,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const categories = useMediaStore((s) => s.categories)
   // P2-5：反馈对话框状态
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  // 液态玻璃全局信号：滚动进度（--glass-scroll-progress）+ 亮度档位（data-glass-tone）
+  useGlassScrollSignal()
 
   const stats = useMemo(() => {
     let images = 0
@@ -137,6 +142,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       {/* TitleBar 置于 sidebar-gradient（层叠上下文根）之内：保持 fixed z-50 标题栏
           与容器内联全屏浮层（BaseDialog z-[100] 等）的「遮罩盖住标题栏」顺序不变；
           fixed 包含块不受 isolation 影响，定位与裁剪行为均与原先一致 */}
+      {/* 液态玻璃折射滤镜 defs（全局单例）+ 滚动/亮度信号 hook（AppShell 挂载一次，
+          服务 Sidebar/TitleBar/StatusBar 三处玻璃件） */}
+      <LiquidGlassDefs />
       <div className="flex-1 flex pt-10 overflow-hidden sidebar-gradient">
         <TitleBar />
         {/* 液态玻璃环境氛围层：光斑（毛玻璃折射源）+ 颗粒纹理 + 漂浮几何体。
@@ -157,8 +165,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
         <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-5">{children}</div>
           <div
-            className="h-8 flex items-center justify-between px-4 text-xs status-bar"
-            style={{ color: 'var(--text-secondary)' }}
+            className="h-8 flex items-center justify-between px-4 text-xs status-bar liquid-glass liquid-glass--bar liquid-glass--bar-reverse"
+            style={{ color: 'var(--glass-ink-2)' }}
           >
             <span>{status.leftText}</span>
             <div className="flex items-center gap-3">
@@ -168,7 +176,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 type="button"
                 className="flex items-center gap-1 px-2 py-0.5 rounded text-xs transition-all hover:scale-105"
                 style={{
-                  color: 'var(--text-tertiary)',
+                  color: 'var(--glass-ink-3)',
                   background: 'transparent'
                 }}
                 onClick={() => setFeedbackOpen(true)}

@@ -360,6 +360,109 @@ body {
       border-color var(--transition-normal);
   }
 
+  /* ═══ 液态玻璃导航栏（Sidebar / TitleBar / StatusBar 共用）═══
+     复用开源技法：backdrop-filter url(#svg) 边缘折射（kube.io "Liquid Glass
+     in the Browser"，Chromium 108+；feImage 位移贴图 + feDisplacementMap，
+     滤镜 defs 见 LiquidGlassDefs.tsx，不支持时整条 @supports 不生效、退回
+     各基类的普通模糊）；滚动联动边缘高光由 useGlassScrollSignal 写入根节点
+     --glass-scroll-progress 驱动；亮度自适应 = data-glass-tone 明暗档位
+     （JS 基调）+ ::after overlay 混合调色层（连续微调，随背景光斑漂移）。
+     注意：遵守本文件既有约束——不新增 will-change、不动画化 --glass-blur、
+     负 z 伪元素画在面板背景之上/内容之下（面板自带 backdrop-filter 层叠上下文）。 */
+  :root {
+    --glass-scroll-progress: 0;
+    --glass-tint-rgb: 255 255 255;
+    --glass-ink: var(--text-primary);
+    --glass-ink-2: var(--text-secondary);
+    --glass-ink-3: var(--text-tertiary);
+  }
+
+  /* JS 亮度档位判暗时切换整套玻璃基调（未来接入深色主题即自动生效） */
+  :root[data-glass-tone='dim'] {
+    --glass-tint-rgb: 28 28 34;
+    --glass-ink: #f2f2f6;
+    --glass-ink-2: rgb(242 242 246 / 0.72);
+    --glass-ink-3: rgb(242 242 246 / 0.5);
+  }
+
+  /* 边缘折射：把基础模糊升级为「位移折射 + 模糊 + 饱和」组合。
+     .soft-pink-luxury 前缀同步声明：柔粉主题对 .title-bar/.status-bar/.glass-panel
+     有同特异性 backdrop-filter 覆盖，本文件靠后级联方可胜出。 */
+  @supports (backdrop-filter: url('#liquid-glass-refract') blur(4px)) {
+    .liquid-glass,
+    .soft-pink-luxury .liquid-glass {
+      backdrop-filter: url('#liquid-glass-refract') blur(var(--glass-blur))
+        saturate(var(--glass-saturate));
+      -webkit-backdrop-filter: url('#liquid-glass-refract') blur(var(--glass-blur))
+        saturate(var(--glass-saturate));
+    }
+
+    /* 「玻璃效果：轻度增强」档：光斑层已隐藏（折射无源），退回普通模糊 */
+    html.glass-lite .liquid-glass {
+      backdrop-filter: var(--backdrop-blur-sm);
+      -webkit-backdrop-filter: var(--backdrop-blur-sm);
+    }
+  }
+
+  /* 滚动联动边缘高光：::before（z:-1 画在面板背景之上、内容之下）。
+     横条（TitleBar/StatusBar）默认：光斑随滚动自左向右扫过。 */
+  .liquid-glass::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    --sheen-pos: calc(var(--glass-scroll-progress) * 100%);
+    background: linear-gradient(
+      90deg,
+      transparent calc(var(--sheen-pos) - 12%),
+      rgb(var(--glass-tint-rgb) / 0.28) var(--sheen-pos),
+      transparent calc(var(--sheen-pos) + 12%)
+    );
+  }
+
+  /* 侧边栏：右缘竖向 glint（高光沿内容滚动方向流动） */
+  .liquid-glass--sidebar::before {
+    inset: 0 0 0 auto;
+    width: 34px;
+    background: linear-gradient(
+      180deg,
+      transparent calc(var(--sheen-pos) - 18%),
+      rgb(var(--glass-tint-rgb) / 0.16) calc(var(--sheen-pos) - 6%),
+      rgb(var(--glass-tint-rgb) / 0.5) var(--sheen-pos),
+      rgb(var(--glass-tint-rgb) / 0.16) calc(var(--sheen-pos) + 6%),
+      transparent calc(var(--sheen-pos) + 18%)
+    );
+  }
+
+  /* 状态栏变体：扫光方向反转（与顶栏对称，光自右向左回流） */
+  .liquid-glass--bar-reverse::before {
+    --sheen-pos: calc((1 - var(--glass-scroll-progress)) * 100%);
+  }
+
+  /* 横条定位兜底：StatusBar 为 static，需 relative 承载绝对定位伪元素
+     （TitleBar 的 .fixed 工具类在 utilities 层，优先级更高不受影响） */
+  .liquid-glass--bar {
+    position: relative;
+  }
+
+  /* 亮度自适应调色层：overlay 混合随玻璃背后内容亮度连续微调对比 */
+  .liquid-glass::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background: rgb(var(--glass-tint-rgb) / 0.1);
+    mix-blend-mode: overlay;
+  }
+
+  /* 「玻璃效果：轻度增强」档：高光与调色层一并关闭，仅保留基础模糊 */
+  html.glass-lite .liquid-glass::before,
+  html.glass-lite .liquid-glass::after {
+    display: none;
+  }
+
   /* 液态玻璃环境光斑：为毛玻璃提供可折射的彩色内容（「明显流动感」档，默认）。
      颜色由 --accent 派生，双主题自适应；仅 transform 漂移动画（compositor 合成）。
      z-index:-1 使其画在 .sidebar-gradient 父背景之上、静态内容之下。
@@ -562,13 +665,21 @@ html.glass-lite .ambient-bg {
   .glass-panel,
   .title-bar,
   .status-bar,
+  .liquid-glass,
   .soft-pink-luxury .glass-card,
   .soft-pink-luxury .glass-panel,
   .soft-pink-luxury .title-bar,
-  .soft-pink-luxury .status-bar {
+  .soft-pink-luxury .status-bar,
+  .soft-pink-luxury .liquid-glass {
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
     background: var(--bg-primary) !important;
+  }
+
+  /* 液态玻璃边缘高光与调色层一并关闭（实底下无意义） */
+  .liquid-glass::before,
+  .liquid-glass::after {
+    display: none !important;
   }
 
   .ambient-bg {

@@ -117,6 +117,12 @@ html.soft-pink-luxury {
     inset 0 -1px 0 rgba(226, 164, 188, 0.06);
 }
 
+/* 液态玻璃导航栏（Sidebar/TitleBar/StatusBar）：暖粉白 tint，
+   边缘高光与 overlay 调色层取奶粉色；墨水色沿用主题变量 */
+.soft-pink-luxury .liquid-glass {
+  --glass-tint-rgb: 255 240 245;
+}
+
 /* 滚动条：细款浅粉色 + 拖动高亮 */
 .soft-pink-luxury ::-webkit-scrollbar {
   width: 6px;

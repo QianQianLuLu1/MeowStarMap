@@ -163,7 +163,7 @@ export const Sidebar: React.FC = () => {
 
   return (
     <motion.aside
-      className="h-full flex flex-col glass-panel overflow-hidden"
+      className="h-full flex flex-col glass-panel liquid-glass liquid-glass--sidebar overflow-hidden"
       animate={{ width: sidebarCollapsed ? 64 : 220 }}
       transition={springSoft}
     >
@@ -171,7 +171,7 @@ export const Sidebar: React.FC = () => {
         {!sidebarCollapsed && (
           <button
             className={`flex items-center gap-1 text-sm font-semibold transition-colors ${canGoBack ? 'cursor-pointer' : 'cursor-default'}`}
-            style={{ color: canGoBack ? 'var(--accent)' : 'var(--text-primary)' }}
+            style={{ color: canGoBack ? 'var(--accent)' : 'var(--glass-ink)' }}
             onClick={() => canGoBack && goBack()}
             disabled={!canGoBack}
             title={canGoBack ? t('nav.backToTop') : t('nav.alreadyAtTop')}
@@ -209,7 +209,7 @@ export const Sidebar: React.FC = () => {
               >
                 {currentProfileLabel.charAt(0)}
               </div>
-              <span className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>
+              <span className="text-sm truncate" style={{ color: 'var(--glass-ink)' }}>
                 {currentProfileLabel}
               </span>
             </div>
@@ -218,6 +218,7 @@ export const Sidebar: React.FC = () => {
           {profileMenuOpen && (
             <div
               role="menu"
+              data-glass-scroll-ignore=""
               className="absolute left-2 right-2 top-full mt-1 glass-panel py-1 z-50 max-h-60 overflow-y-auto"
               style={{ animation: 'scaleIn 150ms ease-out' }}
             >
@@ -225,7 +226,7 @@ export const Sidebar: React.FC = () => {
                 role="menuitem"
                 className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[var(--hover-bg)]"
                 style={{
-                  color: currentProfileUid === 'all' ? 'var(--accent)' : 'var(--text-primary)'
+                  color: currentProfileUid === 'all' ? 'var(--accent)' : 'var(--glass-ink)'
                 }}
                 onClick={() => handleProfileSwitch('all')}
               >
@@ -237,7 +238,7 @@ export const Sidebar: React.FC = () => {
                   role="menuitem"
                   className="w-full text-left px-3 py-2 text-sm transition-colors hover:bg-[var(--hover-bg)]"
                   style={{
-                    color: currentProfileUid === p.uid ? 'var(--accent)' : 'var(--text-primary)'
+                    color: currentProfileUid === p.uid ? 'var(--accent)' : 'var(--glass-ink)'
                   }}
                   onClick={() => handleProfileSwitch(p.uid)}
                 >
@@ -245,7 +246,7 @@ export const Sidebar: React.FC = () => {
                     <span className="truncate">
                       {p.nickname || (p.uid === 'default' ? t('profile.defaultProfile') : p.uid)}
                     </span>
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                    <span className="text-xs" style={{ color: 'var(--glass-ink-3)' }}>
                       {p.uid}
                     </span>
                   </div>
@@ -288,7 +289,7 @@ export const Sidebar: React.FC = () => {
           <div className="pt-3 mt-3" style={{ borderTop: '1px solid var(--divider)' }}>
             <button
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors hover:bg-[var(--hover-bg)]"
-              style={{ color: 'var(--text-secondary)' }}
+              style={{ color: 'var(--glass-ink-2)' }}
               onClick={() => setGroupPanelOpen((v) => !v)}
               title={t('group.title')}
             >
@@ -306,7 +307,7 @@ export const Sidebar: React.FC = () => {
                 <button
                   className="w-full text-left px-2 py-1 text-xs rounded transition-colors hover:bg-[var(--hover-bg)]"
                   style={{
-                    color: groupDimension === 'none' ? 'var(--accent)' : 'var(--text-secondary)',
+                    color: groupDimension === 'none' ? 'var(--accent)' : 'var(--glass-ink-2)',
                     fontWeight: groupDimension === 'none' ? 600 : 400
                   }}
                   onClick={() => setGroupDimension('none')}
@@ -318,8 +319,7 @@ export const Sidebar: React.FC = () => {
                     key={opt.value}
                     className="w-full text-left px-2 py-1 text-xs rounded transition-colors hover:bg-[var(--hover-bg)]"
                     style={{
-                      color:
-                        groupDimension === opt.value ? 'var(--accent)' : 'var(--text-secondary)',
+                      color: groupDimension === opt.value ? 'var(--accent)' : 'var(--glass-ink-2)',
                       fontWeight: groupDimension === opt.value ? 600 : 400
                     }}
                     onClick={() => setGroupDimension(opt.value)}
@@ -330,7 +330,7 @@ export const Sidebar: React.FC = () => {
                 ))}
                 <div
                   className="pt-1 mt-1 text-xs"
-                  style={{ color: 'var(--text-tertiary)', borderTop: '1px solid var(--divider)' }}
+                  style={{ color: 'var(--glass-ink-3)', borderTop: '1px solid var(--divider)' }}
                 >
                   {t('group.title')}
                 </div>
@@ -343,13 +343,13 @@ export const Sidebar: React.FC = () => {
       {!sidebarCollapsed && (
         <div
           className="p-4 space-y-3 text-xs"
-          style={{ color: 'var(--text-secondary)', borderTop: '1px solid var(--divider)' }}
+          style={{ color: 'var(--glass-ink-2)', borderTop: '1px solid var(--divider)' }}
         >
           <div className="flex justify-between">
             <span>{t('nav.images')}</span>
             <span
               className="font-medium"
-              style={{ color: 'var(--text-primary)' }}
+              style={{ color: 'var(--glass-ink)' }}
               title={
                 showFilteredHint
                   ? `已加载 ${imageCount}，过滤后显示 ${filteredImageCount}`
@@ -369,7 +369,7 @@ export const Sidebar: React.FC = () => {
             <span>{t('nav.videos')}</span>
             <span
               className="font-medium"
-              style={{ color: 'var(--text-primary)' }}
+              style={{ color: 'var(--glass-ink)' }}
               title={
                 showFilteredHint
                   ? `已加载 ${videoCount}，过滤后显示 ${filteredVideoCount}`
@@ -387,13 +387,13 @@ export const Sidebar: React.FC = () => {
           </div>
           <div className="flex justify-between">
             <span>{t('nav.categories')}</span>
-            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+            <span className="font-medium" style={{ color: 'var(--glass-ink)' }}>
               {categories.length}
             </span>
           </div>
           <div className="flex justify-between">
             <span>{t('nav.storage')}</span>
-            <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+            <span className="font-medium" style={{ color: 'var(--glass-ink)' }}>
               {formatFileSize(totalSize)}
             </span>
           </div>

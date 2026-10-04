@@ -6,7 +6,7 @@
  *   本测试在组件级锁定「第四项显示 共鸣录、不出现原始 key」。
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { Sidebar } from './Sidebar'
 
 const { uiState, mediaState } = vi.hoisted(() => {
@@ -59,5 +59,23 @@ describe('Sidebar 第 4 项 nav.resonanceRecords', () => {
     // 各项 title 与可见文本均取自 i18n，raw key 不得渲染
     expect(screen.getByTitle('共鸣录')).toBeTruthy()
     expect(screen.queryByText('nav.resonanceRecords')).toBeNull()
+  })
+})
+
+describe('Sidebar 液态玻璃接入', () => {
+  it('根元素携带 liquid-glass 类且保留 glass-panel', () => {
+    render(<Sidebar />)
+    const aside = document.querySelector('aside')
+    expect(aside).not.toBeNull()
+    expect(aside?.classList.contains('liquid-glass')).toBe(true)
+    expect(aside?.classList.contains('liquid-glass--sidebar')).toBe(true)
+    expect(aside?.classList.contains('glass-panel')).toBe(true)
+  })
+
+  it('角色档案下拉携带 data-glass-scroll-ignore（内部滚动不驱动边缘高光）', () => {
+    render(<Sidebar />)
+    fireEvent.click(screen.getByTitle('切换角色档案'))
+    const menu = screen.getByRole('menu')
+    expect(menu.hasAttribute('data-glass-scroll-ignore')).toBe(true)
   })
 })
