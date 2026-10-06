@@ -63,7 +63,7 @@ Expected output: `10.x.x` or higher.
 The project root is the directory containing this file. All commands assume you are in the project root.
 
 ```bash
-cd "h:\<username>\Documents\WXNN XiangCe2"
+cd NikkiGallery
 ```
 
 ### 2.2 Install Dependencies (first run only)
@@ -97,15 +97,17 @@ This is driven by `electron-vite dev`:
 2. Launch the Electron desktop app, with the renderer served by the Vite dev server (hot reload)
 
 > Restart `npm run dev` after editing code under `src/main/`.
-> For renderer hot-reload, run `vite` separately — see [4.2](#42-frontend-hot-reload).
+> Renderer changes hot-reload via HMR built into `npm run dev` — see [4.2](#42-renderer-hot-reload).
 
 ### 2.5 HTML Preview (quick preview without launching Electron)
 
 ```bash
-npm run preview
+npm run build:preview
 ```
 
-Open `http://localhost:5173/` in a browser to view the renderer UI.
+Open the generated root `preview.html` in a browser to view the renderer UI.
+
+> `npm run preview` runs `electron-vite preview`: it performs a production build and launches the Electron app for local preview — not a browser-based HTML preview.
 
 ### 2.6 Build Artifacts (no installer)
 
@@ -164,7 +166,7 @@ WXNN XiangCe/
 │   │   ├── preload/           # Preload split modules (namespaced by domain)
 │   │   │   ├── ipc.ts               # IpcError class + call<T> unwrapping + subscribe event helper
 │   │   │   ├── plugin-bridge.ts     # Plugin capability bridge (window.pluginAPI) + i18n.t injection point
-│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 29 files; each exports a <key>API object)
+│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 30 files; each exports a <key>API object)
 │   │   ├── app/               # App lifecycle management (23 source files)
 │   │   │   ├── application.ts       # App main class
 │   │   │   ├── lifecycle.ts         # Lifecycle management
@@ -254,8 +256,7 @@ WXNN XiangCe/
 ├── docs/                      # Documentation
 │   ├── plans/                 # In-progress fix/feature plans
 │   ├── archive/               # Completed historical plans and reports
-│   ├── tutorial/              # User tutorial
-│   └── screenshots/           # Screenshots
+│   └── tutorial/              # User tutorial
 │
 ├── tests/                     # Test setup
 ├── package.json               # Dependencies and scripts
@@ -292,14 +293,12 @@ npm run dev
 
 After launch, main-process logs stream to the terminal. Restart the command after editing main-process code.
 
-### 4.2 Frontend Hot Reload (standalone Vite server)
+### 4.2 Renderer Hot Reload
 
-```bash
-npm run preview
-```
+`npm run dev` has renderer HMR built in: edits under `src/renderer/` hot-reload inside the Electron window — no separate Vite server needed.
 
-Open `http://localhost:5173/` in a browser; edits under `src/renderer/` hot-reload.
-**Note**: The preview cannot call IPC (no Electron main process); all `window.electronAPI` calls return `undefined`.
+To inspect the renderer UI in a browser without Electron, run `npm run build:preview` and open the generated root `preview.html`.
+**Note**: `preview.html` is a static preview (no Electron main process); IPC is unavailable and all `window.electronAPI` calls return `undefined`.
 
 ### 4.3 Open Chrome DevTools
 
@@ -786,7 +785,7 @@ After packaging:
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.0.exe       # NSIS installer (artifactName: NikkiGallery-Setup-${version}.${ext})
+├── NikkiGallery-Setup-2.5.3.exe       # NSIS installer (artifactName: NikkiGallery-Setup-${version}.${ext})
 └── builder-effective-config.yaml             # build config snapshot
 ```
 
@@ -830,7 +829,7 @@ node scripts/generate-icon.js
 
 ### 7.7 Install and Test
 
-1. Double-click `release\NikkiGallery-Setup-2.5.0.exe` to install
+1. Double-click `release\NikkiGallery-Setup-2.5.3.exe` to install
 2. Launch from Start menu or desktop shortcut
 3. On first launch a full-disk scan runs to locate the game directory (first scan is slow; please be patient)
 4. A desktop shortcut is created automatically (skipped if it already exists)
@@ -912,7 +911,7 @@ npm run build-storybook
 | Install dependencies      | `npm install`                   |
 | Rebuild native modules    | `npx @electron/rebuild`         |
 | Dev mode (exe app)        | `npm run dev`                   |
-| HTML preview              | `npm run preview`               |
+| HTML preview build        | `npm run build:preview`         |
 | Type check                | `npm run typecheck`             |
 | Lint                      | `npm run lint`                  |
 | Lint auto-fix             | `npm run lint:fix`              |

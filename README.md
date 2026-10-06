@@ -28,8 +28,8 @@
 ### 核心特性
 
 - **智能扫描** — 自动定位游戏目录（Steam / Epic 注册表 + 全盘签名扫描），增量扫描，多盘符并发；智能区分游戏截图、启动器缓存与云相册三类来源
-- **多视图图库** — 网格、列表、时间线、活动时间轴 4 种浏览模式；全屏查看与幻灯片播放；支持 Ctrl / Shift 多选批量操作
-- **专业图片编辑** — 12 项基础调整（亮度 / 对比度 / 饱和度 / 色温等）+ HSL 八色独立调色 + RGB 多通道曲线 + 色调分离 + 滤镜预设；完整撤销 / 重做与批量应用
+- **多视图图库** — 网格、列表、瀑布流、时间线、活动时间轴 5 种浏览模式；全屏查看与幻灯片播放；支持 Ctrl / Shift 多选批量操作
+- **专业图片编辑** — 14 项基础调整（亮度 / 对比度 / 饱和度 / 色温等）+ HSL 八色独立调色 + RGB 多通道曲线 + 色调分离 + 滤镜预设；完整撤销 / 重做与批量应用
 - **视频处理** — 缩略图提取、视频裁剪、调速（0.25x–4x）、格式转换、Apple Live Photo 导出
 - **智能整理** — 系统分类 + 三级自定义分类树（拖拽排序 / 颜色标签），标签管理，6 维度智能分组
 - **重复检测** — SHA256 精确比对 + 感知哈希（pHash）双重检测，4 维智能评分推荐保留项
@@ -143,8 +143,8 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 ### Key Features
 
 - **Smart Scanning** — Auto-locates game directories (Steam / Epic registry + full-disk signature scan), incremental scanning, multi-drive concurrency; intelligently distinguishes game screenshots, launcher cache, and cloud albums
-- **Multi-View Gallery** — Grid, list, timeline, and event-timeline views; fullscreen viewer with slideshow; Ctrl / Shift multi-select for batch operations
-- **Professional Editing** — 12 basic adjustments (brightness / contrast / saturation / temperature, etc.) + HSL 8-color independent grading + RGB multi-channel curves + split-toning + filter presets; full undo / redo and batch apply
+- **Multi-View Gallery** — Grid, list, masonry, timeline, and event-timeline views; fullscreen viewer with slideshow; Ctrl / Shift multi-select for batch operations
+- **Professional Editing** — 14 basic adjustments (brightness / contrast / saturation / temperature, etc.) + HSL 8-color independent grading + RGB multi-channel curves + split-toning + filter presets; full undo / redo and batch apply
 - **Video Processing** — Thumbnail extraction, trimming, speed adjustment (0.25x–4x), format conversion, Apple Live Photo export
 - **Smart Organization** — System categories + 3-level custom category tree (drag-sort / color tags), tag management, 6-dimensional smart grouping
 - **Duplicate Detection** — SHA256 exact match + perceptual hash (pHash) dual detection, 4-dimensional smart scoring recommends keepers

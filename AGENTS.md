@@ -16,7 +16,7 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 - **Preload**：入口 `src/main/preload.ts`（另有 `src/main/preload-logger.ts`），通过 `contextBridge.exposeInMainWorld` 暴露 `window.*` 桥（含对不受信任文档的门控）。IPC 契约（通道名/方法签名）必须保持稳定，详见 `docs/IPC_CONTRACT.md`；装配与门禁的模块级约定见 `src/main/preload/AGENTS.md`。
 - **渲染进程**：入口 `src/renderer/main.tsx` + `src/renderer/index.html`；另有预览入口 `src/renderer/preview-entry.tsx`（经 `vite.preview.config.ts` 构建）。
 
-**IPC 模式**：主进程在 `src/main/ipc/handlers/*.ts` 中按领域一个文件注册 `ipcMain.handle`，配套共享的 `handler-context.ts`、输入校验 `validator.ts` 与 `media-read-guard.ts`；渲染层一律经 `window.*` 桥调用；主/渲染共享的类型与错误定义在 `src/shared/`。
+**IPC 模式**：主进程在 `src/main/ipc/handlers/*.ts` 中按领域一个文件注册 `ipcMain.handle`，配套共享的 `src/main/ipc/handler-context.ts`、输入校验 `src/main/ipc/validator.ts` 与 `src/main/ipc/media-read-guard.ts`（三者位于 handlers/ 上一级目录）；渲染层一律经 `window.*` 桥调用；主/渲染共享的类型与错误定义在 `src/shared/`。
 
 **构建产物**：electron-builder（NSIS win x64）输出到 `release/`；打包入口为 `dist/main/main/app/index.js`。
 

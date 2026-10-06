@@ -4,8 +4,8 @@
 > **应用名称**：无限暖暖相册管理工具（NikkiGallery）
 > **当前版本**：2.5.3
 > **平台**：Windows x64
-> **文档版本**：1.4
-> **最后更新**：2026-09-06
+> **文档版本**：1.5
+> **最后更新**：2026-10-06
 
 ---
 
@@ -459,7 +459,7 @@ wxnn-photo-manager/
 │   │   ├── index.ts                   # 主进程入口（早期防护 + 协议注册 + 启动 Application）
 │   │   ├── preload.ts                 # preload 入口（装配 + contextBridge 暴露）
 │   │   ├── preload-logger.ts          # 渲染层日志转发 preload
-│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 29 个命名空间）
+│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 30 个命名空间）
 │   │   └── tsconfig.json
 │   ├── renderer/                      # 渲染进程
 │   │   ├── assets/                    # 静态资源
@@ -588,7 +588,7 @@ wxnn-photo-manager/
 2026-08 命名空间化拆分重构：原 1176 行单体文件拆为入口装配 + 按功能域的模块树，
 对外契约（全局名 / 方法签名 / 通道字符串）不变，并有单元测试守护（`preload/__tests__/`）。
 
-- `preload.ts` 入口：装配 `electronAPI`（reportReady + 29 个命名空间）并执行 5 个 `exposeInMainWorld`
+- `preload.ts` 入口：装配 `electronAPI`（reportReady + 30 个命名空间）并执行 5 个 `exposeInMainWorld`
   ——全部经 `exposeIfTrusted()` 门禁：非授信文档（origin 非 app:// / media:// / dev 5173）零暴露
 - `preload/ipc.ts`：`IpcError` 类 + 统一调用入口 `call<T>(channel, ...args)`（解包 `IpcResponse<T>`，失败抛 `IpcError`）+ `subscribe` 事件订阅助手
 - `preload/api/*.ts`：每文件一个命名空间对象（`scannerAPI`、`fileAPI`…），方法与通道字符串与拆分前逐字一致

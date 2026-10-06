@@ -4,8 +4,8 @@
 > **Application Name**: NikkiGallery (无限暖暖相册管理工具)
 > **Current Version**: 2.5.3
 > **Platform**: Windows x64
-> **Document Version**: 1.4
-> **Last Updated**: 2026-09-06
+> **Document Version**: 1.5
+> **Last Updated**: 2026-10-06
 
 ---
 
@@ -459,7 +459,7 @@ wxnn-photo-manager/
 │   │   ├── index.ts                   # Main process entry (early guards + protocol registration + Application bootstrap)
 │   │   ├── preload.ts                 # preload entry (assembly + contextBridge exposure)
 │   │   ├── preload-logger.ts          # Renderer log forwarding preload
-│   │   ├── preload/                   # preload split modules (ipc base layer / plugin-bridge / api/ 29 namespaces)
+│   │   ├── preload/                   # preload split modules (ipc base layer / plugin-bridge / api/ 30 namespaces)
 │   │   └── tsconfig.json
 │   ├── renderer/                      # Renderer process
 │   │   ├── assets/                    # Static assets
@@ -589,7 +589,7 @@ Namespace-oriented split refactor (Aug 2026): the original 1176-line monolithic 
 entry assembly plus a module tree by functional domain. The external contract (global names / method
 signatures / channel strings) is unchanged, guarded by unit tests (`preload/__tests__/`).
 
-- `preload.ts` entry: assembles `electronAPI` (reportReady + 29 namespaces) and performs 5 `exposeInMainWorld`
+- `preload.ts` entry: assembles `electronAPI` (reportReady + 30 namespaces) and performs 5 `exposeInMainWorld`
   calls — all gated by `exposeIfTrusted()`: untrusted documents (origin not app:// / media:// / dev 5173) get zero exposure
 - `preload/ipc.ts`: `IpcError` class + unified call entry `call<T>(channel, ...args)` (unwraps `IpcResponse<T>`, throws `IpcError` on failure) + `subscribe` event helper
 - `preload/api/*.ts`: one namespace object per file (`scannerAPI`, `fileAPI`…); methods and channel strings are verbatim identical to pre-split

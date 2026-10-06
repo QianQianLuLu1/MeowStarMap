@@ -63,7 +63,7 @@ npm -v
 项目根目录即本文件所在目录。命令均假设你在项目根目录下执行。
 
 ```bash
-cd "h:\<username>\Documents\WXNN XiangCe2"
+cd NikkiGallery
 ```
 
 ### 2.2 安装依赖（首次运行必做）
@@ -97,15 +97,17 @@ npm run dev
 2. 启动 Electron 桌面程序，渲染层由 Vite dev server 提供热更新
 
 > 每次修改 `src/main/` 下代码后需重启 `npm run dev`；
-> 修改 `src/renderer/` 下代码可使用 Vite HMR 热更新（需要单独运行 `vite`，见 [4.2](#42-前端热更新)）。
+> 修改 `src/renderer/` 下代码可使用 Vite HMR 热更新（`npm run dev` 已内置，见 [4.2](#42-渲染层热更新)）。
 
 ### 2.5 HTML 预览版（快速预览，无需启动 Electron）
 
 ```bash
-npm run preview
+npm run build:preview
 ```
 
-打开浏览器访问 `http://localhost:5173/` 查看渲染层界面。
+构建完成后打开仓库根目录生成的 `preview.html` 即可在浏览器中查看渲染层界面。
+
+> `npm run preview` 是 `electron-vite preview`：执行生产构建后以 Electron 启动应用做本地预览，并非浏览器 HTML 预览。
 
 ### 2.6 构建产物（不打包安装程序）
 
@@ -164,7 +166,7 @@ WXNN XiangCe/
 │   │   ├── preload/           # preload 拆分模块（按功能域命名空间化）
 │   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
 │   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
-│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 29 个文件，每文件导出 <key>API 对象）
+│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 30 个文件，每文件导出 <key>API 对象）
 │   │   ├── app/               # 应用生命周期管理（23 个源文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
@@ -253,8 +255,7 @@ WXNN XiangCe/
 │
 ├── docs/                      # 文档目录
 │   ├── plans/                 # 进行中的修复/功能计划
-│   ├── archive/               # 已完成的历史计划与报告
-│   └── screenshots/           # 截图
+│   └── archive/               # 已完成的历史计划与报告
 │
 ├── tests/                     # 测试 setup
 ├── package.json               # 依赖与脚本定义
@@ -291,14 +292,12 @@ npm run dev
 
 启动后 Electron 主进程日志会输出在终端窗口中。主进程代码修改后需要重启命令。
 
-### 4.2 前端热更新（独立 Vite 服务）
+### 4.2 渲染层热更新
 
-```bash
-npm run preview
-```
+`npm run dev` 已内置渲染层 HMR：修改 `src/renderer/` 下代码，Electron 窗口内的界面即时热更新，无需单独启动 Vite 服务。
 
-浏览器访问 `http://localhost:5173/`，修改 `src/renderer/` 下代码可热更新。
-**注意**：预览版无法调用 IPC（无 Electron 主进程），所有 `window.electronAPI` 调用会返回 `undefined`。
+如需脱离 Electron 在浏览器中查看渲染层界面，运行 `npm run build:preview` 构建根目录 `preview.html` 后用浏览器打开。
+**注意**：`preview.html` 是纯静态预览（无 Electron 主进程），无法调用 IPC，所有 `window.electronAPI` 调用会返回 `undefined`。
 
 ### 4.3 打开 Chrome DevTools
 
@@ -782,7 +781,7 @@ npx electron-builder --win --publish never
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.0.exe       # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
+├── NikkiGallery-Setup-2.5.3.exe       # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
 └── builder-effective-config.yaml             # 打包配置快照
 ```
 
@@ -826,7 +825,7 @@ node scripts/generate-icon.js
 
 ### 7.7 安装与测试
 
-1. 双击 `release\NikkiGallery-Setup-2.5.0.exe` 安装
+1. 双击 `release\NikkiGallery-Setup-2.5.3.exe` 安装
 2. 安装完成后从开始菜单或桌面快捷方式启动
 3. 首次启动会触发全盘扫描定位游戏目录（首次扫描较慢，请耐心等待）
 4. 程序会自动在桌面创建快捷方式（若已存在则跳过）
@@ -934,7 +933,7 @@ npm run build-storybook
 | 安装依赖              | `npm install`                   |
 | 重建原生模块          | `npx @electron/rebuild`         |
 | 开发模式启动 exe      | `npm run dev`                   |
-| 启动 HTML 预览        | `npm run preview`               |
+| 构建 HTML 预览        | `npm run build:preview`         |
 | 类型检查              | `npm run typecheck`             |
 | Lint 检查             | `npm run lint`                  |
 | Lint 自动修复         | `npm run lint:fix`              |
