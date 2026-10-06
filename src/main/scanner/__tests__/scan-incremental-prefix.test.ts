@@ -52,6 +52,9 @@ function isBetterSqliteRequest(request: string): boolean {
 // 记录型 fake db：捕获全部 prepare 语句与 SELECT 参数；close 计数供组3-6 断言
 const captured = {
   statements: [] as Array<{ sql: string; params: unknown[] }>,
+  existingRows: [] as Array<{ file_path: string; modified_at: string }>,
+  insertedPaths: [] as string[],
+  insertCount: 0,
   closeCount: 0
 }
 
@@ -62,11 +65,19 @@ function createRecordingDb(): unknown {
       captured.closeCount++
     },
     prepare: (sql: string) => ({
-      run: () => ({ changes: 1, lastInsertRowid: 1 }),
+      run: (...params: unknown[]) => {
+        if (sql.includes('INSERT INTO media_files')) {
+          captured.insertCount++
+          captured.insertedPaths.push(String(params[0]))
+        }
+        return { changes: 1, lastInsertRowid: 1 }
+      },
       get: () => (sql.includes('schema_migrations') ? { 1: 1 } : undefined),
       all: (...args: unknown[]) => {
         captured.statements.push({ sql, params: args })
-        return []
+        return sql.includes('SELECT file_path, modified_at FROM media_files')
+          ? captured.existingRows
+          : []
       }
     }),
     transaction: (fn: (...args: unknown[]) => unknown) => fn
@@ -129,6 +140,9 @@ describe('组3-5：增量扫描 existingFiles 按扫描根前缀过滤', () => {
   it('existingFiles 查询应为 LIKE 前缀（根路径 + 分隔符 + %，含 ESCAPE），不再全表加载', async () => {
     postMessageMock.mockClear()
     captured.statements = []
+    captured.existingRows = []
+    captured.insertedPaths = []
+    captured.insertCount = 0
     h.state.instance = createRecordingDb()
 
     sendMessage({
@@ -157,6 +171,52 @@ describe('组3-5：增量扫描 existingFiles 按扫描根前缀过滤', () => {
     // 参数 = 根路径归一为小写正斜杠前缀，复用与实现一致的共享函数（保证两侧范式完全对称）
     const expectedPrefix = normalizeRootPrefixForLike(fixtureRoot, path.sep)
     expect(likeQuery!.params[0]).toBe(expectedPrefix)
+  })
+
+  it('数据库已有路径仅大小写不同时应视为同一文件并跳过重复写入', async () => {
+    postMessageMock.mockClear()
+    captured.statements = []
+    captured.insertedPaths = []
+    captured.insertCount = 0
+    const filePath = path.join(fixtureRoot, 'photo1.jpg')
+    const stats = await fsp.stat(filePath)
+    captured.existingRows = [
+      { file_path: filePath.toUpperCase(), modified_at: stats.mtime.toISOString() }
+    ]
+    h.state.instance = createRecordingDb()
+
+    sendMessage({
+      type: 'SCAN_START',
+      payload: { dbPath: 'fake-case-incr.db', options: { path: fixtureRoot, incremental: true } }
+    })
+
+    const payload = await waitForScanComplete()
+    expect(payload.success).toBe(true)
+    expect(captured.insertCount).toBe(0)
+  })
+
+  it('大小写不同的已有文件发生修改时复用数据库中的 canonical 路径', async () => {
+    postMessageMock.mockClear()
+    captured.statements = []
+    captured.insertedPaths = []
+    captured.insertCount = 0
+    const filePath = path.join(fixtureRoot, 'photo1.jpg')
+    const canonicalPath = filePath.toUpperCase()
+    captured.existingRows = [{ file_path: canonicalPath, modified_at: new Date(0).toISOString() }]
+    h.state.instance = createRecordingDb()
+
+    sendMessage({
+      type: 'SCAN_START',
+      payload: {
+        dbPath: 'fake-case-modified.db',
+        options: { path: fixtureRoot, incremental: true }
+      }
+    })
+
+    const payload = await waitForScanComplete()
+    expect(payload.success).toBe(true)
+    expect(captured.insertCount).toBe(1)
+    expect(captured.insertedPaths).toEqual([canonicalPath])
   })
 })
 

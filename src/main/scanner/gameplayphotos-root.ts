@@ -94,7 +94,7 @@ export async function isOfficialAlbumDir(dir: string): Promise<boolean> {
  * 命中条件：目录名即为 GamePlayPhotos，或目录下存在 NikkiPhotos_HighQuality / NikkiPhotos_LowQuality 子目录。
  */
 async function isDirectGamePlayPhotosDir(p: string): Promise<boolean> {
-  if (path.basename(p) === 'GamePlayPhotos') return true
+  if (path.basename(p).toLowerCase() === 'gameplayphotos') return true
   try {
     const entries = await fsp.readdir(p, { withFileTypes: true })
     return entries.some(

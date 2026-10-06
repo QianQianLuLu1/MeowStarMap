@@ -452,4 +452,19 @@ describe('repairLegacyDataV1', () => {
     expect(mock._mediaFiles.find((f) => f.file_path.includes('WarThunder'))).toBeUndefined()
     expect(mock._deleteCallCount()).toBe(1)
   })
+
+  it('11. 步骤1 SQL 的 temp 条件必须由 OR 连接（回归：SQLite near "(": syntax error，2026-10-04 日志）', () => {
+    // mock db 不校验 SQL 语法，语法错误只能在真实 SQLite 上暴露（worker 内每次扫描抛
+    // "repairLegacyData 失败: near \"(\": syntax error"）。此处对传入 prepare 的 SQL 文本
+    // 做字符化断言：LIKE '%test_media%' 之后必须以 OR 连接括号分组的 temp 条件。
+    const mock = createMockDb()
+    repairLegacyDataV1(mock.db, silentLog)
+
+    const step1Sql = vi
+      .mocked(mock.db.prepare)
+      .mock.calls.map((c) => String(c[0]))
+      .find((s) => s.includes("NOT LIKE '%infinitynikki%'"))
+    expect(step1Sql).toBeDefined()
+    expect(step1Sql).toMatch(/LIKE '%test_media%'\s+OR\s+\(/i)
+  })
 })

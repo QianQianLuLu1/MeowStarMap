@@ -350,11 +350,12 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
   }
 
   // 2. 配置文件解析（辅助路径）
+  // 配置记录的可能是启动器目录（游戏根 = 启动器目录 + \InfinityNikki），经兜底 helper 统一处理
   for (const configPath of getLauncherConfigCandidates()) {
     if (isScanAborted()) break
     const configInstallPath = await parseLauncherConfig(configPath)
     if (configInstallPath) {
-      const validated = await validateGameRoot(configInstallPath)
+      const validated = await validateGameRootWithLauncherFallback(configInstallPath)
       if (validated && !seenPaths.has(validated.toLowerCase())) {
         seenPaths.add(validated.toLowerCase())
         validatedPaths.push(validated)
@@ -364,6 +365,7 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
   }
 
   // 3. 快捷方式反向定位（兜底）：桌面优先，其次开始菜单（需求三.1 方式2）
+  // 快捷方式常指向启动器 exe（dirname 为启动器目录而非游戏根），同样经兜底 helper 处理
   const shortcutCandidates = [
     ...getShortcutCandidates(),
     ...(await getStartMenuShortcutCandidates())
@@ -374,7 +376,7 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
     if (targetPath) {
       // 快捷方式指向的是 exe，取其父目录作为候选根
       const candidateRoot = path.dirname(targetPath)
-      const validated = await validateGameRoot(candidateRoot)
+      const validated = await validateGameRootWithLauncherFallback(candidateRoot)
       if (validated && !seenPaths.has(validated.toLowerCase())) {
         seenPaths.add(validated.toLowerCase())
         validatedPaths.push(validated)
@@ -482,7 +484,7 @@ async function parseLauncherConfig(configPath: string): Promise<string | null> {
       for (const line of lines) {
         const match = line.trim().match(/^(installpath|game_install_path)\s*=\s*(.+)$/i)
         if (match) {
-          return match[1].trim()
+          return match[2].trim()
         }
       }
       return null
@@ -524,6 +526,20 @@ async function resolveShortcutTarget(shortcutPath: string): Promise<string | nul
       resolve(null)
     }
   })
+}
+
+/**
+ * 候选根校验 + 官方启动器布局兜底（2026-10-04 日志回归）。
+ *
+ * 快捷方式/配置文件解析出的目录常是「启动器目录」（快捷方式指向启动器 exe、
+ * 配置记录的是启动器安装位置），而官方启动器布局中游戏根 = 启动器目录 + \InfinityNikki
+ * （与注册表路径的候选 B 拼接约定一致，见 findOfficialLauncherGamePaths 步骤 1 注释）。
+ * 直校验失败时补一次拼接校验，两次均沿用 validateGameRoot 的诊断埋点与探测轨迹。
+ */
+async function validateGameRootWithLauncherFallback(candidatePath: string): Promise<string | null> {
+  const direct = await validateGameRoot(candidatePath)
+  if (direct) return direct
+  return await validateGameRoot(path.join(candidatePath, 'InfinityNikki'))
 }
 
 /**
@@ -600,6 +616,35 @@ async function hasX6GameDir(candidatePath: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/**
+ * 将用户自定义路径归一化为「游戏根目录」语义（包含 X6Game 的目录）。
+ *
+ * 背景（2026-10-04 日志回归）：设置页兜底引导让用户选"游戏安装根目录"，但用户高概率
+ * 选中 X6Game 目录本身或启动器目录——扫描链路把自定义路径当游戏根拼接
+ * `root\X6Game\Saved\GamePlayPhotos`，双层拼接必失败（E002 → E001）。
+ *
+ * 兼容四种用户实际会选的目录形态（basename 比较大小写不敏感）：
+ * 1. GamePlayPhotos 目录本身 → 原样返回（下游 isDirectGamePlayPhotosDir 直通）；
+ * 2. 游戏根（含 X6Game 子目录）→ 原样返回；
+ * 3. 启动器目录（InfinityNikki\X6Game 存在）→ 归一为 <p>\InfinityNikki；
+ * 4. X6Game 目录本身（basename 匹配）→ 归一为父目录（下游拼 <父>\X6Game\… 还原正确层级）。
+ *
+ * 其余无法识别的目录原样返回（保持旧行为，由下游校验并记 E002 诊断）；
+ * 所有分支 fail-open，不抛异常。扫描侧（worker-entry.findMediaDirectories）与
+ * 设置页候选列表（detectGameRootCandidates）必须同用本函数，保证 excludedScanPaths
+ * 精确匹配两侧路径口径一致。
+ */
+export async function normalizeCustomGameRoot(p: string): Promise<string> {
+  if (!p || typeof p !== 'string') return p
+  const basename = path.basename(p).toLowerCase()
+  if (basename === 'gameplayphotos') return p
+  if (await hasX6GameDir(p)) return p
+  const viaLauncher = path.join(p, 'InfinityNikki')
+  if (await hasX6GameDir(viaLauncher)) return viaLauncher
+  if (basename === 'x6game') return path.dirname(p)
+  return p
 }
 
 /**
@@ -875,13 +920,15 @@ export async function detectGameRootCandidates(
   }
 
   // 用户自定义目录优先展示（其顺序即用户配置顺序）
+  // 路径先经 normalizeCustomGameRoot 归一化（X6Game 目录/启动器目录 → 游戏根），
+  // 与扫描侧 findMediaDirectories 口径一致，保证 excludedScanPaths 精确匹配不失效
   if (Array.isArray(customPaths)) {
     const existing: string[] = []
     for (const p of customPaths) {
       if (!p || typeof p !== 'string') continue
       try {
         await fsp.access(p)
-        existing.push(p)
+        existing.push(await normalizeCustomGameRoot(p))
       } catch {
         // 配置中的目录已不存在，不列入候选
       }

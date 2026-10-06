@@ -54,7 +54,7 @@ import { readMetadataFromFile } from '../services/xmp-metadata-service'
 // 方案三：独立游戏目录 UID 发现机制（对齐上游 nikki_albums）
 import { discoverUidsFromGameDirs } from './uid-discovery'
 // P0-01：游戏目录发现函数抽取为独立模块，便于单元测试 vi.mock 桩替换（循环依赖仅调用期使用，ESM 安全）
-import { findGameInstallRootsByPriority } from './game-directory-discovery'
+import { findGameInstallRootsByPriority, normalizeCustomGameRoot } from './game-directory-discovery'
 import { isOfficialAlbumDir } from './gameplayphotos-root'
 import { resolveScanChannels } from './scan-channels'
 import type { ChannelLogger } from './scan-channels'
@@ -566,15 +566,24 @@ export async function findMediaDirectories(
 
   // 0. 优先路径：用户自定义游戏目录
   // 用户在设置页手动指定的目录，存在即加入结果集；不存在则跳过（游戏可能未安装但用户预配置）。
-  // 注意：自定义路径不计入自动发现集合，恒包含于最终结果，不会被任何过滤剔除。
+  // 注意：自定义路径不计入自动发现集合；除用户显式 excludedPaths 外，不受发现阶段过滤。
+  // 路径先经 normalizeCustomGameRoot 归一化（X6Game 目录/启动器目录 → 游戏根），
+  // 避免被当游戏根双层拼出 root\X6Game\X6Game\... 导致 E002（2026-10-04 日志回归）。
   if (customPaths && customPaths.length > 0) {
     let validCount = 0
     for (const p of customPaths) {
       if (!p || typeof p !== 'string') continue
       try {
+        // 必须先校验原始配置；否则不存在的 <parent>\X6Game 会被归一化为存在的 parent 并误收录。
         await fsp.access(p)
-        customSet.add(p)
+        const normalized = await normalizeCustomGameRoot(p)
+        await fsp.access(normalized)
+        customSet.add(normalized)
         validCount++
+        if (normalized.toLowerCase() !== p.toLowerCase()) {
+          // 低频关键诊断：归一化改写了用户配置的路径，透传主进程日志便于排查
+          sendScanLogInfo(`[Scanner] 自定义路径归一化：${p} → ${normalized}`)
+        }
       } catch {
         workerLog('warn', `[Scanner] 用户自定义路径不存在，跳过: ${p}`)
       }
@@ -588,7 +597,7 @@ export async function findMediaDirectories(
   // 解析游戏安装根目录，再统一拼接 X6Game\Saved\GamePlayPhotos 子路径。
   for (const p of await findGameInstallRootsByPriority()) registrySet.add(p)
 
-  // 合并：自定义路径（恒包含）+ 三渠道游戏根目录；整体去重。
+  // 合并：自定义路径优先 + 三渠道游戏根目录；按 Windows 路径大小写不敏感去重。
   // 不再引入用户数据 / AppData / 全盘扫描通道（spec 二：不做全盘扫描、不经目录过滤）。
   // 需求三.3：剔除用户在设置页取消勾选的目录（大小写不敏感精确匹配）。
   const excluded = new Set(
@@ -596,10 +605,12 @@ export async function findMediaDirectories(
       .filter((p) => typeof p === 'string' && p.length > 0)
       .map((p) => p.toLowerCase())
   )
-  const result = new Set<string>(
-    [...customSet, ...registrySet].filter((p) => !excluded.has(p.toLowerCase()))
-  )
-  const resultDirs = Array.from(result)
+  const result = new Map<string, string>()
+  for (const p of [...customSet, ...registrySet]) {
+    const key = p.toLowerCase()
+    if (!excluded.has(key) && !result.has(key)) result.set(key, p)
+  }
+  const resultDirs = Array.from(result.values())
   // T2：目录发现结论日志透传（低频关键诊断信息，绕过 workerLog 的 info 屏蔽）
   sendScanLogInfo(
     `[Scanner] findMediaDirectories 搜索结果: ${result.size} 个目录（自定义 ${customSet.size} + 三渠道 ${registrySet.size}）`
@@ -699,7 +710,7 @@ export async function scanDirectory(
   let savedCount = 0
 
   // 增量扫描：获取已索引的文件路径和修改时间
-  const existingFiles = new Map<string, string>()
+  const existingFiles = new Map<string, { filePath: string; modifiedAt: string }>()
   if (incremental && db) {
     // FIX(组3-5): 仅加载本次扫描根目录下的已有记录——原无 WHERE 全表 SELECT 在单目录
     // 导入时也把整个库拉入内存（万级库每次多一次全表扫描 + Map 构建）。
@@ -718,7 +729,10 @@ export async function scanDirectory(
       modified_at: string
     }>
     for (const row of rows) {
-      existingFiles.set(row.file_path, row.modified_at)
+      existingFiles.set(row.file_path.toLowerCase(), {
+        filePath: row.file_path,
+        modifiedAt: row.modified_at
+      })
     }
   }
 
@@ -834,17 +848,17 @@ export async function scanDirectory(
               continue
             }
 
-            // 增量扫描：跳过未修改的文件
+            // 增量扫描：跳过未修改的文件；修改文件沿用数据库中的原路径大小写，
+            // 避免 SQLite 的 BINARY 唯一键把同一 Windows 文件写成重复记录。
             // F-G5：mtime 比较容忍 1 秒精度差，避免 ISO 字符串毫秒精度丢失导致重复处理
-            if (incremental) {
-              const existingMtime = existingFiles.get(fullPath)
-              if (
-                existingMtime &&
-                Math.abs(new Date(existingMtime).getTime() - stats.mtime.getTime()) <= 1000
-              ) {
-                continue
-              }
+            const existingFile = incremental ? existingFiles.get(fullPath.toLowerCase()) : undefined
+            if (
+              existingFile &&
+              Math.abs(new Date(existingFile.modifiedAt).getTime() - stats.mtime.getTime()) <= 1000
+            ) {
+              continue
             }
+            const databasePath = existingFile?.filePath ?? fullPath
 
             if (VIDEO_EXTENSIONS.has(ext)) {
               pendingVideos.push({ fullPath, ext, entryName: entry.name, stats })
@@ -910,7 +924,7 @@ export async function scanDirectory(
               }
 
               await addFile({
-                file_path: fullPath,
+                file_path: databasePath,
                 file_name: entry.name,
                 file_type: 'image',
                 file_ext: ext,
@@ -963,6 +977,7 @@ export async function scanDirectory(
 
   // 批量并发读取视频元数据（限制 4 并发），读取后流式写入数据库
   const videoTasks = pendingVideos.map(({ fullPath, ext, entryName, stats }) => async () => {
+    const databasePath = existingFiles.get(fullPath.toLowerCase())?.filePath ?? fullPath
     // C-G10：probeVideoMetadata 现在会 reject，单个视频失败不应中断整个扫描
     // 15 秒超时：ffprobe 二进制不可用时不会 reject 而永久挂起，会卡死整个扫描流程
     let meta: { width?: number; height?: number; duration?: number } = {}
@@ -983,7 +998,7 @@ export async function scanDirectory(
     observeUidGate(rawUid, discoveredUid, validUids)
     if (discoveredUid !== 'default') autoRegisterUid(discoveredUid)
     await addFile({
-      file_path: fullPath,
+      file_path: databasePath,
       file_name: entryName,
       file_type: 'video',
       file_ext: ext,
@@ -1010,7 +1025,7 @@ export async function scanDirectory(
     // 单个文件标记失败不应影响其他文件的扫描
     if (videoCorrupted) {
       try {
-        markCorruptedByPath(fullPath, `视频元数据读取失败: ${videoCorruptedReason}`)
+        markCorruptedByPath(databasePath, `视频元数据读取失败: ${videoCorruptedReason}`)
       } catch (markErr) {
         workerLog(
           'warn',

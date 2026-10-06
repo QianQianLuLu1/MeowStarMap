@@ -17,7 +17,9 @@ import {
   findGameInstallRootsByPriority,
   getAvailableDrives,
   getUserDataPaths,
-  getLastProbeTrail
+  getLastProbeTrail,
+  normalizeCustomGameRoot,
+  detectGameRootCandidates
 } from './game-directory-discovery'
 
 // ============ vi.mock：按被测模块实际 import 的模块名整体替换 ============
@@ -451,6 +453,62 @@ describe('findOfficialLauncherGamePaths（官方启动器三重检测）', () =>
 
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true })
   })
+
+  it('快捷方式指向启动器 exe（启动器目录下无 X6Game）→ 拼接 \\InfinityNikki 兜底命中（2026-10-04 日志回归）', async () => {
+    // 该设备实况：注册表 8 键全空、标准路径全 miss，桌面「无限暖暖」快捷方式指向启动器 exe，
+    // dirname 得到启动器目录 D:\InfinityNikki\InfinityNikki Launcher，游戏实际装在其 \InfinityNikki 子目录下
+    mockReaddir.mockRejectedValue(new Error('ENOENT'))
+    vi.mocked(execFile).mockImplementation(((
+      cmd: string,
+      _args: string[],
+      _opts: unknown,
+      cb: RegCallback
+    ) => {
+      if (cmd === 'powershell' || cmd === 'pwsh') {
+        cb(null, 'D:\\InfinityNikki\\InfinityNikki Launcher\\launcher.exe')
+      } else {
+        cb(new Error('reg query failed'), '')
+      }
+    }) as never)
+    // 仅启动器目录\InfinityNikki\X6Game 存在（启动器目录自身无 X6Game，GamePlayPhotos 尚未生成）
+    stubAccess(['D:\\InfinityNikki\\InfinityNikki Launcher\\InfinityNikki\\X6Game'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\InfinityNikki\\InfinityNikki Launcher\\InfinityNikki'
+    ])
+  })
+
+  it('配置文件 game_install_path 为启动器目录 → 拼接 \\InfinityNikki 兜底命中', async () => {
+    stubExecFile(() => null)
+    mockReaddir.mockRejectedValue(new Error('ENOENT'))
+    mockReadFile.mockImplementation((p: unknown) => {
+      if (String(p) === 'C:\\Users\\tester\\AppData\\Local\\InfinityNikki Launcher\\config.ini') {
+        return Promise.resolve('[Game]\ngame_install_path=D:\\MyGames\\LauncherDir\n')
+      }
+      return Promise.reject(new Error('ENOENT'))
+    })
+    stubAccess(['D:\\MyGames\\LauncherDir\\InfinityNikki\\X6Game'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\MyGames\\LauncherDir\\InfinityNikki'
+    ])
+  })
+
+  it('无 [Game] 段的全局 InstallPath 仍解析路径值并应用启动器兜底', async () => {
+    stubExecFile(() => null)
+    mockReaddir.mockRejectedValue(new Error('ENOENT'))
+    mockReadFile.mockImplementation((p: unknown) => {
+      if (String(p) === 'C:\\Users\\tester\\AppData\\Local\\InfinityNikki Launcher\\config.ini') {
+        return Promise.resolve('InstallPath=D:\\GlobalLauncher\n')
+      }
+      return Promise.reject(new Error('ENOENT'))
+    })
+    stubAccess(['D:\\GlobalLauncher\\InfinityNikki\\X6Game'])
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\GlobalLauncher\\InfinityNikki'
+    ])
+  })
 })
 
 // ============ 常见安装路径枚举（Subtask A 增补） ============
@@ -760,5 +818,66 @@ describe('getUserDataPaths（用户数据快速通道）', () => {
 
     await expect(getUserDataPaths()).resolves.toEqual([])
     expect(mockAccess).not.toHaveBeenCalled()
+  })
+})
+
+// ============ normalizeCustomGameRoot（自定义路径归一化，2026-10-04 日志回归） ============
+
+describe('normalizeCustomGameRoot（自定义路径归一化）', () => {
+  it('X6Game 目录本身 → 父目录（下游拼接 <父>\\X6Game\\… 还原正确层级）', async () => {
+    stubAccess([])
+    await expect(normalizeCustomGameRoot('D:\\Games\\Install\\X6Game')).resolves.toBe(
+      'D:\\Games\\Install'
+    )
+  })
+
+  it('启动器目录（InfinityNikki\\X6Game 存在）→ 归一为 <p>\\InfinityNikki', async () => {
+    stubAccess(['D:\\MyLauncher\\InfinityNikki\\X6Game'])
+    await expect(normalizeCustomGameRoot('D:\\MyLauncher')).resolves.toBe(
+      'D:\\MyLauncher\\InfinityNikki'
+    )
+  })
+
+  it('已是游戏根（含 X6Game 子目录）→ 原样返回', async () => {
+    stubAccess(['E:\\Games\\InfinityNikki\\X6Game'])
+    await expect(normalizeCustomGameRoot('E:\\Games\\InfinityNikki')).resolves.toBe(
+      'E:\\Games\\InfinityNikki'
+    )
+  })
+
+  it('GamePlayPhotos 目录本身 → 原样返回（下游 isDirectGamePlayPhotosDir 直通）', async () => {
+    stubAccess([])
+    await expect(
+      normalizeCustomGameRoot('E:\\Games\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos')
+    ).resolves.toBe('E:\\Games\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos')
+  })
+
+  it('无关目录 → 原样返回（保持旧行为，fail-open）', async () => {
+    stubAccess([])
+    await expect(normalizeCustomGameRoot('F:\\Photos')).resolves.toBe('F:\\Photos')
+  })
+})
+
+describe('detectGameRootCandidates（自定义路径归一化透传）', () => {
+  it('custom 为 X6Game 目录 → 列出父目录且 hasGamePlayPhotos=true', async () => {
+    // 三渠道发现全失败（注册表/配置/快捷方式/盘符枚举全部落空），聚焦 custom 路径
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    mockReaddir.mockRejectedValue(new Error('ENOENT'))
+    stubAccess([
+      'D:\\Install\\X6Game', // custom 收集循环的存在性检查（用户选中的原始路径）
+      'D:\\Install\\X6Game\\Saved\\GamePlayPhotos' // 归一化后游戏根的相册目录（hasGamePlayPhotos 判定）
+    ])
+
+    const candidates = await detectGameRootCandidates(['D:\\Install\\X6Game'])
+
+    expect(candidates).toEqual([
+      {
+        path: 'D:\\Install',
+        mtimeMs: 0, // fsp.stat 未在 mock 工厂中提供，stat 失败降级为 0
+        hasGamePlayPhotos: true,
+        source: 'custom'
+      }
+    ])
   })
 })

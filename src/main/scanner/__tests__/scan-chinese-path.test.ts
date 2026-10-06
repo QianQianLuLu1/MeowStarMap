@@ -19,8 +19,11 @@ import Module from 'node:module'
 vi.mock('../repair-legacy-data-v1', () => ({ repairLegacyDataV1: vi.fn() }))
 vi.mock('../repair-legacy-data-v3', () => ({ repairLegacyDataV3: vi.fn() }))
 vi.mock('../repair-legacy-data-v4', () => ({ repairLegacyDataV4: vi.fn() }))
-// 三渠道定位桩为空：仅验证自定义（中文）路径链路，避免真实注册表/盘符 IO
-vi.mock('../game-directory-discovery', () => ({
+// 三渠道定位桩为空：仅验证自定义（中文）路径链路，避免真实注册表/盘符 IO。
+// importOriginal 展开真实模块：findMediaDirectories 依赖的 normalizeCustomGameRoot
+// （自定义路径归一化纯函数，走真实 fs）保持真实实现，仅覆写三渠道发现函数。
+vi.mock('../game-directory-discovery', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../game-directory-discovery')>()),
   findGameInstallRootsByPriority: () => Promise.resolve([]),
   getLastProbeTrail: () => []
 }))

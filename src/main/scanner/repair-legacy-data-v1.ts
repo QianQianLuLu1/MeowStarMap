@@ -95,7 +95,9 @@ export function repairLegacyDataV1(
             // 对 DB 中单反斜杠的 Windows 路径永假，temp 目录清理从未生效；
             // 与下方步骤 3 的 mallpic 条件同为两反斜杠写法（运行时单反斜杠）。
             // 排除 cloudphotos\temp：该目录由步骤 3 重分类保留，不能被当作误扫描删除
-            "(LOWER(file_path) LIKE '%\\temp\\%' AND LOWER(file_path) NOT LIKE '%\\cloudphotos\\temp\\%') " +
+            // OR 不可省略：缺失时 SQL 为 "LIKE '%test_media%' (LOWER(..."，SQLite 报
+            // near "(": syntax error，导致 V1 每次扫描失败且 V2~V6 全部被跳过
+            "OR (LOWER(file_path) LIKE '%\\temp\\%' AND LOWER(file_path) NOT LIKE '%\\cloudphotos\\temp\\%') " +
             "OR LOWER(file_path) LIKE '%/temp/%')"
         )
         .all() as Array<{ id: number; file_path: string }>

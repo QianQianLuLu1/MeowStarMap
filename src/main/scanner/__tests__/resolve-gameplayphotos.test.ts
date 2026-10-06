@@ -88,6 +88,16 @@ describe('resolveGamePlayPhotosScanRoots', () => {
     expect(result).toEqual(['C:\\Games\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'])
   })
 
+  it('手动兜底：GamePlayPhotos 目录名大小写不同也不重复拼接', async () => {
+    const directRoot = 'C:\\Games\\InfinityNikki\\X6Game\\Saved\\gameplayphotos'
+    vi.mocked(fsp.readdir).mockResolvedValue([] as never)
+    mockAccess.mockImplementation(() => Promise.resolve())
+
+    const result = await resolveGamePlayPhotosScanRoots([directRoot])
+
+    expect(result).toEqual([directRoot])
+  })
+
   it('手动兜底：目录下含 NikkiPhotos_HighQuality 时识别为直接 GamePlayPhotos 根', async () => {
     const mockReaddir = vi.mocked(fsp.readdir)
     mockReaddir.mockResolvedValue([
