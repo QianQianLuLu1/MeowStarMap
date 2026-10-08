@@ -47,7 +47,11 @@ vi.mock('../../hooks/useFilteredMediaFiles', () => ({
   useFilteredMediaFiles: () => []
 }))
 
-vi.mock('../../utils/motionPresets', () => ({ springSoft: {} }))
+// 流体滑块 Hook 依赖同模块的曲线常量，故透传真实实现，仅把 springSoft 降级为空对象
+vi.mock('../../utils/motionPresets', async () => ({
+  ...(await vi.importActual<Record<string, unknown>>('../../utils/motionPresets')),
+  springSoft: {}
+}))
 
 describe('Sidebar 第 4 项 nav.resonanceRecords', () => {
   it('第四个导航项显示「共鸣录」，且界面不出现原始 key 文本', () => {

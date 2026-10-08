@@ -41,6 +41,29 @@ export const fastFade: Transition = {
   ease: [0.4, 0, 0.2, 1]
 }
 
+// ============ 流体滑块 Tab 指示器（Sidebar 导航切换） ============
+
+/**
+ * 流体滑块「前沿」曲线：快出（easeOutQuint 近似）。
+ * 朝运动方向的那条边先冲出去，飞行过半即接近终点，与后沿拉开差距形成拉伸。
+ */
+export const fluidTabLead: [number, number, number, number] = [0.22, 1, 0.36, 1]
+
+/**
+ * 流体滑块「后沿」曲线：慢入慢出（easeInOutCubic 近似）。
+ * 另一条边滞后跟随，与前沿的差值即拉伸量；两条边终态同时收敛，形变自然回收。
+ */
+export const fluidTabTrail: [number, number, number, number] = [0.65, 0, 0.35, 1]
+
+/** 流体滑块单次切换时长（秒） */
+export const FLUID_TAB_DURATION = 0.42
+
+/**
+ * 流体滑块最大拉伸量（px）：长距离跳转（如首项 → 末项）时限制形变上限，
+ * 否则拉伸量随距离线性增长会拉出不可接受的超长条。
+ */
+export const FLUID_TAB_MAX_STRETCH = 28
+
 // ============ 变体预设 ============
 
 /**

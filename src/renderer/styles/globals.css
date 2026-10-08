@@ -1309,6 +1309,39 @@ html.glass-lite .ambient-bg {
   transition: height 200ms ease-out;
 }
 
+/* 流体滑块 Tab 指示器（Sidebar 导航切换）
+   滑块接管 active 的「背景块 + 左侧竖条」，由 useFluidTabIndicator 只写 transform：
+   translateY 位移 + scaleY 形变（前沿快 / 后沿慢），圆角由 JS 反向补偿。
+   nav 有 px-2 内边距，绝对定位基准是 padding box，故 left/right 取 8px 与内容区对齐。 */
+.fluid-tab-indicator {
+  position: absolute;
+  top: 0;
+  left: 8px;
+  right: 8px;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  background: var(--accent-soft);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--accent) 18%, transparent);
+  transform-origin: top;
+  will-change: transform;
+}
+
+/* 滑块已接管高亮，按钮自身不再画背景与竖条，避免与滑块重影 */
+.nav-fluid .nav-item.active {
+  background: transparent;
+}
+.nav-fluid .nav-item.active::before {
+  display: none;
+}
+/* 滑块是 nav 的首个子节点，需抵消 space-y-1 给首个按钮带来的 4px 上间距
+   （同特异性 0,3,0，靠源序压过 Tailwind 的 space-y 规则） */
+.nav-fluid > .fluid-tab-indicator + .nav-item {
+  margin-top: 0;
+}
+
 /* 分类标签 */
 .category-tag {
   display: inline-flex;

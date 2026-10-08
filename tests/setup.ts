@@ -18,6 +18,11 @@ import '@testing-library/jest-dom/vitest'
 import { vi, afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 import '../src/renderer/i18n'
+import {
+  recordMotionAnimateCall,
+  type MotionAnimateCall,
+  type MotionAnimateOptions
+} from './motion-animate-stub'
 
 // jsdom 环境补齐
 if (typeof window !== 'undefined') {
@@ -198,7 +203,29 @@ vi.mock('motion/react', async () => {
     MotionConfig: ({ children }: { children?: React.ReactNode }) =>
       (children ?? null) as React.ReactNode,
     // 视觉体系 v3：SegmentedControl 等组件消费 reduced-motion 感知；测试环境默认无减弱
-    useReducedMotion: () => false
+    useReducedMotion: () => false,
+    // 流体 Tab 指示器：motion 命令式 animate() 同步桩。
+    // jsdom 无可控动画时间轴，桩直接把值推进到终态并触发 onComplete；
+    // 调用明细记入 tests/motion-animate-stub.ts，供断言 ease 分配与 stop 语义。
+    animate: (from: number, to: number, options?: MotionAnimateOptions) => {
+      const record: MotionAnimateCall = { from, to, options: options ?? {}, stopped: 0 }
+      recordMotionAnimateCall(record)
+      options?.onUpdate?.(to)
+      options?.onComplete?.()
+      return {
+        stop: () => {
+          record.stopped += 1
+        },
+        play: () => {},
+        pause: () => {},
+        complete: () => {},
+        cancel: () => {
+          record.stopped += 1
+        },
+        time: 0,
+        speed: 1
+      }
+    }
   }
 })
 

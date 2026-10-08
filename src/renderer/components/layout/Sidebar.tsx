@@ -5,6 +5,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { useUIStore, type ViewLevel } from '../../stores/uiStore'
 import { useMediaStore, fetchMediaFromDatabase, loadProfiles } from '../../stores/mediaStore'
 import { useFilteredMediaFiles } from '../../hooks/useFilteredMediaFiles'
+// 流体滑块 Tab 指示器：导航切换的双边缘补间（前沿快 / 后沿慢）
+import { useFluidTabIndicator } from '../../hooks/useFluidTabIndicator'
 import { formatFileSize } from '../../utils/format'
 import {
   IconGallery,
@@ -87,6 +89,9 @@ export const Sidebar: React.FC = () => {
   const profileMenuRef = useRef<HTMLDivElement>(null)
   // P0-03：智能分组快捷面板展开状态
   const [groupPanelOpen, setGroupPanelOpen] = useState(false)
+
+  // 流体滑块 Tab 指示器：currentView 不在导航项内（detail / editor）时自动隐藏
+  const { containerRef, indicatorRef, registerItem } = useFluidTabIndicator(currentView)
 
   // P0-02：启动时加载角色档案列表
   useEffect(() => {
@@ -271,10 +276,13 @@ export const Sidebar: React.FC = () => {
         </div>
       )}
 
-      <nav className="flex-1 px-2 space-y-1 mt-2">
+      <nav ref={containerRef} className="nav-fluid flex-1 px-2 space-y-1 mt-2 relative">
+        {/* 流体滑块：首个子节点，绘制在按钮之下（按钮 position:relative 且在 DOM 中靠后） */}
+        <div ref={indicatorRef} className="fluid-tab-indicator" aria-hidden="true" />
         {navItems.map((item) => (
           <button
             key={item.id}
+            ref={registerItem(item.id)}
             className={`nav-item w-full motion-hover-scale-sm ${currentView === item.id ? 'active' : ''}`}
             onClick={() => navigateTo(item.id)}
             title={t(item.labelKey)}
