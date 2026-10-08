@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+### Added | 新增
+
+- **重扫复位谓词唯一真源**：新增 `src/main/scanner/rescan-restore-sql.ts`（游戏目录树条件 ∧ `COALESCE(delete_origin, '') <> 'user'` 的纯字符串常量），`worker-entry.ts` 改为 import 该常量、删除本地同名常量，使「哪些软删除记录允许被重扫复位」只有一处定义。配套 `src/main/scanner/__tests__/rescan-restore-sql.test.ts` 分两档断言：真实 SQL 语义档（用 Node 内置 `node:sqlite` 驱动与生产同构的 UPSERT，因 better-sqlite3 是 Electron ABI 无法在 vitest 下加载）按能力探测门控，无引擎依赖的谓词结构档全 Node 版本必跑
+
 ### Changed | 变更
 
 - **提交前指引与实际闸门对齐**：`scripts/verify-changes.ts`（`npm run verify` / `verify:staged`）新增只读格式检查（`prettier --check`，行尾不参与判定），检查集与 `.husky/pre-commit` 对齐但仍不改动任何文件；新增 `scripts/verify-format-scope.ts`（从 `package.json` 的 `lint-staged` 键推导钩子格式作用域）及其单测（含配置契约测试）
@@ -22,6 +26,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - **编码约定真相源入仓**：新增 `docs/CODING_CONVENTIONS.md`（纳入版本控制）承接四条硬约定与「校验与提交」口径；`.qoder/rules/project-conventions.md` 降级为它的本地镜像（IDE `trigger: always_on` 注入用，仍随 `.gitignore` 的 `.qoder/` 不入库）。`AGENTS.md`、`commitlint.config.cjs`、`.gitmessage`、`.husky/commit-msg`（含提交被拒时打印给用户的文案）与 `eslint.config.js` 的段注释全部改指 docs 真相源，并订正章节名「提交校验流程」→「校验与提交」
 - 6 个模块级 `AGENTS.md`（`scripts/`、`src/main/{app,database,media-worker,thumbnail,utils}/`）随根 `AGENTS.md` 作为同一提交单元入仓，消除导航表指向仓库外文件；全部 12 个模块级 `AGENTS.md` 首段的“见 always-on 规则 `project-conventions.md`”改指 `docs/CODING_CONVENTIONS.md`（含 `scripts/AGENTS.md` 顶层链接相对层级写错为 `../../AGENTS.md` 的修正），`scripts/__tests__/verify-format-scope.test.ts` 去掉「干净克隆下不存在则跳过」的 `it.skipIf`，改为对 docs 真相源强制断言，并新增三项守护：被跟踪指引（含从导航表动态解析的模块级 `AGENTS.md`）断链拦截、导航表逐行可解析、镜像正文区与真相源逐字一致。本次未新增也未放宽任何 CI 或钩子拦截
 - **根目录文档一致性修正（2026-10-06 全仓 md 盘点）**：README 中英段浏览模式「4 种」→「5 种（补瀑布流）」与基础调整「12 项」→「14 项」，ARCHITECTURE(.en) 文档版本元数据与 preload「29 个命名空间」→「30」，DEVELOPMENT(.en) 的 HTML 预览工作流改为 `npm run build:preview` → 打开根目录 `preview.html`（订正 `npm run preview` 实为 electron-vite 生产预览）、克隆路径与安装包版本示例、删除不存在的 `docs/screenshots/` 引用；`THUMBNAIL_OPTIMIZATION_PLAN.md`（根目录）与 `docs/plans/` 中 2 份「已实施」计划归档出仓（本地留档 `docs/archive/plans/`，不入仓）
+
+### Fixed | 修复
+
+- **删除与回收站语义修复（D1–D5，详见 `docs/plans/2026-10-08-recycle-bin-semantics-fix.md`）**
+
+  - **D1 软删除不再搬动文件**：`useFileOperations.ts` 的单文件与批量软删除分支移除 `file.delete`（`shell.trashItem` 把文件移入 Windows 系统回收站，而 Electron 无还原 API → 「恢复」只能翻转 DB 标记、文件实体回不来，表现为裂图 / 打开失败 / 被完整性校验标 `is_missing = 1`）；软删除改为纯 DB 标记，恢复 = 翻转标记即完好还原
+  - **D2 重扫不再复活用户删除**：`media_files` 新增 `delete_origin` 列（`connection.ts` 的 `migrateDeleteOrigin()` 经 `safeEnsureColumn` 幂等加列，`'user'` / `'root'` / `NULL` 三态），`media-repository.ts` 的 `softDeleteBatch` / `softDeleteForPermanentDelete` 写 `'user'`、`softDeleteByRootPath` 写 `'root'`、`restoreBatch` 置 `NULL`；扫描 UPSERT 复位分支加 `COALESCE(delete_origin, '') <> 'user'` 谓词，消除「删了又回来」
+  - **D3 详情页与全屏删除进回收站**：`DetailPage.tsx`、`FullscreenViewer.tsx` 的删除由 `file.delete` + `mediaAction.delete`（硬删 DB 行，记录根本进不了回收站）改为 `mediaAction.softDelete`
+  - **D4 回收站列表刷新**：`RecycleBinPage.tsx` 由「空依赖 effect 只在首挂载拉一次」改为首次挂载必拉取 + `currentView` 切回 `recycle-bin` 时重拉，并订阅 `media:updated` 广播（keep-alive 保活下他处删除不再陈旧）
+  - **D5 去掉重复确认弹窗**：`media:emptyRecycleBin` 移除主进程 `dialog.showMessageBox` 二次确认（渲染端 `ConfirmDialog` 已确认，用户被要求确认两次，且取消抛 `IPC_CANCELED` 被误报「清空失败」红 Toast），与 `media:permanentDelete` 同构；`docs/IPC_CONTRACT.md` §2.8 同步
+
+- **`rescan-restore-sql.test.ts` 的 CI 兼容性**：该测试原在模块顶层 `nodeRequire('node:sqlite')`，而 `node:sqlite` 需 Node ≥ 22.5、`.node-version` 与 CI 全部 job 钉 Node 20 → 流水线会以 `Cannot find module` 失败；改为能力探测 + `describe.runIf` 门控（不可用时响亮告警并只跳过语义档，结构档仍必跑，谓词被删改时 CI 仍能拦住），同时修正 3 处 `TS2749`（把值 `DatabaseSync` 用在类型位置，因 `src/main/tsconfig.json` 排除测试文件而未被 `npm run typecheck` 发现）
+- **`docs/IPC_CONTRACT.md` 契约同步**：§2.5 `media:softDelete` 补 `success: true` 与软删除新语义（不搬动文件、`delete_origin` 三态与重扫复位口径、4 处读 `res.success` 的调用方），§2.9 `media:delete` 删除「详情页与全屏查看器的删除（源文件先移入系统回收站）」的不实描述（两处已改走 §2.5）
 
 ---
 

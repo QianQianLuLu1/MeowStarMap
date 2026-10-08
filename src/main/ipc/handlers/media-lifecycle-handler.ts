@@ -1,12 +1,12 @@
+// @core-change: 清空回收站移除主进程 dialog 二次确认，与 media:permanentDelete 对齐，消除重复弹窗与取消误报 IPC_CANCELED
 /**
  * 媒体生命周期域 IPC handler：删除 / 恢复 / 回收站
  *
  * 覆盖：物理删除记录 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
- * 彻底删除采用三阶段事务保证 DB 与文件系统一致，二次确认由渲染端 ConfirmDialog 承担；
- * 清空回收站仍含 dialog 二次确认。
+ * 彻底删除采用三阶段事务保证 DB 与文件系统一致；二次确认由渲染端 ConfirmDialog 承担。
  * 回收站批量操作工具（含缩略图清理：缓存三档位 + 原生 LQ 及其 DB 记录）见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
  */
-import { ipcMain, dialog } from 'electron'
+import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
@@ -19,7 +19,7 @@ import { t } from '../../i18n'
  * 媒体生命周期域 IPC handler
  *
  * 覆盖：物理删除记录 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
- * 彻底删除与清空回收站含 dialog 二次确认；彻底删除采用三阶段事务保证 DB 与文件系统一致。
+ * 彻底删除与清空回收站的二次确认均由渲染端 ConfirmDialog 承担；彻底删除采用三阶段事务保证 DB 与文件系统一致。
  */
 export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
   // 每次调用动态获取 Repository（db 可能在初始化/重连时变化）
@@ -127,19 +127,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
         return { message: t('main.media.message.recycleBinEmpty'), movedCount: 0 }
       }
 
-      // A-S3：高危操作二次确认（清空回收站不可恢复）
-      const confirmResult = await dialog.showMessageBox({
-        type: 'warning',
-        buttons: [t('main.media.dialog.cancel'), t('main.media.dialog.confirmEmpty')],
-        defaultId: 0,
-        cancelId: 0,
-        title: t('main.media.dialog.emptyRecycleBinTitle'),
-        message: t('main.media.dialog.emptyRecycleBinMessage', { count: rows.length }),
-        detail: t('main.media.dialog.permanentDeleteDetail')
-      })
-      if (confirmResult.response !== 1) {
-        throw AppError.canceled(t('main.media.error.userCanceled'))
-      }
+      // 回收站语义修复 D5：二次确认由渲染端 ConfirmDialog 承担（与 media:permanentDelete
+      // 同构）——原实现此处再弹一次原生 dialog，用户需重复确认，且取消时抛 canceled
+      // 被渲染端误报「清空失败」。
 
       // B1 修复：文件删除失败且文件仍存在时，不删除 DB 记录，保留供用户重试。
       // 仅当文件物理删除成功 或 文件已不存在（DB 踪迹已无对应实体）时才删除 DB。

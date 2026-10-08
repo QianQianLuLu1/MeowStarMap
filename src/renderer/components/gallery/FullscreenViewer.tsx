@@ -179,9 +179,10 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
         onConfirm: async () => {
           if (!window.electronAPI) return
           try {
-            const result = await window.electronAPI.file.delete([file.file_path])
+            // 回收站语义修复：删除 = 软删除（纯 DB 标记，文件保留在原路径，可从回收站恢复）。
+            // 不再 file.delete 搬文件 + mediaAction.delete 硬删记录（同 DetailPage）。
+            const result = await window.electronAPI.mediaAction.softDelete([Number(file.id)])
             if (result.success) {
-              await window.electronAPI.mediaAction.delete(Number(file.id))
               deleteMediaFiles([file.id])
               // P1-C10：从 store 获取最新 index，避免闭包中 fullscreenIndex 过期
               // 同时基于当前 filteredFiles.length 计算剩余（props 可能未更新，但有 useEffect 兜底）

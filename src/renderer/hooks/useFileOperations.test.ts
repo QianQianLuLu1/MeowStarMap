@@ -415,9 +415,9 @@ describe('useFileOperations', () => {
       expect(config!.message).toContain('回收站')
     })
 
-    it('软删除成功后 deleteMediaFiles + pushHistory(media_soft_delete)', async () => {
-      api.file.delete.mockResolvedValue({ success: true, message: '已删除' })
-      api.mediaAction.softDelete.mockResolvedValue({ success: true })
+    it('软删除成功后 deleteMediaFiles + pushHistory(media_soft_delete)，不触碰磁盘文件', async () => {
+      // 回收站语义修复：软删除 = 纯 DB 标记（文件保留在原路径），不得调用 file.delete 搬动文件
+      api.mediaAction.softDelete.mockResolvedValue({ success: true, message: '已移入回收站' })
       const file = makeFile({ id: '9', file_path: '/src/img.jpg', file_name: 'img.jpg' })
       useMediaStore.setState({ mediaFiles: [file] })
       const { result } = renderHook(() =>
@@ -434,7 +434,7 @@ describe('useFileOperations', () => {
       await act(async () => {
         await config!.onConfirm()
       })
-      expect(api.file.delete).toHaveBeenCalledWith(['/src/img.jpg'])
+      expect(api.file.delete).not.toHaveBeenCalled()
       expect(api.mediaAction.softDelete).toHaveBeenCalledWith([9])
       expect(useMediaStore.getState().mediaFiles).toHaveLength(0)
       const stack = useOperationHistoryStore.getState().stack
@@ -444,11 +444,11 @@ describe('useFileOperations', () => {
         mediaId: 9,
         originalPath: '/src/img.jpg'
       })
-      expect(onShowMessage).toHaveBeenCalledWith('已删除', 'success')
+      expect(onShowMessage).toHaveBeenCalledWith('已移入回收站', 'success')
     })
 
-    it('软删除 file.delete 失败时不 deleteMediaFiles 且不 pushHistory', async () => {
-      api.file.delete.mockResolvedValue({ success: false, message: '文件被占用' })
+    it('软删除 mediaAction.softDelete 失败时不 deleteMediaFiles 且不 pushHistory', async () => {
+      api.mediaAction.softDelete.mockResolvedValue({ success: false, message: '数据库被锁定' })
       const file = makeFile({ id: '9', file_path: '/src/img.jpg' })
       useMediaStore.setState({ mediaFiles: [file] })
       const { result } = renderHook(() =>
@@ -465,10 +465,10 @@ describe('useFileOperations', () => {
       await act(async () => {
         await config!.onConfirm()
       })
-      expect(api.mediaAction.softDelete).not.toHaveBeenCalled()
+      expect(api.file.delete).not.toHaveBeenCalled()
       expect(useMediaStore.getState().mediaFiles).toHaveLength(1)
       expect(useOperationHistoryStore.getState().stack).toHaveLength(0)
-      expect(onShowMessage).toHaveBeenCalledWith('文件被占用', 'error')
+      expect(onShowMessage).toHaveBeenCalledWith('数据库被锁定', 'error')
     })
 
     it('永久删除成功后 deleteMediaFiles（不 pushHistory）', async () => {
@@ -545,7 +545,7 @@ describe('useFileOperations', () => {
     })
 
     it('onConfirm reject 时显示兜底错误', async () => {
-      api.file.delete.mockRejectedValue(new Error('fs read only'))
+      api.mediaAction.softDelete.mockRejectedValue(new Error('fs read only'))
       const file = makeFile({ id: '9', file_path: '/src/img.jpg' })
       const { result } = renderHook(() =>
         useFileOperations({
@@ -562,6 +562,31 @@ describe('useFileOperations', () => {
         await config!.onConfirm()
       })
       expect(onShowMessage).toHaveBeenCalledWith('fs read only', 'error')
+    })
+
+    it('批量软删除只打 DB 标记，不调用 file.delete 搬动文件', async () => {
+      api.mediaAction.softDelete.mockResolvedValue({ success: true, message: '已移入回收站' })
+      const files = [
+        makeFile({ id: '21', file_path: '/src/a.jpg' }),
+        makeFile({ id: '22', file_path: '/src/b.jpg' })
+      ]
+      useMediaStore.setState({ mediaFiles: files })
+      const { result } = renderHook(() =>
+        useFileOperations({
+          filteredFiles: files,
+          onShowMessage,
+          onRefreshMedia
+        })
+      )
+      let res: { succeeded: string[]; failed: { id: string; error: string }[] } | undefined
+      await act(async () => {
+        res = await result.current.deleteFilesBatch(['21', '22'])
+      })
+      expect(res?.succeeded).toEqual(['21', '22'])
+      expect(api.file.delete).not.toHaveBeenCalled()
+      expect(api.mediaAction.softDelete).toHaveBeenCalledWith([21])
+      expect(api.mediaAction.softDelete).toHaveBeenCalledWith([22])
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(0)
     })
 
     it('无 electronAPI 时提示不支持', async () => {

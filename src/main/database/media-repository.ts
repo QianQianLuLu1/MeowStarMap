@@ -746,20 +746,25 @@ export class MediaRepository {
     await this.runWrite('DELETE FROM media_files WHERE id = ?', [mediaId])
   }
 
-  /** media:softDelete — 批量软删除（标记 is_deleted=1 + deleted_at） */
+  /**
+   * media:softDelete — 批量软删除（标记 is_deleted=1 + deleted_at）
+   *
+   * 同时写入 delete_origin='user'：标记为用户主动删除，重扫时不得把 is_deleted 复位回 0
+   * （否则文件仍留在原路径的记录会在下次扫描复活，表现为"删了又回来"）。
+   */
   async softDeleteBatch(mediaIds: number[]): Promise<void> {
     if (mediaIds.length === 0) return
     await this.runChunkedTransaction(mediaIds, (ids, placeholders) => ({
-      sql: `UPDATE media_files SET is_deleted = 1, deleted_at = datetime('now'), ${MediaRepository.UPDATED_AT_CLAUSE} WHERE id IN (${placeholders}) AND is_deleted = 0`,
+      sql: `UPDATE media_files SET is_deleted = 1, deleted_at = datetime('now'), delete_origin = 'user', ${MediaRepository.UPDATED_AT_CLAUSE} WHERE id IN (${placeholders}) AND is_deleted = 0`,
       params: ids
     }))
   }
 
-  /** media:restore — 批量恢复（清除软删除标记） */
+  /** media:restore — 批量恢复（清除软删除标记与来源） */
   async restoreBatch(mediaIds: number[]): Promise<void> {
     if (mediaIds.length === 0) return
     await this.runChunkedTransaction(mediaIds, (ids, placeholders) => ({
-      sql: `UPDATE media_files SET is_deleted = 0, deleted_at = NULL, ${MediaRepository.UPDATED_AT_CLAUSE} WHERE id IN (${placeholders}) AND is_deleted = 1`,
+      sql: `UPDATE media_files SET is_deleted = 0, deleted_at = NULL, delete_origin = NULL, ${MediaRepository.UPDATED_AT_CLAUSE} WHERE id IN (${placeholders}) AND is_deleted = 1`,
       params: ids
     }))
   }
@@ -772,7 +777,7 @@ export class MediaRepository {
   async softDeleteForPermanentDelete(mediaIds: number[]): Promise<void> {
     if (mediaIds.length === 0) return
     const statements: DbStatement[] = mediaIds.map((id) => ({
-      sql: `UPDATE media_files SET is_deleted = 1, deleted_at = datetime("now"), ${MediaRepository.UPDATED_AT_CLAUSE} WHERE id = ?`,
+      sql: `UPDATE media_files SET is_deleted = 1, deleted_at = datetime('now'), delete_origin = 'user', ${MediaRepository.UPDATED_AT_CLAUSE} WHERE id = ?`,
       params: [id]
     }))
     await this.runTransaction(statements)
@@ -786,13 +791,14 @@ export class MediaRepository {
    *   规避 Windows 路径大小写差异与目录名里的 '_' / '%' 通配误伤。
    * - normalizeRootPath 结果为空（空/非法路径）时直接 no-op 返回 0，绝不生成 `LIKE '%'` 误删全库。
    * - 仅标记 is_deleted=1，不硬删，符合应用「回收站可恢复」数据模型。
+   * - 写入 delete_origin='root'：本来源是"移除扫描源"而非用户主动删除，重扫重新发现时允许复位回图库。
    */
   async softDeleteByRootPath(rootPath: string): Promise<number> {
     const normalized = normalizeRootPath(rootPath).toLowerCase()
     if (!normalized) return 0
     const pattern = `${escapeLikePattern(normalized)}/%`
     const { changes } = await this.runWrite(
-      `UPDATE media_files SET is_deleted = 1, deleted_at = datetime('now'), ${MediaRepository.UPDATED_AT_CLAUSE} WHERE ${NORMALIZED_PATH_EXPR} LIKE ? ESCAPE '\\' AND is_deleted = 0`,
+      `UPDATE media_files SET is_deleted = 1, deleted_at = datetime('now'), delete_origin = 'root', ${MediaRepository.UPDATED_AT_CLAUSE} WHERE ${NORMALIZED_PATH_EXPR} LIKE ? ESCAPE '\\' AND is_deleted = 0`,
       [pattern]
     )
     return changes

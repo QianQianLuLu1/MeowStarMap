@@ -295,15 +295,16 @@ export function useFileOperations(options: UseFileOperationsOptions) {
               deleteMediaFiles([file.id])
               setStage(2, 'done')
             } else {
+              // 回收站语义修复：软删除 = 纯 DB 标记（文件保留在原路径）。不再先调
+              // file.delete 搬文件——shell.trashItem 不可逆，会导致回收站「恢复」后
+              // 文件实体丢失（裂图 / 被标 is_missing）；恢复 = 翻转标记即完好还原。
               setStage(0)
-              const result = await api.file.delete([file.file_path])
-              if (!result.success) throw new InternalError(result.message)
-              toastText = result.message
-              toastType = 'success'
               setStage(0, 'done')
               setStage(1)
               const dbRes = await api.mediaAction.softDelete([Number(file.id)])
               if (!dbRes.success) throw new InternalError(dbRes.message)
+              toastText = dbRes.message
+              toastType = 'success'
               setStage(1, 'done')
               setStage(2)
               deleteMediaFiles([file.id])
@@ -328,7 +329,7 @@ export function useFileOperations(options: UseFileOperationsOptions) {
     [deleteMediaFiles, onShowMessage, pushHistory, t]
   )
 
-  // 批量软删除：对每个 id 复用单文件软删除的操作序列（IPC 删文件 → 软删除数据库记录）
+  // 批量软删除：对每个 id 只打 DB 软删除标记（文件保留在原路径，可从回收站恢复）
   // 只把删除成功的 id 移出 store，失败项保留在列表中供用户重试
   const deleteFilesBatch = useCallback(
     async (ids: string[]): Promise<BatchDeleteResult> => {
@@ -341,10 +342,9 @@ export function useFileOperations(options: UseFileOperationsOptions) {
         return { succeeded: [], failed: ids.map((id) => ({ id, error: message })) }
       }
 
-      // 从 store 全量列表取路径：选中项可能已被当前筛选条件隐藏，filteredFiles 不可靠
-      const pathById = new Map(
-        useMediaStore.getState().mediaFiles.map((file) => [file.id, file.file_path])
-      )
+      // 从 store 全量列表建索引：选中项可能已被当前筛选条件隐藏，filteredFiles 不可靠；
+      // id 不在全量列表中视为脏数据（列表已刷新而选中集过期），按失败处理供用户重试
+      const knownIds = new Set(useMediaStore.getState().mediaFiles.map((file) => file.id))
 
       const succeeded: string[] = []
       const failed: BatchDeleteFailure[] = []
@@ -373,10 +373,9 @@ export function useFileOperations(options: UseFileOperationsOptions) {
             DELETE_CONCURRENCY,
             async (id) => {
               if (signal.aborted) throw makeAbort()
-              const filePath = pathById.get(id)
-              if (!filePath) throw new InternalError(t('toast.batchDelete.missingFile', { id }))
-              const fileResult = await api.file.delete([filePath])
-              if (!fileResult.success) throw new InternalError(fileResult.message)
+              if (!knownIds.has(id))
+                throw new InternalError(t('toast.batchDelete.missingFile', { id }))
+              // 回收站语义修复：软删除 = 纯 DB 标记，文件保留在原路径（同单文件删除分支）
               const dbResult = await api.mediaAction.softDelete([Number(id)])
               if (!dbResult.success) throw new InternalError(dbResult.message)
             },

@@ -143,6 +143,20 @@ class MockDatabase {
     if (str === 'integrity_check') {
       return MockDatabase.integrityFail === 'full' ? 'row damage found' : 'ok'
     }
+    // 表结构查询（迁移断言用）：返回 better-sqlite3 PRAGMA table_info 的行形态
+    // 使「某列是否已由 ALTER TABLE 迁移添加」可被真实断言，而非靠 UPDATE 不抛错的假绿
+    const tableInfoMatch = str.match(/^table_info\((\w+)\)$/i)
+    if (tableInfoMatch) {
+      const table = this.tables.get(tableInfoMatch[1])
+      return (table?.columns ?? []).map((name, cid) => ({
+        cid,
+        name,
+        type: '',
+        notnull: 0,
+        dflt_value: null,
+        pk: 0
+      }))
+    }
     // 读取 auto_vacuum 模式
     if (str === 'auto_vacuum' && options?.simple) {
       return this.autoVacuumMode
@@ -639,6 +653,14 @@ import { backupService } from '../services/backup-service'
 describe('DatabaseManager', () => {
   let manager: DatabaseManager
 
+  /** 读取表当前列名列表（经 PRAGMA table_info），用于迁移后真实断言列是否存在 */
+  const readTableColumns = (tableName: string): string[] => {
+    const db = manager.getDatabase() as unknown as {
+      pragma: (str: string) => Array<{ name: string }>
+    } | null
+    return (db?.pragma(`table_info(${tableName})`) ?? []).map((c) => c.name)
+  }
+
   beforeEach(() => {
     // 重置所有 mock 配置
     MockDatabase.failNextConstruction = false
@@ -888,6 +910,19 @@ describe('DatabaseManager', () => {
       await manager.initialize()
       const result = manager.execute('UPDATE media_files SET deleted_at = NULL WHERE id = 1')
       expect(result).toBeDefined()
+    })
+
+    it('初始化后 media_files 表含 delete_origin 列（软删除来源标记迁移成功）', async () => {
+      await manager.initialize()
+      // 真实断言表结构：迁移未执行时列不在 table_info 中
+      const columns = readTableColumns('media_files')
+      expect(columns).toContain('delete_origin')
+    })
+
+    it('delete_origin 迁移幂等：重复 initialize 不抛错且列仍存在', async () => {
+      await manager.initialize()
+      await manager.initialize()
+      expect(readTableColumns('media_files')).toContain('delete_origin')
     })
 
     it('初始化后 tags 与 media_tags 僵尸表已删除', async () => {

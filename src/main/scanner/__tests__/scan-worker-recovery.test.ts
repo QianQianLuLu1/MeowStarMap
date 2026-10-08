@@ -155,11 +155,14 @@ describe('组3-2：ON CONFLICT 归零缺失计数', () => {
     expect(insertSql).toMatch(/is_missing = 0/)
     // 图库修复：重扫重新发现的游戏目录树（GamePlayPhotos/X6Game）下被软删记录应复位 is_deleted，
     // 使其随重扫回到图库；导入根（用户自定义目录）媒体不匹配该模式，仍尊重软删除状态。
-    expect(insertSql).toMatch(
-      /is_deleted = CASE WHEN .*gameplayphotos.* OR .*x6game.* THEN 0 ELSE is_deleted END/
+    // 回收站语义修复：谓词须排除用户主动软删（delete_origin='user'），否则用户删除的照片
+    // 会在下次重扫复活（"删了又回来"）。先做空白归一化，避免 prettier 换行导致正则失配。
+    const normalizedSql = insertSql.replace(/\s+/g, ' ')
+    expect(normalizedSql).toMatch(
+      /is_deleted = CASE WHEN .*gameplayphotos.* OR .*x6game.* AND COALESCE\(delete_origin, ''\) <> 'user' THEN 0 ELSE is_deleted END/
     )
-    expect(insertSql).toMatch(
-      /deleted_at = CASE WHEN .*gameplayphotos.* OR .*x6game.* THEN NULL ELSE deleted_at END/
+    expect(normalizedSql).toMatch(
+      /deleted_at = CASE WHEN .*gameplayphotos.* OR .*x6game.* AND COALESCE\(delete_origin, ''\) <> 'user' THEN NULL ELSE deleted_at END/
     )
   })
 })

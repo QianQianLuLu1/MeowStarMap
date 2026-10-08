@@ -791,7 +791,8 @@ function createInMemoryDb(): MockDatabase {
       album_type TEXT NOT NULL DEFAULT '其他',
       is_duplicate INTEGER NOT NULL DEFAULT 0,
       original_id INTEGER,
-      media_source TEXT NOT NULL DEFAULT 'game'
+      media_source TEXT NOT NULL DEFAULT 'game',
+      delete_origin TEXT
     );
 
     CREATE TABLE categories (
@@ -857,6 +858,7 @@ interface MediaOverrides {
   is_duplicate?: number
   original_id?: number | null
   media_source?: string
+  delete_origin?: string | null
 }
 
 function insertMedia(db: MockDatabase, overrides: MediaOverrides = {}): number {
@@ -894,6 +896,7 @@ function insertMedia(db: MockDatabase, overrides: MediaOverrides = {}): number {
     is_duplicate: 0,
     original_id: null,
     media_source: 'game',
+    delete_origin: null,
     ...overrides
   }
   const cols = [
@@ -929,7 +932,8 @@ function insertMedia(db: MockDatabase, overrides: MediaOverrides = {}): number {
     'album_type',
     'is_duplicate',
     'original_id',
-    'media_source'
+    'media_source',
+    'delete_origin'
   ]
   const placeholders = cols.map(() => '?').join(', ')
   const values = cols.map((c) => v[c as keyof MediaOverrides])
@@ -1227,6 +1231,56 @@ describe('MediaRepository', () => {
         .prepare('SELECT COUNT(*) as count FROM media_files WHERE is_deleted = 1')
         .get() as { count: number }
       expect(rows.count).toBe(2)
+    })
+
+    // 软删除来源标记（回收站语义修复）：用户主动删除标记 'user'，重扫不得复活
+    it('softDeleteBatch 标记 delete_origin = user', async () => {
+      const id = insertMedia(db, { is_deleted: 0 })
+      await repo.softDeleteBatch([id])
+      const row = db.prepare('SELECT delete_origin FROM media_files WHERE id = ?').get(id) as {
+        delete_origin: string | null
+      }
+      expect(row.delete_origin).toBe('user')
+    })
+
+    it('restoreBatch 恢复时清除 delete_origin（置 NULL）', async () => {
+      const id = insertMedia(db, {
+        is_deleted: 1,
+        deleted_at: '2024-01-01 10:00:00',
+        delete_origin: 'user'
+      })
+      await repo.restoreBatch([id])
+      const row = db.prepare('SELECT delete_origin FROM media_files WHERE id = ?').get(id) as {
+        delete_origin: string | null
+      }
+      expect(row.delete_origin).toBeNull()
+    })
+
+    it('softDeleteForPermanentDelete 标记 delete_origin = user', async () => {
+      const id = insertMedia(db, { file_path: '/t/pd.jpg' })
+      await repo.softDeleteForPermanentDelete([id])
+      const row = db.prepare('SELECT delete_origin FROM media_files WHERE id = ?').get(id) as {
+        delete_origin: string | null
+      }
+      expect(row.delete_origin).toBe('user')
+    })
+
+    it('softDeleteForPermanentDelete 用单引号 datetime 字面量（与其它软删 SQL 一致）', async () => {
+      const id = insertMedia(db, { file_path: '/t/pd2.jpg' })
+      const captured: string[] = []
+      const originalPrepare = db.prepare.bind(db)
+      const spy = vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+        if (sql.includes('UPDATE media_files SET is_deleted = 1')) captured.push(sql)
+        return originalPrepare(sql)
+      })
+      try {
+        await repo.softDeleteForPermanentDelete([id])
+      } finally {
+        spy.mockRestore()
+      }
+      expect(captured.length).toBeGreaterThan(0)
+      expect(captured[0]).toContain("datetime('now')")
+      expect(captured[0]).not.toContain('datetime("now")')
     })
 
     it('hardDeleteBatch 空数组 no-op', async () => {
@@ -3251,6 +3305,15 @@ describe('MediaRepository', () => {
         .prepare('SELECT COUNT(*) as c FROM media_files WHERE is_deleted = 1')
         .get() as { c: number }
       expect(c).toBe(1)
+    })
+
+    it('标记 delete_origin = root（重扫允许复位的来源）', async () => {
+      const id = insertMedia(db, { file_path: 'F:/roots/a.jpg', is_deleted: 0 })
+      await repo.softDeleteByRootPath('F:/roots')
+      const row = db.prepare('SELECT delete_origin FROM media_files WHERE id = ?').get(id) as {
+        delete_origin: string | null
+      }
+      expect(row.delete_origin).toBe('root')
     })
 
     it('生成正确的 LIKE ? ESCAPE 前缀条件与归一化参数', async () => {

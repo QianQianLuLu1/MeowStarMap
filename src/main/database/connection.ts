@@ -1273,6 +1273,8 @@ export class DatabaseManager {
     // is_deleted=0 表示正常，=1 表示已移入应用回收站
     // deleted_at 记录软删除时间，用于回收站排序
     this.migrateSoftDelete()
+    // 迁移：delete_origin 记录软删除来源（'user' 用户主动 / 'root' 移除扫描源触发）
+    this.migrateDeleteOrigin()
 
     // 迁移：import_roots 增加 disabled 列（指定目录"关闭但保留记录"语义）
     // 已发布库无此列，用 safeEnsureColumn 幂等 ALTER 补充；新库由建表 DDL 直接含列
@@ -1825,6 +1827,22 @@ export class DatabaseManager {
     if (!this.db) return
     this.safeEnsureColumn('media_files', 'is_deleted INTEGER NOT NULL DEFAULT 0')
     this.safeEnsureColumn('media_files', 'deleted_at TEXT')
+  }
+
+  /**
+   * 软删除来源标记（回收站语义修复：用户删除不得被重扫复活）。
+   *
+   * - 'user'：`media:softDelete` 触发的用户主动删除——文件保留在原路径仅打标记，
+   *   重扫时**不得**把 is_deleted 复位回 0，否则表现为"删了又回来"。
+   * - 'root'：`softDeleteByRootPath`（移除扫描源且清空记录）触发的整批软删，
+   *   重扫重新发现后允许复位回图库，保持既有行为。
+   * - NULL：存量旧记录，重扫行为与修复前一致（可复活），不引入回归。
+   *
+   * 无 DEFAULT 子句，NULL 即预期默认值（与 phash TEXT 同构，safeEnsureColumn 不回填）。
+   */
+  private migrateDeleteOrigin(): void {
+    if (!this.db) return
+    this.safeEnsureColumn('media_files', 'delete_origin TEXT')
   }
 
   /**

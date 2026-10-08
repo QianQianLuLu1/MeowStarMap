@@ -637,15 +637,20 @@ describe('registerMediaHandlers', () => {
     expect('success' in result.data).toBe(false)
   })
 
-  it('media:emptyRecycleBin 用户取消时抛 canceled', async () => {
+  // 回收站语义修复 D5：清空回收站的二次确认职责完全回归渲染端 ConfirmDialog，
+  // 主进程不再弹原生 dialog——旧用例「用户取消时抛 canceled」的取消路径已不存在。
+  it('media:emptyRecycleBin 不弹原生确认框，任意响应下直接清空', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
+    // 敌意模拟：即便 showMessageBox 被误调且返回「取消」，也应照常清空
     showMessageBoxMock.mockResolvedValue({ response: 0 })
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:emptyRecycleBin')()) as {
-      success: false
-      error: { code: string }
+      success: boolean
+      data: { movedCount: number }
     }
-    expect(result.error.code).toBe('IPC_CANCELED')
+    expect(showMessageBoxMock).not.toHaveBeenCalled()
+    expect(result.success).toBe(true)
+    expect(result.data.movedCount).toBe(1)
   })
 
   it('media:emptyRecycleBin 用户确认后批量删除', async () => {

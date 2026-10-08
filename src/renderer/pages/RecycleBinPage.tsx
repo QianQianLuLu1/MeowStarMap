@@ -72,8 +72,28 @@ export const RecycleBinPage: React.FC = () => {
   // 图库刷新写回：useRefreshMedia 封装「取数 + 写 store + 失败重试」
   const refreshMedia = useRefreshMedia()
 
+  // 回收站语义修复 D4：App 采用 keep-alive（display:none 保活），空依赖 effect 只在
+  // 首次挂载拉一次数据——他处删除后切回回收站列表陈旧。改为「首次挂载必拉取 +
+  // currentView 变回 recycle-bin 时重新拉取」（真实路由下首挂载必然处于回收站视图，
+  // 兼容独立挂载/测试场景的既有时序）
+  const currentView = useUIStore((s) => s.currentView)
+  const isFirstMountRef = useRef(true)
   useEffect(() => {
-    loadRecycleBin()
+    if (isFirstMountRef.current || currentView === 'recycle-bin') {
+      isFirstMountRef.current = false
+      void loadRecycleBin()
+    }
+  }, [currentView])
+
+  // 订阅 media:updated 广播：图库/详情页/全屏删除等操作后主进程会广播，
+  // 回收站为当前视图时重新拉取（不依赖重新挂载）
+  useEffect(() => {
+    const unsubscribe = window.electronAPI?.media?.onUpdated?.(() => {
+      if (useUIStore.getState().currentView === 'recycle-bin') void loadRecycleBin()
+    })
+    return () => {
+      if (unsubscribe) unsubscribe()
+    }
   }, [])
 
   // 切换选中

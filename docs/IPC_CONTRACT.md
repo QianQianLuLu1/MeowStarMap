@@ -150,20 +150,29 @@ wrapHandler(ctx, schema, handler) =>
 
 ### 2.5 `media:softDelete`
 
-| 属性         | 值                                                 |
-| ------------ | -------------------------------------------------- |
-| 通道         | `media:softDelete`                                 |
-| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts` |
-| 参数         | `number[]`（媒体 id 数组）                         |
-| 返回类型     | 内联类型                                           |
+| 属性         | 值                                                  |
+| ------------ | --------------------------------------------------- |
+| 通道         | `media:softDelete`                                  |
+| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts`  |
+| 参数         | `number[]`（媒体 id 数组，`mediaIdArrayBulk` 校验） |
+| 返回类型     | 内联类型                                            |
 
 **返回值结构**：
 
 ```ts
 {
-  message: string // '已将 N 个文件移至回收站'
+  success: true,   // ← 必须！渲染端 4 处调用方检查此字段（见下）
+  message: string  // '已将 N 个文件移至回收站'
 }
 ```
+
+**行为（回收站语义修复 D1 / D2 / D3）**：
+
+- 软删除**不再搬动磁盘文件**：仅写 DB 标记 `is_deleted = 1` + `deleted_at` + `delete_origin = 'user'`，文件保留在原路径。「恢复」（`media:restore`）= 翻转标记并置 `delete_origin = NULL`，因此缩略图与打开均正常。原实现先调 `file:delete`（`shell.trashItem` 移入 Windows 系统回收站），而 Electron 无还原 API → 恢复只能翻转标记、文件实体回不来，表现为裂图与被完整性校验标记 `is_missing = 1`。
+- `delete_origin` 三态与重扫复位口径（唯一真源 `src/main/scanner/rescan-restore-sql.ts`）：`'user'` = 用户主动删除，重扫 UPSERT **不得**复位（否则「删了又回来」）；`'root'` = `softDeleteByRootPath`（移除扫描源且清空记录）的整批软删，重扫重新发现后允许复位回图库；`NULL` = 升级前存量记录，按修复前行为复位，不引入回归。谓词为 `游戏目录树 AND COALESCE(delete_origin, '') <> 'user'`（游戏树条件整体带括号，保证 `OR` 不泄漏到顶层）。
+- 检查 `res.success` 的调用方共 4 处：`src/renderer/hooks/useFileOperations.ts:305`（单文件软删）、`useFileOperations.ts:379`（批量软删）、`src/renderer/pages/DetailPage.tsx:205`、`src/renderer/components/gallery/FullscreenViewer.tsx:184`。后两者原走 §2.9 `media:delete`（硬删 DB 行 + 搬文件），记录根本进不了回收站；改走本通道后删除项才真正出现在回收站（D3）。
+- `media:permanentDelete`（§2.7）阶段 1 的 `softDeleteForPermanentDelete` 同样写 `delete_origin = 'user'`：物理删除失败、文件仍在的条目留在回收站供重试，且不会被重扫复位。
+- 已知类型漂移（登记 DEBT-011 / DEBT-012，本次不改代码）：preload 侧声明为 `call<{ message: string }>`（`src/main/preload/api/media-action.ts:27`）少列 `success`，渲染端 `src/renderer/vite-env.d.ts:467` 声明为 `{ success: boolean; message: string }`（与 handler 实际返回一致）。运行期无危害——`call()` 原样透传 handler 的 data。
 
 ### 2.6 `file:deletePermanent`
 
@@ -223,9 +232,9 @@ wrapHandler(ctx, schema, handler) =>
 }
 ```
 
-**确认语义与行为（#fix-recyclebin-permanent-delete）**：
+**确认语义与行为（#fix-recyclebin-permanent-delete / 回收站语义修复 D5）**：
 
-- 主进程保留原生 `dialog.showMessageBox` 二次确认（A-S3 高危操作，不在本次 Bug 修复范围）；用户取消抛 `IPC_CANCELED`。
+- 二次确认完全由渲染端 `ConfirmDialog` 承担（与 `media:permanentDelete` 同构）；主进程不再弹原生 `dialog.showMessageBox`，无取消路径（原「用户取消抛 `IPC_CANCELED`」行为已移除）。
 - 文件处理：对每条软删除记录的 `file_path` 执行 `fsp.unlink` **物理删除**（原 `shell.trashItem` 仅移入系统回收站，磁盘不释放）；软删除记录经 `getSoftDeletedMediaPaths` 返回（含 `thumbnail` 列）。三态判定沿用 `_trash-utils.ts`：成功 / missing（仅删 DB）/ failed（文件仍存在，DB 保留供重试）。
 - 阶段 4（本次新增）：对已删除 DB 记录的缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 严格推导的原生 LQ 及其 DB 记录）。
 - 渲染端按 preload `call()` 契约消费：成功收到 data（不含 `success` 字段），失败抛 `IpcError`；`RecycleBinPage` 仅消费 `message` 与 `failedCount`。
@@ -239,7 +248,7 @@ wrapHandler(ctx, schema, handler) =>
 | 参数         | `number`（单条媒体 id，`schemas.mediaId` 校验）    |
 | 返回类型     | `{ deleted: true }`                                |
 
-**行为（#fix-gallery-delete-thumbnail-cleanup）**：硬删单条 DB 记录（`hardDelete`）后，对其关联缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 由 `file_path` 严格推导的游戏原生 LQ 文件及其 DB 记录）。调用方：图库永久删除链路（`file:deletePermanent` 成功后调用，`useFileOperations.ts`）、详情页与全屏查看器的删除（源文件先移入系统回收站）。缩略图清理失败仅记录日志，不影响返回值。
+**行为（#fix-gallery-delete-thumbnail-cleanup）**：硬删单条 DB 记录（`hardDelete`）后，对其关联缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 由 `file_path` 严格推导的游戏原生 LQ 文件及其 DB 记录）。调用方：**仅**图库/详情页的**永久删除**链路（`file:deletePermanent` 成功后调用，`src/renderer/hooks/useFileOperations.ts:292`）；插件面的权限名见 `plugin-bridge-handler.ts`。详情页与全屏查看器的删除已改走 §2.5 `media:softDelete`（回收站语义修复 D3），**不再**调用本通道——原先它们「先移入系统回收站 + 硬删 DB 行」，记录直接消失、应用回收站里找不到。缩略图清理失败仅记录日志，不影响返回值。
 
 ## 3. 共享类型定义
 

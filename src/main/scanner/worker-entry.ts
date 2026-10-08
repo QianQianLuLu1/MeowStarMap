@@ -53,6 +53,8 @@ import {
 import { readMetadataFromFile } from '../services/xmp-metadata-service'
 // 方案三：独立游戏目录 UID 发现机制（对齐上游 nikki_albums）
 import { discoverUidsFromGameDirs } from './uid-discovery'
+// 回收站语义修复：重扫复位谓词（排除用户主动软删 delete_origin='user' 的记录）
+import { RESCAN_RESTORE_PREDICATE } from './rescan-restore-sql'
 // P0-01：游戏目录发现函数抽取为独立模块，便于单元测试 vi.mock 桩替换（循环依赖仅调用期使用，ESM 安全）
 import { findGameInstallRootsByPriority, normalizeCustomGameRoot } from './game-directory-discovery'
 import { isOfficialAlbumDir } from './gameplayphotos-root'
@@ -1137,11 +1139,6 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
   // 如未来索引数量超过 20 个，需重新评估写入性能
   // FIX(组3-1): prepare 与事务执行抛错均包装为 ScanBatchWriteError 向上传播
   try {
-    // 游戏目录树路径口径（小写+正斜杠），用于重扫时复位被软删的游戏媒体。
-    // 仅覆盖自动发现的游戏安装树（GamePlayPhotos / X6Game）；导入根（用户自定义目录）路径不匹配，
-    // 其软删除状态仍被尊重，不会被误复位。
-    const RESCAN_RESTORE_GAME_TREE =
-      "(LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%' OR LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/x6game/%')"
     if (!insertStmtCache) {
       insertStmtCache = db.prepare(`
       INSERT INTO media_files
@@ -1178,8 +1175,10 @@ async function saveBatchToDatabase(batch: MediaFile[]): Promise<number> {
         -- softDeleteByRootPath 整批软删了自动发现的游戏媒体），对位于游戏目录树（GamePlayPhotos/
         -- X6Game）下的记录复位 is_deleted=0，使其随重扫回到图库；导入根（用户自定义目录）媒体路径
         -- 不匹配本模式，仍尊重其软删除状态，避免"游戏照片被删后重扫也无法恢复"的卡死。
-        is_deleted = CASE WHEN ${RESCAN_RESTORE_GAME_TREE} THEN 0 ELSE is_deleted END,
-        deleted_at = CASE WHEN ${RESCAN_RESTORE_GAME_TREE} THEN NULL ELSE deleted_at END
+        -- 回收站语义修复：谓词追加 COALESCE(delete_origin,'') <> 'user'——用户主动软删
+        -- （软删除已不再搬动文件，文件留在原路径）不得被重扫复位，否则表现为"删了又回来"。
+        is_deleted = CASE WHEN ${RESCAN_RESTORE_PREDICATE} THEN 0 ELSE is_deleted END,
+        deleted_at = CASE WHEN ${RESCAN_RESTORE_PREDICATE} THEN NULL ELSE deleted_at END
       -- F-O1：scene_time 和 outfit 不在 ON CONFLICT 更新列表中，避免覆盖用户手动设置
       -- P0-02：account_uid 在 ON CONFLICT 时更新（路径变更可能导致 UID 变化）
       -- P0-03：album_type 在 ON CONFLICT 时更新（父目录变更可能导致相册类型变化）
