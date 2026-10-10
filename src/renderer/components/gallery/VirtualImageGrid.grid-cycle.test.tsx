@@ -188,6 +188,141 @@ describe('VirtualImageGrid — 正常 / 异常 / 边界', () => {
     expect(matched).not.toBeNull()
     expect(Number(matched?.[1])).toBeGreaterThanOrEqual(1)
   })
+
+  it('⑥ 首个可视范围立即生成，后续范围变化保持 300ms 防抖', () => {
+    vi.useFakeTimers()
+    const generate = vi.fn(() => new Promise<string | null>(() => {}))
+    const originalElectronApi = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+
+    try {
+      const items = makeItems(3).map((item, index) => ({
+        ...item,
+        file_path: `/p/initial-${Date.now()}-${index}.jpg`,
+        thumbnail: undefined
+      })) as MediaFile[]
+      render(<VirtualImageGrid items={items} {...baseProps} />)
+      const rangeChanged = virtuosoRecords.list[virtuosoRecords.list.length - 1]
+        .rangeChanged as (range: { startIndex: number; endIndex: number }) => void
+
+      act(() => rangeChanged({ startIndex: 0, endIndex: 1 }))
+      expect(generate).toHaveBeenCalledTimes(2)
+
+      act(() => rangeChanged({ startIndex: 1, endIndex: 2 }))
+      expect(generate).toHaveBeenCalledTimes(2)
+      act(() => vi.advanceTimersByTime(299))
+      expect(generate).toHaveBeenCalledTimes(2)
+      act(() => vi.advanceTimersByTime(1))
+      expect(generate).toHaveBeenCalledTimes(3)
+    } finally {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: originalElectronApi
+      })
+      vi.useRealTimers()
+    }
+  })
+})
+
+// —— round2 N5：切板块（items 整体替换、可视区间编号不变）必须重新调度按需生成 ——
+//
+// 缺陷现象（用户报「切板块要重新等一遍」的机制，本机打包态实测）：
+// 图库 → 启动器缓存 切换时网格组件不卸载，两板块的可视区间编号相同（0..N），
+// react-virtuoso 因此不再触发 rangeChanged；而 `generateVisibleRange` 在本组件里
+// **唯一的调用点就是 rangeChanged** ⇒ 新板块的 NULL 缩略图卡片一次 IPC 都不发，
+// showSkeleton 条件（!showThumb && !hasError && !generateFailed && !!file_path）恒成立，
+// 骨架永久停留。
+//
+// 实测佐证：`.cache/perf-real` 副本整轮 R3（缓存/分类/回收站 各等 10s）期间缓存目录
+// 新增文件 0 个，而 R3b 手工直调 generate 4 次立刻产出 4 个缓存文件——生成能力正常，
+// 缺的是触发。
+describe('VirtualImageGrid — 切板块后重新调度按需生成（round2 N5）', () => {
+  const makeNullThumbItems = (n: number, tag: string): MediaFile[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `${tag}-${i}`,
+      file_type: 'image',
+      thumbnail: null,
+      file_path: `/switch/${tag}/${i}.jpg`,
+      file_name: `${i}.jpg`,
+      file_size: 2048,
+      is_favorite: false,
+      is_missing: false,
+      is_corrupted: false
+    })) as unknown as MediaFile[]
+
+  /** 统一装好 fake timers + generate 桩，并在结束后还原（桩返回永不 settle 的 Promise，只数调用） */
+  const withGenerateStub = (run: (generate: ReturnType<typeof vi.fn>) => void): void => {
+    vi.useFakeTimers()
+    const generate = vi.fn(() => new Promise<string | null>(() => {}))
+    const original = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+    try {
+      run(generate)
+    } finally {
+      Object.defineProperty(window, 'electronAPI', { configurable: true, value: original })
+      vi.useRealTimers()
+    }
+  }
+
+  const latestRangeChanged = () =>
+    virtuosoRecords.list[virtuosoRecords.list.length - 1].rangeChanged as (range: {
+      startIndex: number
+      endIndex: number
+    }) => void
+
+  it('① 正常：可视区间已定为 0..5，items 由空数组换成 6 条 NULL 缩略图 → 必须发满 6 次生成', () => {
+    withGenerateStub((generate) => {
+      const { rerender } = render(<VirtualImageGrid items={[]} {...baseProps} />)
+      act(() => latestRangeChanged()({ startIndex: 0, endIndex: 5 }))
+      // 空数据不得发请求（避免把「还没加载完」误当成「该生成」）
+      expect(generate).not.toHaveBeenCalled()
+
+      // 切板块：只换数据，不再触发 rangeChanged —— 这一步在修复前不发任何 IPC
+      rerender(<VirtualImageGrid items={makeNullThumbItems(6, 'sec1')} {...baseProps} />)
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      expect(generate).toHaveBeenCalledTimes(6)
+    })
+  })
+
+  it('② 边界：可视区间 0..5 而 items 有 10 条 → 只为可视区发 6 次，不越界扫描', () => {
+    withGenerateStub((generate) => {
+      const { rerender } = render(<VirtualImageGrid items={[]} {...baseProps} />)
+      act(() => latestRangeChanged()({ startIndex: 0, endIndex: 5 }))
+      rerender(<VirtualImageGrid items={makeNullThumbItems(10, 'sec2')} {...baseProps} />)
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      expect(generate).toHaveBeenCalledTimes(6)
+    })
+  })
+
+  it('③ 异常：切走再切回同一路径 → 复用模块级请求去重，不得重复发 IPC', () => {
+    withGenerateStub((generate) => {
+      const items = makeNullThumbItems(3, 'sec3')
+      const { rerender } = render(<VirtualImageGrid items={[]} {...baseProps} />)
+      act(() => latestRangeChanged()({ startIndex: 0, endIndex: 2 }))
+      rerender(<VirtualImageGrid items={items} {...baseProps} />)
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      expect(generate).toHaveBeenCalledTimes(3)
+
+      // 再切回同一批数据（新数组引用、同 file_path）：请求去重必须挡住重复 IPC
+      rerender(<VirtualImageGrid items={makeNullThumbItems(3, 'sec3')} {...baseProps} />)
+      act(() => {
+        vi.advanceTimersByTime(300)
+      })
+      expect(generate).toHaveBeenCalledTimes(3)
+    })
+  })
 })
 
 // —— 审查修复 T1：错误链终点闭环（docs/plans/2026-10-01-fix-thumbnail-review-fixes.md）——

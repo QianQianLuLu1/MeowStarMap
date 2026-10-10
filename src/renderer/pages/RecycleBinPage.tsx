@@ -9,6 +9,7 @@ import {
 } from '../stores/mediaStore'
 import { resolveThumbnailSrc } from '../utils/thumbnail-src'
 import { useRefreshMedia } from '../hooks/useRefreshMedia'
+import { useOnDemandThumbnails } from '../hooks/useOnDemandThumbnails'
 import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
@@ -501,15 +502,14 @@ export const RecycleBinItemComponent: React.FC<RecycleBinItemProps> = ({
   onToggle
 }) => {
   const { t } = useTranslation()
-  // FIX(B-thumb): 原用 new URL(thumbnail, 'media://') 构造缩略图 URL。thumbnail 为绝对
-  // Windows 路径时，new URL 会把盘符「C:」当作 scheme 解析（protocol === 'c:'）且不抛异常，
-  // 于是 catch 分支失效、返回畸形 URL，最终被 Chromium 当作 file:/// 拒绝加载
-  // （Not allowed to load local resource，日志实测 570 次裂图）。
-  // FIX(N1): 再改用 resolveThumbnailSrc（同 VirtualImageGrid 不变量）——旧写法
-  // `toFileUrl(file.thumbnail || file.file_path)` 对 thumbnail 为空的视频会回退用视频文件
-  // 本身作 <img> 源必裂图，现统一判定：DB thumbnail > （仅图片）原文件 > null（图标占位）；
-  // media 协议白名单（media-protocol.ts）已放行缩略图缓存目录，故无需改协议层。
-  const thumbUrl = useMemo(() => resolveThumbnailSrc(file), [file])
+  const { ensureThumbnail, getGeneratedPath } = useOnDemandThumbnails()
+  useEffect(() => {
+    if (!file.thumbnail) void ensureThumbnail(file)
+  }, [ensureThumbnail, file])
+  const thumbUrl = resolveThumbnailSrc({
+    ...file,
+    thumbnail: getGeneratedPath(file.file_path) ?? file.thumbnail
+  })
   // N5 骨架门控：加载失败回退图标占位（原卡片无 onError 处理，不引入跨卡片失败集合）。
   // 审查修复 T5：thumbUrl 变化（同 id 条目数据刷新后缩略图补齐，Virtuoso 复用实例）
   // 时复位失败态，否则旧失败标记粘滞导致新缩略图永不显示。

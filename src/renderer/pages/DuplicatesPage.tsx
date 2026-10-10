@@ -5,6 +5,7 @@ import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { useContainerSize } from '../hooks/useContainerSize'
+import { useOnDemandThumbnails } from '../hooks/useOnDemandThumbnails'
 import { getAutoFillColumns } from '../utils/responsive'
 import { formatDateTime } from '../utils/date'
 import { formatFileSize, formatEta } from '../utils/format'
@@ -41,9 +42,6 @@ import { ShareGuideDialog, type ShareChannelId } from '../components/common/Shar
 import { runClipboardShare, type ClipboardShareCopyResult } from '../utils/share'
 import type { MediaFile } from '../stores/mediaStore'
 import { toContextMenuMediaFile } from '../utils/duplicateContextMenu'
-
-// 缺缩略图视频按需生成的尝试缓存：同一路径生命周期内最多请求一次（含 null 结果不重试）
-const thumbGenerateCache = new Map<string, string | null>()
 
 // 性能重构 v3 改造项三：重复检测同步任务接入 TaskRegistry + ProgressThrottle + EtaCalculator
 // TaskProgress 类型复用 src/shared/types/progress.ts（消除重复定义）
@@ -1563,42 +1561,14 @@ const DuplicateFileCard: React.FC<DuplicateFileCardProps> = ({
   onContextMenu
 }) => {
   const { t } = useTranslation()
-  // 视频专用取源规则（对齐 VirtualImageGrid.tsx 已验证不变量）：
-  // 视频绝不回退到原文件（原文件无法被 <img> 解码），只用 thumbnail；
-  // 图片允许 thumbnail 缺失时回退到原文件路径。
-  const baseSrc = toFileUrl(
-    file.file_type === 'video' ? file.thumbnail : file.thumbnail || file.file_path
-  )
-
-  // 缺缩略图的视频：按需触发一次生成（不写库，仅本次显示；模块级缓存做单次守卫）
-  const [generatedSrc, setGeneratedSrc] = useState<string | null>(null)
+  const { ensureThumbnail, getGeneratedPath } = useOnDemandThumbnails()
   useEffect(() => {
-    if (file.file_type !== 'video' || file.thumbnail || generatedSrc) return
-    if (typeof file.file_path !== 'string' || file.file_path.length === 0) return
-    const cacheKey = file.file_path
-    const cached = thumbGenerateCache.get(cacheKey)
-    if (cached !== undefined) {
-      if (cached) setGeneratedSrc(toFileUrl(cached))
-      return
-    }
-    const generate = window.electronAPI?.thumbnail?.generate
-    if (!generate) return
-    let cancelled = false
-    void (async () => {
-      try {
-        const result = await generate(file.file_path)
-        thumbGenerateCache.set(cacheKey, result ?? null)
-        if (!cancelled && result) setGeneratedSrc(toFileUrl(result))
-      } catch {
-        thumbGenerateCache.set(cacheKey, null)
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [file.file_type, file.thumbnail, file.file_path, generatedSrc])
+    if (!file.thumbnail) void ensureThumbnail(file)
+  }, [ensureThumbnail, file])
 
-  const thumbSrc = generatedSrc ?? baseSrc
+  // 图片与视频均只使用规范缩略图或共享按需生成结果，不回退原媒体文件。
+  const generatedPath = getGeneratedPath(file.file_path)
+  const thumbSrc = toFileUrl(file.thumbnail ?? generatedPath)
 
   // fix-thumbnail-loading-latency 节点4：standard 加载失败（后台批量尚未生成 → media:// 404）时
   // 回退 64px 低清缩略图而非死胡同警告图标。仅图片提供；游戏原生缩略图/无 _low 可推导时

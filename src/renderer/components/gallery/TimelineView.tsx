@@ -1,7 +1,8 @@
 import React, { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Virtuoso } from 'react-virtuoso'
+import { Virtuoso, type ListRange } from 'react-virtuoso'
 import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
+import { useOnDemandThumbnails } from '../../hooks/useOnDemandThumbnails'
 import { formatDate } from '../../utils/date'
 import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
@@ -53,6 +54,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   const wrapperRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
   const { failedImages, markFailed } = useFailedImages(files)
+  const { ensureThumbnail, getGeneratedPath } = useOnDemandThumbnails()
   // 扁平化渲染单元丢失了原始下标，用 id → 下标映射把正确的 index 交回给 onSelect
   // （GalleryPage 的 Shift 区间选择与 openFullscreen 都依赖 files 内的真实下标）
   const indexById = useMemo(() => new Map(files.map((f, i) => [f.id, i])), [files])
@@ -103,6 +105,21 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
     return result
   }, [grouped, cols])
 
+  const handleRangeChanged = useCallback(
+    ({ startIndex, endIndex }: ListRange) => {
+      const first = Math.max(0, startIndex)
+      const last = Math.min(endIndex, units.length - 1)
+      for (let index = first; index <= last; index++) {
+        const unit = units[index]
+        if (unit?.kind !== 'row') continue
+        for (const file of unit.files) {
+          if (!file.thumbnail) void ensureThumbnail(file)
+        }
+      }
+    },
+    [ensureThumbnail, units]
+  )
+
   const handleKeyDown = useCallback(
     (file: MediaFile, e: React.KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
@@ -133,6 +150,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
         defaultItemHeight={ITEM_HEIGHT + GAP_Y}
         overscan={400}
         increaseViewportBy={{ top: 200, bottom: 200 }}
+        rangeChanged={handleRangeChanged}
         itemContent={(_, unit) => {
           if (unit.kind === 'header') {
             return (
@@ -160,7 +178,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
               }}
             >
               {unit.files.map((file) => {
-                const thumbUrl = resolveThumbnailSrc(file)
+                const thumbUrl = resolveThumbnailSrc({
+                  ...file,
+                  thumbnail: getGeneratedPath(file.file_path) ?? file.thumbnail
+                })
                 const hasError = failedImages.has(file.id)
                 const isMissing = file.is_missing === true
                 // 损坏文件容错：损坏文件不显示缩略图，仅显示占位图 + 损坏角标

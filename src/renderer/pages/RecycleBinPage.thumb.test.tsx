@@ -14,8 +14,8 @@
  *   直接 render 需 mock 数十个模块且脆弱。参考项目已有 GalleryPage.test.tsx 的
  *   源码结构性检查模式，并补充 toFileUrl 的行为断言（该函数此前无测试覆盖）。
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import { render, fireEvent, waitFor } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import { toFileUrl } from '../utils/file'
@@ -46,10 +46,10 @@ describe('RecycleBinPage 缩略图 URL 构造契约（缺陷B）', () => {
     expect(recycleBinPageCode).not.toMatch(/new URL\([^)]*'media:\/\/'\)/)
   })
 
-  it('缩略图源统一经 resolveThumbnailSrc 判定（N1：视频无缩略图不回退原文件防裂图）', () => {
-    // 旧契约「toFileUrl(file.thumbnail || file.file_path)」把视频文件本身当 <img> 源，
-    // 是视频裂图根因（对齐 VirtualImageGrid.resolveEffectiveThumbnail 不变量），已废除
-    expect(recycleBinPageCode).toContain('resolveThumbnailSrc(file)')
+  it('缩略图源经共享 Hook 与 resolveThumbnailSrc 判定，不回退原文件', () => {
+    expect(recycleBinPageCode).toContain('useOnDemandThumbnails()')
+    expect(recycleBinPageCode).toContain('resolveThumbnailSrc({')
+    expect(recycleBinPageCode).toContain('getGeneratedPath(file.file_path)')
     expect(recycleBinPageCode).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
   })
 
@@ -144,10 +144,29 @@ describe('RecycleBinItem thumbFailed 失败态复位（审查修复 T5）', () =
     expect(reloaded?.getAttribute('src')).toBe(toFileUrl('C:/cache/fixed.jpg'))
   })
 
-  it('边界：thumbnail 为 null 且为图片 → resolveThumbnailSrc 回退原文件，img 仍渲染', () => {
-    const { container } = renderItem(makeFile(null))
-    const img = container.querySelector('img') as HTMLImageElement | null
-    expect(img).toBeTruthy()
-    expect(img?.getAttribute('src')).toBe(toFileUrl('D:/photos/photo.jpg'))
+  it('边界：thumbnail 为 null → 显示占位，按需生成后恢复缩略图', async () => {
+    const generatedPath = 'C:/cache/recycle-generated.jpg'
+    const generate = vi.fn().mockResolvedValue(generatedPath)
+    const originalElectronApi = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+
+    try {
+      const file = makeFile(null)
+      file.file_path = `D:/photos/recycle-${Date.now()}.jpg`
+      const { container } = renderItem(file)
+      expect(container.querySelector('img')).toBeNull()
+      await waitFor(() => expect(generate).toHaveBeenCalledWith(file.file_path))
+      await waitFor(() =>
+        expect(container.querySelector('img')?.getAttribute('src')).toBe(toFileUrl(generatedPath))
+      )
+    } finally {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: originalElectronApi
+      })
+    }
   })
 })

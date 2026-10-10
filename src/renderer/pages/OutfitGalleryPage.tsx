@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../stores/uiStore'
 import { OUTFIT_PRESETS } from '../stores/mediaStore'
 import { useGlobalToast } from './settings/sections'
+import { useOnDemandThumbnails } from '../hooks/useOnDemandThumbnails'
 import { toFileUrl } from '../utils/file'
 import { formatDate } from '../utils/date'
 import { IconOutfit, IconRefresh, IconImage, IconLock, IconVideo } from '../icons'
@@ -11,17 +12,14 @@ import { PageHeader } from '../components/common/PageHeader'
 import type { OutfitStat } from '../../shared/scene-category'
 
 /**
- * 套装封面源判定（N3，fix-thumbnail-persist-and-ondemand）：
- * 封面缩略图优先；无缩略图且封面行是视频 → null（渲染视频占位图标，绝不把视频文件
- * 当 <img> src——<img> 无法解码视频必裂图，还会把整个视频当图片下载）；图片无缩略图
- * → 回退原文件（现状保留）。coverFileType 缺失（旧数据）按图片处理。
+ * 套装封面源判定：仅使用规范缩略图；缺图时统一返回 null，
+ * 由 OutfitCard 显示占位并经共享 Hook 按需生成，绝不回退原图片或原视频。
  */
 export function resolveOutfitCoverSrc(
   stat: Pick<OutfitStat, 'coverFilePath' | 'coverThumbnail' | 'coverFileType'>
 ): string | null {
   if (stat.coverThumbnail) return toFileUrl(stat.coverThumbnail)
-  if (stat.coverFileType === 'video') return null
-  return stat.coverFilePath ? toFileUrl(stat.coverFilePath) : null
+  return null
 }
 
 // 统计卡片：单个指标展示
@@ -57,7 +55,19 @@ export const OutfitCard: React.FC<{ stat: OutfitStat; onClick: () => void }> = (
   onClick
 }) => {
   const { t } = useTranslation()
-  const cover = resolveOutfitCoverSrc(stat)
+  const { ensureThumbnail, getGeneratedPath } = useOnDemandThumbnails()
+  useEffect(() => {
+    if (!stat.coverThumbnail && stat.coverFilePath) {
+      void ensureThumbnail({
+        file_path: stat.coverFilePath,
+        thumbnail: stat.coverThumbnail
+      })
+    }
+  }, [ensureThumbnail, stat.coverFilePath, stat.coverThumbnail])
+  const cover = resolveOutfitCoverSrc({
+    ...stat,
+    coverThumbnail: getGeneratedPath(stat.coverFilePath) ?? stat.coverThumbnail
+  })
   // N5 骨架门控：封面加载失败回退图标占位（避免骨架卡死；原实现无 onError 处理）。
   // 审查修复 T4：cover 变化（重扫描换封面，同 key 实例复用）时复位失败态，
   // 否则旧失败标记粘滞导致新封面永不显示。

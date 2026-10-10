@@ -15,16 +15,27 @@ import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { useFailedImages } from '../../hooks/useFailedImages'
+import { useOnDemandThumbnails } from '../../hooks/useOnDemandThumbnails'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
 
-// 前置守卫：后端会把游戏原生缩略图路径直接填入 thumbnail（形如
-// .../GamePlayPhotos/{uid}/NikkiPhotos_LowQuality|HighQuality/xxx.jpg），
-// 这类路径不适用缓存命名规则（_low/_high）改写，否则会推导出不存在的路径导致 404。
+// 前置守卫：后端会把游戏侧文件路径直接填入 thumbnail，两类都不是缓存目录的 ${hash}.jpg：
+// 1) 游戏原生低清缩略图（.../GamePlayPhotos/{uid}/NikkiPhotos_LowQuality|HighQuality/xxx.jpg），
+//    扫描入库时 thumbnail 列已直接指向它；
+// 2) round2 N4 自适应分支的「自建缩略图」——GamePlayPhotos 下长边 ≤512 的低清源由
+//    generator 直接 return filePath，落库后 thumbnail === file_path。
+// 两者都不适用缓存命名规则（_low/_high）改写，否则会推导出不存在的路径导致 404
+// （DetailPage 占位底图、DuplicatesPage fallbackSrc 都消费本函数结果）。
 // 路径分隔符可能是反斜杠或正斜杠，且目录名大小写不保证，统一小写归一化后匹配。
+// 第二段的游戏目录特征与主进程 src/main/scanner/path-classifier.ts:isGamePlayPhotosPath
+// 同形（渲染层不得跨边界 import 主进程模块，故按字符串同形复刻，改一侧需同步另一侧）。
 const isNativeGameThumbnail = (thumbnail: string): boolean => {
-  const lower = thumbnail.toLowerCase()
-  return lower.includes('nikkiphotos_lowquality') || lower.includes('nikkiphotos_highquality')
+  const normalized = thumbnail.replace(/\//g, '\\').toLowerCase()
+  return (
+    normalized.includes('nikkiphotos_lowquality') ||
+    normalized.includes('nikkiphotos_highquality') ||
+    normalized.includes('\\x6game\\saved\\gameplayphotos\\')
+  )
 }
 
 // P1-03：从标准缩略图路径推导低质量路径（缓存命名规则：${hash}.jpg → ${hash}_low.jpg）
@@ -58,22 +69,16 @@ export const toHighQualityUrl = (thumbnail: string | undefined): string | null =
 // 已整体移除——模糊中间态废除后，卡片唯一显示源就是 standard（清晰图），
 // 由 ThumbReveal 做"骨架 → onLoad 后 200ms 淡入"门控直显。
 
-// 按需生成单次守卫：file_path → 生成 Promise（含失败结果），虚拟列表复挂载/重复进入
-// 可视区不重复触发 IPC。与 useVideoThumbGenerate 的 videoThumbGenerateCache 同语义，
-// 覆盖图片与视频两类（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
-const onDemandThumbPromises = new Map<string, Promise<string | null>>()
-
 // 视口外扩展范围：提到模块级常量，避免每次渲染产生新对象引用导致第三方系统反复重订阅
 const VIEWPORT_INCREASE = { top: 100, bottom: 100 } as const
 
 /**
  * 网格卡片缩略图源判定（THUMBNAIL_OPTIMIZATION_PLAN 节点2）。
  *
- * 优先级：DB thumbnail > 按需生成结果 >（仅图片且生成失败时）原文件兜底 > null（占位）。
+ * 优先级：DB thumbnail > 按需生成结果 > null（占位）。
  * - thumbnail=NULL 且生成中/未触发：返回 null → 占位图标。不再直载数 MB 原图拉伸当缩略图
  *   （原图直载与后台批量任务争抢磁盘 IO，是「模糊数秒~数十秒才清晰」的放大器）。
- * - 图片生成失败（文件损坏/不可读）时回退原文件，保留旧行为兜底；视频绝不返回原视频路径
- *   （<img> 无法解码视频，回退必裂图，对齐 useVideoThumbGenerate 不变量）。
+ * - 生成失败保持占位，图片与视频均不回退原媒体路径，避免失败分支重新引入大文件解码。
  */
 export const resolveEffectiveThumbnail = (params: {
   fileType: 'image' | 'video'
@@ -84,9 +89,6 @@ export const resolveEffectiveThumbnail = (params: {
 }): string | null => {
   if (params.thumbnail) return params.thumbnail
   if (params.generatedPath) return params.generatedPath
-  if (params.fileType === 'image' && params.generateFailed && params.filePath) {
-    return params.filePath
-  }
   return null
 }
 
@@ -205,11 +207,7 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
     // P1-U10：failedImages 状态管理 + items 变化时自动清空
     const { failedImages, markFailed, clearFailed } = useFailedImages(items)
-    // THUMBNAIL_OPTIMIZATION_PLAN 节点2：可视区按需生成结果（图片+视频统一）。
-    // onDemandThumbs: file_path → 生成成功的缩略图路径；onDemandFailed: 生成失败集合
-    // （失败不重试，防请求风暴；图片失败时经 resolveEffectiveThumbnail 回退原图）。
-    const [onDemandThumbs, setOnDemandThumbs] = useState<Map<string, string>>(() => new Map())
-    const [onDemandFailed, setOnDemandFailed] = useState<Set<string>>(() => new Set())
+    const { ensureThumbnail, getGeneratedPath, hasFailed } = useOnDemandThumbnails()
     // fix-thumbnail-skeleton-reveal N4：standard 重试代次（file_path → nonce）。
     // media:// 缩略图路径由内容 hash 决定，LRU 驱逐/重建后路径不变；<img> 对同一 src
     // 失败后不会自动重试，重建成功时 +1 并在 src 追加 &r=N 强制重新加载。
@@ -226,8 +224,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     // 可视区按需生成调度（N4：原"停滚 300ms 升级 standard"中的档位升级已废除，
     // 防抖仅用于缺缩略图项的按需生成触发，避免快速滚动期间的 IPC 风暴）
     const scrollTimerRef = useRef<number | null>(null)
-    // 通过 rangeChanged 跟踪当前可视区间
+    // 通过 rangeChanged 跟踪当前可视区间；首个非空范围立即生成，后续滚动保持防抖
     const visibleRangeRef = useRef<ListRange>({ startIndex: 0, endIndex: 0 })
+    const initialRangePendingRef = useRef(true)
 
     // P1-03 / 高清档位路径推导抽为模块级纯函数 toLowQualityUrl / toHighQualityUrl
     //（含游戏原生缩略图路径守卫），推导返回 null 时直接使用原 thumbnail 路径显示。
@@ -269,84 +268,65 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     //   回填新实例（applyResult 幂等），否则显示占位直到下一次 media:updated 全量刷新。
     const ensureOnDemandThumbnail = useCallback(
       (file: MediaFile, onRebuildFailMarkId?: string) => {
-        const filePath = file.file_path
-        if (typeof filePath !== 'string' || filePath.length === 0) return
-        // bumpRetry：仅真正新发起 IPC 生成的成功路径才递增重试代次。Map 命中（复用
-        // 既有 promise）时递增会造成"失败 → 原样重试 → 再失败 → 再递增"的无限重载循环
-        const applyResult = (result: string | null, bumpRetry: boolean) => {
+        const request = onRebuildFailMarkId
+          ? ensureThumbnail(file, { force: true })
+          : ensureThumbnail(file)
+        void request.then((result) => {
           if (!result) {
-            setOnDemandFailed((prev) => new Set(prev).add(filePath))
-            // 审查修复 T1：img 错误链触发的重建失败时 URL 不变，不会再有第二次
-            // onError，必须就地 markFailed 终止为占位警告图标（否则卡片永久卡骨架）
-            if (onRebuildFailMarkId) {
-              markFailed(onRebuildFailMarkId)
-            }
+            if (onRebuildFailMarkId) markFailed(onRebuildFailMarkId)
             return
           }
-          setOnDemandThumbs((prev) => {
-            if (prev.has(filePath)) return prev
-            const next = new Map(prev)
-            next.set(filePath, result)
-            return next
-          })
-          setOnDemandFailed((prev) => {
-            if (!prev.has(filePath)) return prev
-            const next = new Set(prev)
-            next.delete(filePath)
-            return next
-          })
-          if (bumpRetry) {
-            // N4：重建成功 → 重试代次 +1。若该卡片此前因 standard 404 挂在骨架态，
-            // nonce 变化会生成新的 &r=N src 强制重载；首次生成的卡片仅多了无效参数，无副作用
+          if (file.thumbnail) {
             setThumbRetryNonce((prev) => {
               const next = new Map(prev)
-              next.set(filePath, (prev.get(filePath) ?? 0) + 1)
+              next.set(file.file_path, (prev.get(file.file_path) ?? 0) + 1)
               return next
             })
           }
-          // 重建成功：清除该卡片失败标记，使 standard URL 立即重试
           clearFailed(file.id)
-        }
-        // Map 命中：复用既有 promise 去重（同一 file_path 只发起一次生成），
-        // 同时回填结果——直接 return 会让新挂载的实例拿不到已生成的缩略图
-        const existing = onDemandThumbPromises.get(filePath)
-        if (existing) {
-          void existing.then((r) => applyResult(r, false))
-          return
-        }
-        const generate = window.electronAPI?.thumbnail?.generate
-        if (typeof generate !== 'function') return
-        const promise = (async () => {
-          try {
-            return await generate(filePath)
-          } catch {
-            return null
-          }
-        })()
-        onDemandThumbPromises.set(filePath, promise)
-        void promise.then((r) => applyResult(r, true))
+        })
       },
-      [clearFailed, markFailed]
+      [clearFailed, ensureThumbnail, markFailed]
     )
 
-    // 可视区调度（停滚 300ms 防抖）：对可视区内缺缩略图的项触发按需生成。
-    // N4：原"切换到标准质量"的档位升级已废除（standard 即唯一显示源，挂载即加载）
-    const scheduleOnDemandGeneration = useCallback(() => {
-      if (scrollTimerRef.current !== null) {
-        window.clearTimeout(scrollTimerRef.current)
+    const generateVisibleRange = useCallback(() => {
+      const { startIndex, endIndex } = visibleRangeRef.current
+      if (endIndex < startIndex) return
+      for (
+        let index = Math.max(0, startIndex);
+        index <= Math.min(endIndex, items.length - 1);
+        index++
+      ) {
+        const file = items[index]
+        if (file && !file.thumbnail) ensureOnDemandThumbnail(file)
       }
-      scrollTimerRef.current = window.setTimeout(() => {
-        const { startIndex, endIndex } = visibleRangeRef.current
-        if (endIndex <= startIndex) return
-        // 节点2：可视区缺缩略图的项按需生成一次（磁盘缓存优先，单次守卫防风暴）
-        for (let i = startIndex; i <= endIndex; i++) {
-          const file = items[i]
-          if (file && !file.thumbnail) {
-            ensureOnDemandThumbnail(file)
-          }
+    }, [ensureOnDemandThumbnail, items])
+
+    // 首个非空范围立即生成；后续滚动范围保持 300ms 防抖，避免快速滚动请求风暴。
+    const scheduleOnDemandGeneration = useCallback(
+      (immediate = false) => {
+        if (scrollTimerRef.current !== null) {
+          window.clearTimeout(scrollTimerRef.current)
+          scrollTimerRef.current = null
         }
-      }, 300)
-    }, [items, ensureOnDemandThumbnail])
+        if (immediate) {
+          generateVisibleRange()
+          return
+        }
+        scrollTimerRef.current = window.setTimeout(generateVisibleRange, 300)
+      },
+      [generateVisibleRange]
+    )
+
+    // round2 N5：数据整体替换必须重新排一次可视区生成。
+    // 切板块（图库 → 启动器缓存/重复文件等）时本网格组件不卸载，两个板块的可视区间
+    // 编号一致（0..N），react-virtuoso 因此不再回调 rangeChanged——而它原本是该调度
+    // 唯一的调用点，结果新板块的 thumbnail=NULL 卡片一次 IPC 都不发，骨架永久停留
+    // （本机打包态实测：整轮板块切换期间缓存目录新增文件 0 个）。
+    useEffect(() => {
+      if (items.length === 0) return
+      scheduleOnDemandGeneration(false)
+    }, [items, scheduleOnDemandGeneration])
 
     // 清理滚动定时器
     useEffect(() => {
@@ -477,7 +457,9 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
           endReached={onEndReached}
           rangeChanged={(range) => {
             visibleRangeRef.current = range
-            scheduleOnDemandGeneration()
+            const immediate = initialRangePendingRef.current && items.length > 0
+            if (immediate) initialRangePendingRef.current = false
+            scheduleOnDemandGeneration(immediate)
           }}
           itemContent={(index, file) => {
             const isSelected = selectedSet.has(file.id)
@@ -488,8 +470,8 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             // fix-thumbnail-skeleton-reveal N4：standard（清晰图）即唯一显示源，
             // 未 onLoad 前由 ThumbReveal 显示骨架动画，不再有低清垫底/模糊中间态；
             // thumbnail=NULL 且生成中时同样显示骨架动画（而非静态图标干等）。
-            const generatedThumb = onDemandThumbs.get(file.file_path)
-            const generateFailed = onDemandFailed.has(file.file_path)
+            const generatedThumb = getGeneratedPath(file.file_path)
+            const generateFailed = hasFailed(file.file_path)
             const effectiveThumbnail = resolveEffectiveThumbnail({
               fileType: file.file_type,
               thumbnail: file.thumbnail,

@@ -16,7 +16,7 @@
  *   行为用例直测导出的纯函数 + 源码结构断言锁定 OutfitCard 不再出现旧模式。
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, fireEvent } from '@testing-library/react'
+import { render, fireEvent, waitFor } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import type { OutfitStat } from '../../shared/scene-category'
@@ -70,10 +70,10 @@ describe('resolveOutfitCoverSrc 套装封面源判定（fix-thumbnail-persist-an
     ).toBeNull()
   })
 
-  it('正常：图片且无缩略图 → 回退原文件（现状保留）', () => {
-    expect(resolveOutfitCoverSrc({ ...base, coverThumbnail: null, coverFileType: 'image' })).toBe(
-      toFileUrl('D:/media/cover.jpg')
-    )
+  it('正常：图片且无缩略图 → null（显示占位并等待按需生成）', () => {
+    expect(
+      resolveOutfitCoverSrc({ ...base, coverThumbnail: null, coverFileType: 'image' })
+    ).toBeNull()
   })
 
   it('边界：coverThumbnail 为空串按无缩略图处理；coverFilePath 为空且图片无缩略图 → null', () => {
@@ -89,10 +89,8 @@ describe('resolveOutfitCoverSrc 套装封面源判定（fix-thumbnail-persist-an
     ).toBeNull()
   })
 
-  it('边界：file_type 缺失（null，旧数据）按图片处理 → 行为与现状一致', () => {
-    expect(resolveOutfitCoverSrc({ ...base, coverThumbnail: null, coverFileType: null })).toBe(
-      toFileUrl('D:/media/cover.jpg')
-    )
+  it('边界：file_type 缺失（null，旧数据）→ null（未知类型不回退原文件）', () => {
+    expect(resolveOutfitCoverSrc({ ...base, coverThumbnail: null, coverFileType: null })).toBeNull()
   })
 })
 
@@ -101,8 +99,10 @@ describe('OutfitCard 源码结构（N3）', () => {
     expect(code).not.toContain('stat.coverThumbnail || stat.coverFilePath')
   })
 
-  it('封面经 resolveOutfitCoverSrc 判定，视频占位用 IconVideo', () => {
-    expect(code).toContain('resolveOutfitCoverSrc(stat)')
+  it('封面经共享 Hook 与 resolveOutfitCoverSrc 判定，视频占位用 IconVideo', () => {
+    expect(code).toContain('useOnDemandThumbnails()')
+    expect(code).toContain('resolveOutfitCoverSrc({')
+    expect(code).toContain('getGeneratedPath(stat.coverFilePath)')
     expect(code).toContain('IconVideo')
   })
 
@@ -145,5 +145,31 @@ describe('OutfitCard coverFailed 失败态复位（审查修复 T4）', () => {
       <OutfitCard stat={{ ...makeStat(null), coverFileType: 'video' }} onClick={() => {}} />
     )
     expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('正常：图片封面无缩略图 → 按需生成后显示封面', async () => {
+    const generatedPath = 'C:/cache/outfit-generated.jpg'
+    const generate = vi.fn().mockResolvedValue(generatedPath)
+    const originalElectronApi = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+
+    try {
+      const stat = makeStat(null)
+      stat.coverFilePath = `D:/media/outfit-${Date.now()}.jpg`
+      const { container } = render(<OutfitCard stat={stat} onClick={() => {}} />)
+      expect(container.querySelector('img')).toBeNull()
+      await waitFor(() => expect(generate).toHaveBeenCalledWith(stat.coverFilePath))
+      await waitFor(() =>
+        expect(container.querySelector('img')?.getAttribute('src')).toBe(toFileUrl(generatedPath))
+      )
+    } finally {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: originalElectronApi
+      })
+    }
   })
 })

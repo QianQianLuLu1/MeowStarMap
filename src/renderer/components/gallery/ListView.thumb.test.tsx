@@ -12,7 +12,7 @@
  */
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, cleanup, fireEvent } from '@testing-library/react'
+import { render, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -25,6 +25,11 @@ const { VirtuosoMock } = vi.hoisted(() => {
       ((index: number, item: unknown) => React.ReactNode) | undefined
     const computeItemKey = props.computeItemKey as
       ((index: number, item: unknown) => string | number) | undefined
+    const rangeChanged = props.rangeChanged as
+      ((range: { startIndex: number; endIndex: number }) => void) | undefined
+    ReactLib.useEffect(() => {
+      if (data.length > 0) rangeChanged?.({ startIndex: 0, endIndex: data.length - 1 })
+    }, [data, rangeChanged])
     return ReactLib.createElement(
       'div',
       null,
@@ -90,16 +95,38 @@ describe('ListView 缩略图源（N1）', () => {
     )
   })
 
-  it('正常：图片无缩略图 → 回退原文件（旧行为保留）', () => {
-    const { container } = renderRow(
-      makeFile({ file_type: 'image', file_path: 'D:/p/a.png', thumbnail: undefined })
-    )
-    const img = container.querySelector('img') as HTMLImageElement
-    expect(img).toBeTruthy()
-    expect(img.getAttribute('src')).toBe(`media://file?path=${encodeURIComponent('D:/p/a.png')}`)
+  it('正常：图片无缩略图 → 不加载原图，并按需生成后显示缩略图', async () => {
+    const filePath = `D:/p/list-${Date.now()}.png`
+    const generatedPath = 'C:/cache/list-generated.jpg'
+    const generate = vi.fn().mockResolvedValue(generatedPath)
+    const originalElectronApi = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+
+    try {
+      const { container } = renderRow(
+        makeFile({ file_type: 'image', file_path: filePath, thumbnail: undefined })
+      )
+      expect(container.querySelector('img')).toBeNull()
+
+      await waitFor(() => expect(generate).toHaveBeenCalledWith(filePath))
+      await waitFor(() => {
+        const img = container.querySelector('img') as HTMLImageElement | null
+        expect(img?.getAttribute('src')).toBe(
+          `media://file?path=${encodeURIComponent(generatedPath)}`
+        )
+      })
+    } finally {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: originalElectronApi
+      })
+    }
   })
 
-  it('结构：不得存在「thumbnail || file_path」旧回退写法，统一走 resolveThumbnailSrc', () => {
+  it('结构：不得存在原图回退，统一消费共享按需生成结果', () => {
     const src = fs.readFileSync(
       path.resolve(process.cwd(), 'src/renderer/components/gallery/ListView.tsx'),
       'utf-8'
@@ -109,7 +136,9 @@ describe('ListView 缩略图源（N1）', () => {
       .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
       .join('\n')
     expect(code).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
-    expect(code).toContain('resolveThumbnailSrc(file)')
+    expect(code).toContain('useOnDemandThumbnails()')
+    expect(code).toContain('rangeChanged={handleRangeChanged}')
+    expect(code).toContain('getGeneratedPath(file.file_path)')
   })
 })
 

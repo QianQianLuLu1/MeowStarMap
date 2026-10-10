@@ -89,7 +89,7 @@ describe('VirtualImageGrid 视频缩略图裂图防护（fix-gallery-video-thumb
     // 节点2：对齐 useVideoThumbGenerate 已验证模式，但触发范围收敛到可视区，
     // 消除万级视频库一次性发起全部 IPC 在主进程 decodeLimiter 排长队的隐性瓶颈
     expect(code).not.toContain('useVideoThumbGenerate')
-    expect(code).toContain('onDemandThumbPromises')
+    expect(code).toContain('useOnDemandThumbnails()')
     expect(code).toContain('ensureOnDemandThumbnail')
   })
 })
@@ -134,8 +134,7 @@ describe('骨架门控直显接入（fix-thumbnail-skeleton-reveal N4）', () =>
  *
  * 缺陷现象：thumbnail=NULL（刚导入/批量未达）的图片卡片直载数 MB 原图拉伸当缩略图，
  * 与后台批量任务争抢磁盘 IO，「模糊→清晰」被放大到数秒~数十秒。
- * 修复优先级：DB thumbnail > 按需生成结果 >（仅图片且生成失败）原文件兜底 > null（占位）；
- * 视频绝不返回原视频路径（<img> 无法解码视频，回退必裂图）。
+ * 修复优先级：DB thumbnail > 按需生成结果 > null（占位）；图片与视频均不回退原媒体路径。
  */
 describe('resolveEffectiveThumbnail 缩略图源判定', () => {
   it('正常：有 DB thumbnail → 直接使用', () => {
@@ -162,7 +161,7 @@ describe('resolveEffectiveThumbnail 缩略图源判定', () => {
     ).toBe('C:/cache/abc.jpg')
   })
 
-  it('正常：图片无 thumbnail 且生成失败 → 回退原文件（保留旧行为兜底）', () => {
+  it('异常：图片无 thumbnail 且生成失败 → null（保持占位，不回退大原图）', () => {
     expect(
       resolveEffectiveThumbnail({
         fileType: 'image',
@@ -171,7 +170,7 @@ describe('resolveEffectiveThumbnail 缩略图源判定', () => {
         generateFailed: true,
         filePath: 'D:/photos/a.jpg'
       })
-    ).toBe('D:/photos/a.jpg')
+    ).toBeNull()
   })
 
   it('异常：视频无 thumbnail 且生成失败 → null（绝不返回视频路径）', () => {
@@ -221,21 +220,17 @@ describe('resolveEffectiveThumbnail 缩略图源判定', () => {
 })
 
 describe('按需生成机制源码结构（THUMBNAIL_OPTIMIZATION_PLAN 节点2）', () => {
-  it('单次守卫：同一 file_path 只触发一次 thumbnail:generate（Promise Map 缓存）', () => {
-    // N1：守卫从 has() 直接 return 改为 get() 复用既有 promise——单次生成语义不变
-    expect(code).toContain('onDemandThumbPromises.get(filePath)')
-    expect(code).toContain('onDemandThumbPromises.set(')
+  it('单次守卫：复用跨视图共享的 useOnDemandThumbnails', () => {
+    expect(code).toContain('useOnDemandThumbnails()')
+    expect(code).not.toContain('const onDemandThumbPromises = new Map')
+    expect(code).toContain('ensureThumbnail(file)')
   })
 
-  it('缓存命中回填（fix-thumbnail-persist-and-ondemand N1）：Map 命中不再裸 return', () => {
-    // 缺陷：旧写法 if (onDemandThumbPromises.has(filePath)) return —— 卡片滚出视区时
-    // 组件卸载丢掉 onDemandThumbs state，滚回时 Map 命中直接返回，已生成的缩略图
-    // 不回填新实例 → 显示占位直到下一次 media:updated 全量刷新。
-    // 修复：命中分支必须挂 applyResult 把已 resolved 的结果回填新实例 state。
-    // N4：applyResult 增加 bumpRetry 参数——Map 命中不递增重试代次（防无限重载循环）
-    expect(code).not.toMatch(/if \(onDemandThumbPromises\.has\(filePath\)\) return/)
-    expect(code).toMatch(/existing\.then\(\(r\) => applyResult\(r, false\)\)/)
-    expect(code).toMatch(/promise\.then\(\(r\) => applyResult\(r, true\)\)/)
+  it('共享结果回填：网格从 Hook 读取生成路径和失败状态', () => {
+    expect(code).toContain('getGeneratedPath(file.file_path)')
+    expect(code).toContain('hasFailed(file.file_path)')
+    expect(code).not.toContain('setOnDemandThumbs')
+    expect(code).not.toContain('setOnDemandFailed')
   })
 
   it('重建成功清除失败标记让原 URL 立即重试（clearFailed）', () => {
@@ -249,6 +244,11 @@ const NATIVE_BACKSLASH =
 const NATIVE_SLASH_MIXED_CASE = 'D:/GamePlayPhotos/uid123/NikkiPhotos_LOWQUALITY/photo002.jpg'
 const NATIVE_HIGH = 'E:\\GamePlayPhotos\\uid\\NikkiPhotos_HighQuality\\photo003.jpg'
 const CACHE_PATH = 'C:/Users/app/AppData/thumbnails/abc123.jpg'
+// round2 N4 自建缩略图样本：generator 对 GamePlayPhotos 下长边 ≤512 的低清源直接 return filePath，
+// 落库后 thumbnail === file_path。该文件本身不是 ${hash}.jpg 缓存产物，推导 _low/_high 必 404。
+// 路径特征与主进程 src/main/scanner/path-classifier.ts:isGamePlayPhotosPath 同形（含 \X6Game\Saved\）。
+const SELF_THUMBNAIL =
+  'H:\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos\\100001\\CloudPhotos\\Temp\\1654626739.jpg'
 
 describe('toLowQualityUrl 游戏原生缩略图路径守卫', () => {
   it('原生路径（反斜杠）→ 返回 null，不推导 _low 缓存名', () => {
@@ -257,6 +257,12 @@ describe('toLowQualityUrl 游戏原生缩略图路径守卫', () => {
 
   it('原生路径（正斜杠 + 目录名大小写混合）→ 返回 null', () => {
     expect(toLowQualityUrl(NATIVE_SLASH_MIXED_CASE)).toBeNull()
+  })
+
+  it('自建缩略图（thumbnail === file_path 的 .jpg 游戏照片）→ 返回 null', () => {
+    // B4 回归：这类 .jpg 结尾的自建缩略图会被改写成 <name>_low.jpg，
+    // DetailPage 占位底图与 DuplicatesPage 失败回退都拿它当 fallbackSrc → 必然 404。
+    expect(toLowQualityUrl(SELF_THUMBNAIL)).toBeNull()
   })
 
   it('回归：应用缓存路径仍正常推导 _low.jpg', () => {
@@ -271,6 +277,10 @@ describe('toHighQualityUrl 游戏原生缩略图路径守卫', () => {
 
   it('原生路径（LowQuality 正斜杠 + 大小写混合）→ 返回 null', () => {
     expect(toHighQualityUrl(NATIVE_SLASH_MIXED_CASE)).toBeNull()
+  })
+
+  it('自建缩略图（游戏目录内的 .jpg）→ 返回 null，不推导 _high 缓存名', () => {
+    expect(toHighQualityUrl(SELF_THUMBNAIL)).toBeNull()
   })
 
   it('回归：应用缓存路径仍正常推导 _high.jpg', () => {

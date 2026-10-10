@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import fs from 'fs'
 import path from 'path'
 import { MasonryView } from './MasonryView'
@@ -127,7 +127,49 @@ describe('MasonryView 缩略图源（N1）', () => {
     expect(document.querySelector('[data-testid="thumb"]')).toBeTruthy()
   })
 
-  it('结构：不得存在「thumbnail || file_path」旧回退写法，统一走 resolveThumbnailSrc', () => {
+  it('正常：可见图片无缩略图 → 按需生成后显示缩略图', async () => {
+    const filePath = `/tmp/masonry-${Date.now()}.jpg`
+    const generatedPath = '/cache/masonry-generated.jpg'
+    const generate = vi.fn().mockResolvedValue(generatedPath)
+    const originalElectronApi = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+
+    try {
+      render(
+        <MasonryView
+          files={[
+            makeFile('missing', 200, 300),
+            {
+              ...makeFile('target', 200, 300),
+              file_path: filePath,
+              thumbnail: undefined
+            }
+          ]}
+          selectedIds={[]}
+          onSelect={() => {}}
+        />
+      )
+      expect(document.querySelector(`[data-media-id="target"] [data-testid="thumb"]`)).toBeNull()
+      await waitFor(() => expect(generate).toHaveBeenCalledWith(filePath))
+      await waitFor(() =>
+        expect(
+          document
+            .querySelector(`[data-media-id="target"] [data-testid="thumb"]`)
+            ?.getAttribute('src')
+        ).toBe(`media://file?path=${encodeURIComponent(generatedPath)}`)
+      )
+    } finally {
+      Object.defineProperty(window, 'electronAPI', {
+        configurable: true,
+        value: originalElectronApi
+      })
+    }
+  })
+
+  it('结构：不得存在原图回退，可见卡片统一走共享 Hook', () => {
     const src = fs.readFileSync(
       path.resolve(process.cwd(), 'src/renderer/components/gallery/MasonryView.tsx'),
       'utf-8'
@@ -137,7 +179,9 @@ describe('MasonryView 缩略图源（N1）', () => {
       .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
       .join('\n')
     expect(code).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
-    expect(code).toContain('resolveThumbnailSrc(file)')
+    expect(code).toContain('useOnDemandThumbnails()')
+    expect(code).toContain('ensureThumbnail(file)')
+    expect(code).toContain('getGeneratedPath(file.file_path)')
   })
 })
 

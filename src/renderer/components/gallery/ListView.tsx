@@ -1,6 +1,7 @@
 import React, { forwardRef, useCallback, useMemo } from 'react'
-import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
+import { Virtuoso, type ListRange, type VirtuosoHandle } from 'react-virtuoso'
 import { resolveThumbnailSrc } from '../../utils/thumbnail-src'
+import { useOnDemandThumbnails } from '../../hooks/useOnDemandThumbnails'
 import { formatFileSize } from '../../utils/format'
 import { formatDate } from '../../utils/date'
 import { IconStar } from '../../icons'
@@ -34,7 +35,22 @@ const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
     ref
   ) => {
     const { failedImages, markFailed } = useFailedImages(files)
+    const { ensureThumbnail, getGeneratedPath } = useOnDemandThumbnails()
     const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds])
+
+    const handleRangeChanged = useCallback(
+      ({ startIndex, endIndex }: ListRange) => {
+        for (
+          let index = Math.max(0, startIndex);
+          index <= Math.min(endIndex, files.length - 1);
+          index++
+        ) {
+          const file = files[index]
+          if (file && !file.thumbnail) void ensureThumbnail(file)
+        }
+      },
+      [ensureThumbnail, files]
+    )
 
     const handleClick = useCallback(
       (file: MediaFile, index: number, e: React.MouseEvent) => {
@@ -66,8 +82,12 @@ const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
         defaultItemHeight={ITEM_HEIGHT + GAP}
         overscan={400}
         increaseViewportBy={{ top: 200, bottom: 200 }}
+        rangeChanged={handleRangeChanged}
         itemContent={(index, file) => {
-          const thumbUrl = resolveThumbnailSrc(file)
+          const thumbUrl = resolveThumbnailSrc({
+            ...file,
+            thumbnail: getGeneratedPath(file.file_path) ?? file.thumbnail
+          })
           const isSelected = selectedSet.has(file.id)
           const hasError = failedImages.has(file.id)
           const isMissing = file.is_missing === true

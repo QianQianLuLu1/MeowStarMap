@@ -28,8 +28,17 @@ describe.each(['TimelineView.tsx', 'EventTimelineView.tsx'])('%s 缩略图源结
     expect(readGallerySource(name)).not.toContain('toFileUrl(file.thumbnail || file.file_path)')
   })
 
-  it('缩略图源统一走 resolveThumbnailSrc', () => {
-    expect(readGallerySource(name)).toContain('resolveThumbnailSrc(file)')
+  it('缩略图源统一走 resolveThumbnailSrc 并注入生成结果', () => {
+    const code = readGallerySource(name)
+    expect(code).toContain('resolveThumbnailSrc({')
+    expect(code).toContain('getGeneratedPath(file.file_path)')
+  })
+
+  it('缺图项仅在可视行内通过共享 Hook 按需生成', () => {
+    const code = readGallerySource(name)
+    expect(code).toContain('useOnDemandThumbnails()')
+    expect(code).toContain('rangeChanged={handleRangeChanged}')
+    expect(code).toContain('getGeneratedPath(file.file_path)')
   })
 
   it('骨架门控直显（fix-thumbnail-skeleton-reveal N5）：裸 <img> 已替换为 ThumbReveal', () => {

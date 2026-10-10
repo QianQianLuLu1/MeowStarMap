@@ -226,7 +226,7 @@ describe('重复文件板块视频缩略图预览', () => {
     expect(card.querySelector('svg')).not.toBeNull()
   })
 
-  it('图片含 thumbnail → 渲染 <img> 指向缩略图；图片无 thumbnail → 回退 file_path', async () => {
+  it('图片含 thumbnail → 渲染 <img> 指向缩略图', async () => {
     render(<DuplicatesPage />)
     await waitFor(() => expect(electron.media.findDuplicates).toHaveBeenCalled())
     const img1 = await waitFor(() => {
@@ -236,14 +236,25 @@ describe('重复文件板块视频缩略图预览', () => {
       return i!
     })
     expect(img1.src).toContain('.jpg')
+  })
 
-    const img2 = await waitFor(() => {
-      const c = cardFor('img2.png')
-      const i = imgIn(c)
-      expect(i).not.toBeNull()
-      return i!
-    })
-    expect(img2.src).toContain('.png')
+  it('图片无 thumbnail → 不回退原图，按需生成后显示缩略图', async () => {
+    const filePath = `C:\\images\\missing-${Date.now()}.png`
+    const generatedPath = 'C:\\cache\\missing-generated.jpg'
+    const items = group.map((item) =>
+      item.id === 4
+        ? { ...item, file_path: filePath, file_name: 'missing-image.png', thumbnail: null }
+        : { ...item }
+    )
+    electron.media.findDuplicates.mockResolvedValue(buildScan(items))
+    electron.thumbnail.generate.mockResolvedValue(generatedPath)
+
+    render(<DuplicatesPage />)
+    await waitFor(() => expect(electron.media.findDuplicates).toHaveBeenCalled())
+    const card = await waitFor(() => cardFor('missing-image.png'))
+    await waitFor(() => expect(electron.thumbnail.generate).toHaveBeenCalledWith(filePath))
+    await waitFor(() => expect(imgIn(card)?.src).toContain('missing-generated.jpg'))
+    expect(imgIn(card)?.src).not.toContain('missing-image.png')
   })
 
   it('视频无 thumbnail 且 generate 返回路径 → 触发一次生成并渲染 <img>', async () => {
@@ -263,9 +274,11 @@ describe('重复文件板块视频缩略图预览', () => {
     expect(imgIn(card)!.src).toContain('.jpg')
   })
 
-  it('图片类型不触发 thumbnail.generate', async () => {
-    // 组内视频均带缩略图，确保不会触发生成
-    const g = group.map((it) => (it.id === 2 ? { ...it, thumbnail: 'C:\\cache\\v2.jpg' } : it))
+  it('图片与视频均有 thumbnail 时不触发 thumbnail.generate', async () => {
+    const g = group.map((item) => ({
+      ...item,
+      thumbnail: item.thumbnail ?? `C:\\cache\\existing-${item.id}.jpg`
+    }))
     electron.media.findDuplicates.mockResolvedValue(buildScan(g))
     render(<DuplicatesPage />)
     await waitFor(() => expect(electron.media.findDuplicates).toHaveBeenCalled())

@@ -10,6 +10,7 @@ import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { MediaCheckbox } from './MediaCheckbox'
 import { useFailedImages } from '../../hooks/useFailedImages'
+import { useOnDemandThumbnails } from '../../hooks/useOnDemandThumbnails'
 import { useContainerSize } from '../../hooks/useContainerSize'
 import type { MediaFile } from '../../stores/mediaStore'
 
@@ -50,12 +51,18 @@ const MasonryContext = React.createContext<MasonryContextValue | null>(null)
 
 function MasonryCard({ index, data }: { index: number; width: number; data: MediaFile }) {
   const ctx = React.useContext(MasonryContext)
+  const file = data
+  const { ensureThumbnail, getGeneratedPath } = useOnDemandThumbnails()
+  useEffect(() => {
+    if (!file.thumbnail) void ensureThumbnail(file)
+  }, [ensureThumbnail, file])
+  const thumbUrl = resolveThumbnailSrc({
+    ...file,
+    thumbnail: getGeneratedPath(file.file_path) ?? file.thumbnail
+  })
   if (!ctx) return null
   const { selectedSet, onSelect, onContextMenu, failedImages, markFailed, multiSelectMode } = ctx
   const onToggleSelection = ctx.onToggleSelection
-
-  const file = data
-  const thumbUrl = resolveThumbnailSrc(file)
   const isSelected = selectedSet.has(file.id)
   const isMissing = file.is_missing === true
   const isCorrupted = file.is_corrupted === true

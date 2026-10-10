@@ -6,7 +6,7 @@
  *   thumbnail 为空时回退用「原视频文件」作 <img> 源，浏览器无法解码视频必触发
  *   onError 裂图；图片 thumbnail 为空时直载数 MB 原图拖慢加载。网格视图
  *   （VirtualImageGrid.resolveEffectiveThumbnail）已修，本模块将同一不变量抽为
- *   共享纯函数：DB thumbnail > （仅图片）原文件兜底 > null（组件显示占位图标）。
+ *   共享纯函数：仅使用 DB/generated thumbnail；缺图统一返回 null（组件显示占位并按需生成）。
  */
 import { describe, it, expect } from 'vitest'
 import { resolveThumbnailSrc } from './thumbnail-src'
@@ -18,7 +18,6 @@ const THUMB_URL = `media://file?path=${encodeURIComponent(
 )}`
 const VIDEO = 'D:\\Game\\Videos\\clip01.mp4'
 const IMAGE = 'D:\\Game\\Photos\\pic01.png'
-const IMAGE_URL = `media://file?path=${encodeURIComponent('D:/Game/Photos/pic01.png')}`
 
 describe('resolveThumbnailSrc 缩略图源判定（N1）', () => {
   it('正常：有 DB thumbnail → 直接使用缩略图', () => {
@@ -30,13 +29,13 @@ describe('resolveThumbnailSrc 缩略图源判定（N1）', () => {
     )
   })
 
-  it('正常：图片无 thumbnail → 回退原文件（保留旧行为兜底）', () => {
+  it('正常：图片无 thumbnail → null（显示占位并等待按需生成）', () => {
     expect(
       resolveThumbnailSrc({ thumbnail: undefined, file_path: IMAGE, file_type: 'image' })
-    ).toBe(IMAGE_URL)
-    expect(resolveThumbnailSrc({ thumbnail: null, file_path: IMAGE, file_type: 'image' })).toBe(
-      IMAGE_URL
-    )
+    ).toBeNull()
+    expect(
+      resolveThumbnailSrc({ thumbnail: null, file_path: IMAGE, file_type: 'image' })
+    ).toBeNull()
   })
 
   it('异常：视频无 thumbnail → null（绝不返回视频路径，防裂图）', () => {
@@ -50,9 +49,7 @@ describe('resolveThumbnailSrc 缩略图源判定（N1）', () => {
 
   it('边界：thumbnail 空串视为无缩略图', () => {
     expect(resolveThumbnailSrc({ thumbnail: '', file_path: VIDEO, file_type: 'video' })).toBeNull()
-    expect(resolveThumbnailSrc({ thumbnail: '', file_path: IMAGE, file_type: 'image' })).toBe(
-      IMAGE_URL
-    )
+    expect(resolveThumbnailSrc({ thumbnail: '', file_path: IMAGE, file_type: 'image' })).toBeNull()
   })
 
   it('边界：file_type 未知值按视频处理 → null（不回退原文件）', () => {
