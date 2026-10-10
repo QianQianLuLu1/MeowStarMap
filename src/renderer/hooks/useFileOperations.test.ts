@@ -6,9 +6,10 @@
  * @remarks jsdom 环境，mock window.electronAPI，store 走真实路径
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
+import type { Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
-import { useFileOperations } from './useFileOperations'
+import { useFileOperations, type UseFileOperationsOptions } from './useFileOperations'
 import { useMediaStore, type MediaFile } from '../stores/mediaStore'
 import { useUIStore } from '../stores/uiStore'
 import { useOperationHistoryStore } from '../stores/operationHistoryStore'
@@ -80,7 +81,7 @@ function setMockApi(_overrides: Partial<MockApi> = {}): MockApi {
 
 describe('useFileOperations', () => {
   let api: MockApi
-  let onShowMessage: ReturnType<typeof vi.fn>
+  let onShowMessage: Mock<UseFileOperationsOptions['onShowMessage']>
   let onRefreshMedia: () => Promise<void>
 
   beforeEach(() => {
@@ -94,7 +95,7 @@ describe('useFileOperations', () => {
     })
     useOperationHistoryStore.setState({ stack: [], undoing: false })
     api = setMockApi()
-    onShowMessage = vi.fn()
+    onShowMessage = vi.fn<UseFileOperationsOptions['onShowMessage']>()
     onRefreshMedia = vi.fn().mockResolvedValue(undefined) as unknown as () => Promise<void>
   })
 

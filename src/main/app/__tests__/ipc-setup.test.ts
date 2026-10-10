@@ -229,11 +229,14 @@ function makeMainWindow() {
 beforeEach(() => {
   resetAllHandlerMocks()
   // MediaRepository 构造默认返回带 getMediaIdByPath/markCorrupted/clearCorrupted 的实例
-  handlerMocks.MediaRepositoryMock.mockImplementation(() => ({
-    getMediaIdByPath: vi.fn(),
-    markCorrupted: vi.fn().mockResolvedValue(undefined),
-    clearCorrupted: vi.fn().mockResolvedValue(undefined)
-  }))
+  // vitest 5：生产代码以 `new MediaRepository(...)` 使用桩，箭头实现不可构造
+  handlerMocks.MediaRepositoryMock.mockImplementation(function createMediaRepositoryMock() {
+    return {
+      getMediaIdByPath: vi.fn(),
+      markCorrupted: vi.fn().mockResolvedValue(undefined),
+      clearCorrupted: vi.fn().mockResolvedValue(undefined)
+    }
+  })
 })
 
 // ============================================================================
@@ -376,6 +379,16 @@ describe('setupIPC', () => {
 // ============================================================================
 // injectCorruptedMarkers
 // ============================================================================
+/**
+ * vitest 5：MediaRepository 桩被生产代码以 `new MediaRepository(...)` 消费，箭头实现不可构造
+ * （抛 "is not a constructor"），一次性桩统一走可 new 的工厂包装。
+ */
+function onceMediaRepository(instance: Record<string, unknown>): void {
+  handlerMocks.MediaRepositoryMock.mockImplementationOnce(function createRepoMock() {
+    return instance
+  })
+}
+
 describe('injectCorruptedMarkers', () => {
   it('8. thumbnailGen.setCorruptedMarker 被调用，注入两个回调', () => {
     const setCorruptedMarker = vi.fn()
@@ -409,11 +422,11 @@ describe('injectCorruptedMarkers', () => {
     ctx.dbManager.getDatabase.mockReturnValue(db)
     const getMediaIdByPath = vi.fn(() => undefined)
     const markCorrupted = vi.fn().mockResolvedValue(undefined)
-    handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
+    onceMediaRepository({
       getMediaIdByPath,
       markCorrupted,
       clearCorrupted: vi.fn()
-    }))
+    })
 
     injectCorruptedMarkers(ctx)
     const markFn = setCorruptedMarker.mock.calls[0][0] as (
@@ -434,11 +447,11 @@ describe('injectCorruptedMarkers', () => {
     ctx.dbManager.getDatabase.mockReturnValue(db)
     const getMediaIdByPath = vi.fn(() => 42)
     const markCorrupted = vi.fn().mockResolvedValue(undefined)
-    handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
+    onceMediaRepository({
       getMediaIdByPath,
       markCorrupted,
       clearCorrupted: vi.fn()
-    }))
+    })
 
     injectCorruptedMarkers(ctx)
     const markFn = setCorruptedMarker.mock.calls[0][0] as (
@@ -458,13 +471,13 @@ describe('injectCorruptedMarkers', () => {
     const db = { prepare: vi.fn() }
     ctx.dbManager.getDatabase.mockReturnValue(db)
     // getMediaIdByPath 抛错
-    handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
+    onceMediaRepository({
       getMediaIdByPath: vi.fn(() => {
         throw new Error('db error')
       }),
       markCorrupted: vi.fn(),
       clearCorrupted: vi.fn()
-    }))
+    })
 
     injectCorruptedMarkers(ctx)
     const markFn = setCorruptedMarker.mock.calls[0][0] as (
@@ -487,12 +500,12 @@ describe('injectCorruptedMarkers', () => {
     ctx.dbManager.getDatabase.mockReturnValue(db)
     const getMediaIdByPath = vi.fn(() => 99)
     const clearCorruptedByPath = vi.fn().mockResolvedValue(undefined)
-    handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
+    onceMediaRepository({
       getMediaIdByPath,
       markCorrupted: vi.fn(),
       clearCorrupted: vi.fn(),
       clearCorruptedByPath
-    }))
+    })
 
     injectCorruptedMarkers(ctx)
     const clearFn = setCorruptedMarker.mock.calls[0][1] as (filePath: string) => Promise<void>
@@ -509,14 +522,14 @@ describe('injectCorruptedMarkers', () => {
     const ctx = makeAppCtx({ thumbnailGenExt: { setCorruptedMarker } })
     const db = { prepare: vi.fn() }
     ctx.dbManager.getDatabase.mockReturnValue(db)
-    handlerMocks.MediaRepositoryMock.mockImplementationOnce(() => ({
+    onceMediaRepository({
       getMediaIdByPath: vi.fn(),
       markCorrupted: vi.fn(),
       clearCorrupted: vi.fn(),
       clearCorruptedByPath: vi.fn(() => {
         throw new Error('db error')
       })
-    }))
+    })
 
     injectCorruptedMarkers(ctx)
     const clearFn = setCorruptedMarker.mock.calls[0][1] as (filePath: string) => Promise<void>

@@ -325,7 +325,9 @@ describe('database-worker 消息分发与生命周期', () => {
   })
 
   it('DB_OPEN 构造器抛错 → DB_WORKER_ERROR（含 "DB_OPEN 失败"）且以退出码 1 退出', () => {
-    FakeDatabase.mockImplementation(() => {
+    // vitest 5：桩被 `new Database(...)` 使用，箭头实现不可构造（会先抛
+    // "is not a constructor" 而不是被测代码预期捕获的原始错误）
+    FakeDatabase.mockImplementation(function createFailingDatabase() {
       throw new Error('native module ABI mismatch')
     })
 

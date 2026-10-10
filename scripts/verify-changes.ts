@@ -184,7 +184,9 @@ if (related.tests.length > 0) {
   const r = runStep(`相关单元测试 (${related.tests.length} 个文件)`, 'npx', [
     'vitest',
     'run',
-    '--reporter=basic',
+    // vitest 5 移除了 basic reporter（未知名称会被当作自定义 reporter 模块加载并启动失败），
+    // dot 是与原 basic 输出密度最接近的内置 reporter
+    '--reporter=dot',
     ...related.tests
   ])
   results.push({ step: 'test', ...r })

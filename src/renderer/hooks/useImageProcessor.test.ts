@@ -60,7 +60,13 @@ const SOURCE = 'media://file?path=a%2Fb.jpg'
 async function renderWithLoadedImage(source: string = SOURCE, maxPreviewSize?: number) {
   const OriginalImage = global.Image
   const img = new OriginalImage()
-  const imgSpy = vi.spyOn(global, 'Image').mockImplementation(() => img)
+  // vitest 5 起，被 spyOn 的构造器桩必须是可 new 的函数：箭头函数不可构造，
+  // 内部 `new Image()` 会抛错并打印 "The Image mock did not use 'function' or 'class'"
+  const imgSpy = vi
+    .spyOn(global, 'Image')
+    .mockImplementation(function mockImageConstructor(): HTMLImageElement {
+      return img
+    })
   const { result } = renderHook(() =>
     maxPreviewSize === undefined
       ? useImageProcessor({ source })
@@ -132,7 +138,12 @@ describe('useImageProcessor', () => {
       })
       // 重新 render 触发 source 变化
       const newImage = new Image()
-      vi.spyOn(global, 'Image').mockImplementation(() => newImage)
+      // vitest 5：构造器桩必须可 new，箭头函数会让 hook 内 `new Image()` 抛 TypeError
+      vi.spyOn(global, 'Image').mockImplementation(
+        function mockImageConstructor(): HTMLImageElement {
+          return newImage
+        }
+      )
       act(() => {
         // 触发渲染：访问 result.current 触发 React 重新渲染
         void result.current
@@ -314,22 +325,25 @@ describe('useImageProcessor', () => {
       // 保存原始 Image 引用，避免 mock 内 new Image() 递归调用 mockImplementation
       const OriginalImage = global.Image
       let capturedCrossOrigin: string | undefined
-      const imgSpy = vi.spyOn(global, 'Image').mockImplementation(() => {
-        const img = new OriginalImage()
-        // 拦截 crossOrigin setter 以验证被赋值为 'anonymous'
-        let _crossOrigin: string | undefined
-        Object.defineProperty(img, 'crossOrigin', {
-          get() {
-            return _crossOrigin
-          },
-          set(v: string) {
-            capturedCrossOrigin = v
-            _crossOrigin = v
-          },
-          configurable: true
+      const imgSpy = vi
+        .spyOn(global, 'Image')
+        // vitest 5：构造器桩必须可 new（箭头函数不可构造）
+        .mockImplementation(function mockImageConstructor(): HTMLImageElement {
+          const img = new OriginalImage()
+          // 拦截 crossOrigin setter 以验证被赋值为 'anonymous'
+          let _crossOrigin: string | undefined
+          Object.defineProperty(img, 'crossOrigin', {
+            get() {
+              return _crossOrigin
+            },
+            set(v: string) {
+              capturedCrossOrigin = v
+              _crossOrigin = v
+            },
+            configurable: true
+          })
+          return img
         })
-        return img
-      })
       renderHook(({ source }) => useImageProcessor({ source }), {
         initialProps: { source: 'https://example.com/a.jpg' }
       })
@@ -342,22 +356,25 @@ describe('useImageProcessor', () => {
       // media:// scheme 注册为 standard，相对页面为跨源，必须以 anonymous CORS 模式加载
       const OriginalImage = global.Image
       let capturedCrossOrigin: string | undefined
-      const imgSpy = vi.spyOn(global, 'Image').mockImplementation(() => {
-        const img = new OriginalImage()
-        // 拦截 crossOrigin setter 以验证被赋值为 'anonymous'
-        let _crossOrigin: string | undefined
-        Object.defineProperty(img, 'crossOrigin', {
-          get() {
-            return _crossOrigin
-          },
-          set(v: string) {
-            capturedCrossOrigin = v
-            _crossOrigin = v
-          },
-          configurable: true
+      const imgSpy = vi
+        .spyOn(global, 'Image')
+        // vitest 5：构造器桩必须可 new（箭头函数不可构造）
+        .mockImplementation(function mockImageConstructor(): HTMLImageElement {
+          const img = new OriginalImage()
+          // 拦截 crossOrigin setter 以验证被赋值为 'anonymous'
+          let _crossOrigin: string | undefined
+          Object.defineProperty(img, 'crossOrigin', {
+            get() {
+              return _crossOrigin
+            },
+            set(v: string) {
+              capturedCrossOrigin = v
+              _crossOrigin = v
+            },
+            configurable: true
+          })
+          return img
         })
-        return img
-      })
       renderHook(({ source }) => useImageProcessor({ source }), {
         initialProps: { source: 'media://file?path=a%2Fb.jpg' }
       })

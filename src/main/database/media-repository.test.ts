@@ -3177,6 +3177,9 @@ describe('MediaRepository', () => {
       expect(count).toBe(BULK_COUNT)
     })
 
+    // 时间预算 30s：本用例要真实写入并回读 2000 行分片 SQL，`npm run test:coverage`
+    // 下（v8 插桩 + 全库并发）实测超出默认 10s 被判超时；单独跑本文件稳定通过，
+    // 说明是插桩带来的时间开销而非断言失败，故只放宽这一个用例的预算，断言不变。
     it('restoreBatch 2000 个 id 全部恢复，且每条 SQL 占位符 <= SQLITE_MAX_VARIABLE_NUMBER', async () => {
       const ids = insertBulk(BULK_COUNT).map((id) => {
         // 先软删，再恢复
@@ -3199,7 +3202,7 @@ describe('MediaRepository', () => {
         .prepare('SELECT COUNT(*) as count FROM media_files WHERE is_deleted = 1')
         .get() as { count: number }
       expect(count).toBe(0)
-    })
+    }, 30_000)
 
     it('getMediaPathsByIds 2000 个 id 查询结果完整合并', () => {
       const ids = insertBulk(BULK_COUNT)

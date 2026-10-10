@@ -32,7 +32,11 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../../database/media-repository', () => ({
-  MediaRepository: vi.fn(() => repoMock)
+  // vitest 5：生产代码以 new MediaRepository(...) 使用桩，箭头函数不可构造会抛
+  // "is not a constructor"，必须用 function 表达式返回实例
+  MediaRepository: vi.fn(function createMediaRepositoryMock() {
+    return repoMock
+  })
 }))
 
 vi.mock('./_trash-utils', () => ({

@@ -17,23 +17,40 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
-    environmentMatchGlobs: [
-      ['./src/renderer/**/*.test.tsx', 'jsdom'],
-      ['./src/renderer/hooks/**/*.test.ts', 'jsdom']
+    // vitest 5 把 clearMocks 默认值从 false 改为 true：模块加载期（如 preload 入口装配、
+    // vi.hoisted 捕获的暴露记录）写入的调用历史会在每个用例开始前被清空，
+    // 既有断言「模块级调用记录」的用例因此恒为 0 次。这里显式恢复升级前（vitest 1.6）
+    // 的 false 语义，保持 S1 依赖升级为行为无损。
+    clearMocks: false,
+    // vitest 5 移除了 environmentMatchGlobs（未知配置项被静默忽略 → 渲染层组件测试全部落到
+    // node 环境，报 "window is not defined"）。官方替代写法是 test.projects：
+    // 两个 project 的 include 互斥且并集等于原全量 include，环境按原 globs 分配。
+    // 注意：projects 的数组型配置是「合并」而非「覆盖」，所以 include 只在 project 内声明，
+    // 根配置留空——否则每个 project 都会继承根 include 并各跑一遍全量用例（重复计数）。
+    include: [],
+    projects: [
+      {
+        test: {
+          name: 'jsdom',
+          environment: 'jsdom',
+          include: ['./src/renderer/**/*.test.tsx', './src/renderer/hooks/**/*.test.ts']
+        }
+      },
+      {
+        test: {
+          name: 'node',
+          environment: 'node',
+          include: ['./src/**/*.test.ts', './src/**/*.test.tsx', './scripts/**/*.test.ts'],
+          exclude: ['./src/renderer/**/*.test.tsx', './src/renderer/hooks/**/*.test.ts']
+        }
+      }
     ],
-    include: ['./src/**/*.test.ts', './src/**/*.test.tsx', './scripts/**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'release'],
     globals: true,
     testTimeout: 10000,
-    // ── 提速修复层 1：默认 threads 池在 vitest 1.6.1 + Node 22 下 teardown 挂起
-    // （实测 8 文件最小挂起集 threads 下挂、forks 下 2.3s 干净退出）。改用 forks
-    // 绕过 worker 线程回收缺陷；每文件独立 fork 也便于分片隔离挂起文件。
+    // 默认 threads 池在历史版本 + Node 22 下曾出现 teardown 挂起；继续使用每文件独立 forks。
+    // Vitest 4+ 已移除 poolOptions，原 singleFork:false 即当前默认行为，无需额外配置。
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        singleFork: false
-      }
-    },
     setupFiles: ['./tests/setup.ts'],
     coverage: {
       provider: 'v8',

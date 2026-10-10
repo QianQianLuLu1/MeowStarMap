@@ -60,7 +60,10 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../../database/resonance-repository', () => ({
-  ResonanceRepository: vi.fn(() => repoMock)
+  // vitest 5：生产代码以 `new ResonanceRepository(...)` 使用桩，箭头实现不可构造
+  ResonanceRepository: vi.fn(function createResonanceRepositoryMock() {
+    return repoMock
+  })
 }))
 
 vi.mock('node:fs', () => {

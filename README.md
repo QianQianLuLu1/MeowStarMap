@@ -8,7 +8,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/version-2.5.3-blue?style=flat-square">
   <img src="https://img.shields.io/badge/platform-Windows%20x64-success?style=flat-square">
-  <img src="https://img.shields.io/badge/Electron-40.10-blueviolet?style=flat-square">
+  <img src="https://img.shields.io/badge/Electron-41.10-blueviolet?style=flat-square">
   <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
 </p>
@@ -41,7 +41,7 @@
 
 | 领域     | 技术                              |
 | -------- | --------------------------------- |
-| 桌面框架 | Electron 40.10                    |
+| 桌面框架 | Electron 41.10                    |
 | 前端框架 | React 19.2 + TypeScript 5.9       |
 | 状态管理 | Zustand 5.0                       |
 | 样式方案 | Tailwind CSS 3.4                  |
@@ -156,7 +156,7 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 
 | Category   | Technology                        |
 | ---------- | --------------------------------- |
-| Desktop    | Electron 40.10                    |
+| Desktop    | Electron 41.10                    |
 | Frontend   | React 19.2 + TypeScript 5.9       |
 | State      | Zustand 5.0                       |
 | Styling    | Tailwind CSS 3.4                  |

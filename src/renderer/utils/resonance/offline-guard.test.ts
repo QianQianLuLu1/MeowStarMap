@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach, type MockInstance } from 'vitest'
+import { describe, it, expect, vi, afterEach, type MockInstance, type Mock } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
 import { parseImportFileText, countImportDiff } from './importParse'
@@ -123,13 +123,14 @@ vi.mock('node:https', () => {
   return { default: stub, ...stub }
 })
 
-let fetchSpy: ReturnType<typeof vi.fn>
+// vitest 5：fetchSpy 会被直接调用（fetchSpy(url)），必须显式声明签名而非 ReturnType<typeof vi.fn>
+let fetchSpy: Mock<typeof fetch>
 let xhrOpenSpy: MockInstance | null = null
 let wsSpy: ReturnType<typeof vi.fn>
 let beaconSpy: ReturnType<typeof vi.fn>
 
 function installNetworkStubs(): void {
-  fetchSpy = vi.fn()
+  fetchSpy = vi.fn<typeof fetch>()
   vi.stubGlobal('fetch', fetchSpy)
   // node 测试环境无 XMLHttpRequest（jsdom 下同样覆盖）
   if (typeof globalThis.XMLHttpRequest !== 'undefined') {

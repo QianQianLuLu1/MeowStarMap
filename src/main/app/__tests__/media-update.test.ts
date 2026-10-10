@@ -39,10 +39,13 @@ describe('notifyMediaUpdated', () => {
     markMediaCountStaleMock.mockReset()
     registerRootsMock.mockReset()
     // 默认：MediaRepository 构造返回带 refreshMediaCountCache / markMediaCountStale 的实例
-    MediaRepositoryMock.mockImplementation(() => ({
-      refreshMediaCountCache: refreshMediaCountCacheMock,
-      markMediaCountStale: markMediaCountStaleMock
-    }))
+    // vitest 5：生产代码以 `new MediaRepository(...)` 使用桩，箭头实现不可构造
+    MediaRepositoryMock.mockImplementation(function createMediaRepositoryMock() {
+      return {
+        refreshMediaCountCache: refreshMediaCountCacheMock,
+        markMediaCountStale: markMediaCountStaleMock
+      }
+    })
     refreshMediaCountCacheMock.mockResolvedValue(undefined)
     markMediaCountStaleMock.mockResolvedValue(undefined)
   })

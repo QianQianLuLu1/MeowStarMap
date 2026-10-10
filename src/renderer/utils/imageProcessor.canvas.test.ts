@@ -131,6 +131,9 @@ describe('processImageData 尺寸与重采样质量', () => {
     }
   })
 
+  // 时间预算 30s：6000×4000 的 fullSize 路径要在 jsdom 里构造 2400 万像素的 ImageData 桩，
+  // `npm run test:coverage` 下实测超出默认 10s 被判超时；单独跑本文件稳定通过，
+  // 说明是插桩开销而非断言失败，故只放宽这一个用例的预算，断言不变。
   it('maxSize 为 Infinity 时保留原图分辨率（导出 fullSize 路径）', async () => {
     const source = makeSource(6000, 4000)
 
@@ -138,7 +141,7 @@ describe('processImageData 尺寸与重采样质量', () => {
 
     expect(ctxStub.getImageData).toHaveBeenCalledWith(0, 0, 6000, 4000)
     expect(ctxStub.drawImage).toHaveBeenCalledWith(source, 0, 0)
-  })
+  }, 30_000)
 
   it('源图尺寸缺失（0x0）时不抛未捕获异常', async () => {
     const source = makeSource(0, 0)

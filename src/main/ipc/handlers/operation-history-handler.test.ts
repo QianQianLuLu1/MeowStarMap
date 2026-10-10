@@ -17,9 +17,10 @@ const { getMediaUpdatedAtMock } = vi.hoisted(() => ({
   getMediaUpdatedAtMock: vi.fn()
 }))
 vi.mock('../../database/media-repository', () => ({
-  MediaRepository: vi.fn().mockImplementation(() => ({
-    getMediaUpdatedAt: getMediaUpdatedAtMock
-  }))
+  // vitest 5：桩被 `new MediaRepository(...)` 使用，箭头实现不可构造
+  MediaRepository: vi.fn(function createMediaRepositoryMock() {
+    return { getMediaUpdatedAt: getMediaUpdatedAtMock }
+  })
 }))
 
 vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))

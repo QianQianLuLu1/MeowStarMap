@@ -33,14 +33,17 @@ vi.mock('../utils/logger', () => ({
 // better-sqlite3 mock：仅提供 backup/pragma/close/transaction 等方法签名
 // R9：markRestoredFlags 用 transaction 包裹 4 条 INSERT，mock 需支持 transaction 透传
 vi.mock('better-sqlite3', () => {
-  const DatabaseMock = vi.fn().mockImplementation(() => ({
-    backup: vi.fn().mockResolvedValue(undefined),
-    pragma: vi.fn().mockReturnValue('ok'),
-    close: vi.fn(),
-    prepare: vi.fn().mockReturnValue({ run: vi.fn(), get: vi.fn(), all: vi.fn() }),
-    // transaction 接收 fn 并立即执行（同步），返回 fn 本身以便 ()() 调用模式工作
-    transaction: vi.fn((fn: () => void) => fn)
-  }))
+  // vitest 5：生产代码以 `new Database(...)` 使用桩，箭头实现不可构造
+  const DatabaseMock = vi.fn(function createDatabaseMock() {
+    return {
+      backup: vi.fn().mockResolvedValue(undefined),
+      pragma: vi.fn().mockReturnValue('ok'),
+      close: vi.fn(),
+      prepare: vi.fn().mockReturnValue({ run: vi.fn(), get: vi.fn(), all: vi.fn() }),
+      // transaction 接收 fn 并立即执行（同步），返回 fn 本身以便 ()() 调用模式工作
+      transaction: vi.fn((fn: () => void) => fn)
+    }
+  })
   return { default: DatabaseMock }
 })
 
@@ -482,20 +485,23 @@ describe('R9 markRestoredFlags', () => {
     makeBackupFile(name, 100, new Date())
     // 让第二次 new Database（markRestoredFlags）抛错
     let callCount = 0
-    ;(Database as unknown as ReturnType<typeof vi.fn>).mockImplementation(() => {
-      callCount++
-      if (callCount === 2) {
-        // 第二次调用（markRestoredFlags）抛错
-        throw new Error('disk full')
+    // vitest 5：桩被 `new Database(...)` 使用，箭头实现不可构造
+    ;(Database as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      function createDatabaseMock() {
+        callCount++
+        if (callCount === 2) {
+          // 第二次调用（markRestoredFlags）抛错
+          throw new Error('disk full')
+        }
+        return {
+          backup: vi.fn().mockResolvedValue(undefined),
+          pragma: vi.fn().mockReturnValue('ok'),
+          close: vi.fn(),
+          prepare: vi.fn().mockReturnValue({ run: vi.fn(), get: vi.fn(), all: vi.fn() }),
+          transaction: vi.fn((fn: () => void) => fn)
+        }
       }
-      return {
-        backup: vi.fn().mockResolvedValue(undefined),
-        pragma: vi.fn().mockReturnValue('ok'),
-        close: vi.fn(),
-        prepare: vi.fn().mockReturnValue({ run: vi.fn(), get: vi.fn(), all: vi.fn() }),
-        transaction: vi.fn((fn: () => void) => fn)
-      }
-    })
+    )
     const fakeDbManager = { getDatabase: () => null, close: vi.fn() }
     const fresh = new BackupService()
     fresh.setDir(backupDir)

@@ -9,7 +9,7 @@
  *
  * 运行：npx vitest run src/renderer/search/use-search-index.test.tsx
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 
 import { useSearchIndex } from './use-search-index'
@@ -28,14 +28,15 @@ function makeFile(id: string, name: string): MediaFile {
   } as unknown as MediaFile
 }
 
-let updateSpy: ReturnType<typeof vi.fn>
+// vitest 5：显式给出被 mock 的签名，ReturnType<typeof vi.fn> 已不能赋给方法参数位
+let updateSpy: Mock<typeof searchService.update>
 
 beforeEach(() => {
   // 桩掉 searchService：状态恒为 ready，init/update 不产生副作用
   vi.spyOn(searchService, 'init').mockResolvedValue(undefined)
   vi.spyOn(searchService, 'getState').mockReturnValue('ready')
   vi.spyOn(searchService, 'onStateChange').mockReturnValue(() => {})
-  updateSpy = vi.fn()
+  updateSpy = vi.fn<typeof searchService.update>()
   vi.spyOn(searchService, 'update').mockImplementation(updateSpy)
   useMediaStore.setState({ mediaFiles: [] })
 })

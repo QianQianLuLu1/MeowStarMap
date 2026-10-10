@@ -46,7 +46,10 @@ if (missing.length > 0) {
 console.log(`[precommit-test] 找到 ${uniqueTestFiles.length} 个相关测试文件，开始运行...`)
 
 // ── 运行 vitest（Windows 上 npx 是 .cmd，需要 shell: true） ──
-const result = spawnSync('npx', ['vitest', 'run', '--reporter=basic', ...uniqueTestFiles], {
+// vitest 5 移除了 basic reporter：传入未知 reporter 名会在启动期直接报
+// "Failed to load custom Reporter from basic" 并以非零退出，令 pre-commit 测试闸门整体失效；
+// dot 是输出密度最接近原 basic 的内置 reporter。
+const result = spawnSync('npx', ['vitest', 'run', '--reporter=dot', ...uniqueTestFiles], {
   stdio: 'inherit',
   cwd,
   shell: true

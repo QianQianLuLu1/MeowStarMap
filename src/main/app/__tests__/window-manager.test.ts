@@ -169,7 +169,8 @@ beforeEach(() => {
   showMessageBoxMock.mockResolvedValue({ response: 0 })
 
   // BrowserWindow 构造时创建 mock 实例并保存到 lastCreatedWindow
-  BrowserWindowCtorMock.mockImplementation((options: unknown) => {
+  // vitest 5：生产代码 `new BrowserWindow(...)`，箭头实现不可构造 → 必须用 function 表达式
+  BrowserWindowCtorMock.mockImplementation(function createBrowserWindowMock(options: unknown) {
     lastCreatedWindow = createMockWindow(options)
     return lastCreatedWindow
   })
@@ -255,7 +256,8 @@ describe('createMainWindow', () => {
     const ctx = makeAppCtx()
     // 模拟打包版 app:// 本地协议加载极快：ready-to-show 在 loadURL 调用内同步发出，
     // 早于 loadURL 返回的 promise resolve——晚于 loadURL 注册的 once 监听会永久错过该事件
-    BrowserWindowCtorMock.mockImplementation((options: unknown) => {
+    // vitest 5：`new BrowserWindow(...)` 要求实现可 new，箭头函数会抛 "is not a constructor"
+    BrowserWindowCtorMock.mockImplementation(function createBrowserWindowMock(options: unknown) {
       const win = createMockWindow(options)
       win.loadURL.mockImplementation(() => {
         win._emit('ready-to-show')

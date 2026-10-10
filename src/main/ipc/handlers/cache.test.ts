@@ -35,9 +35,10 @@ vi.mock('../../utils/logger', () => ({
 // R13：mock MediaRepository，避免在 cache 测试中引入真实 DB / worker。
 // repo.setSetting 的行为本身在 media-repository.test.ts 中覆盖。
 vi.mock('../../database/media-repository', () => ({
-  MediaRepository: vi.fn().mockImplementation(() => ({
-    setSetting: mediaRepoSetSettingMock
-  }))
+  // vitest 5：桩被 `new MediaRepository(...)` 使用，箭头实现不可构造
+  MediaRepository: vi.fn(function createMediaRepositoryMock() {
+    return { setSetting: mediaRepoSetSettingMock }
+  })
 }))
 
 vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))

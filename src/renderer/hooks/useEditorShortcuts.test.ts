@@ -5,7 +5,7 @@
  * @dependencies react, window.addEventListener
  * @remarks jsdom 环境，派发 KeyboardEvent 验证回调触发
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { renderHook } from '@testing-library/react'
 import { useEditorShortcuts } from './useEditorShortcuts'
 
@@ -30,31 +30,34 @@ function dispatchKey(opts: {
 }
 
 describe('useEditorShortcuts', () => {
+  // vitest 5 起 ReturnType<typeof vi.fn> 推导为 Mock<Procedure | Constructable>，
+  // 不再能赋给本 Hook 的 () => void 形参；改为显式声明被 mock 的函数签名
+  type VoidFn = Mock<() => void>
   let callbacks: {
-    onUndo: ReturnType<typeof vi.fn>
-    onRedo: ReturnType<typeof vi.fn>
-    onSave: ReturnType<typeof vi.fn>
-    onSaveAs: ReturnType<typeof vi.fn>
-    onReset: ReturnType<typeof vi.fn>
-    onCopyParams: ReturnType<typeof vi.fn>
-    onPasteParams: ReturnType<typeof vi.fn>
-    onToggleFullscreen: ReturnType<typeof vi.fn>
-    onToggleShortcuts: ReturnType<typeof vi.fn>
-    onExit: ReturnType<typeof vi.fn>
+    onUndo: VoidFn
+    onRedo: VoidFn
+    onSave: VoidFn
+    onSaveAs: VoidFn
+    onReset: VoidFn
+    onCopyParams: VoidFn
+    onPasteParams: VoidFn
+    onToggleFullscreen: VoidFn
+    onToggleShortcuts: VoidFn
+    onExit: VoidFn
   }
 
   beforeEach(() => {
     callbacks = {
-      onUndo: vi.fn(),
-      onRedo: vi.fn(),
-      onSave: vi.fn(),
-      onSaveAs: vi.fn(),
-      onReset: vi.fn(),
-      onCopyParams: vi.fn(),
-      onPasteParams: vi.fn(),
-      onToggleFullscreen: vi.fn(),
-      onToggleShortcuts: vi.fn(),
-      onExit: vi.fn()
+      onUndo: vi.fn<() => void>(),
+      onRedo: vi.fn<() => void>(),
+      onSave: vi.fn<() => void>(),
+      onSaveAs: vi.fn<() => void>(),
+      onReset: vi.fn<() => void>(),
+      onCopyParams: vi.fn<() => void>(),
+      onPasteParams: vi.fn<() => void>(),
+      onToggleFullscreen: vi.fn<() => void>(),
+      onToggleShortcuts: vi.fn<() => void>(),
+      onExit: vi.fn<() => void>()
     }
   })
 
