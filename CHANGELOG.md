@@ -14,12 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+---
+
+## [2.5.3] - 2026-10-11
+
+> 2026-10-01 首次发布；2026-10-11 重新打包，以下追加变更随同版本安装包一并发布。
+
 ### Added | 新增
 
+- 通用 UI 组件族落地 common 层（Button/Checkbox/Drawer/FloatingActionBar/FormField/PageHeader/Progress/SegmentedControl/Select/Switch/ToastProvider/Tooltip）及零依赖 `cn` 类名工具，均附带行为级测试与 Storybook stories
+- 外观设置新增「氛围颗粒纹理」与「漂浮几何体」独立开关（`display.ambientGrain` / `display.ambientShapes`，12 种语言文案同步）
+- 动效预设新增列表级联入场 `staggerContainer` / `staggerItem`
 - **重扫复位谓词唯一真源**：新增 `src/main/scanner/rescan-restore-sql.ts`（游戏目录树条件 ∧ `COALESCE(delete_origin, '') <> 'user'` 的纯字符串常量），`worker-entry.ts` 改为 import 该常量、删除本地同名常量，使「哪些软删除记录允许被重扫复位」只有一处定义。配套 `src/main/scanner/__tests__/rescan-restore-sql.test.ts` 分两档断言：真实 SQL 语义档（用 Node 内置 `node:sqlite` 驱动与生产同构的 UPSERT，因 better-sqlite3 是 Electron ABI 无法在 vitest 下加载）按能力探测门控，无引擎依赖的谓词结构档全 Node 版本必跑
 
 ### Changed | 变更
 
+- 页面接入通用组件：Duplicates/RecycleBin 底部操作栏统一为 FloatingActionBar，ResonanceRecords 页签改用 SegmentedControl，设置页 Select/Toast 全面迁移
+- Tailwind 圆角/阴影/字体/动画/缓动令牌与 globals.css CSS 变量完全对齐，全项目统一圆角与阴影体系；状态栏样式收敛至 CSS 层
+- 无障碍增强：SegmentedControl 补方向键导航与 roving tabindex，Tooltip 补 aria-describedby 关联与 Escape 退出，全局 focus-visible 焦点描边
 - **工具链跨大版本升级（Electron 41 / Vitest 5 / Vite 6）**：`devDependencies.electron` 40.10.6 → 41.10.6（关闭 DEBT-020：40.x 分支 EOL 与其上的高危通告）、`vitest` 与 `@vitest/coverage-v8` 1.6.1 → 5.0.3、`vite` 5.4.21 → 6.4.4、`sharp` 0.35.3 → 0.35.5，并新增 `overrides`（`http-cache-semantics` / `source-map-js`）。配套适配：`vitest.config.ts` 以 `test.projects` 替换已被移除的 `environmentMatchGlobs`，并显式恢复 `clearMocks: false`（Vitest 5 把默认值改为 true，会清空模块加载期写入的调用记录，令既有断言「模块级调用记录」的用例恒为 0 次）；`scripts/run-precommit-tests.ts` 与 `scripts/verify-changes.ts` 的 `--reporter=basic` 改为 `dot`（Vitest 5 已移除 basic，未知 reporter 名会在启动期报错并使 pre-commit 测试闸门整体失效）；约 30 个测试文件按 Vitest 5 语义适配（构造器 mock 形态、被运行时证据证伪的旧断言订正）
 - **Node 下限三处对齐为单一真源**：`engines.node` 提到 `>=22.12.0` 后，`.node-version` 由 `20` 改为 `22`，`.github/workflows/build.yml` 的 5 个 job 由内联 `node-version: '20'` 改为 `node-version-file: '.node-version'`。Vitest 5 自身 engines 为 `^22.12.0 || ^24.0.0 || >=26.0.0`，原配置会让 `test`/`coverage`/`build` 跑在不受支持的运行时上；改引文件是为消除「两处真源各写一份」这一缺陷成因
 - **覆盖率门控读数下移属测量口径修正，不是测试退化（登记为 DEBT-032）**：Vitest 1.6 的 v8 provider 把「从未被调用的箭头函数体」计入其所在语句并判为已覆盖，Vitest 5 把函数体拆为独立语句如实计未覆盖。同一套测试（334 文件 / 5268 例全通过、零 skip、报表目录分组同为 39）从 `69.94/81.43/68.55/69.94` 变为 `64.65/55.67/57.12/66.21`，四项均低于 `thresholds: 69/80/68/69`。本轮**未**降阈值、未扩大 `exclude`、未换 provider、未跳用例，`npm run test:coverage` 保持红灯，重新基线或补测试的决策留待单独一轮。取证与逐目录对照见 `docs/plans/2026-10-09-fix-thumbnail-loading-performance-round2.md` §15
@@ -32,6 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ### Fixed | 修复
 
+- 修复底部操作栏层级过高（z-60）遮挡全局 Toast 与任务进度浮层的回归
+- 修复 Drawer 硬编码标题 id 导致双抽屉并开时 aria-labelledby 串号
+- 修复 FormField 错误态下 aria-describedby 悬空指向未渲染的 helper 文案
+- 预览 mock 的 uiTheme 写入改为与 zustand persist 同构 JSON，消除主题设置回滚隐患
 - **缩略图「每次启动/切板块都要重新等一遍」的四个成因（详见 `docs/plans/2026-10-09-fix-thumbnail-loading-performance.md` 与 `...-round2.md`）**
 
   - **按需生成的读取守卫与 `media://` 展示口径不一致**：`thumbnail:generate` 原用裸 `assertFileReadPath`，其 roots 只覆盖 userHome / userData / 已注册媒体根；游戏装在未注册的独立盘时，照片经 `media://`（走 `isMediaPathAllowed`）能正常显示，但生成请求恒被判「路径不在白名单内」，打包态实测同批已入库路径 `file:getExif` 全通过而 `thumbnail:generate` 4/4 被拒（0~1ms 即失败），DB `thumbnail` 恒 NULL、卡片停在骨架。改为 `assertMediaAccessPath`，与导出/删除通道同口径（`thumbnail-handler.ts`，携 `@core-change` 授权注释）
@@ -51,29 +67,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 - **`rescan-restore-sql.test.ts` 的 CI 兼容性**：该测试原在模块顶层 `nodeRequire('node:sqlite')`，而 `node:sqlite` 需 Node ≥ 22.5、`.node-version` 与 CI 全部 job 钉 Node 20 → 流水线会以 `Cannot find module` 失败；改为能力探测 + `describe.runIf` 门控（不可用时响亮告警并只跳过语义档，结构档仍必跑，谓词被删改时 CI 仍能拦住），同时修正 3 处 `TS2749`（把值 `DatabaseSync` 用在类型位置，因 `src/main/tsconfig.json` 排除测试文件而未被 `npm run typecheck` 发现）
 - **`docs/IPC_CONTRACT.md` 契约同步**：§2.5 `media:softDelete` 补 `success: true` 与软删除新语义（不搬动文件、`delete_origin` 三态与重扫复位口径、4 处读 `res.success` 的调用方），§2.9 `media:delete` 删除「详情页与全屏查看器的删除（源文件先移入系统回收站）」的不实描述（两处已改走 §2.5）
-
----
-
-## [2.5.3] - 2026-10-01
-
-### Added | 新增
-
-- 通用 UI 组件族落地 common 层（Button/Checkbox/Drawer/FloatingActionBar/FormField/PageHeader/Progress/SegmentedControl/Select/Switch/ToastProvider/Tooltip）及零依赖 `cn` 类名工具，均附带行为级测试与 Storybook stories
-- 外观设置新增「氛围颗粒纹理」与「漂浮几何体」独立开关（`display.ambientGrain` / `display.ambientShapes`，12 种语言文案同步）
-- 动效预设新增列表级联入场 `staggerContainer` / `staggerItem`
-
-### Changed | 变更
-
-- 页面接入通用组件：Duplicates/RecycleBin 底部操作栏统一为 FloatingActionBar，ResonanceRecords 页签改用 SegmentedControl，设置页 Select/Toast 全面迁移
-- Tailwind 圆角/阴影/字体/动画/缓动令牌与 globals.css CSS 变量完全对齐，全项目统一圆角与阴影体系；状态栏样式收敛至 CSS 层
-- 无障碍增强：SegmentedControl 补方向键导航与 roving tabindex，Tooltip 补 aria-describedby 关联与 Escape 退出，全局 focus-visible 焦点描边
-
-### Fixed | 修复
-
-- 修复底部操作栏层级过高（z-60）遮挡全局 Toast 与任务进度浮层的回归
-- 修复 Drawer 硬编码标题 id 导致双抽屉并开时 aria-labelledby 串号
-- 修复 FormField 错误态下 aria-describedby 悬空指向未渲染的 helper 文案
-- 预览 mock 的 uiTheme 写入改为与 zustand persist 同构 JSON，消除主题设置回滚隐患
 
 ---
 
@@ -347,7 +340,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 3. 条目使用 `-` 列表，简明描述「做了什么」与「为什么」，避免无意义提交信息。
 4. 关联 Issue / PR 时，在条目末尾附加 `(#123)` 链接。
 5. 破坏性变更以 `**BREAKING:**` 前缀标注，并说明迁移方式。
-6. 发布版本时，将 `[Unreleased]` 区块整体复制为新区块并填入发布日期，清空 `[Unreleased]`。
+6. 发布版本时，将 `[Unreleased]` 区块整体复制为新区块并填入发布日期，清空 `[Unreleased]`；同版本重新打包/再发布前同样需要先收口（`npm run dist:win` 的 pre-dist-check 链会拦截未收口状态）。
 7. 旧版本仅保留必要摘要，详细历史可归档至 `CHANGELOG-archive.md`。
 
 ## 链接定义 | Link References
@@ -379,7 +372,7 @@ This file follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 
 1. Add new entries under `## [Unreleased]` as you develop.
 2. On release, copy the `[Unreleased]` block to a new `## [x.y.z] - YYYY-MM-DD`
-   block, then clear `[Unreleased]`.
+   block, then clear `[Unreleased]`. The same applies before repackaging the same version: merge the `[Unreleased]` entries into the matching version section first (the pre-dist-check chain blocks packaging otherwise).
 3. Keep category order: Added → Changed → Deprecated → Removed → Fixed → Security.
 4. Use `-` bullet lists; describe both **what** and **why**.
 5. Reference issues/PRs with `(#123)` suffix.
