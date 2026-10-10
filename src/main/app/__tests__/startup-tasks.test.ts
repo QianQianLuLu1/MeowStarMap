@@ -1591,3 +1591,147 @@ describe('exit-forensics 阶段打点', () => {
     expect(analyzeSceneBrightnessMock).toHaveBeenCalledTimes(2)
   })
 })
+
+/**
+ * round2 N3：缩略图引用重绑定（只绑不生成）
+ *
+ * 取证（本机真实库，round2 实施记录 §1/§12 已更正早期读数）：62 个 thumbnail=NULL 的图片行里
+ * 只有 2 行的缓存文件在**现行**缓存目录上（33 行只命中迁盘前的旧目录，generator 不读那里，
+ * 见 DEBT-031），但原 rowsToRepair 只覆盖「缺尺寸 / 悬空缩略图 / NULL 视频」，这类「尺寸齐全、
+ * 缓存现成、仅缺引用」的行无人接管，进入板块只能重走按需生成 → 卡片长期停在骨架。
+ * 重绑定必须零解码：每行只读前 1MB 算 hash、不进 sharp，否则启动任务会变成全库解码风暴
+ * （DEBT-026 长期未做掉的原因）。
+ */
+describe('cleanupAndRepairDatabase 缩略图引用重绑定（round2 N3）', () => {
+  beforeEach(() => {
+    pathExistsMock.mockReset()
+    processThumbnailForRowMock.mockReset()
+    isBlankCachedThumbnailMock.mockReset()
+    loggerWarnMock.mockReset()
+    loggerInfoMock.mockReset()
+  })
+
+  /** image + thumbnail=NULL + 尺寸齐全 的行：原 rowsToRepair 不覆盖（本轮取证缺口） */
+  const NULL_IMAGE_ROW = {
+    id: 7001,
+    file_path: 'H:/InfinityNikki/GamePlayPhotos/a.jpeg',
+    file_type: 'image',
+    thumbnail: null,
+    width: 3311,
+    height: 1485
+  }
+
+  function setupCleanup(rows: Array<Record<string, unknown>>, resolveResult: string | null) {
+    const db = makeDb({ mediaRows: rows })
+    const updateRun = vi.fn(() => ({ changes: 1, lastInsertRowid: 1 }))
+    const rebindRun = vi.fn(() => ({ changes: 1, lastInsertRowid: 1 }))
+    const sqlSeen: string[] = []
+    const resolveExistingThumbnail = vi.fn(async () => resolveResult)
+    db.prepare.mockImplementation((sql: string) => {
+      sqlSeen.push(sql)
+      if (sql.includes('UPDATE media_files SET width')) {
+        return { get: vi.fn(), all: vi.fn(), run: updateRun }
+      }
+      if (sql.includes('AND thumbnail IS NULL')) {
+        return { get: vi.fn(), all: vi.fn(), run: rebindRun }
+      }
+      return { get: vi.fn(), all: vi.fn(() => rows), run: vi.fn() }
+    })
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: {
+        generate: vi.fn(),
+        getCacheDir: vi.fn(() => 'H:/mock/thumbnails'),
+        resolveExistingThumbnail
+      }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    processThumbnailForRowMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(false)
+    return { ctx, updateRun, rebindRun, rebindSql: sqlSeen, resolveExistingThumbnail }
+  }
+
+  it('T2 正常：缓存已存在的 NULL 图片行 → 写回引用，且不触发生成', async () => {
+    const cached = 'H:/mock/thumbnails/a62d7f95b24818c2.jpg'
+    const { ctx, rebindRun, rebindSql, updateRun, resolveExistingThumbnail } = setupCleanup(
+      [NULL_IMAGE_ROW],
+      cached
+    )
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(resolveExistingThumbnail).toHaveBeenCalledWith(NULL_IMAGE_ROW.file_path)
+    expect(rebindRun).toHaveBeenCalledWith(cached, NULL_IMAGE_ROW.id)
+    // 防覆写：重绑定只在 thumbnail 仍为 NULL 时写入，不得覆盖扫描/批量并发写入的有效值
+    const sql = rebindSql.find((s) => s.includes('AND thumbnail IS NULL')) ?? ''
+    expect(sql).toContain('thumbnail IS NULL')
+    // 走的是专用语句，不是缺尺寸修复语句
+    expect(updateRun).not.toHaveBeenCalled()
+    // 只绑不生成：共享修复服务一次都不该被调用
+    expect(processThumbnailForRowMock).not.toHaveBeenCalled()
+  })
+
+  it('T3 边界：缓存不存在 → 零写库、零生成（绝不在启动期解码）', async () => {
+    const { ctx, rebindRun, resolveExistingThumbnail } = setupCleanup([NULL_IMAGE_ROW], null)
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(resolveExistingThumbnail).toHaveBeenCalledTimes(1)
+    expect(rebindRun).not.toHaveBeenCalled()
+    expect(processThumbnailForRowMock).not.toHaveBeenCalled()
+  })
+
+  it('T4 兼容：缺尺寸行仍走 processThumbnailForRow，且不进重绑定候选', async () => {
+    const needsDims = { ...NULL_IMAGE_ROW, id: 7002, width: null, height: null }
+    const { ctx, resolveExistingThumbnail } = setupCleanup([needsDims], 'ignored.jpg')
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(processThumbnailForRowMock).toHaveBeenCalledTimes(1)
+    expect(resolveExistingThumbnail).not.toHaveBeenCalled()
+  })
+
+  it('T5 兼容：thumbnail=NULL 的视频行走原修复分支（重绑定只管图片）', async () => {
+    const videoRow = { ...NULL_IMAGE_ROW, id: 7003, file_type: 'video' }
+    const { ctx, resolveExistingThumbnail } = setupCleanup([videoRow], 'ignored.jpg')
+
+    await cleanupAndRepairDatabase(ctx)
+
+    expect(processThumbnailForRowMock).toHaveBeenCalledTimes(1)
+    expect(resolveExistingThumbnail).not.toHaveBeenCalled()
+  })
+
+  it('边界：重绑定单行抛错只告警，不中断启动任务', async () => {
+    const resolveExistingThumbnail = vi.fn(async () => {
+      throw new Error('ENOENT: metadata locked')
+    })
+    const db = makeDb({ mediaRows: [NULL_IMAGE_ROW] })
+    const rebindRun = vi.fn(() => ({ changes: 1, lastInsertRowid: 1 }))
+    db.prepare.mockImplementation((sql: string) => {
+      if (sql.includes('AND thumbnail IS NULL')) {
+        return { get: vi.fn(), all: vi.fn(), run: rebindRun }
+      }
+      return { get: vi.fn(), all: vi.fn(() => [NULL_IMAGE_ROW]), run: vi.fn() }
+    })
+    const ctx = makeAppCtx({
+      db,
+      mainWindow: makeMainWindow(),
+      thumbnailGen: {
+        generate: vi.fn(),
+        getCacheDir: vi.fn(() => 'H:/mock/thumbnails'),
+        resolveExistingThumbnail
+      }
+    })
+    pathExistsMock.mockResolvedValue(true)
+    isBlankCachedThumbnailMock.mockResolvedValue(false)
+
+    await expect(cleanupAndRepairDatabase(ctx)).resolves.toBeUndefined()
+    // 单行异常不得中断启动任务，也不得留下半截引用
+    expect(rebindRun).not.toHaveBeenCalled()
+    expect(loggerWarnMock).toHaveBeenCalledWith(
+      expect.stringContaining('缩略图引用重绑定失败'),
+      expect.any(Error)
+    )
+  })
+})

@@ -77,6 +77,9 @@ interface ScannerManagerStub {
 interface ThumbnailGenStub {
   generate: ReturnType<typeof vi.fn>
   getCacheDir: ReturnType<typeof vi.fn>
+  // round2 N3：启动重绑定的只读缓存判定（不生成、不解码）。必填以对齐生产
+  // ThumbnailGenerator 的恒定接口；缺省值由 makeCtx 统一补，调用方无需逐处声明。
+  resolveExistingThumbnail: ReturnType<typeof vi.fn>
 }
 
 interface FileServiceStub {
@@ -92,7 +95,8 @@ interface DbStub {
 
 export interface MakeCtxOpts {
   scannerManager?: ScannerManagerStub
-  thumbnailGen?: ThumbnailGenStub
+  // 调用方只声明自己关心的方法即可，缺省键由 makeCtx 统一补齐（见下方 thumbnailGen）
+  thumbnailGen?: Partial<ThumbnailGenStub>
   fileService?: FileServiceStub
   db?: DbStub | null
   mainWindow?: unknown
@@ -107,9 +111,15 @@ export function makeCtx(opts: MakeCtxOpts): HandlerContext {
       scanRoot: vi.fn(),
       on: vi.fn()
     },
-    thumbnailGen: opts.thumbnailGen ?? {
+    // 桩默认值先就位，调用方的 partial stub 只覆盖自己声明的键。
+    // 这样 production 恒有的 resolveExistingThumbnail 在测试侧也恒有实现，
+    // 生产代码无需再用 `typeof … === 'function'` 兜测试桩缺键（那种兜法一旦方法改名
+    // 会把整个启动重绑定阶段静默变成 no-op，而 TS 因 handler-context 标注了具体类而抓不到）。
+    thumbnailGen: {
       generate: vi.fn(),
-      getCacheDir: vi.fn(() => '/mock/cache')
+      getCacheDir: vi.fn(() => '/mock/cache'),
+      resolveExistingThumbnail: vi.fn(async () => null),
+      ...opts.thumbnailGen
     },
     fileService: opts.fileService ?? { previewImport: vi.fn(), importFiles: vi.fn() },
     dbManager: {

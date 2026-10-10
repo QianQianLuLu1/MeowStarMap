@@ -48,6 +48,13 @@ export const MIN_CACHE_LIMIT_BYTES = 100 * 1024 * 1024
 // A-S8：内容 hash 读取文件前 1MB，兼顾唯一性与性能
 const CONTENT_HASH_READ_SIZE = 1024 * 1024
 
+/**
+ * round2 N4：源图长边不超过该值时视为「本身就是低清变体」，可直接当缩略图引用自身（零解码）。
+ * 依据本机真实库实测：启动器缓存 `*_low_s128.jpeg` 为 128px 级；而 `CloudPhotos\*_Low.jpeg`
+ * 名字带 Low 实际是 3311×1485、视频封面是 3840×2160——因此必须按尺寸判定，不能按文件名。
+ */
+const SELF_THUMBNAIL_MAX_EDGE_PX = 512
+
 // 视频抽帧最大可寻址秒数（参数校验上限），避免传入异常 seek 值
 const VIDEO_SEEK_MAX_SECONDS = 60
 // 0s 抽帧失败后的重试位置（秒）
@@ -236,6 +243,53 @@ export class ThumbnailGenerator {
   }
 
   /**
+   * round2 N3：只读解析「已存在的缩略图缓存」，用于启动期把缓存已在磁盘、但 DB 引用为 NULL
+   * 的行重新绑定引用。**不生成、不解码**——本机真实库实测 62 个 NULL 图片行里 33 行的缓存
+   * 文件本就存在，若不绑定，进入板块只能重走按需生成（并被读守卫拒绝），卡片长期停在骨架。
+   * 返回 null 表示无现成缓存，调用方不得据此触发生成（否则启动即全库解码风暴，
+   * 这正是 DEBT-026 长期未做掉的风险面）。
+   */
+  async resolveExistingThumbnail(filePath: string): Promise<string | null> {
+    if (typeof filePath !== 'string' || !path.isAbsolute(filePath)) return null
+    try {
+      // 不调 ensureCacheDir：本方法是只读判定，缓存目录不存在时应直接返回 null，
+      // 而不是在启动路径上凭空创建目录（否则「无缓存」也会产生写副作用）
+      if (!(await pathExists(filePath))) return null
+      const stats = await fsp.stat(filePath)
+      if (!stats.isFile()) return null
+
+      const fileHash = await this.getFileHash(filePath, stats)
+      const thumbnailPath = path.join(this.cacheDir, `${fileHash}.jpg`)
+      if (!(await pathExists(thumbnailPath))) return null
+
+      // LRU 记账：重绑定即一次访问，避免刚绑上的缓存被下一轮淘汰当作冷数据删掉
+      await this.loadAccessTimes()
+      this.accessTimes.set(fileHash, Date.now())
+      this.accessCounter++
+      await this.maybePersistAccessTimes()
+      return thumbnailPath
+    } catch {
+      // 只读判定失败按「无缓存」处理：不阻断启动任务，交由按需生成路径兜底
+      return null
+    }
+  }
+
+  /**
+   * round2 N4：判定源图是否「本身就是可用的低清变体」（长边 ≤ SELF_THUMBNAIL_MAX_EDGE_PX）。
+   * 只读 header（sharp.metadata 不做整图解码）；任何异常按 false 处理，保守走生成。
+   */
+  private async isSelfUsableThumbnail(filePath: string): Promise<boolean> {
+    try {
+      const meta = await sharp(filePath).metadata()
+      const width = meta.width ?? 0
+      const height = meta.height ?? 0
+      return width > 0 && height > 0 && Math.max(width, height) <= SELF_THUMBNAIL_MAX_EDGE_PX
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * T10：获取缓存统计信息（总大小 / 文件数 / 上限）
    */
   async getCacheStats(): Promise<{
@@ -352,7 +406,8 @@ export class ThumbnailGenerator {
   async generate(filePath: string, quality?: 'low' | 'standard' | 'high'): Promise<string | null> {
     // N2 批量让位（fix-thumbnail-skeleton-reveal）：主进程 generate 入口即"按需/自愈"请求
     // （后台批量在 worker 进程内部生成，不经过此入口），在途计数 >0 时通知监听方（manager →
-    // worker）让后台批量任务让位。GamePlayPhotos 早退路径同样计入（快速 settle，零解码）。
+    // worker）让后台批量任务让位。GamePlayPhotos 的早退路径（原生 LQ 命中 / 低清变体引用自身）
+    // 同样计入本计数——它们快速 settle 且零解码，但仍属于"按需请求"语义。
     this.bumpOnDemandPending(1)
     try {
       return await this.generateLocked(filePath, quality)
@@ -368,9 +423,8 @@ export class ThumbnailGenerator {
   ): Promise<string | null> {
     // GamePlayPhotos 豁免（仅图片）：该目录下的游戏照片已有游戏原生低清缩略图（同名文件位于兄弟目录
     // NikkiPhotos_LowQuality），扫描入库时 thumbnail 列已直接指向原生路径。
-    // 入口直接早退：不做任何解码/生成/写盘；用 access(R_OK) 校验推导出的原生 LQ 路径，
-    // 存在 → 返回原生路径；不存在或不可推导 → 返回 null（维持“失败返回 null”
-    // 旧语义）：绝不回退原路径、绝不触发生成——该路径下对图片禁用生成是硬性需求。
+    // 能推导出原生 LQ 且可读 → 直接早退返回原生路径，不做任何解码/生成/写盘（避免重复存储，
+    // 这是本豁免的本意）。推导不出或不可读 → 走 round2 N4 自适应分支（自身低清 / 放行生成）。
     // 视频例外（fix-gameplayphotos-video-thumbnail-null 节点2）：该目录 Videos/ 子树的视频
     // 没有原生低清缩略图，历史上被本豁免一并拦死（恒返回 null），令批量补算与重复页按需生成
     // 全部拿不到缩略图、「缓存/重复文件」板块视频纯白占位——视频必须放行走正常 seek 阶梯抽帧。
@@ -382,10 +436,16 @@ export class ThumbnailGenerator {
           await fsp.access(native, fs.constants.R_OK)
           return native
         } catch {
-          // 原生 LQ 不可读：落入下方统一返回 null（不回退原路径、不触发生成）
+          // 原生 LQ 不可读：不再吞成 null，继续走下方自适应分支（与「恒无出图入口」是两种结果）
         }
       }
-      return null
+      // round2 N4 自适应：推导不出/读不到原生 LQ 时——
+      //   源图已是低清变体（长边 ≤ SELF_THUMBNAIL_MAX_EDGE_PX）→ 引用自身，零解码；
+      //   否则（3311×1485 云照片、3840×2160 视频封面等）→ 放行走正常生成。
+      // 原实现在此处直接 return null，把 GamePlayPhotos 下所有「非 HQ 目录」的行拦死
+      // （NikkiPhotos_LowQuality / CloudPhotos / CloudPhotos\Temp / 视频封面），本机真实库
+      // 实测这类 thumbnail=NULL 行共 79 个，全部没有出图入口。
+      if (await this.isSelfUsableThumbnail(filePath)) return filePath
     }
 
     // F-S4 修复：低质量模式原直接调用 doGenerateLow 不经过 generatingLocks，
@@ -840,12 +900,14 @@ export class ThumbnailGenerator {
       }
 
       // 30 秒超时保护：超时后必须 kill 子进程，避免 ffmpeg 进程泄漏
-      const timeout = setTimeout(() => {
+      const timeout = setTimeout(async () => {
         if (settled) return
         settled = true
         command.kill('SIGKILL')
         cleanup(command)
-        void removeTempFileQuietly(tmpOutputPath)
+        // 必须 await：reject 之后调用方的 catch 无法感知这条 unlink，
+        // 半截临时文件会在 generate 返回后仍留在缓存目录里（实测泄漏 3 个/次）
+        await removeTempFileQuietly(tmpOutputPath)
         reject(new Error(t('main.thumbnail.error.ffmpegFrameTimeout')))
       }, 30000)
 
@@ -880,13 +942,15 @@ export class ThumbnailGenerator {
             reject(statErr instanceof Error ? statErr : new Error(String(statErr)))
           }
         })
-        .on('error', (err) => {
+        .on('error', async (err) => {
           if (settled) return
           settled = true
           cleanup(command)
           // spawn EFTYPE/ENOENT 等子进程错误落盘诊断（阶梯重试会吞掉末次以外的错误）
           maybeLogSpawnError('thumbnail-generator', err)
-          void removeTempFileQuietly(tmpOutputPath)
+          // 与超时分支同理：await 到清理完成再 reject，
+          // 否则 ffmpeg 每次失败的半截临时文件会逃过调用方的失败清理路径长期占盘
+          await removeTempFileQuietly(tmpOutputPath)
           reject(err)
         })
 

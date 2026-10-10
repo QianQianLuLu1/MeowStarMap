@@ -603,6 +603,52 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
   })
   await runWithConcurrency(repairTasks, THUMBNAIL_CONCURRENCY)
 
+  // ── round2 N3：缩略图引用重绑定（只绑不生成）──
+  // rowsToRepair 的三类筛选都不覆盖「图片 + thumbnail 为 NULL + 尺寸齐全」的行，
+  // 本机真实库实测这类行有 62 个。不绑定的后果：这些行进入板块只能走按需生成，
+  // 卡片在结果返回前一直停在骨架，用户侧即「每次启动/切板块都要重新等一遍」。
+  // 只做「已有缓存 → 写回引用」：resolveExistingThumbnail 不进 sharp 解码链路，
+  // 但每行仍要读源文件前 1MB 算内容 hash（**不是零 IO**），故设单次上限 2000 行、
+  // 并发沿用 THUMBNAIL_CONCURRENCY，避免启动被一遍全库 hash 拖长
+  // ——DEBT-026 长期没做掉的风险面正是这里，用只读判定 + 上限消解，而不是不做。
+  // 本机复核（round2 实施记录 §1/§12）：62 个 NULL 图片行只有 2 行的缓存落在**现行**
+  // 缓存目录（另 33 行只命中缓存目录迁盘前的旧目录，generator 不读那里，见 DEBT-031），
+  // 且这 2 行在启动批量任务收尾时已被绑上引用，副本实测本阶段重绑定 0 条——
+  // 所以本阶段是补位而非主路径：批量不选的行（GamePlayPhotos 豁免等）仍依赖它，
+  // 写回语句的 `AND thumbnail IS NULL` 保证与扫描/批量并发时只补空、不覆写已有有效值。
+  const rebindStmt = db.prepare(
+    // 与上方 updateStmt 同形用 COALESCE 守卫：即便调用方误传 null 也不会把已有有效值
+    // 覆写成空；`AND thumbnail IS NULL` 再叠一层，只填空、不与扫描/批量并发写冲突。
+    // （thumbnail-phash-service.test.ts 以源码文本守护本文件不得出现裸 `SET thumbnail =` 写法）
+    'UPDATE media_files SET thumbnail = COALESCE(?, thumbnail) WHERE id = ? AND thumbnail IS NULL'
+  )
+  const rebindCandidates = validRows.filter(
+    (row) =>
+      row.file_type === 'image' && row.thumbnail == null && row.width != null && row.height != null
+  )
+  // 单次上限：极端库（数十万行）不让启动被一遍全库 hash 拖长，余量下次启动继续
+  const MAX_REBIND_ROWS = 2000
+  let reboundCount = 0
+  await runWithConcurrency(
+    rebindCandidates.slice(0, MAX_REBIND_ROWS).map((row) => async () => {
+      try {
+        const cached = await ctx.thumbnailGen.resolveExistingThumbnail(row.file_path)
+        if (!cached) return
+        if (rebindStmt.run(cached, row.id).changes > 0) reboundCount++
+      } catch (err) {
+        // 单行失败仅告警：重绑定是可丢的优化，绝不阻断启动
+        logger.warn(`[Cleanup] 缩略图引用重绑定失败: ${row.file_path}`, err)
+      }
+    }),
+    THUMBNAIL_CONCURRENCY
+  )
+  if (rebindCandidates.length > MAX_REBIND_ROWS) {
+    logger.info(
+      `[Cleanup] 待重绑定 ${rebindCandidates.length} 行超过单次上限 ${MAX_REBIND_ROWS}，` +
+        `本次只处理前 ${MAX_REBIND_ROWS} 行（其中绑定 ${reboundCount} 行），余量下次启动继续`
+    )
+  }
+
   // ── 视频纯白缩略图存量自愈（fix-video-thumbnail-white-frame 收尾）──
   // seek 阶梯已阻止新白帧，但历史落盘的纯白 ${hash}.jpg 从未被触发重建：
   // 批量任务只选 thumbnail IS NULL、渲染层 generate() 被 HIGH_DPI/!thumbnail 门控、
@@ -638,9 +684,10 @@ export async function cleanupAndRepairDatabase(ctx: AppContext): Promise<void> {
   // 渲染层 revalidate 即可拿到新字节；此前"自愈后清空整个会话缓存"的补救会一次性失效
   // 全部已缓存资源（原图/视频一并重拉），造成启动后请求风暴，故移除。
 
-  if (missingCount > 0 || repairedCount > 0 || healedBlankCount > 0) {
+  if (missingCount > 0 || repairedCount > 0 || healedBlankCount > 0 || reboundCount > 0) {
     logger.info(
-      `[Cleanup] 标记 ${missingCount} 条缺失记录，修复 ${repairedCount} 条缩略图记录，自愈 ${healedBlankCount} 张纯白视频缩略图`
+      `[Cleanup] 标记 ${missingCount} 条缺失记录，修复 ${repairedCount} 条缩略图记录，` +
+        `重绑定 ${reboundCount} 条已有缓存引用，自愈 ${healedBlankCount} 张纯白视频缩略图`
     )
     sendToRenderer(ctx, 'media:updated')
   }

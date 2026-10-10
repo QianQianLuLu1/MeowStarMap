@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-04",
+  "updatedAt": "2026-10-10",
   "items": [
     {
       "id": "DEBT-001",
@@ -247,10 +247,10 @@
       "id": "DEBT-020",
       "category": "supply-chain",
       "section": 9,
-      "status": "open",
+      "status": "done",
       "priority": "high",
       "title": "electron 40.10.6 高危通告堆积（5 High + 1 Medium）",
-      "description": "修复需跨大版本升级（最小清除 41.10.6，推荐 44.5.1 / 43.7.6）；升级完成前 CI Security audit 持续红灯。明细见 docs/plans/2026-09-30-electron-40-eol-security-upgrade.md",
+      "description": "已由 2026-10 依赖升级关闭：devDependencies.electron 40.10.6 → 41.10.6（本债务原文即写明「最小清除 41.10.6」），40.x 分支 EOL 与依附其上的高危通告随之清除。关闭证据（2026-10-10 实测 npm run audit 的输出分流）：audit-ci 把仍命中的豁免项列在「Found vulnerable allowlisted advisories」（10 项：tar 链 9 + sigstore 1），把清单里已不再命中的列在「Consider not allowlisting advisories」——electron GHSA-9f4c-93c8-jc8g、vitest GHSA-5xrq-8626-4rwp、vite GHSA-fx2h-pf6j-xcff 与 2026-09 批次 15 项全部落在后者，即已被本次升级清除；本次唯一未豁免的 high 是新披露的 braces GHSA-vfj7-8cjw-p6xm（另记 DEBT-034）。遗留清理：audit-ci.jsonc 的 allowlist 因此残留约 18 个已失效豁免，删除它们属收紧闸门、方向安全，但应与 braces 项一并单独一轮处理，不与本轮缩略图任务混装。原计划见 docs/plans/2026-09-30-electron-40-eol-security-upgrade.md",
       "files": ["package.json", "package-lock.json", "audit-ci.jsonc"],
       "lines": [],
       "issue": false
@@ -319,11 +319,11 @@
       "id": "DEBT-026",
       "category": "startup",
       "section": 10,
-      "status": "open",
+      "status": "done",
       "priority": "low",
       "title": "启动修复未覆盖「图片 thumbnail NULL 且尺寸齐全」行",
-      "description": "N2 写库闭环即可，避免启动 IO 峰值；该行何时被浏览何时生成并持久化",
-      "files": [],
+      "description": "已由 round2 N3 关闭：startup-tasks 增加「只绑不生成」的重绑定阶段（resolveExistingThumbnail 纯存在性判定，零解码，单次上限 2000 行）。本机复核：62 个 NULL 图片行里只有 2 行命中现行缓存目录（另 33 行只命中缓存目录搬迁前遗留的旧目录，见 DEBT-031），且批量任务在扫描收尾时已把这 2 行绑上，副本实测本阶段重绑定 0 条——定位是补位（覆盖批量不选的 GamePlayPhotos 豁免行等），不是主路径。原「避免启动 IO 峰值」的顾虑由只读判定 + 上限消解",
+      "files": ["src/main/app/startup-tasks.ts", "src/main/thumbnail/generator.ts"],
       "lines": [],
       "issue": false
     },
@@ -385,6 +385,54 @@
         "src/renderer/components/common/SliderControl.test.tsx"
       ],
       "lines": [1],
+      "issue": false
+    },
+    {
+      "id": "DEBT-031",
+      "category": "cache",
+      "section": 10,
+      "status": "open",
+      "priority": "medium",
+      "title": "缓存目录迁盘只搬 metadata.json，历史缩略图整体留在旧目录",
+      "description": "applyCustomDir 对 thumbnailCacheDir 的迁移模式是 /metadata\\.json$/i（src/main/app/custom-dirs.ts:43），把缓存目录迁到别的盘时只搬 LRU 元数据，不搬 <hash>.jpg。本机实测：旧目录 %APPDATA%\\wxnn-photo-manager\\thumbnails 残留 1384 个文件，现行目录 D:\\NikkiGallery缓存 只有 149 个；62 个 thumbnail NULL 的图片行里 33 行只在旧目录有缓存、仅 2 行命中现行目录。后果：迁盘等价全库缓存清零，这些行每次进入板块都要重生成，而旧目录既不被 generator 读取、也不被孤儿清理扫到（清理只扫现行 cacheDir），1GB 级残留永久占盘。修法待定：迁移模式加入 /\\.jpg$/i（需评估大目录搬迁的启动耗时与中断安全）或改为读取时回退探测旧目录，二者都会改变缩略图缓存语义，须单独一轮做",
+      "files": ["src/main/app/custom-dirs.ts", "src/main/utils/dir-manager.ts"],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-032",
+      "category": "coverage",
+      "section": 10,
+      "status": "open",
+      "priority": "high",
+      "title": "Vitest 5 覆盖率口径修正使门控由过转不过，阈值需重新基线",
+      "description": "现象：npm run test:coverage 在 HEAD（Vitest 1.6）为 statements 69.94 / branches 81.43 / functions 68.55 / lines 69.94，恰好达到 vitest.config.ts 的 69/80/68/69；升级到 Vitest 5 + Vite 6 后（同一套测试、同样 39 个目录分组、334 文件 5268 例全通过、零 skip）实测 64.65 / 55.67 / 57.12 / 66.21，四项全不达标。根因是测量口径被修正而非测试变差：旧 v8 provider 把「从未被调用的箭头函数体」计入其所在语句并判为已覆盖，新 provider 将其拆为独立语句如实计未覆盖。文件级对照证据（src/main/preload/api/app.ts，一个导出 8 个未调用箭头的模块）——旧：app.ts | Stmts 100 | Branch 100 | Funcs 0 | Lines 100 | 未覆盖列为空（函数一个没调用却语句全绿，自相矛盾）；新：app.ts | 12.5 | 100 | 0 | 12.5 | 7-19（7-19 正是那些箭头体）。同目录 main/preload/api 的 Funcs 两侧同为 0.54，只有 Stmts 从 73.9 降到 14.62。受影响最大的目录：main/preload/api -59.28、renderer/i18n -46.26、main/i18n -45.85、main/scheduler -31.51、renderer/stores -22.65、main/preload -18.00。影响：CI build.yml 的 coverage job 失败会 needs 阻断 build/发布 job，即发布流水线当前被这一项卡住。待决策（本轮未做，因改阈值需产品级同意）：① 按新口径重新取基线并更新 thresholds（同时修订本文件注释里那句「基于 2026-10 基线」的出处）；② 或给这些薄封装模块补真实调用测试把数字做上去。禁止的做法：为凑数把 provider 换回 istanbul 或扩大 exclude",
+      "files": ["vitest.config.ts", ".github/workflows/build.yml"],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-033",
+      "category": "robustness",
+      "section": 10,
+      "status": "open",
+      "priority": "medium",
+      "title": "media-worker 抽帧失败清理未 await，与 generator 同形缺陷（后者已修）",
+      "description": "src/main/media-worker/worker-entry.ts:362（30s 超时分支）与 :400（fluent-ffmpeg error 分支）用 `void removeTempFileQuietly(tmpOutputPath)` 发后不理，reject 与 unlink 并发，调用方的失败清理路径感知不到这条 Promise——每次抽帧失败都会在缩略图缓存目录留下一个 `.xxx.jpg.tmp-<pid>-<rand>` 半截文件。同一缺陷在 src/main/thumbnail/generator.ts 的单文件路径已于 2026-10-10 审查轮修复（改为 await 后再 reject，回归测试 src/main/thumbnail/generator.test.ts「契约：ffmpeg error 的临时文件清理必须在 generate 落定前完成」；改前实测一次抽帧阶梯泄漏 3 个临时文件）。本文件属批量路径（一次扫描可失败数百张），泄漏量级更大，且 media-worker 不在本轮缩略图加载任务的改动面内、无失败信号，故按最小改动原则未顺手改。修法与 generator 侧一致（两处 void → await），并复用同一条 fsp.unlink 延迟技巧写红测试：推迟「真实删除」本身而不是删除完成后，否则未 await 的泄漏在断言时已被异步清掉、测试恒绿",
+      "files": ["src/main/media-worker/worker-entry.ts"],
+      "lines": [362, 400],
+      "issue": false
+    },
+    {
+      "id": "DEBT-034",
+      "category": "supply-chain",
+      "section": 10,
+      "status": "open",
+      "priority": "medium",
+      "title": "braces 新高危披露 GHSA-vfj7-8cjw-p6xm 无修复版本，npm run audit 转红",
+      "description": "2026-10-10 审查轮首次在新 toolchain 下复跑 npm run audit（上一轮门禁表漏了这项，CI build.yml 的 lint-typecheck job 含该步）：audit-ci 以 high 级失败，唯一未豁免项是 GHSA-vfj7-8cjw-p6xm，命中 braces@3.0.3 的 7 条传递路径（@babel/cli>chokidar、cz-conventional-changelog>commitizen>find-node-modules>findup-sync>micromatch、fast-glob>micromatch、lint-staged>micromatch、micromatch、tailwindcss>chokidar、vite-plugin-singlefile>micromatch）。归因：**不是本轮或依赖升级引入**——package-lock 在 HEAD 与工作区同为 braces@3.0.3，且 npm view braces dist-tags 显示 latest 就是 3.0.3（无 4.x 可升），上游未出修复。当前处置：不改 audit-ci.jsonc（把新披露项加进豁免清单属放宽安全闸门，需单独授权），因此 npm run audit 保持红。可选修法：① 等上游（micromatch/chokidar/fast-glob 链条）抬到已修版本后 npm update；② 或经授权后按既有 dev 工具链豁免口径加入 allowlist 并在 audit-ci.jsonc 的注释块续写理由与跟踪责任",
+      "files": ["audit-ci.jsonc", "package-lock.json"],
+      "lines": [],
       "issue": false
     }
   ]

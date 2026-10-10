@@ -12,6 +12,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import fs from 'fs'
+import fsp from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import crypto from 'crypto'
@@ -404,9 +405,11 @@ describe('ThumbnailGenerator GamePlayPhotos 原生缩略图豁免', () => {
     expect(fs.readdirSync(tmpCacheDir).filter((n) => n.endsWith('.jpg'))).toHaveLength(0)
   })
 
-  it('GamePlayPhotos HQ 路径但原生 LQ 缺失 → 早退返回 null（不生成、不回退原路径）', async () => {
-    // LQ 文件故意不创建：评审修正后的早退语义——原生缩略图失效时返回 null
-    // （维持“失败返回 null”旧语义），绝不回退原路径、绝不触发常规生成流程
+  it('GamePlayPhotos HQ 路径但原生 LQ 缺失 → 转入自适应分支，源文件也不存在时仍返回 null', async () => {
+    // 改前语义「推导不出原生 LQ 即 return null、绝不生成」已放宽（round2 N4）：本机真实库里
+    // GamePlayPhotos 下「非 HQ 目录」的行（NikkiPhotos_LowQuality / CloudPhotos / 视频封面等）
+    // 共 79 行因此恒无出图入口。现改为「读不到原生 LQ → 探测自身尺寸 → 低清引用自身 / 否则生成」。
+    // 本例连源文件都不存在：允许发生一次 header 探测，但生成阶段被 pathExists 拦下 → 仍 null、仍零落盘。
     const hqPath = path.join(
       tmpCacheDir,
       'X6Game',
@@ -418,10 +421,10 @@ describe('ThumbnailGenerator GamePlayPhotos 原生缩略图豁免', () => {
     )
     const result = await gen.generate(hqPath)
     expect(result).toBeNull()
-    // 同样零解码/零写盘：不回退到常规生成流程（该路径禁用生成是硬性需求）
-    expect(ctl.sharpCalls).toHaveLength(0)
+    // 不抽帧、不落任何缓存文件（header 探测不算解码，toFileTargets 才是生成证据）
     expect(ctl.seeks).toHaveLength(0)
     expect(ctl.written).toHaveLength(0)
+    expect(ctl.toFileTargets).toHaveLength(0)
   })
 
   it('GamePlayPhotos 视频子目录 → 不适用图片豁免，走正常 seek 阶梯抽帧生成（fix-gameplayphotos-video-thumbnail-null 节点2）', async () => {
@@ -549,6 +552,32 @@ describe('ThumbnailGenerator 原子落盘（N2）', () => {
     expect(result).toBeNull()
     expect(fs.existsSync(path.join(tmpCacheDir, `${hashOf(buf)}.jpg`))).toBe(false)
     expect(noTmpResidue()).toHaveLength(0)
+  })
+
+  it('契约：ffmpeg error 的临时文件清理必须在 generate 落定前完成（不得 fire-and-forget）', async () => {
+    // 上一条用例只断言「最终不残留」，删掉 unlink 的 await 仍能靠调度侥幸通过（本机实测
+    // 间歇性失败）：generator 的 'error' / 超时分支历史上写成 `void removeTempFileQuietly(...)`，
+    // reject 与 unlink 并发，generate 返回时临时文件可能仍在缓存目录里，
+    // 由 enforceCacheLimit / getCacheStats / 启动孤儿清理按「缓存目录内的多余文件」承担后果。
+    // 这里把 unlink 的真实删除照常执行、只在其后追加一个宏任务延迟，使「清理未被 await」必然可见。
+    resetCtl('partialThenFail')
+    const src = path.join(tmpCacheDir, 'torn2.mp4')
+    fs.writeFileSync(src, Buffer.alloc(1024, 0x00))
+
+    const realUnlink = fsp.unlink
+    const spy = vi.spyOn(fsp, 'unlink').mockImplementation(async (target) => {
+      // 推迟「真实删除」本身：清理若未被 await，generate 返回时半截临时文件必然还在
+      await new Promise<void>((resolve) => setTimeout(resolve, 30))
+      await realUnlink(target)
+    })
+
+    try {
+      const result = await gen.generate(src)
+      expect(result).toBeNull()
+      expect(noTmpResidue()).toHaveLength(0)
+    } finally {
+      spy.mockRestore()
+    }
   })
 
   it('正常：视频成功路径 ffmpeg 输出 .tmp- 临时文件后原子替换', async () => {
