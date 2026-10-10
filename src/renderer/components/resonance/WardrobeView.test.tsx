@@ -200,6 +200,49 @@ describe('WardrobeView', () => {
     })
   })
 
+  it('从共鸣笔记导入：按 suit_list 展开部件，跳过已拥有项后写入衣橱', async () => {
+    const openFile = vi.fn(() => Promise.resolve('C:\\notebook.json'))
+    const readImportFile = vi.fn(() =>
+      Promise.resolve({
+        content: JSON.stringify({ info_from_self: { suit_list: ['11', 11, 999] } }),
+        sizeBytes: 40
+      })
+    )
+    ;(window as unknown as { electronAPI?: unknown }).electronAPI = {
+      resonance: { updateWardrobe: updateWardrobeMock, readImportFile },
+      dialog: { openFile }
+    }
+
+    render(<WardrobeView />)
+    fireEvent.click(await screen.findByRole('button', { name: '从共鸣笔记导入' }))
+
+    await vi.waitFor(() => expect(updateWardrobeMock).toHaveBeenCalledTimes(1))
+    const [adds, removes] = updateWardrobeMock.mock.calls[0]! as unknown as [
+      Array<{ category: string; itemId: number }>,
+      unknown[]
+    ]
+    // 套装 11 的部件 101 已拥有 → 只补 102；未知套装 999 与重复 id 被丢弃
+    expect(adds).toEqual([{ category: 'item', itemId: 102 }])
+    expect(removes).toEqual([])
+  })
+
+  it('从共鸣笔记导入：笔记无 suit_list 时不写入并提示', async () => {
+    const openFile = vi.fn(() => Promise.resolve('C:\\notebook.json'))
+    const readImportFile = vi.fn(() =>
+      Promise.resolve({ content: JSON.stringify({ info_from_self: {} }), sizeBytes: 20 })
+    )
+    ;(window as unknown as { electronAPI?: unknown }).electronAPI = {
+      resonance: { updateWardrobe: updateWardrobeMock, readImportFile },
+      dialog: { openFile }
+    }
+
+    render(<WardrobeView />)
+    fireEvent.click(await screen.findByRole('button', { name: '从共鸣笔记导入' }))
+
+    await vi.waitFor(() => expect(readImportFile).toHaveBeenCalledTimes(1))
+    expect(updateWardrobeMock).not.toHaveBeenCalled()
+  })
+
   it('推断确认框：无记录时确认不产生写入', async () => {
     render(<WardrobeView />)
     await screen.findByText('测试套装')

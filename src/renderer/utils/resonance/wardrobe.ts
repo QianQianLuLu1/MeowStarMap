@@ -249,6 +249,40 @@ export const mergeProcessedBannerSources = (
   return merged
 }
 
+/**
+ * 共鸣笔记（Pearpal）suit_list → 衣柜部件 itemId 列表。
+ * 逻辑复用自 gongeo.us-nikki-tracker 的 shared/utils/pearpalWardrobe.ts（MIT, dastrokes）。
+ *
+ * 与源实现差异：宿主目录索引不含 outfitById，改以「outfitItemsById 是否登记该套装」作存在性
+ * 判据——上游对已登记但无部件的集合同样返回空集，两者输出等价。
+ * 入参来自外部 JSON，故按 unknown 逐项收敛：非安全整数与未知套装一律跳过。
+ */
+export const getPearpalCompletedOutfitItemIds = (
+  suitIds: readonly unknown[],
+  index: {
+    itemById: ReadonlyMap<number, unknown>
+    outfitItemsById: ReadonlyMap<number, readonly number[]>
+  }
+): number[] => {
+  const itemIds = new Set<number>()
+
+  for (const rawSuitId of suitIds) {
+    const suitId =
+      typeof rawSuitId === 'number'
+        ? rawSuitId
+        : typeof rawSuitId === 'string' && /^\d+$/.test(rawSuitId)
+          ? Number(rawSuitId)
+          : Number.NaN
+    if (!Number.isSafeInteger(suitId) || !index.outfitItemsById.has(suitId)) continue
+
+    for (const itemId of index.outfitItemsById.get(suitId) ?? []) {
+      if (index.itemById.has(itemId)) itemIds.add(itemId)
+    }
+  }
+
+  return [...itemIds]
+}
+
 export const inferWardrobeIdsFromTracker = ({
   processedBanners,
   evoData,

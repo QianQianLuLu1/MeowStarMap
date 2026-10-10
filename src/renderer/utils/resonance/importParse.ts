@@ -361,3 +361,38 @@ export function countImportDiff(
 
   return { added, duplicate }
 }
+
+/**
+ * 从共鸣笔记（Pearpal notebook）JSON 文本提取 `info_from_self.suit_list`。
+ * 对应上游 65bb3d8f 在 shared/types/api.ts 新增的可选 suit_list 字段。
+ *
+ * 与导入主解析器的严格风格不同：笔记文件是外部产物、结构不受我们控制，
+ * 因此形态不符时一律返回空数组（由调用方决定提示文案），不抛异常。
+ */
+export function parsePearpalSuitIdsFromText(text: string): number[] {
+  let json: unknown
+  try {
+    json = JSON.parse(text)
+  } catch {
+    return []
+  }
+  if (!json || typeof json !== 'object' || Array.isArray(json)) return []
+
+  const suitList = (json as { info_from_self?: { suit_list?: unknown } }).info_from_self?.suit_list
+  if (!Array.isArray(suitList)) return []
+
+  const ids: number[] = []
+  const seen = new Set<number>()
+  for (const raw of suitList) {
+    const id =
+      typeof raw === 'number'
+        ? raw
+        : typeof raw === 'string' && /^\d+$/.test(raw)
+          ? Number(raw)
+          : Number.NaN
+    if (!Number.isSafeInteger(id) || id <= 0 || seen.has(id)) continue
+    seen.add(id)
+    ids.push(id)
+  }
+  return ids
+}

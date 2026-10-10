@@ -3,6 +3,7 @@ import {
   createEmptyWardrobeData,
   createWardrobeSummary,
   getBannerOutfitVariantLevels,
+  getPearpalCompletedOutfitItemIds,
   getWardrobeSetProgress,
   inferWardrobeIdsFromTracker,
   normalizeWardrobeData,
@@ -250,6 +251,50 @@ function padTime(i: number): string {
   const minute = String(i % 60).padStart(2, '0')
   return `2025-01-${day} ${hour}:${minute}:00`
 }
+
+describe('getPearpalCompletedOutfitItemIds（共鸣笔记 suit_list → 衣柜部件）', () => {
+  const index = {
+    itemById: new Map<number, unknown>([
+      [1020000001, { id: 1020000001 }],
+      [1020100001, { id: 1020100001 }],
+      [2020000002, { id: 2020000002 }]
+    ]),
+    outfitItemsById: new Map<number, readonly number[]>([
+      [10001, [1020000001, 1020100001]],
+      [10002, [2020000002, 9999999999]],
+      [10003, []]
+    ])
+  }
+
+  it('正常：命中套装时展开其部件，并剔除目录中不存在的部件', () => {
+    expect(getPearpalCompletedOutfitItemIds([10001], index)).toEqual([1020000001, 1020100001])
+    expect(getPearpalCompletedOutfitItemIds(['10002'], index)).toEqual([2020000002])
+  })
+
+  it('跨套装部件去重（同一部件只出现一次）', () => {
+    const shared = {
+      itemById: new Map<number, unknown>([
+        [1, {}],
+        [2, {}]
+      ]),
+      outfitItemsById: new Map<number, readonly number[]>([
+        [100, [1, 2]],
+        [200, [2, 1]]
+      ])
+    }
+    const ids = getPearpalCompletedOutfitItemIds([100, 200], shared)
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  it('异常与边界：未知 suit、非安全整数、非数字、空数组一律跳过', () => {
+    expect(getPearpalCompletedOutfitItemIds([], index)).toEqual([])
+    expect(getPearpalCompletedOutfitItemIds([999999], index)).toEqual([])
+    expect(getPearpalCompletedOutfitItemIds([1.5, 'abc', null], index)).toEqual([])
+    // 已知套装但无部件映射 → 空
+    expect(getPearpalCompletedOutfitItemIds([10003], index)).toEqual([])
+  })
+})
 
 describe('createWardrobeSummary 汇总', () => {
   const index: WardrobeSummaryCatalogIndex = {

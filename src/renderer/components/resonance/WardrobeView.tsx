@@ -26,11 +26,13 @@ import type {
   PropCatalogEntry
 } from '../../utils/resonance/catalogCompactFormat'
 import {
+  getPearpalCompletedOutfitItemIds,
   getWardrobeSetProgress,
   inferWardrobeIdsFromTracker,
   type WardrobeOutfitStatus,
   type WardrobeTrackerCatalogIndex
 } from '../../utils/resonance/wardrobe'
+import { parsePearpalSuitIdsFromText } from '../../utils/resonance/importParse'
 import type { EvoRecord, ProcessedBanner } from '../../utils/resonance/types'
 
 /**
@@ -118,6 +120,7 @@ export const WardrobeView: React.FC = () => {
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
   const [inferOpen, setInferOpen] = useState(false)
   const [inferBusy, setInferBusy] = useState(false)
+  const [pearpalBusy, setPearpalBusy] = useState(false)
 
   // 图鉴目录懒加载（损坏/缺失降级提示，不崩溃）；名称包跟随界面语言
   useEffect(() => {
@@ -487,6 +490,57 @@ export const WardrobeView: React.FC = () => {
     }
   }
 
+  /**
+   * 从共鸣笔记（Pearpal notebook）导入「已完成套装」的部件为已拥有。
+   * 对应上游 65bb3d8f 的 import.vue wardrobe ownership 分支（info_from_self.suit_list）；
+   * 复用既有 resonance:readImportFile 与 resonance:updateWardrobe 通道，零新增 IPC、零联网。
+   */
+  const handlePearpalImport = async (): Promise<void> => {
+    if (pearpalBusy || !catalog) return
+    let filePath: string | null = null
+    try {
+      filePath =
+        (await window.electronAPI?.dialog?.openFile({
+          properties: ['openFile'],
+          filters: [{ name: 'JSON', extensions: ['json'] }]
+        })) ?? null
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : String(error), 'error')
+      return
+    }
+    if (!filePath) return
+
+    setPearpalBusy(true)
+    try {
+      const file = await window.electronAPI?.resonance?.readImportFile(filePath)
+      const suitIds = parsePearpalSuitIdsFromText(file?.content ?? '')
+      if (suitIds.length === 0) {
+        showMessage(t('resonance.wardrobe.pearpalImportNothing'), 'error')
+        return
+      }
+      const itemIds = getPearpalCompletedOutfitItemIds(suitIds, {
+        itemById: new Map(
+          asEntryArray<CatalogItemEntry>(catalog.items).map((entry) => [entry.id, entry])
+        ),
+        outfitItemsById: new Map(
+          Object.entries(catalog.outfitItems).map(([id, ids]) => [Number(id), ids])
+        )
+      })
+      const owned = new Set(useResonanceStore.getState().wardrobe.ownedItemIds)
+      const adds = itemIds
+        .filter((itemId) => owned.has(itemId) === false)
+        .map((itemId) => ({ category: 'item' as const, itemId }))
+      for (let offset = 0; offset < adds.length; offset += MAX_WARDROBE_BATCH) {
+        await updateWardrobeItems(adds.slice(offset, offset + MAX_WARDROBE_BATCH), [])
+      }
+      showMessage(t('resonance.wardrobe.pearpalImportDone', { count: adds.length }), 'success')
+    } catch (error) {
+      showMessage(error instanceof Error ? error.message : String(error), 'error')
+    } finally {
+      setPearpalBusy(false)
+    }
+  }
+
   // ============ 渲染 ============
 
   const isFlatCategory = category === 'momo' || category === 'prop'
@@ -742,6 +796,16 @@ export const WardrobeView: React.FC = () => {
             disabled={inferBusy}
           >
             {t('resonance.wardrobe.inferButton')}
+          </button>
+        )}
+        {catalog && category !== 'eureka_color' && (
+          <button
+            type="button"
+            className="btn-secondary flex-shrink-0"
+            onClick={() => void handlePearpalImport()}
+            disabled={pearpalBusy}
+          >
+            {t('resonance.wardrobe.pearpalImportButton')}
           </button>
         )}
       </div>

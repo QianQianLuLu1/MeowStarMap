@@ -3,7 +3,8 @@ import {
   ImportStructureError,
   countImportDiff,
   normalizeImportTimestamp,
-  parseImportFileText
+  parseImportFileText,
+  parsePearpalSuitIdsFromText
 } from './importParse'
 import type {
   ResonanceEditRow,
@@ -216,5 +217,36 @@ describe('bannerWishlist 段解析（同步上游 65bb3d8f）', () => {
         ImportStructureError
       )
     }
+  })
+})
+
+describe('parsePearpalSuitIdsFromText（共鸣笔记 suit_list 提取）', () => {
+  it('正常：取 info_from_self.suit_list，字符串与数字混用均可', () => {
+    const text = JSON.stringify({ info_from_self: { suit_list: ['10399', 10347] } })
+    expect(parsePearpalSuitIdsFromText(text)).toEqual([10399, 10347])
+  })
+
+  it('异常：非 JSON / 非对象 / 缺字段 / suit_list 非数组 → 空数组且不抛', () => {
+    expect(parsePearpalSuitIdsFromText('{not-json')).toEqual([])
+    expect(parsePearpalSuitIdsFromText('[1,2]')).toEqual([])
+    expect(parsePearpalSuitIdsFromText('{}')).toEqual([])
+    expect(parsePearpalSuitIdsFromText(JSON.stringify({ info_from_self: {} }))).toEqual([])
+    expect(
+      parsePearpalSuitIdsFromText(JSON.stringify({ info_from_self: { suit_list: 'x' } }))
+    ).toEqual([])
+    expect(parsePearpalSuitIdsFromText('')).toEqual([])
+  })
+
+  it('边界：过滤非安全整数与非数字元素并去重，保持出现顺序', () => {
+    const text = JSON.stringify({
+      info_from_self: { suit_list: ['10399', 10399, 1.5, 'abc', null, 10347, '', '9e999'] }
+    })
+    expect(parsePearpalSuitIdsFromText(text)).toEqual([10399, 10347])
+  })
+
+  it('边界：空 suit_list 返回空数组', () => {
+    expect(
+      parsePearpalSuitIdsFromText(JSON.stringify({ info_from_self: { suit_list: [] } }))
+    ).toEqual([])
   })
 })
