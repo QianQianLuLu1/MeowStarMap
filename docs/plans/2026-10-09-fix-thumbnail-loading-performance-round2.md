@@ -588,3 +588,18 @@ HEAD  Vitest 1.6：  app.ts | Stmts 100 | Branch 100 | Funcs 0 | Lines 100 | 未
 | `npm run test:coverage` | **✗ exit 1** | 用例全过但四项阈值未达（口径修正所致，DEBT-032 / §15）                                 |
 
 两项红一律**如实登记、不消音**：不降阈值、不加 exclude、不加安全豁免、不跳用例。按第五节一票否决，本轮任务在这两项门禁上判定为未完成。
+
+**提交与打包态实测（2026-10-10，接上表）**
+
+| 项                                          | 结果         | 实测明细                                                                                                                                                                                                              |
+| ------------------------------------------- | ------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 分关注点提交                                | ✓ 5 个提交   | `fd81fef` build(deps) / `137703f` fix(thumbnail) / `6111122` perf(thumbnail) / `084d3ef` perf(renderer) / `f5ec605` test(e2e)，合计 74 个文件全部入库，提交后 `git status --porcelain` 为空                           |
+| `.husky/pre-commit`（每个提交）             | ✓ 全部通过   | lint-staged（`eslint --fix` + `prettier --write` + `test:precommit`）→ core-path-gate（识别 1 个受保护文件并放行）→ `tsc -b`                                                                                          |
+| `npm run dist:win`                          | ✓ exit 0     | build（178 + 35 + 888 modules）→ pre-dist-check + check-doc-versions → electron-builder NSIS win x64 → verify:dist（asar 内 sharp 0.35.5 / libvips / koffi 与 4 个 VC++ 运行库齐备，管理员清单 `asInvoker` 闸门通过） |
+| 产物                                        | ✓ 版本 2.5.3 | `release/NikkiGallery-Setup-2.5.3.exe`（182,181,821 B，2026-10-10 15:02 重建，覆盖同名旧产物）+ `.blockmap` + `latest.yml`（`version: 2.5.3`）                                                                        |
+| `npm run e2e:smoke`                         | ✓ exit 0     | 9 passed（打包态、临时 userData；同时反证 B3：perf-real 被收集但整节 skip，不再拖垮收集期）                                                                                                                           |
+| `PERF_DATASET_IMAGES=1500 npm run e2e:perf` | ✓ exit 0     | 10 passed（P1~P10，含本轮新增的 `thumbnail-generate-p95` 3ms 与 `first-thumbnail-visible` 硬阈值）                                                                                                                    |
+| `npm run test:coverage`（提交后复跑）       | **✗ exit 1** | 334 files / 5269 tests 全通过，`64.65 / 55.67 / 57.12 / 66.21` 仍低于 `69/80/68/69`（口径修正，DEBT-032 / §15）                                                                                                       |
+| `npm run audit`                             | **✗ exit 1** | 唯一未豁免 high = `braces` GHSA-vfj7-8cjw-p6xm；`braces@3.0.3` 在 HEAD 与工作区一致且 `npm view braces dist-tags` 显示 latest 即 3.0.3（DEBT-034，未加豁免）                                                          |
+
+版本号核查（用户要求「设定为 2.5.3」）：`package.json:3`、`package-lock.json:3/9`、`README.md:9` 徽章、`AGENTS.md:7`、`CHANGELOG.md` 的 `## [2.5.3] - 2026-10-01` 五处**在审查前就已全部是 2.5.3**，无可修改对象；按「保持 2.5.3」执行，仅把本批两类改动补进 `CHANGELOG.md` 的 `[Unreleased]`（2.5.3 段落与日期不动，仓库无任何 git tag，也未新增 tag）。
