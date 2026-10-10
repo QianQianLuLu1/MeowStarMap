@@ -13,10 +13,29 @@ import {
 } from './staticData'
 
 describe('卡池/套装静态数据（静态 import，始终可用）', () => {
-  it('卡池快照完整（73 个卡池）', () => {
-    expect(Object.keys(BANNER_DATA).length).toBeGreaterThanOrEqual(73)
+  it('卡池快照已同步上游 2.10.1（77 个卡池）', () => {
+    expect(Object.keys(BANNER_DATA).length).toBeGreaterThanOrEqual(77)
     expect(BANNER_DATA['1']?.bannerType).toBe(1)
-    expect(BANNER_DATA['73']).toBeDefined()
+    for (const id of ['74', '75', '76', '77']) {
+      expect(BANNER_DATA[id]).toBeDefined()
+    }
+    // 74/75 为 2.9.2 深眠池：type3、无 5 星、带奖励物品
+    expect(BANNER_DATA['74']?.bannerType).toBe(3)
+    expect(BANNER_DATA['74']?.outfit5StarId.length).toBe(0)
+    expect(BANNER_DATA['74']?.rewardIds?.length).toBeGreaterThan(0)
+    // 76/77 为 2.10.1 限定池：type2
+    expect(BANNER_DATA['76']?.bannerType).toBe(2)
+    expect(BANNER_DATA['76']?.outfit5StarId).toContain('10399')
+  })
+  it('卡池 30 含 2.10.2 复刻档期（记录页取末档展示版本）', () => {
+    const runs = BANNER_DATA['30']!.runs
+    expect(runs.length).toBeGreaterThanOrEqual(2)
+    expect(runs[runs.length - 1]!.version).toBe('2.10.2')
+  })
+  it('2.10.1 新套装部件表可查', () => {
+    for (const outfitId of ['10343', '10347', '10394', '10398', '10399', '10430']) {
+      expect(OUTFIT_ITEMS[outfitId]?.length).toBeGreaterThan(0)
+    }
   })
   it('套装映射可查', () => {
     const banner1 = BANNER_DATA['1']!
@@ -78,6 +97,14 @@ describe('卡池缩略图（本地静态资源）', () => {
     }
     expect(getBannerThumbnailUrl(999999)).toBeNull()
   })
+  it('2.10.1 新增卡池 74-77 有本地图内缩略图', () => {
+    for (const bannerId of [74, 75, 76, 77]) {
+      const url = getBannerThumbnailUrl(bannerId)
+      expect(url).not.toBeNull()
+      expect(url!.startsWith('http://')).toBe(false)
+      expect(url!.startsWith('https://')).toBe(false)
+    }
+  })
 })
 
 describe('百分位快照与元数据', () => {
@@ -92,5 +119,11 @@ describe('百分位快照与元数据', () => {
     expect(meta).not.toBeNull()
     expect(meta!.source).toBe('gongeo.us-nikki-tracker')
     expect(meta!.sourceLicense).toBe('MIT')
+  })
+  it('元数据锚定上游 2.10.1 快照', async () => {
+    const meta = await loadSnapshotMeta()
+    expect(meta!.gameVersion).toBe('2.10.1')
+    // 漂移守卫：latestBannerId 必须与卡池全集最大值一致（生成器半跑时会失配）
+    expect(meta!.latestBannerId).toBe(Math.max(...Object.keys(BANNER_DATA).map((id) => Number(id))))
   })
 })

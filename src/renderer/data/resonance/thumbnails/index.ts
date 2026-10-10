@@ -74,6 +74,10 @@ import thumb70 from './70.png'
 import thumb71 from './71.png'
 import thumb72 from './72.png'
 import thumb73 from './73.png'
+import thumb74 from './74.png'
+import thumb75 from './75.png'
+import thumb76 from './76.png'
+import thumb77 from './77.png'
 
 export const BANNER_THUMBNAIL_URLS: Readonly<Record<string, string>> = {
   '1': thumb1,
@@ -149,4 +153,8 @@ export const BANNER_THUMBNAIL_URLS: Readonly<Record<string, string>> = {
   '71': thumb71,
   '72': thumb72,
   '73': thumb73,
+  '74': thumb74,
+  '75': thumb75,
+  '76': thumb76,
+  '77': thumb77,
 }
