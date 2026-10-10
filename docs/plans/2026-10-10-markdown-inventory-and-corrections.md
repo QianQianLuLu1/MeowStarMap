@@ -18,22 +18,22 @@
 
 ### 2.1 本轮依据的实测真值（全部由命令取得，非推断）
 
-| 项                           | 真值                                                                 | 取得方式                                                                        |
-| ---------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| 应用版本                     | `2.5.3`                                                              | `package.json` `version`                                                        |
-| Node 引擎下限                | `>=22.12.0`                                                          | `package.json` `engines.node`                                                   |
-| `.node-version`              | `22`                                                                 | 直接读取                                                                        |
-| Electron / Vite / Vitest     | `41.10.6` / `^6.4.4` / `^5.0.3`                                      | `package.json` 依赖表                                                           |
-| React / TS / Tailwind        | `^19.2.7` / `^5.9.3` / `^3.4.19`                                     | 同上                                                                            |
-| worker 入口数                | **6**（scanner / media / thumbnail / video / database / decryption） | `electron.vite.config.ts:87-92`，产物 `dist/main/main/app/*-worker.js` 实测存在 |
-| preload 命名空间             | **30** 个 `api/*.ts`；`electronAPI` **31** 键                        | `ls`；`preload.test.ts:72` 用例标题逐字核对                                     |
-| `IPC_CHANNELS` 规模          | 23 个域前缀 / 91 个键 / 86 个唯一通道名                              | 脚本解析 `src/shared/types/ipc.ts`                                              |
-| 全量测试                     | **334 个文件 / 5269 个用例，全绿**（33.62s）                         | `npm test` 实跑                                                                 |
-| `registerXxxHandlers` 注册数 | 40                                                                   | `grep -c` `src/main/app/ipc-setup.ts`                                           |
-| locale                       | 12 个 JSON；`SUPPORTED_LANGUAGES` 13 条（含 `auto`）                 | `ls` + `src/renderer/i18n/index.ts`                                             |
-| `vite-env.d.ts`              | 1184 行                                                              | `wc -l`                                                                         |
-| git tag                      | **0 个**                                                             | `git tag \| wc -l`                                                              |
-| 远端                         | `github.com/QianQianLuLu1/NikkiGallery`                              | `git remote -v`                                                                 |
+| 项                           | 真值                                                                                   | 取得方式                                                                        |
+| ---------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 应用版本                     | `2.5.3`                                                                                | `package.json` `version`                                                        |
+| Node 引擎下限                | `>=22.12.0`                                                                            | `package.json` `engines.node`                                                   |
+| `.node-version`              | `22`                                                                                   | 直接读取                                                                        |
+| Electron / Vite / Vitest     | `41.10.6` / `^6.4.4` / `^5.0.3`                                                        | `package.json` 依赖表                                                           |
+| React / TS / Tailwind        | `^19.2.7` / `^5.9.3` / `^3.4.19`                                                       | 同上                                                                            |
+| worker 入口数                | **6**（scanner / media / thumbnail / video / database / decryption）                   | `electron.vite.config.ts:87-92`，产物 `dist/main/main/app/*-worker.js` 实测存在 |
+| preload 命名空间             | **30** 个 `api/*.ts`；`electronAPI` **31** 键                                          | `ls`；`preload.test.ts:72` 用例标题逐字核对                                     |
+| `IPC_CHANNELS` 规模          | 24 个域前缀 / 91 个键 / 91 个唯一通道名（初记 23/91/86，复核轮订正，见 §6.4）          | 脚本解析 `src/shared/types/ipc.ts:447-588`                                      |
+| 全量测试                     | **337 个文件 / 5331 个用例**（复核轮实测；初记 334/5269；1 个负载相关 flake 见 §8.10） | `npm test` 实跑                                                                 |
+| `registerXxxHandlers` 注册数 | 40                                                                                     | `grep -c` `src/main/app/ipc-setup.ts`                                           |
+| locale                       | 12 个 JSON；`SUPPORTED_LANGUAGES` 13 条（含 `auto`）                                   | `ls` + `src/renderer/i18n/index.ts`                                             |
+| `vite-env.d.ts`              | 1187 行（初记 1184，复核轮订正）                                                       | `wc -l`                                                                         |
+| git tag                      | **0 个**                                                                               | `git tag \| wc -l`                                                              |
+| 远端                         | `github.com/QianQianLuLu1/NikkiGallery`                                                | `git remote -v`                                                                 |
 
 ### 2.2 必须绕开的自动化闸门
 
@@ -50,17 +50,17 @@
 
 ## 3. 启动与运行说明（实际执行顺序与验证）
 
-| 批次 | 内容                                  | 验证                                                               | 结果            |
-| ---- | ------------------------------------- | ------------------------------------------------------------------ | --------------- |
-| B0   | 基线取数                              | 逐项命令实测                                                       | 完成，见 §2.1   |
-| B1   | 根文档版本号与规模订正                | `prettier --check` + `git diff --stat`                             | ✓               |
-| B2   | README 断链 + CHANGELOG tag 注记      | 同上                                                               | ✓               |
-| B3   | 嵌套 AGENTS.md 订正（9 个文件）       | `prettier --check`（app/AGENTS.md 需重排表格，已 `--write`）       | ✓               |
-| B4   | `docs/` 事实订正 + registry JSON 同步 | `npm run debt:check`、JSON.parse 校验、表格列宽实测                | ✓               |
-| B5   | 用户使用教程专批                      | 逐条源码取证 + 48 张配图引用全部命中                               | ✓               |
-| B6   | 轮次快照注记（12 个文件）             | BOM 扫描 + 列宽一致性校验                                          | ✓               |
-| B7   | 本文档                                | —                                                                  | —               |
-| B8   | 终局全量验证                          | typecheck / lint / i18n:guard / debt:check / 两套守卫 / `npm test` | ✓ 全绿，见 §7.2 |
+| 批次 | 内容                                  | 验证                                                               | 结果                                                           |
+| ---- | ------------------------------------- | ------------------------------------------------------------------ | -------------------------------------------------------------- |
+| B0   | 基线取数                              | 逐项命令实测                                                       | 完成，见 §2.1                                                  |
+| B1   | 根文档版本号与规模订正                | `prettier --check` + `git diff --stat`                             | ✓                                                              |
+| B2   | README 断链 + CHANGELOG tag 注记      | 同上                                                               | ✓                                                              |
+| B3   | 嵌套 AGENTS.md 订正（9 个文件）       | `prettier --check`（app/AGENTS.md 需重排表格，已 `--write`）       | ✓                                                              |
+| B4   | `docs/` 事实订正 + registry JSON 同步 | `npm run debt:check`、JSON.parse 校验、表格列宽实测                | ✓                                                              |
+| B5   | 用户使用教程专批                      | 逐条源码取证 + 48 张配图引用全部命中                               | ✓                                                              |
+| B6   | 轮次快照注记（12 个文件）             | BOM 扫描 + 列宽一致性校验                                          | ✓                                                              |
+| B7   | 本文档                                | —                                                                  | —                                                              |
+| B8   | 终局全量验证                          | typecheck / lint / i18n:guard / debt:check / 两套守卫 / `npm test` | ✓ 静态检查与守卫全绿；`npm test` 见 §7.2（1 个负载相关 flake） |
 
 每批通用验证：`npx prettier --write <闸门内文件>` → `npx prettier --check --end-of-line auto <本批文件>` → `npm run verify`。各批 `[VERIFY] ✓ 全部通过`（exit 0）。
 
@@ -104,18 +104,18 @@
 
 ### 5.1 根文档
 
-| 位置                         | 原文（错）                                                                              | 现文                                                                |
-| ---------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| ARCHITECTURE(.en) 技术栈表   | Electron `40.10` / Vite `5.4` / Vitest `1.6`                                            | `41.10` / `6.4` / `5.0`                                             |
-| ARCHITECTURE(.en) §2 正文    | `Electron 40 提供 utilityProcess…五个 worker（scanner/database/media/thumbnail/video）` | `Electron 41`；**六个** worker，补 `decryption`                     |
-| ARCHITECTURE(.en) 附录       | `Electron 40.10 + … + Vite 5`                                                           | `Electron 41.10 + … + Vite 6`                                       |
-| ARCHITECTURE(.en) 测试规模   | `Vitest 1.6，263 个测试文件 / 4476 个用例（2026-09-06 实测，全绿）`                     | `Vitest 5.0，334 个测试文件 / 5269 个用例（2026-10-10 实测，全绿）` |
-| ARCHITECTURE(.en) shared 表  | `IPC_CHANNELS`（13 域 ~60 个通道名常量）                                                | （23 个域前缀 / 86 个唯一通道名常量）                               |
-| ARCHITECTURE(.en) preview 表 | 列 `install.ts`；漏 `resonance-mock.ts`                                                 | 改 `mock/install.ts`，补 `mock/resonance-mock.ts`                   |
-| README 中英两半              | Vite 5.4 / Vitest 1.6 / Node `>= 20`                                                    | Vite 6.4 / Vitest 5.0 / `>= 22.12.0`                                |
-| README 中英两半              | `[Releases 页面](../../releases)`（解析到仓库外）+「下载最新版安装包」                  | 完整 URL + 「尚未推送版本 tag，该页面可能暂无内容」                 |
-| DEVELOPMENT(.en) §1.1·§1.3   | Node `20.x（LTS）`、`.node-version` 锁定为 20、预期 `v20.x.x`                           | 三处均为 22 / `v22.x.x`                                             |
-| CHANGELOG 链接定义区         | 5 条 compare/tag 链接指向不存在的 tag                                                   | 保留原链接，上方补「本仓库尚未推送任何 git tag」注记                |
+| 位置                         | 原文（错）                                                                              | 现文                                                                                    |
+| ---------------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| ARCHITECTURE(.en) 技术栈表   | Electron `40.10` / Vite `5.4` / Vitest `1.6`                                            | `41.10` / `6.4` / `5.0`                                                                 |
+| ARCHITECTURE(.en) §2 正文    | `Electron 40 提供 utilityProcess…五个 worker（scanner/database/media/thumbnail/video）` | `Electron 41`；**六个** worker，补 `decryption`                                         |
+| ARCHITECTURE(.en) 附录       | `Electron 40.10 + … + Vite 5`                                                           | `Electron 41.10 + … + Vite 6`                                                           |
+| ARCHITECTURE(.en) 测试规模   | `Vitest 1.6，263 个测试文件 / 4476 个用例（2026-09-06 实测，全绿）`                     | `Vitest 5.0，337 个文件 / 5331 个用例（2026-10-10 实测；1 个负载相关 flake，见 §8.10）` |
+| ARCHITECTURE(.en) shared 表  | `IPC_CHANNELS`（13 域 ~60 个通道名常量）                                                | （24 个域前缀 / 91 个唯一通道名常量）                                                   |
+| ARCHITECTURE(.en) preview 表 | 列 `install.ts`；漏 `resonance-mock.ts`                                                 | 改 `mock/install.ts`，补 `mock/resonance-mock.ts`                                       |
+| README 中英两半              | Vite 5.4 / Vitest 1.6 / Node `>= 20`                                                    | Vite 6.4 / Vitest 5.0 / `>= 22.12.0`                                                    |
+| README 中英两半              | `[Releases 页面](../../releases)`（解析到仓库外）+「下载最新版安装包」                  | 完整 URL + 「尚未推送版本 tag，该页面可能暂无内容」                                     |
+| DEVELOPMENT(.en) §1.1·§1.3   | Node `20.x（LTS）`、`.node-version` 锁定为 20、预期 `v20.x.x`                           | 三处均为 22 / `v22.x.x`                                                                 |
+| CHANGELOG 链接定义区         | 5 条 compare/tag 链接指向不存在的 tag                                                   | 保留原链接，上方补「本仓库尚未推送任何 git tag」注记                                    |
 
 ### 5.2 嵌套 AGENTS.md
 
@@ -130,7 +130,7 @@
 
 ### 5.3 `docs/`
 
-- **技术债清单 + registry JSON 双写**：DEBT-019（主题变量提权 `html.soft-pink-luxury` 已在 `soft-pink-luxury.css:8,270` 落地）、DEBT-022（缩略图行为级测试已补齐）状态 `open` → `done`，并在正文以 `>` banner 形式记录清偿证据（沿用文档既有「✅ 白名单全量清偿」写法，避免整表重排）；DEBT-012 行数 930 → 1184（两处）。死路径 `docs/plans/2026-09-29-fix-gallery-stack-overflow.md` 补「已归档、不入仓」说明。
+- **技术债清单 + registry JSON 双写**：DEBT-019（主题变量提权 `html.soft-pink-luxury` 已在 `soft-pink-luxury.css:8,270` 落地）、DEBT-022（缩略图行为级测试已补齐）状态 `open` → `done`，并在正文以 `>` banner 形式记录清偿证据（沿用文档既有「✅ 白名单全量清偿」写法，避免整表重排）；DEBT-012 行数 930 → 1187（两处；初记 1184，复核轮按 `wc -l` 订正）。死路径 `docs/plans/2026-09-29-fix-gallery-stack-overflow.md` 补「已归档、不入仓」说明。
 - **IPC_CONTRACT**：§2.5「检查 `res.success` 的调用方共 4 处」→ 实测 **6 处**（补 `DuplicatesPage.tsx` 两处），并把写死行号改为按调用点符号检索；§2 开头补「本节仅为重复/相似检测与回收站链路，不构成完整通道清单」。
 - **channel-discovery**：`13 用例` → 实测 9；`既有 34 用例` → 实测 42；结尾「预先失败项」注记改为「该失败现已不存在（附 2026-10-10 全量结果）」。
 - **troubleshooting-spawn-eftype**：`early-crash-guard.ts:139-235` → `141-244`；`game-directory-discovery.ts:409,506,919` → `411,508,966`；`share-clipboard-service.ts:414,542,609,644,802,871` → 实测 7 处 `315,434,562,629,664,822,891`；表上加「行号会漂移，请以调用点符号定位」提示。`lifecycle.ts` 与 `desktop-shortcut.ts`、`permission.ts` 三行经复核仍准确，未改。
@@ -149,17 +149,26 @@
 
 ### 5.5 轮次快照处理（12 个文件）
 
-每个文件一级标题下插入一行「本文为 X 轮次快照，当前口径以主规约文档为准…」；历史数字**不覆写、就地括注**，形如 `331 个文件、5236 个用例（现 334 / 5269，2026-10-10 实测）`、`39 个 registerXxxHandlers（现 40）`。`round2` 的「执行中」状态保留并补后续落地提交号；`2026-09-30-electron-40-eol` 的「待排期」保留并补「已由 `fd81fef` 升级完毕」。**唯一例外**：`2026-08-24-跨模块集成测试设计.md` 经复核**确未实施**（无 `test:integration` 脚本、无 `sqlite-adapter`/`ipc-transport`/`ctx-factory`、6 个拟新增 `*.integration.test.ts` 一个都没有），banner 写明「仍是开放待办」而非「已完成」。
+每个文件一级标题下插入一行「本文为 X 轮次快照，当前口径以主规约文档为准…」；历史数字**不覆写、就地括注**，形如 `331 个文件、5236 个用例（现 337 / 5331，2026-10-10 实测）`、`39 个 registerXxxHandlers（现 40）`。`round2` 的「执行中」状态保留并补后续落地提交号；`2026-09-30-electron-40-eol` 的「待排期」保留并补「已由 `fd81fef` 升级完毕」。**唯一例外**：`2026-08-24-跨模块集成测试设计.md` 经复核**确未实施**（无 `test:integration` 脚本、无 `sqlite-adapter`/`ipc-transport`/`ctx-factory`、6 个拟新增 `*.integration.test.ts` 一个都没有），banner 写明「仍是开放待办」而非「已完成」。
 
 ---
 
-## 6. 错误处理（本轮实际遇到的两处自身失误，均已修）
+## 6. 错误处理（本轮自身失误 + 同日复核轮订正，均已修）
 
 1. **改宽度导致整表重排**：`IPC_CHANNELS` 单元格加长使 ARCHITECTURE 的 shared 表 13 行被 prettier 重排。已确认为 prettier 规范结果且限于单张表，接受之（计划 §三.3 已预告「会被 `--write` 重排表格列」）。
 2. **误删换行**：给 `2026-09-30-electron-40-eol` 插快照行时，一次 Edit 把 `- 日期：…` 与 `- 状态：…` 合并成一行。已 `git diff` 定位并拆回两行，复核无残留合并行。
 3. 另修正了自己新引入的两处不实引用：备份小节应为 **16.6**（初写成 16.5）；诊断子项名为**扫描链路诊断 / 日志管理 / 崩溃报告**（初写成 扫描日志 / 运行日志 / 崩溃记录）。均以源码与 locale 复核后改正。
+4. **同日复核轮（提交前逐条实测本批 35 项硬事实，查出 6 处并订正）**：
+   - `IPC_CHANNELS` 规模初记「23 个域前缀 / 86 个唯一通道名」，按 `src/shared/types/ipc.ts:447-588` 逐条解析实测为 **24 个唯一前缀 / 91 个通道键（互不重复）**；已同步 ARCHITECTURE(.en) 与本文件 §2.1。
+   - `vite-env.d.ts` 初记 1184 行，`wc -l` 实测（含 `HEAD` blob）**1187 行**；已同步 `docs/技术债清单.md` 与 `docs/debt-registry.json` 两处。
+   - **漏改同源失效点**：`DEVELOPMENT.md` / `DEVELOPMENT.en.md` 的 `npm test` 实测规模仍停在 `263 文件 / 4476 用例（2026-09-06）`，与 ARCHITECTURE C.3 是同一失效事实，本批只改了 DEVELOPMENT 的 Node 版本三处；已按双语最小镜像刷新。
+   - **快照引用块吞行（渲染缺陷）**：`RELEASE_NOTES_v2.5.0_illustrated.md` 的快照行与紧随的 `**发布日期 / Released**…` 之间缺空行，CommonMark 惰性续行把发布信息并入引用块（`prettier --write` 实测即以 `> **发布日期**…` 落地，且提交时钩子已实际合并）；已用空行拆回段落。
+   - **引用块劈断列表**：`2026-09-30-electron-40-eol` 的「后续结论」引用块插在元数据 bullet 列表中间，把一个列表切成两段（提交时钩子只补空行、不会归并）；已移到快照行之后，列表恢复连续 4 项。
+   - **测试规模现值陈旧**：本批写入的「334 文件 / 5269 用例」在复核轮已变为 **337 / 5331**（`git ls-files "*.test.ts*" | wc -l` = 337，与 `npm test` 汇总一致）；已刷新 ARCHITECTURE(.en) C.3、DEVELOPMENT(.en) 命令表、`docs/channel-discovery.md` 现况注记与 `2026-10-09-fix-thumbnail-loading-performance.md` 的现值括注。`round2` §15 的 334/5268/5269 属当轮 `test:coverage` 取证读数，按口径**不改写**。
+   - **同表另外两行「命令实测结果」也与现况不符（复核轮实跑发现，属 HEAD 既有陈旧、非本批引入，因与上一项同表且已实测，一并订正）**：`npm run lint` 原写「exit 1，但仅 16 个问题且全部落在 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs`」，实跑为 **exit 0、0 error、11 warning**（全部是 DEBT-030 的 `common/*.test.tsx` BOM）；`npm run format:check` 原写「exit 0」，本机 `core.autocrlf=true` 下实为 **exit 1（601 个文件只因 CRLF）**，补 `--end-of-line auto` 后同范围 exit 0——这正是 §5 硬约定要求只读检查必须带该参数的原因。
+5. **对 `docs/**` 的格式作用域订正（复核轮实测）**：lint-staged 的根键 `*.{ts,js,json,md}` 在 lint-staged 的匹配语义下命中**任意深度**的 `.md`/`.json`，故 `.husky/pre-commit` 的 `prettier --write` 实际会改写 `docs/**`（本次 35 个暂存文件全部进入该任务）。而 `scripts/verify-format-scope.ts` 按字面把该键解释为仓库根作用域，两侧口径不一致——登记为 §8.9，未擅改任何一侧闸门。
 
-结论性约束：**任何写进文档的数字、路径、小节号、命令，落笔前后必须实测或复读源码**；对 `docs/**` 只用 Edit 或宽度校验脚本，不用 `--write`。所有脚本化改写均以 UTF-8 无 BOM 写回并保留原 EOL（已对 34 个改动文件逐个 `head -c 3` 扫 BOM，零命中）。
+结论性约束：**任何写进文档的数字、路径、小节号、命令，落笔前后必须实测或复读源码**；对 `docs/**` 只用 Edit 或宽度校验脚本，不用 `--write`（`--write` 会把引用块与后续段落合并，方向与语义修复相反）。所有脚本化改写均以 UTF-8 无 BOM 写回并保留原 EOL（已对 34 个改动文件逐个 `head -c 3` 扫 BOM，零命中）。
 
 ---
 
@@ -175,20 +184,20 @@ npm run verify                                       # [VERIFY] ✓ 全部通过
 
 ### 7.2 全量（终局，2026-10-10 实测结果）
 
-| 命令                                              | 结果                                                                                                                           |
-| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run typecheck`                               | ✓ `tsc -b` + `tsc -p tsconfig.scripts.json` 无输出                                                                             |
-| `npm run lint`                                    | ✓ exit 0；**0 error**，11 warning 全部是 DEBT-030 登记的 `src/renderer/components/common/*.test.tsx` BOM（本轮未触碰这些文件） |
-| `npm run i18n:guard`                              | ✓ 「白名单只减不增、清零必移除、key 已同步」                                                                                   |
-| `npm run debt:check`                              | ✓ exit 0（registry 改 done 后仅减少提醒，不影响门禁）                                                                          |
-| `verify-format-scope.test.ts` + `preload.test.ts` | ✓ 2 files / **52 tests passed**（镜像逐字、导航表可解析、lint-staged 键清单、31 键断言均未破）                                 |
-| `npm test`                                        | ✓ **334 个文件 / 5269 个用例全绿**，34.43s，exit 0                                                                             |
+| 命令                                              | 结果                                                                                                                                                      |
+| ------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`                               | ✓ `tsc -b` + `tsc -p tsconfig.scripts.json` 无输出                                                                                                        |
+| `npm run lint`                                    | ✓ exit 0；**0 error**，11 warning 全部是 DEBT-030 登记的 `src/renderer/components/common/*.test.tsx` BOM（本轮未触碰这些文件）                            |
+| `npm run i18n:guard`                              | ✓ 「白名单只减不增、清零必移除、key 已同步」                                                                                                              |
+| `npm run debt:check`                              | ✓ exit 0（registry 改 done 后仅减少提醒，不影响门禁）                                                                                                     |
+| `verify-format-scope.test.ts` + `preload.test.ts` | ✓ 2 files / **52 tests passed**（镜像逐字、导航表可解析、lint-staged 键清单、31 键断言均未破）                                                            |
+| `npm test`                                        | 337 个文件 / 5331 个用例；**5 次全量 2 绿 3 红**，红的三次均为 `generator.limiter.test.ts`（隔离与目录级复跑均绿，见 §8.10）；除该 flake 外无任何其他失败 |
 
 ### 7.3 判定式断言（实跑）
 
 - `grep -rn "40\.10|Vite 5\.4|Vitest 1\.6|>= 20|../../releases" README.md ARCHITECTURE*.md DEVELOPMENT*.md` → **零命中**。
 - `grep -n "四种视图|尚未开放|（体验功能）|13 种语言|系统回收站里也还有" docs/tutorial/用户使用教程.md` → **零命中**。
-- `git diff --stat docs` → 19 个文件 **56 insertions / 27 deletions**，与订正处数相称，无整文件重排（证明未对 `docs/**` 误用 `--write`）。
+- `git diff --stat docs` → 19 个文件 **56 insertions / 27 deletions**，与订正处数相称，无整文件重排（证明本批工作区未对 `docs/**` 手工 `--write`；复核轮补充：提交时钩子的 `prettier --write` 仍改写了 `docs/**`，见 §6.5）。
 - 34 个改动文件逐个 `head -c 3 | od` 扫 BOM → **零命中**（符合「UTF-8 无 BOM」硬约定）。
 - **反向验证镜像闸门真实有效**：临时往 `docs/CODING_CONVENTIONS.md` 追加一行 → `verify-format-scope.test.ts` 立刻 `1 failed | 34 passed`；`git checkout --` 还原后复跑 `35 passed`，并与 `HEAD` blob 逐字节 `cmp` 一致。这既证明该闸门不是摆设，也证明本轮**确实没有**改动该文件正文。
 - 大小写修正前后 `git hash-object` 均为 `dfdf30e1a1fa15b82e88fe2a0d7a2729d3ef6ed8`，`git status` 对该文件无记录。
@@ -205,3 +214,5 @@ npm run verify                                       # [VERIFY] ✓ 全部通过
 6. `docs/plans/2026-08-24-跨模块集成测试设计.md` 仍未实施，是真实的测试缺口而非文档问题。
 7. AI 工具目录内的内容错误（含 `.qoder/skills/**/SKILL.md` 的路径引用）本轮不审不改。
 8. `wxnn-photo-manager/node20/`（Node 20.18.1）与 `engines.node >=22.12.0` 不符，父目录未被 gitignore 覆盖；本机遗留，未处置。
+9. **格式作用域两侧口径不一致（复核轮实测）**：`.husky/pre-commit` 经 lint-staged 执行 `*.{ts,js,json,md}` 时命中**任意深度**的 `.md`/`.json`（本次 35 个暂存文件全部进入该任务，含 `docs/**`），而 `scripts/verify-format-scope.ts` / `npm run verify` 按字面把该键解释为仅仓库根。后果：钩子会重排 `docs/**` 表格并规范化引用块（含把「引用块 + 紧随段落」合并成一个引用块），而 verify 的只读格式检查不会预先暴露它。本轮**未**改动任何一侧（改 lint-staged 键或改作用域推导都会移动既有闸门），仅登记，建议下轮以单测固定期望口径。
+10. **`src/main/thumbnail/generator.limiter.test.ts` 在全量运行下反复失败（复核轮实测：5 次全量 3 红 2 绿，红的三次都是该文件）**：失败点为用例「慢视频抽帧不占用图片解码许可」，首次红在 §4「释放视频门控后 `expect(video1Path).toBeTruthy()` 收到 null」（`Test Files 1 failed | 336 passed (337)`、`Tests 1 failed | 5330 passed (5331)`），汇总读数在三次红中完全一致。而 `npx vitest run <该文件>` 隔离复跑通过、`npx vitest run src/main/thumbnail` 目录级 **6 文件 / 42 例全通过**——即仅在 337 文件并发负载下触发。该用例的两个视频源文件内容同为 `Buffer.alloc(1024, 0x00)` → `computeContentHash` 相同 → 共享同一缓存目标，跨请求的失败清理/存在性判定在负载下更易交错（`round2` §16 曾记录同类「间歇红灯」由 `void removeTempFileQuietly` 引起）。属既有测试稳定性问题，非本批（零代码改动）引入；本轮不处置（改 `generator.ts` 或改测试都超出文档订正范围），建议下一轮以「同内容双视频」最小复现脚本定级后处理。

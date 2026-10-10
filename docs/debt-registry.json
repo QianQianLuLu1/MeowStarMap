@@ -151,7 +151,7 @@
       "status": "open",
       "priority": "medium",
       "title": "渲染端 vite-env.d.ts 手工维护 WindowElectronAPI",
-      "description": "约 1184 行手写签名与 preload 实现靠人工同步，理想方案是渲染端声明改为引用 shared 类型",
+      "description": "约 1187 行手写签名与 preload 实现靠人工同步，理想方案是渲染端声明改为引用 shared 类型",
       "files": ["src/renderer/vite-env.d.ts"],
       "lines": [],
       "issue": false

@@ -174,7 +174,7 @@
 
 - 新增/调整的每个行为均实际执行 Red → Fix → Green；直接相关回归最终为 12 个文件、129 个用例全部通过。
 - `npm run verify`：typecheck、lint、core-gate、format、相关测试 5 项全部通过。
-- `npm test`：331 个文件、5236 个用例全部通过（现 334 个文件 / 5269 个用例，2026-10-10 全量 `npm test` 实测全绿）。
+- `npm test`：331 个文件、5236 个用例全部通过（现 337 个文件 / 5331 个用例，2026-10-10 全量 `npm test` 实测；`generator.limiter.test.ts` 的负载相关 flake 见同日盘点文档 §8.10）。
 - `npm run typecheck`：源码与脚本工具链全部通过。
 - `npm run lint`：0 error；11 个 BOM warning 为未改动文件的既有告警。
 - Windows 构建/打包、`verify:dist` 通过；`npm run e2e:smoke` 9/9 通过。

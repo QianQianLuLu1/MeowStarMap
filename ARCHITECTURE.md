@@ -1176,7 +1176,7 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 | **editor.ts**          | `HSLColorKey`（12 通道）/ `FilterParams`（22 调整项 + HSL + 曲线 + 色调分离 + LUT）/ `FilterPresetRow` / `EditHistoryRow` / `OperationType`（13 种操作）/ `OperationHistoryRow`                                                                                |
 | **watermark.ts**       | `WatermarkPosition`（9 + custom）/ `WatermarkStyle`（5 种）/ `BlendMode`（16 种）/ `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                  |
 | **settings.ts**        | `AppSettingRow` / `SettingKey`（29 个键枚举）/ `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap`（key → TS 类型映射）/ `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                             |
-| **ipc.ts**             | 重导出 `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`、`ShareChannel` / `WifiShareSession`、`MediaParamType` / `CameraParams` / `RichCameraParams`、`ImportOptions` / `ExportOptions`、**`IPC_CHANNELS`**（23 个域前缀 / 86 个唯一通道名常量） |
+| **ipc.ts**             | 重导出 `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`、`ShareChannel` / `WifiShareSession`、`MediaParamType` / `CameraParams` / `RichCameraParams`、`ImportOptions` / `ExportOptions`、**`IPC_CHANNELS`**（24 个域前缀 / 91 个唯一通道名常量） |
 | **ipc-types.ts**       | `IpcError`（code/message/userMessage/details）、`IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`、`IpcProgress`、`IPC_ERROR_CODES`（9 个 IPC_* 错误码）                                                                                      |
 | **progress.ts**        | `TaskType`（7 类任务：scan/duplicate/batch/watermark/import/video-edit/indexing）、`TaskPhase`（6 阶段）、统一任务进度状态（主进程 `task:progress` 通道推送）                                                                                                  |
 | **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` 能力权限清单 / 业务扩展点常量与扩展响应类型                                                                                                                                                                        |
@@ -2001,7 +2001,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 5.0，334 个测试文件 / 5269 个用例（2026-10-10 实测，全绿）。
+- Vitest 5.0，337 个测试文件 / 5331 个用例（2026-10-10 实测；除 `generator.limiter.test.ts` 在全量并发下的负载相关失败外全绿，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---

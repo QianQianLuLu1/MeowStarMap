@@ -1,12 +1,10 @@
 # Electron 40 EOL 供应链高危通告治理：专项立案（2026-09-30）
 
 > 本文为 2026-09-30 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
+> **后续结论（2026-10-10）**：升级已执行完毕——提交 `fd81fef` 将 electron 升至 41.10.6 并把 Node 引擎下限收敛到 `>=22.12.0`，本立案的「待排期」状态已失效；技术债 DEBT-020 已按升级事实关闭。本文的 40.10.6 基线数据与红灯取证保留为该轮证据。
 
 - 日期：2026-09-30
 - 状态：已立案 / 待排期（本文档仅完成问题核实、决策记录与升级方案立案；升级执行另行排期启动，启动时需按 §3.1 重新核对当期版本态势）
-
-> **后续结论（2026-10-10）**：升级已执行完毕——提交 `fd81fef` 将 electron 升至 41.10.6 并把 Node 引擎下限收敛到 `>=22.12.0`，本立案的「待排期」状态已失效；技术债 DEBT-020 已按升级事实关闭。本文的 40.10.6 基线数据与红灯取证保留为该轮证据。
-
 - 关联文件：`package.json` / `package-lock.json`（electron 40.10.6 精确锁定，本立案不动）、`audit-ci.jsonc`（豁免清单，本立案不动）、`.github/workflows/build.yml`（Security audit 门禁，本立案不动）、`scripts/__tests__/audit-config.test.ts`（allowlist 契约测试，升级落地时同步）
 - 关联文档：`docs/plans/2026-09-30-replace-share-icon.md`（§10 S5 首次记录本问题）、`docs/plans/2026-09-26-fix-sharp-xmldom-high-vulns.md`（同类安全治理先例与口径）、`docs/troubleshooting-npm-audit-mirror.md`（registry 约定）
 

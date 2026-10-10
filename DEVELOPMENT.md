@@ -730,12 +730,12 @@ npm test
 
 **门禁基线（改动后以此为参照，判断是不是自己引入的问题）**：
 
-| 命令                   | 基线结果                                                                                                                                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run typecheck`    | **exit 0，零错误**                                                                                                                                                                              |
-| `npm run lint`         | exit 1，但仅 16 个问题且全部落在 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处历史文件；若只报这三处即视为通过（2026-08 基线，未随 2.5.0 文档同步复测） |
-| `npm run format:check` | exit 0；注意 lint-staged 会对根目录 `*.md` 跑 `prettier --write`，改完大文档建议单独 `npx prettier --check <file>`                                                                              |
-| `npm test`             | 全量 263 文件 / 4476 用例，**全绿**（2026-09-06 实测；历史基线中的 `path-safety.test.ts` 与 `GalleryStackOverflow.test.tsx` 两个环境性失败已在 2.5.0 修复）                                     |
+| 命令                   | 基线结果                                                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run typecheck`    | **exit 0，零错误**                                                                                                                                                                                                                                                                                                                                                                       |
+| `npm run lint`         | **exit 0，0 error**；11 个 warning 全部是 DEBT-030 登记的 `src/renderer/components/common/*.test.tsx` 带 BOM（`eslint --fix` 可清）（2026-10-10 实测；旧基线所述 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处问题已不再命中）                                                                                                                   |
+| `npm run format:check` | 本机 `core.autocrlf=true` 下 **exit 1**——601 个文件仅因 CRLF 行尾被判红（2026-10-10 实测）。只读口径必须补 `--end-of-line auto`：`npx prettier --check --end-of-line auto <同范围>` 实测 exit 0。另注意 lint-staged 的根键 `*.{ts,js,json,md}` 在 lint-staged 语义下命中**任意深度**，故 `prettier --write` 实际也会改写 `docs/**`（改完大文档仍建议单独 `npx prettier --check <file>`） |
+| `npm test`             | 全量 337 文件 / 5331 用例（2026-10-10 实测；除 `generator.limiter.test.ts` 在全量并发下的负载相关失败外全绿，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10；历史基线中的 `path-safety.test.ts` 与 `GalleryStackOverflow.test.tsx` 两个环境性失败已在 2.5.0 修复）                                                                                               |
 
 ### 7.2 完整打包命令
 

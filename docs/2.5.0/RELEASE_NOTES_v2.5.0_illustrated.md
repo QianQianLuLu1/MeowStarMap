@@ -1,7 +1,8 @@
 # NikkiGallery v2.5.0 — 无限暖暖相册管理工具 / Infinity Nikki Photo Manager
 
 > 本文为 2026-09-06 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
-> **发布日期 / Released**：2026-09-06　|　**平台 / Platform**：Windows 10 (1803+) / Windows 11，x64　|　**安装包 / Installer**：`NikkiGallery-Setup-2.5.0.exe`
+
+**发布日期 / Released**：2026-09-06　|　**平台 / Platform**：Windows 10 (1803+) / Windows 11，x64　|　**安装包 / Installer**：`NikkiGallery-Setup-2.5.0.exe`
 
 ---
 

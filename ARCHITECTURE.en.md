@@ -1171,7 +1171,7 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 | **editor.ts**          | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (13 op types) / `OperationHistoryRow`                                                                                        |
 | **watermark.ts**       | `WatermarkPosition` (9 + custom) / `WatermarkStyle` (5 types) / `BlendMode` (16 types) / `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                                   |
 | **settings.ts**        | `AppSettingRow` / `SettingKey` (29 key enums) / `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap` (key → TS type mapping) / `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                                               |
-| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (23 domain prefixes / 86 unique channel name constants) |
+| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (24 domain prefixes / 91 unique channel name constants) |
 | **ipc-types.ts**       | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (9 IPC_* error codes)                                                                                                             |
 | **progress.ts**        | `TaskType` (7 task types: scan/duplicate/batch/watermark/import/video-edit/indexing), `TaskPhase` (6 phases), unified task progress state (pushed via the main-process `task:progress` channel)                                                                                       |
 | **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` capability list / business extension point constants and extension response types                                                                                                                                                         |
@@ -1975,7 +1975,7 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- Vitest 5.0, 334 test files / 5269 cases (measured 2026-10-10, all green).
+- Vitest 5.0, 337 test files / 5331 cases (measured 2026-10-10; all green apart from the load-dependent failure of `generator.limiter.test.ts` under the full-suite run — see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10).
 - The two environment-related failures in the historical baseline (`path-safety.test.ts` read-only-directory case, `GalleryStackOverflow.test.tsx`) were fixed in 2.5.0; there are currently no pre-existing failures.
 
 ---
