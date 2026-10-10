@@ -65,4 +65,12 @@ describe('TaskProgressOverlay 阶段步骤渲染', () => {
     const { container } = render(<TaskProgressOverlay progress={null} />)
     expect(container.firstChild).toBeNull()
   })
+
+  it('progress 从有值变为 null 时卡片卸载（退场动画挂载点守卫）', () => {
+    const { rerender, container } = render(<TaskProgressOverlay progress={baseProgress()} />)
+    // 注意卡片内 Spinner 也有 role="status"，此处以毛玻璃卡片类名定位浮窗本体
+    expect(container.querySelector('.glass-card')).not.toBeNull()
+    rerender(<TaskProgressOverlay progress={null} />)
+    expect(container.firstChild).toBeNull()
+  })
 })

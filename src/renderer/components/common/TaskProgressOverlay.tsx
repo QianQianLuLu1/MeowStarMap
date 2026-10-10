@@ -1,5 +1,6 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
+import { AnimatePresence, motion } from 'motion/react'
 import { Spinner } from './Spinner'
 import { formatEta } from '../../utils/format'
 import type { TaskProgress, TaskStageStatus } from '../../../shared/types/progress'
@@ -15,7 +16,8 @@ import type { TaskProgress, TaskStageStatus } from '../../../shared/types/progre
  *
  * 设计原则：
  *   - 纯展示组件，不订阅任何 IPC 通道；父组件负责传入 progress 与 onCancel
- *   - progress=null 时直接返回 null，便于父组件无脑渲染
+ *   - progress=null 时不渲染；根节点常驻 AnimatePresence，progress 置 null 时
+ *     播放退场动画平滑关闭（终态延时自动复位由 useStagedTask 驱动）
  *   - 取消按钮仅在 canCancel=true 且 onCancel 提供时显示
  *   - 终态（done/cancelled/error）隐藏 Spinner，避免动画结束后仍在旋转
  *
@@ -106,15 +108,28 @@ const StageIcon: React.FC<{ status: TaskStageStatus }> = ({ status }) => {
   )
 }
 
-export const TaskProgressOverlay: React.FC<TaskProgressOverlayProps> = ({
+interface TaskProgressCardProps {
+  /** 非空任务进度；置 null 时由外层 AnimatePresence 播放退场动画 */
+  progress: TaskProgress
+  /** 取消回调；不提供则不显示取消按钮（即便 canCancel=true） */
+  onCancel?: () => void
+  /** 自定义标题，默认使用 progress.message */
+  title?: string
+  /** 浮窗位置 */
+  position: NonNullable<TaskProgressOverlayProps['position']>
+  /** 渲染在进度条下方的额外内容 */
+  children?: React.ReactNode
+}
+
+/** 单张进度卡片：progress 非空时的渲染体（退场动画由外层 AnimatePresence 托管） */
+const TaskProgressCard: React.FC<TaskProgressCardProps> = ({
   progress,
   onCancel,
   title,
-  position = 'bottom-right',
+  position,
   children
 }) => {
   const { t } = useTranslation()
-  if (!progress) return null
 
   const isTerminal = TERMINAL_PHASES.has(progress.phase)
   const showSpinner = !isTerminal
@@ -124,8 +139,10 @@ export const TaskProgressOverlay: React.FC<TaskProgressOverlayProps> = ({
   const percent = Math.min(100, Math.max(0, progress.percent))
 
   return (
-    <div
+    <motion.div
       className={`fixed glass-card p-4 w-80 z-50 ${POSITION_CLASS[position]}`}
+      exit={{ opacity: 0, y: 16 }}
+      transition={{ duration: 0.25, ease: 'easeOut' }}
       style={{
         bottom: position.startsWith('bottom') ? '44px' : undefined,
         animation: 'slideInBottom 300ms ease-out'
@@ -219,6 +236,30 @@ export const TaskProgressOverlay: React.FC<TaskProgressOverlayProps> = ({
 
       {/* 父组件可注入额外内容（如当前扫描路径） */}
       {children}
-    </div>
+    </motion.div>
+  )
+}
+
+export const TaskProgressOverlay: React.FC<TaskProgressOverlayProps> = ({
+  progress,
+  onCancel,
+  title,
+  position = 'bottom-right',
+  children
+}) => {
+  return (
+    <AnimatePresence>
+      {progress ? (
+        <TaskProgressCard
+          key="task-progress-overlay"
+          progress={progress}
+          onCancel={onCancel}
+          title={title}
+          position={position}
+        >
+          {children}
+        </TaskProgressCard>
+      ) : null}
+    </AnimatePresence>
   )
 }

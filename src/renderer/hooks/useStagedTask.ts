@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TaskProgress, TaskStageStatus, TaskType } from '../../shared/types/progress'
 import { clampPercent, createStages, setStageStatus } from '../../shared/utils/taskStages'
 
@@ -24,6 +24,9 @@ export interface RunStagedOptions {
 }
 
 const THROTTLE_MS = 80
+
+/** 终态（done/cancelled/error）卡片保留时长，超时自动复位关闭浮窗；对齐 useToast 默认 3s */
+const AUTO_RESET_DELAY_MS = 3000
 
 function completeStages(prev: TaskProgress): TaskProgress {
   return {
@@ -59,6 +62,8 @@ function terminateStages(prev: TaskProgress, aborted: boolean, message?: string)
  * 复用 TaskProgress 协议与 stages 字段，将任意异步删除操作包装为带阶段步骤、
  * 可取消、节流推送的进度状态。纯渲染端逻辑，不依赖主进程 IPC（取消走本地 AbortController）。
  * run() 返回终态 progress，便于调用方据 phase 弹 toast。
+ * 进入终态后延时 AUTO_RESET_DELAY_MS 自动复位（progress 置 null），驱动
+ * TaskProgressOverlay 播放退场动画并关闭浮窗。
  */
 export function useStagedTask() {
   const [progress, setProgress] = useState<TaskProgress | null>(null)
@@ -66,6 +71,7 @@ export function useStagedTask() {
   const latestRef = useRef<TaskProgress | null>(null)
   const lastTickRef = useRef(0)
   const totalRef = useRef(0)
+  const autoResetRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const commit = useCallback((updater: (prev: TaskProgress | null) => TaskProgress | null) => {
     // 同步计算 next 并维护 latestRef，避免 React 延迟执行 updater 导致终态读取到旧值
@@ -74,10 +80,33 @@ export function useStagedTask() {
     setProgress(next)
   }, [])
 
+  const clearAutoReset = useCallback(() => {
+    if (autoResetRef.current !== null) {
+      clearTimeout(autoResetRef.current)
+      autoResetRef.current = null
+    }
+  }, [])
+
+  const reset = useCallback(() => {
+    clearAutoReset()
+    abortRef.current = null
+    latestRef.current = null
+    setProgress(null)
+  }, [clearAutoReset])
+
+  const scheduleAutoReset = useCallback(() => {
+    autoResetRef.current = setTimeout(reset, AUTO_RESET_DELAY_MS)
+  }, [reset])
+
+  // 卸载时清除待触发的自动复位定时器，避免卸载后 setState
+  useEffect(() => clearAutoReset, [clearAutoReset])
+
   const run = useCallback(
     async (opts: RunStagedOptions): Promise<TaskProgress | null> => {
       const controller = new AbortController()
       abortRef.current = controller
+      // 新任务开始前清除上一任务的自动复位定时器，防止误清新进度
+      clearAutoReset()
       const taskId = `${opts.taskType}-${Date.now()}`
       // 参数校验：阶段文案必须非空
       const stages = createStages(opts.stageLabels)
@@ -128,6 +157,7 @@ export function useStagedTask() {
         await opts.execute({ setStage, tick, signal: controller.signal })
         const final = completeStages(latestRef.current!)
         commit(() => final)
+        scheduleAutoReset()
         return final
       } catch (err) {
         const aborted =
@@ -135,20 +165,15 @@ export function useStagedTask() {
         const message = err instanceof Error ? err.message : String(err)
         const final = terminateStages(latestRef.current!, aborted, message)
         commit(() => final)
+        scheduleAutoReset()
         return final
       }
     },
-    [commit]
+    [commit, clearAutoReset, scheduleAutoReset]
   )
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
-  }, [])
-
-  const reset = useCallback(() => {
-    abortRef.current = null
-    latestRef.current = null
-    setProgress(null)
   }, [])
 
   return { progress, run, cancel, reset }

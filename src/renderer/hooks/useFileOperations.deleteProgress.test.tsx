@@ -104,4 +104,23 @@ describe('useFileOperations 阶段步骤进度接入', () => {
     expect(res?.failed[0].id).toBe('b')
     expect(get()!.deleteProgress?.phase).toBe('done')
   })
+
+  it('删除完成终态 3 秒后 deleteProgress 自动清空（浮窗自动关闭）', async () => {
+    vi.useFakeTimers()
+    try {
+      stubApi(true)
+      useMediaStore.getState().setMediaFiles([makeFile('a')])
+      const get = mount()
+      await act(async () => {
+        await get()!.deleteFilesBatch(['a'])
+      })
+      expect(get()!.deleteProgress?.phase).toBe('done')
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(get()!.deleteProgress).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useStagedTask } from './useStagedTask'
 
@@ -121,5 +121,182 @@ describe('useStagedTask 编排器', () => {
       result.current.reset()
     })
     expect(result.current.progress).toBeNull()
+  })
+})
+
+describe('useStagedTask 终态自动关闭', () => {
+  it('done 终态 3 秒后自动复位（progress 置 null）', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useStagedTask())
+      await act(async () => {
+        await result.current.run({
+          taskType: 'batch',
+          title: '删除',
+          stageLabels: ['准备'],
+          execute: async () => {}
+        })
+      })
+      expect(result.current.progress?.phase).toBe('done')
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(result.current.progress).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('error 终态 3 秒后自动复位', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useStagedTask())
+      await act(async () => {
+        await result.current.run({
+          taskType: 'batch',
+          title: '删除',
+          stageLabels: ['准备'],
+          execute: async () => {
+            throw new Error('磁盘写满')
+          }
+        })
+      })
+      expect(result.current.progress?.phase).toBe('error')
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(result.current.progress).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('cancelled 终态 3 秒后自动复位', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useStagedTask())
+      await act(async () => {
+        await result.current.run({
+          taskType: 'batch',
+          title: '删除',
+          stageLabels: ['准备'],
+          canCancel: true,
+          execute: async () => {
+            const e = new Error('aborted')
+            e.name = 'AbortError'
+            throw e
+          }
+        })
+      })
+      expect(result.current.progress?.phase).toBe('cancelled')
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(result.current.progress).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('边界：自动复位窗口内启动新任务，旧定时器不得清掉新进度', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useStagedTask())
+      await act(async () => {
+        await result.current.run({
+          taskType: 'batch',
+          title: '任务A',
+          stageLabels: ['a'],
+          execute: async () => {}
+        })
+      })
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+      await act(async () => {
+        await result.current.run({
+          taskType: 'batch',
+          title: '任务B',
+          stageLabels: ['b'],
+          execute: async () => {}
+        })
+      })
+      // 距任务 A 终态已过 4 秒（旧定时器若未清除应已触发），任务 B 须仍在
+      act(() => {
+        vi.advanceTimersByTime(2000)
+      })
+      expect(result.current.progress).not.toBeNull()
+      expect(result.current.progress?.message).toBe('任务B')
+      // 任务 B 自身 3 秒窗口（2s + 剩余 1s）计满后关闭
+      act(() => {
+        vi.advanceTimersByTime(1000)
+      })
+      expect(result.current.progress).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('边界：任务进行中推进 3 秒不被误关，终态后才计入窗口', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result } = renderHook(() => useStagedTask())
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      let runPromise!: Promise<unknown>
+      await act(async () => {
+        runPromise = result.current.run({
+          taskType: 'batch',
+          title: '删除',
+          stageLabels: ['准备'],
+          execute: async () => {
+            await gate
+          }
+        })
+      })
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(result.current.progress).not.toBeNull()
+      expect(result.current.progress?.phase).toBe('preparing')
+      await act(async () => {
+        release()
+        await runPromise
+      })
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(result.current.progress).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('边界：窗口内手动 reset 后定时器清除，卸载后推进时间无异常', async () => {
+    vi.useFakeTimers()
+    try {
+      const { result, unmount } = renderHook(() => useStagedTask())
+      await act(async () => {
+        await result.current.run({
+          taskType: 'batch',
+          title: '删除',
+          stageLabels: ['a'],
+          execute: async () => {}
+        })
+      })
+      act(() => {
+        result.current.reset()
+      })
+      act(() => {
+        vi.advanceTimersByTime(3000)
+      })
+      expect(result.current.progress).toBeNull()
+      unmount()
+      expect(() => vi.advanceTimersByTime(3000)).not.toThrow()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
