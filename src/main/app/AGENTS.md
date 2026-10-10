@@ -8,7 +8,7 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ## 目录结构
 
-23 个源文件，全部有对应测试覆盖：
+23 个源文件，其中 20 个有配套测试（`app-context.ts`、`auto-update.ts`、`renderer-bridge.ts` 暂无）：
 
 ### 核心编排
 
@@ -30,10 +30,10 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ### IPC 与恢复
 
-| 文件           | 职责                                                                      |
-| -------------- | ------------------------------------------------------------------------- |
-| `ipc-setup.ts` | `setupIPC()` 注册 30+ 个 IPC handler（按域拆分），初始化 pathGuard 白名单 |
-| `recovery.ts`  | 数据库恢复 + worker 崩溃监听器，事件暂存 → 主窗口就绪后弹窗               |
+| 文件           | 职责                                                                     |
+| -------------- | ------------------------------------------------------------------------ |
+| `ipc-setup.ts` | `setupIPC()` 注册 40 个 IPC handler（按域拆分），初始化 pathGuard 白名单 |
+| `recovery.ts`  | 数据库恢复 + worker 崩溃监听器，事件暂存 → 主窗口就绪后弹窗              |
 
 ### 启动与退出
 
@@ -128,4 +128,4 @@ index.ts (入口)
 - `media-protocol.ts` 的路径白名单是安全关键路径，修改时需同时考虑 LRU 缓存一致性和 realpath 解引用。
 - `gpu-fallback.ts` 的状态文件在 `userData` 下，修改格式需向后兼容（旧格式仍能解析）。
 - `window-manager.ts` 中的 CSP 策略修改会影响渲染进程所有外部资源加载，需同步评估。
-- 所有 23 个源文件均有测试覆盖；修改后运行 `npm run test:main` 确认。
+- 23 个源文件中有配套测试的为 20 个（`app-context.ts`、`auto-update.ts`、`renderer-bridge.ts` 暂无）；修改后运行 `npm run test:main` 确认。

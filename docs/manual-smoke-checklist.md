@@ -1,6 +1,6 @@
 # 人工冒烟清单（发布前逐项勾选）
 
-> 来源：`docs/archive/plans/e2e-smoke-playwright.md` §6。
+> 来源：`docs/archive/plans/e2e-smoke-playwright.md` §6（该目录被 `.gitignore` 排除、不入仓，仅本机留存，git 历史可查）。
 > 自动化冒烟（`npm run e2e:smoke`）覆盖启动/白屏/preload/IPC/SQLite 探针；
 > 本清单覆盖**依赖真实游戏图片/视频样本**的深度功能，二者互补，发布前缺一不可。
 >
@@ -52,5 +52,5 @@
 
 ## 相关文档
 
-- 自动化冒烟方案：`docs/archive/plans/e2e-smoke-playwright.md`
+- 自动化冒烟方案：`docs/archive/plans/e2e-smoke-playwright.md`（已归档，不入仓）
 - 开发命令说明：`DEVELOPMENT.md` §2.8（打包产物冒烟测试）

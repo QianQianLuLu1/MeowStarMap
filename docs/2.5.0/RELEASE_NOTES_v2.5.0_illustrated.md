@@ -1,6 +1,7 @@
 # NikkiGallery v2.5.0 — 无限暖暖相册管理工具 / Infinity Nikki Photo Manager
 
-**发布日期 / Released**：2026-09-06　|　**平台 / Platform**：Windows 10 (1803+) / Windows 11，x64　|　**安装包 / Installer**：`NikkiGallery-Setup-2.5.0.exe`
+> 本文为 2026-09-06 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
+> **发布日期 / Released**：2026-09-06　|　**平台 / Platform**：Windows 10 (1803+) / Windows 11，x64　|　**安装包 / Installer**：`NikkiGallery-Setup-2.5.0.exe`
 
 ---
 
@@ -79,7 +80,7 @@
 ### 体验优化
 
 - **工程瘦身**：移除 Python 扫描器原型（`main.py` 及其配套模块与实施计划）。该原型无任何 TS / 脚本 / CI 引用，其路径定位、UID 隔离与原生缩略图复用能力已由 `src/main/scanner/` 下的 TypeScript 扫描器完整覆盖
-- **测试契约同步**：IPC 契约测试更新为 39 个 `registerXxxHandlers`，preload 装配测试更新为 `reportReady` + 29 个命名空间，随共鸣录接入同步扩展
+- **测试契约同步**：IPC 契约测试更新为 39 个 `registerXxxHandlers`（现 40 个注册调用，2026-10-10 实测 `src/main/app/ipc-setup.ts`），preload 装配测试更新为 `reportReady` + 29 个命名空间（现 30 个命名空间 / 31 个键，2026-10-10 实测 `src/main/preload/api/`），随共鸣录接入同步扩展
 - **文档一致性**：`ARCHITECTURE` / `DEVELOPMENT` / `README` 中英四份文档同步补齐 2.5.0 共鸣录章节与工程不变量，版本号统一为 2.5.0
 
 ### 问题修复

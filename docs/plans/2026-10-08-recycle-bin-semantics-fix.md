@@ -1,5 +1,6 @@
 # 修复计划：删除功能与回收站功能不可用（最终版 · 已执行完毕）
 
+> 本文为 2026-10-08 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
 > 仓库：`D:/Zcode项目/WXNN XiangCe`（wxnn-photo-manager v2.5.3）
 > 方案 A（用户已拍板）：软删除 = 纯数据库标记（`is_deleted=1` + `delete_origin='user'`），文件原地保留不动；恢复 = 翻转标记即完好还原；彻底删除/清空回收站 = `fsp.unlink` 真删文件 + 硬删 DB；右键「永久删除」不变。
 

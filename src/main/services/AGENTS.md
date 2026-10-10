@@ -19,8 +19,7 @@ src/main/services/
 ├── file-service.ts                # 文件导出/移动/删除/重命名 + 命名规则变量替换
 ├── livephoto-service.ts           # Apple Live Photo 导出（JPG + MOV 配对）
 ├── log-service.ts                 # 日志/故障记录管理（列举/清理/打包上传）
-├── share-clipboard-service.ts     # Windows 剪贴板文件分享（CF_HDROP + PowerShell）
-├── share-clipboard-service.*.ts   # 剪贴板渠道检测辅助（微信/QQ/vivo办公等）
+├── share-clipboard-service.ts     # Windows 剪贴板文件分享（CF_HDROP + PowerShell + 微信/QQ/vivo 渠道检测）
 ├── share-wifi-service.ts          # WiFi 局域网分享（HTTP 文件下载 + PIN 鉴权）
 ├── thumbnail-phash-service.ts     # 缩略图生成 + pHash 计算（单条/批量/分级调度）
 ├── video-service.ts               # 视频处理（导出/裁剪/调速/帧截图/元数据）

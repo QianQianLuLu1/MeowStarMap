@@ -58,6 +58,8 @@ wrapHandler(ctx, schema, handler) =>
 
 以下通道的返回值**必须包含 `success: true`**，因为前端 `DuplicatesPage.tsx` 会检查此字段。
 
+> **本节范围**：仅覆盖重复/相似检测与回收站删除链路。`res.success` 这一「内层 success」约定在全仓并非只有本节这些通道——分类、编辑器、诊断、设置、批量操作等页面同样存在检查（检索方式：`grep -rn "\.success" src/renderer`）。这些通道未在此逐一列举，改动任何 handler 返回值前必须自行确认其调用方是否读 `success`；本节不构成完整通道清单。
+
 ### 2.1 `media:findDuplicates`
 
 | 属性         | 值                                              |
@@ -170,7 +172,7 @@ wrapHandler(ctx, schema, handler) =>
 
 - 软删除**不再搬动磁盘文件**：仅写 DB 标记 `is_deleted = 1` + `deleted_at` + `delete_origin = 'user'`，文件保留在原路径。「恢复」（`media:restore`）= 翻转标记并置 `delete_origin = NULL`，因此缩略图与打开均正常。原实现先调 `file:delete`（`shell.trashItem` 移入 Windows 系统回收站），而 Electron 无还原 API → 恢复只能翻转标记、文件实体回不来，表现为裂图与被完整性校验标记 `is_missing = 1`。
 - `delete_origin` 三态与重扫复位口径（唯一真源 `src/main/scanner/rescan-restore-sql.ts`）：`'user'` = 用户主动删除，重扫 UPSERT **不得**复位（否则「删了又回来」）；`'root'` = `softDeleteByRootPath`（移除扫描源且清空记录）的整批软删，重扫重新发现后允许复位回图库；`NULL` = 升级前存量记录，按修复前行为复位，不引入回归。谓词为 `游戏目录树 AND COALESCE(delete_origin, '') <> 'user'`（游戏树条件整体带括号，保证 `OR` 不泄漏到顶层）。
-- 检查 `res.success` 的调用方共 4 处：`src/renderer/hooks/useFileOperations.ts:305`（单文件软删）、`useFileOperations.ts:379`（批量软删）、`src/renderer/pages/DetailPage.tsx:205`、`src/renderer/components/gallery/FullscreenViewer.tsx:184`。后两者原走 §2.9 `media:delete`（硬删 DB 行 + 搬文件），记录根本进不了回收站；改走本通道后删除项才真正出现在回收站（D3）。
+- 检查 `res.success` 的调用方共 **6 处**（行号随改动漂移，按 `mediaAction.softDelete(` 调用点检索为准）：`src/renderer/hooks/useFileOperations.ts` 的单文件软删与批量软删两处、`src/renderer/pages/DetailPage.tsx`、`src/renderer/components/gallery/FullscreenViewer.tsx`，以及重复页 `src/renderer/pages/DuplicatesPage.tsx` 的单项删除与整组删除两处。其中详情页与全屏查看器原走 §2.9 `media:delete`（硬删 DB 行 + 搬文件），记录根本进不了回收站；改走本通道后删除项才真正出现在回收站（D3）。
 - `media:permanentDelete`（§2.7）阶段 1 的 `softDeleteForPermanentDelete` 同样写 `delete_origin = 'user'`：物理删除失败、文件仍在的条目留在回收站供重试，且不会被重扫复位。
 - 已知类型漂移（登记 DEBT-011 / DEBT-012，本次不改代码）：preload 侧声明为 `call<{ message: string }>`（`src/main/preload/api/media-action.ts:27`）少列 `success`，渲染端 `src/renderer/vite-env.d.ts:467` 声明为 `{ success: boolean; message: string }`（与 handler 实际返回一致）。运行期无危害——`call()` 原样透传 handler 的 data。
 

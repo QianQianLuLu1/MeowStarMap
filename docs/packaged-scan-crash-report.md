@@ -1,5 +1,6 @@
 # 打包版"启动后扫描阶段闪退"排查报告
 
+> 本文为 2026-09-27 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
 > 实施计划见 [packaged-scan-crash-diagnosis-plan.md](archive/packaged-scan-crash-diagnosis-plan.md)（已归档，不入仓）。排查日期：2026-09-27。
 
 ## 1. 结论速览

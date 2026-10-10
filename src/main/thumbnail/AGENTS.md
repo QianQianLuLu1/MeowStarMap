@@ -60,7 +60,7 @@ this.thumbnailGen.setWorkerBridge(this.thumbnailWorkerBridge) // bridge 注入�
 | [`../ipc/handlers/media-lifecycle-handler.ts`](../ipc/handlers/media-lifecycle-handler.ts) | 删除媒体时清理缩略图缓存：`cleanupThumbnailsForRows(rows, ctx.thumbnailGen.getCacheDir(), ...)` |
 | [`../services/thumbnail-phash-service.ts`](../services/thumbnail-phash-service.ts)         | 单条生成转发到 `ctx.thumbnailGen.generate(filePath, quality)`                                   |
 
-**构建产物约束**：`worker-entry.ts` 在 [`electron.vite.config.ts`](../../../electron.vite.config.ts) 的 `main.build.lib.entry` 中是**独立入口** `'thumbnail-worker'`，输出 `dist/main/main/thumbnail/worker-entry.js`。bridge 以 `path.join(__dirname, 'worker-entry.js')` fork。**改入口名或产物布局会直接导致 fork 失败**。
+**构建产物约束**：`worker-entry.ts` 在 [`electron.vite.config.ts`](../../../electron.vite.config.ts) 的 `main.build.lib.entry` 中是**独立入口** `'thumbnail-worker'`，输出 `dist/main/main/app/thumbnail-worker.js`。bridge 以 `path.join(__dirname, 'thumbnail-worker.js')` fork。**改入口名或产物布局会直接导致 fork 失败**。
 
 ## 2. worker 通信协议
 

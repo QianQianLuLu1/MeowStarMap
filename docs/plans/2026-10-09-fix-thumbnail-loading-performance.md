@@ -1,5 +1,7 @@
 # 缩略图加载性能优化实施计划
 
+> 本文为 2026-10-09 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
+
 ## 产品概述
 
 针对本地相册应用各板块（图库网格/列表/时间线/事件时间线/瀑布流、重复文件、回收站、套装画廊）缩略图加载缓慢的问题，执行“测量 → 定位 → 最小修复 → 回归”闭环：先建立可复现的性能基线，再用确定性计数与真实运行耗时定位瓶颈，只修复被证据证实的瓶颈。
@@ -172,7 +174,7 @@
 
 - 新增/调整的每个行为均实际执行 Red → Fix → Green；直接相关回归最终为 12 个文件、129 个用例全部通过。
 - `npm run verify`：typecheck、lint、core-gate、format、相关测试 5 项全部通过。
-- `npm test`：331 个文件、5236 个用例全部通过。
+- `npm test`：331 个文件、5236 个用例全部通过（现 334 个文件 / 5269 个用例，2026-10-10 全量 `npm test` 实测全绿）。
 - `npm run typecheck`：源码与脚本工具链全部通过。
 - `npm run lint`：0 error；11 个 BOM warning 为未改动文件的既有告警。
 - Windows 构建/打包、`verify:dist` 通过；`npm run e2e:smoke` 9/9 通过。

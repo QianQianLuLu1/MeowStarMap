@@ -78,8 +78,8 @@
 
 ### 语言与执行
 
-- 21/25 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
-- 仅 electron-builder 钩子用 `.cjs`（`after-pack-vc-runtime.cjs`），Vite stub 和图标生成用 `.js`。
+- 15/25 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
+- 其余 10 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成），6 个 `.ps1`（PowerShell 辅助脚本，如 `mimosa-episode-bridge.ps1`、`fix-harness-memory-path.ps1`）。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
 ### 错误处理与退出

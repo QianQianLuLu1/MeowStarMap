@@ -1,5 +1,7 @@
 # 共鸣录静态数据裁剪报告（T0 产物 + 卡池缩略图）
 
+> 本文为 2026-08-29 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
+
 - 日期：2026-08-29
 - 生成脚本：`scripts/generate-resonance-static-data.ts`、`scripts/generate-resonance-names.ts`、`scripts/copy-resonance-thumbnails.ts`
 - 数据来源：gongeo.us-nikki-tracker（dastrokes，MIT License，已获授权）master 分支只读克隆

@@ -1,5 +1,6 @@
 # 计划：学习回路可观测性补齐与检索/新鲜度判定记录
 
+> 本文为 2026-10-04 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
 > 日期：2026-10-04
 > 来源：/better-harness 评审发现 `learning-loop-retrieval-decision-undecidable`（报告 `d:\Users\Downloads\WXNN XiangCe（jiu)\.qoder\better-harness\2026-10-03\213222-wxnn-xiangce-jiu\findings.json`）
 > 性质：只读复核 + 项目侧记录。不创建新 Agent 资产，不合并/删除任何 Memory，不改动 `src/**`、`package.json`、钩子与既有报告文件

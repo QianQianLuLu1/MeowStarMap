@@ -53,12 +53,13 @@
 | --------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
 | 常见安装路径枚举（C: 及盘符变体命中）   | `src/main/scanner/game-directory-discovery.test.ts`                               | `findOfficialLauncherGamePaths` 命中 `C:\Program Files\InfinityNikki Launcher\InfinityNikki` 及 D: 变体；非游戏目录被 `validateGameRoot` 拒 |
 | 渠道优先级解析（启动器 > Steam > Epic） | `src/main/scanner/game-directory-discovery.test.ts`                               | 启动器命中后不查询 Steam/Epic 注册表键；三空返回 `[]`                                                                                       |
-| `findMediaDirectories` 接入优先级解析器 | `src/main/scanner/__tests__/worker-entry.findMediaDirectories.test.ts`            | 13 用例全过，行为等价于 steam+epic 合并                                                                                                     |
+| `findMediaDirectories` 接入优先级解析器 | `src/main/scanner/__tests__/worker-entry.findMediaDirectories.test.ts`            | 9 用例全过，行为等价于 steam+epic 合并                                                                                                      |
 | 隐藏目录强制遍历                        | `src/main/scanner/__tests__/scan-directory.hidden.test.ts`                        | `attrib +h` 标记的 GamePlayPhotos 内部文件仍被扫描入库                                                                                      |
 | 多 UID 自动隔离                         | `src/main/scanner/__tests__/scan-directory.multi-uid.test.ts`                     | 两数字 UID 下照片 `account_uid` 各自正确、无混同                                                                                            |
 | 原生相册子目录识别                      | `src/main/scanner/__tests__/path-classifier.album.test.ts`                        | `NikkiPhotos_HighQuality/LowQuality` 等归类正确、互不混同                                                                                   |
-| GamePlayPhotos 缩略图豁免               | `src/main/media-worker/worker-entry.test.ts`（既有 34 用例）                      | GamePlayPhotos 行被生成 SQL 排除；ScreenShot/普通路径正常生成                                                                               |
+| GamePlayPhotos 缩略图豁免               | `src/main/media-worker/worker-entry.test.ts`（既有 42 用例）                      | GamePlayPhotos 行被生成 SQL 排除；ScreenShot/普通路径正常生成                                                                               |
 | 原生 LQ 缩略图关联入库                  | `src/main/scanner/__tests__/worker-entry.native-thumbnail.test.ts`（既有 5 用例） | HQ+LQ 命中 → `thumbnail` = 原生 LQ 路径                                                                                                     |
 
-> 注：`game-directory-discovery.test.ts` 中"注册表全部失败 → 降级到配置文件解析（JSON 格式）"用例为
-> **改动前即存在的预先失败项**（与本次三渠道优先级改造无关，已用 `git stash` 基线复现），未纳入本次改动范围。
+> 注：`game-directory-discovery.test.ts` 中"注册表全部失败 → 降级到配置文件解析（JSON 格式）"用例曾为
+> **改动前即存在的预先失败项**（与本次三渠道优先级改造无关，当时已用 `git stash` 基线复现），未纳入该轮改动范围。
+> 现况（2026-10-10 全量 `npm test`：334 个测试文件 / 5269 个用例全绿）：该失败已不存在，此段保留为当轮取证记录。

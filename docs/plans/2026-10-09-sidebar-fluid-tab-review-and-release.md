@@ -1,5 +1,6 @@
 # 侧边栏流体滑块 Tab 指示器：代码审查 → 修复 → 提交 → 版本 2.5.3 → 重新打包
 
+> 本文为 2026-10-09 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
 > 日期：2026-10-09
 > 仓库：`D:/Zcode项目/WXNN XiangCe`（wxnn-photo-manager / NikkiGallery）
 > 范围：全部未提交改动（流体滑块 Tab 指示器）+ 版本核验 + Windows 打包重跑

@@ -72,10 +72,10 @@
 
 | 层            | 技术                          | 版本        | 选型理由                                           |
 | ------------- | ----------------------------- | ----------- | -------------------------------------------------- |
-| **运行时**    | Electron                      | 40.10       | 跨平台桌面应用框架，复用 Web 技术栈，支持原生 API  |
+| **运行时**    | Electron                      | 41.10       | 跨平台桌面应用框架，复用 Web 技术栈，支持原生 API  |
 | **前端框架**  | React                         | 19.2        | 生态成熟，团队熟悉度高，支持并发特性               |
 | **状态管理**  | Zustand                       | 5.0         | 轻量、TypeScript 友好，避免 Redux 模板代码         |
-| **构建工具**  | Vite                          | 5.4         | 渲染进程快速 HMR，Rollup 打包                      |
+| **构建工具**  | Vite                          | 6.4         | 渲染进程快速 HMR，Rollup 打包                      |
 | **类型系统**  | TypeScript                    | 5.9         | strict 模式，跨进程类型共享                        |
 | **样式方案**  | Tailwind CSS                  | 3.4         | 原子化 CSS，CSS 变量驱动主题                       |
 | **动画库**    | Motion                        | 12.42       | React 声明式动画，性能优于 CSS keyframes           |
@@ -86,7 +86,7 @@
 | **FFI 调用**  | koffi                         | 3.1         | 调用 nuan5_decryption.dll，比 node-ffi-napi 更现代 |
 | **参数校验**  | zod                           | 4.4         | TypeScript 优先的 schema 校验，IPC 边界必备        |
 | **国际化**    | i18next + react-i18next       | 26.3 / 17.0 | 标准 i18n 方案，支持命名空间                       |
-| **测试框架**  | Vitest                        | 1.6         | Vite 原生测试，零配置                              |
+| **测试框架**  | Vitest                        | 5.0         | Vite 原生测试，零配置                              |
 
 ### 2.2 关键依赖选型理由
 
@@ -96,7 +96,7 @@
 
 #### 为什么用 utilityProcess 而不是 worker_threads？
 
-Electron 40 提供 `utilityProcess` API，独立进程级隔离、独立事件循环、独立 V8 上下文，比 worker_threads 更适合 CPU 密集型任务（如 sharp 缩略图、pHash 计算）。五个 worker（scanner / database / media / thumbnail / video）各自独立，单个崩溃不影响主进程。
+Electron 41 提供 `utilityProcess` API，独立进程级隔离、独立事件循环、独立 V8 上下文，比 worker_threads 更适合 CPU 密集型任务（如 sharp 缩略图、pHash 计算）。六个 worker（scanner / media / thumbnail / video / database / decryption）各自独立，单个崩溃不影响主进程。
 
 #### 为什么用 better-sqlite3 而不是 sqlite3？
 
@@ -1151,13 +1151,14 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 
 | 文件/目录                 | 职责                                                   |
 | ------------------------- | ------------------------------------------------------ |
-| `install.ts`              | 预览环境安装脚本（注入 mock 数据到 window 全局）       |
+| `mock/install.ts`         | 预览环境安装脚本（注入 mock 数据到 window 全局）       |
 | `mock/`                   | mock 数据目录                                          |
 | `mock/data/`              | 静态 JSON 数据（media-samples/categories/profiles 等） |
 | `mock/database-mock.ts`   | 数据库 mock（模拟 mediaStore 的 IPC 响应）             |
 | `mock/event-mock.ts`      | 事件 mock（模拟 scanner:progress 等事件推送）          |
 | `mock/filesystem-mock.ts` | 文件系统 mock（模拟文件路径/缩略图 URL）               |
 | `mock/ipc-error.ts`       | IPC 错误 mock（模拟 IPC 调用失败的响应格式）           |
+| `mock/resonance-mock.ts`  | 共鸣录 mock（示例数据读取，写入提示不支持）            |
 
 ---
 
@@ -1167,22 +1168,22 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 
 `src/shared/types/index.ts` 作为统一导出入口，汇总 14 个域类型模块，全部采用"数据库行（XxxRow，蛇形）↔ 渲染模型（Xxx，驼峰）"双轨制。
 
-| 文件                   | 核心类型                                                                                                                                                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile`（27 字段）/ `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                         |
-| **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon`（7 个枚举）                                                                                                                                          |
-| **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                     |
-| **editor.ts**          | `HSLColorKey`（12 通道）/ `FilterParams`（22 调整项 + HSL + 曲线 + 色调分离 + LUT）/ `FilterPresetRow` / `EditHistoryRow` / `OperationType`（13 种操作）/ `OperationHistoryRow`                                                                     |
-| **watermark.ts**       | `WatermarkPosition`（9 + custom）/ `WatermarkStyle`（5 种）/ `BlendMode`（16 种）/ `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                       |
-| **settings.ts**        | `AppSettingRow` / `SettingKey`（29 个键枚举）/ `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap`（key → TS 类型映射）/ `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                  |
-| **ipc.ts**             | 重导出 `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`、`ShareChannel` / `WifiShareSession`、`MediaParamType` / `CameraParams` / `RichCameraParams`、`ImportOptions` / `ExportOptions`、**`IPC_CHANNELS`**（13 域 ~60 个通道名常量） |
-| **ipc-types.ts**       | `IpcError`（code/message/userMessage/details）、`IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`、`IpcProgress`、`IPC_ERROR_CODES`（9 个 IPC_* 错误码）                                                                           |
-| **progress.ts**        | `TaskType`（7 类任务：scan/duplicate/batch/watermark/import/video-edit/indexing）、`TaskPhase`（6 阶段）、统一任务进度状态（主进程 `task:progress` 通道推送）                                                                                       |
-| **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` 能力权限清单 / 业务扩展点常量与扩展响应类型                                                                                                                                                             |
-| **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / 调色、滤镜、LUT、水印参数的 XMP 自描述序列化结构                                                                                                                                                                 |
-| **duplicate.ts**       | `DuplicateItem` / 重复相似检测域类型（主进程 handler 返回值契约，渲染层 DuplicatesPage 消费）                                                                                                                                                       |
-| **resonance.ts**       | 共鸣录域类型 + zod schema + 导入上限常量（2.5.0 新增）                                                                                                                                                                                              |
-| **electron-api.ts**    | preload `electronAPI` 各命名空间方法签名与 DTO 类型快照（preload 层不内联类型定义）                                                                                                                                                                 |
+| 文件                   | 核心类型                                                                                                                                                                                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile`（27 字段）/ `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                    |
+| **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon`（7 个枚举）                                                                                                                                                     |
+| **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                |
+| **editor.ts**          | `HSLColorKey`（12 通道）/ `FilterParams`（22 调整项 + HSL + 曲线 + 色调分离 + LUT）/ `FilterPresetRow` / `EditHistoryRow` / `OperationType`（13 种操作）/ `OperationHistoryRow`                                                                                |
+| **watermark.ts**       | `WatermarkPosition`（9 + custom）/ `WatermarkStyle`（5 种）/ `BlendMode`（16 种）/ `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                  |
+| **settings.ts**        | `AppSettingRow` / `SettingKey`（29 个键枚举）/ `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap`（key → TS 类型映射）/ `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                             |
+| **ipc.ts**             | 重导出 `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`、`ShareChannel` / `WifiShareSession`、`MediaParamType` / `CameraParams` / `RichCameraParams`、`ImportOptions` / `ExportOptions`、**`IPC_CHANNELS`**（23 个域前缀 / 86 个唯一通道名常量） |
+| **ipc-types.ts**       | `IpcError`（code/message/userMessage/details）、`IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`、`IpcProgress`、`IPC_ERROR_CODES`（9 个 IPC_* 错误码）                                                                                      |
+| **progress.ts**        | `TaskType`（7 类任务：scan/duplicate/batch/watermark/import/video-edit/indexing）、`TaskPhase`（6 阶段）、统一任务进度状态（主进程 `task:progress` 通道推送）                                                                                                  |
+| **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` 能力权限清单 / 业务扩展点常量与扩展响应类型                                                                                                                                                                        |
+| **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / 调色、滤镜、LUT、水印参数的 XMP 自描述序列化结构                                                                                                                                                                            |
+| **duplicate.ts**       | `DuplicateItem` / 重复相似检测域类型（主进程 handler 返回值契约，渲染层 DuplicatesPage 消费）                                                                                                                                                                  |
+| **resonance.ts**       | 共鸣录域类型 + zod schema + 导入上限常量（2.5.0 新增）                                                                                                                                                                                                         |
+| **electron-api.ts**    | preload `electronAPI` 各命名空间方法签名与 DTO 类型快照（preload 层不内联类型定义）                                                                                                                                                                            |
 
 另注：`src/shared/settings-keys.ts` 定义渲染层可经 `settings:set` 自由写入的偏好 key 白名单（`RENDERER_PREF_KEYS`）与安全敏感 key 拒绝清单（`SECURITY_SENSITIVE_KEYS`）。
 
@@ -1618,7 +1619,7 @@ components / pages (展示)
 
 ### 11.4 关键依赖
 
-- **Electron 40.10** + **React 19.2** + **Zustand 5** + **Vite 5** + **TypeScript 5.9**
+- **Electron 41.10** + **React 19.2** + **Zustand 5** + **Vite 6** + **TypeScript 5.9**
 - **better-sqlite3 12** —— 同步 SQLite，主进程读 + worker 写
 - **sharp 0.35** —— 图片处理（缩略图、编辑器 pipeline）
 - **zod 4** —— IPC 参数校验
@@ -2000,7 +2001,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 1.6，263 个测试文件 / 4476 个用例（2026-09-06 实测，全绿）。
+- Vitest 5.0，334 个测试文件 / 5269 个用例（2026-10-10 实测，全绿）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---

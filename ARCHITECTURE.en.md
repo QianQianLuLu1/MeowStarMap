@@ -72,10 +72,10 @@ The project ships two application forms that **share the same UI layout, color s
 
 | Layer                    | Technology                    | Version     | Rationale                                                                         |
 | ------------------------ | ----------------------------- | ----------- | --------------------------------------------------------------------------------- |
-| **Runtime**              | Electron                      | 40.10       | Cross-platform desktop app framework; reuses web tech stack; supports native APIs |
+| **Runtime**              | Electron                      | 41.10       | Cross-platform desktop app framework; reuses web tech stack; supports native APIs |
 | **Frontend Framework**   | React                         | 19.2        | Mature ecosystem; high team familiarity; supports concurrent features             |
 | **State Management**     | Zustand                       | 5.0         | Lightweight, TypeScript-friendly; avoids Redux boilerplate                        |
-| **Build Tool**           | Vite                          | 5.4         | Fast HMR for renderer; Rollup bundling                                            |
+| **Build Tool**           | Vite                          | 6.4         | Fast HMR for renderer; Rollup bundling                                            |
 | **Type System**          | TypeScript                    | 5.9         | strict mode; cross-process type sharing                                           |
 | **Styling**              | Tailwind CSS                  | 3.4         | Atomic CSS; CSS variable-driven theming                                           |
 | **Animation Library**    | Motion                        | 12.42       | Declarative React animations; outperforms CSS keyframes                           |
@@ -86,7 +86,7 @@ The project ships two application forms that **share the same UI layout, color s
 | **FFI**                  | koffi                         | 3.1         | Calls nuan5_decryption.dll; more modern than node-ffi-napi                        |
 | **Parameter Validation** | zod                           | 4.4         | TypeScript-first schema validation; essential at IPC boundary                     |
 | **i18n**                 | i18next + react-i18next       | 26.3 / 17.0 | Standard i18n solution; supports namespaces                                       |
-| **Test Framework**       | Vitest                        | 1.6         | Vite-native testing; zero config                                                  |
+| **Test Framework**       | Vitest                        | 5.0         | Vite-native testing; zero config                                                  |
 
 ### 2.2 Key Dependency Rationale
 
@@ -96,7 +96,7 @@ The project uses the in-house `concurrency.ts` (`runWithConcurrency`). Reason: p
 
 #### Why utilityProcess instead of worker_threads?
 
-Electron 40 provides the `utilityProcess` API with process-level isolation, independent event loop, and independent V8 context — better suited for CPU-intensive tasks (sharp thumbnails, pHash computation) than worker_threads. The five workers (scanner / database / media / thumbnail / video) are independent; a single crash does not affect the main process.
+Electron 41 provides the `utilityProcess` API with process-level isolation, independent event loop, and independent V8 context — better suited for CPU-intensive tasks (sharp thumbnails, pHash computation) than worker_threads. The six workers (scanner / media / thumbnail / video / database / decryption) are independent; a single crash does not affect the main process.
 
 #### Why better-sqlite3 instead of sqlite3?
 
@@ -1146,13 +1146,14 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 
 | File/Directory            | Responsibilities                                                        |
 | ------------------------- | ----------------------------------------------------------------------- |
-| `install.ts`              | Preview environment setup script (injects mock data into window global) |
+| `mock/install.ts`         | Preview environment setup script (injects mock data into window global) |
 | `mock/`                   | Mock data directory                                                     |
 | `mock/data/`              | Static JSON data (media-samples/categories/profiles etc.)               |
 | `mock/database-mock.ts`   | Database mock (simulates mediaStore IPC responses)                      |
 | `mock/event-mock.ts`      | Event mock (simulates scanner:progress and other event pushes)          |
 | `mock/filesystem-mock.ts` | Filesystem mock (simulates file paths/thumbnail URLs)                   |
 | `mock/ipc-error.ts`       | IPC error mock (simulates IPC call failure response format)             |
+| `mock/resonance-mock.ts`  | Resonance mock (sample data reads; writes report unsupported)           |
 
 ---
 
@@ -1162,22 +1163,22 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 
 `src/shared/types/index.ts` is the unified export entry, aggregating 14 domain type modules. All adopt the "database row (XxxRow, snake_case) ↔ renderer model (Xxx, camelCase)" dual-track system.
 
-| File                   | Core Types                                                                                                                                                                                                                                                            |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile` (27 fields) / `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                         |
-| **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon` (7 enums)                                                                                                                                                              |
-| **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                       |
-| **editor.ts**          | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (13 op types) / `OperationHistoryRow`                                                                        |
-| **watermark.ts**       | `WatermarkPosition` (9 + custom) / `WatermarkStyle` (5 types) / `BlendMode` (16 types) / `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                   |
-| **settings.ts**        | `AppSettingRow` / `SettingKey` (29 key enums) / `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap` (key → TS type mapping) / `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                               |
-| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (13 domains ~60 channel name constants) |
-| **ipc-types.ts**       | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (9 IPC_* error codes)                                                                                             |
-| **progress.ts**        | `TaskType` (7 task types: scan/duplicate/batch/watermark/import/video-edit/indexing), `TaskPhase` (6 phases), unified task progress state (pushed via the main-process `task:progress` channel)                                                                       |
-| **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` capability list / business extension point constants and extension response types                                                                                                                                         |
-| **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / XMP self-describing serialization structures for color, filter, LUT and watermark params                                                                                                                                           |
-| **duplicate.ts**       | `DuplicateItem` / duplicate-similarity domain types (main-process handler return contract, consumed by DuplicatesPage)                                                                                                                                                |
-| **resonance.ts**       | Resonance domain types + zod schemas + import limit constants (added in 2.5.0)                                                                                                                                                                                        |
-| **electron-api.ts**    | Type snapshots of preload `electronAPI` namespace method signatures and DTOs (the preload layer does not inline type definitions)                                                                                                                                     |
+| File                   | Core Types                                                                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile` (27 fields) / `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                                         |
+| **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon` (7 enums)                                                                                                                                                                              |
+| **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                                       |
+| **editor.ts**          | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (13 op types) / `OperationHistoryRow`                                                                                        |
+| **watermark.ts**       | `WatermarkPosition` (9 + custom) / `WatermarkStyle` (5 types) / `BlendMode` (16 types) / `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                                   |
+| **settings.ts**        | `AppSettingRow` / `SettingKey` (29 key enums) / `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap` (key → TS type mapping) / `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                                               |
+| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (23 domain prefixes / 86 unique channel name constants) |
+| **ipc-types.ts**       | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (9 IPC_* error codes)                                                                                                             |
+| **progress.ts**        | `TaskType` (7 task types: scan/duplicate/batch/watermark/import/video-edit/indexing), `TaskPhase` (6 phases), unified task progress state (pushed via the main-process `task:progress` channel)                                                                                       |
+| **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` capability list / business extension point constants and extension response types                                                                                                                                                         |
+| **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / XMP self-describing serialization structures for color, filter, LUT and watermark params                                                                                                                                                           |
+| **duplicate.ts**       | `DuplicateItem` / duplicate-similarity domain types (main-process handler return contract, consumed by DuplicatesPage)                                                                                                                                                                |
+| **resonance.ts**       | Resonance domain types + zod schemas + import limit constants (added in 2.5.0)                                                                                                                                                                                                        |
+| **electron-api.ts**    | Type snapshots of preload `electronAPI` namespace method signatures and DTOs (the preload layer does not inline type definitions)                                                                                                                                                     |
 
 ### 7.2 Error Architecture (shared/errors/)
 
@@ -1591,7 +1592,7 @@ components / pages (display)
 
 ### 11.4 Key Dependencies
 
-- **Electron 40.10** + **React 19.2** + **Zustand 5** + **Vite 5** + **TypeScript 5.9**
+- **Electron 41.10** + **React 19.2** + **Zustand 5** + **Vite 6** + **TypeScript 5.9**
 - **better-sqlite3 12** — synchronous SQLite; main process reads + worker writes
 - **sharp 0.35** — image processing (thumbnails, editor pipeline)
 - **zod 4** — IPC parameter validation
@@ -1974,7 +1975,7 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- Vitest 1.6, 263 test files / 4476 cases (measured 2026-09-06, all green).
+- Vitest 5.0, 334 test files / 5269 cases (measured 2026-10-10, all green).
 - The two environment-related failures in the historical baseline (`path-safety.test.ts` read-only-directory case, `GalleryStackOverflow.test.tsx`) were fixed in 2.5.0; there are currently no pre-existing failures.
 
 ---

@@ -17,7 +17,7 @@ Windows 上 Node.js/Electron 的 `spawn` 报 `EFTYPE`，等价于 Win32 错误
 | 架构不符              | 非 x64 PE（如 ARM64 裸机跑 x64 无模拟）                                                                       |
 
 错误如何升级为"启动失败"弹窗：未挂 `error` 监听的 spawn 失败 → `uncaughtException` →
-`early-crash-guard.reportEarlyFatal`（`src/main/utils/early-crash-guard.ts:139-235`）→
+`early-crash-guard.reportEarlyFatal`（`src/main/utils/early-crash-guard.ts:141-244`）→
 写 `startup-errors.log` → 弹窗 → `app.exit(1)`。主窗口创建后同类错误已降级为
 "程序出错 / Runtime Error" 非致命弹窗，不退出。
 
@@ -65,14 +65,17 @@ where.exe <命令名>
 
 ## 4. 附：本仓库子进程调用点审计表（定位 `path=` 后对照）
 
+> 下表 `file:line` 为 2026-10-10 按符号检索的实测值。行号会随代码改动漂移，定位时请以调用点符号
+> （`execFile` / `execFileSync` / `spawn` / `exec`）为准，不要把行号当稳定锚点。
+
 | 调用点（file:line）                                                                                                | 目标                                     | 功能域               | 错误处理现状                                                                                               |
 | ------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- | -------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `src/main/app/lifecycle.ts:109,123,134`                                                                            | powershell / taskkill                    | 单实例锁冲突清理     | try/catch（同步）                                                                                          |
 | `src/main/app/lifecycle.ts:169,192`                                                                                | taskmgr                                  | 锁冲突对话框按钮     | `.on('error')`（ebb2044 加）                                                                               |
 | `src/main/app/desktop-shortcut.ts:124`                                                                             | reg                                      | 桌面快捷方式创建     | callback err → resolve(null)                                                                               |
 | `src/main/app/permission.ts:37`                                                                                    | powershell                               | 管理员重启           | `child.on('error')` 降级 relaunch                                                                          |
-| `src/main/scanner/game-directory-discovery.ts:409,506,919`                                                         | reg / powershell                         | 游戏目录发现         | callback err → resolve(null)                                                                               |
-| `src/main/services/share-clipboard-service.ts:414,542,609,644,802,871`                                             | reg / wmic / powershell / tasklist / cmd | 分享检测/启动        | callback err → 降级                                                                                        |
+| `src/main/scanner/game-directory-discovery.ts:411,508,966`                                                         | reg / powershell                         | 游戏目录发现         | callback err → resolve(null)                                                                               |
+| `src/main/services/share-clipboard-service.ts:315,434,562,629,664,822,891`                                         | reg / wmic / powershell / tasklist / cmd | 分享检测/启动        | callback err → 降级                                                                                        |
 | ffmpeg / ffprobe（`video-probe.ts`、`media-worker/worker-entry.ts`、`thumbnail/generator.ts`、`ffmpeg-runner.ts`） | ffmpeg-static / ffprobe-static           | 视频扫描/缩略图/剪辑 | error 事件 → reject（**v2.5.2 起：spawn 类错误落 startup-errors.log，stage 前缀 `runtime-spawn-error:`**） |
 | 6 处 `utilityProcess.fork`（scanner/media/database/thumbnail/video/decryption bridge）                             | electron.exe                             | worker               | READY 超时 + exit 处理（fork 的是 electron.exe 自身，不会产生 EFTYPE）                                     |
 

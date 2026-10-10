@@ -48,24 +48,24 @@
 | 数据库   | SQLite (better-sqlite3 12.11)     |
 | 图片处理 | sharp 0.35                        |
 | 视频处理 | ffmpeg-static + fluent-ffmpeg     |
-| 构建工具 | Vite 5.4                          |
+| 构建工具 | Vite 6.4                          |
 | 动画库   | Motion 12.42                      |
 | 国际化   | i18next 26.3 + react-i18next 17.0 |
 | 全文搜索 | FlexSearch 0.8                    |
 | FFI 调用 | koffi 3.1                         |
 | 参数校验 | zod 4.4                           |
-| 测试框架 | Vitest 1.6                        |
+| 测试框架 | Vitest 5.0                        |
 
 ### 下载安装
 
-- **GitHub Releases**：前往 [Releases 页面](../../releases) 下载最新版安装包
+- **GitHub Releases**：前往 [Releases 页面](https://github.com/QianQianLuLu1/NikkiGallery/releases) 获取安装包（仓库尚未推送版本 tag，该页面可能暂无内容）
 - **其他渠道**：抖音 / B站 搜索「纤璐不会玩摄影」获取下载指引
 
 **系统要求**：Windows 10 (1803+) / Windows 11，x64 架构
 
 ### 开发
 
-**前提条件**：[Node.js](https://nodejs.org/) >= 20
+**前提条件**：[Node.js](https://nodejs.org/) >= 22.12.0
 
 ```bash
 git clone <repo-url>
@@ -163,24 +163,24 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 | Database   | SQLite (better-sqlite3 12.11)     |
 | Image      | sharp 0.35                        |
 | Video      | ffmpeg-static + fluent-ffmpeg     |
-| Build      | Vite 5.4                          |
+| Build      | Vite 6.4                          |
 | Animation  | Motion 12.42                      |
 | i18n       | i18next 26.3 + react-i18next 17.0 |
 | Search     | FlexSearch 0.8                    |
 | FFI        | koffi 3.1                         |
 | Validation | zod 4.4                           |
-| Testing    | Vitest 1.6                        |
+| Testing    | Vitest 5.0                        |
 
 ### Download
 
-- **GitHub Releases**: Visit the [Releases page](../../releases) for the latest installer
+- **GitHub Releases**: Visit the [Releases page](https://github.com/QianQianLuLu1/NikkiGallery/releases) for the installer (no version tags have been pushed yet, so the page may be empty)
 - **Other channels**: Search "纤璐不会玩摄影" on Douyin / Bilibili for download guides
 
 **Requirements**: Windows 10 (1803+) / Windows 11, x64 architecture
 
 ### Development
 
-**Prerequisites**: [Node.js](https://nodejs.org/) >= 20
+**Prerequisites**: [Node.js](https://nodejs.org/) >= 22.12.0
 
 ```bash
 git clone <repo-url>

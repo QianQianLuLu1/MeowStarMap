@@ -25,7 +25,7 @@
 
 | Software    | Version       | Notes                                                                     |
 | ----------- | ------------- | ------------------------------------------------------------------------- |
-| **Node.js** | 20.x LTS      | `.node-version` in the project root pins to `20`; Node < 20 will not work |
+| **Node.js** | 22.x LTS      | `.node-version` in the project root pins to `22`; Node < 22 will not work |
 | **npm**     | 10+           | Bundled with Node.js; no separate install needed                          |
 | **Git**     | any           | Used for version control; recommended                                     |
 | **Windows** | 10 1803+ / 11 | Build target platform; macOS and Linux are not supported                  |
@@ -44,7 +44,7 @@
 node -v
 ```
 
-Expected output: `v20.x.x`.
+Expected output: `v22.x.x`.
 
 ```bash
 npm -v

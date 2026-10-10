@@ -58,7 +58,7 @@ this.mediaWorkerManager = new MediaWorkerManager(this.mediaWorkerBridge) // brid
 | [`../ipc/handlers/media-handler.ts`](../ipc/handlers/media-handler.ts)             | 注册 `media:*` 通道；只监听事件广播                                                                                             |
 | [`../services/thumbnail-phash-service.ts`](../services/thumbnail-phash-service.ts) | 薄壳服务：`generateThumbnailsForUnprocessed` / `generatePhashForUnprocessed` / `markDuplicates` 转发到 `ctx.mediaWorkerManager` |
 
-**构建产物约束**：`worker-entry.ts` 在 [`electron.vite.config.ts`](../../../electron.vite.config.ts) 的 `main.build.lib.entry` 中是**独立入口** `'media-worker'`，输出 `dist/main/main/media-worker/worker-entry.js`。bridge 以 `path.join(__dirname, 'worker-entry.js')` fork。**改入口名或产物布局会直接导致 fork 失败**——5 个 worker（scanner / media / thumbnail / video / decryption）都靠区分性文件名 fork。
+**构建产物约束**：`worker-entry.ts` 在 [`electron.vite.config.ts`](../../../electron.vite.config.ts) 的 `main.build.lib.entry` 中是**独立入口** `'media-worker'`，输出 `dist/main/main/app/media-worker.js`。bridge 以 `path.join(__dirname, 'media-worker.js')` fork。**改入口名或产物布局会直接导致 fork 失败**——6 个 worker 入口（scanner / media / thumbnail / video / database / decryption）都靠区分性文件名 fork。
 
 **DB 连接**：worker 内部 `new Database(dbPath)`（惰性 `require('better-sqlite3')` + `resolveAsarUnpackedPath` 修正 asar 解包路径），**不持有 `DatabaseManager`**。PRAGMA 与主进程一致（WAL / foreign_keys / synchronous=NORMAL / cache_size=-20000 / temp_store=MEMORY / mmap_size / wal_autocheckpoint=1000），额外加 worker 独有的 `busy_timeout = 5000`。
 

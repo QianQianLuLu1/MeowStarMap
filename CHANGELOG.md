@@ -354,6 +354,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 <!-- 在文件末尾维护版本号锚点链接，便于自动跳转 -->
 
+> 注：本仓库尚未推送任何 git tag，因此以下 `compare/vX...vY` 与 `releases/tag/vX` 链接需在建立对应 tag 后方可访问；保留原链接形式是为了不销毁历史版本记录。
+
 [Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.3...HEAD
 [2.5.3]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.2...v2.5.3
 [2.5.2]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...v2.5.2

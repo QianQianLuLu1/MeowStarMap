@@ -1,5 +1,6 @@
 # 计划：QMind Knowledge 插件同名碰撞归属记录
 
+> 本文为 2026-10-04 轮次快照，当前口径以主规约文档为准（生命周期/约定见根 AGENTS.md 与 docs/CODING_CONVENTIONS.md；通道见 docs/IPC_CONTRACT.md）。
 > 日期：2026-10-04
 > 来源：/better-harness 资产完整性检查发现 `qmind-knowledge-cn` 与 `qmind-knowledge-cn-vpc` 的 `displayName` 均为 "QMind Knowledge" 形成同名碰撞组
 > 性质：只读判定 + 项目侧记录，不改动 Plugin 启用/停用/卸载状态

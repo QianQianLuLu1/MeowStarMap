@@ -57,7 +57,7 @@ React 19 + TypeScript（strict）+ Zustand + Tailwind CSS 3 + i18next 的前端�
 ## 4. i18n 使用（`i18n/`）
 
 - 组件内用 `react-i18next` 的 `const { t } = useTranslation()` 取翻译；**禁止** 硬编码用户可见文本。
-- 中文 `zh-CN` 为基准语言静态加载，其余 12 种语言（`en`/`ja`/`ko`/`fr`/`de`/`es`/`pt`/`ru`/`th`/`vi`/`zh-TW`，含 `auto`）经 `import()` 动态加载以拆分 chunk；语言偏好持久化到 `localStorage`，`'auto'` 跟随 `navigator.language`。对外 API：`SUPPORTED_LANGUAGES`、`changeLanguage`、`getCurrentLanguage`、`detectSystemLanguage`。
+- 中文 `zh-CN` 为基准语言静态加载，其余 11 种语言（`en`/`ja`/`ko`/`fr`/`de`/`es`/`pt`/`ru`/`th`/`vi`/`zh-TW`，另有 `auto` 跟随系统）经 `import()` 动态加载以拆分 chunk；语言偏好持久化到 `localStorage`，`'auto'` 跟随 `navigator.language`。对外 API：`SUPPORTED_LANGUAGES`、`changeLanguage`、`getCurrentLanguage`、`detectSystemLanguage`。
 - 新增/修改文案 key 后运行 `npm run i18n:guard` 校验缺失键；提交信息涉及 i18n key 新增需在 PR 描述登记。
 - `AppError` 的 UI 展示文案经 `extractUserMessage(error)`（`shared/errors/app-error.ts`）获取，`useErrorToast` 钩子已封装此优先级（`userMessage` > `message` > `String(error)` > 兜底翻译），业务代码直接复用 `useErrorToast`，`SUPPORTED_LANGUAGES` 中的语言 endonym（自称名）按国际惯例不翻译，属有意豁免。
 
