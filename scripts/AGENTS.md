@@ -8,17 +8,18 @@
 
 ## 目录结构
 
-25 个文件，按功能分为以下子域：
+40 个文件，按功能分为以下子域：
 
 ### 打包与构建
 
-| 文件                        | 调用方式                                         | 职责                                                                                         |
-| --------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| `pre-dist-check.ts`         | `npm run pre-dist-check` / `npm run verify:dist` | **打包前产物校验闸门**（13+ 项：产物存在性/时间戳/修复点/ABI 一致性/crossorigin/协议实现等） |
-| `after-pack-vc-runtime.cjs` | `package.json` `build.afterPack` 自动调用        | electron-builder `afterPack` 钩子，将 VC++ 2015-2022 运行库 DLL 随包分发                     |
-| `check-doc-versions.ts`     | `npm run pre-dist-check` 内部调用                | 校验 README 中 Electron 版本与 package.json 一致                                             |
-| `reset.ts`                  | `npm run reset`                                  | 全量清理 dist/cache/.vite/tsbuildinfo                                                        |
-| `electron-browser-stub.js`  | 构建配置引用                                     | Vite resolve.alias 目标，将渲染进程残留的 `import 'electron'` 替换为空 stub                  |
+| 文件                         | 调用方式                                         | 职责                                                                                                 |
+| ---------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `pre-dist-check.ts`          | `npm run pre-dist-check` / `npm run verify:dist` | **打包前产物校验闸门**（13+ 项：产物存在性/时间戳/修复点/ABI 一致性/crossorigin/协议实现等）         |
+| `after-pack-vc-runtime.cjs`  | `package.json` `build.afterPack` 自动调用        | electron-builder `afterPack` 钩子，将 VC++ 2015-2022 运行库 DLL 随包分发                             |
+| `check-doc-versions.ts`      | `npm run pre-dist-check` 内部调用                | 校验 README 中 Electron 版本与 package.json 一致                                                     |
+| `check-changelog-release.ts` | `npm run pre-dist-check` 内部调用                | 校验 CHANGELOG.md 已收口（package.json 版本有对应节、`[Unreleased]` 无待发布条目），未收口即阻断打包 |
+| `reset.ts`                   | `npm run reset`                                  | 全量清理 dist/cache/.vite/tsbuildinfo                                                                |
+| `electron-browser-stub.js`   | 构建配置引用                                     | Vite resolve.alias 目标，将渲染进程残留的 `import 'electron'` 替换为空 stub                          |
 
 ### i18n 治理（`i18n/`）
 
@@ -67,18 +68,19 @@
 
 ### 测试
 
-| 文件                                    | 覆盖范围                                                                |
-| --------------------------------------- | ----------------------------------------------------------------------- |
-| `__tests__/audit-config.test.ts`        | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性） |
-| `__tests__/find-related-tests.test.ts`  | 源文件 → 相关测试匹配的共享规则纯函数单测                               |
-| `__tests__/verify-format-scope.test.ts` | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试          |
-| `i18n/__tests__/i18n-scripts.test.ts`   | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                      |
+| 文件                                        | 覆盖范围                                                                |
+| ------------------------------------------- | ----------------------------------------------------------------------- |
+| `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性） |
+| `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                               |
+| `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试          |
+| `__tests__/check-changelog-release.test.ts` | 变更日志收口闸门：纯函数单测（正常/异常/边界）+ 真实仓库结构契约测试    |
+| `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                      |
 
 ## 编码约定
 
 ### 语言与执行
 
-- 15/25 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
+- 27/40 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 10 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成），6 个 `.ps1`（PowerShell 辅助脚本，如 `mimosa-episode-bridge.ps1`、`fix-harness-memory-path.ps1`）。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
