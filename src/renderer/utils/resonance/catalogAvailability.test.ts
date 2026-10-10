@@ -4,6 +4,7 @@ import {
   isCatalogEntryAvailableInScope,
   filterCatalogIdsByRegionScope
 } from './catalogAvailability'
+import { loadCatalog } from './staticData'
 
 /**
  * 区域可用性覆盖表测试：global/cn 双服目录差异逐条判定。
@@ -40,6 +41,20 @@ describe('isCatalogEntryAvailableInScope', () => {
     expect(isCatalogEntryAvailableInScope('item', 1021720040, 'global')).toBe(true)
     expect(isCatalogEntryAvailableInScope('item', 1021720040, 'cn')).toBe(false)
   })
+
+  it('上游 2.10.1 已把两条 cn 限定转为全球可用，覆盖表须剔除', async () => {
+    // 依据：上游 65bb3d8f 的 shared/utils/catalogAvailability.ts 删除了 1021780109 / 1021940016 两条 cn 覆盖。
+    // 先证明二者仍在 2.10.1 图鉴目录中（是「转全球可用」而非条目下架），再断言双服均可用。
+    const catalog = await loadCatalog()
+    const itemIds = new Set((catalog!.items as Array<{ id: number }>).map((item) => item.id))
+    expect(itemIds.has(1021780109)).toBe(true)
+    expect(itemIds.has(1021940016)).toBe(true)
+
+    expect(isCatalogEntryAvailableInScope('item', 1021780109, 'global')).toBe(true)
+    expect(isCatalogEntryAvailableInScope('item', 1021780109, 'cn')).toBe(true)
+    expect(isCatalogEntryAvailableInScope('item', 1021940016, 'global')).toBe(true)
+    expect(isCatalogEntryAvailableInScope('item', 1021940016, 'cn')).toBe(true)
+  }, 30_000)
 
   it('scope 非法时回退 global 语义', () => {
     expect(isCatalogEntryAvailableInScope('item', 1021720039, 'jp' as never)).toBe(false)

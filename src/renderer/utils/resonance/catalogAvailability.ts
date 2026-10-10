@@ -14,8 +14,6 @@ const ITEM_REGION_OVERRIDES = new Map<number, CatalogRegionScope>([
   [1021720039, 'cn'],
   [1021720040, 'global'],
   [1021780027, 'cn'],
-  [1021780109, 'cn'],
-  [1021940016, 'cn'],
   [1028780027, 'global']
 ])
 
