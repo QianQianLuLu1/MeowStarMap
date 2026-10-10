@@ -136,7 +136,11 @@ export const DEFAULT_HARD_RULES: Record<string, PerfMetricRule> = {
   'media-list-page500': { maxMs: 3_000 },
   'find-duplicates': { maxMs: 180_000 },
   'find-duplicates-throughput': { minThroughput: 25 },
-  'cache-get-stats': { maxMs: 1_000 }
+  'cache-get-stats': { maxMs: 1_000 },
+  // 缩略图链路（fix-thumbnail-loading-performance-round2 节点0）：
+  // 阈值先取宽松硬护栏，实测稳定后用 npm run perf:save-baseline 固化为相对基线判定
+  'thumbnail-generate-p95': { maxMs: 8_000 },
+  'first-thumbnail-visible': { maxMs: 15_000 }
 }
 
 export function median(values: number[]): number {
@@ -226,6 +230,61 @@ export async function loadBaseline(): Promise<PerfBaseline | null> {
     }
     return null
   }
+}
+
+/**
+ * 日志行去重键：electron-log 会把同一事件同时写进 `main.log` 与 `main-<日期>.log`，
+ * 两份的时间戳格式还不一样（ISO UTC 与本地空格分隔），按行直接计数会把一次事件数成两次
+ * （本机实测：`[Thumbnail Cleanup] 清理 144 个孤儿缩略图` 被数成 2 条）。
+ *
+ * 键 = 「秒级 epoch」+ 去掉级别前缀后的正文。用秒而非毫秒：两份写入时刻实测差 1ms
+ * （`.094Z` vs `.095`），按毫秒分桶去不掉重。
+ * 无法识别的行原样返回（不参与合并）。
+ */
+export function logLineKey(line: string): string {
+  const m = /^\s*\[([^\]]+)\]\s*\[(?:info|warn|error|debug|trace)\]\s*(.*)$/i.exec(line)
+  if (!m) return line.trim()
+  const raw = m[1].trim()
+  const isoish = raw.includes('T') ? raw : raw.replace(' ', 'T')
+  const ms = Date.parse(isoish)
+  return `${Number.isNaN(ms) ? raw : Math.floor(ms / 1000)}|${m[2].trim()}`
+}
+
+/**
+ * 统计应用日志中匹配某条正则的行数，并回传最多 3 条原文样本。
+ * 用途：缩略图链路的「回写数据库失败」等告警属于副作用型缺陷，单靠耗时指标看不出来，
+ * 必须从 {userData}/logs 里数出来才能判定「这次到底有没有踩到」。日志缺失返回 0，不抛错。
+ */
+export async function countLogPattern(
+  userDataDir: string,
+  pattern: RegExp
+): Promise<{ count: number; samples: string[] }> {
+  const logDir = path.join(userDataDir, 'logs')
+  let entries: string[] = []
+  try {
+    entries = await fs.readdir(logDir)
+  } catch {
+    return { count: 0, samples: [] }
+  }
+  const seen = new Set<string>()
+  const samples: string[] = []
+  for (const entry of entries) {
+    if (!entry.endsWith('.log')) continue
+    let raw = ''
+    try {
+      raw = await fs.readFile(path.join(logDir, entry), 'utf-8')
+    } catch {
+      continue
+    }
+    for (const line of raw.split(/\r?\n/)) {
+      if (!pattern.test(line)) continue
+      const key = logLineKey(line)
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (samples.length < 3) samples.push(line.slice(0, 240))
+    }
+  }
+  return { count: seen.size, samples }
 }
 
 /** 落盘运行结果：带时间戳存档 + latest.json（供基线提升脚本读取） */

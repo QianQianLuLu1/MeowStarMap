@@ -37,14 +37,23 @@ export interface LaunchedApp {
   userDataDir: string
 }
 
+export interface LaunchOptions {
+  /**
+   * 复用指定 userData 目录（默认每次新建 .cache/e2e-smoke-<ts>）。
+   * 用途：同一份库做「二次启动」测量——只有复用目录才能看出跨会话是否重复生成。
+   */
+  userDataDir?: string
+}
+
 /**
  * 用产物自带 Electron 启动应用（Playwright 官方 _electron.launch，无需下载浏览器二进制）。
  * --user-data-dir 指向临时目录：隔离 CI 残留/本机数据，并验证首启建库迁移路径。
  */
-export async function launchApp(): Promise<LaunchedApp> {
+export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedApp> {
   const exe = await findUnpackedExe()
   // userData 放工程内 .cache/：兼容受限沙箱（仅允许写工作区）；CI 上同样可用
-  const userDataDir = path.join(ROOT_DIR, '.cache', `e2e-smoke-${Date.now()}`)
+  const userDataDir =
+    options.userDataDir ?? path.join(ROOT_DIR, '.cache', `e2e-smoke-${Date.now()}`)
   // 排障线索：打印解析到的 exe 与 userData（中文路径风险项，见计划 §7.2）
   process.stdout.write(`[e2e] executable: ${exe}\n`)
   process.stdout.write(`[e2e] userData:   ${userDataDir}\n`)
@@ -127,7 +136,10 @@ export async function collectDiagLogs(userDataDir: string, destDir: string): Pro
  * 关闭兜底（计划 §5）：close 失败（如 8s 白屏诊断原生对话框阻塞）时 kill 进程，
  * 防止 CI 挂起；tempDir 清理失败容忍（Windows 文件锁）。
  */
-export async function closeApp(launched: LaunchedApp | undefined): Promise<void> {
+export async function closeApp(
+  launched: LaunchedApp | undefined,
+  options: { keepUserData?: boolean } = {}
+): Promise<void> {
   if (!launched) return
   try {
     await launched.app.close()
@@ -138,6 +150,8 @@ export async function closeApp(launched: LaunchedApp | undefined): Promise<void>
       // 进程已退出
     }
   }
+  // keepUserData：二次启动测量需要保留同一份库与 Chromium 磁盘缓存，交由调用方清理
+  if (options.keepUserData) return
   try {
     await fs.rm(launched.userDataDir, { recursive: true, force: true })
   } catch {

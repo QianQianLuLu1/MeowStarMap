@@ -24,19 +24,29 @@
 （pathGuard 对 userData 目录始终放行，扫描无需额外授权）。可用环境变量
 `PERF_DATASET_IMAGES=<数量>` 覆盖规模。
 
-| 指标 ID                      | 场景                                             | 单位    | 绝对护栏 | 基线容忍  |
-| ---------------------------- | ------------------------------------------------ | ------- | -------- | --------- |
-| `cold-start-first-paint`     | 冷启动：应用启动 + 首启建库/迁移 + 首屏渲染      | ms      | ≤ 15000  | 基线 × 3  |
-| `scan-ingest`                | 扫描入库（指定目录全量扫描 1500 张）             | ms      | ≤ 30000  | 基线 × 3  |
-| `scan-throughput`            | 扫描吞吐量                                       | 文件/秒 | ≥ 150    | 基线 ÷ 5  |
-| `media-list-page100`         | 媒体列表加载（首页 100 条，预热后 5 次取中位数） | ms      | ≤ 1000   | 基线 × 10 |
-| `media-list-page500`         | 媒体列表加载（大页 500 条，预热后 5 次取中位数） | ms      | ≤ 1000   | 基线 × 10 |
-| `find-duplicates`            | 重复文件检测（全量 sha256 哈希分组）             | ms      | ≤ 60000  | 基线 × 3  |
-| `find-duplicates-throughput` | 重复检测吞吐量                                   | 文件/秒 | ≥ 100    | 基线 ÷ 3  |
-| `cache-get-stats`            | 缓存统计查询（预热后 5 次取中位数）              | ms      | ≤ 1000   | 基线 × 50 |
+| 指标 ID                      | 场景                                                 | 单位    | 绝对护栏 | 基线容忍  |
+| ---------------------------- | ---------------------------------------------------- | ------- | -------- | --------- |
+| `cold-start-first-paint`     | 冷启动：应用启动 + 首启建库/迁移 + 首屏渲染          | ms      | ≤ 15000  | 基线 × 3  |
+| `scan-ingest`                | 扫描入库（指定目录全量扫描 1500 张）                 | ms      | ≤ 30000  | 基线 × 3  |
+| `scan-throughput`            | 扫描吞吐量                                           | 文件/秒 | ≥ 150    | 基线 ÷ 5  |
+| `media-list-page100`         | 媒体列表加载（首页 100 条，预热后 5 次取中位数）     | ms      | ≤ 1000   | 基线 × 10 |
+| `media-list-page500`         | 媒体列表加载（大页 500 条，预热后 5 次取中位数）     | ms      | ≤ 1000   | 基线 × 10 |
+| `find-duplicates`            | 重复文件检测（全量 sha256 哈希分组）                 | ms      | ≤ 60000  | 基线 × 3  |
+| `find-duplicates-throughput` | 重复检测吞吐量                                       | 文件/秒 | ≥ 100    | 基线 ÷ 3  |
+| `cache-get-stats`            | 缓存统计查询（预热后 5 次取中位数）                  | ms      | ≤ 1000   | 基线 × 50 |
+| `thumbnail-generate-p50`     | 可视区按需生成延迟 P50（冷缓存抽样 25 张）           | ms      | 观察项   | —         |
+| `thumbnail-generate-p95`     | 可视区按需生成延迟 P95（同上抽样）                   | ms      | ≤ 8000   | 基线 × 2  |
+| `first-thumbnail-visible`    | 首图显影耗时（重新进入图库，首张 `media://` onLoad） | ms      | ≤ 15000  | 基线 × 2  |
 
 当前基线值（2026-08-23 本地开发机实测）：冷启动 ≈ 2.1s、扫描 ≈ 0.41s（3620 文件/秒）、
 首页列表 ≈ 8ms、大页 ≈ 10ms、重复检测 ≈ 1.0s（1485 文件/秒）、缓存统计 ≈ 1ms。
+
+2026-10-09 复测（同一台开发机，1500 张占位数据集）：冷启动 841ms、扫描 761ms
+（1970 文件/秒）、首页列表 9ms、大页 9ms、重复检测 1375ms（1091 文件/秒）、
+缓存统计 0ms、按需生成 P50 1ms / P95 3ms、首图显影 121ms。
+**注意**：占位图是 1x1 最小 JPEG，按需生成分位只反映 IPC 往返，不代表真实原图；
+真实 3311×1485 / 3840×2160 原图实测单张 12~25ms（读 1MB + hash + sharp 解码缩放编码）。
+「切板块要重新等一遍」这类症状在占位数据集上完全测不出来，必须用 §3.1 的真实数据副本套件。
 
 另有处理量门禁：扫描 `filesFound` 必须等于数据集规模（漏扫即失败），
 重复检测 `scannedFiles` 必须大于 0。
@@ -61,6 +71,46 @@ npm run e2e:smoke
 
 CI：`build` job（windows-latest）在 E2E 冒烟之后强制执行 `npm run e2e:perf`，
 回归即阻断发布链；运行结果（`.cache/perf/**`）始终以 `perf-results` artifact 归档 14 天。
+
+### 3.1 真实数据副本套件（`@perf-real`，手动，本机专用）
+
+占位数据集无法复现「已入库媒体引用缺失」类症状（见 §2 末尾说明），故另有
+`e2e/perf-real.e2e.ts`：把本机真实 userData 的 `database/wxnn_photo_manager.db*` 克隆到
+`.cache/perf-real/user-data-<ts>`，并按副本里 `app_settings.thumbnailCacheDir` 指向的
+**真实缓存目录**把缓存内容一并复制进来，让打包产物指向克隆目录——
+**真实库全程只读，任何写入（扫描修复、日志、缩略图、Chromium 缓存）都落在副本上**，
+跑完删除（`PERF_REAL_KEEP=1` 保留以便翻日志）。
+
+两条必读口径（都是踩过坑后写死的，改动前先读代码注释）：
+
+1. **`--user-data-dir` 本身不构成隔离**。`app_settings` 里的 `logDir` / `crashDir` /
+   `backupDir` / `thumbnailCacheDir` 存的是绝对路径，`applyCustomDirectories` 会在启动时
+   把它们指回真实目录（实测：副本运行把日志写进 `%APPDATA%` 真实日志目录、把缩略图写进
+   用户迁盘的缓存目录）。`beforeAll` 因此必须用 `node:sqlite` 把这四个键改写到副本内部
+   （注意不能用 `better-sqlite3`：它按 Electron ABI 编译，在 Playwright 的普通 Node 进程里
+   `dlopen` 会报 `NODE_MODULE_VERSION` 不匹配）。
+2. **骨架/显影计数只算「已布局」节点**（`getBoundingClientRect().width > 0`）。虚拟网格会
+   挂载尚未布局的隐藏卡片，而 `img[loading=lazy]` 对这类元素**根本不发起请求**（`currentSrc`
+   为空、resource timing 无对应 URL），混入计数会稳定产出「20~40 张骨架永不归零」的假结论。
+   同理，`countLogPattern()` 用 `logLineKey()`（秒级 epoch + 正文）去重，因为 electron-log
+   会把同一事件同时写进 `main.log` 与 `main-<日期>.log`，按行数直接数会翻倍。
+
+判据除耗时外还有两条硬assert：各板块切换后「已布局卡片的缩略图骨架必须归零」，以及
+每段切换记录**副本缓存目录的文件增量**（渲染层没触发按需生成时该增量恒为 0）。
+
+```bash
+npm run dist:win
+PERF_REAL_USERDATA="C:/Users/<你>/AppData/Roaming/wxnn-photo-manager" \
+  npx playwright test --config e2e/playwright.config.ts --grep @perf-real
+```
+
+产出不做阈值门禁（数值随个人库规模变化），落 `.cache/perf-real/latest-real.json`，
+用于改前/改后对照：R2 首启（冷缓存）首图显影与骨架沉降、R3 逐板块切换、
+R3b 直调 `thumbnail:generate` 与 `file:getExif` 的守卫口径对照、R4 二次启动对照、
+R4b 副本日志计数（回写失败 / 孤儿清理 / worker 降级）。
+
+该套件不进 CI：未设置 `PERF_REAL_USERDATA` 时整个 describe 自动 skip。
+`npm run e2e:smoke` 用 `--grep-invert @perf` 排除（`@perf-real` 命中该子串），不会被冒烟带跑。
 
 ## 4. 判定规则
 
@@ -101,14 +151,17 @@ CI：`build` job（windows-latest）在 E2E 冒烟之后强制执行 `npm run e2
   万级数据全量压测仍可用原手工脚本：
   `npx tsx scripts/perf-test/generate-dataset.ts <目录> 10000 5000` 生成数据后，
   在应用 DevTools Console 执行 `scripts/perf-test/perf-baseline.ts` 中的 `runPerfBaseline()`。
-- **缩略图生成耗时未纳入门禁**：依赖 sharp 与素材解码，波动大，暂只观察不设阈值。
+- **缩略图生成耗时分位**：P95 已纳入硬护栏（≤ 8000ms）与基线回归判定，P50 仅观察——
+  它依赖 sharp 解码与素材形态，占位图（1x1）下恒为 1ms 量级，作为门禁只会制造假绿。
+  真实原图的解码耗时请看 §3.1 套件的 `first-thumbnail-visible` 与骨架沉降计数。
 - **单平台**：套件面向 Windows 打包产物（与发布目标一致）；其他平台暂无对照基线。
 
 ## 7. 相关文件
 
 | 文件                                      | 职责                                             |
 | ----------------------------------------- | ------------------------------------------------ |
-| `e2e/perf.e2e.ts`                         | 性能回归套件（P1~P8，`@perf` 标签）              |
+| `e2e/perf.e2e.ts`                         | 性能回归套件（P1~P10，`@perf` 标签）             |
+| `e2e/perf-real.e2e.ts`                    | 真实数据副本套件（`@perf-real`，手动，见 §3.1）  |
 | `e2e/perf-helpers.ts`                     | 数据集生成 / 规则判定 / 报告与落盘               |
 | `e2e/perf-baseline.json`                  | 入库基线（基线值 + 阈值 + 容忍系数）             |
 | `scripts/perf-test/save-perf-baseline.ts` | 基线固化脚本（支持 `--dry-run`）                 |

@@ -120,7 +120,8 @@ test.describe('打包产物冒烟（win-unpacked）', () => {
             discovery: content.includes('findMediaDirectories 搜索结果')
           }
         },
-        { timeout: 90_000, interval: 2_000 }
+        // 新版 Playwright 把 waitForFunction 的轮询参数从 interval 改名为 intervals（数组）
+        { timeout: 90_000, intervals: [2_000] }
       )
       .toEqual({ started: true, done: true, discovery: true })
   })

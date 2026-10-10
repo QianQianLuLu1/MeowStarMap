@@ -8,9 +8,13 @@
  *
  * 场景覆盖（与 T15 手工脚本 scripts/perf-test/perf-baseline.ts 对齐并自动化）：
  *   P1 冷启动（启动 + 首启建库 + 首屏渲染）
- *   P2 扫描入库（指定目录全量扫描 + 处理量/吞吐量）
- *   P3 媒体列表首页（100 条）  P4 媒体列表大页（500 条）
- *   P5 重复文件检测（全量）    P6 缓存统计查询
+ *   P2 数据集生成（准备步骤，不做门禁）
+ *   P3 扫描入库（指定目录全量扫描 + 处理量/吞吐量）
+ *   P4 媒体列表首页（100 条）  P5 媒体列表大页（500 条）
+ *   P6 重复文件检测（全量）    P7 缓存统计查询
+ *   P8 缩略图按需生成延迟（冷缓存 P50/P95 + thumbnail 为 NULL 行数 + 回写失败计数）
+ *   P9 首图显影耗时（重新进入图库，首张 media:// 图片 onLoad）
+ *   P10 基线对比与回归判定
  *
  * 判定：绝对阈值（硬护栏） + 基线劣化（相对容忍区间），规则见 e2e/perf-baseline.json
  * 与 e2e/perf-helpers.ts 的 DEFAULT_HARD_RULES；结果落盘 .cache/perf/ 供追溯与基线更新。
@@ -20,6 +24,7 @@ import path from 'node:path'
 import { launchApp, closeApp, collectDiagLogs, type LaunchedApp } from './helpers'
 import {
   DATASET_SIZE,
+  countLogPattern,
   evaluateSamples,
   generatePerfDataset,
   loadBaseline,
@@ -43,10 +48,13 @@ interface PerfAPI {
     }>
   }
   media: {
-    list: (options?: { page?: number; pageSize?: number }) => Promise<{
-      items?: unknown[]
-      total?: number
-    }>
+    // 真实返回字段是 files（见 src/renderer/stores/mediaStore.ts 的 mediaResult.files 消费），
+    // 不是 items——取样必须读 files，否则会把「查不到数据」误当成「性能达标」的假绿
+    list: (options?: {
+      page?: number
+      pageSize?: number
+      cursor?: { sortValue: string | number | null; id: number } | null
+    }) => Promise<{ files?: unknown[]; total?: number; hasMore?: boolean }>
     findDuplicates: () => Promise<{
       success?: boolean
       scannedFiles?: number
@@ -55,6 +63,9 @@ interface PerfAPI {
   }
   cache: {
     getStats: () => Promise<{ totalSize?: number; fileCount?: number }>
+  }
+  thumbnail: {
+    generate: (filePath: string, quality?: 'low' | 'standard' | 'high') => Promise<string | null>
   }
 }
 
@@ -260,7 +271,125 @@ test.describe.serial('性能基准回归（@perf，win-unpacked）', () => {
     })
   })
 
-  test('P8 基线对比与回归判定', async () => {
+  test('P8 缩略图按需生成延迟（25 张 + thumbnail 为 NULL 行数）', async () => {
+    test.slow() // 冷缓存下逐张解码原图，耗时与数据集规模/磁盘状态相关
+    const SAMPLE_COUNT = 25
+    const measured = await win.evaluate(async (sampleCount) => {
+      const api = window.electronAPI as unknown as PerfAPI
+      // 与图库首屏同一条查询路径（keyset 游标首页），取到的就是网格真正渲染的行
+      const page = await api.media.list({ cursor: null, pageSize: 500 })
+      const files = (page.files ?? []) as Array<{ file_path: string; thumbnail?: string | null }>
+      const nullRows = files.filter((file) => !file.thumbnail)
+      // 优先取 thumbnail 为 NULL 的行（真正走按需生成 + 回写）；不足则由已生成行补齐样本量，
+      // 那些行测的是缓存命中路径（stat + 内容 hash 记忆化 + 引用回写）
+      const picks = [...nullRows, ...files.filter((file) => file.thumbnail)]
+        .slice(0, sampleCount)
+        .map((file) => file.file_path)
+      const durations: number[] = []
+      let generatedPaths = 0
+      for (const filePath of picks) {
+        const t0 = performance.now()
+        const generated = await api.thumbnail.generate(filePath)
+        durations.push(performance.now() - t0)
+        if (generated) generatedPaths++
+      }
+      return {
+        pageRows: files.length,
+        nullThumbnailRows: nullRows.length,
+        coldSampled: Math.min(nullRows.length, sampleCount),
+        sampled: picks.length,
+        generatedPaths,
+        durations
+      }
+    }, SAMPLE_COUNT)
+
+    // 假绿防护：取不到行 = 契约漂移，必须炸，不能把「0 张采样」报成「0ms 达标」
+    expect(measured.pageRows, 'media:list 首页必须返回记录（真实字段为 files）').toBeGreaterThan(0)
+    expect(measured.sampled, `取样数应等于 ${SAMPLE_COUNT}`).toBe(SAMPLE_COUNT)
+    expect(measured.generatedPaths, '按需生成应全部返回缩略图路径').toBe(measured.sampled)
+
+    const sorted = [...measured.durations].sort((a, b) => a - b)
+    const p95Index = Math.max(0, Math.ceil(sorted.length * 0.95) - 1)
+    const detail =
+      `采样 ${measured.sampled} 张（其中缺缩略图 ${measured.coldSampled} 张）| ` +
+      `首页 ${measured.pageRows} 行中 thumbnail 为 NULL: ${measured.nullThumbnailRows} 行`
+
+    samples.push({
+      id: 'thumbnail-generate-p50',
+      scenario: '缩略图按需生成 P50',
+      value: median(sorted),
+      unit: 'ms',
+      itemsProcessed: measured.sampled,
+      rawSamples: sorted.map((d) => Math.round(d)),
+      detail
+    })
+    samples.push({
+      id: 'thumbnail-generate-p95',
+      scenario: '缩略图按需生成 P95',
+      value: sorted[p95Index],
+      unit: 'ms',
+      itemsProcessed: measured.sampled,
+      detail
+    })
+    process.stdout.write(`[perf] ${detail}\n`)
+  })
+
+  test('P9 首图显影耗时（重新进入图库）+ 生成链路副作用计数', async () => {
+    // 覆盖用户可感知的「切板块/重开应用要重新等一遍」：从 renderer 重新挂载开始计时，
+    // 到网格出现第一张真正解码成功的 media:// 图片为止（naturalWidth>0 排除裂图）
+    const start = performance.now()
+    await win.reload({ waitUntil: 'domcontentloaded' })
+    await win.waitForFunction(
+      () => {
+        const imgs = Array.from(document.querySelectorAll('img')) as HTMLImageElement[]
+        return imgs.some(
+          (img) => img.src.startsWith('media://') && img.complete && img.naturalWidth > 0
+        )
+      },
+      undefined,
+      { timeout: 60_000 }
+    )
+    const firstVisibleMs = performance.now() - start
+    // 给按需生成一段沉降时间：首图之后网格仍在批量补齐，回写失败也发生在这段时间里
+    await win.waitForTimeout(3_000)
+    const afterSettle = await win.evaluate(async () => {
+      const api = window.electronAPI as unknown as PerfAPI
+      const page = await api.media.list({ cursor: null, pageSize: 500 })
+      const files = (page.files ?? []) as Array<{ thumbnail?: string | null }>
+      return {
+        pageRows: files.length,
+        nullThumbnailRows: files.filter((file) => !file.thumbnail).length,
+        skeletonCount: document.querySelectorAll('.skeleton').length
+      }
+    })
+
+    samples.push({
+      id: 'first-thumbnail-visible',
+      scenario: '首图显影耗时（重新进入图库）',
+      value: firstVisibleMs,
+      unit: 'ms',
+      detail:
+        `沉降 3s 后骨架卡数: ${afterSettle.skeletonCount} | ` +
+        `首页 ${afterSettle.pageRows} 行中 thumbnail 仍为 NULL: ${afterSettle.nullThumbnailRows} 行`
+    })
+
+    // 「回写数据库失败」是每会话重复生成死循环的入口，耗时指标看不出来，只能从日志数
+    const writeBackFailures = await countLogPattern(
+      launched!.userDataDir,
+      /按需生成结果回写数据库失败/
+    )
+    const workerDegraded = await countLogPattern(
+      launched!.userDataDir,
+      /workerCallFailed|handshakeFailed|worker 超时|异常退出/
+    )
+    process.stdout.write(
+      `[perf] 缩略图回写数据库失败次数: ${writeBackFailures.count}；worker 降级/超时相关告警: ${workerDegraded.count}\n`
+    )
+    for (const line of writeBackFailures.samples) process.stdout.write(`  ↳ ${line}\n`)
+    for (const line of workerDegraded.samples) process.stdout.write(`  ↳ ${line}\n`)
+  })
+
+  test('P10 基线对比与回归判定', async () => {
     const baseline = await loadBaseline()
     const violations = evaluateSamples(samples, baseline)
     const report: PerfRunReport = {
