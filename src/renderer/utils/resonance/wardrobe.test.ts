@@ -261,8 +261,9 @@ describe('createWardrobeSummary 汇总', () => {
     ],
     outfits: [{ id: 10001 }, { id: 1000101 }, { id: 10002 }],
     makeups: [
-      { id: 10001001, type: 'fullMakeup' },
-      { id: 10001002, type: 'lips' }
+      // 部件 10001002 为 7 位 id（非 10 位部件前缀），基底口径下判 base
+      { id: 10001001, type: 'fullMakeup', variantType: 'base' },
+      { id: 10001002, type: 'lips', variantType: 'base' }
     ],
     momo: [{ id: 1160100001 }],
     outfitItemsById: new Map([
@@ -305,5 +306,68 @@ describe('createWardrobeSummary 汇总', () => {
     expect(summary.outfits.owned).toBe(2)
     expect(summary.outfits.partial).toBe(0)
     expect(summary.items.owned).toBe(3)
+  })
+
+  it('非基底整妆不再计入汇总（上游 65bb3d8f 起按 variantType 判定）', () => {
+    // 真实目录取证：2.10.1 的 95 个整妆中，旧尾缀启发式与部件口径唯一分歧样本是 10239002
+    // —— 尾缀 02 使旧规则判为基底并计入，但其部件前缀 1025 为进化3，新规则判为非基底。
+    const evoIndex: WardrobeSummaryCatalogIndex = {
+      items: [],
+      outfits: [],
+      makeups: [
+        { id: 10239002, type: 'fullMakeup', variantType: 'evo3' },
+        // 整妆的部件需以「基底妆容」身份存在于目录中，才会计入其拥有度统计
+        { id: 10001002, type: 'lips', variantType: 'base' }
+      ],
+      momo: [],
+      outfitItemsById: new Map(),
+      makeupItemsById: new Map([[10239002, [10001002]]])
+    }
+    const summary = createWardrobeSummary({
+      index: evoIndex,
+      ownedItemIds: [],
+      ownedMakeupIds: [10001002]
+    })
+    expect(summary.fullMakeups.total).toBe(0)
+    expect(summary.fullMakeups.owned).toBe(0)
+  })
+
+  it('尾缀形似变体但部件为基底的整妆仍须计入（证明不是单纯少算）', () => {
+    const baseIndex: WardrobeSummaryCatalogIndex = {
+      items: [],
+      outfits: [],
+      makeups: [
+        { id: 90000003, type: 'fullMakeup', variantType: 'base' },
+        { id: 10001002, type: 'lips', variantType: 'base' }
+      ],
+      momo: [],
+      outfitItemsById: new Map(),
+      makeupItemsById: new Map([[90000003, [10001002]]])
+    }
+    const summary = createWardrobeSummary({
+      index: baseIndex,
+      ownedItemIds: [],
+      ownedMakeupIds: [10001002]
+    })
+    expect(summary.fullMakeups.total).toBe(1)
+    expect(summary.fullMakeups.owned).toBe(1)
+  })
+
+  it('all scope 下整妆不做基底过滤', () => {
+    const mixedIndex: WardrobeSummaryCatalogIndex = {
+      items: [],
+      outfits: [],
+      makeups: [
+        { id: 10239002, type: 'fullMakeup', variantType: 'evo3' },
+        { id: 10347001, type: 'fullMakeup', variantType: 'base' }
+      ],
+      momo: [],
+      outfitItemsById: new Map(),
+      makeupItemsById: new Map()
+    }
+    expect(
+      createWardrobeSummary({ index: mixedIndex, ownedItemIds: [], scope: 'all' }).fullMakeups.total
+    ).toBe(2)
+    expect(createWardrobeSummary({ index: mixedIndex, ownedItemIds: [] }).fullMakeups.total).toBe(1)
   })
 })

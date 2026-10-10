@@ -41,6 +41,18 @@ export function getItemPrefixForOutfitId(outfitId: string): string {
   return OUTFIT_VARIANT_TO_ITEM_PREFIX[getOutfitVariantType(outfitId)]
 }
 
+/**
+ * 整妆（fullMakeup）自身 id 不携带变体后缀，变体信息藏在 TbClothesSet.clothes
+ * 的部件 id 前缀里，因此按部件 id 反查：取首个非 base 的部件变体类型。
+ */
+export function getFullMakeupVariantType(componentIds: readonly number[]): VariantType {
+  for (const componentId of componentIds) {
+    const variantType = getItemVariantType(componentId)
+    if (variantType !== 'base') return variantType
+  }
+  return 'base'
+}
+
 const ITEM_PREFIX_MAP: Record<string, VariantType> = {
   '1022': 'glowup',
   '1023': 'evo1',

@@ -7,7 +7,7 @@
  * 内存中的 WardrobeData 同构形态与纯计算。
  */
 import { isCatalogEntryAvailableInScope, normalizeCatalogRegionScope } from './catalogAvailability'
-import { getItemVariantType, getOutfitVariantType } from './variants'
+import { getItemVariantType, getOutfitVariantType, type VariantType } from './variants'
 import type { Banner, EvoRecord, ProcessedBanner } from './types'
 
 // ============ 基础模型 ============
@@ -378,6 +378,11 @@ export type WardrobeSummaryCatalogIndex = {
   makeups: Array<{
     id: number
     type: string
+    /**
+     * 整妆基底性由调用方在构建索引时算出（对应上游 app/utils/catalogLocalIndex.ts：
+     * fullMakeup 取部件前缀 getFullMakeupVariantType，其余取 getItemVariantType(id, catalogGroupRootId)）。
+     */
+    variantType: VariantType
   }>
   momo: Array<{
     id: number
@@ -497,11 +502,6 @@ const isBaseSummaryItem = (item: { id: number; catalogGroupRootId?: number }) =>
 const isBaseSummaryOutfit = (outfit: { id: number }) =>
   getOutfitVariantType(String(outfit.id)) === 'base'
 
-const isBaseSummaryMakeup = (makeup: { id: number; type: string }) =>
-  makeup.type === 'fullMakeup'
-    ? !String(makeup.id).endsWith('03')
-    : getItemVariantType(makeup.id) === 'base'
-
 export const createWardrobeSummary = ({
   index,
   ownedItemIds,
@@ -524,7 +524,9 @@ export const createWardrobeSummary = ({
     (item) => isCatalogEntryAvailableInScope('item', item.id, normalizedRegionScope)
   )
   const makeups = (
-    scope === 'all' ? index.makeups : index.makeups.filter(isBaseSummaryMakeup)
+    scope === 'all'
+      ? index.makeups
+      : index.makeups.filter((makeup) => makeup.variantType === 'base')
   ).filter((makeup) => isCatalogEntryAvailableInScope('makeup', makeup.id, normalizedRegionScope))
   const momoEntries = index.momo.filter((momo) =>
     isCatalogEntryAvailableInScope('momo', momo.id, normalizedRegionScope)
