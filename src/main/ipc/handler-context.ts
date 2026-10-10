@@ -30,8 +30,8 @@ export interface HandlerContext {
   getMainWindow: () => BrowserWindow | null
   /** 媒体数据变更通知（节流广播 + 缓存失效） */
   notifyMediaUpdated: () => void
-  /** 失效 media:// 协议白名单缓存 */
-  invalidateMediaPathCache: () => void
+  /** 失效 media:// 协议白名单缓存；传 paths 时仅失效对应路径，缺省时全清 */
+  invalidateMediaPathCache: (paths?: string[]) => void
   /** 应用 UI 主题 */
   applyUITheme: (theme: 'default' | 'soft-pink-luxury') => void
   /** 缩略图批量生成标志（防止并发） */

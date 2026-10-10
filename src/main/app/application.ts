@@ -153,7 +153,10 @@ export class Application {
       getMainWindow: () => this.mainWindow,
       // 阶段 2.2：实现迁移到 app/media-update.ts / theme.ts，直接调用模块函数
       notifyMediaUpdated: () => notifyMediaUpdatedFn(ctx),
-      invalidateMediaPathCache: () => invalidateMediaPathCacheFn(),
+      // 直接引用模块函数而非零参箭头：包装器会静默丢掉 paths 实参
+      // （TS 允许少参函数赋值给多参签名，故编译期抓不到），使 handler 侧的
+      // 「仅定向失效新增缩略图路径」退化成整表全清。签名要求见 handler-context.ts。
+      invalidateMediaPathCache: invalidateMediaPathCacheFn,
       applyUITheme: (theme) => applyUIThemeFn(ctx, theme),
       isThumbnailsGenerating: () => this.thumbnailsGenerating,
       setThumbnailsGenerating: (v) => {

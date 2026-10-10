@@ -517,6 +517,32 @@ describe('registerMediaProtocol', () => {
     expect(getMock.mock.calls.length).toBeGreaterThan(callsAfterFirst)
   })
 
+  it('17b. 定向失效仅删除目标路径，无关路径继续命中缓存', async () => {
+    const targetPath = path.resolve('/invalidate/target.jpg')
+    const unrelatedPath = path.resolve('/invalidate/unrelated.jpg')
+    const getMock = vi.fn(() => undefined)
+    const db = {
+      prepare: vi.fn(() => ({ get: getMock, all: vi.fn(() => []) }))
+    }
+    const ctx = makeAppCtx({ db })
+    registerMediaProtocol(ctx)
+    const handler = protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+
+    await handler!(makeRequest(targetPath))
+    await handler!(makeRequest(unrelatedPath))
+    const callsAfterWarmup = getMock.mock.calls.length
+
+    ;(invalidateMediaPathCache as unknown as (paths: string[]) => void)([targetPath])
+
+    await handler!(makeRequest(unrelatedPath))
+    expect(getMock.mock.calls.length).toBe(callsAfterWarmup)
+
+    await handler!(makeRequest(targetPath))
+    expect(getMock.mock.calls.length).toBeGreaterThan(callsAfterWarmup)
+  })
+
   it('18. handler 内部抛错返回 500（fs.stat 抛非 access 错误）', async () => {
     const targetPath = path.resolve('/error/case.jpg')
     const db = makeDb((sql, param) => {

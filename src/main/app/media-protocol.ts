@@ -374,9 +374,19 @@ async function resolveRealPath(p: string): Promise<string | null> {
 
 /**
  * 失效 media:// 协议白名单缓存（在媒体数据变更后调用）。
- * 拆分前为 Application 类私有方法，拆分后导出供 AppContext.invalidateMediaPathCache 回调调用。
+ * - 传入 paths：仅删除对应路径级判定；source_path 与 realpath 结果不受影响。
+ * - 不传参数：保持媒体整体更新时的全清语义。
  */
-export function invalidateMediaPathCache(): void {
+export function invalidateMediaPathCache(paths?: string[]): void {
+  if (paths !== undefined) {
+    if (!Array.isArray(paths)) return
+    for (const filePath of paths) {
+      if (typeof filePath !== 'string' || filePath.length === 0) continue
+      mediaPathCache.delete(path.resolve(filePath))
+    }
+    return
+  }
+
   mediaPathCache.clear()
   mediaSourcePathCache = null
   realpathCache.clear()
