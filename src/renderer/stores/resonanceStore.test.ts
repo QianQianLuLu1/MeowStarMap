@@ -6,12 +6,16 @@ import {
   commitPendingImport,
   exportResonanceData,
   updateWardrobeItems,
+  toggleBannerWish,
   clearAllResonanceData,
   type ResonanceState
 } from './resonanceStore'
 import { parseImportFileText } from '../utils/resonance/importParse'
 import { MAX_COMMIT_BATCH_ROWS } from '../../shared/types/resonance'
-import type { ResonanceGetDataResult } from '../../shared/types/resonance'
+import type {
+  ResonanceBannerWishlistData,
+  ResonanceGetDataResult
+} from '../../shared/types/resonance'
 
 /**
  * resonanceStore 单元测试：注入 mock electronAPI（preload call() 已解包 IpcResponse，
@@ -48,6 +52,16 @@ const emptyWardrobe: ResonanceGetDataResult['wardrobe'] = {
   updatedAt: ''
 }
 
+const emptyWishlist: ResonanceBannerWishlistData = { version: 1, entries: [] }
+
+const sampleDataWithWishlist: ResonanceGetDataResult = {
+  ...sampleData,
+  wishlist: {
+    version: 1,
+    entries: [{ bannerId: 74 }, { bannerId: 77 }]
+  }
+}
+
 function setMockApi(overrides: Record<string, unknown> = {}): void {
   ;(globalThis as Record<string, unknown>).window = {
     electronAPI: {
@@ -60,6 +74,9 @@ function setMockApi(overrides: Record<string, unknown> = {}): void {
         commitImport: vi.fn(() => Promise.resolve({ imported: 0 })),
         export: vi.fn(() => Promise.resolve({ path: 'C:\\out.json', recordCount: 1 })),
         updateWardrobe: vi.fn(() => Promise.resolve({ wardrobe: sampleData.wardrobe })),
+        setWishlist: vi.fn((wishlist: ResonanceBannerWishlistData) =>
+          Promise.resolve({ wishlist })
+        ),
         clearAll: vi.fn(() => Promise.resolve({ cleared: true })),
         ...overrides
       }
@@ -82,6 +99,7 @@ function resetStoreTo(overrides: Partial<ResonanceState> = {}): void {
     pearpal: [],
     evo: [],
     wardrobe: emptyWardrobe,
+    wishlist: emptyWishlist,
     activeTab: 'records',
     pendingImport: null,
     importRunning: false,
@@ -225,6 +243,8 @@ type CommitBatchArg = {
   evo: unknown[]
   includeWardrobe?: boolean
   wardrobe?: Record<string, unknown>
+  includeWishlist?: boolean
+  wishlist?: ResonanceBannerWishlistData
 }
 
 describe('commitPendingImport', () => {
@@ -381,5 +401,146 @@ describe('updateWardrobeItems / clearAllResonanceData', () => {
     expect(s.loaded).toBe(true)
     expect(s.pulls).toHaveLength(0)
     expect(s.wardrobe).toEqual(emptyWardrobe)
+  })
+})
+
+describe('resonanceStore 卡池心愿单', () => {
+  afterEach(clearMockApi)
+
+  it('getData 返回的 wishlist 进入 store；缺该字段时回退空表', async () => {
+    setMockApi({ getData: vi.fn(() => Promise.resolve(sampleDataWithWishlist)) })
+    await ensureResonanceLoaded(true)
+    expect(useResonanceStore.getState().wishlist).toEqual({
+      version: 1,
+      entries: [{ bannerId: 74 }, { bannerId: 77 }]
+    })
+
+    setMockApi({ getData: vi.fn(() => Promise.resolve(sampleData)) })
+    await ensureResonanceLoaded(true)
+    expect(useResonanceStore.getState().wishlist).toEqual(emptyWishlist)
+  })
+
+  it('toggleBannerWish 加入后再点移除，本地状态以 IPC 回传值为准', async () => {
+    resetStoreTo({ loaded: true, wishlist: emptyWishlist })
+    const setWishlist = vi.fn((wishlist: ResonanceBannerWishlistData) =>
+      Promise.resolve({ wishlist })
+    )
+    setMockApi({ setWishlist })
+
+    await toggleBannerWish(74)
+    expect(setWishlist).toHaveBeenCalledWith({ version: 1, entries: [{ bannerId: 74 }] })
+    expect(useResonanceStore.getState().wishlist).toEqual({
+      version: 1,
+      entries: [{ bannerId: 74 }]
+    })
+
+    await toggleBannerWish(74)
+    expect(useResonanceStore.getState().wishlist).toEqual(emptyWishlist)
+  })
+
+  it('写通道失败时回滚乐观更新并向上抛出', async () => {
+    const previous: ResonanceBannerWishlistData = { version: 1, entries: [{ bannerId: 30 }] }
+    resetStoreTo({ loaded: true, wishlist: previous })
+    setMockApi({
+      setWishlist: vi.fn(() => Promise.reject(new Error('wishlist write failed')))
+    })
+
+    await expect(toggleBannerWish(74)).rejects.toThrow('wishlist write failed')
+    expect(useResonanceStore.getState().wishlist).toEqual(previous)
+  })
+
+  it('includeWishlist 时心愿单随最后一个批次提交；未勾选则不携带', async () => {
+    const parsed = parseImportFileText(
+      JSON.stringify({
+        pulls: { 2: [[T, '1020000001']] },
+        bannerWishlist: { version: 1, entries: [{ bannerId: 76 }] }
+      })
+    )
+
+    const commitImport = vi.fn((_batch: CommitBatchArg) => Promise.resolve({ imported: 1 }))
+    resetStoreTo({ loaded: true, activeTab: 'import', pendingImport: parsed })
+    setMockApi({ commitImport })
+    await commitPendingImport({ includeWardrobe: false, includeWishlist: true })
+    expect(commitImport.mock.calls[0]![0].includeWishlist).toBe(true)
+    expect(commitImport.mock.calls[0]![0].wishlist).toEqual({
+      version: 1,
+      entries: [{ bannerId: 76 }]
+    })
+
+    const commitImport2 = vi.fn((_batch: CommitBatchArg) => Promise.resolve({ imported: 1 }))
+    resetStoreTo({ loaded: true, activeTab: 'import', pendingImport: parsed })
+    setMockApi({ commitImport: commitImport2 })
+    await commitPendingImport({ includeWardrobe: false })
+    expect(commitImport2.mock.calls[0]![0].wishlist).toBeUndefined()
+  })
+
+  it('导出把 store 内 wishlist 送进载荷（仅勾选时）', async () => {
+    const exportFn = vi.fn((_filePath: string, _payload: Record<string, unknown>) =>
+      Promise.resolve({ path: 'C:\\o.json', recordCount: 0 })
+    )
+    resetStoreTo({
+      loaded: true,
+      wishlist: { version: 1, entries: [{ bannerId: 74 }] }
+    })
+    setMockApi({ export: exportFn })
+
+    await exportResonanceData({
+      filePath: 'C:\\o.json',
+      includePulls: false,
+      includeEdits: false,
+      includePearpal: false,
+      includeEvo: false,
+      includeWardrobe: false,
+      includeWishlist: true
+    })
+    const payload = exportFn.mock.calls[0]![1] as unknown as {
+      bannerWishlist?: ResonanceBannerWishlistData
+    }
+    expect(payload.bannerWishlist).toEqual({ version: 1, entries: [{ bannerId: 74 }] })
+
+    await exportResonanceData({
+      filePath: 'C:\\o.json',
+      includePulls: false,
+      includeEdits: false,
+      includePearpal: false,
+      includeEvo: false,
+      includeWardrobe: false
+    })
+    // 未勾选 → 载荷为空 → 直接返回 null，不调用写盘通道
+    expect(exportFn).toHaveBeenCalledTimes(1)
+  })
+
+  it('previewImport 把 bannerWishlist 段标记为可导入', async () => {
+    setMockApi({
+      readImportFile: vi.fn(() =>
+        Promise.resolve({
+          content: JSON.stringify({
+            pulls: { 2: [[T, '1020000001']] },
+            bannerWishlist: { version: 1, entries: [{ bannerId: 76 }] }
+          }),
+          sizeBytes: 100
+        })
+      )
+    })
+    const summary = await previewImport('C:\\f.json')
+    expect(summary.sections.wishlist).toBe(true)
+
+    setMockApi({
+      readImportFile: vi.fn(() =>
+        Promise.resolve({
+          content: JSON.stringify({ pulls: { 2: [[T, '1020000001']] } }),
+          sizeBytes: 40
+        })
+      )
+    })
+    const noWish = await previewImport('C:\\f.json')
+    expect(noWish.sections.wishlist).toBe(false)
+  })
+
+  it('clearAll 后 wishlist 回到空表', async () => {
+    resetStoreTo({ loaded: true, wishlist: { version: 1, entries: [{ bannerId: 74 }] } })
+    setMockApi()
+    await clearAllResonanceData()
+    expect(useResonanceStore.getState().wishlist).toEqual(emptyWishlist)
   })
 })

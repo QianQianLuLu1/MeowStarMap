@@ -19,6 +19,8 @@ const { handleMock, repoMock } = vi.hoisted(() => ({
     replaceWardrobe: vi.fn(),
     updateWardrobe: vi.fn(),
     getWardrobe: vi.fn(),
+    replaceWishlist: vi.fn(),
+    getWishlist: vi.fn(),
     clearAll: vi.fn()
   }
 }))
@@ -74,6 +76,7 @@ vi.mock('node:fs', () => {
 import { registerResonanceHandlers } from './resonance-handler'
 import { pathGuard } from '../validator'
 import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
+import { MAX_WISHLIST_ENTRIES } from '../../../shared/types/resonance'
 import type { HandlerContext } from '../../handler-context'
 
 const ROOT = 'C:\\test\\root'
@@ -118,7 +121,7 @@ describe('resonance handler', () => {
     registerResonanceHandlers(makeCtx())
   })
 
-  it('注册全部 9 个通道', () => {
+  it('注册全部 10 个通道', () => {
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual(
       expect.arrayContaining([
@@ -130,6 +133,7 @@ describe('resonance handler', () => {
         'resonance:commitImport',
         'resonance:export',
         'resonance:updateWardrobe',
+        'resonance:setWishlist',
         'resonance:clearAll'
       ])
     )
@@ -301,6 +305,42 @@ describe('resonance handler', () => {
       expect(repoMock.replaceWardrobe).toHaveBeenCalledTimes(1)
     })
 
+    it('末批携带 wishlist 时全量覆盖心愿单', async () => {
+      repoMock.importPullsBatch.mockReturnValue(0)
+      const res = (await getHandler('resonance:commitImport')(
+        {},
+        {
+          pulls: [],
+          edits: [],
+          pearpal: [],
+          evo: [],
+          includeWishlist: true,
+          wishlist: { version: 1, entries: [{ bannerId: 74 }, { bannerId: 77 }] }
+        }
+      )) as IpcResponseLike
+      expect(res.success).toBe(true)
+      expect(repoMock.replaceWishlist).toHaveBeenCalledWith({
+        version: 1,
+        entries: [{ bannerId: 74 }, { bannerId: 77 }]
+      })
+    })
+
+    it('仅带 wishlist 而无任何记录时视为空批次被拒（不写库）', async () => {
+      const res = (await getHandler('resonance:commitImport')(
+        {},
+        {
+          pulls: [],
+          edits: [],
+          pearpal: [],
+          evo: [],
+          wishlist: { version: 1, entries: [{ bannerId: 74 }] }
+        }
+      )) as IpcResponseLike
+      expect(res.success).toBe(false)
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+      expect(repoMock.replaceWishlist).not.toHaveBeenCalled()
+    })
+
     it('空批次被 schema 拒绝（零副作用）', async () => {
       const res = (await getHandler('resonance:commitImport')(
         {},
@@ -431,6 +471,53 @@ describe('resonance handler', () => {
       )) as IpcResponseLike
       expect(res.success).toBe(false)
       expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    })
+  })
+
+  describe('resonance:setWishlist', () => {
+    it('全量覆盖并回传最新心愿单', async () => {
+      const wishlist = { version: 1, entries: [{ bannerId: 74 }] }
+      repoMock.replaceWishlist.mockResolvedValue(undefined)
+      repoMock.getWishlist.mockReturnValue(wishlist)
+      const res = (await getHandler('resonance:setWishlist')({}, wishlist)) as IpcResponseLike
+      expect(res.success).toBe(true)
+      expect(res.data).toEqual({ wishlist })
+      expect(repoMock.replaceWishlist).toHaveBeenCalledWith(wishlist)
+    })
+
+    it('空 entries 合法（表示清空心愿单）', async () => {
+      repoMock.replaceWishlist.mockResolvedValue(undefined)
+      repoMock.getWishlist.mockReturnValue({ version: 1, entries: [] })
+      const res = (await getHandler('resonance:setWishlist')(
+        {},
+        {
+          version: 1,
+          entries: []
+        }
+      )) as IpcResponseLike
+      expect(res.success).toBe(true)
+      expect(repoMock.replaceWishlist).toHaveBeenCalledTimes(1)
+    })
+
+    it('版本漂移、缺参、条目非整数与超上限均被 schema 拒绝且不写库', async () => {
+      repoMock.replaceWishlist.mockClear()
+      for (const payload of [
+        { version: 2, entries: [] },
+        { entries: [] },
+        { version: 1, entries: [{ bannerId: 1.5 }] },
+        {
+          version: 1,
+          entries: Array.from({ length: MAX_WISHLIST_ENTRIES + 1 }, () => ({ bannerId: 1 }))
+        }
+      ]) {
+        const res = (await getHandler('resonance:setWishlist')({}, payload)) as IpcResponseLike
+        expect(res.success).toBe(false)
+        expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+      }
+      const noArgs = (await getHandler('resonance:setWishlist')({})) as IpcResponseLike
+      expect(noArgs.success).toBe(false)
+      expect(noArgs.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+      expect(repoMock.replaceWishlist).not.toHaveBeenCalled()
     })
   })
 })

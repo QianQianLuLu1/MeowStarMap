@@ -4134,6 +4134,14 @@
       "invalidTime": "Invalid time format. Please choose again",
       "invalidInput": "Input failed validation. Please check the form"
     },
+    "wishlist": {
+      "add": "Add to wishlist",
+      "remove": "Remove from wishlist",
+      "label": "Wishlist",
+      "added": "Added to wishlist",
+      "removed": "Removed from wishlist",
+      "failed": "Failed to update wishlist"
+    },
     "toast": {
       "added": "Added: {{name}}",
       "updated": "Record time updated",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal journal",
       "exportEvo": "Evolution overrides",
       "exportWardrobe": "Wardrobe ownership",
+      "exportWishlist": "Banner wishlist",
+      "includeWishlistLabel": "Also import the wishlist (full replace)",
       "exportButton": "Export JSON",
       "exportDone": "Exported {{count}} records",
       "exportNothing": "Nothing to export. Select content or enter data first",

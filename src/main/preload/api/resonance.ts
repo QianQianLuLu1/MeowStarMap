@@ -1,8 +1,10 @@
+// @core-change: 共鸣录同步上游 65bb3d8f，向渲染层暴露卡池心愿单读写方法 setWishlist
 // 共鸣录命名空间：对应主进程 handlers/resonance-handler.ts 注册的 resonance:* 通道
 import { call } from '../ipc'
 import type {
   ResonanceCommitImportBatch,
   ResonanceCommitImportResult,
+  ResonanceBannerWishlistData,
   ResonanceGetDataResult,
   ResonanceExportPayload,
   ResonanceExportResult,
@@ -40,6 +42,9 @@ export const resonanceAPI = {
       itemId: number
     }>
   ) => call<ResonanceWardrobeUpdateResult>('resonance:updateWardrobe', { adds, removes }),
+  /** 卡池心愿单全量覆盖（空 entries 即清空；回传落库后的最新数据） */
+  setWishlist: (wishlist: ResonanceBannerWishlistData) =>
+    call<{ wishlist: ResonanceBannerWishlistData }>('resonance:setWishlist', wishlist),
   /** 危险操作：清空全部共鸣数据（渲染层负责二次确认） */
   clearAll: () => call<{ cleared: boolean }>('resonance:clearAll')
 }

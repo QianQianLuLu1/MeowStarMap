@@ -4134,6 +4134,14 @@
       "invalidTime": "시간 형식이 잘못되었습니다. 다시 선택해 주세요",
       "invalidInput": "입력이 검증을 통과하지 못했습니다. 폼을 확인해 주세요"
     },
+    "wishlist": {
+      "add": "위시리스트에 추가",
+      "remove": "위시리스트에서 제거",
+      "label": "위시리스트",
+      "added": "위시리스트에 추가했습니다",
+      "removed": "위시리스트에서 제거했습니다",
+      "failed": "위시리스트를 업데이트하지 못했습니다"
+    },
     "toast": {
       "added": "추가됨: {{name}}",
       "updated": "등록 시간을 업데이트했습니다",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal 저널",
       "exportEvo": "진화 오버라이드",
       "exportWardrobe": "옷장 보유 상태",
+      "exportWishlist": "카드 풀 위시리스트",
+      "includeWishlistLabel": "위시리스트도 가져오기(전체 덮어쓰기)",
       "exportButton": "JSON 내보내기",
       "exportDone": "{{count}}개를 내보냈습니다",
       "exportNothing": "내보낼 내용이 없습니다. 내용을 선택하거나 먼저 데이터를 입력해 주세요",

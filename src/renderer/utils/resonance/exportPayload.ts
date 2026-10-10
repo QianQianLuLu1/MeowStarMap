@@ -7,6 +7,7 @@
  * 全部数据段为空时返回 null（无可导出内容）。
  */
 import type {
+  ResonanceBannerWishlistData,
   ResonanceExportOptions,
   ResonanceGetDataResult
 } from '../../../shared/types/resonance'
@@ -22,6 +23,8 @@ export interface ResonanceExportPayload {
   evo: Record<string, EvoRecord[]>
   pearpal: Record<string, PearpalTrackerItem[]>
   wardrobe?: WardrobeData
+  /** 卡池心愿单（与上游导出格式同名键；未勾选或空表时不落段） */
+  bannerWishlist?: ResonanceBannerWishlistData
 }
 
 const filterNonEmptyRecord = <T>(data: Record<string, T[]>): Record<string, T[]> =>
@@ -34,7 +37,12 @@ export function buildExportPayload(
   data: ResonanceGetDataResult,
   options: Pick<
     ResonanceExportOptions,
-    'includePulls' | 'includeEdits' | 'includePearpal' | 'includeEvo' | 'includeWardrobe'
+    | 'includePulls'
+    | 'includeEdits'
+    | 'includePearpal'
+    | 'includeEvo'
+    | 'includeWardrobe'
+    | 'includeWishlist'
   >,
   now: Date = new Date()
 ): ResonanceExportPayload | null {
@@ -103,12 +111,16 @@ export function buildExportPayload(
   const filteredEvo = filterNonEmptyRecord(evo)
   const filteredPearpal = filterNonEmptyRecord(pearpal)
 
+  const wishlist = data.wishlist ?? null
+  const includeWishlist = options.includeWishlist === true && (wishlist?.entries.length ?? 0) > 0
+
   const isEmpty =
     Object.keys(filteredPulls).length === 0 &&
     Object.keys(filteredEdits).length === 0 &&
     Object.keys(filteredEvo).length === 0 &&
     Object.keys(filteredPearpal).length === 0 &&
-    !includeWardrobe
+    !includeWardrobe &&
+    !includeWishlist
 
   if (isEmpty) return null
 
@@ -120,7 +132,8 @@ export function buildExportPayload(
     edits: filteredEdits,
     evo: filteredEvo,
     pearpal: filteredPearpal,
-    ...(includeWardrobe ? { wardrobe: data.wardrobe } : {})
+    ...(includeWardrobe ? { wardrobe: data.wardrobe } : {}),
+    ...(includeWishlist && wishlist ? { bannerWishlist: wishlist } : {})
   }
 }
 

@@ -26,6 +26,7 @@ interface ExportOptions {
   includePearpal: boolean
   includeEvo: boolean
   includeWardrobe: boolean
+  includeWishlist: boolean
 }
 
 const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
@@ -33,7 +34,8 @@ const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   includeEdits: true,
   includePearpal: true,
   includeEvo: true,
-  includeWardrobe: true
+  includeWardrobe: true,
+  includeWishlist: true
 }
 
 const SECTION_KEYS = [
@@ -58,6 +60,7 @@ export const ImportExportView: React.FC = () => {
   const [summary, setSummary] = useState<ResonancePreviewSummary | null>(null)
   const [previewing, setPreviewing] = useState(false)
   const [includeWardrobe, setIncludeWardrobe] = useState(true)
+  const [includeWishlist, setIncludeWishlist] = useState(true)
   const [exportOptions, setExportOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS)
   const [exporting, setExporting] = useState(false)
   const [clearOpen, setClearOpen] = useState(false)
@@ -114,6 +117,7 @@ export const ImportExportView: React.FC = () => {
     try {
       const imported = await commitPendingImport({
         includeWardrobe,
+        includeWishlist,
         isCancelled: () => cancelRef.current
       })
       if (cancelRef.current) {
@@ -180,7 +184,8 @@ export const ImportExportView: React.FC = () => {
     { key: 'includeEdits', labelKey: 'resonance.import.exportEdits' },
     { key: 'includePearpal', labelKey: 'resonance.import.exportPearpal' },
     { key: 'includeEvo', labelKey: 'resonance.import.exportEvo' },
-    { key: 'includeWardrobe', labelKey: 'resonance.import.exportWardrobe' }
+    { key: 'includeWardrobe', labelKey: 'resonance.import.exportWardrobe' },
+    { key: 'includeWishlist', labelKey: 'resonance.import.exportWishlist' }
   ]
 
   return (
@@ -300,6 +305,22 @@ export const ImportExportView: React.FC = () => {
                   onChange={(e) => setIncludeWardrobe(e.target.checked)}
                 />
                 {t('resonance.import.includeWardrobeLabel')}
+              </label>
+            )}
+
+            {summary.sections.wishlist && (
+              <label
+                className="flex items-center gap-2 cursor-pointer"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                <input
+                  type="checkbox"
+                  className="w-4 h-4"
+                  style={{ accentColor: 'var(--accent)' }}
+                  checked={includeWishlist}
+                  onChange={(e) => setIncludeWishlist(e.target.checked)}
+                />
+                {t('resonance.import.includeWishlistLabel')}
               </label>
             )}
 

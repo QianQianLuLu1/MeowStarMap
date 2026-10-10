@@ -176,3 +176,45 @@ describe('countImportDiff 幂等键比对', () => {
     })
   })
 })
+
+describe('bannerWishlist 段解析（同步上游 65bb3d8f）', () => {
+  it('缺 bannerWishlist 时为 null', () => {
+    const parsed = parseImportFileText(JSON.stringify({ pulls: { 2: [[TS, '1020000001']] } }))
+    expect(parsed.wishlist).toBeNull()
+  })
+
+  it('合法心愿单按快照规范化（去重、丢弃未知卡池），不计入记录总数', () => {
+    const parsed = parseImportFileText(
+      JSON.stringify({
+        pulls: { 2: [[TS, '1020000001']] },
+        bannerWishlist: {
+          version: 1,
+          entries: [{ bannerId: 74 }, { bannerId: 74 }, { bannerId: 999999 }]
+        }
+      })
+    )
+    expect(parsed.format).toBe('current')
+    expect(parsed.wishlist).toEqual({ version: 1, entries: [{ bannerId: 74 }] })
+    expect(parsed.totalValidRecords).toBe(1)
+  })
+
+  it('仅含 bannerWishlist 的文件也识别为 current 格式', () => {
+    const parsed = parseImportFileText(
+      JSON.stringify({ bannerWishlist: { version: 1, entries: [] } })
+    )
+    expect(parsed.format).toBe('current')
+    expect(parsed.wishlist).toEqual({ version: 1, entries: [] })
+  })
+
+  it('bannerWishlist 结构非法 → ImportStructureError（不静默丢段）', () => {
+    for (const bad of [
+      { version: 2, entries: [] },
+      { version: 1, entries: 'x' },
+      'not-an-object'
+    ]) {
+      expect(() => parseImportFileText(JSON.stringify({ pulls: {}, bannerWishlist: bad }))).toThrow(
+        ImportStructureError
+      )
+    }
+  })
+})

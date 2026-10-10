@@ -4134,6 +4134,14 @@
       "invalidTime": "時刻の形式が無効です。選び直してください",
       "invalidInput": "入力が検証を通過しませんでした。フォームを確認してください"
     },
+    "wishlist": {
+      "add": "ウィッシュリストに追加",
+      "remove": "ウィッシュリストから削除",
+      "label": "ウィッシュリスト",
+      "added": "ウィッシュリストに追加しました",
+      "removed": "ウィッシュリストから削除しました",
+      "failed": "ウィッシュリストを更新できませんでした"
+    },
     "toast": {
       "added": "追加しました：{{name}}",
       "updated": "登録時刻を更新しました",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal ジャーナル",
       "exportEvo": "進化オーバーライド",
       "exportWardrobe": "ワードローブ所有状態",
+      "exportWishlist": "ウィッシュリスト",
+      "includeWishlistLabel": "ウィッシュリストもインポートする（すべて置き換え）",
       "exportButton": "JSON をエクスポート",
       "exportDone": "{{count}} 件をエクスポートしました",
       "exportNothing": "エクスポートできる内容がありません。内容を選択するか、先にデータを入力してください",

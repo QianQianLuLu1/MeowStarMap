@@ -1123,6 +1123,9 @@ interface WindowElectronAPI {
         itemId: number
       }>
     ) => Promise<import('../../shared/types/resonance').ResonanceWardrobeUpdateResult>
+    setWishlist: (
+      wishlist: import('../../shared/types/resonance').ResonanceBannerWishlistData
+    ) => Promise<{ wishlist: import('../../shared/types/resonance').ResonanceBannerWishlistData }>
     clearAll: () => Promise<{ cleared: boolean }>
   }
 }

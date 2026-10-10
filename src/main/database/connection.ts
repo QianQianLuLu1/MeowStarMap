@@ -1347,7 +1347,7 @@ export class DatabaseManager {
       // 纯新增表、CREATE TABLE IF NOT EXISTS 幂等；media_id UNIQUE 兜底"已在收藏夹"不变量
       'CREATE TABLE IF NOT EXISTS favorites (id INTEGER PRIMARY KEY AUTOINCREMENT, media_id INTEGER NOT NULL UNIQUE, created_at TEXT NOT NULL)',
       // ===== 共鸣录板块（gongeo.us-nikki-tracker 逻辑复用，MIT） =====
-      // 共鸣录 5 张新表：抽卡记录 / 手动补录 / Pearpal 承接 / 进化覆盖 / 衣橱拥有项。
+      // 共鸣录 6 张新表：抽卡记录 / 手动补录 / Pearpal 承接 / 进化覆盖 / 衣橱拥有项 / 卡池心愿单。
       // 纯新增表、CREATE TABLE IF NOT EXISTS 幂等，无数据回填（不需要版本标记）；
       // 表语句置于索引语句之前，走上方同一个幂等执行循环。
       "CREATE TABLE IF NOT EXISTS resonance_pulls (id INTEGER PRIMARY KEY AUTOINCREMENT, banner_id TEXT NOT NULL, item_id TEXT NOT NULL, obtained_at TEXT NOT NULL, source TEXT NOT NULL CHECK (source IN ('json','manual-import')), created_at TEXT NOT NULL, UNIQUE (banner_id, obtained_at, item_id))",
@@ -1355,6 +1355,7 @@ export class DatabaseManager {
       'CREATE TABLE IF NOT EXISTS resonance_pearpal (banner_id TEXT NOT NULL, item_id TEXT NOT NULL, pool_cnt INTEGER NOT NULL, obtained_at TEXT NOT NULL, raw_json TEXT NOT NULL, UNIQUE (banner_id, item_id, pool_cnt))',
       'CREATE TABLE IF NOT EXISTS resonance_evo (banner_id TEXT NOT NULL, outfit_id TEXT NOT NULL, level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 4), updated_at TEXT NOT NULL, UNIQUE (banner_id, outfit_id))',
       "CREATE TABLE IF NOT EXISTS resonance_wardrobe_items (category TEXT NOT NULL CHECK (category IN ('item','makeup','momo','prop','eureka_color')), item_id INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (category, item_id))",
+      'CREATE TABLE IF NOT EXISTS resonance_banner_wishlist (banner_id INTEGER NOT NULL, UNIQUE (banner_id))',
       'CREATE INDEX IF NOT EXISTS idx_resonance_pulls_banner ON resonance_pulls(banner_id, obtained_at)',
       'CREATE INDEX IF NOT EXISTS idx_resonance_edits_banner ON resonance_edits(banner_id)',
       'CREATE INDEX IF NOT EXISTS idx_resonance_pearpal_banner ON resonance_pearpal(banner_id)'

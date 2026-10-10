@@ -4134,6 +4134,14 @@
       "invalidTime": "Formato de horário inválido. Escolha novamente",
       "invalidInput": "A entrada não passou na validação. Verifique o formulário"
     },
+    "wishlist": {
+      "add": "Adicionar à lista de desejos",
+      "remove": "Remover da lista de desejos",
+      "label": "Lista de desejos",
+      "added": "Adicionado à lista de desejos",
+      "removed": "Removido da lista de desejos",
+      "failed": "Falha ao atualizar a lista de desejos"
+    },
     "toast": {
       "added": "Adicionado: {{name}}",
       "updated": "Horário do registro atualizado",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Diário Pearpal",
       "exportEvo": "Substituições de evolução",
       "exportWardrobe": "Posse do guarda-roupa",
+      "exportWishlist": "Lista de desejos de banners",
+      "includeWishlistLabel": "Importar também a lista de desejos (substituição total)",
       "exportButton": "Exportar JSON",
       "exportDone": "{{count}} registros exportados",
       "exportNothing": "Nada para exportar. Selecione o conteúdo ou insira dados primeiro",

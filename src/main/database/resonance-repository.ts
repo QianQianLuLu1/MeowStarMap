@@ -1,6 +1,8 @@
 import type Database from 'better-sqlite3'
 import {
   MAX_WARDROBE_BATCH,
+  MAX_WISHLIST_ENTRIES,
+  type ResonanceBannerWishlistData,
   type ResonanceEditRow,
   type ResonanceEvoRow,
   type ResonancePearpalRow,
@@ -25,6 +27,7 @@ import {
 
 /** 批量上限守卫（与 zod schema 同值，DB 层二次防线） */
 const WARDROBE_BATCH_LIMIT = MAX_WARDROBE_BATCH
+const WISHLIST_ENTRY_LIMIT = MAX_WISHLIST_ENTRIES
 
 const WARDROBE_UPDATED_AT_KEY = 'resonance.wardrobe_updated_at'
 
@@ -39,6 +42,7 @@ export const RESONANCE_DDL_STATEMENTS: readonly string[] = [
   'CREATE TABLE IF NOT EXISTS resonance_pearpal (banner_id TEXT NOT NULL, item_id TEXT NOT NULL, pool_cnt INTEGER NOT NULL, obtained_at TEXT NOT NULL, raw_json TEXT NOT NULL, UNIQUE (banner_id, item_id, pool_cnt))',
   'CREATE TABLE IF NOT EXISTS resonance_evo (banner_id TEXT NOT NULL, outfit_id TEXT NOT NULL, level INTEGER NOT NULL CHECK (level BETWEEN 0 AND 4), updated_at TEXT NOT NULL, UNIQUE (banner_id, outfit_id))',
   "CREATE TABLE IF NOT EXISTS resonance_wardrobe_items (category TEXT NOT NULL CHECK (category IN ('item','makeup','momo','prop','eureka_color')), item_id INTEGER NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY (category, item_id))",
+  'CREATE TABLE IF NOT EXISTS resonance_banner_wishlist (banner_id INTEGER NOT NULL, UNIQUE (banner_id))',
   'CREATE INDEX IF NOT EXISTS idx_resonance_pulls_banner ON resonance_pulls(banner_id, obtained_at)',
   'CREATE INDEX IF NOT EXISTS idx_resonance_edits_banner ON resonance_edits(banner_id)',
   'CREATE INDEX IF NOT EXISTS idx_resonance_pearpal_banner ON resonance_pearpal(banner_id)'
@@ -50,6 +54,7 @@ export interface ResonanceExistingData {
   pearpal: ResonancePearpalRow[]
   evo: ResonanceEvoRow[]
   wardrobe: ResonanceWardrobeData
+  wishlist: ResonanceBannerWishlistData
 }
 
 export interface WardrobeCategoryEntry {
@@ -96,7 +101,14 @@ export class ResonanceRepository {
         'SELECT banner_id, outfit_id, level, updated_at FROM resonance_evo ORDER BY banner_id'
       )
       .all() as unknown as ResonanceEvoRow[]
-    return { pulls, edits, pearpal, evo, wardrobe: this.getWardrobe() }
+    return {
+      pulls,
+      edits,
+      pearpal,
+      evo,
+      wardrobe: this.getWardrobe(),
+      wishlist: this.getWishlist()
+    }
   }
 
   private parsePearpalRaw(rawJson: string): ResonancePearpalRow['raw'] {
@@ -345,6 +357,39 @@ export class ResonanceRepository {
     tx()
   }
 
+  // ============ 卡池心愿单 ============
+
+  /**
+   * 读取心愿单（同步读）。条目按 banner_id 升序返回：表内无时间列，
+   * 排序键固定可保证多次重载顺序稳定（上游 IndexedDB 按插入顺序保存，此处刻意不跟随）。
+   */
+  getWishlist(): ResonanceBannerWishlistData {
+    const rows = this.db
+      .prepare('SELECT banner_id FROM resonance_banner_wishlist ORDER BY banner_id ASC')
+      .all() as unknown as Array<{ banner_id: number }>
+    return {
+      version: 1,
+      entries: rows.map((row) => ({ bannerId: Number(row.banner_id) }))
+    }
+  }
+
+  /** 全量覆盖心愿单（写通道与导入批次共用；空 entries 即清空） */
+  async replaceWishlist(data: ResonanceBannerWishlistData): Promise<void> {
+    if (data.entries.length > WISHLIST_ENTRY_LIMIT) {
+      throw new Error('resonance wishlist entry limit exceeded')
+    }
+    const tx = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM resonance_banner_wishlist').run()
+      const stmt = this.db.prepare(
+        'INSERT OR IGNORE INTO resonance_banner_wishlist (banner_id) VALUES (?)'
+      )
+      for (const entry of data.entries) {
+        stmt.run(entry.bannerId)
+      }
+    })
+    tx()
+  }
+
   /** 清空全部共鸣数据（危险操作，handler 层负责确认） */
   async clearAll(): Promise<void> {
     const tx = this.db.transaction(() => {
@@ -353,6 +398,7 @@ export class ResonanceRepository {
       this.db.prepare('DELETE FROM resonance_pearpal').run()
       this.db.prepare('DELETE FROM resonance_evo').run()
       this.db.prepare('DELETE FROM resonance_wardrobe_items').run()
+      this.db.prepare('DELETE FROM resonance_banner_wishlist').run()
       this.db.prepare('DELETE FROM app_settings WHERE key = ?').run(WARDROBE_UPDATED_AT_KEY)
     })
     tx()

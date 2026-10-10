@@ -81,12 +81,25 @@ export interface ResonanceWardrobeData {
   updatedAt: string
 }
 
+/** 卡池心愿单条目（与上游 shared/types/bannerWishlist.ts 同构，只存卡池 id） */
+export interface ResonanceBannerWish {
+  bannerId: number
+}
+
+/** 卡池心愿单数据（导出文件同构形态；条目顺序按 bannerId 升序返回） */
+export interface ResonanceBannerWishlistData {
+  version: 1
+  entries: ResonanceBannerWish[]
+}
+
 export interface ResonanceGetDataResult {
   pulls: ResonancePullRow[]
   edits: ResonanceEditRow[]
   pearpal: ResonancePearpalRow[]
   evo: ResonanceEvoRow[]
   wardrobe: ResonanceWardrobeData
+  /** 卡池心愿单（可选字段：旧数据与旧客户端读取时缺省为空表） */
+  wishlist?: ResonanceBannerWishlistData
 }
 
 // ============ 导入 / 导出 ============
@@ -110,6 +123,8 @@ export interface ResonanceImportPreview {
     pearpal: boolean
     evo: boolean
     wardrobe: boolean
+    /** 文件是否携带 bannerWishlist 段 */
+    wishlist: boolean
   }
   wardrobe: ResonanceWardrobeData | null
 }
@@ -130,6 +145,8 @@ export interface ResonanceExportOptions {
   includePearpal: boolean
   includeEvo: boolean
   includeWardrobe: boolean
+  /** 可选：缺省不导出心愿单（旧调用方与旧测试无需改动） */
+  includeWishlist?: boolean
 }
 
 export interface ResonanceExportResult {
@@ -174,6 +191,8 @@ export const MAX_PULLS_PER_BANNER = 50_000
 export const MAX_TOTAL_IMPORT_RECORDS = 200_000
 export const MAX_WARDROBE_BATCH = 5_000
 export const MAX_IMPORT_FILE_BYTES = 64 * 1024 * 1024
+/** 心愿单条目上限：远大于卡池全集规模，仅作 IPC 入参的粗粒度防线 */
+export const MAX_WISHLIST_ENTRIES = 200
 
 /** 单卡池记录数组（用于 IPC 单条增改与测试） */
 export const resonancePullRecordListSchema = z.array(pullRecordSchema).max(MAX_PULLS_PER_BANNER)
@@ -196,6 +215,20 @@ const pearpalMapLooseSchema = z.record(
   z.array(pearpalItemLooseSchema).max(MAX_PULLS_PER_BANNER)
 )
 
+/**
+ * 卡池心愿单载荷（写通道入参与导入批次共用，与上游 shared/types/bannerWishlist.ts 同构）。
+ * bannerId 上界沿用卡池 id 的 6 位口径，只做粗界防护；「卡池是否真实存在」由渲染层
+ * normalizeBannerWishlist 按静态快照判定。
+ */
+export const resonanceBannerWishlistSchema = z.object({
+  version: z.literal(1),
+  entries: z
+    .array(z.object({ bannerId: z.number().int().min(1).max(999_999) }))
+    .max(MAX_WISHLIST_ENTRIES)
+})
+
+export const resonanceSetWishlistArgs = z.tuple([resonanceBannerWishlistSchema])
+
 const wardrobeLooseSchema = z.object({
   version: z.literal(1).optional(),
   ownedItemIds: z.array(z.unknown()).max(20_000).optional(),
@@ -211,7 +244,7 @@ const wardrobeLooseSchema = z.object({
  * 以便统计无效条数并定位到 卡池/行号 而非整文件拒绝）。
  */
 export const resonanceImportFileSchema = z.union([
-  // 当前格式（源站导出同构）：{ version?, pulls?, edits?, evo?, pearpal?, wardrobe? }
+  // 当前格式（源站导出同构）：{ version?, pulls?, edits?, evo?, pearpal?, wardrobe?, bannerWishlist? }
   // version 允许 1..99 以便识别“未来版本”文件；>1 时由解析层标记 versionMismatch，
   // 预览层给出「兼容导入/放弃」选择，commit 需 force 确认。
   z
@@ -221,7 +254,9 @@ export const resonanceImportFileSchema = z.union([
       edits: editRecordMapLooseSchema.optional(),
       evo: evoRecordMapLooseSchema.optional(),
       pearpal: pearpalMapLooseSchema.optional(),
-      wardrobe: wardrobeLooseSchema.optional()
+      wardrobe: wardrobeLooseSchema.optional(),
+      // 宽松透传：结构合法性由渲染层 normalizeBannerWishlist 判定（非法则整份拒绝）
+      bannerWishlist: z.unknown().optional()
     })
     .refine(
       (v) =>
@@ -229,7 +264,8 @@ export const resonanceImportFileSchema = z.union([
         v.edits !== undefined ||
         v.evo !== undefined ||
         v.pearpal !== undefined ||
-        v.wardrobe !== undefined,
+        v.wardrobe !== undefined ||
+        v.bannerWishlist !== undefined,
       { message: 'resonance.error.importEmpty' }
     ),
   // 旧格式：Record<bannerId, PullRecord[]>（至少含一个卡池键，空对象视为无数据拒绝）
@@ -304,7 +340,10 @@ export const resonanceCommitImportArgs = z.tuple([
       ),
       /** 仅最后一个批次携带（全量覆盖衣橱） */
       wardrobe: wardrobeLooseSchema.optional(),
-      includeWardrobe: z.boolean().optional()
+      includeWardrobe: z.boolean().optional(),
+      /** 仅最后一个批次携带（全量覆盖心愿单） */
+      wishlist: resonanceBannerWishlistSchema.optional(),
+      includeWishlist: z.boolean().optional()
     })
     .refine(
       (v) =>
@@ -312,7 +351,8 @@ export const resonanceCommitImportArgs = z.tuple([
         v.edits.length > 0 ||
         v.pearpal.length > 0 ||
         v.evo.length > 0 ||
-        (v.includeWardrobe === true && v.wardrobe !== undefined),
+        (v.includeWardrobe === true && v.wardrobe !== undefined) ||
+        (v.includeWishlist === true && v.wishlist !== undefined),
       { message: 'resonance.error.importEmptyBatch' }
     )
 ])
@@ -330,6 +370,8 @@ export interface ResonanceCommitImportBatch {
   evo: Array<{ bannerId: string; outfitId: string; level: number }>
   wardrobe?: Record<string, unknown>
   includeWardrobe?: boolean
+  wishlist?: ResonanceBannerWishlistData
+  includeWishlist?: boolean
 }
 
 export interface ResonanceCommitImportResult {
@@ -357,7 +399,8 @@ export const resonanceExportPayloadSchema = z.object({
     z.string().regex(/^\d{1,6}$/),
     z.array(z.record(z.string(), z.unknown())).max(MAX_PULLS_PER_BANNER)
   ),
-  wardrobe: wardrobeLooseSchema.optional()
+  wardrobe: wardrobeLooseSchema.optional(),
+  bannerWishlist: resonanceBannerWishlistSchema.optional()
 })
 
 export const resonanceExportArgs = z.tuple([
@@ -377,6 +420,7 @@ export interface ResonanceExportPayload {
   evo: Record<string, Array<[string, number]>>
   pearpal: Record<string, Array<Record<string, unknown>>>
   wardrobe?: Record<string, unknown>
+  bannerWishlist?: ResonanceBannerWishlistData
 }
 
 const wardrobeEntrySchema = z.object({

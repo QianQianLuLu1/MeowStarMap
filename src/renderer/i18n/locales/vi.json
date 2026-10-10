@@ -4134,6 +4134,14 @@
       "invalidTime": "Invalid time format. Please choose again",
       "invalidInput": "Input failed validation. Please check the form"
     },
+    "wishlist": {
+      "add": "Thêm vào danh sách mong muốn",
+      "remove": "Xóa khỏi danh sách mong muốn",
+      "label": "Danh sách mong muốn",
+      "added": "Đã thêm vào danh sách mong muốn",
+      "removed": "Đã xóa khỏi danh sách mong muốn",
+      "failed": "Cập nhật danh sách mong muốn thất bại"
+    },
     "toast": {
       "added": "Added: {{name}}",
       "updated": "Record time updated",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal journal",
       "exportEvo": "Evolution overrides",
       "exportWardrobe": "Wardrobe ownership",
+      "exportWishlist": "Danh sách mong muốn banner",
+      "includeWishlistLabel": "Nhập luôn danh sách mong muốn (thay thế toàn bộ)",
       "exportButton": "Export JSON",
       "exportDone": "Exported {{count}} records",
       "exportNothing": "Nothing to export. Select content or enter data first",

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   MAX_PULLS_PER_BANNER,
   MAX_WARDROBE_BATCH,
+  MAX_WISHLIST_ENTRIES,
   resonanceAddManualRecordArgs,
   resonanceBannerIdSchema,
+  resonanceBannerWishlistSchema,
   resonanceDeleteRecordArgs,
   resonanceExportArgs,
   resonanceCommitImportArgs,
@@ -12,6 +14,7 @@ import {
   resonanceItemIdSchema,
   resonanceOutfitIdSchema,
   resonancePullRecordListSchema,
+  resonanceSetWishlistArgs,
   resonanceTimestampSchema,
   resonanceUpdateManualRecordArgs,
   resonanceUpdateWardrobeArgs
@@ -232,5 +235,69 @@ describe('resonanceUpdateWardrobeArgs', () => {
       itemId: i + 1
     }))
     expect(resonanceUpdateWardrobeArgs.safeParse([{ adds, removes: [] }]).success).toBe(false)
+  })
+})
+
+describe('resonanceBannerWishlistSchema', () => {
+  it('接受 version 1 + 合法条目的心愿单（含空表，清空即写空）', () => {
+    expect(resonanceBannerWishlistSchema.safeParse({ version: 1, entries: [] }).success).toBe(true)
+    expect(
+      resonanceBannerWishlistSchema.safeParse({
+        version: 1,
+        entries: [{ bannerId: 74 }, { bannerId: 77 }]
+      }).success
+    ).toBe(true)
+  })
+
+  it('拒绝版本漂移与条目形态非法', () => {
+    expect(resonanceBannerWishlistSchema.safeParse({ version: 2, entries: [] }).success).toBe(false)
+    expect(resonanceBannerWishlistSchema.safeParse({ entries: [] }).success).toBe(false)
+    expect(
+      resonanceBannerWishlistSchema.safeParse({
+        version: 1,
+        entries: [{ bannerId: '74' }]
+      }).success
+    ).toBe(false)
+  })
+
+  it('边界：bannerId 为 1..999999 的正整数（与卡池 id 的 6 位口径一致），条目数不超上限', () => {
+    expect(
+      resonanceBannerWishlistSchema.safeParse({ version: 1, entries: [{ bannerId: 0 }] }).success
+    ).toBe(false)
+    expect(
+      resonanceBannerWishlistSchema.safeParse({ version: 1, entries: [{ bannerId: -1 }] }).success
+    ).toBe(false)
+    expect(
+      resonanceBannerWishlistSchema.safeParse({ version: 1, entries: [{ bannerId: 1.5 }] }).success
+    ).toBe(false)
+    // 未来新增到三位数的卡池不得被 schema 硬上限挡住
+    expect(
+      resonanceBannerWishlistSchema.safeParse({ version: 1, entries: [{ bannerId: 100 }] }).success
+    ).toBe(true)
+    expect(
+      resonanceBannerWishlistSchema.safeParse({
+        version: 1,
+        entries: [{ bannerId: 1_000_000 }]
+      }).success
+    ).toBe(false)
+    const entries = Array.from({ length: MAX_WISHLIST_ENTRIES + 1 }, () => ({ bannerId: 1 }))
+    expect(resonanceBannerWishlistSchema.safeParse({ version: 1, entries }).success).toBe(false)
+  })
+})
+
+describe('resonanceSetWishlistArgs', () => {
+  it('接受单参心愿单载荷', () => {
+    expect(
+      resonanceSetWishlistArgs.safeParse([{ version: 1, entries: [{ bannerId: 30 }] }]).success
+    ).toBe(true)
+    expect(resonanceSetWishlistArgs.safeParse([{ version: 1, entries: [] }]).success).toBe(true)
+  })
+
+  it('拒绝多余参数、缺参与非法载荷', () => {
+    expect(resonanceSetWishlistArgs.safeParse([{ version: 1, entries: [] }, 'extra']).success).toBe(
+      false
+    )
+    expect(resonanceSetWishlistArgs.safeParse([]).success).toBe(false)
+    expect(resonanceSetWishlistArgs.safeParse([{ version: 1 }]).success).toBe(false)
   })
 })

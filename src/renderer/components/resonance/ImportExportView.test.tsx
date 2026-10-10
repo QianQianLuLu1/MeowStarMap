@@ -252,7 +252,14 @@ describe('ImportExportView', () => {
       </ToastCapture>
     )
     await screen.findByRole('button', { name: '导出 JSON' })
-    for (const label of ['抽卡记录', '手动补录', 'Pearpal 手账', '进化覆盖', '衣橱拥有状态']) {
+    for (const label of [
+      '抽卡记录',
+      '手动补录',
+      'Pearpal 手账',
+      '进化覆盖',
+      '衣橱拥有状态',
+      '卡池心愿单'
+    ]) {
       fireEvent.click(screen.getByRole('checkbox', { name: label }))
     }
     fireEvent.click(screen.getByRole('button', { name: '导出 JSON' }))

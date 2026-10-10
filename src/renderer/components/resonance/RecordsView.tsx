@@ -27,6 +27,7 @@ import {
   resonanceUpdateManualRecordArgs
 } from '../../../shared/types/resonance'
 import { AddRecordDialog } from './AddRecordDialog'
+import { BannerWishButton } from './BannerWishButton'
 
 /**
  * 共鸣记录子页：卡池筛选（含本地缩略图）+ 垫抽提示 + 记录长列表（Virtuoso）
@@ -240,6 +241,7 @@ export const RecordsView: React.FC = () => {
                 {latestVersion ? ` · v${latestVersion}` : ''}
               </p>
             </div>
+            <BannerWishButton bannerId={selectedBannerId} />
           </div>
         )}
 

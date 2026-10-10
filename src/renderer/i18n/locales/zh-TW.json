@@ -4134,6 +4134,14 @@
       "invalidTime": "時間格式無效，請重新選擇",
       "invalidInput": "輸入未通過校驗，請檢查表單"
     },
+    "wishlist": {
+      "add": "加入心願單",
+      "remove": "移出心願單",
+      "label": "心願單",
+      "added": "已加入心願單",
+      "removed": "已移出心願單",
+      "failed": "心願單更新失敗"
+    },
     "toast": {
       "added": "已新增：{{name}}",
       "updated": "已更新補錄時間",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal 手帳",
       "exportEvo": "進化覆寫",
       "exportWardrobe": "衣櫥擁有狀態",
+      "exportWishlist": "卡池心願單",
+      "includeWishlistLabel": "同時匯入心願單（全量覆蓋）",
       "exportButton": "匯出 JSON",
       "exportDone": "已匯出 {{count}} 條記錄",
       "exportNothing": "沒有可匯出的內容，請勾選匯出內容或先錄入資料",

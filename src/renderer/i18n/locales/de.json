@@ -4134,6 +4134,14 @@
       "invalidTime": "Ungültiges Zeitformat. Bitte erneut wählen",
       "invalidInput": "Eingabe hat die Prüfung nicht bestanden. Bitte Formular überprüfen"
     },
+    "wishlist": {
+      "add": "Zur Wunschliste hinzufügen",
+      "remove": "Aus der Wunschliste entfernen",
+      "label": "Wunschliste",
+      "added": "Zur Wunschliste hinzugefügt",
+      "removed": "Aus der Wunschliste entfernt",
+      "failed": "Wunschliste konnte nicht aktualisiert werden"
+    },
     "toast": {
       "added": "Hinzugefügt: {{name}}",
       "updated": "Eintragszeit aktualisiert",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal-Journal",
       "exportEvo": "Evolutions-Übersteuerungen",
       "exportWardrobe": "Kleiderschrank-Besitz",
+      "exportWishlist": "Banner-Wunschliste",
+      "includeWishlistLabel": "Wunschliste ebenfalls importieren (vollständig ersetzen)",
       "exportButton": "JSON exportieren",
       "exportDone": "{{count}} Einträge exportiert",
       "exportNothing": "Nichts zu exportieren. Bitte Inhalt wählen oder zuerst Daten erfassen",

@@ -1,3 +1,4 @@
+// @core-change: 共鸣录同步上游 65bb3d8f，新增卡池心愿单读写通道 resonance:setWishlist 并让导入批次可覆盖心愿单
 import { ipcMain } from 'electron'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
@@ -16,6 +17,7 @@ import {
   resonanceDeleteRecordArgs,
   resonanceExportArgs,
   resonanceReadImportFileArgs,
+  resonanceSetWishlistArgs,
   resonanceUpdateManualRecordArgs,
   resonanceUpdateWardrobeArgs,
   type ResonanceWardrobeData
@@ -179,6 +181,10 @@ export function registerResonanceHandlers(ctx: HandlerContext): void {
       if (batch.includeWardrobe === true && batch.wardrobe) {
         await repo.replaceWardrobe(batch.wardrobe as unknown as ResonanceWardrobeData)
       }
+      // 仅最后一个批次携带 wishlist（全量覆盖）
+      if (batch.includeWishlist === true && batch.wishlist) {
+        await repo.replaceWishlist(batch.wishlist)
+      }
       return { imported }
     })
   )
@@ -231,6 +237,17 @@ export function registerResonanceHandlers(ctx: HandlerContext): void {
       const repo = getRepo()
       await repo.updateWardrobe(adds, removes)
       return { wardrobe: repo.getWardrobe() }
+    })
+  )
+
+  // ============ 卡池心愿单 ============
+
+  ipcMain.handle(
+    'resonance:setWishlist',
+    wrapHandler(ctx, resonanceSetWishlistArgs, async ([wishlist]) => {
+      const repo = getRepo()
+      await repo.replaceWishlist(wishlist)
+      return { wishlist: repo.getWishlist() }
     })
   )
 

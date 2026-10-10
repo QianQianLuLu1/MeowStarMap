@@ -4134,6 +4134,14 @@
       "invalidTime": "Invalid time format. Please choose again",
       "invalidInput": "Input failed validation. Please check the form"
     },
+    "wishlist": {
+      "add": "เพิ่มลงในวิชลิสต์",
+      "remove": "ลบออกจากวิชลิสต์",
+      "label": "วิชลิสต์",
+      "added": "เพิ่มลงในวิชลิสต์แล้ว",
+      "removed": "ลบออกจากวิชลิสต์แล้ว",
+      "failed": "อัปเดตวิชลิสต์ไม่สำเร็จ"
+    },
     "toast": {
       "added": "Added: {{name}}",
       "updated": "Record time updated",
@@ -4208,6 +4216,8 @@
       "exportPearpal": "Pearpal journal",
       "exportEvo": "Evolution overrides",
       "exportWardrobe": "Wardrobe ownership",
+      "exportWishlist": "วิชลิสต์แบนเนอร์",
+      "includeWishlistLabel": "นำเข้าวิชลิสต์ด้วย (แทนที่ทั้งหมด)",
       "exportButton": "Export JSON",
       "exportDone": "Exported {{count}} records",
       "exportNothing": "Nothing to export. Select content or enter data first",

@@ -254,6 +254,7 @@ class ResonanceMockDb {
 
 import type Database from 'better-sqlite3'
 import { ResonanceRepository, RESONANCE_DDL_STATEMENTS } from './resonance-repository'
+import { MAX_WISHLIST_ENTRIES } from '../../shared/types/resonance'
 
 function createRepo(): { repo: ResonanceRepository; mock: ResonanceMockDb } {
   const mock = new ResonanceMockDb()
@@ -270,13 +271,14 @@ function createRepo(): { repo: ResonanceRepository; mock: ResonanceMockDb } {
 const T = '2025-06-01 12:30:45'
 
 describe('schema（由 RESONANCE_DDL_STATEMENTS 建表）', () => {
-  it('五张表 + 约束登记完成，DDL 幂等可重复应用', () => {
+  it('六张表 + 约束登记完成，DDL 幂等可重复应用', () => {
     const { mock } = createRepo()
     expect(mock.tables.has('resonance_pulls')).toBe(true)
     expect(mock.tables.has('resonance_edits')).toBe(true)
     expect(mock.tables.has('resonance_pearpal')).toBe(true)
     expect(mock.tables.has('resonance_evo')).toBe(true)
     expect(mock.tables.has('resonance_wardrobe_items')).toBe(true)
+    expect(mock.tables.has('resonance_banner_wishlist')).toBe(true)
     // 重复应用同一 DDL 不抛错（IF NOT EXISTS 幂等）
     expect(() => {
       for (const ddl of RESONANCE_DDL_STATEMENTS) mock.applyDdl(ddl)
@@ -287,6 +289,7 @@ describe('schema（由 RESONANCE_DDL_STATEMENTS 建表）', () => {
       'obtained_at',
       'item_id'
     ])
+    expect(mock.tables.get('resonance_banner_wishlist')!.uniqueKeys).toContainEqual(['banner_id'])
   })
 
   it('防漂移：connection.ts 迁移数组内含与本文件一致的 DDL', async () => {
@@ -470,17 +473,60 @@ describe('衣橱', () => {
   })
 })
 
+describe('卡池心愿单（resonance_banner_wishlist）', () => {
+  it('全量覆盖后按 bannerId 升序读回，重复写入幂等', async () => {
+    const { repo } = createRepo()
+    await repo.replaceWishlist({ version: 1, entries: [{ bannerId: 77 }, { bannerId: 30 }] })
+    expect(repo.getWishlist()).toEqual({
+      version: 1,
+      entries: [{ bannerId: 30 }, { bannerId: 77 }]
+    })
+    // 第二次覆盖 replaces，不追加
+    await repo.replaceWishlist({ version: 1, entries: [{ bannerId: 2 }] })
+    expect(repo.getWishlist().entries).toEqual([{ bannerId: 2 }])
+  })
+
+  it('空载荷即清空；重复 bannerId 不抛错且只留一条', async () => {
+    const { repo } = createRepo()
+    await repo.replaceWishlist({ version: 1, entries: [{ bannerId: 5 }] })
+    await repo.replaceWishlist({ version: 1, entries: [] })
+    expect(repo.getWishlist().entries).toEqual([])
+
+    await repo.replaceWishlist({
+      version: 1,
+      entries: [{ bannerId: 6 }, { bannerId: 6 }]
+    })
+    expect(repo.getWishlist().entries).toEqual([{ bannerId: 6 }])
+  })
+
+  it('getAllData 一并返回心愿单', async () => {
+    const { repo } = createRepo()
+    await repo.replaceWishlist({ version: 1, entries: [{ bannerId: 74 }] })
+    expect(repo.getAllData().wishlist).toEqual({ version: 1, entries: [{ bannerId: 74 }] })
+  })
+
+  it('超出条目上限时拒绝写入（DB 层二次防线）', async () => {
+    const { repo } = createRepo()
+    const entries = Array.from({ length: MAX_WISHLIST_ENTRIES + 1 }, (_, i) => ({
+      bannerId: i + 1
+    }))
+    await expect(repo.replaceWishlist({ version: 1, entries })).rejects.toThrow(/wishlist/i)
+  })
+})
+
 describe('clearAll', () => {
   it('清空全部数据与元数据', async () => {
     const { repo } = createRepo()
     await repo.addManualEdit('2', '2020000002', T)
     repo.importPullsBatch([{ banner_id: '2', item_id: '1020000001', obtained_at: T }])
     await repo.updateWardrobe([{ category: 'item', itemId: 1020000001 }], [])
+    await repo.replaceWishlist({ version: 1, entries: [{ bannerId: 74 }] })
     await repo.clearAll()
     const data = repo.getAllData()
     expect(data.pulls).toHaveLength(0)
     expect(data.edits).toHaveLength(0)
     expect(data.wardrobe.ownedItemIds).toHaveLength(0)
     expect(data.wardrobe.updatedAt).toBe('')
+    expect(data.wishlist).toEqual({ version: 1, entries: [] })
   })
 })

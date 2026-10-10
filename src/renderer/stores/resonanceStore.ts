@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import type {
+  ResonanceBannerWishlistData,
   ResonanceEditRow,
   ResonanceEvoRow,
   ResonanceGetDataResult,
@@ -38,6 +39,8 @@ export interface ResonanceState {
   pearpal: ResonancePearpalRow[]
   evo: ResonanceEvoRow[]
   wardrobe: ResonanceWardrobeData
+  /** 卡池心愿单（与上游 BannerWishlistData 同构；条目按 bannerId 升序） */
+  wishlist: ResonanceBannerWishlistData
 
   // ---- UI ----
   activeTab: ResonanceTab
@@ -52,6 +55,7 @@ export interface ResonanceState {
   setLoadError: (message: string | null) => void
   setLoading: (loading: boolean) => void
   setWardrobe: (wardrobe: ResonanceWardrobeData) => void
+  setWishlist: (wishlist: ResonanceBannerWishlistData) => void
   setPendingImport: (parsed: ParsedImportData | null) => void
   setImportRunning: (running: boolean) => void
   setImportProgress: (progress: ResonanceImportProgressState | null) => void
@@ -68,6 +72,8 @@ const emptyWardrobe: ResonanceWardrobeData = {
   updatedAt: ''
 }
 
+const emptyWishlist: ResonanceBannerWishlistData = { version: 1, entries: [] }
+
 const initialState = {
   loaded: false,
   loading: false,
@@ -77,6 +83,7 @@ const initialState = {
   pearpal: [] as ResonancePearpalRow[],
   evo: [] as ResonanceEvoRow[],
   wardrobe: emptyWardrobe,
+  wishlist: emptyWishlist,
   activeTab: 'records' as ResonanceTab,
   pendingImport: null as ParsedImportData | null,
   importRunning: false,
@@ -95,11 +102,13 @@ export const useResonanceStore = create<ResonanceState>((set) => ({
       edits: data.edits,
       pearpal: data.pearpal,
       evo: data.evo,
-      wardrobe: data.wardrobe
+      wardrobe: data.wardrobe,
+      wishlist: data.wishlist ?? emptyWishlist
     }),
   setLoadError: (message) => set({ loadError: message, loading: false }),
   setLoading: (loading) => set({ loading }),
   setWardrobe: (wardrobe) => set({ wardrobe }),
+  setWishlist: (wishlist) => set({ wishlist }),
   setPendingImport: (parsed) => set({ pendingImport: parsed }),
   setImportRunning: (running) => set({ importRunning: running }),
   setImportProgress: (progress) => set({ importProgress: progress }),
@@ -165,7 +174,14 @@ export interface ResonancePreviewSummary {
   totalRecords: number
   counts: { added: number; duplicate: number; invalid: number }
   invalidSamples: ImportInvalidRecord[]
-  sections: { pulls: boolean; edits: boolean; pearpal: boolean; evo: boolean; wardrobe: boolean }
+  sections: {
+    pulls: boolean
+    edits: boolean
+    pearpal: boolean
+    evo: boolean
+    wardrobe: boolean
+    wishlist: boolean
+  }
 }
 
 /**
@@ -198,7 +214,8 @@ export async function previewImport(filePath: string): Promise<ResonancePreviewS
       edits: Object.keys(parsed.edits).length > 0,
       pearpal: Object.keys(parsed.pearpal).length > 0,
       evo: Object.keys(parsed.evo).length > 0,
-      wardrobe: parsed.wardrobe !== null
+      wardrobe: parsed.wardrobe !== null,
+      wishlist: parsed.wishlist !== null
     }
   }
   useResonanceStore.getState().setPendingImport(parsed)
@@ -207,6 +224,8 @@ export async function previewImport(filePath: string): Promise<ResonancePreviewS
 
 export interface CommitImportOptions {
   includeWardrobe: boolean
+  /** 勾选后随末批全量覆盖心愿单（缺省不覆盖） */
+  includeWishlist?: boolean
   onProgress?: (current: number, total: number) => void
   /** 返回 true 时中止后续批次（已写入部分因幂等可安全续传） */
   isCancelled?: () => boolean
@@ -246,6 +265,8 @@ export async function commitPendingImport(options: CommitImportOptions): Promise
     evo: typeof evoRows
     includeWardrobe?: boolean
     wardrobe?: Record<string, unknown>
+    includeWishlist?: boolean
+    wishlist?: ResonanceBannerWishlistData
   }> = []
   const maxLen = Math.max(pullRows.length, editRows.length, pearpalRows.length, evoRows.length, 1)
   for (let offset = 0; offset < maxLen; offset += MAX_COMMIT_BATCH_ROWS) {
@@ -270,6 +291,10 @@ export async function commitPendingImport(options: CommitImportOptions): Promise
         batches[i]!.includeWardrobe = true
         batches[i]!.wardrobe = parsed.wardrobe as unknown as Record<string, unknown>
       }
+      if (isLast && options.includeWishlist && parsed.wishlist) {
+        batches[i]!.includeWishlist = true
+        batches[i]!.wishlist = parsed.wishlist
+      }
       const result = await api().commitImport(batches[i]!)
       imported += result.imported
       const done = Math.min((i + 1) * MAX_COMMIT_BATCH_ROWS, total)
@@ -292,6 +317,8 @@ export interface ResonanceExportRequest {
   includePearpal: boolean
   includeEvo: boolean
   includeWardrobe: boolean
+  /** 勾选后导出卡池心愿单段（缺省不导出） */
+  includeWishlist?: boolean
 }
 
 /** 组装导出载荷并写盘；无可导出内容时返回 null（filePath 来自 saveFile 对话框） */
@@ -305,14 +332,16 @@ export async function exportResonanceData(
       edits: state.edits,
       pearpal: state.pearpal,
       evo: state.evo,
-      wardrobe: state.wardrobe
+      wardrobe: state.wardrobe,
+      wishlist: state.wishlist
     },
     {
       includePulls: request.includePulls,
       includeEdits: request.includeEdits,
       includePearpal: request.includePearpal,
       includeEvo: request.includeEvo,
-      includeWardrobe: request.includeWardrobe
+      includeWardrobe: request.includeWardrobe,
+      includeWishlist: request.includeWishlist === true
     }
   )
   if (!payload) return null
@@ -327,6 +356,34 @@ export async function updateWardrobeItems(
   const result = await api().updateWardrobe(adds, removes)
   useResonanceStore.getState().setWardrobe(result.wardrobe)
   return result.wardrobe
+}
+
+/**
+ * 切换卡池心愿单（乐观更新，语义对齐上游 useBannerWishlist.persistOptimistic）：
+ * 先本地翻转 → 全量覆盖写库 → 以回传值为准；写失败且本地仍是本次乐观结果时回滚，
+ * 并把异常向上抛给调用方展示 toast。
+ */
+export async function toggleBannerWish(bannerId: number): Promise<ResonanceBannerWishlistData> {
+  const store = useResonanceStore.getState()
+  const previous = store.wishlist
+  const exists = previous.entries.some((entry) => entry.bannerId === bannerId)
+  const optimistic: ResonanceBannerWishlistData = {
+    version: 1,
+    entries: exists
+      ? previous.entries.filter((entry) => entry.bannerId !== bannerId)
+      : [...previous.entries, { bannerId }]
+  }
+  store.setWishlist(optimistic)
+  try {
+    const result = await api().setWishlist(optimistic)
+    useResonanceStore.getState().setWishlist(result.wishlist)
+    return result.wishlist
+  } catch (error) {
+    if (useResonanceStore.getState().wishlist === optimistic) {
+      useResonanceStore.getState().setWishlist(previous)
+    }
+    throw error
+  }
 }
 
 /** 危险操作：清空全部共鸣数据（reset 后立即重拉空数据，避免页面停留在加载态） */

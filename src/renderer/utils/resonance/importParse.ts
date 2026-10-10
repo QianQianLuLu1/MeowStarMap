@@ -15,11 +15,13 @@ import {
   resonanceImportFileSchema
 } from '../../../shared/types/resonance'
 import type {
+  ResonanceBannerWishlistData,
   ResonanceEditRow,
   ResonanceEvoRow,
   ResonancePearpalRow,
   ResonancePullRow
 } from '../../../shared/types/resonance'
+import { normalizeBannerWishlist } from './bannerWishlist'
 import { normalizeWardrobeData, type WardrobeData } from './wardrobe'
 import type { EditRecord, EvoRecord, PearpalTrackerItem, PullRecord } from './types'
 
@@ -42,6 +44,8 @@ export interface ParsedImportData {
   evo: Record<number, EvoRecord[]>
   pearpal: Record<number, PearpalTrackerItem[]>
   wardrobe: WardrobeData | null
+  /** 上游 bannerWishlist 段（规范化后）；文件未携带时为 null */
+  wishlist: ResonanceBannerWishlistData | null
   invalid: ImportInvalidRecord[]
   /** 无效记录总数（invalid 仅是前若干条采样） */
   invalidCount: number
@@ -178,12 +182,17 @@ export function parseImportFileText(text: string): ParsedImportData {
   }
   const raw = shell.data
 
-  // 形态识别：current 格式带 pulls/edits/evo/pearpal/wardrobe 段
+  // 形态识别：current 格式带 pulls/edits/evo/pearpal/wardrobe/bannerWishlist 段
   const isCurrent =
     typeof raw === 'object' &&
     raw !== null &&
     !Array.isArray(raw) &&
-    ('pulls' in raw || 'edits' in raw || 'evo' in raw || 'pearpal' in raw || 'wardrobe' in raw)
+    ('pulls' in raw ||
+      'edits' in raw ||
+      'evo' in raw ||
+      'pearpal' in raw ||
+      'wardrobe' in raw ||
+      'bannerWishlist' in raw)
 
   const invalid: ImportInvalidRecord[] = []
   const pulls: Record<number, PullRecord[]> = {}
@@ -192,6 +201,7 @@ export function parseImportFileText(text: string): ParsedImportData {
   const pearpal: Record<number, PearpalTrackerItem[]> = {}
   let version: number | null = null
   let wardrobe: WardrobeData | null = null
+  let wishlist: ResonanceBannerWishlistData | null = null
   let rawTotal = 0
 
   const collectPulls = (source: Record<string, unknown[]>): void => {
@@ -213,6 +223,7 @@ export function parseImportFileText(text: string): ParsedImportData {
       evo?: Record<string, unknown[]>
       pearpal?: Record<string, unknown[]>
       wardrobe?: unknown
+      bannerWishlist?: unknown
     }
     version = obj.version ?? null
     if (obj.pulls) collectPulls(obj.pulls)
@@ -255,6 +266,14 @@ export function parseImportFileText(text: string): ParsedImportData {
       const normalized = normalizeWardrobeData(obj.wardrobe)
       wardrobe = normalized
     }
+    if (obj.bannerWishlist !== undefined) {
+      // 段结构非法不静默丢弃：整份文件拒绝，避免用户以为心愿单已导入
+      try {
+        wishlist = normalizeBannerWishlist(obj.bannerWishlist)
+      } catch {
+        throw new ImportStructureError('invalidWishlist', 'resonance.error.importInvalidWishlist')
+      }
+    }
   } else {
     // 旧格式：Record<bannerId, PullRecord[]>
     collectPulls(raw as Record<string, unknown[]>)
@@ -284,6 +303,7 @@ export function parseImportFileText(text: string): ParsedImportData {
     evo,
     pearpal,
     wardrobe,
+    wishlist,
     invalid,
     invalidCount,
     totalValidRecords

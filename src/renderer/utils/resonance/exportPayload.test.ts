@@ -146,6 +146,79 @@ describe('导出 → 导入 round-trip 一致性', () => {
   })
 })
 
+describe('卡池心愿单导出段（同步上游 65bb3d8f）', () => {
+  const allSections = {
+    includePulls: true,
+    includeEdits: true,
+    includePearpal: true,
+    includeEvo: true,
+    includeWardrobe: true
+  }
+  const withWishlist = (): ResonanceGetDataResult => ({
+    ...makeData(),
+    wishlist: {
+      version: 1,
+      entries: [{ bannerId: 74 }, { bannerId: 77 }]
+    }
+  })
+
+  it('勾选 includeWishlist 时导出 bannerWishlist 段', () => {
+    const payload = buildExportPayload(withWishlist(), { ...allSections, includeWishlist: true })
+    expect(payload).not.toBeNull()
+    expect(payload!.bannerWishlist).toEqual({
+      version: 1,
+      entries: [{ bannerId: 74 }, { bannerId: 77 }]
+    })
+  })
+
+  it('未勾选时载荷不出现该键（向后兼容）', () => {
+    expect(buildExportPayload(withWishlist(), allSections)!.bannerWishlist).toBeUndefined()
+  })
+
+  it('心愿单为空时即便勾选也不落段', () => {
+    const emptyWish: ResonanceGetDataResult = {
+      ...makeData(),
+      wishlist: { version: 1, entries: [] }
+    }
+    expect(
+      buildExportPayload(emptyWish, { ...allSections, includeWishlist: true })!.bannerWishlist
+    ).toBeUndefined()
+  })
+
+  it('仅有心愿单、无任何记录时仍可导出（载荷非 null）', () => {
+    const onlyWish = buildExportPayload(
+      {
+        pulls: [],
+        edits: [],
+        pearpal: [],
+        evo: [],
+        wardrobe: createEmptyWardrobeData(),
+        wishlist: { version: 1, entries: [{ bannerId: 2 }] }
+      },
+      {
+        includePulls: false,
+        includeEdits: false,
+        includePearpal: false,
+        includeEvo: false,
+        includeWardrobe: false,
+        includeWishlist: true
+      }
+    )
+    expect(onlyWish).not.toBeNull()
+    expect(onlyWish!.pulls).toEqual({})
+    expect(onlyWish!.bannerWishlist).toEqual({ version: 1, entries: [{ bannerId: 2 }] })
+  })
+
+  it('round-trip：含心愿单的导出可被导入解析回同构数据', () => {
+    const payload = buildExportPayload(withWishlist(), { ...allSections, includeWishlist: true })
+    const parsed = parseImportFileText(JSON.stringify(payload))
+    expect(parsed.wishlist).toEqual({
+      version: 1,
+      entries: [{ bannerId: 74 }, { bannerId: 77 }]
+    })
+  })
+})
+
 describe('getResonanceExportFileName', () => {
   it('包含日期', () => {
     expect(getResonanceExportFileName(new Date('2025-06-01T00:00:00Z'))).toBe(

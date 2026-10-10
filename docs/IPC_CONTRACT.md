@@ -340,3 +340,34 @@ wrapHandler(ctx, schema, handler) =>
 **错误处理**：
 
 - 收藏夹中不存在该媒体：抛出 `NotFoundError`
+
+## 7. 共鸣录域（卡池心愿单，同步上游 65bb3d8f 新增）
+
+### 7.1 `resonance:setWishlist`
+
+| 属性                   | 值                                                                        |
+| ---------------------- | ------------------------------------------------------------------------- |
+| 通道名                 | `resonance:setWishlist`                                                   |
+| 参数                   | 单个位置参数：`{ version: 1, entries: [{ bannerId: number }] }`           |
+| 参数校验               | `resonanceSetWishlistArgs = z.tuple([resonanceBannerWishlistSchema])`     |
+| 返回值（`data`）       | `{ wishlist: { version: 1, entries: [{ bannerId }] } }`（落库后的最新值） |
+| 前端检查 `res.success` | 否——`call()` 只透出 `data`，渲染层用 `try/catch` + `IpcError` 分支        |
+| 校验失败错误码         | `VALIDATION_ERROR`                                                        |
+
+- 语义为**全量覆盖**：`entries: []` 即清空心愿单（非增量）。
+- 非法入参：`version ≠ 1`、`entries` 非数组、`bannerId` 非 1..999999 的整数、条目数超过 `MAX_WISHLIST_ENTRIES`（200）→ zod 拒绝，不触达数据库。
+- 「卡池是否真实存在」不在此层判定：由渲染层 `normalizeBannerWishlist()`（`src/renderer/utils/resonance/bannerWishlist.ts`）按本地静态快照 `BANNER_DATA` 过滤，保持离线特性。
+- 回传条目按 `banner_id` 升序（表内无时间列，排序键固定以保证重载顺序稳定）；渲染层以回传值覆盖本地状态，乐观更新失败时回滚。
+- 契约实现位置：`src/main/ipc/handlers/resonance-handler.ts`、`src/main/preload/api/resonance.ts`、`src/shared/types/resonance.ts`、`src/renderer/vite-env.d.ts`。
+
+### 7.2 共鸣录既有通道的向后兼容扩展
+
+本次未改名、未改既有字段语义，仅新增**可选**字段：
+
+| 通道                     | 新增可选字段                                            | 说明                                                        |
+| ------------------------ | ------------------------------------------------------- | ----------------------------------------------------------- |
+| `resonance:getData`      | `wishlist`                                              | 旧调用方读取时缺省为空表，`ResonanceGetDataResult` 向后兼容 |
+| `resonance:commitImport` | `wishlist` + `includeWishlist`                          | 与既有 `wardrobe` / `includeWardrobe` 同构，仅末批携带覆盖  |
+| `resonance:export`       | 载荷 `bannerWishlist`（`resonanceExportPayloadSchema`） | 与上游导出格式对齐；上游同字段亦为可选，缺失即不导出        |
+
+`resonance:commitImport` 的空批次 `refine` 守卫已同步放宽：仅携带 `includeWishlist: true` + `wishlist` 的末批视为有效批次（此前仅记录段与 wardrobe 可使其通过）。
