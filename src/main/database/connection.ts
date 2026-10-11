@@ -12,6 +12,7 @@ import type { DatabaseWorkerBridge } from './worker/database-worker-bridge'
 import type { ScannerWorkerBridge } from '../scanner/scanner-worker-bridge'
 import type { MediaWorkerBridge } from '../media-worker/bridge'
 import type { DbRunResult } from './worker/worker-protocol'
+import { SYNC_METADATA_DDL_STATEMENTS } from './sync-metadata-repository'
 import { t } from '../i18n'
 
 // 惰性加载 better-sqlite3：首次调用时才动态 import，使原生模块加载时机
@@ -1304,6 +1305,11 @@ export class DatabaseManager {
     // R8：乐观锁字段——media_files.updated_at 记录用户面向变更时间，
     // operation_history.snapshot_updated_at 捕获操作发生时的媒体状态快照
     this.migrateOptimisticLockFields()
+    // 同步集成阶段2（docs/sync-integration/02）：NikkiSync 适配层——media_files.sha256 列。
+    // 协议 MediaResource.sha256 必填且资源 ETag 依赖其稳定；逐次全文件哈希对大视频
+    // 不可接受，需持久缓存。nullable：NULL=未计算，由适配层首次访问时惰性计算并回写，
+    // 不改动任何现有列的语义；不批量回填（阶段3可挂扫描任务渐进填充）
+    this.migrateSyncSha256Column()
 
     // 所有 ADD COLUMN 迁移完成后，统一创建索引（避免列未存在时索引创建失败）
     const indexStatements = [
@@ -1358,7 +1364,13 @@ export class DatabaseManager {
       'CREATE TABLE IF NOT EXISTS resonance_banner_wishlist (banner_id INTEGER NOT NULL, UNIQUE (banner_id))',
       'CREATE INDEX IF NOT EXISTS idx_resonance_pulls_banner ON resonance_pulls(banner_id, obtained_at)',
       'CREATE INDEX IF NOT EXISTS idx_resonance_edits_banner ON resonance_edits(banner_id)',
-      'CREATE INDEX IF NOT EXISTS idx_resonance_pearpal_banner ON resonance_pearpal(banner_id)'
+      'CREATE INDEX IF NOT EXISTS idx_resonance_pearpal_banner ON resonance_pearpal(banner_id)',
+      // ===== 同步集成阶段2（docs/sync-integration/02）：NikkiSync 适配层元数据表 =====
+      // 设备配对 / 变更日志（append-only） / 服务元数据（单行 revision 镜像+身份） /
+      // 动态照片配对链接。纯新增表、CREATE TABLE IF NOT EXISTS 幂等，无数据回填
+      // （不需要版本标记）；DDL 单一事实源在 sync-metadata-repository.ts 导出，
+      // 仓储层测试的内存引擎按同一 schema 建表
+      ...SYNC_METADATA_DDL_STATEMENTS
     ]
     for (const stmt of indexStatements) {
       try {
@@ -1868,6 +1880,18 @@ export class DatabaseManager {
     if (!this.db) return
     this.safeEnsureColumn('media_files', 'updated_at TEXT')
     this.safeEnsureColumn('operation_history', 'snapshot_updated_at TEXT')
+  }
+
+  /**
+   * 同步集成阶段2：NikkiSync 适配层的 sha256 缓存列。
+   * 协议 MediaResource.sha256 必填（资源 ETag / 客户端去重依赖），而 media_files
+   * 原生无哈希列、运行时逐次全文件哈希对大视频不可接受。nullable：
+   * NULL=未计算，由 sync-read-repository 首次访问时惰性计算并回写（走参数绑定）。
+   * safeEnsureColumn 保证幂等；无默认值 → 存量行为 NULL，不做批量回填。
+   */
+  private migrateSyncSha256Column(): void {
+    if (!this.db) return
+    this.safeEnsureColumn('media_files', 'sha256 TEXT')
   }
 
   private migrateSceneCategory(): void {
