@@ -16,6 +16,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.5] - 2026-10-11
+
+> 本版本主体为设备同步（NikkiSync 协议 v1）功能整装发布——sync-integration 阶段 0–6 的全部产出，以及端到端联调后的代码审查修复。计划与报告见 `docs/sync-integration/`。
+
+### Added | 新增
+
+- **设备同步（NikkiSync 协议 v1）**：相册库可作为同步服务端，与移动端（NikkiSync 客户端）经 HTTPS + WebSocket 完成配对、认证与图库同步
+  - **协议与认证（阶段 1/3）**：移植 NikkiSync Protocol v1 至 `src/shared/sync/protocol.ts`（类型/路由/错误码/事件契约冻结）；Ed25519 请求验签 + 时间戳/nonce 防重放；一次性配对令牌会话表与仓储（复用即失效、过期 410）
+  - **数据适配层（阶段 2）**：`media_files` 之上的同步读取面（keyset 分页资产列表/资产详情/资源定位/增量 journal）与同步元数据表（服务器身份/已配对设备/配对会话）；motion 照片对经真实 `rebuildMotionLinks` 建链
+  - **HTTPS 同步服务端（阶段 4）**：自签 TLS（指纹钉扎语义）承载全部核心端点——服务器信息/配对/资产列表/详情/资源下载（支持 Range 分片）/增量变更/搜索统计桩 + WebSocket 实时事件（`server.hello`/`asset.*`/`library.rescan.*`）；升级请求即签名
+  - **设置 UI 与扫描器集成（阶段 5）**：设置页设备管理（列表/撤销/状态）、配对二维码（NS1 紧凑 URI + Android 完整 URI）、同步总开关（默认关闭）、扫描事件汇与运行时广播接线
+  - **JPEG 无损导出端点（阶段 6）**：`GET/HEAD .../resources/{rid}/export`——不解码像素、仅在段结构上重写 APP1/Exif TIFF（orientation 旋转换算 + 游戏参数 EXIF 注入），四校验响应头 + 单飞限流 + 源字节哈希/大小校验，`metadata.raw` 敏感键绝不入导出文件
+  - **端到端联调（阶段 6）**：跨仓库驱动测试覆盖 13 个场景（配对/认证/分页/详情/隐私剥离/资源下载/Range/增量/WS/导出等）全部通过；E2E 启动器 `scripts/sync-e2e/launch-server.ts` 入仓；计划与报告见 `docs/sync-integration/06-e2e-report.md`
+- 隐私契约固化：资产详情 `metadata.raw` 剥离 NUAN5 敏感键（`nativeParamPayload`/`nativeParamNuan5Md5`），`nativeParamToken` 按上游语义保留，测试固化
+
+### Fixed | 修复
+
+- 联调与审查修复（均先红灯后绿灯）：详情 `metadata.raw` 泄漏 NUAN5 载荷键（E2E 红灯→绿灯）；export 失败路径静默吞错补告警日志；DB 记录大写 sha256 导致导出恒 409 的大小写归一；ImageDescription 超长截断产生畸形 `\uXXXX` 转义；E2E 启动器参数校验（`--port` 0–65535 整数/未知参数拒绝/`--serve` no-op）与退出清理（exit 处理器先关 DB 再删自建临时目录，修复 Windows 下启动失败路径的临时目录泄漏；shutdown try/finally 保证退出码必达）
+
+---
+
 ## [2.5.3] - 2026-10-11
 
 > 2026-10-01 首次发布；2026-10-11 重新打包，以下追加变更随同版本安装包一并发布。
@@ -349,7 +370,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库尚未推送任何 git tag，因此以下 `compare/vX...vY` 与 `releases/tag/vX` 链接需在建立对应 tag 后方可访问；保留原链接形式是为了不销毁历史版本记录。
 
-[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.3...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.5...HEAD
+[2.5.5]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.3...v2.5.5
 [2.5.3]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.2...v2.5.3
 [2.5.2]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...v2.5.1
