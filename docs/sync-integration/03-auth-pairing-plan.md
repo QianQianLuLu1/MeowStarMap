@@ -52,14 +52,14 @@
 
 ## 3. 依赖声明（已检查项目现有依赖）
 
-| 需求 | 结论 |
-|---|---|
+| 需求                                             | 结论                                                                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Ed25519/RSA 密钥生成、签名验证、哈希、X.509 解析 | **Node 内置 `node:crypto`**（`generateKeyPairSync` / `createSign` / `verify` / `createHash` / `createPublicKey` / `X509Certificate`），零第三方依赖 |
-| 文件持久化 | Node 内置 `node:fs` / `node:path` |
-| 配对二维码**内容** | 已冻结的 `buildPairingUri`（protocol.ts），无需新依赖 |
-| 二维码**渲染**（SVG） | 本阶段不需要；阶段4/5 引入 `qrcode`（上游同款） |
-| sqlite 驱动 | 既有 better-sqlite3 ^12；测试走 FakeDb，不触碰原生模块 |
-| HTTP 服务器 / mDNS | 阶段4 范围，本阶段不引入 |
+| 文件持久化                                       | Node 内置 `node:fs` / `node:path`                                                                                                                   |
+| 配对二维码**内容**                               | 已冻结的 `buildPairingUri`（protocol.ts），无需新依赖                                                                                               |
+| 二维码**渲染**（SVG）                            | 本阶段不需要；阶段4/5 引入 `qrcode`（上游同款）                                                                                                     |
+| sqlite 驱动                                      | 既有 better-sqlite3 ^12；测试走 FakeDb，不触碰原生模块                                                                                              |
+| HTTP 服务器 / mDNS                               | 阶段4 范围，本阶段不引入                                                                                                                            |
 
 **不修改 `package.json`。**
 
@@ -67,20 +67,20 @@
 
 ### 新增
 
-| 文件 | 输入 → 输出 |
-|---|---|
-| `src/main/sync/cert-der.ts` | 私钥 PEM + SPKI DER → 自签 X.509 证书 PEM。纯函数 DER 构造器（自写实现，DER/OID 结构与上游互操作约定一致：v3、sha256WithRSAEncryption、CA+SAN、UTCTime 有效期） |
-| `src/main/sync/identity-service.ts` | 目录路径 → `SyncIdentityService`：`getOrCreateTlsIdentity()` → `{keyPem, certPem, fingerprintSha256, createdAt}`（文件缺失/损坏时生成并持久化）；`getOrCreateServerIdentity()` → `{publicKeyPem, privateKeyPem}`（PairResponse 用 Ed25519 密钥对）；`getTlsFingerprintSha256()` |
-| `src/main/sync/auth-service.ts` | 注入 `{getDevice, touchDevice, clockSkewMs?, now?}` → `AuthService.verifyRequest({method, url, headers, body?})` → `{ok:true, deviceId} \| {ok:false, reason}`；reason ∈ missing_headers / malformed_timestamp / clock_skew / replayed_nonce / unknown_device / revoked_device / invalid_signature |
-| `src/main/sync/pairing-service.ts` | 注入 `{sessions, devices, identity, serverIdentity, ttlMs?, now?}` → `PairingService`：`createPairingToken()` → `{token, expiresAt}`；`buildPairingQrContent({host, port, ttlMs?})` → `NS1\|...` 串；`redeemToken(PairRequest)` → `PairResponse`（失败抛 `PairingError('pairing_expired'\|'pairing_invalid'\|'bad_request')`） |
-| `src/main/database/sync-pairing-repository.ts` | `SYNC_PAIRING_DDL_STATEMENTS`（建表+索引）+ `SyncPairingRepository`：`createSession({tokenHash, serverId, expiresAt})`、`consumeSession(tokenHash, nowIso)` → `'ok'\|'missing'\|'used'\|'expired'`。SQL 全静态字面量 + 参数绑定，同步直写 + 事务（resonance/sync 先例），async 方法签名保留 worker 切回接缝 |
-| `src/main/sync/AGENTS.md` | 模块约定说明 |
-| 测试 ×4 | `src/main/database/sync-pairing-repository.test.ts`、`src/main/sync/auth-service.test.ts`、`src/main/sync/pairing-service.test.ts`、`src/main/sync/identity-service.test.ts` |
+| 文件                                           | 输入 → 输出                                                                                                                                                                                                                                                                                                                    |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/main/sync/cert-der.ts`                    | 私钥 PEM + SPKI DER → 自签 X.509 证书 PEM。纯函数 DER 构造器（自写实现，DER/OID 结构与上游互操作约定一致：v3、sha256WithRSAEncryption、CA+SAN、UTCTime 有效期）                                                                                                                                                                |
+| `src/main/sync/identity-service.ts`            | 目录路径 → `SyncIdentityService`：`getOrCreateTlsIdentity()` → `{keyPem, certPem, fingerprintSha256, createdAt}`（文件缺失/损坏时生成并持久化）；`getOrCreateServerIdentity()` → `{publicKeyPem, privateKeyPem}`（PairResponse 用 Ed25519 密钥对）；`getTlsFingerprintSha256()`                                                |
+| `src/main/sync/auth-service.ts`                | 注入 `{getDevice, touchDevice, clockSkewMs?, now?}` → `AuthService.verifyRequest({method, url, headers, body?})` → `{ok:true, deviceId} \| {ok:false, reason}`；reason ∈ missing_headers / malformed_timestamp / clock_skew / replayed_nonce / unknown_device / revoked_device / invalid_signature                             |
+| `src/main/sync/pairing-service.ts`             | 注入 `{sessions, devices, identity, serverIdentity, ttlMs?, now?}` → `PairingService`：`createPairingToken()` → `{token, expiresAt}`；`buildPairingQrContent({host, port, ttlMs?})` → `NS1\|...` 串；`redeemToken(PairRequest)` → `PairResponse`（失败抛 `PairingError('pairing_expired'\|'pairing_invalid'\|'bad_request')`） |
+| `src/main/database/sync-pairing-repository.ts` | `SYNC_PAIRING_DDL_STATEMENTS`（建表+索引）+ `SyncPairingRepository`：`createSession({tokenHash, serverId, expiresAt})`、`consumeSession(tokenHash, nowIso)` → `'ok'\|'missing'\|'used'\|'expired'`。SQL 全静态字面量 + 参数绑定，同步直写 + 事务（resonance/sync 先例），async 方法签名保留 worker 切回接缝                    |
+| `src/main/sync/AGENTS.md`                      | 模块约定说明                                                                                                                                                                                                                                                                                                                   |
+| 测试 ×4                                        | `src/main/database/sync-pairing-repository.test.ts`、`src/main/sync/auth-service.test.ts`、`src/main/sync/pairing-service.test.ts`、`src/main/sync/identity-service.test.ts`                                                                                                                                                   |
 
 ### 修改（唯一存量文件改动）
 
-| 文件 | 改动 |
-|---|---|
+| 文件                              | 改动                                                                                                                          |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `src/main/database/connection.ts` | 导入 + 展开 `...SYNC_PAIRING_DDL_STATEMENTS`（紧跟 `...SYNC_METADATA_DDL_STATEMENTS`，2 行 + 注释；幂等 DDL，不占迁移版本号） |
 
 ### 目录决策
@@ -91,14 +91,14 @@
 
 本阶段为纯库层（无运行时入口、无 IPC），验证全部经测试与静态检查：
 
-| 目的 | 命令 |
-|---|---|
+| 目的                  | 命令                                                                             |
+| --------------------- | -------------------------------------------------------------------------------- |
 | 新增测试（红灯→绿灯） | `npx vitest run src/main/sync src/main/database/sync-pairing-repository.test.ts` |
-| 数据库层回归 | `npm run test:db` |
-| 主进程回归 | `npm run test:main` |
-| 类型检查 | `npm run typecheck` |
-| Lint | `npm run lint` |
-| 全量测试 | `npm run test` |
+| 数据库层回归          | `npm run test:db`                                                                |
+| 主进程回归            | `npm run test:main`                                                              |
+| 类型检查              | `npm run typecheck`                                                              |
+| Lint                  | `npm run lint`                                                                   |
+| 全量测试              | `npm run test`                                                                   |
 
 加密 API 行为先经 Node 官方文档核对（§7），再以 scratch 脚本实测后才进入实现（执行纪律 §6）。
 
@@ -106,30 +106,30 @@
 
 ### 6.1 错误处理矩阵
 
-| 故障 | 检测 | 处理 |
-|---|---|---|
-| 认证请求缺头 / 头为空 | `verifyRequest` 头检查 | 拒绝（reason=missing_headers） |
-| 时间戳非数字 / 超出 ±5min | `Number.isFinite` + `Math.abs(now−ts)>clockSkewMs` | 拒绝（malformed_timestamp / clock_skew） |
-| nonce 重放 | 内存 Map 命中 `deviceId:nonce` | 拒绝（replayed_nonce），**不写入** |
-| 未知设备 / 已撤销 | 设备仓储查询 | 拒绝（unknown_device / revoked_device） |
-| 验签失败 / 公钥解析异常 / base64url 非法 | try/catch 包住整个验签段 | 拒绝（invalid_signature），不向上抛 |
-| 配对令牌不存在 / 已使用 | `consumeSession` → missing/used | `PairingError('pairing_invalid')` |
-| 配对令牌过期 | ISO 串比较 `expires_at <= now` | `PairingError('pairing_expired')` |
-| 配对请求字段缺失/非法（platform∉{ios,android}、publicKey 不可解析等） | 服务层先校验后消费令牌 | `PairingError('bad_request')`（**未消费令牌**，可重试） |
-| 证书/私钥文件损坏、指纹不符 | `X509Certificate` 解析失败或重算指纹 ≠ 存储指纹 | `logger.warn` 告警 → **重建覆盖**（自愈，改进上游崩溃行为） |
-| 证书目录不可创建 / 写入失败 | fs 异常 | 向上抛（启动期致命，属环境问题） |
-| TLS 校验绕过 | — | 不提供任何"跳过验证"开关；客户端钉扎指纹是唯一信任锚 |
+| 故障                                                                  | 检测                                               | 处理                                                        |
+| --------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------- |
+| 认证请求缺头 / 头为空                                                 | `verifyRequest` 头检查                             | 拒绝（reason=missing_headers）                              |
+| 时间戳非数字 / 超出 ±5min                                             | `Number.isFinite` + `Math.abs(now−ts)>clockSkewMs` | 拒绝（malformed_timestamp / clock_skew）                    |
+| nonce 重放                                                            | 内存 Map 命中 `deviceId:nonce`                     | 拒绝（replayed_nonce），**不写入**                          |
+| 未知设备 / 已撤销                                                     | 设备仓储查询                                       | 拒绝（unknown_device / revoked_device）                     |
+| 验签失败 / 公钥解析异常 / base64url 非法                              | try/catch 包住整个验签段                           | 拒绝（invalid_signature），不向上抛                         |
+| 配对令牌不存在 / 已使用                                               | `consumeSession` → missing/used                    | `PairingError('pairing_invalid')`                           |
+| 配对令牌过期                                                          | ISO 串比较 `expires_at <= now`                     | `PairingError('pairing_expired')`                           |
+| 配对请求字段缺失/非法（platform∉{ios,android}、publicKey 不可解析等） | 服务层先校验后消费令牌                             | `PairingError('bad_request')`（**未消费令牌**，可重试）     |
+| 证书/私钥文件损坏、指纹不符                                           | `X509Certificate` 解析失败或重算指纹 ≠ 存储指纹    | `logger.warn` 告警 → **重建覆盖**（自愈，改进上游崩溃行为） |
+| 证书目录不可创建 / 写入失败                                           | fs 异常                                            | 向上抛（启动期致命，属环境问题）                            |
+| TLS 校验绕过                                                          | —                                                  | 不提供任何"跳过验证"开关；客户端钉扎指纹是唯一信任锚        |
 
 ### 6.2 参数校验规则表
 
-| 项 | 规则 |
-|---|---|
-| 签名头格式 | 四头全部存在且非空字符串；timestamp 必须可解析为有限数字（毫秒）；nonce/signature 按 base64url 解码，解码或验签异常一律拒绝 |
-| 时间戳窗口 | `clockSkewMs` 默认 `5 * 60_000`，构造可注入但**不提供放宽到 >5min 的运行时配置** |
-| nonce 规则 | 键 = `${deviceId}:${nonce}`；TTL = clockSkewMs；惰性清理；仅内存（重启清空，时间窗兜底防重放） |
-| 配对令牌 | 长度 24 随机字节 base64url；TTL 默认 5 分钟；存储仅 sha256 hex；一次性靠事务内 `used_at IS NULL` 守卫 |
-| PairRequest | `pairingToken` 非空；`device.deviceId/deviceName` 非空字符串；`device.platform ∈ {ios, android}`；`device.publicKey` 必须能被 `createPublicKey` 解析（PEM 或 base64url SPKI）；`appVersion` 可空 |
-| host/port（QR 生成入参） | host 非空字符串；port 整数 1–65535（与客户端 `PairingUri.java` 校验对齐） |
+| 项                       | 规则                                                                                                                                                                                             |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 签名头格式               | 四头全部存在且非空字符串；timestamp 必须可解析为有限数字（毫秒）；nonce/signature 按 base64url 解码，解码或验签异常一律拒绝                                                                      |
+| 时间戳窗口               | `clockSkewMs` 默认 `5 * 60_000`，构造可注入但**不提供放宽到 >5min 的运行时配置**                                                                                                                 |
+| nonce 规则               | 键 = `${deviceId}:${nonce}`；TTL = clockSkewMs；惰性清理；仅内存（重启清空，时间窗兜底防重放）                                                                                                   |
+| 配对令牌                 | 长度 24 随机字节 base64url；TTL 默认 5 分钟；存储仅 sha256 hex；一次性靠事务内 `used_at IS NULL` 守卫                                                                                            |
+| PairRequest              | `pairingToken` 非空；`device.deviceId/deviceName` 非空字符串；`device.platform ∈ {ios, android}`；`device.publicKey` 必须能被 `createPublicKey` 解析（PEM 或 base64url SPKI）；`appVersion` 可空 |
+| host/port（QR 生成入参） | host 非空字符串；port 整数 1–65535（与客户端 `PairingUri.java` 校验对齐）                                                                                                                        |
 
 ## 7. 加密 API 核对（禁止假设，实现前完成）
 
@@ -204,4 +204,43 @@ pairing_sessions{token_hash, used_at=NULL, expires_at=now+ttl}   ←—— [待�
 
 ## 13. 执行记录
 
-（执行中回填：基线测试数、scratch 验证结论、红灯/绿灯时间线、回归结果、提交清单。）
+**分支**：`feature/sync-integration-03-auth-pairing`（自 7b48060）。计划文档 commit `2bd276a`。
+
+**基线**：`npm run test:main` = 174 文件 / 3322 通过，EXIT=0（15:39）。
+
+**加密 API 核对（§7 结论，文档 + scratch 双重确认）**：
+
+- `crypto.verify(algorithm, …)` 文档原文："If algorithm is null or undefined, then the algorithm is dependent upon the key type (especially Ed25519 and Ed448)"——Ed25519 传 `null` 正确。
+- `generateKeyPairSync`："When PEM encoding was selected, the respective key will be a string, otherwise it will be a buffer containing the data encoded as DER"——spki/der → Buffer、pkcs8/pem → string。
+- `createPublicKey({key, format:'der', type:'spki'})` 与 PEM 串双格式均可；`createSign('RSA-SHA256')` 为文档认可的签名算法名。
+- scratch 实测（`node -e` 临时脚本，通过后删除）：手写 DER 证书可被 `X509Certificate` 解析、自签 verify 通过、`fingerprint256` 为冒号分隔大写 hex（归一化 == sha256(证书 DER)）、空 body sha256 常量吻合、base64url 无 padding、篡改必败。
+- scratch 抓到 1 个真实缺陷：Name 结构漏 SET（0x31）外壳导致 `ERR_OSSL_ASN1_WRONG_TAG`——"先验证后实现"纪律的直接收益。
+
+**红灯**：4 个测试文件先行提交，`npx vitest run` 全 FAIL（模块缺失）✅。
+
+**绿灯时间线**：
+
+1. `sync-pairing-repository` + connection.ts DDL 展开 → 仓储测试 9/9 ✅
+2. `cert-der` + `identity-service` → 11 通过 + 2 skipped（win32 权限用例）✅（实现期重犯 Name 缺 SET 笔误，测试即时暴露并修复）
+3. `auth-service` → 25/25 ✅
+4. `pairing-service` → 12/12 ✅
+
+**过程中 intercepted 的问题**：
+
+- **Mimosa 写拦截**（identity-service.ts）：`path.join` 动态片段进文件读写被判"路径穿越·高危"。文件名实为模块常量白名单，但按建议落地了 `resolveFilePath()`：`path.resolve` 后强制根目录边界校验（纵深防御，也满足扫描器）。
+- **lint 3 处**：主进程源码禁硬编码中文（`no-restricted-syntax`）→ 服务日志改英文（与 database 仓储层英文 Error 先例一致，维持本目录零 i18n 依赖）；`assertNonEmpty` 未用形参 → `_label`；测试未用变量/类型导入清理。
+- **typecheck 1 处**：`String.replaceAll` 在 src/main 的 tsc lib 目标（<ES2021）不可用 → 改 `replace(/:/g, '')`。
+
+**回归门禁**（全部落文件后复跑）：
+
+| 检查                    | 结果                                                                         |
+| ----------------------- | ---------------------------------------------------------------------------- |
+| `npm run typecheck`     | EXIT=0                                                                       |
+| `npm run test:db`       | 11 文件 / 478 通过，EXIT=0                                                   |
+| `npm run test:main`     | 178 文件 / 3379 通过 + 2 skipped，EXIT=0（基线 3322 → +57 新增，零新增失败） |
+| `npm run test`（全量）  | 346 文件 / 5528 通过 + 2 skipped，EXIT=0                                     |
+| eslint（新增/改动文件） | 0 error 0 warning                                                            |
+
+**验收标准对照（§11）**：① 新增测试 57 通过（认证成功/失败/过期/重放、配对全流程/过期/已用、TLS 生成/持久化/指纹/自愈）✅；② 回归无新增失败 ✅；③ typecheck + eslint 通过 ✅；④ DDL 经 connection.ts 幂等展开（connection.test.ts 的 MockDatabase 泛化处理 CREATE TABLE/忽略 CREATE INDEX，已验证）✅；⑤ 零新依赖、零密钥字面量 ✅。
+
+**提交**：docs 计划 `2bd276a`；database 仓储与 sync 服务按 `feat(database)` / `feat(sync)` 分逻辑提交（见 git log）。
