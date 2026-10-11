@@ -205,11 +205,11 @@ function assertChangeInput(input: RecordAssetChangeInput): void {
 }
 
 export class SyncMetadataRepository {
-  /** workerBridge/dbPath 保留形参：写路径切回 worker 桥接时无需改动调用方 */
+  /** 保留形参（下划线前缀=刻意未读）：写路径切回 worker 桥接时无需改动调用方 */
   constructor(
     private readonly db: Database.Database,
-    private readonly workerBridge: unknown = null,
-    private readonly dbPath: string = ''
+    _workerBridge: unknown = null,
+    _dbPath: string = ''
   ) {}
 
   // ============ 写（async 签名；当前为同步直写，见文件头备注） ============

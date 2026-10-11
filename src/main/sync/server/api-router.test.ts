@@ -252,12 +252,14 @@ describe('api-router', () => {
     expect(post.state.status).toBe(404)
   })
 
-  it('defers the export extension endpoint with 404', async () => {
+  it('serves the export extension endpoint（阶段6 实现）：资源缺失时 404 resource_not_ready', async () => {
     const { res, state } = mockRes()
     const target = '/v1/assets/1/resources/res_1_primary/export?exif=true&rotation=0'
     await call(createServices(), mockReq('GET', target, signedHeaders('GET', target)), res)
+    // 阶段4 曾延后实现（404 not_found）；阶段6 E2E 按上游契约补齐 export，
+    // fake services 无资源 → 404 resource_not_ready 'Ordinary JPEG resource unavailable'
     expect(state.status).toBe(404)
-    expect(parseJson(state)).toMatchObject({ error: { code: 'not_found' } })
+    expect(parseJson(state)).toMatchObject({ error: { code: 'resource_not_ready' } })
   })
 
   it('stubs clothing thumbnails with 404 resource_not_ready', async () => {

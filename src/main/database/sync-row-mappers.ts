@@ -217,6 +217,9 @@ export function buildMotionInfo(link: MotionLinkRow): MotionAssetInfo {
  * editor_metadata（应用自写 base64 JSON）→ 协议 metadata。
  * 协议未定义 WXNN 编辑器字段语义：整体无损放入 raw（协议注释明示的逃生舱），
  * identity/capture 由媒体行填充；缺失或损坏时静默降级为 undefined。
+ * 隐私契约（阶段 6 E2E 红灯→绿灯，对齐上游 row-mappers）：raw 中的
+ * nativeParamPayload / nativeParamNuan5Md5（NUAN5 解密载荷/校验键）不得出库，
+ * 其余键（含 nativeParamToken）原样保留。
  */
 export function buildPhotoMetadata(
   input: Pick<SyncMediaRow, 'account_uid' | 'modified_at' | 'editor_metadata'>
@@ -226,12 +229,15 @@ export function buildPhotoMetadata(
   try {
     const parsed: unknown = JSON.parse(editorMetadata)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined
+    const raw = { ...(parsed as Record<string, unknown>) }
+    delete raw.nativeParamPayload
+    delete raw.nativeParamNuan5Md5
     return {
       schemaVersion: 1,
       identity: { uid: input.account_uid || undefined },
       capture: { capturedAt: input.modified_at || undefined },
       camera: {},
-      raw: parsed as InfinityPhotoMetadata['raw']
+      raw
     }
   } catch {
     return undefined

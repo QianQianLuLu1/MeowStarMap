@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto'
 import { createReadStream } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { open, stat } from 'node:fs/promises'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import {
   API_ROUTES,
@@ -11,6 +12,7 @@ import type { SyncLogger } from '../identity-service'
 import { PairingError } from '../pairing-service'
 import { ApiHttpError, apiErrorBody } from './api-error'
 import { readBody } from './body'
+import { exportJpeg } from './jpeg-export'
 import { parseRangeHeader } from './range'
 import type { SyncApiServices } from './types'
 
@@ -25,8 +27,12 @@ import type { SyncApiServices } from './types'
  * - PATCH metadata：WXNN v1 只读（协议允许键同样 400 read-only），空对象 no-op 200
  * - 搜索/统计：协议形状的空结果桩（getServerInfo 未声明相应 capability）
  * - clothing 缩略图：404 resource_not_ready 桩（无服装字典/远程源）
- * - export 扩展端点延后（落入 Route not found）
  * - body 超限 400（上游 500）；PairingError.bad_request 映射 400（上游 401）
+ *
+ * export 扩展端点（.../resources/{rid}/export，阶段 6 E2E 联调补齐）：语义照抄
+ * 上游 LocalSyncServer.exportStill —— 查询参数白名单（400）、仅就绪 JPEG 静图
+ * （404）、单飞限流（429）、源字节哈希/元数据校验（409），导出为无损 EXIF 重写
+ * （jpeg-export.ts），四校验头 + no-store；HEAD 只回头部。
  */
 
 export const METADATA_ALLOWED_KEYS = new Set([
@@ -145,7 +151,17 @@ export function createApiRequestHandler(input: {
       )
       return
     }
-    // export 扩展端点（.../resources/{rid}/export）延后实现，落入此处 404（计划注记2）
+    const exportMatch = url.pathname.match(/^\/v1\/assets\/([^/]+)\/resources\/([^/]+)\/export$/)
+    if ((method === 'GET' || method === 'HEAD') && exportMatch) {
+      await handleExportStill(
+        req,
+        res,
+        url,
+        decodeURIComponent(exportMatch[1]!),
+        decodeURIComponent(exportMatch[2]!)
+      )
+      return
+    }
     writeJson(res, 404, apiErrorBody('not_found', 'Route not found'))
   }
 
@@ -351,6 +367,148 @@ export function createApiRequestHandler(input: {
       return
     }
     createReadStream(location.absolutePath).pipe(res)
+  }
+
+  /**
+   * JPEG 无损导出（照抄上游 LocalSyncServer.exportStill 语义，见文件头注记）。
+   * exportBusy 单飞：同一时刻只允许一个导出（上游实例字段；此处为 handler 闭包）。
+   */
+  let exportBusy = false
+
+  async function handleExportStill(
+    req: IncomingMessage,
+    res: ServerResponse,
+    url: URL,
+    assetId: string,
+    resourceId: string
+  ): Promise<void> {
+    const exifParam = url.searchParams.get('exif')
+    const rotationParam = url.searchParams.get('rotation')
+    const invalidOptions =
+      Array.from(url.searchParams.keys()).some((x) => !['exif', 'rotation'].includes(x)) ||
+      url.searchParams.getAll('exif').length !== 1 ||
+      url.searchParams.getAll('rotation').length !== 1 ||
+      !['true', 'false'].includes(exifParam ?? '') ||
+      !['0', '90', '180', '270'].includes(rotationParam ?? '') ||
+      req.headers.range !== undefined
+    if (invalidOptions) {
+      writeJson(res, 400, apiErrorBody('bad_request', 'Invalid JPEG export options'))
+      return
+    }
+    // includes 校验无法向 TS 窄化：守卫后二者必为合法字面量集合成员
+    const exif = exifParam as 'true' | 'false'
+    const rotation = rotationParam as '0' | '90' | '180' | '270'
+    const unavailable = apiErrorBody('resource_not_ready', 'Ordinary JPEG resource unavailable')
+    if (!ASSET_ID_PATTERN.test(assetId)) {
+      writeJson(res, 404, unavailable)
+      return
+    }
+    const [location, detail] = await Promise.all([
+      services.getResourceLocation(assetId, resourceId),
+      services.getAssetDetail(assetId)
+    ])
+    // 仅就绪普通照片的 JPEG 源（motion/缩略图/视频一律 404，对齐上游约束集）
+    if (
+      !location ||
+      !detail ||
+      detail.asset.type !== 'photo' ||
+      detail.asset.state !== 'ready' ||
+      location.resource.role !== 'source_primary' ||
+      location.resource.mimeType !== 'image/jpeg'
+    ) {
+      writeJson(res, 404, unavailable)
+      return
+    }
+    if (exportBusy) {
+      writeJson(
+        res,
+        429,
+        apiErrorBody('resource_not_ready', 'Please retry after the current export')
+      )
+      return
+    }
+    exportBusy = true
+    let bytes: Buffer | undefined
+    let output: Buffer | undefined
+    try {
+      const size = location.resource.sizeBytes
+      // digest('hex') 恒小写；DB 记录的形状正则允许大写十六进制，比较前归一
+      const hash = location.resource.sha256.toLowerCase()
+      if (
+        !Number.isSafeInteger(size) ||
+        size < 4 ||
+        size > 16_777_216 ||
+        !/^[a-f0-9]{64}$/i.test(hash)
+      ) {
+        throw new Error('Resource bounds')
+      }
+      const file = await open(location.absolutePath, 'r')
+      try {
+        const before = await file.stat()
+        if (!before.isFile() || before.size !== size) throw new Error('Source changed')
+        bytes = Buffer.alloc(size)
+        let offset = 0
+        while (offset < size) {
+          const part = await file.read(bytes, offset, size - offset, offset)
+          if (!part.bytesRead) throw new Error('Truncated')
+          offset += part.bytesRead
+        }
+        const after = await file.stat()
+        if (
+          after.size !== before.size ||
+          after.mtimeMs !== before.mtimeMs ||
+          after.ino !== before.ino ||
+          createHash('sha256').update(bytes).digest('hex') !== hash
+        ) {
+          throw new Error('Source changed')
+        }
+      } finally {
+        await file.close()
+      }
+      output = exportJpeg(bytes, detail.asset.metadata, {
+        exif: exif === 'true',
+        rotation: Number(rotation) as 0 | 90 | 180 | 270
+      })
+      const exportedHash = createHash('sha256').update(output).digest('hex')
+      res.writeHead(200, {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': output.length,
+        'X-NikkiSync-SHA256': exportedHash,
+        'X-NikkiSync-Exif': exif === 'true' ? '1' : '0',
+        'X-NikkiSync-Rotation': rotation,
+        'X-NikkiSync-Export': 'jpeg-exif-v1',
+        'Cache-Control': 'private, no-store'
+      })
+      if (req.method === 'HEAD') {
+        res.end()
+        return
+      }
+      await new Promise<void>((resolve) => {
+        res.once('close', resolve)
+        res.end(output, resolve)
+      })
+    } catch (error) {
+      // 409 语义覆盖源变化/元数据不可安全导出/记录越界等，不能静默吞错（与外层 catch 一致记日志）
+      logger?.warn(
+        `[sync] export failed: ${error instanceof Error ? error.message : String(error)}`
+      )
+      if (!res.headersSent) {
+        writeJson(
+          res,
+          409,
+          apiErrorBody(
+            'resource_not_ready',
+            'Source changed or JPEG metadata cannot be safely exported'
+          )
+        )
+      } else {
+        res.destroy()
+      }
+    } finally {
+      bytes?.fill(0)
+      output?.fill(0)
+      exportBusy = false
+    }
   }
 
   return async (req, res) => {

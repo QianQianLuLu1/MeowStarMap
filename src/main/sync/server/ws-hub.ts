@@ -50,7 +50,7 @@ function closeFrame(): Buffer {
 export class WebSocketHub {
   private readonly sockets = new Set<Duplex>()
 
-  constructor(private readonly logger?: SyncLogger) {}
+  constructor(_logger?: SyncLogger) {}
 
   get size(): number {
     return this.sockets.size

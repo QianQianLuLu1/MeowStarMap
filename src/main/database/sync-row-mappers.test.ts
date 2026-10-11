@@ -375,6 +375,20 @@ describe('buildPhotoMetadata（editor_metadata 无损逃生舱）', () => {
     expect(buildPhotoMetadata(makeRow({ editor_metadata: '[1,2]' }))).toBeUndefined()
     expect(buildPhotoMetadata(makeRow({ editor_metadata: '"str"' }))).toBeUndefined()
   })
+  it('M11e raw 中的 nativeParamPayload/nativeParamNuan5Md5 剥离，nativeParamToken 保留（隐私契约，阶段6 E2E）', () => {
+    const md = buildPhotoMetadata(
+      makeRow({
+        editor_metadata: JSON.stringify({
+          nativeParamToken: 'token-visible',
+          nativeParamPayload: 'secret-payload',
+          nativeParamNuan5Md5: '0123456789abcdef0123456789abcdef',
+          outfit: '星海'
+        })
+      })
+    )
+    expect(md).toBeDefined()
+    expect(md?.raw).toEqual({ nativeParamToken: 'token-visible', outfit: '星海' })
+  })
 })
 
 describe('mapToNikkiAsset 集成 metadata', () => {

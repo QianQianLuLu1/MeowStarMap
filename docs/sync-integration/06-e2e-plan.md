@@ -49,7 +49,10 @@
 ### 3.2 NikkiSync 驱动 `apps/pc-companion/test/wxnn-cross-server.test.ts`
 
 - 新增文件（不修改既有测试）；自包含签名 helper（复制自 `local-sync-server.test.ts`，注明原因）。
-- spawn 模式（传 WXNN 根路径自动启停启动器）/ attach 模式（外部 `--serve`）。
+- attach 模式（外部 `--serve`/调用方启停启动器，经 `WXNN_E2E_INFO` 注入）。
+  > 执行注记（2026-10-11）：原设计的「spawn 模式（驱动按 WXNN 根路径自启停启动器）」被
+  > 安全扫描以「可执行程序由环境变量决定」拦截——驱动最终为 attach-only，启动器编排由
+  > 调用方完成（见 06-e2e-report.md §1）。
 - 新增 npm script `test:wxnn-e2e`；默认 `npm test` 文件清单不动。构建走根 `npm run build`（wechat-runtime esbuild 先行的既有顺序）。
 
 ### 3.3 Android 模拟器（S13）

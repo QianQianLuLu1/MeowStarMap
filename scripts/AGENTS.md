@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-40 个文件，按功能分为以下子域：
+42 个代码文件（另有 7 个 `__tests__` 单测文件与本 AGENTS.md），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -56,6 +56,13 @@
 | `generate-resonance-names.ts`       | `npx tsx scripts/generate-resonance-names.ts --source <dir>`       | 从外部仓库提取多语言实体名称包             |
 | `generate-resonance-static-data.ts` | `npx tsx scripts/generate-resonance-static-data.ts --source <dir>` | 从外部仓库提取共鸣录静态数据               |
 
+### 同步 E2E 联调（`sync-e2e/`）
+
+| 文件                        | 调用方式                                                                                 | 职责                                                                                                    |
+| --------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `sync-e2e/launch-server.ts` | `ELECTRON_RUN_AS_NODE=1 electron --import tsx scripts/sync-e2e/launch-server.ts`（手动） | 进程内启动真实同步服务端（SQLite/TLS 身份/配对/事件汇）+ 本地控制端口，供跨仓库驱动测试（NikkiSync 侧） |
+| `sync-e2e/launch-args.ts`   | 被 `launch-server.ts` import                                                             | CLI 参数解析纯函数（`--port` 0–65535 校验、未知参数拒绝、`--serve` no-op）                              |
+
 ### 诊断与校验
 
 | 文件                     | 调用方式                                   | 职责                                                                                                            |
@@ -71,17 +78,19 @@
 | 文件                                        | 覆盖范围                                                                |
 | ------------------------------------------- | ----------------------------------------------------------------------- |
 | `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性） |
+| `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护       |
 | `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                               |
 | `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试          |
 | `__tests__/check-changelog-release.test.ts` | 变更日志收口闸门：纯函数单测（正常/异常/边界）+ 真实仓库结构契约测试    |
+| `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                   |
 | `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                      |
 
 ## 编码约定
 
 ### 语言与执行
 
-- 27/40 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
-- 其余 10 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成），6 个 `.ps1`（PowerShell 辅助脚本，如 `mimosa-episode-bridge.ps1`、`fix-harness-memory-path.ps1`）。
+- 29/42 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
+- 其余 13 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成），9 个 `.ps1`（PowerShell 辅助脚本，如 `mimosa-episode-bridge.ps1`、`fix-harness-memory-path.ps1`；其中 3 个位于 `archive/`）。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
 ### 错误处理与退出
@@ -138,7 +147,7 @@
 
 ## 注意事项
 
-- **禁止** 在脚本中直接 `import` 主进程模块（`src/main/`）——脚本运行在 Node 环境，无 Electron 上下文。例外：`copy-resonance-thumbnails.ts` 等数据生成脚本动态导入 `src/renderer/utils/` 中的纯函数。
+- **禁止** 在脚本中直接 `import` 主进程模块（`src/main/`）——脚本运行在 Node 环境，无 Electron 上下文。例外一：`copy-resonance-thumbnails.ts` 等数据生成脚本动态导入 `src/renderer/utils/` 中的纯函数。例外二（记录在案）：`sync-e2e/launch-server.ts` 静态 import 8 个 `src/main/` 模块以装配**真实**同步服务端（不复制装配逻辑，见 `docs/sync-integration/06-e2e-plan.md` §8 的有意决策），运行方式为 `ELECTRON_RUN_AS_NODE=1 electron --import tsx`——原生 better-sqlite3 是 Electron ABI，plain Node 不可加载，Electron 的 Node 侧无渲染进程上下文问题。
 - 修改 `pre-dist-check.ts` 的校验项时需同步更新 `npm run dist:win` 的 CI 预期。
 - i18n 脚本链（`_shared.ts` → `guard.ts` / `codemod.ts` / `prune-whitelist.ts`）有内部依赖，修改 `_shared.ts` 需回归测试全部消费方。
 - `after-pack-vc-runtime.cjs` 是 CommonJS 格式（electron-builder 钩子要求），不得改为 ESM。
