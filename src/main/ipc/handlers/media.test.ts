@@ -46,7 +46,10 @@ const {
       softDeleteForPermanentDelete: vi.fn(),
       hardDeleteBatch: vi.fn(),
       cleanupMissingRecords: vi.fn().mockReturnValue(0),
+      cleanupCorruptedRecords: vi.fn().mockReturnValue(0),
       removeMissingRecord: vi.fn().mockReturnValue(true),
+      // sync-integration 阶段5：清理前候选 id 查询（journal asset.deleted 需要 id 列表）
+      listCleanupCandidateIds: vi.fn().mockReturnValue([]),
       getOutfitAggStats: vi.fn().mockReturnValue([]),
       getLatestOutfitMedia: vi.fn(),
       getDuplicateCandidates: vi.fn().mockReturnValue([]),
@@ -124,6 +127,12 @@ vi.mock('../../database/media-repository', () => ({
 vi.mock('../../services/thumbnail-phash-service', () => ({
   generatePhashForUnprocessed: generatePhashForUnprocessedMock,
   markDuplicates: markDuplicatesMock
+}))
+
+// sync-integration 阶段5：analyzeSceneTime journal 用例需要行数据触发动态 import，
+// mock 掉 sharp 依赖的场景亮度分析
+vi.mock('../../utils/scene-brightness', () => ({
+  analyzeSceneBrightness: vi.fn(async () => 'day')
 }))
 
 vi.mock('../../utils/logger', () => ({
@@ -1559,5 +1568,96 @@ describe('preload 解包集成测试（simulateCall）', () => {
     const data = await simulateCall<{ success: boolean; message: string }>(raw)
     expect(data.success).toBe(true)
     expect(data.message).toBeTruthy()
+  })
+})
+
+// ============================================================================
+// sync-integration 阶段5：删除/修改接线同步变更日志
+// 红灯→绿灯：media-cleanup 4 通道硬删 media_files 行但不写 journal（asset.deleted
+// 缺失）；media:analyzeSceneTime 批量修改但不写 journal（asset.updated 缺失）。
+// ============================================================================
+
+describe('media 域 — sync 变更日志接线（阶段5）', () => {
+  function makeSyncCtx() {
+    const ctx = makeCtx()
+    const syncEvents = {
+      recordAssetChange: vi.fn(async () => undefined),
+      recordAssetChanges: vi.fn(async (changes: unknown[]) => changes.length),
+      broadcastRescanStarted: vi.fn(async () => undefined),
+      broadcastRescanCompleted: vi.fn(async () => undefined)
+    }
+    ;(ctx as unknown as { syncEvents: unknown }).syncEvents = syncEvents
+    return { ctx, syncEvents }
+  }
+
+  beforeEach(() => {
+    repoMock.listCleanupCandidateIds.mockReset()
+    repoMock.listCleanupCandidateIds.mockReturnValue([])
+    repoMock.cleanupMissingRecords.mockReset()
+    repoMock.cleanupMissingRecords.mockReturnValue(0)
+    repoMock.cleanupCorruptedRecords.mockReset()
+    repoMock.cleanupCorruptedRecords.mockReturnValue(0)
+    repoMock.getMediaForSceneAnalysis.mockReset()
+    repoMock.getMediaForSceneAnalysis.mockReturnValue([])
+    repoMock.updateSceneTime.mockReset()
+  })
+
+  it('CL1(红灯→绿灯): media:cleanupMissing → 删前候选 id 批量 journal asset.deleted', async () => {
+    repoMock.listCleanupCandidateIds.mockReturnValue([1, 2, 3])
+    repoMock.cleanupMissingRecords.mockReturnValue(3)
+    const { ctx, syncEvents } = makeSyncCtx()
+    registerMediaHandlers(ctx)
+    await getHandler('media:cleanupMissing')()
+    expect(syncEvents.recordAssetChanges).toHaveBeenCalledWith([
+      { eventType: 'asset.deleted', assetId: '1' },
+      { eventType: 'asset.deleted', assetId: '2' },
+      { eventType: 'asset.deleted', assetId: '3' }
+    ])
+  })
+
+  it('CL2(红灯→绿灯): media:cleanupCorrupted → 同款批量 journal asset.deleted', async () => {
+    repoMock.listCleanupCandidateIds.mockReturnValue([7, 8])
+    repoMock.cleanupCorruptedRecords.mockReturnValue(2)
+    const { ctx, syncEvents } = makeSyncCtx()
+    registerMediaHandlers(ctx)
+    await getHandler('media:cleanupCorrupted')()
+    expect(syncEvents.recordAssetChanges).toHaveBeenCalledWith([
+      { eventType: 'asset.deleted', assetId: '7' },
+      { eventType: 'asset.deleted', assetId: '8' }
+    ])
+  })
+
+  it('CL3(红灯→绿灯): media:removeMissing 成功删除 → 单条 journal asset.deleted', async () => {
+    repoMock.removeMissingRecord.mockReturnValue(true)
+    const { ctx, syncEvents } = makeSyncCtx()
+    registerMediaHandlers(ctx)
+    await getHandler('media:removeMissing')([5])
+    expect(syncEvents.recordAssetChange).toHaveBeenCalledWith('asset.deleted', '5')
+  })
+
+  it('CL4(红灯→绿灯): media:removeMissing 记录不存在 → 不 journal', async () => {
+    repoMock.removeMissingRecord.mockReturnValue(false)
+    const { ctx, syncEvents } = makeSyncCtx()
+    registerMediaHandlers(ctx)
+    await getHandler('media:removeMissing')([5])
+    expect(syncEvents.recordAssetChange).not.toHaveBeenCalled()
+  })
+
+  it('ST1(红灯→绿灯): media:analyzeSceneTime → 批量 journal asset.updated', async () => {
+    repoMock.getMediaForSceneAnalysis.mockReturnValue([
+      { id: 1, file_path: 'D:\\a.jpg' },
+      { id: 2, file_path: 'D:\\b.jpg' }
+    ])
+    repoMock.updateSceneTime.mockResolvedValue(undefined)
+    const { ctx, syncEvents } = makeSyncCtx()
+    registerMediaHandlers(ctx)
+    const result = (await getHandler('media:analyzeSceneTime')([undefined])) as {
+      success: boolean
+    }
+    expect(result.success).toBe(true)
+    expect(syncEvents.recordAssetChanges).toHaveBeenCalledWith([
+      { eventType: 'asset.updated', assetId: '1' },
+      { eventType: 'asset.updated', assetId: '2' }
+    ])
   })
 })

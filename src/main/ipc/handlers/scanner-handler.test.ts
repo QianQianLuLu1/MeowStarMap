@@ -518,3 +518,98 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     expect(scannerManager.startScan).toHaveBeenCalledTimes(1)
   })
 })
+
+// ============================================================================
+// sync-integration 阶段5：扫描事件接线断言
+// S1 行为锁：成功路径 started/completed 配对广播（阶段4 既有行为）
+// S2 红灯→绿灯：后处理抛错时仍补 journal+completed（修复 started 悬挂）
+// S3 红灯→绿灯：restoredComplete 恢复扫描补 started 广播
+// ============================================================================
+
+describe('scanner-handler — sync 事件接线（阶段5）', () => {
+  function makeSyncEvents() {
+    return {
+      recordAssetChange: vi.fn(async () => undefined),
+      recordAssetChanges: vi.fn(async (changes: unknown[]) => changes.length),
+      broadcastRescanStarted: vi.fn(async () => undefined),
+      broadcastRescanCompleted: vi.fn(async () => undefined)
+    }
+  }
+
+  beforeEach(() => {
+    handleMock.mockClear()
+    generateThumbnailsForUnprocessedMock.mockReset()
+    generateThumbnailsForUnprocessedMock.mockResolvedValue(undefined)
+    vi.mocked(pathGuard.isUserPicked).mockReset()
+    vi.mocked(pathGuard.isUserPicked).mockImplementation(() => false)
+    assertFileReadPathMock.mockReset()
+    assertFileReadPathMock.mockImplementation(() => undefined)
+  })
+
+  it('S1(行为锁): 扫描成功路径广播 rescan.started 与 rescan.completed 各一次', async () => {
+    const syncEvents = makeSyncEvents()
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 2 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn(),
+      on: vi.fn()
+    }
+    registerScannerHandlers(
+      makeCtx({ scannerManager, syncEvents, mainWindow: { webContents: { send: vi.fn() } } })
+    )
+    await getHandler(handleMock, 'scanner:start')([{ incremental: true }])
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledWith(0)
+  })
+
+  it('S2(红灯→绿灯): 后处理抛错（notifyMediaUpdated）时仍补 journal+completed，避免 started 悬挂', async () => {
+    const syncEvents = makeSyncEvents()
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 2 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn(),
+      on: vi.fn()
+    }
+    const sendMock = vi.fn()
+    const ctx = makeCtx({ scannerManager, syncEvents, mainWindow: { webContents: { send: sendMock } } })
+    ;(ctx as unknown as { notifyMediaUpdated: ReturnType<typeof vi.fn> }).notifyMediaUpdated =
+      vi.fn(() => {
+        throw new Error('webContents destroyed')
+      })
+    registerScannerHandlers(ctx)
+    const result = (await getHandler(handleMock, 'scanner:start')([{ incremental: true }])) as {
+      success: boolean
+      error?: { code: string }
+    }
+    // started 已广播（发起前），后处理失败后必须补 completed 收口
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledWith(0)
+    expect(result.success).toBe(false)
+    expect(sendMock).toHaveBeenCalledWith(
+      'scanner:complete',
+      expect.objectContaining({ success: false })
+    )
+  })
+
+  it('S3(红灯→绿灯): restoredComplete 崩溃恢复扫描补 started 广播（与 completed 成对）', async () => {
+    const syncEvents = makeSyncEvents()
+    const listeners = new Map<string, (...args: unknown[]) => void>()
+    const scannerManager = {
+      startScan: vi.fn(),
+      stopScan: vi.fn(),
+      getStatus: vi.fn(),
+      on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+        listeners.set(event, cb)
+      })
+    }
+    registerScannerHandlers(makeCtx({ scannerManager, syncEvents }))
+    const restoreCb = listeners.get('restoredComplete')
+    expect(restoreCb).toBeTypeOf('function')
+    restoreCb?.({ success: true, filesFound: 2 }, { path: 'D:\\Games\\Album' })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+  })
+})

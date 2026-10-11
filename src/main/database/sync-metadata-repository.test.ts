@@ -833,6 +833,30 @@ describe('设备配对', () => {
     await repo.revokeDevice('dev-1', '2026-06-04T00:00:00.000Z')
     expect(repo.getPairedDevice('dev-1')?.revoked_at).toBe('2026-06-03T00:00:00.000Z')
   })
+
+  it('R11b(阶段5) listActivePairedDevices 只返回未撤销设备', async () => {
+    await repo.upsertPairDevice({
+      deviceId: 'dev-1',
+      deviceName: 'iPhone',
+      platform: 'ios',
+      publicKey: 'pk',
+      credentialHash: 'h',
+      pairedAt: ISO
+    })
+    await repo.upsertPairDevice({
+      deviceId: 'dev-2',
+      deviceName: 'Pixel',
+      platform: 'android',
+      publicKey: 'pk2',
+      credentialHash: 'h2',
+      pairedAt: '2026-06-02T00:00:00.000Z'
+    })
+    await repo.revokeDevice('dev-1', '2026-06-03T00:00:00.000Z')
+    const active = repo.listActivePairedDevices()
+    expect(active.map((d) => d.device_id)).toEqual(['dev-2'])
+    // 全量列表仍包含已撤销行（撤销=软删保留记录）
+    expect(repo.listPairedDevices()).toHaveLength(2)
+  })
 })
 
 // ============================================================================

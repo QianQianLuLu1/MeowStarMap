@@ -1735,3 +1735,55 @@ describe('cleanupAndRepairDatabase 缩略图引用重绑定（round2 N3）', () 
     )
   })
 })
+
+// ============================================================================
+// sync-integration 阶段5：启动自动扫描接线同步变更日志（journal + rescan 事件）
+// 红灯→绿灯：performStartupScan 此前完全不接 syncEvents——启动扫描新增的资产行
+// 不进 journal、revision 不递增、WS 客户端收不到事件。
+// ============================================================================
+
+describe('performStartupScan — sync 事件接线（阶段5）', () => {
+  function makeSyncEvents() {
+    return {
+      recordAssetChange: vi.fn(async () => undefined),
+      recordAssetChanges: vi.fn(async (changes: unknown[]) => changes.length),
+      broadcastRescanStarted: vi.fn(async () => undefined),
+      broadcastRescanCompleted: vi.fn(async () => undefined)
+    }
+  }
+
+  it('T1(红灯→绿灯): 启动扫描成功 → 广播 rescan.started 与 rescan.completed 各一次', async () => {
+    const syncEvents = makeSyncEvents()
+    const db = makeDb({ scanHistoryCount: 0 })
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 3 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn()
+    }
+    const ctx = makeAppCtx({ db, scannerManager, mainWindow: makeMainWindow(), syncEvents })
+
+    await performStartupScan(ctx)
+
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+    // makeDb 兜底 all() 返回空数组 → 本次启动扫描无新增行 → changedAssets=0
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledWith(0)
+  })
+
+  it('T2(红灯→绿灯): 启动扫描失败 → 仍补广播 rescan.completed 收口，不悬挂已广播的 started', async () => {
+    const syncEvents = makeSyncEvents()
+    const db = makeDb({ scanHistoryCount: 0 })
+    const scannerManager = {
+      startScan: vi.fn().mockRejectedValue(new Error('worker crashed')),
+      stopScan: vi.fn(),
+      getStatus: vi.fn()
+    }
+    const ctx = makeAppCtx({ db, scannerManager, mainWindow: makeMainWindow(), syncEvents })
+
+    await expect(performStartupScan(ctx)).resolves.toBeUndefined()
+
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledWith(0)
+  })
+})
