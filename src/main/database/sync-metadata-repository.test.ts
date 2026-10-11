@@ -612,6 +612,60 @@ describe('recordAssetChange / revision', () => {
   })
 })
 
+describe('recordAssetChanges 批量', () => {
+  let db: SyncMockDb
+  let repo: SyncMetadataRepository
+
+  beforeEach(() => {
+    db = makeDb()
+    repo = makeRepo(db)
+  })
+
+  it('B1 单事务批量写入：逐行 revision 单调、镜像一致、与单条写入衔接', async () => {
+    const written = await repo.recordAssetChanges([
+      { eventType: 'asset.created', assetId: '1', occurredAt: ISO },
+      { eventType: 'asset.created', assetId: '2', occurredAt: ISO },
+      { eventType: 'asset.updated', assetId: '1', occurredAt: ISO }
+    ])
+    expect(written).toBe(3)
+    const afterBatch = repo.listChangesAfter(0).map((c) => c.revision)
+    expect(afterBatch).toEqual([1, 2, 3])
+    expect(repo.getCurrentRevision()).toBe(3)
+    // 与单条写入衔接：批量之后单条继续 MAX+1
+    const single = await repo.recordAssetChange({
+      eventType: 'asset.deleted',
+      assetId: '2',
+      occurredAt: ISO
+    })
+    expect(single.revision).toBe(4)
+    expect(repo.getCurrentRevision()).toBe(4)
+  })
+
+  it('B2 空数组直接返回 0，不写任何行', async () => {
+    expect(await repo.recordAssetChanges([])).toBe(0)
+    expect(db.table('sync_change_journal').rows).toHaveLength(0)
+  })
+
+  it('B3 任一条非法整体回滚（不产生半批状态）', async () => {
+    await repo.recordAssetChange({ eventType: 'asset.created', assetId: '9', occurredAt: ISO })
+    await expect(
+      repo.recordAssetChanges([
+        { eventType: 'asset.updated', assetId: '1', occurredAt: ISO },
+        { eventType: 'asset.exploded' as 'asset.updated', assetId: '2', occurredAt: ISO }
+      ])
+    ).rejects.toThrow('invalid eventType')
+    // 回滚后：journal 无新增，revision 不动；后续写入从 2 继续
+    expect(db.table('sync_change_journal').rows).toHaveLength(1)
+    expect(repo.getCurrentRevision()).toBe(1)
+    const next = await repo.recordAssetChange({
+      eventType: 'asset.updated',
+      assetId: '1',
+      occurredAt: ISO
+    })
+    expect(next.revision).toBe(2)
+  })
+})
+
 // ============================================================================
 // 参数校验（异常 R8–R9）
 // ============================================================================

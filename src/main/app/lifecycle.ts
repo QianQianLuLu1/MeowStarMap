@@ -24,6 +24,8 @@ import { registerMediaProtocol } from './media-protocol'
 import { createMainWindow, getMainWindow } from './window-manager'
 import { setupIPC, injectCorruptedMarkers } from './ipc-setup'
 import { applyUITheme, setupThemeListener } from './theme'
+// sync-integration 阶段 4：NikkiSync HTTPS 同步服务器装配与自启
+import { initSyncServer } from './sync-server-setup'
 // 自动更新：复用 electron-updater，仅生产环境初始化
 import { initAutoUpdater } from './auto-update'
 import {
@@ -330,6 +332,14 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 必须在 setupIPC 之后调用：依赖 dbManager.getDatabase() 与 workerBridge 已就绪
     // 阶段 2.4：实现迁移到 app/ipc-setup.ts
     injectCorruptedMarkers(ctx)
+    // sync-integration 阶段 4：NikkiSync HTTPS 同步服务器组装与自启
+    // 必须在 dbManager.initialize 之后（读 sync.* 设置与打开 sync_* 表）；
+    // 失败不阻塞应用启动（日志留证，状态经 IPC sync:getStatus 可见）
+    try {
+      await initSyncServer(ctx)
+    } catch (err) {
+      logStartupError('initSyncServer', err)
+    }
     // 插件系统初始化：在 createMainWindow 之前完成，确保窗口加载时 facade 可用
     // 失败不阻塞应用启动（init 内部已捕获异常并记录日志）
     await pluginHost.init()

@@ -1,3 +1,4 @@
+// @core-change: sync-integration 阶段4：媒体元数据写路径接线同步变更日志（ctx.syncEvents → journal + WS 广播）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -31,6 +32,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
     'media:updateRating',
     wrapHandler(ctx, z.tuple([schemas.mediaId, schemas.rating]), async ([mediaId, rating]) => {
       await getRepo().updateRating(mediaId, rating)
+      await ctx.syncEvents?.recordAssetChange('asset.updated', String(mediaId))
       ctx.notifyMediaUpdated()
       return { updated: true }
     })
@@ -40,6 +42,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
     'media:updateFavorite',
     wrapHandler(ctx, z.tuple([schemas.mediaId, z.boolean()]), async ([mediaId, isFavorite]) => {
       await getRepo().updateFavorite(mediaId, isFavorite)
+      await ctx.syncEvents?.recordAssetChange('asset.updated', String(mediaId))
       ctx.notifyMediaUpdated()
       return { updated: true }
     })
@@ -57,6 +60,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       ]),
       async ([mediaId, tags]) => {
         await getRepo().updateTags(mediaId, tags)
+        await ctx.syncEvents?.recordAssetChange('asset.updated', String(mediaId))
         ctx.notifyMediaUpdated()
         return { updated: true }
       }
@@ -70,6 +74,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       z.tuple([schemas.mediaId, z.string().max(10000, t('main.media.validation.notesMaxLength'))]),
       async ([mediaId, notes]) => {
         await getRepo().updateNotes(mediaId, notes)
+        await ctx.syncEvents?.recordAssetChange('asset.updated', String(mediaId))
         ctx.notifyMediaUpdated()
         return { updated: true }
       }
@@ -83,6 +88,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       z.tuple([schemas.mediaId, schemas.positiveIntId.nullable()]),
       async ([mediaId, categoryId]) => {
         await getRepo().updateCategory(mediaId, categoryId)
+        await ctx.syncEvents?.recordAssetChange('asset.updated', String(mediaId))
         ctx.notifyMediaUpdated()
         return { updated: true }
       }
@@ -97,6 +103,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
       z.tuple([schemas.mediaId, z.string().max(100, t('main.media.validation.outfitMaxLength'))]),
       async ([mediaId, outfit]) => {
         await getRepo().updateOutfit(mediaId, outfit)
+        await ctx.syncEvents?.recordAssetChange('asset.updated', String(mediaId))
         ctx.notifyMediaUpdated()
         return { updated: true }
       }

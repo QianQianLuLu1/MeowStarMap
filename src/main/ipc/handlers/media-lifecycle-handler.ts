@@ -1,4 +1,4 @@
-// @core-change: 清空回收站移除主进程 dialog 二次确认，与 media:permanentDelete 对齐，消除重复弹窗与取消误报 IPC_CANCELED
+// @core-change: 清空回收站移除主进程 dialog 二次确认，与 media:permanentDelete 对齐，消除重复弹窗与取消误报 IPC_CANCELED；sync-integration 阶段4 接线删除/恢复写路径的同步变更日志（ctx.syncEvents → journal + WS 广播）
 /**
  * 媒体生命周期域 IPC handler：删除 / 恢复 / 回收站
  *
@@ -42,6 +42,7 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       await cleanupThumbnailsForRows(rows, ctx.thumbnailGen.getCacheDir(), {
         onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
       })
+      await ctx.syncEvents?.recordAssetChange('asset.deleted', String(mediaId))
       ctx.notifyMediaUpdated()
       return { deleted: true }
     })
@@ -52,6 +53,10 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     'media:softDelete',
     wrapHandler(ctx, z.tuple([schemas.mediaIdArrayBulk]), async ([mediaIds]) => {
       await getRepo().softDeleteBatch(mediaIds)
+      // 同步变更日志：批量写 journal（合并广播最后一条，防移动端事件风暴）
+      await ctx.syncEvents?.recordAssetChanges(
+        mediaIds.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       return {
         success: true,
@@ -65,6 +70,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     'media:restore',
     wrapHandler(ctx, z.tuple([schemas.mediaIdArrayBulk]), async ([mediaIds]) => {
       await getRepo().restoreBatch(mediaIds)
+      await ctx.syncEvents?.recordAssetChanges(
+        mediaIds.map((id) => ({ eventType: 'asset.updated' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       return { message: t('main.media.message.restored', { count: mediaIds.length }) }
     })
@@ -104,6 +112,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
         onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
       })
 
+      await ctx.syncEvents?.recordAssetChanges(
+        idsToDelete.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       const msg =
         failedPaths.length > 0
@@ -146,6 +157,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
         onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
       })
 
+      await ctx.syncEvents?.recordAssetChanges(
+        idsToDelete.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       const msg =
         failedPaths.length > 0

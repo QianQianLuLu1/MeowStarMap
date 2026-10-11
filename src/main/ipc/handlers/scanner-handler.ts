@@ -1,3 +1,4 @@
+// @core-change: sync-integration 阶段4：扫描完成后的同步变更日志接线（journal + rescan WS 事件）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import path from 'path'
@@ -16,8 +17,28 @@ import { scanLogStore } from '../../scanner/scan-log-store'
 // P1-A1：4 组函数抽取到共享服务模块，启动路径与 IPC 路径共用同一份实现
 import { generateThumbnailsForUnprocessed } from '../../services/thumbnail-phash-service'
 import { ImportRootRepository } from '../../database/import-root-repository'
+import { SyncMetadataRepository } from '../../database/sync-metadata-repository'
 import { detectGameRootCandidates } from '../../scanner/game-directory-discovery'
 import { t } from '../../i18n'
+
+// ---- sync-integration 阶段4：扫描变更日志接线 ----
+// 主进程拿不到 scanner worker 内的逐行写入明细，采用两个水位线近似：
+// - preScanMaxId（扫描发起前 MAX(id)）：id 越线 = 本次扫描新发现的资产行（INSERT），精确
+// - scanStartedAt 时间窗：捕获扫描进行期间的行变化（created_at/updated_at 为 ISO 字符串，
+//   与 ISO 水位线可直接字典序比较）
+// 已知限制：上次扫描结束到本次发起之间被外部修改/失踪标记的行不会进入本批 journal
+// （其时间戳早于 scanStartedAt 且 id 未越线）；崩溃恢复扫描以应用启动时间为窗、
+// 水位线 0（全量补账，保证客户端收敛，代价是恢复后一次全量 journal）
+const APP_STARTED_AT = new Date().toISOString()
+const SCAN_CHANGED_ROWS_SQL =
+  'SELECT id, created_at FROM media_files WHERE is_duplicate = 0 AND (id > ? OR created_at > ? OR updated_at > ?)'
+
+interface ScanSyncContext {
+  /** 扫描发起时刻（ISO）；崩溃恢复扫描用应用启动时间兜底 */
+  scanStartedAt: string
+  /** 扫描发起前的 media_files MAX(id) 水位线；崩溃恢复扫描传 0（全量补账） */
+  preScanMaxId: number
+}
 
 // scanner:start 参数 schema（提取到模块级避免每次调用重建）
 const scannerStartSchema = z
@@ -75,9 +96,58 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
   // IPC 发起路径与崩溃自动重启恢复的扫描（restoredComplete 事件）需要一致的处理：
   // 恢复扫描的完成不经过 scanner:start 的 await 路径（其 Promise 已在崩溃合成事件时
   // 以失败 resolve），不补齐则渲染端永久认为本次扫描失败、链式动作不会执行。
+  // ---- sync-integration 阶段4：水位线与扫描变更落账辅助 ----
+  const getPreScanMaxId = (): number => {
+    const db = ctx.dbManager.getDatabase()
+    if (!db) return 0
+    try {
+      const row = db.prepare('SELECT COALESCE(MAX(id), 0) AS max_id FROM media_files').get() as
+        { max_id: number } | undefined
+      return row?.max_id ?? 0
+    } catch {
+      return 0
+    }
+  }
+
+  const recordScanChanges = async (syncContext: ScanSyncContext): Promise<number> => {
+    const db = ctx.dbManager.getDatabase()
+    if (!db || !ctx.syncEvents) return 0
+    try {
+      // 动态照片同名配对先重建：motion 链接变化对客户端可见（资源列表/hasMotion）
+      const syncMetadata = new SyncMetadataRepository(
+        db,
+        ctx.dbManager.getWorkerBridge(),
+        ctx.dbManager.getDbPath()
+      )
+      await syncMetadata.rebuildMotionLinks()
+      const rows = db
+        .prepare(SCAN_CHANGED_ROWS_SQL)
+        .all(
+          syncContext.preScanMaxId,
+          syncContext.scanStartedAt,
+          syncContext.scanStartedAt
+        ) as Array<{ id: number; created_at: string }>
+      if (rows.length === 0) return 0
+      await ctx.syncEvents.recordAssetChanges(
+        rows.map((row) => ({
+          eventType:
+            row.id > syncContext.preScanMaxId
+              ? ('asset.created' as const)
+              : ('asset.updated' as const),
+          assetId: String(row.id)
+        }))
+      )
+      return rows.length
+    } catch (err) {
+      logger.warn('[Sync] failed to journal scan changes', err)
+      return 0
+    }
+  }
+
   const runPostScanActions = async (
     result: { success: boolean; message?: string; filesFound?: number },
-    options?: { path?: string }
+    options?: { path?: string },
+    syncContext?: ScanSyncContext
   ): Promise<void> => {
     if (result.success && result.filesFound && result.filesFound > 0) {
       // 扫描完成后异步生成缩略图并读取尺寸
@@ -107,11 +177,21 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
     ctx.getMainWindow()?.webContents.send('scanner:complete', result)
     // 扫描完成后刷新媒体列表（含缓存失效 + media_count 刷新 + 节流广播）
     ctx.notifyMediaUpdated()
+    // sync-integration 阶段4：动态照片配对重建 + 批量 journal + rescan.completed 广播
+    //（recordScanChanges 内部吞错仅告警；不阻塞扫描完成返回）
+    if (syncContext) {
+      const changedAssets = await recordScanChanges(syncContext)
+      await ctx.syncEvents?.broadcastRescanCompleted(changedAssets)
+    }
   }
 
   // 崩溃恢复的扫描完成：补齐广播与链式动作（见上方 runPostScanActions 注释）
+  // 恢复扫描的水位线取应用启动时间 + 0（全量补账，保证客户端收敛）
   ctx.scannerManager.on('restoredComplete', (result, options) => {
-    void runPostScanActions(result, options)
+    void runPostScanActions(result, options, {
+      scanStartedAt: APP_STARTED_AT,
+      preScanMaxId: 0
+    })
   })
 
   // ---- scanner 域 ----
@@ -166,9 +246,15 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
           .filter((p): p is string => typeof p === 'string' && p.length > 0)
           .map((p) => path.resolve(p))
         if (scanRoots.length > 0) pathGuard.registerRoots(scanRoots)
+        // sync-integration 阶段4：记录水位线 + 广播 rescan.started（校验全部通过、扫描发起前）
+        const syncContext: ScanSyncContext = {
+          scanStartedAt: new Date().toISOString(),
+          preScanMaxId: getPreScanMaxId()
+        }
+        await ctx.syncEvents?.broadcastRescanStarted()
         try {
           const result = await ctx.scannerManager.startScan(options)
-          await runPostScanActions(result, options)
+          await runPostScanActions(result, options, syncContext)
           return result
         } catch (error) {
           const message = t('main.scanner.error.scanFailed', {

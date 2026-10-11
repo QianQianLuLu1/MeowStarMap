@@ -188,6 +188,19 @@ function assertIsoDateTime(value: string, label: string): void {
   }
 }
 
+/** 变更记录入参校验（单条与批量共用；批量任一条非法整体回滚） */
+function assertChangeInput(input: RecordAssetChangeInput): void {
+  if (!(CHANGE_TYPES as readonly string[]).includes(input.eventType)) {
+    throw new Error(`invalid eventType: ${String(input.eventType)}`)
+  }
+  if (typeof input.assetId !== 'string' || input.assetId === '') {
+    throw new Error('invalid assetId: must be a non-empty string')
+  }
+  if (input.occurredAt !== undefined) {
+    assertIsoDateTime(input.occurredAt, 'occurredAt')
+  }
+}
+
 export class SyncMetadataRepository {
   /** workerBridge/dbPath 保留形参：写路径切回 worker 桥接时无需改动调用方 */
   constructor(
@@ -204,15 +217,7 @@ export class SyncMetadataRepository {
    * revision 镜像更新。revision 严格单调（日志 append-only，无删除 API）。
    */
   async recordAssetChange(input: RecordAssetChangeInput): Promise<{ revision: number }> {
-    if (!(CHANGE_TYPES as readonly string[]).includes(input.eventType)) {
-      throw new Error(`invalid eventType: ${String(input.eventType)}`)
-    }
-    if (typeof input.assetId !== 'string' || input.assetId === '') {
-      throw new Error('invalid assetId: must be a non-empty string')
-    }
-    if (input.occurredAt !== undefined) {
-      assertIsoDateTime(input.occurredAt, 'occurredAt')
-    }
+    assertChangeInput(input)
     const occurredAt = input.occurredAt ?? nowIso()
     const payloadJson = input.payload === undefined ? null : JSON.stringify(input.payload)
     const now = nowIso()
@@ -227,6 +232,33 @@ export class SyncMetadataRepository {
     const row = this.db.prepare(SQL_MAX_JOURNAL_REVISION).get() as
       { revision: number | null } | undefined
     return { revision: row?.revision ?? 0 }
+  }
+
+  /**
+   * 批量记录资产变更：单事务内逐条追加（每行 MAX+1），镜像更新一次。
+   * 任一条非法整体回滚。返回写入条数。
+   * 使用场景：扫描完成后的批量接线——万级文件不能逐条开事务（每条一个事务
+   * 含 3 语句，顺序执行会阻塞 runPostScanActions 数十秒）；广播策略由调用方
+   * （事件汇）负责，本方法只管 journal 落库。
+   */
+  async recordAssetChanges(inputs: ReadonlyArray<RecordAssetChangeInput>): Promise<number> {
+    if (inputs.length === 0) return 0
+    for (const input of inputs) assertChangeInput(input)
+    const now = nowIso()
+    const allocateAll = this.db.transaction(() => {
+      const seed = this.db.prepare(SQL_SERVICE_STATE_SEED)
+      const insert = this.db.prepare(SQL_JOURNAL_INSERT)
+      const mirror = this.db.prepare(SQL_REVISION_MIRROR)
+      seed.run(now, now)
+      for (const input of inputs) {
+        const occurredAt = input.occurredAt ?? now
+        const payloadJson = input.payload === undefined ? null : JSON.stringify(input.payload)
+        insert.run(input.eventType, input.assetId, occurredAt, payloadJson)
+      }
+      mirror.run(now)
+    })
+    allocateAll()
+    return inputs.length
   }
 
   /** 记录设备配对（重复配对视为重新配对：重置 ack 进度与撤销态） */

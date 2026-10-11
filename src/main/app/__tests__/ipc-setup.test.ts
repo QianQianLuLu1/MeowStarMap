@@ -47,6 +47,7 @@ const handlerMocks = vi.hoisted(() => ({
   registerOperationHistoryHandlers: vi.fn(),
   registerTaskHandlers: vi.fn(),
   registerShareHandlers: vi.fn(),
+  registerSyncHandlers: vi.fn(),
   registerPluginManagementHandlers: vi.fn(),
   registerPluginBridgeHandlers: vi.fn(),
   registerFavoritesHandlers: vi.fn(),
@@ -159,6 +160,9 @@ vi.mock('../../ipc/handlers/task-handler', () => ({
 }))
 vi.mock('../../ipc/handlers/share', () => ({
   registerShareHandlers: handlerMocks.registerShareHandlers
+}))
+vi.mock('../../ipc/handlers/sync-handler', () => ({
+  registerSyncHandlers: handlerMocks.registerSyncHandlers
 }))
 vi.mock('../../ipc/handlers/plugin', () => ({
   registerPluginManagementHandlers: handlerMocks.registerPluginManagementHandlers
@@ -348,6 +352,8 @@ describe('setupIPC', () => {
     expect(handlerMocks.registerExportPrefHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerImportRootHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerResonanceHandlers).toHaveBeenCalledWith(ctx)
+    // sync-integration 阶段4：sync 域 handler
+    expect(handlerMocks.registerSyncHandlers).toHaveBeenCalledWith(ctx)
   })
 
   it('6. 调用 pathGuard.initUserDataDir', () => {

@@ -43,6 +43,7 @@ import { registerAppHandlers } from '../ipc/handlers/app-handler'
 import { registerOperationHistoryHandlers } from '../ipc/handlers/operation-history-handler'
 import { registerTaskHandlers } from '../ipc/handlers/task-handler'
 import { registerShareHandlers } from '../ipc/handlers/share'
+import { registerSyncHandlers } from '../ipc/handlers/sync-handler'
 import { registerPluginManagementHandlers } from '../ipc/handlers/plugin'
 import { registerPluginBridgeHandlers } from '../ipc/handlers/plugin-bridge-handler'
 import { registerFavoritesHandlers } from '../ipc/handlers/favorites-handler'
@@ -121,6 +122,8 @@ export function setupIPC(ctx: AppContext): void {
   registerOperationHistoryHandlers(ctx)
   registerTaskHandlers(ctx)
   registerShareHandlers(ctx)
+  // sync-integration 阶段 4：NikkiSync 同步服务器（状态/启停/配对二维码内容）
+  registerSyncHandlers(ctx)
   // 插件系统：注册插件管理 + 能力桥 IPC handler（不修改任何现有通道）
   registerPluginManagementHandlers(ctx)
   registerPluginBridgeHandlers(ctx)

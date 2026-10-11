@@ -113,6 +113,12 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
     wifiShareService.stop()
   } catch {}
 
+  // 4.5 sync-integration 阶段 4：停止 NikkiSync 同步服务器（优雅关闭：停收新连接 →
+  // WS 客户端发 close 帧 → 活动流 3s 宽限 → 强制断开）。必须在 dbManager.close() 之前
+  try {
+    await ctx.syncServer?.stop()
+  } catch {}
+
   // 5. 备份服务清理定时器
   try {
     backupService.dispose()
