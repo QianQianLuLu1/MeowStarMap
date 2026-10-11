@@ -1,3 +1,4 @@
+// @core-change: sync-integration 阶段5：启动自动扫描接线同步变更日志（journal + rescan WS 事件）
 import path from 'path'
 import fs from 'fs'
 import type { AppContext } from './app-context'
@@ -21,6 +22,12 @@ import { taskRegistry } from '../utils/task-registry'
 import type Database from 'better-sqlite3'
 import type { TaskProgress } from '../../shared/types/progress'
 import { t } from '../i18n'
+// 阶段5：启动扫描与 IPC 扫描共用同一份水位线/落账实现（scanner-handler 同款）
+import {
+  captureScanWatermark,
+  recordScanChanges,
+  type ScanSyncContext
+} from '../scanner/scan-journal'
 // 2026-09-27 打包版闪退取证：崩溃落在启动扫描/索引窗口，但 exit-forensics 只有
 // initialized/cleanup 两个里程碑。在此窗口内补精细阶段打点，使下一次崩溃时
 // heartbeat.json 的 stage 能直接定位到 startup-scan / post-scan-indexing / scene-analysis。
@@ -76,37 +83,82 @@ export async function performStartupScan(ctx: AppContext): Promise<void> {
     }
     const mergedPaths = Array.from(new Set([...customScanPathList, ...importRoots]))
     const customKnownPaths = mergedPaths.length > 0 ? mergedPaths : undefined
-    const result = await ctx.scannerManager.startScan({
-      incremental,
-      customKnownPaths,
-      fullScan
-    })
-    logger.info(t('main.startup.log.scanComplete'), result)
-    // 启动扫描也需发送 complete 事件，否则渲染进程的 scanProgress 会一直停留在 scanning:true
-    sendToRenderer(ctx, 'scanner:complete', result)
-    // 扫描完成后立即通知渲染进程刷新媒体列表
-    // 使用 notifyMediaUpdated 而非直接 send，确保同时刷新 media_count 缓存 + 失效路径白名单
-    // 不等场景分析（autoAnalyzeSceneTime 可能耗时数分钟），确保用户立即看到扫描结果
-    ctx.notifyMediaUpdated()
-    // 扫描后长任务（缩略图 / pHash / 场景分析）统一走 task:progress 的 indexing 任务，
-    // 让弹窗在扫描完成后继续显示进度，消除"假死"无反馈
-    if (result.success) {
-      // 索引链独立驱动：扫描完成后立即返回，释放低优先级并发槽位。
-      // 索引链本身已在 startup-scan 低优先级伞内运行，若在此 await 且在内部再次入队
-      // 低优先级任务，会因 maxLowConcurrency=1 自锁（外层占满唯一槽位，内层永不启动）。
-      // 改为 fire-and-forget 后，startup-integrity-check 等后续低优先级任务可正常 pump。
-      void runPostScanIndexing(ctx, result.filesFound ?? 0).catch((e) =>
-        logger.error(t('main.startup.log.indexingTaskError'), e)
+    // sync-integration 阶段5：水位线 + rescan.started 广播（与 scanner:start 同款编排）
+    const syncContext: ScanSyncContext = {
+      scanStartedAt: new Date().toISOString(),
+      preScanMaxId: captureScanWatermark(db)
+    }
+    await ctx.syncEvents?.broadcastRescanStarted()
+    try {
+      const result = await ctx.scannerManager.startScan({
+        incremental,
+        customKnownPaths,
+        fullScan
+      })
+      logger.info(t('main.startup.log.scanComplete'), result)
+      // 启动扫描也需发送 complete 事件，否则渲染进程的 scanProgress 会一直停留在 scanning:true
+      sendToRenderer(ctx, 'scanner:complete', result)
+      // 扫描完成后立即通知渲染进程刷新媒体列表
+      // 使用 notifyMediaUpdated 而非直接 send，确保同时刷新 media_count 缓存 + 失效路径白名单
+      // 不等场景分析（autoAnalyzeSceneTime 可能耗时数分钟），确保用户立即看到扫描结果
+      ctx.notifyMediaUpdated()
+      // sync-integration 阶段5：动态照片配对重建 + 批量 journal + rescan.completed 广播
+      //（recordScanChanges 内部吞错仅告警；不阻塞启动链路）
+      const changedAssets = await recordScanChanges(
+        {
+          db: ctx.dbManager.getDatabase(),
+          workerBridge: ctx.dbManager.getWorkerBridge(),
+          dbPath: ctx.dbManager.getDbPath(),
+          syncEvents: ctx.syncEvents
+        },
+        syncContext
       )
+      await ctx.syncEvents?.broadcastRescanCompleted(changedAssets)
+      // 扫描后长任务（缩略图 / pHash / 场景分析）统一走 task:progress 的 indexing 任务，
+      // 让弹窗在扫描完成后继续显示进度，消除"假死"无反馈
+      if (result.success) {
+        // 索引链独立驱动：扫描完成后立即返回，释放低优先级并发槽位。
+        // 索引链本身已在 startup-scan 低优先级伞内运行，若在此 await 且在内部再次入队
+        // 低优先级任务，会因 maxLowConcurrency=1 自锁（外层占满唯一槽位，内层永不启动）。
+        // 改为 fire-and-forget 后，startup-integrity-check 等后续低优先级任务可正常 pump。
+        void runPostScanIndexing(ctx, result.filesFound ?? 0).catch((e) =>
+          logger.error(t('main.startup.log.indexingTaskError'), e)
+        )
+      }
+    } catch (error) {
+      // sync-integration 阶段5：失败路径收口——started 已广播，必须补 completed，
+      // 否则 WS 客户端挂等。journal/completed 内部吞错，不影响原错误处理。
+      try {
+        const changedAssets = await recordScanChanges(
+          {
+            db: ctx.dbManager.getDatabase(),
+            workerBridge: ctx.dbManager.getWorkerBridge(),
+            dbPath: ctx.dbManager.getDbPath(),
+            syncEvents: ctx.syncEvents
+          },
+          syncContext
+        )
+        await ctx.syncEvents?.broadcastRescanCompleted(changedAssets)
+      } catch (syncErr) {
+        logger.warn('[Sync] failed to close out startup scan rescan events', syncErr)
+      }
+      // Bug #08-F1：console.error → logger.error，统一日志渠道
+      logger.error(t('main.startup.log.autoScanFailed'), error)
+      sendToRenderer(ctx, 'scanner:complete', {
+        success: false,
+        message: String(error)
+      })
+      // 即使扫描失败也刷新一次（GalleryPage 可能在 DB 就绪前加载了空列表）
+      ctx.notifyMediaUpdated()
     }
   } catch (error) {
-    // Bug #08-F1：console.error → logger.error，统一日志渠道
+    // 兜底：扫描前置阶段（scan_history 探测 / 设置读取）异常——行为与阶段5 前一致。
+    // 此时 started 尚未广播，无需 rescan.completed 收口。
     logger.error(t('main.startup.log.autoScanFailed'), error)
     sendToRenderer(ctx, 'scanner:complete', {
       success: false,
       message: String(error)
     })
-    // 即使扫描失败也刷新一次（GalleryPage 可能在 DB 就绪前加载了空列表）
     ctx.notifyMediaUpdated()
   }
 }

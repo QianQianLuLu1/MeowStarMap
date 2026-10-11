@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "Perfis",
       "scan": "Digitalizar",
-      "tools": "Ferramentas"
+      "tools": "Ferramentas",
+      "sync": "Sincronização"
     },
     "language": {
       "auto": "Seguir sistema",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "Serviço de sincronização"
     },
     "startup": {
       "autoScan": "Digitalização automática ao iniciar",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "Serviço de sincronização",
+        "description": "Permite que clientes móveis NikkiSync sincronizem esta biblioteca através de uma ligação encriptada na rede local"
+      },
+      "enable": "Ativar serviço de sincronização",
+      "enableDesc": "Este PC funcionará como servidor de sincronização (HTTPS + WebSocket, porta predefinida 27124)",
+      "status": {
+        "label": "Estado",
+        "running": "Em execução",
+        "stopped": "Parado",
+        "unavailable": "Componentes de sincronização não prontos",
+        "address": "Endereço do servidor",
+        "connections": "Clientes ligados",
+        "serverId": "ID do servidor",
+        "tlsFingerprint": "Impressão digital TLS",
+        "copied": "Copiado"
+      },
+      "pairing": {
+        "title": "Emparelhar novo dispositivo",
+        "open": "Emparelhar novo dispositivo",
+        "hintRunning": "Digitalize o código QR no telemóvel; expira em 5 minutos",
+        "hintDisabled": "Ative o serviço de sincronização para emparelhar novos dispositivos",
+        "expiresIn": "Expira em",
+        "refresh": "Regenerar",
+        "copyContent": "Copiar conteúdo de emparelhamento",
+        "loadFailed": "Falha ao gerar o código QR de emparelhamento",
+        "retry": "Tentar novamente"
+      },
+      "devices": {
+        "title": "Dispositivos emparelhados",
+        "empty": "Sem dispositivos emparelhados",
+        "emptyHint": "Digitalize o código QR de emparelhamento no telemóvel",
+        "lastSeen": "Visto pela última vez",
+        "never": "Nunca ligado",
+        "revoke": "Revogar",
+        "revokeConfirmTitle": "Revogar dispositivo",
+        "revokeConfirmMessage": "Após revogar, «{{name}}» deixará de poder sincronizar com esta biblioteca e terá de ser emparelhado novamente. Revogar?",
+        "revokeConfirm": "Revogar dispositivo",
+        "revoked": "Dispositivo revogado"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "Serviço de sincronização ativado",
+    "syncDisabled": "Serviço de sincronização desativado"
   },
   "video": {
     "applyEdit": "",

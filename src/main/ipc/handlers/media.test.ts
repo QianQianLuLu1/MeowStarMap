@@ -1591,6 +1591,9 @@ describe('media 域 — sync 变更日志接线（阶段5）', () => {
   }
 
   beforeEach(() => {
+    // 本 describe 的 getHandler 必须命中"携带 syncEvents 的本次注册"——
+    // 文件级 handleMock 跨用例累积，先清空再注册
+    handleMock.mockClear()
     repoMock.listCleanupCandidateIds.mockReset()
     repoMock.listCleanupCandidateIds.mockReturnValue([])
     repoMock.cleanupMissingRecords.mockReset()

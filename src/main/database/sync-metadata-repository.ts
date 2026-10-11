@@ -71,6 +71,9 @@ const SQL_DEVICE_BY_ID =
   'SELECT device_id, device_name, platform, public_key, credential_hash, app_version, paired_at, last_seen_at, last_ack_revision, revoked_at FROM sync_paired_devices WHERE device_id = ?'
 const SQL_DEVICE_ALL =
   'SELECT device_id, device_name, platform, public_key, credential_hash, app_version, paired_at, last_seen_at, last_ack_revision, revoked_at FROM sync_paired_devices ORDER BY paired_at DESC'
+// 阶段5：活跃设备（未撤销）——设备列表 UI 与 pairedDeviceCount 的口径
+const SQL_DEVICE_ALL_ACTIVE =
+  'SELECT device_id, device_name, platform, public_key, credential_hash, app_version, paired_at, last_seen_at, last_ack_revision, revoked_at FROM sync_paired_devices WHERE revoked_at IS NULL ORDER BY paired_at DESC'
 const SQL_MOTION_LINK_ALL =
   'SELECT still_media_id, motion_media_id, method, confidence, presentation_timestamp_us FROM sync_motion_links'
 const SQL_MOTION_LINK_BY_STILL =
@@ -397,6 +400,11 @@ export class SyncMetadataRepository {
 
   listPairedDevices(): SyncPairedDeviceRow[] {
     return this.db.prepare(SQL_DEVICE_ALL).all() as unknown as SyncPairedDeviceRow[]
+  }
+
+  /** 活跃（未撤销）设备，按 paired_at DESC——设备列表 UI 与 pairedDeviceCount 口径（阶段5） */
+  listActivePairedDevices(): SyncPairedDeviceRow[] {
+    return this.db.prepare(SQL_DEVICE_ALL_ACTIVE).all() as unknown as SyncPairedDeviceRow[]
   }
 
   listMotionLinks(): MotionLinkRow[] {

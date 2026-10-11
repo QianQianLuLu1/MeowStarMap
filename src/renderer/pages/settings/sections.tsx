@@ -30,3 +30,5 @@ export { LanguageSection } from './language-sections'
 export { ToolsShareCodeSection } from './tools-sections'
 // 插件管理区块
 export { PluginManageSection } from './plugin-sections'
+// sync-integration 阶段5：同步服务区块（开关/状态/配对二维码/设备管理）
+export { SyncServiceSection } from './sync-sections'

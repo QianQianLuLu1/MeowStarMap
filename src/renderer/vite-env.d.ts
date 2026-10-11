@@ -852,6 +852,76 @@ interface WindowElectronAPI {
     // T09：启动目标应用（用于"已安装未运行"场景，用户点击"打开 XX"按钮）
     launchApp: (channelId: string) => Promise<{ success: boolean; message: string }>
   }
+  // sync-integration 阶段5：NikkiSync 同步服务器（形状快照自 shared/types/electron-api.ts）
+  sync: {
+    getStatus: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      connections: number
+      serverId: string | null
+      serverName: string | null
+      pairedDeviceCount: number
+      tlsFingerprintSha256: string | null
+      lanHost: string
+    }>
+    startServer: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      connections: number
+      serverId: string | null
+      serverName: string | null
+      pairedDeviceCount: number
+      tlsFingerprintSha256: string | null
+      lanHost: string
+    }>
+    stopServer: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      connections: number
+      serverId: string | null
+      serverName: string | null
+      pairedDeviceCount: number
+      tlsFingerprintSha256: string | null
+      lanHost: string
+    }>
+    createPairingQr: () => Promise<{
+      /** NS1|... 七段二维码内容（渲染层经 qrcode 生成 SVG） */
+      content: string
+      expiresAt: string
+      serverId: string
+      host: string
+      port: number
+      tlsFingerprintSha256: string
+    }>
+    listDevices: () => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion: string | null
+        pairedAt: string
+        lastSeenAt: string | null
+        lastAckRevision: number
+      }>
+    >
+    revokeDevice: (deviceId: string) => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion: string | null
+        pairedAt: string
+        lastSeenAt: string | null
+        lastAckRevision: number
+      }>
+    >
+  }
   // T10：缩略图缓存管理
   cache: {
     getStats: () => Promise<{

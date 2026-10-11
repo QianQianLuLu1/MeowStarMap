@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "Hồ sơ",
       "scan": "Quét",
-      "tools": "Công cụ"
+      "tools": "Công cụ",
+      "sync": "Đồng bộ"
     },
     "language": {
       "auto": "Theo hệ thống",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "Dịch vụ đồng bộ"
     },
     "startup": {
       "autoScan": "Tự động quét khi khởi động",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "Dịch vụ đồng bộ",
+        "description": "Cho phép ứng dụng di động NikkiSync đồng bộ thư viện này qua kết nối mã hóa trong mạng cục bộ"
+      },
+      "enable": "Bật dịch vụ đồng bộ",
+      "enableDesc": "Máy này sẽ chạy làm máy chủ đồng bộ (HTTPS + WebSocket, cổng mặc định 27124)",
+      "status": {
+        "label": "Trạng thái",
+        "running": "Đang chạy",
+        "stopped": "Đã dừng",
+        "unavailable": "Thành phần đồng bộ chưa sẵn sàng",
+        "address": "Địa chỉ máy chủ",
+        "connections": "Máy khách đang kết nối",
+        "serverId": "ID máy chủ",
+        "tlsFingerprint": "Vân tay TLS",
+        "copied": "Đã sao chép"
+      },
+      "pairing": {
+        "title": "Ghép nối thiết bị mới",
+        "open": "Ghép nối thiết bị mới",
+        "hintRunning": "Quét mã QR trên thiết bị di động; mã hết hạn sau 5 phút",
+        "hintDisabled": "Cần bật dịch vụ đồng bộ để ghép nối thiết bị mới",
+        "expiresIn": "Hết hạn sau",
+        "refresh": "Tạo lại",
+        "copyContent": "Sao chép nội dung ghép nối",
+        "loadFailed": "Không tạo được mã QR ghép nối",
+        "retry": "Thử lại"
+      },
+      "devices": {
+        "title": "Thiết bị đã ghép nối",
+        "empty": "Chưa có thiết bị nào được ghép nối",
+        "emptyHint": "Quét mã QR ghép nối trên thiết bị di động",
+        "lastSeen": "Hoạt động gần nhất",
+        "never": "Chưa từng kết nối",
+        "revoke": "Thu hồi",
+        "revokeConfirmTitle": "Thu hồi thiết bị",
+        "revokeConfirmMessage": "Sau khi thu hồi, \"{{name}}\" sẽ không thể đồng bộ với thư viện này và cần ghép nối lại. Thu hồi?",
+        "revokeConfirm": "Thu hồi thiết bị",
+        "revoked": "Đã thu hồi thiết bị"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "Đã bật dịch vụ đồng bộ",
+    "syncDisabled": "Đã tắt dịch vụ đồng bộ"
   },
   "video": {
     "applyEdit": "",

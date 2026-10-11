@@ -1500,3 +1500,10 @@ html.glass-lite .ambient-bg {
     transform: none !important;
   }
 }
+
+/* sync-integration 阶段5：配对二维码承载面——扫码对比度要求底色恒白，不随主题切换 */
+.sync-qr-surface {
+  background: #ffffff;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}

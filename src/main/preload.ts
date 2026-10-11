@@ -31,6 +31,7 @@ import { exportAPI } from './preload/api/export'
 import { dataAPI } from './preload/api/data'
 import { backupAPI } from './preload/api/backup'
 import { shareAPI } from './preload/api/share'
+import { syncAPI } from './preload/api/sync'
 import { cacheAPI } from './preload/api/cache'
 import { logAPI } from './preload/api/log'
 import { crashAPI } from './preload/api/crash'
@@ -96,6 +97,8 @@ const electronAPI = {
   backup: backupAPI,
   // T08：WiFi 局域网分享 + T09 剪贴板分享
   share: shareAPI,
+  // sync-integration 阶段5：NikkiSync 同步服务器（状态/启停/配对二维码/设备管理）
+  sync: syncAPI,
   // T10：缩略图缓存管理
   cache: cacheAPI,
   // 日志管理

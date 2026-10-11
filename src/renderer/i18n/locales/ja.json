@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "プロファイル",
       "scan": "スキャン",
-      "tools": "ツール"
+      "tools": "ツール",
+      "sync": "同期"
     },
     "language": {
       "auto": "システムに従う",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "同期サービス"
     },
     "startup": {
       "autoScan": "起動時に自動スキャン",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "同期サービス",
+        "description": "LAN 内の NikkiSync モバイルクライアントが暗号化接続でこのライブラリに同期できます"
+      },
+      "enable": "同期サービスを有効化",
+      "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 27124）",
+      "status": {
+        "label": "状態",
+        "running": "実行中",
+        "stopped": "停止中",
+        "unavailable": "同期コンポーネント未準備",
+        "address": "サーバーアドレス",
+        "connections": "接続中のクライアント",
+        "serverId": "サーバー ID",
+        "tlsFingerprint": "TLS フィンガープリント",
+        "copied": "コピーしました"
+      },
+      "pairing": {
+        "title": "新しいデバイスをペアリング",
+        "open": "新しいデバイスをペアリング",
+        "hintRunning": "モバイルで QR コードをスキャンしてペアリング（5 分で失効）",
+        "hintDisabled": "新しいデバイスのペアリングには同期サービスの有効化が必要です",
+        "expiresIn": "有効期限",
+        "refresh": "再生成",
+        "copyContent": "ペアリング内容をコピー",
+        "loadFailed": "ペアリング QR コードの生成に失敗しました",
+        "retry": "再試行"
+      },
+      "devices": {
+        "title": "ペアリング済みデバイス",
+        "empty": "ペアリング済みのデバイスはありません",
+        "emptyHint": "モバイルでペアリング QR コードをスキャンしてください",
+        "lastSeen": "最終接続",
+        "never": "未接続",
+        "revoke": "解除",
+        "revokeConfirmTitle": "デバイスの解除",
+        "revokeConfirmMessage": "解除後「{{name}}」はこのライブラリと同期できなくなり、再ペアリングが必要です。解除しますか？",
+        "revokeConfirm": "デバイスを解除",
+        "revoked": "デバイスを解除しました"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "同期サービスを有効にしました",
+    "syncDisabled": "同期サービスを無効にしました"
   },
   "video": {
     "applyEdit": "",

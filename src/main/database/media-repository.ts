@@ -823,6 +823,21 @@ export class MediaRepository {
   }
 
   /**
+   * sync-integration 阶段5：清理前候选 id 快照（同步变更日志 journal 用）。
+   * 仅返回 is_duplicate=0 的资产行——重复行不在同步资产域（对齐扫描落账与行映射口径），
+   * 调用方在清理成功后对这些 id 记 asset.deleted。kind 与对应 cleanup 的 WHERE 谓词
+   * 保持超集关系（cleanup 不带 is_duplicate 过滤，故 cleared ≥ 候选数即候选全删）。
+   */
+  listCleanupCandidateIds(kind: 'missing' | 'corrupted'): number[] {
+    const sql =
+      kind === 'missing'
+        ? 'SELECT id FROM media_files WHERE is_missing = 1 AND is_duplicate = 0'
+        : 'SELECT id FROM media_files WHERE is_corrupted = 1 AND is_duplicate = 0'
+    const rows = this.db.prepare(sql).all() as Array<{ id: number }>
+    return rows.map((row) => row.id)
+  }
+
+  /**
    * R8：读取媒体记录的 updated_at（乐观锁快照比对用）。
    * 返回 ISO 风格字符串（datetime('now','localtime') 格式），或 NULL（旧库未迁移/未被用户操作过）。
    */

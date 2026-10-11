@@ -353,6 +353,15 @@ class SyncMockDb {
       )
     }
     if (
+      normalized.startsWith(
+        'SELECT device_id, device_name, platform, public_key, credential_hash, app_version, paired_at, last_seen_at, last_ack_revision, revoked_at FROM sync_paired_devices WHERE revoked_at IS NULL'
+      )
+    ) {
+      return [...this.table('sync_paired_devices').rows]
+        .filter((r) => r['revoked_at'] === null)
+        .sort((a, b) => String(b['paired_at']).localeCompare(String(a['paired_at'])))
+    }
+    if (
       normalized ===
       'SELECT still_media_id, motion_media_id, method, confidence, presentation_timestamp_us FROM sync_motion_links'
     ) {

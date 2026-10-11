@@ -1,4 +1,5 @@
-// @core-change: sync-integration 阶段4：媒体元数据写路径接线同步变更日志（ctx.syncEvents → journal + WS 广播）
+// @core-change: sync-integration 阶段4/5：媒体元数据写路径接线同步变更日志（阶段4 六处元数据更新；
+//               阶段5 analyzeSceneTime 批量修改 → journal asset.updated）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -131,6 +132,14 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
         analyzed++
       })
       await runWithConcurrency(tasks, 4)
+
+      // sync-integration 阶段5：场景时段为批量元数据修改 → 批量 journal asset.updated
+      //（rows 为本次分析的全量候选，逐行 updateSceneTime 均刷新 updated_at）
+      if (ctx.syncEvents && rows.length > 0) {
+        await ctx.syncEvents.recordAssetChanges(
+          rows.map((row) => ({ eventType: 'asset.updated' as const, assetId: String(row.id) }))
+        )
+      }
 
       ctx.notifyMediaUpdated()
       return { message: t('main.media.message.sceneTimeAnalyzed', { count: analyzed }), analyzed }

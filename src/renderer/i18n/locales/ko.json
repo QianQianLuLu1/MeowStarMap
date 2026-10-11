@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "프로필",
       "scan": "스캔",
-      "tools": "도구"
+      "tools": "도구",
+      "sync": "동기화"
     },
     "language": {
       "auto": "시스템 따르기",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "동기화 서비스"
     },
     "startup": {
       "autoScan": "시작 시 자동 스캔",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "동기화 서비스",
+        "description": "LAN의 NikkiSync 모바일 클라이언트가 암호화 연결로 이 라이브러리와 동기화할 수 있습니다"
+      },
+      "enable": "동기화 서비스 사용",
+      "enableDesc": "사용 시 이 PC가 동기화 서버로 실행됩니다(HTTPS + WebSocket, 기본 포트 27124)",
+      "status": {
+        "label": "상태",
+        "running": "실행 중",
+        "stopped": "중지됨",
+        "unavailable": "동기화 구성 요소가 준비되지 않았습니다",
+        "address": "서버 주소",
+        "connections": "연결된 클라이언트",
+        "serverId": "서버 ID",
+        "tlsFingerprint": "TLS 지문",
+        "copied": "복사됨"
+      },
+      "pairing": {
+        "title": "새 기기 페어링",
+        "open": "새 기기 페어링",
+        "hintRunning": "모바일에서 QR 코드를 스캔하여 페어링하세요(5분 후 만료)",
+        "hintDisabled": "새 기기 페어링을 위해서는 동기화 서비스를 사용으로 설정해야 합니다",
+        "expiresIn": "만료까지",
+        "refresh": "다시 생성",
+        "copyContent": "페어링 내용 복사",
+        "loadFailed": "페어링 QR 코드 생성 실패",
+        "retry": "재시도"
+      },
+      "devices": {
+        "title": "페어링된 기기",
+        "empty": "페어링된 기기가 없습니다",
+        "emptyHint": "모바일에서 페어링 QR 코드를 스캔하세요",
+        "lastSeen": "마지막 연결",
+        "never": "연결된 적 없음",
+        "revoke": "해지",
+        "revokeConfirmTitle": "기기 해지",
+        "revokeConfirmMessage": "해지하면 \"{{name}}\"은(는) 이 라이브러리와 더 이상 동기화할 수 없으며 다시 페어링해야 합니다. 해지하시겠습니까?",
+        "revokeConfirm": "기기 해지",
+        "revoked": "기기가 해지되었습니다"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "동기화 서비스가 사용 설정되었습니다",
+    "syncDisabled": "동기화 서비스가 중지되었습니다"
   },
   "video": {
     "applyEdit": "",

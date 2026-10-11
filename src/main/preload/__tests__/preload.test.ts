@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('electronAPI 包含全部 31 个键（reportReady + 30 个命名空间）', () => {
+  it('electronAPI 包含全部 32 个键（reportReady + 31 个命名空间，阶段5 增 sync）', () => {
     const electronAPI = getExposed<Record<string, unknown>>('electronAPI')
     expect(Object.keys(electronAPI).sort()).toEqual(
       [
@@ -92,6 +92,7 @@ describe('preload 装配完整性', () => {
         'data',
         'backup',
         'share',
+        'sync',
         'cache',
         'log',
         'crash',

@@ -1881,7 +1881,8 @@
       "plugins": "插件",
       "profile": "角色档案",
       "scan": "扫描",
-      "tools": "工具"
+      "tools": "工具",
+      "sync": "同步"
     },
     "language": {
       "auto": "跟随系统",
@@ -2093,7 +2094,8 @@
       "importRoots": "指定目录",
       "shareCode": "分享码工具",
       "startup": "启动行为",
-      "theme": "主题"
+      "theme": "主题",
+      "syncService": "同步服务"
     },
     "startup": {
       "autoScan": "启动时自动扫描",
@@ -2124,6 +2126,48 @@
     "plugins": {
       "error": {
         "unavailable": "插件系统不可用（预览版无 IPC）"
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "同步服务",
+        "description": "允许局域网内的 NikkiSync 移动端通过加密连接同步本机媒体库"
+      },
+      "enable": "启用同步服务",
+      "enableDesc": "开启后本机作为同步服务端运行（HTTPS + WebSocket，默认端口 27124）",
+      "status": {
+        "label": "运行状态",
+        "running": "运行中",
+        "stopped": "已停止",
+        "unavailable": "同步组件未就绪",
+        "address": "服务地址",
+        "connections": "已连接客户端",
+        "serverId": "服务 ID",
+        "tlsFingerprint": "TLS 指纹",
+        "copied": "已复制"
+      },
+      "pairing": {
+        "title": "配对新设备",
+        "open": "配对新设备",
+        "hintRunning": "在移动端扫码完成配对；二维码 5 分钟内有效",
+        "hintDisabled": "启用同步服务后才能配对新设备",
+        "expiresIn": "有效期",
+        "refresh": "重新生成",
+        "copyContent": "复制配对内容",
+        "loadFailed": "生成配对二维码失败",
+        "retry": "重试"
+      },
+      "devices": {
+        "title": "已配对设备",
+        "empty": "暂无已配对设备",
+        "emptyHint": "在移动端扫描配对二维码完成配对",
+        "lastSeen": "最近活跃",
+        "never": "从未连接",
+        "revoke": "撤销",
+        "revokeConfirmTitle": "撤销设备",
+        "revokeConfirmMessage": "撤销后「{{name}}」将无法再同步本机媒体库，需要重新配对。确定撤销？",
+        "revokeConfirm": "撤销设备",
+        "revoked": "设备已撤销"
       }
     }
   },
@@ -2339,7 +2383,9 @@
     "scanCompletedNoGameShots": "扫描完成：未发现游戏内截图。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
     "scanFoundButGalleryEmpty": "扫描完成：发现 {{count}} 个文件，但均不是游戏内截图（启动器图片已收入「缓存」板块）。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
     "imageProcessorCanvasFailed": "无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用",
-    "imageProcessorLoadFailed": "加载图片失败: {{src}}"
+    "imageProcessorLoadFailed": "加载图片失败: {{src}}",
+    "syncEnabled": "同步服务已启用",
+    "syncDisabled": "同步服务已关闭"
   },
   "video": {
     "applyEdit": "应用并导出",

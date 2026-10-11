@@ -23,7 +23,8 @@ import {
   AboutLicenseSection,
   LanguageSection,
   ToolsShareCodeSection,
-  PluginManageSection
+  PluginManageSection,
+  SyncServiceSection
 } from './settings/sections'
 
 // ============ 设置导航结构 ============
@@ -134,6 +135,18 @@ const SETTINGS_GROUPS: GroupDef[] = [
       { id: 'data-backup', nameKey: 'settings.sections.dataBackup', component: DataBackupSection },
       { id: 'data-cache', nameKey: 'settings.sections.dataCache', component: DataCacheSection },
       { id: 'data-clear', nameKey: 'settings.sections.dataClear', component: DataClearSection }
+    ]
+  },
+  {
+    // sync-integration 阶段5：NikkiSync 同步服务（开关/状态/配对/设备管理）
+    id: 'sync',
+    nameKey: 'settings.groups.sync',
+    sections: [
+      {
+        id: 'sync-service',
+        nameKey: 'settings.sections.syncService',
+        component: SyncServiceSection
+      }
     ]
   },
   {

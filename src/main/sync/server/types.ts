@@ -82,6 +82,17 @@ export interface PairingQrInfo {
   tlsFingerprintSha256: string
 }
 
+/** 已配对设备的 UI/IPC 视图（阶段5）：不含公钥/凭据哈希等敏感列 */
+export interface SyncDeviceInfo {
+  deviceId: string
+  deviceName: string
+  platform: 'ios' | 'android'
+  appVersion: string | null
+  pairedAt: string
+  lastSeenAt: string | null
+  lastAckRevision: number
+}
+
 export interface SyncServerHandle {
   /** 事件汇：写路径 handler 经 ctx.syncEvents 调用（不依赖服务器运行状态） */
   events: SyncEventSink
@@ -89,4 +100,12 @@ export interface SyncServerHandle {
   stop(): Promise<void>
   getStatus(): Promise<SyncServerStatusInfo>
   createPairingQr(): Promise<PairingQrInfo>
+  /** 已配对设备列表（阶段5）：仅活跃设备（revoked_at IS NULL），按 paired_at DESC */
+  listDevices(): Promise<SyncDeviceInfo[]>
+  /**
+   * 撤销设备（阶段5）：软删 revoked_at（不删记录/会话，不踢已建立 WS 连接——与上游一致，
+   * 下一次签名请求/WS 升级被 AuthService 以 revoked_device 拒绝）。
+   * 返回被撤销设备；设备不存在或已撤销时返回 null（由 handler 映射 notFound）。
+   */
+  revokeDevice(deviceId: string): Promise<SyncDeviceInfo | null>
 }

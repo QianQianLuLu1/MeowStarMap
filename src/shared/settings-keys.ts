@@ -15,7 +15,9 @@ export const RENDERER_PREF_KEYS = [
   'fileOps.batchThreshold',
   'fileOps.batchThresholdEnabled',
   'fileOps.preferSoftDelete',
-  'hardwareAcceleration'
+  'hardwareAcceleration',
+  // sync-integration 阶段5：同步服务自启开关（布尔偏好，消费点 sync-server-setup.ts initSyncServer）
+  'sync.serverEnabled'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

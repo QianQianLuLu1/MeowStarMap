@@ -1472,7 +1472,8 @@
       "plugins": "Plugins",
       "profile": "Profiles",
       "scan": "Scan",
-      "tools": "Tools"
+      "tools": "Tools",
+      "sync": "Sync"
     },
     "language": {
       "auto": "Follow System",
@@ -1684,7 +1685,8 @@
       "importRoots": "Import Roots",
       "shareCode": "Share Code Tools",
       "startup": "Startup",
-      "theme": "Theme"
+      "theme": "Theme",
+      "syncService": "Sync Service"
     },
     "startup": {
       "autoScan": "Auto-scan on startup",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "Sync Service",
+        "description": "Let NikkiSync mobile clients sync this library over an encrypted LAN connection"
+      },
+      "enable": "Enable sync service",
+      "enableDesc": "Run this PC as the sync server (HTTPS + WebSocket, default port 27124)",
+      "status": {
+        "label": "Status",
+        "running": "Running",
+        "stopped": "Stopped",
+        "unavailable": "Sync components not ready",
+        "address": "Server address",
+        "connections": "Connected clients",
+        "serverId": "Server ID",
+        "tlsFingerprint": "TLS fingerprint",
+        "copied": "Copied"
+      },
+      "pairing": {
+        "title": "Pair a New Device",
+        "open": "Pair a New Device",
+        "hintRunning": "Scan the QR code on your mobile device; it expires in 5 minutes",
+        "hintDisabled": "Enable the sync service to pair new devices",
+        "expiresIn": "Expires in",
+        "refresh": "Regenerate",
+        "copyContent": "Copy pairing content",
+        "loadFailed": "Failed to generate pairing QR code",
+        "retry": "Retry"
+      },
+      "devices": {
+        "title": "Paired Devices",
+        "empty": "No paired devices",
+        "emptyHint": "Scan the pairing QR code on your mobile device",
+        "lastSeen": "Last seen",
+        "never": "Never connected",
+        "revoke": "Revoke",
+        "revokeConfirmTitle": "Revoke Device",
+        "revokeConfirmMessage": "\"{{name}}\" will no longer be able to sync with this library and must pair again. Revoke this device?",
+        "revokeConfirm": "Revoke Device",
+        "revoked": "Device revoked"
       }
     }
   },
@@ -1917,7 +1961,9 @@
       "partial": ""
     },
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "Sync service enabled",
+    "syncDisabled": "Sync service disabled"
   },
   "video": {
     "applyEdit": "Apply and export",

@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "โปรไฟล์",
       "scan": "สแกน",
-      "tools": "เครื่องมือ"
+      "tools": "เครื่องมือ",
+      "sync": "ซิงค์"
     },
     "language": {
       "auto": "ตามระบบ",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "บริการซิงค์"
     },
     "startup": {
       "autoScan": "สแกนอัตโนมัติเมื่อเริ่มต้น",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "บริการซิงค์",
+        "description": "อนุญาตให้ไคลเอนต์มือถือ NikkiSync ซิงค์คลังสื่อนี้ผ่านการเชื่อมต่อที่เข้ารหัสในเครือข่ายท้องถิ่น"
+      },
+      "enable": "เปิดใช้บริการซิงค์",
+      "enableDesc": "เครื่องนี้จะทำหน้าที่เป็นเซิร์ฟเวอร์ซิงค์ (HTTPS + WebSocket, พอร์ตเริ่มต้น 27124)",
+      "status": {
+        "label": "สถานะ",
+        "running": "กำลังทำงาน",
+        "stopped": "หยุดอยู่",
+        "unavailable": "ส่วนประกอบซิงค์ยังไม่พร้อม",
+        "address": "ที่อยู่เซิร์ฟเวอร์",
+        "connections": "ไคลเอนต์ที่เชื่อมต่อ",
+        "serverId": "ID เซิร์ฟเวอร์",
+        "tlsFingerprint": "ลายนิ้วมือ TLS",
+        "copied": "คัดลอกแล้ว"
+      },
+      "pairing": {
+        "title": "จับคู่อุปกรณ์ใหม่",
+        "open": "จับคู่อุปกรณ์ใหม่",
+        "hintRunning": "สแกน QR Code บนมือถือ หมดอายุใน 5 นาที",
+        "hintDisabled": "ต้องเปิดใช้บริการซิงค์ก่อนจึงจะจับคู่อุปกรณ์ใหม่ได้",
+        "expiresIn": "หมดอายุใน",
+        "refresh": "สร้างใหม่",
+        "copyContent": "คัดลอกเนื้อหาการจับคู่",
+        "loadFailed": "สร้าง QR Code จับคู่ไม่สำเร็จ",
+        "retry": "ลองอีกครั้ง"
+      },
+      "devices": {
+        "title": "อุปกรณ์ที่จับคู่แล้ว",
+        "empty": "ยังไม่มีอุปกรณ์ที่จับคู่",
+        "emptyHint": "สแกน QR Code จับคู่บนมือถือของคุณ",
+        "lastSeen": "ใช้งานล่าสุด",
+        "never": "ไม่เคยเชื่อมต่อ",
+        "revoke": "เพิกถอน",
+        "revokeConfirmTitle": "เพิกถอนอุปกรณ์",
+        "revokeConfirmMessage": "หลังเพิกถอน \"{{name}}\" จะซิงค์กับคลังสื่อนี้ไม่ได้อีกและต้องจับคู่ใหม่ ยืนยันการเพิกถอน?",
+        "revokeConfirm": "เพิกถอนอุปกรณ์",
+        "revoked": "เพิกถอนอุปกรณ์แล้ว"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "เปิดใช้บริการซิงค์แล้ว",
+    "syncDisabled": "ปิดบริการซิงค์แล้ว"
   },
   "video": {
     "applyEdit": "",

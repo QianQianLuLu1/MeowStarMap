@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "Perfiles",
       "scan": "Escanear",
-      "tools": "Herramientas"
+      "tools": "Herramientas",
+      "sync": "Sincronización"
     },
     "language": {
       "auto": "Seguir sistema",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "Servicio de sincronización"
     },
     "startup": {
       "autoScan": "Escaneo automático al iniciar",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "Servicio de sincronización",
+        "description": "Permite que los clientes móviles de NikkiSync sincronicen esta biblioteca mediante una conexión cifrada en la red local"
+      },
+      "enable": "Activar servicio de sincronización",
+      "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 27124)",
+      "status": {
+        "label": "Estado",
+        "running": "En ejecución",
+        "stopped": "Detenido",
+        "unavailable": "Componentes de sincronización no listos",
+        "address": "Dirección del servidor",
+        "connections": "Clientes conectados",
+        "serverId": "ID del servidor",
+        "tlsFingerprint": "Huella TLS",
+        "copied": "Copiado"
+      },
+      "pairing": {
+        "title": "Vincular nuevo dispositivo",
+        "open": "Vincular nuevo dispositivo",
+        "hintRunning": "Escanea el código QR en tu móvil; caduca en 5 minutos",
+        "hintDisabled": "Activa el servicio de sincronización para vincular nuevos dispositivos",
+        "expiresIn": "Caduca en",
+        "refresh": "Regenerar",
+        "copyContent": "Copiar contenido de emparejamiento",
+        "loadFailed": "Error al generar el código QR de emparejamiento",
+        "retry": "Reintentar"
+      },
+      "devices": {
+        "title": "Dispositivos vinculados",
+        "empty": "No hay dispositivos vinculados",
+        "emptyHint": "Escanea el código QR de emparejamiento en tu móvil",
+        "lastSeen": "Última conexión",
+        "never": "Nunca conectado",
+        "revoke": "Revocar",
+        "revokeConfirmTitle": "Revocar dispositivo",
+        "revokeConfirmMessage": "Tras revocar, «{{name}}» ya no podrá sincronizar con esta biblioteca y deberá volver a emparejarse. ¿Revocar?",
+        "revokeConfirm": "Revocar dispositivo",
+        "revoked": "Dispositivo revocado"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "Servicio de sincronización activado",
+    "syncDisabled": "Servicio de sincronización desactivado"
   },
   "video": {
     "applyEdit": "",

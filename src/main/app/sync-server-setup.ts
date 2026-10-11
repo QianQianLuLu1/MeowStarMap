@@ -13,10 +13,12 @@ import type {
   AssetChangeInput,
   PairingQrInfo,
   SyncApiServices,
+  SyncDeviceInfo,
   SyncEventSink,
   SyncServerHandle,
   SyncServerStatusInfo
 } from '../sync/server/types'
+import type { SyncPairedDeviceRow } from '../database/sync-metadata-repository'
 import type { ChangeType, WsEvent } from '../../shared/sync/protocol'
 import type { AppContext } from './app-context'
 
@@ -34,7 +36,7 @@ export type { PairingQrInfo, SyncServerHandle, SyncServerStatusInfo }
  *   完整）、失败仅告警不中断写路径；单条变更立即广播；批量变更合并广播最后一条
  *   （客户端凭最高 revision 走 /v1/changes 补齐整批，防移动端事件风暴）
  * - 端口：设置 sync.serverPort（默认 27124），EADDRINUSE 由 SyncServer +1 重试；
- *   自启开关：设置 sync.serverEnabled（默认 true）
+ *   自启开关：设置 sync.serverEnabled（默认 false——阶段5 起默认关闭，用户手动启用）
  * - LAN 地址解析策略与 share-wifi-service.getLanIp 一致（默认路由优先 + 虚拟网卡
  *   过滤 + 127.0.0.1 兜底）；原方法为类私有，此处精简复制以避免改动 services 目录
  */
@@ -44,6 +46,13 @@ const networkAddress: (options?: { ipv6?: boolean }) => string = require('networ
 
 const SETTING_ENABLED = 'sync.serverEnabled'
 const SETTING_PORT = 'sync.serverPort'
+
+/**
+ * 同步服务自启默认值（阶段5）：默认关闭，用户在设置页手动启用。
+ * 任务硬性要求「同步服务默认关闭」——阶段4 曾临时默认 true（当时无 UI 无法手动开启），
+ * 设置页开关落地后切换为 false；从未写过该 key 的存量库升级后不自启。
+ */
+export const SYNC_SERVER_ENABLED_DEFAULT = false
 
 const VIRTUAL_ADAPTER_PATTERN =
   /(vmware|vmnet|virtualbox|vbox|docker|hyper-v|vethernet|tailscale|zerotier|wireguard|wg-|vpn|tap-|tun-)/i
@@ -158,6 +167,15 @@ export async function initSyncServer(ctx: AppContext): Promise<SyncServerHandle>
     events,
     start,
     stop: () => server.stop(),
+    // 阶段5：设备管理——活跃列表 + 软删撤销（不踢在线连接，见 types.ts 注释）
+    listDevices: async (): Promise<SyncDeviceInfo[]> =>
+      metadata.listActivePairedDevices().map(toDeviceInfo),
+    revokeDevice: async (deviceId: string): Promise<SyncDeviceInfo | null> => {
+      const device = metadata.getPairedDevice(deviceId)
+      if (!device || device.revoked_at) return null
+      await metadata.revokeDevice(deviceId)
+      return toDeviceInfo({ ...device, revoked_at: new Date().toISOString() })
+    },
     getStatus: async (): Promise<SyncServerStatusInfo> => {
       const status = server.getStatus()
       let serverIdentity: { serverId: string; serverName: string } | null = null
@@ -174,7 +192,7 @@ export async function initSyncServer(ctx: AppContext): Promise<SyncServerHandle>
         connections: status.connections,
         serverId: serverIdentity?.serverId ?? null,
         serverName: serverIdentity?.serverName ?? null,
-        pairedDeviceCount: metadata.listPairedDevices().length,
+        pairedDeviceCount: metadata.listActivePairedDevices().length,
         tlsFingerprintSha256: tlsIdentity.fingerprintSha256,
         lanHost: resolveLanHost()
       }
@@ -200,12 +218,25 @@ export async function initSyncServer(ctx: AppContext): Promise<SyncServerHandle>
   ctx.syncServer = handle
 
   try {
-    const enabled = ctx.dbManager.getSetting(SETTING_ENABLED, true)
+    const enabled = ctx.dbManager.getSetting(SETTING_ENABLED, SYNC_SERVER_ENABLED_DEFAULT)
     if (enabled) await start()
   } catch (err) {
     logger.error('[Sync] failed to auto-start the sync server', err)
   }
   return handle
+}
+
+/** sync_paired_devices 行 → IPC/UI 视图（不含公钥/凭据哈希等敏感列） */
+function toDeviceInfo(row: SyncPairedDeviceRow): SyncDeviceInfo {
+  return {
+    deviceId: row.device_id,
+    deviceName: row.device_name,
+    platform: row.platform === 'ios' ? 'ios' : 'android',
+    appVersion: row.app_version,
+    pairedAt: row.paired_at,
+    lastSeenAt: row.last_seen_at,
+    lastAckRevision: row.last_ack_revision
+  }
 }
 
 /** 局域网地址（QR 配对用）：默认路由优先，校验落在真实网卡后采用；否则扫网卡取 IPv4 私有段 */

@@ -58,6 +58,8 @@ function makeSyncServer(overrides: Partial<SyncServerHandle> = {}): SyncServerHa
       port: 27124,
       tlsFingerprintSha256: 'aa'.repeat(32)
     })),
+    listDevices: vi.fn(async () => []),
+    revokeDevice: vi.fn(async () => null),
     ...overrides
   } as SyncServerHandle
 }

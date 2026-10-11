@@ -1472,7 +1472,8 @@
       "plugins": "",
       "profile": "Profile",
       "scan": "Scannen",
-      "tools": "Werkzeuge"
+      "tools": "Werkzeuge",
+      "sync": "Synchronisierung"
     },
     "language": {
       "auto": "System folgen",
@@ -1684,7 +1685,8 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": ""
+      "scanFallback": "",
+      "syncService": "Synchronisierungsdienst"
     },
     "startup": {
       "autoScan": "Beim Start automatisch scannen",
@@ -1715,6 +1717,48 @@
     "plugins": {
       "error": {
         "unavailable": ""
+      }
+    },
+    "sync": {
+      "service": {
+        "title": "Synchronisierungsdienst",
+        "description": "Ermöglicht NikkiSync-Mobilclients, diese Bibliothek über eine verschlüsselte LAN-Verbindung zu synchronisieren"
+      },
+      "enable": "Synchronisierungsdienst aktivieren",
+      "enableDesc": "Dieser PC dient dann als Synchronisierungsserver (HTTPS + WebSocket, Standardport 27124)",
+      "status": {
+        "label": "Status",
+        "running": "Läuft",
+        "stopped": "Gestoppt",
+        "unavailable": "Synchronisierungskomponenten nicht bereit",
+        "address": "Serveradresse",
+        "connections": "Verbundene Clients",
+        "serverId": "Server-ID",
+        "tlsFingerprint": "TLS-Fingerabdruck",
+        "copied": "Kopiert"
+      },
+      "pairing": {
+        "title": "Neues Gerät koppeln",
+        "open": "Neues Gerät koppeln",
+        "hintRunning": "QR-Code auf dem Mobilgerät scannen; er läuft nach 5 Minuten ab",
+        "hintDisabled": "Zum Koppeln neuer Geräte muss der Synchronisierungsdienst aktiviert sein",
+        "expiresIn": "Läuft ab in",
+        "refresh": "Neu erzeugen",
+        "copyContent": "Kopplungsinhalt kopieren",
+        "loadFailed": "QR-Kopplungscode konnte nicht erzeugt werden",
+        "retry": "Erneut versuchen"
+      },
+      "devices": {
+        "title": "Gekoppelte Geräte",
+        "empty": "Keine gekoppelten Geräte",
+        "emptyHint": "QR-Kopplungscode auf dem Mobilgerät scannen",
+        "lastSeen": "Zuletzt aktiv",
+        "never": "Nie verbunden",
+        "revoke": "Widerrufen",
+        "revokeConfirmTitle": "Gerät widerrufen",
+        "revokeConfirmMessage": "Nach dem Widerruf kann „{{name}}\" diese Bibliothek nicht mehr synchronisieren und muss neu gekoppelt werden. Widerrufen?",
+        "revokeConfirm": "Gerät widerrufen",
+        "revoked": "Gerät widerrufen"
       }
     }
   },
@@ -1917,7 +1961,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "",
+    "syncEnabled": "Synchronisierungsdienst aktiviert",
+    "syncDisabled": "Synchronisierungsdienst deaktiviert"
   },
   "video": {
     "applyEdit": "",

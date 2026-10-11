@@ -486,3 +486,40 @@ export interface FavoriteItem {
   media_id: number
   created_at: string
 }
+
+// ============ NikkiSync 同步服务（sync-integration 阶段5） ============
+// 形状快照自 src/main/sync/server/types.ts（SyncServerStatusInfo/PairingQrInfo/SyncDeviceInfo）；
+// 该文件是主进程「理想契约」，此处为 preload 通道的运行时快照，随阶段推进保持同步。
+
+export interface SyncServerStatusInfo {
+  available: boolean
+  running: boolean
+  host: string
+  port: number
+  connections: number
+  serverId: string | null
+  serverName: string | null
+  pairedDeviceCount: number
+  tlsFingerprintSha256: string | null
+  lanHost: string
+}
+
+export interface PairingQrInfo {
+  /** NS1|... 七段二维码内容（渲染层经 qrcode 生成 SVG 图像） */
+  content: string
+  expiresAt: string
+  serverId: string
+  host: string
+  port: number
+  tlsFingerprintSha256: string
+}
+
+export interface SyncDeviceInfo {
+  deviceId: string
+  deviceName: string
+  platform: 'ios' | 'android'
+  appVersion: string | null
+  pairedAt: string
+  lastSeenAt: string | null
+  lastAckRevision: number
+}

@@ -22,6 +22,11 @@ vi.mock('../database/sync-metadata-repository', () => ({
   })
 }))
 
+// scan-journal 吞错路径走真实 logger（electron-log/app.getPath 在 node 测试环境不可用）
+vi.mock('../utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
+}))
+
 function makeWatermarkDb(maxId: number): { prepare: ReturnType<typeof vi.fn> } {
   return {
     prepare: vi.fn(() => ({
@@ -128,9 +133,7 @@ describe('recordScanChanges', () => {
     ).toBe(0)
     const noEvents = makeDeps()
     delete (noEvents as Partial<ScanJournalDeps>).syncEvents
-    expect(
-      await recordScanChanges(noEvents, { scanStartedAt: '', preScanMaxId: 0 })
-    ).toBe(0)
+    expect(await recordScanChanges(noEvents, { scanStartedAt: '', preScanMaxId: 0 })).toBe(0)
   })
 
   it('内部异常（查询/落账失败）→ 吞错返回 0，不阻塞扫描主流程', async () => {
