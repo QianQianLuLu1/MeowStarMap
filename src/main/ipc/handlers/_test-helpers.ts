@@ -103,6 +103,8 @@ export interface MakeCtxOpts {
   // sync-integration 阶段5：sync 域注入（可选；不传时与生产未组装态一致，可选链 no-op）
   syncEvents?: import('../../sync/server/types').SyncEventSink
   syncServer?: import('../../sync/server/types').SyncServerHandle
+  // sync-integration 阶段2：内嵌 NikkiSync Runtime 句柄（可选；不传时 handler 走未组装态）
+  nikkisyncRuntime?: import('../../nikkisync/runtime-types').NikkiSyncRuntimeHandle
 }
 
 export function makeCtx(opts: MakeCtxOpts): HandlerContext {
@@ -141,7 +143,8 @@ export function makeCtx(opts: MakeCtxOpts): HandlerContext {
     setThumbnailsGenerating: vi.fn(),
     // sync-integration 阶段5：仅在调用方声明时注入（undefined = 生产未组装态）
     ...(opts.syncEvents ? { syncEvents: opts.syncEvents } : {}),
-    ...(opts.syncServer ? { syncServer: opts.syncServer } : {})
+    ...(opts.syncServer ? { syncServer: opts.syncServer } : {}),
+    ...(opts.nikkisyncRuntime ? { nikkisyncRuntime: opts.nikkisyncRuntime } : {})
   } as unknown as HandlerContext
 }
 

@@ -2,17 +2,17 @@
  * @layer L3
  * @module src/main/app/ipc-setup
  * @coverage setupIPC / bindScanProgressListener / injectCorruptedMarkers
- * @dependencies 40 个 registerXxxHandlers、pathGuard.initUserDataDir、database/media-repository、utils/logger
+ * @dependencies 41 个 registerXxxHandlers、pathGuard.initUserDataDir、database/media-repository、utils/logger
  *
  * 难点：
- * 1. 40 个 registerXxxHandlers 全部 mock 为 vi.fn()，需 vi.mock 批量 stub
+ * 1. 41 个 registerXxxHandlers 全部 mock 为 vi.fn()，需 vi.mock 批量 stub
  * 2. bindScanProgressListener 用 WeakMap 缓存监听器引用，第二次调用应 removeListener 旧的再 on
  * 3. injectCorruptedMarkers 内部 new MediaRepository(db, workerBridge, dbPath) 后调用 getMediaIdByPath / markCorrupted / clearCorrupted
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
-// 共享 mock：40 个 registerXxxHandlers
+// 共享 mock：41 个 registerXxxHandlers
 const handlerMocks = vi.hoisted(() => ({
   registerMediaMetadataHandlers: vi.fn(),
   registerMediaLifecycleHandlers: vi.fn(),
@@ -48,6 +48,7 @@ const handlerMocks = vi.hoisted(() => ({
   registerTaskHandlers: vi.fn(),
   registerShareHandlers: vi.fn(),
   registerSyncHandlers: vi.fn(),
+  registerNikkiSyncHandlers: vi.fn(),
   registerPluginManagementHandlers: vi.fn(),
   registerPluginBridgeHandlers: vi.fn(),
   registerFavoritesHandlers: vi.fn(),
@@ -163,6 +164,11 @@ vi.mock('../../ipc/handlers/share', () => ({
 }))
 vi.mock('../../ipc/handlers/sync-handler', () => ({
   registerSyncHandlers: handlerMocks.registerSyncHandlers
+}))
+
+// sync-integration 阶段2：内嵌 NikkiSync Runtime 只读域 handler
+vi.mock('../../ipc/handlers/nikkisync-handler', () => ({
+  registerNikkiSyncHandlers: handlerMocks.registerNikkiSyncHandlers
 }))
 vi.mock('../../ipc/handlers/plugin', () => ({
   registerPluginManagementHandlers: handlerMocks.registerPluginManagementHandlers
@@ -306,12 +312,12 @@ describe('bindScanProgressListener', () => {
 // setupIPC
 // ============================================================================
 describe('setupIPC', () => {
-  it('5. 调用所有 40 个 registerXxxHandlers', () => {
+  it('5. 调用所有 41 个 registerXxxHandlers', () => {
     const ctx = makeAppCtx({ scannerManager: makeScannerManagerWithProgress() })
 
     setupIPC(ctx)
 
-    // 40 个 registerXxxHandlers
+    // 41 个 registerXxxHandlers
     expect(handlerMocks.registerMediaMetadataHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerMediaLifecycleHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerScanLogHandlers).toHaveBeenCalledWith(ctx)
@@ -354,6 +360,8 @@ describe('setupIPC', () => {
     expect(handlerMocks.registerResonanceHandlers).toHaveBeenCalledWith(ctx)
     // sync-integration 阶段4：sync 域 handler
     expect(handlerMocks.registerSyncHandlers).toHaveBeenCalledWith(ctx)
+    // sync-integration 阶段2：内嵌 NikkiSync Runtime 只读域 handler
+    expect(handlerMocks.registerNikkiSyncHandlers).toHaveBeenCalledWith(ctx)
   })
 
   it('6. 调用 pathGuard.initUserDataDir', () => {

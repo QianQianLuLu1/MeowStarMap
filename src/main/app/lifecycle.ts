@@ -26,6 +26,7 @@ import { setupIPC, injectCorruptedMarkers } from './ipc-setup'
 import { applyUITheme, setupThemeListener } from './theme'
 // sync-integration 阶段 4：NikkiSync HTTPS 同步服务器装配与自启
 import { initSyncServer } from './sync-server-setup'
+import { initNikkiSyncRuntime } from './nikkisync-runtime-setup'
 // 自动更新：复用 electron-updater，仅生产环境初始化
 import { initAutoUpdater } from './auto-update'
 import {
@@ -339,6 +340,13 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
       await initSyncServer(ctx)
     } catch (err) {
       logStartupError('initSyncServer', err)
+    }
+    // sync-integration 阶段 2：内嵌 NikkiSync PcCompanion Runtime（库+发现+扫描，不起 LAN 服务）
+    // 独立 try/catch：未建链 / 无游戏目录 / 装载失败都只能降级，绝不阻塞启动
+    try {
+      await initNikkiSyncRuntime(ctx)
+    } catch (err) {
+      logStartupError('initNikkiSyncRuntime', err)
     }
     // 插件系统初始化：在 createMainWindow 之前完成，确保窗口加载时 facade 可用
     // 失败不阻塞应用启动（init 内部已捕获异常并记录日志）

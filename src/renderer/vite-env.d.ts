@@ -922,6 +922,41 @@ interface WindowElectronAPI {
       }>
     >
   }
+  // sync-integration 阶段2：内嵌 NikkiSync Runtime（运行态/扫描/资产只读查询）
+  // 返回体为 NikkiSync 协议 DTO（上游 row-mappers 产出），本层零转换 => 资产业务字段以 unknown 承接
+  nikkisync: {
+    getRuntimeStatus: () => Promise<{
+      state:
+        | 'unavailable'
+        | 'idle'
+        | 'starting'
+        | 'running'
+        | 'scanning'
+        | 'degraded'
+        | 'stopping'
+        | 'error'
+      dbPath: string
+      linkReady: boolean
+      scanner?: unknown
+      tables?: string[]
+      error?: string
+      hint?: string
+    }>
+    startScan: (input?: { gameRoot?: string; path?: string }) => Promise<unknown>
+    getAssets: (input?: {
+      limit?: number
+      cursor?: string
+      type?: string
+      afterRevision?: number
+      includeDeleted?: boolean
+    }) => Promise<{ items: unknown[]; nextCursor?: string; libraryRevision: number }>
+    getAssetDetail: (assetId: string) => Promise<unknown>
+    getResource: (input: {
+      assetId: string
+      resourceId: string
+      mode?: 'meta' | 'path'
+    }) => Promise<unknown>
+  }
   // T10：缩略图缓存管理
   cache: {
     getStats: () => Promise<{

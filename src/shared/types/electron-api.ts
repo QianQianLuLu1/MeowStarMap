@@ -523,3 +523,51 @@ export interface SyncDeviceInfo {
   lastSeenAt: string | null
   lastAckRevision: number
 }
+
+// ============ NikkiSync 内嵌运行时（sync-integration 阶段2） ============
+// 形状快照自 src/main/nikkisync/runtime-types.ts（NikkiSyncRuntimeStatus 等）。
+// shared 不得 import src/main（分层约束），因此沿用上方 sync 域的快照口径同步维护。
+// 查询结果（Asset / Resource / ScanResult）为 NikkiSync 协议 DTO，由上游 row-mappers 产出，
+// 内嵌层零转换 ⇒ 这里只能以未知结构承接，不得在本仓重建字段名。
+
+/** 内嵌 Runtime 状态机取值（未建链 / 未启动 / 启动中 / 运行 / 扫描中 / 降级 / 停止中 / 错误）。 */
+export type NikkiSyncRuntimeStateInfo =
+  'unavailable' | 'idle' | 'starting' | 'running' | 'scanning' | 'degraded' | 'stopping' | 'error'
+
+export interface NikkiSyncRuntimeStatusInfo {
+  state: NikkiSyncRuntimeStateInfo
+  /** NikkiSync 库文件绝对路径（{userData}/nikkisync/nikkisync.db）。 */
+  dbPath: string
+  linkReady: boolean
+  /** 上游 `scanner.getStatus()` 原样透传（status / installation / lastScan）。 */
+  scanner?: unknown
+  tables?: string[]
+  error?: string
+  hint?: string
+}
+
+/** `nikkisync:get-assets` 响应：与上游 `GET /v1/assets` 同形。 */
+export interface NikkiSyncAssetPageInfo {
+  items: unknown[]
+  nextCursor?: string
+  libraryRevision: number
+}
+
+export interface NikkiSyncScanInputInfo {
+  gameRoot?: string
+  path?: string
+}
+
+export interface NikkiSyncAssetQueryInfo {
+  limit?: number
+  cursor?: string
+  type?: string
+  afterRevision?: number
+  includeDeleted?: boolean
+}
+
+export interface NikkiSyncResourceQueryInfo {
+  assetId: string
+  resourceId: string
+  mode?: 'meta' | 'path'
+}

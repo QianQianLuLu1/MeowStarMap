@@ -9,6 +9,7 @@ import type { VideoService } from '../services/video-service'
 import type { WatermarkService } from '../services/watermark-service'
 import type { VideoEditorBridge } from '../video-editor/bridge'
 import type { SyncEventSink, SyncServerHandle } from '../sync/server/types'
+import type { NikkiSyncRuntimeHandle } from '../nikkisync/runtime-types'
 
 /**
  * P0-A1：IPC handler 依赖注入上下文
@@ -45,4 +46,9 @@ export interface HandlerContext {
   syncEvents?: SyncEventSink
   /** NikkiSync 同步服务器句柄（阶段4 initSyncServer 注入；未组装时为 undefined） */
   syncServer?: SyncServerHandle
+  /**
+   * NikkiSync 内嵌运行时句柄（阶段2 app/nikkisync-runtime-setup 注入；未启用/未建链时为 undefined，
+   * nikkisync:* handler 因此统一给 PRECONDITION_FAILED，不把环境缺失伪装成逻辑失败）
+   */
+  nikkisyncRuntime?: NikkiSyncRuntimeHandle
 }

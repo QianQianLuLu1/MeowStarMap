@@ -41,6 +41,14 @@ const PACKAGE_SCOPE_PREFIX = '@nikkisync/'
 const SPECIFIER_PATTERN = /^@nikkisync\/[a-z][a-z-]*$/
 const MIGRATIONS_REL = ['migrations', '0001_initial.sql'] as const
 const ENTRY_REL = ['dist', 'src', 'index.js'] as const
+/**
+ * 深入口（阶段 2）：上游只暴露 `dist/src/**` 为可装载 ESM 产物，且桶导出覆盖不到
+ * `server/row-mappers.js` 这类协议 DTO 映射（见 docs/sync-integration/02-runtime-embed-plan.md §0.1），
+ * 因此段清单永远锚在 `dist/src` 之下，并只接受 `.js` / `.mjs`。
+ */
+const DEEP_ENTRY_REL = ['dist', 'src'] as const
+const DEEP_SEGMENT_PATTERN = /^[A-Za-z0-9._-]+$/
+const DEEP_ENTRY_EXTENSIONS = ['.js', '.mjs'] as const
 
 /** 资源解析失败：携带实际路径与可执行修复指令，避免晦涩的 ENOENT 栈。 */
 export class NikkiSyncAssetError extends Error {
@@ -131,6 +139,52 @@ export function resolveModuleRoot(
 export function resolveEntryUrl(root: string): string {
   const value = requireNonBlank(root, 'module root')
   return pathToFileURL(path.resolve(value, ...ENTRY_REL)).href
+}
+
+/**
+ * 由包根推出**深入口**的 file:// URL（阶段 2：`server/row-mappers.js` 不在上游桶导出内）。
+ *
+ * 为什么只走 URL 而不是 bare 子路径：`@nikkisync/{core,database,protocol}` 的 `exports`
+ * 只暴露 `"."`，deep 子路径会撞 ERR_PACKAGE_PATH_NOT_EXPORTED；打包态还需要 `app.asar.unpacked`
+ * 真实落点。两处都由调用方以变量式 `await import(url)` 装载，保持「不被折叠成 require」的护栏。
+ *
+ * 段清单校验（全部为纯字符串判定，不触磁盘）：非空、无点段、无分隔符、无通配/非 ASCII，
+ * 末段必须是 `.js` / `.mjs` —— 避免把 migrations SQL 或任意文件包成可装载 URL。
+ */
+export function resolveDeepEntryUrl(root: string, segments: readonly string[]): string {
+  const value = requireNonBlank(root, 'module root')
+  if (segments.length === 0) {
+    throw new NikkiSyncAssetError(
+      'resolveDeepEntryUrl: empty segment list; expected at least one path segment under dist/src',
+      ''
+    )
+  }
+  const checked: string[] = []
+  for (const segment of segments) {
+    const trimmed = segment.trim()
+    if (
+      trimmed === '' ||
+      trimmed === '.' ||
+      trimmed === '..' ||
+      !DEEP_SEGMENT_PATTERN.test(trimmed)
+    ) {
+      throw new NikkiSyncAssetError(
+        `resolveDeepEntryUrl: illegal segment "${segment}"; segments must be plain relative names ` +
+          '(no ".", "..", separators, wildcards or non-ASCII characters)',
+        segment
+      )
+    }
+    checked.push(trimmed)
+  }
+  const leaf = checked[checked.length - 1]!.toLowerCase()
+  if (!DEEP_ENTRY_EXTENSIONS.some((extension) => leaf.endsWith(extension))) {
+    throw new NikkiSyncAssetError(
+      `resolveDeepEntryUrl: leaf "${checked[checked.length - 1]}" is not a .js or .mjs artifact; ` +
+        'only compiled ESM entries under dist/src can be loaded',
+      checked.join('/')
+    )
+  }
+  return pathToFileURL(path.resolve(value, ...DEEP_ENTRY_REL, ...checked)).href
 }
 
 /** 由包根推出 migrations SQL 的绝对路径（显式传给 DatabaseManager.initialize）。 */

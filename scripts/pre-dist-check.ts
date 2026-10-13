@@ -421,6 +421,22 @@ function checkUnpackedNativeBinaries(): void {
           path.relative(ROOT, entry)
       )
   }
+  // 阶段 2 深入口：内嵌层的协议 DTO 映射不在上游桶导出内，靠 file:// URL 直接装载，
+  // 打包态必须确认该产物真的随包解出（缺它则 nikkisync:get-assets 等查询全部不可用）。
+  const rowMappers = path.join(
+    nikkisyncRoot,
+    'pc-companion',
+    'dist',
+    'src',
+    'server',
+    'row-mappers.js'
+  )
+  if (fs.existsSync(rowMappers)) pass('@nikkisync/pc-companion 深入口 row-mappers.js 已解包')
+  else
+    fail(
+      '@nikkisync/pc-companion 缺 dist/src/server/row-mappers.js（内嵌查询面无法产出协议 DTO）: ' +
+        path.relative(ROOT, rowMappers)
+    )
 }
 
 // ===== 原生模块 ABI 一致性闸门（防 NODE_MODULE_VERSION 错位）=====

@@ -5,6 +5,7 @@ import {
   NikkiSyncAssetError,
   buildPackagingContext,
   readMigrationsSql,
+  resolveDeepEntryUrl,
   resolveEntryUrl,
   resolveMigrationsSqlPath,
   resolveModuleRoot
@@ -129,6 +130,46 @@ describe('resolveEntryUrl 与 resolveMigrationsSqlPath', () => {
   it('异常：空 root 一律拒绝（避免拼出 cwd 相对路径造成晦涩失败）', () => {
     expect(() => resolveEntryUrl('')).toThrow(NikkiSyncAssetError)
     expect(() => resolveMigrationsSqlPath('')).toThrow(NikkiSyncAssetError)
+  })
+})
+
+describe('resolveDeepEntryUrl（阶段 2 · 深入口装载）', () => {
+  it('正常：由包根拼出 dist/src 下的 file:// URL', () => {
+    const root = path.join(PROJECT_ROOT, 'node_modules', '@nikkisync', 'pc-companion')
+    const url = resolveDeepEntryUrl(root, ['server', 'row-mappers.js'])
+    expect(url).toContain('file://')
+    expect(decodeURIComponent(url).replace(/\\/g, '/')).toMatch(
+      /\/node_modules\/@nikkisync\/pc-companion\/dist\/src\/server\/row-mappers\.js$/
+    )
+  })
+
+  it('正常：多级子目录与 .mjs 产物均可解析', () => {
+    const root = path.join(PROJECT_ROOT, 'node_modules', '@nikkisync', 'pc-companion')
+    expect(
+      decodeURIComponent(resolveDeepEntryUrl(root, ['wechat', 'GalleryRuntime.mjs'])).replace(
+        /\\/g,
+        '/'
+      )
+    ).toMatch(/\/dist\/src\/wechat\/GalleryRuntime\.mjs$/)
+  })
+
+  it('异常：空段清单 / 空段 / 点段一律拒绝（不落入 cwd）', () => {
+    const root = path.join(PROJECT_ROOT, 'node_modules', '@nikkisync', 'core')
+    expect(() => resolveDeepEntryUrl(root, [])).toThrow(NikkiSyncAssetError)
+    expect(() => resolveDeepEntryUrl(root, [''])).toThrow(NikkiSyncAssetError)
+    expect(() => resolveDeepEntryUrl('  ', ['a.js'])).toThrow(NikkiSyncAssetError)
+    const bad = ['.', '..', '../evil.js', 'a\\b.js', 'a/b.js', 'server*', '中文.js']
+    for (const segment of bad) {
+      expect(() => resolveDeepEntryUrl(root, [segment])).toThrow(NikkiSyncAssetError)
+    }
+  })
+
+  it('异常：非 JS 产物拒绝（不把任意文件包成可装载 URL）', () => {
+    const root = path.join(PROJECT_ROOT, 'node_modules', '@nikkisync', 'database')
+    expect(() => resolveDeepEntryUrl(root, ['migrations', '0001_initial.sql'])).toThrow(
+      /\.js or \.mjs/
+    )
+    expect(() => resolveDeepEntryUrl(root, ['index.d.ts'])).toThrow(NikkiSyncAssetError)
   })
 })
 
