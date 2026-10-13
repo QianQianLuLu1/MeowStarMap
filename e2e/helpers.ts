@@ -1,4 +1,5 @@
 import { _electron as electron, type ElectronApplication } from '@playwright/test'
+import fsSync from 'node:fs'
 import { glob } from 'tinyglobby'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
@@ -130,6 +131,43 @@ export async function collectDiagLogs(userDataDir: string, destDir: string): Pro
       }
     })
   )
+}
+
+/**
+ * 用仓内 Electron 直接加载**未打包**但已 `npm run build` 的产物（dist/main + dist/renderer）。
+ *
+ * 为什么需要：`launchApp` 依赖 `release/win-unpacked/*.exe`（需 `npm run dist:win`），
+ * 而部分开发机/CI 环境无法拉取 Electron 发行包完成打包。本函数跳过 asar 打包环节，
+ * 仍走真实应用会话（`app://` 协议 + preload + 完整 before-quit 退出链），
+ * 差异只在 `app.isPackaged=false`（装载缝因此走开发态 specifier，不取 asar.unpacked）。
+ *
+ * NODE_ENV 固定为 production：window-manager 据此走 `app://renderer/index.html` 而非 vite dev server。
+ */
+export async function launchBuiltApp(
+  args: string[] = [],
+  extraEnv: Record<string, string> = {},
+  options: LaunchOptions = {}
+): Promise<LaunchedApp> {
+  const exe = path.join(ROOT_DIR, 'node_modules', 'electron', 'dist', 'electron.exe')
+  if (!fsSync.existsSync(exe)) {
+    throw new Error(`未找到 Electron 可执行文件：${exe}（请先 npm install）`)
+  }
+  if (!fsSync.existsSync(path.join(ROOT_DIR, 'dist', 'main', 'main', 'app', 'index.js'))) {
+    throw new Error('未找到 dist/main/main/app/index.js，请先执行 npm run build')
+  }
+  const userDataDir =
+    options.userDataDir ?? path.join(ROOT_DIR, '.cache', `e2e-built-${Date.now()}`)
+  process.stdout.write(`[e2e] executable (unpackaged): ${exe}\n`)
+  process.stdout.write(`[e2e] userData:                ${userDataDir}\n`)
+
+  const app = await electron.launch({
+    executablePath: exe,
+    // 第一个非 switch 参数即应用路径（仓根 package.json 的 main 指向 dist/main/main/app/index.js）
+    args: [ROOT_DIR, `--user-data-dir=${userDataDir}`, ...args],
+    env: { ...process.env, NODE_ENV: 'production', ...extraEnv },
+    timeout: 60_000
+  })
+  return { app, userDataDir }
 }
 
 /**

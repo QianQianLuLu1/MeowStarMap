@@ -105,6 +105,8 @@
 | 19  | `electron.vite.config.ts`                                                         | 修改      | main 入口新增 `nikkisync-runtime`                                                                                                          |
 | 20  | `scripts/pre-dist-check.ts`                                                       | 修改      | 打包断言补 `pc-companion/dist/src/server/row-mappers.js`                                                                                   |
 | 21  | `src/main/nikkisync/AGENTS.md` / `docs/sync-integration/02-runtime-embed-plan.md` | 修改/新增 | 文件职责表 + link 剪枝提醒 + 本计划                                                                                                        |
+| 22  | `e2e/nikkisync-runtime.e2e.ts`                                                    | 新增      | 真应用会话端到端 N1–N4（启动/状态、库落点、DTO 透传与 motion 聚合、`before-quit` 优雅停止链）                                              |
+| 23  | `e2e/helpers.ts`                                                                  | 修改      | 新增 `launchBuiltApp()`：用仓内 Electron 直加**未打包**的 `dist/` 产物跑完整生命周期（环境不能打包时仍有真会话证据）                       |
 
 ## 5. IPC 通道清单（只读查询，响应体 = NikkiSync 协议 DTO）
 
@@ -129,14 +131,15 @@
 
 ## 7. 测试用例与分步放行（红灯 → 绿灯）
 
-| 步  | 红灯                                                                                                                                                                                                                            | 绿灯       | 判据                          |
-| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- | ----------------------------- |
-| 1   | `embedding-paths.test.ts` 追加 `resolveDeepEntryUrl` 正/负例（`..`、绝对路径、空段）                                                                                                                                            | 文件 1     | 纯函数，不触磁盘              |
-| 2   | `runtime-manager.test.ts`：`unavailable`/`idle→starting→running`/重复 start/`installation not found`→`degraded` 不外抛/stop 幂等并释放/`restartWithGameRoot` 重建/查询在未就绪时报错                                            | 文件 5     | 注入假 facade，不依赖链接     |
-| 3   | `runtime-facade.linked.test.ts`（`LINKED` 门控）：临时库文件 + 夹具游戏根 ⇒ 建表 12 张、`fullScan` 后有 assets/resources、角色集合正确、`motion_photo` 静图+视频同资产、游标分页与 `nextCursor` 正确、DTO 由 `row-mappers` 产出 | 文件 4     | 真装载上游产物                |
-| 4   | `nikkisync-handler.test.ts`：5 通道注册、参数校验、DTO 透传 `toEqual` 仓库输出、未启用 ⇒ `preconditionFailed`                                                                                                                   | 文件 13    | mock `ctx.nikkisyncRuntime`   |
-| 5   | 打包/折叠校验：`npm run build` 后 `verify:nikkisync` 0 blocking（含 fresh `electron-builder --dir` 或清理旧 `release/win-unpacked`）                                                                                            | 文件 19/20 | 无 `require("@nikkisync` 命中 |
-| 6   | 真机验证：`NIKKI_NIKKISYNC_RUNTIME=1 npm run dev` ⇒ 库文件、`runtime-status=running`、`get-assets` 返回真照片、退出日志干净                                                                                                     | —          | 手动，结论写入本文件 §9       |
+| 步  | 红灯                                                                                                                                                                                                                                                                                                                           | 绿灯       | 判据                                        |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------- | ------------------------------------------- |
+| 1   | `embedding-paths.test.ts` 追加 `resolveDeepEntryUrl` 正/负例（`..`、绝对路径、空段）                                                                                                                                                                                                                                           | 文件 1     | 纯函数，不触磁盘                            |
+| 2   | `runtime-manager.test.ts`：`unavailable`/`idle→starting→running`/重复 start/`installation not found`→`degraded` 不外抛/stop 幂等并释放/`restartWithGameRoot` 重建/查询在未就绪时报错                                                                                                                                           | 文件 5     | 注入假 facade，不依赖链接                   |
+| 3   | `runtime-facade.linked.test.ts`（`LINKED` 门控）：临时库文件 + 夹具游戏根 ⇒ 建表 12 张、`fullScan` 后有 assets/resources、角色集合正确、`motion_photo` 静图+视频同资产、游标分页与 `nextCursor` 正确、DTO 由 `row-mappers` 产出                                                                                                | 文件 4     | 真装载上游产物                              |
+| 4   | `nikkisync-handler.test.ts`：5 通道注册、参数校验、DTO 透传 `toEqual` 仓库输出、未启用 ⇒ `preconditionFailed`                                                                                                                                                                                                                  | 文件 13    | mock `ctx.nikkisyncRuntime`                 |
+| 5   | 打包/折叠校验：`npm run build` 后 `verify:nikkisync` 0 blocking（含 fresh `electron-builder --dir` 或清理旧 `release/win-unpacked`）                                                                                                                                                                                           | 文件 19/20 | 无 `require("@nikkisync` 命中               |
+| 6   | 真机验证：`NIKKI_NIKKISYNC_RUNTIME=1 npm run dev` ⇒ 库文件、`runtime-status=running`、`get-assets` 返回真照片、退出日志干净                                                                                                                                                                                                    | —          | 手动，结论写入本文件 §9                     |
+| 7   | `e2e/nikkisync-runtime.e2e.ts`（Playwright 驱 Electron，真实应用会话）：N1 启动与状态收敛、N2 库在本次 `--user-data-dir` 下且 `%LOCALAPPDATA%\NikkiSync` 未被写、N3 渲染侧 `electronAPI.nikkisync.*` 拿到协议 DTO（含 motion 配对与资源绝对路径）、N4 `app.close()` 后日志出现 `embedded runtime stopped` 且 WAL 已 checkpoint | 文件 22/23 | **4 passed**；另 `npm run typecheck:e2e` 绿 |
 
 ## 8. 分支与提交
 
@@ -193,10 +196,12 @@
   `change_journal=31`，`library_state.library_revision=31`，`sha256` 均为 64 字符；
 - 构造副作用如实发生且仅限写库：`app_settings` 出现 `server.identity` 与 `server.tlsIdentity`（未绑端口、未组播）；
 - 本会话未配 `metadataResolver`/`metadataDictionary*` ⇒ 无任何上游联网组件（字典/解析器表为空），符合 R6 规避；
-- 退出链：dev 会话由外部 `taskkill` 结束，未走到应用内 `before-quit`（因此本次没有 GUI 会话内的
-  `embedded runtime stopped` 日志）。该缺口由“完整生命周期”链接态用例补齐：真上游
-  `scanner.stop()` + `database.close()` 后状态回 `idle`、`-wal` 已 checkpoint、可重新 `start()` 恢复，
-  且 `cleanup.ts` 的调用点已接入 `stopNikkiSyncRuntime(ctx)`。
+- 退出链（已由 e2e 给出硬证据）：`e2e/nikkisync-runtime.e2e.ts` N4 用 `app.close()` 触发真实
+  `before-quit` → `performCleanup` → `stopNikkiSyncRuntime`，断言主进程日志同时满足
+  「有 `runtime start result: state=running`」、「有 `embedded runtime stopped`」、「无 `stop failed`」，
+  并验证 `nikkisync.db-wal` 已 checkpoint ⇒ 验收项 4 不再只是单测推断。
+- 上一轮 dev 会话遗留的同一结论（日志只到 start，没拿到 stop）已被上述 e2e 取代；
+  该轮已验证的部分（库落点、`state=running`、真机 31 资产）仍成立。
 
 ### 10.4 遗留项
 
