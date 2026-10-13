@@ -142,9 +142,9 @@
 
 | 侧        | 分支                                          | 说明                                                                                                                                                                                                                                                                                    |
 | --------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| XiangCe   | `feat/gallery-runtime-embed`                  | 已提交 `361d078`（阶段 1+9 装载缝/链接/自包含改造，原为未跟踪 WIP）；本阶段改动继续提交于此                                                                                                                                                                                             |
+| XiangCe   | `feat/gallery-runtime-embed`                  | 已提交 `361d078`（阶段 1+9 装载缝/链接/自包含改造，原为未跟踪 WIP）与 `3298632`（阶段 2 内嵌 Runtime + 只读 IPC 桥，29 files / +2990）；两次提交均过 pre-commit（lint-staged + core-gate + `tsc -b`）                                                                                   |
 | XiangCe   | `wip/sync-integration-07-parked`（`528fca0`） | 阶段 7 双向同步 WIP 停放点（6 个已跟踪文件改动 + 5 个未跟踪新文件，含 `protocol-extension.ts`）。**未做成 commit**：该 WIP 自带 2 个 tsc 错，仓内 pre-commit 的 `tsc -b` 步骤按设计必红，而跳钩子（`--no-verify`）违反纪律；改为 stash-commit 对象 + 分支指向 + 保留 `stash@{0}` 双备份 |
-| NikkiSync | `main`（只读）                                | HEAD `d4ca7d7`，零改动；如后续需要兼容性改动，从 main 切 `feat/gallery-runtime-embed` 并在本文件登记                                                                                                                                                                                    |
+| NikkiSync | `main`（只读）                                | HEAD `d4ca7d7`，**零源码改动**（只有 `npm install` 与编译产物；`tools/sample-analyzer/analyze.mjs` 的幻影 M 已举证为 CRLF，未提交）。本阶段无需上游兼容性改动，因此未切分支                                                                                                             |
 
 ## 9. 后续阶段：扫描器统一（本阶段不动原扫描器）
 
@@ -155,15 +155,16 @@
 
 ### 10.1 单元/集成门禁
 
-| 项         | 命令                                                        | 结果                                                                                                                                                                                                  |
-| ---------- | ----------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1         | `npx vitest run src/main/nikkisync/embedding-paths.test.ts` | **17/17 通过**（含 `resolveDeepEntryUrl` 4 例，先红后绿）                                                                                                                                             |
-| T2         | `runtime-manager.test.ts`                                   | **18/18 通过**（状态机、降级、幂等、换根重建、超时兜底）                                                                                                                                              |
-| T3         | `runtime-facade.linked.test.ts`（链接态）                   | **10/10 通过**：建库+12 表、上游扫描、`motion_photo` 静图+视频同资产、`row-mappers` DTO 透传、`limit+1` 游标翻页不重叠、404 语义、**完整生命周期**（stop 后 `-wal` 已 checkpoint、可再次 start 恢复） |
-| T4         | `nikkisync-handler.test.ts`                                 | **14/14 通过**（5 通道注册与顺序、参数校验、DTO 逐字段 `toEqual`、未组装 ⇒ `PRECONDITION_FAILED`、错误分类映射）                                                                                      |
-| 装配       | `app/__tests__/nikkisync-runtime-setup.test.ts`             | **13/13 通过**（库落点、开关优先级、`initNikkiSyncRuntime` 注入与不自启、`stopNikkiSyncRuntime` 幂等）                                                                                                |
-| 全量       | `npm run typecheck` / `npm run lint` / `npm run test`       | typecheck 退出码 0；lint **0 error**（11 个存量 BOM warning，未新增）；`npm run test` **370 files / 5785 passed / 2 skipped**                                                                         |
-| 真装载回归 | `npm run test:main`（链接已建）                             | `runtime-loader.test.ts` 13 例（原 8 skipped → 现在真跑）、`protocol-drift.test.ts` 2 例真跑，均绿                                                                                                    |
+| 项         | 命令                                                                                         | 结果                                                                                                                                                                                                  |
+| ---------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1         | `npx vitest run src/main/nikkisync/embedding-paths.test.ts`                                  | **17/17 通过**（含 `resolveDeepEntryUrl` 4 例，先红后绿）                                                                                                                                             |
+| T2         | `runtime-manager.test.ts`                                                                    | **18/18 通过**（状态机、降级、幂等、换根重建、超时兜底）                                                                                                                                              |
+| T3         | `runtime-facade.linked.test.ts`（链接态）                                                    | **10/10 通过**：建库+12 表、上游扫描、`motion_photo` 静图+视频同资产、`row-mappers` DTO 透传、`limit+1` 游标翻页不重叠、404 语义、**完整生命周期**（stop 后 `-wal` 已 checkpoint、可再次 start 恢复） |
+| T4         | `nikkisync-handler.test.ts`                                                                  | **14/14 通过**（5 通道注册与顺序、参数校验、DTO 逐字段 `toEqual`、未组装 ⇒ `PRECONDITION_FAILED`、错误分类映射）                                                                                      |
+| 装配       | `app/__tests__/nikkisync-runtime-setup.test.ts`                                              | **13/13 通过**（库落点、开关优先级、`initNikkiSyncRuntime` 注入与不自启、`stopNikkiSyncRuntime` 幂等）                                                                                                |
+| 全量       | `npm run typecheck` / `npm run lint` / `npm run test`                                        | typecheck 退出码 0；lint **0 error**（11 个存量 BOM warning，未新增）；`npm run test` **370 files / 5792 passed / 2 skipped**                                                                         |
+| 真装载回归 | `npm run test:main`（链接已建）                                                              | `runtime-loader.test.ts` 13 例（原 8 skipped → 现在真跑）、`protocol-drift.test.ts` 2 例真跑，均绿                                                                                                    |
+| 环境无关   | 接线用例初跑因 dev 会话遗留的 `NIKKI_NIKKISYNC_RUNTIME` / `NIKKI_NIKKISYNC_GAME_ROOT` 假失败 | 已在 `beforeEach` 显式 `delete process.env[...]`（由各用例自设 flag），结果不再依赖宿主环境                                                                                                           |
 
 装配层由接线用例拓出一个真 bug：`app_settings` 历史值/桩返回 `undefined` 时
 `settingsFrom()` 直递造成 `.trim()` 崩溃。已收敛为「类型不匹配即回退 fallback」（
