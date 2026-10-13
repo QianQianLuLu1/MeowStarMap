@@ -43,6 +43,12 @@
 
 拆两文件而非合并的原因：与上游包文件 1:1 对应，后续阶段可直接按文件 diff 同步上游演进；保持上游"protocol 原名 re-export 领域类型、PC 端不另建 DTO"的契约。消费方统一 `from '<相对路径>/shared/sync/protocol'` 导入。
 
+> **阶段 9 回写（真相源定案）**：本目录即 XiangCe 侧协议契约的**唯一真相源**；`@nikkisync/protocol`
+> 不再作为契约来源（已退出依赖声明与类型锚点），仅作为链接态漂移比对对象。
+> 防分叉手段：`src/main/nikkisync/protocol-contract.ts`（逐值快照 + 差异函数）与
+> `protocol-drift.test.ts`（未链接时 skip）。口径见 `src/shared/sync/README.md` 与
+> [`09-legacy-debt-remediation-plan.md`](./09-legacy-debt-remediation-plan.md) §5。
+
 ## 5. 启动 / 验证方式（命令表）
 
 | 动作       | 命令                             | 期望                                         |

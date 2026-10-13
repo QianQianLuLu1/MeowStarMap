@@ -24,20 +24,21 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 
 ### 嵌套 AGENTS.md（模块级速览，改动对应模块前先读）
 
-| 模块               | 文件                                                                 | 覆盖内容                                                                                                                                |
-| ------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 渲染进程           | [`src/renderer/AGENTS.md`](src/renderer/AGENTS.md)                   | 函数式组件约定、Zustand 状态管理、主题 CSS 变量、i18n、IPC 调用侧                                                                       |
-| IPC handler 注册层 | [`src/main/ipc/handlers/AGENTS.md`](src/main/ipc/handlers/AGENTS.md) | `registerXxxHandlers` 模式、`wrapHandler` 家族、zod `schemas`、路径安全、契约稳定性                                                     |
-| Preload 桥装配层   | [`src/main/preload/AGENTS.md`](src/main/preload/AGENTS.md)           | `contextBridge` 暴露模式、`exposeIfTrusted` origin 门禁、`call<T>()`/`subscribe()` 语义、依赖白名单、插件面收窄                         |
-| 扫描流水线         | [`src/main/scanner/AGENTS.md`](src/main/scanner/AGENTS.md)           | 主进程薄壳 ↔ utilityProcess worker 拓扑、`WorkerCommand`/`WorkerEvent` 协议、扫描阶段序列、崩溃恢复与心跳、WAL 并发、E001–E005 诊断码   |
-| 共享契约层         | [`src/shared/AGENTS.md`](src/shared/AGENTS.md)                       | 跨进程类型定义约定、AppError 错误体系、设置键白名单、纯函数工具约束、禁止 Node/Electron 依赖                                            |
-| 业务服务层         | [`src/main/services/AGENTS.md`](src/main/services/AGENTS.md)         | 服务设计模式（class vs 函数模块）、依赖注入、handler 边界、原生模块惰性加载、文件安全与磁盘空间校验                                     |
-| 应用生命周期编排层 | [`src/main/app/AGENTS.md`](src/main/app/AGENTS.md)                   | Application 协调者 + AppContext 依赖注入、8 阶段启动流程、退出清理链、GPU 自愈、自定义协议（media:// / app://）、导航授信、早期弹窗约束 |
-| 主进程核心工具层   | [`src/main/utils/AGENTS.md`](src/main/utils/AGENTS.md)               | 工具分类（叶子层/日志/安全/FFmpeg/媒体分析/进度）、依赖分层、fail-open 错误策略、i18n 分层、Windows 特化                                |
-| 构建工具链与脚本   | [`scripts/AGENTS.md`](scripts/AGENTS.md)                             | 打包校验闸门、i18n 治理工具链、技术债管理、性能基线、数据生成、dry-run 默认、纯函数导出、npm scripts 速查                               |
-| 数据库连接与仓储层 | [`src/main/database/AGENTS.md`](src/main/database/AGENTS.md)         | 读写分离架构（同步读/async 写经 worker bridge）、WAL 并发约束、Repository 模式、schema 迁移、FakeDb 测试约定                            |
-| 批量媒体 worker    | [`src/main/media-worker/AGENTS.md`](src/main/media-worker/AGENTS.md) | 缩略图/pHash/重复/相似检测批量任务、Manager 薄壳 ↔ utilityProcess worker 拓扑、四类任务独立取消、BK-tree 相似检索、崩溃恢复与批量让位   |
-| 单文件缩略图生成   | [`src/main/thumbnail/AGENTS.md`](src/main/thumbnail/AGENTS.md)       | ThumbnailGenerator 类（缓存 LRU/并发信号量/视频抽帧/降级策略）、单文件 worker 化、三档参数同步约束、损坏文件标记                        |
+| 模块               | 文件                                                                 | 覆盖内容                                                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 渲染进程           | [`src/renderer/AGENTS.md`](src/renderer/AGENTS.md)                   | 函数式组件约定、Zustand 状态管理、主题 CSS 变量、i18n、IPC 调用侧                                                                                                          |
+| IPC handler 注册层 | [`src/main/ipc/handlers/AGENTS.md`](src/main/ipc/handlers/AGENTS.md) | `registerXxxHandlers` 模式、`wrapHandler` 家族、zod `schemas`、路径安全、契约稳定性                                                                                        |
+| Preload 桥装配层   | [`src/main/preload/AGENTS.md`](src/main/preload/AGENTS.md)           | `contextBridge` 暴露模式、`exposeIfTrusted` origin 门禁、`call<T>()`/`subscribe()` 语义、依赖白名单、插件面收窄                                                            |
+| 扫描流水线         | [`src/main/scanner/AGENTS.md`](src/main/scanner/AGENTS.md)           | 主进程薄壳 ↔ utilityProcess worker 拓扑、`WorkerCommand`/`WorkerEvent` 协议、扫描阶段序列、崩溃恢复与心跳、WAL 并发、E001–E005 诊断码                                      |
+| 共享契约层         | [`src/shared/AGENTS.md`](src/shared/AGENTS.md)                       | 跨进程类型定义约定、AppError 错误体系、设置键白名单、纯函数工具约束、禁止 Node/Electron 依赖                                                                               |
+| 业务服务层         | [`src/main/services/AGENTS.md`](src/main/services/AGENTS.md)         | 服务设计模式（class vs 函数模块）、依赖注入、handler 边界、原生模块惰性加载、文件安全与磁盘空间校验                                                                        |
+| 应用生命周期编排层 | [`src/main/app/AGENTS.md`](src/main/app/AGENTS.md)                   | Application 协调者 + AppContext 依赖注入、8 阶段启动流程、退出清理链、GPU 自愈、自定义协议（media:// / app://）、导航授信、早期弹窗约束                                    |
+| 主进程核心工具层   | [`src/main/utils/AGENTS.md`](src/main/utils/AGENTS.md)               | 工具分类（叶子层/日志/安全/FFmpeg/媒体分析/进度）、依赖分层、fail-open 错误策略、i18n 分层、Windows 特化                                                                   |
+| 构建工具链与脚本   | [`scripts/AGENTS.md`](scripts/AGENTS.md)                             | 打包校验闸门、i18n 治理工具链、技术债管理、性能基线、数据生成、dry-run 默认、纯函数导出、npm scripts 速查                                                                  |
+| 数据库连接与仓储层 | [`src/main/database/AGENTS.md`](src/main/database/AGENTS.md)         | 读写分离架构（同步读/async 写经 worker bridge）、WAL 并发约束、Repository 模式、schema 迁移、FakeDb 测试约定                                                               |
+| 批量媒体 worker    | [`src/main/media-worker/AGENTS.md`](src/main/media-worker/AGENTS.md) | 缩略图/pHash/重复/相似检测批量任务、Manager 薄壳 ↔ utilityProcess worker 拓扑、四类任务独立取消、BK-tree 相似检索、崩溃恢复与批量让位                                      |
+| 单文件缩略图生成   | [`src/main/thumbnail/AGENTS.md`](src/main/thumbnail/AGENTS.md)       | ThumbnailGenerator 类（缓存 LRU/并发信号量/视频抽帧/降级策略）、单文件 worker 化、三档参数同步约束、损坏文件标记                                                           |
+| NikkiSync 装载缝   | [`src/main/nikkisync/AGENTS.md`](src/main/nikkisync/AGENTS.md)       | 外部 `@nikkisync/*` 包的唯一入口：变量式动态 import 的原因与护栏、不引用上游类型（协议真相源在 `shared/sync`）、探针禁止启动任何服务、链接由 `npm run link:nikkisync` 建立 |
 
 其余模块尚无模块级 AGENTS.md，跨模块任务需自行探索结构。新增嵌套指引时请同步本表。
 
@@ -70,6 +71,7 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 - `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享等业务服务（详见其 AGENTS.md）
 - `scanner/`、`thumbnail/`、`scheduler/` — 照片扫描与缩略图流水线；`scanner/`、`thumbnail/` 详见其 AGENTS.md
 - `media-worker/`、`decryption-worker/` — 后台 worker；`media-worker/` 详见其 AGENTS.md；解密依赖 koffi + `nuan5_decryption.dll`
+- `sync/`、`nikkisync/` — 同步能力的两面：`sync/` 为 NikkiSync 协议的**移植面**服务层（auth/pairing/identity），`nikkisync/` 为直接复用 NikkiSync 包的**外部包装载缝**（两者分工见各自 AGENTS.md）
 - `video-editor/`、`plugins/`、`i18n/`、`types/`
 - `utils/` — 主进程核心工具层（详见其 AGENTS.md）
 

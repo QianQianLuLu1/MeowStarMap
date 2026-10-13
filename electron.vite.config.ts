@@ -89,7 +89,10 @@ export default defineConfig({
           'thumbnail-worker': 'src/main/thumbnail/worker-entry.ts',
           'video-worker': 'src/main/video-editor/worker-entry.ts',
           'database-worker': 'src/main/database/worker/database-worker.ts',
-          'decryption-worker': 'src/main/decryption-worker/worker-entry.ts'
+          'decryption-worker': 'src/main/decryption-worker/worker-entry.ts',
+          // 整合阶段 1：NikkiSync 依赖链接探针。单独成入口是为了让它经与真实主进程
+          // 完全相同的 CJS 管线产出，从而可实测变量式动态 import 未被折叠成 require。
+          'nikkisync-probe': 'src/main/nikkisync/probe-cli.ts'
         },
         formats: ['cjs'],
         // 多入口：每个入口输出为 <name>.js（index.js / scanner-worker.js / ...）

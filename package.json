@@ -67,6 +67,9 @@
     "debt:issues": "tsx scripts/debt/create-github-issues.ts",
     "debt:check": "tsx scripts/debt/check-debt-fix.ts",
     "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
+    "verify:nikkisync": "tsx scripts/verify-nikkisync-link.ts",
+    "link:nikkisync": "tsx scripts/link-nikkisync.ts",
+    "link:nikkisync:check": "tsx scripts/link-nikkisync.ts --check",
     "e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep-invert @perf",
     "e2e:perf": "playwright test --config e2e/playwright.config.ts --grep @perf",
     "dist:win:smoke": "npm run dist:win && npm run e2e:smoke",
@@ -212,6 +215,7 @@
     "files": [
       "dist/**/*",
       "resources/**/*",
+      "node_modules/@nikkisync/**/*",
       "!**/node_modules/@img/sharp-darwin-*",
       "!**/node_modules/@img/sharp-linux-*",
       "!**/node_modules/@img/sharp-libvips-linux-*",
@@ -242,6 +246,7 @@
       "!**/dist/**/*.tsbuildinfo"
     ],
     "asarUnpack": [
+      "**/@nikkisync/**",
       "**/ffmpeg-static/**",
       "**/ffprobe-static/**",
       "**/better-sqlite3/**",

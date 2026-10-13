@@ -121,6 +121,40 @@ export default [
       }
     }
   },
+  // ============ NikkiSync 依赖装载护栏（整合阶段 1） ============
+  // @nikkisync/* 的 ESM 图含 top-level await：静态值导入会被打包器折叠成 require()，
+  // 运行时必现 ERR_REQUIRE_ASYNC_MODULE。值面只能经 src/main/nikkisync/runtime-loader.ts
+  // 的变量式动态 import；`import type` 不受限（编译期擦除，无运行时 require）。
+  // 两层拦截：no-restricted-imports 盖住静态 import/export（allowTypeImports 放行 import type），
+  // no-restricted-syntax 补上核心规则盖不到的字面量 import() 表达式；为不削弱 src/** 的
+  // i18n/console 护栏，此处重新展开 i18nGuardSelectors。
+  {
+    files: ['src/main/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@nikkisync/*'],
+              allowTypeImports: true,
+              message:
+                'Load @nikkisync/* at runtime via src/main/nikkisync/runtime-loader.ts (variable dynamic import); use `import type` for types.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        ...i18nGuardSelectors,
+        {
+          selector: String.raw`ImportExpression[source.value=/^@nikkisync\//]`,
+          message:
+            '禁止字面量 import("@nikkisync/*")：会被 CJS 产物折叠成 require() 而抛 ERR_REQUIRE_ASYNC_MODULE，请经 src/main/nikkisync/runtime-loader.ts 的变量式动态 import。'
+        }
+      ]
+    }
+  },
   // ============ 渲染进程专属约定护栏（docs/CODING_CONVENTIONS.md §1-§4） ============
   // 在 src/** 块之后覆盖 no-restricted-syntax，同时保留 i18n 护栏并追加以下禁令：
   //   §1 禁止渲染层 import('electron') / import ... from 'electron'

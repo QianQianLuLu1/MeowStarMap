@@ -3,6 +3,18 @@
 NikkiSync Protocol v1 的 WXNN 内部移植版。协议字段名、路由常量、错误码与上游
 NikkiSync 逐字一致（客户端兼容硬约束，禁止变更）。
 
+## 唯一真相源（阶段 9 决策）
+
+本目录是 XiangCe 侧协议契约的**唯一真相源**：
+
+- `protocol.ts` + `domain-types.ts` + `protocol-extension.ts`（WXNN 侧写扩展）= 全部服务层、
+  仓储层、IPC 与渲染进程消费的协议符号来源。
+- `@nikkisync/protocol` **不再是契约来源**，也不在 `package.json` 依赖声明里（自包含方案，
+  链接由 `npm run link:nikkisync` 建立）：上游包的 ESM 图含 top-level await，值面无法静态导入。
+- 两侧不再靠人工 diff 防分叉：`src/main/nikkisync/protocol-contract.ts` 提供逐值快照与差异函数，
+  `protocol-drift.test.ts` 在链接就绪时把上游 `API_ROUTES` / `API_ERROR_CODES` / 枚举表与本地快照
+  做机械比对（未链接时整件 skip，纯函数行为由 `protocol-contract.test.ts` 长期覆盖）。
+
 ## 文件
 
 | 文件               | 内容                                                                                                              | 上游对应（commit `284d4a6`）               |
@@ -38,5 +50,7 @@ import type { NikkiAsset, ServerInfoResponse } from '../../shared/sync/protocol'
 - **禁止就地修改协议语义**（字段名、路由、错误码、`buildPairingUri` 的 URI 结构等）。
 - 上游演进时按文件 diff 重新移植（两个文件与上游 1:1 对应），并同步更新
   `protocol.test.ts` 的逐值断言；上游改动需经评审确认客户端兼容后再移植。
+- 新增符号时要同步 `src/main/nikkisync/protocol-contract.ts` 的 `VENDORED_CONTRACT_SYMBOLS`
+  与快照采集（否则该文件的键集断言即失败）；链接态漂移由 `protocol-drift.test.ts` 拦截。
 - 本目录不在 core-path 保护清单内，无需 `@core-change` 注释；但协议内容本身的
   变更视同协议契约变更，需在提交说明中注明上游对应变更。

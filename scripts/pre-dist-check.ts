@@ -31,6 +31,11 @@ function pass(msg: string): void {
   console.log(`  ✔ ${msg}`)
 }
 
+/** 跳过行：不影响退出码，用于“当前环境不适用”的断言（不把未建链伪装成已验证）。 */
+function skip(msg: string): void {
+  console.log(`  ⊘ ${msg}`)
+}
+
 function getMtime(filePath: string): Date | null {
   try {
     const stat = fs.statSync(filePath)
@@ -385,6 +390,36 @@ function checkUnpackedNativeBinaries(): void {
     const p = path.join(appOutDir, dll)
     if (fs.existsSync(p)) pass('VC++ 运行库随包: ' + dll)
     else fail('VC++ 运行库缺失（afterPack 未复制？）: ' + path.relative(ROOT, p))
+  }
+
+  // 6) @nikkisync（阶段 9 · 问题 3）：自包含方案后它不是声明依赖，只能靠
+  //    build.files 的 `node_modules/@nikkisync/**/*` 显式入包，再经 asarUnpack 解出。
+  //    未建链的开发机不会命中本项，此时输出 SKIP 而不是假通过。
+  const nikkisyncRoot = path.join(nm, '@nikkisync')
+  if (!fs.existsSync(nikkisyncRoot)) {
+    skip('@nikkisync 未随包（开发机未 `npm run link:nikkisync` 时属预期）')
+    skip(
+      '要复验打包态 ESM/migrations：先 npm run link:nikkisync + NikkiSync npm run build，再 npx electron-builder --dir'
+    )
+    return
+  }
+  const nikkiSchema = path.join(nikkisyncRoot, 'database', 'migrations', '0001_initial.sql')
+  if (fs.existsSync(nikkiSchema)) {
+    pass('@nikkisync 迁移 SQL 已解包: ' + path.relative(ROOT, nikkiSchema))
+  } else {
+    fail(
+      '@nikkisync 已入包但缺 migrations/0001_initial.sql（asarUnpack 未覆盖或 NikkiSync 未 build）: ' +
+        path.relative(ROOT, nikkiSchema)
+    )
+  }
+  for (const pkgName of ['core', 'database', 'protocol', 'pc-companion']) {
+    const entry = path.join(nikkisyncRoot, pkgName, 'dist', 'src', 'index.js')
+    if (fs.existsSync(entry)) pass(`@nikkisync/${pkgName} 入口已解包`)
+    else
+      fail(
+        `@nikkisync/${pkgName} 缺 dist/src/index.js（装载缝会在此抛 ERR_MODULE_NOT_FOUND）: ` +
+          path.relative(ROOT, entry)
+      )
   }
 }
 

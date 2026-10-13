@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-42 个代码文件（另有 7 个 `__tests__` 单测文件与本 AGENTS.md），按功能分为以下子域：
+44 个代码文件（另有 10 个 `__tests__` 单测文件与本 AGENTS.md），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -65,31 +65,36 @@
 
 ### 诊断与校验
 
-| 文件                     | 调用方式                                   | 职责                                                                                                            |
-| ------------------------ | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| `doctor.ts`              | `npm run doctor`                           | 环境健康诊断（Node 版本/原生模块/DLL/数据库）                                                                   |
-| `verify-changes.ts`      | `npm run verify` / `npm run verify:staged` | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件 |
-| `verify-format-scope.ts` | 被 `verify-changes.ts` import              | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                         |
-| `check-preview-drift.ts` | `npm run preview:check`                    | preview.html 与源码的 10 项漂移检测                                                                             |
-| `generate-icon.js`       | 手动执行                                   | SVG → ICO 图标生成                                                                                              |
+| 文件                       | 调用方式                                                  | 职责                                                                                                                                                                                                                                            |
+| -------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctor.ts`                | `npm run doctor`                                          | 环境健康诊断（Node 版本/原生模块/DLL/数据库）                                                                                                                                                                                                   |
+| `verify-changes.ts`        | `npm run verify` / `npm run verify:staged`                | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件                                                                                                                                 |
+| `verify-format-scope.ts`   | 被 `verify-changes.ts` import                             | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                                                                                                                                                         |
+| `check-preview-drift.ts`   | `npm run preview:check`                                   | preview.html 与源码的 10 项漂移检测                                                                                                                                                                                                             |
+| `verify-nikkisync-link.ts` | `npm run verify:nikkisync`                                | **NikkiSync 依赖与装载面只读诊断**（依赖图是否自包含/`node_modules/@nikkisync/*` 链接/NikkiSync `dist/` 产物/`migrations` 可读/主进程产物未把 ESM 折叠成 `require()`/打包态 unpacked 含 schema），`--json` 可切结构化输出；未链接为 warn 不阻断 |
+| `link-nikkisync.ts`        | `npm run link:nikkisync` / `npm run link:nikkisync:check` | **NikkiSync 开发机链接器**：在候选根（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`）中建/校 `node_modules/@nikkisync/*` junction（幂等；`--check` 只读）；无可用根时退出码 1 并逐项给出拒绝原因                                       |
+| `generate-icon.js`         | 手动执行                                                  | SVG → ICO 图标生成                                                                                                                                                                                                                              |
 
 ### 测试
 
-| 文件                                        | 覆盖范围                                                                |
-| ------------------------------------------- | ----------------------------------------------------------------------- |
-| `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性） |
-| `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护       |
-| `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                               |
-| `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试          |
-| `__tests__/check-changelog-release.test.ts` | 变更日志收口闸门：纯函数单测（正常/异常/边界）+ 真实仓库结构契约测试    |
-| `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                   |
-| `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                      |
+| 文件                                        | 覆盖范围                                                                                               |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性）                                |
+| `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护                                      |
+| `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                                                              |
+| `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试                                         |
+| `__tests__/check-changelog-release.test.ts` | 变更日志收口闸门：纯函数单测（正常/异常/边界）+ 真实仓库结构契约测试                                   |
+| `__tests__/verify-nikkisync-link.test.ts`   | NikkiSync 诊断纯函数单测（不触磁盘，无链接环境也能跑）                                                 |
+| `__tests__/link-nikkisync.test.ts`          | 链接器纯函数单测（候选根解析/链接动作计划/子路径逃逸校验）                                             |
+| `__tests__/self-contained-deps.test.ts`     | 真实 package.json 的**依赖图自包含契约**：无仓库外 `file:`/`workspace:` 依赖 + 打包面保留 `@nikkisync` |
+| `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                                                  |
+| `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                                                     |
 
 ## 编码约定
 
 ### 语言与执行
 
-- 29/42 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
+- 31/44 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 13 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成），9 个 `.ps1`（PowerShell 辅助脚本，如 `mimosa-episode-bridge.ps1`、`fix-harness-memory-path.ps1`；其中 3 个位于 `archive/`）。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
@@ -126,24 +131,27 @@
 
 ## npm scripts 速查
 
-| 命令                           | 说明                                                        |
-| ------------------------------ | ----------------------------------------------------------- |
-| `npm run reset`                | 全量清理构建产物                                            |
-| `npm run pre-dist-check`       | 打包前产物校验                                              |
-| `npm run verify:dist`          | 打包后 asar 校验                                            |
-| `npm run doctor`               | 环境健康诊断                                                |
-| `npm run verify`               | 变更后只读验证（工作区 vs HEAD）                            |
-| `npm run verify:staged`        | 仅暂存文件的只读验证（检查集对齐 pre-commit，但不改写文件） |
-| `npm run i18n:check`           | i18n key 对齐检查                                           |
-| `npm run i18n:guard`           | CI i18n 守卫                                                |
-| `npm run i18n:status`          | 白名单现状报告                                              |
-| `npm run i18n:extract-legacy`  | 提取硬编码中文                                              |
-| `npm run i18n:prune-whitelist` | 白名单瘦身                                                  |
-| `npm run i18n:codemod`         | i18n 自动改写                                               |
-| `npm run preview:check`        | preview.html 漂移检测                                       |
-| `npm run debt:check`           | 技术债 CI 检查                                              |
-| `npm run debt:issues`          | 批量创建技术债 Issue                                        |
-| `npm run perf:save-baseline`   | 保存性能基线                                                |
+| 命令                           | 说明                                                                 |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `npm run reset`                | 全量清理构建产物                                                     |
+| `npm run pre-dist-check`       | 打包前产物校验                                                       |
+| `npm run verify:dist`          | 打包后 asar 校验                                                     |
+| `npm run verify:nikkisync`     | NikkiSync 依赖与装载面只读诊断（自包含 / 链接 / dist 产物 / schema） |
+| `npm run link:nikkisync`       | 为开发机建立 `node_modules/@nikkisync/*` junction（未链接是默认态）  |
+| `npm run link:nikkisync:check` | 只读预览上述链接现状                                                 |
+| `npm run doctor`               | 环境健康诊断                                                         |
+| `npm run verify`               | 变更后只读验证（工作区 vs HEAD）                                     |
+| `npm run verify:staged`        | 仅暂存文件的只读验证（检查集对齐 pre-commit，但不改写文件）          |
+| `npm run i18n:check`           | i18n key 对齐检查                                                    |
+| `npm run i18n:guard`           | CI i18n 守卫                                                         |
+| `npm run i18n:status`          | 白名单现状报告                                                       |
+| `npm run i18n:extract-legacy`  | 提取硬编码中文                                                       |
+| `npm run i18n:prune-whitelist` | 白名单瘦身                                                           |
+| `npm run i18n:codemod`         | i18n 自动改写                                                        |
+| `npm run preview:check`        | preview.html 漂移检测                                                |
+| `npm run debt:check`           | 技术债 CI 检查                                                       |
+| `npm run debt:issues`          | 批量创建技术债 Issue                                                 |
+| `npm run perf:save-baseline`   | 保存性能基线                                                         |
 
 ## 注意事项
 
