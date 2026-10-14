@@ -1,5 +1,6 @@
 /**
- * 内嵌 NikkiSync Runtime 的真实应用会话验证（整合阶段 2 · 验收项 1/2/3/4/5/7）
+ * 内嵌 NikkiSync Runtime 的真实应用会话验证（整合阶段 2 · 验收项 1/2/3/4/5/7；
+ * 阶段 3 追加 N3b 同步服务的跨进程证据）
  *
  * 前置：`npm run build`（dist/main + dist/renderer）。与 smoke.e2e.ts 的区别：
  * 本用例经 `launchBuiltApp` 用仓内 Electron 直接加载**未打包**产物，走完整应用生命周期
@@ -10,6 +11,9 @@
  *   3. 应用退出时 `performCleanup` 真的走到 `stopNikkiSyncRuntime`：日志有 stopped 轨迹、无 stop failed、
  *      WAL 已 checkpoint；
  *   4. 无游戏目录时应用照常启动（state=degraded），不崩不弹。
+ *   5. （阶段 3）`nikkisync:start-server` 让**上游 LocalSyncServer** 在真实主进程里监听 28080，
+ *      e2e 进程用库内自签证书作 CA 做真校验取到 `/v1/server` 200 与未鉴权 401，配对串的指纹
+ *      与 TLS 身份一致；`stop-server` 后端口拒绝连接，`before-quit` 后仍保持释放。
  *
  * 游戏根：优先 `NIKKI_NIKKISYNC_GAME_ROOT`，其次本机常见安装位；都不存在时本轮只验 degraded 分支
  * （资产类断言显式 skip，绝不把环境缺失伪装成逻辑失败）。
@@ -19,6 +23,8 @@
  */
 import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
+import https from 'node:https'
+import net from 'node:net'
 import path from 'node:path'
 import { launchBuiltApp, closeApp, collectDiagLogs, type LaunchedApp } from './helpers'
 
@@ -97,6 +103,34 @@ type BridgeCall =
   | { method: 'assets'; arg?: { limit?: number; cursor?: string; type?: string } }
   | { method: 'detail'; arg: string }
   | { method: 'resource'; arg: { assetId: string; resourceId: string; mode?: 'meta' | 'path' } }
+  | { method: 'serverStatus' }
+  | { method: 'startServer' }
+  | { method: 'stopServer' }
+  | { method: 'pairingCode' }
+
+/** 阶段 3 的服务面返回值（与 `NikkiSyncServerStatusInfo` 同形，此处只做本地窄化） */
+interface ServerStatus {
+  available: boolean
+  running: boolean
+  host: string
+  port: number
+  secure?: boolean
+  serverId?: string
+  mdnsEnabled: boolean
+  tlsFingerprintSha256?: string
+  serverCertificatePem?: string
+  lanHost?: string
+  error?: string
+}
+
+interface PairingCode {
+  content: string
+  expiresAt: string
+  serverId: string
+  host: string
+  port: number
+  tlsFingerprintSha256: string
+}
 
 async function dispatchOnPage(win: Page, call: BridgeCall): Promise<unknown> {
   return await win.evaluate(async (input) => {
@@ -109,6 +143,10 @@ async function dispatchOnPage(win: Page, call: BridgeCall): Promise<unknown> {
       return await (bridge.getAssets as (arg?: unknown) => unknown)(input.arg)
     if (input.method === 'detail')
       return await (bridge.getAssetDetail as (arg: string) => unknown)(input.arg)
+    if (input.method === 'serverStatus') return await (bridge.getServerStatus as () => unknown)()
+    if (input.method === 'startServer') return await (bridge.startServer as () => unknown)()
+    if (input.method === 'stopServer') return await (bridge.stopServer as () => unknown)()
+    if (input.method === 'pairingCode') return await (bridge.getPairingCode as () => unknown)()
     return await (bridge.getResource as (arg?: unknown) => unknown)(input.arg)
   }, call)
 }
@@ -116,6 +154,23 @@ async function dispatchOnPage(win: Page, call: BridgeCall): Promise<unknown> {
 let launched: LaunchedApp | undefined
 let win: Page | undefined
 let status: RuntimeStatus | undefined
+/** N3b 实际监听过的端口；N4 用它验证退出链真的把端口释放了（未启过服务则 undefined）。 */
+let syncPort: number | undefined
+
+/** 读取本次会话的主进程日志（electron-log 落在 `{userData}/logs/*.log`）。 */
+async function readMainLogTail(session: LaunchedApp | undefined): Promise<string> {
+  if (!session) return ''
+  const logDir = path.join(session.userDataDir, 'logs')
+  let names: string[] = []
+  try {
+    names = (await fs.readdir(logDir)).filter((name) => name.endsWith('.log'))
+  } catch {
+    return ''
+  }
+  return (
+    await Promise.all(names.map((name) => fs.readFile(path.join(logDir, name), 'utf-8')))
+  ).join('\n')
+}
 
 /**
  * 在页面内执行一次「必定失败」的详情查询，返回渲染侧实际看到的失败信息。
@@ -145,6 +200,47 @@ async function dispatchFailureMessage(page: Page, assetId: string): Promise<stri
 async function callBridge<T>(call: BridgeCall): Promise<T> {
   if (!win) throw new Error('N1 未创建窗口，无法调用渲染进程桥')
   return (await dispatchOnPage(win, call)) as T
+}
+
+/** 端口在本机是否可占（e2e 用默认 28080，被占则如实 skip，不谎报“通过”）。 */
+function isPortFree(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const probe = net.createServer()
+    probe.once('error', () => resolve(false))
+    probe.listen(port, '127.0.0.1', () => {
+      probe.close(() => resolve(true))
+    })
+  })
+}
+
+/**
+ * 从**外部进程**用上游自签证书作 CA 发一次真校验的 HTTPS 请求
+ * （等价手机侧 pin 指纹后的行为；不关验证，因此这条证据是真的）。
+ */
+function httpsFromTest(port: number, ca: string, requestPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const req = https.request(
+      { host: '127.0.0.1', port, path: requestPath, servername: 'nikkisync.local', ca },
+      (res) => {
+        res.resume()
+        res.on('end', () => resolve(res.statusCode ?? 0))
+      }
+    )
+    req.on('error', reject)
+    req.end()
+  })
+}
+
+/** 连接是否已被拒绝（停止服务的客观判据）。 */
+function connectionRefused(port: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = net.connect({ host: '127.0.0.1', port })
+    socket.once('connect', () => {
+      socket.destroy()
+      resolve(false)
+    })
+    socket.once('error', () => resolve(true))
+  })
 }
 
 async function resolveGameRoot(): Promise<string | undefined> {
@@ -299,6 +395,125 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     expect(notFoundMessage).not.toBe('NO_ERROR')
   })
 
+  test('N3b 同步服务：真实主进程内启上游 LocalSyncServer，外部进程用证书做真校验并停得干净', async () => {
+    if (!status) {
+      test.skip(true, 'N1 未取到 runtime 状态')
+      return
+    }
+    if (!status.linkReady) {
+      test.skip(true, '未建链：同步服务面不可用（受支持的默认态）')
+      return
+    }
+    // 上游对 EADDRINUSE 不重试（本阶段刻意不代其发明兜底）⇒ 端口被占只能如实 skip
+    const free = await isPortFree(28080)
+    test.skip(!free, '默认端口 28080 已被其它进程占用，无法在本机复现该判据')
+
+    const started = await callBridge<ServerStatus>({ method: 'startServer' })
+    expect(started.available).toBe(true)
+    expect(started.running).toBe(true)
+    expect(started.secure).toBe(true)
+    expect(started.port).toBe(28080)
+    expect(started.tlsFingerprintSha256).toHaveLength(64)
+    expect(started.serverCertificatePem).toContain('BEGIN CERTIFICATE')
+    syncPort = started.port
+
+    // 未鉴权请求必须被上游拒于 401（跨进程证据，不是同进程白盒调用）
+    const unauthorized = await httpsFromTest(
+      started.port,
+      String(started.serverCertificatePem),
+      '/v1/assets'
+    )
+    expect(unauthorized).toBe(401)
+    // 免鉴权发现端点
+    const serverInfo = await httpsFromTest(
+      started.port,
+      String(started.serverCertificatePem),
+      '/v1/server'
+    )
+    expect(serverInfo).toBe(200)
+
+    const code = await callBridge<PairingCode>({ method: 'pairingCode' })
+    const segments = code.content.split('|')
+    expect(segments).toHaveLength(7)
+    expect(segments[0]).toBe('NS1')
+    expect(segments[1]).toBe(started.serverId)
+    expect(Number(segments[3])).toBe(started.port)
+    // 二维码 pin 的指纹必须与库内 TLS 身份一致（否则手机侧 pinning 无从谈起）
+    expect(code.tlsFingerprintSha256).toBe(started.tlsFingerprintSha256)
+    expect(Date.parse(code.expiresAt)).toBeGreaterThan(Date.now())
+
+    // 状态卡数据源（UI 每 2s 轮询的同一条通道）
+    const again = await callBridge<ServerStatus>({ method: 'serverStatus' })
+    expect(again.running).toBe(true)
+
+    const stopped = await callBridge<ServerStatus>({ method: 'stopServer' })
+    expect(stopped.running).toBe(false)
+    expect(await connectionRefused(started.port)).toBe(true)
+    // 注：不在此断主进程日志——electron-log 是异步落盘，运行中可能还没写；
+    // 服务停止链的日志判据放在 N4（app.close() 之后，日志已 flush）。
+  })
+
+  test('N3c 设置页真实渲染：开关起服务、二维码 SVG 与设备列表在真实窗口里出图', async () => {
+    const session = launched
+    if (!session || !win) {
+      test.skip(true, 'N1 未启动应用')
+      return
+    }
+    if (!(await isPortFree(28080))) {
+      test.skip(true, '默认端口 28080 已被占用（上游不重试，本阶段不代其发明兜底）')
+      return
+    }
+    const page = win
+    // 文案判据依赖语言：固定为 zh-CN 后重载（localStorage 只影响本次临时 userData）
+    await page.evaluate(() => {
+      localStorage.setItem('app-language', 'zh-CN')
+      // 阶段3：设置页左导航的落点由 localStorage 决定，直接开到「同步服务」节
+      localStorage.setItem('settings-active-section', 'sync-service')
+    })
+    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.getByTitle('设置').first().click()
+
+    // 节标题与开关都来自真实 i18n 文本（不是测试内构造的 DOM）
+    const toggle = page.getByRole('switch', { name: '启用同步服务' }).first()
+    await toggle.waitFor({ timeout: 20_000 })
+    await toggle.click()
+    await expect
+      .poll(
+        async () =>
+          page
+            .getByText('运行中')
+            .first()
+            .isVisible()
+            .catch(() => false),
+        {
+          timeout: 20_000,
+          message: '开关点下后状态卡未出现「运行中」（服务没起或状态通道不通）'
+        }
+      )
+      .toBe(true)
+
+    // 设备列表：尚未配对 ⇒ 空态文案（不是报错态）。放在开弹窗之前，避免模态层影响可见性判定
+    await expect(page.getByText('暂无已配对设备').first()).toBeVisible()
+
+    // 二维码：真实窗口里由 qrcode 生成的 SVG 必须出图，且下方地址段与运行端口一致
+    await page.getByRole('button', { name: '配对新设备' }).first().click()
+    const surface = page.locator('.sync-qr-surface').first()
+    await expect(surface.locator('svg')).toHaveCount(1, { timeout: 20_000 })
+    const svgMarkup = await surface.innerHTML()
+    expect(svgMarkup).toContain('<svg')
+    // 一张真二维码的 SVG 远大于占位空壳：以此排除“渲染了但内容是空”的假绿
+    expect(svgMarkup.length).toBeGreaterThan(2000)
+    await expect(page.getByText(/:28080/).first()).toBeVisible({ timeout: 10_000 })
+    // 有效期倒计时存在（上游默认 5 分钟）
+    await expect(page.getByText('有效期').first()).toBeVisible()
+    // 留一张真实窗口的视觉证据（二维码出图与否，看图比断言更直观）
+    await page.screenshot({ path: path.join('test-results', 'nikkisync-pairing-qr.png') })
+    await page.keyboard.press('Escape')
+
+    // 故意让服务保持运行到 N4：退出链必须把它关掉并释放端口（N4 里断言）
+    syncPort = 28080
+  })
+
   test('N4 退出链：before-quit 走到 stopNikkiSyncRuntime，日志无 stop failed', async () => {
     const session = launched
     if (!session) {
@@ -309,19 +524,15 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     // app.close() 触发真实 before-quit → performCleanup（内含本阶段接入的停止调用）
     await session.app.close()
 
-    const logDir = path.join(session.userDataDir, 'logs')
-    let names: string[] = []
-    try {
-      names = (await fs.readdir(logDir)).filter((name) => name.endsWith('.log'))
-    } catch {
-      names = []
-    }
-    const text = (
-      await Promise.all(names.map((name) => fs.readFile(path.join(logDir, name), 'utf-8')))
-    ).join('\n')
+    const text = await readMainLogTail(session)
     expect(text).toMatch(/\[NIKKISYNC\].*runtime start result: state=(running|degraded)/)
     expect(text).toMatch(/\[NIKKISYNC\] embedded runtime stopped/)
     expect(text).not.toMatch(/embedded runtime stop failed/)
+    // 阶段 3：退出链必须先停 LAN 服务再关库；N3b 启过服务就要看到端口释放
+    expect(text).not.toMatch(/server\.stop failed/)
+    if (syncPort !== undefined) {
+      expect(await connectionRefused(syncPort)).toBe(true)
+    }
 
     // 优雅关闭的客观信号：WAL 已 checkpoint（残留则应为 0 字节）
     const wal = path.join(session.userDataDir, 'nikkisync', 'nikkisync.db-wal')
