@@ -39,6 +39,8 @@ export interface FakeSessionPlan {
   startError?: 'notfound' | 'other'
   stopHangs?: boolean
   stopThrows?: boolean
+  /** 整体覆盖 `scanner.getStatus()` 返回值（测试专用：注入非对象/缺字段等边界形态）。 */
+  scannerStatusRaw?: unknown
 }
 
 export interface RuntimeManagerDependencies {
@@ -101,6 +103,27 @@ function notReadyMessage(state: ManagerState): string {
   return `NikkiSync runtime is not ready (${reason})${state.hint ? `; ${state.hint}` : ''}`
 }
 
+/**
+ * 上游 `ScannerService.getStatus()`（`ScannerMetrics`：`{ status, installation?, lastScan? }`）
+ * 的安全展平：`ScannerServiceLike.getStatus()` 按阶段 9 自包含决策声明为 `unknown`，
+ * 这里只做结构窄化——非对象整体降级为缺省；`installation` / `lastScan` 以键存在性
+ * 写入，与上游「仅在有时出现」的条件键语义一致。`status()` 是 IPC / CLI 的常驻读取
+ * 路径，不得因上游形状意外而抛错，故不加 try/catch（纯 getter，无 IO）。
+ */
+function readScannerSnapshot(raw: unknown): {
+  scannerStatus?: string
+  installation?: unknown
+  lastScan?: unknown
+} {
+  if (typeof raw !== 'object' || raw === null) return {}
+  const metrics = raw as { status?: unknown; installation?: unknown; lastScan?: unknown }
+  return {
+    ...(typeof metrics.status === 'string' ? { scannerStatus: metrics.status } : {}),
+    ...('installation' in metrics ? { installation: metrics.installation } : {}),
+    ...('lastScan' in metrics ? { lastScan: metrics.lastScan } : {})
+  }
+}
+
 /** 由依赖构造状态机句柄（`ctx.nikkisyncRuntime` 的实际实现）。 */
 export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyncRuntimeHandle {
   const state: ManagerState = {
@@ -117,7 +140,11 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       linkReady
     }
     if (state.session) {
-      snapshot.scanner = state.session.scanner.getStatus()
+      // 上游 ScannerMetrics 展平为 scannerStatus/installation/lastScan（键存在性透传）
+      const scanner = readScannerSnapshot(state.session.scanner.getStatus())
+      if ('scannerStatus' in scanner) snapshot.scannerStatus = scanner.scannerStatus
+      if ('installation' in scanner) snapshot.installation = scanner.installation
+      if ('lastScan' in scanner) snapshot.lastScan = scanner.lastScan
       snapshot.tables = state.session.tableNames()
     }
     if (state.error) snapshot.error = state.error

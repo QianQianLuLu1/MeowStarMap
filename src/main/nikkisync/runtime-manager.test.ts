@@ -40,6 +40,7 @@ interface FakeCalls {
  */
 function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiSyncRuntimeSession {
   const installation = { installRoot: '/game', source: 'manual' }
+  const lastScan = { scanId: 'scan_1', roots: ['/game/photos'] }
   const scanner = {
     start: vi.fn(async () => {
       calls.scannerStart += 1
@@ -60,7 +61,12 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       calls.rescanPath.push(filePath)
       return { scanId: 'scan_path', roots: [filePath] }
     }),
-    getStatus: () => ({ status: 'running', installation })
+    // 与上游 ScannerMetrics 同形：{ status, installation?, lastScan? }；
+    // scannerStatusRaw 注入时整体覆盖（边界用例），以 `in` 判定便于注入 undefined
+    getStatus: () =>
+      'scannerStatusRaw' in plan
+        ? plan.scannerStatusRaw
+        : { status: 'running', installation, lastScan }
   }
   return {
     runtime: {
@@ -156,12 +162,17 @@ describe('createRuntimeManager 初始状态', () => {
 })
 
 describe('createRuntimeManager 启动', () => {
-  it('正常路径：starting → running，建目录、启 scanner、状态带表名与 installation', async () => {
+  it('正常路径：starting → running，建目录、启 scanner、状态带表名与扫描器三字段', async () => {
     const { deps, calls } = createDependencies()
     const manager = createRuntimeManager(deps)
     const status = await manager.start(DEFAULTS)
     expect(status.state).toBe('running')
     expect(status.tables).toEqual(['assets', 'resources'])
+    // 上游 ScannerMetrics 展平透传：scannerStatus/installation/lastScan（回归：
+    // runtime-types 字段变更后生产者未同步时，这三条必须失败）
+    expect(status.scannerStatus).toBe('running')
+    expect(status.installation).toEqual({ installRoot: '/game', source: 'manual' })
+    expect(status.lastScan).toEqual({ scanId: 'scan_1', roots: ['/game/photos'] })
     expect(calls.ensureDir).toEqual([DEFAULTS.databaseFile])
     expect(calls.createSession).toEqual(['<auto>'])
     expect(calls.scannerStart).toBe(1)
@@ -209,6 +220,30 @@ describe('createRuntimeManager 启动', () => {
     expect(status.state).toBe('unavailable')
     expect(calls.createSession).toEqual([])
     expect(calls.scannerStart).toBe(0)
+  })
+})
+
+describe('createRuntimeManager 状态快照的扫描器字段', () => {
+  it('异常路径：getStatus() 返回非对象时快照不含扫描器字段且不抛错', async () => {
+    const { deps } = createDependencies({}, { scannerStatusRaw: 'oops' })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    expect(status.scannerStatus).toBeUndefined()
+    expect(status.installation).toBeUndefined()
+    expect(status.lastScan).toBeUndefined()
+    expect(status.tables).toEqual(['assets', 'resources'])
+  })
+
+  it('边界：getStatus() 返回缺字段对象时三字段缺省，不影响其余快照', async () => {
+    const { deps } = createDependencies({}, { scannerStatusRaw: {} })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    expect(status.scannerStatus).toBeUndefined()
+    expect(status.installation).toBeUndefined()
+    expect(status.lastScan).toBeUndefined()
+    expect(status.tables).toEqual(['assets', 'resources'])
   })
 })
 

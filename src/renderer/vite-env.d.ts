@@ -937,7 +937,10 @@ interface WindowElectronAPI {
         | 'error'
       dbPath: string
       linkReady: boolean
-      scanner?: unknown
+      /** 上游 `scanner.getStatus()` 展平：status / installation? / lastScan? */
+      scannerStatus?: string
+      installation?: unknown
+      lastScan?: unknown
       tables?: string[]
       error?: string
       hint?: string

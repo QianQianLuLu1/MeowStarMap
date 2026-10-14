@@ -1,5 +1,7 @@
-// @core-change: sync-integration 阶段2：新增 nikkisync 域只读 IPC handler，把内嵌 NikkiSync
-//               Runtime 的运行时状态与协议 DTO 查询面暴露给渲染进程（零字段转换）。
+// @core-change: runtime-status 快照随 runtime-types 展平同步头注字段清单（scanner? →
+//               scannerStatus?/installation?/lastScan?），无 IPC 通道与行为变更
+//               （历史：sync-integration 阶段2 新增本 handler，把内嵌 NikkiSync Runtime
+//               的运行时状态与协议 DTO 查询面暴露给渲染进程，零字段转换）。
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -11,7 +13,7 @@ import { isAssetType } from '../../../shared/sync/protocol'
 /**
  * NikkiSync 内嵌运行时只读 IPC handler（整合阶段 2）。
  *
- * - `nikkisync:runtime-status`：状态机快照（state/dbPath/linkReady/tables/scanner?/error?/hint?）
+ * - `nikkisync:runtime-status`：状态机快照（state/dbPath/linkReady/tables/scannerStatus?/installation?/lastScan?/error?/hint?）
  * - `nikkisync:start-scan`：触发上游扫描（缺省全量；带 `path` 走上游按 uid 收敛的增量；
  *   带 `gameRoot` 且与当前根不同则由状态机重建会话）
  * - `nikkisync:get-assets`：分页查询，响应体 `{items, nextCursor?, libraryRevision}` 与

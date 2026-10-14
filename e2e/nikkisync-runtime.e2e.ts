@@ -59,7 +59,10 @@ interface RuntimeStatus {
   dbPath: string
   linkReady: boolean
   tables?: string[]
-  scanner?: unknown
+  /** 上游 `scanner.getStatus()` 展平：status / installation? / lastScan? */
+  scannerStatus?: string
+  installation?: unknown
+  lastScan?: unknown
   error?: string
   hint?: string
 }

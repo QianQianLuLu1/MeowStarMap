@@ -29,8 +29,12 @@ export interface NikkiSyncRuntimeStatus {
   dbPath: string
   /** `node_modules/@nikkisync/*` 四包是否齐备（按包内 package.json 判定）。 */
   linkReady: boolean
-  /** 已启用同步器时：`scanner.getStatus()` 原样透传（installation / lastScan / status）。 */
-  scanner?: unknown
+  /** 上游 `scanner.getStatus().status`（stopped/discovering/scanning/reconciling/running/error）。 */
+  scannerStatus?: string
+  /** 上游发现的安装结果 `InfinityNikkiInstallation`（installRoot / x6GameRoot / photoRoots / motionRoots / source）。 */
+  installation?: unknown
+  /** 上游最近一次 `ScanResult` 原样透传。 */
+  lastScan?: unknown
   /** 已建的表名（`sqlite_master` 原样），未建库时缺省。 */
   tables?: string[]
   /** 最近一次失败的原始原因（英文）。 */

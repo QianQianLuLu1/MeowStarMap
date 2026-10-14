@@ -539,8 +539,12 @@ export interface NikkiSyncRuntimeStatusInfo {
   /** NikkiSync 库文件绝对路径（{userData}/nikkisync/nikkisync.db）。 */
   dbPath: string
   linkReady: boolean
-  /** 上游 `scanner.getStatus()` 原样透传（status / installation / lastScan）。 */
-  scanner?: unknown
+  /** 上游 `scanner.getStatus().status`（stopped/discovering/scanning/reconciling/running/error）。 */
+  scannerStatus?: string
+  /** 上游发现的安装结果 `InfinityNikkiInstallation`（installRoot / x6GameRoot / photoRoots / motionRoots / source）。 */
+  installation?: unknown
+  /** 上游最近一次 `ScanResult` 原样透传。 */
+  lastScan?: unknown
   tables?: string[]
   error?: string
   hint?: string
