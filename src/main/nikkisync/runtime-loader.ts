@@ -54,11 +54,17 @@ export const NIKKISYNC_REQUIRED_EXPORTS: Record<NikkiSyncPackageName, Record<str
     toPathKey: 'function'
   },
   database: {
-    DatabaseManager: 'function'
+    DatabaseManager: 'function',
+    // 阶段 3：设备管理与查询面依赖的两个仓储（桶导出内，见 packages/database/src/index.ts）
+    PairingRepository: 'function',
+    SyncReadRepository: 'function'
   },
   pcCompanion: {
     PcCompanionRuntime: 'function',
-    createPcCompanionContext: 'function'
+    createPcCompanionContext: 'function',
+    // 阶段 3：同步服务器与自签 TLS 身份（server/index.js 桶导出）
+    LocalSyncServer: 'function',
+    LocalTlsIdentityService: 'function'
   },
   protocol: {
     API_ROUTES: 'object',

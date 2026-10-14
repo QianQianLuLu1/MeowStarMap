@@ -4,11 +4,14 @@
  * 三条硬边界：
  * 1. **只用上游**：Runtime 由 `@nikkisync/pc-companion` 的 `PcCompanionRuntime` 构造，
  *    扫描交给 `runtime.scanner`（内含 ScanCoordinator / ScanReconciler / AssetResolver），
- *    建表交给 `DatabaseManager.initialize()`，查询交给 `SyncReadRepository`。
- *    本文件不解析目录、不算哈希、不写 SQL、不定义数据模型。
+ *    建表交给 `DatabaseManager.initialize()`，查询交给 `SyncReadRepository`，
+ *    局域网服务交给上游已经组装好的 `runtime.server`（本仓不实现任何 HTTP/TLS/WS/mDNS）。
+ *    本文件不解析目录、不算哈希、不定义数据模型；唯一的 SQL 是 `PAIRED_DEVICES_SQL`
+ *    这一条**只读** SELECT（上游缺 list API 的权宜，撤销仍走上游 `revoke()`）。
  * 2. **不做数据格式转换**：对外响应体逐字取自上游 `server/row-mappers.js`
  *    （`mapAssetSummary` / `mapAssetDetail` / `mapResourceRow`）与 `GET /v1/assets`
- *    的分页语义（`limit + 1` 前瞻 + base64url `{t,id}` 游标），保证与协议 DTO 一致。
+ *    的分页语义（`limit + 1` 前瞻 + base64url `{t,id}` 游标），保证与协议 DTO 一致；
+ *    设备列表属管理视图（非协议 DTO），由 `sync-server-view.mapPairedDeviceRow` 收敛。
  * 3. **装载只能变量式动态 import**：上游 ESM 图含 top-level await，静态值导入会被
  *    打包器折叠成 `require()` 并在运行时抛 `ERR_REQUIRE_ASYNC_MODULE`；深入口
  *    （`server/row-mappers.js`）不在上游桶导出内，且 `@nikkisync/{core,database,protocol}`
@@ -36,8 +39,10 @@ import {
   runWithTimeout,
   type RuntimeManagerDependencies
 } from './runtime-manager'
+import { embeddedServerConfig, mapPairedDeviceRow } from './sync-server-view'
 import type {
   EmbeddedRuntimeLike,
+  NikkiSyncPairedDeviceView,
   NikkiSyncRuntimeSession,
   NikkiSyncSessionOptions
 } from './runtime-types'
@@ -58,6 +63,21 @@ interface RowMapperSurface {
   mapResourceRow(row: Record<string, unknown>): unknown
 }
 
+/**
+ * 上游 `LocalTlsIdentityService` 的最小面（`server/LocalTlsIdentityService.ts:117-129`）。
+ * 只有一个公开方法 `getOrCreate()`：身份存 `app_settings['server.tlsIdentity']`，
+ * **不落盘、也没有路径可注入**——嵌入态因此不建 certs 目录（见计划 §4）。
+ */
+interface LocalTlsIdentityServiceLike {
+  getOrCreate(): { keyPem: string; certPem: string; fingerprintSha256: string; createdAt: string }
+}
+
+/** 上游 `PairingRepository` 中被本阶段用到的最小面（注意：**没有 list 方法**）。 */
+interface PairingRepositoryLike {
+  getDevice(deviceId: string): Record<string, unknown> | undefined
+  revoke(deviceId: string, revokedAt?: string): void
+}
+
 /** 已装载的运行时面。 */
 export interface RuntimeSurface {
   pcCompanion: NikkiSyncModule
@@ -68,13 +88,21 @@ export interface RuntimeSurface {
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
 export const ROW_MAPPER_DEEP_ENTRY = ['server', 'row-mappers.js'] as const
 
-/** 嵌入态 LAN 配置：本阶段只构造、绝不 `start()`（不绑端口、不组播）。 */
-export const EMBEDDED_SERVER_CONFIG = {
-  host: '127.0.0.1',
-  port: 0,
-  mdns: false,
-  name: 'NikkiGallery embedded runtime'
-} as const
+/**
+ * 已配对设备清单的**只读** SELECT。
+ *
+ * 为什么必须有这条 SQL：上游 `PairingRepository`
+ * （`packages/database/src/pairing-repository.ts`）只提供 `getDevice` /
+ * `countActiveDevices` / `pairDevice` / `revoke`，**没有任何 list 方法**
+ * （全仓 grep 无 `listDevices`），而阶段 3 的验收要求 UI 能列出设备。
+ * 因此这里沿用本仓既有先例（`readTableNames()` 读 `sqlite_master`）做只读查询；
+ * 撤销仍走上游 `revoke()`，不写裸 UPDATE。上游若日后补 `listDevices`，改调它并删掉本常量。
+ * 命中的是既有索引 `idx_paired_devices_active(revoked_at, last_seen_at DESC)`。
+ */
+export const PAIRED_DEVICES_SQL =
+  'SELECT device_id, device_name, platform, app_version, paired_at, last_seen_at, revoked_at ' +
+  'FROM paired_devices WHERE revoked_at IS NULL ' +
+  'ORDER BY (last_seen_at IS NULL), last_seen_at DESC, paired_at DESC'
 
 /** 分页游标（与上游 `LocalSyncServer` 的 `encodeCursor` 同格式）。 */
 export interface PageCursorValue {
@@ -202,7 +230,13 @@ export function createQuerySurface(
 
 /**
  * 装载 + 组装一个会话：上游 Runtime 构造期即建库并跑 migration，
- * 本函数返回的会话把 scanner 与只读查询面交给上层编排。
+ * 本函数返回的会话把 scanner、只读查询面与**上游同步服务器**交给上层编排。
+ *
+ * 阶段 3 的关键事实：`PcCompanionRuntime` 构造函数**已经**组装好一台带 TLS 的
+ * `LocalSyncServer`（`runtime.ts:84-89`：未显式传 `tls` 时自动
+ * `LocalTlsIdentityService.getOrCreate()`），本仓因此不新建任何服务对象，
+ * 只做「构造期把 LAN 配置传进去」+「运行期按开关调 `start()/stop()`」。
+ * 传 `mdns: true` 也**不会**在构造期组播——`mdns.start()` 只在 `server.start()` 内被调。
  */
 export async function createRuntimeSession(
   options: NikkiSyncSessionOptions
@@ -211,34 +245,66 @@ export async function createRuntimeSession(
   const RuntimeCtor = nikkisyncExport(surface.pcCompanion, 'PcCompanionRuntime') as new (
     config: Record<string, unknown>
   ) => EmbeddedRuntimeLike
+  const syncServer = embeddedServerConfig(options.syncServer)
   const runtime = new RuntimeCtor({
     databaseFile: options.databaseFile,
     scanner: {
       ...(options.gameRoot ? { selectedInstallRoot: options.gameRoot } : {}),
       watcher: options.watcher
     },
-    server: { ...EMBEDDED_SERVER_CONFIG }
+    server: syncServer
   })
+  const TlsCtor = nikkisyncExport(surface.pcCompanion, 'LocalTlsIdentityService') as new (
+    database: unknown
+  ) => LocalTlsIdentityServiceLike
+  const tlsService = new TlsCtor(runtime.database)
+  const PairingCtor = nikkisyncExport(surface.database, 'PairingRepository') as new (
+    database: unknown
+  ) => PairingRepositoryLike
+  const pairing = new PairingCtor(runtime.database)
+
   return {
     runtime,
     scanner: runtime.scanner,
     queries: createQuerySurface(surface, runtime),
     tableNames: () => readTableNames(runtime),
-    dispose: () => runtime.database.close()
+    dispose: () => runtime.database.close(),
+    server: runtime.server,
+    tlsIdentity: () => {
+      const identity = tlsService.getOrCreate()
+      return { certPem: identity.certPem, fingerprintSha256: identity.fingerprintSha256 }
+    },
+    pairingUri: (host, ttlMs) =>
+      typeof ttlMs === 'number'
+        ? runtime.createPairingUri(host, ttlMs)
+        : runtime.createPairingUri(host),
+    listPairedDevices: () =>
+      (runtime.database.connection.prepare(PAIRED_DEVICES_SQL).all() as unknown[])
+        .map(mapPairedDeviceRow)
+        .filter((device): device is NikkiSyncPairedDeviceView => device !== null),
+    revokePairedDevice: (deviceId) => {
+      const device = pairing.getDevice(deviceId)
+      if (!device || device.revoked_at) return false
+      // 上游 revoke() 是无条件 UPDATE，先验存在与未撤销才能给出可判定的 false
+      pairing.revoke(deviceId)
+      return true
+    }
   }
 }
 
 /**
  * 生产依赖装配：把门面 + 文件系统 + 超时兜底接成状态机需要的依赖表。
  * `log` 由调用方注入（Electron 侧走 electronLogger，CLI 侧走 process.stdout），
- * 本模块因此不 import electron，node 环境下可单测。
+ * `pairingHostResolver` 由装配层注入局域网地址（本模块不碰 `os`/`electron`，保持可单测）。
  */
 export function createManagerDependencies(
   defaults: NikkiSyncSessionOptions,
-  log: (level: 'info' | 'warn' | 'error', message: string) => void
+  log: (level: 'info' | 'warn' | 'error', message: string) => void,
+  pairingHostResolver?: () => string
 ): RuntimeManagerDependencies {
   return {
     defaults,
+    ...(pairingHostResolver ? { resolvePairingHost: pairingHostResolver } : {}),
     createSession: (options) => createRuntimeSession(options),
     isLinkReady: (projectRoot) => hasNikkiSyncLink(projectRoot),
     ensureDatabaseDirectory: (databaseFile) => {

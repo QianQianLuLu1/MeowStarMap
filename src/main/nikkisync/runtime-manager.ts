@@ -7,18 +7,33 @@
  * - 扫描/数据库/DTO 一律交给上游：这里只调 `scanner.start()/fullScan()/rescanPath()/stop()`
  *   与 `queries.*`，不解析、不改写、不重命名任何字段。
  * - 分段启动（见 docs/sync-integration/00-nikkisync-pc-audit-report.md §8.2 与风险 R2）：
- *   上游 `runtime.start()` 把 `scanner.start()` 当硬前置且随后启 LAN 服务；本阶段只需要
- *   数据库 + 发现 + 扫描，因此显式只启 scanner，绝不 `server.start()`（不绑端口、不组播）。
- * - 启动失败不外抛（验收：Runtime 启动失败时应用不崩溃），原因与修复指令进状态快照。
+ *   上游 `runtime.start()` 把 `scanner.start()` 当硬前置且随后启 LAN 服务；本模块因此
+ *   **不用** `runtime.start()`，而是 scanner 与 server 各自独立启停：
+ *   `start()` 只启 scanner，LAN 服务由 `startSyncServer()` 显式启（阶段 3）。
+ *   上游 `LocalSyncServerConfig` 冻结在构造期 ⇒ 端口/mdns 变更走会话重建。
+ * - 启动失败不外抛（验收：Runtime 启动失败时应用不崩溃），原因与修复指令进状态快照；
+ *   `startSyncServer()` 同口径：端口占用归类成 `PORT_IN_USE` 写进状态，**不上抛**。
  */
 
 import type {
+  NikkiSyncPairedDeviceView,
+  NikkiSyncPairingCode,
   NikkiSyncRuntimeHandle,
   NikkiSyncRuntimeSession,
   NikkiSyncRuntimeState,
   NikkiSyncRuntimeStatus,
-  NikkiSyncSessionOptions
+  NikkiSyncSessionOptions,
+  NikkiSyncSyncServerAddress,
+  NikkiSyncSyncServerConfig,
+  NikkiSyncSyncServerStatus
 } from './runtime-types'
+import {
+  LOOPBACK_FALLBACK_HOST,
+  buildSyncStatusSnapshot,
+  classifySyncStartError,
+  parsePairingUri,
+  resolveSyncServerConfig
+} from './sync-server-view'
 
 /**
  * 上游在「找不到游戏安装目录」时的原始消息（`scanner/ScannerService.ts` 内硬编码）。
@@ -41,6 +56,12 @@ export interface FakeSessionPlan {
   stopThrows?: boolean
   /** 整体覆盖 `scanner.getStatus()` 返回值（测试专用：注入非对象/缺字段等边界形态）。 */
   scannerStatusRaw?: unknown
+  /** `server.start()` 的失败形态：`eaddrinuse` 用于验证 `PORT_IN_USE` 归类。 */
+  serverStartError?: 'eaddrinuse' | 'other'
+  /** `createPairingUri` 是否模拟上游「服务未启动」的原生抛错。 */
+  pairingUriThrows?: boolean
+  /** `revokePairedDevice` 的返回值（默认 true）。 */
+  revokeResult?: boolean
 }
 
 export interface RuntimeManagerDependencies {
@@ -53,6 +74,11 @@ export interface RuntimeManagerDependencies {
   log(level: 'info' | 'warn' | 'error', message: string): void
   /** 停止类操作的超时包装：超时返回 undefined，不抛错。 */
   withTimeout<T>(label: string, work: () => Promise<T>): Promise<T | undefined>
+  /**
+   * 配对二维码里要写的局域网地址解析器（由装配层注入，本模块不碰 `os`/`network-address`）。
+   * 缺省回落到回环地址并如实展示——**不假装**它是局域网 IP。
+   */
+  resolvePairingHost?(): string
 }
 
 /**
@@ -91,6 +117,15 @@ interface ManagerState {
   hint?: string
   /** 启动在途共享，避免并发 start 建出两个会话（两个 SQLite 句柄指向同一文件）。 */
   starting?: Promise<NikkiSyncRuntimeStatus>
+  /**
+   * 本会话**构造期**固化的 LAN 服务配置（上游把端口/mdns 冻结在构造期）。
+   * 与 `startSyncServer(input)`  Desired 不一致时，必须整会话重建才能生效。
+   */
+  syncConfig: NikkiSyncSyncServerConfig
+  /** 上游 `start()` 回显的实际监听地址；undefined 表示未监听。 */
+  syncAddress?: NikkiSyncSyncServerAddress
+  /** 最近一次启停失败原因（端口占用归一化为 `PORT_IN_USE`）。 */
+  syncError?: string
 }
 
 function messageOf(error: unknown): string {
@@ -129,7 +164,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   const state: ManagerState = {
     state: deps.isLinkReady(deps.defaults.projectRoot) ? 'idle' : 'unavailable',
     databaseFile: deps.defaults.databaseFile,
-    hint: deps.isLinkReady(deps.defaults.projectRoot) ? undefined : linkMissingHint
+    hint: deps.isLinkReady(deps.defaults.projectRoot) ? undefined : linkMissingHint,
+    syncConfig: resolveSyncServerConfig(deps.defaults.syncServer)
   }
 
   function status(): NikkiSyncRuntimeStatus {
@@ -146,6 +182,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       if ('installation' in scanner) snapshot.installation = scanner.installation
       if ('lastScan' in scanner) snapshot.lastScan = scanner.lastScan
       snapshot.tables = state.session.tableNames()
+      // 同步服务状态随会话一起给出（UI 只轮询一个通道即可拿到扫描 + 服务两面）
+      snapshot.sync = syncStatus()
     }
     if (state.error) snapshot.error = state.error
     if (state.hint) snapshot.hint = state.hint
@@ -155,6 +193,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   async function teardown(label: string): Promise<void> {
     const session = state.session
     if (!session) return
+    try {
+      // 先停 LAN 服务：端口必须在关库之前释放，且 `server.stop()` 会关 WS 与 mDNS
+      await deps.withTimeout(`${label}.server.stop`, () => session.server.stop())
+    } catch (error) {
+      deps.log('warn', `nikkisync server.stop failed: ${messageOf(error)}`)
+    }
+    state.syncAddress = undefined
     try {
       await deps.withTimeout(`${label}.scanner.stop`, () => session.scanner.stop())
     } catch (error) {
@@ -202,6 +247,10 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       }
       state.session = session
       state.activeRoot = options.gameRoot
+      // 会话构造期已把 LAN 配置固化进上游 LocalSyncServer：如实记录本会话实际用的那份
+      state.syncConfig = resolveSyncServerConfig(options.syncServer)
+      state.syncAddress = undefined
+      state.syncError = undefined
       try {
         await session.scanner.start()
         state.state = 'running'
@@ -274,6 +323,119 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return state.session
   }
 
+  /** 配对二维码与状态展示共用同一个局域网地址来源（装配层注入，缺省如实回落回环）。 */
+  function pairingHost(): string {
+    return (deps.resolvePairingHost ?? (() => LOOPBACK_FALLBACK_HOST))()
+  }
+
+  /**
+   * 同步服务状态：只读内存状态 + 上游会话上的 TLS 身份与设备计数。
+   * 未运行也把配置值如实给出（端口冲突时 UI 仍要能显示「配置端口 + PORT_IN_USE」）。
+   */
+  function syncStatus(): NikkiSyncSyncServerStatus {
+    const session = state.session
+    return buildSyncStatusSnapshot({
+      running: Boolean(state.syncAddress),
+      configured: state.syncConfig,
+      ...(state.syncAddress ? { address: state.syncAddress } : {}),
+      ...(session ? { serverId: session.server.serverId, tls: session.tlsIdentity() } : {}),
+      ...(session ? { pairedDeviceCount: session.listPairedDevices().length } : {}),
+      lanHost: pairingHost(),
+      ...(state.syncError ? { error: state.syncError } : {})
+    })
+  }
+
+  /**
+   * 启动上游 LocalSyncServer（HTTPS + WS + mDNS 全在它内部）。
+   * 与 `start()` 同口径**永不上抛**；端口占用按上游原样失败并归类 `PORT_IN_USE`
+   * （上游 `start()` 无重试、无回退，本层不代其发明兜底策略）。
+   */
+  async function startSyncServer(input?: {
+    port?: number
+    mdnsEnabled?: boolean
+  }): Promise<NikkiSyncSyncServerStatus> {
+    const desired = resolveSyncServerConfig({
+      ...state.syncConfig,
+      ...(input?.port === undefined ? {} : { port: input.port }),
+      ...(input?.mdnsEnabled === undefined ? {} : { mdns: input.mdnsEnabled })
+    })
+    const portChanged =
+      desired.port !== state.syncConfig.port ||
+      desired.mdns !== state.syncConfig.mdns ||
+      desired.host !== state.syncConfig.host
+    if (!state.session || portChanged) {
+      // 端口/mdns 冻结在构造期 ⇒ 只能整会话重建（与 scan() 换根同一条路径）
+      if (state.session) await teardown('nikkisync.resync')
+      await start({ ...deps.defaults, syncServer: desired })
+    }
+    const session = state.session
+    if (!session) {
+      state.syncError = notReadyMessage(state)
+      deps.log('warn', `nikkisync sync server not started: ${state.syncError}`)
+      return syncStatus()
+    }
+    try {
+      // 上游 start() 幂等：已在监听时直接回显原地址，不会二次 listen
+      state.syncAddress = await session.server.start()
+      state.syncError = undefined
+      deps.log(
+        'info',
+        `nikkisync sync server listening on ${state.syncAddress.host}:${state.syncAddress.port} ` +
+          `secure=${state.syncAddress.secure} mdns=${state.syncConfig.mdns}`
+      )
+    } catch (error) {
+      state.syncAddress = undefined
+      state.syncError = classifySyncStartError(error)
+      deps.log('warn', `nikkisync sync server start failed: ${state.syncError}`)
+    }
+    return syncStatus()
+  }
+
+  /** 停止同步服务（幂等；会话已释放时只清状态）。 */
+  async function stopSyncServer(): Promise<NikkiSyncSyncServerStatus> {
+    const session = state.session
+    if (session) {
+      try {
+        await deps.withTimeout('nikkisync.server.stop', () => session.server.stop())
+      } catch (error) {
+        deps.log('warn', `nikkisync server.stop failed: ${messageOf(error)}`)
+      }
+    }
+    state.syncAddress = undefined
+    state.syncError = undefined
+    deps.log('info', 'nikkisync sync server stopped')
+    return syncStatus()
+  }
+
+  /**
+   * 一次性配对二维码。串本身由上游 `runtime.createPairingUri` 产出
+   * （内含 `createPairingPayload` → 写 `pairing_sessions` 只存哈希的 token，TTL 5 分钟、单次消费），
+   * 本层只解析出 UI 需要的字段；服务未启动时**上游原生抛错**，不在此处吞掉。
+   */
+  async function pairingCode(): Promise<NikkiSyncPairingCode> {
+    const session = requireSession()
+    const host = pairingHost()
+    const content = session.pairingUri(host)
+    const parsed = parsePairingUri(content)
+    if (!parsed) {
+      throw new Error(`NikkiSync returned an unparseable pairing payload: ${content.slice(0, 16)}…`)
+    }
+    return parsed
+  }
+
+  async function listPairedDevices(): Promise<NikkiSyncPairedDeviceView[]> {
+    return requireSession().listPairedDevices()
+  }
+
+  /** 撤销走上游 `PairingRepository.revoke`；不存在/已撤销上抛，由 handler 映射 `notFound`。 */
+  async function revokeDevice(deviceId: string): Promise<NikkiSyncPairedDeviceView[]> {
+    const session = requireSession()
+    if (!session.revokePairedDevice(deviceId)) {
+      throw new Error(`NikkiSync device not found or already revoked: ${deviceId}`)
+    }
+    return session.listPairedDevices()
+  }
+
   return {
     status,
     start,
@@ -282,6 +444,12 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     listAssets: async (input) => requireSession().queries.listAssets(input),
     getAssetDetail: async (assetId) => requireSession().queries.getAssetDetail(assetId),
     getResource: async (assetId, resourceId, mode = 'meta') =>
-      requireSession().queries.getResource(assetId, resourceId, mode)
+      requireSession().queries.getResource(assetId, resourceId, mode),
+    syncStatus,
+    startSyncServer,
+    stopSyncServer,
+    pairingCode,
+    listPairedDevices,
+    revokeDevice
   }
 }

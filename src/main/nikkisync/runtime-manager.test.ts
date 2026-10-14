@@ -32,6 +32,13 @@ interface FakeCalls {
   rescanPath: string[]
   ensureDir: string[]
   logs: Array<{ level: string; message: string }>
+  serverStart: number
+  serverStop: number
+  /** 每次建会话时拿到的 LAN 配置（断言端口变更确实重建）。 */
+  syncPorts: Array<string>
+  /** 停止链的调用次序（验收「先停服务再关库」）。 */
+  order: string[]
+  revoke: string[]
 }
 
 /**
@@ -50,6 +57,7 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     }),
     stop: vi.fn(async () => {
       calls.scannerStop += 1
+      calls.order.push('scanner.stop')
       if (plan.stopHangs) return new Promise<void>(() => {})
       if (plan.stopThrows) throw new Error('watcher close failed')
     }),
@@ -68,6 +76,35 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
         ? plan.scannerStatusRaw
         : { status: 'running', installation, lastScan }
   }
+  /**
+   * 上游同步服务器的假面：`start()` 回显固定地址（真实端口由上游 `start()` 给出，
+   * 本层只透传），`stop()` 计数；`serverStartError` 注入 EADDRINUSE 以验证归类。
+   */
+  const server = {
+    serverId: 'server_fake_1',
+    start: vi.fn(async () => {
+      calls.serverStart += 1
+      if (plan.serverStartError === 'eaddrinuse') {
+        throw new Error('listen EADDRINUSE: address already in use 0.0.0.0:38137')
+      }
+      if (plan.serverStartError === 'other') {
+        throw new Error('listen EACCES: permission denied 0.0.0.0:80')
+      }
+      return { host: '127.0.0.1', port: 38137, secure: true }
+    }),
+    stop: vi.fn(async () => {
+      calls.serverStop += 1
+      calls.order.push('server.stop')
+    }),
+    createPairingPayload: vi.fn(() => ({ scheme: 'nikki-sync' }))
+  }
+  const pairingUri = (host: string): string => {
+    if (plan.pairingUriThrows) {
+      throw new Error('Server must be started before creating a pairing payload')
+    }
+    const expiresAtSeconds = Math.floor((Date.now() + 5 * 60_000) / 1000)
+    return `NS1|server_fake_1|${host}|38137|tok_value|${expiresAtSeconds}|${'a'.repeat(64)}`
+  }
   return {
     runtime: {
       database: {
@@ -79,9 +116,30 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
         initialize: () => {},
         close: () => {}
       },
-      scanner
+      scanner,
+      server,
+      createPairingUri: (host: string) => pairingUri(host)
     },
     scanner,
+    server,
+    tlsIdentity: () => ({
+      certPem: '-----BEGIN CERTIFICATE-----fake-----END CERTIFICATE-----',
+      fingerprintSha256: 'a'.repeat(64)
+    }),
+    pairingUri: (host: string) => pairingUri(host),
+    listPairedDevices: () => [
+      {
+        deviceId: 'phone_1',
+        deviceName: 'Pixel',
+        platform: 'android' as const,
+        pairedAt: '2026-10-14T00:00:00.000Z',
+        lastSeenAt: null
+      }
+    ],
+    revokePairedDevice: (deviceId: string) => {
+      calls.revoke.push(deviceId)
+      return plan.revokeResult !== false
+    },
     queries: {
       listAssets: vi.fn(async () => ({ items: [{ assetId: 'asset_1' }], libraryRevision: 7 })),
       getAssetDetail: vi.fn(async (assetId: string) => ({ asset: { assetId } })),
@@ -91,6 +149,7 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     },
     tableNames: () => ['assets', 'resources'],
     dispose: () => {
+      calls.order.push('dispose')
       calls.dispose += 1
     }
   }
@@ -108,13 +167,21 @@ function createDependencies(
     fullScan: 0,
     rescanPath: [],
     ensureDir: [],
-    logs: []
+    logs: [],
+    serverStart: 0,
+    serverStop: 0,
+    syncPorts: [],
+    order: [],
+    revoke: []
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
-    // 记录本次会话绑定的游戏根，便于断言换根重建
+    // 记录本次会话绑定的游戏根与 LAN 配置，便于断言换根/换端口重建
     createSession: async (options) => {
       calls.createSession.push(options.gameRoot ?? '<auto>')
+      calls.syncPorts.push(
+        `${options.syncServer?.port ?? '<unset>'}/${String(options.syncServer?.mdns ?? '<unset>')}`
+      )
       return createFakeSession(calls, plan)
     },
     isLinkReady: () => true,
@@ -369,5 +436,160 @@ describe('createRuntimeManager 查询透传', () => {
     expect(status.state).toBe('degraded')
     expect(status.dbPath).toBe(DEFAULTS.databaseFile)
     expect(status.error).toContain(installNotfoundMessage)
+  })
+})
+
+describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
+  it('未建会话时 syncStatus 回落配置默认值且 running=false（默认端口取上游桌面版 28080）', () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    const sync = manager.syncStatus()
+    expect(sync.running).toBe(false)
+    expect(sync.host).toBe('0.0.0.0')
+    expect(sync.port).toBe(28080)
+    expect(sync.mdnsEnabled).toBe(false)
+    // 未在监听时不下「是否安全」的判断，也不虚构 serverId / 指纹
+    expect(sync.secure).toBeUndefined()
+    expect(sync.serverId).toBeUndefined()
+    expect(sync.tlsFingerprintSha256).toBeUndefined()
+    expect(sync.error).toBeUndefined()
+  })
+
+  it('startSyncServer 惰性建会话并原样透传上游 start() 回显的地址', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    const sync = await manager.startSyncServer()
+    expect(sync.running).toBe(true)
+    expect(sync.host).toBe('127.0.0.1')
+    expect(sync.port).toBe(38137)
+    expect(sync.secure).toBe(true)
+    expect(sync.serverId).toBe('server_fake_1')
+    expect(sync.tlsFingerprintSha256).toHaveLength(64)
+    expect(sync.serverCertificatePem).toContain('BEGIN CERTIFICATE')
+    expect(sync.pairedDeviceCount).toBe(1)
+    expect(calls.scannerStart).toBe(1)
+    expect(calls.logs.some((item) => item.message.includes('sync server listening on'))).toBe(true)
+    // runtime-status 一并带出 sync，UI 只轮询一个通道
+    expect(manager.status().sync?.running).toBe(true)
+  })
+
+  it('重复 startSyncServer 不重建会话（幂等依赖上游，本层不额外发明状态判断）', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    const first = await manager.startSyncServer()
+    const second = await manager.startSyncServer()
+    expect(second.port).toBe(first.port)
+    expect(calls.createSession).toHaveLength(1)
+    // 上游 start() 自带 `if (this.server) return this.address` ⇒ 第二次调用不会二次 listen
+    expect(calls.serverStart).toBe(2)
+  })
+
+  it('端口占用：归类 PORT_IN_USE、不上抛、会话与只读查询面仍可用', async () => {
+    const { deps, calls } = createDependencies({}, { serverStartError: 'eaddrinuse' })
+    const manager = createRuntimeManager(deps)
+    const sync = await manager.startSyncServer()
+    expect(sync.running).toBe(false)
+    expect(sync.error).toBe('PORT_IN_USE')
+    // 未监听时端口回落成配置值，UI 才知道该改哪一个
+    expect(sync.port).toBe(28080)
+    await expect(manager.listAssets({ limit: 5 })).resolves.toBeDefined()
+    expect(
+      calls.logs.some((item) => item.level === 'warn' && item.message.includes('start failed'))
+    ).toBe(true)
+  })
+
+  it('非端口类失败保留上游原始串（不吞、不改写文案）', async () => {
+    const { deps } = createDependencies({}, { serverStartError: 'other' })
+    const manager = createRuntimeManager(deps)
+    const sync = await manager.startSyncServer()
+    expect(sync.running).toBe(false)
+    expect(sync.error).toContain('EACCES')
+  })
+
+  it('端口 / mdns 变更走会话重建（上游配置冻结在构造期）', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    expect(calls.syncPorts).toEqual(['28080/false'])
+    const changed = await manager.startSyncServer({ port: 39139, mdnsEnabled: true })
+    expect(changed.running).toBe(true)
+    // 旧会话先被完整 teardown（含 server.stop），再以新 LAN 配置重建
+    expect(calls.createSession).toHaveLength(2)
+    expect(calls.syncPorts).toEqual(['28080/false', '39139/true'])
+    expect(calls.serverStop).toBe(1)
+    expect(calls.dispose).toBe(1)
+    // 同端口同 mdns 重复请求不再重建
+    await manager.startSyncServer({ port: 39139, mdnsEnabled: true })
+    expect(calls.createSession).toHaveLength(2)
+  })
+
+  it('stopSyncServer 停止上游服务并把状态复位', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    const sync = await manager.stopSyncServer()
+    expect(sync.running).toBe(false)
+    expect(calls.serverStop).toBe(1)
+    // 会话仍在（只停服务），库还能查
+    await expect(manager.listAssets({ limit: 5 })).resolves.toBeDefined()
+    // 幂等
+    await manager.stopSyncServer()
+    expect(calls.serverStop).toBe(2)
+  })
+
+  it('teardown 顺序：server.stop → scanner.stop → dispose（端口先释放再关库）', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    await manager.stop()
+    expect(calls.order).toEqual(['server.stop', 'scanner.stop', 'dispose'])
+    expect(manager.syncStatus().running).toBe(false)
+  })
+
+  it('pairingCode：host 来自注入的解析器，NS1 串被解析成结构化字段', async () => {
+    const { deps } = createDependencies({ resolvePairingHost: () => '192.168.1.50' })
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    const code = await manager.pairingCode()
+    expect(code.host).toBe('192.168.1.50')
+    expect(code.port).toBe(38137)
+    expect(code.serverId).toBe('server_fake_1')
+    expect(code.tlsFingerprintSha256).toBe('a'.repeat(64))
+    expect(code.content.startsWith('NS1|server_fake_1|192.168.1.50|38137|')).toBe(true)
+    expect(Date.parse(code.expiresAt)).toBeGreaterThan(Date.now())
+  })
+
+  it('pairingCode：未注入解析器时如实回落回环地址（不假装是局域网 IP）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    const code = await manager.pairingCode()
+    expect(code.host).toBe('127.0.0.1')
+  })
+
+  it('pairingCode：上游原生抛错（服务未启动）原样上抛，供 handler 映射前置条件失败', async () => {
+    const { deps } = createDependencies({}, { pairingUriThrows: true })
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    await expect(manager.pairingCode()).rejects.toThrow(/Server must be started/)
+  })
+
+  it('设备面：未就绪拒绝；撤销返回 false 时上抛 not found', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await expect(manager.listPairedDevices()).rejects.toThrow(/not ready/)
+    await expect(manager.revokeDevice('x')).rejects.toThrow(/not ready/)
+
+    await manager.startSyncServer()
+    await expect(manager.listPairedDevices()).resolves.toEqual([
+      expect.objectContaining({ deviceId: 'phone_1', platform: 'android' })
+    ])
+    await expect(manager.revokeDevice('phone_1')).resolves.toBeDefined()
+    expect(calls.revoke).toEqual(['phone_1'])
+
+    const { deps: refused } = createDependencies({}, { revokeResult: false })
+    const stopped = createRuntimeManager(refused)
+    await stopped.startSyncServer()
+    await expect(stopped.revokeDevice('ghost')).rejects.toThrow(/not found/)
   })
 })

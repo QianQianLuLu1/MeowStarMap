@@ -33,15 +33,26 @@ import {
   RUNTIME_ENV_FLAG,
   SETTING_GAME_ROOT,
   SETTING_RUNTIME_ENABLED,
+  SETTING_SYNC_ENABLED,
+  SETTING_SYNC_MDNS,
+  SETTING_SYNC_PORT,
   SETTING_WATCHER,
+  SYNC_ENABLED_DEFAULT,
   WATCHER_ENABLED_DEFAULT,
   buildSessionOptions,
   initNikkiSyncRuntime,
   nikkisyncDatabaseFile,
   resolveRuntimeEnabled,
+  resolveSyncEnabled,
   stopNikkiSyncRuntime,
   type NikkiSyncSettingsPort
 } from '../nikkisync-runtime-setup'
+import {
+  SYNC_SERVER_DEFAULT_HOST,
+  SYNC_SERVER_DEFAULT_MDNS,
+  SYNC_SERVER_DEFAULT_NAME,
+  SYNC_SERVER_DEFAULT_PORT
+} from '../../nikkisync/sync-server-view'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
 // 依赖以替身注入：本文件验证「装配 → 状态机」的接线（谁被调用、传什么参数），
@@ -59,7 +70,25 @@ const { managerDouble, depsDouble } = vi.hoisted(() => ({
     stop: vi.fn(async () => undefined),
     listAssets: vi.fn(async () => ({ items: [] })),
     getAssetDetail: vi.fn(async () => ({ asset: {} })),
-    getResource: vi.fn(async () => ({}))
+    getResource: vi.fn(async () => ({})),
+    // 阶段 3：同步服务编排面
+    syncStatus: vi.fn(() => ({ running: false, host: '0.0.0.0', port: 28080, mdnsEnabled: true })),
+    startSyncServer: vi.fn(async () => ({
+      running: true,
+      host: '0.0.0.0',
+      port: 28080,
+      secure: true,
+      mdnsEnabled: true
+    })),
+    stopSyncServer: vi.fn(async () => ({
+      running: false,
+      host: '0.0.0.0',
+      port: 28080,
+      mdnsEnabled: true
+    })),
+    pairingCode: vi.fn(async () => ({ content: 'NS1|x' })),
+    listPairedDevices: vi.fn(async () => []),
+    revokeDevice: vi.fn(async () => [])
   },
   depsDouble: {
     defaults: {},
@@ -79,12 +108,21 @@ vi.mock('../../nikkisync/runtime-manager', () => ({
   createRuntimeManager: vi.fn(() => managerDouble)
 }))
 
+// 局域网地址解析器复用移植面那一份实现（同文件导出）；本文件不测它，避免真碰网卡
+vi.mock('../sync-server-setup', () => ({
+  resolveLanHost: vi.fn(() => '192.168.7.7')
+}))
+
 function settings(values: Record<string, unknown>): NikkiSyncSettingsPort {
   return {
     getBoolean: (key, fallback) =>
       typeof values[key] === 'boolean' ? (values[key] as boolean) : fallback,
     getString: (key, fallback) =>
-      typeof values[key] === 'string' ? (values[key] as string) : fallback
+      typeof values[key] === 'string' ? (values[key] as string) : fallback,
+    getNumber: (key, fallback) =>
+      typeof values[key] === 'number' && Number.isFinite(values[key] as number)
+        ? (values[key] as number)
+        : fallback
   }
 }
 
@@ -124,6 +162,17 @@ describe('resolveRuntimeEnabled 开关优先级', () => {
   })
 })
 
+describe('resolveSyncEnabled 服务开关（阶段3）', () => {
+  it('默认关闭：绑 0.0.0.0 暴露游戏照片库属敏感行为，必须用户显式开启', () => {
+    expect(SYNC_ENABLED_DEFAULT).toBe(false)
+    expect(resolveSyncEnabled(settings({}))).toBe(false)
+  })
+
+  it('设置项为 true 时开启', () => {
+    expect(resolveSyncEnabled(settings({ [SETTING_SYNC_ENABLED]: true }))).toBe(true)
+  })
+})
+
 describe('initNikkiSyncRuntime 接线（阶段2）', () => {
   // 本仓 vitest 配置为 clearMocks: false（见 vitest.config.ts 注释），替身调用次数会
   // 在用例间累积，故这里显式归零，避开“上一个用例调过 start”带来的假失败/假通过
@@ -134,6 +183,14 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     delete process.env[GAME_ROOT_ENV_FLAG]
     managerDouble.start.mockClear()
     managerDouble.stop.mockClear()
+    managerDouble.startSyncServer.mockClear()
+    managerDouble.startSyncServer.mockResolvedValue({
+      running: true,
+      host: '0.0.0.0',
+      port: 28080,
+      secure: true,
+      mdnsEnabled: true
+    })
     managerDouble.start.mockResolvedValue({
       state: 'running',
       dbPath: '/mock/userdata/nikkisync/nikkisync.db',
@@ -198,6 +255,48 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
       if (original === undefined) delete process.env[RUNTIME_ENV_FLAG]
       else process.env[RUNTIME_ENV_FLAG] = original
     }
+  })
+
+  it('只开同步服务开关（Runtime 开关未开）：仍起 Runtime 并随后 startSyncServer', async () => {
+    const ctx = makeAppCtx()
+    // 直接改写 ctx.dbManager.getSetting 的返回：设置项走真实 settingsFrom 收敛路径
+    const getSetting = vi.fn((key: string, fallback: unknown) =>
+      key === SETTING_SYNC_ENABLED ? true : fallback
+    )
+    ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
+    await initNikkiSyncRuntime(ctx)
+    expect(managerDouble.start).toHaveBeenCalledTimes(1)
+    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(1)
+    // 未开 Runtime 开关但开了服务 ⇒ start 传下的选项必须含 LAN 配置
+    const options = managerDouble.start.mock.calls[0]![0] as { syncServer?: unknown }
+    expect(options.syncServer).toBeDefined()
+  })
+
+  it('服务自启失败不外抛（状态里带 error 即可，UI 经 server-status 可见）', async () => {
+    const ctx = makeAppCtx()
+    const getSetting = vi.fn((key: string, fallback: unknown) =>
+      key === SETTING_SYNC_ENABLED ? true : fallback
+    )
+    ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
+    managerDouble.startSyncServer.mockResolvedValueOnce({
+      running: false,
+      host: '0.0.0.0',
+      port: 28080,
+      mdnsEnabled: true,
+      error: 'PORT_IN_USE'
+    })
+    await expect(initNikkiSyncRuntime(ctx)).resolves.toBe(managerDouble)
+    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(1)
+  })
+
+  it('把局域网地址解析器注入依赖表（配对二维码要写真实 LAN IP，第三参）', async () => {
+    const { createManagerDependencies } = await import('../../nikkisync/runtime-facade')
+    const { resolveLanHost } = await import('../sync-server-setup')
+    const ctx = makeAppCtx()
+    await initNikkiSyncRuntime(ctx)
+    const call = vi.mocked(createManagerDependencies).mock.calls.at(-1)
+    expect(call).toBeDefined()
+    expect(call?.[2]).toBe(resolveLanHost)
   })
 })
 
@@ -280,5 +379,32 @@ describe('buildSessionOptions', () => {
     expect(options.packagingContext?.isPackaged).toBe(true)
     expect(options.packagingContext?.resourcesPath).toBe('R:')
     expect(options.watcher).toBe(true)
+  })
+
+  it('syncServer：缺省取上游桌面版口径（0.0.0.0 / 28080 / mdns 开），构造期即下传', () => {
+    const options = buildSessionOptions({ ...base, env: {} })
+    expect(options.syncServer).toEqual({
+      host: SYNC_SERVER_DEFAULT_HOST,
+      port: SYNC_SERVER_DEFAULT_PORT,
+      mdns: SYNC_SERVER_DEFAULT_MDNS,
+      name: SYNC_SERVER_DEFAULT_NAME
+    })
+  })
+
+  it('syncServer：设置项覆盖端口与 mdns；非法端口回落默认（不把坏值递给上游）', () => {
+    const overridden = buildSessionOptions({
+      ...base,
+      env: {},
+      settings: settings({ [SETTING_SYNC_PORT]: 39139, [SETTING_SYNC_MDNS]: false })
+    })
+    expect(overridden.syncServer?.port).toBe(39139)
+    expect(overridden.syncServer?.mdns).toBe(false)
+
+    const illegal = buildSessionOptions({
+      ...base,
+      env: {},
+      settings: settings({ [SETTING_SYNC_PORT]: 70000 })
+    })
+    expect(illegal.syncServer?.port).toBe(SYNC_SERVER_DEFAULT_PORT)
   })
 })

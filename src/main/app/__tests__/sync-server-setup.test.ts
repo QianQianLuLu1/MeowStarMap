@@ -16,10 +16,14 @@ vi.mock('../../utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }))
 
-import { SYNC_SERVER_ENABLED_DEFAULT } from '../sync-server-setup'
+import { SYNC_SERVER_ENABLED_DEFAULT, PORTED_SYNC_AUTOSTART_ENABLED } from '../sync-server-setup'
 
 describe('sync-server-setup — 自启默认值（阶段5）', () => {
   it('SYNC_SERVER_ENABLED_DEFAULT 为 false（默认关闭，用户手动启用）', () => {
     expect(SYNC_SERVER_ENABLED_DEFAULT).toBe(false)
+  })
+
+  it('阶段3：移植面服务不再自启（设置节已由真实 NikkiSync LocalSyncServer 接管）', () => {
+    expect(PORTED_SYNC_AUTOSTART_ENABLED).toBe(false)
   })
 })

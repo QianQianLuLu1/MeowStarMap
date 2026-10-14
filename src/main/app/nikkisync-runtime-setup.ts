@@ -5,6 +5,14 @@ import { electronLogger } from '../utils/logger'
 import { buildPackagingContext } from '../nikkisync/embedding-paths'
 import { createManagerDependencies } from '../nikkisync/runtime-facade'
 import { createRuntimeManager } from '../nikkisync/runtime-manager'
+import {
+  SYNC_SERVER_DEFAULT_HOST,
+  SYNC_SERVER_DEFAULT_MDNS,
+  SYNC_SERVER_DEFAULT_NAME,
+  SYNC_SERVER_DEFAULT_PORT,
+  normalizeSyncPort
+} from '../nikkisync/sync-server-view'
+import { resolveLanHost } from './sync-server-setup'
 import type { NikkiSyncRuntimeHandle, NikkiSyncSessionOptions } from '../nikkisync/runtime-types'
 import type { AppContext } from './app-context'
 
@@ -31,8 +39,16 @@ export const SETTING_RUNTIME_ENABLED = 'nikkisync.runtimeEnabled'
 export const SETTING_GAME_ROOT = 'nikkisync.gameRoot'
 /** 设置项：是否启用上游 fs.watch 增量监听（缺省关闭，避免与原扫描器双份 watcher）。 */
 export const SETTING_WATCHER = 'nikkisync.watcherEnabled'
+/** 设置项：局域网同步服务自启开关（阶段 3，缺省关闭——绑 0.0.0.0 属敏感暴露）。 */
+export const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
+/** 设置项：同步服务端口（阶段 3，缺省取上游桌面版默认 28080）。 */
+export const SETTING_SYNC_PORT = 'nikkisync.syncServerPort'
+/** 设置项：是否广播 mDNS 服务（阶段 3，缺省跟随上游 `NIKKISYNC_MDNS` 口径=开）。 */
+export const SETTING_SYNC_MDNS = 'nikkisync.syncMdnsEnabled'
 export const RUNTIME_ENABLED_DEFAULT = false
 export const WATCHER_ENABLED_DEFAULT = false
+/** 同步服务默认关闭：与阶段 5 移植面 `SYNC_SERVER_ENABLED_DEFAULT` 同口径。 */
+export const SYNC_ENABLED_DEFAULT = false
 /** 环境变量名（dev / 验证强启）。 */
 export const RUNTIME_ENV_FLAG = 'NIKKI_NIKKISYNC_RUNTIME'
 /** 环境变量名（dev / 验证强指游戏根，与上游 `NIKKISYNC_GAME_ROOT` 区分：这里归宿主管）。 */
@@ -44,6 +60,7 @@ export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
 export interface NikkiSyncSettingsPort {
   getBoolean(key: string, fallback: boolean): boolean
   getString(key: string, fallback: string): string
+  getNumber(key: string, fallback: number): number
 }
 
 export function nikkisyncDatabaseFile(userDataDir: string): string {
@@ -82,8 +99,24 @@ export function buildSessionOptions(input: {
       isPackaged: input.isPackaged,
       resourcesPath: input.resourcesPath,
       projectRoot: input.projectRoot
-    })
+    }),
+    // 阶段 3：LAN 配置在构造期就传进去（上游把它冻结在 LocalSyncServer 构造函数里）。
+    // 传 mdns:true 不代表会组播——`mdns.start()` 只在 `server.start()` 内被调。
+    syncServer: {
+      host: SYNC_SERVER_DEFAULT_HOST,
+      port: normalizeSyncPort(
+        input.settings.getNumber(SETTING_SYNC_PORT, SYNC_SERVER_DEFAULT_PORT),
+        SYNC_SERVER_DEFAULT_PORT
+      ),
+      mdns: input.settings.getBoolean(SETTING_SYNC_MDNS, SYNC_SERVER_DEFAULT_MDNS),
+      name: SYNC_SERVER_DEFAULT_NAME
+    }
   }
+}
+
+/** 同步服务自启判定：服务开关隐含 Runtime 开关（不开 Runtime 就没有会话可启服务）。 */
+export function resolveSyncEnabled(settings: NikkiSyncSettingsPort): boolean {
+  return settings.getBoolean(SETTING_SYNC_ENABLED, SYNC_ENABLED_DEFAULT)
 }
 
 /**
@@ -100,6 +133,10 @@ function settingsFrom(ctx: AppContext): NikkiSyncSettingsPort {
     getString: (key, fallback) => {
       const value = ctx.dbManager.getSetting<string>(key, fallback)
       return typeof value === 'string' ? value : fallback
+    },
+    getNumber: (key, fallback) => {
+      const value = ctx.dbManager.getSetting<number>(key, fallback)
+      return typeof value === 'number' && Number.isFinite(value) ? value : fallback
     }
   }
 }
@@ -120,20 +157,28 @@ function runtimeLog(level: 'info' | 'warn' | 'error', message: string): void {
  * 任何失败都不抛出到启动链之外（由调用方 lifecycle 的 try/catch 二次兜底）。
  */
 export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRuntimeHandle> {
+  const settings = settingsFrom(ctx)
   const options = buildSessionOptions({
     userDataDir: app.getPath('userData'),
     projectRoot: app.getAppPath(),
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
     env: process.env,
-    settings: settingsFrom(ctx)
+    settings
   })
   const manager = createRuntimeManager(
-    createManagerDependencies(options, (level, message) => runtimeLog(level, message))
+    createManagerDependencies(
+      options,
+      (level, message) => runtimeLog(level, message),
+      // 配对二维码里要写真实的局域网地址（与移植面同款解析：默认路由优先 + 虚拟网卡过滤）
+      resolveLanHost
+    )
   )
   ctx.nikkisyncRuntime = manager
 
-  if (!resolveRuntimeEnabled(process.env, settingsFrom(ctx))) {
+  const syncEnabled = resolveSyncEnabled(settings)
+  // 开了同步服务就必须开 Runtime：没有会话就没有可 start() 的上游服务器
+  if (!resolveRuntimeEnabled(process.env, settings) && !syncEnabled) {
     runtimeLog('info', `embedded runtime registered but disabled (${options.databaseFile})`)
     return manager
   }
@@ -143,6 +188,14 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
     `embedded runtime start result: state=${status.state} linkReady=${status.linkReady} ` +
       `tables=${status.tables?.length ?? 0} error=${status.error ?? 'none'}`
   )
+  if (syncEnabled) {
+    // 失败不外抛：端口占用等由 startSyncServer 归一化进状态，UI 经 server-status 可见
+    const sync = await manager.startSyncServer()
+    runtimeLog(
+      sync.running ? 'info' : 'warn',
+      `sync server autostart: running=${sync.running} port=${sync.port} error=${sync.error ?? 'none'}`
+    )
+  }
   return manager
 }
 

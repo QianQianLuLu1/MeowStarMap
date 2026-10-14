@@ -36,7 +36,8 @@ export type { PairingQrInfo, SyncServerHandle, SyncServerStatusInfo }
  *   完整）、失败仅告警不中断写路径；单条变更立即广播；批量变更合并广播最后一条
  *   （客户端凭最高 revision 走 /v1/changes 补齐整批，防移动端事件风暴）
  * - 端口：设置 sync.serverPort（默认 27124），EADDRINUSE 由 SyncServer +1 重试；
- *   自启开关：设置 sync.serverEnabled（默认 false——阶段5 起默认关闭，用户手动启用）
+ *   自启开关：设置 sync.serverEnabled——**阶段 3 起不再自启**（见 PORTED_SYNC_AUTOSTART_ENABLED），
+ *   设置页的同步服务节已改由真实的 NikkiSync LocalSyncServer 接管
  * - LAN 地址解析策略与 share-wifi-service.getLanIp 一致（默认路由优先 + 虚拟网卡
  *   过滤 + 127.0.0.1 兜底）；原方法为类私有，此处精简复制以避免改动 services 目录
  */
@@ -53,6 +54,13 @@ const SETTING_PORT = 'sync.serverPort'
  * 设置页开关落地后切换为 false；从未写过该 key 的存量库升级后不自启。
  */
 export const SYNC_SERVER_ENABLED_DEFAULT = false
+
+/**
+ * 移植面自启总闸（阶段 3 起恒为 false）。
+ * 保留常量而不是删掉整段逻辑：一是让「设置节已由真实 NikkiSync 服务接管」这件事
+ * 有明确的代码落点，二是若将来需要回滚到移植面，只需翻转这一处。
+ */
+export const PORTED_SYNC_AUTOSTART_ENABLED = false
 
 const VIRTUAL_ADAPTER_PATTERN =
   /(vmware|vmnet|virtualbox|vbox|docker|hyper-v|vethernet|tailscale|zerotier|wireguard|wg-|vpn|tap-|tun-)/i
@@ -217,11 +225,20 @@ export async function initSyncServer(ctx: AppContext): Promise<SyncServerHandle>
   ctx.syncEvents = events
   ctx.syncServer = handle
 
-  try {
-    const enabled = ctx.dbManager.getSetting(SETTING_ENABLED, SYNC_SERVER_ENABLED_DEFAULT)
-    if (enabled) await start()
-  } catch (err) {
-    logger.error('[Sync] failed to auto-start the sync server', err)
+  // 阶段 3：移植面服务不再自启。设置页的「同步服务」节已由真实的
+  // NikkiSync LocalSyncServer（`app/nikkisync-runtime-setup.ts`）接管，两个服务
+  // 是两份数据源（移植面 = App 自有 media 库，NikkiSync = 上游扫出来的游戏目录），
+  // 同屏两个开关与两个二维码只会让手机侧无所适从。
+  // 注意：**上方的组装必须保留**——`ctx.syncEvents` 被 App 自有写路径依赖，
+  // 停掉组装会断掉 journal 记录。`sync:*` 通道与手动 `start()` 仍可用（端口 27124，
+  // 与 NikkiSync 的 28080 不冲突），作为兼容与对照手段保留。
+  if (PORTED_SYNC_AUTOSTART_ENABLED) {
+    try {
+      const enabled = ctx.dbManager.getSetting(SETTING_ENABLED, SYNC_SERVER_ENABLED_DEFAULT)
+      if (enabled) await start()
+    } catch (err) {
+      logger.error('[Sync] failed to auto-start the sync server', err)
+    }
   }
   return handle
 }
@@ -239,8 +256,14 @@ function toDeviceInfo(row: SyncPairedDeviceRow): SyncDeviceInfo {
   }
 }
 
-/** 局域网地址（QR 配对用）：默认路由优先，校验落在真实网卡后采用；否则扫网卡取 IPv4 私有段 */
-function resolveLanHost(): string {
+/**
+ * 局域网地址（QR 配对用）：默认路由优先，校验落在真实网卡后采用；否则扫网卡取 IPv4 私有段。
+ *
+ * 阶段 3 起被 `app/nikkisync-runtime-setup.ts` 复用为**真实 NikkiSync 服务**的配对 host 解析器
+ * （上游 `windows-app.ts:65` 的 `preferredLanIpv4()` 是文件私有函数，不可跨仓复用，
+ * 因此以本仓这一份为唯一实现，不再另写第二份）。导出仅为复用，行为未改。
+ */
+export function resolveLanHost(): string {
   try {
     const byRoute = networkAddress()
     if (byRoute && byRoute !== '0.0.0.0' && byRoute !== '127.0.0.1' && isLanAddress(byRoute)) {
