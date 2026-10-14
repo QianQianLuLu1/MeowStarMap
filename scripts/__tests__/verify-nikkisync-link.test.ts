@@ -23,6 +23,7 @@ const ARTIFACTS_CHECK = 'each linked package ships compiled dist/src/index.js + 
 const MIGRATIONS_CHECK = '@nikkisync/database migrations/0001_initial.sql is readable'
 const FOLD_CHECK = 'main-process bundles do not fold @nikkisync into require()'
 const PACKED_CHECK = 'packed app.asar.unpacked ships @nikkisync/database migrations'
+const SYNC_SERVER_CHECK = '@nikkisync/pc-companion ships the local sync server artifacts'
 const DISCOVER_CHECK = 'a NikkiSync checkout is discoverable for linking'
 
 /** 全部事实成立（默认按"已链接 + 产物齐"取满值）。 */
@@ -97,6 +98,26 @@ describe('evaluateNikkiSyncLink', () => {
     )
     expect(find(checks, ARTIFACTS_CHECK)?.detail).toContain('npm run build')
     expect(failing(checks)).toContain(MIGRATIONS_CHECK)
+  })
+
+  it('异常：已链接但缺同步服务器产物时硬阻断并给出修复动作（阶段3）', () => {
+    const checks = evaluateNikkiSyncLink(
+      facts({ syncServerArtifactsMissing: ['dist\\src\\wechat\\GalleryRuntime.mjs'] })
+    )
+    expect(failing(checks)).toContain(SYNC_SERVER_CHECK)
+    expect(find(checks, SYNC_SERVER_CHECK)?.detail).toContain('GalleryRuntime.mjs')
+    expect(find(checks, SYNC_SERVER_CHECK)?.detail).toContain('npm run build')
+  })
+
+  it('正常：同步服务器产物齐备时该检查通过（阶段3）', () => {
+    const checks = evaluateNikkiSyncLink(facts({ syncServerArtifactsMissing: [] }))
+    expect(failing(checks)).toEqual([])
+    expect(find(checks, SYNC_SERVER_CHECK)?.ok).toBe(true)
+  })
+
+  it('边界：事实未提供该字段时整条检查缺席（旧调用方不受影响）', () => {
+    const checks = evaluateNikkiSyncLink(facts())
+    expect(find(checks, SYNC_SERVER_CHECK)).toBeUndefined()
   })
 
   it('边界：半链接（部分包缺失）只告警，不阻断', () => {

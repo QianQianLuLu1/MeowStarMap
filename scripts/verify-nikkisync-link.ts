@@ -37,6 +37,17 @@ const PACKED_MIGRATION_REL = path.join(
   '0001_initial.sql'
 )
 
+/**
+ * 阶段 3：同步服务器额外依赖的 pc-companion 产物（相对包根）。
+ * `server/LocalSyncServer.js` 由 `tsc` 产出；`wechat/GalleryRuntime.mjs` 由 esbuild 步骤
+ * （`build:pc` 的前半段）产出且被上游 gitignore —— 后者缺失时 `LocalSyncServer` 一装载就
+ * 抛 ERR_MODULE_NOT_FOUND，而 `dist/src/index.js` 存在与否看不出来。
+ */
+export const SYNC_SERVER_REQUIRED_ARTIFACTS: readonly string[] = [
+  path.join('dist', 'src', 'server', 'LocalSyncServer.js'),
+  path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs')
+]
+
 export interface NikkiSyncLinkFacts {
   /** 依赖图中指向仓库外的本地 spec（`file:../…` / `workspace:…`），必须为空。 */
   externalFileSpecs: string[]
@@ -60,6 +71,13 @@ export interface NikkiSyncLinkFacts {
   packedMigrationsReadable: boolean | null
   /** 未建链时本地可解析出的 NikkiSync 检出根（复用 link-nikkisync 的候选链，避免两套真相源）。 */
   candidateRoot?: string
+  /**
+   * 阶段 3：`@nikkisync/pc-companion` 内同步服务器依赖、但不在 `tsc` 产物保证范围内的
+   * 关键文件缺失清单（相对包根的路径）。缺 `wechat/GalleryRuntime.mjs` 时 `LocalSyncServer`
+   * 整条链加载即失败（`LocalSyncServer.ts:7` 静态依赖它），而它由 esbuild 步骤生成、
+   * 被上游 gitignore，因此必须单独点名，不能靠 `dist/src/index.js` 存在来推断。
+   */
+  syncServerArtifactsMissing?: string[]
 }
 
 export interface CheckResult {
@@ -148,6 +166,20 @@ export function evaluateNikkiSyncLink(facts: NikkiSyncLinkFacts): CheckResult[] 
         ? 'schema file reachable (DatabaseManager.initialize depends on it)'
         : 'schema file missing (run `npm run build` is not enough — check the linked directory layout)'
   })
+
+  // 阶段 3：同步服务器的两个额外产物（GalleryRuntime.mjs 由 esbuild 生成且被上游 gitignore）。
+  // 缺任一都会让 `server.start()` 那条链在装载期就抛 ERR_MODULE_NOT_FOUND，而 index.js 检查发现不了。
+  if (facts.syncServerArtifactsMissing !== undefined) {
+    checks.push({
+      name: '@nikkisync/pc-companion ships the local sync server artifacts',
+      ok: !linked || facts.syncServerArtifactsMissing.length === 0,
+      detail: !linked
+        ? 'skipped (no links present)'
+        : facts.syncServerArtifactsMissing.length === 0
+          ? `present: ${SYNC_SERVER_REQUIRED_ARTIFACTS.join(', ')}`
+          : `missing: ${facts.syncServerArtifactsMissing.join(', ')} — run the full \`npm run build\` in NikkiSync (build:pc runs scripts/build-wechat-runtime.mjs before tsc; tsc alone does not emit GalleryRuntime.mjs)`
+    })
+  }
 
   checks.push({
     name: 'main-process bundles do not fold @nikkisync into require()',
@@ -273,6 +305,7 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
   const builtArtifacts: string[] = []
   const linkTargets: string[] = []
   const databaseTargets: string[] = []
+  const syncArtifactsMissing: string[] = []
   for (const [name, subpath] of Object.entries(NIKKISYNC_PACKAGE_DIRS)) {
     const linkDir = path.join(projectRoot, 'node_modules', name)
     if (!fs.existsSync(linkDir)) continue
@@ -289,6 +322,11 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     const dtsEntry = path.join(targetDir, 'dist/src/index.d.ts')
     if (fs.existsSync(jsEntry) && fs.existsSync(dtsEntry)) builtArtifacts.push(name)
     if (name === '@nikkisync/database') databaseTargets.push(targetDir)
+    if (name === '@nikkisync/pc-companion') {
+      for (const artifact of SYNC_SERVER_REQUIRED_ARTIFACTS) {
+        if (!fs.existsSync(path.join(targetDir, artifact))) syncArtifactsMissing.push(artifact)
+      }
+    }
     void subpath
   }
 
@@ -341,7 +379,8 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     electronVersion,
     buildFoldHits: countBuildFoldHits(projectRoot),
     packedMigrationsReadable: packedMigrationsReadable(projectRoot),
-    candidateRoot
+    candidateRoot,
+    syncServerArtifactsMissing: syncArtifactsMissing
   }
 }
 

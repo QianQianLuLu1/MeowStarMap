@@ -437,6 +437,24 @@ function checkUnpackedNativeBinaries(): void {
       '@nikkisync/pc-companion 缺 dist/src/server/row-mappers.js（内嵌查询面无法产出协议 DTO）: ' +
         path.relative(ROOT, rowMappers)
     )
+
+  // 阶段 3：同步服务器（nikkisync:start-server）依赖的两个产物。
+  // 其中 wechat/GalleryRuntime.mjs 由 esbuild 步骤生成、被上游 gitignore，
+  // `tsc` 单跑不会产出它 —— 缺它则 LocalSyncServer 装载即失败，只有产物级断言能拦住。
+  const syncArtifacts: Array<[string, string]> = [
+    ['dist/src/server/LocalSyncServer.js', '同步服务器本体'],
+    ['dist/src/wechat/GalleryRuntime.mjs', 'LocalSyncServer 的静态依赖（esbuild 产物）']
+  ]
+  for (const [relative, purpose] of syncArtifacts) {
+    const target = path.join(nikkisyncRoot, 'pc-companion', ...relative.split('/'))
+    if (fs.existsSync(target)) pass(`@nikkisync/pc-companion ${relative} 已解包（${purpose}）`)
+    else
+      fail(
+        `@nikkisync/pc-companion 缺 ${relative}（${purpose}；局域网同步服务将无法启动，` +
+          `修复：在 NikkiSync 跑完整 npm run build 后重新打包）: ` +
+          path.relative(ROOT, target)
+      )
+  }
 }
 
 // ===== 原生模块 ABI 一致性闸门（防 NODE_MODULE_VERSION 错位）=====
