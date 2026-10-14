@@ -86,13 +86,16 @@ export default defineConfig({
         'release/**',
         'coverage/**'
       ],
-      // 覆盖率门控阈值：基于 2026-10 基线（statements 69.94% / branches 81.43% / functions 68.55% / lines 69.94%），
-      // 取整后设为下限；后续随测试补全逐步提升至 80% 目标。CI 中 vitest --coverage 超阈值即失败阻断。
+      // 覆盖率门控阈值：按 Vitest 5 v8 新口径重新基线（2026-10-14 实测 statements 66.69% / branches 58.19% /
+      // functions 59.22% / lines 68.27%，全量 373 文件通过、含 2 例既有 skip），整数下取整后作为回归下限。
+      // 读数较 2026-10 旧基线（69.94/81.43/68.55/69.94）下移属 v8 provider 口径修正——旧 provider 把从未调用的
+      // 箭头函数体计入所在语句并判为已覆盖，非测试退化（取证见 DEBT-032 / round2 §15）。禁止为凑数换 provider
+      // 或扩大 exclude；后续靠补薄封装模块的真实调用测试回升，目标仍为 80%。
       thresholds: {
-        statements: 69,
-        branches: 80,
-        functions: 68,
-        lines: 69
+        statements: 66,
+        branches: 58,
+        functions: 59,
+        lines: 68
       }
     }
   },

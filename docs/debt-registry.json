@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-10",
+  "updatedAt": "2026-10-14",
   "items": [
     {
       "id": "DEBT-001",
@@ -403,10 +403,10 @@
       "id": "DEBT-032",
       "category": "coverage",
       "section": 10,
-      "status": "open",
+      "status": "done",
       "priority": "high",
       "title": "Vitest 5 覆盖率口径修正使门控由过转不过，阈值需重新基线",
-      "description": "现象：npm run test:coverage 在 HEAD（Vitest 1.6）为 statements 69.94 / branches 81.43 / functions 68.55 / lines 69.94，恰好达到 vitest.config.ts 的 69/80/68/69；升级到 Vitest 5 + Vite 6 后（同一套测试、同样 39 个目录分组、334 文件 5268 例全通过、零 skip）实测 64.65 / 55.67 / 57.12 / 66.21，四项全不达标。根因是测量口径被修正而非测试变差：旧 v8 provider 把「从未被调用的箭头函数体」计入其所在语句并判为已覆盖，新 provider 将其拆为独立语句如实计未覆盖。文件级对照证据（src/main/preload/api/app.ts，一个导出 8 个未调用箭头的模块）——旧：app.ts | Stmts 100 | Branch 100 | Funcs 0 | Lines 100 | 未覆盖列为空（函数一个没调用却语句全绿，自相矛盾）；新：app.ts | 12.5 | 100 | 0 | 12.5 | 7-19（7-19 正是那些箭头体）。同目录 main/preload/api 的 Funcs 两侧同为 0.54，只有 Stmts 从 73.9 降到 14.62。受影响最大的目录：main/preload/api -59.28、renderer/i18n -46.26、main/i18n -45.85、main/scheduler -31.51、renderer/stores -22.65、main/preload -18.00。影响：CI build.yml 的 coverage job 失败会 needs 阻断 build/发布 job，即发布流水线当前被这一项卡住。待决策（本轮未做，因改阈值需产品级同意）：① 按新口径重新取基线并更新 thresholds（同时修订本文件注释里那句「基于 2026-10 基线」的出处）；② 或给这些薄封装模块补真实调用测试把数字做上去。禁止的做法：为凑数把 provider 换回 istanbul 或扩大 exclude",
+      "description": "现象：npm run test:coverage 在 HEAD（Vitest 1.6）为 statements 69.94 / branches 81.43 / functions 68.55 / lines 69.94，恰好达到 vitest.config.ts 的 69/80/68/69；升级到 Vitest 5 + Vite 6 后（同一套测试、同样 39 个目录分组、334 文件 5268 例全通过、零 skip）实测 64.65 / 55.67 / 57.12 / 66.21，四项全不达标。根因是测量口径被修正而非测试变差：旧 v8 provider 把「从未被调用的箭头函数体」计入其所在语句并判为已覆盖，新 provider 将其拆为独立语句如实计未覆盖。文件级对照证据（src/main/preload/api/app.ts，一个导出 8 个未调用箭头的模块）——旧：app.ts | Stmts 100 | Branch 100 | Funcs 0 | Lines 100 | 未覆盖列为空（函数一个没调用却语句全绿，自相矛盾）；新：app.ts | 12.5 | 100 | 0 | 12.5 | 7-19（7-19 正是那些箭头体）。同目录 main/preload/api 的 Funcs 两侧同为 0.54，只有 Stmts 从 73.9 降到 14.62。受影响最大的目录：main/preload/api -59.28、renderer/i18n -46.26、main/i18n -45.85、main/scheduler -31.51、renderer/stores -22.65、main/preload -18.00。影响：CI build.yml 的 coverage job 失败会 needs 阻断 build/发布 job，即发布流水线当前被这一项卡住。待决策（本轮未做，因改阈值需产品级同意）：① 按新口径重新取基线并更新 thresholds（同时修订本文件注释里那句「基于 2026-10 基线」的出处）；② 或给这些薄封装模块补真实调用测试把数字做上去。禁止的做法：为凑数把 provider 换回 istanbul 或扩大 exclude。**2026-10-14 关闭（经用户决策取修法①，按新口径重新基线）**：改前实测 `npm run test:coverage` 退出码 1，四条 ERROR: Coverage for statements (66.69%) / branches (58.2%) / functions (59.22%) / lines (68.27%) does not meet global threshold (69/80/68/69)，同轮 Test Files 373 passed 说明失败只来自阈值。据此把 vitest.config.ts 的 thresholds 由 69/80/68/69 改为 66/58/59/68（实测四项的整数下取整，余量 0.69/1.19/1.22/0.27 个百分点；本轮与 docs/sync-integration/03-sync-server-plan.md §14.3 两次独立实测读数差 ≤0.03 个百分点，故不再额外退档），并改写该文件「基于 2026-10 基线」的注释出处为新口径与取证指引。provider / include / exclude / all / projects 一字未动，未增删 src 生产代码，未新增或解除 skip，未装/升任何依赖。关闭证据：同命令退出码由 1 转 0、阈值错误消失，且汇总行仍为 66.69 / 58.19 / 59.22 / 68.27（与改前逐项一致，即转绿完全由阈值变更造成）。遗留：读数仍低于 2026-10 旧基线，回升须靠给薄封装模块（main/preload/api、renderer/i18n、main/i18n、main/scheduler、renderer/stores）补真实调用测试，目标 80% 未变；本轮未做。计划与取证见 docs/plans/2026-10-14-coverage-rebaseline-and-braces-allowlist.md",
       "files": ["vitest.config.ts", ".github/workflows/build.yml"],
       "lines": [],
       "issue": false
@@ -427,10 +427,10 @@
       "id": "DEBT-034",
       "category": "supply-chain",
       "section": 10,
-      "status": "open",
+      "status": "done",
       "priority": "medium",
       "title": "braces 新高危披露 GHSA-vfj7-8cjw-p6xm 无修复版本，npm run audit 转红",
-      "description": "2026-10-10 审查轮首次在新 toolchain 下复跑 npm run audit（上一轮门禁表漏了这项，CI build.yml 的 lint-typecheck job 含该步）：audit-ci 以 high 级失败，唯一未豁免项是 GHSA-vfj7-8cjw-p6xm，命中 braces@3.0.3 的 7 条传递路径（@babel/cli>chokidar、cz-conventional-changelog>commitizen>find-node-modules>findup-sync>micromatch、fast-glob>micromatch、lint-staged>micromatch、micromatch、tailwindcss>chokidar、vite-plugin-singlefile>micromatch）。归因：**不是本轮或依赖升级引入**——package-lock 在 HEAD 与工作区同为 braces@3.0.3，且 npm view braces dist-tags 显示 latest 就是 3.0.3（无 4.x 可升），上游未出修复。当前处置：不改 audit-ci.jsonc（把新披露项加进豁免清单属放宽安全闸门，需单独授权），因此 npm run audit 保持红。可选修法：① 等上游（micromatch/chokidar/fast-glob 链条）抬到已修版本后 npm update；② 或经授权后按既有 dev 工具链豁免口径加入 allowlist 并在 audit-ci.jsonc 的注释块续写理由与跟踪责任",
+      "description": "2026-10-10 审查轮首次在新 toolchain 下复跑 npm run audit（上一轮门禁表漏了这项，CI build.yml 的 lint-typecheck job 含该步）：audit-ci 以 high 级失败，唯一未豁免项是 GHSA-vfj7-8cjw-p6xm，命中 braces@3.0.3 的 7 条传递路径（@babel/cli>chokidar、cz-conventional-changelog>commitizen>find-node-modules>findup-sync>micromatch、fast-glob>micromatch、lint-staged>micromatch、micromatch、tailwindcss>chokidar、vite-plugin-singlefile>micromatch）。归因：**不是本轮或依赖升级引入**——package-lock 在 HEAD 与工作区同为 braces@3.0.3，且 npm view braces dist-tags 显示 latest 就是 3.0.3（无 4.x 可升），上游未出修复。当前处置：不改 audit-ci.jsonc（把新披露项加进豁免清单属放宽安全闸门，需单独授权），因此 npm run audit 保持红。可选修法：① 等上游（micromatch/chokidar/fast-glob 链条）抬到已修版本后 npm update；② 或经授权后按既有 dev 工具链豁免口径加入 allowlist 并在 audit-ci.jsonc 的注释块续写理由与跟踪责任。**2026-10-14 关闭（经用户授权取修法②）**：先实测排除修法①——`npm view braces dist-tags` 为 latest 3.0.3、`npm view braces versions` 最大即 3.0.3、`npm view micromatch@latest dependencies.braces` 仍为 ^3.0.3，即漏洞版本就是最新版，`overrides` 没有可 pin 的已修目标（pin 到不存在版本会让安装失败，pin 到 3.0.3 等于没改，pin 到更旧是降级），故「依赖手术」在本例不成立。据此按既有 dev 工具链口径把 GHSA-vfj7-8cjw-p6xm 追加进 audit-ci.jsonc 的 allowlist（28 项 → 29 项），并在其注释块续写理由、跟踪归属与撤销条件。关闭证据（2026-10-14 实测）：`npx audit-ci --config ./audit-ci.jsonc` 退出码由 1 转 0，末行为「Passed npm security audit.」，该通告由「Failed security audit due to high vulnerabilities」移入「Found vulnerable allowlisted advisories」（10 项 → 11 项）；`npx vitest run scripts/__tests__/audit-config.test.ts` 19 例全通过——该测试对 28 项迁移基线是**子集**断言（toContain），故新增豁免无需改测试。未动 package.json 的 overrides、未动 package-lock.json、未装/升任何依赖。遗留：audit-ci.jsonc 仍有 18 个已不再命中的失效豁免（被 audit-ci 列在「Consider not allowlisting advisories」），清退属收紧闸门且必须同步改 audit-config.test.ts 的 MIGRATION_BASELINE 数组，按 DEBT-020 原文口径留待独立一轮；上游链条抬到已修版本后按注释里的撤销条件删除本条并 npm update",
       "files": ["audit-ci.jsonc", "package-lock.json"],
       "lines": [],
       "issue": false
