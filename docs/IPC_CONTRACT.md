@@ -373,3 +373,50 @@ wrapHandler(ctx, schema, handler) =>
 | `resonance:export`       | 载荷 `bannerWishlist`（`resonanceExportPayloadSchema`） | 与上游导出格式对齐；上游同字段亦为可选，缺失即不导出        |
 
 `resonance:commitImport` 的空批次 `refine` 守卫已同步放宽：仅携带 `includeWishlist: true` + `wishlist` 的末批视为有效批次（此前仅记录段与 wardrobe 可使其通过）。
+
+## 8. NikkiSync 域（sync-integration 阶段 2 查询面 + 阶段 3 服务面）
+
+补齐阶段 1/2 欠下的同步义务：`nikkisync:*` 与 `sync:*` 两组通道此前未入本契约。
+实现位置：`src/main/ipc/handlers/nikkisync-handler.ts`、`src/main/preload/api/nikkisync.ts`、
+`src/shared/types/electron-api.ts`（形状快照）、`src/renderer/vite-env.d.ts`（镜像声明）。
+
+命名口径：`nikkisync:` 道用 **kebab-case** 动作（本域一致），历史 `sync:` 道用 camelCase（保持不动以免破坏兼容）。
+两组通道的返回值都由 `wrapHandler` 包成 `IpcResponse`，preload 的 `call<T>()` 只透出 `data`；
+渲染层一律 `try/catch` + `IpcError`，不检内层 `res.success`。
+
+### 8.1 查询面（阶段 2，响应体 = NikkiSync 协议 DTO，内嵌层零转换）
+
+| 通道                         | 入参                                                                    | 出参                                                                                                  | 失败码                                                   |
+| ---------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `nikkisync:runtime-status`   | 无                                                                      | `{state, dbPath, linkReady, scannerStatus?, installation?, lastScan?, tables?, sync?, error?, hint?}` | `PRECONDITION_FAILED`（句柄未装配）                      |
+| `nikkisync:start-scan`       | `{gameRoot?, path?}`                                                    | 上游 `ScanResult` 原样                                                                                | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
+| `nikkisync:get-assets`       | `{limit=100 (1..500), cursor?, type?, afterRevision?, includeDeleted?}` | `{items, nextCursor?, libraryRevision}`                                                               | 同上                                                     |
+| `nikkisync:get-asset-detail` | `assetId: string(1..128)`                                               | `mapAssetDetail` 结果                                                                                 | `VALIDATION_ERROR` / `NOT_FOUND`                         |
+| `nikkisync:get-resource`     | `{assetId, resourceId, mode='meta'\|'path'}`                            | `MediaResource` 或上游 `source_path` 原值                                                             | 同上                                                     |
+
+### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
+
+| 通道                           | 入参                                    | 出参                                                                                                                                                    | 失败码                                                                                          |
+| ------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `nikkisync:server-status`      | 无                                      | `{available, running, host, port, secure?, serverId?, mdnsEnabled, tlsFingerprintSha256?, serverCertificatePem?, lanHost?, pairedDeviceCount?, error?}` | 不抛：句柄未装配时 `{available:false, running:false, host:'', port:0, mdnsEnabled:false}`       |
+| `nikkisync:start-server`       | 可选 `{port? (1..65535), mdnsEnabled?}` | 同 `server-status`（`available:true`）                                                                                                                  | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（含 `PORT_IN_USE`）；`INTERNAL_ERROR`（其它启动失败） |
+| `nikkisync:stop-server`        | 无                                      | 同 `server-status`（`running:false`）                                                                                                                   | `PRECONDITION_FAILED`                                                                           |
+| `nikkisync:get-pairing-code`   | 无                                      | `{content, expiresAt, serverId, host, port, tlsFingerprintSha256}`（`content` = 上游 `buildPairingUri()` 的 `NS1\|` 七段串）                            | `PRECONDITION_FAILED`（服务未运行，上游原生文案）                                               |
+| `nikkisync:get-paired-devices` | 无                                      | `Array<{deviceId, deviceName, platform, appVersion?, pairedAt, lastSeenAt}>`（仅未撤销；不含公钥/凭据哈希）                                             | `PRECONDITION_FAILED`                                                                           |
+| `nikkisync:revoke-device`      | `deviceId: string(1..128)`              | 撤销后的同一列表                                                                                                                                        | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED`                                        |
+
+契约要点（不得凭实现细节臆造）：
+
+- `secure` 只在真实监听时出现；未运行时 `host/port` 回落**配置值**，好让 UI 能把「配置端口 + `PORT_IN_USE`」显示出来。
+- `mdnsEnabled` 表示**配置意图**：上游 `MdnsAdvertiser` 静默吞掉所有 socket 错误，因此它不能证明广播已生效，UI 与验收都不得把它当发现证据。
+- `serverCertificatePem` 是公开材料（自签证书，不含私钥），供客户端在 pin 指纹之外做第二重核对。
+- `start-server` 改端口会**重建内嵌会话**（上游把 `LocalSyncServerConfig` 冻结在构造期），调用方应预期一次 SQLite 重开与扫描器重新发现。
+- 撤销是软删（上游 `PairingRepository.revoke` 写 `revoked_at`），**不踢**已建立的 WebSocket 连接；该设备后续签名请求由上游鉴权返回 401。
+
+### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
+
+`sync:getStatus` / `startServer` / `stopServer` / `createPairingQr` / `listDevices` / `revokeDevice`
+六条通道**原样保留**以维持兼容（`src/main/ipc/handlers/sync-handler.ts`），其后端是 `src/main/sync/`
+的自有实现，数据源是本 App 的 `media_files` 库，与 8.2 的 NikkiSync 库是两份数据。
+阶段 3 起设置页的「同步服务」节改接 8.2，移植面服务不再自启
+（`PORTED_SYNC_AUTOSTART_ENABLED = false`；组装仍在，`ctx.syncEvents` 被 App 自有写路径依赖）。
