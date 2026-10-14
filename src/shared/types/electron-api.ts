@@ -13,6 +13,15 @@
  */
 import type { FilterParams } from './editor'
 import type { WatermarkConfig } from './watermark'
+import type {
+  AssetDetailResponse,
+  AssetSummary,
+  ChangesResponse,
+  ClothingSearchResponse,
+  MediaResource,
+  ProfileStatsResponse,
+  SuitSearchResponse
+} from '../sync/protocol'
 
 // ============ 扫描器 ============
 
@@ -527,8 +536,10 @@ export interface SyncDeviceInfo {
 // ============ NikkiSync 内嵌运行时（sync-integration 阶段2） ============
 // 形状快照自 src/main/nikkisync/runtime-types.ts（NikkiSyncRuntimeStatus 等）。
 // shared 不得 import src/main（分层约束），因此沿用上方 sync 域的快照口径同步维护。
-// 查询结果（Asset / Resource / ScanResult）为 NikkiSync 协议 DTO，由上游 row-mappers 产出，
-// 内嵌层零转换 ⇒ 这里只能以未知结构承接，不得在本仓重建字段名。
+// 查询结果为 NikkiSync 协议 DTO：内嵌层零转换，故本文件**不重建字段名**，
+// 而是直接以阶段 9 定下的协议唯一真相源 `src/shared/sync/protocol.ts` 为类型出处
+// （`import type` 为纯类型引入，不进 preload 运行时依赖白名单的对立面）。
+// 同形关系由 src/renderer/stores/nikkisyncContractTypes.test.ts 在编译期钉死。
 
 /** 内嵌 Runtime 状态机取值（未建链 / 未启动 / 启动中 / 运行 / 扫描中 / 降级 / 停止中 / 错误）。 */
 export type NikkiSyncRuntimeStateInfo =
@@ -554,7 +565,7 @@ export interface NikkiSyncRuntimeStatusInfo {
 
 /** `nikkisync:get-assets` 响应：与上游 `GET /v1/assets` 同形。 */
 export interface NikkiSyncAssetPageInfo {
-  items: unknown[]
+  items: AssetSummary[]
   nextCursor?: string
   libraryRevision: number
 }
@@ -576,6 +587,52 @@ export interface NikkiSyncResourceQueryInfo {
   assetId: string
   resourceId: string
   mode?: 'meta' | 'path'
+}
+
+// ============ NikkiSync 资产查询面扩容（sync-integration 阶段4 · UI Bridge） ============
+// 响应侧一律用**类型别名**指向协议真相源，不在本仓重列字段：内嵌层零转换，
+// 别名即「handler 原样返回上游对象」这一事实的编译期表达。
+
+/** `nikkisync:get-asset-detail` 响应：与上游 `GET /v1/assets/:id` 同形。 */
+export type NikkiSyncAssetDetailInfo = AssetDetailResponse
+
+/** `nikkisync:get-changes` 响应：与上游 `GET /v1/changes` 同形（含 fullResyncRequired 判据）。 */
+export type NikkiSyncChangesInfo = ChangesResponse
+
+/** `nikkisync:search-suits` 响应：与上游 `GET /v1/search/suits` 同形。 */
+export type NikkiSyncSuitSearchInfo = SuitSearchResponse
+
+/** `nikkisync:search-clothing` 响应：与上游 `GET /v1/search/clothing` 同形。 */
+export type NikkiSyncClothingSearchInfo = ClothingSearchResponse
+
+/** `nikkisync:profile-stats` 响应：与上游 `GET /v1/profile/stats` 同形。 */
+export type NikkiSyncProfileStatsInfo = ProfileStatsResponse
+
+/** 批量资源元信息：`byAsset` 键为 assetId，值为上游 `listResources` 逐行映射结果。 */
+export interface NikkiSyncResourceRecordsInfo {
+  byAsset: Record<string, MediaResource[]>
+}
+
+/** 批量资源绝对路径：值为 `resourceId -> resources.source_path` 原值（上游落库口径，不改写）。 */
+export interface NikkiSyncResourcePathsInfo {
+  byAsset: Record<string, Record<string, string>>
+}
+
+/** `nikkisync:get-resource-records` 入参（assetIds 上限与 `get-assets` 的 limit 上界同界）。 */
+export interface NikkiSyncResourceRecordsQueryInfo {
+  assetIds: string[]
+  mode?: 'meta' | 'path'
+}
+
+/** `nikkisync:get-changes` 入参：`after` 为已消费到的 libraryRevision。 */
+export interface NikkiSyncChangesQueryInfo {
+  after: number
+  limit?: number
+}
+
+/** 套装 / 服装搜索入参。 */
+export interface NikkiSyncSearchQueryInfo {
+  query: string
 }
 
 // ============ NikkiSync 局域网同步服务（sync-integration 阶段3） ============

@@ -960,19 +960,15 @@ interface WindowElectronAPI {
       hint?: string
     }>
     startScan: (input?: { gameRoot?: string; path?: string }) => Promise<unknown>
-    getAssets: (input?: {
-      limit?: number
-      cursor?: string
-      type?: string
-      afterRevision?: number
-      includeDeleted?: boolean
-    }) => Promise<{ items: unknown[]; nextCursor?: string; libraryRevision: number }>
-    getAssetDetail: (assetId: string) => Promise<unknown>
-    getResource: (input: {
+    getAssets: (
+      input?: import('../shared/types/electron-api').NikkiSyncAssetQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncAssetPageInfo>
+    getAssetDetail: (
       assetId: string
-      resourceId: string
-      mode?: 'meta' | 'path'
-    }) => Promise<unknown>
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncAssetDetailInfo>
+    getResource: (
+      input: import('../shared/types/electron-api').NikkiSyncResourceQueryInfo
+    ) => Promise<import('../shared/sync/protocol').MediaResource | string>
     // ---- sync-integration 阶段3：上游 NikkiSync LocalSyncServer 的启停与配对管理 ----
     getServerStatus: () => Promise<{
       available: boolean
