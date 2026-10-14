@@ -115,7 +115,7 @@ describe('preload 装配完整性', () => {
     expect(invokeMock).toHaveBeenCalledWith('nikkisync:profile-stats')
   })
 
-  it('electronAPI 包含全部 33 个键（reportReady + 32 个命名空间，阶段2 增 nikkisync）', () => {
+  it('electronAPI 包含全部 34 个键（reportReady + 33 个命名空间，阶段4 增 assetEdits）', () => {
     const electronAPI = getExposed<Record<string, unknown>>('electronAPI')
     expect(Object.keys(electronAPI).sort()).toEqual(
       [
@@ -140,6 +140,7 @@ describe('preload 装配完整性', () => {
         'share',
         'sync',
         'nikkisync',
+        'assetEdits',
         'cache',
         'log',
         'crash',

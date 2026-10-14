@@ -1059,6 +1059,16 @@ interface WindowElectronAPI {
       }>
     >
   }
+  // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
+  assetEdits: {
+    list: (
+      assetIds: string[]
+    ) => Promise<{ edits: import('../shared/types/electron-api').AssetEditsInfo[] }>
+    set: (
+      assetId: string,
+      patch: import('../shared/types/electron-api').AssetEditsPatchInfo
+    ) => Promise<{ edit: import('../shared/types/electron-api').AssetEditsInfo | null }>
+  }
   // T10：缩略图缓存管理
   cache: {
     getStats: () => Promise<{

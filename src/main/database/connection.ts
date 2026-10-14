@@ -14,6 +14,7 @@ import type { MediaWorkerBridge } from '../media-worker/bridge'
 import type { DbRunResult } from './worker/worker-protocol'
 import { SYNC_METADATA_DDL_STATEMENTS } from './sync-metadata-repository'
 import { SYNC_PAIRING_DDL_STATEMENTS } from './sync-pairing-repository'
+import { ASSET_EDITS_DDL_STATEMENTS } from './asset-edits-repository'
 import { t } from '../i18n'
 
 // 惰性加载 better-sqlite3：首次调用时才动态 import，使原生模块加载时机
@@ -1376,7 +1377,12 @@ export class DatabaseManager {
       // 配对服务（src/main/sync/pairing-service.ts）持久化底座：只存令牌 sha256，
       // 一次性消费靠 used_at 置位。纯新增表、幂等，DDL 单一事实源在
       // sync-pairing-repository.ts 导出
-      ...SYNC_PAIRING_DDL_STATEMENTS
+      ...SYNC_PAIRING_DDL_STATEMENTS,
+      // ===== 同步集成阶段4（docs/sync-integration/04-ui-bridge-plan）：资产编辑叠加层 =====
+      // 纯新增表、CREATE TABLE IF NOT EXISTS 幂等、无数据回填（不需要版本标记），
+      // DDL 单一事实源在 asset-edits-repository.ts 导出。用户专有编辑按 asset_id
+      // 另存一层，图库以 assets 为媒体事实源后不再靠 media_files 提供这些字段。
+      ...ASSET_EDITS_DDL_STATEMENTS
     ]
     for (const stmt of indexStatements) {
       try {

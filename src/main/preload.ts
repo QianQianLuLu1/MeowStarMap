@@ -33,6 +33,7 @@ import { backupAPI } from './preload/api/backup'
 import { shareAPI } from './preload/api/share'
 import { syncAPI } from './preload/api/sync'
 import { nikkisyncAPI } from './preload/api/nikkisync'
+import { assetEditsAPI } from './preload/api/asset-edits'
 import { cacheAPI } from './preload/api/cache'
 import { logAPI } from './preload/api/log'
 import { crashAPI } from './preload/api/crash'
@@ -102,6 +103,8 @@ const electronAPI = {
   sync: syncAPI,
   // sync-integration 阶段2：内嵌 NikkiSync Runtime（运行态/扫描/资产只读查询）
   nikkisync: nikkisyncAPI,
+  // sync-integration 阶段4：资产编辑叠加层（按 NikkiSync asset_id 归键的本 App 专有编辑）
+  assetEdits: assetEditsAPI,
   // T10：缩略图缓存管理
   cache: cacheAPI,
   // 日志管理

@@ -641,6 +641,40 @@ export interface NikkiSyncSearchQueryInfo {
   query: string
 }
 
+// ============ 资产编辑叠加层（sync-integration 阶段4） ============
+// 本 App 专有的用户编辑（收藏/评分/标签/备注/分类/套装/场景/隐藏），按 NikkiSync
+// `asset_id` 归键存 `asset_edits` 表。它**不是** NikkiSync 协议 DTO，因此这里塑形
+// （boolean / string[]），但字段语义与 `MediaFile` 同名项保持一致。
+
+/** `asset-edits:list` 与 `asset-edits:set` 的单条编辑形态。 */
+export interface AssetEditsInfo {
+  assetId: string
+  isFavorite: boolean
+  rating: number
+  tags: string[]
+  notes: string
+  categoryId: number | null
+  outfit: string | null
+  sceneCategory: string | null
+  sceneTime: string | null
+  isHidden: boolean
+  deletedAt: string | null
+  updatedAt: string
+}
+
+/** `asset-edits:set` 的补丁：全部可选，未给的字段按列默认值落库。 */
+export interface AssetEditsPatchInfo {
+  isFavorite?: boolean
+  rating?: number
+  tags?: string[]
+  notes?: string
+  categoryId?: number | null
+  outfit?: string | null
+  sceneCategory?: string | null
+  sceneTime?: string | null
+  isHidden?: boolean
+}
+
 // ============ NikkiSync 局域网同步服务（sync-integration 阶段3） ============
 // 形状快照自 src/main/nikkisync/runtime-types.ts（NikkiSyncSyncServerStatus 等）；
 // 服务本体是上游 NikkiSync 的 LocalSyncServer，本仓只做启停控制与状态展示。

@@ -444,3 +444,28 @@ wrapHandler(ctx, schema, handler) =>
 的自有实现，数据源是本 App 的 `media_files` 库，与 8.2 的 NikkiSync 库是两份数据。
 阶段 3 起设置页的「同步服务」节改接 8.2，移植面服务不再自启
 （`PORTED_SYNC_AUTOSTART_ENABLED = false`；组装仍在，`ctx.syncEvents` 被 App 自有写路径依赖）。
+
+## 9. asset-edits 域（sync-integration 阶段 4 · 资产编辑叠加层）
+
+实现位置：`src/main/ipc/handlers/asset-edits-handler.ts`、`src/main/preload/api/asset-edits.ts`
+（新命名空间 `electronAPI.assetEdits`，`electronAPI` 键数由 33 → 34）、
+`src/main/database/asset-edits-repository.ts`（DDL 单一事实源 `ASSET_EDITS_DDL_STATEMENTS`，
+由 `connection.ts` 幂等执行）。
+
+| 通道               | 入参                                                      | 出参                               | 失败码                                     |
+| ------------------ | --------------------------------------------------------- | ---------------------------------- | ------------------------------------------ |
+| `asset-edits:list` | `assetIds: string(1..128)[]`（≤500，与一页资产同界）      | `{ edits: AssetEditsInfo[] }`      | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+| `asset-edits:set`  | `{ assetId: string(1..128), patch: AssetEditsPatchInfo }` | `{ edit: AssetEditsInfo \| null }` | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+
+契约要点：
+
+- **这组通道不属于 NikkiSync 协议 DTO**，因此 handler **允许**塑形：`0/1 → boolean`、
+  `tags` JSON 文本 → `string[]`。塑形口径必须与 `media_files` 的同名字段一致，
+  否则「切换数据源」会连带「切换行为」。`tags` 脏数据（非法 JSON）降级为 `[]`，不抛错。
+- 归键是 NikkiSync 的 `asset_id`（TEXT），**不是** `media_files.id`。两者不可混用：
+  `mediaAction:*` 仍以 `media_files.id` 为准，只服务本地数据源。
+- `updatedAt` 由主进程生成，渲染层不传（避免客户端时钟漂移影响排序与冲突判定）。
+- 旧库未迁移（缺 `asset_edits` 表）时读取如实回退为空列表；写入则 `PRECONDITION_FAILED`。
+- 回填 `media_files → asset_edits`（按归一化路径匹配）的纯函数已在仓储层实现并单测
+  （`planAssetEditSeed`），但**尚未接线任何通道**：需要 `media_files` 与 assets 两侧
+  分页游标对拉，属独立一步，见 `docs/sync-integration/04-ui-bridge-plan.md` §16.3。
