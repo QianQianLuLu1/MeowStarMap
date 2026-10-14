@@ -572,7 +572,11 @@ describe('scanner-handler — sync 事件接线（阶段5）', () => {
       on: vi.fn()
     }
     const sendMock = vi.fn()
-    const ctx = makeCtx({ scannerManager, syncEvents, mainWindow: { webContents: { send: sendMock } } })
+    const ctx = makeCtx({
+      scannerManager,
+      syncEvents,
+      mainWindow: { webContents: { send: sendMock } }
+    })
     ;(ctx as unknown as { notifyMediaUpdated: ReturnType<typeof vi.fn> }).notifyMediaUpdated =
       vi.fn(() => {
         throw new Error('webContents destroyed')

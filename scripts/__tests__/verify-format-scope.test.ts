@@ -300,6 +300,16 @@ describe('文档口径与真实配置的一致性守护', () => {
   })
 
   // 真相源已入仓：文件缺失即失败，不再有“干净克隆下静默跳过”的失效路径
+  it('只读格式检查脚本按 §5 携带行尾豁免，写回侧脚本不携带', () => {
+    const scripts = JSON.parse(
+      readFileSync(new URL('../../package.json', import.meta.url), 'utf-8')
+    ).scripts as Record<string, string>
+    expect(scripts['format:check']).toContain('prettier --check')
+    expect(scripts['format:check']).toContain('--end-of-line auto')
+    expect(scripts['format']).toContain('prettier --write')
+    expect(scripts['format']).not.toContain('--end-of-line')
+  })
+
   it('唯一真相源 docs/CODING_CONVENTIONS.md 的「校验与提交」与钩子/verify 分工口径一致', () => {
     const doc = readFileSync(conventionsUrl, 'utf-8')
     expect(doc).toContain('校验与提交')
