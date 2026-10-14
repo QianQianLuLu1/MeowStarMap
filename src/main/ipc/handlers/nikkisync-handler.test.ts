@@ -189,6 +189,40 @@ describe('nikkisync:start-scan', () => {
     expect(runtime.scan).toHaveBeenCalledWith({})
   })
 
+  it('扫描完成后推 nikkisync:library-changed（图库据此自动刷新，无需手动重载）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const send = vi.fn()
+    const handler = getHandler(handleMock, 'nikkisync:start-scan')
+    const res = (await handler({ sender: { send } }, {})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(send).toHaveBeenCalledWith('nikkisync:library-changed')
+  })
+
+  it('事件发送失败不得把成功的扫描判成失败（渲染进程可能已关闭）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-scan')
+    const res = (await handler(
+      {
+        sender: {
+          send: () => {
+            throw new Error('window closed')
+          }
+        }
+      },
+      {}
+    )) as HandleResult
+    expect(res.success).toBe(true)
+  })
+
+  it('无 sender 时静默跳过推送（CLI / 探针复用同一 handler）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-scan')
+    await expect(handler({}, {})).resolves.toMatchObject({ success: true })
+  })
+
   it('透传 gameRoot 与 path（换根/按 uid 收敛由状态机决定）', async () => {
     const runtime = createRuntimeStub()
     register(runtime)

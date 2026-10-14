@@ -624,6 +624,11 @@ export interface NikkiSyncResourcePathsInfo {
   byAsset: Record<string, Record<string, string>>
 }
 
+/** `nikkisync:get-resource-records` 的返回按 `mode` 分流（避免调用侧再判联合）。 */
+export type NikkiSyncResourceRecordsFor<M extends 'meta' | 'path'> = M extends 'meta'
+  ? NikkiSyncResourceRecordsInfo
+  : NikkiSyncResourcePathsInfo
+
 /** `nikkisync:get-resource-records` 入参（assetIds 上限与 `get-assets` 的 limit 上界同界）。 */
 export interface NikkiSyncResourceRecordsQueryInfo {
   assetIds: string[]

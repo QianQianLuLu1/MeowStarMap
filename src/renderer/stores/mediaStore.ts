@@ -1,6 +1,9 @@
 import { create } from 'zustand'
 import { toFileUrl } from '../utils/file'
 import i18n from '../i18n'
+// 阶段 4：NikkiSync 数据源的视图模型映射（渲染层唯一转换点）
+import { toAssetViewModel, type AssetMediaFile } from '../utils/assetViewModel'
+import type { AssetSummary } from '../../shared/sync/protocol'
 // C-S2：从 shared 导入场景分类，消除渲染进程跨边界导入主进程模块
 import type { SceneCategory, SceneTime } from '../../shared/scene-category'
 // P1-01：读取 showDuplicates 状态用于服务端过滤 is_duplicate=1
@@ -95,6 +98,14 @@ interface MediaState {
   // 无限滚动 keyset 游标：当前已加载的最后一页游标锚点（首页/复位为 null）
   // 性能重构：取代旧 currentPage 偏移分页，避免大 OFFSET 全表扫描
   mediaCursor: { sortValue: string | number | null; id: number } | null
+  // 阶段 4：图库数据源。'local' = 本 App 的 media_files（默认，行为完全不变）；
+  // 'nikkisync' = 内嵌 NikkiSync Runtime 的 assets 表
+  source: 'local' | 'nikkisync'
+  // 阶段 4：NikkiSync 分页游标（上游 base64url `{t,id}` 字符串）。
+  // 与 mediaCursor 是**两套游标**，切源时必须一并复位，不可混用
+  nikkiCursor: string | null
+  // 阶段 4：已消费到的 libraryRevision（增量刷新判据，来自 get-assets / get-changes）
+  nikkiRevision: number | null
   // 服务端是否还有下一页（由 media.list 的 hasMore 派生）
   hasMoreMedia: boolean
   // 追加加载中标志位，防止滚动到底时重复触发
@@ -127,6 +138,8 @@ interface MediaState {
 
   // Actions
   setMediaFiles: (files: MediaFile[]) => void
+  // 阶段 4：切换图库数据源（同时复位两套游标，避免 local/nikkisync 的 id 命名空间混屏）
+  setSource: (source: MediaState['source']) => void
   addMediaFiles: (files: MediaFile[]) => void
   updateMediaFile: (id: string, updates: Partial<MediaFile>) => void
   deleteMediaFiles: (ids: string[]) => void
@@ -146,6 +159,9 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
   categories: [],
   loading: false,
   mediaCursor: null,
+  source: 'local',
+  nikkiCursor: null,
+  nikkiRevision: null,
   hasMoreMedia: false,
   loadingMore: false,
   scanProgress: {
@@ -168,6 +184,18 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
   profiles: [],
 
   setMediaFiles: (files) => set({ mediaFiles: files }),
+
+  setSource: (source) =>
+    set({
+      // 切源即复位：两套游标与列表都来自不同 id 命名空间，混用会让翻页与选择集错乱
+      source,
+      mediaFiles: [],
+      mediaCursor: null,
+      nikkiCursor: null,
+      nikkiRevision: null,
+      hasMoreMedia: false,
+      loadingMore: false
+    }),
 
   addMediaFiles: (files) =>
     set((state) => ({
@@ -261,6 +289,131 @@ export async function updateMediaFileAndPersist(
 export const MEDIA_PAGE_SIZE = 500
 
 /**
+ * 阶段 4：把一页 `AssetSummary` 变成图库可用的视图模型。
+ *
+ * 三条往返的分工（都以 500 为界，与 handler 的 zod 上界一致）：
+ * 1. `get-assets` 拿摘要（协议 DTO，零转换）
+ * 2. `get-resource-records` 拿资源元信息（尺寸/时长/扩展名）与绝对路径各一次
+ *    ——上游从不产出派生缩略图，路径只能来自 `resources.source_path`
+ * 3. `asset-edits:list` 拿本 App 专有的用户编辑（收藏/评分/标签…）
+ *
+ * 字段映射规则全部集中在 `utils/assetViewModel` 这一处，不在这里做第二次判断。
+ */
+async function mapAssetPageToFiles(
+  items: AssetSummary[],
+  assetIds: string[]
+): Promise<AssetMediaFile[]> {
+  const api = window.electronAPI?.nikkisync
+  const editsApi = window.electronAPI?.assetEdits
+  if (!api?.getResourceRecords || !editsApi?.list || assetIds.length === 0) return []
+  const metaResponse = await api.getResourceRecords({ assetIds, mode: 'meta' })
+  const pathResponse = await api.getResourceRecords({ assetIds, mode: 'path' })
+  const editsResponse = await editsApi.list(assetIds)
+  const metaByAsset = metaResponse?.byAsset ?? {}
+  const pathByAsset = pathResponse?.byAsset ?? {}
+  const editByAsset = new Map((editsResponse?.edits ?? []).map((edit) => [edit.assetId, edit]))
+  return items.map((summary) =>
+    toAssetViewModel({
+      summary,
+      resources: metaByAsset[summary.assetId] ?? [],
+      pathsByResourceId: pathByAsset[summary.assetId] ?? {},
+      edit: editByAsset.get(summary.assetId)
+    })
+  )
+}
+
+/**
+ * 阶段 4：从内嵌 NikkiSync Runtime 取首屏一页资产。
+ *
+ * 与 `fetchMediaFromDatabase` 同签名同返回形态，因此调用方无感。
+ * 上游 `AssetPageQuery` 不支持 `uid` 过滤（协议只有 limit/cursor/type/afterRevision/
+ * includeDeleted 五键），故档案筛选只能在已取回的这一页上做，翻页可能显稀疏 —— 见
+ * docs/sync-integration/04-ui-bridge-plan.md §16.2，不伪造服务端过滤能力。
+ */
+export async function fetchMediaFromRuntime(options?: {
+  limit?: number
+}): Promise<{ files: MediaFile[]; categories: Category[]; hasMore?: boolean } | null> {
+  const api = window.electronAPI?.nikkisync
+  if (!api?.getAssets || !window.electronAPI?.category?.list) {
+    console.error(i18n.t('mediaStore.log.noElectronApi') + 'nikkisync.getAssets=')
+    return null
+  }
+  try {
+    const page = await api.getAssets({ limit: options?.limit ?? MEDIA_PAGE_SIZE })
+    if (!page || !Array.isArray(page.items)) {
+      console.error(i18n.t('mediaStore.log.filesEmpty'), 'nikkisync page malformed')
+      return null
+    }
+    const currentProfileUid = useMediaStore.getState().currentProfileUid
+    const mapped = await mapAssetPageToFiles(
+      page.items,
+      page.items.map((item) => item.assetId)
+    )
+    const files =
+      currentProfileUid && currentProfileUid !== 'all'
+        ? mapped.filter((file) => file.account_uid === currentProfileUid)
+        : mapped
+    const categoryResult = await window.electronAPI.category.list()
+    if (!categoryResult?.categories) {
+      console.error(i18n.t('mediaStore.log.categoriesEmpty'))
+      return null
+    }
+    const hasMore = Boolean(page.nextCursor)
+    useMediaStore.setState({
+      nikkiCursor: page.nextCursor ?? null,
+      nikkiRevision: page.libraryRevision,
+      // 首屏即复位两套游标：与本地分支的 mediaCursor 复位语义保持对称
+      mediaCursor: null,
+      hasMoreMedia: hasMore,
+      loadingMore: false
+    })
+    return { files, categories: categoryResult.categories as Category[], hasMore }
+  } catch (error) {
+    console.error(
+      i18n.t('mediaStore.log.fetchError'),
+      error instanceof Error ? error.message : String(error),
+      error
+    )
+    return null
+  }
+}
+
+/** 阶段 4：NikkiSync 源的续页（游标推进 + 去重追加 + 并发保护）。 */
+async function loadNextAssetPage(): Promise<void> {
+  const { loadingMore, hasMoreMedia, nikkiCursor } = useMediaStore.getState()
+  if (loadingMore || !hasMoreMedia) return
+  const api = window.electronAPI?.nikkisync
+  if (!api?.getAssets) return
+  useMediaStore.setState({ loadingMore: true })
+  try {
+    const page = await api.getAssets({
+      limit: MEDIA_PAGE_SIZE,
+      ...(nikkiCursor ? { cursor: nikkiCursor } : {})
+    })
+    if (!page || !Array.isArray(page.items)) return
+    const mapped = await mapAssetPageToFiles(
+      page.items,
+      page.items.map((item) => item.assetId)
+    )
+    const fresh = dedupeAgainst(useMediaStore.getState().mediaFiles, mapped)
+    if (fresh.length > 0) useMediaStore.getState().addMediaFiles(fresh)
+    useMediaStore.setState({
+      nikkiCursor: page.nextCursor ?? null,
+      nikkiRevision: page.libraryRevision,
+      hasMoreMedia: Boolean(page.nextCursor)
+    })
+  } catch (error) {
+    console.error(
+      i18n.t('mediaStore.log.fetchError'),
+      error instanceof Error ? error.message : String(error),
+      error
+    )
+  } finally {
+    useMediaStore.setState({ loadingMore: false })
+  }
+}
+
+/**
  * 从数据库查询媒体文件与分类列表（纯查询，不写 store）。
  *
  * 本函数只负责取数：函数体内没有任何 set(...) 调用，返回 { files, categories, total, hasMore } 或 null。
@@ -277,6 +430,12 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
   total?: number
   hasMore?: boolean
 } | null> {
+  // 阶段 4：数据源分流刻意放在**本函数内部** —— useRefreshMedia / Sidebar / GalleryPage
+  // 等所有既有调用点因此一行都不用改，切换只影响「数据从哪来」，不影响「谁在取数」。
+  if (useMediaStore.getState().source === 'nikkisync') {
+    return fetchMediaFromRuntime(options)
+  }
+
   if (!window.electronAPI?.media?.list || !window.electronAPI?.category?.list) {
     console.error(
       i18n.t('mediaStore.log.noElectronApi') +
@@ -446,6 +605,9 @@ function dedupeAgainst(existing: MediaFile[], incoming: MediaFile[]): MediaFile[
 // 无限滚动入口：滚动到底时追加下一页并写入 store
 // 与 loadMoreMedia 的分工：loadMoreMedia 只负责取数，本函数负责游标推进、去重追加与并发保护
 export async function loadNextMediaPage(): Promise<void> {
+  // 阶段 4：NikkiSync 源走自己的游标续页（base64url 字符串游标，与本地 keyset 游标不同构）
+  if (useMediaStore.getState().source === 'nikkisync') return loadNextAssetPage()
+
   const { loadingMore, hasMoreMedia, mediaCursor } = useMediaStore.getState()
   // 并发保护：VirtuosoGrid 的 endReached 在一次触底中可能连续触发多次
   if (loadingMore || !hasMoreMedia) return

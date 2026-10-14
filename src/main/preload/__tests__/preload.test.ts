@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('nikkisync 命名空间方法清单（阶段4 查询面扩容后共 16 个）', () => {
+  it('nikkisync 命名空间方法清单（阶段4 查询面扩容后共 17 个）', () => {
     // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
     // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
     const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
@@ -85,6 +85,7 @@ describe('preload 装配完整性', () => {
         'searchSuits',
         'searchClothing',
         'profileStats',
+        'onLibraryChanged',
         'getServerStatus',
         'startServer',
         'stopServer',

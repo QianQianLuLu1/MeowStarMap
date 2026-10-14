@@ -1,7 +1,9 @@
-// @core-change: sync-integration 阶段4：新增批量资源/增量变更/套装服装搜索/档案统计 5 个桥方法
+// @core-change: sync-integration 阶段4 二次改动：增 library-changed 订阅，并把 getResourceRecords
+//               改为 mode 泛型返回（调用侧不再需要判联合类型）。
+//               （历史：阶段3 建启停/配对/设备管理，阶段4 首轮增 5 个查询扩容方法。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
-import { call } from '../ipc'
+import { call, subscribe } from '../ipc'
 import type {
   NikkiSyncAssetDetailInfo,
   NikkiSyncAssetPageInfo,
@@ -13,10 +15,8 @@ import type {
   NikkiSyncPairingCodeInfo,
   NikkiSyncProfileStatsInfo,
   NikkiSyncResourceInfo,
-  NikkiSyncResourcePathsInfo,
   NikkiSyncResourceQueryInfo,
-  NikkiSyncResourceRecordsInfo,
-  NikkiSyncResourceRecordsQueryInfo,
+  NikkiSyncResourceRecordsFor,
   NikkiSyncRuntimeStatusInfo,
   NikkiSyncScanInputInfo,
   NikkiSyncSearchQueryInfo,
@@ -42,11 +42,8 @@ export const nikkisyncAPI = {
     call<NikkiSyncResourceInfo>('nikkisync:get-resource', input),
   // ---- 阶段 4：查询面扩容（图库数据层切换所需；均为一条通道一行转发）----
   /** 批量资源：一页资产一次往返，避免逐资产 500 次 IPC；mode 决定返回记录表还是路径表 */
-  getResourceRecords: (input: NikkiSyncResourceRecordsQueryInfo) =>
-    call<NikkiSyncResourceRecordsInfo | NikkiSyncResourcePathsInfo>(
-      'nikkisync:get-resource-records',
-      input
-    ),
+  getResourceRecords: <M extends 'meta' | 'path'>(input: { assetIds: string[]; mode: M }) =>
+    call<NikkiSyncResourceRecordsFor<M>>('nikkisync:get-resource-records', input),
   /** 增量变更（GET /v1/changes 的本地等价调用）；fullResyncRequired 为真时须重置游标 */
   getChanges: (input: NikkiSyncChangesQueryInfo) =>
     call<NikkiSyncChangesInfo>('nikkisync:get-changes', input),
@@ -58,6 +55,8 @@ export const nikkisyncAPI = {
     call<NikkiSyncClothingSearchInfo>('nikkisync:search-clothing', input),
   /** 档案统计：转发上游 ProfileStatsIndex */
   profileStats: () => call<NikkiSyncProfileStatsInfo>('nikkisync:profile-stats'),
+  /** 订阅「资产库已变更」（扫描成功返回后由主进程推送）；返回退订函数 */
+  onLibraryChanged: (cb: () => void) => subscribe('nikkisync:library-changed', cb),
   // ---- 阶段 3：上游 LocalSyncServer 的启停与配对管理 ----
   /** 同步服务状态；句柄未装配时 `{ available: false }`（不抛） */
   getServerStatus: () => call<NikkiSyncServerStatusInfo>('nikkisync:server-status'),

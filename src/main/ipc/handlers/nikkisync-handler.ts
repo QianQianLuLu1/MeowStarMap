@@ -1,7 +1,9 @@
-// @core-change: sync-integration 阶段4：新增批量资源/增量变更/套装服装搜索/档案统计 5 条只读通道
-//               （历史：阶段2 建成本 handler 的状态与协议 DTO 查询面，阶段3 增同步服务 6 条；
-//               三个阶段都只增通道，本文件始终零字段转换）。
+// @core-change: sync-integration 阶段4 二次改动：start-scan 成功后向发起方推 library-changed，
+//               使扫描完成时图库自动刷新（无 sender / 发送失败一律静默，不改判扫描结果）。
+//               （历史：本 handler 于阶段2 建成只读查询面、阶段3 增同步服务、阶段4 首轮增 5 条
+//               查询扩容通道；三个阶段均零字段转换。）
 import { ipcMain } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
@@ -158,6 +160,22 @@ async function parseAndRun<S extends z.ZodTypeAny, R>(
   }
 }
 
+/**
+ * 扫描成功 ⇒ 通知发起方「资产库变了」（阶段 4 的图库自动刷新入口）。
+ *
+ * 只在扫描成功返回后发：扫描失败时库可能处于中间态，此时通知反而会让 UI 刷出半截结果。
+ * 发送本身失败（窗口已关、CLI/探针没有 sender）一律静默——绝不能因为一次通知失败
+ * 就把已经成功的扫描判成失败。
+ */
+function notifyLibraryChanged(event: IpcMainInvokeEvent): void {
+  try {
+    const sender = (event as { sender?: { send?: (channel: string) => void } })?.sender
+    sender?.send?.('nikkisync:library-changed')
+  } catch {
+    // 通知是尽力而为：没有任何可恢复动作，也不改变扫描结果
+  }
+}
+
 export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   ipcMain.handle(
     'nikkisync:runtime-status',
@@ -172,14 +190,16 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(
     'nikkisync:start-scan',
-    wrapHandlerRaw(ctx, async (args) => {
+    wrapHandlerRaw(ctx, async (args, _ctx, event) => {
       const runtime = requireRuntime(ctx)
-      return parseAndRun(scanSchema, args[0], 'scan', (input) =>
+      const result = await parseAndRun(scanSchema, args[0], 'scan', (input) =>
         runtime.scan({
           ...(input.gameRoot === undefined ? {} : { gameRoot: input.gameRoot }),
           ...(input.path === undefined ? {} : { path: input.path })
         })
       )
+      notifyLibraryChanged(event)
+      return result
     })
   )
 
