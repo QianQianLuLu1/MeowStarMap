@@ -1,16 +1,27 @@
-// @core-change: sync-integration 阶段3：新增 NikkiSync 同步服务的启停/配对码/设备管理 6 个方法
+// @core-change: sync-integration 阶段4：新增批量资源/增量变更/套装服装搜索/档案统计 5 个桥方法
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call } from '../ipc'
 import type {
+  NikkiSyncAssetDetailInfo,
   NikkiSyncAssetPageInfo,
   NikkiSyncAssetQueryInfo,
+  NikkiSyncChangesInfo,
+  NikkiSyncChangesQueryInfo,
+  NikkiSyncClothingSearchInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncPairingCodeInfo,
+  NikkiSyncProfileStatsInfo,
+  NikkiSyncResourceInfo,
+  NikkiSyncResourcePathsInfo,
   NikkiSyncResourceQueryInfo,
+  NikkiSyncResourceRecordsInfo,
+  NikkiSyncResourceRecordsQueryInfo,
   NikkiSyncRuntimeStatusInfo,
   NikkiSyncScanInputInfo,
+  NikkiSyncSearchQueryInfo,
   NikkiSyncServerStatusInfo,
+  NikkiSyncSuitSearchInfo,
   NikkiSyncSyncStartInputInfo
 } from '../../../shared/types/electron-api'
 
@@ -24,10 +35,29 @@ export const nikkisyncAPI = {
   getAssets: (input?: NikkiSyncAssetQueryInfo) =>
     call<NikkiSyncAssetPageInfo>('nikkisync:get-assets', input ?? {}),
   /** 单资产详情：含 resources 与 motion 配对段（motion_photo 的静图+视频聚合结论） */
-  getAssetDetail: (assetId: string) => call<unknown>('nikkisync:get-asset-detail', assetId),
+  getAssetDetail: (assetId: string) =>
+    call<NikkiSyncAssetDetailInfo>('nikkisync:get-asset-detail', assetId),
   /** 资源元信息（默认）或上游落库的绝对路径（mode:'path'） */
   getResource: (input: NikkiSyncResourceQueryInfo) =>
-    call<unknown>('nikkisync:get-resource', input),
+    call<NikkiSyncResourceInfo>('nikkisync:get-resource', input),
+  // ---- 阶段 4：查询面扩容（图库数据层切换所需；均为一条通道一行转发）----
+  /** 批量资源：一页资产一次往返，避免逐资产 500 次 IPC；mode 决定返回记录表还是路径表 */
+  getResourceRecords: (input: NikkiSyncResourceRecordsQueryInfo) =>
+    call<NikkiSyncResourceRecordsInfo | NikkiSyncResourcePathsInfo>(
+      'nikkisync:get-resource-records',
+      input
+    ),
+  /** 增量变更（GET /v1/changes 的本地等价调用）；fullResyncRequired 为真时须重置游标 */
+  getChanges: (input: NikkiSyncChangesQueryInfo) =>
+    call<NikkiSyncChangesInfo>('nikkisync:get-changes', input),
+  /** 套装搜索：转发上游 SuitSearchIndex，query 原样下传 */
+  searchSuits: (input: NikkiSyncSearchQueryInfo) =>
+    call<NikkiSyncSuitSearchInfo>('nikkisync:search-suits', input),
+  /** 服装搜索：转发上游 ClothingSearchIndex */
+  searchClothing: (input: NikkiSyncSearchQueryInfo) =>
+    call<NikkiSyncClothingSearchInfo>('nikkisync:search-clothing', input),
+  /** 档案统计：转发上游 ProfileStatsIndex */
+  profileStats: () => call<NikkiSyncProfileStatsInfo>('nikkisync:profile-stats'),
   // ---- 阶段 3：上游 LocalSyncServer 的启停与配对管理 ----
   /** 同步服务状态；句柄未装配时 `{ available: false }`（不抛） */
   getServerStatus: () => call<NikkiSyncServerStatusInfo>('nikkisync:server-status'),

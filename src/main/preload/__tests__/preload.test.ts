@@ -69,6 +69,52 @@ describe('preload 装配完整性', () => {
     )
   })
 
+  it('nikkisync 命名空间方法清单（阶段4 查询面扩容后共 16 个）', () => {
+    // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
+    // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
+    const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
+    expect(Object.keys(electronAPI.nikkisync).sort()).toEqual(
+      [
+        'getRuntimeStatus',
+        'startScan',
+        'getAssets',
+        'getAssetDetail',
+        'getResource',
+        'getResourceRecords',
+        'getChanges',
+        'searchSuits',
+        'searchClothing',
+        'profileStats',
+        'getServerStatus',
+        'startServer',
+        'stopServer',
+        'getPairingCode',
+        'getPairedDevices',
+        'revokeDevice'
+      ].sort()
+    )
+  })
+
+  it('阶段4 五个新方法各自命中对应通道名（一行转发最容易写错的就是通道名）', async () => {
+    const electronAPI = getExposed<{
+      nikkisync: Record<string, (...args: unknown[]) => Promise<unknown>>
+    }>('electronAPI')
+    invokeMock.mockResolvedValue({ success: true, data: { ok: 1 } })
+    await electronAPI.nikkisync.getResourceRecords({ assetIds: ['a/1'], mode: 'path' })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:get-resource-records', {
+      assetIds: ['a/1'],
+      mode: 'path'
+    })
+    await electronAPI.nikkisync.getChanges({ after: 3 })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:get-changes', { after: 3 })
+    await electronAPI.nikkisync.searchSuits({ query: '花' })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:search-suits', { query: '花' })
+    await electronAPI.nikkisync.searchClothing({ query: '裙' })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:search-clothing', { query: '裙' })
+    await electronAPI.nikkisync.profileStats()
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:profile-stats')
+  })
+
   it('electronAPI 包含全部 33 个键（reportReady + 32 个命名空间，阶段2 增 nikkisync）', () => {
     const electronAPI = getExposed<Record<string, unknown>>('electronAPI')
     expect(Object.keys(electronAPI).sort()).toEqual(

@@ -589,6 +589,12 @@ export interface NikkiSyncResourceQueryInfo {
   mode?: 'meta' | 'path'
 }
 
+/**
+ * `nikkisync:get-resource` 响应：`meta` → `MediaResource`；`path` → 上游落库的绝对路径原值。
+ * 二者由入参 `mode` 决定，这里保持联合而非 `unknown`，让调用方必须显式判别。
+ */
+export type NikkiSyncResourceInfo = MediaResource | string
+
 // ============ NikkiSync 资产查询面扩容（sync-integration 阶段4 · UI Bridge） ============
 // 响应侧一律用**类型别名**指向协议真相源，不在本仓重列字段：内嵌层零转换，
 // 别名即「handler 原样返回上游对象」这一事实的编译期表达。

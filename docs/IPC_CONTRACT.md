@@ -374,7 +374,7 @@ wrapHandler(ctx, schema, handler) =>
 
 `resonance:commitImport` 的空批次 `refine` 守卫已同步放宽：仅携带 `includeWishlist: true` + `wishlist` 的末批视为有效批次（此前仅记录段与 wardrobe 可使其通过）。
 
-## 8. NikkiSync 域（sync-integration 阶段 2 查询面 + 阶段 3 服务面）
+## 8. NikkiSync 域（sync-integration 阶段 2 查询面 + 阶段 3 服务面 + 阶段 4 查询面扩容）
 
 补齐阶段 1/2 欠下的同步义务：`nikkisync:*` 与 `sync:*` 两组通道此前未入本契约。
 实现位置：`src/main/ipc/handlers/nikkisync-handler.ts`、`src/main/preload/api/nikkisync.ts`、
@@ -393,6 +393,30 @@ wrapHandler(ctx, schema, handler) =>
 | `nikkisync:get-assets`       | `{limit=100 (1..500), cursor?, type?, afterRevision?, includeDeleted?}` | `{items, nextCursor?, libraryRevision}`                                                               | 同上                                                     |
 | `nikkisync:get-asset-detail` | `assetId: string(1..128)`                                               | `mapAssetDetail` 结果                                                                                 | `VALIDATION_ERROR` / `NOT_FOUND`                         |
 | `nikkisync:get-resource`     | `{assetId, resourceId, mode='meta'\|'path'}`                            | `MediaResource` 或上游 `source_path` 原值                                                             | 同上                                                     |
+
+### 8.1.1 查询面扩容（阶段 4，仍零转换；为图库数据层切换而加）
+
+实现位置同上。响应类型出处是 `src/shared/sync/protocol.ts`（本仓协议契约唯一真相源），
+`electron-api.ts` 只以 `import type` 别名引用，**不再重列字段名**。
+
+| 通道                             | 入参                                                         | 出参                                                                                                                                                                                                                                          | 失败码                                                   |
+| -------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `nikkisync:get-resource-records` | `{assetIds: string(1..128)[] (1..500), mode='meta'\|'path'}` | `meta` → `{byAsset: {[assetId]: MediaResource[]}}`；`path` → `{byAsset: {[assetId]: {[resourceId]: 上游 source_path 原值}}}`；无资源的资产给 `[]` / `{}`，不静默丢弃                                                                          | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `nikkisync:get-changes`          | `{after: int(>=0), limit=1000 (1..1000)}`                    | `{changes: ChangeRecord[], libraryRevision, fullResyncRequired}`；判据逐字同上游 `GET /v1/changes`——`after < minimumJournalRevision() - 1` 时 `fullResyncRequired=true` 且 `changes` 为空；日志表为空（`minimum` 为 `undefined`）**不判**全量 | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
+| `nikkisync:search-suits`         | `{query: string(1..128)，不得全空白}`                        | `SuitSearchResponse`（`{query, items}`）                                                                                                                                                                                                      | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `nikkisync:search-clothing`      | 同上                                                         | `ClothingSearchResponse`                                                                                                                                                                                                                      | 同上                                                     |
+| `nikkisync:profile-stats`        | 无                                                           | `ProfileStatsResponse`（`{libraryRevision, dictionary?, topSuits, topClothing}`）                                                                                                                                                             | `PRECONDITION_FAILED`                                    |
+
+契约要点：
+
+- **`query` 原串下传**：`trim` 与空判由上游索引内部负责，本层刻意不加 `.trim()`；但**全空白在本层即拒**——
+  一旦放行，搜索源装配（`listSuitSearchAssets` 无 LIMIT）会为一个无意义查询摊平整库资产。
+- `get-resource-records` 的存在理由是**往返次数**：一页 500 资产若逐条 `get-resource` 就是 500 次 IPC。
+  外层容器 `byAsset` 由本仓组装，容器内每一项仍是上游 `mapResourceRow` / `resources.source_path` 原值。
+- 上游 `AssetListQuery` **不支持** `uid` / `state` / 文本过滤（只有 `cursor/limit/type/afterRevision/includeDeleted`），
+  故档案与关键字过滤属渲染层职责；要加服务端过滤条件属破坏性变更，须另起通道 + 迁移期双写。
+- `path` 模式给的是绝对路径原值，**仅供**渲染层拼 `media://` URL；该路径能否被真正读取由
+  `src/main/app/media-protocol.ts` 的白名单判定，本域不做授权、不做规整、不承诺文件仍存在。
 
 ### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
 

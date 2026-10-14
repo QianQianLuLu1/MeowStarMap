@@ -1,6 +1,6 @@
-// @core-change: sync-integration 阶段3：新增 nikkisync 同步服务启停/配对码/设备管理 5 条通道
-//               （历史：阶段2 新增本 handler 把内嵌 NikkiSync Runtime 的状态与协议 DTO
-//               查询面暴露给渲染进程；阶段3 只增通道，仍零字段转换）。
+// @core-change: sync-integration 阶段4：新增批量资源/增量变更/套装服装搜索/档案统计 5 条只读通道
+//               （历史：阶段2 建成本 handler 的状态与协议 DTO 查询面，阶段3 增同步服务 6 条；
+//               三个阶段都只增通道，本文件始终零字段转换）。
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -22,6 +22,16 @@ import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-a
  * - `nikkisync:get-asset-detail`：`mapAssetDetail` 结果原样返回
  * - `nikkisync:get-resource`：`mode:'meta'` 给 `MediaResource`；`mode:'path'` 给上游落库的
  *   绝对路径原值（渲染层据此经既有 media:// 协议读取文件）
+ *
+ * 查询面扩容（阶段 4，为图库数据层切换而加；同样逐字转发上游仓储/索引，本文件不加工）：
+ * - `nikkisync:get-resource-records`：一页资产一次往返取回全部资源，避免 500 次单查
+ * - `nikkisync:get-changes`：`GET /v1/changes` 的本地等价调用，`fullResyncRequired`
+ *   判据照抄上游 `LocalSyncServer.listChanges`（`after < minimum - 1`）
+ * - `nikkisync:search-suits` / `nikkisync:search-clothing`：转发上游 `SuitSearchIndex` /
+ *   `ClothingSearchIndex`（两者与 `row-mappers` 一样是 `dist/src/server/**` 深入口）；
+ *   `query` 原串下传（trim 归上游），但全空白在本层即拒——否则会为一个无意义查询
+ *   摊平整库资产
+ * - `nikkisync:profile-stats`：转发上游 `ProfileStatsIndex.buildProfileStats`
  *
  * 服务面（阶段 3，全部复用上游 `LocalSyncServer`，本仓不实现任何 HTTP/TLS/WS/mDNS）：
  * - `nikkisync:server-status`：运行状态 + 端口 + TLS 指纹 + 已配对数；未装配 ⇒ `available:false`
@@ -59,6 +69,30 @@ const resourceSchema = z.object({
   assetId: z.string().trim().min(1).max(128),
   resourceId: z.string().trim().min(1).max(128),
   mode: z.enum(['meta', 'path']).default('meta')
+})
+
+/**
+ * 阶段 4：批量资源记录。`assetIds` 上界与 `listSchema.limit` 同界（500），
+ * 否则单个 IPC 请求会放大成上千次上游查询。
+ */
+const resourceRecordsSchema = z.object({
+  assetIds: z.array(z.string().trim().min(1).max(128)).min(1).max(500),
+  mode: z.enum(['meta', 'path']).default('meta')
+})
+
+// after 必填（上游 listChanges 缺该参数即 400）；limit 上界同上游 listChangesAfter 缺省 1000
+const changesSchema = z.object({
+  after: z.number().int().min(0),
+  limit: z.number().int().min(1).max(1000).default(1000)
+})
+
+/**
+ * 阶段 4：搜索入参。刻意**不** `.trim()`——零转换要求把原串交给上游
+ * （`searchSuitLibrary` 内部自行 trim），但全空白必须在本层就拒掉：
+ * 一旦放行，`buildSearchSource` 会为一次无意义查询摊平整库资产。
+ */
+const searchSchema = z.object({
+  query: z.string().min(1).max(128).regex(/\S/, 'query must contain a non-whitespace character')
 })
 
 // 阶段 3：启停入参。端口界与上游 listen 一致（1..65535，0 是「交给系统分配」，
@@ -188,6 +222,60 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
       return parseAndRun(resourceSchema, args[0], 'query', (input) =>
         runtime.getResource(input.assetId, input.resourceId, input.mode)
       )
+    })
+  )
+
+  // ---- 阶段 4：查询面扩容（批量资源 / 增量变更 / 搜索 / 统计），全部零转换 ----
+
+  ipcMain.handle(
+    'nikkisync:get-resource-records',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(resourceRecordsSchema, args[0], 'resource-records', (input) =>
+        runtime.listResourceRecords(input.assetIds, input.mode)
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:get-changes',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(changesSchema, args[0], 'changes', (input) =>
+        runtime.listChanges(input.after, input.limit)
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:search-suits',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(searchSchema, args[0], 'search-suits', (input) =>
+        runtime.searchSuits(input.query)
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:search-clothing',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(searchSchema, args[0], 'search-clothing', (input) =>
+        runtime.searchClothing(input.query)
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:profile-stats',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return await runtime.profileStats()
+      } catch (error) {
+        throw toAppError(error, 'profile-stats')
+      }
     })
   )
 

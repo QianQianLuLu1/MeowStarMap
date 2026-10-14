@@ -969,6 +969,23 @@ interface WindowElectronAPI {
     getResource: (
       input: import('../shared/types/electron-api').NikkiSyncResourceQueryInfo
     ) => Promise<import('../shared/sync/protocol').MediaResource | string>
+    // ---- sync-integration 阶段4：查询面扩容（批量资源 / 增量变更 / 搜索 / 统计）----
+    getResourceRecords: (
+      input: import('../shared/types/electron-api').NikkiSyncResourceRecordsQueryInfo
+    ) => Promise<
+      | import('../shared/types/electron-api').NikkiSyncResourceRecordsInfo
+      | import('../shared/types/electron-api').NikkiSyncResourcePathsInfo
+    >
+    getChanges: (
+      input: import('../shared/types/electron-api').NikkiSyncChangesQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncChangesInfo>
+    searchSuits: (
+      input: import('../shared/types/electron-api').NikkiSyncSearchQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncSuitSearchInfo>
+    searchClothing: (
+      input: import('../shared/types/electron-api').NikkiSyncSearchQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncClothingSearchInfo>
+    profileStats: () => Promise<import('../shared/types/electron-api').NikkiSyncProfileStatsInfo>
     // ---- sync-integration 阶段3：上游 NikkiSync LocalSyncServer 的启停与配对管理 ----
     getServerStatus: () => Promise<{
       available: boolean

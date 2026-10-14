@@ -1,8 +1,8 @@
 /**
  * @layer L3
  * @module src/main/ipc/handlers/nikkisync-handler
- * @coverage NikkiSync 内嵌运行时 IPC（阶段 2 只读查询 + 阶段 3 同步服务）：11 条通道的注册、
- *           参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射。
+ * @coverage NikkiSync 内嵌运行时 IPC（阶段 2 只读查询 + 阶段 3 同步服务 + 阶段 4 查询面扩容）：
+ *           16 条通道的注册、参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射。
  *
  * 断言口径：`data` 与句柄返回值**逐字段相等**（`toEqual`），以此锁死「内嵌层不做数据
  * 格式转换」这条铁律——一旦 handler 里出现字段重命名或结构包装，本文件立即变红。
@@ -76,6 +76,23 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
     })),
     getAssetDetail: vi.fn(async (assetId) => ({ asset: { assetId, resources: [] } })),
     getResource: vi.fn(async (assetId, resourceId, mode) => ({ assetId, resourceId, mode })),
+    // ---- 阶段 4：查询面扩容（批量资源 / 增量变更 / 搜索 / 统计）----
+    listResourceRecords: vi.fn(async (assetIds) => ({
+      byAsset: Object.fromEntries(assetIds.map((assetId) => [assetId, []]))
+    })),
+    listChanges: vi.fn(async (after, limit) => ({
+      changes: [{ revision: after + 1, type: 'asset.updated', assetId: 'asset_1' }],
+      libraryRevision: 9,
+      fullResyncRequired: false,
+      limit
+    })),
+    searchSuits: vi.fn(async (query) => ({ query, items: [] })),
+    searchClothing: vi.fn(async (query) => ({ query, items: [] })),
+    profileStats: vi.fn(async () => ({
+      libraryRevision: 9,
+      topSuits: [],
+      topClothing: []
+    })),
     // ---- 阶段 3 ----
     syncStatus: vi.fn(() => SERVER_STATUS),
     startSyncServer: vi.fn(async () => SERVER_STATUS),
@@ -105,7 +122,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 11 条通道（阶段2 五条查询 + 阶段3 六条服务）', () => {
+  it('恰好注册 16 条通道（阶段2 五条查询 + 阶段4 五条扩容 + 阶段3 六条服务）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -114,6 +131,11 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:get-assets',
       'nikkisync:get-asset-detail',
       'nikkisync:get-resource',
+      'nikkisync:get-resource-records',
+      'nikkisync:get-changes',
+      'nikkisync:search-suits',
+      'nikkisync:search-clothing',
+      'nikkisync:profile-stats',
       'nikkisync:server-status',
       'nikkisync:start-server',
       'nikkisync:stop-server',
@@ -467,5 +489,175 @@ describe('nikkisync:get-paired-devices / revoke-device（阶段3）', () => {
       expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
     }
     expect(runtime.revokeDevice).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================================
+// 阶段 4（UI Bridge）：查询面扩容的五条通道。
+//
+// 断言口径升级：既有用例用 `toEqual` 锁「字段一致」，本组新用例改用 **`toBe` 身份相等**——
+// 只要 handler 里出现 `{...data}`、字段改名或再包一层，返回的就是另一个对象，立即变红。
+// 这是「IPC 桥接是薄转发层」最直接的守卫形式。
+// ============================================================================
+
+describe('nikkisync:get-resource-records（阶段4 批量资源）', () => {
+  it('响应体与句柄返回值同一身份；mode 缺省 meta', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-resource-records')
+    const sentinel = { byAsset: { 'a/1': [{ resourceId: 'r1' }] } }
+    vi.mocked(runtime.listResourceRecords).mockResolvedValueOnce(sentinel)
+    const res = (await handler({}, { assetIds: ['a/1'] })) as HandleResult
+    expect(runtime.listResourceRecords).toHaveBeenCalledWith(['a/1'], 'meta')
+    expect(res.success).toBe(true)
+    expect(res.data).toBe(sentinel)
+  })
+
+  it('mode:path 逐字下传，路径表原样透出', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-resource-records')
+    await handler({}, { assetIds: ['a/1', 'a/2'], mode: 'path' })
+    expect(runtime.listResourceRecords).toHaveBeenCalledWith(['a/1', 'a/2'], 'path')
+  })
+
+  it('assetIds 空数组 / 超 500 / 含空串 / 非数组 ⇒ VALIDATION_ERROR 且不调句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-resource-records')
+    const badInputs: unknown[] = [
+      { assetIds: [] },
+      { assetIds: Array.from({ length: 501 }, (_, i) => `a${i}`) },
+      { assetIds: [''] },
+      { assetIds: 'a/1' },
+      { assetIds: ['a/1'], mode: 'bytes' },
+      {}
+    ]
+    for (const input of badInputs) {
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.success, JSON.stringify(input)).toBe(false)
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.listResourceRecords).not.toHaveBeenCalled()
+  })
+})
+
+describe('nikkisync:get-changes（阶段4 增量变更）', () => {
+  it('after 必填、limit 缺省 1000，响应原样透出', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-changes')
+    const sentinel = {
+      changes: [{ revision: 41, type: 'asset.updated', assetId: 'a/1', occurredAt: 'x' }],
+      libraryRevision: 41,
+      fullResyncRequired: false
+    }
+    vi.mocked(runtime.listChanges).mockResolvedValueOnce(sentinel)
+    const res = (await handler({}, { after: 40 })) as HandleResult
+    expect(runtime.listChanges).toHaveBeenCalledWith(40, 1000)
+    expect(res.data).toBe(sentinel)
+  })
+
+  it('fullResyncRequired:true 不被改写（前端据此才重置游标重取首页）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-changes')
+    const sentinel = { changes: [], libraryRevision: 90, fullResyncRequired: true }
+    vi.mocked(runtime.listChanges).mockResolvedValueOnce(sentinel)
+    const res = (await handler({}, { after: 0, limit: 500 })) as HandleResult
+    expect(runtime.listChanges).toHaveBeenCalledWith(0, 500)
+    expect(res.data).toBe(sentinel)
+    expect((res.data as typeof sentinel).fullResyncRequired).toBe(true)
+  })
+
+  it('after 缺失/负数/小数 与 limit 越界 ⇒ VALIDATION_ERROR 且不调句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-changes')
+    for (const input of [
+      {},
+      { after: -1 },
+      { after: 1.5 },
+      { after: 0, limit: 0 },
+      { after: 0, limit: 1001 }
+    ]) {
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code, JSON.stringify(input)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.listChanges).not.toHaveBeenCalled()
+  })
+})
+
+describe('nikkisync:search-suits / search-clothing / profile-stats（阶段4）', () => {
+  it('query 原样下传（trim 与空判归上游索引内部），响应同一身份', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const suits = getHandler(handleMock, 'nikkisync:search-suits')
+    const clothing = getHandler(handleMock, 'nikkisync:search-clothing')
+    const suitSentinel = { query: '  花 ', items: [{ suitName: 'x' }] }
+    const clothingSentinel = { query: '  花 ', items: [] }
+    vi.mocked(runtime.searchSuits).mockResolvedValueOnce(suitSentinel)
+    vi.mocked(runtime.searchClothing).mockResolvedValueOnce(clothingSentinel)
+    const a = (await suits({}, { query: '  花 ' })) as HandleResult
+    expect(runtime.searchSuits).toHaveBeenCalledWith('  花 ')
+    expect(a.data).toBe(suitSentinel)
+    const b = (await clothing({}, { query: '  花 ' })) as HandleResult
+    expect(runtime.searchClothing).toHaveBeenCalledWith('  花 ')
+    expect(b.data).toBe(clothingSentinel)
+  })
+
+  it('query 空串 / 全空白 / 超长 ⇒ VALIDATION_ERROR 且不调句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    for (const channel of ['nikkisync:search-suits', 'nikkisync:search-clothing']) {
+      const handler = getHandler(handleMock, channel)
+      for (const input of [{}, { query: '' }, { query: '   ' }, { query: 'x'.repeat(129) }]) {
+        const res = (await handler({}, input)) as HandleResult
+        expect(res.error?.code, `${channel} ${JSON.stringify(input)}`).toBe(
+          IPC_ERROR_CODES.VALIDATION_ERROR
+        )
+      }
+    }
+    expect(runtime.searchSuits).not.toHaveBeenCalled()
+    expect(runtime.searchClothing).not.toHaveBeenCalled()
+  })
+
+  it('profile-stats 无参调用并原样返回', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:profile-stats')
+    const sentinel = { libraryRevision: 9, topSuits: [{ suitName: 'x', photoCount: 2 }] }
+    vi.mocked(runtime.profileStats).mockResolvedValueOnce(sentinel)
+    const res = (await handler({})) as HandleResult
+    expect(runtime.profileStats).toHaveBeenCalledTimes(1)
+    expect(res.data).toBe(sentinel)
+  })
+})
+
+describe('阶段4 扩容通道的未装配态', () => {
+  it('五条新通道统一给 PRECONDITION_FAILED（不降级成 INTERNAL_ERROR，也不静默空列表）', async () => {
+    register(undefined)
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:get-resource-records', { assetIds: ['a/1'] }],
+      ['nikkisync:get-changes', { after: 0 }],
+      ['nikkisync:search-suits', { query: '花' }],
+      ['nikkisync:search-clothing', { query: '花' }],
+      ['nikkisync:profile-stats', undefined]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.success, channel).toBe(false)
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+
+  it('上游 not found 类错误仍映射 NOT_FOUND（与既有三面同口径）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-changes')
+    vi.mocked(runtime.listChanges).mockRejectedValueOnce(new Error('journal table not found'))
+    const res = (await handler({}, { after: 0 })) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.NOT_FOUND)
   })
 })
