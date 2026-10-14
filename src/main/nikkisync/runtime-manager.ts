@@ -34,6 +34,8 @@ import {
   parsePairingUri,
   resolveSyncServerConfig
 } from './sync-server-view'
+// 阶段 4：会话拆除时收回 media:// 的资产路径授权（模块级单例，见 resource-allowlist）
+import { clearNikkiSyncResourcePaths } from './resource-allowlist'
 
 /**
  * 上游在「找不到游戏安装目录」时的原始消息（`scanner/ScannerService.ts` 内硬编码）。
@@ -213,6 +215,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     }
     state.session = undefined
     state.activeRoot = undefined
+    // 阶段 4：会话拆除（stop 或换根重建）即收回 media:// 的资产路径授权。
+    // 库已关闭还允许显示旧路径，等于给不存在的文件开一张长期有效的通行证。
+    clearNikkiSyncResourcePaths()
     // 会话已释放：状态回到 idle，否则随后的 start() 会被「已启动」短路吞掉
     if (state.state !== 'unavailable') state.state = 'idle'
   }

@@ -8,6 +8,11 @@ import {
   installNotfoundMessage
 } from './runtime-manager'
 import type { NikkiSyncRuntimeSession, NikkiSyncSessionOptions } from './runtime-types'
+import {
+  clearNikkiSyncResourcePaths,
+  isNikkiSyncResourcePath,
+  registerNikkiSyncResourcePaths
+} from './resource-allowlist'
 
 /**
  * 内嵌 Runtime 状态机单测（整合阶段 2 · T2）。
@@ -367,6 +372,30 @@ describe('createRuntimeManager 优雅停止', () => {
     await manager.stop()
     expect(calls.scannerStop).toBe(1)
     expect(calls.dispose).toBe(1)
+  })
+
+  it('会话拆除即收回 media:// 资产路径授权（阶段4）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    clearNikkiSyncResourcePaths()
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/a.png'])
+    expect(isNikkiSyncResourcePath('/mock/nikki/a.png')).toBe(true)
+
+    await manager.stop()
+    // 库已关闭还允许显示旧路径，等于给不存在的文件开长期口子
+    expect(isNikkiSyncResourcePath('/mock/nikki/a.png')).toBe(false)
+  })
+
+  it('换根重建同样收回授权，不把上一个库的路径带进新会话', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    clearNikkiSyncResourcePaths()
+    registerNikkiSyncResourcePaths(1, ['/mock/old-root/a.png'])
+
+    await manager.scan({ gameRoot: '/mock/other-root' })
+    expect(isNikkiSyncResourcePath('/mock/old-root/a.png')).toBe(false)
   })
 
   it('stop 抛错只记日志，不阻塞退出链', async () => {

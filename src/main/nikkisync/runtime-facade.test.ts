@@ -7,6 +7,12 @@ import {
 } from './runtime-facade'
 import type { RuntimeSurface } from './runtime-facade'
 import type { EmbeddedRuntimeLike } from './runtime-types'
+import {
+  clearNikkiSyncResourcePaths,
+  isNikkiSyncResourcePath,
+  nikkiSyncResourcePathCount,
+  nikkiSyncResourceRevision
+} from './resource-allowlist'
 
 /**
  * 阶段 4（UI Bridge）查询面扩容单测。
@@ -350,6 +356,43 @@ describe('createQuerySurface 搜索与统计', () => {
     const queries = createQuerySurface(brokenSurface, fixture.runtime)
     await queries.searchSuits('花')
     expect(fixture.searchSuitLibrary.mock.calls[0][1]).toBeUndefined()
+  })
+})
+
+describe('createQuerySurface 路径登记与 media:// 授权联动', () => {
+  it('path 模式把交出去的路径按当前 libraryRevision 登记进授权表；meta 模式不登记', async () => {
+    clearNikkiSyncResourcePaths()
+    const fixture = createSurface(
+      emptyRows({
+        currentRevision: 77,
+        resourcesByAsset: {
+          'a/1': [
+            { resource_id: 'r1', source_path: '/mock/nikki/a.png' },
+            { resource_id: 'r2', source_path: '/mock/nikki/a.mp4' }
+          ]
+        }
+      })
+    )
+    const queries = createQuerySurface(fixture.surface, fixture.runtime)
+
+    // meta 模式不送路径，因此也不该动授权表
+    await queries.listResourceRecords(['a/1'], 'meta')
+    expect(isNikkiSyncResourcePath('/mock/nikki/a.png')).toBe(false)
+
+    await queries.listResourceRecords(['a/1'], 'path')
+    expect(isNikkiSyncResourcePath('/mock/nikki/a.png')).toBe(true)
+    expect(isNikkiSyncResourcePath('/mock/nikki/a.mp4')).toBe(true)
+    expect(nikkiSyncResourceRevision()).toBe(77)
+    clearNikkiSyncResourcePaths()
+  })
+
+  it('空资源资产不登记任何东西', async () => {
+    clearNikkiSyncResourcePaths()
+    const fixture = createSurface(emptyRows({ currentRevision: 5 }))
+    const queries = createQuerySurface(fixture.surface, fixture.runtime)
+    await queries.listResourceRecords(['a/none'], 'path')
+    expect(nikkiSyncResourcePathCount()).toBe(0)
+    clearNikkiSyncResourcePaths()
   })
 })
 

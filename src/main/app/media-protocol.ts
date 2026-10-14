@@ -7,6 +7,8 @@ import type { AppContext } from './app-context'
 import { MEDIA_EXTENSIONS, getMimeType } from '../utils/media-constants'
 import { MEDIA_CACHE_TTL_MS } from '../utils/constants'
 import { isPathUnderDir } from '../utils/ipc-validate'
+// 阶段 4：media:// 第 4 条规则的事实来源（NikkiSync 资源路径精确授权表）
+import { isNikkiSyncResourcePath } from '../nikkisync/resource-allowlist'
 import { logger } from '../utils/logger'
 // 文件读流的生命周期管理统一走公共工具（含 error 监听 + abort 取消 + fd 归还），
 // 本文件不再自带实现，避免与 WiFi 分享服务出现两份易漂移的副本
@@ -102,8 +104,17 @@ export function registerMediaProtocol(ctx: AppContext): void {
         return new Response('File not found', { status: 404 })
       }
 
+      // 阶段 4 · 第 4 条规则：NikkiSync 资产路径授权。
+      // 查询面（runtime-facade 的 path 模式）把上游 `resources.source_path` 交给渲染层时
+      // 逐项登记，这里只做**确切路径**的精确匹配——不给目录级授权，判的是解引用之后的
+      // realPath（因此符号链接指向表外仍然落空），并沿用同一道扩展名白名单：
+      // 登记过也不放非媒体文件。本 App 的 DB 是否就绪与该规则无关（两份库彼此独立）。
+      const nikkisyncAllowed =
+        MEDIA_EXTENSIONS.has(path.extname(realPath).toLowerCase()) &&
+        isNikkiSyncResourcePath(realPath)
+
       // 路径白名单校验：仅允许访问已索引的媒体文件或已知缩略图
-      if (!isMediaPathAllowed(ctx, realPath)) {
+      if (!nikkisyncAllowed && !isMediaPathAllowed(ctx, realPath)) {
         logger.warn(t('main.mediaProtocol.log.denyNotWhitelisted'), filePath)
         return new Response('Forbidden', { status: 403 })
       }

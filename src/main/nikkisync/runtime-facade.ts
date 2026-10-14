@@ -40,6 +40,7 @@ import {
   type RuntimeManagerDependencies
 } from './runtime-manager'
 import { embeddedServerConfig, mapPairedDeviceRow } from './sync-server-view'
+import { registerNikkiSyncResourcePaths } from './resource-allowlist'
 import type {
   EmbeddedRuntimeLike,
   NikkiSyncPairedDeviceView,
@@ -321,15 +322,25 @@ export function createQuerySurface(
 
     async listResourceRecords(assetIds, mode) {
       const byAsset: Record<string, unknown> = {}
+      const displayed: string[] = []
       for (const assetId of assetIds) {
         const rows = repo.listResources(assetId)
-        byAsset[assetId] =
-          mode === 'path'
-            ? Object.fromEntries(
-                rows.map((row) => [String(row.resource_id), String(row.source_path)])
-              )
-            : rows.map(mapResourceRow)
+        if (mode === 'path') {
+          const paths: Record<string, string> = {}
+          for (const row of rows) {
+            const value = String(row.source_path)
+            paths[String(row.resource_id)] = value
+            displayed.push(value)
+          }
+          byAsset[assetId] = paths
+        } else {
+          byAsset[assetId] = rows.map(mapResourceRow)
+        }
       }
+      // path 模式送出去的每一条绝对路径同时进入 media:// 授权表：
+      // 「能被显示的」必须恰好是「被我们主动给出去的那批」，不开放目录级授权。
+      // revision 取当前值 ⇒ 扫描推进后旧表整批失效（见 resource-allowlist 安全口径）。
+      if (mode === 'path') registerNikkiSyncResourcePaths(repo.currentRevision(), displayed)
       return { byAsset }
     },
 

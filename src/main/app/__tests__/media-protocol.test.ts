@@ -65,6 +65,10 @@ vi.mock('fs', () => ({
 }))
 
 import { registerMediaProtocol, invalidateMediaPathCache } from '../media-protocol'
+import {
+  clearNikkiSyncResourcePaths,
+  registerNikkiSyncResourcePaths
+} from '../../nikkisync/resource-allowlist'
 
 // 捕获 protocol.handle 注册的 handler
 let mediaHandler:
@@ -657,5 +661,87 @@ describe('缩略图协商缓存（ETag/304）', () => {
     expect(response.headers.get('Content-Range')).toBe('bytes 0-1023/10000')
     // 206 分支保持原强缓存头（缩略图 <img> 请求不会携带 Range）
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000')
+  })
+})
+
+describe('media:// 第 4 条规则：NikkiSync 资源路径授权（阶段 4）', () => {
+  /**
+   * 图库切到 NikkiSync 数据源后，资产路径来自上游 `resources.source_path`，
+   * 不在本 App 的 `media_files` 里。本组用例锁四件事：
+   * ① 登记过的确切路径可示；② 同目录未登记的一律 403（不给目录级授权）；
+   * ③ 扩展名白名单仍然生效（登记过也不放 .txt）；④ 本 App DB 未就绪不影响该规则
+   * （两份库彼此独立，否则启动早期整屏裂图）。
+   */
+  function register(): NonNullable<typeof mediaHandler> {
+    const ctx = makeAppCtx({ db: makeDb(() => undefined) })
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+    invalidateMediaPathCache()
+  })
+
+  it('25. 登记过的 NikkiSync 路径返回 200（DB 无任何匹配）', async () => {
+    const target = `/mock/nikki/a.png`
+    registerNikkiSyncResourcePaths(1, [target])
+    const response = await register()(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('26. 同目录未登记的路径返回 403（精确匹配，不做前缀授权）', async () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/a.png'])
+    const response = await register()(makeRequest('/mock/nikki/other.png'))
+    expect(response.status).toBe(403)
+  })
+
+  it('27. 扩展名不在媒体白名单时，即便登记过也返回 403', async () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/notes.txt'])
+    const response = await register()(makeRequest('/mock/nikki/notes.txt'))
+    expect(response.status).toBe(403)
+  })
+
+  it('28. 本 App DB 为 null 时该规则仍生效（两份库彼此独立）', async () => {
+    const target = '/mock/nikki/b.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    const ctx = makeAppCtx({ db: null })
+    registerMediaProtocol(ctx)
+    const handler = protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+    const response = await handler(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('29. realpath 逃逸：登记原路径而请求解引用到表外 ⇒ 403', async () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/link.png'])
+    fsRealpathMock.mockImplementation(async () => 'C:/Windows/system.png')
+    const response = await register()(makeRequest('/mock/nikki/link.png'))
+    expect(response.status).toBe(403)
+  })
+
+  it('30. clear（Runtime 停止/未就绪）后同一律回落到 403', async () => {
+    const target = '/mock/nikki/c.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    clearNikkiSyncResourcePaths()
+    const response = await register()(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('31. Windows 大小写差异不裂图：登记大写形式、请求小写形式仍命中', async () => {
+    const upper = 'D:/mock/nikki/D.PNG'
+    const lower = 'd:/mock/nikki/d.png'
+    registerNikkiSyncResourcePaths(1, [upper])
+    if (process.platform === 'win32') {
+      const response = await register()(makeRequest(lower))
+      expect(response.status).toBe(200)
+    } else {
+      // 非 Windows 保留大小写敏感：同一路径自身仍必须命中
+      const response = await register()(makeRequest(upper))
+      expect(response.status).toBe(200)
+    }
   })
 })
