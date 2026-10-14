@@ -179,6 +179,23 @@ export interface NikkiSyncQuerySurface {
   getAssetDetail(assetId: string): Promise<unknown>
   /** `mode:'meta'` → `MediaResource`；`mode:'path'` → `resources.source_path` 原值。 */
   getResource(assetId: string, resourceId: string, mode: 'meta' | 'path'): Promise<unknown>
+  /**
+   * 阶段 4：批量资源记录。一次往返覆盖整页，避免逐资产 500 次 IPC。
+   * `'meta'` → `{ byAsset: { [assetId]: MediaResource[] } }`；
+   * `'path'` → `{ byAsset: { [assetId]: { [resourceId]: source_path } } }`（上游原值）。
+   */
+  listResourceRecords(assetIds: string[], mode: 'meta' | 'path'): Promise<unknown>
+  /**
+   * 阶段 4：增量变更。响应与上游 `GET /v1/changes` 同形
+   * （`{ changes, libraryRevision, fullResyncRequired }`），判据照抄上游不作改。
+   */
+  listChanges(after: number, limit: number): Promise<unknown>
+  /** 阶段 4：套装搜索，转发上游 `searchSuitLibrary`。 */
+  searchSuits(query: string): Promise<unknown>
+  /** 阶段 4：服装搜索，转发上游 `searchClothingLibrary`。 */
+  searchClothing(query: string): Promise<unknown>
+  /** 阶段 4：档案统计，转发上游 `buildProfileStats`。 */
+  profileStats(): Promise<unknown>
 }
 
 /** 装载 + 组装后的会话句柄（`runtime-facade.ts` 产出，`runtime-manager.ts` 持有）。 */
@@ -238,6 +255,16 @@ export interface NikkiSyncRuntimeHandle {
   }): Promise<unknown>
   getAssetDetail(assetId: string): Promise<unknown>
   getResource(assetId: string, resourceId: string, mode?: 'meta' | 'path'): Promise<unknown>
+  /** 阶段 4：批量资源记录（`queries.listResourceRecords` 的薄委托）。 */
+  listResourceRecords(assetIds: string[], mode?: 'meta' | 'path'): Promise<unknown>
+  /** 阶段 4：增量变更（`queries.listChanges` 的薄委托）。 */
+  listChanges(after: number, limit?: number): Promise<unknown>
+  /** 阶段 4：套装搜索。 */
+  searchSuits(query: string): Promise<unknown>
+  /** 阶段 4：服装搜索。 */
+  searchClothing(query: string): Promise<unknown>
+  /** 阶段 4：档案统计。 */
+  profileStats(): Promise<unknown>
   /**
    * 同步服务状态（只读、无副作用地读内存状态；TLS 身份与设备数来自上游会话）。
    * 未组装会话时 `running=false` 且回落配置值。

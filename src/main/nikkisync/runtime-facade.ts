@@ -54,6 +54,12 @@ interface SyncReadRepositoryLike {
   getAsset(assetId: string): Record<string, unknown> | undefined
   listResources(assetId: string): Record<string, unknown>[]
   getResource(assetId: string, resourceId: string): Record<string, unknown> | undefined
+  /** 变更日志下界；日志表为空时上游返回 undefined。 */
+  minimumJournalRevision(): number | undefined
+  listChangesAfter(revision: number, limit: number): Record<string, unknown>[]
+  /** 搜索/统计源：资产行与资源行（上游按 `asset_id` 分组前先摊平给出）。 */
+  listSuitSearchAssets(): Record<string, unknown>[]
+  listSuitSearchResources(): Record<string, unknown>[]
 }
 
 /** 上游 `server/row-mappers.js` 的导出面（协议 DTO 映射，本文件零改写）。 */
@@ -61,6 +67,32 @@ interface RowMapperSurface {
   mapAssetSummary(row: Record<string, unknown>, resources: Record<string, unknown>[]): unknown
   mapAssetDetail(row: Record<string, unknown>, resources: Record<string, unknown>[]): unknown
   mapResourceRow(row: Record<string, unknown>): unknown
+  mapChangeRow(row: Record<string, unknown>): unknown
+}
+
+/** 上游 `MetadataDictionaryRepository` 中被搜索/统计用到的最小面（桶导出内）。 */
+interface MetadataDictionaryRepositoryLike {
+  getActiveManifest(): unknown
+}
+
+/**
+ * 上游搜索索引的输入元素（`server/SuitSearchIndex.ts:9` 的 `SuitSearchAsset`）。
+ * 本仓自声明形状，不 `import type` 上游包（AGENTS.md 硬性约定 1）。
+ */
+interface SuitSearchSourceItem {
+  asset: unknown
+  metadataJson?: string
+}
+
+/** 上游三个索引函数的最小面（各自是独立深入口，不在 pc-companion 桶导出内）。 */
+interface SearchIndexSurface {
+  searchSuitLibrary(assets: SuitSearchSourceItem[], manifest: unknown, query: string): unknown
+}
+interface ClothingIndexSurface {
+  searchClothingLibrary(assets: SuitSearchSourceItem[], manifest: unknown, query: string): unknown
+}
+interface ProfileStatsIndexSurface {
+  buildProfileStats(assets: SuitSearchSourceItem[], manifest: unknown, revision: number): unknown
 }
 
 /**
@@ -83,10 +115,26 @@ export interface RuntimeSurface {
   pcCompanion: NikkiSyncModule
   database: NikkiSyncModule
   rowMappers: RowMapperSurface
+  /** 阶段 4：搜索与统计各自是独立深入口。 */
+  suitSearchIndex: SearchIndexSurface
+  clothingSearchIndex: ClothingIndexSurface
+  profileStatsIndex: ProfileStatsIndexSurface
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
 export const ROW_MAPPER_DEEP_ENTRY = ['server', 'row-mappers.js'] as const
+
+/**
+ * 阶段 4 的三个索引深入口。
+ *
+ * 为什么必须逐个数：`searchSuitLibrary` / `searchClothingLibrary` / `buildProfileStats`
+ * 都**不在** `server/index.ts` 桶导出内（同 `row-mappers.js` 的处境，见 §装载注释第 3 条），
+ * 且上游包 `exports` 只暴露 `"."` ⇒ 只能以 `resolveDeepEntryUrl` 组出的 `file://` URL 装载。
+ * 三者各自独立成模块，因此是三条入口而非一条。
+ */
+export const SUIT_SEARCH_DEEP_ENTRY = ['server', 'SuitSearchIndex.js'] as const
+export const CLOTHING_SEARCH_DEEP_ENTRY = ['server', 'ClothingSearchIndex.js'] as const
+export const PROFILE_STATS_DEEP_ENTRY = ['server', 'ProfileStatsIndex.js'] as const
 
 /**
  * 已配对设备清单的**只读** SELECT。
@@ -152,13 +200,20 @@ export async function loadRuntimeSurface(
   const pcCompanion = await loadNikkiSyncPackage('pcCompanion', packaging)
   const database = await loadNikkiSyncPackage('database', packaging)
   const root = resolveModuleRoot(NIKKISYNC_PACKAGES.pcCompanion, packaging)
-  const deepEntry = resolveDeepEntryUrl(root.root, ROW_MAPPER_DEEP_ENTRY)
   // 变量式 import：URL 来自变量而非字面量，保持与 runtime-loader 同一护栏口径
-  const rowMappers = (await import(/* @vite-ignore */ deepEntry)) as NikkiSyncModule
+  const loadDeepModule = async (segments: readonly string[]): Promise<NikkiSyncModule> =>
+    await import(/* @vite-ignore */ resolveDeepEntryUrl(root.root, segments))
+  const rowMappers = await loadDeepModule(ROW_MAPPER_DEEP_ENTRY)
+  const suitSearchIndex = await loadDeepModule(SUIT_SEARCH_DEEP_ENTRY)
+  const clothingSearchIndex = await loadDeepModule(CLOTHING_SEARCH_DEEP_ENTRY)
+  const profileStatsIndex = await loadDeepModule(PROFILE_STATS_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
-    rowMappers: rowMappers as unknown as RowMapperSurface
+    rowMappers: rowMappers as unknown as RowMapperSurface,
+    suitSearchIndex: suitSearchIndex as unknown as SearchIndexSurface,
+    clothingSearchIndex: clothingSearchIndex as unknown as ClothingIndexSurface,
+    profileStatsIndex: profileStatsIndex as unknown as ProfileStatsIndexSurface
   }
 }
 
@@ -179,7 +234,45 @@ export function createQuerySurface(
     database: unknown
   ) => SyncReadRepositoryLike
   const repo = new ReadRepoCtor(runtime.database)
-  const { mapAssetSummary, mapAssetDetail, mapResourceRow } = surface.rowMappers
+  const { mapAssetSummary, mapAssetDetail, mapResourceRow, mapChangeRow } = surface.rowMappers
+  const DictionaryCtor = nikkisyncExport(surface.database, 'MetadataDictionaryRepository') as new (
+    database: unknown
+  ) => MetadataDictionaryRepositoryLike
+  const dictionary = new DictionaryCtor(runtime.database)
+
+  /**
+   * 搜索与统计的资产源：**逐字复刻**上游 `LocalSyncServer.suitSearchSource`
+   * （`apps/pc-companion/src/server/LocalSyncServer.ts:326-347`）的装配——
+   * 资源行按 `asset_id` 分组，资产行喂 `mapAssetSummary`，`metadata_json` 一律 `String()`。
+   *
+   * 为什么连 `String(null) === 'null'` 也要照抄：上游索引的跳过条件是
+   * `if (!searchable.metadataJson) continue`，而它自己给 NULL 行的就是字符串 `'null'`
+   * （真值，**不**跳过，随后 `JSON.parse('null')` 得 null 再被安全忽略）。
+   * 本层若改成 `undefined` 就会让同一行被跳过，与真实 `/v1/search/*` 端点行为分叉——
+   * 该一致性由 `library-paging.linked.test.ts` 与上游端点逐字比对守住。
+   *
+   * 失效判据同上游：按 `libraryRevision` 缓存，revision 前进即重建。
+   */
+  let searchSourceCache: { revision: number; items: SuitSearchSourceItem[] } | undefined
+  const searchSource = (): SuitSearchSourceItem[] => {
+    const revision = repo.currentRevision()
+    if (searchSourceCache && searchSourceCache.revision === revision) {
+      return searchSourceCache.items
+    }
+    const resourcesByAsset = new Map<string, Record<string, unknown>[]>()
+    for (const resource of repo.listSuitSearchResources()) {
+      const assetId = String(resource.asset_id)
+      const bucket = resourcesByAsset.get(assetId)
+      if (bucket) bucket.push(resource)
+      else resourcesByAsset.set(assetId, [resource])
+    }
+    const items = repo.listSuitSearchAssets().map((row): SuitSearchSourceItem => ({
+      asset: mapAssetSummary(row, resourcesByAsset.get(String(row.asset_id)) ?? []),
+      metadataJson: String(row.metadata_json)
+    }))
+    searchSourceCache = { revision, items }
+    return items
+  }
 
   return {
     async listAssets(input) {
@@ -224,6 +317,56 @@ export function createQuerySurface(
       // path 模式直接给上游落库的绝对路径原值，不包装、不改写
       if (mode === 'path') return String(row.source_path)
       return mapResourceRow(row)
+    },
+
+    async listResourceRecords(assetIds, mode) {
+      const byAsset: Record<string, unknown> = {}
+      for (const assetId of assetIds) {
+        const rows = repo.listResources(assetId)
+        byAsset[assetId] =
+          mode === 'path'
+            ? Object.fromEntries(
+                rows.map((row) => [String(row.resource_id), String(row.source_path)])
+              )
+            : rows.map(mapResourceRow)
+      }
+      return { byAsset }
+    },
+
+    async listChanges(after, limit) {
+      const libraryRevision = repo.currentRevision()
+      const minimum = repo.minimumJournalRevision()
+      // 判据逐字取自上游 LocalSyncServer.listChanges（:439）：after < minimum - 1
+      const fullResyncRequired = minimum !== undefined && after < minimum - 1
+      const changes = fullResyncRequired
+        ? []
+        : repo.listChangesAfter(after, limit).map(mapChangeRow)
+      return { changes, libraryRevision, fullResyncRequired }
+    },
+
+    async searchSuits(query) {
+      // query 原样下传：trim / 空判由上游索引内部负责，本层不做预处理
+      return surface.suitSearchIndex.searchSuitLibrary(
+        searchSource(),
+        dictionary.getActiveManifest(),
+        query
+      )
+    },
+
+    async searchClothing(query) {
+      return surface.clothingSearchIndex.searchClothingLibrary(
+        searchSource(),
+        dictionary.getActiveManifest(),
+        query
+      )
+    },
+
+    async profileStats() {
+      return surface.profileStatsIndex.buildProfileStats(
+        searchSource(),
+        dictionary.getActiveManifest(),
+        repo.currentRevision()
+      )
     }
   }
 }

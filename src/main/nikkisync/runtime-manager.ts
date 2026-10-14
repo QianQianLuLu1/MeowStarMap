@@ -445,6 +445,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     getAssetDetail: async (assetId) => requireSession().queries.getAssetDetail(assetId),
     getResource: async (assetId, resourceId, mode = 'meta') =>
       requireSession().queries.getResource(assetId, resourceId, mode),
+    // 阶段 4：全部是同一步 `requireSession().queries.*` 的薄委托，不加工返回值
+    listResourceRecords: async (assetIds, mode = 'meta') =>
+      requireSession().queries.listResourceRecords(assetIds, mode),
+    listChanges: async (after, limit = 1000) => requireSession().queries.listChanges(after, limit),
+    searchSuits: async (query) => requireSession().queries.searchSuits(query),
+    searchClothing: async (query) => requireSession().queries.searchClothing(query),
+    profileStats: async () => requireSession().queries.profileStats(),
     syncStatus,
     startSyncServer,
     stopSyncServer,

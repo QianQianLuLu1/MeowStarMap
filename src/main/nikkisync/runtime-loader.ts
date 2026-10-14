@@ -57,7 +57,9 @@ export const NIKKISYNC_REQUIRED_EXPORTS: Record<NikkiSyncPackageName, Record<str
     DatabaseManager: 'function',
     // 阶段 3：设备管理与查询面依赖的两个仓储（桶导出内，见 packages/database/src/index.ts）
     PairingRepository: 'function',
-    SyncReadRepository: 'function'
+    SyncReadRepository: 'function',
+    // 阶段 4：搜索/统计需要活动字典 manifest（同为桶导出，非深入口）
+    MetadataDictionaryRepository: 'function'
   },
   pcCompanion: {
     PcCompanionRuntime: 'function',
