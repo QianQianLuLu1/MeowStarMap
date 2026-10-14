@@ -263,26 +263,68 @@ curl -k -s -o /dev/null -w '%{http_code}\n' https://127.0.0.1:28080/v1/assets   
 | WXNN XiangCe | 延续 `feat/gallery-runtime-embed`（HEAD `eff0502`） | 按 §6 分组多次 commit（Conventional Commits）：`docs(sync-integration)` → `feat(nikkisync)` 服务启停 → `feat(ipc)` 通道 → `feat(renderer)` UI 接管 → `chore(packaging)` 断言。注意 `.husky/pre-commit` **会改写文件**（`eslint --fix` + `prettier --write`），提交后 `git status --porcelain` 复核 |
 | NikkiSync    | 保持 `main`，**不产生提交**                         | 本阶段对其源码零改动；仅 `node_modules` 层面的链接修复（不被跟踪）                                                                                                                                                                                                                                 |
 
-## 14. 执行结果（编码完成后回填）
+## 14. 执行结果（2026-10-14 回填）
 
 ### 14.1 门禁
 
-| 侧        | 命令                                                              | 基线（步骤 0）                                                                                      | 本阶段结果 |
-| --------- | ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ---------- |
-| NikkiSync | `npm test`                                                        | 136 / 136 pass / 0 fail                                                                             | 待回填     |
-| NikkiSync | `npm run typecheck` / `npm run db:validate`                       | exit 0 / `schema OK`                                                                                | 待回填     |
-| XiangCe   | `npm run typecheck`                                               | exit 0（`tsc -b` + `tsc -p tsconfig.scripts.json`）                                                 | 待回填     |
-| XiangCe   | `npm run lint`                                                    | exit 0，**0 error / 11 warning**（存量 `unicode-bom`）                                              | 待回填     |
-| XiangCe   | `npm test`                                                        | **370 files 全过；5794 pass / 2 skip（共 5796）**，耗时 34.9s（建链后 `*.linked.test.ts` 真实执行） | 待回填     |
-| XiangCe   | `npm run test:coverage` / `npm run i18n:check` / `npm run verify` | 待补测（覆盖率阈值 69/80/68/69）                                                                    | 待回填     |
+| 侧        | 命令                                          | 基线（步骤 0）                                         | 本阶段结果                                                                                                         |
+| --------- | --------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| NikkiSync | `npm test`                                    | 136 / 136 pass / 0 fail                                | **136 / 136 pass / 0 fail / 0 skip** ✓                                                                             |
+| NikkiSync | `npm run typecheck` / `npm run db:validate`   | exit 0 / `schema OK`                                   | exit 0 / `schema OK`（13 对象，FK 与 quick_check ok）✓                                                             |
+| NikkiSync | 源码改动                                      | —                                                      | **零改动**（`git status --porcelain` 仍只有 `tools/sample-analyzer/analyze.mjs` 的行尾幻影，与步骤 0 一致）        |
+| XiangCe   | `npm run typecheck`                           | exit 0（`tsc -b` + `tsc -p tsconfig.scripts.json`）    | exit 0 ✓                                                                                                           |
+| XiangCe   | `npm run lint`                                | exit 0，**0 error / 11 warning**（存量 `unicode-bom`） | 0 error / 11 warning（同一批存量）✓                                                                                |
+| XiangCe   | `npm run format:check` / `npm run i18n:check` | 通过                                                   | 通过 ✓（12 个 locale 只改端口数字，无新增 key）                                                                    |
+| XiangCe   | `npm test`                                    | **370 files 全过；5794 pass / 2 skip（共 5796）**      | **372 files / 5869 pass / 2 skip** ✓（新增 2 个测试文件、+75 例）                                                  |
+| XiangCe   | `npm run test:coverage`                       | **未取**（本轮流程缺口，见 §14.3 之 2）                | **四项仍低于阈值：`66.70 / 58.19 / 59.23 / 68.28` vs `69 / 80 / 68 / 69`** ⇒ 既有债 DEBT-032，本阶段是抬升而非恶化 |
+| XiangCe   | `npm run verify:nikkisync`                    | 7 ✓ / 1 ✗（旧 `release/win-unpacked` 判据）            | 9 项 8 ✓ / 1 ✗（同一既有项；新增的同步服务器产物项为 ✓）                                                           |
+| XiangCe   | `npm run build` + `e2e/nikkisync-runtime`     | 5 passed                                               | **6 passed**（新增 N3b/N3c）✓                                                                                      |
+| XiangCe   | `npm run typecheck:e2e`                       | —                                                      | exit 0 ✓                                                                                                           |
 
 ### 14.2 端点与协议取证
 
-待回填（T-A 用例清单逐条 + `curl` 两条 + mDNS 组播自证，如实标注未验证项）。
+**A. 仓内集成用例（`sync-server.linked.test.ts`，真起上游 TLS 服务）** 12 例全绿，覆盖：
+`GET /v1/server`（免鉴权 200 + `capabilities.profileStats`）、`POST /v1/pair`（200 / 重放 401 / 未知 token 401 / 真过期 410 / 缺字段 400）、
+未签名一律 401 `unauthorized`、`GET /v1/assets`（分页 + `limit=0/501` 给 400）、`GET /v1/assets/{id}`（含上游脱敏断言）、
+`GET …/metadata` **404**（该路由不存在）与签名 `PATCH` 200、`resources/{rid}` 的 200/206/416 + `Accept-Ranges`/`ETag`/`X-NikkiSync-SHA256`、
+`clothing/{cid}/thumbnail` 404（未注入缓存）、`/v1/changes`（200 与缺 `after` 400）、`search/suits`、`search/clothing`、`profile/stats`、
+`WS /ws/v1`（未签名 upgrade 被掐断 + 签名收 `server.hello` + 写 journal 后收 `asset.created`）、停止后拒绝连接并可重启、TLS 身份跨会话指纹不变。
+
+**B. `curl` 现场取证**（临时脚本按**生产默认值** `0.0.0.0:28080` 起上游服务；取证后进程已停、端口已释放）：
+
+| 判据               | 命令要点                                                                                                     | 实测                                                                                                                    |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| 免鉴权端点         | `curl -k https://127.0.0.1:28080/v1/server`                                                                  | 200，`{"protocolVersion":1,"serverId":"server_1340eaf9…","name":"NikkiGallery","libraryRevision":0,"capabilities":{…}}` |
+| 未签名签名路由     | `curl -k …/v1/assets`                                                                                        | `{"error":{"code":"unauthorized","message":"Request signature is missing or invalid"}}`                                 |
+| 坏配对 token       | `curl -k -X POST …/v1/pair`                                                                                  | 401 `pairing_invalid`                                                                                                   |
+| **开启验证**的 TLS | `curl --cacert <库内证书> --resolve nikkisync.local:28080:127.0.0.1 https://nikkisync.local:28080/v1/server` | 200 且 `ssl_verify_result=0`（SAN `nikkisync.local`、CN `NikkiSync Local`、指纹 `a0d6f7e8…a00045`）                     |
+| 局域网可路由       | `curl -k https://192.168.1.249:28080/v1/server`                                                              | 200（证明 `0.0.0.0` 绑定不是只回环）                                                                                    |
+| 配对串             | `runtime.createPairingUri('192.168.1.249')`                                                                  | `NS1\|server_1340eaf9…\|192.168.1.249\|28080\|W9Ot…\|1791969330\|a0d6f7e8…`（7 段，第 7 段与 TLS 指纹逐字一致）         |
+| 身份持久化         | 重启服务进程后再读 `serverId` / 指纹                                                                         | 与上一轮完全相同 ⇒ 库内身份确实持久化                                                                                   |
+
+**C. 真实应用会话（e2e，非白盒）**：`N3b` 在真 Electron 主进程里起服务，由**外部进程**用库内自签证书作 CA + SNI 做**开启验证的** HTTP 请求（不关校验）；
+`N3c` 在真实窗口点开关 → 状态卡「运行中」→ 二维码 SVG 出图（断言 markup 长度以排除空壳）→ 服务留活交由退出链关闭并断端口释放。
+视觉证据：`test-results/nikkisync-pairing-qr.png`（可见服务 ID `server_6df471d3…`、TLS 指纹、二维码、`默认端口 28080` 文案、toast「同步服务已启用」）。
+
+**D. mDNS**：见 §15（实测为上游自激回环缺陷 ⇒ 集成侧默认关）。
 
 ### 14.3 遗留项
 
-待回填（已知候选：打包态 `verify:nikkisync` 对旧 `release/win-unpacked` 的 ✗ 判据、设备列表只读 SELECT 待上游补 `listDevices`、上游 P1 私钥明文入库）。
+1. **打包态未复验**：`verify:nikkisync` 唯一 ✗ 仍打在 2.5.5 的旧 `release/win-unpacked`（早于建链）。本轮只加了产物断言（§6 #20），没跑 `dist:win`（需可行网络/证书环境）；打包态四项产物（migrations SQL、四包 `dist/src/index.js`、`row-mappers.js`、`LocalSyncServer.js` + `GalleryRuntime.mjs`）仍待一次真打包复验。
+2. **覆盖率门控红灯是既有债，不是本轮引入**：`CHANGELOG.md:59` 与 `docs/技术债清单.md`（DEBT-032）记录 Vitest 5 口径修正后同一套测试为 `64.65 / 55.67 / 57.12 / 66.21`，四项全不达标，当时的决定是「不降阈值、不扩 exclude、保持红灯」。本轮用**逐文件剔除法**实测：去掉本阶段改过的 12 个源文件后聚合仍为 `66.38 / 57.69 / 58.90 / 67.96`（照样低于阈值），而本阶段新代码自身为 `sync-server-view 97.91%` / `handler 98.86%` / `facade 98.61%` / `manager 91.42%` / `setup 98.14%` ⇒ 本阶段把四项**抬升**到 `66.70 / 58.19 / 59.23 / 68.28`，阈值一字未动。重新基线或补测试仍属 DEBT-032 的决策。流程缺口如实登记：步骤 0 只取了 typecheck/lint/test 基线，没取 coverage 基线。
+3. **服装缩略图端点在嵌入态恒 404**：刻意不给 `LocalSyncServer` 注入 `metadataThumbnailCache`（它要向公共字典 CDN 外联，与本阶段「零外联」口径冲突；上游桌面版是注入的）。手机侧要显示服装图标就得单独决定何时放开外联。已用集成用例锁定「未注入 ⇒ 404」，不是漏测。
+4. **设备列表是只读 SELECT 权宜**：上游 `PairingRepository` 无 `listDevices`；上游补齐后应改调它并删 `PAIRED_DEVICES_SQL`。
+5. **mDNS 默认关待翻回**：上游修好自激回环（应答前判 QR 位 / 只单播回查询者 / 加最小发送间隔）后，把 `SYNC_SERVER_DEFAULT_MDNS` 翻回 `true` 并复测 §15.2。
+6. **跨设备与防火墙未验证**：无 Android 真机在线 ⇒「局域网可发现」「跨主机可达」两项标**未验证**（本机 LAN IP 直连 200 只证明绑定面可路由，不证明对端可达）。
+7. **上游 P1 已知缺陷照录**：RSA 私钥明文存于 `app_settings`（`docs/M1_1_LOCAL_SYNC_SERVER.md:77` 自标 P1，DPAPI 未做）。
+8. **需求措辞据实修正**：`GET /v1/assets/{id}/metadata` 不存在（只有签名 `PATCH`），已按实现验收，并改正 `docs/INTEGRATION.md:26` 造成的误述。
+9. **新坑记录（步骤 0 已补）**：`npm install` 不只剪本仓的 `@nikkisync` junction，也会把 **NikkiSync 自身的 workspace 链接**变成空目录，导致上游 `npm run build` 报 `TS2307: Cannot find module '@nikkisync/core'`；修复是在 NikkiSync 根跑 `npm install`（只动 `node_modules`，不触被跟踪文件）。
+
+### 14.4 提交面
+
+`feat/gallery-runtime-embed` 上 7 次提交（NikkiSync 侧零提交）：
+`990211e` 计划与取证 → `3763c45` 主进程服务面 → `b83a288` IPC/preload/共享类型 →
+`c5fa279` 渲染层改接 → `2deb805` 打包断言 → `0a52495` e2e → `4239d31` 契约与 AGENTS 边界。
 
 ## 15. mDNS 取证与上游缺陷（2026-10-14 实测）
 
