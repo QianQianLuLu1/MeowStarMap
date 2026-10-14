@@ -6,7 +6,7 @@ import { Button } from '../common/Button'
 import { IconCopyText, IconRefresh } from '../../icons'
 import { useErrorToast } from '../../hooks/useErrorToast'
 import { useGlobalToast } from '../common/ToastProvider'
-import type { PairingQrInfo } from '../../../shared/types/electron-api'
+import type { NikkiSyncPairingCodeInfo } from '../../../shared/types/electron-api'
 
 interface PairingQrDialogProps {
   open: boolean
@@ -14,17 +14,19 @@ interface PairingQrDialogProps {
 }
 
 /**
- * 配对二维码对话框（sync-integration 阶段5）。
+ * 配对二维码对话框（sync-integration 阶段5 落地，阶段3 改接真实 NikkiSync 服务）。
  *
- * - 二维码在渲染层本地生成（qrcode → SVG，参数与上游 pc-companion src/qr.ts 一致），无网络请求
+ * - 二维码内容来自上游 `PcCompanionRuntime.createPairingUri()`（NS1 七段串），
+ *   图形在渲染层本地生成（qrcode → SVG，参数与上游 pc-companion src/qr.ts 一致），无网络请求
  * - 一次性配对令牌默认 5 分钟过期：显示倒计时，过期自动重新生成（生成计数防竞态，上游同款）
- * - 服务器未运行时 createPairingQr 抛错 → 错误态 + 重试（入口按钮已按运行状态禁用，此处兜底）
+ * - 服务未运行时 getPairingCode 抛 PRECONDITION_FAILED → 错误态 + 重试
+ *   （入口按钮已按运行状态禁用，此处兜底）
  */
 export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose }) => {
   const { t } = useTranslation()
   const { showError } = useErrorToast()
   const showMessage = useGlobalToast()
-  const [offer, setOffer] = useState<PairingQrInfo | null>(null)
+  const [offer, setOffer] = useState<NikkiSyncPairingCodeInfo | null>(null)
   const [svg, setSvg] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
   const [now, setNow] = useState(() => Date.now())
@@ -41,7 +43,7 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
     setFailed(false)
     setSvg(null)
     try {
-      const info = await api.sync.createPairingQr()
+      const info = await api.nikkisync.getPairingCode()
       if (generation !== generationRef.current) return
       const svgText = await QRCode.toString(info.content, {
         type: 'svg',
@@ -80,7 +82,7 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
   }, [open])
 
   // 每秒 tick 驱动倒计时；过期自动重新生成（对话框仍打开时，经 ref 读最新 offer，无渲染期 setState）
-  const offerRef = useRef<PairingQrInfo | null>(null)
+  const offerRef = useRef<NikkiSyncPairingCodeInfo | null>(null)
   useEffect(() => {
     offerRef.current = offer
   }, [offer])
