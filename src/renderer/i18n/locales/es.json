@@ -1725,7 +1725,7 @@
         "description": "Permite que los clientes móviles de NikkiSync sincronicen esta biblioteca mediante una conexión cifrada en la red local"
       },
       "enable": "Activar servicio de sincronización",
-      "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 27124)",
+      "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 28080)",
       "status": {
         "label": "Estado",
         "running": "En ejecución",

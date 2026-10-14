@@ -1725,7 +1725,7 @@
         "description": "Ermöglicht NikkiSync-Mobilclients, diese Bibliothek über eine verschlüsselte LAN-Verbindung zu synchronisieren"
       },
       "enable": "Synchronisierungsdienst aktivieren",
-      "enableDesc": "Dieser PC dient dann als Synchronisierungsserver (HTTPS + WebSocket, Standardport 27124)",
+      "enableDesc": "Dieser PC dient dann als Synchronisierungsserver (HTTPS + WebSocket, Standardport 28080)",
       "status": {
         "label": "Status",
         "running": "Läuft",

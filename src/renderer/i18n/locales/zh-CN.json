@@ -2134,7 +2134,7 @@
         "description": "允许局域网内的 NikkiSync 移动端通过加密连接同步本机媒体库"
       },
       "enable": "启用同步服务",
-      "enableDesc": "开启后本机作为同步服务端运行（HTTPS + WebSocket，默认端口 27124）",
+      "enableDesc": "开启后本机作为同步服务端运行（HTTPS + WebSocket，默认端口 28080）",
       "status": {
         "label": "运行状态",
         "running": "运行中",

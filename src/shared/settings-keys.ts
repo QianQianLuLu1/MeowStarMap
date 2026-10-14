@@ -17,7 +17,13 @@ export const RENDERER_PREF_KEYS = [
   'fileOps.preferSoftDelete',
   'hardwareAcceleration',
   // sync-integration 阶段5：同步服务自启开关（布尔偏好，消费点 sync-server-setup.ts initSyncServer）
-  'sync.serverEnabled'
+  'sync.serverEnabled',
+  // sync-integration 阶段3：真实 NikkiSync LocalSyncServer 的两个开关。
+  // syncServerEnabled 隐含 runtimeEnabled（没有会话就没有可 start() 的上游服务器），
+  // 因此两者必须一并可写，否则设置页开了服务、下次启动又回到关闭态。
+  // 端口不在此列：它是绑定面而非展示偏好，本期只由主进程按默认值/设置表读取，不开放给渲染层写。
+  'nikkisync.syncServerEnabled',
+  'nikkisync.runtimeEnabled'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

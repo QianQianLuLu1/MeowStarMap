@@ -1725,7 +1725,7 @@
         "description": "LAN 内の NikkiSync モバイルクライアントが暗号化接続でこのライブラリに同期できます"
       },
       "enable": "同期サービスを有効化",
-      "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 27124）",
+      "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 28080）",
       "status": {
         "label": "状態",
         "running": "実行中",

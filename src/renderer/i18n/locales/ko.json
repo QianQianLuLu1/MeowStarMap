@@ -1725,7 +1725,7 @@
         "description": "LAN의 NikkiSync 모바일 클라이언트가 암호화 연결로 이 라이브러리와 동기화할 수 있습니다"
       },
       "enable": "동기화 서비스 사용",
-      "enableDesc": "사용 시 이 PC가 동기화 서버로 실행됩니다(HTTPS + WebSocket, 기본 포트 27124)",
+      "enableDesc": "사용 시 이 PC가 동기화 서버로 실행됩니다(HTTPS + WebSocket, 기본 포트 28080)",
       "status": {
         "label": "상태",
         "running": "실행 중",

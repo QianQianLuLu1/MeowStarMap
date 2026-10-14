@@ -546,6 +546,8 @@ export interface NikkiSyncRuntimeStatusInfo {
   /** 上游最近一次 `ScanResult` 原样透传。 */
   lastScan?: unknown
   tables?: string[]
+  /** 阶段 3：同步服务状态随会话一并给出（UI 只轮询一个通道）。 */
+  sync?: NikkiSyncServerStatusInfo
   error?: string
   hint?: string
 }
@@ -574,4 +576,58 @@ export interface NikkiSyncResourceQueryInfo {
   assetId: string
   resourceId: string
   mode?: 'meta' | 'path'
+}
+
+// ============ NikkiSync 局域网同步服务（sync-integration 阶段3） ============
+// 形状快照自 src/main/nikkisync/runtime-types.ts（NikkiSyncSyncServerStatus 等）；
+// 服务本体是上游 NikkiSync 的 LocalSyncServer，本仓只做启停控制与状态展示。
+
+/** `nikkisync:server-status` 响应；`available:false` 表示运行时句柄尚未装配（不抛错）。 */
+export interface NikkiSyncServerStatusInfo {
+  available: boolean
+  running: boolean
+  /** 运行中为上游回显地址；未运行时为配置值。 */
+  host: string
+  port: number
+  /** 仅在真实监听时给出。 */
+  secure?: boolean
+  serverId?: string
+  /** 配置意图（上游 mDNS 失败被静默吞掉，因此它不代表广播已生效）。 */
+  mdnsEnabled: boolean
+  tlsFingerprintSha256?: string
+  /** 自签证书 PEM（公开材料，不含私钥）：客户端 pin 指纹之外的第二重核对手段。 */
+  serverCertificatePem?: string
+  /** 已配对（未撤销）设备数。 */
+  pairedDeviceCount?: number
+  /** 配对二维码写出的局域网地址；解析不到时为回环。 */
+  lanHost?: string
+  /** 启停失败原因，端口占用归一化为 `PORT_IN_USE`。 */
+  error?: string
+}
+
+export interface NikkiSyncSyncStartInputInfo {
+  /** 1..65535；上游配置冻结在构造期 ⇒ 改端口会重建会话 */
+  port?: number
+  mdnsEnabled?: boolean
+}
+
+/** 已配对设备的管理视图（不含公钥与凭据哈希）。 */
+export interface NikkiSyncPairedDeviceInfo {
+  deviceId: string
+  deviceName: string
+  platform: 'ios' | 'android'
+  appVersion?: string
+  pairedAt: string
+  lastSeenAt: string | null
+}
+
+/** `nikkisync:get-pairing-code` 响应：与移植面 `PairingQrInfo` 同形（复用同一 UI 组件）。 */
+export interface NikkiSyncPairingCodeInfo {
+  /** NS1|serverId|host|port|token|expiresEpochSeconds|tlsFingerprintSha256 */
+  content: string
+  expiresAt: string
+  serverId: string
+  host: string
+  port: number
+  tlsFingerprintSha256: string
 }

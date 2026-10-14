@@ -1725,7 +1725,7 @@
         "description": "Cho phép ứng dụng di động NikkiSync đồng bộ thư viện này qua kết nối mã hóa trong mạng cục bộ"
       },
       "enable": "Bật dịch vụ đồng bộ",
-      "enableDesc": "Máy này sẽ chạy làm máy chủ đồng bộ (HTTPS + WebSocket, cổng mặc định 27124)",
+      "enableDesc": "Máy này sẽ chạy làm máy chủ đồng bộ (HTTPS + WebSocket, cổng mặc định 28080)",
       "status": {
         "label": "Trạng thái",
         "running": "Đang chạy",

@@ -1,7 +1,6 @@
-// @core-change: runtime-status 快照随 runtime-types 展平同步头注字段清单（scanner? →
-//               scannerStatus?/installation?/lastScan?），无 IPC 通道与行为变更
-//               （历史：sync-integration 阶段2 新增本 handler，把内嵌 NikkiSync Runtime
-//               的运行时状态与协议 DTO 查询面暴露给渲染进程，零字段转换）。
+// @core-change: sync-integration 阶段3：新增 nikkisync 同步服务启停/配对码/设备管理 5 条通道
+//               （历史：阶段2 新增本 handler 把内嵌 NikkiSync Runtime 的状态与协议 DTO
+//               查询面暴露给渲染进程；阶段3 只增通道，仍零字段转换）。
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -9,11 +8,13 @@ import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
 import { wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { isAssetType } from '../../../shared/sync/protocol'
+import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-api'
 
 /**
- * NikkiSync 内嵌运行时只读 IPC handler（整合阶段 2）。
+ * NikkiSync 内嵌运行时 IPC handler（整合阶段 2 只读查询 + 阶段 3 同步服务）。
  *
- * - `nikkisync:runtime-status`：状态机快照（state/dbPath/linkReady/tables/scannerStatus?/installation?/lastScan?/error?/hint?）
+ * 查询面（阶段 2）：
+ * - `nikkisync:runtime-status`：状态机快照（state/dbPath/linkReady/tables/scannerStatus?/installation?/lastScan?/sync?/error?/hint?）
  * - `nikkisync:start-scan`：触发上游扫描（缺省全量；带 `path` 走上游按 uid 收敛的增量；
  *   带 `gameRoot` 且与当前根不同则由状态机重建会话）
  * - `nikkisync:get-assets`：分页查询，响应体 `{items, nextCursor?, libraryRevision}` 与
@@ -22,8 +23,14 @@ import { isAssetType } from '../../../shared/sync/protocol'
  * - `nikkisync:get-resource`：`mode:'meta'` 给 `MediaResource`；`mode:'path'` 给上游落库的
  *   绝对路径原值（渲染层据此经既有 media:// 协议读取文件）
  *
- * 铁律：本文件**不做数据格式转换**，响应体逐字来自上游 `SyncReadRepository` +
- * `server/row-mappers.js`；只做参数校验与错误分类映射。
+ * 服务面（阶段 3，全部复用上游 `LocalSyncServer`，本仓不实现任何 HTTP/TLS/WS/mDNS）：
+ * - `nikkisync:server-status`：运行状态 + 端口 + TLS 指纹 + 已配对数；未装配 ⇒ `available:false`
+ * - `nikkisync:start-server` / `nikkisync:stop-server`：启停（端口/mdns 变更由状态机重建会话）
+ * - `nikkisync:get-pairing-code`：一次性配对二维码内容（NS1 七段，TTL 5 分钟、单次消费）
+ * - `nikkisync:get-paired-devices` / `nikkisync:revoke-device`：设备管理（读/软删 NikkiSync 的 paired_devices）
+ *
+ * 铁律：本文件**不做数据格式转换**，资产响应体逐字来自上游 `SyncReadRepository` +
+ * `server/row-mappers.js`；设备列表是管理视图（非协议 DTO），只做敏感列裁剪。
  * 错误消息为英文（src/** 中文硬编码护栏为 error），本地化由渲染层 i18n 完成。
  */
 
@@ -54,6 +61,25 @@ const resourceSchema = z.object({
   mode: z.enum(['meta', 'path']).default('meta')
 })
 
+// 阶段 3：启停入参。端口界与上游 listen 一致（1..65535，0 是「交给系统分配」，
+// 不由 UI 指定）；两键都可省略 ⇒ 沿用当前构造期固化的配置。
+const syncStartSchema = z.object({
+  port: z.number().int().min(1).max(65535).optional(),
+  mdnsEnabled: z.boolean().optional()
+})
+
+// 与上游 paired_devices.device_id（TEXT PRIMARY KEY，手机侧生成）同量级
+const deviceIdSchema = z.string().trim().min(1).max(128)
+
+/** 句柄未装配时的状态（不抛错：UI 据此显示「同步服务不可用」而非崩一次 toast）。 */
+const UNAVAILABLE_SERVER_STATUS: NikkiSyncServerStatusInfo = {
+  available: false,
+  running: false,
+  host: '',
+  port: 0,
+  mdnsEnabled: false
+}
+
 function requireRuntime(ctx: HandlerContext): NikkiSyncRuntimeHandle {
   if (!ctx.nikkisyncRuntime) {
     throw AppError.preconditionFailed('nikkisync runtime is not assembled yet')
@@ -69,7 +95,11 @@ function toAppError(error: unknown, scope: string): AppError {
   if (error instanceof AppError) return error
   const message = error instanceof Error ? error.message : String(error)
   if (/not found/i.test(message)) return AppError.notFound(`nikkisync ${scope}: ${message}`)
-  if (/not ready|unavailable/i.test(message)) return AppError.preconditionFailed(message)
+  // 「未就绪 / 未建链 / 服务没起来」都是可恢复的前置条件失败：
+  // 后者是上游 createPairingPayload 的原生文案（'Server must be started before ...'）
+  if (/not ready|unavailable|must be started|not running/i.test(message)) {
+    return AppError.preconditionFailed(message)
+  }
   return AppError.internal(`nikkisync ${scope} failed: ${message}`)
 }
 
@@ -158,6 +188,94 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
       return parseAndRun(resourceSchema, args[0], 'query', (input) =>
         runtime.getResource(input.assetId, input.resourceId, input.mode)
       )
+    })
+  )
+
+  // ---- 阶段 3：同步服务（全部复用上游 LocalSyncServer）----
+
+  ipcMain.handle(
+    'nikkisync:server-status',
+    wrapHandlerNoArgs(ctx, () => {
+      // 与移植面 sync:getStatus 同口径：句柄未装配时给 available:false，不抛错
+      if (!ctx.nikkisyncRuntime) return UNAVAILABLE_SERVER_STATUS
+      return { available: true as const, ...ctx.nikkisyncRuntime.syncStatus() }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:start-server',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(syncStartSchema, args[0], 'start-server', async (input) => {
+        const status = await runtime.startSyncServer({
+          ...(input.port === undefined ? {} : { port: input.port }),
+          ...(input.mdnsEnabled === undefined ? {} : { mdnsEnabled: input.mdnsEnabled })
+        })
+        if (!status.running) {
+          // 状态机刻意不外抛（启动失败不得崩主进程），因此这里按状态合成语义化错误
+          const reason = status.error ?? 'unknown failure'
+          if (reason === 'PORT_IN_USE') {
+            throw AppError.preconditionFailed(
+              `sync server could not listen on port ${status.port}: PORT_IN_USE`
+            )
+          }
+          throw AppError.internal(`nikkisync sync server failed to start: ${reason}`)
+        }
+        return { available: true as const, ...status }
+      })
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:stop-server',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return { available: true as const, ...(await runtime.stopSyncServer()) }
+      } catch (error) {
+        throw toAppError(error, 'stop-server')
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:get-pairing-code',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        // 服务未运行时上游原生抛错 ⇒ toAppError 归一为 preconditionFailed
+        return await runtime.pairingCode()
+      } catch (error) {
+        throw toAppError(error, 'pairing-code')
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:get-paired-devices',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return await runtime.listPairedDevices()
+      } catch (error) {
+        throw toAppError(error, 'paired-devices')
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:revoke-device',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      const parsed = deviceIdSchema.safeParse(args[0])
+      if (!parsed.success) {
+        throw AppError.validation('invalid deviceId: must be a non-empty string (<=128)')
+      }
+      try {
+        return await runtime.revokeDevice(parsed.data)
+      } catch (error) {
+        throw toAppError(error, 'revoke-device')
+      }
     })
   )
 }

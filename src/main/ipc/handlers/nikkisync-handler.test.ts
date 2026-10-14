@@ -1,11 +1,14 @@
 /**
  * @layer L3
  * @module src/main/ipc/handlers/nikkisync-handler
- * @coverage NikkiSync 内嵌运行时只读域 IPC（阶段 2）：5 条通道的注册、参数校验、
- *           DTO 原样透传、未组装/未就绪态的错误映射。
+ * @coverage NikkiSync 内嵌运行时 IPC（阶段 2 只读查询 + 阶段 3 同步服务）：11 条通道的注册、
+ *           参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射。
  *
  * 断言口径：`data` 与句柄返回值**逐字段相等**（`toEqual`），以此锁死「内嵌层不做数据
  * 格式转换」这条铁律——一旦 handler 里出现字段重命名或结构包装，本文件立即变红。
+ *
+ * 注意：`src/main/tsconfig.json` 把测试文件排除在 `tsc -b` 之外，故本文件的类型错误
+ * 不会被 `npm run typecheck` 抓到 ⇒ 句柄替身必须与 `NikkiSyncRuntimeHandle` 全量对齐。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeCtx, getHandler } from './_test-helpers'
@@ -33,6 +36,29 @@ interface HandleResult {
   error?: { code: string; message: string }
 }
 
+/** 与上游 LocalSyncServer 状态同形的服务状态替身。 */
+const SERVER_STATUS = {
+  running: true,
+  host: '0.0.0.0',
+  port: 28080,
+  secure: true,
+  serverId: 'server_mock',
+  mdnsEnabled: true,
+  tlsFingerprintSha256: 'a'.repeat(64),
+  lanHost: '192.168.1.20',
+  pairedDeviceCount: 1
+}
+
+const PAIRED_DEVICES = [
+  {
+    deviceId: 'phone_1',
+    deviceName: 'Pixel 8',
+    platform: 'android' as const,
+    pairedAt: '2026-10-14T00:00:00.000Z',
+    lastSeenAt: null
+  }
+]
+
 function createRuntimeStub(): NikkiSyncRuntimeHandle {
   return {
     status: vi.fn(() => ({
@@ -49,7 +75,21 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
       libraryRevision: 7
     })),
     getAssetDetail: vi.fn(async (assetId) => ({ asset: { assetId, resources: [] } })),
-    getResource: vi.fn(async (assetId, resourceId, mode) => ({ assetId, resourceId, mode }))
+    getResource: vi.fn(async (assetId, resourceId, mode) => ({ assetId, resourceId, mode })),
+    // ---- 阶段 3 ----
+    syncStatus: vi.fn(() => SERVER_STATUS),
+    startSyncServer: vi.fn(async () => SERVER_STATUS),
+    stopSyncServer: vi.fn(async () => ({ ...SERVER_STATUS, running: false })),
+    pairingCode: vi.fn(async () => ({
+      content: 'NS1|server_mock|192.168.1.20|28080|tok|1788000000|' + 'a'.repeat(64),
+      expiresAt: '2026-10-14T00:05:00.000Z',
+      serverId: 'server_mock',
+      host: '192.168.1.20',
+      port: 28080,
+      tlsFingerprintSha256: 'a'.repeat(64)
+    })),
+    listPairedDevices: vi.fn(async () => PAIRED_DEVICES),
+    revokeDevice: vi.fn(async () => [])
   }
 }
 
@@ -65,7 +105,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 5 条只读通道', () => {
+  it('恰好注册 11 条通道（阶段2 五条查询 + 阶段3 六条服务）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -73,7 +113,13 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:start-scan',
       'nikkisync:get-assets',
       'nikkisync:get-asset-detail',
-      'nikkisync:get-resource'
+      'nikkisync:get-resource',
+      'nikkisync:server-status',
+      'nikkisync:start-server',
+      'nikkisync:stop-server',
+      'nikkisync:get-pairing-code',
+      'nikkisync:get-paired-devices',
+      'nikkisync:revoke-device'
     ])
   })
 
@@ -83,6 +129,19 @@ describe('nikkisync handler 注册面', () => {
     const res = (await status({})) as HandleResult
     expect(res.success).toBe(false)
     expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+
+  it('未组装时 server-status 给 available:false 而不抛错（UI 显示「不可用」而非弹一次错误）', async () => {
+    register(undefined)
+    const handler = getHandler(handleMock, 'nikkisync:server-status')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({ available: false, running: false })
+    // 服务类通道仍需要句柄
+    const start = getHandler(handleMock, 'nikkisync:start-server')
+    expect(((await start({}, {})) as HandleResult).error?.code).toBe(
+      IPC_ERROR_CODES.PRECONDITION_FAILED
+    )
   })
 })
 
@@ -242,5 +301,171 @@ describe('错误映射', () => {
     const detailRes = (await detail({}, 'asset_1')) as HandleResult
     expect(detailRes.error?.code).toBe(IPC_ERROR_CODES.INTERNAL_ERROR)
     expect(detailRes.error?.message).toContain('nikkisync query failed')
+  })
+})
+
+describe('nikkisync:server-status（阶段3）', () => {
+  it('逐字段透传状态机快照并补 available', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:server-status')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toEqual({ available: true, ...SERVER_STATUS })
+    expect(runtime.syncStatus).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('nikkisync:start-server / stop-server（阶段3）', () => {
+  it('缺省参数即按构造期配置启动，响应等于状态快照', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-server')
+    const res = (await handler({}, {})) as HandleResult
+    expect(runtime.startSyncServer).toHaveBeenCalledWith({})
+    expect(res.data).toEqual({ available: true, ...SERVER_STATUS })
+  })
+
+  it('透传 port 与 mdnsEnabled（键缺失时不注入 undefined，交由状态机沿用当前配置）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-server')
+    await handler({}, { port: 39139, mdnsEnabled: false })
+    expect(runtime.startSyncServer).toHaveBeenLastCalledWith({ port: 39139, mdnsEnabled: false })
+    await handler({}, undefined)
+    expect(runtime.startSyncServer).toHaveBeenLastCalledWith({})
+  })
+
+  it('端口非法一律 VALIDATION_ERROR 且绝不调用状态机', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-server')
+    for (const input of [
+      { port: 0 },
+      { port: 65536 },
+      { port: 28080.5 },
+      { port: '28080' },
+      { mdnsEnabled: 'yes' }
+    ]) {
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.success).toBe(false)
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.startSyncServer).not.toHaveBeenCalled()
+  })
+
+  it('端口占用：状态机不外抛 ⇒ handler 按状态合成 PRECONDITION_FAILED 并保留 PORT_IN_USE', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.startSyncServer).mockResolvedValueOnce({
+      ...SERVER_STATUS,
+      running: false,
+      error: 'PORT_IN_USE'
+    })
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-server')
+    const res = (await handler({}, {})) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    expect(res.error?.message).toContain('PORT_IN_USE')
+  })
+
+  it('非端口类启动失败归一为 INTERNAL_ERROR（不吞原因）', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.startSyncServer).mockResolvedValueOnce({
+      ...SERVER_STATUS,
+      running: false,
+      error: 'listen EACCES: permission denied'
+    })
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:start-server')
+    const res = (await handler({}, {})) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.INTERNAL_ERROR)
+    expect(res.error?.message).toContain('EACCES')
+  })
+
+  it('stop-server 返回停止后的状态（available:true, running:false）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:stop-server')
+    const res = (await handler({})) as HandleResult
+    expect(runtime.stopSyncServer).toHaveBeenCalledTimes(1)
+    expect(res.data).toMatchObject({ available: true, running: false })
+  })
+})
+
+describe('nikkisync:get-pairing-code（阶段3）', () => {
+  it('原样透出上游 NS1 七段串（本层不重编码、不改字段）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-pairing-code')
+    const res = (await handler({})) as HandleResult
+    const data = res.data as { content: string; port: number }
+    expect(data.content.split('|')).toHaveLength(7)
+    expect(data.content.startsWith('NS1|server_mock|')).toBe(true)
+    expect(data.port).toBe(28080)
+  })
+
+  it('服务未运行时上游原生抛错 ⇒ 映射为 PRECONDITION_FAILED（不是 INTERNAL）', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.pairingCode).mockRejectedValueOnce(
+      new Error('Server must be started before creating a pairing payload')
+    )
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-pairing-code')
+    const res = (await handler({})) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+})
+
+describe('nikkisync:get-paired-devices / revoke-device（阶段3）', () => {
+  it('列表原样返回上游 paired_devices 行（管理视图，不含公钥/凭据哈希）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-paired-devices')
+    const res = (await handler({})) as HandleResult
+    expect(res.data).toEqual(PAIRED_DEVICES)
+    expect(JSON.stringify(res.data)).not.toMatch(/public_key|credential/)
+  })
+
+  it('未就绪时列表与撤销都给 PRECONDITION_FAILED', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.listPairedDevices).mockRejectedValueOnce(
+      new Error('NikkiSync runtime is not ready (runtime state is idle)')
+    )
+    vi.mocked(runtime.revokeDevice).mockRejectedValueOnce(
+      new Error('NikkiSync runtime is not ready (runtime state is idle)')
+    )
+    register(runtime)
+    const list = getHandler(handleMock, 'nikkisync:get-paired-devices')
+    expect(((await list({})) as HandleResult).error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    const revoke = getHandler(handleMock, 'nikkisync:revoke-device')
+    expect(((await revoke({}, 'phone_1')) as HandleResult).error?.code).toBe(
+      IPC_ERROR_CODES.PRECONDITION_FAILED
+    )
+  })
+
+  it('撤销：合法 id 下传并返回新列表；不存在映射为 NOT_FOUND', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:revoke-device')
+    const res = (await handler({}, 'phone_1')) as HandleResult
+    expect(runtime.revokeDevice).toHaveBeenCalledWith('phone_1')
+    expect(res.data).toEqual([])
+
+    vi.mocked(runtime.revokeDevice).mockRejectedValueOnce(
+      new Error('NikkiSync device not found or already revoked: ghost')
+    )
+    const missing = (await handler({}, 'ghost')) as HandleResult
+    expect(missing.error?.code).toBe(IPC_ERROR_CODES.NOT_FOUND)
+  })
+
+  it('撤销：deviceId 空串 / 超长 / 非字符串一律 VALIDATION_ERROR 且不调用句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:revoke-device')
+    for (const raw of ['', '   ', 12, null, 'x'.repeat(129)]) {
+      const res = (await handler({}, raw)) as HandleResult
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.revokeDevice).not.toHaveBeenCalled()
   })
 })

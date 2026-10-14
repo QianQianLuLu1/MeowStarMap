@@ -1725,7 +1725,7 @@
         "description": "允許區網內的 NikkiSync 行動裝置透過加密連線同步本機媒體庫"
       },
       "enable": "啟用同步服務",
-      "enableDesc": "開啟後本機作為同步伺服器執行（HTTPS + WebSocket，預設連接埠 27124）",
+      "enableDesc": "開啟後本機作為同步伺服器執行（HTTPS + WebSocket，預設連接埠 28080）",
       "status": {
         "label": "執行狀態",
         "running": "執行中",

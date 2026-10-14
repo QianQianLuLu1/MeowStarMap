@@ -942,6 +942,20 @@ interface WindowElectronAPI {
       installation?: unknown
       lastScan?: unknown
       tables?: string[]
+      /** 阶段 3：同步服务状态随会话一并给出 */
+      sync?: {
+        available?: boolean
+        running: boolean
+        host: string
+        port: number
+        secure?: boolean
+        serverId?: string
+        mdnsEnabled: boolean
+        tlsFingerprintSha256?: string
+        pairedDeviceCount?: number
+        lanHost?: string
+        error?: string
+      }
       error?: string
       hint?: string
     }>
@@ -959,6 +973,78 @@ interface WindowElectronAPI {
       resourceId: string
       mode?: 'meta' | 'path'
     }) => Promise<unknown>
+    // ---- sync-integration 阶段3：上游 NikkiSync LocalSyncServer 的启停与配对管理 ----
+    getServerStatus: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      serverId?: string
+      mdnsEnabled: boolean
+      tlsFingerprintSha256?: string
+      /** 自签证书 PEM（公开材料，不含私钥） */
+      serverCertificatePem?: string
+      pairedDeviceCount?: number
+      lanHost?: string
+      error?: string
+    }>
+    startServer: (input?: { port?: number; mdnsEnabled?: boolean }) => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      serverId?: string
+      mdnsEnabled: boolean
+      tlsFingerprintSha256?: string
+      serverCertificatePem?: string
+      pairedDeviceCount?: number
+      lanHost?: string
+      error?: string
+    }>
+    stopServer: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      serverId?: string
+      mdnsEnabled: boolean
+      tlsFingerprintSha256?: string
+      serverCertificatePem?: string
+      pairedDeviceCount?: number
+      lanHost?: string
+      error?: string
+    }>
+    getPairingCode: () => Promise<{
+      content: string
+      expiresAt: string
+      serverId: string
+      host: string
+      port: number
+      tlsFingerprintSha256: string
+    }>
+    getPairedDevices: () => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion?: string
+        pairedAt: string
+        lastSeenAt: string | null
+      }>
+    >
+    revokeDevice: (deviceId: string) => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion?: string
+        pairedAt: string
+        lastSeenAt: string | null
+      }>
+    >
   }
   // T10：缩略图缓存管理
   cache: {

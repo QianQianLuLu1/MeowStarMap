@@ -1725,7 +1725,7 @@
         "description": "Let NikkiSync mobile clients sync this library over an encrypted LAN connection"
       },
       "enable": "Enable sync service",
-      "enableDesc": "Run this PC as the sync server (HTTPS + WebSocket, default port 27124)",
+      "enableDesc": "Run this PC as the sync server (HTTPS + WebSocket, default port 28080)",
       "status": {
         "label": "Status",
         "running": "Running",
