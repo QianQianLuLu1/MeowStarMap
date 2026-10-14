@@ -20,6 +20,37 @@ const SRC_MAIN = path.join(ROOT, 'src', 'main')
 const SRC_SHARED = path.join(ROOT, 'src', 'shared')
 const SRC_RENDERER = path.join(ROOT, 'src', 'renderer')
 
+/**
+ * 产物修复点标记（第 4/5 项）的检索作用域：整个 main 输出根，不是 app/ 子树。
+ *
+ * main 产物由两套构建器写同一棵树：electron-vite 把 rollup chunk 落在 dist/main/main/app
+ * （见 electron.vite.config.ts 的 main.outDir），而 `tsc -b`（.husky/pre-commit 与 npm run verify
+ * 都会跑）会把 app/ 下的同名 chunk 覆盖成 per-file 产物，其依赖模块（`.min(0)` 等标记的所在处）
+ * 落到 app/ 之外。作用域收窄到 app/ 会让这两项断言随构建顺序反复无谓转红并阻断 dist:win。
+ */
+export const MAIN_MARKER_SCOPE = DIST_MAIN
+
+/** 注入用的产物树节点：path 为绝对路径，content 为文件文本 */
+export type JsTreeFile = { path: string; content: string }
+
+function toPosix(p: string): string {
+  return p.replace(/\\/g, '/')
+}
+
+/**
+ * 纯函数：scope 子树内是否存在含 pattern 的 .js 产物。
+ * 目录缺失或树为空一律返回 false（与原 dirContains 一致的 fail-safe，不抛错）。
+ */
+export function treeContainsMarker(scope: string, files: JsTreeFile[], pattern: string): boolean {
+  const scopePrefix = toPosix(scope).replace(/\/+$/, '') + '/'
+  return files.some(
+    (f) =>
+      toPosix(f.path).startsWith(scopePrefix) &&
+      toPosix(f.path).endsWith('.js') &&
+      f.content.includes(pattern)
+  )
+}
+
 let failed = false
 
 function fail(msg: string): void {
@@ -80,24 +111,37 @@ function fileContains(filePath: string, pattern: string): boolean {
   }
 }
 
-// 在目录内递归检索所有 .js 文件是否含 pattern（electron-vite main 为 rollup 多 chunk 打包，
-// 标记字符串可能落在 application.js / scanner-worker.js 等任一 chunk，不能再只 grep index.js）
-function dirContains(dir: string, pattern: string): boolean {
+/** 磁盘适配器：递归读出 dir 下所有 .js 产物，交给纯函数 treeContainsMarker 判定 */
+function readJsTree(dir: string): JsTreeFile[] {
+  const out: JsTreeFile[] = []
   let entries: fs.Dirent[]
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true })
   } catch {
-    return false
+    return out
   }
   for (const e of entries) {
     const full = path.join(dir, e.name)
     if (e.isDirectory()) {
-      if (dirContains(full, pattern)) return true
-    } else if (e.isFile() && e.name.endsWith('.js') && fileContains(full, pattern)) {
-      return true
+      out.push(...readJsTree(full))
+    } else if (e.isFile() && e.name.endsWith('.js')) {
+      let content = ''
+      try {
+        content = fs.readFileSync(full, 'utf-8')
+      } catch {
+        content = ''
+      }
+      out.push({ path: full, content })
     }
   }
-  return false
+  return out
+}
+
+// 在目录内递归检索所有 .js 产物是否含 pattern。main 产物同时存在 rollup 多 chunk 与 tsc per-file
+// 两种布局，标记可能落在任一模块文件里，故既不能只 grep index.js，也不能只查 app/ 子树
+// （作用域取值理由见 MAIN_MARKER_SCOPE）。
+export function dirContains(dir: string, pattern: string): boolean {
+  return treeContainsMarker(dir, readJsTree(dir), pattern)
 }
 
 // 6/7. renderer 入口 chunk：从 dist/renderer/index.html 的 <script type=module src> 解析，
@@ -133,7 +177,8 @@ function checkNoCrossoriginInRendererHtml(): void {
 }
 
 // 10. 主进程窗口路径回退层数正确（指向 ../../../renderer，层数不对则加载不到 renderer 白屏）
-//     与第 4/5 项一致：main 为多 chunk 打包，字面量可能落在 app/ 下任一 chunk，需递归检索
+//     该项刻意仍收窄到 app/：字面量住在 app/index.js 与 app/renderer-protocol.js 自身模块内，
+//     rollup 与 tsc 两种布局都留在 app/，收窄可避免产物树里其他同名回退串造成假绿。
 function checkWindowManagerPathBacktrack(): void {
   if (!getMtime(path.join(DIST_MAIN, 'app'))) {
     fail('dist/main/main/app 目录不存在，请先执行 npm run build')
@@ -673,15 +718,15 @@ function main(): void {
     }
   }
 
-  // 4. main 产物含 page min(0) 修复（media-handler 已被打包进 app/ 下某 chunk）
-  if (dirContains(path.join(DIST_MAIN, 'app'), '.min(0)')) {
+  // 4. main 产物含 page min(0) 修复（zod 校验入参的非负边界；标记所在模块随构建布局漂移）
+  if (dirContains(MAIN_MARKER_SCOPE, '.min(0)')) {
     pass('main 产物含 page min(0) 修复')
   } else {
     fail('main 产物不含 page min(0) 修复，需重新执行 npm run build')
   }
 
   // 5. main 产物含 repairLegacyDataV2 修复（scanner/worker-entry 现为独立入口 scanner-worker.js）
-  if (dirContains(path.join(DIST_MAIN, 'app'), 'repairLegacyDataV2')) {
+  if (dirContains(MAIN_MARKER_SCOPE, 'repairLegacyDataV2')) {
     pass('main 产物含 repairLegacyDataV2 修复')
   } else {
     fail('main 产物不含 repairLegacyDataV2 修复，需重新执行 npm run build')
@@ -751,4 +796,7 @@ function main(): void {
   }
 }
 
-main()
+// 仅在以脚本方式直接运行（tsx scripts/pre-dist-check.ts）时启动校验；被测试导入时不执行
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('pre-dist-check.ts')) {
+  main()
+}
