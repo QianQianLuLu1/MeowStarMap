@@ -208,6 +208,10 @@
 1. 打包态复验（需可行网络/证书环境重跑 `npm run dist:win`）：`app.asar.unpacked` 内
    `@nikkisync/database/migrations/0001_initial.sql`、`pc-companion/dist/src/index.js`、
    `pc-companion/dist/src/server/row-mappers.js`、`wechat/GalleryRuntime.mjs` 四项均需存在。
+   - **2026-10-14 复评（本项仍未关闭）**：挡在打包前的 `pre-dist-check` 标记作用域缺陷已修（提交
+     `9c17889`），重建 `dist/` 后 `npm run pre-dist-check` 三连全绿；但本轮只验到闸门为止、未跑
+     `electron-builder`，`release/` 内产物仍是早于阶段 2/3 的 2026-10-14 14:09 构建。详见
+     `03-sync-server-plan.md` §14.3 #1 的同一登记。
 2. 渲染层 UI（开关/资产列表）未做（本阶段只交付 IPC 与验证入口）。
 3. 设置项 `nikkisync.runtimeEnabled` / `nikkisync.gameRoot` / `nikkisync.watcherEnabled` 当前只能经
    env 或直写 `app_settings` 开启，需阶段 5 的设置页接入。
