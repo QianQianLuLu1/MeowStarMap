@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [2.5.5] - 2026-10-11
 
 > 本版本主体为设备同步（NikkiSync 协议 v1）功能整装发布——sync-integration 阶段 0–6 的全部产出，以及端到端联调后的代码审查修复。计划与报告见 `docs/sync-integration/`。
+>
+> 2026-10-14 追加：以下「NikkiSync 运行时内嵌」变更已合入 `feat/gallery-runtime-embed` 分支并随本节补录；**`2.5.5` 安装包尚未据此重新构建**——已发布的 `NikkiGallery-Setup-2.5.5.exe` 构建于这些提交之前，打包态复验仍登记为未关闭遗留项（见 `docs/sync-integration/03-sync-server-plan.md` §14.3 #1）。
 
 ### Added | 新增
 
@@ -29,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
   - **设置 UI 与扫描器集成（阶段 5）**：设置页设备管理（列表/撤销/状态）、配对二维码（NS1 紧凑 URI + Android 完整 URI）、同步总开关（默认关闭）、扫描事件汇与运行时广播接线
   - **JPEG 无损导出端点（阶段 6）**：`GET/HEAD .../resources/{rid}/export`——不解码像素、仅在段结构上重写 APP1/Exif TIFF（orientation 旋转换算 + 游戏参数 EXIF 注入），四校验响应头 + 单飞限流 + 源字节哈希/大小校验，`metadata.raw` 敏感键绝不入导出文件
   - **端到端联调（阶段 6）**：跨仓库驱动测试覆盖 13 个场景（配对/认证/分页/详情/隐私剥离/资源下载/Range/增量/WS/导出等）全部通过；E2E 启动器 `scripts/sync-e2e/launch-server.ts` 入仓；计划与报告见 `docs/sync-integration/06-e2e-report.md`
+- **NikkiSync PC Companion 运行时内嵌**（`docs/sync-integration/02-runtime-embed-plan.md` 阶段 2 与 `03-sync-server-plan.md` 阶段 3）：不再只移植协议实现，而是直接复用上游 NikkiSync 包，把 PC Companion 运行时嵌进本应用
+  - **装载缝与依赖链接（阶段 1+9）**：`src/main/nikkisync/` 作为外部 `@nikkisync/*` 包的唯一入口（变量式动态 import，不引用上游类型，协议真相源仍留在本仓 `src/shared/sync`）；`scripts/link-nikkisync.ts` 以 Windows junction 建立 `node_modules/@nikkisync/{core,database,protocol,pc-companion}` 链接，`scripts/verify-nikkisync-link.ts` 提供只读诊断；依赖图改造为自包含（不引入仓库外 `file:` 依赖）
+  - **运行时启停与只读 IPC 桥（阶段 2）**：主进程内嵌 `PcCompanionRuntime`，生命周期接入应用启动与 `before-quit` 停止链，对外仅暴露只读状态通道；真实应用会话 e2e 覆盖启动、库落点、DTO 透传与退出停止
+  - **同步服务端启用与配对面（阶段 3）**：接入上游 `LocalSyncServer` 的启停与配对面，新增 5 条 `nikkisync` 同步服务 IPC 通道与 preload 桥；设置页「同步服务」节改接真实 NikkiSync 服务，替换此前由本仓移植版承担的开关；真实应用会话 e2e 验证同步服务与配对二维码出图
+  - **已知上游缺陷（据此改变默认值）**：上游 `MdnsAdvertiser` 存在组播自激回环，开启后以约 3.5 万包/秒向局域网泛洪，故 `nikkisync.syncMdnsEnabled` 默认置为 `false`（待上游修复后翻回）；嵌入态下服装缩略图端点因零外联未注入缓存而恒返回 404
 - 隐私契约固化：资产详情 `metadata.raw` 剥离 NUAN5 敏感键（`nativeParamPayload`/`nativeParamNuan5Md5`），`nativeParamToken` 按上游语义保留，测试固化
 
 ### Fixed | 修复
