@@ -10,6 +10,8 @@
  *  (f) 无设备时空态
  *  (g) 设备列表通道失败不影响状态卡（getPairedDevices 单独降级为空）
  *  (h) 不再渲染“已连接客户端数”（上游无该计数，本仓不虚构）
+ *  (i) 未装配态显示不可用而非报错
+ *  (j)-(l) 阶段 4：图库数据源开关（写两个设置项 + store 分流 + 触发扫描 / 失败回滚 / 挂载读回）
  *
  * 运行：npx vitest run src/renderer/pages/settings/sync-sections.test.tsx
  */
@@ -19,6 +21,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { GlobalToastContext } from '../../components/common/ToastProvider'
 import { SyncServiceSection } from './sync-sections'
+import { useMediaStore } from '../../stores/mediaStore'
 
 const mockShowMessage = vi.fn()
 
@@ -60,6 +63,7 @@ interface NikkiSyncServerApiStub {
   getPairingCode: Mock
   getPairedDevices: Mock
   revokeDevice: Mock
+  startScan: Mock
 }
 
 let settingsGet: Mock
@@ -74,6 +78,7 @@ function installElectronApi(
     devices?: ReturnType<typeof makeDevice>[]
     startServerReject?: Error
     pairedDevicesReject?: Error
+    startScanReject?: Error
   } = {}
 ) {
   store = { ...opts.persisted }
@@ -109,7 +114,15 @@ function installElectronApi(
           }
         : async () => opts.devices ?? []
     ),
-    revokeDevice: vi.fn(async () => (opts.devices ?? []).slice(1))
+    revokeDevice: vi.fn(async () => (opts.devices ?? []).slice(1)),
+    // 阶段 4：切到 NikkiSync 数据源会触发一次不阻塞的扫描
+    startScan: vi.fn(
+      opts.startScanReject
+        ? async () => {
+            throw opts.startScanReject
+          }
+        : async () => ({ scanId: 'scan_test' })
+    )
   }
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
@@ -210,5 +223,36 @@ describe('SyncServiceSection（阶段3：真实 NikkiSync 服务）', () => {
     installElectronApi({ status: { available: false, running: false } })
     renderSection()
     await waitFor(() => expect(screen.getByText('同步组件未就绪')).toBeInTheDocument())
+  })
+
+  // ===== 阶段 4：图库数据源开关 =====
+
+  it('(j) 切到 NikkiSync：写两个设置项 + 设定 store 分流 + 触发一次不阻塞的扫描', async () => {
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '图库数据源使用 NikkiSync 资产库' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('gallery.dataSource', 'nikkisync'))
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith(SETTING_RUNTIME_ENABLED, true))
+    await waitFor(() => expect(serverApi.startScan).toHaveBeenCalledWith({}))
+    expect(useMediaStore.getState().source).toBe('nikkisync')
+    useMediaStore.getState().setSource('local')
+  })
+
+  it('(k) 持久化失败时三处状态一并回滚，不留「UI 已切、下次启动回本地」的裂口', async () => {
+    settingsSet.mockImplementation(() => Promise.reject(new Error('disk full')))
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '图库数据源使用 NikkiSync 资产库' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(useMediaStore.getState().source).toBe('local'))
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('(l) 挂载读回已持久化的 nikkisync，开关为开启态且不必再触发扫描', async () => {
+    installElectronApi({ persisted: { 'gallery.dataSource': 'nikkisync' } })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '图库数据源使用 NikkiSync 资产库' })
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
+    expect(serverApi.startScan).not.toHaveBeenCalled()
+    useMediaStore.getState().setSource('local')
   })
 })

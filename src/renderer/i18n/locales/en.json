@@ -1726,6 +1726,9 @@
       },
       "enable": "Enable sync service",
       "enableDesc": "Run this PC as the sync server (HTTPS + WebSocket, default port 28080)",
+      "gallerySource": "Use the NikkiSync asset library as the gallery source",
+      "gallerySourceDesc": "Off reads this app's media_files (default); on switches the gallery to the embedded NikkiSync Runtime assets, and implicitly enables the runtime plus one scan",
+      "gallerySourceApplied": "Gallery data source switched to {{source}}",
       "status": {
         "label": "Status",
         "running": "Running",

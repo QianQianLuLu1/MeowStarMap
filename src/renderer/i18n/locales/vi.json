@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "Sau khi thu hồi, \"{{name}}\" sẽ không thể đồng bộ với thư viện này và cần ghép nối lại. Thu hồi?",
         "revokeConfirm": "Thu hồi thiết bị",
         "revoked": "Đã thu hồi thiết bị"
-      }
+      },
+      "gallerySource": "Dùng thư viện asset của NikkiSync làm nguồn phòng trưng bày",
+      "gallerySourceDesc": "Tắt: đọc media_files trên máy (mặc định). Bật: phòng trưng bày đọc assets của runtime NikkiSync nhúng kèm, đồng thời bật runtime và một lần quét",
+      "gallerySourceApplied": "Đã chuyển nguồn dữ liệu phòng trưng bày sang {{source}}"
     }
   },
   "share": {

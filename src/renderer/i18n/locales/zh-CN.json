@@ -2135,6 +2135,9 @@
       },
       "enable": "启用同步服务",
       "enableDesc": "开启后本机作为同步服务端运行（HTTPS + WebSocket，默认端口 28080）",
+      "gallerySource": "图库数据源使用 NikkiSync 资产库",
+      "gallerySourceDesc": "关闭时读本机 media_files（默认）；开启后图库改读内嵌 NikkiSync Runtime 的 assets，并隐含启用运行时与一次扫描",
+      "gallerySourceApplied": "图库数据源已切换为 {{source}}",
       "status": {
         "label": "运行状态",
         "running": "运行中",

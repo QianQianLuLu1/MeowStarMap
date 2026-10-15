@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "Nach dem Widerruf kann „{{name}}\" diese Bibliothek nicht mehr synchronisieren und muss neu gekoppelt werden. Widerrufen?",
         "revokeConfirm": "Gerät widerrufen",
         "revoked": "Gerät widerrufen"
-      }
+      },
+      "gallerySource": "NikkiSync-Ressourcenbibliothek als Galeriequelle verwenden",
+      "gallerySourceDesc": "Aus: lokale media_files werden gelesen (Standard). An: die Galerie liest die Assets des eingebetteten NikkiSync-Runtimes, inklusive impliziter Runtime-Aktivierung und einem Scan",
+      "gallerySourceApplied": "Galerie-Datenquelle auf {{source}} umgestellt"
     }
   },
   "share": {

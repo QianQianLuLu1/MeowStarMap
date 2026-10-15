@@ -5,6 +5,8 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { EmptyState } from '../../components/common/EmptyState'
 import { PairingQrDialog } from '../../components/sync/PairingQrDialog'
 import { useErrorToast } from '../../hooks/useErrorToast'
+// 阶段 4：切源要同时写 store 的分流开关，否则 UI 与列表取数各说各话
+import { useMediaStore } from '../../stores/mediaStore'
 import { IconCopyText } from '../../icons'
 import type {
   NikkiSyncPairedDeviceInfo,
@@ -21,6 +23,8 @@ const STATUS_POLL_MS = 2000
  */
 const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
 const SETTING_RUNTIME_ENABLED = 'nikkisync.runtimeEnabled'
+// 阶段 4：图库数据源开关（'local' | 'nikkisync'），消费点 mediaStore 的源分流
+const SETTING_GALLERY_SOURCE = 'gallery.dataSource'
 
 /**
  * 同步服务设置分区（sync-integration 阶段5 落地，阶段3 改接真实 NikkiSync 服务）。
@@ -37,6 +41,7 @@ export const SyncServiceSection: React.FC = () => {
   const showMessage = useGlobalToast()
   const { showError } = useErrorToast()
   const [enabled, setEnabled] = useState(false)
+  const [gallerySource, setGallerySource] = useState<'local' | 'nikkisync'>('local')
   const [status, setStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
   const [devices, setDevices] = useState<NikkiSyncPairedDeviceInfo[]>([])
   const [busy, setBusy] = useState(false)
@@ -75,6 +80,54 @@ export const SyncServiceSection: React.FC = () => {
       clearInterval(timer)
     }
   }, [refresh])
+
+  /** 阶段 4：图库数据源（'local' 默认 / 'nikkisync'）。 */
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const value = await window.electronAPI?.settings.get(SETTING_GALLERY_SOURCE, 'local')
+        if (alive && value === 'nikkisync') setGallerySource('nikkisync')
+      } catch {
+        // 读不到就保持默认本地库：切源是显式选择，绝不默认生效
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  const handleGallerySourceToggle = async (value: boolean): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    const next = value ? 'nikkisync' : 'local'
+    const previous = gallerySource
+    setBusy(true)
+    setGallerySource(next)
+    // store 先行：列表分流读的就是这个状态
+    useMediaStore.getState().setSource(next)
+    try {
+      await api.settings.set(SETTING_GALLERY_SOURCE, next)
+      if (next === 'nikkisync') {
+        // 没有 Runtime 会话就没有可查的 assets 表 ⇒ 切源隐含启用运行时
+        await api.settings.set(SETTING_RUNTIME_ENABLED, true)
+        // 立即触发一次扫描：首次切过去时 NikkiSync 库往往还是空的。
+        // 扫描是异步长任务，这里刻意不 await —— 完成后主进程推 library-changed，
+        // 图库页据此自动刷新，设置页不必阻塞在扫描上
+        void api.nikkisync.startScan({}).catch((error: unknown) => {
+          showError(error)
+        })
+      }
+      showMessage(t('settings.sync.gallerySourceApplied', { source: next }), 'success')
+    } catch (error) {
+      // 持久化失败即回滚三处状态，避免「UI 显示已切、下次启动又回本地」的不一致
+      setGallerySource(previous)
+      useMediaStore.getState().setSource(previous)
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   /** 两个开关同进同退（服务开关隐含 Runtime 开关）。 */
   const persistEnabled = async (value: boolean): Promise<void> => {
@@ -152,6 +205,15 @@ export const SyncServiceSection: React.FC = () => {
           checked={enabled}
           disabled={busy}
           onChange={(value) => void handleToggle(value)}
+        />
+        {/* 阶段 4：图库数据源。默认本地库，切到 NikkiSync 隐含要求 Runtime 已启用，
+            否则运行时没跑、它的库也没扫过，切过去必然是一片空白 */}
+        <SettingsToggle
+          label={t('settings.sync.gallerySource')}
+          description={t('settings.sync.gallerySourceDesc')}
+          checked={gallerySource === 'nikkisync'}
+          disabled={busy}
+          onChange={(value) => void handleGallerySourceToggle(value)}
         />
         <SettingsCard>
           <div className="space-y-2">

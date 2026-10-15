@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "Après la révocation, « {{name}} » ne pourra plus synchroniser cette bibliothèque et devra être jumelé à nouveau. Révoquer ?",
         "revokeConfirm": "Révoquer l’appareil",
         "revoked": "Appareil révoqué"
-      }
+      },
+      "gallerySource": "Utiliser la bibliothèque de ressources NikkiSync pour la galerie",
+      "gallerySourceDesc": "Désactivé : lecture des media_files locaux (par défaut). Activé : la galerie lit les assets du runtime NikkiSync intégré, avec activation implicite du runtime et une analyse",
+      "gallerySourceApplied": "Source de données de la galerie changée en {{source}}"
     }
   },
   "share": {

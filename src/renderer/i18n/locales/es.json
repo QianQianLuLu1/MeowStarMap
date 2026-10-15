@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "Tras revocar, «{{name}}» ya no podrá sincronizar con esta biblioteca y deberá volver a emparejarse. ¿Revocar?",
         "revokeConfirm": "Revocar dispositivo",
         "revoked": "Dispositivo revocado"
-      }
+      },
+      "gallerySource": "Usar la biblioteca de recursos de NikkiSync como fuente de la galería",
+      "gallerySourceDesc": "Desactivado: se leen los media_files locales (predeterminado). Activado: la galería lee los assets del runtime de NikkiSync integrado, con activación implícita del runtime y un análisis",
+      "gallerySourceApplied": "Fuente de datos de la galería cambiada a {{source}}"
     }
   },
   "share": {

@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "解除後「{{name}}」はこのライブラリと同期できなくなり、再ペアリングが必要です。解除しますか？",
         "revokeConfirm": "デバイスを解除",
         "revoked": "デバイスを解除しました"
-      }
+      },
+      "gallerySource": "ギャラリーのデータソースに NikkiSync アセットライブラリを使う",
+      "gallerySourceDesc": "オフ時は本机の media_files（既定）を読み、オン時は内蔵 NikkiSync Runtime の assets に切り替えます。ランタイムの有効化と 1 回のスキャンが暗黙に含まれます",
+      "gallerySourceApplied": "ギャラリーのデータソースを {{source}} に切り替えました"
     }
   },
   "share": {

@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "撤銷後「{{name}}」將無法再同步本機媒體庫，需要重新配對。確定撤銷？",
         "revokeConfirm": "撤銷裝置",
         "revoked": "裝置已撤銷"
-      }
+      },
+      "gallerySource": "圖庫資料來源使用 NikkiSync 資產庫",
+      "gallerySourceDesc": "關閉時讀取本機 media_files（預設）；開啟後圖庫改讀內嵌 NikkiSync Runtime 的 assets，並隱含啟用執行期與一次掃描",
+      "gallerySourceApplied": "圖庫資料來源已切換為 {{source}}"
     }
   },
   "share": {

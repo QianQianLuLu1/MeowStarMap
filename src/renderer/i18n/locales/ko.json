@@ -1759,7 +1759,10 @@
         "revokeConfirmMessage": "해지하면 \"{{name}}\"은(는) 이 라이브러리와 더 이상 동기화할 수 없으며 다시 페어링해야 합니다. 해지하시겠습니까?",
         "revokeConfirm": "기기 해지",
         "revoked": "기기가 해지되었습니다"
-      }
+      },
+      "gallerySource": "갤러리 데이터 소스로 NikkiSync 자산 라이브러리 사용",
+      "gallerySourceDesc": "끄면 로컬 media_files(기본값)를 읽고, 켜면 내장 NikkiSync Runtime의 assets로 전환합니다. 런타임 활성화와 1회 스캔이 함께 적용됩니다",
+      "gallerySourceApplied": "갤러리 데이터 소스를 {{source}}(으)로 전환했습니다"
     }
   },
   "share": {
