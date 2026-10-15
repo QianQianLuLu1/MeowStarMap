@@ -54,6 +54,8 @@ export interface AssetMediaFile extends MediaFile {
     motionVideoPath?: string
     stillResourceId?: string
     motionVideoResourceId?: string
+    /** 展示用资源（静图/视频）的内容哈希，来自上游 `resources.sha256` */
+    sha256?: string
   }
 }
 
@@ -125,7 +127,8 @@ export function toAssetViewModel(input: AssetViewModelInput): AssetMediaFile {
       gameVersion: summary.gameVersion,
       motionVideoPath,
       stillResourceId: display?.resourceId,
-      motionVideoResourceId: motion?.resourceId
+      motionVideoResourceId: motion?.resourceId,
+      sha256: display?.sha256
     }
   }
 }

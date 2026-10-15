@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Ressonância",
+      "syncGallery": "Galeria sincronizada",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "Menu",
     "recycleBin": "Lixeira",
     "resonanceRecords": "Ressonância",
+    "syncGallery": "Galeria sincronizada",
     "settings": "Configurações",
     "smartGroup": "Grupo inteligente",
     "storage": "Armazenamento",
@@ -4307,6 +4309,93 @@
       "colPulls": "Invocações",
       "colAvg": "Média",
       "colPercentile": "Percentil"
+    }
+  },
+  "syncGallery": {
+    "title": "Galeria sincronizada",
+    "subtitle": "Recursos da biblioteca NikkiSync embutida, sem afetar a galeria local",
+    "loading": "Carregando galeria sincronizada…",
+    "toolbar": {
+      "statusTip": "Estado do runtime NikkiSync embutido",
+      "refresh": "Atualizar",
+      "scan": "Escanear álbum do jogo",
+      "status": {
+        "ready": "Pronto",
+        "degraded": "Pasta do jogo não encontrada",
+        "off": "Não iniciado"
+      },
+      "detail": "Detalhes"
+    },
+    "empty": {
+      "title": "Ainda não há recursos para navegar",
+      "linkHint": "Pacotes NikkiSync não encontrados. Execute npm run link:nikkisync na raiz do projeto e reinicie o app",
+      "runtimeOff": "Serviço embutido não iniciado: ative o runtime NikkiSync em Configurações e tente novamente",
+      "gameRootMissing": "Pasta de instalação do Infinity Nikki não encontrada. Selecione manualmente em Configurações e escaneie de novo",
+      "noAssets": "A varredura terminou sem fotos. Clique em «Escanear álbum do jogo» para reindexar",
+      "retry": "Recarregar"
+    },
+    "error": {
+      "bridgeMissing": "Runtime NikkiSync não encontrado. Execute npm run link:nikkisync",
+      "loadFailed": "Falha ao carregar a galeria sincronizada"
+    },
+    "drawer": {
+      "title": "Detalhes do recurso",
+      "basic": "Informações básicas",
+      "fields": {
+        "assetId": "ID do recurso",
+        "type": "Tipo",
+        "state": "Estado",
+        "motion": "Marca LIVE",
+        "revision": "Revisão",
+        "gameVersion": "Versão do jogo",
+        "resolution": "Resolução",
+        "size": "Tamanho do arquivo",
+        "hash": "Hash do conteúdo",
+        "metadata": "Metadados"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "Gerar cartão de compartilhamento",
+    "generate": "Gerar cartão",
+    "save": "Salvar",
+    "cancel": "Cancelar",
+    "close": "Fechar",
+    "savedCount": "{{count}} imagem(ns) salvas",
+    "progress": "Renderizando {{current}} / {{total}}…",
+    "missingIcons": "{{count}} ícone(s) indisponível(is)",
+    "motionUnsupported": "Cartões de fotos LIVE não são suportados nesta fase",
+    "noParams": "Nenhum parâmetro de captura lido; serão exibidos traços",
+    "errorGenerate": "Falha ao gerar o cartão",
+    "errorCancelled": "Geração cancelada",
+    "errorSave": "Falha ao salvar o cartão",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

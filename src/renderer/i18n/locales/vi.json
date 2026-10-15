@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Cộng Hưởng",
+      "syncGallery": "Thư viện đồng bộ",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "Menu",
     "recycleBin": "Thùng rác",
     "resonanceRecords": "Cộng Hưởng",
+    "syncGallery": "Thư viện đồng bộ",
     "settings": "Cài đặt",
     "smartGroup": "Nhóm thông minh",
     "storage": "Lưu trữ",
@@ -4307,6 +4309,93 @@
       "colPulls": "Total pulls",
       "colAvg": "Avg. pulls",
       "colPercentile": "Percentile"
+    }
+  },
+  "syncGallery": {
+    "title": "Thư viện đồng bộ",
+    "subtitle": "Tài nguyên từ thư viện NikkiSync nhúng, không ảnh hưởng thư viện cục bộ",
+    "loading": "Đang tải thư viện đồng bộ…",
+    "toolbar": {
+      "statusTip": "Trạng thái runtime NikkiSync nhúng",
+      "refresh": "Làm mới",
+      "scan": "Quét album game",
+      "status": {
+        "ready": "Sẵn sàng",
+        "degraded": "Không tìm thấy thư mục game",
+        "off": "Chưa chạy"
+      },
+      "detail": "Chi tiết"
+    },
+    "empty": {
+      "title": "Chưa có tài nguyên để xem",
+      "linkHint": "Không tìm thấy gói NikkiSync. Hãy chạy npm run link:nikkisync ở gốc dự án rồi khởi động lại ứng dụng",
+      "runtimeOff": "Dịch vụ nhúng chưa chạy: bật runtime NikkiSync trong Cài đặt rồi thử lại",
+      "gameRootMissing": "Không thấy thư mục cài Infinity Nikki. Hãy chọn thủ công trong Cài đặt rồi quét lại",
+      "noAssets": "Đã quét xong nhưng không có ảnh. Bấm «Quét album game» để lập chỉ mục lại",
+      "retry": "Tải lại"
+    },
+    "error": {
+      "bridgeMissing": "Không thấy runtime NikkiSync. Hãy chạy npm run link:nikkisync",
+      "loadFailed": "Tải thư viện đồng bộ thất bại"
+    },
+    "drawer": {
+      "title": "Chi tiết tài nguyên",
+      "basic": "Thông tin cơ bản",
+      "fields": {
+        "assetId": "ID tài nguyên",
+        "type": "Loại",
+        "state": "Trạng thái",
+        "motion": "Cờ LIVE",
+        "revision": "Revision",
+        "gameVersion": "Phiên bản game",
+        "resolution": "Độ phân giải",
+        "size": "Kích thước tệp",
+        "hash": "Hash nội dung",
+        "metadata": "Siêu dữ liệu"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "Tạo ảnh chia sẻ",
+    "generate": "Tạo ảnh chia sẻ",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "savedCount": "Đã lưu {{count}} ảnh",
+    "progress": "Đang kết xuất {{current}} / {{total}}…",
+    "missingIcons": "{{count}} biểu tượng bộ phận không khả dụng",
+    "motionUnsupported": "Giai đoạn này chưa hỗ trợ ảnh chia sẻ cho ảnh LIVE",
+    "noParams": "Không đọc được thông số chụp; ảnh sẽ hiển thị dấu gạch",
+    "errorGenerate": "Tạo ảnh chia sẻ thất bại",
+    "errorCancelled": "Đã hủy tạo",
+    "errorSave": "Lưu ảnh chia sẻ thất bại",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

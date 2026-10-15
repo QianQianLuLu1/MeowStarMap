@@ -1,0 +1,82 @@
+// @vitest-environment jsdom
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
+import { toRuntimeGroup, SyncGalleryToolbar } from './SyncGalleryToolbar'
+
+/**
+ * 阶段 5 · A3：同步图库工具栏。
+ * 纯函数 `toRuntimeGroup` 覆盖 8 个状态机取值，壳层只验「状态可见 + 两个动作可点」。
+ */
+
+function renderToolbar(
+  props: Partial<{
+    runtimeState:
+      | 'unavailable'
+      | 'idle'
+      | 'starting'
+      | 'running'
+      | 'scanning'
+      | 'degraded'
+      | 'stopping'
+      | 'error'
+      | null
+    scanning: boolean
+  }> = {}
+): { onRefresh: ReturnType<typeof vi.fn>; onScan: ReturnType<typeof vi.fn> } {
+  const onRefresh = vi.fn()
+  const onScan = vi.fn()
+  render(
+    <SyncGalleryToolbar
+      runtimeState={props.runtimeState === undefined ? null : props.runtimeState}
+      onRefresh={onRefresh}
+      onScan={onScan}
+      scanning={props.scanning ?? false}
+    />
+  )
+  return { onRefresh, onScan }
+}
+
+describe('toRuntimeGroup', () => {
+  it('ready 档收 running / scanning / starting', () => {
+    expect(toRuntimeGroup('running')).toBe('ready')
+    expect(toRuntimeGroup('scanning')).toBe('ready')
+    expect(toRuntimeGroup('starting')).toBe('ready')
+  })
+
+  it('degraded 档收 degraded / error', () => {
+    expect(toRuntimeGroup('degraded')).toBe('degraded')
+    expect(toRuntimeGroup('error')).toBe('degraded')
+  })
+
+  it('off 档收 unavailable / idle / stopping / null', () => {
+    expect(toRuntimeGroup('unavailable')).toBe('off')
+    expect(toRuntimeGroup('idle')).toBe('off')
+    expect(toRuntimeGroup('stopping')).toBe('off')
+    expect(toRuntimeGroup(null)).toBe('off')
+  })
+})
+
+describe('SyncGalleryToolbar', () => {
+  it('状态徽标带 data-runtime-state，便于自动化与排查', () => {
+    renderToolbar({ runtimeState: 'degraded' })
+    const badge = document.querySelector('[data-runtime-state]')
+    expect(badge?.getAttribute('data-runtime-state')).toBe('degraded')
+    expect(badge?.textContent).toBe('未找到游戏目录')
+  })
+
+  it('点击刷新/扫描分别回调对应动作', () => {
+    const { onRefresh, onScan } = renderToolbar({ runtimeState: 'running' })
+    fireEvent.click(screen.getByTitle('刷新'))
+    fireEvent.click(screen.getByTitle('扫描游戏相册'))
+    expect(onRefresh).toHaveBeenCalledTimes(1)
+    expect(onScan).toHaveBeenCalledTimes(1)
+  })
+
+  it('扫描进行中按钮进入 loading（禁用重复触发）', () => {
+    const { onScan } = renderToolbar({ runtimeState: 'running', scanning: true })
+    const button = screen.getByTitle('扫描游戏相册') as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.click(button)
+    expect(onScan).not.toHaveBeenCalled()
+  })
+})

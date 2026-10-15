@@ -5,7 +5,7 @@
  *   nav.resonanceRecords 键曾整体缺失导致界面渲染原始 key 字符串，
  *   本测试在组件级锁定「第四项显示 共鸣录、不出现原始 key」。
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Sidebar } from './Sidebar'
 
@@ -57,12 +57,35 @@ describe('Sidebar 第 4 项 nav.resonanceRecords', () => {
   it('第四个导航项显示「共鸣录」，且界面不出现原始 key 文本', () => {
     render(<Sidebar />)
     const navButtons = Array.from(document.querySelectorAll('button.nav-item'))
-    // 9 个导航项：图库/截图/收藏/共鸣录/缓存/分类/重复文件/回收站/设置
-    expect(navButtons).toHaveLength(9)
+    // 10 个导航项：图库/截图/收藏/共鸣录/同步图库/缓存/分类/重复文件/回收站/设置
+    expect(navButtons).toHaveLength(10)
     expect(navButtons[3].textContent).toBe('共鸣录')
     // 各项 title 与可见文本均取自 i18n，raw key 不得渲染
     expect(screen.getByTitle('共鸣录')).toBeTruthy()
     expect(screen.queryByText('nav.resonanceRecords')).toBeNull()
+  })
+})
+
+describe('Sidebar 第 5 项 nav.syncGallery（阶段 5 同步图库独立入口）', () => {
+  afterEach(() => {
+    // 复位被本组用例替换掉的导航桩，避免污染同文件后续 describe
+    uiState.navigateTo = () => {}
+  })
+
+  it('第五个导航项显示「同步图库」，且不出现原始 key 文本', () => {
+    render(<Sidebar />)
+    const navButtons = Array.from(document.querySelectorAll('button.nav-item'))
+    expect(navButtons[4].textContent).toBe('同步图库')
+    expect(screen.getByTitle('同步图库')).toBeTruthy()
+    expect(screen.queryByText('nav.syncGallery')).toBeNull()
+  })
+
+  it('点击「同步图库」导航到 sync-gallery 视图', () => {
+    const navigateTo = vi.fn()
+    uiState.navigateTo = navigateTo
+    render(<Sidebar />)
+    fireEvent.click(screen.getByTitle('同步图库'))
+    expect(navigateTo).toHaveBeenCalledWith('sync-gallery')
   })
 })
 

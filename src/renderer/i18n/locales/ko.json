@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "공명록",
+      "syncGallery": "동기화 갤러리",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "메뉴",
     "recycleBin": "휴지통",
     "resonanceRecords": "공명록",
+    "syncGallery": "동기화 갤러리",
     "settings": "설정",
     "smartGroup": "스마트 그룹",
     "storage": "용량",
@@ -4307,6 +4309,93 @@
       "colPulls": "총 횟수",
       "colAvg": "평균 획득",
       "colPercentile": "백분위"
+    }
+  },
+  "syncGallery": {
+    "title": "동기화 갤러리",
+    "subtitle": "NikkiSync 내장 라이브러리의 자산, 로컬 갤러리와 서로 간섭하지 않습니다",
+    "loading": "동기화 갤러리 읽는 중…",
+    "toolbar": {
+      "statusTip": "내장 NikkiSync 런타임 상태",
+      "refresh": "새로고침",
+      "scan": "게임 앨범 스캔",
+      "status": {
+        "ready": "준비됨",
+        "degraded": "게임 폴더를 찾지 못함",
+        "off": "미실행"
+      },
+      "detail": "상세"
+    },
+    "empty": {
+      "title": "볼 수 있는 자산이 없습니다",
+      "linkHint": "NikkiSync 패키지를 찾을 수 없습니다. 프로젝트 루트에서 npm run link:nikkisync 실행 후 앱을 재시작하세요",
+      "runtimeOff": "내장 서비스가 실행 중이 아닙니다. 설정에서 NikkiSync 런타임을 켠 후 다시 시도하세요",
+      "gameRootMissing": "Infinity Nikki 설치 폴더를 찾지 못했습니다. 설정에서 직접 지정한 후 다시 스캔하세요",
+      "noAssets": "스캔은 끝났지만 사진이 없습니다. \"게임 앨범 스캔\"을 눌러 다시 색인하세요",
+      "retry": "다시 불러오기"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync 런타임을 찾을 수 없습니다. npm run link:nikkisync를 실행하세요",
+      "loadFailed": "동기화 갤러리 읽기 실패"
+    },
+    "drawer": {
+      "title": "자산 상세",
+      "basic": "기본 정보",
+      "fields": {
+        "assetId": "자산 ID",
+        "type": "종류",
+        "state": "상태",
+        "motion": "LIVE 표시",
+        "revision": "리비전",
+        "gameVersion": "게임 버전",
+        "resolution": "해상도",
+        "size": "파일 크기",
+        "hash": "콘텐츠 해시",
+        "metadata": "메타데이터"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "공유 이미지 생성",
+    "generate": "공유 이미지 생성",
+    "save": "저장",
+    "cancel": "취소",
+    "close": "닫기",
+    "savedCount": "{{count}}장 저장됨",
+    "progress": "{{current}} / {{total}}장 생성 중…",
+    "missingIcons": "{{count}}개 부품 아이콘을 사용할 수 없음",
+    "motionUnsupported": "현재 단계에서는 LIVE 사진 공유 이미지를 지원하지 않습니다",
+    "noParams": "촬영 파라미터를 읽지 못해 대시로 표시됩니다",
+    "errorGenerate": "공유 이미지 생성 실패",
+    "errorCancelled": "생성이 취소되었습니다",
+    "errorSave": "공유 이미지 저장 실패",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

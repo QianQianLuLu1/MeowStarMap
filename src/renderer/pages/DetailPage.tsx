@@ -28,6 +28,8 @@ import { PhotographyPanel } from '../components/common/PhotographyPanel'
 import { NikkiInfoPanel } from '../components/common/NikkiInfoPanel'
 import { OutfitPanel } from '../components/common/OutfitPanel'
 import { InteractionPanel } from '../components/common/InteractionPanel'
+import { Button } from '../components/common/Button'
+import { ShareCardDialog } from '../components/sync/ShareCardDialog'
 
 export const DetailPage: React.FC = () => {
   const { t } = useTranslation()
@@ -51,6 +53,7 @@ export const DetailPage: React.FC = () => {
     frameRate?: number
   } | null>(null)
   const [confirm, setConfirm] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [showTagManager, setShowTagManager] = useState(false)
   // F-O1：套装标注编辑状态
   const [editingOutfit, setEditingOutfit] = useState(false)
@@ -813,7 +816,14 @@ export const DetailPage: React.FC = () => {
           <NikkiInfoPanel file={media} />
           <OutfitPanel file={media} />
           <InteractionPanel file={media} />
+          {/* 阶段 5：本地图库同样能出分享图（同一套 share-card 移植件，数据源是本地解密链） */}
+          <div className="pt-2">
+            <Button variant="secondary" size="sm" onClick={() => setShareOpen(true)}>
+              {t('shareCard.generate')}
+            </Button>
+          </div>
         </div>
+        <ShareCardDialog open={shareOpen} file={media} onClose={() => setShareOpen(false)} />
       </div>
 
       <ConfirmDialog

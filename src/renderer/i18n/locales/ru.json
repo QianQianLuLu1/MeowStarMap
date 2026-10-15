@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Резонанс",
+      "syncGallery": "Синхронизированная галерея",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "Меню",
     "recycleBin": "Корзина",
     "resonanceRecords": "Резонанс",
+    "syncGallery": "Синхронизированная галерея",
     "settings": "Настройки",
     "smartGroup": "Умная группа",
     "storage": "Хранилище",
@@ -4307,6 +4309,93 @@
       "colPulls": "Молитвы",
       "colAvg": "В среднем",
       "colPercentile": "Перцентиль"
+    }
+  },
+  "syncGallery": {
+    "title": "Синхронизированная галерея",
+    "subtitle": "Ресурсы из встроенной библиотеки NikkiSync, не затрагивают локальную галерею",
+    "loading": "Загрузка синхронизированной галереи…",
+    "toolbar": {
+      "statusTip": "Состояние встроенной среды NikkiSync",
+      "refresh": "Обновить",
+      "scan": "Сканировать альбом игры",
+      "status": {
+        "ready": "Готово",
+        "degraded": "Папка игры не найдена",
+        "off": "Не запущено"
+      },
+      "detail": "Подробности"
+    },
+    "empty": {
+      "title": "Пока нет ресурсов для просмотра",
+      "linkHint": "Пакеты NikkiSync не найдены. Выполните npm run link:nikkisync в корне проекта и перезапустите приложение",
+      "runtimeOff": "Встроенная служба не запущена: включите среду NikkiSync в настройках и повторите",
+      "gameRootMissing": "Папка установки Infinity Nikki не найдена. Укажите её вручную в настройках и выполните сканирование заново",
+      "noAssets": "Сканирование завершено, но фото не найдены. Нажмите «Сканировать альбом игры» для повторной индексации",
+      "retry": "Загрузить заново"
+    },
+    "error": {
+      "bridgeMissing": "Среда NikkiSync не найдена. Выполните npm run link:nikkisync",
+      "loadFailed": "Не удалось загрузить синхронизированную галерею"
+    },
+    "drawer": {
+      "title": "Сведения о ресурсе",
+      "basic": "Основные сведения",
+      "fields": {
+        "assetId": "ID ресурса",
+        "type": "Тип",
+        "state": "Состояние",
+        "motion": "Признак LIVE",
+        "revision": "Ревизия",
+        "gameVersion": "Версия игры",
+        "resolution": "Разрешение",
+        "size": "Размер файла",
+        "hash": "Хеш содержимого",
+        "metadata": "Метаданные"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "Создать карточку для публикации",
+    "generate": "Создать карточку",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "close": "Закрыть",
+    "savedCount": "Сохранено {{count}}",
+    "progress": "Рендер {{current}} / {{total}}…",
+    "missingIcons": "Недоступно значков: {{count}}",
+    "motionUnsupported": "Карточки для LIVE-фото на этом этапе не поддерживаются",
+    "noParams": "Параметры съёмки не получены; будут прочерки",
+    "errorGenerate": "Не удалось создать карточку",
+    "errorCancelled": "Создание отменено",
+    "errorSave": "Не удалось сохранить карточку",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "共鳴録",
+      "syncGallery": "同期ギャラリー",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "メニュー",
     "recycleBin": "ごみ箱",
     "resonanceRecords": "共鳴録",
+    "syncGallery": "同期ギャラリー",
     "settings": "設定",
     "smartGroup": "スマートグループ",
     "storage": "容量",
@@ -4307,6 +4309,93 @@
       "colPulls": "合計回数",
       "colAvg": "平均獲得",
       "colPercentile": "百分位"
+    }
+  },
+  "syncGallery": {
+    "title": "同期ギャラリー",
+    "subtitle": "NikkiSync 組み込みライブラリの資産。ローカルギャラリーとは干渉しません",
+    "loading": "同期ギャラリーを読み込み中…",
+    "toolbar": {
+      "statusTip": "組み込み NikkiSync ランタイムの状態",
+      "refresh": "更新",
+      "scan": "ゲーム相册をスキャン",
+      "status": {
+        "ready": "準備完了",
+        "degraded": "ゲームフォルダが見つかりません",
+        "off": "未起動"
+      },
+      "detail": "詳細"
+    },
+    "empty": {
+      "title": "閲覧できる資産がありません",
+      "linkHint": "NikkiSync パッケージが見つかりません。プロジェクトルートで npm run link:nikkisync を実行し、アプリを再起動してください",
+      "runtimeOff": "組み込みサービスが起動していません。設定で NikkiSync ランタイムを有効にして再試行してください",
+      "gameRootMissing": "『インフィニティ ニキ』のインストールフォルダが見つかりません。設定で手動選択後に再スキャンしてください",
+      "noAssets": "スキャンは完了しましたが写真がありません。「ゲーム相册をスキャン」で再索引できます",
+      "retry": "再読み込み"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync ランタイムが見つかりません。npm run link:nikkisync を実行してください",
+      "loadFailed": "同期ギャラリーの読み込みに失敗しました"
+    },
+    "drawer": {
+      "title": "資産詳細",
+      "basic": "基本情報",
+      "fields": {
+        "assetId": "アセット ID",
+        "type": "種別",
+        "state": "状態",
+        "motion": "LIVE 表示",
+        "revision": "リビジョン",
+        "gameVersion": "ゲームバージョン",
+        "resolution": "解像度",
+        "size": "ファイルサイズ",
+        "hash": "コンテンツハッシュ",
+        "metadata": "メタデータ"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "シェア画像を生成",
+    "generate": "シェア画像を生成",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "savedCount": "{{count}} 枚保存しました",
+    "progress": "{{current}} / {{total}} 枚目を生成中…",
+    "missingIcons": "{{count}} 件のアイコンを利用できません",
+    "motionUnsupported": "この段階では LIVE 写真のシェア画像に未対応",
+    "noParams": "撮影パラメータを読み取れませんでした。ダッシュで表示されます",
+    "errorGenerate": "シェア画像の生成に失敗しました",
+    "errorCancelled": "生成をキャンセルしました",
+    "errorSave": "シェア画像の保存に失敗しました",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

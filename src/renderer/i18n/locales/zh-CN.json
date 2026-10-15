@@ -21,6 +21,7 @@
       "editor": "编辑器",
       "favorites": "收藏",
       "resonanceRecords": "共鸣录",
+      "syncGallery": "同步图库",
       "gallery": "图库",
       "launcherCache": "缓存",
       "recycleBin": "回收站",
@@ -1512,6 +1513,7 @@
     "menu": "菜单",
     "recycleBin": "回收站",
     "resonanceRecords": "共鸣录",
+    "syncGallery": "同步图库",
     "settings": "设置",
     "smartGroup": "智能分组",
     "storage": "占用",
@@ -4307,6 +4309,93 @@
       "colPulls": "总抽数",
       "colAvg": "平均出货",
       "colPercentile": "百分位"
+    }
+  },
+  "syncGallery": {
+    "title": "同步图库",
+    "subtitle": "来自 NikkiSync 内嵌库的资产，与本地图库互不影响",
+    "loading": "正在读取同步图库…",
+    "toolbar": {
+      "statusTip": "内嵌 NikkiSync Runtime 的运行状态",
+      "refresh": "刷新",
+      "scan": "扫描游戏相册",
+      "status": {
+        "ready": "已就绪",
+        "degraded": "未找到游戏目录",
+        "off": "未启动"
+      },
+      "detail": "详情"
+    },
+    "empty": {
+      "title": "还没有可浏览的资产",
+      "linkHint": "未找到 NikkiSync 包，请在项目根目录执行 npm run link:nikkisync 后重启应用",
+      "runtimeOff": "内嵌服务未启动：请在设置页开启 NikkiSync 运行时后重试",
+      "gameRootMissing": "未找到《无限暖暖》安装目录，请在设置里手动选择后重新扫描",
+      "noAssets": "已完成扫描但没有照片，可点击「扫描游戏相册」重新索引",
+      "retry": "重新载入"
+    },
+    "error": {
+      "bridgeMissing": "未找到 NikkiSync 运行时，请执行 npm run link:nikkisync",
+      "loadFailed": "读取同步图库失败"
+    },
+    "drawer": {
+      "title": "资产详情",
+      "basic": "基本信息",
+      "fields": {
+        "assetId": "资产 ID",
+        "type": "类型",
+        "state": "状态",
+        "motion": "实况标识",
+        "revision": "修订号",
+        "gameVersion": "游戏版本",
+        "resolution": "分辨率",
+        "size": "文件大小",
+        "hash": "内容哈希",
+        "metadata": "元数据"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "生成分享图",
+    "generate": "生成分享图",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "savedCount": "已保存 {{count}} 张",
+    "progress": "正在生成第 {{current}} / {{total}} 张…",
+    "missingIcons": "{{count}} 个部件图标暂不可用",
+    "motionUnsupported": "实况照片本阶段不支持生成分享图",
+    "noParams": "未读取到拍摄参数，分享图将以破折号占位",
+    "errorGenerate": "生成分享图失败",
+    "errorCancelled": "已取消生成",
+    "errorSave": "保存分享图失败",
+    "card": {
+      "brand": "NikkiSync",
+      "fallbackTitle": "无限暖暖摄影",
+      "outfitHeading": "穿搭",
+      "parameterHeading": "拍摄参数",
+      "iconMissing": "图标暂缺",
+      "categoryBadge": "分类示意",
+      "noOutfit": "暂无穿搭数据",
+      "footer": "NikkiSync · 穿搭与摄影记录",
+      "labelFocalLength": "焦距调节",
+      "labelAperture": "光圈调节",
+      "labelVignette": "晕影调节",
+      "labelBloom": "柔光强度",
+      "labelBloomRange": "柔光范围",
+      "labelBrightness": "亮度",
+      "labelExposure": "曝光",
+      "labelContrast": "对比度",
+      "labelSaturation": "饱和度",
+      "labelNaturalSaturation": "自然饱和",
+      "labelHighlights": "高光",
+      "labelShadows": "阴影",
+      "labelRotation": "镜头旋转",
+      "labelDepthOfField": "景深",
+      "labelAction": "动作",
+      "labelLighting": "光照",
+      "labelFilter": "滤镜",
+      "labelLocation": "地点"
     }
   }
 }

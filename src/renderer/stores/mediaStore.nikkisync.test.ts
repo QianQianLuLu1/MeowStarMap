@@ -180,6 +180,17 @@ describe('fetchMediaFromDatabase 走 NikkiSync 数据源', () => {
     ;(globalThis as { window?: unknown }).window = {}
     await expect(fetchMediaFromDatabase()).resolves.toBeNull()
   })
+
+  it('深度取数 limit 超过上游上界 500 时收敛为 500，不得让 ValidationError 逃出取数层', async () => {
+    const api = setBridge({
+      getAssets: vi.fn().mockResolvedValue({ items: [], libraryRevision: 1 })
+    })
+    // GalleryPage 的 media:updated / get-changes 整表刷新会传 max(500, 已加载条数)；
+    // 已加载 >500 时若不 clamp，fetchAssetPage 抛出的 ValidationError 会让刷新静默失效
+    const result = await fetchMediaFromDatabase({ limit: 800 })
+    expect(api.getAssets.mock.calls[0]?.[0]).toMatchObject({ limit: 500 })
+    expect(result).not.toBeNull()
+  })
 })
 
 describe('loadNextMediaPage 走 NikkiSync 数据源', () => {

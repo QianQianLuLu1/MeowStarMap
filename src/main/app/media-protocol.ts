@@ -8,6 +8,7 @@ import { MEDIA_EXTENSIONS, getMimeType } from '../utils/media-constants'
 import { MEDIA_CACHE_TTL_MS } from '../utils/constants'
 import { isPathUnderDir } from '../utils/ipc-validate'
 // 阶段 4：media:// 第 4 条规则的事实来源（NikkiSync 资源路径精确授权表）
+// 阶段 5：该规则的判定点从协议 handler 下沉到 isMediaPathAllowed，展示与读取共用一套口径
 import { isNikkiSyncResourcePath } from '../nikkisync/resource-allowlist'
 import { logger } from '../utils/logger'
 // 文件读流的生命周期管理统一走公共工具（含 error 监听 + abort 取消 + fd 归还），
@@ -104,17 +105,10 @@ export function registerMediaProtocol(ctx: AppContext): void {
         return new Response('File not found', { status: 404 })
       }
 
-      // 阶段 4 · 第 4 条规则：NikkiSync 资产路径授权。
-      // 查询面（runtime-facade 的 path 模式）把上游 `resources.source_path` 交给渲染层时
-      // 逐项登记，这里只做**确切路径**的精确匹配——不给目录级授权，判的是解引用之后的
-      // realPath（因此符号链接指向表外仍然落空），并沿用同一道扩展名白名单：
-      // 登记过也不放非媒体文件。本 App 的 DB 是否就绪与该规则无关（两份库彼此独立）。
-      const nikkisyncAllowed =
-        MEDIA_EXTENSIONS.has(path.extname(realPath).toLowerCase()) &&
-        isNikkiSyncResourcePath(realPath)
-
-      // 路径白名单校验：仅允许访问已索引的媒体文件或已知缩略图
-      if (!nikkisyncAllowed && !isMediaPathAllowed(ctx, realPath)) {
+      // 路径白名单校验：仅允许访问已索引的媒体文件、已知缩略图、已索引 source_path 下的
+      // 媒体扩展名文件，以及 NikkiSync 资源授权表里的确切路径（第 4 条规则自阶段 5 起
+      // 下沉到 isMediaPathAllowed 内部，与读通道共用一套口径）。
+      if (!isMediaPathAllowed(ctx, realPath)) {
         logger.warn(t('main.mediaProtocol.log.denyNotWhitelisted'), filePath)
         return new Response('Forbidden', { status: 403 })
       }
@@ -253,22 +247,40 @@ function parseRangeHeader(
 }
 
 /**
- * 检查 media:// 请求路径是否在白名单内。
+ * 检查请求路径是否在媒体白名单内（`media://` 展示与 IPC 读通道共用的唯一口径）。
  * 安全策略：
  *   1. 缩略图缓存目录下的文件（受控目录）
  *   2. 数据库中已索引的媒体文件（file_path 精确匹配）或其缩略图路径（thumbnail 精确匹配）
  *   3. 已索引 source_path 目录下的媒体文件（扩展名必须在白名单内，防止读取任意文件）
+ *   4. NikkiSync 资源授权表里的**确切**路径（同样过扩展名白名单）
  * 注：媒体扩展名白名单已抽到 utils/media-constants.ts 的 MEDIA_EXTENSIONS 常量
  * 已修复 A-S2/C-F5：原实现 source_path 前缀匹配无扩展名限制，扫描 D:\ 后可读取整盘任意文件
  * 已修复 A-S1/C-S2：原实现每次请求都执行数据库查询，现使用内存缓存（TTL 5分钟）
+ *
+ * 阶段 5：规则 4 原先只写在 `registerMediaProtocol` 的 handler 里，而
+ * `assertMediaReadPath` / `assertMediaAccessPath` 直接调本函数，导致「照片在图库能显示、
+ * `decrypt:decodeFile` 却报 IPC_PATH_FORBIDDEN」。下沉到此处后展示与读取同口径。
  */
 export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boolean {
-  const db = ctx.dbManager.getDatabase()
-  if (!db) return false
-
   try {
-    const thumbnailDir = path.resolve(ctx.thumbnailGen.getCacheDir())
     const normalizedRequest = path.resolve(filePath)
+
+    // 4. NikkiSync 资产授权表：判在取 DB 之前——两份库彼此独立，本 App DB 未就绪
+    //    不该让 NikkiSync 资产整屏裂图 / 整屏读不了。
+    //    刻意**不写入** mediaPathCache：授权表随 `libraryRevision` 变更整表替换、
+    //    随 `runtime.stop()` 清空，而缓存有 5 分钟 TTL，写入会把「先判否、后登记」
+    //    的分页路径在窗口内持续拒绝。Set 查找零 IO，不需要缓存提速。
+    if (
+      MEDIA_EXTENSIONS.has(path.extname(normalizedRequest).toLowerCase()) &&
+      isNikkiSyncResourcePath(normalizedRequest)
+    ) {
+      return true
+    }
+
+    const db = ctx.dbManager.getDatabase()
+    if (!db) return false
+
+    const thumbnailDir = path.resolve(ctx.thumbnailGen.getCacheDir())
 
     // 0. 检查路径级缓存（命中则直接返回，避免数据库查询）
     // P1-A4：命中时 delete+set 把 key 移到 Map 末尾，实现 LRU 最近访问优先

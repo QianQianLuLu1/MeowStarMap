@@ -1,8 +1,9 @@
 /**
  * NikkiSync 资源路径授权表（阶段 4 · `media://` 第 4 条规则的事实来源）。
  *
- * 为什么需要它：`src/main/app/media-protocol.ts` 的 `isMediaPathAllowed()` 三条既有规则
- * 只认本 App 自己的 `media_files` 表。图库改从 NikkiSync Runtime 取数后，资产的
+ * 为什么需要它：`src/main/app/media-protocol.ts` 的 `isMediaPathAllowed()` 既有三条规则
+ * （缩略图缓存目录 / `media_files` 精确匹配 / 已索引 `source_path` 目录）只认本 App 自己的
+ * `media_files` 表。图库改从 NikkiSync Runtime 取数后，资产的
  * `resources.source_path` 不在那份表里，`media://` 会一律 403 —— 而把整条协议另起一套
  * （`nikkisync://`）要同时改 `navigation-guard` 与 `preload/origin-guard` 两层互相镜像的
  * 放行集合，并重复实现 Range/ETag，代价与风险都更大。因此这里只补一张**精确匹配**的表。

@@ -64,7 +64,11 @@ vi.mock('fs', () => ({
   constants: { R_OK: 4, W_OK: 2 }
 }))
 
-import { registerMediaProtocol, invalidateMediaPathCache } from '../media-protocol'
+import {
+  registerMediaProtocol,
+  invalidateMediaPathCache,
+  isMediaPathAllowed
+} from '../media-protocol'
 import {
   clearNikkiSyncResourcePaths,
   registerNikkiSyncResourcePaths
@@ -742,6 +746,62 @@ describe('media:// 第 4 条规则：NikkiSync 资源路径授权（阶段 4）'
       // 非 Windows 保留大小写敏感：同一路径自身仍必须命中
       const response = await register()(makeRequest(upper))
       expect(response.status).toBe(200)
+    }
+  })
+})
+
+describe('阶段 5 · C1：读通道与展示通道同口径 —— isMediaPathAllowed 含 NikkiSync 资源规则', () => {
+  /**
+   * 阶段 4 只把第 4 条规则写进了协议 handler（`media-protocol.ts` 的 `registerMediaProtocol`），
+   * 但 `assertMediaReadPath` / `assertMediaAccessPath` 走的是 `isMediaPathAllowed` 本身。
+   * 于是「照片在图库能显示、`decrypt:decodeFile` 却报 IPC_PATH_FORBIDDEN」——
+   * 穿搭/拍摄参数展示（阶段 5 C2/C3）与分享图取原图（B）都挡在这道闸上。
+   * 本组用例把口径统一到 `isMediaPathAllowed`，并锁死「不放宽」的三条边界。
+   */
+  const ctxNoRows = () => makeAppCtx({ db: makeDb(() => undefined) })
+
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+    invalidateMediaPathCache()
+  })
+
+  it('32. 登记过的 NikkiSync 路径 ⇒ isMediaPathAllowed true（读通道不再 403）', () => {
+    const target = '/mock/nikki/a.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(true)
+  })
+
+  it('33. 登记过但扩展名不在媒体白名单 ⇒ false（不放 .txt/.exe）', () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/notes.txt', '/mock/nikki/run.exe'])
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/nikki/notes.txt')).toBe(false)
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/nikki/run.exe')).toBe(false)
+  })
+
+  it('34. 未登记路径 ⇒ false（精确匹配，不给目录级授权）', () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/a.png'])
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/nikki/other.png')).toBe(false)
+  })
+
+  it('35. 本 App DB 为 null 时规则仍生效（两份库彼此独立）', () => {
+    const target = '/mock/nikki/b.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    expect(isMediaPathAllowed(makeAppCtx({ db: null }), target)).toBe(true)
+  })
+
+  it('36. 授权表清空后一律拒绝，且否定结果不会被上一轮的判定残留', () => {
+    const target = '/mock/nikki/c.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(true)
+    clearNikkiSyncResourcePaths()
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(false)
+  })
+
+  it('37. Windows 大小写差异在读通道同样不裂：登记大写、判定小写 ⇒ true', () => {
+    registerNikkiSyncResourcePaths(1, ['D:/mock/nikki/D.PNG'])
+    if (process.platform === 'win32') {
+      expect(isMediaPathAllowed(ctxNoRows(), 'd:/mock/nikki/d.png')).toBe(true)
+    } else {
+      expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/nikki/D.PNG')).toBe(true)
     }
   })
 })

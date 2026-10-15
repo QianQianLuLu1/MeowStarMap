@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Résonance",
+      "syncGallery": "Galerie synchronisée",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "Menu",
     "recycleBin": "Corbeille",
     "resonanceRecords": "Résonance",
+    "syncGallery": "Galerie synchronisée",
     "settings": "Paramètres",
     "smartGroup": "Groupe intelligent",
     "storage": "Stockage",
@@ -4307,6 +4309,93 @@
       "colPulls": "Invocations",
       "colAvg": "Moyenne",
       "colPercentile": "Percentile"
+    }
+  },
+  "syncGallery": {
+    "title": "Galerie synchronisée",
+    "subtitle": "Ressources de la bibliothèque NikkiSync intégrée, sans impact sur la galerie locale",
+    "loading": "Chargement de la galerie synchronisée…",
+    "toolbar": {
+      "statusTip": "État du runtime NikkiSync intégré",
+      "refresh": "Actualiser",
+      "scan": "Analyser l’album du jeu",
+      "status": {
+        "ready": "Prêt",
+        "degraded": "Dossier du jeu introuvable",
+        "off": "Non démarré"
+      },
+      "detail": "Détails"
+    },
+    "empty": {
+      "title": "Aucune ressource à parcourir",
+      "linkHint": "Packages NikkiSync introuvables. Exécutez npm run link:nikkisync à la racine du projet, puis redémarrez l’application",
+      "runtimeOff": "Service intégré non démarré : activez le runtime NikkiSync dans les Paramètres, puis réessayez",
+      "gameRootMissing": "Dossier d’installation d’Infinity Nikki introuvable. Sélectionnez-le manuellement dans les Paramètres, puis relancez l’analyse",
+      "noAssets": "Analyse terminée sans photo. Cliquez sur « Analyser l’album du jeu » pour réindexer",
+      "retry": "Recharger"
+    },
+    "error": {
+      "bridgeMissing": "Runtime NikkiSync introuvable. Exécutez npm run link:nikkisync",
+      "loadFailed": "Échec du chargement de la galerie synchronisée"
+    },
+    "drawer": {
+      "title": "Détails de la ressource",
+      "basic": "Informations de base",
+      "fields": {
+        "assetId": "ID de la ressource",
+        "type": "Type",
+        "state": "État",
+        "motion": "Marque LIVE",
+        "revision": "Révision",
+        "gameVersion": "Version du jeu",
+        "resolution": "Résolution",
+        "size": "Taille du fichier",
+        "hash": "Empreinte du contenu",
+        "metadata": "Métadonnées"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "Générer la carte de partage",
+    "generate": "Générer la carte",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "savedCount": "{{count}} image(s) enregistrée(s)",
+    "progress": "Rendu {{current}} / {{total}}…",
+    "missingIcons": "{{count}} icône(s) indisponible(s)",
+    "motionUnsupported": "Les cartes pour photos LIVE ne sont pas prises en charge",
+    "noParams": "Aucun paramètre de prise de vue ; des tirets seront affichés",
+    "errorGenerate": "Échec de la génération",
+    "errorCancelled": "Génération annulée",
+    "errorSave": "Échec de l’enregistrement",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

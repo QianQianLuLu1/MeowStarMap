@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Resonanz",
+      "syncGallery": "Synchronisierte Galerie",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "Menü",
     "recycleBin": "Papierkorb",
     "resonanceRecords": "Resonanz",
+    "syncGallery": "Synchronisierte Galerie",
     "settings": "Einstellungen",
     "smartGroup": "Intelligente Gruppe",
     "storage": "Speicher",
@@ -4307,6 +4309,93 @@
       "colPulls": "Züge",
       "colAvg": "Ø Züge",
       "colPercentile": "Perzentil"
+    }
+  },
+  "syncGallery": {
+    "title": "Synchronisierte Galerie",
+    "subtitle": "Objekte aus der eingebetteten NikkiSync-Bibliothek, unabhängig von der lokalen Galerie",
+    "loading": "Synchronisierte Galerie wird geladen…",
+    "toolbar": {
+      "statusTip": "Status der eingebetteten NikkiSync-Laufzeit",
+      "refresh": "Aktualisieren",
+      "scan": "Spielalbum durchsuchen",
+      "status": {
+        "ready": "Bereit",
+        "degraded": "Spielordner nicht gefunden",
+        "off": "Nicht gestartet"
+      },
+      "detail": "Details"
+    },
+    "empty": {
+      "title": "Noch keine Objekte zum Durchsuchen",
+      "linkHint": "NikkiSync-Pakete nicht gefunden. Führe im Projektstamm npm run link:nikkisync aus und starten Sie die App neu",
+      "runtimeOff": "Eingebetteter Dienst nicht gestartet: aktiviere NikkiSync-Laufzeit in den Einstellungen und versuche es erneut",
+      "gameRootMissing": "Installationsordner von Infinity Nikki nicht gefunden. Bitte manuell auswählen und erneut scannen",
+      "noAssets": "Scan abgeschlossen, aber keine Fotos gefunden. Mit „Spielalbum durchsuchen“ erneut indizieren",
+      "retry": "Neu laden"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync-Laufzeit nicht gefunden. Führe npm run link:nikkisync aus",
+      "loadFailed": "Synchronisierte Galerie konnte nicht geladen werden"
+    },
+    "drawer": {
+      "title": "Objektdetails",
+      "basic": "Grundinformationen",
+      "fields": {
+        "assetId": "Objekt-ID",
+        "type": "Typ",
+        "state": "Zustand",
+        "motion": "LIVE-Kennzeichnung",
+        "revision": "Revision",
+        "gameVersion": "Spielversion",
+        "resolution": "Auflösung",
+        "size": "Dateigröße",
+        "hash": "Inhalts-Hash",
+        "metadata": "Metadaten"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "FreigabeBild erzeugen",
+    "generate": "FreigabeBild erzeugen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "savedCount": "{{count}} Bild(er) gespeichert",
+    "progress": "Rendere {{current}} / {{total}}…",
+    "missingIcons": "{{count}} Symbol(e) nicht verfügbar",
+    "motionUnsupported": "Freigabebilder für LIVE-Fotos werden in dieser Phase nicht unterstützt",
+    "noParams": "Keine Aufnahmeparameter gefunden; Es werden Gedankenstriche angezeigt",
+    "errorGenerate": "Erstellung fehlgeschlagen",
+    "errorCancelled": "Erstellung abgebrochen",
+    "errorSave": "Speichern fehlgeschlagen",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

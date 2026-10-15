@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "共鳴錄",
+      "syncGallery": "同步圖庫",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "選單",
     "recycleBin": "資源回收筒",
     "resonanceRecords": "共鳴錄",
+    "syncGallery": "同步圖庫",
     "settings": "設定",
     "smartGroup": "智慧群組",
     "storage": "佔用",
@@ -4307,6 +4309,93 @@
       "colPulls": "總抽取次數",
       "colAvg": "平均出貨",
       "colPercentile": "百分位"
+    }
+  },
+  "syncGallery": {
+    "title": "同步圖庫",
+    "subtitle": "來自 NikkiSync 內嵌庫的資產，與本地圖庫互不影響",
+    "loading": "正在讀取同步圖庫…",
+    "toolbar": {
+      "statusTip": "內嵌 NikkiSync Runtime 的執行狀態",
+      "refresh": "重新整理",
+      "scan": "掃描遊戲相簿",
+      "status": {
+        "ready": "已就緒",
+        "degraded": "未找到遊戲目錄",
+        "off": "未啟動"
+      },
+      "detail": "詳情"
+    },
+    "empty": {
+      "title": "還沒有可瀏覽的資產",
+      "linkHint": "未找到 NikkiSync 套件，請在專案根目錄執行 npm run link:nikkisync 後重新啟動應用",
+      "runtimeOff": "內嵌服務未啟動：請在設定頁開啟 NikkiSync 執行期後重試",
+      "gameRootMissing": "未找到《無限暖暖》安裝目錄，請在設定裡手動選擇後重新掃描",
+      "noAssets": "已完成掃描但沒有照片，可點選「掃描遊戲相簿」重新索引",
+      "retry": "重新載入"
+    },
+    "error": {
+      "bridgeMissing": "未找到 NikkiSync 執行期，請執行 npm run link:nikkisync",
+      "loadFailed": "讀取同步圖庫失敗"
+    },
+    "drawer": {
+      "title": "資產詳情",
+      "basic": "基本資訊",
+      "fields": {
+        "assetId": "資產 ID",
+        "type": "類型",
+        "state": "狀態",
+        "motion": "實況標識",
+        "revision": "修訂號",
+        "gameVersion": "遊戲版本",
+        "resolution": "解析度",
+        "size": "檔案大小",
+        "hash": "內容雜湊",
+        "metadata": "中繼資料"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "產生分享圖",
+    "generate": "產生分享圖",
+    "save": "儲存",
+    "cancel": "取消",
+    "close": "關閉",
+    "savedCount": "已儲存 {{count}} 張",
+    "progress": "正在產生第 {{current}} / {{total}} 張…",
+    "missingIcons": "{{count}} 個部件圖示暫時不可用",
+    "motionUnsupported": "實況照片本階段不支援產生分享圖",
+    "noParams": "未讀取到拍攝參數，分享圖將以破折號佔位",
+    "errorGenerate": "產生分享圖失敗",
+    "errorCancelled": "已取消產生",
+    "errorSave": "儲存分享圖失敗",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

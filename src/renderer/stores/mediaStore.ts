@@ -4,6 +4,8 @@ import i18n from '../i18n'
 // 阶段 4：NikkiSync 数据源的视图模型映射（渲染层唯一转换点）
 import { toAssetViewModel, type AssetMediaFile } from '../utils/assetViewModel'
 import type { AssetSummary } from '../../shared/sync/protocol'
+// 阶段 5：取数层的页大小上界自查（上游 zod 的 listSchema 上界同为 500）
+import { ValidationError } from '../../shared/errors/app-error'
 // C-S2：从 shared 导入场景分类，消除渲染进程跨边界导入主进程模块
 import type { SceneCategory, SceneTime } from '../../shared/scene-category'
 // P1-01：读取 showDuplicates 状态用于服务端过滤 is_duplicate=1
@@ -322,52 +324,68 @@ async function mapAssetPageToFiles(
   )
 }
 
+/** 上游 `listSchema.limit` 的硬上界（`nikkisync-handler.ts`），越界在发出请求前就拒。 */
+export const ASSET_PAGE_LIMIT_MAX = 500
+
+/** `fetchAssetPage` 的返回形态：一页视图模型 + 游标推进所需的状态。 */
+export interface AssetPageResult {
+  files: AssetMediaFile[]
+  nextCursor: string | null
+  libraryRevision: number
+  hasMore: boolean
+}
+
 /**
- * 阶段 4：从内嵌 NikkiSync Runtime 取首屏一页资产。
+ * 阶段 5：NikkiSync 取数层——**纯取数，不写任何 store**。
  *
- * 与 `fetchMediaFromDatabase` 同签名同返回形态，因此调用方无感。
- * 上游 `AssetPageQuery` 不支持 `uid` 过滤（协议只有 limit/cursor/type/afterRevision/
- * includeDeleted 五键），故档案筛选只能在已取回的这一页上做，翻页可能显稀疏 —— 见
- * docs/sync-integration/04-ui-bridge-plan.md §16.2，不伪造服务端过滤能力。
+ * 阶段 4 时这段逻辑长在 `fetchMediaFromRuntime` / `loadNextAssetPage` 内部，只服务图库一处。
+ * 同步图库入口需要同一套取数链（`get-assets` + 两次 `get-resource-records` + `asset-edits`），
+ * 但**不能**共用图库那份 `mediaFiles` 列表（两份列表分属不同 id 命名空间，且图库是 keep-alive
+ * 常驻、导航即触发本地源取数，会互相覆盖）。因此把取数抽成一处、列表状态各留一份。
+ *
+ * 返回 `null` = 桥缺失或响应畸形（与 `fetchMediaFromDatabase` 同口径，调用方据此保留现有列表）；
+ * 空页返回 `{ files: [], hasMore: false }` 而非 `null`，两者语义不同，不可合并。
  */
-export async function fetchMediaFromRuntime(options?: {
-  limit?: number
-}): Promise<{ files: MediaFile[]; categories: Category[]; hasMore?: boolean } | null> {
+export async function fetchAssetPage(input: {
+  limit: number
+  cursor?: string | null
+  profileUid?: string | null
+}): Promise<AssetPageResult | null> {
+  const { limit, cursor = null, profileUid = null } = input
+  if (!Number.isInteger(limit) || limit < 1 || limit > ASSET_PAGE_LIMIT_MAX) {
+    throw new ValidationError(`fetchAssetPage limit out of range: ${limit}`, {
+      min: 1,
+      max: ASSET_PAGE_LIMIT_MAX
+    })
+  }
   const api = window.electronAPI?.nikkisync
-  if (!api?.getAssets || !window.electronAPI?.category?.list) {
+  if (!api?.getAssets) {
     console.error(i18n.t('mediaStore.log.noElectronApi') + 'nikkisync.getAssets=')
     return null
   }
   try {
-    const page = await api.getAssets({ limit: options?.limit ?? MEDIA_PAGE_SIZE })
+    const page = await api.getAssets({ limit, ...(cursor ? { cursor } : {}) })
     if (!page || !Array.isArray(page.items)) {
       console.error(i18n.t('mediaStore.log.filesEmpty'), 'nikkisync page malformed')
       return null
     }
-    const currentProfileUid = useMediaStore.getState().currentProfileUid
     const mapped = await mapAssetPageToFiles(
       page.items,
       page.items.map((item) => item.assetId)
     )
+    // 上游 AssetPageQuery 不支持 uid 过滤（协议只有 limit/cursor/type/afterRevision/
+    // includeDeleted 五键），故档案筛选只能在已取回的一页上做，翻页可能显稀疏 —— 见
+    // docs/sync-integration/04-ui-bridge-plan.md §16.2，不伪造服务端过滤能力。
     const files =
-      currentProfileUid && currentProfileUid !== 'all'
-        ? mapped.filter((file) => file.account_uid === currentProfileUid)
+      profileUid && profileUid !== 'all'
+        ? mapped.filter((file) => file.account_uid === profileUid)
         : mapped
-    const categoryResult = await window.electronAPI.category.list()
-    if (!categoryResult?.categories) {
-      console.error(i18n.t('mediaStore.log.categoriesEmpty'))
-      return null
+    return {
+      files,
+      nextCursor: page.nextCursor ?? null,
+      libraryRevision: page.libraryRevision,
+      hasMore: Boolean(page.nextCursor)
     }
-    const hasMore = Boolean(page.nextCursor)
-    useMediaStore.setState({
-      nikkiCursor: page.nextCursor ?? null,
-      nikkiRevision: page.libraryRevision,
-      // 首屏即复位两套游标：与本地分支的 mediaCursor 复位语义保持对称
-      mediaCursor: null,
-      hasMoreMedia: hasMore,
-      loadingMore: false
-    })
-    return { files, categories: categoryResult.categories as Category[], hasMore }
   } catch (error) {
     console.error(
       i18n.t('mediaStore.log.fetchError'),
@@ -378,36 +396,62 @@ export async function fetchMediaFromRuntime(options?: {
   }
 }
 
+/**
+ * 阶段 4：从内嵌 NikkiSync Runtime 取首屏一页资产。
+ *
+ * 与 `fetchMediaFromDatabase` 同签名同返回形态，因此调用方无感。
+ */
+export async function fetchMediaFromRuntime(options?: {
+  limit?: number
+}): Promise<{ files: MediaFile[]; categories: Category[]; hasMore?: boolean } | null> {
+  if (!window.electronAPI?.category?.list) {
+    console.error(i18n.t('mediaStore.log.noElectronApi') + 'category.list=')
+    return null
+  }
+  const page = await fetchAssetPage({
+    // N6 深度取数可能传入超过上游 zod 上界（500）的值（已加载条数 > 500），这里收敛到
+    // 上界：不 clamp 会让 fetchAssetPage 的 ValidationError 逃出「吞异常返 null」契约，
+    // media:updated / get-changes 的整表刷新在 nikkisync 源下静默失效
+    limit: Math.min(options?.limit ?? MEDIA_PAGE_SIZE, ASSET_PAGE_LIMIT_MAX),
+    profileUid: useMediaStore.getState().currentProfileUid
+  })
+  if (!page) return null
+  const categoryResult = await window.electronAPI.category.list()
+  if (!categoryResult?.categories) {
+    console.error(i18n.t('mediaStore.log.categoriesEmpty'))
+    return null
+  }
+  useMediaStore.setState({
+    nikkiCursor: page.nextCursor,
+    nikkiRevision: page.libraryRevision,
+    // 首屏即复位两套游标：与本地分支的 mediaCursor 复位语义保持对称
+    mediaCursor: null,
+    hasMoreMedia: page.hasMore,
+    loadingMore: false
+  })
+  return {
+    files: page.files,
+    categories: categoryResult.categories as Category[],
+    hasMore: page.hasMore
+  }
+}
+
 /** 阶段 4：NikkiSync 源的续页（游标推进 + 去重追加 + 并发保护）。 */
 async function loadNextAssetPage(): Promise<void> {
   const { loadingMore, hasMoreMedia, nikkiCursor } = useMediaStore.getState()
   if (loadingMore || !hasMoreMedia) return
-  const api = window.electronAPI?.nikkisync
-  if (!api?.getAssets) return
+  if (!window.electronAPI?.nikkisync?.getAssets) return
   useMediaStore.setState({ loadingMore: true })
   try {
-    const page = await api.getAssets({
-      limit: MEDIA_PAGE_SIZE,
-      ...(nikkiCursor ? { cursor: nikkiCursor } : {})
-    })
-    if (!page || !Array.isArray(page.items)) return
-    const mapped = await mapAssetPageToFiles(
-      page.items,
-      page.items.map((item) => item.assetId)
-    )
-    const fresh = dedupeAgainst(useMediaStore.getState().mediaFiles, mapped)
+    const page = await fetchAssetPage({ limit: MEDIA_PAGE_SIZE, cursor: nikkiCursor })
+    if (!page) return
+    const fresh = dedupeAgainst(useMediaStore.getState().mediaFiles, page.files)
     if (fresh.length > 0) useMediaStore.getState().addMediaFiles(fresh)
     useMediaStore.setState({
-      nikkiCursor: page.nextCursor ?? null,
+      nikkiCursor: page.nextCursor,
       nikkiRevision: page.libraryRevision,
-      hasMoreMedia: Boolean(page.nextCursor)
+      hasMoreMedia: page.hasMore
     })
-  } catch (error) {
-    console.error(
-      i18n.t('mediaStore.log.fetchError'),
-      error instanceof Error ? error.message : String(error),
-      error
-    )
   } finally {
     useMediaStore.setState({ loadingMore: false })
   }

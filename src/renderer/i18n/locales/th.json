@@ -21,6 +21,7 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "บันทึกเรโซแนนซ์",
+      "syncGallery": "แกลเลอรีซิงค์",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
@@ -1123,6 +1124,7 @@
     "menu": "เมนู",
     "recycleBin": "ถังรีไซเคิล",
     "resonanceRecords": "บันทึกเรโซแนนซ์",
+    "syncGallery": "แกลเลอรีซิงค์",
     "settings": "การตั้งค่า",
     "smartGroup": "กลุ่มอัจฉริยะ",
     "storage": "พื้นที่จัดเก็บ",
@@ -4307,6 +4309,93 @@
       "colPulls": "Total pulls",
       "colAvg": "Avg. pulls",
       "colPercentile": "Percentile"
+    }
+  },
+  "syncGallery": {
+    "title": "Sync Gallery",
+    "subtitle": "Assets from the embedded NikkiSync library, independent of the local gallery",
+    "loading": "Loading sync gallery…",
+    "toolbar": {
+      "statusTip": "Status of the embedded NikkiSync runtime",
+      "refresh": "Refresh",
+      "scan": "Scan game album",
+      "status": {
+        "ready": "Ready",
+        "degraded": "Game folder not found",
+        "off": "Not started"
+      },
+      "detail": "Details"
+    },
+    "empty": {
+      "title": "No assets to browse yet",
+      "linkHint": "NikkiSync packages not found. Run npm run link:nikkisync in the project root, then restart the app",
+      "runtimeOff": "Embedded service is not running: enable the NikkiSync runtime in Settings and retry",
+      "gameRootMissing": "Infinity Nikki install folder not found. Select it manually in Settings, then rescan",
+      "noAssets": "Scan finished but no photos were found. Click “Scan game album” to reindex",
+      "retry": "Reload"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync runtime not found. Run npm run link:nikkisync",
+      "loadFailed": "Failed to load sync gallery"
+    },
+    "drawer": {
+      "title": "Asset details",
+      "basic": "Basic info",
+      "fields": {
+        "assetId": "Asset ID",
+        "type": "Type",
+        "state": "State",
+        "motion": "LIVE flag",
+        "revision": "Revision",
+        "gameVersion": "Game version",
+        "resolution": "Resolution",
+        "size": "File size",
+        "hash": "Content hash",
+        "metadata": "Metadata"
+      }
+    }
+  },
+  "shareCard": {
+    "title": "Generate share card",
+    "generate": "Generate share card",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "savedCount": "Saved {{count}} image(s)",
+    "progress": "Rendering {{current}} / {{total}}…",
+    "missingIcons": "{{count}} item icon(s) unavailable",
+    "motionUnsupported": "Share cards for LIVE photos are not supported in this phase",
+    "noParams": "No shooting parameters found; the card will show dashes",
+    "errorGenerate": "Failed to generate the share card",
+    "errorCancelled": "Generation cancelled",
+    "errorSave": "Failed to save the share card",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }
