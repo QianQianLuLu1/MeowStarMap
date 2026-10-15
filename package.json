@@ -215,7 +215,13 @@
     "files": [
       "dist/**/*",
       "resources/**/*",
-      "node_modules/@nikkisync/**/*",
+      {
+        "from": "node_modules/@nikkisync",
+        "to": "node_modules/@nikkisync",
+        "filter": [
+          "**/*"
+        ]
+      },
       "!**/node_modules/@img/sharp-darwin-*",
       "!**/node_modules/@img/sharp-linux-*",
       "!**/node_modules/@img/sharp-libvips-linux-*",

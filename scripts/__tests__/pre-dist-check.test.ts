@@ -6,6 +6,7 @@ import {
   MAIN_MARKER_SCOPE,
   treeContainsMarker,
   dirContains,
+  nikkiSyncPackedVerdict,
   type JsTreeFile
 } from '../pre-dist-check'
 
@@ -113,6 +114,29 @@ describe('treeContainsMarker — 边界：路径归一与作用域前缀', () =>
 describe('dirContains — 磁盘适配器的 fail-safe 语义', () => {
   it('目录不存在 → false 且不抛错', () => {
     expect(dirContains(path.join(DIST_MAIN, 'no-such-dir-for-test'), MARKER)).toBe(false)
+  })
+})
+
+describe('nikkiSyncPackedVerdict — 打包态 @nikkisync 缺失判定', () => {
+  it('正常：产物里已有 @nikkisync ⇒ 进入逐项断言', () => {
+    expect(
+      nikkiSyncPackedVerdict({ packedNikkiSyncExists: true, projectNikkiSyncLinkExists: true })
+    ).toBe('assert')
+  })
+
+  it('异常：项目已建链但产物没带上 ⇒ fail（防静默回归）', () => {
+    // 回归背景：2026-10-15 实测 electron-builder 对根 node_modules 有硬排除，
+    // build.files 的字符串模式 node_modules/@nikkisync/**/* 永不命中；彼时本项
+    // 输出 SKIP 放行，导致安装包缺整个内嵌运行时。已建链而产物缺失必须是失败。
+    expect(
+      nikkiSyncPackedVerdict({ packedNikkiSyncExists: false, projectNikkiSyncLinkExists: true })
+    ).toBe('fail')
+  })
+
+  it('边界：项目未建链（CI 只 checkout 本仓）⇒ skip，不把环境缺失伪装成失败', () => {
+    expect(
+      nikkiSyncPackedVerdict({ packedNikkiSyncExists: false, projectNikkiSyncLinkExists: false })
+    ).toBe('skip')
   })
 })
 

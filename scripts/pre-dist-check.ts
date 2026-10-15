@@ -392,6 +392,29 @@ function findFirstFile(base: string, subDirs: string[], nameRe: RegExp): string 
 }
 
 /** 解包后原生二进制存在性校验（发布前硬性闸门） */
+/**
+ * 打包态 @nikkisync 缺失时的判定（纯函数，供 checkUnpackedNativeBinaries 与单测共用）。
+ *
+ * 回归背景（2026-10-15 实测）：electron-builder 的过滤器对**根 node_modules 有硬排除**
+ * （`app-builder-lib/out/util/filter.js`：`relative === "node_modules"` 直接 return false），
+ * `build.files` 里的字符串模式 `node_modules/@nikkisync` 通配项永远命中不了任何文件——
+ * node_modules 内容只由「按 package.json 依赖图收集」的 collector 产出，而 `@nikkisync/*`
+ * 按阶段 9 自包含决策已不是声明依赖。修 build.files（改对象式 from/to）之前，
+ * 「已建链但产物没带上」会被 SKIP 放行，安装包缺整个内嵌运行时。故：
+ * - 产物已有 ⇒ 'assert'（走逐项存在性断言）
+ * - 产物没有 + 项目已建链 ⇒ 'fail'（打包回归，必须响亮失败）
+ * - 产物没有 + 项目未建链（CI 只 checkout 本仓）⇒ 'skip'（环境性缺失，不伪装成失败）
+ */
+export type NikkiSyncPackedVerdict = 'assert' | 'fail' | 'skip'
+
+export function nikkiSyncPackedVerdict(input: {
+  packedNikkiSyncExists: boolean
+  projectNikkiSyncLinkExists: boolean
+}): NikkiSyncPackedVerdict {
+  if (input.packedNikkiSyncExists) return 'assert'
+  return input.projectNikkiSyncLinkExists ? 'fail' : 'skip'
+}
+
 function checkUnpackedNativeBinaries(): void {
   const releaseDir = path.join(ROOT, 'release')
   const unpackedRoot = findAsarUnpacked(releaseDir)
@@ -438,13 +461,26 @@ function checkUnpackedNativeBinaries(): void {
   }
 
   // 6) @nikkisync（阶段 9 · 问题 3）：自包含方案后它不是声明依赖，只能靠
-  //    build.files 的 `node_modules/@nikkisync/**/*` 显式入包，再经 asarUnpack 解出。
-  //    未建链的开发机不会命中本项，此时输出 SKIP 而不是假通过。
+  //    build.files 的**对象式** from/to 项显式入包（字符串模式命中不了根 node_modules，
+  //    见 nikkiSyncPackedVerdict 注释），再经 asarUnpack 解出。
+  //    未建链的开发机不会命中本项；已建链而产物缺失是打包回归，必须 fail。
   const nikkisyncRoot = path.join(nm, '@nikkisync')
-  if (!fs.existsSync(nikkisyncRoot)) {
+  const verdict = nikkiSyncPackedVerdict({
+    packedNikkiSyncExists: fs.existsSync(nikkisyncRoot),
+    projectNikkiSyncLinkExists: fs.existsSync(path.join(ROOT, 'node_modules', '@nikkisync'))
+  })
+  if (verdict === 'skip') {
     skip('@nikkisync 未随包（开发机未 `npm run link:nikkisync` 时属预期）')
     skip(
       '要复验打包态 ESM/migrations：先 npm run link:nikkisync + NikkiSync npm run build，再 npx electron-builder --dir'
+    )
+    return
+  }
+  if (verdict === 'fail') {
+    fail(
+      '@nikkisync 已建链但未随包：build.files 的 node_modules/@nikkisync 入包项失效' +
+        '（electron-builder 硬排除根 node_modules，须用对象式 from/to 显式拷贝）；' +
+        '修复 package.json build.files 后重新执行 electron-builder'
     )
     return
   }

@@ -27,7 +27,10 @@ interface PackageJsonShape {
   dependencies?: Record<string, string>
   devDependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
-  build?: { files?: string[]; asarUnpack?: string[] }
+  build?: {
+    files?: Array<string | { from?: string; to?: string; filter?: unknown }>
+    asarUnpack?: string[]
+  }
 }
 
 function readPackageJson(): PackageJsonShape {
@@ -66,7 +69,24 @@ describe('package.json 依赖图自包含', () => {
 
   it('正常：链接态的打包面与解包面仍覆盖 @nikkisync（否则产物内必然缺包）', () => {
     const build = readPackageJson().build ?? {}
-    expect(build.files ?? []).toContain('node_modules/@nikkisync/**/*')
+    // 对象式 from/to 是唯一真能入包的形态：electron-builder 的过滤器对根 node_modules
+    // 有硬排除（filter.js：relative === "node_modules" 直接 false），字符串模式
+    // node_modules/@nikkisync 通配项永远命中不了任何文件（2026-10-15 实测，装机验证
+    // 见 scripts/pre-dist-check.ts nikkiSyncPackedVerdict 注释）。故本守卫断言对象式
+    // 入包项存在且锚点正确——字符串模式若回归，本用例随之失败。
+    const nikkisyncEntry = (build.files ?? []).find(
+      (entry) =>
+        typeof entry === 'object' &&
+        entry !== null &&
+        String((entry as { from?: unknown }).from ?? '').replace(/\\/g, '/') ===
+          'node_modules/@nikkisync'
+    ) as { from?: string; to?: string; filter?: unknown } | undefined
+    expect(
+      nikkisyncEntry,
+      'build.files 缺少 @nikkisync 对象式入包项（from: node_modules/@nikkisync）'
+    ).toBeDefined()
+    expect(String(nikkisyncEntry?.to ?? '').replace(/\\/g, '/')).toBe('node_modules/@nikkisync')
+    expect(Array.isArray(nikkisyncEntry?.filter) && nikkisyncEntry?.filter.length > 0).toBe(true)
     expect(build.asarUnpack ?? []).toContain('**/@nikkisync/**')
   })
 
