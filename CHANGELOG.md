@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 本版本主体为设备同步（NikkiSync 协议 v1）功能整装发布——sync-integration 阶段 0–6 的全部产出，以及端到端联调后的代码审查修复。计划与报告见 `docs/sync-integration/`。
 >
-> 2026-10-14 追加：以下「NikkiSync 运行时内嵌」变更已合入 `feat/gallery-runtime-embed` 分支并随本节补录；**`2.5.5` 安装包尚未据此重新构建**——已发布的 `NikkiGallery-Setup-2.5.5.exe` 构建于这些提交之前，打包态复验仍登记为未关闭遗留项（见 `docs/sync-integration/03-sync-server-plan.md` §14.3 #1）。
+> 2026-10-14 追加：以下「NikkiSync 运行时内嵌」变更已合入 `feat/gallery-runtime-embed` 分支并随本节补录；已于 2026-10-15 据此重新构建 `NikkiGallery-Setup-2.5.5.exe`（连同 media:// 流取消竞态启动闪退修复一并出货），`docs/sync-integration/03-sync-server-plan.md` §14.3 #1「打包态未复验」遗留项就此关闭。
 
 ### Added | 新增
 
