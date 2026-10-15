@@ -622,3 +622,48 @@ describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
     await expect(stopped.revokeDevice('ghost')).rejects.toThrow(/not found/)
   })
 })
+
+describe('createRuntimeManager 停止/重建竞态（阶段 4 审查修复）', () => {
+  it('stop() 落在启动在途时不被吞：等在途启动落地后完成拆除', async () => {
+    const { deps, calls } = createDependencies()
+    let release: ((session: NikkiSyncRuntimeSession) => void) | undefined
+    const session = createFakeSession(calls)
+    // 让 createSession 挂起：start() 停在「会话未落地」的在途态
+    deps.createSession = () =>
+      new Promise<NikkiSyncRuntimeSession>((resolve) => {
+        release = resolve
+      })
+    const manager = createRuntimeManager(deps)
+
+    const starting = manager.start(DEFAULTS)
+    // 在途启动期间停止：stop 必须等在途启动落地后再拆（而不是只把状态置 idle
+    // 就返回——那会被在途 start 的收尾覆盖回 running，停止被静默吞掉）
+    const stopping = manager.stop()
+    release?.(session)
+    await starting
+    await stopping
+
+    expect(manager.status().state).toBe('idle')
+    expect(calls.dispose).toBe(1)
+    expect(calls.order).toEqual(['server.stop', 'scanner.stop', 'dispose'])
+  })
+
+  it('换端口重建保留当前会话的游戏根（不丢回 auto-discovery）', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    // 用户经 scan 选过根：会话的 activeRoot 必须被后续重建沿用
+    await manager.scan({ gameRoot: 'D:\\Games\\InfinityNikki' })
+    expect(calls.createSession).toEqual(['<auto>', 'D:\\Games\\InfinityNikki'])
+
+    await manager.startSyncServer({ port: 38138 })
+    expect(calls.createSession).toEqual([
+      '<auto>',
+      'D:\\Games\\InfinityNikki',
+      'D:\\Games\\InfinityNikki'
+    ])
+    // 新端口确实进了重建会话的构造期配置
+    expect(calls.syncPorts[calls.syncPorts.length - 1]).toContain('38138')
+    expect(manager.status().state).toBe('running')
+  })
+})

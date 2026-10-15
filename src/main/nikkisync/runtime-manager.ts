@@ -312,6 +312,15 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   }
 
   async function stop(): Promise<void> {
+    // 启动在途时先等它落地再拆：否则本次停止只把状态置 idle，在途 start 的收尾
+    // 随后会把会话置 running——用户的停止被静默吞掉（会话成为孤儿）。
+    if (state.starting) {
+      try {
+        await state.starting
+      } catch {
+        // 在途启动的失败已如实落入状态快照；这里只关心它落地后的拆除
+      }
+    }
     if (!state.session) {
       if (state.state !== 'unavailable') state.state = 'idle'
       return
@@ -370,8 +379,14 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       desired.host !== state.syncConfig.host
     if (!state.session || portChanged) {
       // 端口/mdns 冻结在构造期 ⇒ 只能整会话重建（与 scan() 换根同一条路径）
+      // teardown 会清 activeRoot，先取存再重建（只用 defaults 会把用户选过的根丢回 auto-discovery）
+      const previousRoot = state.activeRoot
       if (state.session) await teardown('nikkisync.resync')
-      await start({ ...deps.defaults, syncServer: desired })
+      await start({
+        ...deps.defaults,
+        ...(previousRoot === undefined ? {} : { gameRoot: previousRoot }),
+        syncServer: desired
+      })
     }
     const session = state.session
     if (!session) {

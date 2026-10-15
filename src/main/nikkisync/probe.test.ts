@@ -11,9 +11,12 @@ import {
 import {
   formatNikkiSyncLinkProbeReport,
   isNikkiSyncProbeErrorLine,
+  probeDatabase,
   runNikkiSyncLinkProbe,
   type NikkiSyncLinkProbeReport
 } from './probe'
+import { buildPackagingContext } from './embedding-paths'
+import type { NikkiSyncModule } from './runtime-loader'
 
 /**
  * 探针主体测试（整合阶段 1，计划 §11 用例 1-5 的探针形态）。
@@ -115,6 +118,34 @@ describe('formatNikkiSyncLinkProbeReport / isNikkiSyncProbeErrorLine（纯函数
     expect(packed).toContain(
       '[database] schemaSource=D:/inst/resources/app.asar.unpacked/node_modules/@nikkisync/database/migrations/0001_initial.sql'
     )
+  })
+})
+
+describe('probeDatabase 句柄边界（注入假 DatabaseManager，不依赖链接）', () => {
+  it('schema SQL 读取失败也关闭内存库（硬边界：探针结束必须 close）', async () => {
+    const close = vi.fn()
+    class FakeDatabaseManager {
+      connection = {
+        prepare: () => ({ all: () => [] }),
+        exec: () => {}
+      }
+      initialize(): void {}
+      close = close
+    }
+    // resourcesPath 指向不存在的位置 ⇒ resolveModuleRoot 回落后 readMigrationsSql 必抛
+    const context = buildPackagingContext({
+      isPackaged: true,
+      resourcesPath: 'Z:/definitely-missing-resources',
+      projectRoot: '/tmp/xiangce'
+    })
+    const record = await probeDatabase(
+      { DatabaseManager: FakeDatabaseManager } as unknown as NikkiSyncModule,
+      context
+    )
+    expect(record.ok).toBe(false)
+    expect(record.error).toContain('schema SQL')
+    expect(record.schemaSource).toContain('0001_initial.sql')
+    expect(close).toHaveBeenCalledTimes(1)
   })
 })
 

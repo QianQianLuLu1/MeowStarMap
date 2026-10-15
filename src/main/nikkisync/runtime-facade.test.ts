@@ -3,7 +3,8 @@ import {
   CLOTHING_SEARCH_DEEP_ENTRY,
   PROFILE_STATS_DEEP_ENTRY,
   SUIT_SEARCH_DEEP_ENTRY,
-  createQuerySurface
+  createQuerySurface,
+  createRuntimeSession
 } from './runtime-facade'
 import type { RuntimeSurface } from './runtime-facade'
 import type { EmbeddedRuntimeLike } from './runtime-types'
@@ -393,6 +394,60 @@ describe('createQuerySurface 路径登记与 media:// 授权联动', () => {
     await queries.listResourceRecords(['a/none'], 'path')
     expect(nikkiSyncResourcePathCount()).toBe(0)
     clearNikkiSyncResourcePaths()
+  })
+})
+
+describe('createRuntimeSession 组装失败的句柄归还（阶段 4 审查修复）', () => {
+  it('runtime 构造成功后的导出缺失抛错时关闭已建库再上抛（Windows 锁库防护）', async () => {
+    const close = vi.fn()
+    const runtimeLike = {
+      database: {
+        connection: { prepare: () => ({ all: () => [], get: () => undefined }), exec: () => {} },
+        initialize: () => {},
+        close
+      },
+      scanner: {
+        start: async () => ({}),
+        stop: async () => {},
+        fullScan: async () => ({}),
+        rescanPath: async () => ({}),
+        getStatus: () => ({})
+      },
+      server: {
+        serverId: 'server_fake',
+        start: async () => ({ host: '127.0.0.1', port: 38137, secure: true }),
+        stop: async () => {},
+        createPairingPayload: () => ({})
+      },
+      createPairingUri: () => 'NS1|server_fake|127.0.0.1|38137|tok|0|' + 'a'.repeat(64)
+    } as unknown as EmbeddedRuntimeLike
+    // pcCompanion 缺 LocalTlsIdentityService ⇒ nikkisyncExport 在 runtime 建成之后才抛错
+    const surface = {
+      pcCompanion: {
+        PcCompanionRuntime: class {
+          constructor() {
+            return runtimeLike
+          }
+        }
+      },
+      database: { PairingRepository: class {} },
+      rowMappers: {},
+      suitSearchIndex: {},
+      clothingSearchIndex: {},
+      profileStatsIndex: {}
+    } as unknown as RuntimeSurface
+
+    await expect(
+      createRuntimeSession(
+        {
+          databaseFile: '/tmp/userData/nikkisync/nikkisync.db',
+          watcher: false,
+          projectRoot: '/tmp/x'
+        },
+        surface
+      )
+    ).rejects.toThrow(/LocalTlsIdentityService/)
+    expect(close).toHaveBeenCalledTimes(1)
   })
 })
 

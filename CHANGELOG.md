@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 - 联调与审查修复（均先红灯后绿灯）：详情 `metadata.raw` 泄漏 NUAN5 载荷键（E2E 红灯→绿灯）；export 失败路径静默吞错补告警日志；DB 记录大写 sha256 导致导出恒 409 的大小写归一；ImageDescription 超长截断产生畸形 `\uXXXX` 转义；E2E 启动器参数校验（`--port` 0–65535 整数/未知参数拒绝/`--serve` no-op）与退出清理（exit 处理器先关 DB 再删自建临时目录，修复 Windows 下启动失败路径的临时目录泄漏；shutdown try/finally 保证退出码必达）
 - 内嵌 NikkiSync Runtime 状态快照修复（TDD 红绿灯）：`nikkisync:runtime-status` 的扫描器字段由不透明 `scanner?` 透传展平为 `scannerStatus?`/`installation?`/`lastScan?` 三字段（与 `src/main/nikkisync/runtime-types.ts` 声明及阶段 2 计划 §5 记载的形状对齐），修复 `runtime-manager.ts` 生产者仍写已删除的 `scanner` 字段导致的类型检查失败（TS2339）与「状态带 installation」意图未实现的问题；`runtime-manager.test.ts` 补三字段透传断言（修复前失败）与非对象/缺字段边界用例，并同步 shared/preload/e2e 形状镜像
+- 内嵌 NikkiSync Runtime 生命周期审查修复（TDD 红绿灯，随本安装包发布）：① `stop()` 落在启动在途时被吞——状态机不感知 `state.starting`，停止只把状态置 idle 即返回，在途 `start()` 收尾随将会话置 running 成为孤儿会话；修复为 `stop()` 先等在途启动落地再拆除；② 换端口/mdns 重建同步服务时丢失用户已选游戏根——重建取装配层 `defaults` 而非当前会话 `activeRoot`，用户选过根后仅因改端口就丢回 auto-discovery；修复为 teardown 前取存并传入重建；③ 探针 `probeDatabase` 读 schema SQL 失败时内存库连接泄漏（`manager.close()` 所在 try/finally 尚未进入即被外层 catch 截走），修复为 try/finally 紧接构造；④ `createRuntimeSession` 组装中段（TLS/配对导出缺失、查询面装配）抛错时已建库句柄泄漏，Windows 上会锁死 `nikkisync.db` 使后续启动报 "database is locked"，修复为先关库再上抛。四项均先写失败测试复现后修复，回归：`runtime-manager.test.ts` / `probe.test.ts` / `runtime-facade.test.ts` 新增用例（修复前失败）
 
 ### Security | 安全
 

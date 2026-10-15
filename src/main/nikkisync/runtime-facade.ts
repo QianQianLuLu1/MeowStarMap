@@ -391,11 +391,16 @@ export function createQuerySurface(
  * `LocalTlsIdentityService.getOrCreate()`），本仓因此不新建任何服务对象，
  * 只做「构造期把 LAN 配置传进去」+「运行期按开关调 `start()/stop()`」。
  * 传 `mdns: true` 也**不会**在构造期组播——`mdns.start()` 只在 `server.start()` 内被调。
+ *
+ * `preloadedSurface` 仅供测试注入（默认走真实装载）：组装中段（导出缺失 /
+ * 查询面装配）失败的句柄归还要可单测判定。
  */
 export async function createRuntimeSession(
-  options: NikkiSyncSessionOptions
+  options: NikkiSyncSessionOptions,
+  preloadedSurface?: RuntimeSurface
 ): Promise<NikkiSyncRuntimeSession> {
-  const surface = await loadRuntimeSurface(options.projectRoot, options.packagingContext)
+  const surface =
+    preloadedSurface ?? (await loadRuntimeSurface(options.projectRoot, options.packagingContext))
   const RuntimeCtor = nikkisyncExport(surface.pcCompanion, 'PcCompanionRuntime') as new (
     config: Record<string, unknown>
   ) => EmbeddedRuntimeLike
@@ -408,41 +413,53 @@ export async function createRuntimeSession(
     },
     server: syncServer
   })
-  const TlsCtor = nikkisyncExport(surface.pcCompanion, 'LocalTlsIdentityService') as new (
-    database: unknown
-  ) => LocalTlsIdentityServiceLike
-  const tlsService = new TlsCtor(runtime.database)
-  const PairingCtor = nikkisyncExport(surface.database, 'PairingRepository') as new (
-    database: unknown
-  ) => PairingRepositoryLike
-  const pairing = new PairingCtor(runtime.database)
+  // runtime 构造期即建库并跑 migration：其后任一步（TLS/配对导出缺失、查询面装配）
+  // 抛错都必须先关库再上抛——否则泄漏的 SQLite 句柄会在 Windows 上锁死
+  // nikkisync.db，后续 start 全部报 "database is locked" 直至重启。
+  try {
+    const TlsCtor = nikkisyncExport(surface.pcCompanion, 'LocalTlsIdentityService') as new (
+      database: unknown
+    ) => LocalTlsIdentityServiceLike
+    const tlsService = new TlsCtor(runtime.database)
+    const PairingCtor = nikkisyncExport(surface.database, 'PairingRepository') as new (
+      database: unknown
+    ) => PairingRepositoryLike
+    const pairing = new PairingCtor(runtime.database)
 
-  return {
-    runtime,
-    scanner: runtime.scanner,
-    queries: createQuerySurface(surface, runtime),
-    tableNames: () => readTableNames(runtime),
-    dispose: () => runtime.database.close(),
-    server: runtime.server,
-    tlsIdentity: () => {
-      const identity = tlsService.getOrCreate()
-      return { certPem: identity.certPem, fingerprintSha256: identity.fingerprintSha256 }
-    },
-    pairingUri: (host, ttlMs) =>
-      typeof ttlMs === 'number'
-        ? runtime.createPairingUri(host, ttlMs)
-        : runtime.createPairingUri(host),
-    listPairedDevices: () =>
-      (runtime.database.connection.prepare(PAIRED_DEVICES_SQL).all() as unknown[])
-        .map(mapPairedDeviceRow)
-        .filter((device): device is NikkiSyncPairedDeviceView => device !== null),
-    revokePairedDevice: (deviceId) => {
-      const device = pairing.getDevice(deviceId)
-      if (!device || device.revoked_at) return false
-      // 上游 revoke() 是无条件 UPDATE，先验存在与未撤销才能给出可判定的 false
-      pairing.revoke(deviceId)
-      return true
+    return {
+      runtime,
+      scanner: runtime.scanner,
+      queries: createQuerySurface(surface, runtime),
+      tableNames: () => readTableNames(runtime),
+      dispose: () => runtime.database.close(),
+      server: runtime.server,
+      tlsIdentity: () => {
+        const identity = tlsService.getOrCreate()
+        return { certPem: identity.certPem, fingerprintSha256: identity.fingerprintSha256 }
+      },
+      pairingUri: (host, ttlMs) =>
+        typeof ttlMs === 'number'
+          ? runtime.createPairingUri(host, ttlMs)
+          : runtime.createPairingUri(host),
+      listPairedDevices: () =>
+        (runtime.database.connection.prepare(PAIRED_DEVICES_SQL).all() as unknown[])
+          .map(mapPairedDeviceRow)
+          .filter((device): device is NikkiSyncPairedDeviceView => device !== null),
+      revokePairedDevice: (deviceId) => {
+        const device = pairing.getDevice(deviceId)
+        if (!device || device.revoked_at) return false
+        // 上游 revoke() 是无条件 UPDATE，先验存在与未撤销才能给出可判定的 false
+        pairing.revoke(deviceId)
+        return true
+      }
     }
+  } catch (error) {
+    try {
+      runtime.database.close()
+    } catch {
+      // 关库失败不掩盖组装失败的原始原因（原始错误才是可诊断信息）
+    }
+    throw error
   }
 }
 

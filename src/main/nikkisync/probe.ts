@@ -98,7 +98,11 @@ function describeValue(value: unknown): string {
   return `${typeof value} ${String(value).slice(0, 40)}`
 }
 
-async function probeDatabase(
+/**
+ * 数据库子探针（导出供单测注入假 DatabaseManager：探针的「结束必须 close()」
+ * 硬边界要在装配失败路径上也可判定，见 probe.test.ts）。
+ */
+export async function probeDatabase(
   databaseModule: NikkiSyncModule | undefined,
   context?: PackagingContext
 ): Promise<NikkiSyncDatabaseRecord> {
@@ -111,16 +115,18 @@ async function probeDatabase(
       file: string
     ) => DatabaseManagerLike
     const manager = new Ctor(':memory:')
-    // 给出 context 时由本侧解析绝对路径并显式传入 schemaSql：打包态下上游
-    // `import.meta.url` 相对定位 migrations 不可靠（docs/sync-integration/01-dependency-link-plan.md §10）。
-    let schemaSql: string | undefined
-    if (context) {
-      const root = resolveModuleRoot('@nikkisync/database', context)
-      const sqlPath = resolveMigrationsSqlPath(root.root)
-      schemaSource = sqlPath
-      schemaSql = readMigrationsSql(sqlPath)
-    }
+    // try/finally 必须紧接构造：schema 解析（readMigrationsSql）抛错时也要 close，
+    // 否则违反「探针结束必须 close()」的硬边界（对照 probeCompanion 的先建后 try 写法）。
     try {
+      // 给出 context 时由本侧解析绝对路径并显式传入 schemaSql：打包态下上游
+      // `import.meta.url` 相对定位 migrations 不可靠（docs/sync-integration/01-dependency-link-plan.md §10）。
+      let schemaSql: string | undefined
+      if (context) {
+        const root = resolveModuleRoot('@nikkisync/database', context)
+        const sqlPath = resolveMigrationsSqlPath(root.root)
+        schemaSource = sqlPath
+        schemaSql = readMigrationsSql(sqlPath)
+      }
       manager.initialize(schemaSql)
       const rows = manager.connection
         .prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
