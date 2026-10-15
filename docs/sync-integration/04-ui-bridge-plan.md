@@ -398,7 +398,58 @@ grep -c "vite-env.d.ts" /tmp/tc-noskip.log
 - 上游 `derived_thumbnail` 缺产出 ⇒ 缩略图成本落在本仓缩略图流水线首帧之后。
 - 实况（motion_photo）本阶段只做并显，不做厂商 LIVE 容器语义（上游 `LIVE_METADATA_GAP` 调查中，不得据此推断实况元数据可展示）。
 
-### 16.3 风险
+### 16.3 规模与实况（本阶段未做）
+
+- 上游端点逐字比对的 `library-paging.linked.test.ts` 未写：搜索源目前只有单元级形状断言（`runtime-facade.test.ts`）+ 真链接装载（`runtime-facade.linked.test.ts` 10 例、`sync-server.linked.test.ts` 12 例真实执行，未 skip）。CI 从不跑 `*.linked.test.ts`，因此「真机功能已验」只能靠 §14 步骤 13 的手动验收。
+- `mediaStore.perf.test.ts`（3×500=1500 条、恰好 3 次 IPC、`toViewModel` 计时）未写；分页正确性由 `mediaStore.nikkisync.test.ts` 的两页续取/去重/`hasMore` 用例覆盖，规模维度暂无量化守卫。
+- 实况（motion_photo）：视图模型已带 `nikkisync.motionVideoPath` / `motionVideoResourceId`，但卡片角标与详情/全屏的静图+视频并显未实现（渲染层今天零实况支持，本阶段未新建视图）。
+
+### 16.4 元数据面板在本阶段**没有数据源**（取证结论，非"还没做"）
+
+需求 §4 要求详情页直接展示 `InfinityPhotoMetadata` 的相机/穿搭/滤镜/灯光/位置。实测上游链路后判定：按当前内嵌接线，这份数据**根本不会被产出**。
+
+| 取证                                                                                  | 结果                                                                                                                  |
+| ------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `grep -rn "metadata_json\|metadataJson" NikkiSync/apps/pc-companion/src/scanner/*.ts` | **零命中** ⇒ 上游扫描阶段不写 `metadata_json`                                                                         |
+| `Nuan5CompatibleResolver.ts:57-60`                                                    | `dressing{clothes}` / `location{coordinates}` / `photography{time}` / `raw{nuan5}` 由**解析器流水线**写入，不是扫描器 |
+| `runtime.ts:20,74`                                                                    | `metadataResolver` 仅在构造配置里显式提供时才实例化                                                                   |
+| `grep -c metadataResolver` on `runtime-facade.ts` / `nikkisync-runtime-setup.ts`      | **0 : 0** ⇒ 本仓建会话只传 `databaseFile`/`scanner`/`server`，从未启用解析器                                          |
+| `protocol.ts` 的 `dressing.clothes?: unknown[]`                                       | 契约侧本就是 `unknown[]`，元素字段名要由解析器实现决定                                                                |
+
+因此：嵌入态下 `AssetSummary.hasMetadata` 恒假，把面板改读 metadata 只会得到空区块。**两条可行路**，都需要单独决策，不在本阶段擅自选：
+
+1. **启用上游解析器**（内嵌层把 `metadataResolver` 传进 `PcCompanionRuntime`）。代价：它是远端流水线（默认关、约 1 req/s、需外联），会把「本地离线可用」变成有条件；且 `publicMetadata`（`row-mappers.ts:19-31`）会剥掉 `nativeParamPayload`，富参数未必齐。
+2. **继续用本 App 的实时解密**（现状）。可行前提：`decrypt:decodeFile` 走 `assertMediaReadPath`（`decrypt-handler.ts:30`）—— 命中 `media_files` 白名单才放行，否则回落 `assertFileReadPath`（PathGuard 扫描根）。所以只有当 XiangCe 自己也扫过同一游戏目录时，nikkisync 源的条目才解得出参数；否则会 `PATH_FORBIDDEN`。这与 §7.2 的 `media://` 第 4 条规则是**同一类授权缺口**，需要在 `media-read-guard` 上做对等处理。
+
+面板自身的 JSX 与字段访问本阶段一行未动（改数据源前先定路线，避免把空态当成"已展示元数据"）。
+
+## 17. 执行记录（2026-10-15 回填）
+
+分支 `feat/gallery-runtime-embed`，8 个提交， NikkiSync 侧**一行未改**：
+
+| commit    | 内容                                           | 红灯证据 → 绿灯                                                      |
+| --------- | ---------------------------------------------- | -------------------------------------------------------------------- |
+| `3cdd997` | 上一轮 DEBT-032/034 闸门配置单独收口（经确认） | —                                                                    |
+| `c990549` | 本计划文档                                     | —                                                                    |
+| `5800968` | 桥接快照钉成协议 DTO                           | `tsc -b` 16 条（TS2305/TS2724/TS2344）→ 0 条                         |
+| `a64bf6b` | 装载缝 5 方法 + 3 个搜索/统计深入口            | 12 例红 → `nikkisync` 11 文件 148 例绿（含 linked 真实执行）         |
+| `dd2a326` | 5 条 IPC 通道 + preload + 契约 §8.1.1          | handler 12 例、preload 2 例红 → 96 例绿                              |
+| `9b35cc5` | `media://` 第 4 条规则 + `resource-allowlist`  | 期望 200 的 3 例红 → nikkisync+app 13 文件 196 例绿                  |
+| `0790252` | `asset_edits` 叠加层 + `assetEdits` 命名空间   | 两模块「Cannot find module」起步 → 新增用例全绿，全量 eslint 0 error |
+| `39bd786` | 渲染层数据源切换 + `library-changed` 自动刷新  | store 8 例红 → 受影响 61 文件 803 例绿，本地源零回归                 |
+| `080a8aa` | 设置页数据源开关 + 12 语言文案（3848 键对齐）  | 见下方「流程偏差」                                                   |
+
+**全量门禁（真实退出码取自重定向旁路文件，不经管道）**：`npm run typecheck` 0 错误 · `npm run lint` 0 error（11 个存量 BOM warning，DEBT-030）· `npm run i18n:check` / `i18n:guard` 退出码 0 · `npm test` 380 文件 **5976 passed / 2 skipped**，`FULL_TEST_EXIT=0` · `npm run test:coverage` `COV_EXIT=0`，汇总 **66.87 / 58.50 / 59.46 / 68.46**（阈值 66/58/59/68，未新增 exclude）。
+
+**流程偏差（如实登记）**：
+
+1. `(j)(k)(l)` 三个设置页用例与 `resource-allowlist` / `assetViewModel` 两个纯函数模块，是在实现之后才补的测试，未走红灯先行（前者因中途进入 plan 模式打断，后两者首个红灯形态只是「模块不存在」）。其余步骤 1–5 与 store 均为真红灯→绿灯。
+2. §14 步骤 1 原写「扩 `protocol-contract.ts` 符号清单使漂移守护先红」，经取证不成立（interface 无运行时值，且新端点路由键已被 `LITERAL_ROUTE_KEYS` 覆盖），已按 §0.2 改正。
+3. §3.3 规划的 `scripts/backfill-media-edits.ts` 未落地为脚本：`better-sqlite3` 是 Electron ABI，plain Node 脚本打不开本 App 库；改判为「主进程内一次性 seed」，其纯函数 `planAssetEditSeed` 已实现并单测，但两侧游标对拉未接，登记在 §16.3 之上。
+
+**验收对照**：#1–#6、#8–#12 已由代码 + 上述测试满足（其中 #1–#5 的**应用内人工验收未执行**，`npm run dev` 打开关实测是本阶段收尾必须补的一步）；**#7 元数据展示未满足**，根因见 §16.4——不是"漏做"，而是内嵌态没有该数据源，需按两条路择一再决策。
+
+## 18. 风险（起草时清单，执行后仍然成立）
 
 - **CI 从不跑** `link:nikkisync` / `verify:nikkisync` ⇒ 所有 `*.linked.test.ts` 在 CI 整件 skip：**绿 CI ≠ 功能已验**。真实证据 = §14 步骤 3 的 `toBe` 恒等断言 + 步骤 11 本地 linked 比对 + 步骤 13 手动验收，须写进 PR 描述。
 - CI 钉 `.node-version` = 22，本机宿主是 Electron 41 / Node 24 ⇒ linked 行为两侧口径不同。
