@@ -25,12 +25,12 @@
 
 ### 日志与诊断
 
-| 文件                    | 职责                                                                    |
-| ----------------------- | ----------------------------------------------------------------------- |
-| `logger.ts`             | `logger` 单例 + `initLogger` + `logFault` 故障记录（基于 electron-log） |
-| `startup-diagnostic.ts` | 启动期错误文件持久化（`diagLog` / `readStartupErrors`）                 |
-| `early-crash-guard.ts`  | 启动早期致命错误弹窗 + 非致命错误提示（i18n 未就绪时的兜底）            |
-| `spawn-error-log.ts`    | 子进程 spawn 错误分类与诊断日志                                         |
+| 文件                    | 职责                                                                                                          |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `logger.ts`             | `logger` 单例 + `initLogger` + `logFault` 故障记录（基于 electron-log）                                       |
+| `startup-diagnostic.ts` | 启动期错误文件持久化（`diagLog` / `readStartupErrors`）                                                       |
+| `early-crash-guard.ts`  | 启动早期致命错误弹窗 + 非致命错误提示（i18n 未就绪时的兜底；含 spawn 错误与流状态竞态两类"已就绪后降级"分类） |
+| `spawn-error-log.ts`    | 子进程 spawn 错误分类与诊断日志                                                                               |
 
 ### 安全与校验
 
@@ -68,13 +68,13 @@
 
 ### 高层工具
 
-| 文件                       | 职责                                                           |
-| -------------------------- | -------------------------------------------------------------- |
-| `dir-manager.ts`           | 自定义目录解析/迁移/确保（backup/thumbnail/log/crash）         |
-| `file-utils.ts`            | 文件工具（存在性检查、唯一路径、DataUrl 转换、哈希计算、移动） |
-| `managed-read-stream.ts`   | 受管读取流（字节范围 + 生命周期跟踪）                          |
-| `worker-restart-policy.ts` | `WorkerRestartPolicy` 类，worker 崩溃重启策略                  |
-| `zip-archive.ts`           | `createZipFromDirectory()` ZIP 打包（archiver）                |
+| 文件                       | 职责                                                                                                                                                                   |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `dir-manager.ts`           | 自定义目录解析/迁移/确保（backup/thumbnail/log/crash）                                                                                                                 |
+| `file-utils.ts`            | 文件工具（存在性检查、唯一路径、DataUrl 转换、哈希计算、移动）                                                                                                         |
+| `managed-read-stream.ts`   | 受管读取流（字节范围 + 生命周期跟踪）；media:// 响应体由调用方经 `Readable.toWeb` 转换后供给 `new Response`（绕开 undici 对 Node 流的无守卫包装，2026-10-15 闪退根因） |
+| `worker-restart-policy.ts` | `WorkerRestartPolicy` 类，worker 崩溃重启策略                                                                                                                          |
+| `zip-archive.ts`           | `createZipFromDirectory()` ZIP 打包（archiver）                                                                                                                        |
 
 ## 编码约定
 

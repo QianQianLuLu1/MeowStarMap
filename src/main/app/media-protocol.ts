@@ -1,6 +1,7 @@
 import { protocol } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { Readable } from 'node:stream'
 import type Database from 'better-sqlite3'
 import type { HandlerContext } from '../ipc/handler-context'
 import type { AppContext } from './app-context'
@@ -164,7 +165,13 @@ export function registerMediaProtocol(ctx: AppContext): void {
 
       if (range) {
         const stream = createManagedReadStream(realPath, { signal: request.signal, range })
-        return new Response(stream as unknown as ReadableStream, {
+        // 2026-10-15 启动闪退修复：Node 流不可直接作 Response body——undici 会用
+        // ReadableStreamFrom 包装且其 pull 完成后的 close() 无"流已关闭"守卫，请求取消
+        // 竞态下抛 ERR_INVALID_STATE（生产堆栈 undici:1583）并经 uncaughtException 升级为
+        // app.exit(1)。Readable.toWeb 走 Node 官方 webstreams 适配器，undici 对已是 web 流
+        // 的 body 直通不包装，无守卫 close 站点从链路上消失。详见
+        // docs/plans/2026-10-15-media-stream-cancel-race-fix.md
+        return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
           status: 206,
           headers: {
             'Content-Type': mimeType,
@@ -178,9 +185,9 @@ export function registerMediaProtocol(ctx: AppContext): void {
         })
       }
 
-      // 无 Range 头：返回完整文件流
+      // 无 Range 头：返回完整文件流（Node 流必须先经 toWeb 适配，理由同上）
       const stream = createManagedReadStream(realPath, { signal: request.signal })
-      return new Response(stream as unknown as ReadableStream, {
+      return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
         headers: {
           'Content-Type': mimeType,
           'Content-Length': String(fileSize),

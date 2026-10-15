@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'path'
+import { Readable } from 'node:stream'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
 // 共享 mock：protocol 句柄
@@ -125,21 +126,12 @@ beforeEach(() => {
   fsRealpathMock.mockReset()
   fsRealpathMock.mockImplementation(async (p: string) => p)
 
-  // 默认：access 通过，stat 返回 1KB 文件，createReadStream 返回带 on/once 监听接口的 dummy stream
-  // （createManagedReadStream 会对其挂 'error' / 'close' 监听，mock 须提供这些方法）
+  // 默认：access 通过，stat 返回 1KB 文件，createReadStream 返回真实空 Readable。
+  // （createManagedReadStream 会对其挂 'error'/'close' 监听需要事件接口；2026-10-15 起
+  //   响应体经 Readable.toWeb 适配进入 Response body，mock 必须是真实 Readable 才能被包装）
   fsAccessMock.mockResolvedValue(undefined)
   fsStatMock.mockResolvedValue({ size: 1024 })
-  const dummyStream = {
-    destroyed: false,
-    on: vi.fn(function (this: unknown) {
-      return this
-    }),
-    once: vi.fn(function (this: unknown) {
-      return this
-    }),
-    destroy: vi.fn()
-  }
-  fsCreateReadStreamMock.mockReturnValue(dummyStream as unknown as NodeJS.ReadStream)
+  fsCreateReadStreamMock.mockImplementation(() => new Readable({ read() {} }))
 
   // 清空模块级单例缓存
   invalidateMediaPathCache()
@@ -803,5 +795,189 @@ describe('阶段 5 · C1：读通道与展示通道同口径 —— isMediaPathA
     } else {
       expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/nikki/D.PNG')).toBe(true)
     }
+  })
+})
+
+/**
+ * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/plans/2026-10-15-media-stream-cancel-race-fix.md）：
+ * `new Response(fs.ReadStream)` 使 undici 以 ReadableStreamFrom 包装 Node 流，该包装的
+ * pull 完成回调经微任务对 controller 执行 close 且无"流已关闭"守卫。渲染进程快速滚动/
+ * 视频 Range 切换触发请求取消时，取消与迟到 close 竞态，抛
+ * ERR_INVALID_STATE: ReadableStream is already closed（生产堆栈：
+ * ReadableByteStreamController.close ← node:internal/deps/undici/undici ←
+ * processTicksAndRejections），经 uncaughtException 一律致命策略升级为 app.exit(1)。
+ *
+ * 多进程 IPC 取消时序无法在单测中确定性触发（生产为概率竞态），因此 T1 直接断言
+ * 缺陷机制本身：响应体的关闭路径不得经过 undici 的 Node 流适配层；T2-T4 以敌对
+ * 交错护栏锁定替换路径（Readable.toWeb）的消费/取消/终止行为。
+ */
+describe('media:// 响应体流安全（2026-10-15 启动闪退修复）', () => {
+  /** 用真实 Readable 代替 dummy 流：携带 Symbol.asyncIterator，使 Response 走 undici 的 Node 流包装路径 */
+  function makeRealStream(data: Buffer[]): InstanceType<typeof Readable> {
+    return new Readable({
+      read() {
+        while (data.length > 0) this.push(data.shift())
+        this.push(null)
+      }
+    })
+  }
+
+  /** 捕获 ReadableByteStreamController 原型（undici 对 Node 流的包装使用该控制器） */
+  function getByteControllerProto(): Record<string, unknown> {
+    let proto: Record<string, unknown> | null = null
+    new ReadableStream({
+      type: 'bytes',
+      start(c) {
+        proto = Object.getPrototypeOf(c) as Record<string, unknown>
+      }
+    })
+    return proto as Record<string, unknown>
+  }
+
+  /** 注册协议并捕获 handler（白名单走 file_path 精确命中，与既有用例 12/13 同款） */
+  function setupHandler(): NonNullable<typeof mediaHandler> {
+    const targetPath = path.resolve('/videos/race.mp4')
+    const db = makeDb((sql, param) => {
+      if (sql.includes('file_path') && param === targetPath) return { 1: 1 }
+      return undefined
+    })
+    const ctx = makeAppCtx({ db })
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  it('T1【缺陷复现】响应体的 controller.close 不得经由 undici 适配层调用', async () => {
+    fsStatMock.mockResolvedValue({ size: 10000 })
+    fsCreateReadStreamMock.mockImplementation(() => makeRealStream([Buffer.alloc(1024, 1)]))
+    const handler = setupHandler()
+
+    const proto = getByteControllerProto()
+    const origClose = proto.close as (...args: unknown[]) => unknown
+    const closeCallers: string[] = []
+    proto.close = function (this: unknown, ...args: unknown[]) {
+      closeCallers.push(new Error().stack ?? '')
+      return origClose.apply(this, args)
+    }
+    try {
+      const response = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-1023'))
+      expect(response.status).toBe(206)
+      // 消费响应体到自然结束（Electron 侧 Readable.fromWeb 泵送的等价物）
+      const reader = response.body!.getReader()
+      let bytes = 0
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        bytes += value.byteLength
+      }
+      expect(bytes).toBe(1024)
+      // 核心断言：所有 close 调用不得来自 undici 内部。
+      // 修复前：close 由 node:internal/deps/undici 的无守卫微任务调用（生产 24.18 在
+      // undici:1583、本机 Node 26 在 undici:1965，行号随版本漂移，故只匹配模块名）→ 红灯
+      for (const caller of closeCallers) {
+        expect(caller).not.toContain('node:internal/deps/undici')
+      }
+    } finally {
+      proto.close = origClose
+    }
+  })
+
+  it('T2【护栏·正常】206 与 200 分支响应体可完整消费，字节数与 mock 数据一致', async () => {
+    // 模拟真实 fs.createReadStream 语义：按 {start,end} 切片返回
+    const full = Buffer.concat([Buffer.alloc(1024, 7), Buffer.alloc(1024, 8)])
+    fsStatMock.mockResolvedValue({ size: full.length })
+    fsCreateReadStreamMock.mockImplementation(
+      (_p: string, opts?: { start?: number; end?: number }) => {
+        const start = opts?.start ?? 0
+        const end = opts?.end ?? full.length - 1
+        return makeRealStream([full.subarray(start, end + 1)])
+      }
+    )
+    const handler = setupHandler()
+
+    // 206 分支（Range 0-1023 → 1024 字节）
+    const r206 = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-1023'))
+    expect(r206.status).toBe(206)
+    const reader206 = r206.body!.getReader()
+    let bytes206 = 0
+    for (;;) {
+      const { done, value } = await reader206.read()
+      if (done) break
+      bytes206 += value.byteLength
+    }
+    expect(bytes206).toBe(1024)
+
+    // 200 分支（完整文件 2048 字节）
+    const r200 = await handler(makeRequest(path.resolve('/videos/race.mp4')))
+    expect(r200.status).toBe(200)
+    const reader200 = r200.body!.getReader()
+    let bytes200 = 0
+    for (;;) {
+      const { done, value } = await reader200.read()
+      if (done) break
+      bytes200 += value.byteLength
+    }
+    expect(bytes200).toBe(2048)
+  })
+
+  it('T3【护栏·异常】在途消费时 cancel 与流销毁任意交错不产生逃逸异常', async () => {
+    fsStatMock.mockResolvedValue({ size: 10000 })
+    const srcStreams: InstanceType<typeof Readable>[] = []
+    fsCreateReadStreamMock.mockImplementation(() => {
+      // 慢速流：首块后挂起，模拟磁盘 IO 窗口（生产竞态的必要条件）
+      const s = new Readable({ read() {} })
+      s.push(Buffer.alloc(1024, 3))
+      srcStreams.push(s)
+      return s
+    })
+    const handler = setupHandler()
+
+    const uncaught: unknown[] = []
+    const onUncaught = (e: unknown): void => {
+      uncaught.push(e)
+    }
+    process.on('uncaughtException', onUncaught)
+    try {
+      // 敌对交错 A：消费者先 cancel（Chromium 取消请求），流随后销毁（request.signal abort）。
+      // cancel 与 Electron 网络层一致采用 fire-and-forget（主进程不等待取消完成）
+      const responseA = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-9999'))
+      const readerA = responseA.body!.getReader()
+      await readerA.read()
+      const pendingA = readerA.read()
+      await new Promise((r) => setTimeout(r, 5))
+      readerA.cancel().catch(() => {})
+      srcStreams[0].destroy()
+      await pendingA.catch(() => {})
+
+      // 敌对交错 B：流先销毁，消费者后 cancel
+      const responseB = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-9999'))
+      const readerB = responseB.body!.getReader()
+      await readerB.read()
+      const pendingB = readerB.read()
+      await new Promise((r) => setTimeout(r, 5))
+      srcStreams[1].destroy()
+      readerB.cancel().catch(() => {})
+      await pendingB.catch(() => {})
+
+      await new Promise((r) => setTimeout(r, 50))
+      expect(uncaught).toEqual([])
+    } finally {
+      process.off('uncaughtException', onUncaught)
+    }
+  })
+
+  it('T4【护栏·边界】空文件响应体立即结束，重复 cancel 幂等', async () => {
+    fsStatMock.mockResolvedValue({ size: 0 })
+    fsCreateReadStreamMock.mockImplementation(() => makeRealStream([]))
+    const handler = setupHandler()
+
+    const response = await handler(makeRequest(path.resolve('/videos/race.mp4')))
+    expect(response.status).toBe(200)
+    const reader = response.body!.getReader()
+    const { done } = await reader.read()
+    expect(done).toBe(true)
+    await reader.cancel()
+    await reader.cancel()
   })
 })
