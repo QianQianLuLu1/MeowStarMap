@@ -40,6 +40,7 @@ export const SyncGalleryPage: React.FC = () => {
   )
   const currentView = useUIStore((s) => s.currentView)
   const openFullscreen = useUIStore((s) => s.openFullscreen)
+  const navigateTo = useUIStore((s) => s.navigateTo)
 
   const [runtimeState, setRuntimeState] = useState<NikkiSyncRuntimeStateInfo | null>(null)
   const [scanning, setScanning] = useState(false)
@@ -160,6 +161,7 @@ export const SyncGalleryPage: React.FC = () => {
           onRefresh={handleRefresh}
           onScan={handleScan}
           scanning={scanning}
+          onOpenService={() => navigateTo('sync-service')}
         />
         <EmptyState
           status={error === 'syncGallery.error.loadFailed' ? 'error' : 'empty'}
@@ -187,6 +189,7 @@ export const SyncGalleryPage: React.FC = () => {
         scanning={scanning}
         onOpenDetail={() => setDetailOpen(true)}
         detailDisabled={active === null}
+        onOpenService={() => navigateTo('sync-service')}
       />
       {/* 续页失败但已有列表：不能清屏，也不能静默吞掉，给一条行内提示 */}
       {error ? (

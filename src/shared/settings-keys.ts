@@ -17,7 +17,8 @@ export const RENDERER_PREF_KEYS = [
   'fileOps.preferSoftDelete',
   'hardwareAcceleration',
   // sync-integration 阶段4：图库数据源开关（'local' | 'nikkisync'，默认 local）
-  // 消费点 src/renderer/pages/GalleryPage.tsx（启动读取）与 settings/sync-sections.tsx（写入）
+  // 消费点 src/renderer/pages/GalleryPage.tsx（启动读取）与
+  // pages/sync-gallery/SyncServicePage.tsx（写入）
   'gallery.dataSource',
   // sync-integration 阶段5：同步服务自启开关（布尔偏好，消费点 sync-server-setup.ts initSyncServer）
   'sync.serverEnabled',

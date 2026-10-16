@@ -25,7 +25,8 @@
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "同期サービス"
     }
   },
   "categories": {
@@ -1474,8 +1475,7 @@
       "plugins": "",
       "profile": "プロファイル",
       "scan": "スキャン",
-      "tools": "ツール",
-      "sync": "同期"
+      "tools": "ツール"
     },
     "language": {
       "auto": "システムに従う",
@@ -1687,8 +1687,7 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": "",
-      "syncService": "同期サービス"
+      "scanFallback": ""
     },
     "startup": {
       "autoScan": "起動時に自動スキャン",
@@ -1719,56 +1718,6 @@
     "plugins": {
       "error": {
         "unavailable": ""
-      }
-    },
-    "sync": {
-      "service": {
-        "title": "同期サービス",
-        "description": "LAN 内の NikkiSync モバイルクライアントが暗号化接続でこのライブラリに同期できます"
-      },
-      "enable": "同期サービスを有効化",
-      "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 28080）",
-      "status": {
-        "label": "状態",
-        "running": "実行中",
-        "stopped": "停止中",
-        "unavailable": "同期コンポーネント未準備",
-        "address": "サーバーアドレス",
-        "connections": "接続中のクライアント",
-        "serverId": "サーバー ID",
-        "tlsFingerprint": "TLS フィンガープリント",
-        "copied": "コピーしました"
-      },
-      "pairing": {
-        "title": "新しいデバイスをペアリング",
-        "open": "新しいデバイスをペアリング",
-        "hintRunning": "モバイルで QR コードをスキャンしてペアリング（5 分で失効）",
-        "hintDisabled": "新しいデバイスのペアリングには同期サービスの有効化が必要です",
-        "expiresIn": "有効期限",
-        "refresh": "再生成",
-        "copyContent": "ペアリング内容をコピー",
-        "loadFailed": "ペアリング QR コードの生成に失敗しました",
-        "retry": "再試行"
-      },
-      "devices": {
-        "title": "ペアリング済みデバイス",
-        "empty": "ペアリング済みのデバイスはありません",
-        "emptyHint": "モバイルでペアリング QR コードをスキャンしてください",
-        "lastSeen": "最終接続",
-        "never": "未接続",
-        "revoke": "解除",
-        "revokeConfirmTitle": "デバイスの解除",
-        "revokeConfirmMessage": "解除後「{{name}}」はこのライブラリと同期できなくなり、再ペアリングが必要です。解除しますか？",
-        "revokeConfirm": "デバイスを解除",
-        "revoked": "デバイスを解除しました"
-      },
-      "gallerySource": "ギャラリーのデータソースに NikkiSync アセットライブラリを使う",
-      "gallerySourceDesc": "オフ時は本机の media_files（既定）を読み、オン時は内蔵 NikkiSync Runtime の assets に切り替えます。ランタイムの有効化と 1 回のスキャンが暗黙に含まれます",
-      "gallerySourceApplied": "ギャラリーのデータソースを {{source}} に切り替えました",
-      "metadata": {
-        "enable": "コーディネートと撮影パラメータを解析",
-        "enableDesc": "スキャン完了後、上流の NikkiSync レゾルバが同期ギャラリーの撮影パラメータ（焦点距離、絞り、露出、フィルター強度など）を補完します。アプリの再起動後に有効になります。",
-        "disclosure": "有効にすると、写真の UID と写真に埋め込まれたパラメータエンベロープが、解析結果を取得するためにサードパーティサービス nuan5.pro に送信されます。返された内容はローカルの同期データベースに書き込まれ、ローカルネットワーク越しにペアリング済みデバイスにも配信されます。スーツと服装の検索は引き続きローカルの辞書に依存し、このスイッチは対象外です。"
       }
     }
   },
@@ -4324,6 +4273,7 @@
       "statusTip": "組み込み NikkiSync ランタイムの状態",
       "refresh": "更新",
       "scan": "ゲーム相册をスキャン",
+      "service": "同期サービス",
       "status": {
         "ready": "準備完了",
         "degraded": "ゲームフォルダが見つかりません",
@@ -4334,7 +4284,7 @@
     "empty": {
       "title": "閲覧できる資産がありません",
       "linkHint": "NikkiSync パッケージが見つかりません。プロジェクトルートで npm run link:nikkisync を実行し、アプリを再起動してください",
-      "runtimeOff": "組み込みサービスが起動していません。設定で NikkiSync ランタイムを有効にして再試行してください",
+      "runtimeOff": "組み込みサービスが起動していません。ツールバーの「同期サービス」で NikkiSync ランタイムを有効にして再試行してください",
       "gameRootMissing": "『インフィニティ ニキ』のインストールフォルダが見つかりません。設定で手動選択後に再スキャンしてください",
       "noAssets": "スキャンは完了しましたが写真がありません。「ゲーム相册をスキャン」で再索引できます",
       "retry": "再読み込み"
@@ -4358,6 +4308,58 @@
         "hash": "コンテンツハッシュ",
         "metadata": "メタデータ"
       }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "同期サービス"
+    },
+    "service": {
+      "title": "同期サービス",
+      "description": "LAN 内の NikkiSync モバイルクライアントが暗号化接続でこのライブラリに同期できます"
+    },
+    "enable": "同期サービスを有効化",
+    "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 28080）",
+    "status": {
+      "label": "状態",
+      "running": "実行中",
+      "stopped": "停止中",
+      "unavailable": "同期コンポーネント未準備",
+      "address": "サーバーアドレス",
+      "serverId": "サーバー ID",
+      "tlsFingerprint": "TLS フィンガープリント",
+      "copied": "コピーしました"
+    },
+    "pairing": {
+      "title": "新しいデバイスをペアリング",
+      "open": "新しいデバイスをペアリング",
+      "hintRunning": "モバイルで QR コードをスキャンしてペアリング（5 分で失効）",
+      "hintDisabled": "新しいデバイスのペアリングには同期サービスの有効化が必要です",
+      "expiresIn": "有効期限",
+      "refresh": "再生成",
+      "copyContent": "ペアリング内容をコピー",
+      "loadFailed": "ペアリング QR コードの生成に失敗しました",
+      "retry": "再試行"
+    },
+    "devices": {
+      "title": "ペアリング済みデバイス",
+      "empty": "ペアリング済みのデバイスはありません",
+      "emptyHint": "モバイルでペアリング QR コードをスキャンしてください",
+      "lastSeen": "最終接続",
+      "never": "未接続",
+      "revoke": "解除",
+      "revokeConfirmTitle": "デバイスの解除",
+      "revokeConfirmMessage": "解除後「{{name}}」はこのライブラリと同期できなくなり、再ペアリングが必要です。解除しますか？",
+      "revokeConfirm": "デバイスを解除",
+      "revoked": "デバイスを解除しました"
+    },
+    "gallerySource": "ギャラリーのデータソースに NikkiSync アセットライブラリを使う",
+    "gallerySourceDesc": "オフ時は本机の media_files（既定）を読み、オン時は内蔵 NikkiSync Runtime の assets に切り替えます。ランタイムの有効化と 1 回のスキャンが暗黙に含まれます",
+    "gallerySourceApplied": "ギャラリーのデータソースを {{source}} に切り替えました",
+    "metadata": {
+      "enable": "コーディネートと撮影パラメータを解析",
+      "enableDesc": "スキャン完了後、上流の NikkiSync レゾルバが同期ギャラリーの撮影パラメータ（焦点距離、絞り、露出、フィルター強度など）を補完します。アプリの再起動後に有効になります。",
+      "disclosure": "有効にすると、写真の UID と写真に埋め込まれたパラメータエンベロープが、解析結果を取得するためにサードパーティサービス nuan5.pro に送信されます。返された内容はローカルの同期データベースに書き込まれ、ローカルネットワーク越しにペアリング済みデバイスにも配信されます。スーツと服装の検索は引き続きローカルの辞書に依存し、このスイッチは対象外です。"
     }
   },
   "shareCard": {

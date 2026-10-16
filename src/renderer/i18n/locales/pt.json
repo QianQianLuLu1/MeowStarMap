@@ -25,7 +25,8 @@
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Serviço de sincronização"
     }
   },
   "categories": {
@@ -1474,8 +1475,7 @@
       "plugins": "",
       "profile": "Perfis",
       "scan": "Digitalizar",
-      "tools": "Ferramentas",
-      "sync": "Sincronização"
+      "tools": "Ferramentas"
     },
     "language": {
       "auto": "Seguir sistema",
@@ -1687,8 +1687,7 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": "",
-      "syncService": "Serviço de sincronização"
+      "scanFallback": ""
     },
     "startup": {
       "autoScan": "Digitalização automática ao iniciar",
@@ -1719,56 +1718,6 @@
     "plugins": {
       "error": {
         "unavailable": ""
-      }
-    },
-    "sync": {
-      "service": {
-        "title": "Serviço de sincronização",
-        "description": "Permite que clientes móveis NikkiSync sincronizem esta biblioteca através de uma ligação encriptada na rede local"
-      },
-      "enable": "Ativar serviço de sincronização",
-      "enableDesc": "Este PC funcionará como servidor de sincronização (HTTPS + WebSocket, porta predefinida 28080)",
-      "status": {
-        "label": "Estado",
-        "running": "Em execução",
-        "stopped": "Parado",
-        "unavailable": "Componentes de sincronização não prontos",
-        "address": "Endereço do servidor",
-        "connections": "Clientes ligados",
-        "serverId": "ID do servidor",
-        "tlsFingerprint": "Impressão digital TLS",
-        "copied": "Copiado"
-      },
-      "pairing": {
-        "title": "Emparelhar novo dispositivo",
-        "open": "Emparelhar novo dispositivo",
-        "hintRunning": "Digitalize o código QR no telemóvel; expira em 5 minutos",
-        "hintDisabled": "Ative o serviço de sincronização para emparelhar novos dispositivos",
-        "expiresIn": "Expira em",
-        "refresh": "Regenerar",
-        "copyContent": "Copiar conteúdo de emparelhamento",
-        "loadFailed": "Falha ao gerar o código QR de emparelhamento",
-        "retry": "Tentar novamente"
-      },
-      "devices": {
-        "title": "Dispositivos emparelhados",
-        "empty": "Sem dispositivos emparelhados",
-        "emptyHint": "Digitalize o código QR de emparelhamento no telemóvel",
-        "lastSeen": "Visto pela última vez",
-        "never": "Nunca ligado",
-        "revoke": "Revogar",
-        "revokeConfirmTitle": "Revogar dispositivo",
-        "revokeConfirmMessage": "Após revogar, «{{name}}» deixará de poder sincronizar com esta biblioteca e terá de ser emparelhado novamente. Revogar?",
-        "revokeConfirm": "Revogar dispositivo",
-        "revoked": "Dispositivo revogado"
-      },
-      "gallerySource": "Usar a biblioteca de recursos do NikkiSync como fonte da galeria",
-      "gallerySourceDesc": "Desativado: lê os media_files locais (padrão). Ativado: a galeria lê os assets do runtime incorporado do NikkiSync, com ativação implícita do runtime e uma verificação",
-      "gallerySourceApplied": "Fonte de dados da galeria alterada para {{source}}",
-      "metadata": {
-        "enable": "Analisar parâmetros de conjunto e de fotografia",
-        "enableDesc": "Após concluir uma análise, o resolvedor upstream do NikkiSync preenche os parâmetros de fotografia (distância focal, abertura, exposição, intensidade do filtro etc.) da galeria sincronizada. Entra em vigor após reiniciar o aplicativo.",
-        "disclosure": "Quando ativado, o UID de cada foto e o envelope de parâmetros embutido na foto são enviados ao serviço de terceiros nuan5.pro para obter um resultado decodificado. A resposta é gravada no banco de dados local de sincronização e também é entregue aos dispositivos pareados pela rede local. A busca de conjuntos e roupas ainda depende do dicionário local; esta opção não abrange isso."
       }
     }
   },
@@ -4324,6 +4273,7 @@
       "statusTip": "Estado do runtime NikkiSync embutido",
       "refresh": "Atualizar",
       "scan": "Escanear álbum do jogo",
+      "service": "Serviço de sincronização",
       "status": {
         "ready": "Pronto",
         "degraded": "Pasta do jogo não encontrada",
@@ -4334,7 +4284,7 @@
     "empty": {
       "title": "Ainda não há recursos para navegar",
       "linkHint": "Pacotes NikkiSync não encontrados. Execute npm run link:nikkisync na raiz do projeto e reinicie o app",
-      "runtimeOff": "Serviço embutido não iniciado: ative o runtime NikkiSync em Configurações e tente novamente",
+      "runtimeOff": "Serviço embutido não iniciado: abra Serviço de sincronização na barra de ferramentas, ative o runtime NikkiSync ali e tente novamente",
       "gameRootMissing": "Pasta de instalação do Infinity Nikki não encontrada. Selecione manualmente em Configurações e escaneie de novo",
       "noAssets": "A varredura terminou sem fotos. Clique em «Escanear álbum do jogo» para reindexar",
       "retry": "Recarregar"
@@ -4358,6 +4308,58 @@
         "hash": "Hash do conteúdo",
         "metadata": "Metadados"
       }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Serviço de sincronização"
+    },
+    "service": {
+      "title": "Serviço de sincronização",
+      "description": "Permite que clientes móveis NikkiSync sincronizem esta biblioteca através de uma ligação encriptada na rede local"
+    },
+    "enable": "Ativar serviço de sincronização",
+    "enableDesc": "Este PC funcionará como servidor de sincronização (HTTPS + WebSocket, porta predefinida 28080)",
+    "status": {
+      "label": "Estado",
+      "running": "Em execução",
+      "stopped": "Parado",
+      "unavailable": "Componentes de sincronização não prontos",
+      "address": "Endereço do servidor",
+      "serverId": "ID do servidor",
+      "tlsFingerprint": "Impressão digital TLS",
+      "copied": "Copiado"
+    },
+    "pairing": {
+      "title": "Emparelhar novo dispositivo",
+      "open": "Emparelhar novo dispositivo",
+      "hintRunning": "Digitalize o código QR no telemóvel; expira em 5 minutos",
+      "hintDisabled": "Ative o serviço de sincronização para emparelhar novos dispositivos",
+      "expiresIn": "Expira em",
+      "refresh": "Regenerar",
+      "copyContent": "Copiar conteúdo de emparelhamento",
+      "loadFailed": "Falha ao gerar o código QR de emparelhamento",
+      "retry": "Tentar novamente"
+    },
+    "devices": {
+      "title": "Dispositivos emparelhados",
+      "empty": "Sem dispositivos emparelhados",
+      "emptyHint": "Digitalize o código QR de emparelhamento no telemóvel",
+      "lastSeen": "Visto pela última vez",
+      "never": "Nunca ligado",
+      "revoke": "Revogar",
+      "revokeConfirmTitle": "Revogar dispositivo",
+      "revokeConfirmMessage": "Após revogar, «{{name}}» deixará de poder sincronizar com esta biblioteca e terá de ser emparelhado novamente. Revogar?",
+      "revokeConfirm": "Revogar dispositivo",
+      "revoked": "Dispositivo revogado"
+    },
+    "gallerySource": "Usar a biblioteca de recursos do NikkiSync como fonte da galeria",
+    "gallerySourceDesc": "Desativado: lê os media_files locais (padrão). Ativado: a galeria lê os assets do runtime incorporado do NikkiSync, com ativação implícita do runtime e uma verificação",
+    "gallerySourceApplied": "Fonte de dados da galeria alterada para {{source}}",
+    "metadata": {
+      "enable": "Analisar parâmetros de conjunto e de fotografia",
+      "enableDesc": "Após concluir uma análise, o resolvedor upstream do NikkiSync preenche os parâmetros de fotografia (distância focal, abertura, exposição, intensidade do filtro etc.) da galeria sincronizada. Entra em vigor após reiniciar o aplicativo.",
+      "disclosure": "Quando ativado, o UID de cada foto e o envelope de parâmetros embutido na foto são enviados ao serviço de terceiros nuan5.pro para obter um resultado decodificado. A resposta é gravada no banco de dados local de sincronização e também é entregue aos dispositivos pareados pela rede local. A busca de conjuntos e roupas ainda depende do dicionário local; esta opção não abrange isso."
     }
   },
   "shareCard": {

@@ -40,10 +40,11 @@ function asset(id: string): AssetMediaFile {
   } as unknown as AssetMediaFile
 }
 
-const { storeState, uiState, loadFirst, loadMore, openFullscreen } = vi.hoisted(() => {
+const { storeState, uiState, loadFirst, loadMore, openFullscreen, navigateTo } = vi.hoisted(() => {
   const loadFirst = vi.fn(async () => undefined)
   const loadMore = vi.fn(async () => undefined)
   const openFullscreen = vi.fn()
+  const navigateTo = vi.fn()
   const storeState = {
     files: [] as unknown[],
     cursor: null as string | null,
@@ -59,9 +60,10 @@ const { storeState, uiState, loadFirst, loadMore, openFullscreen } = vi.hoisted(
   }
   const uiState = {
     currentView: 'sync-gallery',
-    openFullscreen
+    openFullscreen,
+    navigateTo
   }
-  return { storeState, uiState, loadFirst, loadMore, openFullscreen }
+  return { storeState, uiState, loadFirst, loadMore, openFullscreen, navigateTo }
 })
 
 vi.mock('../../stores/syncGalleryStore', () => ({
@@ -117,6 +119,7 @@ beforeEach(() => {
   loadFirst.mockReset()
   loadMore.mockReset()
   openFullscreen.mockReset()
+  navigateTo.mockReset()
   Object.assign(storeState, {
     files: [],
     cursor: null,
@@ -179,6 +182,14 @@ describe('SyncGalleryPage 接线', () => {
     expect(loadMore).toHaveBeenCalledTimes(1)
   })
 
+  it('列表态的工具栏「同步服务」入口压栈到 sync-service 二级页', async () => {
+    storeState.files = [asset('a/1')]
+    render(<SyncGalleryPage />)
+    await waitFor(() => expect(loadFirst).toHaveBeenCalled())
+    fireEvent.click(screen.getByTitle('同步服务'))
+    expect(navigateTo).toHaveBeenCalledWith('sync-service')
+  })
+
   it('桥缺失空态给出可执行指令（含 npm run link:nikkisync），而不是空白网格', async () => {
     storeState.error = 'syncGallery.error.bridgeMissing'
     statusMock = vi.fn(async () => ({ state: 'unavailable', dbPath: '', linkReady: false }))
@@ -189,12 +200,19 @@ describe('SyncGalleryPage 接线', () => {
     expect(screen.getAllByText(/npm run link:nikkisync/).length).toBeGreaterThan(0)
   })
 
-  it('运行态 off 空态指向设置页开关；degraded 指向游戏目录', async () => {
+  it('运行态 off 空态指向工具栏的「同步服务」入口；degraded 指向游戏目录', async () => {
     statusMock = vi.fn(async () => ({ state: 'idle', dbPath: '', linkReady: true }))
     setBridge(statusMock)
     const { unmount } = render(<SyncGalleryPage />)
     await waitFor(() => expect(screen.queryByTestId('grid')).toBeNull())
-    expect(screen.getByText(/设置页开启 NikkiSync 运行时/)).toBeTruthy()
+    // 同步服务已从设置页剥离，空态必须指向板块内的二级页入口，不能再指向设置页
+    expect(screen.getByText(/工具栏的「同步服务」/)).toBeTruthy()
+    expect(screen.queryByText(/设置页/)).toBeNull()
+    // 空态下工具栏仍在渲染，「同步服务」入口必须可用（这是用户唯一的去处）
+    const serviceEntry = screen.getByTitle('同步服务')
+    expect((serviceEntry as HTMLButtonElement).disabled).toBe(false)
+    fireEvent.click(serviceEntry)
+    expect(navigateTo).toHaveBeenCalledWith('sync-service')
     unmount()
 
     statusMock = vi.fn(async () => ({ state: 'degraded', dbPath: '', linkReady: true }))

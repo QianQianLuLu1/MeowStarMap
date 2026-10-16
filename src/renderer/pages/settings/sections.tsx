@@ -30,5 +30,5 @@ export { LanguageSection } from './language-sections'
 export { ToolsShareCodeSection } from './tools-sections'
 // 插件管理区块
 export { PluginManageSection } from './plugin-sections'
-// sync-integration 阶段5：同步服务区块（开关/状态/配对二维码/设备管理）
-export { SyncServiceSection } from './sync-sections'
+// 同步服务区块已随「同步图库」板块化迁出：现由
+// src/renderer/pages/sync-gallery/SyncServicePage.tsx 承载，不再走本 barrel。

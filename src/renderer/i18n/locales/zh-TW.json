@@ -25,7 +25,8 @@
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "同步服務"
     }
   },
   "categories": {
@@ -1474,8 +1475,7 @@
       "plugins": "",
       "profile": "角色檔案",
       "scan": "掃描",
-      "tools": "工具",
-      "sync": "同步"
+      "tools": "工具"
     },
     "language": {
       "auto": "跟隨系統",
@@ -1687,8 +1687,7 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": "",
-      "syncService": "同步服務"
+      "scanFallback": ""
     },
     "startup": {
       "autoScan": "啟動時自動掃描",
@@ -1719,56 +1718,6 @@
     "plugins": {
       "error": {
         "unavailable": ""
-      }
-    },
-    "sync": {
-      "service": {
-        "title": "同步服務",
-        "description": "允許區網內的 NikkiSync 行動裝置透過加密連線同步本機媒體庫"
-      },
-      "enable": "啟用同步服務",
-      "enableDesc": "開啟後本機作為同步伺服器執行（HTTPS + WebSocket，預設連接埠 28080）",
-      "status": {
-        "label": "執行狀態",
-        "running": "執行中",
-        "stopped": "已停止",
-        "unavailable": "同步元件未就緒",
-        "address": "伺服器位址",
-        "connections": "已連線用戶端",
-        "serverId": "伺服器 ID",
-        "tlsFingerprint": "TLS 指紋",
-        "copied": "已複製"
-      },
-      "pairing": {
-        "title": "配對新裝置",
-        "open": "配對新裝置",
-        "hintRunning": "在行動裝置掃碼完成配對；QR 碼 5 分鐘內有效",
-        "hintDisabled": "啟用同步服務後才能配對新裝置",
-        "expiresIn": "有效期",
-        "refresh": "重新產生",
-        "copyContent": "複製配對內容",
-        "loadFailed": "產生配對 QR 碼失敗",
-        "retry": "重試"
-      },
-      "devices": {
-        "title": "已配對裝置",
-        "empty": "尚無已配對裝置",
-        "emptyHint": "在行動裝置掃描配對 QR 碼完成配對",
-        "lastSeen": "最近活躍",
-        "never": "從未連線",
-        "revoke": "撤銷",
-        "revokeConfirmTitle": "撤銷裝置",
-        "revokeConfirmMessage": "撤銷後「{{name}}」將無法再同步本機媒體庫，需要重新配對。確定撤銷？",
-        "revokeConfirm": "撤銷裝置",
-        "revoked": "裝置已撤銷"
-      },
-      "gallerySource": "圖庫資料來源使用 NikkiSync 資產庫",
-      "gallerySourceDesc": "關閉時讀取本機 media_files（預設）；開啟後圖庫改讀內嵌 NikkiSync Runtime 的 assets，並隱含啟用執行期與一次掃描",
-      "gallerySourceApplied": "圖庫資料來源已切換為 {{source}}",
-      "metadata": {
-        "enable": "解析穿搭與拍攝參數",
-        "enableDesc": "掃描完成後，由上游 NikkiSync 解析器補齊同步圖庫的拍攝參數（焦距、光圈、曝光、濾鏡強度等）。需重啟應用程式後生效。",
-        "disclosure": "開啟後會將照片 UID 與照片內嵌的參數信封傳送至第三方服務 nuan5.pro 以換取解碼結果；返回內容寫入本機同步資料庫，並會隨區域網路同步下发給已配對裝置。套裝與服裝搜尋仍依賴本機字典，本開關不涵蓋該部分。"
       }
     }
   },
@@ -4324,6 +4273,7 @@
       "statusTip": "內嵌 NikkiSync Runtime 的執行狀態",
       "refresh": "重新整理",
       "scan": "掃描遊戲相簿",
+      "service": "同步服務",
       "status": {
         "ready": "已就緒",
         "degraded": "未找到遊戲目錄",
@@ -4334,7 +4284,7 @@
     "empty": {
       "title": "還沒有可瀏覽的資產",
       "linkHint": "未找到 NikkiSync 套件，請在專案根目錄執行 npm run link:nikkisync 後重新啟動應用",
-      "runtimeOff": "內嵌服務未啟動：請在設定頁開啟 NikkiSync 執行期後重試",
+      "runtimeOff": "內嵌服務未啟動：請點擊工具欄的「同步服務」，在其中開啟 NikkiSync 執行期後重試",
       "gameRootMissing": "未找到《無限暖暖》安裝目錄，請在設定裡手動選擇後重新掃描",
       "noAssets": "已完成掃描但沒有照片，可點選「掃描遊戲相簿」重新索引",
       "retry": "重新載入"
@@ -4358,6 +4308,58 @@
         "hash": "內容雜湊",
         "metadata": "中繼資料"
       }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "同步服務"
+    },
+    "service": {
+      "title": "同步服務",
+      "description": "允許區網內的 NikkiSync 行動裝置透過加密連線同步本機媒體庫"
+    },
+    "enable": "啟用同步服務",
+    "enableDesc": "開啟後本機作為同步伺服器執行（HTTPS + WebSocket，預設連接埠 28080）",
+    "status": {
+      "label": "執行狀態",
+      "running": "執行中",
+      "stopped": "已停止",
+      "unavailable": "同步元件未就緒",
+      "address": "伺服器位址",
+      "serverId": "伺服器 ID",
+      "tlsFingerprint": "TLS 指紋",
+      "copied": "已複製"
+    },
+    "pairing": {
+      "title": "配對新裝置",
+      "open": "配對新裝置",
+      "hintRunning": "在行動裝置掃碼完成配對；QR 碼 5 分鐘內有效",
+      "hintDisabled": "啟用同步服務後才能配對新裝置",
+      "expiresIn": "有效期",
+      "refresh": "重新產生",
+      "copyContent": "複製配對內容",
+      "loadFailed": "產生配對 QR 碼失敗",
+      "retry": "重試"
+    },
+    "devices": {
+      "title": "已配對裝置",
+      "empty": "尚無已配對裝置",
+      "emptyHint": "在行動裝置掃描配對 QR 碼完成配對",
+      "lastSeen": "最近活躍",
+      "never": "從未連線",
+      "revoke": "撤銷",
+      "revokeConfirmTitle": "撤銷裝置",
+      "revokeConfirmMessage": "撤銷後「{{name}}」將無法再同步本機媒體庫，需要重新配對。確定撤銷？",
+      "revokeConfirm": "撤銷裝置",
+      "revoked": "裝置已撤銷"
+    },
+    "gallerySource": "圖庫資料來源使用 NikkiSync 資產庫",
+    "gallerySourceDesc": "關閉時讀取本機 media_files（預設）；開啟後圖庫改讀內嵌 NikkiSync Runtime 的 assets，並隱含啟用執行期與一次掃描",
+    "gallerySourceApplied": "圖庫資料來源已切換為 {{source}}",
+    "metadata": {
+      "enable": "解析穿搭與拍攝參數",
+      "enableDesc": "掃描完成後，由上游 NikkiSync 解析器補齊同步圖庫的拍攝參數（焦距、光圈、曝光、濾鏡強度等）。需重啟應用程式後生效。",
+      "disclosure": "開啟後會將照片 UID 與照片內嵌的參數信封傳送至第三方服務 nuan5.pro 以換取解碼結果；返回內容寫入本機同步資料庫，並會隨區域網路同步下发給已配對裝置。套裝與服裝搜尋仍依賴本機字典，本開關不涵蓋該部分。"
     }
   },
   "shareCard": {

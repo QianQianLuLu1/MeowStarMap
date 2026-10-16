@@ -59,6 +59,8 @@ const REQUIRED_KEYS = [
   'syncGallery.toolbar.statusTip',
   'syncGallery.toolbar.refresh',
   'syncGallery.toolbar.scan',
+  // 同步服务从设置页剥离后，入口按钮落在这条键上
+  'syncGallery.toolbar.service',
   'syncGallery.toolbar.status.ready',
   'syncGallery.toolbar.status.degraded',
   'syncGallery.toolbar.status.off',
@@ -137,48 +139,47 @@ describe('同步图库语言包完整性', () => {
 })
 
 /**
- * 阶段 6：元数据解析开关的披露文案完整性。
+ * 同步服务剥离设置页后，「运行时未启动」空态的指引对象变了：
+ * 原来指向设置页的开关，现在必须指向**本板块工具栏的「同步服务」入口**。
  *
- * 这个开关一旦打开就向第三方端点发出站请求（携带 UID 与照片内嵌参数信封），
- * 因此「每个语言包都必须把这件事说清楚」是验收项，不是可选项——
- * 漏一个语言包就等于对那一半用户在未经充分披露的情况下开启了外网请求。
+ * 这条守卫专抓「12 包里漏改一个」：逐包比对旧文案原文（精确负向），
+ * 再要求新文案包含该包自己的入口名（正向）。`i18n:guard` 只做单向 missing 检查，
+ * 抓不到「某个包的旧文案没动」，所以必须在这里钉。
  */
-const METADATA_KEYS = [
-  'settings.sync.metadata.enable',
-  'settings.sync.metadata.enableDesc',
-  'settings.sync.metadata.disclosure'
+const RUNTIME_OFF_BEFORE = [
+  '内嵌服务未启动：请在设置页开启 NikkiSync 运行时后重试',
+  '內嵌服務未啟動：請在設定頁開啟 NikkiSync 執行期後重試',
+  'Embedded service is not running: enable the NikkiSync runtime in Settings and retry',
+  '組み込みサービスが起動していません。設定で NikkiSync ランタイムを有効にして再試行してください',
+  '내장 서비스가 실행 중이 아닙니다. 설정에서 NikkiSync 런타임을 켠 후 다시 시도하세요',
+  'Service intégré non démarré : activez le runtime NikkiSync dans les Paramètres, puis réessayez',
+  'Eingebetteter Dienst nicht gestartet: aktiviere NikkiSync-Laufzeit in den Einstellungen und versuche es erneut',
+  'El servicio integrado no está iniciado: activa el runtime de NikkiSync en Ajustes y vuelve a intentarlo',
+  'Serviço embutido não iniciado: ative o runtime NikkiSync em Configurações e tente novamente',
+  'Встроенная служба не запущена: включите среду NikkiSync в настройках и повторите',
+  'Dịch vụ nhúng chưa chạy: bật runtime NikkiSync trong Cài đặt rồi thử lại'
 ]
 
-describe('阶段 6：元数据解析开关语言包完整性', () => {
-  it('12 个语言包都定义了三个必需键且为非空字符串', () => {
+describe('「运行时未启动」空态改指板块内入口', () => {
+  it('12 个包的 runtimeOff 都不再是旧的「去设置页」文案', () => {
     for (const [code, locale] of Object.entries(LOCALES)) {
-      for (const key of METADATA_KEYS) {
-        const value = readPath(locale, key)
-        expect(value, `${code}.json 缺失 ${key}`).toBeDefined()
-        expect(value, `${code}.json ${key} 应为字符串`).toBeTypeOf('string')
-        expect((value as string).trim(), `${code}.json ${key} 不应为空`).not.toHaveLength(0)
-      }
-    }
-  })
-
-  it('披露文案必须点名实际端点主机（与 metadata-resolver-driver 的常量同主机）', () => {
-    // 这里刻意写主机字面量而不是 import 主进程常量：渲染层不得依赖 `src/main/**`，
-    // 跨边界的共享位是 `src/shared/**`。同一主机由两侧各一条断言钉住：
-    // `metadata-resolver-driver.test.ts` 断言 NUAN5_METADATA_ENDPOINT 以 https://nuan5.pro 开头，
-    // 任一侧改动即有一处先红。
-    for (const [code, locale] of Object.entries(LOCALES)) {
+      const value = String(readPath(locale, 'syncGallery.empty.runtimeOff'))
       expect(
-        readPath(locale, 'settings.sync.metadata.disclosure'),
-        `${code}.json disclosure 未点名出站端点主机`
-      ).toContain('nuan5.pro')
+        RUNTIME_OFF_BEFORE.includes(value),
+        `${code}.json runtimeOff 仍指向设置页，未改指同步图库工具栏`
+      ).toBe(false)
     }
   })
 
-  it('披露文案必须交代「随局域网同步下发给已配对设备」这一后果', () => {
-    // 上游 publicMetadata() 只剥两把原始信封字段，第三方解码结果原样进局域网响应体；
-    // 不说清这一条的披露是不完整的
-    const zh = String(readPath(LOCALES['zh-CN'], 'settings.sync.metadata.disclosure'))
-    expect(zh).toMatch(/配对|已配对/)
-    expect(zh).toMatch(/局域网|本地网络/)
+  it('12 个包的 runtimeOff 都点名了本包的工具栏入口名', () => {
+    for (const [code, locale] of Object.entries(LOCALES)) {
+      const value = String(readPath(locale, 'syncGallery.empty.runtimeOff'))
+      const entryName = String(readPath(locale, 'syncGallery.toolbar.service'))
+      expect(value, `${code}.json runtimeOff 未包含入口名「${entryName}」`).toContain(entryName)
+    }
   })
 })
+
+// 元数据解析开关的披露文案守卫（阶段 6 的验收项）已随「同步服务」从设置页剥离，
+// 迁到同目录 `sync-service-keys.test.ts`：守卫对象改成了新命名空间 syncService.metadata.*，
+// 断言内容（必须点名 nuan5.pro、必须交代下发后果）逐条保留，未削弱。

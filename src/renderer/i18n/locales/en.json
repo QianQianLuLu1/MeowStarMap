@@ -25,7 +25,8 @@
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Sync Service"
     }
   },
   "categories": {
@@ -1474,8 +1475,7 @@
       "plugins": "Plugins",
       "profile": "Profiles",
       "scan": "Scan",
-      "tools": "Tools",
-      "sync": "Sync"
+      "tools": "Tools"
     },
     "language": {
       "auto": "Follow System",
@@ -1687,8 +1687,7 @@
       "importRoots": "Import Roots",
       "shareCode": "Share Code Tools",
       "startup": "Startup",
-      "theme": "Theme",
-      "syncService": "Sync Service"
+      "theme": "Theme"
     },
     "startup": {
       "autoScan": "Auto-scan on startup",
@@ -1719,56 +1718,6 @@
     "plugins": {
       "error": {
         "unavailable": ""
-      }
-    },
-    "sync": {
-      "service": {
-        "title": "Sync Service",
-        "description": "Let NikkiSync mobile clients sync this library over an encrypted LAN connection"
-      },
-      "enable": "Enable sync service",
-      "enableDesc": "Run this PC as the sync server (HTTPS + WebSocket, default port 28080)",
-      "gallerySource": "Use the NikkiSync asset library as the gallery source",
-      "gallerySourceDesc": "Off reads this app's media_files (default); on switches the gallery to the embedded NikkiSync Runtime assets, and implicitly enables the runtime plus one scan",
-      "gallerySourceApplied": "Gallery data source switched to {{source}}",
-      "status": {
-        "label": "Status",
-        "running": "Running",
-        "stopped": "Stopped",
-        "unavailable": "Sync components not ready",
-        "address": "Server address",
-        "connections": "Connected clients",
-        "serverId": "Server ID",
-        "tlsFingerprint": "TLS fingerprint",
-        "copied": "Copied"
-      },
-      "pairing": {
-        "title": "Pair a New Device",
-        "open": "Pair a New Device",
-        "hintRunning": "Scan the QR code on your mobile device; it expires in 5 minutes",
-        "hintDisabled": "Enable the sync service to pair new devices",
-        "expiresIn": "Expires in",
-        "refresh": "Regenerate",
-        "copyContent": "Copy pairing content",
-        "loadFailed": "Failed to generate pairing QR code",
-        "retry": "Retry"
-      },
-      "devices": {
-        "title": "Paired Devices",
-        "empty": "No paired devices",
-        "emptyHint": "Scan the pairing QR code on your mobile device",
-        "lastSeen": "Last seen",
-        "never": "Never connected",
-        "revoke": "Revoke",
-        "revokeConfirmTitle": "Revoke Device",
-        "revokeConfirmMessage": "\"{{name}}\" will no longer be able to sync with this library and must pair again. Revoke this device?",
-        "revokeConfirm": "Revoke Device",
-        "revoked": "Device revoked"
-      },
-      "metadata": {
-        "enable": "Resolve outfit and camera parameters",
-        "enableDesc": "After a scan completes, the upstream NikkiSync resolver fills in camera parameters (focal length, aperture, exposure, filter strength, ...) for the sync gallery. Takes effect after restarting the app.",
-        "disclosure": "When enabled, each photo UID and the parameter envelope embedded in the photo are sent to the third-party service nuan5.pro to obtain a decoded result. The response is written to the local sync database and is also delivered to paired devices over the local network. Suit and clothing search still depends on the local dictionary; this switch does not cover it."
       }
     }
   },
@@ -4324,6 +4273,7 @@
       "statusTip": "Status of the embedded NikkiSync runtime",
       "refresh": "Refresh",
       "scan": "Scan game album",
+      "service": "Sync Service",
       "status": {
         "ready": "Ready",
         "degraded": "Game folder not found",
@@ -4334,7 +4284,7 @@
     "empty": {
       "title": "No assets to browse yet",
       "linkHint": "NikkiSync packages not found. Run npm run link:nikkisync in the project root, then restart the app",
-      "runtimeOff": "Embedded service is not running: enable the NikkiSync runtime in Settings and retry",
+      "runtimeOff": "Embedded service is not running: open Sync Service in the toolbar, enable the NikkiSync runtime there, then retry",
       "gameRootMissing": "Infinity Nikki install folder not found. Select it manually in Settings, then rescan",
       "noAssets": "Scan finished but no photos were found. Click \"Scan game album\" to reindex",
       "retry": "Reload"
@@ -4358,6 +4308,58 @@
         "hash": "Content hash",
         "metadata": "Metadata"
       }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Sync Service"
+    },
+    "service": {
+      "title": "Sync Service",
+      "description": "Let NikkiSync mobile clients sync this library over an encrypted LAN connection"
+    },
+    "enable": "Enable sync service",
+    "enableDesc": "Run this PC as the sync server (HTTPS + WebSocket, default port 28080)",
+    "gallerySource": "Use the NikkiSync asset library as the gallery source",
+    "gallerySourceDesc": "Off reads this app's media_files (default); on switches the gallery to the embedded NikkiSync Runtime assets, and implicitly enables the runtime plus one scan",
+    "gallerySourceApplied": "Gallery data source switched to {{source}}",
+    "status": {
+      "label": "Status",
+      "running": "Running",
+      "stopped": "Stopped",
+      "unavailable": "Sync components not ready",
+      "address": "Server address",
+      "serverId": "Server ID",
+      "tlsFingerprint": "TLS fingerprint",
+      "copied": "Copied"
+    },
+    "pairing": {
+      "title": "Pair a New Device",
+      "open": "Pair a New Device",
+      "hintRunning": "Scan the QR code on your mobile device; it expires in 5 minutes",
+      "hintDisabled": "Enable the sync service to pair new devices",
+      "expiresIn": "Expires in",
+      "refresh": "Regenerate",
+      "copyContent": "Copy pairing content",
+      "loadFailed": "Failed to generate pairing QR code",
+      "retry": "Retry"
+    },
+    "devices": {
+      "title": "Paired Devices",
+      "empty": "No paired devices",
+      "emptyHint": "Scan the pairing QR code on your mobile device",
+      "lastSeen": "Last seen",
+      "never": "Never connected",
+      "revoke": "Revoke",
+      "revokeConfirmTitle": "Revoke Device",
+      "revokeConfirmMessage": "\"{{name}}\" will no longer be able to sync with this library and must pair again. Revoke this device?",
+      "revokeConfirm": "Revoke Device",
+      "revoked": "Device revoked"
+    },
+    "metadata": {
+      "enable": "Resolve outfit and camera parameters",
+      "enableDesc": "After a scan completes, the upstream NikkiSync resolver fills in camera parameters (focal length, aperture, exposure, filter strength, ...) for the sync gallery. Takes effect after restarting the app.",
+      "disclosure": "When enabled, each photo UID and the parameter envelope embedded in the photo are sent to the third-party service nuan5.pro to obtain a decoded result. The response is written to the local sync database and is also delivered to paired devices over the local network. Suit and clothing search still depends on the local dictionary; this switch does not cover it."
     }
   },
   "shareCard": {

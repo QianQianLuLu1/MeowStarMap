@@ -1,7 +1,9 @@
+// @vitest-environment jsdom
 /**
- * @vitest-environment jsdom
+ * SyncServicePage（同步服务二级子页，层级 2）单元测试。
  *
- * SyncServiceSection（同步服务设置分区）单元测试——阶段5 落地，阶段3 改接真实 NikkiSync 服务：
+ * 阶段归属：本页由设置页 `sync` 分组剥离而来（原 `pages/settings/sync-sections.tsx` 的
+ * `SyncServiceSection`）。用例 (a)–(p) 逐条搬入，锁住阶段 3/4/6 的行为契约不变：
  *  (a) 挂载读取 nikkisync.syncServerEnabled（默认 false）与状态/设备列表
  *  (b) 开关启用：写两个设置项（服务 + Runtime 隐含）+ nikkisync.startServer + toast
  *  (c) 启动失败：两个设置项一并回滚为 false + 错误 toast（开关还原）
@@ -12,16 +14,23 @@
  *  (h) 不再渲染“已连接客户端数”（上游无该计数，本仓不虚构）
  *  (i) 未装配态显示不可用而非报错
  *  (j)-(l) 阶段 4：图库数据源开关（写两个设置项 + store 分流 + 触发扫描 / 失败回滚 / 挂载读回）
+ *  (m)-(p) 阶段 6：元数据解析开关（只写自己的键 / 挂载读回 / 披露常驻 / 失败回滚）
  *
- * 运行：npx vitest run src/renderer/pages/settings/sync-sections.test.tsx
+ * 搬移带出的两条新契约（设置页里不需要、独立子页才需要）：
+ *  (q) 三段层级：控制区 h3 / 配对区 h3 / 设备区 h3 同页存在，页头是 h2「同步服务」
+ *  (r) 状态轮询按 currentView 门控：本页在 App.tsx 的 keep-alive 循环里切走不卸载，
+ *      不门控就会后台常驻 2s 定时器一直打 getServerStatus
+ *
+ * 运行：npx vitest run src/renderer/pages/sync-gallery/SyncServicePage.test.tsx
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Mock } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { GlobalToastContext } from '../../components/common/ToastProvider'
-import { SyncServiceSection } from './sync-sections'
+import { SyncServicePage } from './SyncServicePage'
 import { useMediaStore } from '../../stores/mediaStore'
+import { useUIStore } from '../../stores/uiStore'
 
 const mockShowMessage = vi.fn()
 
@@ -29,6 +38,8 @@ const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
 const SETTING_RUNTIME_ENABLED = 'nikkisync.runtimeEnabled'
 const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
 const METADATA_TOGGLE_NAME = '解析穿搭与拍摄参数'
+/** 与页面内的 STATUS_POLL_MS 同值：门控用例靠它推进定时器 */
+const STATUS_POLL_MS = 2000
 
 function makeStatus(overrides: Record<string, unknown> = {}) {
   return {
@@ -135,7 +146,7 @@ function installElectronApi(
 function renderSection() {
   return render(
     <GlobalToastContext.Provider value={mockShowMessage}>
-      <SyncServiceSection />
+      <SyncServicePage />
     </GlobalToastContext.Provider>
   )
 }
@@ -143,13 +154,16 @@ function renderSection() {
 beforeEach(() => {
   installElectronApi()
   mockShowMessage.mockClear()
+  // 轮询按 currentView 门控（用例 (r)），不进本页就一条状态都不拉
+  useUIStore.setState({ currentView: 'sync-service' })
 })
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 
-describe('SyncServiceSection（阶段3：真实 NikkiSync 服务）', () => {
+describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入）', () => {
   it('(a) 挂载读取 nikkisync.syncServerEnabled（缺省 false）并拉取状态与设备列表', async () => {
     renderSection()
     await waitFor(() => expect(settingsGet).toHaveBeenCalledWith(SETTING_SYNC_ENABLED, false))
@@ -301,5 +315,45 @@ describe('SyncServiceSection（阶段3：真实 NikkiSync 服务）', () => {
     const toggle = await screen.findByRole('switch', { name: METADATA_TOGGLE_NAME })
     fireEvent.click(toggle)
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+  })
+
+  // ===== 搬移带出的新契约 =====
+
+  it('(q) 三段层级：页头 h2 + 控制/配对/设备三个 h3 同页存在', async () => {
+    renderSection()
+    await screen.findByRole('switch', { name: '启用同步服务' })
+    expect(
+      screen.getByRole('heading', { level: 2, name: '同步服务' }),
+      '二级页必须有自己的 h2 页头（层级 2 的视觉与语义起点）'
+    ).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: '同步服务' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: '配对新设备' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: '已配对设备' })).toBeInTheDocument()
+    // 配对入口按钮落在配对区内，而不是挤在开关区里
+    expect(screen.getByRole('button', { name: '配对新设备' })).toBeInTheDocument()
+  })
+
+  it('(r) 状态轮询按 currentView 门控：不在本页时一次都不拉，回到本页才恢复 2s 轮询', async () => {
+    useUIStore.setState({ currentView: 'gallery' })
+    renderSection()
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(
+      serverApi.getServerStatus,
+      '页面切走仍轮询 = keep-alive 下后台常驻定时器'
+    ).not.toHaveBeenCalled()
+
+    vi.useFakeTimers()
+    useUIStore.setState({ currentView: 'sync-service' })
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(serverApi.getServerStatus).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      vi.advanceTimersByTime(STATUS_POLL_MS * 2)
+    })
+    expect(serverApi.getServerStatus.mock.calls.length).toBeGreaterThanOrEqual(3)
   })
 })

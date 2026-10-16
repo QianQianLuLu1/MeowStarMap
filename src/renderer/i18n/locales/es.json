@@ -25,7 +25,8 @@
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Servicio de sincronización"
     }
   },
   "categories": {
@@ -1474,8 +1475,7 @@
       "plugins": "",
       "profile": "Perfiles",
       "scan": "Escanear",
-      "tools": "Herramientas",
-      "sync": "Sincronización"
+      "tools": "Herramientas"
     },
     "language": {
       "auto": "Seguir sistema",
@@ -1687,8 +1687,7 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": "",
-      "syncService": "Servicio de sincronización"
+      "scanFallback": ""
     },
     "startup": {
       "autoScan": "Escaneo automático al iniciar",
@@ -1719,56 +1718,6 @@
     "plugins": {
       "error": {
         "unavailable": ""
-      }
-    },
-    "sync": {
-      "service": {
-        "title": "Servicio de sincronización",
-        "description": "Permite que los clientes móviles de NikkiSync sincronicen esta biblioteca mediante una conexión cifrada en la red local"
-      },
-      "enable": "Activar servicio de sincronización",
-      "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 28080)",
-      "status": {
-        "label": "Estado",
-        "running": "En ejecución",
-        "stopped": "Detenido",
-        "unavailable": "Componentes de sincronización no listos",
-        "address": "Dirección del servidor",
-        "connections": "Clientes conectados",
-        "serverId": "ID del servidor",
-        "tlsFingerprint": "Huella TLS",
-        "copied": "Copiado"
-      },
-      "pairing": {
-        "title": "Vincular nuevo dispositivo",
-        "open": "Vincular nuevo dispositivo",
-        "hintRunning": "Escanea el código QR en tu móvil; caduca en 5 minutos",
-        "hintDisabled": "Activa el servicio de sincronización para vincular nuevos dispositivos",
-        "expiresIn": "Caduca en",
-        "refresh": "Regenerar",
-        "copyContent": "Copiar contenido de emparejamiento",
-        "loadFailed": "Error al generar el código QR de emparejamiento",
-        "retry": "Reintentar"
-      },
-      "devices": {
-        "title": "Dispositivos vinculados",
-        "empty": "No hay dispositivos vinculados",
-        "emptyHint": "Escanea el código QR de emparejamiento en tu móvil",
-        "lastSeen": "Última conexión",
-        "never": "Nunca conectado",
-        "revoke": "Revocar",
-        "revokeConfirmTitle": "Revocar dispositivo",
-        "revokeConfirmMessage": "Tras revocar, «{{name}}» ya no podrá sincronizar con esta biblioteca y deberá volver a emparejarse. ¿Revocar?",
-        "revokeConfirm": "Revocar dispositivo",
-        "revoked": "Dispositivo revocado"
-      },
-      "gallerySource": "Usar la biblioteca de recursos de NikkiSync como fuente de la galería",
-      "gallerySourceDesc": "Desactivado: se leen los media_files locales (predeterminado). Activado: la galería lee los assets del runtime de NikkiSync integrado, con activación implícita del runtime y un análisis",
-      "gallerySourceApplied": "Fuente de datos de la galería cambiada a {{source}}",
-      "metadata": {
-        "enable": "Analizar parámetros de atuendo y de fotografía",
-        "enableDesc": "Al terminar un análisis, el resolvedor aguas arriba de NikkiSync completa los parámetros de fotografía (distancia focal, apertura, exposición, intensidad del filtro, etc.) de la galería sincronizada. Se aplica tras reiniciar la aplicación.",
-        "disclosure": "Al activarlo, el UID de cada foto y el sobre de parámetros incrustado en la foto se envían al servicio de terceros nuan5.pro para obtener un resultado decodificado. La respuesta se escribe en la base de datos local de sincronización y también se entrega a los dispositivos vinculados a través de la red local. La búsqueda de atuendos y prendas sigue dependiendo del diccionario local; este interruptor no la cubre."
       }
     }
   },
@@ -4324,6 +4273,7 @@
       "statusTip": "Estado del runtime de NikkiSync integrado",
       "refresh": "Actualizar",
       "scan": "Escanear álbum del juego",
+      "service": "Servicio de sincronización",
       "status": {
         "ready": "Listo",
         "degraded": "Carpeta del juego no encontrada",
@@ -4334,7 +4284,7 @@
     "empty": {
       "title": "Aún no hay recursos para explorar",
       "linkHint": "No se encontraron los paquetes de NikkiSync. Ejecuta npm run link:nikkisync en la raíz del proyecto y reinicia la app",
-      "runtimeOff": "El servicio integrado no está iniciado: activa el runtime de NikkiSync en Ajustes y vuelve a intentarlo",
+      "runtimeOff": "El servicio integrado no está iniciado: abre Servicio de sincronización en la barra de herramientas, activa allí el runtime de NikkiSync y vuelve a intentarlo",
       "gameRootMissing": "No se encontró la carpeta de instalación de Infinity Nikki. Selecciónala manualmente en Ajustes y vuelve a escanear",
       "noAssets": "El escaneo terminó sin fotos. Pulsa «Escanear álbum del juego» para reindexar",
       "retry": "Recargar"
@@ -4358,6 +4308,58 @@
         "hash": "Hash del contenido",
         "metadata": "Metadatos"
       }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Servicio de sincronización"
+    },
+    "service": {
+      "title": "Servicio de sincronización",
+      "description": "Permite que los clientes móviles de NikkiSync sincronicen esta biblioteca mediante una conexión cifrada en la red local"
+    },
+    "enable": "Activar servicio de sincronización",
+    "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 28080)",
+    "status": {
+      "label": "Estado",
+      "running": "En ejecución",
+      "stopped": "Detenido",
+      "unavailable": "Componentes de sincronización no listos",
+      "address": "Dirección del servidor",
+      "serverId": "ID del servidor",
+      "tlsFingerprint": "Huella TLS",
+      "copied": "Copiado"
+    },
+    "pairing": {
+      "title": "Vincular nuevo dispositivo",
+      "open": "Vincular nuevo dispositivo",
+      "hintRunning": "Escanea el código QR en tu móvil; caduca en 5 minutos",
+      "hintDisabled": "Activa el servicio de sincronización para vincular nuevos dispositivos",
+      "expiresIn": "Caduca en",
+      "refresh": "Regenerar",
+      "copyContent": "Copiar contenido de emparejamiento",
+      "loadFailed": "Error al generar el código QR de emparejamiento",
+      "retry": "Reintentar"
+    },
+    "devices": {
+      "title": "Dispositivos vinculados",
+      "empty": "No hay dispositivos vinculados",
+      "emptyHint": "Escanea el código QR de emparejamiento en tu móvil",
+      "lastSeen": "Última conexión",
+      "never": "Nunca conectado",
+      "revoke": "Revocar",
+      "revokeConfirmTitle": "Revocar dispositivo",
+      "revokeConfirmMessage": "Tras revocar, «{{name}}» ya no podrá sincronizar con esta biblioteca y deberá volver a emparejarse. ¿Revocar?",
+      "revokeConfirm": "Revocar dispositivo",
+      "revoked": "Dispositivo revocado"
+    },
+    "gallerySource": "Usar la biblioteca de recursos de NikkiSync como fuente de la galería",
+    "gallerySourceDesc": "Desactivado: se leen los media_files locales (predeterminado). Activado: la galería lee los assets del runtime de NikkiSync integrado, con activación implícita del runtime y un análisis",
+    "gallerySourceApplied": "Fuente de datos de la galería cambiada a {{source}}",
+    "metadata": {
+      "enable": "Analizar parámetros de atuendo y de fotografía",
+      "enableDesc": "Al terminar un análisis, el resolvedor aguas arriba de NikkiSync completa los parámetros de fotografía (distancia focal, apertura, exposición, intensidad del filtro, etc.) de la galería sincronizada. Se aplica tras reiniciar la aplicación.",
+      "disclosure": "Al activarlo, el UID de cada foto y el sobre de parámetros incrustado en la foto se envían al servicio de terceros nuan5.pro para obtener un resultado decodificado. La respuesta se escribe en la base de datos local de sincronización y también se entrega a los dispositivos vinculados a través de la red local. La búsqueda de atuendos y prendas sigue dependiendo del diccionario local; este interruptor no la cubre."
     }
   },
   "shareCard": {

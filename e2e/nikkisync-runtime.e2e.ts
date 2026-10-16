@@ -453,7 +453,7 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     // 服务停止链的日志判据放在 N4（app.close() 之后，日志已 flush）。
   })
 
-  test('N3c 设置页真实渲染：开关起服务、二维码 SVG 与设备列表在真实窗口里出图', async () => {
+  test('N3c 同步服务二级子页真实渲染：开关起服务、二维码 SVG 与设备列表在真实窗口里出图', async () => {
     const session = launched
     if (!session || !win) {
       test.skip(true, 'N1 未启动应用')
@@ -467,11 +467,14 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     // 文案判据依赖语言：固定为 zh-CN 后重载（localStorage 只影响本次临时 userData）
     await page.evaluate(() => {
       localStorage.setItem('app-language', 'zh-CN')
-      // 阶段3：设置页左导航的落点由 localStorage 决定，直接开到「同步服务」节
-      localStorage.setItem('settings-active-section', 'sync-service')
     })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    await page.getByTitle('设置').first().click()
+    // 同步服务已不再是设置页的一节，而是同步图库板块下的 sync-service 二级子页：
+    // 先进板块，再点工具栏入口。等入口出现即隐式跨过加载态分支（那一支不渲染工具栏）。
+    await page.getByTitle('同步图库').first().click()
+    const serviceEntry = page.getByTitle('同步服务').first()
+    await serviceEntry.waitFor({ timeout: 20_000 })
+    await serviceEntry.click()
 
     // 节标题与开关都来自真实 i18n 文本（不是测试内构造的 DOM）
     const toggle = page.getByRole('switch', { name: '启用同步服务' }).first()

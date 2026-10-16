@@ -71,6 +71,8 @@ export type ViewLevel =
   | 'resonance-records'
   | 'screenshots'
   | 'sync-gallery'
+  // 同步服务二级子页：从设置页 `sync` 分组剥离而来，入口在同步图库工具栏。
+  | 'sync-service'
 export type ViewMode = 'grid' | 'list' | 'timeline' | 'masonry' | 'event-timeline'
 
 /**

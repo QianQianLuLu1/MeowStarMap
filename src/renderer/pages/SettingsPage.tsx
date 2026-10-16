@@ -23,8 +23,7 @@ import {
   AboutLicenseSection,
   LanguageSection,
   ToolsShareCodeSection,
-  PluginManageSection,
-  SyncServiceSection
+  PluginManageSection
 } from './settings/sections'
 
 // ============ 设置导航结构 ============
@@ -137,18 +136,8 @@ const SETTINGS_GROUPS: GroupDef[] = [
       { id: 'data-clear', nameKey: 'settings.sections.dataClear', component: DataClearSection }
     ]
   },
-  {
-    // sync-integration 阶段5：NikkiSync 同步服务（开关/状态/配对/设备管理）
-    id: 'sync',
-    nameKey: 'settings.groups.sync',
-    sections: [
-      {
-        id: 'sync-service',
-        nameKey: 'settings.sections.syncService',
-        component: SyncServiceSection
-      }
-    ]
-  },
+  // 同步服务（开关/状态/配对/设备管理）已随「同步图库」板块化从本表移除，
+  // 现由 pages/sync-gallery/SyncServicePage.tsx 承载，入口在同步图库工具栏。
   {
     id: 'diagnostics',
     nameKey: 'settings.groups.diagnostics',

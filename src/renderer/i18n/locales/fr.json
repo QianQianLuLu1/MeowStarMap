@@ -25,7 +25,8 @@
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Service de synchronisation"
     }
   },
   "categories": {
@@ -1474,8 +1475,7 @@
       "plugins": "",
       "profile": "Profils",
       "scan": "Analyse",
-      "tools": "Outils",
-      "sync": "Synchronisation"
+      "tools": "Outils"
     },
     "language": {
       "auto": "Suivre le système",
@@ -1687,8 +1687,7 @@
       "importRoots": "",
       "scanDiagnostic": "扫描链路诊断",
       "gameRoots": "",
-      "scanFallback": "",
-      "syncService": "Service de synchronisation"
+      "scanFallback": ""
     },
     "startup": {
       "autoScan": "Analyse automatique au démarrage",
@@ -1719,56 +1718,6 @@
     "plugins": {
       "error": {
         "unavailable": ""
-      }
-    },
-    "sync": {
-      "service": {
-        "title": "Service de synchronisation",
-        "description": "Permet aux clients mobiles NikkiSync de synchroniser cette bibliothèque via une connexion chiffrée du réseau local"
-      },
-      "enable": "Activer le service de synchronisation",
-      "enableDesc": "Ce PC servira de serveur de synchronisation (HTTPS + WebSocket, port par défaut 28080)",
-      "status": {
-        "label": "État",
-        "running": "En cours",
-        "stopped": "Arrêté",
-        "unavailable": "Composants de synchronisation non prêts",
-        "address": "Adresse du serveur",
-        "connections": "Clients connectés",
-        "serverId": "ID du serveur",
-        "tlsFingerprint": "Empreinte TLS",
-        "copied": "Copié"
-      },
-      "pairing": {
-        "title": "Jumeler un nouvel appareil",
-        "open": "Jumeler un nouvel appareil",
-        "hintRunning": "Scannez le QR code sur votre appareil mobile ; il expire dans 5 minutes",
-        "hintDisabled": "Activez le service de synchronisation pour jumeler de nouveaux appareils",
-        "expiresIn": "Expire dans",
-        "refresh": "Régénérer",
-        "copyContent": "Copier le contenu de jumelage",
-        "loadFailed": "Échec de la génération du QR code de jumelage",
-        "retry": "Réessayer"
-      },
-      "devices": {
-        "title": "Appareils jumelés",
-        "empty": "Aucun appareil jumelé",
-        "emptyHint": "Scannez le QR code de jumelage sur votre appareil mobile",
-        "lastSeen": "Dernière activité",
-        "never": "Jamais connecté",
-        "revoke": "Révoquer",
-        "revokeConfirmTitle": "Révoquer l’appareil",
-        "revokeConfirmMessage": "Après la révocation, « {{name}} » ne pourra plus synchroniser cette bibliothèque et devra être jumelé à nouveau. Révoquer ?",
-        "revokeConfirm": "Révoquer l’appareil",
-        "revoked": "Appareil révoqué"
-      },
-      "gallerySource": "Utiliser la bibliothèque de ressources NikkiSync pour la galerie",
-      "gallerySourceDesc": "Désactivé : lecture des media_files locaux (par défaut). Activé : la galerie lit les assets du runtime NikkiSync intégré, avec activation implicite du runtime et une analyse",
-      "gallerySourceApplied": "Source de données de la galerie changée en {{source}}",
-      "metadata": {
-        "enable": "Analyser les paramètres de tenue et de prise de vue",
-        "enableDesc": "Après la fin d'une analyse, le resolveur amont NikkiSync complète les paramètres de prise de vue (focale, ouverture, exposition, intensité du filtre, etc.) de la galerie synchronisée. Prend effet après le redémarrage de l'application.",
-        "disclosure": "Une fois activé, l'identifiant de chaque photo et l'enveloppe de paramètres intégrée à la photo sont envoyés au service tiers nuan5.pro pour obtenir un résultat décodé. La réponse est écrite dans la base de synchronisation locale et est également transmise aux appariés via le réseau local. La recherche de tenues et de vêtements dépend toujours du dictionnaire local ; ce commutateur ne la couvre pas."
       }
     }
   },
@@ -4324,6 +4273,7 @@
       "statusTip": "État du runtime NikkiSync intégré",
       "refresh": "Actualiser",
       "scan": "Analyser l’album du jeu",
+      "service": "Service de synchronisation",
       "status": {
         "ready": "Prêt",
         "degraded": "Dossier du jeu introuvable",
@@ -4334,7 +4284,7 @@
     "empty": {
       "title": "Aucune ressource à parcourir",
       "linkHint": "Packages NikkiSync introuvables. Exécutez npm run link:nikkisync à la racine du projet, puis redémarrez l’application",
-      "runtimeOff": "Service intégré non démarré : activez le runtime NikkiSync dans les Paramètres, puis réessayez",
+      "runtimeOff": "Service intégré non démarré : ouvrez Service de synchronisation dans la barre d’outils, activez le runtime NikkiSync, puis réessayez",
       "gameRootMissing": "Dossier d’installation d’Infinity Nikki introuvable. Sélectionnez-le manuellement dans les Paramètres, puis relancez l’analyse",
       "noAssets": "Analyse terminée sans photo. Cliquez sur « Analyser l’album du jeu » pour réindexer",
       "retry": "Recharger"
@@ -4358,6 +4308,58 @@
         "hash": "Empreinte du contenu",
         "metadata": "Métadonnées"
       }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Service de synchronisation"
+    },
+    "service": {
+      "title": "Service de synchronisation",
+      "description": "Permet aux clients mobiles NikkiSync de synchroniser cette bibliothèque via une connexion chiffrée du réseau local"
+    },
+    "enable": "Activer le service de synchronisation",
+    "enableDesc": "Ce PC servira de serveur de synchronisation (HTTPS + WebSocket, port par défaut 28080)",
+    "status": {
+      "label": "État",
+      "running": "En cours",
+      "stopped": "Arrêté",
+      "unavailable": "Composants de synchronisation non prêts",
+      "address": "Adresse du serveur",
+      "serverId": "ID du serveur",
+      "tlsFingerprint": "Empreinte TLS",
+      "copied": "Copié"
+    },
+    "pairing": {
+      "title": "Jumeler un nouvel appareil",
+      "open": "Jumeler un nouvel appareil",
+      "hintRunning": "Scannez le QR code sur votre appareil mobile ; il expire dans 5 minutes",
+      "hintDisabled": "Activez le service de synchronisation pour jumeler de nouveaux appareils",
+      "expiresIn": "Expire dans",
+      "refresh": "Régénérer",
+      "copyContent": "Copier le contenu de jumelage",
+      "loadFailed": "Échec de la génération du QR code de jumelage",
+      "retry": "Réessayer"
+    },
+    "devices": {
+      "title": "Appareils jumelés",
+      "empty": "Aucun appareil jumelé",
+      "emptyHint": "Scannez le QR code de jumelage sur votre appareil mobile",
+      "lastSeen": "Dernière activité",
+      "never": "Jamais connecté",
+      "revoke": "Révoquer",
+      "revokeConfirmTitle": "Révoquer l’appareil",
+      "revokeConfirmMessage": "Après la révocation, « {{name}} » ne pourra plus synchroniser cette bibliothèque et devra être jumelé à nouveau. Révoquer ?",
+      "revokeConfirm": "Révoquer l’appareil",
+      "revoked": "Appareil révoqué"
+    },
+    "gallerySource": "Utiliser la bibliothèque de ressources NikkiSync pour la galerie",
+    "gallerySourceDesc": "Désactivé : lecture des media_files locaux (par défaut). Activé : la galerie lit les assets du runtime NikkiSync intégré, avec activation implicite du runtime et une analyse",
+    "gallerySourceApplied": "Source de données de la galerie changée en {{source}}",
+    "metadata": {
+      "enable": "Analyser les paramètres de tenue et de prise de vue",
+      "enableDesc": "Après la fin d'une analyse, le resolveur amont NikkiSync complète les paramètres de prise de vue (focale, ouverture, exposition, intensité du filtre, etc.) de la galerie synchronisée. Prend effet après le redémarrage de l'application.",
+      "disclosure": "Une fois activé, l'identifiant de chaque photo et l'enveloppe de paramètres intégrée à la photo sont envoyés au service tiers nuan5.pro pour obtenir un résultat décodé. La réponse est écrite dans la base de synchronisation locale et est également transmise aux appariés via le réseau local. La recherche de tenues et de vêtements dépend toujours du dictionnaire local ; ce commutateur ne la couvre pas."
     }
   },
   "shareCard": {

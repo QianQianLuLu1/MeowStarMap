@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/common/Button'
-import { IconSync, IconRotateCw, IconInfo } from '../../icons'
+import { IconSync, IconRotateCw, IconInfo, IconSettings } from '../../icons'
 import type { NikkiSyncRuntimeStateInfo } from '../../../shared/types/electron-api'
 
 /** 运行态折算给 UI 的三档分组（8 个状态机取值对客户无意义，折叠成可懂的三档）。 */
@@ -22,6 +22,11 @@ interface SyncGalleryToolbarProps {
   /** 打开当前选中资产的详情抽屉；未选中时按钮禁用 */
   onOpenDetail?: () => void
   detailDisabled?: boolean
+  /**
+   * 进入板块内的「同步服务」二级子页。可选：调用方不传则不渲染入口，
+   * 让加载态分支（本页提前 return，本就没有工具栏）与既有测试保持原样。
+   */
+  onOpenService?: () => void
 }
 
 /** 三档各配一个语义色 token（沿用主题已有变量，不自建 class、不写色值字面量）。 */
@@ -34,11 +39,14 @@ const GROUP_TONE: Record<SyncRuntimeGroup, string> = {
 /**
  * 阶段 5 · A3：同步图库工具栏。
  *
- * 只做两件事——重新取数（刷新）与触发扫描（`nikkisync.startScan`）。扫描是惰性的：
- * `runtime-manager.scan()` 内部按需建会话，因此不必先判断「是否已启动」。
+ * 做三件事——重新取数（刷新）、触发扫描（`nikkisync.startScan`）、以及跳转板块内的
+ * 「同步服务」二级子页。扫描是惰性的：`runtime-manager.scan()` 内部按需建会话，
+ * 因此不必先判断「是否已启动」。
  *
- * 同步服务（LAN 侧）的启停刻意**不放**在这里：那是设置页 `sync-sections` 的职责，
- * 两处各摆一个开关会让用户分不清「到底在哪里打开」。
+ * 同步服务（LAN 侧）的启停**不放在这里**，但入口放这里：服务节已从设置页剥离，现由
+ * `SyncServicePage`（`navigateTo('sync-service')`）承载。本按钮**只做导航、不放任何开关**，
+ * 全应用仍然只有一处能启停同步服务——两处各摆一个开关才会让用户分不清「到底在哪里打开」。
+ * 运行时未启动时按钮照常可点：那正是用户最需要进去把它打开的时刻。
  */
 export const SyncGalleryToolbar: React.FC<SyncGalleryToolbarProps> = ({
   runtimeState,
@@ -46,7 +54,8 @@ export const SyncGalleryToolbar: React.FC<SyncGalleryToolbarProps> = ({
   onScan,
   scanning,
   onOpenDetail,
-  detailDisabled
+  detailDisabled,
+  onOpenService
 }) => {
   const { t } = useTranslation()
   const group = toRuntimeGroup(runtimeState)
@@ -92,6 +101,17 @@ export const SyncGalleryToolbar: React.FC<SyncGalleryToolbarProps> = ({
       >
         {t('syncGallery.toolbar.scan')}
       </Button>
+      {onOpenService ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onOpenService}
+          icon={<IconSettings size={14} />}
+          title={t('syncGallery.toolbar.service')}
+        >
+          {t('syncGallery.toolbar.service')}
+        </Button>
+      ) : null}
     </div>
   )
 }

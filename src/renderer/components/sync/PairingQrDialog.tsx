@@ -105,7 +105,7 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
     if (!offer) return
     try {
       await navigator.clipboard.writeText(offer.content)
-      showMessage(t('settings.sync.status.copied'))
+      showMessage(t('syncService.status.copied'))
     } catch (err) {
       showError(err)
     }
@@ -115,22 +115,22 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
     if (!offer) return
     try {
       await navigator.clipboard.writeText(`${offer.host}:${offer.port}`)
-      showMessage(t('settings.sync.status.copied'))
+      showMessage(t('syncService.status.copied'))
     } catch (err) {
       showError(err)
     }
   }
 
   return (
-    <BaseDialog open={open} onClose={onClose} size="md" title={t('settings.sync.pairing.title')}>
+    <BaseDialog open={open} onClose={onClose} size="md" title={t('syncService.pairing.title')}>
       <div className="space-y-4">
         {failed ? (
           <div className="flex flex-col items-center gap-3 py-6">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {t('settings.sync.pairing.loadFailed')}
+              {t('syncService.pairing.loadFailed')}
             </p>
             <Button variant="secondary" onClick={() => void generate()}>
-              {t('settings.sync.pairing.retry')}
+              {t('syncService.pairing.retry')}
             </Button>
           </div>
         ) : (
@@ -153,14 +153,14 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
                   type="button"
                   onClick={() => void copyAddress()}
                   className="icon-btn text-sm font-mono"
-                  title={t('settings.sync.status.copied')}
+                  title={t('syncService.status.copied')}
                 >
                   {offer.host}:{offer.port}
                   <IconCopyText />
                 </button>
                 <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('settings.sync.pairing.expiresIn')}：{Math.floor((expiresInSeconds ?? 0) / 60)}
-                  :{String((expiresInSeconds ?? 0) % 60).padStart(2, '0')}
+                  {t('syncService.pairing.expiresIn')}：{Math.floor((expiresInSeconds ?? 0) / 60)}:
+                  {String((expiresInSeconds ?? 0) % 60).padStart(2, '0')}
                 </p>
               </>
             )}
@@ -173,7 +173,7 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
             disabled={!offer}
             onClick={() => void copyContent()}
           >
-            {t('settings.sync.pairing.copyContent')}
+            {t('syncService.pairing.copyContent')}
           </Button>
           <Button
             variant="secondary"
@@ -181,7 +181,7 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
             loading={offer === null && !failed}
             onClick={() => void generate()}
           >
-            {t('settings.sync.pairing.refresh')}
+            {t('syncService.pairing.refresh')}
           </Button>
         </div>
       </div>
