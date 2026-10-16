@@ -377,3 +377,7 @@ zh-CN 终态：`内嵌服务未启动：请点击工具栏的「同步服务」�
 - 不把 `SectionShell` 等 4 个原语从 `pages/settings/shared.tsx` 搬进 `components/common`（单一外部落点，搬迁要波及 10+ 文件 import）；
 - 不给段①另起区别于页头的标题文案（需为 12 种语言新写，超出迁移范围）；
 - 不写 `CHANGELOG` 的 `[Unreleased]` 条目（`check-changelog-release.ts` 会因 bullet 阻断打包）。
+
+### 10.7 提交入库（2026-10-16 补记）
+
+本计划的全部产出（§10.5 的 32 项变更）经「未提交变更审查 → 全量回归 → 提交」流程验证后入库：commit `676fd39` `feat(sync-gallery): 同步服务从设置页迁入板块内二级子页`（33 files changed, 2207 insertions, 1159 deletions，rename 检测 79% 生效）。审查与回归实测：OCR delegate 行级审查无 critical/high/medium 问题；局部回归 11 files / 96 tests、`npm test` 397 files / 6177 passed / 2 skipped、typecheck / typecheck:e2e / lint（0 errors）/ i18n:guard / i18n:check / test:coverage（67.68/59.26/60.34/69.25）/ verify（5 项）全绿。审查过程与证据见 `docs/plans/2026-10-16-uncommitted-review-commit-2.5.5-repack.md`。
