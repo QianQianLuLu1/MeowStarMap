@@ -187,4 +187,49 @@ npm run verify:nikkisync   # 内嵌运行时链接态诊断（10 项断言）
 - header 40 字符 ≤100、scope `sync-gallery` 13 字符 ≤24、subject 不以「。」结尾，符合 commitlint 与仓库先例；
 - 提交后 `git status --porcelain` 仅剩计划文档未跟踪项，无钩子改写差异。
 
-（T3 版本核验 / T4 重新打包 / T5 全局收口记录见 7.4–7.6，完成后回填。）
+### 7.4 T3 版本号核验（零改动，证据如下）
+
+| 核验项                                       | 实测值                                                   | 判定       |
+| -------------------------------------------- | -------------------------------------------------------- | ---------- |
+| `package.json` version                       | `2.5.5`                                                  | 相符       |
+| `package-lock.json` 顶层 version             | `2.5.5`                                                  | 相符       |
+| `package-lock.json` `packages[""]`           | `wxnn-photo-manager@2.5.5`                               | 相符       |
+| 基线 `6a6e531` 以来两文件 diff               | 空（`git diff 6a6e531 HEAD --stat` 无输出）              | 未被误改   |
+| `npx tsx scripts/check-changelog-release.ts` | ✅ 「[Unreleased] 已收口（无待发布条目）……可以执行打包」 | 闸门不误伤 |
+
+结论：版本号已符合 2.5.5，按最小化改动原则**不做任何修改**；全仓无第三处需要同步的版本配置文件（`check-doc-versions.ts` 只校验 README 的 Electron 版本，与 app 版本无关；CHANGELOG `[2.5.5]` 节已存在于基线）。
+
+### 7.5 T4 重新打包（`npm run dist:win`，退出码 0）
+
+Safe-Delete 网关兜底（本机实测第三个/第四个命中点，均用 Move-Item 同卷重命名规避，不做递归删除）：
+
+| 目录                   | 项数（>500 触发） | 处置                                                                                    |
+| ---------------------- | ----------------- | --------------------------------------------------------------------------------------- |
+| `dist/main`            | 905               | 先 Move-Item 至 `%TEMP%/dist-main-20261016-repack`，clean 步随即无对象可删              |
+| `release/win-unpacked` | 859               | 先 Move-Item 至 `%TEMP%/release-win-unpacked-20261016-repack`，builder 全新解包         |
+| `dist/renderer/assets` | 149（<500）       | 无需兜底，clean 正常删除                                                                |
+| `coverage/`            | 568               | 仅 `test:coverage` 的 V8CoverageProvider.clean 会碰，dist:win 不涉及；T1 时已按同法兜底 |
+
+打包与产物实测：
+
+- `npm run dist:win`（clean + electron-vite build + 写 `dist/main/package.json` + pre-dist-check 三闸门 + electron-builder --win --publish never + verify:dist）**退出码 0**；signtool 签名、blockMap 生成均完成；
+- `verify:dist`：better-sqlite3 / sharp / koffi 原生二进制 ✔、VC++ 运行库 4 件随包 ✔、@nikkisync 四包入口 + migrations SQL + row-mappers.js + LocalSyncServer.js + GalleryRuntime.mjs 全部解包到位 ✔、管理员清单闸门（asInvoker）✔；
+- `npm run verify:nikkisync`：**OK（blocking failures: 0）**，11 项全 ✓（自包含依赖图、四 junction 链接、编译产物、migrations、LocalSyncServer 静态依赖、主进程 bundle 未折叠 @nikkisync、asar.unpacked 内 migrations 可达、node:sqlite 可导入、electron 41.10.6）；
+- 产物：`release/NikkiGallery-Setup-2.5.5.exe`，183,257,816 字节，`LastWriteTime 2026-10-16 20:29:26`，**晚于 HEAD 提交时间 2026-10-16 20:15:27**（证明是本次重新打包而非复用旧包）；
+- 收尾：三个临时备份目录已删除；`git status --porcelain` 为空（dist/、release/ 均在 .gitignore，无仓库污染）。
+
+### 7.6 T5 全局收口
+
+| 收口项                   | 实测                                                                     | 判定       |
+| ------------------------ | ------------------------------------------------------------------------ | ---------- |
+| `git status --porcelain` | 空                                                                       | 工作树干净 |
+| `npm run verify`         | 0 项 0 失败（干净树上无事可检；实质五项全 ✓ 证据见 7.2）                 | 通过       |
+| `npm test`（复跑）       | 397 files / 6177 passed / 2 skipped（93.77s），与 T1 逐项一致            | 通过       |
+| 安装包时间戳             | 20:29:26 > 提交 20:15:27                                                 | 新鲜产物   |
+| 提交链                   | `676fd39` feat(sync-gallery) → `5b5ee48` docs(plans) → （本回填 commit） | 完整       |
+
+**一票否决核对**：全量测试、Lint、Type Check（含 e2e）、i18n 双向检查、覆盖率、verify、打包产物断言——无一项失败；无测试被跳过/弱化/伪造；T1b TDD 修复分支未触发（审查与回归均未暴露缺陷）。
+
+### 7.7 最终结论
+
+32 项未提交变更经「系统审查 → 全量回归 → 双 commit 提交 → 版本 2.5.5 核验（已相符零改动）→ 标准打包重出」全流程闭环：审查无缺陷、回归无新增失败、提交信息符合 Conventional Commits 与钩子要求、版本号双文件一致为 2.5.5、`NikkiGallery-Setup-2.5.5.exe` 为本次构建的新鲜产物且全部产物断言通过。任务完成。
