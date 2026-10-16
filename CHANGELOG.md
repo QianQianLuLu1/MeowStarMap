@@ -16,13 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
-## [2.5.5] - 2026-10-11
+## [2.5.5-beta] - 2026-10-16
 
 > 本版本主体为设备同步（NikkiSync 协议 v1）功能整装发布——sync-integration 阶段 0–6 的全部产出，以及端到端联调后的代码审查修复。计划与报告见 `docs/sync-integration/`。
 >
-> 2026-10-14 追加：以下「NikkiSync 运行时内嵌」变更已合入 `feat/gallery-runtime-embed` 分支并随本节补录；已于 2026-10-15 据此重新构建 `NikkiGallery-Setup-2.5.5.exe`（连同 media:// 流取消竞态启动闪退修复一并出货），`docs/sync-integration/03-sync-server-plan.md` §14.3 #1「打包态未复验」遗留项就此关闭。
+> 2026-10-14 追加：以下「NikkiSync 运行时内嵌」变更已合入 `feat/gallery-runtime-embed` 分支并随本节补录；已于 2026-10-15 据此重新构建 `NikkiGallery-Setup-2.5.5-beta.exe`（连同 media:// 流取消竞态启动闪退修复一并出货），`docs/sync-integration/03-sync-server-plan.md` §14.3 #1「打包态未复验」遗留项就此关闭。
 >
-> 2026-10-16 追加：「同步元数据解析能力补充（NikkiSync resolver 注入，阶段 6）」已合入并随本节补录；已于 2026-10-16 据此重新构建 `NikkiGallery-Setup-2.5.5.exe`（该能力 opt-in 默认关闭，需在设置页显式开启并重启后生效）。
+> 2026-10-16 追加：「同步元数据解析能力补充（NikkiSync resolver 注入，阶段 6）」已合入并随本节补录；已于 2026-10-16 据此重新构建 `NikkiGallery-Setup-2.5.5-beta.exe`（该能力 opt-in 默认关闭，需在设置页显式开启并重启后生效）。
+>
+> 2026-10-16 追加：「设置页导航整合（9 组 23 节 → 8 组 17 节）」已合入并随本节补录，含两处交互缺陷修复；同日定版为 `2.5.5-beta` 并据此重新构建安装包。计划见 `docs/plans/2026-10-16-settings-nav-consolidation.md`。
 
 ### Added | 新增
 
@@ -44,9 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ### Changed | 变更
 
 - **覆盖率门控按 Vitest 5 新口径重新基线（关闭 DEBT-032）**：`vitest.config.ts` 的 `coverage.thresholds` 由 `69/80/68/69` 改为 `66/58/59/68`，即本轮实测 `statements 66.69% / branches 58.19% / functions 59.22% / lines 68.27%` 的整数下取整，并改写该文件中「基于 2026-10 基线」注释的出处为新口径与取证指引。读数较旧基线下移属 v8 provider 的**测量口径修正而非测试退化**——旧 provider 把「从未被调用的箭头函数体」计入其所在语句并判为已覆盖，Vitest 5 将其拆为独立语句如实计未覆盖。取证：改前 `npm run test:coverage` 退出码 1（四条 `ERROR: Coverage for … does not meet global threshold`）而同轮 `Test Files 373 passed`，即失败只来自阈值；改后退出码 0 且汇总行仍为 `66.69 / 58.19 / 59.22 / 68.27`，与改前逐项一致，证明转绿完全由阈值变更造成。本轮未换 `provider`、未扩大 `exclude`、未动 `include`/`all`/`projects`、未增删 `src/**` 生产代码、未新增或解除 skip（该红线见 DEBT-032「禁止为凑数换回 istanbul 或扩大 exclude」）；读数回升仍待给薄封装模块（`main/preload/api`、`renderer/i18n`、`main/i18n`、`main/scheduler`、`renderer/stores`）补真实调用测试，80% 目标不变
+- **设置页导航整合（9 组 23 节 → 8 组 17 节）**：把同一业务域的设置项聚到同一屏，减少用户为完成一件事而反复切页——主题节与显示节合为「主题与显示」；原先四个都在管「哪些目录参与扫描」的二级页（自定义扫描目录 / 探测到的游戏目录 / 导入根目录 / 自动扫描兜底）合为「扫描目录」；清缓存与清库记录合为「缓存与数据清理」；应用信息与联系方式合为「关于」；「工具」与「插件」两个单节分组并为一组。合页由壳组件纵向堆叠既有节体、而非物理搬动节体内容，故各节既有测试套件保持绿色。老用户 localStorage 里的选中位置经 `SettingsPage.tsx` 的 `LEGACY_SECTION_ALIASES` 迁移到合并后的新页，该表以闭合联合类型 `LegacySectionId` 入类型系统（漏配或将来改名即 tsc 报错，不让迁移表退化成一组散落字符串）；归一化在 `useState` 初值阶段完成而非渲染期兜底——兜底只影响「渲染哪个组件」，脏 id 仍会被写回 localStorage，导致下次进来照旧落回默认节且导航无高亮。新增 5 个导航 i18n 键 12 语言包齐、62 处空串填实，`src/renderer/i18n/locales/settings-nav-keys.test.ts` 作契约测试守卫、`src/renderer/pages/settings/settings-card-usage.test.ts` 反向锁定卡片用法。本轮为渲染层排布收敛，未新增 IPC 通道、未改动跨进程契约
+- **自定义扫描目录读写收口**：`ScanPathsSection` 与「添加导入目录」不再各自内联 `Array.isArray(saved) ? saved : []` 兜底，统一复用 `src/renderer/utils/scan-exclusions` 的 `loadCustomScanPaths` / `saveCustomScanPaths` / `normalizePathList`（剔除空串与空白项、截断到 `MAX_PATH_ITEMS = 64`，读取失败沿用该 util 的 fail-open 返回空数组）；state 与落库内容都取归一化结果，避免界面显示一条实际不会被扫描的空项
+- **扫描兜底写库后同屏只读块感知刷新**：「扫描目录」合并页内，兜底块向 `customScanPaths` 追加目录后，同屏的「游戏目录」「检测到的游戏目录」两个只读块需重读。拆页时代靠「切页自动重挂」免费拿到该刷新，合页后不再自动成立；修复为 `ScanFallbackSection` 新增**可选**回调 `onCustomPathsChanged`（不传即维持原行为，既有调用点与单测零改动），合并页以 `pathsRev` 变更触发两块 `key` 重挂；重挂只跑各自的读取 effect，两块 mount 路径里都不含 `scanner.start`，不会误扫盘
 
 ### Fixed | 修复
 
+- **设置页「添加导入目录」在已有扫描进行时永久卡死并误报成功（TDD 红绿灯）**：`ImportRootsSection` 原先只对 `scanner.start` 抛异常收口（`ipcThrew`），而主进程 `startScan` 在 `currentStatus.status === 'running'` 时直接 `return { success: false }` 且**不广播** `scanner:complete`（`src/main/scanner/index.ts`）。于是 `scanningDir` 与 `customScanningRef` 双双卡在 true——按钮永久停在「正在扫描…」，而下一次任意扫描完成事件会被 `onComplete` 误认成本次添加成功、弹出假的成功 Toast。修复为对 `result.success === false` 补 `rejected` 分支，即时以错误 Toast 回传真实 `message`，并与其后 `finally` 收口共用同一退出路径。回归：`src/renderer/pages/settings/scan-sections.test.tsx`（修复前失败）
+- **批量操作阈值的键盘调值被静默丢弃（TDD 红绿灯）**：`GeneralFileOpsSection` 原为裸 `<input type="range">` 且只在 `onMouseUp` 落库，用方向键调整阈值后不写设置、刷新即回退，界面上却显示着新值。改为复用既有 `SliderControl`（其 `onCommit` 同时挂在 `onPointerUp` 与 `onKeyUp`，键盘方向键调值随之落库）；并显式传入 `defaultValue={batchThreshold}`——该控件双击复位优先取 `defaultValue`，缺省会退到 `min = 3`，不传就等于用户误双击即静默丢掉自己的阈值。回归：`src/renderer/pages/settings/general-sections.test.tsx`（修复前失败）
 - 联调与审查修复（均先红灯后绿灯）：详情 `metadata.raw` 泄漏 NUAN5 载荷键（E2E 红灯→绿灯）；export 失败路径静默吞错补告警日志；DB 记录大写 sha256 导致导出恒 409 的大小写归一；ImageDescription 超长截断产生畸形 `\uXXXX` 转义；E2E 启动器参数校验（`--port` 0–65535 整数/未知参数拒绝/`--serve` no-op）与退出清理（exit 处理器先关 DB 再删自建临时目录，修复 Windows 下启动失败路径的临时目录泄漏；shutdown try/finally 保证退出码必达）
 - 内嵌 NikkiSync Runtime 状态快照修复（TDD 红绿灯）：`nikkisync:runtime-status` 的扫描器字段由不透明 `scanner?` 透传展平为 `scannerStatus?`/`installation?`/`lastScan?` 三字段（与 `src/main/nikkisync/runtime-types.ts` 声明及阶段 2 计划 §5 记载的形状对齐），修复 `runtime-manager.ts` 生产者仍写已删除的 `scanner` 字段导致的类型检查失败（TS2339）与「状态带 installation」意图未实现的问题；`runtime-manager.test.ts` 补三字段透传断言（修复前失败）与非对象/缺字段边界用例，并同步 shared/preload/e2e 形状镜像
 - 内嵌 NikkiSync Runtime 生命周期审查修复（TDD 红绿灯，随本安装包发布）：① `stop()` 落在启动在途时被吞——状态机不感知 `state.starting`，停止只把状态置 idle 即返回，在途 `start()` 收尾随将会话置 running 成为孤儿会话；修复为 `stop()` 先等在途启动落地再拆除；② 换端口/mdns 重建同步服务时丢失用户已选游戏根——重建取装配层 `defaults` 而非当前会话 `activeRoot`，用户选过根后仅因改端口就丢回 auto-discovery；修复为 teardown 前取存并传入重建；③ 探针 `probeDatabase` 读 schema SQL 失败时内存库连接泄漏（`manager.close()` 所在 try/finally 尚未进入即被外层 catch 截走），修复为 try/finally 紧接构造；④ `createRuntimeSession` 组装中段（TLS/配对导出缺失、查询面装配）抛错时已建库句柄泄漏，Windows 上会锁死 `nikkisync.db` 使后续启动报 "database is locked"，修复为先关库再上抛。四项均先写失败测试复现后修复，回归：`runtime-manager.test.ts` / `probe.test.ts` / `runtime-facade.test.ts` 新增用例（修复前失败）
@@ -56,7 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ### Security | 安全
 
 - **`braces` 高危通告纳入审计豁免（关闭 DEBT-034）**：`audit-ci.jsonc` 的 `allowlist` 追加 `GHSA-vfj7-8cjw-p6xm`（28 → 29 项），并在其注释块按既有分组口径续写命中路径、实测取证、跟踪归属与撤销条件。豁免依据（均为 2026-10-14 实测）：命中 `braces@3.0.3` 的 7 条路径全部来自 dev 工具链（`@babel/cli>chokidar`、`tailwindcss>chokidar`、`fast-glob>micromatch`、`lint-staged>micromatch`、`micromatch`、`vite-plugin-singlefile>micromatch`、`cz-conventional-changelog>commitizen>…>findup-sync>micromatch`），生产代码未引入；`package-lock.json` 在 HEAD 与工作区同为 `3.0.3`，非本轮或依赖升级引入；上游确无修复版可取——`npm view braces dist-tags.latest` 与 `versions` 最大值同为 `3.0.3`（即漏洞版本就是最新版），`micromatch@latest` 的依赖仍写 `^3.0.3`，故**依赖覆盖（`overrides`）没有可 pin 的已修目标**（pin 不存在的版本会让安装失败，pin `3.0.3` 等于没改，pin 更旧是降级），本轮未新增/改动 `package.json` 的 `overrides`，未动 `package-lock.json`，未装/升任何依赖。效果：`npm run audit` 退出码由 1 转 0（`Passed npm security audit.`，该通告移入「Found vulnerable allowlisted advisories」），`scripts/__tests__/audit-config.test.ts` 19 例仍全绿（其对 28 项迁移基线取**子集**断言，故新增豁免不需改测试）。除该通告外无新增 `high`/`critical` 命中，`high: true` 判定、CI 审计步骤与既有拦截均未放宽；两项遗留按 DEBT-020/034 口径留待独立一轮：`audit-ci.jsonc` 残留 18 个不再命中的失效豁免（清退须同步改 `MIGRATION_BASELINE`），上游出修复版后按撤销条件删除本条并 `npm update`
-- 本节的覆盖率阈值重新基线与上述审计豁免均为**开发期闸门配置**，不进入运行时与安装包产物；已发布的 `NikkiGallery-Setup-2.5.5.exe`（构建于 2026-10-14 14:09）不含也不需含这两项变更
+- 本节的覆盖率阈值重新基线与上述审计豁免均为**开发期闸门配置**，不进入运行时与安装包产物；已发布的 `NikkiGallery-Setup-2.5.5-beta.exe`（构建于 2026-10-14 14:09）不含也不需含这两项变更
 
 ---
 
@@ -393,8 +400,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库尚未推送任何 git tag，因此以下 `compare/vX...vY` 与 `releases/tag/vX` 链接需在建立对应 tag 后方可访问；保留原链接形式是为了不销毁历史版本记录。
 
-[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.5...HEAD
-[2.5.5]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.3...v2.5.5
+[Unreleased]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.5-beta...HEAD
+[2.5.5-beta]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.3...v2.5.5-beta
 [2.5.3]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.2...v2.5.3
 [2.5.2]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.1...v2.5.2
 [2.5.1]: https://github.com/QianQianLuLu1/NikkiGallery/compare/v2.5.0...v2.5.1

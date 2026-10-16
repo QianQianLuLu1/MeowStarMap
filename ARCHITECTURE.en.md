@@ -2,7 +2,7 @@
 
 > **Project Code**: `wxnn-photo-manager`
 > **Application Name**: NikkiGallery (无限暖暖相册管理工具)
-> **Current Version**: 2.5.5
+> **Current Version**: 2.5.5-beta
 > **Platform**: Windows x64
 > **Document Version**: 1.5
 > **Last Updated**: 2026-10-06
@@ -1626,7 +1626,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 ### 12.2 Version Number Constraint
 
 - **Version number must remain unchanged unless user explicitly requests**
-- Current version: 2.5.5 (bumped from 2.5.3 at user request on 2026-10-11)
+- Current version: 2.5.5-beta (bumped from 2.5.3 at user request on 2026-10-11, designated 2.5.5-beta on 2026-10-16)
 - After changing it, keep these in sync: `version` in `package.json`, the version badge in `README.md`, the header and §12.2 of `ARCHITECTURE.md` / `ARCHITECTURE.en.md`, and the header plus §7.8 of `DEVELOPMENT.md` / `DEVELOPMENT.en.md`; the installer filename follows automatically via the `artifactName` template (`NikkiGallery-Setup-${version}.exe`)
 
 ### 12.3 Performance Red Lines
