@@ -1472,10 +1472,11 @@
       "data": "Управление данными",
       "diagnostics": "Журналы и диагностика",
       "general": "Общие",
-      "plugins": "",
+      "plugins": "Плагины",
       "profile": "Профили",
       "scan": "Сканирование",
-      "tools": "Инструменты"
+      "tools": "Инструменты",
+      "toolsPlugins": "Инструменты и плагины"
     },
     "language": {
       "auto": "Следовать системе",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "Рабочий процесс экспорта",
       "fileops": "Файловые операции",
       "language": "Язык",
-      "pluginManage": "",
+      "pluginManage": "Управление плагинами",
       "profileManage": "Управление профилями",
       "scanOptions": "Параметры сканирования",
       "shareCode": "Инструменты кода обмена",
       "startup": "Поведение при запуске",
       "theme": "Тема",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Каталоги игры",
+      "importRoots": "Указанные каталоги",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Обнаруженные каталоги игры",
+      "scanFallback": "Ручной резервный скан",
+      "themeDisplay": "Тема и отображение",
+      "scanDirectories": "Каталоги сканирования",
+      "cacheCleanup": "Кэш и очистка",
+      "aboutOverview": "Информация о приложении и контакты"
     },
     "startup": {
       "autoScan": "Автоматическое сканирование при запуске",

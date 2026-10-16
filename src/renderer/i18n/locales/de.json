@@ -1472,10 +1472,11 @@
       "data": "Datenverwaltung",
       "diagnostics": "Protokolle & Diagnose",
       "general": "Allgemein",
-      "plugins": "",
+      "plugins": "Plugins",
       "profile": "Profile",
       "scan": "Scannen",
-      "tools": "Werkzeuge"
+      "tools": "Werkzeuge",
+      "toolsPlugins": "Werkzeuge & Plugins"
     },
     "language": {
       "auto": "System folgen",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "Export-Workflow",
       "fileops": "Dateioperationen",
       "language": "Sprache",
-      "pluginManage": "",
+      "pluginManage": "Plugin-Verwaltung",
       "profileManage": "Profilverwaltung",
       "scanOptions": "Scan-Optionen",
       "shareCode": "Share-Code-Werkzeuge",
       "startup": "Startverhalten",
       "theme": "Design",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Spielverzeichnisse",
+      "importRoots": "Angegebene Verzeichnisse",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Erkannte Spielverzeichnisse",
+      "scanFallback": "Manueller Ausweich-Scan",
+      "themeDisplay": "Design & Anzeige",
+      "scanDirectories": "Scan-Verzeichnisse",
+      "cacheCleanup": "Cache & Bereinigung",
+      "aboutOverview": "App-Informationen & Kontakt"
     },
     "startup": {
       "autoScan": "Beim Start automatisch scannen",

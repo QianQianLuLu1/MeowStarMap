@@ -1472,10 +1472,11 @@
       "data": "Quản lý dữ liệu",
       "diagnostics": "Nhật ký & chẩn đoán",
       "general": "Chung",
-      "plugins": "",
+      "plugins": "Plugin",
       "profile": "Hồ sơ",
       "scan": "Quét",
-      "tools": "Công cụ"
+      "tools": "Công cụ",
+      "toolsPlugins": "Công cụ & Plugin"
     },
     "language": {
       "auto": "Theo hệ thống",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "Quy trình xuất",
       "fileops": "Thao tác tệp",
       "language": "Ngôn ngữ",
-      "pluginManage": "",
+      "pluginManage": "Quản lý plugin",
       "profileManage": "Quản lý hồ sơ",
       "scanOptions": "Tùy chọn quét",
       "shareCode": "Công cụ mã chia sẻ",
       "startup": "Hành vi khởi động",
       "theme": "Chủ đề",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Thư mục game",
+      "importRoots": "Thư mục chỉ định",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Thư mục game đã phát hiện",
+      "scanFallback": "Quét dự phòng thủ công",
+      "themeDisplay": "Chủ đề & hiển thị",
+      "scanDirectories": "Thư mục quét",
+      "cacheCleanup": "Bộ nhớ đệm & dọn dẹp",
+      "aboutOverview": "Thông tin ứng dụng & liên hệ"
     },
     "startup": {
       "autoScan": "Tự động quét khi khởi động",

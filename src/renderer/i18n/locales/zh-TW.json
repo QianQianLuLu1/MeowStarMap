@@ -1472,10 +1472,11 @@
       "data": "資料管理",
       "diagnostics": "日誌與診斷",
       "general": "一般",
-      "plugins": "",
+      "plugins": "插件",
       "profile": "角色檔案",
       "scan": "掃描",
-      "tools": "工具"
+      "tools": "工具",
+      "toolsPlugins": "工具與插件"
     },
     "language": {
       "auto": "跟隨系統",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "匯出工作流程",
       "fileops": "檔案操作",
       "language": "語言",
-      "pluginManage": "",
+      "pluginManage": "插件管理",
       "profileManage": "檔案管理",
       "scanOptions": "掃描選項",
       "shareCode": "分享碼工具",
       "startup": "啟動行為",
       "theme": "主題",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "遊戲目錄",
+      "importRoots": "指定目錄",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "偵測到的遊戲目錄",
+      "scanFallback": "手動備用掃描",
+      "themeDisplay": "主題與顯示",
+      "scanDirectories": "掃描目錄",
+      "cacheCleanup": "快取與清理",
+      "aboutOverview": "應用資訊與聯絡方式"
     },
     "startup": {
       "autoScan": "啟動時自動掃描",

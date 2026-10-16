@@ -183,4 +183,41 @@ describe('ImportRootsSection — 添加指定目录', () => {
     // 失败路径不刷新列表
     expect(listRoots).toHaveBeenCalledTimes(1)
   })
+
+  // (f) 主进程 startScan 在已有扫描进行中会短路返回 { success:false }，
+  // 并且**不广播** scanner:complete（src/main/scanner/index.ts:87-91）。
+  // 原实现只把「IPC 抛异常」当失败，于是这两个标记会双双卡死：按钮永久停在
+  // 「正在扫描…」，而下一次任意扫描完成事件会被 customScanningRef 误认成
+  // 本次添加成功，弹出假的「已添加指定目录」并做无谓刷新。
+  // 拆页时需要图库侧扫描恰好撞车才触发；四个扫描块合并到同一屏后，同屏一键即达。
+  it('(f) scanner.start 返回 success:false 时给出失败 Toast、按钮恢复，且后续 onComplete 不得误报成功', async () => {
+    selectDirectory.mockResolvedValue(SELECTED_DIR)
+    scannerStart.mockResolvedValue({ success: false, message: 'scan in progress' })
+    renderSection()
+
+    const btn = screen.getByRole('button', { name: '添加指定目录' })
+    await act(async () => {
+      fireEvent.click(btn)
+    })
+    await waitFor(() => expect(scannerStart).toHaveBeenCalled())
+
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        expect.stringContaining('指定目录扫描失败'),
+        'error'
+      )
+    )
+    await waitFor(() => expect(btn).toBeEnabled())
+
+    // 关键：收口后，别的扫描（例如同页兜底块发起的那次）完成时不得被当成本次添加成功
+    mockShowMessage.mockClear()
+    await act(async () => {
+      onCompleteCbs[0]({ success: true, message: '' })
+    })
+    expect(mockShowMessage).not.toHaveBeenCalledWith(
+      expect.stringContaining('已添加指定目录'),
+      'success'
+    )
+    expect(listRoots).toHaveBeenCalledTimes(1)
+  })
 })

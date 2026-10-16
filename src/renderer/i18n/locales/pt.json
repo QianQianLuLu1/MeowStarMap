@@ -1472,10 +1472,11 @@
       "data": "Gestão de dados",
       "diagnostics": "Logs e diagnósticos",
       "general": "Geral",
-      "plugins": "",
+      "plugins": "Extensões",
       "profile": "Perfis",
       "scan": "Digitalizar",
-      "tools": "Ferramentas"
+      "tools": "Ferramentas",
+      "toolsPlugins": "Ferramentas e extensões"
     },
     "language": {
       "auto": "Seguir sistema",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "Fluxo de exportação",
       "fileops": "Operações de arquivo",
       "language": "Idioma",
-      "pluginManage": "",
+      "pluginManage": "Gestão de extensões",
       "profileManage": "Gestão de perfis",
       "scanOptions": "Opções de digitalização",
       "shareCode": "Ferramentas de código de compartilhamento",
       "startup": "Comportamento de inicialização",
       "theme": "Tema",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Diretórios do jogo",
+      "importRoots": "Diretórios designados",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Diretórios do jogo detectados",
+      "scanFallback": "Varredura manual alternativa",
+      "themeDisplay": "Tema e exibição",
+      "scanDirectories": "Diretórios de varredura",
+      "cacheCleanup": "Cache e limpeza",
+      "aboutOverview": "Informações do aplicativo e contato"
     },
     "startup": {
       "autoScan": "Digitalização automática ao iniciar",

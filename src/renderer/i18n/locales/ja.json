@@ -1472,10 +1472,11 @@
       "data": "データ管理",
       "diagnostics": "ログと診断",
       "general": "一般",
-      "plugins": "",
+      "plugins": "プラグイン",
       "profile": "プロファイル",
       "scan": "スキャン",
-      "tools": "ツール"
+      "tools": "ツール",
+      "toolsPlugins": "ツールとプラグイン"
     },
     "language": {
       "auto": "システムに従う",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "エクスポートワークフロー",
       "fileops": "ファイル操作",
       "language": "言語",
-      "pluginManage": "",
+      "pluginManage": "プラグイン管理",
       "profileManage": "プロファイル管理",
       "scanOptions": "スキャンオプション",
       "shareCode": "共有コードツール",
       "startup": "起動動作",
       "theme": "テーマ",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "ゲームディレクトリ",
+      "importRoots": "指定ディレクトリ",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "検出されたゲームディレクトリ",
+      "scanFallback": "手動フォールバックスキャン",
+      "themeDisplay": "テーマと表示",
+      "scanDirectories": "スキャン先ディレクトリ",
+      "cacheCleanup": "キャッシュとクリーンアップ",
+      "aboutOverview": "アプリ情報と連絡先"
     },
     "startup": {
       "autoScan": "起動時に自動スキャン",

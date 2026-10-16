@@ -1472,10 +1472,11 @@
       "data": "จัดการข้อมูล",
       "diagnostics": "บันทึกและการวินิจฉัย",
       "general": "ทั่วไป",
-      "plugins": "",
+      "plugins": "ปลั๊กอิน",
       "profile": "โปรไฟล์",
       "scan": "สแกน",
-      "tools": "เครื่องมือ"
+      "tools": "เครื่องมือ",
+      "toolsPlugins": "เครื่องมือและปลั๊กอิน"
     },
     "language": {
       "auto": "ตามระบบ",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "ขั้นตอนการส่งออก",
       "fileops": "การดำเนินการไฟล์",
       "language": "ภาษา",
-      "pluginManage": "",
+      "pluginManage": "การจัดการปลั๊กอิน",
       "profileManage": "การจัดการโปรไฟล์",
       "scanOptions": "ตัวเลือกการสแกน",
       "shareCode": "เครื่องมือรหัสแชร์",
       "startup": "พฤติกรรมการเริ่มต้น",
       "theme": "ธีม",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "โฟลเดอร์เกม",
+      "importRoots": "โฟลเดอร์ที่ระบุ",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "โฟลเดอร์เกมที่ตรวจพบ",
+      "scanFallback": "สแกนสำรองแบบแมนนวล",
+      "themeDisplay": "ธีมและการแสดงผล",
+      "scanDirectories": "โฟลเดอร์สำหรับสแกน",
+      "cacheCleanup": "แคชและการล้างข้อมูล",
+      "aboutOverview": "ข้อมูลแอปพลิเคชันและการติดต่อ"
     },
     "startup": {
       "autoScan": "สแกนอัตโนมัติเมื่อเริ่มต้น",

@@ -1884,7 +1884,8 @@
       "plugins": "插件",
       "profile": "角色档案",
       "scan": "扫描",
-      "tools": "工具"
+      "tools": "工具",
+      "toolsPlugins": "工具与插件"
     },
     "language": {
       "auto": "跟随系统",
@@ -2077,6 +2078,8 @@
       "aboutContact": "联系方式",
       "aboutInfo": "应用信息",
       "aboutLicense": "致谢与开源协议",
+      "aboutOverview": "应用信息与联系方式",
+      "cacheCleanup": "缓存与清理",
       "dataBackup": "数据库备份",
       "dataCache": "缓存管理",
       "dataClear": "清除数据",
@@ -2091,12 +2094,14 @@
       "profileManage": "档案管理",
       "scanOptions": "扫描选项",
       "scanPaths": "游戏目录",
+      "scanDirectories": "扫描目录",
       "gameRoots": "检测到的游戏目录",
       "scanFallback": "手动兜底扫描",
       "importRoots": "指定目录",
       "shareCode": "分享码工具",
       "startup": "启动行为",
-      "theme": "主题"
+      "theme": "主题",
+      "themeDisplay": "主题与显示"
     },
     "startup": {
       "autoScan": "启动时自动扫描",

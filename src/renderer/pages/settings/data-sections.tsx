@@ -10,6 +10,7 @@ import { Select } from '../../components/common/Select'
 import {
   SectionShell,
   GlobalToastContext,
+  SettingsCard,
   formatTimestamp,
   formatSize,
   type BackupRecord
@@ -148,10 +149,7 @@ export const DataBackupSection: React.FC = () => {
 
         {/* 备份目录 */}
         {backupDir && (
-          <div
-            className="flex items-center justify-between gap-3 p-3 rounded-lg"
-            style={{ background: 'var(--bg-tertiary)' }}
-          >
+          <SettingsCard className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 {t('settings.backup.storageLocation')}
@@ -197,7 +195,7 @@ export const DataBackupSection: React.FC = () => {
                 {t('settings.backup.openDir')}
               </button>
             </div>
-          </div>
+          </SettingsCard>
         )}
 
         {/* 备份列表 */}
@@ -232,10 +230,9 @@ export const DataBackupSection: React.FC = () => {
                 const uid = parseUidFromBackupFilename(backup.filename)
                 const profileLabel = uid ? (profileMap.get(uid)?.nickname ?? uid) : null
                 return (
-                  <div
+                  <SettingsCard
                     key={backup.filename}
-                    className="flex items-center justify-between gap-3 p-3 rounded-lg"
-                    style={{ background: 'var(--bg-tertiary)' }}
+                    className="flex items-center justify-between gap-3"
                   >
                     <div className="flex-1 min-w-0">
                       <div
@@ -282,7 +279,7 @@ export const DataBackupSection: React.FC = () => {
                         <IconDelete size={14} />
                       </button>
                     </div>
-                  </div>
+                  </SettingsCard>
                 )
               })}
             </div>
@@ -423,7 +420,7 @@ export const DataCacheSection: React.FC = () => {
       {/* 缓存统计卡片 */}
       {stats ? (
         <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+          <SettingsCard>
             <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.cache.currentUsage')}
             </div>
@@ -433,8 +430,8 @@ export const DataCacheSection: React.FC = () => {
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.cache.fileCount', { count: stats.fileCount })}
             </div>
-          </div>
-          <div className="p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+          </SettingsCard>
+          <SettingsCard>
             <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.cache.limit')}
             </div>
@@ -444,7 +441,7 @@ export const DataCacheSection: React.FC = () => {
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.cache.lruHint')}
             </div>
-          </div>
+          </SettingsCard>
         </div>
       ) : (
         <div
@@ -475,10 +472,7 @@ export const DataCacheSection: React.FC = () => {
       )}
 
       {/* 淘汰策略说明卡片 */}
-      <div
-        className="p-3 rounded-lg flex items-start gap-2"
-        style={{ background: 'var(--bg-tertiary)' }}
-      >
+      <SettingsCard className="flex items-start gap-2">
         <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-tertiary)' }}>
           <IconInfo size={14} />
         </span>
@@ -490,7 +484,7 @@ export const DataCacheSection: React.FC = () => {
             {t('settings.cache.strategyDesc')}
           </div>
         </div>
-      </div>
+      </SettingsCard>
 
       {/* 上限调整 */}
       <div className="space-y-2">
@@ -564,10 +558,7 @@ export const DataCacheSection: React.FC = () => {
 
       {/* 缓存目录 */}
       {stats?.cacheDir && (
-        <div
-          className="flex items-center justify-between gap-3 p-3 rounded-lg"
-          style={{ background: 'var(--bg-tertiary)' }}
-        >
+        <SettingsCard className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.cache.cacheLocation')}
@@ -613,7 +604,7 @@ export const DataCacheSection: React.FC = () => {
               {t('settings.cache.openDir')}
             </button>
           </div>
-        </div>
+        </SettingsCard>
       )}
 
       <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
@@ -688,7 +679,7 @@ export const DataClearSection: React.FC = () => {
     <>
       <SectionShell title={t('settings.sections.dataClear')}>
         {/* T02：清理丢失记录（文件已被外部删除的库记录） */}
-        <div className="p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+        <SettingsCard>
           <div className="flex items-start justify-between gap-3">
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -706,7 +697,7 @@ export const DataClearSection: React.FC = () => {
               {missingCleaning ? t('settings.clear.cleaning') : t('settings.clear.cleanMissing')}
             </button>
           </div>
-        </div>
+        </SettingsCard>
 
         <button className="btn-danger w-full" onClick={() => setShowConfirm(true)}>
           {t('settings.clear.clearLocal')}
@@ -737,3 +728,15 @@ export const DataClearSection: React.FC = () => {
     </>
   )
 }
+
+/**
+ * 「缓存与清理」合并页：清缓存与清库记录同属破坏性数据维护动作，
+ * 拆成两个导航项只会让用户在两类「删东西」之间来回跳。
+ * 两节各自保留 SectionShell 与自己的 ConfirmDialog，本组件只管纵向排布。
+ */
+export const DataCacheClearSection: React.FC = () => (
+  <div className="space-y-4">
+    <DataCacheSection />
+    <DataClearSection />
+  </div>
+)

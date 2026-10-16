@@ -1475,7 +1475,8 @@
       "plugins": "Plugins",
       "profile": "Profiles",
       "scan": "Scan",
-      "tools": "Tools"
+      "tools": "Tools",
+      "toolsPlugins": "Tools & Plugins"
     },
     "language": {
       "auto": "Follow System",
@@ -1682,12 +1683,16 @@
       "profileManage": "Profile Management",
       "scanOptions": "Scan Options",
       "scanPaths": "Game Directories",
-      "gameRoots": "",
-      "scanFallback": "",
+      "gameRoots": "Detected Game Directories",
+      "scanFallback": "Manual Fallback Scan",
       "importRoots": "Import Roots",
       "shareCode": "Share Code Tools",
       "startup": "Startup",
-      "theme": "Theme"
+      "theme": "Theme",
+      "themeDisplay": "Theme & Display",
+      "scanDirectories": "Scan Directories",
+      "cacheCleanup": "Cache & Cleanup",
+      "aboutOverview": "App Information & Contact"
     },
     "startup": {
       "autoScan": "Auto-scan on startup",

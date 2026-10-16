@@ -1472,10 +1472,11 @@
       "data": "데이터 관리",
       "diagnostics": "로그 및 진단",
       "general": "일반",
-      "plugins": "",
+      "plugins": "플러그인",
       "profile": "프로필",
       "scan": "스캔",
-      "tools": "도구"
+      "tools": "도구",
+      "toolsPlugins": "도구 및 플러그인"
     },
     "language": {
       "auto": "시스템 따르기",
@@ -1677,17 +1678,21 @@
       "exportWorkflow": "내보내기 워크플로우",
       "fileops": "파일 작업",
       "language": "언어",
-      "pluginManage": "",
+      "pluginManage": "플러그인 관리",
       "profileManage": "프로필 관리",
       "scanOptions": "스캔 옵션",
       "shareCode": "공유 코드 도구",
       "startup": "시작 동작",
       "theme": "테마",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "게임 디렉터리",
+      "importRoots": "지정된 디렉터리",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "감지된 게임 디렉터리",
+      "scanFallback": "수동 폴백 스캔",
+      "themeDisplay": "테마 및 표시",
+      "scanDirectories": "스캔 디렉터리",
+      "cacheCleanup": "캐시 및 정리",
+      "aboutOverview": "앱 정보 및 연락처"
     },
     "startup": {
       "autoScan": "시작 시 자동 스캔",

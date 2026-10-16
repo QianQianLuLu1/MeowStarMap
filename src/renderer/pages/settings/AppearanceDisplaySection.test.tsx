@@ -77,7 +77,7 @@ describe('AppearanceDisplaySection — 玻璃效果档位', () => {
     renderSection()
     await waitFor(() => expect(screen.getByText('玻璃效果')).toBeInTheDocument())
 
-    fireEvent.click(screen.getByRole('button', { name: '轻度增强' }))
+    fireEvent.click(screen.getByRole('radio', { name: '轻度增强' }))
 
     await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('display.glassEffect', 'lite'))
     expect(htmlClasses()).toContain('glass-lite')
@@ -89,7 +89,7 @@ describe('AppearanceDisplaySection — 玻璃效果档位', () => {
     renderSection()
     await waitFor(() => expect(htmlClasses()).toContain('glass-lite'))
 
-    fireEvent.click(screen.getByRole('button', { name: '明显流动感' }))
+    fireEvent.click(screen.getByRole('radio', { name: '明显流动感' }))
 
     await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('display.glassEffect', 'rich'))
     expect(htmlClasses()).not.toContain('glass-lite')

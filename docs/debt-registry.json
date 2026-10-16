@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-14",
+  "updatedAt": "2026-10-16",
   "items": [
     {
       "id": "DEBT-001",
@@ -433,6 +433,35 @@
       "description": "2026-10-10 审查轮首次在新 toolchain 下复跑 npm run audit（上一轮门禁表漏了这项，CI build.yml 的 lint-typecheck job 含该步）：audit-ci 以 high 级失败，唯一未豁免项是 GHSA-vfj7-8cjw-p6xm，命中 braces@3.0.3 的 7 条传递路径（@babel/cli>chokidar、cz-conventional-changelog>commitizen>find-node-modules>findup-sync>micromatch、fast-glob>micromatch、lint-staged>micromatch、micromatch、tailwindcss>chokidar、vite-plugin-singlefile>micromatch）。归因：**不是本轮或依赖升级引入**——package-lock 在 HEAD 与工作区同为 braces@3.0.3，且 npm view braces dist-tags 显示 latest 就是 3.0.3（无 4.x 可升），上游未出修复。当前处置：不改 audit-ci.jsonc（把新披露项加进豁免清单属放宽安全闸门，需单独授权），因此 npm run audit 保持红。可选修法：① 等上游（micromatch/chokidar/fast-glob 链条）抬到已修版本后 npm update；② 或经授权后按既有 dev 工具链豁免口径加入 allowlist 并在 audit-ci.jsonc 的注释块续写理由与跟踪责任。**2026-10-14 关闭（经用户授权取修法②）**：先实测排除修法①——`npm view braces dist-tags` 为 latest 3.0.3、`npm view braces versions` 最大即 3.0.3、`npm view micromatch@latest dependencies.braces` 仍为 ^3.0.3，即漏洞版本就是最新版，`overrides` 没有可 pin 的已修目标（pin 到不存在版本会让安装失败，pin 到 3.0.3 等于没改，pin 到更旧是降级），故「依赖手术」在本例不成立。据此按既有 dev 工具链口径把 GHSA-vfj7-8cjw-p6xm 追加进 audit-ci.jsonc 的 allowlist（28 项 → 29 项），并在其注释块续写理由、跟踪归属与撤销条件。关闭证据（2026-10-14 实测）：`npx audit-ci --config ./audit-ci.jsonc` 退出码由 1 转 0，末行为「Passed npm security audit.」，该通告由「Failed security audit due to high vulnerabilities」移入「Found vulnerable allowlisted advisories」（10 项 → 11 项）；`npx vitest run scripts/__tests__/audit-config.test.ts` 19 例全通过——该测试对 28 项迁移基线是**子集**断言（toContain），故新增豁免无需改测试。未动 package.json 的 overrides、未动 package-lock.json、未装/升任何依赖。遗留：audit-ci.jsonc 仍有 18 个已不再命中的失效豁免（被 audit-ci 列在「Consider not allowlisting advisories」），清退属收紧闸门且必须同步改 audit-config.test.ts 的 MIGRATION_BASELINE 数组，按 DEBT-020 原文口径留待独立一轮；上游链条抬到已修版本后按注释里的撤销条件删除本条并 npm update",
       "files": ["audit-ci.jsonc", "package-lock.json"],
       "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-035",
+      "category": "docs",
+      "section": 14,
+      "status": "open",
+      "priority": "low",
+      "title": "关于页技术栈版本字符串陈旧，与 package.json 实际版本长期失真",
+      "description": "src/renderer/pages/settings/about-sections.tsx:65 硬写 `Electron 28 + React 18 + TypeScript 5.3`，:271-331 另有 `'28.x'` / `'18.x'` 一组同类字面量；而 package.json 实际为 Electron 41 / React 19.2 / TypeScript 5.9，devDependency 口径亦如此。版本号只有「应用版本」那一行是经 `app.getVersion()` 动态读取的（:26-33），技术栈这行是死的。归因：升级轮次改了依赖没回改展示文案。无人把关：`scripts/check-doc-versions.ts` 只校验 README 里的 Electron 版本，不覆盖渲染层字面量，因此 `npm run pre-dist-check` 与 CI 都不会拦。2026-10-16 设置页导航重构轮在改动面内发现，按最小改动原则未顺手改（该文案的修正需要同时决定口径是「跟随 package.json 动态生成」还是「改静态字符串并建立升级同步义务」，属独立决策），故在此登记。修法建议：优先改为从主进程读取运行时版本（复用既有 `app.getVersion` 链路新增只读通道需同步 docs/IPC_CONTRACT.md），或在 docs/CODING_CONVENTIONS.md 的版本同步义务里把该文件纳入 check-doc-versions.ts 的校验面",
+      "files": ["src/renderer/pages/settings/about-sections.tsx"],
+      "lines": [65, 271, 331],
+      "issue": false
+    },
+    {
+      "id": "DEBT-036",
+      "category": "theme",
+      "section": 14,
+      "status": "open",
+      "priority": "low",
+      "title": "设置页内联 rgba()/三元 hex 色值绕过 CSS 变量护栏，源于 lint 规则选择器盲区",
+      "description": "docs/CODING_CONVENTIONS.md §3 禁止组件内硬编码色值，但 `eslint.config.js:204-211` 的 §3-a 规则只匹配 `style` 对象字面量里「属性直接接 Literal」这一形态：值走 `ConditionalExpression`（三元）或是 `rgba()` 形式时选择器不命中，于是静默漏检。实测漏网点：data-sections.tsx:419、diagnostics-sections.tsx:383,393-397,438-441,530-539,599,691,958-969、about-sections.tsx:163（含 `text-[#12B7F5]` 这类 Tailwind 任意值写法）。这些是「闸门漏检的技术债」，不是「合规例外」——全量 `npm run lint` 对它们恒绿，因此不能靠 lint 通过来判断已收敛。2026-10-16 设置页导航重构轮登记：本轮把 21 处与 SettingsCard 同构的手写卡片统一换成 `settings/shared.tsx` 的 SettingsCard，并对换控件处顺带消除了字号磁贴的 `'#fff'`（改由 SegmentedControl 统一用 `--text-on-accent`），但其余 rgba/三元 hex 不在本轮改动面内，未顺手改（收敛会引入主题变量取值决策，属独立一轮）。修法：① 先扩 §3-a 选择器覆盖 ConditionalExpression 与 rgba()，此时会以 error 集中暴露存量，需配渐进策略（参照 DEBT-030 的 warn 降级 + 白名单只减不增口径）；② 再为品牌色（如 QQ 蓝）补语义变量，落到 src/renderer/styles/themes/*.css 的变量赋值，不在组件里写两套颜色",
+      "files": [
+        "src/renderer/pages/settings/data-sections.tsx",
+        "src/renderer/pages/settings/diagnostics-sections.tsx",
+        "src/renderer/pages/settings/about-sections.tsx",
+        "eslint.config.js"
+      ],
+      "lines": [419, 163],
       "issue": false
     }
   ]
