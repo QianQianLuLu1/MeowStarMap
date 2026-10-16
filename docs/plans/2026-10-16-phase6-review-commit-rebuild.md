@@ -170,3 +170,52 @@
 - [ ] P5 dist:win 退出码 0，新安装包时间戳为本次构建
 - [ ] P6 CHANGELOG 补录 + 执行记录回填两个 docs 提交完成
 - [ ] 终态 `git status --porcelain` 为空；`git log --oneline -5` 显示全部 4 个新提交
+
+## 十、执行记录（2026-10-16 回填）
+
+### 10.1 审查与修复
+
+| #   | 发现                                                                                                                                      | 处置                                                                             | 结果                                                                                                                   |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| 1   | `metadata-isolation-guards.ts` L20-25 注释块逐字重复 3 行（计划内缺陷）                                                                   | 删除重复行（P1）                                                                 | 15 例隔离护栏测试全绿（8+7，语义档 `node:sqlite` 实际执行）+ prettier 通过；注释级零行为变更，红绿不适用（计划已声明） |
+| 2   | `src/main/nikkisync/AGENTS.md` prettier 格式违规（**计划外新发现**）：阶段6 新增长文件名表格行未重排列宽，`src/**/*.{...md}` 格式闸门命中 | `npx prettier --write`（仅表格对齐重排，内容零变化），随后 `npm run verify` 复跑 | 首跑 V2 format ✗ → 修复后 5/5 步骤全 ✓                                                                                 |
+
+### 10.2 验证（V1–V7 真实退出码）
+
+| 步骤 | 命令                                                       | 退出码      | 关键输出                                                                                                                                                                                             |
+| ---- | ---------------------------------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| V1   | `npm run link:nikkisync:check && npm run verify:nikkisync` | 0           | 四包 junction 全 ok；诊断 10 项 ✓（含新增 `ships the metadata resolver artifacts: present: dist\src\metadata\Nuan5CompatibleResolver.js, MetadataResolutionDiagnostics.js`），`blocking failures: 0` |
+| V2   | `npm run verify`                                           | 0（修复后） | 首跑 format ✗（见 10.1 #2）；复跑 typecheck ✓ / lint ✓ / core-gate ⊘（未触及受保护路径）/ format ✓（26 文件）/ test ✓（6 files, 140 passed）                                                         |
+| V3   | `npm run typecheck`                                        | 0           | `tsc -b && tsc -p tsconfig.scripts.json` 无输出                                                                                                                                                      |
+| V4   | `npm run lint`                                             | 0           | `0 errors, 11 warnings`（全部为既有 DEBT-030 BOM warning，无新增）                                                                                                                                   |
+| V5   | `npm run i18n:check && npm run i18n:guard`                 | 0           | 12 语言包 `key 对齐成功 (3932 keys)`；白名单守卫通过                                                                                                                                                 |
+| V6   | `npm run audit`                                            | 0           | `Passed npm security audit.`（11 条命中均在 29 项豁免基线内）                                                                                                                                        |
+| V7   | `npm test`                                                 | 0           | `Test Files 394 passed (394)`；`Tests 6151 passed \| 2 skipped (6153)`；Duration 47.83s —— 与阶段6 收口基线逐项一致                                                                                  |
+
+### 10.3 提交（4 个，对应仓库 2026-10-15 同类任务模式）
+
+| 哈希       | 提交                                                                 | 内容                                                                                                                                                                                                                                                                                           |
+| ---------- | -------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ba0a3e3`  | `docs(plans): 登记 2026-10-16 阶段6 审查/提交/版本核验/重新打包计划` | 本计划文件（pre-commit：prettier --write 后入提交）                                                                                                                                                                                                                                            |
+| `8f2e9a8`  | `feat(nikkisync): 阶段6 同步元数据解析 opt-in 注入与表级隔离护栏`    | 34 files changed, 2528 insertions(+), 49 deletions(-)（含 P1 注释修复与 AGENTS.md 表格重排）；pre-commit 三步全过（lint-staged 含 `test:precommit` 17 个 TS/TSX 相关单测、core-gate、`tsc -b`）；commitlint 1 条 warning（body-max-line-length，非阻断）；提交后 `git status --porcelain` 为空 |
+| `0427cca`  | `docs(changelog): 补录阶段6 元数据解析随 2.5.5 重新打包出货`         | CHANGELOG `[2.5.5]` 节 2026-10-16 追加注记 + Added 补录 1 条；收口闸门复核 ✔（12 版本节 / [2.5.5] 唯一 / [Unreleased] 空）                                                                                                                                                                     |
+| （本提交） | `docs(plans): 回填 2026-10-16 审查/提交/版本核验/重新打包执行记录`   | 本节执行记录                                                                                                                                                                                                                                                                                   |
+
+### 10.4 版本核验（P4）
+
+`node -e "…require('./package.json').version"` ⇒ `VERSION=2.5.5`，退出码 0。HEAD 已是目标版本，零改动满足「准确修改为 2.5.5」，未产生额外提交（与计划 §P4 预期一致）。
+
+### 10.5 构建（P5，`npm run dist:win`）
+
+- 退出码 0；链路：`clean + electron-vite build` ✓ → `pre-dist-check` ✓（`全部校验通过` / README Electron 41.10 一致 ✓ / CHANGELOG 收口 ✓）→ `electron-builder 26.15.3 target=nsis x64` ✓ → `verify:dist` ✓（`解包二进制校验通过`）
+- 产物：`release/NikkiGallery-Setup-2.5.5.exe` 重建于 **2026-10-16 17:58:25**（183,274,458 字节；上一版为 2026-10-15 22:56）+ `.blockmap`
+- verify:dist 全 ✔：better-sqlite3 / sharp / koffi / VC++ 2015-2022 运行库 / `@nikkisync` migrations SQL + 四包入口 + row-mappers.js + LocalSyncServer.js + GalleryRuntime.mjs
+- 额外复核：`app.asar.unpacked\node_modules\@nikkisync\pc-companion\dist\src\metadata\{Nuan5CompatibleResolver.js, MetadataResolutionDiagnostics.js}` 两深入口产物均在包内（True/True）
+
+### 10.6 偏差记录
+
+| #   | 计划写法             | 实际落地                                                             | 原因                                                                                                                                    |
+| --- | -------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | 审查发现 1 处缺陷    | 实际发现 2 处（注释重复 + AGENTS.md prettier 格式违规）              | 后者由 V2 verify 格式闸门暴露（阶段6 原收口只 prettier 检查了部分改动文件，漏了该 AGENTS.md）；以 `prettier --write` 最小修复并复跑全绿 |
+| 2   | P0 一次提交成功      | 首次 `git commit` 退出码 1（无钩子输出可见），立即重试成功且钩子全过 | 瞬态（PowerShell 对 git stderr 的 NativeCommandError 处理干扰判定）；重试后仓库状态正确，无残留影响                                     |
+| 3   | 全量测试后台轮询等待 | 后台任务通知机制送达完成事件                                         | 等价，无影响                                                                                                                            |
