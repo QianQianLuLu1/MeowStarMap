@@ -115,6 +115,7 @@
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.10.0",
+    "@use-gesture/react": "^10.3.1",
     "archiver": "^7.0.1",
     "better-sqlite3": "^12.11.1",
     "electron-log": "^5.4.4",

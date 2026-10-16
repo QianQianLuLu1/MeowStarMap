@@ -10,6 +10,8 @@ import { useFavoriteToggle } from '../../hooks/useFavoriteToggle'
 import { useNeighborPrefetch } from '../../hooks/useNeighborPrefetch'
 // DU3：幻灯片播放逻辑统一到 useSlideshow hook
 import { useSlideshow, type UseSlideshowReturn } from '../../hooks/useSlideshow'
+// 缺陷1：鼠标翻页——滚轮由 @use-gesture/react 封装的 useWheelPageNav 接管（阈值累加 + 惯性冷却）
+import { useWheelPageNav } from '../../hooks/useWheelPageNav'
 import { Toast } from '../common/Toast'
 import { ConfirmDialog } from '../common/ConfirmDialog'
 import { ExifPanel } from '../common/ExifPanel'
@@ -30,6 +32,9 @@ import { PhotographyPanel } from '../common/PhotographyPanel'
 import { NikkiInfoPanel } from '../common/NikkiInfoPanel'
 import { OutfitPanel } from '../common/OutfitPanel'
 import { InteractionPanel } from '../common/InteractionPanel'
+
+/** 缺陷1：左右边缘鼠标热区宽度——12% 视口宽、最大 120px（够宽好点，又不侵占媒体区） */
+const HOTZONE_WIDTH = 'min(12%, 120px)'
 
 interface FullscreenViewerProps {
   // C-O5：由父组件传入已计算的 filteredFiles，避免与 GalleryPage 各自调用 useFilteredMediaFiles 重复计算
@@ -121,15 +126,31 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
 
   const navigate = useCallback(
     (delta: number) => {
-      const newIndex = fullscreenIndex + delta
+      // 缺陷2：必须读 store 最新值。原先读闭包里的 fullscreenIndex，而按键连发
+      // （~30ms 重复间隔）快于一次提交，同帧内的第二次按键仍基于旧下标计算，
+      // 结果是「按两张只走一张」后画面跟不上手感的跳变。
+      const newIndex = useUIStore.getState().fullscreenIndex + delta
       if (newIndex >= 0 && newIndex < activeFiles.length) {
         useUIStore.setState({ fullscreenIndex: newIndex })
         // 切换图片时关闭 EXIF 浮层，避免显示上一张的参数
         setShowInfoPanel(false)
       }
     },
-    [fullscreenIndex, activeFiles.length]
+    [activeFiles.length]
   )
+
+  // 缺陷1：鼠标翻页三条路径统一走 navigate（越界判据不复制第二份）
+  const prevPage = useCallback(() => navigate(-1), [navigate])
+  const nextPage = useCallback(() => navigate(1), [navigate])
+  useWheelPageNav({
+    enabled: fullscreenOpen,
+    target: containerRef,
+    onPrev: prevPage,
+    onNext: nextPage,
+    // 缺陷1 审查修复：EXIF 信息浮层声明滚轮归属自身（浮层可滚动、不误翻页），
+    // 选择器与浮层上的 data-wheel-ignore 属性一一对应
+    ignoreSelector: '[data-wheel-ignore]'
+  })
 
   // DU3：幻灯片播放逻辑使用共享 hook（原 stopSlideshow/startSlideshow/toggleSlideshow 三函数合并）
   // slideshow 由下方 useSlideshow 返回，onTick 内经 slideshowRef 调用 stop（避免声明前使用的循环引用）
@@ -257,14 +278,19 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     const handleKey = (e: KeyboardEvent) => {
       switch (e.key) {
         case 'Escape':
+          // 缺陷2：已接管的按键必须阻止默认行为，否则方向键会滚动全屏背后的图库
+          // （虚拟网格随之重算可见区 → 前景画面抖动），Esc/Delete 也可能触发默认行为
+          e.preventDefault()
           slideshow.stop()
           handleClose()
           break
         case 'ArrowLeft':
+          e.preventDefault()
           slideshow.stop()
           navigate(-1)
           break
         case 'ArrowRight':
+          e.preventDefault()
           slideshow.stop()
           navigate(1)
           break
@@ -274,6 +300,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
           toggleSlideshow()
           break
         case 'Delete':
+          e.preventDefault()
           if (currentFile) handleDelete(currentFile)
           break
       }
@@ -316,11 +343,14 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     }
   }, [fullscreenOpen, currentFile, closeFullscreen])
 
+  // 缺陷2：依赖里原有的 fullscreenIndex 会让每翻一页都重新聚焦一次容器，
+  // 而 HTMLElement.focus() 默认会把元素滚动进视口（scroll-into-view），是随
+  // 键盘切换同步发生的布局副作用。键盘焦点只需要在「打开」时取一次。
   useEffect(() => {
     if (fullscreenOpen) {
-      containerRef.current?.focus()
+      containerRef.current?.focus({ preventScroll: true })
     }
-  }, [fullscreenOpen, fullscreenIndex])
+  }, [fullscreenOpen])
 
   if (!fullscreenOpen || !currentFile) return null
 
@@ -359,6 +389,17 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
       onClick={handleClose}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      // 缺陷1：鼠标侧键翻页——3=后退（上一张）/ 4=前进（下一张）；
+      // 必须 preventDefault，否则 Electron 可能把它当浏览器前进/后退手势处理
+      onMouseDown={(e) => {
+        if (e.button === 3) {
+          e.preventDefault()
+          prevPage()
+        } else if (e.button === 4) {
+          e.preventDefault()
+          nextPage()
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-label={t('gallery.fullscreen.ariaLabel', { fileName: currentFile.file_name })}
@@ -404,6 +445,28 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               }
             }}
             style={{ viewTransitionName: 'fullscreen-media' }}
+          />
+        )}
+
+        {/* 缺陷1：左右边缘鼠标热区。置于工具栏与左右导航按钮之前，
+            使其不遮挡既有按钮（后续兄弟节点在同级层叠中位于上层）；
+            纯鼠标命中区对辅助技术隐藏，键盘用户保留方向键路径 */}
+        {fullscreenIndex > 0 && (
+          <div
+            aria-hidden="true"
+            data-mouse-hotzone="prev"
+            className="absolute left-0 top-0 h-full"
+            style={{ width: HOTZONE_WIDTH, cursor: 'pointer' }}
+            onClick={prevPage}
+          />
+        )}
+        {fullscreenIndex < activeFiles.length - 1 && (
+          <div
+            aria-hidden="true"
+            data-mouse-hotzone="next"
+            className="absolute right-0 top-0 h-full"
+            style={{ width: HOTZONE_WIDTH, cursor: 'pointer' }}
+            onClick={nextPage}
           />
         )}
 
@@ -581,10 +644,15 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
 
       <Toast messages={messages} onDismiss={dismiss} zIndex={90} />
 
-      {/* EXIF 相机参数浮层（仅图片，点击信息按钮展开） */}
+      {/* EXIF 相机参数浮层（仅图片，点击信息按钮展开）。
+          data-wheel-ignore：向全屏根部的 useWheelPageNav 声明滚轮归属本浮层
+          （缺陷1 审查修复——浮轮不得被吞并误翻页，也不得被 preventDefault 掐死自身滚动）；
+          data-fullscreen-info-panel：测试定位标记（对齐 data-fullscreen-img 约定） */}
       {showInfoPanel && currentFile.file_type === 'image' && (
         <div
           className="absolute top-16 right-4 w-80 max-h-[calc(100vh-8rem)] overflow-y-auto z-[85] rounded-xl p-4"
+          data-wheel-ignore=""
+          data-fullscreen-info-panel=""
           style={{
             background: 'rgba(20, 25, 35, 0.85)',
             backdropFilter: 'blur(16px)',
