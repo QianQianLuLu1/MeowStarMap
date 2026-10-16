@@ -1764,7 +1764,12 @@
       },
       "gallerySource": "Dùng thư viện asset của NikkiSync làm nguồn phòng trưng bày",
       "gallerySourceDesc": "Tắt: đọc media_files trên máy (mặc định). Bật: phòng trưng bày đọc assets của runtime NikkiSync nhúng kèm, đồng thời bật runtime và một lần quét",
-      "gallerySourceApplied": "Đã chuyển nguồn dữ liệu phòng trưng bày sang {{source}}"
+      "gallerySourceApplied": "Đã chuyển nguồn dữ liệu phòng trưng bày sang {{source}}",
+      "metadata": {
+        "enable": "Phân tích tham số trang phục và chụp",
+        "enableDesc": "Sau khi quét xong, trình phân tích của NikkiSync phía trên sẽ bổ sung các tham số chụp (tiêu cự, khẩu độ, độ phơi sáng, cường độ bộ lọc, v.v.) cho thư viện đã đồng bộ. Có hiệu lực sau khi khởi động lại ứng dụng.",
+        "disclosure": "Khi bật, UID của mỗi ảnh và phong bao tham số nhúng trong ảnh sẽ được gửi tới dịch vụ bên thứ ba nuan5.pro để đổi lấy kết quả giải mã. Nội dung trả về được ghi vào cơ sở dữ liệu đồng bộ trên máy và cũng được gửi tới các thiết bị đã ghép cặp qua mạng cục bộ. Tìm kiếm bộ trang phục và trang phục vẫn phụ thuộc vào từ điển cục bộ; công tắc này không bao gồm phần đó."
+      }
     }
   },
   "share": {

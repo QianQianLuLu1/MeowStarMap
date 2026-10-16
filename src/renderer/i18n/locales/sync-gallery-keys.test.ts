@@ -135,3 +135,50 @@ describe('同步图库语言包完整性', () => {
     }
   })
 })
+
+/**
+ * 阶段 6：元数据解析开关的披露文案完整性。
+ *
+ * 这个开关一旦打开就向第三方端点发出站请求（携带 UID 与照片内嵌参数信封），
+ * 因此「每个语言包都必须把这件事说清楚」是验收项，不是可选项——
+ * 漏一个语言包就等于对那一半用户在未经充分披露的情况下开启了外网请求。
+ */
+const METADATA_KEYS = [
+  'settings.sync.metadata.enable',
+  'settings.sync.metadata.enableDesc',
+  'settings.sync.metadata.disclosure'
+]
+
+describe('阶段 6：元数据解析开关语言包完整性', () => {
+  it('12 个语言包都定义了三个必需键且为非空字符串', () => {
+    for (const [code, locale] of Object.entries(LOCALES)) {
+      for (const key of METADATA_KEYS) {
+        const value = readPath(locale, key)
+        expect(value, `${code}.json 缺失 ${key}`).toBeDefined()
+        expect(value, `${code}.json ${key} 应为字符串`).toBeTypeOf('string')
+        expect((value as string).trim(), `${code}.json ${key} 不应为空`).not.toHaveLength(0)
+      }
+    }
+  })
+
+  it('披露文案必须点名实际端点主机（与 metadata-resolver-driver 的常量同主机）', () => {
+    // 这里刻意写主机字面量而不是 import 主进程常量：渲染层不得依赖 `src/main/**`，
+    // 跨边界的共享位是 `src/shared/**`。同一主机由两侧各一条断言钉住：
+    // `metadata-resolver-driver.test.ts` 断言 NUAN5_METADATA_ENDPOINT 以 https://nuan5.pro 开头，
+    // 任一侧改动即有一处先红。
+    for (const [code, locale] of Object.entries(LOCALES)) {
+      expect(
+        readPath(locale, 'settings.sync.metadata.disclosure'),
+        `${code}.json disclosure 未点名出站端点主机`
+      ).toContain('nuan5.pro')
+    }
+  })
+
+  it('披露文案必须交代「随局域网同步下发给已配对设备」这一后果', () => {
+    // 上游 publicMetadata() 只剥两把原始信封字段，第三方解码结果原样进局域网响应体；
+    // 不说清这一条的披露是不完整的
+    const zh = String(readPath(LOCALES['zh-CN'], 'settings.sync.metadata.disclosure'))
+    expect(zh).toMatch(/配对|已配对/)
+    expect(zh).toMatch(/局域网|本地网络/)
+  })
+})

@@ -48,6 +48,21 @@ export const SYNC_SERVER_REQUIRED_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs')
 ]
 
+/**
+ * 阶段 6：元数据解析依赖的两个 pc-companion 深入口产物（相对包根）。
+ *
+ * 为什么单独成一组而不并进 `SYNC_SERVER_REQUIRED_ARTIFACTS`：二者缺失的**修复动作与影响面
+ * 不同**（缺 `GalleryRuntime.mjs` 是整条 `LocalSyncServer` 装载失败；缺本组只让元数据解析
+ * 不可用），且本组符号**不在上游桶导出内** —— 正因为不在桶里，
+ * `NIKKISYNC_REQUIRED_EXPORTS` 探针管不到它们（把桶外符号写进那张表会让探针在正确构建产物上
+ * 误报红），产物存在性只能由这里承担。缺任一件 ⇒ `resolveDeepEntryUrl` 组出的 URL 404，
+ * 运行期表现为 `ERR_MODULE_NOT_FOUND`。
+ */
+export const METADATA_REQUIRED_ARTIFACTS: readonly string[] = [
+  path.join('dist', 'src', 'metadata', 'Nuan5CompatibleResolver.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataResolutionDiagnostics.js')
+]
+
 export interface NikkiSyncLinkFacts {
   /** 依赖图中指向仓库外的本地 spec（`file:../…` / `workspace:…`），必须为空。 */
   externalFileSpecs: string[]
@@ -78,6 +93,12 @@ export interface NikkiSyncLinkFacts {
    * 被上游 gitignore，因此必须单独点名，不能靠 `dist/src/index.js` 存在来推断。
    */
   syncServerArtifactsMissing?: string[]
+  /**
+   * 阶段 6：`@nikkisync/pc-companion` 内元数据解析依赖的深入口产物缺失清单（相对包根）。
+   * 缺件 ⇒ 装载期 `ERR_MODULE_NOT_FOUND`；与 `syncServerArtifactsMissing` 分列，
+   * 因为两者缺失时的修复语义不同（见 `METADATA_REQUIRED_ARTIFACTS` 注释）。
+   */
+  metadataArtifactsMissing?: string[]
 }
 
 export interface CheckResult {
@@ -178,6 +199,20 @@ export function evaluateNikkiSyncLink(facts: NikkiSyncLinkFacts): CheckResult[] 
         : facts.syncServerArtifactsMissing.length === 0
           ? `present: ${SYNC_SERVER_REQUIRED_ARTIFACTS.join(', ')}`
           : `missing: ${facts.syncServerArtifactsMissing.join(', ')} — run the full \`npm run build\` in NikkiSync (build:pc runs scripts/build-wechat-runtime.mjs before tsc; tsc alone does not emit GalleryRuntime.mjs)`
+    })
+  }
+
+  // 阶段 6：元数据解析的两个深入口产物。两者都不在上游桶导出内，`NIKKISYNC_REQUIRED_EXPORTS`
+  // 探针与 index.js 存在性判定都覆盖不到，只能在此点名；缺件时表现是装载期 ERR_MODULE_NOT_FOUND。
+  if (facts.metadataArtifactsMissing !== undefined) {
+    checks.push({
+      name: '@nikkisync/pc-companion ships the metadata resolver artifacts',
+      ok: !linked || facts.metadataArtifactsMissing.length === 0,
+      detail: !linked
+        ? 'skipped (no links present)'
+        : facts.metadataArtifactsMissing.length === 0
+          ? `present: ${METADATA_REQUIRED_ARTIFACTS.join(', ')}`
+          : `missing: ${facts.metadataArtifactsMissing.join(', ')} — run \`npm run build\` in NikkiSync (tsc emits dist/src/metadata/*; a src-only checkout has none, and these two are deep entries outside the barrel)`
     })
   }
 
@@ -306,6 +341,7 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
   const linkTargets: string[] = []
   const databaseTargets: string[] = []
   const syncArtifactsMissing: string[] = []
+  const metadataArtifactsMissing: string[] = []
   for (const [name, subpath] of Object.entries(NIKKISYNC_PACKAGE_DIRS)) {
     const linkDir = path.join(projectRoot, 'node_modules', name)
     if (!fs.existsSync(linkDir)) continue
@@ -325,6 +361,9 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     if (name === '@nikkisync/pc-companion') {
       for (const artifact of SYNC_SERVER_REQUIRED_ARTIFACTS) {
         if (!fs.existsSync(path.join(targetDir, artifact))) syncArtifactsMissing.push(artifact)
+      }
+      for (const artifact of METADATA_REQUIRED_ARTIFACTS) {
+        if (!fs.existsSync(path.join(targetDir, artifact))) metadataArtifactsMissing.push(artifact)
       }
     }
     void subpath
@@ -380,7 +419,8 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     buildFoldHits: countBuildFoldHits(projectRoot),
     packedMigrationsReadable: packedMigrationsReadable(projectRoot),
     candidateRoot,
-    syncServerArtifactsMissing: syncArtifactsMissing
+    syncServerArtifactsMissing: syncArtifactsMissing,
+    metadataArtifactsMissing: metadataArtifactsMissing
   }
 }
 

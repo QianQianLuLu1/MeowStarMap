@@ -5,6 +5,7 @@ import { electronLogger } from '../utils/logger'
 import { buildPackagingContext } from '../nikkisync/embedding-paths'
 import { createManagerDependencies } from '../nikkisync/runtime-facade'
 import { createRuntimeManager } from '../nikkisync/runtime-manager'
+import { resolveMetadataResolverEnabled as resolveMetadataResolverEnabledFlag } from '../nikkisync/metadata-resolver-driver'
 import {
   SYNC_SERVER_DEFAULT_HOST,
   SYNC_SERVER_DEFAULT_MDNS,
@@ -45,14 +46,23 @@ export const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
 export const SETTING_SYNC_PORT = 'nikkisync.syncServerPort'
 /** 设置项：是否广播 mDNS 服务（阶段 3，缺省跟随上游 `NIKKISYNC_MDNS` 口径=开）。 */
 export const SETTING_SYNC_MDNS = 'nikkisync.syncMdnsEnabled'
+/**
+ * 设置项：是否启用上游远端元数据解析（阶段 6，缺省关）。
+ * 一旦为真即产生对第三方端点的出站请求（UID + 照片内嵌参数信封），
+ * 因此默认关闭、需用户显式开启；端点值不来自渲染层，由主进程侧常量决定。
+ */
+export const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
 export const RUNTIME_ENABLED_DEFAULT = false
 export const WATCHER_ENABLED_DEFAULT = false
+export const METADATA_RESOLVER_ENABLED_DEFAULT = false
 /** 同步服务默认关闭：与阶段 5 移植面 `SYNC_SERVER_ENABLED_DEFAULT` 同口径。 */
 export const SYNC_ENABLED_DEFAULT = false
 /** 环境变量名（dev / 验证强启）。 */
 export const RUNTIME_ENV_FLAG = 'NIKKI_NIKKISYNC_RUNTIME'
 /** 环境变量名（dev / 验证强指游戏根，与上游 `NIKKISYNC_GAME_ROOT` 区分：这里归宿主管）。 */
 export const GAME_ROOT_ENV_FLAG = 'NIKKI_NIKKISYNC_GAME_ROOT'
+/** 环境变量名（阶段 6：元数据解析的强启 / 强关逃生阀，取值同 `RUNTIME_ENV_FLAG` 的 '1' / '0'）。 */
+export const METADATA_ENV_FLAG = 'NIKKI_NIKKISYNC_METADATA'
 /** 库文件相对 userData 的路径段。 */
 export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
 
@@ -94,6 +104,9 @@ export function buildSessionOptions(input: {
     databaseFile: nikkisyncDatabaseFile(input.userDataDir),
     ...(gameRoot ? { gameRoot } : {}),
     watcher: input.settings.getBoolean(SETTING_WATCHER, WATCHER_ENABLED_DEFAULT),
+    // 阶段 6：元数据解析开关。关闭时下游 `createRuntimeSession` 连配置键都不下发，
+    // 上游因此不构造 MetadataResolverService ⇒ 零出站请求、零定时器。
+    metadataResolverEnabled: resolveMetadataResolverEnabled(input.env, input.settings),
     projectRoot: input.projectRoot,
     packagingContext: buildPackagingContext({
       isPackaged: input.isPackaged,
@@ -117,6 +130,22 @@ export function buildSessionOptions(input: {
 /** 同步服务自启判定：服务开关隐含 Runtime 开关（不开 Runtime 就没有会话可启服务）。 */
 export function resolveSyncEnabled(settings: NikkiSyncSettingsPort): boolean {
   return settings.getBoolean(SETTING_SYNC_ENABLED, SYNC_ENABLED_DEFAULT)
+}
+
+/**
+ * 阶段 6：元数据解析开关判定。判据本体在 `metadata-resolver-driver` 的纯函数里
+ * （env 只认 '1' / '0'，其余视为未设置；设置值必须是布尔 true），这里只负责取数。
+ * `getBoolean` 的类型收敛已经把脏值回落到 fallback，因此非布尔历史值必然判关——
+ * 这一条是刻意的：开启即出站请求，绝不能被一条 `'true'` 字符串静默打开。
+ */
+export function resolveMetadataResolverEnabled(
+  env: Record<string, string | undefined>,
+  settings: NikkiSyncSettingsPort
+): boolean {
+  return resolveMetadataResolverEnabledFlag(
+    env[METADATA_ENV_FLAG],
+    settings.getBoolean(SETTING_METADATA_RESOLVER, METADATA_RESOLVER_ENABLED_DEFAULT)
+  )
 }
 
 /**

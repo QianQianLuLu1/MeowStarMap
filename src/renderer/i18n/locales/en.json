@@ -1764,6 +1764,11 @@
         "revokeConfirmMessage": "\"{{name}}\" will no longer be able to sync with this library and must pair again. Revoke this device?",
         "revokeConfirm": "Revoke Device",
         "revoked": "Device revoked"
+      },
+      "metadata": {
+        "enable": "Resolve outfit and camera parameters",
+        "enableDesc": "After a scan completes, the upstream NikkiSync resolver fills in camera parameters (focal length, aperture, exposure, filter strength, ...) for the sync gallery. Takes effect after restarting the app.",
+        "disclosure": "When enabled, each photo UID and the parameter envelope embedded in the photo are sent to the third-party service nuan5.pro to obtain a decoded result. The response is written to the local sync database and is also delivered to paired devices over the local network. Suit and clothing search still depends on the local dictionary; this switch does not cover it."
       }
     }
   },

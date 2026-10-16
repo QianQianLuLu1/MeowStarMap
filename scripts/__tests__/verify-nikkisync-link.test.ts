@@ -24,6 +24,7 @@ const MIGRATIONS_CHECK = '@nikkisync/database migrations/0001_initial.sql is rea
 const FOLD_CHECK = 'main-process bundles do not fold @nikkisync into require()'
 const PACKED_CHECK = 'packed app.asar.unpacked ships @nikkisync/database migrations'
 const SYNC_SERVER_CHECK = '@nikkisync/pc-companion ships the local sync server artifacts'
+const METADATA_CHECK = '@nikkisync/pc-companion ships the metadata resolver artifacts'
 const DISCOVER_CHECK = 'a NikkiSync checkout is discoverable for linking'
 
 /** 全部事实成立（默认按"已链接 + 产物齐"取满值）。 */
@@ -118,6 +119,27 @@ describe('evaluateNikkiSyncLink', () => {
   it('边界：事实未提供该字段时整条检查缺席（旧调用方不受影响）', () => {
     const checks = evaluateNikkiSyncLink(facts())
     expect(find(checks, SYNC_SERVER_CHECK)).toBeUndefined()
+  })
+
+  it('异常：已链接但缺元数据深入口产物时硬阻断并点名文件（阶段6）', () => {
+    const checks = evaluateNikkiSyncLink(
+      facts({ metadataArtifactsMissing: ['dist\\src\\metadata\\Nuan5CompatibleResolver.js'] })
+    )
+    expect(failing(checks)).toContain(METADATA_CHECK)
+    const detail = find(checks, METADATA_CHECK)?.detail
+    expect(detail).toContain('Nuan5CompatibleResolver.js')
+    expect(detail).toContain('npm run build')
+  })
+
+  it('正常：元数据深入口产物齐备时该检查通过（阶段6）', () => {
+    const checks = evaluateNikkiSyncLink(facts({ metadataArtifactsMissing: [] }))
+    expect(failing(checks)).toEqual([])
+    expect(find(checks, METADATA_CHECK)?.ok).toBe(true)
+  })
+
+  it('边界：元数据事实字段缺省时整条检查缺席（阶段6）', () => {
+    const checks = evaluateNikkiSyncLink(facts())
+    expect(find(checks, METADATA_CHECK)).toBeUndefined()
   })
 
   it('边界：半链接（部分包缺失）只告警，不阻断', () => {

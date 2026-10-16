@@ -8,6 +8,7 @@ import {
   installNotfoundMessage
 } from './runtime-manager'
 import type { NikkiSyncRuntimeSession, NikkiSyncSessionOptions } from './runtime-types'
+import { DEFAULT_METADATA_MAX_PASSES, NUAN5_METADATA_ENDPOINT } from './metadata-resolver-driver'
 import {
   clearNikkiSyncResourcePaths,
   isNikkiSyncResourcePath,
@@ -44,6 +45,12 @@ interface FakeCalls {
   /** 停止链的调用次序（验收「先停服务再关库」）。 */
   order: string[]
   revoke: string[]
+  /** 阶段 6：上游元数据服务面的调用计数。 */
+  metadataStop: number
+  metadataRunOnce: number
+  metadataDiagnostics: number
+  /** 阶段 6：上游 `runtime.start()` 是否被调用过（本仓必须恒为 0）。 */
+  runtimeStart: number
 }
 
 /**
@@ -68,6 +75,7 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     }),
     fullScan: vi.fn(async () => {
       calls.fullScan += 1
+      if (plan.fullScanThrows) throw new Error(installNotfoundMessage)
       return { scanId: 'scan_full', filesObserved: 3 }
     }),
     rescanPath: vi.fn(async (filePath: string) => {
@@ -123,6 +131,11 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       },
       scanner,
       server,
+      // 阶段 6：上游 `runtime.start()` 会连带启 LAN 服务（绑 0.0.0.0），本仓必须一次都不调
+      start: vi.fn(async () => {
+        calls.runtimeStart += 1
+        return {}
+      }),
       createPairingUri: (host: string) => pairingUri(host)
     },
     scanner,
@@ -144,6 +157,41 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     revokePairedDevice: (deviceId: string) => {
       calls.revoke.push(deviceId)
       return plan.revokeResult !== false
+    },
+    stopMetadataResolver: () => {
+      calls.metadataStop += 1
+      calls.order.push('metadataResolver.stop')
+      if (plan.metadataStopThrows) throw new Error('metadata resolver stop failed')
+    },
+    // 上游条件构造的镜像：未开启 ⇒ 该成员整个缺席，编排层据此判 0 轮
+    ...(plan.metadataResolverPresent
+      ? {
+          metadataRunOnce: async () => {
+            calls.metadataRunOnce += 1
+            if (plan.metadataRunOnceThrows) throw new Error('SQLITE_BUSY: database is locked')
+            if (plan.metadataRunOnceWait) await plan.metadataRunOnceWait()
+            const results = plan.metadataRunOnceResults ?? [0]
+            return results[Math.min(calls.metadataRunOnce - 1, results.length - 1)]
+          }
+        }
+      : {}),
+    metadataDiagnostics: () => {
+      calls.metadataDiagnostics += 1
+      return {
+        schemaVersion: 1,
+        generatedAt: '2026-10-16T00:00:00.000Z',
+        resolverEnabled: plan.metadataResolverPresent === true,
+        ordinaryPhotos: 25,
+        withNativeToken: 25,
+        withCompleteEnvelope: 25,
+        resolved: 0,
+        failed: 0,
+        pending: 25,
+        withOutfit: 0,
+        withCamera: 0,
+        motionPhotos: 6,
+        failureCategories: {}
+      }
     },
     queries: {
       listAssets: vi.fn(async () => ({ items: [{ assetId: 'asset_1' }], libraryRevision: 7 })),
@@ -177,7 +225,11 @@ function createDependencies(
     serverStop: 0,
     syncPorts: [],
     order: [],
-    revoke: []
+    revoke: [],
+    metadataStop: 0,
+    metadataRunOnce: 0,
+    metadataDiagnostics: 0,
+    runtimeStart: 0
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
@@ -566,12 +618,13 @@ describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
     expect(calls.serverStop).toBe(2)
   })
 
-  it('teardown 顺序：server.stop → scanner.stop → dispose（端口先释放再关库）', async () => {
+  it('teardown 顺序：metadataResolver.stop → server.stop → scanner.stop → dispose（阶段 6 前置生产者）', async () => {
     const { deps, calls } = createDependencies()
     const manager = createRuntimeManager(deps)
     await manager.startSyncServer()
     await manager.stop()
-    expect(calls.order).toEqual(['server.stop', 'scanner.stop', 'dispose'])
+    // 阶段 6：先停元数据生产者（它会在库上写 updateMetadata），再停传输，再停扫描，最后关库
+    expect(calls.order).toEqual(['metadataResolver.stop', 'server.stop', 'scanner.stop', 'dispose'])
     expect(manager.syncStatus().running).toBe(false)
   })
 
@@ -645,7 +698,7 @@ describe('createRuntimeManager 停止/重建竞态（阶段 4 审查修复）', 
 
     expect(manager.status().state).toBe('idle')
     expect(calls.dispose).toBe(1)
-    expect(calls.order).toEqual(['server.stop', 'scanner.stop', 'dispose'])
+    expect(calls.order).toEqual(['metadataResolver.stop', 'server.stop', 'scanner.stop', 'dispose'])
   })
 
   it('换端口重建保留当前会话的游戏根（不丢回 auto-discovery）', async () => {
@@ -665,5 +718,168 @@ describe('createRuntimeManager 停止/重建竞态（阶段 4 审查修复）', 
     // 新端口确实进了重建会话的构造期配置
     expect(calls.syncPorts[calls.syncPorts.length - 1]).toContain('38138')
     expect(manager.status().state).toBe('running')
+  })
+})
+
+describe('阶段 6：元数据解析编排（拆除前置、有界驱动、故障隔离）', () => {
+  it('C-10 全程不调上游 runtime.start()，并在关库之前停元数据服务', async () => {
+    const { deps, calls } = createDependencies({}, { metadataResolverPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    await manager.stop()
+    // 上游 runtime.start() 把 scanner.start() 当硬前置并随后无条件启 LAN 服务（绑 0.0.0.0）；
+    // 本仓的 LAN 服务是显式 opt-in 的，因此这条必须恒为 0（把「巧合」焊成契约）。
+    expect(calls.runtimeStart).toBe(0)
+    expect(calls.metadataStop).toBe(1)
+    expect(calls.order.indexOf('metadataResolver.stop')).toBeLessThan(
+      calls.order.indexOf('dispose')
+    )
+  })
+
+  it('C-11 stopMetadataResolver 抛错时 scanner.stop 与 dispose 照常执行', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { metadataResolverPresent: true, metadataStopThrows: true }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.stop()
+    expect(calls.metadataStop).toBe(1)
+    expect(calls.scannerStop).toBe(1)
+    expect(calls.dispose).toBe(1)
+    // 失败只落 warn，且停止链本身照常收尾到 idle
+    expect(
+      calls.logs.some((entry) => entry.level === 'warn' && /metadata/i.test(entry.message))
+    ).toBe(true)
+    expect(manager.status().state).toBe('idle')
+  })
+
+  it('C-12 扫描成功后按 maxPasses 上界有界驱动（候选不收敛也不会无限轮询）', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { metadataResolverPresent: true, metadataRunOnceResults: [4] }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    // 驱动是后台任务：扫描返回不等于解析返回，故以后落盘的 lastDrive 作为收敛信号
+    await expect.poll(() => manager.status().metadata?.lastDrive, { timeout: 2000 }).toBeTruthy()
+    expect(calls.metadataRunOnce).toBe(DEFAULT_METADATA_MAX_PASSES)
+    expect(manager.status().metadata?.lastDrive).toEqual({
+      passes: DEFAULT_METADATA_MAX_PASSES,
+      resolved: DEFAULT_METADATA_MAX_PASSES * 4,
+      aborted: false,
+      failed: false
+    })
+  })
+
+  it('C-13 上游收敛（runOnce 返回 0）时只发起一轮', async () => {
+    const { deps, calls } = createDependencies({}, { metadataResolverPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    await expect.poll(() => manager.status().metadata?.lastDrive, { timeout: 2000 }).toBeTruthy()
+    expect(calls.metadataRunOnce).toBe(1)
+    expect(manager.status().metadata?.lastDrive?.resolved).toBe(0)
+  })
+
+  it('C-17 驱动不挂扫描返回路径，且拆除后不再发起下一轮（代次契约）', async () => {
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let waited = false
+    const { deps, calls } = createDependencies(
+      {},
+      {
+        metadataResolverPresent: true,
+        metadataRunOnceResults: [4],
+        metadataRunOnceWait: async () => {
+          if (waited) return
+          waited = true
+          await gate
+        }
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    // 扫描已返回，但第一轮还卡在在途请求上：解析不得成为扫描的尾巴
+    expect(calls.metadataRunOnce).toBe(1)
+    expect(manager.status().metadata?.lastDrive).toBeUndefined()
+
+    await manager.stop()
+    release?.()
+    // 放行后驱动发现代次已变 ⇒ 只收尾这一轮，绝不发起第二轮。
+    // 收敛信号取日志而非 status：会话拆除后 status 不再带 metadata 段（没有会话就没有快照），
+    // 这一档恰好也是期望行为——不能拿一个已关闭的库的计数继续对外称「当前状态」。
+    await expect
+      .poll(() => calls.logs.some((entry) => /metadata resolution:.*aborted/.test(entry.message)), {
+        timeout: 2000
+      })
+      .toBe(true)
+    expect(calls.metadataRunOnce).toBe(1)
+  })
+
+  it('C-12b 扫描失败 ⇒ 一轮都不发起（失败态不得产生出站请求）', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { metadataResolverPresent: true, fullScanThrows: true }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.scan({})).rejects.toThrow(installNotfoundMessage)
+    expect(calls.metadataRunOnce).toBe(0)
+    expect(calls.fullScan).toBe(1)
+    // 扫描失败的状态迁移不受阶段 6 改动影响（degraded 判定仍按上游原文）
+    expect(manager.status().state).toBe('degraded')
+    expect(manager.status().metadata?.lastDrive).toBeUndefined()
+  })
+
+  it('C-14 未开启解析 ⇒ 会话没有驱动面，一轮都不发起', async () => {
+    const { deps, calls } = createDependencies({}, { metadataResolverPresent: false })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    expect(calls.metadataRunOnce).toBe(0)
+    expect(manager.status().metadata?.enabled).toBe(false)
+    expect(manager.status().metadata?.lastDrive).toBeUndefined()
+  })
+
+  it('C-15 故障隔离：runOnce 抛错不外抛，扫描结果与状态原样给出', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { metadataResolverPresent: true, metadataRunOnceThrows: true }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const result = (await manager.scan({})) as { scanId: string }
+    // 扫描成功的返回值不得被解析故障改写（handler 逐字透传，已有断言锁定）
+    expect(result.scanId).toBe('scan_full')
+    expect(manager.status().state).toBe('running')
+    await expect.poll(() => manager.status().metadata?.lastDrive, { timeout: 2000 }).toBeTruthy()
+    expect(calls.metadataRunOnce).toBe(1)
+    expect(manager.status().metadata?.lastDrive?.failed).toBe(true)
+  })
+
+  it('C-16 状态快照带端点与上游聚合计数，未开启时同样如实给计数', async () => {
+    const { deps, calls } = createDependencies({}, { metadataResolverPresent: false })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const snapshot = manager.status()
+    expect(snapshot.metadata?.enabled).toBe(false)
+    expect(snapshot.metadata?.endpoint).toBe(NUAN5_METADATA_ENDPOINT)
+    expect(snapshot.metadata?.counters).toMatchObject({
+      ordinaryPhotos: 25,
+      withCompleteEnvelope: 25,
+      resolved: 0,
+      withCamera: 0
+    })
+    // 计数在建会话时取一次即可：不得每次 status() 都跑一遍聚合 SQL
+    const before = calls.metadataDiagnostics
+    manager.status()
+    manager.status()
+    expect(calls.metadataDiagnostics).toBe(before)
   })
 })

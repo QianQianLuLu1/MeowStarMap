@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
   CLOTHING_SEARCH_DEEP_ENTRY,
+  METADATA_DIAGNOSTICS_DEEP_ENTRY,
+  NUAN5_RESOLVER_DEEP_ENTRY,
   PROFILE_STATS_DEEP_ENTRY,
   SUIT_SEARCH_DEEP_ENTRY,
   createQuerySurface,
@@ -8,6 +10,7 @@ import {
 } from './runtime-facade'
 import type { RuntimeSurface } from './runtime-facade'
 import type { EmbeddedRuntimeLike } from './runtime-types'
+import { DEFAULT_METADATA_BATCH_SIZE, NUAN5_METADATA_ENDPOINT } from './metadata-resolver-driver'
 import {
   clearNikkiSyncResourcePaths,
   isNikkiSyncResourcePath,
@@ -156,6 +159,19 @@ describe('nikkisync 深入口常量', () => {
     expect(SUIT_SEARCH_DEEP_ENTRY).toEqual(['server', 'SuitSearchIndex.js'])
     expect(CLOTHING_SEARCH_DEEP_ENTRY).toEqual(['server', 'ClothingSearchIndex.js'])
     expect(PROFILE_STATS_DEEP_ENTRY).toEqual(['server', 'ProfileStatsIndex.js'])
+  })
+})
+
+describe('nikkisync 阶段 6 元数据解析深入口常量', () => {
+  it('Nuan5 解析器与解析诊断各自指向 pc-companion 的 metadata 子模块', () => {
+    // 两者都**不在**上游 `dist/src/index.js` 桶导出内（已实测：桶里只 re-export
+    // `metadata/MetadataResolverPipeline.js` 与 `metadata/types.js`），因此只能走深入口。
+    // 段名写错 ⇒ 运行期 ERR_MODULE_NOT_FOUND，与 server/* 三入口同类风险，必须在编译期钉死。
+    expect(NUAN5_RESOLVER_DEEP_ENTRY).toEqual(['metadata', 'Nuan5CompatibleResolver.js'])
+    expect(METADATA_DIAGNOSTICS_DEEP_ENTRY).toEqual([
+      'metadata',
+      'MetadataResolutionDiagnostics.js'
+    ])
   })
 })
 
@@ -467,5 +483,182 @@ describe('createQuerySurface 既有三面不变', () => {
       __mapped: 'detail',
       row: { asset_id: 'a/1' }
     })
+  })
+})
+
+// ---------------------------------------------------------------- 阶段 6：单缝注入
+
+interface SessionFixture {
+  surface: RuntimeSurface
+  /** 上游 `PcCompanionRuntime` 实际收到的配置对象（注入缝的唯一可观察面）。 */
+  capturedConfig: () => Record<string, unknown> | undefined
+  /** 上游 resolver 构造参数（用于确认端点是显式下传而非吃默认值）。 */
+  resolverConfigs: Record<string, unknown>[]
+  metadataHandle: { start: () => void; stop: () => void; runOnce: () => Promise<number> }
+  diagnostics: (database: unknown, resolverEnabled: boolean) => unknown
+  close: () => void
+}
+
+/**
+ * 只喂 `createRuntimeSession` 所需的假装载面。
+ * 关键复刻点：上游 `runtime.ts:74-81` **仅在 `metadataResolver` 键存在时**才构造服务实例，
+ * 因此假 Runtime 也按同一条件挂 `metadataResolver`，否则测不出「键缺失」的真实后果。
+ */
+function createSessionFixture(): SessionFixture {
+  const close = vi.fn()
+  const metadataHandle = {
+    start: vi.fn(),
+    stop: vi.fn(),
+    runOnce: vi.fn(async () => 0)
+  }
+  const resolverConfigs: Record<string, unknown>[] = []
+  let capturedConfig: Record<string, unknown> | undefined
+  const runtimeShape = {
+    database: {
+      connection: { prepare: () => ({ all: () => [], get: () => undefined }), exec: () => {} },
+      initialize: () => {},
+      close
+    },
+    scanner: {
+      start: async () => ({}),
+      stop: async () => {},
+      fullScan: async () => ({}),
+      rescanPath: async () => ({}),
+      getStatus: () => ({})
+    },
+    server: {
+      serverId: 'server_fake',
+      start: async () => ({ host: '127.0.0.1', port: 38137, secure: true }),
+      stop: async () => {},
+      createPairingPayload: () => ({})
+    },
+    createPairingUri: () => 'NS1|server_fake|127.0.0.1|38137|tok|0|' + 'a'.repeat(64)
+  } as Record<string, unknown>
+
+  const surface = {
+    pcCompanion: {
+      PcCompanionRuntime: class {
+        constructor(config: Record<string, unknown>) {
+          capturedConfig = config
+          if (config.metadataResolver) runtimeShape.metadataResolver = metadataHandle
+          return runtimeShape as unknown as EmbeddedRuntimeLike
+        }
+      },
+      LocalTlsIdentityService: class {
+        getOrCreate() {
+          return { keyPem: 'k', certPem: 'c', fingerprintSha256: 'f', createdAt: 'now' }
+        }
+      }
+    },
+    database: {
+      PairingRepository: class {
+        getDevice(): undefined {
+          return undefined
+        }
+        revoke(): void {}
+      },
+      // createQuerySurface 在会话组装期就会 new 这两个仓储（只构造、不调方法），
+      // 因此假面必须是**可构造的类**；查询行为由上面的 createSurface 用例覆盖。
+      SyncReadRepository: class {},
+      MetadataDictionaryRepository: class {}
+    },
+    rowMappers: {},
+    suitSearchIndex: {},
+    clothingSearchIndex: {},
+    profileStatsIndex: {},
+    nuan5Resolver: {
+      Nuan5CompatibleResolver: class {
+        constructor(config?: Record<string, unknown>) {
+          resolverConfigs.push(config ?? {})
+        }
+        readonly id = 'nuan5-compatible'
+      }
+    },
+    metadataDiagnostics: {
+      metadataResolutionDiagnostics: vi.fn(() => ({ schemaVersion: 1, withCamera: 0 }))
+    }
+  } as unknown as RuntimeSurface
+
+  return {
+    surface,
+    capturedConfig: () => capturedConfig,
+    resolverConfigs,
+    metadataHandle: metadataHandle as unknown as SessionFixture['metadataHandle'],
+    diagnostics: surface.metadataDiagnostics.metadataResolutionDiagnostics,
+    close: close as unknown as () => void
+  }
+}
+
+const sessionOptions = (enabled?: boolean) => ({
+  databaseFile: '/tmp/userData/nikkisync/nikkisync.db',
+  watcher: false,
+  projectRoot: '/tmp/x',
+  ...(enabled === undefined ? {} : { metadataResolverEnabled: enabled })
+})
+
+describe('createRuntimeSession 元数据解析单缝注入（阶段 6）', () => {
+  it('B-7 开关缺省/关闭：配置只有 databaseFile+scanner+server，且不构造 resolver', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(sessionOptions(false), fixture.surface)
+    const config = fixture.capturedConfig()
+    expect(config && Object.keys(config).sort()).toEqual(['databaseFile', 'scanner', 'server'])
+    expect(config && 'metadataResolver' in config).toBe(false)
+    expect(fixture.resolverConfigs).toEqual([])
+    // 未开启 ⇒ 驱动面整个缺席（编排层据此判 0 轮，不需要再读开关）
+    expect(session.metadataRunOnce).toBeUndefined()
+    // 没有上游服务句柄时 stop 必须是 no-op，不能抛
+    expect(() => session.stopMetadataResolver()).not.toThrow()
+    expect(fixture.metadataHandle.stop).not.toHaveBeenCalled()
+  })
+
+  it('B-8 开关开启：下发 resolver 与收窄的 service，且绝不含 intervalMs', async () => {
+    const fixture = createSessionFixture()
+    await createRuntimeSession(sessionOptions(true), fixture.surface)
+    const config = fixture.capturedConfig()
+    const injected = config?.metadataResolver as {
+      resolver: { id: string }
+      service: Record<string, unknown>
+    }
+    expect(injected.resolver.id).toBe('nuan5-compatible')
+    expect(injected.service.batchSize).toBe(DEFAULT_METADATA_BATCH_SIZE)
+    expect(injected.service.enabled).toBe(true)
+    // 上游用 `config.intervalMs ?? 15_000` 取值：下发 0 会造出 setInterval(fn, 0)，
+    // 而下发任何 intervalMs 都意味着把自轮询引进本仓（本阶段刻意改为扫描后驱动）。
+    expect(injected.service).not.toHaveProperty('intervalMs')
+    // 端点必须显式下传，保证设置页披露与实际出口同源
+    expect(fixture.resolverConfigs[0]).toEqual({ endpoint: NUAN5_METADATA_ENDPOINT })
+    expect(String(fixture.resolverConfigs[0].endpoint)).toMatch(/^https:\/\//)
+  })
+
+  it('B-9 stopMetadataResolver 委托上游服务句柄的 stop', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(sessionOptions(true), fixture.surface)
+    session.stopMetadataResolver()
+    expect(fixture.metadataHandle.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('B-10 metadataRunOnce 逐字透传上游返回值', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(sessionOptions(true), fixture.surface)
+    fixture.metadataHandle.runOnce.mockImplementationOnce(async () => 3)
+    await expect(session.metadataRunOnce?.()).resolves.toBe(3)
+  })
+
+  it('B-11 诊断面将当前库句柄与开关原样下传上游', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(sessionOptions(true), fixture.surface)
+    session.metadataDiagnostics()
+    const spy = fixture.diagnostics as unknown as ReturnType<typeof vi.fn>
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(spy.mock.calls[0][1]).toBe(true)
+    expect(spy.mock.calls[0][0]).toBe(
+      (session.runtime as unknown as { database: unknown }).database
+    )
+  })
+
+  it('边界：开关缺省（undefined）与显式 false 同形 —— 都不注入', async () => {
+    const fixture = createSessionFixture()
+    await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(fixture.capturedConfig() && 'metadataResolver' in fixture.capturedConfig()!).toBe(false)
   })
 })

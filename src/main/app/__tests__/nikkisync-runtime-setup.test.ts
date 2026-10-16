@@ -28,10 +28,13 @@ vi.mock('../../utils/startup-diagnostic', () => ({
 
 import {
   GAME_ROOT_ENV_FLAG,
+  METADATA_ENV_FLAG,
+  METADATA_RESOLVER_ENABLED_DEFAULT,
   NIKKISYNC_DB_SEGMENTS,
   RUNTIME_ENABLED_DEFAULT,
   RUNTIME_ENV_FLAG,
   SETTING_GAME_ROOT,
+  SETTING_METADATA_RESOLVER,
   SETTING_RUNTIME_ENABLED,
   SETTING_SYNC_ENABLED,
   SETTING_SYNC_MDNS,
@@ -42,6 +45,7 @@ import {
   buildSessionOptions,
   initNikkiSyncRuntime,
   nikkisyncDatabaseFile,
+  resolveMetadataResolverEnabled,
   resolveRuntimeEnabled,
   resolveSyncEnabled,
   stopNikkiSyncRuntime,
@@ -406,5 +410,73 @@ describe('buildSessionOptions', () => {
       settings: settings({ [SETTING_SYNC_PORT]: 70000 })
     })
     expect(illegal.syncServer?.port).toBe(SYNC_SERVER_DEFAULT_PORT)
+  })
+})
+
+describe('阶段 6：元数据解析开关（默认关 + env 优先 + 脏值回落）', () => {
+  const base = {
+    userDataDir: 'U:',
+    projectRoot: 'P:',
+    isPackaged: false,
+    resourcesPath: '',
+    settings: settings({})
+  }
+
+  it('默认关闭：常量与无设置、无 env 时的判定一致', () => {
+    expect(METADATA_RESOLVER_ENABLED_DEFAULT).toBe(false)
+    expect(SETTING_METADATA_RESOLVER).toBe('nikkisync.metadataResolverEnabled')
+    expect(METADATA_ENV_FLAG).toBe('NIKKI_NIKKISYNC_METADATA')
+    expect(resolveMetadataResolverEnabled({}, settings({}))).toBe(false)
+  })
+
+  it('env 逃生阀优先于设置项（dev / 验证强启与强关两个方向都要压过）', () => {
+    expect(resolveMetadataResolverEnabled({ [METADATA_ENV_FLAG]: '1' }, settings({}))).toBe(true)
+    expect(
+      resolveMetadataResolverEnabled(
+        { [METADATA_ENV_FLAG]: '0' },
+        settings({ [SETTING_METADATA_RESOLVER]: true })
+      )
+    ).toBe(false)
+  })
+
+  it('正常：设置项为布尔 true 时开启', () => {
+    expect(
+      resolveMetadataResolverEnabled({}, settings({ [SETTING_METADATA_RESOLVER]: true }))
+    ).toBe(true)
+  })
+
+  it('边界：脏值一律判关（该开关一旦为真即产生出站请求，不得因历史脏数据静默开启）', () => {
+    for (const dirty of ['true', 1, 'yes', {}, []]) {
+      expect(
+        resolveMetadataResolverEnabled({}, settings({ [SETTING_METADATA_RESOLVER]: dirty }))
+      ).toBe(false)
+    }
+    // 非 1/0 的 env 视为未设置，交回设置项判断
+    expect(
+      resolveMetadataResolverEnabled(
+        { [METADATA_ENV_FLAG]: 'on' },
+        settings({ [SETTING_METADATA_RESOLVER]: true })
+      )
+    ).toBe(true)
+    expect(
+      resolveMetadataResolverEnabled(
+        { [METADATA_ENV_FLAG]: 'on' },
+        settings({ [SETTING_METADATA_RESOLVER]: false })
+      )
+    ).toBe(false)
+  })
+
+  it('buildSessionOptions 把判定结果下传会话参数（默认 false，开启后为 true）', () => {
+    expect(buildSessionOptions({ ...base, env: {} }).metadataResolverEnabled).toBe(false)
+    expect(
+      buildSessionOptions({
+        ...base,
+        env: {},
+        settings: settings({ [SETTING_METADATA_RESOLVER]: true })
+      }).metadataResolverEnabled
+    ).toBe(true)
+    expect(
+      buildSessionOptions({ ...base, env: { [METADATA_ENV_FLAG]: '1' } }).metadataResolverEnabled
+    ).toBe(true)
   })
 })

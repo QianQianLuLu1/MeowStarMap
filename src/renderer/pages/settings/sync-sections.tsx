@@ -25,6 +25,9 @@ const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
 const SETTING_RUNTIME_ENABLED = 'nikkisync.runtimeEnabled'
 // 阶段 4：图库数据源开关（'local' | 'nikkisync'），消费点 mediaStore 的源分流
 const SETTING_GALLERY_SOURCE = 'gallery.dataSource'
+// 阶段 6：上游远端元数据解析开关。渲染层只能写这个布尔键本身
+// （在 src/shared/settings-keys.ts 白名单里），出站请求的实际端点由主进程侧常量决定。
+const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
 
 /**
  * 同步服务设置分区（sync-integration 阶段5 落地，阶段3 改接真实 NikkiSync 服务）。
@@ -42,6 +45,8 @@ export const SyncServiceSection: React.FC = () => {
   const { showError } = useErrorToast()
   const [enabled, setEnabled] = useState(false)
   const [gallerySource, setGallerySource] = useState<'local' | 'nikkisync'>('local')
+  // 阶段 6：上游远端元数据解析开关（默认关——为真即产生对第三方的出站请求）
+  const [metadataEnabled, setMetadataEnabled] = useState(false)
   const [status, setStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
   const [devices, setDevices] = useState<NikkiSyncPairedDeviceInfo[]>([])
   const [busy, setBusy] = useState(false)
@@ -97,6 +102,22 @@ export const SyncServiceSection: React.FC = () => {
     }
   }, [])
 
+  /** 阶段 6：元数据解析开关的读回。读不到一律保持关闭（该开关有出站后果，不默认生效）。 */
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const value = await window.electronAPI?.settings.get(SETTING_METADATA_RESOLVER, false)
+        if (alive) setMetadataEnabled(value === true)
+      } catch {
+        // 静默：保持关闭态
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
   const handleGallerySourceToggle = async (value: boolean): Promise<void> => {
     const api = window.electronAPI
     if (busy || !api) return
@@ -123,6 +144,31 @@ export const SyncServiceSection: React.FC = () => {
       // 持久化失败即回滚三处状态，避免「UI 显示已切、下次启动又回本地」的不一致
       setGallerySource(previous)
       useMediaStore.getState().setSource(previous)
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * 阶段 6：元数据解析开关。
+   *
+   * 只写自己那一个设置项：**不**启停同步服务、**不**改数据源、**不**触发扫描——
+   * 那三件事各有自己的开关与后果，混在一个处理器里会让用户无法判定「我刚才到底开了什么」。
+   * 生效时机是下一次建会话（重启，或换根 / 改端口触发的重建），因此这里刻意不做
+   * 「立即生效」的伪装；成功也不再弹确认条（开关状态本身就是反馈），
+   * 只为真正需要用户知道的失败路径报错并回滚。
+   */
+  const handleMetadataToggle = async (value: boolean): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    const previous = metadataEnabled
+    setBusy(true)
+    setMetadataEnabled(value)
+    try {
+      await api.settings.set(SETTING_METADATA_RESOLVER, value)
+    } catch (error) {
+      setMetadataEnabled(previous)
       showError(error)
     } finally {
       setBusy(false)
@@ -215,6 +261,19 @@ export const SyncServiceSection: React.FC = () => {
           disabled={busy}
           onChange={(value) => void handleGallerySourceToggle(value)}
         />
+        {/* 阶段 6：上游远端元数据解析。默认关闭，开启即向第三方发起请求 */}
+        <SettingsToggle
+          label={t('settings.sync.metadata.enable')}
+          description={t('settings.sync.metadata.enableDesc')}
+          checked={metadataEnabled}
+          disabled={busy}
+          onChange={(value) => void handleMetadataToggle(value)}
+        />
+        {/* 披露常驻可见，不放进 tooltip、也不等开了之后再找：
+            用户必须在点下去之前就看到「发给谁、写到哪里、会不会下发给已配对设备」 */}
+        <p className="text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+          {t('settings.sync.metadata.disclosure')}
+        </p>
         <SettingsCard>
           <div className="space-y-2">
             <SettingsRow label={t('settings.sync.status.label')}>

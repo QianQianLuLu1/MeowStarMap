@@ -41,6 +41,7 @@ import {
 } from './runtime-manager'
 import { embeddedServerConfig, mapPairedDeviceRow } from './sync-server-view'
 import { registerNikkiSyncResourcePaths } from './resource-allowlist'
+import { NUAN5_METADATA_ENDPOINT, buildMetadataResolverConfig } from './metadata-resolver-driver'
 import type {
   EmbeddedRuntimeLike,
   NikkiSyncPairedDeviceView,
@@ -97,6 +98,25 @@ interface ProfileStatsIndexSurface {
 }
 
 /**
+ * 上游 `metadata/Nuan5CompatibleResolver.ts:64` 的本仓最小面（阶段 6）。
+ * 构造参数 `{endpoint?,id?,version?,timeoutMs?,minIntervalMs?}`；本仓**显式传 endpoint**
+ * 而不吃默认值，以保证设置页的隐私披露文案与实际出口逐字同源。
+ * 该模块运行时零上游依赖（只 `import type`），装载它不产生任何网络副作用。
+ */
+interface Nuan5ResolverSurface {
+  Nuan5CompatibleResolver: new (config?: Record<string, unknown>) => unknown
+}
+
+/**
+ * 上游 `metadata/MetadataResolutionDiagnostics.ts:3` 的本仓最小面。
+ * 纯 SELECT 聚合计数（`withCompleteEnvelope/resolved/failed/withOutfit/withCamera/motionPhotos`
+ * + 失败分类），上游注释即承诺「绝不序列化行、原始信封或错误原文」，因此可直接进状态快照。
+ */
+interface MetadataDiagnosticsSurface {
+  metadataResolutionDiagnostics(database: unknown, resolverEnabled: boolean): unknown
+}
+
+/**
  * 上游 `LocalTlsIdentityService` 的最小面（`server/LocalTlsIdentityService.ts:117-129`）。
  * 只有一个公开方法 `getOrCreate()`：身份存 `app_settings['server.tlsIdentity']`，
  * **不落盘、也没有路径可注入**——嵌入态因此不建 certs 目录（见计划 §4）。
@@ -120,6 +140,9 @@ export interface RuntimeSurface {
   suitSearchIndex: SearchIndexSurface
   clothingSearchIndex: ClothingIndexSurface
   profileStatsIndex: ProfileStatsIndexSurface
+  /** 阶段 6：元数据解析器与解析诊断，各自是独立深入口。 */
+  nuan5Resolver: Nuan5ResolverSurface
+  metadataDiagnostics: MetadataDiagnosticsSurface
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -136,6 +159,23 @@ export const ROW_MAPPER_DEEP_ENTRY = ['server', 'row-mappers.js'] as const
 export const SUIT_SEARCH_DEEP_ENTRY = ['server', 'SuitSearchIndex.js'] as const
 export const CLOTHING_SEARCH_DEEP_ENTRY = ['server', 'ClothingSearchIndex.js'] as const
 export const PROFILE_STATS_DEEP_ENTRY = ['server', 'ProfileStatsIndex.js'] as const
+
+/**
+ * 阶段 6 的两个元数据解析深入口。
+ *
+ * 上游 `dist/src/index.js` 的桶只 re-export `metadata/MetadataResolverPipeline.js` 与
+ * `metadata/types.js`（已实测），`Nuan5CompatibleResolver` 与
+ * `metadataResolutionDiagnostics` 都在桶外 ⇒ 与 `server/*` 三入口同类处境。
+ *
+ * 为什么不把它们加进 `NIKKISYNC_REQUIRED_EXPORTS`：那张表由 `probe.ts` 拿去在**桶导出**上
+ * 做存在性判定，桶里没有的符号写进去只会在正确的构建产物上误报红。产物存在性改由
+ * `scripts/verify-nikkisync-link.ts` 的深入口清单承担（见该文件 REQUIRED_METADATA_ARTIFACTS）。
+ */
+export const NUAN5_RESOLVER_DEEP_ENTRY = ['metadata', 'Nuan5CompatibleResolver.js'] as const
+export const METADATA_DIAGNOSTICS_DEEP_ENTRY = [
+  'metadata',
+  'MetadataResolutionDiagnostics.js'
+] as const
 
 /**
  * 已配对设备清单的**只读** SELECT。
@@ -188,10 +228,13 @@ export function packagingContextFor(
 }
 
 /**
- * 装载运行时面：`pc-companion` + `database` + `server/row-mappers.js` 深入口。
+ * 装载运行时面：`pc-companion` + `database` + `server/*` 与 `metadata/*` 深入口。
  *
  * `core` / `protocol` 不在此装载：本阶段不直接调用它们（AssetResolver 由上游
  * ScanReconciler 内部使用，协议常量校验已由阶段 1 的 probe / drift 守护承担）。
+ *
+ * 装载本身**不产生任何网络副作用**：`Nuan5CompatibleResolver` 只是拿到一个类，
+ * 真正的 `fetch` 只在 `MetadataResolverService.runOnce()` 内经本仓显式驱动时发生。
  */
 export async function loadRuntimeSurface(
   projectRoot: string,
@@ -208,13 +251,17 @@ export async function loadRuntimeSurface(
   const suitSearchIndex = await loadDeepModule(SUIT_SEARCH_DEEP_ENTRY)
   const clothingSearchIndex = await loadDeepModule(CLOTHING_SEARCH_DEEP_ENTRY)
   const profileStatsIndex = await loadDeepModule(PROFILE_STATS_DEEP_ENTRY)
+  const nuan5Resolver = await loadDeepModule(NUAN5_RESOLVER_DEEP_ENTRY)
+  const metadataDiagnostics = await loadDeepModule(METADATA_DIAGNOSTICS_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
     rowMappers: rowMappers as unknown as RowMapperSurface,
     suitSearchIndex: suitSearchIndex as unknown as SearchIndexSurface,
     clothingSearchIndex: clothingSearchIndex as unknown as ClothingIndexSurface,
-    profileStatsIndex: profileStatsIndex as unknown as ProfileStatsIndexSurface
+    profileStatsIndex: profileStatsIndex as unknown as ProfileStatsIndexSurface,
+    nuan5Resolver: nuan5Resolver as unknown as Nuan5ResolverSurface,
+    metadataDiagnostics: metadataDiagnostics as unknown as MetadataDiagnosticsSurface
   }
 }
 
@@ -405,13 +452,39 @@ export async function createRuntimeSession(
     config: Record<string, unknown>
   ) => EmbeddedRuntimeLike
   const syncServer = embeddedServerConfig(options.syncServer)
+  /**
+   * 阶段 6 · 唯一注入缝。
+   *
+   * 关闭时 `buildMetadataResolverConfig` 返回 `{}`，展开后**连键都不存在** ⇒
+   * 上游 `runtime.ts:74-81` 的条件分支不成立、根本不构造 `MetadataResolverService`，
+   * 因此既没有出站请求也没有 15s 定时器。这比传 `{ enabled: false }` 更严格：
+   * 后者会保留服务实例，而上游 `runOnce()` 首行就因 `!enabled` 返回 0，
+   * 把「关掉」误实现成「开着但什么都不做」。
+   */
+  const metadataResolverEnabled = options.metadataResolverEnabled === true
+  const metadataFragment = buildMetadataResolverConfig({
+    enabled: metadataResolverEnabled,
+    endpoint: NUAN5_METADATA_ENDPOINT,
+    createResolver: (endpoint) => {
+      // 转型只为复用 nikkisyncExport 的可诊断报错（"Expected export … run `npm run build`"）：
+      // 深入口符号不在 NIKKISYNC_REQUIRED_EXPORTS 里，探针与桶导出都覆盖不到它们。
+      // 该调用发生在 RuntimeCtor 构造**之前**，因此失败时还没有任何 SQLite 句柄需要归还。
+      const ResolverCtor = nikkisyncExport(
+        surface.nuan5Resolver as unknown as NikkiSyncModule,
+        'Nuan5CompatibleResolver'
+      ) as new (config?: Record<string, unknown>) => unknown
+      // 端点由驱动层校验后下传，这里不另取一份：保证披露文案与实际出口只有一个出处
+      return new ResolverCtor({ endpoint })
+    }
+  })
   const runtime = new RuntimeCtor({
     databaseFile: options.databaseFile,
     scanner: {
       ...(options.gameRoot ? { selectedInstallRoot: options.gameRoot } : {}),
       watcher: options.watcher
     },
-    server: syncServer
+    server: syncServer,
+    ...metadataFragment
   })
   // runtime 构造期即建库并跑 migration：其后任一步（TLS/配对导出缺失、查询面装配）
   // 抛错都必须先关库再上抛——否则泄漏的 SQLite 句柄会在 Windows 上锁死
@@ -425,6 +498,8 @@ export async function createRuntimeSession(
       database: unknown
     ) => PairingRepositoryLike
     const pairing = new PairingCtor(runtime.database)
+    // 上游只在配置里存在 metadataResolver 键时才构造该服务 ⇒ undefined 即「本会话未开启解析」
+    const metadataService = runtime.metadataResolver
 
     return {
       runtime,
@@ -451,7 +526,18 @@ export async function createRuntimeSession(
         // 上游 revoke() 是无条件 UPDATE，先验存在与未撤销才能给出可判定的 false
         pairing.revoke(deviceId)
         return true
-      }
+      },
+      stopMetadataResolver: () => {
+        // 上游 stop() 对 undefined timer 安全（幂等）；未开启时句柄整个不存在
+        metadataService?.stop()
+      },
+      // 仅在服务存在时挂出驱动面：编排层据此判 0 轮，无需重复读开关
+      ...(metadataService ? { metadataRunOnce: () => metadataService.runOnce() } : {}),
+      metadataDiagnostics: () =>
+        surface.metadataDiagnostics.metadataResolutionDiagnostics(
+          runtime.database,
+          metadataResolverEnabled
+        )
     }
   } catch (error) {
     try {

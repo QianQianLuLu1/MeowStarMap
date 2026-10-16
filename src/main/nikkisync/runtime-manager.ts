@@ -18,6 +18,8 @@
 import type {
   NikkiSyncPairedDeviceView,
   NikkiSyncPairingCode,
+  NikkiSyncMetadataCounters,
+  NikkiSyncMetadataResolutionStatus,
   NikkiSyncRuntimeHandle,
   NikkiSyncRuntimeSession,
   NikkiSyncRuntimeState,
@@ -36,6 +38,12 @@ import {
 } from './sync-server-view'
 // 阶段 4：会话拆除时收回 media:// 的资产路径授权（模块级单例，见 resource-allowlist）
 import { clearNikkiSyncResourcePaths } from './resource-allowlist'
+// 阶段 6：元数据解析的有界驱动（纯函数层，零上游引用）
+import {
+  NUAN5_METADATA_ENDPOINT,
+  runBoundedMetadataResolution,
+  type MetadataResolutionDriveResult
+} from './metadata-resolver-driver'
 
 /**
  * 上游在「找不到游戏安装目录」时的原始消息（`scanner/ScannerService.ts` 内硬编码）。
@@ -64,6 +72,22 @@ export interface FakeSessionPlan {
   pairingUriThrows?: boolean
   /** `revokePairedDevice` 的返回值（默认 true）。 */
   revokeResult?: boolean
+  /**
+   * 阶段 6：是否模拟「上游构造了 `MetadataResolverService`」。
+   * 复刻上游 `runtime.ts:74-81` 的条件构造：默认 false ⇒ 会话上**没有** `metadataRunOnce`，
+   * 编排层因此连一轮都不发起（不必再读一次开关）。
+   */
+  metadataResolverPresent?: boolean
+  /** 阶段 6：`stopMetadataResolver()` 的抛错形态（验证一个清理步骤失败不影响其余）。 */
+  metadataStopThrows?: boolean
+  /** 阶段 6：逐轮 `runOnce()` 返回值；耗尽后重复最后一个值（缺省每轮 0 ⇒ 驱动只跑一轮）。 */
+  metadataRunOnceResults?: number[]
+  /** 阶段 6：`runOnce()` 是否抛错（验证驱动故障绝不改写已成功的扫描结果）。 */
+  metadataRunOnceThrows?: boolean
+  /** 阶段 6：在返回本轮结果之前等待的钩子（用于构造「驱动仍在飞、扫描已返回」的时序）。 */
+  metadataRunOnceWait?: () => Promise<void>
+  /** 阶段 6：让 `fullScan()` 本身抛错（验证扫描失败时一轮解析都不发起）。 */
+  fullScanThrows?: boolean
 }
 
 export interface RuntimeManagerDependencies {
@@ -128,6 +152,17 @@ interface ManagerState {
   syncAddress?: NikkiSyncSyncServerAddress
   /** 最近一次启停失败原因（端口占用归一化为 `PORT_IN_USE`）。 */
   syncError?: string
+  /**
+   * 阶段 6：会话代次。每次拆除递增，驱动在**每轮开始前**比对，
+   * 代次变了就不再发起下一轮——这是「不假装能取消在飞请求」的唯一诚实做法
+   * （`runWithTimeout` 只是让 Promise resolve，并不中断已在跑的 `runOnce()`，
+   * 若放任其继续，拆除期会与 `updateMetadata` 事务重叠）。
+   */
+  generation: number
+  /** 阶段 6：上游聚合计数（建会话与每次驱动后各取一次；**不**在 status() 里取，避免每次轮询都跑聚合 SQL）。 */
+  metadataCounters?: NikkiSyncMetadataCounters
+  /** 阶段 6：最近一次扫描后驱动的结果。 */
+  metadataDrive?: MetadataResolutionDriveResult
 }
 
 function messageOf(error: unknown): string {
@@ -167,7 +202,59 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     state: deps.isLinkReady(deps.defaults.projectRoot) ? 'idle' : 'unavailable',
     databaseFile: deps.defaults.databaseFile,
     hint: deps.isLinkReady(deps.defaults.projectRoot) ? undefined : linkMissingHint,
-    syncConfig: resolveSyncServerConfig(deps.defaults.syncServer)
+    syncConfig: resolveSyncServerConfig(deps.defaults.syncServer),
+    generation: 0
+  }
+
+  /**
+   * 阶段 6：取一次上游聚合计数。
+   * 诊断本身是纯 SELECT，但**不得成为故障源**：库已关闭或尚未建全时只记 warn，
+   * 状态快照里如实缺省（不伪造计数，也不让一次展示失败牵连生命周期）。
+   */
+  function captureMetadataCounters(session: NikkiSyncRuntimeSession): void {
+    try {
+      const counters = session.metadataDiagnostics()
+      if (counters && typeof counters === 'object') {
+        state.metadataCounters = counters as NikkiSyncMetadataCounters
+      }
+    } catch (error) {
+      deps.log('warn', `nikkisync metadata diagnostics unavailable: ${messageOf(error)}`)
+    }
+  }
+
+  /** 阶段 6：元数据解析快照（`nikkisync:runtime-status` 的可选段，逐字段如实给出）。 */
+  function metadataSnapshot(): NikkiSyncMetadataResolutionStatus {
+    return {
+      enabled: deps.defaults.metadataResolverEnabled === true,
+      // 端点是主进程侧常量，不接受渲染层输入：UI 的披露文案与实际出口因此不会分叉
+      endpoint: NUAN5_METADATA_ENDPOINT,
+      ...(state.metadataCounters ? { counters: state.metadataCounters } : {}),
+      ...(state.metadataDrive ? { lastDrive: state.metadataDrive } : {})
+    }
+  }
+
+  /**
+   * 阶段 6：扫描成功后的有界解析驱动。
+   *
+   * 未开启时会话上没有 `metadataRunOnce`（上游条件构造）⇒ 这里一次都不发起，
+   * 编排层不需要再读一遍开关。故障处理全部在驱动层内完成，本函数**不外抛**。
+   */
+  async function driveMetadata(session: NikkiSyncRuntimeSession): Promise<void> {
+    const runOnce = session.metadataRunOnce
+    if (!runOnce) return
+    const drive = await runBoundedMetadataResolution({
+      runOnce,
+      initialGeneration: state.generation,
+      generation: () => state.generation,
+      log: deps.log
+    })
+    state.metadataDrive = drive
+    deps.log(
+      'info',
+      `nikkisync metadata resolution: passes=${drive.passes} resolved=${drive.resolved}` +
+        `${drive.aborted ? ' aborted' : ''}${drive.failed ? ' failed' : ''}`
+    )
+    captureMetadataCounters(session)
   }
 
   function status(): NikkiSyncRuntimeStatus {
@@ -186,6 +273,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       snapshot.tables = state.session.tableNames()
       // 同步服务状态随会话一起给出（UI 只轮询一个通道即可拿到扫描 + 服务两面）
       snapshot.sync = syncStatus()
+      // 阶段 6：元数据解析状态同批给出（计数是缓存值，轮询不触发聚合 SQL）
+      snapshot.metadata = metadataSnapshot()
     }
     if (state.error) snapshot.error = state.error
     if (state.hint) snapshot.hint = state.hint
@@ -195,6 +284,16 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   async function teardown(label: string): Promise<void> {
     const session = state.session
     if (!session) return
+    // 阶段 6：先作废代次，让在途的解析驱动在「下一轮开始前」自行收手；
+    // 再停元数据生产者（它会在库上写 updateMetadata），然后才是传输、扫描、关库。
+    state.generation += 1
+    try {
+      // 上游 stop() 是同步且幂等的（对 undefined timer 安全）⇒ 无需超时包装，
+      // 也不该包：包一层只会凭空造出一个需要等它落地的定时器。
+      session.stopMetadataResolver()
+    } catch (error) {
+      deps.log('warn', `nikkisync metadataResolver.stop failed: ${messageOf(error)}`)
+    }
     try {
       // 先停 LAN 服务：端口必须在关库之前释放，且 `server.stop()` 会关 WS 与 mDNS
       await deps.withTimeout(`${label}.server.stop`, () => session.server.stop())
@@ -256,6 +355,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       state.syncConfig = resolveSyncServerConfig(options.syncServer)
       state.syncAddress = undefined
       state.syncError = undefined
+      // 阶段 6：新会话不继承上一会话的驱动统计（计数按当前库重取一次）
+      state.metadataDrive = undefined
+      captureMetadataCounters(session)
       try {
         await session.scanner.start()
         state.state = 'running'
@@ -297,8 +399,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     const session = state.session
     if (!session) throw new Error(notReadyMessage(state))
     state.state = 'scanning'
+    let result: unknown
     try {
-      return await (input.path
+      result = await (input.path
         ? session.scanner.rescanPath(input.path)
         : session.scanner.fullScan())
     } catch (error) {
@@ -309,6 +412,16 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     } finally {
       if (state.state === 'scanning') state.state = 'running'
     }
+    // 阶段 6：扫描成功后启动解析，但**不**挂在扫描 IPC 的返回路径上。
+    // 一次扫描后要补的候选可能上百条（上游每轮上限 batchSize），等它跑完会让
+    // `nikkisync:start-scan` 阻塞数十秒，而扫描结果本身早已可用——上游正是因为
+    // 「只取第一批」被 467b590 修过一轮，本仓不能把等待做成收敛条件。
+    // 在途驱动由 generation 作废收尾；`driveMetadata` 内部已把 runOnce 的故障
+    // 收敛成 warn，这里再兜一层 catch，保证任何意外都不会变成未捕获 rejection。
+    void driveMetadata(session).catch((error: unknown) => {
+      deps.log('warn', `nikkisync metadata drive unexpected: ${messageOf(error)}`)
+    })
+    return result
   }
 
   async function stop(): Promise<void> {

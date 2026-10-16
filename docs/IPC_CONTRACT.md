@@ -386,13 +386,13 @@ wrapHandler(ctx, schema, handler) =>
 
 ### 8.1 查询面（阶段 2，响应体 = NikkiSync 协议 DTO，内嵌层零转换）
 
-| 通道                         | 入参                                                                    | 出参                                                                                                  | 失败码                                                   |
-| ---------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `nikkisync:runtime-status`   | 无                                                                      | `{state, dbPath, linkReady, scannerStatus?, installation?, lastScan?, tables?, sync?, error?, hint?}` | `PRECONDITION_FAILED`（句柄未装配）                      |
-| `nikkisync:start-scan`       | `{gameRoot?, path?}`                                                    | 上游 `ScanResult` 原样                                                                                | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
-| `nikkisync:get-assets`       | `{limit=100 (1..500), cursor?, type?, afterRevision?, includeDeleted?}` | `{items, nextCursor?, libraryRevision}`                                                               | 同上                                                     |
-| `nikkisync:get-asset-detail` | `assetId: string(1..128)`                                               | `mapAssetDetail` 结果                                                                                 | `VALIDATION_ERROR` / `NOT_FOUND`                         |
-| `nikkisync:get-resource`     | `{assetId, resourceId, mode='meta'\|'path'}`                            | `MediaResource` 或上游 `source_path` 原值                                                             | 同上                                                     |
+| 通道                         | 入参                                                                    | 出参                                                                                                             | 失败码                                                   |
+| ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `nikkisync:runtime-status`   | 无                                                                      | `{state, dbPath, linkReady, scannerStatus?, installation?, lastScan?, tables?, sync?, metadata?, error?, hint?}` | `PRECONDITION_FAILED`（句柄未装配）                      |
+| `nikkisync:start-scan`       | `{gameRoot?, path?}`                                                    | 上游 `ScanResult` 原样                                                                                           | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
+| `nikkisync:get-assets`       | `{limit=100 (1..500), cursor?, type?, afterRevision?, includeDeleted?}` | `{items, nextCursor?, libraryRevision}`                                                                          | 同上                                                     |
+| `nikkisync:get-asset-detail` | `assetId: string(1..128)`                                               | `mapAssetDetail` 结果                                                                                            | `VALIDATION_ERROR` / `NOT_FOUND`                         |
+| `nikkisync:get-resource`     | `{assetId, resourceId, mode='meta'\|'path'}`                            | `MediaResource` 或上游 `source_path` 原值                                                                        | 同上                                                     |
 
 ### 8.1.1 查询面扩容（阶段 4，仍零转换；为图库数据层切换而加）
 
@@ -432,6 +432,29 @@ wrapHandler(ctx, schema, handler) =>
 - 渲染层（`GalleryPage` 的 useEffect 4）收到后先用 `nikkisync:get-changes` 判有没有真的变化，
   无变化则不整表重取，避免用户滚到的位置被无意义刷新顶掉。
 - 载荷刻意留空：变化内容由 `get-changes` 权威给出，事件只表示「去问一次」。
+
+### 8.1.3 `runtime-status.metadata` 可选段（阶段 6，向后兼容的纯增字段）
+
+通道、入参、包装器**都不变**：`nikkisync:runtime-status` 仍是 `wrapHandlerNoArgs` 的逐字透传，
+preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸门、不改 `preload.test.ts` 键清单。
+新增的只是 `NikkiSyncRuntimeStatus` 上的一个可选键（遵循「新增字段可选、旧字段语义不变」）：
+
+| 字段         | 形状                                                                                                                                          | 出处与含义                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `enabled`    | `boolean`                                                                                                                                     | 主进程侧对该开关的最终判定（env 优先于设置项）                                                      |
+| `endpoint`   | `string`                                                                                                                                      | 实际下传给上游解析器的 https 端点；**只来自主进程常量**，渲染层无法注入                             |
+| `counters?`  | `{ordinaryPhotos, withNativeToken, withCompleteEnvelope, resolved, failed, pending, withOutfit, withCamera, motionPhotos, failureCategories}` | 上游 `metadataResolutionDiagnostics()` 原样透传，**全部是聚合计数**：不序列化行、原始信封或错误原文 |
+| `lastDrive?` | `{passes, resolved, aborted, failed}`                                                                                                         | 最近一次扫描后驱动的统计；未开启或从未驱动时缺省                                                    |
+
+要点：
+
+- `counters` 只在**建会话时**与**每次驱动收尾后**各取一次，**不在** `status()` 里现取：
+  那是两条带 `json_extract` 的全表聚合，而该通道会被 UI 轮询。
+- 会话拆除后 `status()` 不再带 `metadata` 段（没有会话就没有快照）；在途驱动的结果只能从日志读，
+  不能拿一个已关闭的库的计数继续对外称「当前状态」。
+- 该段是**阶段 6 新增、阶段 6b 之前不完整**的：`counters.withOutfit` 会随解析增长，
+  但上游 `dressing.clothes` 是裸 ID 数组，`search-suits` / `search-clothing` 仍返回空 `items`
+  （需要本地字典 manifest）。不要把 `withOutfit > 0` 读成「搜索已经可用」。
 
 ### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
 

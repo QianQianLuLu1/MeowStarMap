@@ -45,6 +45,40 @@ export interface NikkiSyncRuntimeStatus {
   hint?: string
   /** 局域网同步服务状态（阶段 3；未组装会话时缺省）。 */
   sync?: NikkiSyncSyncServerStatus
+  /** 元数据解析状态（阶段 6；未组装会话时缺省）。 */
+  metadata?: NikkiSyncMetadataResolutionStatus
+}
+
+/**
+ * 上游 `metadata/MetadataResolutionDiagnostics.ts` 的返回形状（阶段 6，逐字对齐、不改字段名）。
+ * 全部是**聚合计数**：上游注释即承诺绝不序列化行、原始信封或错误原文，因此可直接进 IPC 响应体。
+ */
+export interface NikkiSyncMetadataCounters {
+  schemaVersion: number
+  generatedAt: string
+  resolverEnabled: boolean
+  ordinaryPhotos: number
+  withNativeToken: number
+  withCompleteEnvelope: number
+  resolved: number
+  failed: number
+  pending: number
+  withOutfit: number
+  withCamera: number
+  motionPhotos: number
+  /** 失败归类（`networkOrTimeout` / `http` / `incompleteEnvelope` / `invalidResponse` / …）。 */
+  failureCategories: Record<string, number>
+}
+
+/** 元数据解析快照：开关事实 + 实际下传的端点 + 上游计数 + 本次驱动的结果。 */
+export interface NikkiSyncMetadataResolutionStatus {
+  enabled: boolean
+  /** 显式下传的 https 端点（不来自渲染层输入，供设置页逐字披露）。 */
+  endpoint: string
+  /** 上游聚合计数；库尚未建成时缺省。 */
+  counters?: NikkiSyncMetadataCounters
+  /** 最近一次扫描后驱动的统计（轮次 / 解析条数 / 是否被代次或故障收尾）。 */
+  lastDrive?: { passes: number; resolved: number; aborted: boolean; failed: boolean }
 }
 
 /** `DatabaseManager` 中被本阶段用到的最小面。 */
@@ -77,6 +111,25 @@ export interface EmbeddedRuntimeLike {
   readonly server: LocalSyncServerLike
   /** 上游一次性配对二维码内容（`NS1|` 七段）。 */
   createPairingUri(host: string, ttlMs?: number): string
+  /**
+   * 阶段 6：上游元数据解析服务。仅当构造时下发了 `metadataResolver` 配置键才存在
+   * （`runtime.ts:74-81` 的条件构造），未开启时为 undefined ⇒ 拆除面的 no-op 分支。
+   */
+  readonly metadataResolver?: MetadataResolverServiceLike
+}
+
+/**
+ * 上游 `metadata/MetadataResolverService.ts` 的本仓最小面（阶段 6）。
+ *
+ * 三个方法都逐字对齐上游公开面；其中 **`start()` 本仓永不调用**：
+ * 它是上游 15s 自轮询的唯一 arm 点，而上游 `runtime.start()` 把 `scanner.start()`
+ * 当硬前置并随后无条件启 LAN 服务（绑 `0.0.0.0`），本仓的 LAN 服务是显式 opt-in 的。
+ * 解析改由本仓在扫描结束后有界驱动 `runOnce()`，并在拆除期调 `stop()` 兜底。
+ */
+export interface MetadataResolverServiceLike {
+  start(): void
+  stop(): void
+  runOnce(): Promise<number>
 }
 
 /**
@@ -216,6 +269,23 @@ export interface NikkiSyncRuntimeSession {
   listPairedDevices(): NikkiSyncPairedDeviceView[]
   /** 走上游 `PairingRepository.revoke`；设备不存在或已撤销返回 false。 */
   revokePairedDevice(deviceId: string): boolean
+  /**
+   * 阶段 6：停上游元数据服务。**未开启时是 no-op**（上游句柄为 undefined）。
+   * 拆除期必须早于 `dispose()`：库关闭后 `runOnce()` 的 DB 错误会以未捕获 rejection 上抛。
+   */
+  stopMetadataResolver(): void
+  /**
+   * 阶段 6：**仅在上游服务存在时**才有此方法（编排层据此判 0 轮，不必再读开关）。
+   * 写成属性而非方法：契约是「已绑定好的闭包」，驱动层把它摘下来单独调用时不依赖 `this`
+   * （`runtime-facade` 正是以箭头函数赋值，上游 `runOnce()` 内部的 `this` 已在闭包内绑定）。
+   * 返回值 = 本轮解析成功的资产数，逐字透传上游 `runOnce()`。
+   */
+  metadataRunOnce?: () => Promise<number>
+  /**
+   * 阶段 6：上游聚合诊断（纯 SELECT）。未开启时同样可读——用于如实呈现
+   * 「有 N 张照片带完整信封但一条都没解析」这类状态，而不是伪装成空。
+   */
+  metadataDiagnostics(): unknown
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
@@ -236,6 +306,12 @@ export interface NikkiSyncSessionOptions {
    * `listen` 与 mDNS 组播都只在 `server.start()` 内发生。
    */
   syncServer?: NikkiSyncSyncServerConfig
+  /**
+   * 阶段 6：是否启用上游远端元数据解析（默认关，且**关闭时连配置键都不下发**）。
+   * 只能由主进程设置（env 或 `app_settings`），不接受渲染层传入的任意字符串：
+   * 该开关一旦为真即产生对第三方端点的出站请求。
+   */
+  metadataResolverEnabled?: boolean
 }
 
 /** IPC / 装配层消费的句柄（`ctx.nikkisyncRuntime`）。 */

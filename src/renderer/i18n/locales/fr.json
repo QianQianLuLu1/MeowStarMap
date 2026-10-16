@@ -1764,7 +1764,12 @@
       },
       "gallerySource": "Utiliser la bibliothèque de ressources NikkiSync pour la galerie",
       "gallerySourceDesc": "Désactivé : lecture des media_files locaux (par défaut). Activé : la galerie lit les assets du runtime NikkiSync intégré, avec activation implicite du runtime et une analyse",
-      "gallerySourceApplied": "Source de données de la galerie changée en {{source}}"
+      "gallerySourceApplied": "Source de données de la galerie changée en {{source}}",
+      "metadata": {
+        "enable": "Analyser les paramètres de tenue et de prise de vue",
+        "enableDesc": "Après la fin d'une analyse, le resolveur amont NikkiSync complète les paramètres de prise de vue (focale, ouverture, exposition, intensité du filtre, etc.) de la galerie synchronisée. Prend effet après le redémarrage de l'application.",
+        "disclosure": "Une fois activé, l'identifiant de chaque photo et l'enveloppe de paramètres intégrée à la photo sont envoyés au service tiers nuan5.pro pour obtenir un résultat décodé. La réponse est écrite dans la base de synchronisation locale et est également transmise aux appariés via le réseau local. La recherche de tenues et de vêtements dépend toujours du dictionnaire local ; ce commutateur ne la couvre pas."
+      }
     }
   },
   "share": {

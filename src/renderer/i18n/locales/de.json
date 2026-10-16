@@ -1764,7 +1764,12 @@
       },
       "gallerySource": "NikkiSync-Ressourcenbibliothek als Galeriequelle verwenden",
       "gallerySourceDesc": "Aus: lokale media_files werden gelesen (Standard). An: die Galerie liest die Assets des eingebetteten NikkiSync-Runtimes, inklusive impliziter Runtime-Aktivierung und einem Scan",
-      "gallerySourceApplied": "Galerie-Datenquelle auf {{source}} umgestellt"
+      "gallerySourceApplied": "Galerie-Datenquelle auf {{source}} umgestellt",
+      "metadata": {
+        "enable": "Outfit- und Aufnahmeparameter analysieren",
+        "enableDesc": "Nach Abschluss eines Durchlauts ergänzt der vorgelagerte NikkiSync-Resolver die Aufnahmeparameter (Brennweite, Blende, Belichtung, Filterstärke usw.) der synchronisierten Galerie. Wirkt nach einem Neustart der App.",
+        "disclosure": "Wenn aktiviert, werden die Foto-UID und der im Foto eingebettete Parameterumschlag zum Erhalt eines dekodierten Ergebnisses an den Drittanbieter nuan5.pro gesendet. Die Antwort wird in die lokale synchronisierte Datenbank geschrieben und über das lokale Netz auch mit gekoppelten Geräten geteilt. Die Suche nach Outfits und Kleidungsstücken ist weiterhin vom lokalen Wörterbuch abhängig; dieser Schalter deckt das nicht ab."
+      }
     }
   },
   "share": {
