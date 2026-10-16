@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 > 本版本主体为设备同步（NikkiSync 协议 v1）功能整装发布——sync-integration 阶段 0–6 的全部产出，以及端到端联调后的代码审查修复。计划与报告见 `docs/sync-integration/`。
 >
 > 2026-10-14 追加：以下「NikkiSync 运行时内嵌」变更已合入 `feat/gallery-runtime-embed` 分支并随本节补录；已于 2026-10-15 据此重新构建 `NikkiGallery-Setup-2.5.5.exe`（连同 media:// 流取消竞态启动闪退修复一并出货），`docs/sync-integration/03-sync-server-plan.md` §14.3 #1「打包态未复验」遗留项就此关闭。
+>
+> 2026-10-16 追加：「同步元数据解析能力补充（NikkiSync resolver 注入，阶段 6）」已合入并随本节补录；已于 2026-10-16 据此重新构建 `NikkiGallery-Setup-2.5.5.exe`（该能力 opt-in 默认关闭，需在设置页显式开启并重启后生效）。
 
 ### Added | 新增
 
@@ -36,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
   - **运行时启停与只读 IPC 桥（阶段 2）**：主进程内嵌 `PcCompanionRuntime`，生命周期接入应用启动与 `before-quit` 停止链，对外仅暴露只读状态通道；真实应用会话 e2e 覆盖启动、库落点、DTO 透传与退出停止
   - **同步服务端启用与配对面（阶段 3）**：接入上游 `LocalSyncServer` 的启停与配对面，新增 5 条 `nikkisync` 同步服务 IPC 通道与 preload 桥；设置页「同步服务」节改接真实 NikkiSync 服务，替换此前由本仓移植版承担的开关；真实应用会话 e2e 验证同步服务与配对二维码出图
   - **已知上游缺陷（据此改变默认值）**：上游 `MdnsAdvertiser` 存在组播自激回环，开启后以约 3.5 万包/秒向局域网泛洪，故 `nikkisync.syncMdnsEnabled` 默认置为 `false`（待上游修复后翻回）；嵌入态下服装缩略图端点因零外联未注入缓存而恒返回 404
+  - **远端元数据解析 opt-in（阶段 6，默认关闭，`docs/plans/2026-10-16-nikkisync-metadata-resolver-phase6.md`）**：扫描结束后有界驱动上游 resolver 补齐同步图库的拍摄参数（焦距/光圈/曝光/滤镜强度等，`batchSize 4`/`maxPasses 50`，绝不启用上游 15s 自轮询）；设置键 `nikkisync.metadataResolverEnabled` 默认关，开启即向第三方 `nuan5.pro` 发送照片 UID 与内嵌参数信封（设置页常驻隐私披露、12 语言包同步，env 逃生阀 `NIKKI_NIKKISYNC_METADATA`）；关闭时连 `metadataResolver` 配置键都不下发 ⇒ 零出站请求、零定时器；表级隔离护栏（结构档 + `node:sqlite` 语义档）把「同步面绝不写原有库表」钉成回归断言；拆除链最前置 `metadataResolver.stop`，generation 代次作废在途驱动；`runtime-status` 新增可选 `metadata` 段，`verify:nikkisync` 新增 metadata 深入口产物闸门；套装/服装搜索仍需本地字典（Phase 6b），`withOutfit` 计数不等于搜索可用
 - 隐私契约固化：资产详情 `metadata.raw` 剥离 NUAN5 敏感键（`nativeParamPayload`/`nativeParamNuan5Md5`），`nativeParamToken` 按上游语义保留，测试固化
 
 ### Changed | 变更
