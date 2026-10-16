@@ -25,6 +25,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 > 2026-10-16 追加：「同步元数据解析能力补充（NikkiSync resolver 注入，阶段 6）」已合入并随本节补录；已于 2026-10-16 据此重新构建 `NikkiGallery-Setup-2.5.5-beta.exe`（该能力 opt-in 默认关闭，需在设置页显式开启并重启后生效）。
 >
 > 2026-10-16 追加：「设置页导航整合（9 组 23 节 → 8 组 17 节）」已合入并随本节补录，含两处交互缺陷修复；同日定版为 `2.5.5-beta` 并据此重新构建安装包。计划见 `docs/plans/2026-10-16-settings-nav-consolidation.md`。
+>
+> 2026-10-17 追加：「全屏预览鼠标翻页（滚轮 / 侧键 / 边缘热区）与键盘切换防抖」已合入并随本节补录，含代码审查发现的滚轮吞并 EXIF 浮层、冷却初值两处缺陷修复（均先红灯后绿灯）；安装包重新构建见 `docs/plans/2026-10-17-uncommitted-review-commit-2.5.5-repack.md` 执行记录。计划见 `docs/plans/2026-10-17-fix-fullscreen-mouse-nav-and-keyboard-jank.md`。
 
 ### Added | 新增
 
@@ -52,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ### Fixed | 修复
 
+- **全屏预览鼠标翻页与键盘切换防抖（2026-10-17，TDD 红绿灯，含审查修复）**：全屏查看器原先只有左右导航箭头与触摸滑动，滚轮 / 鼠标侧键 / 左右边缘点击三条鼠标翻页路径完全未接线；键盘侧有三处抖动成因——`navigate` 读闭包里的陈旧 `fullscreenIndex`（按键连发快于一次提交，同帧第二次按键基于旧值计算，「按两张只走一张」后画面跳变）、已接管的方向键未 `preventDefault`（默认行为滚动背后图库，虚拟网格重算可见区致画面抖动）、焦点 effect 依赖含 `fullscreenIndex` 每次翻页重复 `focus()` 触发隐式 scroll-into-view。修复：新增 `src/renderer/hooks/useWheelPageNav.ts`（基于 `@use-gesture/react` 的 `useWheel` 薄封装——原生绑定规避 React 合成 wheel 的 passive 限制，阈值累加 + 冷却窗口吸收触控板惯性，单轴优先，ctrlKey 捏合缩放交还系统，非破坏性失败静默降级）；`navigate` 改读 `useUIStore.getState().fullscreenIndex`；接管键一律 `preventDefault`；聚焦收敛为打开时一次且 `preventScroll: true`；鼠标侧键 3/4 翻页并 `preventDefault`；左右边缘热区（宽 `min(12%, 120px)`，置于既有导航按钮之前不遮挡，`aria-hidden` 纯鼠标命中区，首/末张对应方向不渲染）。**审查修复（两处，均先写失败用例复现后修复）**：① EXIF 信息浮层上的滚轮被全屏根部监听吞并——浮层无法自行滚动且越阈值误翻页（`overflow-y-auto` 浮层的事件冒泡到根，被 `preventDefault` 掐死默认滚动并触发翻页），修复为 hook 新增 `ignoreSelector` 政策出口（事件目标命中即整条放行，无状态判定、重挂载安全）+ 浮层声明 `data-wheel-ignore`；② 滚轮冷却状态机 `lastTriggerRef` 以 0 初始化（语义为「t=0 已触发过一次」），`timeStamp` 小于冷却窗口的首事件被误吞，初值改 `Number.NEGATIVE_INFINITY`。回归：`useWheelPageNav.test.ts`（16 例）、`FullscreenViewer.mouseNav.test.tsx`（18 例）、`FullscreenViewer.keyboardNav.test.tsx`（9 例）；全量 405 文件 / 6262 通过 / 2 跳过，`npm run verify` 与 `npm run lint`、`npm run typecheck` 全绿
 - **设置页「添加导入目录」在已有扫描进行时永久卡死并误报成功（TDD 红绿灯）**：`ImportRootsSection` 原先只对 `scanner.start` 抛异常收口（`ipcThrew`），而主进程 `startScan` 在 `currentStatus.status === 'running'` 时直接 `return { success: false }` 且**不广播** `scanner:complete`（`src/main/scanner/index.ts`）。于是 `scanningDir` 与 `customScanningRef` 双双卡在 true——按钮永久停在「正在扫描…」，而下一次任意扫描完成事件会被 `onComplete` 误认成本次添加成功、弹出假的成功 Toast。修复为对 `result.success === false` 补 `rejected` 分支，即时以错误 Toast 回传真实 `message`，并与其后 `finally` 收口共用同一退出路径。回归：`src/renderer/pages/settings/scan-sections.test.tsx`（修复前失败）
 - **批量操作阈值的键盘调值被静默丢弃（TDD 红绿灯）**：`GeneralFileOpsSection` 原为裸 `<input type="range">` 且只在 `onMouseUp` 落库，用方向键调整阈值后不写设置、刷新即回退，界面上却显示着新值。改为复用既有 `SliderControl`（其 `onCommit` 同时挂在 `onPointerUp` 与 `onKeyUp`，键盘方向键调值随之落库）；并显式传入 `defaultValue={batchThreshold}`——该控件双击复位优先取 `defaultValue`，缺省会退到 `min = 3`，不传就等于用户误双击即静默丢掉自己的阈值。回归：`src/renderer/pages/settings/general-sections.test.tsx`（修复前失败）
 - 联调与审查修复（均先红灯后绿灯）：详情 `metadata.raw` 泄漏 NUAN5 载荷键（E2E 红灯→绿灯）；export 失败路径静默吞错补告警日志；DB 记录大写 sha256 导致导出恒 409 的大小写归一；ImageDescription 超长截断产生畸形 `\uXXXX` 转义；E2E 启动器参数校验（`--port` 0–65535 整数/未知参数拒绝/`--serve` no-op）与退出清理（exit 处理器先关 DB 再删自建临时目录，修复 Windows 下启动失败路径的临时目录泄漏；shutdown try/finally 保证退出码必达）
