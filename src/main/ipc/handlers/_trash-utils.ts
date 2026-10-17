@@ -1,5 +1,6 @@
+// @core-change: 完全删除图片时补齐 X6Game\ScreenShot 同名副本的同步清理，消除三目录残留与重扫复活
 /**
- * 媒体生命周期域共享工具：文件物理删除批量操作 + 缩略图清理（缓存 + 游戏原生 LQ）
+ * 媒体生命周期域共享工具：文件物理删除批量操作 + 缩略图清理（缓存 + 游戏原生同图衍生文件）
  *
  * 供 `media-lifecycle-handler.ts` 的 permanentDelete / emptyRecycleBin / delete 共用
  * 同一套三态判定（成功 / 文件不存在 / 失败）、重试退避、熔断与聚合日志逻辑。
@@ -15,14 +16,21 @@
  * 1. 缓存缩略图：thumbnail 位于 cacheDir 内 → 引用文件 + ${hash}.jpg/_low/_high 三档位；
  * 2. 游戏原生 LQ：由 file_path 经 resolveNativeThumbnailPath 严格推导（非信任 thumbnail 列），
  *    并联动硬删该 LQ 的 DB 记录（LQ 文件本身也是入库媒体记录，scene_category='thumbnail'）。
+ *
+ * #fix-permanent-delete-game-photo-variants：第 2 类由「LQ 单一目标」扩展为**同图衍生文件
+ * 全集**——游戏会把同一张照片以完全相同的文件名写入多个目录：NikkiPhotos_HighQuality（原图）、
+ * NikkiPhotos_LowQuality（原生低清）、X6Game\ScreenShot（截图副本，扁平无 UID 子目录），
+ * 另有兼容变体 X6Game\Saved\ScreenShot。此前只推导 HQ→LQ 一条，X6Game\ScreenShot 完全未
+ * 覆盖 ⇒ 完全删除后该副本及其 local_screenshot 数据库记录必然残留、重扫即复活。
+ * 现统一经 resolveGamePhotoVariantPaths（scanner/path-classifier.ts 纯函数）推导，
+ * 三个副本与其 DB 记录、缓存缩略图一并清理。
  */
 import fsp from 'fs/promises'
 import path from 'path'
 import { pathExists } from '../../utils/file-utils'
 import { logger } from '../../utils/logger'
 import { t } from '../../i18n'
-import { resolveNativeThumbnailPath } from '../../scanner/path-classifier'
-import type { MediaRepository } from '../../database/media-repository'
+import { resolveGamePhotoVariantPaths } from '../../scanner/path-classifier'
 
 /**
  * 物理删除三态结果。
@@ -170,10 +178,12 @@ export async function unlinkBatch(
  * 1. 缓存缩略图：DB thumbnail 列位于 cacheDir 前缀内 → 删除引用文件，
  *    并按生成器命名规范（generator.ts）推导清理 `${hash}.jpg` / `${hash}_low.jpg` /
  *    `${hash}_high.jpg` 三档位（hash 为 sha256 十六进制切片，不含下划线，后缀剥离无歧义）；
- * 2. 游戏原生 LQ：由源文件路径 file_path 经 `resolveNativeThumbnailPath` 严格推导
- *    （scanner/path-classifier.ts 纯函数，须同时命中 \X6Game\Saved\GamePlayPhotos\ 与
- *    \NikkiPhotos_HighQuality\ 目录段）——thumbnail 列不作依据，绝不据此触碰缓存外文件。
- *    推导结果只可能是「与被删照片同名、位于兄弟 NikkiPhotos_LowQuality 目录」的那一个文件。
+ * 2. 游戏原生同图衍生文件（#fix-permanent-delete-game-photo-variants）：由源文件路径 file_path
+ *    经 `resolveGamePhotoVariantPaths` 严格推导（scanner/path-classifier.ts 纯函数，须命中
+ *    \X6Game\Saved\GamePlayPhotos\ + \NikkiPhotos_HighQuality\ + 单层纯数字 UID 段）——
+ *    thumbnail 列不作依据，绝不据此触碰缓存外文件。推导结果只可能是「与被删照片同名、位于
+ *    兄弟 NikkiPhotos_LowQuality 目录 / X6Game\ScreenShot / X6Game\Saved\ScreenShot」的
+ *    那几个文件（都只是候选，三目录并不总是齐备，缺项按 missing 跳过）。
  *
  * 安全边界：
  * - 缓存目标：cacheDir 前缀（大小写不敏感 + path.sep 边界）不变；
@@ -184,7 +194,7 @@ export async function unlinkBatch(
  *
  * @param rows 待清理的 DB 行（含可选 file_path / thumbnail 路径）
  * @param cacheDir 应用缩略图缓存目录（ctx.thumbnailGen.getCacheDir()）
- * @param hooks 可选钩子：原生 LQ 文件被删除或本已不存在时回调
+ * @param hooks 可选钩子：同图衍生文件被删除或本已不存在时回调
  *   （`makeNativeThumbRecordCleaner` 用于同步硬删其 DB 记录，避免悬空记录）
  * @returns 实际删除的文件数
  */
@@ -199,10 +209,13 @@ export async function cleanupThumbnailsForRows(
   let deleted = 0
   let firstError: unknown
   const nativeRemoved: string[] = []
+  // 失败路径聚合（#fix-permanent-delete-game-photo-variants）：沿用 unlinkBatch 的
+  // 「循环后聚合一条」约定，绝不逐项 warn（历史教训：2474 项失败刷爆日志）
+  const failedPaths: string[] = []
   for (const target of targets) {
     try {
       if (!(await pathExists(target.path))) {
-        // 文件本已不存在；原生缩略图缺失意味着其 DB 记录（若有）此刻已悬空
+        // 文件本已不存在；同图衍生文件缺失意味着其 DB 记录（若有）此刻已悬空
         if (target.kind === 'native') nativeRemoved.push(target.path)
         continue
       }
@@ -221,14 +234,15 @@ export async function cleanupThumbnailsForRows(
         if (target.kind === 'native') nativeRemoved.push(target.path)
         continue
       }
+      failedPaths.push(target.path)
       if (firstError === undefined) firstError = err
     }
   }
 
   if (hooks?.onNativeThumbnailRemoved && nativeRemoved.length > 0) {
-    for (const lqPath of nativeRemoved) {
+    for (const variantPath of nativeRemoved) {
       try {
-        await hooks.onNativeThumbnailRemoved(lqPath)
+        await hooks.onNativeThumbnailRemoved(variantPath)
       } catch (err) {
         if (firstError === undefined) firstError = err
       }
@@ -236,8 +250,10 @@ export async function cleanupThumbnailsForRows(
   }
 
   if (firstError !== undefined) {
+    const shown = failedPaths.slice(0, UNLINK_LOG_SAMPLE_LIMIT)
+    const omitted = failedPaths.length - shown.length
     logger.warn(
-      `[media-cleanup] 缩略图清理部分失败（目标 ${targets.length} 个，已删 ${deleted} 个，原生记录联动 ${nativeRemoved.length} 个）`,
+      `[media-cleanup] 缩略图清理部分失败（目标 ${targets.length} 个，已删 ${deleted} 个，原生记录联动 ${nativeRemoved.length} 个，失败 ${failedPaths.length} 个${failedPaths.length > 0 ? `：${shown.join(' | ')}${omitted > 0 ? ` …等 ${failedPaths.length} 个` : ''}` : ''}）`,
       firstError
     )
   }
@@ -247,26 +263,67 @@ export async function cleanupThumbnailsForRows(
 /** 单个缩略图清理目标 */
 export interface ThumbnailCleanupTarget {
   path: string
-  /** cache：应用缩略图缓存目录内文件；native：由源文件路径严格推导的游戏原生 LQ 缩略图 */
+  /**
+   * cache：应用缩略图缓存目录内文件；
+   * native：由源文件路径严格推导的游戏原生同图衍生文件（NikkiPhotos_LowQuality 同名副本 /
+   * X6Game\ScreenShot 同名副本 / X6Game\Saved\ScreenShot 同名副本）
+   */
   kind: 'cache' | 'native'
 }
 
 /** cleanupThumbnailsForRows 的可选钩子 */
 export interface ThumbnailCleanupHooks {
-  /** 原生 LQ 文件已物理删除或本已不存在（missing）时回调，用于同步硬删其 DB 记录；删除失败时不调用 */
-  onNativeThumbnailRemoved?: (lqPath: string) => Promise<void>
+  /**
+   * 同图衍生文件已物理删除或本已不存在（missing）时回调，用于同步硬删其 DB 记录；
+   * 删除失败时不调用（记录保留供用户重试）。
+   *
+   * @param variantPath 已删除或本已不存在的衍生文件路径
+   */
+  onNativeThumbnailRemoved?: (variantPath: string) => Promise<void>
 }
 
 /** 缓存缩略图文件名模式：${hash}.jpg 及其 _low/_high 档位（hash 为 sha256 十六进制切片，不含下划线） */
 const CACHE_THUMB_NAME_RE = /^(.+?)(?:_low|_high)?\.jpg$/i
 
 /**
+ * 由 DB thumbnail 列推导应清理的缓存文件路径集合（三档位）。
+ *
+ * 安全边界不变：thumbnail 必须落在 cacheDir 前缀内（大小写不敏感 + path.sep 边界），
+ * 否则返回空数组——绝不据此触碰缓存目录外的文件。
+ * 命名非 ${hash}.jpg 时仅返回引用文件本身（维持既有行为）。
+ *
+ * @param thumbnail DB thumbnail 列值（可为缓存内任意档位路径）
+ * @param cacheDir 应用缩略图缓存目录
+ * @returns 应清理的缓存文件路径数组；入参非法 / 目录外 / cacheDir 为空时返回空数组
+ */
+export function collectCacheTierPaths(thumbnail: string, cacheDir: string): string[] {
+  if (!thumbnail || !cacheDir) return []
+  try {
+    const resolved = path.resolve(thumbnail)
+    const resolvedCacheDir = path.resolve(cacheDir).toLowerCase()
+    const lower = resolved.toLowerCase()
+    const isInside = lower === resolvedCacheDir || lower.startsWith(resolvedCacheDir + path.sep)
+    if (!isInside) return []
+    const dir = path.dirname(resolved)
+    const m = path.basename(resolved).match(CACHE_THUMB_NAME_RE)
+    const names = m
+      ? [`${m[1]}.jpg`, `${m[1]}_low.jpg`, `${m[1]}_high.jpg`]
+      : [path.basename(resolved)]
+    return names.map((name) => path.join(dir, name))
+  } catch {
+    // 非法路径跳过
+    return []
+  }
+}
+
+/**
  * 收集删除 DB 记录时应清理的缩略图目标（纯收集，不执行删除，供单元测试与清理执行共用）。
  *
  * - 缓存目标：thumbnail 位于 cacheDir 前缀内 → 引用文件 + 三档位（规范化去重）；
  *   非 ${hash}.jpg 命名仅删除引用文件本身（维持既有行为）；
- * - 原生目标：resolveNativeThumbnailPath(row.file_path) 严格推导，与批内任一 file_path
- *   相同者排除（由其自身行的删除流程处理）、落在 cacheDir 内者排除（双保险）、去重。
+ * - 原生目标：resolveGamePhotoVariantPaths(row.file_path) 严格推导（同图衍生文件全集），
+ *   与批内任一 file_path 相同者排除（由其自身行的删除流程处理）、落在 cacheDir 内者
+ *   排除（双保险）、去重。
  */
 export function collectThumbnailCleanupTargets(
   rows: readonly { file_path?: string; thumbnail?: string | null }[],
@@ -308,58 +365,78 @@ export function collectThumbnailCleanupTargets(
 
   for (const row of rows) {
     // ① 缓存目标：thumbnail 列仅在 cacheDir 前缀内才可作为删除依据（安全边界不变）
-    const thumb = row.thumbnail
-    if (thumb) {
-      try {
-        const resolved = path.resolve(thumb)
-        if (isInsideCacheDir(resolved.toLowerCase())) {
-          const dir = path.dirname(resolved)
-          const m = path.basename(resolved).match(CACHE_THUMB_NAME_RE)
-          const names = m
-            ? [`${m[1]}.jpg`, `${m[1]}_low.jpg`, `${m[1]}_high.jpg`]
-            : [path.basename(resolved)]
-          for (const name of names) {
-            pushTarget({ path: path.join(dir, name), kind: 'cache' })
-          }
-        }
-      } catch {
-        // 非法路径跳过
+    if (row.thumbnail) {
+      for (const cachePath of collectCacheTierPaths(row.thumbnail, cacheDir)) {
+        pushTarget({ path: cachePath, kind: 'cache' })
       }
     }
 
-    // ② 原生目标：由源文件路径严格推导（与扫描入库 / 存量修复 v6 / 缩略图豁免同一口径），
-    //    不信任 thumbnail 列——非 GPP+HQ 路径返回 null，不做任何清理
-    const native = resolveNativeThumbnailPath(row.file_path ?? '')
-    if (!native) continue
-    try {
-      const resolvedNative = path.resolve(native).toLowerCase()
-      if (batchPaths.has(resolvedNative)) continue
-      // 双保险：推导结果落在缓存目录内属异常数据，不删
-      if (isInsideCacheDir(resolvedNative)) continue
-      pushTarget({ path: native, kind: 'native' })
-    } catch {
-      // 非法路径跳过
+    // ② 原生目标：同图衍生文件全集，由源文件路径严格推导（与扫描入库 / 存量修复 v6 /
+    //    缩略图豁免同一口径），不信任 thumbnail 列——非官方相册 HQ 路径返回空数组，
+    //    不做任何清理。推导结果只是候选，由执行阶段 pathExists 预检后决定是否删除。
+    for (const variant of resolveGamePhotoVariantPaths(row.file_path ?? '')) {
+      try {
+        const resolvedVariant = path.resolve(variant).toLowerCase()
+        if (batchPaths.has(resolvedVariant)) continue
+        // 双保险：推导结果落在缓存目录内属异常数据，不删
+        if (isInsideCacheDir(resolvedVariant)) continue
+        pushTarget({ path: variant, kind: 'native' })
+      } catch {
+        // 非法路径跳过
+      }
     }
   }
   return targets
 }
 
+/** makeNativeThumbRecordCleaner 依赖的 repo 最小子集（结构化，便于测试注入） */
+export interface ThumbnailRecordCleanerRepo {
+  getMediaIdByPath(filePath: string): number | undefined
+  /**
+   * 可选：查询该路径记录的 thumbnail 列，用于连带清理其缓存缩略图。
+   * 声明为可选是为了兼容既有精简测试桩（缺失时只硬删记录，不清缓存）。
+   */
+  getThumbnailByPath?(filePath: string): string | null
+  hardDelete(mediaId: number): Promise<void>
+}
+
 /**
- * 生成「按路径硬删原生缩略图 DB 记录」的清理钩子（供三个删除通道接线）。
+ * 生成「按路径硬删同图衍生文件 DB 记录」的清理钩子（供三个删除通道接线）。
  *
  * 背景：游戏原生 LQ 文件（NikkiPhotos_LowQuality）本身也会被扫描器作为独立媒体记录
  * 入库（scene_category='thumbnail'，见 shared/scene-category.ts；扫描器对 GPP 子树
- * 全量遍历且豁免小图过滤）。删除 HQ 记录时若只删 LQ 文件而不删其记录，
+ * 全量遍历且豁免小图过滤）；X6Game\ScreenShot 同名副本同样独立入库
+ * （media_source='local_screenshot'）。删除 HQ 记录时若只删衍生文件而不删其记录，
  * 会残留指向已删除文件的悬空记录。
  *
+ * #fix-permanent-delete-game-photo-variants：衍生文件的缓存缩略图（副本自身记录生成，
+ * 落在 cacheDir 内）一并按三档位清理，避免留下孤儿缓存。
+ *
  * @param repo 结构化子集（便于测试注入），实际传 MediaRepository 实例
+ * @param cacheDir 应用缩略图缓存目录（ctx.thumbnailGen.getCacheDir()），用于连带清理
+ *   衍生文件自身记录的缓存缩略图；不传则只硬删记录
+ * @returns 钩子：入参为已删除或本已不存在的衍生文件路径
  */
 export function makeNativeThumbRecordCleaner(
-  repo: Pick<MediaRepository, 'getMediaIdByPath' | 'hardDelete'>
-): (lqPath: string) => Promise<void> {
-  return async (lqPath: string) => {
-    const id = repo.getMediaIdByPath(lqPath)
+  repo: ThumbnailRecordCleanerRepo,
+  cacheDir?: string
+): (variantPath: string) => Promise<void> {
+  return async (variantPath: string) => {
+    const id = repo.getMediaIdByPath(variantPath)
     if (id === undefined) return
+    // 该衍生文件自身也是入库记录，其缓存缩略图需一并清理（best-effort）
+    if (cacheDir) {
+      const thumbnail = repo.getThumbnailByPath?.(variantPath)
+      if (thumbnail) {
+        for (const cachePath of collectCacheTierPaths(thumbnail, cacheDir)) {
+          try {
+            if (await pathExists(cachePath)) await fsp.unlink(cachePath)
+          } catch {
+            // best-effort：缓存清理失败不影响记录硬删，也不阻断删除主流程
+          }
+        }
+      }
+    }
     await repo.hardDelete(id)
   }
 }

@@ -942,6 +942,22 @@ export class MediaRepository {
     return row?.id
   }
 
+  /**
+   * 根据 file_path 查询媒体记录的 thumbnail 列（#fix-permanent-delete-game-photo-variants）。
+   *
+   * 用途：完全删除一张照片时，其在 `NikkiPhotos_LowQuality` / `X6Game\ScreenShot` 下的同名
+   * 副本也是独立入库记录；删除这些副本文件时需连带清理其自身记录生成的缓存缩略图，
+   * 避免硬删记录后留下孤儿缓存。与 `getMediaIdByPath` 同为同步读（file_path 有 UNIQUE 索引）。
+   *
+   * @returns thumbnail 列值；记录不存在或该列为 NULL 时返回 null，不抛异常
+   */
+  getThumbnailByPath(filePath: string): string | null {
+    const row = this.db
+      .prepare('SELECT thumbnail FROM media_files WHERE file_path = ?')
+      .get(filePath) as { thumbnail: string | null } | undefined
+    return row?.thumbnail ?? null
+  }
+
   // ==========================================================================
   // Edit history（写操作，走 worker）
   // ==========================================================================
