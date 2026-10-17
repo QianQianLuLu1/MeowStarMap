@@ -166,7 +166,7 @@ WXNN XiangCe/
 │   │   ├── preload/           # Preload split modules (namespaced by domain)
 │   │   │   ├── ipc.ts               # IpcError class + call<T> unwrapping + subscribe event helper
 │   │   │   ├── plugin-bridge.ts     # Plugin capability bridge (window.pluginAPI) + i18n.t injection point
-│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 30 files; each exports a <key>API object)
+│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 33 files; each exports a <key>API object)
 │   │   ├── app/               # App lifecycle management (23 source files)
 │   │   │   ├── application.ts       # App main class
 │   │   │   ├── lifecycle.ts         # Lifecycle management
@@ -192,7 +192,7 @@ WXNN XiangCe/
 │   │   ├── scheduler/         # Priority-based task scheduler
 │   │   ├── services/          # Business services (file/video/watermark/share/backup/xmp...)
 │   │   ├── thumbnail/         # Thumbnail generator (sharp-based)
-│   │   ├── ipc/handlers/      # IPC channel handlers (one file per domain, ~40 files)
+│   │   ├── ipc/handlers/      # IPC channel handlers (one file per domain; 47 domain files — 4 `_`-prefixed helpers plus the set-dir-handler factory, 43 registered by setupIPC())
 │   │   ├── plugins/           # Plugin host (plugin-host/permission-guard)
 │   │   ├── video-editor/      # Video editor subprocess (bridge/filter-builder/watermark-builder)
 │   │   ├── i18n/              # Main-process internationalization
@@ -739,7 +739,7 @@ npm test
 | `npm run typecheck`    | **exit 0, zero errors**                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | `npm run lint`         | **exit 0, 0 errors**; the 11 warnings are all the DEBT-030 `src/renderer/components/common/*.test.tsx` BOM items (clearable via `eslint --fix`) (measured 2026-10-10; the three legacy locations cited by the old baseline — `.cache/`, `e2e/fullscreen-diagnose.e2e.ts`, `scripts/after-pack-vc-runtime.cjs` — no longer match)                                                                                                                                                    |
 | `npm run format:check` | On this machine (`core.autocrlf=true`) it is **exit 1** — 601 files flagged solely for CRLF line endings (measured 2026-10-10). A read-only check must add `--end-of-line auto`: `npx prettier --check --end-of-line auto <same globs>` measures exit 0. Also note the root lint-staged key `*.{ts,js,json,md}` matches at **any depth**, so `prettier --write` really rewrites `docs/**` too (still worth re-checking a large doc individually with `npx prettier --check <file>`) |
-| `npm test`             | 337 files / 5331 tests (measured 2026-10-10; all green apart from the load-dependent failure of `generator.limiter.test.ts` under the full-suite run — see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10; the two historical environment-dependent failures — `path-safety.test.ts` and `GalleryStackOverflow.test.tsx` — were fixed in 2.5.0)                                                                                                                |
+| `npm test`             | 407 files / 6288 passing + 2 skipped (measured 2026-10-17; the historical 337 / 5331 reading was the 2026-10-10 snapshot — see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10; the two historical environment-dependent failures — `path-safety.test.ts` and `GalleryStackOverflow.test.tsx` — were fixed in 2.5.0)                                                                                                                                            |
 
 ### 7.2 Full Build Command
 
@@ -906,26 +906,30 @@ npm run build-storybook
 
 ## Appendix: Common Commands Cheat Sheet
 
-| Task                      | Command                         |
-| ------------------------- | ------------------------------- |
-| Install dependencies      | `npm install`                   |
-| Rebuild native modules    | `npx @electron/rebuild`         |
-| Dev mode (exe app)        | `npm run dev`                   |
-| HTML preview build        | `npm run build:preview`         |
-| Type check                | `npm run typecheck`             |
-| Lint                      | `npm run lint`                  |
-| Lint auto-fix             | `npm run lint:fix`              |
-| Code formatting           | `npm run format`                |
-| Run unit tests            | `npm test`                      |
-| Watch tests               | `npm run test:watch`            |
-| Test coverage             | `npm run test:coverage`         |
-| i18n key check            | `npm run i18n:check`            |
-| Preview drift check       | `npm run preview:check`         |
-| Build artifacts           | `npm run build`                 |
-| Build Windows installer   | `npm run dist:win`              |
-| Regenerate icon           | `node scripts/generate-icon.js` |
-| Start component docs site | `npm run storybook`             |
-| Build docs static site    | `npm run build-storybook`       |
+| Task                         | Command                         |
+| ---------------------------- | ------------------------------- |
+| Install dependencies         | `npm install`                   |
+| Rebuild native modules       | `npx @electron/rebuild`         |
+| Dev mode (exe app)           | `npm run dev`                   |
+| HTML preview build           | `npm run build:preview`         |
+| Type check                   | `npm run typecheck`             |
+| Lint                         | `npm run lint`                  |
+| Lint auto-fix                | `npm run lint:fix`              |
+| Code formatting              | `npm run format`                |
+| Run unit tests               | `npm test`                      |
+| Watch tests                  | `npm run test:watch`            |
+| Test coverage                | `npm run test:coverage`         |
+| i18n key check               | `npm run i18n:check`            |
+| Preview drift check          | `npm run preview:check`         |
+| Markdown dead-ref check      | `npm run docs:links`            |
+| Tech-debt CI reminder        | `npm run debt:check`            |
+| Link NikkiSync deps          | `npm run link:nikkisync`        |
+| Diagnose NikkiSync load seam | `npm run verify:nikkisync`      |
+| Build artifacts              | `npm run build`                 |
+| Build Windows installer      | `npm run dist:win`              |
+| Regenerate icon              | `node scripts/generate-icon.js` |
+| Start component docs site    | `npm run storybook`             |
+| Build docs static site       | `npm run build-storybook`       |
 
 ---
 
@@ -936,8 +940,10 @@ npm run build-storybook
 - [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md): user guide (Chinese)
 - [docs/IPC_CONTRACT.md](docs/IPC_CONTRACT.md): IPC contract spec
 - [docs/PLUGIN_API.md](docs/PLUGIN_API.md): plugin API reference
+- [docs/CODING_CONVENTIONS.md](docs/CODING_CONVENTIONS.md): the four hard coding conventions and the verify/commit contract (single source of truth)
 - [docs/技术债清单.md](docs/技术债清单.md): tech debt ledger (Chinese)
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md): component docs site usage (Chinese)
+- [docs/sync-integration/](docs/sync-integration/): NikkiSync integration stage plans and audit reports (16 files, design-of-record; paths mix this repo and upstream — see the scope declaration at the top of each file)
 - [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md): project architecture overview (Chinese) — `docs/archive/` is excluded by `.gitignore`, kept locally only, not in the repo
 
 ---

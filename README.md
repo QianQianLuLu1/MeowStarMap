@@ -93,7 +93,7 @@ npm run storybook     # 启动组件文档站（Storybook，端口 6006）
 src/
 ├── main/          # Electron 主进程（IPC 通信、数据库、扫描器、服务层）
 │   ├── database/      # SQLite + 写入子进程
-│   ├── ipc/           # IPC 通道处理（~40 个文件）
+│   ├── ipc/           # IPC 通道处理（47 个域文件）
 │   ├── scanner/       # 文件扫描器（含子进程）
 │   ├── services/      # 业务服务层（13 个服务）
 │   └── media-worker/  # 缩略图 / pHash / 重复检测子进程
@@ -208,7 +208,7 @@ npm run storybook     # Start the component docs site (Storybook, port 6006)
 src/
 ├── main/          # Electron main process (IPC, database, scanner, services)
 │   ├── database/      # SQLite + write worker
-│   ├── ipc/           # IPC channel handlers (~40 files)
+│   ├── ipc/           # IPC channel handlers (47 domain files)
 │   ├── scanner/       # File scanner (with worker)
 │   ├── services/      # Business service layer (13 services)
 │   └── media-worker/  # Thumbnail / pHash / duplicate detection worker

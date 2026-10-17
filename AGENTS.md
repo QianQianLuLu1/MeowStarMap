@@ -65,7 +65,7 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 ### `src/main/`（主进程）
 
 - `app/` — 应用引导、生命周期编排（详见其 AGENTS.md）
-- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、resonance 等约 40 个域文件）；`handlers/` 详见其 AGENTS.md
+- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、resonance 等 47 个域文件，其中 4 个为 `_` 前缀辅助与 `set-dir-handler` 工厂、43 个 `registerXxxHandlers`）；`handlers/` 详见其 AGENTS.md
 - `preload/` — preload 桥命名空间模块（入口在 `src/main/preload.ts`），详见其 AGENTS.md
 - `database/` — better-sqlite3 连接与仓储（media、resonance、import-root 等）
 - `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享等业务服务（详见其 AGENTS.md）
@@ -168,6 +168,6 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 - ESLint 9 flat config（`eslint.config.js`）+ Prettier。
 - 提交信息遵循 Conventional Commits，经 husky（commit-msg 钩子）+ commitlint 校验；规范详情见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md) 的「校验与提交」节。
 - 单元测试与源码同目录，命名 `*.test.ts(x)`（Vitest）。
-- 代码注释与文档以中文为主；UI 文案走 i18next（zh/en），勿硬编码用户可见文本。
+- 代码注释与文档以中文为主；UI 文案走 i18next（12 个 locale 包，zh-CN 为基准静态加载、其余 11 种动态加载，另有「跟随系统」auto），勿硬编码用户可见文本。
 - 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、源文件编码 UTF-8 无 BOM 与行尾 LF、校验与提交等）见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md)，该文件是唯一真相源。
 - 版本控制边界：根与模块级 `AGENTS.md`、`docs/CODING_CONVENTIONS.md` 均入仓，本文件导航表列出的每个路径都必须能解析到已跟踪文件；`.qoder/` 目录与 `.mimosa/`、`.trae/`、`.zcode/`、`.codebuddy/`、`.workbuddy*/`、`.codegraph/` 一样保持本地化（`.gitignore` 排除），其下的 IDE 规则文件仅作 `docs/CODING_CONVENTIONS.md` 的逐字镜像、skills 仅作本地装配，不得作为任何被跟踪指引的出处。
