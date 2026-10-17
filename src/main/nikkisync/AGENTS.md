@@ -15,7 +15,7 @@
 | `src/main/nikkisync/` | 外部包装载缝（复用 NikkiSync） | 依赖 `npm run link:nikkisync` 建链后 `node_modules/@nikkisync/*` 指向的编译产物 |
 
 两者当前**并存**，但职责已分定（阶段 9 决策）：协议契约的唯一真相源是移植面
-`src/shared/sync/protocol.ts`（含 `domain-types.ts` / `protocol-extension.ts`）；本目录不再引用任何
+`src/shared/sync/protocol.ts`（`protocol.ts` + `domain-types.ts`；曾拟新增的 `protocol-extension.ts` 从未提交，只存在于本机 `stash@{0}` 的阶段 7 WIP）；本目录不再引用任何
 `@nikkisync/*` 类型或值，上游包只作为**链接运行时探测与漂移比对对象**（见 `protocol-drift.test.ts`）。
 
 ## 文件职责
@@ -43,7 +43,7 @@
 | `metadata-resolver.linked.test.ts`    | 阶段 6 链接态集成：经 `createRuntimeSession` 的 `preloadedSurface` 测试缝把上游 `Nuan5CompatibleResolver` 换成假解析器 ⇒ **零出站请求**下验证真上游确实构造服务、逐批落库、推进 revision/journal/诊断计数。未建链整件 skip                                                                                                                                                                                                                                                                                                                                                             |
 | `runtime-cli.ts`                      | 阶段 2 无 UI 验证入口（electron-vite main 的 `nikkisync-runtime` 入口）：`start → scan → query → stop`，只跑流程 + 分流 stdout/stderr + 定退出码                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | `runtime-loader.test.ts`              | Vitest node project 测试（计划 §11 用例 1-7）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| `probe.test.ts`                       | 4 例纯函数（`formatNikkiSyncLinkProbeReport` 的正/负例、n/a 降级、schemaSource 行条件输出，不依赖链接）+ 3 例在本地 Node（>= 24）上跟真实装载链，与 Electron 侧 `nikkisync-probe.js` 共用同一实现                                                                                                                                                                                                                                                                                                                                                                                      |
+| `probe.test.ts`                       | 4 例纯函数（`formatNikkiSyncLinkProbeReport` 的正/负例、n/a 降级、schemaSource 行条件输出，不依赖链接）+ 4 例在本地 Node（>= 24）上跑真实装载链（含「schema SQL 读取失败也必须 close 内存库」这条硬边界），与 Electron 侧 `nikkisync-probe.js` 共用同一实现                                                                                                                                                                                                                                                                                                                            |
 
 ## 硬性约定
 

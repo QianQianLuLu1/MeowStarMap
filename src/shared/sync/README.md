@@ -7,7 +7,7 @@ NikkiSync 逐字一致（客户端兼容硬约束，禁止变更）。
 
 本目录是 XiangCe 侧协议契约的**唯一真相源**：
 
-- `protocol.ts` + `domain-types.ts` + `protocol-extension.ts`（WXNN 侧写扩展）= 全部服务层、
+- `protocol.ts` + `domain-types.ts` = 全部服务层、
   仓储层、IPC 与渲染进程消费的协议符号来源。
 - `@nikkisync/protocol` **不再是契约来源**，也不在 `package.json` 依赖声明里（自包含方案，
   链接由 `npm run link:nikkisync` 建立）：上游包的 ESM 图含 top-level await，值面无法静态导入。

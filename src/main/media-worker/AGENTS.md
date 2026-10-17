@@ -120,7 +120,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
 4. **批量更新 DB** `UPDATE media_files SET thumbnail=?, width=?, height=?, phash=? WHERE id=?`
 5. **发终态** `THUMBNAIL_COMPLETE`
 
-关键常量（**禁止随意改值**）：`THUMBNAIL_CONCURRENCY`（来自 `../utils/constants`）、`STANDARD_MAX_WIDTH/HEIGHT = 320`、`LOW_MAX_WIDTH/HEIGHT = 64`、`HIGH_MAX_WIDTH/HEIGHT = 512`。
+关键常量（**禁止随意改值**）：`THUMBNAIL_CONCURRENCY`（来自 `../utils/constants`）、`STANDARD_MAX_WIDTH/HEIGHT = 320`、`LOW_MAX_WIDTH/HEIGHT = 64`（本 worker **没有** `HIGH_*` 常量——512 那档只存在于 `src/main/thumbnail/worker-entry.ts:40-41`；本目录另有语义无关的 `SELF_THUMBNAIL_MAX_EDGE_PX = 512`）。
 
 ### 3.2 pHash 批量补算（`PHASH_BATCH_START`）
 

@@ -10,7 +10,7 @@ React 19 + TypeScript（strict）+ Zustand + Tailwind CSS 3 + i18next 的前端�
 
 ## 目录导航
 
-- `pages/` — 页面级视图：Gallery、Detail、Editor、Duplicates、Categories、OutfitGallery、RecycleBin、ResonanceRecords、Settings
+- `pages/` — 页面级视图（11 个 `*Page.tsx`）：Gallery、Detail、Editor、Duplicates、Categories、OutfitGallery、RecycleBin、ResonanceRecords、Settings，以及同步面的 `sync-gallery/SyncGalleryPage` 与 `SyncServicePage`
 - `components/` — 按域分层：`common/`、`editor/`、`gallery/`、`layout/`、`resonance/`、`scanner/`、`video/`
 - `stores/` — Zustand 全局状态（见下）
 - `hooks/` — 自定义 Hook，文件名一律 `useXxx.ts`（如 `useIpcCall`、`useErrorToast`、`useFileOperations`、`useBatchOperations`、`useFilteredMediaFiles`）

@@ -38,6 +38,7 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 | 数据库连接与仓储层 | [`src/main/database/AGENTS.md`](src/main/database/AGENTS.md)         | 读写分离架构（同步读/async 写经 worker bridge）、WAL 并发约束、Repository 模式、schema 迁移、FakeDb 测试约定                                                               |
 | 批量媒体 worker    | [`src/main/media-worker/AGENTS.md`](src/main/media-worker/AGENTS.md) | 缩略图/pHash/重复/相似检测批量任务、Manager 薄壳 ↔ utilityProcess worker 拓扑、四类任务独立取消、BK-tree 相似检索、崩溃恢复与批量让位                                      |
 | 单文件缩略图生成   | [`src/main/thumbnail/AGENTS.md`](src/main/thumbnail/AGENTS.md)       | ThumbnailGenerator 类（缓存 LRU/并发信号量/视频抽帧/降级策略）、单文件 worker 化、三档参数同步约束、损坏文件标记                                                           |
+| NikkiSync 移植面   | [`src/main/sync/AGENTS.md`](src/main/sync/AGENTS.md)                 | 移植面服务层与 `server/`（认证/配对/TLS 身份/自研 HTTPS+WS）；与装载面的分工、以及移植面服务「已交付但默认不自启」的口径                                                   |
 | NikkiSync 装载缝   | [`src/main/nikkisync/AGENTS.md`](src/main/nikkisync/AGENTS.md)       | 外部 `@nikkisync/*` 包的唯一入口：变量式动态 import 的原因与护栏、不引用上游类型（协议真相源在 `shared/sync`）、探针禁止启动任何服务、链接由 `npm run link:nikkisync` 建立 |
 
 其余模块尚无模块级 AGENTS.md，跨模块任务需自行探索结构。新增嵌套指引时请同步本表。

@@ -35,6 +35,10 @@ src/shared/
 │   ├── concurrency.ts      # settleWithConcurrency 固定并发遍历工具
 │   ├── extremum.ts         # maxOf / minOf 安全极值（避免 Math.max 栈溢出）
 │   └── taskStages.ts       # createStages / setStageStatus 进度阶段工具
+├── sync/                   # NikkiSync 协议契约（只此一份真相源）
+│   ├── protocol.ts          # Protocol v1 线格式：签名基串、头名、配对/变更/资源端点载荷
+│   ├── domain-types.ts      # WXNN 侧域类型（与 protocol.ts 一同构成冻结契约）
+│   └── README.md            # 冻结规则与消费方清单
 ├── settings-keys.ts        # RENDERER_PREF_KEYS 白名单 + SECURITY_SENSITIVE_KEYS
 ├── scene-category.ts       # SceneCategory / SceneTime 枚举与配置常量
 └── dimension.ts            # GroupDimension 智能分组维度配置
