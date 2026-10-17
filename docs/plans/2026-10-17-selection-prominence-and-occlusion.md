@@ -413,3 +413,105 @@ clean ⇒ 不合规来自那份既有改动，不是本轮引入。本轮 4 个�
 （差异仅为行尾空格、表格竖线对齐、强调标记与空行，零文案变更），并作为独立一笔
 `docs(root)` 提交——提交号与复验读数见文末执行记录。
 另：工作区存在一条与本任务无关的历史 stash（`phase7-wip-parked`），未触碰。
+
+---
+
+## 11. 执行记录 · 第二轮（2026-10-17：未提交改动全面审查 → 提交 → 版本复验 → 重新打包）
+
+状态：**已执行完毕**。基线 `0a1be73`，本轮落地 4 笔代码/文档提交 + 本记录 1 笔，并完成重新打包。
+
+### 11.1 审查结论：CSS 与测试改动无逻辑缺陷
+
+对 §10 那批未提交改动逐行复核，并补做一轮全局回归，只读闸门实测：
+
+| 检查             | 命令                                                          | 结果                                               |
+| ---------------- | ------------------------------------------------------------- | -------------------------------------------------- |
+| 样式守护用例     | `npx vitest run src/renderer/styles`                          | 3 文件 / 35 例全绿（新 17 + 守护 15 + 图层预算 3） |
+| 格式             | `npx prettier --check --end-of-line auto`（4 个 CSS/TS 文件） | All matched files use Prettier code style          |
+| 编码             | node 逐字节读 BOM/CR                                          | 5 个文件均 UTF-8 无 BOM、无 CRLF                   |
+| lint（改动文件） | `npx eslint` 两个测试文件                                     | 0 问题                                             |
+| 文档死引用       | `npm run docs:links`                                          | ✅ 无死引用                                        |
+| 日志收口         | `npx tsx scripts/check-changelog-release.ts`                  | ✅ 通过                                            |
+| 打包前置链接     | `npx tsx scripts/link-nikkisync.ts --check`                   | ✅ 四链全 OK                                       |
+
+补做的前提核实（计划 §2 的判断依据，此前只做过推断）：
+
+- `.media-card` 基类确为 `position: relative`（`globals.css:1243-1249`），`z-index` 抬层成立；`overflow: hidden` 不裁自身外阴影。
+- 四视图网格间距实测 16px（`VirtualImageGrid.tsx:222` 的 `gap = 16`、`TimelineView.tsx:174` 与 `EventTimelineView.tsx:265` 的 `grid gap-4`），5px 光环带不粘连。
+- 四个卡片视图与其容器**均无** `zIndex` / `sticky`；Virtuoso 的 scroller/viewport 与 masonic 的项包裹层都不建层叠上下文（无 `z-index`、无 `transform`），故卡片抬层确实穿透到兄弟卡片之间——即改动意图成立。
+- 全仓 `src/renderer/**/*.tsx` 零 `sticky`；网格之后同一层叠上下文内的浮层全部带正 z（`BatchActions.tsx:71` z-40 起，至 `BaseDialog.tsx:120` / `Drawer.tsx:66` z-[100]），`.sidebar-gradient` 的 `isolation: isolate`（`globals.css:337-340`）把卡片层序封在容器内 ⇒ **无遮挡回归**。
+- 主题层只有 `soft-pink-luxury.css` 一个文件覆写 `.media-card`，D3 的两条 `:not(.is-selected)` 让位已覆盖全部覆写点。
+
+### 11.2 本轮实际修复的两处（均在文档/格式面，非业务代码）
+
+| 项                 | 红灯证据（修复前实测）                                                                                                                                           | 处置                                                                                                                                | 绿灯证据                                                                                                                             |
+| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `README.md` 不合规 | `npx prettier --check README.md` → `[warn] README.md`；这也是 `npm run verify` 唯一的 ✗                                                                          | `npx prettier --write README.md`；`git diff` 逐行复核确认差异仅为行尾双空格硬换行、表格竖线对齐、强调标记与多余空行，**零文案改动** | `--check` 输出 All matched files；`npm run docs:links` ✅；`npx tsx scripts/check-doc-versions.ts` ✅（`Electron 41.10` 串未被破坏） |
+| 本文档两处失实     | §3 写「Node 24.18.0（`node -v` 可复核）」，而 shell 实测 `node -v` = **v26.3.0**（24.18.0 是 Qoder 内置 Node）；状态行仍写「待执行」与 §10「已执行完毕」自相矛盾 | 改写 §3 为实测读数并说明口径；状态行改「已执行完毕」；§10 关于 README「未擅自格式化」的收尾改为记录本轮已格式化并独立提交           | `npx prettier --check` 本文档通过；文档内不再有与实测冲突的读数                                                                      |
+
+### 11.3 提交清单（顺序即依赖顺序：代码先入库，文档与日志才引得到它）
+
+| 笔  | 提交号    | 类型             | 内容                                         | 文件                                                                                                                                    |
+| --- | --------- | ---------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | `b5ca6ef` | `fix(gallery)`   | 选中态贴边实色环与层序抬升，修复悬停邻居遮挡 | 4 个：`globals.css`、`themes/soft-pink-luxury.css`、`selection-prominence.test.ts`（新）、`media-card-selection.test.ts`（+7 行，0 删） |
+| C2  | `23270e4` | `docs(root)`     | README 按 prettier 口径归一格式              | `README.md`（14 增 16 删，纯格式）                                                                                                      |
+| C3  | `9bdfd25` | `docs(plans)`    | 入库本计划文档（含 §10 与 11.2 的订正）      | `docs/plans/2026-10-17-selection-prominence-and-occlusion.md`                                                                           |
+| C4  | `f9d2343` | `chore(release)` | 2.5.5-beta 补录选中态显著度与遮挡修复        | `CHANGELOG.md`（3 增 0 删；`[Unreleased]` 未动）                                                                                        |
+| C5  | 本笔      | `docs(plans)`    | 回填 §11                                     | 本文档                                                                                                                                  |
+
+每笔均由 `.husky/pre-commit` 复验通过（lint-staged + core-gate + `tsc -b`），提交后 `git status --porcelain` 无钩子残留；core-gate 对四笔均为「不涉及核心路径受保护文件，跳过」（`PROTECTED_GLOBS` 不含 `src/renderer`）。
+
+### 11.4 全局回归读数（提交前实跑）
+
+| 命令                    | 读数                                                                                                                   |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `npm run verify:staged` | typecheck / lint / core-gate / format / test **5 项 0 失败**（10728ms）；format 步骤 5 个文件全通过——README 红灯已消除 |
+| `npm test`              | **409 文件 / 6330 passed / 2 skipped**（44.89s），与 §10 读数一致，无新增失败、无 flake 复现                           |
+| `npm run lint`          | **0 errors**，11 warnings 全是既有 DEBT-030（`components/common/*.test.tsx` 的 BOM），本轮未新增                       |
+| `npm run typecheck`     | 通过（`tsc -b` + `tsconfig.scripts.json`）                                                                             |
+| `npm run i18n:guard`    | 通过（本轮零新增文案 key）                                                                                             |
+
+### 11.5 版本配置复验：**已全为 2.5.5-beta，未改动任何版本字段**
+
+| 位置                                             | 读数                                                |
+| ------------------------------------------------ | --------------------------------------------------- |
+| `package.json:3`                                 | `2.5.5-beta`                                        |
+| `package-lock.json` 的 `packages[""].version`    | `2.5.5-beta`                                        |
+| `src/renderer/preview/mock/database-mock.ts:664` | `getVersion: async () => '2.5.5-beta'`              |
+| `README.md` 徽章                                 | `version-2.5.5--beta`（shields 对连字符的转义写法） |
+| `release/latest.yml`                             | `version: 2.5.5-beta`                               |
+
+`git diff --stat HEAD~4 HEAD -- package.json package-lock.json src/renderer/preview/mock/database-mock.ts` 为**空**，即本轮四笔提交没有触碰任何版本文件；未调用 `npm version`（它会改写 lockfile 并可能打 tag，属超范围副作用）。
+
+### 11.6 重新打包：两次失败、一次成功（本机环境的新坑，须留档）
+
+**失败 1（`npm run dist:win`，17:00）**：`build` 与 `pre-dist-check` 24 项全 ✔，electron-builder 在 `extractArchive` 末步报
+`⨯ EPERM: operation not permitted, rename 'release\win-unpacked.tmp' -> 'release\win-unpacked'`。旧的 11:30 安装包未被触碰。
+
+**取证**：`release/win-unpacked.tmp/resources/default_app.asar` 报 `Device or resource busy`；该目录内**子文件可正常增删**，但**目录本身改名恒被拒**（node `fs.renameSync` 纯改名测试 EPERM，非 `mv` 的拷贝回退）。打包时段无任何存活的 builder/electron/7za 进程。
+
+**失败 2（17:1x，换名重试）**：`--config.directories.output=release/alt-stage` 后同一现象在**全新路径**复现（`alt-stage\win-unpacked.tmp -> alt-stage\win-unpacked` 同样 EPERM）。另做 48 次 × 10s 的有界重试（480s）未解除。
+⇒ **结论：与本目录无关，是本机环境（工作区文件监听一类）对工作区内新建目录持句柄，令 electron-builder 的 `.tmp` → 正式名原子改名被拒。** 中途一度想用 `mv` 让位，但 GNU `mv` 在改名失败后回退为「拷贝 + 删除」，会在 TEMP 复制出 345MB 半成品且仍留源目录——已删除该半成品，正确做法是不与句柄硬拼。
+
+**成功 3（17:22–17:24）**：把暂存/输出目录移到**工作区之外**——`npx electron-builder --win --publish never --config.directories.output="D:/Zcode项目/WXNN YD - 副本/wxnn-pack-stage-20261017"`（官方 `--config` 点号覆盖，打包逻辑与 `dist:win` 内的 builder 调用完全一致，只是落点在监听范围之外）。BUILDER-EXIT=0。随后按项目既定标准布局把产物复制回 `release/`：安装包三件套 + `win-unpacked/` 整树（`verify:dist` 与 `e2e:smoke` 的硬编码落点，见 `e2e/helpers.ts:19`），并校验回拷副本与 builder 输出 **sha256 逐字节一致**（`7fd94d6d…11102`），最后删除工作区外暂存目录。
+
+> 待办建议（未在本轮实施，避免超范围改动）：本机环境下 `npm run dist:win` 若要一次跑通，需在打包前把 `directories.output` 指向工作区外再回拷，或让文件监听不覆盖 `release/`。是否把这条纳入 `pre-dist-check` 的提示面，另行立项。
+
+### 11.7 产物证据链（新包确实含本轮修复）
+
+| 项                                          | 读数                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release/NikkiGallery-Setup-2.5.5-beta.exe` | **183316541** 字节，mtime 17:24（旧包 183316635 / 11:30 ⇒ 已被覆盖刷新）                                                                                                                                                                                                                 |
+| `release/latest.yml`                        | `version: 2.5.5-beta`；sha512 `fPKWfTx0ynhh…JUbfw==`（旧 `o0vkNdxsSD8u…zj3Vg==`）；`releaseDate: 2026-10-17T09:24:41.687Z`                                                                                                                                                               |
+| `npm run verify:dist`                       | **17 项全 ✔**（better-sqlite3 / sharp / libvips / koffi 原生二进制、4 个 VC++ 运行库 DLL、@nikkisync 迁移 SQL 与四包入口 + `row-mappers.js` + `LocalSyncServer.js` + `GalleryRuntime.mjs`、`asInvoker` 清单），exit 0                                                                    |
+| `npm run verify:nikkisync`                  | exit 0                                                                                                                                                                                                                                                                                   |
+| `npm run e2e:smoke`                         | **15 passed / 26.6s**，其中 S1–S7 是对 `release/win-unpacked/无限暖暖相册管理工具.exe` 的打包态冒烟（启动、非白屏、preload 四对象、`app.getVersion` 与 package.json 一致、原生模块查询、静置 5s 存活、首装自动扫描），N1–N4 为内嵌运行时真实会话，Console/页面错误为空                   |
+| **包内含样式的直接证据**                    | `release/win-unpacked/resources/app.asar`（71428003 字节）内检索命中 `--selection-halo`、`z-index: 1/2/3`、`:not(.is-selected)`、`outline-offset: 2px`；构建产物 `dist/renderer/assets/index-CgrZxxzV.css` 逐条核对到四层 `box-shadow`、层序三档与恢复为独立规则的 `:focus-visible` 基线 |
+
+**遗留**：`release/win-unpacked.tmp/` 与 `release/alt-stage/` 两个失败残留目录各剩 1 个被锁的 `resources/default_app.asar`（各 116K，其余内容已删净），均在 `.gitignore` 的 `release/` 下、不进 git 视野；句柄释放（或重启）后可直接删除这两个目录。
+
+### 11.8 仍需人工肉眼确认的项（§5 未勾选项，本轮未做视觉验收）
+
+字节级与 CSSOM 证据能证明**层序与色值成立**，但不能替代观感判断。以下必须在可见浏览器窗口里人工确认：
+实际缩略图上的美观度与「双线内衬是否被外环糊成一片」、快速滚动帧率、极端缩略图尺寸下的观感、边缘行光晕被 `overflow-hidden` 裁切的可接受度。
+入口：`npm run storybook` → `Gallery/VirtualImageGrid` → **`WithMultiSelect`**，工具栏切 default ↔ soft-pink-luxury，鼠标划过选中卡的相邻图片。
