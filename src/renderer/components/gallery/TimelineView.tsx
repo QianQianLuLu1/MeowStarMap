@@ -194,14 +194,11 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                     key={file.id}
                     className={`media-card aspect-square ${
                       multiSelectMode ? 'relative ' : ''
-                    }${isSelected ? 'ring-2 ring-offset-2' : ''}`}
+                    }${isSelected ? 'is-selected' : ''}`}
                     style={{
                       background: 'var(--bg-tertiary)',
                       height: ITEM_HEIGHT,
-                      opacity: isMissing ? 0.45 : 1,
-                      ...(isSelected
-                        ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties)
-                        : {})
+                      opacity: isMissing ? 0.45 : 1
                     }}
                     onClick={(e) =>
                       multiSelectMode && onSelect ? onSelect(file.id, fileIndex, e) : onOpen(file)

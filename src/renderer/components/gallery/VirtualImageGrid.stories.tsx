@@ -53,6 +53,20 @@ export const WithSelection: Story = {
   args: { selectedIds: ['1', '3'] }
 }
 
+/**
+ * 多选模式选中态（fix-image-selection-border-visibility 手验入口）：
+ * 卡片左上角渲染 MediaCheckbox，选中卡片带 `is-selected` 语义类——
+ * 由 globals.css 的 `.media-card.is-selected` 提供「主题色描边 + 背景色内衬
+ * 双线框 + 阴影加深 + accent-soft 外发光」四层视觉；悬停时描边加深一档。
+ */
+export const WithMultiSelect: Story = {
+  args: {
+    selectedIds: ['1', '3', '4'],
+    multiSelectMode: true,
+    onToggleSelection: fn()
+  }
+}
+
 /** 卡片快捷操作：注入编辑 / 收藏 / 删除回调（仅图片显示编辑按钮） */
 export const WithCardActions: Story = {
   args: { onEdit: fn(), onFavorite: fn(), onDelete: fn() }

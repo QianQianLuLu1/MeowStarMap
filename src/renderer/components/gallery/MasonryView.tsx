@@ -75,13 +75,12 @@ function MasonryCard({ index, data }: { index: number; width: number; data: Medi
   return (
     <div
       data-media-id={file.id}
-      className={`media-card relative ${isSelected ? 'ring-2 ring-offset-2' : ''}`}
+      className={`media-card relative ${isSelected ? 'is-selected' : ''}`}
       style={{
         width: '100%',
         background: 'var(--bg-tertiary)',
         opacity: isMissing ? 0.45 : 1,
-        cursor: 'pointer',
-        ...(isSelected ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties) : {})
+        cursor: 'pointer'
       }}
       onClick={(e) => onSelect(file.id, index, e)}
       onContextMenu={(e) => onContextMenu(e, file)}

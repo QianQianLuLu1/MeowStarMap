@@ -1249,13 +1249,46 @@ html.glass-lite .ambient-bg {
   box-shadow: var(--shadow-lg);
 }
 
-.media-card:hover::after {
+/* 选中态统一描边层（fix-image-selection-border-visibility）：
+   原实现把 ::after 只在 :hover 时生成（content 从无到有），若选中态沿用同一伪元素会在
+   选中/取消瞬间闪现。改为常驻透明描边层，hover 与 is-selected 只切换 border-color /
+   box-shadow，过渡是纯颜色插值，无闪烁、无重排。
+   R1：废弃组件内的 ring-2 ring-offset-2（offset 色恒为 #fff 会在深/柔粉底上露白圈）；
+   R2：hover 与 selected 统一到同一伪元素，不再两套机制互相吞没。 */
+.media-card::after {
   content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  border: 2px solid var(--accent);
+  border: 2px solid transparent;
   pointer-events: none;
+  /* 只过渡颜色与阴影（合成友好）；transform 不入场，避免与 hover scale 打架造成网格抖动 */
+  transition:
+    border-color 160ms ease-out,
+    box-shadow 160ms ease-out;
+}
+
+.media-card:hover::after {
+  border-color: var(--accent);
+}
+
+/* 选中态四层视觉：外发光（--accent-soft）+ 主题色描边 + 背景色内衬（双线框）+ 阴影加深。
+   内衬让「主题色描边—背景色—图片」形成双线分隔，亮底 / 暗底 / 柔粉底均有稳定对比度；
+   全部颜色走主题变量，未来新增暗色主题自动生效。 */
+.media-card.is-selected {
+  box-shadow:
+    var(--shadow-lg, 0 4px 20px rgba(0, 0, 0, 0.15)),
+    0 0 0 3px var(--accent-soft, transparent);
+}
+
+.media-card.is-selected::after {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 2px var(--bg-primary, #fff);
+}
+
+/* 选中卡悬停：描边加深一档，保留「选中 ≠ 悬停」的层次区分 */
+.media-card.is-selected:hover::after {
+  border-color: var(--accent-deep, var(--accent));
 }
 
 .media-card img {

@@ -498,13 +498,10 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             return (
               <div
                 className={`media-card aspect-square ${multiSelectMode ? 'relative ' : ''}${
-                  isSelected ? 'ring-2 ring-offset-2' : ''
+                  isSelected ? 'is-selected' : ''
                 }`}
                 style={{
                   background: 'var(--bg-tertiary)',
-                  ...(isSelected
-                    ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties)
-                    : {}),
                   outline: isFocused ? '2px solid var(--accent)' : 'none',
                   outlineOffset: '2px',
                   opacity: isMissing ? 0.45 : 1

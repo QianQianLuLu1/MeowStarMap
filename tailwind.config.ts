@@ -21,6 +21,17 @@ const config: Config = {
         'danger-hover': 'var(--danger-hover)',
         success: 'var(--success)'
       },
+      // fix-image-selection-border-visibility R4：ring 令牌进 Tailwind——覆盖默认值使
+      // ring-*/ring-offset-* 与 globals.css 的 --accent/--bg-primary 一致。
+      // 未覆盖前裸用 ring-2 恒为默认蓝 #3b82f6、ring-offset 恒为 #fff（在深/柔粉底上露白圈）
+      ringColor: {
+        DEFAULT: 'var(--accent)',
+        accent: 'var(--accent)',
+        'accent-soft': 'var(--accent-soft)'
+      },
+      ringOffsetColor: {
+        DEFAULT: 'var(--bg-primary)'
+      },
       // 视觉体系 v3：圆角/阴影令牌进 Tailwind——覆盖默认值使 rounded-*/shadow-* 与
       // globals.css 的 --radius-*/--shadow-* 完全一致，全项目单一圆角与阴影体系
       borderRadius: {

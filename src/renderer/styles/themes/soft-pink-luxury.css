@@ -259,6 +259,15 @@ html.soft-pink-luxury {
   box-shadow: inset 0 0 16px rgba(226, 164, 188, 0.1);
 }
 
+/* 选中态：沿用本主题悬停描边的粉色语言（不写死色值以外的层次），
+   内衬走 --bg-primary 保证双线框在本主题下同样成立 */
+.soft-pink-luxury .media-card.is-selected::after {
+  border-color: rgba(226, 164, 188, 0.55);
+  box-shadow:
+    inset 0 0 0 2px var(--bg-primary, #fff),
+    inset 0 0 16px rgba(226, 164, 188, 0.1);
+}
+
 /* 进度条 */
 .soft-pink-luxury .progress-bar-fill {
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-light) 100%);
