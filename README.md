@@ -1,25 +1,24 @@
 <h1 align="center">无限暖暖相册管理工具 · NikkiGallery</h1>
 
-<p align="center">
-  专为「无限暖暖」玩家打造的本地相册管理软件 — 扫描、浏览、编辑、整理、分享，一站式完成<br>
-  A local photo album manager for <em>Infinity Nikki</em> players — scan, browse, edit, organize & share
+<p align="center">  
+  专为「无限暖暖」玩家打造的本地相册管理软件 — 扫描、浏览、编辑、整理、分享，一站式完成
+
+A local photo album manager for <em>Infinity Nikki</em> players — scan, browse, edit, organize & share
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-2.5.5--beta-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/platform-Windows%20x64-success?style=flat-square">
-  <img src="https://img.shields.io/badge/Electron-41.10-blueviolet?style=flat-square">
-  <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
+<p align="center">  
+  <img src="https://img.shields.io/badge/version-2.5.5--beta-blue?style=flat-square">  
+  <img src="https://img.shields.io/badge/platform-Windows%20x64-success?style=flat-square">  
+  <img src="https://img.shields.io/badge/Electron-41.10-blueviolet?style=flat-square">  
+  <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square">  
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">  
 </p>
 
-<p align="center">
-  <a href="#中文">中文</a> · <a href="#english">English</a>
+<p align="center">  
+  <a href="#中文">中文</a> · <a href="#english">English</a>  
 </p>
 
 ---
-
-<!-- ==================== 中文 ==================== -->
 
 <h2 id="中文">中文</h2>
 
@@ -124,7 +123,7 @@ src/
 - **哔哩哔哩**：纤璐不会玩摄影 ([主页链接](https://b23.tv/zCR5oGE))
 - **GitHub**：[QianQianLuLu1](https://github.com/QianQianLuLu1)
 - **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)
-- **作者官网**：https://ppebv9al.qwenwork.host/
+- **作者官网**：<https://ppebv9al.qwenwork.host/>
 
 ### 许可证
 
@@ -133,8 +132,6 @@ src/
 <p align="right"><a href="#中文">回到顶部</a></p>
 
 ---
-
-<!-- ==================== English ==================== -->
 
 <h2 id="english">English</h2>
 
@@ -237,6 +234,7 @@ src/
 - **Douyin**: 纤璐不会玩摄影 ([profile](https://v.douyin.com/Dx67wYkw48A/))
 - **Xiaohongshu (RED)**: 纤璐不会玩摄影 ([profile](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
 - **Bilibili**: 纤璐不会玩摄影 ([profile](https://b23.tv/zCR5oGE))
+
 - **GitHub**: [QianQianLuLu1](https://github.com/QianQianLuLu1)
 - **CSDN Blog**: [QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 - **Author Site**: https://ppebv9al.qwenwork.host/
