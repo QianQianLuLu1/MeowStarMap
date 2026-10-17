@@ -1,5 +1,7 @@
 # NikkiSync PC Companion 运行时嵌入盘点报告（阶段 0+ · 00-nikkisync-pc-audit-report）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 生成日期：2026-10-12
 > 范围：`NikkiSync/apps/pc-companion/`（`@nikkisync/pc-companion` v0.0.1-m0）+ `NikkiSync/packages/{core,database,protocol}/`，对照 `WXNN XiangCe/`（wxnn-photo-manager v2.5.5）
 > 定位：**阶段 0（`00-code-audit-report.md`）的增量补全**，聚焦「把 PC Companion 作为可嵌入运行时」视角。既有报告结论未被推翻，本次新采集的证据见 §11 验证记录。

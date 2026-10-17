@@ -1,5 +1,7 @@
 # 阶段 2：NikkiSync PcCompanion Runtime 内嵌计划（02-runtime-embed-plan）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 生成日期：2026-10-13
 > 范围：在 WXNN XiangCe **主进程内直接实例化并管理** NikkiSync 的 `PcCompanionRuntime`
 > （数据库 + 游戏目录发现 + 扫描器），并以只读 IPC 把 NikkiSync 原生 DTO 透传给渲染进程。

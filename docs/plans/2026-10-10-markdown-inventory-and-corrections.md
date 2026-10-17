@@ -76,7 +76,7 @@
 
 **嵌套 `AGENTS.md`（13）**：根 + `scripts/` + `src/main/{app,database,ipc/handlers,media-worker,preload,scanner,services,thumbnail,utils}/` + `src/{renderer,shared}/`。
 
-**轮次快照 / 一次性记录（14）**：`docs/plans/*.md` 10 个 + `docs/packaged-scan-crash-report.md` + `docs/i18n/fix-sop.md`（自带「历史文档」banner，未重复添加）+ `docs/2.5.0/RELEASE_NOTES_v2.5.0_illustrated.md` + `docs/plans/2026-08-29-resonance-offline-data-report.md`。
+**轮次快照 / 一次性记录（14）**：`docs/plans/*.md` 10 个 + `docs/packaged-scan-crash-report.md` + `docs/i18n/fix-sop.md`（自带「历史文档」banner，未重复添加）+ `docs/2.5.0/RELEASE_NOTES_v2.5.0_illustrated.md` + `docs/plans/2026-08-29-resonance-offline-data-report.md`（现 2026-10-17 已归档至 `docs/archive/plans/`，不入仓）。
 
 **样例包（1）**：`plugins-samples/custom-watermark-template/README.md` —— 保留·本轮不审（需另轮以插件实际加载路径取证）。
 

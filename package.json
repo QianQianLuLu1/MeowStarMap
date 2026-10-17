@@ -64,6 +64,7 @@
     "i18n:guard": "tsx scripts/i18n/guard.ts",
     "sync-i18n-keys": "tsx scripts/sync-i18n-keys.ts",
     "preview:check": "tsx scripts/check-preview-drift.ts",
+    "docs:links": "tsx scripts/check-md-links.ts",
     "debt:issues": "tsx scripts/debt/create-github-issues.ts",
     "debt:check": "tsx scripts/debt/check-debt-fix.ts",
     "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",

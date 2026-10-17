@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-44 个代码文件（另有 10 个 `__tests__` 单测文件与本 AGENTS.md），按功能分为以下子域：
+48 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -71,6 +71,7 @@
 | `verify-changes.ts`        | `npm run verify` / `npm run verify:staged`                | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件                                                                                                                                 |
 | `verify-format-scope.ts`   | 被 `verify-changes.ts` import                             | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                                                                                                                                                         |
 | `check-preview-drift.ts`   | `npm run preview:check`                                   | preview.html 与源码的 10 项漂移检测                                                                                                                                                                                                             |
+| `check-md-links.ts`        | `npm run docs:links`                                      | **被跟踪 Markdown 的引用完整性守护**（只读）：抽取 `[x](path)` 与行内反引号路径，按 tracked 集合判定 ok / ignored-local / annotated-gone / upstream-scope / artifact / dead；死引用退出码 1                                                     |
 | `verify-nikkisync-link.ts` | `npm run verify:nikkisync`                                | **NikkiSync 依赖与装载面只读诊断**（依赖图是否自包含/`node_modules/@nikkisync/*` 链接/NikkiSync `dist/` 产物/`migrations` 可读/主进程产物未把 ESM 折叠成 `require()`/打包态 unpacked 含 schema），`--json` 可切结构化输出；未链接为 warn 不阻断 |
 | `link-nikkisync.ts`        | `npm run link:nikkisync` / `npm run link:nikkisync:check` | **NikkiSync 开发机链接器**：在候选根（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`）中建/校 `node_modules/@nikkisync/*` junction（幂等；`--check` 只读）；无可用根时退出码 1 并逐项给出拒绝原因                                       |
 | `generate-icon.js`         | 手动执行                                                  | SVG → ICO 图标生成                                                                                                                                                                                                                              |
@@ -88,14 +89,17 @@
 | `__tests__/link-nikkisync.test.ts`          | 链接器纯函数单测（候选根解析/链接动作计划/子路径逃逸校验）                                             |
 | `__tests__/self-contained-deps.test.ts`     | 真实 package.json 的**依赖图自包含契约**：无仓库外 `file:`/`workspace:` 依赖 + 打包面保留 `@nikkisync` |
 | `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                                                  |
+| `__tests__/pre-dist-check.test.ts`          | 打包前校验闸门纯函数单测（校验项判定与聚合）                                                           |
+| `__tests__/check-md-links.test.ts`          | Markdown 引用守护纯函数单测 + **真实仓库契约**：被跟踪文档的死引用数必须为 0                           |
 | `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                                                     |
 
 ## 编码约定
 
 ### 语言与执行
 
-- 31/44 为 TypeScript（`.ts`），统一使用 `tsx` 直接执行，无需编译步骤。
-- 其余 13 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成），9 个 `.ps1`（PowerShell 辅助脚本，如 `mimosa-episode-bridge.ps1`、`fix-harness-memory-path.ps1`；其中 3 个位于 `archive/`）。
+- 48 个入仓代码文件里 44 个为 TypeScript（`.ts`：32 个非测试脚本 + 12 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
+- 其余 4 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
+- **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore:147-149` 显式排除，`scripts/archive/` 下 3 个由 `.gitignore:185` 整目录排除。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
 ### 错误处理与退出
@@ -149,6 +153,7 @@
 | `npm run i18n:prune-whitelist` | 白名单瘦身                                                           |
 | `npm run i18n:codemod`         | i18n 自动改写                                                        |
 | `npm run preview:check`        | preview.html 漂移检测                                                |
+| `npm run docs:links`           | 被跟踪 Markdown 的死引用守护（只读，死引用即退出码 1）               |
 | `npm run debt:check`           | 技术债 CI 检查                                                       |
 | `npm run debt:issues`          | 批量创建技术债 Issue                                                 |
 | `npm run perf:save-baseline`   | 保存性能基线                                                         |
@@ -161,4 +166,4 @@
 - `after-pack-vc-runtime.cjs` 是 CommonJS 格式（electron-builder 钩子要求），不得改为 ESM。
 - `doctor.ts` 的诊断结果会被 CI 和 `npm run verify` 引用，修改输出格式需评估下游。
 - 修改 `package.json` 的 `lint-staged` 键**形态**（不只是内容）时必须同步 `verify-format-scope.ts`，否则新增键会被跳过格式检查；`__tests__/verify-format-scope.test.ts` 中的配置契约测试会先失败（不可解析键另在 `npm run verify` 输出 `[VERIFY] ⚠`）。
-- 测试覆盖较低（约 8%），新增脚本时建议将核心逻辑导出为纯函数并补充单测。
+- 测试配对率偏低：32 个非测试脚本中仅 7 个有同名配套单测（≈22%）；且 `scripts/**` 不在 `vitest.config.ts` 的 `include: 'src/**'` 覆盖率统计范围内，本目录**没有行覆盖率读数**，历史写的「约 8%」无法复现，已改为可实测的文件配对口径。新增脚本时建议将核心逻辑导出为纯函数并补充单测。

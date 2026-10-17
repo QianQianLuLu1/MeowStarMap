@@ -1,5 +1,7 @@
 # 阶段 3：启用 NikkiSync 自带 LocalSyncServer 计划（03-sync-server-plan）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 生成日期：2026-10-14
 > 范围：在已内嵌的 `PcCompanionRuntime` 之上，**直接启用 NikkiSync 自带的 LocalSyncServer**
 > （HTTPS + Ed25519 鉴权 + 一次性配对 + WebSocket 事件 + mDNS 广播 + 自签 TLS 身份），

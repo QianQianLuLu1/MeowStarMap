@@ -1,5 +1,7 @@
 # 代码探查报告（阶段 0 · 00-code-audit-report）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 生成日期：2026-10-11
 > 范围：`WXNN XiangCe/`（NikkiGallery / wxnn-photo-manager v2.5.3）与 `NikkiSync/`（v0.0.1-m0）
 > 验证方式：本报告全部论断经 `WXNN XiangCe/docs/sync-integration/verify-audit.mjs`（node:test，9 个断言测试）程序化校验；文中所有文件路径均已在报告中引用时刻确认真实存在。
@@ -202,7 +204,7 @@ server 之外 pc-companion 还有：`scanner/`（ScannerService 流水线：Disc
 3. **sha256 计算成本（中）**：NikkiSync `MediaResource.sha256` 必填；WXNN 首次接入需对全量媒体计算完整文件 sha256（`calculateFileHash` 全文件读），大库（数万张 + 视频）I/O 开销显著；应增量计算并考虑落库缓存（新增列受核心路径闸门约束）。
 4. **双扫描器竞争（中）**：WXNN scanner worker 与 NikkiSync ScannerService 可能同时扫描同一游戏目录（游戏目录只读约束见双方 AGENTS.md）；应二选一为主，另一侧只消费事件。
 5. **核心路径保护闸门（流程，必触发）**：后续阶段的 `src/main/ipc/handlers/**`、`src/main/services/**`、`src/main/preload/api/**`、`src/shared/errors/**` 改动都必须带 `// @core-change: <原因>` 顶部注释，否则 ESLint `local/core-path-guard` 与 `scripts/core-path-gate.ts`（pre-commit）拦截。
-6. **NikkiSync 侧流程约束（流程）**：改动前必读 `docs/GPT_HANDOFF_2026-09-04.md`；先写失败测试；本阶段零源码改动故留在 main，后续任何 NikkiSync 源码改动须先 `git checkout -b`。
+6. **NikkiSync 侧流程约束（流程）**：改动前必读 **上游 NikkiSync 仓库内**的交接文档 `GPT_HANDOFF_2026-09-04.md`（该路径属 NikkiSync 仓，本仓不存在也不归档）；先写失败测试；本阶段零源码改动故留在 main，后续任何 NikkiSync 源码改动须先 `git checkout -b`。
 7. **npm allow-scripts 策略（低，环境）**：本机 npm 拦截 install scripts（esbuild/electron/better-sqlite3 等）。当前两边依赖完好（esbuild 二进制完整、WXNN node_modules 早已装好）；但**将来重装 WXNN 依赖**（含 native 模块 electron/better-sqlite3 下载）时可能需要 `npm approve-scripts`，参照 `docs/troubleshooting-npm-audit-mirror.md`。
 8. **mDNS/组播与防火墙（低，部署）**：`MdnsAdvertiser` 用 224.0.0.251:5353 组播，Windows 防火墙首次会弹授权；electron-builder 打包后需在安装器/文档中声明防火墙规则。
 9. **报告文件位置（记录）**：工作区根不是 git 仓库，根目录报告无法直接提交；本报告已复制到 `WXNN XiangCe/docs/sync-integration/` 入库跟踪，**根目录版为唯一真相源**，后续阶段更新时两处同步。

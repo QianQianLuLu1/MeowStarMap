@@ -3,7 +3,7 @@
 本目录承载 NikkiSync 同步集成的 **主进程侧服务层**（协议契约在
 [`../../shared/sync/`](../../shared/sync/)，持久化底座在
 [`../database/`](../database/)）。集成计划与阶段记录见
-[`docs/sync-integration/`](../../docs/sync-integration/)。
+[`docs/sync-integration/`](../../../docs/sync-integration/)。
 
 ## 模块定位与依赖方向
 

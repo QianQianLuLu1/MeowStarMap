@@ -1,5 +1,7 @@
 # 阶段 4：图库数据层切换 NikkiSync Runtime 计划（04-ui-bridge-plan）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 生成日期：2026-10-14
 > 范围：把 **渲染层图库的数据源** 从 WXNN XiangCe 自有 `media_files` 切换到内嵌 NikkiSync Runtime
 > 的 Asset/Resource；UI 组件、交互与视觉**保持不变**，只换数据层。
@@ -367,7 +369,7 @@ grep -c "vite-env.d.ts" /tmp/tc-noskip.log
 ## 15. 分支与提交
 
 - **本阶段不改 NikkiSync**（前提已证为 `d4ca7d7` = 上游最新），因此只有 XiangCe 一侧分支：继续 `feat/gallery-runtime-embed`（当前分支）。
-- **commit A（先做，与本轮分离）**：现工作树有上一轮覆盖率重基线未收口的 5 个已跟踪文件（`CHANGELOG.md`、`vitest.config.ts`、`audit-ci.jsonc`、`docs/debt-registry.json`、`docs/技术债清单.md`）+ 未跟踪 `docs/plans/2026-10-14-coverage-rebaseline-and-braces-allowlist.md`，先单独成一个 docs/chore 提交。**执行前需确认**。
+- **commit A（先做，与本轮分离）**：现工作树有上一轮覆盖率重基线未收口的 5 个已跟踪文件（`CHANGELOG.md`、`vitest.config.ts`、`audit-ci.jsonc`、`docs/debt-registry.json`、`docs/技术债清单.md`）+ 未跟踪 `docs/archive/plans/2026-10-14-coverage-rebaseline-and-braces-allowlist.md`，先单独成一个 docs/chore 提交。**执行前需确认**。
 - **commit B…N（本轮）**，每步一提交，Conventional Commits（`commitlint`：header ≤100、subject ≤72、scope ≤24、无尾句号）：
   ① `feat(sync): 共享契约标注 nikkisync DTO 真实类型`
   ② `feat(nikkisync): 装载缝扩展 changes 与资源批量查询面`

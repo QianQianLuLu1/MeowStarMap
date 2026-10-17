@@ -1,5 +1,7 @@
 # 同步集成 · 阶段 0+：NikkiSync PC Companion 运行时嵌入盘点计划（00-audit-plan）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 状态：已批准（2026-10-12）
 > 对应交付物：工作区根 `00-nikkisync-pc-audit-report.md`（唯一真相源），`docs/sync-integration/` 留存同名副本。
 > 本阶段为**只读探查 + 运行时探针 + 文档**，不修改两个项目的任何 `.ts/.tsx/.json/.cjs/.mjs` 源码、配置或既有测试。

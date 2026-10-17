@@ -2,7 +2,7 @@
 
 > 状态：已批准（2026-10-13）｜ 分支：`feat/gallery-runtime-embed`（HEAD `9815e68`）
 > 目标：修复 4 项已登记的遗留债务——① 2 个 TypeScript 类型错误（阻塞 `.husky/pre-commit` 的 `tsc -b`）；② `file:../NikkiSync/...` 导致 CI `npm ci` 无法解析；③ 打包态 asar × ESM × `migrations` 资源路径未验证；④ 协议双真相源（`src/shared/sync/protocol.ts` 与 `@nikkisync/protocol`）分叉。
-> 前置阅读：[`01-dependency-link-plan.md`](./01-dependency-link-plan.md)（§14 R1/R3/R4 即本次要关闭的三项风险）、[`07-bidirectional-sync-plan.md`](./07-bidirectional-sync-plan.md)（阶段 7 红灯 WIP 的归属）
+> 前置阅读：[`01-dependency-link-plan.md`](./01-dependency-link-plan.md)（§14 R1/R3/R4 即本次要关闭的三项风险）。阶段 7（双向同步）从未提交，其 WIP 仅存于本机 `stash@{0}`（分支 `feature/sync-integration-07-bidirectional-sync`，标记 `phase7-wip-parked`），故本目录没有 `07-*.md`，编号 07/08 为空缺而非丢失。
 > 核心原则：最小化改动、不顺手实现阶段 7 写端点、不伪造或弱化任何失败结果。
 
 ## 0. 取证基线（2026-10-13 本机实测，非假设）

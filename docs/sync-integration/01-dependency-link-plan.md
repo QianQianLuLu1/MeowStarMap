@@ -1,5 +1,7 @@
 # 整合 · 阶段 1：NikkiSync 依赖链接计划（01-dependency-link-plan）
 
+> 路径作用域：本文为阶段计划/审计报告快照，文中 `src/xxx`、`scripts/xxx` 形式的路径混指本仓与上游 NikkiSync 仓；属上游或当时设计未落地的项按原文保留、不覆写，读者请勿默认它们能在本仓解析。
+
 > 状态：已批准（2026-10-12）｜ 目标：把 NikkiSync 变成 WXNN XiangCe 可直接 import 的内部依赖，并在主进程完成四包 import 验证
 > 基线提交：`WXNN XiangCe` = `9815e68`（分支 `feat/gallery-runtime-embed`）、`NikkiSync` = `b2eb337`（分支 `feat/gallery-runtime-embed`）
 > 前置阅读：[`00-nikkisync-pc-audit-report.md`](./00-nikkisync-pc-audit-report.md)（Phase 0+ 运行时嵌入盘点，本计划的兼容性结论直接引用其 §4/§11）

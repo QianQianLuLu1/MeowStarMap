@@ -960,7 +960,7 @@ npm run build-storybook
 - [docs/PLUGIN_API.md](docs/PLUGIN_API.md)：插件 API 参考
 - [docs/技术债清单.md](docs/技术债清单.md)：技术债台账
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md)：组件文档站使用说明
-- [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md)：项目架构全景（零基础导读）
+- [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md)：项目架构全景（零基础导读）——`docs/archive/` 被 `.gitignore` 排除，仅本机留存，不入仓
 
 ---
 

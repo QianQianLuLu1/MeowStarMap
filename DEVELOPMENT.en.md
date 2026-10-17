@@ -938,7 +938,7 @@ npm run build-storybook
 - [docs/PLUGIN_API.md](docs/PLUGIN_API.md): plugin API reference
 - [docs/技术债清单.md](docs/技术债清单.md): tech debt ledger (Chinese)
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md): component docs site usage (Chinese)
-- [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md): project architecture overview (Chinese)
+- [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md): project architecture overview (Chinese) — `docs/archive/` is excluded by `.gitignore`, kept locally only, not in the repo
 
 ---
 

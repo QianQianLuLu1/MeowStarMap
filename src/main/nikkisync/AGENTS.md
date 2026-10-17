@@ -2,10 +2,10 @@
 
 本目录是 WXNN XiangCe 消费 **NikkiSync 包**（`@nikkisync/core` / `@nikkisync/database` /
 `@nikkisync/protocol` / `@nikkisync/pc-companion`）的**唯一入口**。顶层项目速览见根目录
-[`AGENTS.md`](../../AGENTS.md)，四条硬性编码约定与校验/提交口径见
-[`docs/CODING_CONVENTIONS.md`](../../docs/CODING_CONVENTIONS.md)（唯一真相源）。整合计划与选型依据见
-[`docs/sync-integration/01-dependency-link-plan.md`](../../docs/sync-integration/01-dependency-link-plan.md)，
-阶段 9 自包含改造见 [`docs/sync-integration/09-legacy-debt-remediation-plan.md`](../../docs/sync-integration/09-legacy-debt-remediation-plan.md)。
+[`AGENTS.md`](../../../AGENTS.md)，四条硬性编码约定与校验/提交口径见
+[`docs/CODING_CONVENTIONS.md`](../../../docs/CODING_CONVENTIONS.md)（唯一真相源）。整合计划与选型依据见
+[`docs/sync-integration/01-dependency-link-plan.md`](../../../docs/sync-integration/01-dependency-link-plan.md)，
+阶段 9 自包含改造见 [`docs/sync-integration/09-legacy-debt-remediation-plan.md`](../../../docs/sync-integration/09-legacy-debt-remediation-plan.md)。
 
 ## 与 `src/main/sync/` 的分工
 
