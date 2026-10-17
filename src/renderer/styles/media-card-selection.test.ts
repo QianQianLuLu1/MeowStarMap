@@ -111,6 +111,13 @@ describe('图库卡片选中态样式（fix-image-selection-border-visibility）
         expect(block.includes('will-change'), `${selector} 禁止常驻 will-change`).toBe(false)
       }
     })
+
+    it('遮挡：选中卡必须带正 z-index（层序高于悬停邻居，否则外环被相邻 hover 卡盖住）', () => {
+      // 遮挡根因：.media-card:hover 的 transform: scale(1.02) 会新建层叠上下文，
+      // 悬停中的邻居卡片据此绘制在「已选中但静止」的卡片之上，把选中外环与描边整条盖掉。
+      // 选中态只有同时抬升 z-index 才能真正免疫，故在此钉死。
+      expect(ruleBlockOf(globalsCss, '.media-card.is-selected')).toContain('z-index:')
+    })
   })
 
   describe('异常：主题变量缺失降级（var() 兜底值）', () => {

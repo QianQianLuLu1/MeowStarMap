@@ -40,6 +40,9 @@
   --border-strong: color-mix(in srgb, var(--text-primary) 14%, transparent);
   /* 聚焦光环：输入类控件 focus 的 accent 光晕（替代散落的硬编码 rgba） */
   --focus-ring: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+  /* 选中态外扩光晕：由 --accent 派生（同 --focus-ring 手法），主题切换自动跟随——
+     不直接用 --accent-soft（默认 12% / 柔粉 14% alpha），3px 光环在深底上近乎不可见 */
+  --selection-halo: color-mix(in srgb, var(--accent) 38%, transparent);
   /* P1-U7：统一半透明遮罩色，消除各 Dialog 组件中 0.35/0.4/0.5 三档不一致 */
   --overlay-bg: rgba(0, 0, 0, 0.4);
   --overlay-bg-medium: rgba(0, 0, 0, 0.5);
@@ -275,8 +278,9 @@ body {
 }
 
 /* 统一键盘焦点可见性基线：未自定义 focus-visible 的可交互元素获得 accent 描边。
-   .btn-*/
-.icon-btn/.select/.input-field 等已有专属规则（类选择器特异性更高）不受影响 */ :focus-visible {
+   .btn-*、.icon-btn、.select、.input-field 等已有专属规则（类选择器特异性更高）不受影响。
+   本注释正文不得出现注释收尾符号，否则提前闭合会让下方基线规则整条被解析器丢弃 */
+:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
@@ -1245,6 +1249,9 @@ html.glass-lite .ambient-bg {
 }
 
 .media-card:hover {
+  /* 遮挡修复之一：hover 的 transform 会新建层叠上下文，不抬层则悬停卡只靠 DOM 序胜出，
+     后续兄弟中的静止卡仍可能压住本卡阴影 */
+  z-index: 1;
   transform: scale(1.02);
   box-shadow: var(--shadow-lg);
 }
@@ -1272,13 +1279,22 @@ html.glass-lite .ambient-bg {
   border-color: var(--accent);
 }
 
-/* 选中态四层视觉：外发光（--accent-soft）+ 主题色描边 + 背景色内衬（双线框）+ 阴影加深。
+/* 选中态四层视觉：贴边实色环 + 主题光晕带（--selection-halo）+ 柔光 + 阴影加深，
+   配合 ::after 的「主题色描边 + 背景色内衬」构成双线框。
    内衬让「主题色描边—背景色—图片」形成双线分隔，亮底 / 暗底 / 柔粉底均有稳定对比度；
    全部颜色走主题变量，未来新增暗色主题自动生效。 */
 .media-card.is-selected {
+  /* 遮挡修复之二：选中卡层序必须高于「悬停中的邻居」，否则邻居 hover 的层叠上下文
+     会把选中外环与描边整条盖掉（多选时鼠标划过相邻图片，选中态时有时无） */
+  z-index: 2;
+  /* 由内而外：贴边 2px 实色 accent 环（最高对比）→ 5px 主题光晕带 → 柔光 → 浮起阴影。
+     box-shadow 列表前者压后者，故实色环不被光晕冲淡；最外 5px 小于网格间距 16px，
+     相邻两张选中卡的光晕不会粘连 */
   box-shadow:
-    var(--shadow-lg, 0 4px 20px rgba(0, 0, 0, 0.15)),
-    0 0 0 3px var(--accent-soft, transparent);
+    0 0 0 2px var(--accent, #0078d4),
+    0 0 0 5px var(--selection-halo, var(--accent-soft, transparent)),
+    0 0 14px 5px var(--accent-soft, transparent),
+    var(--shadow-lg, 0 4px 20px rgba(0, 0, 0, 0.15));
 }
 
 .media-card.is-selected::after {
@@ -1289,6 +1305,19 @@ html.glass-lite .ambient-bg {
 /* 选中卡悬停：描边加深一档，保留「选中 ≠ 悬停」的层次区分 */
 .media-card.is-selected:hover::after {
   border-color: var(--accent-deep, var(--accent));
+}
+
+/* 遮挡修复之三：层序 未选中(0) < 悬停(1) < 选中(2) < 选中且悬停(3)。
+   `.media-card:hover` 与 `.media-card.is-selected` 同为 (0,2,0) 特异性，靠源序（本规则晚于
+   hover）让选中压悬停；再补 (0,3,0) 保证「选中且悬停」不被后续 DOM 兄弟中的悬停卡追平 */
+.media-card.is-selected:hover {
+  z-index: 3;
+}
+
+/* 键盘焦点卡（VirtualImageGrid / TimelineView / EventTimelineView 的卡片带 tabIndex）
+   同样抬到 3，使焦点描边不被邻居盖住；MasonryView 卡片不可聚焦，此处为无害空规则 */
+.media-card:focus-visible {
+  z-index: 3;
 }
 
 .media-card img {
