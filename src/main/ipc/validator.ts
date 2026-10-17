@@ -15,6 +15,7 @@
 import { z } from 'zod'
 import path from 'path'
 import os from 'os'
+import fs from 'fs'
 import { app, type IpcMainInvokeEvent } from 'electron'
 import type { HandlerContext } from './handler-context'
 import { AppError, isAppError, toIpcError } from '../../shared/errors/app-error'
@@ -170,8 +171,14 @@ export const schemas = {
  */
 class PathGuard {
   private roots = new Set<string>()
-  /** 「用户显式选择」根集合：仅真实系统对话框返回的路径可写入（见 registerUserPicked） */
+  /** 「用户显式选择」集合（目录与单文件均含）：仅真实系统对话框返回的路径可写入 */
   private userPicked = new Set<string>()
+  /**
+   * userPicked 的**目录**子集：只有 selectDirectory / openFile(openDirectory) 形态写入。
+   * scanner:start 与 settings:set 的短路判据认本集合而非 userPicked——它们的语义是
+   * 「用户显式授权的扫描根」，拿挑中的单个文件冒充目录会绕过路径校验。
+   */
+  private userPickedDirs = new Set<string>()
   private userHome = ''
   private userDataDir = ''
 
@@ -208,26 +215,73 @@ class PathGuard {
     for (const p of paths) this.register(p)
   }
 
-  /**
-   * 登记「用户显式选择」根（userPicked）：与 register 等价登记 roots，
-   * 额外记录到独立集合。仅限真实系统对话框返回的路径调用
-   * （dialog:selectDirectory / dialog:openFile 的 openDirectory 模式）——
-   * 用户在对话框中显式选中目录属真实授权行为，scanner:start / settings:set
-   * 对命中集合的路径短路放行，避免敏感目录黑名单误拦用户显式选择的系统目录
-   * （如装在 X:\Program Files 的游戏根）。渲染进程无任何 IPC 可写入该集合。
-   */
-  registerUserPicked(p: string): void {
-    this.register(p)
-    if (typeof p !== 'string' || p.length === 0) return
+  /** 归一（resolve + 小写）后加入集合，无效路径静默忽略——与 register 同口径 */
+  private markPicked(set: Set<string>, p: string): void {
     try {
-      this.userPicked.add(path.resolve(p).toLowerCase())
+      set.add(path.resolve(p).toLowerCase())
     } catch {
       // 无效路径忽略
     }
   }
 
-  /** 判断路径是否位于 userPicked 根下（含根自身），归一化与前缀语义与 roots 判定一致 */
+  /**
+   * 登记「用户显式选择」路径（userPicked）：与 register 等价登记 roots，额外记入独立集合。
+   * 仅限真实系统对话框返回的路径调用（dialog:selectDirectory / dialog:openFile）——
+   * 用户在对话框中显式选中即属真实授权行为，媒体读通道（media:// 规则 0、
+   * assertMediaAccessPath）对命中路径短路放行，避免敏感目录黑名单误拦用户显式选择的
+   * 系统目录（如装在 X:\Program Files 的游戏根）。渲染进程无任何 IPC 可写入该集合。
+   * asDir=true 时另记入 userPickedDirs，供 scanner:start / settings:set 的「目录」短路。
+   */
+  private addUserPicked(p: string, asDir: boolean): void {
+    this.register(p)
+    if (typeof p !== 'string' || p.length === 0) return
+    this.markPicked(this.userPicked, p)
+    if (asDir) this.markPicked(this.userPickedDirs, p)
+    // 追加登记 realpath 形态：media:// 展示（media-protocol.ts 先 resolveRealPath 再判）与
+    // assertMediaReadPath 的 realpath 复检拿到的都是解引用后的路径，只存对话框原形态时，
+    // 祖先含 junction / 符号链接 / SUBST / 映射盘 / OneDrive 重定向会让两侧永不相交，
+    // 表现为「用户刚挑好的 logo 仍然恒 403」。归一放在写侧，一次覆盖全部 isUserPicked 消费方。
+    // 用非 native 的 fs.realpathSync：判定侧 media-protocol.ts 的 resolveRealPath 用的正是
+    // fs.promises.realpath（非 native），两侧串必须逐字相等。
+    // 两条边界（勿"顺手放宽"）：
+    // ① 物理拼写落敏感目录时**不登记**——isUserPicked 在 scanner:start / settings:set /
+    //    assertMediaAccessPath 处是「跳过黑名单」的短路，不能给它一个直连 `~\.aws`、
+    //    `Program Files` 之类物理路径的拼写（代价：真身在敏感目录里的 logo 仍 403，符合预期）；
+    // ② 只进 userPicked、**不进 roots**——其余消费方一律拿原路径 resolve 后比对 roots，
+    //    把物理拼写塞进白名单会波及约 40 个 handler 的 assertFileReadPath 判定，且无缺陷需要它。
+    // fail-open：解析失败（多为路径已不存在）维持原形态登记，绝不向对话框冒泡异常。
+    try {
+      const real = fs.realpathSync(p)
+      if (!isSensitivePath(real)) {
+        this.markPicked(this.userPicked, real)
+        if (asDir) this.markPicked(this.userPickedDirs, real)
+      }
+    } catch {
+      // 仅保留原形态登记
+    }
+  }
+
+  /** 登记「用户显式选择」的**单个文件**（dialog:openFile 默认形态） */
+  registerUserPicked(p: string): void {
+    this.addUserPicked(p, false)
+  }
+
+  /** 登记「用户显式选择」的**目录**（selectDirectory / openFile 的 openDirectory 形态） */
+  registerUserPickedDir(p: string): void {
+    this.addUserPicked(p, true)
+  }
+
+  /** 判断路径是否位于 userPicked 根下（含根自身，目录与单文件同集合），归一化与前缀语义与 roots 判定一致 */
   isUserPicked(p: string): boolean {
+    return this.matchesPicked(this.userPicked, p)
+  }
+
+  /** 同上，但只认「显式选择的目录」——供 scanner:start / settings:set 这类扫描根短路使用 */
+  isUserPickedDir(p: string): boolean {
+    return this.matchesPicked(this.userPickedDirs, p)
+  }
+
+  private matchesPicked(set: Set<string>, p: string): boolean {
     if (typeof p !== 'string' || p.length === 0) return false
     if (!path.isAbsolute(p)) return false
     let resolved: string
@@ -236,7 +290,7 @@ class PathGuard {
     } catch {
       return false
     }
-    for (const root of this.userPicked) {
+    for (const root of set) {
       if (resolved === root || resolved.startsWith(root + path.sep)) return true
     }
     return false

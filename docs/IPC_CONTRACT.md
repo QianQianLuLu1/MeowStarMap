@@ -507,3 +507,41 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
 - 回填 `media_files → asset_edits`（按归一化路径匹配）的纯函数已在仓储层实现并单测
   （`planAssetEditSeed`），但**尚未接线任何通道**：需要 `media_files` 与 assets 两侧
   分页游标对拉，属独立一步，见 `docs/sync-integration/04-ui-bridge-plan.md` §16.3。
+
+## 10. 水印域（2026-10-17 图片水印修复补录）
+
+实现位置：`src/main/ipc/handlers/watermark.ts`、`src/main/preload/api/watermark.ts`
+（命名空间 `electronAPI.watermark`）、`src/main/services/watermark-service.ts`。
+
+| 通道                       | 入参                                         | 出参（`data`，即渲染层拿到的对象）                     | 失败码                                                   |
+| -------------------------- | -------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| `watermark:apply`          | `config`、`filePaths[]`、`targetDir`         | `{ success, message, processed, cancelled?, taskId? }` | `VALIDATION_ERROR` / `PATH_FORBIDDEN` / `INTERNAL_ERROR` |
+| `watermark:saveTemplate`   | `name(≤128)`、`config`（JSON 字符串 ≤256KB） | `{ success: true, id: number }`                        | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `watermark:loadTemplates`  | 无参                                         | 行数组（DB 未就绪为 `[]`）                             | `INTERNAL_ERROR`                                         |
+| `watermark:deleteTemplate` | `id`（正整数）                               | `{ deleted: true }`                                    | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `watermark:progress`       | 主进程 → 渲染层推送                          | `{ current, total }`                                   | —                                                        |
+
+契约要点：
+
+- **`watermark:saveTemplate` 的返回值必须含内层 `success: true`**：调用方
+  `src/renderer/components/editor/WatermarkPanel.tsx` 判的是 `result.success`，而 §1.2 已说明
+  `call<T>()` 会剥掉外层 `IpcResponse.success`。此前 handler 只返回 `{ id }`，该判断恒为
+  `undefined` → 点「保存」后输入框不清空、列表不刷新、无任何提示（DB 行其实已插入）。
+  修复与回归用例见 `docs/plans/2026-10-17-fix-image-watermark-media-auth.md` §5 N3。
+- `watermark:deleteTemplate` 返回 `{ deleted: true }`，调用方以 `try/catch` + `IpcError` 判定成功，
+  **不读** `success`。但 `src/renderer/vite-env.d.ts:421` 把它声明成了
+  `Promise<{ success: boolean; message?: string }>`，与实现不符——运行期无危害（`call()` 原样透传
+  `data`），属类型漂移，后续按 §4 清单修正声明即可，不得反向给 handler 加 `success` 字段来迁就类型。
+- `watermark:apply` 的 `config` 在 IPC 层只做存在性检查（`z.record(z.string(), z.unknown())`），
+  业务校验在 `WatermarkService.applyBatch` 内（平铺间距必须为正数——`tileSpacingX/Y ≤ 0` 曾分别导致
+  水印静默缺失与主进程死循环冻结）。**`config.image.path`（图片水印 logo）自 2026-10-17 起必须经
+  `assertMediaAccessPath(ctx, logoPath)`**（`src/main/ipc/media-read-guard.ts`：用户显式选择的文件 →
+  已入库媒体 → PathGuard 兜底），未授权时整次批量以 `IPC_PATH_FORBIDDEN` 失败、不触达 `applyBatch`。
+  收紧前 service 直接 `fsp.readFile` 该路径，渲染进程可指任意绝对路径把私人图片字节合成进导出文件
+  （原 plan §8 E3 待办，就此关闭）。连带行为：重启后套用存下来的旧模板时，位于未索引目录的 logo
+  不再被授权，需重选图片——渲染层已有失败可见提示与重选引导（plan §8 E1）。
+- 编辑器内的图片水印**不走本域通道**：预览与导出由渲染层 canvas 完成
+  （`src/renderer/utils/imageProcessor.ts` 的 `applyWatermark`），只有画廊批量「添加水印」走
+  `watermark:apply`。canvas 链路经 `media://` 取 logo 字节（授权口径见
+  `src/main/app/media-protocol.ts` 的 `isMediaPathAllowed` 规则 0），service 链路用 `fs` 直读但
+  以同一口径的 `assertMediaAccessPath` 前置校验——两条链路的 logo 授权判据同源。

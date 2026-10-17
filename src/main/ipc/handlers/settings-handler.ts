@@ -1,3 +1,5 @@
+// @core-change: customScanPaths 短路判据由 isUserPicked 改为 isUserPickedDir，与 scanner:start
+// 同口径——挑中的单个文件不得作为「用户显式授权的扫描根」被持久化
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -28,10 +30,11 @@ function assertCustomScanPaths(value: unknown): void {
     if (typeof p !== 'string' || p.length === 0) {
       throw AppError.validation(t('main.settings.error.customPathsEmptyItem'))
     }
-    // userPicked（对话框显式选择）短路：ScanFallbackSection/ScanPathsSection 选系统目录
-    // 后经此持久化是唯一合法写入来源，用户显式授权不受敏感目录黑名单误拦；
-    // 伪造路径（未命中标记）仍走完整校验。
-    if (!pathGuard.isUserPicked(p)) assertFileReadPath(p)
+    // userPickedDir（对话框显式选择的目录）短路：ScanFallbackSection/ScanPathsSection
+    // 选系统目录后经此持久化是唯一合法写入来源，用户显式授权不受敏感目录黑名单误拦；
+    // 伪造路径（未命中标记）仍走完整校验。判据用目录集合而非 userPicked——
+    // customScanPaths 存的是扫描根，dialog:openFile 挑中的单个文件不能冒充它。
+    if (!pathGuard.isUserPickedDir(p)) assertFileReadPath(p)
   }
 }
 

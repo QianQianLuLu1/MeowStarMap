@@ -43,6 +43,7 @@ export interface CurvePoint {
 
 import { applyLut3D, builtInLuts } from './lut'
 import { toFileUrl, needsAnonymousCors } from './file'
+import { formatWatermarkText } from '../../shared/utils/watermark-text'
 // 仅类型 re-export；builtInLuts 需本地绑定（612 行直接使用），改为顶部 import
 // （原 `export { builtInLuts, parseCube } from './lut'` 是 re-export 非 import，
 // 导致 TS2304 Cannot find name 'builtInLuts'；parseCube 无外部依赖此转发，直接移除）
@@ -190,6 +191,12 @@ export interface FilterPreset {
 export interface ProcessOptions {
   maxSize?: number
   watermark?: WatermarkConfig | null
+  /**
+   * 图片水印的 logo 加载失败时的旁路通知（message 已是用户可读译文）。
+   * 刻意不抛错：抛错会被 useImageProcessor 的降级重渲染捕获，导致整张预览消失——
+   * 「水印没出来」升级为「图片打不开」。调用方据此提示用户重选图片。
+   */
+  onWatermarkImageError?: (message: string) => void
 }
 
 export function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
@@ -717,7 +724,7 @@ export async function processImageData(
 
   // 水印
   if (options.watermark) {
-    imageData = await applyWatermark(imageData, options.watermark)
+    imageData = await applyWatermark(imageData, options.watermark, options.onWatermarkImageError)
   }
 
   return imageData
@@ -817,12 +824,11 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-export function formatWatermarkText(content: string): string {
-  const now = new Date()
-  const dateStr = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, '0')}.${String(now.getDate()).padStart(2, '0')}`
-  const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`
-  return content.replace(/\{date\}/gi, dateStr).replace(/\{time\}/gi, timeStr)
-}
+/**
+ * `{date}`/`{time}` 展开——实现已抽到 shared（主进程批量导出共用同一份，避免漂移），
+ * 此处仅按原对外名再导出，`imageProcessor.test.ts` 的既有用例即为「迁移无损」证据。
+ */
+export { formatWatermarkText }
 
 function drawTextWatermark(
   ctx: CanvasRenderingContext2D,
@@ -888,7 +894,8 @@ async function drawImageWatermark(
   ctx: CanvasRenderingContext2D,
   config: WatermarkConfig,
   cw: number,
-  ch: number
+  ch: number,
+  onImageError?: (message: string) => void
 ): Promise<void> {
   const imgCfg = config.image
   if (!imgCfg?.path) return
@@ -896,7 +903,10 @@ async function drawImageWatermark(
   let img: HTMLImageElement
   try {
     img = await loadImage(imgCfg.path)
-  } catch {
+  } catch (err) {
+    // 跳过图片水印、继续合成（文字水印与滤镜结果不受影响），但必须把失败报给调用方：
+    // 此前这里是无日志无提示的 `catch { return }`，用户只看到「水印没出来」
+    onImageError?.(err instanceof Error ? err.message : String(err))
     return
   }
 
@@ -942,7 +952,11 @@ async function drawImageWatermark(
   }
 }
 
-async function applyWatermark(imageData: ImageData, config: WatermarkConfig): Promise<ImageData> {
+async function applyWatermark(
+  imageData: ImageData,
+  config: WatermarkConfig,
+  onWatermarkImageError?: (message: string) => void
+): Promise<ImageData> {
   const canvas = document.createElement('canvas')
   canvas.width = imageData.width
   canvas.height = imageData.height
@@ -958,7 +972,10 @@ async function applyWatermark(imageData: ImageData, config: WatermarkConfig): Pr
     drawPolaroidFrame(ctx, config, cw, ch)
   }
 
-  if (config.text?.content) {
+  // polaroid 的标签已由 drawPolaroidFrame 画在白带内，这里必须跳过，
+  // 否则按 position 再叠一份（预设是 bottomCenter + margin:0 → 两串字重叠在框内），
+  // 且与批量导出的 SVG 单次绘制口径不一致
+  if (config.text?.content && config.style !== 'polaroid') {
     ctx.save()
     ctx.globalAlpha = (config.text.opacity ?? 80) / 100
     drawTextWatermark(ctx, config, cw, ch)
@@ -966,7 +983,7 @@ async function applyWatermark(imageData: ImageData, config: WatermarkConfig): Pr
   }
 
   if (config.image?.path) {
-    await drawImageWatermark(ctx, config, cw, ch)
+    await drawImageWatermark(ctx, config, cw, ch, onWatermarkImageError)
   }
 
   return ctx.getImageData(0, 0, cw, ch)
@@ -990,7 +1007,9 @@ function drawPolaroidFrame(
     ctx.textBaseline = 'middle'
     ctx.textAlign = 'center'
     ctx.globalAlpha = (config.text.opacity ?? 80) / 100
-    ctx.fillText(config.text.content, cw / 2, ch - frameHeight / 2)
+    // 与 drawTextWatermark 同口径展开占位符——修复前这里画的是未展开的原始 content，
+    // 于是 date-label 之外的 polaroid 框里会露出字面量 `{date}`
+    ctx.fillText(formatWatermarkText(config.text.content), cw / 2, ch - frameHeight / 2)
   }
   ctx.restore()
 }

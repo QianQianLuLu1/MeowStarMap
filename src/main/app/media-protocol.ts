@@ -11,6 +11,9 @@ import { isPathUnderDir } from '../utils/ipc-validate'
 // 阶段 4：media:// 第 4 条规则的事实来源（NikkiSync 资源路径精确授权表）
 // 阶段 5：该规则的判定点从协议 handler 下沉到 isMediaPathAllowed，展示与读取共用一套口径
 import { isNikkiSyncResourcePath } from '../nikkisync/resource-allowlist'
+// 图片水印授权（isMediaPathAllowed 规则 0）：判定「用户是否在系统对话框里显式选中过该文件」。
+// validator 只依赖 utils/shared/electron，不反向引本文件，无循环导入。
+import { pathGuard } from '../ipc/validator'
 import { logger } from '../utils/logger'
 // 文件读流的生命周期管理统一走公共工具（含 error 监听 + abort 取消 + fd 归还），
 // 本文件不再自带实现，避免与 WiFi 分享服务出现两份易漂移的副本
@@ -106,9 +109,9 @@ export function registerMediaProtocol(ctx: AppContext): void {
         return new Response('File not found', { status: 404 })
       }
 
-      // 路径白名单校验：仅允许访问已索引的媒体文件、已知缩略图、已索引 source_path 下的
-      // 媒体扩展名文件，以及 NikkiSync 资源授权表里的确切路径（第 4 条规则自阶段 5 起
-      // 下沉到 isMediaPathAllowed 内部，与读通道共用一套口径）。
+      // 路径白名单校验：允许用户显式选中的媒体文件（规则 0）、已知缩略图、DB 已索引的
+      // file_path/thumbnail、已索引 source_path 下的媒体扩展名文件，以及 NikkiSync 资源
+      // 授权表里的确切路径（规则 0/4 自下沉起与读通道共用一套口径，见 isMediaPathAllowed）。
       if (!isMediaPathAllowed(ctx, realPath)) {
         logger.warn(t('main.mediaProtocol.log.denyNotWhitelisted'), filePath)
         return new Response('Forbidden', { status: 403 })
@@ -256,11 +259,14 @@ function parseRangeHeader(
 /**
  * 检查请求路径是否在媒体白名单内（`media://` 展示与 IPC 读通道共用的唯一口径）。
  * 安全策略：
+ *   0. 用户在系统对话框中显式选中的媒体文件（判在取 DB 之前、不入缓存；见下方规则 0 注释）
  *   1. 缩略图缓存目录下的文件（受控目录）
  *   2. 数据库中已索引的媒体文件（file_path 精确匹配）或其缩略图路径（thumbnail 精确匹配）
  *   3. 已索引 source_path 目录下的媒体文件（扩展名必须在白名单内，防止读取任意文件）
  *   4. NikkiSync 资源授权表里的**确切**路径（同样过扩展名白名单）
  * 注：媒体扩展名白名单已抽到 utils/media-constants.ts 的 MEDIA_EXTENSIONS 常量
+ * 注：规则 1-3 走 mediaPathCache（TTL 5 分钟，含否定结果）；规则 0 与 4 刻意绕过缓存，
+ *     理由分别是「先判否后登记的时序」与「授权表整表替换的语义」。
  * 已修复 A-S2/C-F5：原实现 source_path 前缀匹配无扩展名限制，扫描 D:\ 后可读取整盘任意文件
  * 已修复 A-S1/C-S2：原实现每次请求都执行数据库查询，现使用内存缓存（TTL 5分钟）
  *
@@ -280,6 +286,25 @@ export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boole
     if (
       MEDIA_EXTENSIONS.has(path.extname(normalizedRequest).toLowerCase()) &&
       isNikkiSyncResourcePath(normalizedRequest)
+    ) {
+      return true
+    }
+
+    // 0. 用户在系统对话框中显式选中的媒体文件（图片水印 logo 等）
+    //    判在取 DB **之前**、且**刻意不写 mediaPathCache**，三条理由（勿"顺手优化"）：
+    //    ① 与规则 4 同构——本 App DB 可能尚未就绪（`:287` 会直接 return false），
+    //       用户刚挑好的 logo 不该因启动早期取不到库而显示不出来；
+    //    ② 缓存写入含否定结果且有 5 分钟 TTL，而「先判否、后登记」正是本规则的典型时序
+    //       （面板预览先按未授权路径请求过一次 → 403 入缓存 → 用户重选同一文件），
+    //       入缓存会把它压住最长 5 分钟，表现为「过几分钟又好了」的随机故障。
+    //       因此也**不需要** invalidateMediaPathCache；Set 查找零 IO，本就不靠缓存提速；
+    //    ③ 扩展名闸门——登记语义本身与扩展名无关（dialog-handler 与 selectDirectory 同一
+    //       doctrine：显式选择即授权），但**展示面**只放行媒体扩展名。用户挑中的
+    //       .txt/.json/无扩展名文件绝不因命中 userPicked 而被 media:// 送出字节。
+    //    伪造路径无法命中：userPicked 集合只有真实对话框能写入（见 validator.ts registerUserPicked）。
+    if (
+      MEDIA_EXTENSIONS.has(path.extname(normalizedRequest).toLowerCase()) &&
+      pathGuard.isUserPicked(normalizedRequest)
     ) {
       return true
     }

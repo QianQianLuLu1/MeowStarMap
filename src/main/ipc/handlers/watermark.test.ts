@@ -24,11 +24,21 @@ vi.mock('../../utils/logger', () => ({
 
 vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
 
+// media:apply 需对 config.image.path（水印 logo）做媒体授权校验（IPC_CONTRACT §10）
+vi.mock('../media-read-guard', () => ({
+  assertMediaReadPath: vi.fn(),
+  assertMediaAccessPath: vi.fn(),
+  assertMediaDeletePath: vi.fn()
+}))
+
 import { registerWatermarkHandlers } from './watermark'
 import { assertFileReadPath, assertFileWritePath } from '../validator'
+import { assertMediaAccessPath } from '../media-read-guard'
+import { AppError } from '../../../shared/errors/app-error'
 
 const assertFileReadPathMock = vi.mocked(assertFileReadPath)
 const assertFileWritePathMock = vi.mocked(assertFileWritePath)
+const assertMediaAccessPathMock = vi.mocked(assertMediaAccessPath)
 
 interface WatermarkServiceStub {
   applyBatch: ReturnType<typeof vi.fn>
@@ -67,6 +77,7 @@ describe('registerWatermarkHandlers', () => {
     handleMock.mockClear()
     assertFileReadPathMock.mockReset()
     assertFileWritePathMock.mockReset()
+    assertMediaAccessPathMock.mockReset()
     watermarkService = { applyBatch: vi.fn() }
   })
 
@@ -105,6 +116,44 @@ describe('registerWatermarkHandlers', () => {
       expect.any(AbortSignal)
     )
     expect(result.data.processed).toBe(2)
+  })
+
+  /**
+   * 安全缺口（docs/plans/2026-10-17-fix-image-watermark-media-auth.md §8 E3）：
+   * `config.image.path` 此前不经任何路径校验，`WatermarkService` 直接 `fsp.readFile`
+   * 该绝对路径并把图片字节合成进导出文件——渲染进程可指任意可读图片（如用户私人相册）。
+   * 本组用例钉「logo 必须走媒体授权口径」（assertMediaAccessPath：userPicked →
+   * media:// 白名单 → PathGuard 兜底）。
+   */
+  it('W1 config.image.path 未经媒体授权时拒绝整次批量，且不触达 applyBatch', async () => {
+    const LOGO = 'C:\\Users\\victim\\Pictures\\private.png'
+    assertMediaAccessPathMock.mockImplementation(() => {
+      throw AppError.forbidden('路径不在白名单内，禁止读取操作')
+    })
+    registerWatermarkHandlers(makeCtx(watermarkService))
+    const result = (await getHandler('watermark:apply')([
+      { image: { path: LOGO } },
+      ['/a'],
+      '/out'
+    ])) as { success: boolean; error?: { code: string } }
+
+    expect(assertMediaAccessPathMock).toHaveBeenCalledWith(expect.anything(), LOGO)
+    expect(result.success).toBe(false)
+    expect(result.error?.code).toBe('IPC_PATH_FORBIDDEN')
+    expect(watermarkService.applyBatch).not.toHaveBeenCalled()
+  })
+
+  it('W2 未配置图片水印（无 image.path）时不做 logo 校验，文字水印链路不受影响', async () => {
+    watermarkService.applyBatch.mockResolvedValue({ processed: 1 })
+    registerWatermarkHandlers(makeCtx(watermarkService))
+    const result = (await getHandler('watermark:apply')([
+      { text: { content: 'WXNN' } },
+      ['/a'],
+      '/out'
+    ])) as { success: true; data: { processed: number } }
+
+    expect(assertMediaAccessPathMock).not.toHaveBeenCalled()
+    expect(result.data.processed).toBe(1)
   })
 
   it('watermark:apply progress 回调被调用时通过 webContents 发送 watermark:progress', async () => {
@@ -152,6 +201,26 @@ describe('registerWatermarkHandlers', () => {
     )
     expect(runMock).toHaveBeenCalledWith('模板1', '{"k":1}')
     expect(result.data.id).toBe(10)
+  })
+
+  /**
+   * 双层 success 陷阱（docs/IPC_CONTRACT.md §1.2）：wrapHandler 的外层 success 会被
+   * preload 的 call<T>() 剥掉，渲染层 WatermarkPanel.tsx:236 判的是 handler **自己返回对象**
+   * 里有没有 success。缺它时点「保存」既不报错也不刷新列表——表现为「点了没反应」，
+   * 而 DB 行其实已插入（重开面板才看到）。vite-env.d.ts:419 早就声明了该契约。
+   */
+  it('watermark:saveTemplate 返回值含内层 success（前端判 result.success）', async () => {
+    const runMock = vi.fn(() => ({ lastInsertRowid: 10n }))
+    const db = { prepare: vi.fn(() => ({ run: runMock })) }
+    registerWatermarkHandlers(makeCtx(watermarkService, db))
+    const result = (await getHandler('watermark:saveTemplate')(['模板1', '{"k":1}'])) as {
+      success: true
+      data: { success: boolean; id: number }
+    }
+    expect(result.data.success).toBe(true)
+    expect(result.data.id).toBe(10)
+    // 复现 call<T>() 的解包：渲染层拿到的就是 data，因此 data 内必须自带 success
+    expect(result.success ? result.data : undefined).toEqual({ success: true, id: 10 })
   })
 
   it('watermark:saveTemplate 数据库未初始化时抛 preconditionFailed', async () => {

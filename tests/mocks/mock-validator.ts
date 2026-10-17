@@ -105,7 +105,8 @@ export const assertFileWritePath = vi.fn()
 
 /**
  * pathGuard 超集：真实方法（register / registerRoots / assertAllowed / isAllowed /
- * initUserDataDir / size / registerUserPicked / isUserPicked）
+ * initUserDataDir / size / registerUserPicked / isUserPicked /
+ * registerUserPickedDir / isUserPickedDir）
  * + 个别测试内联 mock 曾额外提供的 setRootMediaDir。
  */
 export const pathGuard = {
@@ -113,6 +114,8 @@ export const pathGuard = {
   registerRoots: vi.fn(),
   registerUserPicked: vi.fn(),
   isUserPicked: vi.fn(),
+  registerUserPickedDir: vi.fn(),
+  isUserPickedDir: vi.fn(),
   assertAllowed: vi.fn(),
   isAllowed: vi.fn(),
   initUserDataDir: vi.fn(),

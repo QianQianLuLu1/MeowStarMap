@@ -183,14 +183,24 @@ export const WatermarkPanel: React.FC<WatermarkPanelProps> = ({ config, onChange
   const [templates, setTemplates] = useState<WatermarkTemplate[]>([])
   const [templateName, setTemplateName] = useState('')
   const [loading, setLoading] = useState(false)
+  // logo 预览图加载失败标记（<img> 的 onError 驱动；换路径时由新一次 load/error 复位）
+  const [logoLoadFailed, setLogoLoadFailed] = useState(false)
   // 插件提供的水印模板（由 watermark.template 扩展点注入）
   const [pluginTemplates, setPluginTemplates] = useState<PluginWatermarkTemplate[]>([])
 
   useEffect(() => {
     if (!window.electronAPI?.watermark?.loadTemplates) return
-    window.electronAPI.watermark.loadTemplates().then((rows) => {
-      setTemplates((rows as WatermarkTemplate[]).map((r) => ({ ...r, config: String(r.config) })))
-    })
+    window.electronAPI.watermark
+      .loadTemplates()
+      .then((rows) => {
+        setTemplates((rows as WatermarkTemplate[]).map((r) => ({ ...r, config: String(r.config) })))
+      })
+      // 无 catch 时 DB 未就绪会让这个 Promise 变成未处理拒绝（控制台红字、列表静默为空）。
+      // 这里只记日志不弹 UI：该场景等价于「模板列表为空」，为它新增 12 语种的专用文案不值当。
+      // 日志文案用英文（非用户可见文案），同 useImageProcessor.ts:127 的既有口径
+      .catch((error) => {
+        console.error('[Watermark] loadTemplates failed', error)
+      })
   }, [])
 
   // 加载插件提供的水印模板（失败静默，不影响主功能）
@@ -498,15 +508,27 @@ export const WatermarkPanel: React.FC<WatermarkPanelProps> = ({ config, onChange
           </div>
 
           {current.image?.path && (
-            <div
-              className="rounded-lg overflow-hidden h-24 flex items-center justify-center"
-              style={{ background: 'var(--bg-tertiary)' }}
-            >
-              <img
-                src={toFileUrl(current.image.path) || undefined}
-                alt={t('watermark.imagePreviewAlt')}
-                className="max-w-full max-h-full object-contain"
-              />
+            <div className="space-y-2">
+              <div
+                className="rounded-lg overflow-hidden h-24 flex items-center justify-center"
+                style={{ background: 'var(--bg-tertiary)' }}
+              >
+                <img
+                  key={current.image.path}
+                  src={toFileUrl(current.image.path) || undefined}
+                  alt={t('watermark.imagePreviewAlt')}
+                  className="max-w-full max-h-full object-contain"
+                  onError={() => setLogoLoadFailed(true)}
+                  onLoad={() => setLogoLoadFailed(false)}
+                />
+              </div>
+              {/* logo 取不到字节时（典型：路径未被 media:// 放行，或重启后模板指向已失效路径），
+                  裂图本身不携带原因——就地报错并让用户重选，避免「选了没反应」的哑故障 */}
+              {logoLoadFailed && (
+                <p className="text-xs break-all" style={{ color: 'var(--danger)' }} role="alert">
+                  {t('toast.imageProcessorLoadFailed', { src: current.image.path })}
+                </p>
+              )}
             </div>
           )}
 

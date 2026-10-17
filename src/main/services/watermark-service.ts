@@ -1,8 +1,11 @@
+// @core-change: 批量水印补齐 polaroid/date-label 底纹与 {date}/{time} 展开
 import fsp from 'fs/promises'
 import path from 'path'
 import sharp from 'sharp'
 import type { Blend, OverlayOptions } from 'sharp'
 import type { WatermarkConfig } from '../types/file'
+// {date}/{time} 展开与渲染层共用同一份实现（此前主进程不展开，导出图露字面花括号）
+import { formatWatermarkText } from '../../shared/utils/watermark-text'
 // C-3：统一文件工具函数与 MIME 映射
 import { pathExists, getUniqueFilePath, bufferToDataUrl } from '../utils/file-utils'
 import { getMimeType } from '../utils/media-constants'
@@ -182,9 +185,38 @@ export class WatermarkService {
 
   private buildTextWatermarkSvg(config: WatermarkConfig, cw: number, ch: number): string | null {
     const text = config.text
+    const fontWeight = text?.bold ? 'bold' : 'normal'
+    const fontStyle = text?.italic ? 'italic' : 'normal'
+    const opacity = (text?.opacity ?? 80) / 100
+
+    /**
+     * polaroid：底部白带与渲染层同源——`drawPolaroidFrame` 的 fillRect 写在
+     * `if (config.text?.content)` 守卫**之前**（imageProcessor.ts:1000-1001），
+     * 所以空文字也必须有框。判据必须放在 `!text?.content` 早退之前，
+     * 否则 `overlays.length === 0 → continue`（:102-104）会让该文件**连输出都不写**。
+     * 不套用 position / tile / rotation（画布版同样不套）。
+     */
+    if (config.style === 'polaroid') {
+      const frameRatio = 0.16
+      const frameHeight = Math.max(1, Math.round(ch * frameRatio))
+      const content = text?.content ? formatWatermarkText(text.content) : ''
+      // SVG 内部色（画布像素，与 UI 主题无关）：拍立得相纸固定白，同渲染层 '#ffffff'
+      const frame = `<rect x="0" y="${ch - frameHeight}" width="${cw}" height="${frameHeight}" fill="#ffffff" />`
+      const label =
+        text && content
+          ? `<text x="${cw / 2}" y="${ch - frameHeight / 2}" text-anchor="middle" dominant-baseline="middle" fill="${this.escapeXml(text.color || '#333333')}" font-family="${this.escapeXml(text.font || 'sans-serif')}" font-size="${Math.min(text.size, frameHeight * 0.4)}" font-weight="${fontWeight}" font-style="${fontStyle}" style="opacity: ${opacity};">${this.escapeXml(content)}</text>`
+          : ''
+      return `<svg width="${cw}" height="${ch}" xmlns="http://www.w3.org/2000/svg">${frame}${label}</svg>`
+    }
+
     if (!text?.content) return null
 
-    const ww = Math.round(text.size * text.content.length * 1.2)
+    // 先展开 {date}/{time}，再参与尺寸估算与 XML 转义（顺序不可颠倒：转义会把串变长，
+    // 影响 ww 估算；而占位符本身必须先落成日期，否则导出图里是一串字面花括号）
+    const content = formatWatermarkText(text.content)
+    const escaped = this.escapeXml(content)
+
+    const ww = Math.round(text.size * content.length * 1.2)
     const wh = Math.round(text.size * 1.5)
     const pos = this.getWatermarkPosition(
       config.position,
@@ -197,10 +229,9 @@ export class WatermarkService {
       config.customY
     )
 
-    const fontWeight = text.bold ? 'bold' : 'normal'
-    const fontStyle = text.italic ? 'italic' : 'normal'
-    const decoration = text.underline ? 'text-decoration: underline;' : ''
-    const opacity = (text.opacity ?? 80) / 100
+    // date-label 下抑制下划线，与画布版同口径（imageProcessor.ts:876）
+    const decoration =
+      text.underline && config.style !== 'date-label' ? 'text-decoration: underline;' : ''
 
     let elements = ''
     const rotation = config.rotation || 0
@@ -208,7 +239,15 @@ export class WatermarkService {
     const drawOne = (x: number, y: number) => {
       const cx = x + ww / 2
       const cy = y + wh / 2
-      return `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="${this.escapeXml(text.color)}" font-family="${this.escapeXml(text.font)}" font-size="${text.size}" font-weight="${fontWeight}" font-style="${fontStyle}" style="${decoration} opacity: ${opacity};" transform="rotate(${rotation}, ${cx}, ${cy})">${this.escapeXml(text.content)}</text>`
+      const transform = `rotate(${rotation}, ${cx}, ${cy})`
+      // date-label：文字前置圆角暗底，口径对齐 imageProcessor.ts:861-868
+      // （pad = size*0.3、底板高 = wh + pad、rx = size*0.25）。SVG 内部色（非 UI 主题色）。
+      let bg = ''
+      if (config.style === 'date-label') {
+        const pad = text.size * 0.3
+        bg = `<rect x="${cx - ww / 2 - pad}" y="${cy - wh / 2 - pad * 0.5}" width="${ww + pad * 2}" height="${wh + pad}" rx="${text.size * 0.25}" fill="rgba(0,0,0,0.55)" opacity="${opacity}" transform="${transform}" />`
+      }
+      return `${bg}<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle" fill="${this.escapeXml(text.color)}" font-family="${this.escapeXml(text.font || 'sans-serif')}" font-size="${text.size}" font-weight="${fontWeight}" font-style="${fontStyle}" style="${decoration} opacity: ${opacity};" transform="${transform}">${escaped}</text>`
     }
 
     if (config.tile) {

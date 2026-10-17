@@ -63,6 +63,8 @@ interface UseImageProcessorReturn {
   setFilterIntensity: (v: number) => void
   watermark: WatermarkConfig | null
   setWatermark: (w: WatermarkConfig | null) => void
+  /** 图片水印 logo 加载失败的可读提示；null 表示无失败 */
+  watermarkError: string | null
   previewUrl: string | null
   originalUrl: string | null
   reset: () => void
@@ -81,6 +83,9 @@ export function useImageProcessor({
   const [filter, setFilter] = useState<FilterPreset | null>(null)
   const [filterIntensity, setFilterIntensity] = useState(100)
   const [watermark, setWatermark] = useState<WatermarkConfig | null>(null)
+  // 图片水印 logo 加载失败的可读提示。刻意与 `error` 分开：`error` 在 EditorPage 只在
+  // 「无预览」时渲染，而 logo 读失败时预览仍在，复用 error 等于什么都不显示。
+  const [watermarkError, setWatermarkError] = useState<string | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [originalUrl, setOriginalUrl] = useState<string | null>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
@@ -91,6 +96,15 @@ export function useImageProcessor({
     () => mergeFilterParams(params, filter, filterIntensity),
     [params, filter, filterIntensity]
   )
+
+  // 换水印（含改 logo 路径）即清除上一次失败提示，避免旧错误常驻
+  useEffect(() => {
+    setWatermarkError(null)
+  }, [watermark])
+
+  const handleWatermarkImageError = useCallback((message: string) => {
+    setWatermarkError(message)
+  }, [])
 
   const renderPreview = useCallback(() => {
     const img = imageRef.current
@@ -106,7 +120,8 @@ export function useImageProcessor({
       try {
         const imageData = await processImageData(img, mergedParams, {
           maxSize,
-          watermark
+          watermark,
+          onWatermarkImageError: handleWatermarkImageError
         })
         if (token !== pendingRef.current) return
         const dataUrl = await imageToDataUrl(imageData, 'image/jpeg', PREVIEW_JPEG_QUALITY)
@@ -119,7 +134,8 @@ export function useImageProcessor({
           try {
             const fallbackData = await processImageData(img, mergedParams, {
               maxSize: FALLBACK_PREVIEW_MAX_SIZE,
-              watermark
+              watermark,
+              onWatermarkImageError: handleWatermarkImageError
             })
             if (token !== pendingRef.current) return
             const dataUrl = await imageToDataUrl(fallbackData, 'image/jpeg', PREVIEW_JPEG_QUALITY)
@@ -139,7 +155,7 @@ export function useImageProcessor({
         }
       }
     }, PREVIEW_DEBOUNCE_MS)
-  }, [mergedParams, watermark, maxPreviewSize, t])
+  }, [mergedParams, watermark, maxPreviewSize, handleWatermarkImageError, t])
 
   // C-S9：用 ref 持有最新的 renderPreview，避免 source 加载完成时调用过期闭包
   // 原实现 useEffect([source]) 内直接调 renderPreview()，但 renderPreview 是后续
@@ -264,7 +280,8 @@ export function useImageProcessor({
           // 用户无从知晓分辨率已损失。原图经 Image 解码时完整位图已驻留内存，
           // 同尺寸 canvas 输出不改变内存量级；预览路径仍由 maxPreviewSize 限制
           maxSize: fullSize ? Number.POSITIVE_INFINITY : normalizeMaxPreviewSize(maxPreviewSize),
-          watermark
+          watermark,
+          onWatermarkImageError: handleWatermarkImageError
         })
         // P2-C11：优先使用调用方传入的 mimeTypeOverride；否则从 source URL 解析扩展名。
         // blob:/data: URL 无可靠扩展名，解析会误判为 jpeg，调用方可通过 mimeTypeOverride 显式指定。
@@ -280,7 +297,7 @@ export function useImageProcessor({
         return null
       }
     },
-    [mergedParams, watermark, maxPreviewSize, source, t]
+    [mergedParams, watermark, maxPreviewSize, source, handleWatermarkImageError, t]
   )
 
   return {
@@ -298,6 +315,7 @@ export function useImageProcessor({
     setFilterIntensity,
     watermark,
     setWatermark,
+    watermarkError,
     previewUrl,
     originalUrl,
     reset,

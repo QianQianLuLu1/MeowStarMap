@@ -1,5 +1,5 @@
-// @core-change: sync-integration 阶段4/5：扫描同步接线（journal + rescan WS 事件；阶段5 落账抽取至
-// scanner/scan-journal 共用、失败路径补收口、restoredComplete 补 started）
+// @core-change: 扫描根短路判据由 isUserPicked 改为 isUserPickedDir（本批 dialog:openFile
+// 开始登记单个文件，文件不得冒充「用户显式授权的扫描目录」绕过白名单校验）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import path from 'path'
@@ -65,17 +65,19 @@ const detectGameRootsSchema = z
  * 合法调用方的路径来源都已在白名单内：
  * - path：dialog:selectDirectory 选中时已 pathGuard.register
  * - customKnownPaths：settings.customScanPaths，启动时由 refreshPathGuardRoots 注册
- * - 用户显式选择（userPicked）路径短路放行：不受敏感目录黑名单误拦（见下方实现注释）
+ * - 用户显式选择的**目录**（userPickedDirs）短路放行：不受敏感目录黑名单误拦（见下方实现注释）
  */
 function assertScanPathsAllowed(options?: { path?: string; customKnownPaths?: string[] }): void {
-  // userPicked 短路：dialog:selectDirectory / dialog:openFile(openDirectory) 登记的
-  // 「用户显式选择」标记 = 用户在真实系统对话框中的授权行为，跳过 PathGuard 校验，
+  // isUserPickedDir 短路：dialog:selectDirectory / dialog:openFile(openDirectory) 登记的
+  // 「用户显式选择的目录」= 用户在真实系统对话框中的授权行为，跳过 PathGuard 校验，
   // 修复敏感目录黑名单误拦显式选择的系统目录（如装在 X:\Program Files 的游戏根）；
   // 渲染进程伪造的路径（未经对话框，无任何 IPC 可写入标记集合）不命中，
   // 仍走 assertFileReadPath 完整白名单 + 黑名单校验，防自助提权链不放宽。
-  if (options?.path && !pathGuard.isUserPicked(options.path)) assertFileReadPath(options.path)
+  // 判据必须是「目录」集合而非 userPicked：本批起 dialog:openFile 也会登记挑中的
+  // 单个文件（图片水印 logo），文件形态的授权不能拿来冒充扫描根。
+  if (options?.path && !pathGuard.isUserPickedDir(options.path)) assertFileReadPath(options.path)
   for (const p of options?.customKnownPaths ?? []) {
-    if (!pathGuard.isUserPicked(p)) assertFileReadPath(p)
+    if (!pathGuard.isUserPickedDir(p)) assertFileReadPath(p)
   }
 }
 

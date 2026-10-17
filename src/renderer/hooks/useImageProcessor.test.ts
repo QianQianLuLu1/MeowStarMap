@@ -460,4 +460,34 @@ describe('useImageProcessor', () => {
       restore()
     })
   })
+
+  /**
+   * 图片水印失败可见（docs/plans/2026-10-17-fix-image-watermark-media-auth.md §5 N2）
+   * logo 经 media:// 被拒时，hook 必须把 message 暴露成 watermarkError 供 UI 提示；
+   * 与 error 分列，因为 EditorPage 的 error 只在「无预览」时渲染。
+   */
+  describe('watermarkError（图片水印失败透传）', () => {
+    it('把 onWatermarkImageError 传给 processImageData，回调后暴露 watermarkError', async () => {
+      const { result, restore } = await renderWithLoadedImage()
+
+      const options = mockProcessImageData.mock.calls[0]?.[2] as {
+        onWatermarkImageError?: (message: string) => void
+      }
+      expect(typeof options.onWatermarkImageError).toBe('function')
+      expect(result.current.watermarkError).toBeNull()
+
+      await act(async () => {
+        options.onWatermarkImageError?.('加载图片失败: /logo.png')
+        await Promise.resolve()
+      })
+      expect(result.current.watermarkError).toBe('加载图片失败: /logo.png')
+      restore()
+    })
+
+    it('预览成功路径不得凭空产生 watermarkError', async () => {
+      const { result, restore } = await renderWithLoadedImage()
+      expect(result.current.watermarkError).toBeNull()
+      restore()
+    })
+  })
 })

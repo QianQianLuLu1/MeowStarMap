@@ -65,11 +65,17 @@ vi.mock('fs', () => ({
   constants: { R_OK: 4, W_OK: 2 }
 }))
 
+// 图片水印授权修复（规则 0）需要 media-protocol 引入 pathGuard；本文件的 electron mock
+// 只提供 protocol，真实 validator 在模块加载期会调 app.getPath 与主进程 i18n 的 t()，
+// 必须换成共享替身（用法见该文件头注释）。
+vi.mock('../../ipc/validator', async () => await import('../../../../tests/mocks/mock-validator'))
+
 import {
   registerMediaProtocol,
   invalidateMediaPathCache,
   isMediaPathAllowed
 } from '../media-protocol'
+import { pathGuard } from '../../ipc/validator'
 import {
   clearNikkiSyncResourcePaths,
   registerNikkiSyncResourcePaths
@@ -135,6 +141,8 @@ beforeEach(() => {
 
   // 清空模块级单例缓存
   invalidateMediaPathCache()
+  // 规则 0 的替身：默认未登记（返回 undefined，falsy），既有用例的判定口径不变
+  vi.mocked(pathGuard.isUserPicked).mockReset()
 
   // 捕获 handler
   mediaHandler = null
@@ -188,6 +196,8 @@ describe('registerMediaProtocol', () => {
   })
 
   it('5. getDatabase() 返回 null 时直接返回 403', async () => {
+    // 规则 0 判在本断言之前，但此处 isUserPicked 未命中（beforeEach 已 mockReset）→ 仍 403。
+    // 用户显式选中且扩展名合规的路径不受本条影响，见「规则 0」组用例 39。
     const ctx = makeAppCtx({ db: null })
     registerMediaProtocol(ctx)
     const handler = protocolHandleMock.mock.calls[
@@ -795,6 +805,96 @@ describe('阶段 5 · C1：读通道与展示通道同口径 —— isMediaPathA
     } else {
       expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/nikki/D.PNG')).toBe(true)
     }
+  })
+})
+
+/**
+ * 规则 0 · 图片水印授权（docs/plans/2026-10-17-fix-image-watermark-media-auth.md §5 N1）
+ *
+ * 缺陷：编辑器「图片水印」挑的 logo 经 media:// 展示时被白名单拒绝（403），而
+ * imageProcessor 的 catch 把失败吞掉 → 水印静默消失。dialog:openFile 单文件模式此前
+ * 不登记 userPicked，且 isMediaPathAllowed 四条规则都不看 userPicked。
+ * 本组锁死新规则的三条边界：媒体扩展名闸门、不给目录级外溢、否定结果不得被缓存压住。
+ */
+describe('规则 0 · 用户显式选中的媒体文件经 media:// 放行', () => {
+  const ctxNoRows = () => makeAppCtx({ db: makeDb(() => undefined) })
+
+  /**
+   * 只放行指定路径自身，模拟真实 PathGuard 的归一与判定口径
+   * （validator.ts isUserPicked：path.resolve + toLowerCase + 「根自身 / 根+分隔符」前缀）。
+   * 两侧都 resolve，否则 win32 下 `/mock/...` 会被解析成 `D:\mock\...` 而永不匹配。
+   */
+  function allowExact(allowed: string): void {
+    const want = path.resolve(allowed).toLowerCase()
+    vi.mocked(pathGuard.isUserPicked).mockImplementation((p: string) => {
+      const resolved = path.resolve(p).toLowerCase()
+      return resolved === want || resolved.startsWith(want + path.sep)
+    })
+  }
+
+  /** 走完整协议 handler（缓存不污染那条必须经 handler 才能验状态码） */
+  function registerHandler(ctx: ReturnType<typeof makeAppCtx>): NonNullable<typeof mediaHandler> {
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+    invalidateMediaPathCache()
+  })
+
+  it('38. DB 无任何匹配但 isUserPicked 命中且是媒体扩展名 ⇒ true', () => {
+    const target = '/mock/pick/logo.png'
+    allowExact(target)
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(true)
+  })
+
+  it('39. 本 App DB 为 null 时规则 0 仍生效（判在取 DB 之前）', () => {
+    const target = '/mock/pick/logo.png'
+    allowExact(target)
+    expect(isMediaPathAllowed(makeAppCtx({ db: null }), target)).toBe(true)
+  })
+
+  it('40. isUserPicked 命中但扩展名不在媒体白名单 ⇒ false（不放 .txt/.json）', () => {
+    allowExact('/mock/pick/notes.txt')
+    allowExact('/mock/pick/conf.json')
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/pick/notes.txt')).toBe(false)
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/pick/conf.json')).toBe(false)
+  })
+
+  it('41. 同目录的兄弟文件未登记 ⇒ false（登记一个文件不外溢成目录级授权）', () => {
+    allowExact('/mock/pick/logo.png')
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/pick/other.png')).toBe(false)
+  })
+
+  it('42. 先判否后登记立即生效：不被 5 分钟否定缓存压住（403 → 200）', async () => {
+    const target = '/mock/pick/late-logo.png'
+    // 第一遍：未登记 → 403，且该否定结果会写进 mediaPathCache（TTL 5 分钟）
+    const handler = registerHandler(ctxNoRows())
+    expect((await handler(makeRequest(target))).status).toBe(403)
+    // 用户此刻才在对话框里显式选中该文件
+    allowExact(target)
+    // 第二遍必须立刻放行——规则 0 判在取缓存之前、且刻意不写缓存
+    expect((await handler(makeRequest(target))).status).toBe(200)
+  })
+
+  it('43. 传给 pathGuard 的是归一化绝对路径（混合大小写仍能命中）', () => {
+    const target = 'D:/mock/pick/Logo.PNG'
+    allowExact(target)
+    const input = 'd:/mock/pick/logo.png'
+    expect(isMediaPathAllowed(ctxNoRows(), input)).toBe(true)
+    // 传入的是 resolve 后的绝对路径，不是原始请求串（否则真实 PathGuard 的前缀匹配失效）
+    const arg = vi.mocked(pathGuard.isUserPicked).mock.calls.at(-1)?.[0] as string
+    expect(arg).toBe(path.resolve(input))
+  })
+
+  it('44. Windows 反斜杠形态的 logo 路径同样命中', () => {
+    // 真实 logo 路径在 Windows 上就是 D:\a\b\logo.png 形态；仅在 win32 下有意义
+    if (process.platform !== 'win32') return
+    allowExact('D:/mock/pick/Logo.PNG')
+    expect(isMediaPathAllowed(ctxNoRows(), 'd:\\mock\\pick\\logo.png')).toBe(true)
   })
 })
 
