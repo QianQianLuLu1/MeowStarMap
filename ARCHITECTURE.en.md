@@ -2001,7 +2001,7 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- Vitest 5.0, 407 test files / 6288 passing + 2 skipped (measured 2026-10-17; the historical 337 / 5331 reading was the 2026-10-10 snapshot — see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10).
+- Vitest 5.0, 408 test files / 6312 passing + 2 skipped (measured 2026-10-17, full run this round; the historical 337 / 5331 reading was the 2026-10-10 snapshot — see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10).
 - The two environment-related failures in the historical baseline (`path-safety.test.ts` read-only-directory case, `GalleryStackOverflow.test.tsx`) were fixed in 2.5.0; there are currently no pre-existing failures.
 
 ---
