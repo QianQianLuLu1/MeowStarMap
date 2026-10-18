@@ -2,7 +2,7 @@
 
 - 日期：2026-10-18
 - 分支 / 基线 HEAD：`feat/gallery-runtime-embed` @ `acdea69`
-- 状态：执行中。§9 为逐节点红/绿读数，§10 为入库前独立审查
+- 状态：已执行。N1 / N2 / N4 落地（提交 `8f0e427`），N3 / N5 经实测否决未改动代码；逐节点红/绿读数见 §12，闸门结果见 §12.4
 - 范围已与用户确认三项决策：① 本轮覆盖 N1–N5 全量（含重渲染风暴节点）；② 批准反转 `ThumbReveal` 「同 src 重挂载仍显示骨架」这条既有测试契约；③ 问题设备可由用户开 DevTools 控制台，真机诊断 D0 由用户执行
 - 上一轮同类工作：`docs/archive/plans/2026-09-30-fix-thumbnail-skeleton-reveal.md`（创建 ThumbReveal 骨架门控）与 `docs/archive/plans/2026-09-29-fix-gallery-stack-overflow.md`（移除 overscan）——两者均已归档至 `docs/archive/plans/`（被 `.gitignore` 排除，不入仓，git 历史可查）；commit `b190247`（换源渲染期重置，消除「旧图闪现一帧」）
 
@@ -150,7 +150,7 @@ A/B 矩阵（每档重启后重跑一次滚动计数，并确认 `logs/main.log`
 - 验收：grid-cycle + `media-card-selection.test.tsx` + `SelectionWiring.test.tsx` 绿；停滚 ≤150ms 后 hover 恢复
 - 风险与红线：**任何情况下不得给 `.media-card` 加回 `will-change`**（`globals.css:1238-1242` 禁令 + `src/renderer/styles/layer-budget.test.ts` 守护）。CSS 侧抑制（`html[data-scrolling] .media-card:hover { transform: none }`）为可选 N2b，若样式守护测试变红立即砍掉
 
-### N3 — `isTouchDevice` 首帧即正确（C2 设备差异）★★
+### N3 — `isTouchDevice` 首帧即正确（C2 设备差异）——**实测否决，未实施，见 §12.2**
 
 - 文件：`VirtualImageGrid.tsx:221,235-239`；新增 `VirtualImageGrid.touch.test.tsx`
 - 红灯：stub `matchMedia` 返回 `matches: true`，断言**第 1 次**渲染即含触屏遮罩。今天首帧 `false`、`useEffect` 后置真 ⇒ 挂载即多一次整网格重渲染 + 遮罩子树翻转 ⇒ 红
@@ -167,7 +167,7 @@ A/B 矩阵（每档重启后重跑一次滚动计数，并确认 `logs/main.log`
 - 验收：`npx vitest run src/renderer/hooks/useFailedImages.test.ts src/renderer/components/gallery` 绿
 - 风险：坏图卡稳定停在警告态直到重建/刷新（正是消除闪烁的目的）
 
-### N5 — 生成结果合帧通知（C4）★
+### N5 — 生成结果合帧通知（C4）——**实测否决：不改实现，用例保留为不变量守护，见 §12.2**
 
 - 文件：`src/renderer/hooks/useOnDemandThumbnails.ts:34-37`
 - 红灯：一帧内 resolve 多个结果时，itemContent 渲染次数增量 ≤ 1
@@ -263,15 +263,19 @@ A/B 矩阵（每档重启后重跑一次滚动计数，并确认 `logs/main.log`
 `渲染 → effect → setState(新引用) → 再渲染` 的**无限环路**——实测把 vitest worker 打到 OOM（退出码 134）。
 现实现无裁剪发生时返回原引用，环路从机制上消失（用例文件头已把这条写成注释，避免后来者再踩）。
 
-### 12.4 全量回归与闸门
+### 12.4 全量回归与闸门（实测输出）
 
-| 命令                                                          | 结果                                                     |
-| ------------------------------------------------------------- | -------------------------------------------------------- |
-| `npm run verify`                                              | 5 项全 ✓（typecheck / lint / core-gate / format / test） |
-| `npm test`                                                    | 见下方提交前复跑记录                                     |
-| `npm run typecheck` / `npm run lint` / `npm run format:check` | 见下方                                                   |
-| `npm run i18n:guard` / `npm run docs:links`                   | 零新增 i18n key；死引用见 §12.5                          |
-| `npm run e2e:smoke`                                           | 见下方                                                   |
+| 命令                               | 结果                                                                                                                                                                                                                                                                                                                                                                                     |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run verify`                   | 5 项全 ✓：typecheck / lint / core-gate（不涉及受保护路径，跳过）/ format / test                                                                                                                                                                                                                                                                                                          |
+| `npm test`                         | **418 文件全通过，6461 passed / 2 skipped / 0 failed**（43s）。首轮曾失败 1 项：`scripts/__tests__/check-md-links.test.ts` 抓到本计划文档 2 处死引用，按 §12.5 修复后复跑通过                                                                                                                                                                                                            |
+| `npm run typecheck`                | ✓（`tsc -b` + `tsc -p tsconfig.scripts.json`，exit 0）                                                                                                                                                                                                                                                                                                                                   |
+| `npm run lint`                     | ✓ 0 errors；11 条 warning 全为 `unicode-bom`，即 `docs/CODING_CONVENTIONS.md` §5 / DEBT-030 登记的存量 `components/common/*.test.tsx`。本次 7 个改动文件单独 `npx eslint` 为 0 问题                                                                                                                                                                                                      |
+| `npm run format:check`             | ✓ All matched files use Prettier code style                                                                                                                                                                                                                                                                                                                                              |
+| `npm run i18n:guard`               | ✓（本轮零新增 i18n key）                                                                                                                                                                                                                                                                                                                                                                 |
+| `npm run docs:links`               | ✓ 无死引用                                                                                                                                                                                                                                                                                                                                                                               |
+| `npm run build`                    | ✓ electron-vite 产出 dist/main + dist/renderer（GalleryPage chunk 227.94 kB，4.98s）                                                                                                                                                                                                                                                                                                     |
+| `npm run e2e:smoke` / `@perf-real` | **未跑，如实说明**：`e2e/smoke.e2e.ts`、`e2e/fullscreen-diagnose.e2e.ts`、`e2e/perf-real.e2e.ts` 的 R2 都经 `e2e/helpers.ts:21` 的 `launchApp()` 启动 `release/win-unpacked/*.exe`，而现存 exe 是本轮改动之前的打包产物——让它们测到本次代码必须先 `npm run dist:win`（覆盖 `release/`，属发布轮次动作，未经用户同意不擅自执行）。真实 App 层验证因此改由「问题设备 + §5 的 D0 脚本」承担 |
 
 ### 12.5 计划文档自身的死引用修复
 
