@@ -4284,7 +4284,8 @@
         "degraded": "未找到遊戲目錄",
         "off": "未啟動"
       },
-      "detail": "詳情"
+      "detail": "詳情",
+      "about": "關於 NikkiSync"
     },
     "empty": {
       "title": "還沒有可瀏覽的資產",

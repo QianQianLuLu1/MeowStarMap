@@ -4284,7 +4284,8 @@
         "degraded": "Game folder not found",
         "off": "Not started"
       },
-      "detail": "Details"
+      "detail": "Details",
+      "about": "เกี่ยวกับ NikkiSync"
     },
     "empty": {
       "title": "No assets to browse yet",

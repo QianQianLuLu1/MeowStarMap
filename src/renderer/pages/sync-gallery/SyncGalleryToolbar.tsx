@@ -1,8 +1,20 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/common/Button'
-import { IconSync, IconRotateCw, IconInfo, IconSettings } from '../../icons'
+import { IconSync, IconRotateCw, IconInfo, IconSettings, IconGithub } from '../../icons'
 import type { NikkiSyncRuntimeStateInfo } from '../../../shared/types/electron-api'
+
+/**
+ * NikkiSync **上游引擎**仓库，与本应用仓库（`settings/about-sections` 的 `GITHUB_URL`）是两个
+ * repo，别「统一」成一个。打开方式沿用既有外链入口：主进程 `shell:openExternal` 通道
+ * （`window.open` / `<a target="_blank">` 被 `setWindowOpenHandler` 一律 deny，不可用）。
+ */
+const NIKKISYNC_REPO_URL = 'https://github.com/ToStardust/NikkiSync'
+
+/** 桥缺失（非授信 origin 下 preload 不暴露任何全局）时静默降级，与其余外链入口同口径。 */
+function openNikkiSyncRepo(): void {
+  window.electronAPI?.shell?.openExternal?.(NIKKISYNC_REPO_URL)
+}
 
 /** 运行态折算给 UI 的三档分组（8 个状态机取值对客户无意义，折叠成可懂的三档）。 */
 export type SyncRuntimeGroup = 'ready' | 'degraded' | 'off'
@@ -112,6 +124,17 @@ export const SyncGalleryToolbar: React.FC<SyncGalleryToolbarProps> = ({
           {t('syncGallery.toolbar.service')}
         </Button>
       ) : null}
+      {/* 压尾且无条件渲染：「详情」是条件渲染的，按钮组左端会随选中态漂移；
+          而空态（桥没接上、运行时没起来）恰恰是最需要去看上游文档的时刻 */}
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={openNikkiSyncRepo}
+        icon={<IconGithub size={14} />}
+        title={t('syncGallery.toolbar.about')}
+      >
+        {t('syncGallery.toolbar.about')}
+      </Button>
     </div>
   )
 }

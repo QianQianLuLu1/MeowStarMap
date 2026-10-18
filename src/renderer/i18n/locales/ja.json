@@ -4284,7 +4284,8 @@
         "degraded": "ゲームフォルダが見つかりません",
         "off": "未起動"
       },
-      "detail": "詳細"
+      "detail": "詳細",
+      "about": "NikkiSync について"
     },
     "empty": {
       "title": "閲覧できる資産がありません",

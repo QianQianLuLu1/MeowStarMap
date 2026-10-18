@@ -213,6 +213,8 @@ describe('SyncGalleryPage 接线', () => {
     expect((serviceEntry as HTMLButtonElement).disabled).toBe(false)
     fireEvent.click(serviceEntry)
     expect(navigateTo).toHaveBeenCalledWith('sync-service')
+    // 「关于 NikkiSync」不受可选 prop 门控：空态分支（不传 onOpenDetail）同样必须出现
+    expect(screen.getByTitle('关于 NikkiSync')).toBeInTheDocument()
     unmount()
 
     statusMock = vi.fn(async () => ({ state: 'degraded', dbPath: '', linkReady: true }))

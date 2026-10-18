@@ -4284,7 +4284,8 @@
         "degraded": "Dossier du jeu introuvable",
         "off": "Non démarré"
       },
-      "detail": "Détails"
+      "detail": "Détails",
+      "about": "À propos de NikkiSync"
     },
     "empty": {
       "title": "Aucune ressource à parcourir",

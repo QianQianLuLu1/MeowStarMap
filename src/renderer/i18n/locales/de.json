@@ -4284,7 +4284,8 @@
         "degraded": "Spielordner nicht gefunden",
         "off": "Nicht gestartet"
       },
-      "detail": "Details"
+      "detail": "Details",
+      "about": "Über NikkiSync"
     },
     "empty": {
       "title": "Noch keine Objekte zum Durchsuchen",

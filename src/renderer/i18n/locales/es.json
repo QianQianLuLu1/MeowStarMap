@@ -4284,7 +4284,8 @@
         "degraded": "Carpeta del juego no encontrada",
         "off": "No iniciado"
       },
-      "detail": "Detalles"
+      "detail": "Detalles",
+      "about": "Acerca de NikkiSync"
     },
     "empty": {
       "title": "Aún no hay recursos para explorar",

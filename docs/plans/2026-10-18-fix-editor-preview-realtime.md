@@ -352,8 +352,8 @@ typecheck / lint / core-gate / format / test **5 项全绿**；`npm run lint` **
   `releaseDate 2026-10-18T10:26:10.528Z`，与实测 `crypto` sha512 **逐字一致**。
 - worker chunk 产物 `dist/renderer/assets/preview-worker-BCQLdoty.js`（32,855 字节，IIFE、无 import 语句），
   `grep -c "react\|i18next"` = **0** → React/i18n 确实没被拖进 worker。
-- **打包态探针复验通过**（临时 `e2e/preview-worker-probe.e2e.ts`，复用仓内 `e2e/helpers.ts:146`
-  的 `launchBuiltApp()` 起 dist 产物、`NODE_ENV=production` 因而 CSP 生效，验证后删除）：
+- **打包态探针复验通过**（临时 `e2e/preview-worker-probe.e2e.ts`，验证后已删除、不入仓，复用仓内 `e2e/helpers.ts:146`
+  的 `launchBuiltApp()` 起 dist 产物、`NODE_ENV=production` 因而 CSP 生效）：
   `app://renderer/index.html` 下 READY 握手成功 → 发一条真实 `RENDER`（8×8 底图、brightness 12、
   `image/jpeg`、quality 0.95，缓冲走 transferable）→ 回 `RESULT`。
   读数 `scriptURL=app://renderer/assets/preview-worker-BCQLdoty.js blobSize=759 type=image/jpeg

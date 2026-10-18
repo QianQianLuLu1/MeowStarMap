@@ -4284,7 +4284,8 @@
         "degraded": "Pasta do jogo não encontrada",
         "off": "Não iniciado"
       },
-      "detail": "Detalhes"
+      "detail": "Detalhes",
+      "about": "Sobre o NikkiSync"
     },
     "empty": {
       "title": "Ainda não há recursos para navegar",

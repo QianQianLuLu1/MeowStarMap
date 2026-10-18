@@ -4284,7 +4284,8 @@
         "degraded": "未找到游戏目录",
         "off": "未启动"
       },
-      "detail": "详情"
+      "detail": "详情",
+      "about": "关于 NikkiSync"
     },
     "empty": {
       "title": "还没有可浏览的资产",

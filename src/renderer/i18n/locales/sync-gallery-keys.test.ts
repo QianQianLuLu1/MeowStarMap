@@ -61,6 +61,8 @@ const REQUIRED_KEYS = [
   'syncGallery.toolbar.scan',
   // 同步服务从设置页剥离后，入口按钮落在这条键上
   'syncGallery.toolbar.service',
+  // 工具栏「关于 NikkiSync」入口：用系统浏览器打开上游引擎仓库
+  'syncGallery.toolbar.about',
   'syncGallery.toolbar.status.ready',
   'syncGallery.toolbar.status.degraded',
   'syncGallery.toolbar.status.off',

@@ -4284,7 +4284,8 @@
         "degraded": "게임 폴더를 찾지 못함",
         "off": "미실행"
       },
-      "detail": "상세"
+      "detail": "상세",
+      "about": "NikkiSync 정보"
     },
     "empty": {
       "title": "볼 수 있는 자산이 없습니다",

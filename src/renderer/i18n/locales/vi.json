@@ -4284,7 +4284,8 @@
         "degraded": "Không tìm thấy thư mục game",
         "off": "Chưa chạy"
       },
-      "detail": "Chi tiết"
+      "detail": "Chi tiết",
+      "about": "Giới thiệu về NikkiSync"
     },
     "empty": {
       "title": "Chưa có tài nguyên để xem",

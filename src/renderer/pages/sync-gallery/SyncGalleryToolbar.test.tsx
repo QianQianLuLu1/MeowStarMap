@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { Mock } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
@@ -51,6 +51,24 @@ function renderToolbar(
   )
   return { onRefresh, onScan, onOpenService }
 }
+
+/**
+ * 「关于 NikkiSync」入口的外链桩：手法同 `SyncGalleryPage.test.tsx` 的 setBridge/clearBridge。
+ * 必须显式覆写——`tests/setup.ts` 的占位桩是单层 Proxy（get 返回新 vi.fn），
+ * `electronAPI.shell.openExternal` 取到的是 undefined，可选链会静默短路成 0 次调用，
+ * 用它断言只会得到假绿。
+ */
+function setShellBridge(openExternal: ReturnType<typeof vi.fn>): void {
+  ;(window as unknown as { electronAPI?: unknown }).electronAPI = { shell: { openExternal } }
+}
+
+function clearBridge(): void {
+  ;(window as unknown as { electronAPI?: unknown }).electronAPI = undefined
+}
+
+afterEach(() => {
+  clearBridge()
+})
 
 describe('toRuntimeGroup', () => {
   it('ready 档收 running / scanning / starting', () => {
@@ -113,5 +131,40 @@ describe('SyncGalleryToolbar', () => {
     expect(entry.disabled).toBe(false)
     fireEvent.click(entry)
     expect(onOpenService).toHaveBeenCalledTimes(1)
+  })
+
+  it('渲染出「关于 NikkiSync」入口', () => {
+    renderToolbar({ runtimeState: 'running' })
+    expect(screen.getByTitle('关于 NikkiSync')).toBeInTheDocument()
+  })
+
+  it('点击后经 shell.openExternal 打开 NikkiSync 上游引擎仓库', () => {
+    const openExternal = vi.fn()
+    setShellBridge(openExternal)
+    renderToolbar({ runtimeState: 'running' })
+    fireEvent.click(screen.getByTitle('关于 NikkiSync'))
+    expect(openExternal).toHaveBeenCalledTimes(1)
+    // URL 逐字锁定：本应用仓库（QianQianLuLu1/NikkiGallery）与上游引擎仓库是两个 repo，混了就跳错地方
+    expect(openExternal).toHaveBeenCalledWith('https://github.com/ToStardust/NikkiSync')
+  })
+
+  it('桥缺失时点击「关于 NikkiSync」不抛错（非授信 origin 下 preload 一个全局都不暴露）', async () => {
+    clearBridge()
+    // React 19 把事件处理器里的同步异常交回 jsdom 异步上报，`fireEvent.click` 抓不到，
+    // 故 `expect(() => fireEvent.click(…)).not.toThrow()` 恒为真（假绿）。实测 window 的
+    // 'error' 监听器能接住该异常，改用它作观测通道。
+    const errors: Event[] = []
+    const onError = (e: Event): void => {
+      errors.push(e)
+    }
+    window.addEventListener('error', onError)
+    try {
+      renderToolbar({ runtimeState: 'running' })
+      fireEvent.click(screen.getByTitle('关于 NikkiSync'))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    } finally {
+      window.removeEventListener('error', onError)
+    }
+    expect(errors).toHaveLength(0)
   })
 })
