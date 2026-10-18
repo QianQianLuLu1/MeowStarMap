@@ -334,3 +334,32 @@ typecheck / lint / core-gate / format / test **5 项全绿**；`npm run lint` **
 （11 条 warning 全是 DEBT-030 登记的 `components/common/*.test.tsx` 存量 BOM，本轮未触碰这些文件）；
 `npm run typecheck`（含 `tsconfig.scripts.json`）无输出；`npm run i18n:guard` ✅（未新增 key）；
 **N0 的四个逐像素校验和一字未变**，说明 R3 的 catch 闸门与死参数清理都没有扰动像素语义。
+
+## 11. 本轮定版与重新打包读数（2026-10-18）
+
+- 功能与三项审查修复随 `a86cc2f feat(editor): 预览改为 rAF 合帧与两档预算，像素处理卸载到 Web Worker`
+  入库（16 files，+2892 / −118）。pre-commit 三步全过（lint-staged → core-path-gate 判定不涉及受保护路径
+  → `tsc -b`），提交后 `git status --porcelain` 干净，钩子未留意外改动。
+- **版本号本轮无需任何改动**：`package.json:3`、`package-lock.json` 的 root 与 `packages[""]`、
+  `src/renderer/preview/mock/database-mock.ts:664`、`release/latest.yml` 现场值全部已是 `2.5.5-beta`，
+  `check-changelog-release.ts` 也打印「package.json：2.5.5-beta」。故只补 CHANGELOG，不动任何版本字段。
+- `npm run dist:win` 退出码 0：`pre-dist-check`、`check-doc-versions`（README Electron 41.10 与
+  package.json 41.10.6 一致）、`check-changelog-release`（解析到 12 个版本节，`[Unreleased]` 已收口）
+  三道预检与 `verify:dist` 解包二进制校验全绿。
+- 新产物 `release/NikkiGallery-Setup-2.5.5-beta.exe` **183,331,198** 字节、mtime 18:26
+  （旧包 183,402,787 / 01:14，按决定**直接覆盖不备份**，需要时可由基线 `672d4af` 重建）；
+  `latest.yml` 为 `version: 2.5.5-beta`、sha512 `mA3fM3YwGJY4QXpd2ey9DCOT95FA0tkm…==`、
+  `releaseDate 2026-10-18T10:26:10.528Z`，与实测 `crypto` sha512 **逐字一致**。
+- worker chunk 产物 `dist/renderer/assets/preview-worker-BCQLdoty.js`（32,855 字节，IIFE、无 import 语句），
+  `grep -c "react\|i18next"` = **0** → React/i18n 确实没被拖进 worker。
+- **打包态探针复验通过**（临时 `e2e/preview-worker-probe.e2e.ts`，复用仓内 `e2e/helpers.ts:146`
+  的 `launchBuiltApp()` 起 dist 产物、`NODE_ENV=production` 因而 CSP 生效，验证后删除）：
+  `app://renderer/index.html` 下 READY 握手成功 → 发一条真实 `RENDER`（8×8 底图、brightness 12、
+  `image/jpeg`、quality 0.95，缓冲走 transferable）→ 回 `RESULT`。
+  读数 `scriptURL=app://renderer/assets/preview-worker-BCQLdoty.js blobSize=759 type=image/jpeg
+consoleErrors=0`，`1 passed (1.6s)`。这条覆盖了三面单测证明不了的事实：
+  CSP 放行同源 worker、`app://` 的 `.js` 已映射 `text/javascript`、`OffscreenCanvas` 合成与
+  `convertToBlob` 编码在打包态真能跑通。**B4 结论就此固化：Phase B 出货，无需改 CSP。**
+- 仍未做的人工项（与 §9 同口径）：真实图库下的拖动手感、放大后是否发虚、分屏对比与直方图表现，
+  只能在装有图库数据的桌面用 `npm run dev` 核验并录 Performance trace；本轮由单元测试量化
+  「拖动期 0 帧 → 连续出帧」，由上面的打包态探针证明 worker 在产物里真出图。
