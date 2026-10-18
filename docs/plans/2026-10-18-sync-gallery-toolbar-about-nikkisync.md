@@ -182,3 +182,26 @@ M2 暴露出计划原写的 `expect(() => fireEvent.click(…)).not.toThrow()` *
 用一次性探针实测三条通道（探针验证后删除、不入仓），读数 `syncThrow=false windowError=1 reportError=0 consoleError=1`；`globalThis.reportError` 在 jsdom 里根本不存在（`vi.spyOn` 报 `The property "reportError" is not defined`），因此唯一可靠的观测点是 `window` 的 `error` 监听器。C3 已改写成「注册监听 → 点击 → 等一个宏任务 → `expect(errors).toHaveLength(0)`」，M2 下 **1 failed / 43 passed** 且红点精确落在 `toHaveLength(0)`，还原后转绿。`SyncGalleryToolbar.test.tsx` 的 numstat 因此从 `40 / 1` 增至 `54 / 1`。
 
 同类写法在 5 个既有测试文件里另有存在（`components/common/IconButton.test.tsx`、`components/common/MediaThumbnail.test.tsx`、`components/common/SliderControl.test.tsx`、`components/gallery/FullscreenViewer.mouseNav.test.tsx`、`pages/settings/shared.test.tsx`），属既有测试质量问题：改它们可能暴露真实缺陷，已超出本任务范围，本轮只登记不修。
+
+### 入库与重新打包读数
+
+提交 1 = `d59e629 feat(sync-gallery): 工具栏新增「关于 NikkiSync」上游外链入口`，19 files / +402 / −16，pre-commit 三步全过（lint-staged、核心路径闸门判 `⊘ 不涉及受保护文件`、`tsc -b`）。
+
+**第一次 `npm run dist:win` 失败（真实退出码 1，非管道尾命令状态）**：NSIS 包、签名、blockmap 全部产出，倒在 `verify:dist`——`✖ @nikkisync 已建链但未随包`。取证：`node_modules/@nikkisync/` 已退化成**空目录**（`LinkType` 为空，四个 junction 全丢），于是 `build.files` 的对象式 `from/to` 拷不到任何东西；`pre-dist-check.ts` 的 `nikkiSyncPackedVerdict()` 三分支在这种情况下正是设计成 `fail`（产物没带上整个内嵌运行时不能静默出货）。根因与 §范围外改动处置 里的 `package-lock.json` libc churn 同源——本机约 20:14 有一次 `npm install` 清掉了链接并改写了 lock。上一轮 18:26 的包是好的，故属**环境状态漂移、非本轮代码缺陷**。
+
+修复用仓库自带工具，不手工造链接：`npm run link:nikkisync`（幂等，root 解析到 sibling `NikkiSync`）重建 4 条链接，`link:nikkisync:check` 回到 `ok ×4`，`verify:nikkisync` 除「已打包的旧产物缺 migrations」这一条（正是那次失败的结果）外全 ✓。
+
+**第二次 `npm run dist:win` 退出码 0**：`pre-dist-check` 打包前 43 项 ✔；`verify:dist` 18 项全 ✔，含 `@nikkisync` 迁移 SQL、四个入口、深入口 `row-mappers.js`、`LocalSyncServer.js` 与 `GalleryRuntime.mjs`。产物读数：
+
+| 项                                       | 旧包（18:26）              | 新包（21:37）                                                                                                            |
+| ---------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `NikkiGallery-Setup-2.5.5-beta.exe` 字节 | 183,331,198                | 183,330,183（−1,015）                                                                                                    |
+| exe 的 sha512(base64)                    | `mA3fM3Yw…`                | `anXBhX1rYNDtjERcLw1Q9jcOIHBmaNK3cGHF5XAbcYfSsCAFr7acRCxrtwRSKLh/SXvSS6QWp0BG9XlPob7Ziw==`，与 `latest.yml` **逐字一致** |
+| `latest.yml` releaseDate                 | `2026-10-18T10:26:10.528Z` | `2026-10-18T13:37:25.042Z`                                                                                               |
+| asar 内 `ToStardust/NikkiSync`           | **0**                      | **1**（`关于 NikkiSync` 2、`About NikkiSync` 2；对照本应用仓库名恒为 7，未受影响）                                       |
+
+旧包按决定直接覆盖、未备份。打包全程未回写 `package-lock.json`（`git status --porcelain package-lock.json` 始终为空），四条 `@nikkisync` 链接也未被 `@electron/rebuild` 破坏。
+
+**打包态探针复验通过**（临时 `e2e/sync-gallery-about-probe.e2e.ts`，验证后已删除、不入仓；`playwright test --list` 复跑为 0 命中）：复用仓内 `e2e/helpers.ts` 的 `launchBuiltApp()` 起 `dist/` 未打包产物（`NODE_ENV=production`，`app://` 协议，CSP 生效，`app.isPackaged=false`——**这不等于已复验安装包本体**），语言固定 `zh-CN` 后重载 → 点侧栏「同步图库」→ `getByTitle('关于 NikkiSync')` 等到出现 → 点击。渲染层打桩无效（`window.electronAPI` 经 `contextBridge` 暴露后是冻结的），故在主进程侧 `app.evaluate(({ shell }) => …)` 把 `shell.openExternal` 换成只记录不委托的桩：既不会真拉起系统浏览器，又让「zod `schemas.httpUrl` 放行 → `wrapHandler` → handler 执行」这段只能在打包态验证的部分被覆盖（拒绝会以 `IpcError` 返回，捕获数组将恒空）。读数 `urls=https://github.com/ToStardust/NikkiSync bridge=function linkErrors=0`，1 passed / 2.9s。
+
+探针首版另有一处自伤：断言写成「全窗口 0 console error」，而本探针不带 `NIKKI_NIKKISYNC_RUNTIME=1` 启动，`Sidebar.tsx:129` 的 `fetchMediaFromDatabase()` 会经 `src/main/nikkisync/runtime-manager.ts` 抛既有的 `NikkiSync runtime is not ready (runtime state is idle)` 告警——与新按钮无关，属把环境配置差异误报成缺陷。已把断言收窄为「外链链路相关错误为 0」并单独打印无关噪声条数（实测 1 条，即上述既有告警）。
