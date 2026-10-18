@@ -4,7 +4,7 @@
 - 分支 / 基线 HEAD：`feat/gallery-runtime-embed` @ `acdea69`
 - 状态：执行中。§9 为逐节点红/绿读数，§10 为入库前独立审查
 - 范围已与用户确认三项决策：① 本轮覆盖 N1–N5 全量（含重渲染风暴节点）；② 批准反转 `ThumbReveal` 「同 src 重挂载仍显示骨架」这条既有测试契约；③ 问题设备可由用户开 DevTools 控制台，真机诊断 D0 由用户执行
-- 上一轮同类工作：`docs/plans/2026-09-30-fix-thumbnail-skeleton-reveal.md`（创建 ThumbReveal 骨架门控）、`docs/plans/2026-09-29-fix-gallery-stack-overflow.md`（移除 overscan）、commit `b190247`（换源渲染期重置，消除「旧图闪现一帧」）
+- 上一轮同类工作：`docs/archive/plans/2026-09-30-fix-thumbnail-skeleton-reveal.md`（创建 ThumbReveal 骨架门控）与 `docs/archive/plans/2026-09-29-fix-gallery-stack-overflow.md`（移除 overscan）——两者均已归档至 `docs/archive/plans/`（被 `.gitignore` 排除，不入仓，git 历史可查）；commit `b190247`（换源渲染期重置，消除「旧图闪现一帧」）
 
 ## 0. 背景（Context）
 
@@ -70,7 +70,8 @@
 | `src/renderer/hooks/useGlassScrollSignal.ts:58-84` | —               | N2 新 Hook 照抄其 capture-phase passive scroll + rAF 合帧手法 | —        |
 
 「优先用开源成熟方案」的权衡：`react-virtuoso` 自带的 `increaseViewportBy` / `overscan` 是行业标准解法，
-但**本项目不得调大**——`VirtualImageGrid.tsx:454-455` 与 `docs/plans/2026-09-29-fix-gallery-stack-overflow.md`
+但**本项目不得调大**——`VirtualImageGrid.tsx:454-455` 与已归档的
+`docs/archive/plans/2026-09-29-fix-gallery-stack-overflow.md`（不入仓，git 历史可查）
 记录过调大后「测量 → 重渲染 → 再测量」不收敛导致 `Maximum call stack size exceeded`。
 故选「消掉需要绘制的那一帧」而非「扩大预加载」。
 
@@ -232,4 +233,51 @@ A/B 矩阵（每档重启后重跑一次滚动计数，并确认 `logs/main.log`
 
 ## 12. 执行记录与红/绿读数
 
-（执行中回填）
+### 12.1 已落地节点
+
+| 节点                      | 红灯（修复前必须失败）                                                              | 修复前读数                                                                                                               | 修复后                                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| N1 ThumbReveal 已加载记忆 | `同 src 卸载后重新挂载不重放骨架`、`同实例换回已加载 src 不重放骨架`                | `ThumbReveal.test.tsx` **2 failed / 9 passed**（骨架节点仍被渲染：`expected <div …skeleton…> to be null`）               | **11 passed**；消费方回归 `components/gallery` + `components/common` + 回收站 + 穿搭集封面 **62 文件 / 751 tests passed** |
+| N2 滚动期冻结 hover       | `滚动期间鼠标扫过卡片不得触发整网格重渲染`、`scroll 与 mouseEnter 同批次时序仍冻结` | grid-cycle **2 failed / 12 passed**（`expected 2 to be 3`、`expected 4 to be 3`，即每次 enter/leave 各多一次整网格渲染） | grid-cycle **15 passed**（含新增 N5 合帧用例）                                                                            |
+| N4 失败态只裁剪消失项     | `① 触底翻页保留失败记录`、`② 仅裁剪消失项`、`⑤ 非数组不抹掉现集`                    | `useFailedImages.test.ts` **3 failed / 8 passed**（整表清空把 size 打成 0）                                              | **11 passed**；5 个消费方所在 `components/gallery` + `MediaThumbnail` + 回收站 **20 文件 / 228 tests passed**             |
+
+配套新增：`src/renderer/hooks/useIsScrolling.ts`（N2 的信号源，capture+passive scroll + 150ms 拖尾沿空闲，只写 ref 不触发渲染）。
+
+### 12.2 被实测否决的两个候选（未改动代码）
+
+诚实记录：**N3 与 N5 的机制假设在测量后不成立，故不实施。** 计划里我把它们列为候选，是靠读代码推出来的，实测推翻了我自己。
+
+- **N3（`isTouchDevice` 首帧同步求值可省一次整网格重渲染）——否决。**
+  用记录型 VirtuosoGrid 探针测挂载渲染次数：桌面分支 2 次、触屏分支 2 次（`{"desktop":{"renders":2,…},"touch":{"renders":2,…}`），
+  差异为 0。原因是 React 的挂载期 passive effect 更新会被合批：列数 effect 的 `setColumns` 与 `setIsTouchDevice`
+  落在同一次 flush ⇒ 触屏分支并不额外多一轮渲染。既然没有可观测收益，就不做无证据的改动。
+  顺带证伪了我中途的一个误判：`window.matchMedia?.('(hover: none)').matches` **不会**在无 matchMedia 的环境抛错——
+  可选链会短路整条表达式；早先出现的 `TypeError: … reading 'matches'` 是我自己把 `mockImplementation(undefined)` 当成「API 缺失」造成的测试缺陷。
+- **N5（`useOnDemandThumbnails` 逐条 `setRevision` 造成整网格重渲染风暴）——否决，但保留用例。**
+  同一帧内 settle 5 个生成结果 ⇒ 整网格渲染增量 ≤ 1（用例 `① 边界：同一帧内 settle 的多个生成结果，整网格重渲染至多 +1` **修复前即通过**）。
+  `084d3ef` 正文记为「已知遗留」的那条，在 React 19 自动批处理下已不构成实害。用例保留为不变量守护（将来若有人改成同步强渲染会被它拦住）。
+
+### 12.3 附带发现（写 N4 用例时撞出来的真实隐患）
+
+`useFailedImages` 旧实现是「dep 引用一变即 `setState(新 Set)`」。调用方若每次渲染都新建数组，会形成
+`渲染 → effect → setState(新引用) → 再渲染` 的**无限环路**——实测把 vitest worker 打到 OOM（退出码 134）。
+现实现无裁剪发生时返回原引用，环路从机制上消失（用例文件头已把这条写成注释，避免后来者再踩）。
+
+### 12.4 全量回归与闸门
+
+| 命令                                                          | 结果                                                     |
+| ------------------------------------------------------------- | -------------------------------------------------------- |
+| `npm run verify`                                              | 5 项全 ✓（typecheck / lint / core-gate / format / test） |
+| `npm test`                                                    | 见下方提交前复跑记录                                     |
+| `npm run typecheck` / `npm run lint` / `npm run format:check` | 见下方                                                   |
+| `npm run i18n:guard` / `npm run docs:links`                   | 零新增 i18n key；死引用见 §12.5                          |
+| `npm run e2e:smoke`                                           | 见下方                                                   |
+
+### 12.5 计划文档自身的死引用修复
+
+`scripts/__tests__/check-md-links.test.ts`（被跟踪 Markdown 死引用必须为 0）第一次全量跑时因本文件报错 2 处：
+早先我用 `ls` 核对路径时把 `docs/plans/` 与 `docs/archive/plans/` 两个目录的输出连在一起看，
+误以为 `2026-09-29-fix-gallery-stack-overflow.md`、`2026-09-30-fix-thumbnail-skeleton-reveal.md` 仍在 `docs/plans/`。
+实际三份历史计划都只在 `docs/archive/plans/`（被 `.gitignore` 排除）。
+已按 `docs/技术债清单.md:169` 的既有写法改为 `docs/archive/plans/…`（不入仓，git 历史可查）。
+教训：核对存在性要用单目录单命令，不要把两条 `ls` 的输出并在一起读。
