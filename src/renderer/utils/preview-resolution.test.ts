@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
   computePreviewMaxSize,
+  computeDragProxyMaxSize,
+  DRAG_PROXY_MAX_SIZE,
   estimateInitialPreviewMaxSize,
   PREVIEW_SIZE_QUANTUM,
   FALLBACK_PREVIEW_MAX_SIZE,
@@ -113,6 +115,33 @@ describe('preview-resolution', () => {
       expect(
         estimateInitialPreviewMaxSize({ innerWidth: NaN, innerHeight: 0, devicePixelRatio: 1 })
       ).toBe(FALLBACK_PREVIEW_MAX_SIZE)
+    })
+  })
+
+  /**
+   * 拖动代理档（docs/plans/2026-10-18-fix-editor-preview-realtime.md N2）
+   * 拖动中的帧只需要「看得出在变」，不需要满分辨率；真实预算由停止输入后的尾随帧补足。
+   */
+  describe('computeDragProxyMaxSize 拖动代理档', () => {
+    it('超出代理档的预算被钳到代理档（正常）', () => {
+      expect(computeDragProxyMaxSize(MAX_PREVIEW_MAX_SIZE)).toBe(DRAG_PROXY_MAX_SIZE)
+      expect(computeDragProxyMaxSize(2048)).toBe(DRAG_PROXY_MAX_SIZE)
+    })
+
+    it('已小于代理档的预算原样返回——只降不升（边界）', () => {
+      expect(computeDragProxyMaxSize(DRAG_PROXY_MAX_SIZE)).toBe(DRAG_PROXY_MAX_SIZE)
+      expect(computeDragProxyMaxSize(512)).toBe(512)
+      expect(computeDragProxyMaxSize(MIN_PREVIEW_MAX_SIZE)).toBe(MIN_PREVIEW_MAX_SIZE)
+    })
+
+    it('正无穷（不限制）在拖动态仍被钳制——这正是 8× 缩放时逐像素跑原图的失控入口', () => {
+      expect(computeDragProxyMaxSize(Number.POSITIVE_INFINITY)).toBe(DRAG_PROXY_MAX_SIZE)
+    })
+
+    it('非法预算原样透传，由下游按「不限制」口径处理，不静默降分辨率（异常）', () => {
+      expect(computeDragProxyMaxSize(NaN)).toBe(NaN)
+      expect(computeDragProxyMaxSize(0)).toBe(0)
+      expect(computeDragProxyMaxSize(-5)).toBe(-5)
     })
   })
 })

@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { processImageData, defaultFilterParams, type WatermarkConfig } from './imageProcessor'
+import {
+  processImageData,
+  clearWatermarkLogoCache,
+  defaultFilterParams,
+  type WatermarkConfig
+} from './imageProcessor'
 
 /**
  * @layer L3
@@ -64,6 +69,8 @@ function watermarkCtx(): Record<string, AnyMock> {
 
 /** Image 构造替身：赋值 src 后按 imageFailMode 异步触发 load / error */
 let imageFailMode = true
+/** 每次真正 new Image() 并赋的 src，用于断言 logo 是否被重复加载 */
+let imageConstructs: string[] = []
 let originalImage: typeof Image
 let originalGetContext: HTMLCanvasElement['getContext']
 
@@ -76,6 +83,7 @@ function installFakeImage(): void {
     width = 64
     height = 64
     set src(_value: string) {
+      imageConstructs.push(_value)
       setTimeout(() => {
         if (imageFailMode)
           this.onerror?.call(this as unknown as GlobalEventHandlers, new Event('error'))
@@ -107,22 +115,27 @@ function makeSource(): HTMLImageElement {
   return { width: 8, height: 8 } as unknown as HTMLImageElement
 }
 
+// 替身安装/卸载对本文件所有 describe 通用，提到文件级避免两处重复
+beforeEach(() => {
+  ctxInstances = []
+  imageConstructs = []
+  imageFailMode = true
+  originalGetContext = HTMLCanvasElement.prototype.getContext
+  HTMLCanvasElement.prototype.getContext = vi.fn(() =>
+    makeCtxStub()
+  ) as unknown as HTMLCanvasElement['getContext']
+  installFakeImage()
+  // logo 缓存是模块级状态，必须在每个用例前清空，否则用例之间互相污染
+  clearWatermarkLogoCache()
+})
+
+afterEach(() => {
+  HTMLCanvasElement.prototype.getContext = originalGetContext
+  globalThis.Image = originalImage
+  clearWatermarkLogoCache()
+})
+
 describe('drawImageWatermark 失败必须可见（图片水印静默吞错修复）', () => {
-  beforeEach(() => {
-    ctxInstances = []
-    imageFailMode = true
-    originalGetContext = HTMLCanvasElement.prototype.getContext
-    HTMLCanvasElement.prototype.getContext = vi.fn(() =>
-      makeCtxStub()
-    ) as unknown as HTMLCanvasElement['getContext']
-    installFakeImage()
-  })
-
-  afterEach(() => {
-    HTMLCanvasElement.prototype.getContext = originalGetContext
-    globalThis.Image = originalImage
-  })
-
   it('C1 logo 加载失败时上报 onWatermarkImageError，且预览仍合成出 ImageData', async () => {
     const onWatermarkImageError = vi.fn()
     const result = await processImageData(makeSource(), defaultFilterParams, {
@@ -205,5 +218,84 @@ describe('drawImageWatermark 失败必须可见（图片水印静默吞错修复
     // 唯一一次必须落在白带中心：ch=8 → frameHeight=max(1, round(8*0.16))=1 → y=8-0.5
     expect(calls[0][1]).toBe(4)
     expect(calls[0][2]).toBe(7.5)
+  })
+})
+
+/**
+ * logo 缓存（docs/plans/2026-10-18-fix-editor-preview-realtime.md N4）
+ *
+ * 复现根因：修复前 `drawImageWatermark` 每帧都 `await loadImage()`，即每帧重新经
+ * media:// 取图并解码一次 logo。拖动时这就是每秒几十次的无谓 IO + 解码。
+ * 约束：只缓存**成功**结果——失败若入缓存，2026-10-17 刚修好的「水印失败可见」
+ * 会退化成永久静默（后续帧直接命中失败的缓存，连上报都没有）。
+ */
+describe('图片水印 logo 缓存', () => {
+  const logoAt = (path: string): WatermarkConfig =>
+    logoConfig({
+      image: { path, width: 120, height: 120, opacity: 80, blendMode: 'normal' }
+    })
+
+  it('cacheLogo 时连续两帧只加载一次 logo（正常）', async () => {
+    imageFailMode = false
+    const options = { watermark: logoConfig(), cacheLogo: true } as Parameters<
+      typeof processImageData
+    >[2]
+
+    await processImageData(makeSource(), defaultFilterParams, options)
+    await processImageData(makeSource(), defaultFilterParams, options)
+
+    expect(imageConstructs).toHaveLength(1)
+  })
+
+  it('不传 cacheLogo 时仍每帧自取——导出路径语义不变', async () => {
+    imageFailMode = false
+    const options = { watermark: logoConfig() } as Parameters<typeof processImageData>[2]
+
+    await processImageData(makeSource(), defaultFilterParams, options)
+    await processImageData(makeSource(), defaultFilterParams, options)
+
+    expect(imageConstructs).toHaveLength(2)
+  })
+
+  it('加载失败不入缓存：每帧重试并每帧上报（异常）', async () => {
+    imageFailMode = true
+    const onWatermarkImageError = vi.fn()
+    const options = {
+      watermark: logoConfig(),
+      cacheLogo: true,
+      onWatermarkImageError
+    } as Parameters<typeof processImageData>[2]
+
+    await processImageData(makeSource(), defaultFilterParams, options)
+    await processImageData(makeSource(), defaultFilterParams, options)
+
+    expect(imageConstructs).toHaveLength(2)
+    expect(onWatermarkImageError).toHaveBeenCalledTimes(2)
+  })
+
+  it('缓存上限 4：第 5 个路径逐出最旧者，回到旧路径需重建（边界）', async () => {
+    imageFailMode = false
+    const paths = ['/a.png', '/b.png', '/c.png', '/d.png', '/e.png']
+    for (const path of paths) {
+      await processImageData(makeSource(), defaultFilterParams, {
+        watermark: logoAt(path),
+        cacheLogo: true
+      } as Parameters<typeof processImageData>[2])
+    }
+    expect(imageConstructs).toHaveLength(5)
+
+    // '/a.png' 已被逐出 → 重新取一次
+    await processImageData(makeSource(), defaultFilterParams, {
+      watermark: logoAt('/a.png'),
+      cacheLogo: true
+    } as Parameters<typeof processImageData>[2])
+    expect(imageConstructs).toHaveLength(6)
+
+    // '/e.png' 仍在缓存内 → 不应再取
+    await processImageData(makeSource(), defaultFilterParams, {
+      watermark: logoAt('/e.png'),
+      cacheLogo: true
+    } as Parameters<typeof processImageData>[2])
+    expect(imageConstructs).toHaveLength(6)
   })
 })

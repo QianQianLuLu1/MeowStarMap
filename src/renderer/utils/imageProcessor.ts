@@ -1,5 +1,18 @@
-import i18n from '../i18n'
-import { InternalError } from '../../shared/errors/app-error'
+type TranslateFn = (key: string, options?: Record<string, unknown>) => string
+
+/**
+ * 译文注入点（与 `shared/errors` 的 setAppErrorTranslator 同一模式）。
+ *
+ * 为什么不让本模块直接 `import i18n from '../i18n'`：那条链会拖进 react-i18next 与
+ * 语言包 JSON，而本模块要被预览 worker 原样 import——worker 里既没有 DOM 也不需要 UI。
+ * 未注入时回落为「返回 key 本身」，与 AppError 的默认翻译口径一致。
+ */
+let translateMessage: TranslateFn = (key) => key
+
+export function setImageProcessorTranslator(fn: TranslateFn): void {
+  translateMessage = fn
+}
+import { FileSystemError, InternalError } from '../../shared/errors/app-error'
 
 export type HSLColorKey =
   | 'red'
@@ -192,6 +205,17 @@ export interface ProcessOptions {
   maxSize?: number
   watermark?: WatermarkConfig | null
   /**
+   * 已重采样的底图（见 `buildPreviewBase`）。拖动帧的参数变了、底图没变，
+   * 传入即可跳过「高质量重采样 + getImageData」这两步与参数无关的开销。
+   * 尺寸与本次目标不符时自动回退完整路径，不会越界读写。
+   */
+  base?: PreviewBase
+  /**
+   * 缓存图片水印 logo。预览路径传 true（拖动时每秒可能几十帧，每帧重新经 media://
+   * 取图并解码一次 logo 纯属白做）；导出路径不传，保持「每次取最新文件」的既有语义。
+   */
+  cacheLogo?: boolean
+  /**
    * 图片水印的 logo 加载失败时的旁路通知（message 已是用户可读译文）。
    * 刻意不抛错：抛错会被 useImageProcessor 的降级重渲染捕获，导致整张预览消失——
    * 「水印没出来」升级为「图片打不开」。调用方据此提示用户重选图片。
@@ -295,15 +319,17 @@ export function applyHSL(
   r: number,
   g: number,
   b: number,
-  hsl: Record<HSLColorKey, HSLAdjustment>
+  hsl: Record<HSLColorKey, HSLAdjustment>,
+  keys: HSLColorKey[] = hslColorKeys
 ): [number, number, number] {
+  if (keys.length === 0) return [r, g, b]
   const [h] = rgbToHsl(r, g, b)
   const hueDeg = h * 360
   let or = r,
     og = g,
     ob = b
 
-  for (const key of hslColorKeys) {
+  for (const key of keys) {
     const adj = hsl[key]
     if (adj.hue === 0 && adj.saturation === 0 && adj.lightness === 0) continue
     const target = getHSLTargetHue(key)
@@ -525,46 +551,82 @@ async function createResampledBitmap(
   }
 }
 
-export async function processImageData(
-  source: ImageBitmap | HTMLImageElement | HTMLCanvasElement,
-  params: FilterParams,
-  options: ProcessOptions = {}
-): Promise<ImageData> {
-  const canvas = document.createElement('canvas')
-  // FIX(预览清晰度)：maxSize 仅接受有限正数。原实现 `options.maxSize || 1600` 会把
-  // undefined/0/负数/NaN 静默改成 1600，是预览分辨率被意外降级的隐藏入口；
-  // 现在这些值一律视为「不限制」，是否限制由调用方显式决定。
-  const requestedMaxSize = options.maxSize
-  const maxSize =
-    typeof requestedMaxSize === 'number' &&
-    Number.isFinite(requestedMaxSize) &&
-    requestedMaxSize > 0
-      ? requestedMaxSize
-      : Number.POSITIVE_INFINITY
-  interface SizableSource {
-    width: number
-    height: number
-    videoWidth?: number
-    videoHeight?: number
-  }
+/**
+ * 预览底图：源图按目标尺寸重采样后的裸像素。
+ * `data` 由调用方持有并跨帧复用，`processImageData` 取用时先复制再原地加工，不会污染它。
+ */
+export interface PreviewBase {
+  width: number
+  height: number
+  /** 显式绑定 ArrayBuffer：DOM lib 的 ImageData 构造器不接受 ArrayBufferLike */
+  data: Uint8ClampedArray<ArrayBuffer>
+}
 
+/** 可带尺寸信息的图源 */
+interface SizableSource {
+  width: number
+  height: number
+  videoWidth?: number
+  videoHeight?: number
+}
+
+/** maxSize 仅接受有限正数；undefined/0/负数/NaN 一律视为「不限制」 */
+function normalizeMaxSize(value: number | undefined): number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+    ? value
+    : Number.POSITIVE_INFINITY
+}
+
+/** 目标尺寸：长边超出预算才等比缩小，否则 1:1 */
+function computeTargetSize(
+  naturalWidth: number,
+  naturalHeight: number,
+  maxSize: number
+): { width: number; height: number } {
+  if (naturalWidth <= maxSize && naturalHeight <= maxSize) {
+    return { width: naturalWidth, height: naturalHeight }
+  }
+  const ratio = Math.min(maxSize / naturalWidth, maxSize / naturalHeight)
+  return { width: Math.round(naturalWidth * ratio), height: Math.round(naturalHeight * ratio) }
+}
+
+/**
+ * 创建离屏绘制面。
+ *
+ * worker 里没有 `document`，只有 `OffscreenCanvas`；主线程与 jsdom（无 OffscreenCanvas 实现）
+ * 继续用 HTMLCanvasElement。二者 2D 上下文成员一致，但 TS 类型不同，故在取值处做一次
+ * 集中转型，避免每个绘制点都写联合类型。
+ */
+function createCanvas(width: number, height: number): HTMLCanvasElement | OffscreenCanvas {
+  if (typeof OffscreenCanvas !== 'undefined') {
+    return new OffscreenCanvas(width, height)
+  }
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  return canvas
+}
+
+function get2dContext(
+  canvas: HTMLCanvasElement | OffscreenCanvas
+): CanvasRenderingContext2D | null {
+  return canvas.getContext('2d') as CanvasRenderingContext2D | null
+}
+
+/** 把图源重采样到目标尺寸并回读为 ImageData */
+async function rasterizeToTarget(
+  source: ImageBitmap | HTMLImageElement | HTMLCanvasElement,
+  maxSize: number
+): Promise<ImageData> {
   const src = source as SizableSource
   const naturalWidth = src.width || src.videoWidth || 0
   const naturalHeight = src.height || src.videoHeight || 0
-  let width = naturalWidth
-  let height = naturalHeight
+  const { width, height } = computeTargetSize(naturalWidth, naturalHeight, maxSize)
 
-  if (width > maxSize || height > maxSize) {
-    const ratio = Math.min(maxSize / width, maxSize / height)
-    width = Math.round(width * ratio)
-    height = Math.round(height * ratio)
-  }
-
-  canvas.width = width
-  canvas.height = height
-  const ctx = canvas.getContext('2d')
+  const canvas = createCanvas(width, height)
+  const ctx = get2dContext(canvas)
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new InternalError(i18n.t('toast.imageProcessorCanvasFailed'))
+  if (!ctx) throw new InternalError(translateMessage('toast.imageProcessorCanvasFailed'))
   // FIX(预览清晰度)：开启高质量重采样。此前未设置任何平滑参数，浏览器默认低质量
   // 滤波在大比例缩小时会明显软化并产生锯齿。
   ctx.imageSmoothingEnabled = true
@@ -588,7 +650,115 @@ export async function processImageData(
     ctx.drawImage(source, 0, 0)
   }
 
-  let imageData = ctx.getImageData(0, 0, width, height)
+  return ctx.getImageData(0, 0, width, height)
+}
+
+/**
+ * 产出一份可跨帧复用的预览底图。
+ *
+ * 拖动滑块时只有调节参数在变、重采样结果不变：底图建一次，之后每帧只剩纯像素运算。
+ */
+export async function buildPreviewBase(
+  source: ImageBitmap | HTMLImageElement | HTMLCanvasElement,
+  maxSize: number = Number.POSITIVE_INFINITY
+): Promise<PreviewBase> {
+  const imageData = await rasterizeToTarget(source, normalizeMaxSize(maxSize))
+  return { width: imageData.width, height: imageData.height, data: imageData.data }
+}
+
+/** 单个数值调节是否「动了」：非 0 且非 NaN；缺字段/非数值一律视为未动 */
+function isAdjusted(value: unknown): boolean {
+  return typeof value === 'number' && !Number.isNaN(value) && value !== 0
+}
+
+/**
+ * 像素循环的 pass 激活表：把「哪些调节真的非零」提到逐像素循环之外只算一次。
+ *
+ * 拖动时通常只有一两个参数在变，而未激活的 pass 也要为每个像素分配一个元组数组；
+ * 有了这张表就能整段跳过。判定口径与各 pass 自身的早退条件逐字对齐
+ * （例如分离色调只看四个 hue/saturation，不看 balance），等价性由
+ * imageProcessor.pixels.test.ts 的逐像素校验和守住。
+ */
+export interface PreviewPassPlan {
+  temperature: boolean
+  vibrance: boolean
+  hsl: boolean
+  activeHslKeys: HSLColorKey[]
+  splitTone: boolean
+  dehaze: boolean
+  convolution: boolean
+  vignette: boolean
+  grain: boolean
+  fade: boolean
+  lut: boolean
+}
+
+export function planPasses(params: FilterParams): PreviewPassPlan {
+  const activeHslKeys = hslColorKeys.filter((key) => {
+    const adj = params.hsl?.[key]
+    if (!adj) return false
+    return isAdjusted(adj.hue) || isAdjusted(adj.saturation) || isAdjusted(adj.lightness)
+  })
+
+  return {
+    temperature: isAdjusted(params.temperature) || isAdjusted(params.tint),
+    vibrance: isAdjusted(params.vibrance),
+    hsl: activeHslKeys.length > 0,
+    activeHslKeys,
+    // 与 applySplitTone 的早退条件逐字一致：只有 splitBalance 非零不算激活
+    splitTone:
+      isAdjusted(params.highlightHue) ||
+      isAdjusted(params.highlightSaturation) ||
+      isAdjusted(params.shadowHue) ||
+      isAdjusted(params.shadowSaturation),
+    dehaze: isAdjusted(params.dehaze),
+    convolution:
+      isAdjusted(params.clarity) || isAdjusted(params.sharpen) || isAdjusted(params.denoise),
+    vignette: params.vignette > 0,
+    grain: params.grain > 0,
+    fade: params.fade > 0,
+    lut: !!params.lut
+  }
+}
+
+export async function processImageData(
+  source: ImageBitmap | HTMLImageElement | HTMLCanvasElement,
+  params: FilterParams,
+  options: ProcessOptions = {}
+): Promise<ImageData> {
+  // FIX(预览清晰度)：maxSize 仅接受有限正数。原实现 `options.maxSize || 1600` 会把
+  // undefined/0/负数/NaN 静默改成 1600，是预览分辨率被意外降级的隐藏入口；
+  // 现在这些值一律视为「不限制」，是否限制由调用方显式决定。
+  const maxSize = normalizeMaxSize(options.maxSize)
+  const src = source as SizableSource
+  const naturalWidth = src.width || src.videoWidth || 0
+  const naturalHeight = src.height || src.videoHeight || 0
+  const target = computeTargetSize(naturalWidth, naturalHeight, maxSize)
+  const base = options.base
+
+  // FIX(实时预览)：拖动帧只有参数在变，底图不变。命中底图时跳过重采样与回读；
+  // 尺寸不符（换图、换档位、缓存陈旧）则回退完整光栅化路径，绝不越界读写。
+  // ImageData 构造器按规范会复制传入数组，因此下面的原地循环不会污染底图本体。
+  const imageData =
+    base && base.width === target.width && base.height === target.height
+      ? new ImageData(base.data, base.width, base.height)
+      : await rasterizeToTarget(source, maxSize)
+
+  return applyImagePasses(imageData, params, options)
+}
+
+/**
+ * 从已就绪的像素起跑完整调色链：主循环 → LUT → 卷积 → 暗角/颗粒/褪色 → 水印。
+ *
+ * 从 `processImageData` 拆出来，是为了让 worker 能直接从底图进入这一步——
+ * 它手上只有像素，没有也拿不到 DOM 图源。
+ */
+export async function applyImagePasses(
+  imageData: ImageData,
+  params: FilterParams,
+  options: ProcessOptions = {}
+): Promise<ImageData> {
+  const plan = planPasses(params)
   const data = imageData.data
 
   const rgbCurve = buildCurveMap(params.curves.rgb)
@@ -634,7 +804,12 @@ export async function processImageData(
     b += whites - blacks
 
     // 色温/色调
-    ;[r, g, b] = applyTemperature(r, g, b, params.temperature, params.tint)
+    if (plan.temperature) {
+      const mixed = applyTemperature(r, g, b, params.temperature, params.tint)
+      r = mixed[0]
+      g = mixed[1]
+      b = mixed[2]
+    }
 
     // 饱和度
     const avg = (r + g + b) / 3
@@ -643,10 +818,20 @@ export async function processImageData(
     b = avg + (b - avg) * saturation
 
     // 自然饱和度
-    ;[r, g, b] = applyVibrance(r, g, b, params.vibrance)
+    if (plan.vibrance) {
+      const vib = applyVibrance(r, g, b, params.vibrance)
+      r = vib[0]
+      g = vib[1]
+      b = vib[2]
+    }
 
-    // HSL 调整
-    ;[r, g, b] = applyHSL(r, g, b, params.hsl)
+    // HSL 调整（只遍历非零的键）
+    if (plan.hsl) {
+      const adj = applyHSL(r, g, b, params.hsl, plan.activeHslKeys)
+      r = adj[0]
+      g = adj[1]
+      b = adj[2]
+    }
 
     // 曲线
     r = rCurve[clamp(r)]
@@ -660,11 +845,21 @@ export async function processImageData(
     b *= factor
 
     // 色调分离
-    const newLum = 0.299 * r + 0.587 * g + 0.114 * b
-    ;[r, g, b] = applySplitTone(r, g, b, newLum, params)
+    if (plan.splitTone) {
+      const newLum = 0.299 * r + 0.587 * g + 0.114 * b
+      const toned = applySplitTone(r, g, b, newLum, params)
+      r = toned[0]
+      g = toned[1]
+      b = toned[2]
+    }
 
     // 去雾
-    ;[r, g, b] = applyDehaze(r, g, b, params.dehaze)
+    if (plan.dehaze) {
+      const clear = applyDehaze(r, g, b, params.dehaze)
+      r = clear[0]
+      g = clear[1]
+      b = clear[2]
+    }
 
     data[i] = clamp(r)
     data[i + 1] = clamp(g)
@@ -672,7 +867,7 @@ export async function processImageData(
   }
 
   // LUT 色彩查找表
-  if (params.lut) {
+  if (plan.lut) {
     // builtInLuts 已在顶部静态 import，此处直接使用，避免"既静态又动态 import"阻止拆包
     const lut = builtInLuts.find((l) => l.id === params.lut)
     if (lut) {
@@ -683,7 +878,7 @@ export async function processImageData(
   // P1-C5：清晰度/锐化/降噪三个卷积操作共享工作缓冲区（ping-pong）
   // 原实现各自 new Uint8ClampedArray(src) + new Uint8ClampedArray(dst)，4096² 峰值 448MB
   // 改为预分配 2 个缓冲区交替使用，峰值降至 192MB（原始 64MB + bufA 64MB + bufB 64MB）
-  if (params.clarity !== 0 || params.sharpen !== 0 || params.denoise !== 0) {
+  if (plan.convolution) {
     const w = imageData.width
     const h = imageData.height
     const bufA = new Uint8ClampedArray(imageData.data)
@@ -708,26 +903,72 @@ export async function processImageData(
   }
 
   // 暗角
-  if (params.vignette > 0) {
+  if (plan.vignette) {
     applyVignette(imageData, params.vignette)
   }
 
   // 颗粒
-  if (params.grain > 0) {
+  if (plan.grain) {
     applyGrain(imageData, params.grain)
   }
 
   // 褪色
-  if (params.fade > 0) {
+  if (plan.fade) {
     applyFade(imageData, params.fade)
   }
 
   // 水印
   if (options.watermark) {
-    imageData = await applyWatermark(imageData, options.watermark, options.onWatermarkImageError)
+    imageData = await applyWatermark(imageData, options.watermark, options)
   }
 
   return imageData
+}
+
+/**
+ * 供预览 worker 使用：从底图直接产出成品像素，不触碰 DOM 图源。
+ * `processImageData` 命中底图分支后等价于它。
+ */
+export async function processPreviewBase(
+  base: PreviewBase,
+  params: FilterParams,
+  options: ProcessOptions = {}
+): Promise<ImageData> {
+  return applyImagePasses(new ImageData(base.data, base.width, base.height), params, options)
+}
+
+/**
+ * 像素 → JPEG/PNG/WebP Blob。
+ *
+ * 与 `imageToDataUrl` 的分工：后者用同步 `toDataURL`，只有主线程能用（导出路径保留它，
+ * 因为 IPC 契约要 dataURL）；本函数用异步 `convertToBlob`/`toBlob`，让编码离开主线程，
+ * 调用方再自行决定是否转成 dataURL。
+ */
+export async function imageDataToBlob(
+  imageData: ImageData,
+  format: 'image/jpeg' | 'image/png' | 'image/webp' = 'image/jpeg',
+  quality = 0.95
+): Promise<Blob> {
+  const canvas = createCanvas(imageData.width, imageData.height)
+  const ctx = get2dContext(canvas)
+  if (!ctx) throw new InternalError(translateMessage('toast.imageProcessorCanvasFailed'))
+  ctx.putImageData(imageData, 0, 0)
+  // 必须先 typeof 再 instanceof：全局不存在 OffscreenCanvas 时（jsdom/node），
+  // 直接 `canvas instanceof OffscreenCanvas` 会抛 ReferenceError 而不是返回 false
+  if (typeof OffscreenCanvas !== 'undefined' && canvas instanceof OffscreenCanvas) {
+    return canvas.convertToBlob({ type: format, quality })
+  }
+  // 全局没有 OffscreenCanvas 时上面的 instanceof 不可判定，TS 也排除不掉该分支，
+  // 这里按 DOM 画布显式收口（运行时只会走到 HTMLCanvasElement）
+  const domCanvas = canvas as HTMLCanvasElement
+  return new Promise<Blob>((resolve, reject) => {
+    domCanvas.toBlob(
+      (blob: Blob | null) =>
+        blob ? resolve(blob) : reject(new InternalError('preview encode produced null blob')),
+      format,
+      quality
+    )
+  })
 }
 
 function applyVignette(imageData: ImageData, amount: number): void {
@@ -737,14 +978,25 @@ function applyVignette(imageData: ImageData, amount: number): void {
   const maxDist = Math.sqrt(cx * cx + cy * cy)
   const strength = (amount / 100) * 0.8
 
+  // 逐列预存 (x-cx)²（逐行预存 (y-cy)²）：原本每像素要算两次幂运算，
+  // 而 a**2 与 a*a 在 V8 里结果逐位相同，故只省算力不改输出。
+  const dxSquared = new Float64Array(width)
+  for (let x = 0; x < width; x++) {
+    const dx = x - cx
+    dxSquared[x] = dx * dx
+  }
+
   for (let y = 0; y < height; y++) {
+    const dy = y - cy
+    const dySquared = dy * dy
+    const rowOffset = y * width * 4
     for (let x = 0; x < width; x++) {
-      const dist = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2)
+      const dist = Math.sqrt(dxSquared[x] + dySquared)
       const factor = 1 - (dist / maxDist) * strength
-      const idx = (y * width + x) * 4
-      for (let c = 0; c < 3; c++) {
-        data[idx + c] = clamp(data[idx + c] * factor)
-      }
+      const idx = rowOffset + x * 4
+      data[idx] = clamp(data[idx] * factor)
+      data[idx + 1] = clamp(data[idx + 1] * factor)
+      data[idx + 2] = clamp(data[idx + 2] * factor)
     }
   }
 }
@@ -819,9 +1071,43 @@ function loadImage(src: string): Promise<HTMLImageElement> {
       img.crossOrigin = 'anonymous'
     }
     img.onload = () => resolve(img)
-    img.onerror = () => reject(new Error(i18n.t('toast.imageProcessorLoadFailed', { src })))
+    img.onerror = () =>
+      reject(new FileSystemError(translateMessage('toast.imageProcessorLoadFailed', { src })))
     img.src = url
   })
+}
+
+/** 预览 logo 缓存条目上限：一次编辑会话通常只用一两个 logo，留一点余量即可 */
+const LOGO_CACHE_MAX_ENTRIES = 4
+const watermarkLogoCache = new Map<string, Promise<HTMLImageElement>>()
+
+/**
+ * 预览专用的 logo 加载：缓存**成功**结果并按 LRU 限量。
+ *
+ * 失败刻意不入缓存——否则 2026-10-17 刚修好的「图片水印加载失败必须可见」会退化成
+ * 永久静默：后续帧命中失败缓存，连 onWatermarkImageError 都不会再触发。
+ * 缓存 Promise 而非图片本身，顺带把并发帧的重复请求也合并掉。
+ */
+async function loadWatermarkLogo(path: string): Promise<HTMLImageElement> {
+  const cached = watermarkLogoCache.get(path)
+  if (cached) return cached
+
+  const pending = loadImage(path)
+  watermarkLogoCache.set(path, pending)
+  pending.catch(() => {
+    if (watermarkLogoCache.get(path) === pending) watermarkLogoCache.delete(path)
+  })
+  while (watermarkLogoCache.size > LOGO_CACHE_MAX_ENTRIES) {
+    const oldest = watermarkLogoCache.keys().next().value
+    if (oldest === undefined) break
+    watermarkLogoCache.delete(oldest)
+  }
+  return pending
+}
+
+/** 清空 logo 缓存：切换源图时由调用方触发，避免跨图片残留 */
+export function clearWatermarkLogoCache(): void {
+  watermarkLogoCache.clear()
 }
 
 /**
@@ -895,18 +1181,19 @@ async function drawImageWatermark(
   config: WatermarkConfig,
   cw: number,
   ch: number,
-  onImageError?: (message: string) => void
+  options: ProcessOptions
 ): Promise<void> {
   const imgCfg = config.image
   if (!imgCfg?.path) return
 
+  // 带图片水印的帧不进 worker（logo 只能由主线程经 media:// 取），因此这里只有主线程一种形态
   let img: HTMLImageElement
   try {
-    img = await loadImage(imgCfg.path)
+    img = await (options.cacheLogo ? loadWatermarkLogo(imgCfg.path) : loadImage(imgCfg.path))
   } catch (err) {
     // 跳过图片水印、继续合成（文字水印与滤镜结果不受影响），但必须把失败报给调用方：
     // 此前这里是无日志无提示的 `catch { return }`，用户只看到「水印没出来」
-    onImageError?.(err instanceof Error ? err.message : String(err))
+    options.onWatermarkImageError?.(err instanceof Error ? err.message : String(err))
     return
   }
 
@@ -955,14 +1242,12 @@ async function drawImageWatermark(
 async function applyWatermark(
   imageData: ImageData,
   config: WatermarkConfig,
-  onWatermarkImageError?: (message: string) => void
+  options: ProcessOptions
 ): Promise<ImageData> {
-  const canvas = document.createElement('canvas')
-  canvas.width = imageData.width
-  canvas.height = imageData.height
-  const ctx = canvas.getContext('2d')
+  const canvas = createCanvas(imageData.width, imageData.height)
+  const ctx = get2dContext(canvas)
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new InternalError(i18n.t('toast.imageProcessorCanvasFailed'))
+  if (!ctx) throw new InternalError(translateMessage('toast.imageProcessorCanvasFailed'))
   ctx.putImageData(imageData, 0, 0)
 
   const cw = imageData.width
@@ -983,7 +1268,7 @@ async function applyWatermark(
   }
 
   if (config.image?.path) {
-    await drawImageWatermark(ctx, config, cw, ch, onWatermarkImageError)
+    await drawImageWatermark(ctx, config, cw, ch, options)
   }
 
   return ctx.getImageData(0, 0, cw, ch)
@@ -1024,7 +1309,7 @@ export async function imageToDataUrl(
   canvas.height = imageData.height
   const ctx = canvas.getContext('2d')
   // P1-C4：移除非空断言，GPU 进程崩溃或硬件加速禁用时 getContext 返回 null
-  if (!ctx) throw new InternalError(i18n.t('toast.imageProcessorCanvasFailed'))
+  if (!ctx) throw new InternalError(translateMessage('toast.imageProcessorCanvasFailed'))
   ctx.putImageData(imageData, 0, 0)
   return canvas.toDataURL(format, quality)
 }

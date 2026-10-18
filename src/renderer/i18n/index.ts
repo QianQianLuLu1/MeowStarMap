@@ -11,6 +11,7 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import zhCN from './locales/zh-CN.json'
 import { setAppErrorTranslator } from '../../shared/errors/app-error'
+import { setImageProcessorTranslator } from '../utils/imageProcessor'
 
 // P2-01：支持的语言列表（顺序影响设置页下拉展示顺序）
 // label 为语言自称名（endonym，国际惯例不随界面语言翻译）；本常量在 i18n 实例 init 前求值，
@@ -134,6 +135,10 @@ i18n.use(initReactI18next).init({
 
 // AppError 默认 userMessage 的翻译接线（shared 层不能反向依赖本模块）
 setAppErrorTranslator((key, options) => i18n.t(key, options as never) as unknown as string)
+
+// 图像管线的错误文案同样靠注入获得：imageProcessor 要被预览 worker 直接 import，
+// 不能自己 import 本模块（那会把 react-i18next 与语言包拖进 worker chunk）。
+setImageProcessorTranslator((key, options) => i18n.t(key, options as never) as unknown as string)
 
 // P3：启动时预加载持久化语言（若非 zh-CN）
 // 应在 React 渲染前 await 调用，避免非中文用户首次看到中文闪烁
