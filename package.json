@@ -1,6 +1,6 @@
 {
   "name": "wxnn-photo-manager",
-  "version": "2.5.3",
+  "version": "2.5.5-beta",
   "description": "无限暖暖相册管理工具",
   "license": "MIT",
   "repository": {
@@ -43,7 +43,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
+    "format:check": "prettier --check --end-of-line auto \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
     "typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:precommit": "tsx scripts/run-precommit-tests.ts",
@@ -64,9 +64,14 @@
     "i18n:guard": "tsx scripts/i18n/guard.ts",
     "sync-i18n-keys": "tsx scripts/sync-i18n-keys.ts",
     "preview:check": "tsx scripts/check-preview-drift.ts",
+    "docs:links": "tsx scripts/check-md-links.ts",
     "debt:issues": "tsx scripts/debt/create-github-issues.ts",
     "debt:check": "tsx scripts/debt/check-debt-fix.ts",
     "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
+    "verify:nikkisync": "tsx scripts/verify-nikkisync-link.ts",
+    "link:nikkisync": "tsx scripts/link-nikkisync.ts",
+    "link:nikkisync:check": "tsx scripts/link-nikkisync.ts --check",
+    "e2e": "tsx scripts/e2e-usage.ts",
     "e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep-invert @perf",
     "e2e:perf": "playwright test --config e2e/playwright.config.ts --grep @perf",
     "dist:win:smoke": "npm run dist:win && npm run e2e:smoke",
@@ -112,6 +117,7 @@
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.10.0",
+    "@use-gesture/react": "^10.3.1",
     "archiver": "^7.0.1",
     "better-sqlite3": "^12.11.1",
     "electron-log": "^5.4.4",
@@ -127,6 +133,7 @@
     "motion": "^12.42.2",
     "network-address": "^1.1.2",
     "pluggable-electron": "^1.0.0",
+    "qrcode": "^1.5.4",
     "react": "^19.2.7",
     "react-compare-slider": "^4.0.0",
     "react-dom": "^19.2.7",
@@ -159,6 +166,7 @@
     "@types/better-sqlite3": "^7.6.13",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/node": "^22.10.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.7.0",
@@ -210,6 +218,13 @@
     "files": [
       "dist/**/*",
       "resources/**/*",
+      {
+        "from": "node_modules/@nikkisync",
+        "to": "node_modules/@nikkisync",
+        "filter": [
+          "**/*"
+        ]
+      },
       "!**/node_modules/@img/sharp-darwin-*",
       "!**/node_modules/@img/sharp-linux-*",
       "!**/node_modules/@img/sharp-libvips-linux-*",
@@ -240,6 +255,7 @@
       "!**/dist/**/*.tsbuildinfo"
     ],
     "asarUnpack": [
+      "**/@nikkisync/**",
       "**/ffmpeg-static/**",
       "**/ffprobe-static/**",
       "**/better-sqlite3/**",

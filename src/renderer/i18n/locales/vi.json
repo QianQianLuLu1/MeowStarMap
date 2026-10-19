@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Cộng Hưởng",
+      "syncGallery": "Thư viện đồng bộ",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Dịch vụ đồng bộ"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "Menu",
     "recycleBin": "Thùng rác",
     "resonanceRecords": "Cộng Hưởng",
+    "syncGallery": "Thư viện đồng bộ",
     "settings": "Cài đặt",
     "smartGroup": "Nhóm thông minh",
     "storage": "Lưu trữ",
@@ -1469,10 +1472,11 @@
       "data": "Quản lý dữ liệu",
       "diagnostics": "Nhật ký & chẩn đoán",
       "general": "Chung",
-      "plugins": "",
+      "plugins": "Plugin",
       "profile": "Hồ sơ",
       "scan": "Quét",
-      "tools": "Công cụ"
+      "tools": "Công cụ",
+      "toolsPlugins": "Công cụ & Plugin"
     },
     "language": {
       "auto": "Theo hệ thống",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "Quy trình xuất",
       "fileops": "Thao tác tệp",
       "language": "Ngôn ngữ",
-      "pluginManage": "",
+      "pluginManage": "Quản lý plugin",
       "profileManage": "Quản lý hồ sơ",
       "scanOptions": "Tùy chọn quét",
       "shareCode": "Công cụ mã chia sẻ",
       "startup": "Hành vi khởi động",
       "theme": "Chủ đề",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Thư mục game",
+      "importRoots": "Thư mục chỉ định",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Thư mục game đã phát hiện",
+      "scanFallback": "Quét dự phòng thủ công",
+      "themeDisplay": "Chủ đề & hiển thị",
+      "scanDirectories": "Thư mục quét",
+      "cacheCleanup": "Bộ nhớ đệm & dọn dẹp",
+      "aboutOverview": "Thông tin ứng dụng & liên hệ"
     },
     "startup": {
       "autoScan": "Tự động quét khi khởi động",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "Không tải được ảnh: {{src}}",
+    "syncEnabled": "Đã bật dịch vụ đồng bộ",
+    "syncDisabled": "Đã tắt dịch vụ đồng bộ"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "Total pulls",
       "colAvg": "Avg. pulls",
       "colPercentile": "Percentile"
+    }
+  },
+  "syncGallery": {
+    "title": "Thư viện đồng bộ",
+    "subtitle": "Tài nguyên từ thư viện NikkiSync nhúng, không ảnh hưởng thư viện cục bộ",
+    "loading": "Đang tải thư viện đồng bộ…",
+    "toolbar": {
+      "statusTip": "Trạng thái runtime NikkiSync nhúng",
+      "refresh": "Làm mới",
+      "scan": "Quét album game",
+      "service": "Dịch vụ đồng bộ",
+      "status": {
+        "ready": "Sẵn sàng",
+        "degraded": "Không tìm thấy thư mục game",
+        "off": "Chưa chạy"
+      },
+      "detail": "Chi tiết",
+      "about": "Giới thiệu về NikkiSync"
+    },
+    "empty": {
+      "title": "Chưa có tài nguyên để xem",
+      "linkHint": "Không tìm thấy gói NikkiSync. Hãy chạy npm run link:nikkisync ở gốc dự án rồi khởi động lại ứng dụng",
+      "runtimeOff": "Dịch vụ nhúng chưa chạy: hãy mở Dịch vụ đồng bộ trên thanh công cụ, bật runtime NikkiSync ở đó rồi thử lại",
+      "gameRootMissing": "Không thấy thư mục cài Infinity Nikki. Hãy chọn thủ công trong Cài đặt rồi quét lại",
+      "noAssets": "Đã quét xong nhưng không có ảnh. Bấm «Quét album game» để lập chỉ mục lại",
+      "retry": "Tải lại"
+    },
+    "error": {
+      "bridgeMissing": "Không thấy runtime NikkiSync. Hãy chạy npm run link:nikkisync",
+      "loadFailed": "Tải thư viện đồng bộ thất bại"
+    },
+    "drawer": {
+      "title": "Chi tiết tài nguyên",
+      "basic": "Thông tin cơ bản",
+      "fields": {
+        "assetId": "ID tài nguyên",
+        "type": "Loại",
+        "state": "Trạng thái",
+        "motion": "Cờ LIVE",
+        "revision": "Revision",
+        "gameVersion": "Phiên bản game",
+        "resolution": "Độ phân giải",
+        "size": "Kích thước tệp",
+        "hash": "Hash nội dung",
+        "metadata": "Siêu dữ liệu"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Dịch vụ đồng bộ"
+    },
+    "service": {
+      "title": "Dịch vụ đồng bộ",
+      "description": "Cho phép ứng dụng di động NikkiSync đồng bộ thư viện này qua kết nối mã hóa trong mạng cục bộ"
+    },
+    "enable": "Bật dịch vụ đồng bộ",
+    "enableDesc": "Máy này sẽ chạy làm máy chủ đồng bộ (HTTPS + WebSocket, cổng mặc định 28080)",
+    "status": {
+      "label": "Trạng thái",
+      "running": "Đang chạy",
+      "stopped": "Đã dừng",
+      "unavailable": "Thành phần đồng bộ chưa sẵn sàng",
+      "address": "Địa chỉ máy chủ",
+      "serverId": "ID máy chủ",
+      "tlsFingerprint": "Vân tay TLS",
+      "copied": "Đã sao chép"
+    },
+    "pairing": {
+      "title": "Ghép nối thiết bị mới",
+      "open": "Ghép nối thiết bị mới",
+      "hintRunning": "Quét mã QR trên thiết bị di động; mã hết hạn sau 5 phút",
+      "hintDisabled": "Cần bật dịch vụ đồng bộ để ghép nối thiết bị mới",
+      "expiresIn": "Hết hạn sau",
+      "refresh": "Tạo lại",
+      "copyContent": "Sao chép nội dung ghép nối",
+      "loadFailed": "Không tạo được mã QR ghép nối",
+      "retry": "Thử lại"
+    },
+    "devices": {
+      "title": "Thiết bị đã ghép nối",
+      "empty": "Chưa có thiết bị nào được ghép nối",
+      "emptyHint": "Quét mã QR ghép nối trên thiết bị di động",
+      "lastSeen": "Hoạt động gần nhất",
+      "never": "Chưa từng kết nối",
+      "revoke": "Thu hồi",
+      "revokeConfirmTitle": "Thu hồi thiết bị",
+      "revokeConfirmMessage": "Sau khi thu hồi, \"{{name}}\" sẽ không thể đồng bộ với thư viện này và cần ghép nối lại. Thu hồi?",
+      "revokeConfirm": "Thu hồi thiết bị",
+      "revoked": "Đã thu hồi thiết bị"
+    },
+    "gallerySource": "Dùng thư viện asset của NikkiSync làm nguồn phòng trưng bày",
+    "gallerySourceDesc": "Tắt: đọc media_files trên máy (mặc định). Bật: phòng trưng bày đọc assets của runtime NikkiSync nhúng kèm, đồng thời bật runtime và một lần quét",
+    "gallerySourceApplied": "Đã chuyển nguồn dữ liệu phòng trưng bày sang {{source}}",
+    "metadata": {
+      "enable": "Phân tích tham số trang phục và chụp",
+      "enableDesc": "Sau khi quét xong, trình phân tích của NikkiSync phía trên sẽ bổ sung các tham số chụp (tiêu cự, khẩu độ, độ phơi sáng, cường độ bộ lọc, v.v.) cho thư viện đã đồng bộ. Có hiệu lực sau khi khởi động lại ứng dụng.",
+      "disclosure": "Khi bật, UID của mỗi ảnh và phong bao tham số nhúng trong ảnh sẽ được gửi tới dịch vụ bên thứ ba nuan5.pro để đổi lấy kết quả giải mã. Nội dung trả về được ghi vào cơ sở dữ liệu đồng bộ trên máy và cũng được gửi tới các thiết bị đã ghép cặp qua mạng cục bộ. Tìm kiếm bộ trang phục và trang phục vẫn phụ thuộc vào từ điển cục bộ; công tắc này không bao gồm phần đó."
+    }
+  },
+  "shareCard": {
+    "title": "Tạo ảnh chia sẻ",
+    "generate": "Tạo ảnh chia sẻ",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "savedCount": "Đã lưu {{count}} ảnh",
+    "progress": "Đang kết xuất {{current}} / {{total}}…",
+    "missingIcons": "{{count}} biểu tượng bộ phận không khả dụng",
+    "motionUnsupported": "Giai đoạn này chưa hỗ trợ ảnh chia sẻ cho ảnh LIVE",
+    "noParams": "Không đọc được thông số chụp; ảnh sẽ hiển thị dấu gạch",
+    "errorGenerate": "Tạo ảnh chia sẻ thất bại",
+    "errorCancelled": "Đã hủy tạo",
+    "errorSave": "Lưu ảnh chia sẻ thất bại",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

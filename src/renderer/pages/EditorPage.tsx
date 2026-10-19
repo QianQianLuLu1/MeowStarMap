@@ -118,6 +118,7 @@ export const EditorPage: React.FC = () => {
     setFilterIntensity,
     watermark,
     setWatermark,
+    watermarkError,
     previewUrl,
     originalUrl,
     reset,
@@ -147,6 +148,18 @@ export const EditorPage: React.FC = () => {
   const batchEtaSamplesRef = useRef<Array<{ t: number; count: number }>>([])
   const showMessage = useGlobalToast()
   const refreshMedia = useRefreshMedia()
+  // 图片水印 logo 加载失败必须可见：预览仍在（processorError 那条只在无预览时渲染），
+  // 所以另开一条 toast。预览是防抖重跑的，同一失败会反复回调 → 按文案去重，避免刷屏。
+  const lastWatermarkErrorRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!watermarkError) {
+      lastWatermarkErrorRef.current = null
+      return
+    }
+    if (lastWatermarkErrorRef.current === watermarkError) return
+    lastWatermarkErrorRef.current = watermarkError
+    showMessage(watermarkError, 'error')
+  }, [watermarkError, showMessage])
   // F-B2：editor:save 失败时暂存 dataUrl，下次进入编辑器时提示恢复
   const [recoverData, setRecoverData] = useState<{
     dataUrl: string
@@ -620,7 +633,14 @@ export const EditorPage: React.FC = () => {
           im.src = imgUrl
         })
         // 2. 应用编辑参数 + 水印（不限制尺寸：修复前钳到 4096，长边更大的原片被静默降采样写回原路径）
-        const imageData = await processImageData(img, mergedParams, { watermark })
+        // logo 读不到时这里**故意抛错**而不是跳过：批量应用写的是用户文件，静默产出
+        // 无水印的结果等于丢功能；抛出后由下方 catch 计入 failedCount 并在汇总里可见。
+        const imageData = await processImageData(img, mergedParams, {
+          watermark,
+          onWatermarkImageError: (message) => {
+            throw new InternalError(message)
+          }
+        })
         // 3. 导出 dataUrl：编码跟随目标扩展名，避免 PNG 目标被写成有损 JPEG
         const { mimeType, quality } = resolveExportEncoding(target.file_ext)
         const dataUrl = await imageToDataUrl(imageData, mimeType, quality)

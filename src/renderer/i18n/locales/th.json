@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "บันทึกเรโซแนนซ์",
+      "syncGallery": "แกลเลอรีซิงค์",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "บริการซิงค์"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "เมนู",
     "recycleBin": "ถังรีไซเคิล",
     "resonanceRecords": "บันทึกเรโซแนนซ์",
+    "syncGallery": "แกลเลอรีซิงค์",
     "settings": "การตั้งค่า",
     "smartGroup": "กลุ่มอัจฉริยะ",
     "storage": "พื้นที่จัดเก็บ",
@@ -1469,10 +1472,11 @@
       "data": "จัดการข้อมูล",
       "diagnostics": "บันทึกและการวินิจฉัย",
       "general": "ทั่วไป",
-      "plugins": "",
+      "plugins": "ปลั๊กอิน",
       "profile": "โปรไฟล์",
       "scan": "สแกน",
-      "tools": "เครื่องมือ"
+      "tools": "เครื่องมือ",
+      "toolsPlugins": "เครื่องมือและปลั๊กอิน"
     },
     "language": {
       "auto": "ตามระบบ",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "ขั้นตอนการส่งออก",
       "fileops": "การดำเนินการไฟล์",
       "language": "ภาษา",
-      "pluginManage": "",
+      "pluginManage": "การจัดการปลั๊กอิน",
       "profileManage": "การจัดการโปรไฟล์",
       "scanOptions": "ตัวเลือกการสแกน",
       "shareCode": "เครื่องมือรหัสแชร์",
       "startup": "พฤติกรรมการเริ่มต้น",
       "theme": "ธีม",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "โฟลเดอร์เกม",
+      "importRoots": "โฟลเดอร์ที่ระบุ",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "โฟลเดอร์เกมที่ตรวจพบ",
+      "scanFallback": "สแกนสำรองแบบแมนนวล",
+      "themeDisplay": "ธีมและการแสดงผล",
+      "scanDirectories": "โฟลเดอร์สำหรับสแกน",
+      "cacheCleanup": "แคชและการล้างข้อมูล",
+      "aboutOverview": "ข้อมูลแอปพลิเคชันและการติดต่อ"
     },
     "startup": {
       "autoScan": "สแกนอัตโนมัติเมื่อเริ่มต้น",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "โหลดรูปภาพไม่สำเร็จ: {{src}}",
+    "syncEnabled": "เปิดใช้บริการซิงค์แล้ว",
+    "syncDisabled": "ปิดบริการซิงค์แล้ว"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "Total pulls",
       "colAvg": "Avg. pulls",
       "colPercentile": "Percentile"
+    }
+  },
+  "syncGallery": {
+    "title": "Sync Gallery",
+    "subtitle": "Assets from the embedded NikkiSync library, independent of the local gallery",
+    "loading": "Loading sync gallery…",
+    "toolbar": {
+      "statusTip": "Status of the embedded NikkiSync runtime",
+      "refresh": "Refresh",
+      "scan": "Scan game album",
+      "service": "บริการซิงค์",
+      "status": {
+        "ready": "Ready",
+        "degraded": "Game folder not found",
+        "off": "Not started"
+      },
+      "detail": "Details",
+      "about": "เกี่ยวกับ NikkiSync"
+    },
+    "empty": {
+      "title": "No assets to browse yet",
+      "linkHint": "NikkiSync packages not found. Run npm run link:nikkisync in the project root, then restart the app",
+      "runtimeOff": "บริการฝังในตัวไม่ได้ทำงาน: โปรดเปิด บริการซิงค์ บนแถบเครื่องมือ แล้วเปิดใช้รันไทม์ NikkiSync จากนั้นลองอีกครั้ง",
+      "gameRootMissing": "Infinity Nikki install folder not found. Select it manually in Settings, then rescan",
+      "noAssets": "Scan finished but no photos were found. Click “Scan game album” to reindex",
+      "retry": "Reload"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync runtime not found. Run npm run link:nikkisync",
+      "loadFailed": "Failed to load sync gallery"
+    },
+    "drawer": {
+      "title": "Asset details",
+      "basic": "Basic info",
+      "fields": {
+        "assetId": "Asset ID",
+        "type": "Type",
+        "state": "State",
+        "motion": "LIVE flag",
+        "revision": "Revision",
+        "gameVersion": "Game version",
+        "resolution": "Resolution",
+        "size": "File size",
+        "hash": "Content hash",
+        "metadata": "Metadata"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "บริการซิงค์"
+    },
+    "service": {
+      "title": "บริการซิงค์",
+      "description": "อนุญาตให้ไคลเอนต์มือถือ NikkiSync ซิงค์คลังสื่อนี้ผ่านการเชื่อมต่อที่เข้ารหัสในเครือข่ายท้องถิ่น"
+    },
+    "enable": "เปิดใช้บริการซิงค์",
+    "enableDesc": "เครื่องนี้จะทำหน้าที่เป็นเซิร์ฟเวอร์ซิงค์ (HTTPS + WebSocket, พอร์ตเริ่มต้น 28080)",
+    "status": {
+      "label": "สถานะ",
+      "running": "กำลังทำงาน",
+      "stopped": "หยุดอยู่",
+      "unavailable": "ส่วนประกอบซิงค์ยังไม่พร้อม",
+      "address": "ที่อยู่เซิร์ฟเวอร์",
+      "serverId": "ID เซิร์ฟเวอร์",
+      "tlsFingerprint": "ลายนิ้วมือ TLS",
+      "copied": "คัดลอกแล้ว"
+    },
+    "pairing": {
+      "title": "จับคู่อุปกรณ์ใหม่",
+      "open": "จับคู่อุปกรณ์ใหม่",
+      "hintRunning": "สแกน QR Code บนมือถือ หมดอายุใน 5 นาที",
+      "hintDisabled": "ต้องเปิดใช้บริการซิงค์ก่อนจึงจะจับคู่อุปกรณ์ใหม่ได้",
+      "expiresIn": "หมดอายุใน",
+      "refresh": "สร้างใหม่",
+      "copyContent": "คัดลอกเนื้อหาการจับคู่",
+      "loadFailed": "สร้าง QR Code จับคู่ไม่สำเร็จ",
+      "retry": "ลองอีกครั้ง"
+    },
+    "devices": {
+      "title": "อุปกรณ์ที่จับคู่แล้ว",
+      "empty": "ยังไม่มีอุปกรณ์ที่จับคู่",
+      "emptyHint": "สแกน QR Code จับคู่บนมือถือของคุณ",
+      "lastSeen": "ใช้งานล่าสุด",
+      "never": "ไม่เคยเชื่อมต่อ",
+      "revoke": "เพิกถอน",
+      "revokeConfirmTitle": "เพิกถอนอุปกรณ์",
+      "revokeConfirmMessage": "หลังเพิกถอน \"{{name}}\" จะซิงค์กับคลังสื่อนี้ไม่ได้อีกและต้องจับคู่ใหม่ ยืนยันการเพิกถอน?",
+      "revokeConfirm": "เพิกถอนอุปกรณ์",
+      "revoked": "เพิกถอนอุปกรณ์แล้ว"
+    },
+    "gallerySource": "ใช้คลังแอสเซตของ NikkiSync เป็นแหล่งข้อมูลแกลเลอรี",
+    "gallerySourceDesc": "ปิด: อ่าน media_files ในเครื่อง (ค่าเริ่มต้น) เปิด: แกลเลอรีอ่าน assets ของรันไทม์ NikkiSync ในตัว พร้อมเปิดรันไทม์และสแกนหนึ่งครั้งโดยนัย",
+    "gallerySourceApplied": "เปลี่ยนแหล่งข้อมูลแกลเลอรีเป็น {{source}} แล้ว",
+    "metadata": {
+      "enable": "วิเคราะห์พารามิเตอร์ชุดแต่งกายและการถ่าย",
+      "enableDesc": "หลังการสแกนเสร็จสิ้น ตัววิเคราะห์ของ NikkiSync ฝั่งต้นทางจะเติมพารามิเตอร์การถ่าย (ทางยาวโฟกัส รูรับแสง การเปิดรับแสง ความเข้มฟิลเตอร์ ฯลฯ) ให้แกลเลอรีที่ซิงก์ มีผลหลังเริ่มแอปใหม่",
+      "disclosure": "เมื่อเปิดใช้งาน UID ของรูปและซองพารามิเตอร์ที่ฝังในรูปจะถูกส่งไปยังบริการของบุคคลที่สาม nuan5.pro เพื่อแลกผลการถอดรหัส เนื้อหาที่ส่งกลับจะถูกเขียนลงในฐานข้อมูลซิงก์ในเครื่องและส่งต่อไปยังอุปกรณ์ที่จับคู่แล้วผ่านเครือข่ายในท้องถิ่น การค้นหาชุดและชิ้นส่วนยังต้องพจนานุกรมในเครื่อง สวิตช์นี้ไม่ครอบคลุมส่วนนั้น"
+    }
+  },
+  "shareCard": {
+    "title": "Generate share card",
+    "generate": "Generate share card",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "savedCount": "Saved {{count}} image(s)",
+    "progress": "Rendering {{current}} / {{total}}…",
+    "missingIcons": "{{count}} item icon(s) unavailable",
+    "motionUnsupported": "Share cards for LIVE photos are not supported in this phase",
+    "noParams": "No shooting parameters found; the card will show dashes",
+    "errorGenerate": "Failed to generate the share card",
+    "errorCancelled": "Generation cancelled",
+    "errorSave": "Failed to save the share card",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

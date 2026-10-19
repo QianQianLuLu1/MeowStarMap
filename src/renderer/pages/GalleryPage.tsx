@@ -239,6 +239,55 @@ export const GalleryPage: React.FC = () => {
     }
   }, [setMediaFiles])
 
+  // useEffect 3（阶段4）：读回持久化的图库数据源开关。
+  // 分流点在 store 内部（fetchMediaFromDatabase），所以这里只负责「设定来源 + 重取一次」，
+  // 视图切换 / 筛选 / 多选等既有行为一律不变。
+  useEffect(() => {
+    const get = window.electronAPI?.settings?.get
+    if (!get) return
+    get('gallery.dataSource', 'local')
+      .then((value) => {
+        const next = value === 'nikkisync' ? 'nikkisync' : 'local'
+        if (next === useMediaStore.getState().source) return
+        useMediaStore.getState().setSource(next)
+        return fetchMediaFromDatabase().then((result) => {
+          if (result) setMediaFiles(result.files)
+        })
+      })
+      .catch((err) => {
+        console.error('[GalleryPage] gallery.dataSource read failed:', err)
+      })
+  }, [setMediaFiles])
+
+  // useEffect 4（阶段4）：订阅「资产库已变更」（扫描成功返回后主进程推送）→ 图库自动刷新。
+  // 先用 get-changes 判有没有变化：扫描跑完但一条资产没变动时不整表重取，
+  // 避免用户滚到的位置被无意义刷新顶掉。
+  useEffect(() => {
+    const subscribe = window.electronAPI?.nikkisync?.onLibraryChanged
+    if (!subscribe) return
+    return subscribe(() => {
+      if (useMediaStore.getState().source !== 'nikkisync') return
+      const api = window.electronAPI?.nikkisync
+      const after = useMediaStore.getState().nikkiRevision
+      const changes =
+        !api?.getChanges || after === null
+          ? Promise.resolve(null)
+          : api.getChanges({ after }).catch(() => null)
+      void changes
+        .then((result) => {
+          if (result && result.changes.length === 0 && result.fullResyncRequired === false) return
+          return fetchMediaFromDatabase({
+            limit: Math.max(MEDIA_PAGE_SIZE, useMediaStore.getState().mediaFiles.length)
+          }).then((fetched) => {
+            if (fetched) setMediaFiles(fetched.files)
+          })
+        })
+        .catch((err) => {
+          console.error('[GalleryPage] library-changed refresh failed:', err)
+        })
+    })
+  }, [setMediaFiles])
+
   // D5：区分“从未扫描”与“已扫描但无游戏截图”——扫描已执行过却仍显示
   // “点击扫描按钮开始扫描”会误导用户反复扫描；已扫描后切换为引导文案
   useEffect(() => {

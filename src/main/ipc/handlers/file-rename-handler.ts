@@ -1,3 +1,4 @@
+// @core-change: sync-integration 阶段4：rename/move 写路径接线同步变更日志（ctx.syncEvents → journal + WS 广播）
 /**
  * 文件操作域 IPC handler：重命名 / 移动
  *
@@ -35,12 +36,14 @@ type RenameRecord = { oldPath: string; newPath: string; newFileName: string }
 
 async function syncMediaFilesAfterRename(
   db: Database.Database,
-  renamed: RenameRecord[]
+  renamed: RenameRecord[],
+  onAssetsChanged?: (mediaIds: number[]) => void
 ): Promise<void> {
   if (renamed.length === 0) return
   const updateStmt = db.prepare(
     'UPDATE media_files SET file_path = ?, file_name = ? WHERE file_path = ?'
   )
+  const selectIdStmt = db.prepare('SELECT id FROM media_files WHERE file_path = ?')
   const tx = db.transaction((rows: RenameRecord[]) => {
     for (const r of rows) {
       updateStmt.run(r.newPath, r.newFileName, r.oldPath)
@@ -48,6 +51,15 @@ async function syncMediaFilesAfterRename(
   })
   try {
     tx(renamed)
+    // sync-integration 阶段4：收集受影响媒体 id 供同步变更日志接线（ctx.syncEvents）
+    if (onAssetsChanged) {
+      const changedIds: number[] = []
+      for (const r of renamed) {
+        const row = selectIdStmt.get(r.newPath) as { id: number } | undefined
+        if (row) changedIds.push(row.id)
+      }
+      if (changedIds.length > 0) onAssetsChanged(changedIds)
+    }
   } catch (error) {
     // R2 补偿机制：DB 失败时尝试反向回滚磁盘，回滚失败的项写入 pending_renames
     // 让 startup-tasks.retryPendingRenames 在下次启动时让 DB 接受新路径。
@@ -89,6 +101,13 @@ async function syncMediaFilesAfterRename(
  * R3：rename/move/batchRename 在文件操作成功后调用 syncMediaFilesAfterRename 同步 DB。
  */
 export function registerFileRenameHandlers(ctx: HandlerContext): void {
+  // sync-integration 阶段4：rename/move 后的媒体路径变更 → 批量 journal（合并广播，
+  // recordAssetChanges 内部吞错，仅告警不中断文件操作主流程）
+  const recordSyncChanges = (mediaIds: number[]): void => {
+    void ctx.syncEvents?.recordAssetChanges(
+      mediaIds.map((id) => ({ eventType: 'asset.updated' as const, assetId: String(id) }))
+    )
+  }
   // 文件移动
   // R3：move 后同步 DB file_path/file_name，避免 DB 指向旧路径让用户视角文件"消失"
   ipcMain.handle(
@@ -106,7 +125,7 @@ export function registerFileRenameHandlers(ctx: HandlerContext): void {
         if (result.renamed && result.renamed.length > 0) {
           const db = ctx.dbManager.getDatabase()
           if (db) {
-            await syncMediaFilesAfterRename(db, result.renamed)
+            await syncMediaFilesAfterRename(db, result.renamed, recordSyncChanges)
           }
         }
         return result
@@ -128,7 +147,7 @@ export function registerFileRenameHandlers(ctx: HandlerContext): void {
         if (result.success && result.renamed && result.renamed.length > 0) {
           const db = ctx.dbManager.getDatabase()
           if (db) {
-            await syncMediaFilesAfterRename(db, result.renamed)
+            await syncMediaFilesAfterRename(db, result.renamed, recordSyncChanges)
           }
         }
         return result
@@ -156,7 +175,7 @@ export function registerFileRenameHandlers(ctx: HandlerContext): void {
         if (result.renamed.length > 0) {
           const db = ctx.dbManager.getDatabase()
           if (db) {
-            await syncMediaFilesAfterRename(db, result.renamed)
+            await syncMediaFilesAfterRename(db, result.renamed, recordSyncChanges)
           }
         }
         return result

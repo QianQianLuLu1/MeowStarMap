@@ -85,6 +85,26 @@ function isChildProcessSpawnError(err: unknown): boolean {
   return e.code === 'EFTYPE'
 }
 
+/**
+ * 判定是否为「web 流状态竞态」（2026-10-15 线上启动闪退根因之一）。
+ *
+ * 为什么需要该分类：undici 对 Node 流 body 的包装（ReadableStreamFrom）在请求取消
+ * 竞态下对已关闭流执行无守卫 close，抛 ERR_INVALID_STATE: Invalid state:
+ * ReadableStream is already closed（堆栈仅平台帧，无应用状态受损）。该异常本属良性瞬态，
+ * 但被一律致命策略升级为 app.exit(1)，叠加媒体请求取消风暴形成崩溃循环。
+ * media:// 响应体已改走 Readable.toWeb 根除此路径，本分类作为其余同类平台路径
+ * （上传流包装等）的最后防线：已知良性竞态，已就绪的应用不应因此退出。
+ * 与 spawn 分级同理的窄匹配：code 精确相等 + message 白名单，宁漏勿滥。
+ */
+function isStreamStateRaceError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false
+  const e = err as NodeJS.ErrnoException
+  if (e.code !== 'ERR_INVALID_STATE') return false
+  return (
+    typeof e.message === 'string' && /ReadableStream is already (closed|locked)/.test(e.message)
+  )
+}
+
 function defaultHasMainWindow(): boolean {
   try {
     return BrowserWindow.getAllWindows().length > 0
@@ -202,6 +222,25 @@ export function reportEarlyFatal(
       /* 落盘失败不阻塞后续弹框 */
     }
     showNonFatalErrorBox(err, { deps })
+    return
+  }
+
+  // 流状态竞态降级（2026-10-15 启动闪退修复）：异常抛自已分离的微任务、仅平台帧、
+  // 无应用状态受损（受影响的响应流本身已销毁）。应用已就绪（有主窗口）时降级为
+  // 仅记录——不弹窗（良性瞬态，弹窗即噪音）、不退出；启动期（无窗口）仍走致命路径，
+  // 不影响真实启动故障的发现能力。与 spawn 分级采用同一 hasMainWindow 判定口径。
+  if (isStreamStateRaceError(err) && (deps.hasMainWindow ?? defaultHasMainWindow)()) {
+    try {
+      // 留痕进 faults 通道：线上再出现时可按 declassified 标记检索来源
+      logFault('uncaughtException', err, { stage, declassified: 'stream-race' })
+    } catch {
+      /* 日志失败不影响继续运行 */
+    }
+    try {
+      diag('STREAM-RACE-NONFATAL', `stage=${stage} ${message}\n${stack}`)
+    } catch {
+      /* 忽略 */
+    }
     return
   }
 

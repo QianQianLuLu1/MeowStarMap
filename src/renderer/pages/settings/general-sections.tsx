@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, GlobalToastContext, SettingsToggle } from './shared'
+import { SectionShell, GlobalToastContext, SettingsToggle, SettingsCard } from './shared'
+import { SliderControl } from '../../components/common/SliderControl'
 
 // ============ 通用 ============
 
@@ -173,36 +174,28 @@ export const GeneralFileOpsSection: React.FC = () => {
           }}
         />
         {batchThresholdEnabled && (
-          <div
-            className="flex items-center gap-3 p-3 rounded-lg"
-            style={{ background: 'var(--bg-tertiary)' }}
-          >
-            <span className="text-sm flex-shrink-0" style={{ color: 'var(--text-secondary)' }}>
-              {t('settings.fileops.thresholdCount')}
-            </span>
-            <input
-              type="range"
+          <SettingsCard>
+            <SliderControl
+              label={t('settings.fileops.thresholdCount')}
+              value={batchThreshold}
               min={3}
               max={100}
               step={1}
-              value={batchThreshold}
-              onChange={(e) => setBatchThreshold(Number(e.target.value))}
-              onMouseUp={async () => {
-                await updateSetting(
+              // defaultValue 传当前值：SliderControl 双击复位优先取 defaultValue，
+              // 缺省会退到 min=3，误双击就把用户的阈值静默改掉了。
+              defaultValue={batchThreshold}
+              onChange={setBatchThreshold}
+              // SliderControl 的提交同时挂在 onPointerUp 与 onKeyUp 上，
+              // 键盘方向键调值因此也会落库（原裸 range 只有 mouseUp，键盘值被静默丢弃）
+              onCommit={() =>
+                void updateSetting(
                   'fileOps.batchThreshold',
                   batchThreshold,
                   t('toast.batchThresholdSet', { count: batchThreshold })
                 )
-              }}
-              className="flex-1 accent-[var(--accent)]"
+              }
             />
-            <span
-              className="text-sm font-mono w-12 text-right"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {batchThreshold}
-            </span>
-          </div>
+          </SettingsCard>
         )}
       </div>
     </SectionShell>

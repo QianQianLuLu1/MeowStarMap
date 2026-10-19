@@ -177,6 +177,81 @@ export function resolveNativeThumbnailPath(hqPath: string): string | null {
   return `${before}${leadingSep}NikkiPhotos_LowQuality${trailingSep}${after}`
 }
 
+// 同图变异推导所用目录段（均含尾部分隔符，小写；与 isGamePlayPhotosPath / resolveNativeThumbnailPath 同口径）
+const GPP_FULL_SEGMENT = '\\x6game\\saved\\gameplayphotos\\'
+const HQ_DIR_SEGMENT = '\\nikkiphotos_highquality\\'
+const X6GAME_SEGMENT = '\\x6game'
+/** UID 目录名：单层纯数字（对齐 gameplayphotos-root.ts 的 UID_DIR_REGEX，任意位数） */
+const UID_DIR_SEGMENT_RE = /^\d+$/
+
+/**
+ * 由 HQ（高清原图）路径推导**同一张照片**在游戏目录下的其余同名文件候选。
+ *
+ * 背景（#fix-permanent-delete-game-photo-variants）：游戏会把同一张照片以**完全相同的
+ * 文件名**同时写入多个目录，实测本机三者齐备：
+ * - `...\X6Game\Saved\GamePlayPhotos\{uid}\NikkiPhotos_HighQuality\{name}`（高清原图，锚点）
+ * - `...\X6Game\Saved\GamePlayPhotos\{uid}\NikkiPhotos_LowQuality\{name}`（原生低清副本）
+ * - `...\X6Game\ScreenShot\{name}`（游戏截图副本，扁平无 UID 子目录）
+ * 还存在兼容变体 `...\X6Game\Saved\ScreenShot\{name}`（scan-channels 已收录该扫描通道）。
+ * 完全删除任一张时，其余副本与其数据库记录都必须一并清理，否则残留且重扫复活。
+ *
+ * 推导口径（纯字符串、零 IO、无副作用）：
+ * - 归一化只做 `/ → \` 与小写，长度不变，索引与原路径一一对应；
+ * - 必须命中完整锚点 `\x6game\saved\gameplayphotos\`（防用户自建同名目录误伤）；
+ * - 必须命中 `\nikkiphotos_highquality\` 目录段 —— **只做 HQ 锚点单向推导**：
+ *   `X6Game\ScreenShot` 扁平无 UID 段，反向推导 HQ 必须猜测 UID，有跨账号误删风险，
+ *   且「缓存 / 截图视图删除不应连带删除图库原图」，故刻意不实现；
+ * - `GamePlayPhotos` 与 `NikkiPhotos_HighQuality` 之间必须是**单层纯数字 UID 目录**，
+ *   否则视为结构异常，整体返回空数组（绝不猜测路径）；
+ * - 文件名部分不得含分隔符，空文件名同样返回空数组。
+ *
+ * 返回值只是**候选**：调用方必须 `pathExists` 预检后再删除（三目录并不总是齐备，
+ * 实测 HQ∩LQ=23、HQ∩ScreenShot=24，缺项是常态）。结果已按大小写不敏感去重。
+ *
+ * @param filePath 候选锚点（HQ）文件绝对路径
+ * @returns 同图衍生文件候选路径数组；不满足上述任一条件返回空数组，不抛异常
+ */
+export function resolveGamePhotoVariantPaths(filePath: string): string[] {
+  if (!filePath || typeof filePath !== 'string') return []
+  // 归一化只做 /→\ 与小写转换，字符串长度不变，索引与原路径一一对应
+  const normalized = filePath.replace(/\//g, '\\').toLowerCase()
+  const gppIdx = normalized.indexOf(GPP_FULL_SEGMENT)
+  if (gppIdx === -1) return []
+  const hqIdx = normalized.indexOf(HQ_DIR_SEGMENT)
+  if (hqIdx === -1 || hqIdx <= gppIdx) return []
+
+  // 锚点与 HQ 目录段之间必须是单层纯数字 UID：标准布局 GamePlayPhotos\{uid}\NikkiPhotos_HighQuality
+  const uid = normalized.slice(gppIdx + GPP_FULL_SEGMENT.length, hqIdx)
+  if (!UID_DIR_SEGMENT_RE.test(uid)) return []
+
+  const fileName = filePath.slice(hqIdx + HQ_DIR_SEGMENT.length)
+  if (!fileName || fileName.includes('\\') || fileName.includes('/')) return []
+
+  // 原路径上锚点位置的分隔符形态（保留原始正/反斜杠）
+  const sep = filePath.charAt(gppIdx)
+  // X6Game 根目录：由 \x6game\saved\gameplayphotos\ 反切得到
+  const gameRoot = filePath.slice(0, gppIdx + X6GAME_SEGMENT.length)
+
+  const candidates: string[] = []
+  const seen = new Set<string>()
+  const push = (candidate: string): void => {
+    const key = candidate.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    candidates.push(candidate)
+  }
+
+  // ① 兄弟目录原生低清副本（复用既有纯函数，保留原路径大小写与分隔符形态）
+  const lq = resolveNativeThumbnailPath(filePath)
+  if (lq) push(lq)
+  // ② 游戏截图副本（扁平目录）
+  push(`${gameRoot}${sep}ScreenShot${sep}${fileName}`)
+  // ③ 兼容变体：含 Saved 段的截图目录
+  push(`${gameRoot}${sep}Saved${sep}ScreenShot${sep}${fileName}`)
+
+  return candidates
+}
+
 /**
  * P0-02 根因修复：账号 UID 合法性闸门。
  *

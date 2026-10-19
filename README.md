@@ -1,25 +1,24 @@
 <h1 align="center">无限暖暖相册管理工具 · NikkiGallery</h1>
 
-<p align="center">
-  专为「无限暖暖」玩家打造的本地相册管理软件 — 扫描、浏览、编辑、整理、分享，一站式完成<br>
-  A local photo album manager for <em>Infinity Nikki</em> players — scan, browse, edit, organize & share
+<p align="center">  
+  专为「无限暖暖」玩家打造的本地相册管理软件 — 扫描、浏览、编辑、整理、分享，一站式完成
+
+A local photo album manager for <em>Infinity Nikki</em> players — scan, browse, edit, organize & share
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/version-2.5.3-blue?style=flat-square">
-  <img src="https://img.shields.io/badge/platform-Windows%20x64-success?style=flat-square">
-  <img src="https://img.shields.io/badge/Electron-41.10-blueviolet?style=flat-square">
-  <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square">
-  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">
+<p align="center">  
+  <img src="https://img.shields.io/badge/version-2.5.5--beta-blue?style=flat-square">  
+  <img src="https://img.shields.io/badge/platform-Windows%20x64-success?style=flat-square">  
+  <img src="https://img.shields.io/badge/Electron-41.10-blueviolet?style=flat-square">  
+  <img src="https://img.shields.io/badge/React-19.2-61dafb?style=flat-square">  
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square">  
 </p>
 
-<p align="center">
-  <a href="#中文">中文</a> · <a href="#english">English</a>
+<p align="center">  
+  <a href="#中文">中文</a> · <a href="#english">English</a>  
 </p>
 
 ---
-
-<!-- ==================== 中文 ==================== -->
 
 <h2 id="中文">中文</h2>
 
@@ -93,7 +92,7 @@ npm run storybook     # 启动组件文档站（Storybook，端口 6006）
 src/
 ├── main/          # Electron 主进程（IPC 通信、数据库、扫描器、服务层）
 │   ├── database/      # SQLite + 写入子进程
-│   ├── ipc/           # IPC 通道处理（~40 个文件）
+│   ├── ipc/           # IPC 通道处理（47 个域文件）
 │   ├── scanner/       # 文件扫描器（含子进程）
 │   ├── services/      # 业务服务层（13 个服务）
 │   └── media-worker/  # 缩略图 / pHash / 重复检测子进程
@@ -124,7 +123,7 @@ src/
 - **哔哩哔哩**：纤璐不会玩摄影 ([主页链接](https://b23.tv/zCR5oGE))
 - **GitHub**：[QianQianLuLu1](https://github.com/QianQianLuLu1)
 - **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)
-- **作者官网**：https://ppebv9al.qwenwork.host/
+- **作者官网**：<https://ppebv9al.qwenwork.host/>
 
 ### 许可证
 
@@ -133,8 +132,6 @@ src/
 <p align="right"><a href="#中文">回到顶部</a></p>
 
 ---
-
-<!-- ==================== English ==================== -->
 
 <h2 id="english">English</h2>
 
@@ -208,7 +205,7 @@ npm run storybook     # Start the component docs site (Storybook, port 6006)
 src/
 ├── main/          # Electron main process (IPC, database, scanner, services)
 │   ├── database/      # SQLite + write worker
-│   ├── ipc/           # IPC channel handlers (~40 files)
+│   ├── ipc/           # IPC channel handlers (47 domain files)
 │   ├── scanner/       # File scanner (with worker)
 │   ├── services/      # Business service layer (13 services)
 │   └── media-worker/  # Thumbnail / pHash / duplicate detection worker
@@ -237,6 +234,7 @@ src/
 - **Douyin**: 纤璐不会玩摄影 ([profile](https://v.douyin.com/Dx67wYkw48A/))
 - **Xiaohongshu (RED)**: 纤璐不会玩摄影 ([profile](https://www.xiaohongshu.com/user/profile/69270bb200000000370092db))
 - **Bilibili**: 纤璐不会玩摄影 ([profile](https://b23.tv/zCR5oGE))
+
 - **GitHub**: [QianQianLuLu1](https://github.com/QianQianLuLu1)
 - **CSDN Blog**: [QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 - **Author Site**: https://ppebv9al.qwenwork.host/

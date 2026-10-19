@@ -4,6 +4,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { IconCheckCircle, IconChevronRight, IconCopy, IconShield } from '../../icons'
 import {
   GlobalToastContext,
+  SettingsCard,
   formatTimestamp,
   formatSize,
   FAULT_TYPE_META,
@@ -268,36 +269,33 @@ export const DiagnosticsLogsSection: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-tertiary)' }}>
+          <SettingsCard className="text-center">
             <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               {faultCount}
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.logs.faultTotal')}
             </div>
-          </div>
-          <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-tertiary)' }}>
+          </SettingsCard>
+          <SettingsCard className="text-center">
             <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               {formatSize(totalSize)}
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.logs.storageUsage')}
             </div>
-          </div>
-          <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-tertiary)' }}>
+          </SettingsCard>
+          <SettingsCard className="text-center">
             <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               {fileCount}
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.logs.logFiles')}
             </div>
-          </div>
+          </SettingsCard>
         </div>
 
-        <div
-          className="flex items-center justify-between gap-3 p-3 rounded-lg"
-          style={{ background: 'var(--bg-tertiary)' }}
-        >
+        <SettingsCard className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.logs.storageLocation')}
@@ -343,12 +341,12 @@ export const DiagnosticsLogsSection: React.FC = () => {
               {t('settings.logs.openDir')}
             </button>
           </div>
-        </div>
+        </SettingsCard>
 
         <div className="space-y-2">
           {/* P3-3：错误趋势分析——最近 14 天柱状图 */}
           {trendData.length > 0 && faults.length > 0 && (
-            <div className="p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+            <SettingsCard>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   {t('settings.logs.trendTitle')}
@@ -423,7 +421,7 @@ export const DiagnosticsLogsSection: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
+            </SettingsCard>
           )}
 
           <div className="flex items-center justify-between">
@@ -838,36 +836,33 @@ export const DiagnosticsCrashSection: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-3 gap-3">
-          <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-tertiary)' }}>
+          <SettingsCard className="text-center">
             <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               {fileCount}
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.crash.crashFiles')}
             </div>
-          </div>
-          <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-tertiary)' }}>
+          </SettingsCard>
+          <SettingsCard className="text-center">
             <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               {formatSize(totalSize)}
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.crash.storageUsage')}
             </div>
-          </div>
-          <div className="p-3 rounded-lg text-center" style={{ background: 'var(--bg-tertiary)' }}>
+          </SettingsCard>
+          <SettingsCard className="text-center">
             <div className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
               {oldestTime ? formatTimestamp(oldestTime).slice(0, 10) : '—'}
             </div>
             <div className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.crash.oldest')}
             </div>
-          </div>
+          </SettingsCard>
         </div>
 
-        <div
-          className="flex items-center justify-between gap-3 p-3 rounded-lg"
-          style={{ background: 'var(--bg-tertiary)' }}
-        >
+        <SettingsCard className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('settings.crash.storageLocation')}
@@ -913,7 +908,7 @@ export const DiagnosticsCrashSection: React.FC = () => {
               {t('settings.crash.openDir')}
             </button>
           </div>
-        </div>
+        </SettingsCard>
 
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -945,11 +940,7 @@ export const DiagnosticsCrashSection: React.FC = () => {
           ) : (
             <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
               {crashes.map((crash) => (
-                <div
-                  key={crash.filename}
-                  className="p-3 rounded-lg space-y-1.5"
-                  style={{ background: 'var(--bg-tertiary)' }}
-                >
+                <SettingsCard key={crash.filename} className="space-y-1.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2 min-w-0">
                       <span
@@ -1014,7 +1005,7 @@ export const DiagnosticsCrashSection: React.FC = () => {
                       </span>
                     </div>
                   )}
-                </div>
+                </SettingsCard>
               ))}
             </div>
           )}

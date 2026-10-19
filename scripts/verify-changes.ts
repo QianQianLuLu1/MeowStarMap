@@ -112,6 +112,8 @@ const results: Array<{ step: string; ok: boolean; duration: number }> = []
 
 // ── Step 1: TypeCheck（仅当存在 TS/TSX 变更时） ──
 if (hasTsFiles(targetFiles)) {
+  // 只读铁律的例外靠 outDir 隔离保证：tsc -b 的产物落点不得是 dist/main
+  // （被引用的 composite 项目不能禁 emit，TS6310），见 docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md
   const r = runStep('TypeScript 类型检查 (tsc -b)', 'npx', ['--no-install', 'tsc', '-b'])
   results.push({ step: 'typecheck', ...r })
 } else {

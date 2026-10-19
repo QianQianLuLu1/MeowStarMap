@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useContext, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, GlobalToastContext } from './shared'
+import { SectionShell, GlobalToastContext, SettingsCard } from './shared'
 import { useMediaStore, loadProfiles, fetchMediaFromDatabase } from '../../stores/mediaStore'
 import { formatFileSize } from '../../utils/format'
 import { IconEdit, IconCheck, IconDelete } from '../../icons'
@@ -193,7 +193,7 @@ export const ProfileManageSection: React.FC = () => {
   return (
     <SectionShell title={t('settings.sections.profileManage')}>
       {/* 新增档案 */}
-      <div className="space-y-2 p-3 rounded-lg" style={{ background: 'var(--bg-tertiary)' }}>
+      <SettingsCard className="space-y-2">
         <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
           {t('settings.profile.addProfile')}
         </p>
@@ -218,7 +218,7 @@ export const ProfileManageSection: React.FC = () => {
             {t('settings.profile.add')}
           </button>
         </div>
-      </div>
+      </SettingsCard>
 
       {/* 档案列表 */}
       <div className="space-y-2">

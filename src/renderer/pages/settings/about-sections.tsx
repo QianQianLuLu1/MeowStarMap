@@ -10,7 +10,7 @@ import {
   IconQQ,
   IconChevronDown
 } from '../../icons'
-import { SectionShell, GlobalToastContext } from './shared'
+import { SectionShell, GlobalToastContext, SettingsCard } from './shared'
 
 // ============ 关于 ============
 
@@ -126,10 +126,7 @@ export const AboutContactSection: React.FC = () => {
       description={t('settings.about.contactDesc')}
     >
       {/* GitHub */}
-      <div
-        className="flex items-center justify-between gap-3 p-3 rounded-lg"
-        style={{ background: 'var(--bg-tertiary)' }}
-      >
+      <SettingsCard className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <IconGithub size={24} style={{ color: 'var(--text-primary)' }} />
           <div>
@@ -152,13 +149,10 @@ export const AboutContactSection: React.FC = () => {
         >
           {t('settings.about.open')}
         </button>
-      </div>
+      </SettingsCard>
 
       {/* QQ 群 */}
-      <div
-        className="flex items-center justify-between gap-3 p-3 rounded-lg"
-        style={{ background: 'var(--bg-tertiary)' }}
-      >
+      <SettingsCard className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <IconQQ size={24} className="text-[#12B7F5]" />
           <div>
@@ -177,7 +171,7 @@ export const AboutContactSection: React.FC = () => {
         >
           {t('settings.about.copyGroup')}
         </button>
-      </div>
+      </SettingsCard>
 
       {/* 社交媒体 */}
       <div className="pt-3 space-y-2" style={{ borderTop: '1px solid var(--divider)' }}>
@@ -517,3 +511,15 @@ export const AboutLicenseSection: React.FC = () => {
     </SectionShell>
   )
 }
+
+/**
+ * 「应用信息与联系方式」合并页：两节都是关于应用的静态信息（版本/开发者/仓库地址
+ * 与社交渠道），各自单独占一个导航项过于零碎。开源许可与致谢篇幅长，仍留在独立页。
+ * 两节各自保留 SectionShell，本组件只管纵向排布。
+ */
+export const AboutOverviewSection: React.FC = () => (
+  <div className="space-y-4">
+    <AboutInfoSection />
+    <AboutContactSection />
+  </div>
+)

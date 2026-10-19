@@ -852,6 +852,222 @@ interface WindowElectronAPI {
     // T09：启动目标应用（用于"已安装未运行"场景，用户点击"打开 XX"按钮）
     launchApp: (channelId: string) => Promise<{ success: boolean; message: string }>
   }
+  // sync-integration 阶段5：NikkiSync 同步服务器（形状快照自 shared/types/electron-api.ts）
+  sync: {
+    getStatus: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      connections: number
+      serverId: string | null
+      serverName: string | null
+      pairedDeviceCount: number
+      tlsFingerprintSha256: string | null
+      lanHost: string
+    }>
+    startServer: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      connections: number
+      serverId: string | null
+      serverName: string | null
+      pairedDeviceCount: number
+      tlsFingerprintSha256: string | null
+      lanHost: string
+    }>
+    stopServer: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      connections: number
+      serverId: string | null
+      serverName: string | null
+      pairedDeviceCount: number
+      tlsFingerprintSha256: string | null
+      lanHost: string
+    }>
+    createPairingQr: () => Promise<{
+      /** NS1|... 七段二维码内容（渲染层经 qrcode 生成 SVG） */
+      content: string
+      expiresAt: string
+      serverId: string
+      host: string
+      port: number
+      tlsFingerprintSha256: string
+    }>
+    listDevices: () => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion: string | null
+        pairedAt: string
+        lastSeenAt: string | null
+        lastAckRevision: number
+      }>
+    >
+    revokeDevice: (deviceId: string) => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion: string | null
+        pairedAt: string
+        lastSeenAt: string | null
+        lastAckRevision: number
+      }>
+    >
+  }
+  // sync-integration 阶段2：内嵌 NikkiSync Runtime（运行态/扫描/资产只读查询）
+  // 返回体为 NikkiSync 协议 DTO（上游 row-mappers 产出），本层零转换 => 资产业务字段以 unknown 承接
+  nikkisync: {
+    getRuntimeStatus: () => Promise<{
+      state:
+        | 'unavailable'
+        | 'idle'
+        | 'starting'
+        | 'running'
+        | 'scanning'
+        | 'degraded'
+        | 'stopping'
+        | 'error'
+      dbPath: string
+      linkReady: boolean
+      /** 上游 `scanner.getStatus()` 展平：status / installation? / lastScan? */
+      scannerStatus?: string
+      installation?: unknown
+      lastScan?: unknown
+      tables?: string[]
+      /** 阶段 3：同步服务状态随会话一并给出 */
+      sync?: {
+        available?: boolean
+        running: boolean
+        host: string
+        port: number
+        secure?: boolean
+        serverId?: string
+        mdnsEnabled: boolean
+        tlsFingerprintSha256?: string
+        pairedDeviceCount?: number
+        lanHost?: string
+        error?: string
+      }
+      error?: string
+      hint?: string
+    }>
+    startScan: (input?: { gameRoot?: string; path?: string }) => Promise<unknown>
+    getAssets: (
+      input?: import('../shared/types/electron-api').NikkiSyncAssetQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncAssetPageInfo>
+    getAssetDetail: (
+      assetId: string
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncAssetDetailInfo>
+    getResource: (
+      input: import('../shared/types/electron-api').NikkiSyncResourceQueryInfo
+    ) => Promise<import('../shared/sync/protocol').MediaResource | string>
+    // ---- sync-integration 阶段4：查询面扩容（批量资源 / 增量变更 / 搜索 / 统计）----
+    getResourceRecords: <M extends 'meta' | 'path'>(input: {
+      assetIds: string[]
+      mode: M
+    }) => Promise<import('../shared/types/electron-api').NikkiSyncResourceRecordsFor<M>>
+    getChanges: (
+      input: import('../shared/types/electron-api').NikkiSyncChangesQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncChangesInfo>
+    searchSuits: (
+      input: import('../shared/types/electron-api').NikkiSyncSearchQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncSuitSearchInfo>
+    searchClothing: (
+      input: import('../shared/types/electron-api').NikkiSyncSearchQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncClothingSearchInfo>
+    profileStats: () => Promise<import('../shared/types/electron-api').NikkiSyncProfileStatsInfo>
+    onLibraryChanged: (cb: () => void) => () => void
+    // ---- sync-integration 阶段3：上游 NikkiSync LocalSyncServer 的启停与配对管理 ----
+    getServerStatus: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      serverId?: string
+      mdnsEnabled: boolean
+      tlsFingerprintSha256?: string
+      /** 自签证书 PEM（公开材料，不含私钥） */
+      serverCertificatePem?: string
+      pairedDeviceCount?: number
+      lanHost?: string
+      error?: string
+    }>
+    startServer: (input?: { port?: number; mdnsEnabled?: boolean }) => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      serverId?: string
+      mdnsEnabled: boolean
+      tlsFingerprintSha256?: string
+      serverCertificatePem?: string
+      pairedDeviceCount?: number
+      lanHost?: string
+      error?: string
+    }>
+    stopServer: () => Promise<{
+      available: boolean
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      serverId?: string
+      mdnsEnabled: boolean
+      tlsFingerprintSha256?: string
+      serverCertificatePem?: string
+      pairedDeviceCount?: number
+      lanHost?: string
+      error?: string
+    }>
+    getPairingCode: () => Promise<{
+      content: string
+      expiresAt: string
+      serverId: string
+      host: string
+      port: number
+      tlsFingerprintSha256: string
+    }>
+    getPairedDevices: () => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion?: string
+        pairedAt: string
+        lastSeenAt: string | null
+      }>
+    >
+    revokeDevice: (deviceId: string) => Promise<
+      Array<{
+        deviceId: string
+        deviceName: string
+        platform: 'ios' | 'android'
+        appVersion?: string
+        pairedAt: string
+        lastSeenAt: string | null
+      }>
+    >
+  }
+  // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
+  assetEdits: {
+    list: (
+      assetIds: string[]
+    ) => Promise<{ edits: import('../shared/types/electron-api').AssetEditsInfo[] }>
+    set: (
+      assetId: string,
+      patch: import('../shared/types/electron-api').AssetEditsPatchInfo
+    ) => Promise<{ edit: import('../shared/types/electron-api').AssetEditsInfo | null }>
+  }
   // T10：缩略图缓存管理
   cache: {
     getStats: () => Promise<{

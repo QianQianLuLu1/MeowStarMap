@@ -11,7 +11,8 @@ import {
   saveExcludedScanPaths,
   isGameRootsInitialized,
   markGameRootsInitialized,
-  pickDefaultSelectedPaths
+  pickDefaultSelectedPaths,
+  normalizePathList
 } from '../../utils/scan-exclusions'
 import { AppError } from '../../../shared/errors/app-error'
 
@@ -52,19 +53,17 @@ export const ScanPathsSection: React.FC = () => {
   const [adding, setAdding] = useState(false)
 
   useEffect(() => {
-    const load = async () => {
-      if (!window.electronAPI) return
-      const saved = (await window.electronAPI.settings.get('customScanPaths', [])) as unknown
-      setPaths(Array.isArray(saved) ? (saved as string[]) : [])
-    }
-    load()
+    // 与兜底块共用 utils/scan-exclusions 的读写：loadCustomScanPaths 内部经
+    // normalizePathList 剔除空串/空白/非字符串并截断到 64 条，脏配置不会原样落进 UI。
+    // 读取失败沿用该 util 的 fail-open（返回空数组），与切换前「拿不到就不显示」一致。
+    void loadCustomScanPaths().then(setPaths)
   }, [])
 
   const persist = async (next: string[]) => {
-    setPaths(next)
-    if (window.electronAPI) {
-      await window.electronAPI.settings.set('customScanPaths', next)
-    }
+    // state 与落库内容都取归一化结果，避免界面显示一条实际不会被扫描的空项
+    const normalized = normalizePathList(next)
+    setPaths(normalized)
+    await saveCustomScanPaths(normalized)
   }
 
   const handleAdd = async () => {
@@ -293,7 +292,14 @@ export const GameRootsSection: React.FC = () => {
  * 两条兜底均走 fullScan（不带 path），由主进程 resolveScanChannels 编排官方相册通道，
  * 而非渲染层自行拼接路径，保证与自动扫描口径一致。
  */
-export const ScanFallbackSection: React.FC = () => {
+export const ScanFallbackSection: React.FC<{
+  /**
+   * 本次兜底把新目录写入了 customScanPaths 时回调，供合并页通知同屏的只读块重新读取。
+   * 可选：拆页时代靠「切页自动重挂」免费拿到的刷新，合页后不再自动成立；
+   * 不传即维持原行为，既有调用点与单测零改动。
+   */
+  onCustomPathsChanged?: () => void
+}> = ({ onCustomPathsChanged }) => {
   const { t } = useTranslation()
   const showMessage = useContext(GlobalToastContext)
   const [busy, setBusy] = useState(false)
@@ -315,6 +321,8 @@ export const ScanFallbackSection: React.FC = () => {
           return
         }
         await saveCustomScanPaths([...custom, selected])
+        // 通知合并页：customScanPaths 变了，同屏的「游戏目录」「检测到的游戏目录」需重读
+        onCustomPathsChanged?.()
       }
 
       if (mode === 'gameRoot' && window.electronAPI.scanner?.detectGameRoots) {
@@ -593,19 +601,30 @@ export const ImportRootsSection: React.FC = () => {
     pendingAddPathRef.current = selected
     showMessage(t('settings.scan.importRootsAddScanning'), 'info')
 
-    // IPC 是否抛异常：抛异常时 onComplete 不会触发，需要 finally 兜底收口
+    // IPC 抛异常、或主进程短路拒绝本次扫描时，onComplete 都不会触发，需要在此收口
     let ipcThrew = false
+    let rejected = false
     try {
-      const savedPaths = (await window.electronAPI.settings.get('customScanPaths', [])) as unknown
-      const customKnownPaths =
-        Array.isArray(savedPaths) && (savedPaths as string[]).length > 0
-          ? (savedPaths as string[])
-          : undefined
-      await window.electronAPI.scanner.start({
+      const custom = await loadCustomScanPaths()
+      const customKnownPaths = custom.length > 0 ? custom : undefined
+      const result = await window.electronAPI.scanner.start({
         path: selected,
         fullScan: true,
         customKnownPaths
       })
+      // 主进程 startScan 在已有扫描进行中会直接返回 { success:false } 且**不广播**
+      // scanner:complete（src/main/scanner/index.ts:87-91）。不在此收口的话，
+      // scanningDir 与 customScanningRef 会双双卡死：按钮永久停在「正在扫描…」，
+      // 而下一次任意扫描完成事件会被误认成本次添加成功，弹出假的成功 Toast。
+      if (result && result.success === false) {
+        rejected = true
+        showMessage(
+          t('settings.scan.importRootsAddFailed', {
+            reason: result.message || t('toast.unknownError')
+          }),
+          'error'
+        )
+      }
     } catch (err) {
       ipcThrew = true
       showMessage(
@@ -615,7 +634,7 @@ export const ImportRootsSection: React.FC = () => {
         'error'
       )
     } finally {
-      if (ipcThrew) {
+      if (ipcThrew || rejected) {
         setScanningDir(false)
         customScanningRef.current = false
       }
@@ -760,5 +779,33 @@ export const ImportRootsSection: React.FC = () => {
         </p>
       </BaseDialog>
     </SectionShell>
+  )
+}
+
+/**
+ * 「扫描目录」合并页：原先拆成 4 个二级页的「哪些目录参与扫描」聚到同一屏。
+ *
+ * 每个块自带 SectionShell，本组件只负责纵向排布——SettingsPage 的内容容器
+ * （`flex-1 min-w-0 overflow-y-auto max-w-2xl`）没有 gap 工具类，
+ * 而合并前每节只返回一张卡，所以从未需要间距。
+ *
+ * 块顺序按数据流向：写 customScanPaths 的 → 由它派生候选的 → 独立登记 import_roots 的
+ * → 触发动作的。
+ *
+ * pathsRev：兜底块会往 customScanPaths 追加目录。拆页时「切页自动重挂 effect」免费提供
+ * 了重新读取，合页后两个只读块不会自己感知，因此用 key 变更触发重挂。
+ * 重挂只跑各自的读取 effect，两块 mount 路径里都没有 scanner.start，不会误扫盘。
+ */
+export const ScanDirectoriesSection: React.FC = () => {
+  const [pathsRev, setPathsRev] = useState(0)
+  const notifyPathsChanged = useCallback(() => setPathsRev((n) => n + 1), [])
+
+  return (
+    <div className="space-y-4">
+      <ScanPathsSection key={`scan-paths-${pathsRev}`} />
+      <GameRootsSection key={`game-roots-${pathsRev}`} />
+      <ImportRootsSection />
+      <ScanFallbackSection onCustomPathsChanged={notifyPathsChanged} />
+    </div>
   )
 }

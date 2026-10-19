@@ -21,7 +21,7 @@ preload 运行在 **sandbox 渲染上下文**，两条硬约束由此而来：
 | [`ipc.ts`](ipc.ts)                             | IPC 基础层：`IpcError` 类 / `call<T>()` 解包 / `subscribe()` 订阅。全部 `api/*.ts` 的公共依赖                                        |
 | [`origin-guard.ts`](origin-guard.ts)           | 文档源自检（第二层防线）：`readDocumentOrigin` / `isTrustedDocumentOrigin` / `isPreloadDev`。**零 import**，只读 `location` 原生全局 |
 | [`plugin-bridge.ts`](plugin-bridge.ts)         | 插件运行时能力桥 `window.pluginAPI` + i18n.t 注入点 `__setPluginI18nT`                                                               |
-| `api/*.ts`                                     | 30 个功能域命名空间，每文件导出一个 `<key>API` 对象（`scannerAPI` / `fileAPI` / `mediaAPI` …）                                       |
+| `api/*.ts`                                     | 33 个功能域命名空间，每文件导出一个 `<key>API` 对象（`scannerAPI` / `fileAPI` / `mediaAPI` …）                                       |
 | [`../preload-logger.ts`](../preload-logger.ts) | preload 专用零依赖日志（`[preload]` 前缀，仅 `console.warn/error`）                                                                  |
 | `__tests__/`                                   | `preload.test.ts`（装配完整性 + 依赖白名单 + 门禁）、`origin-guard.test.ts`                                                          |
 
@@ -49,14 +49,14 @@ import { xxxAPI } from './preload/api/xxx'
 
 const electronAPI = {
   reportReady: () => ipcRenderer.send('renderer:ready'),
-  // ...既有 30 个命名空间
+  // ...既有 33 个命名空间
   xxx: xxxAPI
 }
 ```
 
 ```ts
 // ③ 同步更新 src/main/preload/__tests__/preload.test.ts 的键清单断言
-//    （'electronAPI 包含全部 31 个键（reportReady + 30 个命名空间）' 用例），并更新 docs/IPC_CONTRACT.md
+//    （'electronAPI 包含全部 34 个键（reportReady + 33 个命名空间，阶段4 增 assetEdits）' 用例），并更新 docs/IPC_CONTRACT.md
 ```
 
 - **键名与文件名解耦**：`electronAPI` 上的键（如 `mediaAction`、`uiTheme`、`importRoot`）由 `preload.ts` 决定，文件名可用 kebab-case（`media-action.ts`）。改键名等于破坏对外契约。

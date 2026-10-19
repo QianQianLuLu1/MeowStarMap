@@ -20,6 +20,39 @@ const SRC_MAIN = path.join(ROOT, 'src', 'main')
 const SRC_SHARED = path.join(ROOT, 'src', 'shared')
 const SRC_RENDERER = path.join(ROOT, 'src', 'renderer')
 
+/**
+ * 产物修复点标记（第 4/5 项）的检索作用域：整个 main 输出根，不是 app/ 子树。
+ *
+ * main 产物由 electron-vite 写入这棵树：preload 落在 dist/main/main/preload.js，
+ * main 的 rollup 多入口与动态 chunk 落在其 app/ 子树（见 electron.vite.config.ts 的 main.outDir）。
+ * 历史上 `tsc -b`（.husky/pre-commit 与 npm run verify 都会跑）也写同一棵树，会把 app/ 下的同名
+ * chunk 覆成 per-file 产物、把 `.min(0)` 等标记的所在处推到 app/ 之外；2026-10-19 起类型检查的
+ * emit 已隔离到 .cache/tsmain（见 docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md）。
+ * 作用域仍取整个 main 输出根：收窄回 app/ 会随产物布局变化反复无谓转红并阻断 dist:win。
+ */
+export const MAIN_MARKER_SCOPE = DIST_MAIN
+
+/** 注入用的产物树节点：path 为绝对路径，content 为文件文本 */
+export type JsTreeFile = { path: string; content: string }
+
+function toPosix(p: string): string {
+  return p.replace(/\\/g, '/')
+}
+
+/**
+ * 纯函数：scope 子树内是否存在含 pattern 的 .js 产物。
+ * 目录缺失或树为空一律返回 false（与原 dirContains 一致的 fail-safe，不抛错）。
+ */
+export function treeContainsMarker(scope: string, files: JsTreeFile[], pattern: string): boolean {
+  const scopePrefix = toPosix(scope).replace(/\/+$/, '') + '/'
+  return files.some(
+    (f) =>
+      toPosix(f.path).startsWith(scopePrefix) &&
+      toPosix(f.path).endsWith('.js') &&
+      f.content.includes(pattern)
+  )
+}
+
 let failed = false
 
 function fail(msg: string): void {
@@ -29,6 +62,11 @@ function fail(msg: string): void {
 
 function pass(msg: string): void {
   console.log(`  ✔ ${msg}`)
+}
+
+/** 跳过行：不影响退出码，用于“当前环境不适用”的断言（不把未建链伪装成已验证）。 */
+function skip(msg: string): void {
+  console.log(`  ⊘ ${msg}`)
 }
 
 function getMtime(filePath: string): Date | null {
@@ -75,24 +113,37 @@ function fileContains(filePath: string, pattern: string): boolean {
   }
 }
 
-// 在目录内递归检索所有 .js 文件是否含 pattern（electron-vite main 为 rollup 多 chunk 打包，
-// 标记字符串可能落在 application.js / scanner-worker.js 等任一 chunk，不能再只 grep index.js）
-function dirContains(dir: string, pattern: string): boolean {
+/** 磁盘适配器：递归读出 dir 下所有 .js 产物，交给纯函数 treeContainsMarker 判定 */
+function readJsTree(dir: string): JsTreeFile[] {
+  const out: JsTreeFile[] = []
   let entries: fs.Dirent[]
   try {
     entries = fs.readdirSync(dir, { withFileTypes: true })
   } catch {
-    return false
+    return out
   }
   for (const e of entries) {
     const full = path.join(dir, e.name)
     if (e.isDirectory()) {
-      if (dirContains(full, pattern)) return true
-    } else if (e.isFile() && e.name.endsWith('.js') && fileContains(full, pattern)) {
-      return true
+      out.push(...readJsTree(full))
+    } else if (e.isFile() && e.name.endsWith('.js')) {
+      let content = ''
+      try {
+        content = fs.readFileSync(full, 'utf-8')
+      } catch {
+        content = ''
+      }
+      out.push({ path: full, content })
     }
   }
-  return false
+  return out
+}
+
+// 在目录内递归检索所有 .js 产物是否含 pattern。main 产物同时存在 rollup 多 chunk 与 tsc per-file
+// 两种布局，标记可能落在任一模块文件里，故既不能只 grep index.js，也不能只查 app/ 子树
+// （作用域取值理由见 MAIN_MARKER_SCOPE）。
+export function dirContains(dir: string, pattern: string): boolean {
+  return treeContainsMarker(dir, readJsTree(dir), pattern)
 }
 
 // 6/7. renderer 入口 chunk：从 dist/renderer/index.html 的 <script type=module src> 解析，
@@ -128,7 +179,8 @@ function checkNoCrossoriginInRendererHtml(): void {
 }
 
 // 10. 主进程窗口路径回退层数正确（指向 ../../../renderer，层数不对则加载不到 renderer 白屏）
-//     与第 4/5 项一致：main 为多 chunk 打包，字面量可能落在 app/ 下任一 chunk，需递归检索
+//     该项刻意仍收窄到 app/：字面量住在 app/index.js 与 app/renderer-protocol.js 自身模块内，
+//     rollup 与 tsc 两种布局都留在 app/，收窄可避免产物树里其他同名回退串造成假绿。
 function checkWindowManagerPathBacktrack(): void {
   if (!getMtime(path.join(DIST_MAIN, 'app'))) {
     fail('dist/main/main/app 目录不存在，请先执行 npm run build')
@@ -342,6 +394,29 @@ function findFirstFile(base: string, subDirs: string[], nameRe: RegExp): string 
 }
 
 /** 解包后原生二进制存在性校验（发布前硬性闸门） */
+/**
+ * 打包态 @nikkisync 缺失时的判定（纯函数，供 checkUnpackedNativeBinaries 与单测共用）。
+ *
+ * 回归背景（2026-10-15 实测）：electron-builder 的过滤器对**根 node_modules 有硬排除**
+ * （`app-builder-lib/out/util/filter.js`：`relative === "node_modules"` 直接 return false），
+ * `build.files` 里的字符串模式 `node_modules/@nikkisync` 通配项永远命中不了任何文件——
+ * node_modules 内容只由「按 package.json 依赖图收集」的 collector 产出，而 `@nikkisync/*`
+ * 按阶段 9 自包含决策已不是声明依赖。修 build.files（改对象式 from/to）之前，
+ * 「已建链但产物没带上」会被 SKIP 放行，安装包缺整个内嵌运行时。故：
+ * - 产物已有 ⇒ 'assert'（走逐项存在性断言）
+ * - 产物没有 + 项目已建链 ⇒ 'fail'（打包回归，必须响亮失败）
+ * - 产物没有 + 项目未建链（CI 只 checkout 本仓）⇒ 'skip'（环境性缺失，不伪装成失败）
+ */
+export type NikkiSyncPackedVerdict = 'assert' | 'fail' | 'skip'
+
+export function nikkiSyncPackedVerdict(input: {
+  packedNikkiSyncExists: boolean
+  projectNikkiSyncLinkExists: boolean
+}): NikkiSyncPackedVerdict {
+  if (input.packedNikkiSyncExists) return 'assert'
+  return input.projectNikkiSyncLinkExists ? 'fail' : 'skip'
+}
+
 function checkUnpackedNativeBinaries(): void {
   const releaseDir = path.join(ROOT, 'release')
   const unpackedRoot = findAsarUnpacked(releaseDir)
@@ -385,6 +460,83 @@ function checkUnpackedNativeBinaries(): void {
     const p = path.join(appOutDir, dll)
     if (fs.existsSync(p)) pass('VC++ 运行库随包: ' + dll)
     else fail('VC++ 运行库缺失（afterPack 未复制？）: ' + path.relative(ROOT, p))
+  }
+
+  // 6) @nikkisync（阶段 9 · 问题 3）：自包含方案后它不是声明依赖，只能靠
+  //    build.files 的**对象式** from/to 项显式入包（字符串模式命中不了根 node_modules，
+  //    见 nikkiSyncPackedVerdict 注释），再经 asarUnpack 解出。
+  //    未建链的开发机不会命中本项；已建链而产物缺失是打包回归，必须 fail。
+  const nikkisyncRoot = path.join(nm, '@nikkisync')
+  const verdict = nikkiSyncPackedVerdict({
+    packedNikkiSyncExists: fs.existsSync(nikkisyncRoot),
+    projectNikkiSyncLinkExists: fs.existsSync(path.join(ROOT, 'node_modules', '@nikkisync'))
+  })
+  if (verdict === 'skip') {
+    skip('@nikkisync 未随包（开发机未 `npm run link:nikkisync` 时属预期）')
+    skip(
+      '要复验打包态 ESM/migrations：先 npm run link:nikkisync + NikkiSync npm run build，再 npx electron-builder --dir'
+    )
+    return
+  }
+  if (verdict === 'fail') {
+    fail(
+      '@nikkisync 已建链但未随包：build.files 的 node_modules/@nikkisync 入包项失效' +
+        '（electron-builder 硬排除根 node_modules，须用对象式 from/to 显式拷贝）；' +
+        '修复 package.json build.files 后重新执行 electron-builder'
+    )
+    return
+  }
+  const nikkiSchema = path.join(nikkisyncRoot, 'database', 'migrations', '0001_initial.sql')
+  if (fs.existsSync(nikkiSchema)) {
+    pass('@nikkisync 迁移 SQL 已解包: ' + path.relative(ROOT, nikkiSchema))
+  } else {
+    fail(
+      '@nikkisync 已入包但缺 migrations/0001_initial.sql（asarUnpack 未覆盖或 NikkiSync 未 build）: ' +
+        path.relative(ROOT, nikkiSchema)
+    )
+  }
+  for (const pkgName of ['core', 'database', 'protocol', 'pc-companion']) {
+    const entry = path.join(nikkisyncRoot, pkgName, 'dist', 'src', 'index.js')
+    if (fs.existsSync(entry)) pass(`@nikkisync/${pkgName} 入口已解包`)
+    else
+      fail(
+        `@nikkisync/${pkgName} 缺 dist/src/index.js（装载缝会在此抛 ERR_MODULE_NOT_FOUND）: ` +
+          path.relative(ROOT, entry)
+      )
+  }
+  // 阶段 2 深入口：内嵌层的协议 DTO 映射不在上游桶导出内，靠 file:// URL 直接装载，
+  // 打包态必须确认该产物真的随包解出（缺它则 nikkisync:get-assets 等查询全部不可用）。
+  const rowMappers = path.join(
+    nikkisyncRoot,
+    'pc-companion',
+    'dist',
+    'src',
+    'server',
+    'row-mappers.js'
+  )
+  if (fs.existsSync(rowMappers)) pass('@nikkisync/pc-companion 深入口 row-mappers.js 已解包')
+  else
+    fail(
+      '@nikkisync/pc-companion 缺 dist/src/server/row-mappers.js（内嵌查询面无法产出协议 DTO）: ' +
+        path.relative(ROOT, rowMappers)
+    )
+
+  // 阶段 3：同步服务器（nikkisync:start-server）依赖的两个产物。
+  // 其中 wechat/GalleryRuntime.mjs 由 esbuild 步骤生成、被上游 gitignore，
+  // `tsc` 单跑不会产出它 —— 缺它则 LocalSyncServer 装载即失败，只有产物级断言能拦住。
+  const syncArtifacts: Array<[string, string]> = [
+    ['dist/src/server/LocalSyncServer.js', '同步服务器本体'],
+    ['dist/src/wechat/GalleryRuntime.mjs', 'LocalSyncServer 的静态依赖（esbuild 产物）']
+  ]
+  for (const [relative, purpose] of syncArtifacts) {
+    const target = path.join(nikkisyncRoot, 'pc-companion', ...relative.split('/'))
+    if (fs.existsSync(target)) pass(`@nikkisync/pc-companion ${relative} 已解包（${purpose}）`)
+    else
+      fail(
+        `@nikkisync/pc-companion 缺 ${relative}（${purpose}；局域网同步服务将无法启动，` +
+          `修复：在 NikkiSync 跑完整 npm run build 后重新打包）: ` +
+          path.relative(ROOT, target)
+      )
   }
 }
 
@@ -604,15 +756,15 @@ function main(): void {
     }
   }
 
-  // 4. main 产物含 page min(0) 修复（media-handler 已被打包进 app/ 下某 chunk）
-  if (dirContains(path.join(DIST_MAIN, 'app'), '.min(0)')) {
+  // 4. main 产物含 page min(0) 修复（zod 校验入参的非负边界；标记所在模块随构建布局漂移）
+  if (dirContains(MAIN_MARKER_SCOPE, '.min(0)')) {
     pass('main 产物含 page min(0) 修复')
   } else {
     fail('main 产物不含 page min(0) 修复，需重新执行 npm run build')
   }
 
   // 5. main 产物含 repairLegacyDataV2 修复（scanner/worker-entry 现为独立入口 scanner-worker.js）
-  if (dirContains(path.join(DIST_MAIN, 'app'), 'repairLegacyDataV2')) {
+  if (dirContains(MAIN_MARKER_SCOPE, 'repairLegacyDataV2')) {
     pass('main 产物含 repairLegacyDataV2 修复')
   } else {
     fail('main 产物不含 repairLegacyDataV2 修复，需重新执行 npm run build')
@@ -682,4 +834,7 @@ function main(): void {
   }
 }
 
-main()
+// 仅在以脚本方式直接运行（tsx scripts/pre-dist-check.ts）时启动校验；被测试导入时不执行
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('pre-dist-check.ts')) {
+  main()
+}

@@ -192,10 +192,12 @@ describe('settings:set customScanPaths — userPicked 短路', () => {
     assertFileReadPathMock.mockReset()
     vi.mocked(pathGuard.isUserPicked).mockReset()
     vi.mocked(pathGuard.isUserPicked).mockImplementation(() => false)
+    vi.mocked(pathGuard.isUserPickedDir).mockReset()
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation(() => false)
   })
 
-  it('C1: userPicked 命中的路径跳过 assertFileReadPath 并正常持久化', async () => {
-    vi.mocked(pathGuard.isUserPicked).mockImplementation((p) => p === SYS_PICKED)
+  it('C1: 显式选择的目录（isUserPickedDir 命中）跳过 assertFileReadPath 并正常持久化', async () => {
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation((p) => p === SYS_PICKED)
     assertFileReadPathMock.mockImplementation(() => {
       throw AppError.forbidden('路径不在白名单内，禁止读取操作')
     })
@@ -222,5 +224,24 @@ describe('settings:set customScanPaths — userPicked 短路', () => {
     )(['customScanPaths', ['C:\\Users\\test\\photos']])) as { success: boolean }
     expect(result.success).toBe(false)
     expect(assertFileReadPathMock).toHaveBeenCalledWith('C:\\Users\\test\\photos')
+  })
+
+  it('C3(边界): 仅登记为文件的显式选择不得短路 customScanPaths 校验', async () => {
+    // 图片水印修复后 `dialog:openFile` 也会登记 userPicked；customScanPaths 存的是扫描根，
+    // 单个文件（如挑中的 logo）不能因此被当成合法目录持久化
+    const PICKED_FILE = 'D:\\Downloads\\logo.png'
+    vi.mocked(pathGuard.isUserPicked).mockImplementation((p) => p === PICKED_FILE)
+    assertFileReadPathMock.mockImplementation(() => {
+      throw AppError.forbidden('路径不在白名单内，禁止读取操作')
+    })
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['customScanPaths', [PICKED_FILE]])) as { success: boolean }
+    expect(result.success).toBe(false)
+    expect(assertFileReadPathMock).toHaveBeenCalledWith(PICKED_FILE)
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
   })
 })

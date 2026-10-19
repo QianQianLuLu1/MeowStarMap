@@ -874,3 +874,162 @@ describe('WatermarkService.applyBatch - 输出文件', () => {
     expect(fs.existsSync(path.join(outDir, 'image.png'))).toBe(true)
   })
 })
+
+// ============================================================
+// describe: 批量水印与渲染层对齐 —— style 底纹 与 {date}/{time} 占位符
+// ============================================================
+
+/**
+ * 缺陷（docs/plans/2026-10-17-fix-image-watermark-media-auth.md §5 N4）：
+ * 编辑器预览由渲染层 canvas 绘制，认 `config.style` 与 `{date}`/`{time}`；
+ * 主进程批量导出走 SVG composite，此前**两处都不实现**——于是画廊「添加水印」
+ * 导出的图里，拍立得没有白框、日期标签没有底纹，且 `{date}` 被原样写成字面量。
+ * 替身 sharp 只截 SVG 字符串，不校验 librsvg 是否真渲染（见 plan §8 E4，需手工实测）。
+ */
+describe('WatermarkService.applyBatch - 样式与占位符对齐渲染层', () => {
+  it('S1 {date} 必须展开为 YYYY.MM.DD，而不是写成字面量', async () => {
+    await service.applyBatch(
+      makeBaseConfig({ text: { ...makeBaseConfig().text!, content: '{date}' } }),
+      [srcImage],
+      outDir
+    )
+
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    expect(svg).not.toContain('{date}')
+    expect(svg).toMatch(/\d{4}\.\d{2}\.\d{2}/)
+  })
+
+  it('S2 style=polaroid 生成底部白带（ch=600 → 高 96、y=504）', async () => {
+    await service.applyBatch(
+      makeBaseConfig({
+        text: { ...makeBaseConfig().text!, content: 'Polaroid' },
+        style: 'polaroid'
+      }),
+      [srcImage],
+      outDir
+    )
+
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    // 与 imageProcessor.ts drawPolaroidFrame 同口径：frameRatio 0.16，Math.max(1, round(600*0.16))=96
+    // 只按 <rect> 结构断言——文字本身的 fill 也是 #ffffff（默认 text.color），查色值会歧义
+    expect(svg).toMatch(/<rect[^>]*\bx="0"[^>]*\by="504"[^>]*\bwidth="800"[^>]*\bheight="96"/)
+    expect(svg).toContain('Polaroid')
+  })
+
+  it('S3 style=date-label 在文字前置圆角暗底（先 rect 后 text 保画家序）', async () => {
+    await service.applyBatch(
+      makeBaseConfig({
+        text: { ...makeBaseConfig().text!, content: 'hello', size: 24 },
+        style: 'date-label'
+      }),
+      [srcImage],
+      outDir
+    )
+
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    // 与 imageProcessor.ts:861-868 同口径：rgba(0,0,0,0.55) + rx = size*0.25 = 6
+    expect(svg).toContain('rgba(0,0,0,0.55)')
+    expect(svg).toContain('rx="6"')
+    expect(svg.indexOf('<rect')).toBeLessThan(svg.indexOf('<text'))
+  })
+
+  it('S4 style 缺省 / signature / copyright 不得出现底纹元素', async () => {
+    for (const style of [undefined, 'signature', 'copyright'] as const) {
+      sharpCalls.length = 0
+      await service.applyBatch(
+        makeBaseConfig({ tile: false, ...(style ? { style } : {}) }),
+        [srcImage],
+        outDir
+      )
+      const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+      // 护栏：非 polaroid/date-label 时不得凭空多出底纹图层
+      expect(svg).not.toContain('<rect')
+      expect(svg).not.toContain('rgba(0,0,0,0.55)')
+    }
+  })
+
+  it('S5 占位符展开后仍做 XML 转义（先展开再转义，顺序不可颠倒）', async () => {
+    await service.applyBatch(
+      makeBaseConfig({ text: { ...makeBaseConfig().text!, content: '{date}<b>&x' } }),
+      [srcImage],
+      outDir
+    )
+
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    expect(svg).toContain('&lt;b&gt;')
+    expect(svg).toContain('&amp;x')
+    expect(svg).not.toContain('<b>')
+  })
+
+  it('S6 style=polaroid 且 content 为空仍须导出底部白带（修复前整文件被跳过）', async () => {
+    const r = await service.applyBatch(
+      makeBaseConfig({
+        text: { ...makeBaseConfig().text!, content: '' },
+        style: 'polaroid'
+      }),
+      [srcImage],
+      outDir
+    )
+
+    // 渲染层 drawPolaroidFrame 的白框不受 text.content 约束（imageProcessor.ts:1000 的
+    // fillRect 在 `if (config.text?.content)` 守卫之前），故空文字的拍立得预览有框；
+    // 批量侧此前因 `if (!text?.content) return null` 早退 → overlays 为空 → continue，
+    // 连输出文件都不写。两侧必须同源。
+    expect(r.processed).toBe(1)
+    expect(sharpCalls).toHaveLength(1)
+
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    expect(svg).toMatch(/<rect[^>]*\by="504"[^>]*\bheight="96"/)
+    // 零长度文字不得生成空 <text> 壳（只该有底纹图层）
+    expect(svg).not.toContain('<text')
+  })
+
+  it('S6b style=polaroid 且 text 整体缺省时仍出白框（画布侧同语义）', async () => {
+    const r = await service.applyBatch(
+      makeBaseConfig({ text: undefined, style: 'polaroid' }),
+      [srcImage],
+      outDir
+    )
+
+    // drawPolaroidFrame 的 fillRect 不看 config.text 是否存在（imageProcessor.ts:999-1001），
+    // 故 text 整体缺省与 content 为空是两条不同代码路径，都必须出框
+    expect(r.processed).toBe(1)
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    expect(svg).toMatch(/<rect[^>]*\bheight="96"/)
+    expect(svg).not.toContain('<text')
+  })
+
+  it('S7 style=date-label 时不得带下划线（对齐 imageProcessor.ts:876 的抑制）', async () => {
+    await service.applyBatch(
+      makeBaseConfig({
+        text: { ...makeBaseConfig().text!, content: '2026.10.17', underline: true },
+        style: 'date-label'
+      }),
+      [srcImage],
+      outDir
+    )
+
+    const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+    // 画布版在 date-label 下跳过 underline（底板已被当成交付物，下划线会压在底板上）；
+    // 导出侧若仍带下划线，预览与产物就不一致
+    expect(svg).not.toContain('text-decoration')
+  })
+
+  it('S8 font 为空串时回落 sans-serif（预览与导出同族名）', async () => {
+    for (const style of [undefined, 'polaroid'] as const) {
+      sharpCalls.length = 0
+      await service.applyBatch(
+        makeBaseConfig({
+          text: { ...makeBaseConfig().text!, content: 'WXNN', font: '' },
+          ...(style ? { style } : {})
+        }),
+        [srcImage],
+        outDir
+      )
+      const svg = sharpCalls[0].compositeOverlays[0].input.toString()
+      // 空族名会让 SVG 整属性失效、回落 librsvg 内置默认，与 canvas 的 'sans-serif' 不保证同面
+      expect(svg).toContain('font-family="sans-serif"')
+      expect(svg).not.toContain('font-family=""')
+    }
+  })
+})

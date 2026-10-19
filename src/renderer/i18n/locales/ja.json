@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "共鳴録",
+      "syncGallery": "同期ギャラリー",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "同期サービス"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "メニュー",
     "recycleBin": "ごみ箱",
     "resonanceRecords": "共鳴録",
+    "syncGallery": "同期ギャラリー",
     "settings": "設定",
     "smartGroup": "スマートグループ",
     "storage": "容量",
@@ -1469,10 +1472,11 @@
       "data": "データ管理",
       "diagnostics": "ログと診断",
       "general": "一般",
-      "plugins": "",
+      "plugins": "プラグイン",
       "profile": "プロファイル",
       "scan": "スキャン",
-      "tools": "ツール"
+      "tools": "ツール",
+      "toolsPlugins": "ツールとプラグイン"
     },
     "language": {
       "auto": "システムに従う",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "エクスポートワークフロー",
       "fileops": "ファイル操作",
       "language": "言語",
-      "pluginManage": "",
+      "pluginManage": "プラグイン管理",
       "profileManage": "プロファイル管理",
       "scanOptions": "スキャンオプション",
       "shareCode": "共有コードツール",
       "startup": "起動動作",
       "theme": "テーマ",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "ゲームディレクトリ",
+      "importRoots": "指定ディレクトリ",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "検出されたゲームディレクトリ",
+      "scanFallback": "手動フォールバックスキャン",
+      "themeDisplay": "テーマと表示",
+      "scanDirectories": "スキャン先ディレクトリ",
+      "cacheCleanup": "キャッシュとクリーンアップ",
+      "aboutOverview": "アプリ情報と連絡先"
     },
     "startup": {
       "autoScan": "起動時に自動スキャン",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "画像の読み込みに失敗しました：{{src}}",
+    "syncEnabled": "同期サービスを有効にしました",
+    "syncDisabled": "同期サービスを無効にしました"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "合計回数",
       "colAvg": "平均獲得",
       "colPercentile": "百分位"
+    }
+  },
+  "syncGallery": {
+    "title": "同期ギャラリー",
+    "subtitle": "NikkiSync 組み込みライブラリの資産。ローカルギャラリーとは干渉しません",
+    "loading": "同期ギャラリーを読み込み中…",
+    "toolbar": {
+      "statusTip": "組み込み NikkiSync ランタイムの状態",
+      "refresh": "更新",
+      "scan": "ゲーム相册をスキャン",
+      "service": "同期サービス",
+      "status": {
+        "ready": "準備完了",
+        "degraded": "ゲームフォルダが見つかりません",
+        "off": "未起動"
+      },
+      "detail": "詳細",
+      "about": "NikkiSync について"
+    },
+    "empty": {
+      "title": "閲覧できる資産がありません",
+      "linkHint": "NikkiSync パッケージが見つかりません。プロジェクトルートで npm run link:nikkisync を実行し、アプリを再起動してください",
+      "runtimeOff": "組み込みサービスが起動していません。ツールバーの「同期サービス」で NikkiSync ランタイムを有効にして再試行してください",
+      "gameRootMissing": "『インフィニティ ニキ』のインストールフォルダが見つかりません。設定で手動選択後に再スキャンしてください",
+      "noAssets": "スキャンは完了しましたが写真がありません。「ゲーム相册をスキャン」で再索引できます",
+      "retry": "再読み込み"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync ランタイムが見つかりません。npm run link:nikkisync を実行してください",
+      "loadFailed": "同期ギャラリーの読み込みに失敗しました"
+    },
+    "drawer": {
+      "title": "資産詳細",
+      "basic": "基本情報",
+      "fields": {
+        "assetId": "アセット ID",
+        "type": "種別",
+        "state": "状態",
+        "motion": "LIVE 表示",
+        "revision": "リビジョン",
+        "gameVersion": "ゲームバージョン",
+        "resolution": "解像度",
+        "size": "ファイルサイズ",
+        "hash": "コンテンツハッシュ",
+        "metadata": "メタデータ"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "同期サービス"
+    },
+    "service": {
+      "title": "同期サービス",
+      "description": "LAN 内の NikkiSync モバイルクライアントが暗号化接続でこのライブラリに同期できます"
+    },
+    "enable": "同期サービスを有効化",
+    "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 28080）",
+    "status": {
+      "label": "状態",
+      "running": "実行中",
+      "stopped": "停止中",
+      "unavailable": "同期コンポーネント未準備",
+      "address": "サーバーアドレス",
+      "serverId": "サーバー ID",
+      "tlsFingerprint": "TLS フィンガープリント",
+      "copied": "コピーしました"
+    },
+    "pairing": {
+      "title": "新しいデバイスをペアリング",
+      "open": "新しいデバイスをペアリング",
+      "hintRunning": "モバイルで QR コードをスキャンしてペアリング（5 分で失効）",
+      "hintDisabled": "新しいデバイスのペアリングには同期サービスの有効化が必要です",
+      "expiresIn": "有効期限",
+      "refresh": "再生成",
+      "copyContent": "ペアリング内容をコピー",
+      "loadFailed": "ペアリング QR コードの生成に失敗しました",
+      "retry": "再試行"
+    },
+    "devices": {
+      "title": "ペアリング済みデバイス",
+      "empty": "ペアリング済みのデバイスはありません",
+      "emptyHint": "モバイルでペアリング QR コードをスキャンしてください",
+      "lastSeen": "最終接続",
+      "never": "未接続",
+      "revoke": "解除",
+      "revokeConfirmTitle": "デバイスの解除",
+      "revokeConfirmMessage": "解除後「{{name}}」はこのライブラリと同期できなくなり、再ペアリングが必要です。解除しますか？",
+      "revokeConfirm": "デバイスを解除",
+      "revoked": "デバイスを解除しました"
+    },
+    "gallerySource": "ギャラリーのデータソースに NikkiSync アセットライブラリを使う",
+    "gallerySourceDesc": "オフ時は本机の media_files（既定）を読み、オン時は内蔵 NikkiSync Runtime の assets に切り替えます。ランタイムの有効化と 1 回のスキャンが暗黙に含まれます",
+    "gallerySourceApplied": "ギャラリーのデータソースを {{source}} に切り替えました",
+    "metadata": {
+      "enable": "コーディネートと撮影パラメータを解析",
+      "enableDesc": "スキャン完了後、上流の NikkiSync レゾルバが同期ギャラリーの撮影パラメータ（焦点距離、絞り、露出、フィルター強度など）を補完します。アプリの再起動後に有効になります。",
+      "disclosure": "有効にすると、写真の UID と写真に埋め込まれたパラメータエンベロープが、解析結果を取得するためにサードパーティサービス nuan5.pro に送信されます。返された内容はローカルの同期データベースに書き込まれ、ローカルネットワーク越しにペアリング済みデバイスにも配信されます。スーツと服装の検索は引き続きローカルの辞書に依存し、このスイッチは対象外です。"
+    }
+  },
+  "shareCard": {
+    "title": "シェア画像を生成",
+    "generate": "シェア画像を生成",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる",
+    "savedCount": "{{count}} 枚保存しました",
+    "progress": "{{current}} / {{total}} 枚目を生成中…",
+    "missingIcons": "{{count}} 件のアイコンを利用できません",
+    "motionUnsupported": "この段階では LIVE 写真のシェア画像に未対応",
+    "noParams": "撮影パラメータを読み取れませんでした。ダッシュで表示されます",
+    "errorGenerate": "シェア画像の生成に失敗しました",
+    "errorCancelled": "生成をキャンセルしました",
+    "errorSave": "シェア画像の保存に失敗しました",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

@@ -1,10 +1,10 @@
-// @core-change: 清空回收站移除主进程 dialog 二次确认，与 media:permanentDelete 对齐，消除重复弹窗与取消误报 IPC_CANCELED
+// @core-change: 完全删除图片同步清理 X6Game\ScreenShot 同名副本，并向同图衍生文件记录清理钩子透传缩略图缓存目录
 /**
  * 媒体生命周期域 IPC handler：删除 / 恢复 / 回收站
  *
  * 覆盖：物理删除记录 / 软删除 / 恢复 / 彻底删除 / 清空回收站。
  * 彻底删除采用三阶段事务保证 DB 与文件系统一致；二次确认由渲染端 ConfirmDialog 承担。
- * 回收站批量操作工具（含缩略图清理：缓存三档位 + 原生 LQ 及其 DB 记录）见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
+ * 回收站批量操作工具（含缩略图清理：缓存三档位 + 同图衍生文件及其 DB 记录）见 `_trash-utils.ts`；丢失与损坏记录清理见 `media-cleanup-handler.ts`。
  */
 import { ipcMain } from 'electron'
 import { z } from 'zod'
@@ -35,13 +35,15 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     wrapHandler(ctx, z.tuple([schemas.mediaId]), async ([mediaId]) => {
       const repo = getRepo()
       // #fix-permanent-delete-error-toast：物理删除前先取缩略图路径，删除记录后清理缓存
-      // #fix-gallery-delete-thumbnail-cleanup：清理范围扩展为缓存三档位 + 严格推导的游戏原生 LQ
-      //（LQ 文件本身也是入库媒体记录，删除后同步硬删其 DB 记录，避免悬空记录）
+      // #fix-gallery-delete-thumbnail-cleanup：清理范围扩展为缓存三档位 + 严格推导的游戏原生同图衍生文件
+      // #fix-permanent-delete-game-photo-variants：衍生文件含 LQ 与 X6Game\ScreenShot 同名副本
+      //（它们本身也是入库媒体记录，删除后同步硬删其 DB 记录，避免悬空记录）
       const rows = repo.getMediaPathsByIds([mediaId])
       await repo.hardDelete(mediaId)
       await cleanupThumbnailsForRows(rows, ctx.thumbnailGen.getCacheDir(), {
-        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
+        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo, ctx.thumbnailGen.getCacheDir())
       })
+      await ctx.syncEvents?.recordAssetChange('asset.deleted', String(mediaId))
       ctx.notifyMediaUpdated()
       return { deleted: true }
     })
@@ -52,6 +54,10 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     'media:softDelete',
     wrapHandler(ctx, z.tuple([schemas.mediaIdArrayBulk]), async ([mediaIds]) => {
       await getRepo().softDeleteBatch(mediaIds)
+      // 同步变更日志：批量写 journal（合并广播最后一条，防移动端事件风暴）
+      await ctx.syncEvents?.recordAssetChanges(
+        mediaIds.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       return {
         success: true,
@@ -65,6 +71,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
     'media:restore',
     wrapHandler(ctx, z.tuple([schemas.mediaIdArrayBulk]), async ([mediaIds]) => {
       await getRepo().restoreBatch(mediaIds)
+      await ctx.syncEvents?.recordAssetChanges(
+        mediaIds.map((id) => ({ eventType: 'asset.updated' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       return { message: t('main.media.message.restored', { count: mediaIds.length }) }
     })
@@ -98,12 +107,15 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       await repo.hardDeleteBatch(idsToDelete)
 
       // 阶段 4：清理已删除记录的缩略图（best-effort；#fix-gallery-delete-thumbnail-cleanup：
-      // 缓存三档位 + 由 file_path 严格推导的游戏原生 LQ 文件及其 DB 记录）
+      // 缓存三档位 + 由 file_path 严格推导的游戏原生同图衍生文件及其 DB 记录）
       const deletedRows = rows.filter((r) => idsToDelete.includes(r.id))
       await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir(), {
-        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
+        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo, ctx.thumbnailGen.getCacheDir())
       })
 
+      await ctx.syncEvents?.recordAssetChanges(
+        idsToDelete.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       const msg =
         failedPaths.length > 0
@@ -140,12 +152,15 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       //（与 media:permanentDelete 阶段 4 同构，best-effort）——
       // 修复前缺失此阶段，清空回收站后缩略图缓存文件残留为孤儿。
       // #fix-gallery-delete-thumbnail-cleanup：清理范围扩展为缓存三档位 +
-      // 由 file_path 严格推导的游戏原生 LQ 文件及其 DB 记录。
+      // 由 file_path 严格推导的游戏原生同图衍生文件及其 DB 记录。
       const deletedRows = rows.filter((r) => idsToDelete.includes(r.id))
       await cleanupThumbnailsForRows(deletedRows, ctx.thumbnailGen.getCacheDir(), {
-        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo)
+        onNativeThumbnailRemoved: makeNativeThumbRecordCleaner(repo, ctx.thumbnailGen.getCacheDir())
       })
 
+      await ctx.syncEvents?.recordAssetChanges(
+        idsToDelete.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
+      )
       ctx.notifyMediaUpdated()
       const msg =
         failedPaths.length > 0

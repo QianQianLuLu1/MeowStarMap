@@ -21,10 +21,12 @@
       "editor": "编辑器",
       "favorites": "收藏",
       "resonanceRecords": "共鸣录",
+      "syncGallery": "同步图库",
       "gallery": "图库",
       "launcherCache": "缓存",
       "recycleBin": "回收站",
-      "settings": "设置"
+      "settings": "设置",
+      "syncService": "同步服务"
     }
   },
   "categories": {
@@ -1512,6 +1514,7 @@
     "menu": "菜单",
     "recycleBin": "回收站",
     "resonanceRecords": "共鸣录",
+    "syncGallery": "同步图库",
     "settings": "设置",
     "smartGroup": "智能分组",
     "storage": "占用",
@@ -1881,7 +1884,8 @@
       "plugins": "插件",
       "profile": "角色档案",
       "scan": "扫描",
-      "tools": "工具"
+      "tools": "工具",
+      "toolsPlugins": "工具与插件"
     },
     "language": {
       "auto": "跟随系统",
@@ -2074,6 +2078,8 @@
       "aboutContact": "联系方式",
       "aboutInfo": "应用信息",
       "aboutLicense": "致谢与开源协议",
+      "aboutOverview": "应用信息与联系方式",
+      "cacheCleanup": "缓存与清理",
       "dataBackup": "数据库备份",
       "dataCache": "缓存管理",
       "dataClear": "清除数据",
@@ -2088,12 +2094,14 @@
       "profileManage": "档案管理",
       "scanOptions": "扫描选项",
       "scanPaths": "游戏目录",
+      "scanDirectories": "扫描目录",
       "gameRoots": "检测到的游戏目录",
       "scanFallback": "手动兜底扫描",
       "importRoots": "指定目录",
       "shareCode": "分享码工具",
       "startup": "启动行为",
-      "theme": "主题"
+      "theme": "主题",
+      "themeDisplay": "主题与显示"
     },
     "startup": {
       "autoScan": "启动时自动扫描",
@@ -2339,7 +2347,9 @@
     "scanCompletedNoGameShots": "扫描完成：未发现游戏内截图。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
     "scanFoundButGalleryEmpty": "扫描完成：发现 {{count}} 个文件，但均不是游戏内截图（启动器图片已收入「缓存」板块）。游戏截图目录未自动识别时，可在扫描菜单中选择「指定目录扫描」",
     "imageProcessorCanvasFailed": "无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用",
-    "imageProcessorLoadFailed": "加载图片失败: {{src}}"
+    "imageProcessorLoadFailed": "加载图片失败: {{src}}",
+    "syncEnabled": "同步服务已启用",
+    "syncDisabled": "同步服务已关闭"
   },
   "video": {
     "applyEdit": "应用并导出",
@@ -4258,6 +4268,147 @@
       "colPulls": "总抽数",
       "colAvg": "平均出货",
       "colPercentile": "百分位"
+    }
+  },
+  "syncGallery": {
+    "title": "同步图库",
+    "subtitle": "来自 NikkiSync 内嵌库的资产，与本地图库互不影响",
+    "loading": "正在读取同步图库…",
+    "toolbar": {
+      "statusTip": "内嵌 NikkiSync Runtime 的运行状态",
+      "refresh": "刷新",
+      "scan": "扫描游戏相册",
+      "service": "同步服务",
+      "status": {
+        "ready": "已就绪",
+        "degraded": "未找到游戏目录",
+        "off": "未启动"
+      },
+      "detail": "详情",
+      "about": "关于 NikkiSync"
+    },
+    "empty": {
+      "title": "还没有可浏览的资产",
+      "linkHint": "未找到 NikkiSync 包，请在项目根目录执行 npm run link:nikkisync 后重启应用",
+      "runtimeOff": "内嵌服务未启动：请点击工具栏的「同步服务」，在其中开启 NikkiSync 运行时后重试",
+      "gameRootMissing": "未找到《无限暖暖》安装目录，请在设置里手动选择后重新扫描",
+      "noAssets": "已完成扫描但没有照片，可点击「扫描游戏相册」重新索引",
+      "retry": "重新载入"
+    },
+    "error": {
+      "bridgeMissing": "未找到 NikkiSync 运行时，请执行 npm run link:nikkisync",
+      "loadFailed": "读取同步图库失败"
+    },
+    "drawer": {
+      "title": "资产详情",
+      "basic": "基本信息",
+      "fields": {
+        "assetId": "资产 ID",
+        "type": "类型",
+        "state": "状态",
+        "motion": "实况标识",
+        "revision": "修订号",
+        "gameVersion": "游戏版本",
+        "resolution": "分辨率",
+        "size": "文件大小",
+        "hash": "内容哈希",
+        "metadata": "元数据"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "同步服务"
+    },
+    "service": {
+      "title": "同步服务",
+      "description": "允许局域网内的 NikkiSync 移动端通过加密连接同步本机媒体库"
+    },
+    "enable": "启用同步服务",
+    "enableDesc": "开启后本机作为同步服务端运行（HTTPS + WebSocket，默认端口 28080）",
+    "gallerySource": "图库数据源使用 NikkiSync 资产库",
+    "gallerySourceDesc": "关闭时读本机 media_files（默认）；开启后图库改读内嵌 NikkiSync Runtime 的 assets，并隐含启用运行时与一次扫描",
+    "gallerySourceApplied": "图库数据源已切换为 {{source}}",
+    "status": {
+      "label": "运行状态",
+      "running": "运行中",
+      "stopped": "已停止",
+      "unavailable": "同步组件未就绪",
+      "address": "服务地址",
+      "serverId": "服务 ID",
+      "tlsFingerprint": "TLS 指纹",
+      "copied": "已复制"
+    },
+    "pairing": {
+      "title": "配对新设备",
+      "open": "配对新设备",
+      "hintRunning": "在移动端扫码完成配对；二维码 5 分钟内有效",
+      "hintDisabled": "启用同步服务后才能配对新设备",
+      "expiresIn": "有效期",
+      "refresh": "重新生成",
+      "copyContent": "复制配对内容",
+      "loadFailed": "生成配对二维码失败",
+      "retry": "重试"
+    },
+    "devices": {
+      "title": "已配对设备",
+      "empty": "暂无已配对设备",
+      "emptyHint": "在移动端扫描配对二维码完成配对",
+      "lastSeen": "最近活跃",
+      "never": "从未连接",
+      "revoke": "撤销",
+      "revokeConfirmTitle": "撤销设备",
+      "revokeConfirmMessage": "撤销后「{{name}}」将无法再同步本机媒体库，需要重新配对。确定撤销？",
+      "revokeConfirm": "撤销设备",
+      "revoked": "设备已撤销"
+    },
+    "metadata": {
+      "enable": "解析穿搭与拍摄参数",
+      "enableDesc": "扫描完成后，由上游 NikkiSync 解析器补齐同步图库的拍摄参数（焦距、光圈、曝光、滤镜强度等）。需重启应用后生效。",
+      "disclosure": "开启后会把照片 UID 与照片内嵌的参数信封发送给第三方服务 nuan5.pro 以换取解码结果；返回内容写入本机同步库，并会随局域网同步下发给已配对设备。套装与服装搜索仍依赖本地字典，本开关不覆盖该部分。"
+    }
+  },
+  "shareCard": {
+    "title": "生成分享图",
+    "generate": "生成分享图",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭",
+    "savedCount": "已保存 {{count}} 张",
+    "progress": "正在生成第 {{current}} / {{total}} 张…",
+    "missingIcons": "{{count}} 个部件图标暂不可用",
+    "motionUnsupported": "实况照片本阶段不支持生成分享图",
+    "noParams": "未读取到拍摄参数，分享图将以破折号占位",
+    "errorGenerate": "生成分享图失败",
+    "errorCancelled": "已取消生成",
+    "errorSave": "保存分享图失败",
+    "card": {
+      "brand": "NikkiSync",
+      "fallbackTitle": "无限暖暖摄影",
+      "outfitHeading": "穿搭",
+      "parameterHeading": "拍摄参数",
+      "iconMissing": "图标暂缺",
+      "categoryBadge": "分类示意",
+      "noOutfit": "暂无穿搭数据",
+      "footer": "NikkiSync · 穿搭与摄影记录",
+      "labelFocalLength": "焦距调节",
+      "labelAperture": "光圈调节",
+      "labelVignette": "晕影调节",
+      "labelBloom": "柔光强度",
+      "labelBloomRange": "柔光范围",
+      "labelBrightness": "亮度",
+      "labelExposure": "曝光",
+      "labelContrast": "对比度",
+      "labelSaturation": "饱和度",
+      "labelNaturalSaturation": "自然饱和",
+      "labelHighlights": "高光",
+      "labelShadows": "阴影",
+      "labelRotation": "镜头旋转",
+      "labelDepthOfField": "景深",
+      "labelAction": "动作",
+      "labelLighting": "光照",
+      "labelFilter": "滤镜",
+      "labelLocation": "地点"
     }
   }
 }

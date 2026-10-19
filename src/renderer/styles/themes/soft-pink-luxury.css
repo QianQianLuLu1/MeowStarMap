@@ -243,11 +243,17 @@ html.soft-pink-luxury {
 
 /* 媒体卡片：悬停上浮 + 淡粉色柔光晕染 */
 /* P1-U14：删除 transition: all 180ms ease-out 覆盖，统一使用 globals.css 的 200ms ease-out */
-.soft-pink-luxury .media-card {
+/* 选中态的宿主阴影归 globals.css 的 `.media-card.is-selected` 所有：本主题的基础阴影与它
+   特异性相同（均 0,2,0），只靠源序决胜，而 `.storybook/preview.ts` 为了让主题变量能覆盖
+   `:root` 会在 globals 之后二次引入本文件，源序一反转就把选中外环整条吞掉（实测 computed
+   box-shadow 只剩一层粉色柔光）。用 :not(.is-selected) 明确让位，与源序解耦。 */
+.soft-pink-luxury .media-card:not(.is-selected) {
   box-shadow: 0 4px 14px rgba(226, 164, 188, 0.1);
 }
 
-.soft-pink-luxury .media-card:hover {
+/* 同理：本条为 (0,3,0)，无论源序都会压过 (0,2,0) 的选中态——即生产环境里「悬停一张已选中的
+   卡片」同样会让外环消失，故一并排除选中态；未选中卡片的悬停粉光行为不变。 */
+.soft-pink-luxury .media-card:hover:not(.is-selected) {
   transform: scale(1.02) translateY(-2px);
   box-shadow:
     0 0 22px rgba(226, 164, 188, 0.22),
@@ -257,6 +263,15 @@ html.soft-pink-luxury {
 .soft-pink-luxury .media-card:hover::after {
   border-color: rgba(226, 164, 188, 0.55);
   box-shadow: inset 0 0 16px rgba(226, 164, 188, 0.1);
+}
+
+/* 选中态：沿用本主题悬停描边的粉色语言（不写死色值以外的层次），
+   内衬走 --bg-primary 保证双线框在本主题下同样成立 */
+.soft-pink-luxury .media-card.is-selected::after {
+  border-color: rgba(226, 164, 188, 0.55);
+  box-shadow:
+    inset 0 0 0 2px var(--bg-primary, #fff),
+    inset 0 0 16px rgba(226, 164, 188, 0.1);
 }
 
 /* 进度条 */

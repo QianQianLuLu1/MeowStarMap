@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Résonance",
+      "syncGallery": "Galerie synchronisée",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Service de synchronisation"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "Menu",
     "recycleBin": "Corbeille",
     "resonanceRecords": "Résonance",
+    "syncGallery": "Galerie synchronisée",
     "settings": "Paramètres",
     "smartGroup": "Groupe intelligent",
     "storage": "Stockage",
@@ -1469,10 +1472,11 @@
       "data": "Gestion des données",
       "diagnostics": "Journaux et diagnostics",
       "general": "Général",
-      "plugins": "",
+      "plugins": "Plug-ins",
       "profile": "Profils",
       "scan": "Analyse",
-      "tools": "Outils"
+      "tools": "Outils",
+      "toolsPlugins": "Outils et plug-ins"
     },
     "language": {
       "auto": "Suivre le système",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "Flux d'exportation",
       "fileops": "Opérations sur fichiers",
       "language": "Langue",
-      "pluginManage": "",
+      "pluginManage": "Gestion des plug-ins",
       "profileManage": "Gestion des profils",
       "scanOptions": "Options d'analyse",
       "shareCode": "Outils de code de partage",
       "startup": "Démarrage",
       "theme": "Thème",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Répertoires du jeu",
+      "importRoots": "Répertoires désignés",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Répertoires de jeu détectés",
+      "scanFallback": "Analyse manuelle de repli",
+      "themeDisplay": "Thème et affichage",
+      "scanDirectories": "Répertoires d'analyse",
+      "cacheCleanup": "Cache et nettoyage",
+      "aboutOverview": "Informations sur l'application et contact"
     },
     "startup": {
       "autoScan": "Analyse automatique au démarrage",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "Échec du chargement de l'image : {{src}}",
+    "syncEnabled": "Service de synchronisation activé",
+    "syncDisabled": "Service de synchronisation désactivé"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "Invocations",
       "colAvg": "Moyenne",
       "colPercentile": "Percentile"
+    }
+  },
+  "syncGallery": {
+    "title": "Galerie synchronisée",
+    "subtitle": "Ressources de la bibliothèque NikkiSync intégrée, sans impact sur la galerie locale",
+    "loading": "Chargement de la galerie synchronisée…",
+    "toolbar": {
+      "statusTip": "État du runtime NikkiSync intégré",
+      "refresh": "Actualiser",
+      "scan": "Analyser l’album du jeu",
+      "service": "Service de synchronisation",
+      "status": {
+        "ready": "Prêt",
+        "degraded": "Dossier du jeu introuvable",
+        "off": "Non démarré"
+      },
+      "detail": "Détails",
+      "about": "À propos de NikkiSync"
+    },
+    "empty": {
+      "title": "Aucune ressource à parcourir",
+      "linkHint": "Packages NikkiSync introuvables. Exécutez npm run link:nikkisync à la racine du projet, puis redémarrez l’application",
+      "runtimeOff": "Service intégré non démarré : ouvrez Service de synchronisation dans la barre d’outils, activez le runtime NikkiSync, puis réessayez",
+      "gameRootMissing": "Dossier d’installation d’Infinity Nikki introuvable. Sélectionnez-le manuellement dans les Paramètres, puis relancez l’analyse",
+      "noAssets": "Analyse terminée sans photo. Cliquez sur « Analyser l’album du jeu » pour réindexer",
+      "retry": "Recharger"
+    },
+    "error": {
+      "bridgeMissing": "Runtime NikkiSync introuvable. Exécutez npm run link:nikkisync",
+      "loadFailed": "Échec du chargement de la galerie synchronisée"
+    },
+    "drawer": {
+      "title": "Détails de la ressource",
+      "basic": "Informations de base",
+      "fields": {
+        "assetId": "ID de la ressource",
+        "type": "Type",
+        "state": "État",
+        "motion": "Marque LIVE",
+        "revision": "Révision",
+        "gameVersion": "Version du jeu",
+        "resolution": "Résolution",
+        "size": "Taille du fichier",
+        "hash": "Empreinte du contenu",
+        "metadata": "Métadonnées"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Service de synchronisation"
+    },
+    "service": {
+      "title": "Service de synchronisation",
+      "description": "Permet aux clients mobiles NikkiSync de synchroniser cette bibliothèque via une connexion chiffrée du réseau local"
+    },
+    "enable": "Activer le service de synchronisation",
+    "enableDesc": "Ce PC servira de serveur de synchronisation (HTTPS + WebSocket, port par défaut 28080)",
+    "status": {
+      "label": "État",
+      "running": "En cours",
+      "stopped": "Arrêté",
+      "unavailable": "Composants de synchronisation non prêts",
+      "address": "Adresse du serveur",
+      "serverId": "ID du serveur",
+      "tlsFingerprint": "Empreinte TLS",
+      "copied": "Copié"
+    },
+    "pairing": {
+      "title": "Jumeler un nouvel appareil",
+      "open": "Jumeler un nouvel appareil",
+      "hintRunning": "Scannez le QR code sur votre appareil mobile ; il expire dans 5 minutes",
+      "hintDisabled": "Activez le service de synchronisation pour jumeler de nouveaux appareils",
+      "expiresIn": "Expire dans",
+      "refresh": "Régénérer",
+      "copyContent": "Copier le contenu de jumelage",
+      "loadFailed": "Échec de la génération du QR code de jumelage",
+      "retry": "Réessayer"
+    },
+    "devices": {
+      "title": "Appareils jumelés",
+      "empty": "Aucun appareil jumelé",
+      "emptyHint": "Scannez le QR code de jumelage sur votre appareil mobile",
+      "lastSeen": "Dernière activité",
+      "never": "Jamais connecté",
+      "revoke": "Révoquer",
+      "revokeConfirmTitle": "Révoquer l’appareil",
+      "revokeConfirmMessage": "Après la révocation, « {{name}} » ne pourra plus synchroniser cette bibliothèque et devra être jumelé à nouveau. Révoquer ?",
+      "revokeConfirm": "Révoquer l’appareil",
+      "revoked": "Appareil révoqué"
+    },
+    "gallerySource": "Utiliser la bibliothèque de ressources NikkiSync pour la galerie",
+    "gallerySourceDesc": "Désactivé : lecture des media_files locaux (par défaut). Activé : la galerie lit les assets du runtime NikkiSync intégré, avec activation implicite du runtime et une analyse",
+    "gallerySourceApplied": "Source de données de la galerie changée en {{source}}",
+    "metadata": {
+      "enable": "Analyser les paramètres de tenue et de prise de vue",
+      "enableDesc": "Après la fin d'une analyse, le resolveur amont NikkiSync complète les paramètres de prise de vue (focale, ouverture, exposition, intensité du filtre, etc.) de la galerie synchronisée. Prend effet après le redémarrage de l'application.",
+      "disclosure": "Une fois activé, l'identifiant de chaque photo et l'enveloppe de paramètres intégrée à la photo sont envoyés au service tiers nuan5.pro pour obtenir un résultat décodé. La réponse est écrite dans la base de synchronisation locale et est également transmise aux appariés via le réseau local. La recherche de tenues et de vêtements dépend toujours du dictionnaire local ; ce commutateur ne la couvre pas."
+    }
+  },
+  "shareCard": {
+    "title": "Générer la carte de partage",
+    "generate": "Générer la carte",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "close": "Fermer",
+    "savedCount": "{{count}} image(s) enregistrée(s)",
+    "progress": "Rendu {{current}} / {{total}}…",
+    "missingIcons": "{{count}} icône(s) indisponible(s)",
+    "motionUnsupported": "Les cartes pour photos LIVE ne sont pas prises en charge",
+    "noParams": "Aucun paramètre de prise de vue ; des tirets seront affichés",
+    "errorGenerate": "Échec de la génération",
+    "errorCancelled": "Génération annulée",
+    "errorSave": "Échec de l’enregistrement",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

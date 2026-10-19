@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useThemeStore } from '../../stores/themeStore'
 import { themes, type UITheme } from '../../styles/themes'
 import { Select } from '../../components/common/Select'
+import { SegmentedControl } from '../../components/common/SegmentedControl'
 import { SectionShell, GlobalToastContext, SettingsToggle } from './shared'
 
 // ============ 外观 ============
@@ -38,9 +39,7 @@ export const AppearanceThemeSection: React.FC = () => {
           ))}
         </Select>
       </div>
-      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-        {t('settings.theme.desc')}
-      </p>
+      {/* 描述只经 SectionShell 的 description 渲染一次；此处原先又画了一遍同文 <p> */}
     </SectionShell>
   )
 }
@@ -186,11 +185,14 @@ export const AppearanceDisplaySection: React.FC = () => {
     if (window.electronAPI) await window.electronAPI.settings.set('display.ambientShapes', enabled)
   }
 
-  const sizeOptions: { value: FontSize; label: string; sample: string }[] = [
-    { value: 'small', label: t('settings.display.fontSizeSmall'), sample: '12px' },
-    { value: 'normal', label: t('settings.display.fontSizeNormal'), sample: '14px' },
-    { value: 'large', label: t('settings.display.fontSizeLarge'), sample: '16px' },
-    { value: 'xlarge', label: t('settings.display.fontSizeXLarge'), sample: '18px' }
+  // SegmentedControl 的 option 只有 value/label 两个展示槽，
+  // 原手写磁贴「按该字号自身渲染 + 12/14/16/18px 角标」的所见即所得预览随换控件而取消；
+  // 小/标准/大/特大 四字面已足够自解释，故接受这一处信息缩减。
+  const sizeOptions: { value: FontSize; label: string }[] = [
+    { value: 'small', label: t('settings.display.fontSizeSmall') },
+    { value: 'normal', label: t('settings.display.fontSizeNormal') },
+    { value: 'large', label: t('settings.display.fontSizeLarge') },
+    { value: 'xlarge', label: t('settings.display.fontSizeXLarge') }
   ]
 
   return (
@@ -198,25 +200,12 @@ export const AppearanceDisplaySection: React.FC = () => {
       {/* 字号选择 */}
       <div className="space-y-2">
         <div style={{ color: 'var(--text-primary)' }}>{t('settings.display.fontSize')}</div>
-        <div className="grid grid-cols-4 gap-2">
-          {sizeOptions.map((opt) => (
-            <button
-              key={opt.value}
-              onClick={() => handleFontSize(opt.value)}
-              className="p-3 rounded-lg text-center transition-all"
-              style={{
-                background: fontSize === opt.value ? 'var(--accent)' : 'var(--bg-tertiary)',
-                color: fontSize === opt.value ? '#fff' : 'var(--text-primary)',
-                border: fontSize === opt.value ? '1px solid var(--accent)' : '1px solid transparent'
-              }}
-            >
-              <div className="font-medium" style={{ fontSize: opt.sample }}>
-                {opt.label}
-              </div>
-              <div className="text-xs mt-1 opacity-70">{opt.sample}</div>
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          ariaLabel={t('settings.display.fontSize')}
+          options={sizeOptions}
+          value={fontSize}
+          onChange={(size) => void handleFontSize(size)}
+        />
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {t('settings.display.fontSizeHint')}
         </p>
@@ -238,36 +227,20 @@ export const AppearanceDisplaySection: React.FC = () => {
         onChange={handleReduceMotion}
       />
 
-      {/* 玻璃效果：明显流动感（默认，含环境光斑）/ 轻度增强（低饱和无光斑） */}
+      {/* 玻璃效果：明显流动感（默认，含环境光斑）/ 轻度增强（低饱和无光斑）
+          option 的 value 必须逐字保持 'rich' / 'lite'——它直接决定 html.glass-lite 类，
+          改名会静默打断氛围层的降级链（AppShell .ambient-* 整层隐藏）。 */}
       <div className="space-y-2">
         <div style={{ color: 'var(--text-primary)' }}>{t('settings.display.glassEffect')}</div>
-        <div className="grid grid-cols-2 gap-2">
-          {(['rich', 'lite'] as const).map((opt) => {
-            const active = glassEffect === opt
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => handleGlassEffect(opt)}
-                className="p-3 rounded-lg text-center transition-all"
-                style={{
-                  background: active ? 'var(--accent)' : 'var(--bg-tertiary)',
-                  color: active ? 'var(--text-on-accent)' : 'var(--text-primary)',
-                  border: active ? '1px solid var(--accent)' : '1px solid transparent'
-                }}
-                aria-pressed={active}
-              >
-                <div className="font-medium text-sm">
-                  {t(
-                    opt === 'rich'
-                      ? 'settings.display.glassEffectRich'
-                      : 'settings.display.glassEffectLite'
-                  )}
-                </div>
-              </button>
-            )
-          })}
-        </div>
+        <SegmentedControl
+          ariaLabel={t('settings.display.glassEffect')}
+          options={[
+            { value: 'rich' as GlassEffect, label: t('settings.display.glassEffectRich') },
+            { value: 'lite' as GlassEffect, label: t('settings.display.glassEffectLite') }
+          ]}
+          value={glassEffect}
+          onChange={(effect) => void handleGlassEffect(effect)}
+        />
         <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
           {t('settings.display.glassEffectHint')}
         </p>
@@ -292,3 +265,15 @@ export const AppearanceDisplaySection: React.FC = () => {
     </SectionShell>
   )
 }
+
+/**
+ * 「主题与显示」合并页：主题节原本只有一个下拉框（36 行），
+ * 单独占一个导航项不值当，与同属界面偏好的显示节聚到一屏。
+ * 两节各自保留 SectionShell，本组件只管纵向排布。
+ */
+export const AppearanceThemeDisplaySection: React.FC = () => (
+  <div className="space-y-4">
+    <AppearanceThemeSection />
+    <AppearanceDisplaySection />
+  </div>
+)

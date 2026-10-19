@@ -7,6 +7,7 @@ import { killAllProcesses, getProcessRegistryStats } from '../utils/process-regi
 import { wifiShareService } from '../services/share-wifi-service'
 import { backupService } from '../services/backup-service'
 import { markCleanShutdown, markExitStage } from './exit-forensics'
+import { stopNikkiSyncRuntime } from './nikkisync-runtime-setup'
 import { t } from '../i18n'
 
 /**
@@ -111,6 +112,19 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
   // 4. 停止 WiFi 分享服务
   try {
     wifiShareService.stop()
+  } catch {}
+
+  // 4.5 sync-integration 阶段 4：停止 NikkiSync 同步服务器（优雅关闭：停收新连接 →
+  // WS 客户端发 close 帧 → 活动流 3s 宽限 → 强制断开）。必须在 dbManager.close() 之前
+  try {
+    await ctx.syncServer?.stop()
+  } catch {}
+
+  // 4.6 sync-integration 阶段 2：优雅停止内嵌 NikkiSync Runtime（scanner.stop → 库 close，
+  // 单步 3s 超时兜底）。与上方同步服务器同样必须在 dbManager.close() 之前，
+  // 避免退出链被上游 watcher 卡住（stop 内部已做幂等与异常捕获）
+  try {
+    await stopNikkiSyncRuntime(ctx)
   } catch {}
 
   // 5. 备份服务清理定时器

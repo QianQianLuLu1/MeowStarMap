@@ -4,7 +4,7 @@
 
 ## 项目概述
 
-**wxnn-photo-manager**（无限暖暖相册管理工具，v2.5.3）——面向《无限暖暖》玩家的本地桌面相册管理器：扫描、浏览、编辑、整理、分享游戏照片。目标平台 Windows x64。
+**wxnn-photo-manager**（无限暖暖相册管理工具，v2.5.5-beta）——面向《无限暖暖》玩家的本地桌面相册管理器：扫描、浏览、编辑、整理、分享游戏照片。目标平台 Windows x64。
 
 技术栈：Electron 41 + React 19 + TypeScript 5.9（strict）+ Zustand + Tailwind CSS 3 + better-sqlite3 + sharp + fluent-ffmpeg + i18next。构建工具为 electron-vite + electron-builder。
 
@@ -24,20 +24,22 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 
 ### 嵌套 AGENTS.md（模块级速览，改动对应模块前先读）
 
-| 模块               | 文件                                                                 | 覆盖内容                                                                                                                                |
-| ------------------ | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| 渲染进程           | [`src/renderer/AGENTS.md`](src/renderer/AGENTS.md)                   | 函数式组件约定、Zustand 状态管理、主题 CSS 变量、i18n、IPC 调用侧                                                                       |
-| IPC handler 注册层 | [`src/main/ipc/handlers/AGENTS.md`](src/main/ipc/handlers/AGENTS.md) | `registerXxxHandlers` 模式、`wrapHandler` 家族、zod `schemas`、路径安全、契约稳定性                                                     |
-| Preload 桥装配层   | [`src/main/preload/AGENTS.md`](src/main/preload/AGENTS.md)           | `contextBridge` 暴露模式、`exposeIfTrusted` origin 门禁、`call<T>()`/`subscribe()` 语义、依赖白名单、插件面收窄                         |
-| 扫描流水线         | [`src/main/scanner/AGENTS.md`](src/main/scanner/AGENTS.md)           | 主进程薄壳 ↔ utilityProcess worker 拓扑、`WorkerCommand`/`WorkerEvent` 协议、扫描阶段序列、崩溃恢复与心跳、WAL 并发、E001–E005 诊断码   |
-| 共享契约层         | [`src/shared/AGENTS.md`](src/shared/AGENTS.md)                       | 跨进程类型定义约定、AppError 错误体系、设置键白名单、纯函数工具约束、禁止 Node/Electron 依赖                                            |
-| 业务服务层         | [`src/main/services/AGENTS.md`](src/main/services/AGENTS.md)         | 服务设计模式（class vs 函数模块）、依赖注入、handler 边界、原生模块惰性加载、文件安全与磁盘空间校验                                     |
-| 应用生命周期编排层 | [`src/main/app/AGENTS.md`](src/main/app/AGENTS.md)                   | Application 协调者 + AppContext 依赖注入、8 阶段启动流程、退出清理链、GPU 自愈、自定义协议（media:// / app://）、导航授信、早期弹窗约束 |
-| 主进程核心工具层   | [`src/main/utils/AGENTS.md`](src/main/utils/AGENTS.md)               | 工具分类（叶子层/日志/安全/FFmpeg/媒体分析/进度）、依赖分层、fail-open 错误策略、i18n 分层、Windows 特化                                |
-| 构建工具链与脚本   | [`scripts/AGENTS.md`](scripts/AGENTS.md)                             | 打包校验闸门、i18n 治理工具链、技术债管理、性能基线、数据生成、dry-run 默认、纯函数导出、npm scripts 速查                               |
-| 数据库连接与仓储层 | [`src/main/database/AGENTS.md`](src/main/database/AGENTS.md)         | 读写分离架构（同步读/async 写经 worker bridge）、WAL 并发约束、Repository 模式、schema 迁移、FakeDb 测试约定                            |
-| 批量媒体 worker    | [`src/main/media-worker/AGENTS.md`](src/main/media-worker/AGENTS.md) | 缩略图/pHash/重复/相似检测批量任务、Manager 薄壳 ↔ utilityProcess worker 拓扑、四类任务独立取消、BK-tree 相似检索、崩溃恢复与批量让位   |
-| 单文件缩略图生成   | [`src/main/thumbnail/AGENTS.md`](src/main/thumbnail/AGENTS.md)       | ThumbnailGenerator 类（缓存 LRU/并发信号量/视频抽帧/降级策略）、单文件 worker 化、三档参数同步约束、损坏文件标记                        |
+| 模块               | 文件                                                                 | 覆盖内容                                                                                                                                                                   |
+| ------------------ | -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 渲染进程           | [`src/renderer/AGENTS.md`](src/renderer/AGENTS.md)                   | 函数式组件约定、Zustand 状态管理、主题 CSS 变量、i18n、IPC 调用侧                                                                                                          |
+| IPC handler 注册层 | [`src/main/ipc/handlers/AGENTS.md`](src/main/ipc/handlers/AGENTS.md) | `registerXxxHandlers` 模式、`wrapHandler` 家族、zod `schemas`、路径安全、契约稳定性                                                                                        |
+| Preload 桥装配层   | [`src/main/preload/AGENTS.md`](src/main/preload/AGENTS.md)           | `contextBridge` 暴露模式、`exposeIfTrusted` origin 门禁、`call<T>()`/`subscribe()` 语义、依赖白名单、插件面收窄                                                            |
+| 扫描流水线         | [`src/main/scanner/AGENTS.md`](src/main/scanner/AGENTS.md)           | 主进程薄壳 ↔ utilityProcess worker 拓扑、`WorkerCommand`/`WorkerEvent` 协议、扫描阶段序列、崩溃恢复与心跳、WAL 并发、E001–E005 诊断码                                      |
+| 共享契约层         | [`src/shared/AGENTS.md`](src/shared/AGENTS.md)                       | 跨进程类型定义约定、AppError 错误体系、设置键白名单、纯函数工具约束、禁止 Node/Electron 依赖                                                                               |
+| 业务服务层         | [`src/main/services/AGENTS.md`](src/main/services/AGENTS.md)         | 服务设计模式（class vs 函数模块）、依赖注入、handler 边界、原生模块惰性加载、文件安全与磁盘空间校验                                                                        |
+| 应用生命周期编排层 | [`src/main/app/AGENTS.md`](src/main/app/AGENTS.md)                   | Application 协调者 + AppContext 依赖注入、8 阶段启动流程、退出清理链、GPU 自愈、自定义协议（media:// / app://）、导航授信、早期弹窗约束                                    |
+| 主进程核心工具层   | [`src/main/utils/AGENTS.md`](src/main/utils/AGENTS.md)               | 工具分类（叶子层/日志/安全/FFmpeg/媒体分析/进度）、依赖分层、fail-open 错误策略、i18n 分层、Windows 特化                                                                   |
+| 构建工具链与脚本   | [`scripts/AGENTS.md`](scripts/AGENTS.md)                             | 打包校验闸门、i18n 治理工具链、技术债管理、性能基线、数据生成、dry-run 默认、纯函数导出、npm scripts 速查                                                                  |
+| 数据库连接与仓储层 | [`src/main/database/AGENTS.md`](src/main/database/AGENTS.md)         | 读写分离架构（同步读/async 写经 worker bridge）、WAL 并发约束、Repository 模式、schema 迁移、FakeDb 测试约定                                                               |
+| 批量媒体 worker    | [`src/main/media-worker/AGENTS.md`](src/main/media-worker/AGENTS.md) | 缩略图/pHash/重复/相似检测批量任务、Manager 薄壳 ↔ utilityProcess worker 拓扑、四类任务独立取消、BK-tree 相似检索、崩溃恢复与批量让位                                      |
+| 单文件缩略图生成   | [`src/main/thumbnail/AGENTS.md`](src/main/thumbnail/AGENTS.md)       | ThumbnailGenerator 类（缓存 LRU/并发信号量/视频抽帧/降级策略）、单文件 worker 化、三档参数同步约束、损坏文件标记                                                           |
+| NikkiSync 移植面   | [`src/main/sync/AGENTS.md`](src/main/sync/AGENTS.md)                 | 移植面服务层与 `server/`（认证/配对/TLS 身份/自研 HTTPS+WS）；与装载面的分工、以及移植面服务「已交付但默认不自启」的口径                                                   |
+| NikkiSync 装载缝   | [`src/main/nikkisync/AGENTS.md`](src/main/nikkisync/AGENTS.md)       | 外部 `@nikkisync/*` 包的唯一入口：变量式动态 import 的原因与护栏、不引用上游类型（协议真相源在 `shared/sync`）、探针禁止启动任何服务、链接由 `npm run link:nikkisync` 建立 |
 
 其余模块尚无模块级 AGENTS.md，跨模块任务需自行探索结构。新增嵌套指引时请同步本表。
 
@@ -64,12 +66,13 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 ### `src/main/`（主进程）
 
 - `app/` — 应用引导、生命周期编排（详见其 AGENTS.md）
-- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、resonance 等约 40 个域文件）；`handlers/` 详见其 AGENTS.md
+- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、resonance 等 47 个域文件，其中 4 个为 `_` 前缀辅助与 `set-dir-handler` 工厂、43 个 `registerXxxHandlers`）；`handlers/` 详见其 AGENTS.md
 - `preload/` — preload 桥命名空间模块（入口在 `src/main/preload.ts`），详见其 AGENTS.md
 - `database/` — better-sqlite3 连接与仓储（media、resonance、import-root 等）
 - `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享等业务服务（详见其 AGENTS.md）
 - `scanner/`、`thumbnail/`、`scheduler/` — 照片扫描与缩略图流水线；`scanner/`、`thumbnail/` 详见其 AGENTS.md
 - `media-worker/`、`decryption-worker/` — 后台 worker；`media-worker/` 详见其 AGENTS.md；解密依赖 koffi + `nuan5_decryption.dll`
+- `sync/`、`nikkisync/` — 同步能力的两面：`sync/` 为 NikkiSync 协议的**移植面**服务层（auth/pairing/identity），`nikkisync/` 为直接复用 NikkiSync 包的**外部包装载缝**（两者分工见各自 AGENTS.md）
 - `video-editor/`、`plugins/`、`i18n/`、`types/`
 - `utils/` — 主进程核心工具层（详见其 AGENTS.md）
 
@@ -93,12 +96,14 @@ npm run build        # 清理 + electron-vite build
 npm run dist:win     # 打包 Windows 安装包（含预检查与产物校验）
 
 npm test             # vitest run（变体：test:watch / test:coverage / test:main / test:renderer / test:db）
-npm run typecheck    # tsc -b（src 层）+ tsc -p tsconfig.scripts.json（scripts/ 工具层）；local verify/pre-commit 只跑前者，CI 跑全量
+npm run typecheck    # tsc -b（src 层，emit 落在 .cache/tsmain，不写 dist/main）+ tsc -p tsconfig.scripts.json（scripts/ 工具层）；local verify/pre-commit 只跑前者，CI 跑全量
+npm run typecheck:e2e # tsc --noEmit -p e2e（e2e/ 层）；上面两者都收不到 e2e/，CI 的 lint-typecheck job 也跑它，不得折进 typecheck（TS6310）
 npm run lint         # eslint .（lint:fix 自动修复）
 npm run format       # prettier
 npm run verify       # 变更后只读验证（typecheck + eslint 只读 + prettier --check + 相关单测；不改动文件）
 
 npm run e2e:smoke    # Playwright 冒烟测试（perf 为性能用例）
+npm run e2e          # 误输入守卫：冒号两侧被打上空格时列出真实子命令并以 1 退出
 ```
 
 ## 变更后验证工作流（Agent 必读）
@@ -133,13 +138,14 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 | 相关单测     | 超集：对所有变更 TS 文件按 `scripts/find-related-tests.ts` 匹配并运行（含 `scripts/`、`.storybook/`、`e2e/` 下的 `*.test.ts`） | `test:precommit` 仅由 `src/**/*.{ts,tsx}` 键触发，其他路径不跑测试 |
 | typecheck    | 目标含 `.ts/.tsx` 时 `tsc -b`                                                                                                  | 暂存含 `.ts/.tsx` 时 `tsc -b`                                      |
 
-必须记住的三点：
+必须记住的四点：
 
 1. **verify 通过 ≠ 提交时文件不变**：钩子仍可能修复格式与可自动修复的 lint 问题并重新暂存；提交后用 `git status --porcelain` 复核。
 2. **格式检查范围 = 钩子格式范围**：逐字取自 `package.json` 的 `lint-staged` 中含 `prettier` 任务的键（当前为 `src/**/*.{ts,tsx}`、`.storybook/**/*.{ts,tsx}`、`e2e/**/*.{ts,tsx}`、`src/**/*.{js,jsx,json,css,md}`、`scripts/**/*.{ts,js}`、仓库根 `*.{ts,js,json,md}`）。`docs/**`、`.qoder/rules/*.md`、`scripts/AGENTS.md` 不在闸门格式范围内，verify 也不会因此判失败；`scripts/__tests__/verify-format-scope.test.ts` 会同时守护"配置键形态"与"本文件列举的作用域"，两侧漂移即失败。
 3. **行尾不参与判定**：本机 `core.autocrlf=true` 时工作区为 CRLF、提交内容为 LF，故格式检查传 `--end-of-line auto` 避免假失败（钩子改写行尾不会改变提交内容）。
+4. **`tsc -b` 的 emit 与产物树隔离**：落点由 `src/main/tsconfig.json` 的 `outDir`（现为 `.cache/tsmain`）决定，不得指回 `dist/main`。被引用的 composite 项目不能禁 emit（`tsc -b --noEmit` 会报 TS6310），所以只能迁 outDir；一旦写回 `dist/main`，electron-vite 的 `preload.js` 会被覆写成 per-file CJS，`sandbox: true` 的 preload 无法 require 兄弟模块，走 `launchBuiltApp()` 的 e2e 用例（如 NikkiSync N1）便以 `window.electronAPI` undefined 假失败。防线两处：`e2e/dist-guard.ts` 在启动前拦截并提示先 `npm run build`，`scripts/__tests__/typecheck-emit-isolation.test.ts` 守护落点不回搬。
 
-本地闸门只做增量检查：全量 `npm run lint`、`npm run typecheck`、`npm run i18n:guard` 与全量 `npm test` 由 CI 保障。
+本地闸门只做增量检查：全量 `npm run lint`、`npm run typecheck`、`npm run typecheck:e2e`、`npm run i18n:guard` 与全量 `npm test` 由 CI 保障。`e2e/` 必须单独走 `typecheck:e2e`——`tsc -b` 只看根 tsconfig（include 为 `src/renderer` 与 `src/common`、reference 为 `src/main`），`tsc -p tsconfig.scripts.json` 只收 `scripts/`，两者都覆盖不到 `e2e/**`；该覆盖面由 `scripts/__tests__/typecheck-emit-isolation.test.ts` 的「闸门覆盖面」用例钉住。
 
 ### Agent 工作流
 
@@ -166,6 +172,6 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 - ESLint 9 flat config（`eslint.config.js`）+ Prettier。
 - 提交信息遵循 Conventional Commits，经 husky（commit-msg 钩子）+ commitlint 校验；规范详情见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md) 的「校验与提交」节。
 - 单元测试与源码同目录，命名 `*.test.ts(x)`（Vitest）。
-- 代码注释与文档以中文为主；UI 文案走 i18next（zh/en），勿硬编码用户可见文本。
+- 代码注释与文档以中文为主；UI 文案走 i18next（12 个 locale 包，zh-CN 为基准静态加载、其余 11 种动态加载，另有「跟随系统」auto），勿硬编码用户可见文本。
 - 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、源文件编码 UTF-8 无 BOM 与行尾 LF、校验与提交等）见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md)，该文件是唯一真相源。
 - 版本控制边界：根与模块级 `AGENTS.md`、`docs/CODING_CONVENTIONS.md` 均入仓，本文件导航表列出的每个路径都必须能解析到已跟踪文件；`.qoder/` 目录与 `.mimosa/`、`.trae/`、`.zcode/`、`.codebuddy/`、`.workbuddy*/`、`.codegraph/` 一样保持本地化（`.gitignore` 排除），其下的 IDE 规则文件仅作 `docs/CODING_CONVENTIONS.md` 的逐字镜像、skills 仅作本地装配，不得作为任何被跟踪指引的出处。

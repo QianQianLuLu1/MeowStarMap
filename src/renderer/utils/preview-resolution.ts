@@ -79,6 +79,32 @@ export function computePreviewMaxSize(
 }
 
 /**
+ * 拖动代理档长边（像素）
+ *
+ * FIX(实时预览)：拖动中的帧只需要「看得出画面在跟着参数变」，不需要满分辨率。
+ * 修复前拖动帧与静止帧共用同一预算（显示区 × DPR × 缩放，8× 缩放时可达原图分辨率），
+ * 逐像素循环量级为秒，主线程被整帧占满。拖动帧钳到本档后工作量降一个数量级，
+ * 停止输入由尾随的真实预算帧补回清晰度。
+ */
+export const DRAG_PROXY_MAX_SIZE = 1024
+
+/**
+ * 把真实显示预算折算为拖动代理档预算（只降不升）
+ *
+ * @param realMaxSize 真实长边预算；`Number.POSITIVE_INFINITY`（不限制）同样被钳到代理档，
+ *                    这正是高缩放时逐像素跑原图的失控入口
+ * @returns 代理档预算。NaN / 0 / 负数等非法值**原样返回**，
+ *          交由下游 `normalizeMaxPreviewSize` 按「不限制」口径处理，此处不静默改分辨率
+ */
+export function computeDragProxyMaxSize(realMaxSize: number): number {
+  if (!Number.isFinite(realMaxSize)) {
+    return realMaxSize > 0 ? DRAG_PROXY_MAX_SIZE : realMaxSize
+  }
+  if (realMaxSize <= 0) return realMaxSize
+  return Math.min(realMaxSize, DRAG_PROXY_MAX_SIZE)
+}
+
+/**
  * 首帧（容器尚未测量）时的预算估算
  *
  * @param win 窗口对象；缺失或尺寸非法时回落 FALLBACK_PREVIEW_MAX_SIZE

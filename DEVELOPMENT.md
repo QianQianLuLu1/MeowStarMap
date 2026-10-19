@@ -2,7 +2,7 @@
 
 > 面向零基础开发者的「无限暖暖相册管理工具」上手文档。
 > 所有命令均可直接复制到 PowerShell 终端运行。
-> 项目代号：`wxnn-photo-manager` / 应用名：NikkiGallery / 当前版本：2.5.3 / 平台：Windows x64
+> 项目代号：`wxnn-photo-manager` / 应用名：NikkiGallery / 当前版本：2.5.5-beta / 平台：Windows x64
 
 ---
 
@@ -151,6 +151,7 @@ npm run dist:win:smoke
 - 用例与配置：`e2e/smoke.e2e.ts` / `e2e/playwright.config.ts`；方案见 `docs/archive/plans/e2e-smoke-playwright.md`
 - CI 在 build job 打包后自动执行，失败时上传截图与主进程日志（artifact `e2e-smoke-failure`）
 - 发布前还需按 `docs/manual-smoke-checklist.md` 人工清单逐项验证（扫描/解密/编辑等依赖真实样本的项）
+- 脚本名冒号两侧**不能有空格**：`npm run e2e : smoke` 会被 npm 切成脚本名 `e2e`，由误输入守卫 `scripts/e2e-usage.ts` 拦下（列出真实子命令、退出码 1），而不是 npm 的 Missing script 报错
 
 ---
 
@@ -166,7 +167,7 @@ WXNN XiangCe/
 │   │   ├── preload/           # preload 拆分模块（按功能域命名空间化）
 │   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
 │   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
-│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 30 个文件，每文件导出 <key>API 对象）
+│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 33 个文件，每文件导出 <key>API 对象）
 │   │   ├── app/               # 应用生命周期管理（23 个源文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
@@ -192,7 +193,7 @@ WXNN XiangCe/
 │   │   ├── scheduler/         # 分级任务调度队列
 │   │   ├── services/          # 业务服务层（文件/视频/水印/分享/备份...）
 │   │   ├── thumbnail/         # 缩略图生成器（基于 sharp）
-│   │   ├── ipc/handlers/      # IPC 通道处理函数（按业务分文件，约 40 个）
+│   │   ├── ipc/handlers/      # IPC 通道处理函数（按业务分文件，47 个域文件：4 个 _ 前缀辅助与 set-dir-handler 工厂，43 个由 setupIPC() 注册）
 │   │   ├── plugins/           # 插件宿主（plugin-host/permission-guard）
 │   │   ├── video-editor/      # 视频编辑器子进程（bridge/filter-builder/watermark-builder）
 │   │   ├── i18n/              # 主进程国际化
@@ -735,7 +736,7 @@ npm test
 | `npm run typecheck`    | **exit 0，零错误**                                                                                                                                                                                                                                                                                                                                                                       |
 | `npm run lint`         | **exit 0，0 error**；11 个 warning 全部是 DEBT-030 登记的 `src/renderer/components/common/*.test.tsx` 带 BOM（`eslint --fix` 可清）（2026-10-10 实测；旧基线所述 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处问题已不再命中）                                                                                                                   |
 | `npm run format:check` | 本机 `core.autocrlf=true` 下 **exit 1**——601 个文件仅因 CRLF 行尾被判红（2026-10-10 实测）。只读口径必须补 `--end-of-line auto`：`npx prettier --check --end-of-line auto <同范围>` 实测 exit 0。另注意 lint-staged 的根键 `*.{ts,js,json,md}` 在 lint-staged 语义下命中**任意深度**，故 `prettier --write` 实际也会改写 `docs/**`（改完大文档仍建议单独 `npx prettier --check <file>`） |
-| `npm test`             | 全量 337 文件 / 5331 用例（2026-10-10 实测；除 `generator.limiter.test.ts` 在全量并发下的负载相关失败外全绿，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10；历史基线中的 `path-safety.test.ts` 与 `GalleryStackOverflow.test.tsx` 两个环境性失败已在 2.5.0 修复）                                                                                               |
+| `npm test`             | 全量 408 文件 / 6312 通过 + 2 skip（2026-10-17 本轮全量实跑；历史读数 337 / 5331 为 2026-10-10 快照，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10；历史基线中的 `path-safety.test.ts` 与 `GalleryStackOverflow.test.tsx` 两个环境性失败已在 2.5.0 修复）                                                                                                       |
 
 ### 7.2 完整打包命令
 
@@ -781,7 +782,7 @@ npx electron-builder --win --publish never
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.3.exe       # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
+├── NikkiGallery-Setup-2.5.5-beta.exe  # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
 └── builder-effective-config.yaml             # 打包配置快照
 ```
 
@@ -825,7 +826,7 @@ node scripts/generate-icon.js
 
 ### 7.7 安装与测试
 
-1. 双击 `release\NikkiGallery-Setup-2.5.3.exe` 安装
+1. 双击 `release\NikkiGallery-Setup-2.5.5-beta.exe` 安装
 2. 安装完成后从开始菜单或桌面快捷方式启动
 3. 首次启动会触发全盘扫描定位游戏目录（首次扫描较慢，请耐心等待）
 4. 程序会自动在桌面创建快捷方式（若已存在则跳过）
@@ -836,7 +837,7 @@ node scripts/generate-icon.js
 
 - **不要随意修改版本号**，除非用户明确要求
 - 版本号定义在 `package.json` 的 `version` 字段（同时决定安装程序文件名：`NikkiGallery-Setup-<version>.exe`）
-- 当前版本：`2.5.3`
+- 当前版本：`2.5.5-beta`
 - 改版本号后，`README.md` 的版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 的「当前版本」、本文档头部版本号需同步修改
 
 修改版本号示例（仅在用户要求时执行）：
@@ -943,6 +944,10 @@ npm run build-storybook
 | 测试覆盖率            | `npm run test:coverage`         |
 | i18n 键检查           | `npm run i18n:check`            |
 | 预览版漂移检查        | `npm run preview:check`         |
+| 文档死引用检查        | `npm run docs:links`            |
+| 技术债 CI 提醒        | `npm run debt:check`            |
+| NikkiSync 依赖链接    | `npm run link:nikkisync`        |
+| NikkiSync 装载面诊断  | `npm run verify:nikkisync`      |
 | 构建产物              | `npm run build`                 |
 | 打包 Windows 安装程序 | `npm run dist:win`              |
 | 重新生成图标          | `node scripts/generate-icon.js` |
@@ -958,9 +963,11 @@ npm run build-storybook
 - [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md)：用户使用指南
 - [docs/IPC_CONTRACT.md](docs/IPC_CONTRACT.md)：IPC 契约规范
 - [docs/PLUGIN_API.md](docs/PLUGIN_API.md)：插件 API 参考
+- [docs/CODING_CONVENTIONS.md](docs/CODING_CONVENTIONS.md)：四条硬性编码约定与校验/提交口径（唯一真相源）
 - [docs/技术债清单.md](docs/技术债清单.md)：技术债台账
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md)：组件文档站使用说明
-- [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md)：项目架构全景（零基础导读）
+- [docs/sync-integration/](docs/sync-integration/)：NikkiSync 同步集成的阶段计划与审计报告（16 份，属设计真相源；文中路径混指本仓与上游仓，见各文件首部「路径作用域」声明）
+- [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md)：项目架构全景（零基础导读）——`docs/archive/` 被 `.gitignore` 排除，仅本机留存，不入仓
 
 ---
 

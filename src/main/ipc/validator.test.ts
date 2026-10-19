@@ -14,6 +14,7 @@
  * isUserPicked 归一化前缀匹配 + 与 roots 联动。
  */
 import { describe, it, expect, vi } from 'vitest'
+import fs from 'fs'
 import { z } from 'zod'
 
 // 仅 stub electron（validator.ts 顶层 import 了 electron），保留 ../validator 真实实现
@@ -139,5 +140,75 @@ describe('PathGuard userPicked（用户显式选择即授权）', () => {
     expect(pathGuard.isUserPicked('D:\\Program Filesabc\\Game\\Album')).toBe(false)
     expect(pathGuard.isUserPicked('relative\\path')).toBe(false)
     expect(pathGuard.isUserPicked('')).toBe(false)
+  })
+
+  /**
+   * 缺陷：写侧登记的是对话框返回的**原形态**路径，读侧（media:// 与 assertMediaReadPath）
+   * 拿的是 realpath 之后的形态。二者不一致时，凡祖先含 junction / 符号链接 / SUBST /
+   * 映射盘 / OneDrive 重定向的选中路径都永不相交 → 用户刚挑好的 logo 恒 403（表现为
+   * 「换个目录就好了」）。归一必须放在写侧，一次覆盖全部 isUserPicked 消费方。
+   */
+  it('D3: registerUserPicked 同步登记 realpath 形态（junction / 映射盘不改址即失效）', () => {
+    const JUNCTION = 'D:\\Photos\\logo.png'
+    const REAL = 'E:\\OneDrive\\Photos\\logo.png'
+    const spy = vi.spyOn(fs, 'realpathSync').mockImplementation(() => REAL)
+    try {
+      pathGuard.registerUserPicked(JUNCTION)
+      expect(pathGuard.isUserPicked(REAL)).toBe(true)
+      expect(pathGuard.isUserPicked(JUNCTION)).toBe(true)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it('D4: realpath 抛错时 fail-open —— 仍登记原形态且不向对话框冒泡异常', () => {
+    const spy = vi.spyOn(fs, 'realpathSync').mockImplementation(() => {
+      throw Object.assign(new Error('ENOENT: no such file or directory'), { code: 'ENOENT' })
+    })
+    try {
+      expect(() => pathGuard.registerUserPicked('D:\\Picked\\Album')).not.toThrow()
+      expect(pathGuard.isUserPicked('D:\\Picked\\Album')).toBe(true)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  /**
+   * 安全边界护栏（修复前后皆绿，防后来者「顺手」把物理拼写也无条件登记）：
+   * isUserPicked 在 scanner:start / settings:set / assertMediaAccessPath 处是**跳过黑名单**
+   * 的短路，若 junction 的物理目标落在敏感目录，登记它等于给凭据/系统目录开一条直连读路。
+   * 代价是「真身在敏感目录里的 logo 仍 403」——这是有意的取舍。
+   */
+  it('D5: realpath 落到敏感目录时不登记物理拼写（不给黑名单短路一个直连物理路径的拼写）', () => {
+    const LOGICAL = 'D:\\Junction\\logo.png'
+    const REAL_SENSITIVE = 'C:\\Program Files\\Launcher\\Album\\logo.png'
+    const spy = vi.spyOn(fs, 'realpathSync').mockImplementation(() => REAL_SENSITIVE)
+    try {
+      pathGuard.registerUserPicked(LOGICAL)
+      expect(pathGuard.isUserPicked(LOGICAL)).toBe(true)
+      expect(pathGuard.isUserPicked(REAL_SENSITIVE)).toBe(false)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  /**
+   * 目录与文件必须分集合：scanner:start / settings:set 的短路前提是「这是一份被显式
+   * 选中的**目录**」。本批把 `dialog:openFile` 的单个文件也纳入 userPicked 后，若继续
+   * 用同一个判据，挑中的 logo 就能冒充扫描根（详见 scanner-handler.test.ts B5）。
+   */
+  it('D6: 文件登记不进目录集合，目录登记两集合并存', () => {
+    const PICKED_FILE = 'D:\\Downloads\\D6-logo.png'
+    const PICKED_DIR = 'D:\\D6-Album'
+    pathGuard.registerUserPicked(PICKED_FILE)
+    expect(pathGuard.isUserPicked(PICKED_FILE)).toBe(true)
+    expect(pathGuard.isUserPickedDir(PICKED_FILE)).toBe(false)
+
+    pathGuard.registerUserPickedDir(PICKED_DIR)
+    expect(pathGuard.isUserPicked(PICKED_DIR)).toBe(true)
+    expect(pathGuard.isUserPickedDir(PICKED_DIR)).toBe(true)
+    // 目录级前缀语义只在目录集合内成立
+    expect(pathGuard.isUserPickedDir(`${PICKED_DIR}\\sub`)).toBe(true)
+    expect(pathGuard.isUserPickedDir(PICKED_FILE)).toBe(false)
   })
 })

@@ -15,6 +15,7 @@ import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { useFailedImages } from '../../hooks/useFailedImages'
+import { useIsScrolling } from '../../hooks/useIsScrolling'
 import { useOnDemandThumbnails } from '../../hooks/useOnDemandThumbnails'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -204,8 +205,13 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
     const wrapperRef = useRef<HTMLDivElement>(null)
     const [columns, setColumns] = useState(4)
     const [hoveredId, setHoveredId] = useState<string | null>(null)
+    // 修复网格滚动闪烁 N2：滚动进行中冻结 hover 态。
+    // hoveredId 是整网格级 state，而 Blink 在内容滚过静止光标时会持续重算 hover 命中——
+    // 每一次换行都触发 setHoveredId ⇒ 整个网格重渲染 + 遮罩子树（hover 套 ↔ touch 套）整体装卸，
+    // 这就是「向下滚动时逐格闪一下」的重绘来源。停滚后清掉残留 hover，避免遮罩卡在已滚走的卡上。
+    const scrollingRef = useIsScrolling(() => setHoveredId(null))
     const [focusedIndex, setFocusedIndex] = useState<number>(-1)
-    // P1-U10：failedImages 状态管理 + items 变化时自动清空
+    // P1-U10：failedImages 状态管理（N4 起只裁剪已离开 items 的 id，不再随引用变化整表清空）
     const { failedImages, markFailed, clearFailed } = useFailedImages(items)
     const { ensureThumbnail, getGeneratedPath, hasFailed } = useOnDemandThumbnails()
     // fix-thumbnail-skeleton-reveal N4：standard 重试代次（file_path → nonce）。
@@ -498,23 +504,23 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             return (
               <div
                 className={`media-card aspect-square ${multiSelectMode ? 'relative ' : ''}${
-                  isSelected ? 'ring-2 ring-offset-2' : ''
+                  isSelected ? 'is-selected' : ''
                 }`}
                 style={{
                   background: 'var(--bg-tertiary)',
-                  ...(isSelected
-                    ? ({ '--tw-ring-color': 'var(--accent)' } as React.CSSProperties)
-                    : {}),
                   outline: isFocused ? '2px solid var(--accent)' : 'none',
                   outlineOffset: '2px',
                   opacity: isMissing ? 0.45 : 1
                 }}
                 onClick={(e) => onSelect(file.id, index, e)}
                 onMouseEnter={() => {
+                  // N2：滚动进行中忽略 hover 切换（详见 scrollingRef 声明处注释）
+                  if (scrollingRef.current) return
                   setHoveredId(file.id)
                   onHover(file.id)
                 }}
                 onMouseLeave={() => {
+                  if (scrollingRef.current) return
                   setHoveredId(null)
                   onHover(null)
                 }}

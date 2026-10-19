@@ -2,7 +2,7 @@
 
 > **项目代号**：`wxnn-photo-manager`
 > **应用名称**：无限暖暖相册管理工具（NikkiGallery）
-> **当前版本**：2.5.3
+> **当前版本**：2.5.5-beta
 > **平台**：Windows x64
 > **文档版本**：1.5
 > **最后更新**：2026-10-06
@@ -34,26 +34,26 @@
 
 ### 1.2 核心能力
 
-| 能力域              | 说明                                                                                                                                                                                                                           |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **媒体扫描**        | 自动定位游戏目录，全盘/增量扫描 NikkiPhotos、MagazinePhotos、ScreenShot 等 16 类签名文件夹                                                                                                                                     |
-| **图库浏览**        | 网格/列表/时间线/瀑布流/活动时间轴 5 种视图，虚拟滚动，多档缩略图                                                                                                                                                              |
-| **详情查看**        | EXIF 拍摄参数、游戏相机参数（姿势/光圈/灯光/滤镜）、套装/染色/交互对象信息、坐标定位                                                                                                                                           |
-| **图片编辑**        | 22 项调整（曝光/对比/HSL/曲线/色调分离/LUT/水印）+ 编辑历史栈 + 批量应用                                                                                                                                                       |
-| **视频处理**        | 缩略图提取、元数据读取、裁剪、调速（0.25x-4.0x）、格式转换、Apple Live Photo 导出                                                                                                                                              |
-| **重复检测**        | 精确 SHA256 + 感知哈希（pHash）双重检测，4 维智能评分推荐保留项                                                                                                                                                                |
-| **智能分组**        | 按相册类型/场景分类/场景时段/套装/文件类型 6 维度聚合                                                                                                                                                                          |
-| **角色档案**        | 多账号管理、按 UID 隔离、跨档案转移、统计图鉴                                                                                                                                                                                  |
-| **分类管理**        | 系统分类 + 用户自定义分类树，拖拽排序，颜色与图标配置                                                                                                                                                                          |
-| **回收站**          | 软删除/恢复/彻底删除/清空，二次确认与三阶段事务保证一致性                                                                                                                                                                      |
-| **分享**            | 微信/QQ/vivo 剪贴板分享 + WiFi 局域网分享（PIN 鉴权 + Range 支持）                                                                                                                                                             |
-| **备份恢复**        | 自动定时备份 + 手动备份，按档案 UID 后缀识别，5 份 LRU 保留                                                                                                                                                                    |
-| **设置中心**        | 启动行为/外观/扫描/档案/数据/诊断/关于/工具 8 大分组配置                                                                                                                                                                       |
-| **国际化**          | 12 种语言（zh-CN/zh-TW/en/ja/ko/fr/de/es/pt/ru/th/vi），含"跟随系统"选项                                                                                                                                                       |
-| **主题**            | 默认主题 + 柔粉轻奢主题，CSS 变量驱动，零 JS 重渲染切换                                                                                                                                                                        |
-| **诊断**            | 故障日志（10 类 FaultType）+ 崩溃 dump + 启动诊断 + 进程退出诊断                                                                                                                                                               |
-| **游戏参数解密**    | 通过 koffi 调用 nuan5_decryption.dll 解密游戏内照片相机参数                                                                                                                                                                    |
-| **共鸣录**（2.5.0） | 抽卡记录浏览与手动补录、我的衣橱（部件/妆容/Momo/道具/共鸣色）拥有状态与套装收集进度、本地 JSON 导入导出（解析预览 → 分批事务 → 可取消、断点幂等）、个人统计（欧非百分位与出货分布）；5 张共鸣表 + 9 个 IPC 通道，纯离线零外链 |
+| 能力域              | 说明                                                                                                                                                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **媒体扫描**        | 自动定位游戏目录，全盘/增量扫描 NikkiPhotos、MagazinePhotos、ScreenShot 等 16 类签名文件夹                                                                                                                                      |
+| **图库浏览**        | 网格/列表/时间线/瀑布流/活动时间轴 5 种视图，虚拟滚动，多档缩略图                                                                                                                                                               |
+| **详情查看**        | EXIF 拍摄参数、游戏相机参数（姿势/光圈/灯光/滤镜）、套装/染色/交互对象信息、坐标定位                                                                                                                                            |
+| **图片编辑**        | 22 项调整（曝光/对比/HSL/曲线/色调分离/LUT/水印）+ 编辑历史栈 + 批量应用                                                                                                                                                        |
+| **视频处理**        | 缩略图提取、元数据读取、裁剪、调速（0.25x-4.0x）、格式转换、Apple Live Photo 导出                                                                                                                                               |
+| **重复检测**        | 精确 SHA256 + 感知哈希（pHash）双重检测，4 维智能评分推荐保留项                                                                                                                                                                 |
+| **智能分组**        | 按相册类型/场景分类/场景时段/套装/文件类型 6 维度聚合                                                                                                                                                                           |
+| **角色档案**        | 多账号管理、按 UID 隔离、跨档案转移、统计图鉴                                                                                                                                                                                   |
+| **分类管理**        | 系统分类 + 用户自定义分类树，拖拽排序，颜色与图标配置                                                                                                                                                                           |
+| **回收站**          | 软删除/恢复/彻底删除/清空，二次确认与三阶段事务保证一致性                                                                                                                                                                       |
+| **分享**            | 微信/QQ/vivo 剪贴板分享 + WiFi 局域网分享（PIN 鉴权 + Range 支持）                                                                                                                                                              |
+| **备份恢复**        | 自动定时备份 + 手动备份，按档案 UID 后缀识别，5 份 LRU 保留                                                                                                                                                                     |
+| **设置中心**        | 启动行为/外观/扫描/档案/数据/诊断/关于/工具 8 大分组配置                                                                                                                                                                        |
+| **国际化**          | 12 种语言（zh-CN/zh-TW/en/ja/ko/fr/de/es/pt/ru/th/vi），含"跟随系统"选项                                                                                                                                                        |
+| **主题**            | 默认主题 + 柔粉轻奢主题，CSS 变量驱动，零 JS 重渲染切换                                                                                                                                                                         |
+| **诊断**            | 故障日志（10 类 FaultType）+ 崩溃 dump + 启动诊断 + 进程退出诊断                                                                                                                                                                |
+| **游戏参数解密**    | 通过 koffi 调用 nuan5_decryption.dll 解密游戏内照片相机参数                                                                                                                                                                     |
+| **共鸣录**（2.5.0） | 抽卡记录浏览与手动补录、我的衣橱（部件/妆容/Momo/道具/共鸣色）拥有状态与套装收集进度、本地 JSON 导入导出（解析预览 → 分批事务 → 可取消、断点幂等）、个人统计（欧非百分位与出货分布）；6 张共鸣表 + 10 个 IPC 通道，纯离线零外链 |
 
 ### 1.3 应用形态
 
@@ -119,7 +119,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
 │  │ BrowserWindow │  │  IPC Handlers│  │  media:// Protocol    │  │
-│  │  (Renderer)   │  │(~40 handlers)│  │  (Path Whitelist)     │  │
+│  │  (Renderer)   │  │(43 handlers)│  │  (Path Whitelist)     │  │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘  │
 │                                                                   │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐  │
@@ -155,25 +155,27 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
                    │  userData/database/  │
                    └─────────────────────┘
 
-   （另有两个 utilityProcess：thumbnail-worker —— sharp 缩放；
-     video-worker —— 视频编辑 FFmpeg 执行，见 §5.6 / §5.12）
+   （另有三个 utilityProcess：thumbnail-worker —— sharp 缩放；
+     video-worker —— 视频编辑 FFmpeg 执行，见 §5.6 / §5.12；
+     decryption-worker —— 网络解码 FFI 隔离，见 §3.2）
 ```
 
 ### 3.2 进程职责矩阵
 
-| 进程                 | 入口                                          | 职责                                                                                                | 通信方式                                   |
-| -------------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| **主进程**           | `src/main/index.ts`                           | BrowserWindow 管理、IPC handler 注册、media:// 协议、nativeTheme 同步、单实例锁、启动编排、退出清理 | ipcMain.handle / webContents.send          |
-| **Renderer**         | `src/renderer/main.tsx`                       | UI 渲染、用户交互、状态管理                                                                         | window.electronAPI (preload contextBridge) |
-| **scanner-worker**   | `src/main/scanner/worker-entry.ts`            | 全盘/增量/签名扫描、文件元数据提取、缺失检测、旧数据修复                                            | utilityProcess.parentPort                  |
-| **database-worker**  | `src/main/database/worker/database-worker.ts` | 承接所有 `media_files` / `categories` / `character_profiles` 写操作（INSERT/UPDATE/DELETE/事务）    | utilityProcess.parentPort                  |
-| **media-worker**     | `src/main/media-worker/worker-entry.ts`       | 缩略图批量生成（sharp）、pHash 批量补算（DCT-II）、重复标记（Union-Find）                           | utilityProcess.parentPort                  |
-| **thumbnail-worker** | `src/main/thumbnail/worker-entry.ts`          | sharp 缩放实现（迁移自 ThumbnailGenerator 的 CPU 密集部分）                                         | utilityProcess.parentPort                  |
-| **video-worker**     | `src/main/video-editor/worker-entry.ts`       | 视频编辑的 FFmpeg 命令构建与执行、进度上报                                                          | utilityProcess.parentPort                  |
+| 进程                  | 入口                                          | 职责                                                                                                                                                                                                                                                       | 通信方式                                   |
+| --------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| **主进程**            | `src/main/index.ts`                           | BrowserWindow 管理、IPC handler 注册、media:// 协议、nativeTheme 同步、单实例锁、启动编排、退出清理                                                                                                                                                        | ipcMain.handle / webContents.send          |
+| **Renderer**          | `src/renderer/main.tsx`                       | UI 渲染、用户交互、状态管理                                                                                                                                                                                                                                | window.electronAPI (preload contextBridge) |
+| **scanner-worker**    | `src/main/scanner/worker-entry.ts`            | 全盘/增量/签名扫描、文件元数据提取、缺失检测、旧数据修复                                                                                                                                                                                                   | utilityProcess.parentPort                  |
+| **database-worker**   | `src/main/database/worker/database-worker.ts` | 承接所有 `media_files` / `categories` / `character_profiles` 写操作（INSERT/UPDATE/DELETE/事务）                                                                                                                                                           | utilityProcess.parentPort                  |
+| **media-worker**      | `src/main/media-worker/worker-entry.ts`       | 缩略图批量生成（sharp）、pHash 批量补算（DCT-II）、重复标记（Union-Find）                                                                                                                                                                                  | utilityProcess.parentPort                  |
+| **thumbnail-worker**  | `src/main/thumbnail/worker-entry.ts`          | sharp 缩放实现（迁移自 ThumbnailGenerator 的 CPU 密集部分）                                                                                                                                                                                                | utilityProcess.parentPort                  |
+| **video-worker**      | `src/main/video-editor/worker-entry.ts`       | 视频编辑的 FFmpeg 命令构建与执行、进度上报                                                                                                                                                                                                                 | utilityProcess.parentPort                  |
+| **decryption-worker** | `src/main/decryption-worker/worker-entry.ts`  | 网络解码隔离（`cloth_diy_decode_network` / `home_build_decode_network` 是同步无超时且做真实网络 I/O 的 FFI，留在主进程会冻结事件循环）；koffi 结构定义与主进程刻意重复（两进程各持独立 koffi 注册表）；`WORKER_READY` 推迟到 DLL 加载 + ABI 校验完成后才发 | utilityProcess.parentPort                  |
 
 ### 3.3 通信协议
 
-五个 utilityProcess 采用模式一致但协议独立的消息格式，所有消息均为可序列化 JSON。以下列出 scanner / database / media 三者的协议；thumbnail-worker（`THUMBNAIL_PROCESS_START` / `THUMBNAIL_WORKER_DISPOSE` → `WORKER_READY` / `THUMBNAIL_PROCESS_COMPLETE`）与 video-worker（`EDIT_START` / `EDIT_STOP` / `EDITOR_DISPOSE` → `WORKER_READY` / `EDIT_PROGRESS` / `EDIT_COMPLETE`）的协议定义见 `src/main/thumbnail/worker-protocol.ts` 与 `src/main/video-editor/worker-protocol.ts`。
+六个 utilityProcess 采用模式一致但协议独立的消息格式，所有消息均为可序列化 JSON。以下列出 scanner / database / media 三者的协议；thumbnail-worker（`THUMBNAIL_PROCESS_START` / `THUMBNAIL_WORKER_DISPOSE` → `WORKER_READY` / `THUMBNAIL_PROCESS_COMPLETE`）、video-worker（`EDIT_START` / `EDIT_STOP` / `EDITOR_DISPOSE` → `WORKER_READY` / `EDIT_PROGRESS` / `EDIT_COMPLETE`）与 decryption-worker（`DECRYPT_WORKER_INIT` → `WORKER_READY`，主进程侧 8s `Promise.race` 硬超时后 kill）的协议定义见 `src/main/thumbnail/worker-protocol.ts`、`src/main/video-editor/worker-protocol.ts` 与 `src/main/decryption-worker/worker-protocol.ts`。
 
 #### scanner-worker 协议
 
@@ -327,7 +329,6 @@ wxnn-photo-manager/
 │   ├── archive/                       # 历史归档文档（计划、报告、规范、旧架构文档）
 │   ├── i18n/                          # i18n 改造 SOP（终态快照已归档）
 │   ├── plans/                         # 近期实施计划与报告
-│   ├── screenshots/                   # 截图
 │   ├── storybook/                     # Storybook MDX 指南
 │   ├── tutorial/                      # 用户使用教程（MD 版）
 │   └── IPC_CONTRACT.md / PLUGIN_API.md 等
@@ -416,7 +417,7 @@ wxnn-photo-manager/
 │   │   │   ├── handler-context.ts     # 依赖注入上下文
 │   │   │   ├── validator.ts           # wrapHandler + PathGuard + schemas
 │   │   │   ├── media-read-guard.ts    # assertMediaReadPath（含 realpath 复检）
-│   │   │   └── handlers/              # 约 40 个域文件（含 set-dir-handler 工厂与 _shared 辅助）
+│   │   │   └── handlers/              # 47 个域文件（4 个 _ 前缀辅助与 set-dir-handler 工厂，43 个 registerXxxHandlers）
 │   │   │       ├── media-handler.ts / media-lifecycle-handler.ts / media-cleanup-handler.ts
 │   │   │       ├── file.ts / file-export-handler.ts / file-rename-handler.ts
 │   │   │       ├── video.ts / watermark.ts / editor.ts
@@ -441,10 +442,25 @@ wxnn-photo-manager/
 │   │   │   ├── types.ts               # 视频编辑类型定义
 │   │   │   ├── worker-entry.ts        # worker 进程入口
 │   │   │   └── worker-protocol.ts     # 消息协议
+│   │   ├── decryption-worker/         # 网络解码 FFI 隔离子进程（DLL 加载 + ABI 校验后才发 WORKER_READY）
+│   │   ├── sync/                      # NikkiSync 移植面服务层（自有实现，纯 Node 可测）
+│   │   │   ├── auth-service.ts        # Ed25519 签名验证、±5min 时间窗、nonce 内存防重放
+│   │   │   ├── pairing-service.ts     # 一次性配对令牌（只存 sha256）与 NS1 二维码内容
+│   │   │   ├── identity-service.ts    # TLS 自签证书 + 服务器身份文件持久化
+│   │   │   ├── cert-der.ts            # X.509 v3 DER 纯函数构造（零依赖手写）
+│   │   │   └── server/                # 移植面 HTTPS/WS 服务（sync-server / api-router / ws-hub / range / jpeg-export）
+│   │   │                              #   阶段 3 起不再自启，设置页「同步服务」节由 NikkiSync LocalSyncServer 接管
+│   │   ├── nikkisync/                 # NikkiSync 外部包（@nikkisync/*）装载缝，全仓唯一入口
+│   │   │   ├── runtime-loader.ts      # 变量式 await import + 必需导出表（静态值导入会触发 ERR_REQUIRE_ASYNC_MODULE）
+│   │   │   ├── runtime-facade.ts      # 装载 + 组装 + 只读查询面
+│   │   │   ├── runtime-manager.ts     # 生命周期状态机（唯一依赖注入面；start() 永不外抛）
+│   │   │   ├── probe.ts / probe-cli.ts # 链接探针：绝不启动任何服务，数据库只允许 :memory:
+│   │   │   ├── sync-server-view.ts    # 上游 LocalSyncServer 配置的纯函数折算层
+│   │   │   └── metadata-resolver-driver.ts / metadata-isolation-guards.ts  # 阶段 6 有界驱动与表级隔离护栏
 │   │   ├── i18n/                      # 主进程国际化
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # worker 内纯查表翻译
-│   │   ├── utils/                     # 主进程工具（26 个模块）
+│   │   ├── utils/                     # 主进程工具（31 个模块）
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -459,7 +475,7 @@ wxnn-photo-manager/
 │   │   ├── index.ts                   # 主进程入口（早期防护 + 协议注册 + 启动 Application）
 │   │   ├── preload.ts                 # preload 入口（装配 + contextBridge 暴露）
 │   │   ├── preload-logger.ts          # 渲染层日志转发 preload
-│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 30 个命名空间）
+│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 33 个命名空间）
 │   │   └── tsconfig.json
 │   ├── renderer/                      # 渲染进程
 │   │   ├── assets/                    # 静态资源
@@ -480,7 +496,7 @@ wxnn-photo-manager/
 │   │   │   └── locales/               # 12 种语言 JSON
 │   │   ├── icons/                     # 74 个 SVG 图标集中管理（单文件）
 │   │   │   └── index.tsx
-│   │   ├── pages/                     # 9 个页面
+│   │   ├── pages/                     # 11 个页面
 │   │   │   ├── settings/              # 设置页 sections（按分组拆分文件）
 │   │   │   ├── GalleryPage.tsx
 │   │   │   ├── CategoriesPage.tsx
@@ -501,7 +517,7 @@ wxnn-photo-manager/
 │   │   │   ├── search-service.ts      # 搜索服务
 │   │   │   ├── doc-builder.ts         # 文档构建器
 │   │   │   └── use-search-index.ts    # 搜索 hook
-│   │   ├── stores/                    # 6 个 Zustand store
+│   │   ├── stores/                    # 7 个 Zustand store
 │   │   │   ├── mediaStore.ts
 │   │   │   ├── uiStore.ts
 │   │   │   ├── themeStore.ts
@@ -531,6 +547,7 @@ wxnn-photo-manager/
 │       │   ├── progress.ts / plugin.ts / editor-metadata.ts / duplicate.ts
 │       │   ├── resonance.ts / electron-api.ts
 │       │   └── index.ts
+│       ├── sync/                      # 同步协议契约（protocol.ts / domain-types.ts；协议唯一真相源，禁改）
 │       ├── utils/                     # concurrency.ts / taskStages.ts
 │       ├── settings-keys.ts           # 渲染层可写偏好 key 白名单
 │       ├── dimension.ts               # 智能分组维度
@@ -588,7 +605,7 @@ wxnn-photo-manager/
 2026-08 命名空间化拆分重构：原 1176 行单体文件拆为入口装配 + 按功能域的模块树，
 对外契约（全局名 / 方法签名 / 通道字符串）不变，并有单元测试守护（`preload/__tests__/`）。
 
-- `preload.ts` 入口：装配 `electronAPI`（reportReady + 30 个命名空间）并执行 5 个 `exposeInMainWorld`
+- `preload.ts` 入口：装配 `electronAPI`（reportReady + 33 个命名空间，共 34 个键）并执行 5 个 `exposeInMainWorld`
   ——全部经 `exposeIfTrusted()` 门禁：非授信文档（origin 非 app:// / media:// / dev 5173）零暴露
 - `preload/ipc.ts`：`IpcError` 类 + 统一调用入口 `call<T>(channel, ...args)`（解包 `IpcResponse<T>`，失败抛 `IpcError`）+ `subscribe` 事件订阅助手
 - `preload/api/*.ts`：每文件一个命名空间对象（`scannerAPI`、`fileAPI`…），方法与通道字符串与拆分前逐字一致
@@ -734,7 +751,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 3. **`schemas`** 通用 zod schema 集合：`filePath` / `filePathArray` / `mediaId` / `mediaIdArray` / `rating` / `positiveIntId` / `shortString` / `uid` / `httpUrl` / `uiTheme` / `thumbnailQuality` / `backupFilename` / `shortId` / `cacheLimitBytes`
 
-#### `handlers/` — 约 40 个域文件（含 set-dir-handler 工厂与 `_shared` 辅助）
+#### `handlers/` — 47 个域文件（4 个 `_` 前缀辅助与 `set-dir-handler` 工厂，43 个由 `setupIPC()` 注册的 `registerXxxHandlers`）
 
 | 模块                           | 职责                                                                                                                                 |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -776,7 +793,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | `category-handler.ts`          | 分类管理                                                                                                                             |
 | `plugin.ts`                    | 插件管理                                                                                                                             |
 | `plugin-bridge-handler.ts`     | 插件能力桥（media/db/fs/watermark/task/i18n 受控调用，配合 `permission-guard` 校验）                                                 |
-| `resonance-handler.ts`         | 共鸣录（9 个通道：getData/手动记录 CRUD/readImportFile/commitImport/export/updateWardrobe/clearAll）                                 |
+| `resonance-handler.ts`         | 共鸣录（10 个通道：getData/手动记录 CRUD/readImportFile/commitImport/export/updateWardrobe/setWishlist/clearAll）                    |
 | `set-dir-handler.ts`           | 工厂：`registerSetDirHandler` / `registerResetDirHandler`，消除 4 个文件同构模板                                                     |
 
 ### 5.9 工具层（utils/）
@@ -1373,28 +1390,38 @@ components / pages (展示)
 
 ### 9.2 表结构
 
-| 表                        | 字段（核心）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | 用途                                                   |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| **`media_files`**         | `id` (PK AUTOINCREMENT)、`file_path` (UNIQUE)、`file_name`、`file_type` ('image'/'video')、`file_ext`、`file_size`、`width`、`height`、`duration`、`created_at`、`modified_at`、`source_path`、`thumbnail`、`tags` (JSON 默认 '[]')、`category_id`、`rating`、`is_favorite`、`notes`、`indexed_at`、`scene_category`、`scene_time`、`outfit`、`is_deleted`、`deleted_at`、`is_missing`、`missing_count`、`phash` (64 字符 0/1 串)、`account_uid`、`album_type`、`is_duplicate`、`original_id`、`media_source` | 主表，27+ 字段                                         |
-| **`categories`**          | `id`、`name` (UNIQUE)、`icon`、`color`、`sort_order`、`parent_id`、`is_system`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                  | 分类树，含 7 个系统分类                                |
-| **`scan_history`**        | `id`、`scan_type` ('full'/'incremental'/'signature')、`start_time`、`end_time`、`files_found`、`files_new`、`status`                                                                                                                                                                                                                                                                                                                                                                                          | 扫描历史                                               |
-| **`app_settings`**        | `key` (PK)、`value` (JSON 字符串)                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | KV 设置存储，含 `media_count` 缓存                     |
-| **`filter_presets`**      | `id`、`name`、`category`、`params` (JSON)、`is_builtin`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                         | 滤镜预设                                               |
-| **`watermark_templates`** | `id`、`name`、`config` (JSON)、`is_builtin`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 水印模板                                               |
-| **`edit_history`**        | `id`、`media_id` (FK CASCADE)、`params` (JSON)、`thumbnail`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                     | 单媒体编辑历史                                         |
-| **`operation_history`**   | `id`、`operation_type` (13 种)、`media_id`、`payload` (JSON)、`description`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                     | 全局操作历史（跨重启撤销），启动时自动清理 30 天前记录 |
-| **`character_profiles`**  | `uid` (PK)、`nickname`、`avatar`、`created_at`、`last_active_at`                                                                                                                                                                                                                                                                                                                                                                                                                                              | 角色档案，默认 'default'                               |
-| **`schema_migrations`**   | `name` (PK)、`applied_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 命名迁移跟踪                                           |
+| 表                          | 字段（核心）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | 用途                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **`media_files`**           | `id` (PK AUTOINCREMENT)、`file_path` (UNIQUE)、`file_name`、`file_type` ('image'/'video')、`file_ext`、`file_size`、`width`、`height`、`duration`、`created_at`、`modified_at`、`source_path`、`thumbnail`、`tags` (JSON 默认 '[]')、`category_id`、`rating`、`is_favorite`、`notes`、`indexed_at`、`scene_category`、`scene_time`、`outfit`、`is_deleted`、`deleted_at`、`is_missing`、`missing_count`、`phash` (64 字符 0/1 串)、`account_uid`、`album_type`、`is_duplicate`、`original_id`、`media_source` | 主表，27+ 字段                                                                                                         |
+| **`categories`**            | `id`、`name` (UNIQUE)、`icon`、`color`、`sort_order`、`parent_id`、`is_system`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                  | 分类树，含 7 个系统分类                                                                                                |
+| **`scan_history`**          | `id`、`scan_type` ('full'/'incremental'/'signature')、`start_time`、`end_time`、`files_found`、`files_new`、`status`                                                                                                                                                                                                                                                                                                                                                                                          | 扫描历史                                                                                                               |
+| **`app_settings`**          | `key` (PK)、`value` (JSON 字符串)                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | KV 设置存储，含 `media_count` 缓存                                                                                     |
+| **`filter_presets`**        | `id`、`name`、`category`、`params` (JSON)、`is_builtin`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                         | 滤镜预设                                                                                                               |
+| **`watermark_templates`**   | `id`、`name`、`config` (JSON)、`is_builtin`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 水印模板                                                                                                               |
+| **`edit_history`**          | `id`、`media_id` (FK CASCADE)、`params` (JSON)、`thumbnail`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                     | 单媒体编辑历史                                                                                                         |
+| **`operation_history`**     | `id`、`operation_type` (13 种)、`media_id`、`payload` (JSON)、`description`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                     | 全局操作历史（跨重启撤销），启动时自动清理 30 天前记录                                                                 |
+| **`character_profiles`**    | `uid` (PK)、`nickname`、`avatar`、`created_at`、`last_active_at`                                                                                                                                                                                                                                                                                                                                                                                                                                              | 角色档案，默认 'default'                                                                                               |
+| **`favorites`**             | `id` (PK AUTOINCREMENT)、`media_id` (NOT NULL UNIQUE)、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                           | 收藏关系表（与 `media_files.is_favorite` 并存）                                                                        |
+| **`import_roots`**          | `id` (PK AUTOINCREMENT)、`root_path` (NOT NULL UNIQUE)、`created_at`、`disabled` (默认 0)                                                                                                                                                                                                                                                                                                                                                                                                                     | 导入根登记，供导入向导与路径授权判定                                                                                   |
+| **`pending_renames`**       | `id` (PK AUTOINCREMENT)、`old_path`、`new_path`、`new_file_name`、`created_at`、`retry_count` (默认 0)、`last_retry_at`                                                                                                                                                                                                                                                                                                                                                                                       | 重命名失败补偿队列，启动时重试                                                                                         |
+| **`asset_edits`**           | `asset_id` (TEXT PK)、`is_favorite`、`rating`、`tags` (JSON)、`notes`、`category_id`、`outfit`、`scene_category`、`scene_time`、`is_hidden`、`deleted_at`、`updated_at`                                                                                                                                                                                                                                                                                                                                       | 同步面（NikkiSync 资产）编辑覆盖层，2026-10-14（2.5.5 期间）由 0790252 新增；与 `media_files` 表级隔离，绝不回写原有表 |
+| **`sync_service_state`**    | `id` (PK CHECK id=1)、`library_revision`、`server_id`、`server_name`、`created_at`、`updated_at`                                                                                                                                                                                                                                                                                                                                                                                                              | 同步服务单行状态与库版本号                                                                                             |
+| **`sync_paired_devices`**   | `device_id` (PK)、`device_name`、`platform` (ios/android)、`public_key`、`credential_hash`、`app_version`、`paired_at`、`last_seen_at`、`last_ack_revision`                                                                                                                                                                                                                                                                                                                                                   | 已配对设备与 Ed25519 公钥                                                                                              |
+| **`sync_pairing_sessions`** | `pairing_token_hash` (PK)、`server_id`、`expires_at`、`used_at`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                 | 一次性配对令牌（只存 sha256，兑换后置 used_at）                                                                        |
+| **`sync_change_journal`**   | `revision` (PK CHECK >0)、`event_type` (asset.created/updated/deleted)、`asset_id`、`occurred_at`、`payload_json`                                                                                                                                                                                                                                                                                                                                                                                             | 变更日志，客户端按 revision 增量拉取                                                                                   |
+| **`sync_motion_links`**     | `still_media_id` (PK)、`motion_media_id` (NOT NULL UNIQUE)、`method` (embedded_id/filename/timestamp/heuristic/manual)、`confidence` (0–1)                                                                                                                                                                                                                                                                                                                                                                    | 静帧与动图（Live Photo）配对关系                                                                                       |
+| **`schema_migrations`**     | `name` (PK)、`applied_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 命名迁移跟踪                                                                                                           |
 
-**共鸣录表（2.5.0 新增，5 张）**：DDL 常量 `RESONANCE_DDL_STATEMENTS`（`src/main/database/resonance-repository.ts`）由 `connection.ts` 的共鸣录迁移以 `db.exec` 逐条执行，全部为 `CREATE TABLE IF NOT EXISTS`，幂等可重复执行；5 张表均纳入既有整库备份 / 恢复。
+**共鸣录表（2.5.0 新增 5 张；`resonance_banner_wishlist` 由 2545252「移植上游卡池心愿单」于 2026-10-10（2.5.3 期间）追加，共 6 张）**：DDL 常量 `RESONANCE_DDL_STATEMENTS`（`src/main/database/resonance-repository.ts`）由 `connection.ts` 的共鸣录迁移以 `db.exec` 逐条执行，全部为 `CREATE TABLE IF NOT EXISTS`，幂等可重复执行；6 张表均纳入既有整库备份 / 恢复。
 
-| 表                             | 字段（核心）                                                                                                                                | 用途                                      |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| **`resonance_pulls`**          | `id` (PK)、`banner_id`、`item_id`、`obtained_at`、`source` ('json'/'manual-import')、`created_at`；UNIQUE (banner_id, obtained_at, item_id) | 抽卡记录主表                              |
-| **`resonance_edits`**          | `id` (PK)、`banner_id`、`item_id`、`obtained_at`、`created_at`；UNIQUE (banner_id, item_id)                                                 | 手动补录记录                              |
-| **`resonance_pearpal`**        | `banner_id`、`item_id`、`pool_cnt`、`obtained_at`、`raw_json`；UNIQUE (banner_id, item_id, pool_cnt)                                        | 美鸭梨（Pear-Pal）抓取记录，保留原始 JSON |
-| **`resonance_evo`**            | `banner_id`、`outfit_id`、`level` (0–4)、`updated_at`；UNIQUE (banner_id, outfit_id)                                                        | 套装进化等级                              |
-| **`resonance_wardrobe_items`** | `category` ('item'/'makeup'/'momo'/'prop'/'eureka_color')、`item_id`、`updated_at`；PRIMARY KEY (category, item_id)                         | 我的衣橱拥有状态                          |
+| 表                              | 字段（核心）                                                                                                                                | 用途                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| **`resonance_pulls`**           | `id` (PK)、`banner_id`、`item_id`、`obtained_at`、`source` ('json'/'manual-import')、`created_at`；UNIQUE (banner_id, obtained_at, item_id) | 抽卡记录主表                                                       |
+| **`resonance_edits`**           | `id` (PK)、`banner_id`、`item_id`、`obtained_at`、`created_at`；UNIQUE (banner_id, item_id)                                                 | 手动补录记录                                                       |
+| **`resonance_pearpal`**         | `banner_id`、`item_id`、`pool_cnt`、`obtained_at`、`raw_json`；UNIQUE (banner_id, item_id, pool_cnt)                                        | 美鸭梨（Pear-Pal）抓取记录，保留原始 JSON                          |
+| **`resonance_evo`**             | `banner_id`、`outfit_id`、`level` (0–4)、`updated_at`；UNIQUE (banner_id, outfit_id)                                                        | 套装进化等级                                                       |
+| **`resonance_wardrobe_items`**  | `category` ('item'/'makeup'/'momo'/'prop'/'eureka_color')、`item_id`、`updated_at`；PRIMARY KEY (category, item_id)                         | 我的衣橱拥有状态                                                   |
+| **`resonance_banner_wishlist`** | `banner_id` (NOT NULL, UNIQUE)；写入为整表覆盖式（卡池心愿单是「当前集合」而非历史）                                                        | 卡池心愿单标记（2.5.5-beta 新增，经 `resonance:setWishlist` 写入） |
 
 ### 9.3 关键索引
 
@@ -1653,7 +1680,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 ### 12.2 版本号约束
 
 - **版本号必须保持不变，除非用户明确要求**
-- 当前版本：2.5.3
+- 当前版本：2.5.5-beta（2026-10-11 由用户要求从 2.5.3 升至 2.5.5，2026-10-16 定版为 2.5.5-beta）
 - 改版本号需同步：`package.json` 的 `version`、`README.md` 版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 头部与 §12.2、`DEVELOPMENT.md` / `DEVELOPMENT.en.md` 头部与 §7.8；安装程序文件名由 `artifactName` 模板自动跟随（`NikkiGallery-Setup-${version}.exe`）
 
 ### 12.3 性能红线
@@ -1749,7 +1776,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 - **主进程职责边界**：主进程只做 zod 参数校验、PathGuard 白名单（`assertFileReadPath` / `assertFileWritePath`）、文件读写与 SQLite 存取；导入解析、合并去重、差异计数、导出载荷组装均为渲染层纯函数（`src/renderer/utils/resonance/`）
 - **导入上限**（常量定义在 `src/shared/types/resonance.ts`）：单文件 `MAX_IMPORT_FILE_BYTES` = 64MB、总记录 `MAX_TOTAL_IMPORT_RECORDS` = 200000、单卡池 `MAX_PULLS_PER_BANNER` = 50000、单批提交 `MAX_COMMIT_BATCH_ROWS` = 2000、衣橱单批 `MAX_WARDROBE_BATCH` = 5000
 - **导入提交**：渲染层按 `MAX_COMMIT_BATCH_ROWS` 分批调用 `resonance:commitImport`，每批一个事务、`INSERT OR IGNORE` 幂等，可中断后续传；`wardrobe` 仅最后一个批次携带（全量覆盖）
-- **9 个 IPC 通道**全部经 `wrapHandler` + zod schema 校验：`resonance:getData`、`addManualRecord`、`updateManualRecord`、`deleteRecord`、`readImportFile`、`commitImport`、`export`、`updateWardrobe`、`clearAll`；`clearAll` 为危险操作，二次确认由渲染层负责
+- **10 个 IPC 通道**全部经 `wrapHandler` + zod schema 校验：`resonance:getData`、`addManualRecord`、`updateManualRecord`、`deleteRecord`、`readImportFile`、`commitImport`、`export`、`updateWardrobe`、`setWishlist`、`clearAll`；`clearAll` 为危险操作，二次确认由渲染层负责
 - **离线守护**：`src/renderer/utils/resonance/offline-guard.test.ts` 断言核心流程零网络调用并静态扫描新增源码，且含反向用例防假绿
 
 ### 12.15 工程不变量（2026-08 起收口）
@@ -1934,7 +1961,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 | `src/main/ipc/handler-context.ts`                    | 依赖注入上下文                                 |
 | `src/main/ipc/validator.ts`                          | wrapHandler + PathGuard + schemas              |
 | `src/main/ipc/media-read-guard.ts`                   | `assertMediaReadPath`（含 realpath 复检）      |
-| `src/main/ipc/handlers/resonance-handler.ts`         | 共鸣录 9 个 IPC 通道                           |
+| `src/main/ipc/handlers/resonance-handler.ts`         | 共鸣录 10 个 IPC 通道                          |
 | `src/main/preload/api/resonance.ts`                  | `electronAPI.resonance` 命名空间               |
 | `src/main/preload/origin-guard.ts`                   | `isTrustedDocumentOrigin` + `exposeIfTrusted`  |
 | `src/main/app/navigation-guard.ts`                   | `isAppDocumentUrl`（导航防护第一层）           |
@@ -2001,7 +2028,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 5.0，337 个测试文件 / 5331 个用例（2026-10-10 实测；除 `generator.limiter.test.ts` 在全量并发下的负载相关失败外全绿，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
+- Vitest 5.0，408 个测试文件 / 6312 个通过 + 2 个 skip（2026-10-17 本轮全量实跑；历史读数 337 / 5331 为 2026-10-10 快照，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---

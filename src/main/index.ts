@@ -197,6 +197,45 @@ app.whenReady().then(async () => {
     diagLog('INDEX', 'Application constructed, before initialize()')
     await application.initialize()
     diagLog('INDEX', 'Application.initialize() completed')
+
+    // 整合阶段 1：NikkiSync 依赖链接探针（默认关，仅 NIKKI_NIKKISYNC_PROBE=1 时跑）。
+    // 只验证四包可装载与内存库建表，绝不启动 Runtime/scanner/服务器；失败只记录，
+    // 绝不阻塞启动（与本文件其余诊断分支一致的 fail-open 口径）。
+    if (process.env.NIKKI_NIKKISYNC_PROBE === '1') {
+      try {
+        const { runNikkiSyncLinkProbe } = await import('./nikkisync/probe')
+        const { buildPackagingContext } = await import('./nikkisync/embedding-paths')
+        // 打包态必须给出上下文：装载缝据此走 app.asar.unpacked 兜底装载，
+        // 探针据此以本侧解析的绝对路径显式传 schemaSql（上游 import.meta.url 不可靠）。
+        const packagingContext = buildPackagingContext({
+          isPackaged: app.isPackaged,
+          resourcesPath: process.resourcesPath,
+          projectRoot: app.getAppPath()
+        })
+        const report = await runNikkiSyncLinkProbe(packagingContext)
+        const summary =
+          `nikkisync link probe ok=${report.ok} host=node ${report.host.node} ` +
+          `(electron=${report.host.electron ?? 'n/a'}) packages=${report.packages.length} ` +
+          `exports=${report.exports.length} dbTables=${report.database.tableCount ?? 'n/a'} ` +
+          `packaged=${packagingContext.isPackaged} schemaSource=${report.database.schemaSource ?? 'n/a'} ` +
+          `failures=${report.failures.length > 0 ? report.failures.join(' | ') : 'none'}`
+        diagLog('INDEX', summary)
+        // diag.log 落盘在本机存在静默失败（历史 INDEX 行停在 2026-09-18），因此额外走
+        // electron-log 统一通道，使 dev 启动阶段的可观测性与 gpuFallbackActive 日志一致。
+        try {
+          electronLogger.info(`[NIKKISYNC] ${summary}`)
+        } catch {
+          // electron-log 未就绪时仅依赖 diagLog
+        }
+      } catch (err) {
+        diagLog('INDEX', `nikkisync link probe threw: ${String(err)}`)
+        try {
+          electronLogger.warn(`[NIKKISYNC] link probe threw: ${String(err)}`)
+        } catch {
+          // 同上：日志通道不可用时不阻塞启动
+        }
+      }
+    }
     markExitStage('initialized')
     // 启动成功标记：供纯净系统 / CI 断言启动成功
     try {

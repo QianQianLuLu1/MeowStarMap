@@ -287,3 +287,98 @@ describe('reportEarlyFatal 子进程 spawn 类错误分级', () => {
     expect(logStartupError).toHaveBeenCalledWith('video-extract', expect.any(Error))
   })
 })
+
+/**
+ * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/plans/2026-10-15-media-stream-cancel-race-fix.md）：
+ * undici 对 Node 流 body 的包装（ReadableStreamFrom）在请求取消竞态下对已关闭流执行
+ * 无守卫 close，抛 ERR_INVALID_STATE: Invalid state: ReadableStream is already closed
+ * （堆栈仅平台帧：ReadableByteStreamController.close ← undici ← processTicksAndRejections）。
+ * 该异常发生在已分离的微任务中、无应用状态受损，但被本模块"一律致命"策略升级为
+ * app.exit(1)，与渲染进程媒体请求取消风暴叠加形成崩溃循环（用户感知为"启动失败"）。
+ *
+ * 与 spawn 分级同理：已知良性的流状态竞态在应用已就绪（有主窗口）后降级为仅记录。
+ */
+describe('reportEarlyFatal 流状态竞态错误分级（2026-10-15 启动闪退修复）', () => {
+  /** 构造与生产 startup-errors.log 完全同构的错误对象（code + message + TypeError 类型） */
+  function makeStreamRaceError(): TypeError {
+    return Object.assign(new TypeError('Invalid state: ReadableStream is already closed'), {
+      code: 'ERR_INVALID_STATE'
+    })
+  }
+
+  it('T5【缺陷复现】已开窗口时降级为仅记录：不弹致命框、不释放锁、不退出', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const { logFaultSync } = await import('./logger')
+    const { diagLog } = await import('./startup-diagnostic')
+    const showErrorBox = vi.fn()
+    const exitApp = vi.fn()
+    const releaseLock = vi.fn()
+
+    reportEarlyFatal(makeStreamRaceError(), {
+      stage: 'index.uncaughtException',
+      deps: { showErrorBox, exitApp, releaseLock, hasMainWindow: () => true }
+    })
+
+    // 降级而非致命：不弹框、不退出、不释放锁
+    expect(showErrorBox).not.toHaveBeenCalled()
+    expect(exitApp).not.toHaveBeenCalled()
+    expect(releaseLock).not.toHaveBeenCalled()
+    // 但必须留痕：faults 通道带 declassified 标记，供线上检索同类竞态的来源
+    expect(logFaultSync).toHaveBeenCalledWith(
+      'uncaughtException',
+      expect.any(TypeError),
+      expect.objectContaining({ declassified: 'stream-race' })
+    )
+    expect(diagLog).toHaveBeenCalledWith(
+      'STREAM-RACE-NONFATAL',
+      expect.stringContaining('ReadableStream is already closed')
+    )
+  })
+
+  it('T6【护栏·边界】未开窗口（启动期）时仍按致命处理：弹「启动失败」并退出', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    const exitApp = vi.fn()
+
+    reportEarlyFatal(makeStreamRaceError(), {
+      deps: { showErrorBox, exitApp, hasMainWindow: () => false }
+    })
+
+    expect(String(showErrorBox.mock.calls[0][0])).toContain('启动失败')
+    expect(exitApp).toHaveBeenCalledWith(1)
+  })
+
+  it('T7【护栏·窄分类】ERR_INVALID_STATE 但消息不匹配 / 非对象入参 → 仍致命或分类为否', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+
+    // 其他 invalid state（非 ReadableStream 竞态）+ 有窗口 → 仍致命（分类必须收窄）
+    const otherInvalid = Object.assign(
+      new TypeError('Invalid state: socket is already connected'),
+      {
+        code: 'ERR_INVALID_STATE'
+      }
+    )
+    const showErrorBox = vi.fn()
+    const exitApp = vi.fn()
+    reportEarlyFatal(otherInvalid, {
+      deps: { showErrorBox, exitApp, hasMainWindow: () => true }
+    })
+    expect(String(showErrorBox.mock.calls[0][0])).toContain('启动失败')
+    expect(exitApp).toHaveBeenCalledWith(1)
+  })
+
+  it('T7b【护栏·边界】非对象入参不命中流竞态分类，仍走致命路径', async () => {
+    const { reportEarlyFatal } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    const exitApp = vi.fn()
+
+    // 非对象入参（null/字符串等）无法携带 code/message，分类函数必须判否，
+    // 不能被降级分支吞掉——否则真实的非异常值上报将静默丢失。
+    reportEarlyFatal(null, {
+      deps: { showErrorBox, exitApp, hasMainWindow: () => true }
+    })
+
+    expect(String(showErrorBox.mock.calls[0][0])).toContain('启动失败')
+    expect(exitApp).toHaveBeenCalledWith(1)
+  })
+})

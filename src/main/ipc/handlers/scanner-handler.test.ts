@@ -419,8 +419,9 @@ describe('Bug B 回归：scanner:start 扫描前登记扫描根到 pathGuard 白
 
 // ============================================================================
 // 指定目录白名单修复：userPicked（对话框显式选择即授权）路径放行
-// 翻转回归用例 B1/B3 修复前必须失败（未实现 isUserPicked 短路时，对话框选出的
-// 系统目录仍被 assertFileReadPath 拒绝）；B2/B4 为防安全面放宽的守卫用例。
+// 短路判据是**目录**集合 isUserPickedDir——扫描根语义只认目录；B1/B3 为翻转回归用例
+// （未实现短路时，对话框选出的系统目录仍被 assertFileReadPath 拒绝）；
+// B2/B4 为防安全面放宽的守卫用例；B5 钉「挑中的单个文件不得冒充扫描根」。
 // ============================================================================
 
 describe('scanner:start — userPicked（对话框显式选择）路径放行', () => {
@@ -435,6 +436,8 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     pathGuardMock.register.mockClear()
     vi.mocked(pathGuard.isUserPicked).mockReset()
     vi.mocked(pathGuard.isUserPicked).mockImplementation(() => false)
+    vi.mocked(pathGuard.isUserPickedDir).mockReset()
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation(() => false)
     vi.mocked(pathGuard.registerUserPicked).mockClear()
   })
 
@@ -446,8 +449,8 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     on: vi.fn()
   })
 
-  it('B1: userPicked 命中的系统目录 path 放行（跳过 assertFileReadPath）并正常扫描', async () => {
-    vi.mocked(pathGuard.isUserPicked).mockImplementation((p) => p === SYS_PICKED)
+  it('B1: 显式选择的系统目录（isUserPickedDir 命中）path 放行（跳过 assertFileReadPath）并正常扫描', async () => {
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation((p) => p === SYS_PICKED)
     assertFileReadPathMock.mockImplementation(() => {
       throw AppError.forbidden('路径不在白名单内，禁止读取操作')
     })
@@ -469,7 +472,7 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     expect(pathGuardMock.registerRoots).toHaveBeenCalled()
   })
 
-  it('B2(守卫): isUserPicked 未命中的伪造路径仍被拒绝且不登记不扫描', async () => {
+  it('B2(守卫): isUserPickedDir 未命中的伪造路径仍被拒绝且不登记不扫描', async () => {
     assertFileReadPathMock.mockImplementation(() => {
       throw AppError.forbidden('路径不在白名单内，禁止读取操作')
     })
@@ -490,8 +493,8 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     )
   })
 
-  it('B3: userPicked 命中的 customKnownPaths 条目放行（ScanFallbackSection 链路）', async () => {
-    vi.mocked(pathGuard.isUserPicked).mockImplementation((p) => p === SYS_PICKED)
+  it('B3: 显式选择的目录（isUserPickedDir 命中）customKnownPaths 条目放行（ScanFallbackSection 链路）', async () => {
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation((p) => p === SYS_PICKED)
     assertFileReadPathMock.mockImplementation(() => {
       throw AppError.forbidden('路径不在白名单内，禁止读取操作')
     })
@@ -508,7 +511,7 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     expect(assertFileReadPathMock).not.toHaveBeenCalled()
   })
 
-  it('B4(守卫): isUserPicked 未命中的 customKnownPaths 条目仍走 assertFileReadPath', async () => {
+  it('B4(守卫): isUserPickedDir 未命中的 customKnownPaths 条目仍走 assertFileReadPath', async () => {
     const scannerManager = makeScannerManager()
     registerScannerHandlers(
       makeCtx({ scannerManager, mainWindow: { webContents: { send: vi.fn() } } })
@@ -516,5 +519,133 @@ describe('scanner:start — userPicked（对话框显式选择）路径放行', 
     await getHandler(handleMock, 'scanner:start')([{ customKnownPaths: ['D:\\Games\\Album'] }])
     expect(assertFileReadPathMock).toHaveBeenCalledWith('D:\\Games\\Album')
     expect(scannerManager.startScan).toHaveBeenCalledTimes(1)
+  })
+
+  /**
+   * 缺陷：图片水印修复把 `dialog:openFile` 的**单个文件**也纳入 userPicked
+   * （`dialog-handler.ts:84-86`），而 scanner/settings 的短路判据只看 `isUserPicked`，
+   * 于是 `scanner:start { path: 'D:\\Downloads\\logo.png' }` 这类「拿文件冒充扫描目录」
+   * 不再被校验拦截——扫描会在 readdir 处莫名失败、`customScanPaths` 也能存下非目录项。
+   * 目录授权与文件授权必须分集合（`isUserPickedDir`）。
+   */
+  it('B5(边界): 仅登记为文件（isUserPicked 命中但 isUserPickedDir 未命中）时不得短路', async () => {
+    const PICKED_FILE = 'D:\\Downloads\\logo.png'
+    vi.mocked(pathGuard.isUserPicked).mockImplementation((p) => p === PICKED_FILE)
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation(() => false)
+    assertFileReadPathMock.mockImplementation(() => {
+      throw AppError.forbidden('路径不在白名单内，禁止读取操作')
+    })
+    const scannerManager = makeScannerManager()
+    registerScannerHandlers(
+      makeCtx({ scannerManager, mainWindow: { webContents: { send: vi.fn() } } })
+    )
+    const result = (await getHandler(handleMock, 'scanner:start')([{ path: PICKED_FILE }])) as {
+      success: boolean
+    }
+
+    expect(result.success).toBe(false)
+    expect(assertFileReadPathMock).toHaveBeenCalledWith(PICKED_FILE)
+    expect(scannerManager.startScan).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================================
+// sync-integration 阶段5：扫描事件接线断言
+// S1 行为锁：成功路径 started/completed 配对广播（阶段4 既有行为）
+// S2 红灯→绿灯：后处理抛错时仍补 journal+completed（修复 started 悬挂）
+// S3 红灯→绿灯：restoredComplete 恢复扫描补 started 广播
+// ============================================================================
+
+describe('scanner-handler — sync 事件接线（阶段5）', () => {
+  function makeSyncEvents() {
+    return {
+      recordAssetChange: vi.fn(async () => undefined),
+      recordAssetChanges: vi.fn(async (changes: unknown[]) => changes.length),
+      broadcastRescanStarted: vi.fn(async () => undefined),
+      broadcastRescanCompleted: vi.fn(async () => undefined)
+    }
+  }
+
+  beforeEach(() => {
+    handleMock.mockClear()
+    generateThumbnailsForUnprocessedMock.mockReset()
+    generateThumbnailsForUnprocessedMock.mockResolvedValue(undefined)
+    vi.mocked(pathGuard.isUserPicked).mockReset()
+    vi.mocked(pathGuard.isUserPicked).mockImplementation(() => false)
+    vi.mocked(pathGuard.isUserPickedDir).mockReset()
+    vi.mocked(pathGuard.isUserPickedDir).mockImplementation(() => false)
+    assertFileReadPathMock.mockReset()
+    assertFileReadPathMock.mockImplementation(() => undefined)
+  })
+
+  it('S1(行为锁): 扫描成功路径广播 rescan.started 与 rescan.completed 各一次', async () => {
+    const syncEvents = makeSyncEvents()
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 2 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn(),
+      on: vi.fn()
+    }
+    registerScannerHandlers(
+      makeCtx({ scannerManager, syncEvents, mainWindow: { webContents: { send: vi.fn() } } })
+    )
+    await getHandler(handleMock, 'scanner:start')([{ incremental: true }])
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledWith(0)
+  })
+
+  it('S2(红灯→绿灯): 后处理抛错（notifyMediaUpdated）时仍补 journal+completed，避免 started 悬挂', async () => {
+    const syncEvents = makeSyncEvents()
+    const scannerManager = {
+      startScan: vi.fn().mockResolvedValue({ success: true, filesFound: 2 }),
+      stopScan: vi.fn(),
+      getStatus: vi.fn(),
+      on: vi.fn()
+    }
+    const sendMock = vi.fn()
+    const ctx = makeCtx({
+      scannerManager,
+      syncEvents,
+      mainWindow: { webContents: { send: sendMock } }
+    })
+    ;(ctx as unknown as { notifyMediaUpdated: ReturnType<typeof vi.fn> }).notifyMediaUpdated =
+      vi.fn(() => {
+        throw new Error('webContents destroyed')
+      })
+    registerScannerHandlers(ctx)
+    const result = (await getHandler(handleMock, 'scanner:start')([{ incremental: true }])) as {
+      success: boolean
+      error?: { code: string }
+    }
+    // started 已广播（发起前），后处理失败后必须补 completed 收口
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledWith(0)
+    expect(result.success).toBe(false)
+    expect(sendMock).toHaveBeenCalledWith(
+      'scanner:complete',
+      expect.objectContaining({ success: false })
+    )
+  })
+
+  it('S3(红灯→绿灯): restoredComplete 崩溃恢复扫描补 started 广播（与 completed 成对）', async () => {
+    const syncEvents = makeSyncEvents()
+    const listeners = new Map<string, (...args: unknown[]) => void>()
+    const scannerManager = {
+      startScan: vi.fn(),
+      stopScan: vi.fn(),
+      getStatus: vi.fn(),
+      on: vi.fn((event: string, cb: (...args: unknown[]) => void) => {
+        listeners.set(event, cb)
+      })
+    }
+    registerScannerHandlers(makeCtx({ scannerManager, syncEvents }))
+    const restoreCb = listeners.get('restoredComplete')
+    expect(restoreCb).toBeTypeOf('function')
+    restoreCb?.({ success: true, filesFound: 2 }, { path: 'D:\\Games\\Album' })
+    await new Promise((r) => setTimeout(r, 0))
+    expect(syncEvents.broadcastRescanStarted).toHaveBeenCalledTimes(1)
+    expect(syncEvents.broadcastRescanCompleted).toHaveBeenCalledTimes(1)
   })
 })

@@ -10,7 +10,7 @@
 
 ## 目录结构
 
-- 约 40 个按域拆分的 handler 文件（`app-handler.ts`、`category-handler.ts`、`scanner-handler.ts`、`settings-handler.ts`、`media-handler.ts`、`file.ts`、`video.ts`、`watermark.ts`、`plugin-bridge-handler.ts` 等），一个文件对应一个 `registerXxxHandlers`。
+- 47 个按域拆分的 handler 文件（其中 4 个为 `_` 前缀辅助与 `set-dir-handler` 工厂、43 个由 `setupIPC()` 调用；`app-handler.ts`、`category-handler.ts`、`scanner-handler.ts`、`settings-handler.ts`、`media-handler.ts`、`file.ts`、`video.ts`、`watermark.ts`、`plugin-bridge-handler.ts` 等），一个文件对应一个 `registerXxxHandlers`。
 - 内部工具：`_shared.ts`、`_test-helpers.ts`、`_trash-utils.ts`（下划线前缀表示非独立注册文件）。
 - `__tests__/`：跨文件/集成测试；单文件测试与源码同目录命名 `xxx.test.ts`（Vitest，`npm run test:main`）。
 - 新增一个域：新建 `xxx-handler.ts` 导出 `registerXxxHandlers`，并在 `setupIPC()` 追加调用；同步更新 `docs/IPC_CONTRACT.md`。

@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Resonancia",
+      "syncGallery": "Galería sincronizada",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Servicio de sincronización"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "Menú",
     "recycleBin": "Papelera de reciclaje",
     "resonanceRecords": "Resonancia",
+    "syncGallery": "Galería sincronizada",
     "settings": "Configuración",
     "smartGroup": "Grupo inteligente",
     "storage": "Almacenamiento",
@@ -1469,10 +1472,11 @@
       "data": "Gestión de datos",
       "diagnostics": "Registros y diagnósticos",
       "general": "General",
-      "plugins": "",
+      "plugins": "Extensiones",
       "profile": "Perfiles",
       "scan": "Escanear",
-      "tools": "Herramientas"
+      "tools": "Herramientas",
+      "toolsPlugins": "Herramientas y extensiones"
     },
     "language": {
       "auto": "Seguir sistema",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "Flujo de exportación",
       "fileops": "Operaciones de archivo",
       "language": "Idioma",
-      "pluginManage": "",
+      "pluginManage": "Gestión de extensiones",
       "profileManage": "Gestión de perfiles",
       "scanOptions": "Opciones de escaneo",
       "shareCode": "Herramientas de código compartido",
       "startup": "Comportamiento de inicio",
       "theme": "Tema",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Directorios del juego",
+      "importRoots": "Directorios designados",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Directorios del juego detectados",
+      "scanFallback": "Escaneo manual de respaldo",
+      "themeDisplay": "Tema y visualización",
+      "scanDirectories": "Directorios de escaneo",
+      "cacheCleanup": "Caché y limpieza",
+      "aboutOverview": "Información de la aplicación y contacto"
     },
     "startup": {
       "autoScan": "Escaneo automático al iniciar",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "Error al cargar la imagen: {{src}}",
+    "syncEnabled": "Servicio de sincronización activado",
+    "syncDisabled": "Servicio de sincronización desactivado"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "Tiradas",
       "colAvg": "Tiradas medias",
       "colPercentile": "Percentil"
+    }
+  },
+  "syncGallery": {
+    "title": "Galería sincronizada",
+    "subtitle": "Recursos de la biblioteca NikkiSync integrada, sin afectar la galería local",
+    "loading": "Cargando galería sincronizada…",
+    "toolbar": {
+      "statusTip": "Estado del runtime de NikkiSync integrado",
+      "refresh": "Actualizar",
+      "scan": "Escanear álbum del juego",
+      "service": "Servicio de sincronización",
+      "status": {
+        "ready": "Listo",
+        "degraded": "Carpeta del juego no encontrada",
+        "off": "No iniciado"
+      },
+      "detail": "Detalles",
+      "about": "Acerca de NikkiSync"
+    },
+    "empty": {
+      "title": "Aún no hay recursos para explorar",
+      "linkHint": "No se encontraron los paquetes de NikkiSync. Ejecuta npm run link:nikkisync en la raíz del proyecto y reinicia la app",
+      "runtimeOff": "El servicio integrado no está iniciado: abre Servicio de sincronización en la barra de herramientas, activa allí el runtime de NikkiSync y vuelve a intentarlo",
+      "gameRootMissing": "No se encontró la carpeta de instalación de Infinity Nikki. Selecciónala manualmente en Ajustes y vuelve a escanear",
+      "noAssets": "El escaneo terminó sin fotos. Pulsa «Escanear álbum del juego» para reindexar",
+      "retry": "Recargar"
+    },
+    "error": {
+      "bridgeMissing": "No se encontró el runtime de NikkiSync. Ejecuta npm run link:nikkisync",
+      "loadFailed": "Error al cargar la galería sincronizada"
+    },
+    "drawer": {
+      "title": "Detalles del recurso",
+      "basic": "Información básica",
+      "fields": {
+        "assetId": "ID del recurso",
+        "type": "Tipo",
+        "state": "Estado",
+        "motion": "Marca LIVE",
+        "revision": "Revisión",
+        "gameVersion": "Versión del juego",
+        "resolution": "Resolución",
+        "size": "Tamaño de archivo",
+        "hash": "Hash del contenido",
+        "metadata": "Metadatos"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Servicio de sincronización"
+    },
+    "service": {
+      "title": "Servicio de sincronización",
+      "description": "Permite que los clientes móviles de NikkiSync sincronicen esta biblioteca mediante una conexión cifrada en la red local"
+    },
+    "enable": "Activar servicio de sincronización",
+    "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 28080)",
+    "status": {
+      "label": "Estado",
+      "running": "En ejecución",
+      "stopped": "Detenido",
+      "unavailable": "Componentes de sincronización no listos",
+      "address": "Dirección del servidor",
+      "serverId": "ID del servidor",
+      "tlsFingerprint": "Huella TLS",
+      "copied": "Copiado"
+    },
+    "pairing": {
+      "title": "Vincular nuevo dispositivo",
+      "open": "Vincular nuevo dispositivo",
+      "hintRunning": "Escanea el código QR en tu móvil; caduca en 5 minutos",
+      "hintDisabled": "Activa el servicio de sincronización para vincular nuevos dispositivos",
+      "expiresIn": "Caduca en",
+      "refresh": "Regenerar",
+      "copyContent": "Copiar contenido de emparejamiento",
+      "loadFailed": "Error al generar el código QR de emparejamiento",
+      "retry": "Reintentar"
+    },
+    "devices": {
+      "title": "Dispositivos vinculados",
+      "empty": "No hay dispositivos vinculados",
+      "emptyHint": "Escanea el código QR de emparejamiento en tu móvil",
+      "lastSeen": "Última conexión",
+      "never": "Nunca conectado",
+      "revoke": "Revocar",
+      "revokeConfirmTitle": "Revocar dispositivo",
+      "revokeConfirmMessage": "Tras revocar, «{{name}}» ya no podrá sincronizar con esta biblioteca y deberá volver a emparejarse. ¿Revocar?",
+      "revokeConfirm": "Revocar dispositivo",
+      "revoked": "Dispositivo revocado"
+    },
+    "gallerySource": "Usar la biblioteca de recursos de NikkiSync como fuente de la galería",
+    "gallerySourceDesc": "Desactivado: se leen los media_files locales (predeterminado). Activado: la galería lee los assets del runtime de NikkiSync integrado, con activación implícita del runtime y un análisis",
+    "gallerySourceApplied": "Fuente de datos de la galería cambiada a {{source}}",
+    "metadata": {
+      "enable": "Analizar parámetros de atuendo y de fotografía",
+      "enableDesc": "Al terminar un análisis, el resolvedor aguas arriba de NikkiSync completa los parámetros de fotografía (distancia focal, apertura, exposición, intensidad del filtro, etc.) de la galería sincronizada. Se aplica tras reiniciar la aplicación.",
+      "disclosure": "Al activarlo, el UID de cada foto y el sobre de parámetros incrustado en la foto se envían al servicio de terceros nuan5.pro para obtener un resultado decodificado. La respuesta se escribe en la base de datos local de sincronización y también se entrega a los dispositivos vinculados a través de la red local. La búsqueda de atuendos y prendas sigue dependiendo del diccionario local; este interruptor no la cubre."
+    }
+  },
+  "shareCard": {
+    "title": "Generar tarjeta de compartir",
+    "generate": "Generar tarjeta",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar",
+    "savedCount": "{{count}} imagen(es) guardadas",
+    "progress": "Renderizando {{current}} / {{total}}…",
+    "missingIcons": "{{count}} icono(s) no disponible(s)",
+    "motionUnsupported": "Las tarjetas de fotos LIVE no están admitidas en esta fase",
+    "noParams": "No se leyeron parámetros de captura; se mostrarán guiones",
+    "errorGenerate": "Error al generar la tarjeta",
+    "errorCancelled": "Generación cancelada",
+    "errorSave": "Error al guardar la tarjeta",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

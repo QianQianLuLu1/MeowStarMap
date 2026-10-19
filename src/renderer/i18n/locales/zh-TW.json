@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "共鳴錄",
+      "syncGallery": "同步圖庫",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "同步服務"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "選單",
     "recycleBin": "資源回收筒",
     "resonanceRecords": "共鳴錄",
+    "syncGallery": "同步圖庫",
     "settings": "設定",
     "smartGroup": "智慧群組",
     "storage": "佔用",
@@ -1469,10 +1472,11 @@
       "data": "資料管理",
       "diagnostics": "日誌與診斷",
       "general": "一般",
-      "plugins": "",
+      "plugins": "插件",
       "profile": "角色檔案",
       "scan": "掃描",
-      "tools": "工具"
+      "tools": "工具",
+      "toolsPlugins": "工具與插件"
     },
     "language": {
       "auto": "跟隨系統",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "匯出工作流程",
       "fileops": "檔案操作",
       "language": "語言",
-      "pluginManage": "",
+      "pluginManage": "插件管理",
       "profileManage": "檔案管理",
       "scanOptions": "掃描選項",
       "shareCode": "分享碼工具",
       "startup": "啟動行為",
       "theme": "主題",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "遊戲目錄",
+      "importRoots": "指定目錄",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "偵測到的遊戲目錄",
+      "scanFallback": "手動備用掃描",
+      "themeDisplay": "主題與顯示",
+      "scanDirectories": "掃描目錄",
+      "cacheCleanup": "快取與清理",
+      "aboutOverview": "應用資訊與聯絡方式"
     },
     "startup": {
       "autoScan": "啟動時自動掃描",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "載入圖片失敗: {{src}}",
+    "syncEnabled": "同步服務已啟用",
+    "syncDisabled": "同步服務已關閉"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "總抽取次數",
       "colAvg": "平均出貨",
       "colPercentile": "百分位"
+    }
+  },
+  "syncGallery": {
+    "title": "同步圖庫",
+    "subtitle": "來自 NikkiSync 內嵌庫的資產，與本地圖庫互不影響",
+    "loading": "正在讀取同步圖庫…",
+    "toolbar": {
+      "statusTip": "內嵌 NikkiSync Runtime 的執行狀態",
+      "refresh": "重新整理",
+      "scan": "掃描遊戲相簿",
+      "service": "同步服務",
+      "status": {
+        "ready": "已就緒",
+        "degraded": "未找到遊戲目錄",
+        "off": "未啟動"
+      },
+      "detail": "詳情",
+      "about": "關於 NikkiSync"
+    },
+    "empty": {
+      "title": "還沒有可瀏覽的資產",
+      "linkHint": "未找到 NikkiSync 套件，請在專案根目錄執行 npm run link:nikkisync 後重新啟動應用",
+      "runtimeOff": "內嵌服務未啟動：請點擊工具欄的「同步服務」，在其中開啟 NikkiSync 執行期後重試",
+      "gameRootMissing": "未找到《無限暖暖》安裝目錄，請在設定裡手動選擇後重新掃描",
+      "noAssets": "已完成掃描但沒有照片，可點選「掃描遊戲相簿」重新索引",
+      "retry": "重新載入"
+    },
+    "error": {
+      "bridgeMissing": "未找到 NikkiSync 執行期，請執行 npm run link:nikkisync",
+      "loadFailed": "讀取同步圖庫失敗"
+    },
+    "drawer": {
+      "title": "資產詳情",
+      "basic": "基本資訊",
+      "fields": {
+        "assetId": "資產 ID",
+        "type": "類型",
+        "state": "狀態",
+        "motion": "實況標識",
+        "revision": "修訂號",
+        "gameVersion": "遊戲版本",
+        "resolution": "解析度",
+        "size": "檔案大小",
+        "hash": "內容雜湊",
+        "metadata": "中繼資料"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "同步服務"
+    },
+    "service": {
+      "title": "同步服務",
+      "description": "允許區網內的 NikkiSync 行動裝置透過加密連線同步本機媒體庫"
+    },
+    "enable": "啟用同步服務",
+    "enableDesc": "開啟後本機作為同步伺服器執行（HTTPS + WebSocket，預設連接埠 28080）",
+    "status": {
+      "label": "執行狀態",
+      "running": "執行中",
+      "stopped": "已停止",
+      "unavailable": "同步元件未就緒",
+      "address": "伺服器位址",
+      "serverId": "伺服器 ID",
+      "tlsFingerprint": "TLS 指紋",
+      "copied": "已複製"
+    },
+    "pairing": {
+      "title": "配對新裝置",
+      "open": "配對新裝置",
+      "hintRunning": "在行動裝置掃碼完成配對；QR 碼 5 分鐘內有效",
+      "hintDisabled": "啟用同步服務後才能配對新裝置",
+      "expiresIn": "有效期",
+      "refresh": "重新產生",
+      "copyContent": "複製配對內容",
+      "loadFailed": "產生配對 QR 碼失敗",
+      "retry": "重試"
+    },
+    "devices": {
+      "title": "已配對裝置",
+      "empty": "尚無已配對裝置",
+      "emptyHint": "在行動裝置掃描配對 QR 碼完成配對",
+      "lastSeen": "最近活躍",
+      "never": "從未連線",
+      "revoke": "撤銷",
+      "revokeConfirmTitle": "撤銷裝置",
+      "revokeConfirmMessage": "撤銷後「{{name}}」將無法再同步本機媒體庫，需要重新配對。確定撤銷？",
+      "revokeConfirm": "撤銷裝置",
+      "revoked": "裝置已撤銷"
+    },
+    "gallerySource": "圖庫資料來源使用 NikkiSync 資產庫",
+    "gallerySourceDesc": "關閉時讀取本機 media_files（預設）；開啟後圖庫改讀內嵌 NikkiSync Runtime 的 assets，並隱含啟用執行期與一次掃描",
+    "gallerySourceApplied": "圖庫資料來源已切換為 {{source}}",
+    "metadata": {
+      "enable": "解析穿搭與拍攝參數",
+      "enableDesc": "掃描完成後，由上游 NikkiSync 解析器補齊同步圖庫的拍攝參數（焦距、光圈、曝光、濾鏡強度等）。需重啟應用程式後生效。",
+      "disclosure": "開啟後會將照片 UID 與照片內嵌的參數信封傳送至第三方服務 nuan5.pro 以換取解碼結果；返回內容寫入本機同步資料庫，並會隨區域網路同步下发給已配對裝置。套裝與服裝搜尋仍依賴本機字典，本開關不涵蓋該部分。"
+    }
+  },
+  "shareCard": {
+    "title": "產生分享圖",
+    "generate": "產生分享圖",
+    "save": "儲存",
+    "cancel": "取消",
+    "close": "關閉",
+    "savedCount": "已儲存 {{count}} 張",
+    "progress": "正在產生第 {{current}} / {{total}} 張…",
+    "missingIcons": "{{count}} 個部件圖示暫時不可用",
+    "motionUnsupported": "實況照片本階段不支援產生分享圖",
+    "noParams": "未讀取到拍攝參數，分享圖將以破折號佔位",
+    "errorGenerate": "產生分享圖失敗",
+    "errorCancelled": "已取消產生",
+    "errorSave": "儲存分享圖失敗",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

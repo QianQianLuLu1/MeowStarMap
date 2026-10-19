@@ -13,6 +13,15 @@
  */
 import type { FilterParams } from './editor'
 import type { WatermarkConfig } from './watermark'
+import type {
+  AssetDetailResponse,
+  AssetSummary,
+  ChangesResponse,
+  ClothingSearchResponse,
+  MediaResource,
+  ProfileStatsResponse,
+  SuitSearchResponse
+} from '../sync/protocol'
 
 // ============ 扫描器 ============
 
@@ -485,4 +494,242 @@ export interface FavoriteItem {
   id: number
   media_id: number
   created_at: string
+}
+
+// ============ NikkiSync 同步服务（sync-integration 阶段5） ============
+// 形状快照自 src/main/sync/server/types.ts（SyncServerStatusInfo/PairingQrInfo/SyncDeviceInfo）；
+// 该文件是主进程「理想契约」，此处为 preload 通道的运行时快照，随阶段推进保持同步。
+
+export interface SyncServerStatusInfo {
+  available: boolean
+  running: boolean
+  host: string
+  port: number
+  connections: number
+  serverId: string | null
+  serverName: string | null
+  pairedDeviceCount: number
+  tlsFingerprintSha256: string | null
+  lanHost: string
+}
+
+export interface PairingQrInfo {
+  /** NS1|... 七段二维码内容（渲染层经 qrcode 生成 SVG 图像） */
+  content: string
+  expiresAt: string
+  serverId: string
+  host: string
+  port: number
+  tlsFingerprintSha256: string
+}
+
+export interface SyncDeviceInfo {
+  deviceId: string
+  deviceName: string
+  platform: 'ios' | 'android'
+  appVersion: string | null
+  pairedAt: string
+  lastSeenAt: string | null
+  lastAckRevision: number
+}
+
+// ============ NikkiSync 内嵌运行时（sync-integration 阶段2） ============
+// 形状快照自 src/main/nikkisync/runtime-types.ts（NikkiSyncRuntimeStatus 等）。
+// shared 不得 import src/main（分层约束），因此沿用上方 sync 域的快照口径同步维护。
+// 查询结果为 NikkiSync 协议 DTO：内嵌层零转换，故本文件**不重建字段名**，
+// 而是直接以阶段 9 定下的协议唯一真相源 `src/shared/sync/protocol.ts` 为类型出处
+// （`import type` 为纯类型引入，不进 preload 运行时依赖白名单的对立面）。
+// 同形关系由 src/renderer/stores/nikkisyncContractTypes.test.ts 在编译期钉死。
+
+/** 内嵌 Runtime 状态机取值（未建链 / 未启动 / 启动中 / 运行 / 扫描中 / 降级 / 停止中 / 错误）。 */
+export type NikkiSyncRuntimeStateInfo =
+  'unavailable' | 'idle' | 'starting' | 'running' | 'scanning' | 'degraded' | 'stopping' | 'error'
+
+export interface NikkiSyncRuntimeStatusInfo {
+  state: NikkiSyncRuntimeStateInfo
+  /** NikkiSync 库文件绝对路径（{userData}/nikkisync/nikkisync.db）。 */
+  dbPath: string
+  linkReady: boolean
+  /** 上游 `scanner.getStatus().status`（stopped/discovering/scanning/reconciling/running/error）。 */
+  scannerStatus?: string
+  /** 上游发现的安装结果 `InfinityNikkiInstallation`（installRoot / x6GameRoot / photoRoots / motionRoots / source）。 */
+  installation?: unknown
+  /** 上游最近一次 `ScanResult` 原样透传。 */
+  lastScan?: unknown
+  tables?: string[]
+  /** 阶段 3：同步服务状态随会话一并给出（UI 只轮询一个通道）。 */
+  sync?: NikkiSyncServerStatusInfo
+  error?: string
+  hint?: string
+}
+
+/** `nikkisync:get-assets` 响应：与上游 `GET /v1/assets` 同形。 */
+export interface NikkiSyncAssetPageInfo {
+  items: AssetSummary[]
+  nextCursor?: string
+  libraryRevision: number
+}
+
+export interface NikkiSyncScanInputInfo {
+  gameRoot?: string
+  path?: string
+}
+
+export interface NikkiSyncAssetQueryInfo {
+  limit?: number
+  cursor?: string
+  type?: string
+  afterRevision?: number
+  includeDeleted?: boolean
+}
+
+export interface NikkiSyncResourceQueryInfo {
+  assetId: string
+  resourceId: string
+  mode?: 'meta' | 'path'
+}
+
+/**
+ * `nikkisync:get-resource` 响应：`meta` → `MediaResource`；`path` → 上游落库的绝对路径原值。
+ * 二者由入参 `mode` 决定，这里保持联合而非 `unknown`，让调用方必须显式判别。
+ */
+export type NikkiSyncResourceInfo = MediaResource | string
+
+// ============ NikkiSync 资产查询面扩容（sync-integration 阶段4 · UI Bridge） ============
+// 响应侧一律用**类型别名**指向协议真相源，不在本仓重列字段：内嵌层零转换，
+// 别名即「handler 原样返回上游对象」这一事实的编译期表达。
+
+/** `nikkisync:get-asset-detail` 响应：与上游 `GET /v1/assets/:id` 同形。 */
+export type NikkiSyncAssetDetailInfo = AssetDetailResponse
+
+/** `nikkisync:get-changes` 响应：与上游 `GET /v1/changes` 同形（含 fullResyncRequired 判据）。 */
+export type NikkiSyncChangesInfo = ChangesResponse
+
+/** `nikkisync:search-suits` 响应：与上游 `GET /v1/search/suits` 同形。 */
+export type NikkiSyncSuitSearchInfo = SuitSearchResponse
+
+/** `nikkisync:search-clothing` 响应：与上游 `GET /v1/search/clothing` 同形。 */
+export type NikkiSyncClothingSearchInfo = ClothingSearchResponse
+
+/** `nikkisync:profile-stats` 响应：与上游 `GET /v1/profile/stats` 同形。 */
+export type NikkiSyncProfileStatsInfo = ProfileStatsResponse
+
+/** 批量资源元信息：`byAsset` 键为 assetId，值为上游 `listResources` 逐行映射结果。 */
+export interface NikkiSyncResourceRecordsInfo {
+  byAsset: Record<string, MediaResource[]>
+}
+
+/** 批量资源绝对路径：值为 `resourceId -> resources.source_path` 原值（上游落库口径，不改写）。 */
+export interface NikkiSyncResourcePathsInfo {
+  byAsset: Record<string, Record<string, string>>
+}
+
+/** `nikkisync:get-resource-records` 的返回按 `mode` 分流（避免调用侧再判联合）。 */
+export type NikkiSyncResourceRecordsFor<M extends 'meta' | 'path'> = M extends 'meta'
+  ? NikkiSyncResourceRecordsInfo
+  : NikkiSyncResourcePathsInfo
+
+/** `nikkisync:get-resource-records` 入参（assetIds 上限与 `get-assets` 的 limit 上界同界）。 */
+export interface NikkiSyncResourceRecordsQueryInfo {
+  assetIds: string[]
+  mode?: 'meta' | 'path'
+}
+
+/** `nikkisync:get-changes` 入参：`after` 为已消费到的 libraryRevision。 */
+export interface NikkiSyncChangesQueryInfo {
+  after: number
+  limit?: number
+}
+
+/** 套装 / 服装搜索入参。 */
+export interface NikkiSyncSearchQueryInfo {
+  query: string
+}
+
+// ============ 资产编辑叠加层（sync-integration 阶段4） ============
+// 本 App 专有的用户编辑（收藏/评分/标签/备注/分类/套装/场景/隐藏），按 NikkiSync
+// `asset_id` 归键存 `asset_edits` 表。它**不是** NikkiSync 协议 DTO，因此这里塑形
+// （boolean / string[]），但字段语义与 `MediaFile` 同名项保持一致。
+
+/** `asset-edits:list` 与 `asset-edits:set` 的单条编辑形态。 */
+export interface AssetEditsInfo {
+  assetId: string
+  isFavorite: boolean
+  rating: number
+  tags: string[]
+  notes: string
+  categoryId: number | null
+  outfit: string | null
+  sceneCategory: string | null
+  sceneTime: string | null
+  isHidden: boolean
+  deletedAt: string | null
+  updatedAt: string
+}
+
+/** `asset-edits:set` 的补丁：全部可选，未给的字段按列默认值落库。 */
+export interface AssetEditsPatchInfo {
+  isFavorite?: boolean
+  rating?: number
+  tags?: string[]
+  notes?: string
+  categoryId?: number | null
+  outfit?: string | null
+  sceneCategory?: string | null
+  sceneTime?: string | null
+  isHidden?: boolean
+}
+
+// ============ NikkiSync 局域网同步服务（sync-integration 阶段3） ============
+// 形状快照自 src/main/nikkisync/runtime-types.ts（NikkiSyncSyncServerStatus 等）；
+// 服务本体是上游 NikkiSync 的 LocalSyncServer，本仓只做启停控制与状态展示。
+
+/** `nikkisync:server-status` 响应；`available:false` 表示运行时句柄尚未装配（不抛错）。 */
+export interface NikkiSyncServerStatusInfo {
+  available: boolean
+  running: boolean
+  /** 运行中为上游回显地址；未运行时为配置值。 */
+  host: string
+  port: number
+  /** 仅在真实监听时给出。 */
+  secure?: boolean
+  serverId?: string
+  /** 配置意图（上游 mDNS 失败被静默吞掉，因此它不代表广播已生效）。 */
+  mdnsEnabled: boolean
+  tlsFingerprintSha256?: string
+  /** 自签证书 PEM（公开材料，不含私钥）：客户端 pin 指纹之外的第二重核对手段。 */
+  serverCertificatePem?: string
+  /** 已配对（未撤销）设备数。 */
+  pairedDeviceCount?: number
+  /** 配对二维码写出的局域网地址；解析不到时为回环。 */
+  lanHost?: string
+  /** 启停失败原因，端口占用归一化为 `PORT_IN_USE`。 */
+  error?: string
+}
+
+export interface NikkiSyncSyncStartInputInfo {
+  /** 1..65535；上游配置冻结在构造期 ⇒ 改端口会重建会话 */
+  port?: number
+  mdnsEnabled?: boolean
+}
+
+/** 已配对设备的管理视图（不含公钥与凭据哈希）。 */
+export interface NikkiSyncPairedDeviceInfo {
+  deviceId: string
+  deviceName: string
+  platform: 'ios' | 'android'
+  appVersion?: string
+  pairedAt: string
+  lastSeenAt: string | null
+}
+
+/** `nikkisync:get-pairing-code` 响应：与移植面 `PairingQrInfo` 同形（复用同一 UI 组件）。 */
+export interface NikkiSyncPairingCodeInfo {
+  /** NS1|serverId|host|port|token|expiresEpochSeconds|tlsFingerprintSha256 */
+  content: string
+  expiresAt: string
+  serverId: string
+  host: string
+  port: number
+  tlsFingerprintSha256: string
 }

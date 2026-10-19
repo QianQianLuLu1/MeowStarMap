@@ -49,6 +49,14 @@ const DuplicatesPage = lazy(() =>
 const ResonanceRecordsPage = lazy(() =>
   import('./pages/ResonanceRecordsPage').then((m) => ({ default: m.ResonanceRecordsPage }))
 )
+// 阶段 5：同步图库一级入口（内嵌 NikkiSync Runtime 的资产，独立列表状态）
+const SyncGalleryPage = lazy(() =>
+  import('./pages/sync-gallery/SyncGalleryPage').then((m) => ({ default: m.SyncGalleryPage }))
+)
+// 同步服务二级子页：由设置页 `sync` 分组剥离而来，入口在同步图库工具栏
+const SyncServicePage = lazy(() =>
+  import('./pages/sync-gallery/SyncServicePage').then((m) => ({ default: m.SyncServicePage }))
+)
 
 // 浅色轻量 Suspense fallback：仅加载期占位一屏，无毛玻璃无重资源。
 // 内联 <style> 只在首次挂载时注入一次，后续复用；避免依赖全局动画类。
@@ -93,7 +101,9 @@ const ALL_VIEWS: ViewLevel[] = [
   'duplicates',
   'launcher-cache',
   'resonance-records',
-  'screenshots'
+  'screenshots',
+  'sync-gallery',
+  'sync-service'
 ]
 
 // C 阶段：界面层级映射，用于毛玻璃分层应用
@@ -108,6 +118,9 @@ const VIEW_LEVEL_MAP: Record<ViewLevel, number> = {
   'launcher-cache': 1,
   'resonance-records': 1,
   screenshots: 1,
+  'sync-gallery': 1,
+  // 同步服务是同步图库板块下的二级子页，与详情页同层
+  'sync-service': 2,
   detail: 2,
   editor: 3
 }
@@ -321,6 +334,14 @@ const App: React.FC = () => {
       case 'duplicates':
         // F-S10：重复文件检测独立视图
         return <DuplicatesPage />
+      case 'sync-gallery':
+        // 阶段 5：同步图库是**独立页面**，不复用 GalleryPage——本 switch 有 default 兜到
+        // GalleryPage，漏写这个 case 不会编译失败，只会静默把图库渲染两遍。
+        return <SyncGalleryPage />
+      case 'sync-service':
+        // 同步服务二级子页：同样由 default 兜到 GalleryPage，漏 case 不会编译失败。
+        // 由 App.view-registry.test.ts 的结构断言锁住。
+        return <SyncServicePage />
       default:
         return <GalleryPage />
     }

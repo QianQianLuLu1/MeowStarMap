@@ -1,3 +1,5 @@
+// @core-change: 扫描根短路判据由 isUserPicked 改为 isUserPickedDir（本批 dialog:openFile
+// 开始登记单个文件，文件不得冒充「用户显式授权的扫描目录」绕过白名单校验）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import path from 'path'
@@ -16,8 +18,18 @@ import { scanLogStore } from '../../scanner/scan-log-store'
 // P1-A1：4 组函数抽取到共享服务模块，启动路径与 IPC 路径共用同一份实现
 import { generateThumbnailsForUnprocessed } from '../../services/thumbnail-phash-service'
 import { ImportRootRepository } from '../../database/import-root-repository'
+import {
+  captureScanWatermark,
+  recordScanChanges,
+  type ScanSyncContext
+} from '../../scanner/scan-journal'
 import { detectGameRootCandidates } from '../../scanner/game-directory-discovery'
 import { t } from '../../i18n'
+
+// ---- sync-integration 阶段4/5：扫描变更日志接线 ----
+// 水位线与批量落账实现见 scanner/scan-journal.ts（阶段5 抽取，与 startup-tasks 共用）；
+// 此处保留对 ctx 的薄适配（依赖注入形态差异：HandlerContext → ScanJournalDeps）。
+const APP_STARTED_AT = new Date().toISOString()
 
 // scanner:start 参数 schema（提取到模块级避免每次调用重建）
 const scannerStartSchema = z
@@ -53,17 +65,19 @@ const detectGameRootsSchema = z
  * 合法调用方的路径来源都已在白名单内：
  * - path：dialog:selectDirectory 选中时已 pathGuard.register
  * - customKnownPaths：settings.customScanPaths，启动时由 refreshPathGuardRoots 注册
- * - 用户显式选择（userPicked）路径短路放行：不受敏感目录黑名单误拦（见下方实现注释）
+ * - 用户显式选择的**目录**（userPickedDirs）短路放行：不受敏感目录黑名单误拦（见下方实现注释）
  */
 function assertScanPathsAllowed(options?: { path?: string; customKnownPaths?: string[] }): void {
-  // userPicked 短路：dialog:selectDirectory / dialog:openFile(openDirectory) 登记的
-  // 「用户显式选择」标记 = 用户在真实系统对话框中的授权行为，跳过 PathGuard 校验，
+  // isUserPickedDir 短路：dialog:selectDirectory / dialog:openFile(openDirectory) 登记的
+  // 「用户显式选择的目录」= 用户在真实系统对话框中的授权行为，跳过 PathGuard 校验，
   // 修复敏感目录黑名单误拦显式选择的系统目录（如装在 X:\Program Files 的游戏根）；
   // 渲染进程伪造的路径（未经对话框，无任何 IPC 可写入标记集合）不命中，
   // 仍走 assertFileReadPath 完整白名单 + 黑名单校验，防自助提权链不放宽。
-  if (options?.path && !pathGuard.isUserPicked(options.path)) assertFileReadPath(options.path)
+  // 判据必须是「目录」集合而非 userPicked：本批起 dialog:openFile 也会登记挑中的
+  // 单个文件（图片水印 logo），文件形态的授权不能拿来冒充扫描根。
+  if (options?.path && !pathGuard.isUserPickedDir(options.path)) assertFileReadPath(options.path)
   for (const p of options?.customKnownPaths ?? []) {
-    if (!pathGuard.isUserPicked(p)) assertFileReadPath(p)
+    if (!pathGuard.isUserPickedDir(p)) assertFileReadPath(p)
   }
 }
 
@@ -75,9 +89,24 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
   // IPC 发起路径与崩溃自动重启恢复的扫描（restoredComplete 事件）需要一致的处理：
   // 恢复扫描的完成不经过 scanner:start 的 await 路径（其 Promise 已在崩溃合成事件时
   // 以失败 resolve），不补齐则渲染端永久认为本次扫描失败、链式动作不会执行。
+  // ---- sync-integration 阶段4：水位线与扫描变更落账辅助（阶段5 起委托 scan-journal） ----
+  const getPreScanMaxId = (): number => captureScanWatermark(ctx.dbManager.getDatabase())
+
+  const recordScanChangesForCtx = (syncContext: ScanSyncContext): Promise<number> =>
+    recordScanChanges(
+      {
+        db: ctx.dbManager.getDatabase(),
+        workerBridge: ctx.dbManager.getWorkerBridge(),
+        dbPath: ctx.dbManager.getDbPath(),
+        syncEvents: ctx.syncEvents
+      },
+      syncContext
+    )
+
   const runPostScanActions = async (
     result: { success: boolean; message?: string; filesFound?: number },
-    options?: { path?: string }
+    options?: { path?: string },
+    syncContext?: ScanSyncContext
   ): Promise<void> => {
     if (result.success && result.filesFound && result.filesFound > 0) {
       // 扫描完成后异步生成缩略图并读取尺寸
@@ -107,11 +136,25 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
     ctx.getMainWindow()?.webContents.send('scanner:complete', result)
     // 扫描完成后刷新媒体列表（含缓存失效 + media_count 刷新 + 节流广播）
     ctx.notifyMediaUpdated()
+    // sync-integration 阶段4：动态照片配对重建 + 批量 journal + rescan.completed 广播
+    //（recordScanChanges 内部吞错仅告警；不阻塞扫描完成返回）
+    if (syncContext) {
+      const changedAssets = await recordScanChangesForCtx(syncContext)
+      await ctx.syncEvents?.broadcastRescanCompleted(changedAssets)
+    }
   }
 
   // 崩溃恢复的扫描完成：补齐广播与链式动作（见上方 runPostScanActions 注释）
+  // 恢复扫描的水位线取应用启动时间 + 0（全量补账，保证客户端收敛）
+  // 阶段5：恢复扫描同样补 started 广播——started/completed 恒成对，客户端可无脑配对消费
   ctx.scannerManager.on('restoredComplete', (result, options) => {
-    void runPostScanActions(result, options)
+    void (async () => {
+      await ctx.syncEvents?.broadcastRescanStarted()
+      await runPostScanActions(result, options, {
+        scanStartedAt: APP_STARTED_AT,
+        preScanMaxId: 0
+      })
+    })()
   })
 
   // ---- scanner 域 ----
@@ -166,15 +209,31 @@ export function registerScannerHandlers(ctx: HandlerContext): void {
           .filter((p): p is string => typeof p === 'string' && p.length > 0)
           .map((p) => path.resolve(p))
         if (scanRoots.length > 0) pathGuard.registerRoots(scanRoots)
+        // sync-integration 阶段4：记录水位线 + 广播 rescan.started（校验全部通过、扫描发起前）
+        const syncContext: ScanSyncContext = {
+          scanStartedAt: new Date().toISOString(),
+          preScanMaxId: getPreScanMaxId()
+        }
+        await ctx.syncEvents?.broadcastRescanStarted()
         try {
           const result = await ctx.scannerManager.startScan(options)
-          await runPostScanActions(result, options)
+          await runPostScanActions(result, options, syncContext)
           return result
         } catch (error) {
           const message = t('main.scanner.error.scanFailed', {
             reason: error instanceof Error ? error.message : String(error)
           })
           sendComplete({ success: false, message })
+          // sync-integration 阶段5：失败路径收口——started 已广播，必须补 journal+completed，
+          // 否则 WS 客户端挂等 rescan.completed。journal/completed 内部吞错，不影响原错误上抛。
+          try {
+            if (syncContext) {
+              const changedAssets = await recordScanChangesForCtx(syncContext)
+              await ctx.syncEvents?.broadcastRescanCompleted(changedAssets)
+            }
+          } catch (syncErr) {
+            logger.warn('[Sync] failed to close out rescan after scan failure', syncErr)
+          }
           // 即使扫描失败也刷新一次（DB 可能有旧数据需要重新加载）
           ctx.notifyMediaUpdated()
           logger.error(t('main.scanner.log.startFailed'), error)

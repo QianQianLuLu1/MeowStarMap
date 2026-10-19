@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "Resonanz",
+      "syncGallery": "Synchronisierte Galerie",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "Synchronisierungsdienst"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "Menü",
     "recycleBin": "Papierkorb",
     "resonanceRecords": "Resonanz",
+    "syncGallery": "Synchronisierte Galerie",
     "settings": "Einstellungen",
     "smartGroup": "Intelligente Gruppe",
     "storage": "Speicher",
@@ -1469,10 +1472,11 @@
       "data": "Datenverwaltung",
       "diagnostics": "Protokolle & Diagnose",
       "general": "Allgemein",
-      "plugins": "",
+      "plugins": "Plugins",
       "profile": "Profile",
       "scan": "Scannen",
-      "tools": "Werkzeuge"
+      "tools": "Werkzeuge",
+      "toolsPlugins": "Werkzeuge & Plugins"
     },
     "language": {
       "auto": "System folgen",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "Export-Workflow",
       "fileops": "Dateioperationen",
       "language": "Sprache",
-      "pluginManage": "",
+      "pluginManage": "Plugin-Verwaltung",
       "profileManage": "Profilverwaltung",
       "scanOptions": "Scan-Optionen",
       "shareCode": "Share-Code-Werkzeuge",
       "startup": "Startverhalten",
       "theme": "Design",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "Spielverzeichnisse",
+      "importRoots": "Angegebene Verzeichnisse",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "Erkannte Spielverzeichnisse",
+      "scanFallback": "Manueller Ausweich-Scan",
+      "themeDisplay": "Design & Anzeige",
+      "scanDirectories": "Scan-Verzeichnisse",
+      "cacheCleanup": "Cache & Bereinigung",
+      "aboutOverview": "App-Informationen & Kontakt"
     },
     "startup": {
       "autoScan": "Beim Start automatisch scannen",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "Bild konnte nicht geladen werden: {{src}}",
+    "syncEnabled": "Synchronisierungsdienst aktiviert",
+    "syncDisabled": "Synchronisierungsdienst deaktiviert"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "Züge",
       "colAvg": "Ø Züge",
       "colPercentile": "Perzentil"
+    }
+  },
+  "syncGallery": {
+    "title": "Synchronisierte Galerie",
+    "subtitle": "Objekte aus der eingebetteten NikkiSync-Bibliothek, unabhängig von der lokalen Galerie",
+    "loading": "Synchronisierte Galerie wird geladen…",
+    "toolbar": {
+      "statusTip": "Status der eingebetteten NikkiSync-Laufzeit",
+      "refresh": "Aktualisieren",
+      "scan": "Spielalbum durchsuchen",
+      "service": "Synchronisierungsdienst",
+      "status": {
+        "ready": "Bereit",
+        "degraded": "Spielordner nicht gefunden",
+        "off": "Nicht gestartet"
+      },
+      "detail": "Details",
+      "about": "Über NikkiSync"
+    },
+    "empty": {
+      "title": "Noch keine Objekte zum Durchsuchen",
+      "linkHint": "NikkiSync-Pakete nicht gefunden. Führe im Projektstamm npm run link:nikkisync aus und starten Sie die App neu",
+      "runtimeOff": "Eingebetteter Dienst nicht gestartet: öffnen Sie Synchronisierungsdienst in der Symbolleiste, aktivieren Sie dort die NikkiSync-Laufzeit und versuchen Sie es erneut",
+      "gameRootMissing": "Installationsordner von Infinity Nikki nicht gefunden. Bitte manuell auswählen und erneut scannen",
+      "noAssets": "Scan abgeschlossen, aber keine Fotos gefunden. Mit „Spielalbum durchsuchen“ erneut indizieren",
+      "retry": "Neu laden"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync-Laufzeit nicht gefunden. Führe npm run link:nikkisync aus",
+      "loadFailed": "Synchronisierte Galerie konnte nicht geladen werden"
+    },
+    "drawer": {
+      "title": "Objektdetails",
+      "basic": "Grundinformationen",
+      "fields": {
+        "assetId": "Objekt-ID",
+        "type": "Typ",
+        "state": "Zustand",
+        "motion": "LIVE-Kennzeichnung",
+        "revision": "Revision",
+        "gameVersion": "Spielversion",
+        "resolution": "Auflösung",
+        "size": "Dateigröße",
+        "hash": "Inhalts-Hash",
+        "metadata": "Metadaten"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "Synchronisierungsdienst"
+    },
+    "service": {
+      "title": "Synchronisierungsdienst",
+      "description": "Ermöglicht NikkiSync-Mobilclients, diese Bibliothek über eine verschlüsselte LAN-Verbindung zu synchronisieren"
+    },
+    "enable": "Synchronisierungsdienst aktivieren",
+    "enableDesc": "Dieser PC dient dann als Synchronisierungsserver (HTTPS + WebSocket, Standardport 28080)",
+    "status": {
+      "label": "Status",
+      "running": "Läuft",
+      "stopped": "Gestoppt",
+      "unavailable": "Synchronisierungskomponenten nicht bereit",
+      "address": "Serveradresse",
+      "serverId": "Server-ID",
+      "tlsFingerprint": "TLS-Fingerabdruck",
+      "copied": "Kopiert"
+    },
+    "pairing": {
+      "title": "Neues Gerät koppeln",
+      "open": "Neues Gerät koppeln",
+      "hintRunning": "QR-Code auf dem Mobilgerät scannen; er läuft nach 5 Minuten ab",
+      "hintDisabled": "Zum Koppeln neuer Geräte muss der Synchronisierungsdienst aktiviert sein",
+      "expiresIn": "Läuft ab in",
+      "refresh": "Neu erzeugen",
+      "copyContent": "Kopplungsinhalt kopieren",
+      "loadFailed": "QR-Kopplungscode konnte nicht erzeugt werden",
+      "retry": "Erneut versuchen"
+    },
+    "devices": {
+      "title": "Gekoppelte Geräte",
+      "empty": "Keine gekoppelten Geräte",
+      "emptyHint": "QR-Kopplungscode auf dem Mobilgerät scannen",
+      "lastSeen": "Zuletzt aktiv",
+      "never": "Nie verbunden",
+      "revoke": "Widerrufen",
+      "revokeConfirmTitle": "Gerät widerrufen",
+      "revokeConfirmMessage": "Nach dem Widerruf kann „{{name}}\" diese Bibliothek nicht mehr synchronisieren und muss neu gekoppelt werden. Widerrufen?",
+      "revokeConfirm": "Gerät widerrufen",
+      "revoked": "Gerät widerrufen"
+    },
+    "gallerySource": "NikkiSync-Ressourcenbibliothek als Galeriequelle verwenden",
+    "gallerySourceDesc": "Aus: lokale media_files werden gelesen (Standard). An: die Galerie liest die Assets des eingebetteten NikkiSync-Runtimes, inklusive impliziter Runtime-Aktivierung und einem Scan",
+    "gallerySourceApplied": "Galerie-Datenquelle auf {{source}} umgestellt",
+    "metadata": {
+      "enable": "Outfit- und Aufnahmeparameter analysieren",
+      "enableDesc": "Nach Abschluss eines Durchlauts ergänzt der vorgelagerte NikkiSync-Resolver die Aufnahmeparameter (Brennweite, Blende, Belichtung, Filterstärke usw.) der synchronisierten Galerie. Wirkt nach einem Neustart der App.",
+      "disclosure": "Wenn aktiviert, werden die Foto-UID und der im Foto eingebettete Parameterumschlag zum Erhalt eines dekodierten Ergebnisses an den Drittanbieter nuan5.pro gesendet. Die Antwort wird in die lokale synchronisierte Datenbank geschrieben und über das lokale Netz auch mit gekoppelten Geräten geteilt. Die Suche nach Outfits und Kleidungsstücken ist weiterhin vom lokalen Wörterbuch abhängig; dieser Schalter deckt das nicht ab."
+    }
+  },
+  "shareCard": {
+    "title": "FreigabeBild erzeugen",
+    "generate": "FreigabeBild erzeugen",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen",
+    "savedCount": "{{count}} Bild(er) gespeichert",
+    "progress": "Rendere {{current}} / {{total}}…",
+    "missingIcons": "{{count}} Symbol(e) nicht verfügbar",
+    "motionUnsupported": "Freigabebilder für LIVE-Fotos werden in dieser Phase nicht unterstützt",
+    "noParams": "Keine Aufnahmeparameter gefunden; Es werden Gedankenstriche angezeigt",
+    "errorGenerate": "Erstellung fehlgeschlagen",
+    "errorCancelled": "Erstellung abgebrochen",
+    "errorSave": "Speichern fehlgeschlagen",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }

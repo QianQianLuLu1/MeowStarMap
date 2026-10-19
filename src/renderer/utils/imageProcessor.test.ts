@@ -11,6 +11,7 @@ import {
   applySplitTone,
   getWatermarkPosition,
   formatWatermarkText,
+  planPasses,
   defaultFilterParams,
   hslColorKeys,
   type HSLColorKey,
@@ -651,6 +652,84 @@ describe('imageProcessor', () => {
 
     it('中文混合占位符也能替换', () => {
       expect(formatWatermarkText('暖暖相册 {date}')).toBe('暖暖相册 2026.07.18')
+    })
+  })
+
+  /**
+   * planPasses（docs/plans/2026-10-18-fix-editor-preview-realtime.md N5）
+   *
+   * 拖动时通常只有一两个参数在变，但像素循环此前对**每个像素**都调用全部 pass 函数
+   * （各自返回一个元组数组）。把「哪个 pass 真的激活」提到循环外算一次，
+   * 未激活的 pass 整个跳过——判定口径必须与各 pass 自身的早退条件逐字一致，
+   * 否则会改变输出；等价性由 imageProcessor.pixels.test.ts 的校验和守住。
+   */
+  describe('planPasses 像素循环的 pass 判定', () => {
+    it('默认参数下所有可选 pass 都不激活（正常）', () => {
+      const plan = planPasses(defaultFilterParams)
+      expect(plan.temperature).toBe(false)
+      expect(plan.vibrance).toBe(false)
+      expect(plan.hsl).toBe(false)
+      expect(plan.activeHslKeys).toEqual([])
+      expect(plan.splitTone).toBe(false)
+      expect(plan.dehaze).toBe(false)
+      expect(plan.convolution).toBe(false)
+      expect(plan.vignette).toBe(false)
+      expect(plan.grain).toBe(false)
+      expect(plan.fade).toBe(false)
+      expect(plan.lut).toBe(false)
+    })
+
+    it('色温与色调任一非零即激活色温 pass（正常）', () => {
+      expect(planPasses({ ...defaultFilterParams, temperature: 30, tint: 0 }).temperature).toBe(
+        true
+      )
+      expect(planPasses({ ...defaultFilterParams, temperature: 0, tint: -12 }).temperature).toBe(
+        true
+      )
+    })
+
+    it('只激活真正非零的那个 HSL 键（边界）', () => {
+      const plan = planPasses({
+        ...defaultFilterParams,
+        hsl: {
+          ...defaultFilterParams.hsl,
+          green: { hue: 0, saturation: 10, lightness: 0 }
+        }
+      })
+      expect(plan.hsl).toBe(true)
+      expect(plan.activeHslKeys).toEqual(['green'])
+    })
+
+    it('NaN 视为未激活（异常）——否则每像素 clamp(NaN) 会把整帧涂黑', () => {
+      const plan = planPasses({
+        ...defaultFilterParams,
+        vibrance: NaN,
+        dehaze: NaN,
+        hsl: { ...defaultFilterParams.hsl, red: { hue: NaN, saturation: NaN, lightness: NaN } }
+      })
+      expect(plan.vibrance).toBe(false)
+      expect(plan.dehaze).toBe(false)
+      expect(plan.hsl).toBe(false)
+      expect(plan.activeHslKeys).toEqual([])
+    })
+
+    it('分离色调仅 balance 非零时不激活——与 applySplitTone 的早退口径逐字一致（边界）', () => {
+      expect(planPasses({ ...defaultFilterParams, splitBalance: 50 }).splitTone).toBe(false)
+      expect(planPasses({ ...defaultFilterParams, shadowHue: 50 }).splitTone).toBe(true)
+      expect(planPasses({ ...defaultFilterParams, highlightSaturation: 50 }).splitTone).toBe(true)
+    })
+
+    it('清晰度/锐化/降噪任一非零即激活卷积组（正常）', () => {
+      expect(planPasses({ ...defaultFilterParams, sharpen: 1 }).convolution).toBe(true)
+      expect(planPasses({ ...defaultFilterParams, denoise: 1 }).convolution).toBe(true)
+      expect(planPasses({ ...defaultFilterParams, clarity: -1 }).convolution).toBe(true)
+    })
+
+    it('暗角/颗粒/褪色沿用既有的「大于 0」口径，负值不激活（边界）', () => {
+      expect(planPasses({ ...defaultFilterParams, vignette: -10 }).vignette).toBe(false)
+      expect(planPasses({ ...defaultFilterParams, vignette: 10 }).vignette).toBe(true)
+      expect(planPasses({ ...defaultFilterParams, grain: 0.5 }).grain).toBe(true)
+      expect(planPasses({ ...defaultFilterParams, fade: 0 }).fade).toBe(false)
     })
   })
 })

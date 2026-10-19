@@ -70,12 +70,19 @@ export type ViewLevel =
   | 'launcher-cache'
   | 'resonance-records'
   | 'screenshots'
+  | 'sync-gallery'
+  // 同步服务二级子页：从设置页 `sync` 分组剥离而来，入口在同步图库工具栏。
+  | 'sync-service'
 export type ViewMode = 'grid' | 'list' | 'timeline' | 'masonry' | 'event-timeline'
 
 /**
  * 支持多选的媒体板块集合：图库 / 截图 / 收藏（含启动器缓存）。
  * 三者复用同一个 GalleryPage 与同一份 selectedMediaIds，切换时必须清理选中态，
  * 否则会把 A 板块选中的 id 带到 B 板块（B 板块无这些 id，但批量操作栏会残留常驻）。
+ *
+ * 阶段 5 的 `sync-gallery` **刻意不加入**本集合：它有自己的 `syncGalleryStore` 列表与
+ * 资产 id 命名空间（`asset_id`，与 `media_files.id` 不同源），选中态不与 GalleryPage
+ * 共享，因此不需要——也不应该——在切换时清掉图库的选中集。
  */
 const MULTI_SELECT_VIEWS = new Set<ViewLevel>([
   'gallery',

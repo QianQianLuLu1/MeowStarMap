@@ -11,7 +11,8 @@ import {
   extractAlbumTypeFromPath,
   extractMediaSourceFromPath,
   isGamePlayPhotosPath,
-  resolveNativeThumbnailPath
+  resolveNativeThumbnailPath,
+  resolveGamePhotoVariantPaths
 } from './path-classifier'
 
 describe('extractUidFromPath', () => {
@@ -436,5 +437,70 @@ describe('resolveNativeThumbnailPath', () => {
         'D:/Game/X6Game/Saved\\GamePlayPhotos\\123456789/NikkiPhotos_HighQuality\\p.jpg'
       )
     ).toBe('D:/Game/X6Game/Saved\\GamePlayPhotos\\123456789/NikkiPhotos_LowQuality\\p.jpg')
+  })
+})
+
+describe('resolveGamePhotoVariantPaths', () => {
+  const HQ = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_HighQuality\\p.jpg'
+  const LQ = 'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\NikkiPhotos_LowQuality\\p.jpg'
+  const SS = 'C:\\game\\X6Game\\ScreenShot\\p.jpg'
+  const SS_SAVED = 'C:\\game\\X6Game\\Saved\\ScreenShot\\p.jpg'
+
+  it('E1 正常：HQ 路径产出 LQ + X6Game\\ScreenShot + X6Game\\Saved\\ScreenShot 三个同名候选', () => {
+    expect(resolveGamePhotoVariantPaths(HQ)).toEqual([LQ, SS, SS_SAVED])
+  })
+
+  it('E2 边界：保留原路径大小写与目录段形态（异常大小写的官方目录）', () => {
+    expect(
+      resolveGamePhotoVariantPaths(
+        'D:\\game\\X6GAME\\SAVED\\GAMEPLAYPHOTOS\\123456789\\nikkiPHOTOS_highquality\\photo.jpg'
+      )
+    ).toEqual([
+      'D:\\game\\X6GAME\\SAVED\\GAMEPLAYPHOTOS\\123456789\\NikkiPhotos_LowQuality\\photo.jpg',
+      'D:\\game\\X6GAME\\ScreenShot\\photo.jpg',
+      'D:\\game\\X6GAME\\Saved\\ScreenShot\\photo.jpg'
+    ])
+  })
+
+  it('E3 边界：LQ 锚点与 X6Game\\ScreenShot 路径不反向推导 HQ（防误删原图）', () => {
+    expect(resolveGamePhotoVariantPaths(LQ)).toEqual([])
+    expect(resolveGamePhotoVariantPaths(SS)).toEqual([])
+    expect(resolveGamePhotoVariantPaths(SS_SAVED)).toEqual([])
+  })
+
+  it('E4 边界：UID 段非单层纯数字时整体返回空（结构异常不猜测）', () => {
+    expect(
+      resolveGamePhotoVariantPaths(
+        'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\1001\\sub\\NikkiPhotos_HighQuality\\p.jpg'
+      )
+    ).toEqual([])
+    expect(
+      resolveGamePhotoVariantPaths(
+        'C:\\game\\X6Game\\Saved\\GamePlayPhotos\\myalbum\\NikkiPhotos_HighQuality\\p.jpg'
+      )
+    ).toEqual([])
+  })
+
+  it('E5 边界：用户自建同名目录 / 空串 / 非字符串一律返回空', () => {
+    expect(
+      resolveGamePhotoVariantPaths(
+        'C:\\backup\\GamePlayPhotos\\1001\\NikkiPhotos_HighQuality\\p.jpg'
+      )
+    ).toEqual([])
+    expect(() => resolveGamePhotoVariantPaths('')).not.toThrow()
+    expect(resolveGamePhotoVariantPaths('')).toEqual([])
+    expect(resolveGamePhotoVariantPaths(undefined as unknown as string)).toEqual([])
+  })
+
+  it('E6 边界：无 Saved 段的变体（X6Game\\GamePlayPhotos）不推导，锚点口径不变', () => {
+    expect(
+      resolveGamePhotoVariantPaths(
+        'C:\\game\\X6Game\\GamePlayPhotos\\1001\\NikkiPhotos_HighQuality\\p.jpg'
+      )
+    ).toEqual([])
+  })
+
+  it('E7 边界：非官方相册的普通媒体路径返回空', () => {
+    expect(resolveGamePhotoVariantPaths('C:\\media\\photo.jpg')).toEqual([])
   })
 })

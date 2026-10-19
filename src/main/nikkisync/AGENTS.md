@@ -1,0 +1,105 @@
+# AGENTS.md — `src/main/nikkisync`（NikkiSync 外部包装载缝 · 主进程侧唯一入口）
+
+本目录是 WXNN XiangCe 消费 **NikkiSync 包**（`@nikkisync/core` / `@nikkisync/database` /
+`@nikkisync/protocol` / `@nikkisync/pc-companion`）的**唯一入口**。顶层项目速览见根目录
+[`AGENTS.md`](../../../AGENTS.md)，四条硬性编码约定与校验/提交口径见
+[`docs/CODING_CONVENTIONS.md`](../../../docs/CODING_CONVENTIONS.md)（唯一真相源）。整合计划与选型依据见
+[`docs/sync-integration/01-dependency-link-plan.md`](../../../docs/sync-integration/01-dependency-link-plan.md)，
+阶段 9 自包含改造见 [`docs/sync-integration/09-legacy-debt-remediation-plan.md`](../../../docs/sync-integration/09-legacy-debt-remediation-plan.md)。
+
+## 与 `src/main/sync/` 的分工
+
+| 目录                  | 角色                           | 依赖面                                                                          |
+| --------------------- | ------------------------------ | ------------------------------------------------------------------------------- |
+| `src/main/sync/`      | 移植面服务层（自有实现）       | 只依赖 node 内置 + `src/shared/sync/` + `database` 仓储                         |
+| `src/main/nikkisync/` | 外部包装载缝（复用 NikkiSync） | 依赖 `npm run link:nikkisync` 建链后 `node_modules/@nikkisync/*` 指向的编译产物 |
+
+两者当前**并存**，但职责已分定（阶段 9 决策）：协议契约的唯一真相源是移植面
+`src/shared/sync/protocol.ts`（`protocol.ts` + `domain-types.ts`；曾拟新增的 `protocol-extension.ts` 从未提交，只存在于本机 `stash@{0}` 的阶段 7 WIP）；本目录不再引用任何
+`@nikkisync/*` 类型或值，上游包只作为**链接运行时探测与漂移比对对象**（见 `protocol-drift.test.ts`）。
+
+## 文件职责
+
+| 文件                                  | 职责                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `runtime-loader.ts`                   | 装载缝：包名/specifier 表、必需导出表、变量式 `await import()`、`hasNikkiSyncLink()` skip 门控、可诊断错误类型                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `probe.ts`                            | `runNikkiSyncLinkProbe()`：四包导出存在性 + `:memory:` 建表 + pc-companion Context 校验，返回结构化报告；`formatNikkiSyncLinkProbeReport()` / `isNikkiSyncProbeErrorLine()` 为输出层纯函数                                                                                                                                                                                                                                                                                                                                                                                             |
+| `probe-cli.ts`                        | 入口薄壳（electron-vite main 的 `nikkisync-probe` 入口）：只跑探针 → 分流 stdout/stderr → 定退出码；文本内容不在本文件生成                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `protocol-contract.ts`                | 协议契约快照纯函数（零依赖）：`collectVendoredContract()` / `upstreamSnapshotFromModules()` / `diffProtocolContract()` 与 `VENDORED_CONTRACT_SYMBOLS` 清单——vendored 为唯一真相源后的防分叉底座                                                                                                                                                                                                                                                                                                                                                                                        |
+| `protocol-drift.test.ts`              | 链接态漂移守护：把上游 `@nikkisync/protocol`（+ `core` 兜底）实测值喂给同一套纯函数并断言零差异；未链接整件 skip                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `embedding-paths.ts`                  | 打包态资源路径纯函数：`buildPackagingContext()` / `resolveModuleRoot()`（优先 `app.asar.unpacked`，未命中回落 `app.asar` 并置 `fellBackToAsar`）/ `resolveEntryUrl()` / `resolveDeepEntryUrl()`（阶段 2：不在桶导出内的 `dist/src/**` 深入口）/ `resolveMigrationsSqlPath()` / `readMigrationsSql()` 与 `NikkiSyncAssetError`                                                                                                                                                                                                                                                          |
+| `runtime-types.ts`                    | 阶段 2 结构面类型 + 阶段 3 服务面类型：本仓自声明的 `EmbeddedRuntimeLike` / `ScannerServiceLike` / `DatabaseManagerLike` / `NikkiSyncQuerySurface` / `NikkiSyncRuntimeSession` / `NikkiSyncRuntimeStatus` / `NikkiSyncRuntimeHandle` / `LocalSyncServerLike` / `NikkiSyncSyncServer*` / `NikkiSyncPairedDeviceView`（**不得** `import type` 上游包）                                                                                                                                                                                                                                   |
+| `runtime-facade.ts`                   | 阶段 2 装载 + 组装 + 只读查询，阶段 3 加服务面：`loadRuntimeSurface()`（含 `server/row-mappers.js` 深入口）、`createRuntimeSession()`（构造期下传 `syncServer` 配置，本身仍不监听/不组播）、`createQuerySurface()`（`SyncReadRepository` + `row-mappers` 零转换透传）、`PAIRED_DEVICES_SQL`（上游缺 list API 的只读 SELECT）、`encodePageCursor/decodePageCursor`、`createManagerDependencies(defaults, log, pairingHostResolver?)`                                                                                                                                                    |
+| `sync-server-view.ts`                 | 阶段 3 纯函数层（零上游引用）：`resolveSyncServerConfig` / `embeddedServerConfig`（折算上游 `LocalSyncServerConfig`，刻意不传 `tls`）、`normalizeSyncPort` / `normalizeJournalPollMs`、`isPortInUseError` / `classifySyncStartError`（`PORT_IN_USE` 判据同上游 `StartupFailure.ts`）、`mapPairedDeviceRow`、`parsePairingUri`、`buildSyncStatusSnapshot`                                                                                                                                                                                                                               |
+| `sync-server-view.test.ts`            | 上述纯函数的正常/异常/边界用例（不依赖链接）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `runtime-manager.ts`                  | 生命周期状态机（唯一依赖注入面）：`unavailable/idle/starting/running/scanning/degraded/stopping/error`；`start()` 永不外抛（无游戏目录 ⇒ `degraded`）；`scan()` 惰性启动与换根重建；`stop()` 幂等 + 单步超时兜底；阶段 3 增 `startSyncServer`/`stopSyncServer`/`syncStatus`/`pairingCode`/`listPairedDevices`/`revokeDevice`（改端口 = 重建会话）；阶段 6 增会话代次（`generation`，拆除时递增，用于让在途解析驱动停止发起下一轮）与 `status().metadata` 快照，teardown 顺序改为 `metadataResolver.stop → server.stop → scanner.stop → dispose`（先停生产者）；导出 `runWithTimeout()` |
+| `runtime-manager.test.ts`             | 状态机用例（假 facade 注入，不依赖链接），含阶段 3 同步服务编排                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| `runtime-facade.linked.test.ts`       | 链接态集成：建库+12 表、上游扫描、`motion_photo` 聚合、DTO 透传、游标分页、**完整生命周期**（stop 后 `-wal` 已 checkpoint、可重新 start）；未建链整件 skip                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| `sync-server.linked.test.ts`          | 阶段 3 链接态集成：真起上游 TLS 服务，逐端点验 Protocol v1（免鉴权 2 条 / 签名 9 条 / Range 206+416 / WS `server.hello`+`asset.created` / 配对与重放 / 停止重启 / 端口占用归类 / TLS 指纹持久化）；未建链整件 skip                                                                                                                                                                                                                                                                                                                                                                     |
+| `runtime-cli-report.ts`               | 阶段 2 验证入口的输出层纯函数：`parseRuntimeCliArgs()` / `formatRuntimeRunLines()` / `isRuntimeRunErrorLine()`（与 `probe.ts` 同角色，壳不得长业务）                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `metadata-resolver-driver.ts`         | 阶段 6：元数据解析的**零依赖纯函数层**（开关判定 / `metadataResolver` 配置片段折算 / 扫描后有界驱动）。不 import Electron、不 import `@nikkisync/*`、不发网络，故未建链的 CI 也必跑。**三条不可让步判据**：关闭时连配置键都不下发（上游 `runOnce()` 首行 `!enabled` 会直接返回 0）；绝不下发 `intervalMs`（上游用 `??`，传 0 会造出 `setInterval(fn,0)`）；驱动永不 reject（上游 `runOnce` 外层只有 try/finally 无 catch）                                                                                                                                                             |
+| `metadata-isolation-guards.ts`        | 阶段 6：表级隔离谓词（只认 SQL 语句上下文里的表引用），把「同步面绝不写原有库表」折成可断言判据。禁用集刻意**不含** `app_settings` / `schema_migrations`（上游库里同名表也存在，列进来会让护栏恒真失效）                                                                                                                                                                                                                                                                                                                                                                               |
+| `metadata-resolver.isolation.test.ts` | 阶段 6：两档隔离守护，沿用 `scanner/__tests__/rescan-restore-sql.test.ts` 的形态——结构档（源码文本，任何 Node 必跑）+ 语义档（`node:sqlite` 真实执行上游三条 SQL，证明 `media_files` 行/列/内容三不变，**不需要** `better-sqlite3`，绕开 Electron ABI 与 `vi.mock` 对原生模块无效的限制）                                                                                                                                                                                                                                                                                              |
+| `metadata-resolver.linked.test.ts`    | 阶段 6 链接态集成：经 `createRuntimeSession` 的 `preloadedSurface` 测试缝把上游 `Nuan5CompatibleResolver` 换成假解析器 ⇒ **零出站请求**下验证真上游确实构造服务、逐批落库、推进 revision/journal/诊断计数。未建链整件 skip                                                                                                                                                                                                                                                                                                                                                             |
+| `runtime-cli.ts`                      | 阶段 2 无 UI 验证入口（electron-vite main 的 `nikkisync-runtime` 入口）：`start → scan → query → stop`，只跑流程 + 分流 stdout/stderr + 定退出码                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| `runtime-loader.test.ts`              | Vitest node project 测试（计划 §11 用例 1-7）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `probe.test.ts`                       | 4 例纯函数（`formatNikkiSyncLinkProbeReport` 的正/负例、n/a 降级、schemaSource 行条件输出，不依赖链接）+ 4 例在本地 Node（>= 24）上跑真实装载链（含「schema SQL 读取失败也必须 close 内存库」这条硬边界），与 Electron 侧 `nikkisync-probe.js` 共用同一实现                                                                                                                                                                                                                                                                                                                            |
+
+## 硬性约定
+
+1. **禁止静态值导入 `@nikkisync/*`**：NikkiSync 的 ESM 图含 top-level await，静态值导入会被
+   打包器折叠成 `require()`，运行时必现 `ERR_REQUIRE_ASYNC_MODULE`。该禁令由 `eslint.config.js`
+   两层护栏固化（已实测）：`no-restricted-imports`（`group: ['@nikkisync/*']` +
+   `allowTypeImports: true`）拦静态 import/export，`no-restricted-syntax` 的
+   `ImportExpression[source.value=/^@nikkisync\//]` 补拦字面量 `import()`。
+   - 类型 → **不再引用**（阶段 9 起 `@nikkisync/*` 不是声明依赖，`import type` 在 CI 下会报
+     TS2307；历史类型锚点 `NikkiSyncTypeSurface` 已退役）。
+   - 值 → 一律 `await loadNikkiSyncPackage(...)` / `loadAllNikkiSyncPackages()`。
+2. **interface 型导出不做运行时断言**：`NikkiAsset` / `MediaResource` 等是 interface，无运行时
+   值。上游 `.d.ts` 的可解析性不再由编译期锚点保证，改由三层守卫承担：
+   `npm run verify:nikkisync`（`dist/src/index.js` + `index.d.ts` 双存在）、本目录
+   `NIKKISYNC_REQUIRED_EXPORTS` 运行时探针、`protocol-drift.test.ts` 契约比对；
+   运行时等价断言用同包常量导出（`ASSET_TYPES` / `RESOURCE_ROLES` 等）。
+3. **探针不得启动任何东西**：`probe.ts` / `probe-cli.ts` 不调 `PcCompanionRuntime.start()`，不实例化
+   `LocalSyncServer` / `ScannerService` / `MdnsAdvertiser`（`start()` 以"找到游戏安装目录"为硬前置，且会占用端口、
+   发起组播、写 TLS 身份）。数据库只允许 `':memory:'`，用完必须 `close()`。
+   - 阶段 2 的**内嵌运行面**（`runtime-facade.ts` + `runtime-manager.ts`）是有意跨过这条边界的另一层：
+     它启 `scanner`（建库 + 发现 + 扫描）；Runtime 构造期不可避免会生成
+     自签 TLS 身份并写 `app_settings['server.tlsIdentity']`（上游行为，不得为规避它改 NikkiSync 源码）。
+     库文件落 `{userData}/nikkisync/nikkisync.db`，不走上游默认 `%LOCALAPPDATA%/NikkiSync`。
+   - **阶段 3 起，运行面可以启 LAN 服务**（边界仅适用于探针）：`runtime-manager.startSyncServer()`
+     调**上游自己的** `runtime.server.start()`（不新建任何 HTTP/TLS/WS/mDNS 实现）。三条硬约束：
+     ① 只在用户显式开启时启（`nikkisync.syncServerEnabled` 默认 `false`，绑 `0.0.0.0` 属敏感暴露）；
+     ② `probe.ts` / `probe-cli.ts` / `runtime-cli.ts` **仍绝不**调 `server.start()`（探针语义不变）；
+     ③ 端口/mdns 冻结在上游构造期 ⇒ 变更只能重建会话，`syncServer` 配置必须由 `createRuntimeSession`
+     传入而不是启动后再改。构造 `mdns:true` 不组播（`mdns.start()` 只在 `start()` 内被调）。
+     状态与配对面的纯函数在 `sync-server-view.ts`；上游缺 `listDevices` 才允许对 `paired_devices`
+     做只读 SELECT（`runtime-facade.PAIRED_DEVICES_SQL`），撤销必须走上游 `PairingRepository.revoke`。
+4. **打包态必须传 PackagingContext**：入口（`src/main/index.ts` 的探针钩子、`probe-cli.ts`）
+   在 `app.isPackaged` / `process.resourcesPath` 存在时构造并下传 context；否则上游
+   `DatabaseManager.initialize()` 靠 `import.meta.url` 定位 `migrations/0001_initial.sql` 在 asar 内
+   不可靠，且 `@nikkisync/*` 解包后真实落点在 `app.asar.unpacked`。开发态不传 context
+   （保持阶段 1 已验证行为）。
+5. **`import type` 之外的包名不散落**：新增/改名包只能改 `NIKKISYNC_PACKAGES` 与
+   `NIKKISYNC_REQUIRED_EXPORTS` 两处单一真相源，测试与探针共用。
+   - 阶段 6 例外（勿"顺手补上"）：**深入口符号不进 `NIKKISYNC_REQUIRED_EXPORTS`**。
+     那张表由 `probe.ts` 拿去在**桶导出**（`dist/src/index.js`）上做存在性判定，而
+     `Nuan5CompatibleResolver` / `metadataResolutionDiagnostics` 都在桶外（实测桶只 re-export
+     `metadata/MetadataResolverPipeline.js` 与 `metadata/types.js`），加进去只会在正确的构建产物上
+     误报红。产物存在性改由 `scripts/verify-nikkisync-link.ts` 的 `METADATA_REQUIRED_ARTIFACTS` 承担。
+6. **依赖前置**：链接由 `npm run link:nikkisync` 建立（候选根：`NIKKISYNC_ROOT` → `../NikkiSync` →
+   `vendor/NikkiSync`），消费的是 NikkiSync 的 `dist/` 产物。**未链接是受支持的默认态**：
+   装载类测试整件 skip、`verify:nikkisync` 只给 warn，不得把环境缺失伪装成逻辑失败。
+   链接就绪但 NikkiSync 未 `npm run build` 时，装载错误会显式指向该修复动作
+   （`npm run verify:nikkisync` 给出完整事实表）。skip 门控必须用
+   `hasNikkiSyncLink(projectRoot)`（按包内 `package.json` 可解析判定）而非目录存在判定，
+   否则悬空 junction 会造成假失败。
+   - **`npm install` 会剪掉 `node_modules/@nikkisync` junction**（它们不是声明依赖）：装完依赖后
+     必须重跑 `npm run link:nikkisync`（必要时 `npm run verify:nikkisync` 复验），否则链接态用例会
+     集体降级为 skip，把真实回归藏起来。
+7. **字符串字面量保持英文**：`src/**` 的中文硬编码护栏（`no-restricted-syntax`）为 error；
+   中文只出现在注释与文档中。同一护栏块禁止 `console.log/info/debug`：入口壳用
+   `process.stdout.write`，失败行用允许的 `console.error`。
+8. **输出层必须是纯函数**：报告→文本形态（`formatNikkiSyncLinkProbeReport`）与错误分流判据
+   （`isNikkiSyncProbeErrorLine`）留在 `probe.ts` 内可单测；`probe-cli.ts` 不得再增加业务逻辑
+   （否则入口壳的 0% 覆盖面会随功能增长，把真实覆盖率问题藏进排除项）。

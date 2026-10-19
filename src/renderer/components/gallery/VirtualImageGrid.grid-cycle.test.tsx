@@ -390,3 +390,159 @@ describe('VirtualImageGrid — 错误链终点闭环（审查修复 T1）', () =
     await expectTerminalPlaceholder(container)
   })
 })
+
+// 2026-10-18 网格视图滚动闪烁修复 N5：按需生成结果的通知是否真的逐条整网格重渲染。
+// useOnDemandThumbnails.ts:34-37 的 notifyResult 对每个 promise 结果调一次 setRevision，
+// commit 084d3ef 正文把它记为「已知遗留：整网格重渲染风暴」。本组用例先量明实数再决定改不改。
+describe('VirtualImageGrid — 按需生成结果合帧通知（N5）', () => {
+  const makeNullThumbItems = (n: number, tag: string): MediaFile[] =>
+    Array.from({ length: n }, (_, i) => ({
+      id: `${tag}-${i}`,
+      file_type: 'image',
+      thumbnail: null,
+      file_path: `/n5/${tag}/${i}.jpg`,
+      file_name: `${i}.jpg`,
+      file_size: 2048,
+      is_favorite: false,
+      is_missing: false,
+      is_corrupted: false
+    })) as unknown as MediaFile[]
+
+  const latestRangeChanged = () =>
+    virtuosoRecords.list[virtuosoRecords.list.length - 1].rangeChanged as (range: {
+      startIndex: number
+      endIndex: number
+    }) => void
+
+  it('① 边界：同一帧内 settle 的多个生成结果，整网格重渲染至多 +1', async () => {
+    vi.useFakeTimers()
+    // 模块级 generationRequests/Results 跨用例常驻 ⇒ 每轮用唯一 tag 保证真发请求
+    const tag = `n5-${Date.now()}`
+    const resolvers: Array<(value: string | null) => void> = []
+    const generate = vi.fn(
+      () =>
+        new Promise<string | null>((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+    const original = window.electronAPI
+    Object.defineProperty(window, 'electronAPI', {
+      configurable: true,
+      value: { thumbnail: { generate } }
+    })
+
+    try {
+      render(<VirtualImageGrid items={makeNullThumbItems(5, tag)} {...baseProps} />)
+      // 首个非空可视区间 → 立即对 5 条 thumbnail=NULL 发卡生成
+      act(() => {
+        latestRangeChanged()({ startIndex: 0, endIndex: 4 })
+      })
+      expect(generate).toHaveBeenCalledTimes(5)
+
+      const before = virtuosoRecords.list.length
+      // 5 个结果在同一帧内 settle
+      await act(async () => {
+        resolvers.forEach((resolve, i) => resolve(`/n5/${tag}/${i}.jpg`))
+      })
+      const delta = virtuosoRecords.list.length - before
+      // 至多一次整网格重渲染（逐条通知时为 +5）
+      expect(delta).toBeLessThanOrEqual(1)
+    } finally {
+      Object.defineProperty(window, 'electronAPI', { configurable: true, value: original })
+      vi.useRealTimers()
+    }
+  })
+})
+// 2026-10-18 网格视图滚动闪烁修复 N2（docs/plans/2026-10-18-fix-gallery-grid-scroll-flicker.md）
+// hoveredId 是整网格级 state：Blink 在内容滚过静止光标时会重算 hover，于是每次换行都
+// 触发一次 setHoveredId → 整个网格重渲染 + 遮罩子树（hover 套 / touch 套）整体装卸。
+// 用户不移动鼠标、只向下滚动时，这条链路每帧都在跑——是「画面异常闪烁」里属于
+// 「视图重绘」的那一半，且在软件渲染设备上被放大。
+describe('VirtualImageGrid — 滚动进行中冻结 hover 重渲染', () => {
+  const SCROLL_IDLE_MS = 150
+
+  it('① 异常（红灯主体）：滚动期间鼠标扫过卡片不得触发整网格重渲染', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = render(<VirtualImageGrid items={makeItems(60)} {...baseProps} />)
+      const cards = Array.from(container.querySelectorAll<HTMLElement>('.media-card'))
+      expect(cards.length).toBeGreaterThan(2)
+      const baseline = virtuosoRecords.list.length
+      expect(baseline).toBeGreaterThan(0)
+
+      // 向 document 冒泡不到的 scroll 事件同样被 capture 阶段监听捕获（body 是 document 后代）
+      act(() => {
+        fireEvent.scroll(document.body)
+      })
+
+      // 模拟向下滚动时静止光标依次扫过第 1、2、3 张卡：leave + enter 交替
+      act(() => {
+        fireEvent.mouseEnter(cards[0]!)
+        fireEvent.mouseLeave(cards[0]!)
+        fireEvent.mouseEnter(cards[1]!)
+        fireEvent.mouseLeave(cards[1]!)
+        fireEvent.mouseEnter(cards[2]!)
+      })
+
+      // 滚动未停 → hover 态必须保持冻结，网格渲染次数不得增长
+      expect(virtuosoRecords.list.length).toBe(baseline)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('② 正常：停滚超过空闲阈值后 hover 恢复（遮罩与快捷按钮照常出现）', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = render(<VirtualImageGrid items={makeItems(60)} {...baseProps} />)
+      const cards = Array.from(container.querySelectorAll<HTMLElement>('.media-card'))
+      act(() => {
+        fireEvent.scroll(document.body)
+      })
+      // 空闲期过后再次滚动一次并停下，确认是「滚动中」而非「一次性开关」
+      act(() => {
+        vi.advanceTimersByTime(SCROLL_IDLE_MS + 50)
+        fireEvent.scroll(document.body)
+        vi.advanceTimersByTime(SCROLL_IDLE_MS + 50)
+      })
+
+      const baseline = virtuosoRecords.list.length
+      act(() => {
+        fireEvent.mouseEnter(cards[0]!)
+      })
+      // 静止时 hover 必须照常工作：整网格重渲染 + 遮罩内文件名出现
+      expect(virtuosoRecords.list.length).toBeGreaterThan(baseline)
+      expect(cards[0]!.textContent).toContain('file0.jpg')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('③ 边界：单次 scroll 与 mouseEnter 同一批次时序下仍冻结（不因事件顺序漏判）', () => {
+    vi.useFakeTimers()
+    try {
+      const { container } = render(<VirtualImageGrid items={makeItems(60)} {...baseProps} />)
+      const cards = Array.from(container.querySelectorAll<HTMLElement>('.media-card'))
+      const baseline = virtuosoRecords.list.length
+
+      // hover 先于 scroll：enter 时还没进入滚动态，允许渲染一次；随后 scroll 置真，
+      // 之后的 leave/enter 必须全部冻结
+      act(() => {
+        fireEvent.mouseEnter(cards[0]!)
+      })
+      act(() => {
+        fireEvent.scroll(document.body)
+      })
+      const afterFirstEnter = virtuosoRecords.list.length
+      act(() => {
+        fireEvent.mouseLeave(cards[0]!)
+        fireEvent.mouseEnter(cards[1]!)
+        fireEvent.mouseLeave(cards[1]!)
+      })
+      expect(virtuosoRecords.list.length).toBe(afterFirstEnter)
+      expect(afterFirstEnter).toBeGreaterThan(baseline)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})

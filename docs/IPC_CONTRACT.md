@@ -373,3 +373,175 @@ wrapHandler(ctx, schema, handler) =>
 | `resonance:export`       | 载荷 `bannerWishlist`（`resonanceExportPayloadSchema`） | 与上游导出格式对齐；上游同字段亦为可选，缺失即不导出        |
 
 `resonance:commitImport` 的空批次 `refine` 守卫已同步放宽：仅携带 `includeWishlist: true` + `wishlist` 的末批视为有效批次（此前仅记录段与 wardrobe 可使其通过）。
+
+## 8. NikkiSync 域（sync-integration 阶段 2 查询面 + 阶段 3 服务面 + 阶段 4 查询面扩容）
+
+补齐阶段 1/2 欠下的同步义务：`nikkisync:*` 与 `sync:*` 两组通道此前未入本契约。
+实现位置：`src/main/ipc/handlers/nikkisync-handler.ts`、`src/main/preload/api/nikkisync.ts`、
+`src/shared/types/electron-api.ts`（形状快照）、`src/renderer/vite-env.d.ts`（镜像声明）。
+
+命名口径：`nikkisync:` 道用 **kebab-case** 动作（本域一致），历史 `sync:` 道用 camelCase（保持不动以免破坏兼容）。
+两组通道的返回值都由 `wrapHandler` 包成 `IpcResponse`，preload 的 `call<T>()` 只透出 `data`；
+渲染层一律 `try/catch` + `IpcError`，不检内层 `res.success`。
+
+### 8.1 查询面（阶段 2，响应体 = NikkiSync 协议 DTO，内嵌层零转换）
+
+| 通道                         | 入参                                                                    | 出参                                                                                                             | 失败码                                                   |
+| ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `nikkisync:runtime-status`   | 无                                                                      | `{state, dbPath, linkReady, scannerStatus?, installation?, lastScan?, tables?, sync?, metadata?, error?, hint?}` | `PRECONDITION_FAILED`（句柄未装配）                      |
+| `nikkisync:start-scan`       | `{gameRoot?, path?}`                                                    | 上游 `ScanResult` 原样                                                                                           | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
+| `nikkisync:get-assets`       | `{limit=100 (1..500), cursor?, type?, afterRevision?, includeDeleted?}` | `{items, nextCursor?, libraryRevision}`                                                                          | 同上                                                     |
+| `nikkisync:get-asset-detail` | `assetId: string(1..128)`                                               | `mapAssetDetail` 结果                                                                                            | `VALIDATION_ERROR` / `NOT_FOUND`                         |
+| `nikkisync:get-resource`     | `{assetId, resourceId, mode='meta'\|'path'}`                            | `MediaResource` 或上游 `source_path` 原值                                                                        | 同上                                                     |
+
+### 8.1.1 查询面扩容（阶段 4，仍零转换；为图库数据层切换而加）
+
+实现位置同上。响应类型出处是 `src/shared/sync/protocol.ts`（本仓协议契约唯一真相源），
+`electron-api.ts` 只以 `import type` 别名引用，**不再重列字段名**。
+
+| 通道                             | 入参                                                         | 出参                                                                                                                                                                                                                                          | 失败码                                                   |
+| -------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `nikkisync:get-resource-records` | `{assetIds: string(1..128)[] (1..500), mode='meta'\|'path'}` | `meta` → `{byAsset: {[assetId]: MediaResource[]}}`；`path` → `{byAsset: {[assetId]: {[resourceId]: 上游 source_path 原值}}}`；无资源的资产给 `[]` / `{}`，不静默丢弃                                                                          | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `nikkisync:get-changes`          | `{after: int(>=0), limit=1000 (1..1000)}`                    | `{changes: ChangeRecord[], libraryRevision, fullResyncRequired}`；判据逐字同上游 `GET /v1/changes`——`after < minimumJournalRevision() - 1` 时 `fullResyncRequired=true` 且 `changes` 为空；日志表为空（`minimum` 为 `undefined`）**不判**全量 | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
+| `nikkisync:search-suits`         | `{query: string(1..128)，不得全空白}`                        | `SuitSearchResponse`（`{query, items}`）                                                                                                                                                                                                      | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `nikkisync:search-clothing`      | 同上                                                         | `ClothingSearchResponse`                                                                                                                                                                                                                      | 同上                                                     |
+| `nikkisync:profile-stats`        | 无                                                           | `ProfileStatsResponse`（`{libraryRevision, dictionary?, topSuits, topClothing}`）                                                                                                                                                             | `PRECONDITION_FAILED`                                    |
+
+契约要点：
+
+- **`query` 原串下传**：`trim` 与空判由上游索引内部负责，本层刻意不加 `.trim()`；但**全空白在本层即拒**——
+  一旦放行，搜索源装配（`listSuitSearchAssets` 无 LIMIT）会为一个无意义查询摊平整库资产。
+- `get-resource-records` 的存在理由是**往返次数**：一页 500 资产若逐条 `get-resource` 就是 500 次 IPC。
+  外层容器 `byAsset` 由本仓组装，容器内每一项仍是上游 `mapResourceRow` / `resources.source_path` 原值。
+- 上游 `AssetListQuery` **不支持** `uid` / `state` / 文本过滤（只有 `cursor/limit/type/afterRevision/includeDeleted`），
+  故档案与关键字过滤属渲染层职责；要加服务端过滤条件属破坏性变更，须另起通道 + 迁移期双写。
+- `path` 模式给的是绝对路径原值，**仅供**渲染层拼 `media://` URL；该路径能否被真正读取由
+  `src/main/app/media-protocol.ts` 的白名单判定，本域不做授权、不做规整、不承诺文件仍存在。
+
+### 8.1.2 推送事件（阶段 4）
+
+| 事件                        | 方向            | 载荷 | 触发时机                                                          |
+| --------------------------- | --------------- | ---- | ----------------------------------------------------------------- |
+| `nikkisync:library-changed` | main → renderer | 无   | `nikkisync:start-scan` **成功返回后**推给发起方（`event.sender`） |
+
+要点：
+
+- 只在扫描成功时发：扫描失败时库可能处于中间态，通知反而会让 UI 刷出半截结果。
+- 发送失败（窗口已关）或没有 `sender`（CLI / 探针复用同一 handler）一律**静默跳过**，
+  绝不因为一次通知失败就把已经成功的扫描判成失败。
+- 渲染层（`GalleryPage` 的 useEffect 4）收到后先用 `nikkisync:get-changes` 判有没有真的变化，
+  无变化则不整表重取，避免用户滚到的位置被无意义刷新顶掉。
+- 载荷刻意留空：变化内容由 `get-changes` 权威给出，事件只表示「去问一次」。
+
+### 8.1.3 `runtime-status.metadata` 可选段（阶段 6，向后兼容的纯增字段）
+
+通道、入参、包装器**都不变**：`nikkisync:runtime-status` 仍是 `wrapHandlerNoArgs` 的逐字透传，
+preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸门、不改 `preload.test.ts` 键清单。
+新增的只是 `NikkiSyncRuntimeStatus` 上的一个可选键（遵循「新增字段可选、旧字段语义不变」）：
+
+| 字段         | 形状                                                                                                                                          | 出处与含义                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `enabled`    | `boolean`                                                                                                                                     | 主进程侧对该开关的最终判定（env 优先于设置项）                                                      |
+| `endpoint`   | `string`                                                                                                                                      | 实际下传给上游解析器的 https 端点；**只来自主进程常量**，渲染层无法注入                             |
+| `counters?`  | `{ordinaryPhotos, withNativeToken, withCompleteEnvelope, resolved, failed, pending, withOutfit, withCamera, motionPhotos, failureCategories}` | 上游 `metadataResolutionDiagnostics()` 原样透传，**全部是聚合计数**：不序列化行、原始信封或错误原文 |
+| `lastDrive?` | `{passes, resolved, aborted, failed}`                                                                                                         | 最近一次扫描后驱动的统计；未开启或从未驱动时缺省                                                    |
+
+要点：
+
+- `counters` 只在**建会话时**与**每次驱动收尾后**各取一次，**不在** `status()` 里现取：
+  那是两条带 `json_extract` 的全表聚合，而该通道会被 UI 轮询。
+- 会话拆除后 `status()` 不再带 `metadata` 段（没有会话就没有快照）；在途驱动的结果只能从日志读，
+  不能拿一个已关闭的库的计数继续对外称「当前状态」。
+- 该段是**阶段 6 新增、阶段 6b 之前不完整**的：`counters.withOutfit` 会随解析增长，
+  但上游 `dressing.clothes` 是裸 ID 数组，`search-suits` / `search-clothing` 仍返回空 `items`
+  （需要本地字典 manifest）。不要把 `withOutfit > 0` 读成「搜索已经可用」。
+
+### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
+
+| 通道                           | 入参                                    | 出参                                                                                                                                                    | 失败码                                                                                          |
+| ------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `nikkisync:server-status`      | 无                                      | `{available, running, host, port, secure?, serverId?, mdnsEnabled, tlsFingerprintSha256?, serverCertificatePem?, lanHost?, pairedDeviceCount?, error?}` | 不抛：句柄未装配时 `{available:false, running:false, host:'', port:0, mdnsEnabled:false}`       |
+| `nikkisync:start-server`       | 可选 `{port? (1..65535), mdnsEnabled?}` | 同 `server-status`（`available:true`）                                                                                                                  | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（含 `PORT_IN_USE`）；`INTERNAL_ERROR`（其它启动失败） |
+| `nikkisync:stop-server`        | 无                                      | 同 `server-status`（`running:false`）                                                                                                                   | `PRECONDITION_FAILED`                                                                           |
+| `nikkisync:get-pairing-code`   | 无                                      | `{content, expiresAt, serverId, host, port, tlsFingerprintSha256}`（`content` = 上游 `buildPairingUri()` 的 `NS1\|` 七段串）                            | `PRECONDITION_FAILED`（服务未运行，上游原生文案）                                               |
+| `nikkisync:get-paired-devices` | 无                                      | `Array<{deviceId, deviceName, platform, appVersion?, pairedAt, lastSeenAt}>`（仅未撤销；不含公钥/凭据哈希）                                             | `PRECONDITION_FAILED`                                                                           |
+| `nikkisync:revoke-device`      | `deviceId: string(1..128)`              | 撤销后的同一列表                                                                                                                                        | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED`                                        |
+
+契约要点（不得凭实现细节臆造）：
+
+- `secure` 只在真实监听时出现；未运行时 `host/port` 回落**配置值**，好让 UI 能把「配置端口 + `PORT_IN_USE`」显示出来。
+- `mdnsEnabled` 表示**配置意图**：上游 `MdnsAdvertiser` 静默吞掉所有 socket 错误，因此它不能证明广播已生效，UI 与验收都不得把它当发现证据。
+- `serverCertificatePem` 是公开材料（自签证书，不含私钥），供客户端在 pin 指纹之外做第二重核对。
+- `start-server` 改端口会**重建内嵌会话**（上游把 `LocalSyncServerConfig` 冻结在构造期），调用方应预期一次 SQLite 重开与扫描器重新发现。
+- 撤销是软删（上游 `PairingRepository.revoke` 写 `revoked_at`），**不踢**已建立的 WebSocket 连接；该设备后续签名请求由上游鉴权返回 401。
+
+### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
+
+`sync:getStatus` / `startServer` / `stopServer` / `createPairingQr` / `listDevices` / `revokeDevice`
+六条通道**原样保留**以维持兼容（`src/main/ipc/handlers/sync-handler.ts`），其后端是 `src/main/sync/`
+的自有实现，数据源是本 App 的 `media_files` 库，与 8.2 的 NikkiSync 库是两份数据。
+阶段 3 起设置页的「同步服务」节改接 8.2，移植面服务不再自启
+（`PORTED_SYNC_AUTOSTART_ENABLED = false`；组装仍在，`ctx.syncEvents` 被 App 自有写路径依赖）。
+
+## 9. asset-edits 域（sync-integration 阶段 4 · 资产编辑叠加层）
+
+实现位置：`src/main/ipc/handlers/asset-edits-handler.ts`、`src/main/preload/api/asset-edits.ts`
+（新命名空间 `electronAPI.assetEdits`，`electronAPI` 键数由 33 → 34）、
+`src/main/database/asset-edits-repository.ts`（DDL 单一事实源 `ASSET_EDITS_DDL_STATEMENTS`，
+由 `connection.ts` 幂等执行）。
+
+| 通道               | 入参                                                      | 出参                               | 失败码                                     |
+| ------------------ | --------------------------------------------------------- | ---------------------------------- | ------------------------------------------ |
+| `asset-edits:list` | `assetIds: string(1..128)[]`（≤500，与一页资产同界）      | `{ edits: AssetEditsInfo[] }`      | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+| `asset-edits:set`  | `{ assetId: string(1..128), patch: AssetEditsPatchInfo }` | `{ edit: AssetEditsInfo \| null }` | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+
+契约要点：
+
+- **这组通道不属于 NikkiSync 协议 DTO**，因此 handler **允许**塑形：`0/1 → boolean`、
+  `tags` JSON 文本 → `string[]`。塑形口径必须与 `media_files` 的同名字段一致，
+  否则「切换数据源」会连带「切换行为」。`tags` 脏数据（非法 JSON）降级为 `[]`，不抛错。
+- 归键是 NikkiSync 的 `asset_id`（TEXT），**不是** `media_files.id`。两者不可混用：
+  `mediaAction:*` 仍以 `media_files.id` 为准，只服务本地数据源。
+- `updatedAt` 由主进程生成，渲染层不传（避免客户端时钟漂移影响排序与冲突判定）。
+- 旧库未迁移（缺 `asset_edits` 表）时读取如实回退为空列表；写入则 `PRECONDITION_FAILED`。
+- 回填 `media_files → asset_edits`（按归一化路径匹配）的纯函数已在仓储层实现并单测
+  （`planAssetEditSeed`），但**尚未接线任何通道**：需要 `media_files` 与 assets 两侧
+  分页游标对拉，属独立一步，见 `docs/sync-integration/04-ui-bridge-plan.md` §16.3。
+
+## 10. 水印域（2026-10-17 图片水印修复补录）
+
+实现位置：`src/main/ipc/handlers/watermark.ts`、`src/main/preload/api/watermark.ts`
+（命名空间 `electronAPI.watermark`）、`src/main/services/watermark-service.ts`。
+
+| 通道                       | 入参                                         | 出参（`data`，即渲染层拿到的对象）                     | 失败码                                                   |
+| -------------------------- | -------------------------------------------- | ------------------------------------------------------ | -------------------------------------------------------- |
+| `watermark:apply`          | `config`、`filePaths[]`、`targetDir`         | `{ success, message, processed, cancelled?, taskId? }` | `VALIDATION_ERROR` / `PATH_FORBIDDEN` / `INTERNAL_ERROR` |
+| `watermark:saveTemplate`   | `name(≤128)`、`config`（JSON 字符串 ≤256KB） | `{ success: true, id: number }`                        | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `watermark:loadTemplates`  | 无参                                         | 行数组（DB 未就绪为 `[]`）                             | `INTERNAL_ERROR`                                         |
+| `watermark:deleteTemplate` | `id`（正整数）                               | `{ deleted: true }`                                    | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `watermark:progress`       | 主进程 → 渲染层推送                          | `{ current, total }`                                   | —                                                        |
+
+契约要点：
+
+- **`watermark:saveTemplate` 的返回值必须含内层 `success: true`**：调用方
+  `src/renderer/components/editor/WatermarkPanel.tsx` 判的是 `result.success`，而 §1.2 已说明
+  `call<T>()` 会剥掉外层 `IpcResponse.success`。此前 handler 只返回 `{ id }`，该判断恒为
+  `undefined` → 点「保存」后输入框不清空、列表不刷新、无任何提示（DB 行其实已插入）。
+  修复与回归用例见 `docs/plans/2026-10-17-fix-image-watermark-media-auth.md` §5 N3。
+- `watermark:deleteTemplate` 返回 `{ deleted: true }`，调用方以 `try/catch` + `IpcError` 判定成功，
+  **不读** `success`。但 `src/renderer/vite-env.d.ts:421` 把它声明成了
+  `Promise<{ success: boolean; message?: string }>`，与实现不符——运行期无危害（`call()` 原样透传
+  `data`），属类型漂移，后续按 §4 清单修正声明即可，不得反向给 handler 加 `success` 字段来迁就类型。
+- `watermark:apply` 的 `config` 在 IPC 层只做存在性检查（`z.record(z.string(), z.unknown())`），
+  业务校验在 `WatermarkService.applyBatch` 内（平铺间距必须为正数——`tileSpacingX/Y ≤ 0` 曾分别导致
+  水印静默缺失与主进程死循环冻结）。**`config.image.path`（图片水印 logo）自 2026-10-17 起必须经
+  `assertMediaAccessPath(ctx, logoPath)`**（`src/main/ipc/media-read-guard.ts`：用户显式选择的文件 →
+  已入库媒体 → PathGuard 兜底），未授权时整次批量以 `IPC_PATH_FORBIDDEN` 失败、不触达 `applyBatch`。
+  收紧前 service 直接 `fsp.readFile` 该路径，渲染进程可指任意绝对路径把私人图片字节合成进导出文件
+  （原 plan §8 E3 待办，就此关闭）。连带行为：重启后套用存下来的旧模板时，位于未索引目录的 logo
+  不再被授权，需重选图片——渲染层已有失败可见提示与重选引导（plan §8 E1）。
+- 编辑器内的图片水印**不走本域通道**：预览与导出由渲染层 canvas 完成
+  （`src/renderer/utils/imageProcessor.ts` 的 `applyWatermark`），只有画廊批量「添加水印」走
+  `watermark:apply`。canvas 链路经 `media://` 取 logo 字节（授权口径见
+  `src/main/app/media-protocol.ts` 的 `isMediaPathAllowed` 规则 0），service 链路用 `fs` 直读但
+  以同一口径的 `assertMediaAccessPath` 前置校验——两条链路的 logo 授权判据同源。

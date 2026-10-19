@@ -733,4 +733,4 @@ export function init(extensionPoints) {
 - [pluggable-electron 官方文档](https://github.com/dutchigor/pluggable-electron)
 - [示例插件源码](../plugins-samples/custom-watermark-template/)
 
-> 早期的《NikkiGallery 插件系统设计文档》（`docs/PLUGIN_SYSTEM_PLAN.md`）已从仓库移除，设计要点已并入本文档。
+> 早期的《NikkiGallery 插件系统设计文档》已从仓库移除（该文件从未入仓，无归档副本），设计要点已并入本文档。

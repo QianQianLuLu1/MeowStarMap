@@ -30,3 +30,14 @@ export { LanguageSection } from './language-sections'
 export { ToolsShareCodeSection } from './tools-sections'
 // 插件管理区块
 export { PluginManageSection } from './plugin-sections'
+// 同步服务区块已随「同步图库」板块化迁出：现由
+// src/renderer/pages/sync-gallery/SyncServicePage.tsx 承载，不再走本 barrel。
+
+// ============ 合并页（导航精简 2026-10-16） ============
+// 叶子节导出全部保留：它们既是合并页的组成块，也被各自域内的既有单测按原名导入
+// （ImportRootsSection / ScanFallbackSection / ScanGameRootsSection /
+//  AppearanceDisplaySection），删除任何一行都会连带弄红那批套件。
+export { AppearanceThemeDisplaySection } from './appearance-sections'
+export { ScanDirectoriesSection } from './scan-sections'
+export { DataCacheClearSection } from './data-sections'
+export { AboutOverviewSection } from './about-sections'

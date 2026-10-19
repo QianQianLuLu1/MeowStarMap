@@ -3,7 +3,7 @@
 # 钩子职责：
 #   1. lint-staged — 对暂存文件运行 eslint + prettier + 相关单测
 #   2. core-gate   — 核心路径授权闸门（scripts/core-path-gate.ts，对暂存 diff 判定授权注释）
-#   3. typecheck   — tsc -b 全项目类型检查（增量构建，通常 < 5s）
+#   3. typecheck   — tsc -b 全项目类型检查（产物落点与 dist/main 隔离，见下）
 # 跳过策略：本钩子始终完整执行（[skip lint] 仅跳过 commit-msg）
 # 失败处理：任一步骤失败即阻止提交
 # 输出约定：每步以 [PRE-COMMIT] 前缀标记阶段结果，供 Agent 解析
@@ -48,6 +48,8 @@ echo "[PRE-COMMIT] ✓ Step 2/3 PASSED — 核心路径授权闸门通过"
 # ── 仅当暂存区包含 TS/TSX 文件时执行类型检查 ──
 if git diff --cached --name-only --diff-filter=ACM | grep -qE '\.tsx?$'; then
   # ── Step 3: typecheck（tsc -b 增量构建） ──
+  # 产物落点必须与 dist/main 隔离（src/main/tsconfig.json 的 outDir）：tsc -b 一旦写进
+  # dist/main，就会把 electron-vite 的 bundle 覆写成 per-file CJS，破坏 launchBuiltApp() 类 e2e。
   echo "[PRE-COMMIT] ▶ Step 3/3: TypeScript 类型检查 (tsc -b)"
   npx --no-install tsc -b
   TC_STATUS=$?

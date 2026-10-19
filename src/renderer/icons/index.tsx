@@ -570,6 +570,17 @@ export const IconMessage: React.FC<IconProps> = (props) => (
   </BaseIcon>
 )
 
+// 阶段 5：同步图库导航图标。用双向回环箭（repeat 语义）而非 refresh 单箭，
+// 与「检查更新」的 IconRotateCw 在侧栏里同时可能出现，需要一眼可分。
+export const IconSync: React.FC<IconProps> = (props) => (
+  <BaseIcon {...props}>
+    <polyline points="17 1 21 5 17 9" />
+    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+    <polyline points="7 23 3 19 7 15" />
+    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+  </BaseIcon>
+)
+
 // 通用：顺时针旋转（带箭头，用于检查更新等）
 export const IconRotateCw: React.FC<IconProps> = (props) => (
   <BaseIcon {...props}>

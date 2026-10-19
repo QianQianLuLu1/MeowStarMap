@@ -12,6 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import path from 'path'
+import { Readable } from 'node:stream'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
 // 共享 mock：protocol 句柄
@@ -64,7 +65,21 @@ vi.mock('fs', () => ({
   constants: { R_OK: 4, W_OK: 2 }
 }))
 
-import { registerMediaProtocol, invalidateMediaPathCache } from '../media-protocol'
+// 图片水印授权修复（规则 0）需要 media-protocol 引入 pathGuard；本文件的 electron mock
+// 只提供 protocol，真实 validator 在模块加载期会调 app.getPath 与主进程 i18n 的 t()，
+// 必须换成共享替身（用法见该文件头注释）。
+vi.mock('../../ipc/validator', async () => await import('../../../../tests/mocks/mock-validator'))
+
+import {
+  registerMediaProtocol,
+  invalidateMediaPathCache,
+  isMediaPathAllowed
+} from '../media-protocol'
+import { pathGuard } from '../../ipc/validator'
+import {
+  clearNikkiSyncResourcePaths,
+  registerNikkiSyncResourcePaths
+} from '../../nikkisync/resource-allowlist'
 
 // 捕获 protocol.handle 注册的 handler
 let mediaHandler:
@@ -117,24 +132,17 @@ beforeEach(() => {
   fsRealpathMock.mockReset()
   fsRealpathMock.mockImplementation(async (p: string) => p)
 
-  // 默认：access 通过，stat 返回 1KB 文件，createReadStream 返回带 on/once 监听接口的 dummy stream
-  // （createManagedReadStream 会对其挂 'error' / 'close' 监听，mock 须提供这些方法）
+  // 默认：access 通过，stat 返回 1KB 文件，createReadStream 返回真实空 Readable。
+  // （createManagedReadStream 会对其挂 'error'/'close' 监听需要事件接口；2026-10-15 起
+  //   响应体经 Readable.toWeb 适配进入 Response body，mock 必须是真实 Readable 才能被包装）
   fsAccessMock.mockResolvedValue(undefined)
   fsStatMock.mockResolvedValue({ size: 1024 })
-  const dummyStream = {
-    destroyed: false,
-    on: vi.fn(function (this: unknown) {
-      return this
-    }),
-    once: vi.fn(function (this: unknown) {
-      return this
-    }),
-    destroy: vi.fn()
-  }
-  fsCreateReadStreamMock.mockReturnValue(dummyStream as unknown as NodeJS.ReadStream)
+  fsCreateReadStreamMock.mockImplementation(() => new Readable({ read() {} }))
 
   // 清空模块级单例缓存
   invalidateMediaPathCache()
+  // 规则 0 的替身：默认未登记（返回 undefined，falsy），既有用例的判定口径不变
+  vi.mocked(pathGuard.isUserPicked).mockReset()
 
   // 捕获 handler
   mediaHandler = null
@@ -188,6 +196,8 @@ describe('registerMediaProtocol', () => {
   })
 
   it('5. getDatabase() 返回 null 时直接返回 403', async () => {
+    // 规则 0 判在本断言之前，但此处 isUserPicked 未命中（beforeEach 已 mockReset）→ 仍 403。
+    // 用户显式选中且扩展名合规的路径不受本条影响，见「规则 0」组用例 39。
     const ctx = makeAppCtx({ db: null })
     registerMediaProtocol(ctx)
     const handler = protocolHandleMock.mock.calls[
@@ -657,5 +667,417 @@ describe('缩略图协商缓存（ETag/304）', () => {
     expect(response.headers.get('Content-Range')).toBe('bytes 0-1023/10000')
     // 206 分支保持原强缓存头（缩略图 <img> 请求不会携带 Range）
     expect(response.headers.get('Cache-Control')).toBe('public, max-age=31536000')
+  })
+})
+
+describe('media:// 第 4 条规则：NikkiSync 资源路径授权（阶段 4）', () => {
+  /**
+   * 图库切到 NikkiSync 数据源后，资产路径来自上游 `resources.source_path`，
+   * 不在本 App 的 `media_files` 里。本组用例锁四件事：
+   * ① 登记过的确切路径可示；② 同目录未登记的一律 403（不给目录级授权）；
+   * ③ 扩展名白名单仍然生效（登记过也不放 .txt）；④ 本 App DB 未就绪不影响该规则
+   * （两份库彼此独立，否则启动早期整屏裂图）。
+   */
+  function register(): NonNullable<typeof mediaHandler> {
+    const ctx = makeAppCtx({ db: makeDb(() => undefined) })
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+    invalidateMediaPathCache()
+  })
+
+  it('25. 登记过的 NikkiSync 路径返回 200（DB 无任何匹配）', async () => {
+    const target = `/mock/nikki/a.png`
+    registerNikkiSyncResourcePaths(1, [target])
+    const response = await register()(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('26. 同目录未登记的路径返回 403（精确匹配，不做前缀授权）', async () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/a.png'])
+    const response = await register()(makeRequest('/mock/nikki/other.png'))
+    expect(response.status).toBe(403)
+  })
+
+  it('27. 扩展名不在媒体白名单时，即便登记过也返回 403', async () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/notes.txt'])
+    const response = await register()(makeRequest('/mock/nikki/notes.txt'))
+    expect(response.status).toBe(403)
+  })
+
+  it('28. 本 App DB 为 null 时该规则仍生效（两份库彼此独立）', async () => {
+    const target = '/mock/nikki/b.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    const ctx = makeAppCtx({ db: null })
+    registerMediaProtocol(ctx)
+    const handler = protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+    const response = await handler(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('29. realpath 逃逸：登记原路径而请求解引用到表外 ⇒ 403', async () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/link.png'])
+    fsRealpathMock.mockImplementation(async () => 'C:/Windows/system.png')
+    const response = await register()(makeRequest('/mock/nikki/link.png'))
+    expect(response.status).toBe(403)
+  })
+
+  it('30. clear（Runtime 停止/未就绪）后同一律回落到 403', async () => {
+    const target = '/mock/nikki/c.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    clearNikkiSyncResourcePaths()
+    const response = await register()(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('31. Windows 大小写差异不裂图：登记大写形式、请求小写形式仍命中', async () => {
+    const upper = 'D:/mock/nikki/D.PNG'
+    const lower = 'd:/mock/nikki/d.png'
+    registerNikkiSyncResourcePaths(1, [upper])
+    if (process.platform === 'win32') {
+      const response = await register()(makeRequest(lower))
+      expect(response.status).toBe(200)
+    } else {
+      // 非 Windows 保留大小写敏感：同一路径自身仍必须命中
+      const response = await register()(makeRequest(upper))
+      expect(response.status).toBe(200)
+    }
+  })
+})
+
+describe('阶段 5 · C1：读通道与展示通道同口径 —— isMediaPathAllowed 含 NikkiSync 资源规则', () => {
+  /**
+   * 阶段 4 只把第 4 条规则写进了协议 handler（`media-protocol.ts` 的 `registerMediaProtocol`），
+   * 但 `assertMediaReadPath` / `assertMediaAccessPath` 走的是 `isMediaPathAllowed` 本身。
+   * 于是「照片在图库能显示、`decrypt:decodeFile` 却报 IPC_PATH_FORBIDDEN」——
+   * 穿搭/拍摄参数展示（阶段 5 C2/C3）与分享图取原图（B）都挡在这道闸上。
+   * 本组用例把口径统一到 `isMediaPathAllowed`，并锁死「不放宽」的三条边界。
+   */
+  const ctxNoRows = () => makeAppCtx({ db: makeDb(() => undefined) })
+
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+    invalidateMediaPathCache()
+  })
+
+  it('32. 登记过的 NikkiSync 路径 ⇒ isMediaPathAllowed true（读通道不再 403）', () => {
+    const target = '/mock/nikki/a.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(true)
+  })
+
+  it('33. 登记过但扩展名不在媒体白名单 ⇒ false（不放 .txt/.exe）', () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/notes.txt', '/mock/nikki/run.exe'])
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/nikki/notes.txt')).toBe(false)
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/nikki/run.exe')).toBe(false)
+  })
+
+  it('34. 未登记路径 ⇒ false（精确匹配，不给目录级授权）', () => {
+    registerNikkiSyncResourcePaths(1, ['/mock/nikki/a.png'])
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/nikki/other.png')).toBe(false)
+  })
+
+  it('35. 本 App DB 为 null 时规则仍生效（两份库彼此独立）', () => {
+    const target = '/mock/nikki/b.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    expect(isMediaPathAllowed(makeAppCtx({ db: null }), target)).toBe(true)
+  })
+
+  it('36. 授权表清空后一律拒绝，且否定结果不会被上一轮的判定残留', () => {
+    const target = '/mock/nikki/c.png'
+    registerNikkiSyncResourcePaths(1, [target])
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(true)
+    clearNikkiSyncResourcePaths()
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(false)
+  })
+
+  it('37. Windows 大小写差异在读通道同样不裂：登记大写、判定小写 ⇒ true', () => {
+    registerNikkiSyncResourcePaths(1, ['D:/mock/nikki/D.PNG'])
+    if (process.platform === 'win32') {
+      expect(isMediaPathAllowed(ctxNoRows(), 'd:/mock/nikki/d.png')).toBe(true)
+    } else {
+      expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/nikki/D.PNG')).toBe(true)
+    }
+  })
+})
+
+/**
+ * 规则 0 · 图片水印授权（docs/plans/2026-10-17-fix-image-watermark-media-auth.md §5 N1）
+ *
+ * 缺陷：编辑器「图片水印」挑的 logo 经 media:// 展示时被白名单拒绝（403），而
+ * imageProcessor 的 catch 把失败吞掉 → 水印静默消失。dialog:openFile 单文件模式此前
+ * 不登记 userPicked，且 isMediaPathAllowed 四条规则都不看 userPicked。
+ * 本组锁死新规则的三条边界：媒体扩展名闸门、不给目录级外溢、否定结果不得被缓存压住。
+ */
+describe('规则 0 · 用户显式选中的媒体文件经 media:// 放行', () => {
+  const ctxNoRows = () => makeAppCtx({ db: makeDb(() => undefined) })
+
+  /**
+   * 只放行指定路径自身，模拟真实 PathGuard 的归一与判定口径
+   * （validator.ts isUserPicked：path.resolve + toLowerCase + 「根自身 / 根+分隔符」前缀）。
+   * 两侧都 resolve，否则 win32 下 `/mock/...` 会被解析成 `D:\mock\...` 而永不匹配。
+   */
+  function allowExact(allowed: string): void {
+    const want = path.resolve(allowed).toLowerCase()
+    vi.mocked(pathGuard.isUserPicked).mockImplementation((p: string) => {
+      const resolved = path.resolve(p).toLowerCase()
+      return resolved === want || resolved.startsWith(want + path.sep)
+    })
+  }
+
+  /** 走完整协议 handler（缓存不污染那条必须经 handler 才能验状态码） */
+  function registerHandler(ctx: ReturnType<typeof makeAppCtx>): NonNullable<typeof mediaHandler> {
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+    invalidateMediaPathCache()
+  })
+
+  it('38. DB 无任何匹配但 isUserPicked 命中且是媒体扩展名 ⇒ true', () => {
+    const target = '/mock/pick/logo.png'
+    allowExact(target)
+    expect(isMediaPathAllowed(ctxNoRows(), target)).toBe(true)
+  })
+
+  it('39. 本 App DB 为 null 时规则 0 仍生效（判在取 DB 之前）', () => {
+    const target = '/mock/pick/logo.png'
+    allowExact(target)
+    expect(isMediaPathAllowed(makeAppCtx({ db: null }), target)).toBe(true)
+  })
+
+  it('40. isUserPicked 命中但扩展名不在媒体白名单 ⇒ false（不放 .txt/.json）', () => {
+    allowExact('/mock/pick/notes.txt')
+    allowExact('/mock/pick/conf.json')
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/pick/notes.txt')).toBe(false)
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/pick/conf.json')).toBe(false)
+  })
+
+  it('41. 同目录的兄弟文件未登记 ⇒ false（登记一个文件不外溢成目录级授权）', () => {
+    allowExact('/mock/pick/logo.png')
+    expect(isMediaPathAllowed(ctxNoRows(), '/mock/pick/other.png')).toBe(false)
+  })
+
+  it('42. 先判否后登记立即生效：不被 5 分钟否定缓存压住（403 → 200）', async () => {
+    const target = '/mock/pick/late-logo.png'
+    // 第一遍：未登记 → 403，且该否定结果会写进 mediaPathCache（TTL 5 分钟）
+    const handler = registerHandler(ctxNoRows())
+    expect((await handler(makeRequest(target))).status).toBe(403)
+    // 用户此刻才在对话框里显式选中该文件
+    allowExact(target)
+    // 第二遍必须立刻放行——规则 0 判在取缓存之前、且刻意不写缓存
+    expect((await handler(makeRequest(target))).status).toBe(200)
+  })
+
+  it('43. 传给 pathGuard 的是归一化绝对路径（混合大小写仍能命中）', () => {
+    const target = 'D:/mock/pick/Logo.PNG'
+    allowExact(target)
+    const input = 'd:/mock/pick/logo.png'
+    expect(isMediaPathAllowed(ctxNoRows(), input)).toBe(true)
+    // 传入的是 resolve 后的绝对路径，不是原始请求串（否则真实 PathGuard 的前缀匹配失效）
+    const arg = vi.mocked(pathGuard.isUserPicked).mock.calls.at(-1)?.[0] as string
+    expect(arg).toBe(path.resolve(input))
+  })
+
+  it('44. Windows 反斜杠形态的 logo 路径同样命中', () => {
+    // 真实 logo 路径在 Windows 上就是 D:\a\b\logo.png 形态；仅在 win32 下有意义
+    if (process.platform !== 'win32') return
+    allowExact('D:/mock/pick/Logo.PNG')
+    expect(isMediaPathAllowed(ctxNoRows(), 'd:\\mock\\pick\\logo.png')).toBe(true)
+  })
+})
+
+/**
+ * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/plans/2026-10-15-media-stream-cancel-race-fix.md）：
+ * `new Response(fs.ReadStream)` 使 undici 以 ReadableStreamFrom 包装 Node 流，该包装的
+ * pull 完成回调经微任务对 controller 执行 close 且无"流已关闭"守卫。渲染进程快速滚动/
+ * 视频 Range 切换触发请求取消时，取消与迟到 close 竞态，抛
+ * ERR_INVALID_STATE: ReadableStream is already closed（生产堆栈：
+ * ReadableByteStreamController.close ← node:internal/deps/undici/undici ←
+ * processTicksAndRejections），经 uncaughtException 一律致命策略升级为 app.exit(1)。
+ *
+ * 多进程 IPC 取消时序无法在单测中确定性触发（生产为概率竞态），因此 T1 直接断言
+ * 缺陷机制本身：响应体的关闭路径不得经过 undici 的 Node 流适配层；T2-T4 以敌对
+ * 交错护栏锁定替换路径（Readable.toWeb）的消费/取消/终止行为。
+ */
+describe('media:// 响应体流安全（2026-10-15 启动闪退修复）', () => {
+  /** 用真实 Readable 代替 dummy 流：携带 Symbol.asyncIterator，使 Response 走 undici 的 Node 流包装路径 */
+  function makeRealStream(data: Buffer[]): InstanceType<typeof Readable> {
+    return new Readable({
+      read() {
+        while (data.length > 0) this.push(data.shift())
+        this.push(null)
+      }
+    })
+  }
+
+  /** 捕获 ReadableByteStreamController 原型（undici 对 Node 流的包装使用该控制器） */
+  function getByteControllerProto(): Record<string, unknown> {
+    let proto: Record<string, unknown> | null = null
+    new ReadableStream({
+      type: 'bytes',
+      start(c) {
+        proto = Object.getPrototypeOf(c) as Record<string, unknown>
+      }
+    })
+    return proto as Record<string, unknown>
+  }
+
+  /** 注册协议并捕获 handler（白名单走 file_path 精确命中，与既有用例 12/13 同款） */
+  function setupHandler(): NonNullable<typeof mediaHandler> {
+    const targetPath = path.resolve('/videos/race.mp4')
+    const db = makeDb((sql, param) => {
+      if (sql.includes('file_path') && param === targetPath) return { 1: 1 }
+      return undefined
+    })
+    const ctx = makeAppCtx({ db })
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  it('T1【缺陷复现】响应体的 controller.close 不得经由 undici 适配层调用', async () => {
+    fsStatMock.mockResolvedValue({ size: 10000 })
+    fsCreateReadStreamMock.mockImplementation(() => makeRealStream([Buffer.alloc(1024, 1)]))
+    const handler = setupHandler()
+
+    const proto = getByteControllerProto()
+    const origClose = proto.close as (...args: unknown[]) => unknown
+    const closeCallers: string[] = []
+    proto.close = function (this: unknown, ...args: unknown[]) {
+      closeCallers.push(new Error().stack ?? '')
+      return origClose.apply(this, args)
+    }
+    try {
+      const response = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-1023'))
+      expect(response.status).toBe(206)
+      // 消费响应体到自然结束（Electron 侧 Readable.fromWeb 泵送的等价物）
+      const reader = response.body!.getReader()
+      let bytes = 0
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        bytes += value.byteLength
+      }
+      expect(bytes).toBe(1024)
+      // 核心断言：所有 close 调用不得来自 undici 内部。
+      // 修复前：close 由 node:internal/deps/undici 的无守卫微任务调用（生产 24.18 在
+      // undici:1583、本机 Node 26 在 undici:1965，行号随版本漂移，故只匹配模块名）→ 红灯
+      for (const caller of closeCallers) {
+        expect(caller).not.toContain('node:internal/deps/undici')
+      }
+    } finally {
+      proto.close = origClose
+    }
+  })
+
+  it('T2【护栏·正常】206 与 200 分支响应体可完整消费，字节数与 mock 数据一致', async () => {
+    // 模拟真实 fs.createReadStream 语义：按 {start,end} 切片返回
+    const full = Buffer.concat([Buffer.alloc(1024, 7), Buffer.alloc(1024, 8)])
+    fsStatMock.mockResolvedValue({ size: full.length })
+    fsCreateReadStreamMock.mockImplementation(
+      (_p: string, opts?: { start?: number; end?: number }) => {
+        const start = opts?.start ?? 0
+        const end = opts?.end ?? full.length - 1
+        return makeRealStream([full.subarray(start, end + 1)])
+      }
+    )
+    const handler = setupHandler()
+
+    // 206 分支（Range 0-1023 → 1024 字节）
+    const r206 = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-1023'))
+    expect(r206.status).toBe(206)
+    const reader206 = r206.body!.getReader()
+    let bytes206 = 0
+    for (;;) {
+      const { done, value } = await reader206.read()
+      if (done) break
+      bytes206 += value.byteLength
+    }
+    expect(bytes206).toBe(1024)
+
+    // 200 分支（完整文件 2048 字节）
+    const r200 = await handler(makeRequest(path.resolve('/videos/race.mp4')))
+    expect(r200.status).toBe(200)
+    const reader200 = r200.body!.getReader()
+    let bytes200 = 0
+    for (;;) {
+      const { done, value } = await reader200.read()
+      if (done) break
+      bytes200 += value.byteLength
+    }
+    expect(bytes200).toBe(2048)
+  })
+
+  it('T3【护栏·异常】在途消费时 cancel 与流销毁任意交错不产生逃逸异常', async () => {
+    fsStatMock.mockResolvedValue({ size: 10000 })
+    const srcStreams: InstanceType<typeof Readable>[] = []
+    fsCreateReadStreamMock.mockImplementation(() => {
+      // 慢速流：首块后挂起，模拟磁盘 IO 窗口（生产竞态的必要条件）
+      const s = new Readable({ read() {} })
+      s.push(Buffer.alloc(1024, 3))
+      srcStreams.push(s)
+      return s
+    })
+    const handler = setupHandler()
+
+    const uncaught: unknown[] = []
+    const onUncaught = (e: unknown): void => {
+      uncaught.push(e)
+    }
+    process.on('uncaughtException', onUncaught)
+    try {
+      // 敌对交错 A：消费者先 cancel（Chromium 取消请求），流随后销毁（request.signal abort）。
+      // cancel 与 Electron 网络层一致采用 fire-and-forget（主进程不等待取消完成）
+      const responseA = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-9999'))
+      const readerA = responseA.body!.getReader()
+      await readerA.read()
+      const pendingA = readerA.read()
+      await new Promise((r) => setTimeout(r, 5))
+      readerA.cancel().catch(() => {})
+      srcStreams[0].destroy()
+      await pendingA.catch(() => {})
+
+      // 敌对交错 B：流先销毁，消费者后 cancel
+      const responseB = await handler(makeRequest(path.resolve('/videos/race.mp4'), 'bytes=0-9999'))
+      const readerB = responseB.body!.getReader()
+      await readerB.read()
+      const pendingB = readerB.read()
+      await new Promise((r) => setTimeout(r, 5))
+      srcStreams[1].destroy()
+      readerB.cancel().catch(() => {})
+      await pendingB.catch(() => {})
+
+      await new Promise((r) => setTimeout(r, 50))
+      expect(uncaught).toEqual([])
+    } finally {
+      process.off('uncaughtException', onUncaught)
+    }
+  })
+
+  it('T4【护栏·边界】空文件响应体立即结束，重复 cancel 幂等', async () => {
+    fsStatMock.mockResolvedValue({ size: 0 })
+    fsCreateReadStreamMock.mockImplementation(() => makeRealStream([]))
+    const handler = setupHandler()
+
+    const response = await handler(makeRequest(path.resolve('/videos/race.mp4')))
+    expect(response.status).toBe(200)
+    const reader = response.body!.getReader()
+    const { done } = await reader.read()
+    expect(done).toBe(true)
+    await reader.cancel()
+    await reader.cancel()
   })
 })

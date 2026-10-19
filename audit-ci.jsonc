@@ -17,6 +17,12 @@
   //   2026-09 新披露批次 15 项：dev 工具链传递依赖（fast-uri×4 / brace-expansion×3 /
   //     browserslist×2 / undici / glob / nanoid / js-yaml / ip-address），生产代码未直接引入，
   //     修复均需上游（vitest / swagger / esbuild 链）大版本升级，待专项治理
+  //   braces GHSA-vfj7-8cjw-p6xm：dev 工具链传递依赖（@babel/cli>chokidar / tailwindcss>chokidar /
+  //     fast-glob>micromatch / lint-staged>micromatch / micromatch / vite-plugin-singlefile>micromatch /
+  //     cz-conventional-changelog>commitizen>…>findup-sync>micromatch 共 7 路径），生产代码未引入；
+  //     2026-10-14 实测 npm view braces dist-tags.latest 仍为 3.0.3（即漏洞版本就是最新版），
+  //     micromatch@latest 的依赖仍写 ^3.0.3，上游无修复版可取 ⇒ overrides 无可 pin 目标，依赖手术不成立。
+  //     跟踪：DEBT-034。撤销条件：上游链条抬到已修版本后 npm update 并复跑 npm run audit 不再命中，即删本条。
   "allowlist": [
     // —— tar 链 9 项
     "GHSA-23hp-3jrh-7fpw",
@@ -50,6 +56,8 @@
     "GHSA-jqff-g426-hqxp",
     "GHSA-mh99-v99m-4gvg",
     "GHSA-mwp4-54f8-5fhr",
-    "GHSA-rgw5-rvv9-x895"
+    "GHSA-rgw5-rvv9-x895",
+    // —— braces 1 项（DEBT-034，dev 工具链、上游无修复版）
+    "GHSA-vfj7-8cjw-p6xm"
   ]
 }

@@ -21,10 +21,12 @@
       "editor": "",
       "favorites": "",
       "resonanceRecords": "공명록",
+      "syncGallery": "동기화 갤러리",
       "gallery": "",
       "launcherCache": "",
       "recycleBin": "",
-      "settings": ""
+      "settings": "",
+      "syncService": "동기화 서비스"
     }
   },
   "categories": {
@@ -1123,6 +1125,7 @@
     "menu": "메뉴",
     "recycleBin": "휴지통",
     "resonanceRecords": "공명록",
+    "syncGallery": "동기화 갤러리",
     "settings": "설정",
     "smartGroup": "스마트 그룹",
     "storage": "용량",
@@ -1469,10 +1472,11 @@
       "data": "데이터 관리",
       "diagnostics": "로그 및 진단",
       "general": "일반",
-      "plugins": "",
+      "plugins": "플러그인",
       "profile": "프로필",
       "scan": "스캔",
-      "tools": "도구"
+      "tools": "도구",
+      "toolsPlugins": "도구 및 플러그인"
     },
     "language": {
       "auto": "시스템 따르기",
@@ -1674,17 +1678,21 @@
       "exportWorkflow": "내보내기 워크플로우",
       "fileops": "파일 작업",
       "language": "언어",
-      "pluginManage": "",
+      "pluginManage": "플러그인 관리",
       "profileManage": "프로필 관리",
       "scanOptions": "스캔 옵션",
       "shareCode": "공유 코드 도구",
       "startup": "시작 동작",
       "theme": "테마",
-      "scanPaths": "",
-      "importRoots": "",
+      "scanPaths": "게임 디렉터리",
+      "importRoots": "지정된 디렉터리",
       "scanDiagnostic": "扫描链路诊断",
-      "gameRoots": "",
-      "scanFallback": ""
+      "gameRoots": "감지된 게임 디렉터리",
+      "scanFallback": "수동 폴백 스캔",
+      "themeDisplay": "테마 및 표시",
+      "scanDirectories": "스캔 디렉터리",
+      "cacheCleanup": "캐시 및 정리",
+      "aboutOverview": "앱 정보 및 연락처"
     },
     "startup": {
       "autoScan": "시작 시 자동 스캔",
@@ -1917,7 +1925,9 @@
     },
     "scanInterrupted": "",
     "imageProcessorCanvasFailed": "",
-    "imageProcessorLoadFailed": ""
+    "imageProcessorLoadFailed": "이미지 불러오기에 실패했습니다: {{src}}",
+    "syncEnabled": "동기화 서비스가 사용 설정되었습니다",
+    "syncDisabled": "동기화 서비스가 중지되었습니다"
   },
   "video": {
     "applyEdit": "",
@@ -4258,6 +4268,147 @@
       "colPulls": "총 횟수",
       "colAvg": "평균 획득",
       "colPercentile": "백분위"
+    }
+  },
+  "syncGallery": {
+    "title": "동기화 갤러리",
+    "subtitle": "NikkiSync 내장 라이브러리의 자산, 로컬 갤러리와 서로 간섭하지 않습니다",
+    "loading": "동기화 갤러리 읽는 중…",
+    "toolbar": {
+      "statusTip": "내장 NikkiSync 런타임 상태",
+      "refresh": "새로고침",
+      "scan": "게임 앨범 스캔",
+      "service": "동기화 서비스",
+      "status": {
+        "ready": "준비됨",
+        "degraded": "게임 폴더를 찾지 못함",
+        "off": "미실행"
+      },
+      "detail": "상세",
+      "about": "NikkiSync 정보"
+    },
+    "empty": {
+      "title": "볼 수 있는 자산이 없습니다",
+      "linkHint": "NikkiSync 패키지를 찾을 수 없습니다. 프로젝트 루트에서 npm run link:nikkisync 실행 후 앱을 재시작하세요",
+      "runtimeOff": "내장 서비스가 실행 중이 아닙니다. 도구모음의 동기화 서비스에서 NikkiSync 런타임을 켠 후 다시 시도하세요",
+      "gameRootMissing": "Infinity Nikki 설치 폴더를 찾지 못했습니다. 설정에서 직접 지정한 후 다시 스캔하세요",
+      "noAssets": "스캔은 끝났지만 사진이 없습니다. \"게임 앨범 스캔\"을 눌러 다시 색인하세요",
+      "retry": "다시 불러오기"
+    },
+    "error": {
+      "bridgeMissing": "NikkiSync 런타임을 찾을 수 없습니다. npm run link:nikkisync를 실행하세요",
+      "loadFailed": "동기화 갤러리 읽기 실패"
+    },
+    "drawer": {
+      "title": "자산 상세",
+      "basic": "기본 정보",
+      "fields": {
+        "assetId": "자산 ID",
+        "type": "종류",
+        "state": "상태",
+        "motion": "LIVE 표시",
+        "revision": "리비전",
+        "gameVersion": "게임 버전",
+        "resolution": "해상도",
+        "size": "파일 크기",
+        "hash": "콘텐츠 해시",
+        "metadata": "메타데이터"
+      }
+    }
+  },
+  "syncService": {
+    "page": {
+      "title": "동기화 서비스"
+    },
+    "service": {
+      "title": "동기화 서비스",
+      "description": "LAN의 NikkiSync 모바일 클라이언트가 암호화 연결로 이 라이브러리와 동기화할 수 있습니다"
+    },
+    "enable": "동기화 서비스 사용",
+    "enableDesc": "사용 시 이 PC가 동기화 서버로 실행됩니다(HTTPS + WebSocket, 기본 포트 28080)",
+    "status": {
+      "label": "상태",
+      "running": "실행 중",
+      "stopped": "중지됨",
+      "unavailable": "동기화 구성 요소가 준비되지 않았습니다",
+      "address": "서버 주소",
+      "serverId": "서버 ID",
+      "tlsFingerprint": "TLS 지문",
+      "copied": "복사됨"
+    },
+    "pairing": {
+      "title": "새 기기 페어링",
+      "open": "새 기기 페어링",
+      "hintRunning": "모바일에서 QR 코드를 스캔하여 페어링하세요(5분 후 만료)",
+      "hintDisabled": "새 기기 페어링을 위해서는 동기화 서비스를 사용으로 설정해야 합니다",
+      "expiresIn": "만료까지",
+      "refresh": "다시 생성",
+      "copyContent": "페어링 내용 복사",
+      "loadFailed": "페어링 QR 코드 생성 실패",
+      "retry": "재시도"
+    },
+    "devices": {
+      "title": "페어링된 기기",
+      "empty": "페어링된 기기가 없습니다",
+      "emptyHint": "모바일에서 페어링 QR 코드를 스캔하세요",
+      "lastSeen": "마지막 연결",
+      "never": "연결된 적 없음",
+      "revoke": "해지",
+      "revokeConfirmTitle": "기기 해지",
+      "revokeConfirmMessage": "해지하면 \"{{name}}\"은(는) 이 라이브러리와 더 이상 동기화할 수 없으며 다시 페어링해야 합니다. 해지하시겠습니까?",
+      "revokeConfirm": "기기 해지",
+      "revoked": "기기가 해지되었습니다"
+    },
+    "gallerySource": "갤러리 데이터 소스로 NikkiSync 자산 라이브러리 사용",
+    "gallerySourceDesc": "끄면 로컬 media_files(기본값)를 읽고, 켜면 내장 NikkiSync Runtime의 assets로 전환합니다. 런타임 활성화와 1회 스캔이 함께 적용됩니다",
+    "gallerySourceApplied": "갤러리 데이터 소스를 {{source}}(으)로 전환했습니다",
+    "metadata": {
+      "enable": "코디 및 촬영 파라미터 해석",
+      "enableDesc": "스캔이 끝나면 업스트림 NikkiSync 리졸버가 동기화 갤러리의 촬영 파라미터(초점 거리, 조리개, 노출, 필터 강도 등)를 채웁니다. 앱 재시동 후 적용됩니다.",
+      "disclosure": "켜면 사진 UID와 사진에 내장된 파라미터 엔벨로프가 해석 결과를 얻기 위해 서드파티 서비스 nuan5.pro로 전송됩니다. 반환된 내용은 로컬 동기화 데이터베이스에 기록되며 로컬 네트워크를 통해 페어링된 기기로도 전달됩니다. 의상 및 복장 검색은 계속 로컬 사전에 의존하며 이 스위치는 해당 부분을 다루지 않습니다."
+    }
+  },
+  "shareCard": {
+    "title": "공유 이미지 생성",
+    "generate": "공유 이미지 생성",
+    "save": "저장",
+    "cancel": "취소",
+    "close": "닫기",
+    "savedCount": "{{count}}장 저장됨",
+    "progress": "{{current}} / {{total}}장 생성 중…",
+    "missingIcons": "{{count}}개 부품 아이콘을 사용할 수 없음",
+    "motionUnsupported": "현재 단계에서는 LIVE 사진 공유 이미지를 지원하지 않습니다",
+    "noParams": "촬영 파라미터를 읽지 못해 대시로 표시됩니다",
+    "errorGenerate": "공유 이미지 생성 실패",
+    "errorCancelled": "생성이 취소되었습니다",
+    "errorSave": "공유 이미지 저장 실패",
+    "card": {
+      "brand": "",
+      "fallbackTitle": "",
+      "outfitHeading": "",
+      "parameterHeading": "",
+      "iconMissing": "",
+      "categoryBadge": "",
+      "noOutfit": "",
+      "footer": "",
+      "labelFocalLength": "",
+      "labelAperture": "",
+      "labelVignette": "",
+      "labelBloom": "",
+      "labelBloomRange": "",
+      "labelBrightness": "",
+      "labelExposure": "",
+      "labelContrast": "",
+      "labelSaturation": "",
+      "labelNaturalSaturation": "",
+      "labelHighlights": "",
+      "labelShadows": "",
+      "labelRotation": "",
+      "labelDepthOfField": "",
+      "labelAction": "",
+      "labelLighting": "",
+      "labelFilter": "",
+      "labelLocation": ""
     }
   }
 }
