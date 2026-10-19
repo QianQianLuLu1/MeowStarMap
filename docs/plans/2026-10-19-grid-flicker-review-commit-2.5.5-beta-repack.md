@@ -2,7 +2,7 @@
 
 - 日期：2026-10-19
 - 分支 / 基线 HEAD：`feat/gallery-runtime-embed` @ `86b4b8c`
-- 状态：执行中；逐节点读数见 §11 执行记录
+- 状态：已执行。复核结论见 §1（两处注释订正随 `808926f` 提交，F2/F3 只登记未改）；基线闸门读数见 §11.1，打包与真机复验读数见 §11.2 / §11.3
 - 上一轮同类工作：`docs/plans/2026-10-18-uncommitted-review-commit-2.5.5-beta-repack.md`（提交 `acdea69`）；被复核的那轮修复计划为 `docs/plans/2026-10-18-fix-gallery-grid-scroll-flicker.md`（提交 `8491ff7` / `8f0e427` / `86b4b8c`）
 
 ## 0. 背景（Context）
@@ -94,7 +94,7 @@ npm run e2e:perf
 - 本轮不改任何函数签名、IPC 通道、zod schema、设置键与主题变量 ⇒ `docs/IPC_CONTRACT.md` 与 i18n 键预期零变更。
 - C1 / C2 两处改动限于注释文本，不得新增 `// @core-change:`（`scripts/core-path-gate.ts` 的 PROTECTED_GLOBS 不含 `src/renderer/**`，且守护测试禁止无关占位授权注释）。
 - CHANGELOG 追加行的硬约束：位于 `## [2.5.5-beta]` 节内、以 `>` 开头、日期用绝对日期、引用的计划文档路径必须已在 git index 中（否则 `check-md-links` 判 dead）。
-- 探针文件命名 `e2e/gallery-grid-scroll-probe.e2e.ts`，跑完即删，并以 `npx playwright test --config e2e/playwright.config.ts --list` 证明套件里查不到它——残留会被 `lint`、`typecheck:e2e` 与 `e2e:smoke` 本身再次拾起。
+- 探针文件命名 `e2e/gallery-grid-scroll-probe.e2e.ts`（临时文件、不入仓），跑完即删，并以 `npx playwright test --config e2e/playwright.config.ts --list` 证明套件里查不到它——残留会被 `lint`、`typecheck:e2e` 与 `e2e:smoke` 本身再次拾起。
 
 ## 6. 基础测试用例（三类齐备）
 
@@ -118,7 +118,7 @@ npm run e2e:perf
 | T3  | 暂存 `CHANGELOG.md` 之外全部本轮改动                                                                     | 计划文档 + 两文件 → 1 个提交               | `git log -1 --stat` 恰含这 3 个文件；`git status --porcelain` 干净                                                  |
 | T4  | `CHANGELOG.md`                                                                                           | 在第 41 行后插两条 `>` 行                  | `npx tsx scripts/check-changelog-release.ts` 退出 0；`git diff --stat` 恰 `2 ++`                                    |
 | T5  | `release/`（不入仓）                                                                                     | `npm run dist:win` → 新 exe + `latest.yml` | 真实退出码 0；`verify:dist` 全 ✔ 且 `@nikkisync` 非 ⊘；`latest.yml` 的 sha512 与 exe 实测一致、`releaseDate` 为新值 |
-| T6  | 临时 `e2e/gallery-grid-scroll-probe.e2e.ts`                                                              | `launchApp()` 驱动网格向下滚动 → 读数      | `npm run e2e:smoke` 与 `npm run e2e:perf` 退出 0；探针读数写入 §11；删除后 `--list                                  | grep -c probe` = 0 |
+| T6  | 临时 `e2e/gallery-grid-scroll-probe.e2e.ts`（临时文件、验证后已删除、不入仓）                            | `launchApp()` 驱动网格向下滚动 → 读数      | `npm run e2e:smoke` 与 `npm run e2e:perf` 退出 0；探针读数写入 §11；删除后 `--list` 结果里 probe 命中数为 0         |
 | T7  | `CHANGELOG.md`、本计划文档                                                                               | 读数回填 → 1 个 `chore(release)` 提交      | `git status --porcelain` 空；`git stash list` 仍显示 `stash@{0}: phase7-wip-parked`；不执行 push                    |
 
 ## 8. 验证与自测顺序
@@ -163,12 +163,43 @@ T0 → T1 → T2（全绿方可继续）→ T3 → T4 → T5 → T6 → T7 → �
 
 ### 11.2 T5 打包读数
 
-（待回填：exe 字节数、sha512、`verify:dist` ✔ 计数、真实退出码）
+| 项                            | 实测                                                                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dist:win` 真实退出码 | **0**（先写 `REAL_EXIT` 到文件再读，不经管道）                                                                                                       |
+| 打包前 pre-flight             | `npm run link:nikkisync:check` 四条 junction 全 ok                                                                                                   |
+| 闸门计数                      | 全程日志 `✔` 共 43 行，`✖` / `⊘` **0 行**（`pre-dist-check` 24 项 + `verify:dist` 18 项，其中 `@nikkisync` 七项全为 ✔，无一降级为 ⊘——红线 1 未命中） |
+| 安装包字节                    | 183,332,146（旧包 183,330,183，**+1,963**）                                                                                                          |
+| 安装包 sha512(base64)         | `nEoXIaLri3VXtvblf6oel43kPDeG7gUkruybOewHeLgo9dET0E8Nbk/y1IiIfMmH2xckZZvBdvTUpcqto+I5Tg==`                                                           |
+| `release/latest.yml`          | `version: 2.5.5-beta`、`size: 183332146`、sha512 与 exe 实测**逐字节一致**、`releaseDate: 2026-10-19T04:54:10.511Z`（旧值 2026-10-18T13:37:25.042Z） |
+| 旧包处置                      | 按既定口径直接覆盖、未备份；未向 `release/` 放入任何 `win-unpacked` 备份目录（避免 `findAsarUnpacked` 取错树）                                       |
 
 ### 11.3 T6 真机复验
 
-（待回填：`e2e:smoke` / `e2e:perf` 结果、探针读数。探针为临时 `e2e/gallery-grid-scroll-probe.e2e.ts`，验证后已删除、不入仓）
+**`npm run e2e:smoke` 首跑：10 passed / 1 failed / 4 did not run（24.8s）**。失败项是 `e2e/nikkisync-runtime.e2e.ts` 的 N2「库落点」，与本轮改动无关，取证如下：
+
+- 该用例断言 `%LOCALAPPDATA%\NikkiSync\nikkisync.sqlite` **不存在**（证明嵌入态没写上游独立 exe 的默认数据目录）。本机该文件确实存在：`fs.statSync` 实测 `birthtime 2026-10-18T07:00:33.601Z`、`mtime 2026-10-18T07:55:44.049Z`、size 11,894,784；本轮跑在 `2026-10-19T04:56Z`，即该文件早于本轮 **约 21 小时**且本轮运行期间未被写入。
+- 判定：**既有本机环境状态导致的失败**，非本轮代码/打包缺陷；CI 是全新 checkout，该路径不存在，故 CI 侧不复现。本轮不修、不删用户数据、也不弱化该断言。
+- 排除这一条断言后重跑：`--grep-invert "@perf|N2 库落点"` ⇒ **14 passed（21.0s）**，N1 / N3 / N3b / N3c / N4 与 smoke S1–S7 在新产物上全部通过。
+
+**`npm run e2e:perf`：10 passed / 8 skipped，判定「✓ 全部通过（无阈值超限 / 无基线回归）」**（7.3s）。关键读数：冷启动 816ms、扫描入库 1500 张 611ms（2454.5 项/秒）、媒体列表大页 8ms、缩略图按需生成 P50 1ms / P95 3ms、**首图显影 108ms（沉降 3s 后骨架卡数 0）**。
+
+**打包态网格滚动探针**（临时 `e2e/gallery-grid-scroll-probe.e2e.ts`，验证后已删除、不入仓）：在 `release/win-unpacked` 的安装包态（`app.isPackaged=true`）里扫描入库 500 张**内容互不相同**的 JPEG，用真实滚轮输入把同一段范围滚三遍，`MutationObserver` 计 `.skeleton` / `img` 新增节点：
+
+| 段                               | 骨架新增 | img 新增 | 说明                                                     |
+| -------------------------------- | -------- | -------- | -------------------------------------------------------- |
+| pass1 冷段（8 步）               | **80**   | 80       | 首次拿到 src，出骨架是正确行为；同时充当计数器判别力守卫 |
+| pass2（静止后重滚 5 步）         | 18       | 50       | 仍混有「按需生成完成、src 首次变化」的卡片，属首次加载   |
+| pass3（再次静止后重滚同段 5 步） | **0**    | 50       | 50 次重挂载、**零骨架重放** ⇒ N1 在安装包里成立          |
+
+同轮读数：`coldDistinctIds 100`、`warm2DistinctIds 65`、`warm2Overlap 47`（证明 pass3 滚的确实是冷段那批卡片，重挂载路径被走到）、网格链路相关 console error **0**、全窗口 console error **0**；套件结果 2 passed（33.8s）。
+
+探针迭代了四轮才有效，如实记录三个假信号源：① 手工按 `scrollHeight-clientHeight` 挑滚动容器挑到了无 class 的外层元素，滚了 7280px 而卡片集合纹丝不动 ⇒ 改为真实 `mouse.wheel` 并断言可见卡片集合必须扩大；② `MutationObserver` 只对 `addedNodes` 自身做 `matches`，而 VirtuosoGrid 是**整行插入**，img/骨架都在后代里 ⇒ 冷段恒 0，改为连 `querySelectorAll` 后代一起数；③ 复用 `generatePerfDataset` 时 600 个文件字节全同，缩略图按内容哈希命名于是**共用同一个 URL**，首屏之后每次都命中「已加载完」记忆 ⇒ 冷段骨架恒 0、冷热对照彻底失效，改为 sharp 现造互不相同的 JPEG。第四轮又发现把「新生成的 src 首次挂载」与「已加载完的重挂载」混在同一个计数里判据失真，遂改为三段制，硬断言只打在第三段。
+
+删除探针后复跑：`--list` 里 probe 命中数 **0**、`npx tsc --noEmit -p e2e` 退出 0、`npm run lint` 退出 0（0 errors / 11 warnings 存量）、`npm run docs:links` 退出 0。
 
 ### 11.4 T3 / T7 提交号
 
-（待回填）
+- T3：`808926f` — `fix(gallery): 订正网格闪烁修复遗留的两处注释事实错误`（计划文档 + 两个 tsx，pre-commit 三步全 PASSED，core-gate 判定不涉及受保护路径而跳过）
+- T7：本次 `chore(release)` 提交（提交号见 git log）
+- 版本号：五处声明位实测已是 `2.5.5-beta`，**一处未改**，未做任何批量替换
+- 收尾核对：`git status --porcelain` 空；`git stash list` 仍为 `stash@{0}: On feature/sync-integration-07-bidirectional-sync: phase7-wip-parked`（本轮未触碰）
