@@ -66,6 +66,14 @@ jobs:
       - name: i18n 守卫（白名单只减不增 / 清零必移除 / key 已同步）
         run: npm run i18n:guard
       - run: npm run typecheck
+      # e2e/** 落在 npm run typecheck 的两个覆盖面之外：`tsc -b` 只看根 tsconfig（include 为
+      # src/renderer 与 src/common，reference 为 src/main），`tsc -p tsconfig.scripts.json` 只收 scripts/。
+      # 而 e2e/ 下有真实源码（e2e/dist-guard.ts、e2e/nikkisync-guard.ts、*.e2e.ts 与各 __tests__ 套件），
+      # 此前只能靠本机手动 npm run typecheck:e2e 兜住，CI 上这一层是空档。
+      # 补法复用仓内既有脚本，不折进 npm run typecheck：被 references 引用的 composite 项目禁 emit
+      # 会直接报 TS6310（见 docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md §4）。
+      - name: Typecheck e2e sources (tsc --noEmit -p e2e)
+        run: npm run typecheck:e2e
       # 技术债修复跟踪：当 PR 变更的源码文件命中 docs/debt-registry.json 中已登记的技术债条目时，
       # 输出 ::warning:: 注解提醒开发者关闭对应 Issue 并更新技术债清单（提醒性质，不阻断 CI）
       - name: Tech debt fix tracker
@@ -193,6 +201,12 @@ jobs:
         run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # @nikkisync/* 不是声明依赖，CI 的 npm ci 必然不建链，NikkiSync 的 e2e 因此整件 skip
+      # （未建链门控见 e2e/nikkisync-guard.ts 与 e2e/nikkisync-runtime.e2e.ts）。
+      # 这一步只读地把链接事实与修复动作打进流水线日志，warn-only 不阻断：
+      # 未链接时 scripts/verify-nikkisync-link.ts 的全部条目都降为 warn，退出码仍为 0。
+      - name: NikkiSync link diagnostics (warn-only)
+        run: npm run verify:nikkisync
       # 打包产物运行时冒烟（docs/archive/plans/e2e-smoke-playwright.md）：
       # tag 发布与 PR 两条分支的两个构建步骤之后都会到达此 step，发布前必须冒烟通过
       - name: E2E smoke test on win-unpacked

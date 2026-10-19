@@ -26,7 +26,7 @@ const DIST_MAIN = path.join(ROOT, 'dist', 'main', 'main')
  * 覆盖三类：
  *   正常 — rollup 多 chunk 布局与 tsc per-file 布局两种产物形态都必须命中标记
  *   异常 — 标记全树不存在 / 空树 / 目录缺失一律 false（放宽作用域不等于弱化断言）
- *   边界 — 路径分隔符归一、同名前缀兄弟目录不得误命中；结构契约钉住作用域必须覆盖 tsc 落点
+ *   边界 — 路径分隔符归一、同名前缀兄弟目录不得误命中；结构契约钉住作用域覆盖产物树、且 tsc emit 落在产物树之外
  *
  * 一律注入虚拟文件树：dist/ 被 gitignore，CI 上不存在，且其布局取决于构建顺序。
  */
@@ -140,7 +140,7 @@ describe('nikkiSyncPackedVerdict — 打包态 @nikkisync 缺失判定', () => {
   })
 })
 
-describe('结构契约：标记作用域必须覆盖 tsc 的 main 落点', () => {
+describe('结构契约：标记作用域覆盖产物树，且类型检查 emit 必须在外', () => {
   /** 从已跟踪的 src/main/tsconfig.json 推导 tsc 对 src/main/** 的产出根 */
   function resolveTscMainRoot(): string {
     const tsconfigPath = path.join(ROOT, 'src', 'main', 'tsconfig.json')
@@ -156,17 +156,17 @@ describe('结构契约：标记作用域必须覆盖 tsc 的 main 落点', () =>
 
   const tscMainRoot = resolveTscMainRoot()
 
-  it('tsconfig 推导出的 tsc main 落点即 dist/main/main（本用例的前提自证）', () => {
-    expect(tscMainRoot).toBe(DIST_MAIN)
+  // 2026-10-19 起的不变量（docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md）：
+  // tsc 的产出根一旦落回 dist/main，就会把 electron-vite 的 bundle 覆写成 per-file CJS，
+  // 使 sandbox preload 桥与 @nikkisync 的变量式 import 同时失效。原用例断言的是覆写态，
+  // 现改为断言隔离态——它仍是「读真实 tsconfig 推导落点」，前提自证的方式不变。
+  it('tsc 的 main 落点必须落在产物树之外（本用例的前提自证）', () => {
+    expect(tscMainRoot.startsWith(DIST_MAIN + path.sep)).toBe(false)
+    expect(tscMainRoot).not.toBe(DIST_MAIN)
   })
 
-  it('标记作用域必须包含 tsc 的 main 落点（否则 per-file 产物里的标记会漏检）', () => {
-    const covered =
-      tscMainRoot === MAIN_MARKER_SCOPE || tscMainRoot.startsWith(MAIN_MARKER_SCOPE + path.sep)
-    expect(covered).toBe(true)
-  })
-
-  it('标记作用域就是整个 main 输出根，不得再收窄回 app/', () => {
+  it('标记作用域仍须覆盖产物树内所有 .js（tsc 产物已不在其中，收窄回 app/ 依然禁止）', () => {
+    expect(treeContainsMarker(MAIN_MARKER_SCOPE, ROLLUP_LAYOUT, MARKER)).toBe(true)
     expect(MAIN_MARKER_SCOPE).toBe(DIST_MAIN)
   })
 })

@@ -23,10 +23,12 @@ const SRC_RENDERER = path.join(ROOT, 'src', 'renderer')
 /**
  * 产物修复点标记（第 4/5 项）的检索作用域：整个 main 输出根，不是 app/ 子树。
  *
- * main 产物由两套构建器写同一棵树：electron-vite 把 rollup chunk 落在 dist/main/main/app
- * （见 electron.vite.config.ts 的 main.outDir），而 `tsc -b`（.husky/pre-commit 与 npm run verify
- * 都会跑）会把 app/ 下的同名 chunk 覆盖成 per-file 产物，其依赖模块（`.min(0)` 等标记的所在处）
- * 落到 app/ 之外。作用域收窄到 app/ 会让这两项断言随构建顺序反复无谓转红并阻断 dist:win。
+ * main 产物由 electron-vite 写入这棵树：preload 落在 dist/main/main/preload.js，
+ * main 的 rollup 多入口与动态 chunk 落在其 app/ 子树（见 electron.vite.config.ts 的 main.outDir）。
+ * 历史上 `tsc -b`（.husky/pre-commit 与 npm run verify 都会跑）也写同一棵树，会把 app/ 下的同名
+ * chunk 覆成 per-file 产物、把 `.min(0)` 等标记的所在处推到 app/ 之外；2026-10-19 起类型检查的
+ * emit 已隔离到 .cache/tsmain（见 docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md）。
+ * 作用域仍取整个 main 输出根：收窄回 app/ 会随产物布局变化反复无谓转红并阻断 dist:win。
  */
 export const MAIN_MARKER_SCOPE = DIST_MAIN
 

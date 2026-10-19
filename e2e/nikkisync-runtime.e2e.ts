@@ -18,6 +18,10 @@
  * 游戏根：优先 `NIKKI_NIKKISYNC_GAME_ROOT`，其次本机常见安装位；都不存在时本轮只验 degraded 分支
  * （资产类断言显式 skip，绝不把环境缺失伪装成逻辑失败）。
  *
+ * 链接前置：`npm install` 会剪掉 `node_modules/@nikkisync/*` junction（非声明依赖）。
+ * 未建链时整个 describe 按 `hasNikkiSyncLink()` 门控为 skip，判据与修复命令见
+ * `e2e/nikkisync-guard.ts`——依据 `src/main/nikkisync/AGENTS.md` §6「未链接是受支持的默认态」。
+ *
  * 类型口径：不在此 `declare global` 覆写 `Window.electronAPI`——同 tsconfig program 内
  * smoke.e2e.ts 已有同名声明，合并会直接红 `typecheck:e2e`；改为局部类型 + method/arg 派发。
  */
@@ -26,6 +30,14 @@ import fs from 'node:fs/promises'
 import https from 'node:https'
 import net from 'node:net'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { hasNikkiSyncLink } from '../src/main/nikkisync/runtime-loader'
+import {
+  decideNikkiSyncGate,
+  formatNikkiSyncStateDiagnostic,
+  isUpstreamDbTouched,
+  type DbSnapshot
+} from './nikkisync-guard'
 import { launchBuiltApp, closeApp, collectDiagLogs, type LaunchedApp } from './helpers'
 
 const DEFAULT_GAME_ROOT_CANDIDATES = [
@@ -157,6 +169,29 @@ let status: RuntimeStatus | undefined
 /** N3b 实际监听过的端口；N4 用它验证退出链真的把端口释放了（未启过服务则 undefined）。 */
 let syncPort: number | undefined
 
+/** 上游独立 exe 的默认库路径（`%LOCALAPPDATA%` 缺失时为空串，N2 沿用同一短路）。 */
+const upstreamDbPath = path.join(process.env.LOCALAPPDATA ?? '', 'NikkiSync', 'nikkisync.sqlite')
+
+/**
+ * 读一次上游默认库的读数：不存在归一为 `{exists:false, mtimeMs:0, sizeBytes:0}`，
+ * 其它异常（权限/占用）一律外抛——把「读不到」当成「没被写」会造出一条恒真的假断言。
+ */
+async function readUpstreamDbSnapshot(): Promise<DbSnapshot> {
+  if (!process.env.LOCALAPPDATA) return { exists: false, mtimeMs: 0, sizeBytes: 0 }
+  try {
+    const stat = await fs.stat(upstreamDbPath)
+    return { exists: true, mtimeMs: stat.mtimeMs, sizeBytes: stat.size }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return { exists: false, mtimeMs: 0, sizeBytes: 0 }
+    }
+    throw error
+  }
+}
+
+/** N1 在启动应用**之前**取的上游默认库读数；N2 用它比对「本次运行有没有改动它」。 */
+let upstreamDbBefore: DbSnapshot | undefined
+
 /** 读取本次会话的主进程日志（electron-log 落在 `{userData}/logs/*.log`）。 */
 async function readMainLogTail(session: LaunchedApp | undefined): Promise<string> {
   if (!session) return ''
@@ -262,9 +297,18 @@ async function resolveGameRoot(): Promise<string | undefined> {
 const gameRoot = await resolveGameRoot()
 process.stdout.write(`[e2e-nikkisync] gameRoot=${gameRoot ?? '<none: 预期 degraded>'}\n`)
 
+/** 仓根：`hasNikkiSyncLink()` 的入参基准（与 `e2e/helpers.ts` 的 ROOT_DIR 同式） */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const gate = decideNikkiSyncGate({ linked: hasNikkiSyncLink(REPO_ROOT) })
+process.stdout.write(`[e2e-nikkisync] linkGate=${gate.action} — ${gate.reason}\n`)
+
 test.describe.configure({ mode: 'serial' })
 
 test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
+  // 未建链 ⇒ 整件 skip（AGENTS §6：未链接是受支持的默认态，不得伪装成逻辑失败）。
+  // 已建链时这里绝不降级，任何 unavailable/error 仍按真实缺陷报红。
+  test.skip(gate.action === 'skip', gate.reason)
+
   // eslint-disable-next-line no-empty-pattern -- Playwright hook 首参必须是对象解构模式（与 smoke.e2e.ts 同口径）
   test.afterAll(async ({}, testInfo) => {
     if (!launched) return
@@ -274,6 +318,8 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
   })
 
   test('N1 启动：Runtime 在主进程内初始化，状态可读', async () => {
+    // 取「上游默认库」的启动前读数，供 N2 判「本次运行有没有改动它」（窗口越窄越准确）
+    upstreamDbBefore = await readUpstreamDbSnapshot()
     launched = await launchBuiltApp([], {
       NIKKI_NIKKISYNC_RUNTIME: '1',
       ...(gameRoot ? { NIKKI_NIKKISYNC_GAME_ROOT: gameRoot } : {})
@@ -293,13 +339,30 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     )
     expect(bridgeType).toBe('function')
 
-    // init 在 createMainWindow 之前完成，状态此刻应已收敛为 running / degraded
-    await expect
-      .poll(async () => (await callBridge<RuntimeStatus>({ method: 'status' })).state, {
-        timeout: 30_000,
-        message: 'runtime state 未收敛为 running/degraded（说明启动链没跑或抛错逃逸）'
-      })
-      .toMatch(/^(running|degraded)$/)
+    // init 在 createMainWindow 之前完成，状态此刻应已收敛为 running / degraded。
+    // 超时后必须把最后一次真实读数打进文案：原写死的「说明启动链没跑或抛错逃逸」在未建链时
+    // 与实际原因相反（真实读数就是 state=unavailable + linkMissingHint），故改为携带读数本身。
+    let last: RuntimeStatus | undefined
+    try {
+      await expect
+        .poll(
+          async () => {
+            last = await callBridge<RuntimeStatus>({ method: 'status' })
+            return last.state
+          },
+          { timeout: 30_000 }
+        )
+        .toMatch(/^(running|degraded)$/)
+    } catch (error) {
+      throw new Error(
+        `runtime state 未收敛为 running/degraded — ${formatNikkiSyncStateDiagnostic({
+          state: last?.state ?? '',
+          linkReady: last?.linkReady === true,
+          hint: last?.hint ?? last?.error
+        })}\n${error instanceof Error ? error.message : String(error)}`,
+        { cause: error }
+      )
+    }
 
     status = await callBridge<RuntimeStatus>({ method: 'status' })
     expect(status.linkReady).toBe(true)
@@ -315,7 +378,8 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
   test('N2 库落点：文件在本次 userData/nikkisync 下，不碰 %LOCALAPPDATA%', async () => {
     const app = launched
     const current = status
-    if (!app || !current) {
+    const before = upstreamDbBefore
+    if (!app || !current || !before) {
       test.skip(true, 'N1 未产出状态')
       return
     }
@@ -325,10 +389,15 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     expect(stat.size).toBeGreaterThan(0)
     const localAppData = process.env.LOCALAPPDATA ?? ''
     if (localAppData) {
-      // 上游独立 exe 的默认数据目录不得被嵌入态写入（计划 §3）
-      await expect(
-        fs.stat(path.join(localAppData, 'NikkiSync', 'nikkisync.sqlite'))
-      ).rejects.toThrow()
+      // 上游独立 exe 的默认数据目录不得被嵌入态写入（计划 §3）。判据取「本次运行前后读数一致」
+      // 而非旧版的「该文件必须不存在」：本机该库由独立 NikkiSync exe 长期合法持有，旧判据把
+      // 机器既有状态报成嵌入态越界；新判据同样能抓住写入，还多抓住删除（详见 nikkisync-guard.ts）
+      const after = await readUpstreamDbSnapshot()
+      expect(
+        isUpstreamDbTouched(before, after),
+        `嵌入态改动了上游默认库：path=${upstreamDbPath} ` +
+          `before=${JSON.stringify(before)} after=${JSON.stringify(after)}`
+      ).toBe(false)
     }
   })
 

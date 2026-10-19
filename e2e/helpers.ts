@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
 import type { Dirent } from 'node:fs'
 import path from 'node:path'
+import { detectTscOverwrittenDist } from './dist-guard'
 
 /** 工程根目录（e2e/ 的上一级；项目 type=module，用 import.meta.url 定位而非 __dirname） */
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -154,6 +155,19 @@ export async function launchBuiltApp(
   }
   if (!fsSync.existsSync(path.join(ROOT_DIR, 'dist', 'main', 'main', 'app', 'index.js'))) {
     throw new Error('未找到 dist/main/main/app/index.js，请先执行 npm run build')
+  }
+  // 产物形态守卫：dist/main 若被 tsc -b 覆写成 per-file CJS，这里直接给出原因，
+  // 不要让「preload 桥整体缺失」伪装成被测代码的缺陷（判据与背景见 e2e/dist-guard.ts）
+  const preloadPath = path.join(ROOT_DIR, 'dist', 'main', 'main', 'preload.js')
+  const preloadHead = fsSync.existsSync(preloadPath)
+    ? fsSync.readFileSync(preloadPath, 'utf-8')
+    : ''
+  const guard = detectTscOverwrittenDist(
+    preloadHead,
+    fsSync.existsSync(path.join(path.dirname(preloadPath), 'preload.d.ts'))
+  )
+  if (guard) {
+    throw new Error(guard)
   }
   const userDataDir =
     options.userDataDir ?? path.join(ROOT_DIR, '.cache', `e2e-built-${Date.now()}`)

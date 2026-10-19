@@ -40,7 +40,15 @@ export default defineConfig({
         test: {
           name: 'node',
           environment: 'node',
-          include: ['./src/**/*.test.ts', './src/**/*.test.tsx', './scripts/**/*.test.ts'],
+          // e2e/ 下的 *.test.ts 是 Playwright 用例的配套纯函数单测（如 e2e/dist-guard.ts），
+          // 不在 Playwright 的 testMatch(*.e2e.ts) 内，也不会真的启动应用；此处纳入后
+          // npm test 与 npm run verify（按路径派发）才都能命中它们。
+          include: [
+            './src/**/*.test.ts',
+            './src/**/*.test.tsx',
+            './scripts/**/*.test.ts',
+            './e2e/**/*.test.ts'
+          ],
           exclude: ['./src/renderer/**/*.test.tsx', './src/renderer/hooks/**/*.test.ts']
         }
       }

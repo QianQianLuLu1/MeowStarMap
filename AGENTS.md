@@ -96,7 +96,8 @@ npm run build        # 清理 + electron-vite build
 npm run dist:win     # 打包 Windows 安装包（含预检查与产物校验）
 
 npm test             # vitest run（变体：test:watch / test:coverage / test:main / test:renderer / test:db）
-npm run typecheck    # tsc -b（src 层）+ tsc -p tsconfig.scripts.json（scripts/ 工具层）；local verify/pre-commit 只跑前者，CI 跑全量
+npm run typecheck    # tsc -b（src 层，emit 落在 .cache/tsmain，不写 dist/main）+ tsc -p tsconfig.scripts.json（scripts/ 工具层）；local verify/pre-commit 只跑前者，CI 跑全量
+npm run typecheck:e2e # tsc --noEmit -p e2e（e2e/ 层）；上面两者都收不到 e2e/，CI 的 lint-typecheck job 也跑它，不得折进 typecheck（TS6310）
 npm run lint         # eslint .（lint:fix 自动修复）
 npm run format       # prettier
 npm run verify       # 变更后只读验证（typecheck + eslint 只读 + prettier --check + 相关单测；不改动文件）
@@ -137,13 +138,14 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 | 相关单测     | 超集：对所有变更 TS 文件按 `scripts/find-related-tests.ts` 匹配并运行（含 `scripts/`、`.storybook/`、`e2e/` 下的 `*.test.ts`） | `test:precommit` 仅由 `src/**/*.{ts,tsx}` 键触发，其他路径不跑测试 |
 | typecheck    | 目标含 `.ts/.tsx` 时 `tsc -b`                                                                                                  | 暂存含 `.ts/.tsx` 时 `tsc -b`                                      |
 
-必须记住的三点：
+必须记住的四点：
 
 1. **verify 通过 ≠ 提交时文件不变**：钩子仍可能修复格式与可自动修复的 lint 问题并重新暂存；提交后用 `git status --porcelain` 复核。
 2. **格式检查范围 = 钩子格式范围**：逐字取自 `package.json` 的 `lint-staged` 中含 `prettier` 任务的键（当前为 `src/**/*.{ts,tsx}`、`.storybook/**/*.{ts,tsx}`、`e2e/**/*.{ts,tsx}`、`src/**/*.{js,jsx,json,css,md}`、`scripts/**/*.{ts,js}`、仓库根 `*.{ts,js,json,md}`）。`docs/**`、`.qoder/rules/*.md`、`scripts/AGENTS.md` 不在闸门格式范围内，verify 也不会因此判失败；`scripts/__tests__/verify-format-scope.test.ts` 会同时守护"配置键形态"与"本文件列举的作用域"，两侧漂移即失败。
 3. **行尾不参与判定**：本机 `core.autocrlf=true` 时工作区为 CRLF、提交内容为 LF，故格式检查传 `--end-of-line auto` 避免假失败（钩子改写行尾不会改变提交内容）。
+4. **`tsc -b` 的 emit 与产物树隔离**：落点由 `src/main/tsconfig.json` 的 `outDir`（现为 `.cache/tsmain`）决定，不得指回 `dist/main`。被引用的 composite 项目不能禁 emit（`tsc -b --noEmit` 会报 TS6310），所以只能迁 outDir；一旦写回 `dist/main`，electron-vite 的 `preload.js` 会被覆写成 per-file CJS，`sandbox: true` 的 preload 无法 require 兄弟模块，走 `launchBuiltApp()` 的 e2e 用例（如 NikkiSync N1）便以 `window.electronAPI` undefined 假失败。防线两处：`e2e/dist-guard.ts` 在启动前拦截并提示先 `npm run build`，`scripts/__tests__/typecheck-emit-isolation.test.ts` 守护落点不回搬。
 
-本地闸门只做增量检查：全量 `npm run lint`、`npm run typecheck`、`npm run i18n:guard` 与全量 `npm test` 由 CI 保障。
+本地闸门只做增量检查：全量 `npm run lint`、`npm run typecheck`、`npm run typecheck:e2e`、`npm run i18n:guard` 与全量 `npm test` 由 CI 保障。`e2e/` 必须单独走 `typecheck:e2e`——`tsc -b` 只看根 tsconfig（include 为 `src/renderer` 与 `src/common`、reference 为 `src/main`），`tsc -p tsconfig.scripts.json` 只收 `scripts/`，两者都覆盖不到 `e2e/**`；该覆盖面由 `scripts/__tests__/typecheck-emit-isolation.test.ts` 的「闸门覆盖面」用例钉住。
 
 ### Agent 工作流
 
