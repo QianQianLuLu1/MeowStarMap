@@ -20,7 +20,9 @@ interface ThumbRevealProps {
 // 网格视口外只扩 100px（VirtualImageGrid.tsx VIEWPORT_INCREASE），这次重放因此总落在可见区，
 // 表现为「向下滚动时逐格闪一下」；软件渲染设备上 CPU 光栅让这一帧更显眼（见问题设备日志
 // [GPU] …禁用硬件加速（软件渲染）），故仅部分设备复现。
-// key 用完整 src 字符串（含 &r=N 重试代次）：就地重建会 bump 代次换 URL，天然不会被旧证据命中。
+// key 用完整 src 字符串：网格侧就地重建会 bump `&r=N` 换 URL（全仓唯一生成点在 VirtualImageGrid），
+// 新 URL 天然不被旧证据命中；其余 6 个调用方传裸 URL，而缩略图按源图内容哈希命名，
+// 因此两张重复照片本就共用同一 src——共用的是同一份字节，不影响显示正确性。
 const LOADED_SRC_CAP = 512
 const loadedSrcs = new Set<string>()
 
