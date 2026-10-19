@@ -2,7 +2,7 @@
 
 - 日期：2026-10-19
 - 分支 / 基线 HEAD：`feat/gallery-runtime-embed` @ `8140a80`
-- 状态：审查与两处修复已完成并逐条红→绿（§11.1 / §11.2）；全量闸门与一处格式红灯见 §11.3；提交 1 读数见 §11.4；打包与打包后闸门读数见 §11.5 / §11.6（执行中回填）
+- 状态：已执行完毕。审查与两处修复逐条红→绿见 §11.1 / §11.2，全量闸门与一处格式红灯见 §11.3，提交 1 见 §11.4（`514e8ab`），打包（含一次本机 EPERM 阻塞与仓内既定解法）见 §11.5，打包后两条 e2e 闸门见 §11.6
 - 同族上一轮：`docs/plans/2026-10-19-grid-flicker-review-commit-2.5.5-beta-repack.md`（提交 `808926f` / `48603b9`）
 - 本轮被审查的两项修复计划：`docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md`、`docs/plans/2026-10-19-fix-e2e-smoke-nikkisync-links.md`
 
@@ -181,15 +181,32 @@ N1 → N2 红 → N2 绿 → N2 子集（46 passed）→ N3 红 → N3 绿 → N
 
 ### 11.4 N7｜提交 1
 
-- （待回填：`[PRE-COMMIT]` 三步读数、提交号、`git show --stat` 是否含 lockfile、提交后 `dist/main` 字节数）
+- 提交号 **`514e8ab`**，`20 files changed, 1143 insertions(+), 45 deletions(-)`，头一行 `fix(e2e): 产物与链接双守卫接入闸门，并补 CI 的 e2e 类型检查覆盖面`。
+- `[PRE-COMMIT]` 三步全 PASSED：Step 1 lint-staged（`e2e/**/*.{ts,tsx}` 命中 6 files、`package.json` 20 files）、Step 2 core-gate `⊘ 本次变更不涉及核心路径受保护文件`、Step 3 `tsc -b`。
+- **本批 outDir 隔离在真实提交链上的复验**：钩子跑完 `tsc -b` 之后 `dist/main/main/preload.js` 仍 **28422 字节**、`dist/main` 内 `.d.ts` 计数 **0** —— 这正是本批要消除的污染，如今不再发生。
+- lockfile 未入仓：`git show --stat HEAD` 的文件清单里没有 `package-lock.json`；提交后 `git status --porcelain` 为空。
+- 附带观察：`scripts/AGENTS.md` 被钩子的 `prettier --write` 重新对齐了表格列宽（11 行），属该文件既定的格式化行为，非语义改动。
 
-### 11.5 N8｜打包读数
+### 11.5 N8｜打包读数（含一次本机环境阻塞与仓内既定解法）
 
-- （待回填：`PACK_EXIT`、`pre-dist-check` 的 ✔/✖ 计数、`verify:dist` 结果、`release/NikkiGallery-Setup-2.5.5-beta.exe` 新字节数与 mtime）
+- 补录前先跑收口闸门：`npx --no-install tsx scripts/check-changelog-release.ts` → 解析到 12 个版本节、`[2.5.5-beta]` 存在且唯一、`[Unreleased]` 已收口、**EXIT=0**；`prettier --check --end-of-line auto CHANGELOG.md` EXIT=0。
+- **第一次 `npm run dist:win` 失败：PACK_EXIT=1**。后台包装层报的是「completed (exit code 0)」——那是包装命令的状态，真实码取自 `exits.txt`（既有口径）。`npm run build` 与 `pre-dist-check` 全过（**26 项 ✔**），失败在 electron-builder 的 `prepareApplicationStageDirectory`：
+  `⨯ EPERM: operation not permitted, rename 'release\win-unpacked.tmp' -> 'release\win-unpacked'`（栈经 `electronGet.ts:249 extractArchive` → `ElectronFramework.ts:254 unpack`）。
+- 定位读数：`.tmp` 内 21 项 / 75 文件 / **361,039,014 字节**（Electron 已完整解出）；目录**内单个文件改名 OK**、子树删除 OK；等待 45s 复探目录改名仍 EPERM；无任何 builder / electron / 7za / node 残留进程占用该路径；`Get-CimInstance root/SecurityCenter2` 显示杀软为 Windows Defender。
+- **与 2026-10-18 那次的区别（须如实记）**：该次留档（`docs/plans/2026-10-18-uncommitted-review-commit-2.5.5-beta-repack.md` §8.1）的结论是「本机拦截 Node 进程内的目录 rename，PowerShell 改名可行」；本轮 PowerShell `Rename-Item` **同样被拒**，原因是我为清理而执行的递归删除已把该目录推进 delete-pending 态 —— 这是我处置过程的次生效应，不是初始病因，也说明「移走/删掉再重跑」对本类拦截无效（与该文档的 How to apply 一致）。
+- **复用仓内既定解法**（同文档 §8.1）：`npx electron-builder --win --publish never --config.electronDist=node_modules/electron/dist` ⇒ 日志走 `using custom unpacked Electron distribution` + `copying unpacked Electron`（复制本地已解包 dist，不再「下载 zip → 解压 → rename」），**PACK2_EXIT=0**。该覆盖只用于本次命令行，**未写入 `package.json`**，避免把本机环境规避固化进产物配置（同 §8.1 的最小改动口径）。
+- 产物：`NikkiGallery-Setup-2.5.5-beta.exe` **183,415,300** 字节、mtime `2026-10-19T12:41:49.833Z`（旧为 183,332,146 / `04:54:06Z`，按既定口径直接覆盖不备份）；`latest.yml` 与 `.blockmap` 同步刷新；`release/win-unpacked` 为本次新建。
+- 顺手清掉 `release/alt-stage`（2026-10-17 失败残留）。必要性：`findAsarUnpacked` 取**首个**命中且 `alt-stage` 字典序排在 `win-unpacked` 之前，留着它 `verify:dist` 会校验错树（该 hazard 已在 `docs/plans/2026-10-19-grid-flicker-review-commit-2.5.5-beta-repack.md` §4 登记）。清理前先模拟选取逻辑确认 `_backup-2.5.3-*` 内只有安装包、不含 `app.asar.unpacked`，不构成同类风险。
+- `npm run verify:dist` → **EXIT=0、17 项全 ✔**，校验树确认为 `release\win-unpacked\resources\app.asar.unpacked`（@nikkisync 四包入口 + `0001_initial.sql` + `LocalSyncServer.js` / `GalleryRuntime.mjs` 深入口 + 四个 VC++ 运行库 + better_sqlite3 / sharp / libvips / koffi + `requestedExecutionLevel=asInvoker`）。
+- 残留：`release/win-unpacked.tmp`（内容已被清、目录本体处于 delete-pending，在 `.gitignore` 的 `release/` 下不入仓，句柄释放或重启后可删）。
+- 打包后 `dist/main/main/preload.js` 仍 **28422 字节**、无 `preload.d.ts`。
 
 ### 11.6 N8｜打包后闸门
 
-- （待回填：`e2e:smoke` 退出码与 `linkGate=` 读数、通过/跳过条数、S 套件状态含 S6；`e2e:perf` 退出码与基线对照。N 套件走 `launchBuiltApp()` 的未打包 `dist/main`，读数不得表述为「安装包已复验」；安装包本体是 `launchApp()` 起 `release/win-unpacked`。）
+- `npm run e2e:smoke` → **SMOKE_EXIT=0、15 passed (26.1s)**：`fullscreen-diagnose` 1 + N1/N2/N3/N3b/N3c/N4 六条 + S1–S7 与「userData 隔离」八条。**S6 本轮通过**（仍是本机既有间歇失败，只报告不处理）。
+- 三条关键读数：`[e2e-nikkisync] linkGate=run — @nikkisync 链接就绪` ⇒ N 套件确实跑到了覆盖面而非 skip；`[e2e-nikkisync] gameRoot=H:\InfinityNikki Launcher\InfinityNikki`；`[e2e] executable: …/release/win-unpacked/无限暖暖相册管理工具.exe` ⇒ S 套件测的确实是**本次新产物**（不是 12:54 的旧包）。
+- 口径区分：N 套件走 `launchBuiltApp()` 加载未打包的 `dist/main`，其读数**不等于**安装包复验；安装包本体由 `launchApp()` 的 S 套件覆盖。
+- `npm run e2e:perf` → **PERF_EXIT=0、10 passed | 8 skipped (7.2s)**；8 条 skip 全为 `@perf-real` R1–R5，判据是 `e2e/perf-real.e2e.ts:320` 的 `test.skip(!SOURCE_USER_DATA, '需设置 PERF_REAL_USERDATA 指向本机 userData 目录')` —— 既有 opt-in 门控，非本轮引入，也未据此判红。
 
 ### 11.7 探针与临时件
 
