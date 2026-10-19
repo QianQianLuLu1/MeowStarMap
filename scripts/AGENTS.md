@@ -68,6 +68,7 @@
 | 文件                       | 调用方式                                                  | 职责                                                                                                                                                                                                                                            |
 | -------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `doctor.ts`                | `npm run doctor`                                          | 环境健康诊断（Node 版本/原生模块/DLL/数据库）                                                                                                                                                                                                   |
+| `e2e-usage.ts`             | `npm run e2e`                                             | **e2e 误输入守卫**：裸 `npm run e2e`（含 `e2e : smoke` 这类把冒号两侧打成空格的笔误）列出真实子命令并以退出码 1 结束，替代 npm 的 Missing script 报错                                                                                           |
 | `verify-changes.ts`        | `npm run verify` / `npm run verify:staged`                | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件                                                                                                                                 |
 | `verify-format-scope.ts`   | 被 `verify-changes.ts` import                             | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                                                                                                                                                         |
 | `check-preview-drift.ts`   | `npm run preview:check`                                   | preview.html 与源码的 10 项漂移检测                                                                                                                                                                                                             |
@@ -144,6 +145,7 @@
 | `npm run link:nikkisync`       | 为开发机建立 `node_modules/@nikkisync/*` junction（未链接是默认态）  |
 | `npm run link:nikkisync:check` | 只读预览上述链接现状                                                 |
 | `npm run doctor`               | 环境健康诊断                                                         |
+| `npm run e2e`                  | e2e 误输入守卫：列出真实子命令并以退出码 1 结束                      |
 | `npm run verify`               | 变更后只读验证（工作区 vs HEAD）                                     |
 | `npm run verify:staged`        | 仅暂存文件的只读验证（检查集对齐 pre-commit，但不改写文件）          |
 | `npm run i18n:check`           | i18n key 对齐检查                                                    |

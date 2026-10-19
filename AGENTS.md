@@ -102,6 +102,7 @@ npm run format       # prettier
 npm run verify       # 变更后只读验证（typecheck + eslint 只读 + prettier --check + 相关单测；不改动文件）
 
 npm run e2e:smoke    # Playwright 冒烟测试（perf 为性能用例）
+npm run e2e          # 误输入守卫：冒号两侧被打上空格时列出真实子命令并以 1 退出
 ```
 
 ## 变更后验证工作流（Agent 必读）

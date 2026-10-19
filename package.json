@@ -71,6 +71,7 @@
     "verify:nikkisync": "tsx scripts/verify-nikkisync-link.ts",
     "link:nikkisync": "tsx scripts/link-nikkisync.ts",
     "link:nikkisync:check": "tsx scripts/link-nikkisync.ts --check",
+    "e2e": "tsx scripts/e2e-usage.ts",
     "e2e:smoke": "playwright test --config e2e/playwright.config.ts --grep-invert @perf",
     "e2e:perf": "playwright test --config e2e/playwright.config.ts --grep @perf",
     "dist:win:smoke": "npm run dist:win && npm run e2e:smoke",

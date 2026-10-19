@@ -151,6 +151,7 @@ npm run dist:win:smoke
 - 用例与配置：`e2e/smoke.e2e.ts` / `e2e/playwright.config.ts`；方案见 `docs/archive/plans/e2e-smoke-playwright.md`
 - CI 在 build job 打包后自动执行，失败时上传截图与主进程日志（artifact `e2e-smoke-failure`）
 - 发布前还需按 `docs/manual-smoke-checklist.md` 人工清单逐项验证（扫描/解密/编辑等依赖真实样本的项）
+- 脚本名冒号两侧**不能有空格**：`npm run e2e : smoke` 会被 npm 切成脚本名 `e2e`，由误输入守卫 `scripts/e2e-usage.ts` 拦下（列出真实子命令、退出码 1），而不是 npm 的 Missing script 报错
 
 ---
 
