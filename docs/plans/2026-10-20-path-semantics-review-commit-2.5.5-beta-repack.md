@@ -143,17 +143,17 @@ npm run e2e:smoke && npm run e2e:perf
 
 ## 7. 子任务拆分（涉及文件 / 输入输出 / 验收标准）
 
-| #                  | 涉及文件                                                                                                                          | 输入 → 输出                                     | 验收标准                                                                                         |
-| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| N1 基线复验        | 无（只读）                                                                                                                        | 命令 → 读数                                     | §3.1 八条命令逐条与两份计划文档 §8.3 记录一致或更好；装置新增红逐条点名到轴                      |
-| N2 文档订正        | `AGENTS.md`、`docs/CODING_CONVENTIONS.md`、`scripts/AGENTS.md`、`src/main/utils/AGENTS.md`、`.qoder/rules/project-conventions.md` | 删去失效限定语 → 语义不变                       | 被跟踪文档内指向本轮新文件的「尚未提交/untracked」表述清零；`npm run docs:links` 退出码 0        |
-| N3 CHANGELOG       | `CHANGELOG.md`                                                                                                                    | 在 `[2.5.5-beta]` 节追加 `> 2026-10-20 追加：…` | `[Unreleased]` 仍无列表项；`npx tsx scripts/check-changelog-release.ts` 通过                     |
-| N4 暂存 + 只读闸门 | 33 改 + 12 新 + N2/N3/本文                                                                                                        | 工作区 → 索引                                   | `npm run verify:staged` 五项 0 失败；`git status --porcelain` 无意外条目                         |
-| N5 提交 1          | 全部代码与文档                                                                                                                    | 索引 → `fix(ci): …`                             | `git log -1 --stat` 含 12 个新文件；提交后 `git status --porcelain` 干净（钩子未改写则应无残留） |
-| N6 重新打包        | `release/`、`dist/`                                                                                                               | `npm run dist:win` → 安装包                     | `verify:dist` 全 ✔；`latest.yml` 时间戳晚于提交 1；真实退出码 0 写在 `.cache/review-logs/*.exit` |
-| N7 发布后闸门      | `e2e/smoke.e2e.ts`、`e2e/perf.*`                                                                                                  | 起 `release/win-unpacked` 的 exe                | stdout 含 `[e2e-nikkisync] linkGate=run`；S6 既有失败按原样记录不弱化                            |
-| N8 打包态探针      | 临时 `e2e/media-allowlist-probe.e2e.ts`，验证后已删除、不入仓                                                                     | `launchBuiltApp()` → `media://` 三档判定        | 已登记 200 / 大小写异写 200 / 未登记兄弟 403；探针文件已删除、`git status` 无残留                |
-| N9 提交 2          | 仅 `.md`                                                                                                                          | 索引 → `chore(release): …`                      | 提交只含文档；不推送                                                                             |
+| #                  | 涉及文件                                                                                                                          | 输入 → 输出                                      | 验收标准                                                                                         |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| N1 基线复验        | 无（只读）                                                                                                                        | 命令 → 读数                                      | §3.1 八条命令逐条与两份计划文档 §8.3 记录一致或更好；装置新增红逐条点名到轴                      |
+| N2 文档订正        | `AGENTS.md`、`docs/CODING_CONVENTIONS.md`、`scripts/AGENTS.md`、`src/main/utils/AGENTS.md`、`.qoder/rules/project-conventions.md` | 删去失效限定语 → 语义不变                        | 被跟踪文档内指向本轮新文件的「尚未提交/untracked」表述清零；`npm run docs:links` 退出码 0        |
+| N3 CHANGELOG       | `CHANGELOG.md`                                                                                                                    | 在 `[2.5.5-beta]` 节追加 `> 2026-10-20 追加：…`  | `[Unreleased]` 仍无列表项；`npx tsx scripts/check-changelog-release.ts` 通过                     |
+| N4 暂存 + 只读闸门 | 33 改 + 12 新 + N2/N3/本文                                                                                                        | 工作区 → 索引                                    | `npm run verify:staged` 五项 0 失败；`git status --porcelain` 无意外条目                         |
+| N5 提交 1          | 全部代码与文档                                                                                                                    | 索引 → `fix(ci): …`                              | `git log -1 --stat` 含 12 个新文件；提交后 `git status --porcelain` 干净（钩子未改写则应无残留） |
+| N6 重新打包        | `release/`、`dist/`                                                                                                               | `npm run dist:win` → 安装包                      | `verify:dist` 全 ✔；`latest.yml` 时间戳晚于提交 1；真实退出码 0 写在 `.cache/review-logs/*.exit` |
+| N7 发布后闸门      | `e2e/smoke.e2e.ts`、`e2e/perf.*`                                                                                                  | 起 `release/win-unpacked` 的 exe                 | stdout 含 `[e2e-nikkisync] linkGate=run`；S6 历史既有失败按原样记录不弱化                        |
+| N8 打包态探针      | 临时 `e2e/media-allowlist-probe.e2e.ts`，验证后已删除、不入仓                                                                     | `launchApp()`（安装包本体）→ `media://` 三档判定 | 已登记 200 / 大小写异写 200 / 未登记兄弟 403；探针文件已删除、`git status` 无残留                |
+| N9 提交 2          | 仅 `.md`                                                                                                                          | 索引 → `chore(release): …`                       | 提交只含文档；不推送                                                                             |
 
 ## 8. 验证与自测顺序
 
@@ -176,6 +176,8 @@ npm run e2e:smoke && npm run e2e:perf
 
 - S6 既有失败未定位（怀疑与 GPU 自愈/自重启或窗口关闭路径相关），userData 目录被 `closeApp` 清掉后日志无从回看。
 - `src/shared/**` 不引入 `node:path`，方言判据只留在主进程（§6 硬性禁止项）。
+- `src/main/thumbnail/generator.limiter.test.ts` 是既有的时间敏感脆弱用例：本批全量首跑红一次、复跑绿、隔离必绿、装置下恒红（NTFS 命名轴）。本轮未触碰 `src/main/thumbnail/**`，判为既有事实、不修也不弱化（读数见 §11.1）。
+- S6「静置 5s 进程仍存活」本轮通过，历史本机既有失败仍未定位（怀疑与 GPU 自愈/自重启或窗口关闭路径相关），不据此改判据。
 - 装置的 `child_process` cwd 轴曾试过、因「为 1 个假红造出 2 个新假红」而回退，本轮不重试。
 - `npm run test:ci-linux` 是开发机诊断，不进 CI；CI 侧不新增步骤。
 
@@ -226,18 +228,49 @@ npm run e2e:smoke && npm run e2e:perf
 
 7 条 `⚠` 为「源文件缺同名套件」提示（`vitest.config.ts` 等配置文件本就无测试；`path-dialect.ts` 有配套测试、`ci-linux-fs.ts` / `posix-host-path.ts` 在 `tests/**` 下不参与配对匹配），属存量口径，不阻断。
 
+prettier 改写后再复跑一次装置以证明「格式化没有改变装置行为」：`npm run test:ci-linux` → **10 failed | 416 passed (426 files)**，`Tests 53 failed | 6487 passed | 7 skipped`，与 §11.1 的改写前读数**逐字相同**（剩余红仍全部落在 round2 §8.4 点名的三类装置硬限制上：原生库与子进程绕过被 mock 的 JS 层、NTFS 与 ext4 的命名/权限差异、本机已建链状态）。`npm run test:coverage` 同批复跑 → 426 files 全绿、`All files 69.32 / 60.57 / 61.81 / 70.93`（阈值 66/58/59/68）、退出码 0。
+
 ### 11.4 N5｜提交 1
 
-待回填。
+`94299e4 fix(ci): 路径语义按三分法归位，收口 Linux CI 十片全红的宿主漂移` —— 46 files changed, 2394 insertions(+), 186 deletions(-)，含 13 个新建文件（`path-dialect.ts` 及其测试、装置三件 + `electron-inert`、守卫、`scan-channels.win32-root.test.ts`、`ci-linux-emulation.test.ts`、`vitest.ci-linux.config.ts`、三份计划文档）。
+
+钩子读数：`[CORE-GATE] ⊘ 本次变更不涉及核心路径受保护文件，跳过`（`_trash-utils.ts` 是 handlers 下 `_` 前缀共享文件、其余改动文件不在 `PROTECTED_GLOBS`）、`[PRE-COMMIT] ✓ Step 3/3 PASSED — typecheck 通过`、`[PRE-COMMIT] ✓ 全部验证通过`。提交后 `git status --porcelain` 仅剩 ` M CHANGELOG.md`（按分工留待提交 2），钩子未改写任何文件。
 
 ### 11.5 N6｜打包读数
 
-待回填。
+`npm run dist:win` 后台跑，真实退出码先写入文件再落盘（不经 `tee`）：`.cache/review-logs/dist.exit` = **`REAL_EXIT=0`**。本轮**没有**撞上 `EPERM: rename release\win-unpacked.tmp → win-unpacked`，因此未使用 `--config.electronDist` 覆盖法；跑完后 `release/win-unpacked.tmp` 已被正常消费，`release/` 下不再残留该目录。
+
+| 项                         | 读数                                                                                                                                                                                                                |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 安装包                     | `release/NikkiGallery-Setup-2.5.5-beta.exe`，183,331,537 字节，时间戳 `2026-10-20 21:34`                                                                                                                            |
+| `release/latest.yml`       | `version: 2.5.5-beta`，sha512 `Q9ZXCHmNA0WmD7ETGaki4G6y90aPJgoBTMcTjkJYmYNQli6DSfFZm/yIGuBAA1f6pYQUXBYu8drcJcNZUwsbYA==`（旧包为 `x9PYC67O…`，随本批源码确实变更）                                                  |
+| `pre-dist-check`（打包前） | ✅ 全部校验通过；`⚠️ git 工作区存在未提交改动` 是当时的 CHANGELOG 草稿，属预期警告不阻断                                                                                                                            |
+| `check-changelog-release`  | ✅ 变更日志收口校验通过                                                                                                                                                                                             |
+| `verify:dist`（解包后）    | ✅ 18 项全 ✔：better-sqlite3 / sharp / libvips / koffi 四类原生二进制、VC++ 运行库 4 条、`@nikkisync` 四包入口 + 迁移 SQL + `LocalSyncServer.js` + `GalleryRuntime.mjs` 深入口、`requestedExecutionLevel=asInvoker` |
+
+版本号四处声明位（`package.json` / `package-lock.json` 根与 `packages[""]` / `src/renderer/preview/mock/database-mock.ts` / `release/latest.yml`）复测仍全为 `2.5.5-beta`，**一处未改**。
 
 ### 11.6 N7｜打包后闸门
 
-待回填。
+两条发布后 e2e 均在重打包**之后**跑（`e2e/helpers.ts` 起 `release/win-unpacked/无限暖暖相册管理工具.exe`，测的是新产物）：
+
+| 闸门                | 读数                                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run e2e:smoke` | `REAL_EXIT=0`，**15 passed (28.6s)**，stdout `[e2e-nikkisync] linkGate=run — @nikkisync 链接就绪：N 套件按原断言执行` ⇒ NikkiSync 覆盖面是真跑过而非静默 skip |
+| `npm run e2e:perf`  | `REAL_EXIT=0`，**10 passed (7.6s)**，P10 基线对比与回归判定通过                                                                                               |
+
+S6「静置 5s 后进程仍存活且渲染进程可响应」本轮**通过**（5.0s），S7 与 userData 隔离随之通过；该用例此前的本机既有失败未再复现，按原样记录为「本轮绿、历史红未定位」，不据此改任何判据。
 
 ### 11.7 N8｜打包态探针
 
-待回填。临时 `e2e/media-allowlist-probe.e2e.ts`，验证后已删除、不入仓。
+临时 `e2e/media-allowlist-probe.e2e.ts`，验证后已删除、不入仓（`git status` 无残留，`e2e/*.e2e.ts` 复点为 5 个原有文件）。它经 `launchApp()` 起**安装包本体**（`app.isPackaged=true`），用主进程 `net.fetch` 走真实 `media://` handler，逐档断言本轮改动的安全面：
+
+| 档  | 判据                                                                            | 读数                                                                                                    |
+| --- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| 1   | 缩略图缓存目录内的确切文件（规则 1 前缀比较，且不再对 cacheDir 做宿主 resolve） | **200**，并带 `ETag W/"…"`（说明 `isPathUnderDir(realPath, getCacheDir())` 的缩略图协商缓存分类仍正确） |
+| 2   | 同一文件的全路径大写异写（折叠无条件化）                                        | **200**                                                                                                 |
+| 3   | 缓存目录外、未入索引的确切文件                                                  | **403**                                                                                                 |
+
+第一版探针把三档放在单次 `evaluate` 里连发，第 2 档读出 **404**（不是 403）。定性过程：404 只可能来自 `resolveRealPath` 返回 null 或 `access(R_OK)` 失败，而 Windows 上 `fs.realpath` 对大小写异写路径实测可解析（本机最小复现：`realpathSync` 对全大写路径返回该大写串本身，原样可解析），故问题在夹具侧——打包态 `startup-tasks` 的孤儿缩略图清理会删除缓存目录内不在 DB 的文件，第 1 档读完后夹具被清掉，第 2 档才 404。改为**每档请求前重建夹具**后三档齐绿（200 / 200 / 403）。
+
+如实说明两点：① 这是**探针自身的缺陷**，不是产物缺陷，也未牵出生产代码改动；② 该链路的授权表折叠与白名单归一另有单测覆盖（`media-protocol.test.ts` 用例 31/37/43/44、`resource-allowlist.test.ts`），探针补的是「打包产物里这条链真的通」这一层。
