@@ -227,8 +227,10 @@ describe('applyCustomDirectories', () => {
 
     await applyCustomDirectories(ctx)
 
-    // 回退到默认 userData/backups（path.join 在 Windows 上用反斜杠）
-    const expectedBackupDir = require('path').join('/mock/userData', 'backups')
+    // 回退到默认 userData/backups。必须用**本文件已 import 的 path**（与被测代码同一绑定）：
+    // `require('path')` 绕过 `vi.mock('path')`，在 `npm run test:ci-linux` 装置里会取到 win32
+    // 的 join 而被测代码取到 posix，造出一条与 CI 无关的假红灯。
+    const expectedBackupDir = path.join('/mock/userData', 'backups')
     expect(backupSetDirMock).toHaveBeenCalledWith(expectedBackupDir)
     // logStartupError 被调用
     expect(logStartupErrorMock).toHaveBeenCalledWith(

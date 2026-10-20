@@ -22,6 +22,24 @@ import {
   detectGameRootCandidates
 } from './game-directory-discovery'
 
+/**
+ * CI 复现装置（常驻）：把宿主 `path` 绑定钉成 posix，与本文件既有的
+ * `process.platform = 'win32'` 强制合起来，正是 CI（ubuntu-latest）上跑这份用例时的真实组合
+ * ——宿主绑定是 posix、而代码里的平台分支判定读到 'win32'。
+ * 没有这段 mock，本文件在 Windows 开发机上永远绿（宿主即 win32），
+ * `path-dialect` 被撤掉也发现不了；有了它，两侧跑同一套断言。
+ * 本文件 fs / fs/promises / child_process 全量 mock，不碰真实文件系统，因此可安全钉 posix。
+ * 工厂里必须用动态 import：`vi.mock` 会被提升到文件顶部，引用顶层 import 绑定会撞 TDZ。
+ */
+vi.mock('path', async (importOriginal) => {
+  const { posixHost } = await import('../../../tests/mocks/posix-host-path')
+  return posixHost(importOriginal as () => Promise<unknown>)
+})
+vi.mock('node:path', async (importOriginal) => {
+  const { posixHost } = await import('../../../tests/mocks/posix-host-path')
+  return posixHost(importOriginal as () => Promise<unknown>)
+})
+
 // ============ vi.mock：按被测模块实际 import 的模块名整体替换 ============
 
 // 中止标志需在用例间切换：mock scan-abort（被测模块经它读取中止状态，

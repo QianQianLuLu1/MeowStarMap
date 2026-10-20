@@ -65,6 +65,8 @@ import {
 } from './log-service'
 import { shell } from 'electron'
 import { getStartupLogPathValue } from '../utils/startup-diagnostic'
+// 真 logger 的目录注入缝：见下方 beforeEach 里的 setLogDirectory 用法
+import { setLogDirectory } from '../utils/logger'
 
 // ============================================================
 // Helpers
@@ -116,6 +118,13 @@ beforeEach(() => {
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-log-'))
   mockLogDir = path.join(tmpRoot, 'logs')
   fs.mkdirSync(mockLogDir, { recursive: true })
+  // 把真 logger 的目录钉到本次临时目录：`log-service.ts` 里有一处
+  // `require('../utils/logger')`（走的是 actual 而不是本文件的 mock 桩），
+  // 一旦导出链路里某个分支调 `logger.error`，`writeLog` 会 `if (!logDir) initLogger()`，
+  // 而 initLogger 用 `app.getPath('userData')` = `/mock/userData` 真去 mkdir。
+  // 开发机上 `\mock\userData\logs` 是盘符相对路径、建得起来（还在盘根留下垃圾目录），
+  // CI 的容器里 `/` 不可写 ⇒ EACCES 直接冒成用例失败。改走注入缝，两侧都不碰盘根。
+  setLogDirectory(mockLogDir)
   mockStartupLogPath = path.join(tmpRoot, 'startup-errors.log')
   fs.writeFileSync(mockStartupLogPath, '[STAGE: boot] simulated startup failure', 'utf-8')
   // 每个测试前失效缓存

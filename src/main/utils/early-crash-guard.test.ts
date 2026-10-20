@@ -75,23 +75,44 @@ afterEach(() => {
 })
 
 describe('getUserFacingDiagDir', () => {
+  // 注入的候选根必须是**两侧宿主都能创建**的临时目录：`/mock/...` 这类假绝对路径
+  // 在开发机上是盘符相对路径、建得起来，在 CI 的容器里 `/` 属 root ⇒ EACCES，
+  // 于是被测代码的「首个可创建者采用」循环会静默跳到下一个候选，
+  // 断言拿到的是未注入的真实 `os.homedir()`/`os.tmpdir()`（2026-10-19 CI 两条红即为此）。
   it('documents 可用时返回 documents/NikkiGallery/Diagnostics 并确保目录已创建', async () => {
     const { getUserFacingDiagDir } = await import('./user-diag-path')
-    const dir = getUserFacingDiagDir({ getDocumentsPath: () => '/mock/Documents' })
-    expect(dir).toBe(path.join('/mock/Documents', 'NikkiGallery', 'Diagnostics'))
+    const docs = path.join(tmpDiag, 'Documents')
+    const dir = getUserFacingDiagDir({ getDocumentsPath: () => docs })
+    expect(dir).toBe(path.join(docs, 'NikkiGallery', 'Diagnostics'))
     expect(fs.existsSync(dir)).toBe(true)
-    fs.rmSync(dir, { recursive: true, force: true })
   })
 
   it('documents 抛错时回退到 homedir', async () => {
     const { getUserFacingDiagDir } = await import('./user-diag-path')
+    const home = path.join(tmpDiag, 'home')
     const dir = getUserFacingDiagDir({
       getDocumentsPath: () => {
         throw new Error('not ready')
       },
-      getHomedir: () => '/mock/home'
+      getHomedir: () => home
     })
-    expect(dir).toBe(path.join('/mock/home', 'NikkiGallery', 'Diagnostics'))
+    expect(dir).toBe(path.join(home, 'NikkiGallery', 'Diagnostics'))
+    expect(fs.existsSync(dir)).toBe(true)
+  })
+
+  it('documents 存在但不可创建时回退到 homedir（候选链真的在试可写性，不是只看存在）', async () => {
+    const { getUserFacingDiagDir } = await import('./user-diag-path')
+    // 用一个**同名普通文件**占位：在它下面建子目录在 Windows 与 Linux 上都会失败
+    // （ENOTDIR），这才是可移植的「不可写候选」装置；CI 上表现为 EACCES，同一分支。
+    const blocker = path.join(tmpDiag, 'blocker.txt')
+    fs.writeFileSync(blocker, 'x', 'utf-8')
+    const home = path.join(tmpDiag, 'home2')
+    const dir = getUserFacingDiagDir({
+      getDocumentsPath: () => path.join(blocker, 'Documents'),
+      getHomedir: () => home
+    })
+    expect(dir).toBe(path.join(home, 'NikkiGallery', 'Diagnostics'))
+    expect(fs.existsSync(dir)).toBe(true)
   })
 
   it('documents 与 homedir 均抛错时回退到 tmpdir', async () => {

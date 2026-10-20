@@ -11,7 +11,10 @@
  * 安全边界锁：thumbnail 列不得作为触碰缓存外文件的依据；非 GPP+HQ 路径绝不推导。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import path from 'path'
+import nodePath from 'path'
+// 期望值须与 _trash-utils.ts 同语义（固化 win32）：prod 拼出反斜杠形态，测试若用宿主
+// path.join 造期望值，会在 Linux CI 上得到混合分隔符而误判失败。
+const path = nodePath.win32
 
 const { pathExistsMock, unlinkMock, loggerWarnMock } = vi.hoisted(() => ({
   pathExistsMock: vi.fn(),

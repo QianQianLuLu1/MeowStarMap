@@ -14,6 +14,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { resetScanAbort, abortScan, isScanAborted } from '../scan-abort'
 
 beforeEach(() => {
@@ -51,7 +52,9 @@ describe('scan-abort 中止标志状态机', () => {
 })
 
 describe('反向导入守卫（主进程不得引用 worker 入口）', () => {
-  const scannerDir = path.resolve(__dirname, '..')
+  // 用 fileURLToPath(import.meta.url) 而不是裸 __dirname：后者由加载器按真实文件位置注入，
+  // 在 `vitest.ci-linux.config.ts` 装置里会以反斜杠形态混进 posix 绑定，造出 CI 上不存在的串
+  const scannerDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
   it('5. game-directory-discovery.ts 不得 import worker-entry（防止看门狗进入主进程 chunk）', () => {
     const source = fs.readFileSync(path.join(scannerDir, 'game-directory-discovery.ts'), 'utf8')

@@ -111,7 +111,11 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src/renderer'),
       '@main': path.resolve(__dirname, './src/main'),
-      '@common': path.resolve(__dirname, './src/common')
+      '@common': path.resolve(__dirname, './src/common'),
+      // 单测不得依赖 Electron 二进制是否装好：CI 用 --ignore-scripts 装依赖，
+      // require('electron') 会当场抛「Electron failed to install correctly」。
+      // 详见 tests/mocks/electron-inert.ts（形状与开发机现状逐字等价）。
+      electron: path.resolve(__dirname, './tests/mocks/electron-inert.ts')
     }
   },
   // 让 vi.mock 能拦截 node_modules 依赖（如 react-virtuoso 虚拟列表），否则外部化后 mock 不生效

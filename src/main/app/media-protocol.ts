@@ -8,6 +8,7 @@ import type { AppContext } from './app-context'
 import { MEDIA_EXTENSIONS, getMimeType } from '../utils/media-constants'
 import { MEDIA_CACHE_TTL_MS } from '../utils/constants'
 import { isPathUnderDir } from '../utils/ipc-validate'
+import { pathOf } from '../utils/path-dialect'
 // 阶段 4：media:// 第 4 条规则的事实来源（NikkiSync 资源路径精确授权表）
 // 阶段 5：该规则的判定点从协议 handler 下沉到 isMediaPathAllowed，展示与读取共用一套口径
 import { isNikkiSyncResourcePath } from '../nikkisync/resource-allowlist'
@@ -33,7 +34,8 @@ const MEDIA_CACHE_TTL = MEDIA_CACHE_TTL_MS
 const MEDIA_PATH_CACHE_MAX = 1000
 
 // realpath 解引用缓存：避免每次请求都 syscall
-// key 为 path.resolve 后、realpath 前的请求路径；value 为 fs.realpath 返回的真实路径
+// key 为按数据方言归一（pathOf(...).resolve）后、realpath 前的请求路径；
+// value 为 fs.realpath 返回的真实路径
 // 满上限时整体 clear() 重建——realpath 结果稳定，无需 LRU
 const realpathCache: Map<string, string> = new Map()
 const REALPATH_CACHE_MAX = 5000
@@ -102,7 +104,11 @@ export function registerMediaProtocol(ctx: AppContext): void {
       // 二次解码：含 % 的文件名（如 100%20photos.jpg）被解码成错误路径（404/白图），
       // 或因 %ZZ 等非法序列抛 URIError（500）。直接使用 searchParams 的解码结果。
       const filePath = encodedPath
-      const normalizedPath = path.resolve(filePath)
+      // 归一按**数据方言**选语义（同 resource-allowlist / PathGuard 的口径）：
+      // 表里的资源路径与 DB 的 file_path 都是 Windows 形态，用宿主 resolve 时
+      // Linux CI 会把 `D:/…` 当相对名拼到 cwd 之后，与授权表的 win32 键不同形 ⇒ 已登记资产 403。
+      // 产品宿主本就是 win32，因此这条改动对产物零行为变化；真 POSIX 路径仍走 POSIX 语义。
+      const normalizedPath = pathOf(filePath).resolve(filePath)
       const realPath = await resolveRealPath(normalizedPath)
       if (realPath === null) {
         logger.warn(t('main.mediaProtocol.log.realpathFailed'), filePath)
@@ -136,7 +142,9 @@ export function registerMediaProtocol(ctx: AppContext): void {
       // 一年强缓存会让渲染层持续命中旧字节（典型表现：视频白帧长期不消失）。
       // 仅对缩略图缓存目录内的响应改用 ETag 协商缓存（未变 304 零字节，变更 200 新字节）；
       // 原图/视频为用户文件，保持一年强缓存。修复详见 docs/plans/2026-09-29-fix-thumbnail-loading-latency.md
-      const isThumbnail = isPathUnderDir(realPath, path.resolve(ctx.thumbnailGen.getCacheDir()))
+      // isPathUnderDir 内部已固化 win32 归一（含大小写折叠），这里传**原值**：
+      // 再套一层宿主 resolve 会在 Linux 上把 `D:\…` 拼到 cwd 之后，与前缀比较的对方不同形
+      const isThumbnail = isPathUnderDir(realPath, ctx.thumbnailGen.getCacheDir())
       const thumbnailEtag = isThumbnail ? buildThumbnailEtag(fileStat, fileSize) : null
       if (thumbnailEtag) {
         const ifNoneMatch = request.headers.get('if-none-match')
@@ -276,7 +284,9 @@ function parseRangeHeader(
  */
 export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boolean {
   try {
-    const normalizedRequest = path.resolve(filePath)
+    // 与读通道同一方言（见上方 normalizedPath 的理由）：判定两侧必须同形，否则
+    // Windows 形态资源在 Linux CI 上永远匹配不到已登记键
+    const normalizedRequest = pathOf(filePath).resolve(filePath)
 
     // 4. NikkiSync 资产授权表：判在取 DB 之前——两份库彼此独立，本 App DB 未就绪
     //    不该让 NikkiSync 资产整屏裂图 / 整屏读不了。
@@ -312,7 +322,8 @@ export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boole
     const db = ctx.dbManager.getDatabase()
     if (!db) return false
 
-    const thumbnailDir = path.resolve(ctx.thumbnailGen.getCacheDir())
+    // 原值交给 isPathUnderDir（其内部按 win32 归一并折叠大小写），不在这里做宿主 resolve
+    const thumbnailDir = ctx.thumbnailGen.getCacheDir()
 
     // 0. 检查路径级缓存（命中则直接返回，避免数据库查询）
     // P1-A4：命中时 delete+set 把 key 移到 Map 末尾，实现 LRU 最近访问优先
@@ -356,8 +367,8 @@ export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boole
       if (MEDIA_EXTENSIONS.has(ext)) {
         const sourcePaths = getCachedSourcePaths(db)
         for (const sourcePath of sourcePaths) {
-          const resolvedSource = path.resolve(sourcePath)
-          if (isPathUnderDir(normalizedRequest, resolvedSource)) {
+          // 同规则 1：DB 里的 source_path 是 Windows 形态，归一交给 isPathUnderDir 单点做
+          if (isPathUnderDir(normalizedRequest, sourcePath)) {
             allowed = true
             break
           }
@@ -437,7 +448,9 @@ export function invalidateMediaPathCache(paths?: string[]): void {
     if (!Array.isArray(paths)) return
     for (const filePath of paths) {
       if (typeof filePath !== 'string' || filePath.length === 0) continue
-      mediaPathCache.delete(path.resolve(filePath))
+      // 键必须与写入侧（normalizedRequest = pathOf(...).resolve(...)）同形，
+      // 否则媒体变更后清不掉旧判定，5 分钟 TTL 内继续用陈口的 allow/deny
+      mediaPathCache.delete(pathOf(filePath).resolve(filePath))
     }
     return
   }

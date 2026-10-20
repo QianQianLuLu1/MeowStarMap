@@ -58,6 +58,23 @@ async function loadModule() {
   return mod
 }
 
+/**
+ * 显式声明用例假定的平台，而不是继承宿主。
+ * PE 结构预检在实现里按平台门控（`ffmpeg-paths.ts:42`：只在 win32 生效，避免把 Linux/macOS
+ * 的 ELF 误判成截断二进制）。继承宿主平台的写法在开发机（win32）上恰好命中回退分支，
+ * 在 CI（ubuntu-latest）上分支根本不执行 ⇒ 「截断 PE 回退裸命令」三条断言当场红。
+ * 产品只发布 Windows，这里把前提写进用例而不是交给运行环境。
+ */
+async function withPlatform<T>(platform: NodeJS.Platform, fn: () => Promise<T>): Promise<T> {
+  const original = process.platform
+  Object.defineProperty(process, 'platform', { value: platform, configurable: true })
+  try {
+    return await fn()
+  } finally {
+    Object.defineProperty(process, 'platform', { value: original, configurable: true })
+  }
+}
+
 describe('ffmpeg-paths', () => {
   beforeEach(() => {
     mockFfmpegStaticPath = '/fake/app.asar/ffmpeg.exe'
@@ -174,32 +191,32 @@ describe('ffmpeg-paths', () => {
 
     it('截断/损坏 PE（hasValidPeStructure=false）回退 PATH 并记录诊断日志', async () => {
       mockHasValidPeStructure = false
-      const { ffmpegPath } = await loadModule()
-      expect(ffmpegPath).toBe('ffmpeg')
-      // 模块加载时 ffmpegPath 和 ffprobePath 都会触发诊断日志
-      expect(diagLog).toHaveBeenCalledTimes(2)
-      expect(vi.mocked(diagLog).mock.calls[0][0]).toBe('FFMPEG')
-      expect(String(vi.mocked(diagLog).mock.calls[0][1])).toContain(FFMPEG_RESOLVED)
+      await withPlatform('win32', async () => {
+        const { ffmpegPath } = await loadModule()
+        expect(ffmpegPath).toBe('ffmpeg')
+        // 模块加载时 ffmpegPath 和 ffprobePath 都会触发诊断日志
+        expect(diagLog).toHaveBeenCalledTimes(2)
+        expect(vi.mocked(diagLog).mock.calls[0][0]).toBe('FFMPEG')
+        expect(String(vi.mocked(diagLog).mock.calls[0][1])).toContain(FFMPEG_RESOLVED)
+      })
     })
 
     it('截断 PE 对 ffprobe 同样回退', async () => {
       mockHasValidPeStructure = false
-      const { ffprobePath } = await loadModule()
-      expect(ffprobePath).toBe('ffprobe')
-      expect(diagLog).toHaveBeenCalledTimes(2) // ffmpeg 和 ffprobe 各记一次
+      await withPlatform('win32', async () => {
+        const { ffprobePath } = await loadModule()
+        expect(ffprobePath).toBe('ffprobe')
+        expect(diagLog).toHaveBeenCalledTimes(2) // ffmpeg 和 ffprobe 各记一次
+      })
     })
 
     it('非 Windows 平台跳过 PE 预检，任何二进制仍采用本地路径（平台门控）', async () => {
-      const originalPlatform = process.platform
-      Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
-      try {
+      await withPlatform('linux', async () => {
         mockHasValidPeStructure = false // 即使在 linux 上 PE 校验会返回 false，也不应触发回退
         const { ffmpegPath } = await loadModule()
         expect(ffmpegPath).toBe(FFMPEG_RESOLVED)
         expect(diagLog).not.toHaveBeenCalled()
-      } finally {
-        Object.defineProperty(process, 'platform', { value: originalPlatform, configurable: true })
-      }
+      })
     })
 
     it('本地路径含非 ASCII + 合法 PE → 仍采用绝对路径（不再降级）', async () => {
@@ -216,8 +233,10 @@ describe('ffmpeg-paths', () => {
       mockFfmpegStaticPath = '/fake/中文目录/ffmpeg.exe'
       mockHasValidPeStructure = false
       vi.resetModules()
-      const { ffmpegPath } = await loadModule()
-      expect(ffmpegPath).toBe('ffmpeg')
+      await withPlatform('win32', async () => {
+        const { ffmpegPath } = await loadModule()
+        expect(ffmpegPath).toBe('ffmpeg')
+      })
     })
   })
 })

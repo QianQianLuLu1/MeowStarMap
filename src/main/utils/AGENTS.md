@@ -102,7 +102,8 @@
 
 ### Windows 特化
 
-- 路径操作统一 `path.win32`；PE 结构校验、asar unpacked 路径替换等均为 Windows 专属逻辑。产品仅发布 Windows x64。
+- 路径操作按 `docs/CODING_CONVENTIONS.md` §6 的三分法归位：**只做键/比较**的串固化 `path.win32`（本目录样板 `ipc-validate.ts`，注释写明「产品仅发布 Windows，测试可跨平台执行」）；**交给真实 fs/子进程**的保持宿主绑定；**两侧都会收到**的走 `path-dialect.ts`（导 `pathOf` / `sepOf` / `joinUnder`，判据是串的形态而不是 `process.platform`）。落档登记表在 `scripts/__tests__/path-semantics-guard.test.ts`。
+- PE 结构校验、asar unpacked 路径替换等确实是 Windows 专属的**动作**，用平台分支跳过是对的（`ffmpeg-paths.ts` 即样板）；被禁止的是让平台分支去决定**字符串语义**（分隔符、大小写折叠）。产品仅发布 Windows x64。
 
 ## 注意事项
 

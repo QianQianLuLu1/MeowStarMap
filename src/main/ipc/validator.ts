@@ -13,7 +13,12 @@
  * - 文件操作类 handler 调用 assertFileOpPath 完成路径白名单校验
  */
 import { z } from 'zod'
-import path from 'path'
+// 固化 win32 语义：路径白名单的归一与前缀比较必须与宿主无关。产品仅发布 Windows x64，
+// CI 却在 ubuntu-latest 跑单测——用宿主 path 时 Linux 上 path.posix.isAbsolute('D:\\…')
+// 为 false，判定首行短路，已登记的用户目录全部判为「不在白名单内」。同层黑名单
+// （utils/ipc-validate.ts isSensitivePath）早已同样钉 win32，此处补齐同一口径。
+import nodePath from 'path'
+const path = nodePath.win32
 import os from 'os'
 import fs from 'fs'
 import { app, type IpcMainInvokeEvent } from 'electron'

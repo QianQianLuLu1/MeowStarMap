@@ -17,6 +17,26 @@ import { describe, it, expect, vi } from 'vitest'
 import fs from 'fs'
 import { z } from 'zod'
 
+/**
+ * CI 复现装置（永久）：把本文件的宿主语义强制成 Linux——宿主 path 绑定 = posix、
+ * process.platform = 'linux'。理由：PathGuard 曾读宿主 path，而测试喂的是产品形态的
+ * Windows 盘符路径，CI（ubuntu-latest）上 path.posix.isAbsolute('D:\\…') === false，
+ * 白名单判定首行短路 → 「expected false to be true」与「路径不在白名单内」两类红灯。
+ * 钉死 win32 后判定与宿主无关，因此这份 mock 在 Windows 上是「复现」，在 CI 上是恒等，
+ * 两侧跑的是同一套断言（path.posix.win32 === path.win32，故被测代码里的显式 win32 不受影响）。
+ * 工厂实现在 tests/mocks/posix-host-path.ts（与 `npm run test:ci-linux` 装置共用一份）；
+ * 这里必须用工厂内动态 import——`vi.mock` 会被提升到文件顶部，引用顶层 import 绑定会撞 TDZ。
+ */
+vi.mock('path', async (importOriginal) => {
+  const { posixHost } = await import('../../../tests/mocks/posix-host-path')
+  return posixHost(importOriginal as () => Promise<unknown>)
+})
+vi.mock('node:path', async (importOriginal) => {
+  const { posixHost } = await import('../../../tests/mocks/posix-host-path')
+  return posixHost(importOriginal as () => Promise<unknown>)
+})
+Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
+
 // 仅 stub electron（validator.ts 顶层 import 了 electron），保留 ../validator 真实实现
 vi.mock('electron', () => ({
   app: { getPath: () => '/tmp', getName: () => 'test', getAppPath: () => '/tmp' },

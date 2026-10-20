@@ -14,8 +14,10 @@
 import { describe, it, expect } from 'vitest'
 import * as fs from 'fs'
 import * as path from 'path'
+import { fileURLToPath } from 'url'
 
-const DIR = path.resolve(__dirname)
+// 用 fileURLToPath(import.meta.url) 而不是裸 __dirname：见 scan-abort.test.ts 同一处的理由
+const DIR = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * 替换后各文件应有的 SettingsCard 使用数（原有用量 + 本次机械替换数）：

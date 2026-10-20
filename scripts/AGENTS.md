@@ -89,6 +89,7 @@
 | `__tests__/verify-nikkisync-link.test.ts`   | NikkiSync 诊断纯函数单测（不触磁盘，无链接环境也能跑）                                                 |
 | `__tests__/link-nikkisync.test.ts`          | 链接器纯函数单测（候选根解析/链接动作计划/子路径逃逸校验）                                             |
 | `__tests__/self-contained-deps.test.ts`     | 真实 package.json 的**依赖图自包含契约**：无仓库外 `file:`/`workspace:` 依赖 + 打包面保留 `@nikkisync` |
+| `__tests__/path-semantics-guard.test.ts`    | 路径语义三分法登记表（PINNED / DIALECT / HOST_IO）与 CI 复现装置、electron 别名的存在性守卫            |
 | `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                                                  |
 | `__tests__/pre-dist-check.test.ts`          | 打包前校验闸门纯函数单测（校验项判定与聚合）                                                           |
 | `__tests__/check-md-links.test.ts`          | Markdown 引用守护纯函数单测 + **真实仓库契约**：被跟踪文档的死引用数必须为 0                           |

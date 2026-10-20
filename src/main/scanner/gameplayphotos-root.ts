@@ -6,17 +6,29 @@
  */
 import path from 'path'
 import fsp from 'fs/promises'
+import { joinUnder, pathOf } from '../utils/path-dialect'
 import { logger } from '../utils/logger'
 import { classifyFsError } from './scan-log-store'
 import { sendScanLogEntry } from './scan-logger'
 
-export const GAMEPLAYPHOTOS_RELATIVE = path.join('X6Game', 'Saved', 'GamePlayPhotos')
+/**
+ * 相对片段按**段**保存，拼接时交给 `joinUnder` 选分隔符：
+ * 把 `path.join('X6Game','Saved','GamePlayPhotos')` 的结果当片段，会在非 Windows 宿主上
+ * 造出 `X6Game/Saved/GamePlayPhotos`，再拼到反斜杠游戏根上就是混合分隔符串——
+ * 那正是 2026-10-19 CI（ubuntu）上本模块 6 处红灯的成因。
+ */
+const GPP_SEGMENTS = ['X6Game', 'Saved', 'GamePlayPhotos']
+const GPP_FALLBACK_SEGMENTS = ['X6Game', 'GamePlayPhotos']
+
+// 导出形态钉 win32（产品只发布 Windows x64）：这两个常量是给比较与展示用的**字面量**，
+// 不直接交给 fs，故与宿主无关。`path.posix.win32 === path.win32`，CI 上取到的是同一个实现。
+export const GAMEPLAYPHOTOS_RELATIVE = path.win32.join(...GPP_SEGMENTS)
 
 /**
  * 需求二.2 兼容变体：部分安装/迁移场景下官方相册位于 [游戏根]\X6Game\GamePlayPhotos（无 Saved 段）。
  * 仅在 Saved 变体不存在时降级使用。
  */
-export const GAMEPLAYPHOTOS_RELATIVE_FALLBACK = path.join('X6Game', 'GamePlayPhotos')
+export const GAMEPLAYPHOTOS_RELATIVE_FALLBACK = path.win32.join(...GPP_FALLBACK_SEGMENTS)
 
 /**
  * 将单个游戏安装根目录解析为存在的 GamePlayPhotos 目录。
@@ -24,13 +36,17 @@ export const GAMEPLAYPHOTOS_RELATIVE_FALLBACK = path.join('X6Game', 'GamePlayPho
  * 优先级：X6Game\Saved\GamePlayPhotos（标准）→ X6Game\GamePlayPhotos（变体兜底）。
  * 两者均不存在（或入参非法）时返回 null，不抛异常（调用方据此记 E002 并继续下一个根）。
  *
+ * 返回串会直接交给 `fsp.access` 与后续真实遍历，因此**不能**整体钉 win32：
+ * 库内/注册表来的游戏根是 Windows 形态、单测里 mkdtemp 出来的是 POSIX 形态，
+ * 按数据方言逐次选语义（见 `../utils/path-dialect`）。
+ *
  * @param gameRoot 游戏安装根目录
  * @returns 存在的 GamePlayPhotos 目录路径；不存在返回 null
  */
 export async function resolveGamePlayPhotosDir(gameRoot: string): Promise<string | null> {
   if (!gameRoot || typeof gameRoot !== 'string') return null
-  for (const rel of [GAMEPLAYPHOTOS_RELATIVE, GAMEPLAYPHOTOS_RELATIVE_FALLBACK]) {
-    const candidate = path.join(gameRoot, rel)
+  for (const segments of [GPP_SEGMENTS, GPP_FALLBACK_SEGMENTS]) {
+    const candidate = joinUnder(gameRoot, ...segments)
     try {
       await fsp.access(candidate)
       return candidate
@@ -79,7 +95,7 @@ function toDirNames(entries: unknown): string[] {
  */
 export async function isOfficialAlbumDir(dir: string): Promise<boolean> {
   if (!dir || typeof dir !== 'string') return false
-  if (path.basename(dir).toLowerCase() !== 'gameplayphotos') return false
+  if (pathOf(dir).basename(dir).toLowerCase() !== 'gameplayphotos') return false
   let dirNames: string[]
   try {
     dirNames = toDirNames(await fsp.readdir(dir, { withFileTypes: true }))
@@ -94,7 +110,7 @@ export async function isOfficialAlbumDir(dir: string): Promise<boolean> {
  * 命中条件：目录名即为 GamePlayPhotos，或目录下存在 NikkiPhotos_HighQuality / NikkiPhotos_LowQuality 子目录。
  */
 async function isDirectGamePlayPhotosDir(p: string): Promise<boolean> {
-  if (path.basename(p).toLowerCase() === 'gameplayphotos') return true
+  if (pathOf(p).basename(p).toLowerCase() === 'gameplayphotos') return true
   try {
     const entries = await fsp.readdir(p, { withFileTypes: true })
     return entries.some(

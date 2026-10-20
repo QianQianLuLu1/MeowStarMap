@@ -76,6 +76,8 @@ import {
   isMediaPathAllowed
 } from '../media-protocol'
 import { pathGuard } from '../../ipc/validator'
+// 与 media-protocol.ts 同一判据：归一语义跟着串的形态走，不跟宿主走
+import { pathOf } from '../../utils/path-dialect'
 import {
   clearNikkiSyncResourcePaths,
   registerNikkiSyncResourcePaths
@@ -741,14 +743,15 @@ describe('media:// 第 4 条规则：NikkiSync 资源路径授权（阶段 4）'
     const upper = 'D:/mock/nikki/D.PNG'
     const lower = 'd:/mock/nikki/d.png'
     registerNikkiSyncResourcePaths(1, [upper])
-    if (process.platform === 'win32') {
-      const response = await register()(makeRequest(lower))
-      expect(response.status).toBe(200)
-    } else {
-      // 非 Windows 保留大小写敏感：同一路径自身仍必须命中
-      const response = await register()(makeRequest(upper))
-      expect(response.status).toBe(200)
+    // 折叠大小写不再按平台开关（授权表键表固化 win32，NTFS 不区分大小写是产品事实），
+    // 所以这里不再需要 if (process.platform === 'win32') 分支：两种写法在两侧宿主都必须命中。
+    for (const request of [lower, upper]) {
+      const response = await register()(makeRequest(request))
+      expect(response.status, request).toBe(200)
     }
+    // 折叠只合并写法，不放宽到未登记的确切文件
+    const missed = await register()(makeRequest('d:/mock/nikki/other.png'))
+    expect(missed.status).toBe(403)
   })
 })
 
@@ -800,11 +803,10 @@ describe('阶段 5 · C1：读通道与展示通道同口径 —— isMediaPathA
 
   it('37. Windows 大小写差异在读通道同样不裂：登记大写、判定小写 ⇒ true', () => {
     registerNikkiSyncResourcePaths(1, ['D:/mock/nikki/D.PNG'])
-    if (process.platform === 'win32') {
-      expect(isMediaPathAllowed(ctxNoRows(), 'd:/mock/nikki/d.png')).toBe(true)
-    } else {
-      expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/nikki/D.PNG')).toBe(true)
-    }
+    // 与用例 31 同一改动：折叠不再按平台开关，两种写法在任意宿主都必须命中
+    expect(isMediaPathAllowed(ctxNoRows(), 'd:/mock/nikki/d.png')).toBe(true)
+    expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/nikki/D.PNG')).toBe(true)
+    expect(isMediaPathAllowed(ctxNoRows(), 'd:/mock/nikki/d.PNGX')).toBe(false)
   })
 })
 
@@ -825,10 +827,12 @@ describe('规则 0 · 用户显式选中的媒体文件经 media:// 放行', () 
    * 两侧都 resolve，否则 win32 下 `/mock/...` 会被解析成 `D:\mock\...` 而永不匹配。
    */
   function allowExact(allowed: string): void {
-    const want = path.resolve(allowed).toLowerCase()
+    // 模拟真实 PathGuard 的归一：它已固化 win32（`ipc/validator.ts` 头部理由），
+    // 所以夹具也必须按 win32 归一，否则「同一条路径」在 Linux CI 上被算成两个身份。
+    const want = path.win32.resolve(allowed).toLowerCase()
     vi.mocked(pathGuard.isUserPicked).mockImplementation((p: string) => {
-      const resolved = path.resolve(p).toLowerCase()
-      return resolved === want || resolved.startsWith(want + path.sep)
+      const resolved = path.win32.resolve(p).toLowerCase()
+      return resolved === want || resolved.startsWith(want + path.win32.sep)
     })
   }
 
@@ -885,16 +889,19 @@ describe('规则 0 · 用户显式选中的媒体文件经 media:// 放行', () 
     allowExact(target)
     const input = 'd:/mock/pick/logo.png'
     expect(isMediaPathAllowed(ctxNoRows(), input)).toBe(true)
-    // 传入的是 resolve 后的绝对路径，不是原始请求串（否则真实 PathGuard 的前缀匹配失效）
+    // 传入的是**按数据方言归一**后的绝对路径，不是原始请求串（否则真实 PathGuard 的前缀匹配失效）。
+    // 判据与 media-protocol.ts 的 normalizedRequest 同源：Windows 形态串走 win32，
+    // 真 POSIX 串走 posix ⇒ 两侧在任何宿主上都得是同一个形。
     const arg = vi.mocked(pathGuard.isUserPicked).mock.calls.at(-1)?.[0] as string
-    expect(arg).toBe(path.resolve(input))
+    expect(arg).toBe(pathOf(input).resolve(input))
   })
 
-  it('44. Windows 反斜杠形态的 logo 路径同样命中', () => {
-    // 真实 logo 路径在 Windows 上就是 D:\a\b\logo.png 形态；仅在 win32 下有意义
-    if (process.platform !== 'win32') return
+  it('44. Windows 反斜杠形态的 logo 路径同样命中（归一按数据方言，不再只在 win32 有意义）', () => {
     allowExact('D:/mock/pick/Logo.PNG')
     expect(isMediaPathAllowed(ctxNoRows(), 'd:\\mock\\pick\\logo.png')).toBe(true)
+    // 反斜杠形态与正斜杠形态必须是同一身份，否则用户在对话框挑好的 logo 换种写法就恒 403
+    expect(isMediaPathAllowed(ctxNoRows(), 'D:/mock/pick/Logo.PNG')).toBe(true)
+    expect(isMediaPathAllowed(ctxNoRows(), 'd:\\mock\\pick\\other.png')).toBe(false)
   })
 })
 

@@ -72,8 +72,10 @@ export function isGamePlayPhotosTree(filePath: string): boolean {
  */
 export function extractAlbumTypeFromPath(filePath: string, keepRawName?: boolean): string {
   // 取文件所在目录名（path.dirname 后再 basename）
-  const parentDir = path.dirname(filePath)
-  const parentDirName = path.basename(parentDir)
+  // 固化 win32：库内路径恒为 Windows 形态（产品仅发布 Windows x64），CI 在 Linux 上跑测时
+  // 宿主 path.posix.dirname('D:\\a\\b\\photo.jpg') 会返回 '.'，相册类型因此全部回落「其他」。
+  const parentDir = path.win32.dirname(filePath)
+  const parentDirName = path.win32.basename(parentDir)
   return resolveAlbumType(parentDirName, keepRawName ?? isGamePlayPhotosTree(filePath))
 }
 

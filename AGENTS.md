@@ -96,6 +96,7 @@ npm run build        # 清理 + electron-vite build
 npm run dist:win     # 打包 Windows 安装包（含预检查与产物校验）
 
 npm test             # vitest run（变体：test:watch / test:coverage / test:main / test:renderer / test:db）
+npm run test:ci-linux # 在开发机上按 CI（ubuntu-latest）的宿主语义跑同一批用例（path 绑定/平台/cwd 与家目录/根不可写/electron 未装）；只读诊断，不进 CI
 npm run typecheck    # tsc -b（src 层，emit 落在 .cache/tsmain，不写 dist/main）+ tsc -p tsconfig.scripts.json（scripts/ 工具层）；local verify/pre-commit 只跑前者，CI 跑全量
 npm run typecheck:e2e # tsc --noEmit -p e2e（e2e/ 层）；上面两者都收不到 e2e/，CI 的 lint-typecheck job 也跑它，不得折进 typecheck（TS6310）
 npm run lint         # eslint .（lint:fix 自动修复）
@@ -173,5 +174,5 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 - 提交信息遵循 Conventional Commits，经 husky（commit-msg 钩子）+ commitlint 校验；规范详情见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md) 的「校验与提交」节。
 - 单元测试与源码同目录，命名 `*.test.ts(x)`（Vitest）。
 - 代码注释与文档以中文为主；UI 文案走 i18next（12 个 locale 包，zh-CN 为基准静态加载、其余 11 种动态加载，另有「跟随系统」auto），勿硬编码用户可见文本。
-- 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、源文件编码 UTF-8 无 BOM 与行尾 LF、校验与提交等）见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md)，该文件是唯一真相源。
+- 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、源文件编码 UTF-8 无 BOM 与行尾 LF、路径语义三分法「比较层钉 win32 / IO 层保宿主 / 混合输入走方言」、校验与提交等）见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md)，该文件是唯一真相源。路径语义的落档由 `scripts/__tests__/path-semantics-guard.test.ts` 登记并守卫（PINNED / DIALECT / HOST_IO 三张表；新文件引入 win32 钉或方言引用而未登记 ⇒ 守卫红）。
 - 版本控制边界：根与模块级 `AGENTS.md`、`docs/CODING_CONVENTIONS.md` 均入仓，本文件导航表列出的每个路径都必须能解析到已跟踪文件；`.qoder/` 目录与 `.mimosa/`、`.trae/`、`.zcode/`、`.codebuddy/`、`.workbuddy*/`、`.codegraph/` 一样保持本地化（`.gitignore` 排除），其下的 IDE 规则文件仅作 `docs/CODING_CONVENTIONS.md` 的逐字镜像、skills 仅作本地装配，不得作为任何被跟踪指引的出处。

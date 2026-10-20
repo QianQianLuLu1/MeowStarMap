@@ -20,16 +20,20 @@
  * - 基础测试：见 __tests__/scan-channels.test.ts。
  */
 import fsp from 'fs/promises'
-import path from 'path'
+import { joinUnder, sepOf } from '../utils/path-dialect'
 import { resolveGamePlayPhotosScanRoots, isOfficialAlbumDir } from './gameplayphotos-root'
 import { sendScanLogEntry } from './scan-logger'
 import { getLastProbeTrail } from './game-directory-discovery'
 
-/** 次级通道：游戏内截图与录像目录（相对游戏根目录） */
-const SECONDARY_RELATIVE_PATHS = [
-  path.join('X6Game', 'ScreenShot'),
-  path.join('X6Game', 'Saved', 'ScreenShot'),
-  path.join('X6Game', 'Video')
+/**
+ * 次级通道：游戏内截图与录像目录（相对游戏根目录）。
+ * 按**段**保存而不是预拼串：预拼结果的分隔符随宿主漂移，拼到另一种形态的游戏根上
+ * 就是混合分隔符串（CI 在 ubuntu 上跑单测时即为此）。拼接统一走 `joinUnder`。
+ */
+const SECONDARY_RELATIVE_SEGMENTS = [
+  ['X6Game', 'ScreenShot'],
+  ['X6Game', 'Saved', 'ScreenShot'],
+  ['X6Game', 'Video']
 ]
 
 /** 未找到官方相册目录的根（E002 详情） */
@@ -109,9 +113,11 @@ export async function resolveScanChannels(
     // 该根是否已被解析出官方相册目录：
     // - 相等：用户手动直选的目录本身就是 GamePlayPhotos；
     // - 前缀：解析结果为 root\X6Game\...\GamePlayPhotos。
+    // 分隔符必须跟随 root 的方言（`sepOf`），不能用宿主 `path.sep`——CI 在 Linux 上
+    // 拿到 '/' 而候选串是反斜杠形态，前缀永不命中 ⇒ 每个 Windows 根都被误记成 E002。
     const rootLower = root.toLowerCase()
     const resolved = officialAlbum.some(
-      (p) => p.toLowerCase() === rootLower || p.toLowerCase().startsWith(rootLower + path.sep)
+      (p) => p.toLowerCase() === rootLower || p.toLowerCase().startsWith(rootLower + sepOf(root))
     )
 
     // 官方相册解析失败：记 E002 + 实际子目录列表（用于区分「拼错层级 / 未安装 / 目录被改名」）
@@ -128,8 +134,8 @@ export async function resolveScanChannels(
       })
     }
 
-    for (const rel of SECONDARY_RELATIVE_PATHS) {
-      const candidate = path.join(root, rel)
+    for (const segments of SECONDARY_RELATIVE_SEGMENTS) {
+      const candidate = joinUnder(root, ...segments)
       const key = candidate.toLowerCase()
       if (seenSecondary.has(key)) continue
       if (await exists(candidate)) {

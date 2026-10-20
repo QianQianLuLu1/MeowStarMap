@@ -52,6 +52,7 @@
     "test:main": "vitest run src/main",
     "test:renderer": "vitest run src/renderer",
     "test:db": "vitest run src/main/database",
+    "test:ci-linux": "vitest run --config vitest.ci-linux.config.ts",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build -o storybook-static",
     "i18n:check": "tsx scripts/check-i18n-keys.ts",

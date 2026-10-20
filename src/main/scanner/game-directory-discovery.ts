@@ -21,6 +21,7 @@
 import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
+import { joinUnder, pathOf } from '../utils/path-dialect'
 import { execFile } from 'child_process'
 
 import { DRIVE_LETTER_START, DRIVE_LETTER_END } from '../utils/constants'
@@ -134,12 +135,12 @@ function getLauncherConfigCandidates(): string[] {
   const appData = process.env.APPDATA || ''
 
   if (localAppData) {
-    candidates.push(path.join(localAppData, 'InfinityNikki Launcher', 'config.ini'))
-    candidates.push(path.join(localAppData, 'InfinityNikki Launcher', 'settings.json'))
+    candidates.push(joinUnder(localAppData, 'InfinityNikki Launcher', 'config.ini'))
+    candidates.push(joinUnder(localAppData, 'InfinityNikki Launcher', 'settings.json'))
   }
   if (appData) {
-    candidates.push(path.join(appData, 'InfinityNikki Launcher', 'config.ini'))
-    candidates.push(path.join(appData, 'InfinityNikki Launcher', 'settings.json'))
+    candidates.push(joinUnder(appData, 'InfinityNikki Launcher', 'config.ini'))
+    candidates.push(joinUnder(appData, 'InfinityNikki Launcher', 'settings.json'))
   }
   return candidates
 }
@@ -154,12 +155,12 @@ function getShortcutCandidates(): string[] {
   const publicDir = process.env.PUBLIC || ''
 
   if (userProfile) {
-    candidates.push(path.join(userProfile, 'Desktop', GAME_SHORTCUT_CN))
-    candidates.push(path.join(userProfile, 'Desktop', 'InfinityNikki.lnk'))
+    candidates.push(joinUnder(userProfile, 'Desktop', GAME_SHORTCUT_CN))
+    candidates.push(joinUnder(userProfile, 'Desktop', 'InfinityNikki.lnk'))
   }
   if (publicDir) {
-    candidates.push(path.join(publicDir, 'Desktop', GAME_SHORTCUT_CN))
-    candidates.push(path.join(publicDir, 'Desktop', 'InfinityNikki.lnk'))
+    candidates.push(joinUnder(publicDir, 'Desktop', GAME_SHORTCUT_CN))
+    candidates.push(joinUnder(publicDir, 'Desktop', 'InfinityNikki.lnk'))
   }
   return candidates
 }
@@ -170,10 +171,10 @@ function getStartMenuDirs(): string[] {
   const appData = process.env.APPDATA || ''
   const programData = process.env.ProgramData || ''
   if (appData) {
-    dirs.push(path.join(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs'))
+    dirs.push(joinUnder(appData, 'Microsoft', 'Windows', 'Start Menu', 'Programs'))
   }
   if (programData) {
-    dirs.push(path.join(programData, 'Microsoft', 'Windows', 'Start Menu', 'Programs'))
+    dirs.push(joinUnder(programData, 'Microsoft', 'Windows', 'Start Menu', 'Programs'))
   }
   return dirs
 }
@@ -194,7 +195,7 @@ async function getStartMenuShortcutCandidates(): Promise<string[]> {
         const name = String(entry?.name ?? '')
         if (!name.toLowerCase().endsWith('.lnk')) continue
         if (!SHORTCUT_NAME_REGEX.test(name)) continue
-        out.push(path.join(dir, name))
+        out.push(joinUnder(dir, name))
       }
     } catch {
       recordProbe('shortcut', dir, 'missing')
@@ -218,13 +219,13 @@ async function getCommonLauncherInstallCandidates(): Promise<string[]> {
   const programFilesRoots = ['Program Files', 'Program Files (x86)']
   for (const drive of drives) {
     for (const pf of programFilesRoots) {
-      candidates.push(path.join(drive, pf, 'InfinityNikki Launcher', 'InfinityNikki'))
+      candidates.push(joinUnder(drive, pf, 'InfinityNikki Launcher', 'InfinityNikki'))
     }
     // spec 第 3 变体：自定义盘符根直接安装（无 Program Files 前缀），如 D:\InfinityNikki Launcher\InfinityNikki\
-    candidates.push(path.join(drive, 'InfinityNikki Launcher', 'InfinityNikki'))
+    candidates.push(joinUnder(drive, 'InfinityNikki Launcher', 'InfinityNikki'))
     // 需求三.1 方式3 补充模板：官方启动器之外的裸安装布局
-    candidates.push(path.join(drive, 'InfinityNikki'))
-    candidates.push(path.join(drive, 'Games', 'InfinityNikki'))
+    candidates.push(joinUnder(drive, 'InfinityNikki'))
+    candidates.push(joinUnder(drive, 'Games', 'InfinityNikki'))
   }
   return candidates
 }
@@ -297,10 +298,10 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
 
     // 候选 A：启动器目录下配置文件直读 game_install_path（config.json / game_settings.ini / settings.json / config.ini）
     const configCandidates = [
-      path.join(launcherPath, 'config.json'),
-      path.join(launcherPath, 'game_settings.ini'),
-      path.join(launcherPath, 'settings.json'),
-      path.join(launcherPath, 'config.ini')
+      joinUnder(launcherPath, 'config.json'),
+      joinUnder(launcherPath, 'game_settings.ini'),
+      joinUnder(launcherPath, 'settings.json'),
+      joinUnder(launcherPath, 'config.ini')
     ]
     let resolvedFromConfig = false
     for (const cfg of configCandidates) {
@@ -335,7 +336,7 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
 
     // 候选 B：启动器目录 + InfinityNikki（规范一.1.3 兜底）
     // 全链路诊断：[路径拼接] 节点——必须拼接一层 \InfinityNikki 才是游戏根
-    const inferredRoot = path.join(launcherPath, 'InfinityNikki')
+    const inferredRoot = joinUnder(launcherPath, 'InfinityNikki')
     sendScanLogEntry({
       stage: 'path-join',
       level: 'info',
@@ -374,8 +375,8 @@ export async function findOfficialLauncherGamePaths(): Promise<string[]> {
     if (isScanAborted()) break
     const targetPath = await resolveShortcutTarget(shortcutPath)
     if (targetPath) {
-      // 快捷方式指向的是 exe，取其父目录作为候选根
-      const candidateRoot = path.dirname(targetPath)
+      // 快捷方式指向的是 exe，取其父目录作为候选根（方言判定：exe 路径恒为 Windows 形态）
+      const candidateRoot = pathOf(targetPath).dirname(targetPath)
       const validated = await validateGameRootWithLauncherFallback(candidateRoot)
       if (validated && !seenPaths.has(validated.toLowerCase())) {
         seenPaths.add(validated.toLowerCase())
@@ -539,7 +540,7 @@ async function resolveShortcutTarget(shortcutPath: string): Promise<string | nul
 async function validateGameRootWithLauncherFallback(candidatePath: string): Promise<string | null> {
   const direct = await validateGameRoot(candidatePath)
   if (direct) return direct
-  return await validateGameRoot(path.join(candidatePath, 'InfinityNikki'))
+  return await validateGameRoot(joinUnder(candidatePath, 'InfinityNikki'))
 }
 
 /**
@@ -556,7 +557,7 @@ async function validateGameRoot(candidatePath: string): Promise<string | null> {
 
   // 全链路诊断：[目标路径] 节点——最终目标相册路径必须严格等于
   // [游戏根]\X6Game\Saved\GamePlayPhotos
-  const gamePlayPhotosPath = path.join(candidatePath, 'X6Game', 'Saved', 'GamePlayPhotos')
+  const gamePlayPhotosPath = joinUnder(candidatePath, 'X6Game', 'Saved', 'GamePlayPhotos')
   sendScanLogEntry({
     stage: 'target-path',
     level: 'info',
@@ -574,7 +575,7 @@ async function validateGameRoot(candidatePath: string): Promise<string | null> {
     return candidatePath
   } catch (err) {
     // 备选：验证 X6Game 目录存在（路径错误时继续下一个定位方式，不打断整体扫描）
-    const x6gamePath = path.join(candidatePath, 'X6Game')
+    const x6gamePath = joinUnder(candidatePath, 'X6Game')
     try {
       await fsp.access(x6gamePath, fs.constants.F_OK)
       sendScanLogEntry({
@@ -611,7 +612,7 @@ async function validateGameRoot(candidatePath: string): Promise<string | null> {
 async function hasX6GameDir(candidatePath: string): Promise<boolean> {
   if (!candidatePath) return false
   try {
-    await fsp.access(path.join(candidatePath, 'X6Game'), fs.constants.F_OK)
+    await fsp.access(joinUnder(candidatePath, 'X6Game'), fs.constants.F_OK)
     return true
   } catch {
     return false
@@ -638,12 +639,13 @@ async function hasX6GameDir(candidatePath: string): Promise<boolean> {
  */
 export async function normalizeCustomGameRoot(p: string): Promise<string> {
   if (!p || typeof p !== 'string') return p
-  const basename = path.basename(p).toLowerCase()
+  const dialect = pathOf(p)
+  const basename = dialect.basename(p).toLowerCase()
   if (basename === 'gameplayphotos') return p
   if (await hasX6GameDir(p)) return p
-  const viaLauncher = path.join(p, 'InfinityNikki')
+  const viaLauncher = joinUnder(p, 'InfinityNikki')
   if (await hasX6GameDir(viaLauncher)) return viaLauncher
-  if (basename === 'x6game') return path.dirname(p)
+  if (basename === 'x6game') return dialect.dirname(p)
   return p
 }
 
@@ -665,7 +667,7 @@ export async function findSteamGamePaths(): Promise<string[]> {
   const libraryPaths = new Set<string>()
   libraryPaths.add(steamInstallPath)
 
-  const vdfPath = path.join(steamInstallPath, 'steamapps', 'libraryfolders.vdf')
+  const vdfPath = joinUnder(steamInstallPath, 'steamapps', 'libraryfolders.vdf')
   try {
     const vdfContent = await fsp.readFile(vdfPath, 'utf-8')
     // 简化 VDF 解析：正则提取 "path" 字段，不引入 VDF 解析依赖
@@ -683,7 +685,7 @@ export async function findSteamGamePaths(): Promise<string[]> {
   // 在每个 Steam 库的 steamapps/common/InfinityNikki 下查找特征文件
   for (const libPath of libraryPaths) {
     if (isScanAborted()) break
-    const gamePath = path.join(libPath, 'steamapps', 'common', 'InfinityNikki')
+    const gamePath = joinUnder(libPath, 'steamapps', 'common', 'InfinityNikki')
     try {
       await fsp.access(gamePath, fs.constants.F_OK)
       // 需求三.2：X6Game 强校验（仅凭目录存在不可靠）
@@ -760,7 +762,7 @@ export async function findEpicGamePaths(): Promise<string[]> {
   const found = new Set<string>()
   for (const epicPath of epicRoots) {
     if (isScanAborted()) break
-    const gamePath = path.join(epicPath, 'InfinityNikki')
+    const gamePath = joinUnder(epicPath, 'InfinityNikki')
     try {
       await fsp.access(gamePath, fs.constants.F_OK)
       // 需求三.2：X6Game 强校验
@@ -792,7 +794,7 @@ export async function findEpicGamePaths(): Promise<string[]> {
  */
 export async function parseEpicManifests(): Promise<string[]> {
   const programData = process.env.ProgramData || 'C:\\ProgramData'
-  const manifestsDir = path.join(programData, 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests')
+  const manifestsDir = joinUnder(programData, 'Epic', 'EpicGamesLauncher', 'Data', 'Manifests')
 
   let files: string[]
   try {
@@ -808,7 +810,7 @@ export async function parseEpicManifests(): Promise<string[]> {
     if (!file.toLowerCase().endsWith('.item') && !file.toLowerCase().endsWith('.json')) {
       continue
     }
-    const filePath = path.join(manifestsDir, file)
+    const filePath = joinUnder(manifestsDir, file)
     try {
       const content = await fsp.readFile(filePath, 'utf-8')
       const json = JSON.parse(content) as {
@@ -822,7 +824,9 @@ export async function parseEpicManifests(): Promise<string[]> {
         (installLocation.toLowerCase().includes('infinitynikki') ||
           (json.AppName || '').toLowerCase().includes('infinitynikki'))
       ) {
-        const resolved = path.resolve(installLocation)
+        // 清单里的 InstallLocation 是 Windows 形态；用宿主 resolve 在 Linux CI 上会把整串
+        // 当相对名拼到 cwd 之后，得到一个 CI 上必然 access 失败的伪路径
+        const resolved = pathOf(installLocation).resolve(installLocation)
         try {
           await fsp.access(resolved, fs.constants.F_OK)
           results.push(resolved)
@@ -1032,20 +1036,20 @@ export async function getUserDataPaths(): Promise<string[]> {
   const found: string[] = []
   const userProfile = process.env.USERPROFILE || process.env.HOME || ''
   const localAppData =
-    process.env.LOCALAPPDATA || (userProfile ? path.join(userProfile, 'AppData', 'Local') : '')
+    process.env.LOCALAPPDATA || (userProfile ? joinUnder(userProfile, 'AppData', 'Local') : '')
 
   const candidates: string[] = []
   if (localAppData) {
     // 游戏用户数据（可能含媒体文件）
-    candidates.push(path.join(localAppData, 'InfinityNikki'))
+    candidates.push(joinUnder(localAppData, 'InfinityNikki'))
     // 启动器缓存图片（LauncherCacheImages 资源相册）
-    candidates.push(path.join(localAppData, 'InfinityNikki Launcher', 'cache', 'images'))
+    candidates.push(joinUnder(localAppData, 'InfinityNikki Launcher', 'cache', 'images'))
     // 国际服启动器缓存图片
-    candidates.push(path.join(localAppData, 'InfinityNikkiGlobal Launcher', 'cache', 'images'))
+    candidates.push(joinUnder(localAppData, 'InfinityNikkiGlobal Launcher', 'cache', 'images'))
   }
   if (userProfile) {
     // Documents 下的游戏数据
-    candidates.push(path.join(userProfile, 'Documents', 'InfinityNikki'))
+    candidates.push(joinUnder(userProfile, 'Documents', 'InfinityNikki'))
   }
 
   for (const candidate of candidates) {

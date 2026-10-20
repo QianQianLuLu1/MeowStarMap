@@ -21,13 +21,25 @@
  * 字符串字面量保持英文（`src/**` 中文硬编码护栏为 error）；中文只出现在注释。
  */
 
-import path from 'node:path'
+import nodePath from 'node:path'
+// 固化 win32 语义：本表是**纯键表**（值从不交给 fs，调用方传进来的已是 realpath 解引用后的
+// 路径），键的归一与前缀形态必须与宿主无关。产品只发布 Windows x64，库里的资源路径恒为
+// Windows 形态；用宿主 path 时，CI 的 ubuntu runner 上 `resolve('D:\\…')` 会把整串当相对名
+// 拼到 cwd 之后，登记侧与查询侧虽然仍自洽，但折叠大小写那一半随平台开关失效（见下），
+// 于是 `D:\A\B.png` 与 `d:\a\b.png` 被判成两个身份。与同层黑名单
+// （utils/ipc-validate.ts）、白名单（ipc/validator.ts）同一口径。
+const path = nodePath.win32
 
 /** 表项硬上限：一页上限 500，留出约 40 屏的浏览窗口后开始淘汰最旧条目。 */
 const MAX_ENTRIES = 20000
 
-/** Windows 路径大小写不敏感：DB 存 `D:\Photos`、请求 `d:\photos` 必须同一身份，否则裂图。 */
-const CASE_INSENSITIVE_FILESYSTEM = process.platform === 'win32'
+/**
+ * Windows/NTFS 不区分大小写：DB 存 `D:\Photos`、请求 `d:\photos` 必须同一身份，否则裂图。
+ * 这里**不再按平台开关**：产品只在 Windows 上跑，折叠是产品事实；条件折叠正是本轮要消灭的
+ * 反模式（同层黑名单早已修过一处，白名单与本表是它漏掉的两处）。
+ * 安全性口径不变：折叠只把「同一文件的不同写法」并成一个键，绝不放宽到目录前缀，
+ * 未登记的确切路径仍然拒绝。
+ */
 
 /** 当前表所属的 `libraryRevision`；`undefined` 表示表已被清空（未就绪）。 */
 let currentRevision: number | undefined
@@ -35,10 +47,9 @@ let currentRevision: number | undefined
 /** key = 归一化后的绝对路径；Map 的插入序即淘汰序。 */
 const allowedPaths: Map<string, true> = new Map()
 
-/** 归一化：解析为绝对路径（消解 `..`、多余分隔符），Windows 下再折叠大小写。 */
+/** 归一化：按 win32 解析为绝对路径（消解 `..`、多余分隔符），再折叠大小写。 */
 function normalizeKey(filePath: string): string {
-  const resolved = path.resolve(filePath)
-  return CASE_INSENSITIVE_FILESYSTEM ? resolved.toLowerCase() : resolved
+  return path.resolve(filePath).toLowerCase()
 }
 
 /** 可信条目判定：必须是含非空白字符的字符串。非字符串/空白一律忽略，不进表。 */

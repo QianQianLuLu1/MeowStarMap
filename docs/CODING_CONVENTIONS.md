@@ -12,7 +12,7 @@
 
 # 项目编码约定（Project Conventions）
 
-适用范围：本仓库全部代码改动。以下五条约定为**硬性规则**，PR 与自动化检查会拒绝违反项。若确需例外，必须在改动处附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记。
+适用范围：本仓库全部代码改动。以下六条约定为**硬性规则**，PR 与自动化检查会拒绝违反项。若确需例外，必须在改动处附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记。
 
 ---
 
@@ -135,6 +135,33 @@
 - ❌ 用脚本/工具批量改写源码后以带 BOM 编码写回。Windows PowerShell 的 `Set-Content -Encoding utf8` / `Out-File -Encoding utf8` 与部分编辑器的「UTF-8 with BOM」都会引入 BOM；批量改写必须显式无 BOM（例：`[IO.File]::WriteAllText($path, $text, (New-Object System.Text.UTF8Encoding($false)))`）。
 - ❌ 在 LF 文件里混入单行 CRLF（BOM 注入通常伴随首行 `\r\n`，两者是同一类缺陷）。
 - ❌ 为绕过拦截而关掉源码块的 `unicode-bom`，或给非测试源码加文件级 `/* eslint-disable unicode-bom */`。
+
+---
+
+## 6. 路径语义三分法：比较层钉 win32 / IO 层保宿主 / 混合输入走方言
+
+**规则**
+
+- 产品只发布 Windows x64，而 CI 的 `test`（10 分片）与 `coverage` job 在 ubuntu-latest 上跑单测。凡是拿**宿主** `path` 绑定去解释「Windows 形态路径串」的地方，两侧结论随宿主漂移：`path.posix.isAbsolute('D:\\x')` 为 false、`posix.dirname('D:\\a\\b')` 为 `'.'`、`posix.join('C:\\a','b')` 造出 `C:\\a/b` 混合分隔符、`posix.sep` 让 `startsWith(root + sep)` 永不命中。同一个根因已导致三轮 CI 红灯（黑名单 `src/main/utils/ipc-validate.ts` 早年钉过，白名单 `src/main/ipc/validator.ts` 与 `src/main/nikkisync/resource-allowlist.ts` 是它漏掉的项）。
+- 按路径字符串的**用途**分三档，逐站归位：
+  1. **只当键或比较用**（Set 成员、`startsWith` 前缀、大小写折叠、DB 查询键、`split(sep)`）⇒ 固化 `path.win32`。写法二选一：文件顶部 `import nodePath from 'path'` + `const path = nodePath.win32`（覆盖全模块，样板 `src/main/ipc/validator.ts`），或逐站显式 `path.win32.dirname(...)`（样板 `src/main/utils/ipc-validate.ts`）。
+  2. **交给真实 `fs` / `child_process` / `dialog` / 协议 handler 读写** ⇒ 保持宿主绑定。钉死会让 Linux 上 `path.win32.join('/tmp/x','y')` 造出 `\tmp\x\y`，当场打死用 `mkdtemp(os.tmpdir())` 做真 IO 的套件。
+  3. **同一函数两侧都会收到**（既可能是库里的 `D:\Game`，也可能是 `os.tmpdir()` 遍历出的 `/tmp/x`）⇒ 走 `pathOf` / `sepOf` / `joinUnder`，判据是**串的形态**而不是 `process.platform`。样板 `src/main/scanner/uid-discovery.ts`、`src/main/scanner/gameplayphotos-root.ts`。
+- 大小写折叠同理：NTFS 不区分大小写是产品事实，比较两侧的折叠必须无条件成立。
+- 落档结果要在 `scripts/__tests__/path-semantics-guard.test.ts` 的登记表里登记（PINNED / DIALECT / HOST_IO 三张表，HOST_IO 每条须带真实理由）。新增文件若引入了 win32 钉或方言引用而未登记，该守卫即红。
+- 验证口径：**「装置全绿 + 真宿主全绿」才是 Linux 全绿的充分证据**，只看其一都不算。装置是 `npm run test:ci-linux`（配置 `vitest.ci-linux.config.ts`、装配 `tests/ci-linux.setup.ts`），它补齐宿主身份四轴（path 绑定、`process.platform`、`cwd`/`homedir`/`tmpdir`、容器根不可写 + `fileURLToPath` 落点），其有效性由 `src/main/utils/ci-linux-emulation.test.ts` 逐轴自检。
+
+**允许的例外**（须附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记）
+
+- 渲染层与共享层不接触磁盘路径语义，`src/renderer/**`、`src/shared/**` 不适用本条；主进程里纯 IO 拼接（如 `path.join(cacheDir, name)` 后立刻 `writeFile`）属第 2 档，无需登记为钉。
+- 测试文件若用 `require('path')` 造期望值，会绕过 `vi.mock('path')` 与装置（装置里取到 win32 而 CI 取到 posix ⇒ 假红灯）。期望值必须用与被测代码**同一绑定**的 `import` 形式，或显式 `path.win32`。
+
+**禁止**
+
+- ❌ 用 `process.platform === 'win32' ? 折叠 : 不折叠`、`... ? path.win32.sep : path.sep` 这类**平台开关决定路径语义**的写法——它正是本轮要消灭的反模式，也是 CI 与产品分叉的源头。平台分支只允许出现在「是否执行某段 Windows 专属动作」的判定上（如 `ffmpeg-paths.ts` 的 PE 结构预检跳过）。
+- ❌ 为了让装置变绿而把第 2 档也整体钉成 win32，或给真 IO 套件加 `it.skipIf`。
+- ❌ 在 `src/shared/**` 里引入 `node:path` 运行时依赖来"共享"方言判据（shared 层会进 preload bundle 与渲染层）。
+- ❌ 用 `it.skip` / 放宽断言 / 调低阈值的方式让 CI 变绿。判据必须落在真实行为上：修复前可复现红，修复后不再红。
 
 ---
 

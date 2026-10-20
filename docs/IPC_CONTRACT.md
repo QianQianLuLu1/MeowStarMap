@@ -545,3 +545,9 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
   `watermark:apply`。canvas 链路经 `media://` 取 logo 字节（授权口径见
   `src/main/app/media-protocol.ts` 的 `isMediaPathAllowed` 规则 0），service 链路用 `fs` 直读但
   以同一口径的 `assertMediaAccessPath` 前置校验——两条链路的 logo 授权判据同源。
+
+## 11. 路径白名单归一口径（2026-10-20 Linux CI 修复补录）
+
+- 本轮**未新增/改名任何通道，未改任何方法签名与 `IpcResponse`/`IpcError` 结构**，仅订正既有通道的前置校验归一口径，故按契约同步义务在此登记。
+- `src/main/ipc/validator.ts` 的 `PathGuard`（`assertFileReadPath` / `assertFileWritePath` 的白名单判定，以及 `isUserPicked` / `isUserPickedDir` 短路）改为**固化 `path.win32` 语义**，与同层黑名单 `isSensitivePath`（`src/main/utils/ipc-validate.ts`）口径一致。原因：白名单原先读宿主 `path`，CI 的 ubuntu runner 上 `path.posix.isAbsolute('D:\…')` 为 false，使所有 Windows 形态已授权路径被判为「路径不在白名单内」（错误码 `IPC_PATH_FORBIDDEN` 不变，只是不再误报）。
+- 判据语义不变：非绝对路径（含 `relative/a.jpg`）、未登记路径、系统敏感目录仍返回 `IPC_PATH_FORBIDDEN`；`details.path` 仍经 `maskPath` 脱敏，仅在非 Windows 宿主下分隔符形态不同。

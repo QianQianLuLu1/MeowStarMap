@@ -25,6 +25,22 @@ vi.mock('electron', () => ({
   app: { getPath: () => process.cwd() }
 }))
 
+/**
+ * CI 复现装置（常驻）：把宿主 `path` 钉成 posix。本文件喂的全是产品形态的 Windows 路径串，
+ * 且 `fs/promises` 已被整模块 mock（不碰真实文件系统），所以钉 posix 是安全的，
+ * 也正是 CI 上跑这份用例时的真实语义。没有它，开发机（宿主=win32）上撤掉
+ * `gameplayphotos-root.ts` 的方言分流也不会露馅。
+ * 工厂内必须动态 import：`vi.mock` 会被提升到文件顶部，引用顶层 import 绑定会撞 TDZ。
+ */
+vi.mock('path', async (importOriginal) => {
+  const { posixHost } = await import('../../../../tests/mocks/posix-host-path')
+  return posixHost(importOriginal as () => Promise<unknown>)
+})
+vi.mock('node:path', async (importOriginal) => {
+  const { posixHost } = await import('../../../../tests/mocks/posix-host-path')
+  return posixHost(importOriginal as () => Promise<unknown>)
+})
+
 describe('resolveGamePlayPhotosScanRoots', () => {
   beforeEach(() => {
     vi.clearAllMocks()

@@ -20,8 +20,21 @@ import { renderShareCardPage, type ShareCardCopy } from '../shareCardRender'
  */
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/share-card.reference.txt', import.meta.url))
-/** 上游 NikkiSync @ d4ca7d7 的该文件哈希；副本被改动即在此处红。 */
-const REFERENCE_SHA256 = '6dea2d2a72988cae85dbbdb4c64ebed8ef3b42c7a5b42ec8dcd7fa3f99435d3b'
+/**
+ * 上游 NikkiSync @ d4ca7d7 的该文件哈希；副本被改动即在此处红。
+ *
+ * 值是**行尾归一为 LF 之后**的 sha256：本仓不设 `.gitattributes`（AGENTS.md §5 明令），
+ * 开发机 `core.autocrlf=true` 会把工作副本存成 CRLF，而 CI checkout 出来是 LF，
+ * 直接散列工作区字节会让同一条守卫只在某一侧成立（2026-10-19 CI 即为此红）。
+ * 归一后散列的就是**被跟踪的内容本身**，与上游 git blob 逐字对齐。
+ * 取证：`git show HEAD:<fixture>` 的 blob 散列 = 本机 LF 归一散列 = CI 收到的值。
+ */
+const REFERENCE_SHA256 = 'c4f076d99c72282a5bf9a6f5f7411de6cab48e14638cdceb1bcce185bb8df1bc'
+
+/** 读夹具字节并把行尾归一为 LF（见上注）；除此之外不改内容，任何字节改动仍然会红。 */
+function readFixtureBytes(): Buffer {
+  return Buffer.from(fs.readFileSync(FIXTURE, 'utf8').replace(/\r\n/g, '\n'), 'utf8')
+}
 
 // —— 两套输入：同一份数据，上游用中文 label，本仓用规范键 ————————————————————
 // 说明：本仓的中文硬编码护栏不作用于测试文件，故这里的中文无需 eslint-disable。
@@ -237,9 +250,18 @@ function minePayload(): ShareCardPayload {
 }
 
 describe('B3 参考实现来源', () => {
-  it('夹具与上游 share-card.js@d4ca7d7 逐字节一致', () => {
-    const digest = crypto.createHash('sha256').update(fs.readFileSync(FIXTURE)).digest('hex')
+  it('夹具与上游 share-card.js@d4ca7d7 内容一致（行尾归一后逐字节）', () => {
+    const digest = crypto.createHash('sha256').update(readFixtureBytes()).digest('hex')
     expect(digest).toBe(REFERENCE_SHA256)
+  })
+
+  it('异常：夹具内容被改动一个字符即判红（归一行尾没有弱化守卫）', () => {
+    const tampered = Buffer.from(
+      readFixtureBytes().toString('utf8').replace('share', 'shaxe'),
+      'utf8'
+    )
+    const digest = crypto.createHash('sha256').update(tampered).digest('hex')
+    expect(digest).not.toBe(REFERENCE_SHA256)
   })
 })
 

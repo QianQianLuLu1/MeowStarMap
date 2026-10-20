@@ -9,7 +9,11 @@
  * 通过依赖注入 log 函数实现可测试性（与 repair-legacy-data-v3 模式一致）
  */
 import fs from 'fs'
-import path from 'path'
+// 按「数据方言」取路径语义：媒体路径来自库内 Windows 形态数据时按 win32 解析（宿主 path
+// 在 Linux CI 上会把 'D:\Game\GamePlayPhotos' 整段当一个文件名，向上遍历直接失效）；
+// 真实文件系统遍历得到的 posix 路径仍按 posix 解析，避免把要 readdir 的路径改写成反斜杠。
+// 判据与三档口径统一收在 ../utils/path-dialect，本文件不再各写一份。
+import { pathOf } from '../utils/path-dialect'
 import { sendScanLogEntry } from './scan-logger'
 
 // UID 正则：纯数字、任意位数（名称完全由数字组成即为 UID 文件夹）。
@@ -36,10 +40,10 @@ type LogLevel = 'info' | 'warn' | 'error'
 export function findGamePlayPhotosDir(dir: string): string | null {
   let current = dir
   for (let i = 0; i < MAX_PARENT_SEARCH; i++) {
-    if (path.basename(current) === 'GamePlayPhotos') {
+    if (pathOf(current).basename(current) === 'GamePlayPhotos') {
       return current
     }
-    const parent = path.dirname(current)
+    const parent = pathOf(current).dirname(current)
     if (parent === current) break // 到达根目录
     current = parent
   }

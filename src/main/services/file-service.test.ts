@@ -62,6 +62,8 @@ vi.mock('../utils/file-utils', async () => {
 })
 
 import { FileService } from './file-service'
+// 同一个 PathGuard 单例（file-service.ts 内部用的就是它），用于在 fixture 里声明写入根
+import { pathGuard } from '../ipc/validator'
 
 // ============================================================
 // Helpers
@@ -73,6 +75,12 @@ let service: FileService
 beforeEach(() => {
   vi.clearAllMocks()
   tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-file-'))
+  // 写通道的白名单前提必须显式声明：PathGuard 默认只放行「用户主目录 / userData / 已登记根」。
+  // 本机 Windows 上 os.tmpdir() 恰好落在 C:\Users\<u>\AppData\Local\Temp 里，被 userHome 前缀
+  // 顺带放行；CI 的 ubuntu runner 上 /tmp 不在 /home/runner 之下，同一条用例会判
+  // 「路径不在白名单内」（2026-10-19 CI 注记 file-service.test.ts:464 即为此）。
+  // 产品里目标目录一律来自对话框登记，所以 register 才是与生产同形的 fixture。
+  pathGuard.register(tmpRoot)
   service = new FileService()
 })
 

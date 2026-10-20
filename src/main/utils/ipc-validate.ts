@@ -160,17 +160,16 @@ export function validateNonSensitivePath(filePath: string): { valid: boolean; me
  * 路径归属判断原语：判断 filePath 是否位于 dir 内（含 dir 自身）
  * Windows 文件系统大小写不敏感，须统一 toLowerCase 再比较，
  * 否则 DB 存 D:\Photos、请求 d:\photos\a.jpg 会被前缀比较误判为不在白名单内（裂图）
+ *
+ * 本函数是**纯比较**（结果不交给 fs），故与同文件其余判定一样固化 win32：
+ * 早先它按 `process.platform` 开关决定是否折叠大小写、并用宿主 `path.sep` 拼前缀，
+ * 于是 Linux CI 上两侧归一与产品语义分叉——这正是 `resource-allowlist` 里那处同类漏项的
+ * 模板。折叠无条件化只合并「同一文件的不同写法」，不放宽目录级授权。
  */
 export function isPathUnderDir(filePath: string, dir: string): boolean {
-  const f = path.resolve(filePath)
-  const d = path.resolve(dir)
-  const sep = path.sep
-  if (process.platform === 'win32') {
-    const lf = f.toLowerCase()
-    const ld = d.toLowerCase()
-    return lf === ld || lf.startsWith(ld + sep)
-  }
-  return f === d || f.startsWith(d + sep)
+  const f = path.win32.resolve(filePath).toLowerCase()
+  const d = path.win32.resolve(dir).toLowerCase()
+  return f === d || f.startsWith(d + path.win32.sep)
 }
 
 /**

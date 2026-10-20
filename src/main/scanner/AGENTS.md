@@ -258,6 +258,8 @@ worker 与主进程 `DatabaseManager` / `database-worker` **共享同一 WAL 库
 ## 11. 测试约定
 
 - 单测与源码同目录命名 `*.test.ts`，跨文件/集成用例放 `__tests__/`；跑法 `npm run test:main` 或 `npx vitest run src/main/scanner`。
+- **路径语义按三分法归位**（`docs/CODING_CONVENTIONS.md` §6）：本模块的游戏根/相册路径既可能是库里的 `D:\Game`，也可能是 `mkdtemp(os.tmpdir())` 出来的 `/tmp/x`，一律走 `../utils/path-dialect` 的 `joinUnder` / `pathOf` / `sepOf`（样板 `uid-discovery.ts`、`gameplayphotos-root.ts`、`scan-channels.ts`、`game-directory-discovery.ts`）。整体钉 win32 会打死 `__tests__/scan-channels.test.ts`、`__tests__/epic-manifests.test.ts`、`__tests__/worker-entry.findMediaDirectories.test.ts` 这些真 IO 套件；保持宿主绑定则 CI（ubuntu）上拼出混合分隔符并误记 E002。GPP 候选拼接与 `scan-channels.ts` 的前缀比较是**锁步**的，改一侧必须同批改另一侧。
+- **CI 复现桩（常驻）**：只喂 Windows 字面量且把 fs 全量 mock 的套件（`game-directory-discovery.test.ts`、`__tests__/resolve-gameplayphotos.test.ts`、`__tests__/scan-channels.win32-root.test.ts`）在文件内 `vi.mock('path')` 钉 posix 宿主，使「撤掉方言分流」在开发机上就红；真 IO 套件**不得**加这个桩。全量 CI 语义预跑用 `npm run test:ci-linux`。
 - **纯函数直接测**：`path-classifier.test.ts`、`uid-gate.test.ts`、`integrity-root-filter.test.ts`、`sqlite-retry.test.ts`、`scan-abort.test.ts`、`__tests__/scan-channels.test.ts`、`__tests__/resolve-gameplayphotos.test.ts`、`__tests__/epic-manifests.test.ts` 都是无 electron / 无原生模块的快测。
 - **测 worker-entry 需要两件套**：
   1. `process.parentPort` 桩——用共享工具 [`tests/mocks/parent-port.ts`](../../../tests/mocks/parent-port.ts) 的 `installParentPortStub()` / `uninstallParentPortStub()`。**必须在 import `worker-entry` 之前安装**（消息处理器在模块加载期注册），随后用 `port.emitMessage({ type: 'SCAN_START', payload })` 触发、`port.messages` 断言发出的事件。

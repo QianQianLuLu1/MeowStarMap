@@ -26,7 +26,12 @@
  * 三个副本与其 DB 记录、缓存缩略图一并清理。
  */
 import fsp from 'fs/promises'
-import path from 'path'
+import nodePath from 'path'
+// 固化 win32 语义：本文件把库内 Windows 形态路径当作**比较键**（cacheDir 前缀判定、
+// 大小写折叠、衍生文件名拼接）。宿主 path 在 Linux CI 上会把 'C:\cache\thumbnails' 当成
+// 相对名拼到 cwd 之后，前缀判定永不成立 ⇒ 缓存衍生文件（原生 LQ/HQ 缩略图）无法被回收。
+// 产品只发布 Windows x64，宿主绑定本就是 win32，故此固化对产物零行为变化。
+const path = nodePath.win32
 import { pathExists } from '../../utils/file-utils'
 import { logger } from '../../utils/logger'
 import { t } from '../../i18n'
