@@ -207,6 +207,36 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
     }
     const pkg = JSON.parse(read('package.json')) as { scripts?: Record<string, string> }
     expect(pkg.scripts?.['test:ci-linux']).toContain('vitest.ci-linux.config.ts')
+    // POSIX 宿主（**不带装置**）复现装置：CI 红灯组合「装置未激活 + 宿主是 posix」的等价替身。
+    // 它让「哨兵把宿主平台当常量」这一宿主漂移类缺陷在 Windows 开发机上也能判红；
+    // 拆掉它，本仓就只剩「推到 CI 才看得见」这一条路。
+    expect(existsSync(path.join(repoRoot, 'vitest.posix-host.config.ts'))).toBe(true)
+    expect(existsSync(path.join(repoRoot, 'tests/posix-host.setup.ts'))).toBe(true)
+    const posixHostRig = read('vitest.posix-host.config.ts')
+    expect(posixHostRig, '复现配置必须叠上 posix 宿主 setup').toContain('tests/posix-host.setup.ts')
+    expect(pkg.scripts?.['test:posix-host']).toContain('vitest.posix-host.config.ts')
+  })
+
+  it('装置自检文件：哨兵不得拿 win32 形态常量当期望值，且自身不得被闸门挡住', () => {
+    const rel = 'src/main/utils/ci-linux-emulation.test.ts'
+    const source = read(rel)
+    // run 39440507242 的红灯：哨兵用 `nodePath.sep === nodePath.win32.sep` 证明「真宿主」，
+    // 该式只在 Windows 宿主成立，CI（ubuntu-latest）上恒红。真 Node 下
+    // `path.posix.win32 === path.win32` 恒真、装置又会把 platform 改成 'linux'
+    // ⇒「真宿主 vs 装置态」无法用任何环境取值区分，判据只能结构化。
+    // 轴 1 里的 `nodePath.win32` / `nodePath.posix.win32` 是**引用**（且被 skipIf 闸门挡住），
+    // 只有 `.win32.sep` 这类「宿主值 vs win32 形态常量」的比较才判违规。
+    // 与本守卫其它判据同口径：注释里的反例说明不判违规（`stripComments` 的文本级剔除）
+    expect(stripComments(source), `${rel} 出现宿主值 vs win32 形态常量的比较`).not.toContain(
+      '.win32.sep'
+    )
+    // 反向钉住：装置轴仍靠 skipIf(!ACTIVE) 整件跳过；哨兵自身必须在两种 profile 下都跑
+    expect(source).toContain('it.skipIf(!ACTIVE)')
+    const sentinel = '装置未激活时本文件必须整件跳过'
+    expect(source, `${rel} 少了哨兵用例`).toContain(sentinel)
+    expect(source, `${rel} 的哨兵被闸门挡住了（那样它在 CI 上就成了空转）`).not.toContain(
+      `it.skipIf(!ACTIVE)('${sentinel}`
+    )
   })
 
   it('electron 必须仍被基座别名到惰性替身（否则 CI 的 --ignore-scripts 会打死约 40 个文件）', () => {

@@ -7,6 +7,12 @@
  *
  * 判据来源：2026-10-19 CI run 39268051028（ubuntu-latest）的失败注记，见
  * docs/plans/2026-10-20-fix-ci-linux-path-semantics-round2.md §0。
+ *
+ * 2026-10-20 追加：本文件自己曾带进一盏红灯——哨兵用例（见文件末尾）拿
+ * `nodePath.sep === nodePath.win32.sep` 当「装置未激活 ⇒ 我在真宿主上」的证据，而该式只在
+ * Windows 宿主成立，CI（ubuntu-latest）上恒假（run 39440507242 注记：本文件 :138
+ * `expected '/' to be '\'`）。已改为不依赖宿主平台的结构性判据，见
+ * docs/plans/2026-10-20-fix-ci-selfcheck-host-constant-round3.md §2.3 / §4-N1。
  */
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
@@ -18,6 +24,15 @@ import { fileURLToPath } from 'url'
 const marker = (globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation as
   { cwd: string; root: string } | undefined
 const ACTIVE = marker !== undefined
+
+/**
+ * 双 profile 用例：装置开 / 关都要跑，因此**不**参与「整件跳过」判定。
+ * 改这两条的标题必须同步改这里，否则末尾哨兵用例会红（失焦即红，不放过）。
+ */
+const DUAL_PROFILE_TITLES: string[] = [
+  '轴 5：electron 走惰性替身，单测不依赖二进制安装状态',
+  '装置未激活时本文件必须整件跳过（否则 CI 会把自检当成业务回归）'
+]
 
 describe('CI 宿主模拟装置自检', () => {
   it.skipIf(!ACTIVE)('轴 1：path 绑定已是 posix，且显式 win32 不受影响', () => {
@@ -134,8 +149,20 @@ describe('CI 宿主模拟装置自检', () => {
   it('装置未激活时本文件必须整件跳过（否则 CI 会把自检当成业务回归）', () => {
     if (!ACTIVE) {
       expect(marker).toBeUndefined()
-      // 真宿主：electron 包在开发机上装好了、path 绑定就是 win32，与装置态判然可分
-      expect(nodePath.sep).toBe(nodePath.win32.sep)
+      // 判据**不得依赖宿主平台**：本机 `path.sep` 是 '\\'、CI（ubuntu-latest）是 '/'，
+      // 拿 `nodePath.sep === nodePath.win32.sep` 当「真宿主」证据时，POSIX 宿主上恒红
+      // （run 39440507242 注记即此行 `expected '/' to be '\'`）。且真 Node 下
+      // `path.posix.win32 === path.win32` 恒真、装置又把 platform 改成 'linux'
+      // ⇒「真宿主 vs 装置态」无法用任何环境取值区分，唯一真相源只有 marker 本身。
+      // 「整件跳过」的实质是：装置轴用例一律挂着 `skipIf(!ACTIVE)` 闸门，未激活时一条都不会
+      // 执行——这一点只能从本文件自身的结构读出来，在任何宿主上都成立。
+      // 只在装置未激活时读：装置态下 fs/url 已被翻译层接管，而装置态根本不进这个分支。
+      const self = fs.readFileSync(fileURLToPath(import.meta.url), 'utf-8')
+      const ungated = [...self.matchAll(/\bit\(\s*'([^']+)'/g)].map((m) => m[1])
+      const gatedCount = [...self.matchAll(/\bit\.skipIf\([^)]*\)\(\s*'([^']+)'/g)].length
+      expect(ungated).toEqual(DUAL_PROFILE_TITLES)
+      // 空集保护：装置轴真的还在，否则上一条会在「一个装置轴用例都没有」时恒真
+      expect(gatedCount).toBeGreaterThan(0)
     }
     expect(ACTIVE).toBe(marker !== undefined)
   })
