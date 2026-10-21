@@ -161,7 +161,7 @@ jobs:
         run: npm run test:coverage
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: |
@@ -207,7 +207,8 @@ jobs:
       # 未链接时 scripts/verify-nikkisync-link.ts 的全部条目都降为 warn，退出码仍为 0。
       - name: NikkiSync link diagnostics (warn-only)
         run: npm run verify:nikkisync
-      # 打包产物运行时冒烟（docs/archive/plans/e2e-smoke-playwright.md）：
+      # 打包产物运行时冒烟（清单见 docs/manual-smoke-checklist.md；原方案文档已归档至
+      # docs/archive/plans/e2e-smoke-playwright.md，该目录被 .gitignore 排除、不入仓，仅本机留存）：
       # tag 发布与 PR 两条分支的两个构建步骤之后都会到达此 step，发布前必须冒烟通过
       - name: E2E smoke test on win-unpacked
         run: npm run e2e:smoke
@@ -217,7 +218,7 @@ jobs:
         run: npm run e2e:perf
       - name: Upload perf results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: perf-results
           path: |
@@ -227,7 +228,7 @@ jobs:
       # 失败现场采集：Playwright 截图/视频/trace + 主进程诊断日志，仅冒烟失败时上传
       - name: Upload smoke failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-smoke-failure
           path: |
@@ -236,7 +237,7 @@ jobs:
           retention-days: 7
       - name: Upload installer artifact
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: NikkiGallery-win-x64-nsis
           path: |
@@ -263,7 +264,7 @@ jobs:
           fi
       - name: Publish GitHub Release
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           files: |
             release/*.exe
@@ -301,7 +302,7 @@ jobs:
       - name: Build Storybook static site
         run: npm run build-storybook
       - name: Upload storybook-static artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: storybook-static
           path: |
