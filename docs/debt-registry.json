@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-16",
+  "updatedAt": "2026-10-21",
   "items": [
     {
       "id": "DEBT-001",
@@ -367,10 +367,10 @@
       "id": "DEBT-030",
       "category": "encoding",
       "section": 13,
-      "status": "open",
+      "status": "done",
       "priority": "low",
       "title": "11 个组件测试文件带 UTF-8 BOM（unicode-bom 降为 warn）",
-      "description": "存量 BOM 已在 HEAD 中；docs/CODING_CONVENTIONS.md §5 约定非测试源码一律无 BOM，由 eslint.config.js 的 unicode-bom: ['error','never'] 硬阻断，仅这 11 个测试文件在测试/stories 豁免块降为 warn。清偿：npx eslint --fix src/renderer/components/common/*.test.tsx 后删除该降级行回到 error，并移除本条",
+      "description": "存量 BOM 已在 HEAD 中；docs/CODING_CONVENTIONS.md §5 约定非测试源码一律无 BOM，由 eslint.config.js 的 unicode-bom: ['error','never'] 硬阻断，仅这 11 个测试文件在测试/stories 豁免块降为 warn。清偿：npx eslint --fix src/renderer/components/common/*.test.tsx 后删除该降级行回到 error，并移除本条。✅ 2026-10-21 已清偿：按本仓惯例保留条目改 status=done（check-debt-fix.ts 按 done/wont_fix 跳过），未删除。实跑 npx eslint --fix 剥 11 个文件首 3 字节 BOM，git diff --numstat 恰为 11 files / +11 / −11，且逐文件与 HEAD 比对确认「去 BOM + CRLF 归一后逐字节相同」（无行级噪声、无其他改写）；删除 eslint.config.js 测试/stories 豁免块内 'unicode-bom': 'warn' 一行及其例外注释（同块 no-restricted-syntax 与 local/core-path-guard 保留）。复验：npx eslint . 无任何输出（0 error / 0 warning，此前为 0 error / 11 warning），CI 该批 BOM 告警注解清零；新增 scripts/__tests__/source-encoding.test.ts 钉住「tracked 文件零 BOM + 不得再有降级行 + 全局 error 规则不得被顺手删」。计划与读数见 docs/plans/2026-10-21-fix-ci-smoke-timeout-and-clear-warnings.md",
       "files": [
         "src/renderer/components/common/ConfirmDialog.test.tsx",
         "src/renderer/components/common/ContextMenu.test.tsx",

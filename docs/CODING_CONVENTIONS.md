@@ -128,7 +128,7 @@
 
 **允许的例外**（须附中文注释说明原因、影响面与回滚方案，并在 `docs/技术债清单.md` 登记）
 
-- 存量 11 个 `src/renderer/components/common/*.test.tsx` 在 HEAD 中即带 BOM，已在 `eslint.config.js` 的测试/stories 豁免块降为 `warn` 渐进收敛（登记为 DEBT-030）；清偿方式为 `npx eslint --fix src/renderer/components/common/*.test.tsx`，随后删除该降级行让测试文件回到 `error`。
+- **当前无例外。** 曾存在的唯一例外——11 个 `src/renderer/components/common/*.test.tsx` 在 HEAD 中带 BOM、于 `eslint.config.js` 测试/stories 豁免块降为 `warn`（登记为 DEBT-030）——已于 **2026-10-21 全量清偿**：`npx eslint --fix` 剥除 BOM 后删除该降级行，测试文件与非测试源码同受 `error` 硬阻断，`npx eslint .` 实测 0 error / 0 warning。该条目在 `docs/debt-registry.json` 保留为 `status: "done"`，明细见 `docs/技术债清单.md` §13；防复发由 `scripts/__tests__/source-encoding.test.ts`（本轮新增，尚未入仓，与本文档同批提交）钉住：tracked 文件零 BOM + 不得再现降级行 + 全局 error 规则不得被顺手删。
 
 **禁止**
 

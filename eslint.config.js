@@ -455,15 +455,7 @@ export default [
     rules: {
       'no-restricted-syntax': 'off',
       // 核心路径保护规则在测试文件中豁免（测试 fixture 不需要授权注释）
-      'local/core-path-guard': 'off',
-      // 存量例外（原因/影响面/回滚方案，登记于 docs/技术债清单.md DEBT-030）：
-      // HEAD 中已有 11 个 src/renderer/components/common/*.test.tsx 带 UTF-8 BOM。
-      // 原因：这些文件在提交时即含 BOM，本次不改动其内容；影响面：仅测试与 stories
-      // 文件降为 warn 渐进收敛，非测试源码（含 4 个受保护目录、scripts、e2e、根配置）
-      // 仍受上方 error 硬阻断，非测试文件新增 BOM 会直接报错。
-      // 清偿与回归：跑 `npx eslint --fix src/renderer/components/common/*.test.tsx` 剥离
-      // BOM 后删除本行，让测试文件同样回到 error；参照 i18n 白名单先例，修复一个删一个。
-      'unicode-bom': 'warn'
+      'local/core-path-guard': 'off'
     }
   },
   // ============ i18n 存量技术债白名单（已全量清偿，2026-08-23） ============

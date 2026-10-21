@@ -148,7 +148,7 @@ npm run e2e:smoke
 npm run dist:win:smoke
 ```
 
-- 用例与配置：`e2e/smoke.e2e.ts` / `e2e/playwright.config.ts`；方案见 `docs/archive/plans/e2e-smoke-playwright.md`
+- 用例与配置：`e2e/smoke.e2e.ts` / `e2e/playwright.config.ts`；手工核对清单见 `docs/manual-smoke-checklist.md`（入仓），原方案文档已归档至 `docs/archive/plans/e2e-smoke-playwright.md`（该目录被 `.gitignore` 排除、不入仓，仅本机留存，git 历史可查）
 - CI 在 build job 打包后自动执行，失败时上传截图与主进程日志（artifact `e2e-smoke-failure`）
 - 发布前还需按 `docs/manual-smoke-checklist.md` 人工清单逐项验证（扫描/解密/编辑等依赖真实样本的项）
 - 脚本名冒号两侧**不能有空格**：`npm run e2e : smoke` 会被 npm 切成脚本名 `e2e`，由误输入守卫 `scripts/e2e-usage.ts` 拦下（列出真实子命令、退出码 1），而不是 npm 的 Missing script 报错
@@ -734,7 +734,7 @@ npm test
 | 命令                   | 基线结果                                                                                                                                                                                                                                                                                                                                                                                 |
 | ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `npm run typecheck`    | **exit 0，零错误**                                                                                                                                                                                                                                                                                                                                                                       |
-| `npm run lint`         | **exit 0，0 error**；11 个 warning 全部是 DEBT-030 登记的 `src/renderer/components/common/*.test.tsx` 带 BOM（`eslint --fix` 可清）（2026-10-10 实测；旧基线所述 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处问题已不再命中）                                                                                                                   |
+| `npm run lint`         | **exit 0，0 error / 0 warning（无任何输出）**（2026-10-21 实测）。历史读数曾为「0 error / 11 warning」，那 11 条全部是 DEBT-030 登记的 `src/renderer/components/common/*.test.tsx` 带 BOM，已随该债务清偿归零（见 `docs/技术债清单.md` §13）；更早基线所述 `.cache/`、`e2e/fullscreen-diagnose.e2e.ts`、`scripts/after-pack-vc-runtime.cjs` 三处问题已不再命中                           |
 | `npm run format:check` | 本机 `core.autocrlf=true` 下 **exit 1**——601 个文件仅因 CRLF 行尾被判红（2026-10-10 实测）。只读口径必须补 `--end-of-line auto`：`npx prettier --check --end-of-line auto <同范围>` 实测 exit 0。另注意 lint-staged 的根键 `*.{ts,js,json,md}` 在 lint-staged 语义下命中**任意深度**，故 `prettier --write` 实际也会改写 `docs/**`（改完大文档仍建议单独 `npx prettier --check <file>`） |
 | `npm test`             | 全量 408 文件 / 6312 通过 + 2 skip（2026-10-17 本轮全量实跑；历史读数 337 / 5331 为 2026-10-10 快照，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10；历史基线中的 `path-safety.test.ts` 与 `GalleryStackOverflow.test.tsx` 两个环境性失败已在 2.5.0 修复）                                                                                                       |
 
