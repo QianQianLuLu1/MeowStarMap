@@ -25,6 +25,13 @@ test.afterAll(async ({}, testInfo: TestInfo) => {
 })
 
 test('图库全屏预览诊断：点击缩略图 → 捕获 media:// 状态与 Console', async () => {
+  // 用例预算必须严格大于下方 90s 的网格等待：CI 的 windows runner 上没有游戏
+  // （run 39583778122 日志 `[e2e-nikkisync] gameRoot=<none>` + `[DIAG] gridReady=false gridcellCount=0`），
+  // 图库走 GalleryPage 的 EmptyState 分支 ⇒ `[role="grid"]` 永不出现 ⇒ 等待只能跑到超时。
+  // 配置默认预算是 60s（playwright.config.ts 的 timeout），于是用例在 await 里就被判
+  // `Test timeout of 60000ms exceeded`，末尾那两条恒真断言救不了它——这正是该步骤唯一红点。
+  // 写法与 smoke.e2e.ts 的 S7 同源（那里用 test.setTimeout(120_000) 兜 90s 的 expect.poll）。
+  test.setTimeout(150_000)
   launched = await launchApp()
   win = await launched.app.firstWindow()
   await win.waitForLoadState('domcontentloaded', { timeout: 15_000 })
