@@ -5,11 +5,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/QianQianLuLu1/NikkiGallery.git"
+    "url": "https://github.com/QianQianLuLu1/MeowStarMap.git"
   },
-  "homepage": "https://github.com/QianQianLuLu1/NikkiGallery",
+  "homepage": "https://github.com/QianQianLuLu1/MeowStarMap",
   "bugs": {
-    "url": "https://github.com/QianQianLuLu1/NikkiGallery/issues"
+    "url": "https://github.com/QianQianLuLu1/MeowStarMap/issues"
   },
   "keywords": [
     "electron",
