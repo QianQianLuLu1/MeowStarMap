@@ -365,3 +365,45 @@ DEBT-037 耦合）⇒ 证明这些断言有牙；把字面量与 DEBT-037 状态
 `npx vitest run e2e/__tests__/perf-baseline-env.test.ts` ⇒ **17 passed**；
 `scripts/__tests__/save-perf-baseline.test.ts` ⇒ **19 passed**。
 「三份 CI 读数选 ci 段均 0 违规」同时构成基线幂等自检。
+
+### 11.8 提交 `3ffee8d` 的最终远端复验（本轮收口判据）
+
+run `39776059515`（build job id `119817139369`）**全部 job success**，逐 step（免鉴权
+`GET /actions/jobs/119817139369`）：
+
+| step   | 名称                                | 结论        | 耗时                                    |
+| ------ | ----------------------------------- | ----------- | --------------------------------------- |
+| 9      | E2E smoke test on win-unpacked      | success     | 105s                                    |
+| **10** | **Performance baseline regression** | **success** | **19s**                                 |
+| 11     | Emit perf readings annotation       | success     | 1s                                      |
+| 12     | Upload perf results                 | success     | 1s                                      |
+| 14     | Upload installer artifact           | success     | 8s（此前一直被连坐 skip，现已恢复执行） |
+
+上游：`Lint, Typecheck & Security` success、十片 Test 全 success、`Coverage Gate` success。
+
+第 11 步回出的注解原文（即 ci 段已是 final 的第四次采样，用作假红余量复核）：
+
+```
+env=ci status=final samples=3 dataset=1500
+readings=cold-start-first-paint=1817;scan-ingest=1989;scan-throughput=754.2;media-list-page100=11;
+media-list-page500=27;find-duplicates=6043;find-duplicates-throughput=248.2;cache-get-stats=2;
+thumbnail-generate-p50=3;thumbnail-generate-p95=7;first-thumbnail-visible=551
+```
+
+按 final 段的容忍区间逐项核对，全部通过且余量充足（不是踩线通过）：
+`scan-ingest` 1989 vs 上限 5701（29% 占用）、`find-duplicates` 6043 vs 17068（35%）、
+`scan-throughput` 754.2 vs 下限 157.9（4.8 倍余量）、`media-list-page500` 27 vs 227、
+`media-list-page100` 11 vs 124、`cache-get-stats` 2 vs 90、`cold-start` 1817 vs 5079、
+`find-duplicates-throughput` 248.2 由硬护栏 100 兜住。⇒ 环境分段既消掉了假红，
+也没有把门禁调到「碰不到」的空转区间（相对判定仍会在真劣化 ≥3 倍时报红）。
+
+### 11.9 交付判据对照（计划 §7 的交付定义）
+
+| 判据                                                   | 要求 | 实际                                                                                                                                     |
+| ------------------------------------------------------ | ---- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| ① step 10 success                                      | 必须 | **success（19s）** ✅                                                                                                                    |
+| ② `perf-readings` 注解可读且 `env=ci`                  | 必须 | `env=ci status=final samples=3` ✅                                                                                                       |
+| ③ 四道上游 job 无新增红                                | 必须 | lint / test×10 / coverage / build 全 success ✅（中途 step 6 曾被与本轮无关的 storybook critical 打红，已由 `e5a4bff` 修好并留档 §11.5） |
+| ④ ci 段 `final` + `sampleCount: 3` + `DEBT-037 = done` | 必须 | 三项全部达成 ✅                                                                                                                          |
+| 不放宽任何一侧阈值                                     | 硬性 | 两侧 `regressionFactor` 逐项相同（3/5/10/50），由守卫用例钉住；未 skip、未降阈值 ✅                                                      |
+| 每个回归测试修复前为红                                 | 硬性 | 14 例首跑真红（含正向复现）；3 例等价性表征用临时变异证明判别力后逐字还原；节点 9 的 3 例字面量在改基线后先红再同步 ✅                   |
