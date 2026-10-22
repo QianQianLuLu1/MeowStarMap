@@ -192,7 +192,22 @@ export function planSection(input: {
   }
 
   const metrics: Record<string, RelativeRuleLike> = {}
+  // 受门禁指标集 = 既有各段已定义的指标 id 并集；基线不存在时为 null（首次固化按实测全量建段）。
+  // 不照单全收的原因：报告里还有观察项（thumbnail-generate-p50/p95、first-thumbnail-visible），
+  // 它们没有既有系数可继承，凭空按缺省 factor 2 建门禁必然假红
+  // （实测同一 job 两次 P95 读数为 5.4ms 与 27.1ms）。把观察项升成门禁是人工的显式决策。
+  const gated = new Set<string>()
+  for (const section of Object.values(existing?.environments ?? {})) {
+    for (const id of Object.keys(section?.metrics ?? {})) gated.add(id)
+  }
+  const gatedSet = gated.size > 0 ? gated : null
   for (const [id, entry] of aggregate) {
+    if (gatedSet && !gatedSet.has(id)) {
+      warnings.push(
+        `${id} 不在受门禁指标集内（观察项），本次不为它建相对规则；要纳入门禁需人工同时补 dev 与 ci 段`
+      )
+      continue
+    }
     metrics[id] = {
       baselineValue: Math.round(entry.value * 100) / 100,
       // 系数只沿用旧值：分段的意义是换比较对象，不是换容忍系数

@@ -197,6 +197,36 @@ describe('planSection 分段固化规则', () => {
     })
     expect(section.environment).toBe('windows-latest（GitHub Actions）')
   })
+  it('异常：只携带受门禁指标集，不得给观察项凭空造出相对规则', () => {
+    // dev 段只定义了 scan-ingest；报告里还有观察项 thumbnail-generate-p50。
+    // 若照单全收，观察项会拿到缺省 factor 2 的新门禁（docs/perf-regression.md §6 明确 P50/P95
+    // 只作观察或仅受硬护栏），CI 上必然制造假红——实测 p95 两次读数为 5.4ms 与 27.1ms。
+    const { section, warnings } = planSection({
+      envKey: 'ci',
+      aggregate: aggregateSamples([
+        report('t1', { 'scan-ingest': 1900, 'thumbnail-generate-p50': 3.1 }),
+        report('t2', { 'scan-ingest': 1950, 'thumbnail-generate-p50': 5.1 }),
+        report('t3', { 'scan-ingest': 1920, 'thumbnail-generate-p50': 3.1 })
+      ]),
+      existing: BASELINE,
+      sourceRuns: ['a', 'b', 'c'],
+      requireFinal: false
+    })
+    expect(Object.keys(section.metrics)).toEqual(['scan-ingest'])
+    expect(warnings.join('\n')).toContain('thumbnail-generate-p50')
+  })
+  it('边界：基线还不存在时（首次固化）没有既有指标集可约束，按实测全量建段', () => {
+    const { section } = planSection({
+      envKey: 'dev',
+      aggregate: aggregateSamples([
+        report('t1', { 'scan-ingest': 636, 'thumbnail-generate-p50': 1 })
+      ]),
+      existing: null,
+      sourceRuns: ['first'],
+      requireFinal: false
+    })
+    expect(Object.keys(section.metrics).sort()).toEqual(['scan-ingest', 'thumbnail-generate-p50'])
+  })
 })
 
 describe('mergeBaselineSection 只改写所选段', () => {

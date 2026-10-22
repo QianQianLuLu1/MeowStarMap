@@ -468,10 +468,10 @@
       "id": "DEBT-037",
       "category": "perf",
       "section": 15,
-      "status": "open",
+      "status": "done",
       "priority": "medium",
-      "title": "性能基线 ci 段仅 2 份样本、status=provisional，需补样至 ≥3 后固化为 final",
-      "description": "2026-10-22 把 e2e/perf-baseline.json 改为按运行环境分段（v2：全局 hardRules + environments.dev/ci 相对基线）后，ci 段的 baselineValue 取自 run 39623462678 归档产物里的两份实测报告（该次因 e2e/playwright.config.ts 的 retries=1 让 describe.serial 整链重跑，故一次运行留下两份读数），中位数=两值平均。两份来自同一 runner 实例、共享 warm 磁盘缓存，不是完全独立样本，因此段状态标 provisional 而非 final，且由 e2e/__tests__/perf-baseline-env.test.ts 的「status 与 DEBT-037 双向耦合」用例钉住：provisional 期间本条必须 open，转 final 后必须 done。收口方式：用 .github/workflows/build.yml 的 Emit perf readings annotation 步骤（if: always()，输出 ::notice title=perf-readings::）从免鉴权的 check-runs/{jobId}/annotations 接口取回至少一次新运行的读数，凑满 3 份后执行 npm run perf:save-baseline -- --env ci --samples <三份报告>。禁止用放宽 regressionFactor 或在 CI 上关掉相对判定来消音。",
+      "title": "性能基线 ci 段仅 2 份样本、status=provisional，需补样至 ≥3 后固化为 final（已完成）",
+      "description": "2026-10-22 把 e2e/perf-baseline.json 改为按运行环境分段（v2：全局 hardRules + environments.dev/ci 相对基线）后，ci 段的 baselineValue 取自 run 39623462678 归档产物里的两份实测报告（该次因 e2e/playwright.config.ts 的 retries=1 让 describe.serial 整链重跑，故一次运行留下两份读数），中位数=两值平均。两份来自同一 runner 实例、共享 warm 磁盘缓存，不是完全独立样本，因此段状态标 provisional 而非 final，且由 e2e/__tests__/perf-baseline-env.test.ts 的「status 与 DEBT-037 双向耦合」用例钉住：provisional 期间本条必须 open，转 final 后必须 done。收口方式：用 .github/workflows/build.yml 的 Emit perf readings annotation 步骤（if: always()，输出 ::notice title=perf-readings::）从免鉴权的 check-runs/{jobId}/annotations 接口取回至少一次新运行的读数，凑满 3 份后执行 npm run perf:save-baseline -- --env ci --samples <三份报告>。清偿读数（2026-10-22）：提交 e5a4bff 的 run 39772693608 里 step 10 判 success（18s），其 perf-results artifact 提供第三份读数（绿运行不重跑 ⇒ 只有一份），三份取中位数后 ci 段转 status=final、sampleCount=3、sourceRuns 三条。禁止项已守住：两侧 regressionFactor 逐项相同（3/5/10/50），未放宽任何阈值、未关闭任何判定。",
       "files": ["e2e/perf-baseline.json"],
       "lines": [75],
       "issue": false

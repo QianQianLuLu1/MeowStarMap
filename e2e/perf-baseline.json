@@ -70,45 +70,46 @@
       }
     },
     "ci": {
-      "recordedAt": "2026-10-21T15:21:36.367Z",
+      "recordedAt": "2026-10-22T11:52:52.331Z",
       "environment": "windows-latest（GitHub Actions，Windows Server 2025 / runner 2.330.0 / node v22.23.3）",
-      "status": "provisional",
-      "sampleCount": 2,
+      "status": "final",
+      "sampleCount": 3,
       "sourceRuns": [
         "39623462678#perf-run-2026-10-21T15-21-17-943Z",
-        "39623462678#perf-run-2026-10-21T15-21-36-367Z"
+        "39623462678#perf-run-2026-10-21T15-21-36-367Z",
+        "39772693608#perf-run-2026-10-22T11-52-52-331Z"
       ],
       "metrics": {
         "cold-start-first-paint": {
-          "baselineValue": 1766.32,
+          "baselineValue": 1692.94,
           "regressionFactor": 3
         },
         "scan-ingest": {
-          "baselineValue": 1923.14,
+          "baselineValue": 1900.37,
           "regressionFactor": 3
         },
         "scan-throughput": {
-          "baselineValue": 780.09,
+          "baselineValue": 789.32,
           "regressionFactor": 5
         },
         "media-list-page100": {
-          "baselineValue": 11.75,
+          "baselineValue": 12.4,
           "regressionFactor": 10
         },
         "media-list-page500": {
-          "baselineValue": 26.15,
+          "baselineValue": 22.7,
           "regressionFactor": 10
         },
         "find-duplicates": {
-          "baselineValue": 6274.28,
+          "baselineValue": 5689.25,
           "regressionFactor": 3
         },
         "find-duplicates-throughput": {
-          "baselineValue": 241.53,
+          "baselineValue": 263.66,
           "regressionFactor": 3
         },
         "cache-get-stats": {
-          "baselineValue": 2.05,
+          "baselineValue": 1.8,
           "regressionFactor": 50
         }
       }

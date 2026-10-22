@@ -278,3 +278,90 @@ npm run perf:save-baseline -- --env ci --samples .cache/perf/ci-39623462678/perf
    也不得靠改用 `it.skip` 之类绕过。
 4. 本地 `npm run e2e:perf` 用的仍是 2026-10-20 21:34 的 `release/win-unpacked`（`src/` 最后一次改动
    是 10-21 的 BOM 清偿，无行为变化）；本轮验证的是**判定机制**而非产物性能，故不重打包。
+
+### 11.5 提交 A 的远端复验：被一个与本轮无关的 audit 红点连坐
+
+`e9a78f8` 推送后（run `39771228817`），lint job 的 **step 6 `Security audit (audit-ci, fail on high/critical)`**
+判失败，`npm run lint` / `typecheck` / commitlint / i18n / test / coverage / **build（含 step 10）** 全部
+`skipped` ⇒ 本轮改动**没有拿到 step 10 的远端读数**。逐 step 结论取自免鉴权
+`GET /actions/runs/39771228817/jobs`（annotations 只有 `Process completed with exit code 1`，无正文）。
+
+本地复现归因（`npx audit-ci --config ./audit-ci.jsonc`）：
+
+```
+Found vulnerable advisory paths:
+GHSA-f2ph-cmg5-wxc8|storybook
+Failed security audit due to critical vulnerabilities.
+```
+
+新披露 critical 告警 `GHSA-f2ph-cmg5-wxc8`（"Storybook: Missing origin validation in Storybook preview
+allows code injection from malicious websites"）覆盖 `storybook` **10.0.0 - 10.6.1**，本机装的是
+`storybook@10.5.10`，上游已发修复版 10.6.2 / 10.6.3 ⇒ **与本轮改动无关**（上一次运行还没有这条告警）。
+因为存在官方修复版，把它塞进 `audit-ci.jsonc` 豁免清单等于弱化安全闸门，故选择升级：
+`storybook` / `@storybook/react-vite` / `@storybook/addon-docs` / `@storybook/addon-a11y`
+四个包必须同版本，`^10.5.x → ^10.6.3`（minor），单独成提交 `e5a4bff`（`fix(deps)`）。
+
+升级后的本机验证：`audit-ci` ⇒ `Passed npm security audit`（critical 归零）；
+`npm run build-storybook` ⇒ `completed successfully`（连跑两次 EXIT=0；首跑构建**成功之后**
+出现 `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING) … exit 127`，
+是 Windows libuv 进程退出竞态，不是 10.6.3 回归）；`npm test` ⇒ **433 files / 6602 passed / 12 skipped**，
+与升级前逐字一致；`test:coverage` ⇒ `All files 69.32 / 60.57 / 61.81 / 70.92`，门控 EXIT=0。
+
+**踩到一条新的本机坑（已写进 commit 正文）**：`npm install` 会把 `node_modules/@nikkisync/*`
+四个 junction 当 extraneous 剪掉（它们不是声明依赖，见 `src/main/nikkisync/AGENTS.md`），
+于是 3 个 linked 套件静默转 skip，全量读数变成 `430 passed | 3 skipped` / `6563 passed | 51 skipped`。
+这不是升级引入的回归，但**长得像**：跑全量前必须先 `npm run link:nikkisync` 复原，
+再用 `npm run link:nikkisync:check` / `npm run verify:nikkisync` 确认（复原后读数回到 433 / 6602 / 12）。
+
+### 11.6 提交 `e5a4bff` 的远端复验：step 10 转绿，注解通道回出第三份样本
+
+run `39772693608`（build job id `119805620581`），逐 step 结论取自免鉴权
+`GET /actions/runs/39772693608/jobs`：
+
+| 判据                                        | 期望               | 读数                                                     |
+| ------------------------------------------- | ------------------ | -------------------------------------------------------- |
+| lint job（含 audit）                        | success            | **success**（step 6 audit 转绿后 16 步全过）             |
+| test 十片 + Coverage Gate                   | success            | **10 片全 success + Coverage Gate success**              |
+| step 9 E2E smoke                            | success            | success，105s（与上一轮口径一致）                        |
+| **step 10 Performance baseline regression** | **success**        | **success，18s** —— 本轮交付的核心判据                   |
+| step 11 Emit perf readings annotation       | success + 注解可读 | **success，1s**；注解正文见下                            |
+| step 12 / 14（归档、安装包上传）            | 不再被连坐         | success 1s / success 7s（step 13 失败现场采集正常 skip） |
+
+注解原文（`GET /check-runs/119805620581/annotations`，annotation_level=notice）：
+
+```
+env=ci status=provisional samples=2 dataset=1500
+readings=cold-start-first-paint=1692;scan-ingest=1722;scan-throughput=871.3;media-list-page100=23;
+media-list-page500=20;find-duplicates=5689;find-duplicates-throughput=263.7;cache-get-stats=2;
+thumbnail-generate-p50=3;thumbnail-generate-p95=6;first-thumbnail-visible=344
+```
+
+三条判读：① `env=ci` 证明 `resolvePerfEnv()` 在真 runner 上取到了 ci 段（两侧 `platform` 串都是
+`win32-x64`，只有显式信号能区分）；② 18s 且该次 artifact 只有 **一份** `perf-run-*.json`，
+印证 §11.5 的「绿运行不重跑 ⇒ 只产一份」；③ 注解取整值与随后下载的真实 artifact **逐字一致**
+（注解只把 ms 取整、吞吐量留一位小数），说明这条免鉴权通道可以当作补样口径。
+
+### 11.7 节点 9：三份样本固化为 final（含一处被守卫拦下的缺陷）
+
+第三份样本取自 run `39772693608` 的 `perf-results` artifact（登录态 Edge 走
+`/actions/runs/{runId}/artifacts/{artifactId}` 下载），三份中位数固化后：
+
+```
+ci: status=final, sampleCount=3, sourceRuns=[39623462678#…-17-943Z, 39623462678#…-36-367Z, 39772693608#…-52-331Z]
+cold-start 1692.94 / scan-ingest 1900.37 / scan-throughput 789.32 / page100 12.4 /
+page500 22.7 / find-duplicates 5689.25 / find-duplicates-throughput 263.66 / cache 1.8
+```
+
+**固化过程中被拦下的真缺陷**：`planSection` 最初按报告的指标并集写段，于是给
+`thumbnail-generate-p50` / `thumbnail-generate-p95` / `first-thumbnail-visible` 三个**观察项**
+凭空建了 `regressionFactor: 2` 的相对规则。P95 三次读数为 5.4 / 27.1 / 5.7ms，
+按中位数 5.7×2=11.4ms 建门禁会在 CI 上稳定假红（`docs/perf-regression.md` §6 明确 P50 仅观察、
+P95 只受硬护栏）。修法是让固化只携带「既有各段已定义的指标并集」，缺省即拒绝并逐条告警；
+新增用例「异常：只携带受门禁指标集，不得给观察项凭空造出相对规则」**先红后绿**，
+另加一条「首次固化无既有指标集时按实测全量建段」钉住 bootstrap 分支不被误伤。
+
+红绿读数：三份样本写入基线后，先看到 3 条守卫红（ci 段字面量表、provisional 参与判定、
+DEBT-037 耦合）⇒ 证明这些断言有牙；把字面量与 DEBT-037 状态同步到 final 后
+`npx vitest run e2e/__tests__/perf-baseline-env.test.ts` ⇒ **17 passed**；
+`scripts/__tests__/save-perf-baseline.test.ts` ⇒ **19 passed**。
+「三份 CI 读数选 ci 段均 0 违规」同时构成基线幂等自检。

@@ -7,8 +7,9 @@
  * 而同一份打包产物在开发机当日判定「✓ 全部通过」。
  *
  * 读数出处（全部为实测，不是构造）：
- * - CI 两次读数：run 39623462678 的 perf-results artifact 里两份 perf-run-*.json
- *   （retries=1 让 describe.serial 整链重跑一次），原始精度照抄
+ * - CI 三份读数：run 39623462678 的 perf-results artifact 里两份 perf-run-*.json
+ *   （retries=1 让 describe.serial 整链重跑一次）+ run 39772693608 的一份（绿运行只产一份），
+ *   原始精度照抄；ci 段就是这三份的中位数，status=final、sampleCount=3
  * - 开发机读数：本机 .cache/perf/latest.json（2026-10-21T15:22:20.971Z）
  * 这些数值以字面量固化在本文件里：.cache/ 是 gitignore 的，CI 上读不到，
  * 且「解析型读数必须配字面量断言」，否则守卫自己坏掉时也会通过。
@@ -85,6 +86,21 @@ const CI_PASS_2: Record<string, number> = {
   'first-thumbnail-visible': 865.0233000000007
 }
 
+/** run 39772693608（提交 e5a4bff 那次绿运行）= 第三份样本，也是 ci 段转 final 的依据 */
+const CI_PASS_3: Record<string, number> = {
+  'cold-start-first-paint': 1692.1242000000002,
+  'scan-ingest': 1721.5451999999996,
+  'scan-throughput': 871.31,
+  'media-list-page100': 22.599999999976717,
+  'media-list-page500': 20,
+  'find-duplicates': 5689.250999999999,
+  'find-duplicates-throughput': 263.66,
+  'cache-get-stats': 1.7999999999883585,
+  'thumbnail-generate-p50': 3,
+  'thumbnail-generate-p95': 5.7000000000116415,
+  'first-thumbnail-visible': 343.5684000000001
+}
+
 /** 开发机 2026-10-21 复跑同一份产物的读数（.cache/perf/latest.json，判定为全部通过） */
 const DEV_TODAY: Record<string, number> = {
   'cold-start-first-paint': 908.6333,
@@ -112,17 +128,23 @@ const V1_SNAPSHOT = {
   'cache-get-stats': { maxMs: 1000, baselineValue: 0.7, regressionFactor: 50 }
 } as const
 
-/** ci 段播种值 = 两次 CI 读数的中位数（两份⇒取平均），factor 逐项照搬 dev 段 */
-const CI_SEED: Record<string, { baselineValue: number; regressionFactor: number }> = {
-  'cold-start-first-paint': { baselineValue: 1766.32, regressionFactor: 3 },
-  'scan-ingest': { baselineValue: 1923.14, regressionFactor: 3 },
-  'scan-throughput': { baselineValue: 780.09, regressionFactor: 5 },
-  'media-list-page100': { baselineValue: 11.75, regressionFactor: 10 },
-  'media-list-page500': { baselineValue: 26.15, regressionFactor: 10 },
-  'find-duplicates': { baselineValue: 6274.28, regressionFactor: 3 },
-  'find-duplicates-throughput': { baselineValue: 241.53, regressionFactor: 3 },
-  'cache-get-stats': { baselineValue: 2.05, regressionFactor: 50 }
+/** ci 段 = 三份真 CI 读数的中位数，factor 逐项照搬 dev 段（分段只换比较对象，不换容忍系数） */
+const CI_FINAL: Record<string, { baselineValue: number; regressionFactor: number }> = {
+  'cold-start-first-paint': { baselineValue: 1692.94, regressionFactor: 3 },
+  'scan-ingest': { baselineValue: 1900.37, regressionFactor: 3 },
+  'scan-throughput': { baselineValue: 789.32, regressionFactor: 5 },
+  'media-list-page100': { baselineValue: 12.4, regressionFactor: 10 },
+  'media-list-page500': { baselineValue: 22.7, regressionFactor: 10 },
+  'find-duplicates': { baselineValue: 5689.25, regressionFactor: 3 },
+  'find-duplicates-throughput': { baselineValue: 263.66, regressionFactor: 3 },
+  'cache-get-stats': { baselineValue: 1.8, regressionFactor: 50 }
 }
+
+const CI_SOURCE_RUNS = [
+  '39623462678#perf-run-2026-10-21T15-21-17-943Z',
+  '39623462678#perf-run-2026-10-21T15-21-36-367Z',
+  '39772693608#perf-run-2026-10-22T11-52-52-331Z'
+]
 
 async function realBaseline(): Promise<PerfBaseline> {
   const baseline = await loadBaseline()
@@ -184,15 +206,13 @@ describe('基线 v2 结构（绝对护栏全局共享 + 相对基线按环境分
       )
     }
   })
-  it('边界：ci 段播种值等于两次 CI 读数的中位数，且带可追溯的来源', async () => {
+  it('边界：ci 段等于三份 CI 读数的中位数，final 且带三条可追溯来源', async () => {
     const baseline = await realBaseline()
     const ci = baseline.environments.ci
-    expect(ci?.metrics).toEqual(CI_SEED)
-    expect(ci?.sampleCount).toBe(2)
-    expect(ci?.sourceRuns).toEqual([
-      '39623462678#perf-run-2026-10-21T15-21-17-943Z',
-      '39623462678#perf-run-2026-10-21T15-21-36-367Z'
-    ])
+    expect(ci?.metrics).toEqual(CI_FINAL)
+    expect(ci?.status).toBe('final')
+    expect(ci?.sampleCount).toBe(3)
+    expect(ci?.sourceRuns).toEqual(CI_SOURCE_RUNS)
     expect(ci?.environment).toContain('windows-latest')
   })
   it('异常：version 非 2 / 缺 environments / sourceRuns 为空 一律判为结构不合', () => {
@@ -228,10 +248,11 @@ describe('基线 v2 结构（绝对护栏全局共享 + 相对基线按环境分
 })
 
 describe('evaluateSamples 按环境选段', () => {
-  it('正常：两次 CI 读数选 ci 段均 0 违规（本轮缺陷的正向复现）', async () => {
+  it('正常：三份 CI 读数选 ci 段均 0 违规（本轮缺陷的正向复现 + 基线幂等）', async () => {
     const baseline = await realBaseline()
     expect(evaluateSamples(samples(CI_PASS_1), baseline, 'ci')).toEqual([])
     expect(evaluateSamples(samples(CI_PASS_2), baseline, 'ci')).toEqual([])
+    expect(evaluateSamples(samples(CI_PASS_3), baseline, 'ci')).toEqual([])
   })
   it('反向：同批 CI 读数选 dev 段恰命中 run 39623462678 的三条回归', async () => {
     const baseline = await realBaseline()
@@ -261,9 +282,16 @@ describe('evaluateSamples 按环境选段', () => {
   })
   it('边界：provisional 段照常参与相对判定（播种不等于关闭判定）', async () => {
     const baseline = await realBaseline()
-    expect(baseline.environments.ci?.status).toBe('provisional')
-    const over = { ...CI_PASS_2, 'scan-ingest': 1923.14 * 3 + 1 }
-    const violations = evaluateSamples(samples(over), baseline, 'ci')
+    // 不依赖入库基线当前是 provisional 还是 final：状态语义由判定逻辑保证，故构造一份 provisional 段
+    const provisional: PerfBaseline = {
+      ...baseline,
+      environments: {
+        ...baseline.environments,
+        ci: { ...baseline.environments.ci!, status: 'provisional' }
+      }
+    }
+    const over = { ...CI_PASS_3, 'scan-ingest': 1900.37 * 3 + 1 }
+    const violations = evaluateSamples(samples(over), provisional, 'ci')
     expect(violations.map((v) => [v.kind, v.metricId])).toEqual([['regression', 'scan-ingest']])
   })
   it('边界：绝对护栏与环境段无关，两个环境都必须满足', async () => {
@@ -276,8 +304,8 @@ describe('evaluateSamples 按环境选段', () => {
   })
 })
 
-describe('ci 段 provisional 期间必须挂着技术债条目', () => {
-  it('契约：status 与 DEBT-037 的 open/done 双向耦合', async () => {
+describe('ci 段固化状态与技术债条目双向耦合', () => {
+  it('契约：provisional ⇒ DEBT-037 open；final ⇒ DEBT-037 done', async () => {
     const baseline = await realBaseline()
     const registry = JSON.parse(
       readFileSync(path.join(ROOT_DIR, 'docs', 'debt-registry.json'), 'utf-8')
