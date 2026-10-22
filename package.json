@@ -79,6 +79,7 @@
     "dist:win:smoke": "npm run dist:win && npm run e2e:smoke",
     "dist:win:perf": "npm run dist:win && npm run e2e:perf",
     "perf:save-baseline": "tsx scripts/perf-test/save-perf-baseline.ts",
+    "perf:readings": "tsx scripts/perf-test/emit-perf-readings.ts",
     "typecheck:e2e": "tsc --noEmit -p e2e",
     "commit": "cz",
     "commitlint": "commitlint --from=HEAD~1 --to=HEAD",

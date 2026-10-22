@@ -16,8 +16,9 @@
  *   P9 首图显影耗时（重新进入图库，首张 media:// 图片 onLoad）
  *   P10 基线对比与回归判定
  *
- * 判定：绝对阈值（硬护栏） + 基线劣化（相对容忍区间），规则见 e2e/perf-baseline.json
- * 与 e2e/perf-helpers.ts 的 DEFAULT_HARD_RULES；结果落盘 .cache/perf/ 供追溯与基线更新。
+ * 判定：绝对阈值（硬护栏，全局共享） + 基线劣化（相对容忍区间，按运行环境分段 dev/ci），
+ * 规则见 e2e/perf-baseline.json 与 e2e/perf-helpers.ts 的 DEFAULT_HARD_RULES；
+ * 环境段由 resolvePerfEnv() 判定，结果落盘 .cache/perf/ 供追溯与基线更新。
  */
 import { test, expect, type Page, type TestInfo } from '@playwright/test'
 import path from 'node:path'
@@ -30,6 +31,7 @@ import {
   loadBaseline,
   median,
   printPerfSummary,
+  resolvePerfEnv,
   savePerfReport,
   type PerfRunReport,
   type PerfSample
@@ -74,6 +76,8 @@ let win: Page
 let datasetDir = ''
 const samples: PerfSample[] = []
 let reportSaved = false
+/** 本次运行按哪个环境段判定（platform 串在开发机与 CI 上字面相同，无法用来区分环境） */
+const perfEnv = resolvePerfEnv()
 
 /** afterAll 兜底：未保存则落盘部分结果，采集诊断日志并关闭应用 */
 // eslint-disable-next-line no-empty-pattern -- Playwright hook 首参必须是对象解构模式
@@ -84,6 +88,7 @@ test.afterAll(async ({}, testInfo: TestInfo) => {
       timestamp: new Date().toISOString(),
       platform: `${process.platform}-${process.arch}`,
       nodeVersion: process.version,
+      perfEnv,
       datasetImages: DATASET_SIZE,
       samples,
       violations: [],
@@ -391,11 +396,12 @@ test.describe.serial('性能基准回归（@perf，win-unpacked）', () => {
 
   test('P10 基线对比与回归判定', async () => {
     const baseline = await loadBaseline()
-    const violations = evaluateSamples(samples, baseline)
+    const violations = evaluateSamples(samples, baseline, perfEnv)
     const report: PerfRunReport = {
       timestamp: new Date().toISOString(),
       platform: `${process.platform}-${process.arch}`,
       nodeVersion: process.version,
+      perfEnv,
       datasetImages: DATASET_SIZE,
       samples,
       violations,
@@ -403,7 +409,7 @@ test.describe.serial('性能基准回归（@perf，win-unpacked）', () => {
     }
     const archivePath = await savePerfReport(report)
     reportSaved = true
-    printPerfSummary(report)
+    printPerfSummary(report, baseline)
     process.stdout.write(`[perf] 结果已保存: ${archivePath}\n`)
     if (!baseline) {
       process.stdout.write(

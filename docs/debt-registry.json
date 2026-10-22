@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-21",
+  "updatedAt": "2026-10-22",
   "items": [
     {
       "id": "DEBT-001",
@@ -462,6 +462,18 @@
         "eslint.config.js"
       ],
       "lines": [419, 163],
+      "issue": false
+    },
+    {
+      "id": "DEBT-037",
+      "category": "perf",
+      "section": 15,
+      "status": "open",
+      "priority": "medium",
+      "title": "性能基线 ci 段仅 2 份样本、status=provisional，需补样至 ≥3 后固化为 final",
+      "description": "2026-10-22 把 e2e/perf-baseline.json 改为按运行环境分段（v2：全局 hardRules + environments.dev/ci 相对基线）后，ci 段的 baselineValue 取自 run 39623462678 归档产物里的两份实测报告（该次因 e2e/playwright.config.ts 的 retries=1 让 describe.serial 整链重跑，故一次运行留下两份读数），中位数=两值平均。两份来自同一 runner 实例、共享 warm 磁盘缓存，不是完全独立样本，因此段状态标 provisional 而非 final，且由 e2e/__tests__/perf-baseline-env.test.ts 的「status 与 DEBT-037 双向耦合」用例钉住：provisional 期间本条必须 open，转 final 后必须 done。收口方式：用 .github/workflows/build.yml 的 Emit perf readings annotation 步骤（if: always()，输出 ::notice title=perf-readings::）从免鉴权的 check-runs/{jobId}/annotations 接口取回至少一次新运行的读数，凑满 3 份后执行 npm run perf:save-baseline -- --env ci --samples <三份报告>。禁止用放宽 regressionFactor 或在 CI 上关掉相对判定来消音。",
+      "files": ["e2e/perf-baseline.json"],
+      "lines": [75],
       "issue": false
     }
   ]

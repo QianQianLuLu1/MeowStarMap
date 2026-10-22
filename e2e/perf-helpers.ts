@@ -7,9 +7,13 @@
  * - 占位 JPEG 与 scripts/perf-test/generate-dataset.ts 的 MINIMAL_JPEG 保持一致
  *   （该脚本顶层含 CLI 入口无法直接 import，故在此内联同构常量）
  * - 判定规则分两层：
- *   1) 绝对阈值（maxMs / minThroughput）—— 任何环境都必须满足的硬护栏
+ *   1) 绝对阈值（maxMs / minThroughput）—— 任何环境都必须满足的硬护栏，全局共享一份
  *   2) 基线回归（baselineValue × regressionFactor）—— 相对历史基线的劣化判定，
  *      仅在数据集规模与基线记录一致时生效（避免数据集变化导致假阳性）
+ * - 相对基线按**运行环境分段**（v2 基线的 environments.dev / environments.ci）：
+ *   基线是「机器 + 数据集」的快照，拿开发机读数去比 CI 硬件会让比较对象与被测环境不一致
+ *   （run 39623462678 的 step 10 即因此以 3 条相对回归判红，而同一份产物在开发机全绿）。
+ *   两段的 regressionFactor 必须逐项相同——分段只换比较对象，不换容忍系数。
  */
 import fs from 'node:fs/promises'
 import path from 'node:path'
@@ -75,25 +79,58 @@ export async function generatePerfDataset(
 
 // ============ 指标 / 基线 / 结果类型 ============
 
-/** 单个指标的判定规则 */
+/** 基线分段的环境键：开发机本机 vs GitHub Actions 托管 runner */
+export type PerfEnvKey = 'dev' | 'ci'
+
+/** 单个指标的绝对护栏（任何环境都必须满足） */
 export interface PerfMetricRule {
   /** 绝对耗时上限（ms），超过即判定失败 */
   maxMs?: number
   /** 绝对吞吐量下限（项/秒），低于即判定失败 */
   minThroughput?: number
-  /** 基线值（历史实测，用于相对劣化判定） */
-  baselineValue?: number
-  /** 相对基线的劣化倍数上限（默认 2.0：超过基线 2 倍判定为回归） */
-  regressionFactor?: number
 }
 
-/** 提交入库的基线文件结构 */
-export interface PerfBaseline {
-  version: 1
+/** 单个指标在某环境段上的相对回归规则 */
+export interface PerfRelativeRule {
+  /** 该环境实测的基线值，用于相对劣化判定 */
+  baselineValue: number
+  /** 相对基线的劣化倍数上限（各环境段必须同值，分段不换系数） */
+  regressionFactor: number
+}
+
+/** 一个环境段：同一类硬件上录到的一组相对基线 */
+export interface PerfEnvironmentSection {
+  /** 最后一次固化时间（多样本时为中位数样本的时间戳） */
   recordedAt: string
+  /** 人类可读的硬件/宿主描述（不参与判定，仅供复核） */
   environment: string
+  /** final=多次采样固化；provisional=样本不足播种，相对判定照常生效，待补样转正 */
+  status: 'final' | 'provisional'
+  /** 参与聚合的实测报告份数 */
+  sampleCount: number
+  /** 读数来源（运行号 / 存档名），保证基线可追溯到真实运行 */
+  sourceRuns: string[]
+  metrics: Record<string, PerfRelativeRule>
+}
+
+/** 提交入库的基线文件结构（v2：绝对护栏全局共享，相对基线按环境分段） */
+export interface PerfBaseline {
+  version: 2
   datasetImages: number
-  metrics: Record<string, PerfMetricRule>
+  hardRules: Record<string, PerfMetricRule>
+  environments: Partial<Record<PerfEnvKey, PerfEnvironmentSection>>
+}
+
+/**
+ * 判定本次运行属于哪个环境段。
+ *
+ * 只认 PERF_ENV 显式覆盖与 GitHub Actions 的宿主身份信号，**不认裸 CI**：
+ * 开发机的 shell / IDE 也可能带 CI=true，选错段等于悄悄把比较口径换成另一台机器。
+ */
+export function resolvePerfEnv(env: NodeJS.ProcessEnv = process.env): PerfEnvKey {
+  if (env.PERF_ENV === 'ci' || env.PERF_ENV === 'CI') return 'ci'
+  if (env.PERF_ENV === 'dev' || env.PERF_ENV === 'DEV') return 'dev'
+  return env.GITHUB_ACTIONS === 'true' || env.RUNNER_ENVIRONMENT === 'github-hosted' ? 'ci' : 'dev'
 }
 
 /** 单次指标采样 */
@@ -112,7 +149,8 @@ export interface PerfSample {
 /** 判定违规项 */
 export interface PerfViolation {
   metricId: string
-  kind: 'threshold' | 'throughput' | 'regression'
+  /** missing_section = 所选环境段尚未入库：显式判红，不静默退化为「只跑绝对阈值」 */
+  kind: 'threshold' | 'throughput' | 'regression' | 'missing_section'
   message: string
 }
 
@@ -121,13 +159,15 @@ export interface PerfRunReport {
   timestamp: string
   platform: string
   nodeVersion: string
+  /** 本次运行按哪个环境段判定（platform 串在开发机与 CI 上字面相同，无法区分环境） */
+  perfEnv: PerfEnvKey
   datasetImages: number
   samples: PerfSample[]
   violations: PerfViolation[]
   passed: boolean
 }
 
-/** 无基线文件时也生效的绝对护栏（与基线文件中的 maxMs/minThroughput 语义一致） */
+/** 无基线文件时也生效的绝对护栏（与基线文件 hardRules 语义一致，按指标 id 回退） */
 export const DEFAULT_HARD_RULES: Record<string, PerfMetricRule> = {
   'cold-start-first-paint': { maxMs: 25_000 },
   'scan-ingest': { maxMs: 120_000 },
@@ -152,61 +192,78 @@ export function median(values: number[]): number {
 
 /**
  * 按规则逐指标判定。
- * 回归判定（相对基线）仅在数据集规模与基线一致时启用，规模不一致时仅执行绝对阈值判定。
+ *
+ * - 绝对护栏取全局 `hardRules`，缺条目时回退 `DEFAULT_HARD_RULES`（整对象替换，与 v1 语义一致）；
+ * - 相对基线只从**所选环境段**取，段缺失判一条 `missing_section`（宁可显式红，也不静默丢掉回归能力）；
+ * - 回归判定仅在数据集规模与基线记录一致时启用，规模不一致时只执行绝对阈值判定。
  */
 export function evaluateSamples(
   samples: PerfSample[],
-  baseline: PerfBaseline | null
+  baseline: PerfBaseline | null,
+  envKey: PerfEnvKey
 ): PerfViolation[] {
   const violations: PerfViolation[] = []
   const datasetMatches = baseline !== null && baseline.datasetImages === DATASET_SIZE
+  const section = baseline?.environments?.[envKey]
+
+  // 基线存在但所选环境段没入库：与「数据集规模不一致」区分开，单独报一条
+  if (baseline !== null && datasetMatches && !section) {
+    violations.push({
+      metricId: '(env-section)',
+      kind: 'missing_section',
+      message:
+        `基线缺少环境段 '${envKey}'，相对回归判定无法执行（本次仅绝对阈值生效）；` +
+        `请先采集该环境的实测报告，再用 npm run perf:save-baseline -- --env ${envKey} --samples <报告...> 固化`
+    })
+  }
 
   for (const sample of samples) {
-    // 基线规则覆盖默认护栏：基线文件存在且含该指标时以基线规则为准
-    const rule: PerfMetricRule = baseline?.metrics[sample.id] ?? DEFAULT_HARD_RULES[sample.id] ?? {}
+    const hardRule: PerfMetricRule =
+      baseline?.hardRules?.[sample.id] ?? DEFAULT_HARD_RULES[sample.id] ?? {}
+    const relativeRule = datasetMatches ? (section?.metrics[sample.id] ?? null) : null
 
-    if (rule.maxMs !== undefined && sample.unit === 'ms' && sample.value > rule.maxMs) {
+    if (hardRule.maxMs !== undefined && sample.unit === 'ms' && sample.value > hardRule.maxMs) {
       violations.push({
         metricId: sample.id,
         kind: 'threshold',
-        message: `${sample.scenario} 耗时 ${Math.round(sample.value)}ms 超过绝对阈值 ${rule.maxMs}ms`
+        message: `${sample.scenario} 耗时 ${Math.round(sample.value)}ms 超过绝对阈值 ${hardRule.maxMs}ms`
       })
     }
     if (
-      rule.minThroughput !== undefined &&
+      hardRule.minThroughput !== undefined &&
       sample.unit === 'items/sec' &&
-      sample.value < rule.minThroughput
+      sample.value < hardRule.minThroughput
     ) {
       violations.push({
         metricId: sample.id,
         kind: 'throughput',
-        message: `${sample.scenario} 吞吐量 ${sample.value.toFixed(1)} 项/秒 低于下限 ${rule.minThroughput} 项/秒`
+        message: `${sample.scenario} 吞吐量 ${sample.value.toFixed(1)} 项/秒 低于下限 ${hardRule.minThroughput} 项/秒`
       })
     }
-    if (datasetMatches && rule.baselineValue !== undefined && rule.baselineValue > 0) {
-      const factor = rule.regressionFactor ?? 2.0
+    if (relativeRule !== null && relativeRule.baselineValue > 0) {
+      const factor = relativeRule.regressionFactor
       if (sample.unit === 'ms') {
         // 耗时类：实测超过 基线 × factor 判定为回归
-        const limit = rule.baselineValue * factor
+        const limit = relativeRule.baselineValue * factor
         if (sample.value > limit) {
           violations.push({
             metricId: sample.id,
             kind: 'regression',
             message:
               `${sample.scenario} 实测 ${Math.round(sample.value)}ms 超出基线容忍区间` +
-              `（基线 ${Math.round(rule.baselineValue)}ms × ${factor} = ${Math.round(limit)}ms）`
+              `（基线 ${Math.round(relativeRule.baselineValue)}ms × ${factor} = ${Math.round(limit)}ms）`
           })
         }
       } else {
         // 吞吐量类：实测低于 基线 ÷ factor 判定为回归（劣化方向为数值变小）
-        const floor = rule.baselineValue / factor
+        const floor = relativeRule.baselineValue / factor
         if (sample.value < floor) {
           violations.push({
             metricId: sample.id,
             kind: 'regression',
             message:
               `${sample.scenario} 实测 ${sample.value.toFixed(1)} 项/秒 低于基线容忍区间` +
-              `（基线 ${rule.baselineValue.toFixed(1)} ÷ ${factor} = ${floor.toFixed(1)}）`
+              `（基线 ${relativeRule.baselineValue.toFixed(1)} ÷ ${factor} = ${floor.toFixed(1)}）`
           })
         }
       }
@@ -215,11 +272,57 @@ export function evaluateSamples(
   return violations
 }
 
+/**
+ * 校验并解析基线正文（纯函数，供 loadBaseline 与单测共用）。
+ * 结构不合一律抛错——**不做 v1→v2 迁移**：v1 的相对基线是开发机单次读数，
+ * 静默迁移等于把「比较对象与被测环境不一致」这个缺陷原样带进新格式。
+ */
+export function parseBaseline(raw: string): PerfBaseline {
+  // strip BOM：外部工具写回基线时可能带 BOM，不剥掉会让 JSON.parse 抛错后静默降级
+  const parsed = JSON.parse(raw.replace(/^\uFEFF/, '')) as Partial<PerfBaseline> & {
+    version?: number
+  }
+  if (parsed.version !== 2) {
+    throw new Error(`基线 version 必须为 2（实际 ${String(parsed.version)}）`)
+  }
+  if (typeof parsed.datasetImages !== 'number' || parsed.datasetImages <= 0) {
+    throw new Error(`基线 datasetImages 必须为正数（实际 ${String(parsed.datasetImages)}）`)
+  }
+  if (typeof parsed.hardRules !== 'object' || parsed.hardRules === null) {
+    throw new Error('基线缺少 hardRules 对象（绝对护栏）')
+  }
+  if (typeof parsed.environments !== 'object' || parsed.environments === null) {
+    throw new Error('基线缺少 environments 对象（按环境分段的相对基线）')
+  }
+  for (const [key, section] of Object.entries(parsed.environments)) {
+    if (typeof section !== 'object' || section === null) {
+      throw new Error(`基线环境段 ${key} 不是对象`)
+    }
+    if (section.status !== 'final' && section.status !== 'provisional') {
+      throw new Error(`基线环境段 ${key} 的 status 非法（实际 ${String(section.status)}）`)
+    }
+    if (!Number.isInteger(section.sampleCount) || (section.sampleCount ?? 0) < 0) {
+      throw new Error(`基线环境段 ${key} 的 sampleCount 必须为非负整数`)
+    }
+    if (!Array.isArray(section.sourceRuns) || section.sourceRuns.length === 0) {
+      throw new Error(`基线环境段 ${key} 的 sourceRuns 必须是非空数组（基线须可追溯到真实运行）`)
+    }
+    if (typeof section.metrics !== 'object' || section.metrics === null) {
+      throw new Error(`基线环境段 ${key} 缺少 metrics 对象`)
+    }
+    for (const [id, rule] of Object.entries(section.metrics)) {
+      if (!rule || !(rule.baselineValue > 0) || !(rule.regressionFactor > 0)) {
+        throw new Error(`基线环境段 ${key} 的 ${id} 必须带正的 baselineValue 与 regressionFactor`)
+      }
+    }
+  }
+  return parsed as PerfBaseline
+}
+
 export async function loadBaseline(): Promise<PerfBaseline | null> {
   try {
-    // strip BOM：防止外部工具写回基线时带入 BOM 导致 JSON.parse 失败后静默降级
-    const raw = (await fs.readFile(PERF_BASELINE_PATH, 'utf-8')).replace(/^\uFEFF/, '')
-    return JSON.parse(raw) as PerfBaseline
+    const raw = await fs.readFile(PERF_BASELINE_PATH, 'utf-8')
+    return parseBaseline(raw)
   } catch (err) {
     // 基线文件存在但解析失败 ≠ 无基线：显式告警，避免回归判定被静默跳过
     try {
@@ -297,12 +400,19 @@ export async function savePerfReport(report: PerfRunReport): Promise<string> {
   return archivePath
 }
 
-/** 控制台汇总报告（测试末尾输出，便于 CI 日志直接阅读） */
-export function printPerfSummary(report: PerfRunReport): void {
+/** 控制台汇总报告（测试末尾输出，便于 CI 日志直接阅读；环境段必须自证用的是哪一段） */
+export function printPerfSummary(report: PerfRunReport, baseline?: PerfBaseline | null): void {
   const lines: string[] = []
   lines.push('')
   lines.push('========== 性能基准回归报告 ==========')
   lines.push(`数据集: ${report.datasetImages} 张占位图片 | 平台: ${report.platform}`)
+  const section = baseline?.environments?.[report.perfEnv]
+  lines.push(
+    `环境段: ${report.perfEnv}` +
+      (section
+        ? `（${section.status}, ${section.sampleCount} 样, 记录于 ${section.recordedAt}）`
+        : '（缺失：相对回归判定未生效，见下方 missing_section）')
+  )
   for (const s of report.samples) {
     const text = s.unit === 'ms' ? `${Math.round(s.value)}ms` : `${s.value.toFixed(1)} 项/秒`
     lines.push(`  - ${s.scenario}: ${text}${s.detail ? ` (${s.detail})` : ''}`)

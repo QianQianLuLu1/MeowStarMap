@@ -216,6 +216,12 @@ jobs:
       # 对照入库基线 e2e/perf-baseline.json 判定，超阈或明显劣化则失败；结果始终归档便于追踪趋势与更新基线
       - name: Performance baseline regression
         run: npm run e2e:perf
+      # 采样读数回流：固化 ci 段基线需要多次采样，而 artifact 下载与 step 日志正文都要鉴权。
+      # check-run annotations 免鉴权可读，故把本次读数压成一行 notice；if: always() 保证
+      # 判红的那次运行也能出数（否则补样必须等一次绿运行）。
+      - name: Emit perf readings annotation
+        if: always()
+        run: npm run perf:readings
       - name: Upload perf results
         if: always()
         uses: actions/upload-artifact@v7
