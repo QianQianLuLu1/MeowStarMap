@@ -39,6 +39,7 @@ const OLD_PACK_TOKENS = ['wxnn-photo-manager', '无限暖暖相册管理工具',
 
 interface PackageJson {
   name?: string
+  version?: string
   description?: string
   keywords?: string[]
   repository?: { type?: string; url?: string }
