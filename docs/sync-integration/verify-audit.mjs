@@ -36,7 +36,7 @@ export function isAtLeast(actual, min) {
 // ---------------------------------------------------------------- T1 项目元信息
 test('T1 两项目 package.json 可读且 name/engines 与预期一致', () => {
   const wxnn = readJson(join(wxnnRoot, 'package.json'))
-  assert.equal(wxnn.name, 'wxnn-photo-manager')
+  assert.equal(wxnn.name, 'meow-star-map')
   assert.equal(wxnn.engines.node, '>=22.12.0')
 
   const nikki = readJson(join(nikkiRoot, 'package.json'))

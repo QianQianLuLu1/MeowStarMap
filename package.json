@@ -1,7 +1,7 @@
 {
-  "name": "wxnn-photo-manager",
+  "name": "meow-star-map",
   "version": "2.5.5-beta",
-  "description": "无限暖暖相册管理工具",
+  "description": "喵星图",
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -208,8 +208,8 @@
     "source-map-js": "1.2.2"
   },
   "build": {
-    "appId": "com.qianlu.wxnn-photo-manager",
-    "productName": "无限暖暖相册管理工具",
+    "appId": "com.qianlu.meow-star-map",
+    "productName": "喵星图",
     "directories": {
       "output": "release"
     },
@@ -274,7 +274,7 @@
     "asar": true,
     "compression": "maximum",
     "afterPack": "scripts/after-pack-vc-runtime.cjs",
-    "artifactName": "NikkiGallery-Setup-${version}.${ext}",
+    "artifactName": "MeowStarMap-Setup-${version}.${ext}",
     "win": {
       "target": [
         {
@@ -294,7 +294,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "无限暖暖相册管理工具"
+      "shortcutName": "喵星图"
     }
   },
   "optionalDependencies": {
