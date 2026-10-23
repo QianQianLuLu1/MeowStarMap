@@ -151,6 +151,80 @@ describe('配置与文档同源（阶段 2 先行落档的新值必须已被实�
   })
 })
 
+describe('userData 根跟随新包名（手工拼 %APPDATA% 的站点）', () => {
+  // app.getName() 在生产侧只被 log-service.ts:289 写进日志字段，没有任何测试锁它的返回值；
+  // 而 userData 根由 package.json 的 name 决定，手工拼装的回退路径必须与 Electron 算出的同值，
+  // 否则 whenReady 前后的日志会落进两个不同目录（阶段 1 锁 A 的实质）。
+  it('logger 的两处 whenReady 前回退路径取 kebab 根', () => {
+    const src = read('src/main/utils/logger.ts')
+    expect(src).toContain(`path.join(appData, '${KEBAB}', 'logs', 'main.log')`)
+    expect(src).toContain(`path.join(os.tmpdir(), '${KEBAB}-logs', 'main.log')`)
+    expect(src).not.toContain('wxnn-photo-manager')
+  })
+
+  it('e2e 失败现场采集的 APPDATA 兜底与 logger 同根', () => {
+    const src = read('e2e/helpers.ts')
+    expect(src).toContain(`path.join(process.env.APPDATA ?? '', '${KEBAB}', 'diag.log')`)
+    expect(src).toContain(`%APPDATA%/${KEBAB}/diag.log`)
+    expect(src).not.toContain('wxnn-photo-manager')
+  })
+
+  it('e2e 关于 exe 名的注释跟随新 productName（仍含中文，故 glob 取首个 exe 的口径不变）', () => {
+    const src = read('e2e/helpers.ts')
+    expect(src).toContain(`exe 名跟随 productName（"${CJK}"，含中文）`)
+    expect(src).not.toContain('无限暖暖相册管理工具')
+  })
+
+  it('GPU 崩溃模拟脚本的兜底猜路径落正（历史上写死 NikkiGallery 从来不是真实 userData）', () => {
+    const src = read('scripts/simulate-gpu-crash.cjs')
+    expect(src).toContain(`path.join(os.homedir(), '.config', '${KEBAB}')`)
+    expect(src).toContain(`Roaming\\${KEBAB}"`)
+    expect(src).not.toContain('NikkiGallery')
+    // 环境变量键属私有配置而非产品名，与 WXNN_RENDERER_DIR 同口径不动
+    expect(src).toContain('NIKKI_USERDATA')
+  })
+
+  it('electron mock 的 app.getName 取 meow-star-map-test', () => {
+    expect(read('tests/mocks/electron.ts')).toContain(`getName: vi.fn(() => '${KEBAB}-test')`)
+    expect(read('tests/mocks/electron.ts')).not.toContain('nikki-gallery-test')
+  })
+})
+
+describe('只影响测试与预览 mock 的假 userData 路径跟新根', () => {
+  it('预览 mock 的 cacheDir 取 kebab 根', () => {
+    const src = read('src/renderer/preview/mock/database-mock.ts')
+    expect(src).toContain(`AppData\\\\Roaming\\\\${KEBAB}\\\\cache`)
+    expect(src).not.toContain('wxnn-photo-manager')
+  })
+
+  it('缩略图与回收站的两条测试夹具取 kebab 根（两种分隔符同改，否则正反斜杠夹具互相矛盾）', () => {
+    const thumb = read('src/renderer/utils/thumbnail-src.test.tsx')
+    expect(thumb).toContain(`Roaming\\\\${KEBAB}\\\\thumbnails`)
+    expect(thumb).toContain(`Roaming/${KEBAB}/thumbnails`)
+    expect(thumb).not.toContain('wxnn-photo-manager')
+    const bin = read('src/renderer/pages/RecycleBinPage.thumb.test.tsx')
+    expect(bin).toContain(`Roaming\\\\${KEBAB}\\\\thumbnails`)
+    expect(bin).not.toContain('wxnn-photo-manager')
+  })
+
+  it('启动环境自检夹具的安装路径不再指旧名', () => {
+    const src = read('src/main/app/startup-environment.test.ts')
+    expect(src).not.toContain('NikkiGallery')
+    // 该套件的另一半判据（NIKKI_SKIP_ENV_GUARD 键）仍须在场
+    expect(src).toContain('NIKKI_SKIP_ENV_GUARD')
+  })
+
+  it('perf-real 的 userData 根已取新名，但同文件库名仍属 N3（分叉如实钉住）', () => {
+    const src = read('e2e/perf-real.e2e.ts')
+    expect(src).toContain(`Roaming/${KEBAB}"`)
+    expect(src).not.toContain('Roaming/wxnn-photo-manager')
+    // 四条 wxnn_photo_manager.db 本轮不得改：改了就把「恢复被 zod 拒 + 数十条断言红」的锁拆半
+    expect(src.split('wxnn_photo_manager.db').length - 1).toBe(4)
+    // 本机真实存在的缓存目录名（D:\NikkiGallery缓存）属禁改项
+    expect(src).toContain('NikkiGallery缓存')
+  })
+})
+
 describe('禁改项未被动 —— 证明打包面更名没有越界', () => {
   it('package.json 三条仓库 URL 逐字不动（远端改名由 7c6926f 单独订正过）', () => {
     expect(pkg.repository?.url).toBe('https://github.com/QianQianLuLu1/MeowStarMap.git')
