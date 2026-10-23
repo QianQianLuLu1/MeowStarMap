@@ -417,6 +417,47 @@ export function nikkiSyncPackedVerdict(input: {
   return input.projectNikkiSyncLinkExists ? 'fail' : 'skip'
 }
 
+/**
+ * @nikkisync 未随包时的原因分档（纯函数，供 checkUnpackedNativeBinaries 与单测共用）。
+ *
+ * 判定语义不变：两种形态都仍是 fail——「缺整个内嵌运行时的安装包」绝不能静默发布
+ * （2026-10-23 实测那条 182,722,373 字节的包正是靠本项 fail 拦下的）。这里只修**原因文案**：
+ * `npm install` 按锁文件收敛 node_modules 时，会把 `npm run link:nikkisync` 建的 4 条
+ * junction 清掉、只留一个空的 `node_modules/@nikkisync` scope 目录；这种形态与 build.files
+ * 入包项无关（对象式 from/to 项一直有效，由 self-contained-deps.test.ts 钉住），
+ * 误指配置会把排查带偏——本次就被带偏过一次。
+ */
+export function nikkiSyncMissingDiagnosis(input: {
+  scopeDirExists: boolean
+  scopeEntryCount: number
+}): string {
+  if (input.scopeDirExists && input.scopeEntryCount === 0) {
+    return (
+      '@nikkisync 已建链但未随包：node_modules/@nikkisync 只剩空 scope 目录' +
+      '（npm install 会按锁文件收敛 node_modules，清掉 link:nikkisync 建的 junction）；' +
+      '先重跑 npm run link:nikkisync 与 npm run verify:nikkisync 确认 4 条链接在位，再重新执行 electron-builder'
+    )
+  }
+  return (
+    '@nikkisync 已建链但未随包：build.files 的 node_modules/@nikkisync 入包项失效' +
+    '（electron-builder 硬排除根 node_modules，须用对象式 from/to 显式拷贝）；' +
+    '修复 package.json build.files 后重新执行 electron-builder'
+  )
+}
+
+/**
+ * 读 @nikkisync scope 目录条目数。读不动时返回 -1 交由调用侧按「已建链」处理——
+ * I/O 异常不许被误报成「链被清掉的空壳」。
+ */
+function countNikkiSyncScopeEntries(scopeDir: string, scopeDirExists: boolean): number {
+  if (!scopeDirExists) return 0
+  try {
+    return fs.readdirSync(scopeDir).length
+  } catch {
+    return -1
+  }
+}
+
 function checkUnpackedNativeBinaries(): void {
   const releaseDir = path.join(ROOT, 'release')
   const unpackedRoot = findAsarUnpacked(releaseDir)
@@ -467,9 +508,11 @@ function checkUnpackedNativeBinaries(): void {
   //    见 nikkiSyncPackedVerdict 注释），再经 asarUnpack 解出。
   //    未建链的开发机不会命中本项；已建链而产物缺失是打包回归，必须 fail。
   const nikkisyncRoot = path.join(nm, '@nikkisync')
+  const scopeDir = path.join(ROOT, 'node_modules', '@nikkisync')
+  const scopeDirExists = fs.existsSync(scopeDir)
   const verdict = nikkiSyncPackedVerdict({
     packedNikkiSyncExists: fs.existsSync(nikkisyncRoot),
-    projectNikkiSyncLinkExists: fs.existsSync(path.join(ROOT, 'node_modules', '@nikkisync'))
+    projectNikkiSyncLinkExists: scopeDirExists
   })
   if (verdict === 'skip') {
     skip('@nikkisync 未随包（开发机未 `npm run link:nikkisync` 时属预期）')
@@ -480,9 +523,10 @@ function checkUnpackedNativeBinaries(): void {
   }
   if (verdict === 'fail') {
     fail(
-      '@nikkisync 已建链但未随包：build.files 的 node_modules/@nikkisync 入包项失效' +
-        '（electron-builder 硬排除根 node_modules，须用对象式 from/to 显式拷贝）；' +
-        '修复 package.json build.files 后重新执行 electron-builder'
+      nikkiSyncMissingDiagnosis({
+        scopeDirExists,
+        scopeEntryCount: countNikkiSyncScopeEntries(scopeDir, scopeDirExists)
+      })
     )
     return
   }

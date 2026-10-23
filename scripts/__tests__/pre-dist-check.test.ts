@@ -7,6 +7,7 @@ import {
   treeContainsMarker,
   dirContains,
   nikkiSyncPackedVerdict,
+  nikkiSyncMissingDiagnosis,
   type JsTreeFile
 } from '../pre-dist-check'
 
@@ -137,6 +138,37 @@ describe('nikkiSyncPackedVerdict — 打包态 @nikkisync 缺失判定', () => {
     expect(
       nikkiSyncPackedVerdict({ packedNikkiSyncExists: false, projectNikkiSyncLinkExists: false })
     ).toBe('skip')
+  })
+})
+
+describe('nikkiSyncMissingDiagnosis — @nikkisync 缺失的原因分档', () => {
+  // 回归背景（2026-10-23 实测）：`npm install` 会按锁文件收敛 node_modules，把
+  // `npm run link:nikkisync` 建的 4 条 junction 一并清掉，只留一个**空的**
+  // `node_modules/@nikkisync` scope 目录。彼时本项仍判「已建链 ⇒ fail」（语义正确：
+  // 缺整个内嵌运行时的包不许发布），但文案把矛头指向 build.files，而对象式 from/to
+  // 入包项一直是对的（由 self-contained-deps.test.ts 钉住），诊断因此误导排查方向。
+  const BUILD_FILES_MSG =
+    '@nikkisync 已建链但未随包：build.files 的 node_modules/@nikkisync 入包项失效' +
+    '（electron-builder 硬排除根 node_modules，须用对象式 from/to 显式拷贝）；' +
+    '修复 package.json build.files 后重新执行 electron-builder'
+
+  it('正常：scope 目录仍有 4 个包 ⇒ 沿用 build.files 入包项失效文案（逐字不变）', () => {
+    expect(nikkiSyncMissingDiagnosis({ scopeDirExists: true, scopeEntryCount: 4 })).toBe(
+      BUILD_FILES_MSG
+    )
+  })
+
+  it('异常：scope 目录被 npm install 清空 ⇒ 指向 npm run link:nikkisync，且不再误指 build.files', () => {
+    const msg = nikkiSyncMissingDiagnosis({ scopeDirExists: true, scopeEntryCount: 0 })
+    expect(msg).toContain('npm run link:nikkisync')
+    expect(msg).toContain('npm run verify:nikkisync')
+    expect(msg).not.toContain('build.files')
+  })
+
+  it('边界：scope 目录只剩 1 个包（半个链）⇒ 仍按打包回归走 build.files 文案', () => {
+    expect(nikkiSyncMissingDiagnosis({ scopeDirExists: true, scopeEntryCount: 1 })).toContain(
+      'build.files'
+    )
   })
 })
 
