@@ -261,6 +261,40 @@ describe('CI 宿主装置的工作区根字面值（四站点必须同值）', (
   })
 })
 
+describe('开发自检脚本的自称', () => {
+  /**
+   * 终端显示宽度（CJK 与制表符号按双宽）：doctor.ts 的横幅是手拼的空格配平，
+   * 改名后字符数变了但双宽判定不变，只能按显示宽度断言，不能按 length。
+   */
+  const displayWidth = (s: string): number =>
+    [...s].reduce((n, ch) => {
+      const c = ch.codePointAt(0) as number
+      const wide =
+        (c >= 0x1100 && c <= 0x115f) ||
+        c === 0x2329 ||
+        c === 0x232a ||
+        (c >= 0x2e80 && c <= 0xa4cf) ||
+        (c >= 0xac00 && c <= 0xd7a3) ||
+        (c >= 0xf900 && c <= 0xfaff) ||
+        (c >= 0xfe30 && c <= 0xfe6f) ||
+        (c >= 0xff00 && c <= 0xff60) ||
+        (c >= 0xffe0 && c <= 0xffe6)
+      return n + (wide ? 2 : 1)
+    }, 0)
+
+  it('doctor 横幅取带空格的英文品牌形，且与上下边框显示宽度相等', () => {
+    const lines = read('scripts/doctor.ts').split('\n')
+    const top = lines.find((l) => l.includes('╔'))
+    const banner = lines.find((l) => l.includes('环境诊断报告') && l.includes('║'))
+    expect(top, '找不到横幅上边框').toBeDefined()
+    expect(banner, '找不到横幅行').toBeDefined()
+    const body = banner as string
+    expect(body).toContain('Meow Star Map 环境诊断报告')
+    expect(body).not.toContain('NikkiGallery')
+    expect(displayWidth(body)).toBe(displayWidth(top as string))
+  })
+})
+
 describe('禁改项未被动 —— 证明打包面更名没有越界', () => {
   it('package.json 三条仓库 URL 逐字不动（远端改名由 7c6926f 单独订正过）', () => {
     expect(pkg.repository?.url).toBe('https://github.com/QianQianLuLu1/MeowStarMap.git')

@@ -158,7 +158,7 @@ function main(): void {
   // 输出标题
   console.log('')
   console.log('╔══════════════════════════════════════════╗')
-  console.log('║       NikkiGallery 环境诊断报告          ║')
+  console.log('║        Meow Star Map 环境诊断报告        ║')
   console.log('╚══════════════════════════════════════════╝')
   console.log('')
 
