@@ -1,4 +1,4 @@
-<h1 align="center">无限暖暖相册管理工具 · NikkiGallery</h1>
+<h1 align="center">喵星图 · Meow Star Map</h1>
 
 <p align="center">  
   专为「无限暖暖」玩家打造的本地相册管理软件 — 扫描、浏览、编辑、整理、分享，一站式完成
@@ -68,7 +68,7 @@ A local photo album manager for <em>Infinity Nikki</em> players — scan, browse
 
 ```bash
 git clone <repo-url>
-cd NikkiGallery
+cd MeowStarMap
 npm install          # 安装依赖
 npm run dev          # 启动开发模式
 npm run dist:win     # 打包 Windows 安装包
@@ -181,7 +181,7 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 
 ```bash
 git clone <repo-url>
-cd NikkiGallery
+cd MeowStarMap
 npm install          # Install dependencies
 npm run dev          # Start dev mode
 npm run dist:win     # Build Windows installer

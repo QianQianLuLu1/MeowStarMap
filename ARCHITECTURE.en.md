@@ -1,7 +1,7 @@
-# NikkiGallery Architecture Document
+# Meow Star Map Architecture Document
 
-> **Project Code**: `wxnn-photo-manager`
-> **Application Name**: NikkiGallery (无限暖暖相册管理工具)
+> **Project Code**: `meow-star-map`
+> **Application Name**: Meow Star Map (喵星图)
 > **Current Version**: 2.5.5-beta
 > **Platform**: Windows x64
 > **Document Version**: 1.5
@@ -30,7 +30,7 @@
 
 ### 1.1 Project Positioning
 
-NikkiGallery is an Electron + React based desktop application that provides players of the game "Infinity Nikki" with local photo album scanning, browsing, editing, organizing, sharing, and backup capabilities. All user data is stored locally with no cloud uploads.
+Meow Star Map is an Electron + React based desktop application that provides players of the game "Infinity Nikki" with local photo album scanning, browsing, editing, organizing, sharing, and backup capabilities. All user data is stored locally with no cloud uploads.
 
 ### 1.2 Core Capabilities
 
@@ -150,7 +150,7 @@ node-ffi-napi is no longer maintained. koffi is the modern replacement with bett
                              │
                              ▼
                    ┌─────────────────────┐
-                   │  wxnn_photo_manager  │
+                   │  meow_star_map       │
                    │  .db (SQLite WAL)    │
                    │  userData/database/  │
                    └─────────────────────┘
@@ -239,7 +239,7 @@ The six utilityProcesses use a consistent pattern but independent message protoc
    └─ app.releaseSingleInstanceLock + app.exit(1)
 
 4. dbManager.initialize()
-   ├─ Open wxnn_photo_manager.db
+   ├─ Open meow_star_map.db
    ├─ PRAGMA optimizations (WAL/synchronous=NORMAL/cache_size=20MB/mmap_size=256MB)
    ├─ runMigrations() (schema_migrations table tracking)
    └─ setWorkerBridge(databaseWorkerBridge)
@@ -324,7 +324,7 @@ The six utilityProcesses use a consistent pattern but independent message protoc
 ## 4. Directory Structure
 
 ```
-wxnn-photo-manager/
+MeowStarMap/
 ├── docs/                              # Project documentation
 │   ├── archive/                       # Archived docs (plans, reports, specs, old architecture docs)
 │   ├── i18n/                          # i18n refactor SOP and whitelist status snapshot
@@ -582,7 +582,7 @@ wxnn-photo-manager/
 The earliest main-process entry, responsible for:
 
 - **Earliest exception capture**: uncaughtException / unhandledRejection persisted to startup-errors.log via startup-diagnostic
-- **crashDumps redirection**: crash dumps output to `Documents/NikkiGallery/Diagnostics` (`user-diag-path.ts`); Chromium native log persisted with rotation
+- **crashDumps redirection**: crash dumps output to `Documents/MeowStarMap/Diagnostics` (`user-diag-path.ts`); Chromium native log persisted with rotation
 - **GPU fallback decision**: `recordBootDecision()` → `disableHardwareAcceleration()` when required
 - **Protocol privilege declaration**: `registerSchemesAsPrivileged` registers media:// and app://
 - **Application bootstrap**: after `app.whenReady()`, dynamically imports Application from `app/application.ts` and calls `initialize()`
@@ -799,33 +799,33 @@ Three major capabilities:
 
 ### 5.9 Utility Layer (utils/)
 
-| File                       | Responsibilities                                                                                                                                        |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `active-task-store.ts`     | Active task state store (for task progress query and cancellation)                                                                                      |
-| `concurrency.ts`           | In-house concurrency control (`runWithConcurrency`); replaces p-limit to avoid ESM/CJS compatibility                                                    |
-| `constants.ts`             | Main process global named constants (STARTUP_SCAN_DELAY_MS=5000, THUMBNAIL_CONCURRENCY=4, MEDIA_CACHE_TTL_MS=5min etc.)                                 |
-| `dir-manager.ts`           | Custom directory management (4 features with configurable paths); `resolveCustomDir` / `ensureDir` / `migrateDirFiles`                                  |
-| `disk.ts`                  | Disk space check `assertDiskSpace` (based on `fsp.statfs`)                                                                                              |
-| `duplicate-scoring.ts`     | Smart dedupe scoring (4 dims: resolution 40 + file size 30 + capture time 20 + favorite weight 10)                                                      |
-| `early-crash-guard.ts`     | Early fatal error reporting (`reportEarlyFatal`: persist diagLog + showErrorBox + release single-instance lock + exit)                                  |
-| `ffmpeg-paths.ts`          | Unified ffmpeg/ffprobe binary path resolver; `resolveAsarUnpackedPath` replaces `app.asar` → `app.asar.unpacked`                                        |
-| `ffmpeg-runner.ts`         | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                                             |
-| `file-utils.ts`            | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)                                     |
-| `ipc-validate.ts`          | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                                                |
-| `logger.ts`                | Log management (10 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                                   |
-| `managed-read-stream.ts`   | File read-stream lifecycle utility (`createManagedReadStream`: error listener + AbortSignal cancellation + fd release)                                  |
-| `media-constants.ts`       | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                                               |
-| `path-safety.ts`           | Path safety utilities (sensitive dir detection / read-only dir detection etc.)                                                                          |
-| `phash.ts`                 | Perceptual hash computation (8x8 DCT-II 64-bit hash, precomputed cosine matrix)                                                                         |
-| `process-registry.ts`      | Global active child process registry (trackProcess/trackFfmpegCommand/killAllProcesses, 60s fallback cleanup)                                           |
-| `progress-throttle.ts`     | Task progress push throttling                                                                                                                           |
-| `scene-brightness.ts`      | Image brightness histogram-based scene time analysis (sharp.stats() + BT.601 weighting)                                                                 |
-| `startup-diagnostic.ts`    | Startup diagnostics (independent error recording before logger ready; writes to `Documents/NikkiGallery/Diagnostics/startup-errors.log`, 100KB rolling) |
-| `task-registry.ts`         | Task registry (background task registration and query)                                                                                                  |
-| `user-diag-path.ts`        | User-friendly diagnostics directory resolution (`Documents/NikkiGallery/Diagnostics`)                                                                   |
-| `video-frame.ts`           | Video frame extraction utility                                                                                                                          |
-| `video-probe.ts`           | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                                                        |
-| `worker-restart-policy.ts` | Worker restart policy (crash restart count / backoff decision)                                                                                          |
+| File                       | Responsibilities                                                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `active-task-store.ts`     | Active task state store (for task progress query and cancellation)                                                                                     |
+| `concurrency.ts`           | In-house concurrency control (`runWithConcurrency`); replaces p-limit to avoid ESM/CJS compatibility                                                   |
+| `constants.ts`             | Main process global named constants (STARTUP_SCAN_DELAY_MS=5000, THUMBNAIL_CONCURRENCY=4, MEDIA_CACHE_TTL_MS=5min etc.)                                |
+| `dir-manager.ts`           | Custom directory management (4 features with configurable paths); `resolveCustomDir` / `ensureDir` / `migrateDirFiles`                                 |
+| `disk.ts`                  | Disk space check `assertDiskSpace` (based on `fsp.statfs`)                                                                                             |
+| `duplicate-scoring.ts`     | Smart dedupe scoring (4 dims: resolution 40 + file size 30 + capture time 20 + favorite weight 10)                                                     |
+| `early-crash-guard.ts`     | Early fatal error reporting (`reportEarlyFatal`: persist diagLog + showErrorBox + release single-instance lock + exit)                                 |
+| `ffmpeg-paths.ts`          | Unified ffmpeg/ffprobe binary path resolver; `resolveAsarUnpackedPath` replaces `app.asar` → `app.asar.unpacked`                                       |
+| `ffmpeg-runner.ts`         | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                                            |
+| `file-utils.ts`            | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)                                    |
+| `ipc-validate.ts`          | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                                               |
+| `logger.ts`                | Log management (10 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                                  |
+| `managed-read-stream.ts`   | File read-stream lifecycle utility (`createManagedReadStream`: error listener + AbortSignal cancellation + fd release)                                 |
+| `media-constants.ts`       | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                                              |
+| `path-safety.ts`           | Path safety utilities (sensitive dir detection / read-only dir detection etc.)                                                                         |
+| `phash.ts`                 | Perceptual hash computation (8x8 DCT-II 64-bit hash, precomputed cosine matrix)                                                                        |
+| `process-registry.ts`      | Global active child process registry (trackProcess/trackFfmpegCommand/killAllProcesses, 60s fallback cleanup)                                          |
+| `progress-throttle.ts`     | Task progress push throttling                                                                                                                          |
+| `scene-brightness.ts`      | Image brightness histogram-based scene time analysis (sharp.stats() + BT.601 weighting)                                                                |
+| `startup-diagnostic.ts`    | Startup diagnostics (independent error recording before logger ready; writes to `Documents/MeowStarMap/Diagnostics/startup-errors.log`, 100KB rolling) |
+| `task-registry.ts`         | Task registry (background task registration and query)                                                                                                 |
+| `user-diag-path.ts`        | User-friendly diagnostics directory resolution (`Documents/MeowStarMap/Diagnostics`)                                                                   |
+| `video-frame.ts`           | Video frame extraction utility                                                                                                                         |
+| `video-probe.ts`           | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                                                       |
+| `worker-restart-policy.ts` | Worker restart policy (crash restart count / backoff decision)                                                                                         |
 
 ### 5.10 App Lifecycle Management (app/)
 
@@ -1267,7 +1267,7 @@ DatabaseManager
    │  Read: sync db.prepare().all()/get()
    │  Write: async dbManager.executeAsync() → DatabaseWorkerBridge → utilityProcess
    ▼
-better-sqlite3 (WAL mode, wxnn_photo_manager.db)
+better-sqlite3 (WAL mode, meow_star_map.db)
 ```
 
 ### 8.2 Example 1: media:list (Read Operation)
@@ -1370,7 +1370,7 @@ components / pages (display)
 
 ### 9.1 Database File
 
-- **Path**: `userData/database/wxnn_photo_manager.db`
+- **Path**: `userData/database/meow_star_map.db`
 - **Mode**: WAL (Write-Ahead Logging)
 - **PRAGMA optimizations**:
   - `synchronous=NORMAL` (safe and faster under WAL)
@@ -1485,7 +1485,7 @@ components / pages (display)
 #### 10.2.2 Startup Diagnostics (startup-diagnostic.ts)
 
 - Provides independent error recording capability before logger system is ready
-- Directly writes to `Documents/NikkiGallery/Diagnostics/startup-errors.log` (tmpdir fallback)
+- Directly writes to `Documents/MeowStarMap/Diagnostics/startup-errors.log` (tmpdir fallback)
 - 100KB rolling cap
 
 #### 10.2.3 Crash Reports (crash-service.ts)
@@ -1599,8 +1599,8 @@ components / pages (display)
 
 #### `electron-builder` config (embedded in package.json)
 
-- `appId: com.qianlu.wxnn-photo-manager`
-- `productName: 无限暖暖相册管理工具`
+- `appId: com.qianlu.meow-star-map`
+- `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
 - **`asarUnpack`**: 10 native dependency entries unpacked to disk — `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
@@ -1612,7 +1612,7 @@ components / pages (display)
 1. `clean` — delete `dist/renderer/assets` and `dist/main`
 2. `electron-vite build` — compiles the main process (`src/main` + `shared/`, CJS) → `dist/main/`, and bundles the React app with Vite → `dist/renderer/`; then writes `dist/main/package.json` (`{"type":"commonjs"}`)
 3. `pre-dist-check` — verifies main / renderer artifact timestamp gap ≤ 5 minutes, that key fixpoints are compiled in, and that the Git working tree is clean; also verifies the Electron version in `README.md` matches `package.json` (a mismatch blocks packaging)
-4. `electron-builder --win --publish never` — packages the NSIS installer per `package.json#build` into `release/` as `NikkiGallery-Setup-<version>.exe`; the afterPack hook `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe`
+4. `electron-builder --win --publish never` — packages the NSIS installer per `package.json#build` into `release/` as `MeowStarMap-Setup-<version>.exe`; the afterPack hook `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe`
 5. `verify:dist` — `pre-dist-check --verify-asar`, asserting runtime dependencies such as the VC++ runtime are bundled
 6. Native module rebuild — locally via `npx @electron/rebuild`; during packaging automatically via `build.npmRebuild: true` (better-sqlite3 / sharp / koffi)
 
@@ -1653,7 +1653,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 - **Version number must remain unchanged unless user explicitly requests**
 - Current version: 2.5.5-beta (bumped from 2.5.3 at user request on 2026-10-11, designated 2.5.5-beta on 2026-10-16)
-- After changing it, keep these in sync: `version` in `package.json`, the version badge in `README.md`, the header and §12.2 of `ARCHITECTURE.md` / `ARCHITECTURE.en.md`, and the header plus §7.8 of `DEVELOPMENT.md` / `DEVELOPMENT.en.md`; the installer filename follows automatically via the `artifactName` template (`NikkiGallery-Setup-${version}.exe`)
+- After changing it, keep these in sync: `version` in `package.json`, the version badge in `README.md`, the header and §12.2 of `ARCHITECTURE.md` / `ARCHITECTURE.en.md`, and the header plus §7.8 of `DEVELOPMENT.md` / `DEVELOPMENT.en.md`; the installer filename follows automatically via the `artifactName` template (`MeowStarMap-Setup-${version}.exe`)
 
 ### 12.3 Performance Red Lines
 
@@ -1800,7 +1800,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 - `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe` in the afterPack phase; `npm run verify:dist` (`pre-dist-check --verify-asar`) asserts they exist
 - `src/main/app/native-load-guard.ts` pre-checks inside `app.whenReady` and reports failures via `dialog.showErrorBox` (i18n-independent)
-- `reportEarlyFatal` in `src/main/utils/early-crash-guard.ts`: persists a diagLog, shows an error box, releases the single-instance lock and calls `app.exit(1)`, guarded against duplicates. The diagnostics directory comes from `src/main/utils/user-diag-path.ts` (`Documents/NikkiGallery/Diagnostics`)
+- `reportEarlyFatal` in `src/main/utils/early-crash-guard.ts`: persists a diagLog, shows an error box, releases the single-instance lock and calls `app.exit(1)`, guarded against duplicates. The diagnostics directory comes from `src/main/utils/user-diag-path.ts` (`Documents/MeowStarMap/Diagnostics`)
 - Verification switches `NIKKI_EARLY_CRASH_SIM=1` / `NIKKI_SKIP_NATIVE_GUARD=1`; one-way dependency: never import `native-load-guard` back from here
 
 ---

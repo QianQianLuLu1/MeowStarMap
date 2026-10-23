@@ -1,7 +1,7 @@
-# 无限暖暖相册管理工具 架构文档
+# 喵星图 架构文档
 
-> **项目代号**：`wxnn-photo-manager`
-> **应用名称**：无限暖暖相册管理工具（NikkiGallery）
+> **项目代号**：`meow-star-map`
+> **应用名称**：喵星图（Meow Star Map）
 > **当前版本**：2.5.5-beta
 > **平台**：Windows x64
 > **文档版本**：1.5
@@ -30,7 +30,7 @@
 
 ### 1.1 项目定位
 
-无限暖暖相册管理工具是一款基于 Electron + React 的桌面应用，专为《无限暖暖》游戏玩家提供本地相册的扫描、浏览、编辑、整理、分享与备份能力。所有用户数据均存储在本地，不上传任何云端。
+喵星图是一款基于 Electron + React 的桌面应用，专为《无限暖暖》游戏玩家提供本地相册的扫描、浏览、编辑、整理、分享与备份能力。所有用户数据均存储在本地，不上传任何云端。
 
 ### 1.2 核心能力
 
@@ -150,7 +150,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
                              │
                              ▼
                    ┌─────────────────────┐
-                   │  wxnn_photo_manager  │
+                   │  meow_star_map       │
                    │  .db (SQLite WAL)    │
                    │  userData/database/  │
                    └─────────────────────┘
@@ -239,7 +239,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
    └─ app.releaseSingleInstanceLock + app.exit(1)
 
 4. dbManager.initialize()
-   ├─ 打开 wxnn_photo_manager.db
+   ├─ 打开 meow_star_map.db
    ├─ PRAGMA 优化（WAL/synchronous=NORMAL/cache_size=20MB/mmap_size=256MB）
    ├─ runMigrations()（schema_migrations 表跟踪）
    └─ setWorkerBridge(databaseWorkerBridge)
@@ -324,7 +324,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 ## 4. 目录结构
 
 ```
-wxnn-photo-manager/
+MeowStarMap/
 ├── docs/                              # 项目文档
 │   ├── archive/                       # 历史归档文档（计划、报告、规范、旧架构文档）
 │   ├── i18n/                          # i18n 改造 SOP（终态快照已归档）
@@ -582,7 +582,7 @@ wxnn-photo-manager/
 主进程最早期入口，承担：
 
 - **最早期异常捕获**：uncaughtException / unhandledRejection 经 startup-diagnostic 落盘 startup-errors.log
-- **crashDumps 重定向**：崩溃 dump 输出到 用户文档/NikkiGallery/Diagnostics（`user-diag-path.ts`），Chromium 原生日志落盘与轮转
+- **crashDumps 重定向**：崩溃 dump 输出到 用户文档/MeowStarMap/Diagnostics（`user-diag-path.ts`），Chromium 原生日志落盘与轮转
 - **GPU 回退决策**：`recordBootDecision()` → 必要时 `disableHardwareAcceleration()`
 - **协议特权声明**：`registerSchemesAsPrivileged` 注册 media:// 与 app://
 - **启动 Application**：`app.whenReady()` 后动态 import `app/application.ts` 的 Application 并 `initialize()`
@@ -798,33 +798,33 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.9 工具层（utils/）
 
-| 文件                       | 职责                                                                                                             |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `active-task-store.ts`     | 活跃任务状态存储（供任务进度查询与取消）                                                                         |
-| `concurrency.ts`           | 自研并发控制（`runWithConcurrency`），替代 p-limit 避免 ESM/CJS 兼容问题                                         |
-| `constants.ts`             | 主进程全局命名常量（STARTUP_SCAN_DELAY_MS=5000、THUMBNAIL_CONCURRENCY=4、MEDIA_CACHE_TTL_MS=5min 等）            |
-| `dir-manager.ts`           | 自定义目录管理（4 个功能可配置路径），`resolveCustomDir` / `ensureDir` / `migrateDirFiles`                       |
-| `disk.ts`                  | 磁盘空间检查 `assertDiskSpace`（基于 `fsp.statfs`）                                                              |
-| `duplicate-scoring.ts`     | 智能去重评分（4 维：分辨率 40 + 文件大小 30 + 拍摄时间 20 + 收藏加权 10）                                        |
-| `early-crash-guard.ts`     | 早期致命错误上报（`reportEarlyFatal`：落盘 diagLog + showErrorBox + 释放单实例锁 + exit）                        |
-| `ffmpeg-paths.ts`          | 统一 ffmpeg/ffprobe 二进制路径解析，`resolveAsarUnpackedPath` 替换 `app.asar` → `app.asar.unpacked`              |
-| `ffmpeg-runner.ts`         | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                       |
-| `file-utils.ts`            | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash）     |
-| `ipc-validate.ts`          | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                           |
-| `logger.ts`                | 日志管理（10 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                               |
-| `managed-read-stream.ts`   | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                       |
-| `media-constants.ts`       | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                             |
-| `path-safety.ts`           | 路径安全工具（敏感目录判定 / 只读目录检测等）                                                                    |
-| `phash.ts`                 | 感知哈希计算（8x8 DCT-II 64 位 hash，预计算余弦矩阵）                                                            |
-| `process-registry.ts`      | 全局活跃子进程注册表（trackProcess/trackFfmpegCommand/killAllProcesses，60s 兜底清理）                           |
-| `progress-throttle.ts`     | 任务进度推送节流                                                                                                 |
-| `scene-brightness.ts`      | 基于图像亮度直方图的场景时段分析（sharp.stats() + BT.601 加权）                                                  |
-| `startup-diagnostic.ts`    | 启动诊断（logger 就绪前的独立错误记录，写入 `用户文档/NikkiGallery/Diagnostics/startup-errors.log`，100KB 滚动） |
-| `task-registry.ts`         | 任务注册表（后台任务登记与查询）                                                                                 |
-| `user-diag-path.ts`        | 用户友好诊断目录定位（`文档/NikkiGallery/Diagnostics`）                                                          |
-| `video-frame.ts`           | 视频帧提取工具                                                                                                   |
-| `video-probe.ts`           | 共享 ffprobe 实现（probeVideoMetadata，安全解析 "30000/1001" 帧率格式）                                          |
-| `worker-restart-policy.ts` | worker 重启策略（崩溃后重启次数/退避判定）                                                                       |
+| 文件                       | 职责                                                                                                            |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `active-task-store.ts`     | 活跃任务状态存储（供任务进度查询与取消）                                                                        |
+| `concurrency.ts`           | 自研并发控制（`runWithConcurrency`），替代 p-limit 避免 ESM/CJS 兼容问题                                        |
+| `constants.ts`             | 主进程全局命名常量（STARTUP_SCAN_DELAY_MS=5000、THUMBNAIL_CONCURRENCY=4、MEDIA_CACHE_TTL_MS=5min 等）           |
+| `dir-manager.ts`           | 自定义目录管理（4 个功能可配置路径），`resolveCustomDir` / `ensureDir` / `migrateDirFiles`                      |
+| `disk.ts`                  | 磁盘空间检查 `assertDiskSpace`（基于 `fsp.statfs`）                                                             |
+| `duplicate-scoring.ts`     | 智能去重评分（4 维：分辨率 40 + 文件大小 30 + 拍摄时间 20 + 收藏加权 10）                                       |
+| `early-crash-guard.ts`     | 早期致命错误上报（`reportEarlyFatal`：落盘 diagLog + showErrorBox + 释放单实例锁 + exit）                       |
+| `ffmpeg-paths.ts`          | 统一 ffmpeg/ffprobe 二进制路径解析，`resolveAsarUnpackedPath` 替换 `app.asar` → `app.asar.unpacked`             |
+| `ffmpeg-runner.ts`         | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                      |
+| `file-utils.ts`            | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash）    |
+| `ipc-validate.ts`          | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                          |
+| `logger.ts`                | 日志管理（10 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                              |
+| `managed-read-stream.ts`   | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                      |
+| `media-constants.ts`       | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                            |
+| `path-safety.ts`           | 路径安全工具（敏感目录判定 / 只读目录检测等）                                                                   |
+| `phash.ts`                 | 感知哈希计算（8x8 DCT-II 64 位 hash，预计算余弦矩阵）                                                           |
+| `process-registry.ts`      | 全局活跃子进程注册表（trackProcess/trackFfmpegCommand/killAllProcesses，60s 兜底清理）                          |
+| `progress-throttle.ts`     | 任务进度推送节流                                                                                                |
+| `scene-brightness.ts`      | 基于图像亮度直方图的场景时段分析（sharp.stats() + BT.601 加权）                                                 |
+| `startup-diagnostic.ts`    | 启动诊断（logger 就绪前的独立错误记录，写入 `用户文档/MeowStarMap/Diagnostics/startup-errors.log`，100KB 滚动） |
+| `task-registry.ts`         | 任务注册表（后台任务登记与查询）                                                                                |
+| `user-diag-path.ts`        | 用户友好诊断目录定位（`文档/MeowStarMap/Diagnostics`）                                                          |
+| `video-frame.ts`           | 视频帧提取工具                                                                                                  |
+| `video-probe.ts`           | 共享 ffprobe 实现（probeVideoMetadata，安全解析 "30000/1001" 帧率格式）                                         |
+| `worker-restart-policy.ts` | worker 重启策略（崩溃后重启次数/退避判定）                                                                      |
 
 **读流约束**：任何把本地文件流写出去的场景（`media://` 协议、WiFi 分享下载/缩略图）都必须走
 `createManagedReadStream`，禁止裸写 `fs.createReadStream(path).pipe(dest)`——`pipe()` 一返回外层
@@ -1274,7 +1274,7 @@ DatabaseManager
    │  读：同步 db.prepare().all()/get()
    │  写：async dbManager.executeAsync() → DatabaseWorkerBridge → utilityProcess
    ▼
-better-sqlite3 (WAL 模式，wxnn_photo_manager.db)
+better-sqlite3 (WAL 模式，meow_star_map.db)
 ```
 
 ### 8.2 实例一：media:list（读操作）
@@ -1377,7 +1377,7 @@ components / pages (展示)
 
 ### 9.1 数据库文件
 
-- **路径**：`userData/database/wxnn_photo_manager.db`
+- **路径**：`userData/database/meow_star_map.db`
 - **模式**：WAL（Write-Ahead Logging）
 - **PRAGMA 优化**：
   - `synchronous=NORMAL`（WAL 模式下安全且更快）
@@ -1627,8 +1627,8 @@ components / pages (展示)
 
 #### `electron-builder` 配置（嵌入 package.json）
 
-- `appId: com.qianlu.wxnn-photo-manager`
-- `productName: 无限暖暖相册管理工具`
+- `appId: com.qianlu.meow-star-map`
+- `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
 - **`asarUnpack`**：10 项 native 依赖解包到磁盘 —— `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
@@ -1640,7 +1640,7 @@ components / pages (展示)
 1. `clean` —— 删除 `dist/renderer/assets` 与 `dist/main`
 2. `electron-vite build` —— 编译主进程（`src/main` + `shared/`，CJS）→ `dist/main/`，同时用 Vite 打包 React 应用 → `dist/renderer/`；随后写入 `dist/main/package.json`（`{"type":"commonjs"}`）
 3. `pre-dist-check` —— 校验 main / renderer 产物时间戳差 ≤5 分钟、关键修复点已编入产物、Git 工作区干净；并校验 `README.md` 中的 Electron 版本与 `package.json` 一致（不一致即阻断打包）
-4. `electron-builder --win --publish never` —— 按 `package.json#build` 配置打包 NSIS 安装包到 `release/`，产物名 `NikkiGallery-Setup-<version>.exe`；afterPack 阶段由 `scripts/after-pack-vc-runtime.cjs` 将 `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` 复制到 `electron.exe` 同级
+4. `electron-builder --win --publish never` —— 按 `package.json#build` 配置打包 NSIS 安装包到 `release/`，产物名 `MeowStarMap-Setup-<version>.exe`；afterPack 阶段由 `scripts/after-pack-vc-runtime.cjs` 将 `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` 复制到 `electron.exe` 同级
 5. `verify:dist` —— `pre-dist-check --verify-asar`，断言 VC++ 运行库等原生依赖已随包
 6. 原生模块重建 —— 本地执行 `npx @electron/rebuild`；打包期由 `build.npmRebuild: true` 自动完成（better-sqlite3 / sharp / koffi）
 
@@ -1681,7 +1681,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 
 - **版本号必须保持不变，除非用户明确要求**
 - 当前版本：2.5.5-beta（2026-10-11 由用户要求从 2.5.3 升至 2.5.5，2026-10-16 定版为 2.5.5-beta）
-- 改版本号需同步：`package.json` 的 `version`、`README.md` 版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 头部与 §12.2、`DEVELOPMENT.md` / `DEVELOPMENT.en.md` 头部与 §7.8；安装程序文件名由 `artifactName` 模板自动跟随（`NikkiGallery-Setup-${version}.exe`）
+- 改版本号需同步：`package.json` 的 `version`、`README.md` 版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 头部与 §12.2、`DEVELOPMENT.md` / `DEVELOPMENT.en.md` 头部与 §7.8；安装程序文件名由 `artifactName` 模板自动跟随（`MeowStarMap-Setup-${version}.exe`）
 
 ### 12.3 性能红线
 
@@ -1828,7 +1828,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 
 - `scripts/after-pack-vc-runtime.cjs` 在 afterPack 阶段复制 `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` 到 `electron.exe` 同级；`npm run verify:dist`（`pre-dist-check --verify-asar`）断言其存在
 - `src/main/app/native-load-guard.ts` 在 `app.whenReady` 内预检，失败用不依赖 i18n 的 `dialog.showErrorBox`
-- `src/main/utils/early-crash-guard.ts` 的 `reportEarlyFatal`：落盘 diagLog + `showErrorBox` + 释放单实例锁 + `app.exit(1)`，带去重守卫；诊断目录由 `src/main/utils/user-diag-path.ts` 指向 `文档/NikkiGallery/Diagnostics`
+- `src/main/utils/early-crash-guard.ts` 的 `reportEarlyFatal`：落盘 diagLog + `showErrorBox` + 释放单实例锁 + `app.exit(1)`，带去重守卫；诊断目录由 `src/main/utils/user-diag-path.ts` 指向 `文档/MeowStarMap/Diagnostics`
 - 验证开关 `NIKKI_EARLY_CRASH_SIM=1` / `NIKKI_SKIP_NATIVE_GUARD=1`；单向依赖：不得反向 import `native-load-guard`
 
 ---
