@@ -1,6 +1,6 @@
 # 分享图（share-card）移植件
 
-把 NikkiSync **微信小程序**的分享图渲染器移植到 NikkiGallery 桌面端。上游没有 TypeScript 实现
+把 NikkiSync **微信小程序**的分享图渲染器移植到喵星图桌面端。上游没有 TypeScript 实现
 （`grep -rln ShareCard --include=*.ts apps packages` = 0），只有 Android Java
 （`apps/mobile/.../share/`）和小程序 JS（`apps/wechat-mini-program/miniprogram/lib/share-card.js`），
 所以这里是**移植**，不是「直接调用上游模块」。

@@ -94,7 +94,7 @@ CI：`build` job（windows-latest）在 E2E 冒烟之后强制执行 `npm run e2
 ### 3.1 真实数据副本套件（`@perf-real`，手动，本机专用）
 
 占位数据集无法复现「已入库媒体引用缺失」类症状（见 §2 末尾说明），故另有
-`e2e/perf-real.e2e.ts`：把本机真实 userData 的 `database/wxnn_photo_manager.db*` 克隆到
+`e2e/perf-real.e2e.ts`：把本机真实 userData 的 `database/meow_star_map.db*` 克隆到
 `.cache/perf-real/user-data-<ts>`，并按副本里 `app_settings.thumbnailCacheDir` 指向的
 **真实缓存目录**把缓存内容一并复制进来，让打包产物指向克隆目录——
 **真实库全程只读，任何写入（扫描修复、日志、缩略图、Chromium 缓存）都落在副本上**，
@@ -119,7 +119,7 @@ CI：`build` job（windows-latest）在 E2E 冒烟之后强制执行 `npm run e2
 
 ```bash
 npm run dist:win
-PERF_REAL_USERDATA="C:/Users/<你>/AppData/Roaming/wxnn-photo-manager" \
+PERF_REAL_USERDATA="C:/Users/<你>/AppData/Roaming/meow-star-map" \
   npx playwright test --config e2e/playwright.config.ts --grep @perf-real
 ```
 

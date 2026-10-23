@@ -1,10 +1,10 @@
 # custom-watermark-template
 
-NikkiGallery 自定义水印模板示例插件。
+Meow Star Map 自定义水印模板示例插件。
 
 ## 功能
 
-向 NikkiGallery 的水印面板注入 3 个示例水印模板：
+向 Meow Star Map 的水印面板注入 3 个示例水印模板：
 
 | 模板 ID         | 名称         | 类型     | 说明                                     |
 | --------------- | ------------ | -------- | ---------------------------------------- |
@@ -22,7 +22,7 @@ npm pack
 # 生成 custom-watermark-template-1.0.0.tgz
 ```
 
-然后在 NikkiGallery 设置 → 插件管理 → 安装插件，输入 .tgz 文件路径。
+然后在 Meow Star Map 设置 → 插件管理 → 安装插件，输入 .tgz 文件路径。
 
 ### 方式二：直接从目录安装
 

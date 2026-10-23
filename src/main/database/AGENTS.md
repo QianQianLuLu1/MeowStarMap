@@ -88,7 +88,7 @@ private async runWrite(sql: string, params: unknown[]): Promise<void> {
 
 ### 2.2 数据库文件位置
 
-数据库文件固定存放在 `{userData}/database/wxnn_photo_manager.db`，由 `DatabaseManager` 构造函数自动创建目录。
+数据库文件固定存放在 `{userData}/database/meow_star_map.db`，由 `DatabaseManager` 构造函数自动创建目录。
 
 ### 2.3 WAL 模式与 PRAGMA
 

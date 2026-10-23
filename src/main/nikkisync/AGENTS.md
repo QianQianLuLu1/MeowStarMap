@@ -1,6 +1,6 @@
 # AGENTS.md — `src/main/nikkisync`（NikkiSync 外部包装载缝 · 主进程侧唯一入口）
 
-本目录是 WXNN XiangCe 消费 **NikkiSync 包**（`@nikkisync/core` / `@nikkisync/database` /
+本目录是喵星图消费 **NikkiSync 包**（`@nikkisync/core` / `@nikkisync/database` /
 `@nikkisync/protocol` / `@nikkisync/pc-companion`）的**唯一入口**。顶层项目速览见根目录
 [`AGENTS.md`](../../../AGENTS.md)，四条硬性编码约定与校验/提交口径见
 [`docs/CODING_CONVENTIONS.md`](../../../docs/CODING_CONVENTIONS.md)（唯一真相源）。整合计划与选型依据见
