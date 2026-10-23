@@ -61,6 +61,20 @@ describe('界面自称取新名 —— 渲染层入口标题', () => {
   })
 })
 
+describe('局域网分享页取新名 —— 手机浏览器可见', () => {
+  // 分享页由主进程模板字符串直接拼出，不经渲染层 i18n（改走 t() 属逻辑变更，本轮禁止）；
+  // <title> 与 <h1> 是同一自称的两处落点，必须同源改，漏一处手机上看就是旧名。
+  it('分享页 <title> 与 <h1> 均为喵星图分享', () => {
+    const src = read('src/main/services/share-wifi-service.ts')
+    expect(src).toContain('<title>喵星图分享</title>')
+    expect(src).toContain('<h1>喵星图分享</h1>')
+  })
+
+  it('分享页不残留旧自称无限暖暖相册分享', () => {
+    expect(read('src/main/services/share-wifi-service.ts')).not.toContain('无限暖暖相册分享')
+  })
+})
+
 describe('语包软件名值锁（阶段 2 已落地，此处防回归）', () => {
   it.each(LOCALES)('%s 的 settings.about.appValue 与 titleBar.appTitle 取该语种新名', (locale) => {
     const data = readJson<AboutBlock>(localeRel(locale))

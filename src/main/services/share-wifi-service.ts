@@ -1,3 +1,4 @@
+// @core-change: 项目更名为喵星图，局域网分享页标题同步改名
 /**
  * T08：WiFi 局域网分享服务
  * 基于原生 http 模块的简易文件下载服务（非标准 WebDAV，仅支持浏览/下载）
@@ -417,7 +418,7 @@ class WifiShareService {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>无限暖暖相册分享</title>
+<title>喵星图分享</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f7; color: #1d1d1f; padding: 16px; }
@@ -435,7 +436,7 @@ class WifiShareService {
 </style>
 </head>
 <body>
-  <h1>无限暖暖相册分享</h1>
+  <h1>喵星图分享</h1>
   <p class="summary">共 ${this.session.files.length} 个文件，点击即可下载</p>
   <ul>${items}</ul>
 </body>
