@@ -76,7 +76,9 @@
 2. **UI 新旧混用**：12 语包的 `appValue` / `appTitle` 已改新名，但
    `src/renderer/pages/settings/about-sections.tsx:75`、`:395` 的硬编码标签、
    `src/renderer/index.html:13` 与 `src/renderer/preview/index.html:7` 的 `<title>`、
-   `src/main/services/share-wifi-service.ts:420`、`:438` 仍是旧名 ⇒ 由 N5 关闭。
+   `src/main/services/share-wifi-service.ts:420`、`:438` 仍是旧名 ⇒ ~~由 N5 关闭~~
+   **已由阶段 3 关闭**（`:395` 实为 `openUrl()` 里的 URL，属禁改项未动；改的是 `:75` 文本节点，
+   见 [`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md) 第四节提交 4）。
 3. **进程名指称**：zh-CN `main.dialog.cleanupFailed.detail` 现要求结束「喵星图」进程，
    而任务管理器里的进程名仍是 `无限暖暖相册管理工具.exe` ⇒ 由 N1 关闭。
 4. **本地目录名**：文档树根与 `cd MeowStarMap` 反映已改名的远端；本机工作副本目录物理上仍叫
@@ -85,7 +87,8 @@
    与生效文档并存 —— 这是「记录当时事实」的代价，不是漏改。
 6. **示例渲染资产未动**：`plugins-samples/custom-watermark-template/index.js:63`
    `'© My Nikki Gallery'` 与 `templates/festival.svg:12` `★ NikkiGallery ★` 属渲染内容，
-   不在「.md + 展示 JSON」扫描域 ⇒ 阶段 3 与代码标识一并处理。
+   不在「.md + 展示 JSON」扫描域 ⇒ ~~阶段 3 与代码标识一并处理~~ **已由阶段 3 关闭**
+   （连同 `README.md:12` 的镜像文字与两处默认水印 `'WXNN Photo'`，统一取 `Meow Star Map`）。
 
 ## 六、阶段 3 待办（本轮明确不做）
 
@@ -97,3 +100,10 @@
 - 打包身份五字段 `package.json:2/211/212/277/297` + `package-lock.json:2/8`（N1，锁 A）。
 - 用户数据人工搬迁清单（阶段 1 计划第八节）随 N1 一并交付。
 - 本轮**未发布 tag、未 push、未写 CHANGELOG 条目**（避免 `check-changelog-release.ts` 阻断 `dist:win`）。
+
+> **2026-10-23 阶段 3 已交付后的收口状态**：上表里「locale 之外的 `<title>` 与分享页标题」以及
+> 示例渲染资产已由阶段 3 关闭（见
+> [`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md)），该轮把扫描域
+> `src` + `plugins-samples` 的旧名从 196 行 / 73 文件压到 178 行 / 61 文件。剩下的 178 行仍是上表内容：
+> 打包身份与 `%APPDATA%`（N1）、诊断目录名（N2）、数据库与备份名前缀链（N3）、同步面标识（N4）、
+> `doctor.ts` 横幅与 CI 装置四站点（N7）。
