@@ -1,3 +1,4 @@
+// @core-change: 项目更名为喵星图，诊断目录常量取值变更需同步日志打包路径注释
 import fs from 'fs'
 import path from 'path'
 import { shell } from 'electron'
@@ -186,7 +187,7 @@ export async function exportLogsAsZip(
 
     // 3. 复制 startup-errors.log
     // 路径必须走 getStartupLogPathValue()（诊断目录单一真相源）：
-    // 此前按 logDir/.. 计算，指向 userData，与真实落盘（文档/NikkiGallery/Diagnostics）不一致
+    // 此前按 logDir/.. 计算，指向 userData，与真实落盘（文档/喵星图/Diagnostics）不一致
     try {
       const startupLogPath = getStartupLogPathValue()
       if (fs.existsSync(startupLogPath)) {

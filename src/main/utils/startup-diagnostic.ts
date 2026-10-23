@@ -21,7 +21,7 @@ let startupLogPath: string | null = null
  *
  * documents 候选由主进程入口通过 setDocumentsPathProvider(() => app.getPath('documents'))
  * 注册，使「写盘路径」与「弹窗展示路径」严格同源。
- * 修复前本模块未注入 documents，真实落盘回落到 <homedir>/NikkiGallery/Diagnostics，
+ * 修复前本模块未注入 documents，真实落盘回落到 <homedir>/NikkiGallery/Diagnostics（当时常量值），
  * 而弹窗仍展示 文档/NikkiGallery/Diagnostics → 用户在弹窗路径下找不到日志。
  */
 function resolveDiagDir(): string {
@@ -31,7 +31,7 @@ function resolveDiagDir(): string {
 function getStartupLogPath(): string {
   if (startupLogPath) return startupLogPath
   try {
-    // 用户友好目录：文档/NikkiGallery/Diagnostics（非隐藏，普通用户易查找）
+    // 用户友好目录：文档/喵星图/Diagnostics（非隐藏，普通用户易查找）
     startupLogPath = path.join(resolveDiagDir(), 'startup-errors.log')
   } catch {
     // 极端情况：getUserFacingDiagDir 失败，回退到 os.tmpdir
@@ -46,7 +46,7 @@ let diagLogPath: string | null = null
  * 获取诊断日志路径。
  *
  * 统一输出到用户友好目录（getUserFacingDiagDir）：
- *   文档/NikkiGallery/Diagnostics/diag.log
+ *   文档/喵星图/Diagnostics/diag.log
  * 而非隐藏的 AppData，确保普通用户在启动失败时也能轻松找到日志。
  */
 function getDiagLogPath(): string {

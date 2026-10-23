@@ -82,8 +82,8 @@ describe('startup-diagnostic', () => {
     it('返回用户友好目录下的 startup-errors.log 路径', async () => {
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
-      // 关键：日志落在用户友好的 NikkiGallery/Diagnostics，而非隐藏的 AppData
-      expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
+      // 关键：日志落在用户友好的 喵星图/Diagnostics，而非隐藏的 AppData
+      expect(p).toMatch(/喵星图[\\/]Diagnostics[\\/]startup-errors\.log$/)
     })
 
     it('多次调用返回相同路径（缓存）', async () => {
@@ -93,24 +93,22 @@ describe('startup-diagnostic', () => {
       expect(p1).toBe(p2)
     })
 
-    it('app.getPath 抛错时回退到用户友好目录（文档/NikkiGallery/Diagnostics）', async () => {
+    it('app.getPath 抛错时回退到用户友好目录（文档/喵星图/Diagnostics）', async () => {
       // 配置 getPath 抛错（模拟 app 未就绪）
       mockGetPathImpl = () => {
         throw new Error('app not ready')
       }
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
-      expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
+      expect(p).toMatch(/喵星图[\\/]Diagnostics[\\/]startup-errors\.log$/)
     })
   })
 
   describe('诊断目录单一真相源（回归：弹窗展示路径必须等于真实落盘路径）', () => {
-    it('documents 可用时日志落在 文档/NikkiGallery/Diagnostics', async () => {
+    it('documents 可用时日志落在 文档/喵星图/Diagnostics', async () => {
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
-      expect(p).toBe(
-        path.join(tmpBase, 'documents', 'NikkiGallery', 'Diagnostics', 'startup-errors.log')
-      )
+      expect(p).toBe(path.join(tmpBase, 'documents', '喵星图', 'Diagnostics', 'startup-errors.log'))
     })
 
     it('documents 抛错时不再使用 documents 候选（回落 homedir/tmpdir）', async () => {
@@ -120,7 +118,7 @@ describe('startup-diagnostic', () => {
       }
       const { getStartupLogPathValue } = await loadModule()
       const p = getStartupLogPathValue()
-      expect(p).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
+      expect(p).toMatch(/喵星图[\\/]Diagnostics[\\/]startup-errors\.log$/)
       expect(p).not.toContain(path.join(tmpBase, 'documents'))
     })
   })
@@ -257,7 +255,7 @@ describe('startup-diagnostic', () => {
       // 即使 getPath 抛错，logStartupError 也不应抛错
       expect(() => logStartupError('fallback', new Error('test'))).not.toThrow()
       const logPath = getStartupLogPathValue()
-      expect(logPath).toMatch(/NikkiGallery[\\/]Diagnostics[\\/]startup-errors\.log$/)
+      expect(logPath).toMatch(/喵星图[\\/]Diagnostics[\\/]startup-errors\.log$/)
       // 清理可能存在的临时文件
       if (fs.existsSync(logPath)) {
         fs.unlinkSync(logPath)

@@ -44,7 +44,7 @@ const m = vi.hoisted(() => {
     execFileSyncMock: vi.fn(() => ''),
     execMock: vi.fn(),
     // 启动日志路径（诊断目录单一真相源）
-    getStartupLogPathValueMock: vi.fn(() => '/mock/NikkiGallery/Diagnostics/startup-errors.log'),
+    getStartupLogPathValueMock: vi.fn(() => '/mock/喵星图/Diagnostics/startup-errors.log'),
 
     // app 内部模块
     registerGlobalErrorHandlersMock: vi.fn(),
@@ -964,7 +964,7 @@ describe('lifecycle - bootstrapApplication', () => {
       // 日志路径统一到诊断目录单一真相源 getStartupLogPathValue()（此前指向 userData，
       // 与 logStartupError 真实落盘路径不一致，用户在弹窗目录下找不到日志）
       const openPathArg = m.shellOpenPathMock.mock.calls[0][0]
-      expect(openPathArg).toBe('/mock/NikkiGallery/Diagnostics')
+      expect(openPathArg).toBe('/mock/喵星图/Diagnostics')
     })
 
     it('35. lockAcquired=true 时 dbManager.close + releaseSingleInstanceLock + app.exit(1) 被调用', async () => {

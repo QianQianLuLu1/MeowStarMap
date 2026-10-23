@@ -81,10 +81,10 @@ describe('initCrashDir', () => {
 
   it('目录不存在时自动创建（用户友好目录）', () => {
     // 源码：initCrashDir 在内部 crashDir 为 falsy 时默认输出到用户友好目录
-    // （文档/NikkiGallery/Diagnostics），并经 getUserFacingDiagDir 自动创建目录
+    // （文档/喵星图/Diagnostics），并经 getUserFacingDiagDir 自动创建目录
     setCrashDirectory('')
     const dir = initCrashDir()
-    expect(dir).toMatch(/NikkiGallery[\\/]Diagnostics$/)
+    expect(dir).toMatch(/喵星图[\\/]Diagnostics$/)
     expect(fs.existsSync(dir)).toBe(true)
   })
 

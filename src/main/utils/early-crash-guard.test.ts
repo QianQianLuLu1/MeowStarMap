@@ -79,11 +79,11 @@ describe('getUserFacingDiagDir', () => {
   // 在开发机上是盘符相对路径、建得起来，在 CI 的容器里 `/` 属 root ⇒ EACCES，
   // 于是被测代码的「首个可创建者采用」循环会静默跳到下一个候选，
   // 断言拿到的是未注入的真实 `os.homedir()`/`os.tmpdir()`（2026-10-19 CI 两条红即为此）。
-  it('documents 可用时返回 documents/NikkiGallery/Diagnostics 并确保目录已创建', async () => {
+  it('documents 可用时返回 documents/喵星图/Diagnostics 并确保目录已创建', async () => {
     const { getUserFacingDiagDir } = await import('./user-diag-path')
     const docs = path.join(tmpDiag, 'Documents')
     const dir = getUserFacingDiagDir({ getDocumentsPath: () => docs })
-    expect(dir).toBe(path.join(docs, 'NikkiGallery', 'Diagnostics'))
+    expect(dir).toBe(path.join(docs, '喵星图', 'Diagnostics'))
     expect(fs.existsSync(dir)).toBe(true)
   })
 
@@ -96,7 +96,7 @@ describe('getUserFacingDiagDir', () => {
       },
       getHomedir: () => home
     })
-    expect(dir).toBe(path.join(home, 'NikkiGallery', 'Diagnostics'))
+    expect(dir).toBe(path.join(home, '喵星图', 'Diagnostics'))
     expect(fs.existsSync(dir)).toBe(true)
   })
 
@@ -111,7 +111,7 @@ describe('getUserFacingDiagDir', () => {
       getDocumentsPath: () => path.join(blocker, 'Documents'),
       getHomedir: () => home
     })
-    expect(dir).toBe(path.join(home, 'NikkiGallery', 'Diagnostics'))
+    expect(dir).toBe(path.join(home, '喵星图', 'Diagnostics'))
     expect(fs.existsSync(dir)).toBe(true)
   })
 
@@ -126,7 +126,7 @@ describe('getUserFacingDiagDir', () => {
       },
       getTmpdir: () => '/mock/tmp'
     })
-    expect(dir).toBe(path.join('/mock/tmp', 'NikkiGallery-Diagnostics'))
+    expect(dir).toBe(path.join('/mock/tmp', '喵星图-Diagnostics'))
   })
 })
 

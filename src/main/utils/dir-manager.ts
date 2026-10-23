@@ -34,7 +34,7 @@ export function resolveCustomDir(
   if (custom && isValidDir(custom)) {
     return custom
   }
-  // 崩溃转储默认输出到用户友好目录（文档/NikkiGallery/Diagnostics），避免藏在 AppData；
+  // 崩溃转储默认输出到用户友好目录（文档/喵星图/Diagnostics），避免藏在 AppData；
   // 与 index.ts 早期 app.setPath('crashDumps', ...) 及 crash-service.initCrashDir 对齐
   if (key === 'crashDir') {
     return getUserFacingDiagDir()

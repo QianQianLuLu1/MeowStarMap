@@ -336,9 +336,7 @@ describe('禁改项未被动 —— 证明打包面更名没有越界', () => {
     expect(read('src/main/app/startup-environment.test.ts')).toContain('NIKKI_SKIP_ENV_GUARD')
   })
 
-  it('诊断目录名与 %TEMP% 日志名仍属 N2（本轮不得顺手改掉，改了会打红 11 条断言）', () => {
-    expect(read('src/main/utils/user-diag-path.ts')).toContain(
-      "PRODUCT_DIAG_DIRNAME = 'NikkiGallery'"
-    )
+  it('诊断目录常量已随阶段 5 落地为中文名（旧 N2 禁改锁翻转，细则见 runtime-disk-name.test.ts）', () => {
+    expect(read('src/main/utils/user-diag-path.ts')).toContain("PRODUCT_DIAG_DIRNAME = '喵星图'")
   })
 })

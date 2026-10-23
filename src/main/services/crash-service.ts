@@ -1,3 +1,4 @@
+// @core-change: 项目更名为喵星图，诊断目录常量取值变更需同步崩溃转储落盘目录注释
 import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
@@ -35,7 +36,7 @@ let crashDir: string | null = null
  */
 export function initCrashDir(): string {
   if (crashDir) return crashDir
-  // 崩溃转储统一到用户友好目录（文档/NikkiGallery/Diagnostics），
+  // 崩溃转储统一到用户友好目录（文档/喵星图/Diagnostics），
   // 与 index.ts 早期 app.setPath('crashDumps', ...) 保持一致，
   // 确保 crashpad 实际写入位置 == crash-service 读取/列举位置。
   crashDir = getUserFacingDiagDir()

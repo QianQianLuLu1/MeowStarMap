@@ -143,10 +143,10 @@ describe('dir-manager', () => {
       expect(result).toBe(path.join(mockUserData, 'logs'))
     })
 
-    it('crashDir 回退到用户友好目录（文档/NikkiGallery/Diagnostics），避免藏在 AppData', () => {
+    it('crashDir 回退到用户友好目录（文档/喵星图/Diagnostics），避免藏在 AppData', () => {
       const db = createMockDbManager()
       const result = resolveCustomDir(db as never, 'crashDir')
-      expect(result).toMatch(/NikkiGallery[\\/]Diagnostics$/)
+      expect(result).toMatch(/喵星图[\\/]Diagnostics$/)
     })
 
     it('只读目录回退到默认（W_OK 校验失败）', () => {

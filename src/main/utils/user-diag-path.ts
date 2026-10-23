@@ -2,14 +2,15 @@
  * 用户友好诊断目录的单一权威（叶子模块，零项目内依赖，避免循环依赖）。
  *
  * 面向用户的关键诊断文件（startup-errors.log / diag.log / 崩溃 dump）统一输出到
- * 「文档/NikkiGallery/Diagnostics」，而非隐藏的 AppData，确保普通用户无需进入
+ * 「文档/喵星图/Diagnostics」，而非隐藏的 AppData，确保普通用户无需进入
  * 系统深层目录即可找到。
  */
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
 
-export const PRODUCT_DIAG_DIRNAME = 'NikkiGallery'
+// eslint-disable-next-line no-restricted-syntax -- 诊断目录名是磁盘路径分段，须与产品显示名一致且跨语言稳定，非 UI 文案
+export const PRODUCT_DIAG_DIRNAME = '喵星图'
 export const DIAG_SUBDIR = 'Diagnostics'
 
 export interface UserDiagDirDeps {
@@ -23,7 +24,7 @@ export interface UserDiagDirDeps {
  * 全局「文档」目录提供器。
  *
  * 本模块是零依赖叶子模块（不 import electron），但诊断目录必须统一到
- * 「文档/NikkiGallery/Diagnostics」：早期实现中只有弹窗侧注入了 documents，
+ * 「文档/喵星图/Diagnostics」：早期实现中只有弹窗侧注入了 documents，
  * 写盘侧未注入 → 弹窗指向 Documents、日志实际落在 homedir，用户找不到日志。
  * 由主进程入口（src/main/index.ts）注册 app.getPath('documents')，
  * 使所有调用方（含 startup-diagnostic 写盘）自动共享同一候选。
@@ -46,9 +47,9 @@ function tryMkdir(dir: string): boolean {
 /**
  * 计算用户友好诊断目录。
  * 候选链（首个可创建者采用）：
- *   1) <documents>/NikkiGallery/Diagnostics
- *   2) <homedir>/NikkiGallery/Diagnostics
- *   3) <tmpdir>/NikkiGallery-Diagnostics
+ *   1) <documents>/喵星图/Diagnostics
+ *   2) <homedir>/喵星图/Diagnostics
+ *   3) <tmpdir>/喵星图-Diagnostics
  * 任何候选抛错都被吞掉，不阻塞启动；终极兜底返回 tmpdir 候选字符串。
  */
 export function getUserFacingDiagDir(deps: UserDiagDirDeps = {}): string {

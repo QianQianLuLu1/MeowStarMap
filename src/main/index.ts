@@ -50,7 +50,7 @@ try {
   // 不可用时保持未注册，由 user-diag-path 回落到 homedir / tmpdir 候选
 }
 
-// 崩溃转储目录用户友好化：文档/NikkiGallery/Diagnostics（须在 crashReporter.start 前设定）
+// 崩溃转储目录用户友好化：文档/喵星图/Diagnostics（须在 crashReporter.start 前设定）
 try {
   app.setPath('crashDumps', getUserFacingDiagDir())
 } catch {
@@ -248,7 +248,7 @@ app.whenReady().then(async () => {
     logStartupError('index.ts app.whenReady', err)
     // 崩溃发生在 registerGlobalErrorHandlers 注册之前，必须在此兜底。
     // 改用不依赖 i18n 的同步弹窗（修复原 t() 在 i18n 未就绪时二次抛错 → 无弹窗）。
-    // 日志路径统一到用户友好目录（文档/NikkiGallery/Diagnostics），普通用户易查找
+    // 日志路径统一到用户友好目录（文档/喵星图/Diagnostics），普通用户易查找
     const logPath = getStartupLogPathValue()
     showFatalStartupErrorBox(err, logPath)
     try {
