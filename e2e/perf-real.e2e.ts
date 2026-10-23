@@ -33,7 +33,7 @@ const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 const CLONE_ROOT = path.join(ROOT_DIR, '.cache', 'perf-real')
 
 const SOURCE_USER_DATA = (process.env.PERF_REAL_USERDATA ?? '').replace(/[\\/]+$/, '')
-const SOURCE_DB = path.join(SOURCE_USER_DATA, 'database', 'wxnn_photo_manager.db')
+const SOURCE_DB = path.join(SOURCE_USER_DATA, 'database', 'meow_star_map.db')
 /** 模块加载时刻：用于生成不会与历史运行撞名的克隆目录名 */
 const processStartedAt = Date.now()
 const CLONE_DIR = path.join(CLONE_ROOT, `user-data-${processStartedAt}`)
@@ -332,7 +332,7 @@ test.describe.serial('@perf-real 真实数据副本：缩略图显影测量', ()
     // - 刻意不克隆 Cache/：让首启是冷 HTTP 缓存，二次启动是热缓存，形成对照
     const dbDir = path.join(SOURCE_USER_DATA, 'database')
     for (const entry of await fs.readdir(dbDir)) {
-      if (!entry.startsWith('wxnn_photo_manager.db')) continue
+      if (!entry.startsWith('meow_star_map.db')) continue
       await fs.copyFile(path.join(dbDir, entry), path.join(CLONE_DIR, 'database', entry))
     }
 
@@ -353,7 +353,7 @@ test.describe.serial('@perf-real 真实数据副本：缩略图显影测量', ()
           `请用 Node ≥ 23.4，或设 NODE_OPTIONS=--experimental-sqlite 后再跑。原始错误：${String(err)}`
       )
     })
-    const cloneDbPath = path.join(CLONE_DIR, 'database', 'wxnn_photo_manager.db')
+    const cloneDbPath = path.join(CLONE_DIR, 'database', 'meow_star_map.db')
     const sqlite = new DatabaseSync(cloneDbPath)
     let realCacheDir = ''
     try {
@@ -427,7 +427,7 @@ test.describe.serial('@perf-real 真实数据副本：缩略图显影测量', ()
         `[real] 缩略图缓存文件数: ${thumbCount.length}\n`
     )
     expect(
-      clonedFiles.some((f) => f === 'wxnn_photo_manager.db'),
+      clonedFiles.some((f) => f === 'meow_star_map.db'),
       '应克隆主库文件'
     ).toBeTruthy()
   })

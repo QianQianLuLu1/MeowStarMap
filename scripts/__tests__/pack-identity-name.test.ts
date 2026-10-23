@@ -220,12 +220,13 @@ describe('只影响测试与预览 mock 的假 userData 路径跟新根', () => 
     expect(src).toContain('NIKKI_SKIP_ENV_GUARD')
   })
 
-  it('perf-real 的 userData 根已取新名，但同文件库名仍属 N3（分叉如实钉住）', () => {
+  it('perf-real 的 userData 根与库名同取新名（N3 落库名链已整体翻转，不留分叉）', () => {
     const src = read('e2e/perf-real.e2e.ts')
     expect(src).toContain(`Roaming/${KEBAB}"`)
     expect(src).not.toContain('Roaming/wxnn-photo-manager')
-    // 四条 wxnn_photo_manager.db 本轮不得改：改了就把「恢复被 zod 拒 + 数十条断言红」的锁拆半
-    expect(src.split('wxnn_photo_manager.db').length - 1).toBe(4)
+    // 四条 meow_star_map.db 必须与 connection.ts:156 / backup-service.ts:533 同值
+    expect(src.split('meow_star_map.db').length - 1).toBe(4)
+    expect(src).not.toContain('wxnn_photo_manager')
     // 本机真实存在的缓存目录名（D:\NikkiGallery缓存）属禁改项
     expect(src).toContain('NikkiGallery缓存')
   })
