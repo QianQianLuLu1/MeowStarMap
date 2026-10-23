@@ -143,7 +143,7 @@ export async function migrateDirFiles(
 
 // 各功能的文件名匹配模式（用于迁移时筛选）
 export const MIGRATE_PATTERNS = {
-  backupDir: /^wxnn_photo_manager_.*\.db$/,
+  backupDir: /^meow_star_map_.*\.db$/,
   thumbnailCacheDir: /\.(jpg|jpeg|png|webp)$/i,
   logDir: /\.(log|jsonl)$/,
   crashDir: /\.(dmp|dump|crash)$/

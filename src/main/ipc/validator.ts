@@ -147,7 +147,7 @@ export const schemas = {
   backupFilename: z
     .string()
     .regex(
-      /^wxnn_photo_manager_\d{8}_\d{6}(_[a-zA-Z0-9]+)?\.db$/,
+      /^meow_star_map_\d{8}_\d{6}(_[a-zA-Z0-9]+)?\.db$/,
       t('main.validator.backupFilenameInvalid')
     ),
 

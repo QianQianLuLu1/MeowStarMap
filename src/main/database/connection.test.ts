@@ -725,12 +725,12 @@ describe('DatabaseManager', () => {
       })
     })
 
-    it('dbPath 指向 wxnn_photo_manager.db 文件', () => {
+    it('dbPath 指向 meow_star_map.db 文件', () => {
       // 通过 getWalFileSize 间接验证 dbPath（WAL 路径 = dbPath + '-wal'）
       vi.mocked(fs.statSync).mockReturnValue({ size: 2048 } as fs.Stats)
       const size = manager.getWalFileSize()
       expect(size).toBe(2048)
-      expect(fs.statSync).toHaveBeenCalledWith(expect.stringContaining('wxnn_photo_manager.db-wal'))
+      expect(fs.statSync).toHaveBeenCalledWith(expect.stringContaining('meow_star_map.db-wal'))
     })
   })
 
@@ -1579,7 +1579,7 @@ describe('DatabaseManager', () => {
     it('查询的 WAL 路径包含 dbPath 前缀', () => {
       vi.mocked(fs.statSync).mockReturnValue({ size: 100 } as fs.Stats)
       manager.getWalFileSize()
-      expect(fs.statSync).toHaveBeenCalledWith(expect.stringMatching(/wxnn_photo_manager\.db-wal$/))
+      expect(fs.statSync).toHaveBeenCalledWith(expect.stringMatching(/meow_star_map\.db-wal$/))
     })
   })
 
@@ -1688,7 +1688,7 @@ describe('DatabaseManager', () => {
     it('markCleanExit() 写入 {dbPath}.clean-exit 侧车标志文件', () => {
       manager.markCleanExit()
       expect(fs.writeFileSync).toHaveBeenCalledWith(
-        expect.stringMatching(/wxnn_photo_manager\.db\.clean-exit$/),
+        expect.stringMatching(/meow_star_map\.db\.clean-exit$/),
         expect.any(String),
         'utf8'
       )
@@ -1708,7 +1708,7 @@ describe('DatabaseManager', () => {
 
     it('全新库（db 文件不存在）→ 初始化后自动补写标志，跳过后台全量', async () => {
       vi.mocked(fs.existsSync).mockImplementation(
-        (p: string) => !String(p).includes('wxnn_photo_manager.db')
+        (p: string) => !String(p).includes('meow_star_map.db')
       )
       await manager.initialize()
       expect(fs.writeFileSync).toHaveBeenCalledWith(

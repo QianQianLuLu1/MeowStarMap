@@ -232,3 +232,32 @@ describe('PathGuard userPicked（用户显式选择即授权）', () => {
     expect(pathGuard.isUserPickedDir(PICKED_FILE)).toBe(false)
   })
 })
+
+// ============================================================================
+// schemas.backupFilename：备份文件名严格正则（防路径穿越）
+// handlers/backup.test.ts 用 tests/mocks/mock-validator 顶掉了本模块、_test-helpers.ts
+// 的桩又是宽松 /.+/，真实正则长期无人跑 ⇒ 前缀链漂移不会红，只能在这里钉住。
+// ============================================================================
+const backupTuple = z.tuple([schemas.backupFilename])
+
+describe('schemas.backupFilename（备份名前缀链）', () => {
+  it('接受新前缀的两种合法形态（无 UID 后缀 / 带 UID 后缀）', () => {
+    expect(backupTuple.safeParse(['meow_star_map_20260101_120000.db']).success).toBe(true)
+    expect(backupTuple.safeParse(['meow_star_map_20260101_120000_abc123.db']).success).toBe(true)
+  })
+
+  it('拒绝改名前的旧前缀（老备份需按 DEVELOPMENT 搬迁清单逐个改名后才可见）', () => {
+    expect(backupTuple.safeParse(['wxnn_photo_manager_20260101_120000.db']).success).toBe(false)
+  })
+
+  it('拒绝缺时间戳 / 段数不足 / 大写扩展名 / 路径穿越 / 前后缀漂移', () => {
+    expect(backupTuple.safeParse(['meow_star_map.db']).success).toBe(false)
+    expect(backupTuple.safeParse(['meow_star_map_20260101.db']).success).toBe(false)
+    expect(backupTuple.safeParse(['meow_star_map_2026010_120000.db']).success).toBe(false)
+    expect(backupTuple.safeParse(['meow_star_map_20260101_120000.DB']).success).toBe(false)
+    expect(backupTuple.safeParse(['../meow_star_map_20260101_120000.db']).success).toBe(false)
+    expect(backupTuple.safeParse(['meow_star_map\\sub_20260101_120000.db']).success).toBe(false)
+    expect(backupTuple.safeParse(['meow_star_map_20260101_120000.db.bak']).success).toBe(false)
+    expect(backupTuple.safeParse(['xmeow_star_map_20260101_120000.db']).success).toBe(false)
+  })
+})

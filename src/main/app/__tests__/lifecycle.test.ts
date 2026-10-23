@@ -625,7 +625,7 @@ describe('lifecycle - bootstrapApplication', () => {
       expect(setMainWinIdx).toBeLessThan(flushIdx)
     })
 
-    it('18. scannerManager.setDbPath 与 mediaWorkerManager.setDbPath 路径含 database/wxnn_photo_manager.db', async () => {
+    it('18. scannerManager.setDbPath 与 mediaWorkerManager.setDbPath 路径含 database/meow_star_map.db', async () => {
       m.appGetPathMock.mockImplementation((p: string) => `/mock/${p}`)
       const scannerManager = makeScannerManagerStub()
       const mediaWorkerManager = { dispose: vi.fn(), setDbPath: vi.fn() }
@@ -639,8 +639,8 @@ describe('lifecycle - bootstrapApplication', () => {
 
       const scannerCallArg = scannerManager.setDbPath.mock.calls[0][0] as string
       const mediaCallArg = mediaWorkerManager.setDbPath.mock.calls[0][0] as string
-      expect(scannerCallArg).toContain('wxnn_photo_manager.db')
-      expect(mediaCallArg).toContain('wxnn_photo_manager.db')
+      expect(scannerCallArg).toContain('meow_star_map.db')
+      expect(mediaCallArg).toContain('meow_star_map.db')
     })
   })
 

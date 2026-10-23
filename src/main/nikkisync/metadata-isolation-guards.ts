@@ -15,7 +15,7 @@
  */
 
 /**
- * 只存在于**原有库**（`wxnn_photo_manager.db`）的表名。
+ * 只存在于**原有库**（`meow_star_map.db`）的表名。
  *
  * 刻意**不含** `app_settings` 与 `schema_migrations`：这两个名字在 NikkiSync 自有库里
  * 同样存在（`migrations/0001_initial.sql` 里就有），列进来只会让同步面每次正常读写

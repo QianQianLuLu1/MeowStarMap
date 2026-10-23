@@ -1,3 +1,4 @@
+// @core-change: 项目更名为喵星图，数据库与备份文件名前缀链改为 meow_star_map
 // 步骤4：原生模块改为惰性加载，使 ABI 不匹配时崩溃能被 bootstrapApplication 的 try/catch 捕获
 import type DatabaseType from 'better-sqlite3'
 import path from 'path'
@@ -155,7 +156,7 @@ export class BackupService {
       const timestamp = this.formatTimestamp(new Date())
       // P1-04：按档案备份时文件名加入 _{uid} 后缀
       const uidSuffix = accountUid ? `_${accountUid}` : ''
-      const filename = `wxnn_photo_manager_${timestamp}${uidSuffix}.db`
+      const filename = `meow_star_map_${timestamp}${uidSuffix}.db`
       const backupPath = path.join(this.backupDir, filename)
 
       // better-sqlite3 的 backup 方法：将当前数据库在线备份到目标文件
@@ -211,7 +212,7 @@ export class BackupService {
     const files = await fsp.readdir(this.backupDir)
 
     for (const file of files) {
-      if (!file.startsWith('wxnn_photo_manager_') || !file.endsWith('.db')) continue
+      if (!file.startsWith('meow_star_map_') || !file.endsWith('.db')) continue
       const filePath = path.join(this.backupDir, file)
       try {
         const stats = await fsp.stat(filePath)
@@ -530,7 +531,7 @@ export class BackupService {
     let dbClosed = false
     try {
       // 获取当前数据库路径
-      const dbPath = path.join(app.getPath('userData'), 'database', 'wxnn_photo_manager.db')
+      const dbPath = path.join(app.getPath('userData'), 'database', 'meow_star_map.db')
 
       // P0-A3：恢复前校验备份文件完整性
       // 用 better-sqlite3 以只读模式临时打开备份文件，执行 PRAGMA integrity_check

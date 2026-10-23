@@ -72,7 +72,7 @@ describe('notifyMediaUpdated', () => {
     vi.advanceTimersByTime(100)
     expect(MediaRepositoryMock).toHaveBeenCalledTimes(1)
     // 构造参数：(db, getWorkerBridge()=null, getDbPath()=mock 路径)
-    expect(MediaRepositoryMock).toHaveBeenCalledWith(db, null, '/mock/db/wxnn_photo_manager.db')
+    expect(MediaRepositoryMock).toHaveBeenCalledWith(db, null, '/mock/db/meow_star_map.db')
     // fire-and-forget：节流回调内已调用，promise 已挂起
     await Promise.resolve()
     expect(refreshMediaCountCacheMock).toHaveBeenCalledTimes(1)

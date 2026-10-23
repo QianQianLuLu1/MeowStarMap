@@ -319,13 +319,11 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     registerMediaProtocol(ctx)
     // 全盘扫描模块进程拆分：worker 进程独立打开同一 db 文件（WAL 多连接并发）
     // 不再向 ScannerManager 注入主进程的 Database / DatabaseManager
-    // dbPath 与 DatabaseManager 内部计算保持一致（userData/database/wxnn_photo_manager.db）
-    ctx.scannerManager.setDbPath(
-      path.join(app.getPath('userData'), 'database', 'wxnn_photo_manager.db')
-    )
+    // dbPath 与 DatabaseManager 内部计算保持一致（userData/database/meow_star_map.db）
+    ctx.scannerManager.setDbPath(path.join(app.getPath('userData'), 'database', 'meow_star_map.db'))
     // 缩略图 / pHash / 重复检测进程拆分：media worker 独立打开同一 db 文件（WAL 多连接并发）
     ctx.mediaWorkerManager.setDbPath(
-      path.join(app.getPath('userData'), 'database', 'wxnn_photo_manager.db')
+      path.join(app.getPath('userData'), 'database', 'meow_star_map.db')
     )
     // 阶段 2.4：setupIPC 迁移到 app/ipc-setup.ts
     setupIPC(ctx)

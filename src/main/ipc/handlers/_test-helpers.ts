@@ -265,7 +265,7 @@ export function makeAppCtx(opts: MakeAppCtxOpts = {}): AppContext {
   const dbManager = {
     ...handlerCtx.dbManager,
     getWorkerBridge: vi.fn(() => null),
-    getDbPath: vi.fn(() => '/mock/db/wxnn_photo_manager.db'),
+    getDbPath: vi.fn(() => '/mock/db/meow_star_map.db'),
     close: vi.fn(),
     initialize: vi.fn(() => Promise.resolve()),
     addRecoveryListener: vi.fn(),

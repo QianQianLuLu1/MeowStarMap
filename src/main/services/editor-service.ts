@@ -1,3 +1,4 @@
+// @core-change: 项目更名后 pruneOldBackups 备份文件名前缀改为 meow_star_map，同步本文件注释表述
 /**
  * 编辑器服务（P1-M：从 index.ts 的 editor:save handler 抽取）
  *
@@ -61,7 +62,7 @@ export class EditorService {
   init(dbManager: DatabaseManager): void {
     this.dbManager = dbManager
     // P1-A6：编辑器备份使用独立子目录，避免污染 backupService 的数据库备份列表
-    // pruneOldBackups 的正则 /^wxnn_photo_manager_.*\.db$/ 不匹配编辑器备份文件名，
+    // pruneOldBackups 的正则 /^meow_star_map_.*\.db$/ 不匹配编辑器备份文件名，
     // 独立子目录让两类备份互不干扰，UI 备份列表也不会出现编辑器快照
     this.snapshotDir = path.join(backupService.getBackupDirectory(), 'editor-snapshots')
   }

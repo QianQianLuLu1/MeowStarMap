@@ -76,7 +76,7 @@ function makeDbRecoveryInfo(overrides: Record<string, unknown> = {}): {
   return {
     success: true,
     reason: '数据库文件损坏，已从备份恢复',
-    sourceBackup: { filename: 'wxnn_photo_manager_20260727.db.bak' },
+    sourceBackup: { filename: 'meow_star_map_20260727.db.bak' },
     corruptedBackupPath: 'C:/userData/corrupted_20260727.db',
     ...overrides
   } as ReturnType<typeof makeDbRecoveryInfo>

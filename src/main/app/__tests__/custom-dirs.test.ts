@@ -64,7 +64,7 @@ vi.mock('../../utils/dir-manager', () => ({
   ensureDir: ensureDirMock,
   migrateDirFiles: migrateDirFilesMock,
   MIGRATE_PATTERNS: {
-    backupDir: /^wxnn_photo_manager_.*\.db$/,
+    backupDir: /^meow_star_map_.*\.db$/,
     thumbnailCacheDir: /\.(jpg|jpeg|png|webp)$/i,
     logDir: /\.(log|jsonl)$/,
     crashDir: /\.(dmp|dump|crash)$/

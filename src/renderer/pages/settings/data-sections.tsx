@@ -20,9 +20,9 @@ import { IconDelete, IconInfo } from '../../icons'
 // ============ 数据管理 ============
 
 // P1-04：从备份文件名解析档案 UID 后缀
-// 文件名规范：wxnn_photo_manager_YYYYMMDD_HHMMSS[_uid].db
+// 文件名规范：meow_star_map_YYYYMMDD_HHMMSS[_uid].db
 function parseUidFromBackupFilename(filename: string): string | null {
-  const match = filename.match(/^wxnn_photo_manager_\d{8}_\d{6}_([a-zA-Z0-9]+)\.db$/)
+  const match = filename.match(/^meow_star_map_\d{8}_\d{6}_([a-zA-Z0-9]+)\.db$/)
   return match ? match[1] : null
 }
 

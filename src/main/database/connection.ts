@@ -153,7 +153,7 @@ export class DatabaseManager {
     if (!fs.existsSync(dbDir)) {
       fs.mkdirSync(dbDir, { recursive: true })
     }
-    this.dbPath = path.join(dbDir, 'wxnn_photo_manager.db')
+    this.dbPath = path.join(dbDir, 'meow_star_map.db')
   }
 
   /**

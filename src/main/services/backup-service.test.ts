@@ -151,31 +151,31 @@ describe('listBackups', () => {
     expect(records).toEqual([])
   })
 
-  it('仅返回 wxnn_photo_manager_*.db 文件', async () => {
-    makeBackupFile('wxnn_photo_manager_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
+  it('仅返回 meow_star_map_*.db 文件', async () => {
+    makeBackupFile('meow_star_map_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
     makeBackupFile('other.txt', 50, new Date())
     makeBackupFile('editor-snapshots.txt', 50, new Date())
     const records = await backupService.listBackups()
     expect(records).toHaveLength(1)
-    expect(records[0].filename).toBe('wxnn_photo_manager_20260719_120000.db')
+    expect(records[0].filename).toBe('meow_star_map_20260719_120000.db')
   })
 
   it('按 createdAt 倒序排列（最新在前）', async () => {
-    makeBackupFile('wxnn_photo_manager_20260701_120000.db', 100, new Date('2026-07-01T12:00:00Z'))
-    makeBackupFile('wxnn_photo_manager_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
-    makeBackupFile('wxnn_photo_manager_20260710_120000.db', 100, new Date('2026-07-10T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260701_120000.db', 100, new Date('2026-07-01T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260710_120000.db', 100, new Date('2026-07-10T12:00:00Z'))
     const records = await backupService.listBackups()
     expect(records.map((r) => r.filename)).toEqual([
-      'wxnn_photo_manager_20260719_120000.db',
-      'wxnn_photo_manager_20260710_120000.db',
-      'wxnn_photo_manager_20260701_120000.db'
+      'meow_star_map_20260719_120000.db',
+      'meow_star_map_20260710_120000.db',
+      'meow_star_map_20260701_120000.db'
     ])
   })
 
   it('stat 失败的文件被跳过不抛错', async () => {
     // 创建一个名字符合规则但无法 stat 的路径（使用文件系统不允许的字符模拟）
     // 此处通过 mock fs 验证逻辑：直接构造一个 .db 文件然后删掉
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     const fullPath = path.join(backupDir, name)
     fs.writeFileSync(fullPath, Buffer.alloc(10))
     // 在读取过程中删除，模拟并发场景
@@ -218,7 +218,7 @@ describe('createBackup', () => {
     fresh.init({ getDatabase: () => fakeDb, close: vi.fn() } as never)
     const r = await fresh.createBackup()
     expect(r.success).toBe(true)
-    expect(r.backup?.filename).toMatch(/^wxnn_photo_manager_\d{8}_\d{6}\.db$/)
+    expect(r.backup?.filename).toMatch(/^meow_star_map_\d{8}_\d{6}\.db$/)
     expect(r.backup?.size).toBe(0)
     expect(fs.existsSync(r.backup!.filePath)).toBe(true)
   })
@@ -256,7 +256,7 @@ describe('createBackup', () => {
     // 预置 6 个旧备份，超出 MAX_BACKUPS=5
     for (let i = 0; i < 6; i++) {
       makeBackupFile(
-        `wxnn_photo_manager_20260${i + 1}01_120000.db`,
+        `meow_star_map_20260${i + 1}01_120000.db`,
         100,
         new Date(`2026-0${i + 1}-01T12:00:00Z`)
       )
@@ -279,7 +279,7 @@ describe('deleteBackup', () => {
   })
 
   it('成功删除存在的备份文件', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     const r = await backupService.deleteBackup(name)
     expect(r.success).toBe(true)
@@ -287,7 +287,7 @@ describe('deleteBackup', () => {
   })
 
   it('unlink 抛错时返回失败', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockRejectedValueOnce(new Error('EACCES'))
     const r = await backupService.deleteBackup(name)
@@ -332,7 +332,7 @@ describe('restoreBackup', () => {
   })
 
   it('备份文件损坏（integrity_check 失败）时返回失败', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     // 模拟 better-sqlite3 readonly 打开失败
     ;(Database as unknown as ReturnType<typeof vi.fn>).mockImplementationOnce(() => {
@@ -344,7 +344,7 @@ describe('restoreBackup', () => {
   })
 
   it('恢复成功后调用 app.relaunch + app.exit', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     // 让 integrity_check 返回 'ok'：默认 DatabaseMock.pragma 返回 'ok'
     const fakeDbManager = {
@@ -355,11 +355,11 @@ describe('restoreBackup', () => {
     fresh.setDir(backupDir)
     fresh.init(fakeDbManager as never)
     // 准备目标数据库目录：mock 中 getPath('userData') 返回 wxnn-test-userdata/userData
-    // 源码访问 {userData}/database/wxnn_photo_manager.db，父目录必须存在才能 copyFileSync
+    // 源码访问 {userData}/database/meow_star_map.db，父目录必须存在才能 copyFileSync
     const userDataPath = path.join(os.tmpdir(), 'wxnn-test-userdata', 'userData')
     const dbDir = path.join(userDataPath, 'database')
     fs.mkdirSync(dbDir, { recursive: true })
-    fs.writeFileSync(path.join(dbDir, 'wxnn_photo_manager.db'), Buffer.alloc(0))
+    fs.writeFileSync(path.join(dbDir, 'meow_star_map.db'), Buffer.alloc(0))
     const r = await fresh.restoreBackup(name)
     expect(r.success).toBe(true)
     expect(electronApp.relaunch).toHaveBeenCalled()
@@ -367,7 +367,7 @@ describe('restoreBackup', () => {
   })
 
   it('FIX(组18-1): close 之后恢复失败（rename 被占用）时仍 relaunch 重启回到可用状态', async () => {
-    const name = 'wxnn_photo_manager_20260817_120000.db'
+    const name = 'meow_star_map_20260817_120000.db'
     makeBackupFile(name, 100, new Date())
     const fakeDbManager = { getDatabase: () => null, close: vi.fn() }
     const fresh = new BackupService()
@@ -376,7 +376,7 @@ describe('restoreBackup', () => {
     const userDataPath = path.join(os.tmpdir(), 'wxnn-test-userdata', 'userData')
     const dbDir = path.join(userDataPath, 'database')
     fs.mkdirSync(dbDir, { recursive: true })
-    fs.writeFileSync(path.join(dbDir, 'wxnn_photo_manager.db'), Buffer.alloc(0))
+    fs.writeFileSync(path.join(dbDir, 'meow_star_map.db'), Buffer.alloc(0))
 
     // 模拟 rename 被占用：dbManager.close 对 DB worker dispose 是 fire-and-forget，
     // worker 仍有最长 500ms 窗口持有文件句柄——此时失败应用已处于无数据库状态
@@ -447,7 +447,7 @@ describe('R9 markRestoredFlags', () => {
   }
 
   it('restoreBackup 成功后写入 4 个后置修复标志 key', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     const fakeDbManager = { getDatabase: () => null, close: vi.fn() }
     const fresh = new BackupService()
@@ -456,7 +456,7 @@ describe('R9 markRestoredFlags', () => {
     const userDataPath = path.join(os.tmpdir(), 'wxnn-test-userdata', 'userData')
     const dbDir = path.join(userDataPath, 'database')
     fs.mkdirSync(dbDir, { recursive: true })
-    fs.writeFileSync(path.join(dbDir, 'wxnn_photo_manager.db'), Buffer.alloc(0))
+    fs.writeFileSync(path.join(dbDir, 'meow_star_map.db'), Buffer.alloc(0))
 
     await fresh.restoreBackup(name)
 
@@ -481,7 +481,7 @@ describe('R9 markRestoredFlags', () => {
   })
 
   it('restoreBackup markRestoredFlags 失败时不阻塞恢复（仍 relaunch）', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     // 让第二次 new Database（markRestoredFlags）抛错
     let callCount = 0
@@ -509,7 +509,7 @@ describe('R9 markRestoredFlags', () => {
     const userDataPath = path.join(os.tmpdir(), 'wxnn-test-userdata', 'userData')
     const dbDir = path.join(userDataPath, 'database')
     fs.mkdirSync(dbDir, { recursive: true })
-    fs.writeFileSync(path.join(dbDir, 'wxnn_photo_manager.db'), Buffer.alloc(0))
+    fs.writeFileSync(path.join(dbDir, 'meow_star_map.db'), Buffer.alloc(0))
 
     const r = await fresh.restoreBackup(name)
     // 恢复仍成功（rename 已完成），markRestoredFlags 失败仅记日志
@@ -518,7 +518,7 @@ describe('R9 markRestoredFlags', () => {
   })
 
   it('restoreLatestBackupTo 成功后写入后置修复标志', async () => {
-    const name = 'wxnn_photo_manager_20260719_120000.db'
+    const name = 'meow_star_map_20260719_120000.db'
     makeBackupFile(name, 100, new Date())
     const fresh = new BackupService()
     fresh.setDir(backupDir)
@@ -551,8 +551,8 @@ describe('R9 markRestoredFlags', () => {
 
     // 模拟 getValidBackups 选中一个候选备份（full 校验通过）
     const candidate = {
-      filePath: path.join(backupDir, 'wxnn_photo_manager_20260719.db'),
-      filename: 'wxnn_photo_manager_20260719.db',
+      filePath: path.join(backupDir, 'meow_star_map_20260719.db'),
+      filename: 'meow_star_map_20260719.db',
       size: 100,
       createdAt: new Date().toISOString()
     }
@@ -604,8 +604,8 @@ describe('R9 markRestoredFlags', () => {
     fresh.init({ getDatabase: () => null, close: vi.fn() } as never)
 
     // 两份有效备份（时间倒序：A 最新，B 次新）
-    makeBackupFile('wxnn_photo_manager_20260720_120000.db', 100, new Date('2026-07-20T12:00:00Z'))
-    makeBackupFile('wxnn_photo_manager_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260720_120000.db', 100, new Date('2026-07-20T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
 
     const targetPath = path.join(tmpRoot, 'target-iofallback.db')
     fs.writeFileSync(targetPath, Buffer.from('ONLINE-LIVE-DATA'))
@@ -627,7 +627,7 @@ describe('R9 markRestoredFlags', () => {
     const r = await fresh.restoreLatestBackupTo(targetPath)
     expect(r.success).toBe(true)
     // 回退到次新候选
-    expect(r.sourceBackup?.filename).toBe('wxnn_photo_manager_20260719_120000.db')
+    expect(r.sourceBackup?.filename).toBe('meow_star_map_20260719_120000.db')
     // 失败候选的 .restoring 临时文件应已被清理
     expect(fs.existsSync(`${targetPath}.restoring`)).toBe(false)
   })
@@ -637,8 +637,8 @@ describe('R9 markRestoredFlags', () => {
     fresh.setDir(backupDir)
     fresh.init({ getDatabase: () => null, close: vi.fn() } as never)
 
-    makeBackupFile('wxnn_photo_manager_20260720_120000.db', 100, new Date('2026-07-20T12:00:00Z'))
-    makeBackupFile('wxnn_photo_manager_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260720_120000.db', 100, new Date('2026-07-20T12:00:00Z'))
+    makeBackupFile('meow_star_map_20260719_120000.db', 100, new Date('2026-07-19T12:00:00Z'))
 
     const targetPath = path.join(tmpRoot, 'target-allfail.db')
     fs.writeFileSync(targetPath, Buffer.from('ONLINE-LIVE-DATA'))

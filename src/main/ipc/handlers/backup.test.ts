@@ -181,8 +181,8 @@ describe('registerBackupHandlers', () => {
     restoreBackupMock.mockResolvedValue({ success: true })
     registerBackupHandlers(makeCtx())
     const handler = getHandler('backup:restore')
-    const result = await handler(['wxnn_photo_manager_20260101_120000.db'])
-    expect(restoreBackupMock).toHaveBeenCalledWith('wxnn_photo_manager_20260101_120000.db')
+    const result = await handler(['meow_star_map_20260101_120000.db'])
+    expect(restoreBackupMock).toHaveBeenCalledWith('meow_star_map_20260101_120000.db')
     expect(result).toEqual({ success: true, data: { success: true } })
   })
 
@@ -190,7 +190,7 @@ describe('registerBackupHandlers', () => {
     restoreBackupMock.mockRejectedValue(new Error('文件损坏'))
     registerBackupHandlers(makeCtx())
     const handler = getHandler('backup:restore')
-    const result = (await handler(['wxnn_photo_manager_20260101_120000.db'])) as {
+    const result = (await handler(['meow_star_map_20260101_120000.db'])) as {
       success: false
       error: { code: string; message: string }
     }
@@ -203,8 +203,8 @@ describe('registerBackupHandlers', () => {
     deleteBackupMock.mockResolvedValue({ success: true })
     registerBackupHandlers(makeCtx())
     const handler = getHandler('backup:delete')
-    const result = await handler(['wxnn_photo_manager_20260101_120000.db'])
-    expect(deleteBackupMock).toHaveBeenCalledWith('wxnn_photo_manager_20260101_120000.db')
+    const result = await handler(['meow_star_map_20260101_120000.db'])
+    expect(deleteBackupMock).toHaveBeenCalledWith('meow_star_map_20260101_120000.db')
     expect(result).toEqual({ success: true, data: { success: true } })
   })
 
@@ -212,7 +212,7 @@ describe('registerBackupHandlers', () => {
     deleteBackupMock.mockRejectedValue(new Error('权限不足'))
     registerBackupHandlers(makeCtx())
     const handler = getHandler('backup:delete')
-    const result = (await handler(['wxnn_photo_manager_20260101_120000.db'])) as {
+    const result = (await handler(['meow_star_map_20260101_120000.db'])) as {
       success: false
       error: { code: string }
     }

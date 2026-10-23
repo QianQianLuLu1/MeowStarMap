@@ -75,8 +75,8 @@ describe('dir-manager', () => {
   })
 
   describe('MIGRATE_PATTERNS', () => {
-    it('backupDir 模式匹配 wxnn_photo_manager_*.db', () => {
-      expect(MIGRATE_PATTERNS.backupDir.test('wxnn_photo_manager_20260719.db')).toBe(true)
+    it('backupDir 模式匹配 meow_star_map_*.db', () => {
+      expect(MIGRATE_PATTERNS.backupDir.test('meow_star_map_20260719.db')).toBe(true)
       expect(MIGRATE_PATTERNS.backupDir.test('other.txt')).toBe(false)
     })
 
