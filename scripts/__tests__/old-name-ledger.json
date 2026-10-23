@@ -89,7 +89,7 @@
     "My Nikki Gallery"
   ],
   "minPatterns": 29,
-  "expectedTotal": 180,
+  "expectedTotal": 170,
   "allowed": {
     "ARCHITECTURE.en.md": {
       "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
@@ -119,12 +119,6 @@
         "无限暖暖相册管理工具": 2,
         "wxnn-photo-manager": 5,
         "wxnn_photo_manager": 6
-      }
-    },
-    "README.md": {
-      "reason": "两处 GitHub Releases 链接（用户规定任何 URL 不动，远端改名后靠重定向可达）",
-      "hits": {
-        "NikkiGallery": 2
       }
     },
     "docs/PLUGIN_API.md": {
@@ -198,9 +192,9 @@
       }
     },
     "scripts/__tests__/ui-brand-name.test.ts": {
-      "reason": "界面品牌名守卫的旧展示名反向锁 + 仓库 URL 逐字锁，属判据而非残留",
+      "reason": "界面品牌名守卫的旧展示名反向锁（仓库 URL 逐字锁已于阶段 7 换成新名），属判据而非残留",
       "hits": {
-        "NikkiGallery": 11,
+        "NikkiGallery": 9,
         "nikkiGallery": 5,
         "无限暖暖相册管理工具": 2,
         "无限暖暖相册分享": 3,
@@ -300,34 +294,10 @@
         "NikkiGallery": 2
       }
     },
-    "src/renderer/components/common/UpdateDialog.test.tsx": {
-      "reason": "逐字锁定仓库 URL 的用例（证明更名未动 URL），属判据而非残留",
-      "hits": {
-        "NikkiGallery": 1
-      }
-    },
-    "src/renderer/components/common/UpdateDialog.tsx": {
-      "reason": "GITHUB_URL 常量（用户规定任何 URL 不动）",
-      "hits": {
-        "NikkiGallery": 1
-      }
-    },
-    "src/renderer/pages/settings/about-sections.tsx": {
-      "reason": "关于页三处仓库 URL（常量、openUrl 与可见的 github.com 文本），属 URL 禁改项",
-      "hits": {
-        "NikkiGallery": 3
-      }
-    },
     "src/renderer/pages/settings/plugin-sections.tsx": {
       "reason": "设置页读取插件清单磁盘键 plugin.nikkiGallery（§1.2 禁改）",
       "hits": {
         "nikkiGallery": 3
-      }
-    },
-    "src/renderer/pages/sync-gallery/SyncGalleryToolbar.test.tsx": {
-      "reason": "URL 逐字锁注释：区分本应用仓库与上游 NikkiSync 引擎仓库两个 repo",
-      "hits": {
-        "NikkiGallery": 1
       }
     },
     "src/renderer/utils/resonance/exportPayload.ts": {

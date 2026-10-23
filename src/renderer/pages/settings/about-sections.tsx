@@ -14,7 +14,7 @@ import { SectionShell, GlobalToastContext, SettingsCard } from './shared'
 
 // ============ 关于 ============
 
-const GITHUB_URL = 'https://github.com/QianQianLuLu1/NikkiGallery'
+const GITHUB_URL = 'https://github.com/QianQianLuLu1/MeowStarMap'
 const QQ_GROUP = '635492596'
 
 export const AboutInfoSection: React.FC = () => {
@@ -392,11 +392,11 @@ export const AboutLicenseSection: React.FC = () => {
           <div>
             {t('settings.about.repoLabel')}
             <button
-              onClick={() => openUrl('https://github.com/QianQianLuLu1/NikkiGallery')}
+              onClick={() => openUrl('https://github.com/QianQianLuLu1/MeowStarMap')}
               className="ml-1 hover:underline"
               style={{ color: 'var(--accent)' }}
             >
-              github.com/QianQianLuLu1/NikkiGallery
+              github.com/QianQianLuLu1/MeowStarMap
             </button>
           </div>
           <div className="mt-2 pt-2 border-t" style={{ borderColor: 'var(--divider)' }}>

@@ -15,7 +15,7 @@ import { useTranslation } from 'react-i18next'
  */
 
 // 与 about-sections.tsx 保持一致的项目官网
-const GITHUB_URL = 'https://github.com/QianQianLuLu1/NikkiGallery'
+const GITHUB_URL = 'https://github.com/QianQianLuLu1/MeowStarMap'
 
 export type UpdateStage =
   'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'

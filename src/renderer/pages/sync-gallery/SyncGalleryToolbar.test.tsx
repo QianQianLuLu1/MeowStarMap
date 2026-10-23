@@ -144,7 +144,7 @@ describe('SyncGalleryToolbar', () => {
     renderToolbar({ runtimeState: 'running' })
     fireEvent.click(screen.getByTitle('关于 NikkiSync'))
     expect(openExternal).toHaveBeenCalledTimes(1)
-    // URL 逐字锁定：本应用仓库（QianQianLuLu1/NikkiGallery）与上游引擎仓库是两个 repo，混了就跳错地方
+    // URL 逐字锁定：本应用仓库（QianQianLuLu1/MeowStarMap，阶段 7 起随远端改名）与上游引擎仓库是两个 repo，混了就跳错地方
     expect(openExternal).toHaveBeenCalledWith('https://github.com/ToStardust/NikkiSync')
   })
 

@@ -63,9 +63,7 @@ describe('UpdateDialog 检查更新弹窗改造（error / not-available）', () 
   })
 
   it('模块级 GITHUB_URL 常量指向目标官网', () => {
-    expect(dialogSrc).toContain(
-      "const GITHUB_URL = 'https://github.com/QianQianLuLu1/NikkiGallery'"
-    )
+    expect(dialogSrc).toContain("const GITHUB_URL = 'https://github.com/QianQianLuLu1/MeowStarMap'")
   })
 
   it('i18n key 在 zh-CN / en 中均已声明', () => {

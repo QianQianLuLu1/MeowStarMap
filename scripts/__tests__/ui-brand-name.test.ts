@@ -33,8 +33,9 @@ const LOCALE_APP_NAME: Record<string, string> = { 'zh-CN': '喵星图', 'zh-TW':
 const expectedAppName = (locale: string): string => LOCALE_APP_NAME[locale] ?? 'Meow Star Map'
 
 /** 界面可见形态的旧应用名（各语种 + 分享页自称 + 示例签名两词形） */
-/** 远端仓库仍未改名，URL 属阶段 1 §1.2 禁改项；本轮多处标签改名都必须以它为准逐字不动 */
-const REPO_URL = 'https://github.com/QianQianLuLu1/NikkiGallery'
+/** 远端仓库仍未改名，URL 属阶段 1 §1.2 禁改项；本轮多处标签改名都必须以它为准逐字不动。
+ *  阶段 7 订正：远端已改名为 MeowStarMap，本常量随之换成新地址（旧地址此后仅靠 GitHub 重定向可达）。 */
+const REPO_URL = 'https://github.com/QianQianLuLu1/MeowStarMap'
 
 const OLD_UI_NAMES = [
   '无限暖暖相册管理工具',
@@ -98,6 +99,7 @@ describe('应急启动弹窗取新名 —— i18n 就绪前的原生对话框', 
 describe('关于页仓库标签取新名', () => {
   // :75 是 <a> 的纯文本节点（上一行是 title={GITHUB_URL}），同文件 :17/:395/:399 三处 URL 属禁改项，
   // 所以只锁「独占一行的文本」：按行 trim 比对，避免把 URL 里的 NikkiGallery 误判成残留。
+  // 阶段 7 起三处 URL 已随远端改名换成 MeowStarMap，按行 trim 的判据形态不变（不再有需豁免的旧名 URL 文本）。
   const lines = read('src/renderer/pages/settings/about-sections.tsx')
     .split('\n')
     .map((l) => l.trim())
@@ -110,7 +112,8 @@ describe('关于页仓库标签取新名', () => {
   it('仓库地址三处落点仍在原文件（标签改名未波及 URL：常量、onClick、可见文字）', () => {
     const src = read('src/renderer/pages/settings/about-sections.tsx')
     // :17 与 :395 是完整 https URL，:399 是省略协议的同款文字，按 slug 计数才能一次收全
-    expect(src.split('github.com/QianQianLuLu1/NikkiGallery').length - 1).toBe(3)
+    // 阶段 7：slug 已随远端改名换成 MeowStarMap，三处落点与计数判据都不变
+    expect(src.split('github.com/QianQianLuLu1/MeowStarMap').length - 1).toBe(3)
   })
 })
 
@@ -190,7 +193,7 @@ describe('语包软件名值锁（阶段 2 已落地，此处防回归）', () =
 })
 
 describe('禁改项未被动 —— 证明更名没有越界', () => {
-  it('关于页与更新弹窗的 GitHub URL 逐字保留（仓库尚未改名，动即 404）', () => {
+  it('关于页与更新弹窗的 GitHub URL 逐字保留（原判据「仓库尚未改名，动即 404」；阶段 7 起远端已改名为 MeowStarMap）', () => {
     expect(read('src/renderer/pages/settings/about-sections.tsx')).toContain(
       `const GITHUB_URL = '${REPO_URL}'`
     )

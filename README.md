@@ -57,7 +57,7 @@ A local photo album manager for <em>Infinity Nikki</em> players — scan, browse
 
 ### 下载安装
 
-- **GitHub Releases**：前往 [Releases 页面](https://github.com/QianQianLuLu1/NikkiGallery/releases) 获取安装包（仓库尚未推送版本 tag，该页面可能暂无内容）
+- **GitHub Releases**：前往 [Releases 页面](https://github.com/QianQianLuLu1/MeowStarMap/releases) 获取安装包（仓库尚未推送版本 tag，该页面可能暂无内容）
 - **其他渠道**：抖音 / B站 搜索「纤璐不会玩摄影」获取下载指引
 
 **系统要求**：Windows 10 (1803+) / Windows 11，x64 架构
@@ -170,7 +170,7 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 
 ### Download
 
-- **GitHub Releases**: Visit the [Releases page](https://github.com/QianQianLuLu1/NikkiGallery/releases) for the installer (no version tags have been pushed yet, so the page may be empty)
+- **GitHub Releases**: Visit the [Releases page](https://github.com/QianQianLuLu1/MeowStarMap/releases) for the installer (no version tags have been pushed yet, so the page may be empty)
 - **Other channels**: Search "纤璐不会玩摄影" on Douyin / Bilibili for download guides
 
 **Requirements**: Windows 10 (1803+) / Windows 11, x64 architecture
