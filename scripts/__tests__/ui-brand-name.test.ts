@@ -147,6 +147,22 @@ describe('默认内容与示例插件署名取新名', () => {
   })
 })
 
+describe('桌面快捷方式名取新名', () => {
+  // 文件名须跨语言稳定，所以保持硬编码（行内 eslint-disable 注释与「非 UI 文案」表述原样不动）；
+  // 但它是桌面上用户直接看得见的图标名，按用户决策并入阶段 3。nsis.shortcutName 仍属 N1，本轮分叉入档。
+  it('两处 .lnk 文件名取喵星图.lnk，旧中文全名不再出现', () => {
+    const src = read('src/main/app/desktop-shortcut.ts')
+    expect(src.split("'喵星图.lnk'").length - 1).toBe(2)
+    expect(src).not.toContain('无限暖暖相册管理工具')
+  })
+
+  it('测试常量与源码同值（锁未被拆半）', () => {
+    expect(read('src/main/app/__tests__/desktop-shortcut.test.ts')).toContain(
+      "const SHORTCUT_NAME = '喵星图.lnk'"
+    )
+  })
+})
+
 describe('语包软件名值锁（阶段 2 已落地，此处防回归）', () => {
   it.each(LOCALES)('%s 的 settings.about.appValue 与 titleBar.appTitle 取该语种新名', (locale) => {
     const data = readJson<AboutBlock>(localeRel(locale))

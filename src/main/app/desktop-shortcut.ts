@@ -24,7 +24,7 @@ export async function ensureDesktopShortcut(): Promise<void> {
       return
     }
     // 快捷方式文件名须跨语言保持稳定（与应用名一致），不随 i18n 切换
-    const shortcutPath = path.join(desktopPath, '无限暖暖相册管理工具.lnk') // eslint-disable-line no-restricted-syntax -- 快捷方式文件名须与应用名一致且跨语言稳定，非 UI 文案
+    const shortcutPath = path.join(desktopPath, '喵星图.lnk') // eslint-disable-line no-restricted-syntax -- 快捷方式文件名须与应用名一致且跨语言稳定，非 UI 文案
     const exePath = app.getPath('exe')
 
     // P2-A9：快捷方式已存在时校验目标有效性——target 指向的 exe 不存在则重建
@@ -66,7 +66,7 @@ export async function ensureDesktopShortcut(): Promise<void> {
     // 桌面不可写或创建失败，fallback 到用户主目录
     logger.warn(t('main.desktopShortcut.log.createFailedFallback'))
     const homePath = app.getPath('home')
-    const fallbackPath = path.join(homePath, '无限暖暖相册管理工具.lnk') // eslint-disable-line no-restricted-syntax -- 快捷方式文件名须与应用名一致且跨语言稳定，非 UI 文案
+    const fallbackPath = path.join(homePath, '喵星图.lnk') // eslint-disable-line no-restricted-syntax -- 快捷方式文件名须与应用名一致且跨语言稳定，非 UI 文案
     const fallbackCreated = shell.writeShortcutLink(fallbackPath, 'create', shortcutOpts)
     if (fallbackCreated) {
       try {

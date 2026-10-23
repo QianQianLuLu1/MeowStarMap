@@ -88,7 +88,7 @@ import { ensureDesktopShortcut } from '../desktop-shortcut'
 const DEFAULT_DESKTOP = 'C:\\Users\\Test\\Desktop'
 const DEFAULT_HOME = 'C:\\Users\\Test'
 const DEFAULT_EXE = 'C:\\Program Files\\App\\app.exe'
-const SHORTCUT_NAME = '无限暖暖相册管理工具.lnk'
+const SHORTCUT_NAME = '喵星图.lnk'
 
 // 工具：构造 execFile 回调控制
 function setRegResult(stdout: string | null, err: Error | null = null): void {
