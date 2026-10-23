@@ -16,6 +16,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.5] - 2026-10-23
+
+> 2.5.5 正式版：自 [2.5.5-beta] 定档，去除预发布后缀，**不引入新的功能性变更**。beta 节之后逐轮补录的全部改动（最近一条：2026-10-23「反馈弹窗 QQ 群号占位值更正 + 产物内容禁串闸门」）均已随各轮重新打包出货，本节不重复罗列；四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.5`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.5.exe`。
+
 ## [2.5.5-beta] - 2026-10-16
 
 > 本版本主体为设备同步（NikkiSync 协议 v1）功能整装发布——sync-integration 阶段 0–6 的全部产出，以及端到端联调后的代码审查修复。计划与报告见 `docs/sync-integration/`。
@@ -425,7 +429,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库尚未推送任何 git tag，因此以下 `compare/vX...vY` 与 `releases/tag/vX` 链接需在建立对应 tag 后方可访问；保留原链接形式是为了不销毁历史版本记录。
 
-[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.5-beta...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.5...HEAD
+[2.5.5]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.5-beta...v2.5.5
 [2.5.5-beta]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.3...v2.5.5-beta
 [2.5.3]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.2...v2.5.3
 [2.5.2]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.1...v2.5.2
