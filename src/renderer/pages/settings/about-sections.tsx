@@ -72,7 +72,7 @@ export const AboutInfoSection: React.FC = () => {
             title={GITHUB_URL}
             onClick={handleCheckUpdate}
           >
-            NikkiGallery
+            Meow Star Map
           </a>
         </div>
       </div>
