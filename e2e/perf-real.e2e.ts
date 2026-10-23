@@ -12,7 +12,7 @@
  *
  * 用法（本机）：
  *   npm run dist:win
- *   PERF_REAL_USERDATA="C:/Users/<你>/AppData/Roaming/wxnn-photo-manager" \
+ *   PERF_REAL_USERDATA="C:/Users/<你>/AppData/Roaming/meow-star-map" \
  *     npx playwright test --config e2e/playwright.config.ts --grep @perf-real
  *
  * 判据（不做阈值门禁，只产数值供改前/改后对比）：

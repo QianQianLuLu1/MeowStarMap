@@ -39,7 +39,7 @@ describe('verifyStartupEnvironment', () => {
     tmpDirs.push(marker)
     const showErrorBox = vi.fn()
     const result = verifyStartupEnvironment({
-      getExecPath: () => 'C:\\Program Files\\NikkiGallery\\NikkiGallery.exe',
+      getExecPath: () => 'C:\\Program Files\\MeowStarMap\\MeowStarMap.exe',
       getUserDataPath: () => path.join(marker, 'nested'),
       showErrorBox
     })
@@ -52,7 +52,7 @@ describe('verifyStartupEnvironment', () => {
     const dir = makeTmpDir()
     const showErrorBox = vi.fn()
     const result = verifyStartupEnvironment({
-      getExecPath: () => 'C:\\Program Files\\NikkiGallery\\NikkiGallery.exe',
+      getExecPath: () => 'C:\\Program Files\\MeowStarMap\\MeowStarMap.exe',
       getUserDataPath: () => dir,
       showErrorBox
     })
@@ -64,7 +64,7 @@ describe('verifyStartupEnvironment', () => {
     const dir = makeTmpDir()
     const showErrorBox = vi.fn()
     const result = verifyStartupEnvironment({
-      getExecPath: () => 'D:\\中文目录\\NikkiGallery\\NikkiGallery.exe',
+      getExecPath: () => 'D:\\中文目录\\喵星图\\喵星图.exe',
       getUserDataPath: () => dir,
       showErrorBox
     })
@@ -75,7 +75,7 @@ describe('verifyStartupEnvironment', () => {
   it('NIKKI_SKIP_ENV_GUARD=1 时跳过检测返回 true', () => {
     const showErrorBox = vi.fn()
     const result = verifyStartupEnvironment({
-      getExecPath: () => 'D:\\中文目录\\NikkiGallery\\NikkiGallery.exe',
+      getExecPath: () => 'D:\\中文目录\\喵星图\\喵星图.exe',
       getUserDataPath: () => '/readonly/nonexistent',
       getEnv: () => ({ NIKKI_SKIP_ENV_GUARD: '1' }) as NodeJS.ProcessEnv,
       showErrorBox

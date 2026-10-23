@@ -13,7 +13,7 @@ const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'
 
 /**
  * 定位 win-unpacked 产物 exe。
- * exe 名跟随 productName（"无限暖暖相册管理工具"，含中文），禁止硬编码文件名；
+ * exe 名跟随 productName（"喵星图"，含中文），禁止硬编码文件名；
  * 统一用 glob 结果的绝对路径传给 executablePath，避免 PowerShell/编码拼接问题。
  */
 export async function findUnpackedExe(): Promise<string> {
@@ -78,7 +78,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
  * 采集范围覆盖三类现场：
  * 1. userDataDir/logs/*.log|*.jsonl（electron-log 正常落盘）
  * 2. userDataDir/diag.log、startup-errors.log（启动早期诊断日志，whenReady 后落盘）
- * 3. %APPDATA%/wxnn-photo-manager/diag.log（whenReady 前 diagLog 的 APPDATA fallback，
+ * 3. %APPDATA%/meow-star-map/diag.log（whenReady 前 diagLog 的 APPDATA fallback，
  *    INDEX loaded 等早期行落在那里；仅保留最近 5 分钟行，避免混入历史运行）
  */
 export async function collectDiagLogs(userDataDir: string, destDir: string): Promise<void> {
@@ -108,7 +108,7 @@ export async function collectDiagLogs(userDataDir: string, destDir: string): Pro
   const candidates: Array<[string, string]> = [
     [path.join(userDataDir, 'diag.log'), 'diag.log'],
     [path.join(userDataDir, 'startup-errors.log'), 'startup-errors.log'],
-    [path.join(process.env.APPDATA ?? '', 'wxnn-photo-manager', 'diag.log'), 'appdata-diag.log']
+    [path.join(process.env.APPDATA ?? '', 'meow-star-map', 'diag.log'), 'appdata-diag.log']
   ]
   await Promise.all(
     candidates.map(async ([src, name]) => {

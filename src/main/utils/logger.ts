@@ -179,8 +179,8 @@ function getFallbackElectronLogPath(): string {
   } catch {
     // app.whenReady() 之前触发：回退到 APPDATA（Windows 一定存在）
     const appData = process.env.APPDATA
-    if (appData) return path.join(appData, 'wxnn-photo-manager', 'logs', 'main.log')
-    return path.join(os.tmpdir(), 'wxnn-photo-manager-logs', 'main.log')
+    if (appData) return path.join(appData, 'meow-star-map', 'logs', 'main.log')
+    return path.join(os.tmpdir(), 'meow-star-map-logs', 'main.log')
   }
 }
 

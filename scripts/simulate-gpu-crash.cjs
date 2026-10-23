@@ -13,7 +13,7 @@
  * 用法：
  *   node scripts/simulate-gpu-crash.cjs            # 写入 fallbackActive=true（模拟已崩溃，下次启动软件渲染）
  *   node scripts/simulate-gpu-crash.cjs --reset    # 删除该标记（恢复硬件加速一次干净重试）
- *   node scripts/simulate-gpu-crash.cjs --userdata "C:\Users\...\AppData\Roaming\NikkiGallery"
+ *   node scripts/simulate-gpu-crash.cjs --userdata "C:\Users\...\AppData\Roaming\meow-star-map"
  *
  * 注意：修改后请重启应用生效。
  */
@@ -55,8 +55,8 @@ function resolveUserData() {
   // 兜底：给出猜测路径并提示用户显式传入
   const guess =
     process.platform === 'win32'
-      ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'NikkiGallery')
-      : path.join(os.homedir(), '.config', 'NikkiGallery')
+      ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'meow-star-map')
+      : path.join(os.homedir(), '.config', 'meow-star-map')
   console.warn(`[simulate-gpu-crash] 未自动探测到应用 userData，使用猜测路径：${guess}`)
   console.warn('[simulate-gpu-crash] 如不正确，请用 --userdata <真实路径> 指定（见应用设置→关于/日志目录）。')
   return guess

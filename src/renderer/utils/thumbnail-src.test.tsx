@@ -12,9 +12,9 @@ import { describe, it, expect } from 'vitest'
 import { resolveThumbnailSrc } from './thumbnail-src'
 
 // tests/setup.ts 已注入 window.electronAPI 占位 → toFileUrl 产出 media:// URL
-const THUMB = 'C:\\Users\\u\\AppData\\Roaming\\wxnn-photo-manager\\thumbnails\\abc123.jpg'
+const THUMB = 'C:\\Users\\u\\AppData\\Roaming\\meow-star-map\\thumbnails\\abc123.jpg'
 const THUMB_URL = `media://file?path=${encodeURIComponent(
-  'C:/Users/u/AppData/Roaming/wxnn-photo-manager/thumbnails/abc123.jpg'
+  'C:/Users/u/AppData/Roaming/meow-star-map/thumbnails/abc123.jpg'
 )}`
 const VIDEO = 'D:\\Game\\Videos\\clip01.mp4'
 const IMAGE = 'D:\\Game\\Photos\\pic01.png'

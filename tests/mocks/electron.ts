@@ -153,7 +153,7 @@ export function createElectronMock(options: CreateElectronMockOptions = {}): Ele
         appOptions.getPath ? appOptions.getPath(name) : `/mock/userdata/${name}`
       ),
       isPackaged: appOptions.isPackaged ?? false,
-      getName: vi.fn(() => 'nikki-gallery-test'),
+      getName: vi.fn(() => 'meow-star-map-test'),
       getVersion: vi.fn(() => '0.0.0-test'),
       quit: vi.fn(),
       on: vi.fn(),

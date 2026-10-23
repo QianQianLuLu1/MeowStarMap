@@ -64,7 +64,7 @@ let cacheState = {
   totalSize: MOCK_CACHE_TOTAL,
   fileCount: MOCK_CACHE_FILES.length,
   limit: 2 * 1024 * 1024 * 1024,
-  cacheDir: 'C:\\Users\\Player\\AppData\\Roaming\\wxnn-photo-manager\\cache'
+  cacheDir: 'C:\\Users\\Player\\AppData\\Roaming\\meow-star-map\\cache'
 }
 
 // 启动器缓存媒体记录：独立于图库数据，仅在 mediaSource='launcher' 时返回

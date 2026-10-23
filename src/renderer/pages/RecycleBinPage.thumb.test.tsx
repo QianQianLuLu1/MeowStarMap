@@ -38,7 +38,7 @@ const recycleBinPageCode = recycleBinPageSrc
 
 /** 日志中真实出现的缩略图绝对路径 */
 const REAL_THUMB_PATH =
-  'C:\\Users\\<username>\\AppData\\Roaming\\wxnn-photo-manager\\thumbnails\\ff6b32029931c766.jpg'
+  'C:\\Users\\<username>\\AppData\\Roaming\\meow-star-map\\thumbnails\\ff6b32029931c766.jpg'
 
 describe('RecycleBinPage 缩略图 URL 构造契约（缺陷B）', () => {
   it("不得再用 new URL(..., 'media://') 构造缩略图 URL", () => {
