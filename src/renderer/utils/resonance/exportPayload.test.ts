@@ -222,7 +222,7 @@ describe('卡池心愿单导出段（同步上游 65bb3d8f）', () => {
 describe('getResonanceExportFileName', () => {
   it('包含日期', () => {
     expect(getResonanceExportFileName(new Date('2025-06-01T00:00:00Z'))).toBe(
-      'nikkigallery-resonance-2025-06-01.json'
+      'meow-star-map-resonance-2025-06-01.json'
     )
   })
 })

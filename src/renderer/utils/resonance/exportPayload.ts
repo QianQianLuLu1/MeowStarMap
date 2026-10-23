@@ -139,5 +139,5 @@ export function buildExportPayload(
 
 export function getResonanceExportFileName(now: Date = new Date()): string {
   const iso = now.toISOString().split('T')[0] ?? ''
-  return `nikkigallery-resonance-${iso}.json`
+  return `meow-star-map-resonance-${iso}.json`
 }
