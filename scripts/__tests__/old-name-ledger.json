@@ -1,0 +1,382 @@
+{
+  "version": 1,
+  "readme": "旧名终扫台账（阶段 6 C5）：扫描域内每个文件、每条旧名模式的**精确命中数**。多一处红、少一处同样红——逼改动者同批核账。逐条归属理由见 docs/plans/2026-10-23-rename-final-pass.md 的白名单台账。",
+  "roots": [
+    "src",
+    "tests",
+    "scripts",
+    "e2e",
+    ".storybook",
+    "plugins-samples",
+    "docs",
+    "tools",
+    ".github"
+  ],
+  "exts": [
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".cjs",
+    ".mjs",
+    ".json",
+    ".md",
+    ".yml",
+    ".yaml",
+    ".html",
+    ".css",
+    ".ps1",
+    ".svg",
+    ".txt"
+  ],
+  "skipDirs": [
+    "node_modules",
+    ".git",
+    ".cache",
+    "dist",
+    "release",
+    "coverage",
+    "storybook-static",
+    "build",
+    "test-results",
+    "data",
+    "logs",
+    "thumbnails",
+    "wxnn-photo-manager",
+    ".mimosa",
+    "archive"
+  ],
+  "skipPaths": [
+    "CHANGELOG",
+    "docs/plans/",
+    "docs/archive/",
+    "docs/2.5.0/",
+    "docs/sync-integration/",
+    "docs/packaged-scan-crash-report.md",
+    "docs/troubleshooting-spawn-eftype.md",
+    "scripts/__tests__/old-name-ledger.json",
+    "docs/tutorial/用户使用教程.html"
+  ],
+  "patterns": [
+    "NikkiGallery",
+    "nikkiGallery",
+    "nikkigallery",
+    "nikki-gallery",
+    "无限暖暖相册管理工具",
+    "无限暖暖相册分享",
+    "無限暖暖相簿管理工具",
+    "無限暖暖アルバム管理ツール",
+    "무한난난 앨범 관리 도구",
+    "wxnn-photo-manager",
+    "wxnn_photo_manager",
+    "WXNN XiangCe",
+    "Infinity Nikki Photo Manager",
+    "WXNN Photo",
+    "WXNN Photo Album Manager",
+    "WXNN フォトアルバム管理ツール",
+    "WXNN 사진 앨범 관리 도구",
+    "WXNN Fotoalbum-Manager",
+    "WXNN Fotoverwaltungs-Tool",
+    "Gestor de álbumes de fotos WXNN",
+    "Gestor de álbum de fotos WXNN",
+    "Gestionnaire d'album photo WXNN",
+    "Gerenciador de álbum de fotos WXNN",
+    "Менеджер альбома фотографий WXNN",
+    "Менеджер фотоальбома WXNN",
+    "เครื่องมือจัดการอัลบั้มรูปภาพ WXNN",
+    "เครื่องมือจัดการอัลบั้มภาพ WXNN",
+    "Công cụ quản lý album ảnh WXNN",
+    "My Nikki Gallery"
+  ],
+  "minPatterns": 29,
+  "expectedTotal": 180,
+  "allowed": {
+    "ARCHITECTURE.en.md": {
+      "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
+      "hits": {
+        "NikkiGallery": 1
+      }
+    },
+    "ARCHITECTURE.md": {
+      "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，与 en 版同行）",
+      "hits": {
+        "NikkiGallery": 1
+      }
+    },
+    "DEVELOPMENT.en.md": {
+      "reason": "§9 人工搬迁清单必须逐字写出旧 userData 根、旧库名与旧进程/快捷方式名，否则用户无从对照磁盘实物",
+      "hits": {
+        "NikkiGallery": 3,
+        "无限暖暖相册管理工具": 2,
+        "wxnn-photo-manager": 5,
+        "wxnn_photo_manager": 6
+      }
+    },
+    "DEVELOPMENT.md": {
+      "reason": "§九 人工搬迁清单必须逐字写出旧 userData 根、旧库名与旧进程/快捷方式名，否则用户无从对照磁盘实物",
+      "hits": {
+        "NikkiGallery": 3,
+        "无限暖暖相册管理工具": 2,
+        "wxnn-photo-manager": 5,
+        "wxnn_photo_manager": 6
+      }
+    },
+    "README.md": {
+      "reason": "两处 GitHub Releases 链接（用户规定任何 URL 不动，远端改名后靠重定向可达）",
+      "hits": {
+        "NikkiGallery": 2
+      }
+    },
+    "docs/PLUGIN_API.md": {
+      "reason": "插件清单磁盘键 nikkiGallery（§1.2 禁改）+「对应 NikkiGallery v2.3.0+」与从未入仓的历史文档名，均为已发布事实",
+      "hits": {
+        "NikkiGallery": 2,
+        "nikkiGallery": 10
+      }
+    },
+    "docs/debt-registry.json": {
+      "reason": "DEBT-031 条目记录的磁盘读数（旧 thumbnails 路径与旧仓库目录名），改名即伪造取证",
+      "hits": {
+        "NikkiGallery": 1,
+        "wxnn-photo-manager": 1
+      }
+    },
+    "docs/技术债清单.md": {
+      "reason": "DEBT-031 与 IDE 记忆目录两节记录的磁盘实况（%APPDATA% 旧根与本机工作副本目录名）",
+      "hits": {
+        "wxnn-photo-manager": 1,
+        "WXNN XiangCe": 2
+      }
+    },
+    "e2e/perf-real.e2e.ts": {
+      "reason": "注释里的本机真实缓存目录名 D:\\NikkiGallery缓存（磁盘事实，非产品引用）",
+      "hits": {
+        "NikkiGallery": 1
+      }
+    },
+    "eslint.config.js": {
+      "reason": "'wxnn-photo-manager/**' ignore 指向磁盘真实存在的本地遗留目录，不是产品引用（§1.2 明示不改）",
+      "hits": {
+        "wxnn-photo-manager": 1
+      }
+    },
+    "plugins-samples/custom-watermark-template/package.json": {
+      "reason": "示例插件清单的磁盘键 nikkiGallery（主进程 plugin-host.ts:376 按此键读取，改键即插件失效）",
+      "hits": {
+        "nikkiGallery": 1
+      }
+    },
+    "scripts/__tests__/old-name-ledger.test.ts": {
+      "reason": "本守卫自身：模式在场断言逐字写着七条旧名，属判据而非残留",
+      "hits": {
+        "NikkiGallery": 1,
+        "nikkiGallery": 1,
+        "nikkigallery": 2,
+        "无限暖暖相册管理工具": 1,
+        "無限暖暖相簿管理工具": 1,
+        "wxnn-photo-manager": 1,
+        "wxnn_photo_manager": 1
+      }
+    },
+    "scripts/__tests__/pack-identity-name.test.ts": {
+      "reason": "打包身份守卫的反向锁与禁改锁（OLD_PACK_TOKENS、perf-real/装置/e2e 逐字比对），属判据而非残留",
+      "hits": {
+        "NikkiGallery": 12,
+        "nikkiGallery": 1,
+        "nikki-gallery": 1,
+        "无限暖暖相册管理工具": 2,
+        "wxnn-photo-manager": 9,
+        "wxnn_photo_manager": 1
+      }
+    },
+    "scripts/__tests__/runtime-disk-name.test.ts": {
+      "reason": "运行时落盘名守卫的旧常量反向锁（DEFAULT_SERVER_NAME 旧值、link:nikkisync 提示里的本机目录名）",
+      "hits": {
+        "NikkiGallery": 2,
+        "WXNN XiangCe": 2,
+        "WXNN Photo": 1
+      }
+    },
+    "scripts/__tests__/ui-brand-name.test.ts": {
+      "reason": "界面品牌名守卫的旧展示名反向锁 + 仓库 URL 逐字锁，属判据而非残留",
+      "hits": {
+        "NikkiGallery": 11,
+        "nikkiGallery": 5,
+        "无限暖暖相册管理工具": 2,
+        "无限暖暖相册分享": 3,
+        "無限暖暖相簿管理工具": 1,
+        "WXNN Photo": 3,
+        "My Nikki Gallery": 3
+      }
+    },
+    "src/main/database/sync-read-repository.test.ts": {
+      "reason": "既有库存行 server_name 的自投 fixture，验证「有身份时不覆盖」，与 DEFAULT_SERVER_NAME 无关",
+      "hits": {
+        "WXNN XiangCe": 1
+      }
+    },
+    "src/main/ipc/handlers/resonance-handler.test.ts": {
+      "reason": "导入信封线格式 app:'nikkigallery' 的 handler 侧 fixture（§1.2 禁改，改则历史导出被拒）",
+      "hits": {
+        "nikkigallery": 1
+      }
+    },
+    "src/main/ipc/handlers/sync-handler.test.ts": {
+      "reason": "同步 handler 测试的 serverName 自投 fixture，非产品名站点",
+      "hits": {
+        "WXNN XiangCe": 1
+      }
+    },
+    "src/main/ipc/validator.test.ts": {
+      "reason": "反向锁：断言旧前缀备份名必被 zod 拒（阶段 6 C1 新增，老备份须改名后可用）",
+      "hits": {
+        "wxnn_photo_manager": 1
+      }
+    },
+    "src/main/nikkisync/embedding-paths.ts": {
+      "reason": "link 失败提示里的开发者本机仓库目录名 WXNN XiangCe（同级 NikkiSync 检出路径事实）",
+      "hits": {
+        "WXNN XiangCe": 2
+      }
+    },
+    "src/main/nikkisync/runtime-loader.ts": {
+      "reason": "@nikkisync 装载缝报错提示里的本机仓库目录名，非产品自称",
+      "hits": {
+        "WXNN XiangCe": 1
+      }
+    },
+    "src/main/nikkisync/runtime-manager.ts": {
+      "reason": "@nikkisync 链接未就绪的告警提示里的本机仓库目录名，非产品自称",
+      "hits": {
+        "WXNN XiangCe": 1
+      }
+    },
+    "src/main/plugins/permission-guard.ts": {
+      "reason": "读取插件清单磁盘键 info.nikkiGallery（§1.2 禁改，改键即全部第三方插件权限失效）",
+      "hits": {
+        "nikkiGallery": 1
+      }
+    },
+    "src/main/plugins/plugin-host.ts": {
+      "reason": "插件清单磁盘键 nikkiGallery 与类型名 NikkiGalleryManifest 的读写点（§1.2 禁改）",
+      "hits": {
+        "NikkiGallery": 3,
+        "nikkiGallery": 9
+      }
+    },
+    "src/main/sync/pairing-service.test.ts": {
+      "reason": "配对服务测试的 SERVER_NAME 自投常量，只验证透传，不改默认值语义",
+      "hits": {
+        "WXNN XiangCe": 1
+      }
+    },
+    "src/main/sync/server/api-router.test.ts": {
+      "reason": "移植面 api-router 测试的自投 serverName fixture，非产品名站点（§N4 明示不改）",
+      "hits": {
+        "WXNN XiangCe": 2
+      }
+    },
+    "src/main/sync/server/export-route.test.ts": {
+      "reason": "移植面导出路由测试的自投 serverName fixture，只断言逐字透传",
+      "hits": {
+        "WXNN XiangCe": 2
+      }
+    },
+    "src/main/sync/server/sync-server.integration.test.ts": {
+      "reason": "移植面集成测试的自投 serverName fixture，含 PairResponse 断言",
+      "hits": {
+        "WXNN XiangCe": 3
+      }
+    },
+    "src/main/utils/early-crash-guard.ts": {
+      "reason": "描述修复前实况的注释（弹窗目录与写入端曾分叉，当时常量值），按阶段 5 订正保留旧名 + 时态限定",
+      "hits": {
+        "NikkiGallery": 2
+      }
+    },
+    "src/main/utils/startup-diagnostic.ts": {
+      "reason": "描述修复前实况的注释（未注入 documents 时真实回落路径），按阶段 5 订正保留旧名 + 时态限定",
+      "hits": {
+        "NikkiGallery": 2
+      }
+    },
+    "src/renderer/components/common/UpdateDialog.test.tsx": {
+      "reason": "逐字锁定仓库 URL 的用例（证明更名未动 URL），属判据而非残留",
+      "hits": {
+        "NikkiGallery": 1
+      }
+    },
+    "src/renderer/components/common/UpdateDialog.tsx": {
+      "reason": "GITHUB_URL 常量（用户规定任何 URL 不动）",
+      "hits": {
+        "NikkiGallery": 1
+      }
+    },
+    "src/renderer/pages/settings/about-sections.tsx": {
+      "reason": "关于页三处仓库 URL（常量、openUrl 与可见的 github.com 文本），属 URL 禁改项",
+      "hits": {
+        "NikkiGallery": 3
+      }
+    },
+    "src/renderer/pages/settings/plugin-sections.tsx": {
+      "reason": "设置页读取插件清单磁盘键 plugin.nikkiGallery（§1.2 禁改）",
+      "hits": {
+        "nikkiGallery": 3
+      }
+    },
+    "src/renderer/pages/sync-gallery/SyncGalleryToolbar.test.tsx": {
+      "reason": "URL 逐字锁注释：区分本应用仓库与上游 NikkiSync 引擎仓库两个 repo",
+      "hits": {
+        "NikkiGallery": 1
+      }
+    },
+    "src/renderer/utils/resonance/exportPayload.ts": {
+      "reason": "导入信封线格式 app:'nikkigallery' 两处（zod literal，改则历史导出被拒；文件名已随 C3 转新名）",
+      "hits": {
+        "nikkigallery": 2
+      }
+    },
+    "src/shared/types/plugin.ts": {
+      "reason": "插件系统共享类型：类型名 NikkiGalleryManifest 与字段 nikkiGallery（§1.2 禁改）+ 描述该磁盘键的注释",
+      "hits": {
+        "NikkiGallery": 5,
+        "nikkiGallery": 3
+      }
+    },
+    "src/shared/types/resonance.test.ts": {
+      "reason": "信封线格式用例：断言 app:'nikkigallery' 仍是合法值",
+      "hits": {
+        "nikkigallery": 1
+      }
+    },
+    "src/shared/types/resonance.ts": {
+      "reason": "z.literal('nikkigallery') 与其默认值（导入信封线格式，§1.2 禁改）",
+      "hits": {
+        "nikkigallery": 2
+      }
+    },
+    "tools/scripts/extract_js.ps1": {
+      "reason": "一次性本机脚本里写死的历史磁盘路径（本机仓库目录名与旧产物目录名），属取证事实",
+      "hits": {
+        "wxnn-photo-manager": 1,
+        "WXNN XiangCe": 1
+      }
+    }
+  },
+  "rootFiles": [
+    "AGENTS.md",
+    "ARCHITECTURE.en.md",
+    "ARCHITECTURE.md",
+    "DEVELOPMENT.en.md",
+    "DEVELOPMENT.md",
+    "README.md",
+    "electron.vite.config.ts",
+    "eslint.config.js",
+    "package-lock.json",
+    "package.json",
+    "tailwind.config.ts",
+    "vitest.ci-linux.config.ts",
+    "vitest.config.ts",
+    "vitest.posix-host.config.ts"
+  ]
+}
