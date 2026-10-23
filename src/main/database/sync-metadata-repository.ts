@@ -81,7 +81,7 @@ const SQL_MOTION_LINK_BY_STILL =
 const SQL_PAIRING_CANDIDATES =
   "SELECT id, file_path, file_name, file_ext, file_type FROM media_files WHERE is_deleted = 0 AND file_type IN ('image', 'video')"
 
-export const DEFAULT_SERVER_NAME = 'WXNN XiangCe'
+export const DEFAULT_SERVER_NAME = 'Meow Star Map'
 
 // ============================================================================
 // Row Types

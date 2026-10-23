@@ -77,7 +77,7 @@ describe('resolveSyncServerConfig / embeddedServerConfig', () => {
   it('默认值：端口/绑定对齐上游桌面版，mDNS 刻意默认关（上游自激回环缺陷，见常量注释）', () => {
     const config = resolveSyncServerConfig()
     expect(config).toEqual({
-      name: 'NikkiGallery',
+      name: 'Meow Star Map',
       host: '0.0.0.0',
       port: 28080,
       mdns: false,

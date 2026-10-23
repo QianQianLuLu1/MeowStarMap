@@ -32,6 +32,8 @@ const read = (rel: string): string =>
 const CJK = '喵星图'
 /** 无空格 Pascal 形：只允许出现在文件名/目录名这类技术前缀 */
 const PACK = 'MeowStarMap'
+/** 英文品牌形（三词各一空格）：局域网配对时其他设备看到的服务器名 */
+const BRAND = 'Meow Star Map'
 /** 旧品牌名：只允许残留在「修复前实况」叙述与禁改项里 */
 const OLD = 'NikkiGallery'
 
@@ -163,6 +165,63 @@ describe('%TEMP% 应急日志前缀取无空格技术标识', () => {
   it('弹窗断言不得只含糊匹配品牌子串（必须逐字锚到兜底日志名）', () => {
     const handlers = read('src/main/app/__tests__/error-handlers.test.ts')
     expect(handlers).not.toContain("toContain('NikkiGallery')")
+  })
+})
+
+describe('配对服务默认显示名取英文品牌形（含空格，非 ASCII 会被上游清洗）', () => {
+  it('mDNS 实例名与 PairResponse.serverName 的默认值为 Meow Star Map', () => {
+    expect(read('src/main/nikkisync/sync-server-view.ts')).toContain(
+      `export const SYNC_SERVER_DEFAULT_NAME = '${BRAND}'`
+    )
+  })
+
+  it('落库默认服务器名为 Meow Star Map', () => {
+    expect(read('src/main/database/sync-metadata-repository.ts')).toContain(
+      `export const DEFAULT_SERVER_NAME = '${BRAND}'`
+    )
+  })
+
+  it('注释讲清清洗口径：放行空格与 _ -，清洗非 ASCII', () => {
+    const src = read('src/main/nikkisync/sync-server-view.ts')
+    expect(src).toContain('MdnsAdvertiser.ts:52')
+    expect(src).toContain('非 ASCII')
+  })
+
+  it('旧品牌名与本机目录名不再充当服务默认值', () => {
+    expect(read('src/main/nikkisync/sync-server-view.ts')).not.toContain(`'${OLD}'`)
+    expect(read('src/main/database/sync-metadata-repository.ts')).not.toContain(
+      "DEFAULT_SERVER_NAME = 'WXNN XiangCe'"
+    )
+  })
+
+  it('测试期望值与源码同值（默认名断言未被拆半）', () => {
+    expect(read('src/main/nikkisync/sync-server-view.test.ts')).toContain(`name: '${BRAND}'`)
+  })
+
+  it('已落库配对身份与上游证书标识未波及', () => {
+    const meta = read('src/main/database/sync-metadata-repository.ts')
+    expect(meta).toContain("wxnn-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}")
+    // 移植面的 TLS CN 由 C4 处理，此处只锁上游装载缝的 CN 断言不被顺手改
+    expect(read('src/main/nikkisync/sync-server.linked.test.ts')).toContain(
+      "toContain('NikkiSync Local')"
+    )
+    // link:nikkisync 失败提示里的是开发者本机仓库目录名，不是产品名
+    expect(read('src/main/nikkisync/runtime-loader.ts')).toContain('in WXNN XiangCe')
+  })
+
+  it('带空格品牌形不落到磁盘路径拼接上（三形互斥）', () => {
+    const files = [
+      'src/main/utils/user-diag-path.ts',
+      'src/main/utils/startup-diagnostic.ts',
+      'src/main/utils/early-crash-guard.ts',
+      'src/main/nikkisync/sync-server-view.ts'
+    ]
+    for (const file of files) {
+      for (const line of read(file).split('\n')) {
+        if (!line.includes(BRAND)) continue
+        expect(line, `${file}: ${line.trim()}`).not.toMatch(/path\.join|tmpdir\(\)/)
+      }
+    }
   })
 })
 

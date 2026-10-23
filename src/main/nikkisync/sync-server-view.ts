@@ -30,8 +30,8 @@ import type {
 export const SYNC_SERVER_DEFAULT_PORT = 28080
 /** 上游桌面版默认绑定（`windows-app.ts:127`）。 */
 export const SYNC_SERVER_DEFAULT_HOST = '0.0.0.0'
-/** mDNS 实例名与 `PairResponse.serverName`（非 ASCII 会被上游 `MdnsAdvertiser` 清洗掉）。 */
-export const SYNC_SERVER_DEFAULT_NAME = 'NikkiGallery'
+/** mDNS 实例名与 `PairResponse.serverName`：上游 `MdnsAdvertiser.ts:52` 的清洗只去非 ASCII（空格与 `_ -` 放行），故取英文品牌形，中文名会被洗掉。 */
+export const SYNC_SERVER_DEFAULT_NAME = 'Meow Star Map'
 /**
  * mDNS 默认**关闭**——这是对上游缺陷的集成侧兜底，不是随手改的默认值。
  *
