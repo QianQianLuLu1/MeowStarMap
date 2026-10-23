@@ -123,8 +123,8 @@ function toMessage(err: unknown): { message: string; stack: string } {
 
 function buildFatalContent(message: string, stack: string, logPath: string): string {
   return [
-    'NikkiGallery 启动失败，程序已退出。',
-    'NikkiGallery failed to start and has exited.',
+    '喵星图启动失败，程序已退出。',
+    'Meow Star Map failed to start and has exited.',
     '',
     `原因 / Reason: ${message}`,
     '',

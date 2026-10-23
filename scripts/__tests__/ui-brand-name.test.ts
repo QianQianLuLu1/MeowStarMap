@@ -75,6 +75,23 @@ describe('局域网分享页取新名 —— 手机浏览器可见', () => {
   })
 })
 
+describe('应急启动弹窗取新名 —— i18n 就绪前的原生对话框', () => {
+  // 硬编码双语串走 dialog.showErrorBox，此时 i18next 还没初始化，不能改走 t()（属逻辑变更）。
+  // 只锁两行文案：同文件 :64 的 NikkiGallery-startup-errors.log 是 %TEMP% 兜底日志名，
+  // 与 user-diag-path.ts:12 的诊断目录名同批（阶段 1 的 N2），本轮不碰。
+  const src = read('src/main/utils/early-crash-guard.ts')
+
+  it('致命弹窗中英两行取新名', () => {
+    expect(src).toContain("'喵星图启动失败，程序已退出。'")
+    expect(src).toContain("'Meow Star Map failed to start and has exited.'")
+  })
+
+  it('两行文案不再以旧名自称', () => {
+    expect(src).not.toContain('NikkiGallery 启动失败')
+    expect(src).not.toContain('NikkiGallery failed to start')
+  })
+})
+
 describe('语包软件名值锁（阶段 2 已落地，此处防回归）', () => {
   it.each(LOCALES)('%s 的 settings.about.appValue 与 titleBar.appTitle 取该语种新名', (locale) => {
     const data = readJson<AboutBlock>(localeRel(locale))
