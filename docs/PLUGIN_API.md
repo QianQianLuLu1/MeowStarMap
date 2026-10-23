@@ -1,8 +1,8 @@
-# NikkiGallery 插件开发 API 文档
+# 喵星图 插件开发 API 文档
 
 > 版本：v1.0 ｜ 对应 NikkiGallery v2.3.0+（经核对在 v2.5.0 仍然有效）｜ 核心框架：[pluggable-electron](https://github.com/dutchigor/pluggable-electron) v1.0.0
 
-本文档面向 NikkiGallery 插件开发者，描述插件包格式、生命周期、可用的 API 与扩展点。
+本文档面向喵星图插件开发者，描述插件包格式、生命周期、可用的 API 与扩展点。
 
 ---
 
@@ -76,10 +76,10 @@ export function dispose() {
 }
 ```
 
-### 1.2 安装到 NikkiGallery
+### 1.2 安装到喵星图
 
 1. 在插件目录执行 `npm pack` 生成 `my-first-plugin-1.0.0.tgz`
-2. 打开 NikkiGallery → 设置 → 插件管理 → 安装插件
+2. 打开喵星图 → 设置 → 插件管理 → 安装插件
 3. 输入 `.tgz` 文件路径，确认安装
 4. 启用插件后，水印面板将出现"Hello 插件水印"模板
 
@@ -99,13 +99,13 @@ export function dispose() {
 | `main`             | string                     | ✅   | 入口文件相对路径，默认 `index.js`                                |
 | `type`             | `"module"` \| `"commonjs"` | ❌   | 模块格式，渲染进程插件建议 `module`（ESM）                       |
 | `activationPoints` | string[]                   | ✅   | pluggable-electron 原生字段，列出响应的激活点，通常为 `["init"]` |
-| `nikkiGallery`     | object                     | ✅   | NikkiGallery 专用字段，见下表                                    |
+| `nikkiGallery`     | object                     | ✅   | 喵星图专用字段，见下表                                           |
 
 ### 2.2 nikkiGallery 字段
 
 | 字段              | 类型                             | 必填 | 说明                                                       |
 | ----------------- | -------------------------------- | ---- | ---------------------------------------------------------- |
-| `engines`         | string                           | ✅   | 兼容的 NikkiGallery 版本范围（semver）                     |
+| `engines`         | string                           | ✅   | 兼容的喵星图版本范围（semver）                             |
 | `permissions`     | string[]                         | ❌   | 申请的能力权限，缺省为 `[]`，见 [§9 权限清单](#9-权限清单) |
 | `extensionPoints` | string[]                         | ❌   | 声明将注册的扩展点，用于权限审计                           |
 | `i18n`            | string                           | ❌   | 国际化资源目录相对路径                                     |
@@ -117,8 +117,8 @@ export function dispose() {
 {
   "name": "custom-watermark-template",
   "version": "1.0.0",
-  "description": "NikkiGallery 自定义水印模板示例插件",
-  "author": "NikkiGallery",
+  "description": "Meow Star Map 自定义水印模板示例插件",
+  "author": "Meow Star Map",
   "license": "MIT",
   "main": "index.js",
   "type": "module",
@@ -281,7 +281,7 @@ extensionPoints.register(
 
 执行扩展点的所有响应，返回响应数组（异步响应为 Promise）。
 
-> 插件一般不调用此方法，主要由 NikkiGallery 内部组件消费扩展点。
+> 插件一般不调用此方法，主要由喵星图内部组件消费扩展点。
 
 ### 5.3 unregisterAll(pattern)
 
@@ -302,7 +302,7 @@ extensionPoints.unregisterAll(/^my-plugin:/)
 
 ## 6. 业务扩展点清单
 
-NikkiGallery 提供 6 个业务扩展点，插件可注册响应：
+喵星图提供 6 个业务扩展点，插件可注册响应：
 
 ### 6.1 watermark.template — 水印模板
 
@@ -506,7 +506,7 @@ window.pluginAPI.i18n.t(
 
 **说明**：
 
-- 复用 NikkiGallery 渲染进程的 i18next 实例
+- 复用喵星图渲染进程的 i18next 实例
 - 插件可在 `package.json.nikkiGallery.i18n` 指定自己的 i18n 资源目录
 - 未加载完成时返回原 key（不抛错）
 
@@ -523,7 +523,7 @@ interface PluggableElectronIpc {
 }
 ```
 
-NikkiGallery 在此基础上封装了更高层的管理 API（`window.electronAPI.plugin`）：
+喵星图在此基础上封装了更高层的管理 API（`window.electronAPI.plugin`）：
 
 ```typescript
 interface PluginManagementAPI {
@@ -575,7 +575,7 @@ interface PluginManagementAPI {
 | ---- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | L1   | Electron 渲染进程安全配置 | `contextIsolation: true` + `nodeIntegration: false` + `sandbox: true`                                                  |
 | L2   | pluggable-electron facade | facade 仅暴露只读查询（getActive / updatesAvailable），管理变更走受控的 `electronAPI.plugin` IPC；渲染进程无 Node 权限 |
-| L3   | NikkiGallery 权限声明     | 插件 package.json 声明 permissions（缺省为 `[]`），能力桥调用前校验                                                    |
+| L3   | 喵星图权限声明            | 插件 package.json 声明 permissions（缺省为 `[]`），能力桥调用前校验                                                    |
 | L4   | pathGuard 路径白名单      | 文件操作受限于白名单目录                                                                                               |
 
 ### 10.2 安全建议
@@ -689,34 +689,34 @@ export function init(extensionPoints) {
 
 ### 12.1 开发调试
 
-1. **打包测试**：在插件目录执行 `npm pack`，用生成的 `.tgz` 安装到 NikkiGallery
+1. **打包测试**：在插件目录执行 `npm pack`，用生成的 `.tgz` 安装到喵星图
 2. **目录直装**：pluggable-electron 支持直接从目录安装，便于开发期调试
 3. **DevTools**：应用菜单 → 查看 → 切换开发工具，查看插件 console 输出
-4. **插件目录**：`%APPDATA%/wxnn-photo-manager/plugins/`（Windows），可直接查看插件文件
+4. **插件目录**：`%APPDATA%/meow-star-map/plugins/`（Windows），可直接查看插件文件
 
 ### 12.2 常见问题
 
-| 问题                     | 原因                               | 解决方案                                                          |
-| ------------------------ | ---------------------------------- | ----------------------------------------------------------------- |
-| 插件 init 未执行         | `activationPoints` 未包含 `'init'` | 在 package.json 添加 `"activationPoints": ["init"]`               |
-| 扩展点响应未显示         | 扩展名未以 `'pluginName:'` 为前缀  | 修改扩展名格式                                                    |
-| 能力桥调用抛 `FORBIDDEN` | 插件未声明对应权限                 | 在 package.json 的 `nikkiGallery.permissions` 添加权限            |
-| 资源路径错误             | 未使用 `import.meta.url`           | 改用 `new URL('./path', import.meta.url).pathname`                |
-| 插件状态显示"错误"       | init 函数抛异常                    | 检查 DevTools console，修复异常                                   |
-| 重启后插件状态丢失       | 注册表写入失败                     | 检查 `%APPDATA%/wxnn-photo-manager/plugins/.plugin-registry.json` |
+| 问题                     | 原因                               | 解决方案                                                     |
+| ------------------------ | ---------------------------------- | ------------------------------------------------------------ |
+| 插件 init 未执行         | `activationPoints` 未包含 `'init'` | 在 package.json 添加 `"activationPoints": ["init"]`          |
+| 扩展点响应未显示         | 扩展名未以 `'pluginName:'` 为前缀  | 修改扩展名格式                                               |
+| 能力桥调用抛 `FORBIDDEN` | 插件未声明对应权限                 | 在 package.json 的 `nikkiGallery.permissions` 添加权限       |
+| 资源路径错误             | 未使用 `import.meta.url`           | 改用 `new URL('./path', import.meta.url).pathname`           |
+| 插件状态显示"错误"       | init 函数抛异常                    | 检查 DevTools console，修复异常                              |
+| 重启后插件状态丢失       | 注册表写入失败                     | 检查 `%APPDATA%/meow-star-map/plugins/.plugin-registry.json` |
 
 ### 12.3 日志位置
 
-- 应用日志：`%APPDATA%/wxnn-photo-manager/logs/`
-- 插件注册表：`%APPDATA%/wxnn-photo-manager/plugins/.plugin-registry.json`
-- 插件文件：`%APPDATA%/wxnn-photo-manager/plugins/<plugin-name>/`
+- 应用日志：`%APPDATA%/meow-star-map/logs/`
+- 插件注册表：`%APPDATA%/meow-star-map/plugins/.plugin-registry.json`
+- 插件文件：`%APPDATA%/meow-star-map/plugins/<plugin-name>/`
 
 ### 12.4 开发者检查清单
 
 发布插件前，请检查：
 
 - [ ] `package.json` 字段完整（name / version / main / activationPoints / nikkiGallery）
-- [ ] `nikkiGallery.engines` 与目标 NikkiGallery 版本兼容
+- [ ] `nikkiGallery.engines` 与目标喵星图版本兼容
 - [ ] `nikkiGallery.permissions` 仅声明必要权限（最小权限原则）
 - [ ] 插件入口导出 `init(extensionPoints)` 函数
 - [ ] 注册的扩展名以 `'pluginName:'` 为前缀
@@ -724,7 +724,7 @@ export function init(extensionPoints) {
 - [ ] init 函数内的异常被捕获或上抛（上抛会被框架捕获，不影响其他插件）
 - [ ] dispose 函数清理了插件自身的资源（定时器、监听器等）
 - [ ] 通过 `npm pack` 打包测试安装流程
-- [ ] 在 NikkiGallery 中启用/禁用/卸载流程均正常
+- [ ] 在喵星图中启用/禁用/卸载流程均正常
 
 ---
 
