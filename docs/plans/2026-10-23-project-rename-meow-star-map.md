@@ -495,16 +495,35 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
 
 ## 执行记录
 
-| 节点              | 命令                                                                                      | 结果                             | 关键计数                                                                                                            |
-| ----------------- | ----------------------------------------------------------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| 阶段 1            | 盘点（`git grep` 三组模式 + 4 个 Explore/Plan 代理）                                      | `[PLAN] ✓` 交付本文              | `NikkiGallery` 259/72 文件；中文名 44/26 文件；`wxnn` 649/156 文件（多数禁改）                                      |
-| —                 | `npm run i18n:guard`                                                                      | `✅`（基线）                     | —                                                                                                                   |
-| —                 | `npm run docs:links`                                                                      | `✅ 无死引用`（基线 153 处提醒） | `dead = 0`                                                                                                          |
-| N8（文档部分）    | 阶段 2：`.cache/rename-scan/apply.mjs` 逐行锚定替换 + 复扫                                | `[VERIFY] ✓` 交付                | 红灯 166 行 / 27 文件 → 绿灯 20 行（全部为台账保留项）；`docs:links` dead 0                                         |
-| N1–N7             | 未开始（本轮按用户决策只动文档与展示 JSON，不改代码与打包身份）                           | —                                | 代码与配置残留 248 行 / 74 文件                                                                                     |
-| N5 + N6（界面层） | 阶段 3：`apply.mjs` 逐行锚定 6 提交 + 新增 `scripts/__tests__/ui-brand-name.test.ts` 守卫 | `[VERIFY] ✓` 交付                | 扫描域 `src` + `plugins-samples` 196 行 / 73 文件 → 178 行 / 61 文件（Δ = −18）；全量 431 files / 6595 tests passed |
+| 节点                     | 命令                                                                                                                               | 结果                             | 关键计数                                                                                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 阶段 1                   | 盘点（`git grep` 三组模式 + 4 个 Explore/Plan 代理）                                                                               | `[PLAN] ✓` 交付本文              | `NikkiGallery` 259/72 文件；中文名 44/26 文件；`wxnn` 649/156 文件（多数禁改）                                                                                                                                    |
+| —                        | `npm run i18n:guard`                                                                                                               | `✅`（基线）                     | —                                                                                                                                                                                                                 |
+| —                        | `npm run docs:links`                                                                                                               | `✅ 无死引用`（基线 153 处提醒） | `dead = 0`                                                                                                                                                                                                        |
+| N8（文档部分）           | 阶段 2：`.cache/rename-scan/apply.mjs` 逐行锚定替换 + 复扫                                                                         | `[VERIFY] ✓` 交付                | 红灯 166 行 / 27 文件 → 绿灯 20 行（全部为台账保留项）；`docs:links` dead 0                                                                                                                                       |
+| N1–N7                    | 未开始（本轮按用户决策只动文档与展示 JSON，不改代码与打包身份）                                                                    | —                                | 代码与配置残留 248 行 / 74 文件                                                                                                                                                                                   |
+| N5 + N6（界面层）        | 阶段 3：`apply.mjs` 逐行锚定 6 提交 + 新增 `scripts/__tests__/ui-brand-name.test.ts` 守卫                                          | `[VERIFY] ✓` 交付                | 扫描域 `src` + `plugins-samples` 196 行 / 73 文件 → 178 行 / 61 文件（Δ = −18）；全量 431 files / 6595 tests passed                                                                                               |
+| N1 + N7（打包/流水线层） | 阶段 4：`apply.mjs` 逐行锚定 7 提交 + 新增 `scripts/__tests__/pack-identity-name.test.ts` 守卫（37 用例）+ 真跑 `npm run dist:win` | `[VERIFY] ✓` 交付                | 域内 271 行 / 71 文件 → 259 行（消 36 处站点，守卫自身新增 24 行禁改字面量）；全量 432 files / 6632 tests passed；产物实测 `MeowStarMap-Setup-2.5.5-beta.exe` 与 `win-unpacked/喵星图.exe`，`verify:dist` 18 项 ✔ |
 
 阶段 2 的红绿读数、保留台账与已知偏差见 [`2026-10-23-rename-docs-pass.md`](./2026-10-23-rename-docs-pass.md)；
 阶段 3（界面文字与多语言资源，覆盖本文 B 类表的全部界面站点，并新发现两处默认内容形态与一处 TLS 证书 CN）见
-[`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md)。
-本文 §1.1 的名称映射表与 §1.2 的禁改清单仍是后续节点（N1–N4、N7）的取值依据。
+[`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md)；
+阶段 4（打包、构建与流水线配置，即本文 N1 与 N7 的打包/流水线部分，含真实 `dist:win` 取证）见
+[`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md)。
+本文 §1.1 的名称映射表与 §1.2 的禁改清单仍是后续节点（N2、N3、N4）的取值依据。
+
+### 阶段 4 对本文两处口径的订正
+
+1. §N7 的验收写的「`git grep -c "/home/runner/work/MeowStarMap/MeowStarMap"` = 4」实为 **3 个文件 / 7 处字面量**
+   （`tests/ci-linux.setup.ts:51/:126`、`tests/mocks/ci-linux-fs.ts:23/:292`、
+   `src/main/utils/ci-linux-emulation.test.ts:53/:128/:132`）。
+2. §N7 与 `docs/plans/2026-10-21-fix-ci-smoke-timeout-and-clear-warnings.md` 说「改装置需同步
+   `path-semantics-guard` 登记表」——阶段 4 实测该守卫只断言装置文件存在与七轴 token 在场，
+   **不钉 `CI_ROOT` 字面值**，故登记表无需同步。
+3. §N1 的绿灯写的「`npx prettier --check --end-of-line auto package.json package-lock.json`」对 lock 是空操作
+   （`.prettierignore:6` 已排除 `package-lock.json`）；阶段 4 改用
+   `git diff --numstat -- package-lock.json` = 2 增 2 删 + `"libc"` 计数仍 16 作为判据。
+4. §二 曾规定「不运行 `npm install`，lock 的 `name` 手工编辑」。阶段 4 按用户要求改用仓内既有方式同步，
+   实测 `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` **不产生** 历史多轮的
+   `"libc"` 剥离 churn（diff 恰为 2 行 `"name"`），且不动 `node_modules` ⇒ 该约束可放宽为
+   「只允许 `--package-lock-only` 形态」。

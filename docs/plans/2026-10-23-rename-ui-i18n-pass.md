@@ -1,7 +1,7 @@
 # 阶段 3 执行记录：界面文字与多语言资源更名（喵星图 / Meow Star Map）
 
 > **状态**：已交付。打包身份、数据库与备份名、诊断目录名、同步面标识、CI 宿主装置（阶段 1 计划的
-> N1–N4 与 N7）**未在本轮执行**。
+> N1–N4 与 N7）**未在本轮执行**；其中 **N1 与 N7 已由阶段 4 交付**，N2/N3/N4 仍待放行。
 > **日期**：2026-10-23
 > **上游计划**：[`2026-10-23-project-rename-meow-star-map.md`](./2026-10-23-project-rename-meow-star-map.md)
 > （§1.1 名称映射表为唯一取值依据，§1.2 为禁改清单）
@@ -96,15 +96,25 @@ URL、类型名与任何逻辑；一节点一提交；绿灯判据取「残留�
 `npm run lint` 归零。根治要动 `.gitignore` 或 `eslint.config.js` 的 ignores，属配置变更，**不在本轮授权范围**，
 留待单独一轮（建议与 N1 打包身份同批，避免又一处「文档/配置分叉」）。
 
+> **已由阶段 4 收口**（提交 `83652b3`）。且实测证明本轮那句「动 `.gitignore` 或 `eslint.config.js`」里的
+> **或**字必须改成**且**：ESLint 9 的 flat config 不读 `.gitignore`，只补 `.gitignore` 一行消不掉那 42 条
+> 假错误，两处都得加。取证见
+> [`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md) 第五节。
+
 ## 六、已知偏差（本轮不修，逐项交代去向）
 
 1. **弹窗文字新、弹窗内路径旧**：`early-crash-guard.ts:126/:127` 已取新名，但同弹窗的
    `日志文件 / Log file:` 插值出的仍是 `Documents\NikkiGallery\Diagnostics\startup-errors.log`
    ⇒ 由 N2（诊断目录常量 + 11 条断言）关闭。
 2. **快捷方式名与安装器分叉**：运行时写出的文件已是 `喵星图.lnk`，而 `package.json:297`
-   `nsis.shortcutName` 仍是旧中文全名 ⇒ 由 N1 关闭（阶段 1 明确二者须同 commit）。
+   `nsis.shortcutName` 仍是旧中文全名 ⇒ ~~由 N1 关闭~~ **已由阶段 4 关闭**
+   （[`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md) 提交 `d556a2a`，
+   实测产物 `release/win-unpacked/喵星图.exe`）。
 3. **进程名指称**（承接阶段 2 偏差 3，仍未闭合）：zh-CN `main.dialog.cleanupFailed.detail` 要求结束
-   「喵星图」进程，任务管理器里的进程名仍是 `无限暖暖相册管理工具.exe` ⇒ 由 N1 关闭。
+   「喵星图」进程，任务管理器里的进程名仍是 `无限暖暖相册管理工具.exe` ⇒ ~~由 N1 关闭~~
+   **已由阶段 4 关闭**（`productName` = `喵星图` ⇒ exe 文件名即进程名）。注意 exe 的 **PE 资源元数据**
+   仍不随 `productName`（`win.signAndEditExecutable: false` 跳过资源编辑），右键属性看到的还是
+   Electron 默认值，该剩余项登记在阶段 4 记录的第九节 6。
 4. **手机端同步标识全为旧名**：`SYNC_SERVER_DEFAULT_NAME = 'NikkiGallery'`、
    `DEFAULT_SERVER_NAME = 'WXNN XiangCe'`、TLS CN `WXNN Photo Manager Local` ⇒ N4 / 单独评估。
 5. **关于页标签与 URL 并存**：`:75` 现为 `Meow Star Map`，同文件 `:17/:395/:399` 三处仍是
@@ -112,16 +122,21 @@ URL、类型名与任何逻辑；一节点一提交；绿灯判据取「残留�
 6. **标题类仍是硬编码中文**：`index.html` 的 `<title>` 与分享页标题不随 locale 变，非中文语种用户看到的
    仍是中文自称。改走 `t()` 属逻辑变更，本轮禁止 ⇒ 记录为后续可选项，不是缺陷。
 
-## 七、阶段 3 之外的剩余（N1–N4、N7）
+## 七、阶段 3 之外的剩余
 
-扫描域（`src` + `plugins-samples`）剩 178 行，全部落在第三节的台账分类里，对应：
+扫描域（`src` + `plugins-samples`）在阶段 3 末剩 178 行，全部落在第三节的台账分类里，对应：
 
 - **N1** 打包身份五字段 + `package-lock.json:2/8` + `%APPDATA%` 手工拼装 + `.github/workflows/build.yml` 产物名
-- **N2** 诊断目录常量与 `%TEMP%` 日志名（67 行里的诊断相关部分 + 11 条断言）
-- **N3** 数据库与备份文件名前缀链（65 行，13 处源码 + 约 56 处断言，爆炸半径最大）
-- **N4** 同步面可见标识（16 + mDNS 实例名）
+  ⇒ **已由阶段 4 交付**（`d556a2a` + `216c20c`）
+- **N2** 诊断目录常量与 `%TEMP%` 日志名（67 行里的诊断相关部分 + 11 条断言）⇒ 待做
+- **N3** 数据库与备份文件名前缀链（65 行，13 处源码 + 约 56 处断言，爆炸半径最大）⇒ 待做
+- **N4** 同步面可见标识（16 + mDNS 实例名）⇒ 待做
 - **N7** `scripts/doctor.ts` 横幅、CI 宿主装置四站点（须同 commit）、`docs/sync-integration/verify-audit.mjs:39`
+  ⇒ **已由阶段 4 交付**（`7a460fa` + `7ce73d4`；装置实为 3 文件 / 7 处而非 4 处）
 - **N8** 已随阶段 2 完成
+
+阶段 4 的红绿读数、真实打包取证与新增偏差见
+[`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md)。
 
 ## 附：本轮工装（`.cache/rename-scan/`，被 gitignore，git 里查不到）
 
