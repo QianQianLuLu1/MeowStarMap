@@ -217,3 +217,48 @@ describe('禁改项未被动 —— 证明更名没有越界', () => {
     expect(xmp).toContain('http://wxnn.qianlu.com/xmp/1.0/')
   })
 })
+
+interface FeedbackBlock {
+  common?: { feedbackDialog?: { qqGroupValue?: string } }
+}
+
+/**
+ * 反馈弹窗的「点击复制群号」复制的是整条语包串（FeedbackDialog.tsx:189 把 t('…qqGroupValue')
+ * 原样交给 clipboard），而 12 个语包该键的取值一直是占位 123456789 —— 用户复制到的是一串假号。
+ * 同一组的兄弟键 githubValue 已在阶段 7 换成真实 issues 地址（18723e4），qqGroupValue 是它漏掉的那一项。
+ * 真实群号的另一份副本在 about-sections.tsx:18 `const QQ_GROUP`。不引入共享常量：那要求把 12 条串改成
+ * 插值并在渲染层新增模块导入，属结构性改动；改由下面的跨源等值断言拿到同一保证。
+ * 前缀逐语包原样保留（实测只有 "QQ群: " 与 "QQ Group: " 两种形态），本守卫只锁号码本身。
+ */
+const REAL_QQ_GROUP = '635492596'
+
+const qqGroupFromAboutPage = (): string => {
+  const matched = read('src/renderer/pages/settings/about-sections.tsx').match(
+    /const QQ_GROUP = '(\d+)'/
+  )
+  if (!matched) throw new Error('about-sections.tsx 未找到 const QQ_GROUP 声明（跨源判据失效）')
+  return matched[1]
+}
+
+describe('反馈弹窗 QQ 群号取真实值 —— 语包与关于页同源', () => {
+  it.each(LOCALES)('%s 的 common.feedbackDialog.qqGroupValue 不是占位假号', (locale) => {
+    const value = readJson<FeedbackBlock>(localeRel(locale)).common?.feedbackDialog?.qqGroupValue
+    expect(value, `${locale} 缺 common.feedbackDialog.qqGroupValue`).toBeTypeOf('string')
+    expect(value, `${locale} 仍含占位群号`).not.toContain('123456789')
+    expect(value, `${locale} 未取真实群号`).toContain(REAL_QQ_GROUP)
+  })
+
+  // 复制的是整串 ⇒ 串尾必须就是号码本身；把语包与 TSX 常量钉成同值，任一副本单独漂移即红。
+  it('12 个语包的群号与关于页 QQ_GROUP 同值（防两处副本各自漂移）', () => {
+    const fromAboutPage = qqGroupFromAboutPage()
+    expect(fromAboutPage, '关于页 QQ_GROUP 与本守卫常量不一致').toBe(REAL_QQ_GROUP)
+    for (const locale of LOCALES) {
+      const value =
+        readJson<FeedbackBlock>(localeRel(locale)).common?.feedbackDialog?.qqGroupValue ?? ''
+      expect(
+        value.endsWith(fromAboutPage),
+        `${locale} 的 qqGroupValue 结尾非 ${fromAboutPage}`
+      ).toBe(true)
+    }
+  })
+})
