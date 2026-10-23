@@ -736,7 +736,7 @@ describe('getAssetMetadata / getResourceLocation / getServerInfo / getChanges', 
     const info = await fx.repo.getServerInfo()
     expect(info.protocolVersion).toBe(1)
     expect(info.serverId).toMatch(/^wxnn-[0-9a-f]{16}$/)
-    expect(info.name).toBe('WXNN XiangCe')
+    expect(info.name).toBe('Meow Star Map')
     expect(info.capabilities).toEqual({
       websocketEvents: true,
       rangeRequests: true,

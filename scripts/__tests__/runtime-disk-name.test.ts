@@ -196,6 +196,11 @@ describe('配对服务默认显示名取英文品牌形（含空格，非 ASCII 
 
   it('测试期望值与源码同值（默认名断言未被拆半）', () => {
     expect(read('src/main/nikkisync/sync-server-view.test.ts')).toContain(`name: '${BRAND}'`)
+    // getServerInfo 在库里没有既有身份时走 ensureServerIdentity 的新建分支，
+    // 这条断言实际锁的就是 DEFAULT_SERVER_NAME 的字面值（曾被误判为自投 fixture，实跑证伪）
+    expect(read('src/main/database/sync-read-repository.test.ts')).toContain(
+      `expect(info.name).toBe('${BRAND}')`
+    )
   })
 
   it('已落库配对身份与上游证书标识未波及', () => {
