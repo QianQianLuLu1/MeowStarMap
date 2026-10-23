@@ -1,8 +1,8 @@
 # Development Guide (DEVELOPMENT.en.md)
 
-> A beginner-friendly development guide for "Infinity Nikki Photo Manager" (NikkiGallery).
+> A beginner-friendly development guide for "Meow Star Map" (喵星图).
 > All commands can be copied directly into a PowerShell terminal.
-> Project codename: `wxnn-photo-manager` / App name: NikkiGallery / Current version: 2.5.5-beta / Platform: Windows x64
+> Project codename: `meow-star-map` / App name: Meow Star Map / Current version: 2.5.5-beta / Platform: Windows x64
 
 ---
 
@@ -63,7 +63,7 @@ Expected output: `10.x.x` or higher.
 The project root is the directory containing this file. All commands assume you are in the project root.
 
 ```bash
-cd NikkiGallery
+cd MeowStarMap
 ```
 
 ### 2.2 Install Dependencies (first run only)
@@ -157,7 +157,7 @@ npm run dist:win:smoke
 ## 3. Directory Layout
 
 ```
-WXNN XiangCe/
+MeowStarMap/
 ├── src/
 │   ├── main/                  # Electron main process (Node environment)
 │   │   ├── index.ts           # Main entry (early guards + protocol registration + Application bootstrap)
@@ -314,27 +314,27 @@ In the running Electron window, press `Ctrl+Shift+I` to open DevTools:
 Logs are written to:
 
 ```
-%APPDATA%\wxnn-photo-manager\logs\
+%APPDATA%\meow-star-map\logs\
 ```
 
 Open in PowerShell:
 
 ```powershell
-explorer "$env:APPDATA\wxnn-photo-manager\logs"
+explorer "$env:APPDATA\meow-star-map\logs"
 ```
 
 Key log files:
 
 - `main.log`: application log
 - `faults-YYYY-MM-DD.jsonl`: fault records (10 FaultType categories, rolled by date)
-- `startup-errors.log`: startup error log (in the userData root or `Documents\NikkiGallery\Diagnostics\`, 100KB rolling)
+- `startup-errors.log`: startup error log (in the userData root or `Documents\MeowStarMap\Diagnostics\`, 100KB rolling)
 
 ### 4.5 Inspect the Database
 
 The database file is at:
 
 ```
-%APPDATA%\wxnn-photo-manager\database\wxnn_photo_manager.db
+%APPDATA%\meow-star-map\database\meow_star_map.db
 ```
 
 Use [DB Browser for SQLite](https://sqlitebrowser.org/) to open and inspect it.
@@ -648,7 +648,7 @@ Quick checks:
 1. Confirm the game has produced screenshots (e.g. `...\InfinityNikki\Saved\ScreenShot\` contains files)
 2. In Settings → Scan, click "Scan now"
 3. Manually add the game directory to custom scan paths
-4. Check `%APPDATA%\wxnn-photo-manager\logs\main.log` for errors
+4. Check `%APPDATA%\meow-star-map\logs\main.log` for errors
 
 ### 6.7 App crashes / exits immediately
 
@@ -657,13 +657,13 @@ See the troubleshooting manual for "Crash / exit".
 Crash dumps are at (the app redirects them to the user's Documents folder at startup, keeping them out of AppData):
 
 ```
-%USERPROFILE%\Documents\NikkiGallery\Diagnostics\
+%USERPROFILE%\Documents\MeowStarMap\Diagnostics\
 ```
 
 Open in PowerShell:
 
 ```powershell
-explorer "$env:USERPROFILE\Documents\NikkiGallery\Diagnostics"
+explorer "$env:USERPROFILE\Documents\MeowStarMap\Diagnostics"
 ```
 
 > The 10 most recent crash files are retained, and files older than 30 days are auto-cleaned.
@@ -675,16 +675,16 @@ explorer "$env:USERPROFILE\Documents\NikkiGallery\Diagnostics"
 **Step 2**: Clean potentially corrupt files:
 
 ```powershell
-explorer "$env:APPDATA\wxnn-photo-manager"
+explorer "$env:APPDATA\meow-star-map"
 ```
 
 Delete these files (**back them up first**):
 
-- `wxnn_photo_manager.db-wal`
-- `wxnn_photo_manager.db-shm`
-- `wxnn_photo_manager.db-journal`
+- `meow_star_map.db-wal`
+- `meow_star_map.db-shm`
+- `meow_star_map.db-journal`
 
-**Do NOT delete** `wxnn_photo_manager.db` (that is your media database).
+**Do NOT delete** `meow_star_map.db` (that is your media database).
 
 **Step 3**: Reset config (last resort): rename `config.json` to `config.json.bak` and restart the app.
 
@@ -696,7 +696,7 @@ Delete these files (**back them up first**):
 
 1. Check the system tray for the app icon
 2. Click "Clean and restart" in the dialog
-3. If that fails, click "Manual handling" and end all processes named "无限暖暖相册管理工具" in Task Manager
+3. If that fails, click "Manual handling" and end all processes named "喵星图" in Task Manager
 
 Force-kill via PowerShell:
 
@@ -785,24 +785,24 @@ After packaging:
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.5-beta.exe  # NSIS installer (artifactName: NikkiGallery-Setup-${version}.${ext})
+├── MeowStarMap-Setup-2.5.5-beta.exe  # NSIS installer (artifactName: MeowStarMap-Setup-${version}.${ext})
 └── builder-effective-config.yaml             # build config snapshot
 ```
 
 ### 7.5 Build Config (`build` field in `package.json`)
 
-| Field                          | Value                           | Description                                       |
-| ------------------------------ | ------------------------------- | ------------------------------------------------- |
-| `appId`                        | `com.qianlu.wxnn-photo-manager` | Unique app identifier                             |
-| `productName`                  | `无限暖暖相册管理工具`          | Display name                                      |
-| `directories.output`           | `release`                       | Output directory                                  |
-| `files`                        | `dist/**/*`, `resources/**/*`   | Files included                                    |
-| `asarUnpack`                   | see table below                 | Native deps that must not be packed into asar     |
-| `win.target`                   | `nsis` x64                      | Windows NSIS installer                            |
-| `win.icon`                     | `resources/icons/icon.ico`      | App icon                                          |
-| `nsis.oneClick`                | `false`                         | Non-one-click install; allows directory selection |
-| `nsis.createDesktopShortcut`   | `always`                        | Always create desktop shortcut                    |
-| `nsis.createStartMenuShortcut` | `true`                          | Create Start menu shortcut                        |
+| Field                          | Value                         | Description                                       |
+| ------------------------------ | ----------------------------- | ------------------------------------------------- |
+| `appId`                        | `com.qianlu.meow-star-map`    | Unique app identifier                             |
+| `productName`                  | `喵星图`                      | Display name                                      |
+| `directories.output`           | `release`                     | Output directory                                  |
+| `files`                        | `dist/**/*`, `resources/**/*` | Files included                                    |
+| `asarUnpack`                   | see table below               | Native deps that must not be packed into asar     |
+| `win.target`                   | `nsis` x64                    | Windows NSIS installer                            |
+| `win.icon`                     | `resources/icons/icon.ico`    | App icon                                          |
+| `nsis.oneClick`                | `false`                       | Non-one-click install; allows directory selection |
+| `nsis.createDesktopShortcut`   | `always`                      | Always create desktop shortcut                    |
+| `nsis.createStartMenuShortcut` | `true`                        | Create Start menu shortcut                        |
 
 **asarUnpack list** (native binaries must be unpacked or they will fail to load):
 
@@ -829,7 +829,7 @@ node scripts/generate-icon.js
 
 ### 7.7 Install and Test
 
-1. Double-click `release\NikkiGallery-Setup-2.5.5-beta.exe` to install
+1. Double-click `release\MeowStarMap-Setup-2.5.5-beta.exe` to install
 2. Launch from Start menu or desktop shortcut
 3. On first launch a full-disk scan runs to locate the game directory (first scan is slow; please be patient)
 4. A desktop shortcut is created automatically (skipped if it already exists)
@@ -839,7 +839,7 @@ node scripts/generate-icon.js
 ### 7.8 Version Number Management
 
 - **Do not change the version number** unless explicitly requested
-- Version is in `package.json` `version` field; it also determines the installer filename: `NikkiGallery-Setup-<version>.exe`
+- Version is in `package.json` `version` field; it also determines the installer filename: `MeowStarMap-Setup-<version>.exe`
 - Current version: `2.5.5-beta`
 - After changing it, also update the version badge in `README.md` and the "Current Version" field in `ARCHITECTURE.md` / `ARCHITECTURE.en.md` and the header of this guide
 

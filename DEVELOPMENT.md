@@ -1,8 +1,8 @@
 # 开发指南 DEVELOPMENT.md
 
-> 面向零基础开发者的「无限暖暖相册管理工具」上手文档。
+> 面向零基础开发者的「喵星图」上手文档。
 > 所有命令均可直接复制到 PowerShell 终端运行。
-> 项目代号：`wxnn-photo-manager` / 应用名：NikkiGallery / 当前版本：2.5.5-beta / 平台：Windows x64
+> 项目代号：`meow-star-map` / 应用名：喵星图 / 当前版本：2.5.5-beta / 平台：Windows x64
 
 ---
 
@@ -63,7 +63,7 @@ npm -v
 项目根目录即本文件所在目录。命令均假设你在项目根目录下执行。
 
 ```bash
-cd NikkiGallery
+cd MeowStarMap
 ```
 
 ### 2.2 安装依赖（首次运行必做）
@@ -158,7 +158,7 @@ npm run dist:win:smoke
 ## 三、目录说明
 
 ```
-WXNN XiangCe/
+MeowStarMap/
 ├── src/
 │   ├── main/                  # Electron 主进程（Node 环境）
 │   │   ├── index.ts           # 主入口（早期防护 + 协议注册 + 启动 Application）
@@ -314,27 +314,27 @@ npm run dev
 应用启动后，日志位于：
 
 ```
-%APPDATA%\wxnn-photo-manager\logs\
+%APPDATA%\meow-star-map\logs\
 ```
 
 PowerShell 直接打开：
 
 ```powershell
-explorer "$env:APPDATA\wxnn-photo-manager\logs"
+explorer "$env:APPDATA\meow-star-map\logs"
 ```
 
 主要日志文件：
 
 - `main.log`：应用运行日志
 - `faults-YYYY-MM-DD.jsonl`：故障记录（10 类 FaultType，按日期滚动）
-- `startup-errors.log`：启动错误日志（位于 userData 根目录或 `用户文档\NikkiGallery\Diagnostics\`，100KB 滚动）
+- `startup-errors.log`：启动错误日志（位于 userData 根目录或 `用户文档\MeowStarMap\Diagnostics\`，100KB 滚动）
 
 ### 4.5 查看数据库
 
 数据库文件位于：
 
 ```
-%APPDATA%\wxnn-photo-manager\database\wxnn_photo_manager.db
+%APPDATA%\meow-star-map\database\meow_star_map.db
 ```
 
 推荐使用 [DB Browser for SQLite](https://sqlitebrowser.org/) 打开查看。
@@ -644,20 +644,20 @@ npx vitest run --reporter=verbose
 1. 确认游戏已生成截图（`...\InfinityNikki\Saved\ScreenShot\` 等目录有文件）
 2. 在程序「设置 → 扫描」点击「立即扫描」
 3. 手动添加游戏目录到自定义扫描路径
-4. 查看 `%APPDATA%\wxnn-photo-manager\logs\main.log` 是否有错误
+4. 查看 `%APPDATA%\meow-star-map\logs\main.log` 是否有错误
 
 ### 6.7 应用崩溃闪退
 
 崩溃 dump 位于（应用启动时已重定向到用户文档目录，避免藏在 AppData）：
 
 ```
-%USERPROFILE%\Documents\NikkiGallery\Diagnostics\
+%USERPROFILE%\Documents\MeowStarMap\Diagnostics\
 ```
 
 PowerShell 打开：
 
 ```powershell
-explorer "$env:USERPROFILE\Documents\NikkiGallery\Diagnostics"
+explorer "$env:USERPROFILE\Documents\MeowStarMap\Diagnostics"
 ```
 
 > 崩溃文件保留最近 10 份且超过 30 天自动清理。
@@ -669,16 +669,16 @@ explorer "$env:USERPROFILE\Documents\NikkiGallery\Diagnostics"
 **步骤 2**：清理可能的损坏文件：
 
 ```powershell
-explorer "$env:APPDATA\wxnn-photo-manager"
+explorer "$env:APPDATA\meow-star-map"
 ```
 
 删除以下文件（**注意：先备份**）：
 
-- `wxnn_photo_manager.db-wal`
-- `wxnn_photo_manager.db-shm`
-- `wxnn_photo_manager.db-journal`
+- `meow_star_map.db-wal`
+- `meow_star_map.db-shm`
+- `meow_star_map.db-journal`
 
-**不要删除** `wxnn_photo_manager.db`（这是你的媒体数据库）。
+**不要删除** `meow_star_map.db`（这是你的媒体数据库）。
 
 **步骤 3**：重置配置（最后手段）：将 `config.json` 重命名为 `config.json.bak`，重启程序。
 
@@ -690,7 +690,7 @@ explorer "$env:APPDATA\wxnn-photo-manager"
 
 1. 检查任务栏托盘是否有本程序图标
 2. 点击对话框「清理并重启」按钮
-3. 失败时点击「手动处理」，在任务管理器结束所有名为「无限暖暖相册管理工具」的进程
+3. 失败时点击「手动处理」，在任务管理器结束所有名为「喵星图」的进程
 
 PowerShell 强制结束：
 
@@ -701,8 +701,8 @@ Get-Process | Where-Object { $_.ProcessName -like '*wxnn*' -or $_.ProcessName -l
 ### 6.10 更多排障
 
 - 崩溃与启动问题：见上方 6.6 - 6.9 节
-- 日志位置：`%APPDATA%\wxnn-photo-manager\logs\`（`main.log` 常规日志、`faults-*.jsonl` 故障记录；`startup-errors.log` 启动错误）
-- 崩溃 dump：`%USERPROFILE%\Documents\NikkiGallery\Diagnostics\`
+- 日志位置：`%APPDATA%\meow-star-map\logs\`（`main.log` 常规日志、`faults-*.jsonl` 故障记录；`startup-errors.log` 启动错误）
+- 崩溃 dump：`%USERPROFILE%\Documents\MeowStarMap\Diagnostics\`
 - 诊断包导出：设置 → 诊断 → 一键导出诊断包
 
 ---
@@ -782,24 +782,24 @@ npx electron-builder --win --publish never
 
 ```
 release/
-├── NikkiGallery-Setup-2.5.5-beta.exe  # NSIS 安装程序（artifactName: NikkiGallery-Setup-${version}.${ext}）
+├── MeowStarMap-Setup-2.5.5-beta.exe  # NSIS 安装程序（artifactName: MeowStarMap-Setup-${version}.${ext}）
 └── builder-effective-config.yaml             # 打包配置快照
 ```
 
 ### 7.5 打包配置（`package.json` 的 `build` 字段）
 
-| 字段                           | 值                              | 说明                     |
-| ------------------------------ | ------------------------------- | ------------------------ |
-| `appId`                        | `com.qianlu.wxnn-photo-manager` | 应用唯一标识             |
-| `productName`                  | `无限暖暖相册管理工具`          | 显示名称                 |
-| `directories.output`           | `release`                       | 产物输出目录             |
-| `files`                        | `dist/**/*`、`resources/**/*`   | 包含文件                 |
-| `asarUnpack`                   | 见下表                          | 不进入 asar 的原生依赖   |
-| `win.target`                   | `nsis` x64                      | Windows NSIS 安装程序    |
-| `win.icon`                     | `resources/icons/icon.ico`      | 应用图标                 |
-| `nsis.oneClick`                | `false`                         | 非一键安装，允许选择目录 |
-| `nsis.createDesktopShortcut`   | `always`                        | 始终创建桌面快捷方式     |
-| `nsis.createStartMenuShortcut` | `true`                          | 创建开始菜单快捷方式     |
+| 字段                           | 值                            | 说明                     |
+| ------------------------------ | ----------------------------- | ------------------------ |
+| `appId`                        | `com.qianlu.meow-star-map`    | 应用唯一标识             |
+| `productName`                  | `喵星图`                      | 显示名称                 |
+| `directories.output`           | `release`                     | 产物输出目录             |
+| `files`                        | `dist/**/*`、`resources/**/*` | 包含文件                 |
+| `asarUnpack`                   | 见下表                        | 不进入 asar 的原生依赖   |
+| `win.target`                   | `nsis` x64                    | Windows NSIS 安装程序    |
+| `win.icon`                     | `resources/icons/icon.ico`    | 应用图标                 |
+| `nsis.oneClick`                | `false`                       | 非一键安装，允许选择目录 |
+| `nsis.createDesktopShortcut`   | `always`                      | 始终创建桌面快捷方式     |
+| `nsis.createStartMenuShortcut` | `true`                        | 创建开始菜单快捷方式     |
 
 **asarUnpack 列表**（原生二进制必须解包，否则无法加载）：
 
@@ -826,7 +826,7 @@ node scripts/generate-icon.js
 
 ### 7.7 安装与测试
 
-1. 双击 `release\NikkiGallery-Setup-2.5.5-beta.exe` 安装
+1. 双击 `release\MeowStarMap-Setup-2.5.5-beta.exe` 安装
 2. 安装完成后从开始菜单或桌面快捷方式启动
 3. 首次启动会触发全盘扫描定位游戏目录（首次扫描较慢，请耐心等待）
 4. 程序会自动在桌面创建快捷方式（若已存在则跳过）
@@ -836,7 +836,7 @@ node scripts/generate-icon.js
 ### 7.8 发布版本号管理
 
 - **不要随意修改版本号**，除非用户明确要求
-- 版本号定义在 `package.json` 的 `version` 字段（同时决定安装程序文件名：`NikkiGallery-Setup-<version>.exe`）
+- 版本号定义在 `package.json` 的 `version` 字段（同时决定安装程序文件名：`MeowStarMap-Setup-<version>.exe`）
 - 当前版本：`2.5.5-beta`
 - 改版本号后，`README.md` 的版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 的「当前版本」、本文档头部版本号需同步修改
 
