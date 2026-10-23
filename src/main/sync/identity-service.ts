@@ -48,7 +48,10 @@ const TLS_KEY_FILE = 'server.key'
 const SERVER_PUB_FILE = 'server-ed25519.pub'
 const SERVER_KEY_FILE = 'server-ed25519.key'
 
-const COMMON_NAME = 'WXNN Photo Manager Local'
+// CN 只在全新安装或自愈重签时生效：readTlsIdentity 不比对 subject，已装机沿用既有 server.crt
+const COMMON_NAME = 'Meow Star Map Local'
+// SAN 保持 wxnn.local：Android 侧 PinnedTls 用它做主机名校验，且 sync-server.ts / api-router.ts
+// 把它当请求签名基串的 host——改它等于打断已配对客户端。
 const SAN_DNS_NAME = 'wxnn.local'
 
 /** POSIX 私钥权限；Windows 忽略 mode（userData 每用户 ACL 兜底，见文件头） */

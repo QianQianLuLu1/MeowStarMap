@@ -56,7 +56,7 @@ describe('SyncIdentityService.getOrCreateTlsIdentity', () => {
     const service = new SyncIdentityService({ directory: dir })
     const identity = service.getOrCreateTlsIdentity()
     const cert = new X509Certificate(identity.certPem)
-    expect(cert.subject).toContain('WXNN Photo Manager Local')
+    expect(cert.subject).toContain('Meow Star Map Local')
     expect(cert.subjectAltName).toContain('wxnn.local')
     expect(cert.verify(cert.publicKey)).toBe(true) // 自签名成立
   })

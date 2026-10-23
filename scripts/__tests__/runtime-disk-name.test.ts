@@ -225,6 +225,34 @@ describe('配对服务默认显示名取英文品牌形（含空格，非 ASCII 
   })
 })
 
+describe('TLS 自签证书 CN 取新品牌（SAN 与签名基串刻意不动）', () => {
+  it('COMMON_NAME 为 Meow Star Map Local', () => {
+    expect(read('src/main/sync/identity-service.ts')).toContain(
+      `const COMMON_NAME = '${BRAND} Local'`
+    )
+  })
+
+  it('证书主体断言与源码同值', () => {
+    expect(read('src/main/sync/identity-service.test.ts')).toContain(`toContain('${BRAND} Local')`)
+  })
+
+  it('旧产品名不再充当证书 CN', () => {
+    for (const file of [
+      'src/main/sync/identity-service.ts',
+      'src/main/sync/identity-service.test.ts'
+    ]) {
+      expect(read(file), file).not.toContain('WXNN Photo Manager')
+    }
+  })
+
+  it('SAN dNSName 与两处签名基串 URL 逐字未动（改它们会打断已配对客户端校验）', () => {
+    expect(read('src/main/sync/identity-service.ts')).toContain("const SAN_DNS_NAME = 'wxnn.local'")
+    expect(read('src/main/sync/server/sync-server.ts')).toContain("'http://wxnn.local'")
+    expect(read('src/main/sync/server/api-router.ts')).toContain("'http://wxnn.local'")
+    expect(read('src/main/sync/identity-service.test.ts')).toContain("toContain('wxnn.local')")
+  })
+})
+
 describe('桌面快捷方式名（阶段 3 已交付，此处纳入防回归而非本轮红灯）', () => {
   it('两处 .lnk 文件名仍为喵星图.lnk，测试常量同值', () => {
     const src = read('src/main/app/desktop-shortcut.ts')
