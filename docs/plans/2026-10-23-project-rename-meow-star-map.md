@@ -504,13 +504,46 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
 | N1–N7                    | 未开始（本轮按用户决策只动文档与展示 JSON，不改代码与打包身份）                                                                    | —                                | 代码与配置残留 248 行 / 74 文件                                                                                                                                                                                   |
 | N5 + N6（界面层）        | 阶段 3：`apply.mjs` 逐行锚定 6 提交 + 新增 `scripts/__tests__/ui-brand-name.test.ts` 守卫                                          | `[VERIFY] ✓` 交付                | 扫描域 `src` + `plugins-samples` 196 行 / 73 文件 → 178 行 / 61 文件（Δ = −18）；全量 431 files / 6595 tests passed                                                                                               |
 | N1 + N7（打包/流水线层） | 阶段 4：`apply.mjs` 逐行锚定 7 提交 + 新增 `scripts/__tests__/pack-identity-name.test.ts` 守卫（37 用例）+ 真跑 `npm run dist:win` | `[VERIFY] ✓` 交付                | 域内 271 行 / 71 文件 → 259 行（消 36 处站点，守卫自身新增 24 行禁改字面量）；全量 432 files / 6632 tests passed；产物实测 `MeowStarMap-Setup-2.5.5-beta.exe` 与 `win-unpacked/喵星图.exe`，`verify:dist` 18 项 ✔ |
+| N2 + N4（运行时落盘层）  | 阶段 5：4 提交 + 1 补齐 + 新增 `scripts/__tests__/runtime-disk-name.test.ts` 守卫（25 用例）+ 真实落盘与真证书取证                 | `[VERIFY] ✓` 交付                | 诊断目录 `喵星图`、`%TEMP%` 前缀 `MeowStarMap`、服务名与 CN `Meow Star Map`；本文 §E 的 11 条诊断断言全部转绿，N4 实为 2 条真红（清单漏计 `sync-read-repository.test.ts:739`，见下方订正 5）                      |
 
 阶段 2 的红绿读数、保留台账与已知偏差见 [`2026-10-23-rename-docs-pass.md`](./2026-10-23-rename-docs-pass.md)；
 阶段 3（界面文字与多语言资源，覆盖本文 B 类表的全部界面站点，并新发现两处默认内容形态与一处 TLS 证书 CN）见
 [`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md)；
 阶段 4（打包、构建与流水线配置，即本文 N1 与 N7 的打包/流水线部分，含真实 `dist:win` 取证）见
-[`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md)。
-本文 §1.1 的名称映射表与 §1.2 的禁改清单仍是后续节点（N2、N3、N4）的取值依据。
+[`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md)；
+阶段 5（运行时落盘与上线名称，即本文 N2 与 N4 的全部站点，含真实建目录与真证书取证）见
+[`2026-10-23-rename-runtime-pass.md`](./2026-10-23-rename-runtime-pass.md)。
+本文 §1.1 的名称映射表与 §1.2 的禁改清单仍是后续节点（N3、N5、N7 余量、N8）的取值依据；
+**但 §1.1 行 165/173 与 §N4 的取值已被阶段 5 部分推翻，改前必读下方「阶段 5 对本文 §1.1/N2/N4 的订正」。**
+
+### 阶段 5 对本文 §1.1/N2/N4 的订正
+
+1. **§1.1 行 165 的场合划分不成立**。该行把 `PRODUCT_DIAG_DIRNAME` 与 `%TEMP%` 日志名、mDNS 实例名
+   一并划入 Pascal 形 `MeowStarMap`。阶段 5 按用户口径「面向用户的文件夹与快捷方式名用喵星图」拆分为二：
+   文档目录下的诊断文件夹取 **`喵星图`**（与 `productName`、`喵星图.lnk` 同源，且候选 3 随常量变为
+   `%TEMP%\喵星图-Diagnostics`），而 `%TEMP%` 应急日志**文件名**仍取 **`MeowStarMap-*`**。
+   ⇒ 判据不是「是不是文件名/目录名」，而是「用户会不会在自己的文件管理器里看到它」。
+   CJK 安全性已实测：四道路径闸门（`ipc/validator.ts`、`utils/ipc-validate.ts`、`ipc/media-read-guard.ts`、
+   `nikkisync/resource-allowlist.ts`）都用盘符前缀正则 + `toLowerCase()` 判定，对 CJK 恒等；装置
+   `tests/mocks/ci-linux-fs.ts` 的 `rest()` 无字符集过滤；跑套件后 `%USERPROFILE%\喵星图\Diagnostics` 真实创建。
+2. **§N4 行 366「两处均 `MeowStarMap`（mDNS 实例名保持 ASCII，避开非 ASCII 清洗分支）」取值为
+   `Meow Star Map`（带空格）**。该行的**前提**对（非 ASCII 会被上游清洗），但由它推出「必须无空格」是过度收敛：
+   上游 `MdnsAdvertiser.ts:52` 的清洗正则是 `[^a-zA-Z0-9 _-]`，**空格在白名单内**；实例名标签 13 字节 < 63 上限；
+   而 §五 行 275 禁空格的真实理由是「空格会破坏 NSIS `artifactName` 与命令行引用」，只管文件名，不管协议展示串。
+3. **§D 表行 126「注释类……跟随改动」需要分档**，一刀切会让注释描述一个从未存在过的状态。阶段 5 的口径：
+   描述当前行为的注释跟随新名；描述修复前实况的注释（`startup-diagnostic.ts:24-25`、
+   `early-crash-guard.ts:45-46`）保留旧名 + 加「（当时常量值）」限定，并由新守卫反向锁定它们仍在。
+4. **§九 行 433-434 预备的两条授权注释文案**（「诊断目录名改为 MeowStarMap」）按实际落地值改写为「喵星图」；
+   另 §九 行 439 已核实「注释级改动也算实质改动」，本阶段两处 services 文件按实现走、带授权行提交，
+   红绿双向都验（删授权行 ⇒ `[CORE-GATE] ✗`）。
+5. **§E 测试清单漏计一处真红**：`src/main/database/sync-read-repository.test.ts:739` 的
+   `expect(info.name).toBe('WXNN XiangCe')` 会被 N4 打红——该用例不调用 `seedServiceState()`（只有 `:591/:753`
+   调用），走 `ensureServerIdentity()` 的新建分支，锁的正是 `DEFAULT_SERVER_NAME` 字面值。
+   §行 150 把 `sync-metadata-repository.test.ts:881,884` 判为「引用常量、自动跟随」是对的，
+   但据此推断整个服务器名断言面都无需改动是错的。
+6. **§N2 行 350 含 `startup-environment.test.ts:42,55,67,78`** ⇒ 该四处已随阶段 3/4 改为
+   `MeowStarMap` / `D:\中文目录\喵星图\喵星图.exe`，阶段 5 无改动；同理 §N1 行 341 的
+   `desktop-shortcut.ts:27,69` 早在阶段 3 `fed8e57` 落地，阶段 5 只把它纳入守卫防回归，不制造假红。
 
 ### 阶段 4 对本文两处口径的订正
 
