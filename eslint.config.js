@@ -500,6 +500,10 @@ export default [
       'node_modules/**',
       'node20/**',
       'preview.html',
+      // ESLint 9 的 flat config 不读 .gitignore（本块与本行上方的 preview.html 就是同一原因），
+      // 故 build:preview 落在工作区根的 hashed worker bundle 必须在此另钉一份，
+      // 否则 `npm run lint` 会把 183 KB 的压缩产物收为源码并冒出数十条 no-unused-expressions
+      'preview-worker-*.js',
       'src/renderer/dist/**',
       'tools/**',
       'project-issues-fix-guide/**',

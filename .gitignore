@@ -92,6 +92,8 @@ Desktop.ini
 # ===== Vite preview build intermediary (local only，仅根目录产物；勿匹配 src/renderer/preview/ 源码) =====
 preview.html
 /preview/
+# build:preview 另会在工作区根落下 hashed worker bundle（阶段 3 登记的工装缺口）
+preview-worker-*.js
 
 # ===== Test temp files (tsconfck/vitest typecheck temp copies) =====
 vitest.config.ts.timestamp-*.mjs
