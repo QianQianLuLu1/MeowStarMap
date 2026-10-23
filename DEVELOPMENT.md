@@ -16,6 +16,7 @@
 - [六、排错方案](#六排错方案)
 - [七、打包流程](#七打包流程)
 - [八、组件文档（Storybook）](#八组件文档storybook)
+- [九、用户数据搬迁（从改名前的版本升级）](#九用户数据搬迁从改名前的版本升级)
 
 ---
 
@@ -924,6 +925,83 @@ npm run build-storybook
 - 新增 / 重大修改组件必须随提交附带故事（`docs/组件文档规范.md` §6 增量规则）；
 - 组件在 story 中应保持真实状态，不得硬造假数据掩盖缺陷；源码级问题登记 `docs/技术债清单.md`；
 - 验收基线：带故事的组件在 addon-a11y 面板中零 `serious`/`critical` 违规（实测记录见 `docs/storybook/accessibility.mdx`）。
+
+---
+
+## 九、用户数据搬迁（从改名前的版本升级）
+
+自本版起产品更名为**喵星图 / Meow Star Map**，包身份与落库名同步变更：应用数据根从
+`%APPDATA%\wxnn-photo-manager` 变为 `%APPDATA%\meow-star-map`，主库文件名从
+`wxnn_photo_manager.db` 变为 `meow_star_map.db`。**程序不做自动迁移**——未搬迁的老用户首启
+会在新目录下**新建一份空库**（不是迁移失败），相册看起来是空的，而旧数据完好地留在原目录，
+按本节手工搬迁即可取回。
+
+> ⚠ 发布带更名的版本 tag 前必须先出搬迁公告：老装的 `app-update.yml`
+> （`updaterCacheDirName: wxnn-photo-manager-updater`）会自动取到新安装包，装进新 appId +
+> 新 userData 后表现即为「相册清空」。另因 `appId` 与 `productName` 同时变更，NSIS 不再就地
+> 升级，控制面板/开始菜单会出现**两个应用条目**（beta 阶段可接受，旧条目手工卸载）。
+
+### 9.1 前置
+
+1. 关闭应用，并在任务管理器结束残留进程（新版 `喵星图.exe` 与旧版 `无限暖暖相册管理工具.exe`）。
+2. **不得同时运行新旧两个版本**：单实例锁的键在 userData，两版共写同一份 DB 会直接损坏数据。
+3. 手工新建目录 `%APPDATA%\meow-star-map`。
+
+### 9.2 必须搬迁并重命名
+
+下表路径均相对各自的 userData 根（旧 `…\wxnn-photo-manager` → 新 `…\meow-star-map`）。
+
+| 旧路径                                                         | 处置                                   | 不搬的后果                                                                             |
+| -------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------- |
+| `database\wxnn_photo_manager.db`                               | 改名 `database\meow_star_map.db`       | 首启新建空库，收藏 / 分类 / 编辑历史 / 共振记录全部「消失」（实为旧库未接）            |
+| `database\wxnn_photo_manager.db-wal`、`-shm`                   | 随上行一起换前缀                       | 未落盘的最近写入丢失、完整性判定回退                                                   |
+| `database\wxnn_photo_manager.db.clean-exit`                    | 随上行一起换前缀                       | 新库首启把「上次正常退出」误判为异常                                                   |
+| `database\wxnn_photo_manager.db.corrupt-*`                     | 换前缀搬（仅在你还需要那份损坏快照时） | 丢失历史损坏取证                                                                       |
+| `backups\wxnn_photo_manager_<日期>_<时间>[_uid].db`            | **逐个**改名 `meow_star_map_…` 同后缀  | **静默**失效：设置→备份 列表不显示、不可恢复、不可清理（过滤前缀与校验正则都只认新名） |
+| `thumbnails\`                                                  | 原样搬                                 | 全量重建缩略图                                                                         |
+| `search-index\`                                                | 原样搬                                 | 全文索引重建                                                                           |
+| `plugins\plugins.json`                                         | 原样搬                                 | 插件安装态重置                                                                         |
+| `sync\server.crt`、`sync\server.key`、`nikkisync\nikkisync.db` | 原样搬                                 | **每台已配对手机都要重新配对**                                                         |
+| `logs\`、`crashes\`                                            | 可选原样搬（历史取证用）               | 丢历史记录，不影响功能                                                                 |
+
+`database\db-backup-*.db` 与 `database\pre-migration-*.db` 是当前代码**不再生成**的历史遗留名
+（本机可能仍有若干份），原样搬或留档均可，新装不会读取它们。
+
+### 9.3 故意不搬（让新装重建）
+
+`boot-ok.marker`、`last-exit.json`、`gpu-fallback.json`、`gpu-pref.json`、`heartbeat.json`、
+`diag.log`、`startup-errors.log`、`scan-log.jsonl`、`diagnostic-tmp-*`——搬前两项会让首启把
+正常退出误判为崩溃。Electron 自管的 `Cache\`、`Code Cache\`、`GPUCache\`、`Network\`、
+`Local Storage\`、`Session Storage\`、`blob_storage\`、`Shared Storage\`、`Preferences`、
+`Local State`、`DIPS*`、`Dawn*`、`Dictionaries\`、`SharedStorage*`、`.updaterId` 一律不搬。
+
+### 9.4 诊断目录一并核对
+
+面向用户的诊断目录取**显示名**：首选 `<文档>\喵星图\Diagnostics`，回落候选依序为
+`<主目录>\喵星图\Diagnostics`、`%TEMP%\喵星图-Diagnostics`；`%TEMP%` 的应急启动日志前缀为
+`MeowStarMap-*.log`。改名前遗留的 `<文档>\NikkiGallery\Diagnostics` 与
+`%TEMP%\NikkiGallery-*.log` 属历史文件，确认无需留存后可手工删除。
+
+> ⚠ 不要整体删除 `%USERPROFILE%\NikkiGallery\`：该目录还住着另一个无关第三方应用的
+> `config.json`、`logs\`、`thumb_cache\` 等，本仓库代码对它的写入点为零。
+
+### 9.5 搬迁后验证
+
+1. 相册计数与旧版一致，收藏 / 分类 / 标签 / 共振记录在位。
+2. 设置 → 备份：列表只出现 `meow_star_map_*`，并成功走一次恢复往返。
+3. 浏览既有照片不触发缩略图重建；全文搜索有结果。
+4. `logs\main.log` 无 `unable to open database file`。
+5. 手机端免重连即可发现并配对（沿用同一 `server.crt`）。
+
+> `npm run doctor` 的「数据库文件」检查读的是仓库内 `data\album_index.db`
+> （`scripts/doctor.ts:126`），**不指向 userData**，不能当本项判据——用第 2 步的备份列表代替。
+
+### 9.6 回滚
+
+搬迁全程为**复制**，旧目录不被覆盖：删除 `%APPDATA%\meow-star-map` 整个目录并重新运行旧安装包，
+即回到改名前状态。孤儿目录 `%APPDATA%\wxnn-photo-manager` 与 `%APPDATA%\wxnn-photo-manager-updater`
+确认无需回滚后可手工删除；桌面上并存的两个快捷方式（旧 `无限暖暖相册管理工具.lnk` 与新
+`喵星图.lnk`）同样手工清理。
 
 ---
 

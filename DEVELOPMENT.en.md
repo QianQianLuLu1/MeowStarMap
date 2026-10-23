@@ -16,6 +16,7 @@
 - [6. Troubleshooting](#6-troubleshooting)
 - [7. Packaging Workflow](#7-packaging-workflow)
 - [8. Component Documentation (Storybook)](#8-component-documentation-storybook)
+- [9. User Data Migration (Upgrading from a Pre-Rename Version)](#9-user-data-migration-upgrading-from-a-pre-rename-version)
 
 ---
 
@@ -901,6 +902,96 @@ npm run build-storybook
 - New / substantially modified components must ship with stories in the same commit (`docs/组件文档规范.md` §6 incremental rule);
 - Stories must keep states realistic — never fabricate data to hide defects; log source-level issues in `docs/技术债清单.md`;
 - Acceptance baseline: any component with stories must have zero `serious` / `critical` violations in the addon-a11y panel (records in `docs/storybook/accessibility.mdx`).
+
+---
+
+## 9. User Data Migration (Upgrading from a Pre-Rename Version)
+
+From this release the product is named **Meow Star Map (喵星图)**, and the package identity plus
+the on-disk database name changed with it: the app data root moves from
+`%APPDATA%\wxnn-photo-manager` to `%APPDATA%\meow-star-map`, and the main database file from
+`wxnn_photo_manager.db` to `meow_star_map.db`. **There is no automatic migration** — on first launch
+an unmigrated install **creates a brand-new empty library** (this is not a failed migration), so the
+gallery looks empty while the old data is intact in the previous folder. Follow this section to
+move it back by hand.
+
+> ⚠ Publish a migration notice before tagging a renamed release: an existing install's
+> `app-update.yml` (`updaterCacheDirName: wxnn-photo-manager-updater`) will pick up the new
+> installer and drop it into the new appId plus the new userData, which shows up as an "empty
+> gallery". Also, because `appId` and `productName` change together, NSIS no longer upgrades
+> in place: the Control Panel / Start Menu will list **two apps** (acceptable for beta; remove the
+> old entry by hand).
+
+### 9.1 Before you start
+
+1. Quit the app and kill leftover processes in Task Manager (`喵星图.exe` for the new build,
+   `无限暖暖相册管理工具.exe` for the old one).
+2. **Never run the old and new builds at the same time**: the single-instance lock key lives in
+   userData, so both versions would write the same database and corrupt it.
+3. Create `%APPDATA%\meow-star-map` by hand.
+
+### 9.2 Must be moved and renamed
+
+All paths below are relative to their own userData root
+(old `…\wxnn-photo-manager` → new `…\meow-star-map`).
+
+| Old path                                                       | Action                                                        | Consequence if skipped                                                                                                                                             |
+| -------------------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `database\wxnn_photo_manager.db`                               | rename to `database\meow_star_map.db`                         | first launch builds an empty library; favourites / categories / edit history / resonance records "disappear" (the old library is simply not attached)              |
+| `database\wxnn_photo_manager.db-wal`, `-shm`                   | rename together with the row above                            | recent unflushed writes lost, integrity check falls back                                                                                                           |
+| `database\wxnn_photo_manager.db.clean-exit`                    | rename together with the row above                            | the new library misreads the previous clean shutdown as a crash                                                                                                    |
+| `database\wxnn_photo_manager.db.corrupt-*`                     | move with a new prefix (only if you still need that snapshot) | historical corruption evidence lost                                                                                                                                |
+| `backups\wxnn_photo_manager_<date>_<time>[_uid].db`            | rename **each file** to `meow_star_map_…`, same suffix        | **silent** failure: Settings → Backups lists nothing, and restore/prune cannot reach it (both the filter prefix and the validation regex only accept the new name) |
+| `thumbnails\`                                                  | move as-is                                                    | every thumbnail is regenerated                                                                                                                                     |
+| `search-index\`                                                | move as-is                                                    | the full-text index is rebuilt                                                                                                                                     |
+| `plugins\plugins.json`                                         | move as-is                                                    | plugin install state is reset                                                                                                                                      |
+| `sync\server.crt`, `sync\server.key`, `nikkisync\nikkisync.db` | move as-is                                                    | **every paired phone has to be paired again**                                                                                                                      |
+| `logs\`, `crashes\`                                            | optional (historical forensics)                               | history lost, features unaffected                                                                                                                                  |
+
+`database\db-backup-*.db` and `database\pre-migration-*.db` are legacy names the current code no
+longer produces (you may still have a few on disk); move or archive them as you prefer — a fresh
+install never reads them.
+
+### 9.3 Deliberately not moved (let a fresh install rebuild them)
+
+`boot-ok.marker`, `last-exit.json`, `gpu-fallback.json`, `gpu-pref.json`, `heartbeat.json`,
+`diag.log`, `startup-errors.log`, `scan-log.jsonl`, `diagnostic-tmp-*` — moving the first two makes
+the first launch misread a clean shutdown as a crash. Everything Electron manages itself
+(`Cache\`, `Code Cache\`, `GPUCache\`, `Network\`, `Local Storage\`, `Session Storage\`,
+`blob_storage\`, `Shared Storage\`, `Preferences`, `Local State`, `DIPS*`, `Dawn*`,
+`Dictionaries\`, `SharedStorage*`, `.updaterId`) stays behind.
+
+### 9.4 Check the diagnostics folder too
+
+The user-facing diagnostics folder uses the **display name**:
+`<Documents>\喵星图\Diagnostics` first, then `<home>\喵星图\Diagnostics`,
+then `%TEMP%\喵星图-Diagnostics`; the emergency startup log in `%TEMP%` is prefixed
+`MeowStarMap-*.log`. Leftovers from before the rename — `<Documents>\NikkiGallery\Diagnostics` and
+`%TEMP%\NikkiGallery-*.log` — are historical files; delete them by hand once you no longer need them.
+
+> ⚠ Do not delete `%USERPROFILE%\NikkiGallery\` wholesale: an unrelated third-party app keeps its
+> `config.json`, `logs\`, `thumb_cache\` etc. there, and this repository never writes to it.
+
+### 9.5 Verify after the move
+
+1. Photo count matches the old install; favourites / categories / tags / resonance records are present.
+2. Settings → Backups lists only `meow_star_map_*`, and one restore round-trip succeeds.
+3. Browsing existing photos does not trigger thumbnail regeneration; full-text search returns results.
+4. `logs\main.log` contains no `unable to open database file`.
+5. The phone connects without re-pairing (same `server.crt`).
+
+> The "database file" check in `npm run doctor` reads `data\album_index.db` inside the repository
+> (`scripts/doctor.ts:126`) and **does not look at userData**, so it cannot serve as this
+> verification step — use the backup list in step 2 instead.
+
+### 9.6 Rollback
+
+The move is copy-only and never overwrites the old folder: delete the whole
+`%APPDATA%\meow-star-map` directory and run the old installer again to return to the pre-rename
+state. The orphan directories `%APPDATA%\wxnn-photo-manager` and
+`%APPDATA%\wxnn-photo-manager-updater` can be removed by hand once you are sure you will not roll
+back, and so can whichever of the two desktop shortcuts (`无限暖暖相册管理工具.lnk` vs `喵星图.lnk`)
+you no longer need.
 
 ---
 

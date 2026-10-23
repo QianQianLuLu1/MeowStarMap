@@ -337,7 +337,7 @@ extensionPoints.register(
     id: 'mp-signature',
     name: '签名水印',
     type: 'text',
-    text: '© My Nikki Gallery',
+    text: '© Meow Star Map',
     font: 'Microsoft YaHei',
     fontSize: 24,
     color: '#FF69B4',
