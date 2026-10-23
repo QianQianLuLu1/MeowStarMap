@@ -20,7 +20,7 @@ import nodePath from 'path'
 
 const WIN32 = nodePath.win32
 
-export const CI_ROOT = '/home/runner/work/NikkiGallery/NikkiGallery'
+export const CI_ROOT = '/home/runner/work/MeowStarMap/MeowStarMap'
 export const CI_HOME = '/home/runner'
 export const CI_TMP = '/tmp'
 
@@ -289,7 +289,7 @@ export function ensureSandbox(mkdirSync: (p: string, o: { recursive: true }) => 
  * 这一轴把一大类装置假信号直接消掉：仓内守卫与脚本测试统一用
  * `path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')` 定仓库根。
  * 不翻译 `fileURLToPath` 时，装置里它返回真实反斜杠路径，再经 posix 绑定 `resolve` 就被
- * 当成**相对名**拼到 cwd 之后，得到 `/home/runner/work/NikkiGallery/NikkiGallery/D:\…`
+ * 当成**相对名**拼到 cwd 之后，得到 `/home/runner/work/MeowStarMap/MeowStarMap/D:\…`
  * 这种 CI 上根本不可能出现的串 ⇒ 成片假红。翻译之后，仓库根就是 CI 工作区形态，
  * 后续 `resolve('..','..')` 与 fs 读取都和 CI 一致。
  */

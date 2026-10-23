@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 /**
  * 打包与流水线身份名守卫（阶段 4：打包、构建与流水线配置更名）。
@@ -13,13 +11,20 @@ import { fileURLToPath } from 'node:url'
  * 改漏一处不会红，而它决定的又是用户看得见的一切外部名称（exe 文件名、快捷方式、卸载项、安装包）。
  * 与阶段 3 的 ui-brand-name.test.ts 同一口径：常驻守卫，正向取新名 + 反向无旧名 + 禁改项逐字锁。
  *
- * 读的是磁盘上的源文件文本、不 import 被测模块 ⇒ 不拉 electron/jsdom，也不受装置伪造 cwd 的影响
- * （根路径按 fileURLToPath 解析，与 source-encoding.test.ts、ui-brand-name.test.ts 同口径）。
+ * 读的是磁盘上的源文件文本、不 import 被测模块 ⇒ 不拉 electron/jsdom。
+ *
+ * 根路径刻意走 `new URL(rel, import.meta.url)` 而不是 `path.resolve(dirname(fileURLToPath(...)))`：
+ * 后者在 test:posix-host 装置下必崩——该 profile 把 `path` 钉成 posix，而 import.meta.url 是宿主
+ * 的 Windows 路径，`posix.dirname('D:\\…')` 返回 '.'，repoRoot 落到盘根后全部读取 ENOENT
+ * （实测：ui-brand-name.test.ts 在本 profile 下同样装载失败，属阶段 3 遗留的潜在缺陷，本轮不扩大
+ * 改动面，仅登记）。URL 解析与宿主 `path` 绑定无关，因此本守卫在两种 profile 下判据一致。
  */
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
+const selfUrl = new URL(import.meta.url)
+const repoRootUrl = new URL('../../', selfUrl)
 
-const read = (rel: string): string => readFileSync(path.join(repoRoot, rel), 'utf-8')
+const read = (rel: string): string =>
+  readFileSync(new URL(rel, repoRootUrl), { encoding: 'utf-8', flag: 'r' })
 const readJson = <T>(rel: string): T => JSON.parse(read(rel)) as T
 
 /** 阶段 1 §1.1 的无空格 kebab 形：npm name、appId 尾段、%APPDATA% 根 */
@@ -222,6 +227,37 @@ describe('只影响测试与预览 mock 的假 userData 路径跟新根', () => 
     expect(src.split('wxnn_photo_manager.db').length - 1).toBe(4)
     // 本机真实存在的缓存目录名（D:\NikkiGallery缓存）属禁改项
     expect(src).toContain('NikkiGallery缓存')
+  })
+})
+
+describe('CI 宿主装置的工作区根字面值（四站点必须同值）', () => {
+  // 真实 runner 的 cwd 由远端仓库名决定，仓库已改名 ⇒ 装置伪造的 cwd 与家目录若仍留旧名，
+  // 「rooted 读路径落进根不可写 mock」的判据就跟真宿主分叉（阶段 1 §E 表把它列为必须同 commit）。
+  // 逐字相等而不是「命中数 ≤ 上限」：漏改任一处不会红，除非像这里一样按文件计数。
+  const CI_ROOT_NEW = '/home/runner/work/MeowStarMap/MeowStarMap'
+  const CI_ROOT_OLD = '/home/runner/work/NikkiGallery/NikkiGallery'
+  const RIG_FILES: Array<[string, number]> = [
+    ['tests/ci-linux.setup.ts', 2],
+    ['tests/mocks/ci-linux-fs.ts', 2],
+    ['src/main/utils/ci-linux-emulation.test.ts', 3]
+  ]
+
+  it.each(RIG_FILES)('%s 的装置根全部取新值（期望 %i 处）', (rel, count) => {
+    const src = read(rel)
+    expect(src.split(CI_ROOT_NEW).length - 1, `${rel} 新值处数不符`).toBe(count)
+    expect(src, `${rel} 残留旧装置根`).not.toContain(CI_ROOT_OLD)
+  })
+
+  it('CI_ROOT 常量与装置注入的 cwd 同源（两侧不同值即伪装成产品缺陷）', () => {
+    const mock = read('tests/mocks/ci-linux-fs.ts')
+    const setup = read('tests/ci-linux.setup.ts')
+    expect(mock).toContain(`export const CI_ROOT = '${CI_ROOT_NEW}'`)
+    expect(setup).toContain(`value: () => '${CI_ROOT_NEW}'`)
+    expect(setup).toContain(`root: '${CI_ROOT_NEW}'`)
+  })
+
+  it('装置标识符未被改名（__wxnnCiLinuxEmulation 是代码标识，不是产品名）', () => {
+    expect(read('tests/ci-linux.setup.ts')).toContain('__wxnnCiLinuxEmulation')
   })
 })
 

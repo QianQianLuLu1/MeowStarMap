@@ -50,7 +50,7 @@ describe('CI 宿主模拟装置自检', () => {
   })
 
   it.skipIf(!ACTIVE)('轴 3：cwd / homedir / tmpdir 已是 CI 上的取值形态', () => {
-    expect(process.cwd()).toBe('/home/runner/work/NikkiGallery/NikkiGallery')
+    expect(process.cwd()).toBe('/home/runner/work/MeowStarMap/MeowStarMap')
     expect(os.homedir()).toBe('/home/runner')
     expect(os.tmpdir()).toBe('/tmp')
     expect(os.userInfo().homedir).toBe('/home/runner')
@@ -125,11 +125,11 @@ describe('CI 宿主模拟装置自检', () => {
   it.skipIf(!ACTIVE)('轴 4e：fileURLToPath 派生的仓库根是 CI 工作区形态', () => {
     const here = fileURLToPath(import.meta.url)
     expect(here).toBe(
-      '/home/runner/work/NikkiGallery/NikkiGallery/src/main/utils/ci-linux-emulation.test.ts'
+      '/home/runner/work/MeowStarMap/MeowStarMap/src/main/utils/ci-linux-emulation.test.ts'
     )
     // 本文件位于 src/main/utils ⇒ 上溯三级才是仓库根（守卫类脚本测试在 scripts/__tests__ 下是两级）
     const repoRoot = nodePath.resolve(nodePath.dirname(here), '..', '..', '..')
-    expect(repoRoot).toBe('/home/runner/work/NikkiGallery/NikkiGallery')
+    expect(repoRoot).toBe('/home/runner/work/MeowStarMap/MeowStarMap')
     // 守卫类用例的标准写法：经 cwd/仓库根拼出的源码路径要真读得到
     const source = fs.readFileSync(
       nodePath.join(repoRoot, 'src/main/utils/path-dialect.ts'),

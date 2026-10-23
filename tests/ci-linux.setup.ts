@@ -48,7 +48,7 @@ setRealRoot(realCwd)
 Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
 Object.defineProperty(realOs, 'EOL', { value: '\n', configurable: true })
 Object.defineProperty(process, 'cwd', {
-  value: () => '/home/runner/work/NikkiGallery/NikkiGallery',
+  value: () => '/home/runner/work/MeowStarMap/MeowStarMap',
   configurable: true
 })
 realOs.tmpdir = () => '/tmp'
@@ -123,5 +123,5 @@ vi.mock('node:url', async (importOriginal) => {
 // 供装置自检用例（src/main/utils/ci-linux-emulation.test.ts）判定本轮是否真在模拟态下运行
 ;(globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation = {
   cwd: realCwd,
-  root: '/home/runner/work/NikkiGallery/NikkiGallery'
+  root: '/home/runner/work/MeowStarMap/MeowStarMap'
 }
