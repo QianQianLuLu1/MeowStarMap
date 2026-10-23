@@ -495,16 +495,17 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
 
 ## 执行记录
 
-| 节点                     | 命令                                                                                                                               | 结果                             | 关键计数                                                                                                                                                                                                          |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 阶段 1                   | 盘点（`git grep` 三组模式 + 4 个 Explore/Plan 代理）                                                                               | `[PLAN] ✓` 交付本文              | `NikkiGallery` 259/72 文件；中文名 44/26 文件；`wxnn` 649/156 文件（多数禁改）                                                                                                                                    |
-| —                        | `npm run i18n:guard`                                                                                                               | `✅`（基线）                     | —                                                                                                                                                                                                                 |
-| —                        | `npm run docs:links`                                                                                                               | `✅ 无死引用`（基线 153 处提醒） | `dead = 0`                                                                                                                                                                                                        |
-| N8（文档部分）           | 阶段 2：`.cache/rename-scan/apply.mjs` 逐行锚定替换 + 复扫                                                                         | `[VERIFY] ✓` 交付                | 红灯 166 行 / 27 文件 → 绿灯 20 行（全部为台账保留项）；`docs:links` dead 0                                                                                                                                       |
-| N1–N7                    | 未开始（本轮按用户决策只动文档与展示 JSON，不改代码与打包身份）                                                                    | —                                | 代码与配置残留 248 行 / 74 文件                                                                                                                                                                                   |
-| N5 + N6（界面层）        | 阶段 3：`apply.mjs` 逐行锚定 6 提交 + 新增 `scripts/__tests__/ui-brand-name.test.ts` 守卫                                          | `[VERIFY] ✓` 交付                | 扫描域 `src` + `plugins-samples` 196 行 / 73 文件 → 178 行 / 61 文件（Δ = −18）；全量 431 files / 6595 tests passed                                                                                               |
-| N1 + N7（打包/流水线层） | 阶段 4：`apply.mjs` 逐行锚定 7 提交 + 新增 `scripts/__tests__/pack-identity-name.test.ts` 守卫（37 用例）+ 真跑 `npm run dist:win` | `[VERIFY] ✓` 交付                | 域内 271 行 / 71 文件 → 259 行（消 36 处站点，守卫自身新增 24 行禁改字面量）；全量 432 files / 6632 tests passed；产物实测 `MeowStarMap-Setup-2.5.5-beta.exe` 与 `win-unpacked/喵星图.exe`，`verify:dist` 18 项 ✔ |
-| N2 + N4（运行时落盘层）  | 阶段 5：4 提交 + 1 补齐 + 新增 `scripts/__tests__/runtime-disk-name.test.ts` 守卫（25 用例）+ 真实落盘与真证书取证                 | `[VERIFY] ✓` 交付                | 诊断目录 `喵星图`、`%TEMP%` 前缀 `MeowStarMap`、服务名与 CN `Meow Star Map`；本文 §E 的 11 条诊断断言全部转绿，N4 实为 2 条真红（清单漏计 `sync-read-repository.test.ts:739`，见下方订正 5）                      |
+| 节点                     | 命令                                                                                                                               | 结果                             | 关键计数                                                                                                                                                                                                                                                       |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 阶段 1                   | 盘点（`git grep` 三组模式 + 4 个 Explore/Plan 代理）                                                                               | `[PLAN] ✓` 交付本文              | `NikkiGallery` 259/72 文件；中文名 44/26 文件；`wxnn` 649/156 文件（多数禁改）                                                                                                                                                                                 |
+| —                        | `npm run i18n:guard`                                                                                                               | `✅`（基线）                     | —                                                                                                                                                                                                                                                              |
+| —                        | `npm run docs:links`                                                                                                               | `✅ 无死引用`（基线 153 处提醒） | `dead = 0`                                                                                                                                                                                                                                                     |
+| N8（文档部分）           | 阶段 2：`.cache/rename-scan/apply.mjs` 逐行锚定替换 + 复扫                                                                         | `[VERIFY] ✓` 交付                | 红灯 166 行 / 27 文件 → 绿灯 20 行（全部为台账保留项）；`docs:links` dead 0                                                                                                                                                                                    |
+| N1–N7                    | 未开始（本轮按用户决策只动文档与展示 JSON，不改代码与打包身份）                                                                    | —                                | 代码与配置残留 248 行 / 74 文件                                                                                                                                                                                                                                |
+| N5 + N6（界面层）        | 阶段 3：`apply.mjs` 逐行锚定 6 提交 + 新增 `scripts/__tests__/ui-brand-name.test.ts` 守卫                                          | `[VERIFY] ✓` 交付                | 扫描域 `src` + `plugins-samples` 196 行 / 73 文件 → 178 行 / 61 文件（Δ = −18）；全量 431 files / 6595 tests passed                                                                                                                                            |
+| N1 + N7（打包/流水线层） | 阶段 4：`apply.mjs` 逐行锚定 7 提交 + 新增 `scripts/__tests__/pack-identity-name.test.ts` 守卫（37 用例）+ 真跑 `npm run dist:win` | `[VERIFY] ✓` 交付                | 域内 271 行 / 71 文件 → 259 行（消 36 处站点，守卫自身新增 24 行禁改字面量）；全量 432 files / 6632 tests passed；产物实测 `MeowStarMap-Setup-2.5.5-beta.exe` 与 `win-unpacked/喵星图.exe`，`verify:dist` 18 项 ✔                                              |
+| N2 + N4（运行时落盘层）  | 阶段 5：4 提交 + 1 补齐 + 新增 `scripts/__tests__/runtime-disk-name.test.ts` 守卫（25 用例）+ 真实落盘与真证书取证                 | `[VERIFY] ✓` 交付                | 诊断目录 `喵星图`、`%TEMP%` 前缀 `MeowStarMap`、服务名与 CN `Meow Star Map`；本文 §E 的 11 条诊断断言全部转绿，N4 实为 2 条真红（清单漏计 `sync-read-repository.test.ts:739`，见下方订正 5）                                                                   |
+| N3 + N5 + N8（收尾层）   | 阶段 6：5 提交（`c243bd5`…`5a9166d`）+ 新增常驻终扫守卫 `old-name-ledger.test.ts` + 真跑 `npm run dist` 与真落盘取证               | `[VERIFY] ✓` 交付                | 前缀链 65 处翻转（断言侧真红 12 条）；终扫非记录面 199 → 282 行，命中文件集合与台账「40 文件 + 台账 JSON 自身」**双向差集为空**；全量 437 files / 6704 tests 全绿、装置红集合与阶段 5 逐字相同；新 exe 实测落 `meow_star_map.db` + `-wal`/`-shm`/`.clean-exit` |
 
 阶段 2 的红绿读数、保留台账与已知偏差见 [`2026-10-23-rename-docs-pass.md`](./2026-10-23-rename-docs-pass.md)；
 阶段 3（界面文字与多语言资源，覆盖本文 B 类表的全部界面站点，并新发现两处默认内容形态与一处 TLS 证书 CN）见
@@ -512,9 +513,12 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
 阶段 4（打包、构建与流水线配置，即本文 N1 与 N7 的打包/流水线部分，含真实 `dist:win` 取证）见
 [`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md)；
 阶段 5（运行时落盘与上线名称，即本文 N2 与 N4 的全部站点，含真实建目录与真证书取证）见
-[`2026-10-23-rename-runtime-pass.md`](./2026-10-23-rename-runtime-pass.md)。
-本文 §1.1 的名称映射表与 §1.2 的禁改清单仍是后续节点（N3、N5、N7 余量、N8）的取值依据；
-**但 §1.1 行 165/173 与 §N4 的取值已被阶段 5 部分推翻，改前必读下方「阶段 5 对本文 §1.1/N2/N4 的订正」。**
+[`2026-10-23-rename-runtime-pass.md`](./2026-10-23-rename-runtime-pass.md)；
+阶段 6（收尾：N3 落库名前缀链、N5 导出文件名、N8 生效文档与人工搬迁清单，含 §十一 全量回归、
+终扫白名单台账与常驻守卫）见 [`2026-10-23-rename-final-pass.md`](./2026-10-23-rename-final-pass.md)。
+本文 §1.1 的名称映射表与 §1.2 的禁改清单是全部节点（N1–N8）的取值依据，**N1–N8 已随阶段 6 全部交付**；
+**但 §1.1 行 165/173 与 §N4 的取值已被阶段 5 部分推翻、§八 步骤 9 与 §十一 两条判据已被阶段 6 订正，
+改前必读下方三批「订正」。**
 
 ### 阶段 5 对本文 §1.1/N2/N4 的订正
 
@@ -560,3 +564,35 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
    实测 `npm install --package-lock-only --ignore-scripts --no-audit --no-fund` **不产生** 历史多轮的
    `"libc"` 剥离 churn（diff 恰为 2 行 `"name"`），且不动 `node_modules` ⇒ 该约束可放宽为
    「只允许 `--package-lock-only` 形态」。
+
+### 阶段 6 对本文 §N3/§N5/§八/§十一 的订正
+
+1. **§N3 的红灯清单有一处不成立**：`src/main/ipc/handlers/backup.test.ts` 的 6 条 `backupFilename`
+   断言 **改前不红**——该文件 `:60` 用 `tests/mocks/mock-validator` 顶掉真实 validator，
+   `_test-helpers.ts:28` 的桩是宽松 `/.+/`，而 `validator.test.ts`（原 19 用例）零 `backupFilename`
+   覆盖 ⇒ 真 zod 正则全仓无人跑。阶段 6 补了 3 条直测 `schemas.backupFilename` 的边界用例
+   （新前缀两形态通过 / 旧前缀与缺时间戳、大写扩展名、路径穿越拒绝），这才是真红灯来源；
+   那 6 处如实记为「断言跟随」。
+2. **§N3 的文件清单多算两处**：`src/main/database/AGENTS.md:91` 早已随阶段 2 取
+   `meow_star_map.db`，`e2e/perf-real.e2e.ts:15` 的 userData 根早已随阶段 4 取 `meow-star-map`，
+   阶段 6 均无改动，不制造假红。
+3. **§八 步骤 9 的诊断目录写法被推翻**：原文写「搬入新 `Documents\MeowStarMap\Diagnostics`」，
+   实际落盘名按阶段 5 订正 1 取 `喵星图` ⇒ `DEVELOPMENT` 第九节按
+   `<文档>\喵星图\Diagnostics`（回落 `<主目录>\喵星图\Diagnostics`、`%TEMP%\喵星图-Diagnostics`）行文。
+4. **§八 的 `db-backup-*.db` 代码零生成点**：本机 `%APPDATA%\wxnn-photo-manager\database\` 确有
+   两份历史件，但当前源码不再生成此类名 ⇒ 清单写作「历史遗留，原样搬或留档均可」。
+5. **§十一 两条判据需替换**：
+   - 「`npm run doctor` DB 检查指向新根」为错——`scripts/doctor.ts:126` 查的是仓内
+     `data/album_index.db`，与 userData 无关；替代判据用「设置 → 备份只列 `meow_star_map_*` 且一次
+     恢复往返成功」，已写进 `DEVELOPMENT` §9.5 与 `.cache` 无关的被跟踪文档面。
+   - 「`npm run preview:check` 与改前同档」有个前置没写：`preview.html` 是被 gitignore 的本机产物，
+     必须先 `npm run build:preview`，否则该命令以「preview.html 不存在」失败——这不是更名回归。
+6. **§未验证项 3 已被阶段 6 部分清偿**：本阶段真跑 `npm run dist`（`build` + electron-builder）与
+   `npm run verify:dist`，并以固定 userData 直接启动新 `喵星图.exe`，实测
+   `database/meow_star_map.db` + `-wal`/`-shm`/`.clean-exit` 落盘、全树无 `wxnn*`、
+   `logs/main.log` 无 `unable to open database file` ⇒ 「打包后 userData 是否真变成新名」
+   从推断升为实证。仍未证的是 NSIS 就地升级与 electron-updater 行为（需两版共存）。
+7. **§1.2 禁改清单补一条判据归属**：阶段 6 起，全部保留站点由
+   `scripts/__tests__/old-name-ledger.test.ts` + `old-name-ledger.json` 逐文件逐模式钉住
+   （40 文件、每条带 `reason`），终扫的「命中文件集合 == 台账 ∪ {台账 JSON 自身}」即收尾判据，
+   不再依赖人工 grep 的一次性读数。
