@@ -147,7 +147,7 @@ URL、目录结构与依赖清单；一把锁一个提交；绿灯判据取「�
 bisect 期间写到 `release/bisect-nsis/` 的临时产物已整体删除：它含
 `win-unpacked/resources/app.asar.unpacked`，而 `scripts/pre-dist-check.ts` 的 `findAsarUnpacked()` 取
 **首个**字典序命中，`bisect-nsis` 排在 `win-unpacked` 之前，留着会让后续 `verify:dist` 校验错树
-（同一 hazard 见 `docs/plans/2026-10-19-e2e-guards-review-commit-2.5.5-beta-repack.md` 对 `alt-stage` 的处置）。
+（同一 hazard 见 `docs/archive/plans/2026-10-19-e2e-guards-review-commit-2.5.5-beta-repack.md`（已归档，不入仓）对 `alt-stage` 的处置）。
 删除后复跑 `npm run verify:dist` ⇒ ✅ 通过。
 
 ## 八、e2e 的两类环境性红（都不是更名造成）

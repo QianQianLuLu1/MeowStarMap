@@ -168,7 +168,7 @@ MeowStarMap/
 │   │   │   ├── ipc.ts               # IpcError class + call<T> unwrapping + subscribe event helper
 │   │   │   ├── plugin-bridge.ts     # Plugin capability bridge (window.pluginAPI) + i18n.t injection point
 │   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 33 files; each exports a <key>API object)
-│   │   ├── app/               # App lifecycle management (23 source files)
+│   │   ├── app/               # App lifecycle management (25 source files)
 │   │   │   ├── application.ts       # App main class
 │   │   │   ├── lifecycle.ts         # Lifecycle management
 │   │   │   ├── cleanup.ts           # Exit cleanup

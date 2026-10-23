@@ -169,7 +169,7 @@ MeowStarMap/
 │   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
 │   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
 │   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 33 个文件，每文件导出 <key>API 对象）
-│   │   ├── app/               # 应用生命周期管理（23 个源文件）
+│   │   ├── app/               # 应用生命周期管理（25 个源文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
 │   │   │   ├── cleanup.ts           # 退出清理

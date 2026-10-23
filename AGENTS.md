@@ -78,9 +78,9 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 
 ### `src/renderer/`（渲染进程）
 
-- `pages/` — Gallery、Detail、Editor、Duplicates、Categories、OutfitGallery、RecycleBin、ResonanceRecords、Settings
-- `stores/` — Zustand 状态（mediaStore、resonanceStore、uiStore、themeStore 等）
-- `components/`（common/editor/gallery/layout/resonance/scanner/video）、`hooks/`、`search/`、`i18n/`、`plugins/`、`preview/`
+- `pages/` — Gallery、Detail、Editor、Duplicates、Categories、OutfitGallery、RecycleBin、ResonanceRecords、Settings（另有 `settings/` 与 `sync-gallery/` 两个子目录）
+- `stores/` — Zustand 状态（mediaStore、resonanceStore、syncGalleryStore、uiStore、themeStore 等）
+- `components/`（common/editor/gallery/layout/resonance/scanner/sync/video）、`hooks/`、`search/`、`i18n/`、`plugins/`、`preview/`、`utils/`
 
 ### `src/shared/`（主/渲染共享契约）
 

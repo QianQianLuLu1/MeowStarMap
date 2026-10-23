@@ -1,6 +1,6 @@
 # 2026-10-20 收口 CI（Ubuntu）路径语义遗留项 + 落地防回归护栏（第二轮）
 
-> 上一轮：`docs/plans/2026-10-20-fix-ci-linux-path-semantics.md`（本轮完成后其 §12 遗留项全部收口）。
+> 上一轮：`docs/archive/plans/2026-10-20-fix-ci-linux-path-semantics.md`（已归档，不入仓；本轮完成后其 §12 遗留项全部收口）。
 > 本轮不推送、不建 PR、不发版、不改 `.github/workflows/build.yml`、零新增依赖。
 
 ## 0. 地面真相：本轮的 CI 证据是自己取的，不是等人给的

@@ -348,7 +348,7 @@ MeowStarMap/
 │   └── perf-test/                     # 性能基线脚本
 ├── src/
 │   ├── main/                          # 主进程
-│   │   ├── app/                       # 应用生命周期管理（23 个源文件）
+│   │   ├── app/                       # 应用生命周期管理（25 个源文件）
 │   │   │   ├── application.ts         # 应用主类（阶段化编排）
 │   │   │   ├── lifecycle.ts           # 生命周期管理（单实例锁等）
 │   │   │   ├── cleanup.ts             # 退出清理
@@ -460,7 +460,7 @@ MeowStarMap/
 │   │   ├── i18n/                      # 主进程国际化
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # worker 内纯查表翻译
-│   │   ├── utils/                     # 主进程工具（31 个模块）
+│   │   ├── utils/                     # 主进程工具（32 个模块）
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -490,14 +490,15 @@ MeowStarMap/
 │   │   │   ├── scanner/               # 扫描组件（ScanButton/ScanProgress）
 │   │   │   └── video/                 # VideoPlayer
 │   │   ├── data/resonance/            # 共鸣录静态数据（图鉴/卡池/百分位/12 语言名/缩略图）
-│   │   ├── hooks/                     # 23 个自定义 hooks
+│   │   ├── hooks/                     # 30 个自定义 hooks
 │   │   ├── i18n/                      # 国际化
 │   │   │   ├── index.ts
 │   │   │   └── locales/               # 12 种语言 JSON
-│   │   ├── icons/                     # 74 个 SVG 图标集中管理（单文件）
+│   │   ├── icons/                     # 75 个 SVG 图标集中管理（单文件）
 │   │   │   └── index.tsx
 │   │   ├── pages/                     # 11 个页面
 │   │   │   ├── settings/              # 设置页 sections（按分组拆分文件）
+│   │   │   ├── sync-gallery/          # 同步图库页面（SyncGalleryPage / SyncServicePage）
 │   │   │   ├── GalleryPage.tsx
 │   │   │   ├── CategoriesPage.tsx
 │   │   │   ├── DetailPage.tsx
@@ -523,6 +524,7 @@ MeowStarMap/
 │   │   │   ├── themeStore.ts
 │   │   │   ├── operationHistoryStore.ts
 │   │   │   ├── resonanceStore.ts
+│   │   │   ├── syncGalleryStore.ts
 │   │   │   └── pluginStore.ts
 │   │   ├── styles/
 │   │   │   ├── globals.css            # 全局样式 + CSS 变量
@@ -531,7 +533,7 @@ MeowStarMap/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 23 个工具函数文件（含 resonance/ 共鸣录纯函数子目录）
+│   │   ├── utils/                     # 32 个工具函数文件（含 resonance/ 共鸣录纯函数与 share-card/ 分享卡子目录）
 │   │   ├── App.tsx                    # 应用根组件
 │   │   ├── main.tsx                   # 渲染进程入口
 │   │   ├── preview-entry.tsx          # 预览版入口
@@ -834,7 +836,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.10 应用生命周期管理（app/）
 
-从 `index.ts` 引导启动的 Application 编排层，23 个源文件各司其职：
+从 `index.ts` 引导启动的 Application 编排层，25 个源文件各司其职：
 
 | 文件                     | 职责                                                                             |
 | ------------------------ | -------------------------------------------------------------------------------- |
@@ -1571,9 +1573,9 @@ components / pages (展示)
 "preview": "electron-vite preview",
 "dist": "npm run build && electron-builder --publish never",
 "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
-"pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts",
+"pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
 "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
-"typecheck": "tsc -b",
+"typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
 "typecheck:e2e": "tsc --noEmit -p e2e",
 "lint / lint:fix": "eslint .（--fix 自动修复）",
 "format / format:check": "prettier（覆盖 src / scripts / .storybook / 根目录）",
@@ -1597,9 +1599,9 @@ components / pages (展示)
 
 #### `electron.vite.config.ts`（主/preload/renderer 三段式）
 
-- **main**：lib 多入口 6 个（`index` / `scanner-worker` / `media-worker` / `thumbnail-worker` / `video-worker` / `database-worker`，各自 worker-entry.ts），outDir `dist/main/main/app`，CJS 输出；`writeCommonjsShim()` 写入 `dist/main/package.json {"type":"commonjs"}`
+- **main**：lib 多入口 **9 个**——`index` + 6 个 utilityProcess worker（`scanner-worker` / `media-worker` / `thumbnail-worker` / `video-worker` / `database-worker` / `decryption-worker`，各自 worker-entry.ts）+ 2 个非 worker CLI 入口（`nikkisync-probe` / `nikkisync-runtime`），outDir `dist/main/main/app`，CJS 输出；`npm run build` 末段写入 `dist/main/package.json {"type":"commonjs"}`
 - **preload**：entry `src/main/preload.ts`，outDir `dist/main/main`，define 注入 `__NIKKI_PRELOAD_DEV__`
-- **renderer**：`root: './src/renderer'`、dev 端口 5173（strictPort）、outDir `dist/renderer`；`resolve.alias`：`@` → renderer、`@main` → main、`@common` → common（`src/common` 已移除，别名仅为历史遗留），`electron` → `scripts/electron-browser-stub.js`；define 注入 `__PREVIEW__: false`
+- **renderer**：`root: 'src/renderer'`、dev 端口 5173（strictPort）、outDir `dist/renderer`；`resolve.alias`：`@` → renderer、`@main` → main、`@common` → common（`src/common` 已移除，别名仅为历史遗留），`electron` → `scripts/electron-browser-stub.js`；define 注入 `__PREVIEW__: false`
 
 #### `vite.preview.config.ts`（单文件预览版）
 
@@ -1994,7 +1996,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 | `src/renderer/i18n/index.ts`                           | i18n 入口                                                                        |
 | `src/renderer/styles/globals.css`                      | 全局样式 + CSS 变量                                                              |
 | `src/renderer/styles/themes/index.ts`                  | 主题配置中心                                                                     |
-| `src/renderer/icons/index.tsx`                         | 74 个 SVG 图标集中管理                                                           |
+| `src/renderer/icons/index.tsx`                         | 75 个 SVG 图标集中管理                                                           |
 | `src/renderer/pages/ResonanceRecordsPage.tsx`          | 共鸣录页面（记录 / 衣橱 / 导入导出 / 统计）                                      |
 | `src/renderer/stores/resonanceStore.ts`                | 共鸣录 store                                                                     |
 | `src/renderer/components/resonance/`                   | 共鸣录视图组件（Records / Wardrobe / ImportExport / Stats / AddRecordDialog）    |
@@ -2028,7 +2030,8 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 5.0，408 个测试文件 / 6312 个通过 + 2 个 skip（2026-10-17 本轮全量实跑；历史读数 337 / 5331 为 2026-10-10 快照，见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
+- Vitest 5.0，**437 个测试文件 / 6737 个通过 + 12 个 skip（共 6749 个用例）**（2026-10-24 本轮 `npm test` 全量实跑，`Test Files 437 passed (437)`、`Tests 6737 passed | 12 skipped (6749)`；耗时 49.75s）。文件数构成：src 409 + scripts 24 + e2e 4（静态 glob 统计，与实跑汇总逐项对齐）。
+- 历史读数（仅供对照，勿沿用）：408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---

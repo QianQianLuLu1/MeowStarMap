@@ -348,7 +348,7 @@ MeowStarMap/
 │   └── perf-test/                     # Performance baseline scripts
 ├── src/
 │   ├── main/                          # Main process
-│   │   ├── app/                       # App lifecycle management (23 source files)
+│   │   ├── app/                       # App lifecycle management (25 source files)
 │   │   │   ├── application.ts         # App main class (phased orchestration)
 │   │   │   ├── lifecycle.ts           # Lifecycle management (single-instance lock etc.)
 │   │   │   ├── cleanup.ts             # Exit cleanup
@@ -460,7 +460,7 @@ MeowStarMap/
 │   │   ├── i18n/                      # Main process i18n
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # Worker-side pure lookup translation
-│   │   ├── utils/                     # Main process utilities (31 modules)
+│   │   ├── utils/                     # Main process utilities (32 modules)
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -490,14 +490,15 @@ MeowStarMap/
 │   │   │   ├── scanner/               # Scanner components (ScanButton/ScanProgress)
 │   │   │   └── video/                 # VideoPlayer
 │   │   ├── data/resonance/            # Resonance static data (catalog/banners/percentile/12-language names/thumbnails)
-│   │   ├── hooks/                     # 23 custom hooks
+│   │   ├── hooks/                     # 30 custom hooks
 │   │   ├── i18n/                      # Internationalization
 │   │   │   ├── index.ts
 │   │   │   └── locales/               # 12 language JSON files
-│   │   ├── icons/                     # 74 SVG icons centrally managed (single file)
+│   │   ├── icons/                     # 75 SVG icons centrally managed (single file)
 │   │   │   └── index.tsx
 │   │   ├── pages/                     # 11 pages
 │   │   │   ├── settings/              # Settings page sections (split by group)
+│   │   │   ├── sync-gallery/          # Sync gallery pages (SyncGalleryPage / SyncServicePage)
 │   │   │   ├── GalleryPage.tsx
 │   │   │   ├── CategoriesPage.tsx
 │   │   │   ├── DetailPage.tsx
@@ -523,6 +524,7 @@ MeowStarMap/
 │   │   │   ├── themeStore.ts
 │   │   │   ├── operationHistoryStore.ts
 │   │   │   ├── resonanceStore.ts
+│   │   │   ├── syncGalleryStore.ts
 │   │   │   └── pluginStore.ts
 │   │   ├── styles/
 │   │   │   ├── globals.css            # Global styles + CSS variables
@@ -531,7 +533,7 @@ MeowStarMap/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 23 utility files (incl. resonance/ subdir of pure functions)
+│   │   ├── utils/                     # 32 utility files (incl. resonance/ pure-function and share-card/ subdirs)
 │   │   ├── App.tsx                    # App root component
 │   │   ├── main.tsx                   # Renderer process entry
 │   │   ├── preview-entry.tsx          # Preview entry
@@ -829,7 +831,7 @@ Three major capabilities:
 
 ### 5.10 App Lifecycle Management (app/)
 
-Application orchestration layer bootstrapped from `index.ts`, with 23 source files each handling a specific responsibility:
+Application orchestration layer bootstrapped from `index.ts`, with 25 source files each handling a specific responsibility:
 
 | File                     | Responsibilities                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------------------- |
@@ -1542,9 +1544,9 @@ components / pages (display)
 "preview": "electron-vite preview",
 "dist": "npm run build && electron-builder --publish never",
 "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
-"pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts",
+"pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
 "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
-"typecheck": "tsc -b",
+"typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
 "typecheck:e2e": "tsc --noEmit -p e2e",
 "lint / lint:fix": "eslint . (--fix for auto-fix)",
 "format / format:check": "prettier (covers src / scripts / .storybook / root)",
@@ -1569,9 +1571,9 @@ components / pages (display)
 
 #### `electron.vite.config.ts` (Main / preload / renderer three-segment)
 
-- **main**: 6 lib entries (`index` / `scanner-worker` / `media-worker` / `thumbnail-worker` / `video-worker` / `database-worker`, each a worker-entry.ts), outDir `dist/main/main/app`, CJS output; `writeCommonjsShim()` writes `dist/main/package.json {"type":"commonjs"}`
+- **main**: **9 lib entries** — `index` + 6 utilityProcess workers (`scanner-worker` / `media-worker` / `thumbnail-worker` / `video-worker` / `database-worker` / `decryption-worker`, each a worker-entry.ts) + 2 non-worker CLI entries (`nikkisync-probe` / `nikkisync-runtime`), outDir `dist/main/main/app`, CJS output; `npm run build` writes `dist/main/package.json {"type":"commonjs"}` in its final step
 - **preload**: entry `src/main/preload.ts`, outDir `dist/main/main`, define injects `__NIKKI_PRELOAD_DEV__`
-- **renderer**: `root: './src/renderer'`, dev port 5173 (strictPort), outDir `dist/renderer`; `resolve.alias`: `@` → renderer, `@main` → main, `@common` → common (`src/common` removed; alias kept as legacy), `electron` → `scripts/electron-browser-stub.js`; define injects `__PREVIEW__: false`
+- **renderer**: `root: 'src/renderer'`, dev port 5173 (strictPort), outDir `dist/renderer`; `resolve.alias`: `@` → renderer, `@main` → main, `@common` → common (`src/common` removed; alias kept as legacy), `electron` → `scripts/electron-browser-stub.js`; define injects `__PREVIEW__: false`
 
 #### `vite.preview.config.ts` (Single-file preview)
 
@@ -1967,7 +1969,7 @@ Theme switching with zero JS re-render.
 | `src/renderer/i18n/index.ts`                           | i18n entry                                                                                                       |
 | `src/renderer/styles/globals.css`                      | Global styles + CSS variables                                                                                    |
 | `src/renderer/styles/themes/index.ts`                  | Theme config center                                                                                              |
-| `src/renderer/icons/index.tsx`                         | 74 SVG icons centrally managed                                                                                   |
+| `src/renderer/icons/index.tsx`                         | 75 SVG icons centrally managed                                                                                   |
 | `src/renderer/pages/ResonanceRecordsPage.tsx`          | Resonance Records page (records / wardrobe / import-export / stats)                                              |
 | `src/renderer/stores/resonanceStore.ts`                | Resonance store                                                                                                  |
 | `src/renderer/components/resonance/`                   | Resonance views (Records / Wardrobe / ImportExport / Stats / AddRecordDialog)                                    |
@@ -2001,7 +2003,8 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- Vitest 5.0, 408 test files / 6312 passing + 2 skipped (measured 2026-10-17, full run this round; the historical 337 / 5331 reading was the 2026-10-10 snapshot — see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10).
+- Vitest 5.0, **437 test files / 6737 passing + 12 skipped (6749 tests total)** (measured 2026-10-24 with a full `npm test` run this round: `Test Files 437 passed (437)`, `Tests 6737 passed | 12 skipped (6749)`, 49.75s). Breakdown: src 409 + scripts 24 + e2e 4 (static glob count, reconciled with the run summary).
+- Historical readings (for reference only — do not reuse): 408 / 6312 + 2 is the 2026-10-17 snapshot, 337 / 5331 the 2026-10-10 snapshot (see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10).
 - The two environment-related failures in the historical baseline (`path-safety.test.ts` read-only-directory case, `GalleryStackOverflow.test.tsx`) were fixed in 2.5.0; there are currently no pre-existing failures.
 
 ---
