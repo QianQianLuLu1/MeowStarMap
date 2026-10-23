@@ -34,7 +34,7 @@ describe('formatWatermarkText', () => {
 
   it('边界：无占位符原样返回；空串返回空串', () => {
     const now = at(2026, 1, 1, 1, 1)
-    expect(formatWatermarkText('WXNN Photo', now)).toBe('WXNN Photo')
+    expect(formatWatermarkText('Meow Star Map', now)).toBe('Meow Star Map')
     expect(formatWatermarkText('', now)).toBe('')
   })
 

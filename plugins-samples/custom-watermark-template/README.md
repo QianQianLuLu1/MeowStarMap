@@ -9,7 +9,7 @@ Meow Star Map 自定义水印模板示例插件。
 | 模板 ID         | 名称         | 类型     | 说明                                     |
 | --------------- | ------------ | -------- | ---------------------------------------- |
 | `cwt-festival`  | 节日纪念水印 | 图片水印 | 使用 `templates/festival.svg` 作为水印图 |
-| `cwt-signature` | 个人签名水印 | 文字水印 | 粉色签名风格文字 `© My Nikki Gallery`    |
+| `cwt-signature` | 个人签名水印 | 文字水印 | 粉色签名风格文字 `© Meow Star Map`       |
 | `cwt-datestamp` | 当日日期戳   | 文字水印 | 动态生成当日日期 `YYYY-MM-DD`            |
 
 ## 安装

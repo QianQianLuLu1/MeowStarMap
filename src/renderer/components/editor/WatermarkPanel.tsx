@@ -45,7 +45,7 @@ const positions: { id: WatermarkConfig['position']; labelKey: string }[] = [
 ]
 
 const defaultText: WatermarkText = {
-  content: 'WXNN Photo',
+  content: 'Meow Star Map',
   font: 'sans-serif',
   size: 24,
   color: '#ffffff',

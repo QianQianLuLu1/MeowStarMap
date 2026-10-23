@@ -114,6 +114,39 @@ describe('关于页仓库标签取新名', () => {
   })
 })
 
+describe('默认内容与示例插件署名取新名', () => {
+  // 默认水印文本会直接烧进用户导出的照片，示例插件的签名与水印图则是「复制即用」的样板，
+  // 两者都是用户可见的软件自称，但都不在扫描域的老 26 条模式里（© My Nikki Gallery 是两词带空格）。
+  const SAMPLE = 'plugins-samples/custom-watermark-template'
+
+  it('两处默认水印配置取 Meow Star Map 且不残留 WXNN Photo', () => {
+    for (const rel of [
+      'src/renderer/hooks/useWatermark.ts',
+      'src/renderer/components/editor/WatermarkPanel.tsx'
+    ]) {
+      const src = read(rel)
+      expect(src, rel).toContain("content: 'Meow Star Map',")
+      expect(src, rel).not.toContain('WXNN Photo')
+    }
+  })
+
+  it('示例插件签名、README 镜像与水印图署名同源取新名', () => {
+    expect(read(`${SAMPLE}/index.js`)).toContain("text: '© Meow Star Map',")
+    expect(read(`${SAMPLE}/README.md`)).toContain('`© Meow Star Map`')
+    expect(read(`${SAMPLE}/templates/festival.svg`)).toContain('★ Meow Star Map ★')
+  })
+
+  it('示例插件目录不含任何旧应用名（但磁盘键 nikkiGallery 必须仍在）', () => {
+    for (const rel of ['index.js', 'README.md', 'package.json', 'templates/festival.svg']) {
+      const src = read(`${SAMPLE}/${rel}`)
+      for (const old of ['My Nikki Gallery', 'NikkiGallery', 'WXNN Photo']) {
+        expect(src, `${rel} 残留 ${old}`).not.toContain(old)
+      }
+    }
+    expect(read(`${SAMPLE}/package.json`)).toContain('"nikkiGallery"')
+  })
+})
+
 describe('语包软件名值锁（阶段 2 已落地，此处防回归）', () => {
   it.each(LOCALES)('%s 的 settings.about.appValue 与 titleBar.appTitle 取该语种新名', (locale) => {
     const data = readJson<AboutBlock>(localeRel(locale))

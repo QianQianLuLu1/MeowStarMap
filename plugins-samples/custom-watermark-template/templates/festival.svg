@@ -9,5 +9,5 @@
   <circle cx="100" cy="100" r="90" fill="url(#g)"/>
   <text x="100" y="95" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="28" font-weight="bold" fill="#FFFFFF">节日</text>
   <text x="100" y="130" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="28" font-weight="bold" fill="#FFFFFF">纪念</text>
-  <text x="100" y="170" text-anchor="middle" font-family="serif" font-size="14" fill="#FFFFFF" opacity="0.85">★ NikkiGallery ★</text>
+  <text x="100" y="170" text-anchor="middle" font-family="serif" font-size="14" fill="#FFFFFF" opacity="0.85">★ Meow Star Map ★</text>
 </svg>

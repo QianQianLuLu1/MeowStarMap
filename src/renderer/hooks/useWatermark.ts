@@ -13,7 +13,7 @@ export interface UseWatermarkReturn {
 
 const defaultConfig: WatermarkConfig = {
   text: {
-    content: 'WXNN Photo',
+    content: 'Meow Star Map',
     font: 'Arial',
     size: 24,
     color: '#ffffff',

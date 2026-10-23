@@ -60,7 +60,7 @@ export function init(extensionPoints) {
       id: 'cwt-signature',
       name: '个人签名水印',
       type: 'text',
-      text: '© My Nikki Gallery',
+      text: '© Meow Star Map',
       font: 'Microsoft YaHei',
       fontSize: 24,
       color: '#FF69B4',

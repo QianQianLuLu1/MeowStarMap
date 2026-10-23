@@ -25,7 +25,7 @@ function makeConfig(overrides: Partial<WatermarkConfig>): WatermarkConfig {
 
 function makeText(overrides: Partial<WatermarkText>): WatermarkText {
   return {
-    content: 'NikkiGallery',
+    content: 'Meow Star Map',
     font: 'Arial',
     size: 24,
     color: '#FFFFFF',
@@ -90,7 +90,7 @@ describe('watermark-builder - buildWatermarkFilter', () => {
       expect(r.useFilterComplex).toBe(false)
       expect(r.inputs).toEqual([])
       expect(r.filter).toMatch(/^drawtext=/)
-      expect(r.filter).toContain("text='NikkiGallery'")
+      expect(r.filter).toContain("text='Meow Star Map'")
       expect(r.filter).toContain('fontsize=24')
       expect(r.filter).toContain('fontcolor=0xffffffff')
       expect(r.filter).toContain("font='Arial'")
