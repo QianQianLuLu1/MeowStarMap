@@ -89,6 +89,11 @@
     "My Nikki Gallery"
   ],
   "minPatterns": 29,
+  "artifactBanned": {
+    "note": "产物面禁串清单（唯一维护点）。verify:dist 用它扫 release 解包出的 app.asar，命中即禁止发布。存在理由：本守卫的 skipDirs 含 dist 与 release，只管源码，于是「npm test 全绿」与「包里仍是旧地址」能同时成立——2026-10-23 16:01 那个安装包正是如此带着 4 处旧仓库地址出厂的。URL 形态由 patterns 逐条拼 owner 自动派生，未来再改名只动本文件；extra 放非名称类的失效占位（12 语包的 githubValue 曾长期是 your-repo 占位、qqGroupValue 是假群号）。禁串写在本文件是安全的：本文件在 skipPaths 内、不受逐文件计数约束；写进 scripts/*.ts 反而让本守卫红（未登记文件 + 总数漂移）。",
+    "owner": "QianQianLuLu1",
+    "extra": ["github.com/your-repo/issues", "QQ群: 123456789", "QQ Group: 123456789"]
+  },
   "expectedTotal": 170,
   "allowed": {
     "ARCHITECTURE.en.md": {

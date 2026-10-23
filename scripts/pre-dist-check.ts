@@ -335,6 +335,158 @@ function checkGitClean(): boolean {
   }
 }
 
+// ===== 新增：产物内容禁串校验（旧仓库链接与失效占位）=====
+// 存在理由：旧名终扫守卫（scripts/__tests__/old-name-ledger.test.ts）的扫描域按设计排除 dist 与
+// release，它只管源码。于是「npm test 全绿」与「安装包里仍是旧地址」能同时成立——2026-10-23 16:01
+// 出的包正是这样带着 4 处旧仓库链接与 24 处失效 issues 占位出厂的（源码到 17:21 的 18723e4 才改掉）。
+// 本闸门把判据落到出货产物本身，接在 --verify-asar 分支尾部，即 npm run dist:win 的终点。
+// fail-closed：解析不到待审 asar 一律判失败，不降级为 skip——skip 等于把「静默发布过期包」的口子重开
+// （与 44ab983 把 nikkiSyncPackedVerdict 的降级改成 fail 同一口径）。
+// 禁串清单的唯一出处是台账 JSON 的 patterns + artifactBanned：旧名不落在本文件里，否则本守卫会因
+// 「未登记文件 + 总数漂移」转红（scripts 属扫描域，而本文件不在 skipPaths 内）。
+
+/** 产物禁串命中：needle 为禁串本身，count 为非重叠出现次数 */
+export type BannedHit = { needle: string; count: number }
+
+const nonEmptyStrings = (values: string[]): string[] =>
+  values.filter((v) => typeof v === 'string' && v.trim() !== '')
+
+/**
+ * 纯函数：由台账旧名 patterns 逐条拼出 owner 命名空间下的旧仓库 URL 形态，再并入显式占位禁串。
+ * owner 为空 ⇒ 只返回 extra（「清单为空」由调用方判失败，纯函数不抛错）。去重是因为不同 patterns
+ * 拼出的 URL 可能同形。
+ */
+export function artifactBannedStrings(
+  patterns: string[],
+  owner: string,
+  extra: string[]
+): string[] {
+  const trimmedOwner = typeof owner === 'string' ? owner.trim() : ''
+  const urls =
+    trimmedOwner === ''
+      ? []
+      : nonEmptyStrings(patterns).map((p) => `github.com/${trimmedOwner}/${p}`)
+  return [...new Set([...urls, ...nonEmptyStrings(extra)])]
+}
+
+/**
+ * 纯函数：在产物字节流里逐禁串做字面量计数（不做正则、不解码）。
+ * asar 归档内各文件体是连续字节，故与 grep -a 等价（同一棵树两侧读数已实测对齐）。
+ * 空 Buffer 或空清单一律 []——绝不把「无判据」当成「全命中」。
+ */
+export function scanBufferForBanned(bytes: Buffer, banned: string[]): BannedHit[] {
+  const hits: BannedHit[] = []
+  if (bytes.length === 0) return hits
+  for (const needle of nonEmptyStrings(banned)) {
+    let count = 0
+    let from = 0
+    let at = bytes.indexOf(needle, from, 'utf8')
+    while (at >= 0) {
+      count += 1
+      from = at + needle.length
+      at = bytes.indexOf(needle, from, 'utf8')
+    }
+    if (count > 0) hits.push({ needle, count })
+  }
+  return hits.sort((a, b) => b.count - a.count)
+}
+
+/**
+ * 纯函数：确定 --verify-asar 要审哪个 app.asar。
+ * release/ 下可同时躺着几棵树（上次成功的、失败残留的、解压中途的 *.tmp），
+ * findAsarUnpacked 那套「取 readdir 首个命中」的判据会随残留目录漂移，这里不复用它。
+ * 优先级固定：① --asar=<path> 显式指定（electronDist 旁路打包时用）；
+ * ② release/win-unpacked/resources/app.asar（electron-builder win 解包目录的固定名）；
+ * ③ 任何 *.tmp 目录段一律拒绝。相对路径按 releaseDir 的父目录（仓库根）解析。
+ */
+export function resolveVerifyAsarTarget(
+  argv: string[],
+  releaseDir: string
+): { asarPath: string | null; reason: string } {
+  const override = argv.find((a) => a.startsWith('--asar='))
+  let target: string
+  if (override !== undefined) {
+    const raw = override.slice('--asar='.length).trim()
+    if (raw === '') {
+      return {
+        asarPath: null,
+        reason: '--asar 需要显式路径，形如 --asar=release/win-unpacked/resources/app.asar'
+      }
+    }
+    const root = path.dirname(releaseDir)
+    target = path.isAbsolute(raw) ? raw : path.join(root, raw)
+  } else {
+    target = path.join(releaseDir, 'win-unpacked', 'resources', 'app.asar')
+  }
+  if (target.split(/[\\/]/).some((seg) => seg.endsWith('.tmp'))) {
+    return { asarPath: null, reason: `拒绝校验解压中途目录：${target}` }
+  }
+  if (!fs.existsSync(target)) {
+    return {
+      asarPath: null,
+      reason:
+        `未找到待审产物 ${target}：若走的是 electronDist 旁路打包（解包目录名非 win-unpacked），` +
+        '请传 --asar=<path>'
+    }
+  }
+  return { asarPath: target, reason: '' }
+}
+
+interface ArtifactBannedLedger {
+  patterns?: string[]
+  artifactBanned?: { owner?: string; extra?: string[] }
+}
+
+/** 产物内容闸门：包内出现旧仓库链接或失效占位即禁止发布 */
+function checkArtifactOldNames(): void {
+  const ledgerPath = path.join(ROOT, 'scripts', '__tests__', 'old-name-ledger.json')
+  let ledger: ArtifactBannedLedger
+  try {
+    ledger = JSON.parse(fs.readFileSync(ledgerPath, 'utf-8')) as ArtifactBannedLedger
+  } catch (err) {
+    fail(`无法读取旧名台账（禁串清单的唯一出处）：${(err as Error).message}`)
+    return
+  }
+  const banned = artifactBannedStrings(
+    ledger.patterns ?? [],
+    ledger.artifactBanned?.owner ?? '',
+    ledger.artifactBanned?.extra ?? []
+  )
+  if (banned.length === 0) {
+    fail('产物禁串清单为空：台账缺 patterns 或 artifactBanned.owner，闸门形同虚设')
+    return
+  }
+  const releaseDir = path.join(ROOT, 'release')
+  const { asarPath, reason } = resolveVerifyAsarTarget(process.argv, releaseDir)
+  if (!asarPath) {
+    fail(reason)
+    return
+  }
+  let bytes: Buffer
+  try {
+    bytes = fs.readFileSync(asarPath)
+  } catch (err) {
+    fail(`无法读取待审产物 ${asarPath}：${(err as Error).message}`)
+    return
+  }
+  const hits = scanBufferForBanned(bytes, banned)
+  if (hits.length === 0) {
+    pass(
+      `产物无旧仓库链接与失效占位：${path.relative(ROOT, asarPath)}（${banned.length} 条禁串、${bytes.length} 字节）`
+    )
+    return
+  }
+  const total = hits.reduce((sum, h) => sum + h.count, 0)
+  const preview = hits
+    .slice(0, 5)
+    .map((h) => `"${h.needle}"×${h.count}`)
+    .join('、')
+  fail(
+    `产物 ${path.relative(ROOT, asarPath)} 含 ${hits.length} 类禁串共 ${total} 处：${preview}` +
+      `${hits.length > 5 ? ' 等' : ''} —— 源码改了而包没重建就是这个形状，必须重新执行打包`
+  )
+}
+
 // ===== 新增：解包后原生二进制存在性校验 =====
 // 在 electron-builder 产出 release 后执行，确认三大原生模块的运行时二进制
 // 确实被解包进安装产物。仅做"存在性 + 路径"校验（R5：不在 Node 里 require，
@@ -712,17 +864,18 @@ function checkNoAdminManifest(): void {
 }
 
 function main(): void {
-  // 解包后校验模式：仅执行原生二进制存在性检查，不跑打包前 11 项
+  // 解包后校验模式：原生二进制存在性 + 管理员清单 + 产物内容禁串，不跑打包前 11 项
   if (process.argv.includes('--verify-asar')) {
-    console.log('\n[pre-dist-check] 解包后原生二进制校验\n')
+    console.log('\n[pre-dist-check] 解包后产物校验（原生二进制 + 内容禁串）\n')
     checkUnpackedNativeBinaries()
     checkNoAdminManifest()
+    checkArtifactOldNames()
     console.log('')
     if (failed) {
-      console.error('[pre-dist-check] ❌ 解包二进制校验失败，禁止发布。\n')
+      console.error('[pre-dist-check] ❌ 解包产物校验失败，禁止发布。\n')
       process.exit(1)
     }
-    console.log('[pre-dist-check] ✅ 解包二进制校验通过。\n')
+    console.log('[pre-dist-check] ✅ 解包产物校验通过。\n')
     process.exit(0)
   }
 

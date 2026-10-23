@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import * as os from 'node:os'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 import {
@@ -8,6 +9,9 @@ import {
   dirContains,
   nikkiSyncPackedVerdict,
   nikkiSyncMissingDiagnosis,
+  artifactBannedStrings,
+  scanBufferForBanned,
+  resolveVerifyAsarTarget,
   type JsTreeFile
 } from '../pre-dist-check'
 
@@ -200,5 +204,168 @@ describe('结构契约：标记作用域覆盖产物树，且类型检查 emit �
   it('标记作用域仍须覆盖产物树内所有 .js（tsc 产物已不在其中，收窄回 app/ 依然禁止）', () => {
     expect(treeContainsMarker(MAIN_MARKER_SCOPE, ROLLUP_LAYOUT, MARKER)).toBe(true)
     expect(MAIN_MARKER_SCOPE).toBe(DIST_MAIN)
+  })
+})
+
+// ===== 产物内容禁串闸门（--verify-asar 的第 3 步）=====
+// 回归背景：2026-10-23 16:01 那个安装包出厂时「源码已改、包未重建」，app.asar 里仍含 4 处旧仓库链接
+// 与 24 处失效 issues 占位，而 npm test 全绿——旧名守卫的扫描域按设计排除 dist 与 release，
+// --verify-asar 又只看原生二进制与清单，两侧都管不到产物内容。本组用例锁住补上的三个纯函数判据。
+// 禁串一律用合成 token：scripts/ 在旧名台账的 roots 里，把真实旧名写进 .ts 会立刻让该守卫转红
+// （未登记文件 + 总数漂移），所以清单的唯一出处是台账 JSON（它在 skipPaths 内，允许出现旧名）。
+
+const OWNER = 'someone'
+const LEGACY_URL = `github.com/${OWNER}/LegacyName`
+
+describe('artifactBannedStrings：由台账 patterns 派生产物禁串', () => {
+  it('正常：逐条拼 owner 命名空间下的仓库 URL，再并入显式占位禁串', () => {
+    expect(artifactBannedStrings(['LegacyName', 'legacy_name'], OWNER, ['placeholder/x'])).toEqual([
+      `github.com/${OWNER}/LegacyName`,
+      `github.com/${OWNER}/legacy_name`,
+      'placeholder/x'
+    ])
+  })
+
+  it('异常：owner 为空只返回 extra；空白项与非字符串一律剔除', () => {
+    expect(artifactBannedStrings(['A', '', '   '], '', ['B'])).toEqual(['B'])
+    expect(
+      artifactBannedStrings([undefined as unknown as string], OWNER, [
+        null as unknown as string,
+        ''
+      ])
+    ).toEqual([])
+  })
+
+  it('边界：派生 URL 与 extra 同形时去重，同一条串不判两遍', () => {
+    expect(artifactBannedStrings(['Dup'], OWNER, [`github.com/${OWNER}/Dup`])).toEqual([
+      `github.com/${OWNER}/Dup`
+    ])
+  })
+
+  it('边界：owner 两侧空白被修剪，不产出 github.com/ 空格形态的死禁串', () => {
+    expect(artifactBannedStrings(['P'], `  ${OWNER}  `, [])).toEqual([`github.com/${OWNER}/P`])
+  })
+})
+
+describe('scanBufferForBanned：产物字节流的字面量计数', () => {
+  it('正常：同一禁串多次出现逐次累加（与 grep -a 计数同义）', () => {
+    const bytes = Buffer.from(`x ${LEGACY_URL} y ${LEGACY_URL} z`, 'utf8')
+    expect(scanBufferForBanned(bytes, [LEGACY_URL])).toEqual([{ needle: LEGACY_URL, count: 2 }])
+  })
+
+  it('正常：零命中返回空数组——这是闸门放行的唯一形状', () => {
+    expect(scanBufferForBanned(Buffer.from('clean bundle', 'utf8'), ['nothing'])).toEqual([])
+  })
+
+  it('异常：禁串清单为空与 Buffer 为空一律 []，不得判成「全命中」', () => {
+    expect(scanBufferForBanned(Buffer.from('anything', 'utf8'), [])).toEqual([])
+    expect(scanBufferForBanned(Buffer.alloc(0), ['whatever'])).toEqual([])
+  })
+
+  it('边界：按字面量匹配而非正则——needle 里的点号不得当通配符（否则合法 URL 会被误杀）', () => {
+    expect(scanBufferForBanned(Buffer.from('abc and a.c', 'utf8'), ['a.c'])).toEqual([
+      { needle: 'a.c', count: 1 }
+    ])
+    expect(scanBufferForBanned(Buffer.from('abc', 'utf8'), ['a.c'])).toEqual([])
+  })
+
+  it('边界：非重叠计数，且多类命中按次数降序（失败信息先点名最重的一类）', () => {
+    const hits = scanBufferForBanned(Buffer.from('AAAA aaa', 'utf8'), ['AAAA', 'AA', 'aaa'])
+    expect(hits.map((h) => h.count)).toEqual([2, 1, 1])
+    expect(hits[0].needle).toBe('AA')
+  })
+
+  it('边界：CJK 禁串走 utf8 匹配（12 语包的群号串是中文）', () => {
+    const bytes = Buffer.from('提示：测试群: 000111 已复制', 'utf8')
+    expect(scanBufferForBanned(bytes, ['测试群: 000111'])).toEqual([
+      { needle: '测试群: 000111', count: 1 }
+    ])
+  })
+})
+
+describe('resolveVerifyAsarTarget：待审 app.asar 的选取', () => {
+  const releaseDir = path.join(ROOT, 'release')
+
+  it('异常：--asar= 空值判非法，不静默回落到默认路径', () => {
+    const r = resolveVerifyAsarTarget(['--asar='], releaseDir)
+    expect(r.asarPath).toBeNull()
+    expect(r.reason).toContain('--asar')
+  })
+
+  it('异常：显式指向 *.tmp 解压中途目录一律拒绝（残壳不是产物）', () => {
+    const r = resolveVerifyAsarTarget(
+      ['--asar=release/win-unpacked.tmp/resources/app.asar'],
+      releaseDir
+    )
+    expect(r.asarPath).toBeNull()
+    expect(r.reason).toContain('中途')
+  })
+
+  it('异常：目标不存在时给出 reason 供上层 fail-closed，而不是当无事发生', () => {
+    const r = resolveVerifyAsarTarget(['--asar=release/definitely-not-here/app.asar'], releaseDir)
+    expect(r.asarPath).toBeNull()
+    expect(r.reason.length).toBeGreaterThan(0)
+  })
+
+  // 真 IO 落临时目录：产物树布局是被测判据的一部分，注入虚拟路径等于没测 existsSync 那一支
+  it('正常：默认取 release/win-unpacked/resources/app.asar；--asar 相对路径按仓库根解析', () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'pdc-asar-'))
+    try {
+      const tmpRelease = path.join(tmp, 'release')
+      const asar = path.join(tmpRelease, 'win-unpacked', 'resources', 'app.asar')
+      mkdirSync(path.dirname(asar), { recursive: true })
+      writeFileSync(asar, 'fake asar bytes', 'utf8')
+      expect(resolveVerifyAsarTarget([], tmpRelease).asarPath).toBe(asar)
+      expect(
+        resolveVerifyAsarTarget(
+          [`--asar=${path.join('release', 'win-unpacked', 'resources', 'app.asar')}`],
+          tmpRelease
+        ).asarPath
+      ).toBe(asar)
+      expect(resolveVerifyAsarTarget([`--asar=${asar}`], tmpRelease).asarPath).toBe(asar)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('边界：默认路径缺失但另有陈旧树时仍返回 null——宁可红也不在陈旧树上假绿', () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'pdc-stale-'))
+    try {
+      const tmpRelease = path.join(tmp, 'release')
+      mkdirSync(path.join(tmpRelease, 'win-unpacked-old', 'resources'), { recursive: true })
+      writeFileSync(path.join(tmpRelease, 'win-unpacked-old', 'resources', 'app.asar'), 'x', 'utf8')
+      const r = resolveVerifyAsarTarget([], tmpRelease)
+      expect(r.asarPath).toBeNull()
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('台账是禁串清单的唯一出处（闸门自身不得自带旧名）', () => {
+  const ledgerPath = path.join(ROOT, 'scripts', '__tests__', 'old-name-ledger.json')
+  const ledger = JSON.parse(readFileSync(ledgerPath, 'utf-8')) as {
+    patterns?: string[]
+    artifactBanned?: { owner?: string; extra?: string[] }
+  }
+
+  it('artifactBanned.owner 与 extra 就位，patterns 非空', () => {
+    expect((ledger.artifactBanned?.owner ?? '').trim().length).toBeGreaterThan(0)
+    expect((ledger.artifactBanned?.extra ?? []).length).toBeGreaterThan(0)
+    expect((ledger.patterns ?? []).length).toBeGreaterThan(0)
+  })
+
+  it('派生清单必须真的含 owner 命名空间下的 URL 形态，否则闸门等于无判据', () => {
+    const banned = artifactBannedStrings(
+      ledger.patterns ?? [],
+      ledger.artifactBanned?.owner ?? '',
+      ledger.artifactBanned?.extra ?? []
+    )
+    expect(banned.length).toBe(
+      (ledger.patterns ?? []).length + (ledger.artifactBanned?.extra ?? []).length
+    )
+    expect(
+      banned.filter((s) => s.startsWith(`github.com/${ledger.artifactBanned?.owner}/`)).length
+    ).toBe((ledger.patterns ?? []).length)
   })
 })
