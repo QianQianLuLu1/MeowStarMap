@@ -1266,7 +1266,7 @@
     "about": {
       "alias": "（全網同名）",
       "appName": "應用名稱",
-      "appValue": "無限暖暖相簿管理工具",
+      "appValue": "喵星圖",
       "authorLabel": "作者：QianLu",
       "bilibili": "嗶哩嗶哩",
       "buildTools": "建置工具鏈",
@@ -1826,7 +1826,7 @@
     "unknown": "未知"
   },
   "titleBar": {
-    "appTitle": "無限暖暖相簿管理工具"
+    "appTitle": "喵星圖"
   },
   "toast": {
     "autoScanOff": "已關閉啟動時自動掃描",

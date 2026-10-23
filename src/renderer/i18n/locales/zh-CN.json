@@ -1675,7 +1675,7 @@
     "about": {
       "alias": "（全网同名）",
       "appName": "应用名称",
-      "appValue": "无限暖暖相册管理工具",
+      "appValue": "喵星图",
       "authorLabel": "作者：QianLu",
       "bilibili": "哔哩哔哩",
       "buildTools": "构建工具链",
@@ -2235,7 +2235,7 @@
     "unknown": "未知"
   },
   "titleBar": {
-    "appTitle": "无限暖暖相册管理工具"
+    "appTitle": "喵星图"
   },
   "taskProgress": {
     "calculating": "计算中...",
@@ -2765,11 +2765,11 @@
       "cleanupFailed": {
         "title": "清理失败",
         "message": "未能自动结束残留进程",
-        "detail": "可能原因：\n• 残留进程以管理员权限运行\n• PowerShell 执行策略限制\n• 安全软件拦截\n\n请手动打开任务管理器，结束所有\"无限暖暖相册管理工具\"进程后重试。",
+        "detail": "可能原因：\n• 残留进程以管理员权限运行\n• PowerShell 执行策略限制\n• 安全软件拦截\n\n请手动打开任务管理器，结束所有\"喵星图\"进程后重试。",
         "openTaskManager": "打开任务管理器"
       },
       "startupFailed": {
-        "title": "无限暖暖相册管理工具启动失败",
+        "title": "喵星图启动失败",
         "message": "软件启动时遇到错误",
         "detail": "{{message}}\n\n错误详情已记录到：\n{{logPath}}\n\n如反复出现，请将日志反馈给开发者。",
         "openLogDir": "打开日志目录"
@@ -3534,7 +3534,7 @@
       }
     },
     "app": {
-      "name": "无限暖暖相册管理工具"
+      "name": "喵星图"
     },
     "errorHandlers": {
       "unknownPath": "<未知>",

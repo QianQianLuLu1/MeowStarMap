@@ -1,8 +1,8 @@
 {
   "name": "custom-watermark-template",
   "version": "1.0.0",
-  "description": "NikkiGallery 自定义水印模板示例插件",
-  "author": "NikkiGallery",
+  "description": "Meow Star Map 自定义水印模板示例插件",
+  "author": "Meow Star Map",
   "license": "MIT",
   "main": "index.js",
   "type": "module",

@@ -1266,7 +1266,7 @@
     "about": {
       "alias": "(mesmo nome em todas as plataformas)",
       "appName": "Nome do aplicativo",
-      "appValue": "Gerenciador de álbum de fotos WXNN",
+      "appValue": "Meow Star Map",
       "authorLabel": "Autor: QianLu",
       "bilibili": "Bilibili",
       "buildTools": "Cadeia de ferramentas de build",
@@ -1826,7 +1826,7 @@
     "unknown": "Desconhecido"
   },
   "titleBar": {
-    "appTitle": "Gerenciador de álbum de fotos WXNN"
+    "appTitle": "Meow Star Map"
   },
   "toast": {
     "autoScanOff": "Digitalização automática ao iniciar desativada",

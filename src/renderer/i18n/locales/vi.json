@@ -1266,7 +1266,7 @@
     "about": {
       "alias": "(cùng tên trên tất cả các nền tảng)",
       "appName": "Tên ứng dụng",
-      "appValue": "Công cụ quản lý album ảnh WXNN",
+      "appValue": "Meow Star Map",
       "authorLabel": "Tác giả: QianLu",
       "bilibili": "Bilibili",
       "buildTools": "Bộ công cụ build",
@@ -1826,7 +1826,7 @@
     "unknown": "Không xác định"
   },
   "titleBar": {
-    "appTitle": "Công cụ quản lý album ảnh WXNN"
+    "appTitle": "Meow Star Map"
   },
   "toast": {
     "autoScanOff": "Đã tắt tự động quét khi khởi động",

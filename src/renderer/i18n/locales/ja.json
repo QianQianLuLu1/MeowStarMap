@@ -1266,7 +1266,7 @@
     "about": {
       "alias": "（全网同名）",
       "appName": "アプリ名",
-      "appValue": "無限暖暖アルバム管理ツール",
+      "appValue": "Meow Star Map",
       "authorLabel": "作者：QianLu",
       "bilibili": "ビリビリ",
       "buildTools": "ビルドツールチェーン",
@@ -1826,7 +1826,7 @@
     "unknown": "不明"
   },
   "titleBar": {
-    "appTitle": "WXNN フォトアルバム管理ツール"
+    "appTitle": "Meow Star Map"
   },
   "toast": {
     "autoScanOff": "起動時自動スキャンを無効化",

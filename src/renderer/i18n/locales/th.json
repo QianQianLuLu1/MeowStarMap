@@ -1266,7 +1266,7 @@
     "about": {
       "alias": "(ชื่อเดียวกันในทุกแพลตฟอร์ม)",
       "appName": "ชื่อแอปพลิเคชัน",
-      "appValue": "เครื่องมือจัดการอัลบั้มรูปภาพ WXNN",
+      "appValue": "Meow Star Map",
       "authorLabel": "ผู้เขียน: QianLu",
       "bilibili": "Bilibili",
       "buildTools": "ชุดเครื่องมือสร้าง",
@@ -1826,7 +1826,7 @@
     "unknown": "ไม่ทราบ"
   },
   "titleBar": {
-    "appTitle": "เครื่องมือจัดการอัลบั้มภาพ WXNN"
+    "appTitle": "Meow Star Map"
   },
   "toast": {
     "autoScanOff": "ปิดใช้งานการสแกนอัตโนมัติเมื่อเริ่มต้น",

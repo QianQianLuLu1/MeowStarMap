@@ -1266,7 +1266,7 @@
     "about": {
       "alias": "(전 네트워크 동일 이름)",
       "appName": "앱 이름",
-      "appValue": "무한난난 앨범 관리 도구",
+      "appValue": "Meow Star Map",
       "authorLabel": "작성자: QianLu",
       "bilibili": "비리비리",
       "buildTools": "빌드 도구 체인",
@@ -1826,7 +1826,7 @@
     "unknown": "알 수 없음"
   },
   "titleBar": {
-    "appTitle": "WXNN 사진 앨범 관리 도구"
+    "appTitle": "Meow Star Map"
   },
   "toast": {
     "autoScanOff": "시작 시 자동 스캔 비활성화",
