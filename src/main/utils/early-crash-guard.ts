@@ -61,7 +61,7 @@ function ensureStartupLogExists(logPath: string, message: string, stack: string)
   } catch {
     // 无法判定存在性时按“不存在”处理
   }
-  const emergencyPath = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
+  const emergencyPath = path.join(os.tmpdir(), 'MeowStarMap-startup-errors.log')
   try {
     fs.writeFileSync(
       emergencyPath,

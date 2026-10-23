@@ -80,8 +80,8 @@ describe('局域网分享页取新名 —— 手机浏览器可见', () => {
 
 describe('应急启动弹窗取新名 —— i18n 就绪前的原生对话框', () => {
   // 硬编码双语串走 dialog.showErrorBox，此时 i18next 还没初始化，不能改走 t()（属逻辑变更）。
-  // 只锁两行文案：同文件 :64 的 NikkiGallery-startup-errors.log 是 %TEMP% 兜底日志名，
-  // 与 user-diag-path.ts:12 的诊断目录名同批（阶段 1 的 N2），本轮不碰。
+  // 只锁两行文案：同文件 :64 的 MeowStarMap-startup-errors.log 是 %TEMP% 兜底日志名，
+  // 与 user-diag-path.ts:12 的诊断目录名同批（阶段 1 的 N2），已于阶段 5 落地；细则见 runtime-disk-name.test.ts。
   const src = read('src/main/utils/early-crash-guard.ts')
 
   it('致命弹窗中英两行取新名', () => {

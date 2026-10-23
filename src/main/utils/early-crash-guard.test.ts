@@ -226,7 +226,7 @@ describe('reportEarlyFatal 诊断日志可定位（回归：弹窗路径下必�
 
   it('落盘校验失败时改展示 tmpdir 应急日志，且该文件存在', async () => {
     setDiagWriteOk(false)
-    const emergency = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
+    const emergency = path.join(os.tmpdir(), 'MeowStarMap-startup-errors.log')
     try {
       fs.rmSync(emergency, { force: true })
     } catch {

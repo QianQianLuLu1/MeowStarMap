@@ -58,7 +58,7 @@ vi.mock('../../utils/startup-diagnostic', () => ({
   diagLog: diagLogMock,
   getLogDirectorySafe: getLogDirectorySafeMock,
   // early-crash-guard 弹窗展示路径与写盘路径同源，需提供该 getter
-  getStartupLogPathValue: vi.fn(() => '/mock/NikkiGallery/Diagnostics/startup-errors.log')
+  getStartupLogPathValue: vi.fn(() => '/mock/喵星图/Diagnostics/startup-errors.log')
 }))
 
 // 捕获 process.on 注册的监听器：用 mockImplementation 拦截，避免污染真实 process 事件
@@ -128,8 +128,8 @@ describe('registerGlobalErrorHandlers', () => {
     expect(showErrorBoxMock).toHaveBeenCalledTimes(1)
     const message = showErrorBoxMock.mock.calls[0][1] as string
     expect(message).toContain('boom-first')
-    // 用户友好目录（文档/NikkiGallery/Diagnostics），不再指向隐藏 AppData
-    expect(message).toContain('NikkiGallery')
+    // 诊断目录不可写时弹窗展示的是 %TEMP% 应急兜底日志（不是文档目录，也不再指向隐藏 AppData）
+    expect(message).toContain('MeowStarMap-startup-errors.log')
     expect(message).toContain('启动失败')
     // 崩溃后高亮日志文件（资源管理器定位）
     expect(shellShowItemInFolderMock).toHaveBeenCalledWith(
@@ -188,6 +188,6 @@ describe('registerGlobalErrorHandlers', () => {
     uncaughtExceptionListener!(new Error('trigger'))
     expect(showErrorBoxMock).toHaveBeenCalledTimes(1)
     const message = showErrorBoxMock.mock.calls[0][1] as string
-    expect(message).toContain('NikkiGallery')
+    expect(message).toContain('MeowStarMap-startup-errors.log')
   })
 })

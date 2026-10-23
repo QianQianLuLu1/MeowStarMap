@@ -32,8 +32,6 @@ const read = (rel: string): string =>
 const CJK = '喵星图'
 /** 无空格 Pascal 形：只允许出现在文件名/目录名这类技术前缀 */
 const PACK = 'MeowStarMap'
-/** 英文品牌形（三词各一空格）：服务名与文案，不上磁盘路径 */
-const BRAND = 'Meow Star Map'
 /** 旧品牌名：只允许残留在「修复前实况」叙述与禁改项里 */
 const OLD = 'NikkiGallery'
 
@@ -130,6 +128,41 @@ describe('诊断目录落盘名取中文名（用户在文档目录里直接看�
     const guardTest = read('src/main/utils/early-crash-guard.test.ts')
     expect(guardTest).not.toContain(`${OLD}', 'Diagnostics'`)
     expect(guardTest).not.toContain(`${OLD}-Diagnostics'`)
+  })
+})
+
+describe('%TEMP% 应急日志前缀取无空格技术标识', () => {
+  it('三处应急兜底日志名用 MeowStarMap 前缀', () => {
+    expect(read('src/main/utils/startup-diagnostic.ts')).toContain(`'${PACK}-startup-errors.log'`)
+    expect(read('src/main/utils/startup-diagnostic.ts')).toContain(`'${PACK}-diag.log'`)
+    expect(read('src/main/utils/early-crash-guard.ts')).toContain(`'${PACK}-startup-errors.log'`)
+  })
+
+  it('旧品牌名不再作为日志文件前缀出现（历史叙述用的是斜杠形态，不在此列）', () => {
+    const files = [
+      'src/main/utils/startup-diagnostic.ts',
+      'src/main/utils/startup-diagnostic.test.ts',
+      'src/main/utils/early-crash-guard.ts',
+      'src/main/utils/early-crash-guard.test.ts',
+      'src/main/app/__tests__/error-handlers.test.ts'
+    ]
+    for (const file of files) {
+      expect(read(file), file).not.toContain(`${OLD}-`)
+    }
+  })
+
+  it('断言侧与源码同值：兜底 fixture 与弹窗断言重锚到新前缀', () => {
+    expect(read('src/main/utils/early-crash-guard.test.ts')).toContain(
+      `path.join(os.tmpdir(), '${PACK}-startup-errors.log')`
+    )
+    const handlers = read('src/main/app/__tests__/error-handlers.test.ts')
+    expect(handlers.split(`toContain('${PACK}-startup-errors.log')`).length - 1).toBe(2)
+    expect(handlers).toContain(`'/mock/${CJK}/Diagnostics/startup-errors.log'`)
+  })
+
+  it('弹窗断言不得只含糊匹配品牌子串（必须逐字锚到兜底日志名）', () => {
+    const handlers = read('src/main/app/__tests__/error-handlers.test.ts')
+    expect(handlers).not.toContain("toContain('NikkiGallery')")
   })
 })
 

@@ -35,7 +35,7 @@ function getStartupLogPath(): string {
     startupLogPath = path.join(resolveDiagDir(), 'startup-errors.log')
   } catch {
     // 极端情况：getUserFacingDiagDir 失败，回退到 os.tmpdir
-    startupLogPath = path.join(os.tmpdir(), 'NikkiGallery-startup-errors.log')
+    startupLogPath = path.join(os.tmpdir(), 'MeowStarMap-startup-errors.log')
   }
   return startupLogPath
 }
@@ -54,7 +54,7 @@ function getDiagLogPath(): string {
   try {
     diagLogPath = path.join(resolveDiagDir(), 'diag.log')
   } catch {
-    diagLogPath = path.join(os.tmpdir(), 'NikkiGallery-diag.log')
+    diagLogPath = path.join(os.tmpdir(), 'MeowStarMap-diag.log')
   }
   return diagLogPath
 }
