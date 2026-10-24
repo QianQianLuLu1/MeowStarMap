@@ -25,12 +25,43 @@ import { t } from '../i18n'
  * 若主进程被 FATAL 杀死来不及自愈重启，则靠 consecutiveFailures>=2 阈值
  * 在用户下次手动启动时兜底。观测事件若早于监听器注册而丢失亦由该阈值兜底。
  *
+ * 崩溃升级分级（防误判，2026-10-24 优化）：
+ *  - clean-exit 一律忽略；启动期崩溃立即回退；运行期崩溃 60s 窗口内达 2 次才回退，
+ *    单次瞬时崩溃交 Chromium 自行重启 GPU 进程自愈，避免无谓禁用硬件加速。
+ *
  * 全部文件读写 try/catch 容错：无文件/损坏 JSON/userData 不可写 →
  * 视为默认状态（不禁用、不计数），绝不阻塞启动。
  */
 
 /** 连续启动失败达到该阈值即激活回退（观测事件丢失时的兜底路径） */
 const FAILURE_THRESHOLD = 2
+
+/**
+ * 运行期（首绘后）GPU 崩溃升级窗口：
+ * 单次瞬时崩溃交由 Chromium 自行重启 GPU 进程自愈（界面短暂闪烁后恢复），
+ * 仅当 60s 窗口内崩溃达到 2 次才升级为「回退软件渲染 + 自动重启」，
+ * 避免 VS Code 同源的过度触发问题——一次瞬时异常就把独显/集显设备
+ * 永久打入软件渲染（毛玻璃/Canvas/滚动/视频全线变慢）。
+ * 启动期（首绘前）崩溃不受此窗口约束，仍立即回退（2026-08-19 白屏根因场景）。
+ */
+const RUNTIME_CRASH_WINDOW_MS = 60_000
+const RUNTIME_CRASH_THRESHOLD = 2
+
+/** 运行期 GPU 崩溃时间戳（毫秒，含最近 10 次；模块级内存态，重启自然清零） */
+let runtimeGpuCrashTimestamps: number[] = []
+
+/**
+ * 纯函数：判断运行期 GPU 崩溃是否达到升级阈值。
+ * @param crashTimestamps 崩溃时间戳数组（**含本次刚发生的这条**）
+ * @param nowMs 当前时间
+ * 语义：窗口 [nowMs - RUNTIME_CRASH_WINDOW_MS, nowMs] 闭区间内的崩溃数 ≥ 阈值即升级。
+ */
+export function shouldEscalateRuntimeGpuCrash(crashTimestamps: number[], nowMs: number): boolean {
+  return (
+    crashTimestamps.filter((t) => nowMs - t <= RUNTIME_CRASH_WINDOW_MS).length >=
+    RUNTIME_CRASH_THRESHOLD
+  )
+}
 
 interface GpuFallbackState {
   consecutiveFailures: number
@@ -221,7 +252,10 @@ export function requestSelfHeal(reason: string, exitCode: number): boolean {
 
 /**
  * whenReady 内、首个窗口创建前注册：观测子进程崩溃。
- * GPU 崩溃 → requestSelfHeal（落盘 + 自动重启进入软件渲染）；
+ * GPU 事件分级处理（避免误判——Chromium 对单次运行期 GPU 崩溃会自行重启 GPU 进程自愈）：
+ *  - reason=clean-exit（正常退出）→ 仅记日志，不计数不回退；
+ *  - 启动期（首绘前）崩溃 → 立即 requestSelfHeal（落盘 + 自动重启进入软件渲染）；
+ *  - 运行期崩溃 → 60s 窗口内第 1 次仅告警，达阈值（2 次）才升级 requestSelfHeal。
  * 其他类型（Utility/Renderer/PickleBroker 等）→ 仅记日志留痕（取证：主进程存活但子进程消失）。
  */
 export function setupGpuProcessWatcher(): void {
@@ -242,11 +276,48 @@ export function setupGpuProcessWatcher(): void {
       }
       return
     }
-    try {
-      logger.error(t('main.gpu.log.processCrashFallback'), details)
-    } catch {
-      // logger 未初始化时仅依赖 diagLog，不重抛
+    // 正常退出（如关机/退出链中的 GPU 进程拆除）不是崩溃，绝不据此降级硬件加速
+    if (reason === 'clean-exit') {
+      diagLog('GPU', `GPU process clean-exit (exitCode=${exitCode})，按正常退出忽略`)
+      return
     }
-    requestSelfHeal(reason, exitCode)
+    // 启动期崩溃：GPU 可能根本无法运行（白屏根因场景），立即回退自愈
+    if (isStartupPhase()) {
+      try {
+        logger.error(t('main.gpu.log.processCrashFallback'), details)
+      } catch {
+        // logger 未初始化时仅依赖 diagLog，不重抛
+      }
+      requestSelfHeal(reason, exitCode)
+      return
+    }
+    // 运行期崩溃：窗口计数升级（单次交 Chromium 自愈，避免无谓禁用硬件加速）
+    const now = Date.now()
+    runtimeGpuCrashTimestamps.push(now)
+    if (runtimeGpuCrashTimestamps.length > 10)
+      runtimeGpuCrashTimestamps = runtimeGpuCrashTimestamps.slice(-10)
+    if (shouldEscalateRuntimeGpuCrash(runtimeGpuCrashTimestamps, now)) {
+      try {
+        logger.error(t('main.gpu.log.processCrashFallback'), details)
+      } catch {
+        // logger 未初始化时仅依赖 diagLog，不重抛
+      }
+      diagLog(
+        'GPU',
+        `GPU process gone (reason=${reason} exitCode=${exitCode})，${RUNTIME_CRASH_WINDOW_MS / 1000}s 窗口内第 ${RUNTIME_CRASH_THRESHOLD} 次崩溃，升级回退软件渲染`
+      )
+      requestSelfHeal(reason, exitCode)
+    } else {
+      const warnMsg =
+        `GPU process gone at runtime (reason=${reason} exitCode=${exitCode})，` +
+        `窗口内第 1/${RUNTIME_CRASH_THRESHOLD} 次，交 Chromium 自行重启 GPU 进程；` +
+        `${RUNTIME_CRASH_WINDOW_MS / 1000}s 内再次崩溃将自动切换软件渲染`
+      diagLog('GPU', warnMsg)
+      try {
+        logger.warn(warnMsg)
+      } catch {
+        // logger 未初始化时仅依赖 diagLog，不重抛
+      }
+    }
   })
 }

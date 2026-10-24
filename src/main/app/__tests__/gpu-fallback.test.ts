@@ -181,6 +181,8 @@ describe('gpu-fallback 状态机', () => {
   })
 
   it('9. setupGpuProcessWatcher：GPU 触发回退标记；其他类型仅记日志、不写盘不自愈', () => {
+    // 注：本文件不 resetModules，前序用例 3/8 的 markBootSuccess 已置 appBooted=true，
+    // 故此处走「运行期崩溃 60s 窗口升级」路径：第 1 次仅告警，窗口内第 2 次才升级回退
     setupGpuProcessWatcher()
     expect(mockAppOn).toHaveBeenCalledWith('child-process-gone', expect.any(Function))
     const handler = mockAppOn.mock.calls[0][1] as (
@@ -193,7 +195,9 @@ describe('gpu-fallback 状态机', () => {
     expect(loggerErrorMock).not.toHaveBeenCalled()
     expect(diagLogMock).toHaveBeenCalledWith('CHILD-PROC', expect.stringContaining('type=Utility'))
 
-    handler(null, { type: 'GPU', reason: 'crashed', exitCode: 1 })
+    handler(null, { type: 'GPU', reason: 'crashed', exitCode: 1 }) // 运行期第 1 次：仅告警
+    expect(fs.existsSync(statePath())).toBe(false)
+    handler(null, { type: 'GPU', reason: 'crashed', exitCode: 1 }) // 窗口内第 2 次：升级回退
     expect(readRaw().fallbackActive).toBe(true)
     expect(loggerErrorMock).toHaveBeenCalled()
   })
