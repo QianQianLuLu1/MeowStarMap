@@ -1692,7 +1692,8 @@
       "themeDisplay": "Chủ đề & hiển thị",
       "scanDirectories": "Thư mục quét",
       "cacheCleanup": "Bộ nhớ đệm & dọn dẹp",
-      "aboutOverview": "Thông tin ứng dụng & liên hệ"
+      "aboutOverview": "Thông tin ứng dụng & liên hệ",
+      "diagnosticsGpu": "Trạng thái GPU"
     },
     "startup": {
       "autoScan": "Tự động quét khi khởi động",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "Trạng thái GPU",
+      "desc": "Ảnh chụp nhanh thời gian thực về tăng tốc phần cứng, GPU đang dùng và tùy chọn GPU rời (chẩn đoán chỉ đọc)",
+      "refresh": "Làm mới",
+      "hwAccel": "Tăng tốc phần cứng",
+      "hwOn": "Đã bật",
+      "hwOff": "Đã tắt",
+      "reason": {
+        "default": "Bật theo mặc định",
+        "userDisabled": "Người dùng tắt",
+        "crashFallback": "Tự động chuyển sau sự cố",
+        "retryAfterUpdate": "Tự thử lại sau cập nhật"
+      },
+      "activeGpu": "GPU đang hoạt động",
+      "gpuCount": "GPU phát hiện được",
+      "featureStatus": "Trạng thái tính năng chính",
+      "fallback": "Trạng thái chuyển sau sự cố",
+      "fallbackActive": "Đang bật",
+      "fallbackInactive": "Không bật",
+      "discrete": "Tùy chọn GPU rời",
+      "discreteOn": "GPU rời hiệu năng cao",
+      "discreteOff": "Theo hệ thống",
+      "registry": {
+        "set": "Đã ghi vào registry",
+        "removed": "Đã xóa khỏi registry",
+        "kept-foreign": "Giữ cài đặt ngoài",
+        "skipped-dev": "Bỏ qua ở chế độ dev",
+        "skipped-platform": "Bỏ qua ngoài Windows",
+        "noop": "Không thao tác"
+      },
+      "unavailable": "Không khả dụng",
+      "loadFailed": "Không đọc được trạng thái GPU",
+      "hint": "Tùy chọn GPU rời được áp dụng qua cài đặt đồ họa Windows (registry GpuPreference) và có hiệu lực sau khi khởi động lại; sau khi cập nhật ứng dụng, cơ chế chuyển sau sự cố sẽ tự thử lại tăng tốc phần cứng một lần."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "Đã xuất tới {{path}}",
       "exportFailed": "Xuất thất bại: {{reason}}",
       "errorCodeHint": "Mã lỗi E001–E005 tương ứng với định vị thất bại/thiếu thư mục con/không đủ quyền/không có UID/lỗi đọc. Nhật ký xuất ra có thể đính kèm vào ticket"
+    },
+    "gpu": {
+      "refreshAria": "Làm mới trạng thái GPU"
     }
   },
   "errorFallback": {

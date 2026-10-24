@@ -1692,7 +1692,8 @@
       "themeDisplay": "테마 및 표시",
       "scanDirectories": "스캔 디렉터리",
       "cacheCleanup": "캐시 및 정리",
-      "aboutOverview": "앱 정보 및 연락처"
+      "aboutOverview": "앱 정보 및 연락처",
+      "diagnosticsGpu": "GPU 상태"
     },
     "startup": {
       "autoScan": "시작 시 자동 스캔",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "GPU 상태",
+      "desc": "하드웨어 가속, 사용 중 GPU, 독립 그래픽 카드 설정의 실시간 스냅샷(읽기 전용 진단)",
+      "refresh": "새로 고침",
+      "hwAccel": "하드웨어 가속",
+      "hwOn": "켜짐",
+      "hwOff": "꺼짐",
+      "reason": {
+        "default": "기본으로 켜짐",
+        "userDisabled": "사용자가 끔",
+        "crashFallback": "충돌 후 자동 전환",
+        "retryAfterUpdate": "업데이트 후 자동 재시도 중"
+      },
+      "activeGpu": "사용 중 GPU",
+      "gpuCount": "감지된 GPU",
+      "featureStatus": "주요 기능 상태",
+      "fallback": "충돌 전환 상태",
+      "fallbackActive": "활성",
+      "fallbackInactive": "비활성",
+      "discrete": "독립 그래픽 카드 설정",
+      "discreteOn": "고성능 독립 그래픽 카드",
+      "discreteOff": "시스템 설정 따르기",
+      "registry": {
+        "set": "레지스트리에 기록됨",
+        "removed": "레지스트리에서 제거됨",
+        "kept-foreign": "외부 설정 유지",
+        "skipped-dev": "개발 모드에서 건너뜀",
+        "skipped-platform": "Windows 외 환경 건너뜀",
+        "noop": "작업 없음"
+      },
+      "unavailable": "사용 불가",
+      "loadFailed": "GPU 상태를 읽지 못했습니다",
+      "hint": "독립 그래픽 카드 설정은 Windows 그래픽 설정(레지스트리 GpuPreference)으로 적용되며 재시작 후 효과가 있습니다. 충돌 전환은 앱 업데이트 후 하드웨어 가속을 한 번 자동으로 재시도합니다."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "{{path}}(으)로 내보냈습니다",
       "exportFailed": "내보내기 실패: {{reason}}",
       "errorCodeHint": "오류 코드 E001–E005은 위치 찾기 실패/하위 디렉터리 없음/권한 부족/UID 없음/읽기 실패에 해당합니다. 내보낸 로그를 티켓에 첨부할 수 있습니다"
+    },
+    "gpu": {
+      "refreshAria": "GPU 상태 새로 고침"
     }
   },
   "errorFallback": {

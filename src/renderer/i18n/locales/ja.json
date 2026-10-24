@@ -1692,7 +1692,8 @@
       "themeDisplay": "テーマと表示",
       "scanDirectories": "スキャン先ディレクトリ",
       "cacheCleanup": "キャッシュとクリーンアップ",
-      "aboutOverview": "アプリ情報と連絡先"
+      "aboutOverview": "アプリ情報と連絡先",
+      "diagnosticsGpu": "GPU 状態"
     },
     "startup": {
       "autoScan": "起動時に自動スキャン",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "GPU 状態",
+      "desc": "ハードウェアアクセラレーション・使用中 GPU・ディスクリート GPU 設定のリアルタイムスナップショット（読み取り専用）",
+      "refresh": "更新",
+      "hwAccel": "ハードウェアアクセラレーション",
+      "hwOn": "有効",
+      "hwOff": "無効",
+      "reason": {
+        "default": "既定で有効",
+        "userDisabled": "ユーザーが無効化",
+        "crashFallback": "クラッシュ時に自動フォールバック",
+        "retryAfterUpdate": "更新後に自動再試行中"
+      },
+      "activeGpu": "使用中の GPU",
+      "gpuCount": "検出された GPU",
+      "featureStatus": "主要機能の状態",
+      "fallback": "クラッシュフォールバック状態",
+      "fallbackActive": "有効",
+      "fallbackInactive": "無効",
+      "discrete": "ディスクリート GPU 設定",
+      "discreteOn": "高性能ディスクリート GPU",
+      "discreteOff": "システムに従う",
+      "registry": {
+        "set": "レジストリに書き込み済み",
+        "removed": "レジストリから削除済み",
+        "kept-foreign": "外部設定を保持",
+        "skipped-dev": "開発モードでスキップ",
+        "skipped-platform": "Windows 以外でスキップ",
+        "noop": "操作なし"
+      },
+      "unavailable": "利用不可",
+      "loadFailed": "GPU 状態の取得に失敗しました",
+      "hint": "ディスクリート GPU 設定は Windows のグラフィックス設定（レジストリ GpuPreference）で適用され、再起動後に有効になります。クラッシュフォールバックはアプリ更新後に一度だけ自動再試行します。"
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "{{path}} にエクスポートしました",
       "exportFailed": "エクスポート失敗: {{reason}}",
       "errorCodeHint": "エラーコード E001–E005 は位置特定失敗/サブディレクトリ不存在/権限不足/UID なし/読み取り失敗に対応します。エクスポートしたログをチケットに添付できます"
+    },
+    "gpu": {
+      "refreshAria": "GPU 状態を更新"
     }
   },
   "errorFallback": {

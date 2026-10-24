@@ -2084,6 +2084,7 @@
       "dataCache": "缓存管理",
       "dataClear": "清除数据",
       "diagnosticsCrash": "崩溃报告",
+      "diagnosticsGpu": "GPU 状态",
       "diagnosticsLogs": "日志管理",
       "scanDiagnostic": "扫描链路诊断",
       "display": "字体与显示",
@@ -2116,6 +2117,40 @@
       "discreteGpuRestartHint": "独立显卡偏好已保存，将在应用重启后生效。是否立即重启？",
       "restartNow": "立即重启",
       "restartLater": "稍后重启"
+    },
+    "gpu": {
+      "title": "GPU 状态",
+      "desc": "硬件加速、活动显卡与独显偏好的实时快照（只读诊断，不改动任何配置）",
+      "refresh": "刷新",
+      "hwAccel": "硬件加速",
+      "hwOn": "已开启",
+      "hwOff": "已关闭",
+      "reason": {
+        "default": "默认开启",
+        "userDisabled": "用户已关闭",
+        "crashFallback": "因崩溃自动回退",
+        "retryAfterUpdate": "升级后自动重试中"
+      },
+      "activeGpu": "当前活动显卡",
+      "gpuCount": "检测到显卡",
+      "featureStatus": "关键特性状态",
+      "fallback": "崩溃回退状态",
+      "fallbackActive": "已激活",
+      "fallbackInactive": "未激活",
+      "discrete": "独显偏好",
+      "discreteOn": "高性能独显",
+      "discreteOff": "跟随系统",
+      "registry": {
+        "set": "已写入注册表",
+        "removed": "已清理注册表",
+        "kept-foreign": "保留外来设置",
+        "skipped-dev": "开发模式跳过",
+        "skipped-platform": "非 Windows 跳过",
+        "noop": "无操作"
+      },
+      "unavailable": "不可用",
+      "loadFailed": "GPU 状态读取失败",
+      "hint": "独显偏好经 Windows 图形设置（注册表 GpuPreference）应用，重启后生效；崩溃回退会在应用升级后自动重试一次硬件加速。"
     },
     "theme": {
       "desc": "切换后实时生效，主题偏好会自动保存到本地配置。",
@@ -2704,6 +2739,9 @@
     "smartGroupToggle": "切换智能分组面板"
   },
   "diagnostics": {
+    "gpu": {
+      "refreshAria": "刷新 GPU 状态"
+    },
     "logs": {
       "clearAllHint": "清空所有历史日志",
       "copyAppVersion": "应用版本: {{version}}",

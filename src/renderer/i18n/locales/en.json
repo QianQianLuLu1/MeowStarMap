@@ -1692,7 +1692,8 @@
       "themeDisplay": "Theme & Display",
       "scanDirectories": "Scan Directories",
       "cacheCleanup": "Cache & Cleanup",
-      "aboutOverview": "App Information & Contact"
+      "aboutOverview": "App Information & Contact",
+      "diagnosticsGpu": "GPU Status"
     },
     "startup": {
       "autoScan": "Auto-scan on startup",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "GPU Status",
+      "desc": "Live snapshot of hardware acceleration, active GPU and discrete GPU preference (read-only diagnostics)",
+      "refresh": "Refresh",
+      "hwAccel": "Hardware Acceleration",
+      "hwOn": "Enabled",
+      "hwOff": "Disabled",
+      "reason": {
+        "default": "Enabled by default",
+        "userDisabled": "Disabled by user",
+        "crashFallback": "Auto fallback after crash",
+        "retryAfterUpdate": "Auto retry after update"
+      },
+      "activeGpu": "Active GPU",
+      "gpuCount": "Detected GPUs",
+      "featureStatus": "Key Feature Status",
+      "fallback": "Crash Fallback Status",
+      "fallbackActive": "Active",
+      "fallbackInactive": "Inactive",
+      "discrete": "Discrete GPU Preference",
+      "discreteOn": "High-performance discrete GPU",
+      "discreteOff": "Follow system",
+      "registry": {
+        "set": "Written to registry",
+        "removed": "Removed from registry",
+        "kept-foreign": "Foreign setting kept",
+        "skipped-dev": "Skipped in dev mode",
+        "skipped-platform": "Skipped on non-Windows",
+        "noop": "No operation"
+      },
+      "unavailable": "Unavailable",
+      "loadFailed": "Failed to read GPU status",
+      "hint": "The discrete GPU preference is applied via Windows graphics settings (registry GpuPreference) and takes effect after restart; crash fallback automatically retries hardware acceleration once after an app update."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "Exported to {{path}}",
       "exportFailed": "Export failed: {{reason}}",
       "errorCodeHint": "Codes E001–E005 map to locate failure / missing subdir / permission denied / no UID / read failure; export the log and attach it to your ticket"
+    },
+    "gpu": {
+      "refreshAria": "Refresh GPU status"
     }
   },
   "errorFallback": {

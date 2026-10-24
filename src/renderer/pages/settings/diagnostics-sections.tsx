@@ -13,6 +13,225 @@ import {
   type CrashRecord
 } from './shared'
 
+// ============ GPU 状态（app:gpu-status 只读探针） ============
+
+/** GPU 状态载荷的最小结构声明（与 shared/types/electron-api.ts 的 GpuStatusSummary 对齐） */
+interface GpuStatusPayload {
+  hardwareAcceleration: { enabled: boolean; reason: string }
+  fallback: { active: boolean; consecutiveFailures: number; fallbackVersion: string | null }
+  discretePreference: { mode: 'auto' | 'high-performance'; registry: string | null }
+  featureStatus: Record<string, string> | null
+  gpus: Array<{
+    vendorId: string | null
+    deviceId: string | null
+    vendor: string | null
+    device: string | null
+    active: boolean | null
+  }> | null
+  activeGpu: string | null
+  electronVersion: string
+  platform: string
+}
+
+/** 特性状态里优先展示的关键项（Chrome GPU Feature Status 常见键） */
+const FEATURE_KEYS = ['canvas', 'webgl', 'webgl2', 'video_decode', 'opengl', 'raster'] as const
+
+/**
+ * GPU 硬件加速状态卡：回答「硬件加速是否真的开着、当前用哪块卡、
+ * 哪些特性被降级到软件、崩溃回退与独显偏好的应用结果」。
+ * 只读探针，任何字段不可得（null）时显示「不可用」。
+ */
+export const DiagnosticsGpuSection: React.FC = () => {
+  const { t } = useTranslation()
+  const [status, setStatus] = useState<GpuStatusPayload | null>(null)
+  const [loadFailed, setLoadFailed] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const loadStatus = useCallback(async () => {
+    if (!window.electronAPI?.app?.getGpuStatus) return
+    setLoading(true)
+    try {
+      const s = (await window.electronAPI.app.getGpuStatus()) as GpuStatusPayload
+      setStatus(s)
+      setLoadFailed(false)
+    } catch {
+      setLoadFailed(true)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadStatus()
+  }, [loadStatus])
+
+  const reasonText = useMemo(() => {
+    const reason = status?.hardwareAcceleration.reason
+    if (reason === 'user-disabled') return t('settings.gpu.reason.userDisabled')
+    if (reason === 'crash-fallback') return t('settings.gpu.reason.crashFallback')
+    if (reason === 'retry-after-update') return t('settings.gpu.reason.retryAfterUpdate')
+    return t('settings.gpu.reason.default')
+  }, [status, t])
+
+  const featureLines = useMemo(() => {
+    if (!status?.featureStatus) return []
+    return FEATURE_KEYS.filter((k) => typeof status.featureStatus?.[k] === 'string').map(
+      (k) => `${k}: ${status.featureStatus?.[k]}`
+    )
+  }, [status])
+
+  const registryText = useMemo(() => {
+    const r = status?.discretePreference.registry
+    if (r === null || r === undefined) return t('settings.gpu.unavailable')
+    const key = `settings.gpu.registry.${r}` as const
+    const translated = t(key)
+    return translated === key ? r : translated
+  }, [status, t])
+
+  return (
+    <div className="glass-card p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h3 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+            {t('settings.gpu.title')}
+          </h3>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>
+            {t('settings.gpu.desc')}
+          </p>
+        </div>
+        <button
+          className="btn-secondary text-xs px-3 py-1.5"
+          onClick={loadStatus}
+          disabled={loading}
+          title={t('diagnostics.logs.refreshHint')}
+          aria-label={t('diagnostics.gpu.refreshAria')}
+        >
+          {loading ? t('common.loading') : t('settings.gpu.refresh')}
+        </button>
+      </div>
+
+      {loadFailed ? (
+        <p className="text-xs py-3" style={{ color: 'var(--danger-hover)' }}>
+          {t('settings.gpu.loadFailed')}
+        </p>
+      ) : status === null ? (
+        <p className="text-xs py-3" style={{ color: 'var(--text-tertiary)' }}>
+          {loading ? t('common.loading') : t('settings.gpu.loadFailed')}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          <SettingsCard className="flex items-center justify-between gap-3">
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('settings.gpu.hwAccel')}
+            </span>
+            <span
+              className="text-xs font-medium"
+              style={{
+                color: status.hardwareAcceleration.enabled ? 'var(--accent)' : 'var(--danger-hover)'
+              }}
+            >
+              {status.hardwareAcceleration.enabled
+                ? t('settings.gpu.hwOn')
+                : t('settings.gpu.hwOff')}
+              <span className="ml-2" style={{ color: 'var(--text-tertiary)' }}>
+                ({reasonText})
+              </span>
+            </span>
+          </SettingsCard>
+
+          <SettingsCard className="flex items-center justify-between gap-3">
+            <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-tertiary)' }}>
+              {t('settings.gpu.activeGpu')}
+            </span>
+            <span
+              className="text-xs font-mono text-right truncate"
+              style={{ color: 'var(--text-primary)' }}
+              title={status.activeGpu ?? undefined}
+            >
+              {status.activeGpu ?? t('settings.gpu.unavailable')}
+            </span>
+          </SettingsCard>
+
+          <SettingsCard className="space-y-1.5">
+            <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('settings.gpu.gpuCount')}
+              {status.gpus === null ? (
+                <span className="ml-2">{t('settings.gpu.unavailable')}</span>
+              ) : (
+                <span className="ml-2 font-mono">{status.gpus.length}</span>
+              )}
+            </div>
+            {status.gpus?.map((g, i) => (
+              <div
+                key={`${g.vendorId ?? '?'}/${g.deviceId ?? '?'}/${i}`}
+                className="text-xs font-mono truncate"
+                style={{ color: 'var(--text-secondary)' }}
+                title={`${g.vendor ?? ''} ${g.device ?? ''} (${g.vendorId ?? '?'}/${g.deviceId ?? '?'})`}
+              >
+                {g.device ?? g.vendor ?? `${g.vendorId ?? '?'}/${g.deviceId ?? '?'}`}
+              </div>
+            ))}
+          </SettingsCard>
+
+          <SettingsCard className="space-y-1">
+            <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('settings.gpu.featureStatus')}
+            </div>
+            {featureLines.length === 0 ? (
+              <div className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {t('settings.gpu.unavailable')}
+              </div>
+            ) : (
+              <div
+                className="text-xs font-mono flex flex-wrap gap-x-4 gap-y-1"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                {featureLines.map((line) => (
+                  <span key={line}>{line}</span>
+                ))}
+              </div>
+            )}
+          </SettingsCard>
+
+          <SettingsCard className="flex items-center justify-between gap-3">
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('settings.gpu.fallback')}
+            </span>
+            <span
+              className="text-xs"
+              style={{
+                color: status.fallback.active ? 'var(--danger-hover)' : 'var(--text-primary)'
+              }}
+            >
+              {status.fallback.active
+                ? `${t('settings.gpu.fallbackActive')}（v=${status.fallback.fallbackVersion ?? '?'}, fails=${status.fallback.consecutiveFailures}）`
+                : t('settings.gpu.fallbackInactive')}
+            </span>
+          </SettingsCard>
+
+          <SettingsCard className="flex items-center justify-between gap-3">
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('settings.gpu.discrete')}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
+              {status.discretePreference.mode === 'high-performance'
+                ? t('settings.gpu.discreteOn')
+                : t('settings.gpu.discreteOff')}
+              <span className="ml-2" style={{ color: 'var(--text-tertiary)' }}>
+                ({registryText})
+              </span>
+            </span>
+          </SettingsCard>
+        </div>
+      )}
+
+      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+        {t('settings.gpu.hint')}
+      </p>
+    </div>
+  )
+}
+
 // ============ 日志与诊断 ============
 
 export const DiagnosticsLogsSection: React.FC = () => {

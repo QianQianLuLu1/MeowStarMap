@@ -11,6 +11,7 @@ import {
   ProfileManageSection,
   DataBackupSection,
   DataCacheClearSection,
+  DiagnosticsGpuSection,
   DiagnosticsLogsSection,
   DiagnosticsCrashSection,
   ScanLogDiagnosticSection,
@@ -121,6 +122,11 @@ const SETTINGS_GROUPS: GroupDef[] = [
     id: 'diagnostics',
     nameKey: 'settings.groups.diagnostics',
     sections: [
+      {
+        id: 'diagnostics-gpu',
+        nameKey: 'settings.sections.diagnosticsGpu',
+        component: DiagnosticsGpuSection
+      },
       {
         id: 'diagnostics-scan',
         nameKey: 'settings.sections.scanDiagnostic',

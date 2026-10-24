@@ -1692,7 +1692,8 @@
       "themeDisplay": "Thème et affichage",
       "scanDirectories": "Répertoires d'analyse",
       "cacheCleanup": "Cache et nettoyage",
-      "aboutOverview": "Informations sur l'application et contact"
+      "aboutOverview": "Informations sur l'application et contact",
+      "diagnosticsGpu": "État du GPU"
     },
     "startup": {
       "autoScan": "Analyse automatique au démarrage",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "État du GPU",
+      "desc": "Instantané en direct de l'accélération matérielle, du GPU actif et de la préférence GPU dédiée (diagnostic en lecture seule)",
+      "refresh": "Actualiser",
+      "hwAccel": "Accélération matérielle",
+      "hwOn": "Activée",
+      "hwOff": "Désactivée",
+      "reason": {
+        "default": "Activée par défaut",
+        "userDisabled": "Désactivée par le utilisateur",
+        "crashFallback": "Repli auto après plantage",
+        "retryAfterUpdate": "Nouvel essai auto après mise à jour"
+      },
+      "activeGpu": "GPU actif",
+      "gpuCount": "GPU détectés",
+      "featureStatus": "État des fonctions clés",
+      "fallback": "État du repli après plantage",
+      "fallbackActive": "Actif",
+      "fallbackInactive": "Inactif",
+      "discrete": "Préférence GPU dédié",
+      "discreteOn": "GPU dédié haute performance",
+      "discreteOff": "Suivre le système",
+      "registry": {
+        "set": "Écrit dans le registre",
+        "removed": "Supprimé du registre",
+        "kept-foreign": "Réglage externe conservé",
+        "skipped-dev": "Ignoré en mode dev",
+        "skipped-platform": "Ignoré hors Windows",
+        "noop": "Aucune opération"
+      },
+      "unavailable": "Indisponible",
+      "loadFailed": "Échec de lecture de l'état du GPU",
+      "hint": "La préférence est appliquée via les paramètres graphiques de Windows (registre GpuPreference) et prend effet après redémarrage ; après une mise à jour, le repli retente automatiquement une fois l'accélération matérielle."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "Exporté vers {{path}}",
       "exportFailed": "Échec de l'export : {{reason}}",
       "errorCodeHint": "Les codes E001–E005 correspondent à échec de localisation/sous-répertoire manquant/droits insuffisants/aucun UID/échec de lecture. Les journaux exportés peuvent être joints au ticket"
+    },
+    "gpu": {
+      "refreshAria": "Actualiser l'état du GPU"
     }
   },
   "errorFallback": {

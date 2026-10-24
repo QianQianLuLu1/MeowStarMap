@@ -1692,7 +1692,8 @@
       "themeDisplay": "Tema y visualización",
       "scanDirectories": "Directorios de escaneo",
       "cacheCleanup": "Caché y limpieza",
-      "aboutOverview": "Información de la aplicación y contacto"
+      "aboutOverview": "Información de la aplicación y contacto",
+      "diagnosticsGpu": "Estado de GPU"
     },
     "startup": {
       "autoScan": "Escaneo automático al iniciar",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "Estado de GPU",
+      "desc": "Instantánea en vivo de aceleración por hardware, GPU activa y preferencia de GPU dedicada (diagnóstico de solo lectura)",
+      "refresh": "Actualizar",
+      "hwAccel": "Aceleración por hardware",
+      "hwOn": "Activada",
+      "hwOff": "Desactivada",
+      "reason": {
+        "default": "Activada por defecto",
+        "userDisabled": "Desactivada por el usuario",
+        "crashFallback": "Retroceso automático por fallo",
+        "retryAfterUpdate": "Reintento automático tras actualizar"
+      },
+      "activeGpu": "GPU activa",
+      "gpuCount": "GPU detectadas",
+      "featureStatus": "Estado de funciones clave",
+      "fallback": "Estado del retroceso por fallo",
+      "fallbackActive": "Activo",
+      "fallbackInactive": "Inactivo",
+      "discrete": "Preferencia de GPU dedicada",
+      "discreteOn": "GPU dedicada de alto rendimiento",
+      "discreteOff": "Seguir al sistema",
+      "registry": {
+        "set": "Escrito en el registro",
+        "removed": "Eliminado del registro",
+        "kept-foreign": "Ajuste externo conservado",
+        "skipped-dev": "Omitido en modo desarrollo",
+        "skipped-platform": "Omitido en no Windows",
+        "noop": "Sin operación"
+      },
+      "unavailable": "No disponible",
+      "loadFailed": "No se pudo leer el estado de GPU",
+      "hint": "La preferencia se aplica mediante la configuración de gráficos de Windows (registro GpuPreference) y surte efecto tras reiniciar; tras actualizar la app, el retroceso por fallo reintenta automáticamente una vez la aceleración por hardware."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "Exportado a {{path}}",
       "exportFailed": "Error de exportación: {{reason}}",
       "errorCodeHint": "Los códigos E001–E005 corresponden a ubicación fallida/subdirectorio inexistente/permisos insuficientes/sin UID/error de lectura. Los registros exportados pueden adjuntarse al ticket"
+    },
+    "gpu": {
+      "refreshAria": "Actualizar estado de GPU"
     }
   },
   "errorFallback": {

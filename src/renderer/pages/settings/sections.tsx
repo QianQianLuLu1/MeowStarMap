@@ -21,7 +21,11 @@ export {
 } from './scan-sections'
 export { ProfileManageSection } from './profile-sections'
 export { DataBackupSection, DataCacheSection, DataClearSection } from './data-sections'
-export { DiagnosticsLogsSection, DiagnosticsCrashSection } from './diagnostics-sections'
+export {
+  DiagnosticsGpuSection,
+  DiagnosticsLogsSection,
+  DiagnosticsCrashSection
+} from './diagnostics-sections'
 export { ScanLogDiagnosticSection } from './scan-log-diagnostic-section'
 export { AboutInfoSection, AboutContactSection, AboutLicenseSection } from './about-sections'
 // P2-01：语言设置区块

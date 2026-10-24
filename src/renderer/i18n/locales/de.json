@@ -1692,7 +1692,8 @@
       "themeDisplay": "Design & Anzeige",
       "scanDirectories": "Scan-Verzeichnisse",
       "cacheCleanup": "Cache & Bereinigung",
-      "aboutOverview": "App-Informationen & Kontakt"
+      "aboutOverview": "App-Informationen & Kontakt",
+      "diagnosticsGpu": "GPU-Status"
     },
     "startup": {
       "autoScan": "Beim Start automatisch scannen",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "GPU-Status",
+      "desc": "Echtzeit-Snapshot von Hardwarebeschleunigung, aktiver GPU und dedizierter GPU-Präferenz (schreibgeschützte Diagnose)",
+      "refresh": "Aktualisieren",
+      "hwAccel": "Hardwarebeschleunigung",
+      "hwOn": "Aktiviert",
+      "hwOff": "Deaktiviert",
+      "reason": {
+        "default": "Standardmäßig aktiviert",
+        "userDisabled": "Vom Benutzer deaktiviert",
+        "crashFallback": "Automatisch nach Absturz zurückgesetzt",
+        "retryAfterUpdate": "Automatischer Neuversuch nach Update"
+      },
+      "activeGpu": "Aktive GPU",
+      "gpuCount": "Erkannte GPUs",
+      "featureStatus": "Wichtige Funktionsstatus",
+      "fallback": "Absturz-Rückfallstatus",
+      "fallbackActive": "Aktiv",
+      "fallbackInactive": "Inaktiv",
+      "discrete": "Dedizierte-GPU-Präferenz",
+      "discreteOn": "Hochleistungs-dedizierte GPU",
+      "discreteOff": "Systemauswahl folgen",
+      "registry": {
+        "set": "In Registry geschrieben",
+        "removed": "Aus Registry entfernt",
+        "kept-foreign": "Fremde Einstellung erhalten",
+        "skipped-dev": "Im Entwicklungsmodus übersprungen",
+        "skipped-platform": "Nicht-Windows, übersprungen",
+        "noop": "Keine Aktion"
+      },
+      "unavailable": "Nicht verfügbar",
+      "loadFailed": "GPU-Status konnte nicht gelesen werden",
+      "hint": "Die Präferenz wird über die Windows-Grafikeinstellungen (Registry GpuPreference) angewendet und wirkt nach dem Neustart; nach einem App-Update wird die Hardwarebeschleunigung automatisch einmal erneut versucht."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "Exportiert nach {{path}}",
       "exportFailed": "Export fehlgeschlagen: {{reason}}",
       "errorCodeHint": "Fehlercodes E001–E005 stehen für Ortung fehlgeschlagen/Unterverzeichnis fehlt/keine Berechtigung/keine UID/Lesen fehlgeschlagen. Exportierte Protokolle können dem Ticket beigefügt werden"
+    },
+    "gpu": {
+      "refreshAria": "GPU-Status aktualisieren"
     }
   },
   "errorFallback": {

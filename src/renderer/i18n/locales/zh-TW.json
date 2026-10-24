@@ -1692,7 +1692,8 @@
       "themeDisplay": "主題與顯示",
       "scanDirectories": "掃描目錄",
       "cacheCleanup": "快取與清理",
-      "aboutOverview": "應用資訊與聯絡方式"
+      "aboutOverview": "應用資訊與聯絡方式",
+      "diagnosticsGpu": "GPU 狀態"
     },
     "startup": {
       "autoScan": "啟動時自動掃描",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "GPU 狀態",
+      "desc": "硬體加速、使用中顯示卡與獨立顯卡偏好的即時快照（唯讀診斷，不變更任何設定）",
+      "refresh": "重新整理",
+      "hwAccel": "硬體加速",
+      "hwOn": "已開啟",
+      "hwOff": "已關閉",
+      "reason": {
+        "default": "預設開啟",
+        "userDisabled": "使用者已關閉",
+        "crashFallback": "因當機自動回退",
+        "retryAfterUpdate": "升級後自動重試中"
+      },
+      "activeGpu": "目前使用顯示卡",
+      "gpuCount": "偵測到顯示卡",
+      "featureStatus": "關鍵特性狀態",
+      "fallback": "當機回退狀態",
+      "fallbackActive": "已啟用",
+      "fallbackInactive": "未啟用",
+      "discrete": "獨立顯卡偏好",
+      "discreteOn": "高效能獨立顯卡",
+      "discreteOff": "跟隨系統",
+      "registry": {
+        "set": "已寫入登錄檔",
+        "removed": "已從登錄檔清理",
+        "kept-foreign": "保留外部設定",
+        "skipped-dev": "開發模式跳過",
+        "skipped-platform": "非 Windows 跳過",
+        "noop": "無操作"
+      },
+      "unavailable": "不可用",
+      "loadFailed": "GPU 狀態讀取失敗",
+      "hint": "獨立顯卡偏好經 Windows 圖形設定（登錄檔 GpuPreference）套用，重新啟動後生效；當機回退會在應用程式升級後自動重試一次硬體加速。"
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "已匯出到 {{path}}",
       "exportFailed": "匯出失敗: {{reason}}",
       "errorCodeHint": "錯誤碼 E001–E005 對應定位失敗/子目錄缺失/權限不足/無 UID/讀取失敗，匯出日誌可附於工單"
+    },
+    "gpu": {
+      "refreshAria": "重新整理 GPU 狀態"
     }
   },
   "errorFallback": {

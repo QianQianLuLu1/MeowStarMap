@@ -1692,7 +1692,8 @@
       "themeDisplay": "Tema e exibição",
       "scanDirectories": "Diretórios de varredura",
       "cacheCleanup": "Cache e limpeza",
-      "aboutOverview": "Informações do aplicativo e contato"
+      "aboutOverview": "Informações do aplicativo e contato",
+      "diagnosticsGpu": "Status da GPU"
     },
     "startup": {
       "autoScan": "Digitalização automática ao iniciar",
@@ -1727,6 +1728,40 @@
       "error": {
         "unavailable": ""
       }
+    },
+    "gpu": {
+      "title": "Status da GPU",
+      "desc": "Instantâneo em tempo real de aceleração de hardware, GPU ativa e preferência de GPU dedicada (diagnóstico somente leitura)",
+      "refresh": "Atualizar",
+      "hwAccel": "Aceleração de hardware",
+      "hwOn": "Ativada",
+      "hwOff": "Desativada",
+      "reason": {
+        "default": "Ativada por padrão",
+        "userDisabled": "Desativada pelo usuário",
+        "crashFallback": "Reversão automática após falha",
+        "retryAfterUpdate": "Nova tentativa automática após atualização"
+      },
+      "activeGpu": "GPU ativa",
+      "gpuCount": "GPUs detectadas",
+      "featureStatus": "Status das funções principais",
+      "fallback": "Status da reversão por falha",
+      "fallbackActive": "Ativa",
+      "fallbackInactive": "Inativa",
+      "discrete": "Preferência de GPU dedicada",
+      "discreteOn": "GPU dedicada de alto desempenho",
+      "discreteOff": "Seguir o sistema",
+      "registry": {
+        "set": "Gravado no registro",
+        "removed": "Removido do registro",
+        "kept-foreign": "Configuração externa mantida",
+        "skipped-dev": "Ignorado no modo dev",
+        "skipped-platform": "Ignorado fora do Windows",
+        "noop": "Nenhuma operação"
+      },
+      "unavailable": "Indisponível",
+      "loadFailed": "Falha ao ler o status da GPU",
+      "hint": "A preferência é aplicada pelas configurações gráficas do Windows (registro GpuPreference) e vale após reiniciar; após uma atualização, a reversão por falha tenta automaticamente uma vez a aceleração de hardware."
     }
   },
   "share": {
@@ -2671,6 +2706,9 @@
       "exportedTo": "Exportado para {{path}}",
       "exportFailed": "Falha na exportação: {{reason}}",
       "errorCodeHint": "Os códigos E001–E005 correspondem a localização falhada/subdiretório inexistente/permissão insuficiente/sem UID/falha de leitura. Os logs exportados podem ser anexados ao chamado"
+    },
+    "gpu": {
+      "refreshAria": "Atualizar status da GPU"
     }
   },
   "errorFallback": {
