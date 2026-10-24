@@ -4,6 +4,9 @@ import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
+import type { GpuBootDecisionReason } from '../../shared/types/electron-api'
+
+export type { GpuBootDecisionReason }
 
 /**
  * GPU 崩溃自动回退软件渲染（复刻 VS Code 的成熟自愈模式）。
@@ -255,6 +258,51 @@ export function recordBootDecision(): boolean {
 /** 本次启动是否已进入兼容模式（即已禁用硬件加速）。 */
 export function wasBootInCompatMode(): boolean {
   return bootDecisionCache === true
+}
+
+/** GPU 状态面板用的回退状态快照（只读、归一化，fallbackVersion 缺失为 null） */
+export interface GpuFallbackStateSnapshot {
+  active: boolean
+  consecutiveFailures: number
+  fallbackVersion: string | null
+}
+
+/** 只读透出回退状态文件（供 gpu-status 聚合，不做任何写盘） */
+export function readGpuFallbackState(): GpuFallbackStateSnapshot {
+  const s = readState()
+  return {
+    active: s.fallbackActive,
+    consecutiveFailures: s.consecutiveFailures,
+    fallbackVersion: s.fallbackVersion ?? null
+  }
+}
+
+/**
+ * 只读版启动决策分类（供 GPU 状态面板/日志展示原因，绝不写盘）。
+ * 与 shouldDisableHardwareAcceleration 同一套判定优先级，但把
+ * 「版本升级后的一次重试」显式区分为 retry-after-update。
+ */
+export function classifyBootDecisionForStatus(): {
+  enabled: boolean
+  reason: GpuBootDecisionReason
+} {
+  if (process.env.NIKKI_FORCE_GPU_COMPAT === '1') {
+    return { enabled: false, reason: 'crash-fallback' }
+  }
+  const pref = readHardwareAccelPref()
+  if (pref === false) return { enabled: false, reason: 'user-disabled' }
+  const state = readState()
+  if (state.fallbackActive) {
+    const currentVersion = getCurrentAppVersion()
+    if (currentVersion && state.fallbackVersion !== currentVersion) {
+      return { enabled: true, reason: 'retry-after-update' }
+    }
+    return { enabled: false, reason: 'crash-fallback' }
+  }
+  if (state.consecutiveFailures >= FAILURE_THRESHOLD) {
+    return { enabled: false, reason: 'crash-fallback' }
+  }
+  return { enabled: true, reason: 'default' }
 }
 
 /** whenReady 后、创建窗口前调用：登记一次启动尝试（失败计数 +1） */

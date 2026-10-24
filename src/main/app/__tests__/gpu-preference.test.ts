@@ -22,7 +22,8 @@ import {
   buildRegAddArgs,
   buildRegQueryArgs,
   buildRegDeleteArgs,
-  applyDiscreteGpuPreference
+  applyDiscreteGpuPreference,
+  getDiscretePreferenceStatus
 } from '../gpu-preference'
 
 const EXE = 'C:\\Program Files\\喵星图\\MeowStarMap.exe' // 含空格与非 ASCII，验证参数数组化无拼接
@@ -59,6 +60,25 @@ describe('reg 参数构建（纯函数）', () => {
 })
 
 describe('applyDiscreteGpuPreference（守卫与 fail-open）', () => {
+  it('g1. getDiscretePreferenceStatus：未应用时返回默认 mode（high-performance）与 registry null', async () => {
+    const s = getDiscretePreferenceStatus()
+    expect(s.mode).toBe('high-performance')
+    expect(s.registry).toBeNull()
+  })
+
+  it('g2. 应用后返回最近一次结果（mode 与 applied 一致）', async () => {
+    const run = makeRun()
+    await applyDiscreteGpuPreference('high-performance', {
+      platform: 'win32',
+      isPackaged: true,
+      run,
+      execPath: EXE
+    })
+    const s = getDiscretePreferenceStatus()
+    expect(s.mode).toBe('high-performance')
+    expect(s.registry).toBe('set')
+  })
+
   it('非 win32 平台 → skipped-platform，不执行任何 reg 命令', async () => {
     const run = makeRun()
     const r = await applyDiscreteGpuPreference('high-performance', {

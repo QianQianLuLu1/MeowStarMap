@@ -1,3 +1,4 @@
+// @core-change: 新增 app:gpu-status 只读通道，供诊断面板读取 GPU 硬件加速状态
 import { ipcMain, app } from 'electron'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandlerNoArgs } from '../validator'
@@ -5,6 +6,8 @@ import { wrapHandlerNoArgs } from '../validator'
 import { checkForUpdates, downloadUpdate, quitAndInstall } from '../../app/auto-update'
 // 需求五.2：权限不足（E003）时由渲染层触发「一键重启并提升权限」
 import { requestAdminRelaunch } from '../../app/permission'
+// GPU 状态可观测：只读聚合探针（硬件加速开关态/活动显卡/特性降级/独显偏好）
+import { collectGpuStatus } from '../../app/gpu-status'
 
 /**
  * app 域 IPC handler：应用重启 / 版本号查询。
@@ -37,6 +40,13 @@ export function registerAppHandlers(_ctx: HandlerContext): void {
   ipcMain.handle(
     'app:getVersion',
     wrapHandlerNoArgs(_ctx, async () => app.getVersion())
+  )
+
+  // GPU 状态只读探针：诊断面板展示硬件加速开关态/原因、活动显卡、
+  // 特性降级、崩溃回退状态、独显偏好注册表应用结果（无副作用）
+  ipcMain.handle(
+    'app:gpu-status',
+    wrapHandlerNoArgs(_ctx, async () => collectGpuStatus())
   )
 
   // 自动更新：渲染端主动触发检查（仅生产环境有效，dev 下 checkForUpdates no-op）

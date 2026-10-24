@@ -419,6 +419,38 @@ export interface UpdatePayload {
   readyToInstall?: boolean
 }
 
+// ============ GPU 状态（app:gpu-status 只读探针，2026-10-24 硬件加速优化） ============
+
+/** 硬件加速启动决策原因 */
+export type GpuBootDecisionReason =
+  | 'default' // 默认开启
+  | 'user-disabled' // 用户在设置页显式关闭
+  | 'crash-fallback' // 崩溃自愈回退（本版本内生效）
+  | 'retry-after-update' // 历史回退 + 应用版本升级 → 本版本自动重试硬件加速
+
+/** 单块显卡摘要（防御式解析 Chromium GPUInfo.gpuDevice，缺字段为 null） */
+export interface GpuDeviceSummary {
+  vendorId: string | null
+  deviceId: string | null
+  vendor: string | null
+  device: string | null
+  active: boolean | null
+}
+
+/** GPU 状态总览（app:gpu-status 返回值；GPU 信息不可得时 gpus/activeGpu/featureStatus 为 null） */
+export interface GpuStatusSummary {
+  hardwareAcceleration: { enabled: boolean; reason: GpuBootDecisionReason }
+  fallback: { active: boolean; consecutiveFailures: number; fallbackVersion: string | null }
+  discretePreference: { mode: 'auto' | 'high-performance'; registry: string | null }
+  /** Chromium GPU Feature Status（chrome://gpu 同源），如 { canvas:'enabled', webgl:'enabled' } */
+  featureStatus: Record<string, string> | null
+  gpus: GpuDeviceSummary[] | null
+  /** 当前活动显卡描述（取 GPUInfo.auxAttributes.glRenderer，独显验证的关键信号） */
+  activeGpu: string | null
+  electronVersion: string
+  platform: string
+}
+
 // ============ 操作历史 ============
 
 export interface OperationHistoryRecord {

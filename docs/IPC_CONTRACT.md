@@ -551,3 +551,21 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
 - 本轮**未新增/改名任何通道，未改任何方法签名与 `IpcResponse`/`IpcError` 结构**，仅订正既有通道的前置校验归一口径，故按契约同步义务在此登记。
 - `src/main/ipc/validator.ts` 的 `PathGuard`（`assertFileReadPath` / `assertFileWritePath` 的白名单判定，以及 `isUserPicked` / `isUserPickedDir` 短路）改为**固化 `path.win32` 语义**，与同层黑名单 `isSensitivePath`（`src/main/utils/ipc-validate.ts`）口径一致。原因：白名单原先读宿主 `path`，CI 的 ubuntu runner 上 `path.posix.isAbsolute('D:\…')` 为 false，使所有 Windows 形态已授权路径被判为「路径不在白名单内」（错误码 `IPC_PATH_FORBIDDEN` 不变，只是不再误报）。
 - 判据语义不变：非绝对路径（含 `relative/a.jpg`）、未登记路径、系统敏感目录仍返回 `IPC_PATH_FORBIDDEN`；`details.path` 仍经 `maskPath` 脱敏，仅在非 Windows 宿主下分隔符形态不同。
+
+## 12. app:gpu-status（2026-10-24 GPU 硬件加速优化新增）
+
+- **通道**：`app:gpu-status`（无入参，`wrapHandlerNoArgs` 包装，只读、无副作用）。
+  注册于 `src/main/ipc/handlers/app-handler.ts`，实现委托 `src/main/app/gpu-status.ts` 的
+  `collectGpuStatus()`；preload 侧暴露为 `window.electronAPI.app.getGpuStatus()`。
+- **返回**（`GpuStatusSummary`，类型真相源 `src/shared/types/electron-api.ts`）：
+  `hardwareAcceleration{enabled, reason: 'default'|'user-disabled'|'crash-fallback'|'retry-after-update'}`、
+  `fallback{active, consecutiveFailures, fallbackVersion}`、
+  `discretePreference{mode: 'auto'|'high-performance', registry: 应用结果|null}`、
+  `featureStatus: Record<string,string>|null`（chrome://gpu 同源特性状态）、
+  `gpus: GpuDeviceSummary[]|null`、`activeGpu: string|null`（auxAttributes.glRenderer）、
+  `electronVersion`、`platform`。
+- **容错契约**：`getGPUInfo('complete')` 3s 超时竞速 → 降级 `'basic'` → 再失败
+  `gpus`/`activeGpu`/`featureStatus` 为 `null`（软件回退态 GPUInfo 缺失不抛错）；
+  调用方（设置→日志与诊断的 GPU 状态卡、启动日志摘要）对 null 一律显示「不可用」。
+- **消费方**：`src/renderer/pages/settings/diagnostics-sections.tsx`（GPU 状态卡）、
+  `src/main/app/window-manager.ts`（did-finish-load 后记一行摘要日志）。

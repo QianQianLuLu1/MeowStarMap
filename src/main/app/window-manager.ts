@@ -6,6 +6,7 @@ import { logger } from '../utils/logger'
 import { logFault } from '../utils/logger'
 import { logStartupError, diagLog } from '../utils/startup-diagnostic'
 import { markBootSuccess, requestSelfHeal, isStartupPhase } from './gpu-fallback'
+import { logGpuStatusSummary } from './gpu-status'
 import { guardNavigation } from './navigation-guard'
 import { t } from '../i18n'
 
@@ -126,6 +127,12 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     diagLog('WIN', `scheduler resumed via ${via}`)
   }
   mainWindow.once('ready-to-show', () => onFirstVisible('ready-to-show'))
+
+  // GPU 状态可观测：首帧加载完成后异步记一行摘要（hwAccel 开关态/活动显卡/回退/独显偏好）。
+  // getGPUInfo 在 GPU 进程就绪后才有数据，故挂 did-finish-load；fire-and-forget 不影响窗口流程。
+  mainWindow.webContents.once('did-finish-load', () => {
+    void logGpuStatusSummary()
+  })
 
   // 加载渲染进程
   if (isDev) {

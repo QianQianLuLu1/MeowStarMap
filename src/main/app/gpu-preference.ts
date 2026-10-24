@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { app } from 'electron'
 import { diagLog } from '../utils/startup-diagnostic'
+import { readGpuBootPrefs } from './gpu-fallback'
 
 /**
  * 独显优先（Windows 混合显卡设备的高性能 GPU 偏好）：
@@ -82,6 +83,23 @@ function defaultRun(args: string[]): Promise<{ stdout: string; stderr: string }>
   return execFileAsync('reg', args, { windowsHide: true })
 }
 
+/** 最近一次 applyDiscreteGpuPreference 的结果（模块级内存态，供 gpu-status 展示） */
+let lastApplyStatus: { mode: GpuPreferenceMode; registry: string } | null = null
+
+/**
+ * 独显偏好状态（供 GPU 状态面板）：优先返回本次启动已应用的结果；
+ * 尚未应用（或非 win32 提前跳过的调用路径未覆盖）时回退启动偏好镜像，
+ * 镜像缺省按默认策略 high-performance 返回。
+ */
+export function getDiscretePreferenceStatus(): {
+  mode: GpuPreferenceMode
+  registry: string | null
+} {
+  if (lastApplyStatus) return { ...lastApplyStatus }
+  const prefs = readGpuBootPrefs()
+  return { mode: prefs.discretePreference ?? 'high-performance', registry: null }
+}
+
 /**
  * 应用独显优先偏好（在主进程启动早期调用；对下次启动生效）。
  * @param mode 'high-performance'（默认，缺省/undefined 同样按此处理）写 GpuPreference=2；
@@ -92,11 +110,20 @@ export async function applyDiscreteGpuPreference(
   mode: GpuPreferenceMode | undefined,
   deps: GpuPreferenceDeps = {}
 ): Promise<GpuPreferenceApplyResult> {
+  const effectiveMode: GpuPreferenceMode = mode ?? 'high-performance'
+  const result = await applyDiscreteGpuPreferenceInternal(effectiveMode, deps)
+  lastApplyStatus = { mode: effectiveMode, registry: result.applied }
+  return result
+}
+
+async function applyDiscreteGpuPreferenceInternal(
+  effectiveMode: GpuPreferenceMode,
+  deps: GpuPreferenceDeps
+): Promise<GpuPreferenceApplyResult> {
   const platform = deps.platform ?? process.platform
   const isPackaged = deps.isPackaged ?? app.isPackaged
   const execPath = deps.execPath ?? process.execPath
   const run = deps.run ?? defaultRun
-  const effectiveMode: GpuPreferenceMode = mode ?? 'high-performance'
 
   try {
     if (platform !== 'win32') {

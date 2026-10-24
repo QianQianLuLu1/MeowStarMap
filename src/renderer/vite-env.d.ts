@@ -1166,6 +1166,23 @@ interface WindowElectronAPI {
     relaunchAsAdmin: () => Promise<{ ok: boolean }>
     // U1：获取应用版本号，避免渲染层硬编码
     getVersion: () => Promise<string>
+    // GPU 状态只读探针（app:gpu-status）：硬件加速开关态/活动显卡/特性降级/独显偏好
+    getGpuStatus: () => Promise<{
+      hardwareAcceleration: { enabled: boolean; reason: string }
+      fallback: { active: boolean; consecutiveFailures: number; fallbackVersion: string | null }
+      discretePreference: { mode: 'auto' | 'high-performance'; registry: string | null }
+      featureStatus: Record<string, string> | null
+      gpus: Array<{
+        vendorId: string | null
+        deviceId: string | null
+        vendor: string | null
+        device: string | null
+        active: boolean | null
+      }> | null
+      activeGpu: string | null
+      electronVersion: string
+      platform: string
+    }>
     // 自动更新：手动触发检查（生产环境有效，dev 下主进程 no-op）
     checkUpdate: () => Promise<{ checking: boolean }>
     // 自动更新：用户确认后开始下载

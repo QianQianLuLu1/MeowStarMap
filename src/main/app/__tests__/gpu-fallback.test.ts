@@ -64,7 +64,9 @@ import {
   recordBootDecision,
   requestSelfHeal,
   readGpuBootPrefs,
-  writeGpuDiscretePref
+  writeGpuDiscretePref,
+  readGpuFallbackState,
+  classifyBootDecisionForStatus
 } from '../gpu-fallback'
 
 let tmpDir: string
@@ -370,5 +372,65 @@ describe('gpu-fallback 启动偏好镜像（gpu-pref.json 扩展字段）', () =
       hardwareAcceleration: false,
       discretePreference: 'auto'
     })
+  })
+})
+
+describe('gpu-fallback 状态查询导出（供 gpu-status，只读）', () => {
+  it('q1. readGpuFallbackState：无文件 → 默认态；有文件 → 归一化透出', () => {
+    expect(readGpuFallbackState()).toEqual({
+      active: false,
+      consecutiveFailures: 0,
+      fallbackVersion: null
+    })
+
+    writeRaw({ consecutiveFailures: 3, fallbackActive: true, fallbackVersion: '2.5.4' })
+    expect(readGpuFallbackState()).toEqual({
+      active: true,
+      consecutiveFailures: 3,
+      fallbackVersion: '2.5.4'
+    })
+  })
+
+  it('q2. classifyBootDecisionForStatus 四分类：default / user-disabled / crash-fallback / retry-after-update', () => {
+    // default：无任何标记
+    expect(classifyBootDecisionForStatus()).toEqual({ enabled: true, reason: 'default' })
+
+    // user-disabled：用户显式关闭（绝对优先）
+    writePref({ hardwareAcceleration: false })
+    expect(classifyBootDecisionForStatus()).toEqual({
+      enabled: false,
+      reason: 'user-disabled'
+    })
+    writePref({ hardwareAcceleration: true })
+
+    // crash-fallback：回退激活且版本戳为当前版本
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
+    expect(classifyBootDecisionForStatus()).toEqual({
+      enabled: false,
+      reason: 'crash-fallback'
+    })
+
+    // retry-after-update：回退激活但戳为旧版本（本版本将获一次重试）
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.4' })
+    expect(classifyBootDecisionForStatus()).toEqual({
+      enabled: true,
+      reason: 'retry-after-update'
+    })
+
+    // crash-fallback：阈值路径（无 active 标记但连续失败达 2）
+    writeRaw({ consecutiveFailures: 2, fallbackActive: false })
+    expect(classifyBootDecisionForStatus()).toEqual({
+      enabled: false,
+      reason: 'crash-fallback'
+    })
+  })
+
+  it('q3. classifyBootDecisionForStatus 只读：判定后状态文件不被改写（不落版本戳）', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true }) // 无戳旧格式
+    classifyBootDecisionForStatus()
+    expect(readRaw()).toEqual({ consecutiveFailures: 0, fallbackActive: true }) // 原样未动
+    writeRaw({ consecutiveFailures: 2, fallbackActive: false })
+    classifyBootDecisionForStatus()
+    expect(readRaw()).toEqual({ consecutiveFailures: 2, fallbackActive: false }) // 阈值路径也不写盘
   })
 })
