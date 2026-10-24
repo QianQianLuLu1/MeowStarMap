@@ -237,8 +237,7 @@ html.reduce-motion .motion-hover-scale-sm:active,
 html.reduce-motion .motion-hover-scale-cta:hover,
 html.reduce-motion .motion-hover-scale-cta:active,
 html.reduce-motion .card-hover:hover,
-html.reduce-motion .card-hover:active,
-html.reduce-motion .settings-elastic-switch:active .settings-elastic-switch-knob {
+html.reduce-motion .card-hover:active {
   transform: none !important;
 }
 
@@ -1059,9 +1058,9 @@ html.glass-lite .ambient-bg {
   transform: scale(0.97);
 }
 
-/* 设置板块「弹性开关」：滑块按下（拖动起步）时横向拉伸，松开落位后回弹至原宽。
-   与上方 .motion-hover-scale-* 同族——交互态微动画统一走 CSS，
-   由 compositor 线程合成 transform，不触发 React 重渲染。
+/* 设置板块「果冻开关」：点击后滑块以 350ms 过冲弹簧滑向另一端（掠过终点再回落），
+   滑动途中横向拉长成胶囊形、抵达终点回弹恢复圆形；轨道底色灰→绿渐变。
+   交互态微动画统一走 CSS，由 compositor 线程合成 transform，不触发 React 重渲染。
    轨道 44×24 + 滑块 18px；关闭态滑块 left:3px，开启态 left:23px（44-18-3）。 */
 .settings-elastic-switch {
   position: relative;
@@ -1073,12 +1072,12 @@ html.glass-lite .ambient-bg {
   border: 1px solid var(--divider);
   cursor: pointer;
   transition:
-    background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
-    border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+    background-color 350ms var(--ease-standard),
+    border-color 350ms var(--ease-standard);
 }
 .settings-elastic-switch[aria-checked='true'] {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--success);
+  border-color: var(--success-deep);
 }
 .settings-elastic-switch:focus-visible {
   outline: 2px solid var(--accent);
@@ -1098,22 +1097,41 @@ html.glass-lite .ambient-bg {
   border-radius: 999px;
   background: #fff;
   box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
-  /* 关闭态锚定左端：拉伸向右生长，不溢出轨道 */
-  transform-origin: left center;
-  /* 过冲曲线（控制点 y=1.56 > 1）：松开时掠过原宽再回落，形成"有质量"的回弹 */
-  transition:
-    left 260ms cubic-bezier(0.34, 1.56, 0.64, 1),
-    transform 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* 位置滑动走 transition（过冲弹簧：掠过终点再回落）；中途反向点击时可从当前位置平滑重定向 */
+  transition: left 350ms var(--ease-spring);
+  /* 途中果冻拉伸走 keyframes，与 left 分属两个属性，避免 transition/animation 同属性级联竞争；
+     开/关两个方向用不同动画名，aria-checked 翻转即名字变化 → 动画必然重触发 */
+  animation: settings-elastic-switch-jelly-off 350ms var(--ease-spring);
   will-change: left, transform;
 }
 .settings-elastic-switch[aria-checked='true'] .settings-elastic-switch-knob {
   left: 23px;
-  /* 开启态锚定右端：拉伸向左生长，同样不溢出轨道 */
-  transform-origin: right center;
+  animation-name: settings-elastic-switch-jelly-on;
 }
-/* 拖动起步（按下）：滑块横向拉伸；松开移除 :active 后由上方过冲曲线回弹 */
-.settings-elastic-switch:active:not(:disabled) .settings-elastic-switch-knob {
-  transform: scaleX(1.35);
+/* 滑动途中以滑块中心为轴横向拉长成胶囊（45% 峰值 1.35），弹簧曲线作用于每一段，
+   末段掠过 scaleX(1) 再回落 = 抵达终点回弹恢复圆形。两份帧体相同但名字不同：
+   同名动画在名字不变时不会重启，双向重触发依赖名字切换 */
+@keyframes settings-elastic-switch-jelly-on {
+  0% {
+    transform: scaleX(1);
+  }
+  45% {
+    transform: scaleX(1.35);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+@keyframes settings-elastic-switch-jelly-off {
+  0% {
+    transform: scaleX(1);
+  }
+  45% {
+    transform: scaleX(1.35);
+  }
+  100% {
+    transform: scaleX(1);
+  }
 }
 
 /* 搜索框 */
