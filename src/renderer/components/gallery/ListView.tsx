@@ -9,6 +9,7 @@ import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
+import { MediaFavoriteButton } from './MediaFavoriteButton'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -21,6 +22,8 @@ interface ListViewProps {
   onContextMenu: (event: React.MouseEvent, file: MediaFile) => void
   /** 可选；true 时行首渲染可见勾选框（默认 false，保证既有调用点行为不变） */
   multiSelectMode?: boolean
+  /** 可选；收藏切换回调（批量模式行尾常驻收藏按钮，正常模式仅已收藏行显示） */
+  onFavorite?: (file: MediaFile) => void
 }
 
 const ITEM_HEIGHT = 72
@@ -31,7 +34,15 @@ const GAP = 8
 // - 保留：多选（Ctrl/Cmd/Shift）、键盘 ↑↓ 导航、滚动位置记忆、丢失文件角标、缩略图降级
 const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
   (
-    { files, selectedIds, onSelect, onToggleSelection, onContextMenu, multiSelectMode = false },
+    {
+      files,
+      selectedIds,
+      onSelect,
+      onToggleSelection,
+      onContextMenu,
+      multiSelectMode = false,
+      onFavorite
+    },
     ref
   ) => {
     const { failedImages, markFailed } = useFailedImages(files)
@@ -160,6 +171,14 @@ const ListViewComponent = forwardRef<VirtuosoHandle, ListViewProps>(
                   <IconStar key={i} size={12} filled={i < file.rating} />
                 ))}
               </div>
+              {/* 收藏按钮：批量模式每行常驻（可即时切换，不与勾选冲突），正常模式仅已收藏行显示 */}
+              {(multiSelectMode || file.is_favorite) && onFavorite && (
+                <MediaFavoriteButton
+                  isFavorite={file.is_favorite}
+                  onToggle={() => onFavorite(file)}
+                  label={file.file_name}
+                />
+              )}
             </div>
           )
         }}

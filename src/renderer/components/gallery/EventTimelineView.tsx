@@ -9,6 +9,7 @@ import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { MediaCheckbox } from './MediaCheckbox'
+import { MediaFavoriteButton } from './MediaFavoriteButton'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { getResponsiveColumns, DEFAULT_COLUMNS_BREAKPOINTS } from '../../utils/responsive'
 import type { MediaFile } from '../../stores/mediaStore'
@@ -29,6 +30,8 @@ interface EventTimelineViewProps {
   multiSelectMode?: boolean
   /** 可选；勾选框点击回调（点击不冒泡到卡片） */
   onToggleSelection?: (id: string) => void
+  /** 可选；收藏切换回调（批量模式卡片常驻收藏按钮，正常模式仅已收藏卡显示） */
+  onFavorite?: (file: MediaFile) => void
 }
 
 const NODE_HEADER_HEIGHT = 80
@@ -89,7 +92,8 @@ export const EventTimelineView: React.FC<EventTimelineViewProps> = ({
   selectedIds,
   onSelect,
   multiSelectMode = false,
-  onToggleSelection
+  onToggleSelection,
+  onFavorite
 }) => {
   const { t } = useTranslation()
   const wrapperRef = useRef<HTMLDivElement>(null)
@@ -326,6 +330,15 @@ export const EventTimelineView: React.FC<EventTimelineViewProps> = ({
                         hasError={hasError || isCorrupted}
                         visible={!showThumb}
                       />
+                      {/* 收藏按钮：批量模式每卡常驻（可即时切换，不与勾选冲突），正常模式仅已收藏卡显示 */}
+                      {(multiSelectMode || file.is_favorite) && onFavorite && (
+                        <MediaFavoriteButton
+                          isFavorite={file.is_favorite}
+                          onToggle={() => onFavorite(file)}
+                          label={file.file_name}
+                          className="absolute top-2 right-2 z-10"
+                        />
+                      )}
                     </div>
                   </div>
                 )

@@ -9,6 +9,7 @@ import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { MediaCheckbox } from './MediaCheckbox'
+import { MediaFavoriteButton } from './MediaFavoriteButton'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { useOnDemandThumbnails } from '../../hooks/useOnDemandThumbnails'
 import { useContainerSize } from '../../hooks/useContainerSize'
@@ -26,6 +27,8 @@ interface MasonryViewProps {
   multiSelectMode?: boolean
   /** 可选；勾选框点击回调（与卡片点击解耦，勾选框点击不会冒泡到卡片） */
   onToggleSelection?: (id: string) => void
+  /** 可选；收藏切换回调（批量模式卡片常驻收藏按钮，正常模式仅已收藏卡显示） */
+  onFavorite?: (file: MediaFile) => void
 }
 
 const GAP = 16
@@ -45,6 +48,7 @@ interface MasonryContextValue {
   markFailed: (id: string) => void
   multiSelectMode: boolean
   onToggleSelection: (id: string) => void
+  onFavorite?: (file: MediaFile) => void
 }
 
 const MasonryContext = React.createContext<MasonryContextValue | null>(null)
@@ -61,7 +65,15 @@ function MasonryCard({ index, data }: { index: number; width: number; data: Medi
     thumbnail: getGeneratedPath(file.file_path) ?? file.thumbnail
   })
   if (!ctx) return null
-  const { selectedSet, onSelect, onContextMenu, failedImages, markFailed, multiSelectMode } = ctx
+  const {
+    selectedSet,
+    onSelect,
+    onContextMenu,
+    failedImages,
+    markFailed,
+    multiSelectMode,
+    onFavorite
+  } = ctx
   const onToggleSelection = ctx.onToggleSelection
   const isSelected = selectedSet.has(file.id)
   const isMissing = file.is_missing === true
@@ -112,6 +124,15 @@ function MasonryCard({ index, data }: { index: number; width: number; data: Medi
           hasError={hasError || isCorrupted}
           visible={!showThumb}
         />
+        {/* 收藏按钮：批量模式每卡常驻（可即时切换，不与勾选冲突），正常模式仅已收藏卡显示 */}
+        {(multiSelectMode || file.is_favorite) && onFavorite && (
+          <MediaFavoriteButton
+            isFavorite={file.is_favorite}
+            onToggle={() => onFavorite(file)}
+            label={file.file_name}
+            className="absolute top-2 right-2 z-10"
+          />
+        )}
       </div>
       <div
         className="absolute bottom-0 left-0 right-0 p-2 text-xs truncate"
@@ -129,7 +150,8 @@ export const MasonryView: React.FC<MasonryViewProps> = ({
   onSelect,
   onContextMenu,
   multiSelectMode = false,
-  onToggleSelection
+  onToggleSelection,
+  onFavorite
 }) => {
   const { t } = useTranslation()
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -206,7 +228,8 @@ export const MasonryView: React.FC<MasonryViewProps> = ({
         failedImages,
         markFailed,
         multiSelectMode,
-        onToggleSelection: safeOnToggleSelection
+        onToggleSelection: safeOnToggleSelection,
+        onFavorite
       }}
     >
       <div

@@ -13,6 +13,7 @@ import { MissingBadge } from '../common/MissingBadge'
 import { CorruptedBadge } from '../common/CorruptedBadge'
 import { MediaThumbPlaceholder } from './MediaThumbPlaceholder'
 import { MediaCheckbox } from './MediaCheckbox'
+import { MediaFavoriteButton } from './MediaFavoriteButton'
 import { ThumbReveal } from '../common/ThumbReveal'
 import { useFailedImages } from '../../hooks/useFailedImages'
 import { useIsScrolling } from '../../hooks/useIsScrolling'
@@ -624,11 +625,19 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
                     </div>
                   )}
 
-                  {file.is_favorite && hoveredId !== file.id && !isTouchDevice && (
-                    <div className="absolute top-2 right-2">
-                      <IconFavorite size={16} filled />
-                    </div>
-                  )}
+                  {/* 收藏徽标：批量模式每卡常驻（可即时切换，不与勾选冲突），
+                      正常模式承接原静态徽标并升级为可点击；悬停/触屏时让位给操作按钮组 */}
+                  {(multiSelectMode || file.is_favorite) &&
+                    onFavorite &&
+                    hoveredId !== file.id &&
+                    !isTouchDevice && (
+                      <MediaFavoriteButton
+                        isFavorite={file.is_favorite}
+                        onToggle={() => onFavorite(file)}
+                        label={file.file_name}
+                        className="absolute top-2 right-2 z-10"
+                      />
+                    )}
 
                   {file.duration && (
                     <div

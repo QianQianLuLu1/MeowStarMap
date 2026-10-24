@@ -735,6 +735,7 @@ export const GalleryPage: React.FC = () => {
               onToggleSelection={selection.toggle}
               onContextMenu={handleContextMenu}
               multiSelectMode={multiSelectMode}
+              onFavorite={fileOperations.handleToggleFavorite}
             />
           )}
           {viewMode === 'timeline' && (
@@ -746,6 +747,7 @@ export const GalleryPage: React.FC = () => {
               onSelect={handleGridItemClick}
               multiSelectMode={multiSelectMode}
               onToggleSelection={selection.toggle}
+              onFavorite={fileOperations.handleToggleFavorite}
             />
           )}
           {viewMode === 'masonry' && (
@@ -756,6 +758,7 @@ export const GalleryPage: React.FC = () => {
               onContextMenu={handleContextMenu}
               multiSelectMode={multiSelectMode}
               onToggleSelection={selection.toggle}
+              onFavorite={fileOperations.handleToggleFavorite}
             />
           )}
           {viewMode === 'event-timeline' && (
@@ -767,6 +770,7 @@ export const GalleryPage: React.FC = () => {
               onSelect={handleGridItemClick}
               multiSelectMode={multiSelectMode}
               onToggleSelection={selection.toggle}
+              onFavorite={fileOperations.handleToggleFavorite}
             />
           )}
         </ErrorBoundary>
