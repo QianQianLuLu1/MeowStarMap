@@ -1,6 +1,6 @@
 # 审查收口 + 果冻描述/CHANGELOG 对齐 + 2.5.5 重打包
 
-> 日期：2026-10-24 ｜ 状态：执行中（执行记录见文末）
+> 日期：2026-10-24 ｜ 状态：已完成（执行记录见文末 §八）
 > 背景：对全部近期提交与未提交代码做全面审查、修复问题、确认版本 2.5.5、重新打包。
 
 ## 一、审查结论（已完成，证据在案）
@@ -92,4 +92,18 @@
 
 ## 八、执行记录
 
-（待各节点完成后回填）
+> 日期：2026-10-24（23:00–23:45）｜ 状态：**全部完成**
+
+- **Node 1**（三处漂移修复）：`Switch.tsx` L20 注释、`Switch.stories.tsx` L13-14 描述改为果冻行为口径；`CHANGELOG.md` 补录台账追加果冻动效条目（GPU 条目之后）。验收子集 `settings-elastic-switch.test.ts`（8）+ `check-changelog-release.test.ts`（17）+ `Switch.test.tsx`（3）+ `shared.test.tsx`（21）= 4 文件 / 49 用例全绿；`npm run verify` 五项（typecheck / lint / core-gate / format / test）全绿。
+- **Node 2**（全量回归）：首次 `npm test` 出现 1 红——`check-md-links.test.ts`「runCheck() 的死引用数为 0」判 `CHANGELOG.md:59` 引用的本计划文档为死引用，根因是该守卫以 `git ls-files` tracked 集合为判定真相源、文档当时尚未暂存（闸门按设计强制 CHANGELOG 引用与计划文档同批入库，非测试缺陷）；`git add` 四文件后复跑该守卫 24/24 绿。随后全量 `npm test` **441 文件 / 6794 通过 / 12 跳过，与 610521a 基线完全一致**；`npm run typecheck`、`npm run typecheck:e2e`、`npm run lint` 全绿。
+- **Node 3**（提交）：`d76a983 docs(ui): 果冻开关描述与变更日志对齐——Switch 注释与 Storybook 文案纠偏、补录动效出货条目`（4 文件，+101/−2）；pre-commit 三步（lint-staged / core-gate / tsc -b）全过；提交后 `git status --porcelain` 干净。
+- **Node 4**（版本一致性）：`check-changelog-release.ts` 绿（13 个版本节，最新 2.5.5 = package.json，`[2.5.5]` 节唯一，`[Unreleased]` 已收口）；`check-doc-versions.ts` 绿（README Electron 徽章 41.10 与 package.json 41.10.6 一致）。四处版本声明位零改动。
+- **Node 5**（重打包四段链）：
+  1. `link:nikkisync:check` — 四链接在位；
+  2. 清理 10-24 17:48 旧 `win-unpacked` 树；
+  3. `npm run dist:win` exit 0 — changelog/doc-versions 预检绿，NSIS 重建，`verify:dist` 全绿（原生二进制 better-sqlite3/sharp/koffi、VC++ 运行库、@nikkisync 六入口、asInvoker 清单、app.asar 71,567,136 字节 32 条禁串零命中）；
+  4. `npm run e2e:smoke` **16/16 通过**（S4 打包产物 `app.getVersion()` === 2.5.5、S8 GPU 探针 RTX 5070 硬件加速 enabled、N1–N4 NikkiSync 内嵌运行时）。
+  - 产物：`MeowStarMap-Setup-2.5.5.exe` **183,353,708 字节 @ 10-24 23:32**（旧包 183,352,577 @ 17:48，内容含 `610521a` 果冻动效与 `d76a983` 文档对齐）；`latest.yml` version 2.5.5、sha512 与 releaseDate（2026-10-24T15:32:33Z）已更新。
+- **Node 6**（收尾）：补本节执行记录，`docs(plans)` 提交，最终 `git status` 干净。
+
+**结论**：审查范围（`38c746e` 之后全部提交 + 未提交改动）内未发现逻辑缺陷；三处文档漂移已修复入库；版本 2.5.5 全声明位一致；安装包已重建并通过全部闸门与冒烟。
