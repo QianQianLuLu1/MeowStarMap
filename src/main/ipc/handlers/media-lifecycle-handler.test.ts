@@ -10,7 +10,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { HandlerContext } from '../handler-context'
 
-const { handleMock, showMessageBoxMock, repoMock, unlinkBatchMock } = vi.hoisted(() => ({
+const { handleMock, showMessageBoxMock, repoMock, trashBatchMock } = vi.hoisted(() => ({
   handleMock: vi.fn(),
   showMessageBoxMock: vi.fn(),
   repoMock: {
@@ -23,7 +23,7 @@ const { handleMock, showMessageBoxMock, repoMock, unlinkBatchMock } = vi.hoisted
     getSoftDeletedMediaPaths: vi.fn().mockReturnValue([]),
     getMediaIdByPath: vi.fn().mockReturnValue(undefined)
   },
-  unlinkBatchMock: vi.fn()
+  trashBatchMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -40,7 +40,7 @@ vi.mock('../../database/media-repository', () => ({
 }))
 
 vi.mock('./_trash-utils', () => ({
-  unlinkBatch: unlinkBatchMock,
+  trashBatch: trashBatchMock,
   cleanupThumbnailsForRows: vi.fn().mockResolvedValue(0),
   makeNativeThumbRecordCleaner: vi.fn(() => vi.fn().mockResolvedValue(undefined))
 }))
@@ -81,7 +81,7 @@ describe('registerMediaLifecycleHandlers', () => {
     showMessageBoxMock.mockResolvedValue({ response: 0 })
     vi.clearAllMocks()
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([])
-    unlinkBatchMock.mockResolvedValue({
+    trashBatchMock.mockResolvedValue({
       idsToDelete: [],
       movedCount: 0,
       missingCount: 0,
@@ -91,7 +91,7 @@ describe('registerMediaLifecycleHandlers', () => {
 
   it('media:emptyRecycleBin 不再弹原生确认框，直接执行清空（D5）', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
-    unlinkBatchMock.mockResolvedValue({
+    trashBatchMock.mockResolvedValue({
       idsToDelete: [1],
       movedCount: 1,
       missingCount: 0,
@@ -105,7 +105,7 @@ describe('registerMediaLifecycleHandlers', () => {
     }
 
     expect(showMessageBoxMock).not.toHaveBeenCalled()
-    expect(unlinkBatchMock).toHaveBeenCalledWith([{ id: 1, file_path: '/a' }])
+    expect(trashBatchMock).toHaveBeenCalledWith([{ id: 1, file_path: '/a' }])
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1])
     expect(result.success).toBe(true)
     expect(result.data.movedCount).toBe(1)

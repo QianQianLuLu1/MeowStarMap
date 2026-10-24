@@ -1,15 +1,17 @@
-// @core-change: 完全删除图片时补齐 X6Game\ScreenShot 同名副本的同步清理，消除三目录残留与重扫复活
+// @core-change: 清空回收站/彻底删除的原语由 fsp.unlink 换回 shell.trashItem，恢复与确认文案一致的「移入系统回收站」语义
 /**
- * 媒体生命周期域共享工具：文件物理删除批量操作 + 缩略图清理（缓存 + 游戏原生同图衍生文件）
+ * 媒体生命周期域共享工具：文件移入系统回收站的批量操作 + 缩略图清理（缓存 + 游戏原生同图衍生文件）
  *
  * 供 `media-lifecycle-handler.ts` 的 permanentDelete / emptyRecycleBin / delete 共用
  * 同一套三态判定（成功 / 文件不存在 / 失败）、重试退避、熔断与聚合日志逻辑。
  *
- * #fix-recyclebin-permanent-delete：原实现用 `shell.trashItem` 处理「彻底删除」,
- * 语义是移入 Windows 系统回收站而非物理删除——文件被转移到 $Recycle.Bin 仍占磁盘,
- * 且 Shell API 大批量调用存在实测瞬时失败（2474 项 94.5% 失败）。现改为 `fsp.unlink`
- * 直接物理删除（与 fileService.deletePermanent / cleanupThumbnailsForRows 同一删除原语）,
- * 重试 / 熔断 / 聚合日志机制原样保留（对 EBUSY/EPERM 等占用类瞬时错误同样有效）。
+ * #fix-empty-recyclebin-system-trash：`a5d154c` 曾把本模块的原语从 `shell.trashItem`
+ * 改为 `fsp.unlink`（动机：大批量 94.5% 瞬时失败）——但该失败是旧双回收站架构的产物：
+ * 当时软删除在删除时已把文件搬入系统回收站，清空时 trashItem 打的是已消失的原路径，
+ * 自然批量失败。`80d910a` 后软删除为纯 DB 标记、文件留在原位，trashItem 的前提已恢复；
+ * 而 unlink 直接永久删除用户文件，与回收站页确认文案「文件会先移至系统回收站」矛盾，
+ * 故换回 `shell.trashItem`。三态判定/重试/熔断/聚合日志机制原样保留，
+ * 失败项保留 DB 记录供重试（B1），绝不 fallback 永久删除。
  *
  * #fix-gallery-delete-thumbnail-cleanup：缩略图清理范围从「仅缓存目录内 thumbnail 列指向
  * 的单一文件」扩展为两类：
@@ -25,6 +27,7 @@
  * 现统一经 resolveGamePhotoVariantPaths（scanner/path-classifier.ts 纯函数）推导，
  * 三个副本与其 DB 记录、缓存缩略图一并清理。
  */
+import { shell } from 'electron'
 import fsp from 'fs/promises'
 import nodePath from 'path'
 // 固化 win32 语义：本文件把库内 Windows 形态路径当作**比较键**（cacheDir 前缀判定、
@@ -38,51 +41,52 @@ import { t } from '../../i18n'
 import { resolveGamePhotoVariantPaths } from '../../scanner/path-classifier'
 
 /**
- * 物理删除三态结果。
- * - ok：删除成功，DB 可安全删除
+ * 移入系统回收站的三态结果。
+ * - ok：移入成功，DB 可安全删除
  * - missing：文件已不存在，DB 可安全删除
- * - failed：删除失败且文件仍存在，DB 必须保留供用户重试
+ * - failed：移入失败且文件仍存在，DB 必须保留供用户重试
  */
-export type UnlinkResult = 'ok' | 'missing' | 'failed'
+export type TrashItemResult = 'ok' | 'missing' | 'failed'
 
-/** 单个文件删除失败后的重试次数（不含首次尝试） */
-const UNLINK_RETRY_MAX = 2
+/** 单个文件移入系统回收站失败后的重试次数（不含首次尝试） */
+const TRASH_RETRY_MAX = 2
 /** 重试退避基数，实际延迟为 BASE * 2^n（50ms → 100ms） */
-const UNLINK_RETRY_BASE_DELAY_MS = 50
+const TRASH_RETRY_BASE_DELAY_MS = 50
 /**
- * 连续失败达到该阈值后判定为系统性故障（磁盘故障 / 目录被整体锁定等），
- * 后续项不再重试以避免整体耗时失控：实测 2474 项全失败场景下，
- * 逐项重试会把 18.5s 拖成分钟级卡顿。熔断后退化为原「单次尝试」行为。
+ * 连续失败达到该阈值后判定为系统性故障（磁盘故障 / 目录被整体锁定 / 不支持回收站的卷等），
+ * 后续项不再重试以避免整体耗时失控：大批量全失败场景下，
+ * 逐项重试会把耗时拖成分钟级卡顿。熔断后退化为原「单次尝试」行为。
  */
-const UNLINK_CIRCUIT_BREAK_THRESHOLD = 10
+const TRASH_CIRCUIT_BREAK_THRESHOLD = 10
 /** 聚合日志中最多记录的样例路径数 */
-const UNLINK_LOG_SAMPLE_LIMIT = 3
+const TRASH_LOG_SAMPLE_LIMIT = 3
 
 const delay = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
 
 /**
- * 物理删除单个文件并区分三态：成功 / 文件不存在 / 失败（文件仍存在）。
+ * 将单个文件移入系统回收站并区分三态：成功 / 文件不存在 / 失败（文件仍存在）。
  *
  * 抽取此函数是为了让 `emptyRecycleBin` 与 `permanentDelete` 共用同一三态判定逻辑，
- * 避免 B1 类 Bug（删除失败时仍删 DB 记录导致用户数据丢失踪迹）。
+ * 避免 B1 类 Bug（移入失败时仍删 DB 记录导致用户数据丢失踪迹）。
  *
- * FIX(A-retry): 保留失败重试。文件被占用（EBUSY/EPERM 等）属瞬时失败，对重试敏感；
- * 历史上 shell.trashItem 大批量场景实测 2474 项 94.5% 瞬时失败，重试机制显著降低失败率。
+ * FIX(A-retry): 保留失败重试。文件被占用（EBUSY/EPERM 等）与 Shell 瞬时失败对重试敏感；
  * 每次重试前先 pathExists 复检：文件已消失则立即判 missing，不做无谓重试。
+ * 重试用尽且文件仍存在 → failed，**不 fallback 永久删除**（与确认文案「文件会先移至
+ * 系统回收站」一致，失败项保留 DB 记录供用户重试）。
  *
  * @param filePath 目标文件绝对路径
  * @param maxRetries 重试次数上限，负值归一化为 0（熔断时传 0 以快速失败）
  * @returns 三态结果与首个错误（错误由调用方聚合记录，避免逐条 warn 刷爆日志）
  */
-export async function unlinkWithFallback(
+export async function trashItemWithFallback(
   filePath: string,
-  maxRetries: number = UNLINK_RETRY_MAX
-): Promise<{ result: UnlinkResult; error?: unknown }> {
+  maxRetries: number = TRASH_RETRY_MAX
+): Promise<{ result: TrashItemResult; error?: unknown }> {
   const totalAttempts = Math.max(0, maxRetries) + 1
   let firstError: unknown
   for (let attempt = 0; attempt < totalAttempts; attempt++) {
     try {
-      await fsp.unlink(filePath)
+      await shell.trashItem(filePath)
       return { result: 'ok' }
     } catch (err) {
       if (firstError === undefined) firstError = err
@@ -91,42 +95,42 @@ export async function unlinkWithFallback(
         return { result: 'missing' }
       }
       if (attempt < totalAttempts - 1) {
-        await delay(UNLINK_RETRY_BASE_DELAY_MS * 2 ** attempt)
+        await delay(TRASH_RETRY_BASE_DELAY_MS * 2 ** attempt)
       }
     }
   }
   return { result: 'failed', error: firstError }
 }
 
-/** 批量物理删除的聚合结果 */
-export interface UnlinkBatchOutcome {
-  /** 可安全物理删除的 DB 记录 id（文件删除成功 或 文件已不存在） */
+/** 批量移入系统回收站的聚合结果 */
+export interface TrashBatchOutcome {
+  /** 可安全删除的 DB 记录 id（文件移入成功 或 文件已不存在） */
   idsToDelete: number[]
-  /** 成功物理删除的文件数量 */
+  /** 成功移入系统回收站的文件数量 */
   movedCount: number
   /** 文件已不存在的数量 */
   missingCount: number
-  /** 删除失败且文件仍存在的路径（DB 记录保留供用户重试） */
+  /** 移入失败且文件仍存在的路径（DB 记录保留供用户重试） */
   failedPaths: string[]
 }
 
 /**
- * 批量物理删除文件，聚合三态统计并在结束后统一记录一条失败日志。
+ * 批量将文件移入系统回收站，聚合三态统计并在结束后统一记录一条失败日志。
  *
  * FIX(A-log): 原实现在循环内逐项 logger.warn，实测 2474 项失败写出 2474 行日志，
  * 刷爆日志文件且淹没其他诊断信息。改为循环结束后聚合一条（总数 + 样例路径 + 首个错误）。
  * FIX(A-breaker): 连续失败达阈值即停止重试，防止退避延迟在大批量失败时累积成分钟级卡顿。
  *
  * 日志 key 沿用历史 `main.media.log.recycleBinMoveFailed`（12 语言包共享 key 结构，
- * 仅更新 zh-CN 文案为「物理删除失败」语义，避免波及全部语言包的 key 重命名）。
+ * 仅更新 zh-CN 文案为「移入系统回收站失败」语义，避免波及全部语言包的 key 重命名）。
  *
  * @param rows 待处理的 DB 记录（id + 文件绝对路径）
  * @returns 三态聚合统计；`failedPaths` 对应的记录不得物理删除 DB
  */
-export async function unlinkBatch(
+export async function trashBatch(
   rows: readonly { id: number; file_path: string }[]
-): Promise<UnlinkBatchOutcome> {
-  const outcome: UnlinkBatchOutcome = {
+): Promise<TrashBatchOutcome> {
+  const outcome: TrashBatchOutcome = {
     idsToDelete: [],
     movedCount: 0,
     missingCount: 0,
@@ -137,8 +141,8 @@ export async function unlinkBatch(
 
   for (const row of rows) {
     // 熔断：连续失败过多说明是系统性故障，重试已无意义，直接快速失败
-    const retries = consecutiveFailures >= UNLINK_CIRCUIT_BREAK_THRESHOLD ? 0 : UNLINK_RETRY_MAX
-    const { result, error } = await unlinkWithFallback(row.file_path, retries)
+    const retries = consecutiveFailures >= TRASH_CIRCUIT_BREAK_THRESHOLD ? 0 : TRASH_RETRY_MAX
+    const { result, error } = await trashItemWithFallback(row.file_path, retries)
 
     if (result === 'failed') {
       outcome.failedPaths.push(row.file_path)
@@ -154,7 +158,7 @@ export async function unlinkBatch(
   }
 
   if (outcome.failedPaths.length > 0) {
-    const shown = outcome.failedPaths.slice(0, UNLINK_LOG_SAMPLE_LIMIT)
+    const shown = outcome.failedPaths.slice(0, TRASH_LOG_SAMPLE_LIMIT)
     const samples = shown.join(' | ')
     const omitted = outcome.failedPaths.length - shown.length
     logger.warn(
@@ -214,7 +218,7 @@ export async function cleanupThumbnailsForRows(
   let deleted = 0
   let firstError: unknown
   const nativeRemoved: string[] = []
-  // 失败路径聚合（#fix-permanent-delete-game-photo-variants）：沿用 unlinkBatch 的
+  // 失败路径聚合（#fix-permanent-delete-game-photo-variants）：沿用 trashBatch 的
   // 「循环后聚合一条」约定，绝不逐项 warn（历史教训：2474 项失败刷爆日志）
   const failedPaths: string[] = []
   for (const target of targets) {
@@ -255,7 +259,7 @@ export async function cleanupThumbnailsForRows(
   }
 
   if (firstError !== undefined) {
-    const shown = failedPaths.slice(0, UNLINK_LOG_SAMPLE_LIMIT)
+    const shown = failedPaths.slice(0, TRASH_LOG_SAMPLE_LIMIT)
     const omitted = failedPaths.length - shown.length
     logger.warn(
       `[media-cleanup] 缩略图清理部分失败（目标 ${targets.length} 个，已删 ${deleted} 个，原生记录联动 ${nativeRemoved.length} 个，失败 ${failedPaths.length} 个${failedPaths.length > 0 ? `：${shown.join(' | ')}${omitted > 0 ? ` …等 ${failedPaths.length} 个` : ''}` : ''}）`,

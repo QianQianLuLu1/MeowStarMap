@@ -200,18 +200,18 @@ wrapHandler(ctx, schema, handler) =>
 
 ```ts
 {
-  message: string,      // 成功 '已彻底删除 N 项'；部分失败 '已彻底删除 N 项，M 项失败'
-  deletedCount: number, // 已物理删除 DB 记录数（含文件已不存在的项）
-  failedCount: number   // 文件物理删除失败且文件仍存在的项数（渲染端据此判定部分失败）
+  message: string,      // 成功 '已彻底删除 N 项'；部分失败 '已移入系统回收站 N 项（M 项移入失败，已保留记录供手动处理）'
+  deletedCount: number, // 已处理（移入系统回收站或本已不存在）并硬删 DB 的记录数
+  failedCount: number   // 移入系统回收站失败且文件仍存在的项数（渲染端据此判定部分失败）
 }
 ```
 
-**确认语义与行为（#fix-permanent-delete-error-toast / #fix-recyclebin-permanent-delete）**：
+**确认语义与行为（#fix-permanent-delete-error-toast / #fix-empty-recyclebin-system-trash）**：
 
 - 二次确认由渲染端 ConfirmDialog 承担（调用方：回收站 `RecycleBinPage`、重复页 `DuplicatesPage`）。主进程**不再弹出原生 `dialog.showMessageBox`**，也不再抛 `IPC_CANCELED`。
-- 三阶段事务不变（软删标记 → 物理删除文件 → 硬删 DB）；阶段 4：对已删除记录的缩略图执行 best-effort 清理，范围见下方 #fix-gallery-delete-thumbnail-cleanup 行为变更，失败仅记录日志不影响返回值。
+- 三阶段事务不变（软删标记 → 移入系统回收站 → 硬删 DB）；阶段 4：对已删除记录的缩略图执行 best-effort 清理，范围见下方 #fix-gallery-delete-thumbnail-cleanup 行为变更，失败仅记录日志不影响返回值。
 - **#fix-gallery-delete-thumbnail-cleanup 行为变更**：阶段 4 清理范围从「仅缓存目录内 thumbnail 列指向的单一文件」扩展为两类：① 缓存缩略图三档位（thumbnail 位于缓存目录内 → 引用文件 + `${hash}.jpg`/`${hash}_low.jpg`/`${hash}_high.jpg`）；② 游戏原生 LQ 文件（由 `file_path` 经 `resolveNativeThumbnailPath` 严格推导：须同时命中 `\X6Game\Saved\GamePlayPhotos\` 与 `\NikkiPhotos_HighQuality\` 目录段，thumbnail 列不作依据），并联动硬删该 LQ 的 DB 记录（LQ 文件本身也是入库媒体记录，避免悬空记录）。返回值结构不变。
-- **#fix-recyclebin-permanent-delete 行为变更**：阶段 2 原用 `shell.trashItem`（仅把文件移入系统回收站，磁盘不释放，且 Windows Shell 大批量下有实测瞬时失败），现改为 `fsp.unlink` 直接物理删除；三态判定（成功/missing/failed）与重试/熔断/聚合日志机制沿用 `_trash-utils.ts` 不变。
+- **#fix-empty-recyclebin-system-trash 行为变更**：阶段 2 恢复 `shell.trashItem`（移入系统回收站）——回收站页确认文案自项目基线起承诺「文件会先移至系统回收站，之后无法从本应用恢复」，`a5d154c` 改 `fsp.unlink` 与该承诺矛盾，且 `80d910a`（软删除改纯 DB 标记、文件留在原位）后 unlink 会永久删除用户文件。`a5d154c` 的动机（Shell API 大批量 94.5% 瞬时失败）是旧双回收站架构产物（当时文件在删除时已被搬走，清空打的是空路径），前提已消失。三态判定（成功/missing/failed）与重试/熔断/聚合日志机制沿用 `_trash-utils.ts` 不变，失败项保留 DB 记录供重试，不 fallback 永久删除。
 - 渲染端按 preload `call()` 契约消费：成功收到 data，失败抛 `IpcError`；部分失败以 `failedCount > 0` 判定。
 
 ### 2.8 `media:emptyRecycleBin`
@@ -227,17 +227,17 @@ wrapHandler(ctx, schema, handler) =>
 
 ```ts
 {
-  message: string,      // 为空 '回收站为空，无需清理'；成功 '已清空回收站（共 N 项）'；部分失败 '已彻底删除 N 项，M 项失败'
-  movedCount: number,   // 成功物理删除的文件数（#fix-recyclebin-permanent-delete 前语义为移入系统回收站数）
+  message: string,      // 为空 '回收站为空，无需清理'；成功 '已清空回收站（共 N 项）'；部分失败 '已移入系统回收站 N 项（M 项移入失败，已保留记录供手动处理）'
+  movedCount: number,   // 成功移入系统回收站的文件数（#fix-empty-recyclebin-system-trash 起恢复本语义；a5d154c 至该修复前曾为物理删除数）
   missingCount: number, // 文件已不存在（原路径 ENOENT）的项数
-  failedCount: number   // 物理删除失败且文件仍存在的项数（DB 记录保留供重试，渲染端据此判定部分失败）
+  failedCount: number   // 移入系统回收站失败且文件仍存在的项数（DB 记录保留供重试，渲染端据此判定部分失败）
 }
 ```
 
-**确认语义与行为（#fix-recyclebin-permanent-delete / 回收站语义修复 D5）**：
+**确认语义与行为（#fix-empty-recyclebin-system-trash / 回收站语义修复 D5）**：
 
 - 二次确认完全由渲染端 `ConfirmDialog` 承担（与 `media:permanentDelete` 同构）；主进程不再弹原生 `dialog.showMessageBox`，无取消路径（原「用户取消抛 `IPC_CANCELED`」行为已移除）。
-- 文件处理：对每条软删除记录的 `file_path` 执行 `fsp.unlink` **物理删除**（原 `shell.trashItem` 仅移入系统回收站，磁盘不释放）；软删除记录经 `getSoftDeletedMediaPaths` 返回（含 `thumbnail` 列）。三态判定沿用 `_trash-utils.ts`：成功 / missing（仅删 DB）/ failed（文件仍存在，DB 保留供重试）。
+- 文件处理：对每条软删除记录的 `file_path` 执行 `shell.trashItem` **移入系统回收站**（与确认文案「文件会先移至系统回收站，之后无法从本应用恢复」一致；`a5d154c` 至 `#fix-empty-recyclebin-system-trash` 间曾为 `fsp.unlink` 物理删除，详见 §2.7 行为变更注记）；软删除记录经 `getSoftDeletedMediaPaths` 返回（含 `thumbnail` 列）。三态判定沿用 `_trash-utils.ts`：成功 / missing（仅删 DB）/ failed（文件仍存在，DB 保留供重试）。
 - 阶段 4（本次新增）：对已删除 DB 记录的缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 严格推导的原生 LQ 及其 DB 记录）。
 - 渲染端按 preload `call()` 契约消费：成功收到 data（不含 `success` 字段），失败抛 `IpcError`；`RecycleBinPage` 仅消费 `message` 与 `failedCount`。
 

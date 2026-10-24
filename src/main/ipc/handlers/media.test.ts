@@ -444,7 +444,7 @@ describe('registerMediaHandlers', () => {
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1])
   })
 
-  it('media:permanentDelete 确认后软删→物理删除→硬删', async () => {
+  it('media:permanentDelete 确认后软删→移入系统回收站→硬删', async () => {
     repoMock.getMediaPathsByIds.mockReturnValue([
       { id: 1, file_path: '/a' },
       { id: 2, file_path: '/b' }
@@ -455,25 +455,26 @@ describe('registerMediaHandlers', () => {
       data: { deletedCount: number; failedCount: number }
     }
     expect(repoMock.softDeleteForPermanentDelete).toHaveBeenCalledWith([1, 2])
-    expect(unlinkMock).toHaveBeenCalledWith('/a')
-    expect(unlinkMock).toHaveBeenCalledWith('/b')
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/a')
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/b')
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1, 2])
     expect(result.data.deletedCount).toBe(2)
     expect(result.data.failedCount).toBe(0)
   })
 
-  // #fix-recyclebin-permanent-delete 红灯 R3：「永久删除」必须物理删除文件（fsp.unlink），
-  // 而非 shell.trashItem 再移入系统回收站——修复前文件被转移到 $Recycle.Bin 仍占磁盘，
-  // 与 file:deletePermanent（fsp.unlink）及渲染端确认文案「直接删除（不进入回收站）」不一致。
-  it('media:permanentDelete 确认后对每个文件执行物理删除且不再调用 shell.trashItem', async () => {
+  // #fix-empty-recyclebin-system-trash 红灯 R2：「彻底删除」必须把文件移入系统回收站
+  //（shell.trashItem），不得 fsp.unlink 物理删除——回收站页确认文案承诺
+  //「文件会先移至系统回收站，之后无法从本应用恢复」，a5d154c 的 unlink 实现与承诺矛盾，
+  // 80d910a（软删除改纯 DB 标记、文件留在原位）后清空/彻底删除 100% 永久删除用户文件。
+  it('media:permanentDelete 确认后对每个文件调用 shell.trashItem 且不以 unlink 删除媒体文件', async () => {
     repoMock.getMediaPathsByIds.mockReturnValue([{ id: 1, file_path: '/a' }])
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:permanentDelete')([[1]])) as {
       success: true
       data: { deletedCount: number; failedCount: number }
     }
-    expect(unlinkMock).toHaveBeenCalledWith('/a')
-    expect(shellTrashItemMock).not.toHaveBeenCalled()
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/a')
+    expect(unlinkMock).not.toHaveBeenCalledWith('/a')
     expect(result.data.deletedCount).toBe(1)
     expect(result.data.failedCount).toBe(0)
   })
@@ -497,10 +498,11 @@ describe('registerMediaHandlers', () => {
     }
     expect(result.success).toBe(true)
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1, 2, 3])
-    // #fix-recyclebin-permanent-delete：unlink 现承担文件物理删除（3 个）+ 缩略图清理（1 个）
-    expect(unlinkMock).toHaveBeenCalledWith('/a')
-    expect(unlinkMock).toHaveBeenCalledWith('/b')
-    expect(unlinkMock).toHaveBeenCalledWith('/c')
+    // #fix-empty-recyclebin-system-trash：媒体文件经 shell.trashItem 移入系统回收站（3 个），
+    // 缩略图清理仍走 unlink（仅缓存目录内 1 个）
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/a')
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/b')
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/c')
     expect(unlinkMock).toHaveBeenCalledWith('C:\\cache\\thumbnails\\t1.jpg')
     // 缓存目录外（游戏原生 LQ）绝不触碰
     expect(unlinkMock).not.toHaveBeenCalledWith(
@@ -527,9 +529,9 @@ describe('registerMediaHandlers', () => {
     expect(repoMock.hardDelete).toHaveBeenCalledWith(88)
   })
 
-  it('media:permanentDelete 删除失败但文件不存在时仍硬删（计 missing）', async () => {
+  it('media:permanentDelete 移入回收站失败但文件不存在时仍硬删（计 missing）', async () => {
     repoMock.getMediaPathsByIds.mockReturnValue([{ id: 1, file_path: '/missing' }])
-    unlinkMock.mockRejectedValue(new Error('ENOENT'))
+    shellTrashItemMock.mockRejectedValue(new Error('Failed to perform delete operation'))
     // 文件不存在：pathExists 返回 false → 视为 missing，可安全删 DB
     pathExistsMock.mockResolvedValue(false)
     registerMediaHandlers(makeCtx())
@@ -541,10 +543,10 @@ describe('registerMediaHandlers', () => {
     expect(result.data.failedCount).toBe(0)
   })
 
-  it('media:permanentDelete 删除失败且文件存在时计入 failedPaths', async () => {
+  it('media:permanentDelete 移入回收站失败且文件存在时计入 failedPaths', async () => {
     showMessageBoxMock.mockResolvedValue({ response: 1 })
     repoMock.getMediaPathsByIds.mockReturnValue([{ id: 1, file_path: '/exists' }])
-    unlinkMock.mockRejectedValue(new Error('permission'))
+    shellTrashItemMock.mockRejectedValue(new Error('EPERM: operation not permitted'))
     // 文件仍存在：pathExists 返回 true → 视为 failed，保留 DB 供重试
     pathExistsMock.mockResolvedValue(true)
     registerMediaHandlers(makeCtx())
@@ -681,9 +683,11 @@ describe('registerMediaHandlers', () => {
     expect(result.data.movedCount).toBe(2)
   })
 
-  // #fix-recyclebin-permanent-delete 红灯 R1：清空回收站时对原路径文件执行物理删除（fsp.unlink），
-  // 不得再调用 shell.trashItem——修复前文件被移入系统回收站（磁盘不释放，大批量下还易瞬时失败）。
-  it('media:emptyRecycleBin 确认后物理删除每个文件且不再调用 shell.trashItem', async () => {
+  // #fix-empty-recyclebin-system-trash 红灯 R1：清空回收站时必须把原路径文件移入系统回收站
+  //（shell.trashItem），不得 fsp.unlink 永久删除——确认文案承诺「文件会先移至系统回收站，
+  // 之后无法从本应用恢复」。历史「Shell API 大批量 94.5% 瞬时失败」是旧双回收站架构产物
+  //（删除时文件已被搬走，清空打的是空路径），80d910a 后文件留在原位、前提已消失。
+  it('media:emptyRecycleBin 确认后对每个文件调用 shell.trashItem 且不以 unlink 删除媒体文件', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([
       { id: 1, file_path: '/a' },
       { id: 2, file_path: '/b' }
@@ -694,9 +698,10 @@ describe('registerMediaHandlers', () => {
       success: true
       data: { movedCount: number; missingCount: number; failedCount: number }
     }
-    expect(unlinkMock).toHaveBeenCalledWith('/a')
-    expect(unlinkMock).toHaveBeenCalledWith('/b')
-    expect(shellTrashItemMock).not.toHaveBeenCalled()
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/a')
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/b')
+    expect(unlinkMock).not.toHaveBeenCalledWith('/a')
+    expect(unlinkMock).not.toHaveBeenCalledWith('/b')
     expect(result.data.movedCount).toBe(2)
     expect(result.data.failedCount).toBe(0)
   })
@@ -759,10 +764,12 @@ describe('registerMediaHandlers', () => {
     expect(result.data.failedCount).toBe(0)
   })
 
-  it('media:emptyRecycleBin 删除失败但文件不存在时仍删 DB（计 missing）', async () => {
+  // #fix-empty-recyclebin-system-trash 红灯 R3：trashItem 抛错 + 文件已不存在 → 判 missing、
+  // 安全删 DB（外部已删除的记录仅清踪迹，不涉及系统回收站实体）
+  it('media:emptyRecycleBin 移入回收站失败但文件不存在时仍删 DB（计 missing）', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/gone' }])
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    unlinkMock.mockRejectedValue(new Error('ENOENT'))
+    shellTrashItemMock.mockRejectedValue(new Error('Failed to perform delete operation'))
     pathExistsMock.mockResolvedValue(false)
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:emptyRecycleBin')()) as {
@@ -776,7 +783,7 @@ describe('registerMediaHandlers', () => {
     expect(result.data.failedCount).toBe(0)
   })
 
-  it('media:emptyRecycleBin 删除失败且文件仍存在时【不】删 DB（B1 修复核心）', async () => {
+  it('media:emptyRecycleBin 移入回收站失败且文件仍存在时【不】删 DB（B1 修复核心）', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([
       { id: 1, file_path: '/locked-a' },
       { id: 2, file_path: '/ok-b' }
@@ -784,8 +791,8 @@ describe('registerMediaHandlers', () => {
     showMessageBoxMock.mockResolvedValue({ response: 1 })
     // /locked-a 持续失败（文件仍存在），/ok-b 成功。
     // 用「路径键控」而非「调用序列」模拟，使断言不依赖内部重试次数。
-    unlinkMock.mockImplementation(async (p: string) => {
-      if (p === '/locked-a') throw new Error('permission denied')
+    shellTrashItemMock.mockImplementation(async (p: string) => {
+      if (p === '/locked-a') throw new Error('EPERM: operation not permitted')
     })
     pathExistsMock.mockResolvedValue(true) // /locked-a 仍存在 → 重试用尽后判 failed
     registerMediaHandlers(makeCtx())
@@ -801,12 +808,12 @@ describe('registerMediaHandlers', () => {
     expect(result.data.message).toContain('失败')
   })
 
-  // ── 缺陷A 修复：文件删除瞬时失败重试（占用类错误 EBUSY/EPERM 对重试敏感）
+  // ── 缺陷A 修复：移入系统回收站瞬时失败重试（占用类错误 EBUSY/EPERM 对重试敏感）
   it('media:emptyRecycleBin 首次失败但重试成功时计 movedCount 并删 DB', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/flaky' }])
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    // 首次瞬时失败、重试后成功（文件被占用类瞬时失败的典型场景）
-    unlinkMock
+    // 首次瞬时失败、重试后成功（Shell 瞬时失败/文件被占用类瞬时失败的典型场景）
+    shellTrashItemMock
       .mockRejectedValueOnce(new Error('EBUSY: resource busy or locked'))
       .mockResolvedValueOnce(undefined)
     pathExistsMock.mockResolvedValue(true) // 文件仍存在 → 应重试而非直接判 failed
@@ -820,10 +827,12 @@ describe('registerMediaHandlers', () => {
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1])
   })
 
+  // #fix-empty-recyclebin-system-trash 红灯 R4：trashItem 持续失败且文件仍存在 →
+  // 重试用尽判 failed、保留 DB 供重试（B1 数据安全约定：绝不 fallback 永久删除）
   it('media:emptyRecycleBin 重试用尽仍失败时保留 DB 记录且不超过重试上限', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 7, file_path: '/always-locked' }])
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    unlinkMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
+    shellTrashItemMock.mockRejectedValue(new Error('EPERM: operation not permitted'))
     pathExistsMock.mockResolvedValue(true) // 文件始终存在 → 重试到上限后判 failed
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:emptyRecycleBin')()) as {
@@ -832,16 +841,16 @@ describe('registerMediaHandlers', () => {
     }
     expect(result.data.failedCount).toBe(1)
     expect(result.data.movedCount).toBe(0)
-    // 失败项不得进入物理删除，保留供用户重试（B1 数据安全约定）
+    // 失败项不得物理删除，保留供用户重试（B1 数据安全约定）
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([])
     // 首次尝试 + 2 次重试 = 3 次，防止无限重试
-    expect(unlinkMock).toHaveBeenCalledTimes(3)
+    expect(shellTrashItemMock).toHaveBeenCalledTimes(3)
   })
 
   it('media:emptyRecycleBin 重试期间文件消失时判 missing 并删 DB', async () => {
     repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 9, file_path: '/vanishing' }])
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    unlinkMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
+    shellTrashItemMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
     // 首次复检仍存在（触发重试），第二次复检已消失 → 应立即判 missing 停止重试
     pathExistsMock.mockResolvedValueOnce(true).mockResolvedValue(false)
     registerMediaHandlers(makeCtx())
@@ -853,14 +862,14 @@ describe('registerMediaHandlers', () => {
     expect(result.data.failedCount).toBe(0)
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([9])
     // 文件消失后不再重试（仅 2 次尝试，未走到第 3 次）
-    expect(unlinkMock).toHaveBeenCalledTimes(2)
+    expect(shellTrashItemMock).toHaveBeenCalledTimes(2)
   })
 
   it('media:emptyRecycleBin 多项失败时日志聚合为一条（避免刷屏）', async () => {
     const rows = Array.from({ length: 5 }, (_, i) => ({ id: i + 1, file_path: `/locked-${i}` }))
     repoMock.getSoftDeletedMediaPaths.mockReturnValue(rows)
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    unlinkMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
+    shellTrashItemMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
     pathExistsMock.mockResolvedValue(true)
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:emptyRecycleBin')()) as {
@@ -877,7 +886,7 @@ describe('registerMediaHandlers', () => {
     const rows = Array.from({ length: 14 }, (_, i) => ({ id: i + 1, file_path: `/sys-fail-${i}` }))
     repoMock.getSoftDeletedMediaPaths.mockReturnValue(rows)
     showMessageBoxMock.mockResolvedValue({ response: 1 })
-    unlinkMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
+    shellTrashItemMock.mockRejectedValue(new Error('EBUSY: resource busy or locked'))
     pathExistsMock.mockResolvedValue(true)
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:emptyRecycleBin')()) as {
@@ -889,7 +898,7 @@ describe('registerMediaHandlers', () => {
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([])
     // 系统性故障（如磁盘故障/目录被整体锁定）时熔断：总尝试数应显著小于 14*3=42，
     // 避免大批量全失败场景下重试退避累积成分钟级卡顿
-    expect(unlinkMock.mock.calls.length).toBeLessThan(42)
+    expect(shellTrashItemMock.mock.calls.length).toBeLessThan(42)
   }, 20000)
 
   it('media:cleanupMissing 返回清理数量', async () => {

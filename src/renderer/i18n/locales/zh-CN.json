@@ -2865,7 +2865,7 @@
         "softDeleted": "已将 {{count}} 项移至回收站",
         "restored": "已恢复 {{count}} 项",
         "permanentDeleted": "已彻底删除 {{count}} 项",
-        "permanentDeletePartial": "已彻底删除 {{deleted}} 项（{{failed}} 项删除失败，已保留记录供手动处理）",
+        "permanentDeletePartial": "已移入系统回收站 {{deleted}} 项（{{failed}} 项移入失败，已保留记录供手动处理）",
         "recycleBinEmpty": "回收站为空，无需清理",
         "recycleBinEmptied": "已清空回收站（共 {{count}} 项）",
         "cleanedMissing": "已清理 {{count}} 条丢失记录",
@@ -2876,7 +2876,7 @@
         "sceneTimeAnalyzed": "已分析 {{count}} 张图片的场景时段"
       },
       "log": {
-        "recycleBinMoveFailed": "[RecycleBin] 物理删除失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
+        "recycleBinMoveFailed": "[RecycleBin] 移入系统回收站失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
         "recycleBinMoveOmitted": " …(另 {{count}} 项)"
       },
       "validation": {

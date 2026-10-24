@@ -1,4 +1,4 @@
-// @core-change: 完全删除图片同步清理 X6Game\ScreenShot 同名副本，并向同图衍生文件记录清理钩子透传缩略图缓存目录
+// @core-change: 清空回收站与彻底删除换回 shell.trashItem（移入系统回收站），修复与确认文案「文件会先移至系统回收站」矛盾的永久删除缺陷
 /**
  * 媒体生命周期域 IPC handler：删除 / 恢复 / 回收站
  *
@@ -12,7 +12,7 @@ import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
-import { unlinkBatch, cleanupThumbnailsForRows, makeNativeThumbRecordCleaner } from './_trash-utils'
+import { trashBatch, cleanupThumbnailsForRows, makeNativeThumbRecordCleaner } from './_trash-utils'
 import { t } from '../../i18n'
 
 /**
@@ -92,16 +92,18 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       // 查询文件路径（含缩略图，供阶段 4 清理缓存）
       const rows = repo.getMediaPathsByIds(mediaIds)
 
-      // F-S1 三阶段：①事务软删除标记 ②逐个物理删除文件（fsp.unlink） ③事务物理删除已处理记录
+      // F-S1 三阶段：①事务软删除标记 ②逐个移入系统回收站（shell.trashItem） ③事务物理删除已处理记录
       // 保证 DB 与文件系统一致：中断后 DB 仍有 is_deleted=1 记录，用户可重试
 
       // 阶段1：幂等软删除标记
       await repo.softDeleteForPermanentDelete(rows.map((r) => r.id))
 
-      // 阶段2：逐个物理删除文件（#fix-recyclebin-permanent-delete：
-      // 原用 shell.trashItem 只是把文件移入系统回收站，磁盘不释放；现改 fsp.unlink 真正删除），
+      // 阶段2：逐个移入系统回收站（#fix-empty-recyclebin-system-trash：
+      // a5d154c 曾改 fsp.unlink 物理删除，但回收站页确认文案始终承诺「文件会先移至
+      // 系统回收站」；且 80d910a 后文件留在原位，unlink 会 100% 永久删除用户文件。
+      // 旧「Shell API 大批量 94.5% 失败」是旧架构删除时已搬走文件所致，前提已消失），
       // 区分「成功」「文件已不存在」「失败」
-      const { idsToDelete, failedPaths } = await unlinkBatch(rows)
+      const { idsToDelete, failedPaths } = await trashBatch(rows)
 
       // 阶段3：事务中物理删除已成功处理的记录
       await repo.hardDeleteBatch(idsToDelete)
@@ -143,9 +145,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
       // 同构）——原实现此处再弹一次原生 dialog，用户需重复确认，且取消时抛 canceled
       // 被渲染端误报「清空失败」。
 
-      // B1 修复：文件删除失败且文件仍存在时，不删除 DB 记录，保留供用户重试。
-      // 仅当文件物理删除成功 或 文件已不存在（DB 踪迹已无对应实体）时才删除 DB。
-      const { idsToDelete, movedCount, missingCount, failedPaths } = await unlinkBatch(rows)
+      // B1 修复：移入系统回收站失败且文件仍存在时，不删除 DB 记录，保留供用户重试。
+      // 仅当文件移入成功 或 文件已不存在（DB 踪迹已无对应实体）时才删除 DB。
+      const { idsToDelete, movedCount, missingCount, failedPaths } = await trashBatch(rows)
       await repo.hardDeleteBatch(idsToDelete)
 
       // #fix-recyclebin-permanent-delete：阶段 4 清理已删除记录的缩略图
