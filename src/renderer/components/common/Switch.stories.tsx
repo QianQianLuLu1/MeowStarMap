@@ -10,7 +10,8 @@ const meta: Meta<typeof Switch> = {
     docs: {
       description: {
         component:
-          '独立弹性开关：`.settings-elastic-switch` 裸控件封装。按下拉伸、松开过冲回弹；' +
+          '独立弹性开关：`.settings-elastic-switch` 裸控件封装。点击后 350ms 果冻滑动' +
+          '（途中胶囊拉伸、终点回弹、轨道灰→绿渐变）；' +
           'role=switch，Space/Enter 可切换。设置行布局请用 SettingsToggle。'
       }
     }

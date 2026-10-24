@@ -17,7 +17,8 @@ export interface SwitchProps {
  *
  * 与 SettingsToggle（设置行布局：标签 + 描述 + 开关）分工：
  * 本组件只渲染开关本体，用于 FormField 或自定义布局。
- * 按下拉伸、松开过冲回弹的手感由 CSS 类承载（compositor 合成，不触发 React 重渲染）。
+ * 点击后滑块 350ms 弹簧滑动、途中胶囊拉伸、终点回弹的果冻手感由 CSS 类承载
+ * （compositor 合成，不触发 React 重渲染）。
  *
  * 无障碍：<button role="switch">，Space/Enter 原生可切换，aria-checked 反映状态。
  */
