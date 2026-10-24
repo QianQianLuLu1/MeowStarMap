@@ -21,12 +21,13 @@ const DIR = path.dirname(fileURLToPath(import.meta.url))
 
 /**
  * 替换后各文件应有的 SettingsCard 使用数（原有用量 + 本次机械替换数）：
- * about 0+2 / data 0+7 / diagnostics 0+10 / general 0+1 / profile 0+1 / scan 9+0
+ * about 0+2 / data 0+7 / diagnostics 0+10（2026-10-24 GPU 状态卡 +6 → 16）/
+ * general 0+1 / profile 0+1 / scan 9+0
  */
 const EXPECTED_USAGE: Record<string, number> = {
   'about-sections.tsx': 2,
   'data-sections.tsx': 7,
-  'diagnostics-sections.tsx': 10,
+  'diagnostics-sections.tsx': 16,
   'general-sections.tsx': 1,
   'profile-sections.tsx': 1,
   'scan-sections.tsx': 9
