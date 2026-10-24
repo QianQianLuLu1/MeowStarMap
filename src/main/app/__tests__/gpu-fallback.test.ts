@@ -20,6 +20,7 @@ const {
   mockRelaunch,
   mockExit,
   mockReleaseLock,
+  mockGetVersion,
   diagLogMock,
   loggerErrorMock
 } = vi.hoisted(() => ({
@@ -28,6 +29,7 @@ const {
   mockRelaunch: vi.fn(),
   mockExit: vi.fn(),
   mockReleaseLock: vi.fn(),
+  mockGetVersion: vi.fn(),
   diagLogMock: vi.fn(),
   loggerErrorMock: vi.fn()
 }))
@@ -38,7 +40,8 @@ vi.mock('electron', () => ({
     on: mockAppOn,
     relaunch: mockRelaunch,
     exit: mockExit,
-    releaseSingleInstanceLock: mockReleaseLock
+    releaseSingleInstanceLock: mockReleaseLock,
+    getVersion: mockGetVersion
   }
 }))
 
@@ -72,7 +75,11 @@ function prefPath(): string {
   return path.join(tmpDir, 'gpu-pref.json')
 }
 
-function readRaw(): { consecutiveFailures: number; fallbackActive: boolean } {
+function readRaw(): {
+  consecutiveFailures: number
+  fallbackActive: boolean
+  fallbackVersion?: string
+} {
   return JSON.parse(fs.readFileSync(statePath(), 'utf8'))
 }
 
@@ -91,6 +98,7 @@ beforeEach(() => {
   mockRelaunch.mockReset()
   mockExit.mockReset()
   mockReleaseLock.mockReset()
+  mockGetVersion.mockReset().mockReturnValue('2.5.5')
   diagLogMock.mockReset()
   loggerErrorMock.mockReset()
   if (process.env.NIKKI_FORCE_GPU_COMPAT) delete process.env.NIKKI_FORCE_GPU_COMPAT
@@ -119,8 +127,8 @@ describe('gpu-fallback 状态机', () => {
     expect(shouldDisableHardwareAcceleration()).toBe(true)
   })
 
-  it('3. markBootSuccess 清零失败计数，但 fallbackActive 保留（删文件才能恢复硬件加速）', () => {
-    writeRaw({ consecutiveFailures: 2, fallbackActive: true })
+  it('3. markBootSuccess 清零失败计数，但 fallbackActive 保留（同版本内仍回退；升级后获一次重试）', () => {
+    writeRaw({ consecutiveFailures: 2, fallbackActive: true, fallbackVersion: '2.5.5' })
     markBootSuccess()
     const s = readRaw()
     expect(s.consecutiveFailures).toBe(0)
@@ -162,8 +170,8 @@ describe('gpu-fallback 状态机', () => {
     expect(() => markGpuProcessCrash('crashed', 1)).not.toThrow()
   })
 
-  it('7. fallbackActive=true 且 failures=0 → 仅凭激活标记即返回 true', () => {
-    writeRaw({ consecutiveFailures: 0, fallbackActive: true })
+  it('7. fallbackActive=true（同版本戳）且 failures=0 → 仅凭激活标记即返回 true', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
     expect(shouldDisableHardwareAcceleration()).toBe(true)
   })
 
@@ -220,8 +228,8 @@ describe('gpu-fallback 用户偏好镜像', () => {
     expect(shouldDisableHardwareAcceleration()).toBe(false)
   })
 
-  it('c. 无偏好镜像（undefined）且 fallbackActive=true → 返回 true（维持既有逻辑）', () => {
-    writeRaw({ consecutiveFailures: 0, fallbackActive: true })
+  it('c. 无偏好镜像（undefined）且 fallbackActive=true（同版本戳）→ 返回 true（维持既有逻辑）', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
     expect(fs.existsSync(prefPath())).toBe(false)
     expect(shouldDisableHardwareAcceleration()).toBe(true)
   })
@@ -259,10 +267,72 @@ describe('gpu-fallback 自愈重启（requestSelfHeal）', () => {
   })
 
   it('c. 已兼容模式仍崩溃 → requestSelfHeal 不重启（防死循环）', () => {
-    writeRaw({ consecutiveFailures: 0, fallbackActive: true })
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
     expect(recordBootDecision()).toBe(true) // 已兼容模式
     const healed = requestSelfHeal('crashed', 1)
     expect(healed).toBe(false)
     expect(mockRelaunch).not.toHaveBeenCalled()
+  })
+})
+
+describe('gpu-fallback 版本级自动重试（fallbackVersion）', () => {
+  it('v1. 回退戳为旧版本 → 本次判定 false（给一次干净重试）并落当前版本戳', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.4' })
+    mockGetVersion.mockReturnValue('2.5.5')
+    expect(shouldDisableHardwareAcceleration()).toBe(false) // 升级后自动重试硬件加速
+    expect(readRaw().fallbackActive).toBe(true) // 历史标记保留（诊断可见）
+    expect(readRaw().fallbackVersion).toBe('2.5.5') // 重试已记账，同版本不再重试
+  })
+
+  it('v2. 重试记账后同版本再判 → true（每版本至多一次重试，防每启动循环）', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
+    mockGetVersion.mockReturnValue('2.5.5')
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+  })
+
+  it('v3. 旧格式无 fallbackVersion 字段 → 恰好一次重试并落戳', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true }) // 历史遗留文件
+    mockGetVersion.mockReturnValue('2.5.5')
+    expect(shouldDisableHardwareAcceleration()).toBe(false)
+    expect(readRaw().fallbackVersion).toBe('2.5.5')
+    expect(shouldDisableHardwareAcceleration()).toBe(true) // 第二次不再重试
+  })
+
+  it('v4. 版本不可得（getVersion 抛错/返回空）→ 保守 true 不重试', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.4' })
+    mockGetVersion.mockImplementation(() => {
+      throw new Error('not ready')
+    })
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+
+    mockGetVersion.mockReturnValue('')
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+  })
+
+  it('v5. markGpuProcessCrash 激活回退时盖当前版本戳', () => {
+    writeRaw({ consecutiveFailures: 1, fallbackActive: false })
+    mockGetVersion.mockReturnValue('2.5.5')
+    markGpuProcessCrash('crashed', 1)
+    expect(readRaw().fallbackActive).toBe(true)
+    expect(readRaw().fallbackVersion).toBe('2.5.5')
+    // 崩溃后下次启动（同版本）→ 回退生效
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+  })
+
+  it('v6. 连续失败阈值路径激活回退时同样盖版本戳', () => {
+    writeRaw({ consecutiveFailures: 2, fallbackActive: false })
+    mockGetVersion.mockReturnValue('2.5.5')
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+    expect(readRaw().fallbackActive).toBe(true)
+    expect(readRaw().fallbackVersion).toBe('2.5.5')
+    // 阈值路径盖戳后，下次启动不得再因「无戳」获得重试
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
+  })
+
+  it('v7. 用户显式关闭（pref=false）优先于版本重试 → true', () => {
+    writePref({ hardwareAcceleration: false })
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.4' })
+    mockGetVersion.mockReturnValue('2.5.5')
+    expect(shouldDisableHardwareAcceleration()).toBe(true)
   })
 })

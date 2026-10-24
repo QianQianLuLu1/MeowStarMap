@@ -66,6 +66,8 @@ export function shouldEscalateRuntimeGpuCrash(crashTimestamps: number[], nowMs: 
 interface GpuFallbackState {
   consecutiveFailures: number
   fallbackActive: boolean
+  /** 激活回退（或最近一次版本级重试）时的应用版本；用于「升级后自动重试硬件加速」记账 */
+  fallbackVersion?: string
 }
 
 const DEFAULT_STATE: GpuFallbackState = { consecutiveFailures: 0, fallbackActive: false }
@@ -81,6 +83,16 @@ function getStatePath(): string {
   return path.join(app.getPath('userData'), 'gpu-fallback.json')
 }
 
+/** 当前应用版本；不可得（异常/空串）返回 ''，调用方须按「保守不重试」处理 */
+function getCurrentAppVersion(): string {
+  try {
+    const v = app.getVersion()
+    return typeof v === 'string' ? v : ''
+  } catch {
+    return ''
+  }
+}
+
 function readState(): GpuFallbackState {
   try {
     const p = getStatePath()
@@ -88,11 +100,14 @@ function readState(): GpuFallbackState {
     const raw = JSON.parse(fs.readFileSync(p, 'utf8')) as {
       consecutiveFailures?: unknown
       fallbackActive?: unknown
+      fallbackVersion?: unknown
     }
     const n = raw?.consecutiveFailures
     const consecutiveFailures =
       typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
-    return { consecutiveFailures, fallbackActive: raw?.fallbackActive === true }
+    const fallbackVersion =
+      typeof raw?.fallbackVersion === 'string' ? raw.fallbackVersion : undefined
+    return { consecutiveFailures, fallbackActive: raw?.fallbackActive === true, fallbackVersion }
   } catch {
     return { ...DEFAULT_STATE }
   }
@@ -156,7 +171,12 @@ export function writeHardwareAccelPref(value: boolean): void {
  *     fallbackActive（或连续失败达阈值），仍回退软件渲染，避免启用后
  *     反复崩溃白屏。用户开启仅通过 writeHardwareAccelPref(true) 清空
  *     fallbackActive 来获得一次干净重试，故正常启动会落入下方返回 false；
- *  3) 无偏好且无崩溃标记 → 启用硬件加速（默认保留硬件加速，不牺牲性能）。
+ *  3) **版本级自动重试（2026-10-24 优化）**：fallbackActive 已置位但版本戳
+ *     与当前版本不一致（含旧格式无戳）→ 说明回退发生在旧版本时期，显卡
+ *     驱动/系统可能已修复——落当前版本戳并返回 false，给每个新版本一次
+ *     干净重试（真实崩溃观测仍兜底：再崩会重新置位并盖当前版本戳，
+ *     同版本内不再重试，杜绝每启动循环）。版本不可得时保守返回 true；
+ *  4) 无偏好且无崩溃标记 → 启用硬件加速（默认保留硬件加速，不牺牲性能）。
  *
  * 注意：本函数保持纯函数（每次从磁盘重读），以便既有状态机测试可重复调用；
  * 启动决策仅由 recordBootDecision() 在 index.ts 顶层缓存一次，供 requestSelfHeal 使用。
@@ -166,9 +186,17 @@ export function shouldDisableHardwareAcceleration(): boolean {
   const pref = readHardwareAccelPref()
   if (pref === false) return true
   const state = readState()
-  if (state.fallbackActive) return true
+  if (state.fallbackActive) {
+    const currentVersion = getCurrentAppVersion()
+    if (!currentVersion) return true // 版本不可得：保守回退，不做重试
+    if (state.fallbackVersion === currentVersion) return true // 同版本已回退/已重试过
+    // 版本升级（或旧格式无戳）：记录本次重试并保留硬件加速
+    writeState({ ...state, fallbackVersion: currentVersion })
+    return false
+  }
   if (state.consecutiveFailures >= FAILURE_THRESHOLD) {
-    writeState({ ...state, fallbackActive: true })
+    const currentVersion = getCurrentAppVersion()
+    writeState({ ...state, fallbackActive: true, fallbackVersion: currentVersion || undefined })
     return true
   }
   return false
@@ -215,11 +243,16 @@ export function markBootSuccess(): void {
 }
 
 /**
- * GPU 子进程崩溃时调用：同步 writeFileSync 落盘回退标记，
- * 抢在 Chromium FATAL 杀死主进程之前完成（使下一次启动即恢复）。
+ * GPU 子进程崩溃时调用：同步 writeFileSync 落盘回退标记（盖当前版本戳，
+ * 使同版本内下次启动直接回退、不触发版本级重试），抢在 Chromium FATAL
+ * 杀死主进程之前完成（使下一次启动即恢复）。
  */
 export function markGpuProcessCrash(reason: string, exitCode: number): void {
-  writeState({ consecutiveFailures: readState().consecutiveFailures, fallbackActive: true })
+  writeState({
+    consecutiveFailures: readState().consecutiveFailures,
+    fallbackActive: true,
+    fallbackVersion: getCurrentAppVersion() || undefined
+  })
   diagLog('GPU', `GPU process gone (reason=${reason} exitCode=${exitCode})，已置软件渲染回退标记`)
 }
 

@@ -15,6 +15,7 @@ const {
   mockRelaunch,
   mockExit,
   mockReleaseLock,
+  mockGetVersion,
   diagLogMock,
   loggerErrorMock,
   loggerWarnMock
@@ -24,6 +25,7 @@ const {
   mockRelaunch: vi.fn(),
   mockExit: vi.fn(),
   mockReleaseLock: vi.fn(),
+  mockGetVersion: vi.fn(),
   diagLogMock: vi.fn(),
   loggerErrorMock: vi.fn(),
   loggerWarnMock: vi.fn()
@@ -35,7 +37,8 @@ vi.mock('electron', () => ({
     on: mockAppOn,
     relaunch: mockRelaunch,
     exit: mockExit,
-    releaseSingleInstanceLock: mockReleaseLock
+    releaseSingleInstanceLock: mockReleaseLock,
+    getVersion: mockGetVersion
   }
 }))
 vi.mock('../../utils/startup-diagnostic', () => ({ diagLog: diagLogMock }))
@@ -54,6 +57,7 @@ beforeEach(() => {
   mockRelaunch.mockReset()
   mockExit.mockReset()
   mockReleaseLock.mockReset()
+  mockGetVersion.mockReset().mockReturnValue('2.5.5')
   diagLogMock.mockReset()
   loggerErrorMock.mockReset()
   loggerWarnMock.mockReset()
@@ -79,10 +83,10 @@ describe('GPU 崩溃自愈完整链路', () => {
     expect(raw.fallbackActive).toBe(true)
   })
 
-  it('2. 下次启动读到标记 → shouldDisableHardwareAcceleration 返回 true（软件渲染）', async () => {
+  it('2. 下次启动读到标记（同版本戳）→ shouldDisableHardwareAcceleration 返回 true（软件渲染）', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'gpu-fallback.json'),
-      JSON.stringify({ consecutiveFailures: 1, fallbackActive: true })
+      JSON.stringify({ consecutiveFailures: 1, fallbackActive: true, fallbackVersion: '2.5.5' })
     )
     const m = await import('../gpu-fallback')
     expect(m.shouldDisableHardwareAcceleration()).toBe(true)
@@ -92,7 +96,7 @@ describe('GPU 崩溃自愈完整链路', () => {
   it('3. 已兼容模式仍崩溃 → requestSelfHeal 不自动重启（防死循环）', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'gpu-fallback.json'),
-      JSON.stringify({ consecutiveFailures: 0, fallbackActive: true })
+      JSON.stringify({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
     )
     const m = await import('../gpu-fallback')
     expect(m.recordBootDecision()).toBe(true) // 本次已进入兼容模式
