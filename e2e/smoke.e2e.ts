@@ -20,7 +20,11 @@ import {
 declare global {
   interface Window {
     electronAPI?: {
-      app: { getVersion: () => Promise<string> }
+      app: {
+        getVersion: () => Promise<string>
+        /** GPU 状态只读探针（app:gpu-status，2026-10-24 硬件加速优化新增） */
+        getGpuStatus?: () => Promise<unknown>
+      }
       uiTheme: { get: () => Promise<{ theme: string }> }
       scanner?: unknown
       media?: unknown
@@ -131,5 +135,37 @@ test.describe('打包产物冒烟（win-unpacked）', () => {
     // --user-data-dir 为 Chromium 稳定开关；显式断言防止参数语义变化静默失效（计划 §7.2）
     const userData = await launched!.app.evaluate(({ app }) => app.getPath('userData'))
     expect(userData).toBe(launched!.userDataDir)
+  })
+
+  test('S8 GPU 状态探针：app:gpu-status 结构齐备且硬件加速默认开启', async () => {
+    const raw = await win.evaluate(() => window.electronAPI?.app?.getGpuStatus?.())
+    // 结构断言（字段契约见 docs/IPC_CONTRACT.md §12）
+    expect(raw).toBeTruthy()
+    const s = raw as {
+      hardwareAcceleration: { enabled: boolean; reason: string }
+      fallback: unknown
+      discretePreference: unknown
+      featureStatus: unknown
+      gpus: unknown
+      activeGpu: unknown
+      electronVersion: string
+      platform: string
+    }
+    expect(typeof s.hardwareAcceleration?.enabled).toBe('boolean')
+    expect(typeof s.hardwareAcceleration?.reason).toBe('string')
+    expect(s.fallback).toBeTruthy()
+    expect(s.discretePreference).toBeTruthy()
+    // 全新临时 userData 无回退标记 → 硬件加速必须默认开启。该断言与机器有无独显无关：
+    // CI 无 GPU 环境下 Electron 默认也不禁用（SwiftShader 仅体现在 featureStatus 取值上）
+    expect(s.hardwareAcceleration.enabled).toBe(true)
+    // 只观测不断言具体值：CI SwiftShader 与独显机的取值本来就不同，输出供人工复核
+    expect(['object', 'null']).toContain(typeof s.featureStatus)
+    expect(['object', 'null']).toContain(typeof s.gpus)
+    expect(['string', 'null']).toContain(typeof s.activeGpu)
+    process.stdout.write(`[gpu] reason=${s.hardwareAcceleration.reason}\n`)
+    process.stdout.write(`[gpu] activeGpu=${JSON.stringify(s.activeGpu)}\n`)
+    process.stdout.write(
+      `[gpu] featureStatus=${JSON.stringify(s.featureStatus)} gpus=${JSON.stringify(s.gpus)}\n`
+    )
   })
 })

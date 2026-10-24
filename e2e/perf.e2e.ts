@@ -394,6 +394,47 @@ test.describe.serial('性能基准回归（@perf，win-unpacked）', () => {
     for (const line of workerDegraded.samples) process.stdout.write(`  ↳ ${line}\n`)
   })
 
+  test('P9b 图库滚动帧间隔采样（渲染流畅度观测，暂不设硬护栏）', async () => {
+    // rAF 连续采样 3s，期间持续滚动图库（window.scrollBy + 中心元素 wheel，覆盖
+    // 虚拟列表的两种滚动容器）。帧间隔 P95 反映合成器/主线程卡顿；
+    // 硬件加速开启时应显著低于软件渲染。CI SwiftShader 帧率失真，故先只采样
+    // 落盘与基线固化，不进硬护栏（取舍记录于 docs/plans/2026-10-24-gpu-hwaccel-optimization.md）
+    const scroll = await win.evaluate(async () => {
+      const intervals: number[] = []
+      let last = performance.now()
+      const endAt = performance.now() + 3_000
+      await new Promise<void>((resolve) => {
+        const tick = (): void => {
+          const now = performance.now()
+          intervals.push(now - last)
+          last = now
+          window.scrollBy(0, 240)
+          const el = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2)
+          el?.dispatchEvent(new WheelEvent('wheel', { deltaY: 240, deltaMode: 0, bubbles: true }))
+          if (now < endAt) requestAnimationFrame(tick)
+          else resolve()
+        }
+        requestAnimationFrame(tick)
+      })
+      intervals.sort((a, b) => a - b)
+      const pick = (q: number): number =>
+        intervals.length > 0
+          ? intervals[Math.min(intervals.length - 1, Math.floor(intervals.length * q))]
+          : 0
+      return { frames: intervals.length, p95: pick(0.95), median: pick(0.5) }
+    })
+    samples.push({
+      id: 'gallery-scroll-frame-p95',
+      scenario: '图库滚动帧间隔 P95（越低越流畅）',
+      value: scroll.p95,
+      unit: 'ms',
+      detail: `3s 采样 ${scroll.frames} 帧，中位 ${Math.round(scroll.median)}ms（观测指标，未设硬护栏，待基线固化）`
+    })
+    process.stdout.write(
+      `[perf] 图库滚动: ${scroll.frames} 帧 / 3s，帧间隔 p95=${Math.round(scroll.p95)}ms median=${Math.round(scroll.median)}ms\n`
+    )
+  })
+
   test('P10 基线对比与回归判定', async () => {
     const baseline = await loadBaseline()
     const violations = evaluateSamples(samples, baseline, perfEnv)
