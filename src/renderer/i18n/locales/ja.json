@@ -1703,7 +1703,10 @@
       "restartNow": "今すぐ再起動",
       "restartLater": "後で",
       "description": "アプリ起動時の自動動作設定",
-      "title": "起動動作"
+      "title": "起動動作",
+      "discreteGpu": "ディスクリートGPUを優先",
+      "discreteGpuDesc": "マルチGPU環境では高性能なディスクリートGPUに画面と画像の描画を任せます（再起動後に有効）",
+      "discreteGpuRestartHint": "ディスクリートGPU設定を保存しました。再起動後に有効になります。今すぐ再起動しますか？"
     },
     "theme": {
       "desc": "切り替え後即時反映、テーマ設定はローカル設定に自動保存されます。",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "画像の読み込みに失敗しました：{{src}}",
     "syncEnabled": "同期サービスを有効にしました",
-    "syncDisabled": "同期サービスを無効にしました"
+    "syncDisabled": "同期サービスを無効にしました",
+    "gpuDiscreteOn": "ディスクリートGPUを優先しました（再起動後に有効）",
+    "gpuDiscreteOff": "システムのGPU選択に従うよう切り替えました（再起動後に有効）"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference は auto または high-performance である必要があります"
       },
       "validation": {
         "keyRequired": "",

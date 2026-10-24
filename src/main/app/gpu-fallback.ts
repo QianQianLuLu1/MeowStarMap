@@ -123,42 +123,81 @@ function writeState(state: GpuFallbackState): void {
 
 /**
  * 用户偏好镜像 userData/gpu-pref.json：
- * 仅含 { hardwareAcceleration: boolean }，供 whenReady 前同步读取，
- * 因为 sqlite 业务库在 whenReady 后才初始化、启动期无法读库。
- * 与 app_settings.hardwareAcceleration 由 settings:set 双写保持一致。
+ * { hardwareAcceleration?: boolean, discretePreference?: 'auto' | 'high-performance' }，
+ * 供 whenReady 前同步读取（sqlite 业务库在 whenReady 后才初始化、启动期无法读库）。
+ * 与 app_settings 对应键由 settings:set 双写保持一致；两个写入口互不覆盖对方字段。
  */
 function getHardwareAccelPrefPath(): string {
   return path.join(app.getPath('userData'), 'gpu-pref.json')
 }
 
-/** 读取用户偏好；文件不存在/损坏/字段非布尔 → undefined（等同未设置） */
-export function readHardwareAccelPref(): boolean | undefined {
+/** 独显偏好合法值域（与 gpu-preference.ts 的 GpuPreferenceMode 对齐） */
+export type GpuDiscretePreference = 'auto' | 'high-performance'
+
+function isGpuDiscretePreference(v: unknown): v is GpuDiscretePreference {
+  return v === 'auto' || v === 'high-performance'
+}
+
+/** 读取完整启动偏好镜像；文件不存在/损坏/字段非法的字段落 undefined */
+export function readGpuBootPrefs(): {
+  hardwareAcceleration?: boolean
+  discretePreference?: GpuDiscretePreference
+} {
   try {
     const p = getHardwareAccelPrefPath()
-    if (!fs.existsSync(p)) return undefined
+    if (!fs.existsSync(p)) return {}
     const raw = JSON.parse(fs.readFileSync(p, 'utf8')) as {
       hardwareAcceleration?: unknown
+      discretePreference?: unknown
     }
-    const v = raw?.hardwareAcceleration
-    return typeof v === 'boolean' ? v : undefined
+    return {
+      hardwareAcceleration:
+        typeof raw?.hardwareAcceleration === 'boolean' ? raw.hardwareAcceleration : undefined,
+      discretePreference: isGpuDiscretePreference(raw?.discretePreference)
+        ? raw.discretePreference
+        : undefined
+    }
   } catch {
-    return undefined
+    return {}
   }
 }
 
+/** 读取硬件加速偏好；文件不存在/损坏/字段非布尔 → undefined（等同未设置） */
+export function readHardwareAccelPref(): boolean | undefined {
+  return readGpuBootPrefs().hardwareAcceleration
+}
+
+/** 就地合并写入偏好镜像（保留未涉及字段），失败静默 */
+function mergeWriteGpuBootPrefs(patch: {
+  hardwareAcceleration?: boolean
+  discretePreference?: GpuDiscretePreference
+}): void {
+  try {
+    const current = readGpuBootPrefs()
+    fs.writeFileSync(getHardwareAccelPrefPath(), JSON.stringify({ ...current, ...patch }))
+  } catch {
+    // 静默降级，不影响主流程
+  }
+}
+
+/** 写入独显偏好镜像（保留 hardwareAcceleration 字段） */
+export function writeGpuDiscretePref(value: GpuDiscretePreference): void {
+  mergeWriteGpuBootPrefs({ discretePreference: value })
+}
+
 /**
- * 写入用户偏好镜像；value===true 时一并复位崩溃自愈标记 fallbackActive，
+ * 写入硬件加速偏好镜像；value===true 时一并复位崩溃自愈标记 fallbackActive，
  * 给用户一次干净的硬件加速重试机会（仍由真实崩溃观测兜底）。
  */
 export function writeHardwareAccelPref(value: boolean): void {
-  try {
-    fs.writeFileSync(getHardwareAccelPrefPath(), JSON.stringify({ hardwareAcceleration: value }))
-    if (value === true) {
+  mergeWriteGpuBootPrefs({ hardwareAcceleration: value })
+  if (value === true) {
+    try {
       const state = readState()
       if (state.fallbackActive) writeState({ ...state, fallbackActive: false })
+    } catch {
+      // 静默降级，不影响主流程
     }
-  } catch {
-    // 静默降级，不影响主流程
   }
 }
 

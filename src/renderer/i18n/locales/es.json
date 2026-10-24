@@ -1703,7 +1703,10 @@
       "restartNow": "Reiniciar ahora",
       "restartLater": "Más tarde",
       "description": "Configuración de comportamiento automático al iniciar la aplicación",
-      "title": "Comportamiento de inicio"
+      "title": "Comportamiento de inicio",
+      "discreteGpu": "Preferir GPU dedicada",
+      "discreteGpuDesc": "En equipos con varias GPU, la GPU dedicada de alto rendimiento se encarga del renderizado de la interfaz y las imágenes (surte efecto tras reiniciar)",
+      "discreteGpuRestartHint": "La preferencia de GPU dedicada se ha guardado y surte efecto tras reiniciar. ¿Reiniciar ahora?"
     },
     "theme": {
       "desc": "Surte efecto inmediatamente; la preferencia de tema se guarda automáticamente en la configuración local.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "Error al cargar la imagen: {{src}}",
     "syncEnabled": "Servicio de sincronización activado",
-    "syncDisabled": "Servicio de sincronización desactivado"
+    "syncDisabled": "Servicio de sincronización desactivado",
+    "gpuDiscreteOn": "GPU dedicada preferida (surte efecto tras reiniciar)",
+    "gpuDiscreteOff": "Cambiado a la selección de GPU del sistema (surte efecto tras reiniciar)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference debe ser auto o high-performance"
       },
       "validation": {
         "keyRequired": "",

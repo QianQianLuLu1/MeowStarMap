@@ -245,3 +245,79 @@ describe('settings:set customScanPaths — userPicked 短路', () => {
     expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
   })
 })
+
+// ============================================================================
+// gpu.discretePreference — 独显优先偏好（gpu-pref.json 镜像双写）
+// ============================================================================
+
+describe('settings:set gpu.discretePreference — 值域校验与镜像双写', () => {
+  // 上一 describe 的 afterAll 已删除其临时目录，这里自建独立目录
+  beforeAll(() => {
+    tmpUserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-pref2-'))
+    mockAppGetPath.mockImplementation((name: string) => (name === 'userData' ? tmpUserDir : ''))
+  })
+
+  afterAll(() => {
+    fs.rmSync(tmpUserDir, { recursive: true, force: true })
+  })
+
+  beforeEach(() => {
+    handleMock.mockClear()
+    const pref = path.join(tmpUserDir, 'gpu-pref.json')
+    if (fs.existsSync(pref)) fs.rmSync(pref, { force: true })
+  })
+
+  it('d1: 合法值 high-performance 持久化并双写到 gpu-pref.json（保留 hardwareAcceleration）', async () => {
+    fs.writeFileSync(
+      path.join(tmpUserDir, 'gpu-pref.json'),
+      JSON.stringify({ hardwareAcceleration: true })
+    )
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['gpu.discretePreference', 'high-performance'])) as {
+      success: true
+      data: { saved: boolean }
+    }
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(
+      'gpu.discretePreference',
+      'high-performance'
+    )
+    expect(result.data.saved).toBe(true)
+    const pref = JSON.parse(fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')) as {
+      hardwareAcceleration: boolean
+      discretePreference: string
+    }
+    expect(pref.discretePreference).toBe('high-performance')
+    expect(pref.hardwareAcceleration).toBe(true) // 不互相覆盖
+  })
+
+  it('d2: 合法值 auto 同样放行', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['gpu.discretePreference', 'auto'])) as { success: boolean }
+    expect(result.success).toBe(true)
+    const pref = JSON.parse(fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')) as {
+      discretePreference: string
+    }
+    expect(pref.discretePreference).toBe('auto')
+  })
+
+  it('d3: 非法值（foo / 数组 / undefined）→ 被拒且不写镜像', async () => {
+    registerSettingsHandlers(makeCtx({}))
+    for (const bad of ['foo', ['high-performance'], undefined, 2]) {
+      const result = (await getHandler(
+        handleMock,
+        'settings:set'
+      )(['gpu.discretePreference', bad])) as { success: boolean; error?: { code: string } }
+      expect(result.success).toBe(false)
+      expect(result.error?.code).toBe('IPC_VALIDATION_ERROR')
+    }
+    expect(fs.existsSync(path.join(tmpUserDir, 'gpu-pref.json'))).toBe(false)
+  })
+})

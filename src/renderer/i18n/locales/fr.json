@@ -1703,7 +1703,10 @@
       "restartNow": "Redémarrer maintenant",
       "restartLater": "Plus tard",
       "description": "Configuration des comportements automatiques au démarrage de l'application",
-      "title": "Démarrage"
+      "title": "Démarrage",
+      "discreteGpu": "Préférer le GPU dédié",
+      "discreteGpuDesc": "Sur les machines multi-GPU, le GPU dédié haute performance gère le rendu de l'interface et des images (actif après redémarrage)",
+      "discreteGpuRestartHint": "La préférence de GPU dédié est enregistrée et sera active après redémarrage. Redémarrer maintenant ?"
     },
     "theme": {
       "desc": "Prend effet immédiatement ; la préférence de thème est sauvegardée automatiquement dans la config locale.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "Échec du chargement de l'image : {{src}}",
     "syncEnabled": "Service de synchronisation activé",
-    "syncDisabled": "Service de synchronisation désactivé"
+    "syncDisabled": "Service de synchronisation désactivé",
+    "gpuDiscreteOn": "GPU dédié privilégié (actif après redémarrage)",
+    "gpuDiscreteOff": "Sélection du GPU laissée au système (actif après redémarrage)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference doit être auto ou high-performance"
       },
       "validation": {
         "keyRequired": "",

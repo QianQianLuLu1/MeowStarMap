@@ -1703,7 +1703,10 @@
       "restartNow": "Перезапустить сейчас",
       "restartLater": "Позже",
       "description": "Конфигурация автоматического поведения при запуске приложения",
-      "title": "Поведение при запуске"
+      "title": "Поведение при запуске",
+      "discreteGpu": "Предпочитать дискретный GPU",
+      "discreteGpuDesc": "На компьютерах с несколькими GPU рендеринг интерфейса и изображений берёт на себя производительный дискретный GPU (действует после перезапуска)",
+      "discreteGpuRestartHint": "Настройка сохранена и вступит в силу после перезапуска. Перезапустить сейчас?"
     },
     "theme": {
       "desc": "Вступает в силу немедленно; предпочтение темы сохраняется автоматически в локальной конфигурации.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "Не удалось загрузить изображение: {{src}}",
     "syncEnabled": "Служба синхронизации включена",
-    "syncDisabled": "Служба синхронизации выключена"
+    "syncDisabled": "Служба синхронизации выключена",
+    "gpuDiscreteOn": "Дискретный GPU выбран приоритетно (действует после перезапуска)",
+    "gpuDiscreteOff": "Переключено на выбор GPU системой (действует после перезапуска)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference должен быть auto или high-performance"
       },
       "validation": {
         "keyRequired": "",

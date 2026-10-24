@@ -1703,7 +1703,10 @@
       "restartNow": "立即重新啟動",
       "restartLater": "稍後重新啟動",
       "description": "應用啟動時的自動行為設定",
-      "title": "啟動行為"
+      "title": "啟動行為",
+      "discreteGpu": "優先使用獨立顯卡",
+      "discreteGpuDesc": "多顯卡裝置上讓高效能獨立顯卡承擔介面與影像渲染（下次啟動生效）",
+      "discreteGpuRestartHint": "獨立顯卡偏好已儲存，將在應用程式重新啟動後生效。是否立即重新啟動？"
     },
     "theme": {
       "desc": "切換後即時生效，主題偏好會自動儲存到本地設定。",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "載入圖片失敗: {{src}}",
     "syncEnabled": "同步服務已啟用",
-    "syncDisabled": "同步服務已關閉"
+    "syncDisabled": "同步服務已關閉",
+    "gpuDiscreteOn": "已優先使用獨立顯卡（重新啟動後生效）",
+    "gpuDiscreteOff": "已切換為跟隨系統 GPU 選擇（重新啟動後生效）"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference 必須是 auto 或 high-performance"
       },
       "validation": {
         "keyRequired": "",

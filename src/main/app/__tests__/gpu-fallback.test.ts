@@ -62,7 +62,9 @@ import {
   markGpuProcessCrash,
   setupGpuProcessWatcher,
   recordBootDecision,
-  requestSelfHeal
+  requestSelfHeal,
+  readGpuBootPrefs,
+  writeGpuDiscretePref
 } from '../gpu-fallback'
 
 let tmpDir: string
@@ -334,5 +336,39 @@ describe('gpu-fallback 版本级自动重试（fallbackVersion）', () => {
     writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.4' })
     mockGetVersion.mockReturnValue('2.5.5')
     expect(shouldDisableHardwareAcceleration()).toBe(true)
+  })
+})
+
+describe('gpu-fallback 启动偏好镜像（gpu-pref.json 扩展字段）', () => {
+  it('p1. readGpuBootPrefs 解析完整镜像；文件缺失/损坏/字段非法 → 相应 undefined', () => {
+    writePref({ hardwareAcceleration: true, discretePreference: 'auto' })
+    expect(readGpuBootPrefs()).toEqual({ hardwareAcceleration: true, discretePreference: 'auto' })
+
+    fs.rmSync(prefPath())
+    expect(readGpuBootPrefs()).toEqual({})
+
+    fs.writeFileSync(prefPath(), 'not-json{{{')
+    expect(readGpuBootPrefs()).toEqual({})
+
+    writePref({ hardwareAcceleration: 'yes', discretePreference: 'foo' })
+    expect(readGpuBootPrefs()).toEqual({})
+  })
+
+  it('p2. writeGpuDiscretePref 写入 discretePreference 且保留 hardwareAcceleration', () => {
+    writePref({ hardwareAcceleration: false })
+    writeGpuDiscretePref('high-performance')
+    expect(readGpuBootPrefs()).toEqual({
+      hardwareAcceleration: false,
+      discretePreference: 'high-performance'
+    })
+  })
+
+  it('p3. writeHardwareAccelPref 保留已有 discretePreference 字段（不互相覆盖）', () => {
+    writePref({ hardwareAcceleration: true, discretePreference: 'auto' })
+    writeHardwareAccelPref(false)
+    expect(readGpuBootPrefs()).toEqual({
+      hardwareAcceleration: false,
+      discretePreference: 'auto'
+    })
   })
 })

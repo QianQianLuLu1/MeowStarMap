@@ -16,6 +16,10 @@ export const RENDERER_PREF_KEYS = [
   'fileOps.batchThresholdEnabled',
   'fileOps.preferSoftDelete',
   'hardwareAcceleration',
+  // 独显优先偏好（'auto' | 'high-performance'，默认 high-performance）：
+  // 消费点 src/main/index.ts 启动早期经 gpu-preference.ts 写 Windows GpuPreference 注册表，
+  // settings:set 内联值域校验 + gpu-pref.json 镜像双写（启动期同步读取）
+  'gpu.discretePreference',
   // sync-integration 阶段4：图库数据源开关（'local' | 'nikkisync'，默认 local）
   // 消费点 src/renderer/pages/GalleryPage.tsx（启动读取）与
   // pages/sync-gallery/SyncServicePage.tsx（写入）

@@ -9,6 +9,7 @@ export const GeneralStartupSection: React.FC = () => {
   const { t } = useTranslation()
   const [autoScan, setAutoScan] = useState(true)
   const [hardwareAccel, setHardwareAccel] = useState(true)
+  const [discreteGpu, setDiscreteGpu] = useState(true)
   const showMessage = useContext(GlobalToastContext)
 
   useEffect(() => {
@@ -18,6 +19,12 @@ export const GeneralStartupSection: React.FC = () => {
       setAutoScan(a)
       const h = (await window.electronAPI.settings.get('hardwareAcceleration', true)) as boolean
       setHardwareAccel(h)
+      // 独显优先：缺省视为 high-performance（默认开启）；仅 'auto' 为关闭态
+      const d = (await window.electronAPI.settings.get(
+        'gpu.discretePreference',
+        'high-performance'
+      )) as string
+      setDiscreteGpu(d !== 'auto')
     }
     load()
   }, [])
@@ -44,6 +51,26 @@ export const GeneralStartupSection: React.FC = () => {
     }
   }
 
+  const saveDiscreteGpu = async (value: boolean) => {
+    setDiscreteGpu(value)
+    if (window.electronAPI)
+      await window.electronAPI.settings.set(
+        'gpu.discretePreference',
+        value ? 'high-performance' : 'auto'
+      )
+    showMessage(value ? t('toast.gpuDiscreteOn') : t('toast.gpuDiscreteOff'))
+    // 注册表偏好由下次启动应用：询问是否立即重启（按钮 0 = 立即重启）
+    if (window.electronAPI?.dialog?.showMessageBox && window.electronAPI?.app?.relaunch) {
+      const response = await window.electronAPI.dialog.showMessageBox({
+        type: 'info',
+        title: t('settings.startup.discreteGpu'),
+        message: t('settings.startup.discreteGpuRestartHint'),
+        buttons: [t('settings.startup.restartNow'), t('settings.startup.restartLater')]
+      })
+      if (response === 0) await window.electronAPI.app.relaunch()
+    }
+  }
+
   return (
     <SectionShell
       title={t('settings.sections.startup')}
@@ -62,6 +89,14 @@ export const GeneralStartupSection: React.FC = () => {
         description={t('settings.startup.hardwareAccelerationDesc')}
         checked={hardwareAccel}
         onChange={(value) => void saveHardwareAccel(value)}
+      />
+
+      {/* 独显优先（Windows 混合显卡）：写系统 GPU 首选项让独显承担渲染负载，下次启动生效 */}
+      <SettingsToggle
+        label={t('settings.startup.discreteGpu')}
+        description={t('settings.startup.discreteGpuDesc')}
+        checked={discreteGpu}
+        onChange={(value) => void saveDiscreteGpu(value)}
       />
     </SectionShell>
   )

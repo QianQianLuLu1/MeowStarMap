@@ -13,7 +13,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
-import { GeneralFileOpsSection } from './general-sections'
+import { GeneralFileOpsSection, GeneralStartupSection } from './general-sections'
 import { GlobalToastContext } from './shared'
 
 const mockShowMessage = vi.fn()
@@ -112,5 +112,35 @@ describe('GeneralFileOpsSection — 批量操作阈值', () => {
       expect(screen.getByRole('switch', { name: '批量操作阈值' })).toBeInTheDocument()
     )
     expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+  })
+})
+
+describe('GeneralStartupSection — 独显优先开关', () => {
+  it('(正常) 读取 auto 偏好 → 关闭态；点击后提交 high-performance', async () => {
+    installElectronApi({ 'gpu.discretePreference': 'auto' })
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <GeneralStartupSection />
+      </GlobalToastContext.Provider>
+    )
+    const sw = await screen.findByRole('switch', { name: '优先使用独立显卡' })
+    expect(sw).not.toBeChecked()
+    fireEvent.click(sw)
+    await waitFor(() =>
+      expect(settingsSet).toHaveBeenCalledWith('gpu.discretePreference', 'high-performance')
+    )
+  })
+
+  it('(边界) 无持久化值时默认开启（high-performance，点击切回 auto）', async () => {
+    installElectronApi({})
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <GeneralStartupSection />
+      </GlobalToastContext.Provider>
+    )
+    const sw = await screen.findByRole('switch', { name: '优先使用独立显卡' })
+    expect(sw).toBeChecked()
+    fireEvent.click(sw)
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('gpu.discretePreference', 'auto'))
   })
 })

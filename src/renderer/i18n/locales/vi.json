@@ -1703,7 +1703,10 @@
       "restartNow": "Khởi động lại ngay",
       "restartLater": "Để sau",
       "description": "Cấu hình hành vi tự động khi khởi động ứng dụng",
-      "title": "Hành vi khởi động"
+      "title": "Hành vi khởi động",
+      "discreteGpu": "Ưu tiên GPU rời",
+      "discreteGpuDesc": "Trên máy có nhiều GPU, GPU rời hiệu năng cao đảm nhận kết xuất giao diện và hình ảnh (có hiệu lực sau khi khởi động lại)",
+      "discreteGpuRestartHint": "Đã lưu tùy chọn GPU rời và sẽ có hiệu lực sau khi khởi động lại. Khởi động lại ngay?"
     },
     "theme": {
       "desc": "Có hiệu lực ngay lập tức; tùy chọn chủ đề được lưu tự động trong cấu hình cục bộ.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "Không tải được ảnh: {{src}}",
     "syncEnabled": "Đã bật dịch vụ đồng bộ",
-    "syncDisabled": "Đã tắt dịch vụ đồng bộ"
+    "syncDisabled": "Đã tắt dịch vụ đồng bộ",
+    "gpuDiscreteOn": "Đã ưu tiên GPU rời (hiệu lực sau khi khởi động lại)",
+    "gpuDiscreteOff": "Đã chuyển sang lựa chọn GPU của hệ thống (hiệu lực sau khi khởi động lại)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "Giá trị phải là auto hoặc high-performance"
       },
       "validation": {
         "keyRequired": "",

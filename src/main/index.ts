@@ -13,8 +13,10 @@ import {
   markBootAttempt,
   setupGpuProcessWatcher,
   requestSelfHeal,
-  wasBootInCompatMode
+  wasBootInCompatMode,
+  readGpuBootPrefs
 } from './app/gpu-fallback'
+import { applyDiscreteGpuPreference } from './app/gpu-preference'
 import { initExitForensics, markExitStage } from './app/exit-forensics'
 import { installFfmpegSpawnGuard } from './utils/fluent-ffmpeg-shim'
 import { t } from './i18n'
@@ -97,6 +99,15 @@ if (recordBootDecision()) {
   } catch {
     // electronLogger 未就绪时仅依赖 diagLog
   }
+}
+
+// 独显优先（Windows 混合显卡）：按启动偏好镜像写 HKCU UserGpuPreferences 的
+// GpuPreference=2（默认 high-performance，仅打包版，对下次启动生效；'auto' 时仅
+// 清理我们写入过的自有格式值）。内部全程 fail-open，失败只记日志不影响启动。
+try {
+  void applyDiscreteGpuPreference(readGpuBootPrefs().discretePreference)
+} catch {
+  // 偏好读取/应用异常绝不阻塞启动
 }
 
 // 注册自定义协议，使渲染进程可以安全访问本地媒体文件

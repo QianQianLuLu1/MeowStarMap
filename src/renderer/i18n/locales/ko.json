@@ -1703,7 +1703,10 @@
       "restartNow": "지금 재시작",
       "restartLater": "나중에",
       "description": "앱 시작 시 자동 동작 설정",
-      "title": "시작 동작"
+      "title": "시작 동작",
+      "discreteGpu": "독립 그래픽 카드 우선",
+      "discreteGpuDesc": "듀얼 그래픽 환경에서 고성능 독립 그래픽 카드가 화면 및 이미지 렌더링을 담당합니다(재시작 후 적용)",
+      "discreteGpuRestartHint": "독립 그래픽 카드 설정이 저장되었으며 재시작 후 적용됩니다. 지금 재시작할까요?"
     },
     "theme": {
       "desc": "전환 후 즉시 적용, 테마 설정은 로컬 설정에 자동 저장됩니다.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "이미지 불러오기에 실패했습니다: {{src}}",
     "syncEnabled": "동기화 서비스가 사용 설정되었습니다",
-    "syncDisabled": "동기화 서비스가 중지되었습니다"
+    "syncDisabled": "동기화 서비스가 중지되었습니다",
+    "gpuDiscreteOn": "독립 그래픽 카드를 우선 사용합니다(재시작 후 적용)",
+    "gpuDiscreteOff": "시스템 GPU 선택을 따르도록 전환했습니다(재시작 후 적용)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference 값은 auto 또는 high-performance여야 합니다"
       },
       "validation": {
         "keyRequired": "",

@@ -2111,6 +2111,9 @@
       "hardwareAcceleration": "GPU 硬件加速",
       "hardwareAccelerationDesc": "关闭后改用软件渲染，可规避部分显卡导致的启动崩溃。修改后需重启应用生效。",
       "hardwareAccelerationRestartHint": "GPU 硬件加速设置已保存，需要重启应用才能生效。是否立即重启？",
+      "discreteGpu": "优先使用独立显卡",
+      "discreteGpuDesc": "多显卡设备上让高性能独立显卡承担界面与图像渲染（下次启动生效）",
+      "discreteGpuRestartHint": "独立显卡偏好已保存，将在应用重启后生效。是否立即重启？",
       "restartNow": "立即重启",
       "restartLater": "稍后重启"
     },
@@ -2255,6 +2258,8 @@
     "autoScanOn": "已开启启动时自动扫描",
     "gpuOff": "已关闭 GPU 硬件加速（重启后生效）",
     "gpuOn": "已开启 GPU 硬件加速（重启后生效）",
+    "gpuDiscreteOn": "已优先使用独立显卡（重启后生效）",
+    "gpuDiscreteOff": "已切换为跟随系统 GPU 选择（重启后生效）",
     "batchDelete": {
       "allSucceeded": "已将 {{count}} 个文件移至回收站",
       "missingFile": "找不到该文件的记录（id: {{id}}）",
@@ -3422,6 +3427,7 @@
         "valueTooLarge": "设置值过大（上限 1MB）",
         "valueNotSerializable": "设置值无法序列化",
         "hwAccelNotBoolean": "hardwareAcceleration 必须是布尔值",
+        "gpuPreferenceInvalid": "gpu.discretePreference 必须是 auto 或 high-performance",
         "securitySensitiveKey": "key \"{{key}}\" 为安全敏感项，请改用通道：{{channel}}",
         "unknownKey": "未知的设置项 key：{{key}}"
       },

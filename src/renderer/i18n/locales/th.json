@@ -1703,7 +1703,10 @@
       "restartNow": "รีสตาร์ทเลย",
       "restartLater": "ไว้ทีหลัง",
       "description": "การกำหนดค่าพฤติกรรมอัตโนมัติเมื่อเริ่มต้นแอปพลิเคชัน",
-      "title": "พฤติกรรมการเริ่มต้น"
+      "title": "พฤติกรรมการเริ่มต้น",
+      "discreteGpu": "ใช้ GPU แยกเป็นลำดับแรก",
+      "discreteGpuDesc": "บนเครื่องที่มีหลาย GPU ให้ GPU แยกประสิทธิภาพสูงรับผิดชอบการเรนเดอร์หน้าจอและรูปภาพ (มีผลหลังรีสตาร์ท)",
+      "discreteGpuRestartHint": "บันทึกการตั้งค่าแล้วและจะมีผลหลังรีสตาร์ท รีสตาร์ทตอนนี้หรือไม่?"
     },
     "theme": {
       "desc": "มีผลทันที; ค่ากำหนดธีมจะถูกบันทึกอัตโนมัติในการกำหนดค่าในเครื่อง",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "โหลดรูปภาพไม่สำเร็จ: {{src}}",
     "syncEnabled": "เปิดใช้บริการซิงค์แล้ว",
-    "syncDisabled": "ปิดบริการซิงค์แล้ว"
+    "syncDisabled": "ปิดบริการซิงค์แล้ว",
+    "gpuDiscreteOn": "ใช้ GPU แยกเป็นลำดับแรกแล้ว (มีผลหลังรีสตาร์ท)",
+    "gpuDiscreteOff": "สลับเป็นการเลือก GPU ตามระบบแล้ว (มีผลหลังรีสตาร์ท)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "ค่าต้องเป็น auto หรือ high-performance"
       },
       "validation": {
         "keyRequired": "",

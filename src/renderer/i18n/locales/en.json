@@ -1703,7 +1703,10 @@
       "restartNow": "Restart now",
       "restartLater": "Later",
       "description": "Automatic behaviors on app startup",
-      "title": "Startup"
+      "title": "Startup",
+      "discreteGpu": "Prefer discrete GPU",
+      "discreteGpuDesc": "On multi-GPU systems, the high-performance discrete GPU handles interface and image rendering (takes effect after restart)",
+      "discreteGpuRestartHint": "The discrete GPU preference is saved and takes effect after restart. Restart now?"
     },
     "theme": {
       "desc": "Takes effect immediately; theme preference is auto-saved to local config.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "Failed to load image: {{src}}",
     "syncEnabled": "Sync service enabled",
-    "syncDisabled": "Sync service disabled"
+    "syncDisabled": "Sync service disabled",
+    "gpuDiscreteOn": "Discrete GPU preferred (takes effect after restart)",
+    "gpuDiscreteOff": "Switched to system GPU selection (takes effect after restart)"
   },
   "video": {
     "applyEdit": "Apply and export",
@@ -3423,7 +3428,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference must be auto or high-performance"
       },
       "validation": {
         "keyRequired": "",

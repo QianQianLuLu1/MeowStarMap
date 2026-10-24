@@ -1703,7 +1703,10 @@
       "restartNow": "Jetzt neu starten",
       "restartLater": "Später",
       "description": "Automatische Verhaltenskonfiguration beim App-Start",
-      "title": "Startverhalten"
+      "title": "Startverhalten",
+      "discreteGpu": "Dedizierte GPU bevorzugen",
+      "discreteGpuDesc": "Auf Mehr-GPU-Systemen übernimmt die leistungsstarke dedizierte GPU die Oberflächen- und Bildwiedergabe (wirkt nach Neustart)",
+      "discreteGpuRestartHint": "Die Einstellung zur dedizierten GPU ist gespeichert und wird nach dem Neustart wirksam. Jetzt neu starten?"
     },
     "theme": {
       "desc": "Wirkt sofort; Design-Einstellung wird automatisch in lokaler Konfiguration gespeichert.",
@@ -1927,7 +1930,9 @@
     "imageProcessorCanvasFailed": "",
     "imageProcessorLoadFailed": "Bild konnte nicht geladen werden: {{src}}",
     "syncEnabled": "Synchronisierungsdienst aktiviert",
-    "syncDisabled": "Synchronisierungsdienst deaktiviert"
+    "syncDisabled": "Synchronisierungsdienst deaktiviert",
+    "gpuDiscreteOn": "Dedizierte GPU wird bevorzugt (wirkt nach Neustart)",
+    "gpuDiscreteOff": "Auf System-GPU-Auswahl umgestellt (wirkt nach Neustart)"
   },
   "video": {
     "applyEdit": "",
@@ -3417,7 +3422,8 @@
         "valueNotSerializable": "",
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
-        "unknownKey": ""
+        "unknownKey": "",
+        "gpuPreferenceInvalid": "gpu.discretePreference muss auto oder high-performance sein"
       },
       "validation": {
         "keyRequired": "",

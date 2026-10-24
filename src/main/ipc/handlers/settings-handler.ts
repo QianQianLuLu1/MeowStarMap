@@ -1,12 +1,11 @@
-// @core-change: customScanPaths 短路判据由 isUserPicked 改为 isUserPickedDir，与 scanner:start
-// 同口径——挑中的单个文件不得作为「用户显式授权的扫描根」被持久化
+// @core-change: 新增 gpu.discretePreference 偏好（独显优先）值域校验与启动镜像双写
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerRaw, assertFileReadPath, pathGuard } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { RENDERER_PREF_KEYS, SECURITY_SENSITIVE_KEYS } from '../../../shared/settings-keys'
-import { writeHardwareAccelPref } from '../../app/gpu-fallback'
+import { writeHardwareAccelPref, writeGpuDiscretePref } from '../../app/gpu-fallback'
 import { t } from '../../i18n'
 
 // 与设置页 MAX_CUSTOM_PATHS / scanner:start schema 保持一致
@@ -105,6 +104,16 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           }
           ctx.dbManager.setSetting(key, value)
           writeHardwareAccelPref(value)
+          return { saved: true }
+        }
+        // gpu.discretePreference 走内联值域校验（'auto' | 'high-performance'），
+        // 同样双写启动期镜像（index.ts 在 whenReady 前读镜像应用独显优先注册表）
+        if (key === 'gpu.discretePreference') {
+          if (value !== 'auto' && value !== 'high-performance') {
+            throw AppError.validation(t('main.settings.error.gpuPreferenceInvalid'))
+          }
+          ctx.dbManager.setSetting(key, value)
+          writeGpuDiscretePref(value)
           return { saved: true }
         }
         // 其余 key 必须在普通偏好白名单内；命中敏感 key 时给出专用通道指引
