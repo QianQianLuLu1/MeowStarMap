@@ -122,4 +122,44 @@
 
 ## 8. 执行记录
 
-（执行中追加）
+全部节点按「红灯 → 修改 → 绿灯 → 回归 → 提交」闭环执行（2026-10-24）。
+
+### 各节点红绿证据与提交
+
+| 节点              | 红灯证据                                                                                                                                           | 绿灯证据                                                                                                    | 提交                      |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------- |
+| T0 计划落档       | —                                                                                                                                                  | 文件入仓                                                                                                    | 17f31ee（随 T1 一并提交） |
+| T1 崩溃升级策略   | gpu-selfheal.test.ts 新增 r1–r5 共 5 用例失败（clean-exit 仍落盘 / 运行期单次即回退 / 纯函数缺失）                                                 | 28/28 全绿（含旧用例 9 按新语义更新为窗口内两次升级）                                                       | 17f31ee                   |
+| T2 版本级重试     | gpu-fallback.test.ts v1/v3/v5/v6 共 4 用例失败（旧版本戳仍禁用 / 崩溃不盖戳）                                                                      | 35/35 全绿（旧用例 3/7/c 补同版本戳适配新语义）                                                             | 6a6d644                   |
+| T3 独显优先       | gpu-preference.test.ts 整文件失败（模块缺失）+ settings-handler d1/d2 失败（键不在白名单）+ 镜像 p1–p3 失败 + general-sections 独显开关 2 用例失败 | gpu-preference 11+2、settings-handler 16、gpu-fallback 27、general-sections 6 全绿；i18n 6 键 × 12 语言同步 | 独立 commit（22 文件）    |
+| T4 GPU 状态可观测 | gpu-status.test.ts 整文件失败 + gpu-fallback q1–q3 失败 + gpu-preference g1/g2 失败 + app-handler gpu-status 通道用例失败                          | 66/66 全绿（5 测试文件）                                                                                    | 独立 commit（13 文件）    |
+| T5 诊断面板       | diagnostics-sections.test.ts 3 用例失败（组件不存在）                                                                                              | 25/25 全绿（含 SettingsPage 导航 17→18、卡片守卫 10→16 语义更新）；i18n 30 键 × 12 语言                     | 570b492                   |
+| T6 e2e 扩展       | **旧打包产物上 e2e:smoke：15 passed / 仅 S8 failed**（getGpuStatus 不存在，真红灯）                                                                | 新产物 16/16 全绿（S8 ok）                                                                                  | 1a05780                   |
+
+### 全量回归（T7）
+
+- `npm run verify` 全绿；`npm test` 全量 **6785 passed / 12 skipped / 0 failed**（440 文件）。
+- `npm run typecheck`、`npm run typecheck:e2e`、`npm run lint`、`npm run i18n:guard`、`npm run i18n:check` 全部通过。
+- `npm run dist:win` 四段打包链通过（管理员清单闸门 + 解包产物校验全绿）。
+- `npm run e2e:smoke`（新产物）：**16 passed**，S8 GPU 探针转绿。
+- `npm run e2e:perf`（新产物）：全部通过、无基线回归；新增指标「图库滚动帧间隔 P95 = 6ms（3s 采样 537 帧，中位 6ms）」；冷启动 831ms、扫描吞吐 1962.5 项/s、首图显影 120ms（报告存 `.cache/perf/perf-run-2026-10-24T08-24-11-309Z.json`）。
+- mimosa 安全扫描（normal 深度，scan-2026-10-24T08-28-06）：全仓 398 项静态发现，**findings.json 零命中本次 GPU 改动文件**（gpu-fallback / gpu-preference / gpu-status 及相关 handler/组件），无新增安全问题。
+
+### 独显实机验证结果（执行机：RTX 5070 + 多显卡）
+
+S8 探针实测输出（打包产物、全新临时 userData）：
+
+- `hardwareAcceleration = { enabled: true, reason: 'default' }` —— 默认开启硬件加速 ✓
+- `activeGpu = "ANGLE (NVIDIA, NVIDIA GeForce RTX 5070 (0x00002F04) Direct3D11 vs_5_0 ps_5_0, D3D11-32.0.16.2101)"` —— 活动显卡为**高性能独显** ✓
+- `featureStatus`：`2d_canvas / gpu_compositing / rasterization / video_decode / video_encode / webgl / webgpu` 全部 `enabled(_on)` —— 合成、Canvas、视频编解码、WebGL 均硬件加速 ✓
+- `gpus` 检出 4 项（1 active + 3 inactive）—— 多显卡拓扑可见 ✓
+
+### 行为对比结论（优化前 → 优化后）
+
+| 场景                            | 优化前                                          | 优化后                                                                |
+| ------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------- |
+| 运行期 GPU 进程单次瞬时崩溃     | 立即落盘回退标记 + 自动重启进软件渲染，**永久** | 仅告警，Chromium 自行重启 GPU 进程，硬件加速保持；60s 内第 2 次才回退 |
+| GPU 进程 clean-exit（正常退出） | 同样触发回退（误判源之一）                      | 一律忽略                                                              |
+| 崩溃回退后的恢复                | 仅用户手删文件 / 重开开关                       | 应用升级后自动重试一次；手动路径保留                                  |
+| 混合显卡设备 GPU 分派           | 无干预（常落集显）                              | 默认写 GpuPreference=2 优先独显（仅打包版，可切回跟随系统）           |
+| 可观测性                        | 仅崩溃日志                                      | GPU 状态卡 + 启动摘要日志 + app:gpu-status 探针 + e2e S8 门禁         |
