@@ -128,7 +128,8 @@ export async function collectGpuStatus(deps: GpuStatusDeps = {}): Promise<GpuSta
     try {
       parsed = parseGpuInfo(await withTimeout(getGpuInfo('complete'), timeoutMs))
     } catch {
-      parsed = parseGpuInfo(await getGpuInfo('basic'))
+      // basic 同样套超时：两档都挂起时探针收敛 null，绝不永久挂起（fail-open 契约）
+      parsed = parseGpuInfo(await withTimeout(getGpuInfo('basic'), timeoutMs))
     }
   } catch {
     // GPU 信息整体不可得（如软件回退态）：保持 null

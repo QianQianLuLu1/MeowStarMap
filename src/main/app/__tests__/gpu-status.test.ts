@@ -137,6 +137,32 @@ describe('collectGpuStatus（注入式依赖）', () => {
     })
     expect(s.discretePreference.mode).toBe('high-performance')
   })
+
+  it('s7. complete 抛错且 basic 挂起 → gpuInfoTimeoutMs 超时后收敛 null，探针不永久挂起', async () => {
+    const sentinel = '__hang__'
+    const result = await Promise.race([
+      collectGpuStatus({
+        classify: () => ({ enabled: true, reason: 'default' }),
+        readFallbackState: () => ({ active: false, consecutiveFailures: 0, fallbackVersion: null }),
+        getFeatureStatus: () => null,
+        getGpuInfo: (mode) =>
+          mode === 'complete'
+            ? Promise.reject(new Error('unavailable in software mode'))
+            : new Promise<never>(() => {}), // basic 永不 resolve（挂起）
+        getPreference: () => ({ mode: 'high-performance', registry: 'set' }),
+        electronVersion: () => '41.0.0',
+        platform: 'win32',
+        gpuInfoTimeoutMs: 10
+      }),
+      // 哨兵：1s 后先到即证明 collectGpuStatus 永久挂起（fail-open 契约被破坏）
+      new Promise<typeof sentinel>((resolve) => setTimeout(() => resolve(sentinel), 1_000))
+    ])
+    if (result === sentinel) {
+      throw new Error('collectGpuStatus 永久挂起：basic 降级查询缺超时兜底')
+    }
+    expect(result.gpus).toBeNull()
+    expect(result.activeGpu).toBeNull()
+  })
 })
 
 describe('buildGpuStatusSummaryLine（启动日志摘要）', () => {
