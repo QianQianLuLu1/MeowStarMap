@@ -342,6 +342,41 @@ suite('完整生命周期（真上游对象，验证退出链）', () => {
   }, 30000)
 })
 
+suite('同一库文件二次 createRuntimeSession 重开（兼容层 C3-3：老库零迁移升级路径）', () => {
+  it('重开后表清单与首次一致、schema_migrations 可读且版本为 1（零迁移执行）', async () => {
+    // 证明目标：既有 {userData}/nikkisync/nikkisync.db 用户在链接从 d4ca7d7 升到 b422193 后
+    // 重开应用，上游 migrations 零变化（仍仅 0001_initial.sql、schema_migrations 已登记版本 1），
+    // 重开必须零迁移执行、零异常、表形不变——本仓无需任何迁移适配（02 计划 C3）。
+    const reopenFile = path.join(fixtureRoot, 'userData-reopen', 'nikkisync.db')
+    fs.mkdirSync(path.dirname(reopenFile), { recursive: true })
+    const options: NikkiSyncSessionOptions = {
+      databaseFile: reopenFile,
+      gameRoot: path.join(fixtureRoot, 'game'),
+      watcher: false,
+      projectRoot
+    }
+
+    const first = await createRuntimeSession(options)
+    const firstTables = first.tableNames().slice().sort()
+    expect(firstTables).toContain('schema_migrations')
+    first.dispose()
+
+    const second = await createRuntimeSession(options)
+    const secondTables = second.tableNames().slice().sort()
+    expect(secondTables).toEqual(firstTables)
+
+    const migrationRows = second.runtime.database.connection
+      .prepare('SELECT version, name FROM schema_migrations ORDER BY version')
+      .all() as Array<{ version: number; name: string }>
+    expect(migrationRows).toHaveLength(1)
+    expect(migrationRows[0]).toMatchObject({
+      version: 1,
+      name: 'initial_asset_resource_sync_schema'
+    })
+    second.dispose()
+  }, 30000)
+})
+
 describe('runtime-facade 游标纯函数（不依赖链接）', () => {
   it('与上游同格式：base64url(JSON {t,id})，可解回原值', () => {
     const cursor = encodePageCursor({ t: '2026-06-16T13:17:41.000Z', id: 'asset_1' })
