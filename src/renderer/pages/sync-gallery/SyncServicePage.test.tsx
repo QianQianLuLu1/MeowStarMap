@@ -71,6 +71,7 @@ function makeDevice(overrides: Record<string, unknown> = {}) {
 
 interface NikkiSyncServerApiStub {
   getServerStatus: Mock
+  getRuntimeStatus: Mock
   startServer: Mock
   stopServer: Mock
   getPairingCode: Mock
@@ -88,6 +89,7 @@ function installElectronApi(
   opts: {
     persisted?: Record<string, unknown>
     status?: Record<string, unknown>
+    runtimeStatus?: Record<string, unknown>
     devices?: ReturnType<typeof makeDevice>[]
     startServerReject?: Error
     pairedDevicesReject?: Error
@@ -104,6 +106,13 @@ function installElectronApi(
   })
   serverApi = {
     getServerStatus: vi.fn(async () => makeStatus(opts.status)),
+    // K1：启动阶段来自 runtime-status 响应体（无新通道）；缺省不给 startupStages
+    getRuntimeStatus: vi.fn(async () => ({
+      state: 'idle',
+      dbPath: 'C:/userData/nikkisync/nikkisync.db',
+      linkReady: true,
+      ...(opts.runtimeStatus ?? {})
+    })),
     startServer: vi.fn(
       opts.startServerReject
         ? async () => {
@@ -355,5 +364,39 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
       vi.advanceTimersByTime(STATUS_POLL_MS * 2)
     })
     expect(serverApi.getServerStatus.mock.calls.length).toBeGreaterThanOrEqual(3)
+  })
+
+  // ===== K1：启动阶段观测 =====
+
+  it('(s) K1：启动阶段行按 i18n 映射展示，未知阶段回退原样英文串；无阶段时不渲染该行', async () => {
+    installElectronApi({
+      runtimeStatus: {
+        state: 'running',
+        startupStages: [
+          { stage: 'scanner', at: '2026-10-25T08:00:00.000Z' },
+          { stage: 'runtime-ready', at: '2026-10-25T08:00:01.000Z' },
+          { stage: 'lan-listen', at: '2026-10-25T08:00:02.000Z' },
+          { stage: 'cached-metadata', at: '2026-10-25T08:00:03.000Z' },
+          { stage: 'custom-x', at: '2026-10-25T08:00:04.000Z' }
+        ]
+      }
+    })
+    renderSection()
+    await waitFor(() => expect(serverApi.getRuntimeStatus).toHaveBeenCalled())
+    expect(screen.getByText('启动阶段')).toBeInTheDocument()
+    expect(screen.getByText('扫描器')).toBeInTheDocument()
+    expect(screen.getByText('运行时就绪')).toBeInTheDocument()
+    expect(screen.getByText('局域网监听')).toBeInTheDocument()
+    expect(screen.getByText('缓存元数据升级')).toBeInTheDocument()
+    // 未知阶段不谎报：原样展示上游英文短码，交由用户/日志判断
+    expect(screen.getByText('custom-x')).toBeInTheDocument()
+  })
+
+  it('(s2) K1：无已发生阶段（未启动/中断）时不渲染启动阶段行', async () => {
+    installElectronApi({ runtimeStatus: { state: 'idle' } })
+    renderSection()
+    await waitFor(() => expect(serverApi.getRuntimeStatus).toHaveBeenCalled())
+    await waitFor(() => expect(screen.getByText('运行状态')).toBeInTheDocument())
+    expect(screen.queryByText('启动阶段')).not.toBeInTheDocument()
   })
 })

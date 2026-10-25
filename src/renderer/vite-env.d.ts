@@ -956,6 +956,8 @@ interface WindowElectronAPI {
         lanHost?: string
         error?: string
       }
+      /** K1：本会话真实发生的启动阶段（scanner/runtime-ready/lan-listen/cached-metadata） */
+      startupStages?: Array<{ stage: string; at: string }>
       error?: string
       hint?: string
     }>

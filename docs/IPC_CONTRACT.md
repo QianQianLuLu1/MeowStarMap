@@ -456,6 +456,21 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
   但上游 `dressing.clothes` 是裸 ID 数组，`search-suits` / `search-clothing` 仍返回空 `items`
   （需要本地字典 manifest）。不要把 `withOutfit > 0` 读成「搜索已经可用」。
 
+### 8.1.4 `runtime-status.startupStages` 可选段（K1，向后兼容的纯增字段）
+
+通道、入参、包装器都不变；新增 `NikkiSyncRuntimeStatus.startupStages?`：
+`Array<{stage: string, at: string}>`。要点：
+
+- 只记录本仓编排下**真实完成**的阶段，取值域 `scanner`（scanner.start 成功）、
+  `runtime-ready`（start 完成）、`lan-listen`（server.start 成功）、`cached-metadata`
+  （缓存解码 runOnce 完成）。上游六阶段中的 `dictionary-enrichment` / `background-services`
+  在本仓编排下不会发生，**永不出现**。
+- 同会话同阶段幂等（只记一次）；记录随会话生命周期，会话拆除（stop / 换根重建）即清空。
+- 阶段抛错即未完成：`cachedMetadataRunOnce` 抛错时 `cached-metadata` 不出现，错误只落
+  主进程 warn 日志，不影响启动/扫描结果。
+- 缺省语义：尚未启动、启动中断在首个阶段完成之前、或会话已拆除 ⇒ 键缺省。UI 据此
+  区分「还没开始」与「进行到一半」。
+
 ### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
 
 | 通道                           | 入参                                    | 出参                                                                                                                                                    | 失败码                                                                                          |

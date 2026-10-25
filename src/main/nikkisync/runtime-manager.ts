@@ -88,6 +88,15 @@ export interface FakeSessionPlan {
   metadataRunOnceWait?: () => Promise<void>
   /** 阶段 6：让 `fullScan()` 本身抛错（验证扫描失败时一轮解析都不发起）。 */
   fullScanThrows?: boolean
+  /**
+   * K1：是否模拟「深入口装载成功、会话挂出 `cachedMetadataRunOnce` 闭包」。
+   * 默认 false ⇒ 会话上没有该闭包，编排层一次都不调用。
+   */
+  cachedMetadataPresent?: boolean
+  /** K1：`cachedMetadataRunOnce()` 是否抛错（验证故障隔离与阶段记录口径）。 */
+  cachedMetadataRunOnceThrows?: boolean
+  /** K1：`cachedMetadataRunOnce()` 返回值序列；缺省每轮 0。 */
+  cachedMetadataRunOnceResults?: number[]
 }
 
 export interface RuntimeManagerDependencies {
@@ -163,6 +172,13 @@ interface ManagerState {
   metadataCounters?: NikkiSyncMetadataCounters
   /** 阶段 6：最近一次扫描后驱动的结果。 */
   metadataDrive?: MetadataResolutionDriveResult
+  /**
+   * K1：本会话**真实发生**的启动阶段记录（随会话生命周期，teardown 清空）。
+   * 本仓编排不调上游 `runtime.start()`，上游六阶段不会自然发生——这里只在自身
+   * 编排点自报确实完成的阶段（scanner / runtime-ready / lan-listen / cached-metadata），
+   * 不得照抄上游枚举谎报未执行的阶段（如 dictionary-enrichment / background-services）。
+   */
+  startupStages: { stage: string; at: string }[]
 }
 
 function messageOf(error: unknown): string {
@@ -203,7 +219,36 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     databaseFile: deps.defaults.databaseFile,
     hint: deps.isLinkReady(deps.defaults.projectRoot) ? undefined : linkMissingHint,
     syncConfig: resolveSyncServerConfig(deps.defaults.syncServer),
-    generation: 0
+    generation: 0,
+    startupStages: []
+  }
+
+  /** K1：记录真实发生的启动阶段（同会话同阶段幂等；随会话生命周期，teardown 清空）。 */
+  function recordStage(stage: string): void {
+    if (state.startupStages.some((item) => item.stage === stage)) return
+    state.startupStages.push({ stage, at: new Date().toISOString() })
+  }
+
+  /**
+   * K1：缓存解码元数据的一次驱动（上游 `CachedDecodedMetadataService.runOnce(): number`，
+   * 同步的本地库升级，无网络出站）。仅闭包存在时执行；仅在启动后与手动扫描后各一次。
+   * 「runOnce 完成」才记 `cached-metadata` 阶段——抛错即未完成，不谎报。
+   */
+  function driveCachedMetadata(session: NikkiSyncRuntimeSession): void {
+    const runOnce = session.cachedMetadataRunOnce
+    if (!runOnce) return
+    const startedAt = Date.now()
+    try {
+      const upgraded = runOnce()
+      recordStage('cached-metadata')
+      deps.log(
+        'info',
+        `nikkisync cached metadata upgrade: assets=${upgraded} elapsedMs=${Date.now() - startedAt}`
+      )
+    } catch (error) {
+      // 不静默吞：warn 必含原始 message（日志不含路径/信封原文，messageOf 只取错误串）
+      deps.log('warn', `nikkisync cached metadata upgrade failed: ${messageOf(error)}`)
+    }
   }
 
   /**
@@ -275,6 +320,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       snapshot.sync = syncStatus()
       // 阶段 6：元数据解析状态同批给出（计数是缓存值，轮询不触发聚合 SQL）
       snapshot.metadata = metadataSnapshot()
+      // K1：真实发生的启动阶段（无新通道，随 runtime-status 响应体给出）
+      if (state.startupStages.length > 0) snapshot.startupStages = state.startupStages
     }
     if (state.error) snapshot.error = state.error
     if (state.hint) snapshot.hint = state.hint
@@ -314,6 +361,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     }
     state.session = undefined
     state.activeRoot = undefined
+    // K1：阶段记录随会话生命周期，会话拆除即清空（新会话的阶段不得继承旧记录）
+    state.startupStages = []
     // 阶段 4：会话拆除（stop 或换根重建）即收回 media:// 的资产路径授权。
     // 库已关闭还允许显示旧路径，等于给不存在的文件开一张长期有效的通行证。
     clearNikkiSyncResourcePaths()
@@ -361,6 +410,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       try {
         await session.scanner.start()
         state.state = 'running'
+        // K1：scanner.start 成功 = scanner 阶段真实发生；start 完成 = runtime-ready
+        recordStage('scanner')
+        recordStage('runtime-ready')
         deps.log('info', `nikkisync runtime started (gameRoot=${options.gameRoot ?? 'auto'})`)
       } catch (error) {
         state.error = messageOf(error)
@@ -373,6 +425,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
           deps.log('error', `nikkisync scanner.start failed: ${state.error}`)
         }
       }
+      // K1：启动后驱动一次缓存解码升级（有界本地操作；失败只落日志不影响启动结果）
+      driveCachedMetadata(session)
       return status()
     })()
     // 并发 start 共享同一次启动（两个会话 = 两个 SQLite 句柄指同一文件，绝不允许）
@@ -421,6 +475,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     void driveMetadata(session).catch((error: unknown) => {
       deps.log('warn', `nikkisync metadata drive unexpected: ${messageOf(error)}`)
     })
+    // K1：手动扫描成功后同样驱动一次缓存解码升级（同步有界，不挂返回路径的时序语义）
+    driveCachedMetadata(session)
     return result
   }
 
@@ -511,6 +567,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       // 上游 start() 幂等：已在监听时直接回显原地址，不会二次 listen
       state.syncAddress = await session.server.start()
       state.syncError = undefined
+      // K1：server.start 成功 = lan-listen 阶段真实发生
+      recordStage('lan-listen')
       deps.log(
         'info',
         `nikkisync sync server listening on ${state.syncAddress.host}:${state.syncAddress.port} ` +

@@ -4410,6 +4410,15 @@
       "enable": "Phân tích tham số trang phục và chụp",
       "enableDesc": "Sau khi quét xong, trình phân tích của NikkiSync phía trên sẽ bổ sung các tham số chụp (tiêu cự, khẩu độ, độ phơi sáng, cường độ bộ lọc, v.v.) cho thư viện đã đồng bộ. Có hiệu lực sau khi khởi động lại ứng dụng.",
       "disclosure": "Khi bật, UID của mỗi ảnh và phong bao tham số nhúng trong ảnh sẽ được gửi tới dịch vụ bên thứ ba nuan5.pro để đổi lấy kết quả giải mã. Nội dung trả về được ghi vào cơ sở dữ liệu đồng bộ trên máy và cũng được gửi tới các thiết bị đã ghép cặp qua mạng cục bộ. Tìm kiếm bộ trang phục và trang phục vẫn phụ thuộc vào từ điển cục bộ; công tắc này không bao gồm phần đó."
+    },
+    "startupStages": {
+      "label": "Các giai đoạn khởi chạy",
+      "stage": {
+        "scanner": "Máy quét",
+        "runtimeReady": "Thời gian chạy sẵn sàng",
+        "lanListen": "Nghe LAN",
+        "cachedMetadata": "Nâng cấp siêu dữ liệu đã lưu"
+      }
     }
   },
   "shareCard": {

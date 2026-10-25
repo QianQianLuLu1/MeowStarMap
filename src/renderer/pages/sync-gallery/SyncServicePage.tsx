@@ -35,6 +35,19 @@ const SETTING_GALLERY_SOURCE = 'gallery.dataSource'
 const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
 
 /**
+ * K1：本仓编排点自报的启动阶段 → i18n key 映射。
+ * 主进程只会记真实发生的阶段（scanner / runtime-ready / lan-listen / cached-metadata）；
+ * 上游六阶段里的 dictionary-enrichment / background-services 在本仓编排下不会发生，
+ * 永不出现。未知阶段键原样回退展示英文短码（不谎报、不吞）。
+ */
+const STARTUP_STAGE_I18N_KEYS: Record<string, string> = {
+  scanner: 'syncService.startupStages.stage.scanner',
+  'runtime-ready': 'syncService.startupStages.stage.runtimeReady',
+  'lan-listen': 'syncService.startupStages.stage.lanListen',
+  'cached-metadata': 'syncService.startupStages.stage.cachedMetadata'
+}
+
+/**
  * 同步服务二级子页（层级 2）。原设置页 `sync` 分组的 `SyncServiceSection`，
  * 随「同步服务从设置页剥离」迁入同步图库板块：入口是 `SyncGalleryToolbar` 的
  * 「同步服务」按钮，走 `navigateTo('sync-service')` 压栈，返回用侧边栏返回按钮。
@@ -64,6 +77,8 @@ export const SyncServicePage: React.FC = () => {
   // 阶段 6：上游远端元数据解析开关（默认关——为真即产生对第三方的出站请求）
   const [metadataEnabled, setMetadataEnabled] = useState(false)
   const [status, setStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
+  // K1：本会话真实发生的启动阶段（runtime-status 响应体可选段；缺省 = 尚无已完成阶段）
+  const [startupStages, setStartupStages] = useState<Array<{ stage: string; at: string }>>([])
   const [devices, setDevices] = useState<NikkiSyncPairedDeviceInfo[]>([])
   const [busy, setBusy] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
@@ -74,12 +89,17 @@ export const SyncServicePage: React.FC = () => {
     const api = window.electronAPI
     if (!api) return
     try {
-      const [nextStatus, nextDevices] = await Promise.all([
+      const [nextStatus, nextDevices, nextRuntime] = await Promise.all([
         api.nikkisync.getServerStatus(),
-        api.nikkisync.getPairedDevices().catch(() => [] as NikkiSyncPairedDeviceInfo[])
+        api.nikkisync.getPairedDevices().catch(() => [] as NikkiSyncPairedDeviceInfo[]),
+        // K1：启动阶段随 runtime-status 一并拉取；失败降级为「无阶段」，不打断状态轮询
+        api.nikkisync
+          .getRuntimeStatus()
+          .catch(() => null as { startupStages?: Array<{ stage: string; at: string }> } | null)
       ])
       setStatus(nextStatus)
       setDevices(nextDevices)
+      setStartupStages(nextRuntime?.startupStages ?? [])
     } catch {
       // 状态查询失败静默：轮询下一轮重试（未组装时 getServerStatus 返回 available:false 不抛）
     }
@@ -319,6 +339,26 @@ export const SyncServicePage: React.FC = () => {
                         : t('syncService.status.stopped')}
                   </span>
                 </SettingsRow>
+                {startupStages.length > 0 && (
+                  <SettingsRow label={t('syncService.startupStages.label')}>
+                    {/* K1：阶段名→i18n 映射；未知阶段不谎报，原样展示英文短码 */}
+                    <span className="flex flex-wrap items-center gap-1 text-xs">
+                      {startupStages.map((item, index) => (
+                        <React.Fragment key={`${item.stage}-${item.at}`}>
+                          {index > 0 && <span style={{ color: 'var(--text-tertiary)' }}>→</span>}
+                          <span
+                            className="rounded px-1.5 py-0.5"
+                            style={{ background: 'var(--bg-secondary, rgba(127,127,127,0.15))' }}
+                          >
+                            {STARTUP_STAGE_I18N_KEYS[item.stage]
+                              ? t(STARTUP_STAGE_I18N_KEYS[item.stage])
+                              : item.stage}
+                          </span>
+                        </React.Fragment>
+                      ))}
+                    </span>
+                  </SettingsRow>
+                )}
                 {running && status && (
                   <>
                     <SettingsRow label={t('syncService.status.address')}>

@@ -4410,6 +4410,15 @@
       "enable": "Analyser les paramètres de tenue et de prise de vue",
       "enableDesc": "Après la fin d'une analyse, le resolveur amont NikkiSync complète les paramètres de prise de vue (focale, ouverture, exposition, intensité du filtre, etc.) de la galerie synchronisée. Prend effet après le redémarrage de l'application.",
       "disclosure": "Une fois activé, l'identifiant de chaque photo et l'enveloppe de paramètres intégrée à la photo sont envoyés au service tiers nuan5.pro pour obtenir un résultat décodé. La réponse est écrite dans la base de synchronisation locale et est également transmise aux appariés via le réseau local. La recherche de tenues et de vêtements dépend toujours du dictionnaire local ; ce commutateur ne la couvre pas."
+    },
+    "startupStages": {
+      "label": "Phases de démarrage",
+      "stage": {
+        "scanner": "Scanner",
+        "runtimeReady": "Runtime prêt",
+        "lanListen": "Écoute LAN",
+        "cachedMetadata": "Mise à niveau des métadonnées en cache"
+      }
     }
   },
   "shareCard": {

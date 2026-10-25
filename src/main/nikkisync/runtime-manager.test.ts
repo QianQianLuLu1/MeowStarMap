@@ -51,6 +51,8 @@ interface FakeCalls {
   metadataDiagnostics: number
   /** 阶段 6：上游 `runtime.start()` 是否被调用过（本仓必须恒为 0）。 */
   runtimeStart: number
+  /** K1：缓存解码元数据闭包被调次数。 */
+  cachedMetadataRunOnce: number
 }
 
 /**
@@ -175,6 +177,19 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
           }
         }
       : {}),
+    // K1：上游 cachedMetadataRunOnce「仅存在时挂出」先例的镜像（默认缺席 ⇒ 零调用）
+    ...(plan.cachedMetadataPresent
+      ? {
+          cachedMetadataRunOnce: () => {
+            calls.cachedMetadataRunOnce += 1
+            if (plan.cachedMetadataRunOnceThrows) {
+              throw new Error('SQLITE_BUSY: cached metadata upgrade failed')
+            }
+            const results = plan.cachedMetadataRunOnceResults ?? [0]
+            return results[Math.min(calls.cachedMetadataRunOnce - 1, results.length - 1)]
+          }
+        }
+      : {}),
     metadataDiagnostics: () => {
       calls.metadataDiagnostics += 1
       return {
@@ -229,7 +244,8 @@ function createDependencies(
     metadataStop: 0,
     metadataRunOnce: 0,
     metadataDiagnostics: 0,
-    runtimeStart: 0
+    runtimeStart: 0,
+    cachedMetadataRunOnce: 0
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
@@ -881,5 +897,96 @@ describe('阶段 6：元数据解析编排（拆除前置、有界驱动、故�
     manager.status()
     manager.status()
     expect(calls.metadataDiagnostics).toBe(before)
+  })
+})
+
+describe('K1：启动阶段观测与缓存解码元数据接线', () => {
+  it('K1-1 正常启动只记录真实发生的阶段：[scanner, runtime-ready, cached-metadata]', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { cachedMetadataPresent: true, cachedMetadataRunOnceResults: [3] }
+    )
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    expect(status.startupStages?.map((item) => item.stage)).toEqual([
+      'scanner',
+      'runtime-ready',
+      'cached-metadata'
+    ])
+    // 有闭包 ⇒ 启动触发点恰好驱动一次
+    expect(calls.cachedMetadataRunOnce).toBe(1)
+    expect(calls.logs.some((item) => item.message.includes('cached metadata'))).toBe(true)
+  })
+
+  it('K1-2 lan-listen 仅在 server.start 成功后追加，重复 startSyncServer 不重复记', async () => {
+    const { deps } = createDependencies({}, { cachedMetadataPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.startSyncServer()
+    await manager.startSyncServer()
+    const stages = manager.status().startupStages?.map((item) => item.stage)
+    expect(stages).toContain('lan-listen')
+    expect(stages?.filter((stage) => stage === 'lan-listen')).toHaveLength(1)
+  })
+
+  it('K1-3 未发生的阶段永不出现：degraded（无游戏目录）启动后阶段为空', async () => {
+    const { deps } = createDependencies({}, { startError: 'notfound' })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('degraded')
+    expect(status.startupStages).toBeUndefined()
+  })
+
+  it('K1-4 启动中断时已发生阶段保留：cachedMetadataRunOnce 抛错 ⇒ warn 日志、scanner/runtime-ready 保留', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { cachedMetadataPresent: true, cachedMetadataRunOnceThrows: true }
+    )
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    // 故障不外抛、不改判启动结果；「runOnce 完成」才记阶段 ⇒ cached-metadata 不出现
+    expect(status.state).toBe('running')
+    expect(status.startupStages?.map((item) => item.stage)).toEqual(['scanner', 'runtime-ready'])
+    expect(
+      calls.logs.some((item) => item.level === 'warn' && item.message.includes('SQLITE_BUSY'))
+    ).toBe(true)
+  })
+
+  it('K1-5 无闭包零调用：深入口缺席（老会话）时不驱动、不记阶段', async () => {
+    const { deps, calls } = createDependencies({}, { cachedMetadataPresent: false })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    await manager.scan({})
+    expect(calls.cachedMetadataRunOnce).toBe(0)
+    expect(status.startupStages?.map((item) => item.stage)).toEqual(['scanner', 'runtime-ready'])
+  })
+
+  it('K1-6 扫描成功后各驱动一次（启动+扫描共两次）；扫描失败不驱动', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { cachedMetadataPresent: true, cachedMetadataRunOnceResults: [1, 2, 0] }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(calls.cachedMetadataRunOnce).toBe(1)
+    await manager.scan({})
+    expect(calls.cachedMetadataRunOnce).toBe(2)
+
+    const failed = createDependencies({}, { cachedMetadataPresent: true, fullScanThrows: true })
+    const failedManager = createRuntimeManager(failed.deps)
+    await failedManager.start(DEFAULTS)
+    const before = failed.calls.cachedMetadataRunOnce
+    await expect(failedManager.scan({})).rejects.toThrow(installNotfoundMessage)
+    expect(failed.calls.cachedMetadataRunOnce).toBe(before)
+  })
+
+  it('K1-7 teardown 清空阶段记录：stop() 后 startupStages 缺省', async () => {
+    const { deps } = createDependencies({}, { cachedMetadataPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(manager.status().startupStages).toBeTruthy()
+    await manager.stop()
+    expect(manager.status().startupStages).toBeUndefined()
   })
 })

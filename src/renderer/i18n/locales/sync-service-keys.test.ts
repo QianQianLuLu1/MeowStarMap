@@ -105,7 +105,13 @@ const SYNC_SERVICE_LEAVES = [
   'devices.revoked',
   'metadata.enable',
   'metadata.enableDesc',
-  'metadata.disclosure'
+  'metadata.disclosure',
+  // K1：启动阶段观测（SyncServicePage 状态卡的阶段行）
+  'startupStages.label',
+  'startupStages.stage.scanner',
+  'startupStages.stage.runtimeReady',
+  'startupStages.stage.lanListen',
+  'startupStages.stage.cachedMetadata'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */

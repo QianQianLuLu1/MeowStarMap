@@ -4410,6 +4410,15 @@
       "enable": "解析穿搭與拍攝參數",
       "enableDesc": "掃描完成後，由上游 NikkiSync 解析器補齊同步圖庫的拍攝參數（焦距、光圈、曝光、濾鏡強度等）。需重啟應用程式後生效。",
       "disclosure": "開啟後會將照片 UID 與照片內嵌的參數信封傳送至第三方服務 nuan5.pro 以換取解碼結果；返回內容寫入本機同步資料庫，並會隨區域網路同步下发給已配對裝置。套裝與服裝搜尋仍依賴本機字典，本開關不涵蓋該部分。"
+    },
+    "startupStages": {
+      "label": "啟動階段",
+      "stage": {
+        "scanner": "掃描器",
+        "runtimeReady": "執行階段就緒",
+        "lanListen": "區域網路監聽",
+        "cachedMetadata": "快取中繼資料升級"
+      }
     }
   },
   "shareCard": {

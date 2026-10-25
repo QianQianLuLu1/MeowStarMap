@@ -591,6 +591,11 @@ export interface NikkiSyncRuntimeStatusInfo {
   tables?: string[]
   /** 阶段 3：同步服务状态随会话一并给出（UI 只轮询一个通道）。 */
   sync?: NikkiSyncServerStatusInfo
+  /**
+   * K1：本会话真实发生的启动阶段（scanner / runtime-ready / lan-listen / cached-metadata）。
+   * 缺省 = 尚无已完成的启动阶段（未启动，或启动中断在首个阶段完成之前）。
+   */
+  startupStages?: Array<{ stage: string; at: string }>
   error?: string
   hint?: string
 }
