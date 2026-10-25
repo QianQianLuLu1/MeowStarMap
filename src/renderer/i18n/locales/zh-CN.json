@@ -4353,6 +4353,7 @@
         "motion": "实况标识",
         "revision": "修订号",
         "gameVersion": "游戏版本",
+        "gameVersionInferred": "（推断）",
         "resolution": "分辨率",
         "size": "文件大小",
         "hash": "内容哈希",

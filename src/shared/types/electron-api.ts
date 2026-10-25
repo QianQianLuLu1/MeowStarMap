@@ -620,6 +620,17 @@ export interface NikkiSyncMetadataConsentSetInput {
   policyVersion: string
 }
 
+/** K3：`nikkisync:resolve-game-version` 入参（ISO 8601 外输入由上游判缺省）。 */
+export interface NikkiSyncGameVersionQueryInfo {
+  capturedAt?: string
+}
+
+/** K3：`nikkisync:resolve-game-version` 响应（两键缺省 = 无法推断）。 */
+export interface NikkiSyncGameVersionInfo {
+  version?: string
+  effectiveAt?: string
+}
+
 export interface NikkiSyncScanInputInfo {
   gameRoot?: string
   path?: string

@@ -880,6 +880,16 @@ function createCompatibilityFixture() {
           return cachedRunOnce()
         }
       }
+    },
+    // K3：日历深入口假面（边界值与上游实测表一致，见 runtime-facade.linked.test.ts）
+    gameVersionCalendar: {
+      inferInfinityNikkiGameVersion: vi.fn((capturedAt?: string) =>
+        capturedAt === '2025-04-01T00:00:00.000Z' ? '1.4' : undefined
+      ),
+      getGameVersionReleases: vi.fn(() => [
+        { version: '1.4', effectiveAt: '2025-03-26T03:00:00.000Z' },
+        { version: '1.3', effectiveAt: '2025-02-26T03:00:00.000Z' }
+      ])
     }
   } as unknown as RuntimeSurface
   return { surface, capturedConfig: () => capturedConfig, pairingCalls, deletions, cachedRunOnce }
@@ -947,5 +957,23 @@ describe('createRuntimeSession 兼容层注入缝（C5：声明与透传，无�
     const legacy = createSessionFixture()
     const legacySession = await createRuntimeSession(sessionOptions(), legacy.surface)
     expect(legacySession.cachedMetadataRunOnce).toBeUndefined()
+  })
+})
+
+describe('createRuntimeSession 游戏版本会话面（K3）', () => {
+  it('K3-f1 命中日历：version 与 effectiveAt 成对给出（release 表反查生效时间）', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(session.resolveGameVersion('2025-04-01T00:00:00.000Z')).toEqual({
+      version: '1.4',
+      effectiveAt: '2025-03-26T03:00:00.000Z'
+    })
+  })
+
+  it('K3-f2 未命中/缺省：两键缺省（不伪造版本，上游「unknown never fabricates」口径）', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(session.resolveGameVersion(undefined)).toEqual({})
+    expect(session.resolveGameVersion('2024-01-01T00:00:00.000Z')).toEqual({})
   })
 })

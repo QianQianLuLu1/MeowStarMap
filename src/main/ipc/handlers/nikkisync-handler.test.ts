@@ -122,7 +122,12 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
     revokeDevice: vi.fn(async () => []),
     // ---- K2：在线解析同意 ----
     metadataConsentState: vi.fn(() => CONSENT_STATE),
-    setMetadataConsent: vi.fn(() => CONSENT_STATE)
+    setMetadataConsent: vi.fn(() => CONSENT_STATE),
+    // ---- K3：游戏版本推断 ----
+    resolveGameVersion: vi.fn(async () => ({
+      version: '2.5',
+      effectiveAt: '2026-04-24T03:00:00.000Z'
+    }))
   }
 }
 
@@ -138,7 +143,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 18 条通道（阶段2 五查询 + 阶段4 五扩容 + 阶段3 六服务 + K2 两条同意）', () => {
+  it('恰好注册 19 条通道（阶段2 五查询 + 阶段4 五扩容 + 阶段3 六服务 + K2 两同意 + K3 版本推断）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -159,7 +164,8 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:get-paired-devices',
       'nikkisync:revoke-device',
       'nikkisync:get-metadata-consent',
-      'nikkisync:set-metadata-consent'
+      'nikkisync:set-metadata-consent',
+      'nikkisync:resolve-game-version'
     ])
   })
 
@@ -803,6 +809,53 @@ describe('nikkisync:set-metadata-consent（K2）', () => {
       {},
       { enabled: true, policyVersion: '2026-10-13.1' }
     )) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+})
+
+// ============================================================================
+// K3：游戏版本推断通道（纯本地静态表，无出站）
+// ============================================================================
+
+describe('nikkisync:resolve-game-version（K3）', () => {
+  it('capturedAt 原样下传、结果同一身份透出', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:resolve-game-version')
+    const sentinel = { version: '2.5', effectiveAt: '2026-04-24T03:00:00.000Z' }
+    vi.mocked(runtime.resolveGameVersion).mockResolvedValueOnce(sentinel)
+    const res = (await handler({}, { capturedAt: '2026-05-01T00:00:00.000Z' })) as HandleResult
+    expect(runtime.resolveGameVersion).toHaveBeenCalledWith('2026-05-01T00:00:00.000Z')
+    expect(res.success).toBe(true)
+    expect(res.data).toBe(sentinel)
+  })
+
+  it('无参调用放行（capturedAt=undefined 交上游判「无法推断」）；非法输入不抛错、返回缺省', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.resolveGameVersion).mockResolvedValueOnce({})
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:resolve-game-version')
+    const missing = (await handler({}, {})) as HandleResult
+    expect(missing.success).toBe(true)
+    expect(runtime.resolveGameVersion).toHaveBeenCalledWith(undefined)
+
+    // ISO 8601 之外的输入原样下传由上游判缺省，本层不做日期格式校验（纯查询无副作用）
+    const garbage = (await handler({}, { capturedAt: 'not-a-date' })) as HandleResult
+    expect(garbage.success).toBe(true)
+    expect(runtime.resolveGameVersion).toHaveBeenLastCalledWith('not-a-date')
+  })
+
+  it('capturedAt 超长（>64）⇒ VALIDATION_ERROR 且不调句柄；未装配 ⇒ PRECONDITION_FAILED', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:resolve-game-version')
+    const bad = (await handler({}, { capturedAt: 'x'.repeat(65) })) as HandleResult
+    expect(bad.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(runtime.resolveGameVersion).not.toHaveBeenCalled()
+
+    register(undefined)
+    const unprepared = getHandler(handleMock, 'nikkisync:resolve-game-version')
+    const res = (await unprepared({})) as HandleResult
     expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
   })
 })

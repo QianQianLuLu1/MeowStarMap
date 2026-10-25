@@ -1,5 +1,5 @@
-// @core-change: K2 新增 getMetadataConsent/setMetadataConsent 同意开关桥方法（透传上游同意面）。
-//               （历史：阶段3 建启停/配对/设备管理，阶段4 增 5 个查询扩容方法与 library-changed 订阅。）
+// @core-change: K3 新增 resolveGameVersion 桥方法（游戏版本推断，纯本地静态表查询）。
+//               （历史：阶段3-4 建查询/服务/扩容面、K2 增同意开关两方法——历次授权原因见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -12,6 +12,8 @@ import type {
   NikkiSyncClothingSearchInfo,
   NikkiSyncMetadataConsentInfo,
   NikkiSyncMetadataConsentSetInput,
+  NikkiSyncGameVersionInfo,
+  NikkiSyncGameVersionQueryInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncPairingCodeInfo,
   NikkiSyncProfileStatsInfo,
@@ -77,5 +79,9 @@ export const nikkisyncAPI = {
   getMetadataConsent: () => call<NikkiSyncMetadataConsentInfo>('nikkisync:get-metadata-consent'),
   /** 写同意开关：policyVersion 必须取自 getMetadataConsent 的展示值原串带回 */
   setMetadataConsent: (input: NikkiSyncMetadataConsentSetInput) =>
-    call<NikkiSyncMetadataConsentInfo>('nikkisync:set-metadata-consent', input)
+    call<NikkiSyncMetadataConsentInfo>('nikkisync:set-metadata-consent', input),
+  // ---- K3：游戏版本推断（上游静态表，纯本地无出站）----
+  /** 按拍摄时间推断游戏版本；两键缺省 = 无法推断（早于 1.0 / 非法输入 / 未装配） */
+  resolveGameVersion: (input?: NikkiSyncGameVersionQueryInfo) =>
+    call<NikkiSyncGameVersionInfo>('nikkisync:resolve-game-version', input ?? {})
 }

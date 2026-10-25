@@ -507,6 +507,18 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
 - 撤回（`enabled:false`）即时生效：上游 `setEnabled(false)` 内部即 `abortPending()` 中止在途出站请求。
 - 未同意时零出站：上游 `guard()` 包装的解析器在 `resolve` 首行即抛，失败计数归入既有 `metadata.counters.failureCategories`。
 
+### 8.2.2 游戏版本推断（K3，上游 `GameVersionCalendar` 静态表，纯本地无出站）
+
+| 通道                             | 入参                                | 出参                                              | 失败码                                                                 |
+| -------------------------------- | ----------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------- |
+| `nikkisync:resolve-game-version` | 可选 `{capturedAt?: string(1..64)}` | `{version?, effectiveAt?}`（两键缺省 = 无法推断） | `VALIDATION_ERROR`（capturedAt 超长）；`PRECONDITION_FAILED`（未装配） |
+
+契约要点：
+
+- **不做日期格式校验**：ISO 8601 之外的输入原样下传，由上游判缺省返回空结果、不抛错（纯查询无副作用）。
+- 推断边界以上游静态表为准（1.0=2024-12-05 起，维护开服时刻为界）；渲染层对推断值标注「（推断）」，
+  metadata 自带版本优先、推断值并列或补位。
+
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
 
 `sync:getStatus` / `startServer` / `stopServer` / `createPairingQr` / `listDevices` / `revokeDevice`

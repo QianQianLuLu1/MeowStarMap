@@ -1,6 +1,5 @@
-// @core-change: K2 新增 nikkisync:get/set-metadata-consent 同意开关通道（上游同意面的读写映射）。
-//               （历史：阶段2 建只读查询面、阶段3 增同步服务、阶段4 增查询扩容与 library-changed、
-//               K1 增 startupStages 可选段——本文件此前的授权原因为 sync-integration 阶段4 二次改动。）
+// @core-change: K3 新增 nikkisync:resolve-game-version 游戏版本推断通道（纯本地静态表查询）。
+//               （历史：阶段2-4 建查询与服务面、K2 增同意开关两通道——历次授权原因见各节点提交。）
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -113,6 +112,14 @@ const deviceIdSchema = z.string().trim().min(1).max(128)
 const consentSetSchema = z.object({
   enabled: z.boolean(),
   policyVersion: z.string().min(1).max(64)
+})
+
+/**
+ * K3：版本推断入参。只做长度界，**不做日期格式校验**——ISO 8601 之外的输入
+ * 原样下传由上游判缺省返回两键缺省，与「纯查询无副作用」一致。
+ */
+const gameVersionSchema = z.object({
+  capturedAt: z.string().min(1).max(64).optional()
 })
 
 /** 句柄未装配时的状态（不抛错：UI 据此显示「同步服务不可用」而非崩一次 toast）。 */
@@ -450,6 +457,19 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
       } catch (error) {
         throw consentErrorToAppError(error)
       }
+    })
+  )
+
+  // ---- K3：游戏版本推断（上游 GameVersionCalendar 静态表，纯本地无出站）----
+
+  ipcMain.handle(
+    'nikkisync:resolve-game-version',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(gameVersionSchema, args[0] ?? {}, 'resolve-game-version', (input) =>
+        // ISO 8601 之外的输入原样下传由上游判缺省、不抛错（纯查询无副作用）
+        runtime.resolveGameVersion(input.capturedAt)
+      )
     })
   )
 }

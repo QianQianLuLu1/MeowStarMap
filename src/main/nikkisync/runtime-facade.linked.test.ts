@@ -9,7 +9,8 @@ import {
   createManagerDependencies,
   createRuntimeSession,
   decodePageCursor,
-  encodePageCursor
+  encodePageCursor,
+  loadRuntimeSurface
 } from './runtime-facade'
 import { createRuntimeManager } from './runtime-manager'
 import type { NikkiSyncRuntimeSession, NikkiSyncSessionOptions } from './runtime-types'
@@ -391,5 +392,43 @@ describe('runtime-facade 游标纯函数（不依赖链接）', () => {
     expect(
       decodePageCursor(Buffer.from(JSON.stringify({ t: 1, id: 2 })).toString('base64url'))
     ).toBeUndefined()
+  })
+})
+
+suite('K3：游戏版本日历深入口的实测边界（真实产物，无出站）', () => {
+  it('静态表推断：边界日/未来/早于 1.0/undefined/非法输入都按上游口径', async () => {
+    const surface = await loadRuntimeSurface(projectRoot)
+    const infer = surface.gameVersionCalendar.inferInfinityNikkiGameVersion
+    // 实测表（b422193）：1.4=2025-03-26T03:00Z、1.5=2025-04-29T03:00Z、
+    // 1.0=2024-12-05T02:00Z、最新 2.10=2026-09-24T03:00Z
+    expect(infer('2025-04-01T00:00:00.000Z')).toBe('1.4')
+    expect(infer('2025-03-26T03:00:00.000Z')).toBe('1.4')
+    expect(infer('2025-03-26T02:59:59.999Z')).toBe('1.3')
+    expect(infer('2024-12-04T00:00:00.000Z')).toBeUndefined()
+    expect(infer('2027-01-01T00:00:00.000Z')).toBe('2.10')
+    expect(infer(undefined)).toBeUndefined()
+    // 非法输入不抛错：上游判缺省（纯查询无副作用）
+    expect(infer('not-a-date')).toBeUndefined()
+  })
+
+  it('会话面 resolveGameVersion：版本与生效时间成对给出，未知时刻两键缺省', async () => {
+    const session = await createRuntimeSession(
+      {
+        databaseFile: path.join(os.tmpdir(), `nikkisync-k3-${Date.now()}.db`),
+        watcher: false,
+        projectRoot
+      },
+      await loadRuntimeSurface(projectRoot)
+    )
+    try {
+      const hit = session.resolveGameVersion('2025-04-01T00:00:00.000Z')
+      expect(hit.version).toBe('1.4')
+      expect(hit.effectiveAt).toBe('2025-03-26T03:00:00.000Z')
+      const miss = session.resolveGameVersion(undefined)
+      expect('version' in miss).toBe(false)
+      expect('effectiveAt' in miss).toBe(false)
+    } finally {
+      session.dispose()
+    }
   })
 })

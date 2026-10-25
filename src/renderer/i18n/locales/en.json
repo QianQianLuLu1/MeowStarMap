@@ -4356,7 +4356,8 @@
         "resolution": "Resolution",
         "size": "File size",
         "hash": "Content hash",
-        "metadata": "Metadata"
+        "metadata": "Metadata",
+        "gameVersionInferred": " (inferred)"
       }
     }
   },

@@ -55,6 +55,8 @@ interface FakeCalls {
   cachedMetadataRunOnce: number
   /** K2：同意开关 setEnabled 收到的参数序列。 */
   metadataConsentSet: Array<{ enabled: boolean; policyVersion?: string }>
+  /** K3：会话面收到的 capturedAt 序列。 */
+  resolveGameVersion: Array<string | undefined>
 }
 
 /**
@@ -238,6 +240,11 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
         mode === 'path' ? '/game/photos/1.jpg' : { resourceId }
       )
     },
+    // K3：会话面的游戏版本推断（facade 接到日历深入口；默认两键缺省）
+    resolveGameVersion: (capturedAt?: string) => {
+      calls.resolveGameVersion.push(capturedAt)
+      return plan.gameVersionResult ?? {}
+    },
     tableNames: () => ['assets', 'resources'],
     dispose: () => {
       calls.order.push('dispose')
@@ -269,7 +276,8 @@ function createDependencies(
     metadataDiagnostics: 0,
     runtimeStart: 0,
     cachedMetadataRunOnce: 0,
-    metadataConsentSet: []
+    metadataConsentSet: [],
+    resolveGameVersion: []
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
@@ -1041,5 +1049,31 @@ describe('K2：元数据在线同意读写', () => {
     })
     manager.setMetadataConsent(true, '2026-10-13.1')
     expect(calls.metadataConsentSet).toEqual([{ enabled: true, policyVersion: '2026-10-13.1' }])
+  })
+})
+
+describe('K3：游戏版本推断', () => {
+  it('K3-m1 未启动即查询拒绝（不把空结果伪装成正常）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await expect(manager.resolveGameVersion('2025-04-01T00:00:00.000Z')).rejects.toThrow(
+      /not ready/
+    )
+  })
+
+  it('K3-m2 会话在位：capturedAt 原样下传、结果逐字透传；缺省入参同样放行', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { gameVersionResult: { version: '1.4', effectiveAt: '2025-03-26T03:00:00.000Z' } }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.resolveGameVersion('2025-04-01T00:00:00.000Z')).resolves.toEqual({
+      version: '1.4',
+      effectiveAt: '2025-03-26T03:00:00.000Z'
+    })
+    // 缺省 capturedAt = 交给上游判「无法推断」，不在本层拦截
+    await manager.resolveGameVersion(undefined)
+    expect(calls.resolveGameVersion).toEqual(['2025-04-01T00:00:00.000Z', undefined])
   })
 })

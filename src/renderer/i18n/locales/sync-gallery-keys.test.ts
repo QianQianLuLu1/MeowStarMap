@@ -81,6 +81,8 @@ const REQUIRED_KEYS = [
   'syncGallery.drawer.fields.motion',
   'syncGallery.drawer.fields.revision',
   'syncGallery.drawer.fields.gameVersion',
+  // K3：推断版本的后缀标注（与 gameVersion 拼接展示）
+  'syncGallery.drawer.fields.gameVersionInferred',
   'syncGallery.drawer.fields.resolution',
   'syncGallery.drawer.fields.size',
   'syncGallery.drawer.fields.hash',

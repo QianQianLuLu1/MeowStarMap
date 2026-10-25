@@ -44,6 +44,7 @@ import { registerNikkiSyncResourcePaths } from './resource-allowlist'
 import { NUAN5_METADATA_ENDPOINT, buildMetadataResolverConfig } from './metadata-resolver-driver'
 import type {
   EmbeddedRuntimeLike,
+  NikkiSyncGameVersionView,
   NikkiSyncPairedDeviceView,
   NikkiSyncRuntimeSession,
   NikkiSyncSessionOptions
@@ -702,6 +703,27 @@ export async function createRuntimeSession(
         : {}),
       // K2：同意面（构造条件见上方 metadataConsent；缺席即不挂键）
       ...(metadataConsent ? { metadataConsent } : {}),
+      /**
+       * K3：游戏版本推断（上游静态表纯函数）。深入口缺席（老 surface）时恒返回
+       * 两键缺省，不抛——推断是纯展示增强，不得因缺件牵连会话可用性。
+       */
+      resolveGameVersion: (capturedAt?: string): NikkiSyncGameVersionView => {
+        const calendar = surface.gameVersionCalendar
+        if (!calendar) return {}
+        const version = calendar.inferInfinityNikkiGameVersion(capturedAt)
+        if (!version) return {}
+        const release = calendar
+          .getGameVersionReleases()
+          .find((item) => String((item as { version?: unknown }).version) === version) as
+          | {
+              effectiveAt?: unknown
+            }
+          | undefined
+        return {
+          version,
+          ...(typeof release?.effectiveAt === 'string' ? { effectiveAt: release.effectiveAt } : {})
+        }
+      },
       metadataDiagnostics: () =>
         surface.metadataDiagnostics.metadataResolutionDiagnostics(
           runtime.database,

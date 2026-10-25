@@ -4356,7 +4356,8 @@
         "resolution": "解析度",
         "size": "檔案大小",
         "hash": "內容雜湊",
-        "metadata": "中繼資料"
+        "metadata": "中繼資料",
+        "gameVersionInferred": "（推斷）"
       }
     }
   },

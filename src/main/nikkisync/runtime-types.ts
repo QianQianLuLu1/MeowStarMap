@@ -93,6 +93,16 @@ export interface NikkiSyncMetadataConsentState {
 }
 
 /**
+ * K3：游戏版本推断结果（上游 `GameVersionCalendar` 静态表，纯本地无出站）。
+ * 两键缺省 = 无法推断（早于 1.0 / 缺 capturedAt / 非法输入）——不伪造版本。
+ */
+export interface NikkiSyncGameVersionView {
+  version?: string
+  /** 命中版本的生效时间（维护开服边界，上游表反查）。 */
+  effectiveAt?: string
+}
+
+/**
  * 上游 `metadata/MetadataOnlineConsent.ts` 的本仓最小面（K2）。
  * 仅在「解析开启 && consentFile 给出 && 深入口在位」时挂上会话；`guard()` 是
  * facade 内部的包装动作，不出会话面。`state().recipients[].endpoint` 由上游脱敏
@@ -372,6 +382,11 @@ export interface NikkiSyncRuntimeSession {
    * unavailable、handler 映射 PRECONDITION_FAILED。
    */
   metadataConsent?: NikkiSyncMetadataConsent
+  /**
+   * K3：按拍摄时间推断游戏版本（上游静态表纯函数经 facade 接线）。
+   * 深入口缺席（老 surface）时恒返回两键缺省，不抛。
+   */
+  resolveGameVersion(capturedAt?: string): NikkiSyncGameVersionView
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
@@ -465,4 +480,6 @@ export interface NikkiSyncRuntimeHandle {
   metadataConsentState(): NikkiSyncMetadataConsentState
   /** K2：写同意开关（policyVersion 必须与当前策略一致，上游校验）；返回更新后的状态。 */
   setMetadataConsent(enabled: boolean, policyVersion: string): NikkiSyncMetadataConsentState
+  /** K3：按拍摄时间推断游戏版本（两键缺省 = 无法推断）。 */
+  resolveGameVersion(capturedAt?: string): Promise<NikkiSyncGameVersionView>
 }

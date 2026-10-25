@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Drawer } from '../../components/common/Drawer'
 import { Button } from '../../components/common/Button'
@@ -36,6 +36,33 @@ export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
   onShare
 }) => {
   const { t } = useTranslation()
+  // K3：按拍摄时间推断的游戏版本（上游静态表，纯本地无出站）。
+  // 失败/未装配/无法推断一律 null ⇒ 不渲染推断值（推断是展示增强，不报错打扰）。
+  const [inferredGameVersion, setInferredGameVersion] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!open || !file?.created_at) {
+      setInferredGameVersion(null)
+      return
+    }
+    let alive = true
+    // 函数存在性守卫：老桥面（或测试桩）没有该方法时静默不推断，不抛错
+    const resolve = window.electronAPI?.nikkisync?.resolveGameVersion
+    if (typeof resolve !== 'function') {
+      setInferredGameVersion(null)
+      return
+    }
+    void resolve({ capturedAt: file.created_at })
+      .then((result) => {
+        if (alive) setInferredGameVersion(result.version ?? null)
+      })
+      .catch(() => {
+        if (alive) setInferredGameVersion(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [open, file?.created_at])
 
   if (!file) return null
 
@@ -51,8 +78,17 @@ export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
   if (extra?.revision !== undefined) {
     rows.push({ label: t('syncGallery.drawer.fields.revision'), value: String(extra.revision) })
   }
-  if (extra?.gameVersion) {
-    rows.push({ label: t('syncGallery.drawer.fields.gameVersion'), value: extra.gameVersion })
+  // K3：游戏版本行——metadata 自带值优先，推断值并列或补位（同值不重复展示）
+  {
+    const owned = extra?.gameVersion
+    const inferred =
+      inferredGameVersion && inferredGameVersion !== owned
+        ? `${inferredGameVersion}${t('syncGallery.drawer.fields.gameVersionInferred')}`
+        : undefined
+    const value = owned ? (inferred ? `${owned} · ${inferred}` : owned) : inferred
+    if (value) {
+      rows.push({ label: t('syncGallery.drawer.fields.gameVersion'), value })
+    }
   }
   if (file.width && file.height) {
     rows.push({

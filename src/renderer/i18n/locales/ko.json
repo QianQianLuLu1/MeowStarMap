@@ -4356,7 +4356,8 @@
         "resolution": "해상도",
         "size": "파일 크기",
         "hash": "콘텐츠 해시",
-        "metadata": "메타데이터"
+        "metadata": "메타데이터",
+        "gameVersionInferred": " (추정)"
       }
     }
   },

@@ -88,4 +88,48 @@ describe('SyncAssetDrawer', () => {
     render(<SyncAssetDrawer open onClose={vi.fn()} file={bare} />)
     expect(screen.getByTestId('panel-outfit')).toBeTruthy()
   })
+
+  // ===== K3：游戏版本推断行 =====
+
+  function installGameVersionApi(result: { version?: string; effectiveAt?: string } | Error): void {
+    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+      nikkisync: {
+        resolveGameVersion:
+          result instanceof Error
+            ? vi.fn(() => Promise.reject(result))
+            : vi.fn(() => Promise.resolve(result))
+      }
+    }
+  }
+
+  it('K3：metadata 无版本时按拍摄时间推断展示（成功才渲染，标注推断）', async () => {
+    installGameVersionApi({ version: '2.5', effectiveAt: '2026-04-24T03:00:00.000Z' })
+    const noVersion = asset()
+    delete noVersion.nikkisync?.gameVersion
+    render(<SyncAssetDrawer open onClose={vi.fn()} file={noVersion} />)
+    expect(await screen.findByText(/2\.5/)).toBeTruthy()
+    expect(await screen.findByText(/（推断）/)).toBeTruthy()
+  })
+
+  it('K3：metadata 自带版本与推断不同 ⇒ 并列展示；通道失败只显示自带版本', async () => {
+    installGameVersionApi({ version: '2.5' })
+    const withVersion = asset({ created_at: '2026-05-01T00:00:00.000Z' })
+    const first = render(<SyncAssetDrawer open onClose={vi.fn()} file={withVersion} />)
+    // metadata 自带 1.3，推断 2.5：两者并列（自带值在前）
+    expect(await first.findByText(/1\.3/)).toBeTruthy()
+    expect(await first.findByText(/2\.5/)).toBeTruthy()
+    first.unmount()
+
+    // 通道失败/未装配 ⇒ 不渲染推断值（自带版本仍显示）
+    installGameVersionApi(new Error('not ready'))
+    const second = render(
+      <SyncAssetDrawer
+        open
+        onClose={vi.fn()}
+        file={asset({ created_at: '2026-05-01T00:00:00.000Z' })}
+      />
+    )
+    expect(await second.findByText(/1\.3/)).toBeTruthy()
+    expect(second.queryByText(/2\.5/)).toBeNull()
+  })
 })

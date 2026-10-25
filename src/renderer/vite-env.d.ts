@@ -1066,6 +1066,10 @@ interface WindowElectronAPI {
     setMetadataConsent: (
       input: import('../shared/types/electron-api').NikkiSyncMetadataConsentSetInput
     ) => Promise<import('../shared/types/electron-api').NikkiSyncMetadataConsentInfo>
+    // ---- K3：游戏版本推断（上游静态表，纯本地无出站）----
+    resolveGameVersion: (
+      input?: import('../shared/types/electron-api').NikkiSyncGameVersionQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncGameVersionInfo>
   }
   // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
   assetEdits: {

@@ -100,6 +100,8 @@ export interface FakeSessionPlan {
   cachedMetadataRunOnceResults?: number[]
   /** K2：会话上是否挂出同意面（默认不挂 ⇒ manager 的同意读写抛 unavailable）。 */
   metadataConsentPresent?: boolean
+  /** K3：会话面 resolveGameVersion 的固定返回值（默认 {} 两键缺省）。 */
+  gameVersionResult?: { version?: string; effectiveAt?: string }
 }
 
 export interface RuntimeManagerDependencies {
@@ -654,6 +656,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return consent.state()
   }
 
+  /** K3：会话面的薄委托（capturedAt 原样下传；两键缺省 = 无法推断）。 */
+  async function resolveGameVersion(
+    capturedAt?: string
+  ): Promise<import('./runtime-types').NikkiSyncGameVersionView> {
+    return requireSession().resolveGameVersion(capturedAt)
+  }
+
   return {
     status,
     start,
@@ -677,6 +686,7 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     listPairedDevices,
     revokeDevice,
     metadataConsentState,
-    setMetadataConsent
+    setMetadataConsent,
+    resolveGameVersion
   }
 }
