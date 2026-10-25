@@ -490,6 +490,23 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
 - `start-server` 改端口会**重建内嵌会话**（上游把 `LocalSyncServerConfig` 冻结在构造期），调用方应预期一次 SQLite 重开与扫描器重新发现。
 - 撤销是软删（上游 `PairingRepository.revoke` 写 `revoked_at`），**不踢**已建立的 WebSocket 连接；该设备后续签名请求由上游鉴权返回 401。
 
+### 8.2.1 在线解析同意（K2，上游 `MetadataOnlineConsent` 的读写面）
+
+| 通道                             | 入参                                               | 出参                                                                                            | 失败码                                                                                                                         |
+| -------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `nikkisync:get-metadata-consent` | 无                                                 | `{enabled, policyVersion, recipients: [{name, endpoint, fields}]}`（endpoint 由上游脱敏后透出） | `PRECONDITION_FAILED`（会话未装配或解析关闭 ⇒ 同意面不存在）                                                                   |
+| `nikkisync:set-metadata-consent` | `{enabled: boolean, policyVersion: string(1..64)}` | 更新后的同意状态（同 get）                                                                      | `VALIDATION_ERROR`（入参非法或 policyVersion 与当前策略不符，上游中文原生文案改写为英文不透传）；`PRECONDITION_FAILED`（同上） |
+
+契约要点：
+
+- `policyVersion` 必须取 `get-metadata-consent` 展示值**原串**带回（上游逐字比对，防「看旧文案点新同意」）。
+- 同意面仅在「解析开启（`nikkisync.metadataResolverEnabled`）的会话」上存在；关闭解析 ⇒ 两通道
+  `PRECONDITION_FAILED`（渲染层据此隐藏同意块，不当作错误弹给用户）。
+- fail-closed：同意文件不存在（首次安装）或损坏（非法 JSON）⇒ `enabled:false`；同意文件持久化于
+  `{userData}/nikkisync/metadata-online-consent.json`（0600，上游原子写）。
+- 撤回（`enabled:false`）即时生效：上游 `setEnabled(false)` 内部即 `abortPending()` 中止在途出站请求。
+- 未同意时零出站：上游 `guard()` 包装的解析器在 `resolve` 首行即抛，失败计数归入既有 `metadata.counters.failureCategories`。
+
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
 
 `sync:getStatus` / `startServer` / `stopServer` / `createPairingQr` / `listDevices` / `revokeDevice`

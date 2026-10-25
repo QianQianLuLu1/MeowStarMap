@@ -65,6 +65,8 @@ export const GAME_ROOT_ENV_FLAG = 'NIKKI_NIKKISYNC_GAME_ROOT'
 export const METADATA_ENV_FLAG = 'NIKKI_NIKKISYNC_METADATA'
 /** 库文件相对 userData 的路径段。 */
 export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
+/** K2：在线解析同意文件相对 userData 的路径段（上游 0600 JSON，读写全在上游）。 */
+export const NIKKISYNC_CONSENT_SEGMENTS = ['nikkisync', 'metadata-online-consent.json'] as const
 
 /** 设置读取端口（与 `DatabaseManager.getSetting<T>` 对齐，便于注入与单测）。 */
 export interface NikkiSyncSettingsPort {
@@ -75,6 +77,11 @@ export interface NikkiSyncSettingsPort {
 
 export function nikkisyncDatabaseFile(userDataDir: string): string {
   return path.join(userDataDir, ...NIKKISYNC_DB_SEGMENTS)
+}
+
+/** K2：同意文件路径（仅解析开启时由 facade 消费；未开启时连文件都不创建）。 */
+export function nikkisyncMetadataConsentFile(userDataDir: string): string {
+  return path.join(userDataDir, ...NIKKISYNC_CONSENT_SEGMENTS)
 }
 
 /** 自启判定：env 显式取值优先，其余交给设置项。 */
@@ -107,6 +114,8 @@ export function buildSessionOptions(input: {
     // 阶段 6：元数据解析开关。关闭时下游 `createRuntimeSession` 连配置键都不下发，
     // 上游因此不构造 MetadataResolverService ⇒ 零出站请求、零定时器。
     metadataResolverEnabled: resolveMetadataResolverEnabled(input.env, input.settings),
+    // K2：同意文件路径（与库同目录；仅解析开启时被消费，fail-closed 由上游构造器承担）
+    consentFile: nikkisyncMetadataConsentFile(input.userDataDir),
     projectRoot: input.projectRoot,
     packagingContext: buildPackagingContext({
       isPackaged: input.isPackaged,

@@ -1059,6 +1059,13 @@ interface WindowElectronAPI {
         lastSeenAt: string | null
       }>
     >
+    // ---- K2：在线解析同意（解析开启的会话上才有；否则 PRECONDITION_FAILED）----
+    getMetadataConsent: () => Promise<
+      import('../shared/types/electron-api').NikkiSyncMetadataConsentInfo
+    >
+    setMetadataConsent: (
+      input: import('../shared/types/electron-api').NikkiSyncMetadataConsentSetInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncMetadataConsentInfo>
   }
   // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
   assetEdits: {

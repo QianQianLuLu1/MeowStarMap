@@ -4419,6 +4419,15 @@
         "lanListen": "Nghe LAN",
         "cachedMetadata": "Nâng cấp siêu dữ liệu đã lưu"
       }
+    },
+    "consent": {
+      "title": "Thông báo giải mã tham số trực tuyến",
+      "endpoint": "Điểm cuối dịch vụ",
+      "policyVersion": "Phiên bản chính sách",
+      "fields": "Dữ liệu gửi đi",
+      "enable": "Đồng ý gửi tham số ảnh",
+      "enableDesc": "Chưa đồng ý thì không gửi gì cho bên thứ ba; sau khi đồng ý, các mục trên sẽ được gửi để đổi kết quả giải mã trang phục và tham số chụp.",
+      "revokeNote": "Tắt đồng ý sẽ thu hồi ngay và hủy các yêu cầu đang thực hiện; kết quả đã ghi vào cơ sở dữ liệu đồng bộ trên máy không bị ảnh hưởng."
     }
   },
   "shareCard": {

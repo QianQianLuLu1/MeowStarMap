@@ -4419,6 +4419,15 @@
         "lanListen": "區域網路監聽",
         "cachedMetadata": "快取中繼資料升級"
       }
+    },
+    "consent": {
+      "title": "線上參數解析說明",
+      "endpoint": "服務端點",
+      "policyVersion": "策略版本",
+      "fields": "外送內容",
+      "enable": "同意傳送照片參數",
+      "enableDesc": "未同意時不會向第三方傳送任何內容；同意後按上方清單外送，用於換取穿搭與拍攝參數解析結果。",
+      "revokeNote": "關閉同意立即撤回授權並中止在途請求；已寫入本機同步資料庫的歷史結果不受影響。"
     }
   },
   "shareCard": {

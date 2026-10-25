@@ -18,7 +18,7 @@
  *    的 `exports` 只暴露 `"."` ⇒ 必须用 `resolveDeepEntryUrl` 给出的 `file://` URL。
  */
 
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -152,6 +152,20 @@ interface GameVersionCalendarSurface {
 }
 
 /**
+ * 上游 `metadata/MetadataOnlineConsent.ts` 的本仓最小面（K2）。
+ * 同意文件 JSON 由上游读写（0600、原子 rename）；`state()` 的 endpoint 已脱敏。
+ */
+interface MetadataOnlineConsentSurface {
+  MetadataOnlineConsent: new (
+    file: string,
+    recipients: Array<{ name: string; endpoint: string; fields: string[] }>,
+    initiallyDisabled?: boolean
+  ) => import('./runtime-types').NikkiSyncMetadataConsent & {
+    guard(resolver: unknown): unknown
+  }
+}
+
+/**
  * 上游 `LocalTlsIdentityService` 的最小面（`server/LocalTlsIdentityService.ts:117-129`）。
  * 只有一个公开方法 `getOrCreate()`：身份存 `app_settings['server.tlsIdentity']`，
  * **不落盘、也没有路径可注入**——嵌入态因此不建 certs 目录（见计划 §4）。
@@ -182,6 +196,11 @@ export interface RuntimeSurface {
   cachedDecodedMetadataService: CachedDecodedMetadataSurface
   lanAddress: LanAddressSurface
   gameVersionCalendar: GameVersionCalendarSurface
+  /**
+   * K2：在线解析同意深入口。**可选**：老链接会话（predecessor 深入口缺席）上
+   * 该字段可为 undefined，构造期据此走「不包装」分支——解析行为与 K2 之前完全一致。
+   */
+  metadataOnlineConsent?: MetadataOnlineConsentSurface
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -230,6 +249,36 @@ export const CACHED_DECODED_METADATA_DEEP_ENTRY = [
 ] as const
 export const LAN_ADDRESS_DEEP_ENTRY = ['server', 'LanAddress.js'] as const
 export const GAME_VERSION_CALENDAR_DEEP_ENTRY = ['server', 'GameVersionCalendar.js'] as const
+
+/**
+ * K2 的同意深入口。与上面三入口同处境（不在桶导出内、探针管不到，产物存在性由
+ * `verify-nikkisync-link.ts` 的 `NIKKISYNC_CAPABILITY_ARTIFACTS` 承担）。
+ */
+export const METADATA_ONLINE_CONSENT_DEEP_ENTRY = ['metadata', 'MetadataOnlineConsent.js'] as const
+
+/**
+ * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
+ * `POST {photos: {[uid]: [[nativeParamNuan5Md5, 编码元组]]}, raw_data: true, raw_id: true}`，
+ * 请求头 `x-client: SpinningMomo`；编码元组 = 照片内嵌参数信封的 hash 段 + 数据段（Base64）。
+ * **不含照片字节本身**。披露 UI 的字段清单以此处为唯一出处（与实际出口同源）。
+ */
+export const NUAN5_METADATA_CONSENT_RECIPIENTS: Array<{
+  name: string
+  endpoint: string
+  fields: string[]
+}> = [
+  {
+    name: 'Nuan5 metadata service',
+    endpoint: NUAN5_METADATA_ENDPOINT,
+    fields: [
+      'photo UID',
+      'NUAN5 JPEG-prefix parameter MD5 digest',
+      'embedded parameter envelope (hash + data segments, base64)',
+      'raw_data / raw_id request flags',
+      'x-client request header'
+    ]
+  }
+]
 
 /**
  * 已配对设备清单的**只读** SELECT。
@@ -310,6 +359,7 @@ export async function loadRuntimeSurface(
   const cachedDecodedMetadataService = await loadDeepModule(CACHED_DECODED_METADATA_DEEP_ENTRY)
   const lanAddress = await loadDeepModule(LAN_ADDRESS_DEEP_ENTRY)
   const gameVersionCalendar = await loadDeepModule(GAME_VERSION_CALENDAR_DEEP_ENTRY)
+  const metadataOnlineConsent = await loadDeepModule(METADATA_ONLINE_CONSENT_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -322,7 +372,8 @@ export async function loadRuntimeSurface(
     cachedDecodedMetadataService:
       cachedDecodedMetadataService as unknown as CachedDecodedMetadataSurface,
     lanAddress: lanAddress as unknown as LanAddressSurface,
-    gameVersionCalendar: gameVersionCalendar as unknown as GameVersionCalendarSurface
+    gameVersionCalendar: gameVersionCalendar as unknown as GameVersionCalendarSurface,
+    metadataOnlineConsent: metadataOnlineConsent as unknown as MetadataOnlineConsentSurface
   }
 }
 
@@ -523,6 +574,31 @@ export async function createRuntimeSession(
    * 把「关掉」误实现成「开着但什么都不做」。
    */
   const metadataResolverEnabled = options.metadataResolverEnabled === true
+  /**
+   * K2 · 同意门（fail-closed）。仅在「解析开启 && consentFile 给出 && 深入口在位」时
+   * 构造。`initiallyDisabled` 按上游真实语义取值（`windows-app.js:105` 传
+   * `resolverFile?.enabled === false`，即「功能整体关闭 ⇒ 无视文件强制不同意」）：
+   * 恒传 true 会让已同意文件在重启后失效，因此本仓取「同意文件不存在（首次安装）
+   * ⇒ true（fail-closed，比上游 fresh-install 默认放行更严，§14-Q3）；文件存在 ⇒
+   * 交上游按内容判定（坏 JSON 走构造器 catch 分支同样 fail-closed）」。
+   * 叠加既有 `nikkisync.metadataResolverEnabled` 默认 false ⇒ 实际出站为双重门。
+   */
+  let metadataConsent: import('./runtime-types').NikkiSyncMetadataConsent | undefined
+  if (metadataResolverEnabled && options.consentFile && surface.metadataOnlineConsent) {
+    const ConsentCtor = nikkisyncExport(
+      surface.metadataOnlineConsent as unknown as NikkiSyncModule,
+      'MetadataOnlineConsent'
+    ) as new (
+      file: string,
+      recipients: Array<{ name: string; endpoint: string; fields: string[] }>,
+      initiallyDisabled?: boolean
+    ) => import('./runtime-types').NikkiSyncMetadataConsent
+    metadataConsent = new ConsentCtor(
+      options.consentFile,
+      NUAN5_METADATA_CONSENT_RECIPIENTS,
+      !existsSync(options.consentFile)
+    )
+  }
   const metadataFragment = buildMetadataResolverConfig({
     enabled: metadataResolverEnabled,
     endpoint: NUAN5_METADATA_ENDPOINT,
@@ -534,8 +610,17 @@ export async function createRuntimeSession(
         surface.nuan5Resolver as unknown as NikkiSyncModule,
         'Nuan5CompatibleResolver'
       ) as new (config?: Record<string, unknown>) => unknown
-      // 端点由驱动层校验后下传，这里不另取一份：保证披露文案与实际出口只有一个出处
-      return new ResolverCtor({ endpoint })
+      // 端点由驱动层校验后下传，这里不另取一份：保证披露文案与实际出口只有一个出处。
+      // K2：同意在位 ⇒ 下发 guard 包装后的解析器（未同意时上游在 resolve 首行即抛，
+      // 零出站）；深入口缺席（老会话）不包装，行为与 K2 之前逐字节一致。
+      const resolver = new ResolverCtor({ endpoint })
+      return metadataConsent
+        ? (
+            metadataConsent as unknown as {
+              guard(resolver: unknown): unknown
+            }
+          ).guard(resolver)
+        : resolver
     }
   })
   const runtime = new RuntimeCtor({
@@ -615,6 +700,8 @@ export async function createRuntimeSession(
       ...(cachedDecodedMetadata
         ? { cachedMetadataRunOnce: () => cachedDecodedMetadata.runOnce() }
         : {}),
+      // K2：同意面（构造条件见上方 metadataConsent；缺席即不挂键）
+      ...(metadataConsent ? { metadataConsent } : {}),
       metadataDiagnostics: () =>
         surface.metadataDiagnostics.metadataResolutionDiagnostics(
           runtime.database,

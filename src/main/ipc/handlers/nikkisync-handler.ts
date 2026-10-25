@@ -1,7 +1,6 @@
-// @core-change: sync-integration 阶段4 二次改动：start-scan 成功后向发起方推 library-changed，
-//               使扫描完成时图库自动刷新（无 sender / 发送失败一律静默，不改判扫描结果）。
-//               （历史：本 handler 于阶段2 建成只读查询面、阶段3 增同步服务、阶段4 首轮增 5 条
-//               查询扩容通道；三个阶段均零字段转换。）
+// @core-change: K2 新增 nikkisync:get/set-metadata-consent 同意开关通道（上游同意面的读写映射）。
+//               （历史：阶段2 建只读查询面、阶段3 增同步服务、阶段4 增查询扩容与 library-changed、
+//               K1 增 startupStages 可选段——本文件此前的授权原因为 sync-integration 阶段4 二次改动。）
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -107,6 +106,15 @@ const syncStartSchema = z.object({
 // 与上游 paired_devices.device_id（TEXT PRIMARY KEY，手机侧生成）同量级
 const deviceIdSchema = z.string().trim().min(1).max(128)
 
+/**
+ * K2：同意开关入参。`policyVersion` 由页面从 get-metadata-consent 的展示值原串带回
+ * （上游 `MetadataOnlineConsent.setEnabled` 逐字比对策略版本，防「看旧文案点新同意」）。
+ */
+const consentSetSchema = z.object({
+  enabled: z.boolean(),
+  policyVersion: z.string().min(1).max(64)
+})
+
 /** 句柄未装配时的状态（不抛错：UI 据此显示「同步服务不可用」而非崩一次 toast）。 */
 const UNAVAILABLE_SERVER_STATUS: NikkiSyncServerStatusInfo = {
   available: false,
@@ -137,6 +145,22 @@ function toAppError(error: unknown, scope: string): AppError {
     return AppError.preconditionFailed(message)
   }
   return AppError.internal(`nikkisync ${scope} failed: ${message}`)
+}
+
+/**
+ * K2：同意开关的原始错误 → IPC 错误码。上游 `setEnabled` 的 policyVersion 不匹配
+ * 抛中文原生文案——**不透传渲染层**（§6 通用规则）：含 CJK 的消息一律改写为
+ * 英文可诊断提示（src/** 禁硬编码中文，因此按 CJK 字符区间判别而非匹配原文）。
+ */
+function consentErrorToAppError(error: unknown): AppError {
+  if (error instanceof AppError) return error
+  const message = error instanceof Error ? error.message : String(error)
+  if (/[\u4e00-\u9fff]/.test(message)) {
+    return AppError.validation(
+      'metadata consent rejected the request (upstream policy check failed); re-read the disclosure and retry'
+    )
+  }
+  return toAppError(error, 'metadata-consent')
 }
 
 /** 统一「校验 + 调用 + 错误分类」的查询包装（避免五个 handler 各写一遍 try/catch）。 */
@@ -383,6 +407,48 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         return await runtime.revokeDevice(parsed.data)
       } catch (error) {
         throw toAppError(error, 'revoke-device')
+      }
+    })
+  )
+
+  // ---- K2：在线解析同意（上游 MetadataOnlineConsent 的读写面）----
+
+  ipcMain.handle(
+    'nikkisync:get-metadata-consent',
+    wrapHandlerNoArgs(ctx, () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return runtime.metadataConsentState()
+      } catch (error) {
+        throw consentErrorToAppError(error)
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:set-metadata-consent',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      const parsed = consentSetSchema.safeParse(args[0] ?? {})
+      if (!parsed.success) {
+        const detail = parsed.error.issues
+          .map((issue) => `[${issue.path.join('.')}] ${issue.message}`)
+          .join('; ')
+        throw AppError.validation(`invalid nikkisync metadata consent request: ${detail}`)
+      }
+      try {
+        // 前置校验策略版本：上游 setEnabled 抛中文原生文案，本层先行拦截给出英文
+        // 错误（§6「上游中文串不透传」）；竞态下上游仍可能抛出，由 CJK 兜底分支改写
+        const current = runtime.metadataConsentState()
+        if (parsed.data.enabled && parsed.data.policyVersion !== current.policyVersion) {
+          throw AppError.validation(
+            `metadata consent policy version mismatch (expected ${current.policyVersion}); re-read the disclosure and retry`
+          )
+        }
+        // 关闭（撤回）时上游 setEnabled(false) 内部即 abortPending：在途出站请求一并中止
+        return runtime.setMetadataConsent(parsed.data.enabled, parsed.data.policyVersion)
+      } catch (error) {
+        throw consentErrorToAppError(error)
       }
     })
   )

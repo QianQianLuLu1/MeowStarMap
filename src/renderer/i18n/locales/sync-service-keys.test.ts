@@ -111,7 +111,15 @@ const SYNC_SERVICE_LEAVES = [
   'startupStages.stage.scanner',
   'startupStages.stage.runtimeReady',
   'startupStages.stage.lanListen',
-  'startupStages.stage.cachedMetadata'
+  'startupStages.stage.cachedMetadata',
+  // K2：在线解析同意块（解析开启时显示）
+  'consent.title',
+  'consent.endpoint',
+  'consent.policyVersion',
+  'consent.fields',
+  'consent.enable',
+  'consent.enableDesc',
+  'consent.revokeNote'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */

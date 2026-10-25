@@ -1,6 +1,5 @@
-// @core-change: sync-integration 阶段4 二次改动：增 library-changed 订阅，并把 getResourceRecords
-//               改为 mode 泛型返回（调用侧不再需要判联合类型）。
-//               （历史：阶段3 建启停/配对/设备管理，阶段4 首轮增 5 个查询扩容方法。）
+// @core-change: K2 新增 getMetadataConsent/setMetadataConsent 同意开关桥方法（透传上游同意面）。
+//               （历史：阶段3 建启停/配对/设备管理，阶段4 增 5 个查询扩容方法与 library-changed 订阅。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -11,6 +10,8 @@ import type {
   NikkiSyncChangesInfo,
   NikkiSyncChangesQueryInfo,
   NikkiSyncClothingSearchInfo,
+  NikkiSyncMetadataConsentInfo,
+  NikkiSyncMetadataConsentSetInput,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncPairingCodeInfo,
   NikkiSyncProfileStatsInfo,
@@ -70,5 +71,11 @@ export const nikkisyncAPI = {
   getPairedDevices: () => call<NikkiSyncPairedDeviceInfo[]>('nikkisync:get-paired-devices'),
   /** 撤销设备（上游 PairingRepository.revoke，软删 revoked_at；不断已有 WS 连接） */
   revokeDevice: (deviceId: string) =>
-    call<NikkiSyncPairedDeviceInfo[]>('nikkisync:revoke-device', deviceId)
+    call<NikkiSyncPairedDeviceInfo[]>('nikkisync:revoke-device', deviceId),
+  // ---- K2：在线解析同意（解析开启的会话上才有；否则 PRECONDITION_FAILED）----
+  /** 同意状态（enabled/policyVersion/recipients，endpoint 由上游脱敏） */
+  getMetadataConsent: () => call<NikkiSyncMetadataConsentInfo>('nikkisync:get-metadata-consent'),
+  /** 写同意开关：policyVersion 必须取自 getMetadataConsent 的展示值原串带回 */
+  setMetadataConsent: (input: NikkiSyncMetadataConsentSetInput) =>
+    call<NikkiSyncMetadataConsentInfo>('nikkisync:set-metadata-consent', input)
 }

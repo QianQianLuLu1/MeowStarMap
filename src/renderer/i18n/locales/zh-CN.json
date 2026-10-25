@@ -4419,6 +4419,15 @@
         "lanListen": "局域网监听",
         "cachedMetadata": "缓存元数据升级"
       }
+    },
+    "consent": {
+      "title": "在线参数解析说明",
+      "endpoint": "服务端点",
+      "policyVersion": "策略版本",
+      "fields": "外发内容",
+      "enable": "同意发送照片参数",
+      "enableDesc": "未同意时不会向第三方发送任何内容；同意后按上方清单外发，用于换取穿搭与拍摄参数解析结果。",
+      "revokeNote": "关闭同意立即撤回授权并中止在途请求；已写入本机同步库的历史结果不受影响。"
     }
   },
   "shareCard": {

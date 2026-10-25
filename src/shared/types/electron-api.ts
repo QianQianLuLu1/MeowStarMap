@@ -607,6 +607,19 @@ export interface NikkiSyncAssetPageInfo {
   libraryRevision: number
 }
 
+/** K2：`nikkisync:get-metadata-consent` 响应（endpoint 由上游脱敏后透出）。 */
+export interface NikkiSyncMetadataConsentInfo {
+  enabled: boolean
+  policyVersion: string
+  recipients: Array<{ name: string; endpoint: string; fields: string[] }>
+}
+
+/** K2：`nikkisync:set-metadata-consent` 入参（policyVersion 取展示值原串带回）。 */
+export interface NikkiSyncMetadataConsentSetInput {
+  enabled: boolean
+  policyVersion: string
+}
+
 export interface NikkiSyncScanInputInfo {
   gameRoot?: string
   path?: string

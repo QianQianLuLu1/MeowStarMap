@@ -14,6 +14,7 @@ import { IconCopyText, IconSync } from '../../icons'
 import { useMediaStore } from '../../stores/mediaStore'
 import { useUIStore } from '../../stores/uiStore'
 import type {
+  NikkiSyncMetadataConsentInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncServerStatusInfo
 } from '../../../shared/types/electron-api'
@@ -76,6 +77,8 @@ export const SyncServicePage: React.FC = () => {
   const [gallerySource, setGallerySource] = useState<'local' | 'nikkisync'>('local')
   // 阶段 6：上游远端元数据解析开关（默认关——为真即产生对第三方的出站请求）
   const [metadataEnabled, setMetadataEnabled] = useState(false)
+  // K2：在线解析同意状态（仅解析开启的会话上有；拉取失败/未装配 ⇒ null，同意块隐藏）
+  const [consent, setConsent] = useState<NikkiSyncMetadataConsentInfo | null>(null)
   const [status, setStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
   // K1：本会话真实发生的启动阶段（runtime-status 响应体可选段；缺省 = 尚无已完成阶段）
   const [startupStages, setStartupStages] = useState<Array<{ stage: string; at: string }>>([])
@@ -157,6 +160,27 @@ export const SyncServicePage: React.FC = () => {
     }
   }, [])
 
+  /**
+   * K2：同意状态拉取。仅在解析开启时拉——同意面只存在于「解析开启的会话」上，
+   * 解析关闭时通道按契约回 PRECONDITION_FAILED，此处降级为 null（同意块隐藏），
+   * 不把这个预期内的失败当成错误弹给用户。
+   */
+  useEffect(() => {
+    if (!metadataEnabled) return
+    let alive = true
+    void window.electronAPI?.nikkisync
+      .getMetadataConsent()
+      .then((next) => {
+        if (alive) setConsent(next)
+      })
+      .catch(() => {
+        if (alive) setConsent(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [metadataEnabled])
+
   const handleGallerySourceToggle = async (value: boolean): Promise<void> => {
     const api = window.electronAPI
     if (busy || !api) return
@@ -208,6 +232,31 @@ export const SyncServicePage: React.FC = () => {
       await api.settings.set(SETTING_METADATA_RESOLVER, value)
     } catch (error) {
       setMetadataEnabled(previous)
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /**
+   * K2：同意开关。policyVersion 取页面当前展示的原串提交（上游逐字比对策略版本，
+   * 防「看旧文案点新同意」）；提交失败回滚开关态并报错。生效即时的：同意在位时
+   * 上游 guard 放行、撤回时上游 setEnabled(false) 内部即中止在途请求。
+   */
+  const handleConsentToggle = async (value: boolean): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api || !consent) return
+    const previous = consent
+    setBusy(true)
+    setConsent({ ...consent, enabled: value })
+    try {
+      const next = await api.nikkisync.setMetadataConsent({
+        enabled: value,
+        policyVersion: consent.policyVersion
+      })
+      setConsent(next)
+    } catch (error) {
+      setConsent(previous)
       showError(error)
     } finally {
       setBusy(false)
@@ -318,6 +367,42 @@ export const SyncServicePage: React.FC = () => {
             <p className="text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
               {t('syncService.metadata.disclosure')}
             </p>
+            {/* K2：在线解析同意块（仅解析开启且会话挂出同意面时显示；同意前零出站） */}
+            {metadataEnabled && consent && (
+              <SettingsCard>
+                <div className="space-y-2">
+                  <p className="text-xs font-medium">{t('syncService.consent.title')}</p>
+                  <SettingsRow label={t('syncService.consent.endpoint')}>
+                    <span className="font-mono text-xs break-all">
+                      {consent.recipients[0]?.endpoint}
+                    </span>
+                  </SettingsRow>
+                  <SettingsRow label={t('syncService.consent.policyVersion')}>
+                    <span className="font-mono text-xs">{consent.policyVersion}</span>
+                  </SettingsRow>
+                  <SettingsRow label={t('syncService.consent.fields')}>
+                    <ul
+                      className="list-disc pl-4 text-xs"
+                      style={{ color: 'var(--text-tertiary)' }}
+                    >
+                      {consent.recipients[0]?.fields.map((field) => (
+                        <li key={field}>{field}</li>
+                      ))}
+                    </ul>
+                  </SettingsRow>
+                  <SettingsToggle
+                    label={t('syncService.consent.enable')}
+                    description={t('syncService.consent.enableDesc')}
+                    checked={consent.enabled}
+                    disabled={busy}
+                    onChange={(value) => void handleConsentToggle(value)}
+                  />
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
+                    {t('syncService.consent.revokeNote')}
+                  </p>
+                </div>
+              </SettingsCard>
+            )}
             <SettingsCard>
               <div className="space-y-2">
                 <SettingsRow label={t('syncService.status.label')}>

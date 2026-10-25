@@ -59,6 +59,19 @@ const PAIRED_DEVICES = [
   }
 ]
 
+/** K2：与上游 `MetadataOnlineConsent.state()` 同形的同意状态替身。 */
+const CONSENT_STATE = {
+  enabled: false,
+  policyVersion: '2026-10-13.1',
+  recipients: [
+    {
+      name: 'Nuan5 metadata service',
+      endpoint: 'https://nuan5.pro/api/decode-photo2',
+      fields: ['photo UID', 'NUAN5 JPEG-prefix parameter MD5 digest']
+    }
+  ]
+}
+
 function createRuntimeStub(): NikkiSyncRuntimeHandle {
   return {
     status: vi.fn(() => ({
@@ -106,7 +119,10 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
       tlsFingerprintSha256: 'a'.repeat(64)
     })),
     listPairedDevices: vi.fn(async () => PAIRED_DEVICES),
-    revokeDevice: vi.fn(async () => [])
+    revokeDevice: vi.fn(async () => []),
+    // ---- K2：在线解析同意 ----
+    metadataConsentState: vi.fn(() => CONSENT_STATE),
+    setMetadataConsent: vi.fn(() => CONSENT_STATE)
   }
 }
 
@@ -122,7 +138,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 16 条通道（阶段2 五条查询 + 阶段4 五条扩容 + 阶段3 六条服务）', () => {
+  it('恰好注册 18 条通道（阶段2 五查询 + 阶段4 五扩容 + 阶段3 六服务 + K2 两条同意）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -141,7 +157,9 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:stop-server',
       'nikkisync:get-pairing-code',
       'nikkisync:get-paired-devices',
-      'nikkisync:revoke-device'
+      'nikkisync:revoke-device',
+      'nikkisync:get-metadata-consent',
+      'nikkisync:set-metadata-consent'
     ])
   })
 
@@ -693,5 +711,98 @@ describe('阶段4 扩容通道的未装配态', () => {
     vi.mocked(runtime.listChanges).mockRejectedValueOnce(new Error('journal table not found'))
     const res = (await handler({}, { after: 0 })) as HandleResult
     expect(res.error?.code).toBe(IPC_ERROR_CODES.NOT_FOUND)
+  })
+})
+
+// ============================================================================
+// K2：在线解析同意通道（get / set-metadata-consent）
+// ============================================================================
+
+describe('nikkisync:get-metadata-consent（K2）', () => {
+  it('原样透传同意状态（endpoint 已由上游脱敏、fields 为技术字段清单）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-metadata-consent')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toBe(CONSENT_STATE)
+  })
+
+  it('未装配会话 ⇒ PRECONDITION_FAILED', async () => {
+    register(undefined)
+    const handler = getHandler(handleMock, 'nikkisync:get-metadata-consent')
+    const res = (await handler({})) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+
+  it('会话未挂同意面（解析关闭）⇒ PRECONDITION_FAILED 而非 INTERNAL', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.metadataConsentState).mockImplementationOnce(() => {
+      throw new Error('metadata consent is unavailable (resolver disabled)')
+    })
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-metadata-consent')
+    const res = (await handler({})) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+})
+
+describe('nikkisync:set-metadata-consent（K2）', () => {
+  it('合法入参下传并返回更新后的状态', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.setMetadataConsent).mockImplementationOnce(() => ({
+      ...CONSENT_STATE,
+      enabled: true
+    }))
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-metadata-consent')
+    const res = (await handler(
+      {},
+      { enabled: true, policyVersion: '2026-10-13.1' }
+    )) as HandleResult
+    expect(runtime.setMetadataConsent).toHaveBeenCalledWith(true, '2026-10-13.1')
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({ enabled: true })
+  })
+
+  it('入参非法（enabled 非布尔 / policyVersion 空/超长/非串）⇒ VALIDATION_ERROR 且不调句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-metadata-consent')
+    for (const input of [
+      {},
+      { enabled: 'yes', policyVersion: 'v' },
+      { enabled: true },
+      { enabled: true, policyVersion: '' },
+      { enabled: true, policyVersion: 'x'.repeat(65) },
+      { enabled: true, policyVersion: 12 }
+    ]) {
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.success, JSON.stringify(input)).toBe(false)
+      expect(res.error?.code, JSON.stringify(input)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.setMetadataConsent).not.toHaveBeenCalled()
+  })
+
+  it('上游 policyVersion 不匹配（中文原生文案）⇒ VALIDATION_ERROR 且不透传中文', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.setMetadataConsent).mockImplementationOnce(() => {
+      throw new Error('请先阅读并同意当前在线解析说明')
+    })
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-metadata-consent')
+    const res = (await handler({}, { enabled: true, policyVersion: 'stale' })) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(res.error?.message).not.toMatch(/[\u4e00-\u9fff]/)
+  })
+
+  it('未装配 / 同意面缺席 ⇒ PRECONDITION_FAILED', async () => {
+    register(undefined)
+    const missing = getHandler(handleMock, 'nikkisync:set-metadata-consent')
+    const res = (await missing(
+      {},
+      { enabled: true, policyVersion: '2026-10-13.1' }
+    )) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
   })
 })

@@ -78,6 +78,8 @@ interface NikkiSyncServerApiStub {
   getPairedDevices: Mock
   revokeDevice: Mock
   startScan: Mock
+  getMetadataConsent: Mock
+  setMetadataConsent: Mock
 }
 
 let settingsGet: Mock
@@ -90,6 +92,7 @@ function installElectronApi(
     persisted?: Record<string, unknown>
     status?: Record<string, unknown>
     runtimeStatus?: Record<string, unknown>
+    consent?: Record<string, unknown> | null
     devices?: ReturnType<typeof makeDevice>[]
     startServerReject?: Error
     pairedDevicesReject?: Error
@@ -144,7 +147,30 @@ function installElectronApi(
             throw opts.startScanReject
           }
         : async () => ({ scanId: 'scan_test' })
-    )
+    ),
+    // K2：在线解析同意（consent:null 模拟「解析关闭/未装配」⇒ 页面隐藏同意块）
+    getMetadataConsent: vi.fn(async () => {
+      if (opts.consent === null) {
+        throw new Error('metadata consent is unavailable')
+      }
+      return {
+        enabled: false,
+        policyVersion: '2026-10-13.1',
+        recipients: [
+          {
+            name: 'Nuan5 metadata service',
+            endpoint: 'https://nuan5.pro/api/decode-photo2',
+            fields: ['photo UID', 'NUAN5 JPEG-prefix parameter MD5 digest']
+          }
+        ],
+        ...(opts.consent ?? {})
+      }
+    }),
+    setMetadataConsent: vi.fn(async (input: { enabled: boolean; policyVersion: string }) => ({
+      enabled: input.enabled,
+      policyVersion: input.policyVersion,
+      recipients: []
+    }))
   }
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
@@ -398,5 +424,46 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     await waitFor(() => expect(serverApi.getRuntimeStatus).toHaveBeenCalled())
     await waitFor(() => expect(screen.getByText('运行状态')).toBeInTheDocument())
     expect(screen.queryByText('启动阶段')).not.toBeInTheDocument()
+  })
+
+  // ===== K2：在线解析同意 =====
+
+  it('(t) K2：解析开关关闭时不渲染同意块（同意面只在解析开启的会话上存在）', async () => {
+    installElectronApi({ consent: null })
+    renderSection()
+    await waitFor(() => expect(screen.getByText('运行状态')).toBeInTheDocument())
+    expect(screen.queryByText('在线参数解析说明')).not.toBeInTheDocument()
+  })
+
+  it('(u) K2：解析开启且同意可用 ⇒ 渲染端点/策略版本/字段清单；勾选携带页面 policyVersion 提交', async () => {
+    installElectronApi({
+      persisted: { [SETTING_METADATA_RESOLVER]: true },
+      consent: { enabled: false }
+    })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '同意发送照片参数' })
+    await waitFor(() => expect(screen.getByText('在线参数解析说明')).toBeInTheDocument())
+    expect(screen.getByText(/nuan5\.pro\/api\/decode-photo2/)).toBeInTheDocument()
+    expect(screen.getByText('2026-10-13.1')).toBeInTheDocument()
+    expect(screen.getByText('photo UID')).toBeInTheDocument()
+    fireEvent.click(toggle)
+    await waitFor(() =>
+      expect(serverApi.setMetadataConsent).toHaveBeenCalledWith({
+        enabled: true,
+        policyVersion: '2026-10-13.1'
+      })
+    )
+  })
+
+  it('(v) K2：提交失败（policyVersion 过期）⇒ 开关回滚为原态并报错', async () => {
+    installElectronApi({
+      persisted: { [SETTING_METADATA_RESOLVER]: true },
+      consent: { enabled: false }
+    })
+    serverApi.setMetadataConsent.mockRejectedValueOnce(new Error('policy version mismatch'))
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '同意发送照片参数' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
   })
 })

@@ -4419,6 +4419,15 @@
         "lanListen": "LAN-Dienst bereit",
         "cachedMetadata": "Upgrade zwischengespeicherter Metadaten"
       }
+    },
+    "consent": {
+      "title": "Hinweis zur Online-Parameterauflösung",
+      "endpoint": "Dienst-Endpunkt",
+      "policyVersion": "Richtlinienversion",
+      "fields": "Gesendete Daten",
+      "enable": "Versand der Fotoparameter zustimmen",
+      "enableDesc": "Bis zur Zustimmung wird nichts an den Drittanbieter gesendet; nach der Zustimmung werden die oben aufgeführten Daten gesendet, um Ergebnisse für Outfits und Kameraparameter zu erhalten.",
+      "revokeNote": "Das Ausschalten widerruft die Zustimmung sofort und bricht laufende Anfragen ab; bereits in die lokale Synchron-Datenbank geschriebene Ergebnisse bleiben unberührt."
     }
   },
   "shareCard": {

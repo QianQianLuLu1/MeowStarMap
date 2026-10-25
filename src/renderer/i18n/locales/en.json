@@ -4419,6 +4419,15 @@
         "lanListen": "LAN listening",
         "cachedMetadata": "Cached metadata upgrade"
       }
+    },
+    "consent": {
+      "title": "Online parameter resolution notice",
+      "endpoint": "Service endpoint",
+      "policyVersion": "Policy version",
+      "fields": "Data sent",
+      "enable": "Consent to send photo parameters",
+      "enableDesc": "Nothing is sent to the third party until you consent; after consent, the items listed above are sent to obtain outfit and camera parameter resolution results.",
+      "revokeNote": "Turning this off withdraws consent immediately and aborts in-flight requests; results already written to the local sync database are unaffected."
     }
   },
   "shareCard": {

@@ -85,6 +85,27 @@ export interface NikkiSyncMetadataResolutionStatus {
   lastDrive?: { passes: number; resolved: number; aborted: boolean; failed: boolean }
 }
 
+/** 同意状态（`nikkisync:get-metadata-consent` 的响应体形状）。 */
+export interface NikkiSyncMetadataConsentState {
+  enabled: boolean
+  policyVersion: string
+  recipients: Array<{ name: string; endpoint: string; fields: string[] }>
+}
+
+/**
+ * 上游 `metadata/MetadataOnlineConsent.ts` 的本仓最小面（K2）。
+ * 仅在「解析开启 && consentFile 给出 && 深入口在位」时挂上会话；`guard()` 是
+ * facade 内部的包装动作，不出会话面。`state().recipients[].endpoint` 由上游脱敏
+ * （剥 userinfo/query/hash），可直接进 IPC 响应体。
+ */
+export interface NikkiSyncMetadataConsent {
+  state(): NikkiSyncMetadataConsentState
+  /** policyVersion 不匹配时上游抛错（中文原生文案，handler 层映射、不透传渲染层）。 */
+  setEnabled(enabled: boolean, policyVersion?: string): void
+  /** 撤回时中止在途请求（上游 `setEnabled(false)` 内部也会调用）。 */
+  abortPending(): void
+}
+
 /** `DatabaseManager` 中被本阶段用到的最小面。 */
 export interface DatabaseConnectionLike {
   prepare(sql: string): { all(...values: unknown[]): unknown[]; get(...values: unknown[]): unknown }
@@ -345,6 +366,12 @@ export interface NikkiSyncRuntimeSession {
    * K1 在启动后与手动扫描后各调用一次，本层不接定时器。
    */
   cachedMetadataRunOnce?: () => number
+  /**
+   * K2：在线解析同意面。仅「解析开启 && consentFile 给出 && 深入口在位」时挂出；
+   * 缺席 = 该会话没有可管理的同意（解析关闭或老链接），manager 层据此抛
+   * unavailable、handler 映射 PRECONDITION_FAILED。
+   */
+  metadataConsent?: NikkiSyncMetadataConsent
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
@@ -431,4 +458,11 @@ export interface NikkiSyncRuntimeHandle {
   listPairedDevices(): Promise<NikkiSyncPairedDeviceView[]>
   /** 撤销设备并返回撤销后的列表；设备不存在/已撤销上抛（由 handler 映射 notFound）。 */
   revokeDevice(deviceId: string): Promise<NikkiSyncPairedDeviceView[]>
+  /**
+   * K2：在线解析同意状态。会话未装配或同意面缺席（解析关闭/老链接）时抛
+   * unavailable 语义错误，由 handler 映射 PRECONDITION_FAILED。
+   */
+  metadataConsentState(): NikkiSyncMetadataConsentState
+  /** K2：写同意开关（policyVersion 必须与当前策略一致，上游校验）；返回更新后的状态。 */
+  setMetadataConsent(enabled: boolean, policyVersion: string): NikkiSyncMetadataConsentState
 }

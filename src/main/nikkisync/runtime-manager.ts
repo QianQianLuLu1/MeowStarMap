@@ -18,6 +18,7 @@
 import type {
   NikkiSyncPairedDeviceView,
   NikkiSyncPairingCode,
+  NikkiSyncMetadataConsentState,
   NikkiSyncMetadataCounters,
   NikkiSyncMetadataResolutionStatus,
   NikkiSyncRuntimeHandle,
@@ -97,6 +98,8 @@ export interface FakeSessionPlan {
   cachedMetadataRunOnceThrows?: boolean
   /** K1：`cachedMetadataRunOnce()` 返回值序列；缺省每轮 0。 */
   cachedMetadataRunOnceResults?: number[]
+  /** K2：会话上是否挂出同意面（默认不挂 ⇒ manager 的同意读写抛 unavailable）。 */
+  metadataConsentPresent?: boolean
 }
 
 export interface RuntimeManagerDependencies {
@@ -627,6 +630,30 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return session.listPairedDevices()
   }
 
+  /** K2：同意面缺席（解析关闭/老链接/未装配）的统一拒绝口径（handler 映射 PRECONDITION_FAILED）。 */
+  function requireConsent() {
+    const consent = requireSession().metadataConsent
+    if (!consent) {
+      throw new Error(
+        'metadata consent is unavailable (resolver disabled or consent entry missing)'
+      )
+    }
+    return consent
+  }
+
+  function metadataConsentState(): NikkiSyncMetadataConsentState {
+    return requireConsent().state()
+  }
+
+  function setMetadataConsent(
+    enabled: boolean,
+    policyVersion: string
+  ): NikkiSyncMetadataConsentState {
+    const consent = requireConsent()
+    consent.setEnabled(enabled, policyVersion)
+    return consent.state()
+  }
+
   return {
     status,
     start,
@@ -648,6 +675,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     stopSyncServer,
     pairingCode,
     listPairedDevices,
-    revokeDevice
+    revokeDevice,
+    metadataConsentState,
+    setMetadataConsent
   }
 }

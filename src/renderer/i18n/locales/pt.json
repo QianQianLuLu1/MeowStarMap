@@ -4419,6 +4419,15 @@
         "lanListen": "Escuta LAN",
         "cachedMetadata": "Atualização de metadados em cache"
       }
+    },
+    "consent": {
+      "title": "Aviso de resolução de parâmetros on-line",
+      "endpoint": "Endpoint do serviço",
+      "policyVersion": "Versão da política",
+      "fields": "Dados enviados",
+      "enable": "Consentir o envio de parâmetros das fotos",
+      "enableDesc": "Nada é enviado a terceiros até você consentir; após consentir, os itens acima são enviados para obter os resultados de resolução de conjuntos e parâmetros de câmera.",
+      "revokeNote": "Desativar retira o consentimento imediatamente e aborta as solicitações em andamento; os resultados já gravados no banco de sincronização local não são afetados."
     }
   },
   "shareCard": {

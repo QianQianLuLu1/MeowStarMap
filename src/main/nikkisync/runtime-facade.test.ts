@@ -497,14 +497,26 @@ interface SessionFixture {
   metadataHandle: { start: () => void; stop: () => void; runOnce: () => Promise<number> }
   diagnostics: (database: unknown, resolverEnabled: boolean) => unknown
   close: () => void
+  /** K2：上游同意构造器收到的 (file, recipients, initiallyDisabled) 三元组。 */
+  consentCalls: Array<{ file: string; recipients: unknown; initiallyDisabled: boolean | undefined }>
+  /** K2：构造出的假同意实例（guard 是否被调、setEnabled 透传的可观察面）。 */
+  consentInstances: Array<{
+    enabled: () => boolean
+    state: () => Record<string, unknown>
+    setEnabled: (enabled: boolean, policyVersion?: string) => void
+    abortPending: () => void
+    guard: (resolver: unknown) => unknown
+  }>
 }
 
 /**
  * 只喂 `createRuntimeSession` 所需的假装载面。
  * 关键复刻点：上游 `runtime.ts:74-81` **仅在 `metadataResolver` 键存在时**才构造服务实例，
  * 因此假 Runtime 也按同一条件挂 `metadataResolver`，否则测不出「键缺失」的真实后果。
+ * K2 开关 `consentSurfaceDisabled`：模拟「同意深入口缺席的老链接会话」（不包装、不挂 consent 面）。
  */
-function createSessionFixture(): SessionFixture {
+function createSessionFixture(options: { consentSurfaceDisabled?: boolean } = {}): SessionFixture {
+  const consentSurfaceDisabled = options.consentSurfaceDisabled === true
   const close = vi.fn()
   const metadataHandle = {
     start: vi.fn(),
@@ -512,6 +524,12 @@ function createSessionFixture(): SessionFixture {
     runOnce: vi.fn(async () => 0)
   }
   const resolverConfigs: Record<string, unknown>[] = []
+  const consentCalls: Array<{
+    file: string
+    recipients: unknown
+    initiallyDisabled: boolean | undefined
+  }> = []
+  const consentInstances: SessionFixture['consentInstances'] = []
   let capturedConfig: Record<string, unknown> | undefined
   const runtimeShape = {
     database: {
@@ -576,7 +594,46 @@ function createSessionFixture(): SessionFixture {
     },
     metadataDiagnostics: {
       metadataResolutionDiagnostics: vi.fn(() => ({ schemaVersion: 1, withCamera: 0 }))
-    }
+    },
+    ...(consentSurfaceDisabled
+      ? {}
+      : {
+          metadataOnlineConsent: {
+            MetadataOnlineConsent: class {
+              granted = false
+              constructor(
+                public readonly file: string,
+                public readonly recipients: unknown,
+                public readonly initiallyDisabled?: boolean
+              ) {
+                consentCalls.push({ file, recipients, initiallyDisabled })
+                consentInstances.push(this)
+              }
+              enabled(): boolean {
+                return this.granted
+              }
+              state(): Record<string, unknown> {
+                return {
+                  enabled: this.granted,
+                  policyVersion: '2026-10-13.1',
+                  recipients: this.recipients
+                }
+              }
+              setEnabled(enabled: boolean, policyVersion?: string): void {
+                // 复刻上游：policyVersion 不匹配抛中文文案（handler 层映射的判据）
+                if (enabled && policyVersion !== '2026-10-13.1') {
+                  throw new Error('请先阅读并同意当前在线解析说明')
+                }
+                this.granted = enabled
+              }
+              abortPending(): void {}
+              guard(resolver: unknown): unknown {
+                // 可识别的包装形态：K2 断言「下发给上游的是 guard 的返回值」
+                return { ...(resolver as Record<string, unknown>), __consentGuarded: true }
+              }
+            }
+          }
+        })
   } as unknown as RuntimeSurface
 
   return {
@@ -585,7 +642,9 @@ function createSessionFixture(): SessionFixture {
     resolverConfigs,
     metadataHandle: metadataHandle as unknown as SessionFixture['metadataHandle'],
     diagnostics: surface.metadataDiagnostics.metadataResolutionDiagnostics,
-    close: close as unknown as () => void
+    close: close as unknown as () => void,
+    consentCalls,
+    consentInstances
   }
 }
 
@@ -660,6 +719,84 @@ describe('createRuntimeSession 元数据解析单缝注入（阶段 6）', () =>
     const fixture = createSessionFixture()
     await createRuntimeSession(sessionOptions(), fixture.surface)
     expect(fixture.capturedConfig() && 'metadataResolver' in fixture.capturedConfig()!).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------- K2：在线解析同意
+
+describe('createRuntimeSession 元数据在线同意（K2）', () => {
+  it('K2-f1 解析开启 + consentFile：构造同意（fail-closed 三元组）并下发 guard 包装后的 resolver', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        consentFile: '/tmp/userData/nikkisync/metadata-online-consent.json'
+      },
+      fixture.surface
+    )
+    expect(fixture.consentCalls).toHaveLength(1)
+    const call = fixture.consentCalls[0]
+    expect(call.file).toBe('/tmp/userData/nikkisync/metadata-online-consent.json')
+    // fail-closed 缺省（§14-Q3）：比上游 fresh-install 默认放行更严
+    expect(call.initiallyDisabled).toBe(true)
+    // recipients 逐字来自主进程常量：披露文案与实际出口同源
+    const recipients = call.recipients as Array<{
+      name: string
+      endpoint: string
+      fields: string[]
+    }>
+    expect(recipients).toHaveLength(1)
+    expect(recipients[0].endpoint).toBe(NUAN5_METADATA_ENDPOINT)
+    expect(recipients[0].fields.length).toBeGreaterThan(0)
+    // 下发给上游的是 guard() 的返回值（带可识别标记），不是裸 resolver
+    const injected = fixture.capturedConfig()?.metadataResolver as {
+      resolver: Record<string, unknown>
+    }
+    expect(injected.resolver.__consentGuarded).toBe(true)
+    // 会话挂出同意面（manager → handler 消费）
+    expect(session.metadataConsent).toBe(fixture.consentInstances[0])
+  })
+
+  it('K2-f2 解析关闭：同意不构造（沿「关闭时连键都不下发」口径），会话无 consent 面', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(false),
+        consentFile: '/tmp/userData/nikkisync/metadata-online-consent.json'
+      },
+      fixture.surface
+    )
+    expect(fixture.consentCalls).toHaveLength(0)
+    expect(session.metadataConsent).toBeUndefined()
+    expect(fixture.capturedConfig() && 'metadataResolver' in fixture.capturedConfig()!).toBe(false)
+  })
+
+  it('K2-f3 consentFile 缺省：不构造同意，resolver 裸下发（不包装）', async () => {
+    const fixture = createSessionFixture()
+    await createRuntimeSession(sessionOptions(true), fixture.surface)
+    expect(fixture.consentCalls).toHaveLength(0)
+    const injected = fixture.capturedConfig()?.metadataResolver as {
+      resolver: Record<string, unknown>
+    }
+    expect(injected.resolver.__consentGuarded).toBeUndefined()
+    expect(injected.resolver.id).toBe('nuan5-compatible')
+  })
+
+  it('K2-f4 深入口缺席（老链接会话）：不构造同意、不包装、不挂会话面', async () => {
+    const fixture = createSessionFixture({ consentSurfaceDisabled: true })
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        consentFile: '/tmp/userData/nikkisync/metadata-online-consent.json'
+      },
+      fixture.surface
+    )
+    expect(fixture.consentCalls).toHaveLength(0)
+    expect(session.metadataConsent).toBeUndefined()
+    const injected = fixture.capturedConfig()?.metadataResolver as {
+      resolver: Record<string, unknown>
+    }
+    expect(injected.resolver.__consentGuarded).toBeUndefined()
   })
 })
 

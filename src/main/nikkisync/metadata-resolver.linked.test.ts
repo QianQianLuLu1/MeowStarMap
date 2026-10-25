@@ -270,4 +270,100 @@ suite('阶段 6 元数据解析链接态', () => {
     expect(() => session?.stopMetadataResolver()).not.toThrow()
     expect(() => session?.stopMetadataResolver()).not.toThrow()
   })
+
+  // ---------------------------------------------------------------- K2：在线解析同意
+
+  it('K2 真实同意门：未同意 ⇒ runOnce 零出站、失败归入 failureCategories；同意文件持久化后新会话可解析', async () => {
+    expect(session).toBeDefined()
+    // 独立假解析器：resolve 被调一次就能观测「是否真的出站」
+    let fakeResolveCalls = 0
+    const countingFixture = {
+      id: 'counting-fixture-resolver',
+      version: '1',
+      resolve: async () => {
+        fakeResolveCalls += 1
+        return {
+          provider: 'counting-fixture-resolver',
+          metadata: { camera: { focalLength: 50 }, dressing: { clothes: [101] } }
+        }
+      }
+    }
+    class CountingResolverCtor {
+      constructor() {
+        return countingFixture as unknown as CountingResolverCtor
+      }
+    }
+    const consentSurface = {
+      ...surface,
+      nuan5Resolver: {
+        Nuan5CompatibleResolver: CountingResolverCtor
+      } as unknown as RuntimeSurface['nuan5Resolver']
+    }
+    const consentFile = path.join(fixtureRoot, 'metadata-online-consent.json')
+
+    // ① 未同意（initiallyDisabled + 无同意文件）：runOnce 零出站，失败计数归入诊断
+    const denied = await createRuntimeSession(
+      {
+        databaseFile: path.join(fixtureRoot, 'consent-denied.db'),
+        watcher: false,
+        projectRoot,
+        metadataResolverEnabled: true,
+        consentFile
+      },
+      consentSurface
+    )
+    try {
+      expect(denied.metadataConsent).toBeDefined()
+      expect(denied.metadataConsent?.state().enabled).toBe(false)
+      seedAssets(denied.runtime.database)
+      const beforeCalls = fakeResolveCalls
+      const resolved = await denied.metadataRunOnce?.()
+      expect(resolved).toBe(0)
+      expect(fakeResolveCalls).toBe(beforeCalls)
+      const counters = denied.metadataDiagnostics() as NikkiSyncMetadataCounters
+      expect(counters.failed).toBeGreaterThan(0)
+      expect(counters.resolved).toBe(0)
+      expect(Object.keys(counters.failureCategories).length).toBeGreaterThan(0)
+
+      // ② 同意写入磁盘（policyVersion 取自 state，与 UI「携带页面展示版本提交」同口径）
+      denied.metadataConsent?.setEnabled(true, denied.metadataConsent?.state().policyVersion)
+      expect(denied.metadataConsent?.state().enabled).toBe(true)
+      expect(fs.existsSync(consentFile)).toBe(true)
+    } finally {
+      denied.stopMetadataResolver()
+      await denied.scanner.stop().catch(() => undefined)
+      denied.dispose()
+    }
+
+    // ③ 同意文件跨会话生效：新会话（新库、同一 consentFile）读回已同意 ⇒ 可解析
+    const granted = await createRuntimeSession(
+      {
+        databaseFile: path.join(fixtureRoot, 'consent-granted.db'),
+        watcher: false,
+        projectRoot,
+        metadataResolverEnabled: true,
+        consentFile
+      },
+      consentSurface
+    )
+    try {
+      expect(granted.metadataConsent?.state().enabled).toBe(true)
+      seedAssets(granted.runtime.database)
+      const beforeCalls = fakeResolveCalls
+      let total = 0
+      for (let round = 0; round < 40 && total < PHOTO_COUNT; round += 1) {
+        const resolved = await granted.metadataRunOnce?.()
+        if (!resolved) break
+        total += resolved
+      }
+      expect(total).toBe(PHOTO_COUNT)
+      expect(fakeResolveCalls).toBeGreaterThan(beforeCalls)
+      const counters = granted.metadataDiagnostics() as NikkiSyncMetadataCounters
+      expect(counters.resolved).toBe(PHOTO_COUNT)
+    } finally {
+      granted.stopMetadataResolver()
+      await granted.scanner.stop().catch(() => undefined)
+      granted.dispose()
+    }
+  })
 })

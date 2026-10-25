@@ -53,6 +53,8 @@ interface FakeCalls {
   runtimeStart: number
   /** K1：缓存解码元数据闭包被调次数。 */
   cachedMetadataRunOnce: number
+  /** K2：同意开关 setEnabled 收到的参数序列。 */
+  metadataConsentSet: Array<{ enabled: boolean; policyVersion?: string }>
 }
 
 /**
@@ -190,6 +192,27 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
           }
         }
       : {}),
+    // K2：上游同意面「仅解析开启时挂出」的镜像（默认缺席 ⇒ manager 读写抛 unavailable）
+    ...(plan.metadataConsentPresent
+      ? {
+          metadataConsent: {
+            state: () => ({
+              enabled: false,
+              policyVersion: '2026-10-13.1',
+              recipients: [
+                {
+                  name: 'Nuan5 metadata service',
+                  endpoint: 'https://nuan5.pro/api/decode-photo2',
+                  fields: ['photo UID']
+                }
+              ]
+            }),
+            setEnabled: (enabled: boolean, policyVersion?: string) => {
+              calls.metadataConsentSet.push({ enabled, policyVersion })
+            }
+          }
+        }
+      : {}),
     metadataDiagnostics: () => {
       calls.metadataDiagnostics += 1
       return {
@@ -245,7 +268,8 @@ function createDependencies(
     metadataRunOnce: 0,
     metadataDiagnostics: 0,
     runtimeStart: 0,
-    cachedMetadataRunOnce: 0
+    cachedMetadataRunOnce: 0,
+    metadataConsentSet: []
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
@@ -988,5 +1012,34 @@ describe('K1：启动阶段观测与缓存解码元数据接线', () => {
     expect(manager.status().startupStages).toBeTruthy()
     await manager.stop()
     expect(manager.status().startupStages).toBeUndefined()
+  })
+})
+
+describe('K2：元数据在线同意读写', () => {
+  it('K2-m1 会话无同意面（解析关闭）⇒ 读写都抛 unavailable（handler 映射 PRECONDITION_FAILED）', async () => {
+    const { deps } = createDependencies({}, { metadataConsentPresent: false })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(() => manager.metadataConsentState()).toThrow(/unavailable/)
+    expect(() => manager.setMetadataConsent(true, '2026-10-13.1')).toThrow(/unavailable/)
+  })
+
+  it('K2-m2 有同意面：state 原样透传；setEnabled 下传 (enabled, policyVersion)', async () => {
+    const { deps, calls } = createDependencies({}, { metadataConsentPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const state = manager.metadataConsentState()
+    expect(state).toMatchObject({
+      enabled: false,
+      policyVersion: '2026-10-13.1',
+      recipients: [
+        {
+          name: 'Nuan5 metadata service',
+          endpoint: 'https://nuan5.pro/api/decode-photo2'
+        }
+      ]
+    })
+    manager.setMetadataConsent(true, '2026-10-13.1')
+    expect(calls.metadataConsentSet).toEqual([{ enabled: true, policyVersion: '2026-10-13.1' }])
   })
 })
