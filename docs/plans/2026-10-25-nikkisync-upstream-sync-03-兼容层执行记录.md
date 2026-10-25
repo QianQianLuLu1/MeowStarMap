@@ -2,7 +2,7 @@
 
 > 生成日期：2026-10-25 · 执行依据：已批准的 [`02-实施计划`](2026-10-25-nikkisync-upstream-sync-02-实施计划.md) §5
 > 批准方式：用户裁示「计划整体批准，§14 六项待确认按提案裁示」（2026-10-25，已回填 02 文档状态行与 §14 裁示记录）
-> 本仓 `main` 起点 `dc9f085`；阶段内提交：`b8c78e9`（docs(plans) 计划入库+批准回填）→ `c48a037`（feat(nikkisync) C2）→（后续节点按序追加）
+> 本仓 `main` 起点 `dc9f085`；阶段内提交：`b8c78e9`（docs(plans) 计划入库+批准回填）→ `c48a037`（feat(nikkisync) C2）→ `f43faa9`（docs(nikkisync) C3）→ `9bb771b`（feat(sync) C4）→ `505718c`（feat(nikkisync) C5）→ 收尾 `docs(plans)`（本档 + 02 §16 回填）
 > 上游锚定 `b422193`（工作区全程 0 行 porcelain，本阶段零修改上游源码）
 > 环境：Node v26.3.0 / npm 11.16.0 / git 2.55.0.windows.2 / electron 41.10.6；四条 junction 在位（12:53 建立），无需 install
 
@@ -124,3 +124,72 @@ C3 提交（`f43faa9`）之后、C4 开工之前，工作区出现三份**未提
 - 上游 `POST /v1/organizer/sync` 硬编码路由未登记进 `API_ROUTES`、未注入时返回 404 兜底文案——本仓 K8 接入前无互操作影响（C1-3 链接态 259 测全绿已含同步服务面回归）。
 
 （C5/C6/收尾记录随节点执行追加。）
+
+## 5. C5 装载面结构跟随（提交 `505718c`）
+
+### 5.1 红灯证据（2026-10-25 15:20）
+
+`npx vitest run src/main/nikkisync/sync-server-view.test.ts src/main/nikkisync/runtime-facade.test.ts` → **Tests 5 failed | 48 passed (53)**：
+
+- view 两支红：`AssertionError: expected undefined to be [Function connectionHosts]`（透传缺失）。
+- facade 四缝红：config 未收到 `onStartupStage`/`server.connectionHosts`、`pairingUri` 三参调用被吞（`expected [ {host:'h1',…} ] to deeply equal […]` 逐参不符）、`session.deletions` undefined、`session.cachedMetadataRunOnce` undefined。
+
+覆盖意图：两处透传缝的「存在 + 缺省连键都不下发」双支、三参透传的逐参形态、同引用透传不复制、闭包仅存在时挂出（老 surface 形态缺席）。
+
+### 5.2 改动文件清单
+
+| 文件                                     | 改动                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/nikkisync/runtime-types.ts`    | 十项声明扩展：新增 `DeletionQueueLike`（list/decide/approveMany/activity/stop 五方法，不含 sync/preview，注释说明 K8 归属与上游错误码）；`EmbeddedRuntimeLike` 增 `readonly deletions` 与 `createPairingUri` 第三参 `hosts?`；`ScannerServiceLike` 增 `getScanRoots/getAutomaticRoots/getExtraDirectoryCount/setExtraDirectories`；`NikkiSyncSessionOptions` 增 `onStartupStage?/consentFile?`；`NikkiSyncSyncServerConfig` 增 `connectionHosts?: () => string[]`；`NikkiSyncRuntimeStatus` 增 `startupStages?/scanDiagnostics?`；`NikkiSyncSyncServerStatus` 增 `connectionHosts?/diagnostics?`；`NikkiSyncPairingCode` 增 `hosts?`；`NikkiSyncRuntimeSession` 增 `deletions`、`pairingUri` 三参、`cachedMetadataRunOnce?: () => number` |
+| `src/main/nikkisync/runtime-facade.ts`   | 四注入缝：构造 config 透传 `onStartupStage`（缺省连键都不下发）；三深入口装载（`CACHED_DECODED_METADATA_DEEP_ENTRY`/`LAN_ADDRESS_DEEP_ENTRY`/`GAME_VERSION_CALENDAR_DEEP_ENTRY` + `RuntimeSurface` 三字段，注释注明 K2/K6/K7 深入口在消费节点就地增载）；`session.deletions = runtime.deletions`（同引用）；`pairingUri` 三参分支透传；`cachedMetadataRunOnce` 闭包（模块在位时以 `runtime.database` 预构造上游服务，同步返回值逐字透传）                                                                                                                                                                                                                                                                                                 |
+| `src/main/nikkisync/sync-server-view.ts` | `resolveSyncServerConfig`/`embeddedServerConfig` 的 `connectionHosts` 函数引用透传（缺省时键不存在）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 配套测试 ×2                              | 上述红灯用例（5 个）+ C5 专用夹具（记录 `createPairingUri` 调用、带 `deletions` 与 `CachedDecodedMetadataService` 假面）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+
+### 5.3 绿灯与零回归证据
+
+- 同两文件 → **53 passed (53)**，5 红全转绿。
+- `npx vitest run src/main/nikkisync` → **229 passed (229)**，0 skip，域内零回归（含 C3-3 重开用例、链接态 sync-server/runtime-facade 全套）。
+- `npm run verify` → 首跑 format ✗（新代码长行），prettier 后 **5 项全 ✓**；pre-commit（lint-staged + core-gate + tsc -b）全过，提交 `505718c`（commitlint 一条 body 行长 warning，非阻断）。
+
+## 6. C6 打包收集核查（零配置改动实证，无独立提交）
+
+| #    | 动作                                                                                                                                            | 结果                                                                                                                    |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| C6-1 | `package.json` build.files 对象式 from/to（`node_modules/@nikkisync` → 同名目标，filter `**/*`）+ `asarUnpack: "**/@nikkisync/**"` 均为通配收集 | 新模块 dist 文件**自动收进**，无需配置改动；`git diff dc9f085..HEAD -- package.json` → **0 行**（本阶段零配置改动实证） |
+| C6-2 | `npm run build`（5.04s 成功）→ `npm run verify:nikkisync`                                                                                       | 第 7 项折叠检查 ✓（zero `require("@nikkisync` hits across `dist/main/main/app/*.js`）；12 项全 ✓、0 blocking            |
+| C6-3 | 链接源存在性核对（`node_modules/@nikkisync/pc-companion/dist/src/` 下 7 能力深入口 + `core/dist/src/decoded-metadata.js`）                      | 8/8 OK（逐项 test -f 输出）                                                                                             |
+
+**与计划 §4 的偏差记录**：C6 预期提交类型 `chore(nikkisync)`，但本节点实证结论为零改动（产物断言已由 C2-3 落进 `pre-dist-check.ts`），无文件变更即无独立提交——证据型节点，结论入本档。完整安装包态（asar.unpacked 逐项 + dist:win）按计划归收尾节点 F（能力层之后）。
+
+## 7. 阶段验收与遗留
+
+### 7.1 验收自检（对照任务验收标准）
+
+- [x] `verify:nikkisync` 通过且链接态事实正确（12 项全 ✓，第 12 项为 C2 新增；上游 `b422193` 工作区全程 0 行）
+- [x] nikkisync 域链接态测试真实执行全绿（229/229，0 skip——非 skip 证据：`runtime-facade.linked`/`sync-server.linked`/`metadata-resolver.linked` 等真实装载上游产物）；未链接 skip 门控未破坏（新增测试全部走 `hasNikkiSyncLink`/假 surface 注入，无目录存在性判定）
+- [x] protocol-drift 零差异（含 C4 新增三组配对 URI 采样键，链接态逐字节一致）
+- [x] typecheck/lint/format 无新增失败（每节点 `npm run verify` 五项全绿；阶段末矩阵见 §7.3）
+- [x] 本仓未改上游源码（上游仓 porcelain 全程 0 行）；未新增 `package.json` 的 `@nikkisync` 声明（C6-1 实证 0 行 diff）；未新增任何 npm 依赖
+- [x] 节点独立提交：`b8c78e9` → `c48a037`（C2）→ `f43faa9`（C3）→ `9bb771b`（C4）→ `505718c`（C5）；全部走 pre-commit 钩子（无 --no-verify）；既有 `M package-lock.json` 未纳入任何提交
+
+### 7.2 遗留与分歧项
+
+| #   | 项                                | 说明                                                                                                                                                                                                                                  |
+| --- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | C4 红灯用例系工作区预置           | C3 提交后工作区出现三份未提交改动（protocol.test.ts / protocol-contract.ts / protocol-contract.test.ts），经逐行审查与计划 C4-3/C4-4 一致后采纳为红灯用例随 C4 提交（§4.1）；来源为会话外（用户或并行会话），本会话全程未与该来源冲突 |
+| 2   | C4-1 计划文字「capture 块」系笔误 | 实际对齐目标为上游 camera 块（§4.3 注），已按上游文件形状执行                                                                                                                                                                         |
+| 3   | C6 无独立提交                     | 证据型节点零代码改动（§6 偏差记录）                                                                                                                                                                                                   |
+| 4   | C3-3 证明型用例首跑即绿           | 与「红灯先行」总纲的偏差已在计划层面声明（零适配证明型），结论成立（§3.3）                                                                                                                                                            |
+| 5   | commitlint 一条 warning           | `505718c` body 行超 120 字符（warning 非 error，未阻断）；后续节点注意换行                                                                                                                                                            |
+| 6   | 能力层（K1–K8）与收尾（F）未开工  | 按阶段边界留给下一阶段；§14 六项已随计划批准按提案裁示（02 文档 §14 裁示记录）                                                                                                                                                        |
+
+### 7.3 阶段末校验矩阵（2026-10-25 15:27 实跑）
+
+| #   | 命令                                                                                                                                                    | 结果                                                                         |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 1   | `npm run verify`                                                                                                                                        | 5 项全 ✓（typecheck / lint / core-gate / format / test；各节点收尾亦均跑过） |
+| 2   | `npm run typecheck && npm run typecheck:e2e`                                                                                                            | 双通过（tsc -b + tsconfig.scripts.json、tsc --noEmit -p e2e，零错误输出）    |
+| 3   | `npx vitest run src/main/nikkisync src/shared/sync scripts/__tests__/{link-nikkisync,verify-nikkisync-link,self-contained-deps,pre-dist-check}.test.ts` | **339 passed (339)**，0 失败 0 skip（15.36s）                                |
+| 4   | `npm run verify:nikkisync`                                                                                                                              | 12 项全 ✓，`OK (blocking failures: 0)`（C6 时点实测）                        |
+
+阶段收尾提交：`docs(plans)`（本文档 C5/C6/§7 回填 + 02 §16 执行记录表回填）。
