@@ -51,6 +51,31 @@ const STARTUP_STAGE_I18N_KEYS: Record<string, string> = {
 }
 
 /**
+ * K7：`scanDiagnostics.lastScan` 七计数 → 「观察 31 · 收录 25 …」紧凑串。
+ * 纯展示聚合：缺段跳过、全缺返回 null（行不渲染），绝不给缺省计数编 0。
+ */
+function formatLastScanCounts(scanDiagnostics: unknown, t: (key: string) => string): string | null {
+  const lastScan =
+    typeof scanDiagnostics === 'object' && scanDiagnostics !== null
+      ? (scanDiagnostics as { lastScan?: Record<string, unknown> }).lastScan
+      : undefined
+  if (typeof lastScan !== 'object' || lastScan === null) return null
+  const entries: Array<[string, string]> = [
+    ['filesObserved', t('syncService.diagnostics.lastScanObserved')],
+    ['resourcesAccepted', t('syncService.diagnostics.lastScanAccepted')],
+    ['resourcesIgnored', t('syncService.diagnostics.lastScanIgnored')],
+    ['assetsCreated', t('syncService.diagnostics.lastScanCreated')],
+    ['assetsUpdated', t('syncService.diagnostics.lastScanUpdated')],
+    ['assetsDeleted', t('syncService.diagnostics.lastScanDeleted')],
+    ['errorCount', t('syncService.diagnostics.lastScanErrors')]
+  ]
+  const parts = entries
+    .filter(([key]) => typeof lastScan[key] === 'number')
+    .map(([key, label]) => `${label} ${String(lastScan[key])}`)
+  return parts.length > 0 ? parts.join(' · ') : null
+}
+
+/**
  * 同步服务二级子页（层级 2）。原设置页 `sync` 分组的 `SyncServiceSection`，
  * 随「同步服务从设置页剥离」迁入同步图库板块：入口是 `SyncGalleryToolbar` 的
  * 「同步服务」按钮，走 `navigateTo('sync-service')` 压栈，返回用侧边栏返回按钮。
@@ -84,6 +109,8 @@ export const SyncServicePage: React.FC = () => {
   const [status, setStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
   // K1：本会话真实发生的启动阶段（runtime-status 响应体可选段；缺省 = 尚无已完成阶段）
   const [startupStages, setStartupStages] = useState<Array<{ stage: string; at: string }>>([])
+  // K7：最近一次扫描的诊断聚合计数（runtime-status 响应体可选段；未扫描/老链接缺省）
+  const [scanDiagnostics, setScanDiagnostics] = useState<Record<string, unknown> | null>(null)
   const [devices, setDevices] = useState<NikkiSyncPairedDeviceInfo[]>([])
   const [busy, setBusy] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
@@ -108,6 +135,10 @@ export const SyncServicePage: React.FC = () => {
       setStatus(nextStatus)
       setDevices(nextDevices)
       setStartupStages(nextRuntime?.startupStages ?? [])
+      setScanDiagnostics(
+        (nextRuntime as { scanDiagnostics?: Record<string, unknown> } | null)?.scanDiagnostics ??
+          null
+      )
     } catch {
       // 状态查询失败静默：轮询下一轮重试（未组装时 getServerStatus 返回 available:false 不抛）
     }
@@ -397,6 +428,8 @@ export const SyncServicePage: React.FC = () => {
   }
 
   const running = Boolean(status?.running)
+  // K7：诊断卡「上次扫描」行文本（段缺失/未扫描时为 null ⇒ 行不渲染）
+  const lastScanText = formatLastScanCounts(scanDiagnostics, t)
 
   return (
     <div className="flex h-full flex-col">
@@ -596,6 +629,12 @@ export const SyncServicePage: React.FC = () => {
                           </span>
                         </SettingsRow>
                       )}
+                    {/* K7：上次扫描计数（runtime-status 响应体；仅计数无路径/UID/错误原文） */}
+                    {lastScanText && (
+                      <SettingsRow label={t('syncService.diagnostics.lastScan')}>
+                        <span className="font-mono text-xs">{lastScanText}</span>
+                      </SettingsRow>
+                    )}
                     {status.diagnostics.lastError && (
                       <SettingsRow label={t('syncService.diagnostics.lastError')}>
                         <span

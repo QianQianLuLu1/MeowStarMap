@@ -4441,7 +4441,15 @@
       "tlsTail": "TLS fingerprint (last 8)",
       "devices": "Paired devices",
       "altHosts": "Alternate addresses",
-      "lastError": "Last error"
+      "lastError": "Last error",
+      "lastScan": "Last scan",
+      "lastScanObserved": "Observed",
+      "lastScanAccepted": "Accepted",
+      "lastScanIgnored": "Ignored",
+      "lastScanCreated": "Created",
+      "lastScanUpdated": "Updated",
+      "lastScanDeleted": "Deleted",
+      "lastScanErrors": "Errors"
     },
     "extraDirectories": {
       "title": "Extra photo directories",

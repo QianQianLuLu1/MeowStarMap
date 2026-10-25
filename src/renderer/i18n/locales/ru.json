@@ -4441,7 +4441,15 @@
       "tlsTail": "Отпечаток TLS (последние 8)",
       "devices": "Сопряжённые устройства",
       "altHosts": "Альтернативные адреса",
-      "lastError": "Последняя ошибка"
+      "lastError": "Последняя ошибка",
+      "lastScan": "Последнее сканирование",
+      "lastScanObserved": "Наблюдено",
+      "lastScanAccepted": "Принято",
+      "lastScanIgnored": "Пропущено",
+      "lastScanCreated": "Создано",
+      "lastScanUpdated": "Обновлено",
+      "lastScanDeleted": "Удалено",
+      "lastScanErrors": "Ошибки"
     },
     "extraDirectories": {
       "title": "Дополнительные папки фото",

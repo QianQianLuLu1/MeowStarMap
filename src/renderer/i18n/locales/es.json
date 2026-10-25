@@ -4441,7 +4441,15 @@
       "tlsTail": "Huella TLS (últimos 8)",
       "devices": "Dispositivos vinculados",
       "altHosts": "Direcciones alternativas",
-      "lastError": "Último error"
+      "lastError": "Último error",
+      "lastScan": "Último escaneo",
+      "lastScanObserved": "Observadas",
+      "lastScanAccepted": "Aceptadas",
+      "lastScanIgnored": "Ignoradas",
+      "lastScanCreated": "Creadas",
+      "lastScanUpdated": "Actualizadas",
+      "lastScanDeleted": "Eliminadas",
+      "lastScanErrors": "Errores"
     },
     "extraDirectories": {
       "title": "Carpetas de fotos adicionales",

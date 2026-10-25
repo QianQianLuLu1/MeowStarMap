@@ -4441,7 +4441,15 @@
       "tlsTail": "TLS 指紋（尾 8 位）",
       "devices": "已配對裝置數",
       "altHosts": "備選位址",
-      "lastError": "最近錯誤"
+      "lastError": "最近錯誤",
+      "lastScan": "上次掃描",
+      "lastScanObserved": "觀察",
+      "lastScanAccepted": "收錄",
+      "lastScanIgnored": "忽略",
+      "lastScanCreated": "新建",
+      "lastScanUpdated": "更新",
+      "lastScanDeleted": "刪除",
+      "lastScanErrors": "錯誤"
     },
     "extraDirectories": {
       "title": "額外照片目錄",

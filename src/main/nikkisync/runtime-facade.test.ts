@@ -815,6 +815,7 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
     onScopeChanged?: () => Promise<void>
   }> = []
   const extraDirectoryInstances: unknown[] = []
+  const scanDiagnosticCalls: Array<{ scanner: unknown }> = []
   const pairingCalls: Array<{ host: string; ttlMs?: number; hosts?: readonly string[] }> = []
   const deletions = {
     list: vi.fn((): unknown[] => []),
@@ -899,6 +900,13 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
         { version: '1.3', effectiveAt: '2025-02-26T03:00:00.000Z' }
       ])
     },
+    // K7：扫描诊断深入口假面（记录传入的 scanner，验证 facade 确实绑定会话 scanner）
+    scanDiagnostics: {
+      scanDiagnosticSummary: vi.fn((scanner: unknown) => {
+        scanDiagnosticCalls.push({ scanner })
+        return { status: 'running', scanRootCount: 2, installationFound: true }
+      })
+    },
     // K6：额外照片目录深入口假面（记录构造三元组；onScopeChanged 缝由 facade 传入）
     ...(extraDirectoriesSurfaceDisabled
       ? {}
@@ -943,7 +951,8 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
     deletions,
     cachedRunOnce,
     extraDirectoryCalls,
-    extraDirectoryInstances
+    extraDirectoryInstances,
+    scanDiagnosticCalls: scanDiagnosticCalls as unknown as Array<{ scanner: unknown }>
   }
 }
 
@@ -1054,5 +1063,23 @@ describe('createRuntimeSession 额外照片目录接线（K6）', () => {
     const session = await createRuntimeSession(sessionOptions(), fixture.surface)
     expect(fixture.extraDirectoryCalls).toHaveLength(0)
     expect(session.extraDirectories).toBeUndefined()
+  })
+})
+
+describe('createRuntimeSession 扫描诊断面（K7）', () => {
+  it('K7-f1 会话挂 scanDiagnostics 闭包：绑定会话 scanner、逐字透传上游计数快照', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    const snapshot = session.scanDiagnostics?.()
+    expect(snapshot).toEqual({ status: 'running', scanRootCount: 2, installationFound: true })
+    // facade 必须把会话的 scanner（上游 ScannerService 实例）递给上游纯函数
+    expect(fixture.scanDiagnosticCalls).toHaveLength(1)
+    expect(fixture.scanDiagnosticCalls[0].scanner).toBe(session.scanner)
+  })
+
+  it('K7-f2 深入口缺席（老 surface）⇒ 会话不挂该面（调用即 undefined，不抛）', async () => {
+    const legacy = createSessionFixture()
+    const session = await createRuntimeSession(sessionOptions(), legacy.surface)
+    expect(session.scanDiagnostics).toBeUndefined()
   })
 })

@@ -4441,7 +4441,15 @@
       "tlsTail": "TLS 지문(끝 8자리)",
       "devices": "페어링된 기기 수",
       "altHosts": "대체 주소",
-      "lastError": "최근 오류"
+      "lastError": "최근 오류",
+      "lastScan": "마지막 스캔",
+      "lastScanObserved": "관찰",
+      "lastScanAccepted": "수집",
+      "lastScanIgnored": "제외",
+      "lastScanCreated": "신규 생성",
+      "lastScanUpdated": "업데이트",
+      "lastScanDeleted": "삭제",
+      "lastScanErrors": "오류"
     },
     "extraDirectories": {
       "title": "추가 사진 폴더",

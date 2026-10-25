@@ -4441,7 +4441,15 @@
       "tlsTail": "Impressão digital TLS (últimos 8)",
       "devices": "Dispositivos pareados",
       "altHosts": "Endereços alternativos",
-      "lastError": "Último erro"
+      "lastError": "Último erro",
+      "lastScan": "Última varredura",
+      "lastScanObserved": "Observadas",
+      "lastScanAccepted": "Aceitas",
+      "lastScanIgnored": "Ignoradas",
+      "lastScanCreated": "Criadas",
+      "lastScanUpdated": "Atualizadas",
+      "lastScanDeleted": "Excluídas",
+      "lastScanErrors": "Erros"
     },
     "extraDirectories": {
       "title": "Pastas de fotos adicionais",

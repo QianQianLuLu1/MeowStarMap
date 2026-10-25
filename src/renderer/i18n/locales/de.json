@@ -4441,7 +4441,15 @@
       "tlsTail": "TLS-Fingerprint (letzte 8)",
       "devices": "Gekoppelte Geräte",
       "altHosts": "Alternative Adressen",
-      "lastError": "Letzter Fehler"
+      "lastError": "Letzter Fehler",
+      "lastScan": "Letzter Scan",
+      "lastScanObserved": "Beobachtet",
+      "lastScanAccepted": "Aufgenommen",
+      "lastScanIgnored": "Ignoriert",
+      "lastScanCreated": "Neu",
+      "lastScanUpdated": "Aktualisiert",
+      "lastScanDeleted": "Gelöscht",
+      "lastScanErrors": "Fehler"
     },
     "extraDirectories": {
       "title": "Zusätzliche Fotoordner",

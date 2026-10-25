@@ -280,6 +280,10 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
           }
         }
       : {}),
+    // K7：扫描诊断面「仅存在时挂出」（facade 接 ScanDiagnostics 深入口）
+    ...(plan.scanDiagnosticsResult
+      ? { scanDiagnostics: () => ({ ...plan.scanDiagnosticsResult }) }
+      : {}),
     tableNames: () => ['assets', 'resources'],
     dispose: () => {
       calls.order.push('dispose')
@@ -1219,5 +1223,42 @@ describe('K6：额外照片目录五方法', () => {
     await expect(manager.addExtraDirectory('p1')).resolves.toEqual({ added: 'p1' })
     await expect(manager.removeExtraDirectory('dir_1')).resolves.toEqual({ removed: 'dir_1' })
     await expect(manager.rescanExtraDirectories()).resolves.toEqual({ rescanned: true })
+  })
+})
+
+describe('K7：扫描诊断观测面（纯计数，无路径/UID/错误原文）', () => {
+  it('K7-m1 扫描完成后 status 带 scanDiagnostics 段（计数快照逐字透传）；未扫描时缺省', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        scanDiagnosticsResult: {
+          lastScan: { filesObserved: 31, resourcesAccepted: 25, errorCount: 1 },
+          timestamp: '2026-10-25T09:00:00.000Z',
+          status: 'running',
+          installationFound: true,
+          scanRootCount: 2,
+          automaticRootCount: 1,
+          extraRootCount: 1
+        }
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    // 未扫描：即使会话在位，诊断段也缺省（不拿旧值伪装当前状态）
+    expect(manager.status().scanDiagnostics).toBeUndefined()
+    await manager.scan({})
+    const diagnostics = manager.status().scanDiagnostics as { scanRootCount: number }
+    expect(diagnostics.scanRootCount).toBe(2)
+    expect(manager.status().scanDiagnostics).toMatchObject({
+      lastScan: { filesObserved: 31, errorCount: 1 }
+    })
+  })
+
+  it('K7-m2 会话未挂诊断面（老链接）⇒ 扫描成功也不带段、不抛', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    expect(manager.status().scanDiagnostics).toBeUndefined()
   })
 })

@@ -406,6 +406,12 @@ export interface NikkiSyncRuntimeSession {
    * 仅 `extraDirectoriesFile` 给出且深入口在位时挂出；缺席 ⇒ manager 抛 unavailable。
    */
   extraDirectories?: ExtraScanDirectoriesLike
+  /**
+   * K7：扫描诊断快照闭包（上游 `scanDiagnosticSummary(scanner)`——仅计数，绝不
+   * 序列化路径/UID/文件名/原始错误）。仅深入口在位时挂出；manager 在扫描完成后
+   * 调用一次并把结果放进 `runtime-status.scanDiagnostics`。
+   */
+  scanDiagnostics?: () => unknown
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */

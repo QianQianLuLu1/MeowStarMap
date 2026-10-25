@@ -4441,7 +4441,15 @@
       "tlsTail": "Dấu vân TLS (8 ký tự cuối)",
       "devices": "Thiết bị đã ghép cặp",
       "altHosts": "Địa chỉ thay thế",
-      "lastError": "Lỗi gần nhất"
+      "lastError": "Lỗi gần nhất",
+      "lastScan": "Quét lần trước",
+      "lastScanObserved": "Quan sát",
+      "lastScanAccepted": "Đã nhận",
+      "lastScanIgnored": "Bỏ qua",
+      "lastScanCreated": "Tạo mới",
+      "lastScanUpdated": "Cập nhật",
+      "lastScanDeleted": "Đã xóa",
+      "lastScanErrors": "Lỗi"
     },
     "extraDirectories": {
       "title": "Thư mục ảnh bổ sung",

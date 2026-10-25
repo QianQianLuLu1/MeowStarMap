@@ -4441,6 +4441,14 @@
       "tlsTail": "TLS 指纹（尾 8 位）",
       "devices": "已配对设备数",
       "altHosts": "备选地址",
+      "lastScan": "上次扫描",
+      "lastScanObserved": "观察",
+      "lastScanAccepted": "收录",
+      "lastScanIgnored": "忽略",
+      "lastScanCreated": "新建",
+      "lastScanUpdated": "更新",
+      "lastScanDeleted": "删除",
+      "lastScanErrors": "错误",
       "lastError": "最近错误"
     },
     "extraDirectories": {

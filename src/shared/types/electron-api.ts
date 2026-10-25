@@ -596,6 +596,13 @@ export interface NikkiSyncRuntimeStatusInfo {
    * 缺省 = 尚无已完成的启动阶段（未启动，或启动中断在首个阶段完成之前）。
    */
   startupStages?: Array<{ stage: string; at: string }>
+  /**
+   * K7：最近一次扫描的诊断快照（仅计数，不含路径/UID/错误原文；未扫描时缺省）。
+   * 形状随上游 `scanDiagnosticSummary`：`{lastScan?: {filesObserved, resourcesAccepted,
+   * resourcesIgnored, assetsCreated, assetsUpdated, assetsDeleted, errorCount},
+   * timestamp, status, installationFound, scanRootCount, automaticRootCount, extraRootCount}`。
+   */
+  scanDiagnostics?: unknown
   error?: string
   hint?: string
 }

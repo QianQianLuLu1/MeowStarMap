@@ -4441,7 +4441,15 @@
       "tlsTail": "Empreinte TLS (8 derniers)",
       "devices": "Appareils appariés",
       "altHosts": "Adresses alternatives",
-      "lastError": "Dernière erreur"
+      "lastError": "Dernière erreur",
+      "lastScan": "Dernier scan",
+      "lastScanObserved": "Observés",
+      "lastScanAccepted": "Acceptés",
+      "lastScanIgnored": "Ignorés",
+      "lastScanCreated": "Créés",
+      "lastScanUpdated": "Mis à jour",
+      "lastScanDeleted": "Supprimés",
+      "lastScanErrors": "Erreurs"
     },
     "extraDirectories": {
       "title": "Dossiers photo supplémentaires",

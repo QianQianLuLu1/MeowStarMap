@@ -179,6 +179,14 @@ interface ExtraScanDirectoriesSurface {
 }
 
 /**
+ * K7：上游 `scanner/ScanDiagnostics.ts` 的本仓最小面。
+ * 上游注释承诺：仅计数，绝不序列化路径/UID/文件名/原始错误/参数——可直接进 IPC。
+ */
+interface ScanDiagnosticsSurface {
+  scanDiagnosticSummary(scanner: unknown): unknown
+}
+
+/**
  * 上游 `LocalTlsIdentityService` 的最小面（`server/LocalTlsIdentityService.ts:117-129`）。
  * 只有一个公开方法 `getOrCreate()`：身份存 `app_settings['server.tlsIdentity']`，
  * **不落盘、也没有路径可注入**——嵌入态因此不建 certs 目录（见计划 §4）。
@@ -216,6 +224,8 @@ export interface RuntimeSurface {
   metadataOnlineConsent?: MetadataOnlineConsentSurface
   /** K6：额外照片目录深入口（可选同上——老链接会话据此走「不挂面」分支）。 */
   extraScanDirectories?: ExtraScanDirectoriesSurface
+  /** K7：扫描诊断深入口（可选同上）。 */
+  scanDiagnostics?: ScanDiagnosticsSurface
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -276,6 +286,9 @@ export const METADATA_ONLINE_CONSENT_DEEP_ENTRY = ['metadata', 'MetadataOnlineCo
  * `NIKKISYNC_CAPABILITY_ARTIFACTS` 守护产物存在性）。
  */
 export const EXTRA_SCAN_DIRECTORIES_DEEP_ENTRY = ['scanner', 'ExtraScanDirectories.js'] as const
+
+/** K7 的扫描诊断深入口（上游 `scanner/ScanDiagnostics.js`；产物存在性同上守护）。 */
+export const SCAN_DIAGNOSTICS_DEEP_ENTRY = ['scanner', 'ScanDiagnostics.js'] as const
 
 /**
  * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
@@ -382,6 +395,7 @@ export async function loadRuntimeSurface(
   const gameVersionCalendar = await loadDeepModule(GAME_VERSION_CALENDAR_DEEP_ENTRY)
   const metadataOnlineConsent = await loadDeepModule(METADATA_ONLINE_CONSENT_DEEP_ENTRY)
   const extraScanDirectories = await loadDeepModule(EXTRA_SCAN_DIRECTORIES_DEEP_ENTRY)
+  const scanDiagnostics = await loadDeepModule(SCAN_DIAGNOSTICS_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -396,7 +410,8 @@ export async function loadRuntimeSurface(
     lanAddress: lanAddress as unknown as LanAddressSurface,
     gameVersionCalendar: gameVersionCalendar as unknown as GameVersionCalendarSurface,
     metadataOnlineConsent: metadataOnlineConsent as unknown as MetadataOnlineConsentSurface,
-    extraScanDirectories: extraScanDirectories as unknown as ExtraScanDirectoriesSurface
+    extraScanDirectories: extraScanDirectories as unknown as ExtraScanDirectoriesSurface,
+    scanDiagnostics: scanDiagnostics as unknown as ScanDiagnosticsSurface
   }
 }
 
@@ -747,6 +762,10 @@ export async function createRuntimeSession(
       ...(metadataConsent ? { metadataConsent } : {}),
       // K6：额外目录面（构造条件见上方 extraDirectories；缺席即不挂键）
       ...(extraDirectories ? { extraDirectories } : {}),
+      // K7：扫描诊断闭包（深入口缺席即不挂键；绑定会话 scanner）
+      ...(surface.scanDiagnostics
+        ? { scanDiagnostics: () => surface.scanDiagnostics!.scanDiagnosticSummary(runtime.scanner) }
+        : {}),
       /**
        * K3：游戏版本推断（上游静态表纯函数）。深入口缺席（老 surface）时恒返回
        * 两键缺省，不抛——推断是纯展示增强，不得因缺件牵连会话可用性。

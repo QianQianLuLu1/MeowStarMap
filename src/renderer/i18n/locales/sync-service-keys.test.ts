@@ -132,6 +132,15 @@ const SYNC_SERVICE_LEAVES = [
   'diagnostics.tlsTail',
   'diagnostics.devices',
   'diagnostics.altHosts',
+  // K7：上次扫描计数行（并入诊断卡；runtime-status 响应体可选段）
+  'diagnostics.lastScan',
+  'diagnostics.lastScanObserved',
+  'diagnostics.lastScanAccepted',
+  'diagnostics.lastScanIgnored',
+  'diagnostics.lastScanCreated',
+  'diagnostics.lastScanUpdated',
+  'diagnostics.lastScanDeleted',
+  'diagnostics.lastScanErrors',
   'diagnostics.lastError',
   // K6：额外照片目录节（仅作用同步库扫描器）
   'extraDirectories.title',

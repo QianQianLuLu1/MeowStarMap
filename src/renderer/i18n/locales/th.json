@@ -4441,7 +4441,15 @@
       "tlsTail": "ลายนิ้วมือ TLS (8 ตัวท้าย)",
       "devices": "อุปกรณ์ที่จับคู่แล้ว",
       "altHosts": "ที่อยู่สำรอง",
-      "lastError": "ข้อผิดพลาดล่าสุด"
+      "lastError": "ข้อผิดพลาดล่าสุด",
+      "lastScan": "การสแกนล่าสุด",
+      "lastScanObserved": "พบไฟล์",
+      "lastScanAccepted": "รับเข้า",
+      "lastScanIgnored": "ข้าม",
+      "lastScanCreated": "สร้างใหม่",
+      "lastScanUpdated": "อัปเดต",
+      "lastScanDeleted": "ลบแล้ว",
+      "lastScanErrors": "ข้อผิดพลาด"
     },
     "extraDirectories": {
       "title": "โฟลเดอร์รูปภาพเพิ่มเติม",

@@ -105,6 +105,8 @@ export interface FakeSessionPlan {
   gameVersionResult?: { version?: string; effectiveAt?: string }
   /** K6：会话上是否挂额外目录面（默认不挂 ⇒ manager 五方法抛 unavailable）。 */
   extraDirectoriesPresent?: boolean
+  /** K7：扫描诊断快照固定返回值（仅存在时 status 带 scanDiagnostics 段）。 */
+  scanDiagnosticsResult?: Record<string, unknown>
 }
 
 export interface RuntimeManagerDependencies {
@@ -186,6 +188,8 @@ interface ManagerState {
   metadataCounters?: NikkiSyncMetadataCounters
   /** 阶段 6：最近一次扫描后驱动的结果。 */
   metadataDrive?: MetadataResolutionDriveResult
+  /** K7：最近一次扫描完成后的诊断快照（仅计数；未扫描时缺省）。 */
+  scanDiagnostics?: unknown
   /**
    * K1：本会话**真实发生**的启动阶段记录（随会话生命周期，teardown 清空）。
    * 本仓编排不调上游 `runtime.start()`，上游六阶段不会自然发生——这里只在自身
@@ -336,6 +340,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       snapshot.metadata = metadataSnapshot()
       // K1：真实发生的启动阶段（无新通道，随 runtime-status 响应体给出）
       if (state.startupStages.length > 0) snapshot.startupStages = state.startupStages
+      // K7：最近一次扫描的诊断快照（未扫描时缺省；无新通道）
+      if (state.scanDiagnostics !== undefined) snapshot.scanDiagnostics = state.scanDiagnostics
     }
     if (state.error) snapshot.error = state.error
     if (state.hint) snapshot.hint = state.hint
@@ -377,6 +383,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     state.activeRoot = undefined
     // K1：阶段记录随会话生命周期，会话拆除即清空（新会话的阶段不得继承旧记录）
     state.startupStages = []
+    // K7：诊断快照同口径清空（旧库的计数不得带进新会话）
+    state.scanDiagnostics = undefined
     // 阶段 4：会话拆除（stop 或换根重建）即收回 media:// 的资产路径授权。
     // 库已关闭还允许显示旧路径，等于给不存在的文件开一张长期有效的通行证。
     clearNikkiSyncResourcePaths()
@@ -491,6 +499,10 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     })
     // K1：手动扫描成功后同样驱动一次缓存解码升级（同步有界，不挂返回路径的时序语义）
     driveCachedMetadata(session)
+    // K7：扫描完成后刷新扫描诊断快照（纯计数；未扫描时保持缺省，不拿旧值伪装当前态）
+    if (session.scanDiagnostics) {
+      state.scanDiagnostics = session.scanDiagnostics()
+    }
     return result
   }
 

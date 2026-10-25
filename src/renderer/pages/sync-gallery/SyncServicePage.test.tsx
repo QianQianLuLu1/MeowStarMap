@@ -539,6 +539,53 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     expect(screen.queryByText('连接诊断')).not.toBeInTheDocument()
   })
 
+  // ===== K7：扫描诊断观测面（并入 K4 诊断卡；纯计数，上游承诺无路径/UID/错误原文） =====
+
+  /** 与上游 scanDiagnosticSummary 输出同形（见 electron-api.ts K7 JSDoc 与 IPC_CONTRACT §8.1.5）。 */
+  function makeScanDiagnostics() {
+    return {
+      lastScan: {
+        filesObserved: 31,
+        resourcesAccepted: 25,
+        resourcesIgnored: 4,
+        assetsCreated: 20,
+        assetsUpdated: 3,
+        assetsDeleted: 2,
+        errorCount: 1
+      },
+      timestamp: '2026-10-25T08:00:00.000Z',
+      status: 'running',
+      installationFound: true,
+      scanRootCount: 2,
+      automaticRootCount: 1,
+      extraRootCount: 1
+    }
+  }
+
+  it('(x2) K7：runtime-status 带 scanDiagnostics ⇒ 诊断卡内渲染「上次扫描」七项计数行', async () => {
+    installElectronApi({
+      status: makeStatus(),
+      runtimeStatus: { scanDiagnostics: makeScanDiagnostics() }
+    })
+    renderSection()
+    await waitFor(() => expect(screen.getByText('连接诊断')).toBeInTheDocument())
+    expect(screen.getByText('上次扫描')).toBeInTheDocument()
+    expect(screen.getByText(/观察\s*31/)).toBeInTheDocument()
+    expect(screen.getByText(/收录\s*25/)).toBeInTheDocument()
+    expect(screen.getByText(/忽略\s*4/)).toBeInTheDocument()
+    expect(screen.getByText(/新建\s*20/)).toBeInTheDocument()
+    expect(screen.getByText(/更新\s*3/)).toBeInTheDocument()
+    expect(screen.getByText(/删除\s*2/)).toBeInTheDocument()
+    expect(screen.getByText(/错误\s*1/)).toBeInTheDocument()
+  })
+
+  it('(x3) K7：无 scanDiagnostics 段（未扫描/老链接）⇒ 诊断卡照常但不出现「上次扫描」行', async () => {
+    installElectronApi()
+    renderSection()
+    await waitFor(() => expect(screen.getByText('连接诊断')).toBeInTheDocument())
+    expect(screen.queryByText('上次扫描')).not.toBeInTheDocument()
+  })
+
   // ===== K6：额外照片目录 =====
 
   it('(y) K6：目录列表渲染（path/mode/移除）+ 作用域说明；移除按 id 调用', async () => {

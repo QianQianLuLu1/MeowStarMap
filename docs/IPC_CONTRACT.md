@@ -471,6 +471,21 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
 - 缺省语义：尚未启动、启动中断在首个阶段完成之前、或会话已拆除 ⇒ 键缺省。UI 据此
   区分「还没开始」与「进行到一半」。
 
+### 8.1.5 `runtime-status.scanDiagnostics` 可选段（K7，向后兼容的纯增字段）
+
+通道、入参、包装器都不变；新增 `NikkiSyncRuntimeStatus.scanDiagnostics?`：
+上游 `scanner/ScanDiagnostics.js` 的 `scanDiagnosticSummary(scanner)` 返回值**逐字透传**，
+形状 `{lastScan?: {filesObserved, resourcesAccepted, resourcesIgnored, assetsCreated,
+assetsUpdated, assetsDeleted, errorCount}, timestamp, status, installationFound,
+scanRootCount, automaticRootCount, extraRootCount}`。要点：
+
+- **纯计数观测面**：上游承诺绝不序列化路径/UID/文件名/原始错误/参数，可直接进 IPC；
+  本仓不发明修复按钮、不新增协议动作（上游 1.0.23 的 live index repair 无用户可调用 API）。
+- 刷新时机：仅**扫描成功返回后**由 manager 调一次并缓存；`status()` 读缓存值，
+  轮询不触发上游聚合。未扫描 ⇒ 键缺省（不拿旧值伪装成当前值）。
+- 记录随会话生命周期，会话拆除（stop / 换根重建）即清空。
+- 老链接（上游包内无 `ScanDiagnostics.js` 深入口产物）⇒ 会话不挂诊断面 ⇒ 键恒缺省。
+
 ### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
 
 | 通道                           | 入参                                    | 出参                                                                                                                                                    | 失败码                                                                                          |

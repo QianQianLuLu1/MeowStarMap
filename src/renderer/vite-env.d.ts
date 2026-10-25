@@ -960,6 +960,11 @@ interface WindowElectronAPI {
       }
       /** K1：本会话真实发生的启动阶段（scanner/runtime-ready/lan-listen/cached-metadata） */
       startupStages?: Array<{ stage: string; at: string }>
+      /**
+       * K7：最近一次扫描的诊断聚合计数（上游 scanDiagnosticSummary——仅计数，
+       * 绝不序列化路径/UID/文件名/原始错误；未扫描/老链接缺省，teardown 清空）
+       */
+      scanDiagnostics?: unknown
       error?: string
       hint?: string
     }>

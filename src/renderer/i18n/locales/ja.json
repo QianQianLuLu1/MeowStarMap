@@ -4441,7 +4441,15 @@
       "tlsTail": "TLS フィンガープリント（末尾 8 桁）",
       "devices": "ペアリング済みデバイス数",
       "altHosts": "代替アドレス",
-      "lastError": "直近のエラー"
+      "lastError": "直近のエラー",
+      "lastScan": "前回のスキャン",
+      "lastScanObserved": "観察",
+      "lastScanAccepted": "取り込み",
+      "lastScanIgnored": "除外",
+      "lastScanCreated": "新規作成",
+      "lastScanUpdated": "更新",
+      "lastScanDeleted": "削除",
+      "lastScanErrors": "エラー"
     },
     "extraDirectories": {
       "title": "追加の写真フォルダ",
