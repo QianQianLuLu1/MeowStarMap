@@ -4429,6 +4429,18 @@
       "enable": "Consentement à l'envoi des paramètres photo",
       "enableDesc": "Rien n'est envoyé au tiers sans votre consentement ; après consentement, les éléments ci-dessus sont envoyés pour obtenir les résultats de résolution des tenues et des paramètres de prise de vue.",
       "revokeNote": "Désactiver retire le consentement immédiatement et interrompt les requêtes en cours ; les résultats déjà écrits dans la base de synchronisation locale ne sont pas affectés."
+    },
+    "diagnostics": {
+      "title": "Diagnostic de connexion",
+      "bindAddress": "Adresse de liaison",
+      "port": "Port",
+      "secure": "Chiffrement",
+      "secureOn": "HTTPS (TLS)",
+      "secureOff": "Pas à l'écoute",
+      "tlsTail": "Empreinte TLS (8 derniers)",
+      "devices": "Appareils appariés",
+      "altHosts": "Adresses alternatives",
+      "lastError": "Dernière erreur"
     }
   },
   "shareCard": {

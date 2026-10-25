@@ -1077,3 +1077,42 @@ describe('K3：游戏版本推断', () => {
     expect(calls.resolveGameVersion).toEqual(['2025-04-01T00:00:00.000Z', undefined])
   })
 })
+
+describe('K4：连接诊断段（观测面，纯聚合既有状态）', () => {
+  it('K4-m1 运行中：syncStatus 附带 diagnostics（指纹尾 8 位、设备数、监听地址）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.startSyncServer()
+    const diagnostics = manager.syncStatus().diagnostics as {
+      running: boolean
+      host: string
+      port: number
+      secure?: boolean
+      pairedDeviceCount?: number
+      tlsFingerprintTail8?: string
+      updatedAt: string
+    }
+    expect(diagnostics.running).toBe(true)
+    expect(diagnostics.secure).toBe(true)
+    expect(diagnostics.pairedDeviceCount).toBe(1)
+    // 假会话指纹为 'a'.repeat(64) ⇒ 尾 8 位摘要 'aaaaaaaa'
+    expect(diagnostics.tlsFingerprintTail8).toBe('a'.repeat(8))
+    expect(Number.isFinite(Date.parse(diagnostics.updatedAt))).toBe(true)
+  })
+
+  it('K4-m2 无会话：diagnostics 同样给出（running=false、回落配置默认端口，不虚构字段）', () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    const diagnostics = manager.syncStatus().diagnostics as {
+      running: boolean
+      port: number
+      secure?: boolean
+      tlsFingerprintTail8?: string
+    }
+    expect(diagnostics.running).toBe(false)
+    expect(diagnostics.port).toBe(28080)
+    expect(diagnostics.secure).toBeUndefined()
+    expect(diagnostics.tlsFingerprintTail8).toBeUndefined()
+  })
+})

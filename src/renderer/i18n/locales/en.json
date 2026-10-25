@@ -4429,6 +4429,18 @@
       "enable": "Consent to send photo parameters",
       "enableDesc": "Nothing is sent to the third party until you consent; after consent, the items listed above are sent to obtain outfit and camera parameter resolution results.",
       "revokeNote": "Turning this off withdraws consent immediately and aborts in-flight requests; results already written to the local sync database are unaffected."
+    },
+    "diagnostics": {
+      "title": "Connection diagnostics",
+      "bindAddress": "Bind address",
+      "port": "Port",
+      "secure": "Encryption",
+      "secureOn": "HTTPS (TLS)",
+      "secureOff": "Not listening",
+      "tlsTail": "TLS fingerprint (last 8)",
+      "devices": "Paired devices",
+      "altHosts": "Alternate addresses",
+      "lastError": "Last error"
     }
   },
   "shareCard": {

@@ -4429,6 +4429,18 @@
       "enable": "同意傳送照片參數",
       "enableDesc": "未同意時不會向第三方傳送任何內容；同意後按上方清單外送，用於換取穿搭與拍攝參數解析結果。",
       "revokeNote": "關閉同意立即撤回授權並中止在途請求；已寫入本機同步資料庫的歷史結果不受影響。"
+    },
+    "diagnostics": {
+      "title": "連線診斷",
+      "bindAddress": "綁定位址",
+      "port": "連接埠",
+      "secure": "加密",
+      "secureOn": "HTTPS（TLS）",
+      "secureOff": "未監聽",
+      "tlsTail": "TLS 指紋（尾 8 位）",
+      "devices": "已配對裝置數",
+      "altHosts": "備選位址",
+      "lastError": "最近錯誤"
     }
   },
   "shareCard": {

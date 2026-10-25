@@ -955,6 +955,8 @@ interface WindowElectronAPI {
         pairedDeviceCount?: number
         lanHost?: string
         error?: string
+        /** K4：连接诊断段（观测面；纯聚合既有状态） */
+        diagnostics?: import('../shared/types/electron-api').NikkiSyncDiagnosticsInfo
       }
       /** K1：本会话真实发生的启动阶段（scanner/runtime-ready/lan-listen/cached-metadata） */
       startupStages?: Array<{ stage: string; at: string }>
@@ -1002,6 +1004,8 @@ interface WindowElectronAPI {
       pairedDeviceCount?: number
       lanHost?: string
       error?: string
+      /** K4：连接诊断段（观测面；纯聚合既有状态） */
+      diagnostics?: import('../shared/types/electron-api').NikkiSyncDiagnosticsInfo
     }>
     startServer: (input?: { port?: number; mdnsEnabled?: boolean }) => Promise<{
       available: boolean

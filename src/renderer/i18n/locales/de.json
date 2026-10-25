@@ -4429,6 +4429,18 @@
       "enable": "Versand der Fotoparameter zustimmen",
       "enableDesc": "Bis zur Zustimmung wird nichts an den Drittanbieter gesendet; nach der Zustimmung werden die oben aufgeführten Daten gesendet, um Ergebnisse für Outfits und Kameraparameter zu erhalten.",
       "revokeNote": "Das Ausschalten widerruft die Zustimmung sofort und bricht laufende Anfragen ab; bereits in die lokale Synchron-Datenbank geschriebene Ergebnisse bleiben unberührt."
+    },
+    "diagnostics": {
+      "title": "Verbindungsdiagnose",
+      "bindAddress": "Bindungsadresse",
+      "port": "Port",
+      "secure": "Verschlüsselung",
+      "secureOn": "HTTPS (TLS)",
+      "secureOff": "Nicht empfangsbereit",
+      "tlsTail": "TLS-Fingerprint (letzte 8)",
+      "devices": "Gekoppelte Geräte",
+      "altHosts": "Alternative Adressen",
+      "lastError": "Letzter Fehler"
     }
   },
   "shareCard": {

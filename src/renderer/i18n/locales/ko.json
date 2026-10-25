@@ -4429,6 +4429,18 @@
       "enable": "사진 파라미터 전송 동의",
       "enableDesc": "동의하기 전까지 서드파티에 아무것도 전송되지 않습니다. 동의하면 위 항목이 코디 및 촬영 파라미터 해석 결과를 얻기 위해 전송됩니다.",
       "revokeNote": "동의를 끄면 즉시 철회되고 진행 중인 요청도 중단됩니다. 로컬 동기화 데이터베이스에 이미 기록된 결과에는 영향을 주지 않습니다."
+    },
+    "diagnostics": {
+      "title": "연결 진단",
+      "bindAddress": "바인드 주소",
+      "port": "포트",
+      "secure": "암호화",
+      "secureOn": "HTTPS(TLS)",
+      "secureOff": "수신 대기 아님",
+      "tlsTail": "TLS 지문(끝 8자리)",
+      "devices": "페어링된 기기 수",
+      "altHosts": "대체 주소",
+      "lastError": "최근 오류"
     }
   },
   "shareCard": {

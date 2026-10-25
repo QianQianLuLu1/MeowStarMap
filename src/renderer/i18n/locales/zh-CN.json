@@ -4429,6 +4429,18 @@
       "enable": "同意发送照片参数",
       "enableDesc": "未同意时不会向第三方发送任何内容；同意后按上方清单外发，用于换取穿搭与拍摄参数解析结果。",
       "revokeNote": "关闭同意立即撤回授权并中止在途请求；已写入本机同步库的历史结果不受影响。"
+    },
+    "diagnostics": {
+      "title": "连接诊断",
+      "bindAddress": "绑定地址",
+      "port": "端口",
+      "secure": "加密",
+      "secureOn": "HTTPS（TLS）",
+      "secureOff": "未监听",
+      "tlsTail": "TLS 指纹（尾 8 位）",
+      "devices": "已配对设备数",
+      "altHosts": "备选地址",
+      "lastError": "最近错误"
     }
   },
   "shareCard": {

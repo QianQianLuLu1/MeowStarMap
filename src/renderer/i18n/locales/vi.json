@@ -4429,6 +4429,18 @@
       "enable": "Đồng ý gửi tham số ảnh",
       "enableDesc": "Chưa đồng ý thì không gửi gì cho bên thứ ba; sau khi đồng ý, các mục trên sẽ được gửi để đổi kết quả giải mã trang phục và tham số chụp.",
       "revokeNote": "Tắt đồng ý sẽ thu hồi ngay và hủy các yêu cầu đang thực hiện; kết quả đã ghi vào cơ sở dữ liệu đồng bộ trên máy không bị ảnh hưởng."
+    },
+    "diagnostics": {
+      "title": "Chẩn đoán kết nối",
+      "bindAddress": "Địa chỉ liên kết",
+      "port": "Cổng",
+      "secure": "Mã hóa",
+      "secureOn": "HTTPS (TLS)",
+      "secureOff": "Không lắng nghe",
+      "tlsTail": "Dấu vân TLS (8 ký tự cuối)",
+      "devices": "Thiết bị đã ghép cặp",
+      "altHosts": "Địa chỉ thay thế",
+      "lastError": "Lỗi gần nhất"
     }
   },
   "shareCard": {

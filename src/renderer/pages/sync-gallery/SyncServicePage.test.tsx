@@ -53,6 +53,17 @@ function makeStatus(overrides: Record<string, unknown> = {}) {
     tlsFingerprintSha256: 'aa'.repeat(32),
     lanHost: '192.168.1.10',
     pairedDeviceCount: 1,
+    // K4：诊断段（观测面；主进程在 syncStatus 里聚合）
+    diagnostics: {
+      running: true,
+      host: '0.0.0.0',
+      port: 28080,
+      secure: true,
+      mdnsEnabled: true,
+      pairedDeviceCount: 1,
+      tlsFingerprintTail8: 'abcd1234',
+      updatedAt: '2026-10-25T08:00:00.000Z'
+    },
     ...overrides
   }
 }
@@ -465,5 +476,33 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     const toggle = await screen.findByRole('switch', { name: '同意发送照片参数' })
     fireEvent.click(toggle)
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+  })
+
+  // ===== K4：连接诊断折叠卡 =====
+
+  it('(w) K4：诊断卡渲染指纹摘要/设备数/加密态/端口，端口占用时带最近错误行', async () => {
+    installElectronApi({
+      status: {
+        ...makeStatus(),
+        error: 'PORT_IN_USE',
+        diagnostics: {
+          ...(makeStatus().diagnostics as Record<string, unknown>),
+          lastError: 'PORT_IN_USE'
+        }
+      }
+    })
+    renderSection()
+    await waitFor(() => expect(screen.getByText('连接诊断')).toBeInTheDocument())
+    expect(screen.getByText('abcd1234')).toBeInTheDocument()
+    expect(screen.getByText('HTTPS（TLS）')).toBeInTheDocument()
+    expect(screen.getByText('28080')).toBeInTheDocument()
+    expect(screen.getByText('PORT_IN_USE')).toBeInTheDocument()
+  })
+
+  it('(x) K4：未装配（available:false，无诊断段）时不渲染诊断卡', async () => {
+    installElectronApi({ status: { available: false, running: false, diagnostics: undefined } })
+    renderSection()
+    await waitFor(() => expect(screen.getByText('同步组件未就绪')).toBeInTheDocument())
+    expect(screen.queryByText('连接诊断')).not.toBeInTheDocument()
   })
 })

@@ -198,6 +198,8 @@ export function buildSyncStatusSnapshot(input: {
   /** 配对二维码会写出的局域网地址（解析不到时为回环，UI 据此如实提示）。 */
   lanHost?: string
   error?: string
+  /** K5：`/v1/server` 同款备选地址（≤8；来源为 listLanIpv4，未接线时缺省）。 */
+  connectionHosts?: string[]
 }): NikkiSyncSyncServerStatus {
   const { configured, address } = input
   return {
@@ -218,6 +220,54 @@ export function buildSyncStatusSnapshot(input: {
     ...(input.pairedDeviceCount === undefined
       ? {}
       : { pairedDeviceCount: input.pairedDeviceCount }),
+    ...(input.connectionHosts ? { connectionHosts: input.connectionHosts } : {}),
     ...(input.error ? { error: input.error } : {})
+  }
+}
+
+/**
+ * K4：连接诊断快照（`nikkisync:server-status` 响应的 `diagnostics` 可选段）。
+ *
+ * 上游 1.0.22 的连接诊断主体在其 C# windows-shell（`ConnectionDiagnosticsCollector`），
+ * **不可复用**；本函数是本仓自建观测面——只聚合既有状态快照，**不做任何主动网络
+ * 探测**（不 ping、不扫端口、不扫子网）。指纹只给尾 8 位摘要（完整指纹已在状态卡）。
+ */
+export interface NikkiSyncDiagnosticsSnapshot {
+  running: boolean
+  host: string
+  port: number
+  secure?: boolean
+  mdnsEnabled: boolean
+  pairedDeviceCount?: number
+  /** 完整指纹的尾 8 位摘要（展示用；完整值见状态卡 tlsFingerprintSha256）。 */
+  tlsFingerprintTail8?: string
+  /** 备选连接地址（K5 接线后给出；≤8）。 */
+  connectionHosts?: string[]
+  /** 最近一次启停失败原因（端口占用归一化为 PORT_IN_USE）。 */
+  lastError?: string
+  /** 快照采集时刻（ISO 8601；UI 据此判断数据新鲜度）。 */
+  updatedAt: string
+}
+
+/** 由状态快照聚合诊断段（纯函数；缺省字段如实缺省，不虚构）。 */
+export function buildSyncDiagnosticsSnapshot(
+  status: NikkiSyncSyncServerStatus,
+  now: Date = new Date()
+): NikkiSyncDiagnosticsSnapshot {
+  return {
+    running: status.running,
+    host: status.host,
+    port: status.port,
+    ...(status.secure === undefined ? {} : { secure: status.secure }),
+    mdnsEnabled: status.mdnsEnabled,
+    ...(status.pairedDeviceCount === undefined
+      ? {}
+      : { pairedDeviceCount: status.pairedDeviceCount }),
+    ...(status.tlsFingerprintSha256
+      ? { tlsFingerprintTail8: status.tlsFingerprintSha256.slice(-8) }
+      : {}),
+    ...(status.connectionHosts ? { connectionHosts: status.connectionHosts } : {}),
+    ...(status.error ? { lastError: status.error } : {}),
+    updatedAt: now.toISOString()
   }
 }

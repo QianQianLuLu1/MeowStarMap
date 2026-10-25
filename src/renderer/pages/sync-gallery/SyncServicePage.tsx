@@ -480,6 +480,65 @@ export const SyncServicePage: React.FC = () => {
                 )}
               </div>
             </SettingsCard>
+
+            {/* K4：连接诊断折叠卡（观测面：纯聚合既有状态，不做主动探测；未装配时无此段） */}
+            {status?.diagnostics && (
+              <details className="group">
+                <summary
+                  className="cursor-pointer select-none text-sm"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  {t('syncService.diagnostics.title')}
+                </summary>
+                <SettingsCard>
+                  <div className="space-y-2">
+                    <SettingsRow label={t('syncService.diagnostics.bindAddress')}>
+                      <span className="font-mono text-xs">{status.diagnostics.host}</span>
+                    </SettingsRow>
+                    <SettingsRow label={t('syncService.diagnostics.port')}>
+                      <span className="font-mono text-xs">{status.diagnostics.port}</span>
+                    </SettingsRow>
+                    <SettingsRow label={t('syncService.diagnostics.secure')}>
+                      <span className="text-xs">
+                        {status.diagnostics.secure
+                          ? t('syncService.diagnostics.secureOn')
+                          : t('syncService.diagnostics.secureOff')}
+                      </span>
+                    </SettingsRow>
+                    {status.diagnostics.tlsFingerprintTail8 && (
+                      <SettingsRow label={t('syncService.diagnostics.tlsTail')}>
+                        <span className="font-mono text-xs">
+                          {status.diagnostics.tlsFingerprintTail8}
+                        </span>
+                      </SettingsRow>
+                    )}
+                    {status.diagnostics.pairedDeviceCount !== undefined && (
+                      <SettingsRow label={t('syncService.diagnostics.devices')}>
+                        <span className="text-xs">{status.diagnostics.pairedDeviceCount}</span>
+                      </SettingsRow>
+                    )}
+                    {status.diagnostics.connectionHosts &&
+                      status.diagnostics.connectionHosts.length > 0 && (
+                        <SettingsRow label={t('syncService.diagnostics.altHosts')}>
+                          <span className="font-mono text-xs">
+                            {status.diagnostics.connectionHosts.join(' · ')}
+                          </span>
+                        </SettingsRow>
+                      )}
+                    {status.diagnostics.lastError && (
+                      <SettingsRow label={t('syncService.diagnostics.lastError')}>
+                        <span
+                          className="font-mono text-xs"
+                          style={{ color: 'var(--danger, #ef4444)' }}
+                        >
+                          {status.diagnostics.lastError}
+                        </span>
+                      </SettingsRow>
+                    )}
+                  </div>
+                </SettingsCard>
+              </details>
+            )}
           </SectionShell>
 
           {/* ②配对：服务没跑起来时二维码无内容可生成，按钮按 running 禁用 */}

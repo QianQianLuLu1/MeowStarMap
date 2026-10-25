@@ -8,6 +8,7 @@ import {
   SYNC_SERVER_DEFAULT_MDNS,
   SYNC_SERVER_DEFAULT_NAME,
   SYNC_SERVER_DEFAULT_PORT,
+  buildSyncDiagnosticsSnapshot,
   buildSyncStatusSnapshot,
   classifySyncStartError,
   embeddedServerConfig,
@@ -280,5 +281,55 @@ describe('buildSyncStatusSnapshot', () => {
 describe('回落 host 常量', () => {
   it('配对 host 解析不到局域网地址时用回环，而不是空串或 0.0.0.0', () => {
     expect(LOOPBACK_FALLBACK_HOST).toBe('127.0.0.1')
+  })
+})
+
+describe('K4：buildSyncDiagnosticsSnapshot（观测面，纯聚合既有状态）', () => {
+  it('运行中：全字段给出，指纹取尾 8 位摘要、备选地址透传、带采集时刻', () => {
+    const running = buildSyncStatusSnapshot({
+      running: true,
+      configured: baseConfig,
+      address: { host: '192.168.1.8', port: 28080, secure: true },
+      serverId: 'server_1',
+      tls: { certPem: 'CERT', fingerprintSha256: fingerprint },
+      pairedDeviceCount: 2,
+      lanHost: '192.168.1.8',
+      connectionHosts: ['192.168.1.8', '192.168.1.9']
+    } as Parameters<typeof buildSyncStatusSnapshot>[0])
+    const diagnostics = buildSyncDiagnosticsSnapshot(running, new Date('2026-10-25T08:00:00Z'))
+    expect(diagnostics).toEqual({
+      running: true,
+      host: '192.168.1.8',
+      port: 28080,
+      secure: true,
+      mdnsEnabled: baseConfig.mdns,
+      pairedDeviceCount: 2,
+      tlsFingerprintTail8: 'a'.repeat(8),
+      connectionHosts: ['192.168.1.8', '192.168.1.9'],
+      updatedAt: '2026-10-25T08:00:00.000Z'
+    })
+  })
+
+  it('未组装会话：running=false、host/port 回落配置值，不下 secure/指纹/计数判断', () => {
+    const stopped = buildSyncStatusSnapshot({ running: false, configured: baseConfig })
+    const diagnostics = buildSyncDiagnosticsSnapshot(stopped, new Date('2026-10-25T08:00:00Z'))
+    expect(diagnostics.running).toBe(false)
+    expect(diagnostics.host).toBe(SYNC_SERVER_DEFAULT_HOST)
+    expect(diagnostics.port).toBe(SYNC_SERVER_DEFAULT_PORT)
+    expect('secure' in diagnostics).toBe(false)
+    expect('tlsFingerprintTail8' in diagnostics).toBe(false)
+    expect('pairedDeviceCount' in diagnostics).toBe(false)
+    expect(diagnostics.updatedAt).toBe('2026-10-25T08:00:00.000Z')
+  })
+
+  it('端口占用归一呈现：lastError 原样带出 PORT_IN_USE 短标', () => {
+    const conflicted = buildSyncStatusSnapshot({
+      running: false,
+      configured: { ...baseConfig, port: 39000 },
+      error: PORT_IN_USE_MARKER
+    })
+    const diagnostics = buildSyncDiagnosticsSnapshot(conflicted, new Date(0))
+    expect(diagnostics.lastError).toBe(PORT_IN_USE_MARKER)
+    expect(diagnostics.port).toBe(39000)
   })
 })

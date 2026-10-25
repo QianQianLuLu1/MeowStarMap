@@ -119,7 +119,18 @@ const SYNC_SERVICE_LEAVES = [
   'consent.fields',
   'consent.enable',
   'consent.enableDesc',
-  'consent.revokeNote'
+  'consent.revokeNote',
+  // K4：连接诊断折叠卡（观测面）
+  'diagnostics.title',
+  'diagnostics.bindAddress',
+  'diagnostics.port',
+  'diagnostics.secure',
+  'diagnostics.secureOn',
+  'diagnostics.secureOff',
+  'diagnostics.tlsTail',
+  'diagnostics.devices',
+  'diagnostics.altHosts',
+  'diagnostics.lastError'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */

@@ -489,6 +489,11 @@ preload 侧 `getRuntimeStatus()` 签名不变，因此不触发核心路径闸�
 - `serverCertificatePem` 是公开材料（自签证书，不含私钥），供客户端在 pin 指纹之外做第二重核对。
 - `start-server` 改端口会**重建内嵌会话**（上游把 `LocalSyncServerConfig` 冻结在构造期），调用方应预期一次 SQLite 重开与扫描器重新发现。
 - 撤销是软删（上游 `PairingRepository.revoke` 写 `revoked_at`），**不踢**已建立的 WebSocket 连接；该设备后续签名请求由上游鉴权返回 401。
+- **K4 `diagnostics?` 可选段**：`{running, host, port, secure?, mdnsEnabled, pairedDeviceCount?,
+tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自建观测面，只聚合既有
+  状态快照，**不做任何主动网络探测**（不 ping、不扫端口、不扫子网；上游 1.0.22 的诊断主体在其
+  C# windows-shell，不可复用）。指纹为尾 8 位摘要（完整值见 `tlsFingerprintSha256`）；
+  `connectionHosts` 由 K5 接线后给出（≤8）。
 
 ### 8.2.1 在线解析同意（K2，上游 `MetadataOnlineConsent` 的读写面）
 

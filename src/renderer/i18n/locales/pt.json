@@ -4429,6 +4429,18 @@
       "enable": "Consentir o envio de parâmetros das fotos",
       "enableDesc": "Nada é enviado a terceiros até você consentir; após consentir, os itens acima são enviados para obter os resultados de resolução de conjuntos e parâmetros de câmera.",
       "revokeNote": "Desativar retira o consentimento imediatamente e aborta as solicitações em andamento; os resultados já gravados no banco de sincronização local não são afetados."
+    },
+    "diagnostics": {
+      "title": "Diagnóstico de conexão",
+      "bindAddress": "Endereço de ligação",
+      "port": "Porta",
+      "secure": "Criptografia",
+      "secureOn": "HTTPS (TLS)",
+      "secureOff": "Sem escuta",
+      "tlsTail": "Impressão digital TLS (últimos 8)",
+      "devices": "Dispositivos pareados",
+      "altHosts": "Endereços alternativos",
+      "lastError": "Último erro"
     }
   },
   "shareCard": {

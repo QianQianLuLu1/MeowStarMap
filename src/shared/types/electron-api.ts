@@ -766,6 +766,26 @@ export interface NikkiSyncServerStatusInfo {
   lanHost?: string
   /** 启停失败原因，端口占用归一化为 `PORT_IN_USE`。 */
   error?: string
+  /** K4：连接诊断段（观测面；纯聚合既有状态，不做主动探测）。 */
+  diagnostics?: NikkiSyncDiagnosticsInfo
+}
+
+/** K4：`server-status.diagnostics` 的形状（主进程 `buildSyncDiagnosticsSnapshot` 产出）。 */
+export interface NikkiSyncDiagnosticsInfo {
+  running: boolean
+  host: string
+  port: number
+  secure?: boolean
+  mdnsEnabled: boolean
+  pairedDeviceCount?: number
+  /** 完整指纹的尾 8 位摘要。 */
+  tlsFingerprintTail8?: string
+  /** 备选连接地址（≤8；K5 接线后给出）。 */
+  connectionHosts?: string[]
+  /** 最近一次启停失败原因（PORT_IN_USE 等）。 */
+  lastError?: string
+  /** 快照采集时刻（ISO 8601）。 */
+  updatedAt: string
 }
 
 export interface NikkiSyncSyncStartInputInfo {

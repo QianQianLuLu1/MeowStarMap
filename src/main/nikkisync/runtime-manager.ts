@@ -32,6 +32,7 @@ import type {
 } from './runtime-types'
 import {
   LOOPBACK_FALLBACK_HOST,
+  buildSyncDiagnosticsSnapshot,
   buildSyncStatusSnapshot,
   classifySyncStartError,
   parsePairingUri,
@@ -522,7 +523,7 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
    */
   function syncStatus(): NikkiSyncSyncServerStatus {
     const session = state.session
-    return buildSyncStatusSnapshot({
+    const snapshot = buildSyncStatusSnapshot({
       running: Boolean(state.syncAddress),
       configured: state.syncConfig,
       ...(state.syncAddress ? { address: state.syncAddress } : {}),
@@ -531,6 +532,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       lanHost: pairingHost(),
       ...(state.syncError ? { error: state.syncError } : {})
     })
+    // K4：诊断段——纯聚合本快照既有字段（不做任何主动网络探测）
+    snapshot.diagnostics = buildSyncDiagnosticsSnapshot(snapshot)
+    return snapshot
   }
 
   /**
