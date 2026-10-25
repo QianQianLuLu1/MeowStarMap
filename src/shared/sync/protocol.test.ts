@@ -194,6 +194,76 @@ describe('sync/protocol（NikkiSync Protocol v1 移植）', () => {
     })
   })
 
+  describe('buildPairingUri 多 host 分支（兼容层：对齐上游 b422193）', () => {
+    const base = {
+      scheme: 'nikki-sync' as const,
+      action: 'pair' as const,
+      serverId: 'server_1',
+      host: '192.168.1.5',
+      port: 4242,
+      pairingToken: 'abc-_123',
+      protocolVersion: 1 as const,
+      expiresAt: '2026-09-02T14:30:00.000Z',
+      tlsFingerprintSha256: '00'.repeat(32)
+    }
+
+    it('双 host：输出 nikkisync://pair? 查询串，hosts 为去重后含 host 的逗号串', () => {
+      const uri = buildPairingUri({ ...base, hosts: ['192.168.1.6', '10.0.0.3'] })
+      expect(uri.startsWith('nikki-sync://pair?')).toBe(true)
+      const query = new URLSearchParams(uri.slice('nikki-sync://pair?'.length))
+      expect(query.get('hosts')).toBe('192.168.1.5,192.168.1.6,10.0.0.3')
+    })
+
+    it('query 携带 serverId/host/port/token/protocol/expiresAt/tls，protocolVersion 为数值串', () => {
+      const uri = buildPairingUri({ ...base, hosts: ['192.168.1.6'] })
+      const query = new URLSearchParams(uri.slice('nikki-sync://pair?'.length))
+      expect(query.get('serverId')).toBe('server_1')
+      expect(query.get('host')).toBe('192.168.1.5')
+      expect(query.get('port')).toBe('4242')
+      expect(query.get('token')).toBe('abc-_123')
+      expect(query.get('protocol')).toBe('1')
+      expect(query.get('expiresAt')).toBe('2026-09-02T14:30:00.000Z')
+      expect(query.get('tls')).toBe('00'.repeat(32))
+    })
+
+    it('hosts 去重：重复项（含与 host 相同的项）折叠', () => {
+      const uri = buildPairingUri({
+        ...base,
+        hosts: ['192.168.1.5', '192.168.1.6', '192.168.1.6']
+      })
+      const query = new URLSearchParams(uri.slice('nikki-sync://pair?'.length))
+      expect(query.get('hosts')).toBe('192.168.1.5,192.168.1.6')
+    })
+
+    it('hosts 超上限：去重后截断至 8 项（host 占首位）', () => {
+      const uri = buildPairingUri({
+        ...base,
+        hosts: [
+          '10.0.0.2',
+          '10.0.0.3',
+          '10.0.0.4',
+          '10.0.0.5',
+          '10.0.0.6',
+          '10.0.0.7',
+          '10.0.0.8',
+          '10.0.0.9',
+          '10.0.0.10'
+        ]
+      })
+      const query = new URLSearchParams(uri.slice('nikki-sync://pair?'.length))
+      expect(query.get('hosts')).toBe(
+        '192.168.1.5,10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.5,10.0.0.6,10.0.0.7,10.0.0.8'
+      )
+    })
+
+    it('边界：hosts 去重后仅剩 host 自身 → 逐字节保留 NS1 七段（单 host 回归锚）', () => {
+      const uri = buildPairingUri({ ...base, hosts: ['192.168.1.5'] })
+      expect(uri.startsWith('NS1|server_1|192.168.1.5|4242|abc-_123|')).toBe(true)
+      expect(uri.split('|').length).toBe(7)
+      expect(uri).not.toContain('nikki-sync://')
+    })
+  })
+
   describe('type guard', () => {
     it('T8 isAssetType 拒绝非法值', () => {
       expect(isAssetType('photo')).toBe(true)

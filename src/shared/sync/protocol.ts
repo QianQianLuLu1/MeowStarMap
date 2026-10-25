@@ -1,7 +1,9 @@
 /**
  * NikkiSync Protocol Contract v1 —— 移植模块入口
  *
- * 逐字移植自 NikkiSync/packages/protocol/src/index.ts（commit 284d4a6）。
+ * 逐字移植自 NikkiSync/packages/protocol/src/index.ts（commit 284d4a6；
+ * 2026-10-25 兼容层对齐至上游 b422193：ServerInfoResponse.connectionHosts、
+ * PairingQrPayload.hosts、buildPairingUri 多 host 分支——全部为可选扩展，wire 兼容）。
  * 与上游的唯一代码差异：'@nikkisync/core' 的 import / re-export 改为指向 './domain-types'。
  * 协议字段名、路由常量、错误码为客户端兼容硬约束，禁止变更。
  * 维护规则与上游溯源见同目录 README.md。
@@ -86,6 +88,8 @@ export interface CursorPage<T> {
 }
 
 export interface ServerInfoResponse {
+  /** Optional LAN alternatives (upstream caps at 8); absent on servers without a connectionHosts provider. */
+  connectionHosts?: readonly string[]
   protocolVersion: ProtocolVersion
   serverId: ServerId
   name: string
@@ -237,6 +241,8 @@ export interface PairingQrPayload {
   action: 'pair'
   serverId: ServerId
   host: string
+  /** Optional IPv4 alternatives; old clients keep using host. */
+  hosts?: readonly string[]
   port: number
   pairingToken: string
   protocolVersion: ProtocolVersion
@@ -338,6 +344,22 @@ export function buildChangesRoute(after: Revision): string {
 
 export function buildPairingUri(payload: PairingQrPayload): string {
   const expiresEpochSeconds = Math.floor(Date.parse(payload.expiresAt) / 1000)
+  // 兼容层（对齐上游 b422193）：host 本身参与去重后截断至 8；仅多 host 走新 URI 方案，
+  // 单 host（含 hosts 去重后仅剩 host 自身）逐字节保留 NS1 七段——第三方旧客户端回归锚。
+  const hosts = [...new Set([payload.host, ...(payload.hosts ?? [])])].slice(0, 8)
+  if (hosts.length > 1) {
+    const query = new URLSearchParams({
+      serverId: payload.serverId,
+      host: payload.host,
+      port: String(payload.port),
+      token: payload.pairingToken,
+      protocol: String(payload.protocolVersion),
+      expiresAt: payload.expiresAt,
+      tls: payload.tlsFingerprintSha256,
+      hosts: hosts.join(',')
+    })
+    return `nikki-sync://pair?${query}`
+  }
   return `NS1|${payload.serverId}|${payload.host}|${payload.port}|${payload.pairingToken}|${expiresEpochSeconds}|${payload.tlsFingerprintSha256}`
 }
 

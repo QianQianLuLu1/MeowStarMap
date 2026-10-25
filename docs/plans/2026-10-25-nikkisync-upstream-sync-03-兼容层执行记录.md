@@ -87,3 +87,40 @@
 上游四包导出只增不删、migrations 零变化 ⇒ 回滚任何兼容层节点都不产生 schema 变化，老库无兼容负担（与 02 计划 §12.5 一致）。
 
 （C4/C5/C6/收尾记录随节点执行追加。）
+
+## 4. C4 vendored 协议/域类型真相源同步（协议漂移归零）
+
+### 4.1 执行偏差记录：红灯用例系工作区预置
+
+C3 提交（`f43faa9`）之后、C4 开工之前，工作区出现三份**未提交**的预置改动：`src/shared/sync/protocol.test.ts`（多 host 五用例）、`src/main/nikkisync/protocol-contract.ts`（三组配对采样与快照键）、`src/main/nikkisync/protocol-contract.test.ts`（采样断言）——内容经逐行审查与 02 计划 C4-3/C4-4 **逐条一致且无越界**（采样值与上游语义吻合：host 参与去重、截断 8、`protocol` 数值串、单 host NS1 回归锚），按「红灯先行」语义采纳为本节点红灯用例，随节点一并提交；来源为会话外（用户或并行会话）预置，如实记录。
+
+### 4.2 红灯证据（2026-10-25 14:35–15:10）
+
+`npx vitest run src/shared/sync/protocol.test.ts src/main/nikkisync/protocol-contract.test.ts src/main/nikkisync/protocol-drift.test.ts` → **Tests 6 failed | 38 passed (44)**：
+
+- `protocol.test.ts` 4 用例红：`AssertionError: expected false to be true`（双 host 前缀）、`expected null to be 'server_1'` / `'192.168.1.5,192.168.1.6'` / 截断串（现实现恒 NS1，query 解析为 null）。
+- `protocol-contract.test.ts` 1 用例红：`expected 'NS1|server_1|…' to match /^nikki-sync:\/\/pair\?/`。
+- 链接态 `protocol-drift.test.ts` 1 用例红，**3 条真实 drift**（vendored NS1 vs 上游 `nikki-sync://pair?serverId=…&hosts=…` 逐字节输出）——证明采样面扩展后漂移守护对多 host 分叉真实可判（堵住 R4 静默漂移）。
+
+### 4.3 改动文件清单（实现侧）
+
+| 文件                              | 改动                                                                                                                                                                                                                                                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/shared/sync/domain-types.ts` | `identity.gameVersionEnglishName?: string`（gameVersion 之后，同上游位次）；**camera 块**追加 `rotation?/zoom?/cameraYaw?/cameraPitch?/cameraLoc?: Record<string, unknown>`（portraitMode 之后）；camera 与 filter 之间新增 `pose?: { id?: string; name?: string; strength?: number }`（上游内联单行形态逐字）；头部注释记录对齐来源                                |
+| `src/shared/sync/protocol.ts`     | `ServerInfoResponse` 增 `connectionHosts?: readonly string[]`（置于块首，同上游位次）；`PairingQrPayload` 增 `hosts?: readonly string[]`（host 之后，注释同上游）；`buildPairingUri` 双分支逐字对齐（Set 去重含 host、`slice(0, 8)`、URLSearchParams 键序 serverId→host→port→token→protocol→expiresAt→tls→hosts、单 host NS1 七段逐字节保留）；头部注释记录对齐来源 |
+
+注：02 计划 C4-1 行文写「capture.rotation…」，经上游 `packages/core/src/types.ts`（b422193 L65-85）实读，五个新字段的外层块是 **camera**（diff 上下文 `bloomThreshold/portraitMode` 所在块），`pose` 位于 camera 与 filter 之间——按上游文件形状对齐，计划文字系笔误，本条即澄清。
+
+### 4.4 绿灯与漂移归零证据
+
+- `npx vitest run src/shared/sync src/main/nikkisync/protocol-contract.test.ts src/main/nikkisync/protocol-drift.test.ts` → **Test Files 3 passed，Tests 44 passed (44)**：6 红全转绿；链接态漂移守护对三组新采样键**零差异**（vendored 与上游 b422193 的 `buildPairingUri` 输出逐字节一致）。
+
+### 4.5 C4-5 wire 格式逐字比对与第三方 Android 互操作结论
+
+逐字比对范围：签名基串（`NS1|` 七段与 `nikki-sync://pair?` query 键序）、头名（AuthHeaders 未动）、路由（`API_ROUTES` 12 键逐一相同）、DTO（`ServerInfoResponse`/`PairingQrPayload` 仅可选字段追加）、错误码（`API_ERROR_CODES` 9 项未动）、版本号（`PROTOCOL_VERSION === 1` 未动）。结论：
+
+- **旧版第三方 Android 客户端互操作零影响**：全部协议扩展为可选字段；单 host 配对 URI 输出与升级前**逐字节一致**（协议测试 T5/T10/T9 与新增「去重后仅剩 host 自身 → NS1」回归锚双保险）；服务器不配置 `connectionHosts` 时 `/v1/server` 响应不含新键。
+- **新 URI 方案（`nikki-sync://pair?`）仅在主动携带多 host 时产生**：行为面属 K5 节点（`nikkisync.multiHostPairing` 默认 false，§14-Q4 裁示），本轮未接任何行为面，vendored 升级不改变运行时行为。
+- 上游 `POST /v1/organizer/sync` 硬编码路由未登记进 `API_ROUTES`、未注入时返回 404 兜底文案——本仓 K8 接入前无互操作影响（C1-3 链接态 259 测全绿已含同步服务面回归）。
+
+（C5/C6/收尾记录随节点执行追加。）

@@ -19,7 +19,9 @@ import {
   CHANGE_TYPES,
   METADATA_SCHEMA_VERSION,
   PROTOCOL_VERSION,
-  RESOURCE_ROLES
+  RESOURCE_ROLES,
+  buildPairingUri,
+  type PairingQrPayload
 } from '../../shared/sync/protocol'
 
 /** 快照值形态：标量或字符串数组（协议里参与跨仓比对的值只有这两类）。 */
@@ -56,6 +58,50 @@ const LITERAL_ROUTE_KEYS = [
 ] as const
 
 /**
+ * 配对 URI 的固定采样输入（兼容层：对齐上游 b422193）——覆盖 `buildPairingUri` 的
+ * 多 host 分支。上游在本轮新增 hosts 去重 / 截断(8) / `nikki-sync://pair?` 新 URI 方案，
+ * 此前不在采样面，vendored 与上游的分叉会被漂移守护静默放过（02 计划 R4）；
+ * 三组输入分别钉住「多 host / 重复折叠 / 超 8 截断」。
+ */
+const PAIRING_SAMPLE_BASE: PairingQrPayload = {
+  scheme: 'nikki-sync',
+  action: 'pair',
+  serverId: 'server_1',
+  host: '192.168.1.5',
+  port: 4242,
+  pairingToken: 'abc-_123',
+  protocolVersion: PROTOCOL_VERSION,
+  expiresAt: '2026-09-02T14:30:00.000Z',
+  tlsFingerprintSha256: '00'.repeat(32)
+}
+
+export const CONTRACT_PAIRING_SAMPLES = {
+  multiHost: { ...PAIRING_SAMPLE_BASE, hosts: ['192.168.1.6', '10.0.0.3'] },
+  dedupHosts: { ...PAIRING_SAMPLE_BASE, hosts: ['192.168.1.5', '192.168.1.6', '192.168.1.6'] },
+  overLimit: {
+    ...PAIRING_SAMPLE_BASE,
+    hosts: [
+      '10.0.0.2',
+      '10.0.0.3',
+      '10.0.0.4',
+      '10.0.0.5',
+      '10.0.0.6',
+      '10.0.0.7',
+      '10.0.0.8',
+      '10.0.0.9',
+      '10.0.0.10'
+    ]
+  }
+} as const
+
+/** 配对 URI 采样在快照中的键名（与 collectVendoredContract 的写入键一致）。 */
+export const CONTRACT_PAIRING_KEYS = {
+  multiHost: 'buildPairingUri(multiHost)',
+  dedupHosts: 'buildPairingUri(dedupHosts)',
+  overLimit: 'buildPairingUri(overLimit)'
+} as const
+
+/**
  * 契约面清单（显式声明，刻意不从实现反推）：新增/删除任一可比符号都要同步本表，
  * 否则 protocol-contract.test.ts 的键集断言即失败。
  */
@@ -71,7 +117,10 @@ export const VENDORED_CONTRACT_SYMBOLS: readonly string[] = [
   CONTRACT_ROUTE_KEYS.asset,
   CONTRACT_ROUTE_KEYS.metadata,
   CONTRACT_ROUTE_KEYS.resource,
-  CONTRACT_ROUTE_KEYS.clothingThumbnail
+  CONTRACT_ROUTE_KEYS.clothingThumbnail,
+  CONTRACT_PAIRING_KEYS.multiHost,
+  CONTRACT_PAIRING_KEYS.dedupHosts,
+  CONTRACT_PAIRING_KEYS.overLimit
 ]
 
 /** 取值形态序列化：数组按顺序 joined，对象记键名，其余 String()。 */
@@ -121,6 +170,9 @@ export function collectVendoredContract(): ContractSnapshot {
     CONTRACT_ROUTE_SAMPLES.assetId,
     CONTRACT_ROUTE_SAMPLES.clothingId
   )
+  snapshot[CONTRACT_PAIRING_KEYS.multiHost] = buildPairingUri(CONTRACT_PAIRING_SAMPLES.multiHost)
+  snapshot[CONTRACT_PAIRING_KEYS.dedupHosts] = buildPairingUri(CONTRACT_PAIRING_SAMPLES.dedupHosts)
+  snapshot[CONTRACT_PAIRING_KEYS.overLimit] = buildPairingUri(CONTRACT_PAIRING_SAMPLES.overLimit)
   return snapshot
 }
 
@@ -165,6 +217,16 @@ export function upstreamSnapshotFromModules(
   for (const symbol of lists) {
     const value = pick(namespaces, symbol)
     if (value !== undefined) snapshot[symbol] = value
+  }
+
+  // 配对 URI 采样（兼容层 b422193）：与 vendored 同一组采样输入喂给上游 buildPairingUri，
+  // 多 host 分支（新 URI 方案 / hosts 去重 / 截断）由此进入漂移比对面。
+  const pairingFn = pick(namespaces, 'buildPairingUri')
+  if (typeof pairingFn === 'function') {
+    for (const key of ['multiHost', 'dedupHosts', 'overLimit'] as const) {
+      const value = (pairingFn as (payload: unknown) => unknown)(CONTRACT_PAIRING_SAMPLES[key])
+      if (typeof value === 'string') snapshot[CONTRACT_PAIRING_KEYS[key]] = value
+    }
   }
 
   const routes = pick(namespaces, 'API_ROUTES')

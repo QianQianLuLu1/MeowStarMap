@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  CONTRACT_PAIRING_KEYS,
   CONTRACT_ROUTE_KEYS,
   VENDORED_CONTRACT_SYMBOLS,
   collectVendoredContract,
@@ -15,7 +16,8 @@ import {
   CHANGE_TYPES,
   METADATA_SCHEMA_VERSION,
   PROTOCOL_VERSION,
-  RESOURCE_ROLES
+  RESOURCE_ROLES,
+  buildPairingUri
 } from '../../shared/sync/protocol'
 
 /**
@@ -41,7 +43,8 @@ function makeAlignedUpstreamModules(): Record<string, unknown> {
     RESOURCE_ROLES,
     CHANGE_TYPES,
     API_ERROR_CODES,
-    API_ROUTES
+    API_ROUTES,
+    buildPairingUri
   }
 }
 
@@ -79,6 +82,29 @@ describe('collectVendoredContract', () => {
     expect(snapshot[CONTRACT_ROUTE_KEYS.resource]).toBe(API_ROUTES.resource('7/1', 'res 1'))
     expect(snapshot[CONTRACT_ROUTE_KEYS.clothingThumbnail]).toBe(
       API_ROUTES.clothingThumbnail('7/1', 'c 1')
+    )
+  })
+
+  it('兼容层：配对 URI 采样进入快照，多 host 采样值必须落在新 URI 方案上（漂移可判）', () => {
+    const snapshot = collectVendoredContract()
+    // 采样键存在的价值：上游改多 host 编码（键序/截断/URI 方案）时，这里先红再谈
+    expect(snapshot[CONTRACT_PAIRING_KEYS.multiHost]).toMatch(/^nikki-sync:\/\/pair\?/)
+    expect(snapshot[CONTRACT_PAIRING_KEYS.dedupHosts]).toMatch(/^nikki-sync:\/\/pair\?/)
+    expect(snapshot[CONTRACT_PAIRING_KEYS.overLimit]).toMatch(/^nikki-sync:\/\/pair\?/)
+    // 三组采样输入喂同一实现，快照值即实现输出（与 buildPairingUri 直接调用一致）
+    const multiHostQuery = new URLSearchParams(
+      String(snapshot[CONTRACT_PAIRING_KEYS.multiHost]).slice('nikki-sync://pair?'.length)
+    )
+    expect(multiHostQuery.get('hosts')).toBe('192.168.1.5,192.168.1.6,10.0.0.3')
+    const dedupQuery = new URLSearchParams(
+      String(snapshot[CONTRACT_PAIRING_KEYS.dedupHosts]).slice('nikki-sync://pair?'.length)
+    )
+    expect(dedupQuery.get('hosts')).toBe('192.168.1.5,192.168.1.6')
+    const overLimitQuery = new URLSearchParams(
+      String(snapshot[CONTRACT_PAIRING_KEYS.overLimit]).slice('nikki-sync://pair?'.length)
+    )
+    expect(overLimitQuery.get('hosts')).toBe(
+      '192.168.1.5,10.0.0.2,10.0.0.3,10.0.0.4,10.0.0.5,10.0.0.6,10.0.0.7,10.0.0.8'
     )
   })
 })

@@ -1,7 +1,9 @@
 /**
  * NikkiSync 领域类型（domain types）
  *
- * 逐字移植自 NikkiSync/packages/core/src/types.ts（commit 284d4a6），
+ * 逐字移植自 NikkiSync/packages/core/src/types.ts（commit 284d4a6；
+ * 2026-10-25 兼容层对齐至上游 b422193：identity.gameVersionEnglishName、
+ * camera 的 rotation/zoom/cameraYaw/cameraPitch/cameraLoc、新增 pose——全部为可选字段追加），
  * 由本目录 protocol.ts 原名 re-export（上游契约：PC 端不得另建 DTO）。
  *
  * 维护规则：本文件正文禁止就地修改协议语义；上游演进时按文件 diff 重新移植，
@@ -66,6 +68,8 @@ export interface InfinityPhotoMetadata {
   identity: {
     uid?: string
     gameVersion?: string
+    /** English display name of the game version (upstream b422193, optional). */
+    gameVersionEnglishName?: string
     sourceAssetId?: string
   }
   capture: {
@@ -85,7 +89,14 @@ export interface InfinityPhotoMetadata {
     bloomIntensity?: number
     bloomThreshold?: number
     portraitMode?: boolean
+    rotation?: number
+    zoom?: number
+    cameraYaw?: number
+    cameraPitch?: number
+    cameraLoc?: Record<string, unknown>
   }
+  /** Camera pose (upstream b422193, optional; inline object type verbatim from upstream). */
+  pose?: { id?: string; name?: string; strength?: number }
   filter?: {
     id?: string
     name?: string
