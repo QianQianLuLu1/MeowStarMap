@@ -38,7 +38,7 @@ shared/sync/protocol.ts（冻结契约）    database/sync-*-repository
 
 两者**并存且都还在**，但当前生效的是内嵌面：`sync-server-setup.ts:63` 的
 `PORTED_SYNC_AUTOSTART_ENABLED = false`（阶段 3 决策）使移植面**不再自启**——
-`initSyncServer()` 仍在 `lifecycle.ts:340` 被调用（装配与 `sync:*` 通道保持可用），
+`initSyncServer()` 仍在 `lifecycle.ts:338` 被调用（装配与 `sync:*` 通道保持可用），
 但默认不监听端口；设置页的「同步服务」节已改由真实 NikkiSync `LocalSyncServer` 接管。
 因此：`sync/` 的服务器代码不是死代码也不是规划中，而是**已交付但默认静默**；
 要改 LAN 服务行为时先确认用户实际走的是哪一面，别只改静默的那一侧。
