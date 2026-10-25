@@ -31,6 +31,7 @@ import {
   METADATA_ENV_FLAG,
   METADATA_RESOLVER_ENABLED_DEFAULT,
   NIKKISYNC_DB_SEGMENTS,
+  RECYCLE_HELPER_ENV,
   RUNTIME_ENABLED_DEFAULT,
   RUNTIME_ENV_FLAG,
   SETTING_GAME_ROOT,
@@ -46,6 +47,7 @@ import {
   initNikkiSyncRuntime,
   nikkisyncDatabaseFile,
   resolveMetadataResolverEnabled,
+  resolveRecycleHelperPath,
   resolveRuntimeEnabled,
   resolveSyncEnabled,
   stopNikkiSyncRuntime,
@@ -137,6 +139,24 @@ describe('nikkisync 库落点（阶段2：必须与宿主 userData 同源）', (
       path.join('/app/userData', 'nikkisync', 'nikkisync.db')
     )
     expect(NIKKISYNC_DB_SEGMENTS).toEqual(['nikkisync', 'nikkisync.db'])
+  })
+})
+
+describe('resolveRecycleHelperPath（K8-a：回收 helper 路径）', () => {
+  it('env 常量与上游 DeletionQueue 读取名逐字一致', () => {
+    expect(RECYCLE_HELPER_ENV).toBe('NIKKISYNC_RECYCLE_HELPER')
+  })
+
+  it('打包态 = {resourcesPath}/nikkisync/（extraResources 落点）', () => {
+    expect(
+      resolveRecycleHelperPath({ isPackaged: true, resourcesPath: '/res', projectRoot: '/app' })
+    ).toBe(path.join('/res', 'nikkisync', 'nikkisync-recycle-helper.exe'))
+  })
+
+  it('dev = 仓内 resources/nikkisync/ 产物（build:recycle-helper 输出位）', () => {
+    expect(
+      resolveRecycleHelperPath({ isPackaged: false, resourcesPath: '/res', projectRoot: '/app' })
+    ).toBe(path.join('/app', 'resources', 'nikkisync', 'nikkisync-recycle-helper.exe'))
   })
 })
 

@@ -4462,6 +4462,38 @@
       "cancelAdd": "キャンセル",
       "rescan": "再スキャン",
       "proposalSummary": "{{images}} 枚の写真 / {{videos}} 本の動画を検出"
+    },
+    "organizer": {
+      "title": "整理キュー",
+      "toggle": "整理キュー（一括削除）",
+      "toggleDesc": "有効にすると、スマホから送られた削除要求を PC 側で承認できます。削除はスマホと PC の二重確認で行われ、ファイルは Windows のごみ箱へ移動されます（復元可能）。",
+      "empty": "整理待ちの削除項目はありません",
+      "emptyHint": "スマホから削除要求が送られるとここに表示されます",
+      "unavailable": "整理キューを利用できません",
+      "unavailableHint": "同期コンポーネントの準備が未完了です。自動的に再試行します",
+      "state": {
+        "preparing": "準備中",
+        "pending": "PC の確認待ち",
+        "confirming": "スマホの確認待ち",
+        "queued": "キュー投入済み",
+        "checking": "ファイル確認中",
+        "executing": "ごみ箱へ移動中",
+        "recycled": "ごみ箱へ移動済み",
+        "failed": "失敗",
+        "changed": "ファイルが変更されました",
+        "cancelled": "キャンセル済み",
+        "rejected": "拒否済み"
+      },
+      "filesCount": "{{count}} 件のファイル",
+      "online": "スマホ接続中",
+      "offline": "スマホ未接続",
+      "approve": "承認",
+      "reject": "却下",
+      "approveAll": "すべて承認",
+      "confirmTitle": "ごみ箱への移動を確認",
+      "confirmBody": "{{count}} 件のファイルを Windows のごみ箱に移動します（ごみ箱から復元できます）。続行しますか？",
+      "confirmAction": "ごみ箱へ移動",
+      "cancel": "キャンセル"
     }
   },
   "shareCard": {

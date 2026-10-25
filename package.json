@@ -34,9 +34,10 @@
     "reset": "tsx scripts/reset.ts",
     "build": "npm run clean && electron-vite build && node -e \"require('fs').writeFileSync('dist/main/package.json',JSON.stringify({type:'commonjs'}))\"",
     "build:preview": "vite build --config vite.preview.config.ts",
+    "build:recycle-helper": "node scripts/build-recycle-helper.cjs",
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder --publish never",
-    "dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+    "dist:win": "npm run build:recycle-helper && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
     "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
     "audit": "audit-ci --config ./audit-ci.jsonc",
     "audit:fix": "npm audit fix --registry=https://registry.npmjs.org",
@@ -221,6 +222,7 @@
     "files": [
       "dist/**/*",
       "resources/**/*",
+      "!resources/nikkisync/*.exe",
       {
         "from": "node_modules/@nikkisync",
         "to": "node_modules/@nikkisync",
@@ -272,6 +274,15 @@
     ],
     "npmRebuild": true,
     "asar": true,
+    "extraResources": [
+      {
+        "from": "resources/nikkisync",
+        "to": "nikkisync",
+        "filter": [
+          "*.exe"
+        ]
+      }
+    ],
     "compression": "maximum",
     "afterPack": "scripts/after-pack-vc-runtime.cjs",
     "artifactName": "MeowStarMap-Setup-${version}.${ext}",

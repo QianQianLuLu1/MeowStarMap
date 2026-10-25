@@ -4462,6 +4462,38 @@
       "cancelAdd": "Cancelar",
       "rescan": "Volver a analizar",
       "proposalSummary": "{{images}} fotos / {{videos}} vídeos detectados"
+    },
+    "organizer": {
+      "title": "Cola de organización",
+      "toggle": "Cola de organización (eliminación por lotes)",
+      "toggleDesc": "Al activarla, las solicitudes de eliminación enviadas desde el teléfono podrán aprobarse en este equipo; la eliminación requiere doble confirmación (teléfono y equipo) y los archivos se mueven a la Papelera de reciclaje de Windows (recuperables).",
+      "empty": "No hay solicitudes de eliminación pendientes",
+      "emptyHint": "Las solicitudes del teléfono aparecerán aquí",
+      "unavailable": "Cola de organización no disponible",
+      "unavailableHint": "Componentes de sincronización no listos; reintentando automáticamente",
+      "state": {
+        "preparing": "Preparando",
+        "pending": "Esperando aprobación del equipo",
+        "confirming": "Esperando comprobación del teléfono",
+        "queued": "En cola",
+        "checking": "Comprobando archivos",
+        "executing": "Moviendo a la papelera",
+        "recycled": "Movido a la papelera",
+        "failed": "Error",
+        "changed": "Archivos modificados",
+        "cancelled": "Cancelado",
+        "rejected": "Rechazado"
+      },
+      "filesCount": "{{count}} archivos",
+      "online": "Teléfono en línea",
+      "offline": "Teléfono sin conexión",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "approveAll": "Aprobar todo",
+      "confirmTitle": "Confirmar mover a la papelera",
+      "confirmBody": "Se moverán {{count}} archivos a la Papelera de reciclaje de Windows (recuperables desde la papelera). ¿Continuar?",
+      "confirmAction": "Mover a la papelera",
+      "cancel": "Cancelar"
     }
   },
   "shareCard": {

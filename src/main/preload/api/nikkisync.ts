@@ -1,5 +1,6 @@
-// @core-change: K6 新增额外照片目录五个桥方法（getExtraDirectories 等，仅作用同步库扫描器）。
-//               （历史：阶段3-4 建查询/服务/扩容面、K2 同意、K3 版本推断——历次授权原因见各节点提交。）
+// @core-change: K8 新增整理队列三个桥方法（getOrganizerQueue / decideOrganizerItem /
+//               approveOrganizerItems，批量删除管理面，破坏性动作需页面确认弹窗）。
+//               （历史：阶段3-4 建查询/服务/扩容面、K2 同意、K3 版本推断、K6 目录面——历次授权原因见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -16,6 +17,11 @@ import type {
   NikkiSyncGameVersionQueryInfo,
   NikkiSyncExtraDirectoriesInfo,
   NikkiSyncExtraDirectoryProposalInfo,
+  NikkiSyncOrganizerApproveInput,
+  NikkiSyncOrganizerApproveResultInfo,
+  NikkiSyncOrganizerDecideInput,
+  NikkiSyncOrganizerItemInfo,
+  NikkiSyncOrganizerViewInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncPairingCodeInfo,
   NikkiSyncProfileStatsInfo,
@@ -100,5 +106,14 @@ export const nikkisyncAPI = {
     call<NikkiSyncExtraDirectoriesInfo>('nikkisync:remove-extra-directory', input),
   /** 手动重扫全部目录 */
   rescanExtraDirectories: () =>
-    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:rescan-extra-directories')
+    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:rescan-extra-directories'),
+  // ---- K8：整理队列（批量删除；开关默认关，破坏性动作由页面确认弹窗把关）----
+  /** 队列视图（list 剔除中文 message + activity 计数；开关关闭时 PRECONDITION_FAILED） */
+  getOrganizerQueue: () => call<NikkiSyncOrganizerViewInfo>('nikkisync:get-organizer-queue'),
+  /** 单条批准/拒绝（返回更新后的队列行列表；not_pending/phone_offline 由通道映射错误码） */
+  decideOrganizerItem: (input: NikkiSyncOrganizerDecideInput) =>
+    call<NikkiSyncOrganizerItemInfo[]>('nikkisync:decide-organizer-item', input),
+  /** 批量批准（1..500；返回 {items, approved, skipped}；重复 id 由上游 invalid_ids 拒绝） */
+  approveOrganizerItems: (input: NikkiSyncOrganizerApproveInput) =>
+    call<NikkiSyncOrganizerApproveResultInfo>('nikkisync:approve-organizer-items', input)
 }

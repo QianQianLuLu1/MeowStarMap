@@ -17,6 +17,8 @@ import type {
   NikkiSyncExtraDirectoriesInfo,
   NikkiSyncExtraDirectoryProposalInfo,
   NikkiSyncMetadataConsentInfo,
+  NikkiSyncOrganizerItemInfo,
+  NikkiSyncOrganizerViewInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncServerStatusInfo
 } from '../../../shared/types/electron-api'
@@ -36,6 +38,36 @@ const SETTING_GALLERY_SOURCE = 'gallery.dataSource'
 // 阶段 6：上游远端元数据解析开关。渲染层只能写这个布尔键本身
 // （在 src/shared/settings-keys.ts 白名单里），出站请求的实际端点由主进程侧常量决定。
 const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
+// K8：整理队列（批量删除）开关。默认关属破坏性能力的双保险之一；
+// 关闭时三条 organizer 通道按契约回 PRECONDITION_FAILED（错误文案指向本开关）。
+const SETTING_ORGANIZER_ENABLED = 'nikkisync.organizerEnabled'
+
+/**
+ * K8：上游 DeletionQueue 11 态 → i18n key 映射。未知状态回退原样英文短码
+ * （不谎报，K1 启动阶段同款口径）；state 值域由上游协议定义，本仓不发明新态。
+ */
+const ORGANIZER_STATE_I18N_KEYS: Record<string, string> = {
+  preparing: 'syncService.organizer.state.preparing',
+  pending: 'syncService.organizer.state.pending',
+  confirming: 'syncService.organizer.state.confirming',
+  queued: 'syncService.organizer.state.queued',
+  checking: 'syncService.organizer.state.checking',
+  executing: 'syncService.organizer.state.executing',
+  recycled: 'syncService.organizer.state.recycled',
+  failed: 'syncService.organizer.state.failed',
+  changed: 'syncService.organizer.state.changed',
+  cancelled: 'syncService.organizer.state.cancelled',
+  rejected: 'syncService.organizer.state.rejected'
+}
+
+/** K8：可执行 PC 侧动作（批准/拒绝）的状态集；终态与 executing 不再给操作钮。 */
+const ORGANIZER_ACTIONABLE_STATES = new Set([
+  'preparing',
+  'pending',
+  'confirming',
+  'queued',
+  'checking'
+])
 
 /**
  * K1：本仓编排点自报的启动阶段 → i18n key 映射。
@@ -118,6 +150,14 @@ export const SyncServicePage: React.FC = () => {
   // K6：额外照片目录（null = 会话未挂面/未装配 ⇒ 整节隐藏，预期内不报错）
   const [extraDirs, setExtraDirs] = useState<NikkiSyncExtraDirectoriesInfo | null>(null)
   const [proposal, setProposal] = useState<NikkiSyncExtraDirectoryProposalInfo | null>(null)
+  // K8：整理队列（破坏性能力，开关默认关）。null = 未拉到/不可用 ⇒ 队列区显示不可用而非报错
+  const [organizerEnabled, setOrganizerEnabled] = useState(false)
+  const [organizerQueue, setOrganizerQueue] = useState<NikkiSyncOrganizerViewInfo | null>(null)
+  const [organizerUnavailable, setOrganizerUnavailable] = useState(false)
+  /** K8：待确认的批准目标（single=单条，batch=全部可批准项）；null = 无待确认。 */
+  const [approveTarget, setApproveTarget] = useState<
+    { mode: 'single'; item: NikkiSyncOrganizerItemInfo } | { mode: 'batch' } | null
+  >(null)
   const currentView = useUIStore((s) => s.currentView)
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -316,6 +356,102 @@ export const SyncServicePage: React.FC = () => {
     if (currentView !== 'sync-service') return
     void refreshExtraDirs()
   }, [currentView, refreshExtraDirs])
+
+  /** K8：开关读回。读不到一律保持关闭（破坏性能力绝不默认生效）。 */
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const value = await window.electronAPI?.settings.get(SETTING_ORGANIZER_ENABLED, false)
+        if (alive) setOrganizerEnabled(value === true)
+      } catch {
+        // 静默：保持关闭态
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  /**
+   * K8：队列拉取。开关关闭时一次都不拉；开关开但会话未装配时通道回
+   * PRECONDITION_FAILED——这是预期内状态，降级为「不可用」提示而非错误弹窗。
+   */
+  const refreshOrganizerQueue = useCallback(async (): Promise<void> => {
+    try {
+      const next = await window.electronAPI?.nikkisync.getOrganizerQueue()
+      setOrganizerQueue(next ?? null)
+      setOrganizerUnavailable(false)
+    } catch {
+      setOrganizerQueue(null)
+      setOrganizerUnavailable(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    // 仅队列区可见（开关开 + 本页在前台）时轮询；否则不留后台定时器
+    if (!organizerEnabled || currentView !== 'sync-service') return
+    void refreshOrganizerQueue()
+    const timer = setInterval(() => void refreshOrganizerQueue(), STATUS_POLL_MS)
+    return () => clearInterval(timer)
+  }, [organizerEnabled, currentView, refreshOrganizerQueue])
+
+  /** K8：开关切换。写入失败回滚开关态并报错；开启后立即拉一次队列。 */
+  const handleOrganizerToggle = async (value: boolean): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    const previous = organizerEnabled
+    setBusy(true)
+    setOrganizerEnabled(value)
+    try {
+      await api.settings.set(SETTING_ORGANIZER_ENABLED, value)
+      if (value) void refreshOrganizerQueue()
+    } catch (error) {
+      setOrganizerEnabled(previous)
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** K8：拒绝（非破坏性：不删任何文件，队列项转 rejected）。 */
+  const handleReject = async (item: NikkiSyncOrganizerItemInfo): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    setBusy(true)
+    try {
+      await api.nikkisync.decideOrganizerItem({ id: item.id, approve: false })
+      await refreshOrganizerQueue()
+    } catch (error) {
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** K8：确认弹窗的确认回调——单条走 decide，批量走 approveMany；完成后刷新队列。 */
+  const handleConfirmApprove = async (): Promise<void> => {
+    const api = window.electronAPI
+    const target = approveTarget
+    if (busy || !api || !target) return
+    setBusy(true)
+    try {
+      if (target.mode === 'single') {
+        await api.nikkisync.decideOrganizerItem({ id: target.item.id, approve: true })
+      } else {
+        const ids = (organizerQueue?.items ?? [])
+          .filter((item) => ORGANIZER_ACTIONABLE_STATES.has(item.state) && item.online)
+          .map((item) => item.id)
+        if (ids.length > 0) await api.nikkisync.approveOrganizerItems({ ids })
+      }
+      setApproveTarget(null)
+      await refreshOrganizerQueue()
+    } catch (error) {
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
 
   /** K6：添加流程——系统目录选择器 → 预检（images/videos 计数）→ 用户确认后按提案 id 提交。 */
   const handleAddDirectory = async (): Promise<void> => {
@@ -795,6 +931,92 @@ export const SyncServicePage: React.FC = () => {
               </div>
             </SectionShell>
           )}
+
+          {/* ⑤K8：整理队列（批量删除；破坏性能力默认关，开关门由主进程三通道强制） */}
+          <SectionShell title={t('syncService.organizer.title')}>
+            <div className="space-y-2">
+              <SettingsToggle
+                label={t('syncService.organizer.toggle')}
+                description={t('syncService.organizer.toggleDesc')}
+                checked={organizerEnabled}
+                disabled={busy}
+                onChange={(value) => void handleOrganizerToggle(value)}
+              />
+              {organizerEnabled && (
+                <>
+                  {organizerUnavailable ? (
+                    <EmptyState
+                      title={t('syncService.organizer.unavailable')}
+                      subtitle={t('syncService.organizer.unavailableHint')}
+                    />
+                  ) : !organizerQueue || organizerQueue.items.length === 0 ? (
+                    <EmptyState
+                      title={t('syncService.organizer.empty')}
+                      subtitle={t('syncService.organizer.emptyHint')}
+                    />
+                  ) : (
+                    <>
+                      {organizerQueue.items.map((item) => {
+                        const actionable = ORGANIZER_ACTIONABLE_STATES.has(item.state)
+                        // 已知 11 态走 i18n 映射；未知状态回退原样英文短码（不谎报，K1 同款口径）
+                        const stateKey = ORGANIZER_STATE_I18N_KEYS[item.state]
+                        return (
+                          <SettingsCard key={item.id}>
+                            <SettingsRow
+                              label={stateKey ? t(stateKey) : item.state}
+                              description={`${t('syncService.organizer.filesCount', {
+                                count: item.count
+                              })} · ${
+                                item.online
+                                  ? t('syncService.organizer.online')
+                                  : t('syncService.organizer.offline')
+                              }`}
+                            >
+                              {actionable && (
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    className="btn-danger text-xs"
+                                    disabled={busy || !item.online}
+                                    onClick={() => setApproveTarget({ mode: 'single', item })}
+                                  >
+                                    {t('syncService.organizer.approve')}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-ghost text-xs"
+                                    disabled={busy}
+                                    onClick={() => void handleReject(item)}
+                                  >
+                                    {t('syncService.organizer.reject')}
+                                  </button>
+                                </div>
+                              )}
+                            </SettingsRow>
+                          </SettingsCard>
+                        )
+                      })}
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          className="btn-danger text-sm"
+                          disabled={
+                            busy ||
+                            !organizerQueue.items.some(
+                              (item) => ORGANIZER_ACTIONABLE_STATES.has(item.state) && item.online
+                            )
+                          }
+                          onClick={() => setApproveTarget({ mode: 'batch' })}
+                        >
+                          {t('syncService.organizer.approveAll')}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </SectionShell>
         </div>
       </div>
 
@@ -809,6 +1031,25 @@ export const SyncServicePage: React.FC = () => {
         confirmVariant="danger"
         onConfirm={() => void handleRevokeConfirm()}
         onCancel={() => setRevokeTarget(null)}
+      />
+      {/* K8：破坏性确认弹窗——列明将移入 Windows 回收站的文件总数与去向，取消可退；
+          未确认绝不发起 decide/approveMany（由 approveTarget 是否为 null 把关）。 */}
+      <ConfirmDialog
+        open={approveTarget !== null}
+        title={t('syncService.organizer.confirmTitle')}
+        message={t('syncService.organizer.confirmBody', {
+          count:
+            approveTarget?.mode === 'single'
+              ? approveTarget.item.count
+              : (organizerQueue?.items ?? [])
+                  .filter((item) => ORGANIZER_ACTIONABLE_STATES.has(item.state) && item.online)
+                  .reduce((sum, item) => sum + item.count, 0)
+        })}
+        confirmText={t('syncService.organizer.confirmAction')}
+        cancelText={t('syncService.organizer.cancel')}
+        confirmVariant="danger"
+        onConfirm={() => void handleConfirmApprove()}
+        onCancel={() => setApproveTarget(null)}
       />
     </div>
   )

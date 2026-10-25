@@ -107,6 +107,18 @@ export interface FakeSessionPlan {
   extraDirectoriesPresent?: boolean
   /** K7：扫描诊断快照固定返回值（仅存在时 status 带 scanDiagnostics 段）。 */
   scanDiagnosticsResult?: Record<string, unknown>
+  /**
+   * K8：会话面整理队列假面的编排（行内带上游中文 message，验证 manager 剔除；
+   * decide/approveMany 可注入错误形态验证「原样上抛」）。缺省 ⇒ 会话无队列面。
+   */
+  deletionsPlan?: {
+    rows: Array<Record<string, unknown>>
+    activity?: unknown
+    decideResult?: unknown
+    decideError?: string
+    approveManyResult?: unknown
+    approveManyError?: string
+  }
 }
 
 export interface RuntimeManagerDependencies {
@@ -723,6 +735,57 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return requireExtraDirectories().rescan()
   }
 
+  /**
+   * K8：整理队列面缺席的拒绝口径。上游 `PcCompanionRuntime` 构造期必建 `deletions`
+   * （runtime.js:29），缺席仅见于未装配会话/测试假会话——错误消息含 unavailable，
+   * handler 的 toAppError 归一为 PRECONDITION_FAILED。
+   */
+  function requireDeletions(): NikkiSyncRuntimeSession['deletions'] {
+    const deletions = requireSession().deletions
+    if (!deletions) {
+      throw new Error('organizer deletion queue is unavailable (session not assembled)')
+    }
+    return deletions
+  }
+
+  /**
+   * K8：剔除队列行的上游中文 `message`（§7-5「上游中文串不透传渲染层」；
+   * id/assetId/state/online/files/count 原样保留，UI 状态徽标由本仓 i18n 映射）。
+   */
+  function stripDeletionRows(rows: unknown[]): unknown[] {
+    return rows.map((row) => {
+      if (typeof row !== 'object' || row === null) return row
+      const rest = { ...(row as Record<string, unknown>) }
+      delete rest.message
+      return rest
+    })
+  }
+
+  /** K8：队列视图（list 逐行剔除中文 message + activity 计数；纯读无副作用）。 */
+  function organizerStatus(): { items: unknown[]; activity: unknown } {
+    const deletions = requireDeletions()
+    return { items: stripDeletionRows(deletions.list()), activity: deletions.activity() }
+  }
+
+  /** K8：单条批准/拒绝（上游 decide；返回更新后的列表，同样剔除 message；错误原样上抛）。 */
+  async function organizerDecide(id: string, approve: boolean): Promise<unknown> {
+    const deletions = requireDeletions()
+    const result = await deletions.decide(id, approve)
+    return Array.isArray(result) ? stripDeletionRows(result) : result
+  }
+
+  /** K8：批量批准（上游 approveMany，≤500 去重由上游校验；items 剔除 message；错误原样上抛）。 */
+  async function organizerApproveMany(ids: string[]): Promise<unknown> {
+    const deletions = requireDeletions()
+    const result = await deletions.approveMany(ids)
+    if (typeof result === 'object' && result !== null && 'items' in result) {
+      const rest = { ...(result as Record<string, unknown>) }
+      if (Array.isArray(rest.items)) rest.items = stripDeletionRows(rest.items)
+      return rest
+    }
+    return result
+  }
+
   return {
     status,
     start,
@@ -752,6 +815,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     inspectExtraDirectory,
     addExtraDirectory,
     removeExtraDirectory,
-    rescanExtraDirectories
+    rescanExtraDirectories,
+    organizerStatus,
+    organizerDecide,
+    organizerApproveMany
   }
 }

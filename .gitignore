@@ -197,3 +197,6 @@ playwright/.cache/
 
 # ===== 教程派生的大体积 HTML（约 30MB，由 md 版生成，不入仓）=====
 /docs/tutorial/用户使用教程.html
+
+# ===== K8 回收 helper 构建产物（由 npm run build:recycle-helper 生成，不入仓）=====
+/resources/nikkisync/*.exe

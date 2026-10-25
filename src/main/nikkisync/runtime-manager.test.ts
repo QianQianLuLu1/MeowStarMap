@@ -59,6 +59,9 @@ interface FakeCalls {
   resolveGameVersion: Array<string | undefined>
   /** K5：会话面 pairingUri 收到的参数序列。 */
   pairingUriArgs: Array<{ host: string; ttlMs?: number; hosts?: string[] }>
+  /** K8：整理队列 decide/approveMany 收到的参数序列（验证逐字透传）。 */
+  organizerDecide: Array<{ id: string; approve: boolean }>
+  organizerApproveMany: string[][]
 }
 
 /**
@@ -284,6 +287,37 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     ...(plan.scanDiagnosticsResult
       ? { scanDiagnostics: () => ({ ...plan.scanDiagnosticsResult }) }
       : {}),
+    // K8：整理队列假面（上游构造期必建；缺省不挂 ⇒ manager 三方法抛 unavailable）
+    ...(plan.deletionsPlan
+      ? {
+          deletions: {
+            list: () => plan.deletionsPlan!.rows.map((row) => ({ ...row })),
+            decide: async (id: string, approve: boolean) => {
+              calls.organizerDecide.push({ id, approve })
+              if (plan.deletionsPlan!.decideError) throw new Error(plan.deletionsPlan!.decideError)
+              return (
+                plan.deletionsPlan!.decideResult ??
+                plan.deletionsPlan!.rows.map((row) => ({ ...row }))
+              )
+            },
+            approveMany: async (ids: string[]) => {
+              calls.organizerApproveMany.push(ids)
+              if (plan.deletionsPlan!.approveManyError) {
+                throw new Error(plan.deletionsPlan!.approveManyError)
+              }
+              return (
+                plan.deletionsPlan!.approveManyResult ?? {
+                  items: plan.deletionsPlan!.rows.map((row) => ({ ...row })),
+                  approved: ids.length,
+                  skipped: 0
+                }
+              )
+            },
+            activity: () =>
+              plan.deletionsPlan!.activity ?? { catalogPasses: 0, queued: 0, active: 0 }
+          }
+        }
+      : {}),
     tableNames: () => ['assets', 'resources'],
     dispose: () => {
       calls.order.push('dispose')
@@ -317,6 +351,8 @@ function createDependencies(
     cachedMetadataRunOnce: 0,
     metadataConsentSet: [],
     resolveGameVersion: [],
+    organizerDecide: [],
+    organizerApproveMany: [],
     pairingUriArgs: []
   }
   const deps: RuntimeManagerDependencies = {
@@ -1260,5 +1296,153 @@ describe('K7：扫描诊断观测面（纯计数，无路径/UID/错误原文）
     await manager.start(DEFAULTS)
     await manager.scan({})
     expect(manager.status().scanDiagnostics).toBeUndefined()
+  })
+})
+
+describe('K8-c：整理队列（批量删除）三方法——透传、中文剔除、错误上抛', () => {
+  const QUEUE_ROWS = [
+    {
+      id: 'del_1aaaaaaaaaaaaaaa',
+      assetId: 'asset_1',
+      state: 'pending',
+      message: '等待电脑确认',
+      online: true,
+      files: [{ name: 'a.jpg', size: 123, folder: 'photos' }],
+      count: 1
+    },
+    {
+      id: 'del_2aaaaaaaaaaaaaaa',
+      assetId: 'asset_2',
+      state: 'recycled',
+      message: '已移入电脑回收站，可从回收站恢复',
+      online: false,
+      files: [{ name: 'b.jpg', size: 456, folder: 'photos' }],
+      count: 1
+    }
+  ]
+
+  function deletionsPlan(): FakeSessionPlan['deletionsPlan'] {
+    return {
+      rows: QUEUE_ROWS.map((row) => ({ ...row })),
+      activity: {
+        catalogPasses: 1,
+        catalogImages: 3,
+        prepared: 2,
+        recycled: 1,
+        queued: 0,
+        active: 0
+      }
+    }
+  }
+
+  it('K8-c-1 organizerStatus：list() 行剔除中文 message 后透传 + activity() 计数', async () => {
+    const { deps } = createDependencies({}, { deletionsPlan: deletionsPlan() })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(manager.organizerStatus()).toEqual({
+      items: [
+        {
+          id: 'del_1aaaaaaaaaaaaaaa',
+          assetId: 'asset_1',
+          state: 'pending',
+          online: true,
+          files: [{ name: 'a.jpg', size: 123, folder: 'photos' }],
+          count: 1
+        },
+        {
+          id: 'del_2aaaaaaaaaaaaaaa',
+          assetId: 'asset_2',
+          state: 'recycled',
+          online: false,
+          files: [{ name: 'b.jpg', size: 456, folder: 'photos' }],
+          count: 1
+        }
+      ],
+      activity: {
+        catalogPasses: 1,
+        catalogImages: 3,
+        prepared: 2,
+        recycled: 1,
+        queued: 0,
+        active: 0
+      }
+    })
+  })
+
+  it('K8-c-2 organizerDecide：参数逐字透传，返回列表同样剔除 message（批准与拒绝两支）', async () => {
+    const { deps, calls } = createDependencies({}, { deletionsPlan: deletionsPlan() })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.organizerDecide('del_1aaaaaaaaaaaaaaa', true)
+    await manager.organizerDecide('del_2aaaaaaaaaaaaaaa', false)
+    expect(calls.organizerDecide).toEqual([
+      { id: 'del_1aaaaaaaaaaaaaaa', approve: true },
+      { id: 'del_2aaaaaaaaaaaaaaa', approve: false }
+    ])
+    const list = (await manager.organizerDecide('del_1aaaaaaaaaaaaaaa', true)) as Array<
+      Record<string, unknown>
+    >
+    expect(list).toHaveLength(2)
+    for (const row of list) expect(row).not.toHaveProperty('message')
+  })
+
+  it('K8-c-3 organizerApproveMany：ids 逐字透传，返回 {items 剔除, approved, skipped}', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      {
+        deletionsPlan: {
+          ...deletionsPlan(),
+          approveManyResult: {
+            items: QUEUE_ROWS.map((row) => ({ ...row })),
+            approved: 1,
+            skipped: 1
+          }
+        }
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const ids = ['del_1aaaaaaaaaaaaaaa', 'del_2aaaaaaaaaaaaaaa']
+    const result = (await manager.organizerApproveMany(ids)) as {
+      items: Array<Record<string, unknown>>
+      approved: number
+      skipped: number
+    }
+    expect(calls.organizerApproveMany).toEqual([ids])
+    expect(result.approved).toBe(1)
+    expect(result.skipped).toBe(1)
+    for (const row of result.items) expect(row).not.toHaveProperty('message')
+  })
+
+  it('K8-c-4 上游错误原样上抛（not_pending / stopping），manager 不吞不改写', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        deletionsPlan: {
+          ...deletionsPlan(),
+          decideError: 'not_pending',
+          approveManyError: 'stopping'
+        }
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.organizerDecide('del_1aaaaaaaaaaaaaaa', true)).rejects.toThrow(
+      'not_pending'
+    )
+    await expect(manager.organizerApproveMany(['del_1aaaaaaaaaaaaaaa'])).rejects.toThrow('stopping')
+  })
+
+  it('K8-c-5 会话未挂队列面 ⇒ unavailable 语义错误（handler 映射 PRECONDITION_FAILED）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(() => manager.organizerStatus()).toThrow(/unavailable/)
+    await expect(manager.organizerDecide('del_1aaaaaaaaaaaaaaa', true)).rejects.toThrow(
+      /unavailable/
+    )
+    await expect(manager.organizerApproveMany(['del_1aaaaaaaaaaaaaaa'])).rejects.toThrow(
+      /unavailable/
+    )
   })
 })

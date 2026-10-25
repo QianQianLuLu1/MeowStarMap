@@ -4462,6 +4462,38 @@
       "cancelAdd": "Cancel",
       "rescan": "Rescan",
       "proposalSummary": "Found {{images}} photos / {{videos}} videos"
+    },
+    "organizer": {
+      "title": "Organizer queue",
+      "toggle": "Organizer queue (batch deletion)",
+      "toggleDesc": "When enabled, deletion requests initiated on the phone can be approved on this PC; deletion requires confirmation on both sides, and files are moved to the Windows Recycle Bin (recoverable).",
+      "empty": "No pending deletion requests",
+      "emptyHint": "Deletion requests from the phone will appear here",
+      "unavailable": "Organizer queue unavailable",
+      "unavailableHint": "Sync components are not ready; retrying automatically",
+      "state": {
+        "preparing": "Preparing",
+        "pending": "Awaiting PC approval",
+        "confirming": "Awaiting phone check",
+        "queued": "Queued",
+        "checking": "Verifying files",
+        "executing": "Moving to Recycle Bin",
+        "recycled": "Moved to Recycle Bin",
+        "failed": "Failed",
+        "changed": "Files changed",
+        "cancelled": "Cancelled",
+        "rejected": "Rejected"
+      },
+      "filesCount": "{{count}} files",
+      "online": "Phone online",
+      "offline": "Phone offline",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approveAll": "Approve all",
+      "confirmTitle": "Move to Recycle Bin",
+      "confirmBody": "Move {{count}} files to the Windows Recycle Bin (recoverable from the Recycle Bin)? Continue?",
+      "confirmAction": "Move to Recycle Bin",
+      "cancel": "Cancel"
     }
   },
   "shareCard": {

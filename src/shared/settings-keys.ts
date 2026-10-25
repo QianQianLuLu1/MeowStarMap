@@ -38,7 +38,11 @@ export const RENDERER_PREF_KEYS = [
   // K5：多 host 配对开关（布尔，默认 false，消费点 nikkisync-runtime-setup.ts）。
   // 默认关以保第三方旧客户端只认 NS1 七段串；开启后配对串/服务响应附带备选地址
   // （上游 listLanIpv4，≤8），需手机端 NikkiSync App 支持新格式。
-  'nikkisync.multiHostPairing'
+  'nikkisync.multiHostPairing',
+  // K8：整理队列（批量删除）开关（布尔，默认 false，消费点 nikkisync-handler.ts 三通道开关门）。
+  // 开启后手机端发起的删除意图才可经电脑批准执行（移入 Windows 回收站，可恢复）；
+  // 默认关属破坏性能力的双保险之一，关闭时三条通道一律 PRECONDITION_FAILED。
+  'nikkisync.organizerEnabled'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

@@ -560,6 +560,33 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
   `directory_not_found` → `PRECONDITION_FAILED`。
 - **仅作用于 NikkiSync 同步库扫描器**，不影响本地图库自有扫描目录（`customScanPaths`）。
 
+### 8.2.4 整理队列（K8，上游 `DeletionQueue` 的 PC 管理面；破坏性能力，开关默认关）
+
+| 通道                                | 入参                                      | 出参                                                                                                                | 失败码                                                |
+| ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `nikkisync:get-organizer-queue`     | 无                                        | `{items: [{id, assetId, state, online, files[{name,size,folder?}], count}], activity}`（**中文 `message` 已剔除**） | `PRECONDITION_FAILED`（开关关/未装配）                |
+| `nikkisync:decide-organizer-item`   | `{id: /^[a-zA-Z0-9-]{16,64}$/, approve}`  | 批准/拒绝后的队列行列表（同样剔除 message）                                                                         | `VALIDATION_ERROR`；`PRECONDITION_FAILED`；`CANCELED` |
+| `nikkisync:approve-organizer-items` | `{ids: string[] 1..500}`（id 正则同上游） | `{items, approved, skipped}`（items 剔除 message；重复 id 由上游 `invalid_ids` 拒绝，本层不去重）                   | 同上映射                                              |
+
+契约要点：
+
+- **开关门**：三通道先读 `nikkisync.organizerEnabled`（渲染层白名单键，默认 **false**），
+  false ⇒ `PRECONDITION_FAILED`（错误文案指向同步服务页开关）；未装配会话同样
+  `PRECONDITION_FAILED`。
+- **删除语义**：上游确认链 `preparing→pending→PC decide/approveMany→confirming→queued→
+executing（逐文件 sha256+size 复核后经回收 helper 送 Windows 回收站）→recycled`；
+  文件变化 ⇒ `changed` 不执行；中断 ⇒ 构造期标记 `failed` 不自动重放。可逆性 =
+  Windows 回收站可恢复；本仓不入应用内回收站（数据源与索引体系不同）。
+- 上游四错误短码映射：`not_pending` / `invalid_ids` → `VALIDATION_ERROR`；
+  `phone_offline` → `PRECONDITION_FAILED`；`stopping` → `CANCELED`。
+- 回收 helper：上游 `DeletionQueue` 经 `NIKKISYNC_RECYCLE_HELPER` env 调用
+  `--recycle-file <path> <sha256> <size>`（构建见 `scripts/build-recycle-helper.cjs`，
+  打包经 extraResources 落 `{resourcesPath}/nikkisync/`）；helper 未构建/失败 ⇒
+  上游抛 `recycle_unavailable`，任务标 `failed`，**绝不退化为永久删除**。
+- 11 态枚举（UI i18n 映射）：`preparing/pending/confirming/queued/checking/executing/
+recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
+- 手机端协同前提：NikkiSync App ≥ 1.0.21（OrganizerPage 随 1.0.21 发布）。
+
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
 
 `sync:getStatus` / `startServer` / `stopServer` / `createPairingQr` / `listDevices` / `revokeDevice`

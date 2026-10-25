@@ -152,7 +152,36 @@ const SYNC_SERVICE_LEAVES = [
   'extraDirectories.confirmAdd',
   'extraDirectories.cancelAdd',
   'extraDirectories.rescan',
-  'extraDirectories.proposalSummary'
+  'extraDirectories.proposalSummary',
+  // K8：整理队列（批量删除，破坏性能力）
+  'organizer.title',
+  'organizer.toggle',
+  'organizer.toggleDesc',
+  'organizer.empty',
+  'organizer.emptyHint',
+  'organizer.unavailable',
+  'organizer.unavailableHint',
+  'organizer.state.preparing',
+  'organizer.state.pending',
+  'organizer.state.confirming',
+  'organizer.state.queued',
+  'organizer.state.checking',
+  'organizer.state.executing',
+  'organizer.state.recycled',
+  'organizer.state.failed',
+  'organizer.state.changed',
+  'organizer.state.cancelled',
+  'organizer.state.rejected',
+  'organizer.filesCount',
+  'organizer.online',
+  'organizer.offline',
+  'organizer.approve',
+  'organizer.reject',
+  'organizer.approveAll',
+  'organizer.confirmTitle',
+  'organizer.confirmBody',
+  'organizer.confirmAction',
+  'organizer.cancel'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */

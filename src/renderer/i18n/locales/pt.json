@@ -4462,6 +4462,38 @@
       "cancelAdd": "Cancelar",
       "rescan": "Varrer novamente",
       "proposalSummary": "{{images}} fotos / {{videos}} vídeos detectados"
+    },
+    "organizer": {
+      "title": "Fila de organização",
+      "toggle": "Fila de organização (exclusão em lote)",
+      "toggleDesc": "Ao ativar, solicitações de exclusão enviadas pelo celular poderão ser aprovadas neste computador; a exclusão exige dupla confirmação (celular e computador) e os arquivos são movidos para a Lixeira do Windows (recuperáveis).",
+      "empty": "Nenhuma solicitação de exclusão pendente",
+      "emptyHint": "As solicitações do celular aparecerão aqui",
+      "unavailable": "Fila de organização indisponível",
+      "unavailableHint": "Componentes de sincronização não prontos; tentando novamente automaticamente",
+      "state": {
+        "preparing": "Preparando",
+        "pending": "Aguardando aprovação do PC",
+        "confirming": "Aguardando verificação do celular",
+        "queued": "Na fila",
+        "checking": "Verificando arquivos",
+        "executing": "Movendo para a lixeira",
+        "recycled": "Movido para a lixeira",
+        "failed": "Falhou",
+        "changed": "Arquivos alterados",
+        "cancelled": "Cancelado",
+        "rejected": "Rejeitado"
+      },
+      "filesCount": "{{count}} arquivos",
+      "online": "Celular online",
+      "offline": "Celular offline",
+      "approve": "Aprovar",
+      "reject": "Rejeitar",
+      "approveAll": "Aprovar tudo",
+      "confirmTitle": "Confirmar mover para a lixeira",
+      "confirmBody": "Mover {{count}} arquivos para a Lixeira do Windows (recuperáveis na Lixeira)? Continuar?",
+      "confirmAction": "Mover para a lixeira",
+      "cancel": "Cancelar"
     }
   },
   "shareCard": {

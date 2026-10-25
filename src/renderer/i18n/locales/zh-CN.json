@@ -4462,6 +4462,38 @@
       "cancelAdd": "取消",
       "rescan": "重新扫描",
       "proposalSummary": "识别到 {{images}} 张照片 / {{videos}} 个视频"
+    },
+    "organizer": {
+      "title": "整理队列",
+      "toggle": "整理队列（批量删除）",
+      "toggleDesc": "开启后，手机端发起的删除请求才可经本机批准执行；删除由手机与电脑双重确认，文件移入 Windows 系统回收站、可恢复。",
+      "empty": "暂无待整理删除项",
+      "emptyHint": "手机端发起删除请求后将出现在这里",
+      "unavailable": "整理队列不可用",
+      "unavailableHint": "同步组件未就绪或会话未装配，稍后自动重试",
+      "state": {
+        "preparing": "筹备中",
+        "pending": "等待电脑确认",
+        "confirming": "等待手机核对",
+        "queued": "已排队",
+        "checking": "正在核对文件",
+        "executing": "正在移入回收站",
+        "recycled": "已移入回收站",
+        "failed": "失败",
+        "changed": "文件已变化",
+        "cancelled": "已取消",
+        "rejected": "已拒绝"
+      },
+      "filesCount": "{{count}} 个文件",
+      "online": "手机在线",
+      "offline": "手机离线",
+      "approve": "批准",
+      "reject": "拒绝",
+      "approveAll": "全部批准",
+      "confirmTitle": "确认移入回收站",
+      "confirmBody": "将把 {{count}} 个文件移入 Windows 系统回收站（可从回收站恢复）。确认继续？",
+      "confirmAction": "确认移入回收站",
+      "cancel": "取消"
     }
   },
   "shareCard": {

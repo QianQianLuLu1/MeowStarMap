@@ -4462,6 +4462,38 @@
       "cancelAdd": "취소",
       "rescan": "다시 스캔",
       "proposalSummary": "사진 {{images}}장 / 동영상 {{videos}}개 발견"
+    },
+    "organizer": {
+      "title": "정리 대기열",
+      "toggle": "정리 대기열 (일괄 삭제)",
+      "toggleDesc": "사용 시 휴대폰에서 보낸 삭제 요청을 PC에서 승인할 수 있습니다. 삭제는 휴대폰과 PC의 이중 확인으로 진행되며, 파일은 Windows 휴지통으로 이동됩니다(복구 가능).",
+      "empty": "정리할 삭제 항목이 없습니다",
+      "emptyHint": "휴대폰에서 삭제 요청을 보내면 여기에 표시됩니다",
+      "unavailable": "정리 대기열을 사용할 수 없습니다",
+      "unavailableHint": "동기화 구성 요소가 준비되지 않았습니다. 자동으로 다시 시도합니다",
+      "state": {
+        "preparing": "준비 중",
+        "pending": "PC 확인 대기 중",
+        "confirming": "휴대폰 확인 대기 중",
+        "queued": "대기열에 추가됨",
+        "checking": "파일 확인 중",
+        "executing": "휴지통으로 이동 중",
+        "recycled": "휴지통으로 이동됨",
+        "failed": "실패",
+        "changed": "파일이 변경됨",
+        "cancelled": "취소됨",
+        "rejected": "거부됨"
+      },
+      "filesCount": "파일 {{count}}개",
+      "online": "휴대폰 온라인",
+      "offline": "휴대폰 오프라인",
+      "approve": "승인",
+      "reject": "거부",
+      "approveAll": "모두 승인",
+      "confirmTitle": "휴지통으로 이동 확인",
+      "confirmBody": "파일 {{count}}개를 Windows 휴지통으로 이동합니다(휴지통에서 복구 가능). 계속하시겠습니까?",
+      "confirmAction": "휴지통으로 이동",
+      "cancel": "취소"
     }
   },
   "shareCard": {

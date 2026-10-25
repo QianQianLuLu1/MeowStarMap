@@ -91,6 +91,32 @@ const EXTRA_DIRECTORY_PROPOSAL = {
   hint: '已识别 12 张照片'
 }
 
+/** K8：与上游 `DeletionQueue.list()` 行同形（含会被剔除的中文 message 字段；id 匹配上游正则）。 */
+const ORGANIZER_ROW = {
+  id: 'del-1aaaaaaaaaaaaaaa',
+  assetId: 'asset_1',
+  state: 'pending',
+  message: '等待电脑确认',
+  online: true,
+  files: [{ name: 'a.jpg', size: 123, folder: 'photos' }],
+  count: 1
+}
+
+/** K8：manager 剔除 message 后的队列视图（handler 逐字段透传锁死零转换）。 */
+const ORGANIZER_VIEW = {
+  items: [
+    {
+      id: 'del-1aaaaaaaaaaaaaaa',
+      assetId: 'asset_1',
+      state: 'pending',
+      online: true,
+      files: [{ name: 'a.jpg', size: 123, folder: 'photos' }],
+      count: 1
+    }
+  ],
+  activity: { catalogPasses: 1, catalogImages: 3, prepared: 2, recycled: 1, queued: 0, active: 0 }
+}
+
 function createRuntimeStub(): NikkiSyncRuntimeHandle {
   return {
     status: vi.fn(() => ({
@@ -152,7 +178,11 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
     inspectExtraDirectory: vi.fn(async () => EXTRA_DIRECTORY_PROPOSAL),
     addExtraDirectory: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
     removeExtraDirectory: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
-    rescanExtraDirectories: vi.fn(async () => EXTRA_DIRECTORIES_STATE)
+    rescanExtraDirectories: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
+    // ---- K8：整理队列（批量删除）----
+    organizerStatus: vi.fn(() => ORGANIZER_VIEW),
+    organizerDecide: vi.fn(async () => ORGANIZER_VIEW.items),
+    organizerApproveMany: vi.fn(async () => ORGANIZER_VIEW)
   }
 }
 
@@ -168,7 +198,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 24 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 五条目录）', () => {
+  it('恰好注册 27 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 五条目录 + K8 三条整理队列）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -195,7 +225,10 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:inspect-extra-directory',
       'nikkisync:add-extra-directory',
       'nikkisync:remove-extra-directory',
-      'nikkisync:rescan-extra-directories'
+      'nikkisync:rescan-extra-directories',
+      'nikkisync:get-organizer-queue',
+      'nikkisync:decide-organizer-item',
+      'nikkisync:approve-organizer-items'
     ])
   })
 
@@ -992,6 +1025,133 @@ describe('nikkisync:*-extra-directories（K6）', () => {
       ['nikkisync:add-extra-directory', { id: 'p1' }],
       ['nikkisync:remove-extra-directory', { id: 'dir_1' }],
       ['nikkisync:rescan-extra-directories', undefined]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+})
+
+// ===== K8：整理队列（批量删除）三通道 =====
+
+describe('nikkisync 整理队列三通道（K8，破坏性能力）', () => {
+  /** 开关开：ctx.dbManager.getSetting 对 organizerEnabled 返回 true。 */
+  function registerWithSwitch(enabled: boolean, runtime?: NikkiSyncRuntimeHandle) {
+    const ctx = register(runtime ?? createRuntimeStub())
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, fallback: unknown) =>
+        key === 'nikkisync.organizerEnabled' ? enabled : fallback
+    )
+    return ctx
+  }
+
+  it('开关门：nikkisync.organizerEnabled 缺省（false）⇒ 三通道全拒 PRECONDITION_FAILED 且句柄零调用', async () => {
+    const runtime = createRuntimeStub()
+    registerWithSwitch(false, runtime)
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:get-organizer-queue', undefined],
+      ['nikkisync:decide-organizer-item', { id: ORGANIZER_ROW.id, approve: true }],
+      ['nikkisync:approve-organizer-items', { ids: [ORGANIZER_ROW.id] }]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.success, channel).toBe(false)
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+      expect(res.error?.message, channel).toContain('organizer is disabled')
+    }
+    expect(runtime.organizerStatus).not.toHaveBeenCalled()
+    expect(runtime.organizerDecide).not.toHaveBeenCalled()
+    expect(runtime.organizerApproveMany).not.toHaveBeenCalled()
+  })
+
+  it('开关开：get-organizer-queue 数据与句柄返回值逐字段相等（零转换铁律）', async () => {
+    const runtime = createRuntimeStub()
+    registerWithSwitch(true, runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-organizer-queue')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toEqual(runtime.organizerStatus())
+    expect(res.data).toEqual(ORGANIZER_VIEW)
+  })
+
+  it('开关开：decide-organizer-item 参数逐字透传（批准/拒绝两支）', async () => {
+    const runtime = createRuntimeStub()
+    registerWithSwitch(true, runtime)
+    const handler = getHandler(handleMock, 'nikkisync:decide-organizer-item')
+    await handler({}, { id: ORGANIZER_ROW.id, approve: true })
+    await handler({}, { id: ORGANIZER_ROW.id, approve: false })
+    expect(runtime.organizerDecide).toHaveBeenNthCalledWith(1, ORGANIZER_ROW.id, true)
+    expect(runtime.organizerDecide).toHaveBeenNthCalledWith(2, ORGANIZER_ROW.id, false)
+  })
+
+  it('开关开：approve-organizer-items ids 逐字透传', async () => {
+    const runtime = createRuntimeStub()
+    registerWithSwitch(true, runtime)
+    const handler = getHandler(handleMock, 'nikkisync:approve-organizer-items')
+    const ids = ['del-1aaaaaaaaaaaaaaa', 'del-2aaaaaaaaaaaaaaa']
+    await handler({}, { ids })
+    expect(runtime.organizerApproveMany).toHaveBeenCalledWith(ids)
+  })
+
+  it('入参校验：id 不匹配上游同规正则 ⇒ VALIDATION_ERROR 且句柄零调用；ids 空/超 500 同拒', async () => {
+    const runtime = createRuntimeStub()
+    registerWithSwitch(true, runtime)
+    const decideHandler = getHandler(handleMock, 'nikkisync:decide-organizer-item')
+    const badIds = ['short', 'del_1!', ORGANIZER_ROW.id + 'x'.repeat(70)]
+    for (const id of badIds) {
+      const res = (await decideHandler({}, { id, approve: true })) as HandleResult
+      expect(res.error?.code, id).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.organizerDecide).not.toHaveBeenCalled()
+
+    const approveHandler = getHandler(handleMock, 'nikkisync:approve-organizer-items')
+    const empty = (await approveHandler({}, { ids: [] })) as HandleResult
+    expect(empty.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    const tooMany = (await approveHandler(
+      {},
+      { ids: Array.from({ length: 501 }, (_, i) => `del-${String(i).padStart(20, '0')}`) }
+    )) as HandleResult
+    expect(tooMany.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(runtime.organizerApproveMany).not.toHaveBeenCalled()
+  })
+
+  it('上游错误显式映射：not_pending/invalid_ids→VALIDATION、phone_offline→PRECONDITION、stopping→CANCELED', async () => {
+    const runtime = createRuntimeStub()
+    registerWithSwitch(true, runtime)
+    const decideHandler = getHandler(handleMock, 'nikkisync:decide-organizer-item')
+    vi.mocked(runtime.organizerDecide).mockRejectedValueOnce(new Error('not_pending'))
+    vi.mocked(runtime.organizerDecide).mockRejectedValueOnce(new Error('phone_offline'))
+    expect(
+      ((await decideHandler({}, { id: ORGANIZER_ROW.id, approve: true })) as HandleResult).error
+        ?.code
+    ).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(
+      ((await decideHandler({}, { id: ORGANIZER_ROW.id, approve: true })) as HandleResult).error
+        ?.code
+    ).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    const approveHandler = getHandler(handleMock, 'nikkisync:approve-organizer-items')
+    vi.mocked(runtime.organizerApproveMany).mockRejectedValueOnce(new Error('invalid_ids'))
+    vi.mocked(runtime.organizerApproveMany).mockRejectedValueOnce(new Error('stopping'))
+    expect(
+      ((await approveHandler({}, { ids: [ORGANIZER_ROW.id] })) as HandleResult).error?.code
+    ).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(
+      ((await approveHandler({}, { ids: [ORGANIZER_ROW.id] })) as HandleResult).error?.code
+    ).toBe(IPC_ERROR_CODES.CANCELED)
+  })
+
+  it('未装配 ⇒ 三通道统一 PRECONDITION_FAILED（开关开也拦在句柄层）', async () => {
+    const ctx = register(undefined)
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, fallback: unknown) => (key === 'nikkisync.organizerEnabled' ? true : fallback)
+    )
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:get-organizer-queue', undefined],
+      ['nikkisync:decide-organizer-item', { id: ORGANIZER_ROW.id, approve: true }],
+      ['nikkisync:approve-organizer-items', { ids: [ORGANIZER_ROW.id] }]
     ]
     for (const [channel, input] of cases) {
       const handler = getHandler(handleMock, channel)

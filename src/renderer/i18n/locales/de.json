@@ -4462,6 +4462,38 @@
       "cancelAdd": "Abbrechen",
       "rescan": "Erneut scannen",
       "proposalSummary": "{{images}} Fotos / {{videos}} Videos erkannt"
+    },
+    "organizer": {
+      "title": "Organisations-Warteschlange",
+      "toggle": "Organisations-Warteschlange (Stapellöschung)",
+      "toggleDesc": "Nach dem Aktivieren können vom Telefon gesendete Löschanfragen auf diesem PC genehmigt werden; das Löschen erfordert eine doppelte Bestätigung (Telefon und PC), und Dateien werden in den Windows-Papierkorb verschoben (wiederherstellbar).",
+      "empty": "Keine ausstehenden Löschanfragen",
+      "emptyHint": "Löschanfragen des Telefons erscheinen hier",
+      "unavailable": "Organisations-Warteschlange nicht verfügbar",
+      "unavailableHint": "Synchronisierungskomponenten nicht bereit; automatischer Wiederholungsversuch",
+      "state": {
+        "preparing": "Wird vorbereitet",
+        "pending": "Wartet auf PC-Freigabe",
+        "confirming": "Wartet auf Telefonprüfung",
+        "queued": "In Warteschlange",
+        "checking": "Dateien werden geprüft",
+        "executing": "Wird in den Papierkorb verschoben",
+        "recycled": "In den Papierkorb verschoben",
+        "failed": "Fehlgeschlagen",
+        "changed": "Dateien geändert",
+        "cancelled": "Abgebrochen",
+        "rejected": "Abgelehnt"
+      },
+      "filesCount": "{{count}} Dateien",
+      "online": "Telefon online",
+      "offline": "Telefon offline",
+      "approve": "Genehmigen",
+      "reject": "Ablehnen",
+      "approveAll": "Alle genehmigen",
+      "confirmTitle": "Verschieben in den Papierkorb bestätigen",
+      "confirmBody": "{{count}} Dateien in den Windows-Papierkorb verschieben (aus dem Papierkorb wiederherstellbar)? Fortfahren?",
+      "confirmAction": "In den Papierkorb verschieben",
+      "cancel": "Abbrechen"
     }
   },
   "shareCard": {

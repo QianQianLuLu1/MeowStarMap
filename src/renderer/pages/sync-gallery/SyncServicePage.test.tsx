@@ -97,6 +97,9 @@ interface NikkiSyncServerApiStub {
   removeExtraDirectory: Mock
   rescanExtraDirectories: Mock
   selectDirectory: Mock
+  getOrganizerQueue: Mock
+  decideOrganizerItem: Mock
+  approveOrganizerItems: Mock
 }
 
 let settingsGet: Mock
@@ -115,6 +118,8 @@ function installElectronApi(
     pairedDevicesReject?: Error
     startScanReject?: Error
     extraReject?: boolean
+    organizerQueue?: Record<string, unknown>
+    organizerQueueReject?: boolean
   } = {}
 ) {
   store = { ...opts.persisted }
@@ -213,7 +218,20 @@ function installElectronApi(
       automaticRoots: [],
       busy: false
     })),
-    selectDirectory: vi.fn(async () => 'D:\\NewPhotos')
+    selectDirectory: vi.fn(async () => 'D:\\NewPhotos'),
+    // K8：整理队列（默认空队列；organizerQueueReject 模拟「开关开但会话未装配」）
+    getOrganizerQueue: vi.fn(() =>
+      opts.organizerQueueReject
+        ? Promise.reject(new Error('organizer deletion queue is unavailable'))
+        : Promise.resolve(
+            opts.organizerQueue ?? {
+              items: [],
+              activity: { catalogPasses: 0, queued: 0, active: 0 }
+            }
+          )
+    ),
+    decideOrganizerItem: vi.fn(async () => []),
+    approveOrganizerItems: vi.fn(async () => ({ items: [], approved: 0, skipped: 0 }))
   }
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
@@ -622,5 +640,169 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     await waitFor(() => expect(serverApi.addExtraDirectory).toHaveBeenCalledWith({ id: 'prop_1' }))
     fireEvent.click(screen.getByRole('button', { name: '重新扫描' }))
     await waitFor(() => expect(serverApi.rescanExtraDirectories).toHaveBeenCalled())
+  })
+
+  // ===== K8：整理队列（批量删除，破坏性能力） =====
+
+  /** 与上游 DeletionQueue.list() 行同形（message 已在 manager 层剔除）。 */
+  function makeOrganizerItem(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'del-1aaaaaaaaaaaaaaa',
+      assetId: 'asset_1',
+      state: 'pending',
+      online: true,
+      files: [
+        { name: 'a.jpg', size: 123, folder: 'photos' },
+        { name: 'b.jpg', size: 456, folder: 'raw' }
+      ],
+      count: 2,
+      ...overrides
+    }
+  }
+
+  function makeOrganizerView(items = [makeOrganizerItem()]) {
+    return {
+      items,
+      activity: {
+        catalogPasses: 1,
+        catalogImages: 3,
+        prepared: 1,
+        recycled: 0,
+        queued: 0,
+        active: 0
+      }
+    }
+  }
+
+  it('(aa) K8：开关挂载读取 organizerEnabled；拨动写回设置项（默认关 ⇒ 队列区隐藏）', async () => {
+    installElectronApi({ persisted: { 'nikkisync.organizerEnabled': false } })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '整理队列（批量删除）' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    expect(screen.queryByText('全部批准')).not.toBeInTheDocument()
+    fireEvent.click(toggle)
+    await waitFor(() =>
+      expect(settingsSet).toHaveBeenCalledWith('nikkisync.organizerEnabled', true)
+    )
+  })
+
+  it('(ab) K8：开关开 ⇒ 队列列表渲染（11 态映射/文件数/online 指示/操作钮）', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView([
+        makeOrganizerItem({ state: 'pending' }),
+        makeOrganizerItem({
+          id: 'del-2aaaaaaaaaaaaaaa',
+          state: 'recycled',
+          online: false,
+          count: 1,
+          files: [{ name: 'c.jpg', size: 7, folder: 'photos' }]
+        })
+      ])
+    })
+    renderSection()
+    expect(await screen.findByText('等待电脑确认')).toBeInTheDocument()
+    expect(screen.getByText('已移入回收站')).toBeInTheDocument()
+    // 行描述是合并文本节点（"N 个文件 · 手机在线"），按子串正则断言
+    expect(screen.getByText(/2 个文件/)).toBeInTheDocument()
+    expect(screen.getByText(/手机在线/)).toBeInTheDocument()
+    expect(screen.getByText(/手机离线/)).toBeInTheDocument()
+    // 非终态行有批准/拒绝；终态行（recycled）没有
+    expect(screen.getByRole('button', { name: '批准' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '拒绝' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '全部批准' })).toBeInTheDocument()
+  })
+
+  it('(ac) K8：未知队列状态回退原样英文串（不谎报，K1 同款口径）', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView([makeOrganizerItem({ state: 'brand-new-state' })])
+    })
+    renderSection()
+    expect(await screen.findByText('brand-new-state')).toBeInTheDocument()
+  })
+
+  it('(ad) K8：确认弹窗拦截——批准先弹确认（列明文件数与回收站去向），取消不调用', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView()
+    })
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '批准' }))
+    // 标题与确认按钮同名（确认移入回收站），按 role 断言弹窗出现；文案用弹窗专属长句
+    expect(await screen.findByRole('button', { name: '确认移入回收站' })).toBeInTheDocument()
+    expect(screen.getByText(/将把 2 个文件移入 Windows 系统回收站/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    await waitFor(() => expect(screen.queryByText('确认移入回收站')).not.toBeInTheDocument())
+    expect(serverApi.decideOrganizerItem).not.toHaveBeenCalled()
+    expect(serverApi.approveOrganizerItems).not.toHaveBeenCalled()
+  })
+
+  it('(ae) K8：单条批准确认后调用 decideOrganizerItem(id,true)；拒绝路径无弹窗直接调用', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView()
+    })
+    renderSection()
+    // 拒绝：直接调用（非破坏性）
+    fireEvent.click(await screen.findByRole('button', { name: '拒绝' }))
+    await waitFor(() =>
+      expect(serverApi.decideOrganizerItem).toHaveBeenCalledWith({
+        id: 'del-1aaaaaaaaaaaaaaa',
+        approve: false
+      })
+    )
+    // 批准：弹确认 → 确认后调用
+    fireEvent.click(screen.getByRole('button', { name: '批准' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认移入回收站' }))
+    await waitFor(() =>
+      expect(serverApi.decideOrganizerItem).toHaveBeenCalledWith({
+        id: 'del-1aaaaaaaaaaaaaaa',
+        approve: true
+      })
+    )
+  })
+
+  it('(af) K8：批量批准确认后调用 approveOrganizerItems（仅 actionable 且在线的 id）', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView([
+        makeOrganizerItem({ id: 'del-1aaaaaaaaaaaaaaa', state: 'pending', online: true }),
+        makeOrganizerItem({
+          id: 'del-2aaaaaaaaaaaaaaa',
+          state: 'pending',
+          online: false
+        }),
+        makeOrganizerItem({ id: 'del-3aaaaaaaaaaaaaaa', state: 'recycled', online: false })
+      ])
+    })
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '全部批准' }))
+    fireEvent.click(await screen.findByRole('button', { name: '确认移入回收站' }))
+    await waitFor(() =>
+      expect(serverApi.approveOrganizerItems).toHaveBeenCalledWith({
+        ids: ['del-1aaaaaaaaaaaaaaa']
+      })
+    )
+  })
+
+  it('(ag) K8：开关开但队列为空 ⇒ 空态文案，无操作按钮', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView([])
+    })
+    renderSection()
+    expect(await screen.findByText('暂无待整理删除项')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '全部批准' })).not.toBeInTheDocument()
+  })
+
+  it('(ah) K8：队列通道失败（会话未装配）⇒ 队列区显示不可用提示而非报错弹窗', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueueReject: true
+    })
+    renderSection()
+    expect(await screen.findByText('整理队列不可用')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '全部批准' })).not.toBeInTheDocument()
   })
 })

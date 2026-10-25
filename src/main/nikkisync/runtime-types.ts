@@ -522,4 +522,13 @@ export interface NikkiSyncRuntimeHandle {
   removeExtraDirectory(id: string): Promise<unknown>
   /** K6：手动重扫全部目录。 */
   rescanExtraDirectories(): Promise<unknown>
+  /** K8：队列视图（list 逐行剔除上游中文 message 后透传 + activity 计数；纯读无副作用）。 */
+  organizerStatus(): { items: unknown[]; activity: unknown }
+  /**
+   * K8：单条批准/拒绝（上游 `DeletionQueue.decide`；错误 `not_pending`/`phone_offline`
+   * 原样上抛，由 handler 层映射 AppError——与 revokeDevice 先例同口径）。
+   */
+  organizerDecide(id: string, approve: boolean): Promise<unknown>
+  /** K8：批量批准（上游 `approveMany`，≤500 去重由上游校验；错误 `stopping`/`invalid_ids` 原样上抛）。 */
+  organizerApproveMany(ids: string[]): Promise<unknown>
 }

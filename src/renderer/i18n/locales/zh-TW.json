@@ -4462,6 +4462,38 @@
       "cancelAdd": "取消",
       "rescan": "重新掃描",
       "proposalSummary": "識別到 {{images}} 張照片 / {{videos}} 個影片"
+    },
+    "organizer": {
+      "title": "整理佇列",
+      "toggle": "整理佇列（批次刪除）",
+      "toggleDesc": "開啟後，手機端發起的刪除請求才可經本機批准執行；刪除由手機與電腦雙重確認，檔案移入 Windows 系統資源回收筒、可復原。",
+      "empty": "暫無待整理刪除項",
+      "emptyHint": "手機端發起刪除請求後將出現在這裡",
+      "unavailable": "整理佇列不可用",
+      "unavailableHint": "同步元件未就緒或工作階段未裝配，稍後自動重試",
+      "state": {
+        "preparing": "準備中",
+        "pending": "等待電腦確認",
+        "confirming": "等待手機核對",
+        "queued": "已排入佇列",
+        "checking": "正在核對檔案",
+        "executing": "正在移入資源回收筒",
+        "recycled": "已移入資源回收筒",
+        "failed": "失敗",
+        "changed": "檔案已變更",
+        "cancelled": "已取消",
+        "rejected": "已拒絕"
+      },
+      "filesCount": "{{count}} 個檔案",
+      "online": "手機線上",
+      "offline": "手機離線",
+      "approve": "批准",
+      "reject": "拒絕",
+      "approveAll": "全部批准",
+      "confirmTitle": "確認移入資源回收筒",
+      "confirmBody": "將把 {{count}} 個檔案移入 Windows 系統資源回收筒（可從資源回收筒復原）。確認繼續？",
+      "confirmAction": "確認移入資源回收筒",
+      "cancel": "取消"
     }
   },
   "shareCard": {

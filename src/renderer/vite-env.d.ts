@@ -1097,6 +1097,17 @@ interface WindowElectronAPI {
     rescanExtraDirectories: () => Promise<
       import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo
     >
+    // K8：整理队列（批量删除；开关默认关，PRECONDITION_FAILED 指向同步服务页开关）
+    getOrganizerQueue: () => Promise<
+      import('../shared/types/electron-api').NikkiSyncOrganizerViewInfo
+    >
+    decideOrganizerItem: (input: {
+      id: string
+      approve: boolean
+    }) => Promise<Array<import('../shared/types/electron-api').NikkiSyncOrganizerItemInfo>>
+    approveOrganizerItems: (input: {
+      ids: string[]
+    }) => Promise<import('../shared/types/electron-api').NikkiSyncOrganizerApproveResultInfo>
   }
   // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
   assetEdits: {

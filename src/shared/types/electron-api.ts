@@ -655,6 +655,44 @@ export interface NikkiSyncExtraDirectoryProposalInfo {
   limited: boolean
 }
 
+/** K8：整理队列行（上游 `DeletionQueue.list()` 行剔除中文 message 后的形状）。 */
+export interface NikkiSyncOrganizerItemInfo {
+  id: string
+  assetId: string
+  /** 上游 11 态：preparing/pending/confirming/queued/checking/executing/recycled/failed/changed/cancelled/rejected。 */
+  state: string
+  /** 手机端 45s 租约是否有效（online=false 时批准会被上游以 phone_offline 拒绝）。 */
+  online: boolean
+  /** 关联文件清单（仅文件名/大小/所在文件夹名，不含绝对路径）。 */
+  files: Array<{ name: string; size: number; folder?: string }>
+  count: number
+}
+
+/** K8：`nikkisync:get-organizer-queue` 响应（队列视图 + activity 计数）。 */
+export interface NikkiSyncOrganizerViewInfo {
+  items: NikkiSyncOrganizerItemInfo[]
+  /** 上游 `DeletionQueue.activity()`：metrics + queued + active 原样透传。 */
+  activity: unknown
+}
+
+/** K8：`nikkisync:decide-organizer-item` 入参。 */
+export interface NikkiSyncOrganizerDecideInput {
+  id: string
+  approve: boolean
+}
+
+/** K8：`nikkisync:approve-organizer-items` 入参（1..500；重复 id 由上游 invalid_ids 拒绝）。 */
+export interface NikkiSyncOrganizerApproveInput {
+  ids: string[]
+}
+
+/** K8：`nikkisync:approve-organizer-items` 响应（items 剔除 message + 批准/跳过计数）。 */
+export interface NikkiSyncOrganizerApproveResultInfo {
+  items: NikkiSyncOrganizerItemInfo[]
+  approved: number
+  skipped: number
+}
+
 export interface NikkiSyncScanInputInfo {
   gameRoot?: string
   path?: string

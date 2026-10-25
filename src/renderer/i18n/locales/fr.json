@@ -4462,6 +4462,38 @@
       "cancelAdd": "Annuler",
       "rescan": "Réanalyser",
       "proposalSummary": "{{images}} photos / {{videos}} vidéos détectées"
+    },
+    "organizer": {
+      "title": "File d'organisation",
+      "toggle": "File d'organisation (suppression par lot)",
+      "toggleDesc": "Une fois activé, les demandes de suppression envoyées depuis le téléphone peuvent être approuvées sur ce PC ; la suppression requiert une double confirmation (téléphone et PC), et les fichiers sont déplacés vers la Corbeille Windows (récupérables).",
+      "empty": "Aucune demande de suppression en attente",
+      "emptyHint": "Les demandes du téléphone apparaîtront ici",
+      "unavailable": "File d'organisation indisponible",
+      "unavailableHint": "Composants de synchronisation non prêts ; nouvelle tentative automatique",
+      "state": {
+        "preparing": "Préparation",
+        "pending": "En attente d'approbation du PC",
+        "confirming": "En attente de vérification du téléphone",
+        "queued": "En file",
+        "checking": "Vérification des fichiers",
+        "executing": "Déplacement vers la corbeille",
+        "recycled": "Déplacé vers la corbeille",
+        "failed": "Échec",
+        "changed": "Fichiers modifiés",
+        "cancelled": "Annulé",
+        "rejected": "Refusé"
+      },
+      "filesCount": "{{count}} fichiers",
+      "online": "Téléphone en ligne",
+      "offline": "Téléphone hors ligne",
+      "approve": "Approuver",
+      "reject": "Refuser",
+      "approveAll": "Tout approuver",
+      "confirmTitle": "Confirmer la mise à la corbeille",
+      "confirmBody": "Déplacer {{count}} fichiers vers la Corbeille Windows (récupérables depuis la corbeille) ? Continuer ?",
+      "confirmAction": "Mettre à la corbeille",
+      "cancel": "Annuler"
     }
   },
   "shareCard": {

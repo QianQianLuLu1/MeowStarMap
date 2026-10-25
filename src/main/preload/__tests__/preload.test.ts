@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('nikkisync 命名空间方法清单（阶段4 查询面扩容后共 17 个）', () => {
+  it('nikkisync 命名空间方法清单（K8 整理队列接入后共 28 个）', () => {
     // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
     // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
     const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
@@ -91,7 +91,20 @@ describe('preload 装配完整性', () => {
         'stopServer',
         'getPairingCode',
         'getPairedDevices',
-        'revokeDevice'
+        'revokeDevice',
+        // K2/K3/K6（历史缺口：这三个节点的 8 个方法当时未入清单，随 K8 一并补全）
+        'getMetadataConsent',
+        'setMetadataConsent',
+        'resolveGameVersion',
+        'getExtraDirectories',
+        'inspectExtraDirectory',
+        'addExtraDirectory',
+        'removeExtraDirectory',
+        'rescanExtraDirectories',
+        // K8：整理队列（批量删除）
+        'getOrganizerQueue',
+        'decideOrganizerItem',
+        'approveOrganizerItems'
       ].sort()
     )
   })
@@ -114,6 +127,27 @@ describe('preload 装配完整性', () => {
     expect(invokeMock).toHaveBeenCalledWith('nikkisync:search-clothing', { query: '裙' })
     await electronAPI.nikkisync.profileStats()
     expect(invokeMock).toHaveBeenCalledWith('nikkisync:profile-stats')
+  })
+
+  it('K8 三个整理队列方法各自命中对应通道名（破坏性能力的转发面逐字锁定）', async () => {
+    const electronAPI = getExposed<{
+      nikkisync: Record<string, (...args: unknown[]) => Promise<unknown>>
+    }>('electronAPI')
+    invokeMock.mockResolvedValue({ success: true, data: { ok: 1 } })
+    await electronAPI.nikkisync.getOrganizerQueue()
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:get-organizer-queue')
+    await electronAPI.nikkisync.decideOrganizerItem({
+      id: 'del-1aaaaaaaaaaaaaaa',
+      approve: true
+    })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:decide-organizer-item', {
+      id: 'del-1aaaaaaaaaaaaaaa',
+      approve: true
+    })
+    await electronAPI.nikkisync.approveOrganizerItems({ ids: ['del-1aaaaaaaaaaaaaaa'] })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:approve-organizer-items', {
+      ids: ['del-1aaaaaaaaaaaaaaa']
+    })
   })
 
   it('electronAPI 包含全部 34 个键（reportReady + 33 个命名空间，阶段4 增 assetEdits）', () => {

@@ -1,4 +1,5 @@
 import { app } from 'electron'
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
 import { electronLogger } from '../utils/logger'
@@ -69,6 +70,13 @@ export const RUNTIME_ENV_FLAG = 'NIKKI_NIKKISYNC_RUNTIME'
 export const GAME_ROOT_ENV_FLAG = 'NIKKI_NIKKISYNC_GAME_ROOT'
 /** 环境变量名（阶段 6：元数据解析的强启 / 强关逃生阀，取值同 `RUNTIME_ENV_FLAG` 的 '1' / '0'）。 */
 export const METADATA_ENV_FLAG = 'NIKKI_NIKKISYNC_METADATA'
+/**
+ * K8-a：回收 helper 的环境变量名（与上游 `DeletionQueue.recycleFile` 执行期读取名逐字一致）。
+ * 未设置时上游抛 `recycle_unavailable`——删除任务标 failed、绝不退化为永久删除（fail-safe）。
+ */
+export const RECYCLE_HELPER_ENV = 'NIKKISYNC_RECYCLE_HELPER'
+/** K8-a：helper 产物文件名（构建脚本 extraResources filter 与此保持一致）。 */
+export const RECYCLE_HELPER_BASENAME = 'nikkisync-recycle-helper.exe'
 /** 库文件相对 userData 的路径段。 */
 export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
 /** K2：在线解析同意文件相对 userData 的路径段（上游 0600 JSON，读写全在上游）。 */
@@ -93,6 +101,21 @@ export function nikkisyncDatabaseFile(userDataDir: string): string {
 /** K2：同意文件路径（仅解析开启时由 facade 消费；未开启时连文件都不创建）。 */
 export function nikkisyncMetadataConsentFile(userDataDir: string): string {
   return path.join(userDataDir, ...NIKKISYNC_CONSENT_SEGMENTS)
+}
+
+/**
+ * K8-a：回收 helper 产物路径（dev=仓内 `resources/nikkisync/`，由
+ * `npm run build:recycle-helper` 产出；打包=`{resourcesPath}/nikkisync/`，
+ * 由 package.json extraResources 收进安装目录）。
+ */
+export function resolveRecycleHelperPath(input: {
+  isPackaged: boolean
+  resourcesPath: string
+  projectRoot: string
+}): string {
+  return input.isPackaged
+    ? path.join(input.resourcesPath, 'nikkisync', RECYCLE_HELPER_BASENAME)
+    : path.join(input.projectRoot, 'resources', 'nikkisync', RECYCLE_HELPER_BASENAME)
 }
 
 /** 自启判定：env 显式取值优先，其余交给设置项。 */
@@ -208,6 +231,22 @@ function runtimeLog(level: 'info' | 'warn' | 'error', message: string): void {
  * 任何失败都不抛出到启动链之外（由调用方 lifecycle 的 try/catch 二次兜底）。
  */
 export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRuntimeHandle> {
+  // K8-a：回收 helper 路径注入（上游 DeletionQueue 执行期读该 env；未设置时上游抛
+  // recycle_unavailable，删除任务标 failed、绝不退化为永久删除）。exe 尚未构建
+  // （fresh dev 环境未跑 build:recycle-helper）时保持未设置并 warn，可诊断不静默。
+  const recycleHelperPath = resolveRecycleHelperPath({
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+    projectRoot: app.getAppPath()
+  })
+  if (existsSync(recycleHelperPath)) {
+    process.env[RECYCLE_HELPER_ENV] = recycleHelperPath
+  } else {
+    runtimeLog(
+      'warn',
+      `recycle helper not built, organizer deletions will fail safely: expected ${recycleHelperPath}`
+    )
+  }
   const settings = settingsFrom(ctx)
   const options = buildSessionOptions({
     userDataDir: app.getPath('userData'),

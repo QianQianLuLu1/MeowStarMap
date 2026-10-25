@@ -4462,6 +4462,38 @@
       "cancelAdd": "Hủy",
       "rescan": "Quét lại",
       "proposalSummary": "Phát hiện {{images}} ảnh / {{videos}} video"
+    },
+    "organizer": {
+      "title": "Hàng đợi dọn dẹp",
+      "toggle": "Hàng đợi dọn dẹp (xóa hàng loạt)",
+      "toggleDesc": "Khi bật, các yêu cầu xóa từ điện thoại có thể được phê duyệt trên máy này; việc xóa cần xác nhận kép (điện thoại và máy tính), tệp sẽ được chuyển vào Thùng rác của Windows (có thể khôi phục).",
+      "empty": "Không có yêu cầu xóa nào đang chờ",
+      "emptyHint": "Yêu cầu từ điện thoại sẽ xuất hiện tại đây",
+      "unavailable": "Hàng đợi dọn dẹp không khả dụng",
+      "unavailableHint": "Thành phần đồng bộ chưa sẵn sàng, sẽ tự động thử lại",
+      "state": {
+        "preparing": "Đang chuẩn bị",
+        "pending": "Chờ máy tính xác nhận",
+        "confirming": "Chờ điện thoại kiểm tra",
+        "queued": "Đã vào hàng đợi",
+        "checking": "Đang kiểm tra tệp",
+        "executing": "Đang chuyển vào thùng rác",
+        "recycled": "Đã chuyển vào thùng rác",
+        "failed": "Thất bại",
+        "changed": "Tệp đã thay đổi",
+        "cancelled": "Đã hủy",
+        "rejected": "Đã từ chối"
+      },
+      "filesCount": "{{count}} tệp",
+      "online": "Điện thoại trực tuyến",
+      "offline": "Điện thoại ngoại tuyến",
+      "approve": "Phê duyệt",
+      "reject": "Từ chối",
+      "approveAll": "Phê duyệt tất cả",
+      "confirmTitle": "Xác nhận chuyển vào thùng rác",
+      "confirmBody": "Sẽ chuyển {{count}} tệp vào Thùng rác của Windows (có thể khôi phục từ Thùng rác). Tiếp tục?",
+      "confirmAction": "Chuyển vào thùng rác",
+      "cancel": "Hủy"
     }
   },
   "shareCard": {

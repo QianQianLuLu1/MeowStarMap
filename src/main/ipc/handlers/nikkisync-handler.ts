@@ -1,5 +1,6 @@
-// @core-change: K6 新增 nikkisync:*-extra-directories 五通道（额外照片目录管理，仅作用同步库扫描器）。
-//               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断——历次授权原因见各节点提交。）
+// @core-change: K8 新增 nikkisync 整理队列三通道（get-organizer-queue / decide-organizer-item /
+//               approve-organizer-items，批量删除管理面：开关门 + 上游四错误短码映射）。
+//               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断、K6 五条目录——历次授权原因见各节点提交。）
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -138,6 +139,62 @@ const inspectDirectorySchema = z.object({
 })
 
 const directoryIdSchema = z.string().trim().min(1).max(128)
+
+/**
+ * K8：整理队列条目 id。与上游 `DeletionQueue.approveMany` 的校验**同规同界**
+ * （`/^[a-zA-Z0-9-]{16,64}$/`），形态错误在本层即拒，语义错误（not_pending 等）交上游。
+ */
+const organizerIdSchema = z.string().regex(/^[a-zA-Z0-9-]{16,64}$/)
+
+/**
+ * K8：批量批准入参。ids 界与上游一致（1..500）；**刻意不去重**——重复 id 由上游
+ * `invalid_ids` 承担（单一真相源），本层去重反而会破坏「委托参数逐字透传」口径。
+ */
+const organizerApproveSchema = z.object({
+  ids: z.array(organizerIdSchema).min(1).max(500)
+})
+
+/**
+ * K8：上游四错误短码 → IPC 错误码（逐码注释，映射表唯一真相源）。
+ * 形态类（队列项不在可决定态 / ids 非法）→ VALIDATION_ERROR；
+ * 会话态类（手机租约过期可重试）→ PRECONDITION_FAILED；拆除中 → CANCELED。
+ */
+const ORGANIZER_ERROR_CODES: Record<string, 'validation' | 'precondition' | 'canceled'> = {
+  not_pending: 'validation', // 队列项不存在或已不在可决定状态（已被处理/已过期）
+  invalid_ids: 'validation', // 批量 ids 形态非法（正则/重复/上限——上游单真相源）
+  phone_offline: 'precondition', // 手机 45s 租约过期：重连后需重新确认，可重试
+  stopping: 'canceled' // 会话正在拆除（stop/重建），动作被取消
+}
+
+function organizerErrorToAppError(error: unknown): AppError {
+  if (error instanceof AppError) return error
+  const message = error instanceof Error ? error.message : String(error)
+  const code = message.trim().split(/[\s:]+/)[0]
+  const mapped = code ? ORGANIZER_ERROR_CODES[code] : undefined
+  if (mapped === 'validation') {
+    return AppError.validation(`organizer request rejected: ${code}`)
+  }
+  if (mapped === 'precondition') {
+    return AppError.preconditionFailed(`organizer state rejected: ${code}`)
+  }
+  if (mapped === 'canceled') {
+    return AppError.canceled(`organizer action canceled: ${code}`)
+  }
+  return toAppError(error, 'organizer')
+}
+
+/**
+ * K8：开关门。三通道先读 `nikkisync.organizerEnabled`（渲染层白名单键，默认 false），
+ * false ⇒ PRECONDITION_FAILED——破坏性能力的显式开关，错误文案指向同步服务页开关。
+ */
+function requireOrganizerEnabled(ctx: HandlerContext): void {
+  const enabled = ctx.dbManager.getSetting<boolean>('nikkisync.organizerEnabled', false)
+  if (enabled !== true) {
+    throw AppError.preconditionFailed(
+      'organizer is disabled: enable it via the nikkisync.organizerEnabled switch on the sync service page'
+    )
+  }
+}
 
 /**
  * K6：上游八错误短码 → IPC 错误码（逐码注释，映射表唯一真相源）。
@@ -616,6 +673,63 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
       } catch (error) {
         throw extraDirectoryErrorToAppError(error)
       }
+    })
+  )
+
+  // ---- K8：整理队列（批量删除；确认链为上游协议内建双重确认，本仓只调既有方法）----
+
+  ipcMain.handle(
+    'nikkisync:get-organizer-queue',
+    wrapHandlerNoArgs(ctx, () => {
+      // 开关门先于句柄装配检查：开关关闭时不给「未装配」误导信号
+      requireOrganizerEnabled(ctx)
+      const runtime = requireRuntime(ctx)
+      try {
+        return runtime.organizerStatus()
+      } catch (error) {
+        throw organizerErrorToAppError(error)
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:decide-organizer-item',
+    wrapHandlerRaw(ctx, async (args) => {
+      requireOrganizerEnabled(ctx)
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        z.object({ id: organizerIdSchema, approve: z.boolean() }),
+        args[0] ?? {},
+        'decide-organizer-item',
+        async (input) => {
+          try {
+            // 上游 decide 自带状态校验（not_pending/phone_offline），本层不做二次判定
+            return await runtime.organizerDecide(input.id, input.approve)
+          } catch (error) {
+            throw organizerErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:approve-organizer-items',
+    wrapHandlerRaw(ctx, async (args) => {
+      requireOrganizerEnabled(ctx)
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        organizerApproveSchema,
+        args[0] ?? {},
+        'approve-organizer-items',
+        async (input) => {
+          try {
+            return await runtime.organizerApproveMany(input.ids)
+          } catch (error) {
+            throw organizerErrorToAppError(error)
+          }
+        }
+      )
     })
   )
 }

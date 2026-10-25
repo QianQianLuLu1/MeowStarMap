@@ -88,6 +88,17 @@ describe('registerSettingsHandlers', () => {
     expect(result.data.saved).toBe(true)
   })
 
+  it('settings:set K8 整理队列开关（nikkisync.organizerEnabled）白名单内可写', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['nikkisync.organizerEnabled', true])) as { success: true; data: { saved: boolean } }
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.organizerEnabled', true)
+    expect(result.data.saved).toBe(true)
+  })
+
   it('settings:set customScanPaths 经内联校验放行', async () => {
     const ctx = makeCtx({})
     registerSettingsHandlers(ctx)
