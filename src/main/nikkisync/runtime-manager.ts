@@ -120,6 +120,12 @@ export interface RuntimeManagerDependencies {
    * 缺省回落到回环地址并如实展示——**不假装**它是局域网 IP。
    */
   resolvePairingHost?(): string
+  /**
+   * K5：多 host 备选地址来源（上游 `listLanIpv4`，装配层仅在设置键
+   * `nikkisync.multiHostPairing` 开启且深入口可装载时注入）。**缺省 = 开关关**：
+   * pairingUri 走单参形态，NS1 串逐字节不变（第三方旧客户端回归锚）。
+   */
+  resolvePairingHosts?: () => string[]
 }
 
 /**
@@ -615,7 +621,14 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   async function pairingCode(): Promise<NikkiSyncPairingCode> {
     const session = requireSession()
     const host = pairingHost()
-    const content = session.pairingUri(host)
+    // K5：开关关（未注入）⇒ 单参形态，NS1 逐字节不变；开关开 ⇒ 三参带备选地址
+    // （空解析结果同样回落单参，不产出空 hosts 的新格式串）。hosts 回填进
+    // NikkiSyncPairingCode.hosts 由 parsePairingUri 完成。
+    const hosts = deps.resolvePairingHosts?.()
+    const content =
+      hosts && hosts.length > 0
+        ? session.pairingUri(host, undefined, hosts)
+        : session.pairingUri(host)
     const parsed = parsePairingUri(content)
     if (!parsed) {
       throw new Error(`NikkiSync returned an unparseable pairing payload: ${content.slice(0, 16)}…`)

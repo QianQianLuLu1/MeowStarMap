@@ -93,6 +93,8 @@ const SYNC_SERVICE_LEAVES = [
   'pairing.copyContent',
   'pairing.loadFailed',
   'pairing.retry',
+  // K5：多 host 配对的备选地址清单标题
+  'pairing.altHosts',
   'devices.title',
   'devices.empty',
   'devices.emptyHint',

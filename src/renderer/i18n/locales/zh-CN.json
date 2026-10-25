@@ -4393,7 +4393,8 @@
       "refresh": "重新生成",
       "copyContent": "复制配对内容",
       "loadFailed": "生成配对二维码失败",
-      "retry": "重试"
+      "retry": "重试",
+      "altHosts": "备选地址"
     },
     "devices": {
       "title": "已配对设备",

@@ -744,15 +744,18 @@ export async function createRuntimeSession(
  * 生产依赖装配：把门面 + 文件系统 + 超时兜底接成状态机需要的依赖表。
  * `log` 由调用方注入（Electron 侧走 electronLogger，CLI 侧走 process.stdout），
  * `pairingHostResolver` 由装配层注入局域网地址（本模块不碰 `os`/`electron`，保持可单测）。
+ * K5：`pairingHostsResolver` 仅在设置键开启且深入口可装载时注入（见 loadLanAddressLister）。
  */
 export function createManagerDependencies(
   defaults: NikkiSyncSessionOptions,
   log: (level: 'info' | 'warn' | 'error', message: string) => void,
-  pairingHostResolver?: () => string
+  pairingHostResolver?: () => string,
+  pairingHostsResolver?: () => string[]
 ): RuntimeManagerDependencies {
   return {
     defaults,
     ...(pairingHostResolver ? { resolvePairingHost: pairingHostResolver } : {}),
+    ...(pairingHostsResolver ? { resolvePairingHosts: pairingHostsResolver } : {}),
     createSession: (options) => createRuntimeSession(options),
     isLinkReady: (projectRoot) => hasNikkiSyncLink(projectRoot),
     ensureDatabaseDirectory: (databaseFile) => {
@@ -764,4 +767,16 @@ export function createManagerDependencies(
         log('warn', `${timedOut} timed out after ${defaultStopTimeoutMs}ms`)
       )
   }
+}
+
+/**
+ * K5：装载上游 `listLanIpv4` 深入口并返回同步取值器（仅枚举本机网卡地址，
+ * **不做子网扫描**；上游排序去重截 8）。仅在设置键 `nikkisync.multiHostPairing`
+ * 开启时由装配层调用；装载失败（老链接缺件）由调用方降级为单 host，不影响既有配对。
+ */
+export async function loadLanAddressLister(
+  options: NikkiSyncSessionOptions
+): Promise<() => string[]> {
+  const surface = await loadRuntimeSurface(options.projectRoot, options.packagingContext)
+  return () => surface.lanAddress.listLanIpv4()
 }

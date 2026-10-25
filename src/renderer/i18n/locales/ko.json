@@ -4390,7 +4390,8 @@
       "refresh": "다시 생성",
       "copyContent": "페어링 내용 복사",
       "loadFailed": "페어링 QR 코드 생성 실패",
-      "retry": "재시도"
+      "retry": "재시도",
+      "altHosts": "대체 주소"
     },
     "devices": {
       "title": "페어링된 기기",

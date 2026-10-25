@@ -333,3 +333,72 @@ describe('K4：buildSyncDiagnosticsSnapshot（观测面，纯聚合既有状态�
     expect(diagnostics.port).toBe(39000)
   })
 })
+
+describe('K5：parsePairingUri 的 nikki-sync://pair? 新格式分支', () => {
+  /** 与 vendored `buildPairingUri`（对齐上游 b422193）同构的多 host 配对串工厂。 */
+  const multiHostUri = (over: Record<string, string> = {}): string => {
+    const query = new URLSearchParams({
+      serverId: 'server_x',
+      host: '192.168.1.10',
+      port: '28080',
+      token: 'tok_value',
+      protocol: '1',
+      expiresAt: '2026-10-14T12:05:00.000Z',
+      tls: 'ab'.repeat(32),
+      hosts: '192.168.1.10,192.168.1.11,192.168.1.12',
+      ...over
+    })
+    return `nikki-sync://pair?${query}`
+  }
+
+  it('正常：解析出 hosts 数组与 ISO expiresAt，content 原样保留', () => {
+    const parsed = parsePairingUri(multiHostUri())
+    expect(parsed).toMatchObject({
+      serverId: 'server_x',
+      host: '192.168.1.10',
+      port: 28080,
+      tlsFingerprintSha256: 'ab'.repeat(32),
+      expiresAt: '2026-10-14T12:05:00.000Z',
+      hosts: ['192.168.1.10', '192.168.1.11', '192.168.1.12']
+    })
+    expect(parsed?.content).toBe(multiHostUri())
+  })
+
+  it('缺任一必需参数（serverId/host/token/expiresAt/tls）⇒ null', () => {
+    for (const key of ['serverId', 'host', 'token', 'protocol', 'expiresAt', 'tls']) {
+      const query = new URLSearchParams({
+        serverId: 'server_x',
+        host: '192.168.1.10',
+        port: '28080',
+        token: 'tok_value',
+        protocol: '1',
+        expiresAt: '2026-10-14T12:05:00.000Z',
+        tls: 'ab'.repeat(32)
+      })
+      query.delete(key)
+      const uri = `nikki-sync://pair?${query}`
+      expect(parsePairingUri(uri), `缺 ${key}`).toBeNull()
+    }
+  })
+
+  it('坏 port（0 / 65536 / 非数字）与坏 tls（非 64 位小写 hex）⇒ null（沿 NS1 同口径）', () => {
+    for (const bad of [{ port: '0' }, { port: '65536' }, { port: 'abc' }]) {
+      expect(parsePairingUri(multiHostUri(bad)), JSON.stringify(bad)).toBeNull()
+    }
+    expect(parsePairingUri(multiHostUri({ tls: 'AB'.repeat(32) }))).toBeNull()
+    expect(parsePairingUri(multiHostUri({ tls: 'ab'.repeat(31) }))).toBeNull()
+  })
+
+  it('hosts 缺省或空串 ⇒ hosts 键缺省（单 host 新格式仍可解析）；hosts 项去空串', () => {
+    const noHosts = parsePairingUri(multiHostUri({ hosts: '' }))
+    expect(noHosts).not.toBeNull()
+    expect(noHosts?.hosts).toBeUndefined()
+    const padded = parsePairingUri(multiHostUri({ hosts: '192.168.1.10,,192.168.1.11' }))
+    expect(padded?.hosts).toEqual(['192.168.1.10', '192.168.1.11'])
+  })
+
+  it('非 pair 路径的 nikki-sync:// 串 ⇒ null（不误吞任意查询串）', () => {
+    expect(parsePairingUri('nikki-sync://other?host=x&port=1&tls=' + 'a'.repeat(64))).toBeNull()
+    expect(parsePairingUri('nikki-sync://pair')).toBeNull()
+  })
+})

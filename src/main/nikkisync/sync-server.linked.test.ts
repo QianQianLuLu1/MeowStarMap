@@ -10,7 +10,11 @@ import tls from 'node:tls'
 import { fileURLToPath } from 'node:url'
 
 import { buildPackagingContext } from './embedding-paths'
-import { createManagerDependencies, createRuntimeSession } from './runtime-facade'
+import {
+  createManagerDependencies,
+  createRuntimeSession,
+  loadLanAddressLister
+} from './runtime-facade'
 import { createRuntimeManager } from './runtime-manager'
 import { hasNikkiSyncLink, loadNikkiSyncPackage, nikkisyncExport } from './runtime-loader'
 import type { NikkiSyncRuntimeSession, NikkiSyncSessionOptions } from './runtime-types'
@@ -759,6 +763,49 @@ suite('RuntimeManager 同步服务编排', () => {
       await manager.stop()
     }
     expect(manager.syncStatus().running).toBe(false)
+  }, 60000)
+
+  it('K5：默认态 NS1 逐字节不变（回归锚）；注入多 host ⇒ nikki-sync://pair? 新格式且 hosts ≤8', async () => {
+    // ① 默认态：content 以 NS1| 开头、恰 6 个竖线、hosts 缺省（第三方旧客户端回归锚）
+    const defaults = testOptions({ databaseFile: databaseIn('k5-default') })
+    const defaultManager = createRuntimeManager({
+      ...createManagerDependencies(defaults, () => {}),
+      resolvePairingHost: () => '127.0.0.1'
+    })
+    await defaultManager.startSyncServer()
+    try {
+      const code = await defaultManager.pairingCode()
+      expect(code.content.startsWith('NS1|')).toBe(true)
+      expect(code.content.split('|').length - 1).toBe(6)
+      expect(code.hosts).toBeUndefined()
+    } finally {
+      await defaultManager.stopSyncServer()
+      await defaultManager.stop()
+    }
+
+    // ② 开启态（注入 resolvePairingHosts）：三参形态 ⇒ 新格式串，hosts 回填且 ≤8
+    const multiOptions = testOptions({ databaseFile: databaseIn('k5-multi') })
+    const multiManager = createRuntimeManager({
+      ...createManagerDependencies(multiOptions, () => {}),
+      resolvePairingHost: () => '127.0.0.1',
+      resolvePairingHosts: () => ['127.0.0.1', '127.0.0.2']
+    })
+    await multiManager.startSyncServer()
+    try {
+      const code = await multiManager.pairingCode()
+      expect(code.content.startsWith('nikki-sync://pair?')).toBe(true)
+      expect(code.hosts).toEqual(['127.0.0.1', '127.0.0.2'])
+      expect((code.hosts ?? []).length).toBeLessThanOrEqual(8)
+    } finally {
+      await multiManager.stopSyncServer()
+      await multiManager.stop()
+    }
+
+    // ③ 深入口装载器实跑：listLanIpv4 只枚举本机地址（无子网扫描），≤8
+    const lister = await loadLanAddressLister(defaults)
+    const listed = lister()
+    expect(Array.isArray(listed)).toBe(true)
+    expect(listed.length).toBeLessThanOrEqual(8)
   }, 60000)
 
   it('端口被占用 ⇒ 不外抛、状态分类 PORT_IN_USE，只读查询面不受影响', async () => {

@@ -4390,7 +4390,8 @@
       "refresh": "再生成",
       "copyContent": "ペアリング内容をコピー",
       "loadFailed": "ペアリング QR コードの生成に失敗しました",
-      "retry": "再試行"
+      "retry": "再試行",
+      "altHosts": "代替アドレス"
     },
     "devices": {
       "title": "ペアリング済みデバイス",

@@ -806,11 +806,13 @@ export interface NikkiSyncPairedDeviceInfo {
 
 /** `nikkisync:get-pairing-code` 响应：与移植面 `PairingQrInfo` 同形（复用同一 UI 组件）。 */
 export interface NikkiSyncPairingCodeInfo {
-  /** NS1|serverId|host|port|token|expiresEpochSeconds|tlsFingerprintSha256 */
+  /** NS1|serverId|host|port|token|expiresEpochSeconds|tlsFingerprintSha256（多 host 时为 nikki-sync://pair? 查询串） */
   content: string
   expiresAt: string
   serverId: string
   host: string
   port: number
   tlsFingerprintSha256: string
+  /** K5：多 host 配对时的备选地址（≤8；单 host NS1 形态缺省）。 */
+  hosts?: string[]
 }

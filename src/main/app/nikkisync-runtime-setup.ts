@@ -3,7 +3,7 @@ import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
 import { electronLogger } from '../utils/logger'
 import { buildPackagingContext } from '../nikkisync/embedding-paths'
-import { createManagerDependencies } from '../nikkisync/runtime-facade'
+import { createManagerDependencies, loadLanAddressLister } from '../nikkisync/runtime-facade'
 import { createRuntimeManager } from '../nikkisync/runtime-manager'
 import { resolveMetadataResolverEnabled as resolveMetadataResolverEnabledFlag } from '../nikkisync/metadata-resolver-driver'
 import {
@@ -52,9 +52,15 @@ export const SETTING_SYNC_MDNS = 'nikkisync.syncMdnsEnabled'
  * 因此默认关闭、需用户显式开启；端点值不来自渲染层，由主进程侧常量决定。
  */
 export const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
+/**
+ * K5：多 host 配对开关（缺省关）。关闭时配对串逐字节保持 `NS1|` 七段——第三方旧版
+ * Android 客户端只认该格式；开启后走 `nikki-sync://pair?` 新格式并附设备可达的备选地址。
+ */
+export const SETTING_MULTI_HOST_PAIRING = 'nikkisync.multiHostPairing'
 export const RUNTIME_ENABLED_DEFAULT = false
 export const WATCHER_ENABLED_DEFAULT = false
 export const METADATA_RESOLVER_ENABLED_DEFAULT = false
+export const MULTI_HOST_PAIRING_DEFAULT = false
 /** 同步服务默认关闭：与阶段 5 移植面 `SYNC_SERVER_ENABLED_DEFAULT` 同口径。 */
 export const SYNC_ENABLED_DEFAULT = false
 /** 环境变量名（dev / 验证强启）。 */
@@ -204,12 +210,34 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
     env: process.env,
     settings
   })
+  let sessionOptions = options
+  let pairingHostsResolver: (() => string[]) | undefined
+  // K5：多 host 配对（默认关）。开启时装载上游 listLanIpv4（仅枚举本机网卡，无子网扫描），
+  // 同时作为配对串的 hosts 来源与 /v1/server 的 connectionHosts 回调；装载失败只降级
+  // 单 host（warn 可诊断），绝不影响既有配对路径。
+  if (settings.getBoolean(SETTING_MULTI_HOST_PAIRING, MULTI_HOST_PAIRING_DEFAULT)) {
+    try {
+      pairingHostsResolver = await loadLanAddressLister(options)
+      sessionOptions = {
+        ...options,
+        syncServer: { ...options.syncServer!, connectionHosts: pairingHostsResolver }
+      }
+    } catch (error) {
+      runtimeLog(
+        'warn',
+        `multi-host pairing disabled (LanAddress deep entry unavailable): ${String(error)}`
+      )
+    }
+  }
   const manager = createRuntimeManager(
     createManagerDependencies(
-      options,
+      sessionOptions,
       (level, message) => runtimeLog(level, message),
-      // 配对二维码里要写真实的局域网地址（与移植面同款解析：默认路由优先 + 虚拟网卡过滤）
-      resolveLanHost
+      // 配对二维码里要写真实的局域网地址（与移植面同款解析：默认路由优先 + 虚拟网卡过滤）。
+      // K5-1① 偏差裁示：配对 host 保留仓内 resolveLanHost（默认路由优先），上游
+      // listLanIpv4 仅作备选地址来源——见 04 执行记录偏差表。
+      resolveLanHost,
+      pairingHostsResolver
     )
   )
   ctx.nikkisyncRuntime = manager
@@ -220,7 +248,7 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
     runtimeLog('info', `embedded runtime registered but disabled (${options.databaseFile})`)
     return manager
   }
-  const status = await manager.start(options)
+  const status = await manager.start(sessionOptions)
   runtimeLog(
     status.state === 'error' ? 'error' : 'info',
     `embedded runtime start result: state=${status.state} linkReady=${status.linkReady} ` +

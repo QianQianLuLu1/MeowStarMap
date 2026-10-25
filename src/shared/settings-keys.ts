@@ -34,7 +34,11 @@ export const RENDERER_PREF_KEYS = [
   'nikkisync.runtimeEnabled',
   // sync-integration 阶段6：上游远端元数据解析开关（布尔，消费点 nikkisync-runtime-setup.ts）。
   // 只开放布尔键本身：实际请求的端点由主进程侧常量决定，渲染层无法注入任意 URL。
-  'nikkisync.metadataResolverEnabled'
+  'nikkisync.metadataResolverEnabled',
+  // K5：多 host 配对开关（布尔，默认 false，消费点 nikkisync-runtime-setup.ts）。
+  // 默认关以保第三方旧客户端只认 NS1 七段串；开启后配对串/服务响应附带备选地址
+  // （上游 listLanIpv4，≤8），需手机端 NikkiSync App 支持新格式。
+  'nikkisync.multiHostPairing'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

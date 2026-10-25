@@ -4390,7 +4390,8 @@
       "refresh": "重新產生",
       "copyContent": "複製配對內容",
       "loadFailed": "產生配對 QR 碼失敗",
-      "retry": "重試"
+      "retry": "重試",
+      "altHosts": "備選位址"
     },
     "devices": {
       "title": "已配對裝置",

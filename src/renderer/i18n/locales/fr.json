@@ -4390,7 +4390,8 @@
       "refresh": "Régénérer",
       "copyContent": "Copier le contenu de jumelage",
       "loadFailed": "Échec de la génération du QR code de jumelage",
-      "retry": "Réessayer"
+      "retry": "Réessayer",
+      "altHosts": "Adresses alternatives"
     },
     "devices": {
       "title": "Appareils jumelés",

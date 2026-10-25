@@ -75,4 +75,31 @@ describe('PairingQrDialog', () => {
     render(<PairingQrDialog open={false} onClose={() => {}} />)
     expect(getPairingCode).not.toHaveBeenCalled()
   })
+
+  // ===== K5：多 host 备选地址清单 =====
+
+  it('(f) K5：offer 带 hosts ⇒ 渲染备选地址清单；单 host（无 hosts）界面不变', async () => {
+    getPairingCode = vi.fn(async () => ({
+      ...QR_OFFER,
+      content:
+        'nikki-sync://pair?serverId=wxnn-0123456789abcdef&host=192.168.1.10&port=28080&token=tok&protocol=1&expiresAt=2026-10-11T12%3A05%3A00.000Z&tls=' +
+        'ab'.repeat(32) +
+        '&hosts=192.168.1.10,192.168.1.11,192.168.1.12',
+      hosts: ['192.168.1.10', '192.168.1.11', '192.168.1.12']
+    }))
+    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+      nikkisync: { getPairingCode }
+    }
+    const first = render(<PairingQrDialog open onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByText('备选地址')).toBeInTheDocument())
+    // 清单为 join 后的单个文本块（主地址已单独展示，不重复列出）
+    expect(screen.getByText('192.168.1.11 · 192.168.1.12')).toBeInTheDocument()
+    first.unmount()
+
+    // 单 host：无备选地址区（恢复默认桩——QR_OFFER 无 hosts）
+    installElectronApi()
+    render(<PairingQrDialog open onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByText('192.168.1.10:28080')).toBeInTheDocument())
+    expect(screen.queryByText('备选地址')).toBeNull()
+  })
 })

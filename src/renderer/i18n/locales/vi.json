@@ -4390,7 +4390,8 @@
       "refresh": "Tạo lại",
       "copyContent": "Sao chép nội dung ghép nối",
       "loadFailed": "Không tạo được mã QR ghép nối",
-      "retry": "Thử lại"
+      "retry": "Thử lại",
+      "altHosts": "Địa chỉ thay thế"
     },
     "devices": {
       "title": "Thiết bị đã ghép nối",

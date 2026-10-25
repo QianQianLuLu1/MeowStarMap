@@ -57,6 +57,8 @@ interface FakeCalls {
   metadataConsentSet: Array<{ enabled: boolean; policyVersion?: string }>
   /** K3：会话面收到的 capturedAt 序列。 */
   resolveGameVersion: Array<string | undefined>
+  /** K5：会话面 pairingUri 收到的参数序列。 */
+  pairingUriArgs: Array<{ host: string; ttlMs?: number; hosts?: string[] }>
 }
 
 /**
@@ -117,9 +119,24 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     }),
     createPairingPayload: vi.fn(() => ({ scheme: 'nikki-sync' }))
   }
-  const pairingUri = (host: string): string => {
+  const pairingUri = (host: string, ttlMs?: number, hosts?: readonly string[]): string => {
     if (plan.pairingUriThrows) {
       throw new Error('Server must be started before creating a pairing payload')
+    }
+    calls.pairingUriArgs.push({ host, ttlMs, hosts: hosts ? [...hosts] : undefined })
+    // K5：多 host 时上游走 nikki-sync://pair? 新格式（与 vendored buildPairingUri 同构）
+    if (hosts && hosts.length > 1) {
+      const query = new URLSearchParams({
+        serverId: 'server_fake_1',
+        host,
+        port: '38137',
+        token: 'tok_value',
+        protocol: '1',
+        expiresAt: '2026-10-25T12:05:00.000Z',
+        tls: 'a'.repeat(64),
+        hosts: [...new Set([host, ...hosts])].slice(0, 8).join(',')
+      })
+      return `nikki-sync://pair?${query}`
     }
     const expiresAtSeconds = Math.floor((Date.now() + 5 * 60_000) / 1000)
     return `NS1|server_fake_1|${host}|38137|tok_value|${expiresAtSeconds}|${'a'.repeat(64)}`
@@ -142,7 +159,8 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
         calls.runtimeStart += 1
         return {}
       }),
-      createPairingUri: (host: string) => pairingUri(host)
+      createPairingUri: (host: string, ttlMs?: number, hosts?: readonly string[]) =>
+        pairingUri(host, ttlMs, hosts)
     },
     scanner,
     server,
@@ -150,7 +168,8 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       certPem: '-----BEGIN CERTIFICATE-----fake-----END CERTIFICATE-----',
       fingerprintSha256: 'a'.repeat(64)
     }),
-    pairingUri: (host: string) => pairingUri(host),
+    pairingUri: (host: string, ttlMs?: number, hosts?: readonly string[]) =>
+      pairingUri(host, ttlMs, hosts),
     listPairedDevices: () => [
       {
         deviceId: 'phone_1',
@@ -277,7 +296,8 @@ function createDependencies(
     runtimeStart: 0,
     cachedMetadataRunOnce: 0,
     metadataConsentSet: [],
-    resolveGameVersion: []
+    resolveGameVersion: [],
+    pairingUriArgs: []
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
@@ -1114,5 +1134,45 @@ describe('K4：连接诊断段（观测面，纯聚合既有状态）', () => {
     expect(diagnostics.port).toBe(28080)
     expect(diagnostics.secure).toBeUndefined()
     expect(diagnostics.tlsFingerprintTail8).toBeUndefined()
+  })
+})
+
+describe('K5：多 host 配对', () => {
+  it('K5-m1 默认态（未注入 resolvePairingHosts）：pairingUri 单参调用，NS1 逐字节不变', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.startSyncServer()
+    const code = await manager.pairingCode()
+    expect(code.content.startsWith('NS1|')).toBe(true)
+    expect(code.content.split('|')).toHaveLength(7)
+    expect(code.hosts).toBeUndefined()
+    // 单参形态：hosts 键不下传（与关闭前的行为逐字节一致——第三方旧客户端回归锚）
+    expect(calls.pairingUriArgs).toEqual([
+      { host: '127.0.0.1', ttlMs: undefined, hosts: undefined }
+    ])
+  })
+
+  it('K5-m2 开启态（注入 resolvePairingHosts）：三参调用且 hosts 回填进配对码', async () => {
+    const { deps, calls } = createDependencies()
+    deps.resolvePairingHosts = () => ['192.168.1.10', '192.168.1.11']
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.startSyncServer()
+    const code = await manager.pairingCode()
+    expect(code.content.startsWith('nikki-sync://pair?')).toBe(true)
+    expect(code.hosts).toEqual(['127.0.0.1', '192.168.1.10', '192.168.1.11'])
+    expect(calls.pairingUriArgs[0].hosts).toEqual(['192.168.1.10', '192.168.1.11'])
+  })
+
+  it('K5-m3 开启态但解析结果为空（无网卡）：回落单参 NS1，不产出空 hosts 新格式', async () => {
+    const { deps } = createDependencies()
+    deps.resolvePairingHosts = () => []
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.startSyncServer()
+    const code = await manager.pairingCode()
+    expect(code.content.startsWith('NS1|')).toBe(true)
+    expect(code.hosts).toBeUndefined()
   })
 })

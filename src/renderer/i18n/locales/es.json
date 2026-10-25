@@ -4390,7 +4390,8 @@
       "refresh": "Regenerar",
       "copyContent": "Copiar contenido de emparejamiento",
       "loadFailed": "Error al generar el código QR de emparejamiento",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "altHosts": "Direcciones alternativas"
     },
     "devices": {
       "title": "Dispositivos vinculados",

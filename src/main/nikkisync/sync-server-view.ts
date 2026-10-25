@@ -117,12 +117,16 @@ export function embeddedServerConfig(
 }
 
 /**
- * 解析上游 `buildPairingUri()` 的紧凑配对串（`packages/protocol/src/index.ts:326-329`）：
- * `NS1|serverId|host|port|token|expiresEpochSeconds|tlsFingerprintSha256`（恰 7 段）。
- * 注意它**不是 URL scheme**（`docs/M2_0` 里的 `nikki-sync://pair?...` 是过时文档），
- * 且 `PairingQrPayload.scheme: 'nikki-sync'` 不出现在串里。字段不全即返回 null。
+ * 解析上游 `buildPairingUri()` 的两种配对串（vendored 真相源 `shared/sync/protocol.ts`）：
+ * - 紧凑串 `NS1|serverId|host|port|token|expiresEpochSeconds|tlsFingerprintSha256`（恰 7 段）
+ * - 多 host 查询串 `nikki-sync://pair?serverId&host&port&token&protocol&expiresAt&tls&hosts`
+ *   （仅多 host 时产生——K5 默认关，单 host 逐字节保留 NS1，第三方旧客户端回归锚）。
+ * 字段不全或形态不对即返回 null；`port`/`tls` 校验两种格式同口径。
  */
 export function parsePairingUri(content: string): NikkiSyncPairingCode | null {
+  if (content.startsWith('nikki-sync://pair')) {
+    return parsePairingQueryUri(content)
+  }
   const parts = content.split('|')
   if (parts.length !== 7 || parts[0] !== 'NS1') return null
   const [, serverId, host, port, , expiresAtSeconds, tlsFingerprintSha256] = parts
@@ -140,6 +144,49 @@ export function parsePairingUri(content: string): NikkiSyncPairingCode | null {
     host: String(host),
     port: portValue,
     tlsFingerprintSha256: String(tlsFingerprintSha256)
+  }
+}
+
+/**
+ * K5：`nikki-sync://pair?` 查询串分支（与 vendored `buildPairingUri` 的键序/形状对齐）。
+ * `hosts` 为逗号分隔列表（上游去重截 8 后拼接）；空串/缺省 ⇒ `hosts` 键缺省。
+ */
+function parsePairingQueryUri(content: string): NikkiSyncPairingCode | null {
+  const prefix = 'nikki-sync://pair?'
+  if (!content.startsWith(prefix)) return null
+  let query: URLSearchParams
+  try {
+    query = new URLSearchParams(content.slice(prefix.length))
+  } catch {
+    return null
+  }
+  const required = ['serverId', 'host', 'token', 'protocol', 'expiresAt', 'tls'] as const
+  for (const key of required) {
+    const value = query.get(key)
+    if (value === null || value.length === 0) return null
+  }
+  const portValue = Number(query.get('port'))
+  if (!Number.isInteger(portValue) || portValue < 1 || portValue > 65535) return null
+  const expiresAt = query.get('expiresAt') ?? ''
+  const expiresMs = Date.parse(expiresAt)
+  if (Number.isNaN(expiresMs)) return null
+  const tls = query.get('tls') ?? ''
+  if (!/^[0-9a-f]{64}$/.test(tls)) return null
+  const hostsRaw = query.get('hosts')
+  const hosts = hostsRaw
+    ? hostsRaw
+        .split(',')
+        .map((item) => item.trim())
+        .filter((item) => item.length > 0)
+    : undefined
+  return {
+    content,
+    expiresAt: new Date(expiresMs).toISOString(),
+    serverId: String(query.get('serverId')),
+    host: String(query.get('host')),
+    port: portValue,
+    tlsFingerprintSha256: tls,
+    ...(hosts && hosts.length > 0 ? { hosts } : {})
   }
 }
 

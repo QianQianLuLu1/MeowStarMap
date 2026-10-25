@@ -1042,6 +1042,8 @@ interface WindowElectronAPI {
       host: string
       port: number
       tlsFingerprintSha256: string
+      /** K5：多 host 配对时的备选地址（≤8；单 host NS1 形态缺省） */
+      hosts?: string[]
     }>
     getPairedDevices: () => Promise<
       Array<{

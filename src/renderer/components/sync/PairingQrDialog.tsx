@@ -158,6 +158,18 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
                   {offer.host}:{offer.port}
                   <IconCopyText />
                 </button>
+                {/* K5：多 host 配对时列出备选地址（手机在主地址不可达时按清单换连）；
+                    单 host（NS1 形态）无 hosts 字段，界面与升级前完全一致 */}
+                {offer.hosts && offer.hosts.length > 1 && (
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      {t('syncService.pairing.altHosts')}
+                    </span>
+                    <span className="font-mono text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      {offer.hosts.filter((item) => item !== offer.host).join(' · ')}
+                    </span>
+                  </div>
+                )}
                 <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   {t('syncService.pairing.expiresIn')}：{Math.floor((expiresInSeconds ?? 0) / 60)}:
                   {String((expiresInSeconds ?? 0) % 60).padStart(2, '0')}

@@ -4393,7 +4393,8 @@
       "refresh": "Regenerate",
       "copyContent": "Copy pairing content",
       "loadFailed": "Failed to generate pairing QR code",
-      "retry": "Retry"
+      "retry": "Retry",
+      "altHosts": "Alternate addresses"
     },
     "devices": {
       "title": "Paired Devices",
