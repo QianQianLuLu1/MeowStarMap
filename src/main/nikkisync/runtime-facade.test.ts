@@ -662,3 +662,153 @@ describe('createRuntimeSession 元数据解析单缝注入（阶段 6）', () =>
     expect(fixture.capturedConfig() && 'metadataResolver' in fixture.capturedConfig()!).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------- 兼容层 C5：注入缝
+
+/**
+ * C5 专用夹具：在阶段 6 夹具之上补齐上游 b422193 构造期新增面——
+ * `runtime.deletions`（构造期必建）与记录调用的 `createPairingUri`（三参形态）。
+ */
+function createCompatibilityFixture() {
+  const pairingCalls: Array<{ host: string; ttlMs?: number; hosts?: readonly string[] }> = []
+  const deletions = {
+    list: vi.fn((): unknown[] => []),
+    decide: vi.fn(async () => ({}) as unknown),
+    approveMany: vi.fn(async () => ({}) as unknown),
+    activity: vi.fn(() => ({ queued: 0, active: 0 }) as unknown),
+    stop: vi.fn(async () => undefined)
+  }
+  const cachedRunOnce = vi.fn((): number => 7)
+  const close = vi.fn()
+  const runtimeShape = {
+    database: {
+      connection: { prepare: () => ({ all: () => [], get: () => undefined }), exec: () => {} },
+      initialize: () => {},
+      close
+    },
+    scanner: {
+      start: async () => ({}),
+      stop: async () => {},
+      fullScan: async () => ({}),
+      rescanPath: async () => ({}),
+      getStatus: () => ({})
+    },
+    server: {
+      serverId: 'server_fake',
+      start: async () => ({ host: '127.0.0.1', port: 38137, secure: true }),
+      stop: async () => {},
+      createPairingPayload: () => ({})
+    },
+    deletions,
+    createPairingUri: (host: string, ttlMs?: number, hosts?: readonly string[]) => {
+      pairingCalls.push({ host, ttlMs, hosts })
+      return 'NS1|server_fake|127.0.0.1|38137|tok|0|' + 'a'.repeat(64)
+    }
+  }
+  let capturedConfig: Record<string, unknown> | undefined
+  const surface = {
+    pcCompanion: {
+      PcCompanionRuntime: class {
+        constructor(config: Record<string, unknown>) {
+          capturedConfig = config
+          return runtimeShape as unknown as EmbeddedRuntimeLike
+        }
+      },
+      LocalTlsIdentityService: class {
+        getOrCreate() {
+          return { keyPem: 'k', certPem: 'c', fingerprintSha256: 'f', createdAt: 'now' }
+        }
+      }
+    },
+    database: {
+      PairingRepository: class {
+        getDevice(): undefined {
+          return undefined
+        }
+        revoke(): void {}
+      },
+      SyncReadRepository: class {},
+      MetadataDictionaryRepository: class {}
+    },
+    rowMappers: {},
+    suitSearchIndex: {},
+    clothingSearchIndex: {},
+    profileStatsIndex: {},
+    nuan5Resolver: { Nuan5CompatibleResolver: class {} },
+    metadataDiagnostics: { metadataResolutionDiagnostics: vi.fn(() => ({})) },
+    cachedDecodedMetadataService: {
+      CachedDecodedMetadataService: class {
+        constructor(public readonly database: unknown) {}
+        runOnce(): number {
+          return cachedRunOnce()
+        }
+      }
+    }
+  } as unknown as RuntimeSurface
+  return { surface, capturedConfig: () => capturedConfig, pairingCalls, deletions, cachedRunOnce }
+}
+
+describe('createRuntimeSession 兼容层注入缝（C5：声明与透传，无行为变化）', () => {
+  it('onStartupStage 与 server.connectionHosts 透传进构造 config；缺省时连键都不下发', async () => {
+    const fixture = createCompatibilityFixture()
+    const onStartupStage = vi.fn()
+    const connectionHosts = (): string[] => ['192.168.1.5', '192.168.1.6']
+    await createRuntimeSession(
+      {
+        ...sessionOptions(),
+        onStartupStage,
+        syncServer: {
+          host: '0.0.0.0',
+          port: 28080,
+          mdns: false,
+          name: 'Meow Star Map',
+          connectionHosts
+        }
+      },
+      fixture.surface
+    )
+    const config = fixture.capturedConfig()
+    expect(config?.onStartupStage).toBe(onStartupStage)
+    expect((config?.server as Record<string, unknown> | undefined)?.connectionHosts).toBe(
+      connectionHosts
+    )
+
+    const bare = createSessionFixture()
+    await createRuntimeSession(sessionOptions(), bare.surface)
+    const bareConfig = bare.capturedConfig()
+    expect(bareConfig && 'onStartupStage' in bareConfig).toBe(false)
+    expect('connectionHosts' in (bareConfig?.server as Record<string, unknown>)).toBe(false)
+  })
+
+  it('pairingUri 三参透传 hosts；两参/单参形态与既有调用面不变', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    session.pairingUri('h1', undefined, ['a', 'b'])
+    session.pairingUri('h2', 5000)
+    session.pairingUri('h3')
+    expect(fixture.pairingCalls).toEqual([
+      { host: 'h1', ttlMs: undefined, hosts: ['a', 'b'] },
+      { host: 'h2', ttlMs: 5000 },
+      { host: 'h3' }
+    ])
+  })
+
+  it('session.deletions 与 runtime.deletions 为同一引用（上游构造期必建，透传不复制）', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(session.deletions).toBe(fixture.deletions)
+  })
+
+  it('cachedMetadataRunOnce 逐字透传上游同步返回值；模块缺席（老会话面）时不挂键', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(session.cachedMetadataRunOnce).toBeTypeOf('function')
+    expect(session.cachedMetadataRunOnce?.()).toBe(7)
+    expect(fixture.cachedRunOnce).toHaveBeenCalledTimes(1)
+
+    // 深入口未装载的旧 surface 形态：闭包整个缺席（沿 metadataRunOnce 的「仅存在时挂出」先例）
+    const legacy = createSessionFixture()
+    const legacySession = await createRuntimeSession(sessionOptions(), legacy.surface)
+    expect(legacySession.cachedMetadataRunOnce).toBeUndefined()
+  })
+})

@@ -47,6 +47,10 @@ export interface NikkiSyncRuntimeStatus {
   sync?: NikkiSyncSyncServerStatus
   /** 元数据解析状态（阶段 6；未组装会话时缺省）。 */
   metadata?: NikkiSyncMetadataResolutionStatus
+  /** 兼容层（b422193）：真实发生的启动阶段记录（K1 在自身编排点自报，非上游枚举照抄）。 */
+  startupStages?: { stage: string; at: string }[]
+  /** 兼容层（b422193）：扫描诊断聚合计数（K7 消费；上游承诺不含路径/UID/错误原文）。 */
+  scanDiagnostics?: unknown
 }
 
 /**
@@ -101,6 +105,29 @@ export interface ScannerServiceLike {
   fullScan(): Promise<unknown>
   rescanPath(filePath: string): Promise<unknown>
   getStatus(): unknown
+  /** 兼容层（b422193）：全部扫描根（自动根 + 额外目录，上游做父目录折叠去重）。 */
+  getScanRoots(): unknown[]
+  /** 兼容层（b422193）：游戏安装推断的自动扫描根（photo/motion/supplemental，K6 消费）。 */
+  getAutomaticRoots(): unknown[]
+  /** 兼容层（b422193）：已配置的额外照片目录数（K6 消费）。 */
+  getExtraDirectoryCount(): number
+  /** 兼容层（b422193）：设置额外照片目录并触发重扫（K6 消费；上限 16 由上游自校验）。 */
+  setExtraDirectories(dirs: unknown[]): Promise<unknown>
+}
+
+/**
+ * 上游 `organizer/DeletionQueue.ts` 的本仓最小面（兼容层 b422193，构造期必建于
+ * `runtime.ts:65`）。五个公开方法逐字对齐上游签名；**刻意不含 `sync`**——那是手机端
+ * 经 `POST /v1/organizer/sync` 路由的动作，本仓不直调；`preview` 同理留待 K8 需要
+ * 时再声明。上游抛错（`not_pending` / `phone_offline` / `invalid_ids` / `stopping`）
+ * 原样上抛，由 handler 层映射（02 计划 K8-c）；`stop()` 仅在会话拆除链调用。
+ */
+export interface DeletionQueueLike {
+  list(device?: string): unknown[]
+  decide(id: string, approve: boolean): Promise<unknown>
+  approveMany(ids: string[]): Promise<unknown>
+  activity(): unknown
+  stop(): Promise<void>
 }
 
 /** `PcCompanionRuntime` 中被本阶段用到的最小面。 */
@@ -109,8 +136,17 @@ export interface EmbeddedRuntimeLike {
   readonly scanner: ScannerServiceLike
   /** 上游构造期即组装好的局域网同步服务器（含 TLS 身份、鉴权、配对、WS、mDNS）。 */
   readonly server: LocalSyncServerLike
-  /** 上游一次性配对二维码内容（`NS1|` 七段）。 */
-  createPairingUri(host: string, ttlMs?: number): string
+  /**
+   * 上游一次性配对二维码内容：单 host 为 `NS1|` 七段；携带多 host 时为
+   * `nikki-sync://pair?` 查询串（兼容层 b422193，行为面 K5 接入）。
+   */
+  createPairingUri(host: string, ttlMs?: number, hosts?: readonly string[]): string
+  /**
+   * 兼容层（b422193）：上游构造期即组装的整理队列（批量删除）。本轮仅暴露引用，
+   * PC 侧动作归 K8；未接入前不产生任何行为（`POST /v1/organizer/sync` 由上游
+   * 内建 404 兜底对旧客户端语义安全）。
+   */
+  readonly deletions: DeletionQueueLike
   /**
    * 阶段 6：上游元数据解析服务。仅当构造时下发了 `metadataResolver` 配置键才存在
    * （`runtime.ts:74-81` 的条件构造），未开启时为 undefined ⇒ 拆除面的 no-op 分支。
@@ -142,6 +178,11 @@ export interface NikkiSyncSyncServerConfig {
   mdns: boolean
   name: string
   journalPollMs?: number
+  /**
+   * 兼容层（b422193）：`/v1/server` 响应的备选地址回调（上游截 8 条）。
+   * 构造期冻结、缺省时连键都不下发（响应不含 `connectionHosts`）；K5 接线。
+   */
+  connectionHosts?: () => string[]
 }
 
 /** 上游 `LocalSyncServerAddress`（`start()` 回显的**实际**绑定地址）。 */
@@ -193,6 +234,10 @@ export interface NikkiSyncSyncServerStatus {
   pairedDeviceCount?: number
   /** 启停失败原因；端口占用归一化为 `PORT_IN_USE`。 */
   error?: string
+  /** 兼容层（b422193）：`/v1/server` 下发的备选地址（≤8；未配置时缺省，K5）。 */
+  connectionHosts?: string[]
+  /** 兼容层（b422193）：连接诊断快照（K4 自建观测面，仅聚合既有状态，不做主动探测）。 */
+  diagnostics?: unknown
 }
 
 /** 一次性配对二维码内容。 */
@@ -203,6 +248,8 @@ export interface NikkiSyncPairingCode {
   host: string
   port: number
   tlsFingerprintSha256: string
+  /** 兼容层（b422193）：多 host 配对时的备选地址（单 host NS1 形态缺省；K5）。 */
+  hosts?: string[]
 }
 
 /** 分页查询入参：与上游 `SyncReadRepository.AssetPageQuery` 同形（游标另编）。 */
@@ -263,8 +310,13 @@ export interface NikkiSyncRuntimeSession {
   server: LocalSyncServerLike
   /** 自签 TLS 身份（证书公开、私钥不外泄）；指纹供配对与展示。 */
   tlsIdentity(): { certPem: string; fingerprintSha256: string }
-  /** 上游 `runtime.createPairingUri`：一次性配对二维码内容。 */
-  pairingUri(host: string, ttlMs?: number): string
+  /**
+   * 上游 `runtime.createPairingUri`：一次性配对二维码内容。第三参 `hosts`
+   * 为兼容层（b422193）透传缝，行为面 K5 接入；单 host 形态逐字节不变。
+   */
+  pairingUri(host: string, ttlMs?: number, hosts?: readonly string[]): string
+  /** 兼容层（b422193）：上游构造期必建的整理队列（同一引用透传，动作面归 K8）。 */
+  deletions: DeletionQueueLike
   /** 已配对（未撤销）设备列表。 */
   listPairedDevices(): NikkiSyncPairedDeviceView[]
   /** 走上游 `PairingRepository.revoke`；设备不存在或已撤销返回 false。 */
@@ -286,6 +338,13 @@ export interface NikkiSyncRuntimeSession {
    * 「有 N 张照片带完整信封但一条都没解析」这类状态，而不是伪装成空。
    */
   metadataDiagnostics(): unknown
+  /**
+   * 兼容层（b422193）：缓存解码元数据的**同步**驱动闭包（上游
+   * `CachedDecodedMetadataService.runOnce(): number` 返回值逐字透传）。
+   * 仅在深入口模块装载成功时挂出（沿 `metadataRunOnce` 的「仅存在时挂出」先例）；
+   * K1 在启动后与手动扫描后各调用一次，本层不接定时器。
+   */
+  cachedMetadataRunOnce?: () => number
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
@@ -312,6 +371,18 @@ export interface NikkiSyncSessionOptions {
    * 该开关一旦为真即产生对第三方端点的出站请求。
    */
   metadataResolverEnabled?: boolean
+  /**
+   * 兼容层（b422193）：上游启动阶段回调透传缝。本仓编排不调 `runtime.start()`
+   * （它会无条件启 LAN 服务），上游六阶段在本仓编排下不会自然发生；K1 由
+   * runtime-manager 在自身编排点自报**真实发生**的阶段，缺省时连键都不下发。
+   */
+  onStartupStage?: (stage: string) => void
+  /**
+   * 兼容层（b422193）：在线解析同意文件路径（K2 的 `MetadataOnlineConsent`
+   * 深入口消费，落 `{userData}/nikkisync/metadata-online-consent.json`）。
+   * 本轮仅声明透传缝，不产生行为。
+   */
+  consentFile?: string
 }
 
 /** IPC / 装配层消费的句柄（`ctx.nikkisyncRuntime`）。 */

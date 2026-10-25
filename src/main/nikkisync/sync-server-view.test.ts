@@ -105,6 +105,19 @@ describe('resolveSyncServerConfig / embeddedServerConfig', () => {
     expect('remoteBridge' in embeddedServerConfig()).toBe(false)
   })
 
+  it('兼容层 C5：connectionHosts 函数引用逐字透传（K5 将经 /v1/server 下发备选地址）', () => {
+    const connectionHosts = (): string[] => ['192.168.1.5', '192.168.1.6']
+    const resolved = resolveSyncServerConfig({ connectionHosts })
+    expect(resolved.connectionHosts).toBe(connectionHosts)
+    const embedded = embeddedServerConfig({ connectionHosts }) as Record<string, unknown>
+    expect(embedded.connectionHosts).toBe(connectionHosts)
+  })
+
+  it('兼容层 C5：connectionHosts 缺省时连键都不下发（默认态 server config 形状不变）', () => {
+    expect('connectionHosts' in resolveSyncServerConfig()).toBe(false)
+    expect('connectionHosts' in embeddedServerConfig()).toBe(false)
+  })
+
   it('边界：空白 name 回落默认，异常 name 原样保留（清洗由上游 mDNS 侧负责）', () => {
     expect(resolveSyncServerConfig({ name: '   ' }).name).toBe(SYNC_SERVER_DEFAULT_NAME)
     expect(resolveSyncServerConfig({ name: '  自定义名字  ' }).name).toBe('自定义名字')

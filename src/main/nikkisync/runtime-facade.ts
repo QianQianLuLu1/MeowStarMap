@@ -117,6 +117,41 @@ interface MetadataDiagnosticsSurface {
 }
 
 /**
+ * 上游 `metadata/CachedDecodedMetadataService.ts` 的本仓最小面（兼容层 b422193）。
+ * 构造器仅存储引用（零副作用）；`runOnce()` 同步返回本次升级的 asset 计数。
+ * K1 在启动后与手动扫描后各驱动一次，不接上游 `runtime.start()` 的自动阶段。
+ */
+interface CachedDecodedMetadataSurface {
+  CachedDecodedMetadataService: new (
+    database: unknown,
+    dictionary?: unknown
+  ) => { runOnce(): number }
+}
+
+/**
+ * 上游 `server/LanAddress.ts` 的本仓最小面（兼容层 b422193）。两个纯函数；
+ * 入参 `interfaces` 缺省时上游自取 `os.networkInterfaces()`（`listLanIpv4` 排序
+ * 去重后截 8）。K5 消费（配对 host 解析 + `connectionHosts` 数据源）。
+ */
+interface LanAddressSurface {
+  selectLanIpv4(interfaces?: unknown): string | undefined
+  listLanIpv4(interfaces?: unknown): string[]
+}
+
+/**
+ * 上游 `server/GameVersionCalendar.ts` 的本仓最小面（兼容层 b422193）。
+ * 纯本地静态表推断（无出站）；远程刷新与 Steam 英文名拉取按 02 计划 §11/Q6 不做。
+ * K3 消费。
+ */
+interface GameVersionCalendarSurface {
+  inferInfinityNikkiGameVersion(
+    capturedAt: string | undefined,
+    releases?: unknown
+  ): string | undefined
+  getGameVersionReleases(): unknown[]
+}
+
+/**
  * 上游 `LocalTlsIdentityService` 的最小面（`server/LocalTlsIdentityService.ts:117-129`）。
  * 只有一个公开方法 `getOrCreate()`：身份存 `app_settings['server.tlsIdentity']`，
  * **不落盘、也没有路径可注入**——嵌入态因此不建 certs 目录（见计划 §4）。
@@ -143,6 +178,10 @@ export interface RuntimeSurface {
   /** 阶段 6：元数据解析器与解析诊断，各自是独立深入口。 */
   nuan5Resolver: Nuan5ResolverSurface
   metadataDiagnostics: MetadataDiagnosticsSurface
+  /** 兼容层（b422193）：K1/K3/K5 将消费的三个深入口（产物存在性由 verify:nikkisync 第 12 项承担）。 */
+  cachedDecodedMetadataService: CachedDecodedMetadataSurface
+  lanAddress: LanAddressSurface
+  gameVersionCalendar: GameVersionCalendarSurface
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -176,6 +215,21 @@ export const METADATA_DIAGNOSTICS_DEEP_ENTRY = [
   'metadata',
   'MetadataResolutionDiagnostics.js'
 ] as const
+
+/**
+ * 兼容层（上游 b422193 同步）的三个能力深入口——`CachedDecodedMetadataService`（K1）、
+ * `LanAddress`（K5）、`GameVersionCalendar`（K3）。与既有深入口同处境：都不在上游桶导出
+ * 内、探针管不到，产物存在性由 `scripts/verify-nikkisync-link.ts` 的
+ * `NIKKISYNC_CAPABILITY_ARTIFACTS`（第 12 项检查）与 pre-dist-check 打包断言承担。
+ * K2（MetadataOnlineConsent）、K6（ExtraScanDirectories）、K7（ScanDiagnostics）的
+ * 深入口按 02 计划在各自消费节点就地增载，此处不预载未用符号。
+ */
+export const CACHED_DECODED_METADATA_DEEP_ENTRY = [
+  'metadata',
+  'CachedDecodedMetadataService.js'
+] as const
+export const LAN_ADDRESS_DEEP_ENTRY = ['server', 'LanAddress.js'] as const
+export const GAME_VERSION_CALENDAR_DEEP_ENTRY = ['server', 'GameVersionCalendar.js'] as const
 
 /**
  * 已配对设备清单的**只读** SELECT。
@@ -253,6 +307,9 @@ export async function loadRuntimeSurface(
   const profileStatsIndex = await loadDeepModule(PROFILE_STATS_DEEP_ENTRY)
   const nuan5Resolver = await loadDeepModule(NUAN5_RESOLVER_DEEP_ENTRY)
   const metadataDiagnostics = await loadDeepModule(METADATA_DIAGNOSTICS_DEEP_ENTRY)
+  const cachedDecodedMetadataService = await loadDeepModule(CACHED_DECODED_METADATA_DEEP_ENTRY)
+  const lanAddress = await loadDeepModule(LAN_ADDRESS_DEEP_ENTRY)
+  const gameVersionCalendar = await loadDeepModule(GAME_VERSION_CALENDAR_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -261,7 +318,11 @@ export async function loadRuntimeSurface(
     clothingSearchIndex: clothingSearchIndex as unknown as ClothingIndexSurface,
     profileStatsIndex: profileStatsIndex as unknown as ProfileStatsIndexSurface,
     nuan5Resolver: nuan5Resolver as unknown as Nuan5ResolverSurface,
-    metadataDiagnostics: metadataDiagnostics as unknown as MetadataDiagnosticsSurface
+    metadataDiagnostics: metadataDiagnostics as unknown as MetadataDiagnosticsSurface,
+    cachedDecodedMetadataService:
+      cachedDecodedMetadataService as unknown as CachedDecodedMetadataSurface,
+    lanAddress: lanAddress as unknown as LanAddressSurface,
+    gameVersionCalendar: gameVersionCalendar as unknown as GameVersionCalendarSurface
   }
 }
 
@@ -484,6 +545,8 @@ export async function createRuntimeSession(
       watcher: options.watcher
     },
     server: syncServer,
+    // 兼容层（b422193）：启动阶段回调透传缝（缺省时连键都不下发；K1 在本仓编排点自报阶段）
+    ...(options.onStartupStage ? { onStartupStage: options.onStartupStage } : {}),
     ...metadataFragment
   })
   // runtime 构造期即建库并跑 migration：其后任一步（TLS/配对导出缺失、查询面装配）
@@ -500,6 +563,17 @@ export async function createRuntimeSession(
     const pairing = new PairingCtor(runtime.database)
     // 上游只在配置里存在 metadataResolver 键时才构造该服务 ⇒ undefined 即「本会话未开启解析」
     const metadataService = runtime.metadataResolver
+    // 兼容层（b422193）：预构造缓存解码服务（上游构造器仅存储引用，零副作用）；
+    // 仅深入口模块在位时挂出闭包（沿 metadataRunOnce「仅存在时挂出」先例），
+    // K1 在扫描完成后驱动，上游 runOnce(): number 的同步返回值逐字透传。
+    const cachedDecodedMetadata = surface.cachedDecodedMetadataService
+      ? new (
+          nikkisyncExport(
+            surface.cachedDecodedMetadataService as unknown as NikkiSyncModule,
+            'CachedDecodedMetadataService'
+          ) as new (database: unknown, dictionary?: unknown) => { runOnce(): number }
+        )(runtime.database)
+      : undefined
 
     return {
       runtime,
@@ -512,10 +586,14 @@ export async function createRuntimeSession(
         const identity = tlsService.getOrCreate()
         return { certPem: identity.certPem, fingerprintSha256: identity.fingerprintSha256 }
       },
-      pairingUri: (host, ttlMs) =>
-        typeof ttlMs === 'number'
-          ? runtime.createPairingUri(host, ttlMs)
-          : runtime.createPairingUri(host),
+      pairingUri: (host, ttlMs, hosts) =>
+        hosts !== undefined
+          ? runtime.createPairingUri(host, ttlMs, hosts)
+          : typeof ttlMs === 'number'
+            ? runtime.createPairingUri(host, ttlMs)
+            : runtime.createPairingUri(host),
+      // 兼容层（b422193）：上游构造期必建的整理队列，同一引用透传（动作面归 K8）
+      deletions: runtime.deletions,
       listPairedDevices: () =>
         (runtime.database.connection.prepare(PAIRED_DEVICES_SQL).all() as unknown[])
           .map(mapPairedDeviceRow)
@@ -533,6 +611,10 @@ export async function createRuntimeSession(
       },
       // 仅在服务存在时挂出驱动面：编排层据此判 0 轮，无需重复读开关
       ...(metadataService ? { metadataRunOnce: () => metadataService.runOnce() } : {}),
+      // 兼容层（b422193）：缓存解码同步驱动闭包（模块缺席即不挂键）
+      ...(cachedDecodedMetadata
+        ? { cachedMetadataRunOnce: () => cachedDecodedMetadata.runOnce() }
+        : {}),
       metadataDiagnostics: () =>
         surface.metadataDiagnostics.metadataResolutionDiagnostics(
           runtime.database,

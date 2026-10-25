@@ -89,7 +89,9 @@ export function resolveSyncServerConfig(
     host: input?.host ?? SYNC_SERVER_DEFAULT_HOST,
     port: normalizeSyncPort(input?.port),
     mdns: input?.mdns ?? SYNC_SERVER_DEFAULT_MDNS,
-    journalPollMs: normalizeJournalPollMs(input?.journalPollMs)
+    journalPollMs: normalizeJournalPollMs(input?.journalPollMs),
+    // 兼容层（b422193）：函数引用原样保留（上游构造期调用取值）；缺省时键不存在
+    ...(input?.connectionHosts ? { connectionHosts: input.connectionHosts } : {})
   }
 }
 
@@ -108,7 +110,9 @@ export function embeddedServerConfig(
     host: config.host,
     port: config.port,
     mdns: config.mdns,
-    journalPollMs: config.journalPollMs
+    journalPollMs: config.journalPollMs,
+    // 兼容层（b422193）：备选地址回调透传（缺省时连键都不下发，与上游可选语义一致）
+    ...(config.connectionHosts ? { connectionHosts: config.connectionHosts } : {})
   }
 }
 
