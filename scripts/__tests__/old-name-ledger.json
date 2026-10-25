@@ -94,7 +94,7 @@
     "owner": "QianQianLuLu1",
     "extra": ["github.com/your-repo/issues", "QQ群: 123456789", "QQ Group: 123456789"]
   },
-  "expectedTotal": 170,
+  "expectedTotal": 172,
   "allowed": {
     "ARCHITECTURE.en.md": {
       "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
@@ -239,9 +239,16 @@
       }
     },
     "src/main/nikkisync/runtime-loader.ts": {
-      "reason": "@nikkisync 装载缝报错提示里的本机仓库目录名，非产品自称",
+      "reason": "@nikkisync 装载缝报错提示里的本机仓库目录名 + 必需导出表的上游桶导出符号名 normalizeNikkiGalleryPhoto（C2 引入，均为非产品自称的标识符）",
       "hits": {
-        "WXNN XiangCe": 1
+        "WXNN XiangCe": 1,
+        "NikkiGallery": 1
+      }
+    },
+    "src/main/nikkisync/runtime-loader.test.ts": {
+      "reason": "runtime-loader 导出表测试的镜像常量（含上游桶导出符号名 normalizeNikkiGalleryPhoto，非产品自称）",
+      "hits": {
+        "NikkiGallery": 1
       }
     },
     "src/main/nikkisync/runtime-manager.ts": {

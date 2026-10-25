@@ -140,7 +140,7 @@ describe('build-recycle-helper（K8-a 回收 helper 构建脚本，纯函数层�
       error: vi.fn()
     })
     expect(code).toBe(0)
-    const [file, args, options] = spawn.mock.calls[0] as [
+    const [file, args, options] = spawn.mock.calls[0] as unknown as [
       string,
       string[],
       { windowsHide: boolean }
