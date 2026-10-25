@@ -63,6 +63,25 @@ export const METADATA_REQUIRED_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'metadata', 'MetadataResolutionDiagnostics.js')
 ]
 
+/**
+ * 兼容层（上游 b422193 同步）：能力层节点（02 计划 K1–K8）将消费的 7 个 pc-companion
+ * 深入口产物（相对包根）。全部不在桶导出内（同 `METADATA_REQUIRED_ARTIFACTS` 的处境），
+ * `NIKKISYNC_REQUIRED_EXPORTS` 探针与 `dist/src/index.js` 存在性判定都覆盖不到；
+ * 缺任一件 ⇒ 对应能力节点装载期 `ERR_MODULE_NOT_FOUND`。与上两组分列的原因：
+ * 本组缺件只影响尚未接入的能力面，不影响已交付的内嵌面（同步服务/元数据解析），
+ * 修复动作同为「上游仓跑完整 `npm run build`（tsc 产出 dist/src/**）」。
+ * 打包态逐项断言共用此表（scripts/pre-dist-check.ts 的 C2-3 扩容）。
+ */
+export const NIKKISYNC_CAPABILITY_ARTIFACTS: readonly string[] = [
+  path.join('dist', 'src', 'organizer', 'DeletionQueue.js'),
+  path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
+  path.join('dist', 'src', 'scanner', 'ScanDiagnostics.js'),
+  path.join('dist', 'src', 'metadata', 'CachedDecodedMetadataService.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataOnlineConsent.js'),
+  path.join('dist', 'src', 'server', 'LanAddress.js'),
+  path.join('dist', 'src', 'server', 'GameVersionCalendar.js')
+]
+
 export interface NikkiSyncLinkFacts {
   /** 依赖图中指向仓库外的本地 spec（`file:../…` / `workspace:…`），必须为空。 */
   externalFileSpecs: string[]
@@ -99,6 +118,11 @@ export interface NikkiSyncLinkFacts {
    * 因为两者缺失时的修复语义不同（见 `METADATA_REQUIRED_ARTIFACTS` 注释）。
    */
   metadataArtifactsMissing?: string[]
+  /**
+   * 兼容层（b422193 同步）：能力层节点将消费的 7 个深入口产物缺失清单（相对包根，
+   * 见 `NIKKISYNC_CAPABILITY_ARTIFACTS`）。缺件只影响未来能力节点，不影响已交付内嵌面。
+   */
+  capabilityArtifactsMissing?: string[]
 }
 
 export interface CheckResult {
@@ -213,6 +237,21 @@ export function evaluateNikkiSyncLink(facts: NikkiSyncLinkFacts): CheckResult[] 
         : facts.metadataArtifactsMissing.length === 0
           ? `present: ${METADATA_REQUIRED_ARTIFACTS.join(', ')}`
           : `missing: ${facts.metadataArtifactsMissing.join(', ')} — run \`npm run build\` in NikkiSync (tsc emits dist/src/metadata/*; a src-only checkout has none, and these two are deep entries outside the barrel)`
+    })
+  }
+
+  // 兼容层（b422193 同步）：能力层节点将消费的 7 个深入口产物。与上两组同处境（桶导出外、
+  // 探针管不到），但缺件只影响未来能力面；未链接是受支持默认态（warn 展示、不阻断）。
+  if (facts.capabilityArtifactsMissing !== undefined) {
+    checks.push({
+      name: '@nikkisync/pc-companion ships the capability deep-entry artifacts',
+      ok: !linked || facts.capabilityArtifactsMissing.length === 0,
+      level: !linked ? 'warn' : undefined,
+      detail: !linked
+        ? 'skipped (no links present; embedding lane inactive)'
+        : facts.capabilityArtifactsMissing.length === 0
+          ? `present: ${NIKKISYNC_CAPABILITY_ARTIFACTS.join(', ')}`
+          : `missing: ${facts.capabilityArtifactsMissing.join(', ')} — run the full \`npm run build\` in NikkiSync (tsc emits dist/src/**; these deep entries back the upcoming capability nodes, not the shipped embedding lane)`
     })
   }
 
@@ -342,6 +381,7 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
   const databaseTargets: string[] = []
   const syncArtifactsMissing: string[] = []
   const metadataArtifactsMissing: string[] = []
+  const capabilityArtifactsMissing: string[] = []
   for (const [name, subpath] of Object.entries(NIKKISYNC_PACKAGE_DIRS)) {
     const linkDir = path.join(projectRoot, 'node_modules', name)
     if (!fs.existsSync(linkDir)) continue
@@ -364,6 +404,10 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
       }
       for (const artifact of METADATA_REQUIRED_ARTIFACTS) {
         if (!fs.existsSync(path.join(targetDir, artifact))) metadataArtifactsMissing.push(artifact)
+      }
+      for (const artifact of NIKKISYNC_CAPABILITY_ARTIFACTS) {
+        if (!fs.existsSync(path.join(targetDir, artifact)))
+          capabilityArtifactsMissing.push(artifact)
       }
     }
     void subpath
@@ -420,7 +464,8 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     packedMigrationsReadable: packedMigrationsReadable(projectRoot),
     candidateRoot,
     syncServerArtifactsMissing: syncArtifactsMissing,
-    metadataArtifactsMissing: metadataArtifactsMissing
+    metadataArtifactsMissing: metadataArtifactsMissing,
+    capabilityArtifactsMissing: capabilityArtifactsMissing
   }
 }
 

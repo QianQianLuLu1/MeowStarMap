@@ -11,6 +11,8 @@ import * as path from 'path'
 import { execSync } from 'child_process'
 import { fileURLToPath } from 'url'
 
+import { NIKKISYNC_CAPABILITY_ARTIFACTS } from './verify-nikkisync-link'
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 
@@ -598,6 +600,19 @@ export function nikkiSyncMissingDiagnosis(input: {
 }
 
 /**
+ * 兼容层 C2-3：能力深入口产物在解包树内的缺失清单（纯判定核）。
+ * 清单单一真相源为 verify-nikkisync-link 的 `NIKKISYNC_CAPABILITY_ARTIFACTS`
+ * （开发态链接检查与打包态断言共用一表，两侧不得各自抄录）；存在性由调用方
+ * 以探针注入，解包树布局因此可在单测中虚拟化。空清单 = 逐项断言全过。
+ */
+export function missingPackedCapabilityArtifacts(
+  artifacts: readonly string[],
+  exists: (relativeToPcCompanion: string) => boolean
+): string[] {
+  return artifacts.filter((relative) => !exists(relative))
+}
+
+/**
  * 读 @nikkisync scope 目录条目数。读不动时返回 -1 交由调用侧按「已建链」处理——
  * I/O 异常不许被误报成「链被清掉的空壳」。
  */
@@ -733,6 +748,28 @@ function checkUnpackedNativeBinaries(): void {
           `修复：在 NikkiSync 跑完整 npm run build 后重新打包）: ` +
           path.relative(ROOT, target)
       )
+  }
+
+  // 兼容层 C2-3：能力层节点将消费的 7 个深入口产物（清单与 verify:nikkisync 共用，
+  // 见 NIKKISYNC_CAPABILITY_ARTIFACTS）。缺件 ⇒ 对应能力节点装载期 ERR_MODULE_NOT_FOUND；
+  // 已随包就逐项放行，缺任一即 fail 并点名（缺失清单经纯函数核判定，供单测虚拟化解包树）。
+  const pcCompanionRoot = path.join(nikkisyncRoot, 'pc-companion')
+  const capabilityMissing = missingPackedCapabilityArtifacts(
+    NIKKISYNC_CAPABILITY_ARTIFACTS,
+    (relative) => fs.existsSync(path.join(pcCompanionRoot, relative))
+  )
+  if (capabilityMissing.length === 0) {
+    pass(
+      `@nikkisync/pc-companion 能力深入口产物 ${NIKKISYNC_CAPABILITY_ARTIFACTS.length} 项已全部解包`
+    )
+  } else {
+    for (const relative of capabilityMissing) {
+      fail(
+        `@nikkisync/pc-companion 缺能力深入口产物 ${relative}` +
+          '（能力节点装载期将 ERR_MODULE_NOT_FOUND；在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
+          path.relative(ROOT, path.join(pcCompanionRoot, relative))
+      )
+    }
   }
 }
 

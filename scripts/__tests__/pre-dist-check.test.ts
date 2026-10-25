@@ -9,11 +9,13 @@ import {
   dirContains,
   nikkiSyncPackedVerdict,
   nikkiSyncMissingDiagnosis,
+  missingPackedCapabilityArtifacts,
   artifactBannedStrings,
   scanBufferForBanned,
   resolveVerifyAsarTarget,
   type JsTreeFile
 } from '../pre-dist-check'
+import { NIKKISYNC_CAPABILITY_ARTIFACTS } from '../verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..', '..')
@@ -173,6 +175,25 @@ describe('nikkiSyncMissingDiagnosis — @nikkisync 缺失的原因分档', () =>
     expect(nikkiSyncMissingDiagnosis({ scopeDirExists: true, scopeEntryCount: 1 })).toContain(
       'build.files'
     )
+  })
+})
+
+describe('missingPackedCapabilityArtifacts — 能力深入口产物断言核（兼容层 C2-3）', () => {
+  it('正常：解包树内 7 项能力产物全存在 → 空清单（逐项断言全过）', () => {
+    expect(missingPackedCapabilityArtifacts(NIKKISYNC_CAPABILITY_ARTIFACTS, () => true)).toEqual([])
+  })
+
+  it('异常：缺 DeletionQueue.js → 清单点名缺项（fail 消息取自该清单）', () => {
+    const missing = missingPackedCapabilityArtifacts(
+      NIKKISYNC_CAPABILITY_ARTIFACTS,
+      (relative) => !relative.includes('DeletionQueue.js')
+    )
+    expect(missing).toHaveLength(1)
+    expect(missing[0]).toContain('DeletionQueue.js')
+  })
+
+  it('边界：清单为空 → 空清单，不误报（未消费能力面时不造断言）', () => {
+    expect(missingPackedCapabilityArtifacts([], () => false)).toEqual([])
   })
 })
 

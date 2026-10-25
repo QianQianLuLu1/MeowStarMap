@@ -50,6 +50,11 @@ export const NIKKISYNC_REQUIRED_EXPORTS: Record<NikkiSyncPackageName, Record<str
     ASSET_STATES: 'object',
     ASSET_TYPES: 'object',
     AssetResolver: 'function',
+    // 兼容层（上游 b422193 同步）：core 桶导出新增 decoded-metadata 三纯函数
+    // （packages/core/src/index.ts 追加 `export * from './decoded-metadata.js'`）
+    mergePhotoMetadataGaps: 'function',
+    normalizeNikkiGalleryPhoto: 'function',
+    normalizeNuan5Photo: 'function',
     RESOURCE_ROLES: 'object',
     toPathKey: 'function'
   },

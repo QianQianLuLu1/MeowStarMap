@@ -79,6 +79,16 @@ describe('runtime-loader 纯函数面（不依赖链接是否就绪）', () => {
     // 未建链的默认态（自包含方案）下项目根也必须给出 false
     if (!LINKED) expect(hasNikkiSyncLink(projectRoot)).toBe(false)
   })
+
+  it('兼容层（b422193 同步）：core 必需导出表覆盖 decoded-metadata 三个桶导出纯函数', () => {
+    // 上游 core 桶导出追加 `export * from './decoded-metadata.js'`（b422193）；
+    // 三符号入表后，链接态用例 1b 会在真实上游产物上逐个探测其存在与形态。
+    expect(NIKKISYNC_REQUIRED_EXPORTS.core).toMatchObject({
+      normalizeNuan5Photo: 'function',
+      normalizeNikkiGalleryPhoto: 'function',
+      mergePhotoMetadataGaps: 'function'
+    })
+  })
 })
 
 describe.skipIf(!LINKED)('runtime-loader 装载面（需 @nikkisync/* 链接就绪）', () => {

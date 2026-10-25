@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import path from 'node:path'
 
 import {
+  NIKKISYNC_CAPABILITY_ARTIFACTS,
   NIKKISYNC_PACKAGE_NAMES,
   collectOutOfRepoSpecs,
   evaluateNikkiSyncLink,
@@ -25,6 +27,7 @@ const FOLD_CHECK = 'main-process bundles do not fold @nikkisync into require()'
 const PACKED_CHECK = 'packed app.asar.unpacked ships @nikkisync/database migrations'
 const SYNC_SERVER_CHECK = '@nikkisync/pc-companion ships the local sync server artifacts'
 const METADATA_CHECK = '@nikkisync/pc-companion ships the metadata resolver artifacts'
+const CAPABILITY_CHECK = '@nikkisync/pc-companion ships the capability deep-entry artifacts'
 const DISCOVER_CHECK = 'a NikkiSync checkout is discoverable for linking'
 
 /** 全部事实成立（默认按"已链接 + 产物齐"取满值）。 */
@@ -142,6 +145,44 @@ describe('evaluateNikkiSyncLink', () => {
     expect(find(checks, METADATA_CHECK)).toBeUndefined()
   })
 
+  it('异常：已链接但缺能力深入口产物时硬阻断并点名文件（兼容层 b422193 同步）', () => {
+    const checks = evaluateNikkiSyncLink(
+      facts({ capabilityArtifactsMissing: ['dist\\src\\organizer\\DeletionQueue.js'] })
+    )
+    expect(failing(checks)).toContain(CAPABILITY_CHECK)
+    const detail = find(checks, CAPABILITY_CHECK)?.detail
+    expect(detail).toContain('DeletionQueue.js')
+    expect(detail).toContain('npm run build')
+  })
+
+  it('正常：能力深入口产物齐备时该检查通过（兼容层 b422193 同步）', () => {
+    const checks = evaluateNikkiSyncLink(facts({ capabilityArtifactsMissing: [] }))
+    expect(failing(checks)).toEqual([])
+    expect(find(checks, CAPABILITY_CHECK)?.ok).toBe(true)
+  })
+
+  it('边界：能力事实字段缺省时整条检查缺席（兼容层）', () => {
+    const checks = evaluateNikkiSyncLink(facts())
+    expect(find(checks, CAPABILITY_CHECK)).toBeUndefined()
+  })
+
+  it('边界：未链接时该检查降为 warn 的 skipped，不阻断（兼容层）', () => {
+    const checks = evaluateNikkiSyncLink(
+      facts({
+        installedLinks: [],
+        builtArtifacts: [],
+        linkTargets: [],
+        migrationSqlPresent: false,
+        capabilityArtifactsMissing: []
+      })
+    )
+    const capability = find(checks, CAPABILITY_CHECK)
+    expect(capability?.ok).toBe(true)
+    expect(capability?.level).toBe('warn')
+    expect(capability?.detail).toContain('skipped')
+    expect(failing(checks)).toEqual([])
+  })
+
   it('边界：半链接（部分包缺失）只告警，不阻断', () => {
     const checks = evaluateNikkiSyncLink(
       facts({ installedLinks: ['@nikkisync/core'], builtArtifacts: ['@nikkisync/core'] })
@@ -217,6 +258,20 @@ describe('evaluateNikkiSyncLink', () => {
     expect(sqliteCheck?.ok).toBe(false)
     expect(sqliteCheck?.level).toBe('warn')
     expect(failing(checks)).toEqual([])
+  })
+})
+
+describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步）', () => {
+  it('恰好 7 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
+    expect(NIKKISYNC_CAPABILITY_ARTIFACTS).toEqual([
+      path.join('dist', 'src', 'organizer', 'DeletionQueue.js'),
+      path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
+      path.join('dist', 'src', 'scanner', 'ScanDiagnostics.js'),
+      path.join('dist', 'src', 'metadata', 'CachedDecodedMetadataService.js'),
+      path.join('dist', 'src', 'metadata', 'MetadataOnlineConsent.js'),
+      path.join('dist', 'src', 'server', 'LanAddress.js'),
+      path.join('dist', 'src', 'server', 'GameVersionCalendar.js')
+    ])
   })
 })
 
