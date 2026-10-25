@@ -73,6 +73,11 @@ export const METADATA_ENV_FLAG = 'NIKKI_NIKKISYNC_METADATA'
 export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
 /** K2：在线解析同意文件相对 userData 的路径段（上游 0600 JSON，读写全在上游）。 */
 export const NIKKISYNC_CONSENT_SEGMENTS = ['nikkisync', 'metadata-online-consent.json'] as const
+/** K6：额外照片目录清单相对 userData 的路径段（上游 0600 JSON 即单一真相源，不落设置键）。 */
+export const NIKKISYNC_EXTRA_DIRECTORIES_SEGMENTS = [
+  'nikkisync',
+  'extra-scan-directories.json'
+] as const
 
 /** 设置读取端口（与 `DatabaseManager.getSetting<T>` 对齐，便于注入与单测）。 */
 export interface NikkiSyncSettingsPort {
@@ -122,6 +127,8 @@ export function buildSessionOptions(input: {
     metadataResolverEnabled: resolveMetadataResolverEnabled(input.env, input.settings),
     // K2：同意文件路径（与库同目录；仅解析开启时被消费，fail-closed 由上游构造器承担）
     consentFile: nikkisyncMetadataConsentFile(input.userDataDir),
+    // K6：额外目录清单文件（上游 0600 JSON 即单一真相源；未给出时 facade 不挂目录面）
+    extraDirectoriesFile: path.join(input.userDataDir, ...NIKKISYNC_EXTRA_DIRECTORIES_SEGMENTS),
     projectRoot: input.projectRoot,
     packagingContext: buildPackagingContext({
       isPackaged: input.isPackaged,

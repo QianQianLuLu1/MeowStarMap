@@ -4442,6 +4442,18 @@
       "devices": "Gekoppelte Geräte",
       "altHosts": "Alternative Adressen",
       "lastError": "Letzter Fehler"
+    },
+    "extraDirectories": {
+      "title": "Zusätzliche Fotoordner",
+      "scopeNote": "Fügt Fotoordner für den Scanner der Sync-Bibliothek hinzu; betrifft nur die NikkiSync-Sync-Bibliothek, nicht die eigenen Scanpfade der lokalen Galerie.",
+      "empty": "Keine zusätzlichen Ordner",
+      "emptyHint": "Fügen Sie Fotoordner von anderen Orten hinzu, um sie in Sync-Scans einzubeziehen",
+      "add": "Ordner hinzufügen",
+      "remove": "Entfernen",
+      "confirmAdd": "Hinzufügen bestätigen",
+      "cancelAdd": "Abbrechen",
+      "rescan": "Erneut scannen",
+      "proposalSummary": "{{images}} Fotos / {{videos}} Videos erkannt"
     }
   },
   "shareCard": {

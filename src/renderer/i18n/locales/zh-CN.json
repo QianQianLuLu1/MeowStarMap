@@ -4442,6 +4442,18 @@
       "devices": "已配对设备数",
       "altHosts": "备选地址",
       "lastError": "最近错误"
+    },
+    "extraDirectories": {
+      "title": "额外照片目录",
+      "scopeNote": "为同步库扫描器追加照片目录；仅作用于 NikkiSync 同步库，不影响本地图库自有扫描目录。",
+      "empty": "暂无额外目录",
+      "emptyHint": "添加其他位置的照片目录，纳入同步库扫描",
+      "add": "添加目录",
+      "remove": "移除目录",
+      "confirmAdd": "确认添加",
+      "cancelAdd": "取消",
+      "rescan": "重新扫描",
+      "proposalSummary": "识别到 {{images}} 张照片 / {{videos}} 个视频"
     }
   },
   "shareCard": {

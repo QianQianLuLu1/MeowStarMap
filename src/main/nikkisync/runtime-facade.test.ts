@@ -805,8 +805,16 @@ describe('createRuntimeSession 元数据在线同意（K2）', () => {
 /**
  * C5 专用夹具：在阶段 6 夹具之上补齐上游 b422193 构造期新增面——
  * `runtime.deletions`（构造期必建）与记录调用的 `createPairingUri`（三参形态）。
+ * K6 开关 `extraDirectoriesSurfaceDisabled`：模拟「深入口缺席的老链接会话」。
  */
-function createCompatibilityFixture() {
+function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?: boolean } = {}) {
+  const extraDirectoriesSurfaceDisabled = options.extraDirectoriesSurfaceDisabled === true
+  const extraDirectoryCalls: Array<{
+    file: string
+    scanner: unknown
+    onScopeChanged?: () => Promise<void>
+  }> = []
+  const extraDirectoryInstances: unknown[] = []
   const pairingCalls: Array<{ host: string; ttlMs?: number; hosts?: readonly string[] }> = []
   const deletions = {
     list: vi.fn((): unknown[] => []),
@@ -890,9 +898,53 @@ function createCompatibilityFixture() {
         { version: '1.4', effectiveAt: '2025-03-26T03:00:00.000Z' },
         { version: '1.3', effectiveAt: '2025-02-26T03:00:00.000Z' }
       ])
-    }
+    },
+    // K6：额外照片目录深入口假面（记录构造三元组；onScopeChanged 缝由 facade 传入）
+    ...(extraDirectoriesSurfaceDisabled
+      ? {}
+      : {
+          extraScanDirectories: {
+            ExtraScanDirectories: class {
+              constructor(
+                public readonly file: string,
+                public readonly scanner: unknown,
+                public readonly onScopeChanged?: () => Promise<void>
+              ) {
+                extraDirectoryCalls.push({
+                  file,
+                  scanner,
+                  onScopeChanged
+                })
+                extraDirectoryInstances.push(this)
+              }
+              state(): Record<string, unknown> {
+                return { directories: [], automaticRoots: [], busy: false, message: '' }
+              }
+              async inspect(): Promise<Record<string, unknown>> {
+                return { id: 'x', roots: [], images: 0, videos: 0, limited: false, hint: '' }
+              }
+              async add(): Promise<Record<string, unknown>> {
+                return this.state()
+              }
+              async remove(): Promise<Record<string, unknown>> {
+                return this.state()
+              }
+              async rescan(): Promise<Record<string, unknown>> {
+                return this.state()
+              }
+            }
+          }
+        })
   } as unknown as RuntimeSurface
-  return { surface, capturedConfig: () => capturedConfig, pairingCalls, deletions, cachedRunOnce }
+  return {
+    surface,
+    capturedConfig: () => capturedConfig,
+    pairingCalls,
+    deletions,
+    cachedRunOnce,
+    extraDirectoryCalls,
+    extraDirectoryInstances
+  }
 }
 
 describe('createRuntimeSession 兼容层注入缝（C5：声明与透传，无行为变化）', () => {
@@ -975,5 +1027,32 @@ describe('createRuntimeSession 游戏版本会话面（K3）', () => {
     const session = await createRuntimeSession(sessionOptions(), fixture.surface)
     expect(session.resolveGameVersion(undefined)).toEqual({})
     expect(session.resolveGameVersion('2024-01-01T00:00:00.000Z')).toEqual({})
+  })
+})
+
+describe('createRuntimeSession 额外照片目录接线（K6）', () => {
+  it('K6-f1 给出 extraDirectoriesFile ⇒ 深入口构造（文件+scanner+onScopeChanged 缝）并挂会话面', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(),
+        extraDirectoriesFile: '/tmp/userData/nikkisync/extra-scan-directories.json'
+      },
+      fixture.surface
+    )
+    expect(fixture.extraDirectoryCalls).toHaveLength(1)
+    expect(fixture.extraDirectoryCalls[0].file).toBe(
+      '/tmp/userData/nikkisync/extra-scan-directories.json'
+    )
+    // onScopeChanged 先空实现（保留缝）：必须是可调用且不抛的函数
+    expect(typeof fixture.extraDirectoryCalls[0].onScopeChanged).toBe('function')
+    expect(session.extraDirectories).toBe(fixture.extraDirectoryInstances[0])
+  })
+
+  it('K6-f2 未给出文件 ⇒ 不构造、不挂面（老会话零变化）', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(fixture.extraDirectoryCalls).toHaveLength(0)
+    expect(session.extraDirectories).toBeUndefined()
   })
 })

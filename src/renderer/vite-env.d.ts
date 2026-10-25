@@ -1076,6 +1076,22 @@ interface WindowElectronAPI {
     resolveGameVersion: (
       input?: import('../shared/types/electron-api').NikkiSyncGameVersionQueryInfo
     ) => Promise<import('../shared/types/electron-api').NikkiSyncGameVersionInfo>
+    // ---- K6：额外照片目录（仅作用于同步库扫描器）----
+    getExtraDirectories: () => Promise<
+      import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo
+    >
+    inspectExtraDirectory: (input: {
+      path: string
+    }) => Promise<import('../shared/types/electron-api').NikkiSyncExtraDirectoryProposalInfo>
+    addExtraDirectory: (input: {
+      id: string
+    }) => Promise<import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo>
+    removeExtraDirectory: (input: {
+      id: string
+    }) => Promise<import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo>
+    rescanExtraDirectories: () => Promise<
+      import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo
+    >
   }
   // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
   assetEdits: {

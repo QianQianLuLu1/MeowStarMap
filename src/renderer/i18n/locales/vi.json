@@ -4442,6 +4442,18 @@
       "devices": "Thiết bị đã ghép cặp",
       "altHosts": "Địa chỉ thay thế",
       "lastError": "Lỗi gần nhất"
+    },
+    "extraDirectories": {
+      "title": "Thư mục ảnh bổ sung",
+      "scopeNote": "Thêm thư mục ảnh cho bộ quét của thư viện đồng bộ; chỉ ảnh hưởng thư viện đồng bộ NikkiSync, không ảnh hưởng đường dẫn quét của thư viện cục bộ.",
+      "empty": "Chưa có thư mục bổ sung",
+      "emptyHint": "Thêm thư mục ảnh từ nơi khác để đưa vào quét đồng bộ",
+      "add": "Thêm thư mục",
+      "remove": "Gỡ bỏ",
+      "confirmAdd": "Xác nhận thêm",
+      "cancelAdd": "Hủy",
+      "rescan": "Quét lại",
+      "proposalSummary": "Phát hiện {{images}} ảnh / {{videos}} video"
     }
   },
   "shareCard": {

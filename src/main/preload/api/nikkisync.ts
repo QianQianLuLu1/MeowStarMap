@@ -1,5 +1,5 @@
-// @core-change: K3 新增 resolveGameVersion 桥方法（游戏版本推断，纯本地静态表查询）。
-//               （历史：阶段3-4 建查询/服务/扩容面、K2 增同意开关两方法——历次授权原因见各节点提交。）
+// @core-change: K6 新增额外照片目录五个桥方法（getExtraDirectories 等，仅作用同步库扫描器）。
+//               （历史：阶段3-4 建查询/服务/扩容面、K2 同意、K3 版本推断——历次授权原因见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -14,6 +14,8 @@ import type {
   NikkiSyncMetadataConsentSetInput,
   NikkiSyncGameVersionInfo,
   NikkiSyncGameVersionQueryInfo,
+  NikkiSyncExtraDirectoriesInfo,
+  NikkiSyncExtraDirectoryProposalInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncPairingCodeInfo,
   NikkiSyncProfileStatsInfo,
@@ -83,5 +85,20 @@ export const nikkisyncAPI = {
   // ---- K3：游戏版本推断（上游静态表，纯本地无出站）----
   /** 按拍摄时间推断游戏版本；两键缺省 = 无法推断（早于 1.0 / 非法输入 / 未装配） */
   resolveGameVersion: (input?: NikkiSyncGameVersionQueryInfo) =>
-    call<NikkiSyncGameVersionInfo>('nikkisync:resolve-game-version', input ?? {})
+    call<NikkiSyncGameVersionInfo>('nikkisync:resolve-game-version', input ?? {}),
+  // ---- K6：额外照片目录（仅作用于同步库扫描器，不影响本地图库扫描目录）----
+  /** 目录状态（directories/automaticRoots/busy；上游中文 message 已剔除） */
+  getExtraDirectories: () => call<NikkiSyncExtraDirectoriesInfo>('nikkisync:get-extra-directories'),
+  /** 预检目录（返回 id/images/videos/limited 提案；中文 hint 已剔除） */
+  inspectExtraDirectory: (input: { path: string }) =>
+    call<NikkiSyncExtraDirectoryProposalInfo>('nikkisync:inspect-extra-directory', input),
+  /** 按预检 id 加入目录清单（触发上游重扫） */
+  addExtraDirectory: (input: { id: string }) =>
+    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:add-extra-directory', input),
+  /** 按目录 id 移除（触发上游重扫） */
+  removeExtraDirectory: (input: { id: string }) =>
+    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:remove-extra-directory', input),
+  /** 手动重扫全部目录 */
+  rescanExtraDirectories: () =>
+    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:rescan-extra-directories')
 }

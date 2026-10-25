@@ -631,6 +631,23 @@ export interface NikkiSyncGameVersionInfo {
   effectiveAt?: string
 }
 
+/** K6：`nikkisync:get-extra-directories` 响应（上游中文 message 已剔除）。 */
+export interface NikkiSyncExtraDirectoriesInfo {
+  directories: Array<{ id: string; path: string; mode: 'native' | 'images' }>
+  automaticRoots: string[]
+  busy: boolean
+  scannerStatus?: unknown
+}
+
+/** K6：`nikkisync:inspect-extra-directory` 响应（上游中文 hint 已剔除）。 */
+export interface NikkiSyncExtraDirectoryProposalInfo {
+  id: string
+  roots: unknown[]
+  images: number
+  videos: number
+  limited: boolean
+}
+
 export interface NikkiSyncScanInputInfo {
   gameRoot?: string
   path?: string

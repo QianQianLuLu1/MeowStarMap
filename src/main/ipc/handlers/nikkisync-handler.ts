@@ -1,5 +1,5 @@
-// @core-change: K3 新增 nikkisync:resolve-game-version 游戏版本推断通道（纯本地静态表查询）。
-//               （历史：阶段2-4 建查询与服务面、K2 增同意开关两通道——历次授权原因见各节点提交。）
+// @core-change: K6 新增 nikkisync:*-extra-directories 五通道（额外照片目录管理，仅作用同步库扫描器）。
+//               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断——历次授权原因见各节点提交。）
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -121,6 +121,69 @@ const consentSetSchema = z.object({
 const gameVersionSchema = z.object({
   capturedAt: z.string().min(1).max(64).optional()
 })
+
+/**
+ * K6：目录预检入参。必须绝对路径（Windows 盘符 / UNC / POSIX 根起始）；
+ * 上限 16 由上游 `too_many_directories` 承担，zod 不重复设（避免双真相源）。
+ */
+const inspectDirectorySchema = z.object({
+  path: z
+    .string()
+    .trim()
+    .min(1)
+    .max(4096)
+    .refine((value) => /^([A-Za-z]:[\\/]|\\\\|\/)/.test(value), {
+      message: 'path must be absolute'
+    })
+})
+
+const directoryIdSchema = z.string().trim().min(1).max(128)
+
+/**
+ * K6：上游八错误短码 → IPC 错误码（逐码注释，映射表唯一真相源）。
+ * 输入形态类（路径/层级/覆盖问题）→ VALIDATION_ERROR；会话状态类（可重试/需重预检/上限）→ PRECONDITION_FAILED。
+ */
+const EXTRA_DIRECTORY_ERROR_CODES: Record<string, 'validation' | 'precondition'> = {
+  invalid_directory: 'validation', // 路径形态不对（非目录等）
+  choose_subfolder: 'validation', // 层级不对（应选照片子目录）
+  thumbnail_only: 'validation', // 只包含缩略图目录
+  choose_photo_folder: 'validation', // 应选择照片目录
+  already_covered: 'validation', // 已被现有扫描根覆盖
+  directory_unavailable: 'precondition', // 目录暂不可访问（盘未挂载等，可重试）
+  too_many_directories: 'precondition', // 达到上限 16（上游承担判定）
+  selection_expired: 'precondition', // 预检已过期（需重新 inspect）
+  directory_not_found: 'precondition' // 目录 id 不存在/已被移除
+}
+
+function extraDirectoryErrorToAppError(error: unknown): AppError {
+  if (error instanceof AppError) return error
+  const message = error instanceof Error ? error.message : String(error)
+  const code = message.trim().split(/[\s:]+/)[0]
+  const mapped = code ? EXTRA_DIRECTORY_ERROR_CODES[code] : undefined
+  if (mapped === 'validation') {
+    return AppError.validation(`extra directory request rejected: ${code}`)
+  }
+  if (mapped === 'precondition') {
+    return AppError.preconditionFailed(`extra directory state rejected: ${code}`)
+  }
+  return toAppError(error, 'extra-directories')
+}
+
+/** K6：剔除上游中文串字段（state().message——上游 UI 提示文案，§6「不透传渲染层」）。 */
+function stripExtraDirectoriesState(state: unknown): unknown {
+  if (typeof state !== 'object' || state === null) return state
+  const rest = { ...(state as Record<string, unknown>) }
+  delete rest.message
+  return rest
+}
+
+/** K6：剔除提案的中文 hint（同上；id/roots/images/videos/limited 原样保留）。 */
+function stripExtraDirectoryProposal(proposal: unknown): unknown {
+  if (typeof proposal !== 'object' || proposal === null) return proposal
+  const rest = { ...(proposal as Record<string, unknown>) }
+  delete rest.hint
+  return rest
+}
 
 /** 句柄未装配时的状态（不抛错：UI 据此显示「同步服务不可用」而非崩一次 toast）。 */
 const UNAVAILABLE_SERVER_STATUS: NikkiSyncServerStatusInfo = {
@@ -470,6 +533,89 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         // ISO 8601 之外的输入原样下传由上游判缺省、不抛错（纯查询无副作用）
         runtime.resolveGameVersion(input.capturedAt)
       )
+    })
+  )
+
+  // ---- K6：额外照片目录（仅作用于同步库扫描器，不影响本地图库 customScanPaths）----
+
+  ipcMain.handle(
+    'nikkisync:get-extra-directories',
+    wrapHandlerNoArgs(ctx, () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return stripExtraDirectoriesState(runtime.extraDirectoriesState())
+      } catch (error) {
+        throw extraDirectoryErrorToAppError(error)
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:inspect-extra-directory',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        inspectDirectorySchema,
+        args[0] ?? {},
+        'inspect-extra-directory',
+        async (input) => {
+          try {
+            return stripExtraDirectoryProposal(await runtime.inspectExtraDirectory(input.path))
+          } catch (error) {
+            throw extraDirectoryErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:add-extra-directory',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        z.object({ id: directoryIdSchema }),
+        args[0] ?? {},
+        'add-extra-directory',
+        async (input) => {
+          try {
+            return stripExtraDirectoriesState(await runtime.addExtraDirectory(input.id))
+          } catch (error) {
+            throw extraDirectoryErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:remove-extra-directory',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        z.object({ id: directoryIdSchema }),
+        args[0] ?? {},
+        'remove-extra-directory',
+        async (input) => {
+          try {
+            return stripExtraDirectoriesState(await runtime.removeExtraDirectory(input.id))
+          } catch (error) {
+            throw extraDirectoryErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:rescan-extra-directories',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return stripExtraDirectoriesState(await runtime.rescanExtraDirectories())
+      } catch (error) {
+        throw extraDirectoryErrorToAppError(error)
+      }
     })
   )
 }

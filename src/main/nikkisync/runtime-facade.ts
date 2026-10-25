@@ -167,6 +167,18 @@ interface MetadataOnlineConsentSurface {
 }
 
 /**
+ * 上游 `scanner/ExtraScanDirectories.ts` 的本仓最小面（K6）。
+ * 构造器 `(file, scanner, onScopeChanged?)`；目录清单持久化在上游 0600 JSON。
+ */
+interface ExtraScanDirectoriesSurface {
+  ExtraScanDirectories: new (
+    file: string,
+    scanner: unknown,
+    onScopeChanged?: () => Promise<void>
+  ) => import('./runtime-types').ExtraScanDirectoriesLike
+}
+
+/**
  * 上游 `LocalTlsIdentityService` 的最小面（`server/LocalTlsIdentityService.ts:117-129`）。
  * 只有一个公开方法 `getOrCreate()`：身份存 `app_settings['server.tlsIdentity']`，
  * **不落盘、也没有路径可注入**——嵌入态因此不建 certs 目录（见计划 §4）。
@@ -202,6 +214,8 @@ export interface RuntimeSurface {
    * 该字段可为 undefined，构造期据此走「不包装」分支——解析行为与 K2 之前完全一致。
    */
   metadataOnlineConsent?: MetadataOnlineConsentSurface
+  /** K6：额外照片目录深入口（可选同上——老链接会话据此走「不挂面」分支）。 */
+  extraScanDirectories?: ExtraScanDirectoriesSurface
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -256,6 +270,12 @@ export const GAME_VERSION_CALENDAR_DEEP_ENTRY = ['server', 'GameVersionCalendar.
  * `verify-nikkisync-link.ts` 的 `NIKKISYNC_CAPABILITY_ARTIFACTS` 承担）。
  */
 export const METADATA_ONLINE_CONSENT_DEEP_ENTRY = ['metadata', 'MetadataOnlineConsent.js'] as const
+
+/**
+ * K6 的额外照片目录深入口（上游 `scanner/ExtraScanDirectories.js`；同上由
+ * `NIKKISYNC_CAPABILITY_ARTIFACTS` 守护产物存在性）。
+ */
+export const EXTRA_SCAN_DIRECTORIES_DEEP_ENTRY = ['scanner', 'ExtraScanDirectories.js'] as const
 
 /**
  * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
@@ -361,6 +381,7 @@ export async function loadRuntimeSurface(
   const lanAddress = await loadDeepModule(LAN_ADDRESS_DEEP_ENTRY)
   const gameVersionCalendar = await loadDeepModule(GAME_VERSION_CALENDAR_DEEP_ENTRY)
   const metadataOnlineConsent = await loadDeepModule(METADATA_ONLINE_CONSENT_DEEP_ENTRY)
+  const extraScanDirectories = await loadDeepModule(EXTRA_SCAN_DIRECTORIES_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -374,7 +395,8 @@ export async function loadRuntimeSurface(
       cachedDecodedMetadataService as unknown as CachedDecodedMetadataSurface,
     lanAddress: lanAddress as unknown as LanAddressSurface,
     gameVersionCalendar: gameVersionCalendar as unknown as GameVersionCalendarSurface,
-    metadataOnlineConsent: metadataOnlineConsent as unknown as MetadataOnlineConsentSurface
+    metadataOnlineConsent: metadataOnlineConsent as unknown as MetadataOnlineConsentSurface,
+    extraScanDirectories: extraScanDirectories as unknown as ExtraScanDirectoriesSurface
   }
 }
 
@@ -661,6 +683,26 @@ export async function createRuntimeSession(
         )(runtime.database)
       : undefined
 
+    /**
+     * K6：额外照片目录管理面。仅「extraDirectoriesFile 给出 && 深入口在位」时构造；
+     * 目录清单持久化在上游 0600 JSON（文件即单一真相源，本仓不落设置键）。
+     * `onScopeChanged` 先空实现——上游在 add/remove/rescan 后回调它做联动（上游
+     * 桌面壳用它刷新页面），本仓渲染层在响应返回后自行刷新，保留缝不吞调用。
+     */
+    const extraDirectories: import('./runtime-types').ExtraScanDirectoriesLike | undefined =
+      options.extraDirectoriesFile && surface.extraScanDirectories
+        ? new (
+            nikkisyncExport(
+              surface.extraScanDirectories as unknown as NikkiSyncModule,
+              'ExtraScanDirectories'
+            ) as new (
+              file: string,
+              scanner: unknown,
+              onScopeChanged?: () => Promise<void>
+            ) => import('./runtime-types').ExtraScanDirectoriesLike
+          )(options.extraDirectoriesFile, runtime.scanner, async () => {})
+        : undefined
+
     return {
       runtime,
       scanner: runtime.scanner,
@@ -703,6 +745,8 @@ export async function createRuntimeSession(
         : {}),
       // K2：同意面（构造条件见上方 metadataConsent；缺席即不挂键）
       ...(metadataConsent ? { metadataConsent } : {}),
+      // K6：额外目录面（构造条件见上方 extraDirectories；缺席即不挂键）
+      ...(extraDirectories ? { extraDirectories } : {}),
       /**
        * K3：游戏版本推断（上游静态表纯函数）。深入口缺席（老 surface）时恒返回
        * 两键缺省，不抛——推断是纯展示增强，不得因缺件牵连会话可用性。

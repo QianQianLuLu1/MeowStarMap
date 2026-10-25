@@ -72,6 +72,25 @@ const CONSENT_STATE = {
   ]
 }
 
+/** K6：与上游 `ExtraScanDirectories.state()` 同形（含会被剔除的中文 message 字段）。 */
+const EXTRA_DIRECTORIES_STATE = {
+  directories: [{ id: 'dir_1', path: 'D:\\ExtraPhotos', mode: 'native' }],
+  automaticRoots: ['C:\\game\\photos'],
+  busy: false,
+  message: '就绪',
+  scannerStatus: 'running'
+}
+
+/** K6：与上游 `inspect()` 提案同形（含会被剔除的中文 hint 字段）。 */
+const EXTRA_DIRECTORY_PROPOSAL = {
+  id: 'p1',
+  roots: [{ path: 'D:\\ExtraPhotos', kind: 'user' }],
+  images: 12,
+  videos: 2,
+  limited: false,
+  hint: '已识别 12 张照片'
+}
+
 function createRuntimeStub(): NikkiSyncRuntimeHandle {
   return {
     status: vi.fn(() => ({
@@ -127,7 +146,13 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
     resolveGameVersion: vi.fn(async () => ({
       version: '2.5',
       effectiveAt: '2026-04-24T03:00:00.000Z'
-    }))
+    })),
+    // ---- K6：额外照片目录 ----
+    extraDirectoriesState: vi.fn(() => EXTRA_DIRECTORIES_STATE),
+    inspectExtraDirectory: vi.fn(async () => EXTRA_DIRECTORY_PROPOSAL),
+    addExtraDirectory: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
+    removeExtraDirectory: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
+    rescanExtraDirectories: vi.fn(async () => EXTRA_DIRECTORIES_STATE)
   }
 }
 
@@ -143,7 +168,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 19 条通道（阶段2 五查询 + 阶段4 五扩容 + 阶段3 六服务 + K2 两同意 + K3 版本推断）', () => {
+  it('恰好注册 24 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 五条目录）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -165,7 +190,12 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:revoke-device',
       'nikkisync:get-metadata-consent',
       'nikkisync:set-metadata-consent',
-      'nikkisync:resolve-game-version'
+      'nikkisync:resolve-game-version',
+      'nikkisync:get-extra-directories',
+      'nikkisync:inspect-extra-directory',
+      'nikkisync:add-extra-directory',
+      'nikkisync:remove-extra-directory',
+      'nikkisync:rescan-extra-directories'
     ])
   })
 
@@ -857,5 +887,116 @@ describe('nikkisync:resolve-game-version（K3）', () => {
     const unprepared = getHandler(handleMock, 'nikkisync:resolve-game-version')
     const res = (await unprepared({})) as HandleResult
     expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+})
+
+// ============================================================================
+// K6：额外照片目录五通道（上游 ExtraScanDirectories；仅作用于同步库扫描器）
+// ============================================================================
+
+describe('nikkisync:*-extra-directories（K6）', () => {
+  it('get：状态透传但剔除上游中文 message（含 scannerStatus 汇总）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-extra-directories')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    const data = res.data as Record<string, unknown>
+    expect(data.directories).toEqual(EXTRA_DIRECTORIES_STATE.directories)
+    expect(data.automaticRoots).toEqual(EXTRA_DIRECTORIES_STATE.automaticRoots)
+    expect('message' in data).toBe(false)
+    expect(JSON.stringify(data)).not.toMatch(/[\u4e00-\u9fff]/)
+  })
+
+  it('inspect：path 原样下传、提案剔除中文 hint；相对路径/空串/超长 ⇒ VALIDATION 且不调句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    const res = (await handler({}, { path: 'D:\\ExtraPhotos' })) as HandleResult
+    expect(runtime.inspectExtraDirectory).toHaveBeenCalledWith('D:\\ExtraPhotos')
+    const data = res.data as Record<string, unknown>
+    expect(data.id).toBe('p1')
+    expect(data.images).toBe(12)
+    expect('hint' in data).toBe(false)
+
+    for (const bad of ['relative/path', '', 'x'.repeat(4097)]) {
+      const rejected = (await handler({}, { path: bad })) as HandleResult
+      expect(rejected.error?.code, JSON.stringify(bad)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.inspectExtraDirectory).toHaveBeenCalledTimes(1)
+  })
+
+  it('add / remove：id 下传并返回状态；id 空串/超长 ⇒ VALIDATION 且不调句柄', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const add = getHandler(handleMock, 'nikkisync:add-extra-directory')
+    await add({}, { id: 'p1' })
+    expect(runtime.addExtraDirectory).toHaveBeenCalledWith('p1')
+    const remove = getHandler(handleMock, 'nikkisync:remove-extra-directory')
+    await remove({}, { id: 'dir_1' })
+    expect(runtime.removeExtraDirectory).toHaveBeenCalledWith('dir_1')
+    for (const bad of ['', ' ', 'x'.repeat(129)]) {
+      const rejected = (await add({}, { id: bad })) as HandleResult
+      expect(rejected.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.addExtraDirectory).toHaveBeenCalledTimes(1)
+  })
+
+  it('rescan：无参调用并返回状态', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:rescan-extra-directories')
+    const res = (await handler({})) as HandleResult
+    expect(runtime.rescanExtraDirectories).toHaveBeenCalledTimes(1)
+    expect(res.success).toBe(true)
+  })
+
+  it('八错误短码逐码映射（输入类→VALIDATION，状态类→PRECONDITION），中文原文不透传', async () => {
+    const validationCodes = [
+      'invalid_directory',
+      'choose_subfolder',
+      'thumbnail_only',
+      'choose_photo_folder',
+      'already_covered'
+    ]
+    const preconditionCodes = [
+      'directory_unavailable',
+      'too_many_directories',
+      'selection_expired',
+      'directory_not_found'
+    ]
+    const runtime = createRuntimeStub()
+    for (const code of validationCodes) {
+      vi.mocked(runtime.inspectExtraDirectory).mockRejectedValueOnce(new Error(code))
+    }
+    for (const code of preconditionCodes) {
+      vi.mocked(runtime.inspectExtraDirectory).mockRejectedValueOnce(new Error(code))
+    }
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    for (const code of validationCodes) {
+      const res = (await handler({}, { path: 'D:\\X' })) as HandleResult
+      expect(res.error?.code, code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    for (const code of preconditionCodes) {
+      const res = (await handler({}, { path: 'D:\\X' })) as HandleResult
+      expect(res.error?.code, code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+
+  it('未装配 ⇒ 五通道统一 PRECONDITION_FAILED', async () => {
+    register(undefined)
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:get-extra-directories', undefined],
+      ['nikkisync:inspect-extra-directory', { path: 'D:\\X' }],
+      ['nikkisync:add-extra-directory', { id: 'p1' }],
+      ['nikkisync:remove-extra-directory', { id: 'dir_1' }],
+      ['nikkisync:rescan-extra-directories', undefined]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
   })
 })

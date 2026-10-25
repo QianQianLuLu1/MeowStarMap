@@ -4442,6 +4442,18 @@
       "devices": "Dispositivos vinculados",
       "altHosts": "Direcciones alternativas",
       "lastError": "Último error"
+    },
+    "extraDirectories": {
+      "title": "Carpetas de fotos adicionales",
+      "scopeNote": "Añade carpetas de fotos al escáner de la biblioteca de sincronización; solo afecta a la biblioteca NikkiSync, no a las rutas de análisis de la galería local.",
+      "empty": "Sin carpetas adicionales",
+      "emptyHint": "Añade carpetas de fotos de otras ubicaciones para incluirlas en los análisis de sincronización",
+      "add": "Añadir carpeta",
+      "remove": "Quitar",
+      "confirmAdd": "Confirmar",
+      "cancelAdd": "Cancelar",
+      "rescan": "Volver a analizar",
+      "proposalSummary": "{{images}} fotos / {{videos}} vídeos detectados"
     }
   },
   "shareCard": {

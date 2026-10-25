@@ -524,6 +524,27 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
 - 推断边界以上游静态表为准（1.0=2024-12-05 起，维护开服时刻为界）；渲染层对推断值标注「（推断）」，
   metadata 自带版本优先、推断值并列或补位。
 
+### 8.2.3 额外照片目录（K6，上游 `ExtraScanDirectories`；仅作用于同步库扫描器）
+
+| 通道                                 | 入参                                    | 出参                                                                                                  | 失败码                                                |
+| ------------------------------------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `nikkisync:get-extra-directories`    | 无                                      | `{directories: [{id, path, mode}], automaticRoots, busy, scannerStatus}`（**中文 `message` 已剔除**） | `PRECONDITION_FAILED`（未装配/未挂面）                |
+| `nikkisync:inspect-extra-directory`  | `{path: string(1..4096)，必须绝对路径}` | `{id, roots, images, videos, limited}`（**中文 `hint` 已剔除**）                                      | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（见映射表） |
+| `nikkisync:add-extra-directory`      | `{id: string(1..128)}`（预检返回的 id） | 同 get（更新后状态）                                                                                  | 同上映射                                              |
+| `nikkisync:remove-extra-directory`   | `{id: string(1..128)}`                  | 同 get                                                                                                | 同上映射                                              |
+| `nikkisync:rescan-extra-directories` | 无                                      | 同 get                                                                                                | 同上映射                                              |
+
+契约要点：
+
+- 目录清单持久化在上游 0600 JSON（`{userData}/nikkisync/extra-scan-directories.json`，
+  `{version, directories, retiredRoots}`）——**上游文件即单一真相源**，不落本仓设置键。
+- 上限 16、模式折叠、重叠判定全部由上游实现承担，zod 不重复设上限（避免双真相源）。
+- 上游八错误短码映射：`invalid_directory` / `choose_subfolder` / `thumbnail_only` /
+  `choose_photo_folder` / `already_covered` → `VALIDATION_ERROR`；
+  `directory_unavailable` / `too_many_directories` / `selection_expired` /
+  `directory_not_found` → `PRECONDITION_FAILED`。
+- **仅作用于 NikkiSync 同步库扫描器**，不影响本地图库自有扫描目录（`customScanPaths`）。
+
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
 
 `sync:getStatus` / `startServer` / `stopServer` / `createPairingQr` / `listDevices` / `revokeDevice`

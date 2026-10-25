@@ -132,7 +132,18 @@ const SYNC_SERVICE_LEAVES = [
   'diagnostics.tlsTail',
   'diagnostics.devices',
   'diagnostics.altHosts',
-  'diagnostics.lastError'
+  'diagnostics.lastError',
+  // K6：额外照片目录节（仅作用同步库扫描器）
+  'extraDirectories.title',
+  'extraDirectories.scopeNote',
+  'extraDirectories.empty',
+  'extraDirectories.emptyHint',
+  'extraDirectories.add',
+  'extraDirectories.remove',
+  'extraDirectories.confirmAdd',
+  'extraDirectories.cancelAdd',
+  'extraDirectories.rescan',
+  'extraDirectories.proposalSummary'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */

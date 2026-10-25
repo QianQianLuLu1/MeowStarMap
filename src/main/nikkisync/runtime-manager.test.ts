@@ -264,6 +264,22 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       calls.resolveGameVersion.push(capturedAt)
       return plan.gameVersionResult ?? {}
     },
+    // K6：额外目录面「仅文件给出时挂出」的镜像（默认缺席 ⇒ manager 五方法抛 unavailable）
+    ...(plan.extraDirectoriesPresent
+      ? {
+          extraDirectories: {
+            state: () => ({
+              directories: [{ id: 'dir_1', path: 'D:/ExtraPhotos', mode: 'native' }],
+              automaticRoots: ['/game/photos'],
+              busy: false
+            }),
+            inspect: async (selected: string) => ({ id: 'p1', selected, images: 3, videos: 1 }),
+            add: async (id: string) => ({ added: id }),
+            remove: async (id: string) => ({ removed: id }),
+            rescan: async () => ({ rescanned: true })
+          }
+        }
+      : {}),
     tableNames: () => ['assets', 'resources'],
     dispose: () => {
       calls.order.push('dispose')
@@ -1174,5 +1190,34 @@ describe('K5：多 host 配对', () => {
     const code = await manager.pairingCode()
     expect(code.content.startsWith('NS1|')).toBe(true)
     expect(code.hosts).toBeUndefined()
+  })
+})
+
+describe('K6：额外照片目录五方法', () => {
+  it('K6-m1 会话无该面（未给文件/老链接）⇒ 五方法都抛 unavailable（handler 映射 PRECONDITION）', async () => {
+    const { deps } = createDependencies({}, { extraDirectoriesPresent: false })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(() => manager.extraDirectoriesState()).toThrow(/unavailable/)
+    await expect(manager.inspectExtraDirectory('D:/X')).rejects.toThrow(/unavailable/)
+    await expect(manager.addExtraDirectory('p1')).rejects.toThrow(/unavailable/)
+    await expect(manager.removeExtraDirectory('dir_1')).rejects.toThrow(/unavailable/)
+    await expect(manager.rescanExtraDirectories()).rejects.toThrow(/unavailable/)
+  })
+
+  it('K6-m2 有该面：五个调用逐字透传（state/inspect(path)/add(id)/remove(id)/rescan）', async () => {
+    const { deps } = createDependencies({}, { extraDirectoriesPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(manager.extraDirectoriesState()).toMatchObject({
+      directories: [{ id: 'dir_1', path: 'D:/ExtraPhotos', mode: 'native' }]
+    })
+    await expect(manager.inspectExtraDirectory('D:/ExtraPhotos')).resolves.toMatchObject({
+      id: 'p1',
+      selected: 'D:/ExtraPhotos'
+    })
+    await expect(manager.addExtraDirectory('p1')).resolves.toEqual({ added: 'p1' })
+    await expect(manager.removeExtraDirectory('dir_1')).resolves.toEqual({ removed: 'dir_1' })
+    await expect(manager.rescanExtraDirectories()).resolves.toEqual({ rescanned: true })
   })
 })

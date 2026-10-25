@@ -14,6 +14,8 @@ import { IconCopyText, IconSync } from '../../icons'
 import { useMediaStore } from '../../stores/mediaStore'
 import { useUIStore } from '../../stores/uiStore'
 import type {
+  NikkiSyncExtraDirectoriesInfo,
+  NikkiSyncExtraDirectoryProposalInfo,
   NikkiSyncMetadataConsentInfo,
   NikkiSyncPairedDeviceInfo,
   NikkiSyncServerStatusInfo
@@ -86,6 +88,9 @@ export const SyncServicePage: React.FC = () => {
   const [busy, setBusy] = useState(false)
   const [qrOpen, setQrOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<NikkiSyncPairedDeviceInfo | null>(null)
+  // K6：额外照片目录（null = 会话未挂面/未装配 ⇒ 整节隐藏，预期内不报错）
+  const [extraDirs, setExtraDirs] = useState<NikkiSyncExtraDirectoriesInfo | null>(null)
+  const [proposal, setProposal] = useState<NikkiSyncExtraDirectoryProposalInfo | null>(null)
   const currentView = useUIStore((s) => s.currentView)
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -260,6 +265,72 @@ export const SyncServicePage: React.FC = () => {
       showError(error)
     } finally {
       setBusy(false)
+    }
+  }
+
+  /**
+   * K6：额外目录状态拉取。老链接/未装配会话上通道按契约回 PRECONDITION_FAILED——
+   * 这是预期内状态而非故障，降级为隐藏整节（不弹错误）。
+   */
+  const refreshExtraDirs = useCallback(async (): Promise<void> => {
+    try {
+      const next = await window.electronAPI?.nikkisync.getExtraDirectories()
+      setExtraDirs(next ?? null)
+    } catch {
+      setExtraDirs(null)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (currentView !== 'sync-service') return
+    void refreshExtraDirs()
+  }, [currentView, refreshExtraDirs])
+
+  /** K6：添加流程——系统目录选择器 → 预检（images/videos 计数）→ 用户确认后按提案 id 提交。 */
+  const handleAddDirectory = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    try {
+      const selected = await api.dialog.selectDirectory()
+      if (!selected) return
+      setProposal(await api.nikkisync.inspectExtraDirectory({ path: selected }))
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  const handleConfirmAdd = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api || !proposal) return
+    const id = proposal.id
+    setBusy(true)
+    try {
+      setExtraDirs(await api.nikkisync.addExtraDirectory({ id }))
+      setProposal(null)
+    } catch (error) {
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleRemoveDirectory = async (id: string): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    try {
+      setExtraDirs(await api.nikkisync.removeExtraDirectory({ id }))
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  const handleRescanExtraDirs = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    try {
+      setExtraDirs(await api.nikkisync.rescanExtraDirectories())
+    } catch (error) {
+      showError(error)
     }
   }
 
@@ -597,6 +668,94 @@ export const SyncServicePage: React.FC = () => {
               </div>
             )}
           </SectionShell>
+
+          {/* ④K6：额外照片目录（仅作用于同步库扫描器；会话未挂面时整节隐藏） */}
+          {extraDirs && (
+            <SectionShell
+              title={t('syncService.extraDirectories.title')}
+              description={t('syncService.extraDirectories.scopeNote')}
+            >
+              <div className="space-y-2">
+                {extraDirs.directories.length === 0 ? (
+                  <EmptyState
+                    title={t('syncService.extraDirectories.empty')}
+                    subtitle={t('syncService.extraDirectories.emptyHint')}
+                  />
+                ) : (
+                  extraDirs.directories.map((dir) => (
+                    <SettingsCard key={dir.id}>
+                      <SettingsRow label={dir.path}>
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="font-mono text-xs"
+                            style={{ color: 'var(--text-tertiary)' }}
+                          >
+                            {dir.mode}
+                          </span>
+                          <button
+                            type="button"
+                            className="btn-danger text-xs"
+                            disabled={busy}
+                            onClick={() => void handleRemoveDirectory(dir.id)}
+                          >
+                            {t('syncService.extraDirectories.remove')}
+                          </button>
+                        </div>
+                      </SettingsRow>
+                    </SettingsCard>
+                  ))
+                )}
+                {/* 预检确认区：展示识别到的照片/视频计数，确认后才真正加入 */}
+                {proposal && (
+                  <SettingsCard>
+                    <SettingsRow label={proposal.id}>
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {t('syncService.extraDirectories.proposalSummary', {
+                            images: proposal.images,
+                            videos: proposal.videos
+                          })}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-primary text-xs"
+                          disabled={busy}
+                          onClick={() => void handleConfirmAdd()}
+                        >
+                          {t('syncService.extraDirectories.confirmAdd')}
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-ghost text-xs"
+                          onClick={() => setProposal(null)}
+                        >
+                          {t('syncService.extraDirectories.cancelAdd')}
+                        </button>
+                      </div>
+                    </SettingsRow>
+                  </SettingsCard>
+                )}
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    disabled={busy}
+                    onClick={() => void handleAddDirectory()}
+                  >
+                    {t('syncService.extraDirectories.add')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost text-sm"
+                    disabled={busy || extraDirs.busy}
+                    onClick={() => void handleRescanExtraDirs()}
+                  >
+                    {t('syncService.extraDirectories.rescan')}
+                  </button>
+                </div>
+              </div>
+            </SectionShell>
+          )}
         </div>
       </div>
 

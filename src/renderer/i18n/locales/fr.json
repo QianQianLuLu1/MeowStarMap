@@ -4442,6 +4442,18 @@
       "devices": "Appareils appariés",
       "altHosts": "Adresses alternatives",
       "lastError": "Dernière erreur"
+    },
+    "extraDirectories": {
+      "title": "Dossiers photo supplémentaires",
+      "scopeNote": "Ajoute des dossiers photo au scanner de la bibliothèque de synchronisation ; seuls NikkiSync est concerné, pas les dossiers d'analyse de la galerie locale.",
+      "empty": "Aucun dossier supplémentaire",
+      "emptyHint": "Ajoutez des dossiers photo ailleurs pour les inclure dans les analyses de synchronisation",
+      "add": "Ajouter un dossier",
+      "remove": "Retirer",
+      "confirmAdd": "Confirmer l'ajout",
+      "cancelAdd": "Annuler",
+      "rescan": "Réanalyser",
+      "proposalSummary": "{{images}} photos / {{videos}} vidéos détectées"
     }
   },
   "shareCard": {

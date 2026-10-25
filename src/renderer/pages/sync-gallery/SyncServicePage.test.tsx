@@ -91,6 +91,12 @@ interface NikkiSyncServerApiStub {
   startScan: Mock
   getMetadataConsent: Mock
   setMetadataConsent: Mock
+  getExtraDirectories: Mock
+  inspectExtraDirectory: Mock
+  addExtraDirectory: Mock
+  removeExtraDirectory: Mock
+  rescanExtraDirectories: Mock
+  selectDirectory: Mock
 }
 
 let settingsGet: Mock
@@ -108,6 +114,7 @@ function installElectronApi(
     startServerReject?: Error
     pairedDevicesReject?: Error
     startScanReject?: Error
+    extraReject?: boolean
   } = {}
 ) {
   store = { ...opts.persisted }
@@ -181,11 +188,37 @@ function installElectronApi(
       enabled: input.enabled,
       policyVersion: input.policyVersion,
       recipients: []
-    }))
+    })),
+    // K6：额外照片目录（默认一个已配置目录；extraReject 模拟「会话未挂面」⇒ 隐藏整节）
+    getExtraDirectories: vi.fn(async () =>
+      opts.extraReject
+        ? Promise.reject(new Error('extra directories panel is unavailable'))
+        : {
+            directories: [{ id: 'dir_1', path: 'D:\\ExtraPhotos', mode: 'native' as const }],
+            automaticRoots: ['C:\\game\\photos'],
+            busy: false
+          }
+    ),
+    inspectExtraDirectory: vi.fn(async () => ({
+      id: 'prop_1',
+      roots: [],
+      images: 12,
+      videos: 2,
+      limited: false
+    })),
+    addExtraDirectory: vi.fn(async () => ({ directories: [], automaticRoots: [], busy: false })),
+    removeExtraDirectory: vi.fn(async () => ({ directories: [], automaticRoots: [], busy: false })),
+    rescanExtraDirectories: vi.fn(async () => ({
+      directories: [],
+      automaticRoots: [],
+      busy: false
+    })),
+    selectDirectory: vi.fn(async () => 'D:\\NewPhotos')
   }
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
-    nikkisync: serverApi
+    nikkisync: serverApi,
+    dialog: { selectDirectory: serverApi.selectDirectory }
   }
 }
 
@@ -504,5 +537,43 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     renderSection()
     await waitFor(() => expect(screen.getByText('同步组件未就绪')).toBeInTheDocument())
     expect(screen.queryByText('连接诊断')).not.toBeInTheDocument()
+  })
+
+  // ===== K6：额外照片目录 =====
+
+  it('(y) K6：目录列表渲染（path/mode/移除）+ 作用域说明；移除按 id 调用', async () => {
+    installElectronApi()
+    renderSection()
+    await waitFor(() => expect(screen.getByText('额外照片目录')).toBeInTheDocument())
+    expect(screen.getByText(/仅作用于/)).toBeInTheDocument()
+    expect(screen.getByText(/D:\\ExtraPhotos/)).toBeInTheDocument()
+    expect(screen.getByText('native')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '移除目录' }))
+    await waitFor(() =>
+      expect(serverApi.removeExtraDirectory).toHaveBeenCalledWith({ id: 'dir_1' })
+    )
+  })
+
+  it('(y2) K6：会话未挂面（老链接）⇒ 预期内的拒绝隐藏整节而非报错', async () => {
+    installElectronApi({ extraReject: true })
+    renderSection()
+    await waitFor(() => expect(screen.getByText('已配对设备')).toBeInTheDocument())
+    expect(screen.queryByText('额外照片目录')).not.toBeInTheDocument()
+  })
+
+  it('(z) K6：添加流程 selectDirectory → inspect 预览（images/videos）→ 确认携带提案 id add；手动重扫调用 rescan', async () => {
+    installElectronApi()
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '添加目录' }))
+    await waitFor(() => expect(serverApi.selectDirectory).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(serverApi.inspectExtraDirectory).toHaveBeenCalledWith({ path: 'D:\\NewPhotos' })
+    )
+    // 预览数字可见后确认
+    expect(await screen.findByText('识别到 12 张照片 / 2 个视频')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }))
+    await waitFor(() => expect(serverApi.addExtraDirectory).toHaveBeenCalledWith({ id: 'prop_1' }))
+    fireEvent.click(screen.getByRole('button', { name: '重新扫描' }))
+    await waitFor(() => expect(serverApi.rescanExtraDirectories).toHaveBeenCalled())
   })
 })

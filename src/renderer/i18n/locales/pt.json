@@ -4442,6 +4442,18 @@
       "devices": "Dispositivos pareados",
       "altHosts": "Endereços alternativos",
       "lastError": "Último erro"
+    },
+    "extraDirectories": {
+      "title": "Pastas de fotos adicionais",
+      "scopeNote": "Adiciona pastas de fotos ao scanner da biblioteca de sincronização; afeta apenas a biblioteca NikkiSync, não os caminhos de varredura da galeria local.",
+      "empty": "Sem pastas adicionais",
+      "emptyHint": "Adicione pastas de fotos de outros locais para incluí-las nas varreduras de sincronização",
+      "add": "Adicionar pasta",
+      "remove": "Remover",
+      "confirmAdd": "Confirmar",
+      "cancelAdd": "Cancelar",
+      "rescan": "Varrer novamente",
+      "proposalSummary": "{{images}} fotos / {{videos}} vídeos detectados"
     }
   },
   "shareCard": {

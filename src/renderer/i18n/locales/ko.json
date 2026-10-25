@@ -4442,6 +4442,18 @@
       "devices": "페어링된 기기 수",
       "altHosts": "대체 주소",
       "lastError": "최근 오류"
+    },
+    "extraDirectories": {
+      "title": "추가 사진 폴더",
+      "scopeNote": "동기화 라이브러리 스캐너에 사진 폴더를 추가합니다. NikkiSync 동기화 라이브러리에만 적용되며 로컬 갤러리의 스캔 경로에는 영향을 주지 않습니다.",
+      "empty": "추가 폴더 없음",
+      "emptyHint": "다른 위치의 사진 폴더를 추가해 동기화 스캔에 포함",
+      "add": "폴더 추가",
+      "remove": "폴더 제거",
+      "confirmAdd": "추가 확인",
+      "cancelAdd": "취소",
+      "rescan": "다시 스캔",
+      "proposalSummary": "사진 {{images}}장 / 동영상 {{videos}}개 발견"
     }
   },
   "shareCard": {

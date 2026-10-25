@@ -103,6 +103,8 @@ export interface FakeSessionPlan {
   metadataConsentPresent?: boolean
   /** K3：会话面 resolveGameVersion 的固定返回值（默认 {} 两键缺省）。 */
   gameVersionResult?: { version?: string; effectiveAt?: string }
+  /** K6：会话上是否挂额外目录面（默认不挂 ⇒ manager 五方法抛 unavailable）。 */
+  extraDirectoriesPresent?: boolean
 }
 
 export interface RuntimeManagerDependencies {
@@ -680,6 +682,35 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return requireSession().resolveGameVersion(capturedAt)
   }
 
+  /** K6：额外目录面缺席（未给文件/老链接/未装配）的统一拒绝口径。 */
+  function requireExtraDirectories() {
+    const extra = requireSession().extraDirectories
+    if (!extra) {
+      throw new Error('extra directories panel is unavailable (file not wired or entry missing)')
+    }
+    return extra
+  }
+
+  function extraDirectoriesState(): unknown {
+    return requireExtraDirectories().state()
+  }
+
+  async function inspectExtraDirectory(path: string): Promise<unknown> {
+    return requireExtraDirectories().inspect(path)
+  }
+
+  async function addExtraDirectory(id: string): Promise<unknown> {
+    return requireExtraDirectories().add(id)
+  }
+
+  async function removeExtraDirectory(id: string): Promise<unknown> {
+    return requireExtraDirectories().remove(id)
+  }
+
+  async function rescanExtraDirectories(): Promise<unknown> {
+    return requireExtraDirectories().rescan()
+  }
+
   return {
     status,
     start,
@@ -704,6 +735,11 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     revokeDevice,
     metadataConsentState,
     setMetadataConsent,
-    resolveGameVersion
+    resolveGameVersion,
+    extraDirectoriesState,
+    inspectExtraDirectory,
+    addExtraDirectory,
+    removeExtraDirectory,
+    rescanExtraDirectories
   }
 }

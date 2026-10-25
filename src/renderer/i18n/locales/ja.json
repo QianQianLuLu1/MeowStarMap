@@ -4442,6 +4442,18 @@
       "devices": "ペアリング済みデバイス数",
       "altHosts": "代替アドレス",
       "lastError": "直近のエラー"
+    },
+    "extraDirectories": {
+      "title": "追加の写真フォルダ",
+      "scopeNote": "同期ライブラリのスキャナーに写真フォルダを追加します。NikkiSync 同期ライブラリにのみ作用し、ローカルギャラリー自体のスキャン先には影響しません。",
+      "empty": "追加フォルダはありません",
+      "emptyHint": "他の場所の写真フォルダを追加して同期スキャンに含めます",
+      "add": "フォルダを追加",
+      "remove": "フォルダを削除",
+      "confirmAdd": "追加を確定",
+      "cancelAdd": "キャンセル",
+      "rescan": "再スキャン",
+      "proposalSummary": "{{images}} 枚の写真 / {{videos}} 本の動画を検出"
     }
   },
   "shareCard": {

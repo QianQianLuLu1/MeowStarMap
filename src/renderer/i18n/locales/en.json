@@ -4442,6 +4442,18 @@
       "devices": "Paired devices",
       "altHosts": "Alternate addresses",
       "lastError": "Last error"
+    },
+    "extraDirectories": {
+      "title": "Extra photo directories",
+      "scopeNote": "Add photo directories for the sync library scanner; these only affect the NikkiSync sync library, not the local gallery's own scan paths.",
+      "empty": "No extra directories",
+      "emptyHint": "Add photo directories elsewhere to include them in sync scans",
+      "add": "Add directory",
+      "remove": "Remove",
+      "confirmAdd": "Confirm add",
+      "cancelAdd": "Cancel",
+      "rescan": "Rescan",
+      "proposalSummary": "Found {{images}} photos / {{videos}} videos"
     }
   },
   "shareCard": {

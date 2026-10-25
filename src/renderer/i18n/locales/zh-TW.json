@@ -4442,6 +4442,18 @@
       "devices": "已配對裝置數",
       "altHosts": "備選位址",
       "lastError": "最近錯誤"
+    },
+    "extraDirectories": {
+      "title": "額外照片目錄",
+      "scopeNote": "為同步資料庫掃描器追加照片目錄；僅作用於 NikkiSync 同步資料庫，不影響本機圖庫自有掃描目錄。",
+      "empty": "暫無額外目錄",
+      "emptyHint": "新增其他位置的照片目錄，納入同步資料庫掃描",
+      "add": "新增目錄",
+      "remove": "移除目錄",
+      "confirmAdd": "確認新增",
+      "cancelAdd": "取消",
+      "rescan": "重新掃描",
+      "proposalSummary": "識別到 {{images}} 張照片 / {{videos}} 個影片"
     }
   },
   "shareCard": {

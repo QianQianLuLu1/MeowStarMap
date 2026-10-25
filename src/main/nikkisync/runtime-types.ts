@@ -161,6 +161,20 @@ export interface DeletionQueueLike {
   stop(): Promise<void>
 }
 
+/**
+ * K6：上游 `scanner/ExtraScanDirectories.ts` 的本仓最小面。
+ * 目录清单持久化在上游 0600 JSON（`extraDirectoriesFile` 指定路径，**单一真相源**，
+ * 不落本仓设置键）；上限 16、模式折叠、重叠判定全由上游实现承担。
+ * `state()`/`inspect()` 的返回含上游中文串（message/hint）——handler 层剔除后透出。
+ */
+export interface ExtraScanDirectoriesLike {
+  state(): unknown
+  inspect(selected: string): Promise<unknown>
+  add(id: string): Promise<unknown>
+  remove(id: string): Promise<unknown>
+  rescan(): Promise<unknown>
+}
+
 /** `PcCompanionRuntime` 中被本阶段用到的最小面。 */
 export interface EmbeddedRuntimeLike {
   readonly database: DatabaseManagerLike
@@ -387,6 +401,11 @@ export interface NikkiSyncRuntimeSession {
    * 深入口缺席（老 surface）时恒返回两键缺省，不抛。
    */
   resolveGameVersion(capturedAt?: string): NikkiSyncGameVersionView
+  /**
+   * K6：额外照片目录管理面（上游 ExtraScanDirectories 深入口）。
+   * 仅 `extraDirectoriesFile` 给出且深入口在位时挂出；缺席 ⇒ manager 抛 unavailable。
+   */
+  extraDirectories?: ExtraScanDirectoriesLike
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
@@ -425,6 +444,11 @@ export interface NikkiSyncSessionOptions {
    * 本轮仅声明透传缝，不产生行为。
    */
   consentFile?: string
+  /**
+   * K6：额外照片目录清单文件路径（上游 0600 JSON，`{version, directories,
+   * retiredRoots}` 形状——上游文件即单一真相源，本仓不落设置键）。
+   */
+  extraDirectoriesFile?: string
 }
 
 /** IPC / 装配层消费的句柄（`ctx.nikkisyncRuntime`）。 */
@@ -482,4 +506,14 @@ export interface NikkiSyncRuntimeHandle {
   setMetadataConsent(enabled: boolean, policyVersion: string): NikkiSyncMetadataConsentState
   /** K3：按拍摄时间推断游戏版本（两键缺省 = 无法推断）。 */
   resolveGameVersion(capturedAt?: string): Promise<NikkiSyncGameVersionView>
+  /** K6：目录状态（directories/automaticRoots/busy/scannerStatus；中文 message 由 handler 剔除）。 */
+  extraDirectoriesState(): unknown
+  /** K6：预检目录（提案 id/roots/images/videos/limited；中文 hint 由 handler 剔除）。 */
+  inspectExtraDirectory(path: string): Promise<unknown>
+  /** K6：按预检 id 加入目录清单（触发上游重扫）。 */
+  addExtraDirectory(id: string): Promise<unknown>
+  /** K6：按目录 id 移除（触发上游重扫）。 */
+  removeExtraDirectory(id: string): Promise<unknown>
+  /** K6：手动重扫全部目录。 */
+  rescanExtraDirectories(): Promise<unknown>
 }
