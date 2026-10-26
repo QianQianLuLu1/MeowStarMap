@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "Экспорт",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "Перенос не удался",
     "transferSuccess": "Перенос выполнен успешно",
     "transferUnsupported": "Перенос между профилями не поддерживается в этой среде",
-    "batchExportFailed": "",
+    "batchExportFailed": "Пакетный экспорт завершился ошибкой",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "Экспорт завершился ошибкой",
+    "exportUnsupported": "Экспорт не поддерживается в этой среде",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "Каталог экспорта по умолчанию не задан. Задайте его в настройках",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2583,10 +2583,10 @@
       "categorize": "",
       "clearSelection": "",
       "delete": "",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "Экспорт",
+      "exportSelectDir": "Экспорт в выбранный каталог",
+      "exportToDefault": "Экспорт по умолчанию",
+      "exportToDefaultHint": "Экспорт в каталог по умолчанию одним нажатием (автопереименование по правилу имён)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "Массив путей не может быть пустым",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "Экспорт"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "Каталог экспорта по умолчанию не задан. Задайте его в настройках",
+        "noFilesToExport": "Не выбраны файлы для экспорта"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "Экспортировано файлов: {{count}}",
+        "exportedWithFailures": "Экспорт с ошибками: выполнено {{success}}, ошибок {{failed}}",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] Не удалось экспортировать файл:"
       },
       "validation": {
         "operationsRequired": "",

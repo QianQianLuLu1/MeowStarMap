@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "Export",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "Transfer failed",
     "transferSuccess": "Transfer succeeded",
     "transferUnsupported": "Cross-profile transfer is not supported in this environment",
-    "batchExportFailed": "",
+    "batchExportFailed": "Batch export failed",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "Export failed",
+    "exportUnsupported": "Exporting is not supported in this environment",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "No default export folder configured. Set one in Settings first",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2584,10 +2584,10 @@
       "clearSelection": "",
       "delete": "",
       "deselectAll": "Deselect all",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "Export",
+      "exportSelectDir": "Export to selected folder",
+      "exportToDefault": "Export to default",
+      "exportToDefaultHint": "One-click export to the default folder (renamed automatically by the naming rule)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "Path array must not be empty",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "Export"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "No default export folder configured. Set one in Settings first",
+        "noFilesToExport": "No files selected to export"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "Exported {{count}} files",
+        "exportedWithFailures": "Exported with failures: {{success}} succeeded, {{failed}} failed",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] Failed to export a single file:"
       },
       "validation": {
         "operationsRequired": "",

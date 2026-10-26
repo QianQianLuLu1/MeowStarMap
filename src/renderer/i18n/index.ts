@@ -130,7 +130,11 @@ i18n.use(initReactI18next).init({
     // React 已默认转义，避免重复转义影响显示
     escapeValue: false
   },
-  returnNull: false
+  returnNull: false,
+  // 空串视为未译、回退 fallbackLng（zh-CN）。i18next 默认 returnEmptyString: true，
+  // 会把语言包里的空串当有效译文——本仓 11 个非基准包各有约 2.4k 条空串，于是按钮
+  // 文字与提示全部渲染成空白，用户看着就是"点了没反应"（导出修复的 R5 即此因）。
+  returnEmptyString: false
 })
 
 // AppError 默认 userMessage 的翻译接线（shared 层不能反向依赖本模块）

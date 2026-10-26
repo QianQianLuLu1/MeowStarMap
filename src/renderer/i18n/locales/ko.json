@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "내보내기",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "전송 실패",
     "transferSuccess": "전송 성공",
     "transferUnsupported": "현재 환경에서는 프로필 간 전송이 지원되지 않습니다",
-    "batchExportFailed": "",
+    "batchExportFailed": "일괄 내보내기 실패",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "내보내기 실패",
+    "exportUnsupported": "이 환경에서는 내보내기를 지원하지 않습니다",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "기본 내보내기 경로가 설정되지 않았습니다. 설정에서 지정하세요",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2583,10 +2583,10 @@
       "categorize": "",
       "clearSelection": "",
       "delete": "",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "내보내기",
+      "exportSelectDir": "폴더를 선택해 내보내기",
+      "exportToDefault": "기본 위치로 내보내기",
+      "exportToDefaultHint": "클릭 한 번으로 기본 폴더에 내보내기(이름 규칙에 따라 자동 변경)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "경로 배열은 비워 둘 수 없습니다",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "내보내기"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "기본 내보내기 경로가 설정되지 않았습니다. 설정에서 지정하세요",
+        "noFilesToExport": "내보낼 파일이 선택되지 않았습니다"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "{{count}}개 파일을 내보냈습니다",
+        "exportedWithFailures": "내보내기 일부 완료: 성공 {{success}}개, 실패 {{failed}}개",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] 파일 내보내기 실패:"
       },
       "validation": {
         "operationsRequired": "",

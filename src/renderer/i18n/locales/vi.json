@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "Xuất",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "Chuyển giao thất bại",
     "transferSuccess": "Chuyển giao thành công",
     "transferUnsupported": "Chuyển giao giữa các hồ sơ không được hỗ trợ trong môi trường này",
-    "batchExportFailed": "",
+    "batchExportFailed": "Xuất hàng loạt thất bại",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "Xuất thất bại",
+    "exportUnsupported": "Môi trường này không hỗ trợ xuất",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "Chưa cấu hình thư mục xuất mặc định. Hãy cấu hình trong phần Cài đặt",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2583,10 +2583,10 @@
       "categorize": "",
       "clearSelection": "",
       "delete": "",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "Xuất",
+      "exportSelectDir": "Xuất sang thư mục đã chọn",
+      "exportToDefault": "Xuất về mặc định",
+      "exportToDefaultHint": "Xuất một chạm về thư mục mặc định (tự đổi tên theo quy tắc đặt tên)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "Mảng đường dẫn không được trống",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "Xuất"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "Chưa cấu hình thư mục xuất mặc định. Hãy cấu hình trong phần Cài đặt",
+        "noFilesToExport": "Chưa chọn tệp để xuất"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "Đã xuất {{count}} tệp",
+        "exportedWithFailures": "Đã xuất một phần: thành công {{success}}, thất bại {{failed}}",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] Không thể xuất một tệp:"
       },
       "validation": {
         "operationsRequired": "",

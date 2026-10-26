@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "Exportar",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "Transferencia fallida",
     "transferSuccess": "Transferencia exitosa",
     "transferUnsupported": "La transferencia entre perfiles no es compatible en este entorno",
-    "batchExportFailed": "",
+    "batchExportFailed": "Error al exportar en lote",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "Error al exportar",
+    "exportUnsupported": "La exportación no es compatible con este entorno",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "No hay carpeta de exportación predeterminada. Configúrela primero en Ajustes",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2583,10 +2583,10 @@
       "categorize": "",
       "clearSelection": "",
       "delete": "",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "Exportar",
+      "exportSelectDir": "Exportar a una carpeta elegida",
+      "exportToDefault": "Exportar a la predeterminada",
+      "exportToDefaultHint": "Exportar con un clic a la carpeta predeterminada (renombrado automático según la regla de nombres)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "La matriz de rutas no puede estar vacía",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "Exportar"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "No hay carpeta de exportación predeterminada. Configúrela primero en Ajustes",
+        "noFilesToExport": "No se han seleccionado archivos para exportar"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "{{count}} archivos exportados",
+        "exportedWithFailures": "Exportación parcial: {{success}} correctos, {{failed}} fallidos",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] Error al exportar un archivo:"
       },
       "validation": {
         "operationsRequired": "",

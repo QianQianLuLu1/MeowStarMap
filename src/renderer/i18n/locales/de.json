@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "Exportieren",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "Transfer fehlgeschlagen",
     "transferSuccess": "Transfer erfolgreich",
     "transferUnsupported": "Profilübergreifender Transfer wird in dieser Umgebung nicht unterstützt",
-    "batchExportFailed": "",
+    "batchExportFailed": "Massenexport fehlgeschlagen",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "Export fehlgeschlagen",
+    "exportUnsupported": "Export wird in dieser Umgebung nicht unterstützt",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "Kein Standard-Exportordner festgelegt. Bitte zuerst in den Einstellungen festlegen",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2583,10 +2583,10 @@
       "categorize": "",
       "clearSelection": "",
       "delete": "",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "Exportieren",
+      "exportSelectDir": "In ausgewählten Ordner exportieren",
+      "exportToDefault": "In Standardordner exportieren",
+      "exportToDefaultHint": "Per Klick in den Standardordner exportieren (automatisch umbenannt nach Namensregel)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "Das Pfadarray darf nicht leer sein",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "Exportieren"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "Kein Standard-Exportordner festgelegt. Bitte zuerst in den Einstellungen festlegen",
+        "noFilesToExport": "Keine Dateien zum Exportieren ausgewählt"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "{{count}} Dateien exportiert",
+        "exportedWithFailures": "Export mit Fehlern abgeschlossen: {{success}} erfolgreich, {{failed}} fehlgeschlagen",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] Export einer Datei fehlgeschlagen:"
       },
       "validation": {
         "operationsRequired": "",

@@ -3060,7 +3060,8 @@
         "invalidName": "文件名无效",
         "fileTooLarge": "文件大小 {{size}} 超过限制 {{limit}} 字节",
         "noOutputDir": "未选择输出目录",
-        "noDefaultExportDir": "未配置默认导出路径，请先在设置中配置"
+        "noDefaultExportDir": "未配置默认导出路径，请先在设置中配置",
+        "noFilesToExport": "未选择要导出的文件"
       },
       "message": {
         "movedToRecycleBin": "已将 {{count}} 个文件移至回收站",
@@ -3071,6 +3072,7 @@
         "batchRenameAllSuccess": "成功重命名 {{count}} 个文件",
         "batchRenamePartial": "成功 {{success}} 个，失败 {{failed}} 个",
         "exported": "已导出 {{count}} 个文件",
+        "exportedWithFailures": "部分导出完成：成功 {{success}} 个，失败 {{failed}} 个",
         "saveAsSuccess": "另存为成功",
         "saveAsFailed": "另存为失败: {{error}}",
         "deletePermanentPartial": "部分删除失败（成功 {{success}}/{{total}}）: {{failed}}",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "[Exif] 读取失败:",
         "dbSyncFailed": "[File] DB 同步失败，尝试反向回滚磁盘:",
         "pendingRenamesRecordFailed": "[File] 写入 pending_renames 补偿表失败:",
-        "exportMetadataFallback": "[file:export] 查询元数据失败，回退到无变量命名:"
+        "exportMetadataFallback": "[file:export] 查询元数据失败，回退到无变量命名:",
+        "exportItemFailed": "[File] 导出单个文件失败:"
       },
       "validation": {
         "operationsRequired": "操作列表为空",

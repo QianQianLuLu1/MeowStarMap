@@ -963,7 +963,7 @@
       "delete": "",
       "deletePermanent": "",
       "edit": "",
-      "export": "",
+      "export": "ส่งออก",
       "favorite": "",
       "moveTo": "",
       "open": "",
@@ -1889,7 +1889,7 @@
     "transferFailed": "การถ่ายโอนล้มเหลว",
     "transferSuccess": "การถ่ายโอนสำเร็จ",
     "transferUnsupported": "การถ่ายโอนระหว่างโปรไฟล์ไม่ได้รับการสนับสนุนในสภาพแวดล้อมนี้",
-    "batchExportFailed": "",
+    "batchExportFailed": "ส่งออกเป็นชุดไม่สำเร็จ",
     "batchMoveFailed": "",
     "batchRenameFailed": "",
     "batchRenameUnsupported": "",
@@ -1902,8 +1902,8 @@
     "deleteFailed": "",
     "deleteFileTitle": "",
     "deleteUnsupported": "",
-    "exportFailed": "",
-    "exportUnsupported": "",
+    "exportFailed": "ส่งออกไม่สำเร็จ",
+    "exportUnsupported": "ไม่รองรับการส่งออกในสภาพแวดล้อมนี้",
     "favorite": "",
     "favoriteFailed": "",
     "fileProperties": {
@@ -1919,7 +1919,7 @@
     "moveToRecycleConfirm": "",
     "moveUnsupported": "",
     "noCancellableTask": "",
-    "noDefaultExportDir": "",
+    "noDefaultExportDir": "ยังไม่ได้กำหนดโฟลเดอร์ส่งออกเริ่มต้น กรุณากำหนดในการตั้งค่า",
     "noWatermarkSelection": "",
     "permanentDeleteConfirm": "",
     "permanentDeleteTitle": "",
@@ -2583,10 +2583,10 @@
       "categorize": "",
       "clearSelection": "",
       "delete": "",
-      "export": "",
-      "exportSelectDir": "",
-      "exportToDefault": "",
-      "exportToDefaultHint": "",
+      "export": "ส่งออก",
+      "exportSelectDir": "ส่งออกไปยังโฟลเดอร์ที่เลือก",
+      "exportToDefault": "ส่งออกไปยังค่าเริ่มต้น",
+      "exportToDefaultHint": "ส่งออกด้วยคลิกเดียวไปยังโฟลเดอร์เริ่มต้น (เปลี่ยนชื่ออัตโนมัติตามกฎการตั้งชื่อ)",
       "invertSelection": "",
       "move": "",
       "rename": "",
@@ -2931,7 +2931,7 @@
     "validator": {
       "pathRequired": "",
       "pathMaxLength": "",
-      "pathArrayRequired": "",
+      "pathArrayRequired": "อาร์เรย์ของพาธต้องไม่ว่าง",
       "pathArrayMaxLength": "",
       "mediaIdPositive": "",
       "mediaIdsRequired": "",
@@ -3047,7 +3047,7 @@
         "copy": "",
         "move": "",
         "rename": "",
-        "export": ""
+        "export": "ส่งออก"
       },
       "error": {
         "busy": "",
@@ -3060,7 +3060,8 @@
         "invalidName": "",
         "fileTooLarge": "",
         "noOutputDir": "",
-        "noDefaultExportDir": ""
+        "noDefaultExportDir": "ยังไม่ได้กำหนดโฟลเดอร์ส่งออกเริ่มต้น กรุณากำหนดในการตั้งค่า",
+        "noFilesToExport": "ยังไม่ได้เลือกไฟล์สำหรับส่งออก"
       },
       "message": {
         "movedToRecycleBin": "",
@@ -3070,7 +3071,8 @@
         "renameSuccess": "",
         "batchRenameAllSuccess": "",
         "batchRenamePartial": "",
-        "exported": "",
+        "exported": "ส่งออกไฟล์แล้ว {{count}} ไฟล์",
+        "exportedWithFailures": "ส่งออกบางส่วนสำเร็จ: สำเร็จ {{success}} รายการ, ล้มเหลว {{failed}} รายการ",
         "saveAsSuccess": "",
         "saveAsFailed": "",
         "deletePermanentPartial": "",
@@ -3088,7 +3090,8 @@
         "exifReadFailed": "",
         "dbSyncFailed": "",
         "pendingRenamesRecordFailed": "",
-        "exportMetadataFallback": ""
+        "exportMetadataFallback": "",
+        "exportItemFailed": "[File] ส่งออกไฟล์ไม่สำเร็จ:"
       },
       "validation": {
         "operationsRequired": "",

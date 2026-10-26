@@ -48,7 +48,10 @@ i18n.init({
   interpolation: {
     escapeValue: false
   },
-  returnNull: false
+  returnNull: false,
+  // 与渲染层同口径（见 src/renderer/i18n/index.ts）：空串按未译处理、回退 zh-CN，
+  // 否则主进程组装的导出结果/校验失败文案在非中文界面是空字符串，用户收不到任何提示
+  returnEmptyString: false
 })
 
 /**
