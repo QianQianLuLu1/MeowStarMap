@@ -1,6 +1,6 @@
-// @core-change: nikkisync:inspect-extra-directory 补路径白名单守卫——渲染层给的绝对路径此前
-//               未登记即可直交上游枚举并可被提升为扫描根，违反硬规则「涉路径通道必须按读写语义
-//               校验」；判据复用 scanner/settings 的 userPickedDir 短路 + assertFileReadPath。
+// @core-change: 订正上一提交（f4823f5，inspect 路径白名单守卫）遗留的 get-pairing-code 头注释
+//               括号笔误——一句里两个闭括号、TTL 与单次消费被挤到括号外，易误读成格式说明。
+//               纯注释改动、零行为变更；守卫本体与其判据见该提交与 docs/IPC_CONTRACT.md §8.2.3。
 //               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断、K5 多 host、K6 五条目录、
 //               K7 诊断、K8 整理队列三通道——历次授权原因见各节点提交。）
 import { ipcMain } from 'electron'
@@ -40,7 +40,7 @@ import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-a
  * - `nikkisync:server-status`：运行状态 + 端口 + TLS 指纹 + 已配对数；未装配 ⇒ `available:false`
  * - `nikkisync:start-server` / `nikkisync:stop-server`：启停（端口/mdns 变更由状态机重建会话）
  * - `nikkisync:get-pairing-code`：一次性配对二维码内容（单 host = NS1 七段；注入多 host =
- *   `nikki-sync://pair?` 新格式并回填 `hosts`，K5）TTL 5 分钟、单次消费）
+ *   `nikki-sync://pair?` 新格式并回填 `hosts`，K5），TTL 5 分钟、单次消费
  * - `nikkisync:get-paired-devices` / `nikkisync:revoke-device`：设备管理（读/软删 NikkiSync 的 paired_devices）
  *
  * 铁律：本文件**不做数据格式转换**，资产响应体逐字来自上游 `SyncReadRepository` +
