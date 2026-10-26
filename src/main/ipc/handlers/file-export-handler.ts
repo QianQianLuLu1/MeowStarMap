@@ -1,3 +1,4 @@
+// @core-change: 导出/另存为源图读校验口径统一到媒体授权，修复已入库媒体「看得见导不出」
 /**
  * 文件操作域 IPC handler：导出 / 另存为
  *
@@ -6,14 +7,17 @@
  *
  * 安全基线（与文件操作域一致）：
  * - 所有路径参数由 zod schema 校验长度/格式
- * - 所有文件操作调用 assertFileReadPath/assertFileWritePath 完成白名单拦截
+ * - 源文件读取走 assertMediaAccessPath 三级校验（userPicked → 已入库媒体白名单 →
+ *   PathGuard 兜底），与 media:// 展示、file:delete、editor:batchExportWithMetadata 同口径；
+ *   目标目录写入仍走 assertFileWritePath（严格白名单，未放宽）
  * - 写操作额外校验目标目录可写
  */
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { ExportOptions } from '../../types/file'
-import { wrapHandler, schemas, assertFileReadPath, assertFileWritePath } from '../validator'
+import { wrapHandler, schemas, assertFileWritePath } from '../validator'
+import { assertMediaAccessPath } from '../media-read-guard'
 import { AppError } from '../../../shared/errors/app-error'
 import { chunkArray } from '../../database/sql-chunk'
 // 日志管理
@@ -39,7 +43,10 @@ export function registerFileExportHandlers(ctx: HandlerContext): void {
           .optional()
       ]),
       async ([filePaths, targetDir, options]) => {
-        for (const p of filePaths) assertFileReadPath(p)
+        // 源图是图库里已入库、media:// 能正常展示的媒体；裸 PathGuard 会因敏感目录黑名单
+        // （官方启动器默认装在 Program Files）或目录未登记为根而恒拒，且本校验先于目标目录
+        // 写校验执行，表现为「导出到默认」与「选目录导出」同时失败。口径见文件头安全基线。
+        for (const p of filePaths) assertMediaAccessPath(ctx, p)
         assertFileWritePath(targetDir)
 
         // P1-02：useDefaultDir=true 时从 settings 读取默认导出路径
@@ -106,7 +113,8 @@ export function registerFileExportHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([schemas.filePath, schemas.filePath, schemas.shortString(255).optional()]),
       async ([filePath, targetDir, newName]) => {
-        assertFileReadPath(filePath)
+        // 源图读校验与 file:export 同口径（三级校验，见文件头安全基线）
+        assertMediaAccessPath(ctx, filePath)
         assertFileWritePath(targetDir)
         return ctx.fileService.saveAs(filePath, targetDir, newName)
       }

@@ -685,3 +685,33 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   调用方（设置→日志与诊断的 GPU 状态卡、启动日志摘要）对 null 一律显示「不可用」。
 - **消费方**：`src/renderer/pages/settings/diagnostics-sections.tsx`（GPU 状态卡）、
   `src/main/app/window-manager.ts`（did-finish-load 后记一行摘要日志）。
+
+## 13. 文件导出域与同族写通道（2026-10-26 导出修复补录）
+
+- 本轮**未新增/改名任何通道，未改任何入参 schema 与返回形状**（`file:export` / `file:saveAs` /
+  `file:copy` / `file:move` / `file:rename` / `file:batchRename` 的参数与 `IpcResponse` 结构不变），
+  仅订正源路径的前置校验口径与默认导出目录的白名单恢复，故按契约同步义务在此登记。
+- **源图读校验统一到 `assertMediaAccessPath`**（`src/main/ipc/media-read-guard.ts`，三级：
+  `pathGuard.isUserPicked` → `isMediaPathAllowed`（DB 已索引 `file_path` / 已索引 `source_path`
+  下媒体扩展名 / 原生缩略图）→ `assertFileReadPath` 兜底）。落点：
+  `file-export-handler.ts` 的 `file:export` / `file:saveAs`、`file.ts` 的 `file:copy`、
+  `file-rename-handler.ts` 的 `file:move` / `file:rename` / `file:batchRename`。
+  原先这些通道对**源文件**用裸 `assertFileReadPath`，而该校验在目标目录写校验**之前**执行，
+  于是「导出到默认目录」与「选择目录导出」以同一个 `IPC_PATH_FORBIDDEN` 失败；已入库媒体并不
+  必然命中 PathGuard——官方启动器默认装在 `C:\Program Files\InfinityNikki Launcher\...`，
+  命中 `isSensitivePath` 黑名单，而 `isAllowed` 的判定顺序是「黑名单先于 roots」，登记扫描根
+  也不放行，表现为图库里（`media://`）看得见、导不出。与 §11 的 `PathGuard` win32 归一是两个
+  独立缺陷，本轮不动那部分。
+- **放宽面有界**：只放行「DB 已索引媒体 ∪ 用户经系统对话框显式选过的路径」，其余未入库路径
+  仍由 `assertFileReadPath` 判 `IPC_PATH_FORBIDDEN`、`details.path` 仍经 `maskPath` 脱敏。
+  由 `file-export-handler.test.ts` 的 E3 / X1 与 `file.test.ts` 的 D6 钉住；目标目录写校验
+  一律保持 `assertFileWritePath` 不变。刻意**不用** `assertMediaReadPath`：它保留
+  `isSensitivePath` 前置闸门与 realpath 复检，对 Program Files 安装形态仍会回落拒绝。
+- **`export.defaultDir` 进入 pathGuard 恢复源**：`refreshPathGuardRoots`
+  （`src/main/app/media-update.ts`）在既有三类（`media_files.source_path` /
+  `app_settings.customScanPaths` / `import_roots`）之外新增第 4 类 `app_settings.export.defaultDir`
+  （仅非空字符串才登记）。`roots` 与 `userPicked` 都是进程内存态、重启即空，而导出时的默认目录
+  是从设置读出的字符串、不再经过对话框，缺了恢复源就无人把它装回白名单——默认目录不在用户
+  主目录/扫描根下（如 `D:\导出`）时，重启后 `file:export` 的目标写校验必然 `IPC_PATH_FORBIDDEN`。
+  不构成自助扩权：写入端 `export:setDefaultDir` 必须先过 `assertFileWritePath`，而
+  `assertAllowed` 的 `op` 只影响文案、读写共用同一 `isAllowed` 判定集，故登记后判定范围不变。

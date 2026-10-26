@@ -1,16 +1,22 @@
+// @core-change: 复制到目标目录的源图读校验并入媒体授权三级口径，与导出/删除对齐
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { ExifData } from '../../types/file'
-import { wrapHandler, schemas, assertFileReadPath, assertFileWritePath } from '../validator'
-import { assertMediaReadPath, assertMediaDeletePath } from '../media-read-guard'
+import { wrapHandler, schemas, assertFileWritePath } from '../validator'
+import {
+  assertMediaReadPath,
+  assertMediaAccessPath,
+  assertMediaDeletePath
+} from '../media-read-guard'
 
 /**
  * 文件操作域 IPC handler：删除 / 复制 / 永久删除 / EXIF
  *
  * 安全基线：
  * - 所有路径参数由 zod schema 校验长度/格式
- * - 所有文件操作调用 assertFileReadPath/assertFileWritePath 完成白名单拦截
+ * - 源文件读取走媒体授权校验（删除/复制用 assertMediaAccessPath 三级校验，
+ *   EXIF 用 assertMediaReadPath 双层校验），目标目录写入用 assertFileWritePath
  * - 写操作（copy）额外校验目标目录可写
  *
  * copy 不主动入库（新文件由扫描器扫到时入库，强行插入会写出缺字段的脏记录）。
@@ -37,7 +43,9 @@ export function registerFileHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([schemas.filePathArrayBulk, schemas.filePath]),
       async ([sourcePaths, targetDir]) => {
-        for (const p of sourcePaths) assertFileReadPath(p)
+        // 复制通道三级校验：userPicked → 已入库媒体白名单 → PathGuard 兜底
+        // （与 file:export / file:delete 同口径，避免「导出可用、复制到 403」的同菜单不一致）
+        for (const p of sourcePaths) assertMediaAccessPath(ctx, p)
         assertFileWritePath(targetDir)
         return ctx.fileService.copyFiles(sourcePaths, targetDir)
       }

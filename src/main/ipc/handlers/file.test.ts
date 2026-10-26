@@ -219,6 +219,8 @@ describe('file:delete / file:deletePermanent 删除白名单对齐（assertMedia
     fileService.deletePermanent
       .mockReset()
       .mockImplementation((ps: string[]) => Promise.resolve({ deleted: ps.length, failed: [] }))
+    // D5/D6 需要断言 copyFiles 是否被调用，必须逐例复位（否则读到上一例的调用记录）
+    fileService.copyFiles.mockReset()
     pathGuard.register(ROOT)
     registerFileHandlers(makeCtx())
   })
@@ -263,8 +265,26 @@ describe('file:delete / file:deletePermanent 删除白名单对齐（assertMedia
     expect(dialog.showMessageBox).not.toHaveBeenCalled()
   })
 
-  it('D5 file:copy 源路径不接入删除守卫（通道口径不变）', async () => {
+  /**
+   * D5 口径变更（2026-10-26 导出修复）：原用例钉的是「file:copy 不接入媒体守卫」，
+   * 作用是上一轮删除通道迁移时证明改动没有外溢到 copy。本轮按报障把「复制到 / 导出 /
+   * 移动 / 重命名」的源路径统一到与删除、media:// 展示相同的三级授权口径
+   * （此前导出已修好、复制到仍 403，同一右键菜单出现可见不一致），该围栏的前提随之作废。
+   * 放宽面并未失控：未入库且未 userPicked 的路径仍被拒绝，见下方 D6 与
+   * file-export-handler.test.ts 的 E3 / X1。
+   */
+  it('D5 file:copy 源为已入库媒体（敏感目录形态）时复制成功', async () => {
     isMediaPathAllowedMock.mockReturnValue(true)
+    const steamPhoto =
+      'C:\\Program Files (x86)\\Steam\\steamapps\\common\\InfinityNikki\\X6Game\\ScreenShot\\003.jpg'
+
+    const res = (await getHandler('file:copy')({}, [steamPhoto], ROOT)) as IpcResponseLike
+    expect(res.success).toBe(true)
+    expect(fileService.copyFiles).toHaveBeenCalledWith([steamPhoto], ROOT)
+  })
+
+  it('D6 file:copy 未入库且未授权源仍被 PATH_FORBIDDEN 拦截（放宽面边界不降）', async () => {
+    isMediaPathAllowedMock.mockReturnValue(false)
 
     const res = (await getHandler('file:copy')({}, ['Q:\\nowhere\\a.jpg'], ROOT)) as IpcResponseLike
     expect(res.success).toBe(false)

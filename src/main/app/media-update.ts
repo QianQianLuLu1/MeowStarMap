@@ -17,9 +17,18 @@ const MEDIA_UPDATE_THROTTLE_MS = 100
  * 2. app_settings.customScanPaths（用户配置的自定义扫描路径，即便尚未扫描也允许读写）
  * 3. import_roots（导入向导复制的目标目录；扫描 worker 写入 source_path 前的时间窗内，
  *    若不放行，media:// 协议会拒绝读取导入目录，缩略图加载失败导致图库卡片"看似空"）
+ * 4. app_settings.export.defaultDir（默认导出目录；见下方"为什么必须恢复它"）
  *
  * 调用时机：启动初始化 + 每次 notifyMediaUpdated（媒体变更收口点）。
  * 幂等：pathGuard.register 内部用 Set 去重，重复注册无副作用。
+ *
+ * 为什么必须恢复 export.defaultDir：pathGuard 的 roots 与 userPicked 都是**进程内存态**，
+ * 重启即空。用户经设置页挑目录时，dialog:selectDirectory 会把当次选中的路径登记进 roots，
+ * 所以"刚配好就能用"；但导出时默认目录是从设置里读出来的字符串、不再经过对话框，
+ * 缺了恢复源就无人把它装回白名单——默认目录不在用户主目录/扫描根下（如 D:\导出）时，
+ * file:export 的目标写校验在重启后必然 IPC_PATH_FORBIDDEN，表现为"导出到默认目录失败"。
+ * 注意不能改用 pathGuard.isUserPickedDir 判定：userPicked 同样是内存态，重启后恒不命中，
+ * 那样等于没修。
  *
  * 信任前提（改动前务必先看）：本函数是白名单的**恢复**机制，重启后 roots 为空，
  * 全靠这些数据源把非主目录盘的媒体根重新装回去，因此这里不能再用 isAllowed 过滤
@@ -28,7 +37,15 @@ const MEDIA_UPDATE_THROTTLE_MS = 100
  * - media_files.source_path ← scanner:start（assertScanPathsAllowed）/ 主进程启动扫描
  * - app_settings.customScanPaths ← settings:set（assertCustomScanPaths）
  * - import_roots ← import:run（assertFileReadPath / assertFileWritePath 校验 targetBaseDir）
+ * - app_settings.export.defaultDir ← export:setDefaultDir（assertFileWritePath 校验 dir，
+ *   见 ipc/handlers/export-pref-handler.ts；空串=清空，不登记）
  * 新增写入口时同样要先校验，否则等于绕过 pathGuard 自助扩权。
+ *
+ * 不构成扩权的理由：PathGuard.assertAllowed 的 op 参数只影响错误文案，读写共用同一个
+ * isAllowed 判定集，故"写入时已被允许"的目录登记为根后判定范围不变。敏感目录无需在此
+ * 二次过滤——isAllowed 的黑名单判定先于 roots 匹配，登记了也恒不放行。
+ * 已知取舍：若默认目录当初是靠某个扫描根才通过校验、之后该根被删除，重启后仍会把它
+ * 装回白名单，留下一个 DB 不再引用的可写目录。它是用户显式选定的导出目的地，代价可接受。
  */
 export function refreshPathGuardRoots(ctx: AppContext): void {
   const db = ctx.dbManager.getDatabase()
@@ -63,6 +80,16 @@ export function refreshPathGuardRoots(ctx: AppContext): void {
     roots.push(...importRoots)
   } catch {
     // import_roots 表缺失或读取失败时静默，与上方数据源容错一致
+  }
+
+  // 4. 默认导出目录：导出时从设置读取、不经对话框，必须在此装回白名单（详见函数头注释）
+  try {
+    const defaultExportDir = ctx.dbManager.getSetting<string>('export.defaultDir', '')
+    if (typeof defaultExportDir === 'string' && defaultExportDir.length > 0) {
+      roots.push(defaultExportDir)
+    }
+  } catch {
+    // 设置读取失败忽略，其余数据源照常注册
   }
 
   pathGuard.registerRoots(roots)

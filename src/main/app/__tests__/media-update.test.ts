@@ -230,10 +230,59 @@ describe('refreshPathGuardRoots', () => {
     const allMock = vi.fn(() => [{ source_path: 'H:\\Photos' }])
     const db = { prepare: vi.fn(() => ({ all: allMock })) }
     const ctx = makeAppCtx({ db })
-    ctx.dbManager.getSetting.mockReturnValue('not-an-array')
+    // key-aware 夹具：本用例只断言 customScanPaths 的非数组容错，
+    // export.defaultDir 必须另给合法值，否则会被当成默认导出根混进结果数组
+    ctx.dbManager.getSetting.mockImplementation((key: string) =>
+      key === 'customScanPaths' ? 'not-an-array' : ''
+    )
 
     refreshPathGuardRoots(ctx)
 
+    expect(registerRootsMock).toHaveBeenCalledWith(['H:\\Photos'])
+  })
+
+  /**
+   * 缺陷（用户报障「导出到默认目录失败」的主因之一）：export.defaultDir 只在
+   * export:setDefaultDir 写入时经 assertFileWritePath 校验，重启后既不在
+   * media_files.source_path / customScanPaths / import_roots 任一恢复源里，也不落
+   * pathGuard（userPicked 是内存态），于是默认目录位于非家盘（如 D:\导出）时
+   * file:export 的目标写校验必然 IPC_PATH_FORBIDDEN。
+   */
+  it('6. export.defaultDir 为非空字符串时注册为恢复根（修复前红）', () => {
+    const allMock = vi.fn(() => [{ source_path: 'H:\\Photos' }])
+    const db = { prepare: vi.fn(() => ({ all: allMock })) }
+    const ctx = makeAppCtx({ db })
+    ctx.dbManager.getSetting.mockImplementation((key: string) =>
+      key === 'customScanPaths' ? [] : key === 'export.defaultDir' ? 'D:\\导出' : ''
+    )
+
+    refreshPathGuardRoots(ctx)
+
+    expect(registerRootsMock).toHaveBeenCalledWith(['H:\\Photos', 'D:\\导出'])
+  })
+
+  it('7. export.defaultDir 为空串（用户已清空）时不注册空根', () => {
+    const allMock = vi.fn(() => [{ source_path: 'H:\\Photos' }])
+    const db = { prepare: vi.fn(() => ({ all: allMock })) }
+    const ctx = makeAppCtx({ db })
+    ctx.dbManager.getSetting.mockImplementation((key: string) =>
+      key === 'customScanPaths' ? [] : key === 'export.defaultDir' ? '' : ''
+    )
+
+    refreshPathGuardRoots(ctx)
+
+    expect(registerRootsMock).toHaveBeenCalledWith(['H:\\Photos'])
+  })
+
+  it('8. export.defaultDir 为脏数据（非字符串）时跳过且不抛错', () => {
+    const allMock = vi.fn(() => [{ source_path: 'H:\\Photos' }])
+    const db = { prepare: vi.fn(() => ({ all: allMock })) }
+    const ctx = makeAppCtx({ db })
+    ctx.dbManager.getSetting.mockImplementation((key: string) =>
+      key === 'export.defaultDir' ? { bad: true } : []
+    )
+
+    expect(() => refreshPathGuardRoots(ctx)).not.toThrow()
     expect(registerRootsMock).toHaveBeenCalledWith(['H:\\Photos'])
   })
 })

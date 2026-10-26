@@ -1,4 +1,4 @@
-// @core-change: sync-integration 阶段4：rename/move 写路径接线同步变更日志（ctx.syncEvents → journal + WS 广播）
+// @core-change: 移动/重命名源路径读校验并入媒体授权三级口径，与导出/删除对齐（替换阶段4原因串）
 /**
  * 文件操作域 IPC handler：重命名 / 移动
  *
@@ -11,7 +11,8 @@ import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type Database from 'better-sqlite3'
 import type { HandlerContext } from '../handler-context'
-import { wrapHandler, schemas, assertFileReadPath, assertFileWritePath } from '../validator'
+import { wrapHandler, schemas, assertFileWritePath } from '../validator'
+import { assertMediaAccessPath } from '../media-read-guard'
 import { moveFile } from '../../utils/file-utils'
 // 日志管理
 import { logger } from '../../utils/logger'
@@ -96,7 +97,8 @@ async function syncMediaFilesAfterRename(
 /**
  * 重命名/移动域安全基线（与文件操作域一致）：
  * - 所有路径参数由 zod schema 校验长度/格式
- * - 所有文件操作调用 assertFileReadPath 完成白名单拦截
+ * - 源路径读取走 assertMediaAccessPath 三级校验（userPicked → 已入库媒体白名单 →
+ *   PathGuard 兜底），与 file:export / file:delete 同口径；目标目录写入用 assertFileWritePath
  *
  * R3：rename/move/batchRename 在文件操作成功后调用 syncMediaFilesAfterRename 同步 DB。
  */
@@ -116,7 +118,7 @@ export function registerFileRenameHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([schemas.filePathArrayBulk, schemas.filePath]),
       async ([sourcePaths, targetDir]) => {
-        for (const p of sourcePaths) assertFileReadPath(p)
+        for (const p of sourcePaths) assertMediaAccessPath(ctx, p)
         assertFileWritePath(targetDir)
         const result = await ctx.fileService.moveFiles(sourcePaths, targetDir)
         // FIX(组14-1): 部分失败时也要同步已成功移动的项（service 会随失败结果回传
@@ -141,7 +143,7 @@ export function registerFileRenameHandlers(ctx: HandlerContext): void {
       ctx,
       z.tuple([schemas.filePath, schemas.shortString(255)]),
       async ([oldPath, newName]) => {
-        assertFileReadPath(oldPath)
+        assertMediaAccessPath(ctx, oldPath)
         const result = await ctx.fileService.renameFile(oldPath, newName)
         // 仅在文件操作成功且有 renamed mapping 时同步 DB
         if (result.success && result.renamed && result.renamed.length > 0) {
@@ -169,7 +171,7 @@ export function registerFileRenameHandlers(ctx: HandlerContext): void {
       ]),
       async ([operations]) => {
         for (const op of operations) {
-          assertFileReadPath(op.oldPath)
+          assertMediaAccessPath(ctx, op.oldPath)
         }
         const result = await ctx.fileService.batchRename(operations)
         if (result.renamed.length > 0) {
