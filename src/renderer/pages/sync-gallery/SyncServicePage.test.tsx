@@ -470,8 +470,11 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
       }
     })
     renderSection()
-    await waitFor(() => expect(serverApi.getRuntimeStatus).toHaveBeenCalled())
-    expect(screen.getByText('启动阶段')).toBeInTheDocument()
+    // 等「渲染出结果」而不是「发起了调用」：refresh() 把三个通道放进同一个 Promise.all，
+    // setStartupStages 落在其后的微任务里。只 waitFor 调用发生就断言文本，在全量套件的
+    // CPU 争用下会随机读到尚未提交的渲染（本行在 npm test 中间歇性红，2026-10-26 实测
+    // 两轮一次红），同文件 (s2)/(x2) 都是按落地结果等待的口径。
+    await waitFor(() => expect(screen.getByText('启动阶段')).toBeInTheDocument())
     expect(screen.getByText('扫描器')).toBeInTheDocument()
     expect(screen.getByText('运行时就绪')).toBeInTheDocument()
     expect(screen.getByText('局域网监听')).toBeInTheDocument()
