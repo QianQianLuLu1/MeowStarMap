@@ -61,6 +61,14 @@
 - **桩改造的取舍**：保留该测试文件对 `../validator` 的**真实**引用，不采用 scanner/settings 的 `vi.mock('../validator')` 路线——`tests/mocks/mock-validator.ts` 的 `wrapHandlerRaw` 以 `unwrap(args)` 位置传参，而本文件按 `handler(event, { path })` 调用、handler 读 `args[0]`，换 mock 会让全部 raw 用例静默拿到 event 对象并绕过 zod，把既有 `VALIDATION_ERROR` 断言整体打死。登记用 `pathGuard.registerUserPickedDir(...)` 且在具体用例内调用（singleton 跨用例污染），守卫用例刻意使用与已登记路径不同的盘符路径。`src/main/ipc/validator.ts` 已固化 `path.win32`，故 `D:\…` 形态在 ubuntu runner 上判定一致。
 - **契约同步（第 6 项，同批）**：`docs/IPC_CONTRACT.md` 补 `get-pairing-code` 出参的 `hosts?` 与 `content` 的 `NS1|` / `nikki-sync://pair?` 双格式（K5 `476182b` 引入而未同步文档），`inspect` 通道入参加「须是已登记目录」、失败码加 `PATH_FORBIDDEN` 并补一条契约要点；映射表计数「八」订正为「九」（表体实列 9 个短码，逐码映射用例 5+4 与表一致）。同类漂移一并订正：`src/renderer/components/sync/PairingQrDialog.tsx` 与 `.test.tsx` 顶部注释里「NS1 七段串」的单一格式表述。
 
+### Node 5：最终全量回归抓到的 K1 用例断言竞态（原审查未列入，回归中新发现）
+
+- **触发**：出货前的最后一次 `npm test` 报 `1 failed`——`(s) K1：启动阶段行…` 取不到文本「启动阶段」；紧接的第二次全量跑却全绿。即这是一条随时序抖动的测试缺陷，而非本轮改动引入的行为回归。
+- **根因**：该用例只 `await waitFor(() => expect(serverApi.getRuntimeStatus).toHaveBeenCalled())` 就断言渲染结果。`refresh()` 把 `getServerStatus` / `getPairedDevices` / `getRuntimeStatus` 放进同一个 `Promise.all`，`setStartupStages(...)` 落在其后的微任务里——「调用已发起」≠「状态已提交」，全量套件的 CPU 争用把这段窗口拉开就随机读到旧渲染。同文件的 `(s2)`、`(x2)` 本来就是按落地结果等待（先等「运行状态」/「连接诊断」出现），`(s)` 是唯一漏了这一拍的。
+- **涉及文件**：`src/renderer/pages/sync-gallery/SyncServicePage.test.tsx`（仅测试层，`src/renderer/**` 的 `*.test.tsx` 不被应用代码引用，不进 bundle、不进出货产物）。
+- **输入/输出**：把等待换成结果锚定 `await waitFor(() => expect(screen.getByText('启动阶段')).toBeInTheDocument())`，其后六条断言（五个 i18n 阶段名 + 未知阶段回退原样英文串）逐字保留——只收紧时序，不弱化任何判据。
+- **验收标准**：改前实测两轮全量一轮红（`test-final.log` 留 `FAIL … 启动阶段`）；改后单文件 40/40、连续三次 `npm test` 均 6946 通过 / 12 跳过 exit 0。
+
 ## 五、参数校验
 
 本轮唯一新增的入参约束是「已登记目录」这一条，其校验次序为固定契约，不得调换：
@@ -90,9 +98,9 @@
 
 - **Node 1–4 红绿**：逐条先跑出红并留存读数——`(ai)` `Received: aria-checked="true"`；`(aj)` 断言失败 + `Errors 1 error`（悬空 rejection，栈 `handleToggle` → `onChange`）；`(g)` `to be called 2 times, but got 5 times`（只清 state 仍 4 次）；守卫用例 `expected undefined to be 'IPC_PATH_FORBIDDEN'`。修复后各自转绿，未跳过、未放宽任何断言。
 - **`npm run verify`**：`typecheck` / `lint` / `core-gate` / `format` / `test` 五项全 ✓，`总计: 5 项, 0 失败`。受保护路径改动与新授权注释同批，`core-gate` 通过。
-- **全局回归**：`npm test` 444 文件全过、**6946 通过 / 12 跳过**（较基线 6942 净增 4，正是本轮四条新用例；skipped 零增长）；`npm run typecheck` exit 0；`npm run typecheck:e2e` exit 0；`npm run lint` exit 0；`npm run i18n:guard` exit 0（零新增 key）。
+- **全局回归**：`npm test` 444 文件全过、**6946 通过 / 12 跳过**（较基线 6942 净增 4，正是本轮四条新用例；skipped 零增长）；`npm run typecheck` exit 0；`npm run typecheck:e2e` exit 0；`npm run lint` exit 0；`npm run i18n:guard` exit 0（零新增 key）。**出货前的最后一次全量重跑抓到 Node 5 的断言竞态**（`1 failed`，随后一次全绿——随时序抖动），修复后连续三次 `npm test` 均 6946 通过 / 12 跳过 exit 0。
 - **`npm run test:ci-linux`（只读诊断，不进 CI）**：13 文件 / 59 用例红。逐条归因于本机装置的环境缺件而非本轮改动——`scripts/__tests__/check-md-links.test.ts`、`source-encoding.test.ts` 等于 `spawnSync git ENOENT`；三个 `*.linked.test.ts` 与 `media-worker` / `thumbnail` / `scanner` / `sync` 用例于 `unable to open database file`（装置按设计把容器根置为不可写）。本轮改动的三个测试文件**无一出现在失败集合**，且 `nikkisync-handler.test.ts` 在同一装置下 66/66 绿。本机该命令长期为红早有台账（见 `docs/plans/2026-10-23-rename-ui-i18n-pass.md` 记录的 26 文件红集），属已知环境条件，非本轮引入。
-- **提交面**：`package-lock.json` 的 48 行 `libc` 剥离在提交前 `git checkout --` 还原，未进入任何提交；每次提交后 `git status --porcelain` 复核钩子无残留改动。落盘四个提交：`08b171a`（Node 1+2）、`614acdf`（Node 3）、`f4823f5`（Node 4，受保护路径，core-gate 以 1 个受保护文件通过）、`ad65b55`（订正 `f4823f5` 自己在 `nikkisync-handler.ts` 头注释里留下的括号笔误——一句两个闭括号、TTL 与单次消费被挤到括号外；纯注释改动，按约定随批替换授权注释为新原因）。
+- **提交面**：`package-lock.json` 的 48 行 `libc` 剥离在提交前 `git checkout --` 还原，未进入任何提交；每次提交后 `git status --porcelain` 复核钩子无残留改动。已落 `08b171a`（Node 1+2）、`614acdf`（Node 3）、`f4823f5`（Node 4，受保护路径，core-gate 以 1 个受保护文件通过）、`ad65b55`（订正 `f4823f5` 自己在 `nikkisync-handler.ts` 头注释里留下的括号笔误——一句两个闭括号、TTL 与单次消费被挤到括号外；纯注释改动，按约定随批替换授权注释为新原因）、`be6f4b9`（CHANGELOG 补录 + 本计划文档首次入库），Node 5 的测试修复与其文档记录再各落一个提交。
 
 ## 九、重打包实测
 
@@ -116,3 +124,4 @@
 
 1. 打包时 `pre-dist-check` 提示「git 工作区存在未提交改动」——那是本计划文档与 `CHANGELOG.md`（`.md` 不在 `build.files` 内，不参与 asar），仅告警不阻断；这两份文档随本轮最后一次提交入库，故出货产物与最终 HEAD 的差异仅为不随包的分派文档。
 2. 两次构建均未改写 `package-lock.json`（构建链不跑 `npm install`），工作区自始至终只有预期的文档改动。
+3. Node 5 之后**不再重打包**：它只改 `src/renderer/pages/sync-gallery/SyncServicePage.test.tsx`，测试文件不被任何应用入口引用，不进 renderer bundle、不进 asar；`be6f4b9` 与本节两份文档同理（`.md` 不在 `build.files` 内）。故 19:31 的产物与最终 HEAD 之间不存在可出货差异。
