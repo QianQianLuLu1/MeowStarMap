@@ -364,6 +364,58 @@ describe('exportFiles', () => {
     expect(r.success).toBe(true)
     expect(fs.existsSync(path.join(targetDir, 'a_1.jpg'))).toBe(true)
   })
+
+  /**
+   * 回归（用户报障「批量导出到一半就断、文件不全」）：原实现把整个 for 循环包在**单一 try**
+   * 里，第 N 个文件抛错即中断其余文件，且只回一条 formatFileError 泛化消息、不报已成功数量。
+   * 现改为逐文件 try/catch（形态照抄同服务 batchRename 的 renamed/failed）。
+   */
+  it('P1 单个源文件失败时其余文件照常导出，并如实回报成功/失败数', async () => {
+    const good = makeFile('good.jpg', Buffer.from('good-bytes'))
+    const missing = makeFile('missing.jpg', Buffer.from('to-be-removed'))
+    const targetDir = path.join(tmpRoot, 'export-partial')
+    fs.rmSync(missing)
+
+    const r = await service.exportFiles([good, missing], targetDir, { format: 'original' })
+
+    expect(r.success).toBe(false)
+    // 已成功的那张必须真实落盘（原实现在 missing 之前处理 good，但若失败点在第 1 个则全丢）
+    expect(fs.existsSync(path.join(targetDir, 'good.jpg'))).toBe(true)
+    // 计数进消息：不新增返回字段（FileOpResult 形状已被 DEBT-011 冻结），走 i18n 文案
+    expect(r.message).toContain('成功 1 个')
+    expect(r.message).toContain('失败 1 个')
+  })
+
+  it('P2 全部成功时仍回报「已导出 N 个文件」（守住既有文案，防改造回退）', async () => {
+    const a = makeFile('p2a.jpg', Buffer.from('a'))
+    const b = makeFile('p2b.jpg', Buffer.from('b'))
+    const targetDir = path.join(tmpRoot, 'export-all-ok')
+    const r = await service.exportFiles([a, b], targetDir, { format: 'original' })
+    expect(r.success).toBe(true)
+    expect(r.message).toContain('2')
+    expect(fs.existsSync(path.join(targetDir, 'p2a.jpg'))).toBe(true)
+    expect(fs.existsSync(path.join(targetDir, 'p2b.jpg'))).toBe(true)
+  })
+
+  /**
+   * 服务层纵深防御（非本次用户报障成因：当前 UI 只传 {} / {useDefaultDir:true}，
+   * 不会带 format 走这条分支）。原实现把"是否转码"与"目标扩展名"绑在一起，
+   * 于是 .mp4「转 jpg」会产出一个改了名的原始字节文件——扩展名说自己是 jpg，内容不是。
+   */
+  it('P3 非图片源在要求转码格式时保持源扩展名，不产出改了名的原始字节', async () => {
+    const src = makeFile('clip.mp4', Buffer.from('mp4-bytes'))
+    const targetDir = path.join(tmpRoot, 'export-video')
+    const r = await service.exportFiles([src], targetDir, { format: 'jpg' })
+    expect(r.success).toBe(true)
+    expect(fs.existsSync(path.join(targetDir, 'clip.mp4'))).toBe(true)
+    expect(fs.existsSync(path.join(targetDir, 'clip.jpg'))).toBe(false)
+  })
+
+  it('P4 空路径数组不再回报成功（同为服务层纵深防御，IPC 层已被 min(1) 拦下）', async () => {
+    const targetDir = path.join(tmpRoot, 'export-empty')
+    const r = await service.exportFiles([], targetDir, { format: 'original' })
+    expect(r.success).toBe(false)
+  })
 })
 
 // ============================================================

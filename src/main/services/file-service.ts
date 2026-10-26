@@ -1,3 +1,4 @@
+// @core-change: 导出改为逐文件失败收集并如实回报计数，修复批量导出中途断裂
 import fsp from 'fs/promises'
 import path from 'path'
 import { shell, dialog } from 'electron'
@@ -329,6 +330,12 @@ export class FileService {
     // P1-02：每个源文件对应的元数据（用于命名规则变量替换）
     metadataMap?: Map<string, ExportFileMetadata>
   ): Promise<{ success: boolean; message: string }> {
+    // 空集合不等于"导出成功"。IPC 层的 filePathArrayBulk 已用 min(1) 拦住空数组，
+    // 这里补齐同一语义，避免任何新调用方复刻出"报成功但目录里什么都没有"的假象。
+    if (filePaths.length === 0) {
+      return { success: false, message: t('main.file.error.noFilesToExport') }
+    }
+
     try {
       await fsp.mkdir(targetDir, { recursive: true })
 
@@ -339,20 +346,35 @@ export class FileService {
           const stat = await fsp.stat(sourcePath)
           totalSize += stat.size
         } catch {
-          // 源文件 stat 失败时跳过
+          // 源文件 stat 失败时跳过（缺失项会在逐文件导出阶段如实计入失败）
         }
       }
       if (totalSize > 0) await assertDiskSpace(targetDir, totalSize)
+    } catch (error) {
+      // 建目录 / 磁盘空间预估失败 ⇒ 整批无法继续，直接失败
+      return {
+        success: false,
+        message: this.formatFileError(error, t('main.file.action.export'))
+      }
+    }
 
-      const { format = 'original', quality = 90, namingPattern } = options
+    const { format = 'original', quality = 90, namingPattern } = options
 
-      let seq = 0
-      for (const sourcePath of filePaths) {
-        seq++
+    // R4：逐文件独立处理。原实现把整个循环包在单一 try 里，第 N 个文件抛错即中断其余
+    // 文件、且只回一条泛化错误（用户看到的是"批量导出到一半就断、文件还不全"）。
+    // 失败收集形态照抄同服务 batchRename（:311-322）。
+    let seq = 0
+    let exported = 0
+    let failed = 0
+    for (const sourcePath of filePaths) {
+      seq++
+      try {
         const ext = path.extname(sourcePath).toLowerCase()
         const baseName = path.basename(sourcePath, ext)
-        const targetFormat = format === 'original' ? ext.replace('.', '') : format
-        const targetExt = targetFormat === 'jpeg' ? 'jpg' : targetFormat
+        // 转格式只对图片生效。"是否转码"与"目标扩展名"必须解耦：非图片走 copyFile 时
+        // 若仍把扩展名改成 targetExt，就产出了一个扩展名自称 jpg、内容却是原始字节的文件。
+        const convert = isImageExt(ext) && format !== 'original'
+        const targetExt = convert ? (format === 'jpeg' ? 'jpg' : format) : ext.replace('.', '')
 
         // P1-02：若配置了命名规则，解析变量生成新文件名
         let finalBaseName = baseName
@@ -364,7 +386,7 @@ export class FileService {
         // C-3：统一唯一路径生成（取代内联 do-while 冲突自增循环）
         const targetPath = await getUniqueFilePath(targetDir, finalBaseName, `.${targetExt}`)
 
-        if (isImageExt(ext) && format !== 'original') {
+        if (convert) {
           let pipeline = sharp(sourcePath)
           switch (format) {
             case 'jpg':
@@ -382,17 +404,25 @@ export class FileService {
         } else {
           await fsp.copyFile(sourcePath, targetPath)
         }
+        exported++
+      } catch (error) {
+        failed++
+        // 逐条落日志（消息只带文件名，不带完整路径），计数进用户文案
+        logger.warn(`${t('main.file.log.exportItemFailed')} ${path.basename(sourcePath)}`, error)
       }
+    }
 
-      return {
-        success: true,
-        message: t('main.file.message.exported', { count: filePaths.length })
-      }
-    } catch (error) {
+    // 不新增返回字段：FileOpResult 的形状已被 DEBT-011 冻结（shared/types/electron-api.ts
+    // 头注释明令统一前不要动），成功/失败计数走 message 文案。
+    if (failed > 0) {
       return {
         success: false,
-        message: this.formatFileError(error, t('main.file.action.export'))
+        message: t('main.file.message.exportedWithFailures', { success: exported, failed })
       }
+    }
+    return {
+      success: true,
+      message: t('main.file.message.exported', { count: filePaths.length })
     }
   }
 
