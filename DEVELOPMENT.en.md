@@ -822,11 +822,17 @@ release/
 
 ### 7.6 Regenerate the App Icon
 
-If you modify `resources/icons/icon.svg`, regenerate the `.ico`:
+The single source of truth is `resources/icons/icon-master.png` (a 1024×1024 lossless square PNG). Replace it, then regenerate the `.ico`:
 
 ```bash
 node scripts/generate-icon.js
 ```
+
+The generator downsamples the master to 48 / 32 / 16 / 256 independently (each size straight from the master, never via the 256 copy), applies a rounded-square alpha mask with `radius = clamp(round(size × 3/16), 2, size/2)` → 9 / 6 / 3 / 48, and hands the four PNGs to `png-to-ico` **as an array**. The array form is mandatory: the single-argument form makes png-to-ico regenerate the small sizes with its own bicubic, which smears the transparent corners into semi-transparent ones (before this change the 16×16 corner alpha was 6/11/10/15). Output is deterministic — rerunning leaves sha256 unchanged.
+
+The master comes from a 4912×4912 square illustration (a local file, not committed; sha256 `a486a62c2411bfdaaa34e4436afb87b85d1b463ffa6f76687404a31945533132`, 4,244,855 bytes, EXIF Orientation=1), downscaled to 1024×1024 with `sharp` using the lanczos3 kernel.
+
+Judgements are pinned permanently by `scripts/__tests__/app-icon.test.ts` (four-size structure, per-size transparent corners + AND bits, palette, square master, the `build.win` PE resource-editing switch, and the rounded-geometry pure functions).
 
 ### 7.7 Install and Test
 

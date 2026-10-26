@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ## [2.5.5] - 2026-10-23
 
 > 2.5.5 正式版：自 [2.5.5-beta] 定档，去除预发布后缀，**不引入新的功能性变更**。beta 节之后逐轮补录的全部改动（最近一条：2026-10-23「反馈弹窗 QQ 群号占位值更正 + 产物内容禁串闸门」）均已随各轮重新打包出货，本节不重复罗列；四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.5`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.5.exe`。
+>
+> 2026-10-26 追加：**应用图标换为正式插画，并恢复 app exe 的 PE 资源编辑**。此前 `resources/icons/icon.ico` 由一张蓝色圆角方块占位 SVG 生成，且 `build.win.signAndEditExecutable: false` 会让 electron-builder 连资源编辑一起跳过——实测该 `.ico` 的四档负载在安装器里全部命中、在 app exe 里全部缺失，而 NSIS 快捷方式（`$appExe 0`）、`desktop-shortcut.ts`（`icon: exePath`）与主窗口（未设 `icon`，Windows 回退 exe 图标）三处都跟随 exe 图标，故桌面/开始菜单/任务栏一直是 Electron 默认图标。现改为主源 `resources/icons/icon-master.png`（1024×1024 无损方形，源自用户提供的 4912×4912 插画）经圆角方形 alpha 蒙版生成四档图标，开关按官方提示换成 `signExecutable: false`（仍不签名，但图标与 `ProductName`/`FileVersion` 元数据经纯 JS resedit 写入），占位 SVG 退役。新增 `scripts/__tests__/app-icon.test.ts` 常驻守卫（四档结构、逐档四角透明 + AND 位、配色统计、主源方形、开关反向锁、圆角几何纯函数）。顺带闭合 `docs/plans/2026-10-23-rename-packaging-pass.md` 第九节 6 登记的「右键属性仍显示 Electron 默认值」遗留项。计划与实测读数见 `docs/plans/2026-10-26-app-icon-replace-and-repack.md`。
 
 ## [2.5.5-beta] - 2026-10-16
 

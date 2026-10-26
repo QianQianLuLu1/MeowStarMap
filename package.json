@@ -296,7 +296,7 @@
         }
       ],
       "icon": "resources/icons/icon.ico",
-      "signAndEditExecutable": false,
+      "signExecutable": false,
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker"
     },

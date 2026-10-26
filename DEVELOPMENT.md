@@ -819,11 +819,17 @@ release/
 
 ### 7.6 重新生成应用图标
 
-若修改了 `resources/icons/icon.svg`，需重新生成 `.ico`：
+图标的唯一真相源是 `resources/icons/icon-master.png`（1024×1024 无损方形 PNG）。替换它之后重新生成 `.ico`：
 
 ```bash
 node scripts/generate-icon.js
 ```
+
+生成器把主源分别降采样到 48 / 32 / 16 / 256 四档（每档直接从主源出，不经 256 中转），按 `radius = clamp(round(size × 3/16), 2, size/2)` 即 9 / 6 / 3 / 48 做圆角方形 alpha 蒙版，再以数组形式交给 `png-to-ico` 打包。**必须用数组形式**：单参调用会让 png-to-ico 用它自带的 bicubic 二次生成小档，把透明角抹成半透明（改造前 16×16 档四角 alpha = 6/11/10/15 即此成因）。产出确定性，重复运行 sha256 不变。
+
+主源来自一张 4912×4912 的方形插画（本机文件，不入仓；sha256 `a486a62c2411bfdaaa34e4436afb87b85d1b463ffa6f76687404a31945533132`，4,244,855 字节，EXIF Orientation=1），经 `sharp` 以 lanczos3 核降采样为 1024×1024。
+
+判据由 `scripts/__tests__/app-icon.test.ts` 常驻守卫（四档结构、逐档四角透明 + AND 位、配色、主源方形、`build.win` 的 PE 资源编辑开关、圆角几何纯函数）。
 
 ### 7.7 安装与测试
 

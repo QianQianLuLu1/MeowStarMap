@@ -76,7 +76,7 @@
 | `check-md-links.ts`        | `npm run docs:links`                                      | **被跟踪 Markdown 的引用完整性守护**（只读）：抽取 `[x](path)` 与行内反引号路径，按 tracked 集合判定 ok / ignored-local / annotated-gone / upstream-scope / artifact / dead；死引用退出码 1                                                                                                                                       |
 | `verify-nikkisync-link.ts` | `npm run verify:nikkisync`                                | **NikkiSync 依赖与装载面只读诊断**（依赖图是否自包含/`node_modules/@nikkisync/*` 链接/NikkiSync `dist/` 产物/`migrations` 可读/主进程产物未把 ESM 折叠成 `require()`/打包态 unpacked 含 schema），`--json` 可切结构化输出；未链接为 warn 不阻断                                                                                   |
 | `link-nikkisync.ts`        | `npm run link:nikkisync` / `npm run link:nikkisync:check` | **NikkiSync 开发机链接器**：在候选根（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`）中建/校 `node_modules/@nikkisync/*` junction（幂等；`--check` 只读）；无可用根时退出码 1 并逐项给出拒绝原因                                                                                                                         |
-| `generate-icon.js`         | 手动执行                                                  | SVG → ICO 图标生成                                                                                                                                                                                                                                                                                                                |
+| `generate-icon.js`         | 手动执行                                                  | 主源 PNG → 四档圆角 ICO 图标生成（导出 `radiusFor` / `roundedRectCoverage` 等纯函数，由 `__tests__/app-icon.test.ts` 覆盖）                                                                                                                                                                                                       |
 
 ### 测试
 
@@ -102,8 +102,8 @@
 
 ### 语言与执行
 
-- 58 个入仓代码文件里 54 个为 TypeScript（`.ts`：34 个非测试脚本 + 20 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
-- 其余 4 个：2 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
+- 65 个入仓代码文件里 60 个为 TypeScript（`.ts`：34 个非测试脚本 + 26 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
+- 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
 - **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore:147-149` 显式排除，`scripts/archive/` 下 3 个由 `.gitignore:185` 整目录排除。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 

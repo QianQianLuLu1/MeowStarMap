@@ -1635,7 +1635,7 @@ components / pages (展示)
 - `files: [dist/**/*, resources/**/*]`
 - **`asarUnpack`**：10 项 native 依赖解包到磁盘 —— `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
 - **Windows NSIS**：x64、非 one-click、允许自定义安装目录、强制创建桌面快捷方式 + 开始菜单快捷方式
-- `signAndEditExecutable: false` / `verifyUpdateCodeSignature: false` —— 未启用代码签名
+- `signExecutable: false` / `verifyUpdateCodeSignature: false` —— 未启用代码签名，但 **exe 图标与 PE 版本元数据仍经 resedit 写入**。此前写的是 `signAndEditExecutable: false`，该值会让 electron-builder 连资源编辑一起跳过，导致 app exe / 桌面快捷方式 / 任务栏始终是 Electron 默认图标。
 
 ### 11.3 构建流程
 

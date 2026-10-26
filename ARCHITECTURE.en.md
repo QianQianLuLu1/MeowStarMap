@@ -1607,7 +1607,7 @@ components / pages (display)
 - `files: [dist/**/*, resources/**/*]`
 - **`asarUnpack`**: 10 native dependency entries unpacked to disk — `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
 - **Windows NSIS**: x64, non-one-click, allows custom install dir, force create desktop shortcut + start menu shortcut
-- `signAndEditExecutable: false` / `verifyUpdateCodeSignature: false` — code signing not enabled
+- `signExecutable: false` / `verifyUpdateCodeSignature: false` — code signing not enabled, but **the exe icon and PE version metadata are still written via resedit**. This used to read `signAndEditExecutable: false`, which makes electron-builder skip resource editing along with signing, leaving the app exe / desktop shortcut / taskbar on the Electron default icon.
 
 ### 11.3 Build Flow
 
