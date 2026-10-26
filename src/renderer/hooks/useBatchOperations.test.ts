@@ -178,6 +178,47 @@ describe('useBatchOperations', () => {
       })
       expect(onShowMessage).toHaveBeenCalledWith('network down', 'error')
     })
+
+    /**
+     * 回归（用户报障链路上的右键单图「导出」）：`GalleryPage.handleExportSingle` 先
+     * `setSelectedMediaIds([file.id])`、再在**同一次事件回调里**同步调用 handleBatchExport()，
+     * 此时 React 还没重渲染，hook 拿到的仍是本次渲染闭包里的旧 selectedMediaIds。
+     * 最坏症状不是报错，而是**静默导出上一轮的选中集**并回报成功——数据错误比失败更严重，
+     * 所以断言必须比对具体路径数组内容，不能只断言"非空"。
+     */
+    it('选中态在调用前刚被同步改写时，导出最新选中集而非渲染闭包里的旧值', async () => {
+      useMediaStore.setState({
+        mediaFiles: [
+          makeFile({ id: '1', file_path: '/a.jpg' }),
+          makeFile({ id: '9', file_path: '/old.jpg' })
+        ]
+      })
+      useUIStore.setState({ selectedMediaIds: ['9'] })
+      api.dialog.selectDirectory.mockResolvedValue('/target')
+      api.file.export.mockResolvedValue({ success: true, message: '导出成功' })
+      const onShowMessage = vi.fn()
+      const { result } = renderHook(() => useBatchOperations({ onShowMessage }))
+      // 先取当前渲染里的函数引用（其闭包持有旧选中 ['9']），
+      // 再改写 store——handleExportSingle 的真实时序是"写完立刻同步调用"，
+      // 这里用 act 包裹写入只为符合 RTL 约束，不影响已被捕获的陈旧闭包
+      const exportFn = result.current.handleBatchExport
+      act(() => {
+        useUIStore.getState().setSelectedMediaIds(['1'])
+      })
+
+      await act(async () => {
+        await exportFn()
+      })
+
+      expect(api.file.export).toHaveBeenCalledWith(['/a.jpg'], '/target', {})
+      // 也不再可能把陈旧/空集合发向 IPC（空数组会被主进程 filePathArrayBulk 的 min(1) 拒掉）
+      expect(api.file.export).not.toHaveBeenCalledWith([], expect.anything(), expect.anything())
+      expect(api.file.export).not.toHaveBeenCalledWith(
+        ['/old.jpg'],
+        expect.anything(),
+        expect.anything()
+      )
+    })
   })
 
   describe('handleBatchMove', () => {

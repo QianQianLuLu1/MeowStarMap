@@ -101,9 +101,17 @@ export function useBatchOperations(options: UseBatchOperationsOptions) {
     }
   }, [])
 
+  // 必须读 store 最新值，不能用上面订阅到的 mediaFiles / selectedMediaIds：
+  // 调用方 GalleryPage.handleExportSingle 在同一次事件回调里先写选中态、再同步调用批量操作，
+  // 那时本次渲染的闭包里还是上一轮的选中集（React 尚未重渲染），
+  // 表现为右键单图导出实际导出的是旧集合，且主进程照样回报成功——静默导出错的图。
   const getSelectedFilePaths = useCallback(() => {
-    return mediaFiles.filter((f) => selectedMediaIds.includes(f.id)).map((f) => f.file_path)
-  }, [mediaFiles, selectedMediaIds])
+    const ids = useUIStore.getState().selectedMediaIds
+    return useMediaStore
+      .getState()
+      .mediaFiles.filter((f) => ids.includes(f.id))
+      .map((f) => f.file_path)
+  }, [])
 
   const handleBatchExport = useCallback(
     async (useDefaultDir = false) => {
