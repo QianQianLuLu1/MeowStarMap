@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { makeCtx, getHandler } from './_test-helpers'
 import { registerNikkiSyncHandlers } from './nikkisync-handler'
+import { pathGuard } from '../validator'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
 import { AppError } from '../../../shared/errors/app-error'
 import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
@@ -944,6 +945,9 @@ describe('nikkisync:*-extra-directories（K6）', () => {
   it('inspect：path 原样下传、提案剔除中文 hint；相对路径/空串/超长 ⇒ VALIDATION 且不调句柄', async () => {
     const runtime = createRuntimeStub()
     register(runtime)
+    // 真实流程里这条路径来自 dialog:selectDirectory（同步服务页「添加目录」），主进程侧
+    // 由 dialog-handler 登记为 userPickedDir；此处按同一事实造桩，不靠放宽校验让它通过。
+    pathGuard.registerUserPickedDir('D:\\ExtraPhotos')
     const handler = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
     const res = (await handler({}, { path: 'D:\\ExtraPhotos' })) as HandleResult
     expect(runtime.inspectExtraDirectory).toHaveBeenCalledWith('D:\\ExtraPhotos')
@@ -957,6 +961,19 @@ describe('nikkisync:*-extra-directories（K6）', () => {
       expect(rejected.error?.code, JSON.stringify(bad)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
     }
     expect(runtime.inspectExtraDirectory).toHaveBeenCalledTimes(1)
+  })
+
+  it('inspect：绝对但未登记的伪造路径 ⇒ PATH_FORBIDDEN 且不调句柄（渲染层路径必须先过白名单）', async () => {
+    // 硬规则：涉及文件路径的通道要按读写语义校验。inspect 的入参是渲染层给的绝对路径，
+    // 且会交给上游真去枚举目录（并可被提升为长期扫描根 ⇒ 其内容随后经 media:// 可读），
+    // 只校验「是不是绝对路径」等于把一个可信目录选择器换成任意目录探针。
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    // 刻意与上一条已登记的 D:\ExtraPhotos 不同：pathGuard 是模块级单例，同路径会互相污染
+    const res = (await handler({}, { path: 'D:\\ForgedPhotos' })) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+    expect(runtime.inspectExtraDirectory).not.toHaveBeenCalled()
   })
 
   it('add / remove：id 下传并返回状态；id 空串/超长 ⇒ VALIDATION 且不调句柄', async () => {
@@ -984,7 +1001,7 @@ describe('nikkisync:*-extra-directories（K6）', () => {
     expect(res.success).toBe(true)
   })
 
-  it('八错误短码逐码映射（输入类→VALIDATION，状态类→PRECONDITION），中文原文不透传', async () => {
+  it('九错误短码逐码映射（输入类→VALIDATION，状态类→PRECONDITION），中文原文不透传', async () => {
     const validationCodes = [
       'invalid_directory',
       'choose_subfolder',
@@ -1007,6 +1024,9 @@ describe('nikkisync:*-extra-directories（K6）', () => {
     }
     register(runtime)
     const handler = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    // D:\X 是「用户挑完目录、上游按内容判形不合格」的场景桩：本用例只锁错误短码映射，
+    // 与白名单无关，故按真实流程登记为 userPickedDir，让守卫不先拦掉映射断言。
+    pathGuard.registerUserPickedDir('D:\\X')
     for (const code of validationCodes) {
       const res = (await handler({}, { path: 'D:\\X' })) as HandleResult
       expect(res.error?.code, code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)

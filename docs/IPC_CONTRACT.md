@@ -488,14 +488,14 @@ scanRootCount, automaticRootCount, extraRootCount}`。要点：
 
 ### 8.2 服务面（阶段 3，后端是上游 `LocalSyncServer`，本仓只做启停与配对面）
 
-| 通道                           | 入参                                    | 出参                                                                                                                                                    | 失败码                                                                                          |
-| ------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `nikkisync:server-status`      | 无                                      | `{available, running, host, port, secure?, serverId?, mdnsEnabled, tlsFingerprintSha256?, serverCertificatePem?, lanHost?, pairedDeviceCount?, error?}` | 不抛：句柄未装配时 `{available:false, running:false, host:'', port:0, mdnsEnabled:false}`       |
-| `nikkisync:start-server`       | 可选 `{port? (1..65535), mdnsEnabled?}` | 同 `server-status`（`available:true`）                                                                                                                  | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（含 `PORT_IN_USE`）；`INTERNAL_ERROR`（其它启动失败） |
-| `nikkisync:stop-server`        | 无                                      | 同 `server-status`（`running:false`）                                                                                                                   | `PRECONDITION_FAILED`                                                                           |
-| `nikkisync:get-pairing-code`   | 无                                      | `{content, expiresAt, serverId, host, port, tlsFingerprintSha256}`（`content` = 上游 `buildPairingUri()` 的 `NS1\|` 七段串）                            | `PRECONDITION_FAILED`（服务未运行，上游原生文案）                                               |
-| `nikkisync:get-paired-devices` | 无                                      | `Array<{deviceId, deviceName, platform, appVersion?, pairedAt, lastSeenAt}>`（仅未撤销；不含公钥/凭据哈希）                                             | `PRECONDITION_FAILED`                                                                           |
-| `nikkisync:revoke-device`      | `deviceId: string(1..128)`              | 撤销后的同一列表                                                                                                                                        | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED`                                        |
+| 通道                           | 入参                                    | 出参                                                                                                                                                                                                                                                    | 失败码                                                                                          |
+| ------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `nikkisync:server-status`      | 无                                      | `{available, running, host, port, secure?, serverId?, mdnsEnabled, tlsFingerprintSha256?, serverCertificatePem?, lanHost?, pairedDeviceCount?, error?}`                                                                                                 | 不抛：句柄未装配时 `{available:false, running:false, host:'', port:0, mdnsEnabled:false}`       |
+| `nikkisync:start-server`       | 可选 `{port? (1..65535), mdnsEnabled?}` | 同 `server-status`（`available:true`）                                                                                                                                                                                                                  | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（含 `PORT_IN_USE`）；`INTERNAL_ERROR`（其它启动失败） |
+| `nikkisync:stop-server`        | 无                                      | 同 `server-status`（`running:false`）                                                                                                                                                                                                                   | `PRECONDITION_FAILED`                                                                           |
+| `nikkisync:get-pairing-code`   | 无                                      | `{content, expiresAt, serverId, host, port, tlsFingerprintSha256, hosts?}`（`content` = 上游 `buildPairingUri()`：单 host 为 `NS1\|` 七段串，注入多 host 时为 `nikki-sync://pair?...` 新格式；`hosts` 由 `parsePairingUri` 解出，单 host 形态不含该键） | `PRECONDITION_FAILED`（服务未运行，上游原生文案）                                               |
+| `nikkisync:get-paired-devices` | 无                                      | `Array<{deviceId, deviceName, platform, appVersion?, pairedAt, lastSeenAt}>`（仅未撤销；不含公钥/凭据哈希）                                                                                                                                             | `PRECONDITION_FAILED`                                                                           |
+| `nikkisync:revoke-device`      | `deviceId: string(1..128)`              | 撤销后的同一列表                                                                                                                                                                                                                                        | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED`                                        |
 
 契约要点（不得凭实现细节臆造）：
 
@@ -541,20 +541,24 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
 
 ### 8.2.3 额外照片目录（K6，上游 `ExtraScanDirectories`；仅作用于同步库扫描器）
 
-| 通道                                 | 入参                                    | 出参                                                                                                  | 失败码                                                |
-| ------------------------------------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `nikkisync:get-extra-directories`    | 无                                      | `{directories: [{id, path, mode}], automaticRoots, busy, scannerStatus}`（**中文 `message` 已剔除**） | `PRECONDITION_FAILED`（未装配/未挂面）                |
-| `nikkisync:inspect-extra-directory`  | `{path: string(1..4096)，必须绝对路径}` | `{id, roots, images, videos, limited}`（**中文 `hint` 已剔除**）                                      | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（见映射表） |
-| `nikkisync:add-extra-directory`      | `{id: string(1..128)}`（预检返回的 id） | 同 get（更新后状态）                                                                                  | 同上映射                                              |
-| `nikkisync:remove-extra-directory`   | `{id: string(1..128)}`                  | 同 get                                                                                                | 同上映射                                              |
-| `nikkisync:rescan-extra-directories` | 无                                      | 同 get                                                                                                | 同上映射                                              |
+| 通道                                 | 入参                                                      | 出参                                                                                                  | 失败码                                                                                |
+| ------------------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `nikkisync:get-extra-directories`    | 无                                                        | `{directories: [{id, path, mode}], automaticRoots, busy, scannerStatus}`（**中文 `message` 已剔除**） | `PRECONDITION_FAILED`（未装配/未挂面）                                                |
+| `nikkisync:inspect-extra-directory`  | `{path: string(1..4096)，必须绝对路径，且须是已登记目录}` | `{id, roots, images, videos, limited}`（**中文 `hint` 已剔除**）                                      | `VALIDATION_ERROR`；`PATH_FORBIDDEN`（未登记路径）；`PRECONDITION_FAILED`（见映射表） |
+| `nikkisync:add-extra-directory`      | `{id: string(1..128)}`（预检返回的 id）                   | 同 get（更新后状态）                                                                                  | 同上映射                                                                              |
+| `nikkisync:remove-extra-directory`   | `{id: string(1..128)}`                                    | 同 get                                                                                                | 同上映射                                                                              |
+| `nikkisync:rescan-extra-directories` | 无                                                        | 同 get                                                                                                | 同上映射                                                                              |
 
 契约要点：
 
 - 目录清单持久化在上游 0600 JSON（`{userData}/nikkisync/extra-scan-directories.json`，
   `{version, directories, retiredRoots}`）——**上游文件即单一真相源**，不落本仓设置键。
 - 上限 16、模式折叠、重叠判定全部由上游实现承担，zod 不重复设上限（避免双真相源）。
-- 上游八错误短码映射：`invalid_directory` / `choose_subfolder` / `thumbnail_only` /
+- `inspect` 的 `path` 受路径白名单约束：`dialog:selectDirectory` 显式选中的目录（登记的
+  userPickedDir）短路放行，其余一律 `assertFileReadPath`——未登记的绝对路径返回
+  `IPC_PATH_FORBIDDEN` 且不调上游句柄。判据与 `scanner:start` / `settings:set` 的扫描根短路
+  逐字一致（提案随后可被 `add` 提升为长期扫描根，其内容会经 `media://` 可读，故这一步不能省）。
+- 上游九错误短码映射：`invalid_directory` / `choose_subfolder` / `thumbnail_only` /
   `choose_photo_folder` / `already_covered` → `VALIDATION_ERROR`；
   `directory_unavailable` / `too_many_directories` / `selection_expired` /
   `directory_not_found` → `PRECONDITION_FAILED`。

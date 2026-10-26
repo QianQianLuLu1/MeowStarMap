@@ -1,12 +1,14 @@
-// @core-change: K8 新增 nikkisync 整理队列三通道（get-organizer-queue / decide-organizer-item /
-//               approve-organizer-items，批量删除管理面：开关门 + 上游四错误短码映射）。
-//               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断、K6 五条目录——历次授权原因见各节点提交。）
+// @core-change: nikkisync:inspect-extra-directory 补路径白名单守卫——渲染层给的绝对路径此前
+//               未登记即可直交上游枚举并可被提升为扫描根，违反硬规则「涉路径通道必须按读写语义
+//               校验」；判据复用 scanner/settings 的 userPickedDir 短路 + assertFileReadPath。
+//               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断、K5 多 host、K6 五条目录、
+//               K7 诊断、K8 整理队列三通道——历次授权原因见各节点提交。）
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
-import { wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
+import { assertFileReadPath, pathGuard, wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { isAssetType } from '../../../shared/sync/protocol'
 import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-api'
@@ -37,7 +39,8 @@ import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-a
  * 服务面（阶段 3，全部复用上游 `LocalSyncServer`，本仓不实现任何 HTTP/TLS/WS/mDNS）：
  * - `nikkisync:server-status`：运行状态 + 端口 + TLS 指纹 + 已配对数；未装配 ⇒ `available:false`
  * - `nikkisync:start-server` / `nikkisync:stop-server`：启停（端口/mdns 变更由状态机重建会话）
- * - `nikkisync:get-pairing-code`：一次性配对二维码内容（NS1 七段，TTL 5 分钟、单次消费）
+ * - `nikkisync:get-pairing-code`：一次性配对二维码内容（单 host = NS1 七段；注入多 host =
+ *   `nikki-sync://pair?` 新格式并回填 `hosts`，K5）TTL 5 分钟、单次消费）
  * - `nikkisync:get-paired-devices` / `nikkisync:revoke-device`：设备管理（读/软删 NikkiSync 的 paired_devices）
  *
  * 铁律：本文件**不做数据格式转换**，资产响应体逐字来自上游 `SyncReadRepository` +
@@ -197,7 +200,7 @@ function requireOrganizerEnabled(ctx: HandlerContext): void {
 }
 
 /**
- * K6：上游八错误短码 → IPC 错误码（逐码注释，映射表唯一真相源）。
+ * K6：上游九错误短码 → IPC 错误码（逐码注释，映射表唯一真相源）。
  * 输入形态类（路径/层级/覆盖问题）→ VALIDATION_ERROR；会话状态类（可重试/需重预检/上限）→ PRECONDITION_FAILED。
  */
 const EXTRA_DIRECTORY_ERROR_CODES: Record<string, 'validation' | 'precondition'> = {
@@ -616,6 +619,13 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         args[0] ?? {},
         'inspect-extra-directory',
         async (input) => {
+          // 白名单守卫，放在 zod 之后：形态错误仍先由 inspectDirectorySchema 判 VALIDATION。
+          // 目录选择器（dialog:selectDirectory）返回的路径已由 dialog-handler 登记进
+          // userPickedDirs，直接短路；未登记的伪造绝对路径交 assertFileReadPath ⇒
+          // PermissionError → IPC_PATH_FORBIDDEN，不会把一个渲染层字符串原样递给上游去枚举
+          // 真实文件系统（提案随后可被 add 提升为长期扫描根，内容再经 media:// 可读）。
+          // 判据与 scanner-handler / settings-handler 的扫描根短路逐字一致。
+          if (!pathGuard.isUserPickedDir(input.path)) assertFileReadPath(input.path)
           try {
             return stripExtraDirectoryProposal(await runtime.inspectExtraDirectory(input.path))
           } catch (error) {
