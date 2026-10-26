@@ -1,6 +1,6 @@
 # 换用猫脸插画作为软件图标并重新打包 2.5.5
 
-> 日期：2026-10-26 ｜ 状态：进行中（执行记录见文末 §八）
+> 日期：2026-10-26 ｜ 状态：已完成（全部实测读数见文末 §8.5）
 > 背景：用户提供一张 4912×4912 方形插画，要求作为软件图标并重新打包 Windows 安装包。
 
 ## 〇、路径作用域声明
@@ -291,6 +291,33 @@ Setup 体积 183,641,784 → **184,343,181 B（+701,397）**，与「主源 PNG 
 
 **静态四面**：`npm run typecheck`（`tsc -b` + `tsc -p tsconfig.scripts.json`）exit 0；`npm run typecheck:e2e` exit 0；`npm run lint`（全量 `eslint .`）exit 0；`npm run format:check` All matched files use Prettier code style；`npm run i18n:guard` ✅。
 
+**Phase 8 全量回归与提交**：
+
+| 闸门                                                             | 结果                                                                                                                       |
+| ---------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `npm test`（全量 vitest）                                        | **447 文件 / 6984 通过 / 12 跳过**，exit 0；新增的 `scripts/__tests__/app-icon.test.ts` 13 用例在其中                      |
+| `npm run typecheck`（`tsc -b` + `tsc -p tsconfig.scripts.json`） | exit 0                                                                                                                     |
+| `npm run typecheck:e2e`                                          | exit 0                                                                                                                     |
+| `npm run lint`（全量 `eslint .`）                                | exit 0                                                                                                                     |
+| `npm run format:check`                                           | All matched files use Prettier code style                                                                                  |
+| `npm run i18n:guard`                                             | ✅ 白名单只减不增、key 已同步                                                                                              |
+| `npm run docs:links`                                             | ✅ 无死引用                                                                                                                |
+| `npm run e2e:smoke`                                              | **16 passed**（含针对真实 `release/win-unpacked/喵星图.exe` 的 S1–S8 与 userData 隔离校验，以及历史上易倒的 NikkiSync N1） |
+| `.husky/pre-commit`                                              | lint-staged → core-path-gate（⊘ 本次不涉及受保护路径）→ `tsc -b`，三步全 PASSED                                            |
+
+提交为 `9f0f343 fix(build): 换用猫脸主源并恢复 exe 图标的 PE 资源编辑`（13 文件 / +755 −26）。提交后 `git status --porcelain` 为空，`git show HEAD:resources/icons/icon.ico` 的 sha256 与验证过的 `16c4897c…3df1` 逐字节一致。
+
+**一处为消除不确定性而做的额外重打**：钩子的 lint-staged 会对暂存文件跑 `prettier --write`，因此 `package.json` 的 mtime 落到了 `22:55:21`——**晚于** 22:49 产出的 Setup。先确证 `git show HEAD:package.json` 与 `HEAD~1` 之间除 `signExecutable` 那一行外无任何其它差异（即钩子并未改写内容），但「产物是否对应 HEAD」这件事不该靠推理回答，故按已提交的树**整链路重打一次** `npm run dist:win`：exit 0，三段闸门与 `verify:dist` 全 ✔，`file signing skipped via signExecutable configuration` 仍出现三次。
+
+重打后的最终读数：
+
+| 产物                                  | 四档**整档逐字节**探针 | 字节        |
+| ------------------------------------- | ---------------------- | ----------- |
+| `release/win-unpacked/喵星图.exe`     | 48/32/16/256 全 HIT    | 224,013,312 |
+| `release/MeowStarMap-Setup-2.5.5.exe` | 48/32/16/256 全 HIT    | 184,343,137 |
+
+Setup 相对改前 183,641,784 B 增加 **701,353 B**（前表记的 +701,397 是首轮读数，两轮差 44 B 来自归档内时间戳，非内容差异）。新鲜度复核：Setup `22:57:20` 晚于最晚出货输入 `22:56:39` ⇒ **安装包确实对应 HEAD `9f0f343`**。
+
 **视觉取证（把图标从 exe 里反向解出来看）**：字节探针只能证明「负载进去了」，不证明「画面对了」。故按 ICONDIRENTRY 取每档**完整** payload 在 exe 中 `indexOf`——四档均**整档逐字节命中**（强于 §8.4 的 96 字节探针），再把 BMP DIB（bottom-up BGRA）翻转回 RGBA 交给 sharp 栅格化成 PNG 目视：
 
 | 档位    | 目视结论                                                                                                                               |
@@ -303,4 +330,5 @@ Setup 体积 183,641,784 → **184,343,181 B（+701,397）**，与「主源 PNG 
 预览文件写在 `.cache/icon-preview/`（gitignore 区）并已删除，不留残留。
 
 > 若日后要让 16 档也清晰，正确解法仍是**单独做一张猫脸特写主源**（例如 `icon-master-16.png`）并在生成器里按档选源，而不是给现有链路加 crop 参数——后者会把「裁切构图」这个设计决策塞进代码。
-> **文档残留引用的处置**：全仓检索 `icon.svg` 与 `signAndEditExecutable` 后，仅两类位置仍有命中，均为**应保留的历史叙述**而非失真——带日期的执行记录（`docs/plans/2026-10-23-*`、`docs/plans/2026-10-26-review-fixes-*`）与 `docs/archive/`（gitignore 的本机留档）；另有 `.qoder/`、`storybook-static/` 两处 gitignore 目录。当前生效的配置真相源（`package.json`）与描述现状的文档（`ARCHITECTURE.md` / `ARCHITECTURE.en.md` / `DEVELOPMENT.md` / `DEVELOPMENT.en.md` / `scripts/AGENTS.md`）已全部对齐。
+
+**文档残留引用的处置**：全仓检索 `icon.svg` 与 `signAndEditExecutable` 后，仅两类位置仍有命中，均为**应保留的历史叙述**而非失真——带日期的执行记录（`docs/plans/2026-10-23-*`、`docs/plans/2026-10-26-review-fixes-*`）与 `docs/archive/`（gitignore 的本机留档）；另有 `.qoder/`、`storybook-static/` 两处 gitignore 目录。当前生效的配置真相源（`package.json`）与描述现状的文档（`ARCHITECTURE.md` / `ARCHITECTURE.en.md` / `DEVELOPMENT.md` / `DEVELOPMENT.en.md` / `scripts/AGENTS.md`）已全部对齐。
