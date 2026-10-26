@@ -7,7 +7,8 @@
  *  (c) 「重新生成」按钮再次调用 getPairingCode
  *  (d) 生成失败 → 错误态 + 重试按钮
  *
- * 二维码内容是上游 `buildPairingUri()` 的 NS1 七段串（serverId 形如 `server_` + 32 hex）。
+ * 二维码内容是上游 `buildPairingUri()` 的结果：单 host 为 NS1 七段串，注入多 host 时为
+ * `nikki-sync://pair?...&hosts=` 新格式（见 (f)）。
  *
  * 运行：npx vitest run src/renderer/components/sync/PairingQrDialog.test.tsx
  */
@@ -41,6 +42,8 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  // (g) 起假定时器，不归还就会漏给后续用例（waitFor 会连带失真）
+  vi.useRealTimers()
 })
 
 describe('PairingQrDialog', () => {
@@ -101,5 +104,24 @@ describe('PairingQrDialog', () => {
     render(<PairingQrDialog open onClose={() => {}} />)
     await waitFor(() => expect(screen.getByText('192.168.1.10:28080')).toBeInTheDocument())
     expect(screen.queryByText('备选地址')).toBeNull()
+  })
+
+  it('(g) 过期后重生成失败即作废提案，不得逐秒反复重试（弹窗常开时的 toast 风暴）', async () => {
+    // 过期重生成由 1s tick 驱动，用假定时器把这段真实等待压成确定序列
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-11T12:04:59.000Z'))
+    render(<PairingQrDialog open onClose={() => {}} />)
+    // 先让首次生成走完（expiresAt = 12:05:00，此刻尚未过期，不触发任何 tick）
+    await vi.advanceTimersByTimeAsync(500)
+    expect(getPairingCode).toHaveBeenCalledTimes(1)
+
+    // 服务停止：此后每次生成都失败
+    getPairingCode.mockImplementation(() => Promise.reject(new Error('sync server is not running')))
+    await vi.advanceTimersByTimeAsync(4000)
+
+    // 初始 1 次 + 过期后 1 次；那次失败必须把 offer 一并作废，否则 offer 仍停在
+    // 已过期的 expiresAt 上，tick 每秒重发请求并每秒弹一次错误 toast，只要弹窗开着就停不下来
+    expect(getPairingCode).toHaveBeenCalledTimes(2)
+    expect(screen.getByText('生成配对二维码失败')).toBeInTheDocument()
   })
 })

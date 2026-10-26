@@ -16,9 +16,11 @@ interface PairingQrDialogProps {
 /**
  * 配对二维码对话框（sync-integration 阶段5 落地，阶段3 改接真实 NikkiSync 服务）。
  *
- * - 二维码内容来自上游 `PcCompanionRuntime.createPairingUri()`（NS1 七段串），
+ * - 二维码内容来自上游配对 URI 构造（`buildPairingUri`，经会话 `pairingUri()` 转发）：
+ *   单 host 为 NS1 七段串，K5 注入多 host 时为 `nikki-sync://pair?...&hosts=` 新格式，
  *   图形在渲染层本地生成（qrcode → SVG，参数与上游 pc-companion src/qr.ts 一致），无网络请求
- * - 一次性配对令牌默认 5 分钟过期：显示倒计时，过期自动重新生成（生成计数防竞态，上游同款）
+ * - 一次性配对令牌默认 5 分钟过期：显示倒计时，过期自动重新生成（生成计数防竞态，上游同款）；
+ *   重新生成失败即作废当前提案，否则过期判据每秒重发一次请求并每秒弹一次错误 toast
  * - 服务未运行时 getPairingCode 抛 PRECONDITION_FAILED → 错误态 + 重试
  *   （入口按钮已按运行状态禁用，此处兜底）
  */
@@ -32,6 +34,11 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
   const [now, setNow] = useState(() => Date.now())
   // 生成计数防竞态：慢响应返回时若已有更新的生成发起，丢弃本次结果（上游 DesktopPageScript 同款）
   const generationRef = useRef(0)
+  // 过期判据由 1s tick 直接读这个 ref（渲染回流的 effect 总慢一拍，见下方 catch 里的同步作废）
+  const offerRef = useRef<NikkiSyncPairingCodeInfo | null>(null)
+  useEffect(() => {
+    offerRef.current = offer
+  }, [offer])
 
   const generate = useCallback(async (): Promise<void> => {
     const api = window.electronAPI
@@ -58,6 +65,11 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
     } catch (err) {
       if (generation !== generationRef.current) return
       setFailed(true)
+      // offer 必须一并作废：过期重生成由 1s tick 按 `offerRef.current.expiresAt <= now` 驱动，
+      // 留着已过期的 offer 会让每个 tick 再发一次请求、每秒弹一次错误 toast（弹窗开着就停不下）。
+      // ref 同步写：等 [offer] 的 effect 回流要慢一拍，那一秒的多几次重试是真实发生的。
+      offerRef.current = null
+      setOffer(null)
       showError(err)
     }
   }, [showError])
@@ -82,11 +94,6 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
   }, [open])
 
   // 每秒 tick 驱动倒计时；过期自动重新生成（对话框仍打开时，经 ref 读最新 offer，无渲染期 setState）
-  const offerRef = useRef<NikkiSyncPairingCodeInfo | null>(null)
-  useEffect(() => {
-    offerRef.current = offer
-  }, [offer])
-
   useEffect(() => {
     if (!open) return
     const timer = setInterval(() => {
