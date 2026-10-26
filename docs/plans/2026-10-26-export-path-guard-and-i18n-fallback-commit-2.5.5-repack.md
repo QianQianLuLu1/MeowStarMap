@@ -113,8 +113,44 @@ CHANGELOG 无本轮条目、`docs/plans/` 无本批次记录，已分别补录�
 2. 变异抽查 M1–M4 → 读数见第七节，四次还原 `sha256sum -c` 全部 `OK`。
 3. `CHANGELOG.md` 补录本轮条目 → `git diff --numstat` = `2 0`；`npx tsx scripts/check-changelog-release.ts` → `✅ 变更日志收口校验通过`（exit 0）。
 4. 本文件落档 → `npm run docs:links`、`npx vitest run scripts/__tests__/old-name-ledger.test.ts` 读数见下。
-5. 五个原子提交（`fix(i18n)` → `fix(export)` 校验口径 → `fix(export)` 逐文件计数 → `fix(gallery)` 陈旧闭包 → `docs(release)`），逐个过 `.husky/pre-commit`。
-6. 全局回归：`npm test`、`npm run typecheck`、`npm run typecheck:e2e`、`npm run i18n:guard`、`npm run i18n:check`、`npm run docs:links`、全量 `prettier --check`（含未跟踪新文件）。
-7. `npm run dist:win` 重新打包 + `npm run e2e:smoke` 打包态复验。**打包后闸门读数（pre-dist-check 第⑤项产物 mtime、`--verify-asar` 禁串计数、`latest.yml` 新 `sha512`、e2e 冒烟结果）随第六次提交 `docs(release): 补录…` 一并记入本节之后。**
+5. 五个原子提交（`2970925` `fix(i18n)` → `b496870` `fix(export)` 校验口径 → `9288c33` `fix(export)` 逐文件计数 → `b77d754` `fix(gallery)` 陈旧闭包 → `695a058` `docs(release)`），逐个过 `.husky/pre-commit` 三步（lint-staged / core-gate / `tsc -b`）；core-gate 在 `b496870` 计 3 个受保护文件、`9288c33` 计 1 个，提交后 `git status --porcelain=v1` 为空。
+6. 全局回归：`npm test` **446 文件 / 6971 通过 / 12 跳过**、`npm run typecheck`、`npm run typecheck:e2e`、`npm run i18n:guard`、`npm run i18n:check`、`npm run docs:links`、全量 `eslint`、全域 `prettier --check`（含未跟踪新文件）——全部 exit 0，与改动前基线一致、无新增失败项。
+7. `npm run dist:win` 重新打包 + `npm run e2e:smoke` 打包态复验 → 读数见第十节。
+
+## 十、重新打包与打包态复验读数
+
+### 10.1 `npm run dist:win`（链尾自带 `verify:dist`），整链 exit 0
+
+- `pre-dist-check`：`✅ 全部校验通过，可以执行打包`。其中 **`✔ git status clean`** 成立（正是先提交再打包的顺序）；第⑤项「产物 mtime ≥ 最新 src mtime」转绿——旧包（19:31）早于本批源码（20:21–20:35），这条机械判据此前正是「包里没有这批修复」的证据；ABI 闸门 `electron=41.10.6 / npmRebuild=true / asarUnpack 已覆盖 better-sqlite3|koffi|sharp|@img`；`afterPack` 随包 `vcruntime140.dll`、`vcruntime140_1.dll`、`msvcp140.dll`、`concrt140.dll`；管理员清单 `requestedExecutionLevel=asInvoker`。
+- `electron-builder`：`target=nsis file=release\MeowStarMap-Setup-2.5.5.exe archs=x64`，产物 **21:52:54 / 183,641,784 字节**（上一轮 19:31 为 183,631,854 ⇒ +9,930 字节，与「本批改运行期校验与文案」相符）。
+- `--verify-asar`：`✅ 解包产物校验通过`，其中 **`✔ 产物无旧仓库链接与失效占位：app.asar（32 条禁串、71766277 字节）`** ⇒ 禁串命中数为 0（fail-closed 判据，解析不到 asar 也会判失败）；`@nikkisync` 四包入口 + `migrations/0001_initial.sql` + `row-mappers.js` + `LocalSyncServer.js` + `GalleryRuntime.mjs` + 能力深入口 7 项全部解包。
+- `release/latest.yml`：`version: 2.5.5`、`sha512: 4SrEmn/T+2gKzQjf19Qso/np53r+qR1uA2Lak7ZGLPxOQNhEBNbWFyZ0lVFNmrtzaNN5BRw+AdtGKKMiotW1Lg==`、`size: 183641784`、`releaseDate: 2026-10-26T13:52:58.634Z`；本机 `certutil -hashfile … SHA512` 得 `e12ac49a7fd3fb68…`，与该 base64 同值 ⇒ yml 与实际包一致，不是陈旧登记。
+
+### 10.2 产物内容实证（不靠「闸门过了」推断「内容在里面」）
+
+对 `release/win-unpacked/resources/app.asar` 的字节做字面量计数，本批改动的标记确在包内：
+
+| 标记                   | 命中 | 标记                                 | 命中 |
+| ---------------------- | ---- | ------------------------------------ | ---- |
+| `exportedWithFailures` | 25   | `export.defaultDir`（第 4 类恢复源） | 10   |
+| `noFilesToExport`      | 25   | `isUserPicked`（三级校验入口）       | 8    |
+| `exportItemFailed`     | 25   | `returnEmptyString`                  | 29   |
+
+中文串须按 **utf8** 解码再探：`导出单个文件失败` 2、`部分导出完成：成功` 2、`未选择要导出的文件` 2。按 latin1 解码时这三条恒为 0——那是探针自身的编码问题，**不得据此判「中文文案没进包」**。
+
+### 10.3 `npm run e2e:smoke`：16 passed (25.8s)，exit 0
+
+S1–S8 全部跑在 `release/win-unpacked/喵星图.exe` 上；N1–N4 因 `@nikkisync` 已建链（`linkGate=run`）按原断言执行、未被门控跳过。关键读数：`[DIAG] gridReady=true gridcellCount=20`、`media://` 17 次响应全 200、`consoleErrors=[]` 与 `pageErrors=[]`；S8 `[gpu] reason=default`、活动显卡为 `NVIDIA GeForce RTX 5070`、`2d_canvas / gpu_compositing / opengl / rasterization / video_decode / video_encode / webgl / webgpu` 全 enabled。
+
+### 10.4 两条必须如实登记的判读陷阱（都在本轮真实踩到）
+
+1. **管道尾命令吞掉闸门状态**。第一次跑 e2e 用的是 `npm run e2e:smoke 2>&1 | tail -35`，后台任务据此报 **exit code 0**，而真实状态是 **REAL-EXIT=1、11 failed / 5 did not run**——`$?` 取到的是 `tail` 的状态。这是本仓 `CHANGELOG.md` 与只读取证流程反复警告过的假绿形态，本轮仍踩了一次，改为「重定向到文件 + 直接取退出码」后才拿到真值。
+2. **`ELECTRON_RUN_AS_NODE=1` 会让打包态 e2e 全线倒在启动前，且症状看起来像产品回归**。本 agent 的 shell 导出该变量，`喵星图.exe` 因此按**纯 Node 解释器**启动，把 `--remote-debugging-port=0` 与 `--user-data-dir=…` 判为 `bad option`、`exitCode=9`，于是 S1「app:// 协议加载成功」连同 S2–S8、N1 一起失败——没有一条是断言失败。判据不是猜的：同一个 exe 带该变量复现 `bad option`、`unset` 后消失；`unset` 后同一产物 16 例全绿。**后续任何在本机跑的打包态 e2e，都必须显式 `unset ELECTRON_RUN_AS_NODE`（或以 `env -u ELECTRON_RUN_AS_NODE` 起）**，否则会把环境问题报成产品缺陷。
+
+另登记一次自纠：`env -u … npm run e2e:smoke > /tmp/e2e-fixed.log` 那一轮返回 exit 0，但日志 0 字节、`test-results/` 时间戳未变 ⇒ 该轮根本没有执行 Playwright，退出码不可信；改写入仓内 `.cache/` 路径重跑才拿到 44 行真实日志。教训与陷阱 1 同源：**闸门结论必须落在现场读数上，不能落在「命令返回 0」上**。
+
+### 10.5 出货口径
+
+版本号本轮**一处未改**（`package.json:3` / `package-lock.json:3,:9` / `src/renderer/preview/mock/database-mock.ts:664` / `release/latest.yml:1` 实测均已是 `2.5.5`，且无脚本校验这四处、属手工口径）。`latest.yml` 仍写 `2.5.5` ⇒ 已装该版本的用户不会收到自动更新提示，需手动安装新包。本轮共 6 个提交（含本文件所在的补录提交），分支较 `origin/main` 领先 95 个提交且**未 push**——外发动作未被请求。
 
 如实说明两条：`latest.yml` 仍写 `2.5.5` ⇒ 已装 2.5.5 的用户不会收到自动更新提示，需手动安装新包；本轮分支较 `origin/main` 领先 89 个提交且**未 push**（外发动作未被请求）。
