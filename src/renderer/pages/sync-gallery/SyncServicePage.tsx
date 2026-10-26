@@ -191,7 +191,10 @@ export const SyncServicePage: React.FC = () => {
     void (async () => {
       try {
         const value = await window.electronAPI?.settings.get(SETTING_SYNC_ENABLED, false)
-        if (alive) setEnabled(Boolean(value))
+        // 严格 === true：主进程对 app_settings 历史非布尔值收敛成关闭
+        // （nikkisync-runtime-setup.ts 的 settingsFrom），渲染层用 Boolean() 会显示「已启用」
+        // 而服务其实没起。判据必须与消费点一致，同下方元数据/整理两处开关。
+        if (alive) setEnabled(value === true)
       } catch {
         // 设置读取失败保持默认关闭态
       }
@@ -515,21 +518,22 @@ export const SyncServicePage: React.FC = () => {
     setBusy(true)
     setEnabled(value)
     try {
+      // 写在同一个 try 里：持久化本身失败也要走下面那条回滚分支。它曾落在只有 finally
+      // 没有 catch 的外层 try，rejection 直冒到 `void handleToggle(value)`（悬空 promise），
+      // 而 enabled 已翻转 ⇒ UI 显示开启、配置从未落地。
       await persistEnabled(value)
+      if (value) await api.nikkisync.startServer()
+      else await api.nikkisync.stopServer()
+      showMessage(value ? t('toast.syncEnabled') : t('toast.syncDisabled'))
+    } catch (err) {
+      // 回滚：两个持久化设置与本地状态一并还原（下次启动不再反复自启失败）
       try {
-        if (value) await api.nikkisync.startServer()
-        else await api.nikkisync.stopServer()
-        showMessage(value ? t('toast.syncEnabled') : t('toast.syncDisabled'))
-      } catch (err) {
-        // 回滚：两个持久化设置与本地状态一并还原（下次启动不再反复自启失败）
-        try {
-          await persistEnabled(!value)
-        } catch {
-          // 回滚失败仅保留本地态
-        }
-        setEnabled(!value)
-        showError(err)
+        await persistEnabled(!value)
+      } catch {
+        // 回滚失败仅保留本地态
       }
+      setEnabled(!value)
+      showError(err)
     } finally {
       setBusy(false)
       void refresh()
@@ -650,11 +654,7 @@ export const SyncServicePage: React.FC = () => {
                     <span
                       className="w-2 h-2 rounded-full"
                       style={{
-                        background: running
-                          ? 'var(--accent, #22c55e)'
-                          : status?.available === false
-                            ? 'var(--text-tertiary)'
-                            : 'var(--text-tertiary)'
+                        background: running ? 'var(--accent)' : 'var(--text-tertiary)'
                       }}
                     />
                     {!status?.available
@@ -673,7 +673,7 @@ export const SyncServicePage: React.FC = () => {
                           {index > 0 && <span style={{ color: 'var(--text-tertiary)' }}>→</span>}
                           <span
                             className="rounded px-1.5 py-0.5"
-                            style={{ background: 'var(--bg-secondary, rgba(127,127,127,0.15))' }}
+                            style={{ background: 'var(--bg-secondary)' }}
                           >
                             {STARTUP_STAGE_I18N_KEYS[item.stage]
                               ? t(STARTUP_STAGE_I18N_KEYS[item.stage])
@@ -773,10 +773,7 @@ export const SyncServicePage: React.FC = () => {
                     )}
                     {status.diagnostics.lastError && (
                       <SettingsRow label={t('syncService.diagnostics.lastError')}>
-                        <span
-                          className="font-mono text-xs"
-                          style={{ color: 'var(--danger, #ef4444)' }}
-                        >
+                        <span className="font-mono text-xs" style={{ color: 'var(--danger)' }}>
                           {status.diagnostics.lastError}
                         </span>
                       </SettingsRow>

@@ -805,4 +805,31 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     expect(await screen.findByText('整理队列不可用')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '全部批准' })).not.toBeInTheDocument()
   })
+
+  it('(ai) 历史非布尔持久化值不得把同步服务开关显示为开启（与主进程形态收敛同口径）', async () => {
+    // app_settings 历史值可能是字符串（nikkisync-runtime-setup.ts 的 settingsFrom 为此
+    // 显式做 `typeof value === 'boolean' ? value : fallback` 收敛 ⇒ 主进程视作关闭、
+    // 不会自启）。渲染层必须同一判据，否则 UI 挂着「已启用」而服务端根本没起，
+    // 用户以为同步开着——比一律显示关闭更难发现。
+    installElectronApi({ persisted: { 'nikkisync.syncServerEnabled': 'true' } })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '启用同步服务' })
+    await waitFor(() => expect(settingsGet).toHaveBeenCalledWith(SETTING_SYNC_ENABLED, false))
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('(aj) 持久化失败：同步服务开关不得悬挂在已启用态，且不得留下未捕获 rejection', async () => {
+    // (c) 只覆盖了 startServer 失败的回滚；写设置本身失败是另一条分支：
+    // 此前 persistEnabled 落在一层只有 finally 没有 catch 的 try 里，
+    // rejection 直接冒到 `void handleToggle(value)`（页面里是悬空 promise），
+    // 同时 enabled 已翻转 ⇒ UI 显示开启、配置仍是关闭。
+    settingsSet.mockImplementation(() => Promise.reject(new Error('disk full')))
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '启用同步服务' })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+    expect(serverApi.startServer).not.toHaveBeenCalled()
+    expect(store[SETTING_SYNC_ENABLED]).not.toBe(true)
+    expect(store[SETTING_RUNTIME_ENABLED]).not.toBe(true)
+  })
 })
