@@ -2,7 +2,7 @@
 
 > 面向零基础开发者的「喵星图」上手文档。
 > 所有命令均可直接复制到 PowerShell 终端运行。
-> 项目代号：`meow-star-map` / 应用名：喵星图 / 当前版本：2.5.5 / 平台：Windows x64
+> 项目代号：`meow-star-map` / 应用名：喵星图 / 当前版本：2.5.6-beta / 平台：Windows x64
 
 ---
 
@@ -783,7 +783,7 @@ npx electron-builder --win --publish never
 
 ```
 release/
-├── MeowStarMap-Setup-2.5.5.exe  # NSIS 安装程序（artifactName: MeowStarMap-Setup-${version}.${ext}）
+├── MeowStarMap-Setup-2.5.6-beta.exe  # NSIS 安装程序（artifactName: MeowStarMap-Setup-${version}.${ext}）
 └── builder-effective-config.yaml             # 打包配置快照
 ```
 
@@ -833,7 +833,7 @@ node scripts/generate-icon.js
 
 ### 7.7 安装与测试
 
-1. 双击 `release\MeowStarMap-Setup-2.5.5.exe` 安装
+1. 双击 `release\MeowStarMap-Setup-2.5.6-beta.exe` 安装
 2. 安装完成后从开始菜单或桌面快捷方式启动
 3. 首次启动会触发全盘扫描定位游戏目录（首次扫描较慢，请耐心等待）
 4. 程序会自动在桌面创建快捷方式（若已存在则跳过）
@@ -844,7 +844,7 @@ node scripts/generate-icon.js
 
 - **不要随意修改版本号**，除非用户明确要求
 - 版本号定义在 `package.json` 的 `version` 字段（同时决定安装程序文件名：`MeowStarMap-Setup-<version>.exe`）
-- 当前版本：`2.5.5`
+- 当前版本：`2.5.6-beta`
 - 改版本号后，`README.md` 的版本徽章、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 的「当前版本」、本文档头部版本号需同步修改
 
 修改版本号示例（仅在用户要求时执行）：

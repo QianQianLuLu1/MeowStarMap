@@ -16,6 +16,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.6-beta] - 2026-10-27
+
+> 2.5.6-beta：全面审查后的缺陷修复定版，**不引入新功能**。版本号由用户明确要求变更（2.5.5 期间已多轮原地重打包，本轮改动量足以与旧产物区分）。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6-beta`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.6-beta.exe`。
+
+### Fixed | 修复
+
+- **「重复文件」/「相似」把硬链接的同一物理文件报成多份**：游戏与启动器用 Windows 硬链接把同一文件同时暴露在 `GamePlayPhotos\<UID>\NikkiPhotos_HighQuality\` 与 `X6Game\ScreenShot\`、`X6Game\Video\` 下，扫描器按路径各写一条 `media_files` 记录，而两条链路都假定「一行 = 一个文件」——精确重复按 `file_size` + sha256 分组必然把同一文件判成 2 份（`wastedBytes` 虚报，删掉任一条都省不出空间），pHash 汉明距离 0 又让「自己重复自己」进入重复标记与相似列表。新增唯一收敛点 `src/main/utils/physical-file-key.ts`（`statPhysicalFile()` 读 `dev + ino`，`dedupeByPhysicalFile()` 按物理身份只保留 id 最小的一行并保持原相对顺序），接入 `media:findDuplicates` 的候选装载处与 `media-worker` 的 `markDuplicatesInWorker` / `startSimilarFind`（重复标记链路的 SELECT 因此补出 `file_path`）。真机取证：本机 212 行候选中 29 组同 size、23 组同 pHash 属硬链接误报，修复后同物理文件误报组降为 0；相似侧剩余 19 组为 HQ/LQ 真实两份，按既定决策不处理。只读诊断脚本 `scripts/diagnose-duplicate-false-positive.ts`（`node:sqlite` 只读打开，绝不写库）留存为验收入口。计划与全部红绿读数见 `docs/plans/2026-10-27-fix-duplicate-false-positive.md`
+  - 二轮审查补漏：首版无条件采信 `s.ino`，而 FAT32/exFAT 卷（U 盘、SD 卡，正是游戏照片的常见落点）与部分重定向网络盘不提供文件索引号，同卷所有文件的 `ino` 恒为退化值 0 —— 此时 `dev` 相同、`ino` 相同会把整卷并成 1 行，`markDuplicatesInWorker` 随即命中 `rows.length < 2` 分支**清空全部 `is_duplicate` 标记**，等于修复本身在低风险文件系统上把功能反向打死。现由模块内 `isUsableKey()`（`key !== null && key.ino !== 0`）把退化身份与 stat 失败同等处理（该行保留、不参与去重也不被去重），与本模块及 `src/main/utils/AGENTS.md` 自陈的「宁可少去重，不可误删候选」口径对齐；新增用例先按红灯取证（读数为两行被并成一行）再转绿，NTFS 上的真实硬链接去重读数逐项不变
+- **全屏查看器顶部工具栏图标压在照片上几乎不可见**：9 处按钮（7 个顶栏 + 左右导航）原写 `icon-btn text-[var(--text-on-overlay)]`，而 `.icon-btn` 是裸 CSS、源序在 `@tailwind utilities` 之后，与该工具类同为 (0,1,0) 且后源序胜出，前景实际被整条盖成 `--text-secondary`(#666666)、hover 再变 `--text-primary`(#1a1a1a)；左右导航另内联硬编码 `rgba(0,0,0,0.4)` 底（白图标最坏 2.85:1）、标题压在渐变透明段为白压白、播放间隔菜单选中项用 `--accent`（默认主题下压深底仅 2.78:1）、收藏激活态用 `--favorite`（最坏 2.32:1，低于 WCAG 1.4.11 的 3:1）。修复为新增 `.icon-btn.icon-btn-on-overlay` 叠加态变体——特异性抬到 (0,2,0)、显式覆盖 hover / focus-visible / disabled 三态、不用 `!important`、不声明 `transform`（缩放仍由 `.icon-btn:hover` 提供，其它 26 个 `.icon-btn` 使用方零改动），并配一组「压在照片上」的令牌 `--overlay-control-*` / `--overlay-gradient-top` / `--overlay-title-shadow` / `--favorite-on-overlay`；这类对比度由照片而非 UI 主题决定，故落 `:root` 而非主题变量块。柔粉主题的 `.icon-btn:hover` 追加 `:not(.icon-btn-on-overlay)` 守卫，与 `.storybook/preview.ts` 刻意反转的源序解耦。计划与读数见 `docs/plans/2026-10-26-fix-fullscreen-toolbar-contrast.md`
+
+### Changed | 变更
+
+- 版本号定为 `2.5.6-beta`，随动的当前版本声明位全部同步：`package.json`、`package-lock.json` 根与 `packages[""]`（`scripts/__tests__/pack-identity-name.test.ts` 硬钉两者等于 `pkg.version`）、`src/renderer/preview/mock/database-mock.ts` 的 `app.getVersion`、`AGENTS.md` 项目概述、`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 头部与 §12.2 版本史、`DEVELOPMENT.md` / `DEVELOPMENT.en.md` 头部与 §7.8 及两处安装包文件名、`README.md` 版本徽章。历史陈述（README 的「2.5.5 新增」段、ARCHITECTURE 表格里标注版本期间的行、各测试自身的 mock 取值）一律不改写，避免破坏可追溯性
+
+---
+
 ## [2.5.5] - 2026-10-23
 
 > 2.5.5 正式版：自 [2.5.5-beta] 定档，去除预发布后缀，**不引入新的功能性变更**。beta 节之后逐轮补录的全部改动（最近一条：2026-10-23「反馈弹窗 QQ 群号占位值更正 + 产物内容禁串闸门」）均已随各轮重新打包出货，本节不重复罗列；四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.5`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.5.exe`。
@@ -447,7 +463,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库已有 8 个 tag，但**全部不带 `v` 前缀**——无前缀形式（`2.3.6`、`2.5.0`）与旧项目名前缀形式（`NikkiGallery2.3.6`、`NikkiGallery2.5.0` / `2.5.1` / `2.5.2` / `2.5.3`、`NikkiGallery2.5.5-beta`）。因此下列 `compare/vX...vY` 与 `releases/tag/vX` 链接**实际均不可访问**（2026-10-24 复核）。处置：除 `[Unreleased]` 因 `scripts/__tests__/check-changelog-release.test.ts` 的契约要求必须保持 `compare/v<最新版本>...HEAD` 形式而原样保留外，其余各版本锚点一律改为指向 Releases 页面，确保链接可用；待补打 `vX.Y.Z` tag 后可整体恢复 compare 形式。
 
-[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.5...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.6-beta...HEAD
+[2.5.6-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.5]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.5-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.3]: https://github.com/QianQianLuLu1/MeowStarMap/releases

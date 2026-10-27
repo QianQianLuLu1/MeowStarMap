@@ -2,7 +2,7 @@
 
 > A beginner-friendly development guide for "Meow Star Map" (喵星图).
 > All commands can be copied directly into a PowerShell terminal.
-> Project codename: `meow-star-map` / App name: Meow Star Map / Current version: 2.5.5 / Platform: Windows x64
+> Project codename: `meow-star-map` / App name: Meow Star Map / Current version: 2.5.6-beta / Platform: Windows x64
 
 ---
 
@@ -786,7 +786,7 @@ After packaging:
 
 ```
 release/
-├── MeowStarMap-Setup-2.5.5.exe  # NSIS installer (artifactName: MeowStarMap-Setup-${version}.${ext})
+├── MeowStarMap-Setup-2.5.6-beta.exe  # NSIS installer (artifactName: MeowStarMap-Setup-${version}.${ext})
 └── builder-effective-config.yaml             # build config snapshot
 ```
 
@@ -836,7 +836,7 @@ Judgements are pinned permanently by `scripts/__tests__/app-icon.test.ts` (four-
 
 ### 7.7 Install and Test
 
-1. Double-click `release\MeowStarMap-Setup-2.5.5.exe` to install
+1. Double-click `release\MeowStarMap-Setup-2.5.6-beta.exe` to install
 2. Launch from Start menu or desktop shortcut
 3. On first launch a full-disk scan runs to locate the game directory (first scan is slow; please be patient)
 4. A desktop shortcut is created automatically (skipped if it already exists)
@@ -847,7 +847,7 @@ Judgements are pinned permanently by `scripts/__tests__/app-icon.test.ts` (four-
 
 - **Do not change the version number** unless explicitly requested
 - Version is in `package.json` `version` field; it also determines the installer filename: `MeowStarMap-Setup-<version>.exe`
-- Current version: `2.5.5`
+- Current version: `2.5.6-beta`
 - After changing it, also update the version badge in `README.md` and the "Current Version" field in `ARCHITECTURE.md` / `ARCHITECTURE.en.md` and the header of this guide
 
 Example (only when explicitly requested):
