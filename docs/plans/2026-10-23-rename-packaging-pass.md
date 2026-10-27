@@ -6,8 +6,8 @@
 > **日期**：2026-10-23
 > **上游计划**：[`2026-10-23-project-rename-meow-star-map.md`](./2026-10-23-project-rename-meow-star-map.md)
 > （§1.1 名称映射表为唯一取值依据，§1.2 为禁改清单；本轮执行其中的 N1 与 N7 的打包/流水线部分）
-> **前置记录**：[`2026-10-23-rename-docs-pass.md`](./2026-10-23-rename-docs-pass.md)（阶段 2 文档与署名层）、
-> [`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md)（阶段 3 界面文字层）
+> **前置记录**：[`2026-10-23-rename-docs-pass.md`](../archive/plans/2026-10-23-rename-docs-pass.md)（阶段 2 文档与署名层，已归档，不入仓）、
+> [`2026-10-23-rename-ui-i18n-pass.md`](../archive/plans/2026-10-23-rename-ui-i18n-pass.md)（阶段 3 界面文字层，已归档，不入仓）
 
 本轮范围 = 由构建配置决定的对外名称：npm 包名与 `%APPDATA%` 数据根、NSIS 的 appId / productName /
 artifactName / shortcutName（⇒ exe 文件名、任务管理器进程名、快捷方式名、卸载显示名、默认安装目录名）、

@@ -507,13 +507,13 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
 | N2 + N4（运行时落盘层）  | 阶段 5：4 提交 + 1 补齐 + 新增 `scripts/__tests__/runtime-disk-name.test.ts` 守卫（25 用例）+ 真实落盘与真证书取证                 | `[VERIFY] ✓` 交付                | 诊断目录 `喵星图`、`%TEMP%` 前缀 `MeowStarMap`、服务名与 CN `Meow Star Map`；本文 §E 的 11 条诊断断言全部转绿，N4 实为 2 条真红（清单漏计 `sync-read-repository.test.ts:739`，见下方订正 5）                                                                   |
 | N3 + N5 + N8（收尾层）   | 阶段 6：5 提交（`c243bd5`…`5a9166d`）+ 新增常驻终扫守卫 `old-name-ledger.test.ts` + 真跑 `npm run dist` 与真落盘取证               | `[VERIFY] ✓` 交付                | 前缀链 65 处翻转（断言侧真红 12 条）；终扫非记录面 199 → 282 行，命中文件集合与台账「40 文件 + 台账 JSON 自身」**双向差集为空**；全量 437 files / 6704 tests 全绿、装置红集合与阶段 5 逐字相同；新 exe 实测落 `meow_star_map.db` + `-wal`/`-shm`/`.clean-exit` |
 
-阶段 2 的红绿读数、保留台账与已知偏差见 [`2026-10-23-rename-docs-pass.md`](./2026-10-23-rename-docs-pass.md)；
+阶段 2 的红绿读数、保留台账与已知偏差见 [`2026-10-23-rename-docs-pass.md`](../archive/plans/2026-10-23-rename-docs-pass.md)（已归档，不入仓）；
 阶段 3（界面文字与多语言资源，覆盖本文 B 类表的全部界面站点，并新发现两处默认内容形态与一处 TLS 证书 CN）见
-[`2026-10-23-rename-ui-i18n-pass.md`](./2026-10-23-rename-ui-i18n-pass.md)；
+[`2026-10-23-rename-ui-i18n-pass.md`](../archive/plans/2026-10-23-rename-ui-i18n-pass.md)（已归档，不入仓）；
 阶段 4（打包、构建与流水线配置，即本文 N1 与 N7 的打包/流水线部分，含真实 `dist:win` 取证）见
 [`2026-10-23-rename-packaging-pass.md`](./2026-10-23-rename-packaging-pass.md)；
 阶段 5（运行时落盘与上线名称，即本文 N2 与 N4 的全部站点，含真实建目录与真证书取证）见
-[`2026-10-23-rename-runtime-pass.md`](./2026-10-23-rename-runtime-pass.md)；
+[`2026-10-23-rename-runtime-pass.md`](../archive/plans/2026-10-23-rename-runtime-pass.md)（已归档，不入仓）；
 阶段 6（收尾：N3 落库名前缀链、N5 导出文件名、N8 生效文档与人工搬迁清单，含 §十一 全量回归、
 终扫白名单台账与常驻守卫）见 [`2026-10-23-rename-final-pass.md`](./2026-10-23-rename-final-pass.md)。
 本文 §1.1 的名称映射表与 §1.2 的禁改清单是全部节点（N1–N8）的取值依据，**N1–N8 已随阶段 6 全部交付**；
@@ -554,7 +554,7 @@ npm run doctor            # 横幅 42 列对齐、DB 检查指向新根
 1. §N7 的验收写的「`git grep -c "/home/runner/work/MeowStarMap/MeowStarMap"` = 4」实为 **3 个文件 / 7 处字面量**
    （`tests/ci-linux.setup.ts:51/:126`、`tests/mocks/ci-linux-fs.ts:23/:292`、
    `src/main/utils/ci-linux-emulation.test.ts:53/:128/:132`）。
-2. §N7 与 `docs/plans/2026-10-21-fix-ci-smoke-timeout-and-clear-warnings.md` 说「改装置需同步
+2. §N7 与 `docs/archive/plans/2026-10-21-fix-ci-smoke-timeout-and-clear-warnings.md`（已归档，不入仓）说「改装置需同步
    `path-semantics-guard` 登记表」——阶段 4 实测该守卫只断言装置文件存在与七轴 token 在场，
    **不钉 `CI_ROOT` 字面值**，故登记表无需同步。
 3. §N1 的绿灯写的「`npx prettier --check --end-of-line auto package.json package-lock.json`」对 lock 是空操作

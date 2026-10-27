@@ -1,6 +1,6 @@
 # 2026-10-22 性能基线按运行环境分设 dev / ci 两段
 
-> 承接 `docs/plans/2026-10-21-fix-ci-smoke-timeout-and-clear-warnings.md` §10.11 的远端验证补录：那一轮把冒烟红点收口后，障碍下移到 step 10 性能基准回归。本轮处理该障碍，并把 §10.11 一并入库。
+> 承接 `docs/archive/plans/2026-10-21-fix-ci-smoke-timeout-and-clear-warnings.md`（已归档，不入仓）§10.11 的远端验证补录：那一轮把冒烟红点收口后，障碍下移到 step 10 性能基准回归。本轮处理该障碍，并把 §10.11 一并入库。
 
 ## 1. Context
 
