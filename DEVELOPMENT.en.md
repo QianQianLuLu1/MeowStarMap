@@ -53,7 +53,7 @@ npm -v
 
 Expected output: `10.x.x` or higher.
 
-> If `node -v` errors or returns a version below 20, download the LTS version from [nodejs.org](https://nodejs.org/).
+> If `node -v` errors or returns a version below 22 (`package.json` requires `engines.node >= 22.12.0`, and `.node-version` pins 22), download the LTS version from [nodejs.org](https://nodejs.org/).
 
 ---
 
@@ -168,7 +168,7 @@ MeowStarMap/
 │   │   │   ├── ipc.ts               # IpcError class + call<T> unwrapping + subscribe event helper
 │   │   │   ├── plugin-bridge.ts     # Plugin capability bridge (window.pluginAPI) + i18n.t injection point
 │   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 33 files; each exports a <key>API object)
-│   │   ├── app/               # App lifecycle management (25 source files)
+│   │   ├── app/               # App lifecycle management (27 source files)
 │   │   │   ├── application.ts       # App main class
 │   │   │   ├── lifecycle.ts         # Lifecycle management
 │   │   │   ├── cleanup.ts           # Exit cleanup
@@ -327,7 +327,7 @@ explorer "$env:APPDATA\meow-star-map\logs"
 Key log files:
 
 - `main.log`: application log
-- `faults-YYYY-MM-DD.jsonl`: fault records (10 FaultType categories, rolled by date)
+- `faults-YYYY-MM-DD.jsonl`: fault records (18 FaultType categories, rolled by date)
 - `startup-errors.log`: startup error log (in the userData root or `Documents\MeowStarMap\Diagnostics\`, 100KB rolling)
 
 ### 4.5 Inspect the Database
@@ -750,10 +750,11 @@ npm run dist:win
 
 This runs sequentially:
 
-1. `npm run build`: `clean` → `electron-vite build` → write `dist/main/package.json` (`{"type":"commonjs"}`)
-2. `npm run pre-dist-check`: artifact timestamps, key fixpoints, Git working tree, plus README Electron version matching `package.json`
-3. `electron-builder --win --publish never`: package the Windows NSIS installer
-4. `npm run verify:dist`: verify runtime dependencies such as the VC++ runtime are bundled inside the asar
+1. `npm run build:recycle-helper`: `node scripts/build-recycle-helper.cjs` compiles `resources/nikkisync/recycle-helper.cs` into `nikkisync-recycle-helper.exe` with the .NET Framework `csc.exe` (skipped with exit 0 on non-win32; ordered before `clean` because `clean` does not touch `resources/`)
+2. `npm run build`: `clean` → `electron-vite build` → write `dist/main/package.json` (`{"type":"commonjs"}`)
+3. `npm run pre-dist-check`: three chained steps — artifacts newer than sources (this replaced the old main-vs-renderer timestamp comparison), key fixpoints, Git working tree; README Electron version matching `package.json`; the CHANGELOG back-fill obligation for the version section
+4. `electron-builder --win --publish never`: package the Windows NSIS installer
+5. `npm run verify:dist`: verify runtime dependencies such as the VC++ runtime are bundled inside the asar
 
 ### 7.3 Step-by-Step (for debugging)
 
@@ -772,13 +773,14 @@ npx electron-builder --win --publish never
 > Full release sequence (with artifact verification, recommended for releases):
 >
 > ```bash
+> npm run build:recycle-helper
 > npx electron-vite build
 > npm run pre-dist-check
 > npx electron-builder --win --publish never
 > npm run verify:dist
 > ```
 >
-> `npm run dist:win` is equivalent to the four steps above (step 1 is `npm run build`, which may fail on this machine due to the Safe-Delete gateway — see [2.6](#26-build-artifacts-no-installer)).
+> `npm run dist:win` is equivalent to the five steps above (`npm run build` = `clean` + `electron-vite build` + writing `dist/main/package.json`; the `clean` step may fail on this machine due to the Safe-Delete gateway — see [2.6](#26-build-artifacts-no-installer)).
 
 ### 7.4 Output Location
 
@@ -871,6 +873,33 @@ Drift check:
 ```bash
 npm run preview:check
 ```
+
+#### 7.9.1 Sync Checklist
+
+After changing any of the following files under `src/renderer/`, `preview.html` must be updated in step and `npm run preview:check` must pass:
+
+| Changed exe file                                                         | preview.html content to sync                                |
+| ------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| `components/layout/Sidebar.tsx`                                          | `SIDEBAR_NAV_ITEMS` array + profile switcher + footer stats |
+| `components/layout/TitleBar.tsx`                                         | title bar structure + drag region                           |
+| `pages/GalleryPage.tsx`                                                  | toolbar + view modes + batch operations                     |
+| `pages/DetailPage.tsx`                                                   | detail layout + EXIF panel + keyboard navigation            |
+| `pages/EditorPage.tsx` + `components/editor/*`                           | EditorToolbar + EditorTabs + histogram                      |
+| `pages/SettingsPage.tsx`                                                 | settings items + sub-pages                                  |
+| `pages/CategoriesPage.tsx` / `RecycleBinPage.tsx` / `DuplicatesPage.tsx` | the corresponding pages                                     |
+| `styles/globals.css` + `styles/themes/*.css`                             | the `:root` and `.soft-pink-luxury` CSS variables           |
+| `i18n/locales/zh-CN.json`                                                | Chinese copy (hard-coded in preview)                        |
+| `package.json` dependencies                                              | versions referenced by preview CDN tags                     |
+
+#### 7.9.2 Required Before Commit
+
+```bash
+npm run preview:check    # must PASS or only WARN
+npm run typecheck        # TypeScript type check
+npm run lint             # ESLint check
+```
+
+> Governance strategy and detection dimensions: see the output of `npm run preview:check` and the source of `scripts/check-preview-drift.ts`.
 
 ---
 

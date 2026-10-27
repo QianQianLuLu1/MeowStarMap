@@ -51,7 +51,7 @@ Meow Star Map is an Electron + React based desktop application that provides pla
 | **Settings Center**           | 8 groups: startup / appearance / scan / profile / data / diagnostics / about / tools                                                                                                                                                                                                                                                                                                              |
 | **Internationalization**      | 12 languages (zh-CN/zh-TW/en/ja/ko/fr/de/es/pt/ru/th/vi) with "Follow System" option                                                                                                                                                                                                                                                                                                              |
 | **Themes**                    | Default theme + Soft Pink Luxury theme; CSS variable driven; zero JS re-render switching                                                                                                                                                                                                                                                                                                          |
-| **Diagnostics**               | Fault logs (10 FaultTypes) + crash dumps + startup diagnostics + process exit diagnostics                                                                                                                                                                                                                                                                                                         |
+| **Diagnostics**               | Fault logs (18 FaultTypes) + crash dumps + startup diagnostics + process exit diagnostics                                                                                                                                                                                                                                                                                                         |
 | **Game Param Decryption**     | Decrypts in-game photo camera params via koffi calling nuan5_decryption.dll                                                                                                                                                                                                                                                                                                                       |
 | **Resonance Records** (2.5.0) | Browse pull records and add manual entries; My Wardrobe (items / makeup / Momo / props / eureka colors) ownership with outfit completion progress; local JSON import & export (parse preview → batched transactions → cancellable and idempotent resume); personal stats (luck percentile and drop distribution). 6 resonance tables + 10 IPC channels, fully offline with zero external requests |
 
@@ -259,7 +259,7 @@ The six utilityProcesses use a consistent pattern but independent message protoc
 
 10. scannerManager.setDbPath() + mediaWorkerManager.setDbPath()
 
-11. setupIPC() (register ~15 domain IPC handlers + pathGuard init)
+11. setupIPC() (registers 43 `registerXxxHandlers` groups, one per domain file under `src/main/ipc/handlers/`, plus pathGuard init)
 
 12. createMainWindow()
     ├─ loadFile('dist/renderer/index.html')
@@ -348,7 +348,7 @@ MeowStarMap/
 │   └── perf-test/                     # Performance baseline scripts
 ├── src/
 │   ├── main/                          # Main process
-│   │   ├── app/                       # App lifecycle management (25 source files)
+│   │   ├── app/                       # App lifecycle management (27 source files)
 │   │   │   ├── application.ts         # App main class (phased orchestration)
 │   │   │   ├── lifecycle.ts           # Lifecycle management (single-instance lock etc.)
 │   │   │   ├── cleanup.ts             # Exit cleanup
@@ -460,7 +460,7 @@ MeowStarMap/
 │   │   ├── i18n/                      # Main process i18n
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # Worker-side pure lookup translation
-│   │   ├── utils/                     # Main process utilities (32 modules)
+│   │   ├── utils/                     # Main process utilities (33 modules)
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -484,7 +484,7 @@ MeowStarMap/
 │   │   ├── components/
 │   │   │   ├── common/                # Common components (30+)
 │   │   │   ├── editor/                # Editor components (12)
-│   │   │   ├── gallery/               # Gallery components (16)
+│   │   │   ├── gallery/               # Gallery components (18)
 │   │   │   ├── layout/                # Layout components (AppShell/Sidebar/TitleBar)
 │   │   │   ├── resonance/             # Resonance Records view components
 │   │   │   ├── scanner/               # Scanner components (ScanButton/ScanProgress)
@@ -814,7 +814,7 @@ Three major capabilities:
 | `ffmpeg-runner.ts`         | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                                            |
 | `file-utils.ts`            | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)                                    |
 | `ipc-validate.ts`          | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                                               |
-| `logger.ts`                | Log management (10 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                                  |
+| `logger.ts`                | Log management (18 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                                  |
 | `managed-read-stream.ts`   | File read-stream lifecycle utility (`createManagedReadStream`: error listener + AbortSignal cancellation + fd release)                                 |
 | `media-constants.ts`       | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                                              |
 | `path-safety.ts`           | Path safety utilities (sensitive dir detection / read-only dir detection etc.)                                                                         |
@@ -831,7 +831,7 @@ Three major capabilities:
 
 ### 5.10 App Lifecycle Management (app/)
 
-Application orchestration layer bootstrapped from `index.ts`, with 25 source files each handling a specific responsibility:
+Application orchestration layer bootstrapped from `index.ts`, with 27 source files each handling a specific responsibility:
 
 | File                     | Responsibilities                                                                                          |
 | ------------------------ | --------------------------------------------------------------------------------------------------------- |
@@ -919,7 +919,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | **OutfitGalleryPage**            | Outfit gallery. Aggregates by outfit, StatCard + OutfitCard grid, click to jump to filtered gallery                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | **RecycleBinPage**               | Recycle bin. Soft-deleted file list, select all/invert, restore/hard delete/empty, failed op retry                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | **SettingsPage**                 | Settings center. Left nav + right section content; `activeSection` persisted to localStorage                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| **ResonanceRecordsPage** (2.5.0) | Resonance Records. Four switchable views — pull records (73 banners, manual entry / edit time / delete, virtual scrolling), My Wardrobe (five-category ownership, outfit completion progress, name search and filters, batch select, "infer from pull records"), import & export (parse preview → added/duplicate/invalid counts with per-item location → batched transactional commit with visible, cancellable progress), personal stats (overview cards, luck percentile, SVG distribution histogram, per-banner cumulative curve and detail table) |
+| **ResonanceRecordsPage** (2.5.0) | Resonance Records. Four switchable views — pull records (77 banners, manual entry / edit time / delete, virtual scrolling), My Wardrobe (five-category ownership, outfit completion progress, name search and filters, batch select, "infer from pull records"), import & export (parse preview → added/duplicate/invalid counts with per-item location → batched transactional commit with visible, cancellable progress), personal stats (overview cards, luck percentile, SVG distribution histogram, per-banner cumulative curve and detail table) |
 
 #### `pages/settings/` — Section Files (split by settings group)
 
@@ -941,11 +941,11 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 
 ### 6.3 Layout Components (components/layout/)
 
-| Component    | Responsibilities                                                                                                                                                                                     |
-| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **AppShell** | Overall layout skeleton. TitleBar (top) + Sidebar (left) + main (content) + bottom status bar                                                                                                        |
-| **Sidebar**  | Side bar. Collapsible (motion.aside width animation 64↔220). Contains back-to-top button, character profile switcher, 9 main nav items, smart grouping quick panel (gallery view only), bottom stats |
-| **TitleBar** | Top title bar. Fixed height 40px, `app-drag` class (Electron drag region), shows app icon + i18n title                                                                                               |
+| Component    | Responsibilities                                                                                                                                                                                      |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AppShell** | Overall layout skeleton. TitleBar (top) + Sidebar (left) + main (content) + bottom status bar                                                                                                         |
+| **Sidebar**  | Side bar. Collapsible (motion.aside width animation 64↔220). Contains back-to-top button, character profile switcher, 10 main nav items, smart grouping quick panel (gallery view only), bottom stats |
+| **TitleBar** | Top title bar. Fixed height 40px, `app-drag` class (Electron drag region), shows app icon + i18n title                                                                                                |
 
 ### 6.4 Common Components (components/common/)
 
@@ -1043,7 +1043,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **scanner/ScanProgress**: Scan progress bar (scanned/found/currentPath + stop button)
 - **video/VideoPlayer**: Video player (playback progress persisted to localStorage by src hash)
 
-### 6.8 Custom Hooks (23)
+### 6.8 Custom Hooks (30 non-test files)
 
 #### Media Operation Class (7)
 
@@ -1080,6 +1080,16 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **useGlobalUndo**: Global undo hook (App top-level registers Ctrl+Z, active in non-editor views, skips when input focused)
 - **useStagedTask**: Staged task progress hook (drives TaskProgress stage states and item progress, throttled pushes, carries a cancellation signal)
 
+#### View Interaction & On-Demand Generation (7)
+
+- **useFluidTabIndicator**: fluid slider tab indicator (measures the active tab position to drive the indicator offset)
+- **useGlassScrollSignal**: liquid-glass global signal hook (mounted once by AppShell, serving the Sidebar / TitleBar glass panels)
+- **useIsScrolling**: scrolling-state signal (capture + passive listener, **writes a ref only and never triggers a render**, suppresses hover switches while scrolling)
+- **useMultiSelection**: multi-selection state (Ctrl / Shift range selection and set maintenance)
+- **useNeighborPrefetch**: neighbour prefetch (thumbnail-optimization plan node 4, prefetching around the current index)
+- **useOnDemandThumbnails**: on-demand thumbnail generation entry point for the visible area (module-level Promise cache ensures one request per target)
+- **useWheelPageNav**: wheel page-turn hook for the fullscreen preview (with cooldown and side-button / edge hotzone coordination)
+
 ### 6.9 State Management (stores/)
 
 | Store                     | Persistence                                              | Responsibilities                                                                                                                                                                                                                                                                                                                                                                                                 |
@@ -1087,7 +1097,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | **uiStore**               | `wxnn-ui-store`                                          | UI global state: currentView + viewStack, selectedMediaId(s), sidebarCollapsed, searchQuery/sortBy/sortOrder/viewMode/filterType/filterDateRange/filterRating, selectedSceneCategories/selectedSceneTimes/filterOutfit, showMissingOnly/showDuplicates, groupDimension/selectedGroupKey, fullscreen state (incl. fullscreenTargetImg for View Transitions shared element transition), slideshow state and config |
 | **mediaStore**            | No (in-memory)                                           | Media data: mediaFiles/categories/loading/scanProgress/editingMedia/recycleBinFiles, currentProfileUid/profiles. Pure reducer actions + async action `updateMediaFileAndPersist` (IPC persist first, then update local)                                                                                                                                                                                          |
 | **themeStore**            | `wxnn-ui-theme`                                          | Theme management (setTheme + applyThemeClass, auto-derives all non-empty classNames from themes config)                                                                                                                                                                                                                                                                                                          |
-| **operationHistoryStore** | No (in-memory + IPC persists to operation_history table) | Global operation history. 50 cap, 9 OperationTypes, type-dispatched UndoHandler registry (module-level Map), database write failure callback Set subscription, loadFromDatabase startup load                                                                                                                                                                                                                     |
+| **operationHistoryStore** | No (in-memory + IPC persists to operation_history table) | Global operation history. 50 cap, 10 OperationTypes (the store's own union, including `notes_update` — **same name, different set** from the 14-member `OperationType` in `src/shared/types/editor.ts`; do not conflate them), type-dispatched UndoHandler registry (module-level Map), database write failure callback Set subscription, loadFromDatabase startup load                                          |
 | **resonanceStore**        | No (in-memory)                                           | Resonance Records data (records / wardrobe / stats and import-export state); added in 2.5.0                                                                                                                                                                                                                                                                                                                      |
 | **pluginStore**           | No (in-memory)                                           | Plugin runtime state (installed/enabled plugin list, in-progress install/uninstall operation flags and error info)                                                                                                                                                                                                                                                                                               |
 
@@ -1125,7 +1135,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 #### `themes/index.ts`
 
 - Theme config center. `UITheme = 'default' | 'soft-pink-luxury'`
-- `themes` array: `{ id, name, className }` (default appends no class; soft-pink-luxury appends `.soft-pink-luxury` class)
+- `themes` array: `{ id, nameKey, className }` (`nameKey` is an i18n key resolved via `t(nameKey)` in the UI; default appends no class; soft-pink-luxury appends `.soft-pink-luxury` class)
 - Adding a theme flow: 1) register here; 2) add same-named CSS file and import in globals.css
 
 #### `themes/soft-pink-luxury.css`
@@ -1136,7 +1146,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 
 ### 6.13 Icon Management (icons/)
 
-- **Single-file centralized management of all icons**, exports 74 icon components
+- **Single-file centralized management of all icons**, exports 75 icon components
 - Based on `BaseIcon` unified wrapper: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">`, follows Feather/Lucide style
 - `IconProps` interface extends `React.SVGProps<SVGSVGElement>` + `size?: number` (default 16)
 - Categorized by purpose: Action (17) / View (5) / Navigation (7) / Editor (10) / Media (5) / Status (4) / File Ops (5) / Category & Tag (3) / Share Channel (4) / Import-Export (2) / Playback Control (2) / Social Platform (3) / Other (7)
@@ -1187,11 +1197,11 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 | **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile` (27 fields) / `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                                         |
 | **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon` (7 enums)                                                                                                                                                                              |
 | **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                                       |
-| **editor.ts**          | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (13 op types) / `OperationHistoryRow`                                                                                        |
+| **editor.ts**          | `HSLColorKey` (12 channels) / `FilterParams` (22 adjustments + HSL + curves + split-tone + LUT) / `FilterPresetRow` / `EditHistoryRow` / `OperationType` (14 op types) / `OperationHistoryRow`                                                                                        |
 | **watermark.ts**       | `WatermarkPosition` (9 + custom) / `WatermarkStyle` (5 types) / `BlendMode` (16 types) / `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                                   |
 | **settings.ts**        | `AppSettingRow` / `SettingKey` (29 key enums) / `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap` (key → TS type mapping) / `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                                               |
-| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (24 domain prefixes / 91 unique channel name constants) |
-| **ipc-types.ts**       | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (9 IPC_* error codes)                                                                                                             |
+| **ipc.ts**             | Re-exports `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`, `ShareChannel` / `WifiShareSession`, `MediaParamType` / `CameraParams` / `RichCameraParams`, `ImportOptions` / `ExportOptions`, **`IPC_CHANNELS`** (23 domain prefixes / 86 unique channel name constants) |
+| **ipc-types.ts**       | `IpcError` (code/message/userMessage/details), `IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`, `IpcProgress`, `IPC_ERROR_CODES` (8 IPC_* error codes)                                                                                                             |
 | **progress.ts**        | `TaskType` (7 task types: scan/duplicate/batch/watermark/import/video-edit/indexing), `TaskPhase` (6 phases), unified task progress state (pushed via the main-process `task:progress` channel)                                                                                       |
 | **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` capability list / business extension point constants and extension response types                                                                                                                                                         |
 | **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / XMP self-describing serialization structures for color, filter, LUT and watermark params                                                                                                                                                           |
@@ -1203,7 +1213,7 @@ Data support layer for the HTML preview (`preview.html`), enabling the preview t
 
 #### `error-codes.ts`
 
-- **`ERROR_CODES`**: Extends 2 codes on top of `IPC_ERROR_CODES` 9 codes (`APP_DATABASE_ERROR` / `APP_FILE_SYSTEM_ERROR`), totaling 11 error codes
+- **`ERROR_CODES`**: Extends 2 codes on top of `IPC_ERROR_CODES` 8 codes (`APP_DATABASE_ERROR` / `APP_FILE_SYSTEM_ERROR`), totaling 10 error codes
 - **`ErrorCategory`** enum: 6 major categories — `Validation` / `NotFound` / `Permission` / `Database` / `FileSystem` / `Internal`
 - **`CODE_TO_CATEGORY`**: Static mapping from error code to category
 - Utility functions: `categoryOfCode(code)` / `isUserFacing(category)`
@@ -1394,7 +1404,7 @@ components / pages (display)
 | **`filter_presets`**        | `id`, `name`, `category`, `params` (JSON), `is_builtin`, `created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                | Filter presets                                                                                                                                                      |
 | **`watermark_templates`**   | `id`, `name`, `config` (JSON), `is_builtin`, `created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Watermark templates                                                                                                                                                 |
 | **`edit_history`**          | `id`, `media_id` (FK CASCADE), `params` (JSON), `thumbnail`, `created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                            | Per-media edit history                                                                                                                                              |
-| **`operation_history`**     | `id`, `operation_type` (13 types), `media_id`, `payload` (JSON), `description`, `created_at`                                                                                                                                                                                                                                                                                                                                                                                                                         | Global operation history (cross-restart undo); auto-cleans records older than 30 days on startup                                                                    |
+| **`operation_history`**     | `id`, `operation_type` (10 types, taken from `operationHistoryStore`'s union), `media_id`, `payload` (JSON), `description`, `created_at`                                                                                                                                                                                                                                                                                                                                                                             | Global operation history (cross-restart undo); auto-cleans records older than 30 days on startup                                                                    |
 | **`character_profiles`**    | `uid` (PK), `nickname`, `avatar`, `created_at`, `last_active_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Character profiles; default 'default'                                                                                                                               |
 | **`favorites`**             | `id` (PK AUTOINCREMENT), `media_id` (NOT NULL UNIQUE), `created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Favorite links (coexists with `media_files.is_favorite`)                                                                                                            |
 | **`import_roots`**          | `id` (PK AUTOINCREMENT), `root_path` (NOT NULL UNIQUE), `created_at`, `disabled` (default 0)                                                                                                                                                                                                                                                                                                                                                                                                                         | Registered import roots, used by the import wizard and path authorization                                                                                           |
@@ -1419,7 +1429,7 @@ components / pages (display)
 
 ### 9.3 Key Indexes
 
-**`media_files` single-column indexes (15)**: `file_type` / `category_id` / `is_favorite` / `modified_at` / `thumbnail` / `source_path` / `scene_category` / `scene_time` / `outfit` / `is_deleted` / `is_missing` / `phash` / `account_uid` / `album_type` / `is_duplicate` / `original_id` / `media_source`
+**`media_files` single-column indexes (18)**: `file_type` / `category_id` / `is_favorite` / `modified_at` / `thumbnail` / `source_path` / `scene_category` / `scene_time` / `outfit` / `is_deleted` / `is_missing` / `phash` / `account_uid` / `album_type` / `is_duplicate` / `original_id` / `media_source` / `is_corrupted`
 
 **Composite indexes (5)**:
 
@@ -1479,7 +1489,7 @@ components / pages (display)
 
 #### 10.2.1 Fault Logs (logger.ts)
 
-- **10 FaultTypes**: uncaughtException / unhandledRejection / rendererCrash / ipcError / databaseError / fileSystemError / startupError / exitDiagnosis / decryptionError / custom
+- **18 FaultTypes** (`src/main/utils/logger.ts:13-31`): uncaughtException / unhandledRejection / rendererCrash / rendererError / ipcError / manual / rendererComponent / rendererPromise / rendererResource / exitDiagnosis / workerCrash / workerRestart / databaseCorruption / databaseRestore / indexingTimeout / renderer-not-ready / schedulerStuckPaused / navigation-blocked (`renderer-not-ready` is the only hyphenated member; do not infer a naming rule from it)
 - **FaultRecord** contains full env info: appVersion / electronVersion / nodeVersion / platform / osVersion / pid / uptime
 - Total log cap 2GB; oldest-by-mtime eviction on overflow
 - File naming: `faults-YYYY-MM-DD.jsonl`
@@ -1589,7 +1599,7 @@ components / pages (display)
 #### `src/main/tsconfig.json` (Main Process)
 
 - `target: ES2020`, `module: commonjs` (Electron main process needs CJS)
-- `outDir: '../../dist/main'`, `rootDir: '../'`
+- `outDir: '../../.cache/tsmain'` (**deliberately isolated from the build artifact tree**: if `tsc -b` wrote back into `dist/main` it would overwrite electron-vite's `preload.js` / `app/index.js` with per-file CJS, and the `sandbox: true` preload could no longer require sibling modules; this target is pinned by `scripts/__tests__/typecheck-emit-isolation.test.ts` and must not be moved back to `dist/main`, nor sidestepped with `tsc -b --noEmit` — a referenced composite project cannot disable emit and the root tsconfig would fail with TS6310), `rootDir: '../'`
 - `declaration: true`, `sourceMap: true`, `composite: true`
 - `include: ["**/*", "../shared/**/*"]`
 
@@ -1605,18 +1615,19 @@ components / pages (display)
 - `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**: 10 native dependency entries unpacked to disk — `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
+- **`asarUnpack`**: 11 native dependency entries unpacked to disk — `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
 - **Windows NSIS**: x64, non-one-click, allows custom install dir, force create desktop shortcut + start menu shortcut
 - `signExecutable: false` / `verifyUpdateCodeSignature: false` — code signing not enabled, but **the exe icon and PE version metadata are still written via resedit**. This used to read `signAndEditExecutable: false`, which makes electron-builder skip resource editing along with signing, leaving the app exe / desktop shortcut / taskbar on the Electron default icon.
 
 ### 11.3 Build Flow
 
-1. `clean` — delete `dist/renderer/assets` and `dist/main`
-2. `electron-vite build` — compiles the main process (`src/main` + `shared/`, CJS) → `dist/main/`, and bundles the React app with Vite → `dist/renderer/`; then writes `dist/main/package.json` (`{"type":"commonjs"}`)
-3. `pre-dist-check` — verifies main / renderer artifact timestamp gap ≤ 5 minutes, that key fixpoints are compiled in, and that the Git working tree is clean; also verifies the Electron version in `README.md` matches `package.json` (a mismatch blocks packaging)
-4. `electron-builder --win --publish never` — packages the NSIS installer per `package.json#build` into `release/` as `MeowStarMap-Setup-<version>.exe`; the afterPack hook `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe`
-5. `verify:dist` — `pre-dist-check --verify-asar`, asserting runtime dependencies such as the VC++ runtime are bundled
-6. Native module rebuild — locally via `npx @electron/rebuild`; during packaging automatically via `build.npmRebuild: true` (better-sqlite3 / sharp / koffi)
+1. `build:recycle-helper` — `node scripts/build-recycle-helper.cjs` compiles `resources/nikkisync/recycle-helper.cs` into `nikkisync-recycle-helper.exe` with the .NET Framework `csc.exe` (consumed by the K8 organizer queue's Windows Recycle Bin path); a missing csc, a compile failure or a missing artifact all exit non-zero, while non-win32 skips with exit 0. This step runs before `clean` because `clean` does not touch `resources/`, and `extraResources` must find the built helper
+2. `clean` — delete `dist/renderer/assets` and `dist/main`
+3. `electron-vite build` — compiles the main process (`src/main` + `shared/`, CJS) → `dist/main/`, and bundles the React app with Vite → `dist/renderer/`; then writes `dist/main/package.json` (`{"type":"commonjs"}`)
+4. `pre-dist-check` — three chained scripts: `scripts/pre-dist-check.ts` (asserts artifacts are newer than sources — this check replaced the old main-vs-renderer timestamp gap — that key fixpoints are compiled in, and that the Git working tree is clean), `scripts/check-doc-versions.ts` (the Electron version in `README.md` must match `package.json`; a mismatch blocks packaging), `scripts/check-changelog-release.ts` (the changelog back-fill obligation per version section)
+5. `electron-builder --win --publish never` — packages the NSIS installer per `package.json#build` into `release/` as `MeowStarMap-Setup-<version>.exe`; the afterPack hook `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe`
+6. `verify:dist` — `pre-dist-check --verify-asar`, asserting runtime dependencies such as the VC++ runtime are bundled
+7. Native module rebuild — locally via `npx @electron/rebuild`; during packaging automatically via `build.npmRebuild: true` (better-sqlite3 / sharp / koffi)
 
 ### 11.4 Key Dependencies
 
@@ -1746,7 +1757,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 ### 12.14 Resonance Records Module Constraints
 
-- **Offline first**: the resonance module must not issue any network request. All static data ships with the app — 11 catalog shards plus `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json`, a 12-language entity name pack, and 73 banner thumbnails (~7.1 MB). Banner thumbnails are resolved via a static import from `src/renderer/data/resonance/thumbnails/index.ts` to a relative in-bundle URL (`base: './'`) — zero external links
+- **Offline first**: the resonance module must not issue any network request. All static data ships with the app — 11 catalog shards plus `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json`, a 12-language entity name pack, and 77 banner thumbnails (~7.1 MB). Banner thumbnails are resolved via a static import from `src/renderer/data/resonance/thumbnails/index.ts` to a relative in-bundle URL (`base: './'`) — zero external links
 - **Main-process responsibility boundary**: the main process only does zod validation, PathGuard allow-list checks (`assertFileReadPath` / `assertFileWritePath`), file I/O and SQLite access. Import parsing, merge/dedupe, diff counting and export payload assembly are all renderer-side pure functions (`src/renderer/utils/resonance/`)
 - **Import limits** (constants in `src/shared/types/resonance.ts`): `MAX_IMPORT_FILE_BYTES` = 64 MB per file, `MAX_TOTAL_IMPORT_RECORDS` = 200000, `MAX_PULLS_PER_BANNER` = 50000, `MAX_COMMIT_BATCH_ROWS` = 2000 per commit batch, `MAX_WARDROBE_BATCH` = 5000
 - **Import commit**: the renderer calls `resonance:commitImport` in batches of `MAX_COMMIT_BATCH_ROWS`; each batch is one transaction with `INSERT OR IGNORE` (idempotent, resumable after interruption). `wardrobe` is carried only by the final batch (full overwrite)
@@ -1984,7 +1995,7 @@ Theme switching with zero JS re-render.
 | `resources/nuan5_decryption.dll`        | Game photo param decryption DLL                                                                                                                                          |
 | `src/renderer/assets/cloth-names.json`  | 7369 clothing names                                                                                                                                                      |
 | `src/renderer/assets/outfit-names.json` | 657 outfit names                                                                                                                                                         |
-| `src/renderer/data/resonance/`          | Resonance static data (11 catalog shards + banner / outfit / percentile snapshots + 12-language names + 73 banner thumbnails, ~7.1 MB, bundled with zero external links) |     |
+| `src/renderer/data/resonance/`          | Resonance static data (11 catalog shards + banner / outfit / percentile snapshots + 12-language names + 77 banner thumbnails, ~7.1 MB, bundled with zero external links) |     |
 
 ---
 

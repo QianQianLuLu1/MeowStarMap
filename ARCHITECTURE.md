@@ -51,7 +51,7 @@
 | **设置中心**        | 启动行为/外观/扫描/档案/数据/诊断/关于/工具 8 大分组配置                                                                                                                                                                        |
 | **国际化**          | 12 种语言（zh-CN/zh-TW/en/ja/ko/fr/de/es/pt/ru/th/vi），含"跟随系统"选项                                                                                                                                                        |
 | **主题**            | 默认主题 + 柔粉轻奢主题，CSS 变量驱动，零 JS 重渲染切换                                                                                                                                                                         |
-| **诊断**            | 故障日志（10 类 FaultType）+ 崩溃 dump + 启动诊断 + 进程退出诊断                                                                                                                                                                |
+| **诊断**            | 故障日志（18 类 FaultType）+ 崩溃 dump + 启动诊断 + 进程退出诊断                                                                                                                                                                |
 | **游戏参数解密**    | 通过 koffi 调用 nuan5_decryption.dll 解密游戏内照片相机参数                                                                                                                                                                     |
 | **共鸣录**（2.5.0） | 抽卡记录浏览与手动补录、我的衣橱（部件/妆容/Momo/道具/共鸣色）拥有状态与套装收集进度、本地 JSON 导入导出（解析预览 → 分批事务 → 可取消、断点幂等）、个人统计（欧非百分位与出货分布）；6 张共鸣表 + 10 个 IPC 通道，纯离线零外链 |
 
@@ -259,7 +259,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 
 10. scannerManager.setDbPath() + mediaWorkerManager.setDbPath()
 
-11. setupIPC()（注册 ~15 个域的 IPC handler + pathGuard 初始化）
+11. setupIPC()（注册 43 组 `registerXxxHandlers`，对应 `src/main/ipc/handlers/` 的 43 个域文件 + pathGuard 初始化）
 
 12. createMainWindow()
     ├─ loadFile('dist/renderer/index.html')
@@ -348,7 +348,7 @@ MeowStarMap/
 │   └── perf-test/                     # 性能基线脚本
 ├── src/
 │   ├── main/                          # 主进程
-│   │   ├── app/                       # 应用生命周期管理（25 个源文件）
+│   │   ├── app/                       # 应用生命周期管理（27 个源文件）
 │   │   │   ├── application.ts         # 应用主类（阶段化编排）
 │   │   │   ├── lifecycle.ts           # 生命周期管理（单实例锁等）
 │   │   │   ├── cleanup.ts             # 退出清理
@@ -460,7 +460,7 @@ MeowStarMap/
 │   │   ├── i18n/                      # 主进程国际化
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # worker 内纯查表翻译
-│   │   ├── utils/                     # 主进程工具（32 个模块）
+│   │   ├── utils/                     # 主进程工具（33 个模块）
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -484,7 +484,7 @@ MeowStarMap/
 │   │   ├── components/
 │   │   │   ├── common/                # 通用组件（30+ 个）
 │   │   │   ├── editor/                # 编辑器组件（12 个）
-│   │   │   ├── gallery/               # 画廊组件（16 个）
+│   │   │   ├── gallery/               # 画廊组件（18 个）
 │   │   │   ├── layout/                # 布局组件（AppShell/Sidebar/TitleBar）
 │   │   │   ├── resonance/             # 共鸣录视图组件
 │   │   │   ├── scanner/               # 扫描组件（ScanButton/ScanProgress）
@@ -813,7 +813,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | `ffmpeg-runner.ts`         | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                      |
 | `file-utils.ts`            | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash）    |
 | `ipc-validate.ts`          | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                          |
-| `logger.ts`                | 日志管理（10 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                              |
+| `logger.ts`                | 日志管理（18 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                              |
 | `managed-read-stream.ts`   | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                      |
 | `media-constants.ts`       | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                            |
 | `path-safety.ts`           | 路径安全工具（敏感目录判定 / 只读目录检测等）                                                                   |
@@ -836,7 +836,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.10 应用生命周期管理（app/）
 
-从 `index.ts` 引导启动的 Application 编排层，25 个源文件各司其职：
+从 `index.ts` 引导启动的 Application 编排层，27 个源文件各司其职：
 
 | 文件                     | 职责                                                                             |
 | ------------------------ | -------------------------------------------------------------------------------- |
@@ -924,7 +924,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | **OutfitGalleryPage**             | 套装画廊。按套装聚合统计、StatCard + OutfitCard 卡片网格、点击跳转图库筛选                                                                                                                                                                                                                                                    |
 | **RecycleBinPage**                | 回收站。软删除文件列表、全选/反选、恢复/彻底删除/清空、失败操作重试                                                                                                                                                                                                                                                           |
 | **SettingsPage**                  | 设置中心。左侧分组导航 + 右侧 section 内容，`activeSection` 持久化到 localStorage                                                                                                                                                                                                                                             |
-| **ResonanceRecordsPage**（2.5.0） | 共鸣录。四个视图切换——共鸣记录（73 卡池浏览、手动补录 / 改时间 / 删除、虚拟滚动）、我的衣橱（五分类拥有状态、套装聚合进度、名称搜索与筛选、批量勾选、「从共鸣记录推断」）、导入导出（解析预览 → 新增/重复/无效计数与逐条定位 → 分批事务提交、进度可视可取消）、个人统计（总览卡、欧非百分位、SVG 直方图、按卡池曲线与明细表） |
+| **ResonanceRecordsPage**（2.5.0） | 共鸣录。四个视图切换——共鸣记录（77 卡池浏览、手动补录 / 改时间 / 删除、虚拟滚动）、我的衣橱（五分类拥有状态、套装聚合进度、名称搜索与筛选、批量勾选、「从共鸣记录推断」）、导入导出（解析预览 → 新增/重复/无效计数与逐条定位 → 分批事务提交、进度可视可取消）、个人统计（总览卡、欧非百分位、SVG 直方图、按卡池曲线与明细表） |
 
 #### `pages/settings/` — Section 文件（按设置分组拆分）
 
@@ -946,11 +946,11 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 6.3 布局组件（components/layout/）
 
-| 组件         | 职责                                                                                                                                         |
-| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| **AppShell** | 整体布局骨架。TitleBar（顶）+ Sidebar（左）+ main（内容区）+ 底部状态栏                                                                      |
-| **Sidebar**  | 侧边栏。可折叠（motion.aside 宽度动画 64↔220）。含返回栈顶按钮、角色档案切换器、9 个主导航项、智能分组快捷面板（gallery 视图专属）、底部统计 |
-| **TitleBar** | 顶部标题栏。固定高度 40px、`app-drag` 类（Electron 拖拽区域）、显示应用图标 + i18n 标题                                                      |
+| 组件         | 职责                                                                                                                                          |
+| ------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| **AppShell** | 整体布局骨架。TitleBar（顶）+ Sidebar（左）+ main（内容区）+ 底部状态栏                                                                       |
+| **Sidebar**  | 侧边栏。可折叠（motion.aside 宽度动画 64↔220）。含返回栈顶按钮、角色档案切换器、10 个主导航项、智能分组快捷面板（gallery 视图专属）、底部统计 |
+| **TitleBar** | 顶部标题栏。固定高度 40px、`app-drag` 类（Electron 拖拽区域）、显示应用图标 + i18n 标题                                                       |
 
 ### 6.4 通用组件（components/common/）
 
@@ -1048,7 +1048,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **scanner/ScanProgress**：扫描进度条（scanned/found/currentPath + 停止按钮）
 - **video/VideoPlayer**：视频播放器（播放进度按 src 哈希持久化到 localStorage）
 
-### 6.8 自定义 Hooks（23 个）
+### 6.8 自定义 Hooks（30 个非测试文件）
 
 #### 媒体操作类（7 个）
 
@@ -1085,6 +1085,16 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **useGlobalUndo**：全局撤销 hook（App 顶层注册 Ctrl+Z、非编辑器视图生效、输入框聚焦时跳过）
 - **useStagedTask**：阶段化任务进度 hook（驱动 TaskProgress 阶段状态与条目进度、节流推送、携带取消信号）
 
+#### 视图交互与按需生成类（7 个）
+
+- **useFluidTabIndicator**：流体滑块 Tab 指示器（测量活动 Tab 位置驱动指示条位移）
+- **useGlassScrollSignal**：液态玻璃全局信号 hook（AppShell 挂载一次，服务 Sidebar / TitleBar 等玻璃面板）
+- **useIsScrolling**：滚动状态信号（capture + passive 监听，**只写 ref、不触发渲染**，滚动进行中抑制 hover 切换）
+- **useMultiSelection**：多选状态管理（Ctrl / Shift 区间选与集合维护）
+- **useNeighborPrefetch**：邻近项预取（缩略图优化计划节点 4，围绕当前索引预取邻域）
+- **useOnDemandThumbnails**：可视区缩略图按需生成入口（模块级 Promise 缓存保证同一目标只发一次）
+- **useWheelPageNav**：全屏预览「滚轮翻页」钩子（含冷却与侧键 / 边缘热区协同）
+
 ### 6.9 状态管理（stores/）
 
 | Store                     | 持久化                                         | 职责                                                                                                                                                                                                                                                                                                                                                                                    |
@@ -1092,7 +1102,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | **uiStore**               | `wxnn-ui-store`                                | UI 全局状态：currentView + viewStack、selectedMediaId(s)、sidebarCollapsed、searchQuery/sortBy/sortOrder/viewMode/filterType/filterDateRange/filterRating、selectedSceneCategories/selectedSceneTimes/filterOutfit、showMissingOnly/showDuplicates、groupDimension/selectedGroupKey、fullscreen 状态（含 fullscreenTargetImg 用于 View Transitions 共享元素过渡）、slideshow 状态与配置 |
 | **mediaStore**            | 否（内存）                                     | 媒体数据：mediaFiles/categories/loading/scanProgress/editingMedia/recycleBinFiles、currentProfileUid/profiles。纯 reducer actions + 异步 action `updateMediaFileAndPersist`（先 IPC 持久化再更新本地）                                                                                                                                                                                  |
 | **themeStore**            | `wxnn-ui-theme`                                | 主题管理（setTheme + applyThemeClass，从 themes 配置自动派生所有非空 className）                                                                                                                                                                                                                                                                                                        |
-| **operationHistoryStore** | 否（内存 + IPC 持久化到 operation_history 表） | 全局操作历史。50 上限、9 种 OperationType、按 type 分发的 UndoHandler 注册表（模块级 Map）、数据库写入失败回调 Set 订阅、loadFromDatabase 启动加载                                                                                                                                                                                                                                      |
+| **operationHistoryStore** | 否（内存 + IPC 持久化到 operation_history 表） | 全局操作历史。50 上限、10 种 OperationType（本 store 自带的联合类型，含 `notes_update`，与 `src/shared/types/editor.ts` 那份 14 种的 `OperationType` **同名不同集**，勿混用）、按 type 分发的 UndoHandler 注册表（模块级 Map）、数据库写入失败回调 Set 订阅、loadFromDatabase 启动加载                                                                                                  |
 | **resonanceStore**        | 否（内存）                                     | 共鸣录数据（记录/衣橱/统计与导入导出状态），2.5.0 新增                                                                                                                                                                                                                                                                                                                                  |
 | **pluginStore**           | 否（内存）                                     | 插件运行时状态（已安装/启用插件列表、安装卸载等操作进行中标志与错误信息）                                                                                                                                                                                                                                                                                                               |
 
@@ -1130,7 +1140,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 #### `themes/index.ts`
 
 - 主题配置中心。`UITheme = 'default' | 'soft-pink-luxury'`
-- `themes` 数组：`{ id, name, className }`（default 不附加类名，soft-pink-luxury 附加 `.soft-pink-luxury` 类）
+- `themes` 数组：`{ id, nameKey, className }`（`nameKey` 是 i18n 键，UI 侧 `t(nameKey)` 解析；default 不附加类名，soft-pink-luxury 附加 `.soft-pink-luxury` 类）
 - 新增主题流程：1) 在此注册；2) 添加同名 CSS 文件并在 globals.css 引入
 
 #### `themes/soft-pink-luxury.css`
@@ -1141,7 +1151,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 6.13 图标管理（icons/）
 
-- **单一文件集中管理所有图标**，导出 74 个图标组件
+- **单一文件集中管理所有图标**，导出 75 个图标组件
 - 基于 `BaseIcon` 统一封装：`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">`，符合 Feather/Lucide 风格
 - `IconProps` 接口继承 `React.SVGProps<SVGSVGElement>` + `size?: number`（默认 16）
 - 按用途分类：操作类（17）/ 视图类（5）/ 导航类（7）/ 编辑类（10）/ 媒体类（5）/ 状态类（4）/ 文件操作类（5）/ 分类与标签类（3）/ 分享渠道类（4）/ 导入导出类（2）/ 播放控制类（2）/ 社交平台类（3）/ 其他（7）
@@ -1192,11 +1202,11 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 | **media.ts**           | `MediaType` / `MediaSource` / `SceneTime` / `MediaRow` / `MediaFile`（27 字段）/ `MediaListOptions` / `ScanOptions` / `VideoExportFormat` / `DuplicateGroup` / `OutfitStat`                                                                                    |
 | **category.ts**        | `CategoryRow` / `Category` / `CategoryCreateInput` / `CategoryTreeNode` / `SystemCategoryIcon`（7 个枚举）                                                                                                                                                     |
 | **profile.ts**         | `ProfileRow` / `CharacterProfile` / `ProfileBaseStats` / `ProfileTopStatRow` / `GroupCountRow` / `ProfileStats`                                                                                                                                                |
-| **editor.ts**          | `HSLColorKey`（12 通道）/ `FilterParams`（22 调整项 + HSL + 曲线 + 色调分离 + LUT）/ `FilterPresetRow` / `EditHistoryRow` / `OperationType`（13 种操作）/ `OperationHistoryRow`                                                                                |
+| **editor.ts**          | `HSLColorKey`（12 通道）/ `FilterParams`（22 调整项 + HSL + 曲线 + 色调分离 + LUT）/ `FilterPresetRow` / `EditHistoryRow` / `OperationType`（14 种操作）/ `OperationHistoryRow`                                                                                |
 | **watermark.ts**       | `WatermarkPosition`（9 + custom）/ `WatermarkStyle`（5 种）/ `BlendMode`（16 种）/ `WatermarkConfig` / `WatermarkTemplateRow`                                                                                                                                  |
 | **settings.ts**        | `AppSettingRow` / `SettingKey`（29 个键枚举）/ `AppTheme` / `AppLanguage` / `UIScale` / `GridSize` / `SettingKeyMap`（key → TS 类型映射）/ `BackupRecord` / `CacheStats` / `LogStats` / `CrashStats` / `FaultType` / `FaultRecord`                             |
-| **ipc.ts**             | 重导出 `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`、`ShareChannel` / `WifiShareSession`、`MediaParamType` / `CameraParams` / `RichCameraParams`、`ImportOptions` / `ExportOptions`、**`IPC_CHANNELS`**（24 个域前缀 / 91 个唯一通道名常量） |
-| **ipc-types.ts**       | `IpcError`（code/message/userMessage/details）、`IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`、`IpcProgress`、`IPC_ERROR_CODES`（9 个 IPC_* 错误码）                                                                                      |
+| **ipc.ts**             | 重导出 `IpcError` / `IpcResponse` / `IpcProgress` / `IPC_ERROR_CODES`、`ShareChannel` / `WifiShareSession`、`MediaParamType` / `CameraParams` / `RichCameraParams`、`ImportOptions` / `ExportOptions`、**`IPC_CHANNELS`**（23 个域前缀 / 86 个唯一通道名常量） |
+| **ipc-types.ts**       | `IpcError`（code/message/userMessage/details）、`IpcResponse<T>` = `{success:true,data}` ∪ `{success:false,error}`、`IpcProgress`、`IPC_ERROR_CODES`（8 个 IPC_* 错误码）                                                                                      |
 | **progress.ts**        | `TaskType`（7 类任务：scan/duplicate/batch/watermark/import/video-edit/indexing）、`TaskPhase`（6 阶段）、统一任务进度状态（主进程 `task:progress` 通道推送）                                                                                                  |
 | **plugin.ts**          | `NikkiGalleryManifest` / `PluginPermission` 能力权限清单 / 业务扩展点常量与扩展响应类型                                                                                                                                                                        |
 | **editor-metadata.ts** | `EDITOR_METADATA_SCHEMA_VERSION` / 调色、滤镜、LUT、水印参数的 XMP 自描述序列化结构                                                                                                                                                                            |
@@ -1210,7 +1220,7 @@ HTML 预览版（`preview.html`）的数据支撑层，让预览版无需 Electr
 
 #### `error-codes.ts`
 
-- **`ERROR_CODES`**：在 `IPC_ERROR_CODES` 9 个码基础上扩展 2 个（`APP_DATABASE_ERROR` / `APP_FILE_SYSTEM_ERROR`），共 11 个错误码
+- **`ERROR_CODES`**：在 `IPC_ERROR_CODES` 8 个码基础上扩展 2 个（`APP_DATABASE_ERROR` / `APP_FILE_SYSTEM_ERROR`），共 10 个错误码
 - **`ErrorCategory`** 枚举：6 大类 —— `Validation` / `NotFound` / `Permission` / `Database` / `FileSystem` / `Internal`
 - **`CODE_TO_CATEGORY`**：错误码 → 类别的静态映射表
 - 工具函数：`categoryOfCode(code)` / `isUserFacing(category)`
@@ -1401,7 +1411,7 @@ components / pages (展示)
 | **`filter_presets`**        | `id`、`name`、`category`、`params` (JSON)、`is_builtin`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                         | 滤镜预设                                                                                                               |
 | **`watermark_templates`**   | `id`、`name`、`config` (JSON)、`is_builtin`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                                     | 水印模板                                                                                                               |
 | **`edit_history`**          | `id`、`media_id` (FK CASCADE)、`params` (JSON)、`thumbnail`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                     | 单媒体编辑历史                                                                                                         |
-| **`operation_history`**     | `id`、`operation_type` (13 种)、`media_id`、`payload` (JSON)、`description`、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                     | 全局操作历史（跨重启撤销），启动时自动清理 30 天前记录                                                                 |
+| **`operation_history`**     | `id`、`operation_type` (10 种，取自 `operationHistoryStore` 的联合类型)、`media_id`、`payload` (JSON)、`description`、`created_at`                                                                                                                                                                                                                                                                                                                                                                            | 全局操作历史（跨重启撤销），启动时自动清理 30 天前记录                                                                 |
 | **`character_profiles`**    | `uid` (PK)、`nickname`、`avatar`、`created_at`、`last_active_at`                                                                                                                                                                                                                                                                                                                                                                                                                                              | 角色档案，默认 'default'                                                                                               |
 | **`favorites`**             | `id` (PK AUTOINCREMENT)、`media_id` (NOT NULL UNIQUE)、`created_at`                                                                                                                                                                                                                                                                                                                                                                                                                                           | 收藏关系表（与 `media_files.is_favorite` 并存）                                                                        |
 | **`import_roots`**          | `id` (PK AUTOINCREMENT)、`root_path` (NOT NULL UNIQUE)、`created_at`、`disabled` (默认 0)                                                                                                                                                                                                                                                                                                                                                                                                                     | 导入根登记，供导入向导与路径授权判定                                                                                   |
@@ -1427,7 +1437,7 @@ components / pages (展示)
 
 ### 9.3 关键索引
 
-**`media_files` 单列索引（15 个）**：`file_type` / `category_id` / `is_favorite` / `modified_at` / `thumbnail` / `source_path` / `scene_category` / `scene_time` / `outfit` / `is_deleted` / `is_missing` / `phash` / `account_uid` / `album_type` / `is_duplicate` / `original_id` / `media_source`
+**`media_files` 单列索引（18 个）**：`file_type` / `category_id` / `is_favorite` / `modified_at` / `thumbnail` / `source_path` / `scene_category` / `scene_time` / `outfit` / `is_deleted` / `is_missing` / `phash` / `account_uid` / `album_type` / `is_duplicate` / `original_id` / `media_source` / `is_corrupted`
 
 **联合索引（5 个）**：
 
@@ -1508,7 +1518,7 @@ components / pages (展示)
 
 #### 10.2.1 故障日志（logger.ts）
 
-- **10 类 FaultType**：uncaughtException / unhandledRejection / rendererCrash / ipcError / databaseError / fileSystemError / startupError / exitDiagnosis / decryptionError / custom
+- **18 类 FaultType**（`src/main/utils/logger.ts:13-31`）：uncaughtException / unhandledRejection / rendererCrash / rendererError / ipcError / manual / rendererComponent / rendererPromise / rendererResource / exitDiagnosis / workerCrash / workerRestart / databaseCorruption / databaseRestore / indexingTimeout / renderer-not-ready / schedulerStuckPaused / navigation-blocked（其中 `renderer-not-ready` 是全表唯一的连字符写法，历史遗留，勿据此推断命名规则）
 - **FaultRecord** 含完整环境信息：appVersion / electronVersion / nodeVersion / platform / osVersion / pid / uptime
 - 日志总上限 2GB，超限按 mtime 升序删除最旧
 - 文件命名：`faults-YYYY-MM-DD.jsonl`
@@ -1617,7 +1627,7 @@ components / pages (展示)
 #### `src/main/tsconfig.json`（主进程）
 
 - `target: ES2020`、`module: commonjs`（Electron 主进程需 CJS）
-- `outDir: '../../dist/main'`、`rootDir: '../'`
+- `outDir: '../../.cache/tsmain'`（**刻意与构建产物树隔离**：`tsc -b` 一旦写回 `dist/main`，就会把 electron-vite 的 `preload.js` / `app/index.js` 覆写成 per-file CJS，`sandbox: true` 的 preload 无法 require 兄弟模块；该落点由 `scripts/__tests__/typecheck-emit-isolation.test.ts` 钉住，不得指回 `dist/main`，也不得改用 `tsc -b --noEmit` 规避——被引用的 composite 项目禁 emit 会直接报 TS6310）、`rootDir: '../'`
 - `declaration: true`、`sourceMap: true`、`composite: true`
 - `include: ["**/*", "../shared/**/*"]`
 
@@ -1633,18 +1643,19 @@ components / pages (展示)
 - `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**：10 项 native 依赖解包到磁盘 —— `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
+- **`asarUnpack`**：11 项 native 依赖解包到磁盘 —— `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
 - **Windows NSIS**：x64、非 one-click、允许自定义安装目录、强制创建桌面快捷方式 + 开始菜单快捷方式
 - `signExecutable: false` / `verifyUpdateCodeSignature: false` —— 未启用代码签名，但 **exe 图标与 PE 版本元数据仍经 resedit 写入**。此前写的是 `signAndEditExecutable: false`，该值会让 electron-builder 连资源编辑一起跳过，导致 app exe / 桌面快捷方式 / 任务栏始终是 Electron 默认图标。
 
 ### 11.3 构建流程
 
-1. `clean` —— 删除 `dist/renderer/assets` 与 `dist/main`
-2. `electron-vite build` —— 编译主进程（`src/main` + `shared/`，CJS）→ `dist/main/`，同时用 Vite 打包 React 应用 → `dist/renderer/`；随后写入 `dist/main/package.json`（`{"type":"commonjs"}`）
-3. `pre-dist-check` —— 校验 main / renderer 产物时间戳差 ≤5 分钟、关键修复点已编入产物、Git 工作区干净；并校验 `README.md` 中的 Electron 版本与 `package.json` 一致（不一致即阻断打包）
-4. `electron-builder --win --publish never` —— 按 `package.json#build` 配置打包 NSIS 安装包到 `release/`，产物名 `MeowStarMap-Setup-<version>.exe`；afterPack 阶段由 `scripts/after-pack-vc-runtime.cjs` 将 `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` 复制到 `electron.exe` 同级
-5. `verify:dist` —— `pre-dist-check --verify-asar`，断言 VC++ 运行库等原生依赖已随包
-6. 原生模块重建 —— 本地执行 `npx @electron/rebuild`；打包期由 `build.npmRebuild: true` 自动完成（better-sqlite3 / sharp / koffi）
+1. `build:recycle-helper` —— `node scripts/build-recycle-helper.cjs` 用 .NET Framework 的 `csc.exe` 把 `resources/nikkisync/recycle-helper.cs` 编成 `nikkisync-recycle-helper.exe`（K8 整理队列的 Windows 回收站链路消费）；探测不到 csc、编译失败或产物缺失都以非零退出，非 win32 直接跳过退出 0。该步排在 `clean` 之前，因为 `clean` 不动 `resources/`，而 `extraResources` 要能拷到产物
+2. `clean` —— 删除 `dist/renderer/assets` 与 `dist/main`
+3. `electron-vite build` —— 编译主进程（`src/main` + `shared/`，CJS）→ `dist/main/`，同时用 Vite 打包 React 应用 → `dist/renderer/`；随后写入 `dist/main/package.json`（`{"type":"commonjs"}`）
+4. `pre-dist-check` —— 三段串接：`scripts/pre-dist-check.ts`（校验产物比源码新——该判据已替代旧的 main vs renderer 时间戳差比较、关键修复点已编入产物、Git 工作区干净）、`scripts/check-doc-versions.ts`（`README.md` 的 Electron 版本须与 `package.json` 一致，不一致即阻断）、`scripts/check-changelog-release.ts`（版本节的补录义务）
+5. `electron-builder --win --publish never` —— 按 `package.json#build` 配置打包 NSIS 安装包到 `release/`，产物名 `MeowStarMap-Setup-<version>.exe`；afterPack 阶段由 `scripts/after-pack-vc-runtime.cjs` 将 `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` 复制到 `electron.exe` 同级
+6. `verify:dist` —— `pre-dist-check --verify-asar`，断言 VC++ 运行库等原生依赖已随包
+7. 原生模块重建 —— 本地执行 `npx @electron/rebuild`；打包期由 `build.npmRebuild: true` 自动完成（better-sqlite3 / sharp / koffi）
 
 ### 11.4 关键依赖
 
@@ -1774,7 +1785,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 
 ### 12.14 共鸣录（Resonance）模块约束
 
-- **离线优先**：共鸣录不得发起任何网络请求。静态数据全部随包——图鉴 11 片 + `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json` + 12 语言实体名包 + 73 张卡池缩略图（约 7.1MB）；卡池缩略图经 `src/renderer/data/resonance/thumbnails/index.ts` 静态 import 取得打包内相对 URL（`base: './'`），零外链
+- **离线优先**：共鸣录不得发起任何网络请求。静态数据全部随包——图鉴 11 片 + `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json` + 12 语言实体名包 + 77 张卡池缩略图（约 7.1MB）；卡池缩略图经 `src/renderer/data/resonance/thumbnails/index.ts` 静态 import 取得打包内相对 URL（`base: './'`），零外链
 - **主进程职责边界**：主进程只做 zod 参数校验、PathGuard 白名单（`assertFileReadPath` / `assertFileWritePath`）、文件读写与 SQLite 存取；导入解析、合并去重、差异计数、导出载荷组装均为渲染层纯函数（`src/renderer/utils/resonance/`）
 - **导入上限**（常量定义在 `src/shared/types/resonance.ts`）：单文件 `MAX_IMPORT_FILE_BYTES` = 64MB、总记录 `MAX_TOTAL_IMPORT_RECORDS` = 200000、单卡池 `MAX_PULLS_PER_BANNER` = 50000、单批提交 `MAX_COMMIT_BATCH_ROWS` = 2000、衣橱单批 `MAX_WARDROBE_BATCH` = 5000
 - **导入提交**：渲染层按 `MAX_COMMIT_BATCH_ROWS` 分批调用 `resonance:commitImport`，每批一个事务、`INSERT OR IGNORE` 幂等，可中断后续传；`wardrobe` 仅最后一个批次携带（全量覆盖）
@@ -2011,7 +2022,7 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 | `resources/nuan5_decryption.dll`        | 游戏图片参数解密 DLL                                                                                              |
 | `src/renderer/assets/cloth-names.json`  | 7369 条服装名                                                                                                     |
 | `src/renderer/assets/outfit-names.json` | 657 条套装名                                                                                                      |
-| `src/renderer/data/resonance/`          | 共鸣录静态数据（图鉴 11 片 + 卡池 / 套装 / 百分位快照 + 12 语言名称 + 73 张卡池缩略图，约 7.1MB，全部随包零外链） |
+| `src/renderer/data/resonance/`          | 共鸣录静态数据（图鉴 11 片 + 卡池 / 套装 / 百分位快照 + 12 语言名称 + 77 张卡池缩略图，约 7.1MB，全部随包零外链） |
 
 ---
 

@@ -53,7 +53,7 @@ npm -v
 
 预期输出：`10.x.x` 以上。
 
-> 若 `node -v` 报错或版本低于 20，请到 [nodejs.org](https://nodejs.org/zh-cn) 下载 LTS 版本安装。
+> 若 `node -v` 报错或版本低于 22（`package.json` 的 `engines.node` 要求 `>=22.12.0`，`.node-version` 固定 22），请到 [nodejs.org](https://nodejs.org/zh-cn) 下载 LTS 版本安装。
 
 ---
 
@@ -169,7 +169,7 @@ MeowStarMap/
 │   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
 │   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
 │   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 33 个文件，每文件导出 <key>API 对象）
-│   │   ├── app/               # 应用生命周期管理（25 个源文件）
+│   │   ├── app/               # 应用生命周期管理（27 个源文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
 │   │   │   ├── cleanup.ts           # 退出清理
@@ -327,7 +327,7 @@ explorer "$env:APPDATA\meow-star-map\logs"
 主要日志文件：
 
 - `main.log`：应用运行日志
-- `faults-YYYY-MM-DD.jsonl`：故障记录（10 类 FaultType，按日期滚动）
+- `faults-YYYY-MM-DD.jsonl`：故障记录（18 类 FaultType，按日期滚动）
 - `startup-errors.log`：启动错误日志（位于 userData 根目录或 `用户文档\MeowStarMap\Diagnostics\`，100KB 滚动）
 
 ### 4.5 查看数据库
@@ -747,10 +747,11 @@ npm run dist:win
 
 该命令依次执行：
 
-1. `npm run build`：`clean` → `electron-vite build` → 写入 `dist/main/package.json`（`{"type":"commonjs"}`）
-2. `npm run pre-dist-check`：产物时间戳差、关键修复点、Git 工作区，以及 README 中 Electron 版本与 `package.json` 一致
-3. `electron-builder --win --publish never`：打包 Windows NSIS 安装程序
-4. `npm run verify:dist`：校验 asar 内 VC++ 运行库等原生依赖已随包
+1. `npm run build:recycle-helper`：`node scripts/build-recycle-helper.cjs` 用 .NET Framework 的 `csc.exe` 编译 `resources/nikkisync/recycle-helper.cs` → `nikkisync-recycle-helper.exe`（非 win32 跳过退出 0；排在 `clean` 前是因为 `clean` 不动 `resources/`）
+2. `npm run build`：`clean` → `electron-vite build` → 写入 `dist/main/package.json`（`{"type":"commonjs"}`）
+3. `npm run pre-dist-check`：三段串接——产物比源码新（已替代旧的 main vs renderer 时间戳差比较）、关键修复点、Git 工作区；README 中 Electron 版本与 `package.json` 一致；版本节的 CHANGELOG 补录义务
+4. `electron-builder --win --publish never`：打包 Windows NSIS 安装程序
+5. `npm run verify:dist`：校验 asar 内 VC++ 运行库等原生依赖已随包
 
 ### 7.3 分步执行（用于排错）
 
@@ -769,13 +770,14 @@ npx electron-builder --win --publish never
 > 完整的发布序列（含产物校验，推荐发布时使用）：
 >
 > ```bash
+> npm run build:recycle-helper
 > npx electron-vite build
-> npm run pre-dist-check   # 产物时间戳差、关键修复点、Git 工作区，以及 README 中 Electron 版本与 package.json 一致
+> npm run pre-dist-check   # 产物比源码新、关键修复点、Git 工作区；README 的 Electron 版本与 package.json 一致；CHANGELOG 补录义务
 > npx electron-builder --win --publish never
 > npm run verify:dist      # 校验 asar 内 VC++ 运行库等原生依赖已随包
 > ```
 >
-> `npm run dist:win` 等价于上述四步（第一步为 `npm run build`，在本机可能因 Safe-Delete 网关失败，见 [2.6](#26-构建产物不打包安装程序)）。
+> `npm run dist:win` 等价于上述五步（其中 `npm run build` = `clean` + `electron-vite build` + 写入 `dist/main/package.json`，`clean` 这一步在本机可能因 Safe-Delete 网关失败，见 [2.6](#26-构建产物不打包安装程序)）。
 
 ### 7.4 产物位置
 
