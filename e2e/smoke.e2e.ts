@@ -50,6 +50,11 @@ test.afterAll(async ({}, testInfo: TestInfo) => {
   launched = undefined
 })
 
+// launched/win 是模块作用域的跨用例共享态（S1 建、S2~S8 复用），而 Playwright 在某条用例
+// 失败后会回收 worker 并重新求值模块 ⇒ 剩余用例读到 undefined，一条真失败伪装成六条。
+// serial 让本 describe 失败即中止剩余用例（同族写法见 e2e/nikkisync-runtime.e2e.ts:305）。
+test.describe.configure({ mode: 'serial' })
+
 test.describe('打包产物冒烟（win-unpacked）', () => {
   test('S1 启动与主窗口：app:// 协议加载成功', async () => {
     launched = await launchApp()

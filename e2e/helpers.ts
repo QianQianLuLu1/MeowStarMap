@@ -7,9 +7,26 @@ import fs from 'node:fs/promises'
 import type { Dirent } from 'node:fs'
 import path from 'node:path'
 import { detectTscOverwrittenDist } from './dist-guard'
+import { sanitizeLaunchEnv, ELECTRON_RUN_AS_NODE } from './launch-env'
 
 /** 工程根目录（e2e/ 的上一级；项目 type=module，用 import.meta.url 定位而非 __dirname） */
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+/**
+ * 装配交给 Electron 子进程的环境：NODE_ENV 固定 production，extra 可覆盖既有语义不变，
+ * 最后过闸门剥离宿主泄漏项（放在合并之后 ⇒ 调用方无法重新注入）。
+ */
+function launchEnv(extra: Record<string, string> = {}): Record<string, string> {
+  const merged: Record<string, string> = { ...process.env, NODE_ENV: 'production', ...extra }
+  if (ELECTRON_RUN_AS_NODE in merged) {
+    // 排障线索：静默剥离会让「同一命令在不同终端结论不同」难以归因，故留一行可读痕迹
+    process.stdout.write(
+      `[e2e] stripped ${ELECTRON_RUN_AS_NODE}=${merged[ELECTRON_RUN_AS_NODE]}（宿主 shell 泄漏，` +
+        '保留会让被测 exe 按纯 Node 启动并把 Chromium 开关判为 bad option）\n'
+    )
+  }
+  return sanitizeLaunchEnv(merged)
+}
 
 /**
  * 定位 win-unpacked 产物 exe。
@@ -66,7 +83,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
     // 只解析等号形式的 switch 值，空格分隔形式（--user-data-dir <path>）会被忽略，
     // 导致 userData 落回默认 Roaming、隔离失效（含空格路径仍正确保留）。
     args: [`--user-data-dir=${userDataDir}`],
-    env: { ...process.env, NODE_ENV: 'production' },
+    env: launchEnv(),
     timeout: 30_000
   })
   return { app, userDataDir }
@@ -178,7 +195,7 @@ export async function launchBuiltApp(
     executablePath: exe,
     // 第一个非 switch 参数即应用路径（仓根 package.json 的 main 指向 dist/main/main/app/index.js）
     args: [ROOT_DIR, `--user-data-dir=${userDataDir}`, ...args],
-    env: { ...process.env, NODE_ENV: 'production', ...extraEnv },
+    env: launchEnv(extraEnv),
     timeout: 60_000
   })
   return { app, userDataDir }
