@@ -2,7 +2,7 @@
 
 - 日期：2026-10-27
 - 分支 / 基线 HEAD：`main` @ `fb08813`（开工时 `git status --porcelain` 为空）
-- 状态：执行中（本文档随本轮第一个提交入库，§7 闸门读数在收尾批回写）
+- 状态：已执行（本文档随本轮最后一个提交入库；§5 结果列与 §7 读数均为实跑回填）
 - 上一轮同类工作：`docs/plans/2026-10-17-markdown-cleanup-guard-and-corrections.md`（脱管语义见其 §3，遗留风险见其 §8——
   本轮已复核其 §8 全部五条，逐条结论记在本文 §8）
 
@@ -10,7 +10,8 @@
 
 1. **本轮实际移出仓库 7 个 markdown**：`docs/plans/` 里执行记录已回填、且不被任何活文档或源码注释引用的轮次快照，
    经 `git mv` + `git rm --cached` 两步落到被 `.gitignore:186 /docs/archive/` 排除的 `docs/archive/plans/`，
-   本机副本保留、仓库中消失。被跟踪 `.md` 由 **92 降到 85**，`docs/plans/` 由 **37 降到 30**。
+   本机副本保留、仓库中消失。被跟踪 `.md` 由 **92 变为 86**（移出 7、本轮记录文档自身新增 1），
+   `docs/plans/` 由 **37 变为 31**（同口径）。
 2. **用户请求里的四条前提再次与仓库现状不符**，与 2026-10-10、2026-10-17 两轮一字不差：不存在 `_plans/`、`.review/`、
    根 `SKILL.md`、`使用指南.md`（用户手册实为 `docs/tutorial/用户使用教程.md`）；`.zcode/plans/` 与 `.trae/documents/`
    磁盘存在但被 `.gitignore:156` / `:152` 排除，天然不在审计范围。工作区没有任何未跟踪 `.md`，
@@ -21,8 +22,9 @@
 4. **新发现一类从未被守护的失真**：源码注释里指向已归档计划的 `docs/plans/*.md` 指针死了 **10 个**，分布在 14 个 `.ts/.tsx`。
    `scripts/check-md-links.ts` 只扫 `git ls-files -z '*.md'`，所以 `src/**` 与 `scripts/**` 的注释从来不在覆盖面上。
    这十个目标文件全部仍在本机 `docs/archive/plans/`，即**前几轮移档时只搬了文件、没改注释**——本仓移档流程的一处系统性漏项。
-5. **订正分两批共 15 处文档侧 + 10 处源码注释侧**，其中双语四件（`ARCHITECTURE(.en)` / `DEVELOPMENT(.en)`）
-   补出一处**违反根 `AGENTS.md` 硬规则**的反向陈述（`src/main/tsconfig.json` 的 `outDir` 仍写 `dist/main`，实为 `.cache/tsmain`）。
+5. **订正共 24 项事实**（落地为 60 余处行级编辑，双语四件按「同一事实改两遍」计一次），另有源码注释侧 **17 处站点 / 14 个 `.ts/.tsx`**。
+   双语四件里补出一处**违反根 `AGENTS.md` 硬规则**的反向陈述（`src/main/tsconfig.json` 的 `outDir` 仍写 `dist/main`，实为 `.cache/tsmain`），
+   以及两处中英结构性缺口（`§6.8` 标题计数 vs 实际 hook 数、`DEVELOPMENT.en.md` 整节缺失）。
 
 ## 2. 本轮依据的实测真值（全部由命令取得，禁止沿用上一轮读数）
 
@@ -97,15 +99,15 @@ git rm --cached docs/archive/plans/X.md
 
 ## 5. 执行批次
 
-| 批次 | 内容                                                                    | 验证                                                  | 结果 |
-| ---- | ----------------------------------------------------------------------- | ----------------------------------------------------- | ---- |
-| B0   | 本记录文档入库（先落地，用于随手抓出后续每一步新写的错）                | `npm run docs:links` 不因此新增死引用                 | ☐    |
-| B1   | 移档 7 份 + 改写 4 份保留文档里的 8 处引用                              | `git status` 恰 7 条暂存删除；`comm` 零冲突；死引用 0 | ☐    |
-| B2   | 源码注释 10 处死指针（14 个 `.ts/.tsx`）改为归档路径并注明去向          | `npm run verify`；相关单测                            | ☐    |
-| B3   | 测试规模四处 + 「尚未入仓」两处（含 `.qoder` 镜像同步）                 | 每处替换命中 1 次；`verify-format-scope` 全绿         | ☐    |
-| B4   | 模块指引与技术债清单 8 处计数 + 集成测试状态 3 处 + 回收站计划状态 1 行 | 逐条命令复跑读数一致；`debt:check`                    | ☐    |
-| B4b  | 双语四件（`ARCHITECTURE(.en)` / `DEVELOPMENT(.en)`）已复验失真订正      | 中英成对同改；`.en` 不混中文行                        | ☐    |
-| B5   | 全量闸门 + 本文 §7 读数回写                                             | 见 §7                                                 | ☐    |
+| 批次 | 内容                                                                    | 验证                                                  | 结果                                                                          |
+| ---- | ----------------------------------------------------------------------- | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
+| B0   | 本记录文档入库（先落地，用于随手抓出后续每一步新写的错）                | `npm run docs:links` 不因此新增死引用                 | ✓ `701ca3d`（死引用 0，提醒 161 → 171，全部是本文自带的归档路径交代）         |
+| B1   | 移档 7 份 + 改写 4 份保留文档里的 8 处引用                              | `git status` 恰 7 条暂存删除；`comm` 零冲突；死引用 0 | ✓ `522fb34`（7 条 D docs/plans/... 全部 check-ignore rc=0，磁盘副本 84 → 91） |
+| B2   | 源码注释 10 处死指针（14 个 `.ts/.tsx`）改为归档路径并注明去向          | `npm run verify`；相关单测                            | ✓ `734acc7`（verify 5 项 0 失败；diff 17 增 17 删纯注释行）                   |
+| B3   | 测试规模四处 + 「尚未入仓」两处（含 `.qoder` 镜像同步）                 | 每处替换命中 1 次；`verify-format-scope` 全绿         | ✓ `793cede`（verify-format-scope 36 例通过）                                  |
+| B4   | 模块指引与技术债清单 8 处计数 + 集成测试状态 3 处 + 回收站计划状态 1 行 | 逐条命令复跑读数一致；`debt:check`                    | ✓ `4e2a8d6`（debt:check 未命中登记条目）                                      |
+| B4b  | 双语四件（`ARCHITECTURE(.en)` / `DEVELOPMENT(.en)`）已复验失真订正      | 中英成对同改；`.en` 不混中文行                        | ✓ `5d2408b`（残留旧值全表扫描为空；prettier 二次跑 4 文件 unchanged）         |
+| B5   | 全量闸门 + 本文 §7 读数回写                                             | 见 §7                                                 | ✓（与本文同批的最后一个提交；读数见 §7）                                      |
 
 移出的 7 份（移后位置记为 `docs/archive/plans/…`，已归档，不入仓）：
 
@@ -128,9 +130,17 @@ git rm --cached docs/archive/plans/X.md
 
 ## 6. 订正要点（选取易被再次写错的）
 
-- **`src/main/tsconfig.json` 的 `outDir` 是 `.cache/tsmain`，不是 `dist/main`**：`ARCHITECTURE.md:1619` 与
-  `ARCHITECTURE.en.md:1592` 仍写 `../../dist/main`，这恰好是根 `AGENTS.md`「类型检查的 emit 落点必须与构建产物树隔离」
-  那条硬规则**禁止**的回搬态。文档在这里不是过期，是**反向**——照着做会打死 `sandbox: true` 的 preload。
+- **子代理报出的行号与结论都必须二次核验**：本轮 B4b 的两份审计返回里，行号普遍偏差 1–9 行（`outDir` 实际在 `1620` 而报成 `1619`），
+  且有两条结论被实测推翻——「`ARCHITECTURE.en.md` 写 All 5 tables 未与中文同步」是**误报**（该行实为「6 in total」，与中文一致），
+  「`SIDEBAR_NAV_ITEMS` 是不存在的标识符」也**站不住**（它是 `preview.html` 内的常量，由 `scripts/check-preview-drift.ts:92` 用正则提取，
+  本就不是 `src/` 符号）。反过来说，被实测证实的是 `DEVELOPMENT.en.md` 整节缺失 §7.9.1 / §7.9.2。
+  教训：报「缺失」之前先确认判据落在哪个产物上；行号一律用 `grep -n` 现取。
+- **`grep -v test` 不是「排除测试文件」的正确写法**：`scripts/perf-test/`、`find-related-tests.ts`、`run-precommit-tests.ts`
+  都会连带被删（61 − 32 = 29，正解 61 − 26 = 35）。本轮 `scripts/AGENTS.md` 的配对率就是从 29 纠正到 35 的。
+- **`src/main/tsconfig.json` 的 `outDir` 是 `.cache/tsmain`，不是 `dist/main`**：`ARCHITECTURE.md:1620` 与
+  `ARCHITECTURE.en.md:1592` 曾写 `../../dist/main`，这恰好是根 `AGENTS.md`「类型检查的 emit 落点必须与构建产物树隔离」
+  那条硬规则**禁止**的回搬态。文档在这里不是过期，是**反向**——照着做会把 electron-vite 的 `preload.js` 覆写成
+  per-file CJS，打死 `sandbox: true` 的 preload。订正时须连「不得用 `tsc -b --noEmit` 规避（TS6310）」一并写明。
 - **易腐数字的正确取数姿势**：`npm test` 汇总行是唯一可信来源（本轮 450 / 7021 + 12 skip）。上一轮写 408 / 6312，
   再上轮 337 / 5331，本轮 437 / 6737 也已作废——三份根文档各留各的快照会互相矛盾，故本轮把四处正文统一到当轮实跑值，
   并把旧值降级进「历史读数」行。
@@ -157,20 +167,21 @@ git rm --cached docs/archive/plans/X.md
 - **`annotated-gone` 按物理行判定**：本文与 B1 改写的引用都遵守「标记词紧跟路径、同一物理行」，
   因为 prettier 会按 `printWidth` 折 CJK 长句。
 
-## 7. 验证（收尾批回写读数）
+## 7. 验证（本轮实跑读数）
 
-| 命令                                                           | 结果 |
-| -------------------------------------------------------------- | ---- |
-| `npm run docs:links`                                           | ☐    |
-| `npm run typecheck`                                            | ☐    |
-| `npm run typecheck:e2e`                                        | ☐    |
-| `npm run lint`                                                 | ☐    |
-| `npm run verify`                                               | ☐    |
-| `npx vitest run scripts/__tests__/check-md-links.test.ts`      | ☐    |
-| `npx vitest run scripts/__tests__/verify-format-scope.test.ts` | ☐    |
-| `npm run debt:check`                                           | ☐    |
-| prettier 表格噪声核查                                          | ☐    |
-| BOM 扫描（本轮改动的 `.md` / `.ts` / `.tsx`）                  | ☐    |
+| 命令                                                           | 结果                                                                                                              |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `npm run docs:links`                                           | ✓ 死引用 0；提醒 161（开工）→ 175（收尾），增量全部是本轮新增的「已归档，不入仓」交代                             |
+| `npm run typecheck`                                            | ✓ `tsc -b` + `tsc -p tsconfig.scripts.json` 均无输出                                                              |
+| `npm run typecheck:e2e`                                        | ✓ `tsc --noEmit -p e2e` 无输出                                                                                    |
+| `npm run lint`                                                 | ✓ exit 0 且零输出（0 error / 0 warning）                                                                          |
+| `npm run verify`                                               | ✓ 0 失败：B2 批次 5 项全过（含 11 个匹配套件 205 例），纯文档批次 2 项全过                                        |
+| `npx vitest run scripts/__tests__/check-md-links.test.ts`      | ✓ 24 例通过（含「真实仓库死引用数为 0」契约用例）                                                                 |
+| `npx vitest run scripts/__tests__/verify-format-scope.test.ts` | ✓ 36 例通过（CODING_CONVENTIONS ↔ `.qoder` 镜像正文区未漂移）                                                     |
+| `npm run debt:check`                                           | ✓ 变更文件未命中任何已登记技术债条目                                                                              |
+| prettier 表格噪声核查                                          | ✓ 双语四件订正后二次 `--write` 报 4 个文件 unchanged，说明首轮已收敛，无遗留格式漂移                              |
+| BOM 扫描（被跟踪 `.md` 全量首 3 字节）                         | ✓ 空输出，零 `ef bb bf`                                                                                           |
+| `npm test`（收尾复跑）                                         | ✓ **450 文件 / 7021 通过 + 12 skip（共 7033）**，57.95s，与本轮写入 `ARCHITECTURE` / `DEVELOPMENT` 的读数逐项一致 |
 
 ## 8. 上一轮遗留风险的复核结论
 
@@ -189,7 +200,9 @@ git rm --cached docs/archive/plans/X.md
 2. 源码注释不在 `npm run docs:links` 覆盖面内：本轮只清存量 10 处，后续移档若不同步跑 `git grep … -- '*.ts' '*.tsx'` 仍会新增。
 3. `eslint.config.js:114` 的注释仍写「存量技术债文件在下方 legacy 白名单块中降级为 warn」，而该 warn 块已于 2026-10-21 清偿删除
    （`docs/技术债清单.md` §13 记 DEBT-030 done）。属代码注释，非 `.md`，本轮不动。
-4. 双语四件里若干数字未经本轮复验，不写进正文也不改：SettingKey 数、tailwind `theme.extend.colors` 映射数、
-   `ALBUM_TYPE_MAP` 键数、`OUTFIT_PRESETS` 条目数、`GROUP_DIMENSION_OPTIONS` 字段形态、worker 协议命令/事件类数、
-   共鸣缩略图文件数、`pre-dist-check` 的「时间戳差 ≤5 分钟」判据是否已被「产物比源码新」取代。
-   这些是子代理审计报出但我没能用命令独立复验的项，按「取不到就不写上去」的原则登记为待核，不当结论用。
+4. 双语四件里另有 6 项数字**未经本轮独立复验**，因此既不写进正文也不改：`SettingKey` 键数（文档写 29，代理报 31，
+   但我按 `src/shared/settings-keys.ts` 与 `src/shared/types/settings.ts` 两种口径都没能一次测准）、
+   `tailwind.config.ts` 的 `theme.extend.colors` var 映射数、`ALBUM_TYPE_MAP` 键数、`OUTFIT_PRESETS` 条目数、
+   `GROUP_DIMENSION_OPTIONS` 字段形态、worker 协议的命令 / 事件类数。
+   （代理同时报的「共鸣缩略图 73 → 77」与「`pre-dist-check` 时间戳差判据已被替代」两条本轮已实测并改正。）
+   这些按「取不到就不写上去」的原则登记为待核，不当结论用。
