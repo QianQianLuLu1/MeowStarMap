@@ -173,7 +173,11 @@ html.soft-pink-luxury {
 }
 
 /* P2-C：.icon-btn 已通过 --text-secondary/--hover-bg 变量覆盖，仅保留 active 特殊光晕 */
-.soft-pink-luxury .icon-btn:hover {
+/* 排除遮罩变体：本规则与 .icon-btn.icon-btn-on-overlay:hover 同为 (0,3,0)，
+   只能靠源序决胜，而 .storybook/preview.ts 刻意在 globals.css 之后再引入本文件
+   （源序反转），不守卫的话 Storybook 下全屏工具栏 hover 会被染成 --accent-deep 深粉。
+   守卫后与源序解耦，同 .media-card:not(.is-selected) 手法 */
+.soft-pink-luxury .icon-btn:hover:not(.icon-btn-on-overlay) {
   color: var(--accent-deep);
   box-shadow: 0 0 12px rgba(226, 164, 188, 0.12);
 }

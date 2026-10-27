@@ -49,6 +49,7 @@ React 19 + TypeScript（strict）+ Zustand + Tailwind CSS 3 + i18next 的前端�
   - 动效曲线：`--ease-standard/emphasized/decelerate/spring`（CSS 侧）；motion 侧统一走 `utils/motionPresets.ts`（含 `staggerContainer/staggerItem` 级联入场），禁止组件内硬编码
   - 间距：`--space-1/2/3/4/6/8`（4px 基）与既有语义 `--space-card-*`/`--space-nav-*`/`--space-toolbar-gap` 并存
   - 纹理：`--texture-grain`（内联 SVG 噪点 data-URI）+ `--grain-opacity`
+  - 遮罩控件：`--overlay-control-*`（压在照片上的图标按钮：底 / 描边 / 前景 / 焦点环，含 hover、active、disabled 三档）+ `--overlay-gradient-top`、`--overlay-title-shadow`、`--favorite-on-overlay`。与 `--text-on-overlay`、`--overlay-bg*`、`--overlay-gradient-bottom` 同族——对比度由照片而非 UI 主题决定，**不进主题变量块**；消费侧配 `.icon-btn.icon-btn-on-overlay` 变体类（叠加态，仅全屏查看器使用）
   - 工具：`utils/cn.ts` 的 `cn()` 为类名拼接统一入口（零依赖）
 - **基础组件（`components/common/`，新 UI 一律复用，不再手写等价结构）**：`Button`（变体/尺寸/loading）、`Switch`/`Checkbox`/`Select`（统一表单控件）、`SegmentedControl`（药丸切换，radiogroup 语义）、`Tooltip`（portal + 视口钳制，替代原生 `title`）、`Drawer`（侧滑抽屉）、`Progress`（确定/不定态）、`PageHeader`（统一页头）、`FloatingActionBar`（底部浮动操作栏）、`FormField`（label 上置 + helper/error + aria 关联）、`ToastProvider`（全局 Toast Context，`pages/settings/shared.tsx` 仅保留 re-export）。
 - **氛围层**（`AppShell` 内 `.ambient-bg`，全局唯一实例）：环境光斑（`.ambient-blob-*`）+ 漂浮几何体（`.ambient-shape-*`）+ 颗粒纹理（`.ambient-grain`）。用户可经设置开关（`display.ambientGrain`/`display.ambientShapes`，App.tsx 启动时挂 `html.grain-off`/`html.shapes-off`）独立关闭；`html.glass-lite` 与 `prefers-reduced-transparency` 整层隐藏，`reduce-motion` 下动画静止。改动氛围层时必须维持这条降级链。

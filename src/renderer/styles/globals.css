@@ -122,6 +122,28 @@
   --warning-text: #d97706;
   /* 媒体卡片底部渐变遮罩（用于悬停时显示文件名等信息） */
   --overlay-gradient-bottom: linear-gradient(transparent, rgba(0, 0, 0, 0.5));
+  /* 遮罩控件（全屏查看器等压在照片上的图标按钮）三件套：底 / 描边 / 前景。
+     与 --text-on-overlay、--overlay-bg*、--overlay-gradient-bottom 同族：它们压在照片上，
+     对比度由照片而非 UI 主题决定，故两主题共用同一组值、不进主题变量块。
+     取值口径：60% 黑胶囊压纯白照片合成 sRGB 0.4，纯白图标对比度 5.74:1（最坏情况），
+     压纯黑照片 21:1；hover 底 0.72 时最坏 9.23:1。本注释正文不得出现注释收尾符号 */
+  --overlay-control-bg: rgba(0, 0, 0, 0.6);
+  --overlay-control-bg-hover: rgba(0, 0, 0, 0.72);
+  --overlay-control-bg-active: rgba(0, 0, 0, 0.78);
+  --overlay-control-border: rgba(255, 255, 255, 0.28);
+  --overlay-control-border-hover: rgba(255, 255, 255, 0.45);
+  --overlay-control-border-active: rgba(255, 255, 255, 0.65);
+  --overlay-control-fg: var(--text-on-overlay);
+  --overlay-control-fg-disabled: rgba(255, 255, 255, 0.5);
+  /* 焦点双色环：外侧白描边 + 内侧暗环，两环直接相邻 21:1，任意照片底色上至少一环可辨
+     （单色环在纯白或纯黑照片上必有一端失效） */
+  --overlay-control-ring: #ffffff;
+  --overlay-control-ring-shadow: 0 0 0 2px rgba(0, 0, 0, 0.78);
+  --overlay-gradient-top: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+  --overlay-title-shadow: 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 10px rgba(0, 0, 0, 0.45);
+  /* --favorite(#fd79a8) 压在最坏情况（纯白照片上的胶囊）仅 2.32:1，低于 1.4.11 的 3:1；
+     提亮后最坏 3.58:1、纯黑底 13.1:1，深浅照片下都能认出「已收藏」 */
+  --favorite-on-overlay: #ffb8d9;
 }
 
 input[type='checkbox'] {
@@ -906,6 +928,42 @@ html.glass-lite .ambient-bg {
 .icon-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* 遮罩上的图标按钮变体（.icon-btn 的叠加态，仅全屏查看器使用）。
+   根因：.icon-btn 是裸 CSS，源序在 @tailwind utilities（本文件第 4~6 行）之后，
+   Tailwind 工具类 text-[var(--text-on-overlay)] 与它同特异性 (0,1,0) 且源序在前，
+   会被整条盖成 --text-secondary(#666666)、hover 再变 --text-primary(#1a1a1a)，
+   压在深色遮罩与照片上几乎不可见。
+   解法：用两个类把特异性抬到 (0,2,0)，并显式覆盖 hover/focus/disabled 三个态，
+   不再与 .icon-btn 的源序赛跑。本块必须裸写：一旦包进 @layer 就会反被 .icon-btn 压掉。
+   注意：只声明颜色/描边/圆角，不声明 transform，hover 缩放仍由 .icon-btn:hover 提供 */
+.icon-btn.icon-btn-on-overlay {
+  color: var(--overlay-control-fg);
+  background: var(--overlay-control-bg);
+  border: 1px solid var(--overlay-control-border);
+  border-radius: var(--radius-pill);
+}
+
+.icon-btn.icon-btn-on-overlay:hover {
+  color: var(--overlay-control-fg);
+  background: var(--overlay-control-bg-hover);
+  border-color: var(--overlay-control-border-hover);
+}
+
+.icon-btn.icon-btn-on-overlay:focus-visible {
+  outline: 2px solid var(--overlay-control-ring);
+  outline-offset: 2px;
+  box-shadow: var(--overlay-control-ring-shadow);
+}
+
+/* 禁用态：压过 .icon-btn:disabled 的 opacity 0.5（半透明会让胶囊在浅色照片上失效），
+   改用降透明度前景色区分。WCAG 1.4.3 明确豁免非活动控件的对比度要求 */
+.icon-btn.icon-btn-on-overlay:disabled {
+  color: var(--overlay-control-fg-disabled);
+  background: var(--overlay-control-bg);
+  border-color: var(--overlay-control-border);
+  opacity: 1;
 }
 
 /* 社交媒体图标按钮 */

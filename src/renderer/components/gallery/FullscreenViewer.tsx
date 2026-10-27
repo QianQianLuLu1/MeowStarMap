@@ -474,13 +474,17 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
         <div
           className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-4 transition-opacity"
           style={{
-            background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)',
+            background: 'var(--overlay-gradient-top)',
             opacity: showControls ? 1 : 0,
             pointerEvents: showControls ? 'auto' : 'none'
           }}
         >
           {/* P2 修复：长标题（含文件名 + 序号）会挤压右侧按钮组，加 truncate + max-w 限制 */}
-          <span className="text-[var(--text-on-overlay)] text-sm font-medium truncate max-w-[50%]">
+          {/* 标题压在渐变透明段时为白压白，加 text-shadow 保证浅色照片上也可辨 */}
+          <span
+            className="text-[var(--text-on-overlay)] text-sm font-medium truncate max-w-[50%]"
+            style={{ textShadow: 'var(--overlay-title-shadow)' }}
+          >
             {title}
           </span>
           <div
@@ -496,7 +500,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
             {/* F-S10：幻灯片播放控制 */}
             <div className="relative">
               <button
-                className="icon-btn text-[var(--text-on-overlay)]"
+                className="icon-btn icon-btn-on-overlay"
                 onClick={toggleSlideshow}
                 title={
                   slideshow.isPlaying
@@ -512,7 +516,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
                 {slideshow.isPlaying ? <IconPause size={18} /> : <IconPlay size={18} />}
               </button>
               <button
-                className="icon-btn text-[var(--text-on-overlay)] text-xs ml-1"
+                className="icon-btn icon-btn-on-overlay text-xs ml-1"
                 onClick={() => setShowIntervalMenu((v) => !v)}
                 title={t('gallery.fullscreen.intervalTitle')}
                 aria-label={t('gallery.fullscreen.intervalTitle')}
@@ -539,7 +543,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
                       }}
                       style={
                         playInterval === ms
-                          ? { color: 'var(--accent)', fontWeight: 600 }
+                          ? { color: 'var(--accent-light)', fontWeight: 600 }
                           : undefined
                       }
                     >
@@ -551,7 +555,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
             </div>
             <div className="w-px h-5 bg-white/20" />
             <button
-              className="icon-btn text-[var(--text-on-overlay)]"
+              className="icon-btn icon-btn-on-overlay"
               onClick={() => toggleFavorite(currentFile)}
               title={
                 currentFile.is_favorite
@@ -567,13 +571,15 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               <IconFavorite
                 size={18}
                 filled={currentFile.is_favorite}
-                color={currentFile.is_favorite ? 'var(--favorite)' : 'var(--text-on-overlay)'}
+                color={
+                  currentFile.is_favorite ? 'var(--favorite-on-overlay)' : 'var(--text-on-overlay)'
+                }
               />
             </button>
             {/* 图片相机参数浮层开关（视频文件不显示） */}
             {currentFile.file_type === 'image' && (
               <button
-                className="icon-btn text-[var(--text-on-overlay)]"
+                className="icon-btn icon-btn-on-overlay"
                 onClick={() => setShowInfoPanel((v) => !v)}
                 title={
                   showInfoPanel
@@ -585,13 +591,20 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
                     ? t('gallery.fullscreen.hideInfoTitle')
                     : t('gallery.fullscreen.showInfoTitle')
                 }
-                style={showInfoPanel ? { background: 'rgba(255,255,255,0.18)' } : undefined}
+                style={
+                  showInfoPanel
+                    ? {
+                        background: 'var(--overlay-control-bg-active)',
+                        borderColor: 'var(--overlay-control-border-active)'
+                      }
+                    : undefined
+                }
               >
                 <IconInfo size={18} />
               </button>
             )}
             <button
-              className="icon-btn text-[var(--text-on-overlay)]"
+              className="icon-btn icon-btn-on-overlay"
               onClick={() => handleSaveAs(currentFile)}
               title={t('gallery.fullscreen.saveAsTitle')}
               aria-label={t('gallery.fullscreen.saveAsTitle')}
@@ -599,7 +612,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               <IconSaveAs size={18} />
             </button>
             <button
-              className="icon-btn text-[var(--text-on-overlay)]"
+              className="icon-btn icon-btn-on-overlay"
               onClick={() => handleDelete(currentFile)}
               title={t('common.delete')}
               aria-label={t('common.delete')}
@@ -607,7 +620,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               <IconDelete size={18} />
             </button>
             <button
-              className="icon-btn text-[var(--text-on-overlay)]"
+              className="icon-btn icon-btn-on-overlay"
               onClick={handleClose}
               title={t('gallery.fullscreen.closeTitle')}
               aria-label={t('common.close')}
@@ -620,9 +633,8 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
         {/* 左右导航 */}
         {fullscreenIndex > 0 && (
           <button
-            className="absolute left-4 top-1/2 -translate-y-1/2 icon-btn text-[var(--text-on-overlay)]"
+            className="absolute left-4 top-1/2 -translate-y-1/2 icon-btn icon-btn-on-overlay"
             onClick={() => navigate(-1)}
-            style={{ background: 'rgba(0,0,0,0.4)' }}
             aria-label={t('gallery.fullscreen.prevAriaLabel')}
           >
             <IconChevronLeft size={24} />
@@ -632,9 +644,8 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
             为准。重复文件页等显式携带 files 的入口，filteredFiles 只是图库兜底列表 */}
         {fullscreenIndex < activeFiles.length - 1 && (
           <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 icon-btn text-[var(--text-on-overlay)]"
+            className="absolute right-4 top-1/2 -translate-y-1/2 icon-btn icon-btn-on-overlay"
             onClick={() => navigate(1)}
-            style={{ background: 'rgba(0,0,0,0.4)' }}
             aria-label={t('gallery.fullscreen.nextAriaLabel')}
           >
             <IconChevronRight size={24} />
