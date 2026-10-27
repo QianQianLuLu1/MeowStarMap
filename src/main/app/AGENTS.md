@@ -8,7 +8,7 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ## 目录结构
 
-25 个源文件，其中 21 个有配套测试（`app-context.ts`、`auto-update.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无）：
+27 个源文件，其中 23 个有配套测试（`app-context.ts`、`auto-update.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无）：
 
 ### 核心编排
 
@@ -128,4 +128,4 @@ index.ts (入口)
 - `media-protocol.ts` 的路径白名单是安全关键路径，修改时需同时考虑 LRU 缓存一致性和 realpath 解引用。
 - `gpu-fallback.ts` 的状态文件在 `userData` 下，修改格式需向后兼容（旧格式仍能解析）。
 - `window-manager.ts` 中的 CSP 策略修改会影响渲染进程所有外部资源加载，需同步评估。
-- 25 个源文件中有**同名**配套测试的为 21 个（`app-context.ts`、`auto-update.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无同名套件）；其中 `cleanup.ts` 并非无测试，而是由 `__tests__/cleanup-perform-cleanup.test.ts` 与 `__tests__/cleanup-collect-exit-diagnosis.test.ts` 按函数拆分覆盖。修改后运行 `npm run test:main` 确认。
+- 27 个源文件中有**同名**配套测试的为 23 个（`app-context.ts`、`auto-update.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无同名套件）；其中 `cleanup.ts` 并非无测试，而是由 `__tests__/cleanup-perform-cleanup.test.ts` 与 `__tests__/cleanup-collect-exit-diagnosis.test.ts` 按函数拆分覆盖。修改后运行 `npm run test:main` 确认。

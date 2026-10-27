@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-58 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
+67 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -102,9 +102,9 @@
 
 ### 语言与执行
 
-- 65 个入仓代码文件里 60 个为 TypeScript（`.ts`：34 个非测试脚本 + 26 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
+- 67 个入仓代码文件里 61 个为 TypeScript（`.ts`：35 个非测试脚本 + 26 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
-- **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore:147-149` 显式排除，`scripts/archive/` 下 3 个由 `.gitignore:185` 整目录排除。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
+- **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore` 的 `/scripts/mimosa-*.ps1`、`/scripts/fix-harness-memory-path.ps1`、`/scripts/write-bridge-report.ps1` 三条规则显式排除，`scripts/archive/` 下 3 个由 `/scripts/archive/` 整目录排除（行号会随 `.gitignore` 增长漂移，故按规则文本引用）。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
 ### 错误处理与退出
@@ -173,4 +173,4 @@
 - `after-pack-vc-runtime.cjs` 是 CommonJS 格式（electron-builder 钩子要求），不得改为 ESM。
 - `doctor.ts` 的诊断结果会被 CI 和 `npm run verify` 引用，修改输出格式需评估下游。
 - 修改 `package.json` 的 `lint-staged` 键**形态**（不只是内容）时必须同步 `verify-format-scope.ts`，否则新增键会被跳过格式检查；`__tests__/verify-format-scope.test.ts` 中的配置契约测试会先失败（不可解析键另在 `npm run verify` 输出 `[VERIFY] ⚠`）。
-- 测试配对率偏低：34 个非测试脚本中 11 个有同名配套单测（`X.ts` ↔ `__tests__/X.test.ts`，≈32%；2026-10-22 性能基线分段轮把 `save-perf-baseline.ts` / `emit-perf-readings.ts` 补齐了同名配套）；且 `scripts/**` 不在 `vitest.config.ts` 的 `include: 'src/**'` 覆盖率统计范围内，本目录**没有行覆盖率读数**，历史写的「约 8%」无法复现，已改为可实测的文件配对口径。新增脚本时建议将核心逻辑导出为纯函数并补充单测。
+- 测试配对率偏低：35 个非测试脚本中 11 个有同名配套单测（`X.ts` ↔ `__tests__/X.test.ts`，≈31%；2026-10-22 性能基线分段轮把 `save-perf-baseline.ts` / `emit-perf-readings.ts` 补齐了同名配套）；且 `scripts/**` 不在 `vitest.config.ts` 的 `include: 'src/**'` 覆盖率统计范围内，本目录**没有行覆盖率读数**，历史写的「约 8%」无法复现，已改为可实测的文件配对口径。新增脚本时建议将核心逻辑导出为纯函数并补充单测。
