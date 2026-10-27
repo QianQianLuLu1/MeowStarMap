@@ -2030,8 +2030,8 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 5.0，**437 个测试文件 / 6737 个通过 + 12 个 skip（共 6749 个用例）**（2026-10-24 本轮 `npm test` 全量实跑，`Test Files 437 passed (437)`、`Tests 6737 passed | 12 skipped (6749)`；耗时 49.75s）。文件数构成：src 409 + scripts 24 + e2e 4（静态 glob 统计，与实跑汇总逐项对齐）。
-- 历史读数（仅供对照，勿沿用）：408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
+- Vitest 5.0，**450 个测试文件 / 7021 个通过 + 12 个 skip（共 7033 个用例）**（2026-10-27 本轮 `npm test` 全量实跑，`Test Files 450 passed (450)`、`Tests 7021 passed | 12 skipped (7033)`；耗时 54.19s）。文件数构成：src 420 + scripts 26 + e2e 4（静态 glob 统计，与实跑汇总逐项对齐）。
+- 历史读数（仅供对照，勿沿用）：437 / 6737 + 12 为 2026-10-24 快照，408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---
