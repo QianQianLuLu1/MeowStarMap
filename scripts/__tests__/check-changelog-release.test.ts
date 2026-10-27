@@ -10,7 +10,7 @@ import { analyzeChangelog, checkChangelogRelease } from '../check-changelog-rele
  * 背景：CHANGELOG.md 为手工维护（Keep a Changelog），2026-10-01 发布 2.5.3 后未执行
  * 「将 [Unreleased] 并入版本节并清空」的收口步骤，导致已随 2.5.3 安装包发布的变更
  * 长期标记为「未发布」。计划与执行记录见
- * docs/plans/2026-10-11-changelog-unreleased-rollover.md。
+ * docs/archive/plans/2026-10-11-changelog-unreleased-rollover.md（已归档，不入仓）。
  *
  * 覆盖三类：
  *   纯函数 — 收口判定（正常 / 异常 / 边界），夹具全部内联

@@ -3,7 +3,7 @@
  * @module src/renderer/components/gallery/VirtualImageGrid
  * @remarks 针对图库主页 `Maximum call stack size exceeded` 的回归测试。
  *
- * 背景（取证过程见 docs/plans/2026-09-29-fix-gallery-stack-overflow.md）：
+ * 背景（取证过程见 docs/archive/plans/2026-09-29-fix-gallery-stack-overflow.md（已归档，不入仓））：
  * 渲染进程故障日志中的堆栈（274747-long/2026-09-29 v2.5.1）全部落在
  * react-virtuoso 代码块的响应式内核上：
  *   U() 发布 → at()(combineLatest) 输入处理器 → M() 再发布 → gridDimensions(2904)
@@ -15,7 +15,7 @@
  * 本文件用「记录型 VirtuosoGrid 探针」在 jsdom 下对这两个放大器做确定性断言，
  * 修复前必须红灯；同时保留正常/异常/边界三类场景，防止修复引入回归。
  *
- * 2026-10-01 审查修复 T1（docs/plans/2026-10-01-fix-thumbnail-review-fixes.md）：
+ * 2026-10-01 审查修复 T1（docs/archive/plans/2026-10-01-fix-thumbnail-review-fixes.md（已归档，不入仓））：
  * 错误链终点闭环行为测试复用本文件的真渲染探针（见文末 describe）。
  */
 import React from 'react'
@@ -325,7 +325,7 @@ describe('VirtualImageGrid — 切板块后重新调度按需生成（round2 N5�
   })
 })
 
-// —— 审查修复 T1：错误链终点闭环（docs/plans/2026-10-01-fix-thumbnail-review-fixes.md）——
+// —— 审查修复 T1：错误链终点闭环（docs/archive/plans/2026-10-01-fix-thumbnail-review-fixes.md（已归档，不入仓））——
 // 缺陷：DB thumbnail 非空但 404 时 onError 就地重建；重建失败不改变 URL（不会再有
 // 第二次 onError）→ markFailed 永不执行；重建成功但 &r=N 重载仍 404 的二次 onError
 // 走 Map 命中分支无动作 → 两种场景卡片都永久卡在骨架态，占位警告图标永不出现。

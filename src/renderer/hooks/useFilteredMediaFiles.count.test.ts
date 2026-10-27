@@ -5,7 +5,7 @@
  * @dependencies react, stores/uiStore, stores/mediaStore
  * @remarks jsdom 环境；不 mock mediaStore 模块，走真实 loadNextMediaPage → loadMoreMedia →
  *          window.electronAPI.media.list（keyset 游标分页 mock），验收标准：mediaFiles 与
- *          hook 返回值长度均等于注入总数（计划：docs/plans/fix-gallery-non-grid-500-display.md §4.1 测试 B）
+ *          hook 返回值长度均等于注入总数（计划：docs/archive/plans/fix-gallery-non-grid-500-display.md（已归档，不入仓） §4.1 测试 B）
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'

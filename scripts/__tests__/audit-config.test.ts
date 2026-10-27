@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 /**
  * 审计配置契约测试：保证 audit-ci.jsonc / package.json / .github/workflows/build.yml /
  * .npmrc 四处与"本地与 CI 共用同一份审计配置（唯一事实来源）"的约定不漂移。
- * 背景与计划见 docs/plans/2026-09-26-npm-audit-mirror-bypass.md、
+ * 背景与计划见 docs/archive/plans/2026-09-26-npm-audit-mirror-bypass.md（已归档，不入仓）、
  * docs/troubleshooting-npm-audit-mirror.md。
  */
 

@@ -356,7 +356,7 @@ const VirtualImageGridComponent = forwardRef<VirtuosoGridHandle, VirtualImageGri
             : t('gallery.virtualGrid.noMore')
 
     // 修复 Maximum call stack size exceeded（取证见
-    // docs/plans/2026-09-29-fix-gallery-stack-overflow.md）：
+    // docs/archive/plans/2026-09-29-fix-gallery-stack-overflow.md（已归档，不入仓））：
     // react-virtuoso 的 components 一旦变更引用，其内部 List / Footer 的组件类型随之改变，
     // React 会卸载并重建整个列表子树，使 itemDimensions / gap / viewport 测量重新发布；
     // 而网格维度计算又以「已渲染可见区间」为输入，由此形成「测量 → 重渲染 → 再测量」

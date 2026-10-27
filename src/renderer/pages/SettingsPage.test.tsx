@@ -90,7 +90,7 @@ describe('SettingsPage 不再承载同步服务', () => {
 })
 
 /**
- * 设置导航合并后的结构契约（2026-10-16 轮次，见 docs/plans/2026-10-16-settings-nav-consolidation.md）。
+ * 设置导航合并后的结构契约（2026-10-16 轮次，见 docs/archive/plans/2026-10-16-settings-nav-consolidation.md（已归档，不入仓））。
  *
  * 钉三件事：
  * ① 二级侧边栏从 9 组 23 项收敛到 8 组 17 项——`SETTINGS_GROUPS` 是普通数组常量，

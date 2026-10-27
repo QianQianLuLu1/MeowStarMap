@@ -556,7 +556,7 @@ describe('useFilteredMediaFiles', () => {
 
   // 修复「扫描媒体超过 500 个时 UI 仅显示 500 个」：
   // 非网格视图（list/timeline/masonry/event-timeline）无触底加载入口，
-  // 无筛选条件时应同样逐页拉齐全库（计划：docs/plans/fix-gallery-non-grid-500-display.md）
+  // 无筛选条件时应同样逐页拉齐全库（计划：docs/archive/plans/fix-gallery-non-grid-500-display.md（已归档，不入仓））
   describe('非网格视图全库加载（fix-gallery-non-grid-500-display）', () => {
     beforeEach(() => {
       loadNextMediaPageMock.mockClear()

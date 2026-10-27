@@ -141,7 +141,7 @@ export function registerMediaProtocol(ctx: AppContext): void {
       // 缩略图协商缓存：白帧自愈/重新生成时会就地覆盖同名文件（内容 hash 命名，URL 不变），
       // 一年强缓存会让渲染层持续命中旧字节（典型表现：视频白帧长期不消失）。
       // 仅对缩略图缓存目录内的响应改用 ETag 协商缓存（未变 304 零字节，变更 200 新字节）；
-      // 原图/视频为用户文件，保持一年强缓存。修复详见 docs/plans/2026-09-29-fix-thumbnail-loading-latency.md
+      // 原图/视频为用户文件，保持一年强缓存。修复详见 docs/archive/plans/2026-09-29-fix-thumbnail-loading-latency.md（已归档，不入仓）
       // isPathUnderDir 内部已固化 win32 归一（含大小写折叠），这里传**原值**：
       // 再套一层宿主 resolve 会在 Linux 上把 `D:\…` 拼到 cwd 之后，与前缀比较的对方不同形
       const isThumbnail = isPathUnderDir(realPath, ctx.thumbnailGen.getCacheDir())
@@ -181,7 +181,7 @@ export function registerMediaProtocol(ctx: AppContext): void {
         // 竞态下抛 ERR_INVALID_STATE（生产堆栈 undici:1583）并经 uncaughtException 升级为
         // app.exit(1)。Readable.toWeb 走 Node 官方 webstreams 适配器，undici 对已是 web 流
         // 的 body 直通不包装，无守卫 close 站点从链路上消失。详见
-        // docs/plans/2026-10-15-media-stream-cancel-race-fix.md
+        // docs/archive/plans/2026-10-15-media-stream-cancel-race-fix.md（已归档，不入仓）
         return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
           status: 206,
           headers: {

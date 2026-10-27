@@ -310,7 +310,7 @@ describe('reportEarlyFatal 子进程 spawn 类错误分级', () => {
 })
 
 /**
- * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/plans/2026-10-15-media-stream-cancel-race-fix.md）：
+ * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/archive/plans/2026-10-15-media-stream-cancel-race-fix.md（已归档，不入仓））：
  * undici 对 Node 流 body 的包装（ReadableStreamFrom）在请求取消竞态下对已关闭流执行
  * 无守卫 close，抛 ERR_INVALID_STATE: Invalid state: ReadableStream is already closed
  * （堆栈仅平台帧：ReadableByteStreamController.close ← undici ← processTicksAndRejections）。

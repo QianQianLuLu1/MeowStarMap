@@ -23,7 +23,7 @@ import {
 
 // ============ 设置导航结构 ============
 // 二级分类 → 三级页面。2026-10-16 导航精简：9 组 23 节 → 8 组 17 节，
-// 把同一业务域的功能聚到同一屏（详见 docs/plans/2026-10-16-settings-nav-consolidation.md）。
+// 把同一业务域的功能聚到同一屏（详见 docs/archive/plans/2026-10-16-settings-nav-consolidation.md（已归档，不入仓））。
 // 分组与章节名通过 i18n key 动态翻译，支持多语言。
 
 interface SectionDef {

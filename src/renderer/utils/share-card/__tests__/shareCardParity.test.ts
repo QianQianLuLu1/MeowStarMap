@@ -16,7 +16,7 @@ import { renderShareCardPage, type ShareCardCopy } from '../shareCardRender'
  *
  * 对拍覆盖的是**几何等价 / 语义等价 / 降级等价**三条；字体像素渲染不在范围内
  * （小程序 Skia 与 Chromium Skia 的字形 hinting 不同），理由见
- * docs/plans/2026-10-15-sync-gallery-share-card-metadata.md §0.2。
+ * docs/archive/plans/2026-10-15-sync-gallery-share-card-metadata.md（已归档，不入仓） §0.2。
  */
 
 const FIXTURE = fileURLToPath(new URL('./fixtures/share-card.reference.txt', import.meta.url))

@@ -906,7 +906,7 @@ describe('规则 0 · 用户显式选中的媒体文件经 media:// 放行', () 
 })
 
 /**
- * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/plans/2026-10-15-media-stream-cancel-race-fix.md）：
+ * 缺陷背景（2026-10-15 v2.5.3 线上启动闪退，docs/archive/plans/2026-10-15-media-stream-cancel-race-fix.md（已归档，不入仓））：
  * `new Response(fs.ReadStream)` 使 undici 以 ReadableStreamFrom 包装 Node 流，该包装的
  * pull 完成回调经微任务对 controller 执行 close 且无"流已关闭"守卫。渲染进程快速滚动/
  * 视频 Range 切换触发请求取消时，取消与迟到 close 竞态，抛

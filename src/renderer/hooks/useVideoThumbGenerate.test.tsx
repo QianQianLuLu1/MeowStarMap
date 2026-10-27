@@ -7,7 +7,7 @@
  * @remarks
  *   缺陷现象：「缓存」（launcher-cache）与「重复文件」板块中，DB thumbnail 为 NULL 的游戏视频
  *   （...\X6Game\Saved\GamePlayPhotos\{uid}\Videos\{ts}\{ts}.Mp4）永久显示纯白占位卡片。
- *   根因：主进程多条补算链路全部失效（见 docs/plans/fix-gameplayphotos-video-thumbnail-null.md），
+ *   根因：主进程多条补算链路全部失效（见 docs/archive/plans/fix-gameplayphotos-video-thumbnail-null.md（已归档，不入仓）），
  *   且网格视图（VirtualImageGrid）对无缩略图视频不触发任何生成。
  *   修复：本 hook 对齐 DuplicatesPage DuplicateFileCard 的已验证模式——视频缺 thumbnail 时
  *   按需调用一次 window.electronAPI.thumbnail.generate（IPC → 主进程 seek 阶梯抽帧），

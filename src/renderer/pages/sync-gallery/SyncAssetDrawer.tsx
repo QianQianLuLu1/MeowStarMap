@@ -26,7 +26,7 @@ interface SyncAssetDrawerProps {
  * 五个参数面板**原样复用**图库那套（它们只吃 `MediaFile`，而 `AssetMediaFile extends MediaFile`）：
  * 穿搭/拍摄参数的实际来源是本地解密链 `decrypt:decodeFile`——内嵌 Runtime 从不传
  * `metadataResolver`/字典，上游 `metadata_json` 的 `camera`/`capture` 恒为空对象（见
- * docs/plans/2026-10-15-sync-gallery-share-card-metadata.md §0.1），所以这里不需要第二套取数。
+ * docs/archive/plans/2026-10-15-sync-gallery-share-card-metadata.md（已归档，不入仓） §0.1），所以这里不需要第二套取数。
  * 抽屉能读到该路径的前提是阶段 5 · C1 把 media:// 第 4 条规则下沉进了 `isMediaPathAllowed`。
  */
 export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
