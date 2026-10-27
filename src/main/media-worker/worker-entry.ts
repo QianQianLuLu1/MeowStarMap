@@ -41,6 +41,7 @@ import { isBlankImageFile, isBlankCachedThumbnail } from '../utils/video-frame'
 import { writeFileAtomic, tempSiblingPath, removeTempFileQuietly } from '../utils/atomic-file'
 import { calculatePHash, hammingDistance } from '../utils/phash'
 import { pickBestId } from '../utils/duplicate-scoring'
+import { dedupeByPhysicalFile } from '../utils/physical-file-key'
 import { buildAndSearch } from './bktree-index'
 import type {
   MediaWorkerCommand,
@@ -852,22 +853,27 @@ async function startDuplicateMark(
 async function markDuplicatesInWorker(
   database: DatabaseType.Database
 ): Promise<{ markedDuplicates: number; totalGroups: number }> {
-  const rows = database
-    .prepare(
-      `SELECT id, file_size, width, height, modified_at, is_favorite, rating, phash
-       FROM media_files
-       WHERE is_deleted = 0 AND file_type = 'image' AND phash IS NOT NULL AND phash != ''`
-    )
-    .all() as Array<{
-    id: number
-    file_size: number
-    width: number | null
-    height: number | null
-    modified_at: string
-    is_favorite: number
-    rating: number
-    phash: string
-  }>
+  // 同一物理文件（硬链接的多个路径）只保留一行：否则同 pHash（汉明距离 0）会把同一文件
+  // 标成「自己重复自己」。
+  const rows = dedupeByPhysicalFile(
+    database
+      .prepare(
+        `SELECT id, file_path, file_size, width, height, modified_at, is_favorite, rating, phash
+         FROM media_files
+         WHERE is_deleted = 0 AND file_type = 'image' AND phash IS NOT NULL AND phash != ''`
+      )
+      .all() as Array<{
+      id: number
+      file_path: string
+      file_size: number
+      width: number | null
+      height: number | null
+      modified_at: string
+      is_favorite: number
+      rating: number
+      phash: string
+    }>
+  )
 
   if (rows.length < 2) {
     // 单文件或无文件：清空所有重复标记
@@ -988,13 +994,17 @@ async function startSimilarFind(dbPath: string, threshold: number): Promise<void
   const database = openDatabaseIfNeeded(dbPath)
 
   try {
-    const rows = database
-      .prepare(
-        `SELECT id, file_path, file_name, file_type, file_size, modified_at, width, height, is_favorite, rating, thumbnail, phash
-         FROM media_files
-         WHERE is_deleted = 0 AND phash IS NOT NULL AND phash != ''`
-      )
-      .all() as Array<SimilarRowMeta & { phash: string }>
+    // 同一物理文件（硬链接的多个路径）只保留一行：否则同一文件的两条记录 pHash 相同，
+    // BK-tree 会把它配成候选边，在相似列表里显示成两份。
+    const rows = dedupeByPhysicalFile(
+      database
+        .prepare(
+          `SELECT id, file_path, file_name, file_type, file_size, modified_at, width, height, is_favorite, rating, thumbnail, phash
+           FROM media_files
+           WHERE is_deleted = 0 AND phash IS NOT NULL AND phash != ''`
+        )
+        .all() as Array<SimilarRowMeta & { phash: string }>
+    )
 
     const total = rows.length
     if (total < 2) {

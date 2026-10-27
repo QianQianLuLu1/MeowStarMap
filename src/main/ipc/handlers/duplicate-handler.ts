@@ -1,6 +1,8 @@
+// @core-change: 重复检测按物理文件（dev+ino）去重，修复硬链接同一文件被误报为两份重复
 import { ipcMain } from 'electron'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandlerNoArgs } from '../validator'
+import { dedupeByPhysicalFile } from '../../utils/physical-file-key'
 import { AppError } from '../../../shared/errors/app-error'
 import { calculateFileHash } from '../../utils/file-utils'
 import { pickBestId } from '../../utils/duplicate-scoring'
@@ -33,7 +35,15 @@ export function registerDuplicateHandlers(ctx: HandlerContext): void {
   ipcMain.handle(
     'media:findDuplicates',
     wrapHandlerNoArgs(ctx, async () => {
-      const rows = getRepo().getDuplicateCandidates()
+      // 同一物理文件（硬链接的多个路径）只保留一行：否则同 size + 同 sha256 必然被判成
+      // 「2 份重复」，而删除其中任一条都省不出空间（wastedBytes 也会虚报）。
+      const candidates = getRepo().getDuplicateCandidates()
+      const rows = dedupeByPhysicalFile(candidates)
+      if (rows.length !== candidates.length) {
+        logger.info(
+          `[Duplicates] 候选 ${candidates.length} 行 → 去重后 ${rows.length} 行，剔除 ${candidates.length - rows.length} 个硬链接重复项`
+        )
+      }
 
       // 性能重构 v3 改造项三：注册到 TaskRegistry，支持 task:cancel + 进度推送
       const taskId = `duplicate-find-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`

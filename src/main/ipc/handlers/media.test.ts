@@ -5,6 +5,9 @@
  * @dependencies electron / MediaRepository / file-utils / phash / duplicate-scoring
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import type { HandlerContext } from '../handler-context'
 import type { ScanResult, PhashResult, MarkDuplicatesResult } from '../../../shared/types/duplicate'
 
@@ -1119,6 +1122,64 @@ describe('registerMediaHandlers', () => {
     }
     expect(result.data.totalGroups).toBe(0)
     expect(result.data.success).toBe(true)
+  })
+
+  it('media:findDuplicates 同一物理文件（硬链接）不产生重复组', async () => {
+    // 真实硬链接：两条路径同一 inode，模拟游戏目录与启动器目录指向同一文件
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dup-hardlink-'))
+    try {
+      const origin = path.join(dir, 'origin.jpg')
+      const link = path.join(dir, 'link.jpg')
+      fs.writeFileSync(origin, 'same-content')
+      try {
+        fs.linkSync(origin, link)
+      } catch {
+        // 不支持硬链接的文件系统：退化为两条相同路径，仍是同一 inode，判据不变
+      }
+      const secondPath = fs.existsSync(link) ? link : origin
+
+      repoMock.getDuplicateCandidates.mockReturnValue([
+        {
+          id: 1,
+          file_path: origin,
+          file_name: 'origin.jpg',
+          file_type: 'image',
+          file_size: 100,
+          modified_at: '2026-01-01',
+          width: 100,
+          height: 100,
+          is_favorite: 0,
+          rating: 0
+        },
+        {
+          id: 2,
+          file_path: secondPath,
+          file_name: 'link.jpg',
+          file_type: 'image',
+          file_size: 100,
+          modified_at: '2026-01-02',
+          width: 100,
+          height: 100,
+          is_favorite: 0,
+          rating: 0
+        }
+      ])
+      calculateFileHashMock.mockResolvedValue('hashA')
+      pickBestIdMock.mockReturnValue(1)
+      registerMediaHandlers(makeCtx())
+      const result = (await getHandler('media:findDuplicates')()) as {
+        success: true
+        data: { success: boolean; totalGroups: number; totalFiles: number; wastedBytes: number }
+      }
+      // 同一物理文件只保留一行 → size 桶不足 2 项 → 不产生重复组，也完全不必算 sha256
+      expect(result.data.totalGroups).toBe(0)
+      expect(result.data.totalFiles).toBe(0)
+      expect(result.data.wastedBytes).toBe(0)
+      expect(calculateFileHashMock).not.toHaveBeenCalled()
+      expect(result.data.success).toBe(true)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('media:generatePhash 调用 generatePhashForUnprocessed', async () => {

@@ -1055,6 +1055,53 @@ describe('worker-entry 消息处理分支', () => {
     expect(marked.every((r) => r.args[1] === 1)).toBe(true)
   })
 
+  it('DUPLICATE_MARK：同一物理文件（硬链接）不标记重复', async () => {
+    ctl.hammingImpl = () => 0 // 两行 pHash 相同（同 inode 必然相同）
+    const origin = mediaFiles[0]
+    const link = path.join(tmpRoot, 'img-0-hardlink.jpg')
+    try {
+      fs.linkSync(origin, link)
+    } catch {
+      // 不支持硬链接的文件系统：退化为两条相同路径，仍是同一 inode
+    }
+    const secondPath = fs.existsSync(link) ? link : origin
+    const rows = [
+      {
+        id: 1,
+        file_path: origin,
+        file_size: 100,
+        width: 100,
+        height: 100,
+        modified_at: '2026-01-01 00:00:00',
+        is_favorite: 0,
+        rating: 0,
+        phash: '0'.repeat(64)
+      },
+      {
+        id: 2,
+        file_path: secondPath,
+        file_size: 100,
+        width: 100,
+        height: 100,
+        modified_at: '2026-01-01 00:00:00',
+        is_favorite: 0,
+        rating: 0,
+        phash: '0'.repeat(64)
+      }
+    ]
+    const fake = createFakeDb((sql) => (sql.includes('is_favorite') ? rows : []))
+    ctl.currentDb = fake.db
+    port.emitMessage({ type: 'DUPLICATE_MARK_START', payload: { dbPath: 'dup-hardlink.db' } })
+    const evt = await waitForEvent(port.messages, 'DUPLICATE_COMPLETE')
+    // 同一物理文件只保留一行 → 组内不足 2 项 → 无任何 is_duplicate=1 写入
+    expect(evt.payload).toMatchObject({ success: true, markedDuplicates: 0, totalGroups: 0 })
+    expect(
+      fake.runs.filter(
+        (r) => r.sql.startsWith('UPDATE media_files SET is_duplicate = ?') && r.args[0] === 1
+      )
+    ).toHaveLength(0)
+  })
+
   it('DUPLICATE_MARK 少于 2 行：清空重复标记并返回 0 组', async () => {
     const rows = [
       {
@@ -1137,6 +1184,60 @@ describe('worker-entry 消息处理分支', () => {
     const outRows = evt.payload.rows as Array<Record<string, unknown>>
     expect(outRows).toHaveLength(2)
     expect(outRows[0]).not.toHaveProperty('phash')
+  })
+
+  it('SIMILAR_FIND：同一物理文件（硬链接）只保留一行参与检索', async () => {
+    const origin = mediaFiles[0]
+    const link = path.join(tmpRoot, 'img-0-similar-hardlink.jpg')
+    try {
+      fs.linkSync(origin, link)
+    } catch {
+      // 不支持硬链接的文件系统：退化为两条相同路径，仍是同一 inode
+    }
+    const secondPath = fs.existsSync(link) ? link : origin
+    const rows = [
+      {
+        id: 1,
+        file_path: origin,
+        file_name: 'img-0.jpg',
+        file_type: 'image',
+        file_size: 100,
+        modified_at: '2026-01-01 00:00:00',
+        width: 10,
+        height: 10,
+        is_favorite: 0,
+        rating: 0,
+        phash: '0'.repeat(64)
+      },
+      {
+        id: 2,
+        file_path: secondPath,
+        file_name: 'img-0-hardlink.jpg',
+        file_type: 'image',
+        file_size: 100,
+        modified_at: '2026-01-01 00:00:00',
+        width: 10,
+        height: 10,
+        is_favorite: 0,
+        rating: 0,
+        phash: '0'.repeat(64)
+      }
+    ]
+    const fake = createFakeDb((sql) => (sql.includes('file_name') ? rows : []))
+    ctl.currentDb = fake.db
+    let searchCalled = false
+    ctl.bktreeImpl = (_opts) => {
+      searchCalled = true
+      return { cancelled: false, totalCandidates: 0 }
+    }
+    port.emitMessage({
+      type: 'SIMILAR_FIND_START',
+      payload: { dbPath: 'similar-hardlink.db', threshold: 10 }
+    })
+    const evt = await waitForEvent(port.messages, 'SIMILAR_COMPLETE')
+    // 硬链接的两条记录收敛为 1 行 → 不足 2 行，BK-tree 检索根本不该启动
+    expect(searchCalled).toBe(false)
+    expect(evt.payload).toMatchObject({ success: true, totalRows: 1 })
   })
 
   it('SIMILAR_FIND 少于 2 行：直接回传无需检测', async () => {
