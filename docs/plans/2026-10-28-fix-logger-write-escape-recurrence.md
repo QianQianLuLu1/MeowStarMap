@@ -1,9 +1,12 @@
 # 2026-10-28 CI 状态核查与 DEBT-039 复发性逃逸清偿
 
-> 状态：**已执行完毕（本机侧）**——节点 0 至 7 全部落地，锚定计数 28 → 1、守卫 15 例全绿、
-> `npm test` 453 文件 / 7063 通过 + 12 跳过。原「计划已落仓，等待用户读过」为节点 0 时的事实，保留在此
-> 以供追溯；逐节点读数与**五处与计划的偏差**见文末 §十。剩余未闭环一项只能由 CI 给出证据：
-> 慢宿主上的 `EnvironmentTeardownError`（§十 末节）。
+> 状态：**已执行完毕，CI 复验全链转绿**——推送 `520588a..baacb9f` 触发 run 26（`40715251928`，head
+> `baacb9f`）结论 **success**，14 个 job 全部到位：`Lint, Typecheck & Security` / `Test (shard 1..10)`
+> （含本轮两处落点 shard 3、shard 7）/ `Coverage Gate` / `Build & Release (Windows)` 全绿，
+> `Storybook Docs` 按设计 skipped。终局读数：`[Logger]` 三类告警锚定计数 28 → **1**、
+> `npm test` 453 文件 / 7063 通过 + 12 跳过。
+> 原「计划已落仓，等待用户读过」为节点 0 时的事实，保留在此以供追溯；逐节点红→绿读数、
+> **五处与计划的偏差**与 CI 终局分别见文末 §十、§十一。
 > 用户已确认的两项口径：① 收口范围 = 「两处都修 + 防回归守卫」（实测到的 `logger.enforce.test.ts` 与
 > `dir-manager.test.ts` 两个真站点全修，并补一条封闭集守卫）；② 交付路径 = 「直推 `main` 触发一次真实 CI 复验」。
 > 前置事实：**CI 在 HEAD 已全绿，本轮没有失败可修**，故不虚构红灯（见 §一 开头）。
@@ -183,4 +186,62 @@ interface LedgerRow {
 
 慢宿主上的 `EnvironmentTeardownError` 本身：本机 54.14s 跑完，rejection 排得进环境拆解之前，
 **无法确定性复现**，因此本机全绿不等于「已验证不再出现」。该缺席证据只能由推送后的 CI 十个分片给出，
-读法见 §七 节点 8。
+读法见 §七 节点 8。**（已由 §十一 的 run 26 终局读数闭合）**
+
+---
+
+## 十一、推送后 CI 复验终局（run 26 = `40715251928`，head `baacb9f`）
+
+推送 6 个提交（`61d9825` → `baacb9f`，即 `520588a..baacb9f`）触发 run 26，结论 **success**，
+started 15:22:17Z → completed 15:32:09Z（9m52s），**14 个 job 全部到位、无一失败**：
+
+| Job                                  | 结论    | 关键点                                                                                                 |
+| ------------------------------------ | ------- | ------------------------------------------------------------------------------------------------------ |
+| `Lint, Typecheck & Security`         | success | 第 6 步 `Security audit` 绿；lint / i18n:guard / typecheck / typecheck:e2e 全绿                        |
+| `Test (shard 1..10)`                 | success | **10 个全绿**，含本轮两处落点 shard 3（`logger.enforce`）与 shard 7（`dir-manager`）及上轮红的 shard 5 |
+| `Coverage Gate`                      | success | 阈值门控通过                                                                                           |
+| `Build & Release (Windows x64 NSIS)` | success | 287s：`npm run build` / `dist:win` / `e2e:smoke` / `e2e:perf` 逐步绿                                   |
+| `Storybook Docs`                     | skipped | 按 `build.yml:292` 设计（仅 `workflow_dispatch` / tag push 才跑）                                      |
+
+三个关键分片的 step 级读数（每片只有 `Run npm test -- --shard=N/10` 这一步，success；
+`Complete job` 亦 success）：
+
+```text
+shard 3/10  success  15:23:38Z -> 15:24:11Z  (33s)
+shard 5/10  success  15:23:38Z -> 15:24:25Z  (47s)
+shard 7/10  success  15:23:39Z -> 15:24:30Z  (51s)
+```
+
+三片的 check-run annotations 里**没有任何测试失败注解**（该仓的 CI reporter 会在失败时打注解），
+只有 runner 镜像迁移提示（`ubuntu-latest` 自 2026-10-19 起迁移到 Ubuntu 26）。
+Windows job 的三条注解证明性能门是真判绿而非跳过：`env=ci status=final samples=3 dataset=1500`，
+`cold-start-first-paint=1357; scan-ingest=1608; scan-throughput=932.7; find-duplicates=3223;
+find-duplicates-throughput=465.5; gallery-scroll-frame-p95=23 …`；
+冒烟 `8 skipped / 11 passed (15.0s)`、perf `6 skipped / 10 passed (1.7m)`
+——skip 全部来自 CI 未建 `@nikkisync` 链的既有门控 `e2e/nikkisync-guard.ts`，非本轮新增。
+
+### 这条竞态现在凭什么算闭合
+
+本轮的修法让它**失去可交付物**：三处逃逸站点各自要么把日志目录按用例重建到真实存在
+（`logger.enforce`），要么把 `appendFile` / `readdir` 桩成永不失败（`dir-manager` / `connection`），
+因此本次改动面上根本没有路径会走到那四条告警的 `console.error`。没有 `console.error`，
+就不存在「排到环境拆解之后送达的 log RPC」可抛。这比「靠本机速度快排进拆解之前」强一档：
+后者依赖宿主时序，前者是构造性成立。
+
+但**不写成「已证明 `EnvironmentTeardownError` 永不出现」**：它的判据是「本仓当前没有任何测试会
+触发那四条告警」，由 `scripts/__tests__/logger-escape-ledger.test.ts`（静态形状与台账）与全量
+`npm test` 的锚定计数（终局 = 1，唯一站点 `src/main/utils/logger.test.ts`）双向钉住；
+CI run 26 十片全绿是旁证。另需注意本轮 CI 的分片耗时只有 33-51s（比 run 23 的 24.15s 单片更快），
+即这次运行**并未**处于「慢宿主」压力之下——所以它不能替代构造性论证，只能作为无回归的证据。
+
+### 本轮终局账目与仍开放项
+
+- 提交序列：`61d9825`（计划落仓）→ `0bb84a4`（守卫红灯取证）→ `fb581a5` → `23eb77f` → `37d8a06` →
+  `baacb9f`（文档回写）→ 本节回写提交。
+- 债：DEBT-039 由 `open` 转 `done`，撤销判据按 §1.4 订正且原句保留。
+- 读数：`[Logger]` 三类告警锚定计数 **28 → 1**；`npm test` 由 452 / 7046+12 转 **453 / 7063+12**；
+  CI run 26 **14 job 全绿**。
+- 仍开放（不在本轮范围，逐条留档，不假装清完）：DEBT-038（electron 41 → 42 跨大版本专项）、
+  `audit-ci.jsonc` 的 19 个失效豁免清退（须同步 `audit-config.test.ts` 的 `MIGRATION_BASELINE`）、
+  以及直推 `main` 使四道 PR-only 门（dependency-review / commitlint / IPC 契约同步 / tech-debt 注解）
+  持续不触发——本轮契约面为零，但这一结构性空档未变。
