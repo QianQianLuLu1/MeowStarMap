@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-22",
+  "updatedAt": "2026-10-28",
   "items": [
     {
       "id": "DEBT-001",
@@ -474,6 +474,18 @@
       "description": "2026-10-22 把 e2e/perf-baseline.json 改为按运行环境分段（v2：全局 hardRules + environments.dev/ci 相对基线）后，ci 段的 baselineValue 取自 run 39623462678 归档产物里的两份实测报告（该次因 e2e/playwright.config.ts 的 retries=1 让 describe.serial 整链重跑，故一次运行留下两份读数），中位数=两值平均。两份来自同一 runner 实例、共享 warm 磁盘缓存，不是完全独立样本，因此段状态标 provisional 而非 final，且由 e2e/__tests__/perf-baseline-env.test.ts 的「status 与 DEBT-037 双向耦合」用例钉住：provisional 期间本条必须 open，转 final 后必须 done。收口方式：用 .github/workflows/build.yml 的 Emit perf readings annotation 步骤（if: always()，输出 ::notice title=perf-readings::）从免鉴权的 check-runs/{jobId}/annotations 接口取回至少一次新运行的读数，凑满 3 份后执行 npm run perf:save-baseline -- --env ci --samples <三份报告>。清偿读数（2026-10-22）：提交 e5a4bff 的 run 39772693608 里 step 10 判 success（18s），其 perf-results artifact 提供第三份读数（绿运行不重跑 ⇒ 只有一份），三份取中位数后 ci 段转 status=final、sampleCount=3、sourceRuns 三条。禁止项已守住：两侧 regressionFactor 逐项相同（3/5/10/50），未放宽任何阈值、未关闭任何判定。",
       "files": ["e2e/perf-baseline.json"],
       "lines": [75],
+      "issue": false
+    },
+    {
+      "id": "DEBT-038",
+      "category": "supply-chain",
+      "section": 16,
+      "status": "open",
+      "priority": "medium",
+      "title": "electron GHSA-jr5w-w6x2-84p9 无 41 线回移补丁，走豁免待跨大版本专项",
+      "description": "2026-10-27 起 CI 的 lint-typecheck job 第 6 步「Security audit (audit-ci, fail on high/critical)」连续两次变红（run 22 = df2ab848 即本机 HEAD、run 21 = 59b40a42；上一条绿是 run 20 = 530e9c09，2026-10-22）。本机复跑同一条命令逐字复现，未豁免的 high 恰 3 条：GHSA-mrhx-c7xc-m3w5（zod <4.6.6）、GHSA-xjj6-f33q-929c（undici 两个传递节点 7.30.0 与 6.29.0）、GHSA-jr5w-w6x2-84p9（electron <42.11.16）。前两条已由提交 d2ae917 按修复版重解析清除（zod 4.4.3 → 4.6.7、undici 7.30.0 → 7.30.1 与 6.29.0 → 6.29.1，全部在既有 semver 区间内、未新增 overrides、未用 npm audit fix），本条记录第三条的处置。归因取证：逐 commit 读 package-lock.json，530e9c09..df2ab84 之间三条版本一字未变，变的是通告进入 npm 审计源的时间（electron 与 undici 两条 2026-10-23 披露；zod 一条 2026-10-01 披露、修复版 10-11 发布，但 10-27 才进审计源返回）——同一份 lock 会因外部数据源由绿转红，故另建离线回归闸门 scripts/__tests__/lock-advisory-floor.test.ts 钉住已修复项。electron 侧事实：devDependencies.electron 精确钉 41.10.6，而 scripts/pre-dist-check.ts:806-810 的 ABI 闸门要求它必须是精确版本（禁止 ^ ~ > < x），故不能改成区间来「等补丁」；GHSA-jr5w-w6x2-84p9 的区间是 <42.11.16，41 线最新只到 41.10.7——41 线没有回移补丁，41.10.7 同样命中该区间，所以「升到 41 线最新」是无效动作，此点必须写明以免后来人误关。官方修复版从 42.11.16 起（42 线现已到 42.11.18），即需跨大版本 41 → 42。2026-10-28 经用户授权，按既有 dev 工具链豁免口径把 GHSA-jr5w-w6x2-84p9 加入 audit-ci.jsonc 的 allowlist（29 → 30 项），未放宽 high/critical 阈值本身、未改动 .github/workflows/build.yml。处置读数（2026-10-28 实测）：npm run audit 由退出码 1 转退出码 0，末行「Passed npm security audit.」，该通告由「Failed security audit due to high vulnerabilities」移入「Found vulnerable allowlisted advisories」（10 → 11 项）；scripts/__tests__/audit-config.test.ts 19 例全通过（对 28 项迁移基线取子集断言，新增豁免无须改测试）；scripts/__tests__/lock-advisory-floor.test.ts 19 例全通过（表内 zod/undici 通告与新豁免无重叠，互斥断言在真实数据上成立）。撤销条件：devDependencies.electron 升到 >=42.11.16（或 41 线出现回移修复版）后复跑 npm run audit 不再命中，即删 allowlist 本条并把本条改 done。跨大版本按 DEBT-020 的 40 → 41 先例须独立立项，已排明的额外改动面：package.json 的精确版本、package-lock.json 的 electron 子树、README.md 三处 Electron 版本徽章（41.10 → 42.11，由 scripts/check-doc-versions.ts 在 pre-dist-check 链硬阻断）、ARCHITECTURE.md / ARCHITECTURE.en.md 同值、better-sqlite3 需按新 ABI 取产物（node-abi 已含 electron 42 → ABI 146；它是本仓唯一绑 V8 ABI 的原生模块，koffi 与 @img/sharp 为 N-API/独立二进制跨 ABI 稳定）、e2e/perf-baseline.json 需重跑采样重新固化（禁止调低阈值消音）。暴露面评估：本条是 eMudhra 中间证书被入侵后的缓解动作，本仓是否实际发起依赖该信任锚的出站 TLS 本轮未取证，按「待评估」记账，不得记为「不影响」。遗留：audit-ci.jsonc 仍有 19 个已不再命中的失效豁免（被列在「Consider not allowlisting advisories」），清退属收紧闸门且须同步改 MIGRATION_BASELINE 数组，按 DEBT-020 / DEBT-034 口径留待独立一轮。",
+      "files": ["package.json", "package-lock.json", "audit-ci.jsonc"],
+      "lines": [],
       "issue": false
     }
   ]

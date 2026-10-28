@@ -23,6 +23,15 @@
   //     2026-10-14 实测 npm view braces dist-tags.latest 仍为 3.0.3（即漏洞版本就是最新版），
   //     micromatch@latest 的依赖仍写 ^3.0.3，上游无修复版可取 ⇒ overrides 无可 pin 目标，依赖手术不成立。
   //     跟踪：DEBT-034。撤销条件：上游链条抬到已修版本后 npm update 并复跑 npm run audit 不再命中，即删本条。
+  //   electron GHSA-jr5w-w6x2-84p9（2026-10-28 新增）：2026-10-23 披露的 eMudhra 中间证书缓解通告，
+  //     漏洞区间 <42.11.16。本仓 devDependencies.electron 精确钉 41.10.6，而 41 线最新只到 41.10.7——
+  //     41 线**没有回移补丁**，41.10.7 同样命中该区间，所以「升到 41 线最新」是无效动作；官方修复版
+  //     从 42.11.16 起（42 线现已到 42.11.18），即需跨大版本 41 → 42。按 DEBT-020（40 → 41）先例，
+  //     跨大版本须独立立项：原生模块 ABI 重建（better-sqlite3 是唯一绑 V8 ABI 的模块）、README 三处
+  //     Electron 版本徽章与 scripts/check-doc-versions.ts 闸门、e2e/perf-baseline.json 重新固化。
+  //     跟踪：DEBT-038。撤销条件：electron 升到 >=42.11.16（或 41 线出现回移修复版）后复跑
+  //     npm run audit 不再命中，即删本条。暴露面（本仓是否实际发起依赖该信任锚的出站 TLS）尚未取证，
+  //     按「待评估」记账，不得写成「不影响」。
   "allowlist": [
     // —— tar 链 9 项
     "GHSA-23hp-3jrh-7fpw",
@@ -58,6 +67,8 @@
     "GHSA-mwp4-54f8-5fhr",
     "GHSA-rgw5-rvv9-x895",
     // —— braces 1 项（DEBT-034，dev 工具链、上游无修复版）
-    "GHSA-vfj7-8cjw-p6xm"
+    "GHSA-vfj7-8cjw-p6xm",
+    // —— electron 2026-10 新披露 1 项（DEBT-038，41 线无回移补丁，跨大版本待专项）
+    "GHSA-jr5w-w6x2-84p9"
   ]
 }
