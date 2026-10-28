@@ -653,6 +653,18 @@ import { backupService } from '../services/backup-service'
 describe('DatabaseManager', () => {
   let manager: DatabaseManager
 
+  /**
+   * 让 logger 的落盘写在本套件内全程静默：`writeLog()` 是
+   * `fs.promises.appendFile(...).catch(err => console.error('[Logger] 写入失败:', err))` 的
+   * fire-and-forget，而 `app.getPath` 被指到 `/mock/userdata/*`，真实写必然 reject；
+   * reject 若排到环境拆解之后，Vitest 抛 `EnvironmentTeardownError`（Closing rpc while
+   * "onUserConsoleLog" was pending）并计为未处理错误。beforeEach 装一次，afterEach 的
+   * `restoreAllMocks()` 之后必须补装——锁重试（500ms 延时）等路径在还原之后才写日志。
+   */
+  const silenceLoggerDiskWrite = (): void => {
+    vi.spyOn(fs.promises, 'appendFile').mockImplementation(() => Promise.resolve())
+  }
+
   /** 读取表当前列名列表（经 PRAGMA table_info），用于迁移后真实断言列是否存在 */
   const readTableColumns = (tableName: string): string[] => {
     const db = manager.getDatabase() as unknown as {
@@ -681,6 +693,12 @@ describe('DatabaseManager', () => {
     vi.spyOn(fs, 'statSync').mockReturnValue({ size: 1024 } as fs.Stats)
     // 启动性能优化：markCleanExit 写标志断言用（默认静默，不真实写盘）
     vi.spyOn(fs, 'writeFileSync').mockImplementation(() => undefined)
+    // 环境卫生：logger.writeLog 用 fs.promises.appendFile(...).catch(...) 兜底（fire-and-forget），
+    // 而本套件的 app.getPath 指向 /mock/userdata/* ⇒ 真实异步写必然 reject。这些 reject 若排到
+    // 环境拆解之后，Vitest 会抛 EnvironmentTeardownError（Closing rpc while "onUserConsoleLog" was
+    // pending）并计为未处理错误：2026-10-28 CI 的 Test (shard 5/10) 即「45 文件全通过仍退出 1」。
+    // 与上面 writeFileSync 同源处置——日志落盘在本套件内一律静默，由 logger.test.ts 单独验写盘语义。
+    silenceLoggerDiskWrite()
 
     // 重置 electron.app.getPath mock
     app.getPath.mockClear()
@@ -691,6 +709,9 @@ describe('DatabaseManager', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    // restoreAllMocks 连带还原上面装的 appendFile spy，而 manager.close() 与锁重试（500ms 延时）
+    // 都在其之后才写日志 ⇒ 立即补装，否则那一次 reject 仍逃逸到环境拆解外
+    silenceLoggerDiskWrite()
     // 确保关闭数据库
     try {
       manager.close()
@@ -1835,5 +1856,32 @@ describe('DatabaseManager', () => {
       }
       expect(rows).toHaveLength(3)
     })
+  })
+
+  /**
+   * 环境卫生守卫：logger 的写盘失败不得逃逸到测试生命周期之外。
+   * `writeLog()` 用 `fs.promises.appendFile(...).catch(err => console.error('[Logger] 写入失败:', err))`
+   * 兜底，而本套件把 `app.getPath` 指向 `/mock/userdata/*` ⇒ 真实异步 appendFile 必然 reject；
+   * 这些 reject 若落到环境拆解阶段才完成，Vitest 会以
+   * `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending` 计为未处理错误。
+   * 2026-10-28 CI 的 `Test (shard 5/10)` 正是这样红的：45 个测试文件全通过、1073 例通过 + 1 跳过，
+   * 仍因 2 条该错误退出码 1（本机因跑得快要早于拆解排空，故只在 CI 慢宿主上显形）。
+   */
+  it('logger 写盘在本套件内不得留下 [Logger] 写入失败（fs.promises.appendFile 必须被 mock）', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      logger.info('connection.test 环境卫生探针')
+      // 排空 appendFile 的 reject 与其 .catch 回调（两个 macrotask 确保已入队的回调都跑完）
+      await new Promise((resolve) => setImmediate(resolve))
+      await new Promise((resolve) => setImmediate(resolve))
+      const failures = errorSpy.mock.calls.filter((args) =>
+        String(args[0]).includes('[Logger] 写入失败')
+      )
+      expect(failures, '真实 fs.promises.appendFile 被调用，reject 会逃逸到环境拆解之外').toEqual(
+        []
+      )
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })

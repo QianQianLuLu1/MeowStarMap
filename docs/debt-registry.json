@@ -487,6 +487,22 @@
       "files": ["package.json", "package-lock.json", "audit-ci.jsonc"],
       "lines": [],
       "issue": false
+    },
+    {
+      "id": "DEBT-039",
+      "category": "test-gap",
+      "section": 16,
+      "status": "open",
+      "priority": "medium",
+      "title": "其余套件仍可能留下 fire-and-forget 的 logger 写盘 reject，慢宿主上显形为 EnvironmentTeardownError",
+      "description": "2026-10-28 修 CI 依赖审计红的同轮，run 23 暴露第二处红：Test (shard 5/10) 里 45 个测试文件全通过、1073 例通过 + 1 跳过，仍因 2 条 Unhandled Rejection 退出码 1——EnvironmentTeardownError: [vitest-worker]: Closing rpc while \"onUserConsoleLog\" was pending，Vitest 归因到 src/main/database/connection.test.ts。根因：src/main/utils/logger.ts:222 的 writeLog() 用 fs.promises.appendFile(...).catch(err => console.error('[Logger] 写入失败:', err)) 兜底（fire-and-forget，无人持有这条 Promise），而该套件的 app.getPath 被指到 /mock/userdata/*，真实异步写必然 reject；reject 的 console.error 若在环境拆解之后才送达 worker，RPC 已关，Vitest 即抛该错并按未处理错误退出。本机 1.75s 跑完（reject 早于拆解排空）故不复现，CI 慢一个量级（同一 shard 24.15s，restoreBatch 10323ms vs 本机 3118ms）才显形——属「只在慢宿主红」的时序类缺陷。本轮修法（已提交）：connection.test.ts 的 beforeEach 增补 vi.spyOn(fs.promises, 'appendFile').mockImplementation(() => Promise.resolve())，与既有 writeFileSync 静默同源；并在 afterEach 的 restoreAllMocks() 之后立即补装——实测首轮只压到 207 剩 1，漏的那条正是锁重试（500ms 延时）与 manager.close() 在还原之后才写日志的路径。红→绿读数：修复前该套件单独跑输出 207 条 [Logger] 写入失败（与 CI 日志计数逐字相同），新增守卫用例红（断到 56 条积压）；修复后真实写盘失败 0 条、122 例全通过，npm test -- --shard=5/10 由 1074 例转 1075 例全绿。遗留（本条 open 的内容）：同类隐患不止这一份文件——凡是把 app.getPath 指到 /mock/* 或不可写路径、又会在测试结束前后触发 logger 的套件，都可能在慢宿主上重现同一竞态；本轮只修 CI 实际点名的 connection.test.ts，未做全仓扫。下一轮的判具建议：给 tests/setup.ts 装一条「fs.promises.appendFile 全局静默 + 单文件可覆写」的基线（须先排除 src/main/utils/logger.test.ts 自身对写盘语义的用例），并加一条守卫统计各套件运行时 [Logger] 写入失败 的出现次数（>0 即提示该套件在真实写盘）。撤销条件：全仓 npm test 输出里 [Logger] 写入失败 计数为 0（含 --shard 分片跑），即可关闭本条。",
+      "files": [
+        "src/main/utils/logger.ts",
+        "tests/setup.ts",
+        "src/main/database/connection.test.ts"
+      ],
+      "lines": [222],
+      "issue": false
     }
   ]
 }

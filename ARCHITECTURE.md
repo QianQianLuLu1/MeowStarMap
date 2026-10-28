@@ -2041,8 +2041,8 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 5.0，**452 个测试文件 / 7045 个通过 + 12 个 skip（共 7057 个用例）**（2026-10-28 本轮 `npm test` 全量实跑，`Test Files 452 passed (452)`、`Tests 7045 passed | 12 skipped (7057)`；耗时 54.93s）。文件数构成：src 420 + scripts 27 + e2e 5（静态 glob 统计，与实跑汇总逐项对齐）。
-- 历史读数（仅供对照，勿沿用）：450 / 7021 + 12 为 2026-10-27 快照——其静态构成把 `60cfe96`（2026-10-27）新增的 `e2e/__tests__/launch-env.test.ts` 漏计成「e2e 4」，本轮按实跑对齐为 5；本轮相对该快照 +1 文件 / +19 例来自新增的 `scripts/__tests__/lock-advisory-floor.test.ts`，余 +1 文件 / +5 例即上述漏计件（450+1+1=452、7021+19+5=7045，逐项闭合）。437 / 6737 + 12 为 2026-10-24 快照，408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
+- Vitest 5.0，**452 个测试文件 / 7046 个通过 + 12 个 skip（共 7058 个用例）**（2026-10-28 本轮 `npm test` 全量实跑，`Test Files 452 passed (452)`、`Tests 7046 passed | 12 skipped (7058)`；耗时 53.60s）。文件数构成：src 420 + scripts 27 + e2e 5（静态 glob 统计，与实跑汇总逐项对齐）。
+- 历史读数（仅供对照，勿沿用）：450 / 7021 + 12 为 2026-10-27 快照——其静态构成把 `60cfe96`（2026-10-27）新增的 `e2e/__tests__/launch-env.test.ts` 漏计成「e2e 4」，本轮按实跑对齐为 5；本轮相对该快照 +1 文件 / +19 例来自新增的 `scripts/__tests__/lock-advisory-floor.test.ts`，+1 例来自 `connection.test.ts` 新增的环境卫生守卫用例，余 +1 文件 / +5 例即上述漏计件（450+1+1=452、7021+19+1+5=7046，逐项闭合）。437 / 6737 + 12 为 2026-10-24 快照，408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---

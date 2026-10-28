@@ -242,14 +242,15 @@ npm run audit           # 最终必须 exit 0
 
 ### 提交序列
 
-| 提交       | 节点 | 内容                                                                                            |
-| ---------- | ---- | ----------------------------------------------------------------------------------------------- |
-| `e805193`  | 1    | 本计划文档落仓（仅此一个文件）                                                                  |
-| `127158d`  | 2    | `scripts/__tests__/lock-advisory-floor.test.ts` + `scripts/AGENTS.md`（**红灯取证**）           |
-| `2434ffd`  | 2 补 | 订正本文档一处错误路径（全量 `npm test` 打回，见下「计划自身缺陷」）                            |
-| `d2ae917`  | 3    | `package-lock.json` 9 增 9 删：zod 4.4.3→4.6.7、undici 7.30.0→7.30.1、node-gyp 侧 6.29.0→6.29.1 |
-| `9451efd`  | 4    | `audit-ci.jsonc` 豁免 + `docs/debt-registry.json` DEBT-038 + `docs/技术债清单.md` §0/§16        |
-| （本提交） | 5    | `CHANGELOG.md` 补录 + `ARCHITECTURE.md` / `ARCHITECTURE.en.md` 读数回写 + 本文档执行读数        |
+| 提交              | 节点 | 内容                                                                                                |
+| ----------------- | ---- | --------------------------------------------------------------------------------------------------- |
+| `e805193`         | 1    | 本计划文档落仓（仅此一个文件）                                                                      |
+| `127158d`         | 2    | `scripts/__tests__/lock-advisory-floor.test.ts` + `scripts/AGENTS.md`（**红灯取证**）               |
+| `2434ffd`         | 2 补 | 订正本文档一处错误路径（全量 `npm test` 打回，见下「计划自身缺陷」）                                |
+| `d2ae917`         | 3    | `package-lock.json` 9 增 9 删：zod 4.4.3→4.6.7、undici 7.30.0→7.30.1、node-gyp 侧 6.29.0→6.29.1     |
+| `9451efd`         | 4    | `audit-ci.jsonc` 豁免 + `docs/debt-registry.json` DEBT-038 + `docs/技术债清单.md` §0/§16            |
+| （`d28564f`）     | 5    | `CHANGELOG.md` 补录 + `ARCHITECTURE.md` / `ARCHITECTURE.en.md` 读数回写 + 本文档执行读数            |
+| （run 23 复验轮） | 7    | `connection.test.ts` 静默 logger 落盘 + 守卫用例；DEBT-039 登记；双语读数改 7046/7058；本文档 §十二 |
 
 ### 红 → 绿闭环
 
@@ -298,3 +299,68 @@ allowlist **29 → 30**；`Found vulnerable allowlisted advisories` **10 → 11*
 ### 本机未验（不写成已验）
 
 `npm run build`（干净克隆主进程编译）、`npm run dist:win`、`npm run e2e:smoke`、`npm run e2e:perf` 只有 Windows job 能验，按用户选择本轮不跑；PR-only 的 dependency-review / commitlint / IPC 契约同步检查因直推 `main` 不触发。这四层的首次真实读数由推送后的 CI 运行给出。
+
+---
+
+## 十二、推送后 CI 复验（run 23）与第二处红
+
+推送 `d28564f` 触发 run 23（`40686664787`），结论 **failure**，但已推进一大步：
+
+| Job                          | run 22（修复前）            | run 23（本轮）                                                            |
+| ---------------------------- | --------------------------- | ------------------------------------------------------------------------- |
+| `Lint, Typecheck & Security` | failure（第 6 步 audit-ci） | **success**（audit / lint / i18n:guard / typecheck / typecheck:e2e 全过） |
+| `Coverage Gate`              | skipped                     | **success**                                                               |
+| `Test (shard 1..10)`         | skipped                     | 9 个 success，**shard 5 failure**                                         |
+| `Build & Release (Windows)`  | skipped                     | skipped（被 test job 阻断）                                               |
+
+### shard 5 的失败不是断言失败
+
+日志正文（本机匿名不可读，经用户登录后从浏览器取）末段：
+
+```text
+ Test Files  45 passed (45)
+      Tests  1073 passed | 1 skipped (1074)
+     Errors  2 errors
+⎯⎯ Unhandled Rejection ⎯⎯
+EnvironmentTeardownError: [vitest-worker]: Closing rpc while "onUserConsoleLog" was pending
+This error originated in "src/main/database/connection.test.ts" test file.
+```
+
+即 45 个文件全通过、无一条断言失败，红在两条未处理 rejection 让进程退出 1。
+
+### 根因与判据
+
+`src/main/utils/logger.ts:222` 的 `writeLog()` 是
+`fs.promises.appendFile(...).catch(err => console.error('[Logger] 写入失败:', err))`——fire-and-forget，无人持有该 Promise。
+`connection.test.ts` 的 `beforeEach` 把 `app.getPath` 指向 `/mock/userdata/${name}`，真实异步 append 必然 reject；
+这些 reject 的 `console.error` 若落到环境拆解之后送达，worker RPC 已关 ⇒ Vitest 抛 `EnvironmentTeardownError`。
+本机与 CI 的差别只是速度：本机单跑该套件 1.75s（reject 早于拆解排空 ⇒ 绿），CI 同一 shard 24.15s
+（`restoreBatch` 10323ms vs 本机 3118ms ⇒ 有 reject 排到拆解后）。
+
+关键交叉证据：本机单跑 `npx vitest run src/main/database/connection.test.ts` 输出 **207** 条
+`[Logger] 写入失败`，与 CI 整条 shard 日志里的计数（207）**逐字相同** ⇒ 刷屏唯一来源就是这份文件，
+Vitest 的归因可信。
+
+### 修法（红→绿闭环）
+
+1. 先写守卫用例（`connection.test.ts` 末尾）：spy `console.error`，触发一次 `logger.info`，排空两个
+   macrotask，断言期间没有 `[Logger] 写入失败`。**修复前红**：
+   `1 failed | 121 passed (122)`，失败消息 `expected [ [ '[Logger] 写入失败:', …(1) ], …(55) ] to deeply equal []`
+   ——一次断到 56 条积压，正是要钉住的逃逸 promise。
+2. `beforeEach` 增补 `vi.spyOn(fs.promises, 'appendFile').mockImplementation(() => Promise.resolve())`
+   （与本文件既有 `writeFileSync` 静默同源；仓内另有同族处置 `media-protocol.test.ts:33`、
+   `decryption-service.integration.test.ts:48`）。首轮实测 207 → **剩 1**：那一条来自
+   `FIX(组7-1)` 锁重试（500ms 延时）路径——`afterEach` 的 `vi.restoreAllMocks()` 已把 spy 还原，
+   延时写日志落在还原之后。
+3. 据此把静默收敛成一个具名 helper（`silenceLoggerDiskWrite`），在 `beforeEach` 与 `afterEach`
+   （`restoreAllMocks()` 之后、`manager.close()` 之前）各装一次。**转绿**：真实写盘失败 **0** 条、
+   122 例全通过；`npm test -- --shard=5/10` → `45 passed (45)`、`1075 passed (1075)`、退出码 0；
+   全量 `npm test` → `452 passed (452)`、`7046 passed | 12 skipped (7058)`；`typecheck` / `lint` /
+   `prettier --check` / `npm run verify`（5 项）全过。
+4. 同类隐患登记 **DEBT-039**（open）：只修了 CI 实际点名的这份文件，未做全仓扫；撤销条件是
+   全量与分片跑的 `npm test` 输出里 `[Logger] 写入失败` 计数为 0。
+
+### 顺带修正的文档读数
+
+`ARCHITECTURE.md` / `ARCHITECTURE.en.md` 的测试规模由 7045/7057 更新为 **7046 / 7058**
+（+1 例来自新守卫用例），并把闭合式改写为 `7021+19+1+5=7046`。
