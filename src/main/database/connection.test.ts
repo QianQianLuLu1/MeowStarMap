@@ -663,6 +663,13 @@ describe('DatabaseManager', () => {
    */
   const silenceLoggerDiskWrite = (): void => {
     vi.spyOn(fs.promises, 'appendFile').mockImplementation(() => Promise.resolve())
+    // 同族漏项（2026-10-28 第二轮）：appendFile 被桩成"成功"后，logFault 首条即触发
+    // enforceMaxSize 的真实目录扫描（logger.ts:448 的 fs.promises.readdir），而本套件的
+    // mkdirSync 同样是 mock（见上方），那个 logs 目录从未真的存在 ⇒ readdir 必然 ENOENT，
+    // logger.ts:491 的 console.error('[Logger] 大小检查失败:') 从异步续体发出。
+    // 实测：本套件 122 例全过、退出码 0，但 stderr 里留着 1 条该告警——与 run 23 打红
+    // shard 5 的形状完全同类，只是本机排得进拆解之前没显形。返回空目录不触发任何删除动作。
+    vi.spyOn(fs.promises, 'readdir').mockResolvedValue([] as unknown as fs.Dirent[])
   }
 
   /** 读取表当前列名列表（经 PRAGMA table_info），用于迁移后真实断言列是否存在 */
@@ -1859,7 +1866,7 @@ describe('DatabaseManager', () => {
   })
 
   /**
-   * 环境卫生守卫：logger 的写盘失败不得逃逸到测试生命周期之外。
+   * 环境卫生守卫（@hygiene-probe）：logger 的写盘失败不得逃逸到测试生命周期之外。
    * `writeLog()` 用 `fs.promises.appendFile(...).catch(err => console.error('[Logger] 写入失败:', err))`
    * 兜底，而本套件把 `app.getPath` 指向 `/mock/userdata/*` ⇒ 真实异步 appendFile 必然 reject；
    * 这些 reject 若落到环境拆解阶段才完成，Vitest 会以
