@@ -84,6 +84,7 @@
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性）                                    |
 | `__tests__/lock-advisory-floor.test.ts`     | lock 解析版本下限闸门（读真实 package-lock.json，不联网）+ 与 audit-ci.jsonc 豁免清单的互斥断言            |
+| `__tests__/logger-escape-ledger.test.ts`    | logger 落盘逃逸台账闸门（静默/真写盘两张封闭集 + `logger.ts` 的 fire-and-forget 与四条告警形状的反遮蔽锁） |
 | `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护                                          |
 | `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                                                                  |
 | `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试                                             |
