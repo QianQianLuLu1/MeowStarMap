@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-67 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
+68 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -83,6 +83,7 @@
 | 文件                                        | 覆盖范围                                                                                                   |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性）                                    |
+| `__tests__/lock-advisory-floor.test.ts`     | lock 解析版本下限闸门（读真实 package-lock.json，不联网）+ 与 audit-ci.jsonc 豁免清单的互斥断言            |
 | `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护                                          |
 | `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                                                                  |
 | `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试                                             |
@@ -102,7 +103,7 @@
 
 ### 语言与执行
 
-- 67 个入仓代码文件里 61 个为 TypeScript（`.ts`：35 个非测试脚本 + 26 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
+- 68 个入仓代码文件里 62 个为 TypeScript（`.ts`：35 个非测试脚本 + 27 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
 - **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore` 的 `/scripts/mimosa-*.ps1`、`/scripts/fix-harness-memory-path.ps1`、`/scripts/write-bridge-report.ps1` 三条规则显式排除，`scripts/archive/` 下 3 个由 `/scripts/archive/` 整目录排除（行号会随 `.gitignore` 增长漂移，故按规则文本引用）。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
