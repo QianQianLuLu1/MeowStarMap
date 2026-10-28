@@ -26,6 +26,7 @@ import {
   migrateDirFiles,
   MIGRATE_PATTERNS
 } from './dir-manager'
+import { logger, setLogDirectory } from './logger'
 
 // 构造满足 DatabaseManager 接口的最小 mock
 function createMockDbManager(settings: Record<string, unknown> = {}): {
@@ -42,10 +43,28 @@ function createMockDbManager(settings: Record<string, unknown> = {}): {
 describe('dir-manager', () => {
   let tmpBase: string
 
+  /**
+   * 让 logger 的落盘写在本套件内不可用：`writeLog()` 用
+   * `fs.promises.appendFile(...).catch(err => console.error('[Logger] 写入失败:', err))` 兜底
+   * （logger.ts:222），这条 Promise 无人持有；reject 若排到环境拆解之后送达，Vitest 抛
+   * EnvironmentTeardownError（Closing rpc while "onUserConsoleLog" was pending）并按未处理错误退出 1。
+   * 本套件测的是目录解析与文件迁移，写盘语义由 logger.test.ts / logger.enforce.test.ts 负责，
+   * 故一律静默——与 connection.test.ts 的同名处置同源。
+   */
+  const silenceLoggerDiskWrite = (): void => {
+    vi.spyOn(fs.promises, 'appendFile').mockImplementation(() => Promise.resolve())
+  }
+
   beforeEach(async () => {
     tmpBase = await fsp.mkdtemp(path.join(os.tmpdir(), 'wxnn-dir-test-'))
     mockUserData = path.join(tmpBase, 'userData')
     await fsp.mkdir(mockUserData, { recursive: true })
+    // logDir 是 logger.ts:123 的模块态，而 Vitest 只按**文件**隔离模块：不设这一行，它会被冻结在
+    // 「本文件第一个触发 logger 的用例」的旧 tmpBase 上，其后用例的 logger 写与 electron-log 的
+    // main.log（resolvePathFn 同样读 logDir，见 logger.ts:191-192）都往已被 afterEach 删掉的目录里写。
+    // 按用例重新指向，跨用例状态泄漏随之消除。
+    setLogDirectory(mockUserData)
+    silenceLoggerDiskWrite()
   })
 
   afterEach(async () => {
@@ -362,5 +381,31 @@ describe('dir-manager', () => {
       expect(result.moved).toBe(1)
       renameSpy.mockRestore()
     })
+  })
+
+  /**
+   * 环境卫生探针（@hygiene-probe）：`logger.ts:123` 的 `logDir` 是模块态，而 Vitest 按**文件**
+   * 隔离模块，于是它会被冻结在「本文件里第一个触发 logger 的用例」的 tmpBase 上；其后用例的
+   * beforeEach 换了新 tmpBase、afterEach 又把旧目录删掉，logger 仍往那个已删除的目录写 ⇒
+   * `writeLog()` 无人持有的 appendFile reject，`console.error('[Logger] 写入失败:')` 若排到
+   * 环境拆解之后送达，Vitest 抛 EnvironmentTeardownError 并按未处理错误退出 1（run 23 的
+   * Test (shard 5/10) 正是「45 文件全通过仍退出 1」）。本套件测的是目录解析与迁移，不验写盘语义，
+   * 故由 beforeEach 的静默桩兜住；这条探针负责在夹具再次退化时先红。
+   */
+  it('探针：本套件内不得留下 [Logger] 写入失败', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    try {
+      logger.info('dir-manager 环境卫生探针')
+      await new Promise((resolve) => setImmediate(resolve))
+      await new Promise((resolve) => setImmediate(resolve))
+      const failures = errorSpy.mock.calls.filter((args) =>
+        String(args[0]).includes('[Logger] 写入失败')
+      )
+      expect(failures, '真实 fs.promises.appendFile 被调用，reject 会逃逸到环境拆解之外').toEqual(
+        []
+      )
+    } finally {
+      errorSpy.mockRestore()
+    }
   })
 })
