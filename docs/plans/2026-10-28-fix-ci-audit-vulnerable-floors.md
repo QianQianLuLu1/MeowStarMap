@@ -1,6 +1,9 @@
 # 2026-10-28 修复 CI 连续两次失败（依赖审计三条新披露通告：zod / undici / electron）
 
-> 状态：**已执行完毕**（2026-10-28）。五个提交 `e805193` → `127158d` → `2434ffd` → `d2ae917` → `9451efd` → 本节点回写；逐项读数见文末「十一、执行读数」。
+> 状态：**已执行完毕，CI 全链转绿**——run 24（`40691339965`，head `489ffbf`）结论 **success**，
+> `Lint, Typecheck & Security` / `Test (shard 1..10)` / `Coverage Gate` / `Build & Release (Windows)` 全部通过。
+> 提交序列 `e805193` → `127158d` → `2434ffd` → `d2ae917` → `9451efd` → `d28564f` → `489ffbf` → 本回写提交。
+> 读数分布在三节：§十一（本机执行读数）、§十二（run 23 暴露的第二处红与修法）、§十三（run 24 终局与遗留）。
 > 用户已确认的三项口径：① electron 走「加豁免 + 登记 DEBT-038」，不跨大版本升级；② 本机验证到「静态门 + 全量单测」为止，不打 Windows 包；③ 改完提交并推送 `main` 触发一次真实 CI 复验。
 
 ## 一、诊断结论（全部为实测读数，非推测）
@@ -364,3 +367,49 @@ Vitest 的归因可信。
 
 `ARCHITECTURE.md` / `ARCHITECTURE.en.md` 的测试规模由 7045/7057 更新为 **7046 / 7058**
 （+1 例来自新守卫用例），并把闭合式改写为 `7021+19+1+5=7046`。
+
+---
+
+## 十三、终局：run 24 全链绿（`489ffbf`）
+
+推送第二个修复提交后，run `40691339965`（run 24，event=push）**结论 success**，13 个 job 全部到位：
+
+| Job                                  | 结论                                                             |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| `Lint, Typecheck & Security`         | success（audit / lint / i18n:guard / typecheck / typecheck:e2e） |
+| `Test (shard 1/10 … 10/10)`          | **10 个全 success**（含上一轮红的 shard 5）                      |
+| `Coverage Gate`                      | success                                                          |
+| `Build & Release (Windows x64 NSIS)` | success                                                          |
+| `Storybook Docs`                     | skipped（按 `if` 设计：仅 `workflow_dispatch` 或 tag push 才跑） |
+
+Windows job 逐步读数（started 12:57:12Z → completed 13:03:06Z，5m54s）：
+
+```text
+#5  Verify clean clone compiles main-process output   success   ← §十一 标为「本机未验」
+#7  Build only (preview / PR)  → npm run dist:win      success   ← 同上
+#8  NikkiSync link diagnostics (warn-only)             success
+#9  E2E smoke test on win-unpacked                     success   ← 同上
+#10 Performance baseline regression                    success   ← 同上
+#14 Upload installer artifact                          success
+#13 Upload smoke failure artifacts                     skipped   （无失败可传）
+#16 Publish GitHub Release                             skipped   （非 tag 事件）
+```
+
+`Emit perf readings annotation`（step #11，`if: always()`）回出的免鉴权读数，证明性能门是真判绿而非跳过：
+`env=ci status=final samples=3 dataset=1500 readings=cold-start-first-paint=1890; scan-ingest=1670;
+scan-throughput=898.5; media-list-page100=15; media-list-page500=27; find-duplicates=5158;
+find-duplicates-throughput=290.8; cache-get-stats=2; thumbnail-generate-p50=3…`；
+另两条注解是冒烟与 perf 的汇总：`8 skipped / 11 passed (18.7s)` 与 `6 skipped / 10 passed (1.7m)`
+（skip 是 CI 未建 `@nikkisync` 链的既有门控，见 `e2e/nikkisync-guard.ts`，非本轮新增）。
+
+**结论**：§八 列的「仅 CI 能验」四层（干净克隆编译、`dist:win`、`e2e:smoke`、`e2e:perf`）本轮由 CI 给出
+首份真实读数，全部通过；§十一 保留「本机未验」的原话作为当时的事实记录，不改写。
+
+### 本轮遗留（不假装清完）
+
+- **DEBT-038（open）**：electron `GHSA-jr5w-w6x2-84p9` 走豁免，真修需跨大版本 41 → 42，另立专项。
+- **DEBT-039（open）**：本轮只静默了 CI 实际点名的 `connection.test.ts`，未做全仓同类隐患扫描；
+  撤销判据是全量与分片跑的 `npm test` 输出里 `[Logger] 写入失败` 计数为 0。
+- `audit-ci.jsonc` 仍有 19 个不再命中的失效豁免待清退（收紧闸门，需同步改 `MIGRATION_BASELINE`）。
+- PR-only 的四道检查（dependency-review / commitlint / IPC 契约同步 / tech-debt 注解）因按历史惯例直推
+  `main` 而未触发；本轮无 IPC 通道与 preload 签名改动，契约面为零。
