@@ -1,6 +1,6 @@
 # 2026-10-28 修复 CI 连续两次失败（依赖审计三条新披露通告：zod / undici / electron）
 
-> 状态：阶段 A 已落盘（本文件）。阶段 B（回归闸门取红灯 → lock 手术 → electron 豁免登记 → 文档回写 → 推送复验）**待用户读过本文档后开始**。
+> 状态：**已执行完毕**（2026-10-28）。五个提交 `e805193` → `127158d` → `2434ffd` → `d2ae917` → `9451efd` → 本节点回写；逐项读数见文末「十一、执行读数」。
 > 用户已确认的三项口径：① electron 走「加豁免 + 登记 DEBT-038」，不跨大版本升级；② 本机验证到「静态门 + 全量单测」为止，不打 Windows 包；③ 改完提交并推送 `main` 触发一次真实 CI 复验。
 
 ## 一、诊断结论（全部为实测读数，非推测）
@@ -232,6 +232,69 @@ npm run audit           # 最终必须 exit 0
 - `package-lock.json` — 唯一生产物改动（3 个节点：`node_modules/zod`、`node_modules/undici`、`node_modules/node-gyp/node_modules/undici`）
 - `audit-ci.jsonc` — 豁免清单唯一事实来源（`scripts/__tests__/audit-config.test.ts` 对其取 28 项子集断言）
 - `scripts/__tests__/audit-config.test.ts` — 新增套件的写法模板；本轮不改它
-- `scripts/__tests__/lock-advisory-floor.test.ts` — 待新建的 lock 下限闸门
-- `docs/技术债清单.md` + `docs/debt-registry.json` — DEBT-038 登记（现有 37 项，最大编号 DEBT-037）
+- `scripts/__tests__/lock-advisory-floor.test.ts` — 本轮新建的 lock 下限闸门（已落仓）
+- `docs/技术债清单.md` + `docs/debt-registry.json` — DEBT-038 登记（登记前 37 项，登记后 38 项）
 - `.github/workflows/build.yml` — 失败 step 所在 job 的编排（本轮不改动）
+
+---
+
+## 十一、执行读数（2026-10-28，逐项实测）
+
+### 提交序列
+
+| 提交       | 节点 | 内容                                                                                            |
+| ---------- | ---- | ----------------------------------------------------------------------------------------------- |
+| `e805193`  | 1    | 本计划文档落仓（仅此一个文件）                                                                  |
+| `127158d`  | 2    | `scripts/__tests__/lock-advisory-floor.test.ts` + `scripts/AGENTS.md`（**红灯取证**）           |
+| `2434ffd`  | 2 补 | 订正本文档一处错误路径（全量 `npm test` 打回，见下「计划自身缺陷」）                            |
+| `d2ae917`  | 3    | `package-lock.json` 9 增 9 删：zod 4.4.3→4.6.7、undici 7.30.0→7.30.1、node-gyp 侧 6.29.0→6.29.1 |
+| `9451efd`  | 4    | `audit-ci.jsonc` 豁免 + `docs/debt-registry.json` DEBT-038 + `docs/技术债清单.md` §0/§16        |
+| （本提交） | 5    | `CHANGELOG.md` 补录 + `ARCHITECTURE.md` / `ARCHITECTURE.en.md` 读数回写 + 本文档执行读数        |
+
+### 红 → 绿闭环
+
+- 修复前：`npx vitest run scripts/__tests__/lock-advisory-floor.test.ts` → `Tests 3 failed | 16 passed (19)`，退出码 **1**；三条失败恰为 zod / undici / node-gyp-undici 的版本下限断言，失败消息自带当前版本与下限（`node_modules/zod 当前 4.4.3，未达 … 4.6.6`），脚手架用例（`compareSemver`、合成数据、边界）全部通过 ⇒ 红灯归因于 lock 数据本身。
+- 修复后：同一命令、**零断言改动** → `Tests 19 passed (19)`，退出码 **0**。
+
+### lock 手术取证
+
+- `git diff --numstat`：**9 增 9 删**；变化行类型白名单核对（只允许 `version` / `resolved` / `integrity`）不合规行数 **0**；`lockfileVersion` 行改动 **0**。
+- 结构不变量：`packages` 条目 **1539**（改前同值）；缺 `integrity` 的条目 **0**（改前同值）。
+- `npm ci --dry-run --ignore-scripts` 退出码 **0**（CI 的 npm 10 可消费同一份 lock 的离线替身）。
+- 意外与恢复：`npm update` 输出「removed 4 packages」正是已知的 `@nikkisync` 4 条 junction 被静默拆除；`npm run link:nikkisync` 重建后 `:check` 报 `check OK (all four links in place)`。
+- `zod` 的 `resolved` 主机由 npmmirror 变为 npmjs（`--registry` 官方源所致），已按计划点名。
+
+### 安全审计状态（不自评，按输出原文判读）
+
+| 阶段              | 退出码 | 输出末行                                             | 未豁免集合                      |
+| ----------------- | ------ | ---------------------------------------------------- | ------------------------------- |
+| 修复前（复现 CI） | 1      | `Failed security audit due to high vulnerabilities.` | 3 条（zod / undici / electron） |
+| 节点 3 之后       | 1      | 同上                                                 | 1 条（仅 electron）             |
+| 节点 4 之后       | **0**  | **`Passed npm security audit.`**                     | 0 条                            |
+
+allowlist **29 → 30**；`Found vulnerable allowlisted advisories` **10 → 11**；`Consider not allowlisting advisories` 仍 **19** 项（失效豁免清退留待独立一轮）。
+
+### 收尾全量门禁（本机）
+
+| 命令                                         | 读数                                                                                          |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `npm test`                                   | `Test Files 452 passed (452)`、`Tests 7045 passed \| 12 skipped (7057)`，54.93s，退出码 0     |
+| `npm run lint`                               | 退出码 0（`eslint .` 无任何输出）                                                             |
+| `npm run typecheck`                          | 退出码 0（`tsc -b` + `tsc -p tsconfig.scripts.json`）                                         |
+| `npm run typecheck:e2e`                      | 退出码 0                                                                                      |
+| `npm run i18n:guard`                         | 退出码 0（白名单只减不增 / 清零必移除 / key 已同步）                                          |
+| `npx tsx scripts/check-changelog-release.ts` | 退出码 0（14 个版本节，`2.5.6-beta` 唯一，`[Unreleased]` 已收口）                             |
+| `npx tsx scripts/check-doc-versions.ts`      | 退出码 0（README 三处 Electron 仍 41.10，与 `package.json` 一致——本轮未动 electron）          |
+| `npm run docs:links`                         | 死引用 0（175 处提醒均为既有「本机留存区/已交代去向」路径）                                   |
+| `npm run debt:check`                         | 退出码 0，正确点名 DEBT-038 涉及本次变更的 `package-lock.json` / `audit-ci.jsonc`（预期提醒） |
+| `npm run verify:nikkisync`                   | 4 条 junction 在位（`link:nikkisync:check` OK）                                               |
+
+规模读数闭合：上一快照 450 / 7021 + 12（2026-10-27）→ 本轮 452 / 7045 + 12。+2 文件 = 本轮新增 `lock-advisory-floor.test.ts`（+19 例）与 `60cfe96`（2026-10-27）新增但被上一快照静态构成漏计的 `e2e/__tests__/launch-env.test.ts`（+5 例）；7021 + 19 + 5 = 7045 逐项对上，**没有任何既有用例被吞或跳过**（skip 数 12 未变）。
+
+### 计划自身缺陷（如实记账）
+
+节点 1 落仓的本文档把 check-md-links 套件写成少一层 `__tests__` 目录的形式（正确路径是 `scripts/__tests__/check-md-links.test.ts`），被全量 `npm test` 的「真实仓库契约：被跟踪文档不留死引用」用例打回（`发现 1 处死引用`）。值得记的机制是：`check-md-links` 的扫描集取 `git ls-files`，**文件在 tracked 之前不会被扫**——所以节点 1 当时裸跑 `npm run docs:links` 是绿的，提交进 tracked 集之后才红。已在 `2434ffd` 修正，并把这条反向坑补进 §四。
+
+### 本机未验（不写成已验）
+
+`npm run build`（干净克隆主进程编译）、`npm run dist:win`、`npm run e2e:smoke`、`npm run e2e:perf` 只有 Windows job 能验，按用户选择本轮不跑；PR-only 的 dependency-review / commitlint / IPC 契约同步检查因直推 `main` 不触发。这四层的首次真实读数由推送后的 CI 运行给出。
