@@ -149,4 +149,137 @@ npm run dist:win:smoke                                   # 打包态冒烟
 
 ## 7. 执行记录与读数（随执行回写）
 
-（待回写：N2 红灯原文、N3 绿灯读数、N4 变异抽查两次读数与 sha256、N5 全量回归读数、N6 两条计数核对、N7 打包链 `EXIT=` 与 `verify:dist` 回显路径、N8 not-run 清单与遗留。）
+### 7.1 N1 计划落仓
+
+提交 `f6a139b`（`docs(plans)`，1 file / +152）。pre-commit 三步：lint-staged ✓（`*.{ts,js,json,md}` 键命中，`prettier --write` 重排本文表格）、core-gate ⊘、tsc ⊘（无 TS/TSX）。`npm run docs:links` exit 0（177 处既存提醒、无死引用）。落盘后复核：无 BOM、无 CR、29,129 B。
+
+### 7.2 N2 红灯（修复前取证）
+
+改动面：`runtime-manager.test.ts:307` 夹具换成 `ClothingSearchIndex.js:67-92` 形态的嵌套载荷 + 新增 3 例；`runtime-manager.ts` 加 `FakeSessionPlan.clothingPage?: unknown`（测试面入口，非修复本体）。
+
+```
+npx vitest run src/main/nikkisync/runtime-manager.test.ts
+ Test Files  1 failed (1)
+      Tests  2 failed | 75 passed (77)
+FAIL ... > 缺陷：同一 asset 身份被两个套装聚合共享时两处都必须是已裁键副本（上游按引用塞入 ⇒ 第二处曾退回原件）
+AssertionError: expected { assetId: 'asset_1', …(2) } not to be { assetId: 'asset_1', …(2) } // Object.is equality
+    at src/main/nikkisync/runtime-manager.test.ts:848:33   ← expect(photo.asset).not.toBe(sharedAsset)
+FAIL ... > 缺陷：searchClothing 的同一 asset 跨服装聚合共享 ⇒ 两处都裁键（一张照片命中 N 件服装即 N 份引用）
+AssertionError: expected { assetId: 'asset_1', …(2) } not to be ...  at :895:33
+```
+
+`…(2)` 即第二处拿到的就是带 `sourcePath`/`sourceFolder` 的原件 ⇒ 缺陷被精准复现，且基线 74 例保持绿（`2 failed | 75 passed` 中 75 = 74 既存 + 1 条不依赖共享身份的回归补测）。
+
+### 7.3 N3 绿灯
+
+| 命令                                                        | 修复前                            | 修复后                                                              |
+| ----------------------------------------------------------- | --------------------------------- | ------------------------------------------------------------------- |
+| `npx vitest run src/main/nikkisync/runtime-manager.test.ts` | 2 failed / 75 passed (77)         | **77 passed**                                                       |
+| `npx vitest run src/main/nikkisync`                         | 16 files / 282 passed / 0 skipped | 16 files / **285 passed** / 0 skipped（+3 == 新增例数，逐位可对上） |
+| `npm run verify:nikkisync`                                  | 13 行全 ✓ / blocking 0            | 13 行全 ✓ / `OK (blocking failures: 0)` / exit 0                    |
+| `npm run verify`                                            | —                                 | typecheck / lint / core-gate / format / test **5 项 0 失败**        |
+
+### 7.4 N4 判别力（两次变异抽查）
+
+计划表 §6 的 N4 行原写「新增 3 例红」——**预期写宽了，按实况订正**：回归补测例不构造共享身份，`WeakSet` 旧实现下本就绿，故第一次变异的真实读数是 2 红。判别力由「两条缺陷例 + 第二条变异」共同承担。
+
+| 变异                                      | 期望                                         | 实测      |
+| ----------------------------------------- | -------------------------------------------- | --------- |
+| M1 还原 `WeakSet` 访问集版函数            | 恰好两条跨聚合缺陷例红                       | `2 failed | 75 passed (77)`，失败原文与 §7.2 逐字一致，其余 75 绿                                           |
+| M2 把 `searchClothing` 改回薄委托（不裁） | 恰好两条服装相关例红（证明回归补测不是空转） | `2 failed | 75 passed (77)`，红的是「回归：searchClothing 的嵌套…」与「缺陷：searchClothing 的同一 asset…」 |
+
+两次恢复后 `sha256sum src/main/nikkisync/runtime-manager.ts` = `af57b0302a5a9315c48d3c740b6237b33b2df6cf47f3c4a0f0cb733e0a457678`，与绿灯版**逐字节一致**；提交后钩子（`eslint --fix` + `prettier --write`）未改写该文件（同一哈希复验），且对提交后的内容复跑仍 77 passed。
+
+### 7.5 N5 全量回归与提交
+
+- 静态门全绿：`lint` / `typecheck` / `typecheck:e2e` / `i18n:guard` / `docs:links` 五条命令 `EXIT=0`。
+- 全量 `npm test`：**453 files passed / 7080 passed | 12 skipped (7092) / 71.98s**，`EXIT=0`。
+  口径说明：与 CHANGELOG 里 2026-10-28 的「453 / 7063 / 12」不可直接相减——其间有 5 个提交新增过用例，非同等基线；本轮的「总数差 == 新增例数」在**文件级（74→77）与域级（282→285）**两处等式都成立，全量只用于判「无新增失败项」。
+- 提交 `1353cd0`（`fix(nikkisync)`，3 files / +176 −9），pre-commit Step 1/3、2/3、3/3 全过；提交后 `git status --porcelain` 仅 `?? release-sync/`。
+- CHANGELOG 补录 bullet 追加在既有 `## [2.5.6-beta]` 节 `### Fixed | 修复` **首位**（未写进 `[Unreleased]`）：`npx tsx scripts/check-changelog-release.ts` → 解析到 14 个版本节、`[2.5.6-beta]` 唯一、`[Unreleased]` 已收口、exit 0。
+
+### 7.6 N6 卫生修正
+
+提交 `b0e39ba`（`docs(scripts)`，2 files / +3 −1）。
+
+- 计数复核：`git ls-files scripts` = 70 = 63 `.ts` + 3 `.cjs` + 2 `.js` + 1 `.json` + 1 `.md`；63 个 `.ts` 中 35 非测试 + 28 `__tests__` ⇒ 文档现与实测逐位对上（63 / 35 / 28）。
+- 忽略残壳：`git check-ignore -v release-sync/win-unpacked/resources/app.asar` → `.gitignore:15:/release-sync/`，exit 0；`git status --porcelain` 由 `?? release-sync/` 转为**完全为空**。
+- 复跑 `npm run docs:links` exit 0（`scripts/AGENTS.md` 改动不引入死引用）。
+
+### 7.7 N7 出包
+
+**出包前**：`npm run link:nikkisync:check` 四条 ok；独占打开探针七处——`release/win-unpacked.tmp/resources/default_app.asar`、`release/win-unpacked/resources/app.asar`、`release/win-unpacked/resources/default_app.asar`、旧 Setup 三件均 **FREE**，仅 `release-sync/.../app.asar` **LOCKED**；`Get-Process` 里工作区内**零进程**。旧包四件（exe 184,427,991 B / blockmap 190,888 B / latest.yml / builder-debug.yml）已 `mv` 到 `_safe_backup_20261029-pre-stripfix/`（该前缀被 `.gitignore:167` 覆盖），`git status` 复核为空。
+
+**标准配方失败**：`npm run dist:win` → `EXIT=1`，死在 `app-builder-lib/out/util/electronGet.js` 的 rename 步：
+
+```
+⨯ EPERM: operation not permitted, rename '...\release\win-unpacked.tmp' -> '...\release\win-unpacked'
+    at extractArchive (electronGet.ts:249)  at unpack (ElectronFramework.ts:254)
+```
+
+失败点之前的各环节全部走完：`build:recycle-helper` ✓、`build`（electron-vite）✓、`pre-dist-check` 27 项 ✓、`check-doc-versions` ✓、`check-changelog-release` ✓、`@electron/rebuild`（better-sqlite3 x64）✓、Electron 下载与解压 ✓。
+判据取证（区分「历史孤本被占」与「新解压被主动加锁」）：老 `release/win-unpacked`（10-27 树）**被 builder 成功删除**（`fs.rm` 未报错），失败发生在把**刚写好的** `.tmp` 改名过去；随后手工探针 `mv release/win-unpacked.tmp release/win-unpacked` → `Permission denied`，且 23:39 独占打开新产 `release/build-*/win-unpacked/resources/app.asar` 亦为 **LOCKED**（落地一分钟内）。⇒ 结论是**实时防护对新写入解包树主动加锁**（本机既有记录的同型现象），不是本仓配置或本轮改动引入的回归，也不是残留句柄。
+
+**旁路出包**（仅替换 unpack 机制，输入完全相同：同一 `dist/`、同一 junction 拉入的 `@nikkisync`、同一 `build` 配置）：
+
+```
+npx electron-builder --win --publish never \
+  --config.electronDist="<仓根>/.cache/electron-dist-clean" \
+  --config.directories.output=release/build-20261029-stripfix
+→ EXIT=0
+```
+
+`electronDist` 指目录时走 `copying unpacked Electron source=... destination=release\build-20261029-stripfix\win-unpacked`（`emptyDir` + `copyDir`，无 `.tmp`、无 rename），`.cache/electron-dist-clean` 为官方缓存 zip 的完整 41.10.6 解包（19 项、`electron.exe` 223,764,992 B，刻意不含标准流程 `cleanupAfterUnpack` 会删的 `resources/default_app.asar` 与 `version`）。日志里 `file signing skipped — signAndEditExecutable is false` 是仓内既有配置（`package.json` 的 `build.win.signAndEditExecutable`），**不是旁路引入的差异**。
+
+**产物闸门**（带显式目标，杜绝混合审计）：`npm run verify:dist -- --asar=release/build-20261029-stripfix/win-unpacked/resources/app.asar` → **21 项全 ✔、exit 0**，其中
+
+- `✔ @nikkisync/pc-companion 装载链传递依赖 3 项已全部解包`（`a90a7cf` 新增的 `CHAIN_REQUIRED_ARTIFACTS` 闸门第一次在真产物上被走到）；
+- `✔ @nikkisync 四个包入口 + 深入口 row-mappers.js + LocalSyncServer.js + GalleryRuntime.mjs 已解包`（运行时未静默缺失）；
+- `✔ 产物无旧仓库链接与失效占位：release\build-20261029-stripfix\win-unpacked\resources\app.asar（32 条禁串、73987071 字节）` ⇒ 回显路径确实是本轮新树，没有偷偷去审 10-27 旧壳。
+
+**回到标准布局**：Setup 四件 `mv` 到 `release/`（FREE，成功）；解包树 `mv` 因新 `app.asar` 被锁而 `Permission denied` ⇒ 改用 `cp -rf release/build-20261029-stripfix/win-unpacked release/win-unpacked`（被锁文件允许读取与就地覆盖、只挡 rename/unlink），标准名下树重建成功（`resources/app.asar` 73,987,071 B + `app.asar.unpacked` + `喵星图.exe` 224,013,312 B）。
+
+**包内字节级验收（「包 == 修复后的源码」的直接判据）**：用 `@electron/asar` 取数（注意坑：`listPackage` 的条目名带反斜杠且有前导分隔符，喂 `extractFile` 前**只能去前导分隔符、不能把反斜杠换成正斜杠**，否则 `was not found in this archive`——本轮第一次就踩了这个）：
+
+| 判据                                                    | 读数                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 标准名 vs 旁路树 `app.asar`                             | sha256 前缀 `2624aa103e35a63f` **两侧全等** ⇒ `cp` 未改内容                                                                                                                                                                                           |
+| 包内 `dist\main\main\app\runtime-facade.js`（45,362 B） | `new WeakMap` = **1**、`new WeakSet` = **0**，函数体为 `function stripAssetPathFields(value, depth = 0, memo = new WeakMap()) { ... const remembered = memo.get(value); if (remembered !== void 0) return remembered; ... }` ⇒ **修复真的进了安装包** |
+| 包内主入口 vs 盘上 `dist/main/main/app/index.js`        | sha256(16) 均 `57a46bb5ed434f1c`、41,022 B、`MAIN ENTRY MATCH: true` ⇒ 产物树与包内容同一份                                                                                                                                                           |
+| 全包 `sourceFolder` 命中文件                            | 2 个：上游 `row-mappers.js`（生产者，本该有）与 `runtime-facade.js`（裁剪者）⇒ 无第三处来源                                                                                                                                                           |
+
+**新包标识**：`release/latest.yml` → `version: 2.5.6-beta`、`size: 184634077`、`sha512: WeL7deJ2euK5q4hvNrpWixhfRjif0fxuWmPdqBqw2nAc2jzAE+HEK739c/bkJi1rr9dVNeOgnsjfGH4z2V9l5A==`、`releaseDate: '2026-10-29T15:38:18.396Z'`；与被归档的旧包（184,427,991 B / `3MlmxC3O…`）在大小与 sha512 两条轴上都不相同 ⇒ 不是「只换 releaseDate」的空重跑。体积 +206,086 B 与「`1e11c0e` 起的本仓改动 + 上游 `b397e0e` 的 `@nikkisync` 产物」一致，且远高于「运行时缺失」的 182,722,373 B 形态。
+
+### 7.8 打包态冒烟（跑在**本轮新产**的标准名树上）
+
+`npm run e2e:smoke` → **16 passed (25.2s)**、`EXIT=0`，取数到的 `[e2e] executable: .../release/win-unpacked/喵星图.exe` 证明起的是新树（不是 `node_modules/electron`）。与本轮修复直接相关的三条：
+
+| 用例                                                                                            | 读数      | 为什么算这条判据                                                                                                  |
+| ----------------------------------------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------- |
+| S3 preload 注入：`contextBridge` 四个全局对象齐备                                               | ok (7ms)  | 旁路产物与标准产物在桥暴露面上无差异（`window.electronAPI` 完整，历史踩过的 `tsc -b` 覆写产物树那类假失败未出现） |
+| N3 查询：协议 DTO 原样透传（含 motion 聚合与**资源绝对路径**）                                  | ok (45ms) | 裁剪**没有过界**：`mode:'path'` 出口在真实会话里仍给绝对路径原值，`media://` 授权链未被本修复打断                 |
+| N1/N2/N3b/N3c/N4 六条（真实主进程内起上游 LocalSyncServer、证书真校验、退出链无 `stop failed`） | 全 ok     | 旁路 `electronDist` 换的只是 unpack 机制，装载链与退出链行为等价                                                  |
+
+另有两条既存防线在日志里留痕：`[e2e] stripped ELECTRON_RUN_AS_NODE=1（宿主 shell 泄漏…）`（`60cfe96` 引入的启动环境闸门在本机真实生效，否则整套冒烟会以其症状假失败）；`[DIAG] consoleErrors=[] pageErrors=[]`（全屏诊断用例无 Error 级日志）。`gameRoot=H:\InfinityNikki Launcher\InfinityNikki` 为本机真机库，S7 首装自动扫描 ok。
+
+### 7.9 not-run 与遗留
+
+| 项                                                                                                                                                       | 状态                       | 说明                                                                                                                                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 标准配方 `npm run dist:win` 全绿                                                                                                                         | **未成立**（EPERM rename） | 前提是本机实时防护不给新解压树加锁；根治只有两条：给工作区目录加排除项（加完不必重启）或重启清内核侧句柄。本轮改走旁路出包，产物已用 §7.7 的字节级判据证明等于源码                                                                                                                                                                                                                              |
+| 渲染层 UI 肉眼验证                                                                                                                                       | **not-run**                | 该环境无法看屏；冒烟只验协议加载与窗口存在，不覆盖「搜索页响应体里到底还有没有绝对路径」的目视确认。功能判据由 §7.2/§7.4 的单元级红绿与包内字节取数承担                                                                                                                                                                                                                                         |
+| N4 真上游链路补搜索面断言                                                                                                                                | 本轮不做（用户裁决）       | 见 §1.4 第 3 行；现有夹具 `metadata_json` 恒 NULL ⇒ 直接加断言是空转绿，须先播种字典富化元数据                                                                                                                                                                                                                                                                                                  |
+| `verify-nikkisync-link.ts` 半链接空转表述 / `connection.test.ts` 宽 `readdir` 桩                                                                         | 挂账未改                   | 见 §1.4 第 1、2 行，都有「今天不构成静默口子」的证据                                                                                                                                                                                                                                                                                                                                            |
+| `release/build-20261029-stripfix/`（旁路解包残壳，内含被锁 `app.asar`）与 `release/win-unpacked.tmp/`（失败的标准流程残留，内含被锁 `default_app.asar`） | 删不掉，留在 `release/`    | 二者都在 `.gitignore` 的 `release/` 内、不入仓。风险已取证可控：`findAsarUnpacked` 取 readdir 首命中，`build-*` 排在 `win-unpacked` 之前 ⇒ 下次裸跑 `verify:dist` 的原生二进制步会验到**本轮**这棵 `build-*` 树（本轮产物正确，但下次就是过期树）。句柄释放后执行 `rm -rf release/build-20261029-stripfix release/win-unpacked.tmp release-sync`，并把 §7.7 的 `--asar=` 记成下轮裸跑前的必查项 |
+
+### 7.10 结案：本轮交付与判据
+
+| 交付           | 落点                                                                                                                                          | 客观判据                                                                                                                                                   |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 缺陷修复       | `1353cd0` `fix(nikkisync)`（`src/main/nikkisync/runtime-manager.ts` + `runtime-manager.test.ts` + `CHANGELOG.md`，3 files / +176 −9）         | 修复前 2 failed（失败原文在 §7.2）、修复后 77 passed；两次变异抽查各打中恰好 2 例；恢复后 sha256 逐字节一致                                                |
+| 审查计划与取证 | `f6a139b` `docs(plans)` + 本节                                                                                                                | `git ls-files docs/plans` 命中本文；`docs:links` exit 0                                                                                                    |
+| 卫生修正       | `b0e39ba` `docs(scripts)`（`scripts/AGENTS.md:107` 计数 + `.gitignore` 忽略残壳）                                                             | 计数与 `git ls-files scripts` 逐位对上；`git status --porcelain` 完全为空                                                                                  |
+| 新版本安装包   | `release/MeowStarMap-Setup-2.5.6-beta.exe` 184,634,077 B / `latest.yml`（sha512 `WeL7deJ2…`）；旧包归档 `_safe_backup_20261029-pre-stripfix/` | `verify:dist` 21 项全 ✔；包内 `runtime-facade.js` 为 `new WeakMap` 且 `new WeakSet` 计数 0；主入口 sha256 与盘上产物全等；`e2e:smoke` 16 passed 跑在新树上 |
+| 版本号         | **零编辑**（四处声明位本就全是 2.5.6-beta）                                                                                                   | `node -e` 读 `package.json`；`check-changelog-release` 三条 ✔                                                                                              |
+
+**下轮准入提示**：① 若想拿「标准配方自己变绿」，先给工作区目录加实时防护排除项（不必重启）或重启，再裸跑 `npm run dist:win`；② 裸跑前先 `rm -rf release/build-20261029-stripfix release/win-unpacked.tmp release-sync`（句柄释放后才删得动），否则 `findAsarUnpacked` 的 readdir 首命中会把闸门引到本轮这棵过期树上；③ §1.4 的三项挂账与 §7.9 的 N4 真上游断言是本轮明确留下的工作项，不是已完成项。 |
