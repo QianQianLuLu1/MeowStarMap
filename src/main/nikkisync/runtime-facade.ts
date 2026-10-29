@@ -213,7 +213,7 @@ export interface RuntimeSurface {
   /** 阶段 6：元数据解析器与解析诊断，各自是独立深入口。 */
   nuan5Resolver: Nuan5ResolverSurface
   metadataDiagnostics: MetadataDiagnosticsSurface
-  /** 兼容层（b422193）：K1/K3/K5 将消费的三个深入口（产物存在性由 verify:nikkisync 第 12 项承担）。 */
+  /** 兼容层（b422193）：K1/K3/K5 将消费的三个深入口（产物存在性由 verify:nikkisync 的 `NIKKISYNC_CAPABILITY_ARTIFACTS` 清单承担）。 */
   cachedDecodedMetadataService: CachedDecodedMetadataSurface
   lanAddress: LanAddressSurface
   gameVersionCalendar: GameVersionCalendarSurface
@@ -264,7 +264,7 @@ export const METADATA_DIAGNOSTICS_DEEP_ENTRY = [
  * 兼容层（上游 b422193 同步）的三个能力深入口——`CachedDecodedMetadataService`（K1）、
  * `LanAddress`（K5）、`GameVersionCalendar`（K3）。与既有深入口同处境：都不在上游桶导出
  * 内、探针管不到，产物存在性由 `scripts/verify-nikkisync-link.ts` 的
- * `NIKKISYNC_CAPABILITY_ARTIFACTS`（第 12 项检查）与 pre-dist-check 打包断言承担。
+ * `NIKKISYNC_CAPABILITY_ARTIFACTS` 清单与 pre-dist-check 打包断言承担。
  * K2（MetadataOnlineConsent）、K6（ExtraScanDirectories）、K7（ScanDiagnostics）的
  * 深入口按 02 计划在各自消费节点就地增载，此处不预载未用符号。
  */

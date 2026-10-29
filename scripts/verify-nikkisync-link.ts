@@ -82,6 +82,22 @@ export const NIKKISYNC_CAPABILITY_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'server', 'GameVersionCalendar.js')
 ]
 
+/**
+ * 上游 b397e0e 同步：本轮被**新增的静态 import 边**推入本仓装载链、却不属于任何能力深入口的
+ * 三个上游自有模块（相对包根）。判据是「被静态 import 且已在本仓装载链上」，三条边实测为
+ * `row-mappers.js -> ./MediaFingerprint.js`、`LocalSyncServer.js -> ./AccountSyncSettings.js`、
+ * `runtime.js -> ./organizer/NativeMediaOperations.js`（末者在桶导出 `dist/src/index.js` 闭包内）。
+ * 为何不并进 `NIKKISYNC_CAPABILITY_ARTIFACTS`：那张表的语义是「待接入能力节点的深入口」，
+ * 失败文案按那个语义给修复指引；本组是**已交付装载面的传递依赖**，缺件坏的是正在使用的查询面
+ * （`row-mappers.js` 装载即抛 ERR_MODULE_NOT_FOUND），因此单独成组、单独给文案。
+ * 打包态逐项断言共用此表（scripts/pre-dist-check.ts 复用同一判定核，两侧不得各自抄录）。
+ */
+export const CHAIN_REQUIRED_ARTIFACTS: readonly string[] = [
+  path.join('dist', 'src', 'server', 'MediaFingerprint.js'),
+  path.join('dist', 'src', 'server', 'AccountSyncSettings.js'),
+  path.join('dist', 'src', 'organizer', 'NativeMediaOperations.js')
+]
+
 export interface NikkiSyncLinkFacts {
   /** 依赖图中指向仓库外的本地 spec（`file:../…` / `workspace:…`），必须为空。 */
   externalFileSpecs: string[]
@@ -123,6 +139,11 @@ export interface NikkiSyncLinkFacts {
    * 见 `NIKKISYNC_CAPABILITY_ARTIFACTS`）。缺件只影响未来能力节点，不影响已交付内嵌面。
    */
   capabilityArtifactsMissing?: string[]
+  /**
+   * 上游 b397e0e 同步：本轮经新增静态 import 边进入装载链的上游自有模块缺失清单（相对包根，
+   * 见 `CHAIN_REQUIRED_ARTIFACTS`）。缺件坏的是已交付查询面，与能力深入口分列因此文案不同。
+   */
+  chainArtifactsMissing?: string[]
 }
 
 export interface CheckResult {
@@ -255,6 +276,22 @@ export function evaluateNikkiSyncLink(facts: NikkiSyncLinkFacts): CheckResult[] 
     })
   }
 
+  // 上游 b397e0e 同步：本轮被新增静态 import 边推入装载链的三个上游自有模块。它们既不在桶导出内
+  // （`NIKKISYNC_REQUIRED_EXPORTS` 探针管不到），也不是本仓深入口（深入口清单管不到），缺任一件都会
+  // 让正在使用的查询面在装载期抛 ERR_MODULE_NOT_FOUND；未链接仍是受支持默认态（warn 展示、不阻断）。
+  if (facts.chainArtifactsMissing !== undefined) {
+    checks.push({
+      name: '@nikkisync/pc-companion ships the load-chain static dependency artifacts',
+      ok: !linked || facts.chainArtifactsMissing.length === 0,
+      level: !linked ? 'warn' : undefined,
+      detail: !linked
+        ? 'skipped (no links present; embedding lane inactive)'
+        : facts.chainArtifactsMissing.length === 0
+          ? `present: ${CHAIN_REQUIRED_ARTIFACTS.join(', ')}`
+          : `missing: ${facts.chainArtifactsMissing.join(', ')} — run the full \`npm run build\` in NikkiSync (these upstream-owned modules sit on the shipped load chain behind a static import; without them the deep entry that imports them throws ERR_MODULE_NOT_FOUND at load time)`
+    })
+  }
+
   checks.push({
     name: 'main-process bundles do not fold @nikkisync into require()',
     ok: facts.buildFoldHits === null || facts.buildFoldHits === 0,
@@ -382,6 +419,7 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
   const syncArtifactsMissing: string[] = []
   const metadataArtifactsMissing: string[] = []
   const capabilityArtifactsMissing: string[] = []
+  const chainArtifactsMissing: string[] = []
   for (const [name, subpath] of Object.entries(NIKKISYNC_PACKAGE_DIRS)) {
     const linkDir = path.join(projectRoot, 'node_modules', name)
     if (!fs.existsSync(linkDir)) continue
@@ -408,6 +446,9 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
       for (const artifact of NIKKISYNC_CAPABILITY_ARTIFACTS) {
         if (!fs.existsSync(path.join(targetDir, artifact)))
           capabilityArtifactsMissing.push(artifact)
+      }
+      for (const artifact of CHAIN_REQUIRED_ARTIFACTS) {
+        if (!fs.existsSync(path.join(targetDir, artifact))) chainArtifactsMissing.push(artifact)
       }
     }
     void subpath
@@ -465,7 +506,8 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     candidateRoot,
     syncServerArtifactsMissing: syncArtifactsMissing,
     metadataArtifactsMissing: metadataArtifactsMissing,
-    capabilityArtifactsMissing: capabilityArtifactsMissing
+    capabilityArtifactsMissing: capabilityArtifactsMissing,
+    chainArtifactsMissing: chainArtifactsMissing
   }
 }
 

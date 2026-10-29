@@ -11,7 +11,7 @@ import * as path from 'path'
 import { execSync } from 'child_process'
 import { fileURLToPath } from 'url'
 
-import { NIKKISYNC_CAPABILITY_ARTIFACTS } from './verify-nikkisync-link'
+import { CHAIN_REQUIRED_ARTIFACTS, NIKKISYNC_CAPABILITY_ARTIFACTS } from './verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -767,6 +767,27 @@ function checkUnpackedNativeBinaries(): void {
       fail(
         `@nikkisync/pc-companion 缺能力深入口产物 ${relative}` +
           '（能力节点装载期将 ERR_MODULE_NOT_FOUND；在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
+          path.relative(ROOT, path.join(pcCompanionRoot, relative))
+      )
+    }
+  }
+
+  // 上游 b397e0e 同步：本轮被新增静态 import 边推入装载链的 3 个上游自有模块（清单与
+  // verify:nikkisync 共用 CHAIN_REQUIRED_ARTIFACTS，两侧不得各自抄录）。判定核也复用同一个
+  // missingPackedCapabilityArtifacts——它与清单内容无关，再开一份就是两套真相源。
+  // 缺件坏的是已交付查询面：row-mappers.js 静态依赖 MediaFingerprint.js，装载即抛
+  // ERR_MODULE_NOT_FOUND；runtime.js 依赖 NativeMediaOperations.js，在桶导出闭包里。
+  const chainMissing = missingPackedCapabilityArtifacts(CHAIN_REQUIRED_ARTIFACTS, (relative) =>
+    fs.existsSync(path.join(pcCompanionRoot, relative))
+  )
+  if (chainMissing.length === 0) {
+    pass(`@nikkisync/pc-companion 装载链传递依赖 ${CHAIN_REQUIRED_ARTIFACTS.length} 项已全部解包`)
+  } else {
+    for (const relative of chainMissing) {
+      fail(
+        `@nikkisync/pc-companion 缺装载链产物 ${relative}` +
+          '（上游新增静态 import 边的目标文件；缺它时深入口装载期将 ERR_MODULE_NOT_FOUND；' +
+          '在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
           path.relative(ROOT, path.join(pcCompanionRoot, relative))
       )
     }
