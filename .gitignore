@@ -11,6 +11,8 @@ test-results/
 playwright-report/
 release-v*/
 release-new/
+# 打包旁路留存的解包残壳（内含 app.asar；实时防护句柄未释放时删不掉，但不入仓）
+/release-sync/
 out/
 build/
 build-output/
