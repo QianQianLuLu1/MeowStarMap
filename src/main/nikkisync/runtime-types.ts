@@ -332,7 +332,9 @@ export interface NikkiSyncQuerySurface {
   listResourceRecords(assetIds: string[], mode: 'meta' | 'path'): Promise<unknown>
   /**
    * 阶段 4：增量变更。响应与上游 `GET /v1/changes` 同形
-   * （`{ changes, libraryRevision, fullResyncRequired }`），判据照抄上游不作改。
+   * （`{ changes, libraryRevision, fullResyncRequired }`）；判据同上游 **b422193 时点**形态，
+   * b397e0e 起上游多一支 `after < accounts.revision()`，本仓不走账号作用域 ⇒ 刻意不跟随
+   * （理由见 `runtime-facade.ts` 的 `listChanges` 注释）。
    */
   listChanges(after: number, limit: number): Promise<unknown>
   /** 阶段 4：套装搜索，转发上游 `searchSuitLibrary`。 */

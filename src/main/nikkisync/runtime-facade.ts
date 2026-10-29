@@ -544,7 +544,10 @@ export function createQuerySurface(
     async listChanges(after, limit) {
       const libraryRevision = repo.currentRevision()
       const minimum = repo.minimumJournalRevision()
-      // 判据逐字取自上游 LocalSyncServer.listChanges（:439）：after < minimum - 1
+      // 判据同上游 LocalSyncServer.listChanges 的 b422193 时点形态（基线该行在 :453，原注的 :439 从未对上；
+      // b397e0e 已漂到 :457 并多出 `after < this.accounts.revision()` 一支）。本仓刻意不跟随：本文件 :434 单参构造
+      // SyncReadRepository ⇒ 作用域恒 1=1，不存在 accounts.revision() 取值来源（不构造 AccountSyncSettings）。
+      // 接入账号作用域时必须同步这一支，否则本仓侧漏发 fullResyncRequired、客户端停在增量游标上。
       const fullResyncRequired = minimum !== undefined && after < minimum - 1
       const changes = fullResyncRequired
         ? []
