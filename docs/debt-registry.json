@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-28",
+  "updatedAt": "2026-10-29",
   "items": [
     {
       "id": "DEBT-001",
@@ -505,6 +505,39 @@
         "scripts/__tests__/logger-escape-ledger.test.ts"
       ],
       "lines": [222],
+      "issue": false
+    },
+    {
+      "id": "DEBT-040",
+      "category": "test-gap",
+      "section": 17,
+      "status": "open",
+      "priority": "medium",
+      "title": "装载链产物闸门是「命名清单」而非依赖闭包：50 个装载链模块里仅 19 个被点名，缺件仍可能推迟到运行期暴露",
+      "description": "2026-10-29 上游同步（b422193 → b397e0e / v1.0.27-public-beta.1）阶段二新增 `CHAIN_REQUIRED_ARTIFACTS`（`scripts/verify-nikkisync-link.ts:95`）覆盖本轮经三条新增静态 import 边入链的模块（`server/MediaFingerprint.js` ← `row-mappers.js`、`server/AccountSyncSettings.js` ← `LocalSyncServer.js`、`organizer/NativeMediaOperations.js` ← `runtime.js`），并把打包态接在同一张表上（`scripts/pre-dist-check.ts:780`，复用 `missingPackedCapabilityArtifacts`）。但这仍是**人工点名**：实测以 `dist/src/index.js` + 12 个 `*_DEEP_ENTRY` 为根递归解析相对 `import`/`export from`，装载链共 50 个模块，其中被任何清单点名的只有 19 个，余下 31 个（如 `scanner/ScannerService.js`、`scanner/ScanReconciler.js`、`runtime.js` 自身、`remote/*`、`server/AuthService.js` 等）不在闸门视野内。后果：下一次上游同步若给这些文件新增一条静态依赖，仍会以「运行期 ERR_MODULE_NOT_FOUND」而不是闸门先红的形式暴露——正是本轮 R4 的同类缺陷，只是覆盖面收窄了。修法（需授权，属新机制）：把清单换成从产物 import 图派生的闭包校验（约 30–40 行纯函数 + 单测，须同时给开发态与解包态两种宿主语义、并处理未链接时的 skip 语义）。另须如实记下本轮的保护面：`build.files` 以 `from: node_modules/@nikkisync` + `filter: ['**/*']` 整树搬运，且 `asarUnpack` 含 `**/@nikkisync/**`，因此「单文件漏解包」今天结构上不可能发生，这张表的实际价值是钉住上游装载链与本仓点名不再各自漂移，不得在文档里写成「防止漏文件」。",
+      "files": [
+        "scripts/verify-nikkisync-link.ts",
+        "scripts/pre-dist-check.ts",
+        "scripts/__tests__/verify-nikkisync-link.test.ts",
+        "scripts/__tests__/pre-dist-check.test.ts"
+      ],
+      "lines": [95, 780],
+      "issue": false
+    },
+    {
+      "id": "DEBT-041",
+      "category": "supply-chain",
+      "section": 17,
+      "status": "open",
+      "priority": "medium",
+      "title": "采纳锚点 b397e0e 自带 1 条上游红：ScreenShot 拼贴补充扫描撞 resources.path_key 唯一约束（ScanIndexFailure）",
+      "description": "2026-10-29 按裁决 Q-e 首次为本轮补跑上游自测（上一轮该项为 not-run，评估 R11）：`cd ../NikkiSync && npm test` 退出码 **1**，1 条失败——`apps/pc-companion/test/extra-scan-directories.test.ts:61` 的「default ScreenShot supplements collages without duplicating native photos and updates on native changes」，抛 `ScanIndexFailure: Photo index operation failed`，`[cause]` 为 `UNIQUE constraint failed: resources.path_key`（`packages/database/dist/src/asset-repository.js:141` ← `ScanReconciler.reconcile` ← `ScannerService.runScan`）。单文件隔离复跑同样失败（`# tests 17 / pass 16 / fail 1`），排除 `--test-isolation=none` 的跨文件状态串扰。归因本轮：该测试文件在 b422193..b397e0e 区间 +24 行，且 `-S path_key` / `-S exportsByImage` 都命中本轮两个提交（fc39fd2 的「ScreenShot 精确字节抑制」与 b397e0e），失败语义恰是该用例要防的「重复入库」。与本仓关系：本仓装载面只读消费上游 ScannerService，不改上游源码（AGENTS.md 硬约束），故无法在本仓修复；本仓链接态套件（含真实扫描入库的 `runtime-facade.linked.test.ts` 与本轮新增的 N4 守卫）全绿，说明本仓夹具未触发该形态。产品风险：`ScreenShot` 正是《无限暖暖》存截图的目录，用户库里「拼贴 + 原生照同目录」的形态可能触发同类 `ScanIndexFailure`，表现为扫描该目录失败而非静默错标。处置：下一次同步先复跑上游 `npm test` 确认上游是否已修，若仍红则需产品侧裁示（继续采纳并在扫描失败诊断里向用户透出，还是退到 `fc39fd2`/`b422193`）。取证读数全部记录于 `docs/plans/2026-10-29-nikkisync-upstream-sync-05-结案报告.md` §R12。",
+      "files": [
+        "src/main/nikkisync/AGENTS.md",
+        "src/main/nikkisync/runtime-facade.linked.test.ts",
+        "src/main/scanner/AGENTS.md"
+      ],
+      "lines": [],
       "issue": false
     }
   ]
