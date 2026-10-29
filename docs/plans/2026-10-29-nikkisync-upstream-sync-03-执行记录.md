@@ -177,3 +177,75 @@ handler 的 27 通道有序 `toEqual` 与 6 条身份 `toBe` 钉测**零改动�
 | （N5）    | `docs(plans): 回写执行记录与结案报告并登记 DEBT-040/041`                                   | N5   |
 
 本轮改动文件共 14 个，全部落在 `src/main/nikkisync/**`、`scripts/**`、`src/renderer/utils/assetViewModel.ts`、`docs/**`；未触碰核心路径受保护 glob ⇒ 全程无 `// @core-change:` 需求（`core-path-gate` 四次均 `⊘ 跳过`，实测一致）。
+
+## 9. 收口复验（阶段三终局 · 2026-10-29 二次下发任务时复跑）
+
+**为什么本节存在**：任务再次以「执行已批准计划中的兼容性收敛节点」下发，开工核对实测出该前提已不成立——上游 `origin/main` 与全部 tag 仍停在 `b397e0e`（本轮已采纳锚点，无新差异），本仓 HEAD `31d59cc` 即 N5 结案提交，且本阶段相关子集全绿（无可制造的真实红灯）。就此提问后裁决为「**做收口复验，不改代码**」。本节把 02 计划 §8 验证矩阵完整重跑一遍并与 §5/§6 与 `05-结案报告` §1 已记读数逐条交叉复核；**唯一改动文件是本文件**，`src/**`、`scripts/**`、契约、债账零触碰。
+
+### 9.1 开工核对（复验起点）
+
+| 项             | 命令                                                                | 实测读数                                                                                                                                                      |
+| -------------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 上游锚点       | `git -C ../NikkiSync rev-parse HEAD` / `tag --points-at HEAD`       | `b397e0eb6ca1b4748f13a72f13bb1702a549410e` / `v1.0.27-public-beta.1`                                                                                          |
+| 上游洁净度     | `git -C ../NikkiSync status --porcelain \| wc -l`                   | **0**（复验前；收尾再取一次）                                                                                                                                 |
+| 远端是否更前进 | `ls-remote origin refs/heads/main HEAD` / `ls-remote --tags origin` | 两行均 `b397e0e`；tag 最新 `v1.0.27-public-beta.1` ⇒ **无新锚点**                                                                                             |
+| 连接状态       | `npm run link:nikkisync:check`                                      | `check OK (all four links in place)`                                                                                                                          |
+| 连接诊断       | `npm run verify:nikkisync`                                          | 13 行全 ✓、`OK (blocking failures: 0)`、exit 0；第 8 行仍点名装载链 3 件产物（`MediaFingerprint.js` / `AccountSyncSettings.js` / `NativeMediaOperations.js`） |
+| 本仓工作区     | `git status --porcelain`                                            | 仅 `?? release-sync/`（10-27 遗存的 `win-unpacked`，未被 `.gitignore` 覆盖，非本轮引入）                                                                      |
+| 受保护改动规则 | `git diff --name-only c45e3f4..HEAD` × 四条 `PROTECTED_GLOBS`       | 命中 **0**；提交面共 18 个文件，扣除 4 篇计划文档 = **14** ⇒ 与本文 §8「改动文件共 14 个」逐位吻合                                                            |
+
+### 9.2 四个交付节点的静态复核（只读定位，不改）
+
+| 节点          | 复验判据（命令）                                                                                                                                                                                                                                                                                                                | 读数                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| N1 派生断言   | 域内套件                                                                                                                                                                                                                                                                                                                        | `16 files / 282 passed`、**0 skipped** ⇒ 满足结案「≥276→≥280」，判据不再钉时点    |
+| N2 文案订正   | `grep -n "（:439）" src/main/nikkisync/runtime-facade.ts`；`grep -rn "逐字同上游\|判据照抄上游" src/main/nikkisync docs/IPC_CONTRACT.md`                                                                                                                                                                                        | **0 命中 / 0 命中**（订正未被回退）                                               |
+| N3 单一真相源 | `grep -c "第 12 项"` → 0；`CHAIN_REQUIRED_ARTIFACTS` 定义位与消费位：`verify-nikkisync-link.ts:95`（导出）`:290`/`:450`（消费）、`pre-dist-check.ts:14`（import）、`:780`/`:784`（复用 `missingPackedCapabilityArtifacts`）                                                                                                     | 序号失真 0 命中；打包态确实复用同一表与同一判定核，**无第二判定核、无内联字面量** |
+| N4 隐私裁剪   | `stripAssetPathFields` 定义 `runtime-manager.ts:792`，委托调用点 `:844`（`listAssets`）/ `:855`（`searchSuits`）/ `:857`（`searchClothing`）；刻意不裁的 path 模式由 `runtime-manager.test.ts:717` + handler `:401`/`:642` 钉住；契约「一处刻意例外」在 `IPC_CONTRACT.md:389-399`；视图模型时点限定在 `assetViewModel.ts:10-13` | 三处裁剪点 + 两处「保留绝对路径原值」用例全绿；文档三处登记在位                   |
+
+### 9.3 验证矩阵复跑（对照本文 §5/§6 与结案 §1）
+
+| 命令                                                                              | 原记读数                                                                         | 复验读数                                                  | 判定                                                     |
+| --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------------------------------------- | -------------------------------------------------------- |
+| `npx vitest run src/main/nikkisync`                                               | 276 passed / 0 skipped（N1 时点）                                                | **16 files / 282 passed / 0 skipped**，22.84s             | ✅ 红未复现；+6 条为 N4 新增用例                         |
+| 评估 §5.4 同口径合并（域 + 3 个 scripts 套件）                                    | `1 failed \| 319 passed (320)`                                                   | **19 files / 331 passed / 0 skipped**，23.38s             | ✅ 唯一红已闭；+11 条来自 N3/N4 新增                     |
+| 扩展合并口径（上表 + `pre-dist-check` + handler + `assetViewModel`）              | 未记同口径                                                                       | **22 files / 448 passed / 0 skipped**                     | ✅ 本节建立为新基准                                      |
+| `npx vitest run scripts/__tests__/{verify-nikkisync-link,pre-dist-check}.test.ts` | 72 passed（§4）                                                                  | **72 passed**                                             | ✅ 逐位相同                                              |
+| `npm test`                                                                        | 453 files；`7077 passed \| 12 skipped`                                           | **453 files；`7077 passed \| 12 skipped (7089)`**，69.98s | ✅ 逐位相同，一票否决项无漂移                            |
+| `npm run typecheck` / `typecheck:e2e`                                             | exit 0 / exit 0                                                                  | **0 / 0**                                                 | ✅                                                       |
+| `npm run lint`（`eslint .`）                                                      | exit 0                                                                           | **0**                                                     | ✅                                                       |
+| `npm run i18n:guard`                                                              | 白名单只减不增、key 已同步                                                       | 同文案，exit 0                                            | ✅ 仍零新 key                                            |
+| `npm run docs:links`                                                              | exit 0，另 177 处提醒                                                            | exit 0，另 177 处提醒                                     | ✅ 逐位相同                                              |
+| `npm run verify:nikkisync` / `link:nikkisync:check`                               | 13 行 blocking 0 / `check OK`                                                    | 13 行 blocking 0 / `check OK`                             | ✅ 无阻断项                                              |
+| `npm run test:ci-linux`（两次复跑）                                               | `32 failed \| 421 passed (453)`；`59 failed \| 6909 passed \| 61 skipped (7029)` | **两次均为同一读数**                                      | ✅ 相对开工基线**无新增红**（既有装置现象，归因仍见 §6） |
+| `npx tsx scripts/core-path-gate.ts`                                               | 四次 `⊘ 跳过`                                                                    | `⊘ 本次变更不涉及核心路径受保护文件，跳过`                | ✅ 复验面同样不触闸门                                    |
+| `npm run test:coverage`                                                           | exit 0，All files `70.02 / 61.42 / 62.78 / 71.64`                                | **not-run**（见 §9.5 第 1 条）                            | ⚠ 以盘上产物 + 阈值对照替代                              |
+| `npm run verify`                                                                  | 四项全过（N1–N4 各次）                                                           | **not-run**（见 §9.5 第 2 条）                            | ⚠ 构成项已逐一独立跑绿                                   |
+| `npm run dist:win` / `verify:dist`                                                | not-run（裁决 Q-a）                                                              | not-run                                                   | 维持结案 §4                                              |
+
+### 9.4 skip 台账：`npm test` 的 12 条逐条归因
+
+先取计数（`npm test` = 12 skipped），再用 `--reporter=verbose` 点名，全部落到仓库已记载的受支持降级语义：
+
+| #      | 用例                                                                                                                                                    | 条件                                                                                         | 语义出处与本轮证明                                                                                                                                                                                           |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 1–10   | `src/main/utils/ci-linux-emulation.test.ts` 轴 1、2、3、4、4a、4b、4c、4d、4e、4f（装置四轴自检）                                                       | `it.skipIf(!ACTIVE)`，`ACTIVE = globalThis.__wxnnCiLinuxEmulation !== undefined`（`:26-27`） | 文件头第 2 行明写「`npm run test:ci-linux` 专用；普通 `npm test` 与 CI 下整件 skip」；证明：`npx vitest run <本文件> --config vitest.ci-linux.config.ts` → **12 passed / 0 skipped**（装置态真实执行并通过） |
+| —      | 同文件的轴 5 与「装置未激活时本文件必须整件跳过」                                                                                                       | 不 skip（`DUAL_PROFILE_TITLES` `:30-35` 显式豁免）                                           | 已执行且绿 ⇒ 哨兵本身在 `npm test` 里有效，不属 12 条                                                                                                                                                        |
+| 11–12  | `src/main/sync/identity-service.test.ts:125`「私钥文件权限最小化（POSIX 0600；Windows 继承 userData 每用户 ACL）」、`:186`「Ed25519 私钥文件权限 0600」 | `it.skipIf(process.platform === 'win32')`                                                    | 断言体是 `fs.statSync(key).mode & 0o777 === 0o600`，POSIX 权限位在 NTFS 不成立；属规则 6 允许的「平台专属动作」判定，不是路径语义开关                                                                        |
+| 关联   | 同一文件在装置（`vitest.ci-linux.config.ts`）下这两条会执行且**失败**（本机扮 linux、宿主仍是 NTFS ⇒ 装置局限）                                         | —                                                                                            | 已包含在 ci-linux 的 `32 files / 59 tests` 基线内（§9.5 第 4 条的完整清单可核）                                                                                                                              |
+| 兼容面 | 域内与合并口径**0 skipped**                                                                                                                             | `hasNikkiSyncLink()` 为真                                                                    | 链接态集成真实执行（评估 §5.4 第 4 条判据），不存在「用 skip 掩盖未跑」                                                                                                                                      |
+
+### 9.5 差异账与 not-run（显式记账，不当作已通过）
+
+1. **`npm run test:coverage` not-run**：权限层拦截（判定「覆盖率采集要写 `./coverage/`，与本轮只读复验冲突」）。替代证据：盘上 `coverage/coverage-summary.json`（本轮 N5 于 21:23 自跑产出）`total` = `70.02 / 61.42 / 62.78 / 71.64`，与结案 §1 记录**逐位相同**；`vitest.config.ts:103-106` 阈值为 `66 / 58 / 59 / 68`，四项均高于阈值 ⇒ 门控结论不变。但「本次复跑阈值门控」缺证，若要补需授权该命令。
+2. **`npm run verify` not-run**：同一权限层拦截；另需在干净工作区上 `git diff HEAD` 为空 ⇒ 本就应记 `⊘ 跳过`。替代：其构成项逐一独立跑绿（`tsc -b` + `tsconfig.scripts.json` = 0、`typecheck:e2e` = 0、`eslint .` = 0、`prettier --check --end-of-line auto` 对本文件通过、`core-path-gate` ⊘、相关单测由 §9.3 三行套件覆盖）。
+3. **打包面维持 not-run**：`dist:win` / `verify:dist` / M2 依裁决 Q-a 不变；本轮也未跑 `npm install` / `npm update` / `link:nikkisync`（写操作，且会剪链）。
+4. **明细缺口（非新增红）**：`test:ci-linux` 的 32 个失败**文件集合**本轮完整捕获（scanner 16、scripts 6、nikkisync 3、media-worker 2、utils 2、ipc/handlers/cache 1、sync/identity-service 1）。其中 `identity-service`、`metadata-resolver.linked`、`sync-server.linked` 三件本文 §6 未点名（原记只举 `runtime-facade.linked` 与两类根因）；两次复跑计数与 §6 逐位相同 ⇒ 属**归因明细不全**，不是回归。根因面另补一类：NTFS 不还原 POSIX mode 位（第 9.4 条关联行）。
+5. **用例总数增长**：域 276→282、评估同口径合并 320→331，与 N3（+7 条闸门用例）、N4（+6 条裁剪与反空转用例）一致；本文 §4/§5 未记「阶段一同口径复跑值」，本节补齐该坐标。
+6. **`release-sync/` 遗存**：未跟踪且不在 `.gitignore`，内含 `win-unpacked`（10-27）；本节提交仍按文件名 `git add`，不纳入它。
+
+### 9.6 终局判定与下一阶段准入
+
+- 三条收口判据达标：① 只读闸门相对 §5/§6 与结案 §1 **零漂移**（`npm test` 逐位相同、域内 0 failed / 0 skipped、诊断 13 行 blocking 0）；② 契约/漂移守护面 §9.2 四项复核全部在位且绿；③ 装置面失败集合不新增（32/59 两次复跑同读数）。
+- **阶段三收口**：已批准计划内无待执行兼容节点，也不存在可复现的兼容型红灯。
+- 下一阶段准入需二者之一：(a) 上游新锚点（当前 `origin/main` = `b397e0e` ⇒ 无差异可评，须先有 `> b397e0e` 的 release）；(b) 对挂账四项的解禁裁决——DEBT-040 装载链闭包化闸门、R5 vendored 契约形状漂移登记、M3 闸门负向端到端取证（需上游检出副本）、结案 §5 三处已知失真。能力接入（评估 §6 可选 7 项）另需先补阶段一/二。本节不代替后续阶段开工。
