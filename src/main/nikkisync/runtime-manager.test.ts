@@ -256,11 +256,56 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       }
     },
     queries: {
-      listAssets: vi.fn(async () => ({ items: [{ assetId: 'asset_1' }], libraryRevision: 7 })),
+      // 上游 b397e0e 起 `mapAssetSummary` 追加两个本机绝对路径键（sourceFolder 由 sourcePath
+      // 剥尾段得来 ⇒ 二者成对出现）。夹具如实带上，用于钉住「渲染层拿不到绝对路径」这条姿态。
+      listAssets: vi.fn(async () =>
+        plan.assetPage
+          ? (plan.assetPage as { items: unknown[]; libraryRevision: number })
+          : {
+              items: [
+                {
+                  assetId: 'asset_1',
+                  revision: 3,
+                  sourcePath: 'D:/game/photos/Photo_1.jpg',
+                  sourceFolder: 'D:/game/photos'
+                }
+              ],
+              libraryRevision: 7
+            }
+      ),
       getAssetDetail: vi.fn(async (assetId: string) => ({ asset: { assetId } })),
       getResource: vi.fn(async (_assetId: string, resourceId: string, mode: string) =>
         mode === 'path' ? '/game/photos/1.jpg' : { resourceId }
-      )
+      ),
+      listResourceRecords: vi.fn(async (_assetIds: string[], mode: string) =>
+        mode === 'path'
+          ? { byAsset: { asset_1: { res_1: 'D:/game/photos/Photo_1.jpg' } } }
+          : { byAsset: { asset_1: [{ resourceId: 'res_1', role: 'source_primary' }] } }
+      ),
+      // 搜索面把资产行嵌在 items[].photos[].asset 里（上游 SuitSearchIndex 按引用塞入）：
+      // 只浅拷一层裁不到它，故夹具刻意做成嵌套
+      searchSuits: vi.fn(
+        async () =>
+          plan.suitPage ?? {
+            items: [
+              {
+                suitId: 'suit_1',
+                photos: [
+                  {
+                    asset: {
+                      assetId: 'asset_1',
+                      sourcePath: 'D:/game/photos/Photo_1.jpg',
+                      sourceFolder: 'D:/game/photos'
+                    },
+                    matchedParts: ['top']
+                  }
+                ]
+              }
+            ]
+          }
+      ),
+      searchClothing: vi.fn(async () => ({ items: [] })),
+      profileStats: vi.fn(async () => ({ libraryRevision: 7 }))
     },
     // K3：会话面的游戏版本推断（facade 接到日历深入口；默认两键缺省）
     resolveGameVersion: (capturedAt?: string) => {
@@ -619,12 +664,12 @@ describe('createRuntimeManager 优雅停止', () => {
 })
 
 describe('createRuntimeManager 查询透传', () => {
-  it('原样返回查询面结果，不做字段包装', async () => {
+  it('除资产行的本机绝对路径两键外原样返回，不做字段包装', async () => {
     const { deps } = createDependencies()
     const manager = createRuntimeManager(deps)
     await manager.start(DEFAULTS)
     await expect(manager.listAssets({ limit: 10 })).resolves.toEqual({
-      items: [{ assetId: 'asset_1' }],
+      items: [{ assetId: 'asset_1', revision: 3 }],
       libraryRevision: 7
     })
     await expect(manager.getAssetDetail('asset_9')).resolves.toEqual({
@@ -641,6 +686,81 @@ describe('createRuntimeManager 查询透传', () => {
     expect(status.state).toBe('degraded')
     expect(status.dbPath).toBe(DEFAULTS.databaseFile)
     expect(status.error).toContain(installNotfoundMessage)
+  })
+})
+
+describe('createRuntimeManager 资产路径键裁剪（上游 b397e0e 同步）', () => {
+  it('正常：资产行的 sourcePath/sourceFolder 不透给渲染层，其余键原样保留', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const page = await manager.listAssets({ limit: 10 })
+    expect(JSON.stringify(page)).not.toContain('sourcePath')
+    expect(JSON.stringify(page)).not.toContain('sourceFolder')
+    expect((page as { items: unknown[] }).items).toHaveLength(1)
+    expect((page as { libraryRevision: number }).libraryRevision).toBe(7)
+  })
+
+  it('正常：搜索面嵌套 items[].photos[].asset 里的两键同样不透出（浅拷一层不够）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const suits = await manager.searchSuits('dress')
+    expect(JSON.stringify(suits)).not.toContain('sourcePath')
+    expect(JSON.stringify(suits)).not.toContain('sourceFolder')
+    // 结构本身不被改写：suitId / matchedParts 仍在原位
+    const first = (suits as { items: Array<{ photos: Array<{ matchedParts: string[] }> }> })
+      .items[0]
+    expect(first?.photos[0]?.matchedParts).toEqual(['top'])
+  })
+
+  it('边界：path 模式资源通道按设计保留绝对路径原值（裁了 media:// 当场失效）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.getResource('a', 'r', 'path')).resolves.toBe('/game/photos/1.jpg')
+    const records = (await manager.listResourceRecords(['asset_1'], 'path')) as {
+      byAsset: Record<string, Record<string, string>>
+    }
+    expect(records.byAsset.asset_1?.res_1).toBe('D:/game/photos/Photo_1.jpg')
+  })
+
+  it('边界：裁剪走副本，不写回上游查询面的对象身份（searchSource 按 revision 缓存，就地删键会污染缓存与统计面）', async () => {
+    const rawPage = {
+      items: [
+        {
+          assetId: 'asset_1',
+          sourcePath: 'D:/game/photos/Photo_1.jpg',
+          sourceFolder: 'D:/game/photos'
+        }
+      ],
+      libraryRevision: 9
+    }
+    const rawSuits = {
+      items: [
+        {
+          suitId: 'suit_1',
+          photos: [
+            {
+              asset: {
+                assetId: 'asset_1',
+                sourcePath: 'D:/game/photos/Photo_1.jpg',
+                sourceFolder: 'D:/game/photos'
+              },
+              matchedParts: ['top']
+            }
+          ]
+        }
+      ]
+    }
+    const { deps } = createDependencies({}, { assetPage: rawPage, suitPage: rawSuits })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.listAssets({ limit: 10 })
+    await manager.searchSuits('dress')
+    // 原件两键仍在 ⇒ 委托层返回的是副本；若实现改成 delete 原对象，这两条断言立刻红
+    expect(rawPage.items[0]).toHaveProperty('sourcePath')
+    expect(rawSuits.items[0]?.photos[0]?.asset).toHaveProperty('sourceFolder')
   })
 })
 

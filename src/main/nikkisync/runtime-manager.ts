@@ -68,6 +68,14 @@ export interface FakeSessionPlan {
   stopThrows?: boolean
   /** 整体覆盖 `scanner.getStatus()` 返回值（测试专用：注入非对象/缺字段等边界形态）。 */
   scannerStatusRaw?: unknown
+  /**
+   * 测试专用：以**固定对象身份**充当 `queries.listAssets` 的返回体（默认每次新建对象）。
+   * 裁剪必须是 copy-on-write——`createQuerySurface` 的 `searchSource()` 按 revision 缓存资产行，
+   * 就地删键会污染缓存并波及统计面；只有身份稳定才观察得到「有没有写回原件」。
+   */
+  assetPage?: unknown
+  /** 测试专用：同上，身份固定地充当 `queries.searchSuits` 的返回体（嵌套 `items[].photos[].asset`）。 */
+  suitPage?: unknown
   /** `server.start()` 的失败形态：`eaddrinuse` 用于验证 `PORT_IN_USE` 归类。 */
   serverStartError?: 'eaddrinuse' | 'other'
   /** `createPairingUri` 是否模拟上游「服务未启动」的原生抛错。 */
@@ -761,6 +769,44 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     })
   }
 
+  /**
+   * 上游 b397e0e 起 `mapAssetSummary` 追加资产行的本机绝对路径两键：`sourcePath` 与由它剥尾段
+   * 得到的 `sourceFolder`（上游自陈仅经鉴权 LAN gallery 共享）。本仓查询面对上游 DTO 是零转换
+   * 透传，两键因此会随 `nikkisync:*` 响应进入渲染层；本仓既有姿态是渲染层拿不到资产行绝对路径
+   * （`src/renderer/utils/assetViewModel.ts` 一直据此写视图），故在委托层裁剪。
+   *
+   * 三条硬约束：
+   * 1. **只返回副本**——`createQuerySurface().searchSource()` 按 revision 缓存资产行，且与
+   *    `profileStats` 共享同一批对象引用，就地 `delete` 会污染缓存并波及统计面。
+   * 2. **必须下钻**——搜索面的资产行嵌在 `items[].photos[].asset`（上游 `SuitSearchIndex` 按引用
+   *    塞入），浅拷一层裁不到；故按形状递归而不是硬编码响应结构。
+   * 3. **成对处理**——上游仅在 `sourcePath` 存在时同时给出两键，二者一起剔、一起不留。
+   *
+   * 深度上限只在「超出即不再下钻」处生效，且该层两键照样剔掉（宁少不漏，不因为兜底而漏键）；
+   * `seen` 防环。path 模式资源通道刻意不走这里：那是 `media://` 授权的唯一出口（见下方委托）。
+   */
+  const ASSET_PATH_FIELDS = ['sourcePath', 'sourceFolder'] as const
+  /** 实测最大深度 4（`{items:[{photos:[{asset}]}]}`）；留出余量，超限只停下钻不放过当层键。 */
+  const MAX_STRIP_DEPTH = 8
+
+  function stripAssetPathFields(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+    if (typeof value !== 'object' || value === null || seen.has(value)) return value
+    seen.add(value)
+    if (Array.isArray(value)) {
+      return value.map((item) => stripAssetPathFields(item, depth + 1, seen))
+    }
+    const copy = { ...(value as Record<string, unknown>) }
+    for (const field of ASSET_PATH_FIELDS) delete copy[field]
+    if (depth >= MAX_STRIP_DEPTH) return copy
+    for (const key of Object.keys(copy)) {
+      const child = copy[key]
+      if (typeof child === 'object' && child !== null) {
+        copy[key] = stripAssetPathFields(child, depth + 1, seen)
+      }
+    }
+    return copy
+  }
+
   /** K8：队列视图（list 逐行剔除中文 message + activity 计数；纯读无副作用）。 */
   function organizerStatus(): { items: unknown[]; activity: unknown } {
     const deletions = requireDeletions()
@@ -791,16 +837,24 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     start,
     scan,
     stop,
-    listAssets: async (input) => requireSession().queries.listAssets(input),
+    // 上游 b397e0e 起资产行带本机绝对路径两键 ⇒ 这三条委托经 stripAssetPathFields 裁剪后透出
+    // （理由与三条硬约束见该函数注释）。刻意放在委托层而不是 handler：那 6 条通道用身份 `toBe`
+    // 钉死「handler 不加工返回值」，且 handlers/ 属核心路径受保护面。
+    listAssets: async (input) =>
+      stripAssetPathFields(await requireSession().queries.listAssets(input)),
     getAssetDetail: async (assetId) => requireSession().queries.getAssetDetail(assetId),
     getResource: async (assetId, resourceId, mode = 'meta') =>
       requireSession().queries.getResource(assetId, resourceId, mode),
-    // 阶段 4：全部是同一步 `requireSession().queries.*` 的薄委托，不加工返回值
+    // 阶段 4：其余是同一步 `requireSession().queries.*` 的薄委托，不加工返回值。
+    // getResource / listResourceRecords 的 mode:'path' 必须继续给出绝对路径原值——那是
+    // `media://` 授权的唯一出口（registerNikkiSyncResourcePaths 靠它建表），刻意不裁。
     listResourceRecords: async (assetIds, mode = 'meta') =>
       requireSession().queries.listResourceRecords(assetIds, mode),
     listChanges: async (after, limit = 1000) => requireSession().queries.listChanges(after, limit),
-    searchSuits: async (query) => requireSession().queries.searchSuits(query),
-    searchClothing: async (query) => requireSession().queries.searchClothing(query),
+    searchSuits: async (query) =>
+      stripAssetPathFields(await requireSession().queries.searchSuits(query)),
+    searchClothing: async (query) =>
+      stripAssetPathFields(await requireSession().queries.searchClothing(query)),
     profileStats: async () => requireSession().queries.profileStats(),
     syncStatus,
     startSyncServer,

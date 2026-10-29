@@ -343,6 +343,52 @@ suite('完整生命周期（真上游对象，验证退出链）', () => {
   }, 30000)
 })
 
+suite('N4：委托层不透出资产行的本机绝对路径（真上游载荷 + 真扫描）', () => {
+  it('raw 查询面确实产出两键 ⇒ 反空转取证（上游若停止产出该键，本用例先红）', async () => {
+    const queries = session?.queries
+    expect(queries).toBeDefined()
+    const page = (await queries?.listAssets({ limit: 20 })) as {
+      items: Array<Record<string, unknown>>
+    }
+    const withPath = page.items.filter(
+      (item) => typeof item.sourcePath === 'string' && typeof item.sourceFolder === 'string'
+    )
+    // 夹具每条资产都有 source_primary 资源，上游 mapAssetSummary 据此必带两键；
+    // 这条若红，说明上游改产/改名，则下面的裁剪用例只是空转绿 ⇒ 必须复核而不是删断言。
+    expect(withPath.length).toBeGreaterThan(0)
+    const first = withPath[0] as Record<string, unknown>
+    const sourcePath = String(first.sourcePath)
+    expect(sourcePath.length).toBeGreaterThan(0)
+    // 不假设大小写与分隔符（8.3 短名/卷名差异都会改变字面形态）：只断言父子关系成立
+    expect(sourcePath.startsWith(String(first.sourceFolder))).toBe(true)
+    expect(sourcePath).not.toBe(first.sourceFolder)
+  })
+
+  it('manager 面同一条链的响应里既无 sourcePath 也无 sourceFolder', async () => {
+    const options: NikkiSyncSessionOptions = {
+      databaseFile: path.join(fixtureRoot, 'userDataN4', 'nikkisync.db'),
+      gameRoot: path.join(fixtureRoot, 'game'),
+      watcher: false,
+      projectRoot
+    }
+    const logs: string[] = []
+    const manager = createRuntimeManager(
+      createManagerDependencies(options, (_level, message) => logs.push(message))
+    )
+    try {
+      await manager.start(options)
+      const scan = (await manager.scan({})) as { filesObserved: number }
+      expect(scan.filesObserved).toBeGreaterThanOrEqual(5)
+      const page = await manager.listAssets({ limit: 20 })
+      expect((page as { items: unknown[] }).items.length).toBeGreaterThanOrEqual(2)
+      expect(JSON.stringify(page)).not.toContain('sourcePath')
+      expect(JSON.stringify(page)).not.toContain('sourceFolder')
+    } finally {
+      await manager.stop()
+    }
+  }, 30000)
+})
+
 suite('同一库文件二次 createRuntimeSession 重开（兼容层 C3-3：老库零迁移升级路径）', () => {
   it('重开后表清单与首次一致、schema_migrations 可读且版本为 1（零迁移执行）', async () => {
     // 证明目标：既有 {userData}/nikkisync/nikkisync.db 用户在链接从 d4ca7d7 升到 b422193 后

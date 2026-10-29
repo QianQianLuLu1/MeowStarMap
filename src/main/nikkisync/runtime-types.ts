@@ -467,6 +467,7 @@ export interface NikkiSyncRuntimeHandle {
   scan(input: { gameRoot?: string; path?: string }): Promise<unknown>
   /** 优雅停止：scanner.stop() → database.close()，幂等。 */
   stop(): Promise<void>
+  /** `{items,nextCursor?,libraryRevision}`；资产行的 `sourcePath`/`sourceFolder` 由委托层剔除。 */
   listAssets(input: {
     limit: number
     cursor?: string
@@ -476,13 +477,16 @@ export interface NikkiSyncRuntimeHandle {
   }): Promise<unknown>
   getAssetDetail(assetId: string): Promise<unknown>
   getResource(assetId: string, resourceId: string, mode?: 'meta' | 'path'): Promise<unknown>
-  /** 阶段 4：批量资源记录（`queries.listResourceRecords` 的薄委托）。 */
+  /**
+   * 阶段 4：批量资源记录（`queries.listResourceRecords` 的薄委托）。
+   * `mode:'path'` 按设计继续给出绝对路径原值（`media://` 授权的唯一出口），不经路径键裁剪。
+   */
   listResourceRecords(assetIds: string[], mode?: 'meta' | 'path'): Promise<unknown>
   /** 阶段 4：增量变更（`queries.listChanges` 的薄委托）。 */
   listChanges(after: number, limit?: number): Promise<unknown>
-  /** 阶段 4：套装搜索。 */
+  /** 阶段 4：套装搜索（委托 + 路径键裁剪：嵌套 `items[].photos[].asset` 同样剔两键）。 */
   searchSuits(query: string): Promise<unknown>
-  /** 阶段 4：服装搜索。 */
+  /** 阶段 4：服装搜索（委托 + 路径键裁剪，同上）。 */
   searchClothing(query: string): Promise<unknown>
   /** 阶段 4：档案统计。 */
   profileStats(): Promise<unknown>
