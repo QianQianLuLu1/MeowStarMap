@@ -304,7 +304,35 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
             ]
           }
       ),
-      searchClothing: vi.fn(async () => ({ items: [] })),
+      // 服装索引与套装索引同构：上游 ClothingSearchIndex.js:79 把同一张照片的**同一个** asset
+      // 对象按引用塞进每个命中的服装聚合 ⇒ 夹具必须给出嵌套载荷，`{ items: [] }` 会让裁剪
+      // 断言空转（这正是跨聚合漏键没被抓住的原因）。字段形态取自上游 :67-92，
+      // 刻意不含 matchedParts——那是套装索引独有。
+      searchClothing: vi.fn(
+        async () =>
+          plan.clothingPage ?? {
+            query: '裙',
+            items: [
+              {
+                clothingId: 'cloth_1',
+                name: '天鹅裙',
+                category: 'dresses',
+                suitId: 'suit_1',
+                suitName: '天鹅童话',
+                photoCount: 1,
+                photos: [
+                  {
+                    asset: {
+                      assetId: 'asset_1',
+                      sourcePath: 'D:/game/photos/Photo_1.jpg',
+                      sourceFolder: 'D:/game/photos'
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+      ),
       profileStats: vi.fn(async () => ({ libraryRevision: 7 }))
     },
     // K3：会话面的游戏版本推断（facade 接到日历深入口；默认两键缺省）
@@ -761,6 +789,116 @@ describe('createRuntimeManager 资产路径键裁剪（上游 b397e0e 同步）'
     // 原件两键仍在 ⇒ 委托层返回的是副本；若实现改成 delete 原对象，这两条断言立刻红
     expect(rawPage.items[0]).toHaveProperty('sourcePath')
     expect(rawSuits.items[0]?.photos[0]?.asset).toHaveProperty('sourceFolder')
+  })
+
+  it('回归：searchClothing 的嵌套 items[].photos[].asset 同样不透两键，且结构不被改写', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const clothing = await manager.searchClothing('裙')
+    expect(JSON.stringify(clothing)).not.toContain('sourcePath')
+    expect(JSON.stringify(clothing)).not.toContain('sourceFolder')
+    // 结构原样：服装面的键（clothingId/photoCount/photos[].asset）不被改写，无 matchedParts
+    const typed = clothing as {
+      query: string
+      items: Array<{
+        clothingId: string
+        photoCount: number
+        photos: Array<{ asset: { assetId: string }; matchedParts?: unknown }>
+      }>
+    }
+    expect(typed.query).toBe('裙')
+    expect(typed.items[0]?.clothingId).toBe('cloth_1')
+    expect(typed.items[0]?.photoCount).toBe(1)
+    expect(typed.items[0]?.photos[0]?.asset.assetId).toBe('asset_1')
+    expect(typed.items[0]?.photos[0]?.matchedParts).toBeUndefined()
+  })
+
+  it('缺陷：同一 asset 身份被两个套装聚合共享时两处都必须是已裁键副本（上游按引用塞入 ⇒ 第二处曾退回原件）', async () => {
+    const sharedAsset = {
+      assetId: 'asset_1',
+      sourcePath: 'D:/game/photos/Photo_1.jpg',
+      sourceFolder: 'D:/game/photos'
+    }
+    // 一张照片同时命中两套「天鹅」开头的服装 ⇒ 上游 SuitSearchIndex.js:145 把**同一个** asset
+    // 对象塞进两个聚合；委托层若按「已访问」跳过第二处，拿回去的就是带绝对路径的原件。
+    const rawSuits = {
+      items: [
+        {
+          suitId: 'suit_1',
+          suitName: '天鹅童话',
+          photos: [{ asset: sharedAsset, matchedParts: ['top'] }]
+        },
+        {
+          suitId: 'suit_2',
+          suitName: '天鹅童话·晨曦',
+          photos: [{ asset: sharedAsset, matchedParts: ['dress'] }]
+        }
+      ]
+    }
+    const { deps } = createDependencies({}, { suitPage: rawSuits })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const suits = (await manager.searchSuits('天鹅')) as {
+      items: Array<{ photos: Array<{ asset: unknown }> }>
+    }
+    expect(suits.items).toHaveLength(2)
+    for (const item of suits.items) {
+      for (const photo of item.photos) {
+        expect(photo.asset).not.toBe(sharedAsset)
+        expect(photo.asset).not.toHaveProperty('sourcePath')
+        expect(photo.asset).not.toHaveProperty('sourceFolder')
+      }
+    }
+    expect(JSON.stringify(suits)).not.toContain('sourcePath')
+    expect(JSON.stringify(suits)).not.toContain('sourceFolder')
+    // 副本而非就地删键：原件两键必须原样在（searchSource 缓存与统计面共享它）
+    expect(sharedAsset).toHaveProperty('sourcePath')
+    expect(sharedAsset).toHaveProperty('sourceFolder')
+  })
+
+  it('缺陷：searchClothing 的同一 asset 跨服装聚合共享 ⇒ 两处都裁键（一张照片命中 N 件服装即 N 份引用）', async () => {
+    const sharedAsset = {
+      assetId: 'asset_1',
+      sourcePath: 'D:/game/photos/Photo_1.jpg',
+      sourceFolder: 'D:/game/photos'
+    }
+    // 上游 ClothingSearchIndex.js:79 在逐服装循环里 push 同一个 searchable.asset
+    const rawClothing = {
+      query: '天鹅',
+      items: [
+        {
+          clothingId: 'cloth_1',
+          name: '天鹅裙',
+          category: 'dresses',
+          photoCount: 1,
+          photos: [{ asset: sharedAsset }]
+        },
+        {
+          clothingId: 'cloth_2',
+          name: '天鹅披肩',
+          category: 'accessories',
+          photoCount: 1,
+          photos: [{ asset: sharedAsset }]
+        }
+      ]
+    }
+    const { deps } = createDependencies({}, { clothingPage: rawClothing })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const clothing = (await manager.searchClothing('天鹅')) as {
+      items: Array<{ photos: Array<{ asset: unknown }> }>
+    }
+    expect(clothing.items).toHaveLength(2)
+    for (const item of clothing.items) {
+      for (const photo of item.photos) {
+        expect(photo.asset).not.toBe(sharedAsset)
+        expect(photo.asset).not.toHaveProperty('sourcePath')
+        expect(photo.asset).not.toHaveProperty('sourceFolder')
+      }
+    }
+    expect(JSON.stringify(clothing)).not.toContain('sourcePath')
+    expect(sharedAsset).toHaveProperty('sourcePath')
   })
 })
 

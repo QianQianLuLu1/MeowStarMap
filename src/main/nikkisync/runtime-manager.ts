@@ -76,6 +76,8 @@ export interface FakeSessionPlan {
   assetPage?: unknown
   /** 测试专用：同上，身份固定地充当 `queries.searchSuits` 的返回体（嵌套 `items[].photos[].asset`）。 */
   suitPage?: unknown
+  /** 测试专用：同上，身份固定地充当 `queries.searchClothing` 的返回体（嵌套形态与套装面同构）。 */
+  clothingPage?: unknown
   /** `server.start()` 的失败形态：`eaddrinuse` 用于验证 `PORT_IN_USE` 归类。 */
   serverStartError?: 'eaddrinuse' | 'other'
   /** `createPairingUri` 是否模拟上游「服务未启动」的原生抛错。 */
@@ -782,26 +784,51 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
    *    塞入），浅拷一层裁不到；故按形状递归而不是硬编码响应结构。
    * 3. **成对处理**——上游仅在 `sourcePath` 存在时同时给出两键，二者一起剔、一起不留。
    *
-   * 深度上限只在「超出即不再下钻」处生效，且该层两键照样剔掉（宁少不漏，不因为兜底而漏键）；
-   * `seen` 防环。path 模式资源通道刻意不走这里：那是 `media://` 授权的唯一出口（见下方委托）。
+   * 深度上限只在「超出即不再下钻」处生效，且该层两键照样剔掉（宁少不漏，不因为兜底而漏键）。
+   * path 模式资源通道刻意不走这里：那是 `media://` 授权的唯一出口（见下方委托）。
+   *
+   * `memo` 是「原对象身份 → 已裁好的副本」登记表，副本在递归子节点**之前**登记。这一条同时承担
+   * 三件事，缺一件就漏：
+   * ① 同一对象在一次响应里出现两次——上游每张照片只建一份 `searchable.asset`，再按引用塞进多个
+   *    聚合（`ClothingSearchIndex.js:79` 逐服装循环、`SuitSearchIndex.js:145` 逐套装循环；一张
+   *    照片命中 N 件服装即 N 份引用），第二处必须拿回**已裁键的副本**。早先用 `WeakSet` 记「已
+   *    访问」时命中即 `return value`，第二处退回原件，两键原样漏给渲染层——正是本函数要防的事。
+   * ② 环形引用的回边同样靠这条登记收敛：返回在途副本（该副本已裁过两键）。
+   * ③ 共享子图只裁一次，不再退化成指数级拷贝。
+   * 代价：输出里的引用共享关系与原载荷一致。返回值随即经 `wrapHandler` 序列化出 IPC，结构化克隆
+   * 本就把共享引用展平，且无人就地改这棵树（handler 侧被 6 条通道的身份 `toBe` 钉成不加工），
+   * 故不构成风险。数组走「先登记空数组、再按序 push」，否则被共享或成环的数组会整条退回原件。
+   * 命中判定用 `!== undefined` 是安全的：登记表只写对象/数组副本，永远不写 `undefined`。
+   * 非纯对象（Date/Map/Set/类实例）会被展开成 `{}`——上游 DTO 各键都经 `String()`/`Number()`
+   * 包裹（`row-mappers.js:47-146`），今天载荷里不存在这类值；出现即按空对象透出，是依赖不是新风险。
    */
   const ASSET_PATH_FIELDS = ['sourcePath', 'sourceFolder'] as const
-  /** 实测最大深度 4（`{items:[{photos:[{asset}]}]}`）；留出余量，超限只停下钻不放过当层键。 */
+  /** 实测最深落在 asset 对象 = 深度 5（root 记 0：root→items→item→photos→photo→asset）；
+   *  留出余量，超限只停下钻不放过当层键。 */
   const MAX_STRIP_DEPTH = 8
 
-  function stripAssetPathFields(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
-    if (typeof value !== 'object' || value === null || seen.has(value)) return value
-    seen.add(value)
+  function stripAssetPathFields(
+    value: unknown,
+    depth = 0,
+    memo = new WeakMap<object, unknown>()
+  ): unknown {
+    if (typeof value !== 'object' || value === null) return value
+    const remembered = memo.get(value)
+    if (remembered !== undefined) return remembered
     if (Array.isArray(value)) {
-      return value.map((item) => stripAssetPathFields(item, depth + 1, seen))
+      const copy: unknown[] = []
+      memo.set(value, copy)
+      for (const item of value) copy.push(stripAssetPathFields(item, depth + 1, memo))
+      return copy
     }
     const copy = { ...(value as Record<string, unknown>) }
+    memo.set(value, copy)
     for (const field of ASSET_PATH_FIELDS) delete copy[field]
     if (depth >= MAX_STRIP_DEPTH) return copy
     for (const key of Object.keys(copy)) {
       const child = copy[key]
       if (typeof child === 'object' && child !== null) {
-        copy[key] = stripAssetPathFields(child, depth + 1, seen)
+        copy[key] = stripAssetPathFields(child, depth + 1, memo)
       }
     }
     return copy
