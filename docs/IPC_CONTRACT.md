@@ -386,6 +386,22 @@ wrapHandler(ctx, schema, handler) =>
 
 ### 8.1 查询面（阶段 2，响应体 = NikkiSync 协议 DTO，内嵌层零转换）
 
+> **一处刻意例外（上游 b397e0e 同步新增）**：上游 `mapAssetSummary` 自该锚点起在资产行追加
+> `sourcePath` / `sourceFolder`（本机绝对路径与其父目录）。本仓在**委托层**
+> （`src/main/nikkisync/runtime-manager.ts` 的 `stripAssetPathFields`）剔除这两键，作用通道为
+> `nikkisync:get-assets`、`nikkisync:search-suits`（含嵌套 `items[].photos[].asset`）与
+> `nikkisync:search-clothing`；其余键仍零转换原样透出，响应形状不变（少两个可选键，渲染层
+> 本就无消费点，故不构成破坏性变更）。裁剪刻意不放在 handler：`get-resource-records`/`get-changes`/
+> `search-*`/`profile-stats` 等通道以身份 `toBe` 钉死「handler 不加工返回值」，且 `handlers/`
+> 属核心路径受保护面。
+>
+> `get-resource` 与 `get-resource-records` 的 `mode:'path'` **按设计仍返回绝对路径原值**，不受该
+> 裁剪影响——它是 `media://` 授权的唯一出口（`registerNikkiSyncResourcePaths` 靠它建表）。
+>
+> 覆盖边界须如实读：本条只关闭**本仓渲染层**这一面。上游 `LocalSyncServer` 对已配对 LAN 设备
+> 仍照常下发两键（本仓不改上游源码）；vendored `AssetSummary`（`src/shared/sync/protocol.ts`）
+> 刻意不新增这两键，声明面与载荷一致。
+
 | 通道                         | 入参                                                                    | 出参                                                                                                             | 失败码                                                   |
 | ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
 | `nikkisync:runtime-status`   | 无                                                                      | `{state, dbPath, linkReady, scannerStatus?, installation?, lastScan?, tables?, sync?, metadata?, error?, hint?}` | `PRECONDITION_FAILED`（句柄未装配）                      |
