@@ -15,7 +15,7 @@ import {
   resolveVerifyAsarTarget,
   type JsTreeFile
 } from '../pre-dist-check'
-import { NIKKISYNC_CAPABILITY_ARTIFACTS } from '../verify-nikkisync-link'
+import { CHAIN_REQUIRED_ARTIFACTS, NIKKISYNC_CAPABILITY_ARTIFACTS } from '../verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..', '..')
@@ -194,6 +194,28 @@ describe('missingPackedCapabilityArtifacts — 能力深入口产物断言核（
 
   it('边界：清单为空 → 空清单，不误报（未消费能力面时不造断言）', () => {
     expect(missingPackedCapabilityArtifacts([], () => false)).toEqual([])
+  })
+})
+
+describe('missingPackedCapabilityArtifacts — 装载链传递依赖断言核（上游 b397e0e 同步）', () => {
+  it('正常：解包树内 3 项链上产物全存在 → 空清单（复用同一判定核，不另写一份）', () => {
+    expect(missingPackedCapabilityArtifacts(CHAIN_REQUIRED_ARTIFACTS, () => true)).toEqual([])
+  })
+
+  it('异常：缺 MediaFingerprint.js → 清单点名（row-mappers.js 装载即 ERR_MODULE_NOT_FOUND）', () => {
+    const missing = missingPackedCapabilityArtifacts(
+      CHAIN_REQUIRED_ARTIFACTS,
+      (relative) => !relative.includes('MediaFingerprint.js')
+    )
+    expect(missing).toHaveLength(1)
+    expect(missing[0]).toContain('MediaFingerprint.js')
+  })
+
+  it('边界：链上清单与能力清单不重叠（同一产物不被两张表重复点名）', () => {
+    const overlap = CHAIN_REQUIRED_ARTIFACTS.filter((item) =>
+      NIKKISYNC_CAPABILITY_ARTIFACTS.includes(item)
+    )
+    expect(overlap).toEqual([])
   })
 })
 

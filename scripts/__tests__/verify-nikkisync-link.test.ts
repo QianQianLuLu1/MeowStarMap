@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import path from 'node:path'
 
 import {
+  CHAIN_REQUIRED_ARTIFACTS,
   NIKKISYNC_CAPABILITY_ARTIFACTS,
   NIKKISYNC_PACKAGE_NAMES,
   collectOutOfRepoSpecs,
@@ -28,6 +29,7 @@ const PACKED_CHECK = 'packed app.asar.unpacked ships @nikkisync/database migrati
 const SYNC_SERVER_CHECK = '@nikkisync/pc-companion ships the local sync server artifacts'
 const METADATA_CHECK = '@nikkisync/pc-companion ships the metadata resolver artifacts'
 const CAPABILITY_CHECK = '@nikkisync/pc-companion ships the capability deep-entry artifacts'
+const CHAIN_CHECK = '@nikkisync/pc-companion ships the load-chain static dependency artifacts'
 const DISCOVER_CHECK = 'a NikkiSync checkout is discoverable for linking'
 
 /** 全部事实成立（默认按"已链接 + 产物齐"取满值）。 */
@@ -183,6 +185,45 @@ describe('evaluateNikkiSyncLink', () => {
     expect(failing(checks)).toEqual([])
   })
 
+  it('异常：已链接但缺装载链传递依赖时硬阻断并点名文件（上游 b397e0e 同步）', () => {
+    const checks = evaluateNikkiSyncLink(
+      facts({ chainArtifactsMissing: ['dist\\src\\server\\MediaFingerprint.js'] })
+    )
+    expect(failing(checks)).toContain(CHAIN_CHECK)
+    const detail = find(checks, CHAIN_CHECK)?.detail
+    expect(detail).toContain('MediaFingerprint.js')
+    expect(detail).toContain('npm run build')
+  })
+
+  it('正常：装载链传递依赖齐备时该检查通过并点名清单（上游 b397e0e 同步）', () => {
+    const checks = evaluateNikkiSyncLink(facts({ chainArtifactsMissing: [] }))
+    expect(failing(checks)).toEqual([])
+    expect(find(checks, CHAIN_CHECK)?.ok).toBe(true)
+    expect(find(checks, CHAIN_CHECK)?.detail).toContain('present:')
+  })
+
+  it('边界：装载链事实字段缺省时整条检查缺席（不凭空造断言）', () => {
+    const checks = evaluateNikkiSyncLink(facts())
+    expect(find(checks, CHAIN_CHECK)).toBeUndefined()
+  })
+
+  it('边界：未链接时装载链检查即便有缺件也降为 warn 的 skipped，不阻断（受支持默认态）', () => {
+    const checks = evaluateNikkiSyncLink(
+      facts({
+        installedLinks: [],
+        builtArtifacts: [],
+        linkTargets: [],
+        migrationSqlPresent: false,
+        chainArtifactsMissing: ['dist\\src\\server\\MediaFingerprint.js']
+      })
+    )
+    const chain = find(checks, CHAIN_CHECK)
+    expect(chain?.ok).toBe(true)
+    expect(chain?.level).toBe('warn')
+    expect(chain?.detail).toContain('skipped')
+    expect(failing(checks)).toEqual([])
+  })
+
   it('边界：半链接（部分包缺失）只告警，不阻断', () => {
     const checks = evaluateNikkiSyncLink(
       facts({ installedLinks: ['@nikkisync/core'], builtArtifacts: ['@nikkisync/core'] })
@@ -271,6 +312,20 @@ describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步
       path.join('dist', 'src', 'metadata', 'MetadataOnlineConsent.js'),
       path.join('dist', 'src', 'server', 'LanAddress.js'),
       path.join('dist', 'src', 'server', 'GameVersionCalendar.js')
+    ])
+  })
+})
+
+describe('CHAIN_REQUIRED_ARTIFACTS 结构契约（上游 b397e0e 同步）', () => {
+  it('恰好 3 个本轮被静态 import 推入本仓装载链的上游新模块，逐项钉死', () => {
+    // 判据「被静态 import 且已在本仓装载链上」，逐条对应实测 import 边：
+    //   row-mappers.js:3 -> ./MediaFingerprint.js（本仓深入口 ROW_MAPPER_DEEP_ENTRY 的依赖）
+    //   LocalSyncServer.js -> ./AccountSyncSettings.js（该文件已闸门，此依赖原先无人点名）
+    //   runtime.js -> ./organizer/NativeMediaOperations.js（在桶导出 index.js 的闭包内）
+    expect(CHAIN_REQUIRED_ARTIFACTS).toEqual([
+      path.join('dist', 'src', 'server', 'MediaFingerprint.js'),
+      path.join('dist', 'src', 'server', 'AccountSyncSettings.js'),
+      path.join('dist', 'src', 'organizer', 'NativeMediaOperations.js')
     ])
   })
 })
