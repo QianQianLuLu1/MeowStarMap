@@ -399,13 +399,35 @@ suite('K3：游戏版本日历深入口的实测边界（真实产物，无出�
   it('静态表推断：边界日/未来/早于 1.0/undefined/非法输入都按上游口径', async () => {
     const surface = await loadRuntimeSurface(projectRoot)
     const infer = surface.gameVersionCalendar.inferInfinityNikkiGameVersion
-    // 实测表（b422193）：1.4=2025-03-26T03:00Z、1.5=2025-04-29T03:00Z、
-    // 1.0=2024-12-05T02:00Z、最新 2.10=2026-09-24T03:00Z
+    // 历史边界按字面钉住（原实测表 b422193：1.4=2025-03-26T03:00Z、1.5=2025-04-29T03:00Z、
+    // 1.0=2024-12-05T02:00Z）——已生效的边界不随上游发版变化。
+    // 「最新项」自锚点 b397e0e（v1.0.27-public-beta.1，新增 tentative 的 2.11 行）起改为从产物表派生，
+    // 不再硬编码版本常量：上游日历是随发版增长的数据表，钉常量会让每一次同步必红一次。
     expect(infer('2025-04-01T00:00:00.000Z')).toBe('1.4')
     expect(infer('2025-03-26T03:00:00.000Z')).toBe('1.4')
     expect(infer('2025-03-26T02:59:59.999Z')).toBe('1.3')
     expect(infer('2024-12-04T00:00:00.000Z')).toBeUndefined()
-    expect(infer('2027-01-01T00:00:00.000Z')).toBe('2.10')
+    const releases = surface.gameVersionCalendar
+      .getGameVersionReleases()
+      .filter(
+        (row): row is { version: string; effectiveAt: string } =>
+          typeof (row as { version?: unknown; effectiveAt?: unknown }).version === 'string' &&
+          typeof (row as { version?: unknown; effectiveAt?: unknown }).effectiveAt === 'string'
+      )
+    expect(releases.length).toBeGreaterThan(0)
+    const stamps = releases.map((row) => Date.parse(row.effectiveAt))
+    // 上游 infer 靠「按数组顺序首个命中」工作，降序本身即装载契约的一部分；
+    // 出现非有限时间戳说明表形态与已装载产物不符 ⇒ 显式红，不静默回退
+    expect(stamps.every((stamp) => Number.isFinite(stamp))).toBe(true)
+    expect(stamps).toEqual([...stamps].sort((a, b) => b - a))
+    const newest = releases.reduce((earlier, later) =>
+      Date.parse(later.effectiveAt) > Date.parse(earlier.effectiveAt) ? later : earlier
+    )
+    // 未来时刻取「最新行生效之后 1 秒」而不是固定年份：上游再加版本也不会重新变红。
+    // 更不可取「当下时刻」——tentative 行的 uncertainFrom..effectiveAt 区间内上游返回 undefined。
+    expect(infer(new Date(Date.parse(newest.effectiveAt) + 1000).toISOString())).toBe(
+      newest.version
+    )
     expect(infer(undefined)).toBeUndefined()
     // 非法输入不抛错：上游判缺省（纯查询无副作用）
     expect(infer('not-a-date')).toBeUndefined()
