@@ -214,6 +214,7 @@ MeowStarMap/
 │   │   │   ├── layout/             # 布局组件（AppShell/Sidebar/TitleBar）
 │   │   │   ├── resonance/          # 共鸣录视图组件（2.5.0）
 │   │   │   ├── scanner/            # 扫描进度组件
+│   │   │   ├── sync/               # 同步配对与分享卡对话框（PairingQrDialog / ShareCardDialog）
 │   │   │   └── video/              # 视频播放器
 │   │   ├── pages/             # 页面组件
 │   │   │   ├── GalleryPage.tsx     # 图库主页
@@ -225,7 +226,8 @@ MeowStarMap/
 │   │   │   ├── RecycleBinPage.tsx  # 回收站
 │   │   │   ├── OutfitGalleryPage.tsx # 套装图鉴页
 │   │   │   ├── ResonanceRecordsPage.tsx # 共鸣录（2.5.0）
-│   │   │   └── settings/           # 设置页各分块
+│   │   │   ├── settings/           # 设置页各分块
+│   │   └── sync-gallery/       # 同步图库（SyncGalleryPage / SyncServicePage / 工具栏与资产抽屉）
 │   │   ├── hooks/             # 自定义 React Hooks
 │   │   ├── stores/            # Zustand 状态管理
 │   │   ├── i18n/              # 国际化（12 种语言）
@@ -246,7 +248,8 @@ MeowStarMap/
 │   │   └── scene-category.ts  # 场景分类定义
 │   │
 ├── resources/                 # 应用资源
-│   ├── icons/                 # 应用图标（.ico/.svg）
+│   ├── icons/                 # 应用图标（icon.ico + icon-master.png；后者是唯一真相源，无 .svg）
+│   ├── nikkisync/             # recycle-helper.cs——K8 整理队列的 Windows 回收站链路，由 build:recycle-helper 编译
 │   └── nuan5_decryption.dll   # 游戏内照片参数解密库
 │
 ├── scripts/                   # 辅助脚本
@@ -537,7 +540,20 @@ npm run format:check
 npm test
 ```
 
-四项全绿才可提交。
+上述四项是 `npm run verify` 的组成部分。**日常变更后只跑一条命令**：
+
+```bash
+npm run verify
+```
+
+它是**只读**检查集（`tsc -b` + 不带 `--fix` 的 eslint + `prettier --check` + 核心路径授权闸门 + 相关单测），
+不会替你改写文件。提交时 `.husky/pre-commit` 会再查一遍，但**它会改写文件**（`eslint --fix` 与
+`prettier --write` 改写后重新暂存），所以「verify 通过」不等于「提交时文件内容不变」——提交后用
+`git status --porcelain` 复核钩子留下的改动。两侧分工与逐项差异见 `AGENTS.md` 的「verify 与 pre-commit 闸门的差异」，
+规约本体在 `docs/CODING_CONVENTIONS.md` 的「校验与提交」。
+
+全量 `npm run lint`、`npm run typecheck`、`npm run typecheck:e2e`、`npm run i18n:guard` 与完整 `npm test`
+由 CI 的 `lint-typecheck` / `test` / `coverage` job 强制，本地闸门只做增量。
 
 ---
 

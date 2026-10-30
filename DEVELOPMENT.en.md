@@ -213,6 +213,7 @@ MeowStarMap/
 │   │   │   ├── layout/             # Layout (AppShell/Sidebar/TitleBar)
 │   │   │   ├── resonance/          # Resonance Records view components (2.5.0)
 │   │   │   ├── scanner/            # Scan progress components
+│   │   │   ├── sync/               # Sync pairing and share-card dialogs (PairingQrDialog / ShareCardDialog)
 │   │   │   └── video/              # Video player
 │   │   ├── pages/             # Page components
 │   │   │   ├── GalleryPage.tsx     # Gallery home
@@ -224,7 +225,8 @@ MeowStarMap/
 │   │   │   ├── RecycleBinPage.tsx  # Recycle bin
 │   │   │   ├── OutfitGalleryPage.tsx # Outfit gallery
 │   │   │   ├── ResonanceRecordsPage.tsx # Resonance Records (2.5.0)
-│   │   │   └── settings/           # Settings sub-sections
+│   │   │   ├── settings/           # Settings sub-sections
+│   │   └── sync-gallery/       # Sync gallery (SyncGalleryPage / SyncServicePage / toolbar and asset drawer)
 │   │   ├── hooks/             # Custom React Hooks
 │   │   ├── stores/            # Zustand state management
 │   │   ├── i18n/              # Internationalization (12 languages)
@@ -245,7 +247,8 @@ MeowStarMap/
 │   │   └── scene-category.ts  # Scene category definitions
 │   │
 ├── resources/                 # App resources
-│   ├── icons/                 # App icons (.ico/.svg)
+│   ├── icons/                 # App icons (icon.ico + icon-master.png; the PNG is the single source of truth — no .svg)
+│   ├── nikkisync/             # recycle-helper.cs — Windows recycle-bin path for the K8 tidy queue, compiled by build:recycle-helper
 │   └── nuan5_decryption.dll   # In-game photo parameter decryption library
 │
 ├── scripts/                   # Helper scripts
@@ -537,7 +540,22 @@ npm run format:check
 npm test
 ```
 
-All four must pass before commit.
+The four checks above are what `npm run verify` composes. **After a change, run one command**:
+
+```bash
+npm run verify
+```
+
+It is a **read-only** check set (`tsc -b` + eslint without `--fix` + `prettier --check` + the core-path
+authorization gate + related unit tests) and never rewrites your files. `.husky/pre-commit` checks again at
+commit time, but **it does rewrite files** (`eslint --fix` and `prettier --write`, then re-stages them), so
+"verify passed" does not mean "file contents unchanged at commit" — re-check with `git status --porcelain`
+afterwards. The division of labor and item-by-item differences are in `AGENTS.md` under
+"verify vs. the pre-commit gate"; the rules themselves live in `docs/CODING_CONVENTIONS.md` under
+"Validation and committing".
+
+Full `npm run lint`, `npm run typecheck`, `npm run typecheck:e2e`, `npm run i18n:guard` and the complete
+`npm test` are enforced by CI's `lint-typecheck` / `test` / `coverage` jobs; local gates only check increments.
 
 ---
 
