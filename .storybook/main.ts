@@ -8,7 +8,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 /**
  * Storybook 主配置（阶段 1 基础设施）
  *
- * - stories：渲染层组件故事 + docs/storybook 下的 MDX 文档（目录暂不存在，glob 为空即可）
+ * - stories：渲染层组件故事 + docs/storybook 下的 MDX 文档（现存 3 份：accessibility / design-tokens / electron-api-mock）
  * - framework：@storybook/react-vite（与项目 Vite 5 构建链同源）
  * - autodocs：默认对所有故事生成文档页
  */

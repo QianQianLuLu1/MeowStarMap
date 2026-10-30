@@ -1,6 +1,11 @@
 # 阶段 4 计划：HTTPS 同步服务器 + WebSocket（NikkiSync 协议 v1）
 
 > 状态：执行中。前置：阶段 3（认证/配对/TLS）已验收（commit 774e70d）。
+> **订正（2026-10-30）**：上一行的「执行中」是当时规划快照，不可当现状读。阶段 4 已验收
+> （`05-ui-scanner-integration-plan.md` 首部记 commit `015150b`）；代码侧 `src/main/sync/server/` 存在、
+> 由 `initSyncServer()` 装配，但**默认不再自启**——见 `src/main/app/sync-server-setup.ts` 的
+> `PORTED_SYNC_AUTOSTART_ENABLED = false`（该常量刻意保留而不删整段逻辑，回滚只需翻转它）。
+> 本目录各文件首部的状态字段以 `README.md` 表 2 为唯一对账处。
 > 目标：在 WXNN XiangCe 主进程启动 HTTPS 服务器，实现协议 v1 全部 API 端点与 WebSocket 事件推送。
 
 ## 1. 依赖声明（先检查已有依赖）

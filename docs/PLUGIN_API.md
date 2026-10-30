@@ -1,6 +1,9 @@
 # 喵星图 插件开发 API 文档
 
-> 版本：v1.0 ｜ 对应 NikkiGallery v2.3.0+（经核对在 v2.5.0 仍然有效）｜ 核心框架：[pluggable-electron](https://github.com/dutchigor/pluggable-electron) v1.0.0
+> 版本：v1.0 ｜ 对应 NikkiGallery v2.3.0+（该发布名是 2026-10-23 更名**前**的产品名，项目现为 meow-star-map / 喵星图，当前版本 2.5.6-beta；本文件经核对在 v2.5.0 仍然有效）｜ 核心框架：[pluggable-electron](https://github.com/dutchigor/pluggable-electron) v1.0.0
+>
+> 更名只改产品名与产物名，**插件清单的磁盘键名、目录名与 IPC 通道名一律保持不变**（字段位见 §2.1 插件包格式
+> 与 §9 权限清单），所以旧插件在新版本下仍按原键解析、无需重新发布。
 
 本文档面向喵星图插件开发者，描述插件包格式、生命周期、可用的 API 与扩展点。
 
