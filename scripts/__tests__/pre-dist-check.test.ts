@@ -15,7 +15,12 @@ import {
   resolveVerifyAsarTarget,
   type JsTreeFile
 } from '../pre-dist-check'
-import { CHAIN_REQUIRED_ARTIFACTS, NIKKISYNC_CAPABILITY_ARTIFACTS } from '../verify-nikkisync-link'
+import {
+  CHAIN_REQUIRED_ARTIFACTS,
+  METADATA_REQUIRED_ARTIFACTS,
+  NIKKISYNC_CAPABILITY_ARTIFACTS,
+  SYNC_SERVER_REQUIRED_ARTIFACTS
+} from '../verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..', '..')
@@ -410,5 +415,45 @@ describe('台账是禁串清单的唯一出处（闸门自身不得自带旧名�
     expect(
       banned.filter((s) => s.startsWith(`github.com/${ledger.artifactBanned?.owner}/`)).length
     ).toBe((ledger.patterns ?? []).length)
+  })
+})
+
+// ===== 打包态产物清单覆盖面（M3）=====
+// 回归背景：开发态 verify:nikkisync 对 SYNC_SERVER/METADATA/CAPABILITY/CHAIN 四组清单逐一
+// fs.existsSync，打包态 pre-dist-check 却把同步服务器两项硬编码、METADATA 直接漏掉 —— 同一张
+// 真相源在两种宿主下覆盖面漂移。缺件只会在运行期 ERR_MODULE_NOT_FOUND，闸门先红才拦得住。
+// 前两条是「接线契约」：读真实 pre-dist-check.ts 源码文本断言它确已复用两组清单（纯函数核对任意
+// 清单恒绿，证明不了接线发生，故必须锚源码）；第三条验行为：缺件时两组各自点名。
+describe('打包态产物清单覆盖面：SYNC_SERVER + METADATA 两组复用同一真相源（M3）', () => {
+  const pdcSource = readFileSync(path.join(ROOT, 'scripts', 'pre-dist-check.ts'), 'utf-8')
+
+  it('接线契约：pre-dist-check.ts 须对 SYNC_SERVER 清单做打包态断言（修复前必红）', () => {
+    expect(pdcSource).toMatch(/missingPackedCapabilityArtifacts\(\s*SYNC_SERVER_REQUIRED_ARTIFACTS/)
+  })
+
+  it('接线契约：pre-dist-check.ts 须对 METADATA 清单做打包态断言（修复前必红）', () => {
+    expect(pdcSource).toMatch(/missingPackedCapabilityArtifacts\(\s*METADATA_REQUIRED_ARTIFACTS/)
+  })
+
+  it('单一真相源：两组常量须从 verify-nikkisync-link import，不得本地硬编码（修复前必红）', () => {
+    const importBlock = pdcSource.match(/import\s*\{[^}]*\}\s*from\s*'\.\/verify-nikkisync-link'/s)
+    expect(importBlock, '前置：须存在从 verify-nikkisync-link 的 import').not.toBeNull()
+    expect(importBlock?.[0]).toContain('SYNC_SERVER_REQUIRED_ARTIFACTS')
+    expect(importBlock?.[0]).toContain('METADATA_REQUIRED_ARTIFACTS')
+  })
+
+  it('行为：虚拟解包树缺 GalleryRuntime.mjs / Nuan5CompatibleResolver.js 时两组各自点名缺项', () => {
+    const serverMissing = missingPackedCapabilityArtifacts(
+      SYNC_SERVER_REQUIRED_ARTIFACTS,
+      (relative) => !relative.includes('GalleryRuntime.mjs')
+    )
+    expect(serverMissing).toHaveLength(1)
+    expect(serverMissing[0]).toContain('GalleryRuntime.mjs')
+    const metaMissing = missingPackedCapabilityArtifacts(
+      METADATA_REQUIRED_ARTIFACTS,
+      (relative) => !relative.includes('Nuan5CompatibleResolver.js')
+    )
+    expect(metaMissing).toHaveLength(1)
+    expect(metaMissing[0]).toContain('Nuan5CompatibleResolver.js')
   })
 })

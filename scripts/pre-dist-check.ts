@@ -11,7 +11,12 @@ import * as path from 'path'
 import { execSync } from 'child_process'
 import { fileURLToPath } from 'url'
 
-import { CHAIN_REQUIRED_ARTIFACTS, NIKKISYNC_CAPABILITY_ARTIFACTS } from './verify-nikkisync-link'
+import {
+  CHAIN_REQUIRED_ARTIFACTS,
+  METADATA_REQUIRED_ARTIFACTS,
+  NIKKISYNC_CAPABILITY_ARTIFACTS,
+  SYNC_SERVER_REQUIRED_ARTIFACTS
+} from './verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -732,28 +737,53 @@ function checkUnpackedNativeBinaries(): void {
         path.relative(ROOT, rowMappers)
     )
 
-  // 阶段 3：同步服务器（nikkisync:start-server）依赖的两个产物。
-  // 其中 wechat/GalleryRuntime.mjs 由 esbuild 步骤生成、被上游 gitignore，
-  // `tsc` 单跑不会产出它 —— 缺它则 LocalSyncServer 装载即失败，只有产物级断言能拦住。
-  const syncArtifacts: Array<[string, string]> = [
-    ['dist/src/server/LocalSyncServer.js', '同步服务器本体'],
-    ['dist/src/wechat/GalleryRuntime.mjs', 'LocalSyncServer 的静态依赖（esbuild 产物）']
-  ]
-  for (const [relative, purpose] of syncArtifacts) {
-    const target = path.join(nikkisyncRoot, 'pc-companion', ...relative.split('/'))
-    if (fs.existsSync(target)) pass(`@nikkisync/pc-companion ${relative} 已解包（${purpose}）`)
-    else
+  const pcCompanionRoot = path.join(nikkisyncRoot, 'pc-companion')
+
+  // 阶段 3：同步服务器（nikkisync:start-server）依赖的产物。清单与开发态 verify:nikkisync 共用
+  // SYNC_SERVER_REQUIRED_ARTIFACTS，判定核复用 missingPackedCapabilityArtifacts（两侧不得各自抄录）。
+  // 其中 wechat/GalleryRuntime.mjs 由 esbuild 步骤生成、被上游 gitignore，`tsc` 单跑不会产出它 ——
+  // 缺它则 LocalSyncServer 装载即失败，只有产物级断言能拦住。
+  const syncServerMissing = missingPackedCapabilityArtifacts(
+    SYNC_SERVER_REQUIRED_ARTIFACTS,
+    (relative) => fs.existsSync(path.join(pcCompanionRoot, relative))
+  )
+  if (syncServerMissing.length === 0) {
+    pass(
+      `@nikkisync/pc-companion 同步服务器产物 ${SYNC_SERVER_REQUIRED_ARTIFACTS.length} 项已全部解包`
+    )
+  } else {
+    for (const relative of syncServerMissing) {
       fail(
-        `@nikkisync/pc-companion 缺 ${relative}（${purpose}；局域网同步服务将无法启动，` +
-          `修复：在 NikkiSync 跑完整 npm run build 后重新打包）: ` +
-          path.relative(ROOT, target)
+        `@nikkisync/pc-companion 缺同步服务器产物 ${relative}` +
+          '（局域网同步服务将无法启动；在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
+          path.relative(ROOT, path.join(pcCompanionRoot, relative))
       )
+    }
+  }
+
+  // 阶段 6：元数据解析依赖的深入口产物（不在上游桶导出内，NIKKISYNC_REQUIRED_EXPORTS 探针管不到，
+  // 只能由产物存在性断言承担）。清单与开发态共用 METADATA_REQUIRED_ARTIFACTS，判定核同上。
+  const metadataMissing = missingPackedCapabilityArtifacts(
+    METADATA_REQUIRED_ARTIFACTS,
+    (relative) => fs.existsSync(path.join(pcCompanionRoot, relative))
+  )
+  if (metadataMissing.length === 0) {
+    pass(
+      `@nikkisync/pc-companion 元数据解析深入口产物 ${METADATA_REQUIRED_ARTIFACTS.length} 项已全部解包`
+    )
+  } else {
+    for (const relative of metadataMissing) {
+      fail(
+        `@nikkisync/pc-companion 缺元数据解析产物 ${relative}` +
+          '（元数据解析将 ERR_MODULE_NOT_FOUND；在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
+          path.relative(ROOT, path.join(pcCompanionRoot, relative))
+      )
+    }
   }
 
   // 兼容层 C2-3：能力层节点将消费的 7 个深入口产物（清单与 verify:nikkisync 共用，
   // 见 NIKKISYNC_CAPABILITY_ARTIFACTS）。缺件 ⇒ 对应能力节点装载期 ERR_MODULE_NOT_FOUND；
   // 已随包就逐项放行，缺任一即 fail 并点名（缺失清单经纯函数核判定，供单测虚拟化解包树）。
-  const pcCompanionRoot = path.join(nikkisyncRoot, 'pc-companion')
   const capabilityMissing = missingPackedCapabilityArtifacts(
     NIKKISYNC_CAPABILITY_ARTIFACTS,
     (relative) => fs.existsSync(path.join(pcCompanionRoot, relative))
