@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-29",
+  "updatedAt": "2026-10-30",
   "items": [
     {
       "id": "DEBT-001",
@@ -538,6 +538,30 @@
         "src/main/scanner/AGENTS.md"
       ],
       "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-042",
+      "category": "robustness",
+      "section": 17,
+      "status": "open",
+      "priority": "low",
+      "title": "委托层路径裁剪的浅拷贝会把 Date/Map/Set/类实例展开成空对象 {}",
+      "description": "2026-10-30 全面审查发现：`src/main/nikkisync/runtime-manager.ts` 的 `stripAssetPathFields` 对任意对象走 `{...value}` 浅拷贝 + `Object.keys` 递归，遇到非纯对象（Date/Map/Set/类实例，其可枚举自有属性为空）会被静默展开成 `{}`，丢弃数据。node 内存复现确认 Date/Map/Set 均变 `{}`。当前不触发：上游 DTO 各键都经 `String()`/`Number()` 包裹（`row-mappers.js:47-146`）、metadata 经 JSON.parse，载荷里不存在这类值（函数注释已自陈『是依赖不是新风险』）。触发条件：上游若把某字段改成 Date/Map/Set/类实例。修法/撤销条件：递归前用 `Object.prototype.toString.call(value) !== '[object Object]'` 判定非纯对象即原样透传并打 warn 日志，禁止静默丢数据。属未来上游演进假设，本轮按最小化只登记不改码。",
+      "files": ["src/main/nikkisync/runtime-manager.ts"],
+      "lines": [824],
+      "issue": false
+    },
+    {
+      "id": "DEBT-043",
+      "category": "robustness",
+      "section": 17,
+      "status": "open",
+      "priority": "low",
+      "title": "委托层路径裁剪的浅拷贝触发 getter 求值、且 Object.keys 不遍历 Symbol 键",
+      "description": "2026-10-30 全面审查发现：`src/main/nikkisync/runtime-manager.ts` 的 `stripAssetPathFields` 用 `{...value}` 展开会触发对象 getter 求值（node 复现 getterCalls=1，属意外副作用）；且递归只走 `Object.keys`，不遍历以 Symbol 为键的属性——若绝对路径藏在 Symbol 键的值里则残留。当前不触发：上游 DTO 无 getter、无 Symbol 键，且跨 IPC 的结构化克隆本就不支持 Symbol 键。触发条件：上游 DTO 引入 getter 或 Symbol 键承载敏感字段。修法/撤销条件：需要严防时用 `Reflect.ownKeys` 配合属性描述符判断是否递归，避免求值 getter。属未来上游演进假设，本轮按最小化只登记不改码。",
+      "files": ["src/main/nikkisync/runtime-manager.ts"],
+      "lines": [824, 828],
       "issue": false
     }
   ]
