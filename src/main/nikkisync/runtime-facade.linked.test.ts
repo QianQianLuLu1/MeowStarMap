@@ -480,9 +480,12 @@ suite('K3：游戏版本日历深入口的实测边界（真实产物，无出�
   })
 
   it('会话面 resolveGameVersion：版本与生效时间成对给出，未知时刻两键缺省', async () => {
+    // 库文件直接落在 os.tmpdir() 下而不是 fixtureRoot 里 ⇒ 文件级 afterAll 的 rmSync 扫不到它。
+    // 装置轴 7（node:sqlite）打通之后这一支才真能建库，每轮会留一个 180KB 的 .db，所以本用例自己收。
+    const databaseFile = path.join(os.tmpdir(), `nikkisync-k3-${Date.now()}.db`)
     const session = await createRuntimeSession(
       {
-        databaseFile: path.join(os.tmpdir(), `nikkisync-k3-${Date.now()}.db`),
+        databaseFile,
         watcher: false,
         projectRoot
       },
@@ -497,6 +500,7 @@ suite('K3：游戏版本日历深入口的实测边界（真实产物，无出�
       expect('effectiveAt' in miss).toBe(false)
     } finally {
       session.dispose()
+      fs.rmSync(databaseFile, { force: true, maxRetries: 10, retryDelay: 300 })
     }
   })
 })
