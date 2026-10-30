@@ -10,7 +10,8 @@
  * 测试策略：**不 mock fluent-ffmpeg**（必须让真实的 processor.js / capabilities.js /
  * async@0.2.10 参与）。fluent-ffmpeg 是外部化 CJS 模块，其顶层
  * `var spawn = require('child_process').spawn` 在模块求值时捕获引用，vi.mock 无法拦截，
- * 故直接补丁 node 内置 child_process 单例的 spawn 属性，并保证补丁先于 fluent-ffmpeg
+ * 故直接补丁 node 内置 child_process 单例的 spawn 属性（取法用 createRequire：装置态下
+ * 静态 import 拿到的是轴 8 的副本，补在副本上拦不到外部化消费者），并保证补丁先于 fluent-ffmpeg
  * 首次加载（所有相关模块一律动态 import）。补丁行为由 ctl.mode 控制：
  * - 'ok'    ：返回可发射 stdout/stderr/exit 事件的假子进程（正常路径）
  * - 'EFTYPE'：同步抛出 EFTYPE 错误（复现现场损坏二进制）
@@ -22,7 +23,19 @@
 
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { EventEmitter } from 'events'
-import childProcess from 'child_process'
+import { createRequire } from 'module'
+
+/**
+ * 打桩对象必须是**真内置单例**，不能是 `import childProcess from 'child_process'`：
+ * 装置（`npm run test:ci-linux`）的轴 8 交给测试图的是真命名空间的**副本**，而 fluent-ffmpeg
+ * 作为外部化 CJS，顶层捕获的引用来自真单例那一份 ⇒ 桩打在副本上等于没打（实测真 spawn 被调用，
+ * `/fake/ffmpeg.exe` 给异步 ENOENT 而不是这里要的同步 EFTYPE）。`vi.mock` 拦不到 createRequire
+ * （与 `tests/ci-linux.setup.ts` 对 `os` 的处理同一套），所以取到的正是外部化消费者那一份。
+ * 真宿主与 CI 上两者本是同一个对象，因此这一改动只影响装置态。
+ */
+const childProcess = createRequire(import.meta.url)(
+  'child_process'
+) as typeof import('child_process')
 
 // ---- 共享控制态 ----
 const ctl = {

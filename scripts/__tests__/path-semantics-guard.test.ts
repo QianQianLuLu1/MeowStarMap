@@ -96,6 +96,19 @@ const RIG_COMPOSING_FS_TESTS: string[] = [
   'src/main/scanner/__tests__/scan-traverse-timeout.test.ts'
 ]
 
+/**
+ * 靠给 node 内置 `child_process` 单例打桩来拦截**外部化 CJS** 的测试（fluent-ffmpeg 顶层
+ * `var spawn = require('child_process').spawn` 在模块求值时就捕获了引用）。装置轴 8 交给
+ * 测试图的是真命名空间的**副本**，桩打在副本上就拦不到外部化消费者——实测真 spawn 被调用，
+ * `/fake/ffmpeg.exe` 给的是异步 ENOENT 而不是设计要的同步 EFTYPE（第 5 轮 RC-9）。
+ * 真宿主与 CI 上只有一个身份，所以修法只能是「补真单例那一份」：
+ * `createRequire(import.meta.url)('child_process')`（`vi.mock` 拦不到 createRequire，同 `os` 轴）。
+ */
+const RIG_PATCHES_REAL_CHILD_PROCESS: string[] = [
+  'src/main/utils/fluent-ffmpeg-shim.test.ts',
+  'src/main/thumbnail/generator.eftype.test.ts'
+]
+
 /** 随宿主漂移即出错的语义调用；`extname` 两种方言结果相同，不在禁止之列 */
 const HOST_SEMANTIC = /\bpath\.(join|resolve|dirname|basename|sep|isAbsolute|relative|normalize)\b/
 
@@ -260,6 +273,22 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
       expect(source, `${rel} 必须自带 fs mock`).toContain("vi.mock('fs")
       expect(source, `${rel} 必须组合 ciLinuxFsLayer，否则拿到的是未翻译的真 fs`).toContain(
         'ciLinuxFsLayer'
+      )
+    }
+  })
+
+  it('装置轴 8：给内置 child_process 打桩的测试必须补真单例，不得命中轴的副本', () => {
+    for (const rel of RIG_PATCHES_REAL_CHILD_PROCESS) {
+      const source = stripComments(read(rel))
+      // 判据按形态匹配而不是逐字子串：prettier 会把这一调用折行
+      expect(
+        source,
+        `${rel} 必须经 createRequire 取真 child_process 单例再打桩（装置态下 import 拿到的是轴的副本）`
+      ).toMatch(/createRequire\(import\.meta\.url\)\(\s*'child_process'\s*\)/)
+      // 静态 import 在装置态拿到的是轴的包装副本，桩打上去拦不到外部化 CJS
+      // （解释这条约束的注释里会原样引用那行写法，所以只看代码体）
+      expect(source, `${rel} 不得再用静态 import childProcess 当打桩对象`).not.toContain(
+        "import childProcess from 'child_process'"
       )
     }
   })

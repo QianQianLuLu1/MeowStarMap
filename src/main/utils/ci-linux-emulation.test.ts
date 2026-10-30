@@ -257,6 +257,27 @@ describe('CI 宿主模拟装置自检', () => {
     }
   })
 
+  it.skipIf(!ACTIVE)(
+    '轴 8b：child_process 在装置态确实有两个身份（测试图拿副本、外部化 CJS 拿真单例）',
+    async () => {
+      // 这条钉的是「EFTYPE 两处补桩点为什么必须走 createRequire」。轴 8 的工厂返回真命名空间的
+      // 副本（./mocks/ci-linux-child-process 的 `{ ...ns }`），而外部化 CJS 在模块求值时捕获的是
+      // 真内置单例——真宿主与 CI 上两者是同一个对象，装置里不是。于是给 `import cp from
+      // 'child_process'` 的属性打桩，拦不到 fluent-ffmpeg 里的 spawn。
+      // 若哪天把轴改成就地改写真单例（一个身份），本例会红：那时两处补桩点要一起回退成静态
+      // import，不能让「补桩点」与「装置形态」各说一半。
+      const cpNs = (await import('node:child_process')) as unknown as {
+        default?: Record<string, unknown>
+      }
+      const mocked = (cpNs.default ?? cpNs) as Record<string, unknown>
+      const real = createRequire(import.meta.url)('child_process') as Record<string, unknown>
+      expect(real).not.toBe(mocked)
+      expect(real.spawn).not.toBe(mocked.spawn)
+      // 真单例本身没被装置改坏：它仍可当普通函数用（两处桩法都靠这个前提）
+      expect(typeof real.spawn).toBe('function')
+    }
+  )
+
   it('轴 5：electron 走惰性替身，单测不依赖二进制安装状态', async () => {
     // 这条在两种 profile 下都必须成立：CI 用 --ignore-scripts 装依赖时真 electron 会抛错，
     // 基座 vitest.config.ts 的 resolve.alias 就是把那 40 个文件从 CI 红灯里捞出来的手段。
