@@ -47,10 +47,15 @@ function isInsideWriteRoot(p: string): boolean {
 }
 
 // ---- os：钳到 1 核，使 DECODE_CONCURRENCY = 1 × 2 = 2 ----
+// 本文件自带的 vi.mock('os') 会遮蔽装置轴 3b（importOriginal 给回的是未 mock 的原形），
+// 所以必须把装置形态组合进来：否则 os.tmpdir() 在这里仍是真宿主值，而 TEMP/TMP 已被装置删除
+// ⇒ 回落到 Windows 兜底字面量，electron mock 拼出的 userData 会以反斜杠形态混进 posix 绑定。
 vi.mock('os', async (importOriginal) => {
   const actual = await importOriginal<typeof import('os')>()
+  const { ciLinuxOsOverrides } = await import('../../../tests/mocks/ci-linux-os')
   const oneCore = () => [0]
-  return { ...actual, default: { ...actual, cpus: oneCore }, cpus: oneCore }
+  const merged = { ...actual, ...ciLinuxOsOverrides(), cpus: oneCore }
+  return { ...merged, default: merged }
 })
 
 // ---- electron（仅提供 userData 路径） ----

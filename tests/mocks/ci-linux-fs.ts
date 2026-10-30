@@ -15,7 +15,6 @@
  *
  * 测试文件自带的 `vi.mock('fs')` / `vi.mock('fs/promises')` 优先级高于这里，互不影响。
  */
-import realOs from 'os'
 import nodePath from 'path'
 
 const WIN32 = nodePath.win32
@@ -30,9 +29,28 @@ export function setRealRoot(root: string): void {
   REAL_ROOT = root.replace(/[\\/]+$/, '')
 }
 
-const SANDBOX = WIN32.join(realOs.tmpdir(), 'wxnn-ci-linux')
-const REAL_TMP = WIN32.join(SANDBOX, 'tmp')
-const REAL_HOME = WIN32.join(SANDBOX, 'home-runner')
+/**
+ * 沙箱落点：由 setup 在**任何轴改写之前**注入真宿主的 tmpdir 与 null 设备。
+ * 本模块不得再 `import 'os'`——`os` 一旦被装置轴 mock，这里的取值会变成装置形态的 `/tmp`，
+ * 于是沙箱被搬到盘根（`WIN32.join('/tmp', …)` ⇒ `\tmp\wxnn-ci-linux`），整套翻译层失效。
+ * 与 `setRealRoot` 同一注入姿势。
+ */
+let SANDBOX = ''
+let REAL_TMP = ''
+let REAL_HOME = ''
+let REAL_DEV_NULL = ''
+
+export function setHostPaths(host: { tmp: string; devNull: string }): void {
+  SANDBOX = WIN32.join(host.tmp, 'wxnn-ci-linux')
+  REAL_TMP = WIN32.join(SANDBOX, 'tmp')
+  REAL_HOME = WIN32.join(SANDBOX, 'home-runner')
+  REAL_DEV_NULL = host.devNull
+}
+
+/** 供 marker 与自检用例读「沙箱真的建在真宿主 tmp 下」 */
+export function realSandbox(): string {
+  return SANDBOX
+}
 
 /** CI 工作区的两级祖先（`path.resolve(repoRoot, '..')` 这类用法在 CI 上真实存在） */
 const CI_WORKSPACE = CI_ROOT.slice(0, CI_ROOT.lastIndexOf('/'))
@@ -61,7 +79,7 @@ export function toReal(value: unknown): unknown {
   }
   if (p === CI_TMP) return REAL_TMP
   if (p.startsWith(`${CI_TMP}/`)) return WIN32.join(REAL_TMP, ...rest(p, CI_TMP))
-  if (p === '/dev/null') return realOs.devNull
+  if (p === '/dev/null') return REAL_DEV_NULL
   if (p === CI_HOME) return REAL_HOME
   if (p.startsWith(`${CI_HOME}/`)) return WIN32.join(REAL_HOME, ...rest(p, CI_HOME))
   return p

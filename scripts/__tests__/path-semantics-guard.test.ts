@@ -79,6 +79,13 @@ const HARNESS_TESTS: string[] = [
   'src/main/scanner/__tests__/scan-channels.win32-root.test.ts'
 ]
 
+/**
+ * 自带 `vi.mock('os')` 的测试文件：mock 遮蔽会让装置轴 3b 在这些文件里失效
+ * （`importOriginal()` 给回的是未 mock 的原形），必须显式组合 `ciLinuxOsOverrides()`。
+ * 不登记就会变成静默假信号——轴装着，这些文件却仍读真宿主 tmpdir。
+ */
+const RIG_COMPOSING_OS_TESTS: string[] = ['src/main/thumbnail/generator.limiter.test.ts']
+
 /** 随宿主漂移即出错的语义调用；`extname` 两种方言结果相同，不在禁止之列 */
 const HOST_SEMANTIC = /\bpath\.(join|resolve|dirname|basename|sep|isAbsolute|relative|normalize)\b/
 
@@ -200,6 +207,8 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
       "process, 'cwd'",
       'realOs.tmpdir = ',
       'realOs.homedir = ',
+      "vi.mock('os'",
+      "vi.mock('node:os'",
       "vi.mock('fs'",
       "vi.mock('url'"
     ]) {
@@ -215,6 +224,16 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
     const posixHostRig = read('vitest.posix-host.config.ts')
     expect(posixHostRig, '复现配置必须叠上 posix 宿主 setup').toContain('tests/posix-host.setup.ts')
     expect(pkg.scripts?.['test:posix-host']).toContain('vitest.posix-host.config.ts')
+  })
+
+  it('装置轴 3b：自带 vi.mock(os) 的测试必须组合装置形态，不得把轴遮蔽掉', () => {
+    for (const rel of RIG_COMPOSING_OS_TESTS) {
+      const source = read(rel)
+      expect(source, `${rel} 必须 mock 'os'`).toContain("vi.mock('os'")
+      expect(source, `${rel} 必须组合 ciLinuxOsOverrides，否则 os.tmpdir() 仍是真宿主值`).toContain(
+        'ciLinuxOsOverrides'
+      )
+    }
   })
 
   it('装置自检文件：哨兵不得拿 win32 形态常量当期望值，且自身不得被闸门挡住', () => {

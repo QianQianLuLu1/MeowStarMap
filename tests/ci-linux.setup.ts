@@ -12,6 +12,8 @@
  * 1. `path` / `node:path` 宿主绑定 → posix（工厂见 `./mocks/posix-host-path`）
  * 2. `process.platform` → `'linux'`，`os.EOL` → `'\n'`
  * 3. `process.cwd()` / `os.homedir()` / `os.tmpdir()` / `os.userInfo().homedir` → CI 上的真实形态
+ * 3b. `os` / `node:os` → `vi.mock`（工厂见 `./mocks/ci-linux-os`）：轴 3 的就地改写只治得到
+ *     default 导入，具名与命名空间导入拿的是 interop 快照 ⇒ 只有 mock 才能对所有形态成立
  * 4. `fs` / `fs/promises`：posix 假路径双向翻译到本机真实目录 + 复刻容器 `/` 不可写
  *    （实现见 `./mocks/ci-linux-fs`；必须走 `vi.mock`，就地改 `fs` 对象会被 vitest 的
  *    interop Proxy 绕过）
@@ -30,9 +32,16 @@
  * - 外置 CJS 依赖内部的 `require('fs')` 不经过第 4 轴（只有测试图里的 import 被 mock）。
  */
 import realFs from 'fs'
-import realOs from 'os'
+import { createRequire } from 'module'
 import { vi } from 'vitest'
-import { ensureSandbox, setRealRoot } from './mocks/ci-linux-fs'
+import { ensureSandbox, realSandbox, setHostPaths, setRealRoot } from './mocks/ci-linux-fs'
+
+/**
+ * 真 `os` 模块：必须经 `createRequire` 取，不能 `import 'os'`——本文件的 `vi.mock('os')` 会被
+ * vitest 提到顶部，import 拿到的就是被 mock 的形态，轴 3 的就地改写会落在 mock 对象上，
+ * 原生 `require('os')` 那条逃逸路径（`vi.mock` 拦不到）因此失去覆盖。
+ */
+const realOs = createRequire(import.meta.url)('os') as typeof import('os')
 
 /**
  * 本机真实仓库根：**只能**取自 `process.cwd()` 原样字符串。
@@ -43,6 +52,13 @@ import { ensureSandbox, setRealRoot } from './mocks/ci-linux-fs'
  */
 const realCwd = process.cwd()
 setRealRoot(realCwd)
+
+/**
+ * 沙箱基址与 null 设备：必须在改写 `os` 与删环境变量**之前**从真 `os` 取。
+ * 取晚了会拿到装置形态的 `/tmp`，沙箱就被 `WIN32.join('/tmp', …)` 搬到盘根去。
+ */
+const hostTmp = realOs.tmpdir()
+setHostPaths({ tmp: hostTmp, devNull: realOs.devNull })
 
 // ---------- 轴 2 / 3：宿主身份 ----------
 Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
@@ -89,6 +105,17 @@ vi.mock('node:path', async (importOriginal) => {
   return posixHost(importOriginal as () => Promise<unknown>)
 })
 
+// ---------- 轴 3b：os 的具名/命名空间导入形态 ----------
+// 轴 3 的就地改写只覆盖 default 导入；工厂同轴 1 走动态 import（被提升的 vi.mock 不能引用顶层绑定）
+vi.mock('os', async (importOriginal) => {
+  const { ciLinuxOsHost } = await import('./mocks/ci-linux-os')
+  return ciLinuxOsHost(importOriginal as () => Promise<unknown>)
+})
+vi.mock('node:os', async (importOriginal) => {
+  const { ciLinuxOsHost } = await import('./mocks/ci-linux-os')
+  return ciLinuxOsHost(importOriginal as () => Promise<unknown>)
+})
+
 // ---------- 轴 4：文件系统翻译 + 容器根不可写 ----------
 // 工厂必须逐条内联（同轴 1：被提升的 vi.mock 不能引用顶层绑定；写成循环也不会按预期展开）
 vi.mock('fs', async (importOriginal) => {
@@ -123,5 +150,8 @@ vi.mock('node:url', async (importOriginal) => {
 // 供装置自检用例（src/main/utils/ci-linux-emulation.test.ts）判定本轮是否真在模拟态下运行
 ;(globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation = {
   cwd: realCwd,
-  root: '/home/runner/work/MeowStarMap/MeowStarMap'
+  root: '/home/runner/work/MeowStarMap/MeowStarMap',
+  // 沙箱落点与它的宿主基址：自检用例据此判「os 被 mock 之后沙箱没被搬到盘根」
+  sandbox: realSandbox(),
+  hostTmp
 }

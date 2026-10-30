@@ -18,11 +18,13 @@ import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import fsp from 'fs/promises'
 import os from 'os'
+import { EOL as osEolNamed, homedir as osHomedirNamed, tmpdir as osTmpdirNamed } from 'node:os'
+import * as osNs from 'node:os'
 import nodePath from 'path'
 import { fileURLToPath } from 'url'
 
 const marker = (globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation as
-  { cwd: string; root: string } | undefined
+  { cwd: string; root: string; sandbox: string; hostTmp: string } | undefined
 const ACTIVE = marker !== undefined
 
 /**
@@ -56,6 +58,44 @@ describe('CI 宿主模拟装置自检', () => {
     expect(os.userInfo().homedir).toBe('/home/runner')
     expect(process.env.LOCALAPPDATA).toBeUndefined()
     expect(process.env.APPDATA).toBeUndefined()
+  })
+
+  it.skipIf(!ACTIVE)(
+    '轴 3b：具名与命名空间导入的 os 同样是 CI 取值（装置不得只治好 default 导入）',
+    () => {
+      // 判据落在「所有导入形态说同一句话」这条不变量上：轴 3 就地改写只覆盖 default 导入，
+      // 具名/命名空间导入拿的是 interop 快照，于是 os.tmpdir() 在装置里仍是真宿主值；又因为
+      // 装置删了 TEMP/TMP，它会回落到 Windows 兜底字面量，那条反斜杠串随后被 posix 绑定
+      // 当相对名拼到模拟仓库根之后 ⇒ 成片假红（第 4 轮的 RC-1）。
+      expect(osTmpdirNamed()).toBe('/tmp')
+      expect(osHomedirNamed()).toBe('/home/runner')
+      expect(osEolNamed).toBe('\n')
+      expect(osNs.tmpdir()).toBe('/tmp')
+      expect(osNs.homedir()).toBe('/home/runner')
+      expect(osNs.devNull).toBe('/dev/null')
+      expect(osNs.userInfo().homedir).toBe('/home/runner')
+      expect(osTmpdirNamed()).toBe(os.tmpdir())
+      expect(osNs.homedir()).toBe(os.homedir())
+    }
+  )
+
+  it.skipIf(!ACTIVE)(
+    '轴 3c：沙箱基址仍来自真宿主临时目录（os 被 mock 后不得把沙箱搬到盘根）',
+    () => {
+      // 与 tests/mocks/ci-linux-fs.ts 的 setHostPaths 同表达式，两侧宿主都能判：
+      // 若沙箱改由被 mock 的 os 求值，这里会得到 `\tmp\wxnn-ci-linux` 形态而当场红。
+      expect(marker!.sandbox).toBe(nodePath.win32.join(marker!.hostTmp, 'wxnn-ci-linux'))
+      expect(fs.existsSync(marker!.sandbox)).toBe(true)
+    }
+  )
+
+  it.skipIf(!ACTIVE)('轴 3d：/dev/null 经装置落到本机 null 设备', () => {
+    // 判据只能用「写进去不抛」：真宿主的 null 设备在 Windows 上是 `\\.\nul`，
+    // fs.existsSync 对它恒为 false（stat 打不开该设备），而打开与写入都成立；
+    // 换成 existsSync 会在 Windows 开发机上假红、在 Linux 上绿，正是要消灭的宿主漂移。
+    expect(() => fs.writeFileSync('/dev/null', 'probe', 'utf-8')).not.toThrow()
+    const handle = fs.openSync('/dev/null', 'w')
+    fs.closeSync(handle)
   })
 
   it.skipIf(!ACTIVE)('轴 4：posix 假路径可真的读写，且结果反向翻译回 posix 形态', () => {
