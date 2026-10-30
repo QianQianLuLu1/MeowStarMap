@@ -1,8 +1,7 @@
-// @core-change: 订正上一提交（f4823f5，inspect 路径白名单守卫）遗留的 get-pairing-code 头注释
-//               括号笔误——一句里两个闭括号、TTL 与单次消费被挤到括号外，易误读成格式说明。
-//               纯注释改动、零行为变更；守卫本体与其判据见该提交与 docs/IPC_CONTRACT.md §8.2.3。
-//               （历史：阶段2-4 建查询与服务面、K2 同意、K3 版本推断、K5 多 host、K6 五条目录、
-//               K7 诊断、K8 整理队列三通道——历次授权原因见各节点提交。）
+// @core-change: 订正 get-changes 头注释对 fullResyncRequired 判据的失真表述——上游 b397e0e 已给
+//               LocalSyncServer.listChanges 判据新增 after < accounts.revision() 一支，本仓刻意不跟随
+//               （runtime-facade.ts 单参构造 SyncReadRepository ⇒ 作用域恒 1=1，无 accounts.revision() 取值来源）。
+//               纯注释改动、零行为变更；判据本体与豁免理由见 docs/IPC_CONTRACT.md。
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -29,7 +28,9 @@ import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-a
  * 查询面扩容（阶段 4，为图库数据层切换而加；同样逐字转发上游仓储/索引，本文件不加工）：
  * - `nikkisync:get-resource-records`：一页资产一次往返取回全部资源，避免 500 次单查
  * - `nikkisync:get-changes`：`GET /v1/changes` 的本地等价调用，`fullResyncRequired`
- *   判据照抄上游 `LocalSyncServer.listChanges`（`after < minimum - 1`）
+ *   判据沿用上游 `LocalSyncServer.listChanges` 的 `after < minimum - 1` 一支；上游 b397e0e 另增
+ *   `after < accounts.revision()` 一支，本仓刻意不跟随（runtime-facade.ts 单参构造
+ *   SyncReadRepository ⇒ 作用域恒 1=1，无 accounts.revision() 取值来源）
  * - `nikkisync:search-suits` / `nikkisync:search-clothing`：转发上游 `SuitSearchIndex` /
  *   `ClothingSearchIndex`（两者与 `row-mappers` 一样是 `dist/src/server/**` 深入口）；
  *   `query` 原串下传（trim 归上游），但全空白在本层即拒——否则会为一个无意义查询
