@@ -121,7 +121,7 @@ git rm --cached docs/archive/plans/X.md
 | `docs/archive/plans/2026-10-23-rename-runtime-pass.md`（已归档，不入仓）                         | 「三、提交与红绿读数」                                | 1 次提交  |
 | `docs/archive/plans/2026-10-23-rename-ui-i18n-pass.md`（已归档，不入仓）                         | 「三、红绿读数」                                      | 2 次提交  |
 
-**一份从批准清单里剔除的**：`2026-10-24-fix-empty-recyclebin-system-trash.md` 由修复提交 `7d4459f` 同批新建（`--stat` 显示 101 行全新增，
+**一份从批准清单里剔除的**：`archive/2026-Q4/2026-10-24-fix-empty-recyclebin-system-trash.md` 由修复提交 `7d4459f` 同批新建（`--stat` 显示 101 行全新增，
 正文至今仍是 101 行 ⇒ 从未回填），标题结构里只有「5. 子任务分解 T0–T5 / 6. 测试用例矩阵 / 7. 明确不做」而**无执行记录节**，
 状态行是「已确认」而非「已执行」⇒ 不满足「执行记录已回填」这道前置门禁，本轮只补一行交付说明，不移档。
 
@@ -150,7 +150,7 @@ git rm --cached docs/archive/plans/X.md
   不加 `--include='*.ts'` 会把 `handlers/AGENTS.md` 数进去（44 而非 43）。
 - **通道计数正则必须含连字符**：`nikkisync:*` 域按 `docs/IPC_CONTRACT.md:383` 用 kebab-case 命名，
   用 `[a-zA-Z]+` 会得 0 并误判成「文档与代码脱节」。另注意区分 invoke 通道与推送事件，否则 28 会被当成 28 条通道，
-  而 `2026-10-25-nikkisync-upstream-sync-05-结案报告.md:227` 写的「实际注册 27 条」才是对的。
+  而 `archive/2026-Q4/2026-10-25-nikkisync-upstream-sync-05-结案报告.md:227` 写的「实际注册 27 条」才是对的。
 - **`docs/plans/2026-08-24-跨模块集成测试设计.md` 的「6 个拟新增套件」是错的，本文 §7 表格自己写「第 5 节 7 个」**：
   同一份文档内自相矛盾，实测点名 7 个路径全部未落地。它的「路径作用域」横幅还有个隐藏约束——
   `check-md-links.ts:158` 的 `SCOPE_DECLARATION` 要求同一物理行内出现「未落地」等标记词且只读前 12 行，

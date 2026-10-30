@@ -2,7 +2,7 @@
 
 > 生成日期：2026-10-29 · 本仓 `main` @ `c45e3f4`（`meow-star-map 2.5.6-beta`）
 > 上游锚点：**双锚点**（裁决 Q5）SHA `b397e0eb6ca1b4748f13a72f13bb1702a549410e` **且** tag `v1.0.27-public-beta.1`（同值）；基线 `b4221933be9714fde0c260b1f19bdaa6d1337fd3` = tag `v1.0.23-public-beta.1`
-> 真相源：[01 影响评估](2026-10-29-nikkisync-upstream-sync-01-影响评估.md)（下称「评估」）· `.qoder/rules/project-conventions.md` · `src/main/nikkisync/AGENTS.md` · `scripts/AGENTS.md` · `docs/IPC_CONTRACT.md`
+> 真相源：[01 影响评估](archive/2026-Q4/2026-10-29-nikkisync-upstream-sync-01-影响评估.md)（下称「评估」）· `.qoder/rules/project-conventions.md` · `src/main/nikkisync/AGENTS.md` · `scripts/AGENTS.md` · `docs/IPC_CONTRACT.md`
 > 落盘状态：本文于 2026-10-29 落盘于 `docs/plans/`（已检索确认无重名：该目录 35 个入仓文件，本轮此前仅 `-01-影响评估.md`），命名沿用上一轮系列 `01 评估 → 02 计划 → 03/04 执行记录 → 05 结案` 风格。**阶段二到此为止：未改任何业务代码、未做任何 git 提交**；§11 待确认清单 Q-a…Q-g 逐条裁决后，才按 §4 的节点顺序进入执行阶段。
 
 ---
@@ -130,7 +130,7 @@ npm run verify:nikkisync         # 期望 12 行 ✓/⚠、OK (blocking failures
 
 ### N0 · 落盘两份文档 + 双锚点
 
-- **文件**：`docs/plans/2026-10-29-nikkisync-upstream-sync-01-影响评估.md`（当前 `?? ` 未跟踪，追加 `§10.1 裁决结论` 块）、`docs/plans/2026-10-29-nikkisync-upstream-sync-02-实施计划.md`（本文，已落盘、待入仓）
+- **文件**：`docs/plans/archive/2026-Q4/2026-10-29-nikkisync-upstream-sync-01-影响评估.md`（当前 `?? ` 未跟踪，追加 `§10.1 裁决结论` 块）、`docs/plans/2026-10-29-nikkisync-upstream-sync-02-实施计划.md`（本文，已落盘、待入仓）
 - **输入 → 输出**：已批准的四项裁决 + §0.1 订正 → 两份入仓文档，锚点同时记 SHA 与 tag（评估 §10-Q5）
 - **验收**：`git ls-files docs/plans | grep -c "2026-10-29-nikkisync-upstream-sync-0[12]"` → `2`；`npm run docs:links` 退出 0；`git status --porcelain` 只剩 `?? release-sync/`
 - **提交**：`docs(plans): 落盘本轮 NikkiSync 同步的影响评估与实施计划并记双锚点`

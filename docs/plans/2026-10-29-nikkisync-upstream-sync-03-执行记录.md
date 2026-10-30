@@ -2,7 +2,7 @@
 title: NikkiSync 上游同步 · 03 执行记录（阶段三：按 02 计划逐节点真跑）
 date: 2026-10-29
 plan: 2026-10-29-nikkisync-upstream-sync-02-实施计划.md
-assessment: 2026-10-29-nikkisync-upstream-sync-01-影响评估.md
+assessment: archive/2026-Q4/2026-10-29-nikkisync-upstream-sync-01-影响评估.md
 ---
 
 # NikkiSync 上游同步 · 03 执行记录

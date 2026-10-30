@@ -45,7 +45,7 @@
 
 ### T0 落档计划
 
-- 文件：`docs/plans/2026-10-24-fix-empty-recyclebin-system-trash.md`（本文件）
+- 文件：`docs/plans/archive/2026-Q4/2026-10-24-fix-empty-recyclebin-system-trash.md`（本文件）
 - 验收：文件存在且 `git status` 可见。
 
 ### T1 红灯——复现缺陷的测试（`src/main/ipc/handlers/media.test.ts`）
