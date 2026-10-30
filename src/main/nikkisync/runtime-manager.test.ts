@@ -900,6 +900,28 @@ describe('createRuntimeManager 资产路径键裁剪（上游 b397e0e 同步）'
     expect(JSON.stringify(clothing)).not.toContain('sourcePath')
     expect(sharedAsset).toHaveProperty('sourcePath')
   })
+
+  it('缺陷：深层嵌套（>8 层）对象的 sourcePath/sourceFolder 也必须裁掉（旧 MAX_STRIP_DEPTH=8 提前 return 致 fail-open）', async () => {
+    // 旧实现在 depth>=8 的对象上 `return copy` 停下钻，其子树仍是原引用 → 两键残留。
+    // 含两键对象落在 depth12（root=0 → items 数组=1 → items[0]=2 → 10 层 nested=12）；
+    // 只要真实 payload 未来在 asset 外多包几层即泄漏，破的是函数自述「按形状递归、宁少不漏」。
+    let deep: Record<string, unknown> = {
+      sourcePath: 'D:/game/photos/leak.jpg',
+      sourceFolder: 'D:/game/photos'
+    }
+    for (let i = 0; i < 10; i++) deep = { nested: deep }
+    const rawPage = { items: [deep], libraryRevision: 1 }
+
+    const { deps } = createDependencies({}, { assetPage: rawPage })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const page = await manager.listAssets({ limit: 10 })
+
+    expect(JSON.stringify(page)).not.toContain('sourcePath')
+    expect(JSON.stringify(page)).not.toContain('sourceFolder')
+    // 防恒绿：结构其余键与 libraryRevision 原样保留，证明拿到的是裁剪后的副本而非空对象
+    expect((page as { libraryRevision: number }).libraryRevision).toBe(1)
+  })
 })
 
 describe('createRuntimeManager 同步服务编排（阶段 3）', () => {

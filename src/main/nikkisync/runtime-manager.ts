@@ -784,7 +784,10 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
    *    塞入），浅拷一层裁不到；故按形状递归而不是硬编码响应结构。
    * 3. **成对处理**——上游仅在 `sourcePath` 存在时同时给出两键，二者一起剔、一起不留。
    *
-   * 深度上限只在「超出即不再下钻」处生效，且该层两键照样剔掉（宁少不漏，不因为兜底而漏键）。
+   * 按对象形状完全递归，无深度上限——环与共享由下面的 `memo` 收敛，不必靠「超限就停下钻」兜底；
+   * 那样做会让深层子树里的两键原样漏给渲染层（fail-open），破的正是「宁少不漏」。真实载荷最深
+   * 落在 asset 对象 = 深度 5，且上游 DTO 层级有界，同步调用栈可承受；环形引用命中 `memo` 即返回
+   * 在途副本、不再下钻，故不引入栈溢出风险。
    * path 模式资源通道刻意不走这里：那是 `media://` 授权的唯一出口（见下方委托）。
    *
    * `memo` 是「原对象身份 → 已裁好的副本」登记表，副本在递归子节点**之前**登记。这一条同时承担
@@ -803,32 +806,24 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
    * 包裹（`row-mappers.js:47-146`），今天载荷里不存在这类值；出现即按空对象透出，是依赖不是新风险。
    */
   const ASSET_PATH_FIELDS = ['sourcePath', 'sourceFolder'] as const
-  /** 实测最深落在 asset 对象 = 深度 5（root 记 0：root→items→item→photos→photo→asset）；
-   *  留出余量，超限只停下钻不放过当层键。 */
-  const MAX_STRIP_DEPTH = 8
 
-  function stripAssetPathFields(
-    value: unknown,
-    depth = 0,
-    memo = new WeakMap<object, unknown>()
-  ): unknown {
+  function stripAssetPathFields(value: unknown, memo = new WeakMap<object, unknown>()): unknown {
     if (typeof value !== 'object' || value === null) return value
     const remembered = memo.get(value)
     if (remembered !== undefined) return remembered
     if (Array.isArray(value)) {
       const copy: unknown[] = []
       memo.set(value, copy)
-      for (const item of value) copy.push(stripAssetPathFields(item, depth + 1, memo))
+      for (const item of value) copy.push(stripAssetPathFields(item, memo))
       return copy
     }
     const copy = { ...(value as Record<string, unknown>) }
     memo.set(value, copy)
     for (const field of ASSET_PATH_FIELDS) delete copy[field]
-    if (depth >= MAX_STRIP_DEPTH) return copy
     for (const key of Object.keys(copy)) {
       const child = copy[key]
       if (typeof child === 'object' && child !== null) {
-        copy[key] = stripAssetPathFields(child, depth + 1, memo)
+        copy[key] = stripAssetPathFields(child, memo)
       }
     }
     return copy
