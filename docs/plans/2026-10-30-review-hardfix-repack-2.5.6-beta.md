@@ -1,7 +1,7 @@
 # 2026-10-30 全面审查 → 全量硬修 → 提交 → 2.5.6-beta 原地重打包（第 6 轮）
 
-> 状态：**进行中**。§1–§3 是开工取证与审查结论（落盘于改码之前），§4 是节点计划与判据，
-> §5–§7 的红绿读数**随节点推进回写**，未回写的格子即「未发生」，不得当作已完成。
+> 状态：**已结案**。§1–§3 是开工取证与审查结论（落盘于改码之前），§4 是节点计划与判据，
+> §5–§6 是逐节点红绿读数与变异检验，§8 是末态全局门 / 提交 / 打包 / 冒烟读数（含新旧安装包 sha256）。
 
 ## 1. 前提台账（祈使请求自带的假设，先取证再动手）
 
@@ -144,4 +144,56 @@
 ## 7. not-run 与如实声明
 
 - OS 级窗口拖拽手感无法在无 GUI 交互环境自动化验证，判据由 `src/renderer/styles/app-drag-region.test.ts` 的 CSS 契约与干净产物字节取数承担；真人手工拖拽本轮不做。
-- 旧包 `release/MeowStarMap-Setup-2.5.6-beta.exe`（10-30 09:13）与新树在出货 payload 上等价的依据是「`09:14` 之后 13 笔提交不含 `build.files` 覆盖路径」，重打只把这一点变成实证，不得表述成「包变新了」。
+- **出货 payload 本轮确实变了**（与 §1 前提台账里那条「09:14 之后 13 笔提交不改出货面」的限定不冲突——那是本轮改动之前的状态）：`94a96cf` 改了 `src/main/nikkisync/runtime-manager.ts` 的**产品代码**（`isPlainObject` 分支 + `Reflect.ownKeys` 下钻），经 electron-vite 编进 `dist/main` ⇒ 新包与旧包在装载面行为上不等价。因此这次重打不只是「把产物 ↔ HEAD 变成实证」，而是必须重打。
+- `npm test` / `test:ci-linux` 全量日志里 `stripAssetPathFields` 的告警行数为 **0**（两侧都是）⇒ 真上游载荷里没有出现非纯对象，透传分支只在夹具里被显式驱动；不存在「靠告警刷屏暴露的新噪声」。
+- 打包态 e2e 的 `S1–S8` 跑的是 `release/win-unpacked/喵星图.exe`（本次构建产出，17:54:23），不再是 09:13 的旧 exe。
+
+## 8. 末态读数（全局回归 + 提交 + 打包）
+
+### 8.1 N8 全局回归（改码之后）
+
+| 命令                    | 退出码 | 读数                                                                                                  |
+| ----------------------- | ------ | ----------------------------------------------------------------------------------------------------- |
+| `npm run verify`        | 0      | 5 项全 ✓（typecheck / lint / core-gate / format 9 文件 / 相关单测 5 文件），`全部通过 — 可以安全提交` |
+| `npm run lint`          | 0      | `eslint .` 零输出                                                                                     |
+| `npm run typecheck`     | 0      | `tsc -b` + `tsc -p tsconfig.scripts.json`                                                             |
+| `npm run typecheck:e2e` | 0      | `tsc --noEmit -p e2e`                                                                                 |
+| `npm run i18n:guard`    | 0      | 白名单只减不增                                                                                        |
+| `npm test`              | 0      | **455 文件全绿 / 7131 passed / 20 skipped (7151)**，62.30s                                            |
+| `npm run test:ci-linux` | 0      | **455 文件全绿 / 7148 passed / 3 skipped (7151)**，44.88s（两侧总数一致，装置与真宿主不漂移）         |
+| `npm run test:coverage` | 0      | All files **70.04 / 61.44 / 62.81 / 71.66**，全部高于阈值 66 / 58 / 59 / 68                           |
+
+用例账：总数 7118 → **7151（+33）** = 收尾闸门 9 + 裁剪缺陷用例 4 + 闭包判定核与契约用例 20；无删除、无 skip 新增（`it.skip` 计数为 0，唯一门控是按链接在位的真实树读数用例，未建链时显式 skip 并打印理由）。
+
+### 8.2 N9 版本核对（四处声明位 + 产物两处，均已是 2.5.6-beta）
+
+`package.json = 2.5.6-beta`；`package-lock.json` 根与 `packages[""]` 同为 `2.5.6-beta`；`src/renderer/preview/mock/database-mock.ts:664 getVersion: async () => '2.5.6-beta'`；`release/latest.yml` 首行 `version: 2.5.6-beta`、`path: MeowStarMap-Setup-2.5.6-beta.exe`。`check-doc-versions` exit 0（README 的 Electron 徽章仍 41.10 = `41.10.6`）。打包态 `S4` 探针在包内断言 `app.getVersion()` 与 `package.json` 一致 ⇒ 版本号在运行时同样取到 2.5.6-beta。
+
+### 8.3 N10 提交（5 笔，未推送）
+
+| SHA       | 主题             | 内容                                                                     |
+| --------- | ---------------- | ------------------------------------------------------------------------ |
+| `315f3f4` | `docs(plans)`    | 本轮计划、前提台账、审查结论与开工读数                                   |
+| `77fddb5` | `test(guard)`    | 收尾闸门 + F1/F2 两处清偿（379 insert / 30 delete）                      |
+| `94a96cf` | `fix(nikkisync)` | F4/F5 硬修 + F3 注释订正（195 insert / 34 delete）                       |
+| `40e5203` | `chore(gate)`    | F6 闭包化 + 两个配套单测 + `scripts/AGENTS.md`（619 insert / 33 delete） |
+| `33cdc58` | `docs(debt)`     | DEBT-040/042/043 转 done 与账目回写                                      |
+
+每批提交前 `npm run verify:staged` 全 ✓；`.husky/pre-commit` 三步（lint-staged / core-gate / `tsc -b`）逐批通过；末态 `git status --porcelain=v1` 为空；`@{u}..HEAD` 由 43 增至 **48**；按裁示**未执行 `git push`**。
+
+### 8.4 N11 打包与冒烟
+
+| 步骤                | 读数                                                                                                                                                                                                                                                                                                            |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run dist:win`  | **退出码 0**。链路 `build:recycle-helper → build → pre-dist-check → electron-builder --win → verify:dist`；本轮**没有**踩 `EPERM rename(win-unpacked.tmp → win-unpacked)`，未使用 `--config.electronDist` 绕法                                                                                                  |
+| pre-dist-check      | `✔ main 产物比源码新 (src latest: 2026-10-30T09:43:55.476Z = 本地 17:43，即 `94a96cf` 的那次产品改动)`、`✔ renderer 产物比源码新`、`✅ 全部校验通过，可以执行打包`                                                                                                                                              |
+| electron-builder    | `version=26.15.3`，`@electron/rebuild electronVersion=41.10.6 arch=x64`，`target=nsis archs=x64 oneClick=false perMachine=false`，签名按配置 skipped（`signExecutable`）                                                                                                                                        |
+| verify:dist         | `✅ 解包产物校验通过`，含新增行 `✔ … 装载链闭包 50 个模块、每条相对边的目标文件都已解包（根 13 个：桶导出 + 全部 *_DEEP_ENTRY）`；原生模块四件、VC++ 运行库四 DLL、迁移 SQL、32 条禁串扫描（app.asar 73,988,906 字节）全部 ✓                                                                                    |
+| 新包                | `release/MeowStarMap-Setup-2.5.6-beta.exe`，184,634,402 字节，2026-10-30 17:54:53，**sha256 `bfe0ed4e859ff1b7226ba0b93310cb293c5f930d4c663da15ac590e2dde45e64`**                                                                                                                                                |
+| 被覆盖的旧包        | 同路径，184,634,183 字节，2026-10-30 09:13:17，**sha256 `7e30ce123cf5a1fc7a750697b5b7ce6bc3ae6dcd887238c0c4a1eef37cbb421c`**（`release/` 被 gitignore、产物不可 revert，本行即唯一回滚依据）；`release/win-unpacked/resources/app.asar` 旧值 `2b03eaa2f8d46ce58203c7a6a800f89fe186c62675150ac27e130c5873ca7d28` |
+| `npm run e2e:smoke` | **退出码 0**，`16 passed (24.7s)`；`test-results/.last-run.json` = `{"status":"passed","failedTests":[]}`；S3 preload 四全局齐备、S4 版本一致、S5 原生模块真实查询、S6 静置 5s 存活、S7 首装自动扫描完成、S8 GPU 默认硬件加速                                                                                   |
+| 收尾卫生            | 无 `release/win-unpacked.tmp`、无 `release-r2/`；`release-sync/` 为既有残壳且已被 `.gitignore` 覆盖，未污染 `git status`                                                                                                                                                                                        |
+
+## 9. 一句话结论
+
+前提三条里两条不成立（无未提交代码、版本早就是 2.5.6-beta），真实交付是：43 笔未推送提交的全面审查 → 6 项缺陷定位（3 新 + 3 既存债）→ 全部按红灯先行硬修并变异检验 → 5 笔提交（未推送）→ 八项全局门双绿 → 携带产品改动的 2.5.6-beta 安装包重打并通过 16 条打包态冒烟。
