@@ -13,9 +13,11 @@ import { fileURLToPath } from 'url'
 
 import {
   CHAIN_REQUIRED_ARTIFACTS,
+  LOAD_CHAIN_ROOTS,
   METADATA_REQUIRED_ARTIFACTS,
   NIKKISYNC_CAPABILITY_ARTIFACTS,
-  SYNC_SERVER_REQUIRED_ARTIFACTS
+  SYNC_SERVER_REQUIRED_ARTIFACTS,
+  closureLoadChain
 } from './verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -818,6 +820,51 @@ function checkUnpackedNativeBinaries(): void {
         `@nikkisync/pc-companion 缺装载链产物 ${relative}` +
           '（上游新增静态 import 边的目标文件；缺它时深入口装载期将 ERR_MODULE_NOT_FOUND；' +
           '在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
+          path.relative(ROOT, path.join(pcCompanionRoot, relative))
+      )
+    }
+  }
+
+  // DEBT-040 收口：人工点名只能覆盖「已知的那几条边」，上游再加边就得回来补表。这里改用
+  // verify-nikkisync-link 的同一判定核按 import 图派生闭包，逐条相对边验目标文件在不在；
+  // 两侧（开发态链接树 / 打包态解包树）共用一函数，再写一份就是两套真相源。
+  // 如实限定：build.files 整树搬运使「打包时单文件漏解包」今天结构上不可能发生，本判据拦的是
+  // 上游构建产物本身就缺件（只跑 tsc 没跑 esbuild、增量构建掉件等）。
+  const packedClosure = closureLoadChain(
+    LOAD_CHAIN_ROOTS,
+    (relative) => {
+      try {
+        return fs.readFileSync(path.join(pcCompanionRoot, relative), 'utf8')
+      } catch {
+        return null
+      }
+    },
+    (from, specifier) => path.normalize(path.join(path.dirname(from), specifier)),
+    (relative) => fs.existsSync(path.join(pcCompanionRoot, relative))
+  )
+  if (packedClosure.dangling.length === 0 && packedClosure.unreadable.length === 0) {
+    pass(
+      `@nikkisync/pc-companion 装载链闭包 ${packedClosure.visited} 个模块、每条相对边的目标文件都已解包` +
+        `（根 ${LOAD_CHAIN_ROOTS.length} 个：桶导出 + 全部 *_DEEP_ENTRY）`
+    )
+  } else {
+    for (const edge of packedClosure.dangling) {
+      fail(
+        `@nikkisync/pc-companion 装载链闭包缺件：${edge.from} 相对引用 ${edge.specifier} 的目标不存在` +
+          '（装载期将 ERR_MODULE_NOT_FOUND；在 NikkiSync 跑完整 npm run build 后重新打包）: ' +
+          path.relative(
+            ROOT,
+            path.join(
+              pcCompanionRoot,
+              path.normalize(path.join(path.dirname(edge.from), edge.specifier))
+            )
+          )
+      )
+    }
+    for (const relative of packedClosure.unreadable) {
+      fail(
+        `@nikkisync/pc-companion 装载链闭包里的模块读不动：${relative}` +
+          '（存在但读不出文本，不能当成「没有出边」放行）: ' +
           path.relative(ROOT, path.join(pcCompanionRoot, relative))
       )
     }

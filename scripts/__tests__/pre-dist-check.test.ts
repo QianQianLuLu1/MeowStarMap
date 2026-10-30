@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -19,7 +19,8 @@ import {
   CHAIN_REQUIRED_ARTIFACTS,
   METADATA_REQUIRED_ARTIFACTS,
   NIKKISYNC_CAPABILITY_ARTIFACTS,
-  SYNC_SERVER_REQUIRED_ARTIFACTS
+  SYNC_SERVER_REQUIRED_ARTIFACTS,
+  closureLoadChain
 } from '../verify-nikkisync-link'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -455,5 +456,77 @@ describe('打包态产物清单覆盖面：SYNC_SERVER + METADATA 两组复用�
     )
     expect(metaMissing).toHaveLength(1)
     expect(metaMissing[0]).toContain('Nuan5CompatibleResolver.js')
+  })
+})
+
+// ===== 打包态装载链闭包的接线（DEBT-040 收口）=====
+// 回归背景：四张人工点名清单只能覆盖「已知的那几条边」，上游每加一条静态依赖都得回来补表；
+// 漏补一次就是「闸门全绿 + 运行期 ERR_MODULE_NOT_FOUND」。改成按 import 图派生闭包后，判据与
+// 清单条目数无关。本 describe 锚两件事：打包态确已复用同一个判定核（接线契约，读源码文本），
+// 以及那三个探针在真解包树形态下判得对（行为，用 mkdtemp 造一棵小树，宿主分隔符语义与生产一致）。
+describe('打包态装载链闭包：判定核复用同一真相源（DEBT-040）', () => {
+  const pdcSource = readFileSync(path.join(ROOT, 'scripts', 'pre-dist-check.ts'), 'utf-8')
+
+  it('接线契约：pre-dist-check.ts 须以 LOAD_CHAIN_ROOTS 为根调用 closureLoadChain（修复前必红）', () => {
+    expect(pdcSource).toMatch(/closureLoadChain\(\s*LOAD_CHAIN_ROOTS/)
+  })
+
+  it('单一真相源：闭包判定核与根清单都须从 verify-nikkisync-link import，本地不得再抄一份根表', () => {
+    const importBlock = pdcSource.match(/import\s*\{[^}]*\}\s*from\s*'\.\/verify-nikkisync-link'/s)
+    expect(importBlock, '前置：须存在从 verify-nikkisync-link 的 import').not.toBeNull()
+    expect(importBlock?.[0]).toContain('closureLoadChain')
+    expect(importBlock?.[0]).toContain('LOAD_CHAIN_ROOTS')
+    // 本地另起一张根表 = 两套真相源，正是本轮要消灭的形状
+    expect(pdcSource).not.toMatch(/const\s+(LOAD_CHAIN_ROOTS|packedChainRoots|CHAIN_ROOTS)\b/)
+  })
+
+  it('行为：mkdtemp 造的最小解包树里，边齐则判绿、缺一个目标文件就点名该条边', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'wxnn-chain-'))
+    try {
+      const rel = (p: string): string => p.split(path.sep).join('/')
+      const files: Record<string, string> = {
+        'dist/src/index.js': "export * from './src/a.js'\n",
+        'dist/src/src/a.js': "import { b } from './b.js'\nexport const a = 1\n",
+        'dist/src/src/b.js': 'export const b = 2\n'
+      }
+      const write = (relative: string, text: string): void => {
+        const target = path.join(root, ...relative.split('/'))
+        mkdirSync(path.dirname(target), { recursive: true })
+        writeFileSync(target, text)
+      }
+      for (const [relative, text] of Object.entries(files)) write(relative, text)
+      const probes = {
+        readSource: (relative: string): string | null => {
+          try {
+            return readFileSync(path.join(root, relative), 'utf8')
+          } catch {
+            return null
+          }
+        },
+        resolveRelative: (from: string, specifier: string): string =>
+          rel(path.normalize(path.join(path.dirname(from), specifier))),
+        exists: (relative: string): boolean => existsSync(path.join(root, relative))
+      }
+      const full = closureLoadChain(
+        ['dist/src/index.js'],
+        probes.readSource,
+        probes.resolveRelative,
+        probes.exists
+      )
+      expect(full.dangling).toEqual([])
+      expect(full.unreadable).toEqual([])
+      expect(full.visited).toBe(3)
+
+      rmSync(path.join(root, ...'dist/src/src/b.js'.split('/')), { force: true })
+      const broken = closureLoadChain(
+        ['dist/src/index.js'],
+        probes.readSource,
+        probes.resolveRelative,
+        probes.exists
+      )
+      expect(broken.dangling).toEqual([{ from: 'dist/src/src/a.js', specifier: './b.js' }])
+    } finally {
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+    }
   })
 })

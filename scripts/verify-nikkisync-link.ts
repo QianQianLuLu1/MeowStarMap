@@ -98,6 +98,135 @@ export const CHAIN_REQUIRED_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'organizer', 'NativeMediaOperations.js')
 ]
 
+/**
+ * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部 12 个
+ * `*_DEEP_ENTRY` 深入口。判据是「本仓实际会装载什么」，不是「上游有多少文件」。与
+ * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那 12 个常量不能被 scripts 直接
+ * import（会牵进 electron 依赖图），故由 `scripts/__tests__/verify-nikkisync-link.test.ts` 从
+ * 其源码文本里抽出字面量、与本表逐项相等，任一侧漂移即红。
+ */
+export const LOAD_CHAIN_ROOTS: readonly string[] = [
+  path.join('dist', 'src', 'index.js'),
+  path.join('dist', 'src', 'server', 'row-mappers.js'),
+  path.join('dist', 'src', 'server', 'SuitSearchIndex.js'),
+  path.join('dist', 'src', 'server', 'ClothingSearchIndex.js'),
+  path.join('dist', 'src', 'server', 'ProfileStatsIndex.js'),
+  path.join('dist', 'src', 'metadata', 'Nuan5CompatibleResolver.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataResolutionDiagnostics.js'),
+  path.join('dist', 'src', 'metadata', 'CachedDecodedMetadataService.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataOnlineConsent.js'),
+  path.join('dist', 'src', 'server', 'LanAddress.js'),
+  path.join('dist', 'src', 'server', 'GameVersionCalendar.js'),
+  path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
+  path.join('dist', 'src', 'scanner', 'ScanDiagnostics.js')
+]
+
+/** 装载链上「源模块 → 相对说明符」的一条边（只记文本形态，不掺宿主分隔符语义）。 */
+export interface LoadChainEdge {
+  readonly from: string
+  readonly specifier: string
+}
+
+/** 闭包遍历的结果：缺件边、读不动的模块、访问到的模块数。 */
+export interface LoadChainClosure {
+  readonly dangling: readonly LoadChainEdge[]
+  readonly unreadable: readonly string[]
+  readonly visited: number
+  /** 本次遍历实际使用的根数（读数文案要说「这次吃了几个根」，不是常量表长度） */
+  readonly rootCount: number
+}
+
+/**
+ * 静态依赖边的抽取，覆盖八种写法：`import d from '…'`、`import {a} from '…'`、
+ * `import * as a from '…'`、`import '…'`（副作用）、`export {a} from '…'`、`export * from '…'`、
+ * `require('…')`、动态 `import('…')`。只认 `./`、`../` 形态 ⇒ 裸包名与 `node:` 前缀不入闭包。
+ */
+const CHAIN_EDGE_RE =
+  /(?:\bimport(?:[^"'();]*?)?\s*from\s*|\bexport\s+[\w*{}$,\s]*?from\s*|\brequire\s*\(\s*|\bimport\s*\(\s*|\bimport\s+)["'](\.{1,2}\/[^"']+)["']/g
+
+/** 剥掉块注释与整行注释：只为避免注释里的示例路径被当成边，不追求词法级精确。 */
+export function stripCommentsForChain(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n')
+}
+
+/**
+ * DEBT-040 的收口：从人工点名清单改为**按产物 import 图派生闭包**校验。
+ *
+ * 判据只问一件事——「每条相对边的目标文件在不在」。刻意不问「目标有没有被某张清单点名」：
+ * 实测装载链 50 个模块里只有 19 个被四张表点名，把后者做成硬失败既红得没道理也给不出修法。
+ * 于是上游下一次新增一条静态依赖时，缺件会在闸门红，而不是等运行期 `ERR_MODULE_NOT_FOUND`
+ * （本轮 R4 的同类缺陷形状）。三个探针全部注入，函数不读全局也不碰 `process.env`，
+ * 因此开发态（链接树）与打包态（解包树）共用同一判定核，单测可以喂虚拟树。
+ *
+ * 保护面如实限定（勿夸大）：`build.files` 以 `from: node_modules/@nikkisync` 整树搬运
+ * （filter 是全树通配），`asarUnpack` 亦覆盖该 scope，所以「打包时单文件漏解包」今天结构上不可能发生；
+ * 本判据拦的是**上游构建产物本身就缺件**（只跑了 `tsc` 没跑 esbuild、增量构建掉件等）。
+ */
+export function closureLoadChain(
+  roots: readonly string[],
+  readSource: (relative: string) => string | null,
+  resolveRelative: (from: string, specifier: string) => string,
+  exists: (relative: string) => boolean
+): LoadChainClosure {
+  const queue: string[] = []
+  const dangling: LoadChainEdge[] = []
+  const unreadable: string[] = []
+  for (const root of roots) {
+    if (exists(root)) queue.push(root)
+    else dangling.push({ from: '<root>', specifier: root })
+  }
+  const seen = new Set<string>()
+  // BFS 用下标推进（队列会长大），不用 shift() 以免触发非空断言
+  for (let index = 0; index < queue.length; index++) {
+    const current = queue[index] as string
+    if (seen.has(current)) continue
+    seen.add(current)
+    const raw = readSource(current)
+    if (raw === null) {
+      // 存在却读不动 ⇒ 判红而非「没有边」：I/O 异常不许变成静默放行
+      unreadable.push(current)
+      continue
+    }
+    const source = stripCommentsForChain(raw)
+    for (const match of source.matchAll(CHAIN_EDGE_RE)) {
+      const specifier = match[1] as string
+      const resolved = resolveRelative(current, specifier)
+      if (!exists(resolved)) dangling.push({ from: current, specifier })
+      else if (!seen.has(resolved)) queue.push(resolved)
+    }
+  }
+  return { dangling, unreadable, visited: seen.size, rootCount: roots.length }
+}
+
+/** 把闭包判定结果压成一行可执行的修复提示（开发态与打包态共用，避免两侧各写一份文案）。 */
+export function describeLoadChainClosure(closure: LoadChainClosure): string {
+  const parts: string[] = []
+  if (closure.dangling.length > 0) {
+    parts.push(
+      `dangling: ${closure.dangling
+        .slice(0, 8)
+        .map((edge) => `${edge.from} -> ${edge.specifier}`)
+        .join('; ')}`
+    )
+    if (closure.dangling.length > 8) parts.push(`(+${closure.dangling.length - 8} more)`)
+  }
+  if (closure.unreadable.length > 0) {
+    parts.push(`unreadable: ${closure.unreadable.join(', ')}`)
+  }
+  if (parts.length === 0) {
+    return `resolved: ${closure.visited} module(s) reachable from ${closure.rootCount} root(s)`
+  }
+  parts.push(
+    'run the full `npm run build` in NikkiSync (tsc alone can miss deep outputs; ' +
+      'the packed tree copies node_modules/@nikkisync wholesale, so a missing file here means the upstream build is incomplete)'
+  )
+  return parts.join(' — ')
+}
+
 export interface NikkiSyncLinkFacts {
   /** 依赖图中指向仓库外的本地 spec（`file:../…` / `workspace:…`），必须为空。 */
   externalFileSpecs: string[]
@@ -144,6 +273,18 @@ export interface NikkiSyncLinkFacts {
    * 见 `CHAIN_REQUIRED_ARTIFACTS`）。缺件坏的是已交付查询面，与能力深入口分列因此文案不同。
    */
   chainArtifactsMissing?: string[]
+  /**
+   * DEBT-040 收口：装载链**闭包**里目标文件不存在的相对边（判据由 `closureLoadChain` 派生，
+   * 不再靠人工点名）。与 `chainArtifactsMissing` 并存：后者钉「本轮新增边的修复指引」，
+   * 前者管「上游再加边时不必回来补表」。缺省 = 未取得该事实 ⇒ 整条检查缺席（同其余产物面口径）。
+   */
+  loadChainDangling?: readonly LoadChainEdge[]
+  /** 闭包内「文件在但读不动」的模块；非空即判红，I/O 异常不许变成静默放行。 */
+  loadChainUnreadable?: readonly string[]
+  /** 闭包访问到的模块数（仅用于读数展示，不参与判定）。 */
+  loadChainVisited?: number
+  /** 本次闭包实际使用的根数（读数文案用；缺省时取 `LOAD_CHAIN_ROOTS` 表长）。 */
+  loadChainRootCount?: number
 }
 
 export interface CheckResult {
@@ -292,6 +433,27 @@ export function evaluateNikkiSyncLink(facts: NikkiSyncLinkFacts): CheckResult[] 
     })
   }
 
+  // DEBT-040 收口：装载链按 import 图派生闭包后逐边验存在。人工点名清单（上面那条）只覆盖
+  // 被点名的 3 个模块，上游再加一条静态边就得回来补表；闭包判据不需要补表，缺件当场红。
+  // 未链接仍是受支持默认态（warn 展示、不阻断），口径与上面几组产物检查一致。
+  if (facts.loadChainDangling !== undefined) {
+    const closure: LoadChainClosure = {
+      dangling: facts.loadChainDangling,
+      unreadable: facts.loadChainUnreadable ?? [],
+      visited: facts.loadChainVisited ?? 0,
+      rootCount: facts.loadChainRootCount ?? LOAD_CHAIN_ROOTS.length
+    }
+    const clean = closure.dangling.length === 0 && closure.unreadable.length === 0
+    checks.push({
+      name: '@nikkisync/pc-companion load chain closure resolves (every relative import target exists)',
+      ok: !linked || clean,
+      level: !linked ? 'warn' : undefined,
+      detail: !linked
+        ? 'skipped (no links present; embedding lane inactive)'
+        : describeLoadChainClosure(closure)
+    })
+  }
+
   checks.push({
     name: 'main-process bundles do not fold @nikkisync into require()',
     ok: facts.buildFoldHits === null || facts.buildFoldHits === 0,
@@ -420,6 +582,8 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
   const metadataArtifactsMissing: string[] = []
   const capabilityArtifactsMissing: string[] = []
   const chainArtifactsMissing: string[] = []
+  /** 装载链闭包事实：仅在 pc-companion 已建链时取得（未建链保持缺省 ⇒ 整条检查缺席） */
+  let loadChain: LoadChainClosure | undefined
   for (const [name, subpath] of Object.entries(NIKKISYNC_PACKAGE_DIRS)) {
     const linkDir = path.join(projectRoot, 'node_modules', name)
     if (!fs.existsSync(linkDir)) continue
@@ -450,6 +614,20 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
       for (const artifact of CHAIN_REQUIRED_ARTIFACTS) {
         if (!fs.existsSync(path.join(targetDir, artifact))) chainArtifactsMissing.push(artifact)
       }
+      // DEBT-040 收口：从深入口与桶导出出发，逐条相对边验目标文件存在（判据见 closureLoadChain）。
+      // 开发态与打包态共用同一判定核，差别只在探针喂哪棵树；宿主 path 用于真 IO，符合约定 §6 第 2 档。
+      loadChain = closureLoadChain(
+        LOAD_CHAIN_ROOTS,
+        (relative) => {
+          try {
+            return fs.readFileSync(path.join(targetDir, relative), 'utf8')
+          } catch {
+            return null
+          }
+        },
+        (from, specifier) => path.normalize(path.join(path.dirname(from), specifier)),
+        (relative) => fs.existsSync(path.join(targetDir, relative))
+      )
     }
     void subpath
   }
@@ -507,7 +685,11 @@ export async function collectNikkiSyncLinkFacts(): Promise<NikkiSyncLinkFacts> {
     syncServerArtifactsMissing: syncArtifactsMissing,
     metadataArtifactsMissing: metadataArtifactsMissing,
     capabilityArtifactsMissing: capabilityArtifactsMissing,
-    chainArtifactsMissing: chainArtifactsMissing
+    chainArtifactsMissing: chainArtifactsMissing,
+    loadChainDangling: loadChain?.dangling,
+    loadChainUnreadable: loadChain?.unreadable,
+    loadChainVisited: loadChain?.visited,
+    loadChainRootCount: loadChain?.rootCount
   }
 }
 

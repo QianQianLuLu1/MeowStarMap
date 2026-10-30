@@ -8,18 +8,18 @@
 
 ## 目录结构
 
-68 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
+69 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
-| 文件                         | 调用方式                                         | 职责                                                                                                 |
-| ---------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| `pre-dist-check.ts`          | `npm run pre-dist-check` / `npm run verify:dist` | **打包前产物校验闸门**（13+ 项：产物存在性/时间戳/修复点/ABI 一致性/crossorigin/协议实现等）         |
-| `after-pack-vc-runtime.cjs`  | `package.json` `build.afterPack` 自动调用        | electron-builder `afterPack` 钩子，将 VC++ 2015-2022 运行库 DLL 随包分发                             |
-| `check-doc-versions.ts`      | `npm run pre-dist-check` 内部调用                | 校验 README 中 Electron 版本与 package.json 一致                                                     |
-| `check-changelog-release.ts` | `npm run pre-dist-check` 内部调用                | 校验 CHANGELOG.md 已收口（package.json 版本有对应节、`[Unreleased]` 无待发布条目），未收口即阻断打包 |
-| `reset.ts`                   | `npm run reset`                                  | 全量清理 dist/cache/.vite/tsbuildinfo                                                                |
-| `electron-browser-stub.js`   | 构建配置引用                                     | Vite resolve.alias 目标，将渲染进程残留的 `import 'electron'` 替换为空 stub                          |
+| 文件                         | 调用方式                                         | 职责                                                                                                    |
+| ---------------------------- | ------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `pre-dist-check.ts`          | `npm run pre-dist-check` / `npm run verify:dist` | **打包前产物校验闸门**（13+ 项：产物存在性/装载链闭包/时间戳/修复点/ABI 一致性/crossorigin/协议实现等） |
+| `after-pack-vc-runtime.cjs`  | `package.json` `build.afterPack` 自动调用        | electron-builder `afterPack` 钩子，将 VC++ 2015-2022 运行库 DLL 随包分发                                |
+| `check-doc-versions.ts`      | `npm run pre-dist-check` 内部调用                | 校验 README 中 Electron 版本与 package.json 一致                                                        |
+| `check-changelog-release.ts` | `npm run pre-dist-check` 内部调用                | 校验 CHANGELOG.md 已收口（package.json 版本有对应节、`[Unreleased]` 无待发布条目），未收口即阻断打包    |
+| `reset.ts`                   | `npm run reset`                                  | 全量清理 dist/cache/.vite/tsbuildinfo                                                                   |
+| `electron-browser-stub.js`   | 构建配置引用                                     | Vite resolve.alias 目标，将渲染进程残留的 `import 'electron'` 替换为空 stub                             |
 
 ### i18n 治理（`i18n/`）
 
@@ -80,31 +80,32 @@
 
 ### 测试
 
-| 文件                                        | 覆盖范围                                                                                                   |
-| ------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性）                                    |
-| `__tests__/lock-advisory-floor.test.ts`     | lock 解析版本下限闸门（读真实 package-lock.json，不联网）+ 与 audit-ci.jsonc 豁免清单的互斥断言            |
-| `__tests__/logger-escape-ledger.test.ts`    | logger 落盘逃逸台账闸门（静默/真写盘两张封闭集 + `logger.ts` 的 fire-and-forget 与四条告警形状的反遮蔽锁） |
-| `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护                                          |
-| `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                                                                  |
-| `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试                                             |
-| `__tests__/check-changelog-release.test.ts` | 变更日志收口闸门：纯函数单测（正常/异常/边界）+ 真实仓库结构契约测试                                       |
-| `__tests__/verify-nikkisync-link.test.ts`   | NikkiSync 诊断纯函数单测（不触磁盘，无链接环境也能跑）                                                     |
-| `__tests__/link-nikkisync.test.ts`          | 链接器纯函数单测（候选根解析/链接动作计划/子路径逃逸校验）                                                 |
-| `__tests__/self-contained-deps.test.ts`     | 真实 package.json 的**依赖图自包含契约**：无仓库外 `file:`/`workspace:` 依赖 + 打包面保留 `@nikkisync`     |
-| `__tests__/path-semantics-guard.test.ts`    | 路径语义三分法登记表（PINNED / DIALECT / HOST_IO）与 CI 复现装置、electron 别名的存在性守卫                |
-| `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                                                      |
-| `__tests__/pre-dist-check.test.ts`          | 打包前校验闸门纯函数单测（校验项判定与聚合）                                                               |
-| `__tests__/check-md-links.test.ts`          | Markdown 引用守护纯函数单测 + **真实仓库契约**：被跟踪文档的死引用数必须为 0                               |
-| `__tests__/save-perf-baseline.test.ts`      | 基线固化脚本纯函数单测：`--env`/`--samples` 校验、跨报告中位数、只改写所选段、ci 段样本不足拒绝 final      |
-| `__tests__/emit-perf-readings.test.ts`      | 读数注解纯函数单测（workflow 命令转义）+ **build.yml 契约**：必须有 `if: always()` 的 `perf:readings` 步骤 |
-| `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                                                         |
+| 文件                                        | 覆盖范围                                                                                                                                                                                                                                |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `__tests__/audit-config.test.ts`            | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性）                                                                                                                                                                 |
+| `__tests__/lock-advisory-floor.test.ts`     | lock 解析版本下限闸门（读真实 package-lock.json，不联网）+ 与 audit-ci.jsonc 豁免清单的互斥断言                                                                                                                                         |
+| `__tests__/logger-escape-ledger.test.ts`    | logger 落盘逃逸台账闸门（静默/真写盘两张封闭集 + `logger.ts` 的 fire-and-forget 与四条告警形状的反遮蔽锁）                                                                                                                              |
+| `__tests__/test-teardown-guard.test.ts`     | 测试侧「资源收尾」闸门（封闭登记表 + 合成源码异常例 + 表规模上限）：钉住「获取动作必须在带无条件收尾的 `try` 内」，防失败路径漏下临时文件与跨用例的桩残留                                                                               |
+| `__tests__/core-path-gate.test.ts`          | 核心路径闸门：PROTECTED_GLOBS 与 eslint 配置一致性 + 占位文案守护                                                                                                                                                                       |
+| `__tests__/find-related-tests.test.ts`      | 源文件 → 相关测试匹配的共享规则纯函数单测                                                                                                                                                                                               |
+| `__tests__/verify-format-scope.test.ts`     | 格式检查作用域纯函数单测 + 与真实 `lint-staged` 配置的契约测试                                                                                                                                                                          |
+| `__tests__/check-changelog-release.test.ts` | 变更日志收口闸门：纯函数单测（正常/异常/边界）+ 真实仓库结构契约测试                                                                                                                                                                    |
+| `__tests__/verify-nikkisync-link.test.ts`   | NikkiSync 诊断纯函数单测：结论推导不触磁盘；装载链**闭包**判定核（虚拟树八种引用写法/缺件/读不动/注释防伪边/环）+ `LOAD_CHAIN_ROOTS` 与 `runtime-facade.ts` 深入口常量的源码契约；唯一读真实产物树的用例按链接在位门控、未建链显式 skip |
+| `__tests__/link-nikkisync.test.ts`          | 链接器纯函数单测（候选根解析/链接动作计划/子路径逃逸校验）                                                                                                                                                                              |
+| `__tests__/self-contained-deps.test.ts`     | 真实 package.json 的**依赖图自包含契约**：无仓库外 `file:`/`workspace:` 依赖 + 打包面保留 `@nikkisync`                                                                                                                                  |
+| `__tests__/path-semantics-guard.test.ts`    | 路径语义三分法登记表（PINNED / DIALECT / HOST_IO）与 CI 复现装置、electron 别名的存在性守卫                                                                                                                                             |
+| `__tests__/sync-e2e-launch-args.test.ts`    | sync-e2e 启动器参数解析纯函数单测（默认值/校验/边界）                                                                                                                                                                                   |
+| `__tests__/pre-dist-check.test.ts`          | 打包前校验闸门纯函数单测（校验项判定与聚合）                                                                                                                                                                                            |
+| `__tests__/check-md-links.test.ts`          | Markdown 引用守护纯函数单测 + **真实仓库契约**：被跟踪文档的死引用数必须为 0                                                                                                                                                            |
+| `__tests__/save-perf-baseline.test.ts`      | 基线固化脚本纯函数单测：`--env`/`--samples` 校验、跨报告中位数、只改写所选段、ci 段样本不足拒绝 final                                                                                                                                   |
+| `__tests__/emit-perf-readings.test.ts`      | 读数注解纯函数单测（workflow 命令转义）+ **build.yml 契约**：必须有 `if: always()` 的 `perf:readings` 步骤                                                                                                                              |
+| `i18n/__tests__/i18n-scripts.test.ts`       | i18n 脚本纯函数单测（prune/codemod/guard/_shared）                                                                                                                                                                                      |
 
 ## 编码约定
 
 ### 语言与执行
 
-- 68 个入仓代码文件里 63 个为 TypeScript（`.ts`：35 个非测试脚本 + 28 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
+- 69 个入仓代码文件里 64 个为 TypeScript（`.ts`：35 个非测试脚本 + 29 个 `__tests__` 单测），统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
 - **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore` 的 `/scripts/mimosa-*.ps1`、`/scripts/fix-harness-memory-path.ps1`、`/scripts/write-bridge-report.ps1` 三条规则显式排除，`scripts/archive/` 下 3 个由 `/scripts/archive/` 整目录排除（行号会随 `.gitignore` 增长漂移，故按规则文本引用）。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
