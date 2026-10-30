@@ -21,7 +21,9 @@ import os from 'os'
 import { EOL as osEolNamed, homedir as osHomedirNamed, tmpdir as osTmpdirNamed } from 'node:os'
 import * as osNs from 'node:os'
 import nodePath from 'path'
+import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
+import { rigNativePath } from '../../../tests/mocks/ci-linux-fs'
 
 const marker = (globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation as
   { cwd: string; root: string; sandbox: string; hostTmp: string } | undefined
@@ -178,6 +180,22 @@ describe('CI 宿主模拟装置自检', () => {
     expect(source).toContain('WINDOWS_SHAPED')
   })
 
+  it.skipIf(!ACTIVE)(
+    '轴 4g：rigNativePath 交出的真路径与 fs 轴写进去的是同一份文件（原生消费者的契约）',
+    () => {
+      // sharp 的 libvips open、sqlite 的文件句柄都不走 `fs` 轴：装置形态的 `/tmp/…`
+      // 在它们手里变成盘相对路径。rigNativePath 的职责就是给出**同一份文件**的真路径。
+      // 判据不依赖宿主（Windows/Linux 开发机都成立）：用原生 require 拿未 mock 的 fs 再读一次。
+      const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'self-check-native-'))
+      const emulated = nodePath.join(dir, 'same.txt')
+      fs.writeFileSync(emulated, 'native-ok', 'utf-8')
+      const native = rigNativePath(emulated)
+      const rawFs = createRequire(import.meta.url)('fs') as typeof import('fs')
+      expect(rawFs.readFileSync(native, 'utf-8')).toBe('native-ok')
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  )
+
   it('轴 5：electron 走惰性替身，单测不依赖二进制安装状态', async () => {
     // 这条在两种 profile 下都必须成立：CI 用 --ignore-scripts 装依赖时真 electron 会抛错，
     // 基座 vitest.config.ts 的 resolve.alias 就是把那 40 个文件从 CI 红灯里捞出来的手段。
@@ -185,6 +203,24 @@ describe('CI 宿主模拟装置自检', () => {
     expect(electron.app).toBeUndefined()
     expect(electron.ipcMain).toBeUndefined()
   })
+
+  it.skipIf(!ACTIVE)(
+    '轴 6：sharp 原生绑定在装置态可用（预载先于 process.platform 改写）',
+    async () => {
+      // 装载发生在轴 2 之前（setup 里 await import('sharp')）⇒ 装置用的就是真 sharp。
+      // 预载被挪到改写之后就会算出 linuxnull-x64 并当场抛错，
+      // 凡 import 到 sharp 的文件（scanner/*、phash、video-frame、ipc/handlers/cache）整片收集失败。
+      const sharp = (await import('sharp')).default
+      expect(sharp.versions.vips).toMatch(/^\d+\.\d+\.\d+$/)
+      const buf = await sharp({
+        create: { width: 8, height: 8, channels: 3, background: '#ffffff' }
+      })
+        .jpeg()
+        .toBuffer()
+      expect(buf[0]).toBe(0xff)
+      expect(buf[1]).toBe(0xd8)
+    }
+  )
 
   it('装置未激活时本文件必须整件跳过（否则 CI 会把自检当成业务回归）', () => {
     if (!ACTIVE) {

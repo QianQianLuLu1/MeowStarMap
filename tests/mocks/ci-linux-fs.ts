@@ -295,6 +295,32 @@ export async function ciLinuxFsHost(
   return wrapNamespace(real)
 }
 
+/**
+ * 自带 `vi.mock('fs')` / `vi.mock('fs/promises')` 的测试文件用：这类文件的 mock 会顶掉装置轴，
+ * 而它拿到的 `importOriginal()` 是**未翻译的真 fs** ⇒ 装置形态的 `/tmp/…` 在它手里变成盘相对
+ * 路径（实测：`scan-traverse-timeout` 的 readdir 落空，扫描零入库）。本函数把装置翻译层取回来。
+ * 轴未激活（真宿主 / CI）时原样返回 `importOriginal()` 的结果，逐字等价于今日行为。
+ */
+export async function ciLinuxFsLayer(
+  importOriginal: () => Promise<unknown>
+): Promise<Record<string, unknown>> {
+  if ((globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation === undefined) {
+    return (await importOriginal()) as Record<string, unknown>
+  }
+  return ciLinuxFsHost(importOriginal)
+}
+
+/**
+ * 交给**原生消费者**的路径（sharp 的 libvips open、sqlite 的文件句柄这类不经 `fs` 轴的入口）：
+ * 装置激活时换成沙箱里的真路径，未激活（真宿主 / CI）恒等。
+ * 第 4 轴只接管 import 进来的 fs API；原生 open 按 OS 语义解析装置形态的 `/tmp/…`，
+ * 在 Windows 上得到盘相对路径 `D:\tmp\…`，目录不存在即 `unable to open`（写与读两侧都会踩）。
+ */
+export function rigNativePath(value: string): string {
+  if ((globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation === undefined) return value
+  return toReal(value) as string
+}
+
 /** 供 setup 预建沙箱目录 */
 export function ensureSandbox(mkdirSync: (p: string, o: { recursive: true }) => unknown): void {
   mkdirSync(REAL_TMP, { recursive: true })

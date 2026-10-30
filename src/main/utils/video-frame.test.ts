@@ -14,6 +14,7 @@ import fsp from 'fs/promises'
 import os from 'os'
 import path from 'path'
 import sharp from 'sharp'
+import { rigNativePath } from '../../../tests/mocks/ci-linux-fs'
 import {
   isBlankImageFile,
   isBlankCachedThumbnail,
@@ -61,7 +62,10 @@ async function writeGradientJpeg(name: string): Promise<string> {
 }
 
 beforeEach(async () => {
-  tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), 'wxnn-video-frame-'))
+  // 夹具根必须是**真路径**：isBlankImageFile 用 sharp 解码，那是 libvips 自己的 open，
+  // 不经装置的 fs 翻译层——装置形态的 `/tmp/…` 会被 Windows 按盘相对路径解析而读不到。
+  // 轴未激活（真宿主 / CI）时 rigNativePath 恒等，本行等价于今日写法。
+  tmpDir = rigNativePath(await fsp.mkdtemp(path.join(os.tmpdir(), 'wxnn-video-frame-')))
 })
 
 afterEach(async () => {

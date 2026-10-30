@@ -24,7 +24,11 @@ const slow = vi.hoisted(() => ({ dirs: new Set<string>(), delayMs: 200 }))
 
 // 仅接管 readdir：目标目录人为延时，其余调用透传原生实现
 vi.mock('fs/promises', async (importOriginal) => {
-  const orig = (await importOriginal()) as unknown as {
+  // 透传的目标必须是**装置翻译层**而不是裸 fs：本文件的 mock 顶掉了轴 4，
+  // 直接用 importOriginal() 会拿到未翻译的真 fs，装置形态的 `/tmp/…` 变成盘相对路径 ⇒
+  // readdir 落空、扫描零入库。ciLinuxFsLayer 在轴未激活时原样返回 importOriginal() 的结果。
+  const { ciLinuxFsLayer } = await import('../../../../tests/mocks/ci-linux-fs')
+  const orig = (await ciLinuxFsLayer(importOriginal)) as unknown as {
     readdir: (p: unknown, o?: unknown) => unknown
     default: { readdir: (p: unknown, o?: unknown) => unknown }
   }

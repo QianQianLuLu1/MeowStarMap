@@ -86,6 +86,16 @@ const HARNESS_TESTS: string[] = [
  */
 const RIG_COMPOSING_OS_TESTS: string[] = ['src/main/thumbnail/generator.limiter.test.ts']
 
+/**
+ * 自带 `vi.mock('fs')` / `vi.mock('fs/promises')` 且需要装置翻译层的测试文件：
+ * 这类 mock 顶掉轴 4，工厂里若直接用 `importOriginal()` 拿到的是未翻译的真 fs，
+ * 装置形态的 `/tmp/…` 于是变成盘相对路径（实测：readdir 落空、扫描零入库的静默假信号）。
+ * 必须经 `ciLinuxFsLayer` 取回翻译层。
+ */
+const RIG_COMPOSING_FS_TESTS: string[] = [
+  'src/main/scanner/__tests__/scan-traverse-timeout.test.ts'
+]
+
 /** 随宿主漂移即出错的语义调用；`extname` 两种方言结果相同，不在禁止之列 */
 const HOST_SEMANTIC = /\bpath\.(join|resolve|dirname|basename|sep|isAbsolute|relative|normalize)\b/
 
@@ -210,7 +220,10 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
       "vi.mock('os'",
       "vi.mock('node:os'",
       "vi.mock('fs'",
-      "vi.mock('url'"
+      "vi.mock('url'",
+      // 轴 6：sharp 的原生运行时 id 在首次装载时按 process.platform 算，
+      // 预载必须排在轴 2 改写之前，否则装置里凡 import sharp 的文件整片收集失败
+      "await import('sharp')"
     ]) {
       expect(setup, `装置缺少轴：${token}`).toContain(token)
     }
@@ -232,6 +245,16 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
       expect(source, `${rel} 必须 mock 'os'`).toContain("vi.mock('os'")
       expect(source, `${rel} 必须组合 ciLinuxOsOverrides，否则 os.tmpdir() 仍是真宿主值`).toContain(
         'ciLinuxOsOverrides'
+      )
+    }
+  })
+
+  it('装置轴 4：自带 vi.mock(fs) 的测试必须经 ciLinuxFsLayer 取回翻译层', () => {
+    for (const rel of RIG_COMPOSING_FS_TESTS) {
+      const source = read(rel)
+      expect(source, `${rel} 必须自带 fs mock`).toContain("vi.mock('fs")
+      expect(source, `${rel} 必须组合 ciLinuxFsLayer，否则拿到的是未翻译的真 fs`).toContain(
+        'ciLinuxFsLayer'
       )
     }
   })

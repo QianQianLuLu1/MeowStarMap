@@ -22,6 +22,8 @@
  * 5. `electron`：与基座 `vitest.config.ts` 一致，走 `tests/mocks/electron-inert.ts` 惰性替身。
  *    （装置曾把它指向必抛错的壳来复刻 CI；基座加了别名之后 CI 也不再加载真 electron，
  *    于是这一轴改为「与基座同形」，由自检用例断言替身确实生效。）
+ * 6. 原生绑定装载时机：`sharp` 在轴 2 改写 `process.platform` **之前**预载，
+ *    装置里用的是真 sharp 而不是惰性替身（`video-frame.test.ts` 要真 sharp 造素材）。
  *
  * 已知失真（读结果时必须知道，逐文件归因就按这些轴点名）：
  * - **裸 `__dirname`** 无法改写（vitest 注入的是真实文件位置）；经 `fileURLToPath(import.meta.url)`
@@ -59,6 +61,23 @@ setRealRoot(realCwd)
  */
 const hostTmp = realOs.tmpdir()
 setHostPaths({ tmp: hostTmp, devNull: realOs.devNull })
+
+// ---------- 轴 6：原生绑定的装载时机（必须在轴 2 改写 platform 之前） ----------
+/**
+ * sharp 的原生运行时 id 是在**首次装载**时算出来的：
+ * `node_modules/sharp/dist/libvips.cjs:40-41` 用 `${process.platform}${runtimeLibc()}-${arch}`，
+ * 而 `runtimeLibc()` 走 detect-libc——轴 2 把 platform 改成 'linux' 之后 `isNonGlibcLinuxSync()`
+ * 为真，但 `familySync()` 在 Windows 上四个探针全失败返回 null，模板把 null 拼进串里
+ * ⇒ `linuxnull-x64`，装载当场抛错，凡 import 到 sharp 的测试文件整文件收集失败。
+ * 真 CI（ubuntu）装载的是真 linux 绑定，所以装置的忠实做法是「让装载发生在改写之前」，
+ * 用**真 sharp**（`src/main/utils/video-frame.test.ts` 明确要真 sharp 造素材，惰性替身会打死它）。
+ *
+ * 必须是 `await import('sharp')`：sharp 的 exports 里 import/require 是两个不同实例，
+ * createRequire 预热的是错的那一份。必须在 setupFiles 而非 globalSetup：
+ * `pool: 'forks'`（vitest.config.ts:61）意味着每 fork 一份模块缓存，globalSetup 只在父进程跑一次。
+ * 不 try/catch：预载失败就该打死整个 profile，而不是退回「一片文件静默 collect 失败」。
+ */
+await import('sharp')
 
 // ---------- 轴 2 / 3：宿主身份 ----------
 Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })
