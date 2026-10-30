@@ -2,6 +2,11 @@
 
 > 适用现场：启动弹窗提示 **"NikkiGallery 启动失败，程序已退出"**，原因为 `spawn EFTYPE`，
 > 引导查看 `C:\Users\<user>\Documents\NikkiGallery\Diagnostics\startup-errors.log`。
+>
+> **口径订正（2026-10-30）**：上面两句都是 **2026-10-23 更名前**的现场，保留是为了对照旧安装包的报障。
+> 当前产物弹窗文案是 `喵星图启动失败，程序已退出。`（`src/main/utils/early-crash-guard.ts:126`），
+> 诊断目录是 **`文档\喵星图\Diagnostics`**（`src/main/utils/user-diag-path.ts:13` 的
+> `PRODUCT_DIAG_DIRNAME`，注释自称「单一权威」）。排现行版本请按 §2 的「当前产物」候选链找日志。
 
 ## 1. `spawn EFTYPE` 是什么
 
@@ -23,7 +28,17 @@ Windows 上 Node.js/Electron 的 `spawn` 报 `EFTYPE`，等价于 Win32 错误
 
 ## 2. 第一步：读 `startup-errors.log` 定位是哪一个 spawn
 
-日志候选路径链（首个可创建者生效，**旧版注意两处都看**）：
+日志候选路径链（首个可创建者生效）。**当前产物**（2026-10-23 更名后；目录名取
+`PRODUCT_DIAG_DIRNAME = '喵星图'`，见 `src/main/utils/user-diag-path.ts:47-84`）：
+
+1. `<Documents>\喵星图\Diagnostics\startup-errors.log`
+2. `<homedir>\喵星图\Diagnostics\startup-errors.log`
+3. `%TEMP%\喵星图-Diagnostics\startup-errors.log`
+4. 应急兜底：`%TEMP%\MeowStarMap-startup-errors.log`
+   ——注意这一条**仍是英文产品名**，与上面三条的中文目录名不同源（`early-crash-guard.ts:64`、
+   `startup-diagnostic.ts:38` 各自硬写），别按 `喵星图-startup-errors.log` 去找。
+
+**更名前产物**（本指南初版记录的就是这套，排旧安装包时仍会遇到）：
 
 1. `<Documents>\NikkiGallery\Diagnostics\startup-errors.log`
 2. `<homedir>\NikkiGallery\Diagnostics\startup-errors.log`（旧版弹窗指向 Documents 但实际写这里）

@@ -583,7 +583,7 @@ MeowStarMap/
 The earliest main-process entry, responsible for:
 
 - **Earliest exception capture**: uncaughtException / unhandledRejection persisted to startup-errors.log via startup-diagnostic
-- **crashDumps redirection**: crash dumps output to `Documents/MeowStarMap/Diagnostics` (`user-diag-path.ts`); Chromium native log persisted with rotation
+- **crashDumps redirection**: crash dumps output to `Documents/喵星图/Diagnostics` (`user-diag-path.ts`); Chromium native log persisted with rotation
 - **GPU fallback decision**: `recordBootDecision()` → `disableHardwareAcceleration()` when required
 - **Protocol privilege declaration**: `registerSchemesAsPrivileged` registers media:// and app://
 - **Application bootstrap**: after `app.whenReady()`, dynamically imports Application from `app/application.ts` and calls `initialize()`
@@ -800,33 +800,33 @@ Three major capabilities:
 
 ### 5.9 Utility Layer (utils/)
 
-| File                       | Responsibilities                                                                                                                                       |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `active-task-store.ts`     | Active task state store (for task progress query and cancellation)                                                                                     |
-| `concurrency.ts`           | In-house concurrency control (`runWithConcurrency`); replaces p-limit to avoid ESM/CJS compatibility                                                   |
-| `constants.ts`             | Main process global named constants (STARTUP_SCAN_DELAY_MS=5000, THUMBNAIL_CONCURRENCY=4, MEDIA_CACHE_TTL_MS=5min etc.)                                |
-| `dir-manager.ts`           | Custom directory management (4 features with configurable paths); `resolveCustomDir` / `ensureDir` / `migrateDirFiles`                                 |
-| `disk.ts`                  | Disk space check `assertDiskSpace` (based on `fsp.statfs`)                                                                                             |
-| `duplicate-scoring.ts`     | Smart dedupe scoring (4 dims: resolution 40 + file size 30 + capture time 20 + favorite weight 10)                                                     |
-| `early-crash-guard.ts`     | Early fatal error reporting (`reportEarlyFatal`: persist diagLog + showErrorBox + release single-instance lock + exit)                                 |
-| `ffmpeg-paths.ts`          | Unified ffmpeg/ffprobe binary path resolver; `resolveAsarUnpackedPath` replaces `app.asar` → `app.asar.unpacked`                                       |
-| `ffmpeg-runner.ts`         | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                                            |
-| `file-utils.ts`            | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)                                    |
-| `ipc-validate.ts`          | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                                               |
-| `logger.ts`                | Log management (18 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                                  |
-| `managed-read-stream.ts`   | File read-stream lifecycle utility (`createManagedReadStream`: error listener + AbortSignal cancellation + fd release)                                 |
-| `media-constants.ts`       | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                                              |
-| `path-safety.ts`           | Path safety utilities (sensitive dir detection / read-only dir detection etc.)                                                                         |
-| `phash.ts`                 | Perceptual hash computation (8x8 DCT-II 64-bit hash, precomputed cosine matrix)                                                                        |
-| `process-registry.ts`      | Global active child process registry (trackProcess/trackFfmpegCommand/killAllProcesses, 60s fallback cleanup)                                          |
-| `progress-throttle.ts`     | Task progress push throttling                                                                                                                          |
-| `scene-brightness.ts`      | Image brightness histogram-based scene time analysis (sharp.stats() + BT.601 weighting)                                                                |
-| `startup-diagnostic.ts`    | Startup diagnostics (independent error recording before logger ready; writes to `Documents/MeowStarMap/Diagnostics/startup-errors.log`, 100KB rolling) |
-| `task-registry.ts`         | Task registry (background task registration and query)                                                                                                 |
-| `user-diag-path.ts`        | User-friendly diagnostics directory resolution (`Documents/MeowStarMap/Diagnostics`)                                                                   |
-| `video-frame.ts`           | Video frame extraction utility                                                                                                                         |
-| `video-probe.ts`           | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                                                       |
-| `worker-restart-policy.ts` | Worker restart policy (crash restart count / backoff decision)                                                                                         |
+| File                       | Responsibilities                                                                                                                                  |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `active-task-store.ts`     | Active task state store (for task progress query and cancellation)                                                                                |
+| `concurrency.ts`           | In-house concurrency control (`runWithConcurrency`); replaces p-limit to avoid ESM/CJS compatibility                                              |
+| `constants.ts`             | Main process global named constants (STARTUP_SCAN_DELAY_MS=5000, THUMBNAIL_CONCURRENCY=4, MEDIA_CACHE_TTL_MS=5min etc.)                           |
+| `dir-manager.ts`           | Custom directory management (4 features with configurable paths); `resolveCustomDir` / `ensureDir` / `migrateDirFiles`                            |
+| `disk.ts`                  | Disk space check `assertDiskSpace` (based on `fsp.statfs`)                                                                                        |
+| `duplicate-scoring.ts`     | Smart dedupe scoring (4 dims: resolution 40 + file size 30 + capture time 20 + favorite weight 10)                                                |
+| `early-crash-guard.ts`     | Early fatal error reporting (`reportEarlyFatal`: persist diagLog + showErrorBox + release single-instance lock + exit)                            |
+| `ffmpeg-paths.ts`          | Unified ffmpeg/ffprobe binary path resolver; `resolveAsarUnpackedPath` replaces `app.asar` → `app.asar.unpacked`                                  |
+| `ffmpeg-runner.ts`         | ffmpeg command execution utility; unified trackFfmpegCommand register/unregister + timeout + event handling                                       |
+| `file-utils.ts`            | Filesystem utilities (pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash)                               |
+| `ipc-validate.ts`          | IPC param validation utilities (SYSTEM_SENSITIVE_DIRS blacklist + validateFilePath/validateMediaId etc.)                                          |
+| `logger.ts`                | Log management (18 FaultTypes, FaultRecord with full env info, 2GB cap with oldest-by-mtime eviction)                                             |
+| `managed-read-stream.ts`   | File read-stream lifecycle utility (`createManagedReadStream`: error listener + AbortSignal cancellation + fd release)                            |
+| `media-constants.ts`       | Unified media extension and MIME type constants (IMAGE/VIDEO/MEDIA_EXTENSIONS, ALBUM_TYPE_MAP 22 entries)                                         |
+| `path-safety.ts`           | Path safety utilities (sensitive dir detection / read-only dir detection etc.)                                                                    |
+| `phash.ts`                 | Perceptual hash computation (8x8 DCT-II 64-bit hash, precomputed cosine matrix)                                                                   |
+| `process-registry.ts`      | Global active child process registry (trackProcess/trackFfmpegCommand/killAllProcesses, 60s fallback cleanup)                                     |
+| `progress-throttle.ts`     | Task progress push throttling                                                                                                                     |
+| `scene-brightness.ts`      | Image brightness histogram-based scene time analysis (sharp.stats() + BT.601 weighting)                                                           |
+| `startup-diagnostic.ts`    | Startup diagnostics (independent error recording before logger ready; writes to `Documents/喵星图/Diagnostics/startup-errors.log`, 100KB rolling) |
+| `task-registry.ts`         | Task registry (background task registration and query)                                                                                            |
+| `user-diag-path.ts`        | User-friendly diagnostics directory resolution (`Documents/喵星图/Diagnostics`)                                                                   |
+| `video-frame.ts`           | Video frame extraction utility                                                                                                                    |
+| `video-probe.ts`           | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                                                  |
+| `worker-restart-policy.ts` | Worker restart policy (crash restart count / backoff decision)                                                                                    |
 
 **Read-stream constraint**: any scenario that streams a local file outward (`media://` protocol, WiFi-share
 downloads and thumbnails) must go through `createManagedReadStream`; never write a bare
@@ -1529,7 +1529,7 @@ commit (preload cannot import main-process modules, so the two cannot share a si
 #### 10.2.2 Startup Diagnostics (startup-diagnostic.ts)
 
 - Provides independent error recording capability before logger system is ready
-- Directly writes to `Documents/MeowStarMap/Diagnostics/startup-errors.log` (tmpdir fallback)
+- Directly writes to `Documents/喵星图/Diagnostics/startup-errors.log` (tmpdir fallback)
 - 100KB rolling cap
 
 #### 10.2.3 Crash Reports (crash-service.ts)
@@ -1845,7 +1845,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 - `scripts/after-pack-vc-runtime.cjs` copies `vcruntime140.dll` / `vcruntime140_1.dll` / `msvcp140.dll` / `concrt140.dll` next to `electron.exe` in the afterPack phase; `npm run verify:dist` (`pre-dist-check --verify-asar`) asserts they exist
 - `src/main/app/native-load-guard.ts` pre-checks inside `app.whenReady` and reports failures via `dialog.showErrorBox` (i18n-independent)
-- `reportEarlyFatal` in `src/main/utils/early-crash-guard.ts`: persists a diagLog, shows an error box, releases the single-instance lock and calls `app.exit(1)`, guarded against duplicates. The diagnostics directory comes from `src/main/utils/user-diag-path.ts` (`Documents/MeowStarMap/Diagnostics`)
+- `reportEarlyFatal` in `src/main/utils/early-crash-guard.ts`: persists a diagLog, shows an error box, releases the single-instance lock and calls `app.exit(1)`, guarded against duplicates. The diagnostics directory comes from `src/main/utils/user-diag-path.ts` (`Documents/喵星图/Diagnostics`)
 - Verification switches `NIKKI_EARLY_CRASH_SIM=1` / `NIKKI_SKIP_NATIVE_GUARD=1`; one-way dependency: never import `native-load-guard` back from here
 
 ---
