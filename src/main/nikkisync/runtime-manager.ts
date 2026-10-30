@@ -798,14 +798,35 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
    *    访问」时命中即 `return value`，第二处退回原件，两键原样漏给渲染层——正是本函数要防的事。
    * ② 环形引用的回边同样靠这条登记收敛：返回在途副本（该副本已裁过两键）。
    * ③ 共享子图只裁一次，不再退化成指数级拷贝。
-   * 代价：输出里的引用共享关系与原载荷一致。返回值随即经 `wrapHandler` 序列化出 IPC，结构化克隆
-   * 本就把共享引用展平，且无人就地改这棵树（handler 侧被 6 条通道的身份 `toBe` 钉成不加工），
-   * 故不构成风险。数组走「先登记空数组、再按序 push」，否则被共享或成环的数组会整条退回原件。
-   * 命中判定用 `!== undefined` 是安全的：登记表只写对象/数组副本，永远不写 `undefined`。
-   * 非纯对象（Date/Map/Set/类实例）会被展开成 `{}`——上游 DTO 各键都经 `String()`/`Number()`
-   * 包裹（`row-mappers.js:47-146`），今天载荷里不存在这类值；出现即按空对象透出，是依赖不是新风险。
+   * 代价：输出里的引用共享关系与原载荷一致。返回值随即经 `wrapHandler` 序列化出 IPC，而结构化克隆
+   * **保留**共享引用与环（`validator.ts:445-479` 只 `{ success, data }`、不做 JSON.stringify），
+   * 输出图与输入同构 ⇒ 风险不由「展平」承担，只由「无人就地改这棵树」承担（handler 侧被 6 条通道
+   * 的身份 `toBe` 钉成不加工）。数组走「先登记空数组、再按序 push」，否则被共享或成环的数组会整条
+   * 退回原件；`for...of` 不跳稀疏洞，故长度保真（非索引自有属性会丢，属下面的外生形态同类）。
+   * 命中判定用 `!== undefined` 是安全的：登记表只写对象/数组副本或透传身份，永远不写 `undefined`。
+   *
+   * 两条形态边界（2026-10-30 全面审查后收口，判据见 docs/技术债清单.md DEBT-042/043）：
+   * - **非纯对象**（Date/Map/Set/RegExp/类实例）不再被浅拷展开成 `{}`：这类值的可枚举自有属性通常
+   *   为空，展开即静默丢数据。现按原样透传并 `process.emitWarning` 点名（按身份登记 ⇒ 同一值只报
+   *   一次，不刷屏）；告警不走 logger——本模块零 `../utils` 依赖（见文件头职责边界），链接态用例
+   *   直接 import 它。它**自带**两键时仍要裁（泄漏优先于类型保真）：按属性描述符裁、保留原型，
+   *   实例身份与其它自有属性不跟着丢。原型链上的同名键不裁（那要改共享原型），但该分支必然告警
+   *   ⇒ 不静默。
+   * - **访问器刻意求值**：`{...value}` 会把自有可枚举 getter 求值成数据属性。不采纳「用描述符保留
+   *   访问器、只下钻数据属性」的写法，因为出 IPC 时结构化克隆自己会求值这些访问器并把返回值送出，
+   *   本层不求值就等于把未裁键的子树推迟到序列化期——方向是 fail-open，与上一轮消灭掉的
+   *   「超过深度上限就停下钻」同一形状。求值次数也不因此变多：一次求值替代「本层不求值 + 序列化再求值」。
+   * - 下钻用 `Reflect.ownKeys` 而非 `Object.keys`，Symbol 键承载的子对象同样收敛（既有断言一律
+   *   `JSON.stringify`，而它对 Symbol 键不可见 ⇒ 配套用例改用 `Reflect.get` 探针）。
    */
   const ASSET_PATH_FIELDS = ['sourcePath', 'sourceFolder'] as const
+
+  /** 纯对象判据：`Object.prototype.toString` 给 `[object Object]` 且原型是 Object.prototype / null */
+  function isPlainObject(value: object): boolean {
+    if (Object.prototype.toString.call(value) !== '[object Object]') return false
+    const proto = Object.getPrototypeOf(value)
+    return proto === Object.prototype || proto === null
+  }
 
   function stripAssetPathFields(value: unknown, memo = new WeakMap<object, unknown>()): unknown {
     if (typeof value !== 'object' || value === null) return value
@@ -817,13 +838,35 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       for (const item of value) copy.push(stripAssetPathFields(item, memo))
       return copy
     }
+    if (!isPlainObject(value)) {
+      const carriesFields = ASSET_PATH_FIELDS.some((field) =>
+        Object.prototype.hasOwnProperty.call(value, field)
+      )
+      let settled: unknown = value
+      if (carriesFields) {
+        const descriptors = Object.getOwnPropertyDescriptors(value)
+        for (const field of ASSET_PATH_FIELDS) delete descriptors[field]
+        settled = Object.create(Object.getPrototypeOf(value), descriptors)
+      }
+      memo.set(value, settled)
+      // 告警文案刻意用英文：`no-restricted-syntax` 禁止中文字符串字面量（用户可见文案须走 i18n），
+      // 而这条只是开发者诊断、不进 UI；债号引用 ASCII 路径，避免同一规则再被触发
+      process.emitWarning(
+        `stripAssetPathFields: non-plain object in payload ${Object.prototype.toString.call(value)} ` +
+          (carriesFields
+            ? 'carries asset path fields, stripped into a descriptor copy'
+            : 'passed through unchanged') +
+          ' — upstream DTO emits no such value today; see DEBT-042 in docs/debt-registry.json'
+      )
+      return settled
+    }
     const copy = { ...(value as Record<string, unknown>) }
     memo.set(value, copy)
     for (const field of ASSET_PATH_FIELDS) delete copy[field]
-    for (const key of Object.keys(copy)) {
-      const child = copy[key]
+    for (const key of Reflect.ownKeys(copy)) {
+      const child = (copy as Record<PropertyKey, unknown>)[key]
       if (typeof child === 'object' && child !== null) {
-        copy[key] = stripAssetPathFields(child, memo)
+        ;(copy as Record<PropertyKey, unknown>)[key] = stripAssetPathFields(child, memo)
       }
     }
     return copy

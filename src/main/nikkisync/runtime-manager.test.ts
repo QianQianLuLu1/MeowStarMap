@@ -922,6 +922,124 @@ describe('createRuntimeManager 资产路径键裁剪（上游 b397e0e 同步）'
     // 防恒绿：结构其余键与 libraryRevision 原样保留，证明拿到的是裁剪后的副本而非空对象
     expect((page as { libraryRevision: number }).libraryRevision).toBe(1)
   })
+
+  it('缺陷：Date/Map/Set 作为载荷值不得被浅拷展开成空对象（DEBT-042 的静默丢数据）', async () => {
+    const capturedAt = new Date('2026-10-30T00:00:00.000Z')
+    const tags = new Map([['theme', 12]])
+    const buckets = new Set(['Photo_1.jpg'])
+    const rawPage = {
+      items: [
+        { assetId: 'a1', capturedAt, tags, buckets },
+        // 同一个身份在一页里再出现一次 ⇒ 告警必须按身份去重，否则热路径会刷屏
+        { assetId: 'a2', capturedAt, tags, buckets }
+      ],
+      libraryRevision: 9
+    }
+    const warnSpy = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
+    try {
+      const { deps } = createDependencies({}, { assetPage: rawPage })
+      const manager = createRuntimeManager(deps)
+      await manager.start(DEFAULTS)
+      const page = (await manager.listAssets({ limit: 10 })) as {
+        items: Array<Record<string, unknown>>
+      }
+      expect(page.items).toHaveLength(2)
+      for (const item of page.items) {
+        // 旧实现走 `{...value}`：Date/Map/Set 的可枚举自有属性为空 ⇒ 三者全变 `{}`，数据静默消失
+        expect(item.capturedAt).toBe(capturedAt)
+        expect(item.tags).toBe(tags)
+        expect(item.buckets).toBe(buckets)
+      }
+      // 透传不许是静默的：三个身份各告警一次，出现两次不翻倍
+      expect(warnSpy).toHaveBeenCalledTimes(3)
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('缺陷：类实例自带两键时必须剔键，但不得连带丢掉其它自有属性与实例身份', async () => {
+    class AssetRow {
+      assetId = 'asset_1'
+      note = 'keep me'
+      sourcePath = 'D:/game/photos/Photo_1.jpg'
+      sourceFolder = 'D:/game/photos'
+    }
+    const row = new AssetRow()
+    const rawPage = { items: [row], libraryRevision: 9 }
+    const warnSpy = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
+    try {
+      const { deps } = createDependencies({}, { assetPage: rawPage })
+      const manager = createRuntimeManager(deps)
+      await manager.start(DEFAULTS)
+      const page = (await manager.listAssets({ limit: 10 })) as {
+        items: Array<Record<string, unknown>>
+      }
+      const item = page.items[0]!
+      expect(item).not.toHaveProperty('sourcePath')
+      expect(item).not.toHaveProperty('sourceFolder')
+      // 旧实现的 `{...row}` 把原型抹平 ⇒ 这两条同时钉住「裁键不以丢类型为代价」
+      expect(item).toBeInstanceOf(AssetRow)
+      expect(item.note).toBe('keep me')
+      expect(item.assetId).toBe('asset_1')
+      // 副本语义不因分支改变：原件一律不动
+      expect(row).toHaveProperty('sourcePath')
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('缺陷：Symbol 键承载的子对象也必须下钻裁键（旧实现只走 Object.keys）', async () => {
+    const extra = Symbol('nikkisync.extra')
+    const nested = {
+      sourcePath: 'D:/game/photos/Photo_7.jpg',
+      sourceFolder: 'D:/game/photos'
+    }
+    const rawPage = { items: [{ assetId: 'a1', [extra]: nested }], libraryRevision: 9 }
+    const { deps } = createDependencies({}, { assetPage: rawPage })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const page = (await manager.listAssets({ limit: 10 })) as {
+      items: Array<Record<PropertyKey, unknown>>
+    }
+    // 既有断言一律用 JSON.stringify，而它对 Symbol 键不可见 ⇒ 这里改用 Reflect 探针
+    const carried = Reflect.get(page.items[0]!, extra) as Record<string, unknown>
+    expect(carried).not.toHaveProperty('sourcePath')
+    expect(carried).not.toHaveProperty('sourceFolder')
+    expect(nested).toHaveProperty('sourcePath') // 副本语义：原件仍带两键
+  })
+
+  it('边界：访问器返回的子树同样要裁——求值是 IPC 序列化本来就会做的事，不裁才是 fail-open', async () => {
+    // 刻意钉住「不求值访问器」这条修法**不采纳**的理由：出 IPC 时结构化克隆自己会求值自有可枚举
+    // 访问器并把返回值送出去，若本层为了避开求值而原样带过访问器，未裁键的子树就会照样漏给渲染层。
+    let calls = 0
+    const nested = {
+      sourcePath: 'D:/game/photos/Photo_8.jpg',
+      sourceFolder: 'D:/game/photos'
+    }
+    const rawPage = {
+      items: [
+        {
+          assetId: 'a1',
+          get derived(): unknown {
+            calls += 1
+            return nested
+          }
+        }
+      ],
+      libraryRevision: 9
+    }
+    const { deps } = createDependencies({}, { assetPage: rawPage })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const page = (await manager.listAssets({ limit: 10 })) as {
+      items: Array<Record<string, unknown>>
+    }
+    expect(JSON.stringify(page)).not.toContain('sourcePath')
+    expect(page.items[0]?.derived).not.toHaveProperty('sourcePath')
+    expect(page.items[0]?.derived).not.toHaveProperty('sourceFolder')
+    expect(calls).toBeGreaterThan(0)
+    expect(nested).toHaveProperty('sourcePath')
+  })
 })
 
 describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
