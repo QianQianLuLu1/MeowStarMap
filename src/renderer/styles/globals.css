@@ -1580,6 +1580,25 @@ html.glass-lite .ambient-bg {
   -webkit-user-select: none;
 }
 
+/* 窗口可拖拽区：titleBarStyle:'hidden' + WCO 隐藏原生标题栏后，必须由渲染层
+   用 app-region 显式声明可拖拽区，否则窗口无法移动。
+   注意：上方 .drag-over（1571）是「文件拖放高亮」，与本区无关。
+   置于无 @layer 全局区：层叠优先级高于所有 @layer、不被 Tailwind purge；
+   prefers-reduced-transparency 与柔粉主题均不覆盖 app-region，故本区始终存活。
+   标题栏内子元素（图标+标题）为非交互文本，继承 drag，无需单独 no-drag；
+   .app-no-drag 作为工具保留，供日后在标题栏内新增按钮/输入时排除命中。 */
+.app-drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
 /* 单行省略 */
 .ellipsis {
   overflow: hidden;
