@@ -5,23 +5,23 @@
 
 ## 0. 地面真相：开工读数（2026-10-30 本机，HEAD = 045713b + 未提交半成品）
 
-| 命令                                                                    | 实测读数                                                            |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `npm run test:ci-linux`                                                 | **7 文件 / 39 例红**（454 文件收集，7066 passed / 10 skipped）      |
-| `npx vitest run --config vitest.ci-linux.config.ts src/main/nikkisync`  | 5 failed / 11 passed（簇 A 定位）                                   |
-| `npx vitest run --config vitest.ci-linux.config.ts <两个 EFTYPE 文件>`  | 2 failed（簇 B 定位）                                               |
-| `npx vitest run src/main/utils/fluent-ffmpeg-shim.test.ts …generator.eftype.test.ts src/main/nikkisync`（真宿主） | **18 文件 / 292 例全绿** ⇒ 两簇都不是产品回归                       |
-| `npm run link:nikkisync:check`                                          | OK（四包 junction 在位）                                            |
-| 泄漏计数开工基线                                                        | `D:/tmp` 194、`C:/WINDOWS/temp` 10、沙箱 `wxnn-ci-linux\tmp` 112    |
+| 命令                                                                                                              | 实测读数                                                         |
+| ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `npm run test:ci-linux`                                                                                           | **7 文件 / 39 例红**（454 文件收集，7066 passed / 10 skipped）   |
+| `npx vitest run --config vitest.ci-linux.config.ts src/main/nikkisync`                                            | 5 failed / 11 passed（簇 A 定位）                                |
+| `npx vitest run --config vitest.ci-linux.config.ts <两个 EFTYPE 文件>`                                            | 2 failed（簇 B 定位）                                            |
+| `npx vitest run src/main/utils/fluent-ffmpeg-shim.test.ts …generator.eftype.test.ts src/main/nikkisync`（真宿主） | **18 文件 / 292 例全绿** ⇒ 两簇都不是产品回归                    |
+| `npm run link:nikkisync:check`                                                                                    | OK（四包 junction 在位）                                         |
+| 泄漏计数开工基线                                                                                                  | `D:/tmp` 194、`C:/WINDOWS/temp` 10、沙箱 `wxnn-ci-linux\tmp` 112 |
 
 上一轮开工基线是 32 文件 / 59 例红；本轮剩余 39 盏**全部属装置侧**（要么轴没接完，要么轴补齐后暴露出装置自身的失真），分两簇。
 
 ## 1. 根因表
 
-| #    | 红数 | 现象                                                             | 真实原因（已取证）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | 节点 |
-| ---- | ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---- |
+| #    | 红数 | 现象                                                                                                                | 真实原因（已取证）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | 节点 |
+| ---- | ---- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
 | RC-8 | 35   | `[vitest] No "Database" export is defined on the "node:sqlite" mock`；`expected [Array(12)] to have a length of 20` | `tests/ci-linux.setup.ts:182-194` 挂着上一段会话的**临时 Gate-A 探针**：`DatabaseSync` 桩构造即抛，且返回值没声明 `Database` 键。上游 `../NikkiSync/packages/database/src/database-manager.ts:14-17` 取构造器写的是 `sqliteModule.Database ?? sqliteModule.DatabaseSync`，而 vitest 的 mock 代理读到**未声明的导出直接抛**（本机 Node v26 的 `node:sqlite` 实际导出 `DatabaseSync,Session,StatementSync,backup,constants,default`，无 `Database`）⇒ 四包装载当场失败。轴本体 `tests/mocks/ci-linux-sqlite.ts` 已写好但**没接线**，守卫 token 表与自检例也都没有它。波及 `sync-server.linked`(13) / `runtime-facade.linked`(13) / `runtime-loader`(5) / `probe`(3) / `metadata-resolver.linked`(1 文件级)。`probe` 的 20→12 是纯下游：`src/main/nikkisync/probe.ts:243-266` 只在包**装载成功**时才累加 `exports` 记录 | N1   |
-| RC-9 | 5    | `expected 'ENOENT' to be 'EFTYPE'`、`expected [Function] to throw an error`、陈旧 spy 串扰 | `tests/mocks/ci-linux-child-process.ts:42` 的 `wrapNamespace` 返回真命名空间的**副本**。`src/main/utils/fluent-ffmpeg-shim.test.ts:25,43,75` 与 `src/main/thumbnail/generator.eftype.test.ts:22,108-111` 的桩法前提是被外部化 CJS（fluent-ffmpeg 顶层 `var spawn = require('child_process').spawn`）捕获的那个内置单例；装置态下测试补的是副本、fluent-ffmpeg 用的仍是真单例 ⇒ 桩打空 ⇒ 真 `spawn('/fake/ffmpeg.exe')` 给异步 ENOENT 而非设计要的同步 EFTYPE。其余三盏同因串扰：`fluent-ffmpeg-shim.test.ts:175` 先抛 ⇒ `:176` 的 `origSpy.mockRestore()` 不执行 ⇒ 最后一个用例吃到还在抛 EFTYPE 的陈旧 spy。属提交 fb6f226 补轴 8 带出的**装置失真**，真宿主与 CI 上两者同一对象，故全绿 | N2   |
+| RC-9 | 5    | `expected 'ENOENT' to be 'EFTYPE'`、`expected [Function] to throw an error`、陈旧 spy 串扰                          | `tests/mocks/ci-linux-child-process.ts:42` 的 `wrapNamespace` 返回真命名空间的**副本**。`src/main/utils/fluent-ffmpeg-shim.test.ts:25,43,75` 与 `src/main/thumbnail/generator.eftype.test.ts:22,108-111` 的桩法前提是被外部化 CJS（fluent-ffmpeg 顶层 `var spawn = require('child_process').spawn`）捕获的那个内置单例；装置态下测试补的是副本、fluent-ffmpeg 用的仍是真单例 ⇒ 桩打空 ⇒ 真 `spawn('/fake/ffmpeg.exe')` 给异步 ENOENT 而非设计要的同步 EFTYPE。其余三盏同因串扰：`fluent-ffmpeg-shim.test.ts:175` 先抛 ⇒ `:176` 的 `origSpy.mockRestore()` 不执行 ⇒ 最后一个用例吃到还在抛 EFTYPE 的陈旧 spy。属提交 fb6f226 补轴 8 带出的**装置失真**，真宿主与 CI 上两者同一对象，故全绿                                                                                                                            | N2   |
 
 ## 2. 启动 / 环境准备
 
@@ -88,22 +88,48 @@ npm run e2e:smoke
 
 ## 6. 基础测试用例（正常 / 异常 / 边界）
 
-| 类别 | 用例                             | 判据                                                                                                                      |
-| ---- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| 正常 | 轴 7 变量式 specifier 也被接管   | `await import(specifier)` 后在 `mkdtemp` 目录建库 + `CREATE TABLE` + 回读成功                                              |
-| 正常 | 上游 `Database ?? DatabaseSync`  | 读 `mod.Database` 得 `undefined` 而**不抛**，构造器落 `DatabaseSync`                                                       |
-| 正常 | linked 套件真绿                  | 装置态 `src/main/nikkisync` = 0 failed / **0 skipped**                                                                     |
-| 正常 | 簇 B 语义不变                    | `code==='EFTYPE'`、无回调形态同步 rethrow `/spawn EFTYPE/`、`origSpy` 恰好 1 次、正常路径 `err===null` 且 `formats.mp4` 正确 |
-| 异常 | 轴 7 不得被拆                    | 守卫 token 表含 `"vi.mock('node:sqlite'"`，删掉即红                                                                        |
-| 异常 | 补桩点不得退回副本               | `RIG_PATCHES_REAL_CHILD_PROCESS` 两文件必须含 `createRequire(import.meta.url)('child_process')`                            |
-| 异常 | 双身份失真成立                   | 装置态 `real !== mocked.default` 且 `real.spawn !== mocked.spawn`                                                          |
-| 异常 | 真宿主不受影响                   | `npm test` 逐字回基线；真宿主两文件 0 failed                                                                               |
-| 边界 | `':memory:'`                     | 装置态可 `exec('SELECT 1')` 并 close（`toReal` 恒等）                                                                      |
-| 边界 | 非字符串 / 其余导出              | `toReal` 短路透传；`StatementSync` / `backup` / `constants` 原形                                                           |
-| 边界 | 库文件真宿主落点                 | `.db` 出现在 `realSandbox()/tmp/…` 下（原生句柄确实吃到翻译后的路径）                                                       |
-| 边界 | 宿主无 `DatabaseSync`            | 工厂返回 `actual` 不接管；不造平台开关                                                                                     |
+| 类别 | 用例                            | 判据                                                                                                                         |
+| ---- | ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 正常 | 轴 7 变量式 specifier 也被接管  | `await import(specifier)` 后在 `mkdtemp` 目录建库 + `CREATE TABLE` + 回读成功                                                |
+| 正常 | 上游 `Database ?? DatabaseSync` | 读 `mod.Database` 得 `undefined` 而**不抛**，构造器落 `DatabaseSync`                                                         |
+| 正常 | linked 套件真绿                 | 装置态 `src/main/nikkisync` = 0 failed / **0 skipped**                                                                       |
+| 正常 | 簇 B 语义不变                   | `code==='EFTYPE'`、无回调形态同步 rethrow `/spawn EFTYPE/`、`origSpy` 恰好 1 次、正常路径 `err===null` 且 `formats.mp4` 正确 |
+| 异常 | 轴 7 不得被拆                   | 守卫 token 表含 `"vi.mock('node:sqlite'"`，删掉即红                                                                          |
+| 异常 | 补桩点不得退回副本              | `RIG_PATCHES_REAL_CHILD_PROCESS` 两文件必须含 `createRequire(import.meta.url)('child_process')`                              |
+| 异常 | 双身份失真成立                  | 装置态 `real !== mocked.default` 且 `real.spawn !== mocked.spawn`                                                            |
+| 异常 | 真宿主不受影响                  | `npm test` 逐字回基线；真宿主两文件 0 failed                                                                                 |
+| 边界 | `':memory:'`                    | 装置态可 `exec('SELECT 1')` 并 close（`toReal` 恒等）                                                                        |
+| 边界 | 非字符串 / 其余导出             | `toReal` 短路透传；`StatementSync` / `backup` / `constants` 原形                                                             |
+| 边界 | 库文件真宿主落点                | `.db` 出现在 `realSandbox()/tmp/…` 下（原生句柄确实吃到翻译后的路径）                                                        |
+| 边界 | 宿主无 `DatabaseSync`           | 工厂返回 `actual` 不接管；不造平台开关                                                                                       |
 
-## 7. 明确不做
+## 7. 结案读数（实跑回写）
+
+| 命令                                           | 开工                                                             | 结案                                                                          |
+| ---------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `npm run test:ci-linux`                        | 7 文件 / 39 例红（454 收集，7066 passed / 10 skipped）           | **454 文件全绿 / 7115 passed / 3 skipped / 0 failed**（42.89s）               |
+| `npm test`（真宿主）                           | —（本轮未重跑开工档，见下方用例账）                              | **454 文件全绿 / 7098 passed / 20 skipped / 0 failed**（52.46s）              |
+| `npx vitest run --config … src/main/nikkisync` | 5 failed / 11 passed（RC-8 35 盏）                               | **16 文件全绿 / 286 passed / 0 skipped**（skipped=0 ⇒ junction 在位，非假绿） |
+| `npx vitest run --config … <两个 EFTYPE 文件>` | 2 failed（RC-9 5 盏）                                            | **2 文件全绿 / 6 passed**；真宿主同两条文件亦全绿                             |
+| `npm run verify`                               | —                                                                | 5 项全 ✓（typecheck / eslint / core-gate / prettier / 相关单测）              |
+| 泄漏计数                                       | `D:/tmp` 194、`C:/WINDOWS/temp` 10、沙箱 `wxnn-ci-linux\tmp` 112 | `D:/tmp` 194、`C:/WINDOWS/temp` 10、沙箱跑前 116 / 跑后 116（持平）           |
+
+**用例账**：本轮 5 笔提交新增 3 条用例（`git diff 045713b..HEAD -U0 | grep '^+\s*it'` 可复核）——轴 7 自检例与轴 8b 自检例各 1（装置闸门 ⇒ 真宿主读作 skipped）、`path-semantics-guard` 的轴 8 登记表例 1（两侧都跑）。装置态 7115 passed / 3 skipped、真宿主 7098 passed / 20 skipped，总数同为 7118；与第 4 轮 §0 的 7094/12 之差来自第 4 轮自己补的自检例（那些在真宿主全部读作 skipped），不是本轮带出的漂移。
+
+**RC-8 收口过程中轴本体的真缺陷**：`tests/mocks/ci-linux-sqlite.ts` 原写 `super(toReal(location), options)`，把 `undefined` 显式传给原生第二参 ⇒ Node 的 `DatabaseSync` 抛 `ERR_INVALID_ARG_TYPE: The "options" argument must be an object`（实测 `new DatabaseSync(':memory:', undefined)` 红、`new DatabaseSync(':memory:')` 绿），而上游正是单参形态。改为 `options === undefined` 时只传一路径参。这一条是新写的轴 7 自检例抓出来的——它先红（哨兵态）后绿（接线态），并在结案前用「把 specifier 改成 `node:sqliteXX`」的变异检验证明拆轴即红。
+
+**变异检验记录（判据有牙齿的证据，均已复原）**
+
+| 判据                               | 变异                                                                 | 结果                                                                                                |
+| ---------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 守卫 token `vi.mock('node:sqlite'` | 轴的注册 specifier 改为 `node:sqliteXX`                              | `path-semantics-guard` 红：`装置缺少轴：vi.mock('node:sqlite'`                                      |
+| 轴 7 自检例                        | 同上（撤掉轴）                                                       | 装置态红：`unable to open database file`（真句柄拿到 `D:\tmp\…`）                                   |
+| 轴 8 登记表例                      | 补桩的 `createRequire` specifier 改为 `child_processXX`              | 红：`必须经 createRequire 取真 child_process 单例再打桩`                                            |
+| 轴 8b 自检例                       | 两根 `vi.mock('child_process'…)` 的 specifier 改为 `…XX`（等于撤轴） | 装置态红：`expected { …(9) } not to be { …(9) }`（撤轴后两侧同一对象，恒等式不再成立）；轴 8 同批红 |
+
+**顺带清掉的两项**：`tests/ci-linux.setup.ts:172` 被上一段会话粘成一行的轴 8 标题注释已复原；K3 会话面用例的库文件改为自己收尾（见提交「K3 会话面用例自收尾库文件」），否则轴 7 打通后每轮在沙箱留 3 个 180KB 的 `.db`。
+
+## 8. 明确不做
 
 - 不改 `package.json` 依赖与 scripts，不动 `node_modules`，不引入第三方方案（正解在 vitest mock 语义内部）。
 - 不动产品代码 `src/main/**` 非测试文件（含 `src/main/utils/fluent-ffmpeg-shim.ts`）。
