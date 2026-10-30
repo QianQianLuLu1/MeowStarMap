@@ -21,7 +21,16 @@
  * 未装垫片时本文件必须红：cb 不被调用 + 错误逃逸到 uncaughtException 间谍。
  */
 
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance
+} from 'vitest'
 import { EventEmitter } from 'events'
 import { createRequire } from 'module'
 
@@ -168,25 +177,32 @@ describe('installFfmpegSpawnGuard：fluent-ffmpeg spawn 同步抛错逃逸垫片
     // 在安装垫片之前 spy 原始方法：垫片包裹后 spy 位于包裹层内侧，
     // 每次 _spawnFfmpeg 调用 spy 恰好 1 次；叠加「重复 install 后回调仍收到 EFTYPE」
     // 共同锁定幂等语义（重复包裹会导致错误被多层重复路由/行为异常）
-    const origSpy = vi.spyOn(proto, '_spawnFfmpeg').mockImplementation(() => {
-      throw makeEftypeError()
-    })
+    // 打桩动作本身必须落在 try 内：fluent-ffmpeg 被外部化，vi.resetModules() 不重置它的原型，
+    // 这个强制抛 EFTYPE 的桩若只写在 try 之外，一旦后续改动在进 try 之前抛错就会漏还原并把
+    // 串扰播给同文件后续用例（RC-9 那一类）。判据由 scripts/__tests__/test-teardown-guard.test.ts 钉住。
+    let origSpy: MockInstance | undefined
+    try {
+      origSpy = vi.spyOn(proto, '_spawnFfmpeg').mockImplementation(() => {
+        throw makeEftypeError()
+      })
 
-    const { installFfmpegSpawnGuard } = await loadModules()
-    installFfmpegSpawnGuard()
-    installFfmpegSpawnGuard()
-    installFfmpegSpawnGuard()
-    ffmpeg().setFfmpegPath('/fake/ffmpeg.exe')
+      const { installFfmpegSpawnGuard } = await loadModules()
+      installFfmpegSpawnGuard()
+      installFfmpegSpawnGuard()
+      installFfmpegSpawnGuard()
+      ffmpeg().setFfmpegPath('/fake/ffmpeg.exe')
 
-    const cb = vi.fn()
-    ffmpeg().getAvailableFormats(cb)
-    await tickTwice()
+      const cb = vi.fn()
+      ffmpeg().getAvailableFormats(cb)
+      await tickTwice()
 
-    expect(origSpy).toHaveBeenCalledTimes(1)
-    expect(cb).toHaveBeenCalledTimes(1)
-    expect((cb.mock.calls[0][0] as NodeJS.ErrnoException).code).toBe('EFTYPE')
-    expect(uncaughtSpy).not.toHaveBeenCalled()
-    origSpy.mockRestore()
+      expect(origSpy).toHaveBeenCalledTimes(1)
+      expect(cb).toHaveBeenCalledTimes(1)
+      expect((cb.mock.calls[0][0] as NodeJS.ErrnoException).code).toBe('EFTYPE')
+      expect(uncaughtSpy).not.toHaveBeenCalled()
+    } finally {
+      origSpy?.mockRestore()
+    }
   })
 
   it('兼容：fluent-ffmpeg 结构变更（_spawnFfmpeg 缺失）→ diagLog 告警且不抛错', async () => {

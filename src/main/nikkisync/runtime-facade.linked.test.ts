@@ -482,25 +482,28 @@ suite('K3：游戏版本日历深入口的实测边界（真实产物，无出�
   it('会话面 resolveGameVersion：版本与生效时间成对给出，未知时刻两键缺省', async () => {
     // 库文件直接落在 os.tmpdir() 下而不是 fixtureRoot 里 ⇒ 文件级 afterAll 的 rmSync 扫不到它。
     // 装置轴 7（node:sqlite）打通之后这一支才真能建库，每轮会留一个 180KB 的 .db，所以本用例自己收。
-    const databaseFile = path.join(os.tmpdir(), `nikkisync-k3-${Date.now()}.db`)
-    const session = await createRuntimeSession(
-      {
-        databaseFile,
-        watcher: false,
-        projectRoot
-      },
-      await loadRuntimeSurface(projectRoot)
-    )
+    // 建库必须写在 try 内：`createRuntimeSession` 打开 `.db` 之后还有若干步，任一步抛错时写在它外面的
+    // 收尾都不会执行——那正是「自收尾」要消灭的泄漏，漏在失败路径上也算漏。
+    const k3DatabaseFile = path.join(os.tmpdir(), `nikkisync-k3-${Date.now()}.db`)
+    let k3Session: NikkiSyncRuntimeSession | undefined
     try {
-      const hit = session.resolveGameVersion('2025-04-01T00:00:00.000Z')
+      k3Session = await createRuntimeSession(
+        {
+          databaseFile: k3DatabaseFile,
+          watcher: false,
+          projectRoot
+        },
+        await loadRuntimeSurface(projectRoot)
+      )
+      const hit = k3Session.resolveGameVersion('2025-04-01T00:00:00.000Z')
       expect(hit.version).toBe('1.4')
       expect(hit.effectiveAt).toBe('2025-03-26T03:00:00.000Z')
-      const miss = session.resolveGameVersion(undefined)
+      const miss = k3Session.resolveGameVersion(undefined)
       expect('version' in miss).toBe(false)
       expect('effectiveAt' in miss).toBe(false)
     } finally {
-      session.dispose()
-      fs.rmSync(databaseFile, { force: true, maxRetries: 10, retryDelay: 300 })
+      k3Session?.dispose()
+      fs.rmSync(k3DatabaseFile, { force: true, maxRetries: 10, retryDelay: 300 })
     }
   })
 })
