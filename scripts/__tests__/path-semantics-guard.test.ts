@@ -221,6 +221,8 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
       "vi.mock('node:os'",
       "vi.mock('fs'",
       "vi.mock('url'",
+      "vi.mock('child_process'",
+      "vi.mock('node:child_process'",
       // 轴 6：sharp 的原生运行时 id 在首次装载时按 process.platform 算，
       // 预载必须排在轴 2 改写之前，否则装置里凡 import sharp 的文件整片收集失败
       "await import('sharp')"

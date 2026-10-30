@@ -24,6 +24,9 @@
  *    于是这一轴改为「与基座同形」，由自检用例断言替身确实生效。）
  * 6. 原生绑定装载时机：`sharp` 在轴 2 改写 `process.platform` **之前**预载，
  *    装置里用的是真 sharp 而不是惰性替身（`video-frame.test.ts` 要真 sharp 造素材）。
+ * 8. `child_process` / `node:child_process`：第 0 位（program/file）与 `options.cwd` 走轴 4 的
+ *    `toReal`（工厂见 `./mocks/ci-linux-child-process`）——轴 4 只管 `fs`，而子进程的 cwd 由 OS
+ *    解析，装置形态的仓库根在 Windows 上并不存在 ⇒ `spawnSync git ENOENT`。
  *
  * 已知失真（读结果时必须知道，逐文件归因就按这些轴点名）：
  * - **裸 `__dirname`** 无法改写（vitest 注入的是真实文件位置）；经 `fileURLToPath(import.meta.url)`
@@ -164,6 +167,17 @@ vi.mock('url', async (importOriginal) => {
 vi.mock('node:url', async (importOriginal) => {
   const { ciLinuxUrlHost } = await import('./mocks/ci-linux-fs')
   return ciLinuxUrlHost(importOriginal as () => Promise<unknown>)
+})
+
+// ---------- 轴 8：child_process —— 子进程的路径参数（cwd 与 program）也要翻译 ----------
+// 工厂逐条内联（同轴 1：被提升的 vi.mock 不能引用顶层绑定）
+vi.mock('child_process', async (importOriginal) => {
+  const { ciLinuxChildProcessHost } = await import('./mocks/ci-linux-child-process')
+  return ciLinuxChildProcessHost(importOriginal as () => Promise<unknown>)
+})
+vi.mock('node:child_process', async (importOriginal) => {
+  const { ciLinuxChildProcessHost } = await import('./mocks/ci-linux-child-process')
+  return ciLinuxChildProcessHost(importOriginal as () => Promise<unknown>)
 })
 
 // 供装置自检用例（src/main/utils/ci-linux-emulation.test.ts）判定本轮是否真在模拟态下运行

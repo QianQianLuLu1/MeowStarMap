@@ -196,6 +196,31 @@ describe('CI 宿主模拟装置自检', () => {
     }
   )
 
+  it.skipIf(!ACTIVE)(
+    '轴 8：child_process 的 cwd 经装置翻译（git 能在模拟仓库根跑起来）',
+    async () => {
+      // 不抛 ENOENT 只说明「cwd 被翻译过」；再比一次 git 自己报出的顶层目录，
+      // 才证明它落在**真仓库**而不是随便一个目录——scripts/check-md-links.ts 的 tracked
+      // 清单正是从这个 cwd 取出来的，落错地方会静默扫到空集合。
+      const cp = (await import('node:child_process')) as unknown as {
+        execFileSync: (
+          file: string,
+          args: string[],
+          options: { cwd: string; encoding: 'utf8' }
+        ) => string
+      }
+      const norm = (value: string): string =>
+        value.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+      const top = cp
+        .execFileSync('git', ['-c', 'core.quotepath=false', 'rev-parse', '--show-toplevel'], {
+          cwd: process.cwd(),
+          encoding: 'utf8'
+        })
+        .trim()
+      expect(norm(top)).toBe(norm(marker!.cwd))
+    }
+  )
+
   it('轴 5：electron 走惰性替身，单测不依赖二进制安装状态', async () => {
     // 这条在两种 profile 下都必须成立：CI 用 --ignore-scripts 装依赖时真 electron 会抛错，
     // 基座 vitest.config.ts 的 resolve.alias 就是把那 40 个文件从 CI 红灯里捞出来的手段。

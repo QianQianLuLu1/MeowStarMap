@@ -91,7 +91,7 @@
 ### N6 轴 7：`vi.mock('node:sqlite')`（RC-6，**探针先行**）
 
 - Gate A（动手前必做，临时代码不落库）：在 setup 里临时注册会大声失败的哨兵 `class Sentinel extends actual.DatabaseSync { constructor(loc){ throw new Error('__SQLITE_MOCK_HIT__ ' + loc) } }`，跑 `npx vitest run --config vitest.ci-linux.config.ts src/main/nikkisync/runtime-facade.linked.test.ts`。打出 `__SQLITE_MOCK_HIT__ /tmp/…` ⇒ 上游包在 vitest 图里、变量式 specifier 被接管 ⇒ 走轴；仍是 `unable to open database file` ⇒ 被外部化 ⇒ 走兜底。**注意**上游 `dist/src/*.js.map` 带 `sourceMappingURL`，栈帧显示 `.ts` 不构成「在图里」的证据
-- 首选设计：`tests/mocks/ci-linux-sqlite.ts`（新）导出 `ciLinuxSqliteHost`，`class CiLinuxDatabaseSync extends RealDatabaseSync { constructor(location, options){ super(toReal(location), options) } }`；`StatementSync/constants/backup` 原样透传；用 `extends` 保 `instanceof`；只注册 `node:sqlite`（`bun:sqlite` 上游不可达）
+- 首选设计：轴 7 的新工厂模块（`tests/mocks/` 下，与其余轴文件同址；文件名与内容见对应提交）导出 `ciLinuxSqliteHost`，`class CiLinuxDatabaseSync extends RealDatabaseSync { constructor(location, options){ super(toReal(location), options) } }`；`StatementSync/constants/backup` 原样透传；用 `extends` 保 `instanceof`；只注册 `node:sqlite`（`bun:sqlite` 上游不可达）
 - 兜底：`rigSqlitePath(p)`（marker 缺席即恒等）只套在每个 linked 文件的 `mkdtemp` 结果那一行（`sync-server.linked.test.ts:260`、`runtime-facade.linked.test.ts:70` 及其 `:485`、`metadata-resolver.linked.test.ts:115`），一次覆盖所有派生库路径；必须在 `tests/ci-linux.setup.ts` 的「已知失真」头标明「sqlite 路径由夹具层翻译，不是宿主轴」。**不许**：把沙箱搬到盘根、把这三套 skip
 - 自检例（把 Gate A 结论永久化）：逐字复刻上游装载序列 `const specifier = process.versions.bun ? 'bun:sqlite' : 'node:sqlite'` → `await import(specifier)` → 在 `mkdtemp` 目录建库 `CREATE TABLE` → 再开 `':memory:'` → close → `rmSync`
 - 验收：`25→0`；`npx vitest run --config vitest.ci-linux.config.ts src/main/nikkisync` 的 **skipped 必须为 0**（非 0 ⇒ junction 没了，是假绿）；`D:/tmp` 不增长
