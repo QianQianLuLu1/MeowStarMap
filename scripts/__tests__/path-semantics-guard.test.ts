@@ -261,6 +261,18 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
     }
   })
 
+  it('同绑定期望值：经 createRequire 装载的 .cjs，期望值不得用顶层 import 的 path 拼', () => {
+    // 第 4 轮 RC-5：`.cjs` 走 createRequire ⇒ 拿宿主 path，而测试顶层 `import path` 会被
+    // 装置轴 1 换成 posix，两侧各拼一种方言必然假红。钉 win32 也不是解（真 CI 上脚本用 posix）。
+    // 判据落在源码形态上：必须有 require_('node:path') 的同绑定别名，且不得残留裸 path.join。
+    const rel = 'scripts/__tests__/build-recycle-helper.test.ts'
+    const source = read(rel)
+    expect(source, `${rel} 必须从 require 图里取 path 作期望值绑定`).toContain(
+      "require_('node:path')"
+    )
+    expect(stripComments(source), `${rel} 残留裸 path.join 期望值`).not.toMatch(/\bpath\.join\(/)
+  })
+
   it('装置自检文件：哨兵不得拿 win32 形态常量当期望值，且自身不得被闸门挡住', () => {
     const rel = 'src/main/utils/ci-linux-emulation.test.ts'
     const source = read(rel)

@@ -43,6 +43,14 @@ interface RecycleHelperModule {
 
 const require_ = createRequire(import.meta.url)
 const helper = require_('../build-recycle-helper.cjs') as RecycleHelperModule
+/**
+ * 期望值必须与脚本里 `require('node:path')` **同一绑定**：`.cjs` 经 createRequire 装载，
+ * 在 CI 宿主模拟装置里拿的是真 win32 `path`，而本文件顶层 `import path from 'node:path'`
+ * 被装置轴 1 换成 posix ⇒ 两种方言各拼各的（`D:\Win\…\csc.exe` vs `D:\Win/…/csc.exe`），
+ * 用顶层 path 拼期望值就必然假红（第 4 轮 RC-5）。
+ * 不能改用 path.win32 钉死：真 CI（Linux）上脚本用的是 posix join，钉 win32 会把绿的 CI 判红。
+ */
+const helperPath = require_('node:path') as typeof path
 
 describe('build-recycle-helper（K8-a 回收 helper 构建脚本，纯函数层）', () => {
   it('resolveSourcePath/resolveOutputPath：落在 resources/nikkisync/ 下，产物名固定', () => {
@@ -58,9 +66,10 @@ describe('build-recycle-helper（K8-a 回收 helper 构建脚本，纯函数层�
   it('resolveCscPath：%WINDIR% 参与拼装、exists 命中返回路径、缺失返回 null', () => {
     const exists = vi.fn((candidate: string) => candidate.endsWith('csc.exe'))
     const found = helper.resolveCscPath({ WINDIR: 'D:\\Win' }, exists)
-    // 期望值用同款 path.join 计算，Linux CI（posix join）与 win32 宿主（win32 join）都成立
+    // 期望值用被测脚本同一绑定的 path.join 计算：真 CI（posix）与 win32 宿主都成立，
+    // CI 宿主模拟装置下也不会与脚本本体分叉
     expect(found).toBe(
-      path.join('D:\\Win', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
+      helperPath.join('D:\\Win', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
     )
     expect(exists).toHaveBeenCalledWith(found)
 
@@ -146,7 +155,7 @@ describe('build-recycle-helper（K8-a 回收 helper 构建脚本，纯函数层�
       { windowsHide: boolean }
     ]
     expect(file).toBe(
-      path.join('C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
+      helperPath.join('C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe')
     )
     // 参数形状：/nologo /target:exe /out:<output> /r:Microsoft.VisualBasic.dll <source>
     expect(args).toEqual([
