@@ -828,6 +828,14 @@ Three major capabilities:
 | `video-probe.ts`           | Shared ffprobe implementation (probeVideoMetadata; safely parses "30000/1001" frame rate format)                                                       |
 | `worker-restart-policy.ts` | Worker restart policy (crash restart count / backoff decision)                                                                                         |
 
+**Read-stream constraint**: any scenario that streams a local file outward (`media://` protocol, WiFi-share
+downloads and thumbnails) must go through `createManagedReadStream`; never write a bare
+`fs.createReadStream(path).pipe(dest)` — once `pipe()` returns, the outer `try/catch` is already useless, so
+errors in the async phase reach neither the catch nor the logs, and a stream that was never `destroy()`ed
+leaks its fd (on Windows this shows up as a file that stays locked and cannot be deleted). When writing a
+stream into an HTTP response, the caller must also attach `error`/`close` listeners on the response object
+(see `serveFile` in `share-wifi-service.ts`).
+
 ### 5.10 App Lifecycle Management (app/)
 
 Application orchestration layer bootstrapped from `index.ts`, with 27 source files each handling a specific responsibility:
@@ -1460,7 +1468,32 @@ components / pages (display)
 - `sandbox: true` — sandbox mode
 - `protocol.registerSchemesAsPrivileged` — media:// and app:// protocol privilege declaration
 
-#### 10.1.2 IPC Path Whitelist (PathGuard)
+#### 10.1.2 Navigation Guard and Preload Trusted Origin
+
+`preload` is a window-level `webPreferences` entry: it runs for **any** document the webContents loads,
+regardless of origin, and it is not covered by the page CSP. So "navigating to a non-app document" hands
+that document the full IPC bridge. Two independent lines of defence apply (`will-navigate` interception is
+layer one, the preload self-check is layer two):
+
+- **Main process**: `src/main/app/navigation-guard.ts` exposes `isAppDocumentUrl(url, isDev)`
+  - Allows: `app://` / `media://`; in dev only, `http://localhost:5173` and `http://127.0.0.1:5173`
+  - Denies: `file://` (in every environment), localhost on any port other than 5173, and all external sites
+  - On a hit: `event.preventDefault()` plus `logFault('navigation-blocked', …, { source, url })`
+  - `window-manager.ts` registers both `will-navigate` (main frame) and `will-frame-navigate` (sub-frames;
+    the main-frame event short-circuits so the same fault is not logged twice)
+- **Preload**: `src/main/preload/origin-guard.ts` exposes `isTrustedDocumentOrigin(origin, isDev)`
+  - An untrusted document gets no `exposeInMainWorld` at all (`electronAPI` / `IpcError` /
+    `pluggableElectronIpc` / `__setPluginI18nT` / `pluginAPI`)
+  - Empty / `'null'` / `about:` origins are always denied (an opaque origin can be reached by an evil parent
+    page after `document.write` on its `contentWindow`)
+  - The dev flag comes from the compile-time constant `__NIKKI_PRELOAD_DEV__` (the preload `define` in
+    `electron.vite.config.ts`) and safely defaults to `false` when not injected — runtime `process.env` is
+    unreliable inside a sandboxed preload
+
+The two allow-lists must mirror each other verbatim; changing one means changing the other in the same
+commit (preload cannot import main-process modules, so the two cannot share a single module).
+
+#### 10.1.3 IPC Path Whitelist (PathGuard)
 
 - **Default deny** policy
 - **Blacklist fallback**: `SYSTEM_SENSITIVE_DIRS` (Windows/ProgramData/$recycle.bin/System32 etc.) always denies
@@ -1468,7 +1501,7 @@ components / pages (display)
 - **Dynamic registration**: scanner-discovered media dirs, dialog-selected dirs
 - **File op handlers** must call `assertFileReadPath` / `assertFileWritePath`
 
-#### 10.1.3 media:// Protocol Whitelist
+#### 10.1.4 media:// Protocol Whitelist
 
 5-layer validation:
 
@@ -1478,7 +1511,7 @@ components / pages (display)
 4. Database `thumbnail` exact match
 5. Indexed `source_path` prefix match + extension whitelist
 
-#### 10.1.4 Parameter Validation
+#### 10.1.5 Parameter Validation
 
 - All IPC handlers wrapped via `wrapHandler`
 - zod schema validates parameter types and ranges
