@@ -2043,10 +2043,18 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 - **测试文件数（静态可核，不必实跑）**：Vitest 5.0，**454 个测试文件** = src 421 + scripts 28 + e2e 5
   （`git ls-files '*.test.ts' '*.test.tsx'` 分目录计数）。相对上一颗 453 是 +1，来自 `59b3377`（2026-10-30）
   新增的 `src/renderer/styles/app-drag-region.test.ts`。
-- **用例通过数（必须实跑才有资格写）**：最近一次全量实跑是 2026-10-28 的
-  `Test Files 453 passed (453)`、`Tests 7063 passed | 12 skipped (7075)`，耗时 54.14s——它对应的是**上一行 453 文件那一轮**的形态。
-  454 文件这一轮的用例数尚未实跑，不在这里预填；把两轴合并成一个「当前值」正是本附录此前反复过期的原因。
-- 历史读数（仅供对照，勿沿用）：452 / 7046 + 12 为 2026-10-28 同轮第一颗快照（53.60s）。本轮相对它 +1 文件 / +17 例，逐项闭合为：+1 文件 / +15 例来自新增闸门 `scripts/__tests__/logger-escape-ledger.test.ts`，+1 例来自 `src/main/utils/logger.enforce.test.ts` 新加的环境卫生探针，+1 例来自 `src/main/utils/dir-manager.test.ts` 新加的同类探针（452+1=453、7046+15+1+1=7063，`12 skipped` 未变）。再往前：450 / 7021 + 12 为 2026-10-27 快照——其静态构成把 `60cfe96`（2026-10-27）新增的 `e2e/__tests__/launch-env.test.ts` 漏计成「e2e 4」，按实跑对齐为 5；该轮相对 450 快照 +1 文件 / +19 例来自 `scripts/__tests__/lock-advisory-floor.test.ts`，+1 例来自 `connection.test.ts` 的探针，余 +1 文件 / +5 例即上述漏计件（450+1+1=452、7021+19+1+5=7046）。437 / 6737 + 12 为 2026-10-24 快照，408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
+- **用例通过数（必须实跑才有资格写）**：2026-10-30 本机全量 `npm test` 实跑
+  `Test Files 454 passed (454)`、`Tests 7094 passed | 12 skipped (7106)`，耗时 53.45s
+  （宿主 `win32 / node-v26.3.0 / vitest 5.0.3`）。文件数与上一行的静态计数逐项闭合（454 = 421+28+5）；
+  相对 2026-10-28 那颗为 +1 文件 / +31 例 / skip 不变。
+- **装置侧（`npm run test:ci-linux`）本机不可达全绿，终判在 CI**：同一命令本机跑出 32 failed | 422 passed (454)，
+  轮前基线 `a678393` 为 33 failed | 421 passed (454)——**本轮 0 新增红**。红项集中在两类装载期失败：
+  sharp/better-sqlite3 的原生二进制按模拟 Linux 宿主去取（`Could not load the "sharp" module using the linuxnull-x64 runtime`）、
+  以及 `execFileSync('git', …, {cwd: ROOT})` 的 cwd 经轴 4e 翻成 `/home/runner/…` 而本机不存在 ⇒ `spawnSync git ENOENT`
+  （后者已由 `docs/plans/2026-10-20-fix-ci-linux-path-semantics-round2.md` 记为已知限制）。
+  另注意 `scripts/__tests__/logger-escape-ledger.test.ts` 两次同命令跑出不同结果，属时序敏感 flaky，不得当改善或回归读。
+- 历史读数（仅供对照，勿沿用）：**453 / 7063 + 12（54.14s）为 2026-10-28 全量实跑快照**（下文的「本轮」
+  均指 2026-10-28 那一轮，不指当前）。452 / 7046 + 12 为 2026-10-28 同轮第一颗快照（53.60s）。本轮相对它 +1 文件 / +17 例，逐项闭合为：+1 文件 / +15 例来自新增闸门 `scripts/__tests__/logger-escape-ledger.test.ts`，+1 例来自 `src/main/utils/logger.enforce.test.ts` 新加的环境卫生探针，+1 例来自 `src/main/utils/dir-manager.test.ts` 新加的同类探针（452+1=453、7046+15+1+1=7063，`12 skipped` 未变）。再往前：450 / 7021 + 12 为 2026-10-27 快照——其静态构成把 `60cfe96`（2026-10-27）新增的 `e2e/__tests__/launch-env.test.ts` 漏计成「e2e 4」，按实跑对齐为 5；该轮相对 450 快照 +1 文件 / +19 例来自 `scripts/__tests__/lock-advisory-floor.test.ts`，+1 例来自 `connection.test.ts` 的探针，余 +1 文件 / +5 例即上述漏计件（450+1+1=452、7021+19+1+5=7046）。437 / 6737 + 12 为 2026-10-24 快照，408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
 ---
