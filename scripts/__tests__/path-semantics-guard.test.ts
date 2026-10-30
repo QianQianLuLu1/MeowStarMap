@@ -223,6 +223,9 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
       "vi.mock('url'",
       "vi.mock('child_process'",
       "vi.mock('node:child_process'",
+      // 轴 7：sqlite 的文件句柄不经轴 4 的 fs 翻译层，库路径必须由这一轴自己翻译，
+      // 否则 linked 套件里的库会落到盘根（Windows 上目录不存在 ⇒ unable to open database file）
+      "vi.mock('node:sqlite'",
       // 轴 6：sharp 的原生运行时 id 在首次装载时按 process.platform 算，
       // 预载必须排在轴 2 改写之前，否则装置里凡 import sharp 的文件整片收集失败
       "await import('sharp')"

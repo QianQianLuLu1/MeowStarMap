@@ -23,6 +23,7 @@ import * as osNs from 'node:os'
 import nodePath from 'path'
 import { createRequire } from 'module'
 import { fileURLToPath } from 'url'
+import type { DatabaseSync as DatabaseSyncType } from 'node:sqlite'
 import { rigNativePath } from '../../../tests/mocks/ci-linux-fs'
 
 const marker = (globalThis as Record<string, unknown>).__wxnnCiLinuxEmulation as
@@ -220,6 +221,41 @@ describe('CI 宿主模拟装置自检', () => {
       expect(norm(top)).toBe(norm(marker!.cwd))
     }
   )
+
+  it.skipIf(!ACTIVE)('轴 7：node:sqlite 的库路径经装置翻译（真原生句柄落在沙箱里）', async () => {
+    // 逐字复刻上游装载序列（NikkiSync `packages/database/src/database-manager.ts:14-17`）：
+    // 变量式 specifier + `Database ?? DatabaseSync`。sqlite 的文件句柄不经轴 4 的 fs 翻译层，
+    // 装置形态的 `/tmp/…` 交给原生 open 会按 OS 语义解析成盘相对路径 ⇒ unable to open database file。
+    const specifier = (process.versions as Record<string, string | undefined>).bun
+      ? 'bun:sqlite'
+      : 'node:sqlite'
+    const mod = (await import(specifier)) as Record<string, unknown>
+    // vitest 的 mock 代理读到**未声明的导出**直接抛，所以「取到 undefined 而不是抛」
+    // 是这一轴必须守住的契约（上游靠它落到 ?? DatabaseSync 这一支）
+    expect(mod.Database).toBeUndefined()
+    const Ctor = (mod.Database ?? mod.DatabaseSync) as
+      (new (location: string) => DatabaseSyncType) | undefined
+    expect(typeof Ctor).toBe('function')
+
+    const dir = fs.mkdtempSync(nodePath.join(os.tmpdir(), 'self-check-sqlite-'))
+    const file = nodePath.join(dir, 'a.db')
+    try {
+      const db = new Ctor!(file)
+      db.exec('CREATE TABLE t(v INTEGER)')
+      db.prepare('INSERT INTO t VALUES (?)').run(7)
+      expect(db.prepare('SELECT v FROM t').get()).toEqual({ v: 7 })
+      db.close()
+      // 落点判据：真原生句柄写的是沙箱里那份文件（与轴 4g 同一套取法，不依赖宿主平台）
+      const rawFs = createRequire(import.meta.url)('fs') as typeof import('fs')
+      expect(rawFs.existsSync(rigNativePath(file))).toBe(true)
+      // 边界：':memory:' 不带装置根前缀 ⇒ toReal 恒等，内存库语义不受装置影响
+      const mem = new Ctor!(':memory:')
+      expect(mem.prepare('SELECT 1 AS one').get()).toEqual({ one: 1 })
+      mem.close()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   it('轴 5：electron 走惰性替身，单测不依赖二进制安装状态', async () => {
     // 这条在两种 profile 下都必须成立：CI 用 --ignore-scripts 装依赖时真 electron 会抛错，

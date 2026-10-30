@@ -24,6 +24,10 @@
  *    于是这一轴改为「与基座同形」，由自检用例断言替身确实生效。）
  * 6. 原生绑定装载时机：`sharp` 在轴 2 改写 `process.platform` **之前**预载，
  *    装置里用的是真 sharp 而不是惰性替身（`video-frame.test.ts` 要真 sharp 造素材）。
+ * 7. `node:sqlite`：库文件路径经轴 4 同一套 `toReal` 交给原生句柄（工厂见
+ *    `./mocks/ci-linux-sqlite`）。sqlite 的构造器拿的是 OS 语义的真路径，轴 4 只接管 `fs` API
+ *    ⇒ 装置形态的 `/tmp/…` 在 Windows 上解析成盘相对路径、父目录不存在即
+ *    `unable to open database file`（第 4 轮 RC-6 的 25 盏）。它属宿主轴，落点在沙箱真目录。
  * 8. `child_process` / `node:child_process`：第 0 位（program/file）与 `options.cwd` 走轴 4 的
  *    `toReal`（工厂见 `./mocks/ci-linux-child-process`）——轴 4 只管 `fs`，而子进程的 cwd 由 OS
  *    解析，装置形态的仓库根在 Windows 上并不存在 ⇒ `spawnSync git ENOENT`。
@@ -35,6 +39,12 @@
  *   在 Windows 上不能创建 ⇒ 「拿非法名去 mkdir」的用例只在装置红、CI 绿。
  * - 大小写不敏感、junction/symlink 语义与 ext4 不同。
  * - 外置 CJS 依赖内部的 `require('fs')` 不经过第 4 轴（只有测试图里的 import 被 mock）。
+ * - **轴 8 在装置态给出两个 `child_process` 身份**：测试图里 `import cp from 'child_process'`
+ *   拿到的是包装**副本**（`./mocks/ci-linux-child-process` 的 `{ ...ns }`），而外部化 CJS
+ *   （fluent-ffmpeg 顶层 `var spawn = require('child_process').spawn`）捕获的仍是真内置单例。
+ *   真宿主与 CI 上两者同一对象，装置里不同 ⇒ 凡「靠给内置单例打桩来拦截外部化 CJS」的测试
+ *   必须补真单例那一份（`createRequire(import.meta.url)('child_process')`，与 `os` 同法），
+ *   否则桩打空、真 spawn 拿到装置形态的假路径。见 EFTYPE 两处补桩点。
  */
 import realFs from 'fs'
 import { createRequire } from 'module'
@@ -178,6 +188,14 @@ vi.mock('child_process', async (importOriginal) => {
 vi.mock('node:child_process', async (importOriginal) => {
   const { ciLinuxChildProcessHost } = await import('./mocks/ci-linux-child-process')
   return ciLinuxChildProcessHost(importOriginal as () => Promise<unknown>)
+})
+
+// ---------- 轴 7：node:sqlite —— 库文件路径交给原生句柄，不经轴 4 ----------
+// 只注册 `node:sqlite`：上游取构造器的 specifier 由 `process.versions.bun` 决定，
+// `bun:sqlite` 那条支路在 Node 上不可达，注册了也没有消费者。
+vi.mock('node:sqlite', async (importOriginal) => {
+  const { ciLinuxSqliteHost } = await import('./mocks/ci-linux-sqlite')
+  return ciLinuxSqliteHost(importOriginal as () => Promise<unknown>)
 })
 
 // 供装置自检用例（src/main/utils/ci-linux-emulation.test.ts）判定本轮是否真在模拟态下运行
