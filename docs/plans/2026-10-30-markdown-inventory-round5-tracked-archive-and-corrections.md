@@ -16,9 +16,10 @@
    - `scripts/__tests__/old-name-ledger.json:43` 的 `skipDirs` 含 `archive`，而 `old-name-ledger.test.ts:69-70`
      的 `isSkipped` 按**路径段**匹配 ⇒ 归档件自动豁免旧名终扫，不需要为它们增设 `skipPaths` 条目；
    - 移动后仍是 tracked ⇒ `check-md-links.ts:288-318` 的 `classifyRef` 判 `ok`，**不需要**给任何入站行
-     补 GONE_MARKER。反面前四轮的两步法：`docs/plans/X.md` 形态的入站引用在未跟踪时会落进 `dead`，
+     补 GONE_MARKER。反面前四轮的两步法：`docs/plans/X.md`（示意占位，本仓不存在同名文件）形态的入站引用在未跟踪时会落进 `dead`，
      而 `:232` 断 `dead === 0` 是硬阻断。
-   - 命名是承重的：路径段必须恰为 `archive`（`docs/plans/retired/` 之类会被旧名扫描收录）。
+   - 命名是承重的：路径段必须恰为 `archive`（`docs/plans/retired/` 是反例占位，仓库中不存在该目录，
+     且这类命名会被旧名终扫收录）。
 2. **撤销 10-27 §9 的裁示**。上一轮记「归档判定无自动化……根治分支经用户裁示本轮不采纳」。本轮经用户
    在四个候选里明确选择「移入受跟踪归档目录」，裁示已变，故本文件即变更出处。`docs/plans/archive/README.md`（S7 待创建）
    随本轮建立，登记「名称 → 结案 commit → 后继文档」，下轮按表操作而非重新判断。
