@@ -385,7 +385,7 @@ MeowStarMap/
 │   │   │   ├── path-classifier.ts     # Path classification pure functions
 │   │   │   ├── scan-channels.ts       # Scan channel orchestration
 │   │   │   ├── game-directory-discovery.ts # Three-channel game directory discovery
-│   │   │   ├── repair-legacy-data-v1..v6.ts # Legacy data repair series
+│   │   │   ├── repair-legacy-data-v1/v3/v4/v5/v6.ts # Legacy data repair series (no v2 — that number was never used)
 │   │   │   ├── worker-entry.ts        # scanner-worker entry
 │   │   │   └── worker-protocol.ts
 │   │   ├── media-worker/              # media-worker (thumbnail/pHash/duplicate)
@@ -558,8 +558,7 @@ MeowStarMap/
 │   ├── setup.ts
 │   └── mocks/                         # electron / sqlite / parent-port test stubs
 ├── tools/                             # Auxiliary tools
-│   ├── image-decode-analysis/
-│   └── scripts/
+│   └── scripts/                       # Only extract_js.ps1 / setup-env.ps1 — no subproject here
 ├── .gitignore / .npmrc / .prettierrc / .prettierignore
 ├── .husky/ / commitlint.config.cjs    # Git hooks and commit validation
 ├── electron.vite.config.ts            # Main/preload/renderer three-segment build config
@@ -1553,7 +1552,7 @@ components / pages (display)
 "build:preview": "vite build --config vite.preview.config.ts",
 "preview": "electron-vite preview",
 "dist": "npm run build && electron-builder --publish never",
-"dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+"dist:win": "npm run build:recycle-helper && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
 "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
 "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
 "typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
@@ -2014,7 +2013,12 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- Vitest 5.0, **453 test files / 7063 passing + 12 skipped (7075 tests total)** (measured 2026-10-28 with a full `npm test` run in the second pass of this day: `Test Files 453 passed (453)`, `Tests 7063 passed | 12 skipped (7075)`, 54.14s). Breakdown: src 420 + scripts 28 + e2e 5 (static glob count, reconciled with the run summary).
+- **Test file count (statically verifiable, no run needed)**: Vitest 5.0, **454 test files** = src 421 + scripts 28 + e2e 5
+  (per-directory count of `git ls-files '*.test.ts' '*.test.tsx'`). Versus the previous 453 this is +1, from
+  `src/renderer/styles/app-drag-region.test.ts` added by `59b3377` (2026-10-30).
+- **Passing case count (only quotable from an actual run)**: the most recent full run is 2026-10-28 —
+  `Test Files 453 passed (453)`, `Tests 7063 passed | 12 skipped (7075)`, 54.14s — and it describes the **453-file round above**, not the current tree.
+  The 454-file round has not been run yet, so no number is prefilled here; merging the two axes into a single "current value" is exactly what kept this appendix stale.
 - Historical readings (for reference only — do not reuse): 452 / 7046 + 12 is the earlier same-day snapshot (2026-10-28 first pass, 53.60s). Versus it this pass adds +1 file / +17 cases, reconciled item by item: +1 file / +15 cases from the new gate `scripts/__tests__/logger-escape-ledger.test.ts`, +1 case from the hygiene probe added to `src/main/utils/logger.enforce.test.ts`, +1 case from the matching probe in `src/main/utils/dir-manager.test.ts` (452+1=453, 7046+15+1+1=7063; the `12 skipped` count is unchanged). Further back: 450 / 7021 + 12 is the 2026-10-27 snapshot — its static breakdown under-counted `e2e/__tests__/launch-env.test.ts` (added by `60cfe96`, 2026-10-27) as "e2e 4" and was aligned to 5 per the actual run; versus that snapshot +1 file / +19 cases came from `scripts/__tests__/lock-advisory-floor.test.ts`, +1 case from `connection.test.ts`'s probe, and the remaining +1 file / +5 cases were the under-counted file above (450+1+1=452, 7021+19+1+5=7046). 437 / 6737 + 12 is the 2026-10-24 snapshot, 408 / 6312 + 2 is the 2026-10-17 snapshot, 337 / 5331 the 2026-10-10 snapshot (see `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10).
 - The two environment-related failures in the historical baseline (`path-safety.test.ts` read-only-directory case, `GalleryStackOverflow.test.tsx`) were fixed in 2.5.0; there are currently no pre-existing failures.
 

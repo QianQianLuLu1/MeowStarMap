@@ -385,7 +385,7 @@ MeowStarMap/
 │   │   │   ├── path-classifier.ts     # 路径分类纯函数
 │   │   │   ├── scan-channels.ts       # 扫描通道编排
 │   │   │   ├── game-directory-discovery.ts # 游戏目录三渠道发现
-│   │   │   ├── repair-legacy-data-v1..v6.ts # 旧数据修复系列
+│   │   │   ├── repair-legacy-data-v1/v3/v4/v5/v6.ts # 旧数据修复系列（无 v2，该序号从未启用）
 │   │   │   ├── worker-entry.ts        # scanner-worker 入口
 │   │   │   └── worker-protocol.ts
 │   │   ├── media-worker/              # media-worker（缩略图/pHash/重复检测）
@@ -558,8 +558,7 @@ MeowStarMap/
 │   ├── setup.ts
 │   └── mocks/                         # electron / sqlite / parent-port 等测试桩
 ├── tools/                             # 辅助工具
-│   ├── image-decode-analysis/
-│   └── scripts/
+│   └── scripts/                       # 仅 extract_js.ps1 / setup-env.ps1 两个脚本，无子项目
 ├── .gitignore / .npmrc / .prettierrc / .prettierignore
 ├── .husky/ / commitlint.config.cjs    # Git 钩子与提交校验
 ├── electron.vite.config.ts            # 主/preload/renderer 三段式构建配置
@@ -1582,7 +1581,7 @@ components / pages (展示)
 "build:preview": "vite build --config vite.preview.config.ts",
 "preview": "electron-vite preview",
 "dist": "npm run build && electron-builder --publish never",
-"dist:win": "npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+"dist:win": "npm run build:recycle-helper && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
 "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
 "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
 "typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
@@ -2041,7 +2040,12 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- Vitest 5.0，**453 个测试文件 / 7063 个通过 + 12 个 skip（共 7075 个用例）**（2026-10-28 第二轮 `npm test` 全量实跑，`Test Files 453 passed (453)`、`Tests 7063 passed | 12 skipped (7075)`；耗时 54.14s）。文件数构成：src 420 + scripts 28 + e2e 5（静态 glob 统计，与实跑汇总逐项对齐）。
+- **测试文件数（静态可核，不必实跑）**：Vitest 5.0，**454 个测试文件** = src 421 + scripts 28 + e2e 5
+  （`git ls-files '*.test.ts' '*.test.tsx'` 分目录计数）。相对上一颗 453 是 +1，来自 `59b3377`（2026-10-30）
+  新增的 `src/renderer/styles/app-drag-region.test.ts`。
+- **用例通过数（必须实跑才有资格写）**：最近一次全量实跑是 2026-10-28 的
+  `Test Files 453 passed (453)`、`Tests 7063 passed | 12 skipped (7075)`，耗时 54.14s——它对应的是**上一行 453 文件那一轮**的形态。
+  454 文件这一轮的用例数尚未实跑，不在这里预填；把两轴合并成一个「当前值」正是本附录此前反复过期的原因。
 - 历史读数（仅供对照，勿沿用）：452 / 7046 + 12 为 2026-10-28 同轮第一颗快照（53.60s）。本轮相对它 +1 文件 / +17 例，逐项闭合为：+1 文件 / +15 例来自新增闸门 `scripts/__tests__/logger-escape-ledger.test.ts`，+1 例来自 `src/main/utils/logger.enforce.test.ts` 新加的环境卫生探针，+1 例来自 `src/main/utils/dir-manager.test.ts` 新加的同类探针（452+1=453、7046+15+1+1=7063，`12 skipped` 未变）。再往前：450 / 7021 + 12 为 2026-10-27 快照——其静态构成把 `60cfe96`（2026-10-27）新增的 `e2e/__tests__/launch-env.test.ts` 漏计成「e2e 4」，按实跑对齐为 5；该轮相对 450 快照 +1 文件 / +19 例来自 `scripts/__tests__/lock-advisory-floor.test.ts`，+1 例来自 `connection.test.ts` 的探针，余 +1 文件 / +5 例即上述漏计件（450+1+1=452、7021+19+1+5=7046）。437 / 6737 + 12 为 2026-10-24 快照，408 / 6312 + 2 为 2026-10-17 快照，337 / 5331 为 2026-10-10 快照（见 `docs/plans/2026-10-10-markdown-inventory-and-corrections.md` §8.10）。
 - 历史基线中的两个环境性失败（`path-safety.test.ts` 只读目录用例、`GalleryStackOverflow.test.tsx`）已在 2.5.0 修复，当前无既有失败。
 
