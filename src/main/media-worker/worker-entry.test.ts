@@ -119,9 +119,11 @@ vi.mock('sharp', () => {
 
 // fluent-ffmpeg：链式命令 mock；run 后异步触发 end/error（受控）
 // 成功时向捕获到的 output 路径真实写入一个非空 JPG，使 end 后的输出校验通过。
+// 写盘必须用本文件顶层的 `fs`/`path` 绑定（与上面的 sharp mock 同一写法）：
+// 原先在这里 `require('fs')` 拿的是原生模块，绕过 vi.mock 与 CI 宿主模拟装置的 fs 翻译层，
+// 于是抽帧临时文件按盘相对路径落到 D:\tmp\…，而被测代码经 mocked fs 校验 ⇒ 沙箱里查无此文件，
+// 判为抽帧失败（多一次 seek、最终 thumbnailPath 为 null）。第 4 轮 RC-7 即此。
 vi.mock('fluent-ffmpeg', () => {
-  const fs = require('fs')
-  const path = require('path')
   const createCommand = (): Record<string, unknown> => {
     const handlers: Record<string, (err?: Error) => void> = {}
     const cmd: Record<string, unknown> = {}
