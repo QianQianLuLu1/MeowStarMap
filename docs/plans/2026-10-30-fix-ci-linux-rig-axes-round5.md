@@ -137,3 +137,20 @@ npm run e2e:smoke
 - 不改 `tests/mocks/ci-linux-child-process.ts` 的「返回副本」语义：就地改会把 `toReal` 推给全部外部化 CJS，属装置自造 CI 不可能出现的分叉。
 - 不动姊妹装置 `tests/posix-host.setup.ts` / `vitest.posix-host.config.ts`（刻意只开一根轴，已核实与 `node:sqlite` 无交集）。
 - 不把沙箱搬到盘根去「迁就」原生模块。
+
+## 9. 用户点名的五闸门实跑读数（按 §5-N4 的顺序）
+
+| 步骤                                                               | 读数                                                                                                                                                                             |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run link:nikkisync:check`（install 前真相）                   | OK，四包在位                                                                                                                                                                     |
+| **`npm install`**                                                  | exit 0，`removed 4 packages in 1s` ⇒ **四个 junction 被清掉**（已知陷阱）；`package-lock.json` 未被改写（`git status` 干净）                                                     |
+| `npm run link:nikkisync` → `verify:nikkisync`                      | 4 link(s) written；`[verify:nikkisync] OK (blocking failures: 0)`，含「node:sqlite 在 node 26.x 可 import」一条                                                                  |
+| `npm run doctor`                                                   | 总计 5 项 / OK 5 / DEGRADED 0                                                                                                                                                    |
+| 装置态 `src/main/nikkisync`（install 后防假绿复读）                | 16 文件全绿 / 286 passed / **0 skipped**                                                                                                                                         |
+| **`npm run build`**                                                | exit 0，`✓ built in 8.10s`，产物齐；`dist/main/main/app/index.js` 时间戳晚于 HEAD                                                                                                |
+| **`npm run test`**                                                 | exit 0，**454 文件全绿 / 7098 passed / 20 skipped**（与 install 前逐字一致）                                                                                                     |
+| **`npm run typecheck`**                                            | exit 0（`tsc -b` + `tsc -p tsconfig.scripts.json`）                                                                                                                              |
+| `npm run typecheck:e2e` / `npm run lint` / `i18n:guard` / `verify` | 全部 exit 0；lint 零输出；i18n 白名单只减不增；verify 5 项全 ✓                                                                                                                   |
+| **`npm run e2e:smoke`**                                            | exit 0，**16 passed (23.8s)**，`test-results/.last-run.json` = `status: passed, failedTests: []`；日志两处 `[e2e] stripped ELECTRON_RUN_AS_NODE=1` 说明宿主泄漏已被 helpers 收敛 |
+
+一条必须交代的读数边界：S1–S8 那 8 条跑的是 `release/win-unpacked/喵星图.exe`（时间戳 2026-10-30T01:12Z，**早于**本轮提交），N 套件走 `launchBuiltApp()` 用的是 `npm run build` 刚出的 `dist/main` 与 `node_modules/electron`。本轮改动全在测试与装置层（`git diff 045713b..HEAD --stat` 只含 `tests/`、`scripts/__tests__/`、`src/main/**/*.test.ts`、`docs/plans/`），没有产品代码，因此打包态与源码态在这一点上没有差别；若要打包态也吃进本轮提交，需另跑 `npm run dist:win`（本轮按 §8 未做）。
