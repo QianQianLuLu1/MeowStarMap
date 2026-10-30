@@ -31,6 +31,22 @@ function normalizeFingerprint(fingerprint: string): string {
   return fingerprint.replaceAll(':', '').toLowerCase()
 }
 
+/**
+ * 「文件权限位」这条判据成立与否取决于**文件系统有没有 POSIX mode 语义**，不是「我在哪个平台」。
+ * 拿 process.platform 当门会被 CI 宿主模拟装置打开：装置把 platform 改成 'linux'，可底下的盘
+ * 仍是 NTFS（chmod 是空操作、stat 恒回 0o666）⇒ 用例当场假红（第 4 轮 RC-4）。
+ * 改成能力探针后：真 CI 的 ext4 上为 true，用例照旧**执行**；NTFS（真 Windows 宿主与装置态）
+ * 上为 false，跳过的理由与宿主无关，判据落在真实行为上。
+ */
+function posixModeBitsAreMeaningful(): boolean {
+  const probe = path.join(makeDirectory(), 'mode-probe')
+  fs.writeFileSync(probe, 'x')
+  fs.chmodSync(probe, 0o600)
+  return (fs.statSync(probe).mode & 0o777) === 0o600
+}
+
+const POSIX_MODE = posixModeBitsAreMeaningful()
+
 // ============================================================================
 // TLS 证书：生成 / 持久化 / 指纹
 // ============================================================================
@@ -122,7 +138,7 @@ describe('SyncIdentityService.getOrCreateTlsIdentity', () => {
     ).toBe(true)
   })
 
-  it.skipIf(process.platform === 'win32')(
+  it.skipIf(!POSIX_MODE)(
     '私钥文件权限最小化（POSIX 0600；Windows 继承 userData 每用户 ACL）',
     () => {
       const dir = makeDirectory()
@@ -183,7 +199,7 @@ describe('SyncIdentityService.getOrCreateServerIdentity', () => {
     expect(() => createPublicKey(recovered.publicKeyPem)).not.toThrow()
   })
 
-  it.skipIf(process.platform === 'win32')('Ed25519 私钥文件权限 0600', () => {
+  it.skipIf(!POSIX_MODE)('Ed25519 私钥文件权限 0600', () => {
     const dir = makeDirectory()
     new SyncIdentityService({ directory: dir }).getOrCreateServerIdentity()
     expect(fs.statSync(path.join(dir, 'server-ed25519.key')).mode & 0o777).toBe(0o600)

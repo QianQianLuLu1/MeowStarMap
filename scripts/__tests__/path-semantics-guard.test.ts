@@ -59,7 +59,7 @@ const HOST_IO: Array<{ file: string; reason: string }> = [
   },
   {
     file: 'src/main/sync/identity-service.ts',
-    reason: '含 it.skipIf(win32) 的真实文件系统用例，只在 Linux 侧执行，钉 win32 会当场打死'
+    reason: '真实 chmod/stat 私钥文件，配套用例按 POSIX mode 位能力门控，钉 win32 会当场打死'
   },
   {
     file: 'src/main/scanner/integrity-root-filter.ts',
