@@ -1,7 +1,7 @@
 # 搭配码面板收尾审查 → 修复 → 六门全绿 → 提交 → 2.5.6-beta 重打包
 
 > 生成日期：2026-10-31 · 本仓 `main` @ `9d25c73`（`meow-star-map 2.5.6-beta`）
-> 状态：已批准，按本文执行；执行读数回写 §9
+> 状态：已批准并执行完成（读数见 §9）；执行中未放宽任何判据
 > 性质：审查近期提交 + 未提交的「完整搭配码面板」阶段 0–5 改动 → 修可判定缺陷 → 全量门禁 → 提交 → 版本核对 → 原地重打包
 
 ## 1. 背景与目标
@@ -101,9 +101,70 @@
 | F   | 版本 + 打包 | `release/`（gitignore）                    | 版本核对 → 归档旧包 → `dist:win`                      | 版本 `2.5.6-beta`；新包 size/sha512 两轴均变；`verify:dist` 全 ✔；重打包后冒烟 0 failed |
 | G   | 回写        | 本文件 §9                                  | 实测读数 → 文档并提交                                 | 文档与实测一致                                                                          |
 
-## 9. 执行记录
+## 9. 执行记录（2026-10-31 完成）
 
-（待回写）
+### 9.1 审查与修复（TDD 红 → 绿）
+
+| 节点             | 红灯读数                                                                                                    | 绿灯读数                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| F1 name 缓存锁死 | `cloth-data-service.test.ts`：**1 failed / 10 passed**（`expected undefined to be '时光讯号'`）             | **11 passed**                                                                        |
+| F2 同步抛错泄漏  | `ShareCodeDecoderDialog.test.tsx`：**1 failed / 32 passed**（失败分支出现 `operationFailed` + `sync boom`） | **33 passed**                                                                        |
+| F3/F4 契约订正   | 未造红（文档订正）；去掉「未入仓」标注后先把新文件 `git add` 进 tracked 集，`docs:links` 仍为 0 死引用      | `docs:links` 退出码 0；新增 §16 登记 `decodeClothDiy.structured`                     |
+| F5 index.html    | —                                                                                                           | `git diff` 仅注释 1 行 + CSP 1 行；`node` 比对两处 CSP 字符串 `true`                 |
+| F6 CHANGELOG     | —                                                                                                           | 14 个版本节、`[2.5.6-beta]` 唯一、`[Unreleased]` 无条目，`check-changelog-release` 0 |
+
+### 9.2 用户指定六道硬门
+
+运行时：Node **v26.3.0** / npm **11.16.0**（Windows x64）。
+
+| #   | 命令                                                                   | 实测读数                                                                                                                                 | 退出码 |
+| --- | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| 1   | `npm install`                                                          | `removed 4 packages` 即 4 条 @nikkisync junction；lock 前后 `git diff` 为空（无本机抖动）                                                | 0      |
+| —   | `npm run link:nikkisync` / `link:nikkisync:check` / `verify:nikkisync` | 4 条链接 `ok`；诊断 13 项全 ✓、`blocking failures: 0`                                                                                    | 0      |
+| 2   | `npm run build`                                                        | `✓ built in 9.89s`；dist 产物齐备                                                                                                        | 0      |
+| 3   | `npm test`                                                             | **459 文件 / 7199 passed / 20 skipped / 0 failed**（基线 7197 + 2 条新回归，逐位吻合）                                                   | 0      |
+| 4   | `npm run typecheck`                                                    | `tsc -b` + `tsc -p tsconfig.scripts.json` 零输出                                                                                         | 0      |
+| 5   | `npm run e2e:smoke`（重打包前）                                        | **16 passed / 30.2s**；`[e2e] executable:` 指向当时既有的 `release/win-unpacked/喵星图.exe`；N1–N4 走 `launchBuiltApp` 验的是本批 `dist` | 0      |
+| 6   | `npm run test:ci-linux`                                                | **459 文件 / 7216 passed / 3 skipped / 0 failed / 60.65s**（装置下 linked 套件真跑，skip 由 20 降至 3）                                  | 0      |
+
+### 9.3 补充静态 / 安全门
+
+- `npm run lint`：0；`npm run typecheck:e2e`：0。
+- `npm run i18n:check`：12 locale 各 4070 key 对齐；`npm run i18n:guard`：通过。
+- `npm run preview:check`：PASS=5 / WARN=5 / FAIL=0（5 条 WARN 为既有页面/CDN 口径，非本批引入）。
+- `npm run docs:links`：0 死引用（185 条既有本机留存区提醒）。
+- `npm run test:coverage`：All files **70.32 / 61.78 / 63.09 / 71.95**（阈值 66 / 58 / 59 / 68），0 failed。
+- `npm run audit`：`Passed npm security audit.`（豁免清单内 8 high / 1 critical，与既有基线一致）。
+- `npm run verify`：typecheck / lint / core-gate / format / 相关单测 **5/5**（158 用例）；4 个纯类型/桥文件无同名套件属非阻断提示（`preload/api/decrypt.ts`、`cloth-data-config.ts`、`types/decryption.ts`、`shared/types/electron-api.ts`）。
+
+### 9.4 提交
+
+- `188778f docs(plans): 落盘搭配码面板收尾审查-提交-重打包计划`（本文件单独提交）。
+- `200691f feat(cloth-outfit): 完整搭配码面板与本地缓存，并修审查发现的降级缺口`：41 文件、+3992/−98；pre-commit 的 lint-staged、core-gate（**6 个受保护文件**）、`tsc -b` 全过；提交后 `git status --porcelain` 为空。
+- 未推送（用户未要求）。
+
+### 9.5 版本核对（零编辑）
+
+`package.json` = `2.5.6-beta`；`package-lock.json` 根与 `packages[""]` 同值；`src/renderer/preview/mock/database-mock.ts:664` 同值；`AGENTS.md` / `ARCHITECTURE(.en).md` / `DEVELOPMENT(.en).md` / `README.md` 同值。未改任何版本声明位；`check-changelog-release` 三条 ✔。
+
+### 9.6 重打包与产物
+
+- 标准 `npm run dist:win`：`pre-dist-check`、`build`、`@electron/rebuild` 均通过，随后在 electron 解压处失败：`EPERM rename 'release\win-unpacked.tmp' -> 'release\win-unpacked'`（本机扫描器对新解压树加锁的既有环境问题，非代码缺陷）。
+- 按计划走旁路：从官方缓存 zip 解出 `.cache/electron-dist-clean2`（`unzip -x` 排除 `resources/default_app.asar` 与 `version`，避免落地即被锁），以 `--config.electronDist=... --config.directories.output=release/build-20261031-cloth` 出包，退出码 0；未改任何配置文件。
+- 产物回标准位：`release/win-unpacked`（新树）、`release/MeowStarMap-Setup-2.5.6-beta.exe`、`.blockmap`、`latest.yml`。旁路树的 `app.asar.unpacked` 已删除，`find release -name app.asar.unpacked` 只剩标准树；被锁的旁路 `app.asar` 与 `win-unpacked.tmp/resources/default_app.asar` 仅余空壳（gitignored，不影响判据）。
+- 新包标识：**184,642,989 B**、sha256 `c76c10a1117691bcad662d71512274376c383e2afd661b38012ffe886aa15fad`、sha512 `ZULydQwdI26axxBUV1sCIjB7W5pqAqMdusdUJjE6AR/TuBB97jmc2laA+JJFTqNwfMRnPzBvTkPHIlZv73NCiQ==`、`releaseDate: 2026-10-31T13:44:18.780Z`。
+- 旧包归档：`_safe_backup_20261031-pre-cloth-repack/`，184,634,402 B、sha256 `bfe0ed4e…`、sha512 `eDUpe…` ⇒ 与新版在 **size 与 sha512 两轴均不同**，非空重跑。
+- `release/latest.yml`：`version: 2.5.6-beta`、`path: MeowStarMap-Setup-2.5.6-beta.exe`。
+- `npm run verify:dist`：21 项全 ✔（原生二进制、VC++ 运行库、@nikkisync 全部产物与闭包、管理员清单、禁串）。
+- 重打包后 `npm run e2e:smoke`：**16 passed / 29.7s**，`[e2e] executable:` 为标准名树。
+- 包内字节：`app.asar` 内 `dist\main\main\app\index.js` 与盘上 `dist/main/main/app/index.js` **逐字节相等**（41,022 B，sha256 `57a46bb5…`）；包内特征串计数 `lookupCloth=11`、`clearClothCache=3`、`cloth-diy-cache=1`、`gongeo.us=122`，证明本批代码确在包内。
+
+### 9.7 偏差与未覆盖项
+
+- 计划已预告「重打包前的 e2e:smoke 验的是既有 10-30 包」，实测一致；新包已在重打包后二跑。
+- 标准打包失败归因环境锁；旁路是绕锁而非改配方，`verify:dist` 裸跑在新树上通过。
+- 真实游戏分享码的 GUI 复验本轮未重做；阶段 5 的实机证据保留，本批新增/回归由 33 条组件用例与服务单测覆盖。
+- `preview:check` 的 5 条 WARN、`audit` 的豁免清单、4 个无同名套件的源文件均为既有状态，不在本批修复范围。
 
 ## 10. 风险与回滚
 
