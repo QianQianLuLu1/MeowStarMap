@@ -1,10 +1,12 @@
+// @core-change: 新增 decrypt:clearClothCache 搭配码缓存清理通道（阶段 3）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
-import { wrapHandler, schemas } from '../validator'
+import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
 import { assertMediaReadPath } from '../media-read-guard'
 import { logger } from '../../utils/logger'
 import { t } from '../../i18n'
+import type { ClothDataInfo } from '../../../shared/types/electron-api'
 
 /**
  * decrypt 域 IPC handler：游戏参数 / 相机参数 / 染色分享码 / 家园建造分享码 解密。
@@ -94,7 +96,8 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
           data: {
             timestamp: result.timestamp,
             uidBytes: result.uidBytes ? result.uidBytes.toString('hex') : undefined,
-            networkData: result.networkData
+            networkData: result.networkData,
+            structured: result.structured
           },
           message: result.error
         }
@@ -126,6 +129,41 @@ export function registerDecryptHandlers(ctx: HandlerContext): void {
         }
       }
     )
+  )
+
+  // Group 5: 服饰数据批量查询（第三方 gongeo.us，契约 docs/plans/cloth-outfit-data-contract.md §6）
+  // 数据源任何失败（超时/网络/4xx/5xx/解析）均由 service 静默降级为空对象，永不 reject；
+  // 入参校验：正整数、非空、单次 ≤ 50（去重在 service 内部完成）。
+  ipcMain.handle(
+    'decrypt:lookupCloth',
+    wrapHandler(
+      ctx,
+      z.tuple([
+        z
+          .array(schemas.positiveIntId)
+          .min(1, t('main.decrypt.validation.idsRequired'))
+          .max(50, t('main.decrypt.validation.idsBatchMaxLength', { max: 50 }))
+      ]),
+      async ([ids]) => {
+        const { lookupClothData } = await import('../../services/cloth-data-service')
+        const resultMap = await lookupClothData(ids)
+        const data: Record<string, ClothDataInfo> = {}
+        for (const [id, info] of resultMap) {
+          data[String(id)] = info
+        }
+        return { ok: true, data }
+      }
+    )
+  )
+
+  // Group 6: 清空搭配码网络结果缓存（阶段 3；缓存落盘 <userData>/cloth-diy-cache，
+  // value 为原始 networkData 字符串。本阶段无 UI，通道供后续设置页/调试消费）
+  ipcMain.handle(
+    'decrypt:clearClothCache',
+    wrapHandlerNoArgs(ctx, async () => {
+      const { clearClothDiyCache } = await import('../../services/cloth-diy-cache')
+      return { ok: true, data: await clearClothDiyCache() }
+    })
   )
 }
 

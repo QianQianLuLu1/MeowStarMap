@@ -23,7 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ## [2.5.6-beta] - 2026-10-27
 
-> 2.5.6-beta：全面审查后的缺陷修复定版，**不引入新功能**。版本号由用户明确要求变更（2.5.5 期间已多轮原地重打包，本轮改动量足以与旧产物区分）。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6-beta`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.6-beta.exe`。
+> 2.5.6-beta：全面审查后的缺陷修复定版，**以缺陷修复为主**（2026-10-31 追加完整搭配码面板，见 Added）。版本号由用户明确要求变更（2.5.5 期间已多轮原地重打包，本轮改动量足以与旧产物区分）。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6-beta`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.6-beta.exe`。
+
+### Added | 新增
+
+- **完整搭配码面板（2026-10-31，阶段 0–5）**：`decrypt:decodeClothDiy` 将 DLL 返回的裸 networkData 结构化——先按契约把 `patternData` / `nsHiddenData` 的 `[:k:v,...]` IdMap 自定义语法预归一化为 JSON，再过双层 `Content` 信封校验，投影为 `data.structured = { poseId?, clothes[] }`（`wearingClothes` 原顺序、非有限/≤0 ID 跳过、`PoseId` 仅正整数；解析失败为 `null` 且原始字符串保留）。新增 `decrypt:lookupCloth` 批量补名称/图标：名称映射一次全量加载、目录 API 按 ID 查询、图标 URL 由 ID 构造；出站仅 http/https + host 白名单且显式拒绝环回/私网，400/404 负缓存、其余失败不缓存、整体静默降级为空对象（name map 冷却后恢复时，已缓存的无名条目会在命中路径补名）。新增 `decrypt:clearClothCache`：网络成功结果按 `sha256(code.trim())` 原子写入 `<userData>/cloth-diy-cache/<hash>.txt`，同码再次解码跳过子进程网络解码（离线可用），失败仅 warn、不阻塞主流程。渲染层 clothDiy tab 改为结构化列表（图标、名称/`#id` 兜底、部位/状态枚举、系列/款型标注、原始数据折叠区），并修复主进程 `{ ok, data, message }` 与渲染层 `success` 的契约漂移（此前三个 tab 成功时恒显示「操作失败」）；CSP `img-src` 放行 `https://cdn.gongeo.us`（meta 与响应头两处逐字一致），12 locale 补齐 9 个文案键。计划、契约与逐节点读数见 `docs/plans/2026-10-31-cloth-outfit-data-contract-实施计划.md`、`docs/plans/cloth-outfit-data-contract.md` 及同目录 `2026-10-31-cloth-outfit-phase1..5-实施计划.md`
 
 ### Fixed | 修复
 

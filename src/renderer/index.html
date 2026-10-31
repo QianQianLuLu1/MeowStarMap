@@ -7,8 +7,9 @@
        script-src 不给 inline/eval，XSS 便无法执行脚本去调用 window.electronAPI 触达 IPC。
        style-src 需要 inline：React style 属性与运行时注入的样式。
        img-src / media-src 放行 media:：本地图片与视频走自定义 media:// 协议。
+       img-src 另放行 https://cdn.gongeo.us：搭配码服饰图标（gongeo CDN，见 src/main/services/cloth-data-config.ts）。
        注意：charset 必须留在 head 前 1024 字节内，本注释不要再往上挪。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; object-src 'none'; img-src 'self' media: data:; media-src 'self' media:; style-src 'self' 'unsafe-inline'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; object-src 'none'; img-src 'self' media: data: https://cdn.gongeo.us; media-src 'self' media:; style-src 'self' 'unsafe-inline'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>喵星图</title>
   <style>

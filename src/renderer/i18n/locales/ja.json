@@ -240,7 +240,16 @@
         "networkData": "ネットワークデータ",
         "networkUnavailable": "ネットワークデコードは利用できません（インターネット接続が必要な場合があります）",
         "serverId": "サーバー ID",
-        "timestamp": "タイムスタンプ"
+        "timestamp": "タイムスタンプ",
+        "clothesEmpty": "この共有コードには服飾データが含まれていません",
+        "featureRaw": "スタイル {{value}}",
+        "outfitTitle": "着用中の服飾",
+        "parseFailed": "構造化データの解析に失敗しました。展開して元のネットワークデータを確認できます",
+        "poseId": "ポーズ ID",
+        "rawDataSummary": "元のネットワークデータ",
+        "speciesRaw": "シリーズ {{value}}",
+        "stateRaw": "状態 {{value}}",
+        "uidHex": "UID (16進)"
       },
       "tabs": {
         "clothDiy": "染色シェアコード",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "服飾 ID リストを空にすることはできません",
+        "idsBatchMaxLength": "服飾 ID は 1 回につき {{max}} 個まで照会できます"
       },
       "log": {
         "mediaWhitelistHit": "",

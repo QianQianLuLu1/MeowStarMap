@@ -501,6 +501,27 @@ export interface DecodeClothDiyResponse {
     timestamp?: number
     uidBytes?: string
     networkData?: unknown
+    /**
+     * 结构化解析结果（阶段 1）：解析成功为投影对象，解析失败为 null，networkData 缺省时缺省。
+     * 结构真相源 src/main/types/decryption.ts（ClothDiyStructuredOutfit）
+     */
+    structured?: {
+      /** 动作 ID；缺省/0/负数/非整数时省略 */
+      poseId?: number
+      /** 身着服饰投影，保持 wearingClothes 原顺序 */
+      clothes: Array<{
+        /** 服装完整 ID */
+        id: number
+        /** 部位类型（从 ID 拆解） */
+        clothType: number
+        /** 状态（从 ID 拆解） */
+        state: number
+        /** 服装系列（从 ID 拆解） */
+        species: number
+        /** 款型（从 ID 拆解） */
+        outfitFeature: number
+      }>
+    } | null
   }
   message?: string
 }
@@ -509,6 +530,38 @@ export interface DecodeHomeBuildResponse {
   data: {
     server?: string
     networkData?: unknown
+  }
+  message?: string
+}
+
+/** 服饰可读信息（decrypt:lookupCloth data 条目；数据源为 gongeo.us，见 docs/plans/cloth-outfit-data-contract.md §6） */
+export interface ClothDataInfo {
+  /** 显示名（gongeo locale JSON；name map 不可用时缺省） */
+  name?: string
+  /** 图标 CDN URL（gongeo CDN，由 ID 直接构造，无需网络） */
+  iconUrl?: string
+  /** 属性/类型标签（data API category/subcategory/metadata 值，英文原样） */
+  tags?: string[]
+  /** 风格分数（数据源暂无此数据，恒缺省；保留字段） */
+  styleScore?: number
+  /** 目录 API 原始响应体（供后续阶段扩展消费） */
+  raw?: unknown
+}
+export interface LookupClothDataResponse {
+  ok: boolean
+  /** 键为服饰 ID 十进制字符串；查询失败/未收录的 ID 对应空对象 */
+  data: Record<string, ClothDataInfo>
+  message?: string
+}
+
+/** decrypt:clearClothCache 返回（阶段 3 搭配码网络结果缓存清理） */
+export interface ClearClothCacheResponse {
+  ok: boolean
+  data: {
+    /** 清理的缓存文件数 */
+    clearedCount: number
+    /** 清理的总字节数 */
+    clearedSize: number
   }
   message?: string
 }

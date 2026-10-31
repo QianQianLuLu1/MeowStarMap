@@ -249,11 +249,20 @@
         "mediaEncrypt": "粘贴相机参数 JSON..."
       },
       "result": {
+        "clothesEmpty": "该分享码未包含服饰数据",
         "encryptedResult": "加密结果 (Base64)",
+        "featureRaw": "款型 {{value}}",
         "networkData": "网络数据",
         "networkUnavailable": "网络解码不可用（可能需要联网）",
+        "outfitTitle": "身着服饰",
+        "parseFailed": "结构化数据解析失败，可展开查看原始网络数据",
+        "poseId": "动作 ID",
+        "rawDataSummary": "原始网络数据",
         "serverId": "服务器 ID",
-        "timestamp": "时间戳"
+        "speciesRaw": "系列 {{value}}",
+        "stateRaw": "状态 {{value}}",
+        "timestamp": "时间戳",
+        "uidHex": "UID (十六进制)"
       },
       "tabs": {
         "clothDiy": "染色分享码",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "jsonText 不能为空",
         "jsonTextMaxLength": "jsonText 长度上限 1MB",
         "codeStrRequired": "codeStr 不能为空",
-        "codeStrMaxLength": "codeStr 长度上限 1MB"
+        "codeStrMaxLength": "codeStr 长度上限 1MB",
+        "idsRequired": "服饰 ID 列表不能为空",
+        "idsBatchMaxLength": "服饰 ID 单次最多查询 {{max}} 个"
       },
       "log": {
         "mediaWhitelistHit": "[decrypt] 命中已索引媒体白名单，跳过 pathGuard 校验:",

@@ -133,6 +133,28 @@ interface GameRootCandidate {
   source: 'custom' | 'official' | 'steam' | 'epic'
 }
 
+// 搭配码 structured 解析结果（阶段 1）；与主进程 ClothDiyStructuredOutfit 保持一致，
+// 见 src/main/types/decryption.ts（数据契约 docs/plans/cloth-outfit-data-contract.md §4）
+interface ClothDiyStructuredCloth {
+  /** 服装完整 ID */
+  id: number
+  /** 部位类型（从 ID 拆解） */
+  clothType: number
+  /** 状态（从 ID 拆解） */
+  state: number
+  /** 服装系列（从 ID 拆解） */
+  species: number
+  /** 款型（从 ID 拆解） */
+  outfitFeature: number
+}
+
+interface ClothDiyStructuredOutfit {
+  /** 动作 ID；缺省/0/负数/非整数/字符串时省略 */
+  poseId?: number
+  /** 身着服饰列表（wearingClothes 投影，保持原顺序，ID ≤ 0 或非有限数跳过） */
+  clothes: ClothDiyStructuredCloth[]
+}
+
 interface WindowElectronAPI {
   // preload 已通过 contextBridge 暴露；renderer 在就绪时调用通知主进程（对应 ipcRenderer.send('renderer:ready')）
   reportReady: () => void
@@ -264,17 +286,37 @@ interface WindowElectronAPI {
     // Group 2: 相机参数加密
     encodeCameraParams: (
       jsonText: string
-    ) => Promise<{ success: boolean; data?: string; message?: string }>
+    ) => Promise<{ ok: boolean; data?: string; message?: string }>
     // Group 3: 染色分享码解码
     decodeClothDiy: (codeStr: string) => Promise<{
-      success: boolean
-      data?: { timestamp?: number; uidBytes?: string; networkData?: string }
+      ok: boolean
+      data?: {
+        timestamp?: number
+        uidBytes?: string
+        networkData?: string
+        /** 结构化解析结果（阶段 1）：解析成功为投影对象，解析失败为 null，networkData 缺省时缺省 */
+        structured?: ClothDiyStructuredOutfit | null
+      }
       message?: string
     }>
     // Group 4: 家园建造分享码解码
     decodeHomeBuild: (codeStr: string) => Promise<{
-      success: boolean
+      ok: boolean
       data?: { server?: number; networkData?: string }
+      message?: string
+    }>
+    // Group 5: 服饰数据批量查询（阶段 2，第三方 gongeo.us 数据源；
+    // 数据源失败静默降级为空对象；类型真相源 src/shared/types/electron-api.ts）
+    lookupCloth: (ids: number[]) => Promise<{
+      ok: boolean
+      data?: Record<string, import('../../shared/types/electron-api').ClothDataInfo>
+      message?: string
+    }>
+    // Group 6: 清空搭配码网络结果缓存（阶段 3；本阶段无 UI；
+    // 类型真相源 src/shared/types/electron-api.ts）
+    clearClothCache: () => Promise<{
+      ok: boolean
+      data: { clearedCount: number; clearedSize: number }
       message?: string
     }>
   }

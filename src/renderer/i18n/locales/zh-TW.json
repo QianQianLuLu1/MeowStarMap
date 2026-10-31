@@ -240,7 +240,16 @@
         "networkData": "網路資料",
         "networkUnavailable": "網路解碼不可用（可能需要聯網）",
         "serverId": "伺服器 ID",
-        "timestamp": "時間戳"
+        "timestamp": "時間戳",
+        "clothesEmpty": "該分享碼未包含服飾資料",
+        "featureRaw": "款型 {{value}}",
+        "outfitTitle": "身著服飾",
+        "parseFailed": "結構化資料解析失敗，可展開查看原始網路資料",
+        "poseId": "動作 ID",
+        "rawDataSummary": "原始網路資料",
+        "speciesRaw": "系列 {{value}}",
+        "stateRaw": "狀態 {{value}}",
+        "uidHex": "UID (十六進位)"
       },
       "tabs": {
         "clothDiy": "染色分享碼",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "服飾 ID 清單不能為空",
+        "idsBatchMaxLength": "服飾 ID 單次最多查詢 {{max}} 個"
       },
       "log": {
         "mediaWhitelistHit": "",

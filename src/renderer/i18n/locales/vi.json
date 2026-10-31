@@ -240,7 +240,16 @@
         "networkData": "Dữ liệu mạng",
         "networkUnavailable": "Giải mã mạng không khả dụng (có thể cần Internet)",
         "serverId": "ID máy chủ",
-        "timestamp": "Dấu thời gian"
+        "timestamp": "Dấu thời gian",
+        "clothesEmpty": "Mã chia sẻ này không chứa dữ liệu trang phục",
+        "featureRaw": "Kiểu dáng {{value}}",
+        "outfitTitle": "Trang phục đang mặc",
+        "parseFailed": "Phân tích dữ liệu có cấu trúc thất bại; bung ra để xem dữ liệu mạng gốc",
+        "poseId": "ID dáng thế",
+        "rawDataSummary": "Dữ liệu mạng gốc",
+        "speciesRaw": "Bộ sưu tập {{value}}",
+        "stateRaw": "Trạng thái {{value}}",
+        "uidHex": "UID (hex)"
       },
       "tabs": {
         "clothDiy": "Mã chia sẻ nhuộm màu",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "Danh sách ID trang phục không được để trống",
+        "idsBatchMaxLength": "Mỗi lần chỉ có thể truy vấn tối đa {{max}} ID trang phục"
       },
       "log": {
         "mediaWhitelistHit": "",

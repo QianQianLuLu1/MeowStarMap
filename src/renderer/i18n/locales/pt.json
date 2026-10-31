@@ -240,7 +240,16 @@
         "networkData": "Dados de rede",
         "networkUnavailable": "Decodificação por rede indisponível (pode exigir Internet)",
         "serverId": "ID do servidor",
-        "timestamp": "Timestamp"
+        "timestamp": "Timestamp",
+        "clothesEmpty": "Este código de compartilhamento não contém dados de roupas",
+        "featureRaw": "Estilo {{value}}",
+        "outfitTitle": "Roupas equipadas",
+        "parseFailed": "Falha ao analisar os dados estruturados; expanda para ver os dados de rede originais",
+        "poseId": "ID da pose",
+        "rawDataSummary": "Dados de rede originais",
+        "speciesRaw": "Série {{value}}",
+        "stateRaw": "Estado {{value}}",
+        "uidHex": "UID (hex)"
       },
       "tabs": {
         "clothDiy": "Código de tingimento",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "A lista de IDs de roupas não pode estar vazia",
+        "idsBatchMaxLength": "É possível consultar no máximo {{max}} IDs de roupas por chamada"
       },
       "log": {
         "mediaWhitelistHit": "",

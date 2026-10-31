@@ -731,3 +731,58 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   主目录/扫描根下（如 `D:\导出`）时，重启后 `file:export` 的目标写校验必然 `IPC_PATH_FORBIDDEN`。
   不构成自助扩权：写入端 `export:setDefaultDir` 必须先过 `assertFileWritePath`，而
   `assertAllowed` 的 `op` 只影响文案、读写共用同一 `isAllowed` 判定集，故登记后判定范围不变。
+
+## 14. 游戏参数解密域 · 服饰数据查询通道（2026-10-31 搭配码面板阶段 2 新增）
+
+- **通道**：`decrypt:lookupCloth`（`wrapHandler` 包装）。注册于 `src/main/ipc/handlers/decrypt-handler.ts`
+  （Group 5），service 实现在 `src/main/services/cloth-data-service.ts`（数据源配置
+  `cloth-data-config.ts`）；preload 侧暴露为 `window.electronAPI.decrypt.lookupCloth(ids)`。
+- **入参**：`ids: number[]`——正整数（zod 复用 `schemas.positiveIntId`）、非空、单次 ≤ 50；
+  违规返回 `IPC_VALIDATION_ERROR`。service 内部再去重（保持首次出现顺序）。
+- **返回**（`LookupClothDataResponse`，类型真相源 `src/shared/types/electron-api.ts`）：
+  `{ ok: true, data: Record<string, ClothDataInfo> }`——键为服饰 ID 十进制字符串；
+  `ClothDataInfo = { name?, iconUrl?, tags?, styleScore?, raw? }`（全字段可选，查询失败/未收录为空对象）。
+- **容错契约（静默降级，永不 reject）**：数据源为第三方 gongeo.us（选型与降级链见
+  `docs/plans/cloth-outfit-data-contract.md` §6）。超时（4s）/网络错误/5xx/解析失败 → 空对象且**不缓存**
+  （可重试）；404/400（确认未收录）→ 空对象且**负缓存**（防重试风暴）；ID 位数既非 10（单品）也非
+  5（套装）→ 空对象。进程内 Map-LRU（默认 500 条），同会话同 ID 不重复发起网络请求；
+  不做磁盘缓存（阶段 3）。出站请求统一过 URL 安全守卫（仅 http/https + host 白名单 +
+  拒绝 localhost/环回/私网/保留地址）。
+- **消费方**：阶段 4 搭配码面板 UI——2026-10-31 起 `ShareCodeDecoderDialog` clothDiy tab 已接入
+  （解码成功且含 structured 时批量补名称/图标，查询失败按 #id 兜底降级）。
+- **存量缺口备注**：decrypt 域既有 4 通道（`decrypt:decodeFile` / `decrypt:encodeCameraParams` /
+  `decrypt:decodeClothDiy` / `decrypt:decodeHomeBuild`）先于本文登记流程存在、至今未在本文登记，
+  本轮按最小改动原则不顺带补录，待该域下次实质变更时一并补齐。
+
+## 15. 游戏参数解密域 · 搭配码网络结果缓存清理通道（2026-10-31 搭配码面板阶段 3 新增）
+
+- **通道**：`decrypt:clearClothCache`（`wrapHandlerNoArgs` 包装，无参）。注册于
+  `src/main/ipc/handlers/decrypt-handler.ts`（Group 6），service 实现在
+  `src/main/services/cloth-diy-cache.ts`；preload 侧暴露为
+  `window.electronAPI.decrypt.clearClothCache()`。
+- **背景契约（读侧）**：`decodeClothDiyShareCode` 的网络成功结果按 `sha256(codeStr.trim())` hex
+  落盘 `<userData>/cloth-diy-cache/<hash>.txt`（原子写，value 为原始 networkData 字符串、
+  无 TTL）；再次解码同码时命中缓存即跳过子进程网络解码。本通道是该缓存的唯一清理入口。
+- **入参**：无。
+- **返回**（`ClearClothCacheResponse`，类型真相源 `src/shared/types/electron-api.ts`）：
+  `{ ok: true, data: { clearedCount, clearedSize } }`。
+- **容错契约**：缓存目录不存在 → `{clearedCount: 0, clearedSize: 0}`（视为已清空）；
+  单文件 stat/unlink 失败 → 跳过该文件并 warn、继续清其余；目录枚举失败 → 上抛，
+  由 `handleError` 转为 `IPC_INTERNAL_ERROR`。写缓存侧永不阻塞解码主流程（失败仅 warn）。
+- **消费方**：阶段 4 搭配码面板 UI / 设置页（本通道登记时尚无渲染层调用方；preload 类型面已就绪）。
+
+## 16. 游戏参数解密域 · `decrypt:decodeClothDiy` 响应新增 `structured`（2026-10-31 搭配码面板阶段 1）
+
+- **通道**：`decrypt:decodeClothDiy`（既有通道，注册于 `src/main/ipc/handlers/decrypt-handler.ts`
+  Group 3；本轮未改通道名、入参与外层 `IpcResponse`）。
+- **变更**：handler 内层 `data` 新增可选字段
+  `structured?: { poseId?: number; clothes: Array<{ id: number; clothType: number; state: number; species: number; outfitFeature: number }> } | null`
+  （类型真相源 `src/main/types/decryption.ts` 的 `ClothDiyStructuredOutfit`；共享副本见
+  `src/shared/types/electron-api.ts`）。三态语义：
+  - `networkData` 缺省（离线/网络失败）⇒ `structured` 缺省；
+  - 网络数据存在但解析失败 ⇒ `structured: null`，`networkData` 原样保留供 UI 折叠展示；
+  - 解析成功 ⇒ 投影对象：`wearingClothes` 保持原顺序，非有限数/≤0 的 ID 跳过，`PoseId` 仅保留正整数。
+- **兼容性**：纯新增可选字段，旧消费方忽略即可；`data.networkData` 的语义与形状不变
+  （共享类型历史声明为 `unknown`，消费方以 `typeof === 'string'` 收窄）。
+- **消费方**：`ShareCodeDecoderDialog` clothDiy tab（阶段 4 起）。
+- **存量缺口**：decrypt 域既有 4 通道仍按 §14 备注待下次实质变更时补齐；本节只登记本次新增字段。

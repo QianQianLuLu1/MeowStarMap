@@ -240,7 +240,16 @@
         "networkData": "ข้อมูลเครือข่าย",
         "networkUnavailable": "การถอดรหัสเครือข่ายไม่พร้อมใช้งาน (อาจต้องเชื่อมต่ออินเทอร์เน็ต)",
         "serverId": "รหัสเซิร์ฟเวอร์",
-        "timestamp": "การประทับเวลา"
+        "timestamp": "การประทับเวลา",
+        "clothesEmpty": "โค้ดแชร์นี้ไม่มีข้อมูลเครื่องแต่งกาย",
+        "featureRaw": "สไตล์ {{value}}",
+        "outfitTitle": "เครื่องแต่งกายที่สวมใส่",
+        "parseFailed": "แยกวิเคราะห์ข้อมูลโครงสร้างไม่สำเร็จ ขยายเพื่อดูข้อมูลเครือข่ายดิบ",
+        "poseId": "ID ท่าทาง",
+        "rawDataSummary": "ข้อมูลเครือข่ายดิบ",
+        "speciesRaw": "ซีรีส์ {{value}}",
+        "stateRaw": "สถานะ {{value}}",
+        "uidHex": "UID (เลขฐานสิบหก)"
       },
       "tabs": {
         "clothDiy": "รหัสแชร์การย้อมสี",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "รายการ ID เสื้อผ้าต้องไม่ว่าง",
+        "idsBatchMaxLength": "ค้นหา ID เสื้อผ้าได้สูงสุด {{max}} รายการต่อครั้ง"
       },
       "log": {
         "mediaWhitelistHit": "",

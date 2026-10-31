@@ -1,3 +1,4 @@
+// @core-change: 搭配码网络解码结果接入本地磁盘缓存（阶段 3）
 /**
  * 游戏内图片参数解密服务
  * 严格按 nuan5_decryption_ffi.h 头文件调用 DLL
@@ -17,10 +18,12 @@
  */
 import koffi from 'koffi'
 import fsp from 'fs/promises'
+import { z } from 'zod'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
 import { InternalError } from '../../shared/errors/app-error'
 import { findDllPath } from '../decryption-worker/dll-path'
+import { readClothDiyCache, writeClothDiyCache } from './cloth-diy-cache'
 import type { DecryptionWorkerBridge } from '../decryption-worker/bridge'
 import type { NetworkDecodeKind, NetworkDecodeResult } from '../decryption-worker/worker-protocol'
 import {
@@ -37,6 +40,9 @@ import {
   type LocationInfo,
   type TaskInfo,
   type ClothParams,
+  type ClothIdParts,
+  type ClothDiyStructuredCloth,
+  type ClothDiyStructuredOutfit,
   type EurekaParams,
   type MomoHiddenState
 } from '../types/decryption'
@@ -540,6 +546,21 @@ function parseNikkiParams(json: SocialPhotoJSON): NikkiParams {
   return { giantState, hidden, loc, rot, scale }
 }
 
+/**
+ * 服饰 ID 拆解共享纯函数（十进制位段，非位掩码；对齐上游 cloth_parser.rs，公式冻结于
+ * docs/plans/cloth-outfit-data-contract.md §5）：
+ * ID（10 位十进制）= species(3位) + state(1位) + clothType(2位) + outfitFeature(4位)
+ * 照片参数解码（parseDressingParams）与搭配码 structured 解析共用，禁止另造副本。
+ */
+export function decomposeClothId(rawId: number): ClothIdParts {
+  return {
+    outfitFeature: rawId % 10000,
+    clothType: Math.floor(rawId / 10000) % 100,
+    state: Math.floor(rawId / 1000000) % 10,
+    species: Math.floor(rawId / 10000000) % 1000
+  }
+}
+
 /** Step 5c: 解析搭配信息（服装 + 祝福闪光）
  *  ID 拆解规则来自 nikki_albums 上游 cloth_parser.rs / eureka_parser.rs
  */
@@ -562,11 +583,8 @@ function parseDressingParams(json: SocialPhotoJSON): DressingParams {
               : 0
         if (rawId === 0) continue
 
-        // 从 ID 拆解（对齐上游 cloth_parser.rs）
-        const outfitFeature = rawId % 10000
-        const clothType = Math.floor(rawId / 10000) % 100
-        const state = Math.floor(rawId / 1000000) % 10
-        const species = Math.floor(rawId / 10000000) % 1000
+        // 从 ID 拆解（对齐上游 cloth_parser.rs，共享纯函数 decomposeClothId）
+        const { outfitFeature, clothType, state, species } = decomposeClothId(rawId)
 
         // clothTypeName: 优先从 JSON 对象读取，否则为 null
         let clothTypeName: string | null = null
@@ -792,6 +810,127 @@ function mergeRichCameraParams(camera: CameraParams, json: SocialPhotoJSON): Ric
     framedMoment,
     momoHidden
   }
+}
+
+// ============================================================
+// ClothDiy networkData 结构化解析（阶段 1）
+// 线上形态冻结于 docs/plans/cloth-outfit-data-contract.md §3/§4：双层 Content 包裹 JSON，
+// 但 patternData/nsHiddenData 为 IdMap 自定义语法（"[:k:v,...]"），直接 JSON.parse 对含该
+// 字段的样本必失败，须先按契约 §3.2 路线 1 预归一化。
+// ============================================================
+
+/** 信封层校验：双层 Content 包裹 + 必需/可选字段形态；strip 模式容忍未知字段（DIY 等） */
+const clothDiyNetworkEnvelopeSchema = z.object({
+  Content: z.object({
+    Content: z.object({
+      PoseId: z.unknown().optional(),
+      wearingClothes: z.array(z.unknown()).optional()
+    })
+  })
+})
+
+/** IdMap 条目 BNF（契约 §3.2）：key=裸整数，value=裸数字（允许负数/小数） */
+const ID_MAP_ENTRY_RE = /^(-?\d+)\s*:\s*(-?\d+(?:\.\d+)?)$/
+
+/** IdMap 体 → JSON 对象体（"k:v,k:v" 改写为 '"k":v,"k":v'）；不符合 BNF 返回 null */
+function idMapBodyToJson(body: string): string | null {
+  if (body.trim() === '') return '' // 空表 "[:]"（唯一合法空形式）
+  const parts: string[] = []
+  for (const entry of body.split(',')) {
+    const m = entry.trim().match(ID_MAP_ENTRY_RE)
+    if (!m) return null // 含尾逗号/非数字键值 → 非 IdMap，整体放弃改写
+    parts.push('"' + m[1] + '":' + m[2])
+  }
+  return parts.join(',')
+}
+
+/**
+ * 将 networkData 中的 IdMap 自定义语法改写为标准 JSON 对象文本（契约 §3.2 预归一化路线）：
+ * "[:1020600092:0,1021830003:0]" 改写为 '{"1020600092":0,"1021830003":0}'，空表 "[:]" 改写为 '{}'
+ * 逐条目按 BNF 校验，不匹配的 "[:...]" 原样保留，交由后续 JSON.parse 自然失败降级。
+ */
+export function normalizeClothDiyIdMap(text: string): string {
+  if (!text.includes('[:')) return text
+  let out = ''
+  let i = 0
+  while (i < text.length) {
+    const start = text.indexOf('[:', i)
+    if (start === -1) {
+      out += text.slice(i)
+      break
+    }
+    const end = text.indexOf(']', start + 2)
+    if (end === -1) {
+      // 无配对右括号：非 IdMap，原样保留并继续扫描
+      out += text.slice(i, start + 2)
+      i = start + 2
+      continue
+    }
+    const body = text.slice(start + 2, end)
+    const jsonBody = idMapBodyToJson(body)
+    if (jsonBody === null) {
+      // 不符合 BNF：不是 IdMap，原样保留
+      out += text.slice(i, end + 1)
+      i = end + 1
+      continue
+    }
+    out += text.slice(i, start) + '{' + jsonBody + '}'
+    i = end + 1
+  }
+  return out
+}
+
+/**
+ * 结构化解析 networkData → { poseId?, clothes }（阶段 1 投影，契约 §3/§4）。
+ * 永不抛错：任何失败分支降级返回 null（raw 字符串由调用方保留兜底）。
+ * @param networkData DLL 联网拉回的原始 UTF-8 文本
+ */
+export function parseClothDiyNetworkData(networkData: string): ClothDiyStructuredOutfit | null {
+  // 预归一化（扫描器设计上不抛错，此处兜底防御：异常时按原文解析）
+  let jsonText: string
+  try {
+    jsonText = normalizeClothDiyIdMap(networkData)
+  } catch {
+    jsonText = networkData
+  }
+
+  let raw: unknown
+  try {
+    raw = JSON.parse(jsonText)
+  } catch {
+    logger.warn(`[clothDiy] networkData 结构化解析失败（JSON 解析），降级为 structured:null`)
+    return null
+  }
+
+  const parsed = clothDiyNetworkEnvelopeSchema.safeParse(raw)
+  if (!parsed.success) {
+    logger.warn(`[clothDiy] networkData 结构化解析失败（信封校验），降级为 structured:null`)
+    return null
+  }
+  const inner = parsed.data.Content.Content
+
+  // wearingClothes 必需（契约 §3.1）：缺失视为载荷畸形
+  if (!inner.wearingClothes) {
+    logger.warn(`[clothDiy] networkData 缺少 wearingClothes，降级为 structured:null`)
+    return null
+  }
+
+  // 服饰投影：脏数据（非数字/非有限数/≤0）逐条跳过，保持原顺序
+  const clothes: ClothDiyStructuredCloth[] = []
+  for (const item of inner.wearingClothes) {
+    if (typeof item !== 'number' || !Number.isFinite(item) || item <= 0) continue
+    clothes.push({ id: item, ...decomposeClothId(item) })
+  }
+
+  // PoseId 仅保留正整数（0/负数/非整数/字符串一律省略）
+  const poseRaw = inner.PoseId
+  const poseId =
+    typeof poseRaw === 'number' && Number.isInteger(poseRaw) && poseRaw > 0 ? poseRaw : undefined
+
+  const structured: ClothDiyStructuredOutfit =
+    poseId === undefined ? { clothes } : { poseId, clothes }
+  logger.debug('[clothDiy] networkData structured:', { poseId, clothesCount: clothes.length })
+  return structured
 }
 
 // ============================================================
@@ -1179,6 +1318,8 @@ export interface ClothDiyDecodeResult {
   timestamp?: number
   uidBytes?: Buffer
   networkData?: string
+  /** networkData 结构化解析结果（阶段 1）：解析成功为投影对象，解析失败为 null，networkData 缺省时缺省 */
+  structured?: ClothDiyStructuredOutfit | null
   error?: string
 }
 
@@ -1235,13 +1376,25 @@ export async function decodeClothDiyShareCode(codeStr: string): Promise<ClothDiy
     return { success: false, error: t('main.decryption.error.invalidClothDiyCode') }
   }
 
-  // Step 4: 网络解码（子进程 + 8s 硬超时，失败优雅降级，本地字段照常返回）
-  const net = await decodeNetworkGraceful('clothDiy', codeStr)
+  // Step 4: 网络解码（子进程 + 8s 硬超时，失败优雅降级，本地字段照常返回）。
+  // 阶段 3：本地缓存命中则跳过子进程网络解码（离线复用）；仅网络成功结果落盘，
+  // 失败不写缓存；写盘失败由缓存模块内部 warn 兜底，不影响本次返回。
+  const cached = await readClothDiyCache(codeStr)
+  const net =
+    cached !== undefined
+      ? { networkData: cached }
+      : await decodeNetworkGraceful('clothDiy', codeStr)
+  if (cached === undefined && net.networkData !== undefined) {
+    await writeClothDiyCache(codeStr, net.networkData)
+  }
   return {
     success: true,
     timestamp: local.timestamp > 0 ? local.timestamp : undefined,
     uidBytes: local.uidBytes,
     networkData: net.networkData,
+    // 结构化解析（阶段 1）：networkData 缺省时同进退；解析失败降级 null，raw 照常返回
+    structured:
+      net.networkData === undefined ? undefined : parseClothDiyNetworkData(net.networkData),
     error: net.error
   }
 }

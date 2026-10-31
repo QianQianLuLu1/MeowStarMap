@@ -240,7 +240,16 @@
         "networkData": "네트워크 데이터",
         "networkUnavailable": "네트워크 디코딩을 사용할 수 없습니다 (인터넷 연결 필요)",
         "serverId": "서버 ID",
-        "timestamp": "타임스탬프"
+        "timestamp": "타임스탬프",
+        "clothesEmpty": "이 공유 코드에는 의상 데이터가 포함되어 있지 않습니다",
+        "featureRaw": "스타일 {{value}}",
+        "outfitTitle": "착용 중인 의상",
+        "parseFailed": "구조화된 데이터 파싱에 실패했습니다. 펼쳐서 원본 네트워크 데이터를 확인할 수 있습니다",
+        "poseId": "포즈 ID",
+        "rawDataSummary": "원본 네트워크 데이터",
+        "speciesRaw": "시리즈 {{value}}",
+        "stateRaw": "상태 {{value}}",
+        "uidHex": "UID (16진수)"
       },
       "tabs": {
         "clothDiy": "염색 공유 코드",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "의상 ID 목록은 비어 있을 수 없습니다",
+        "idsBatchMaxLength": "의상 ID는 한 번에 최대 {{max}}개까지 조회할 수 있습니다"
       },
       "log": {
         "mediaWhitelistHit": "",

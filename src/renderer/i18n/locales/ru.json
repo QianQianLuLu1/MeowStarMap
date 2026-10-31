@@ -240,7 +240,16 @@
         "networkData": "Сетевые данные",
         "networkUnavailable": "Сетевое декодирование недоступно (может потребоваться интернет)",
         "serverId": "ID сервера",
-        "timestamp": "Метка времени"
+        "timestamp": "Метка времени",
+        "clothesEmpty": "Этот код обмена не содержит данных об одежде",
+        "featureRaw": "Стиль {{value}}",
+        "outfitTitle": "Надетая одежда",
+        "parseFailed": "Не удалось разобрать структурированные данные; разверните, чтобы просмотреть исходные сетевые данные",
+        "poseId": "ID позы",
+        "rawDataSummary": "Исходные сетевые данные",
+        "speciesRaw": "Серия {{value}}",
+        "stateRaw": "Состояние {{value}}",
+        "uidHex": "UID (шестн.)"
       },
       "tabs": {
         "clothDiy": "Код окрашивания",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "Список ID одежды не может быть пустым",
+        "idsBatchMaxLength": "За один запрос можно получить не более {{max}} ID одежды"
       },
       "log": {
         "mediaWhitelistHit": "",

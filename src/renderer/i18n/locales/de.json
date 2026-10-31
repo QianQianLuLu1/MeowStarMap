@@ -240,7 +240,16 @@
         "networkData": "Netzwerkdaten",
         "networkUnavailable": "Netzwerkdekodierung nicht verfügbar (möglicherweise Internet erforderlich)",
         "serverId": "Server-ID",
-        "timestamp": "Zeitstempel"
+        "timestamp": "Zeitstempel",
+        "clothesEmpty": "Dieser Freigabecode enthält keine Kleidungsdaten",
+        "featureRaw": "Stil {{value}}",
+        "outfitTitle": "Getragene Kleidung",
+        "parseFailed": "Strukturierte Daten konnten nicht geparst werden; zum Anzeigen der Original-Netzwerkdaten aufklappen",
+        "poseId": "Posen-ID",
+        "rawDataSummary": "Original-Netzwerkdaten",
+        "speciesRaw": "Serie {{value}}",
+        "stateRaw": "Zustand {{value}}",
+        "uidHex": "UID (hex)"
       },
       "tabs": {
         "clothDiy": "Färbungs-Freigabecode",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "Die Liste der Kleidungs-IDs darf nicht leer sein",
+        "idsBatchMaxLength": "Pro Abfrage sind höchstens {{max}} Kleidungs-IDs erlaubt"
       },
       "log": {
         "mediaWhitelistHit": "",

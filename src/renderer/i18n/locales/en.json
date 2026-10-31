@@ -236,11 +236,20 @@
         "mediaEncrypt": "Paste camera params JSON..."
       },
       "result": {
+        "clothesEmpty": "This share code contains no clothing items",
         "encryptedResult": "Encrypted Result (Base64)",
+        "featureRaw": "Style {{value}}",
         "networkData": "Network Data",
         "networkUnavailable": "Network decoding unavailable (may require internet)",
+        "outfitTitle": "Wearing",
+        "parseFailed": "Failed to parse structured data; expand to view the raw network data",
+        "poseId": "Pose ID",
+        "rawDataSummary": "Raw network data",
         "serverId": "Server ID",
-        "timestamp": "Timestamp"
+        "speciesRaw": "Series {{value}}",
+        "stateRaw": "State {{value}}",
+        "timestamp": "Timestamp",
+        "uidHex": "UID (hex)"
       },
       "tabs": {
         "clothDiy": "Dye Share Code",
@@ -3333,7 +3342,9 @@
         "jsonTextRequired": "",
         "jsonTextMaxLength": "",
         "codeStrRequired": "",
-        "codeStrMaxLength": ""
+        "codeStrMaxLength": "",
+        "idsRequired": "Clothing ID list cannot be empty",
+        "idsBatchMaxLength": "Query at most {{max}} clothing IDs per call"
       },
       "log": {
         "mediaWhitelistHit": "",

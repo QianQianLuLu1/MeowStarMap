@@ -12,9 +12,10 @@ import { t } from '../i18n'
 
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
 // 单独一处都能被绕过：响应头缺失时靠 meta，HTML 被替换时靠响应头。
+// img-src 放行 https://cdn.gongeo.us：搭配码服饰图标（gongeo CDN，见 src/main/services/cloth-data-config.ts）。
 const CSP_POLICY =
   "default-src 'self'; script-src 'self'; object-src 'none'; " +
-  "img-src 'self' media: data:; media-src 'self' media:; style-src 'self' 'unsafe-inline'"
+  "img-src 'self' media: data: https://cdn.gongeo.us; media-src 'self' media:; style-src 'self' 'unsafe-inline'"
 
 // D1 保险丝：ready-to-show 与 did-finish-load 双兜底均失效的极端情况下，
 // 15s 后强制恢复调度器，避免启动扫描任务因调度器永久暂停而静默不触发
