@@ -1,9 +1,14 @@
 /**
  * NikkiSync Protocol Contract v1 —— 移植模块入口
  *
- * 逐字移植自 NikkiSync/packages/protocol/src/index.ts（commit 284d4a6；
- * 2026-10-25 兼容层对齐至上游 b422193：ServerInfoResponse.connectionHosts、
- * PairingQrPayload.hosts、buildPairingUri 多 host 分支——全部为可选扩展，wire 兼容）。
+ * 逐字移植自 NikkiSync/packages/protocol/src/index.ts。锚点演进：
+ * - 284d4a6：首次移植；
+ * - 2026-10-25 兼容层对齐至 b422193：ServerInfoResponse.connectionHosts、
+ *   PairingQrPayload.hosts、buildPairingUri 多 host 分支；
+ * - 2026-10-31 对齐至 b397e0e（tag v1.0.27-public-beta.1）：AssetSummary 追加
+ *   thumbnailSha256 / previewSha256 / fullPreviewResourceId / fullPreviewSha256 /
+ *   mediaFingerprint（fc39fd2）与 sourcePath / sourceFolder / sizeBytes（b397e0e）。
+ *   全部为可选扩展，wire 兼容。
  * 与上游的唯一代码差异：'@nikkisync/core' 的 import / re-export 改为指向 './domain-types'。
  * 协议字段名、路由常量、错误码为客户端兼容硬约束，禁止变更。
  * 维护规则与上游溯源见同目录 README.md。
@@ -75,6 +80,18 @@ export interface AssetSummary {
   hasMetadata: boolean
   thumbnailResourceId?: ResourceId
   previewResourceId?: ResourceId
+  /** Media-byte identities, independent of metadata revisions. Optional for v1 clients. */
+  thumbnailSha256?: string
+  previewSha256?: string
+  /** Larger still for the full-screen viewer; exports continue to use original resources. */
+  fullPreviewResourceId?: ResourceId
+  fullPreviewSha256?: string
+  /** All current source resources, excluding parameter-only revisions; used for offline organizer intent. */
+  mediaFingerprint?: string
+  /** Local source descriptor, shared only through the authenticated LAN gallery. */
+  sourcePath?: string
+  sourceFolder?: string
+  sizeBytes?: number
   /** Resolved Infinity Nikki game version for version-first gallery grouping. */
   gameVersion?: string
   /** Provenance of gameVersion; unknown never forces a fabricated version. */

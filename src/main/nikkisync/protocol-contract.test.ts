@@ -5,7 +5,9 @@ import {
   CONTRACT_ROUTE_KEYS,
   VENDORED_CONTRACT_SYMBOLS,
   collectVendoredContract,
+  diffInterfaceMembers,
   diffProtocolContract,
+  extractInterfaceMembers,
   upstreamSnapshotFromModules
 } from './protocol-contract'
 import {
@@ -186,5 +188,64 @@ describe('diffProtocolContract', () => {
     const differences = diffProtocolContract(collectVendoredContract(), upstream)
     expect(differences[0]).toContain('drift: PROTOCOL_VERSION')
     expect(differences[0]).toContain('upstream=object(nested)')
+  })
+})
+
+describe('extractInterfaceMembers', () => {
+  it('正常：只取一层成员，可选与 readonly 归一，嵌套对象成员不计入', () => {
+    const source = `
+export interface Sample {
+  /** doc with braces { } */
+  readonly id: string
+  name?: string
+  nested?: {
+    inner: string
+    deeper?: { leaf: number }
+  }
+  count: number
+  run?(): void
+}
+`
+    expect(extractInterfaceMembers(source, 'Sample')).toEqual([
+      'id',
+      'name',
+      'nested',
+      'count',
+      'run'
+    ])
+  })
+
+  it('异常：接口不存在或接口体未闭合时返回 undefined', () => {
+    expect(extractInterfaceMembers('interface Other { a: string }', 'Sample')).toBeUndefined()
+    expect(extractInterfaceMembers('interface Sample { a: string', 'Sample')).toBeUndefined()
+  })
+
+  it('边界：注释与字符串里的花括号不破坏接口体边界', () => {
+    const source = `interface Sample {
+  /** { } */
+  a: string
+  // }
+  b: '{ not a brace }'
+  c: "tpl { }"
+  d: \`raw { }\`
+}`
+    expect(extractInterfaceMembers(source, 'Sample')).toEqual(['a', 'b', 'c', 'd'])
+  })
+})
+
+describe('diffInterfaceMembers', () => {
+  it('正常：成员集合一致时无差异', () => {
+    expect(diffInterfaceMembers(['a', 'b'], ['b', 'a'])).toEqual({ missing: [], extra: [] })
+  })
+
+  it('异常：缺字段与多余字段分别按各自源码顺序列出', () => {
+    expect(diffInterfaceMembers(['a', 'stale'], ['a', 'b', 'c'])).toEqual({
+      missing: ['b', 'c'],
+      extra: ['stale']
+    })
+  })
+
+  it('边界：重复成员名与不同顺序都不产生差异', () => {
+    expect(diffInterfaceMembers(['a', 'a', 'b'], ['b', 'a'])).toEqual({ missing: [], extra: [] })
   })
 })

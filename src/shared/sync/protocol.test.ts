@@ -291,10 +291,20 @@ describe('sync/protocol（NikkiSync Protocol v1 移植）', () => {
         hasMotion: false,
         hasMetadata: true,
         gameVersion: '2.9',
-        gameVersionSource: 'explicit'
+        gameVersionSource: 'explicit',
+        thumbnailSha256: 'a'.repeat(64),
+        previewSha256: 'b'.repeat(64),
+        fullPreviewResourceId: '7/100',
+        fullPreviewSha256: 'c'.repeat(64),
+        mediaFingerprint: 'd'.repeat(64),
+        sourcePath: 'D:/Game/X6Game/Saved/GamePlayPhotos/10001/Photo_1.jpg',
+        sourceFolder: 'D:/Game/X6Game/Saved/GamePlayPhotos/10001',
+        sizeBytes: 1024
       }
       expect(summary.gameVersion).toBe('2.9')
       expect(summary.gameVersionSource).toBe('explicit')
+      expect(summary.sourceFolder).toBe('D:/Game/X6Game/Saved/GamePlayPhotos/10001')
+      expect(summary.sizeBytes).toBe(1024)
     })
 
     it('T6 NikkiAsset 最小合法对象可构造', () => {

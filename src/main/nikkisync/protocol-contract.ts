@@ -270,6 +270,128 @@ export function upstreamSnapshotFromModules(
   return snapshot
 }
 
+/** 接口成员差异：missing = 上游有而 vendored 未登记；extra = vendored 有而上游已移除。 */
+export interface InterfaceMemberDiff {
+  missing: string[]
+  extra: string[]
+}
+
+/**
+ * 纯函数：先把注释与字符串内容替换为空格（保留换行），再交给结构扫描。
+ * 目的：注释/字符串里的花括号不得干扰接口体边界与成员识别。
+ */
+function maskCommentsAndStrings(source: string): string {
+  const chars = source.split('')
+  const blank = (from: number, to: number): void => {
+    for (let index = from; index < to; index += 1) {
+      if (chars[index] !== '\n') chars[index] = ' '
+    }
+  }
+  let index = 0
+  while (index < source.length) {
+    const char = source[index]
+    const next = source[index + 1]
+    if (char === '/' && next === '*') {
+      const end = source.indexOf('*/', index + 2)
+      const stop = end === -1 ? source.length : end + 2
+      blank(index, stop)
+      index = stop
+      continue
+    }
+    if (char === '/' && next === '/') {
+      const end = source.indexOf('\n', index + 2)
+      const stop = end === -1 ? source.length : end
+      blank(index, stop)
+      index = stop
+      continue
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      let cursor = index + 1
+      while (cursor < source.length) {
+        if (source[cursor] === '\\') {
+          cursor += 2
+          continue
+        }
+        if (source[cursor] === char) {
+          cursor += 1
+          break
+        }
+        cursor += 1
+      }
+      blank(index + 1, Math.max(index + 1, cursor - 1))
+      index = cursor
+      continue
+    }
+    index += 1
+  }
+  return chars.join('')
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * 纯函数：从 TypeScript 源码文本提取接口的一层成员名（保持源码顺序、去重）。
+ *
+ * 只认深度 0 的 `name:` / `name?:` / `readonly name:` 与 `name(`（方法签名）；
+ * 嵌套对象类型内部的成员不进入结果。接口不存在或未闭合时返回 `undefined`——
+ * 调用方必须把「读不到」与「读到了但为空」分开处理。
+ */
+export function extractInterfaceMembers(
+  source: string,
+  interfaceName: string
+): string[] | undefined {
+  const masked = maskCommentsAndStrings(source)
+  const declaration = new RegExp(`\\binterface\\s+${escapeRegExp(interfaceName)}\\b`).exec(masked)
+  if (!declaration) return undefined
+  const open = masked.indexOf('{', declaration.index + declaration[0].length)
+  if (open === -1) return undefined
+  let depth = 0
+  let close = -1
+  for (let index = open; index < masked.length; index += 1) {
+    if (masked[index] === '{') depth += 1
+    else if (masked[index] === '}') {
+      depth -= 1
+      if (depth === 0) {
+        close = index
+        break
+      }
+    }
+  }
+  if (close === -1) return undefined
+
+  const members: string[] = []
+  let bodyDepth = 0
+  for (const line of masked.slice(open + 1, close).split('\n')) {
+    if (bodyDepth === 0) {
+      const match =
+        /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*\??\s*:/.exec(line) ??
+        /^\s*([A-Za-z_$][\w$]*)\s*\??\s*\(/.exec(line)
+      const name = match?.[1]
+      if (name && !members.includes(name)) members.push(name)
+    }
+    for (const char of line) {
+      if (char === '{') bodyDepth += 1
+      else if (char === '}') bodyDepth = Math.max(0, bodyDepth - 1)
+    }
+  }
+  return members
+}
+
+/** 纯函数：按成员名集合比较两个接口（顺序不参与判定），返回 missing / extra 明细。 */
+export function diffInterfaceMembers(
+  vendored: readonly string[],
+  upstream: readonly string[]
+): InterfaceMemberDiff {
+  const vendoredSet = new Set(vendored)
+  const upstreamSet = new Set(upstream)
+  return {
+    missing: upstream.filter((name) => !vendoredSet.has(name)),
+    extra: vendored.filter((name) => !upstreamSet.has(name))
+  }
+}
+
 /**
  * 纯函数：比较 vendored 快照与上游快照，返回逐条差异（空数组 = 契约一致）。
  * missing = 上游缺该符号；drift = 两侧值不等；extra = 上游有而 vendored 未覆盖。

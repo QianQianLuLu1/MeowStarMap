@@ -17,11 +17,11 @@ NikkiSync 逐字一致（客户端兼容硬约束，禁止变更）。
 
 ## 文件
 
-| 文件               | 内容                                                                                                              | 上游对应（commit `284d4a6`）               |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| `protocol.ts`      | 协议契约：`PROTOCOL_VERSION`、`API_ROUTES`、`API_ERROR_CODES`、`CHANGE_TYPES`、消息类型、type guard、路由构建函数 | `NikkiSync/packages/protocol/src/index.ts` |
-| `domain-types.ts`  | 领域类型：`NikkiAsset`、`MediaResource`、`InfinityPhotoMetadata`、资源角色/资产状态等常量                         | `NikkiSync/packages/core/src/types.ts`     |
-| `protocol.test.ts` | 逐值一致性 + 路由编码 + 配对 URI + type guard 测试                                                                | —                                          |
+| 文件               | 内容                                                                                                              | 上游对应（commit `b397e0e` = tag `v1.0.27-public-beta.1`） |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `protocol.ts`      | 协议契约：`PROTOCOL_VERSION`、`API_ROUTES`、`API_ERROR_CODES`、`CHANGE_TYPES`、消息类型、type guard、路由构建函数 | `NikkiSync/packages/protocol/src/index.ts`                 |
+| `domain-types.ts`  | 领域类型：`NikkiAsset`、`MediaResource`、`InfinityPhotoMetadata`、资源角色/资产状态等常量                         | `NikkiSync/packages/core/src/types.ts`                     |
+| `protocol.test.ts` | 逐值一致性 + 路由编码 + 配对 URI + type guard 测试                                                                | —                                                          |
 
 与上游的代码差异（共两处，均已注释说明，类型形状与符号名不变）：
 
@@ -52,5 +52,7 @@ import type { NikkiAsset, ServerInfoResponse } from '../../shared/sync/protocol'
   `protocol.test.ts` 的逐值断言；上游改动需经评审确认客户端兼容后再移植。
 - 新增符号时要同步 `src/main/nikkisync/protocol-contract.ts` 的 `VENDORED_CONTRACT_SYMBOLS`
   与快照采集（否则该文件的键集断言即失败）；链接态漂移由 `protocol-drift.test.ts` 拦截。
+- 接口型 DTO（如 `AssetSummary`）没有运行时值，其字段集由 `protocol-drift.test.ts` 的
+  `extractInterfaceMembers` 用例直接比对上游 `dist/src/index.d.ts`；上游加字段而未补移植会转红。
 - 本目录不在 core-path 保护清单内，无需 `@core-change` 注释；但协议内容本身的
   变更视同协议契约变更，需在提交说明中注明上游对应变更。
