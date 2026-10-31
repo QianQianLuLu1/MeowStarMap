@@ -314,17 +314,17 @@ npm run dev        # electron-vite dev
 
 ## 7. 实测读数回写位（执行时填写）
 
-| 项                            | 读数                                                                                                                        |
-| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| 上游锚点复核                  | `b397e0eb6ca1b4748f13a72f13bb1702a549410e` = tag `v1.0.27-public-beta.1`，检出 `porcelain` = 0，四条链接 `check OK`         |
-| N0 `npm test` 基线            | `459 passed` / `7199 passed \| 20 skipped (7219)`，71.15s；`verify:nikkisync` = 13 项 OK、blocking 0；`docs:links` 无死引用 |
-| N1 红 → 绿读数                | 待填                                                                                                                        |
-| N2 红 → 绿读数                | 待填                                                                                                                        |
-| N3 链接态读数（含 0 skipped） | 待填                                                                                                                        |
-| N4 handler/preload/typecheck  | 待填                                                                                                                        |
-| N5 renderer/i18n              | 待填                                                                                                                        |
-| N6 全量回归 + coverage        | 待填                                                                                                                        |
-| not-run 清单                  | 待填（含原因与复现命令）                                                                                                    |
+| 项                            | 读数                                                                                                                                                                                                                                                                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 上游锚点复核                  | `b397e0eb6ca1b4748f13a72f13bb1702a549410e` = tag `v1.0.27-public-beta.1`，检出 `porcelain` = 0，四条链接 `check OK`                                                                                                                                                                                                                         |
+| N0 `npm test` 基线            | `459 passed` / `7199 passed \| 20 skipped (7219)`，71.15s；`verify:nikkisync` = 13 项 OK、blocking 0；`docs:links` 无死引用                                                                                                                                                                                                                 |
+| N1 红 → 绿读数                | 红：drift 用例报 `missing: [thumbnailSha256, previewSha256, fullPreviewResourceId, fullPreviewSha256, mediaFingerprint, sourcePath, sourceFolder, sizeBytes]`；绿：`npx vitest run src/shared/sync src/main/nikkisync/protocol-contract.test.ts src/main/nikkisync/protocol-drift.test.ts` = 3 文件 / **51 passed**（0 skipped）            |
+| N2 红 → 绿读数                | 红：零转换断言（含嵌套 `photos[].asset`）在旧裁剪实现下缺两键；绿：`npx vitest run src/main/nikkisync/runtime-manager.test.ts` = **77 passed**；变异抽查（恢复裁剪）即红                                                                                                                                                                    |
+| N3 链接态读数（含 0 skipped） | `npx vitest run src/main/nikkisync/runtime-facade.test.ts src/main/nikkisync/runtime-facade.linked.test.ts src/main/nikkisync/sync-server-view.test.ts` = 3 文件 / **101 passed**、**0 skipped**；变异抽查两次（listChanges 判据回退、仓储回单参）各致 1–2 条红                                                                             |
+| N4 handler/preload/typecheck  | `npx vitest run src/main/ipc/handlers/nikkisync-handler.test.ts src/main/preload src/renderer/stores/nikkisyncContractTypes.test.ts` = 4 文件 / **139 passed**；`npm run typecheck` exit 0；变异抽查两次（去 label 剔除、去 library-changed）各致 2 / 1 条红                                                                                |
+| N5 renderer/i18n              | `npx vitest run src/renderer/pages/sync-gallery src/renderer/i18n/locales/sync-service-keys.test.ts` = 2 文件 / **59 passed**；`npm run i18n:guard` exit 0；变异抽查三次（`uids` 恒数组、复选框恒可编辑、en.json 缺 `syncAccounts.title`）分别致 1 / 1 / 3 条红                                                                             |
+| N6 全量回归 + coverage        | `npm test` = **459 passed / 7238 passed \| 20 skipped (7258)**，83.51s（较基线 +39 条、零新增失败）；`test:coverage` exit 0，All files 70.46 / 61.93 / 63.4 / 72.11；`lint` / `format:check` / `typecheck` / `typecheck:e2e` / `i18n:guard` / `docs:links` / `verify:nikkisync`（blocking 0）/ `audit`（exit 0，仅既有 allowlist 提示）全绿 |
+| not-run 清单                  | ① `npm run dist:win` 未跑（计划 §6 明确不重打包）；② Electron GUI 手工冒烟未跑——账号节需要真实会话与已扫描库，本轮以 59 条组件用例覆盖交互（渲染/全选/数组与 null/全不选/失败回滚/缩略图失败/来源切换/添加旋转吧大喵目录）；复现命令 `npm run dev` 后进入「图库数据源=同步图库 → 同步服务 → 同步账号」                                      |
 
 ---
 
@@ -333,3 +333,14 @@ npm run dev        # electron-vite dev
 - 每节点一个 Conventional Commit；**红测与修复同一提交**（仓库 lint-staged 会拒绝带失败用例的提交，禁止 `--no-verify`）。
 - 受保护路径 `src/main/preload/api/**`、`src/main/ipc/handlers/**` 的实质改动必须同批附带**一条**真实原因的 `// @core-change:` 注释（替换旧原因，不追加第二条）。
 - 不夹带无关格式化/重构；`npm run format` 仅对改动文件执行。
+
+**执行偏差（如实记账）**：N2 与 N3 共用 `runtime-manager.ts` / `runtime-manager.test.ts` /
+`runtime-facade.linked.test.ts` 三个文件，在不做交互式 hunk 暂存（`git add -p`）的前提下无法
+把同一文件的两组语义拆成两次提交，故合并为单笔 `feat(nikkisync)`（8ecac26）。实际提交序列：
+
+1. `56c6998` docs(plans)：N0 落盘计划
+2. `97555c5` fix(sync)：N1 契约补字段 + 漂移守卫
+3. `8ecac26` feat(nikkisync)：N2 撤裁剪 + N3 账号作用域内核
+4. `4570c6e` feat(nikkisync)：N4 IPC / preload / 共享类型 / 契约文档
+5. `476fcc7` feat(sync-ui)：N5 同步服务页 + 12 语言
+6. N6 文档回写 + 读数（本提交）

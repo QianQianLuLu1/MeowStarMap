@@ -26,6 +26,12 @@
 该节同时澄清了 `src/main/nikkisync/AGENTS.md` 硬约束 3「不新建任何 HTTP/TLS/WS/mDNS 实现」
 指的是**内嵌面不复用移植面代码**，而非移植面服务不存在。
 
+上游 1.0.27（`b397e0e`）的账号同步作用域（`AccountSyncSettings`）已接入内嵌面：
+`runtime.server.accounts` 原实例经 `src/main/nikkisync/runtime-facade.ts` 注入
+`SyncReadRepository`，LAN 下发内容按账号选择过滤；`nikkisync:get-sync-accounts` /
+`preview-sync-account` / `set-sync-account-selection` / `set-extra-directory-source`
+四条通道与同步服务页的「同步账号」区块对应该能力（契约见 `docs/IPC_CONTRACT.md` §8.2.5）。
+
 ## 2. 各文档状态一览（照抄各文件首部 `状态：` 行，未做推断）
 
 | 文件                                 | 首部记载状态                                    | 复核提示                                                                                                                                                                                                                                                                                               |
