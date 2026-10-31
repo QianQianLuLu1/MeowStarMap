@@ -4475,7 +4475,31 @@
       "confirmAdd": "Confirm add",
       "cancelAdd": "Cancel",
       "rescan": "Rescan",
-      "proposalSummary": "Found {{images}} photos / {{videos}} videos"
+      "proposalSummary": "Found {{images}} photos / {{videos}} videos",
+      "addSpinning": "Add SpinningMomo folder",
+      "markSpinning": "Mark as SpinningMomo",
+      "unmarkSpinning": "Unmark SpinningMomo",
+      "sourceSpinning": "SpinningMomo",
+      "sourceOther": "Other source",
+      "sourceUpdated": "Folder source updated"
+    },
+    "syncAccounts": {
+      "title": "Sync accounts",
+      "scopeNote": "Choose which accounts sync to your phone; leaving everything unchecked pauses photo sync.",
+      "all": "Sync all accounts",
+      "empty": "No account groups yet",
+      "emptyHint": "Accounts appear here by UID once the sync library has scanned photos",
+      "unknownUid": "Photos without a recognized UID",
+      "spinningMomo": "SpinningMomo",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} photos",
+      "samples": "Sample thumbnails",
+      "save": "Save selection",
+      "saving": "Saving…",
+      "saved": "Account selection saved",
+      "saveFailed": "Save failed, please retry",
+      "loadFailed": "Failed to refresh accounts",
+      "previewEmpty": "No samples"
     },
     "organizer": {
       "title": "Organizer queue",

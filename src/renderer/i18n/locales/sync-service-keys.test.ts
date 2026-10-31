@@ -63,7 +63,7 @@ export function leafKeys(node: unknown, prefix = ''): string[] {
 }
 
 /**
- * `syncService` 子树的全部叶子（38 个）。
+ * `syncService` 子树的全部叶子。
  * 与 `SyncServicePage.tsx` / `PairingQrDialog.tsx` 的 `t()` 调用点一一对应，
  * 两侧任何一边增删而未同步另一边，等集断言即红。
  */
@@ -153,6 +153,30 @@ const SYNC_SERVICE_LEAVES = [
   'extraDirectories.cancelAdd',
   'extraDirectories.rescan',
   'extraDirectories.proposalSummary',
+  // K9：目录来源标注（spinning_momo / other）
+  'extraDirectories.addSpinning',
+  'extraDirectories.markSpinning',
+  'extraDirectories.unmarkSpinning',
+  'extraDirectories.sourceSpinning',
+  'extraDirectories.sourceOther',
+  'extraDirectories.sourceUpdated',
+  // K9：账号同步作用域（1.0.27 上游 AccountSyncSettings）
+  'syncAccounts.title',
+  'syncAccounts.scopeNote',
+  'syncAccounts.all',
+  'syncAccounts.empty',
+  'syncAccounts.emptyHint',
+  'syncAccounts.unknownUid',
+  'syncAccounts.spinningMomo',
+  'syncAccounts.uidLabel',
+  'syncAccounts.count',
+  'syncAccounts.samples',
+  'syncAccounts.save',
+  'syncAccounts.saving',
+  'syncAccounts.saved',
+  'syncAccounts.saveFailed',
+  'syncAccounts.loadFailed',
+  'syncAccounts.previewEmpty',
   // K8：整理队列（批量删除，破坏性能力）
   'organizer.title',
   'organizer.toggle',
@@ -281,6 +305,15 @@ describe('同步服务语言包完整性', () => {
         String(readPath(locale, 'syncService.devices.revokeConfirmMessage')),
         `${code}.json revokeConfirmMessage 丢了 {{name}}`
       ).toContain('{{name}}')
+      // K9：账号标签与计数是模板文案，丢占位就会把 {{uid}} / {{count}} 当字面量渲染
+      expect(
+        String(readPath(locale, 'syncService.syncAccounts.uidLabel')),
+        `${code}.json syncAccounts.uidLabel 丢了 {{uid}}`
+      ).toContain('{{uid}}')
+      expect(
+        String(readPath(locale, 'syncService.syncAccounts.count')),
+        `${code}.json syncAccounts.count 丢了 {{count}}`
+      ).toContain('{{count}}')
     }
   })
 })

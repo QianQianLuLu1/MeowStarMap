@@ -4475,7 +4475,31 @@
       "confirmAdd": "ยืนยันเพิ่ม",
       "cancelAdd": "ยกเลิก",
       "rescan": "สแกนใหม่",
-      "proposalSummary": "พบรูปภาพ {{images}} รายการ / วิดีโอ {{videos}} รายการ"
+      "proposalSummary": "พบรูปภาพ {{images}} รายการ / วิดีโอ {{videos}} รายการ",
+      "addSpinning": "เพิ่มโฟลเดอร์ SpinningMomo",
+      "markSpinning": "ทำเครื่องหมายเป็น SpinningMomo",
+      "unmarkSpinning": "ยกเลิกเครื่องหมาย SpinningMomo",
+      "sourceSpinning": "SpinningMomo",
+      "sourceOther": "แหล่งอื่น",
+      "sourceUpdated": "อัปเดตแหล่งของโฟลเดอร์แล้ว"
+    },
+    "syncAccounts": {
+      "title": "บัญชีที่ซิงค์",
+      "scopeNote": "เลือกบัญชีที่จะซิงค์ไปยังโทรศัพท์ หากไม่เลือกเลยจะหยุดซิงค์รูปภาพชั่วคราว",
+      "all": "ซิงค์ทุกบัญชี",
+      "empty": "ยังไม่มีกลุ่มบัญชี",
+      "emptyHint": "บัญชีจะแสดงที่นี่ตาม UID หลังจากไลบรารีซิงค์สแกนรูปภาพแล้ว",
+      "unknownUid": "รูปที่ระบุ UID ไม่ได้",
+      "spinningMomo": "SpinningMomo",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} รูป",
+      "samples": "ภาพตัวอย่างขนาดย่อ",
+      "save": "บันทึกการเลือก",
+      "saving": "กำลังบันทึก…",
+      "saved": "บันทึกการเลือกบัญชีแล้ว",
+      "saveFailed": "บันทึกไม่สำเร็จ โปรดลองอีกครั้ง",
+      "loadFailed": "รีเฟรชรายการบัญชีไม่สำเร็จ",
+      "previewEmpty": "ไม่มีตัวอย่าง"
     },
     "organizer": {
       "title": "คิวจัดระเบียบ",

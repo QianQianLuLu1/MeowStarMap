@@ -4475,7 +4475,31 @@
       "confirmAdd": "確認新增",
       "cancelAdd": "取消",
       "rescan": "重新掃描",
-      "proposalSummary": "識別到 {{images}} 張照片 / {{videos}} 個影片"
+      "proposalSummary": "識別到 {{images}} 張照片 / {{videos}} 個影片",
+      "addSpinning": "新增旋轉吧大喵目錄",
+      "markSpinning": "標為旋轉吧大喵",
+      "unmarkSpinning": "取消旋轉吧大喵標記",
+      "sourceSpinning": "旋轉吧大喵",
+      "sourceOther": "其他來源",
+      "sourceUpdated": "目錄來源已更新"
+    },
+    "syncAccounts": {
+      "title": "同步帳號",
+      "scopeNote": "選擇要同步到手機的帳號；全部不勾選將暫不同步照片。",
+      "all": "同步全部帳號",
+      "empty": "暫無帳號分組",
+      "emptyHint": "同步庫掃描到照片後，這裡會按 UID 列出帳號",
+      "unknownUid": "未識別 UID 的照片",
+      "spinningMomo": "旋轉吧大喵",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} 張照片",
+      "samples": "樣例縮圖",
+      "save": "儲存選擇",
+      "saving": "儲存中…",
+      "saved": "帳號選擇已儲存",
+      "saveFailed": "儲存失敗，請重試",
+      "loadFailed": "帳號清單更新失敗",
+      "previewEmpty": "暫無樣例"
     },
     "organizer": {
       "title": "整理佇列",

@@ -4475,7 +4475,31 @@
       "confirmAdd": "Xác nhận thêm",
       "cancelAdd": "Hủy",
       "rescan": "Quét lại",
-      "proposalSummary": "Phát hiện {{images}} ảnh / {{videos}} video"
+      "proposalSummary": "Phát hiện {{images}} ảnh / {{videos}} video",
+      "addSpinning": "Thêm thư mục SpinningMomo",
+      "markSpinning": "Đánh dấu là SpinningMomo",
+      "unmarkSpinning": "Bỏ đánh dấu SpinningMomo",
+      "sourceSpinning": "SpinningMomo",
+      "sourceOther": "Nguồn khác",
+      "sourceUpdated": "Đã cập nhật nguồn thư mục"
+    },
+    "syncAccounts": {
+      "title": "Tài khoản đồng bộ",
+      "scopeNote": "Chọn tài khoản đồng bộ lên điện thoại; nếu bỏ chọn tất cả, ảnh sẽ tạm thời không được đồng bộ.",
+      "all": "Đồng bộ tất cả tài khoản",
+      "empty": "Chưa có nhóm tài khoản",
+      "emptyHint": "Tài khoản sẽ xuất hiện ở đây theo UID sau khi thư viện đồng bộ quét ảnh",
+      "unknownUid": "Ảnh không nhận diện được UID",
+      "spinningMomo": "SpinningMomo",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} ảnh",
+      "samples": "Ảnh thu nhỏ mẫu",
+      "save": "Lưu lựa chọn",
+      "saving": "Đang lưu…",
+      "saved": "Đã lưu lựa chọn tài khoản",
+      "saveFailed": "Lưu thất bại, vui lòng thử lại",
+      "loadFailed": "Làm mới danh sách tài khoản thất bại",
+      "previewEmpty": "Không có mẫu"
     },
     "organizer": {
       "title": "Hàng đợi dọn dẹp",

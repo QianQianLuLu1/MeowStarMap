@@ -4475,7 +4475,31 @@
       "confirmAdd": "Подтвердить",
       "cancelAdd": "Отмена",
       "rescan": "Пересканировать",
-      "proposalSummary": "Найдено фото: {{images}} / видео: {{videos}}"
+      "proposalSummary": "Найдено фото: {{images}} / видео: {{videos}}",
+      "addSpinning": "Добавить папку SpinningMomo",
+      "markSpinning": "Отметить как SpinningMomo",
+      "unmarkSpinning": "Снять отметку SpinningMomo",
+      "sourceSpinning": "SpinningMomo",
+      "sourceOther": "Другой источник",
+      "sourceUpdated": "Источник папки обновлён"
+    },
+    "syncAccounts": {
+      "title": "Синхронизируемые аккаунты",
+      "scopeNote": "Выберите аккаунты для синхронизации с телефоном; если снять все отметки, фото синхронизироваться не будут.",
+      "all": "Синхронизировать все аккаунты",
+      "empty": "Групп аккаунтов нет",
+      "emptyHint": "Аккаунты появятся здесь по UID после сканирования библиотеки синхронизации",
+      "unknownUid": "Фото без распознанного UID",
+      "spinningMomo": "SpinningMomo",
+      "uidLabel": "UID {{uid}}",
+      "count": "Фото: {{count}}",
+      "samples": "Примеры миниатюр",
+      "save": "Сохранить выбор",
+      "saving": "Сохранение…",
+      "saved": "Выбор аккаунтов сохранён",
+      "saveFailed": "Не удалось сохранить, повторите попытку",
+      "loadFailed": "Не удалось обновить список аккаунтов",
+      "previewEmpty": "Примеров нет"
     },
     "organizer": {
       "title": "Очередь очистки",

@@ -13,6 +13,7 @@ import { useErrorToast } from '../../hooks/useErrorToast'
 import { IconCopyText, IconSync } from '../../icons'
 import { useMediaStore } from '../../stores/mediaStore'
 import { useUIStore } from '../../stores/uiStore'
+import { toFileUrl } from '../../utils/file'
 import type {
   NikkiSyncExtraDirectoriesInfo,
   NikkiSyncExtraDirectoryProposalInfo,
@@ -20,7 +21,8 @@ import type {
   NikkiSyncOrganizerItemInfo,
   NikkiSyncOrganizerViewInfo,
   NikkiSyncPairedDeviceInfo,
-  NikkiSyncServerStatusInfo
+  NikkiSyncServerStatusInfo,
+  NikkiSyncSyncAccountsInfo
 } from '../../../shared/types/electron-api'
 
 // 状态轮询间隔（上游 pc-companion DesktopPageScript 同款 2s）
@@ -80,6 +82,16 @@ const STARTUP_STAGE_I18N_KEYS: Record<string, string> = {
   'runtime-ready': 'syncService.startupStages.stage.runtimeReady',
   'lan-listen': 'syncService.startupStages.stage.lanListen',
   'cached-metadata': 'syncService.startupStages.stage.cachedMetadata'
+}
+
+/**
+ * K9：账号分组文案。上游 `label` 是中文（`UID x` / 未识别 / 旋转吧大喵），已在 handler
+ * 剔除；渲染层按 `uid` 三态 + i18n 生成，`src/**` 不出现硬编码中文。
+ */
+function accountLabel(uid: string, t: (key: string, options?: Record<string, unknown>) => string) {
+  if (uid === '') return t('syncService.syncAccounts.unknownUid')
+  if (uid === 'source:spinning_momo') return t('syncService.syncAccounts.spinningMomo')
+  return t('syncService.syncAccounts.uidLabel', { uid })
 }
 
 /**
@@ -150,6 +162,13 @@ export const SyncServicePage: React.FC = () => {
   // K6：额外照片目录（null = 会话未挂面/未装配 ⇒ 整节隐藏，预期内不报错）
   const [extraDirs, setExtraDirs] = useState<NikkiSyncExtraDirectoriesInfo | null>(null)
   const [proposal, setProposal] = useState<NikkiSyncExtraDirectoryProposalInfo | null>(null)
+  // K9：账号同步作用域（null = 会话无 accounts / 未装配 ⇒ 整节隐藏，预期内不报错）
+  const [syncAccounts, setSyncAccounts] = useState<NikkiSyncSyncAccountsInfo | null>(null)
+  const [allAccounts, setAllAccounts] = useState(true)
+  const [selectedAccounts, setSelectedAccounts] = useState<string[]>([])
+  const [accountSaving, setAccountSaving] = useState(false)
+  // K9：样例缩略图（assetId → media:// URL；预览失败留空，不打断整卡）
+  const [accountSampleUrls, setAccountSampleUrls] = useState<Record<string, string | null>>({})
   // K8：整理队列（破坏性能力，开关默认关）。null = 未拉到/不可用 ⇒ 队列区显示不可用而非报错
   const [organizerEnabled, setOrganizerEnabled] = useState(false)
   const [organizerQueue, setOrganizerQueue] = useState<NikkiSyncOrganizerViewInfo | null>(null)
@@ -360,6 +379,124 @@ export const SyncServicePage: React.FC = () => {
     void refreshExtraDirs()
   }, [currentView, refreshExtraDirs])
 
+  /**
+   * K9：账号状态拉取。老链接/未装配会话上通道回 PRECONDITION_FAILED——预期内状态，
+   * 降级为隐藏整节（不弹错误）。返回是否成功，供来源变更等调用点决定要不要提示。
+   */
+  const refreshAccounts = useCallback(async (): Promise<boolean> => {
+    try {
+      const next = await window.electronAPI?.nikkisync.getSyncAccounts()
+      if (!next) return false
+      setSyncAccounts(next)
+      setAllAccounts(next.all)
+      setSelectedAccounts(next.accounts.filter((account) => account.selected).map((a) => a.uid))
+      return true
+    } catch {
+      setSyncAccounts(null)
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (currentView !== 'sync-service') return
+    void refreshAccounts()
+  }, [currentView, refreshAccounts])
+
+  /**
+   * K9：样例缩略图。`preview` 给资源行的 source_path，经既有 media:// 出口读取；
+   * 单张失败留空（不伪造占位、不打断整卡）。上限 60 次批量预览，防账号极多时打爆 IPC。
+   */
+  useEffect(() => {
+    if (!syncAccounts) return
+    const assetIds = syncAccounts.accounts.flatMap((account) => account.samples).slice(0, 60)
+    if (assetIds.length === 0) {
+      setAccountSampleUrls({})
+      return
+    }
+    let alive = true
+    void Promise.all(
+      assetIds.map(async (assetId) => {
+        try {
+          const preview = await window.electronAPI?.nikkisync.previewSyncAccount({ assetId })
+          return [assetId, toFileUrl(preview?.sourcePath)] as const
+        } catch {
+          return [assetId, null] as const
+        }
+      })
+    ).then((pairs) => {
+      if (alive) setAccountSampleUrls(Object.fromEntries(pairs))
+    })
+    return () => {
+      alive = false
+    }
+  }, [syncAccounts])
+
+  /**
+   * K9：保存账号选择。开启「同步全部账号」时提交 `null`（上游语义 = 全部），
+   * 否则提交勾选数组（可为 `[]` = 一个都不同步）。**不做乐观更新**：失败保留旧选择，
+   * 避免「UI 已保存、下次启动又变回去」的裂口。
+   */
+  const handleSaveAccounts = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (accountSaving || !api) return
+    setAccountSaving(true)
+    try {
+      const next = await api.nikkisync.setSyncAccountSelection({
+        uids: allAccounts ? null : selectedAccounts
+      })
+      setSyncAccounts(next)
+      setAllAccounts(next.all)
+      setSelectedAccounts(next.accounts.filter((account) => account.selected).map((a) => a.uid))
+      showMessage(t('syncService.syncAccounts.saved'), 'success')
+    } catch {
+      showMessage(t('syncService.syncAccounts.saveFailed'), 'error')
+    } finally {
+      setAccountSaving(false)
+    }
+  }
+
+  const toggleAccount = (uid: string, checked: boolean): void => {
+    setSelectedAccounts((previous) =>
+      checked ? [...new Set([...previous, uid])] : previous.filter((item) => item !== uid)
+    )
+  }
+
+  /** K9：目录来源标注。成功后同时刷新目录与账号两处（来源分组随指纹变化）。 */
+  const handleSetDirectorySource = async (
+    id: string,
+    source: 'spinning_momo' | 'other'
+  ): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    setBusy(true)
+    try {
+      setExtraDirs(await api.nikkisync.setExtraDirectorySource({ id, source }))
+      if (syncAccounts && !(await refreshAccounts())) {
+        showMessage(t('syncService.syncAccounts.loadFailed'), 'error')
+      }
+      showMessage(t('syncService.extraDirectories.sourceUpdated'), 'success')
+    } catch (error) {
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** K9：添加「旋转吧大喵」目录（inspect 带 source，上游据此把它归入旋转吧大喵分组）。 */
+  const handleAddSpinningDirectory = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    try {
+      const selected = await api.dialog.selectDirectory()
+      if (!selected) return
+      setProposal(
+        await api.nikkisync.inspectExtraDirectory({ path: selected, source: 'spinning_momo' })
+      )
+    } catch (error) {
+      showError(error)
+    }
+  }
+
   /** K8：开关读回。读不到一律保持关闭（破坏性能力绝不默认生效）。 */
   useEffect(() => {
     let alive = true
@@ -477,6 +614,8 @@ export const SyncServicePage: React.FC = () => {
     try {
       setExtraDirs(await api.nikkisync.addExtraDirectory({ id }))
       setProposal(null)
+      // 新目录可能带来旋转吧大喵分组；仅在账号节可见时刷新，老链接不制造噪声
+      if (syncAccounts) await refreshAccounts()
     } catch (error) {
       showError(error)
     } finally {
@@ -864,6 +1003,33 @@ export const SyncServicePage: React.FC = () => {
                           >
                             {dir.mode}
                           </span>
+                          {/* K9：来源标注（仅 images 目录）——spinning_momo 的分组出现在账号节 */}
+                          {dir.mode === 'images' && (
+                            <>
+                              {dir.source && (
+                                <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                  {dir.source === 'spinning_momo'
+                                    ? t('syncService.extraDirectories.sourceSpinning')
+                                    : t('syncService.extraDirectories.sourceOther')}
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                className="btn-ghost text-xs"
+                                disabled={busy}
+                                onClick={() =>
+                                  void handleSetDirectorySource(
+                                    dir.id,
+                                    dir.source === 'spinning_momo' ? 'other' : 'spinning_momo'
+                                  )
+                                }
+                              >
+                                {dir.source === 'spinning_momo'
+                                  ? t('syncService.extraDirectories.unmarkSpinning')
+                                  : t('syncService.extraDirectories.markSpinning')}
+                              </button>
+                            </>
+                          )}
                           <button
                             type="button"
                             className="btn-danger text-xs"
@@ -908,14 +1074,25 @@ export const SyncServicePage: React.FC = () => {
                   </SettingsCard>
                 )}
                 <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    className="btn-secondary text-sm"
-                    disabled={busy}
-                    onClick={() => void handleAddDirectory()}
-                  >
-                    {t('syncService.extraDirectories.add')}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      className="btn-secondary text-sm"
+                      disabled={busy}
+                      onClick={() => void handleAddDirectory()}
+                    >
+                      {t('syncService.extraDirectories.add')}
+                    </button>
+                    {/* K9：直接添加并标为旋转吧大喵（inspect 带 source） */}
+                    <button
+                      type="button"
+                      className="btn-ghost text-sm"
+                      disabled={busy}
+                      onClick={() => void handleAddSpinningDirectory()}
+                    >
+                      {t('syncService.extraDirectories.addSpinning')}
+                    </button>
+                  </div>
                   <button
                     type="button"
                     className="btn-ghost text-sm"
@@ -929,7 +1106,96 @@ export const SyncServicePage: React.FC = () => {
             </SectionShell>
           )}
 
-          {/* ⑤K8：整理队列（批量删除；破坏性能力默认关，开关门由主进程三通道强制） */}
+          {/* ⑤K9：账号同步作用域（1.0.27 上游 AccountSyncSettings；会话无 accounts 时整节隐藏） */}
+          {syncAccounts && (
+            <SectionShell
+              title={t('syncService.syncAccounts.title')}
+              description={t('syncService.syncAccounts.scopeNote')}
+            >
+              <div className="space-y-2">
+                <SettingsToggle
+                  label={t('syncService.syncAccounts.all')}
+                  checked={allAccounts}
+                  disabled={accountSaving}
+                  onChange={setAllAccounts}
+                />
+                {syncAccounts.accounts.length === 0 ? (
+                  <EmptyState
+                    title={t('syncService.syncAccounts.empty')}
+                    subtitle={t('syncService.syncAccounts.emptyHint')}
+                  />
+                ) : (
+                  <>
+                    {syncAccounts.accounts.map((account) => {
+                      const label = accountLabel(account.uid, t)
+                      return (
+                        <SettingsCard key={account.uid}>
+                          <SettingsRow
+                            label={label}
+                            description={t('syncService.syncAccounts.count', {
+                              count: account.count
+                            })}
+                          >
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="flex items-center gap-1"
+                                aria-label={t('syncService.syncAccounts.samples')}
+                              >
+                                {account.samples.length === 0 ? (
+                                  <span
+                                    className="text-xs"
+                                    style={{ color: 'var(--text-tertiary)' }}
+                                  >
+                                    {t('syncService.syncAccounts.previewEmpty')}
+                                  </span>
+                                ) : (
+                                  account.samples.map((assetId) => {
+                                    const url = accountSampleUrls[assetId]
+                                    return url ? (
+                                      <img
+                                        key={assetId}
+                                        src={url}
+                                        alt=""
+                                        className="h-10 w-10 rounded object-cover"
+                                      />
+                                    ) : null
+                                  })
+                                )}
+                              </span>
+                              <input
+                                type="checkbox"
+                                aria-label={label}
+                                className="w-4 h-4"
+                                checked={allAccounts || selectedAccounts.includes(account.uid)}
+                                disabled={allAccounts || accountSaving}
+                                onChange={(event) =>
+                                  toggleAccount(account.uid, event.target.checked)
+                                }
+                              />
+                            </div>
+                          </SettingsRow>
+                        </SettingsCard>
+                      )
+                    })}
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        className="btn-primary text-sm"
+                        disabled={accountSaving}
+                        onClick={() => void handleSaveAccounts()}
+                      >
+                        {accountSaving
+                          ? t('syncService.syncAccounts.saving')
+                          : t('syncService.syncAccounts.save')}
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </SectionShell>
+          )}
+
+          {/* ⑥K8：整理队列（批量删除；破坏性能力默认关，开关门由主进程三通道强制） */}
           <SectionShell title={t('syncService.organizer.title')}>
             <div className="space-y-2">
               <SettingsToggle

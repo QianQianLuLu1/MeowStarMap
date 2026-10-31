@@ -100,6 +100,25 @@ interface NikkiSyncServerApiStub {
   getOrganizerQueue: Mock
   decideOrganizerItem: Mock
   approveOrganizerItems: Mock
+  // K9：账号同步作用域与目录来源
+  getSyncAccounts: Mock
+  previewSyncAccount: Mock
+  setSyncAccountSelection: Mock
+  setExtraDirectorySource: Mock
+}
+
+/** K9：与 handler 剔除 label 后的账号快照同形（uid 三态 + 样例 assetId）。 */
+function makeSyncAccounts(
+  overrides: { all?: boolean; accounts?: Array<Record<string, unknown>> } = {}
+) {
+  return {
+    all: overrides.all ?? true,
+    accounts: overrides.accounts ?? [
+      { uid: '', count: 3, selected: true, samples: [] },
+      { uid: '10001', count: 12, selected: true, samples: ['asset_a', 'asset_b'] },
+      { uid: 'source:spinning_momo', count: 2, selected: true, samples: ['asset_m'] }
+    ]
+  }
 }
 
 let settingsGet: Mock
@@ -120,6 +139,10 @@ function installElectronApi(
     extraReject?: boolean
     organizerQueue?: Record<string, unknown>
     organizerQueueReject?: boolean
+    accounts?: ReturnType<typeof makeSyncAccounts>
+    accountsReject?: boolean
+    previewReject?: string[]
+    extraDirectories?: Array<Record<string, unknown>>
   } = {}
 ) {
   store = { ...opts.persisted }
@@ -199,7 +222,9 @@ function installElectronApi(
       opts.extraReject
         ? Promise.reject(new Error('extra directories panel is unavailable'))
         : {
-            directories: [{ id: 'dir_1', path: 'D:\\ExtraPhotos', mode: 'native' as const }],
+            directories: opts.extraDirectories ?? [
+              { id: 'dir_1', path: 'D:\\ExtraPhotos', mode: 'native' as const }
+            ],
             automaticRoots: ['C:\\game\\photos'],
             busy: false
           }
@@ -231,7 +256,41 @@ function installElectronApi(
           )
     ),
     decideOrganizerItem: vi.fn(async () => []),
-    approveOrganizerItems: vi.fn(async () => ({ items: [], approved: 0, skipped: 0 }))
+    approveOrganizerItems: vi.fn(async () => ({ items: [], approved: 0, skipped: 0 })),
+    // K9：账号作用域（accountsReject 模拟「会话无 accounts」⇒ 整节隐藏）
+    getSyncAccounts: vi.fn(() =>
+      opts.accountsReject
+        ? Promise.reject(new Error('sync account scope is unavailable'))
+        : Promise.resolve(opts.accounts ?? makeSyncAccounts())
+    ),
+    previewSyncAccount: vi.fn(async ({ assetId }: { assetId: string }) => {
+      if (opts.previewReject?.includes(assetId)) throw new Error('NikkiSync asset not found')
+      return {
+        resourceId: `res_${assetId}`,
+        mimeType: 'image/jpeg',
+        sourcePath: `D:\\Photos\\${assetId}.jpg`
+      }
+    }),
+    // 与上游一致：null = 全部；数组 = 逐项选中
+    setSyncAccountSelection: vi.fn(async ({ uids }: { uids: string[] | null }) => {
+      const base = opts.accounts ?? makeSyncAccounts()
+      return {
+        all: uids === null,
+        accounts: base.accounts.map((account) => ({
+          ...account,
+          selected: uids === null || uids.includes(String(account.uid))
+        }))
+      }
+    }),
+    setExtraDirectorySource: vi.fn(
+      async ({ id, source }: { id: string; source: 'spinning_momo' | 'other' }) => ({
+        directories: (opts.extraDirectories ?? []).map((dir) =>
+          dir.id === id ? { ...dir, source } : dir
+        ),
+        automaticRoots: [],
+        busy: false
+      })
+    )
   }
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
@@ -819,6 +878,128 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     const toggle = await screen.findByRole('switch', { name: '启用同步服务' })
     await waitFor(() => expect(settingsGet).toHaveBeenCalledWith(SETTING_SYNC_ENABLED, false))
     expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  // ===== K9：账号同步作用域（1.0.27 上游 AccountSyncSettings） =====
+
+  it('(ak) K9：账号节渲染 uid 三态文案 + 数量 + 样例缩略图；无样例账号显示占位', async () => {
+    renderSection()
+    expect(await screen.findByText('同步账号')).toBeInTheDocument()
+    expect(screen.getByText('未识别 UID 的照片')).toBeInTheDocument()
+    expect(screen.getByText('UID 10001')).toBeInTheDocument()
+    expect(screen.getAllByText('旋转吧大喵').length).toBeGreaterThan(0)
+    expect(screen.getByText('12 张照片')).toBeInTheDocument()
+    expect(screen.getByText('暂无样例')).toBeInTheDocument()
+    await waitFor(() => expect(serverApi.previewSyncAccount).toHaveBeenCalledTimes(3))
+    // 样例缩略图是装饰性图片（alt=""），按 DOM 元素而非 role=img 断言
+    await waitFor(() => expect(document.querySelectorAll('img')).toHaveLength(3))
+    const sources = Array.from(document.querySelectorAll('img')).map(
+      (img) => img.getAttribute('src') ?? ''
+    )
+    expect(sources.some((src) => src.includes('asset_a'))).toBe(true)
+  })
+
+  it('(ak2) K9：会话无 accounts（老链接）⇒ 预期内拒绝隐藏整节而非报错', async () => {
+    installElectronApi({ accountsReject: true })
+    renderSection()
+    await waitFor(() => expect(screen.getByText('额外照片目录')).toBeInTheDocument())
+    expect(screen.queryByText('同步账号')).not.toBeInTheDocument()
+  })
+
+  it('(al) K9：默认「同步全部账号」⇒ 各账号勾选且禁用；保存提交 uids:null 并提示已保存', async () => {
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: '同步全部账号' })
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    const box = screen.getByRole('checkbox', { name: 'UID 10001' }) as HTMLInputElement
+    expect(box.checked).toBe(true)
+    expect(box.disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '保存选择' }))
+    await waitFor(() =>
+      expect(serverApi.setSyncAccountSelection).toHaveBeenCalledWith({ uids: null })
+    )
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('账号选择已保存', 'success'))
+  })
+
+  it('(am) K9：关闭全选后逐项可编辑；保存提交勾选数组（不含被取消的账号）', async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole('switch', { name: '同步全部账号' }))
+    const box = screen.getByRole('checkbox', { name: 'UID 10001' }) as HTMLInputElement
+    expect(box.disabled).toBe(false)
+    fireEvent.click(box)
+    fireEvent.click(screen.getByRole('button', { name: '保存选择' }))
+    await waitFor(() =>
+      expect(serverApi.setSyncAccountSelection).toHaveBeenCalledWith({
+        uids: ['', 'source:spinning_momo']
+      })
+    )
+  })
+
+  it('(an) K9：全部不勾选 ⇒ 保存提交空数组（上游语义：一个都不同步）', async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole('switch', { name: '同步全部账号' }))
+    for (const name of ['未识别 UID 的照片', 'UID 10001', '旋转吧大喵']) {
+      fireEvent.click(screen.getByRole('checkbox', { name }))
+    }
+    fireEvent.click(screen.getByRole('button', { name: '保存选择' }))
+    await waitFor(() =>
+      expect(serverApi.setSyncAccountSelection).toHaveBeenCalledWith({ uids: [] })
+    )
+  })
+
+  it('(ao) K9：保存失败 ⇒ 错误 toast，且不回写状态（无乐观更新）', async () => {
+    renderSection()
+    await screen.findByText('同步账号')
+    serverApi.setSyncAccountSelection.mockRejectedValueOnce(new Error('invalid_accounts'))
+    fireEvent.click(screen.getByRole('button', { name: '保存选择' }))
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('保存失败，请重试', 'error'))
+    expect(screen.getByRole('switch', { name: '同步全部账号' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    )
+  })
+
+  it('(ap) K9：样例预览失败留空（不伪造占位、不影响其余样例）', async () => {
+    installElectronApi({ previewReject: ['asset_a'] })
+    renderSection()
+    await waitFor(() => expect(serverApi.previewSyncAccount).toHaveBeenCalledTimes(3))
+    await waitFor(() => expect(document.querySelectorAll('img')).toHaveLength(2))
+    const sources = Array.from(document.querySelectorAll('img')).map(
+      (img) => img.getAttribute('src') ?? ''
+    )
+    expect(sources.some((src) => src.includes('asset_a'))).toBe(false)
+  })
+
+  it('(aq) K9：images 目录可切换来源标注，成功后刷新目录与账号', async () => {
+    installElectronApi({
+      extraDirectories: [
+        { id: 'dir_momo', path: 'D:\\Momo', mode: 'images', source: 'spinning_momo' }
+      ]
+    })
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '取消旋转吧大喵标记' }))
+    await waitFor(() =>
+      expect(serverApi.setExtraDirectorySource).toHaveBeenCalledWith({
+        id: 'dir_momo',
+        source: 'other'
+      })
+    )
+    await waitFor(() =>
+      expect(serverApi.getSyncAccounts.mock.calls.length).toBeGreaterThanOrEqual(2)
+    )
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('目录来源已更新', 'success'))
+    // 回写后的状态里来源变成 other ⇒ 按钮翻转为「标为旋转吧大喵」
+    expect(await screen.findByRole('button', { name: '标为旋转吧大喵' })).toBeInTheDocument()
+  })
+
+  it('(ar) K9：添加旋转吧大喵目录 ⇒ inspect 带 source:spinning_momo', async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '添加旋转吧大喵目录' }))
+    await waitFor(() =>
+      expect(serverApi.inspectExtraDirectory).toHaveBeenCalledWith({
+        path: 'D:\\NewPhotos',
+        source: 'spinning_momo'
+      })
+    )
   })
 
   it('(aj) 持久化失败：同步服务开关不得悬挂在已启用态，且不得留下未捕获 rejection', async () => {

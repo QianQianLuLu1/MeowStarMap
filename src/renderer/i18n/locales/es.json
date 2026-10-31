@@ -4475,7 +4475,31 @@
       "confirmAdd": "Confirmar",
       "cancelAdd": "Cancelar",
       "rescan": "Volver a analizar",
-      "proposalSummary": "{{images}} fotos / {{videos}} vídeos detectados"
+      "proposalSummary": "{{images}} fotos / {{videos}} vídeos detectados",
+      "addSpinning": "Añadir carpeta SpinningMomo",
+      "markSpinning": "Marcar como SpinningMomo",
+      "unmarkSpinning": "Desmarcar SpinningMomo",
+      "sourceSpinning": "SpinningMomo",
+      "sourceOther": "Otra fuente",
+      "sourceUpdated": "Origen de la carpeta actualizado"
+    },
+    "syncAccounts": {
+      "title": "Cuentas sincronizadas",
+      "scopeNote": "Elige qué cuentas se sincronizan con el teléfono; si no dejas ninguna marcada, las fotos no se sincronizan.",
+      "all": "Sincronizar todas las cuentas",
+      "empty": "No hay grupos de cuentas",
+      "emptyHint": "Las cuentas aparecerán aquí por UID cuando la biblioteca sincronizada haya escaneado fotos",
+      "unknownUid": "Fotos sin UID reconocido",
+      "spinningMomo": "SpinningMomo",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} fotos",
+      "samples": "Miniaturas de ejemplo",
+      "save": "Guardar selección",
+      "saving": "Guardando…",
+      "saved": "Selección de cuentas guardada",
+      "saveFailed": "Error al guardar, inténtalo de nuevo",
+      "loadFailed": "Error al actualizar las cuentas",
+      "previewEmpty": "Sin ejemplos"
     },
     "organizer": {
       "title": "Cola de organización",

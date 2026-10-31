@@ -4475,7 +4475,31 @@
       "confirmAdd": "确认添加",
       "cancelAdd": "取消",
       "rescan": "重新扫描",
-      "proposalSummary": "识别到 {{images}} 张照片 / {{videos}} 个视频"
+      "proposalSummary": "识别到 {{images}} 张照片 / {{videos}} 个视频",
+      "addSpinning": "添加旋转吧大喵目录",
+      "markSpinning": "标为旋转吧大喵",
+      "unmarkSpinning": "取消旋转吧大喵标记",
+      "sourceSpinning": "旋转吧大喵",
+      "sourceOther": "其他来源",
+      "sourceUpdated": "目录来源已更新"
+    },
+    "syncAccounts": {
+      "title": "同步账号",
+      "scopeNote": "选择要同步到手机的账号；全部不勾选将暂不同步照片。",
+      "all": "同步全部账号",
+      "empty": "暂无账号分组",
+      "emptyHint": "同步库扫描到照片后，这里会按 UID 列出账号",
+      "unknownUid": "未识别 UID 的照片",
+      "spinningMomo": "旋转吧大喵",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} 张照片",
+      "samples": "样例缩略图",
+      "save": "保存选择",
+      "saving": "保存中…",
+      "saved": "账号选择已保存",
+      "saveFailed": "保存失败，请重试",
+      "loadFailed": "账号列表刷新失败",
+      "previewEmpty": "暂无样例"
     },
     "organizer": {
       "title": "整理队列",

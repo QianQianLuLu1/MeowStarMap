@@ -4475,7 +4475,31 @@
       "confirmAdd": "Confirmer l'ajout",
       "cancelAdd": "Annuler",
       "rescan": "Réanalyser",
-      "proposalSummary": "{{images}} photos / {{videos}} vidéos détectées"
+      "proposalSummary": "{{images}} photos / {{videos}} vidéos détectées",
+      "addSpinning": "Ajouter un dossier SpinningMomo",
+      "markSpinning": "Marquer comme SpinningMomo",
+      "unmarkSpinning": "Ne plus marquer SpinningMomo",
+      "sourceSpinning": "SpinningMomo",
+      "sourceOther": "Autre source",
+      "sourceUpdated": "Source du dossier mise à jour"
+    },
+    "syncAccounts": {
+      "title": "Comptes synchronisés",
+      "scopeNote": "Choisissez les comptes synchronisés vers votre téléphone ; tout décocher suspend la synchronisation des photos.",
+      "all": "Synchroniser tous les comptes",
+      "empty": "Aucun groupe de comptes",
+      "emptyHint": "Les comptes apparaîtront ici par UID après le scan de la bibliothèque",
+      "unknownUid": "Photos sans UID reconnu",
+      "spinningMomo": "SpinningMomo",
+      "uidLabel": "UID {{uid}}",
+      "count": "{{count}} photos",
+      "samples": "Vignettes d’exemple",
+      "save": "Enregistrer la sélection",
+      "saving": "Enregistrement…",
+      "saved": "Sélection des comptes enregistrée",
+      "saveFailed": "Échec de l’enregistrement, réessayez",
+      "loadFailed": "Échec de l’actualisation des comptes",
+      "previewEmpty": "Aucun exemple"
     },
     "organizer": {
       "title": "File d'organisation",
