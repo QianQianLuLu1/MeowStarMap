@@ -749,8 +749,10 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return requireExtraDirectories().state()
   }
 
-  async function inspectExtraDirectory(path: string): Promise<unknown> {
-    return requireExtraDirectories().inspect(path)
+  async function inspectExtraDirectory(path: string, source?: 'spinning_momo'): Promise<unknown> {
+    return source === undefined
+      ? requireExtraDirectories().inspect(path)
+      : requireExtraDirectories().inspect(path, source)
   }
 
   async function addExtraDirectory(id: string): Promise<unknown> {

@@ -18,7 +18,9 @@ import type {
   NikkiSyncProfileStatsInfo,
   NikkiSyncResourcePathsInfo,
   NikkiSyncResourceRecordsInfo,
-  NikkiSyncSuitSearchInfo
+  NikkiSyncSuitSearchInfo,
+  NikkiSyncSyncAccountInfo,
+  NikkiSyncSyncAccountPreviewInfo
 } from '../../shared/types/electron-api'
 
 /**
@@ -55,6 +57,22 @@ describe('nikkisync 桥接快照与协议 DTO 同形', () => {
     >()
     expectCompileTimeTrue<
       Exact<NikkiSyncResourcePathsInfo, { byAsset: Record<string, Record<string, string>> }>
+    >()
+    expect(true).toBe(true)
+  })
+
+  it('K9 账号快照不含上游中文 label（文案由渲染层按 uid + i18n 生成）', () => {
+    expectCompileTimeTrue<
+      Exact<
+        NikkiSyncSyncAccountInfo,
+        { uid: string; count: number; selected: boolean; samples: string[] }
+      >
+    >()
+    expectCompileTimeTrue<
+      Exact<
+        NikkiSyncSyncAccountPreviewInfo,
+        { resourceId: string; mimeType: string; sourcePath?: string }
+      >
     >()
     expect(true).toBe(true)
   })

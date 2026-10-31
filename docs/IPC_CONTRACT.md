@@ -386,21 +386,15 @@ wrapHandler(ctx, schema, handler) =>
 
 ### 8.1 查询面（阶段 2，响应体 = NikkiSync 协议 DTO，内嵌层零转换）
 
-> **一处刻意例外（上游 b397e0e 同步新增）**：上游 `mapAssetSummary` 自该锚点起在资产行追加
-> `sourcePath` / `sourceFolder`（本机绝对路径与其父目录）。本仓在**委托层**
-> （`src/main/nikkisync/runtime-manager.ts` 的 `stripAssetPathFields`）剔除这两键，作用通道为
-> `nikkisync:get-assets`、`nikkisync:search-suits`（含嵌套 `items[].photos[].asset`）与
-> `nikkisync:search-clothing`；其余键仍零转换原样透出，响应形状不变（少两个可选键，渲染层
-> 本就无消费点，故不构成破坏性变更）。裁剪刻意不放在 handler：`get-resource-records`/`get-changes`/
-> `search-*`/`profile-stats` 等通道以身份 `toBe` 钉死「handler 不加工返回值」，且 `handlers/`
-> 属核心路径受保护面。
+> **零转换口径（2026-10-31 起）**：上游 `mapAssetSummary` 自 b397e0e 起在资产行追加
+> `sourcePath` / `sourceFolder`（本机绝对路径与其父目录）以及 `thumbnailSha256`/`previewSha256`/
+> `fullPreviewResourceId`/`fullPreviewSha256`/`mediaFingerprint`/`sizeBytes`；本仓 IPC 一律原样透出，
+> 与已配对 LAN 设备收到的 `/v1/assets` 形状一致。vendored `AssetSummary`
+> （`src/shared/sync/protocol.ts`）已同步登记这 8 个可选键，由 `protocol-drift.test.ts` 与上游
+> `dist/src/index.d.ts` 机械比对。
 >
-> `get-resource` 与 `get-resource-records` 的 `mode:'path'` **按设计仍返回绝对路径原值**，不受该
-> 裁剪影响——它是 `media://` 授权的唯一出口（`registerNikkiSyncResourcePaths` 靠它建表）。
->
-> 覆盖边界须如实读：本条只关闭**本仓渲染层**这一面。上游 `LocalSyncServer` 对已配对 LAN 设备
-> 仍照常下发两键（本仓不改上游源码）；vendored `AssetSummary`（`src/shared/sync/protocol.ts`）
-> 刻意不新增这两键，声明面与载荷一致。
+> `get-resource` 与 `get-resource-records` 的 `mode:'path'` **按设计返回绝对路径原值**——它是
+> `media://` 授权的唯一出口（`registerNikkiSyncResourcePaths` 靠它建表）。
 
 | 通道                         | 入参                                                                    | 出参                                                                                                             | 失败码                                                   |
 | ---------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
@@ -415,13 +409,13 @@ wrapHandler(ctx, schema, handler) =>
 实现位置同上。响应类型出处是 `src/shared/sync/protocol.ts`（本仓协议契约唯一真相源），
 `electron-api.ts` 只以 `import type` 别名引用，**不再重列字段名**。
 
-| 通道                             | 入参                                                         | 出参                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | 失败码                                                   |
-| -------------------------------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `nikkisync:get-resource-records` | `{assetIds: string(1..128)[] (1..500), mode='meta'\|'path'}` | `meta` → `{byAsset: {[assetId]: MediaResource[]}}`；`path` → `{byAsset: {[assetId]: {[resourceId]: 上游 source_path 原值}}}`；无资源的资产给 `[]` / `{}`，不静默丢弃                                                                                                                                                                                                                                                                                                                                                                                                                           | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
-| `nikkisync:get-changes`          | `{after: int(>=0), limit=1000 (1..1000)}`                    | `{changes: ChangeRecord[], libraryRevision, fullResyncRequired}`；判据同上游 `GET /v1/changes` 的 **b422193 时点**形态——`after < minimumJournalRevision() - 1` 时 `fullResyncRequired=true` 且 `changes` 为空；日志表为空（`minimum` 为 `undefined`）**不判**全量。（上游自 b397e0e 另增 `after < accounts.revision()` 一支：用户改同步账号作用域即强制客户端全量重同步。本仓以单参构造 `SyncReadRepository`、不构造 `AccountSyncSettings` ⇒ 作用域恒 `1=1`、该支恒不触发，刻意不跟随；接入账号作用域时须同步，理由与影响面见 `src/main/nikkisync/runtime-facade.ts` 的 `listChanges` 注释。） | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
-| `nikkisync:search-suits`         | `{query: string(1..128)，不得全空白}`                        | `SuitSearchResponse`（`{query, items}`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
-| `nikkisync:search-clothing`      | 同上                                                         | `ClothingSearchResponse`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | 同上                                                     |
-| `nikkisync:profile-stats`        | 无                                                           | `ProfileStatsResponse`（`{libraryRevision, dictionary?, topSuits, topClothing}`）                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | `PRECONDITION_FAILED`                                    |
+| 通道                             | 入参                                                         | 出参                                                                                                                                                                                                                                                                                                                                                                | 失败码                                                   |
+| -------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `nikkisync:get-resource-records` | `{assetIds: string(1..128)[] (1..500), mode='meta'\|'path'}` | `meta` → `{byAsset: {[assetId]: MediaResource[]}}`；`path` → `{byAsset: {[assetId]: {[resourceId]: 上游 source_path 原值}}}`；无资源的资产给 `[]` / `{}`，不静默丢弃                                                                                                                                                                                                | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `nikkisync:get-changes`          | `{after: int(>=0), limit=1000 (1..1000)}`                    | `{changes: ChangeRecord[], libraryRevision, fullResyncRequired}`；判据与上游 `LocalSyncServer.listChanges` 逐字一致：`after < accounts.revision()`（用户改同步账号作用域）**或** `after < minimumJournalRevision() - 1`（日志已被裁掉）时 `fullResyncRequired=true` 且 `changes` 为空；日志表为空且无账号作用域变更（`minimum` 为 `undefined`、revision=0）不判全量 | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED` |
+| `nikkisync:search-suits`         | `{query: string(1..128)，不得全空白}`                        | `SuitSearchResponse`（`{query, items}`）                                                                                                                                                                                                                                                                                                                            | `VALIDATION_ERROR` / `PRECONDITION_FAILED`               |
+| `nikkisync:search-clothing`      | 同上                                                         | `ClothingSearchResponse`                                                                                                                                                                                                                                                                                                                                            | 同上                                                     |
+| `nikkisync:profile-stats`        | 无                                                           | `ProfileStatsResponse`（`{libraryRevision, dictionary?, topSuits, topClothing}`）                                                                                                                                                                                                                                                                                   | `PRECONDITION_FAILED`                                    |
 
 契约要点：
 
@@ -557,13 +551,14 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
 
 ### 8.2.3 额外照片目录（K6，上游 `ExtraScanDirectories`；仅作用于同步库扫描器）
 
-| 通道                                 | 入参                                                      | 出参                                                                                                  | 失败码                                                                                |
-| ------------------------------------ | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `nikkisync:get-extra-directories`    | 无                                                        | `{directories: [{id, path, mode}], automaticRoots, busy, scannerStatus}`（**中文 `message` 已剔除**） | `PRECONDITION_FAILED`（未装配/未挂面）                                                |
-| `nikkisync:inspect-extra-directory`  | `{path: string(1..4096)，必须绝对路径，且须是已登记目录}` | `{id, roots, images, videos, limited}`（**中文 `hint` 已剔除**）                                      | `VALIDATION_ERROR`；`PATH_FORBIDDEN`（未登记路径）；`PRECONDITION_FAILED`（见映射表） |
-| `nikkisync:add-extra-directory`      | `{id: string(1..128)}`（预检返回的 id）                   | 同 get（更新后状态）                                                                                  | 同上映射                                                                              |
-| `nikkisync:remove-extra-directory`   | `{id: string(1..128)}`                                    | 同 get                                                                                                | 同上映射                                                                              |
-| `nikkisync:rescan-extra-directories` | 无                                                        | 同 get                                                                                                | 同上映射                                                                              |
+| 通道                                   | 入参                                                                                | 出参                                                                                                                                                       | 失败码                                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `nikkisync:get-extra-directories`      | 无                                                                                  | `{directories: [{id, path, mode, source?}], automaticRoots, busy, scannerStatus}`（**中文 `message` 已剔除**；`source` 为 1.0.27 来源标注，缺省 = 未标注） | `PRECONDITION_FAILED`（未装配/未挂面）                                                    |
+| `nikkisync:inspect-extra-directory`    | `{path: string(1..4096)，必须绝对路径，且须是已登记目录；source?: 'spinning_momo'}` | `{id, roots, images, videos, limited}`（**中文 `hint` 已剔除**；`source` 只允许 `spinning_momo`，用于「添加旋转吧大喵目录」）                              | `VALIDATION_ERROR`；`PATH_FORBIDDEN`（未登记路径）；`PRECONDITION_FAILED`（见映射表）     |
+| `nikkisync:add-extra-directory`        | `{id: string(1..128)}`（预检返回的 id）                                             | 同 get（更新后状态）                                                                                                                                       | 同上映射                                                                                  |
+| `nikkisync:remove-extra-directory`     | `{id: string(1..128)}`                                                              | 同 get                                                                                                                                                     | 同上映射                                                                                  |
+| `nikkisync:set-extra-directory-source` | `{id: string(1..128), source: 'spinning_momo' \| 'other'}`                          | 同 get（更新后状态；上游同步刷新账号来源分组）                                                                                                             | `VALIDATION_ERROR`（含 `invalid_source`）；`PRECONDITION_FAILED`（`directory_not_found`） |
+| `nikkisync:rescan-extra-directories`   | 无                                                                                  | 同 get                                                                                                                                                     | 同上映射                                                                                  |
 
 契约要点：
 
@@ -574,11 +569,14 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
   userPickedDir）短路放行，其余一律 `assertFileReadPath`——未登记的绝对路径返回
   `IPC_PATH_FORBIDDEN` 且不调上游句柄。判据与 `scanner:start` / `settings:set` 的扫描根短路
   逐字一致（提案随后可被 `add` 提升为长期扫描根，其内容会经 `media://` 可读，故这一步不能省）。
-- 上游九错误短码映射：`invalid_directory` / `choose_subfolder` / `thumbnail_only` /
-  `choose_photo_folder` / `already_covered` → `VALIDATION_ERROR`；
+- 上游十错误短码映射：`invalid_directory` / `choose_subfolder` / `thumbnail_only` /
+  `choose_photo_folder` / `already_covered` / `invalid_source` → `VALIDATION_ERROR`；
   `directory_unavailable` / `too_many_directories` / `selection_expired` /
   `directory_not_found` → `PRECONDITION_FAILED`。
 - **仅作用于 NikkiSync 同步库扫描器**，不影响本地图库自有扫描目录（`customScanPaths`）。
+- 来源标注（`source`）是 1.0.27 新增：`spinning_momo` 让该目录的照片进入「旋转吧大喵」
+  账号分组；`other` 显式排除（未标注时上游仍按路径自动识别 `SpinningMomo` / `旋转吧大喵`）。
+  仅 `mode: 'images'` 的目录可标注。
 
 ### 8.2.4 整理队列（K8，上游 `DeletionQueue` 的 PC 管理面；破坏性能力，开关默认关）
 
@@ -606,6 +604,34 @@ executing（逐文件 sha256+size 复核后经回收 helper 送 Windows 回收�
 - 11 态枚举（UI i18n 映射）：`preparing/pending/confirming/queued/checking/executing/
 recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
 - 手机端协同前提：NikkiSync App ≥ 1.0.21（OrganizerPage 随 1.0.21 发布）。
+
+### 8.2.5 账号同步作用域（K9，上游 `AccountSyncSettings`，1.0.27 新增）
+
+| 通道                                   | 入参                                                        | 出参                                                                                               | 失败码                                                                     |
+| -------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `nikkisync:get-sync-accounts`          | 无                                                          | `{all: boolean, accounts: [{uid, count, selected, samples: string[]}]}`（**中文 `label` 已剔除**） | `PRECONDITION_FAILED`（未装配 / 会话无 accounts）                          |
+| `nikkisync:preview-sync-account`       | `{assetId: string(1..128)}`                                 | `{resourceId, mimeType, sourcePath?}`（上游资源行只投影这三键）                                    | `VALIDATION_ERROR` / `NOT_FOUND` / `PRECONDITION_FAILED`                   |
+| `nikkisync:set-sync-account-selection` | `{uids: string[] \| null}`（元素 ≤64，≤200 条；语义交上游） | 保存后的同 get 形状                                                                                | `VALIDATION_ERROR`（zod 或上游 `invalid_accounts`）/ `PRECONDITION_FAILED` |
+| `nikkisync:set-extra-directory-source` | 见 8.2.3                                                    | 见 8.2.3                                                                                           | 见 8.2.3                                                                   |
+
+契约要点：
+
+- **三态语义（上游 `AccountSyncSettings`）**：`null`（显式全部）= 全部账号；`undefined`
+  （从未保存）= 全部；`[]` = 一个都不同步。`all` 字段即 `selection === undefined`。
+- `uid` 取值域（上游 `validKey` 单真相源）：`''`（未识别 UID 的照片）、1–32 位纯数字、
+  `'source:spinning_momo'`（旋转吧大喵目录的照片）。本层只做长度/数量界，非法值由上游
+  `invalid_accounts` 拒绝并映射 `VALIDATION_ERROR`。
+- 保存上游先去重排序；与当前选择相同则**不写 journal、不 bump revision**（幂等）。
+  真正变更会 bump revision，令 `get-changes` 的 `fullResyncRequired` 触发客户端全量重同步；
+  handler 在保存成功后同时推送 `nikkisync:library-changed`，本地图库据此重取。
+- `accounts[].label` 是上游中文文案（`UID x` / `未识别 UID 的照片` / `旋转吧大喵`），
+  handler 剔除；渲染层按 `uid` + i18n 生成文案（`src/**` 禁中文硬编码）。
+- `preview` 是唯一显式投影：上游返回完整 DB 资源行（`resource_id` / `mime_type` /
+  `source_path` / `role` 等），本通道只取 UI 需要的三键，供账号样例缩略图
+  （`previewSyncAccount` → `toFileUrl(sourcePath)`）。
+- 会话未建 `accounts`（老链接 / 未装配）⇒ `PRECONDITION_FAILED`，渲染层隐藏整节，不崩页。
+- `sourceGroups()` 是上游读路径上的写操作（来源指纹变化时写 `app_settings` /
+  `change_journal`）；本仓不加锁、不缓存，逐字沿用。
 
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
 

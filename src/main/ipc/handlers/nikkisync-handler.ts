@@ -1,7 +1,7 @@
-// @core-change: 订正 get-changes 头注释对 fullResyncRequired 判据的失真表述——上游 b397e0e 已给
-//               LocalSyncServer.listChanges 判据新增 after < accounts.revision() 一支，本仓刻意不跟随
-//               （runtime-facade.ts 单参构造 SyncReadRepository ⇒ 作用域恒 1=1，无 accounts.revision() 取值来源）。
-//               纯注释改动、零行为变更；判据本体与豁免理由见 docs/IPC_CONTRACT.md。
+// @core-change: K9 新增账号同步作用域四通道（get-sync-accounts / preview-sync-account /
+//               set-sync-account-selection / set-extra-directory-source）——1.0.27 上游
+//               AccountSyncSettings 的读写面：中文 label 剔除、样例资源行三键投影、选择保存后
+//               推送 library-changed；inspect-extra-directory 追加 source 入参。
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -10,7 +10,10 @@ import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
 import { assertFileReadPath, pathGuard, wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { isAssetType } from '../../../shared/sync/protocol'
-import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-api'
+import type {
+  NikkiSyncServerStatusInfo,
+  NikkiSyncSyncAccountPreviewInfo
+} from '../../../shared/types/electron-api'
 
 /**
  * NikkiSync 内嵌运行时 IPC handler（整合阶段 2 只读查询 + 阶段 3 同步服务）。
@@ -28,9 +31,8 @@ import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-a
  * 查询面扩容（阶段 4，为图库数据层切换而加；同样逐字转发上游仓储/索引，本文件不加工）：
  * - `nikkisync:get-resource-records`：一页资产一次往返取回全部资源，避免 500 次单查
  * - `nikkisync:get-changes`：`GET /v1/changes` 的本地等价调用，`fullResyncRequired`
- *   判据沿用上游 `LocalSyncServer.listChanges` 的 `after < minimum - 1` 一支；上游 b397e0e 另增
- *   `after < accounts.revision()` 一支，本仓刻意不跟随（runtime-facade.ts 单参构造
- *   SyncReadRepository ⇒ 作用域恒 1=1，无 accounts.revision() 取值来源）
+ *   判据与上游 `LocalSyncServer.listChanges` 逐字一致：`after < accounts.revision()` 或
+ *   `after < minimum - 1`（账号作用域变更会 bump revision ⇒ 客户端强制全量重同步）
  * - `nikkisync:search-suits` / `nikkisync:search-clothing`：转发上游 `SuitSearchIndex` /
  *   `ClothingSearchIndex`（两者与 `row-mappers` 一样是 `dist/src/server/**` 深入口）；
  *   `query` 原串下传（trim 归上游），但全空白在本层即拒——否则会为一个无意义查询
@@ -44,8 +46,9 @@ import type { NikkiSyncServerStatusInfo } from '../../../shared/types/electron-a
  *   `nikki-sync://pair?` 新格式并回填 `hosts`，K5），TTL 5 分钟、单次消费
  * - `nikkisync:get-paired-devices` / `nikkisync:revoke-device`：设备管理（读/软删 NikkiSync 的 paired_devices）
  *
- * 铁律：本文件**不做数据格式转换**，资产响应体逐字来自上游 `SyncReadRepository` +
- * `server/row-mappers.js`；设备列表是管理视图（非协议 DTO），只做敏感列裁剪。
+ * 铁律：资产响应体逐字来自上游 `SyncReadRepository` + `server/row-mappers.js`，**不做裁剪**
+ * （含 `sourcePath` / `sourceFolder`）；仅管理视图做两处收窄——设备列表剔敏感列、
+ * 账号分组的 label 剔除（中文文案，改由渲染层按 uid + i18n 生成）与样例缩略图三键投影。
  * 错误消息为英文（src/** 中文硬编码护栏为 error），本地化由渲染层 i18n 完成。
  */
 
@@ -139,10 +142,29 @@ const inspectDirectorySchema = z.object({
     .max(4096)
     .refine((value) => /^([A-Za-z]:[\\/]|\\\\|\/)/.test(value), {
       message: 'path must be absolute'
-    })
+    }),
+  // 1.0.27：上游 `inspect` 只接受 `spinning_momo`（`other` 只供 setSource）
+  source: z.enum(['spinning_momo']).optional()
 })
 
 const directoryIdSchema = z.string().trim().min(1).max(128)
+
+/** K9：目录来源标注入参（上游 `setSource` 取值域，非法值上游抛 invalid_source）。 */
+const directorySourceSchema = z.object({
+  id: directoryIdSchema,
+  source: z.enum(['spinning_momo', 'other'])
+})
+
+/** K9：账号样例缩略图入参（资产 id 界与查询面一致）。 */
+const accountPreviewSchema = z.object({ assetId: assetIdSchema })
+
+/**
+ * K9：账号选择保存入参。数量界与上游一致（1..200 由上游判定，本层只挡超大载荷）；
+ * **刻意不做 UID 正则**——上游 `validKey` 是单真相源，非法值映射 VALIDATION_ERROR。
+ */
+const accountSelectionSchema = z.object({
+  uids: z.array(z.string().max(64)).max(200).nullable()
+})
 
 /**
  * K8：整理队列条目 id。与上游 `DeletionQueue.approveMany` 的校验**同规同界**
@@ -213,7 +235,8 @@ const EXTRA_DIRECTORY_ERROR_CODES: Record<string, 'validation' | 'precondition'>
   directory_unavailable: 'precondition', // 目录暂不可访问（盘未挂载等，可重试）
   too_many_directories: 'precondition', // 达到上限 16（上游承担判定）
   selection_expired: 'precondition', // 预检已过期（需重新 inspect）
-  directory_not_found: 'precondition' // 目录 id 不存在/已被移除
+  directory_not_found: 'precondition', // 目录 id 不存在/已被移除
+  invalid_source: 'validation' // 1.0.27 setSource 的来源取值非法（本层 zod 已挡，兜底）
 }
 
 function extraDirectoryErrorToAppError(error: unknown): AppError {
@@ -244,6 +267,51 @@ function stripExtraDirectoryProposal(proposal: unknown): unknown {
   const rest = { ...(proposal as Record<string, unknown>) }
   delete rest.hint
   return rest
+}
+
+/**
+ * K9：上游 `invalid_accounts`（uid 键非法 / 超 200 / 非数组）→ VALIDATION_ERROR；
+ * 其余沿用通用分类（未装配会话的 unavailable → PRECONDITION_FAILED）。
+ */
+function accountsErrorToAppError(error: unknown): AppError {
+  if (error instanceof AppError) return error
+  const message = error instanceof Error ? error.message : String(error)
+  const code = message.trim().split(/[\s:]+/)[0]
+  if (code === 'invalid_accounts') {
+    return AppError.validation(`sync account selection rejected: ${code}`)
+  }
+  return toAppError(error, 'sync-accounts')
+}
+
+/**
+ * K9：剔除上游 `state().accounts[].label` 的中文文案（`UID x` / `未识别 UID 的照片` /
+ * `旋转吧大喵`）；渲染层按 `uid` + i18n 出文案。`all` / `count` / `selected` / `samples` 原样。
+ */
+function stripAccountLabels(state: unknown): unknown {
+  if (typeof state !== 'object' || state === null) return state
+  const accounts = (state as { accounts?: unknown }).accounts
+  if (!Array.isArray(accounts)) return state
+  return {
+    ...(state as Record<string, unknown>),
+    accounts: accounts.map((item) => {
+      if (typeof item !== 'object' || item === null) return item
+      const row = { ...(item as Record<string, unknown>) }
+      delete row.label
+      return row
+    })
+  }
+}
+
+/**
+ * K9：样例缩略图投影。上游 `preview()` 返回完整 DB 资源行，本仓只取 UI 需要的三键
+ * （这是新增通道的显式投影，不是对既有资产 DTO 的裁剪）。
+ */
+function projectAccountPreview(row: unknown): NikkiSyncSyncAccountPreviewInfo {
+  const record = (typeof row === 'object' && row !== null ? row : {}) as Record<string, unknown>
+  const resourceId = typeof record.resource_id === 'string' ? record.resource_id : ''
+  const mimeType = typeof record.mime_type === 'string' ? record.mime_type : ''
+  const sourcePath = typeof record.source_path === 'string' ? record.source_path : undefined
+  return { resourceId, mimeType, ...(sourcePath === undefined ? {} : { sourcePath }) }
 }
 
 /** 句柄未装配时的状态（不抛错：UI 据此显示「同步服务不可用」而非崩一次 toast）。 */
@@ -628,7 +696,9 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
           // 判据与 scanner-handler / settings-handler 的扫描根短路逐字一致。
           if (!pathGuard.isUserPickedDir(input.path)) assertFileReadPath(input.path)
           try {
-            return stripExtraDirectoryProposal(await runtime.inspectExtraDirectory(input.path))
+            return stripExtraDirectoryProposal(
+              await runtime.inspectExtraDirectory(input.path, input.source)
+            )
           } catch (error) {
             throw extraDirectoryErrorToAppError(error)
           }
@@ -676,6 +746,27 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   )
 
   ipcMain.handle(
+    'nikkisync:set-extra-directory-source',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        directorySourceSchema,
+        args[0] ?? {},
+        'set-extra-directory-source',
+        async (input) => {
+          try {
+            return stripExtraDirectoriesState(
+              await runtime.setExtraDirectorySource(input.id, input.source)
+            )
+          } catch (error) {
+            throw extraDirectoryErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
     'nikkisync:rescan-extra-directories',
     wrapHandlerNoArgs(ctx, async () => {
       const runtime = requireRuntime(ctx)
@@ -684,6 +775,61 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
       } catch (error) {
         throw extraDirectoryErrorToAppError(error)
       }
+    })
+  )
+
+  // ---- K9：账号同步作用域（上游 AccountSyncSettings —— 1.0.27 新增线上同步范围）----
+
+  ipcMain.handle(
+    'nikkisync:get-sync-accounts',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = requireRuntime(ctx)
+      try {
+        return stripAccountLabels(await runtime.listSyncAccounts())
+      } catch (error) {
+        throw accountsErrorToAppError(error)
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:preview-sync-account',
+    wrapHandlerRaw(ctx, async (args) => {
+      const runtime = requireRuntime(ctx)
+      return parseAndRun(
+        accountPreviewSchema,
+        args[0] ?? {},
+        'preview-sync-account',
+        async (input) => {
+          try {
+            return projectAccountPreview(await runtime.previewSyncAccount(input.assetId))
+          } catch (error) {
+            throw accountsErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:set-sync-account-selection',
+    wrapHandlerRaw(ctx, async (args, _ctx, event) => {
+      const runtime = requireRuntime(ctx)
+      const state = await parseAndRun(
+        accountSelectionSchema,
+        args[0] ?? {},
+        'set-sync-account-selection',
+        async (input) => {
+          try {
+            return await runtime.setSyncAccountSelection(input.uids)
+          } catch (error) {
+            throw accountsErrorToAppError(error)
+          }
+        }
+      )
+      // 作用域变更会 bump revision ⇒ 客户端 fullResyncRequired；此处同步通知本地图库重取
+      notifyLibraryChanged(event)
+      return stripAccountLabels(state)
     })
   )
 

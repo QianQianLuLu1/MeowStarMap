@@ -1129,6 +1129,7 @@ interface WindowElectronAPI {
     >
     inspectExtraDirectory: (input: {
       path: string
+      source?: 'spinning_momo'
     }) => Promise<import('../shared/types/electron-api').NikkiSyncExtraDirectoryProposalInfo>
     addExtraDirectory: (input: {
       id: string
@@ -1136,9 +1137,21 @@ interface WindowElectronAPI {
     removeExtraDirectory: (input: {
       id: string
     }) => Promise<import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo>
+    // K9：目录来源标注（spinning_momo / other，仅 images 目录）
+    setExtraDirectorySource: (
+      input: import('../shared/types/electron-api').NikkiSyncExtraDirectorySourceInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo>
     rescanExtraDirectories: () => Promise<
       import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo
     >
+    // ---- K9：账号同步作用域（上游 AccountSyncSettings；会话无 accounts ⇒ PRECONDITION_FAILED）----
+    getSyncAccounts: () => Promise<import('../shared/types/electron-api').NikkiSyncSyncAccountsInfo>
+    previewSyncAccount: (input: {
+      assetId: string
+    }) => Promise<import('../shared/types/electron-api').NikkiSyncSyncAccountPreviewInfo>
+    setSyncAccountSelection: (
+      input: import('../shared/types/electron-api').NikkiSyncSyncAccountSelectionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncSyncAccountsInfo>
     // K8：整理队列（批量删除；开关默认关，PRECONDITION_FAILED 指向同步服务页开关）
     getOrganizerQueue: () => Promise<
       import('../shared/types/electron-api').NikkiSyncOrganizerViewInfo

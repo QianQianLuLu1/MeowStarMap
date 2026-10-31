@@ -693,7 +693,13 @@ export interface NikkiSyncGameVersionInfo {
 
 /** K6：`nikkisync:get-extra-directories` 响应（上游中文 message 已剔除）。 */
 export interface NikkiSyncExtraDirectoriesInfo {
-  directories: Array<{ id: string; path: string; mode: 'native' | 'images' }>
+  directories: Array<{
+    id: string
+    path: string
+    mode: 'native' | 'images'
+    /** 1.0.27：目录来源标注（仅 images 目录可标；缺省 = 未标注，服务端仍按路径自动识别 SpinningMomo）。 */
+    source?: 'spinning_momo' | 'other'
+  }>
   automaticRoots: string[]
   busy: boolean
   scannerStatus?: unknown
@@ -744,6 +750,42 @@ export interface NikkiSyncOrganizerApproveResultInfo {
   items: NikkiSyncOrganizerItemInfo[]
   approved: number
   skipped: number
+}
+
+/**
+ * K9：账号分组（上游 `AccountSyncSettings.state().accounts` 剔除中文 `label` 后的形状）。
+ * 渲染层按 `uid` 出 i18n 文案：`''` = 未识别，`'source:spinning_momo'` = 旋转吧大喵，其余 = UID。
+ */
+export interface NikkiSyncSyncAccountInfo {
+  uid: string
+  count: number
+  selected: boolean
+  /** 最多 3 个 assetId，供 `preview-sync-account` 取样例缩略图。 */
+  samples: string[]
+}
+
+/** K9：`nikkisync:get-sync-accounts` 与 `set-sync-account-selection` 的响应。 */
+export interface NikkiSyncSyncAccountsInfo {
+  all: boolean
+  accounts: NikkiSyncSyncAccountInfo[]
+}
+
+/** K9：`nikkisync:preview-sync-account` 响应（上游资源行只投影 UI 所需三键）。 */
+export interface NikkiSyncSyncAccountPreviewInfo {
+  resourceId: string
+  mimeType: string
+  sourcePath?: string
+}
+
+/** K9：`nikkisync:set-sync-account-selection` 入参（`null` = 全部；`[]` = 不同步任何账号）。 */
+export interface NikkiSyncSyncAccountSelectionInput {
+  uids: string[] | null
+}
+
+/** K9：`nikkisync:set-extra-directory-source` 入参。 */
+export interface NikkiSyncExtraDirectorySourceInput {
+  id: string
+  source: 'spinning_momo' | 'other'
 }
 
 export interface NikkiSyncScanInputInfo {

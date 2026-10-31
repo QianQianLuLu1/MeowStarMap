@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('nikkisync 命名空间方法清单（K8 整理队列接入后共 28 个）', () => {
+  it('nikkisync 命名空间方法清单（K9 账号作用域接入后共 32 个）', () => {
     // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
     // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
     const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
@@ -100,7 +100,12 @@ describe('preload 装配完整性', () => {
         'inspectExtraDirectory',
         'addExtraDirectory',
         'removeExtraDirectory',
+        'setExtraDirectorySource',
         'rescanExtraDirectories',
+        // K9：账号同步作用域（1.0.27 上游 AccountSyncSettings）
+        'getSyncAccounts',
+        'previewSyncAccount',
+        'setSyncAccountSelection',
         // K8：整理队列（批量删除）
         'getOrganizerQueue',
         'decideOrganizerItem',
@@ -147,6 +152,24 @@ describe('preload 装配完整性', () => {
     await electronAPI.nikkisync.approveOrganizerItems({ ids: ['del-1aaaaaaaaaaaaaaa'] })
     expect(invokeMock).toHaveBeenCalledWith('nikkisync:approve-organizer-items', {
       ids: ['del-1aaaaaaaaaaaaaaa']
+    })
+  })
+
+  it('K9 四个账号作用域方法各自命中对应通道名（入参逐字转发）', async () => {
+    const electronAPI = getExposed<{
+      nikkisync: Record<string, (...args: unknown[]) => Promise<unknown>>
+    }>('electronAPI')
+    invokeMock.mockResolvedValue({ success: true, data: { ok: 1 } })
+    await electronAPI.nikkisync.getSyncAccounts()
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:get-sync-accounts')
+    await electronAPI.nikkisync.previewSyncAccount({ assetId: 'a1' })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:preview-sync-account', { assetId: 'a1' })
+    await electronAPI.nikkisync.setSyncAccountSelection({ uids: null })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:set-sync-account-selection', { uids: null })
+    await electronAPI.nikkisync.setExtraDirectorySource({ id: 'dir_1', source: 'other' })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:set-extra-directory-source', {
+      id: 'dir_1',
+      source: 'other'
     })
   })
 

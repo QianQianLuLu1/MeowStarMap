@@ -2,7 +2,7 @@
  * @layer L3
  * @module src/main/ipc/handlers/nikkisync-handler
  * @coverage NikkiSync 内嵌运行时 IPC（阶段 2 只读查询 + 阶段 3 同步服务 + 阶段 4 查询面扩容）：
- *           16 条通道的注册、参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射。
+ *           31 条通道的注册、参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射。
  *
  * 断言口径：`data` 与句柄返回值**逐字段相等**（`toEqual`），以此锁死「内嵌层不做数据
  * 格式转换」这条铁律——一旦 handler 里出现字段重命名或结构包装，本文件立即变红。
@@ -103,6 +103,33 @@ const ORGANIZER_ROW = {
   count: 1
 }
 
+/**
+ * K9：与上游 `AccountSyncSettings.state()` 同形（label 为上游中文文案，handler 必须剔除）。
+ * 三个分组覆盖 `uid` 的三态：空串（未识别）/ 纯数字 UID / `source:spinning_momo`。
+ */
+const SYNC_ACCOUNTS_STATE = {
+  all: true,
+  accounts: [
+    { uid: '', label: '未识别 UID 的照片', count: 3, selected: true, samples: [] },
+    { uid: '10001', label: 'UID 10001', count: 12, selected: true, samples: ['a1', 'a2', 'a3'] },
+    {
+      uid: 'source:spinning_momo',
+      label: '旋转吧大喵',
+      count: 2,
+      selected: true,
+      samples: ['m1']
+    }
+  ]
+}
+
+/** K9：上游 `preview(assetId)` 返回的 DB 资源行（handler 只投影三键）。 */
+const ACCOUNT_PREVIEW_ROW = {
+  resource_id: 'res_1',
+  mime_type: 'image/jpeg',
+  source_path: 'D:\\Photos\\a1.jpg',
+  role: 'derived_thumbnail'
+}
+
 /** K8：manager 剔除 message 后的队列视图（handler 逐字段透传锁死零转换）。 */
 const ORGANIZER_VIEW = {
   items: [
@@ -180,6 +207,11 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
     addExtraDirectory: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
     removeExtraDirectory: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
     rescanExtraDirectories: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
+    setExtraDirectorySource: vi.fn(async () => EXTRA_DIRECTORIES_STATE),
+    // ---- K9：账号同步作用域 ----
+    listSyncAccounts: vi.fn(async () => SYNC_ACCOUNTS_STATE),
+    previewSyncAccount: vi.fn(async () => ACCOUNT_PREVIEW_ROW),
+    setSyncAccountSelection: vi.fn(async () => SYNC_ACCOUNTS_STATE),
     // ---- K8：整理队列（批量删除）----
     organizerStatus: vi.fn(() => ORGANIZER_VIEW),
     organizerDecide: vi.fn(async () => ORGANIZER_VIEW.items),
@@ -199,7 +231,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 27 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 五条目录 + K8 三条整理队列）', () => {
+  it('恰好注册 31 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 六条目录 + K9 三条账号 + K8 三条整理队列）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -226,7 +258,11 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:inspect-extra-directory',
       'nikkisync:add-extra-directory',
       'nikkisync:remove-extra-directory',
+      'nikkisync:set-extra-directory-source',
       'nikkisync:rescan-extra-directories',
+      'nikkisync:get-sync-accounts',
+      'nikkisync:preview-sync-account',
+      'nikkisync:set-sync-account-selection',
       'nikkisync:get-organizer-queue',
       'nikkisync:decide-organizer-item',
       'nikkisync:approve-organizer-items'
@@ -950,17 +986,30 @@ describe('nikkisync:*-extra-directories（K6）', () => {
     pathGuard.registerUserPickedDir('D:\\ExtraPhotos')
     const handler = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
     const res = (await handler({}, { path: 'D:\\ExtraPhotos' })) as HandleResult
-    expect(runtime.inspectExtraDirectory).toHaveBeenCalledWith('D:\\ExtraPhotos')
+    expect(runtime.inspectExtraDirectory).toHaveBeenCalledWith('D:\\ExtraPhotos', undefined)
     const data = res.data as Record<string, unknown>
     expect(data.id).toBe('p1')
     expect(data.images).toBe(12)
     expect('hint' in data).toBe(false)
 
-    for (const bad of ['relative/path', '', 'x'.repeat(4097)]) {
-      const rejected = (await handler({}, { path: bad })) as HandleResult
+    // 1.0.27：来源标注走同一通道（渲染层「添加旋转吧大喵目录」按钮）；inspect 只接受这一取值
+    pathGuard.registerUserPickedDir('D:\\SpinningMomo')
+    await handler({}, { path: 'D:\\SpinningMomo', source: 'spinning_momo' })
+    expect(runtime.inspectExtraDirectory).toHaveBeenLastCalledWith(
+      'D:\\SpinningMomo',
+      'spinning_momo'
+    )
+
+    for (const bad of [
+      { path: 'relative/path' },
+      { path: '' },
+      { path: 'x'.repeat(4097) },
+      { path: 'D:\\SpinningMomo', source: 'other' }
+    ]) {
+      const rejected = (await handler({}, bad)) as HandleResult
       expect(rejected.error?.code, JSON.stringify(bad)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
     }
-    expect(runtime.inspectExtraDirectory).toHaveBeenCalledTimes(1)
+    expect(runtime.inspectExtraDirectory).toHaveBeenCalledTimes(2)
   })
 
   it('inspect：绝对但未登记的伪造路径 ⇒ PATH_FORBIDDEN 且不调句柄（渲染层路径必须先过白名单）', async () => {
@@ -1037,13 +1086,14 @@ describe('nikkisync:*-extra-directories（K6）', () => {
     }
   })
 
-  it('未装配 ⇒ 五通道统一 PRECONDITION_FAILED', async () => {
+  it('未装配 ⇒ 六通道统一 PRECONDITION_FAILED', async () => {
     register(undefined)
     const cases: Array<[string, unknown]> = [
       ['nikkisync:get-extra-directories', undefined],
       ['nikkisync:inspect-extra-directory', { path: 'D:\\X' }],
       ['nikkisync:add-extra-directory', { id: 'p1' }],
       ['nikkisync:remove-extra-directory', { id: 'dir_1' }],
+      ['nikkisync:set-extra-directory-source', { id: 'dir_1', source: 'spinning_momo' }],
       ['nikkisync:rescan-extra-directories', undefined]
     ]
     for (const [channel, input] of cases) {
@@ -1051,6 +1101,191 @@ describe('nikkisync:*-extra-directories（K6）', () => {
       const res = (await handler({}, input)) as HandleResult
       expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
     }
+  })
+})
+
+// ===== K9：账号同步作用域（1.0.27 上游 AccountSyncSettings）三通道 + 目录来源 =====
+
+describe('nikkisync:get-sync-accounts / preview-sync-account / set-sync-account-selection（K9）', () => {
+  it('get：剔除上游中文 label，all/count/selected/samples 原样透传', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-sync-accounts')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toEqual({
+      all: true,
+      accounts: [
+        { uid: '', count: 3, selected: true, samples: [] },
+        { uid: '10001', count: 12, selected: true, samples: ['a1', 'a2', 'a3'] },
+        { uid: 'source:spinning_momo', count: 2, selected: true, samples: ['m1'] }
+      ]
+    })
+    expect(JSON.stringify(res.data)).not.toMatch(/[\u4e00-\u9fff]/)
+    expect(runtime.listSyncAccounts).toHaveBeenCalledTimes(1)
+  })
+
+  it('get：会话未装配 accounts（老链接）⇒ 上游式 unavailable 映射为 PRECONDITION_FAILED', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.listSyncAccounts).mockRejectedValueOnce(
+      new Error('sync account scope is unavailable (session not assembled)')
+    )
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:get-sync-accounts')
+    const res = (await handler({})) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+  })
+
+  it('preview：assetId 下传，DB 资源行只投影 resourceId/mimeType/sourcePath 三键', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:preview-sync-account')
+    const res = (await handler({}, { assetId: 'a1' })) as HandleResult
+    expect(runtime.previewSyncAccount).toHaveBeenCalledWith('a1')
+    expect(res.data).toEqual({
+      resourceId: 'res_1',
+      mimeType: 'image/jpeg',
+      sourcePath: 'D:\\Photos\\a1.jpg'
+    })
+
+    // 无 source_path 的资源（如内存/派生资源）不伪造空串键
+    vi.mocked(runtime.previewSyncAccount).mockResolvedValueOnce({
+      resource_id: 'res_2',
+      mime_type: 'image/png'
+    })
+    const bare = (await handler({}, { assetId: 'a2' })) as HandleResult
+    expect(bare.data).toEqual({ resourceId: 'res_2', mimeType: 'image/png' })
+  })
+
+  it('preview：资产不存在 ⇒ NOT_FOUND；assetId 空串/超长 ⇒ VALIDATION 且句柄零调用', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.previewSyncAccount).mockRejectedValueOnce(
+      new Error('NikkiSync asset not found: ghost')
+    )
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:preview-sync-account')
+    const res = (await handler({}, { assetId: 'ghost' })) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.NOT_FOUND)
+    for (const bad of ['', ' ', 'x'.repeat(129)]) {
+      const rejected = (await handler({}, { assetId: bad })) as HandleResult
+      expect(rejected.error?.code, JSON.stringify(bad)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.previewSyncAccount).toHaveBeenCalledTimes(1)
+  })
+
+  it('set-selection：null（全部）/ []（零个）/ 数组逐字下传，返回剔除 label 的新状态', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-sync-account-selection')
+    const all = (await handler({}, { uids: null })) as HandleResult
+    expect(runtime.setSyncAccountSelection).toHaveBeenNthCalledWith(1, null)
+    expect(JSON.stringify(all.data)).not.toMatch(/[\u4e00-\u9fff]/)
+
+    await handler({}, { uids: [] })
+    expect(runtime.setSyncAccountSelection).toHaveBeenNthCalledWith(2, [])
+
+    await handler({}, { uids: ['10001', 'source:spinning_momo'] })
+    expect(runtime.setSyncAccountSelection).toHaveBeenNthCalledWith(3, [
+      '10001',
+      'source:spinning_momo'
+    ])
+
+    // 上游 `invalid_accounts`（uid 键非法）⇒ VALIDATION_ERROR，中文原文不透传
+    vi.mocked(runtime.setSyncAccountSelection).mockRejectedValueOnce(new Error('invalid_accounts'))
+    const rejected = (await handler({}, { uids: ['not-a-uid'] })) as HandleResult
+    expect(rejected.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+  })
+
+  it('set-selection：uids 非数组 / 超 200 ⇒ zod 先拒（VALIDATION，句柄零调用）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-sync-account-selection')
+    const tooMany = Array.from({ length: 201 }, (_, i) => String(i))
+    for (const bad of [{ uids: '10001' }, { uids: tooMany }, { uids: [1, 2] }]) {
+      const res = (await handler({}, bad)) as HandleResult
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.setSyncAccountSelection).not.toHaveBeenCalled()
+  })
+
+  it('set-selection 成功后推 nikkisync:library-changed（作用域变更让图库重取）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const send = vi.fn()
+    const handler = getHandler(handleMock, 'nikkisync:set-sync-account-selection')
+    const res = (await handler({ sender: { send } }, { uids: ['10001'] })) as HandleResult
+    expect(res.success).toBe(true)
+    expect(send).toHaveBeenCalledWith('nikkisync:library-changed')
+
+    // 保存失败不得推送（库没变，UI 不该刷）
+    vi.mocked(runtime.setSyncAccountSelection).mockRejectedValueOnce(new Error('invalid_accounts'))
+    await handler({ sender: { send } }, { uids: ['bad uid'] })
+    expect(send).toHaveBeenCalledTimes(1)
+  })
+
+  it('未装配 ⇒ 三通道统一 PRECONDITION_FAILED', async () => {
+    register(undefined)
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:get-sync-accounts', undefined],
+      ['nikkisync:preview-sync-account', { assetId: 'a1' }],
+      ['nikkisync:set-sync-account-selection', { uids: null }]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+})
+
+describe('nikkisync:set-extra-directory-source（K9 目录来源标注）', () => {
+  it('id/source 逐字下传并返回剔除中文 message 的状态', async () => {
+    const runtime = createRuntimeStub()
+    const marker = { ...EXTRA_DIRECTORIES_STATE, directories: [] }
+    vi.mocked(runtime.setExtraDirectorySource).mockResolvedValueOnce(marker)
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-extra-directory-source')
+    const res = (await handler({}, { id: 'dir_1', source: 'other' })) as HandleResult
+    expect(runtime.setExtraDirectorySource).toHaveBeenCalledWith('dir_1', 'other')
+    expect(res.data).toEqual({
+      directories: [],
+      automaticRoots: EXTRA_DIRECTORIES_STATE.automaticRoots,
+      busy: false,
+      scannerStatus: 'running'
+    })
+    expect('message' in (res.data as Record<string, unknown>)).toBe(false)
+  })
+
+  it('source 非法 / id 形态非法 ⇒ zod 先拒（VALIDATION，句柄零调用）', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-extra-directory-source')
+    for (const bad of [
+      { id: 'dir_1', source: 'native' },
+      { id: 'dir_1' },
+      { id: '', source: 'other' },
+      { id: 'x'.repeat(129), source: 'spinning_momo' }
+    ]) {
+      const res = (await handler({}, bad)) as HandleResult
+      expect(res.error?.code, JSON.stringify(bad)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(runtime.setExtraDirectorySource).not.toHaveBeenCalled()
+  })
+
+  it('上游错误映射：invalid_source→VALIDATION、directory_not_found→PRECONDITION', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.setExtraDirectorySource).mockRejectedValueOnce(new Error('invalid_source'))
+    vi.mocked(runtime.setExtraDirectorySource).mockRejectedValueOnce(
+      new Error('directory_not_found')
+    )
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-extra-directory-source')
+    expect(
+      ((await handler({}, { id: 'dir_1', source: 'other' })) as HandleResult).error?.code
+    ).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(
+      ((await handler({}, { id: 'dir_1', source: 'other' })) as HandleResult).error?.code
+    ).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
   })
 })
 

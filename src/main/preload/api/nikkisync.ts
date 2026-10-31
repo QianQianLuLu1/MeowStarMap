@@ -1,6 +1,6 @@
-// @core-change: K8 新增整理队列三个桥方法（getOrganizerQueue / decideOrganizerItem /
-//               approveOrganizerItems，批量删除管理面，破坏性动作需页面确认弹窗）。
-//               （历史：阶段3-4 建查询/服务/扩容面、K2 同意、K3 版本推断、K6 目录面——历次授权原因见各节点提交。）
+// @core-change: K9 新增账号同步作用域三方法与目录来源标注（getSyncAccounts / previewSyncAccount /
+//               setSyncAccountSelection / setExtraDirectorySource，inspect 增 source 入参）。
+//               （历史：阶段3-4 建查询/服务/扩容面、K2 同意、K3 版本推断、K6 目录面、K8 整理队列——历次授权原因见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -17,6 +17,7 @@ import type {
   NikkiSyncGameVersionQueryInfo,
   NikkiSyncExtraDirectoriesInfo,
   NikkiSyncExtraDirectoryProposalInfo,
+  NikkiSyncExtraDirectorySourceInput,
   NikkiSyncOrganizerApproveInput,
   NikkiSyncOrganizerApproveResultInfo,
   NikkiSyncOrganizerDecideInput,
@@ -33,6 +34,9 @@ import type {
   NikkiSyncSearchQueryInfo,
   NikkiSyncServerStatusInfo,
   NikkiSyncSuitSearchInfo,
+  NikkiSyncSyncAccountPreviewInfo,
+  NikkiSyncSyncAccountSelectionInput,
+  NikkiSyncSyncAccountsInfo,
   NikkiSyncSyncStartInputInfo
 } from '../../../shared/types/electron-api'
 
@@ -95,8 +99,8 @@ export const nikkisyncAPI = {
   // ---- K6：额外照片目录（仅作用于同步库扫描器，不影响本地图库扫描目录）----
   /** 目录状态（directories/automaticRoots/busy；上游中文 message 已剔除） */
   getExtraDirectories: () => call<NikkiSyncExtraDirectoriesInfo>('nikkisync:get-extra-directories'),
-  /** 预检目录（返回 id/images/videos/limited 提案；中文 hint 已剔除） */
-  inspectExtraDirectory: (input: { path: string }) =>
+  /** 预检目录（返回 id/images/videos/limited 提案；中文 hint 已剔除）；source 仅支持 spinning_momo */
+  inspectExtraDirectory: (input: { path: string; source?: 'spinning_momo' }) =>
     call<NikkiSyncExtraDirectoryProposalInfo>('nikkisync:inspect-extra-directory', input),
   /** 按预检 id 加入目录清单（触发上游重扫） */
   addExtraDirectory: (input: { id: string }) =>
@@ -104,9 +108,21 @@ export const nikkisyncAPI = {
   /** 按目录 id 移除（触发上游重扫） */
   removeExtraDirectory: (input: { id: string }) =>
     call<NikkiSyncExtraDirectoriesInfo>('nikkisync:remove-extra-directory', input),
+  /** 标注目录来源（spinning_momo / other；仅 images 目录），并触发账号来源组刷新 */
+  setExtraDirectorySource: (input: NikkiSyncExtraDirectorySourceInput) =>
+    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:set-extra-directory-source', input),
   /** 手动重扫全部目录 */
   rescanExtraDirectories: () =>
     call<NikkiSyncExtraDirectoriesInfo>('nikkisync:rescan-extra-directories'),
+  // ---- K9：账号同步作用域（手机只同步勾选账号；选择存上游 app_settings）----
+  /** 账号分组与选择状态（上游中文 label 已剔除；null/undefined 选择在响应里体现为 all=true） */
+  getSyncAccounts: () => call<NikkiSyncSyncAccountsInfo>('nikkisync:get-sync-accounts'),
+  /** 账号样例缩略图（assetId → 上游优先资源；不存在时 NOT_FOUND） */
+  previewSyncAccount: (input: { assetId: string }) =>
+    call<NikkiSyncSyncAccountPreviewInfo>('nikkisync:preview-sync-account', input),
+  /** 保存账号选择（null = 全部；[] = 不同步任何账号），返回更新后的状态并触发图库刷新 */
+  setSyncAccountSelection: (input: NikkiSyncSyncAccountSelectionInput) =>
+    call<NikkiSyncSyncAccountsInfo>('nikkisync:set-sync-account-selection', input),
   // ---- K8：整理队列（批量删除；开关默认关，破坏性动作由页面确认弹窗把关）----
   /** 队列视图（list 剔除中文 message + activity 计数；开关关闭时 PRECONDITION_FAILED） */
   getOrganizerQueue: () => call<NikkiSyncOrganizerViewInfo>('nikkisync:get-organizer-queue'),
