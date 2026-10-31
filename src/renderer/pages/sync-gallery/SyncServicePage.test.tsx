@@ -1002,6 +1002,24 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     )
   })
 
+  it('(as) K9：移除目录后重取账号节（来源分组可能随目录消失）', async () => {
+    installElectronApi({
+      extraDirectories: [
+        { id: 'dir_momo', path: 'D:\\Momo', mode: 'images', source: 'spinning_momo' }
+      ]
+    })
+    renderSection()
+    await waitFor(() => expect(serverApi.getSyncAccounts).toHaveBeenCalledTimes(1))
+    fireEvent.click(await screen.findByRole('button', { name: '移除目录' }))
+    await waitFor(() =>
+      expect(serverApi.removeExtraDirectory).toHaveBeenCalledWith({ id: 'dir_momo' })
+    )
+    // 删除 spinning_momo 目录会让「旋转吧大喵」分组消失，账号节必须跟着重取
+    await waitFor(() =>
+      expect(serverApi.getSyncAccounts.mock.calls.length).toBeGreaterThanOrEqual(2)
+    )
+  })
+
   it('(aj) 持久化失败：同步服务开关不得悬挂在已启用态，且不得留下未捕获 rejection', async () => {
     // (c) 只覆盖了 startServer 失败的回滚；写设置本身失败是另一条分支：
     // 此前 persistEnabled 落在一层只有 finally 没有 catch 的 try 里，

@@ -628,6 +628,8 @@ export const SyncServicePage: React.FC = () => {
     if (busy || !api) return
     try {
       setExtraDirs(await api.nikkisync.removeExtraDirectory({ id }))
+      // K9：删掉 spinning_momo 目录会让来源分组消失，账号节须同步重取（与 add / setSource 同款）
+      if (syncAccounts) await refreshAccounts()
     } catch (error) {
       showError(error)
     }
