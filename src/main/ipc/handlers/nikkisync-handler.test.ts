@@ -1256,6 +1256,39 @@ describe('nikkisync:set-extra-directory-source（K9 目录来源标注）', () =
     expect('message' in (res.data as Record<string, unknown>)).toBe(false)
   })
 
+  it('成功后推 nikkisync:library-changed（来源分组变化 = 作用域变更）；失败与发送异常都不改变结果', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:set-extra-directory-source')
+
+    const send = vi.fn()
+    const ok = (await handler(
+      { sender: { send } },
+      { id: 'dir_1', source: 'spinning_momo' }
+    )) as HandleResult
+    expect(ok.success).toBe(true)
+    expect(send).toHaveBeenCalledWith('nikkisync:library-changed')
+
+    // 上游拒绝 ⇒ 库没变，不得推送
+    vi.mocked(runtime.setExtraDirectorySource).mockRejectedValueOnce(new Error('invalid_source'))
+    const failed = (await handler(
+      { sender: { send } },
+      { id: 'dir_1', source: 'other' }
+    )) as HandleResult
+    expect(failed.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(send).toHaveBeenCalledTimes(1)
+
+    // 发送方已关闭（send 抛错）⇒ 通知尽力而为，操作仍判成功
+    const throwing = vi.fn(() => {
+      throw new Error('sender closed')
+    })
+    const stillOk = (await handler(
+      { sender: { send: throwing } },
+      { id: 'dir_1', source: 'spinning_momo' }
+    )) as HandleResult
+    expect(stillOk.success).toBe(true)
+  })
+
   it('source 非法 / id 形态非法 ⇒ zod 先拒（VALIDATION，句柄零调用）', async () => {
     const runtime = createRuntimeStub()
     register(runtime)

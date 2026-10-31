@@ -3,6 +3,8 @@ import {
   clearNikkiSyncResourcePaths,
   isNikkiSyncResourcePath,
   nikkiSyncResourcePathCount,
+  nikkiSyncResourceRevision,
+  registerNikkiSyncResourcePath,
   registerNikkiSyncResourcePaths
 } from './resource-allowlist'
 
@@ -140,5 +142,52 @@ describe('NikkiSync 资源授权表', () => {
     // 同一相对写法命中；换目录语境下的同一相对名不应被误判为已授权
     expect(isNikkiSyncResourcePath('Game\\X6Game\\a.png')).toBe(true)
     expect(isNikkiSyncResourcePath('Other\\X6Game\\a.png')).toBe(false)
+  })
+})
+
+/**
+ * 单条精确登记：账号样例缩略图（`preview-sync-account`）在查询面之外取到路径，
+ * 没有 `libraryRevision` 上下文，只能追加、不能参与整表替换的 revision 判定。
+ */
+describe('NikkiSync 资源授权表单条登记（revision 中立）', () => {
+  beforeEach(() => {
+    clearNikkiSyncResourcePaths()
+  })
+
+  it('未设定 revision 时追加：后续按 revision 整表登记不得清掉该条', () => {
+    registerNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)).toBe(true)
+    expect(nikkiSyncResourceRevision()).toBeUndefined()
+
+    registerNikkiSyncResourcePaths(1, [`${WIN_ROOT}\\gallery.jpg`])
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)).toBe(true)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\gallery.jpg`)).toBe(true)
+    expect(nikkiSyncResourceRevision()).toBe(1)
+  })
+
+  it('表已带 revision 时追加只增不改：revision 与既有条目都保持', () => {
+    registerNikkiSyncResourcePaths(7, [`${WIN_ROOT}\\gallery.jpg`])
+    registerNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)
+    expect(nikkiSyncResourceRevision()).toBe(7)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\gallery.jpg`)).toBe(true)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)).toBe(true)
+  })
+
+  it('空串 / 纯空白 / 非字符串被忽略；重复登记不膨胀', () => {
+    registerNikkiSyncResourcePath('')
+    registerNikkiSyncResourcePath('   ')
+    registerNikkiSyncResourcePath(42 as unknown)
+    expect(nikkiSyncResourcePathCount()).toBe(0)
+
+    registerNikkiSyncResourcePath(`${WIN_ROOT}\\p.jpg`)
+    registerNikkiSyncResourcePath(`${WIN_ROOT}\\p.jpg`)
+    expect(nikkiSyncResourcePathCount()).toBe(1)
+  })
+
+  it('精确匹配：同目录兄弟文件不因单条登记被放行', () => {
+    registerNikkiSyncResourcePath(`${WIN_ROOT}\\p.jpg`)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\p.jpg`)).toBe(true)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\q.jpg`)).toBe(false)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\sub\\p.jpg`)).toBe(false)
   })
 })

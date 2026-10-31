@@ -577,6 +577,9 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
 - 来源标注（`source`）是 1.0.27 新增：`spinning_momo` 让该目录的照片进入「旋转吧大喵」
   账号分组；`other` 显式排除（未标注时上游仍按路径自动识别 `SpinningMomo` / `旋转吧大喵`）。
   仅 `mode: 'images'` 的目录可标注。
+- `set-extra-directory-source` 成功后推送 `nikkisync:library-changed`：来源分组变化属作用域变更
+  （已勾选账号的资产会进出作用域），本地图库据此按 `get-changes` 的 `fullResyncRequired` 重取，
+  与 `set-sync-account-selection` 同一口径。
 
 ### 8.2.4 整理队列（K8，上游 `DeletionQueue` 的 PC 管理面；破坏性能力，开关默认关）
 
@@ -628,7 +631,10 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   handler 剔除；渲染层按 `uid` + i18n 生成文案（`src/**` 禁中文硬编码）。
 - `preview` 是唯一显式投影：上游返回完整 DB 资源行（`resource_id` / `mime_type` /
   `source_path` / `role` 等），本通道只取 UI 需要的三键，供账号样例缩略图
-  （`previewSyncAccount` → `toFileUrl(sourcePath)`）。
+  （`previewSyncAccount` → `toFileUrl(sourcePath)`）。返回前主进程把该 `source_path`
+  以 revision 中立的单条登记写入 `media://` 授权表（`registerNikkiSyncResourcePath`）——
+  样例走的是账号作用域自己的读仓储，不在 `get-resource-records` 的登记链上，不补登记
+  会被 `media://` 第 4 条规则拒绝（真机裂图）。
 - 会话未建 `accounts`（老链接 / 未装配）⇒ `PRECONDITION_FAILED`，渲染层隐藏整节，不崩页。
 - `sourceGroups()` 是上游读路径上的写操作（来源指纹变化时写 `app_settings` /
   `change_journal`）；本仓不加锁、不缓存，逐字沿用。

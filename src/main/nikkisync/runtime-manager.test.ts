@@ -12,6 +12,7 @@ import { DEFAULT_METADATA_MAX_PASSES, NUAN5_METADATA_ENDPOINT } from './metadata
 import {
   clearNikkiSyncResourcePaths,
   isNikkiSyncResourcePath,
+  nikkiSyncResourcePathCount,
   registerNikkiSyncResourcePaths
 } from './resource-allowlist'
 
@@ -1695,5 +1696,44 @@ describe('K9：账号同步作用域四方法——透传、三态、错误上�
     await expect(bareManager.setExtraDirectorySource('dir_1', 'spinning_momo')).rejects.toThrow(
       /unavailable/
     )
+  })
+
+  it('正常：preview 把样例资源的确切路径登记进 media:// 授权表（否则缩略图 403）', async () => {
+    clearNikkiSyncResourcePaths()
+    const { deps } = createDependencies({}, { accountsPlan: accountsPlan() })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.previewSyncAccount('a1')
+    expect(isNikkiSyncResourcePath('D:/photos/a1.jpg')).toBe(true)
+    // 只授权这一个确切文件：同目录兄弟路径不得命中
+    expect(isNikkiSyncResourcePath('D:/photos/a2.jpg')).toBe(false)
+  })
+
+  it('边界：资源行缺 source_path / 空串时不登记，也不改变返回', async () => {
+    clearNikkiSyncResourcePaths()
+    const base = accountsPlan()
+    const rows = [
+      { resource_id: 'r1', mime_type: 'image/jpeg' },
+      { resource_id: 'r1', mime_type: 'image/jpeg', source_path: '   ' }
+    ]
+    for (const preview of rows) {
+      const { deps } = createDependencies({}, { accountsPlan: { ...base, preview } })
+      const manager = createRuntimeManager(deps)
+      await manager.start(DEFAULTS)
+      await expect(manager.previewSyncAccount('a1')).resolves.toEqual(preview)
+      expect(nikkiSyncResourcePathCount()).toBe(0)
+    }
+  })
+
+  it('异常：preview 不存在时维持 not found 且不登记任何路径', async () => {
+    clearNikkiSyncResourcePaths()
+    const { deps } = createDependencies(
+      {},
+      { accountsPlan: { ...accountsPlan(), preview: undefined } }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.previewSyncAccount('missing')).rejects.toThrow(/not found/)
+    expect(nikkiSyncResourcePathCount()).toBe(0)
   })
 })

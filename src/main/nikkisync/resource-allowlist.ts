@@ -59,6 +59,17 @@ function usablePath(value: unknown): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined
 }
 
+/** 插入或前移一个已归一化的键；超上限按插入序淘汰最旧条目。 */
+function appendKey(key: string): void {
+  // 先删后插：重复登记不膨胀，且把该 key 挪到插入序末尾（最近使用）
+  allowedPaths.delete(key)
+  allowedPaths.set(key, true)
+  if (allowedPaths.size > MAX_ENTRIES) {
+    const oldest = allowedPaths.keys().next().value
+    if (oldest !== undefined) allowedPaths.delete(oldest)
+  }
+}
+
 /**
  * 登记一批资源绝对路径。
  *
@@ -73,15 +84,24 @@ export function registerNikkiSyncResourcePaths(revision: number, paths: readonly
   for (const candidate of paths) {
     const value = usablePath(candidate)
     if (!value) continue
-    const key = normalizeKey(value)
-    // 先删后插：重复登记不膨胀，且把该 key 挪到插入序末尾（最近使用）
-    allowedPaths.delete(key)
-    allowedPaths.set(key, true)
-    if (allowedPaths.size > MAX_ENTRIES) {
-      const oldest = allowedPaths.keys().next().value
-      if (oldest !== undefined) allowedPaths.delete(oldest)
-    }
+    appendKey(normalizeKey(value))
   }
+}
+
+/**
+ * 授权**单条**确切路径，且不参与 revision 归属（不比对、不清表）。
+ *
+ * 为什么需要它：账号样例缩略图由 `nikkisync:preview-sync-account` 取到 `source_path` 后经
+ * `media://` 展示，而该通道走的是上游 `AccountSyncSettings` 自己的读仓储，不在
+ * `listResourceRecords` 的登记链上；它也没有 `libraryRevision` 上下文，不能伪装成某一版
+ * 整表登记（用错的 revision 会在下一次查询面登记时把整表清掉）。故这里只追加：
+ * 表已带 revision N 时保持 N；未初始化时保持未初始化（首次整表登记不会清掉该条）；
+ * revision 滚动时它随整表一起失效，样例会随状态刷新重新登记。
+ */
+export function registerNikkiSyncResourcePath(filePath: unknown): void {
+  const value = usablePath(filePath)
+  if (!value) return
+  appendKey(normalizeKey(value))
 }
 
 /** 该**确切**路径是否被登记过（调用方传入的必须是已 realpath 解引用的路径）。 */

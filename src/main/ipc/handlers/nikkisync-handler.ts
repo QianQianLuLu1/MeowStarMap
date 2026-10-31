@@ -1,7 +1,5 @@
-// @core-change: K9 新增账号同步作用域四通道（get-sync-accounts / preview-sync-account /
-//               set-sync-account-selection / set-extra-directory-source）——1.0.27 上游
-//               AccountSyncSettings 的读写面：中文 label 剔除、样例资源行三键投影、选择保存后
-//               推送 library-changed；inspect-extra-directory 追加 source 入参。
+// @core-change: K9 收尾——set-extra-directory-source 成功后补推 nikkisync:library-changed
+//               （目录来源分组变化属作用域变更，本地图库须按 fullResyncRequired 重取）。
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -747,9 +745,9 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(
     'nikkisync:set-extra-directory-source',
-    wrapHandlerRaw(ctx, async (args) => {
+    wrapHandlerRaw(ctx, async (args, _ctx, event) => {
       const runtime = requireRuntime(ctx)
-      return parseAndRun(
+      const state = await parseAndRun(
         directorySourceSchema,
         args[0] ?? {},
         'set-extra-directory-source',
@@ -763,6 +761,9 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
           }
         }
       )
+      // 来源分组变化属作用域变更（有账号选择时资产进出作用域）⇒ 本地图库按 fullResyncRequired 重取
+      notifyLibraryChanged(event)
+      return state
     })
   )
 

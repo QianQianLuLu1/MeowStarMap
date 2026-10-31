@@ -39,7 +39,7 @@ import {
   resolveSyncServerConfig
 } from './sync-server-view'
 // 阶段 4：会话拆除时收回 media:// 的资产路径授权（模块级单例，见 resource-allowlist）
-import { clearNikkiSyncResourcePaths } from './resource-allowlist'
+import { clearNikkiSyncResourcePaths, registerNikkiSyncResourcePath } from './resource-allowlist'
 // 阶段 6：元数据解析的有界驱动（纯函数层，零上游引用）
 import {
   NUAN5_METADATA_ENDPOINT,
@@ -796,6 +796,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   async function previewSyncAccount(assetId: string): Promise<unknown> {
     const row = requireAccounts().preview(assetId)
     if (!row) throw new Error(`NikkiSync asset not found: ${assetId}`)
+    // 样例缩略图由渲染层经 media:// 读取，而该协议只放行授权表里的确切路径；
+    // preview 走账号作用域自己的读仓储，不在 get-resource-records 的登记链上，故在此补登记。
+    registerNikkiSyncResourcePath(row.source_path)
     return row
   }
 
