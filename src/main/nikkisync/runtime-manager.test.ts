@@ -62,6 +62,12 @@ interface FakeCalls {
   /** K8：整理队列 decide/approveMany 收到的参数序列（验证逐字透传）。 */
   organizerDecide: Array<{ id: string; approve: boolean }>
   organizerApproveMany: string[][]
+  /** K9：账号选择写入序列（null 也要如实记录）。 */
+  accountSelection: Array<string[] | null>
+  /** K9：样例缩略图请求的 assetId 序列。 */
+  accountPreview: string[]
+  /** 1.0.27：目录来源标注写入序列。 */
+  extraSetSource: Array<{ id: string; source: string }>
 }
 
 /**
@@ -257,7 +263,7 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     },
     queries: {
       // 上游 b397e0e 起 `mapAssetSummary` 追加两个本机绝对路径键（sourceFolder 由 sourcePath
-      // 剥尾段得来 ⇒ 二者成对出现）。夹具如实带上，用于钉住「渲染层拿不到绝对路径」这条姿态。
+      // 剥尾段得来 ⇒ 二者成对出现）。夹具如实带上，用于钉住「委托层零转换、两键原样透出」。
       listAssets: vi.fn(async () =>
         plan.assetPage
           ? (plan.assetPage as { items: unknown[]; libraryRevision: number })
@@ -349,10 +355,42 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
               automaticRoots: ['/game/photos'],
               busy: false
             }),
-            inspect: async (selected: string) => ({ id: 'p1', selected, images: 3, videos: 1 }),
+            inspect: async (selected: string, source?: string) => ({
+              id: 'p1',
+              selected,
+              source,
+              images: 3,
+              videos: 1
+            }),
             add: async (id: string) => ({ added: id }),
             remove: async (id: string) => ({ removed: id }),
-            rescan: async () => ({ rescanned: true })
+            rescan: async () => ({ rescanned: true }),
+            setSource: async (id: string, source: string) => {
+              calls.extraSetSource.push({ id, source })
+              return { id, source }
+            }
+          }
+        }
+      : {}),
+    // K9：账号作用域假面（缺省不挂 ⇒ manager 四方法抛 unavailable）
+    ...(plan.accountsPlan
+      ? {
+          accounts: {
+            state: () => plan.accountsPlan!.state ?? { all: true, accounts: [] },
+            revision: () => plan.accountsPlan!.revision ?? 0,
+            selection: () => plan.accountsPlan!.selection,
+            setSelection: (value: string[] | null) => {
+              calls.accountSelection.push(value)
+              if (plan.accountsPlan!.setSelectionError) {
+                throw new Error(plan.accountsPlan!.setSelectionError)
+              }
+            },
+            preview: (assetId: string) => {
+              calls.accountPreview.push(assetId)
+              return plan.accountsPlan!.preview
+            },
+            sourceGroups: () => [] as Array<{ key: string; pathPrefixes: string[] }>,
+            sourceDirectoriesChanged: () => {}
           }
         }
       : {}),
@@ -426,7 +464,10 @@ function createDependencies(
     resolveGameVersion: [],
     organizerDecide: [],
     organizerApproveMany: [],
-    pairingUriArgs: []
+    pairingUriArgs: [],
+    accountSelection: [],
+    accountPreview: [],
+    extraSetSource: []
   }
   const deps: RuntimeManagerDependencies = {
     defaults: DEFAULTS,
@@ -692,20 +733,6 @@ describe('createRuntimeManager 优雅停止', () => {
 })
 
 describe('createRuntimeManager 查询透传', () => {
-  it('除资产行的本机绝对路径两键外原样返回，不做字段包装', async () => {
-    const { deps } = createDependencies()
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    await expect(manager.listAssets({ limit: 10 })).resolves.toEqual({
-      items: [{ assetId: 'asset_1', revision: 3 }],
-      libraryRevision: 7
-    })
-    await expect(manager.getAssetDetail('asset_9')).resolves.toEqual({
-      asset: { assetId: 'asset_9' }
-    })
-    await expect(manager.getResource('a', 'r', 'path')).resolves.toBe('/game/photos/1.jpg')
-  })
-
   it('degraded 状态下 status 仍带 dbPath 与降级原因（供 IPC 展示）', async () => {
     const { deps } = createDependencies({}, { startError: 'notfound' })
     const manager = createRuntimeManager(deps)
@@ -717,32 +744,76 @@ describe('createRuntimeManager 查询透传', () => {
   })
 })
 
-describe('createRuntimeManager 资产路径键裁剪（上游 b397e0e 同步）', () => {
-  it('正常：资产行的 sourcePath/sourceFolder 不透给渲染层，其余键原样保留', async () => {
+describe('createRuntimeManager 查询零转换（资产行含 sourcePath/sourceFolder）', () => {
+  it('正常：资产行两键与其余键原样返回，不做字段包装', async () => {
     const { deps } = createDependencies()
     const manager = createRuntimeManager(deps)
     await manager.start(DEFAULTS)
-    const page = await manager.listAssets({ limit: 10 })
-    expect(JSON.stringify(page)).not.toContain('sourcePath')
-    expect(JSON.stringify(page)).not.toContain('sourceFolder')
-    expect((page as { items: unknown[] }).items).toHaveLength(1)
-    expect((page as { libraryRevision: number }).libraryRevision).toBe(7)
+    await expect(manager.listAssets({ limit: 10 })).resolves.toEqual({
+      items: [
+        {
+          assetId: 'asset_1',
+          revision: 3,
+          sourcePath: 'D:/game/photos/Photo_1.jpg',
+          sourceFolder: 'D:/game/photos'
+        }
+      ],
+      libraryRevision: 7
+    })
+    await expect(manager.getAssetDetail('asset_9')).resolves.toEqual({
+      asset: { assetId: 'asset_9' }
+    })
+    await expect(manager.getResource('a', 'r', 'path')).resolves.toBe('/game/photos/1.jpg')
   })
 
-  it('正常：搜索面嵌套 items[].photos[].asset 里的两键同样不透出（浅拷一层不够）', async () => {
+  it('正常：搜索面嵌套 items[].photos[].asset 的两键原样保留（含跨聚合共享引用）', async () => {
+    const sharedAsset = {
+      assetId: 'asset_1',
+      sourcePath: 'D:/game/photos/Photo_1.jpg',
+      sourceFolder: 'D:/game/photos'
+    }
+    const rawSuits = {
+      items: [
+        { suitId: 'suit_1', photos: [{ asset: sharedAsset, matchedParts: ['top'] }] },
+        { suitId: 'suit_2', photos: [{ asset: sharedAsset, matchedParts: ['dress'] }] }
+      ]
+    }
+    const { deps } = createDependencies({}, { suitPage: rawSuits })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const suits = (await manager.searchSuits('dress')) as {
+      items: Array<{ suitId: string; photos: Array<{ asset: unknown; matchedParts: string[] }> }>
+    }
+    expect(suits.items).toHaveLength(2)
+    for (const item of suits.items) {
+      expect(item.photos[0]?.asset).toBe(sharedAsset)
+      expect(item.photos[0]?.asset).toHaveProperty('sourcePath')
+      expect(item.photos[0]?.matchedParts).toEqual(item.suitId === 'suit_1' ? ['top'] : ['dress'])
+    }
+  })
+
+  it('正常：searchClothing 的嵌套资产同样原样保留', async () => {
     const { deps } = createDependencies()
     const manager = createRuntimeManager(deps)
     await manager.start(DEFAULTS)
-    const suits = await manager.searchSuits('dress')
-    expect(JSON.stringify(suits)).not.toContain('sourcePath')
-    expect(JSON.stringify(suits)).not.toContain('sourceFolder')
-    // 结构本身不被改写：suitId / matchedParts 仍在原位
-    const first = (suits as { items: Array<{ photos: Array<{ matchedParts: string[] }> }> })
-      .items[0]
-    expect(first?.photos[0]?.matchedParts).toEqual(['top'])
+    const clothing = (await manager.searchClothing('裙')) as {
+      query: string
+      items: Array<{
+        clothingId: string
+        photoCount: number
+        photos: Array<{ asset: Record<string, unknown>; matchedParts?: unknown }>
+      }>
+    }
+    expect(clothing.query).toBe('裙')
+    expect(clothing.items[0]?.clothingId).toBe('cloth_1')
+    expect(clothing.items[0]?.photoCount).toBe(1)
+    expect(clothing.items[0]?.photos[0]?.asset.assetId).toBe('asset_1')
+    expect(clothing.items[0]?.photos[0]?.asset.sourcePath).toBe('D:/game/photos/Photo_1.jpg')
+    expect(clothing.items[0]?.photos[0]?.asset.sourceFolder).toBe('D:/game/photos')
+    expect(clothing.items[0]?.photos[0]?.matchedParts).toBeUndefined()
   })
 
-  it('边界：path 模式资源通道按设计保留绝对路径原值（裁了 media:// 当场失效）', async () => {
+  it('边界：path 模式资源通道仍返回绝对路径原值（media:// 授权的唯一出口）', async () => {
     const { deps } = createDependencies()
     const manager = createRuntimeManager(deps)
     await manager.start(DEFAULTS)
@@ -751,294 +822,6 @@ describe('createRuntimeManager 资产路径键裁剪（上游 b397e0e 同步）'
       byAsset: Record<string, Record<string, string>>
     }
     expect(records.byAsset.asset_1?.res_1).toBe('D:/game/photos/Photo_1.jpg')
-  })
-
-  it('边界：裁剪走副本，不写回上游查询面的对象身份（searchSource 按 revision 缓存，就地删键会污染缓存与统计面）', async () => {
-    const rawPage = {
-      items: [
-        {
-          assetId: 'asset_1',
-          sourcePath: 'D:/game/photos/Photo_1.jpg',
-          sourceFolder: 'D:/game/photos'
-        }
-      ],
-      libraryRevision: 9
-    }
-    const rawSuits = {
-      items: [
-        {
-          suitId: 'suit_1',
-          photos: [
-            {
-              asset: {
-                assetId: 'asset_1',
-                sourcePath: 'D:/game/photos/Photo_1.jpg',
-                sourceFolder: 'D:/game/photos'
-              },
-              matchedParts: ['top']
-            }
-          ]
-        }
-      ]
-    }
-    const { deps } = createDependencies({}, { assetPage: rawPage, suitPage: rawSuits })
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    await manager.listAssets({ limit: 10 })
-    await manager.searchSuits('dress')
-    // 原件两键仍在 ⇒ 委托层返回的是副本；若实现改成 delete 原对象，这两条断言立刻红
-    expect(rawPage.items[0]).toHaveProperty('sourcePath')
-    expect(rawSuits.items[0]?.photos[0]?.asset).toHaveProperty('sourceFolder')
-  })
-
-  it('回归：searchClothing 的嵌套 items[].photos[].asset 同样不透两键，且结构不被改写', async () => {
-    const { deps } = createDependencies()
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    const clothing = await manager.searchClothing('裙')
-    expect(JSON.stringify(clothing)).not.toContain('sourcePath')
-    expect(JSON.stringify(clothing)).not.toContain('sourceFolder')
-    // 结构原样：服装面的键（clothingId/photoCount/photos[].asset）不被改写，无 matchedParts
-    const typed = clothing as {
-      query: string
-      items: Array<{
-        clothingId: string
-        photoCount: number
-        photos: Array<{ asset: { assetId: string }; matchedParts?: unknown }>
-      }>
-    }
-    expect(typed.query).toBe('裙')
-    expect(typed.items[0]?.clothingId).toBe('cloth_1')
-    expect(typed.items[0]?.photoCount).toBe(1)
-    expect(typed.items[0]?.photos[0]?.asset.assetId).toBe('asset_1')
-    expect(typed.items[0]?.photos[0]?.matchedParts).toBeUndefined()
-  })
-
-  it('缺陷：同一 asset 身份被两个套装聚合共享时两处都必须是已裁键副本（上游按引用塞入 ⇒ 第二处曾退回原件）', async () => {
-    const sharedAsset = {
-      assetId: 'asset_1',
-      sourcePath: 'D:/game/photos/Photo_1.jpg',
-      sourceFolder: 'D:/game/photos'
-    }
-    // 一张照片同时命中两套「天鹅」开头的服装 ⇒ 上游 SuitSearchIndex.js:145 把**同一个** asset
-    // 对象塞进两个聚合；委托层若按「已访问」跳过第二处，拿回去的就是带绝对路径的原件。
-    const rawSuits = {
-      items: [
-        {
-          suitId: 'suit_1',
-          suitName: '天鹅童话',
-          photos: [{ asset: sharedAsset, matchedParts: ['top'] }]
-        },
-        {
-          suitId: 'suit_2',
-          suitName: '天鹅童话·晨曦',
-          photos: [{ asset: sharedAsset, matchedParts: ['dress'] }]
-        }
-      ]
-    }
-    const { deps } = createDependencies({}, { suitPage: rawSuits })
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    const suits = (await manager.searchSuits('天鹅')) as {
-      items: Array<{ photos: Array<{ asset: unknown }> }>
-    }
-    expect(suits.items).toHaveLength(2)
-    for (const item of suits.items) {
-      for (const photo of item.photos) {
-        expect(photo.asset).not.toBe(sharedAsset)
-        expect(photo.asset).not.toHaveProperty('sourcePath')
-        expect(photo.asset).not.toHaveProperty('sourceFolder')
-      }
-    }
-    expect(JSON.stringify(suits)).not.toContain('sourcePath')
-    expect(JSON.stringify(suits)).not.toContain('sourceFolder')
-    // 副本而非就地删键：原件两键必须原样在（searchSource 缓存与统计面共享它）
-    expect(sharedAsset).toHaveProperty('sourcePath')
-    expect(sharedAsset).toHaveProperty('sourceFolder')
-  })
-
-  it('缺陷：searchClothing 的同一 asset 跨服装聚合共享 ⇒ 两处都裁键（一张照片命中 N 件服装即 N 份引用）', async () => {
-    const sharedAsset = {
-      assetId: 'asset_1',
-      sourcePath: 'D:/game/photos/Photo_1.jpg',
-      sourceFolder: 'D:/game/photos'
-    }
-    // 上游 ClothingSearchIndex.js:79 在逐服装循环里 push 同一个 searchable.asset
-    const rawClothing = {
-      query: '天鹅',
-      items: [
-        {
-          clothingId: 'cloth_1',
-          name: '天鹅裙',
-          category: 'dresses',
-          photoCount: 1,
-          photos: [{ asset: sharedAsset }]
-        },
-        {
-          clothingId: 'cloth_2',
-          name: '天鹅披肩',
-          category: 'accessories',
-          photoCount: 1,
-          photos: [{ asset: sharedAsset }]
-        }
-      ]
-    }
-    const { deps } = createDependencies({}, { clothingPage: rawClothing })
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    const clothing = (await manager.searchClothing('天鹅')) as {
-      items: Array<{ photos: Array<{ asset: unknown }> }>
-    }
-    expect(clothing.items).toHaveLength(2)
-    for (const item of clothing.items) {
-      for (const photo of item.photos) {
-        expect(photo.asset).not.toBe(sharedAsset)
-        expect(photo.asset).not.toHaveProperty('sourcePath')
-        expect(photo.asset).not.toHaveProperty('sourceFolder')
-      }
-    }
-    expect(JSON.stringify(clothing)).not.toContain('sourcePath')
-    expect(sharedAsset).toHaveProperty('sourcePath')
-  })
-
-  it('缺陷：深层嵌套（>8 层）对象的 sourcePath/sourceFolder 也必须裁掉（旧 MAX_STRIP_DEPTH=8 提前 return 致 fail-open）', async () => {
-    // 旧实现在 depth>=8 的对象上 `return copy` 停下钻，其子树仍是原引用 → 两键残留。
-    // 含两键对象落在 depth12（root=0 → items 数组=1 → items[0]=2 → 10 层 nested=12）；
-    // 只要真实 payload 未来在 asset 外多包几层即泄漏，破的是函数自述「按形状递归、宁少不漏」。
-    let deep: Record<string, unknown> = {
-      sourcePath: 'D:/game/photos/leak.jpg',
-      sourceFolder: 'D:/game/photos'
-    }
-    for (let i = 0; i < 10; i++) deep = { nested: deep }
-    const rawPage = { items: [deep], libraryRevision: 1 }
-
-    const { deps } = createDependencies({}, { assetPage: rawPage })
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    const page = await manager.listAssets({ limit: 10 })
-
-    expect(JSON.stringify(page)).not.toContain('sourcePath')
-    expect(JSON.stringify(page)).not.toContain('sourceFolder')
-    // 防恒绿：结构其余键与 libraryRevision 原样保留，证明拿到的是裁剪后的副本而非空对象
-    expect((page as { libraryRevision: number }).libraryRevision).toBe(1)
-  })
-
-  it('缺陷：Date/Map/Set 作为载荷值不得被浅拷展开成空对象（DEBT-042 的静默丢数据）', async () => {
-    const capturedAt = new Date('2026-10-30T00:00:00.000Z')
-    const tags = new Map([['theme', 12]])
-    const buckets = new Set(['Photo_1.jpg'])
-    const rawPage = {
-      items: [
-        { assetId: 'a1', capturedAt, tags, buckets },
-        // 同一个身份在一页里再出现一次 ⇒ 告警必须按身份去重，否则热路径会刷屏
-        { assetId: 'a2', capturedAt, tags, buckets }
-      ],
-      libraryRevision: 9
-    }
-    const warnSpy = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
-    try {
-      const { deps } = createDependencies({}, { assetPage: rawPage })
-      const manager = createRuntimeManager(deps)
-      await manager.start(DEFAULTS)
-      const page = (await manager.listAssets({ limit: 10 })) as {
-        items: Array<Record<string, unknown>>
-      }
-      expect(page.items).toHaveLength(2)
-      for (const item of page.items) {
-        // 旧实现走 `{...value}`：Date/Map/Set 的可枚举自有属性为空 ⇒ 三者全变 `{}`，数据静默消失
-        expect(item.capturedAt).toBe(capturedAt)
-        expect(item.tags).toBe(tags)
-        expect(item.buckets).toBe(buckets)
-      }
-      // 透传不许是静默的：三个身份各告警一次，出现两次不翻倍
-      expect(warnSpy).toHaveBeenCalledTimes(3)
-    } finally {
-      warnSpy.mockRestore()
-    }
-  })
-
-  it('缺陷：类实例自带两键时必须剔键，但不得连带丢掉其它自有属性与实例身份', async () => {
-    class AssetRow {
-      assetId = 'asset_1'
-      note = 'keep me'
-      sourcePath = 'D:/game/photos/Photo_1.jpg'
-      sourceFolder = 'D:/game/photos'
-    }
-    const row = new AssetRow()
-    const rawPage = { items: [row], libraryRevision: 9 }
-    const warnSpy = vi.spyOn(process, 'emitWarning').mockImplementation(() => {})
-    try {
-      const { deps } = createDependencies({}, { assetPage: rawPage })
-      const manager = createRuntimeManager(deps)
-      await manager.start(DEFAULTS)
-      const page = (await manager.listAssets({ limit: 10 })) as {
-        items: Array<Record<string, unknown>>
-      }
-      const item = page.items[0]!
-      expect(item).not.toHaveProperty('sourcePath')
-      expect(item).not.toHaveProperty('sourceFolder')
-      // 旧实现的 `{...row}` 把原型抹平 ⇒ 这两条同时钉住「裁键不以丢类型为代价」
-      expect(item).toBeInstanceOf(AssetRow)
-      expect(item.note).toBe('keep me')
-      expect(item.assetId).toBe('asset_1')
-      // 副本语义不因分支改变：原件一律不动
-      expect(row).toHaveProperty('sourcePath')
-    } finally {
-      warnSpy.mockRestore()
-    }
-  })
-
-  it('缺陷：Symbol 键承载的子对象也必须下钻裁键（旧实现只走 Object.keys）', async () => {
-    const extra = Symbol('nikkisync.extra')
-    const nested = {
-      sourcePath: 'D:/game/photos/Photo_7.jpg',
-      sourceFolder: 'D:/game/photos'
-    }
-    const rawPage = { items: [{ assetId: 'a1', [extra]: nested }], libraryRevision: 9 }
-    const { deps } = createDependencies({}, { assetPage: rawPage })
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    const page = (await manager.listAssets({ limit: 10 })) as {
-      items: Array<Record<PropertyKey, unknown>>
-    }
-    // 既有断言一律用 JSON.stringify，而它对 Symbol 键不可见 ⇒ 这里改用 Reflect 探针
-    const carried = Reflect.get(page.items[0]!, extra) as Record<string, unknown>
-    expect(carried).not.toHaveProperty('sourcePath')
-    expect(carried).not.toHaveProperty('sourceFolder')
-    expect(nested).toHaveProperty('sourcePath') // 副本语义：原件仍带两键
-  })
-
-  it('边界：访问器返回的子树同样要裁——求值是 IPC 序列化本来就会做的事，不裁才是 fail-open', async () => {
-    // 刻意钉住「不求值访问器」这条修法**不采纳**的理由：出 IPC 时结构化克隆自己会求值自有可枚举
-    // 访问器并把返回值送出去，若本层为了避开求值而原样带过访问器，未裁键的子树就会照样漏给渲染层。
-    let calls = 0
-    const nested = {
-      sourcePath: 'D:/game/photos/Photo_8.jpg',
-      sourceFolder: 'D:/game/photos'
-    }
-    const rawPage = {
-      items: [
-        {
-          assetId: 'a1',
-          get derived(): unknown {
-            calls += 1
-            return nested
-          }
-        }
-      ],
-      libraryRevision: 9
-    }
-    const { deps } = createDependencies({}, { assetPage: rawPage })
-    const manager = createRuntimeManager(deps)
-    await manager.start(DEFAULTS)
-    const page = (await manager.listAssets({ limit: 10 })) as {
-      items: Array<Record<string, unknown>>
-    }
-    expect(JSON.stringify(page)).not.toContain('sourcePath')
-    expect(page.items[0]?.derived).not.toHaveProperty('sourcePath')
-    expect(page.items[0]?.derived).not.toHaveProperty('sourceFolder')
-    expect(calls).toBeGreaterThan(0)
-    expect(nested).toHaveProperty('sourcePath')
   })
 })
 
@@ -1840,6 +1623,76 @@ describe('K8-c：整理队列（批量删除）三方法——透传、中文剔
       /unavailable/
     )
     await expect(manager.organizerApproveMany(['del_1aaaaaaaaaaaaaaa'])).rejects.toThrow(
+      /unavailable/
+    )
+  })
+})
+
+describe('K9：账号同步作用域四方法——透传、三态、错误上抛、缺席降级', () => {
+  const accountsPlan = () => ({
+    state: {
+      all: false,
+      accounts: [
+        { uid: '10001', count: 2, selected: true, samples: ['a1', 'a2'], label: 'UID 10001' }
+      ]
+    },
+    revision: 4,
+    selection: ['10001'],
+    preview: { resource_id: 'r1', mime_type: 'image/jpeg', source_path: 'D:/photos/a1.jpg' }
+  })
+
+  it('正常：state/preview 透传，setSelection 的 null 与数组逐字下传', async () => {
+    const { deps, calls } = createDependencies({}, { accountsPlan: accountsPlan() })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.listSyncAccounts()).resolves.toEqual(accountsPlan().state)
+    await expect(manager.previewSyncAccount('a1')).resolves.toEqual(accountsPlan().preview)
+    await manager.setSyncAccountSelection(null)
+    await manager.setSyncAccountSelection(['20002'])
+    expect(calls.accountSelection).toEqual([null, ['20002']])
+    expect(calls.accountPreview).toEqual(['a1'])
+  })
+
+  it('异常：上游 invalid_accounts 原样上抛；preview 不存在抛 not found', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        accountsPlan: {
+          ...accountsPlan(),
+          preview: undefined,
+          setSelectionError: 'invalid_accounts'
+        }
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.setSyncAccountSelection(['bad uid'])).rejects.toThrow('invalid_accounts')
+    await expect(manager.previewSyncAccount('missing')).rejects.toThrow(/not found/)
+  })
+
+  it('边界：会话未挂 accounts ⇒ 三个账号方法都抛 unavailable', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.listSyncAccounts()).rejects.toThrow(/unavailable/)
+    await expect(manager.previewSyncAccount('a1')).rejects.toThrow(/unavailable/)
+    await expect(manager.setSyncAccountSelection(null)).rejects.toThrow(/unavailable/)
+  })
+
+  it('1.0.27：setExtraDirectorySource 逐字透传；无目录面抛 unavailable', async () => {
+    const withDirs = createDependencies({}, { extraDirectoriesPresent: true })
+    const manager = createRuntimeManager(withDirs.deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.setExtraDirectorySource('dir_1', 'other')).resolves.toEqual({
+      id: 'dir_1',
+      source: 'other'
+    })
+    expect(withDirs.calls.extraSetSource).toEqual([{ id: 'dir_1', source: 'other' }])
+
+    const bare = createDependencies()
+    const bareManager = createRuntimeManager(bare.deps)
+    await bareManager.start(DEFAULTS)
+    await expect(bareManager.setExtraDirectorySource('dir_1', 'spinning_momo')).rejects.toThrow(
       /unavailable/
     )
   })

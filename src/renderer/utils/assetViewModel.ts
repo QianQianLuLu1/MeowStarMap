@@ -6,11 +6,10 @@ import type { MediaFile } from '../stores/mediaStore'
  * NikkiSync Asset → 图库视图模型（阶段 4 · 唯一允许发生「模型转换」的地方）。
  *
  * 为什么必须有一处转换：图库组件消费的 `MediaFile` 有 ~25 个 snake_case 字段
- * （`stores/mediaStore.ts` 的 `MediaFile`），而协议侧的 `AssetSummary` 只有 14 个
- * camelCase 字段，且**不含任何绝对路径**（此句在 b422193 时点由线上载荷本身成立；自上游
- * b397e0e 起 `mapAssetSummary` 会给资产行追加 `sourcePath`/`sourceFolder`，该保证改由
- * 委托层 `runtime-manager.ts` 的 `stripAssetPathFields` 与配套用例维持——vendored 类型
- * 刻意不扩面，故这一层仍然拿不到绝对路径）。主进程侧的 IPC 除该处剔键外是零转换薄转发
+ * （`stores/mediaStore.ts` 的 `MediaFile`），而协议侧的 `AssetSummary` 是 22 个可选/必选
+ * camelCase 字段（b397e0e 起含 `sourcePath`/`sourceFolder` 等 8 个可选键，随载荷原样透出）。
+ * 本视图模型刻意不映射路径等额外字段：图库只消费缩略/显示资源与少量摘要键。主进程侧的 IPC
+ * 是零转换薄转发
  * （`nikkisync-handler.ts` 的铁律），因此映射只能在渲染层做，且只能做在这一处纯函数里
  * ——散进 JSX 会既不可测又与「不改 UI 组件」的约束冲突。
  *

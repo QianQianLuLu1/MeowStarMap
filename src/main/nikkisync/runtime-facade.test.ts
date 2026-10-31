@@ -41,11 +41,27 @@ interface RepoRows {
   minimumJournalRevision: number | undefined
 }
 
+interface FakeAccountsState {
+  revision: number
+  selection: string[] | undefined
+}
+
 /** 造一个只含查询面所需方法的假 Runtime（不碰 node:fs、不建库）。 */
-function createSurface(rows: RepoRows) {
+function createSurface(rows: RepoRows, accountsState: FakeAccountsState | null = { revision: 0 }) {
   const repoCalls: Array<Record<string, unknown>> = []
+  const repoScope: {
+    allowedUids?: () => readonly string[] | undefined
+    sourceGroups?: () => ReadonlyArray<{ key: string; pathPrefixes: readonly string[] }>
+  } = {}
   class FakeSyncReadRepository {
-    constructor(private readonly database: unknown) {}
+    constructor(
+      private readonly database: unknown,
+      allowedUids?: () => readonly string[] | undefined,
+      sourceGroups?: () => ReadonlyArray<{ key: string; pathPrefixes: readonly string[] }>
+    ) {
+      repoScope.allowedUids = allowedUids
+      repoScope.sourceGroups = sourceGroups
+    }
     currentRevision(): number {
       void this.database
       return rows.currentRevision
@@ -124,11 +140,30 @@ function createSurface(rows: RepoRows) {
     clothingSearchIndex,
     profileStatsIndex
   } as unknown as RuntimeSurface
-  const runtime = { database: { fake: true } } as unknown as EmbeddedRuntimeLike
+  const accounts = accountsState
+    ? {
+        state: () => ({ all: accountsState.selection === undefined, accounts: [] }),
+        revision: () => accountsState.revision,
+        selection: () => accountsState.selection,
+        setSelection: (value: string[] | null) => {
+          accountsState.selection = value ?? undefined
+        },
+        preview: () => undefined,
+        sourceGroups: () => [] as Array<{ key: string; pathPrefixes: string[] }>,
+        sourceDirectoriesChanged: () => {}
+      }
+    : undefined
+  const runtime = {
+    database: { fake: true },
+    server: accounts ? { accounts } : {}
+  } as unknown as EmbeddedRuntimeLike
   return {
     surface,
     runtime,
     rows,
+    accounts,
+    accountsState,
+    repoScope,
     searchSuitLibrary,
     searchClothingLibrary,
     buildProfileStats,
@@ -224,6 +259,30 @@ describe('createQuerySurface 批量资源记录', () => {
   })
 })
 
+describe('createQuerySurface 账号作用域接线（1.0.27）', () => {
+  it('正常：把 accounts.selection / sourceGroups 作为三参传给上游 SyncReadRepository', () => {
+    const fixture = createSurface(emptyRows(), { revision: 3, selection: ['10001'] })
+    createQuerySurface(fixture.surface, fixture.runtime)
+    expect(fixture.repoScope.allowedUids?.()).toEqual(['10001'])
+    expect(fixture.repoScope.sourceGroups?.()).toEqual([])
+  })
+
+  it('异常：老链接无 accounts ⇒ 两个作用域回调都不下发（上游回落 1=1）', () => {
+    const fixture = createSurface(emptyRows(), null)
+    createQuerySurface(fixture.surface, fixture.runtime)
+    expect(fixture.repoScope.allowedUids).toBeUndefined()
+    expect(fixture.repoScope.sourceGroups).toBeUndefined()
+  })
+
+  it('边界：账号选择改变后仓储闭包读到最新值（不是构造期快照）', () => {
+    const fixture = createSurface(emptyRows(), { revision: 3, selection: undefined })
+    createQuerySurface(fixture.surface, fixture.runtime)
+    expect(fixture.repoScope.allowedUids?.()).toBeUndefined()
+    fixture.accounts?.setSelection(['20002'])
+    expect(fixture.repoScope.allowedUids?.()).toEqual(['20002'])
+  })
+})
+
 describe('createQuerySurface 增量变更', () => {
   it('未落后于日志保留下界时逐行 mapChangeRow 并带当前 revision', async () => {
     const fixture = createSurface(
@@ -280,6 +339,26 @@ describe('createQuerySurface 增量变更', () => {
     const result = await queries.listChanges(0, 1000)
     expect(result.fullResyncRequired).toBe(false)
     expect(result.changes).toEqual([])
+  })
+
+  it('账号作用域：after < accounts.revision 判全量（上游 b397e0e 新增一支）', async () => {
+    const fixture = createSurface(emptyRows({ minimumJournalRevision: undefined }), {
+      revision: 5,
+      selection: ['10001']
+    })
+    const queries = createQuerySurface(fixture.surface, fixture.runtime)
+    const behind = await queries.listChanges(4, 1000)
+    expect(behind.fullResyncRequired).toBe(true)
+    expect(behind.changes).toEqual([])
+    const aligned = await queries.listChanges(5, 1000)
+    expect(aligned.fullResyncRequired).toBe(false)
+  })
+
+  it('边界：无 accounts 时按 revision 0 处理，不误判全量', async () => {
+    const fixture = createSurface(emptyRows({ minimumJournalRevision: undefined }), null)
+    const queries = createQuerySurface(fixture.surface, fixture.runtime)
+    const result = await queries.listChanges(0, 1000)
+    expect(result.fullResyncRequired).toBe(false)
   })
 })
 
@@ -813,10 +892,22 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
     file: string
     scanner: unknown
     onScopeChanged?: () => Promise<void>
+    onSourcesChanged?: () => void
   }> = []
   const extraDirectoryInstances: unknown[] = []
   const scanDiagnosticCalls: Array<{ scanner: unknown }> = []
   const pairingCalls: Array<{ host: string; ttlMs?: number; hosts?: readonly string[] }> = []
+  const extraDirectoryDirectories: Array<Record<string, unknown>> = []
+  const accountSourceDirectoriesChanged = vi.fn()
+  const accounts = {
+    state: () => ({ all: true, accounts: [] }),
+    revision: () => 0,
+    selection: () => undefined as string[] | undefined,
+    setSelection: () => {},
+    preview: () => undefined,
+    sourceGroups: () => [] as Array<{ key: string; pathPrefixes: string[] }>,
+    sourceDirectoriesChanged: accountSourceDirectoriesChanged
+  }
   const deletions = {
     list: vi.fn((): unknown[] => []),
     decide: vi.fn(async () => ({}) as unknown),
@@ -843,7 +934,8 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
       serverId: 'server_fake',
       start: async () => ({ host: '127.0.0.1', port: 38137, secure: true }),
       stop: async () => {},
-      createPairingPayload: () => ({})
+      createPairingPayload: () => ({}),
+      accounts
     },
     deletions,
     createPairingUri: (host: string, ttlMs?: number, hosts?: readonly string[]) => {
@@ -913,20 +1005,28 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
       : {
           extraScanDirectories: {
             ExtraScanDirectories: class {
+              setSource = vi.fn(async (id: string, source: string) => ({ id, source }))
               constructor(
                 public readonly file: string,
                 public readonly scanner: unknown,
-                public readonly onScopeChanged?: () => Promise<void>
+                public readonly onScopeChanged?: () => Promise<void>,
+                public readonly onSourcesChanged?: () => void
               ) {
                 extraDirectoryCalls.push({
                   file,
                   scanner,
-                  onScopeChanged
+                  onScopeChanged,
+                  onSourcesChanged
                 })
                 extraDirectoryInstances.push(this)
               }
               state(): Record<string, unknown> {
-                return { directories: [], automaticRoots: [], busy: false, message: '' }
+                return {
+                  directories: extraDirectoryDirectories,
+                  automaticRoots: [],
+                  busy: false,
+                  message: ''
+                }
               }
               async inspect(): Promise<Record<string, unknown>> {
                 return { id: 'x', roots: [], images: 0, videos: 0, limited: false, hint: '' }
@@ -949,6 +1049,9 @@ function createCompatibilityFixture(options: { extraDirectoriesSurfaceDisabled?:
     capturedConfig: () => capturedConfig,
     pairingCalls,
     deletions,
+    accounts,
+    accountSourceDirectoriesChanged,
+    extraDirectoryDirectories,
     cachedRunOnce,
     extraDirectoryCalls,
     extraDirectoryInstances,
@@ -1018,6 +1121,56 @@ describe('createRuntimeSession 兼容层注入缝（C5：声明与透传，无�
     const legacy = createSessionFixture()
     const legacySession = await createRuntimeSession(sessionOptions(), legacy.surface)
     expect(legacySession.cachedMetadataRunOnce).toBeUndefined()
+  })
+})
+
+describe('createRuntimeSession 账号作用域注入缝（1.0.27）', () => {
+  const withExtraDirs = () => ({
+    ...sessionOptions(),
+    extraDirectoriesFile: '/tmp/userData/nikkisync/extra-scan-directories.json'
+  })
+
+  it('accounts 与 runtime.server.accounts 同一引用（不另建实例）', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(withExtraDirs(), fixture.surface)
+    expect(session.accounts).toBe(fixture.accounts)
+  })
+
+  it('accountSourceDirectories 晚绑定：构造期冻结函数，运行期读最新目录清单', async () => {
+    const fixture = createCompatibilityFixture()
+    await createRuntimeSession(withExtraDirs(), fixture.surface)
+    const server = fixture.capturedConfig()?.server as Record<string, unknown>
+    const thunk = server.accountSourceDirectories as () => readonly unknown[]
+    expect(thunk).toBeTypeOf('function')
+    expect(thunk()).toEqual([])
+    fixture.extraDirectoryDirectories.push({
+      id: 'dir_1',
+      path: 'D:/Extra/SpinningMomo',
+      mode: 'images',
+      source: 'spinning_momo'
+    })
+    expect(thunk()).toEqual([
+      { id: 'dir_1', path: 'D:/Extra/SpinningMomo', mode: 'images', source: 'spinning_momo' }
+    ])
+  })
+
+  it('第四参接上 accounts.sourceDirectoriesChanged；setSource 逐字透传', async () => {
+    const fixture = createCompatibilityFixture()
+    const session = await createRuntimeSession(withExtraDirs(), fixture.surface)
+    const call = fixture.extraDirectoryCalls[0]
+    expect(call?.onSourcesChanged).toBeTypeOf('function')
+    call?.onSourcesChanged?.()
+    expect(fixture.accountSourceDirectoriesChanged).toHaveBeenCalledTimes(1)
+
+    await session.extraDirectories?.setSource('dir_1', 'other')
+    const instance = fixture.extraDirectoryInstances[0] as { setSource: ReturnType<typeof vi.fn> }
+    expect(instance.setSource).toHaveBeenCalledWith('dir_1', 'other')
+  })
+
+  it('老链接无 accounts：会话不挂 accounts（调用方按 unavailable 降级）', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(sessionOptions(), fixture.surface)
+    expect(session.accounts).toBeUndefined()
   })
 })
 

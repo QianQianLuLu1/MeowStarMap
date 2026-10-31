@@ -126,6 +126,19 @@ beforeAll(() => {
     path.join('game', 'X6Game', 'Saved', 'GamePlayPhotos', UID, 'Videos', 'Photo_2.mp4'),
     mp4
   )
+  // K9：第二个账号（UID 20002），用于验证账号作用域真的按 UID 收窄资产查询
+  writeFixture(
+    path.join(
+      'game',
+      'X6Game',
+      'Saved',
+      'GamePlayPhotos',
+      '20002',
+      'NikkiPhotos_HighQuality',
+      'Photo_3.jpg'
+    ),
+    jpeg
+  )
 })
 
 afterAll(async () => {
@@ -343,7 +356,7 @@ suite('完整生命周期（真上游对象，验证退出链）', () => {
   }, 30000)
 })
 
-suite('N4：委托层不透出资产行的本机绝对路径（真上游载荷 + 真扫描）', () => {
+suite('查询零转换：资产行的本机绝对路径随上游载荷透出（真上游 + 真扫描）', () => {
   it('raw 查询面确实产出两键 ⇒ 反空转取证（上游若停止产出该键，本用例先红）', async () => {
     const queries = session?.queries
     expect(queries).toBeDefined()
@@ -364,7 +377,7 @@ suite('N4：委托层不透出资产行的本机绝对路径（真上游载荷 +
     expect(sourcePath).not.toBe(first.sourceFolder)
   })
 
-  it('manager 面同一条链的响应里既无 sourcePath 也无 sourceFolder', async () => {
+  it('manager 面同一条链的响应里保留 sourcePath 与 sourceFolder', async () => {
     const options: NikkiSyncSessionOptions = {
       databaseFile: path.join(fixtureRoot, 'userDataN4', 'nikkisync.db'),
       gameRoot: path.join(fixtureRoot, 'game'),
@@ -380,13 +393,65 @@ suite('N4：委托层不透出资产行的本机绝对路径（真上游载荷 +
       const scan = (await manager.scan({})) as { filesObserved: number }
       expect(scan.filesObserved).toBeGreaterThanOrEqual(5)
       const page = await manager.listAssets({ limit: 20 })
-      expect((page as { items: unknown[] }).items.length).toBeGreaterThanOrEqual(2)
-      expect(JSON.stringify(page)).not.toContain('sourcePath')
-      expect(JSON.stringify(page)).not.toContain('sourceFolder')
+      const items = (page as { items: Array<Record<string, unknown>> }).items
+      expect(items.length).toBeGreaterThanOrEqual(2)
+      const withPath = items.filter(
+        (item) => typeof item.sourcePath === 'string' && typeof item.sourceFolder === 'string'
+      )
+      expect(withPath.length).toBe(items.length)
+      expect(String(withPath[0]!.sourcePath).startsWith(String(withPath[0]!.sourceFolder))).toBe(
+        true
+      )
     } finally {
       await manager.stop()
     }
   }, 30000)
+})
+
+suite('K9：账号同步作用域（真上游 AccountSyncSettings）', () => {
+  it('默认态全部共享；选择变更后 listAssets 收窄且 listChanges 强制全量重同步', async () => {
+    const accounts = session?.accounts
+    expect(accounts).toBeDefined()
+    const initial = accounts!.state()
+    expect(initial.all).toBe(true)
+    expect(initial.accounts.map((item) => item.uid).sort()).toEqual(['10001', '20002'])
+    expect(initial.accounts.every((item) => item.selected)).toBe(true)
+
+    accounts!.setSelection(['10001'])
+    expect(accounts!.state().all).toBe(false)
+    const page = (await session?.queries.listAssets({ limit: 50 })) as {
+      items: Array<{ uid?: string }>
+    }
+    expect(page.items.length).toBeGreaterThan(0)
+    expect(page.items.every((item) => item.uid === '10001')).toBe(true)
+
+    const changes = (await session?.queries.listChanges(0, 1000)) as {
+      fullResyncRequired: boolean
+    }
+    expect(changes.fullResyncRequired).toBe(true)
+  })
+
+  it('三态：[] 不同步任何账号；null 恢复全部', async () => {
+    const accounts = session!.accounts!
+    accounts.setSelection([])
+    const none = (await session!.queries.listAssets({ limit: 50 })) as { items: unknown[] }
+    expect(none.items).toHaveLength(0)
+
+    accounts.setSelection(null)
+    const all = (await session!.queries.listAssets({ limit: 50 })) as {
+      items: Array<{ uid?: string }>
+    }
+    expect(new Set(all.items.map((item) => item.uid))).toEqual(new Set(['10001', '20002']))
+  })
+
+  it('preview：账号样例按上游优先级返回图片资源行', () => {
+    const accounts = session!.accounts!
+    const sample = accounts.state().accounts.find((item) => item.uid === '10001')?.samples[0]
+    expect(sample).toBeTruthy()
+    const row = accounts.preview(String(sample)) as Record<string, unknown> | undefined
+    expect(row).toBeDefined()
+    expect(String(row?.mime_type)).toMatch(/^image\//)
+  })
 })
 
 suite('同一库文件二次 createRuntimeSession 重开（兼容层 C3-3：老库零迁移升级路径）', () => {
@@ -506,4 +571,69 @@ suite('K3：游戏版本日历深入口的实测边界（真实产物，无出�
       fs.rmSync(k3DatabaseFile, { force: true, maxRetries: 10, retryDelay: 300 })
     }
   })
+})
+
+suite('K9：目录来源标注与旋转吧大喵分组（真上游 ExtraScanDirectories）', () => {
+  it('setSource 触发来源组出现/消失，并在已保存选择时推进 revision', async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nikkisync-k9-source-'))
+    const imagesDir = path.join(root, 'SpinningMomo')
+    const dbFile = path.join(root, 'userData', 'nikkisync.db')
+    fs.mkdirSync(imagesDir, { recursive: true })
+    fs.mkdirSync(path.dirname(dbFile), { recursive: true })
+    fs.writeFileSync(
+      path.join(imagesDir, 'shot.jpg'),
+      Buffer.from([0xff, 0xd8, 0xff, 0xdb, 1, 2, 3, 4, 0xff, 0xd9])
+    )
+    let k9Session: NikkiSyncRuntimeSession | undefined
+    try {
+      k9Session = await createRuntimeSession(
+        {
+          databaseFile: dbFile,
+          gameRoot: path.join(fixtureRoot, 'game'),
+          watcher: false,
+          projectRoot,
+          extraDirectoriesFile: path.join(root, 'extra-scan-directories.json')
+        },
+        await loadRuntimeSurface(projectRoot)
+      )
+      const extra = k9Session.extraDirectories
+      const accounts = k9Session.accounts
+      expect(extra).toBeDefined()
+      expect(accounts).toBeDefined()
+
+      const proposal = (await extra!.inspect(imagesDir, 'spinning_momo')) as { id?: string }
+      expect(proposal.id).toBeTruthy()
+      const addedState = (await extra!.add(String(proposal.id))) as {
+        directories: Array<{ id: string; path: string; source?: string }>
+      }
+      const added = addedState.directories.find((directory) => directory.source === 'spinning_momo')
+      expect(added).toBeDefined()
+
+      const grouped = accounts!.state().accounts.find((item) => item.uid === 'source:spinning_momo')
+      expect(grouped).toBeDefined()
+      expect(grouped!.count).toBeGreaterThanOrEqual(1)
+      expect(accounts!.sourceGroups()).toHaveLength(1)
+
+      accounts!.setSelection(['10001'])
+      const revisionAfterSelection = accounts!.revision()
+      expect(revisionAfterSelection).toBeGreaterThan(0)
+
+      await extra!.setSource(String(added!.id), 'other')
+      expect(accounts!.sourceGroups()).toHaveLength(0)
+      expect(accounts!.revision()).toBeGreaterThan(revisionAfterSelection)
+      const refreshed = (await extra!.state()) as {
+        directories: Array<{ id: string; source?: string }>
+      }
+      expect(refreshed.directories.find((directory) => directory.id === added!.id)?.source).toBe(
+        'other'
+      )
+      expect(accounts!.state().accounts.some((item) => item.uid === 'source:spinning_momo')).toBe(
+        false
+      )
+    } finally {
+      await k9Session?.scanner.stop()
+      k9Session?.dispose()
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }, 30000)
 })

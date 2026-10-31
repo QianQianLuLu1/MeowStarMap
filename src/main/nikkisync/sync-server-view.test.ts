@@ -119,6 +119,20 @@ describe('resolveSyncServerConfig / embeddedServerConfig', () => {
     expect('connectionHosts' in embeddedServerConfig()).toBe(false)
   })
 
+  it('1.0.27：accountSourceDirectories thunk 引用逐字透传（供上游账号作用域识别来源目录）', () => {
+    const accountSourceDirectories = (): readonly unknown[] => []
+    expect(resolveSyncServerConfig({ accountSourceDirectories }).accountSourceDirectories).toBe(
+      accountSourceDirectories
+    )
+    const embedded = embeddedServerConfig({ accountSourceDirectories }) as Record<string, unknown>
+    expect(embedded.accountSourceDirectories).toBe(accountSourceDirectories)
+  })
+
+  it('1.0.27：accountSourceDirectories 缺省时连键都不下发（上游回落 () => []）', () => {
+    expect('accountSourceDirectories' in resolveSyncServerConfig()).toBe(false)
+    expect('accountSourceDirectories' in embeddedServerConfig()).toBe(false)
+  })
+
   it('边界：空白 name 回落默认，异常 name 原样保留（清洗由上游 mDNS 侧负责）', () => {
     expect(resolveSyncServerConfig({ name: '   ' }).name).toBe(SYNC_SERVER_DEFAULT_NAME)
     expect(resolveSyncServerConfig({ name: '  自定义名字  ' }).name).toBe('自定义名字')

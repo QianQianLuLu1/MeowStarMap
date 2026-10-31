@@ -129,6 +129,26 @@ export interface FakeSessionPlan {
     approveManyResult?: unknown
     approveManyError?: string
   }
+  /**
+   * K9：会话面账号作用域假面的编排。缺省 ⇒ 会话无 `accounts`（manager 四个方法抛 unavailable）。
+   * `setSelectionError` 用于验证上游 `invalid_accounts` 原样上抛、由 handler 映射。
+   */
+  accountsPlan?: {
+    state?: {
+      all: boolean
+      accounts: Array<{
+        uid: string
+        count: number
+        selected: boolean
+        samples: string[]
+        label?: string
+      }>
+    }
+    revision?: number
+    selection?: string[]
+    preview?: Record<string, unknown> | undefined
+    setSelectionError?: string
+  }
 }
 
 export interface RuntimeManagerDependencies {
@@ -745,6 +765,45 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return requireExtraDirectories().rescan()
   }
 
+  /** 1.0.27：目录来源标注（上游 setSource；错误 invalid_source/directory_not_found 原样上抛）。 */
+  async function setExtraDirectorySource(
+    id: string,
+    source: 'spinning_momo' | 'other'
+  ): Promise<unknown> {
+    return requireExtraDirectories().setSource(id, source)
+  }
+
+  /**
+   * K9：账号作用域面缺席的拒绝口径（会话未装配 / 老链接无 accounts）。
+   * 错误消息含 unavailable，handler 的 toAppError 归一为 PRECONDITION_FAILED。
+   */
+  function requireAccounts(): import('./runtime-types').AccountSyncSettingsLike {
+    const accounts = requireSession().accounts
+    if (!accounts) {
+      throw new Error('sync account scope is unavailable (session not assembled)')
+    }
+    return accounts
+  }
+
+  /** K9：账号状态（label 由 handler 剔除；sourceGroups 的读路径写由上游承担）。 */
+  async function listSyncAccounts(): Promise<unknown> {
+    return requireAccounts().state()
+  }
+
+  /** K9：账号样例缩略图资源行；资产不存在时抛 not found（handler → NOT_FOUND）。 */
+  async function previewSyncAccount(assetId: string): Promise<unknown> {
+    const row = requireAccounts().preview(assetId)
+    if (!row) throw new Error(`NikkiSync asset not found: ${assetId}`)
+    return row
+  }
+
+  /** K9：保存账号选择（null = 全部；[] = 零；上游去重排序并 bump revision）。 */
+  async function setSyncAccountSelection(uids: string[] | null): Promise<unknown> {
+    const accounts = requireAccounts()
+    accounts.setSelection(uids)
+    return accounts.state()
+  }
+
   /**
    * K8：整理队列面缺席的拒绝口径。上游 `PcCompanionRuntime` 构造期必建 `deletions`
    * （runtime.js:29），缺席仅见于未装配会话/测试假会话——错误消息含 unavailable，
@@ -769,107 +828,6 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       delete rest.message
       return rest
     })
-  }
-
-  /**
-   * 上游 b397e0e 起 `mapAssetSummary` 追加资产行的本机绝对路径两键：`sourcePath` 与由它剥尾段
-   * 得到的 `sourceFolder`（上游自陈仅经鉴权 LAN gallery 共享）。本仓查询面对上游 DTO 是零转换
-   * 透传，两键因此会随 `nikkisync:*` 响应进入渲染层；本仓既有姿态是渲染层拿不到资产行绝对路径
-   * （`src/renderer/utils/assetViewModel.ts` 一直据此写视图），故在委托层裁剪。
-   *
-   * 三条硬约束：
-   * 1. **只返回副本**——`createQuerySurface().searchSource()` 按 revision 缓存资产行，且与
-   *    `profileStats` 共享同一批对象引用，就地 `delete` 会污染缓存并波及统计面。
-   * 2. **必须下钻**——搜索面的资产行嵌在 `items[].photos[].asset`（上游 `SuitSearchIndex` 按引用
-   *    塞入），浅拷一层裁不到；故按形状递归而不是硬编码响应结构。
-   * 3. **成对处理**——上游仅在 `sourcePath` 存在时同时给出两键，二者一起剔、一起不留。
-   *
-   * 按对象形状完全递归，无深度上限——环与共享由下面的 `memo` 收敛，不必靠「超限就停下钻」兜底；
-   * 那样做会让深层子树里的两键原样漏给渲染层（fail-open），破的正是「宁少不漏」。真实载荷最深
-   * 落在 asset 对象 = 深度 5，且上游 DTO 层级有界，同步调用栈可承受；环形引用命中 `memo` 即返回
-   * 在途副本、不再下钻，故不引入栈溢出风险。
-   * path 模式资源通道刻意不走这里：那是 `media://` 授权的唯一出口（见下方委托）。
-   *
-   * `memo` 是「原对象身份 → 已裁好的副本」登记表，副本在递归子节点**之前**登记。这一条同时承担
-   * 三件事，缺一件就漏：
-   * ① 同一对象在一次响应里出现两次——上游每张照片只建一份 `searchable.asset`，再按引用塞进多个
-   *    聚合（`ClothingSearchIndex.js:79` 逐服装循环、`SuitSearchIndex.js:145` 逐套装循环；一张
-   *    照片命中 N 件服装即 N 份引用），第二处必须拿回**已裁键的副本**。早先用 `WeakSet` 记「已
-   *    访问」时命中即 `return value`，第二处退回原件，两键原样漏给渲染层——正是本函数要防的事。
-   * ② 环形引用的回边同样靠这条登记收敛：返回在途副本（该副本已裁过两键）。
-   * ③ 共享子图只裁一次，不再退化成指数级拷贝。
-   * 代价：输出里的引用共享关系与原载荷一致。返回值随即经 `wrapHandler` 序列化出 IPC，而结构化克隆
-   * **保留**共享引用与环（`validator.ts:445-479` 只 `{ success, data }`、不做 JSON.stringify），
-   * 输出图与输入同构 ⇒ 风险不由「展平」承担，只由「无人就地改这棵树」承担（handler 侧被 6 条通道
-   * 的身份 `toBe` 钉成不加工）。数组走「先登记空数组、再按序 push」，否则被共享或成环的数组会整条
-   * 退回原件；`for...of` 不跳稀疏洞，故长度保真（非索引自有属性会丢，属下面的外生形态同类）。
-   * 命中判定用 `!== undefined` 是安全的：登记表只写对象/数组副本或透传身份，永远不写 `undefined`。
-   *
-   * 两条形态边界（2026-10-30 全面审查后收口，判据见 docs/技术债清单.md DEBT-042/043）：
-   * - **非纯对象**（Date/Map/Set/RegExp/类实例）不再被浅拷展开成 `{}`：这类值的可枚举自有属性通常
-   *   为空，展开即静默丢数据。现按原样透传并 `process.emitWarning` 点名（按身份登记 ⇒ 同一值只报
-   *   一次，不刷屏）；告警不走 logger——本模块零 `../utils` 依赖（见文件头职责边界），链接态用例
-   *   直接 import 它。它**自带**两键时仍要裁（泄漏优先于类型保真）：按属性描述符裁、保留原型，
-   *   实例身份与其它自有属性不跟着丢。原型链上的同名键不裁（那要改共享原型），但该分支必然告警
-   *   ⇒ 不静默。
-   * - **访问器刻意求值**：`{...value}` 会把自有可枚举 getter 求值成数据属性。不采纳「用描述符保留
-   *   访问器、只下钻数据属性」的写法，因为出 IPC 时结构化克隆自己会求值这些访问器并把返回值送出，
-   *   本层不求值就等于把未裁键的子树推迟到序列化期——方向是 fail-open，与上一轮消灭掉的
-   *   「超过深度上限就停下钻」同一形状。求值次数也不因此变多：一次求值替代「本层不求值 + 序列化再求值」。
-   * - 下钻用 `Reflect.ownKeys` 而非 `Object.keys`，Symbol 键承载的子对象同样收敛（既有断言一律
-   *   `JSON.stringify`，而它对 Symbol 键不可见 ⇒ 配套用例改用 `Reflect.get` 探针）。
-   */
-  const ASSET_PATH_FIELDS = ['sourcePath', 'sourceFolder'] as const
-
-  /** 纯对象判据：`Object.prototype.toString` 给 `[object Object]` 且原型是 Object.prototype / null */
-  function isPlainObject(value: object): boolean {
-    if (Object.prototype.toString.call(value) !== '[object Object]') return false
-    const proto = Object.getPrototypeOf(value)
-    return proto === Object.prototype || proto === null
-  }
-
-  function stripAssetPathFields(value: unknown, memo = new WeakMap<object, unknown>()): unknown {
-    if (typeof value !== 'object' || value === null) return value
-    const remembered = memo.get(value)
-    if (remembered !== undefined) return remembered
-    if (Array.isArray(value)) {
-      const copy: unknown[] = []
-      memo.set(value, copy)
-      for (const item of value) copy.push(stripAssetPathFields(item, memo))
-      return copy
-    }
-    if (!isPlainObject(value)) {
-      const carriesFields = ASSET_PATH_FIELDS.some((field) =>
-        Object.prototype.hasOwnProperty.call(value, field)
-      )
-      let settled: unknown = value
-      if (carriesFields) {
-        const descriptors = Object.getOwnPropertyDescriptors(value)
-        for (const field of ASSET_PATH_FIELDS) delete descriptors[field]
-        settled = Object.create(Object.getPrototypeOf(value), descriptors)
-      }
-      memo.set(value, settled)
-      // 告警文案刻意用英文：`no-restricted-syntax` 禁止中文字符串字面量（用户可见文案须走 i18n），
-      // 而这条只是开发者诊断、不进 UI；债号引用 ASCII 路径，避免同一规则再被触发
-      process.emitWarning(
-        `stripAssetPathFields: non-plain object in payload ${Object.prototype.toString.call(value)} ` +
-          (carriesFields
-            ? 'carries asset path fields, stripped into a descriptor copy'
-            : 'passed through unchanged') +
-          ' — upstream DTO emits no such value today; see DEBT-042 in docs/debt-registry.json'
-      )
-      return settled
-    }
-    const copy = { ...(value as Record<string, unknown>) }
-    memo.set(value, copy)
-    for (const field of ASSET_PATH_FIELDS) delete copy[field]
-    for (const key of Reflect.ownKeys(copy)) {
-      const child = (copy as Record<PropertyKey, unknown>)[key]
-      if (typeof child === 'object' && child !== null) {
-        ;(copy as Record<PropertyKey, unknown>)[key] = stripAssetPathFields(child, memo)
-      }
-    }
-    return copy
   }
 
   /** K8：队列视图（list 逐行剔除中文 message + activity 计数；纯读无副作用）。 */
@@ -902,24 +860,18 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     start,
     scan,
     stop,
-    // 上游 b397e0e 起资产行带本机绝对路径两键 ⇒ 这三条委托经 stripAssetPathFields 裁剪后透出
-    // （理由与三条硬约束见该函数注释）。刻意放在委托层而不是 handler：那 6 条通道用身份 `toBe`
-    // 钉死「handler 不加工返回值」，且 handlers/ 属核心路径受保护面。
-    listAssets: async (input) =>
-      stripAssetPathFields(await requireSession().queries.listAssets(input)),
+    // 查询面一律零转换薄委托：资产行含上游 b397e0e 起的 sourcePath/sourceFolder 与其余可选键，
+    // 由上游 row-mappers 原样产出。getResource / listResourceRecords 的 mode:'path' 给出绝对路径
+    // 原值——那是 `media://` 授权的唯一出口（registerNikkiSyncResourcePaths 靠它建表）。
+    listAssets: async (input) => requireSession().queries.listAssets(input),
     getAssetDetail: async (assetId) => requireSession().queries.getAssetDetail(assetId),
     getResource: async (assetId, resourceId, mode = 'meta') =>
       requireSession().queries.getResource(assetId, resourceId, mode),
-    // 阶段 4：其余是同一步 `requireSession().queries.*` 的薄委托，不加工返回值。
-    // getResource / listResourceRecords 的 mode:'path' 必须继续给出绝对路径原值——那是
-    // `media://` 授权的唯一出口（registerNikkiSyncResourcePaths 靠它建表），刻意不裁。
     listResourceRecords: async (assetIds, mode = 'meta') =>
       requireSession().queries.listResourceRecords(assetIds, mode),
     listChanges: async (after, limit = 1000) => requireSession().queries.listChanges(after, limit),
-    searchSuits: async (query) =>
-      stripAssetPathFields(await requireSession().queries.searchSuits(query)),
-    searchClothing: async (query) =>
-      stripAssetPathFields(await requireSession().queries.searchClothing(query)),
+    searchSuits: async (query) => requireSession().queries.searchSuits(query),
+    searchClothing: async (query) => requireSession().queries.searchClothing(query),
     profileStats: async () => requireSession().queries.profileStats(),
     syncStatus,
     startSyncServer,
@@ -935,6 +887,10 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     addExtraDirectory,
     removeExtraDirectory,
     rescanExtraDirectories,
+    setExtraDirectorySource,
+    listSyncAccounts,
+    previewSyncAccount,
+    setSyncAccountSelection,
     organizerStatus,
     organizerDecide,
     organizerApproveMany

@@ -429,9 +429,18 @@ export function createQuerySurface(
   runtime: EmbeddedRuntimeLike
 ): NikkiSyncRuntimeSession['queries'] {
   const ReadRepoCtor = nikkisyncExport(surface.database, 'SyncReadRepository') as new (
-    database: unknown
+    database: unknown,
+    allowedUids?: () => readonly string[] | undefined,
+    sourceGroups?: () => ReadonlyArray<{ key: string; pathPrefixes: readonly string[] }>
   ) => SyncReadRepositoryLike
-  const repo = new ReadRepoCtor(runtime.database)
+  // 1.0.27：作用域与上游 LocalSyncServer 共用同一个 AccountSyncSettings 实例
+  // （`runtime.server.accounts` 构造期必建，老链接可能缺席 ⇒ 此时保持无作用域）。
+  const accounts = runtime.server.accounts
+  const repo = new ReadRepoCtor(
+    runtime.database,
+    accounts ? () => accounts.selection() : undefined,
+    accounts ? () => accounts.sourceGroups() : undefined
+  )
   const { mapAssetSummary, mapAssetDetail, mapResourceRow, mapChangeRow } = surface.rowMappers
   const DictionaryCtor = nikkisyncExport(surface.database, 'MetadataDictionaryRepository') as new (
     database: unknown
@@ -544,12 +553,10 @@ export function createQuerySurface(
     async listChanges(after, limit) {
       const libraryRevision = repo.currentRevision()
       const minimum = repo.minimumJournalRevision()
-      // 判据同上游 LocalSyncServer.listChanges 的 b422193 时点形态（基线该行在 :453，原注的 :439 从未对上；
-      // b397e0e 已漂到 :457 并多出 `after < this.accounts.revision()` 一支）。本仓刻意不跟随：本文件 :434 单参构造
-      // SyncReadRepository ⇒ 作用域恒 1=1，不存在 accounts.revision() 取值来源（不构造 AccountSyncSettings）。
-      // 接入账号作用域时须同步补上这一支（届时本仓侧才有 accounts.revision() 取值来源）；当前架构下
-      // 手机 LAN 客户端走上游自带完整判据、渲染层另有「changes 非空」兜底，不跟随该支不会让客户端停在增量游标上。
-      const fullResyncRequired = minimum !== undefined && after < minimum - 1
+      // 判据逐字对齐上游 b397e0e（LocalSyncServer.listChanges:457）：账号选择或来源集合
+      // 变化会让 accounts.revision 前移，落后于它的客户端必须整库重拉；老链接无 accounts ⇒ 0。
+      const fullResyncRequired =
+        after < (accounts?.revision() ?? 0) || (minimum !== undefined && after < minimum - 1)
       const changes = fullResyncRequired
         ? []
         : repo.listChangesAfter(after, limit).map(mapChangeRow)
@@ -605,7 +612,22 @@ export async function createRuntimeSession(
   const RuntimeCtor = nikkisyncExport(surface.pcCompanion, 'PcCompanionRuntime') as new (
     config: Record<string, unknown>
   ) => EmbeddedRuntimeLike
-  const syncServer = embeddedServerConfig(options.syncServer)
+  /**
+   * 1.0.27：额外目录只能在本函数后段（runtime 构造之后）创建，而上游在 LocalSyncServer
+   * 构造期就冻结 `accountSourceDirectories`。故先声明可变绑定、下传读取该绑定的 thunk：
+   * 构造期冻结的是函数引用，运行期每次求值都拿到最新目录清单；赋值前调用回落空数组。
+   */
+  let extraDirectories: import('./runtime-types').ExtraScanDirectoriesLike | undefined
+  const accountSourceDirectories = (): readonly unknown[] => {
+    const state = extraDirectories?.state()
+    if (typeof state !== 'object' || state === null) return []
+    const directories = (state as { directories?: unknown }).directories
+    return Array.isArray(directories) ? directories : []
+  }
+  const syncServer = embeddedServerConfig({
+    ...(options.syncServer ?? {}),
+    accountSourceDirectories
+  })
   /**
    * 阶段 6 · 唯一注入缝。
    *
@@ -707,8 +729,10 @@ export async function createRuntimeSession(
      * 目录清单持久化在上游 0600 JSON（文件即单一真相源，本仓不落设置键）。
      * `onScopeChanged` 先空实现——上游在 add/remove/rescan 后回调它做联动（上游
      * 桌面壳用它刷新页面），本仓渲染层在响应返回后自行刷新，保留缝不吞调用。
+     * `onSourcesChanged`（1.0.27）必须接上：目录来源标注变化后让账号作用域立刻刷新
+     * 来源指纹（对齐上游 windows-app.ts:212），否则只在下次查询时被动发现。
      */
-    const extraDirectories: import('./runtime-types').ExtraScanDirectoriesLike | undefined =
+    extraDirectories =
       options.extraDirectoriesFile && surface.extraScanDirectories
         ? new (
             nikkisyncExport(
@@ -717,9 +741,15 @@ export async function createRuntimeSession(
             ) as new (
               file: string,
               scanner: unknown,
-              onScopeChanged?: () => Promise<void>
+              onScopeChanged?: () => Promise<void>,
+              onSourcesChanged?: () => void
             ) => import('./runtime-types').ExtraScanDirectoriesLike
-          )(options.extraDirectoriesFile, runtime.scanner, async () => {})
+          )(
+            options.extraDirectoriesFile,
+            runtime.scanner,
+            async () => {},
+            () => runtime.server.accounts?.sourceDirectoriesChanged()
+          )
         : undefined
 
     return {
@@ -741,6 +771,8 @@ export async function createRuntimeSession(
             : runtime.createPairingUri(host),
       // 兼容层（b422193）：上游构造期必建的整理队列，同一引用透传（动作面归 K8）
       deletions: runtime.deletions,
+      // 1.0.27：账号作用域实例（与 LocalSyncServer 内部及查询面共用同一对象）
+      ...(runtime.server.accounts ? { accounts: runtime.server.accounts } : {}),
       listPairedDevices: () =>
         (runtime.database.connection.prepare(PAIRED_DEVICES_SQL).all() as unknown[])
           .map(mapPairedDeviceRow)

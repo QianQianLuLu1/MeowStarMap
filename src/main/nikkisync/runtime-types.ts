@@ -169,10 +169,42 @@ export interface DeletionQueueLike {
  */
 export interface ExtraScanDirectoriesLike {
   state(): unknown
-  inspect(selected: string): Promise<unknown>
+  /** `source` 取值域是 `'spinning_momo'`（上游 inspect 只接受这一值；`'other'` 只供 setSource）。 */
+  inspect(selected: string, source?: 'spinning_momo'): Promise<unknown>
   add(id: string): Promise<unknown>
   remove(id: string): Promise<unknown>
   rescan(): Promise<unknown>
+  /** 上游 `setSource`：目录必须存在且 mode === 'images'，否则抛 directory_not_found / invalid_source。 */
+  setSource(id: string, source: 'spinning_momo' | 'other'): Promise<unknown>
+}
+
+/**
+ * 1.0.27：上游 `server/AccountSyncSettings.ts` 的本仓最小面（`runtime.server.accounts`
+ * 同一实例，不另建）。选择持久化在上游 `app_settings['sync_account_selection']`，
+ * 本仓不落设置键。
+ *
+ * 三态语义：`selection() === undefined`（从未保存）与显式 `null` 都是“全部”，
+ * `[]` 是“一个都不同步”。`state()`/作用域查询会经 `sourceGroups()` 在来源指纹变化时
+ * 写 `app_settings` 与 `change_journal`（上游读路径写操作，本仓不缓存）。
+ */
+export interface AccountSyncSettingsLike {
+  state(): {
+    all: boolean
+    accounts: Array<{
+      uid: string
+      count: number
+      selected: boolean
+      samples: string[]
+      /** 上游中文标签；handler 层剔除以避免中文串透传。 */
+      label?: string
+    }>
+  }
+  revision(): number
+  selection(): string[] | undefined
+  setSelection(value: string[] | null): void
+  preview(assetId: string): Record<string, unknown> | undefined
+  sourceGroups(): Array<{ key: string; pathPrefixes: string[] }>
+  sourceDirectoriesChanged(): void
 }
 
 /** `PcCompanionRuntime` 中被本阶段用到的最小面。 */
@@ -228,6 +260,12 @@ export interface NikkiSyncSyncServerConfig {
    * 构造期冻结、缺省时连键都不下发（响应不含 `connectionHosts`）；K5 接线。
    */
   connectionHosts?: () => string[]
+  /**
+   * 1.0.27：账号作用域用来识别“旋转吧大喵”目录的 thunk（每次取当前额外目录清单）。
+   * 构造期冻结函数引用、运行期求值；缺省时上游 `AccountSyncSettings` 回落 `() => []`
+   * （永不出来源组，行为与 1.0.26 等价）。
+   */
+  accountSourceDirectories?: () => readonly unknown[]
 }
 
 /** 上游 `LocalSyncServerAddress`（`start()` 回显的**实际**绑定地址）。 */
@@ -244,6 +282,8 @@ export interface NikkiSyncSyncServerAddress {
  */
 export interface LocalSyncServerLike {
   readonly serverId: string
+  /** 1.0.27：上游构造期必建的账号作用域实例（老链接可能缺席 ⇒ 调用方按不可用降级）。 */
+  readonly accounts?: AccountSyncSettingsLike
   /** 幂等：已在监听时直接回显原地址（`LocalSyncServer.ts:175`）。 */
   start(): Promise<NikkiSyncSyncServerAddress>
   /** 置空内部句柄 ⇒ 可再次 `start()`（`LocalSyncServer.ts:193-201`）。 */
@@ -332,9 +372,8 @@ export interface NikkiSyncQuerySurface {
   listResourceRecords(assetIds: string[], mode: 'meta' | 'path'): Promise<unknown>
   /**
    * 阶段 4：增量变更。响应与上游 `GET /v1/changes` 同形
-   * （`{ changes, libraryRevision, fullResyncRequired }`）；判据同上游 **b422193 时点**形态，
-   * b397e0e 起上游多一支 `after < accounts.revision()`，本仓不走账号作用域 ⇒ 刻意不跟随
-   * （理由见 `runtime-facade.ts` 的 `listChanges` 注释）。
+   * （`{ changes, libraryRevision, fullResyncRequired }`）；判据逐字对齐上游 b397e0e：
+   * `after < accounts.revision() || (minimum !== undefined && after < minimum - 1)`。
    */
   listChanges(after: number, limit: number): Promise<unknown>
   /** 阶段 4：套装搜索，转发上游 `searchSuitLibrary`。 */
@@ -364,6 +403,8 @@ export interface NikkiSyncRuntimeSession {
   pairingUri(host: string, ttlMs?: number, hosts?: readonly string[]): string
   /** 兼容层（b422193）：上游构造期必建的整理队列（同一引用透传，动作面归 K8）。 */
   deletions: DeletionQueueLike
+  /** 1.0.27：账号作用域实例（`runtime.server.accounts` 同一引用；老链接缺席）。 */
+  accounts?: AccountSyncSettingsLike
   /** 已配对（未撤销）设备列表。 */
   listPairedDevices(): NikkiSyncPairedDeviceView[]
   /** 走上游 `PairingRepository.revoke`；设备不存在或已撤销返回 false。 */
@@ -467,7 +508,7 @@ export interface NikkiSyncRuntimeHandle {
   scan(input: { gameRoot?: string; path?: string }): Promise<unknown>
   /** 优雅停止：scanner.stop() → database.close()，幂等。 */
   stop(): Promise<void>
-  /** `{items,nextCursor?,libraryRevision}`；资产行的 `sourcePath`/`sourceFolder` 由委托层剔除。 */
+  /** `{items,nextCursor?,libraryRevision}`；资产行（含 `sourcePath`/`sourceFolder`）与上游 DTO 同形透出。 */
   listAssets(input: {
     limit: number
     cursor?: string
@@ -479,14 +520,14 @@ export interface NikkiSyncRuntimeHandle {
   getResource(assetId: string, resourceId: string, mode?: 'meta' | 'path'): Promise<unknown>
   /**
    * 阶段 4：批量资源记录（`queries.listResourceRecords` 的薄委托）。
-   * `mode:'path'` 按设计继续给出绝对路径原值（`media://` 授权的唯一出口），不经路径键裁剪。
+   * `mode:'path'` 按设计给出绝对路径原值（`media://` 授权的唯一出口）。
    */
   listResourceRecords(assetIds: string[], mode?: 'meta' | 'path'): Promise<unknown>
   /** 阶段 4：增量变更（`queries.listChanges` 的薄委托）。 */
   listChanges(after: number, limit?: number): Promise<unknown>
-  /** 阶段 4：套装搜索（委托 + 路径键裁剪：嵌套 `items[].photos[].asset` 同样剔两键）。 */
+  /** 阶段 4：套装搜索（零转换委托；嵌套 `items[].photos[].asset` 同样原样透出）。 */
   searchSuits(query: string): Promise<unknown>
-  /** 阶段 4：服装搜索（委托 + 路径键裁剪，同上）。 */
+  /** 阶段 4：服装搜索（零转换委托，同上）。 */
   searchClothing(query: string): Promise<unknown>
   /** 阶段 4：档案统计。 */
   profileStats(): Promise<unknown>
@@ -521,13 +562,24 @@ export interface NikkiSyncRuntimeHandle {
   /** K6：目录状态（directories/automaticRoots/busy/scannerStatus；中文 message 由 handler 剔除）。 */
   extraDirectoriesState(): unknown
   /** K6：预检目录（提案 id/roots/images/videos/limited；中文 hint 由 handler 剔除）。 */
-  inspectExtraDirectory(path: string): Promise<unknown>
+  inspectExtraDirectory(path: string, source?: 'spinning_momo'): Promise<unknown>
   /** K6：按预检 id 加入目录清单（触发上游重扫）。 */
   addExtraDirectory(id: string): Promise<unknown>
   /** K6：按目录 id 移除（触发上游重扫）。 */
   removeExtraDirectory(id: string): Promise<unknown>
   /** K6：手动重扫全部目录。 */
   rescanExtraDirectories(): Promise<unknown>
+  /** 1.0.27：标注目录来源（spinning_momo / other）；成功后触发账号来源组刷新。 */
+  setExtraDirectorySource(id: string, source: 'spinning_momo' | 'other'): Promise<unknown>
+  /** 1.0.27：账号作用域状态（label 由 handler 剔除，渲染层按 uid + i18n 出文案）。 */
+  listSyncAccounts(): Promise<unknown>
+  /**
+   * 1.0.27：账号样例缩略图（上游 `preview` 选出的图片资源行；不存在时 NOT_FOUND）。
+   * handler 只投影 `{ resourceId, mimeType, sourcePath }` 三键。
+   */
+  previewSyncAccount(assetId: string): Promise<unknown>
+  /** 1.0.27：保存账号选择（null = 全部；[] = 不同步任何账号；返回更新后的状态）。 */
+  setSyncAccountSelection(uids: string[] | null): Promise<unknown>
   /** K8：队列视图（list 逐行剔除上游中文 message 后透传 + activity 计数；纯读无副作用）。 */
   organizerStatus(): { items: unknown[]; activity: unknown }
   /**

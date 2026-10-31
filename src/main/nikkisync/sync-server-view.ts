@@ -91,7 +91,11 @@ export function resolveSyncServerConfig(
     mdns: input?.mdns ?? SYNC_SERVER_DEFAULT_MDNS,
     journalPollMs: normalizeJournalPollMs(input?.journalPollMs),
     // 兼容层（b422193）：函数引用原样保留（上游构造期调用取值）；缺省时键不存在
-    ...(input?.connectionHosts ? { connectionHosts: input.connectionHosts } : {})
+    ...(input?.connectionHosts ? { connectionHosts: input.connectionHosts } : {}),
+    // 1.0.27：账号来源目录 thunk 同理原样保留（缺省不发键 ⇒ 上游回落 () => []）
+    ...(input?.accountSourceDirectories
+      ? { accountSourceDirectories: input.accountSourceDirectories }
+      : {})
   }
 }
 
@@ -112,7 +116,11 @@ export function embeddedServerConfig(
     mdns: config.mdns,
     journalPollMs: config.journalPollMs,
     // 兼容层（b422193）：备选地址回调透传（缺省时连键都不下发，与上游可选语义一致）
-    ...(config.connectionHosts ? { connectionHosts: config.connectionHosts } : {})
+    ...(config.connectionHosts ? { connectionHosts: config.connectionHosts } : {}),
+    // 1.0.27：账号来源目录 thunk 透传（同上）
+    ...(config.accountSourceDirectories
+      ? { accountSourceDirectories: config.accountSourceDirectories }
+      : {})
   }
 }
 
