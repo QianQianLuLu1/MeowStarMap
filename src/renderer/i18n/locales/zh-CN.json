@@ -4481,7 +4481,28 @@
       "unmarkSpinning": "取消旋转吧大喵标记",
       "sourceSpinning": "旋转吧大喵",
       "sourceOther": "其他来源",
-      "sourceUpdated": "目录来源已更新"
+      "sourceUpdated": "目录来源已更新",
+      "typedPlaceholder": "或手动输入目录路径",
+      "inspectTyped": "预检并添加"
+    },
+    "photoDirectories": {
+      "title": "照片目录",
+      "description": "自定义同步图库的照片来源根目录；留空时自动发现游戏安装根。修改需重启应用生效。",
+      "currentLabel": "当前照片目录",
+      "defaultValue": "默认（自动发现游戏目录）",
+      "inputPlaceholder": "输入或浏览选择本地目录",
+      "browse": "浏览…",
+      "save": "保存",
+      "reset": "恢复默认",
+      "saved": "照片目录已保存，重启后生效",
+      "notWritable": "目录不可写：扫描读取不受影响，但无法向该目录写入",
+      "resetDone": "已恢复默认照片目录，重启后生效",
+      "restartTitle": "重启应用",
+      "restartMessage": "照片目录将在下次启动时生效，是否立即重启？",
+      "restartNow": "立即重启",
+      "restartLater": "稍后重启",
+      "invalidEmpty": "请先输入或选择目录路径",
+      "invalidAbsolute": "请输入绝对路径（如 D:\\Photos）"
     },
     "syncAccounts": {
       "title": "同步账号",

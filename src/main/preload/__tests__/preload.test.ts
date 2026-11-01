@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('nikkisync 命名空间方法清单（K9 账号作用域接入后共 32 个）', () => {
+  it('nikkisync 命名空间方法清单（照片目录自定义接入后共 36 个）', () => {
     // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
     // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
     const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
@@ -102,6 +102,11 @@ describe('preload 装配完整性', () => {
         'removeExtraDirectory',
         'setExtraDirectorySource',
         'rescanExtraDirectories',
+        // 照片目录自定义（gameRoot 替代默认路径；admit 供 K6 手输路径预检）
+        'getGameRoot',
+        'setGameRoot',
+        'resetGameRoot',
+        'admitDirectory',
         // K9：账号同步作用域（1.0.27 上游 AccountSyncSettings）
         'getSyncAccounts',
         'previewSyncAccount',

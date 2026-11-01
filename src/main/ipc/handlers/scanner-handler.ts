@@ -1,5 +1,7 @@
-// @core-change: 扫描根短路判据由 isUserPicked 改为 isUserPickedDir（本批 dialog:openFile
-// 开始登记单个文件，文件不得冒充「用户显式授权的扫描目录」绕过白名单校验）
+// @core-change: 照片目录手输预检收窄配套订正——在本文件扫描根短路的判据注释里指名
+//               `nikkisync:admit-directory` 只登记同步域专用集合（registerSyncPhotoDir）、
+//               不写 userPickedDirs，故 isUserPickedDir 仍是「真实对话框才写得进」的集合。
+//               （历史：扫描根判据由 isUserPicked 改为 isUserPickedDir——见该节点提交。）
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import path from 'path'
@@ -73,6 +75,8 @@ function assertScanPathsAllowed(options?: { path?: string; customKnownPaths?: st
   // 修复敏感目录黑名单误拦显式选择的系统目录（如装在 X:\Program Files 的游戏根）；
   // 渲染进程伪造的路径（未经对话框，无任何 IPC 可写入标记集合）不命中，
   // 仍走 assertFileReadPath 完整白名单 + 黑名单校验，防自助提权链不放宽。
+  // （同步库 K6 的手输照片目录不走这里：`nikkisync:admit-directory` 只登记同步域专用集合
+  // `registerSyncPhotoDir`，唯一消费方是 `nikkisync:inspect-extra-directory`，故本短路不变。）
   // 判据必须是「目录」集合而非 userPicked：本批起 dialog:openFile 也会登记挑中的
   // 单个文件（图片水印 logo），文件形态的授权不能拿来冒充扫描根。
   if (options?.path && !pathGuard.isUserPickedDir(options.path)) assertFileReadPath(options.path)

@@ -64,5 +64,7 @@ export const SECURITY_SENSITIVE_KEYS = {
   logDir: 'log:setDir',
   crashDir: 'crash:setDir',
   'export.defaultDir': 'export:setDefaultDir',
-  'export.namingPattern': 'export:setNamingPattern'
+  'export.namingPattern': 'export:setNamingPattern',
+  // 同步图库照片根目录（空 = 上游自动发现）；读取端 buildSessionOptions，写入只走专用通道
+  'nikkisync.gameRoot': 'nikkisync:set-game-root'
 } as const

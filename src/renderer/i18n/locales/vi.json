@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "Bỏ đánh dấu SpinningMomo",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "Nguồn khác",
-      "sourceUpdated": "Đã cập nhật nguồn thư mục"
+      "sourceUpdated": "Đã cập nhật nguồn thư mục",
+      "typedPlaceholder": "Hoặc nhập thủ công đường dẫn thư mục",
+      "inspectTyped": "Kiểm tra và thêm"
     },
     "syncAccounts": {
       "title": "Tài khoản đồng bộ",
@@ -4532,6 +4534,25 @@
       "confirmBody": "Sẽ chuyển {{count}} tệp vào Thùng rác của Windows (có thể khôi phục từ Thùng rác). Tiếp tục?",
       "confirmAction": "Chuyển vào thùng rác",
       "cancel": "Hủy"
+    },
+    "photoDirectories": {
+      "title": "Thư mục ảnh",
+      "description": "Tùy chỉnh thư mục gốc nguồn ảnh của thư viện đồng bộ; để trống sẽ tự động tìm thư mục cài đặt game. Thay đổi có hiệu lực sau khi khởi động lại.",
+      "currentLabel": "Thư mục ảnh hiện tại",
+      "defaultValue": "Mặc định (tự động tìm thư mục game)",
+      "inputPlaceholder": "Nhập hoặc duyệt chọn thư mục cục bộ",
+      "browse": "Duyệt…",
+      "save": "Lưu",
+      "reset": "Khôi phục mặc định",
+      "saved": "Đã lưu thư mục ảnh, có hiệu lực sau khi khởi động lại",
+      "notWritable": "Thư mục không ghi được: quét và đọc không bị ảnh hưởng, nhưng không thể ghi vào đó",
+      "resetDone": "Đã khôi phục thư mục ảnh về mặc định, có hiệu lực sau khi khởi động lại",
+      "restartTitle": "Khởi động lại ứng dụng",
+      "restartMessage": "Thư mục ảnh sẽ có hiệu lực ở lần khởi động tiếp theo. Khởi động lại ngay bây giờ?",
+      "restartNow": "Khởi động lại ngay",
+      "restartLater": "Để sau",
+      "invalidEmpty": "Vui lòng nhập hoặc chọn đường dẫn thư mục trước",
+      "invalidAbsolute": "Vui lòng nhập đường dẫn tuyệt đối (ví dụ: D:\\Photos)"
     }
   },
   "shareCard": {

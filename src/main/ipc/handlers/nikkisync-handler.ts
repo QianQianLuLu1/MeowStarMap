@@ -1,12 +1,15 @@
-// @core-change: 账号作用域收口——add/remove-extra-directory 成功后补推 nikkisync:library-changed
-//               （目录增删与来源标注同属作用域变更，本地图库须按 fullResyncRequired 重取）。
-//               （历史：K9 四通道接入与 set-extra-directory-source 补推——历次授权原因见各节点提交。）
+// @core-change: 照片目录自定义——新增 game-root 三通道（get/set/reset，持久化 nikkisync.gameRoot）
+//               与 admit-directory 目录预检通道（校验全过后只登记同步域专用集合 syncPhotoDirs，
+//               不写全局 user-picked 集合——入参来自渲染层，写全局即构成免手势的整盘短路授权）。
+//               （历史：K9 四通道接入与 library-changed 补推、K6/K2/K3/K8 历次接入——见各节点提交。）
+import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
 import { assertFileReadPath, pathGuard, wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
+import { isSensitivePath } from '../../utils/ipc-validate'
 import { AppError } from '../../../shared/errors/app-error'
 import { isAssetType } from '../../../shared/sync/protocol'
 import type {
@@ -153,6 +156,26 @@ const directorySourceSchema = z.object({
   id: directoryIdSchema,
   source: z.enum(['spinning_momo', 'other'])
 })
+
+/** 绝对路径字符串（Windows 盘符 / UNC / POSIX 根起始），max 为长度上界。 */
+const absolutePath = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(1)
+    .max(max)
+    .refine((value) => /^([A-Za-z]:[\\/]|\\\\|\/)/.test(value), {
+      message: 'path must be absolute'
+    })
+
+/**
+ * 照片根目录写入入参。长度上界与 `scanSchema.gameRoot` 同界（512）——两处最终都把
+ * 该串交给上游 ScannerService，界必须一致；绝对路径要求与 inspectDirectorySchema 同款。
+ */
+const gameRootSetSchema = z.object({ path: absolutePath(512) })
+
+/** K6 手输预检入参：与 inspectDirectorySchema 同界（4096），通过后登记 pathGuard 交回 inspect。 */
+const admitDirectorySchema = z.object({ path: absolutePath(4096) })
 
 /** K9：账号样例缩略图入参（资产 id 界与查询面一致）。 */
 const accountPreviewSchema = z.object({ assetId: assetIdSchema })
@@ -359,6 +382,47 @@ function consentErrorToAppError(error: unknown): AppError {
     )
   }
   return toAppError(error, 'metadata-consent')
+}
+
+/**
+ * 照片根目录设置键。读取端在 `app/nikkisync-runtime-setup.ts` 的 `buildSessionOptions`
+ * （`SETTING_GAME_ROOT` 同名字符串）：空串 = 交给上游 game-directory-discovery（默认路径）。
+ * 仿 organizerEnabled 的直读写先例——handler 层不 import app/ 常量，以注释交叉引用锁定同名。
+ */
+const SETTING_GAME_ROOT_KEY = 'nikkisync.gameRoot'
+
+/**
+ * 照片目录自定义通道（set-game-root / admit-directory）共用的目录校验：
+ * 绝对路径形态已由 zod schema 先行，这里做「敏感目录黑名单 → 存在 + 目录 → 可读（R_OK 必过）」，
+ * 并 fail-open 探测可写（返回 writable 布尔，只提示不阻断——照片源目录扫描只读，
+ * Program Files 等不可写位置本身合法，系统敏感目录则一律拒绝）。
+ */
+async function validatePhotoSourceDirectory(dir: string): Promise<{ writable: boolean }> {
+  if (isSensitivePath(dir)) {
+    throw AppError.forbidden(`refusing to use a system sensitive directory as photo source: ${dir}`)
+  }
+  let stat: fs.Stats
+  try {
+    stat = await fs.promises.stat(dir)
+  } catch {
+    throw AppError.validation(`photo source directory does not exist: ${dir}`)
+  }
+  if (!stat.isDirectory()) {
+    throw AppError.validation(`photo source path is not a directory: ${dir}`)
+  }
+  try {
+    await fs.promises.access(dir, fs.constants.R_OK)
+  } catch {
+    throw AppError.forbidden(`photo source directory is not readable: ${dir}`)
+  }
+  let writable = true
+  try {
+    await fs.promises.access(dir, fs.constants.W_OK)
+  } catch {
+    // 可写探测 fail-open：EACCES/EROFS/其他异常都只归为「不可写」，绝不阻断保存
+    writable = false
+  }
+  return { writable }
 }
 
 /** 统一「校验 + 调用 + 错误分类」的查询包装（避免五个 handler 各写一遍 try/catch）。 */
@@ -688,12 +752,14 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         'inspect-extra-directory',
         async (input) => {
           // 白名单守卫，放在 zod 之后：形态错误仍先由 inspectDirectorySchema 判 VALIDATION。
-          // 目录选择器（dialog:selectDirectory）返回的路径已由 dialog-handler 登记进
-          // userPickedDirs，直接短路；未登记的伪造绝对路径交 assertFileReadPath ⇒
-          // PermissionError → IPC_PATH_FORBIDDEN，不会把一个渲染层字符串原样递给上游去枚举
-          // 真实文件系统（提案随后可被 add 提升为长期扫描根，内容再经 media:// 可读）。
-          // 判据与 scanner-handler / settings-handler 的扫描根短路逐字一致。
-          if (!pathGuard.isUserPickedDir(input.path)) assertFileReadPath(input.path)
+          // 两类合法来源：① 目录选择器（dialog:selectDirectory）返回的路径已由 dialog-handler
+          // 登记进 userPickedDirs；② 渲染层手输、已过 admit-directory 校验+登记的同步域集合
+          // （isSyncPhotoDir，只在本通道被消费，不影响 scanner/settings/media 的短路判据）。
+          // 两者都不命中的伪造绝对路径交 assertFileReadPath ⇒ PermissionError →
+          // IPC_PATH_FORBIDDEN，不会把一个渲染层字符串原样递给上游去枚举真实文件系统
+          // （提案随后可被 add 提升为长期扫描根，内容再经 media:// 可读）。
+          if (!pathGuard.isUserPickedDir(input.path) && !pathGuard.isSyncPhotoDir(input.path))
+            assertFileReadPath(input.path)
           try {
             return stripExtraDirectoryProposal(
               await runtime.inspectExtraDirectory(input.path, input.source)
@@ -785,6 +851,57 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         throw extraDirectoryErrorToAppError(error)
       }
     })
+  )
+
+  // ---- 照片目录自定义（game-root 三通道 + K6 手输预检）----
+  // 与 K6 的分工：gameRoot 替代上游自动发现的游戏安装根（单值、重启后由
+  // buildSessionOptions 读设置键生效——运行期换根须整会话重建，故这里只持久化）；
+  // admit 不落库，只做校验 + 同步域登记，让手输路径能过既有 inspect 门禁。登记刻意不进
+  // userPickedDirs：那条路是「对话框显式选中」专属，而本通道入参来自渲染层，写进全局集合
+  // 就顺带给了 scanner:start / settings:set / media:// 免检（前缀命中 ⇒ 一次调用整盘放行）。
+  // 四通道都不 requireRuntime：未启用 Runtime 时配置仍可先行落库。
+
+  ipcMain.handle(
+    'nikkisync:get-game-root',
+    wrapHandlerNoArgs(ctx, () => {
+      const value = ctx.dbManager.getSetting<string>(SETTING_GAME_ROOT_KEY, '')
+      // 历史脏值（早期版本可能写入非字符串）按读取端口同口径回退空串
+      return { gameRoot: typeof value === 'string' ? value : '' }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:set-game-root',
+    wrapHandlerRaw(ctx, async (args) =>
+      parseAndRun(gameRootSetSchema, args[0] ?? {}, 'set-game-root', async (input) => {
+        const { writable } = await validatePhotoSourceDirectory(input.path)
+        ctx.dbManager.setSetting(SETTING_GAME_ROOT_KEY, input.path)
+        return { gameRoot: input.path, needRestart: true, writable }
+      })
+    )
+  )
+
+  ipcMain.handle(
+    'nikkisync:reset-game-root',
+    wrapHandlerNoArgs(ctx, () => {
+      ctx.dbManager.setSetting(SETTING_GAME_ROOT_KEY, '')
+      return { needRestart: true }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:admit-directory',
+    wrapHandlerRaw(ctx, async (args) =>
+      parseAndRun(admitDirectorySchema, args[0] ?? {}, 'admit-directory', async (input) => {
+        await validatePhotoSourceDirectory(input.path)
+        // 校验全过才登记，且只进**同步域专用集合**（不是 userPickedDirs）：入参来自渲染层、
+        // 无对话框手势，若写全局集合则 `matchesPicked` 的前缀语义会让一次 admit 变成
+        // 整棵子树对 scanner:start / settings:set / media:// 免检。登记后渲染层走
+        // inspect-extra-directory 时由 isSyncPhotoDir 短路放行，授权面止于同步库预检本身。
+        pathGuard.registerSyncPhotoDir(input.path)
+        return { path: input.path }
+      })
+    )
   )
 
   // ---- K9：账号同步作用域（上游 AccountSyncSettings —— 1.0.27 新增线上同步范围）----

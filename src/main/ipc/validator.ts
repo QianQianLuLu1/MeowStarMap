@@ -184,6 +184,16 @@ class PathGuard {
    * 「用户显式授权的扫描根」，拿挑中的单个文件冒充目录会绕过路径校验。
    */
   private userPickedDirs = new Set<string>()
+  /**
+   * 同步域专用的「待预检照片目录」集合：只由 `nikkisync:admit-directory`（K6 手输路径预检）
+   * 在校验全过后写入，且**只**被 `nikkisync:inspect-extra-directory` 消费。
+   * 与 userPickedDirs 的区别是刻意的：本集合不调 `register()`（不进全局读白名单 roots）、
+   * 不进 userPicked/userPickedDirs，因此**不构成** `scanner:start` / `settings:set`
+   * (customScanPaths) / `assertMediaAccessPath` / `media://` 规则 0 的短路。
+   * 理由：admit 的入参是渲染层任意传入的串而非对话框返回值，而 `matchesPicked` 按前缀命中，
+   * 一旦写进全局集合，一次 `admit(D:\)` 就等于免手势授予整盘免检授权。
+   */
+  private syncPhotoDirs = new Set<string>()
   private userHome = ''
   private userDataDir = ''
 
@@ -236,6 +246,8 @@ class PathGuard {
    * assertMediaAccessPath）对命中路径短路放行，避免敏感目录黑名单误拦用户显式选择的
    * 系统目录（如装在 X:\Program Files 的游戏根）。渲染进程无任何 IPC 可写入该集合。
    * asDir=true 时另记入 userPickedDirs，供 scanner:start / settings:set 的「目录」短路。
+   * （K6 手输路径的预检**不**走这里：它拿的是渲染层传入的串、没有对话框手势，
+   * 故只进 `registerSyncPhotoDir` 的同步域集合，见其注释。）
    */
   private addUserPicked(p: string, asDir: boolean): void {
     this.register(p)
@@ -284,6 +296,20 @@ class PathGuard {
   /** 同上，但只认「显式选择的目录」——供 scanner:start / settings:set 这类扫描根短路使用 */
   isUserPickedDir(p: string): boolean {
     return this.matchesPicked(this.userPickedDirs, p)
+  }
+
+  /**
+   * 登记「同步域预检通过」的照片目录（`nikkisync:admit-directory`）。
+   * 刻意**不**走 `addUserPicked`：那里会 `register()` 进全局 roots 并记入 userPicked 系，
+   * 而 admit 的入参来自渲染层，不具备「用户在对话框显式选中」这一授权前提。
+   */
+  registerSyncPhotoDir(p: string): void {
+    this.markPicked(this.syncPhotoDirs, p)
+  }
+
+  /** 判路径是否落在同步域预检目录内——唯一消费方是 `nikkisync:inspect-extra-directory` */
+  isSyncPhotoDir(p: string): boolean {
+    return this.matchesPicked(this.syncPhotoDirs, p)
   }
 
   private matchesPicked(set: Set<string>, p: string): boolean {

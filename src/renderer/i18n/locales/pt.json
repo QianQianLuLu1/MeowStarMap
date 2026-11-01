@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "Remover marcação SpinningMomo",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "Outra origem",
-      "sourceUpdated": "Origem da pasta atualizada"
+      "sourceUpdated": "Origem da pasta atualizada",
+      "typedPlaceholder": "Ou digite manualmente um caminho de diretório",
+      "inspectTyped": "Inspecionar e adicionar"
     },
     "syncAccounts": {
       "title": "Contas sincronizadas",
@@ -4532,6 +4534,25 @@
       "confirmBody": "Mover {{count}} arquivos para a Lixeira do Windows (recuperáveis na Lixeira)? Continuar?",
       "confirmAction": "Mover para a lixeira",
       "cancel": "Cancelar"
+    },
+    "photoDirectories": {
+      "title": "Diretórios de fotos",
+      "description": "Personalize a pasta raiz de origem das fotos da galeria sincronizada; deixe vazio para detectar automaticamente a pasta de instalação do jogo. As alterações entram em vigor após a reinicialização.",
+      "currentLabel": "Diretório de fotos atual",
+      "defaultValue": "Padrão (detectar automaticamente a pasta do jogo)",
+      "inputPlaceholder": "Digite ou navegue para escolher um diretório local",
+      "browse": "Procurar…",
+      "save": "Salvar",
+      "reset": "Restaurar padrão",
+      "saved": "Diretório de fotos salvo. Entrará em vigor após a reinicialização.",
+      "notWritable": "O diretório não é gravável: a leitura e a varredura não são afetadas, mas não é possível gravar nele",
+      "resetDone": "Diretório de fotos restaurado ao padrão. Entrará em vigor após a reinicialização.",
+      "restartTitle": "Reiniciar o aplicativo",
+      "restartMessage": "O diretório de fotos entrará em vigor na próxima inicialização. Reiniciar agora?",
+      "restartNow": "Reiniciar agora",
+      "restartLater": "Mais tarde",
+      "invalidEmpty": "Digite ou selecione primeiro um caminho de diretório",
+      "invalidAbsolute": "Digite um caminho absoluto (ex.: D:\\Photos)"
     }
   },
   "shareCard": {

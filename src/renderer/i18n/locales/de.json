@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "SpinningMomo-Markierung entfernen",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "Andere Quelle",
-      "sourceUpdated": "Ordnerquelle aktualisiert"
+      "sourceUpdated": "Ordnerquelle aktualisiert",
+      "typedPlaceholder": "Oder Verzeichnispfad manuell eingeben",
+      "inspectTyped": "Prüfen und hinzufügen"
     },
     "syncAccounts": {
       "title": "Synchronisierte Konten",
@@ -4532,6 +4534,25 @@
       "confirmBody": "{{count}} Dateien in den Windows-Papierkorb verschieben (aus dem Papierkorb wiederherstellbar)? Fortfahren?",
       "confirmAction": "In den Papierkorb verschieben",
       "cancel": "Abbrechen"
+    },
+    "photoDirectories": {
+      "title": "Foto-Verzeichnisse",
+      "description": "Passen Sie den Foto-Quellordner der synchronisierten Galerie an; leer lassen, um das Spielinstallationsverzeichnis automatisch zu finden. Änderungen werden nach Neustart wirksam.",
+      "currentLabel": "Aktuelles Foto-Verzeichnis",
+      "defaultValue": "Standard (Spielverzeichnis automatisch erkennen)",
+      "inputPlaceholder": "Lokales Verzeichnis eingeben oder auswählen",
+      "browse": "Durchsuchen…",
+      "save": "Speichern",
+      "reset": "Auf Standard zurücksetzen",
+      "saved": "Foto-Verzeichnis gespeichert. Wirksam nach Neustart.",
+      "notWritable": "Verzeichnis ist nicht beschreibbar: Scannen und Lesen funktionieren weiterhin, Schreiben ist nicht möglich",
+      "resetDone": "Foto-Verzeichnis auf Standard zurückgesetzt. Wirksam nach Neustart.",
+      "restartTitle": "Anwendung neu starten",
+      "restartMessage": "Das Foto-Verzeichnis wird beim nächsten Start wirksam. Jetzt neu starten?",
+      "restartNow": "Jetzt neu starten",
+      "restartLater": "Später",
+      "invalidEmpty": "Bitte zuerst einen Verzeichnispfad eingeben oder auswählen",
+      "invalidAbsolute": "Absoluten Pfad eingeben (z. B. D:\\Photos)"
     }
   },
   "shareCard": {

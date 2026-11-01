@@ -312,6 +312,9 @@ export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boole
     //       doctrine：显式选择即授权），但**展示面**只放行媒体扩展名。用户挑中的
     //       .txt/.json/无扩展名文件绝不因命中 userPicked 而被 media:// 送出字节。
     //    伪造路径无法命中：userPicked 集合只有真实对话框能写入（见 validator.ts registerUserPicked）。
+    //    同步库 K6 的手输照片目录同样不写本集合——`nikkisync:admit-directory` 只登记
+    //    validator.ts 的 registerSyncPhotoDir（唯一消费方是 inspect-extra-directory），
+    //    手输目录扫出的照片靠上面第 4 条规则的 resource-allowlist 精确授权读图。
     if (
       MEDIA_EXTENSIONS.has(path.extname(normalizedRequest).toLowerCase()) &&
       pathGuard.isUserPicked(normalizedRequest)

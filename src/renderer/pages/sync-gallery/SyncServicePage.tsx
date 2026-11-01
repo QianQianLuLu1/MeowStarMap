@@ -162,6 +162,12 @@ export const SyncServicePage: React.FC = () => {
   // K6：额外照片目录（null = 会话未挂面/未装配 ⇒ 整节隐藏，预期内不报错）
   const [extraDirs, setExtraDirs] = useState<NikkiSyncExtraDirectoriesInfo | null>(null)
   const [proposal, setProposal] = useState<NikkiSyncExtraDirectoryProposalInfo | null>(null)
+  // 照片目录自定义：gameRoot 持久化值（''=默认自动发现）；input 为输入框草稿。
+  // 该配置不经运行时装配（只读写设置数据库），未启用同步服务时也可先行配置。
+  const [gameRoot, setGameRoot] = useState('')
+  const [gameRootInput, setGameRootInput] = useState('')
+  // K6 手输目录草稿：admit（主进程校验+登记 pathGuard）→ 复用既有 inspect 提案确认流
+  const [typedDirInput, setTypedDirInput] = useState('')
   // K9：账号同步作用域（null = 会话无 accounts / 未装配 ⇒ 整节隐藏，预期内不报错）
   const [syncAccounts, setSyncAccounts] = useState<NikkiSyncSyncAccountsInfo | null>(null)
   const [allAccounts, setAllAccounts] = useState(true)
@@ -278,6 +284,26 @@ export const SyncServicePage: React.FC = () => {
       alive = false
     }
   }, [metadataEnabled])
+
+  /** 照片目录：挂载读取持久化值（''=默认自动发现）并回填输入框草稿。只碰设置数据库，
+   * 不 requireRuntime——同步服务未启用时配置也可先行落库，重启后由会话装配消费。 */
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const res = await window.electronAPI?.nikkisync.getGameRoot()
+        if (alive && res) {
+          setGameRoot(res.gameRoot)
+          setGameRootInput(res.gameRoot)
+        }
+      } catch {
+        // 读不到保持默认（''=自动发现）：设置库只读失败极少见，不打断页面其余部分
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
 
   const handleGallerySourceToggle = async (value: boolean): Promise<void> => {
     const api = window.electronAPI
@@ -590,6 +616,97 @@ export const SyncServicePage: React.FC = () => {
       showError(error)
     } finally {
       setBusy(false)
+    }
+  }
+
+  /** 照片目录：needRestart 共用的重启询问（确认 0 = 立即重启，与备份/缓存目录同款）。 */
+  const promptRestart = useCallback(async (): Promise<void> => {
+    const api = window.electronAPI
+    if (!api?.dialog?.showMessageBox) return
+    const confirmed = await api.dialog.showMessageBox({
+      type: 'question',
+      title: t('syncService.photoDirectories.restartTitle'),
+      message: t('syncService.photoDirectories.restartMessage'),
+      buttons: [
+        t('syncService.photoDirectories.restartNow'),
+        t('syncService.photoDirectories.restartLater')
+      ]
+    })
+    if (confirmed === 0) await api.app?.relaunch?.()
+  }, [t])
+
+  /** 照片目录：浏览选择。只回填输入框不直接保存——给用户检查/修改的机会。 */
+  const handleBrowseGameRoot = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    try {
+      const selected = await api.dialog.selectDirectory()
+      if (selected) setGameRootInput(selected)
+    } catch (error) {
+      showError(error)
+    }
+  }
+
+  /** 照片目录：保存。客户端只拦「空/非绝对路径」两个零成本错误，存在性/权限交给主进程校验
+   * （唯一真相源）；可写探测失败仅 info 警告不阻断（照片源目录扫描只读，只读位置合法）。 */
+  const handleSaveGameRoot = async (): Promise<void> => {
+    const api = window.electronAPI
+    const value = gameRootInput.trim()
+    if (busy || !api) return
+    if (!value) {
+      showMessage(t('syncService.photoDirectories.invalidEmpty'), 'info')
+      return
+    }
+    if (!/^([A-Za-z]:[\\/]|\\\\|\/)/.test(value)) {
+      showMessage(t('syncService.photoDirectories.invalidAbsolute'), 'info')
+      return
+    }
+    setBusy(true)
+    try {
+      const res = await api.nikkisync.setGameRoot({ path: value })
+      setGameRoot(res.gameRoot)
+      setGameRootInput(res.gameRoot)
+      showMessage(t('syncService.photoDirectories.saved'), 'success')
+      if (!res.writable) showMessage(t('syncService.photoDirectories.notWritable'), 'info')
+      await promptRestart()
+    } catch (error) {
+      // 失败保留输入值与当前生效目录，用户可直接改后重试
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** 照片目录：恢复默认（清空设置键；重启后回到上游自动发现的游戏安装根）。 */
+  const handleResetGameRoot = async (): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    setBusy(true)
+    try {
+      await api.nikkisync.resetGameRoot()
+      setGameRoot('')
+      setGameRootInput('')
+      showMessage(t('syncService.photoDirectories.resetDone'), 'success')
+      await promptRestart()
+    } catch (error) {
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** K6 手输预检：先 admit（主进程做敏感目录/存在性/可读校验并登记 pathGuard），
+   * 再走与「添加目录」完全相同的 inspect → 提案确认流。失败则不进入 inspect。 */
+  const handleInspectTypedDirectory = async (): Promise<void> => {
+    const api = window.electronAPI
+    const value = typedDirInput.trim()
+    if (busy || !api || !value) return
+    try {
+      await api.nikkisync.admitDirectory({ path: value })
+      setProposal(await api.nikkisync.inspectExtraDirectory({ path: value }))
+      setTypedDirInput('')
+    } catch (error) {
+      showError(error)
     }
   }
 
@@ -982,6 +1099,67 @@ export const SyncServicePage: React.FC = () => {
             )}
           </SectionShell>
 
+          {/* ③b：照片目录（gameRoot 替代默认路径；只碰设置库，不经运行时装配 ⇒ 常驻显示） */}
+          <SectionShell
+            title={t('syncService.photoDirectories.title')}
+            description={t('syncService.photoDirectories.description')}
+          >
+            <SettingsCard>
+              <SettingsRow label={t('syncService.photoDirectories.currentLabel')}>
+                <span
+                  className="font-mono text-xs truncate max-w-[24rem]"
+                  style={{ color: 'var(--text-tertiary)' }}
+                  title={gameRoot}
+                >
+                  {gameRoot || t('syncService.photoDirectories.defaultValue')}
+                </span>
+              </SettingsRow>
+            </SettingsCard>
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={gameRootInput}
+                onChange={(e) => setGameRootInput(e.target.value)}
+                placeholder={t('syncService.photoDirectories.inputPlaceholder')}
+                spellCheck={false}
+                className="w-full px-3 py-2 text-sm rounded-lg border"
+                style={{
+                  background: 'var(--bg-tertiary)',
+                  borderColor: 'var(--border-color)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    disabled={busy}
+                    onClick={() => void handleBrowseGameRoot()}
+                  >
+                    {t('syncService.photoDirectories.browse')}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-primary text-sm"
+                    disabled={busy}
+                    onClick={() => void handleSaveGameRoot()}
+                  >
+                    {t('syncService.photoDirectories.save')}
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="btn-ghost text-sm"
+                  disabled={busy}
+                  onClick={() => void handleResetGameRoot()}
+                >
+                  {t('syncService.photoDirectories.reset')}
+                </button>
+              </div>
+            </div>
+          </SectionShell>
+
           {/* ④K6：额外照片目录（仅作用于同步库扫描器；会话未挂面时整节隐藏） */}
           {extraDirs && (
             <SectionShell
@@ -1075,6 +1253,31 @@ export const SyncServicePage: React.FC = () => {
                     </SettingsRow>
                   </SettingsCard>
                 )}
+                {/* 手输目录入口：先 admit（主进程校验 + 登记 pathGuard）再走既有 inspect 提案流。
+                    系统选择器选中的目录在 dialog-handler 登记后同样能过 inspect 门禁，两条路同权。 */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={typedDirInput}
+                    onChange={(e) => setTypedDirInput(e.target.value)}
+                    placeholder={t('syncService.extraDirectories.typedPlaceholder')}
+                    spellCheck={false}
+                    className="flex-1 px-3 py-2 text-sm rounded-lg border"
+                    style={{
+                      background: 'var(--bg-tertiary)',
+                      borderColor: 'var(--border-color)',
+                      color: 'var(--text-primary)'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    disabled={busy || extraDirs.busy}
+                    onClick={() => void handleInspectTypedDirectory()}
+                  >
+                    {t('syncService.extraDirectories.inspectTyped')}
+                  </button>
+                </div>
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <button

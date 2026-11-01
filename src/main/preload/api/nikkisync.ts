@@ -1,16 +1,19 @@
-// @core-change: K9 新增账号同步作用域三方法与目录来源标注（getSyncAccounts / previewSyncAccount /
-//               setSyncAccountSelection / setExtraDirectorySource，inspect 增 source 入参）。
-//               （历史：阶段3-4 建查询/服务/扩容面、K2 同意、K3 版本推断、K6 目录面、K8 整理队列——历次授权原因见各节点提交。）
+// @core-change: 照片目录自定义——新增 getGameRoot/setGameRoot/resetGameRoot（持久化 nikkisync.gameRoot，
+//               重启后由主进程 buildSessionOptions 生效）与 admitDirectory（K6 手输路径的校验+登记预检）。
+//               （历史：K9 账号作用域与目录来源标注、K6 目录面、K2/K3/K8 历次接入——见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
 import type {
+  NikkiSyncAdmitDirectoryInput,
+  NikkiSyncAdmitDirectoryResult,
   NikkiSyncAssetDetailInfo,
   NikkiSyncAssetPageInfo,
   NikkiSyncAssetQueryInfo,
   NikkiSyncChangesInfo,
   NikkiSyncChangesQueryInfo,
   NikkiSyncClothingSearchInfo,
+  NikkiSyncGameRootInfo,
   NikkiSyncMetadataConsentInfo,
   NikkiSyncMetadataConsentSetInput,
   NikkiSyncGameVersionInfo,
@@ -26,6 +29,7 @@ import type {
   NikkiSyncPairedDeviceInfo,
   NikkiSyncPairingCodeInfo,
   NikkiSyncProfileStatsInfo,
+  NikkiSyncResetGameRootResult,
   NikkiSyncResourceInfo,
   NikkiSyncResourceQueryInfo,
   NikkiSyncResourceRecordsFor,
@@ -33,6 +37,8 @@ import type {
   NikkiSyncScanInputInfo,
   NikkiSyncSearchQueryInfo,
   NikkiSyncServerStatusInfo,
+  NikkiSyncSetGameRootInput,
+  NikkiSyncSetGameRootResult,
   NikkiSyncSuitSearchInfo,
   NikkiSyncSyncAccountPreviewInfo,
   NikkiSyncSyncAccountSelectionInput,
@@ -114,6 +120,17 @@ export const nikkisyncAPI = {
   /** 手动重扫全部目录 */
   rescanExtraDirectories: () =>
     call<NikkiSyncExtraDirectoriesInfo>('nikkisync:rescan-extra-directories'),
+  // ---- 照片目录自定义（gameRoot 替代默认路径；admit 供 K6 手输预检）----
+  /** 读取持久化的照片根目录（'' = 未设置，走上游自动发现；不经运行时，未启用也可读） */
+  getGameRoot: () => call<NikkiSyncGameRootInfo>('nikkisync:get-game-root'),
+  /** 校验并持久化自定义照片根目录；writable 仅提示（只读目录合法），needRestart = 重启后生效 */
+  setGameRoot: (input: NikkiSyncSetGameRootInput) =>
+    call<NikkiSyncSetGameRootResult>('nikkisync:set-game-root', input),
+  /** 清空自定义照片根目录（回退默认自动发现），重启后生效 */
+  resetGameRoot: () => call<NikkiSyncResetGameRootResult>('nikkisync:reset-game-root'),
+  /** K6 手输路径预检：主进程校验并登记 pathGuard，随后即可走 inspectExtraDirectory */
+  admitDirectory: (input: NikkiSyncAdmitDirectoryInput) =>
+    call<NikkiSyncAdmitDirectoryResult>('nikkisync:admit-directory', input),
   // ---- K9：账号同步作用域（手机只同步勾选账号；选择存上游 app_settings）----
   /** 账号分组与选择状态（上游中文 label 已剔除；null/undefined 选择在响应里体现为 all=true） */
   getSyncAccounts: () => call<NikkiSyncSyncAccountsInfo>('nikkisync:get-sync-accounts'),

@@ -49,6 +49,8 @@
 
 安全说明：gameRoot **不**登记 pathGuard（运行时扫描器在主进程直接 fs 读；扫出的照片经 `resource-allowlist` 授权 `media://`，无需扩权）；K6 admit 登记是为了过 inspect 既有 `isUserPickedDir || assertFileReadPath` 门禁，信任级别与 `dialog:selectDirectory`（同样登记 + 敏感目录拒绝）一致。
 
+> **2026-11-01 二轮审查订正（保留上句原样，仅追加）**：上句「信任级别与 `dialog:selectDirectory` 一致」不成立——`matchesPicked` 按前缀命中，`registerUserPickedDir` 还会经 `addUserPicked` 写入全局 `roots`，而 admit 的入参由渲染层给出、没有对话框手势，等于一次 `admit(D:\)` 就让整盘对 `scanner:start` / `settings:set` / `media://` 免检。已改为只登记同步域专用集合 `registerSyncPhotoDir`（唯一消费方 `nikkisync:inspect-extra-directory`）。修复与实测读数见 `docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`。
+
 设置键写入：`ctx.dbManager.setSetting('nikkisync.gameRoot', dir)`（仿 `nikkisync-handler.ts:216` 直读先例，不 import app 层常量；字符串键加注释交叉引用 `SETTING_GAME_ROOT`）。
 
 ## 3. 依赖声明
@@ -174,6 +176,41 @@
 
 无（四项裁决见 §0）。
 
-## 13. 执行读数回写
+## 13. 执行读数回写（2026-11-01 实测）
 
-（执行完成后回填：各节点验证命令与结果、提交 SHA、全量回归读数。）
+### 节点验证链（每节点红→绿，均由 Agent 亲自运行）
+
+| 节点    | 验证命令                                                                                                                               | 结果                                                                            |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| N1 红灯 | `npx vitest run src/main/ipc/handlers/nikkisync-handler.test.ts src/main/ipc/handlers/settings-handler.test.ts`                        | 12 failed（11 新增 game-root/admit + 1 settings 拒绝）/ 95 passed（既有全绿）   |
+| N2 绿灯 | 同上 + `npx vitest run src/main/ipc/handlers`                                                                                          | 107/107；handlers 目录 41 文件 602 用例全绿                                     |
+| N3      | `npm run typecheck` + `npx vitest run src/renderer/stores/nikkisyncContractTypes.test.ts src/main/nikkisync/protocol-contract.test.ts` | typecheck 通过；契约测试 22/22                                                  |
+| N4 红灯 | `npx vitest run src/renderer/pages/sync-gallery/SyncServicePage.test.tsx`                                                              | 9 failed（(at)-(bb) 全红）/ 50 passed（(a)-(as) 全绿）                          |
+| N5 绿灯 | 同上 + `npx vitest run src/renderer/pages/sync-gallery`                                                                                | 59/59；目录 4 文件 87 用例全绿                                                  |
+| N6      | `npx vitest run src/renderer/i18n/locales` + `npm run i18n:guard`                                                                      | locale 守卫 6 文件 33 用例全绿；i18n:guard ✅（12 包 +19 键同构、等集断言通过） |
+| N7      | 文档与实现键位核对                                                                                                                     | `docs/IPC_CONTRACT.md` §8.2.6 四通道；`CHANGELOG.md` [Unreleased] Added 条目    |
+| N8      | 见下                                                                                                                                   | 全绿                                                                            |
+
+### 全局回归矩阵（N8 实测）
+
+- `npm run verify`：**5 项 0 失败**（typecheck 10113ms→8957ms、eslint 只读、core-gate、prettier --check 24 文件、相关单测 5 文件）——中途 format 失败一轮，`prettier --write` 6 文件后转绿
+- `npm test`（全量）：**7296 passed / 20 skipped / 0 failed**（463 文件，63.7s）——首轮暴露 2 处既有锁测试，处置见下
+- `npm run lint`：✅ 无输出（0 问题）
+- `npm run typecheck` / `npm run typecheck:e2e`：✅
+- `npm run i18n:guard`：✅ 白名单只减不增、key 已同步
+- `git status --porcelain`：25 个改动文件 + 1 个新增计划文件（已 `git add`，死链检查按 `git ls-files` 判 tracked 需要），无钩子残留意外改动
+
+### 首轮全量回归暴露的两处既有锁测试（合法契约更新，非弱化）
+
+1. `src/main/preload/__tests__/preload.test.ts`「nikkisync 命名空间方法清单（共 32 个）」→ 更新为 36 个（逐方法名等集，含新增 4 方法）。
+2. `scripts/__tests__/check-md-links.test.ts` 死引用 ×1：CHANGELOG 引用本计划文件时该文件尚未 tracked——`git add docs/plans/2026-11-01-…-实施计划.md` 后转绿（检查口径为 `git ls-files` tracked 集合，非 fs 存在性）。
+
+### 实施中的三处修正（如实记录）
+
+1. esbuild 不接受换行书写在表达式后的 `as` 类型断言（测试文件转换错误），改同行断言。
+2. (ay)/(bb) 两用例的断言口径修正：`useErrorToast.showError` 委托 `useToast` **本地状态**而非 `GlobalToastContext`，测试桩 `mockShowMessage` 观察不到——改为锁「重启流 / inspect 提案流短路」等可观察契约（错误提示本身由 useErrorToast 既有行为承担）。
+3. admit 未登记断言初版误用 tmpdir 路径（位于用户主目录下，`assertFileReadPath` 恒放行，不能证明「未登记」），改用系统敏感路径 `C:\Windows\System32`：若 admit 误登记则 inspect 放行、断言变红，语义更精准。
+
+### 人工验证清单（待真机，无法自动化）
+
+见 §11：dev 实机设置路径→重启→照片入库、Program Files 拒绝提示、只读目录警告、K6 手输流、默认回退与局域网服务不受影响。

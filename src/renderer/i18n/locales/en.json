@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "Unmark SpinningMomo",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "Other source",
-      "sourceUpdated": "Folder source updated"
+      "sourceUpdated": "Folder source updated",
+      "typedPlaceholder": "Or type a directory path manually",
+      "inspectTyped": "Inspect & add"
     },
     "syncAccounts": {
       "title": "Sync accounts",
@@ -4532,6 +4534,25 @@
       "confirmBody": "Move {{count}} files to the Windows Recycle Bin (recoverable from the Recycle Bin)? Continue?",
       "confirmAction": "Move to Recycle Bin",
       "cancel": "Cancel"
+    },
+    "photoDirectories": {
+      "title": "Photo Directories",
+      "description": "Customize the photo source root for the sync gallery; leave empty to auto-discover the game installation root. Changes take effect after restart.",
+      "currentLabel": "Current photo directory",
+      "defaultValue": "Default (auto-discover game directory)",
+      "inputPlaceholder": "Type or browse for a local directory",
+      "browse": "Browse…",
+      "save": "Save",
+      "reset": "Reset to default",
+      "saved": "Photo directory saved. Takes effect after restart.",
+      "notWritable": "Directory is not writable: scanning and reading still work, but nothing can be written to it",
+      "resetDone": "Photo directory reset to default. Takes effect after restart.",
+      "restartTitle": "Restart application",
+      "restartMessage": "The photo directory will take effect on next launch. Restart now?",
+      "restartNow": "Restart now",
+      "restartLater": "Later",
+      "invalidEmpty": "Enter or select a directory path first",
+      "invalidAbsolute": "Enter an absolute path (e.g. D:\\Photos)"
     }
   },
   "shareCard": {

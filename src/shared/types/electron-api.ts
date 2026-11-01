@@ -714,6 +714,38 @@ export interface NikkiSyncExtraDirectoryProposalInfo {
   limited: boolean
 }
 
+/** 照片根目录（nikkisync.gameRoot）读取响应；'' = 未设置（上游自动发现游戏安装根）。 */
+export interface NikkiSyncGameRootInfo {
+  gameRoot: string
+}
+
+/** `nikkisync:set-game-root` 入参（替代默认路径的自定义照片根目录）。 */
+export interface NikkiSyncSetGameRootInput {
+  path: string
+}
+
+/** `nikkisync:set-game-root` 响应；writable 仅提示（只读目录合法），needRestart = 重启后生效。 */
+export interface NikkiSyncSetGameRootResult {
+  gameRoot: string
+  needRestart: boolean
+  writable: boolean
+}
+
+/** `nikkisync:reset-game-root` 响应（清空设置回退默认自动发现）。 */
+export interface NikkiSyncResetGameRootResult {
+  needRestart: boolean
+}
+
+/** `nikkisync:admit-directory` 入参（K6 手输路径的预检登记）。 */
+export interface NikkiSyncAdmitDirectoryInput {
+  path: string
+}
+
+/** `nikkisync:admit-directory` 响应（已校验并登记 pathGuard，可安全走 inspect-extra-directory）。 */
+export interface NikkiSyncAdmitDirectoryResult {
+  path: string
+}
+
 /** K8：整理队列行（上游 `DeletionQueue.list()` 行剔除中文 message 后的形状）。 */
 export interface NikkiSyncOrganizerItemInfo {
   id: string

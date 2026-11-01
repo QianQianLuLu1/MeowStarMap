@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "Desmarcar SpinningMomo",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "Otra fuente",
-      "sourceUpdated": "Origen de la carpeta actualizado"
+      "sourceUpdated": "Origen de la carpeta actualizado",
+      "typedPlaceholder": "O escriba manualmente una ruta de directorio",
+      "inspectTyped": "Inspeccionar y añadir"
     },
     "syncAccounts": {
       "title": "Cuentas sincronizadas",
@@ -4532,6 +4534,25 @@
       "confirmBody": "Se moverán {{count}} archivos a la Papelera de reciclaje de Windows (recuperables desde la papelera). ¿Continuar?",
       "confirmAction": "Mover a la papelera",
       "cancel": "Cancelar"
+    },
+    "photoDirectories": {
+      "title": "Directorios de fotos",
+      "description": "Personalice la carpeta raíz de origen de fotos de la galería sincronizada; déjelo vacío para detectar automáticamente la carpeta de instalación del juego. Los cambios surten efecto tras reiniciar.",
+      "currentLabel": "Directorio de fotos actual",
+      "defaultValue": "Predeterminado (detectar automáticamente la carpeta del juego)",
+      "inputPlaceholder": "Escriba o busque un directorio local",
+      "browse": "Examinar…",
+      "save": "Guardar",
+      "reset": "Restaurar predeterminado",
+      "saved": "Directorio de fotos guardado. Surte efecto tras reiniciar.",
+      "notWritable": "El directorio no es escribible: la lectura y el análisis no se ven afectados, pero no se puede escribir en él",
+      "resetDone": "Directorio de fotos restaurado al valor predeterminado. Surte efecto tras reiniciar.",
+      "restartTitle": "Reiniciar la aplicación",
+      "restartMessage": "El directorio de fotos surtirá efecto en el próximo inicio. ¿Reiniciar ahora?",
+      "restartNow": "Reiniciar ahora",
+      "restartLater": "Más tarde",
+      "invalidEmpty": "Escriba o seleccione primero una ruta de directorio",
+      "invalidAbsolute": "Escriba una ruta absoluta (p. ej., D:\\Photos)"
     }
   },
   "shareCard": {

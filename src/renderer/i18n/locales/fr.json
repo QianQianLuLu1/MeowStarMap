@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "Ne plus marquer SpinningMomo",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "Autre source",
-      "sourceUpdated": "Source du dossier mise à jour"
+      "sourceUpdated": "Source du dossier mise à jour",
+      "typedPlaceholder": "Ou saisir manuellement un chemin de dossier",
+      "inspectTyped": "Analyser et ajouter"
     },
     "syncAccounts": {
       "title": "Comptes synchronisés",
@@ -4532,6 +4534,25 @@
       "confirmBody": "Déplacer {{count}} fichiers vers la Corbeille Windows (récupérables depuis la corbeille) ? Continuer ?",
       "confirmAction": "Mettre à la corbeille",
       "cancel": "Annuler"
+    },
+    "photoDirectories": {
+      "title": "Dossiers photo",
+      "description": "Personnalisez la racine des photos sources de la galerie synchronisée ; laissez vide pour détecter automatiquement la racine du jeu. Les modifications prennent effet après redémarrage.",
+      "currentLabel": "Dossier photo actuel",
+      "defaultValue": "Par défaut (détection automatique du dossier du jeu)",
+      "inputPlaceholder": "Saisir ou parcourir un dossier local",
+      "browse": "Parcourir…",
+      "save": "Enregistrer",
+      "reset": "Rétablir par défaut",
+      "saved": "Dossier photo enregistré. Prendra effet après redémarrage.",
+      "notWritable": "Dossier non accessible en écriture : la lecture et l’analyse ne sont pas affectées, mais l’écriture est impossible",
+      "resetDone": "Dossier photo rétabli par défaut. Prendra effet après redémarrage.",
+      "restartTitle": "Redémarrer l’application",
+      "restartMessage": "Le dossier photo prendra effet au prochain lancement. Redémarrer maintenant ?",
+      "restartNow": "Redémarrer maintenant",
+      "restartLater": "Plus tard",
+      "invalidEmpty": "Saisissez d’abord ou sélectionnez un chemin de dossier",
+      "invalidAbsolute": "Saisissez un chemin absolu (ex. D:\\Photos)"
     }
   },
   "shareCard": {

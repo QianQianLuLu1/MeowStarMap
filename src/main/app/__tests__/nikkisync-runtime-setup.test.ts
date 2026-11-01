@@ -7,6 +7,7 @@
  * 在链接态覆盖；此处只锁「默认关闭 + userData 落点 + 开关优先级」这三条任务硬性口径。
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
 vi.mock('electron', () => ({
@@ -498,5 +499,44 @@ describe('阶段 6：元数据解析开关（默认关 + env 优先 + 脏值回�
     expect(
       buildSessionOptions({ ...base, env: { [METADATA_ENV_FLAG]: '1' } }).metadataResolverEnabled
     ).toBe(true)
+  })
+})
+
+// ============================================================================
+// 审查发现 F3：`nikkisync.gameRoot` 的**写入端**与**读取端**分处两层，键名各写一份字面量。
+// 读端用本模块导出的 `SETTING_GAME_ROOT`；写端（`nikkisync:handler`）为守住「handler 不 import
+// app/ 常量」的分层（见该文件 SETTING_GAME_ROOT_KEY 的注释）另写了一份串。
+// 两次变异实测（口径以实测为准，原判断在此订正）：
+//   M1 改**写端**字面量 ⇒ `nikkisync-handler.test.ts` 4 例红（它们断言的是 `setSetting` 收到的
+//      实际键，写端漂移本来就兜得住）；
+//   M2 改**读端**常量值 ⇒ 全仓仅本守卫红（实测 1179 例仍绿）——读端测试用 `[SETTING_GAME_ROOT]`
+//      符号化供键，改值后自洽通过，这才是真正无人兜的那一侧。
+// 所以本用例钉的是「读端值 = 历史串」+「写端串 = 读端常量」两条：改任何一侧、删常量、挪文件都红
+//（源码里提不到声明即抛，不 skip）。
+// ============================================================================
+
+describe('gameRoot 设置键：写入端与读取端必须同源（F3 漂移守卫）', () => {
+  /** 从 handler 源码文本提取写端键名字面量；提不到 = 声明被动过 = 直接红。 */
+  function extractHandlerGameRootKey(): string {
+    // 只当 IO 用（约定 §6 第 2 档）：按 cwd 拼真实文件路径读源码，保持宿主绑定，
+    // 与 favorites-handler.test.ts 取 connection.ts DDL 的写法同口径。
+    const source = readFileSync(
+      path.resolve(process.cwd(), 'src', 'main', 'ipc', 'handlers', 'nikkisync-handler.ts'),
+      'utf-8'
+    )
+    const match = source.match(/const SETTING_GAME_ROOT_KEY = '([^']*)'/)
+    const key = match ? match[1] : undefined
+    if (typeof key !== 'string') {
+      throw new Error('nikkisync-handler.ts 中找不到 SETTING_GAME_ROOT_KEY 的字面量声明')
+    }
+    return key
+  }
+
+  it('写端字面量 === 读端 SETTING_GAME_ROOT（任一侧改名即红）', () => {
+    expect(extractHandlerGameRootKey()).toBe(SETTING_GAME_ROOT)
+  })
+
+  it('读端常量仍为历史值 nikkisync.gameRoot（改它等于作废已入库的设置行）', () => {
+    expect(SETTING_GAME_ROOT).toBe('nikkisync.gameRoot')
   })
 })

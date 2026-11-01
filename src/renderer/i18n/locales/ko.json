@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "SpinningMomo 표시 해제",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "기타 소스",
-      "sourceUpdated": "폴더 소스가 업데이트되었습니다"
+      "sourceUpdated": "폴더 소스가 업데이트되었습니다",
+      "typedPlaceholder": "또는 디렉터리 경로를 직접 입력",
+      "inspectTyped": "검사 후 추가"
     },
     "syncAccounts": {
       "title": "동기화 계정",
@@ -4532,6 +4534,25 @@
       "confirmBody": "파일 {{count}}개를 Windows 휴지통으로 이동합니다(휴지통에서 복구 가능). 계속하시겠습니까?",
       "confirmAction": "휴지통으로 이동",
       "cancel": "취소"
+    },
+    "photoDirectories": {
+      "title": "사진 폴더",
+      "description": "동기화 갤러리의 사진 소스 루트를 사용자 지정합니다. 비워 두면 게임 설치 루트를 자동으로 찾습니다. 변경 사항은 앱 재시작 후 적용됩니다.",
+      "currentLabel": "현재 사진 폴더",
+      "defaultValue": "기본값(게임 폴더 자동 탐색)",
+      "inputPlaceholder": "로컬 디렉터리를 입력하거나 찾아보기",
+      "browse": "찾아보기…",
+      "save": "저장",
+      "reset": "기본값으로 복원",
+      "saved": "사진 폴더가 저장되었습니다. 재시작 후 적용됩니다",
+      "notWritable": "디렉터리에 쓸 수 없습니다: 스캔과 읽기는 영향을 받지 않지만 쓰기는 불가능합니다",
+      "resetDone": "사진 폴더가 기본값으로 복원되었습니다. 재시작 후 적용됩니다",
+      "restartTitle": "앱 재시작",
+      "restartMessage": "사진 폴더는 다음 시작 시 적용됩니다. 지금 재시작하시겠습니까?",
+      "restartNow": "지금 재시작",
+      "restartLater": "나중에",
+      "invalidEmpty": "먼저 디렉터리 경로를 입력하거나 선택하세요",
+      "invalidAbsolute": "절대 경로를 입력하세요(예: D:\\Photos)"
     }
   },
   "shareCard": {

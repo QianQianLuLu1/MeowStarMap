@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "SpinningMomo のマークを解除",
       "sourceSpinning": "SpinningMomo",
       "sourceOther": "その他のソース",
-      "sourceUpdated": "フォルダーのソースを更新しました"
+      "sourceUpdated": "フォルダーのソースを更新しました",
+      "typedPlaceholder": "または手動でディレクトリパスを入力",
+      "inspectTyped": "プレビューして追加"
     },
     "syncAccounts": {
       "title": "同期アカウント",
@@ -4532,6 +4534,25 @@
       "confirmBody": "{{count}} 件のファイルを Windows のごみ箱に移動します（ごみ箱から復元できます）。続行しますか？",
       "confirmAction": "ごみ箱へ移動",
       "cancel": "キャンセル"
+    },
+    "photoDirectories": {
+      "title": "写真フォルダ",
+      "description": "同期ギャラリーの写真取得元ルートをカスタマイズします。空欄の場合はゲームのインストールルートを自動検出します。変更はアプリ再起動後に有効になります。",
+      "currentLabel": "現在の写真フォルダ",
+      "defaultValue": "デフォルト（ゲームフォルダを自動検出）",
+      "inputPlaceholder": "ローカルフォルダを入力または参照",
+      "browse": "参照…",
+      "save": "保存",
+      "reset": "デフォルトに戻す",
+      "saved": "写真フォルダを保存しました。再起動後に有効になります",
+      "notWritable": "フォルダは書き込み不可です：スキャンと読み取りには影響しませんが、書き込みはできません",
+      "resetDone": "写真フォルダをデフォルトに戻しました。再起動後に有効になります",
+      "restartTitle": "アプリを再起動",
+      "restartMessage": "写真フォルダは次回起動時に有効になります。今すぐ再起動しますか？",
+      "restartNow": "今すぐ再起動",
+      "restartLater": "後で",
+      "invalidEmpty": "先にディレクトリパスを入力または選択してください",
+      "invalidAbsolute": "絶対パスを入力してください（例：D:\\Photos）"
     }
   },
   "shareCard": {

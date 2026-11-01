@@ -2,7 +2,8 @@
  * @layer L3
  * @module src/main/ipc/handlers/nikkisync-handler
  * @coverage NikkiSync 内嵌运行时 IPC（阶段 2 只读查询 + 阶段 3 同步服务 + 阶段 4 查询面扩容）：
- *           31 条通道的注册、参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射。
+ *           35 条通道的注册、参数校验、DTO 原样透传、未组装/未就绪/端口占用态的错误映射、
+ *           照片目录自定义四通道（game-root 三条不依赖运行时 + admit 校验登记）。
  *
  * 断言口径：`data` 与句柄返回值**逐字段相等**（`toEqual`），以此锁死「内嵌层不做数据
  * 格式转换」这条铁律——一旦 handler 里出现字段重命名或结构包装，本文件立即变红。
@@ -10,7 +11,10 @@
  * 注意：`src/main/tsconfig.json` 把测试文件排除在 `tsc -b` 之外，故本文件的类型错误
  * 不会被 `npm run typecheck` 抓到 ⇒ 句柄替身必须与 `NikkiSyncRuntimeHandle` 全量对齐。
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { makeCtx, getHandler } from './_test-helpers'
 import { registerNikkiSyncHandlers } from './nikkisync-handler'
 import { pathGuard } from '../validator'
@@ -231,7 +235,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 31 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 六条目录 + K9 三条账号 + K8 三条整理队列）', () => {
+  it('恰好注册 35 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 六条目录 + 照片目录四通道 + K9 三条账号 + K8 三条整理队列）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -260,6 +264,10 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:remove-extra-directory',
       'nikkisync:set-extra-directory-source',
       'nikkisync:rescan-extra-directories',
+      'nikkisync:get-game-root',
+      'nikkisync:set-game-root',
+      'nikkisync:reset-game-root',
+      'nikkisync:admit-directory',
       'nikkisync:get-sync-accounts',
       'nikkisync:preview-sync-account',
       'nikkisync:set-sync-account-selection',
@@ -1140,6 +1148,234 @@ describe('nikkisync:*-extra-directories（K6）', () => {
       const res = (await handler({}, input)) as HandleResult
       expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
     }
+  })
+})
+
+// ============================================================================
+// 照片目录自定义四通道（game-root 三条 + K6 手输预检 admit-directory）
+// 语义：gameRoot 持久化值为 '' ⇒ 交给上游 game-directory-discovery（默认路径回退）；
+// admit 在主进程完成「绝对路径 + 敏感目录黑名单 + 存在/目录/可读」校验后，只登记**同步域
+// 专用集合**（isSyncPhotoDir），因此 inspect-extra-directory 放行、而 scanner:start /
+// settings:set / media:// 的短路判据一律不受影响。
+// 可写探测 fail-open：仅随 set-game-root 响应返回 writable 布尔，不阻断保存。
+// ============================================================================
+
+describe('nikkisync:game-root / admit-directory（照片目录自定义）', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  /** 系统临时目录下造真实存在的唯一子目录（非敏感目录，跨平台可过存在性/可读校验）。 */
+  async function makeTempDir(): Promise<string> {
+    return fs.promises.mkdtemp(path.join(os.tmpdir(), 'wxnn-gameroot-'))
+  }
+
+  // ---- 正常 ----
+
+  it('set-game-root：真实目录 → 持久化设置键并返回 needRestart，writable 为布尔', async () => {
+    const ctx = register(createRuntimeStub())
+    const dir = await makeTempDir()
+    const handler = getHandler(handleMock, 'nikkisync:set-game-root')
+    const res = (await handler({}, { path: dir })) as HandleResult
+    expect(res.success).toBe(true)
+    const data = res.data as Record<string, unknown>
+    expect(data.gameRoot).toBe(dir)
+    expect(data.needRestart).toBe(true)
+    expect(typeof data.writable).toBe('boolean')
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+  })
+
+  it('get-game-root：回读持久化值；历史非字符串值回退空串（默认自动发现）', async () => {
+    const ctx = register(createRuntimeStub())
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>)
+      .mockReturnValueOnce('D:\\CustomRoot')
+      .mockReturnValueOnce(123)
+      .mockReturnValueOnce(undefined)
+    const handler = getHandler(handleMock, 'nikkisync:get-game-root')
+    const first = (await handler({})) as HandleResult
+    expect(first.data).toEqual({ gameRoot: 'D:\\CustomRoot' })
+    const dirty = (await handler({})) as HandleResult
+    expect(dirty.data).toEqual({ gameRoot: '' })
+    const missing = (await handler({})) as HandleResult
+    expect(missing.data).toEqual({ gameRoot: '' })
+  })
+
+  it('reset-game-root：清空设置键（空串=回退默认路径）并返回 needRestart', async () => {
+    const ctx = register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:reset-game-root')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect((res.data as Record<string, unknown>).needRestart).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', '')
+  })
+
+  it('admit-directory：校验通过并登记同步域集合，随后 inspect 无需预登记即放行', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+    const dir = await makeTempDir()
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    const res = (await admit({}, { path: dir })) as HandleResult
+    expect(res.success).toBe(true)
+    expect((res.data as Record<string, unknown>).path).toBe(dir)
+    // 未 admit 时同路径 inspect 会 PATH_FORBIDDEN（见 K6 伪造路径用例）；登记后必须放行
+    const inspect = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    const proposal = (await inspect({}, { path: dir })) as HandleResult
+    expect(proposal.success).toBe(true)
+    expect(runtime.inspectExtraDirectory).toHaveBeenCalledWith(dir, undefined)
+  })
+
+  // F1（审查发现）：admit 的入参是**渲染层任意传入**的串，不是真实对话框的返回值。
+  // `registerUserPickedDir` 一次写入的是三个全局集合——`roots`（`addUserPicked` 内部
+  // `this.register(p)`）、`userPicked`、`userPickedDirs`，且 `matchesPicked` 按**前缀**命中，
+  // 而 `scanner:start` / `settings:set`(customScanPaths) / `assertMediaAccessPath` / `media://`
+  // 规则 0 全拿它做「跳过黑名单」的短路。因此一次 `admit(D:\)` 就让整盘免检、且无需用户手势。
+  // 本组用例锁死收窄后的边界：admit 只授予同步域（inspect 放行），不得触碰全局授权集合。
+  it('admit-directory：不得写全局 user-picked 集合（registerUserPickedDir 未被调用）', async () => {
+    register(createRuntimeStub())
+    const spy = vi.spyOn(pathGuard, 'registerUserPickedDir')
+    const dir = await makeTempDir()
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    const res = (await admit({}, { path: dir })) as HandleResult
+    // 校验通过、预检本身仍要成功（收窄不能削掉功能，见上一条 inspect 放行用例）
+    expect(res.success).toBe(true)
+    expect(spy, 'admit 传入的是渲染层任意串，不构成对话框显式授权').not.toHaveBeenCalled()
+  })
+
+  it('admit-directory：通过后全局 isUserPicked/isUserPickedDir 均不命中（含子路径放大）', async () => {
+    register(createRuntimeStub())
+    const dir = await makeTempDir()
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    expect(((await admit({}, { path: dir })) as HandleResult).success).toBe(true)
+    // 目录本身与目录下的子路径都不算「用户显式选择」——后者正是前缀短路把授权
+    // 放大到整棵子树的地方（盘根/用户目录被 admit 时波及面即全部文件）。
+    expect(pathGuard.isUserPicked(dir)).toBe(false)
+    expect(pathGuard.isUserPickedDir(dir)).toBe(false)
+    expect(pathGuard.isUserPicked(path.join(dir, 'photo.jpg'))).toBe(false)
+  })
+
+  it('四通道均不依赖运行时装配（nikkisyncRuntime 未注入也可用）', async () => {
+    const ctx = register(undefined)
+    const dir = await makeTempDir()
+    const got = (await getHandler(handleMock, 'nikkisync:get-game-root')({})) as HandleResult
+    expect(got.success).toBe(true)
+    const set = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      {},
+      { path: dir }
+    )) as HandleResult
+    expect(set.success).toBe(true)
+    const reset = (await getHandler(handleMock, 'nikkisync:reset-game-root')({})) as HandleResult
+    expect(reset.success).toBe(true)
+    const admit = (await getHandler(handleMock, 'nikkisync:admit-directory')(
+      {},
+      { path: dir }
+    )) as HandleResult
+    expect(admit.success).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+  })
+
+  // ---- 异常 ----
+
+  it('set-game-root：相对路径/不存在/文件非目录 ⇒ VALIDATION 且不写设置', async () => {
+    const ctx = register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:set-game-root')
+    const dir = await makeTempDir()
+    const filePath = path.join(dir, 'plain.txt')
+    await fs.promises.writeFile(filePath, 'x')
+    const missingDir = path.join(dir, 'does-not-exist')
+    for (const bad of [{ path: 'relative/path' }, { path: missingDir }, { path: filePath }]) {
+      const res = (await handler({}, bad)) as HandleResult
+      expect(res.error?.code, JSON.stringify(bad)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+
+  it('set-game-root：系统敏感目录 ⇒ PATH_FORBIDDEN（任意盘符系统目录均拦）', async () => {
+    const ctx = register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:set-game-root')
+    for (const bad of ['C:\\Windows\\System32', 'C:\\Program Files\\SomeGame', 'D:\\ProgramData']) {
+      const res = (await handler({}, { path: bad })) as HandleResult
+      expect(res.error?.code, bad).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+    }
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+
+  it('set-game-root：目录不可读（access R_OK 拒绝）⇒ PATH_FORBIDDEN 且不写设置', async () => {
+    const ctx = register(createRuntimeStub())
+    const realAccess = fs.promises.access.bind(fs.promises)
+    vi.spyOn(fs.promises, 'access').mockImplementation(async (p, mode) => {
+      if (mode === fs.constants.R_OK) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      }
+      return realAccess(p, mode)
+    })
+    const dir = await makeTempDir()
+    const handler = getHandler(handleMock, 'nikkisync:set-game-root')
+    const res = (await handler({}, { path: dir })) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+
+  it('set-game-root：可写探测失败 fail-open —— 仅 writable:false，不阻断保存', async () => {
+    register(createRuntimeStub())
+    const realAccess = fs.promises.access.bind(fs.promises)
+    vi.spyOn(fs.promises, 'access').mockImplementation(async (p, mode) => {
+      if (mode === fs.constants.W_OK) {
+        throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' })
+      }
+      return realAccess(p, mode)
+    })
+    const dir = await makeTempDir()
+    const handler = getHandler(handleMock, 'nikkisync:set-game-root')
+    const res = (await handler({}, { path: dir })) as HandleResult
+    expect(res.success).toBe(true)
+    expect((res.data as Record<string, unknown>).writable).toBe(false)
+    expect((res.data as Record<string, unknown>).needRestart).toBe(true)
+  })
+
+  it('admit-directory：四类非法输入一律拒绝且不登记（随后 inspect 仍 PATH_FORBIDDEN）', async () => {
+    register(createRuntimeStub())
+    const dir = await makeTempDir()
+    const filePath = path.join(dir, 'plain.txt')
+    await fs.promises.writeFile(filePath, 'x')
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    for (const bad of [
+      { path: 'relative/path' },
+      { path: path.join(dir, 'does-not-exist') },
+      { path: filePath },
+      { path: 'C:\\Windows\\System32' }
+    ]) {
+      const res = (await admit({}, bad)) as HandleResult
+      expect(
+        [IPC_ERROR_CODES.VALIDATION_ERROR, IPC_ERROR_CODES.PATH_FORBIDDEN],
+        JSON.stringify(bad)
+      ).toContain(res.error?.code)
+    }
+    // 未登记 ⇒ inspect 的白名单门禁仍拒绝（admit 的登记只发生在校验全过之后）。
+    // 用敏感路径做该断言：若 admit 误登记，isUserPickedDir / isSyncPhotoDir 会短路放行
+    // 使本断言变红；tmpdir 位于主目录下（isAllowed 恒放行），不能用作「未登记」的证明。
+    const inspect = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    const proposal = (await inspect({}, { path: 'C:\\Windows\\System32' })) as HandleResult
+    expect(proposal.error?.code).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+  })
+
+  // ---- 边界 ----
+
+  it('set-game-root：512 为长度上界（与 scanSchema.gameRoot 同界）；前后空白 trim 后入库；重复 set 幂等', async () => {
+    const ctx = register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:set-game-root')
+    // 513 字符绝对路径 ⇒ zod 上界拒绝（512 界与 start-scan 的 gameRoot 同规）
+    const over = (await handler({}, { path: 'D:\\' + 'x'.repeat(510) })) as HandleResult
+    expect(over.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    // trim：zod .trim() 归一后校验与持久化都用净值
+    const dir = await makeTempDir()
+    const trimmed = (await handler({}, { path: `  ${dir}  ` })) as HandleResult
+    expect(trimmed.success).toBe(true)
+    expect((trimmed.data as Record<string, unknown>).gameRoot).toBe(dir)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+    // 重复设置同值：两次都成功（幂等）
+    const again = (await handler({}, { path: dir })) as HandleResult
+    expect(again.success).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledTimes(2)
   })
 })
 

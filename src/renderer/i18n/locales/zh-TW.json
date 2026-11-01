@@ -4481,7 +4481,9 @@
       "unmarkSpinning": "取消旋轉吧大喵標記",
       "sourceSpinning": "旋轉吧大喵",
       "sourceOther": "其他來源",
-      "sourceUpdated": "目錄來源已更新"
+      "sourceUpdated": "目錄來源已更新",
+      "typedPlaceholder": "或手動輸入目錄路徑",
+      "inspectTyped": "預檢並新增"
     },
     "syncAccounts": {
       "title": "同步帳號",
@@ -4532,6 +4534,25 @@
       "confirmBody": "將把 {{count}} 個檔案移入 Windows 系統資源回收筒（可從資源回收筒復原）。確認繼續？",
       "confirmAction": "確認移入資源回收筒",
       "cancel": "取消"
+    },
+    "photoDirectories": {
+      "title": "照片目錄",
+      "description": "自訂同步圖庫的照片來源根目錄；留空時自動探索遊戲安裝根目錄。修改需重新啟動應用程式生效。",
+      "currentLabel": "目前照片目錄",
+      "defaultValue": "預設（自動探索遊戲目錄）",
+      "inputPlaceholder": "輸入或瀏覽選擇本機目錄",
+      "browse": "瀏覽…",
+      "save": "儲存",
+      "reset": "恢復預設",
+      "saved": "照片目錄已儲存，重新啟動後生效",
+      "notWritable": "目錄不可寫入：掃描讀取不受影響，但無法寫入該目錄",
+      "resetDone": "已恢復預設照片目錄，重新啟動後生效",
+      "restartTitle": "重新啟動應用程式",
+      "restartMessage": "照片目錄將在下次啟動時生效，是否立即重新啟動？",
+      "restartNow": "立即重新啟動",
+      "restartLater": "稍後再說",
+      "invalidEmpty": "請先輸入或選擇目錄路徑",
+      "invalidAbsolute": "請輸入絕對路徑（如 D:\\Photos）"
     }
   },
   "shareCard": {

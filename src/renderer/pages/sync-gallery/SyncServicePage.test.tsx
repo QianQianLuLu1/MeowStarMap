@@ -20,6 +20,9 @@
  *  (q) 三段层级：控制区 h3 / 配对区 h3 / 设备区 h3 同页存在，页头是 h2「同步服务」
  *  (r) 状态轮询按 currentView 门控：本页在 App.tsx 的 keep-alive 循环里切走不卸载，
  *      不门控就会后台常驻 2s 定时器一直打 getServerStatus
+ *  (at)-(bb) 照片目录自定义：挂载读取 gameRoot（''=默认自动发现）/ 浏览回填 / 保存→
+ *      成功 Toast + 重启询问→relaunch / writable:false 仅警告 / 失败保留输入 /
+ *      恢复默认 / K6 手输路径先 admit 后 inspect（拒绝则不进 inspect）
  *
  * 运行：npx vitest run src/renderer/pages/sync-gallery/SyncServicePage.test.tsx
  */
@@ -105,6 +108,11 @@ interface NikkiSyncServerApiStub {
   previewSyncAccount: Mock
   setSyncAccountSelection: Mock
   setExtraDirectorySource: Mock
+  // 照片目录自定义（gameRoot 持久化 + K6 手输预检）
+  getGameRoot: Mock
+  setGameRoot: Mock
+  resetGameRoot: Mock
+  admitDirectory: Mock
 }
 
 /** K9：与 handler 剔除 label 后的账号快照同形（uid 三态 + 样例 assetId）。 */
@@ -125,6 +133,9 @@ let settingsGet: Mock
 let settingsSet: Mock
 let serverApi: NikkiSyncServerApiStub
 let store: Record<string, unknown>
+// 重启弹窗与重启动作（照片目录保存/恢复默认的 needRestart 流）
+let dialogShowMessageBox: Mock
+let appRelaunch: Mock
 
 function installElectronApi(
   opts: {
@@ -143,6 +154,12 @@ function installElectronApi(
     accountsReject?: boolean
     previewReject?: string[]
     extraDirectories?: Array<Record<string, unknown>>
+    // 照片目录自定义：gameRoot 持久化值（''/缺省 = 默认自动发现）
+    gameRoot?: string
+    gameRootReject?: boolean
+    setGameRootReject?: Error
+    setGameRootWritableFalse?: boolean
+    admitReject?: Error
   } = {}
 ) {
   store = { ...opts.persisted }
@@ -290,12 +307,40 @@ function installElectronApi(
         automaticRoots: [],
         busy: false
       })
+    ),
+    // ---- 照片目录自定义（gameRoot 持久化在 nikkisync.gameRoot；'' = 默认自动发现）----
+    getGameRoot: vi.fn(async () => {
+      if (opts.gameRootReject) throw new Error('game root settings unavailable')
+      return { gameRoot: opts.gameRoot ?? '' }
+    }),
+    setGameRoot: vi.fn(
+      opts.setGameRootReject
+        ? async () => {
+            throw opts.setGameRootReject
+          }
+        : async ({ path }: { path: string }) => ({
+            gameRoot: path,
+            needRestart: true,
+            writable: !opts.setGameRootWritableFalse
+          })
+    ),
+    resetGameRoot: vi.fn(async () => ({ needRestart: true })),
+    // K6 手输预检：主进程校验并登记 pathGuard；admitReject 模拟校验拒绝
+    admitDirectory: vi.fn(
+      opts.admitReject
+        ? async () => {
+            throw opts.admitReject
+          }
+        : async ({ path }: { path: string }) => ({ path })
     )
   }
+  dialogShowMessageBox = vi.fn(async () => 0)
+  appRelaunch = vi.fn(async () => undefined)
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
     nikkisync: serverApi,
-    dialog: { selectDirectory: serverApi.selectDirectory }
+    dialog: { selectDirectory: serverApi.selectDirectory, showMessageBox: dialogShowMessageBox },
+    app: { relaunch: appRelaunch }
   }
 }
 
@@ -1033,5 +1078,125 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     expect(serverApi.startServer).not.toHaveBeenCalled()
     expect(store[SETTING_SYNC_ENABLED]).not.toBe(true)
     expect(store[SETTING_RUNTIME_ENABLED]).not.toBe(true)
+  })
+})
+
+// ============================================================================
+// 照片目录自定义（gameRoot 三通道 + K6 手输预检）
+// 契约：分区常驻（不经运行时装配也能配置）；'' = 默认自动发现；保存/恢复默认都
+// 走「成功 Toast → needRestart 重启询问 → relaunch」；可写探测失败仅警告不阻断；
+// K6 手输路径先 admit（校验+登记）后 inspect（既有提案确认流不变）。
+// ============================================================================
+
+describe('SyncServicePage 照片目录自定义（(at)-(bb)）', () => {
+  it('(at) 挂载读取 getGameRoot：未设置显示「默认（自动发现）」，输入框为空', async () => {
+    renderSection()
+    await waitFor(() => expect(serverApi.getGameRoot).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('照片目录')).toBeInTheDocument()
+    expect(await screen.findByText('默认（自动发现游戏目录）')).toBeInTheDocument()
+    const input = screen.getByPlaceholderText('输入或浏览选择本地目录') as HTMLInputElement
+    expect(input.value).toBe('')
+  })
+
+  it('(au) 已设置自定义目录：展示路径并回填输入框', async () => {
+    installElectronApi({ gameRoot: 'D:\\CustomRoot' })
+    renderSection()
+    expect(await screen.findByText('D:\\CustomRoot')).toBeInTheDocument()
+    const input = (await screen.findByPlaceholderText('输入或浏览选择本地目录')) as HTMLInputElement
+    expect(input.value).toBe('D:\\CustomRoot')
+  })
+
+  it('(av) 浏览按钮：selectDirectory 选中目录回填输入框（不直接保存）', async () => {
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '浏览…' }))
+    await waitFor(() => expect(serverApi.selectDirectory).toHaveBeenCalled())
+    const input = (await screen.findByPlaceholderText('输入或浏览选择本地目录')) as HTMLInputElement
+    expect(input.value).toBe('D:\\NewPhotos')
+    expect(serverApi.setGameRoot).not.toHaveBeenCalled()
+  })
+
+  it('(aw) 保存成功：setGameRoot + 成功 Toast + 重启询问（确认 0 ⇒ relaunch）', async () => {
+    renderSection()
+    const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    fireEvent.change(input, { target: { value: 'D:\\CustomRoot' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(serverApi.setGameRoot).toHaveBeenCalledWith({ path: 'D:\\CustomRoot' })
+    )
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith('照片目录已保存，重启后生效', 'success')
+    )
+    expect(dialogShowMessageBox).toHaveBeenCalled()
+    expect(appRelaunch).toHaveBeenCalledTimes(1)
+  })
+
+  it('(ax) 保存成功但目录不可写：仍保存并追加 info 警告，重启询问不受影响', async () => {
+    installElectronApi({ setGameRootWritableFalse: true })
+    renderSection()
+    const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    fireEvent.change(input, { target: { value: 'D:\\ReadOnly' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith('照片目录已保存，重启后生效', 'success')
+    )
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        '目录不可写：扫描读取不受影响，但无法向该目录写入',
+        'info'
+      )
+    )
+    expect(dialogShowMessageBox).toHaveBeenCalled()
+  })
+
+  it('(ay) 保存失败：输入保留、不弹重启询问、不重启（错误 Toast 由 useErrorToast 本地态承担，此处锁下游短路）', async () => {
+    installElectronApi({ setGameRootReject: new Error('photo source directory is not readable') })
+    renderSection()
+    const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    fireEvent.change(input, { target: { value: 'D:\\Locked' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() => expect(serverApi.setGameRoot).toHaveBeenCalledWith({ path: 'D:\\Locked' }))
+    // 失败后：输入值保留（可直接改后重试）、重启流整体短路
+    expect((input as HTMLInputElement).value).toBe('D:\\Locked')
+    expect(dialogShowMessageBox).not.toHaveBeenCalled()
+    expect(appRelaunch).not.toHaveBeenCalled()
+  })
+
+  it('(az) 恢复默认：resetGameRoot + 成功 Toast + 重启询问', async () => {
+    installElectronApi({ gameRoot: 'D:\\CustomRoot' })
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '恢复默认' }))
+    await waitFor(() => expect(serverApi.resetGameRoot).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith('已恢复默认照片目录，重启后生效', 'success')
+    )
+    expect(dialogShowMessageBox).toHaveBeenCalled()
+  })
+
+  it('(ba) K6 手输路径：预检并添加 ⇒ 先 admitDirectory 后 inspectExtraDirectory（提案照常出现）', async () => {
+    renderSection()
+    const input = await screen.findByPlaceholderText('或手动输入目录路径')
+    fireEvent.change(input, { target: { value: 'D:\\TypedPhotos' } })
+    fireEvent.click(screen.getByRole('button', { name: '预检并添加' }))
+    await waitFor(() =>
+      expect(serverApi.admitDirectory).toHaveBeenCalledWith({ path: 'D:\\TypedPhotos' })
+    )
+    await waitFor(() =>
+      expect(serverApi.inspectExtraDirectory).toHaveBeenCalledWith({ path: 'D:\\TypedPhotos' })
+    )
+    expect(await screen.findByText('识别到 12 张照片 / 2 个视频')).toBeInTheDocument()
+  })
+
+  it('(bb) K6 手输路径被拒：不进入 inspect（错误提示由 useErrorToast 承担，此处锁流程短路）', async () => {
+    installElectronApi({ admitReject: new Error('photo source directory does not exist') })
+    renderSection()
+    const input = await screen.findByPlaceholderText('或手动输入目录路径')
+    fireEvent.change(input, { target: { value: 'D:\\Missing' } })
+    fireEvent.click(screen.getByRole('button', { name: '预检并添加' }))
+    await waitFor(() =>
+      expect(serverApi.admitDirectory).toHaveBeenCalledWith({ path: 'D:\\Missing' })
+    )
+    // admit 拒绝 ⇒ 提案流整体短路：inspect 零调用、无提案卡
+    expect(serverApi.inspectExtraDirectory).not.toHaveBeenCalled()
+    expect(screen.queryByText('识别到 12 张照片 / 2 个视频')).not.toBeInTheDocument()
   })
 })

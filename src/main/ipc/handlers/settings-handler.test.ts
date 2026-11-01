@@ -124,7 +124,8 @@ describe('registerSettingsHandlers', () => {
       ['logDir', 'log:setDir'],
       ['crashDir', 'crash:setDir'],
       ['export.defaultDir', 'export:setDefaultDir'],
-      ['export.namingPattern', 'export:setNamingPattern']
+      ['export.namingPattern', 'export:setNamingPattern'],
+      ['nikkisync.gameRoot', 'nikkisync:set-game-root']
     ]
     for (const [key, channel] of cases) {
       const result = (await getHandler(handleMock, 'settings:set')([key, 'x'])) as {
