@@ -1289,4 +1289,49 @@ describe('SyncServicePage 照片目录自定义（(at)-(be)）', () => {
     expect(serverApi.inspectExtraDirectory).not.toHaveBeenCalled()
     expect(screen.queryByText('识别到 12 张照片 / 2 个视频')).not.toBeInTheDocument()
   })
+
+  it('(bg) 输入框边框 token：不再引用未定义的 --border-color（未定义 token 会回落到文字色）', async () => {
+    renderSection()
+    const photoInput = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    const typedInput = await screen.findByPlaceholderText('或手动输入目录路径')
+    // globals.css 只定义 --border-subtle / --border-strong / --divider；--border-color 无定义处
+    expect((photoInput as HTMLInputElement).style.borderColor).not.toBe('var(--border-color)')
+    expect((photoInput as HTMLInputElement).style.borderColor).toBe('var(--border-subtle)')
+    expect((typedInput as HTMLInputElement).style.borderColor).not.toBe('var(--border-color)')
+    expect((typedInput as HTMLInputElement).style.borderColor).toBe('var(--border-subtle)')
+  })
+
+  it('(bh) K6 手输预检连点：busy 门生效 ⇒ admit+inspect 链只发一条（第二条点击被拦）', async () => {
+    renderSection()
+    const input = await screen.findByPlaceholderText('或手动输入目录路径')
+    fireEvent.change(input, { target: { value: 'D:\\TypedPhotos' } })
+    const button = screen.getByRole('button', { name: '预检并添加' })
+    fireEvent.click(button)
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(serverApi.admitDirectory).toHaveBeenCalledWith({ path: 'D:\\TypedPhotos' })
+    )
+    await waitFor(() => {
+      expect(serverApi.admitDirectory).toHaveBeenCalledTimes(1)
+      expect(serverApi.inspectExtraDirectory).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  it('(bi) 保存未生效且目录不可写：只报 savedDeferred（生效失败自有文案），不叠加 notWritable toast', async () => {
+    installElectronApi({ setGameRootWritableFalse: true, gameRootApplyDeferred: true })
+    renderSection()
+    const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    fireEvent.change(input, { target: { value: 'D:\\SlowDisk' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        '配置已保存，但未能立即生效，重启应用后生效',
+        'success'
+      )
+    )
+    expect(mockShowMessage).not.toHaveBeenCalledWith(
+      '目录不可写：扫描读取不受影响，但无法向该目录写入',
+      'info'
+    )
+  })
 })

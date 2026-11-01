@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "No se pueden usar directorios sensibles del sistema como directorio de origen de fotos",
+      "photoDirMissing": "El directorio de origen de fotos no existe",
+      "photoDirNotDirectory": "Esta ruta no es un directorio",
+      "photoDirNotReadable": "El directorio de origen de fotos no se puede leer",
+      "photoDirBareRoot": "El directorio de origen de fotos no puede ser la raíz de una unidad o UNC"
     }
   },
   "appError": {

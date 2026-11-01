@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "システムの機密ディレクトリは写真ソースとして使用できません",
+      "photoDirMissing": "写真ソースのディレクトリが存在しません",
+      "photoDirNotDirectory": "このパスはディレクトリではありません",
+      "photoDirNotReadable": "写真ソースのディレクトリを読み取れません",
+      "photoDirBareRoot": "写真ソースのディレクトリにはドライブルートやUNCルートを指定できません"
     }
   },
   "appError": {

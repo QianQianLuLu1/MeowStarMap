@@ -3962,6 +3962,13 @@
       "log": {
         "exported": "共鸣录数据已导出（{{count}} 条记录）"
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "不能使用系统敏感目录作为照片源目录",
+      "photoDirMissing": "照片源目录不存在",
+      "photoDirNotDirectory": "该路径不是目录",
+      "photoDirNotReadable": "照片源目录不可读",
+      "photoDirBareRoot": "照片源目录不能是盘根或 UNC 根目录"
     }
   },
   "appError": {

@@ -287,7 +287,8 @@ export const SyncServicePage: React.FC = () => {
   }, [metadataEnabled])
 
   /** 照片目录：挂载读取持久化值（''=默认自动发现）并回填输入框草稿。只碰设置数据库，
-   * 不 requireRuntime——同步服务未启用时配置也可先行落库，重启后由会话装配消费。 */
+   * 不 requireRuntime——同步服务未启用时配置也可先行落库，保存/恢复默认会当场经
+   * applyGameRoot 生效，未生效才回退重启消费点。 */
   useEffect(() => {
     let alive = true
     void (async () => {
@@ -702,7 +703,10 @@ export const SyncServicePage: React.FC = () => {
       setGameRoot(res.gameRoot)
       setGameRootInput(res.gameRoot)
       await announceGameRootApply(res, t('syncService.photoDirectories.saved'), 'set')
-      if (!res.writable) showMessage(t('syncService.photoDirectories.notWritable'), 'info')
+      // 不可写提示只在「已当场生效」时追加：生效失败（applied:false）已有 savedDeferred/
+      // applyFailedInstallRoot 专属文案，再叠一条 info 是一次动作两条 toast
+      if (!res.writable && res.applied)
+        showMessage(t('syncService.photoDirectories.notWritable'), 'info')
     } catch (error) {
       // 失败保留输入值与当前生效目录，用户可直接改后重试
       showError(error)
@@ -728,18 +732,22 @@ export const SyncServicePage: React.FC = () => {
     }
   }
 
-  /** K6 手输预检：先 admit（主进程做敏感目录/存在性/可读校验并登记 pathGuard），
-   * 再走与「添加目录」完全相同的 inspect → 提案确认流。失败则不进入 inspect。 */
+  /** K6 手输预检：先 admit（主进程做敏感目录/盘根/存在性/可读校验并登记 pathGuard），
+   * 再走与「添加目录」完全相同的 inspect → 提案确认流。失败则不进入 inspect。
+   * busy 门必须在 try 内显式闭合（与 handleConfirmAdd 同形），否则双击会并发两条 admit+inspect 链。 */
   const handleInspectTypedDirectory = async (): Promise<void> => {
     const api = window.electronAPI
     const value = typedDirInput.trim()
     if (busy || !api || !value) return
+    setBusy(true)
     try {
       await api.nikkisync.admitDirectory({ path: value })
       setProposal(await api.nikkisync.inspectExtraDirectory({ path: value }))
       setTypedDirInput('')
     } catch (error) {
       showError(error)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -1158,7 +1166,7 @@ export const SyncServicePage: React.FC = () => {
                 className="w-full px-3 py-2 text-sm rounded-lg border"
                 style={{
                   background: 'var(--bg-tertiary)',
-                  borderColor: 'var(--border-color)',
+                  borderColor: 'var(--border-subtle)',
                   color: 'var(--text-primary)'
                 }}
               />
@@ -1298,7 +1306,7 @@ export const SyncServicePage: React.FC = () => {
                     className="flex-1 px-3 py-2 text-sm rounded-lg border"
                     style={{
                       background: 'var(--bg-tertiary)',
-                      borderColor: 'var(--border-color)',
+                      borderColor: 'var(--border-subtle)',
                       color: 'var(--text-primary)'
                     }}
                   />

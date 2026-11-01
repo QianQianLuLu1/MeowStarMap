@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "Les répertoires sensibles du système ne peuvent pas être utilisés comme répertoire source des photos",
+      "photoDirMissing": "Le répertoire source des photos n'existe pas",
+      "photoDirNotDirectory": "Ce chemin n'est pas un répertoire",
+      "photoDirNotReadable": "Le répertoire source des photos n'est pas lisible",
+      "photoDirBareRoot": "Le répertoire source des photos ne peut pas être la racine d'un lecteur ou un répertoire UNC"
     }
   },
   "appError": {

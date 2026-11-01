@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "Không thể dùng thư mục nhạy cảm của hệ thống làm thư mục nguồn ảnh",
+      "photoDirMissing": "Thư mục nguồn ảnh không tồn tại",
+      "photoDirNotDirectory": "Đường dẫn này không phải là thư mục",
+      "photoDirNotReadable": "Không thể đọc thư mục nguồn ảnh",
+      "photoDirBareRoot": "Thư mục nguồn ảnh không thể là thư mục gốc của ổ đĩa hoặc UNC"
     }
   },
   "appError": {

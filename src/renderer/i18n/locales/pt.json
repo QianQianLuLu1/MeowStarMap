@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "Não é possível usar diretórios confidenciais do sistema como diretório de origem das fotos",
+      "photoDirMissing": "O diretório de origem das fotos não existe",
+      "photoDirNotDirectory": "Este caminho não é um diretório",
+      "photoDirNotReadable": "O diretório de origem das fotos não pode ser lido",
+      "photoDirBareRoot": "O diretório de origem das fotos não pode ser a raiz de uma unidade ou raiz UNC"
     }
   },
   "appError": {

@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "不能使用系統敏感目錄作為照片來源目錄",
+      "photoDirMissing": "照片來源目錄不存在",
+      "photoDirNotDirectory": "該路徑不是目錄",
+      "photoDirNotReadable": "照片來源目錄不可讀",
+      "photoDirBareRoot": "照片來源目錄不能是磁碟根目錄或 UNC 根目錄"
     }
   },
   "appError": {

@@ -1540,7 +1540,7 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
         expect(
           res.error?.message ?? '',
           `盘根 ${root} 必须拒于盘根判据本身，而不是下游校验`
-        ).toMatch(/bare drive|UNC root/i)
+        ).toMatch(/盘根|UNC 根/)
         expect(
           res.error?.message ?? '',
           `盘根 ${root} 不得靠 stat「目录不存在」蒙过本用例`
@@ -1561,6 +1561,39 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     expect(isBareDirectoryRoot('///')).toBe(true)
     expect(isBareDirectoryRoot('  /  ')).toBe(true)
     expect(isBareDirectoryRoot('D:')).toBe(true)
+  })
+
+  // N1（复查缺陷）：四个校验 throw 此前把完整路径拼进 message 且不带 userMessage——
+  // ValidationError/PermissionError 又没有默认 userMessage ⇒ 跨进程还原后渲染层只能
+  // 拿英文技术串 + 完整盘路径弹 toast。钉死三条脱敏口径：message 不含裸路径、
+  // details.path 只留末 2 段（<...> 开头）、userMessage 非空。
+  it('照片目录校验错误：message 不含裸路径、details.path 走 maskPath 脱敏、userMessage 非空', async () => {
+    register(createRuntimeStub())
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    const dir = await makeTempDir()
+    const filePath = path.join(dir, 'a-file.txt')
+    fs.writeFileSync(filePath, 'x')
+    const cases: Array<{ input: string; label: string }> = [
+      { input: 'C:\\Windows\\System32', label: '敏感目录' },
+      { input: path.join(dir, 'does-not-exist'), label: '目录不存在' },
+      { input: filePath, label: '不是目录' }
+    ]
+    for (const { input, label } of cases) {
+      const res = (await admit({}, { path: input })) as HandleResult
+      expect(res.success, `${label} 必须被拒`).toBe(false)
+      const message = res.error?.message ?? ''
+      expect(message, `${label} 的 message 不得携带裸路径`).not.toContain(input)
+      expect(message, `${label} 的 message 必须是用户可读文案`).toBeTruthy()
+      const details = res.error?.details as { path?: string } | undefined
+      expect(
+        typeof details?.path === 'string' && details.path.startsWith('<...>'),
+        `${label} 的 details.path 必须是 maskPath 脱敏形态`
+      ).toBe(true)
+      expect(
+        typeof res.error?.userMessage === 'string' && res.error.userMessage.length > 0,
+        `${label} 必须显式携带 userMessage`
+      ).toBe(true)
+    }
   })
 
   it('admit-directory：边界——盘根下的真实子目录与 UNC 共享下的目录照常放行', async () => {

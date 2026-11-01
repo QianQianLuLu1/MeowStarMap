@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "Системные защищённые каталоги нельзя использовать как источник фотографий",
+      "photoDirMissing": "Каталог источника фотографий не существует",
+      "photoDirNotDirectory": "Указанный путь не является каталогом",
+      "photoDirNotReadable": "Каталог источника фотографий недоступен для чтения",
+      "photoDirBareRoot": "Источник фотографий не может быть корнем диска или UNC-каталогом"
     }
   },
   "appError": {

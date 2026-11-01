@@ -1,7 +1,6 @@
-// @core-change: admit-directory 新增盘根/UNC 根形态闸（isBareDirectoryRoot，整盘/根目录
-//               不得登记为同步照片源，含 // 与 /// 等裸分隔符根），未装配 runtime 的
-//               set/reset 生效失败补回 applyError:'runtime-unavailable'，生效失败分类判据
-//               由宽正则 /not found/i 收紧为与 runtime-manager 同源的 installNotfoundMessage。
+// @core-change: 照片目录校验的四个 throw 改走 userMessage 与 maskPath 脱敏（message 经
+//               主进程 i18n 输出、不再拼接裸路径，details 只留末 2 段），修跨进程后
+//               渲染层拿英文技术串 + 完整盘路径弹 toast 的泄露；盘根闸同步走同口径。
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -10,7 +9,15 @@ import type { HandlerContext } from '../handler-context'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
 // 生效失败分类判据与 runtime-manager 同源（该常量是其状态机判定 degraded 的同一把尺）
 import { installNotfoundMessage } from '../../nikkisync/runtime-manager'
-import { assertFileReadPath, pathGuard, wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
+// 照片目录校验失败的用户可见文案走主进程 i18n（不含路径，路径只在 details 里走 maskPath 脱敏）
+import { t } from '../../i18n'
+import {
+  assertFileReadPath,
+  maskPath,
+  pathGuard,
+  wrapHandlerNoArgs,
+  wrapHandlerRaw
+} from '../validator'
 import { isSensitivePath } from '../../utils/ipc-validate'
 import { AppError } from '../../../shared/errors/app-error'
 import { isAssetType } from '../../../shared/sync/protocol'
@@ -420,24 +427,52 @@ export function isBareDirectoryRoot(p: string): boolean {
  * 绝对路径形态已由 zod schema 先行，这里做「敏感目录黑名单 → 存在 + 目录 → 可读（R_OK 必过）」，
  * 并 fail-open 探测可写（返回 writable 布尔，只提示不阻断——照片源目录扫描只读，
  * Program Files 等不可写位置本身合法，系统敏感目录则一律拒绝）。
+ *
+ * 错误口径（与 `assertAllowed` 样板逐字对齐）：message 走 `t()` 不带路径（跨进程后渲染层
+ * 只能拿到它），details 只放 `maskPath` 脱敏形态，并显式携带 `userMessage`——
+ * ValidationError/PermissionError 没有默认 userMessage，不显式传渲染层就会拿英文技术串弹 toast。
  */
 async function validatePhotoSourceDirectory(dir: string): Promise<{ writable: boolean }> {
   if (isSensitivePath(dir)) {
-    throw AppError.forbidden(`refusing to use a system sensitive directory as photo source: ${dir}`)
+    throw AppError.forbidden(
+      t('main.nikkisync.photoDirSensitive'),
+      { path: maskPath(dir) },
+      {
+        userMessage: t('main.nikkisync.photoDirSensitive')
+      }
+    )
   }
   let stat: fs.Stats
   try {
     stat = await fs.promises.stat(dir)
   } catch {
-    throw AppError.validation(`photo source directory does not exist: ${dir}`)
+    throw AppError.validation(
+      t('main.nikkisync.photoDirMissing'),
+      { path: maskPath(dir) },
+      {
+        userMessage: t('main.nikkisync.photoDirMissing')
+      }
+    )
   }
   if (!stat.isDirectory()) {
-    throw AppError.validation(`photo source path is not a directory: ${dir}`)
+    throw AppError.validation(
+      t('main.nikkisync.photoDirNotDirectory'),
+      { path: maskPath(dir) },
+      {
+        userMessage: t('main.nikkisync.photoDirNotDirectory')
+      }
+    )
   }
   try {
     await fs.promises.access(dir, fs.constants.R_OK)
   } catch {
-    throw AppError.forbidden(`photo source directory is not readable: ${dir}`)
+    throw AppError.forbidden(
+      t('main.nikkisync.photoDirNotReadable'),
+      { path: maskPath(dir) },
+      {
+        userMessage: t('main.nikkisync.photoDirNotReadable')
+      }
+    )
   }
   let writable = true
   try {
@@ -969,7 +1004,11 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         // 盘根先拒（D3）：它在「非敏感 + 存在 + 是目录 + 可读」四关上全过，但登记进去就是
         // 把整块盘递给上游当同步扫描根；这里不落库也不登记。
         if (isBareDirectoryRoot(input.path)) {
-          throw AppError.validation('refusing a bare drive or UNC root as a photo source directory')
+          throw AppError.validation(
+            t('main.nikkisync.photoDirBareRoot'),
+            { path: maskPath(input.path) },
+            { userMessage: t('main.nikkisync.photoDirBareRoot') }
+          )
         }
         await validatePhotoSourceDirectory(input.path)
         // 校验全过才登记，且只进**同步域专用集合**（不是 userPickedDirs）：入参来自渲染层、

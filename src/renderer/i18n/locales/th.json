@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "ไม่สามารถใช้ไดเรกทอรีที่เป็นความลับของระบบเป็นไดเรกทอรีต้นทางของรูปภาพได้",
+      "photoDirMissing": "ไม่พบไดเรกทอรีต้นทางของรูปภาพ",
+      "photoDirNotDirectory": "พาธนี้ไม่ใช่ไดเรกทอรี",
+      "photoDirNotReadable": "ไม่สามารถอ่านไดเรกทอรีต้นทางของรูปภาพได้",
+      "photoDirBareRoot": "ไดเรกทอรีต้นทางของรูปภาพไม่สามารถเป็นรูทของไดรฟ์หรือรูท UNC ได้"
     }
   },
   "appError": {

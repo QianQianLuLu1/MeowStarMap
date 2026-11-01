@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "시스템 중요 디렉터리는 사진 소스 디렉터리로 사용할 수 없습니다",
+      "photoDirMissing": "사진 소스 디렉터리가 존재하지 않습니다",
+      "photoDirNotDirectory": "이 경로는 디렉터리가 아닙니다",
+      "photoDirNotReadable": "사진 소스 디렉터리를 읽을 수 없습니다",
+      "photoDirBareRoot": "사진 소스 디렉터리는 드라이브 루트나 UNC 루트일 수 없습니다"
     }
   },
   "appError": {

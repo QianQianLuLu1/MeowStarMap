@@ -3962,6 +3962,13 @@
         "emptyArchive": "",
         "targetNotGenerated": ""
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "Systemrelevante Verzeichnisse können nicht als Fotoquellverzeichnis verwendet werden",
+      "photoDirMissing": "Das Fotoquellverzeichnis existiert nicht",
+      "photoDirNotDirectory": "Dieser Pfad ist kein Verzeichnis",
+      "photoDirNotReadable": "Das Fotoquellverzeichnis ist nicht lesbar",
+      "photoDirBareRoot": "Das Fotoquellverzeichnis darf kein Laufwerks- oder UNC-Stammverzeichnis sein"
     }
   },
   "appError": {

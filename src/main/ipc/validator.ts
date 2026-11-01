@@ -395,7 +395,7 @@ class PathGuard {
  * 脱敏路径：仅保留末尾 2 段，前面替换为 <...>
  * 用于日志/错误详情，避免完整路径泄露用户目录结构
  */
-function maskPath(p: string): string {
+export function maskPath(p: string): string {
   try {
     const resolved = path.resolve(p)
     const segments = resolved.split(path.sep).filter(Boolean)

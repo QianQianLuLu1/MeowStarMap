@@ -3962,6 +3962,13 @@
       "log": {
         "exported": "Resonance data exported ({{count}} records)"
       }
+    },
+    "nikkisync": {
+      "photoDirSensitive": "System-sensitive directories cannot be used as the photo source directory",
+      "photoDirMissing": "The photo source directory does not exist",
+      "photoDirNotDirectory": "This path is not a directory",
+      "photoDirNotReadable": "The photo source directory is not readable",
+      "photoDirBareRoot": "The photo source directory cannot be a drive or UNC root"
     }
   },
   "appError": {
