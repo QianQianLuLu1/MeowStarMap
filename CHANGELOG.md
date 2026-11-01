@@ -23,7 +23,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ## [2.5.6] - 2026-11-01
 
-> 2.5.6：全屏预览与同步图库缺陷修复的收口定版（2.5.6-beta 的定版轮，无新增功能）。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6`，安装包名随 `artifactName` 模板为 `MeowStarMap-Setup-2.5.6.exe`。
+> 2.5.6：全屏预览与同步图库缺陷修复的收口定版。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6`，安装包名随 `artifactName` 模板为 `MeowStarMap-Setup-2.5.6.exe`。
+
+### Added | 新增
+
+- **同步图库自定义照片目录（2026-11-01）**：「同步服务」页新增「照片目录」分区，支持手动输入或浏览选择本地目录以**替代系统默认路径**（留空回退上游自动发现的游戏安装根）。主进程新增 `nikkisync:get/set/reset-game-root` 三通道（持久化设置键 `nikkisync.gameRoot`，重启后由 `buildSessionOptions` 既有读取端自动生效）与 `nikkisync:admit-directory` 预检通道（K6 额外照片目录同步支持手输路径，先校验再走既有 inspect 提案流）。校验口径：绝对路径 + 系统敏感目录黑名单 + 存在/目录/可读必过，可写探测失败仅提示不阻断（照片源目录扫描只读）；保存/恢复默认走「成功提示 → 重启询问 → relaunch」流。新增键入 `SECURITY_SENSITIVE_KEYS`（settings:set 拒绝并指向专用通道）；文案 12 语言齐备。计划与验证读数见 `docs/plans/2026-11-01-sync-gallery-custom-photo-dir-实施计划.md`
+  - 二轮审查修正（2026-11-01）：① **手输预检不再授予全局免检**——首版 `admit-directory` 把渲染层传入的目录经 `registerUserPickedDir` 写进 `userPicked`/`userPickedDirs`/`roots` 三个全局集合，而 `matchesPicked` 按**前缀**命中、`scanner:start` / `settings:set`(customScanPaths) / `assertMediaAccessPath` / `media://` 规则 0 全拿它做黑名单短路，等于一次 `admit(D:\)` 就让整盘免检且**无需对话框手势**（与 `validator.ts` 自陈的「渲染进程无任何 IPC 可写入该集合」直接矛盾）。改为只登记同步域专用集合 `registerSyncPhotoDir`，唯一消费方是 `nikkisync:inspect-extra-directory`；手输目录的照片仍按 `media://` 第 4 条规则（resource-allowlist 精确授权表）读图，功能面零收窄。② **`gameRoot` 读写两端键名同源守卫**——写端字面量与读端 `SETTING_GAME_ROOT` 分处两层，变异实测显示读端改名时全仓 1179 例仍绿（读端测试用常量符号化供键、改值后自洽），故新增源码级钉（改任一侧即红）。审查结论与逐节点读数见 `docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`
 
 ### Fixed | 修复
 
