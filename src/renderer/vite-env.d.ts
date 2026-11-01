@@ -1144,7 +1144,7 @@ interface WindowElectronAPI {
     rescanExtraDirectories: () => Promise<
       import('../shared/types/electron-api').NikkiSyncExtraDirectoriesInfo
     >
-    // ---- 照片目录自定义（gameRoot 替代默认路径，重启后由 buildSessionOptions 生效；admit 供 K6 手输预检）----
+    // ---- 照片目录自定义（gameRoot 替代默认路径，落库后当场经 applyGameRoot 生效，未生效才回退重启；admit 供 K6 手输预检）----
     getGameRoot: () => Promise<import('../shared/types/electron-api').NikkiSyncGameRootInfo>
     setGameRoot: (
       input: import('../shared/types/electron-api').NikkiSyncSetGameRootInput

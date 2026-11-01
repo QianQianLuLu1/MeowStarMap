@@ -1,14 +1,15 @@
-// @core-change: 照片目录 set/reset-game-root 在落库后接运行期生效通道 runtime.applyGameRoot
-//               （换根重建 + 全量扫描 + 成功后广播 library-changed），needRestart 由恒 true
-//               改为「未能当场生效才为 true」，并新增可选 applied / applyError 告知渲染层；
-//               admit-directory 的同步域登记收窄语义不变（历史：game-root 三通道与 K6 预检、
-//               K9/K6/K2/K3/K8 历次接入——见各节点提交）。
+// @core-change: admit-directory 新增盘根/UNC 根形态闸（isBareDirectoryRoot，整盘/根目录
+//               不得登记为同步照片源，含 // 与 /// 等裸分隔符根），未装配 runtime 的
+//               set/reset 生效失败补回 applyError:'runtime-unavailable'，生效失败分类判据
+//               由宽正则 /not found/i 收紧为与 runtime-manager 同源的 installNotfoundMessage。
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
+// 生效失败分类判据与 runtime-manager 同源（该常量是其状态机判定 degraded 的同一把尺）
+import { installNotfoundMessage } from '../../nikkisync/runtime-manager'
 import { assertFileReadPath, pathGuard, wrapHandlerNoArgs, wrapHandlerRaw } from '../validator'
 import { isSensitivePath } from '../../utils/ipc-validate'
 import { AppError } from '../../../shared/errors/app-error'
@@ -394,6 +395,27 @@ function consentErrorToAppError(error: unknown): AppError {
 const SETTING_GAME_ROOT_KEY = 'nikkisync.gameRoot'
 
 /**
+ * 盘根/UNC 根形态判据（缺陷 D3）：`D:\`、`C:/`、`\`、`/`、`//`、`///`、`\\nas\share`。
+ *
+ * 为什么单独设一道：照片源目录的四关是「非敏感 → 存在 → 是目录 → 可读」，而
+ * `isSensitivePath` 只按**首段**拦 windows/program files/programdata，盘根没有首段可拦，
+ * 于是 `admit(D:\)` 四关全过并把整块盘登记成同步照片源、递给上游当扫描根。
+ *
+ * 判据刻意只看**串的形态**：不 import `node:path`、不触磁盘，故不引入 win32 钉也不引入
+ * 方言引用（无需在 path-semantics-guard 登记），Windows 真宿主与 Linux 装置同判据。
+ */
+export function isBareDirectoryRoot(p: string): boolean {
+  const s = p.trim()
+  // 裸分隔符根：`/`、`\`，以及重复形态 `//`、`///`、`\\\\`——POSIX 上 `//` 语义等同 `/`
+  // 且 stat 可过（实测 Windows 宿主同样能 stat 过并被登记），必须与单分隔符同判
+  if (/^[\\/]+$/.test(s)) return true
+  // 盘符根：`D:` / `D:\` / `D:/` / `D:\\`（分隔符多寡都算同一个根）
+  if (/^[A-Za-z]:[\\/]*$/.test(s)) return true
+  // UNC 根：恰好「服务器 + 共享」两段，其后不再有路径段（`\\nas\share\photos` 是子目录，放行）
+  return /^\\\\[^\\/]+[\\/][^\\/]+[\\/]*$/.test(s)
+}
+
+/**
  * 照片目录自定义通道（set-game-root / admit-directory）共用的目录校验：
  * 绝对路径形态已由 zod schema 先行，这里做「敏感目录黑名单 → 存在 + 目录 → 可读（R_OK 必过）」，
  * 并 fail-open 探测可写（返回 writable 布尔，只提示不阻断——照片源目录扫描只读，
@@ -485,14 +507,20 @@ async function applyPersistedGameRoot(
   gameRoot: string,
   event: IpcMainInvokeEvent
 ): Promise<NikkiSyncGameRootApplyResult> {
-  if (!runtime) return { applied: false, needRestart: true }
+  if (!runtime) {
+    // 契约把 runtime-unavailable 定义为「Runtime 未装配 / 未建链」，未装配这一支也必须如实回
+    // 分类码（渲染层仍按 needRestart 走重启兜底，补码只为诊断与契约成真）
+    return { applied: false, needRestart: true, applyError: 'runtime-unavailable' }
+  }
   try {
     await runtime.applyGameRoot(gameRoot)
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
-    // 判据顺序与 `toAppError` 保持一致：'not found' 只来自上游安装发现失败，
-    // 未建链/未就绪走 'not ready|unavailable' 一支。
-    if (/not found/i.test(message)) {
+    // 判据与 `runtime-manager` 同源：`installation-not-found` 的唯一特征就是那一条
+    // installNotfoundMessage（该文件 :496/:540 也是拿它比的）。宽正则 `/not found/i`
+    // 会把任何含 "not found" 的下游故障（缺表、缺资源行）误判成安装根问题，
+    // 让渲染层给出「请改选游戏安装目录」这种无效指向。未建链/未就绪仍走下一支。
+    if (message.includes(installNotfoundMessage)) {
       return { applied: false, needRestart: true, applyError: 'installation-not-found' }
     }
     if (/not ready|unavailable/i.test(message)) {
@@ -938,6 +966,11 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
     'nikkisync:admit-directory',
     wrapHandlerRaw(ctx, async (args) =>
       parseAndRun(admitDirectorySchema, args[0] ?? {}, 'admit-directory', async (input) => {
+        // 盘根先拒（D3）：它在「非敏感 + 存在 + 是目录 + 可读」四关上全过，但登记进去就是
+        // 把整块盘递给上游当同步扫描根；这里不落库也不登记。
+        if (isBareDirectoryRoot(input.path)) {
+          throw AppError.validation('refusing a bare drive or UNC root as a photo source directory')
+        }
         await validatePhotoSourceDirectory(input.path)
         // 校验全过才登记，且只进**同步域专用集合**（不是 userPickedDirs）：入参来自渲染层、
         // 无对话框手势，若写全局集合则 `matchesPicked` 的前缀语义会让一次 admit 变成

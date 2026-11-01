@@ -641,12 +641,12 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
 
 ### 8.2.6 照片目录自定义（2026-11-01 新增；gameRoot 替代默认路径 + K6 手输预检）
 
-| 通道                        | 入参                                    | 出参                                                                                         | 失败码                                                                               |
-| --------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `nikkisync:get-game-root`   | 无                                      | `{gameRoot: string}`（`''` = 未设置，走上游自动发现游戏安装根）                              | 无（只读设置数据库；非字符串历史脏值回退 `''`）                                      |
-| `nikkisync:set-game-root`   | `{path: string(1..512)，必须绝对路径}`  | `{gameRoot, writable, applied, needRestart, applyError?}`（`writable` 仅提示——只读目录合法） | `VALIDATION_ERROR`（非绝对/不存在/非目录）；`PATH_FORBIDDEN`（系统敏感目录、不可读） |
-| `nikkisync:reset-game-root` | 无                                      | `{applied, needRestart, applyError?}`（清空回默认自动发现，同样当场生效）                    | 无                                                                                   |
-| `nikkisync:admit-directory` | `{path: string(1..4096)，必须绝对路径}` | `{path}`（校验通过并登记同步域专用集合，见下）                                               | 同 `set-game-root`                                                                   |
+| 通道                        | 入参                                    | 出参                                                                                         | 失败码                                                                                                                                                                                                |
+| --------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nikkisync:get-game-root`   | 无                                      | `{gameRoot: string}`（`''` = 未设置，走上游自动发现游戏安装根）                              | 无（只读设置数据库；非字符串历史脏值回退 `''`）                                                                                                                                                       |
+| `nikkisync:set-game-root`   | `{path: string(1..512)，必须绝对路径}`  | `{gameRoot, writable, applied, needRestart, applyError?}`（`writable` 仅提示——只读目录合法） | `VALIDATION_ERROR`（非绝对/不存在/非目录）；`PATH_FORBIDDEN`（系统敏感目录、不可读）                                                                                                                  |
+| `nikkisync:reset-game-root` | 无                                      | `{applied, needRestart, applyError?}`（清空回默认自动发现，同样当场生效）                    | 无                                                                                                                                                                                                    |
+| `nikkisync:admit-directory` | `{path: string(1..4096)，必须绝对路径}` | `{path}`（校验通过并登记同步域专用集合，见下）                                               | 同 `set-game-root`；另**新增盘根闸**：`D:\`、`C:/`、`\`、`/`、`//`、`///`、`\\nas\share` 等盘根/UNC 根形态 ⇒ `VALIDATION_ERROR`（拒于盘根判据本身，不落库不登记；`set`/`reset-game-root` **不收窄**） |
 
 契约要点：
 
@@ -662,7 +662,9 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   `installation-not-found`（该目录解析不出游戏安装根——上游要求 `<root>\X6Game` + 游戏主程序）、
   `scan-failed`（其他重建/扫描故障）。三种情况下**值都已持久化**，下次进程仍按消费点 ① 生效，
   不把已成功的保存改判为失败；且都不广播 `library-changed`（库未变化）。
-- **校验口径**：绝对路径（win32 正则，与 inspect 同款）→ `isSensitivePath` 系统敏感目录黑名单
+- **校验口径**：绝对路径（win32 正则，与 inspect 同款）→ **盘根/UNC 根形态闸**（`isBareDirectoryRoot`
+  纯串形态判定，不触磁盘，`admit-directory` 专属、先于一切 IO；2026-11-01 二轮新增）
+  → `isSensitivePath` 系统敏感目录黑名单
   → 存在 + 目录 → `R_OK` 可读必过；`W_OK` 可写探测 **fail-open**（仅 `writable:false` 提示，
   不阻断、也不阻断生效——照片源目录扫描只读，Program Files 等不可写位置本身合法，系统敏感目录才拒绝）。
 - `admit-directory` 供 K6 手输路径使用：校验全过后只登记**同步域专用集合**

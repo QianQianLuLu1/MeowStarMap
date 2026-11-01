@@ -16,7 +16,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { makeCtx, getHandler } from './_test-helpers'
-import { registerNikkiSyncHandlers } from './nikkisync-handler'
+import { isBareDirectoryRoot, registerNikkiSyncHandlers } from './nikkisync-handler'
 import { pathGuard } from '../validator'
 import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
 import { AppError } from '../../../shared/errors/app-error'
@@ -1260,6 +1260,29 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     })
   })
 
+  // N3：分类判据必须与 runtime-manager 同源。`installation-not-found` 的真实特征只有
+  // `installNotfoundMessage` 那一条串；此前用宽正则 `/not found/i` 扫上游错误原文，
+  // 于是任何含 "not found" 的下游故障（缺表、缺资源行）都被误判成「目录不是安装根」，
+  // 让渲染层给出「请改选游戏安装目录」这种无效指向，而不是本该保留的重启兜底。
+  it('set-game-root：含无关 "not found" 的故障归 scan-failed，不得误判成安装根问题', async () => {
+    const runtime = createRuntimeStub()
+    runtime.applyGameRoot = vi.fn(async () => {
+      throw new Error('SqliteError: no such table: assets not found')
+    })
+    register(runtime)
+    const dir = await makeTempDir()
+    const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      {},
+      { path: dir }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data as Record<string, unknown>).toMatchObject({
+      applied: false,
+      needRestart: true,
+      applyError: 'scan-failed'
+    })
+  })
+
   it('set-game-root：runtime 未装配时不调生效通道，保持旧「重启后生效」语义', async () => {
     const ctx = register(undefined)
     const dir = await makeTempDir()
@@ -1269,7 +1292,13 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
       { path: dir }
     )) as HandleResult
     expect(res.success).toBe(true)
-    expect(res.data as Record<string, unknown>).toMatchObject({ applied: false, needRestart: true })
+    // D4：契约把 runtime-unavailable 定义为「Runtime 未装配 / 未建链」，未装配支必须如实回
+    // 该分类码（渲染层仍按 needRestart 走重启兜底，补码只为诊断与契约成真）
+    expect(res.data as Record<string, unknown>).toMatchObject({
+      applied: false,
+      needRestart: true,
+      applyError: 'runtime-unavailable'
+    })
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
     expect(send).not.toHaveBeenCalled()
   })
@@ -1479,6 +1508,69 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     const inspect = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
     const proposal = (await inspect({}, { path: 'C:\\Windows\\System32' })) as HandleResult
     expect(proposal.error?.code).toBe(IPC_ERROR_CODES.PATH_FORBIDDEN)
+  })
+
+  // D3：盘根/UNC 根可以合法通过「非敏感 + 存在 + 是目录 + 可读」四关（`isSensitivePath`
+  // 只拦 windows/program files 等首段，盘根本身不在其列），于是 `admit(D:\)` 会把**整块盘**
+  // 登记成同步照片源并递给上游当扫描根。上一轮已把全局 `registerUserPickedDir` 收窄为
+  // 同步域集合，这一档是它的残留。
+  //
+  // 判据必须落在「拒于盘根判据」而不是「拒于目录不存在」：Windows 上 `D:\` 确实存在，
+  // Linux 上它压根 stat 不到——两侧都回 VALIDATION_ERROR，只断 code 会让 Linux 因错误的
+  // 原因假绿，故同时钉住错误文案不含「不存在」这条 stat 支的特征。
+  it('admit-directory：盘根/UNC 根一律拒绝，且拒于盘根判据本身（不是目录不存在）', async () => {
+    register(createRuntimeStub())
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    // 第二元 = 该形态能否通过绝对路径 schema 抵达盘根闸：能抵达的必须拒于「盘根判据」
+    // 文案本身；单个 `\` 过不了 schema（`\\` 分支要求两段），在 zod 层即被拒，只钉码与不登记。
+    const bareRoots: Array<[string, boolean]> = [
+      ['D:\\', true],
+      ['C:/', true],
+      ['\\\\nas\\share', true],
+      ['/', true],
+      ['//', true],
+      ['///', true],
+      ['\\', false]
+    ]
+    for (const [root, reachesGate] of bareRoots) {
+      const res = (await admit({}, { path: root })) as HandleResult
+      expect(res.success, `盘根必须被拒：${root}`).toBe(false)
+      expect(res.error?.code, `盘根 ${root} 的错误码`).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+      if (reachesGate) {
+        expect(
+          res.error?.message ?? '',
+          `盘根 ${root} 必须拒于盘根判据本身，而不是下游校验`
+        ).toMatch(/bare drive|UNC root/i)
+        expect(
+          res.error?.message ?? '',
+          `盘根 ${root} 不得靠 stat「目录不存在」蒙过本用例`
+        ).not.toMatch(/does not exist|no such file|ENOENT/i)
+      }
+      expect(pathGuard.isSyncPhotoDir(root), `盘根 ${root} 不得登记进同步域`).toBe(false)
+    }
+  })
+
+  it('isBareDirectoryRoot：直接判据——合法深路径一律 false，裸分隔符根（含 // 与 ///）一律 true', () => {
+    // 合法子目录：盘根下、UNC 共享下、POSIX 深路径都放行（收窄只砍「整盘当照片源」）
+    expect(isBareDirectoryRoot('D:\\Photos')).toBe(false)
+    expect(isBareDirectoryRoot('D:\\X6Game')).toBe(false)
+    expect(isBareDirectoryRoot('\\\\nas\\share\\photos')).toBe(false)
+    // `//`/`///`：POSIX 语义等同 `/` 且 stat 可过，必须与 `/` 同判——这道缝不补，
+    // Linux 装置会把 `//` 登记成同步照片源
+    expect(isBareDirectoryRoot('//')).toBe(true)
+    expect(isBareDirectoryRoot('///')).toBe(true)
+    expect(isBareDirectoryRoot('  /  ')).toBe(true)
+    expect(isBareDirectoryRoot('D:')).toBe(true)
+  })
+
+  it('admit-directory：边界——盘根下的真实子目录与 UNC 共享下的目录照常放行', async () => {
+    register(createRuntimeStub())
+    const dir = await makeTempDir()
+    const admit = getHandler(handleMock, 'nikkisync:admit-directory')
+    // 收窄只能砍掉「整盘当照片源」，不能砍掉合法的深层目录（含 tmpdir 下的真实目录）
+    const res = (await admit({}, { path: dir })) as HandleResult
+    expect(res.success).toBe(true)
+    expect(pathGuard.isSyncPhotoDir(dir)).toBe(true)
   })
 
   // ---- 边界 ----
