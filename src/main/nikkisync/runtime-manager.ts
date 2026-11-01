@@ -101,6 +101,13 @@ export interface FakeSessionPlan {
   /** 阶段 6：让 `fullScan()` 本身抛错（验证扫描失败时一轮解析都不发起）。 */
   fullScanThrows?: boolean
   /**
+   * 并发保护用例专用：只让**第一次** `fullScan()` 挂在门闩上，后续各次照常立即返回。
+   * 用于构造「上一次全量扫描仍在飞、换根重建已经发起」的交错。
+   */
+  fullScanHoldFirst?: () => Promise<void>
+  /** 并发保护用例专用：只让**第一次** `fullScan()` 抛安装未找到（后续各次成功）。 */
+  fullScanThrowsFirst?: boolean
+  /**
    * K1：是否模拟「深入口装载成功、会话挂出 `cachedMetadataRunOnce` 闭包」。
    * 默认 false ⇒ 会话上没有该闭包，编排层一次都不调用。
    */
@@ -210,6 +217,12 @@ interface ManagerState {
   hint?: string
   /** 启动在途共享，避免并发 start 建出两个会话（两个 SQLite 句柄指向同一文件）。 */
   starting?: Promise<NikkiSyncRuntimeStatus>
+  /**
+   * 扫描在途互斥句柄（缺陷 D2）。`scan()` 的整个临界区——换根判据 → teardown →
+   * 重建 → fullScan → 状态收敛——必须串行：并发时拆除会关掉**正在被扫描读的那个库**，
+   * 而被淘汰那次的失败随后又把 error/degraded 覆写进新会话的状态快照。
+   */
+  scanInFlight?: Promise<unknown>
   /**
    * 本会话**构造期**固化的 LAN 服务配置（上游把端口/mdns 冻结在构造期）。
    * 与 `startSyncServer(input)`  Desired 不一致时，必须整会话重建才能生效。
@@ -503,7 +516,7 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     }
   }
 
-  async function scan(input: { gameRoot?: string; path?: string }): Promise<unknown> {
+  async function scanCore(input: { gameRoot?: string; path?: string }): Promise<unknown> {
     const desiredRoot = input.gameRoot
     const rootOptions: NikkiSyncSessionOptions =
       desiredRoot === undefined ? { ...deps.defaults } : { ...deps.defaults, gameRoot: desiredRoot }
@@ -549,6 +562,38 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   }
 
   /**
+   * 等前一次扫描落地。只吞「已被上一次扫描如实记录过」的失败——那份失败已由它自己的
+   * catch 写进状态快照与日志，这里再抛只会把用户的第二次动作误判成失败。
+   */
+  async function settleScan(): Promise<void> {
+    if (state.scanInFlight) await state.scanInFlight.catch(() => undefined)
+  }
+
+  /**
+   * `scan()` = `scanCore()` 的串行闸门（缺陷 D2）。
+   *
+   * 并发交错是真实可达的：图库工具栏的 `handleGallerySourceToggle` 刻意不 await
+   * `startScan({})`，用户在全量扫描在途时点「保存」→ `applyGameRoot` → 换根判据不相等
+   * → `teardown` 关掉**正在扫描读的那个库**；而在途扫描随后落地的失败又覆写新会话状态。
+   * 更糟的是 `teardown` 不复位 `state.state`（仍是上一次扫描写的 `'scanning'`），
+   * 紧随的 `start()` 会命中「已启动」短路支直接返回，会话压根没建出来。
+   *
+   * 句柄必须在**第一个 await 之前**同步发布，否则并发的第二次调用读不到在途事实。
+   * 不变量：同一 manager 内 `fullScan`/`rescanPath` 在途峰值 ≤ 1，且 teardown
+   * 绝不作用在仍有在途扫描的会话上（`stop()` / `startSyncServer()` 的拆除点同口径 settle）。
+   */
+  async function scan(input: { gameRoot?: string; path?: string }): Promise<unknown> {
+    const inFlight = settleScan().then(() => scanCore(input))
+    state.scanInFlight = inFlight
+    try {
+      return await inFlight
+    } finally {
+      // 只清自己这一次：后继扫描已接管句柄时不得把它的互斥抹掉
+      if (state.scanInFlight === inFlight) state.scanInFlight = undefined
+    }
+  }
+
+  /**
    * 照片目录（设置键 `nikkisync.gameRoot`）的运行期生效通道。
    *
    * 为什么必须存在：该键的原生读者只有进程启动那一次的 `buildSessionOptions`
@@ -586,6 +631,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
         // 在途启动的失败已如实落入状态快照；这里只关心它落地后的拆除
       }
     }
+    // 同口径等扫描落地（D2）：在途 fullScan 正读着要关的那个库，抢先拆除会让它
+    // 以原生错误 reject，并把失败覆写进停止之后的状态。
+    await settleScan()
     if (!state.session) {
       if (state.state !== 'unavailable') state.state = 'idle'
       return
@@ -647,6 +695,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       desired.host !== state.syncConfig.host
     if (!state.session || portChanged) {
       // 端口/mdns 冻结在构造期 ⇒ 只能整会话重建（与 scan() 换根同一条路径）
+      // 同样先等扫描落地再拆（D2）：这条路径绕过 scan()，不 settle 就会关掉在扫的库
+      await settleScan()
       // teardown 会清 activeRoot，先取存再重建（只用 defaults 会把用户选过的根丢回 auto-discovery）
       const previousRoot = state.activeRoot
       if (state.session) await teardown('nikkisync.resync')

@@ -36,6 +36,14 @@ interface FakeCalls {
   scannerStop: number
   dispose: number
   fullScan: number
+  /**
+   * 并发保护判据（D2）：当前**正在飞**的 `fullScan()` 数量、其历史峰值、
+   * 以及「拆除会话时仍有在飞扫描」的次数。三者共同钉住「teardown 绝不作用在
+   * 正在扫描的会话上」这条不变量——单看 `fullScan` 总数看不出并发。
+   */
+  fullScanActive: number
+  fullScanPeak: number
+  disposeWhileScanning: number
   rescanPath: string[]
   ensureDir: string[]
   logs: Array<{ level: string; message: string }>
@@ -92,9 +100,20 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       if (plan.stopThrows) throw new Error('watcher close failed')
     }),
     fullScan: vi.fn(async () => {
-      calls.fullScan += 1
-      if (plan.fullScanThrows) throw new Error(installNotfoundMessage)
-      return { scanId: 'scan_full', filesObserved: 3 }
+      // 必须当场定格本次是第几轮：并发时计数会在 await 期间被别人推进，
+      // 用 calls.fullScan 回读会让「只失败第一次」的注入随竞态漂移。
+      const index = (calls.fullScan += 1)
+      calls.fullScanActive += 1
+      if (calls.fullScanActive > calls.fullScanPeak) calls.fullScanPeak = calls.fullScanActive
+      try {
+        // 只挂第一次：让「扫描在飞」与「换根重建」有机会真正交叠
+        if (plan.fullScanHoldFirst && index === 1) await plan.fullScanHoldFirst()
+        if (plan.fullScanThrows) throw new Error(installNotfoundMessage)
+        if (plan.fullScanThrowsFirst && index === 1) throw new Error(installNotfoundMessage)
+        return { scanId: 'scan_full', filesObserved: 3 }
+      } finally {
+        calls.fullScanActive -= 1
+      }
     }),
     rescanPath: vi.fn(async (filePath: string) => {
       calls.rescanPath.push(filePath)
@@ -434,6 +453,8 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     dispose: () => {
       calls.order.push('dispose')
       calls.dispose += 1
+      // 会话库是在扫线程正在读的库：在飞扫描未落地就关库即判为违例
+      if (calls.fullScanActive > 0) calls.disposeWhileScanning += 1
     }
   }
 }
@@ -448,6 +469,9 @@ function createDependencies(
     scannerStop: 0,
     dispose: 0,
     fullScan: 0,
+    fullScanActive: 0,
+    fullScanPeak: 0,
+    disposeWhileScanning: 0,
     rescanPath: [],
     ensureDir: [],
     logs: [],
@@ -1788,5 +1812,95 @@ describe('applyGameRoot：照片目录的运行期生效通道', () => {
     const manager = createRuntimeManager(deps)
     await expect(manager.applyGameRoot('/any/root')).rejects.toThrow(/not ready/)
     expect(manager.status().state).toBe('unavailable')
+  })
+})
+
+/**
+ * 扫描并发保护（缺陷 D2）。
+ *
+ * 触发面是真实存在的：图库工具栏的 `handleGallerySourceToggle` 刻意不 await
+ * `startScan({})`，用户在全量扫描在途时点「保存」会走 `applyGameRoot` → `scan({gameRoot})`
+ * → 根不相等 → `teardown('nikkisync.restart')`，把**正在扫描的那个会话**连库一起关掉。
+ * `teardown` 不复位 `state.state`（它仍是上一次扫描写的 `'scanning'`），于是紧随其后的
+ * `start()` 命中「running/degraded/scanning 视为已启动」短路支直接返回，会话没建出来，
+ * 换根重建以 `not ready` 告终；上一次扫描随后落地，又把 error/degraded 覆写进新状态。
+ *
+ * 时序靠 `fullScanHoldFirst` 门闩钉住：**不放开**门闩就让第二次换根走完整条拆除链，
+ * 这样拆除必然落在「扫描在飞」的窗口内；放开后门闩才落地。
+ */
+describe('createRuntimeManager 扫描并发保护（换根重建不得拆掉在飞扫描）', () => {
+  /** 排空微任务队列（每个宏任务边界都会先把微任务跑完），让在途链真正推进。 */
+  const flush = async (): Promise<void> => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  }
+
+  /** 造一对「第一次 fullScan 挂起、可由测试放开」的门闩。 */
+  function createScanGate(): {
+    hold: () => Promise<void>
+    release: () => void
+    entered: Promise<void>
+  } {
+    let release: () => void = () => {}
+    const gate = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let markEntered: () => void = () => {}
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve
+    })
+    return {
+      hold: () => {
+        markEntered()
+        return gate
+      },
+      release,
+      entered
+    }
+  }
+
+  it('在途全量扫描未落地时换根重建：峰值 ≤ 1 且绝不在扫描中关库', async () => {
+    const scanGate = createScanGate()
+    const { deps, calls } = createDependencies({}, { fullScanHoldFirst: scanGate.hold })
+    const manager = createRuntimeManager(deps)
+
+    const first = manager.scan({ gameRoot: '/first/root' })
+    await scanGate.entered
+    expect(calls.fullScanActive).toBe(1)
+
+    // 门闩不放：此刻发起换根，拆除必然落在「扫描在飞」的窗口里
+    const second = manager.applyGameRoot('/second/root')
+    await flush()
+    scanGate.release()
+    await Promise.all([first, second])
+
+    expect(calls.fullScanPeak).toBeLessThanOrEqual(1)
+    expect(calls.disposeWhileScanning).toBe(0)
+    // 两次换根都如实落地，且终态由**新会话**的成功扫描决定
+    expect(calls.createSession).toEqual(['/first/root', '/second/root'])
+    expect(calls.fullScan).toBe(2)
+    expect(manager.status().state).toBe('running')
+  })
+
+  it('扫描在途时换根重建必须成功，终态不得是被淘汰那次写下的错误态', async () => {
+    const scanGate = createScanGate()
+    const { deps, calls } = createDependencies(
+      {},
+      { fullScanHoldFirst: scanGate.hold, fullScanThrowsFirst: true }
+    )
+    const manager = createRuntimeManager(deps)
+
+    const first = manager.scan({ gameRoot: '/first/root' })
+    await scanGate.entered
+    const second = manager.applyGameRoot('/second/root')
+    await flush()
+    scanGate.release()
+
+    // 被淘汰那次的全量扫描确实失败，这个 reject 必须如实交给它的调用方
+    await expect(first).rejects.toThrow(/installation was not found/)
+    // 而用户的「保存」不能因此落空：新会话这一轮是成功的
+    await expect(second).resolves.toMatchObject({ scanId: 'scan_full' })
+    expect(calls.createSession).toEqual(['/first/root', '/second/root'])
+    expect(manager.status().state).toBe('running')
   })
 })
