@@ -1,5 +1,6 @@
-// @core-change: K9 收尾——set-extra-directory-source 成功后补推 nikkisync:library-changed
-//               （目录来源分组变化属作用域变更，本地图库须按 fullResyncRequired 重取）。
+// @core-change: 账号作用域收口——add/remove-extra-directory 成功后补推 nikkisync:library-changed
+//               （目录增删与来源标注同属作用域变更，本地图库须按 fullResyncRequired 重取）。
+//               （历史：K9 四通道接入与 set-extra-directory-source 补推——历次授权原因见各节点提交。）
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
@@ -707,9 +708,9 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(
     'nikkisync:add-extra-directory',
-    wrapHandlerRaw(ctx, async (args) => {
+    wrapHandlerRaw(ctx, async (args, _ctx, event) => {
       const runtime = requireRuntime(ctx)
-      return parseAndRun(
+      const state = await parseAndRun(
         z.object({ id: directoryIdSchema }),
         args[0] ?? {},
         'add-extra-directory',
@@ -721,14 +722,18 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
           }
         }
       )
+      // review-fix：目录清单变化属作用域变更（来源分组随目录进出，上游同样
+      // onSourcesChanged）⇒ 本地图库按 fullResyncRequired 重取
+      notifyLibraryChanged(event)
+      return state
     })
   )
 
   ipcMain.handle(
     'nikkisync:remove-extra-directory',
-    wrapHandlerRaw(ctx, async (args) => {
+    wrapHandlerRaw(ctx, async (args, _ctx, event) => {
       const runtime = requireRuntime(ctx)
-      return parseAndRun(
+      const state = await parseAndRun(
         z.object({ id: directoryIdSchema }),
         args[0] ?? {},
         'remove-extra-directory',
@@ -740,6 +745,9 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
           }
         }
       )
+      // review-fix：同 add——目录移出作用域亦须让本地图库重取
+      notifyLibraryChanged(event)
+      return state
     })
   )
 

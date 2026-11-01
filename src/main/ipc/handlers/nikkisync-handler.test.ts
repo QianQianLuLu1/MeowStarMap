@@ -1041,6 +1041,45 @@ describe('nikkisync:*-extra-directories（K6）', () => {
     expect(runtime.addExtraDirectory).toHaveBeenCalledTimes(1)
   })
 
+  // review-fix：上游在 add/remove 成功路径同样 onSourcesChanged（已保存选择时 bump
+  // revision），与 set-extra-directory-source 同属「作用域变更」——不推送则 keep-alive 的
+  // 同步图库停在旧作用域，切页才自愈。
+  it('review-fix：add/remove 成功后推 nikkisync:library-changed（作用域变更）；失败与发送异常都不改变结果', async () => {
+    const runtime = createRuntimeStub()
+    register(runtime)
+
+    const add = getHandler(handleMock, 'nikkisync:add-extra-directory')
+    const addSend = vi.fn()
+    const added = (await add({ sender: { send: addSend } }, { id: 'p1' })) as HandleResult
+    expect(added.success).toBe(true)
+    expect(
+      addSend,
+      '新增目录改变来源分组 ⇒ 图库须重取（与 set-extra-directory-source 同判据）'
+    ).toHaveBeenCalledWith('nikkisync:library-changed')
+
+    const remove = getHandler(handleMock, 'nikkisync:remove-extra-directory')
+    const removeSend = vi.fn()
+    const removed = (await remove(
+      { sender: { send: removeSend } },
+      { id: 'dir_1' }
+    )) as HandleResult
+    expect(removed.success).toBe(true)
+    expect(removeSend).toHaveBeenCalledWith('nikkisync:library-changed')
+
+    // 上游拒绝 ⇒ 库没变，不得推送
+    vi.mocked(runtime.addExtraDirectory).mockRejectedValueOnce(new Error('too_many_directories'))
+    const failed = (await add({ sender: { send: addSend } }, { id: 'p2' })) as HandleResult
+    expect(failed.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    expect(addSend).toHaveBeenCalledTimes(1)
+
+    // 发送方已关闭（send 抛错）⇒ 通知尽力而为，操作仍判成功
+    const throwing = vi.fn(() => {
+      throw new Error('sender closed')
+    })
+    const stillOk = (await add({ sender: { send: throwing } }, { id: 'p3' })) as HandleResult
+    expect(stillOk.success).toBe(true)
+  })
+
   it('rescan：无参调用并返回状态', async () => {
     const runtime = createRuntimeStub()
     register(runtime)

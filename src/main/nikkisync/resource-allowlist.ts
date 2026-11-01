@@ -11,7 +11,8 @@
  * 安全口径（比既有规则 3 更窄，不得放宽）：
  * - 只做**确切文件**的精确匹配，不给目录级授权；
  * - 表项只由查询面在把路径交给渲染层时登记，外部无法自行写入；
- * - `libraryRevision` 变化 ⇒ 整表替换（扫描删除的资产不残留授权）；
+ * - `libraryRevision` 变化 ⇒ 整表替换（扫描删除的资产不残留授权）；单条登记的
+ *   样例预览条目是唯一例外：跨 revision 滚动回填存活（独立上限），teardown 全清；
  * - `clear()` 后一律拒绝（Runtime 停止 / 未就绪态）；
  * - 条目数硬上限 + 插入序淘汰，避免长会话无界增长。
  *
@@ -47,6 +48,19 @@ let currentRevision: number | undefined
 /** key = 归一化后的绝对路径；Map 的插入序即淘汰序。 */
 const allowedPaths: Map<string, true> = new Map()
 
+/**
+ * 单条登记（账号样例预览）的存活集合：跨 revision 滚动回填，上限防无界增长。
+ *
+ * review-fix：样例登记与图库整表登记是并发链——保存账号选择/来源变更会 bump revision
+ * 并推送 `nikkisync:library-changed`，keep-alive 的同步图库随即 loadFirst 换 revision
+ * 整表登记（清表重建）；若清表落在样例登记之后，条目被抹掉且 preview effect 不会自动
+ * 重跑（只在 syncAccounts 身份变化时运行），403 裂图无自愈。故单条登记跨滚动回填。
+ */
+const previewPaths: string[] = []
+
+/** 单条登记存活集合的硬上限：账号区块样例量级极小（个位数），60 已是宽余量。 */
+const MAX_PREVIEW_PATHS = 60
+
 /** 归一化：按 win32 解析为绝对路径（消解 `..`、多余分隔符），再折叠大小写。 */
 function normalizeKey(filePath: string): string {
   return path.resolve(filePath).toLowerCase()
@@ -70,15 +84,25 @@ function appendKey(key: string): void {
   }
 }
 
+/** 记录一条单条登记键到存活集合（去重 + 插入序上限淘汰）。 */
+function rememberPreview(key: string): void {
+  const idx = previewPaths.indexOf(key)
+  if (idx >= 0) previewPaths.splice(idx, 1)
+  previewPaths.push(key)
+  if (previewPaths.length > MAX_PREVIEW_PATHS) previewPaths.shift()
+}
+
 /**
  * 登记一批资源绝对路径。
  *
  * `revision` 与当前表不同 ⇒ 先整表替换再登记：扫描后已删除的资产不应继续可示。
+ * 唯一例外是单条登记的样例预览条目：清表后从 `previewPaths` 回填（见其注释）。
  * 同一 `revision` 多次调用是**追加**（分页逐页登记）。
  */
 export function registerNikkiSyncResourcePaths(revision: number, paths: readonly unknown[]): void {
   if (currentRevision !== undefined && currentRevision !== revision) {
     allowedPaths.clear()
+    for (const key of previewPaths) appendKey(key)
   }
   currentRevision = revision
   for (const candidate of paths) {
@@ -95,13 +119,17 @@ export function registerNikkiSyncResourcePaths(revision: number, paths: readonly
  * `media://` 展示，而该通道走的是上游 `AccountSyncSettings` 自己的读仓储，不在
  * `listResourceRecords` 的登记链上；它也没有 `libraryRevision` 上下文，不能伪装成某一版
  * 整表登记（用错的 revision 会在下一次查询面登记时把整表清掉）。故这里只追加：
- * 表已带 revision N 时保持 N；未初始化时保持未初始化（首次整表登记不会清掉该条）；
- * revision 滚动时它随整表一起失效，样例会随状态刷新重新登记。
+ * 表已带 revision N 时保持 N；未初始化时保持未初始化（首次整表登记不会清掉该条）。
+ * revision 滚动时整表条目被替换，但本条从 `previewPaths` 回填存活——样例的重登记
+ * （preview effect）只在 syncAccounts 身份变化时发生，晚于并发的图库整表登记链，
+ * 不回填就会间歇性 403；teardown 的 `clearNikkiSyncResourcePaths()` 仍两者全清。
  */
 export function registerNikkiSyncResourcePath(filePath: unknown): void {
   const value = usablePath(filePath)
   if (!value) return
-  appendKey(normalizeKey(value))
+  const key = normalizeKey(value)
+  appendKey(key)
+  rememberPreview(key)
 }
 
 /** 该**确切**路径是否被登记过（调用方传入的必须是已 realpath 解引用的路径）。 */
@@ -114,6 +142,7 @@ export function isNikkiSyncResourcePath(filePath: unknown): boolean {
 /** 清空授权表并回到「未就绪」态：任何路径一律拒绝，直到重新登记。 */
 export function clearNikkiSyncResourcePaths(): void {
   allowedPaths.clear()
+  previewPaths.length = 0
   currentRevision = undefined
 }
 

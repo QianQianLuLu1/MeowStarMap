@@ -14,7 +14,8 @@ import {
  * 这是**安全边界**的支撑件：`media://` 只能出示「渲染层被告知的确切文件」。
  * 因此本表刻意只做**精确匹配**，不做目录前缀授权（比既有规则 3 的
  * 「已索引 source_path 目录 + 扩展名白名单」更窄），并且：
- * - revision 变化即整表替换（旧资产路径不再可示，防止越权残留）；
+ * - revision 变化即整表替换（旧资产路径不再可示，防止越权残留）；单条登记的
+ *   样例预览条目是唯一例外：跨 revision 滚动回填存活（独立上限），teardown 全清；
  * - 条目数有硬上限并 FIFO 淘汰，避免长会话无界增长；
  * - `clear()` 后一律拒绝（Runtime 停止 / 未就绪态）。
  *
@@ -147,7 +148,8 @@ describe('NikkiSync 资源授权表', () => {
 
 /**
  * 单条精确登记：账号样例缩略图（`preview-sync-account`）在查询面之外取到路径，
- * 没有 `libraryRevision` 上下文，只能追加、不能参与整表替换的 revision 判定。
+ * 没有 `libraryRevision` 上下文，只能追加、不能参与整表替换的 revision 判定；
+ * revision 滚动时整表条目被替换，但单条条目从 previewPaths 回填存活（teardown 全清）。
  */
 describe('NikkiSync 资源授权表单条登记（revision 中立）', () => {
   beforeEach(() => {
@@ -189,5 +191,44 @@ describe('NikkiSync 资源授权表单条登记（revision 中立）', () => {
     expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\p.jpg`)).toBe(true)
     expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\q.jpg`)).toBe(false)
     expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\sub\\p.jpg`)).toBe(false)
+  })
+
+  // review-fix（b4bcd88 D1 回归窗口）：样例缩略图的单条授权与图库整表登记是并发链——
+  // 保存账号选择/来源变更会 bump revision 并推送 library-changed，keep-alive 的同步图库
+  // 随即 loadFirst 换 revision 整表登记（清表重建），若该清表落在样例登记之后，样例条目
+  // 被抹掉且 preview effect 不会自动重跑（只在 syncAccounts 身份变化时运行）→ 间歇性 403。
+  it('review-fix：revision 滚动后单条登记的样例路径仍放行（并发清表晚于登记不得裂图）', () => {
+    registerNikkiSyncResourcePaths(7, [`${WIN_ROOT}\\gallery.jpg`])
+    registerNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`)).toBe(true)
+
+    // 并发链：图库换 revision 整表登记（清表重建）落在样例单条登记之后
+    registerNikkiSyncResourcePaths(8, [`${WIN_ROOT}\\gallery2.jpg`])
+    expect(
+      isNikkiSyncResourcePath(`${WIN_ROOT}\\preview.jpg`),
+      '样例单条授权被换 revision 清掉且无补偿：账号区块 403 裂图回归'
+    ).toBe(true)
+    // 整表替换语义不变：旧 revision 的整表条目仍失效
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\gallery.jpg`)).toBe(false)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\gallery2.jpg`)).toBe(true)
+  })
+
+  it('边界：preview 条目有独立硬上限（防预览通道无界增长），clear 后两者全清', () => {
+    registerNikkiSyncResourcePaths(7, [`${WIN_ROOT}\\gallery.jpg`]) // 先设定 revision
+    for (let i = 0; i < 70; i += 1) {
+      registerNikkiSyncResourcePath(`${WIN_ROOT}\\p\\${i}.jpg`)
+    }
+    // 换 revision 清表重建：整表条目全部失效，preview 存活集合按上限 60 回填
+    registerNikkiSyncResourcePaths(8, [`${WIN_ROOT}\\gallery2.jpg`])
+    expect(nikkiSyncResourcePathCount()).toBe(61)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\gallery.jpg`)).toBe(false)
+    // 70 > 60：最旧的按插入序被淘汰出存活集合
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\p\\0.jpg`)).toBe(false)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\p\\69.jpg`)).toBe(true)
+
+    clearNikkiSyncResourcePaths()
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\p\\69.jpg`)).toBe(false)
+    expect(isNikkiSyncResourcePath(`${WIN_ROOT}\\gallery2.jpg`)).toBe(false)
+    expect(nikkiSyncResourcePathCount()).toBe(0)
   })
 })

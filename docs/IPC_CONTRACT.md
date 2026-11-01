@@ -430,9 +430,9 @@ wrapHandler(ctx, schema, handler) =>
 
 ### 8.1.2 推送事件（阶段 4）
 
-| 事件                        | 方向            | 载荷 | 触发时机                                                          |
-| --------------------------- | --------------- | ---- | ----------------------------------------------------------------- |
-| `nikkisync:library-changed` | main → renderer | 无   | `nikkisync:start-scan` **成功返回后**推给发起方（`event.sender`） |
+| 事件                        | 方向            | 载荷 | 触发时机                                                                                                                                                                                                                                                          |
+| --------------------------- | --------------- | ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nikkisync:library-changed` | main → renderer | 无   | `nikkisync:start-scan` / `nikkisync:set-sync-account-selection` / `nikkisync:set-extra-directory-source` / `nikkisync:add-extra-directory` / `nikkisync:remove-extra-directory` **成功返回后**推给发起方（`event.sender`）；作用域类通道见 8.1.5 / 8.2.5 各自小节 |
 
 要点：
 
