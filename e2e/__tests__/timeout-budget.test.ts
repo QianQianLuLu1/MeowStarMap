@@ -32,7 +32,12 @@ const e2eDir = path.join(repoRoot, 'e2e')
 const SETUP_MARGIN_MS = 15_000
 
 /** `npm run e2e:smoke` = `--grep-invert @perf`，故含 @perf 的文件不进冒烟覆盖面 */
-const SMOKE_COVERAGE = ['fullscreen-diagnose.e2e.ts', 'nikkisync-runtime.e2e.ts', 'smoke.e2e.ts']
+const SMOKE_COVERAGE = [
+  'fullscreen-diagnose.e2e.ts',
+  'nikkisync-game-root.e2e.ts',
+  'nikkisync-runtime.e2e.ts',
+  'smoke.e2e.ts'
+]
 
 export interface BudgetViolation {
   /** 违例的等待毫秒数；符号量（读不出字面量）时为 null */
