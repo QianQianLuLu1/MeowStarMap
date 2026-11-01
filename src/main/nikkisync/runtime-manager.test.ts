@@ -1737,3 +1737,56 @@ describe('K9：账号同步作用域四方法——透传、三态、错误上�
     expect(nikkiSyncResourcePathCount()).toBe(0)
   })
 })
+
+describe('applyGameRoot：照片目录的运行期生效通道', () => {
+  it('换根立即生效：以新根重建会话并补一次全量扫描', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.scan({ gameRoot: '/first/root' })
+    await manager.applyGameRoot('/second/root')
+    expect(calls.createSession).toEqual(['/first/root', '/second/root'])
+    expect(calls.fullScan).toBe(2)
+    expect(manager.status().state).toBe('running')
+  })
+
+  it('恢复默认（空串）回到自动发现，且后续 scan({}) 不再被启动快照的旧根拉回', async () => {
+    const { deps, calls } = createDependencies({
+      defaults: { ...DEFAULTS, gameRoot: '/startup/root' }
+    })
+    const manager = createRuntimeManager(deps)
+    await manager.scan({})
+    await manager.applyGameRoot('')
+    await manager.scan({})
+    // 第三次 scan 若仍读启动快照，这里会多出一条 '/startup/root'
+    expect(calls.createSession).toEqual(['/startup/root', '<auto>'])
+    expect(calls.fullScan).toBe(3)
+  })
+
+  it('换根不把正在监听的局域网同步服务掐掉：teardown 后按原配置再启一次', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    expect(manager.syncStatus().running).toBe(true)
+    await manager.applyGameRoot('/new/root')
+    expect(calls.createSession).toEqual(['<auto>', '/new/root'])
+    expect(calls.serverStop).toBe(1)
+    expect(calls.serverStart).toBe(2)
+    expect(manager.syncStatus().running).toBe(true)
+  })
+
+  it('边界：服务原本没在跑时，applyGameRoot 不得把它顺带启起来', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.scan({ gameRoot: '/first' })
+    await manager.applyGameRoot('/second')
+    expect(calls.serverStart).toBe(0)
+    expect(manager.syncStatus().running).toBe(false)
+  })
+
+  it('异常：未建链（unavailable）时如实上抛 not ready，状态不被改写', async () => {
+    const { deps } = createDependencies({ isLinkReady: () => false })
+    const manager = createRuntimeManager(deps)
+    await expect(manager.applyGameRoot('/any/root')).rejects.toThrow(/not ready/)
+    expect(manager.status().state).toBe('unavailable')
+  })
+})

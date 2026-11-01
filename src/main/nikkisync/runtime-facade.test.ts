@@ -1236,3 +1236,23 @@ describe('createRuntimeSession 扫描诊断面（K7）', () => {
     expect(session.scanDiagnostics).toBeUndefined()
   })
 })
+
+describe('createRuntimeSession 照片根注入缝（selectedInstallRoot）', () => {
+  // 特征化钉（钉既有注入缝，非本轮 bug 的复现项）：照片目录的运行期生效通道
+  // 最终依赖这一缝把值交给上游发现器，先把它钉死，避免 manager/handler 修好而这一环漂移。
+  it('options.gameRoot 落进上游 scanner.selectedInstallRoot；未给出时连键都不下发', async () => {
+    const withRoot = createSessionFixture()
+    await createRuntimeSession(
+      { ...sessionOptions(), gameRoot: '/manual/game/root' },
+      withRoot.surface
+    )
+    expect(
+      (withRoot.capturedConfig()?.scanner as Record<string, unknown>).selectedInstallRoot
+    ).toBe('/manual/game/root')
+
+    const without = createSessionFixture()
+    await createRuntimeSession(sessionOptions(), without.surface)
+    const plain = without.capturedConfig()?.scanner as Record<string, unknown>
+    expect(plain && 'selectedInstallRoot' in plain).toBe(false)
+  })
+})

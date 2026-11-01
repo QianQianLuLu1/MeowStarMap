@@ -548,6 +548,34 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return result
   }
 
+  /**
+   * 照片目录（设置键 `nikkisync.gameRoot`）的运行期生效通道。
+   *
+   * 为什么必须存在：该键的原生读者只有进程启动那一次的 `buildSessionOptions`
+   * （`app/nikkisync-runtime-setup.ts`），产物冻结进 `deps.defaults`；保存后若不在此处
+   * 同时刷新快照与当前会话，设置键就成了死键——图库工具栏的 `scan({})` 读的是旧快照，
+   * 连「换根判据」都不会不相等。
+   *
+   * - `deps.defaults` 先刷新：`scan({})` 与 `startSyncServer` 的会话重建支都读这份快照，
+   *   不刷会把用户刚选的目录静默退回旧根（`''` ⇒ 回上游自动发现）。
+   * - 复用 `scan({ gameRoot })`：换根重建 + 一次全量扫描本就是它的既有职责，不另起编排。
+   * - 局域网同步服务随 teardown 停止：原本在监听才按同配置复原（换照片目录不该让手机掉线），
+   *   原本没跑则不代为开启；`startSyncServer` 按本文件契约永不上抛，故放进 finally
+   *   保证「新根不可用（discovery 失败）」时服务同样回来。
+   * - 失败原样上抛（未建链 / 目录不是安装根），由 handler 归一成 `applyError`——本层不吞。
+   */
+  async function applyGameRoot(gameRoot: string): Promise<unknown> {
+    deps.defaults = { ...deps.defaults, gameRoot: gameRoot || undefined }
+    const wasServing = Boolean(state.syncAddress)
+    try {
+      // 空串在这里归一为 undefined：`''` 与「不下发 selectedInstallRoot」在 facade 侧本就等价，
+      // 但只有 undefined 才让 state.activeRoot 如实记成「自动发现」，不留一个既非根也非空的第三态。
+      return await scan({ gameRoot: gameRoot || undefined })
+    } finally {
+      if (wasServing) await startSyncServer()
+    }
+  }
+
   async function stop(): Promise<void> {
     // 启动在途时先等它落地再拆：否则本次停止只把状态置 idle，在途 start 的收尾
     // 随后会把会话置 running——用户的停止被静默吞掉（会话成为孤儿）。
@@ -864,6 +892,7 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     status,
     start,
     scan,
+    applyGameRoot,
     stop,
     // 查询面一律零转换薄委托：资产行含上游 b397e0e 起的 sourcePath/sourceFolder 与其余可选键，
     // 由上游 row-mappers 原样产出。getResource / listResourceRecords 的 mode:'path' 给出绝对路径

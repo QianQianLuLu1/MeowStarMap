@@ -506,6 +506,12 @@ export interface NikkiSyncRuntimeHandle {
   start(options: NikkiSyncSessionOptions): Promise<NikkiSyncRuntimeStatus>
   /** 触发扫描（必要时惰性启动 / 换根重建）。 */
   scan(input: { gameRoot?: string; path?: string }): Promise<unknown>
+  /**
+   * 照片目录设置键 `nikkisync.gameRoot` 的运行期生效通道：刷新默认快照 + 换根重建 +
+   * 补一次全量扫描，并在原本在监听时复原局域网同步服务。`''` = 回上游自动发现。
+   * 失败（未建链 / 目录不是安装根）原样上抛，由 handler 归一成 `applyError`。
+   */
+  applyGameRoot(gameRoot: string): Promise<unknown>
   /** 优雅停止：scanner.stop() → database.close()，幂等。 */
   stop(): Promise<void>
   /** `{items,nextCursor?,libraryRevision}`；资产行（含 `sourcePath`/`sourceFolder`）与上游 DTO 同形透出。 */
