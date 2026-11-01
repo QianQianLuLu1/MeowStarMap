@@ -1,6 +1,8 @@
-// @core-change: 照片目录自定义——新增 getGameRoot/setGameRoot/resetGameRoot（持久化 nikkisync.gameRoot，
-//               重启后由主进程 buildSessionOptions 生效）与 admitDirectory（K6 手输路径的校验+登记预检）。
-//               （历史：K9 账号作用域与目录来源标注、K6 目录面、K2/K3/K8 历次接入——见各节点提交。）
+// @core-change: 照片目录契约订正——set/resetGameRoot 由主进程落库后当场走运行期生效通道
+//               （换根重建 + 全量扫描），返回体 needRestart 不再恒 true、新增可选
+//               applied / applyError；本层只做透传，不改方法名与入参。
+//               （历史：三通道与 admitDirectory 预检接入、K9 账号作用域、K6 目录面、K2/K3/K8
+//               历次接入——见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -123,10 +125,11 @@ export const nikkisyncAPI = {
   // ---- 照片目录自定义（gameRoot 替代默认路径；admit 供 K6 手输预检）----
   /** 读取持久化的照片根目录（'' = 未设置，走上游自动发现；不经运行时，未启用也可读） */
   getGameRoot: () => call<NikkiSyncGameRootInfo>('nikkisync:get-game-root'),
-  /** 校验并持久化自定义照片根目录；writable 仅提示（只读目录合法），needRestart = 重启后生效 */
+  /** 校验并持久化自定义照片根目录，并当场换根重建 + 重扫；writable 仅提示（只读目录合法），
+   * applied = 已立即生效，needRestart 仅在未能当场生效时为 true（applyError 给分类原因） */
   setGameRoot: (input: NikkiSyncSetGameRootInput) =>
     call<NikkiSyncSetGameRootResult>('nikkisync:set-game-root', input),
-  /** 清空自定义照片根目录（回退默认自动发现），重启后生效 */
+  /** 清空自定义照片根目录（回退上游自动发现），同样当场生效；未生效时才需要重启 */
   resetGameRoot: () => call<NikkiSyncResetGameRootResult>('nikkisync:reset-game-root'),
   /** K6 手输路径预检：主进程校验并登记 pathGuard，随后即可走 inspectExtraDirectory */
   admitDirectory: (input: NikkiSyncAdmitDirectoryInput) =>

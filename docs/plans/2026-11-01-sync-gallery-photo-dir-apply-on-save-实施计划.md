@@ -189,6 +189,60 @@ git status --porcelain   # 复核 pre-commit 钩子是否改写文件
 4. 官方启动器装在 `Program Files` 时 `isSensitivePath` 会拒绝手工设为 gameRoot（`validatePhotoSourceDirectory:401` 前置黑名单）。
 5. 上述 2/3/4 与 `docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md` 记录的「未跑的人工回归」同源，本轮在计划里显式留痕，不悄悄吞掉。
 
-## 10. 执行记录（实施时逐节点回写红灯/绿灯实测读数与命令输出）
+## 10. 执行记录（2026-11-01 实测读数，全部由 Agent 亲自运行）
 
-（待回写）
+### 10.1 节点验证链（红→绿）
+
+| 节点    | 验证命令                                                                   | 实测读数                                                                                                                                                                        |
+| ------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| N0 落盘 | `git commit` + `npm run docs:links`                                        | `5585851 docs(plans)`；死链检查 ✅（185 处提醒为既有历史路径）                                                                                                                  |
+| N1 红灯 | `npx vitest run src/main/nikkisync/runtime-manager.test.ts`                | **5 failed**（`TypeError: manager.applyGameRoot is not a function`）/ 80 passed                                                                                                 |
+| N2 绿灯 | `npx vitest run src/main/nikkisync`                                        | **16 文件 321 passed**（含链接态套件，非 skip）                                                                                                                                 |
+| N3 红灯 | `npx vitest run src/main/ipc/handlers/nikkisync-handler.test.ts`           | **5 failed** / 93 passed —— 逐条：`set-game-root：落库后立即换根重扫`、`目录不是安装根`、`其他故障归一 scan-failed`、`runtime 未装配时`、`reset-game-root 走同一生效通道并广播` |
+| N4 绿灯 | 同上 + `npx vitest run src/main/ipc/handlers` + `npx tsc -b`               | 该文件 98 passed；handlers **41 文件 610 passed**；tsc 退出码 0                                                                                                                 |
+| N5 红灯 | `npx vitest run SyncServicePage.test.tsx sync-service-keys.test.ts`        | **8 failed**（(aw)(ax)(az) 三条改写 + 新增 (bc)(bd)(be) + 键守卫 2 条）/ 64 passed                                                                                              |
+| N6 绿灯 | `npx vitest run src/renderer/pages/sync-gallery src/renderer/i18n/locales` | **10 文件 123 passed**；`npm run i18n:guard` ✅                                                                                                                                 |
+| N7 回归 | 见 §10.4                                                                   | 全绿                                                                                                                                                                            |
+
+### 10.2 两处与本文的偏差（如实订正，不改判据迁就实现）
+
+1. **§8「异常」格写了「未建链时不外抛」，实现选择上抛。** 依据：handler 必须区分 `runtime-unavailable` 与 `scan-failed` 才能给出正确的 `applyError`；若 manager 吞掉错误，handler 就无从分类。落定口径 = `applyGameRoot` **原样上抛**（用例断言 `rejects.toThrow(/not ready/)` 且 `status().state` 仍为 `unavailable`），归一化只发生在 handler 一处。§7 表格里「未建链 ⇒ applied:false + applyError:'runtime-unavailable'」的结论不变，变的只是它由谁产生。
+2. **§2.1「明确不动 preload」被部分推翻。** `src/main/preload/api/nikkisync.ts` 的 3 处注释（`@core-change` 块「重启后由 buildSessionOptions 生效」、`setGameRoot`/`resetGameRoot` 的「重启后生效」）是**对我本轮改动的契约陈述**，留原句就是留下假文档。改动为纯注释、签名与入参零变化，并按约定同批替换 `@core-change` 授权注释。
+
+### 10.3 变异抽查（两次，各只打中预期用例 ⇒ 判据精确而非泛红）
+
+| 变异                                           | 位置                                          | 实测                                                                                                     |
+| ---------------------------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| 撤掉 `deps.defaults` 快照刷新                  | `runtime-manager.ts` applyGameRoot            | **1 failed** = 「恢复默认…后续 `scan({})}` 不再被启动快照的旧根拉回」（即根因 2 的钉子），其余 84 例仍绿 |
+| 撤掉生效成功后的 `notifyLibraryChanged(event)` | `nikkisync-handler.ts` applyPersistedGameRoot | **2 failed** = set / reset 两条广播断言，其余 96 例仍绿                                                  |
+
+两次变异均当场还原，还原后套件复绿。
+
+### 10.4 全局回归矩阵（N7 实测）
+
+- `npm run verify`：**5 项 0 失败**（typecheck / lint / core-gate / format / test）；`⚠ 缺匹配套件`仅命中 `runtime-types.ts` 与 `electron-api.ts` 两个纯类型文件（既有状态，非本轮引入）
+- `npm test`（全量）：**463 文件 7315 passed / 20 skipped / 0 failed**（基线 7296 passed ⇒ 净增 19 例，0 新失败）
+- `npm run test:coverage`：退出码 **0**（阈值门控通过，`coverage` job 门不会因本轮改动翻红）
+- `npm run lint`（`eslint .`）：退出码 **0**，无输出
+- `npm run typecheck`（`tsc -b` + `tsconfig.scripts.json`）/ `npm run typecheck:e2e`：均 ✅
+- `npm run i18n:guard`：✅（12 包 +2 新键、3 键改写，白名单只减不增）
+- `npm run docs:links`：✅ 无死引用
+- 提交序列：`5585851 docs(plans)` → `a732c2b fix(nikkisync) applyGameRoot` → `f3f7b35 fix(nikkisync) set/reset 当场生效 + 广播` → `e1fa82c fix(sync-ui) applied 分支文案 + 12 语包` → 本轮收尾（CHANGELOG / preload 注释 / 本节）
+- 三笔提交均过 `.husky/pre-commit`（lint-staged + core-gate + `tsc -b`），未使用 `--no-verify`
+
+### 10.5 既有断言的合法契约订正（非弱化，逐条列明）
+
+| 位置                                                  | 原断言                    | 新断言                                   | 理由                                                                       |
+| ----------------------------------------------------- | ------------------------- | ---------------------------------------- | -------------------------------------------------------------------------- |
+| `nikkisync-handler.test.ts` set-game-root「真实目录」 | `needRestart === true`    | 只锁 `gameRoot` / `writable` 类型 / 落库 | needRestart 不再恒 true，两个取值由新增的生效通道用例分别钉住              |
+| 同文件 reset-game-root                                | `needRestart === true`    | 只锁清空落库                             | 同上（原用例名与注释已改写指向新判据）                                     |
+| 同文件「可写探测失败 fail-open」                      | `needRestart === true`    | `applied:true / needRestart:false`       | 加强：证明只读目录既不阻断保存**也不阻断生效**                             |
+| `SyncServicePage.test.tsx` (aw)(ax)(az)               | 断言弹重启询问 + relaunch | 断言即时生效文案 + **不弹**重启询问      | 本轮行为变更本身；(bc)(be) 另钉「未生效 ⇒ 仍弹重启询问」的兜底支，覆盖未丢 |
+
+### 10.6 人工验证清单（真机，本轮按裁决未执行）
+
+1. `npm run dev` → 同步图库 → 同步服务 → 照片目录 → 浏览选 `H:\InfinityNikki Launcher` → 保存：**不出现重启询问**、回同步图库应直接出图。
+2. 手输一个独立照片文件夹（如 `H:\CloudMusic`）→ 保存：应出现「不是有效游戏安装根」提示且**不**弹重启询问（值仍已落库）。
+3. 开着局域网同步服务时换根：手机侧连接应自愈（`applyGameRoot` 内复原 `startSyncServer`）。
+4. 「恢复默认」后同步图库回到上游自动发现的根；`runtimeEnabled` 关闭的冷启动态下保存也应惰性起会话（原「内嵌服务未启动」空态当场消失）。
+5. 「额外照片目录」K6 手输 → 预检 → 添加 → 缩略图与全屏出图（`resource-allowlist` 与 `media://` realpath 不对称的残留面，见 §9.2）。

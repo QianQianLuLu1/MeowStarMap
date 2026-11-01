@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+### Fixed | 修复
+
+- **同步图库「自定义照片目录」保存后不出图（2026-11-01）**：`nikkisync:set/reset-game-root` 只写设置键，而该键的唯一读者是进程启动那一次的 `buildSessionOptions`（产物冻结成会话默认快照与 `activeRoot`）——运行期既无重建调用，图库工具栏的 `startScan()` 又是无参的（读同一份旧快照 ⇒ 换根判据恒等），于是**应用内不存在任何动作能把刚保存的目录推给运行中的会话**：用户「已成功选择自定义路径」后板块仍停在旧根，该路径下的照片一条都不出；而重启也不自愈（`nikkisync.runtimeEnabled` / `syncServerEnabled` 缺省关，重启后不自启会话、也不补扫）。修法：`runtime-manager` 新增生效通道 `applyGameRoot(gameRoot)`——先刷新会话默认快照（否则 `scan({})` 与改端口时的重建支会把新目录静默退回旧根），再复用既有 `scan({ gameRoot })` 完成换根重建 + 一次全量扫描；局域网同步服务随 teardown 停止，**原本在监听才**按同配置复原，原本没跑不代为开启。set/reset 落库后当场调用，并只在成功后广播 `nikkisync:library-changed`（与 `start-scan` 同判据）。契约同步订正（向后兼容）：`needRestart` 由恒 `true` 改为「未能当场生效才为 `true`」，新增可选 `applied` / `applyError`（`runtime-unavailable` | `installation-not-found` | `scan-failed`）；生效失败时值仍已持久化，绝不把已成功的保存改判为失败。渲染层据 `applied` 分流文案，即时生效不再拿重启询问挡在用户与照片之间；目录形态不是安装根时给可执行提示（改选游戏安装目录，或走「额外照片目录」）且不再询问重启。`photoDirectories` 文案 12 语包齐备（改写 3 键、新增 2 键）。计划与逐节点红→绿读数见 `docs/plans/2026-11-01-sync-gallery-photo-dir-apply-on-save-实施计划.md`
+
 ---
 
 ## [2.5.6] - 2026-11-01
@@ -28,7 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ### Added | 新增
 
 - **同步图库自定义照片目录（2026-11-01）**：「同步服务」页新增「照片目录」分区，支持手动输入或浏览选择本地目录以**替代系统默认路径**（留空回退上游自动发现的游戏安装根）。主进程新增 `nikkisync:get/set/reset-game-root` 三通道（持久化设置键 `nikkisync.gameRoot`，重启后由 `buildSessionOptions` 既有读取端自动生效）与 `nikkisync:admit-directory` 预检通道（K6 额外照片目录同步支持手输路径，先校验再走既有 inspect 提案流）。校验口径：绝对路径 + 系统敏感目录黑名单 + 存在/目录/可读必过，可写探测失败仅提示不阻断（照片源目录扫描只读）；保存/恢复默认走「成功提示 → 重启询问 → relaunch」流。新增键入 `SECURITY_SENSITIVE_KEYS`（settings:set 拒绝并指向专用通道）；文案 12 语言齐备。计划与验证读数见 `docs/plans/2026-11-01-sync-gallery-custom-photo-dir-实施计划.md`
-  - 二轮审查修正（2026-11-01）：① **手输预检不再授予全局免检**——首版 `admit-directory` 把渲染层传入的目录经 `registerUserPickedDir` 写进 `userPicked`/`userPickedDirs`/`roots` 三个全局集合，而 `matchesPicked` 按**前缀**命中、`scanner:start` / `settings:set`(customScanPaths) / `assertMediaAccessPath` / `media://` 规则 0 全拿它做黑名单短路，等于一次 `admit(D:\)` 就让整盘免检且**无需对话框手势**（与 `validator.ts` 自陈的「渲染进程无任何 IPC 可写入该集合」直接矛盾）。改为只登记同步域专用集合 `registerSyncPhotoDir`，唯一消费方是 `nikkisync:inspect-extra-directory`；手输目录的照片仍按 `media://` 第 4 条规则（resource-allowlist 精确授权表）读图，功能面零收窄。② **`gameRoot` 读写两端键名同源守卫**——写端字面量与读端 `SETTING_GAME_ROOT` 分处两层，变异实测显示读端改名时全仓 1179 例仍绿（读端测试用常量符号化供键、改值后自洽），故新增源码级钉（改任一侧即红）。审查结论与逐节点读数见 `docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`
+  - 二轮审查修正（2026-11-01）：① **手输预检不再授予全局免检**——首版 `admit-directory` 把渲染层传入的目录经 `registerUserPickedDir` 写进 `userPicked`/`userPickedDirs`/`roots` 三个全局集合，而 `matchesPicked` 按**前缀**命中、`scanner:start` / `settings:set`(customScanPaths) / `assertMediaAccessPath` / `media://` 规则 0 全拿它做黑名单短路，等于一次 `admit(D:\)` 就让整盘免检且**无需对话框手势**（与 `validator.ts` 自陈的「渲染进程无任何 IPC 可写入该集合」直接矛盾）。改为只登记同步域专用集合 `registerSyncPhotoDir`，唯一消费方是 `nikkisync:inspect-extra-directory`；手输目录的照片仍按 `media://` 第 4 条规则（resource-allowlist 精确授权表）读图，功能面零收窄。② **`gameRoot` 读写两端键名同源守卫**——写端字面量与读端 `SETTING_GAME_ROOT` 分处两层，变异实测显示读端改名时全仓 1179 例仍绿（读端测试用常量符号化供键、改值后自洽），故新增源码级钉（改任一侧即红）。 - 后续修正（2026-11-01，已移入 `[Unreleased]`）：本条「保存/恢复默认走成功提示 → 重启询问 → relaunch」的口径不足以让用户看到所选目录的照片——重启之外没有运行期生效通道，且重启后因 `runtimeEnabled` 缺省关而不自启会话，实测表现为「选了自定义路径但板块不出图」。修法与契约订正见上方 `[Unreleased]` 的「同步图库「自定义照片目录」保存后不出图」条目；本条按原文保留、不覆写
 
 ### Fixed | 修复
 
