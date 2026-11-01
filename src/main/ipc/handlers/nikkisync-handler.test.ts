@@ -159,6 +159,7 @@ function createRuntimeStub(): NikkiSyncRuntimeHandle {
     })),
     start: vi.fn(async () => ({ state: 'running', dbPath: '', linkReady: true })),
     scan: vi.fn(async () => ({ scanId: 'scan_1', filesObserved: 5, assetsCreated: 2 })),
+    applyGameRoot: vi.fn(async () => ({ scanId: 'scan_full', filesObserved: 3 })),
     stop: vi.fn(async () => undefined),
     listAssets: vi.fn(async (input) => ({
       items: [{ assetId: 'asset_1', input }],
@@ -1172,7 +1173,7 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
 
   // ---- 正常 ----
 
-  it('set-game-root：真实目录 → 持久化设置键并返回 needRestart，writable 为布尔', async () => {
+  it('set-game-root：真实目录 → 持久化设置键并返回 writable 布尔', async () => {
     const ctx = register(createRuntimeStub())
     const dir = await makeTempDir()
     const handler = getHandler(handleMock, 'nikkisync:set-game-root')
@@ -1180,9 +1181,128 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     expect(res.success).toBe(true)
     const data = res.data as Record<string, unknown>
     expect(data.gameRoot).toBe(dir)
-    expect(data.needRestart).toBe(true)
     expect(typeof data.writable).toBe('boolean')
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+  })
+
+  // ---- 运行期生效通道（本轮 bug 的主判据）----
+  // 保存只落库时，设置键的唯一原生读者是进程启动那一次 buildSessionOptions：
+  // 同步图库会停在旧根，且工具栏 startScan() 无参也读同一份旧快照 ⇒ 应用内没有任何动作能生效。
+  // 以下钉住「落库 + 运行期生效 + 广播库变更」三件事成套，以及生效失败时不谎报也不误判失败。
+
+  it('set-game-root：落库后立即换根重扫（applied:true / needRestart:false）并推 library-changed', async () => {
+    const runtime = createRuntimeStub()
+    const ctx = register(runtime)
+    const dir = await makeTempDir()
+    const send = vi.fn()
+    const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      { sender: { send } },
+      { path: dir }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data as Record<string, unknown>).toMatchObject({
+      gameRoot: dir,
+      applied: true,
+      needRestart: false
+    })
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+    expect(runtime.applyGameRoot).toHaveBeenCalledWith(dir)
+    expect(send).toHaveBeenCalledWith('nikkisync:library-changed')
+  })
+
+  it('set-game-root：目录不是安装根 ⇒ 仍落库、applied:false + applyError，不判成失败也不广播', async () => {
+    const runtime = createRuntimeStub()
+    runtime.applyGameRoot = vi.fn(async () => {
+      throw new Error('Infinity Nikki installation was not found')
+    })
+    const ctx = register(runtime)
+    const dir = await makeTempDir()
+    const send = vi.fn()
+    const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      { sender: { send } },
+      { path: dir }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data as Record<string, unknown>).toMatchObject({
+      gameRoot: dir,
+      applied: false,
+      needRestart: true,
+      applyError: 'installation-not-found'
+    })
+    expect(
+      ctx.dbManager.setSetting,
+      '值仍已持久化（下次进程按既有语义生效），不谎称丢配置'
+    ).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+    expect(
+      send,
+      '库未变化 ⇒ 不发 library-changed（与 start-scan「只在成功后发」同口径）'
+    ).not.toHaveBeenCalled()
+  })
+
+  it('set-game-root：生效的其他故障归一 scan-failed（已成功的保存不被改判为失败）', async () => {
+    const runtime = createRuntimeStub()
+    runtime.applyGameRoot = vi.fn(async () => {
+      throw new Error('EACCES: permission denied')
+    })
+    register(runtime)
+    const dir = await makeTempDir()
+    const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      {},
+      {
+        path: dir
+      }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data as Record<string, unknown>).toMatchObject({
+      applied: false,
+      needRestart: true,
+      applyError: 'scan-failed'
+    })
+  })
+
+  it('set-game-root：runtime 未装配时不调生效通道，保持旧「重启后生效」语义', async () => {
+    const ctx = register(undefined)
+    const dir = await makeTempDir()
+    const send = vi.fn()
+    const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      { sender: { send } },
+      { path: dir }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data as Record<string, unknown>).toMatchObject({ applied: false, needRestart: true })
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', dir)
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('set-game-root：校验失败时既不落库也不生效', async () => {
+    const runtime = createRuntimeStub()
+    const ctx = register(runtime)
+    const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+      {},
+      {
+        path: 'relative/path'
+      }
+    )) as HandleResult
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+    expect(runtime.applyGameRoot).not.toHaveBeenCalled()
+  })
+
+  it('reset-game-root：清空设置键后按空串走同一生效通道并广播（恢复默认也不再等重启）', async () => {
+    const runtime = createRuntimeStub()
+    const ctx = register(runtime)
+    const send = vi.fn()
+    const res = (await getHandler(
+      handleMock,
+      'nikkisync:reset-game-root'
+    )({
+      sender: { send }
+    })) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data as Record<string, unknown>).toMatchObject({ applied: true, needRestart: false })
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', '')
+    expect(runtime.applyGameRoot).toHaveBeenCalledWith('')
+    expect(send).toHaveBeenCalledWith('nikkisync:library-changed')
   })
 
   it('get-game-root：回读持久化值；历史非字符串值回退空串（默认自动发现）', async () => {
@@ -1200,13 +1320,14 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     expect(missing.data).toEqual({ gameRoot: '' })
   })
 
-  it('reset-game-root：清空设置键（空串=回退默认路径）并返回 needRestart', async () => {
+  it('reset-game-root：清空设置键（空串=回退默认路径）', async () => {
     const ctx = register(createRuntimeStub())
     const handler = getHandler(handleMock, 'nikkisync:reset-game-root')
     const res = (await handler({})) as HandleResult
     expect(res.success).toBe(true)
-    expect((res.data as Record<string, unknown>).needRestart).toBe(true)
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('nikkisync.gameRoot', '')
+    // needRestart 的取值随「能否立即生效」而变（原为恒 true），由上面两条生效通道用例分别钉住：
+    // applied:true ⇒ needRestart:false；applied:false ⇒ needRestart:true。这里不再断言恒值。
   })
 
   it('admit-directory：校验通过并登记同步域集合，随后 inspect 无需预登记即放行', async () => {
@@ -1329,7 +1450,9 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     const res = (await handler({}, { path: dir })) as HandleResult
     expect(res.success).toBe(true)
     expect((res.data as Record<string, unknown>).writable).toBe(false)
-    expect((res.data as Record<string, unknown>).needRestart).toBe(true)
+    // needRestart 已不再恒 true（生效成功即为 false）：这里必须证明「只读目录」既不阻断保存、
+    // 也不阻断生效（照片源目录扫描只读，W_OK 失败本身不构成拒绝理由）。
+    expect(res.data as Record<string, unknown>).toMatchObject({ applied: true, needRestart: false })
   })
 
   it('admit-directory：四类非法输入一律拒绝且不登记（随后 inspect 仍 PATH_FORBIDDEN）', async () => {

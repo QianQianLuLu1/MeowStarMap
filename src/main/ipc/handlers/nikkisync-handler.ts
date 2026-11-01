@@ -1,7 +1,8 @@
-// @core-change: 照片目录自定义——新增 game-root 三通道（get/set/reset，持久化 nikkisync.gameRoot）
-//               与 admit-directory 目录预检通道（校验全过后只登记同步域专用集合 syncPhotoDirs，
-//               不写全局 user-picked 集合——入参来自渲染层，写全局即构成免手势的整盘短路授权）。
-//               （历史：K9 四通道接入与 library-changed 补推、K6/K2/K3/K8 历次接入——见各节点提交。）
+// @core-change: 照片目录 set/reset-game-root 在落库后接运行期生效通道 runtime.applyGameRoot
+//               （换根重建 + 全量扫描 + 成功后广播 library-changed），needRestart 由恒 true
+//               改为「未能当场生效才为 true」，并新增可选 applied / applyError 告知渲染层；
+//               admit-directory 的同步域登记收窄语义不变（历史：game-root 三通道与 K6 预检、
+//               K9/K6/K2/K3/K8 历次接入——见各节点提交）。
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -13,6 +14,7 @@ import { isSensitivePath } from '../../utils/ipc-validate'
 import { AppError } from '../../../shared/errors/app-error'
 import { isAssetType } from '../../../shared/sync/protocol'
 import type {
+  NikkiSyncGameRootApplyResult,
   NikkiSyncServerStatusInfo,
   NikkiSyncSyncAccountPreviewInfo
 } from '../../../shared/types/electron-api'
@@ -462,6 +464,46 @@ function notifyLibraryChanged(event: IpcMainInvokeEvent): void {
   }
 }
 
+/**
+ * 照片目录落库之后的运行期生效（set / reset 共用）。
+ *
+ * 为什么需要这一环：`nikkisync.gameRoot` 的原生读者只有进程启动那一次的
+ * `buildSessionOptions`（`app/nikkisync-runtime-setup.ts`），产物冻结进会话依赖的默认快照。
+ * 只落库不生效，运行中的同步库就停在旧根，而图库工具栏的 `startScan()` 是无参的（同一份旧
+ * 快照）——应用内不存在任何动作能把刚保存的目录推给当前会话，表现为「选了自定义路径但板块
+ * 不显示该路径的照片」。生效本体（换根重建 + 全量扫描 + LAN 复原）在 `runtime-manager`。
+ *
+ * 三条不让步的口径：
+ * 1. 先落库再生效：生效失败时值仍已持久化（下次进程按既有语义读到），不把已成功的保存改判失败；
+ * 2. 只在生效成功后广播 `library-changed`（与 `start-scan`「只在扫描成功后发」同判据——
+ *    库没变化就通知，只会让 UI 重取一次旧结果）；
+ * 3. 只回分类码不回原文：`src/**` 禁硬编码中文，且上游错误原文（含路径线索）不该跨 IPC 泄漏，
+ *    真实原因由 `runtime-manager` 的 `deps.log` 落日志。
+ */
+async function applyPersistedGameRoot(
+  runtime: NikkiSyncRuntimeHandle | undefined,
+  gameRoot: string,
+  event: IpcMainInvokeEvent
+): Promise<NikkiSyncGameRootApplyResult> {
+  if (!runtime) return { applied: false, needRestart: true }
+  try {
+    await runtime.applyGameRoot(gameRoot)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    // 判据顺序与 `toAppError` 保持一致：'not found' 只来自上游安装发现失败，
+    // 未建链/未就绪走 'not ready|unavailable' 一支。
+    if (/not found/i.test(message)) {
+      return { applied: false, needRestart: true, applyError: 'installation-not-found' }
+    }
+    if (/not ready|unavailable/i.test(message)) {
+      return { applied: false, needRestart: true, applyError: 'runtime-unavailable' }
+    }
+    return { applied: false, needRestart: true, applyError: 'scan-failed' }
+  }
+  notifyLibraryChanged(event)
+  return { applied: true, needRestart: false }
+}
+
 export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   ipcMain.handle(
     'nikkisync:runtime-status',
@@ -854,12 +896,13 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   )
 
   // ---- 照片目录自定义（game-root 三通道 + K6 手输预检）----
-  // 与 K6 的分工：gameRoot 替代上游自动发现的游戏安装根（单值、重启后由
-  // buildSessionOptions 读设置键生效——运行期换根须整会话重建，故这里只持久化）；
+  // 与 K6 的分工：gameRoot 替代上游自动发现的游戏安装根（单值）；set/reset 落库后当场走
+  // 运行期生效通道（`runtime.applyGameRoot` = 换根重建 + 全量扫描），生效成功即不再需要重启，
+  // 生效不了才退回「重启后生效」并以 applied/applyError 如实告知（原因见 applyPersistedGameRoot）。
   // admit 不落库，只做校验 + 同步域登记，让手输路径能过既有 inspect 门禁。登记刻意不进
   // userPickedDirs：那条路是「对话框显式选中」专属，而本通道入参来自渲染层，写进全局集合
   // 就顺带给了 scanner:start / settings:set / media:// 免检（前缀命中 ⇒ 一次调用整盘放行）。
-  // 四通道都不 requireRuntime：未启用 Runtime 时配置仍可先行落库。
+  // get/admit 不 requireRuntime；set/reset 在 Runtime 未装配时仍可落库（applied:false）。
 
   ipcMain.handle(
     'nikkisync:get-game-root',
@@ -872,20 +915,22 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
 
   ipcMain.handle(
     'nikkisync:set-game-root',
-    wrapHandlerRaw(ctx, async (args) =>
+    wrapHandlerRaw(ctx, async (args, _ctx, event) =>
       parseAndRun(gameRootSetSchema, args[0] ?? {}, 'set-game-root', async (input) => {
         const { writable } = await validatePhotoSourceDirectory(input.path)
         ctx.dbManager.setSetting(SETTING_GAME_ROOT_KEY, input.path)
-        return { gameRoot: input.path, needRestart: true, writable }
+        const apply = await applyPersistedGameRoot(ctx.nikkisyncRuntime, input.path, event)
+        return { gameRoot: input.path, writable, ...apply }
       })
     )
   )
 
   ipcMain.handle(
     'nikkisync:reset-game-root',
-    wrapHandlerNoArgs(ctx, () => {
+    wrapHandlerNoArgs(ctx, async (_ctx, event) => {
       ctx.dbManager.setSetting(SETTING_GAME_ROOT_KEY, '')
-      return { needRestart: true }
+      // 空串 = 「不下发 selectedInstallRoot」，交给上游自动发现（生效通道内已归一）
+      return applyPersistedGameRoot(ctx.nikkisyncRuntime, '', event)
     })
   )
 

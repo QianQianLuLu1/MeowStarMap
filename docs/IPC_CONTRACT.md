@@ -641,23 +641,30 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
 
 ### 8.2.6 照片目录自定义（2026-11-01 新增；gameRoot 替代默认路径 + K6 手输预检）
 
-| 通道                        | 入参                                    | 出参                                                                         | 失败码                                                                               |
-| --------------------------- | --------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| `nikkisync:get-game-root`   | 无                                      | `{gameRoot: string}`（`''` = 未设置，走上游自动发现游戏安装根）              | 无（只读设置数据库；非字符串历史脏值回退 `''`）                                      |
-| `nikkisync:set-game-root`   | `{path: string(1..512)，必须绝对路径}`  | `{gameRoot, needRestart: true, writable}`（`writable` 仅提示——只读目录合法） | `VALIDATION_ERROR`（非绝对/不存在/非目录）；`PATH_FORBIDDEN`（系统敏感目录、不可读） |
-| `nikkisync:reset-game-root` | 无                                      | `{needRestart: true}`（清空回默认自动发现）                                  | 无                                                                                   |
-| `nikkisync:admit-directory` | `{path: string(1..4096)，必须绝对路径}` | `{path}`（校验通过并登记同步域专用集合，见下）                               | 同 `set-game-root`                                                                   |
+| 通道                        | 入参                                    | 出参                                                                                         | 失败码                                                                               |
+| --------------------------- | --------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| `nikkisync:get-game-root`   | 无                                      | `{gameRoot: string}`（`''` = 未设置，走上游自动发现游戏安装根）                              | 无（只读设置数据库；非字符串历史脏值回退 `''`）                                      |
+| `nikkisync:set-game-root`   | `{path: string(1..512)，必须绝对路径}`  | `{gameRoot, writable, applied, needRestart, applyError?}`（`writable` 仅提示——只读目录合法） | `VALIDATION_ERROR`（非绝对/不存在/非目录）；`PATH_FORBIDDEN`（系统敏感目录、不可读） |
+| `nikkisync:reset-game-root` | 无                                      | `{applied, needRestart, applyError?}`（清空回默认自动发现，同样当场生效）                    | 无                                                                                   |
+| `nikkisync:admit-directory` | `{path: string(1..4096)，必须绝对路径}` | `{path}`（校验通过并登记同步域专用集合，见下）                                               | 同 `set-game-root`                                                                   |
 
 契约要点：
 
 - **替代默认路径的语义**：设置键 `nikkisync.gameRoot`（安全敏感键，`settings:set` 拒绝并指向
-  本通道）由 `buildSessionOptions` 在启动时消费——空值 = 交给上游 `game-directory-discovery`，
-  非空 = 传上游 `selectedInstallRoot`。**运行期换根须整会话重建**（`runtime-manager.scan()` 同
-  源约束），故 set/reset 只持久化并返回 `needRestart: true`，由渲染层提示重启；四通道都不
-  `requireRuntime`，同步服务未启用时也可先配置。
+  本通道）有两个消费点：① 启动时 `buildSessionOptions` 读它装配会话默认快照；② set/reset 落库
+  后**当场**调 `runtime.applyGameRoot(gameRoot)`——刷新该快照 + 换根整会话重建 + 一次全量扫描
+  （`ScannerService` 缓存 installation，换根只能重建），成功即 `applied:true / needRestart:false`
+  并广播 `nikkisync:library-changed`（与 `start-scan` 同判据：**只在成功后发**）。空串 = 回退上游
+  `game-directory-discovery`（`reset-game-root` 传 `''`，内部归一为「不下发 `selectedInstallRoot`」）。
+- **`needRestart` 语义于 2026-11-01 订正**：由「恒 `true`（只持久化、等重启）」改为「未能当场
+  生效才 `true`」；`applied` / `applyError` 是**新增可选字段**，旧调用方读不到即按 `needRestart`
+  走重启兜底，向后兼容。`applyError` 三值：`runtime-unavailable`（Runtime 未装配 / 未建链）、
+  `installation-not-found`（该目录解析不出游戏安装根——上游要求 `<root>\X6Game` + 游戏主程序）、
+  `scan-failed`（其他重建/扫描故障）。三种情况下**值都已持久化**，下次进程仍按消费点 ① 生效，
+  不把已成功的保存改判为失败；且都不广播 `library-changed`（库未变化）。
 - **校验口径**：绝对路径（win32 正则，与 inspect 同款）→ `isSensitivePath` 系统敏感目录黑名单
   → 存在 + 目录 → `R_OK` 可读必过；`W_OK` 可写探测 **fail-open**（仅 `writable:false` 提示，
-  不阻断——照片源目录扫描只读，Program Files 等不可写位置本身合法，系统敏感目录才拒绝）。
+  不阻断、也不阻断生效——照片源目录扫描只读，Program Files 等不可写位置本身合法，系统敏感目录才拒绝）。
 - `admit-directory` 供 K6 手输路径使用：校验全过后只登记**同步域专用集合**
   `pathGuard.registerSyncPhotoDir`，唯一消费方是 `nikkisync:inspect-extra-directory` 的
   `isSyncPhotoDir` 短路；失败不登记。**刻意不写** `userPicked`/`userPickedDirs`/`roots`——
@@ -667,7 +674,8 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   **不同**，后者以真实系统对话框手势为凭）。手输目录扫出的照片仍按 `media://` 第 4 条规则
   （`resource-allowlist` 精确授权表）读图，与本通道的登记无关。
 - gameRoot 通道**不**登记 pathGuard、不扩权：运行时扫描器在主进程直接读文件，扫出的照片经
-  `resource-allowlist` 授权 `media://`，与上游自动发现同一条授权链。
+  `resource-allowlist` 授权 `media://`，与上游自动发现同一条授权链。换根重建同样**不**因 `applyGameRoot`
+  顺带把局域网同步服务启起来：只有原本在监听时才按同配置复原（`runtime-manager.applyGameRoot` 内）。
 - 入库路径即后续 `start-scan` 的 `gameRoot` 上界（512），两处同规避免双真相源。
 
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）

@@ -724,17 +724,28 @@ export interface NikkiSyncSetGameRootInput {
   path: string
 }
 
-/** `nikkisync:set-game-root` 响应；writable 仅提示（只读目录合法），needRestart = 重启后生效。 */
-export interface NikkiSyncSetGameRootResult {
-  gameRoot: string
+/** 照片目录生效失败的分类码（运行期换根重扫未能完成的原因；原因原文只落主进程日志）。 */
+export type NikkiSyncGameRootApplyError =
+  'runtime-unavailable' | 'installation-not-found' | 'scan-failed'
+
+/**
+ * 照片目录生效结果（set/reset 共用片段）。`applied` = 已在当前进程重建会话并完成重扫；
+ * `needRestart` = 仍需重启才生效（与 applied 互斥：立即生效成功时为 false，未生效分支为 true）。
+ */
+export interface NikkiSyncGameRootApplyResult {
+  applied: boolean
   needRestart: boolean
+  applyError?: NikkiSyncGameRootApplyError
+}
+
+/** `nikkisync:set-game-root` 响应；writable 仅提示（只读目录合法）。 */
+export interface NikkiSyncSetGameRootResult extends NikkiSyncGameRootApplyResult {
+  gameRoot: string
   writable: boolean
 }
 
-/** `nikkisync:reset-game-root` 响应（清空设置回退默认自动发现）。 */
-export interface NikkiSyncResetGameRootResult {
-  needRestart: boolean
-}
+/** `nikkisync:reset-game-root` 响应（清空设置回退默认自动发现；applied 表示是否已当场生效）。 */
+export type NikkiSyncResetGameRootResult = NikkiSyncGameRootApplyResult
 
 /** `nikkisync:admit-directory` 入参（K6 手输路径的预检登记）。 */
 export interface NikkiSyncAdmitDirectoryInput {
