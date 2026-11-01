@@ -21,6 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.6] - 2026-11-01
+
+> 2.5.6：全屏预览与同步图库缺陷修复的收口定版（2.5.6-beta 的定版轮，无新增功能）。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6`，安装包名随 `artifactName` 模板为 `MeowStarMap-Setup-2.5.6.exe`。
+
+### Fixed | 修复
+
+- **全屏预览顶部工具栏点击无响应（2026-11-01）**：Electron `-webkit-app-region: drag` 按矩形计算且不感知遮挡，TitleBar 常驻拖拽区在全屏覆盖层之下仍吞掉顶部 40px 内按钮的 mousedown——全屏查看器与幻灯片放映根容器加仓库预留的 `.app-no-drag` 工具类做几何减法；同轮修掉工具栏裸 `div` 按行内基线对齐导致的按钮下沉错位。计划与真机实测读数见 `docs/plans/2026-11-01-fullscreen-topbar-fix-实施计划.md`
+- **全屏前后切换画面抖动（2026-11-01）**：换源时 `src` 与宽高盒错位——切图同帧即用新文件元数据成形宽高盒，而位图要等换源提交后才到达，旧画面被塞进新比例盒子重新 letterbox，一次翻页肉眼可见跳 2~3 下。修法为换源三联状态（显示 URL / 归属文件 / URL 引用）恒属同一文件、成组原子更新：新缩略图离屏解码就绪前旧画面持稳，就绪后单次提交换源；快速往返重开同图零闪烁；无缩略图路径保持立即换源。幻灯片放映同步修复：影像按元数据预成形宽高盒、按播放顺序（洗牌感知）预热相邻原图；放映钩子返回对象不再整体进入 effect 依赖——它每次渲染都是新引用，与视频等待的停止逻辑拉锯成死循环挂死（skipVideo 关闭且播放位落在视频时应用冻结），一并修复。计划与真机实测读数见 `docs/plans/2026-11-01-fullscreen-switch-jitter-fix-实施计划.md`
+- **放映状态机两处收口（2026-11-01，审查发现）**：① 暂停态修改播放间隔会被自动启动逻辑拉回播放——自动启动 effect 加「打开沿」门卫，仅在放映打开时启动一次，播放中改间隔仍由既有计时器重启语义接管；② 「因等待视频而暂停」的标记跨手动导航/暂停残留，暂停态可被后续视频播完事件无声复播——手动播放/暂停起点清除过期标记，合法的视频等待恢复链不受影响
+- **同步账号样例缩略图 403 间歇回归（2026-11-01，审查发现）**：单条登记的样例预览授权与图库整表登记是并发链，换 revision 的整表替换会把样例条目一并清掉且无补偿——新增独立存活集合跨 revision 回填（上限 60、插入序淘汰），运行时停止仍全清；同轮补齐目录增删成功后的 `nikkisync:library-changed` 推送（与来源变更同判据，本地同步图库按 fullResyncRequired 重取）。审查结论与验证读数见 `docs/plans/2026-11-01-review-fix-verify-2.5.6-release-实施计划.md`
+
+---
+
 ## [2.5.6-beta] - 2026-10-27
 
 > 2.5.6-beta：全面审查后的缺陷修复定版，**以缺陷修复为主**（2026-10-31 追加完整搭配码面板，见 Added）。版本号由用户明确要求变更（2.5.5 期间已多轮原地重打包，本轮改动量足以与旧产物区分）。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6-beta`，安装包名随 `artifactName` 模板变为 `MeowStarMap-Setup-2.5.6-beta.exe`。
@@ -487,7 +500,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库已有 8 个 tag，但**全部不带 `v` 前缀**——无前缀形式（`2.3.6`、`2.5.0`）与旧项目名前缀形式（`NikkiGallery2.3.6`、`NikkiGallery2.5.0` / `2.5.1` / `2.5.2` / `2.5.3`、`NikkiGallery2.5.5-beta`）。因此下列 `compare/vX...vY` 与 `releases/tag/vX` 链接**实际均不可访问**（2026-10-24 复核）。处置：除 `[Unreleased]` 因 `scripts/__tests__/check-changelog-release.test.ts` 的契约要求必须保持 `compare/v<最新版本>...HEAD` 形式而原样保留外，其余各版本锚点一律改为指向 Releases 页面，确保链接可用；待补打 `vX.Y.Z` tag 后可整体恢复 compare 形式。
 
-[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.6-beta...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.6...HEAD
+[2.5.6]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.6-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.5]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.5-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
