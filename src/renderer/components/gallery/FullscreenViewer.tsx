@@ -83,10 +83,6 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   const activeFiles = fullscreenFiles ?? filteredFiles
   const currentFile = activeFiles[fullscreenIndex]
   const fileUrl = toFileUrl(currentFile?.file_path)
-  useEffect(() => {
-    setImgError(false)
-  }, [fileUrl])
-
   // RC2：动画窗口内只渲染已被引擎缓存的缩略图，原图用离屏 Image 预解码就绪后再原子换源。
   // 直接以数 MB 的 4K 原图作 src 会带来三个问题：① 新快照拍摄时原图尚未加载、固有尺寸
   // 未知，共享元素 group 的起终点尺寸失真；② 加载完成触发重排，正在进行的放大动画被撕裂；
@@ -98,11 +94,50 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     hasBoxMetadata && currentFile?.thumbnail ? toFileUrl(currentFile.thumbnail) : null
   const initialUrl = thumbUrl && thumbUrl !== fileUrl ? thumbUrl : fileUrl
   const [displayUrl, setDisplayUrl] = useState<string | null>(initialUrl)
+  // jitter-fix：换源三联状态（displayUrl / displayedFile / displayedUrlRef）恒属同一
+  // 文件、必须成组更新——宽高盒跟随 displayedFile 而非当前索引文件：旧实现切换后同帧
+  // 渲染即把 width/height 属性换成新文件的元数据，而 src 要等 effect 提交后才换新
+  // 缩略图，新缩略图就绪前旧位图被塞进新比例的盒子重新 letterbox（横→竖整幅瞬间缩小
+  // 过半再弹出），一次翻页肉眼可见跳 2~3 下。改为新缩略图离屏 decode 就绪前旧画面原样
+  // 持稳（src 与宽高盒都不动），就绪后同一回调内成组换源（React 批处理 → 单次提交原子
+  // 生效）；imgError 复位亦随换源成组生效，错误占位不再闪帧。
+  const [displayedFile, setDisplayedFile] = useState<MediaFile | null>(currentFile ?? null)
+  const displayedUrlRef = useRef<string | null>(initialUrl)
   useEffect(() => {
-    setDisplayUrl(initialUrl)
-    // 无缩略图可先行时（已是原图）无需换源
-    if (!fileUrl || initialUrl === fileUrl) return
+    if (!currentFile || !fileUrl) return
+    // 快速往返 / 重开同图：目标原图已在显示（ref 命中）——零探测零闪烁，仅对齐归属文件
+    if (displayedUrlRef.current === fileUrl) {
+      setDisplayUrl(fileUrl)
+      setDisplayedFile(currentFile)
+      setImgError(false)
+      return
+    }
     let cancelled = false
+    const settled = whenTransitionSettled()
+    const applySource = (url: string | null) => {
+      displayedUrlRef.current = url
+      setDisplayUrl(url)
+      setDisplayedFile(currentFile)
+      setImgError(false)
+    }
+    // 无缩略图可先行时（已是原图）：沿旧行为提交后立即换源，不发离屏解码
+    // （!initialUrl 仅为类型收窄守卫：上方已保证 fileUrl 非空，此处恒为假）
+    if (!initialUrl || initialUrl === fileUrl) {
+      applySource(fileUrl)
+      return
+    }
+    // 缩略图先行：decode（失败降级同换）+ 过渡结束后，与归属文件成组换源
+    const thumbProbe = new Image()
+    thumbProbe.src = initialUrl
+    const thumbReady: Promise<unknown> =
+      typeof thumbProbe.decode === 'function'
+        ? thumbProbe.decode()
+        : Promise.reject(new Error('no decode'))
+    void Promise.all([thumbReady.catch(() => undefined), settled]).then(() => {
+      // 原图已先行换源（缓存命中）时不回退到缩略图
+      if (!cancelled && displayedUrlRef.current !== fileUrl) applySource(initialUrl)
+    })
+    // 原图预解码：就绪后换源（终态）
     const probe = new Image()
     probe.src = fileUrl
     // decode() 缺失时降级为「加载完成即换」；预解码失败同样换源，
@@ -112,13 +147,13 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
     // G2：换源条件为「decode 完成 且 当前过渡已结束」。冷加载的 4K 图若在
     // ~220ms 共享元素动画窗口内完成解码并换源，解码+重绘会直接吃掉动画帧。
     // 无活动过渡（降级路径）时 whenTransitionSettled() 立即 resolve，行为不变。
-    void Promise.all([ready.catch(() => undefined), whenTransitionSettled()]).then(() => {
-      if (!cancelled) setDisplayUrl(fileUrl)
+    void Promise.all([ready.catch(() => undefined), settled]).then(() => {
+      if (!cancelled) applySource(fileUrl)
     })
     return () => {
       cancelled = true
     }
-  }, [fileUrl, initialUrl])
+  }, [currentFile, fileUrl, initialUrl])
 
   // THUMBNAIL_OPTIMIZATION_PLAN 节点4：邻近项原图预热——当前项变化时预热前后各一张，
   // 翻页时字节已入 HTTP 缓存（原图一年强缓存），基本即点即显。仅在打开状态预热。
@@ -384,7 +419,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[80] flex items-center justify-center outline-none"
+      className="fixed inset-0 z-[80] flex items-center justify-center outline-none app-no-drag"
       style={{ background: 'rgba(0,0,0,0.92)' }}
       onClick={handleClose}
       onTouchStart={handleTouchStart}
@@ -400,6 +435,10 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
           nextPage()
         }
       }}
+      // topbar-fix：Electron 拖拽区（-webkit-app-region: drag）按矩形计算、不感知遮挡，
+      // TitleBar 的 .app-drag（常驻挂载）会让窗口顶部 40px 条带在本查看器之下仍为活动
+      // 拖拽区，顶栏按钮 mousedown 被窗口拖动吞掉（点击无响应）。根容器整屏声明
+      // .app-no-drag 做几何减法，仅全屏打开期间生效，非全屏 TitleBar 拖拽不受影响
       role="dialog"
       aria-modal="true"
       aria-label={t('gallery.fullscreen.ariaLabel', { fileName: currentFile.file_name })}
@@ -428,9 +467,12 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
         ) : (
           <img
             src={displayUrl ?? fileUrl ?? ''}
-            // 占位阶段按原图宽高比撑满盒子，使「缩略图 → 原图」换源零布局变化
-            width={displayUrl !== fileUrl ? currentFile.width : undefined}
-            height={displayUrl !== fileUrl ? currentFile.height : undefined}
+            // 占位阶段按原图宽高比撑满盒子，使「缩略图 → 原图」换源零布局变化。
+            // jitter-fix：宽高盒必须跟随「正在显示的文件」（displayedFile）而非当前
+            // 索引文件——新缩略图就绪前 src 仍是旧图，盒子若先切到新文件尺寸就会把
+            // 旧位图重新 letterbox（切换抖动根因，见换源 effect 处注释）
+            width={displayUrl !== fileUrl ? (displayedFile ?? currentFile)?.width : undefined}
+            height={displayUrl !== fileUrl ? (displayedFile ?? currentFile)?.height : undefined}
             alt={currentFile.file_name}
             className="max-w-full max-h-full object-contain"
             draggable={false}
@@ -439,6 +481,7 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
             onError={() => {
               // 缩略图失败不等于图片不可用：先升级为原图，原图再失败才进错误占位
               if (displayUrl !== fileUrl) {
+                displayedUrlRef.current = fileUrl
                 setDisplayUrl(fileUrl)
               } else {
                 setImgError(true)
@@ -498,7 +541,11 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
             }}
           >
             {/* F-S10：幻灯片播放控制 */}
-            <div className="relative">
+            {/* topbar-fix：原裸 div.relative 为块级容器，两按钮按行内基线对齐——
+                播放按钮基线=图标底缘、间隔按钮基线=文本基线，二者不同导致间隔按钮
+                相对下沉。改 flex items-center 恢复与其余按钮一致的盒级垂直居中；
+                relative 保留：间隔下拉菜单仍以本容器为定位锚 */}
+            <div className="relative flex items-center gap-2">
               <button
                 className="icon-btn icon-btn-on-overlay"
                 onClick={toggleSlideshow}
@@ -515,12 +562,13 @@ export const FullscreenViewer: React.FC<FullscreenViewerProps> = ({ filteredFile
               >
                 {slideshow.isPlaying ? <IconPause size={18} /> : <IconPlay size={18} />}
               </button>
+              {/* topbar-fix：去除 ml-1 与内联 minWidth/padding 覆盖，与其余按钮统一
+                  36×36 盒 + 8px 等距（gap-2） */}
               <button
-                className="icon-btn icon-btn-on-overlay text-xs ml-1"
+                className="icon-btn icon-btn-on-overlay text-xs"
                 onClick={() => setShowIntervalMenu((v) => !v)}
                 title={t('gallery.fullscreen.intervalTitle')}
                 aria-label={t('gallery.fullscreen.intervalTitle')}
-                style={{ minWidth: 'auto', padding: '4px 8px' }}
               >
                 {(playInterval / 1000).toString()}s
               </button>

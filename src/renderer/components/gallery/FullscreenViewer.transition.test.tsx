@@ -33,18 +33,37 @@ const pendingResolvers: Array<() => void> = []
 const pendingRejectors: Array<(err: Error) => void> = []
 /** 离屏预解码请求过的 src 序列（按调用顺序） */
 const preDecodedSources: string[] = []
+/** 全部 FakeImage 实例（jitter-fix 后 decode 推进一律按 src 匹配，不再按实例序数） */
+const fakeImages: FakeImage[] = []
 
 class FakeImage {
   src = ''
+  /** 本实例处于 pending 的 decode 推进器 */
+  resolvers: Array<() => void> = []
+
+  constructor() {
+    fakeImages.push(this)
+  }
 
   async decode(): Promise<void> {
     preDecodedSources.push(this.src)
     if (decodeMode === 'resolve') return
     if (decodeMode === 'reject') throw new Error('decode boom')
     return new Promise<void>((resolve, reject) => {
+      this.resolvers.push(resolve)
       pendingResolvers.push(resolve)
       pendingRejectors.push(reject)
     })
+  }
+}
+
+/** 按 src 推进对应实例的离屏 decode。jitter-fix 后缩略图先行会多发一次缩略图 probe，
+    同一文件存在缩略图/原图两个 probe，按创建序数取会错位 */
+function resolveDecodesFor(url: string): void {
+  for (const instance of fakeImages) {
+    if (instance.src === url) {
+      instance.resolvers.forEach((resolve) => resolve())
+    }
   }
 }
 
@@ -106,6 +125,7 @@ beforeEach(() => {
   pendingResolvers.length = 0
   pendingRejectors.length = 0
   preDecodedSources.length = 0
+  fakeImages.length = 0
   vi.stubGlobal('Image', FakeImage)
   resetStores()
 })
@@ -138,7 +158,11 @@ describe('FullscreenViewer 首图策略（RC2：缩略图先行）', () => {
     })
 
     await waitFor(() => expect(currentImg()?.getAttribute('src')).toBe(fullUrlA))
-    expect(preDecodedSources, '应对原图发起一次离屏预解码').toEqual([fullUrlA])
+    // jitter-fix 后缩略图先行会额外预解码一次缩略图（预期新增），原图语义不变：恰好一次
+    expect(
+      preDecodedSources.filter((s) => s === fullUrlA),
+      '应对原图发起一次离屏预解码'
+    ).toEqual([fullUrlA])
   })
 
   it('边界：缺宽高元数据时不用缩略图占位（避免换源时「先小后跳」）', () => {
@@ -198,18 +222,23 @@ describe('FullscreenViewer 首图策略（RC2：缩略图先行）', () => {
     act(() => {
       useUIStore.setState({ fullscreenIndex: 1 })
     })
+    // jitter-fix：第二张缩略图 probe decode 就绪才换源——先推进缩略图 probe 再断言
+    await act(async () => {
+      resolveDecodesFor(toFileUrl(secondFileWithThumb.thumbnail) as string)
+      await Promise.resolve()
+    })
     expect(currentImg()?.getAttribute('src')).toBe(toFileUrl(secondFileWithThumb.thumbnail))
 
     // 推进第一张的 decode：若缺少竞态保护会把 b 图换成 a 图原图
     await act(async () => {
-      pendingResolvers[0]?.()
+      resolveDecodesFor(fullUrlA)
       await Promise.resolve()
     })
     expect(currentImg()?.getAttribute('src')).toBe(toFileUrl(secondFileWithThumb.thumbnail))
 
     // 推进第二张的 decode：才应换成第二张原图
     await act(async () => {
-      pendingResolvers[1]?.()
+      resolveDecodesFor(toFileUrl(secondFileWithThumb.file_path) as string)
       await Promise.resolve()
     })
     await waitFor(() =>
@@ -264,7 +293,7 @@ describe('FullscreenViewer 换源时机（G2：避开过渡动画窗口）', () 
     // 手动推进 decode resolve（decode 已就绪），过渡保持 pending：
     // 旧实现此刻即换源（4K 解码/重绘落在动画窗口内）→ 本断言红灯
     await act(async () => {
-      pendingResolvers[0]?.()
+      resolveDecodesFor(fullUrlA)
       for (let i = 0; i < 5; i++) await Promise.resolve()
     })
     expect(currentImg()?.getAttribute('src'), '过渡未结束前不得换源').toBe(thumbUrlA)
@@ -288,7 +317,7 @@ describe('FullscreenViewer 换源时机（G2：避开过渡动画窗口）', () 
     openFullscreen([fileWithThumb])
 
     await act(async () => {
-      pendingResolvers[0]?.()
+      resolveDecodesFor(fullUrlA)
       for (let i = 0; i < 5; i++) await Promise.resolve()
     })
     expect(currentImg()?.getAttribute('src'), '过渡未结束前不得换源').toBe(thumbUrlA)
@@ -306,7 +335,7 @@ describe('FullscreenViewer 换源时机（G2：避开过渡动画窗口）', () 
     openFullscreen([fileWithThumb])
 
     await act(async () => {
-      pendingResolvers[0]?.()
+      resolveDecodesFor(fullUrlA)
       for (let i = 0; i < 5; i++) await Promise.resolve()
     })
     await waitFor(() => expect(currentImg()?.getAttribute('src')).toBe(fullUrlA))

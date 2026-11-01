@@ -4,6 +4,8 @@ import { useUIStore, type SlideshowOrder, type SlideshowTransition } from '../..
 import { toFileUrl, type MediaFile } from '../../stores/mediaStore'
 // DU3：幻灯片播放逻辑统一到 useSlideshow hook
 import { useSlideshow } from '../../hooks/useSlideshow'
+// jitter-fix：按播放顺序预热相邻原图（跳过视频/越界判空由钩子内处理）
+import { useNeighborPrefetch } from '../../hooks/useNeighborPrefetch'
 import {
   IconClose,
   IconChevronLeft,
@@ -101,6 +103,15 @@ export const SlideshowPlayer: React.FC<SlideshowPlayerProps> = ({ filteredFiles 
 
   const currentFile = playableFiles[playOrder[currentPos]]
 
+  // jitter-fix：按播放顺序（洗牌感知）映射文件列表，复用邻居预取钩子预热当前项前后
+  // 各一张原图——翻页时字节已入 HTTP 缓存（原图一年强缓存）基本即点即显，消除
+  // 「重挂载后全新 img 现场加载 4K 原图、空白后突然撑开」的抖动源
+  const prefetchFiles = useMemo(
+    () => playOrder.map((i) => playableFiles[i]),
+    [playOrder, playableFiles]
+  )
+  useNeighborPrefetch(prefetchFiles, currentPos, slideshowOpen)
+
   // DU3：用 ref 持有 stop 函数，避免 goToNext 与 slideshow 的循环依赖
   const stopRef = useRef<() => void>(() => {})
 
@@ -130,27 +141,50 @@ export const SlideshowPlayer: React.FC<SlideshowPlayerProps> = ({ filteredFiles 
     interval: config.interval,
     onTick: goToNext
   })
+  // jitter-fix：slideshow 返回对象每次渲染都是新引用，任何把它整体放进 deps 的 effect
+  // 都会在每次渲染重跑——与视频等待路径的 stop() 叠加会形成 start/stop 无限拉锯
+  // （skipVideo=false 且播放位落在视频时挂死），暂停也会被重启覆盖。下方 effect 一律
+  // 改依赖 useCallback 稳定引用（start/stop）与原始值（isPlaying）
+  const { isPlaying, start: startSlideshow, stop: stopSlideshow } = slideshow
   // 同步 stop 到 ref（slideshow.stop 是稳定引用，安全赋值）
-  stopRef.current = slideshow.stop
+  stopRef.current = stopSlideshow
 
   // 重置播放位置时自动开始播放
+  // review-fix：start 的引用随 interval 重建（useCallback 依赖 [interval]），interval
+  // 变化会让本 effect 重入并把暂停态拉回播放——加「打开沿」门卫，仅在 slideshowOpen
+  // false→true 时启动一次；interval 变化时的计时器重启由 useSlideshow 内部 effect
+  // （isPlaying 时以新间隔重建）负责，语义不丢
+  const autoStartedRef = useRef(false)
   useEffect(() => {
-    if (!slideshowOpen) return
-    slideshow.start()
-  }, [slideshowOpen, slideshow])
+    if (!slideshowOpen) {
+      autoStartedRef.current = false
+      return
+    }
+    if (autoStartedRef.current) return
+    autoStartedRef.current = true
+    startSlideshow()
+  }, [slideshowOpen, startSlideshow])
 
+  // review-fix：togglePlay 起点清除「因等待而暂停」标记——该标记只在视频等待路径
+  // 有效，手动播放/暂停后旧标记已过期，不清会在暂停态被后续视频播完事件无声复播
+  // （等待 effect 会在真正需要恢复时重新置位，合法恢复链不受影响）
   const togglePlay = useCallback(() => {
+    videoEndedRef.current = false
     slideshow.toggle()
   }, [slideshow])
 
   // T11：视频文件且未跳过时，等待视频播完再切换，暂停 interval
+  // jitter-fix：依赖改原始值 isPlaying + 稳定引用——stop 后 isPlaying=false，
+  // effect 不再每渲染重入；videoEndedRef 反转为「因等待而暂停」标记，
+  // 供视频播完后恢复自动播放（原实现依赖每渲染重启的自动启动 effect 恢复，
+  // 正是拉锯挂死的另一半）
   useEffect(() => {
-    if (!slideshow.isPlaying || !currentFile) return
+    if (!isPlaying || !currentFile) return
     if (currentFile.file_type === 'video' && !config.skipVideo) {
-      videoEndedRef.current = false
-      slideshow.stop()
+      videoEndedRef.current = true
+      stopSlideshow()
     }
-  }, [slideshow, currentFile, config.skipVideo])
+  }, [isPlaying, currentFile, config.skipVideo, stopSlideshow])
 
   // T11：鼠标移动 3 秒后隐藏控制条
   useEffect(() => {
@@ -211,10 +245,10 @@ export const SlideshowPlayer: React.FC<SlideshowPlayerProps> = ({ filteredFiles 
 
   // 关闭时停止播放
   useEffect(() => {
-    if (!slideshowOpen && slideshow.isPlaying) {
-      slideshow.stop()
+    if (!slideshowOpen && isPlaying) {
+      stopSlideshow()
     }
-  }, [slideshowOpen, slideshow])
+  }, [slideshowOpen, isPlaying, stopSlideshow])
 
   if (!slideshowOpen || playableFiles.length === 0 || !currentFile) return null
 
@@ -234,15 +268,23 @@ export const SlideshowPlayer: React.FC<SlideshowPlayerProps> = ({ filteredFiles 
 
   const handleVideoEnded = () => {
     if (!config.loop && currentPos >= playableFiles.length - 1) {
-      slideshow.stop()
+      stopSlideshow()
+      videoEndedRef.current = false
       return
     }
     goToNext()
+    // 视频等待路径曾暂停计时器：恢复自动播放（放映语义下视频是延长的幻灯片页）
+    if (videoEndedRef.current) {
+      videoEndedRef.current = false
+      startSlideshow()
+    }
   }
 
   return (
     <div
-      className="fixed inset-0 z-[85] flex items-center justify-center outline-none"
+      // topbar-fix：同 FullscreenViewer——TitleBar 的 .app-drag 拖拽区不感知遮挡，
+      // 顶部 40px 条带会吞掉顶栏「退出」按钮的点击，根容器整屏 no-drag 做几何减法
+      className="fixed inset-0 z-[85] flex items-center justify-center outline-none app-no-drag"
       style={{ background: 'rgba(0,0,0,0.96)' }}
       role="dialog"
       aria-modal="true"
@@ -266,6 +308,10 @@ export const SlideshowPlayer: React.FC<SlideshowPlayerProps> = ({ filteredFiles 
           ) : (
             <img
               src={fileUrl || undefined}
+              // jitter-fix：按元数据预成形宽高盒——位图加载前盒子即按原比例占位，
+              // 加载完不再「突然撑开」，fade/slide 过渡动画作用于稳定盒子
+              width={currentFile.width}
+              height={currentFile.height}
               alt={currentFile.file_name}
               className="max-w-full max-h-full"
               style={{ objectFit: 'contain' }}
