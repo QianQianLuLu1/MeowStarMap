@@ -17,6 +17,7 @@ import { toFileUrl } from '../../utils/file'
 import type {
   NikkiSyncExtraDirectoriesInfo,
   NikkiSyncExtraDirectoryProposalInfo,
+  NikkiSyncGameRootApplyResult,
   NikkiSyncMetadataConsentInfo,
   NikkiSyncOrganizerItemInfo,
   NikkiSyncOrganizerViewInfo,
@@ -635,6 +636,31 @@ export const SyncServicePage: React.FC = () => {
     if (confirmed === 0) await api.app?.relaunch?.()
   }, [t])
 
+  /**
+   * 照片目录生效结果的三条出口（保存 / 恢复默认共用；`successMessage` 由调用点给静态键文案，
+   * 避免动态 t(key) 让 i18n 抽取与键守卫看不见消费点）：
+   * - `applyError === 'installation-not-found'`：该值按「游戏安装根种子」被上游消费，目录形态
+   *   不对时重启也救不了 ⇒ 给可执行提示（改选游戏安装目录，或走「额外照片目录」），**不**弹重启询问；
+   * - `applied`：主进程已当场换根重建 + 全量扫描并广播 library-changed ⇒ 只报即时生效；
+   * - 其余未生效支（Runtime 未装配 / 未建链 / 重扫故障）：退回旧的「重启后生效」询问——值已持久化，
+   *   下次进程仍按启动消费点读到，不能因为当场没生效就说保存失败。
+   */
+  const announceGameRootApply = useCallback(
+    async (result: NikkiSyncGameRootApplyResult, successMessage: string): Promise<void> => {
+      if (result.applyError === 'installation-not-found') {
+        showMessage(t('syncService.photoDirectories.applyFailedInstallRoot'), 'info')
+        return
+      }
+      if (result.applied) {
+        showMessage(successMessage, 'success')
+        return
+      }
+      showMessage(t('syncService.photoDirectories.savedDeferred'), 'success')
+      await promptRestart()
+    },
+    [showMessage, t, promptRestart]
+  )
+
   /** 照片目录：浏览选择。只回填输入框不直接保存——给用户检查/修改的机会。 */
   const handleBrowseGameRoot = async (): Promise<void> => {
     const api = window.electronAPI
@@ -666,9 +692,8 @@ export const SyncServicePage: React.FC = () => {
       const res = await api.nikkisync.setGameRoot({ path: value })
       setGameRoot(res.gameRoot)
       setGameRootInput(res.gameRoot)
-      showMessage(t('syncService.photoDirectories.saved'), 'success')
+      await announceGameRootApply(res, t('syncService.photoDirectories.saved'))
       if (!res.writable) showMessage(t('syncService.photoDirectories.notWritable'), 'info')
-      await promptRestart()
     } catch (error) {
       // 失败保留输入值与当前生效目录，用户可直接改后重试
       showError(error)
@@ -677,17 +702,16 @@ export const SyncServicePage: React.FC = () => {
     }
   }
 
-  /** 照片目录：恢复默认（清空设置键；重启后回到上游自动发现的游戏安装根）。 */
+  /** 照片目录：恢复默认（清空设置键并当场回到上游自动发现的游戏安装根）。 */
   const handleResetGameRoot = async (): Promise<void> => {
     const api = window.electronAPI
     if (busy || !api) return
     setBusy(true)
     try {
-      await api.nikkisync.resetGameRoot()
+      const res = await api.nikkisync.resetGameRoot()
       setGameRoot('')
       setGameRootInput('')
-      showMessage(t('syncService.photoDirectories.resetDone'), 'success')
-      await promptRestart()
+      await announceGameRootApply(res, t('syncService.photoDirectories.resetDone'))
     } catch (error) {
       showError(error)
     } finally {

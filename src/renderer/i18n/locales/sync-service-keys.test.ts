@@ -173,6 +173,8 @@ const SYNC_SERVICE_LEAVES = [
   'photoDirectories.save',
   'photoDirectories.reset',
   'photoDirectories.saved',
+  'photoDirectories.savedDeferred',
+  'photoDirectories.applyFailedInstallRoot',
   'photoDirectories.notWritable',
   'photoDirectories.resetDone',
   'photoDirectories.restartTitle',

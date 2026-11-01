@@ -159,6 +159,10 @@ function installElectronApi(
     gameRootReject?: boolean
     setGameRootReject?: Error
     setGameRootWritableFalse?: boolean
+    /** 生效通道未成功（applied:false / needRestart:true）——如 Runtime 未装配、未建链、重扫故障。 */
+    gameRootApplyDeferred?: boolean
+    /** 生效失败且原因是「该目录解析不出游戏安装根」（applied:false + applyError）。 */
+    gameRootApplyNotInstallRoot?: boolean
     admitReject?: Error
   } = {}
 ) {
@@ -320,11 +324,21 @@ function installElectronApi(
           }
         : async ({ path }: { path: string }) => ({
             gameRoot: path,
-            needRestart: true,
-            writable: !opts.setGameRootWritableFalse
+            writable: !opts.setGameRootWritableFalse,
+            ...(opts.gameRootApplyNotInstallRoot
+              ? { applied: false, needRestart: true, applyError: 'installation-not-found' }
+              : opts.gameRootApplyDeferred
+                ? { applied: false, needRestart: true }
+                : { applied: true, needRestart: false })
           })
     ),
-    resetGameRoot: vi.fn(async () => ({ needRestart: true })),
+    resetGameRoot: vi.fn(async () =>
+      opts.gameRootApplyNotInstallRoot
+        ? { applied: false, needRestart: true, applyError: 'installation-not-found' }
+        : opts.gameRootApplyDeferred
+          ? { applied: false, needRestart: true }
+          : { applied: true, needRestart: false }
+    ),
     // K6 手输预检：主进程校验并登记 pathGuard；admitReject 模拟校验拒绝
     admitDirectory: vi.fn(
       opts.admitReject
@@ -1083,12 +1097,14 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
 
 // ============================================================================
 // 照片目录自定义（gameRoot 三通道 + K6 手输预检）
-// 契约：分区常驻（不经运行时装配也能配置）；'' = 默认自动发现；保存/恢复默认都
-// 走「成功 Toast → needRestart 重启询问 → relaunch」；可写探测失败仅警告不阻断；
+// 契约：分区常驻（不经运行时装配也能配置）；'' = 默认自动发现；保存/恢复默认由主进程
+// 当场换根重建 + 重扫，applied:true ⇒ 即时生效文案且**不弹**重启询问，applied:false ⇒
+// savedDeferred + 重启询问兜底，applyError:'installation-not-found' ⇒ 专属可执行提示且
+// **不弹**重启询问（重启也救不了选错形态的目录）。可写探测失败仅警告不阻断；
 // K6 手输路径先 admit（校验+登记）后 inspect（既有提案确认流不变）。
 // ============================================================================
 
-describe('SyncServicePage 照片目录自定义（(at)-(bb)）', () => {
+describe('SyncServicePage 照片目录自定义（(at)-(be)）', () => {
   it('(at) 挂载读取 getGameRoot：未设置显示「默认（自动发现）」，输入框为空', async () => {
     renderSection()
     await waitFor(() => expect(serverApi.getGameRoot).toHaveBeenCalledTimes(1))
@@ -1115,7 +1131,7 @@ describe('SyncServicePage 照片目录自定义（(at)-(bb)）', () => {
     expect(serverApi.setGameRoot).not.toHaveBeenCalled()
   })
 
-  it('(aw) 保存成功：setGameRoot + 成功 Toast + 重启询问（确认 0 ⇒ relaunch）', async () => {
+  it('(aw) 保存并立即生效（applied:true）：成功 Toast 走即时生效文案，不弹重启询问、不重启', async () => {
     renderSection()
     const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
     fireEvent.change(input, { target: { value: 'D:\\CustomRoot' } })
@@ -1124,20 +1140,55 @@ describe('SyncServicePage 照片目录自定义（(at)-(bb)）', () => {
       expect(serverApi.setGameRoot).toHaveBeenCalledWith({ path: 'D:\\CustomRoot' })
     )
     await waitFor(() =>
-      expect(mockShowMessage).toHaveBeenCalledWith('照片目录已保存，重启后生效', 'success')
+      expect(mockShowMessage).toHaveBeenCalledWith('照片目录已保存并立即生效', 'success')
+    )
+    // 本轮 bug 的判据：保存即换根重扫，不该再拿重启询问挡在用户与照片之间
+    expect(dialogShowMessageBox).not.toHaveBeenCalled()
+    expect(appRelaunch).not.toHaveBeenCalled()
+    // 生效后的路径回写「当前照片目录」展示位
+    expect(await screen.findByText('D:\\CustomRoot')).toBeInTheDocument()
+  })
+
+  it('(bc) 未能立即生效（applied:false）：走 savedDeferred 文案并保留重启询问（旧行为兜底）', async () => {
+    installElectronApi({ gameRootApplyDeferred: true })
+    renderSection()
+    const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    fireEvent.change(input, { target: { value: 'D:\\CustomRoot' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        '配置已保存，但未能立即生效，重启应用后生效',
+        'success'
+      )
     )
     expect(dialogShowMessageBox).toHaveBeenCalled()
     expect(appRelaunch).toHaveBeenCalledTimes(1)
   })
 
-  it('(ax) 保存成功但目录不可写：仍保存并追加 info 警告，重启询问不受影响', async () => {
+  it('(bd) 目录不是安装根（applyError）：给可执行提示，且不弹重启询问（重启也救不了错形态目录）', async () => {
+    installElectronApi({ gameRootApplyNotInstallRoot: true })
+    renderSection()
+    const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
+    fireEvent.change(input, { target: { value: 'D:\\Photos' } })
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        '该目录不是有效的游戏安装根，已保存但无法生效；请改选游戏安装目录，或用「额外照片目录」添加照片文件夹',
+        'info'
+      )
+    )
+    expect(dialogShowMessageBox).not.toHaveBeenCalled()
+    expect(appRelaunch).not.toHaveBeenCalled()
+  })
+
+  it('(ax) 保存成功但目录不可写：仍保存并追加 info 警告，即时生效不受影响', async () => {
     installElectronApi({ setGameRootWritableFalse: true })
     renderSection()
     const input = await screen.findByPlaceholderText('输入或浏览选择本地目录')
     fireEvent.change(input, { target: { value: 'D:\\ReadOnly' } })
     fireEvent.click(screen.getByRole('button', { name: '保存' }))
     await waitFor(() =>
-      expect(mockShowMessage).toHaveBeenCalledWith('照片目录已保存，重启后生效', 'success')
+      expect(mockShowMessage).toHaveBeenCalledWith('照片目录已保存并立即生效', 'success')
     )
     await waitFor(() =>
       expect(mockShowMessage).toHaveBeenCalledWith(
@@ -1145,7 +1196,7 @@ describe('SyncServicePage 照片目录自定义（(at)-(bb)）', () => {
         'info'
       )
     )
-    expect(dialogShowMessageBox).toHaveBeenCalled()
+    expect(dialogShowMessageBox).not.toHaveBeenCalled()
   })
 
   it('(ay) 保存失败：输入保留、不弹重启询问、不重启（错误 Toast 由 useErrorToast 本地态承担，此处锁下游短路）', async () => {
@@ -1161,13 +1212,28 @@ describe('SyncServicePage 照片目录自定义（(at)-(bb)）', () => {
     expect(appRelaunch).not.toHaveBeenCalled()
   })
 
-  it('(az) 恢复默认：resetGameRoot + 成功 Toast + 重启询问', async () => {
+  it('(az) 恢复默认并立即生效：resetGameRoot + 即时生效文案 + 清空展示，不弹重启询问', async () => {
     installElectronApi({ gameRoot: 'D:\\CustomRoot' })
     renderSection()
     fireEvent.click(await screen.findByRole('button', { name: '恢复默认' }))
     await waitFor(() => expect(serverApi.resetGameRoot).toHaveBeenCalledTimes(1))
     await waitFor(() =>
-      expect(mockShowMessage).toHaveBeenCalledWith('已恢复默认照片目录，重启后生效', 'success')
+      expect(mockShowMessage).toHaveBeenCalledWith('已恢复默认照片目录并立即生效', 'success')
+    )
+    // 必须消费返回值：旧实现整个丢弃 resetGameRoot 的响应，重启询问与文案都无据可依
+    expect(dialogShowMessageBox).not.toHaveBeenCalled()
+    expect(await screen.findByText('默认（自动发现游戏目录）')).toBeInTheDocument()
+  })
+
+  it('(be) 恢复默认未能立即生效：走 savedDeferred 文案并保留重启询问', async () => {
+    installElectronApi({ gameRoot: 'D:\\CustomRoot', gameRootApplyDeferred: true })
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '恢复默认' }))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        '配置已保存，但未能立即生效，重启应用后生效',
+        'success'
+      )
     )
     expect(dialogShowMessageBox).toHaveBeenCalled()
   })
