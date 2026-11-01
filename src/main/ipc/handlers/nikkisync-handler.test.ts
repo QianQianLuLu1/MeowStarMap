@@ -1375,10 +1375,14 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
   })
 
   // F1（审查发现）：admit 的入参是**渲染层任意传入**的串，不是真实对话框的返回值。
-  // `registerUserPickedDir` 一次写入的是三个全局集合——`roots`（`addUserPicked` 内部
+  // 首版 `registerUserPickedDir` 一次写入的是三个全局集合——`roots`（`addUserPicked` 内部
   // `this.register(p)`）、`userPicked`、`userPickedDirs`，且 `matchesPicked` 按**前缀**命中，
   // 而 `scanner:start` / `settings:set`(customScanPaths) / `assertMediaAccessPath` / `media://`
-  // 规则 0 全拿它做「跳过黑名单」的短路。因此一次 `admit(D:\)` 就让整盘免检、且无需用户手势。
+  // 规则 0 全拿它做「跳过黑名单」的短路——把无对话框手势的入参写进全局授权集合，与
+  // `validator.ts` 自陈的「渲染进程无任何 IPC 可写入该集合」直接矛盾。（订正：盘根形态现由
+  // `isBareDirectoryRoot` 前置拒绝；「一次 `admit(D:\)` 即让整棵子树免检」并不成立——
+  // `path.win32.resolve('D:\')` 保留尾分隔符使前缀比对不命中子目录，防线属实现特性而非
+  // 护栏本身，收窄的依据是信任级别而非该放大叙述。）
   // 本组用例锁死收窄后的边界：admit 只授予同步域（inspect 放行），不得触碰全局授权集合。
   it('admit-directory：不得写全局 user-picked 集合（registerUserPickedDir 未被调用）', async () => {
     register(createRuntimeStub())
