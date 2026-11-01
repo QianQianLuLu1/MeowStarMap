@@ -114,6 +114,31 @@
 - 输入/输出：`npm run dist:win` → `release/MeowStarMap-Setup-2.5.6.exe`。
 - 验收标准：pre-dist-check 27 项全过、verify:dist 通过、打包后冒烟 S4 断言 `app.getVersion() === '2.5.6'`。
 
-## 7. 执行读数回写
+## 7. 执行读数回写（2026-11-01 实测）
 
-（执行过程中回写：各红灯读数、六项验证结果、提交哈希、打包产物校验值。）
+**审查收口**：F1–F5 修复与红-绿测试已在工作区落地，经逐条对照源码 diff 复核确认（autoStartedRef 打开门卫 / togglePlay 清 videoEndedRef / previewPaths 跨 revision 回填 / add-remove 目录补推 / @core-change 历史括注）；本轮无新增缺陷需要修复。
+
+**预检**：`npm run verify` 5 项全 ✓；8 个触碰测试文件定向 vitest = 7 文件 145 用例全过。
+
+**六项验证链（按用户指定顺序，全绿）**：
+
+1. `npm install` exit 0——`package-lock.json` 本轮零扰动（无需 checkout）；`node_modules/@nikkisync` 四 junction 被剥除 → `npm run link:nikkisync` 复原 → `link:nikkisync:check` OK（four links in place）
+2. `npm run build` exit 0（renderer 构建约 5s）
+3. `npm run test` exit 0：**463 文件全 passed**，7276 passed | 20 skipped（20 例为既有平台条件 skip；链接门控 3 文件正常运行未 skip）
+4. `npm run typecheck` exit 0（`tsc -b` + scripts 两段）
+5. `npm run e2e:smoke` exit 0：16 passed（S1–S8 打包产物冒烟 + N1–N4 Runtime）
+6. `npm run test:ci-linux` exit 0：463 文件，7293 passed | 3 skipped
+
+**提交（pre-commit 全过、提交后工作区干净）**：
+
+- `37a6669` docs(plans): 落盘全屏修复与 2.5.6 定版实施计划（3 文件 +359）
+- `0fd7b90` fix(gallery): 全屏预览顶栏无响应与切换抖动修复（7 文件 +1142/−37）
+- `04e92d6` fix(nikkisync): 预览授权跨 revision 存活并补推目录变更通知（5 文件 +132/−15，核心路径授权闸门通过）
+
+**2.5.6 定版**：check-changelog-release 先红（改版本位后 exit 1「不存在 [2.5.6] 版本节」）→ 补节转绿（解析到 15 个版本节，最新 2.5.6，Unreleased 已收口）。版本声明位 4 处（package.json / lock 第 3 与 9 行 / preview mock getVersion）+ 文档「当前版本」句 13 处（README 徽章、AGENTS、ARCHITECTURE(.en) 头部与 §12.2 溯源句、DEVELOPMENT(.en) 头部与 §7.7/§7.8、PLUGIN_API）。提交 `a3cfaf6` release: 2.5.6 定版。
+
+**重新打包**：`npm run link:nikkisync:check` OK → 清 `release/win-unpacked*` 残壳 → `npm run dist:win` exit 0（27 项 pre-dist-check 含 changelog 收口闸门 + 原生二进制 + 管理员清单 asInvoker + 32 条禁串字节扫描；NSIS；verify:dist 解包校验全过）。
+
+- 产物：`release/MeowStarMap-Setup-2.5.6.exe` = **184,648,735 B**，sha256 = `0229d9c697b609b860b91757d994bc7c75f017867869abe1936543052d7a851a`
+- `release/latest.yml` 自动生成 `version: 2.5.6`
+- 打包后 `npm run e2e:smoke` 16 passed / 0 failed——S4 断言打包产物 `app.getVersion()` 与 package.json 版本一致（2.5.6）
