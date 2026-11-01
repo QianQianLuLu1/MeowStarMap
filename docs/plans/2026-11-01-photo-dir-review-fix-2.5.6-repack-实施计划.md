@@ -152,10 +152,44 @@
 
 `npm run dev`：设自定义路径 → 重启询问 → 重启后同步图库出该目录照片；Program Files 被拒并提示；只读目录保存成功 + 不可写警告；K6 手输 → 预检提案 → 确认添加 → **缩略图与全屏预览能出图（这条专门验 F1 收窄没打断 `media://`）**；未设置时回退自动发现；保存动作不动运行中的局域网同步服务。
 
-## 8. 执行读数回写（运行时填写）
+## 8. 执行读数回写（2026-11-01 实测，全部由 Agent 亲自运行）
 
-- N1 红：`___ failed / ___ passed` · N2 绿：`___` · M1 变异：`改后红 ___ / 还原 sha256 ___`
-- 六项点名门：install+relink `___` · build `___` · typecheck `___` · e2e:smoke（基线/新树）`___` · test:ci-linux `___` · dist:win `___`
-- 全量：`npm test` `___ passed / ___ skipped / 0 failed` · lint `___` · typecheck:e2e `___` · i18n:guard `___`
-- 包新鲜度：`latest.yml` size/sha512 与旧包差异 `___` · asar 逐文件哈希 `___` · 包内新通道命中 `___`
-- 预期与实测不符时保留原预期并另写订正行，不悄悄改计划。
+### 节点链
+
+| 节点    | 命令                                                                    | 实测读数                                                                                                                                                                                                                                                                    |
+| ------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| N0      | 计划落仓 + 提交                                                         | `a7f0012`（pre-commit 3 步：lint-staged ✓ / core-gate ⊘ / typecheck ⊘）。**顺带带上了上一轮遗留、此前已在暂存区的 `docs/plans/2026-11-01-sync-gallery-custom-photo-dir-实施计划.md`**（215 行完整），message 只描述了新计划文档——不重写这笔提交来美化切分，如实记账         |
+| N1 红灯 | `npx vitest run src/main/ipc/handlers/nikkisync-handler.test.ts`        | **2 failed / 90 passed (92)**。原文①`1st registerUserPickedDir call: Array ["C:\Users\45001\AppData\Local\Temp\wxnn-gameroot-YGAJAz"]`（断言「未被调用」被打穿）；原文②`expected true to be false`（admit 后 `isUserPicked(dir)` 为真）——失败输出本身就是 F1 的放大效应取证 |
+| N2 绿灯 | 同上                                                                    | **92 passed / 0 failed**。计划要求的 `src/main/ipc/handlers` 与 `src/main/app` 两目录分层跑未单独执行，由 N6 全量 `npm test`（含两目录）覆盖取证                                                                                                                            |
+| N3 M1   | 改**写端**字面量                                                        | 守卫文件 `1 failed / 29 passed`（`expected 'nikkisync.gameRoot' to be 'nikkisync.gameRootDrifted'`）；`nikkisync-handler.test.ts` **4 failed / 88 passed**。还原 `sha256 = fabebfba…`（与变异前逐字节一致）                                                                 |
+| N3 M2   | 改**读端** `SETTING_GAME_ROOT` 值                                       | `npx vitest run src/main/app src/main/ipc/handlers src/shared` = **2 failed / 1179 passed（73 文件中 1 个失败）**，且失败的只有新守卫两例 ⇒ 读端漂移此前全仓无人兜。还原 `sha256 = 67eecca8…` 一致                                                                          |
+| N4      | `npx tsx scripts/check-changelog-release.ts`                            | 三条 ✔（15 个版本节 / `[2.5.6]` 唯一 / `[Unreleased]` 已收口），提交后对最终内容复跑仍 ✅、EXIT=0                                                                                                                                                                           |
+| N5      | `npx vitest run …/check-md-links.test.ts …/i18n` + `npm run i18n:guard` | md-links + locale 守卫 7 文件 **57 passed**；i18n:guard ✅；契约四通道与实现逐字段核对一致                                                                                                                                                                                  |
+| N7      | 两笔提交                                                                | `2807c8d` feat（29 文件 +1238 −35，core-gate **3 个受保护文件**通过、`tsc -b` ✓）· `951c235` chore(release)。提交后 `git status` 无钩子残余                                                                                                                                 |
+
+**对 §0 的 F3 判断的订正（保留原句，另记实况）**：原写「任一侧改名，功能静默失效而测试仍绿」——M1 实测**只对读端成立**：改写端字面量时既有 4 例会红（它们断言 `setSetting` 实收的键），改写读端常量值时全仓 1179 例仍绿。守卫的实际价值在读端一侧与两侧同源。
+
+### 六项点名门 + 仓内其余门
+
+1. `npm install` EXIT=0；`package-lock.json` sha256 未变（`79ab81f5…`）⇒ **无 lock 抖动需还原**；但 4 条 `@nikkisync` junction 被静默拆除（目录只剩空壳）⇒ `npm run link:nikkisync` 重建 4 条 + `link:nikkisync:check` 全 ok。
+2. `npm run build` EXIT=0（renderer `✓ built in 5.64s`）。
+3. `npm run typecheck` EXIT=0；4. `npm run typecheck:e2e` EXIT=0；5. `npm run lint`（全量 `eslint .`）EXIT=0 无输出；6. `npm run i18n:guard` EXIT=0。
+4. `npm test` 全量：**463 文件 / 7300 passed / 20 skipped / 0 failed**（66.05s）。与上一轮 7296 的差 = **+4**，恰为本轮新增 2 例 F1 + 2 例 F3 ⇒ 无既有用例被吞。
+5. `npm run test:ci-linux`：**463 文件 / 7317 passed / 3 skipped**（46.27s）EXIT=0。本轮新增用例含 `mkdtemp` 真 IO 与 `readFileSync(cwd)`，在装置的 posix 宿主语义下无红（未加任何 skip 或放宽）。
+6. `npm run e2e:smoke`：**16 passed** 两次——基线跑（S 侧验的是 15:43 旧树，如实标注）与重打包后跑（`[e2e] executable:` 打新树 `release/win-unpacked/喵星图.exe`，含全屏 `media://` 诊断用例）。
+7. `npm run verify`：首跑 **format ✗**（`nikkisync-handler.ts` / `.test.ts` 两文件），`prettier --write` 后 **5 项 0 失败**（typecheck / lint / core-gate / format / test）。⚠ 3 个源文件无匹配套件（`preload/api/nikkisync.ts`、`shared/settings-keys.ts`、`shared/types/electron-api.ts`）属既有状况，非本轮引入。
+
+### 打包与包内取证
+
+- 版本六处声明位（`package.json` / README 徽章 / `AGENTS.md` / `DEVELOPMENT(.en).md` / `ARCHITECTURE(.en).md` / `preview/mock/database-mock.ts`）**全部已是 2.5.6 ⇒ 零编辑**；`ARCHITECTURE*.md` 内的 `2.5.6-beta` 是版本沿革叙述、当前版本行已是 2.5.6。
+- 留底：`_safe_backup_20261101-pre-photo-dir/` = 旧四件 + 旧 `win-unpacked` 树（当时 `mv` 全部成功，说明历史文件未被锁——但**这不能预测新解包树**，见下）。
+- 标准配方 `npm run dist:win`：**EXIT=1**，死在 `⨯ EPERM: rename 'release\win-unpacked.tmp' -> 'release\win-unpacked'`（`app-builder-lib/out/util/electronGet.ts:249`）；前置的 build 与 27 项 pre-dist-check 全过。`rm` tmp 残壳时只有刚解出的 `resources/default_app.asar` 报 `Device or resource busy` ⇒ 本机实时防护对**新写入解包树主动加锁**复现，与仓库无关。
+- 旁路：官方缓存 zip 解到 `.cache/electron-dist-20261101`（排除 `resources/default_app.asar` 与 `version`，实测该目录连 `resources/` 都不存在）+ `--config.directories.output=release/build-20261101-photo` ⇒ **EXIT=0**（`signExecutable` 跳过为仓内既有配置，非旁路差异）。
+- 回标准位置：`cp -rf …/win-unpacked release/win-unpacked` 成功，两侧 `app.asar` sha256 全等（`cede96e0…`，74,116,637B）；安装器四件 `mv` 回 `release/` 成功。
+- `npm run verify:dist` 裸跑 **EXIT=0**：原生二进制、VC++ 运行库、`@nikkisync` 四包入口 + 装载链闭包 50 模块全部解包在位（证明 relink 未漏）；禁串步读的是 `release\win-unpacked\resources\app.asar`。
+- 新鲜度三轴：① `latest.yml` 新 `size=184,653,067` / `sha512=d5+9HkzW…` vs 旧 `184,648,735` / `1b/3oukH…` ⇒ **两轴皆不同，非空重跑**；② 包内 `dist/` **113 个 JS 与盘上产物逐文件 sha256，不一致 0（全等）**；③ 包内字节直接回答「修复在不在包里」——`registerSyncPhotoDir` 2 处（PathGuard 定义 + admit 调用点，上下文可见 `await validatePhotoSourceDirectory(input.path); pathGuard.registerSyncPhotoDir(input.path)`），`registerUserPickedDir` 仅 3 处 = 方法定义 + `dialog:selectDirectory` + `dialog:openFile(目录)` 两处合法调用点 ⇒ **admit 分支零全局登记**；4 条新通道在 `preload.js` 与 `application.js` 俱在；12 个 i18n chunk 与 `SyncServicePage-B529YIJ6.js` 含 `photoDirectories`。
+- 现场末态：`release/win-unpacked` = 本轮新树；`release/build-20261101-photo` 仅剩被句柄占住的 `app.asar`（其 `app.asar.unpacked` 已随 `rm` 消失 ⇒ `findAsarUnpacked` 的字典序首命中隐患被物理消除）；`release/win-unpacked.tmp` 同样只剩一个被锁的 `default_app.asar`；`_safe_backup_*` 未动。
+
+### 本轮未做（不记为已验证）
+
+§7 人工实机清单需真机：自定义路径→重启→照片入库、Program Files 拒绝提示、只读目录警告、K6 手输→预检→添加→缩略图与全屏出图（这条专门验 F1 收窄未打断 `media://`）、默认回退、局域网服务不受影响。本机锁的根治仍是给工作区加实时防护白名单。
