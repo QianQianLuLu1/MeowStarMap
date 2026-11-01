@@ -1181,6 +1181,30 @@ describe('SyncServicePage 照片目录自定义（(at)-(be)）', () => {
     expect(appRelaunch).not.toHaveBeenCalled()
   })
 
+  it('(bf) 恢复默认遇 installation-not-found：不回「该目录不是安装根」，走 savedDeferred + 重启询问', async () => {
+    // 「恢复默认」的入参恒是空串（交上游自动发现），不存在「用户选的目录形态不对」这回事。
+    // 而游戏未装且无额外目录时，上游 ScannerService.fullScan 抛的是同一条
+    // 'Infinity Nikki installation was not found' ⇒ 按 applyError 分流而不分动作类型的旧实现，
+    // 会让刚清空输入框的人被告知「该目录不是有效的游戏安装根，请改选游戏安装目录」，
+    // 并且这条分支先 return，把原有的「重启后生效」询问整条吞掉。
+    installElectronApi({ gameRoot: 'D:\\CustomRoot', gameRootApplyNotInstallRoot: true })
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '恢复默认' }))
+    await waitFor(() => expect(serverApi.resetGameRoot).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith(
+        '配置已保存，但未能立即生效，重启应用后生效',
+        'success'
+      )
+    )
+    expect(mockShowMessage).not.toHaveBeenCalledWith(
+      '该目录不是有效的游戏安装根，已保存但无法生效；请改选游戏安装目录，或用「额外照片目录」添加照片文件夹',
+      'info'
+    )
+    expect(dialogShowMessageBox).toHaveBeenCalled()
+    expect(await screen.findByText('默认（自动发现游戏目录）')).toBeInTheDocument()
+  })
+
   it('(ax) 保存成功但目录不可写：仍保存并追加 info 警告，即时生效不受影响', async () => {
     installElectronApi({ setGameRootWritableFalse: true })
     renderSection()

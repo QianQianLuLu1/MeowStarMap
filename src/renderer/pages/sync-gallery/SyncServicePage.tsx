@@ -639,15 +639,24 @@ export const SyncServicePage: React.FC = () => {
   /**
    * 照片目录生效结果的三条出口（保存 / 恢复默认共用；`successMessage` 由调用点给静态键文案，
    * 避免动态 t(key) 让 i18n 抽取与键守卫看不见消费点）：
-   * - `applyError === 'installation-not-found'`：该值按「游戏安装根种子」被上游消费，目录形态
-   *   不对时重启也救不了 ⇒ 给可执行提示（改选游戏安装目录，或走「额外照片目录」），**不**弹重启询问；
+   * - `kind === 'set'` 且 `applyError === 'installation-not-found'`：该值按「游戏安装根种子」
+   *   被上游消费，目录形态不对时重启也救不了 ⇒ 给可执行提示（改选游戏安装目录，或走
+   *   「额外照片目录」），**不**弹重启询问；
    * - `applied`：主进程已当场换根重建 + 全量扫描并广播 library-changed ⇒ 只报即时生效；
    * - 其余未生效支（Runtime 未装配 / 未建链 / 重扫故障）：退回旧的「重启后生效」询问——值已持久化，
    *   下次进程仍按启动消费点读到，不能因为当场没生效就说保存失败。
+   *
+   * `kind` 是必需的：恢复默认的入参恒是空串（交上游自动发现），「该目录不是有效的游戏安装根」
+   * 对它是一句无效指向；而游戏未装且无额外目录时上游抛的正是同一条 installation not found，
+   * 不按动作分流就会拿这条文案吞掉本该保留的重启询问兜底。
    */
   const announceGameRootApply = useCallback(
-    async (result: NikkiSyncGameRootApplyResult, successMessage: string): Promise<void> => {
-      if (result.applyError === 'installation-not-found') {
+    async (
+      result: NikkiSyncGameRootApplyResult,
+      successMessage: string,
+      kind: 'set' | 'reset'
+    ): Promise<void> => {
+      if (kind === 'set' && result.applyError === 'installation-not-found') {
         showMessage(t('syncService.photoDirectories.applyFailedInstallRoot'), 'info')
         return
       }
@@ -692,7 +701,7 @@ export const SyncServicePage: React.FC = () => {
       const res = await api.nikkisync.setGameRoot({ path: value })
       setGameRoot(res.gameRoot)
       setGameRootInput(res.gameRoot)
-      await announceGameRootApply(res, t('syncService.photoDirectories.saved'))
+      await announceGameRootApply(res, t('syncService.photoDirectories.saved'), 'set')
       if (!res.writable) showMessage(t('syncService.photoDirectories.notWritable'), 'info')
     } catch (error) {
       // 失败保留输入值与当前生效目录，用户可直接改后重试
@@ -711,7 +720,7 @@ export const SyncServicePage: React.FC = () => {
       const res = await api.nikkisync.resetGameRoot()
       setGameRoot('')
       setGameRootInput('')
-      await announceGameRootApply(res, t('syncService.photoDirectories.resetDone'))
+      await announceGameRootApply(res, t('syncService.photoDirectories.resetDone'), 'reset')
     } catch (error) {
       showError(error)
     } finally {
