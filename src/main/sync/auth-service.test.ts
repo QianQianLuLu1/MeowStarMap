@@ -328,6 +328,32 @@ describe('AuthService.verifyRequest — nonce 防重放', () => {
     })
   })
 
+  it('未来时间戳的请求在自己的有效窗口内不得被重放放过（对齐上游 589b932 的 nonce 判据）', async () => {
+    // 判据：nonce 条目必须活到「这条请求自己失去效力」为止，而不是「收下它那一刻 + 窗口」为止。
+    // 手机时钟可以超前：ts = now + 4min 仍在 ±5min 窗口内，请求有效期实际到 ts+5min（= now+9min）；
+    // 若条目按旧写法只记到 now+5min，则 (now+5min, now+9min) 这一段里重放同一 nonce 会被再次接受。
+    const key = makeDeviceKeyPair()
+    const row = makeDeviceRow(key.publicKeyPem)
+    const devices = new Map([[row.device_id, row]])
+    let now = NOW
+    const service = new AuthService(
+      { getDevice: (id: string) => devices.get(id) ?? null, touchDevice: async () => {} },
+      { now: () => now, clockSkewMs: FIVE_MIN }
+    )
+    const request = buildSignedRequest({
+      privateKeyPem: key.privateKeyPem,
+      timestamp: NOW + 4 * 60_000
+    })
+    await expect(service.verifyRequest(request)).resolves.toMatchObject({ ok: true })
+
+    // 推进时钟到 now + 6min：该请求仍在窗口内（|6-4| = 2min），因此重放必须仍被拦下
+    now = NOW + 6 * 60_000
+    await expect(service.verifyRequest(request)).resolves.toMatchObject({
+      ok: false,
+      reason: 'replayed_nonce'
+    })
+  })
+
   it('重放检查在设备查询与验签之前（缺头外的最早拒绝点之一）', async () => {
     const key = makeDeviceKeyPair()
     const { service, touchDevice } = makeService([makeDeviceRow(key.publicKeyPem)])

@@ -488,6 +488,151 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
     }
   }, 60000)
 
+  it('灵感同步 v1（上游 589b932 新增面）：能力位广告 / 未签名 401 / 图片与条目闭环 / 冲突 409', async () => {
+    const session = await createRuntimeSession(
+      testOptions({ databaseFile: databaseIn('inspiration') })
+    )
+    const address = await session.server.start()
+    const client = createClient(address.port, session.tlsIdentity().certPem)
+    const signed = (method: string, requestPath: string, body: Buffer, contentType: string) =>
+      client.request(requestPath, {
+        method,
+        headers: {
+          ...signedHeaders(deviceKeys.privateKey, 'phone_test', method, requestPath, body),
+          'Content-Type': contentType
+        },
+        body
+      })
+    try {
+      const qr = parsePairingUri(session.pairingUri('127.0.0.1'))
+      expect((await client.pair('phone_test', qr.token)).status).toBe(200)
+
+      // ① 能力位由上游自己广告；本仓不硬编码，只验「确实挂上了」
+      const serverInfo = jsonOf<{ capabilities: Record<string, unknown> }>(
+        await client.request('/v1/server')
+      )
+      expect(serverInfo.capabilities.inspirationV1).toBe(true)
+
+      // ② 路由在挂载：未签名走 401。这条判据刻意不写 404——路由不存在时上游给 404，
+      //    只断言「非 200」会把「压根没挂」误当成「挂了但拒绝」放过。
+      expect((await client.request('/v1/inspiration')).status).toBe(401)
+
+      // ③ 签名后空列表 200；limit 边界由上游把门（1..100）
+      const empty = await client.signedGet('phone_test', '/v1/inspiration')
+      expect(empty.status).toBe(200)
+      expect(jsonOf<{ items: unknown[] }>(empty).items).toEqual([])
+      expect((await client.signedGet('phone_test', '/v1/inspiration?limit=0')).status).toBe(400)
+
+      // ④ 图片 PUT：sha256 与 magic byte 双校验；伪造哈希拒绝
+      const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82])
+      const pngSha = createHash('sha256').update(png).digest('hex')
+      expect(
+        (await signed('PUT', `/v1/inspiration/images/${pngSha}`, png, 'image/png')).status
+      ).toBe(200)
+      const forged = 'f'.repeat(64)
+      expect(
+        (await signed('PUT', `/v1/inspiration/images/${forged}`, png, 'image/png')).status
+      ).toBe(400)
+      const fetched = await client.signedGet('phone_test', `/v1/inspiration/images/${pngSha}`)
+      expect(fetched.status).toBe(200)
+      expect(fetched.headers['content-type']).toBe('image/png')
+      expect(fetched.body.equals(png)).toBe(true)
+
+      // ⑤ 条目 POST：新建 200 且推进 revision；陈旧 baseRevision ⇒ 409 conflict
+      const entry = {
+        id: '11111111-1111-1111-1111-111111111111',
+        title: 'lan entry',
+        notes: '',
+        tags: [],
+        categories: [],
+        status: 'self',
+        createdAt: 1,
+        deletedAt: 0,
+        code: {
+          id: '22222222-2222-2222-2222-222222222222',
+          rawCode: 'x',
+          type: 'unknown',
+          sourceText: 'x',
+          sourceUrl: null,
+          parsedState: 'pending',
+          snapshotJson: null,
+          resolverVersion: null,
+          dictionaryVersion: null,
+          resolvedAt: 0
+        },
+        images: [
+          {
+            id: '33333333-3333-3333-3333-333333333333',
+            sha256: pngSha,
+            mimeType: 'image/png',
+            bytes: png.length,
+            addedAt: 1
+          }
+        ]
+      }
+      const created = await signed(
+        'POST',
+        '/v1/inspiration',
+        Buffer.from(JSON.stringify({ entry, baseRevision: 0 })),
+        'application/json'
+      )
+      expect(created.status).toBe(200)
+      const revision = jsonOf<{ revision: number }>(created).revision
+      expect(revision).toBeGreaterThan(0)
+
+      // 边界：同一条目原样重放是幂等的——上游在冲突判定**之前**先比字节，返回原 revision 不推进
+      const replay = await signed(
+        'POST',
+        '/v1/inspiration',
+        Buffer.from(JSON.stringify({ entry, baseRevision: 0 })),
+        'application/json'
+      )
+      expect(replay.status).toBe(200)
+      expect(jsonOf<{ revision: number }>(replay).revision).toBe(revision)
+
+      // 异常：真正改写内容 + 陈旧 baseRevision 才走乐观并发拒绝（409）
+      const stale = Buffer.from(
+        JSON.stringify({ entry: { ...entry, title: 'changed offline' }, baseRevision: 99 })
+      )
+      expect((await signed('POST', '/v1/inspiration', stale, 'application/json')).status).toBe(409)
+
+      // 边界：引用未上传的图片 ⇒ 上游按 missing_image 拒绝（400），不落库
+      const dangling = Buffer.from(
+        JSON.stringify({
+          entry: { ...entry, id: '44444444-4444-4444-4444-444444444444', images: [] },
+          baseRevision: 0
+        })
+      )
+      expect((await signed('POST', '/v1/inspiration', dangling, 'application/json')).status).toBe(
+        200
+      )
+      const withMissing = Buffer.from(
+        JSON.stringify({
+          entry: {
+            ...entry,
+            id: '55555555-5555-5555-5555-555555555555',
+            images: [
+              {
+                id: '66666666-6666-6666-6666-666666666666',
+                sha256: 'a'.repeat(64),
+                mimeType: 'image/png',
+                bytes: png.length,
+                addedAt: 1
+              }
+            ]
+          },
+          baseRevision: 0
+        })
+      )
+      expect(
+        (await signed('POST', '/v1/inspiration', withMissing, 'application/json')).status
+      ).toBe(400)
+    } finally {
+      await session.server.stop()
+      session.dispose()
+    }
+  }, 30000)
+
   it('签名后的资产/详情/元数据/变更/搜索/统计端点全部可用', async () => {
     const session = await createRuntimeSession(testOptions({ databaseFile: databaseIn('routes') }))
     const address = await session.server.start()
@@ -586,6 +731,29 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
       expect(
         jsonOf<{ topSuits: unknown[]; topClothing: unknown[] }>(stats).topSuits.length
       ).toBeGreaterThanOrEqual(1)
+
+      // 上游 589b932：`/v1/organizer/sync` 请求体上限 128→256 KiB，溢出改由 RequestBodyTooLarge
+      // 归 413（此前落到 500）。readBody 在验签之前，所以这条不需要签名头即可判定路由已挂载。
+      expect(
+        (
+          await client.request('/v1/organizer/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: Buffer.alloc(300 * 1024, 0x20)
+          })
+        ).status
+      ).toBe(413)
+      // 反向判据：200 KiB 落在旧 128 KiB 上限内会误判、在新 256 KiB 下应放行到验签那步（401）。
+      // 只断言 413 的话，上限其实没抬也会绿——这条才把「128→256」钉住。
+      expect(
+        (
+          await client.request('/v1/organizer/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: Buffer.alloc(200 * 1024, 0x20)
+          })
+        ).status
+      ).toBe(401)
 
       // 服装缩略图：嵌入态刻意**不注入** `metadataThumbnailCache` ⇒ 上游按 404 resource_not_ready 处理
       expect(

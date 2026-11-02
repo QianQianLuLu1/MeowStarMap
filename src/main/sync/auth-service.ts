@@ -11,7 +11,8 @@ import type { SyncPairedDeviceRow } from '../database/sync-metadata-repository'
  *   （'\n' 分隔，UTF-8；空 body 哈希 = sha256("")；query 参与签名且不做规范化）
  * - 验签：Ed25519（crypto.verify 首参 null），设备公钥兼容 PEM / base64url(SPKI DER)
  * - 时间窗：±clockSkewMs（默认 5 分钟，硬约束上限）
- * - nonce 防重放：内存 Map（键 deviceId:nonce，TTL = 时间窗，惰性清理；
+ * - nonce 防重放：内存 Map（键 deviceId:nonce，条目过期时刻 = max(收下时刻, 请求时间戳) + 时间窗 + 1，
+ *   即活到这条请求自身失效为止；惰性清理；
  *   进程重启清空，重放防护由时间窗兜底——与上游一致）
  * - 所有失败原因内部区分（reason，供测试与日志），对外统一映射 401 unauthorized
  *   （协议不区分原因；HTTP 层属阶段4）
@@ -96,7 +97,7 @@ export class AuthService {
   private readonly deps: AuthServiceDeps
   private readonly clockSkewMs: number
   private readonly now: () => number
-  /** deviceId:nonce → 过期时刻（仅内存；TTL = 时间窗） */
+  /** deviceId:nonce → 过期时刻（仅内存；= max(收下时刻, 请求时间戳) + 时间窗 + 1） */
   private readonly nonces = new Map<string, number>()
 
   constructor(deps: AuthServiceDeps, options: AuthServiceOptions = {}) {
@@ -148,8 +149,11 @@ export class AuthService {
       return { ok: false, reason: 'invalid_signature' }
     }
 
-    // 验签成功才消费 nonce（失败请求不占号，修正后可重试）
-    this.nonces.set(nonceKey, now + this.clockSkewMs)
+    // 验签成功才消费 nonce（失败请求不占号，修正后可重试）。
+    // 过期时刻取 max(now, ts) + 窗口 + 1（与上游 589b932 同判据）：一条请求自身的有效期是
+    // ts + 窗口，手机时钟超前时 ts > now，若只记 now + 窗口就会在 (now+窗口, ts+窗口] 这段
+    // 仍在有效期内、条目却已过期的区间里放开重放。
+    this.nonces.set(nonceKey, Math.max(now, ts) + this.clockSkewMs + 1)
     try {
       await this.deps.touchDevice?.(deviceId)
     } catch {
