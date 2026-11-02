@@ -471,6 +471,25 @@ describe('exportLogsAsZip', () => {
   })
 
   // ---------- 原生 FATAL 取证补位（2026-11-02 问题设备转储归因缺口） ----------
+  //
+  // 判据落点说明：这三例判「服务把哪些文件放进打包源目录」，不判 zip 字节。
+  // 缘由（2026-11-02 实测归因）：archiver 在自己的模块里 `var fs = require('fs')`
+  // （node_modules/archiver/lib/core.js:8），属外部化 CJS，不经过 `npm run test:ci-linux`
+  // 装置的第 4 轴 fs 翻译（该失真在 tests/ci-linux.setup.ts 头注释里已显式记账）。
+  // 于是装置态真跑 archiver 只会得到空包（22B 的 EOCD），而真宿主（win/linux）能正常收条目
+  // ——同一断言在两侧读数不同，属装置失真而非产品缺陷。打包动作本身由
+  // zip-archive.test.ts（走 createArchive 注入缝）判，两侧同样成立。
+
+  /** 收集本次导出放进打包源目录的文件名（copyFile 的 dst 与 writeFile 的 file 两条写入路径） */
+  function stagedNames(
+    copySpy: { mock: { calls: unknown[][] } },
+    writeSpy: { mock: { calls: unknown[][] } }
+  ): string[] {
+    return [
+      ...copySpy.mock.calls.map((c) => path.basename(String(c[1]))),
+      ...writeSpy.mock.calls.map((c) => path.basename(String(c[0])))
+    ]
+  }
 
   it('F2. 诊断包纳入 chromium-debug.log / diag.log / gpu-fallback.json', async () => {
     fs.writeFileSync(
@@ -486,19 +505,25 @@ describe('exportLogsAsZip', () => {
     getPathMock.mockImplementation((name: string) =>
       name === 'userData' ? userData : `/mock/${name}`
     )
+    // 透传式 spy：不改变行为，只记录目标文件名
+    const copySpy = vi.spyOn(fs.promises, 'copyFile')
+    const writeSpy = vi.spyOn(fs.promises, 'writeFile')
 
     try {
       const target = path.join(tmpRoot, 'f2.zip')
       const r = await exportLogsAsZip(target)
       expect(r.success).toBe(true)
+      expect(fs.readFileSync(target).subarray(0, 2).toString('latin1')).toBe('PK')
 
-      // zip 本地头里的条目名是明文，直接按字节判定产物内容是否齐备
-      const zip = fs.readFileSync(target).toString('latin1')
-      expect(zip).toContain('chromium-debug.log')
-      expect(zip).toContain('diag.log')
-      expect(zip).toContain('gpu-fallback.json')
-      expect(zip).toContain('startup-errors.log') // 既有内容不得丢
+      const staged = stagedNames(copySpy, writeSpy)
+      expect(staged).toContain('chromium-debug.log')
+      expect(staged).toContain('diag.log')
+      expect(staged).toContain('gpu-fallback.json')
+      expect(staged).toContain('startup-errors.log') // 既有内容不得丢
+      expect(staged).toContain('manifest.json')
     } finally {
+      copySpy.mockRestore()
+      writeSpy.mockRestore()
       getPathMock.mockImplementation((name: string) => `/mock/${name}`)
     }
   })
@@ -506,13 +531,20 @@ describe('exportLogsAsZip', () => {
   it('F3. 边界：chromium-debug.log 不存在 → 导出不失败，其余文件照收', async () => {
     fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] only diag', 'utf-8')
     const target = path.join(tmpRoot, 'f3.zip')
+    const copySpy = vi.spyOn(fs.promises, 'copyFile')
+    const writeSpy = vi.spyOn(fs.promises, 'writeFile')
 
-    const r = await exportLogsAsZip(target)
+    try {
+      const r = await exportLogsAsZip(target)
 
-    expect(r.success).toBe(true)
-    const zip = fs.readFileSync(target).toString('latin1')
-    expect(zip).not.toContain('chromium-debug.log')
-    expect(zip).toContain('diag.log')
+      expect(r.success).toBe(true)
+      const staged = stagedNames(copySpy, writeSpy)
+      expect(staged).not.toContain('chromium-debug.log')
+      expect(staged).toContain('diag.log')
+    } finally {
+      copySpy.mockRestore()
+      writeSpy.mockRestore()
+    }
   })
 
   it('F4. 异常：chromium-debug.log 超上限 → 只截尾部，不整文件复制', async () => {
