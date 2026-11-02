@@ -233,6 +233,54 @@ PY
 | 心跳证据把「系统强杀/断电」也算成升级依据   | 只升一级且封顶 2；版本变更自动复位                                             | revert T2（退回纯计数慢路径）                                 |
 | 8s 存活窗口让正常用户偶发多启动一次才计成功 | 仅影响清零时机，不影响功能；阈值仍为 2                                         | revert T3                                                     |
 | 上游改掉 `disable-software-rasterizer` 语义 | §3 的 V0 与本机 level 2 判定 A/B 是显式守卫，失效会立刻表现为「仍有 GPU 进程」 | 改用 `--in-process-gpu`（需另评估驱动级崩溃带走主进程的风险） |
-| `NIKKI_GPU_FORCE_LEVEL` 被误当生产开关      | 仅 `'0'                                                                        | '1'                                                           | '2'`生效、dev/test 语义、启动即`diagLog` 记录 | 删除该 env 分支，不影响持久化档位 |
+| `NIKKI_GPU_FORCE_LEVEL` 被误当生产开关      | 仅字面量 `'0'/'1'/'2'` 生效，dev/test 语义，非法值启动即 `diagLog` 记录        | 删除该 env 分支，不影响持久化档位                             |
 
 **待用户侧唯一动作（可选但高价值）**：V0 启动一次后，用右下角「导出诊断包」发回 zip（含 `chromium-debug.log` 里的 `exit_code`）——这是把「注入秒死」与「驱动 TDR」彻底分开的最后一块证据；本轮代码改动不依赖它。
+
+---
+
+## 10. 执行记录（2026-11-02，本机实测）
+
+### 10.1 各节点红绿证据与提交
+
+| 节点                 | 红灯证据（修复前必红）                                                                                                                                                      | 绿灯证据                                                                                                | 提交      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------- |
+| T0 计划落档          | —                                                                                                                                                                           | 文件入仓且未被 `.gitignore` 排除（`git check-ignore` 退出 1）                                           | `698236a` |
+| T1 三级阶梯          | `gpu-fallback.test.ts` + `gpu-selfheal.test.ts` **14 failed / 39 passed**（`recordBootLevel`/`resolveCompatLevel`/`MAX_COMPAT_LEVEL` 不存在、旧死胡同语义用例按新口径失败） | 两套件 **53/53**；含既有 41 例语义不变                                                                  | `e667c1f` |
+| T2 心跳驱动升级      | **6 failed**（`classifyPreviousExit`/`getPreviousExitEvidence` 不存在；selfheal 7 取证联动失败），既有 12+12 例保持绿                                                       | `exit-forensics` 16/16、`gpu-selfheal` 14/14、`gpu-fallback` 41/41                                      | `fa498f6` |
+| T3 成功判定延后      | **5 failed**（15/S1/S2/8/8b）。注：S3（`did-fail-load` 不确认成功）修复前即绿，属不变量守卫而非复现用例，如实标注                                                           | `window-manager` 32/32、selfheal 16/16、`npm run test:main` **4233 passed / 0 failed**                  | `c338052` |
+| T4 开关下发 + 诊断包 | **4 failed**（弹窗缺 chromium-debug.log 行；F2/F3/F4 缺新文件与截尾）                                                                                                       | `log-service` + `early-crash-guard` + `log`(handler) **81/81**；core-gate 认可 1 个受保护文件           | `6d633f8` |
+| T5 档位可观测        | **5 failed**（快照缺 compatLevel、摘要缺 `level=`、面板两例）                                                                                                               | gpu-status/gpu-fallback/diagnostics/app-handler **59/59**；`src/main/app/__tests__` 全量 **502 passed** | `25c80a7` |
+
+与计划的取舍差异（如实记账）：
+
+- **T5 未新增 `reason='max-compat'`**。`reason` 表达「为什么关掉硬件加速」，档位表达「关到哪一级」，二者叠加会让同一事实有两套表达。改为只在 `fallback` 里透出 `compatLevel?`（向后兼容的可选字段），面板沿用既有 `v=` / `fails=` 风格追加 `level=N` ⇒ **零新增 i18n 键、不动 12 语言**。
+- **T3 补了 `before-quit` 确认路径**。纯按计划只延后 8s 会把「打开看一眼就正常关闭」的健康设备也计成失败，两次即误降级——正是 2026-10-24 轮次要避免的过度触发。故成功 = 「首绘后存活 8s」**或**「已首绘后的正常退出（`before-quit`）」；`app.exit()` 与原生杀死都不触发 `before-quit`，被杀死的那次启动仍计入失败并据此升档。
+- **T5 顺带修了一处真实架空**：`writeHardwareAccelPref(true)` 原先只清 `fallbackActive`、不清 `compatLevel`，用户在设置里明确要硬件加速后下次启动仍会带着 `--disable-gpu` 起来。已随 T5 提交（`25c80a7`）。
+
+### 10.2 全局校验
+
+| 检查                                                          | 结果                                                                                                                                                                                                                                                                                                   |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run verify`                                              | 5 项全绿（typecheck / lint / core-gate / format / test）；⚠ 1 个源文件无匹配套件 = `src/main/index.ts`（既有状态，本轮未为其新建入口级套件）                                                                                                                                                           |
+| `npm test`（全量）                                            | **465 文件 / 7386 passed / 20 skipped / 0 failed**（53.2s）                                                                                                                                                                                                                                            |
+| `npm run typecheck` / `typecheck:e2e` / `lint` / `i18n:guard` | 全部通过，零输出零告警                                                                                                                                                                                                                                                                                 |
+| `npm run build`                                               | 通过（`dist/` 已刷新）                                                                                                                                                                                                                                                                                 |
+| `npm run e2e:smoke`                                           | 19/19 passed，**但** `release/win-unpacked/resources/app.asar` 时间戳为 16:01:56，早于本轮全部代码改动（T1 起于 17:0x）⇒ **该结果检验的是既有 2.5.6 产物，不能作为本轮证据**；本轮启动路径改动的实证来自 §10.3 的 dev 实测与单元测试。用户口径为「本轮不重打包」，故未执行 `npm run dist:win` 刷新产物 |
+
+### 10.3 三档实测（dev 宿主，`NIKKI_GPU_FORCE_LEVEL`）与计划判据的订正
+
+计划 §3 的「判定 A：不应出现 `--type=gpu-process`」**是错的**，实测把它订正为「不应出现**承担渲染的** GPU 进程（`--use-gl=angle`）」。证据是子进程命令行本身：
+
+| 档位                                                        | `--type=gpu-process` 子进程命令行关键段       | 该进程计入崩溃上限？                           | 结论                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------------------------------------------- | --------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1（仅 `disableHardwareAcceleration()`）                     | `--use-gl=angle --use-angle=d3d11-warp-webgl` | **是**（`kind == GPU_PROCESS_KIND_SANDBOXED`） | 渲染 GPU 进程照旧存在 ⇒ 问题设备仍会崩满 3 次走空阶梯而 FATAL。**这就是本机实测对「第 1 级救不回来」论断的直接确认**                                                                                                                                                                                                                                  |
+| 2（追加 `--disable-gpu` + `--disable-software-rasterizer`） | `--use-gl=disabled`                           | **否**                                         | 只剩 Chromium 自己的 info-collection 进程（上游对 `GPU_PROCESS_KIND_INFO_COLLECTION` 自行附加 `--disable-gpu-sandbox` 与 `--use-gl=disabled`）。`RecordProcessCrash()` 首行 `if (!process_launched_ \|\| kind_ != GPU_PROCESS_KIND_SANDBOXED) return` ⇒ 该进程不可能推进崩溃计数 ⇒ `FallBackToNextGpuModeDueToCrash` 无从触发 ⇒ 该 FATAL 结构性不可达 |
+
+功能可用性（档位 2）：`[Scheduler] resume` 正常触发（按模块约定该日志只在 `ready-to-show` 后出现）⇒ 窗口确实完成首次可见与绘制；日志中无 `FATAL` / `启动失败` / `uncaughtException` / 白屏看门狗命中；`activeGPU=unknown gpus=unknown` 与「无渲染 GPU 进程」自相印证。
+
+另一处实测发现（记为后续项，不在本轮修）：dev 模式走 `http://localhost:5173` 分支，**不注册** `did-finish-load`（`window-manager` 既有行为，单测 16 钉住），因此 dev 下 `consecutiveFailures` 只增不清零（实测本机累计到 2）。打包版有 `did-finish-load` + `before-quit` 两条确认路径，不受影响。
+
+### 10.4 仍缺的那块证据
+
+问题设备的 GPU 进程 `exit_code` 仍未知（栈副本把它截断在 40 字节）。本轮改动不依赖它；拿到它才能把「注入导致子进程启动即死」与「驱动 TDR/崩溃」彻底分开。索取方式已内建：§3 的 V0 命令行 + 右下角「导出诊断包」（T4 起包里含 `chromium-debug.log`）。
