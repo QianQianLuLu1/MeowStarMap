@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-10-30",
+  "updatedAt": "2026-11-02",
   "items": [
     {
       "id": "DEBT-001",
@@ -562,6 +562,48 @@
       "description": "【收口 2026-10-30，两条分列】① `Object.keys` 不遍历 Symbol 键：已按登记的修法改为 `Reflect.ownKeys` 下钻，Symbol 键承载的子对象同样收敛；配套红灯用例刻意不用 `JSON.stringify` 断言（它对 Symbol 键不可见，正是上一轮的断言盲区），改走 `Reflect.get` 探针——修复前该例红（读数为 `expected { …(2) } to not have property \"sourcePath\"`），修复后绿。② `{...value}` 求值 getter：**刻意不修**，因为按原登记的修法（描述符保留访问器、只下钻数据属性）会把安全判据做坏：出 IPC 时 Electron 的结构化克隆自己会求值自有可枚举访问器并把返回值送出，本层不求值等于把未裁键的子树推迟到序列化期，方向是 fail-open，与上一轮消灭的「超过深度上限就停下钻」同一形状；求值次数也不增加（本层一次求值替代「本层不求值 + 序列化再求值」）。该边界由新增用例 `边界：访问器返回的子树同样要裁` 钉住（夹具自带 getter 计数断言，改成保留描述符的写法即红）。撤销条件：若上游 DTO 真的引入携带敏感路径的访问器且求值有副作用，需求解法改为「按值扫描 + 白名单键」而非回到保留访问器。原描述保留备查：2026-10-30 全面审查发现：`src/main/nikkisync/runtime-manager.ts` 的 `stripAssetPathFields` 用 `{...value}` 展开会触发对象 getter 求值（node 复现 getterCalls=1，属意外副作用）；且递归只走 `Object.keys`，不遍历以 Symbol 为键的属性——若绝对路径藏在 Symbol 键的值里则残留。当前不触发：上游 DTO 无 getter、无 Symbol 键，且跨 IPC 的结构化克隆本就不支持 Symbol 键。触发条件：上游 DTO 引入 getter 或 Symbol 键承载敏感字段。修法/撤销条件：需要严防时用 `Reflect.ownKeys` 配合属性描述符判断是否递归，避免求值 getter。属未来上游演进假设，本轮按最小化只登记不改码。",
       "files": ["src/main/nikkisync/runtime-manager.ts"],
       "lines": [824, 828],
+      "issue": false
+    },
+    {
+      "id": "DEBT-044",
+      "category": "robustness",
+      "section": 18,
+      "status": "open",
+      "priority": "medium",
+      "title": "回收站「彻底删除选中项」与清空同走 shell.trashItem，卷级不可用时无任何出路",
+      "description": "2026-11-02 审查发现：media:permanentDelete 阶段 2 复用 trashBatch(rows)（不传 opts ⇒ force=false），与 media:emptyRecycleBin 同一条 shell.trashItem 链路。真机取证证明 trashItem 的失败可以是**卷级**的（同一 Electron 进程在 C 盘可正常移入回收站、空格与非 ASCII 都不是变量，而 H 盘连刚新建的 ASCII 无空格文件都返回 Failed to perform delete operation），于是「彻底删除选中项」在该卷上恒 100% 失败；渲染层只点亮 failedAction=permanent 的「重试删除」（RecycleBinPage.tsx:214-222），没有任何永久删除出路——真机日志 2026-11-01 17:25 最后那条 1/1 失败就是它。本轮只给清空通道加了经显式同意的 force 出路（用户裁决保持最小改动）。修法预案：media:permanentDelete 同样接 force?: boolean，failedAction=permanent 时并列给出「跳过系统回收站」按钮；代价是再改一次通道签名（preload + vite-env.d.ts + IPC_CONTRACT §2.7 + 双侧测试）。撤销条件：该卷 trashItem 恢复正常，或产品决定回收站不再承诺「文件会先移至系统回收站」。",
+      "files": [
+        "src/main/ipc/handlers/media-lifecycle-handler.ts",
+        "src/renderer/pages/RecycleBinPage.tsx"
+      ],
+      "lines": [106, 214],
+      "issue": false
+    },
+    {
+      "id": "DEBT-045",
+      "category": "perf",
+      "section": 18,
+      "status": "open",
+      "priority": "medium",
+      "title": "NikkiSync scan 串行闸门无超时、无合并：连续保存会排队跑 N 次全量扫描",
+      "description": "2026-11-02 审查发现：600a996 的串行闸门（scan() = settleScan().then(() => scanCore())）解决了「拆掉正在扫描的会话」，但既无超时也无合并——用户连点「保存照片目录」N 次就有 N 条全量扫描依次排队挂在 IPC 上（每条都要等前一条落地），首条落地前界面拿不到任何反馈。修法需要产品决策（按根去重合并 / 取消在途旧任务 / 给闸门加超时），三者语义不同，不属于本轮最小改动范围。同批已把 stop() 也挂进同一闸门（消除两条拆除链踩同一会话、同一 SQLite 句柄被 dispose 两次），本条只记合并与超时缺口。",
+      "files": ["src/main/nikkisync/runtime-manager.ts"],
+      "lines": [587],
+      "issue": false
+    },
+    {
+      "id": "DEBT-046",
+      "category": "theme",
+      "section": 18,
+      "status": "open",
+      "priority": "low",
+      "title": "未定义 CSS token --border-color 残留 3 处（1 处声明失效、2 处靠硬编码兜底）",
+      "description": "2026-11-02 审查发现：globals.css 只定义 --border-subtle / --border-strong / --divider，而 plugin-sections.tsx:439 仍写 borderColor: var(--border-color) ⇒ 声明整条失效、边框回落到元素文字色；ShareCodeDecoderDialog.tsx:271/404 写成 var(--border-color, rgba(0,0,0,0.04)) ⇒ 靠硬编码兜底渲染，违反约定③「禁止硬编码色值」且无例外注释。19088bc 只修了同步服务页两处并由 SyncServicePage.test.tsx:1293 钉住；本组三处来自基线提交 a89d1e4 与 200691f，不在本轮审查窗口（a3cfaf6..d86c7c2 + 工作树）内，故只登记不清偿。修法：统一改 var(--border-subtle)，并可把「引用未定义 token」做成静态守卫（枚举 var(--*) 引用与 globals.css 定义集求差集）。",
+      "files": [
+        "src/renderer/pages/settings/plugin-sections.tsx",
+        "src/renderer/components/common/ShareCodeDecoderDialog.tsx"
+      ],
+      "lines": [439, 271, 404],
       "issue": false
     }
   ]
