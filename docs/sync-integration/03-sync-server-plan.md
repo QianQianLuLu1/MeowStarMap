@@ -65,15 +65,15 @@
 
 ## 3. 端口配置
 
-| 项         | 值                                                                                                                     | 依据（禁假设，逐条给出处）                                                                                                                                                                          |
-| ---------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 默认端口   | **`28080`**                                                                                                            | 上游桌面版 `apps/pc-companion/src/windows-app.ts:128` = `Number(process.env.NIKKISYNC_PORT ?? 28080)`；**不用** `LocalSyncServer` 自身默认 `0`（ephemeral），因为配对二维码与防火墙规则需要稳定端口 |
-| 用户可覆盖 | 设置项 `nikkisync.syncServerPort`（1–65535 整数；非法值回落默认并记日志）                                              | 与移植面 `sync.serverPort` 同型                                                                                                                                                                     |
-| bind       | `0.0.0.0`                                                                                                              | 上游桌面版默认（`windows-app.ts:127`）；局域网可达与 mDNS 是需求前提。注意 `address.host` 回显的是**配置值**而非可路由 LAN IP                                                                       |
-| 冲突处理   | **不重试**：`EADDRINUSE` 原样冒泡 → 状态标记 `PORT_IN_USE`                                                             | 上游 `start()` 对 listen error 直接 reject，无重试/无回退；分类判据 `description.includes('EADDRINUSE') ? 'PORT_IN_USE'` 逐字取自 `apps/pc-companion/src/desktop/StartupFailure.ts:8`               |
-| 配对 host  | `resolveLanHost()`：默认路由优先 + 虚拟网卡名过滤 + `127.0.0.1` 兜底                                                   | **复用** `src/main/app/sync-server-setup.ts:243-261`（本阶段导出该函数，**不复制第二份**）。上游 `windows-app.ts:65` 的 `preferredLanIpv4()` 是文件私有、不可复用                                   |
-| mDNS       | 设置项 `nikkisync.syncMdnsEnabled`，**本仓默认 `false`**（有意偏离上游默认）                                           | 上游 `windows-app.ts:129` 的口径是 `NIKKISYNC_MDNS !== '0'`（即默认开）。本仓实测 `MdnsAdvertiser` 有组播自激回环（§15），因此默认关；手机侧不依赖它——`NS1\|` 第 3/4 段已直接携带 `host:port`       |
-| 自启       | 设置项 `nikkisync.syncServerEnabled`，**默认 `false`**（fail-closed）；UI 开启时一并写 `nikkisync.runtimeEnabled=true` | 绑 `0.0.0.0` 会把游戏照片库暴露到局域网，必须用户显式授权；与移植面 `SYNC_SERVER_ENABLED_DEFAULT = false` 一致                                                                                      |
+| 项         | 值                                                                                                                     | 依据（禁假设，逐条给出处）                                                                                                                                                                                                                                                  |
+| ---------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 默认端口   | **`28080`**                                                                                                            | 上游桌面版 `apps/pc-companion/src/windows-app.ts:128` = `Number(process.env.NIKKISYNC_PORT ?? 28080)`；**不用** `LocalSyncServer` 自身默认 `0`（ephemeral），因为配对二维码与防火墙规则需要稳定端口                                                                         |
+| 用户可覆盖 | 设置项 `nikkisync.syncServerPort`（1–65535 整数；非法值回落默认并记日志）                                              | 与移植面 `sync.serverPort` 同型                                                                                                                                                                                                                                             |
+| bind       | `0.0.0.0`                                                                                                              | 上游桌面版默认（`windows-app.ts:127`）；局域网可达与 mDNS 是需求前提。注意 `address.host` 回显的是**配置值**而非可路由 LAN IP                                                                                                                                               |
+| 冲突处理   | **不重试**：`EADDRINUSE` 原样冒泡 → 状态标记 `PORT_IN_USE`                                                             | 上游 `start()` 对 listen error 直接 reject，无重试/无回退；分类判据 `description.includes('EADDRINUSE') ? 'PORT_IN_USE'` 逐字取自 `apps/pc-companion/src/desktop/StartupFailure.ts:8`                                                                                       |
+| 配对 host  | `resolveLanHost()`：默认路由优先 + 虚拟网卡名过滤 + `127.0.0.1` 兜底                                                   | **复用** `src/main/app/sync-server-setup.ts:243-261`（本阶段导出该函数，**不复制第二份**）。上游 `windows-app.ts:65` 的 `preferredLanIpv4()` 是文件私有、不可复用                                                                                                           |
+| mDNS       | 设置项 `nikkisync.syncMdnsEnabled`，**默认 `true`（2026-11-02 复测后翻回，见本节末「复测订正」）**                     | 上游 `windows-app.ts:129` 的口径是 `NIKKISYNC_MDNS !== '0'`（即默认开）。本仓曾因组播自激回环（§15）默认关；闸门与每网卡 socket 落地后复测为 `no_loop`（4 包/60s，对照 0）⇒ 与上游口径一致，开关仍留给用户知情关闭。手机侧不依赖它——`NS1\|` 第 3/4 段已直接携带 `host:port` |
+| 自启       | 设置项 `nikkisync.syncServerEnabled`，**默认 `false`**（fail-closed）；UI 开启时一并写 `nikkisync.runtimeEnabled=true` | 绑 `0.0.0.0` 会把游戏照片库暴露到局域网，必须用户显式授权；与移植面 `SYNC_SERVER_ENABLED_DEFAULT = false` 一致                                                                                                                                                              |
 
 三个新 key 必须加入 `src/shared/settings-keys.ts` 的 `RENDERER_PREF_KEYS`（渲染层需经 `settings:set` 写）。
 
@@ -166,7 +166,7 @@ NikkiSync 仓库**不改、不提交**；若执行中发现必须改上游才能
 5. 资源下载支持 Range：`bytes=0-99` ⇒ **206** + `Content-Range` + `Accept-Ranges: bytes`；越界 ⇒ **416** + `Content-Range: bytes */size`。
 6. WebSocket：连接 `/ws/v1` 收到 `server.hello`；写 `change_journal` 后收到 `asset.created`（走上游 journal 轮询，不手播）。
 7. TLS：首启在 `app_settings['server.tlsIdentity']` 生成自签身份；重启后指纹不变（持久化 + `getOrCreate()` 校验自愈）。
-8. mDNS：**默认关闭**；显式开启时本机可观测到 `_nikkisync._tcp.local` 公告，且公告 TXT 的 `serverId` / `port` 与本次会话一致（§15 已实测）。因上游存在自激放大缺陷，本项不得默认开启；**跨设备发现仍需真机实测**，未实测就标「未验证」。
+8. mDNS：**默认开**（原文为「默认关，因上游存在自激放大缺陷」；2026-11-02 在 `589b932` 复测为 `no_loop` ⇒ 已翻回，见 §15 末订正）。开启时本机可观测到 `_nikkisync._tcp.local` 公告，且公告 TXT 的 `serverId` / `port` 与本次会话一致；**跨设备发现仍需真机实测**，未实测就标「未验证」。
 9. UI：设置-同步服务节能显示开关、状态（地址/服务 id/TLS 指纹/已配对数）、二维码、设备列表与撤销。
 10. 停止后重启：`stop-server` → 端口拒绝 → `start-server` → 同端口恢复。
 11. NikkiSync 自带 `local-sync-server.test.js`（等价门禁）与本仓集成用例同时通过。
@@ -212,7 +212,8 @@ curl -k -s -o /dev/null -w '%{http_code}\n' https://127.0.0.1:28080/v1/assets   
 
 > **curl 的真实边界**：9 条签名端点与 206/416 **curl 无法完成**（Ed25519 逐请求签名 + nonce + ±5min 时间戳），
 > 由 T-A 覆盖；`/export` 明确拒绝 `Range` 头（给 400），不要用 curl 去证明它支持断点续传。
-> mDNS 取证结论见 §15（实测：开启时 45s 内收到 1,568,807 条自激公告 ⇒ 本仓默认关；
+> mDNS 取证结论见 §15（2026-10-14 实测：开启时 45s 内收到 1,568,807 条自激公告 ⇒ 当时默认关；
+> 2026-11-02 在 `589b932` 复测 4 包/60s、对照 0 ⇒ 已翻回默认开；
 > Windows 上 5353 常与 Bonjour 冲突、`0.0.0.0` 监听可能触发防火墙弹窗）。跨设备发现无真机 ⇒ 标未验证。
 
 **分步放行**：步骤 0（§0，已完成 ✓）→ T-A/T-B 红灯留证 → 主进程实现绿灯 → IPC/preload 绿灯 → UI 实跑（`npm run dev`，须看到二维码真实渲染，不以单测代替）→ 文档/打包断言 → e2e → 全量门禁。每步不过不得进下一步。
@@ -308,7 +309,7 @@ curl -k -s -o /dev/null -w '%{http_code}\n' https://127.0.0.1:28080/v1/assets   
 `N3c` 在真实窗口点开关 → 状态卡「运行中」→ 二维码 SVG 出图（断言 markup 长度以排除空壳）→ 服务留活交由退出链关闭并断端口释放。
 视觉证据：`test-results/nikkisync-pairing-qr.png`（可见服务 ID `server_6df471d3…`、TLS 指纹、二维码、`默认端口 28080` 文案、toast「同步服务已启用」）。
 
-**D. mDNS**：见 §15（实测为上游自激回环缺陷 ⇒ 集成侧默认关）。
+**D. mDNS**：见 §15（2026-10-14 在 `d4ca7d7` 实测为上游自激回环缺陷 ⇒ 当时默认关；2026-11-02 在 `589b932` 复测为 `no_loop` ⇒ 已翻回默认开）。
 
 ### 14.3 遗留项
 
@@ -317,7 +318,7 @@ curl -k -s -o /dev/null -w '%{http_code}\n' https://127.0.0.1:28080/v1/assets   
 2. **覆盖率门控红灯是既有债，不是本轮引入**：`CHANGELOG.md:59` 与 `docs/技术债清单.md`（DEBT-032）记录 Vitest 5 口径修正后同一套测试为 `64.65 / 55.67 / 57.12 / 66.21`，四项全不达标，当时的决定是「不降阈值、不扩 exclude、保持红灯」。本轮用**逐文件剔除法**实测：去掉本阶段改过的 12 个源文件后聚合仍为 `66.38 / 57.69 / 58.90 / 67.96`（照样低于阈值），而本阶段新代码自身为 `sync-server-view 97.91%` / `handler 98.86%` / `facade 98.61%` / `manager 91.42%` / `setup 98.14%` ⇒ 本阶段把四项**抬升**到 `66.70 / 58.19 / 59.23 / 68.28`，阈值一字未动。重新基线或补测试仍属 DEBT-032 的决策。流程缺口如实登记：步骤 0 只取了 typecheck/lint/test 基线，没取 coverage 基线。
 3. **服装缩略图端点在嵌入态恒 404**：刻意不给 `LocalSyncServer` 注入 `metadataThumbnailCache`（它要向公共字典 CDN 外联，与本阶段「零外联」口径冲突；上游桌面版是注入的）。手机侧要显示服装图标就得单独决定何时放开外联。已用集成用例锁定「未注入 ⇒ 404」，不是漏测。
 4. **设备列表是只读 SELECT 权宜**：上游 `PairingRepository` 无 `listDevices`；上游补齐后应改调它并删 `PAIRED_DEVICES_SQL`。
-5. **mDNS 默认关待翻回**：上游修好自激回环（应答前判 QR 位 / 只单播回查询者 / 加最小发送间隔）后，把 `SYNC_SERVER_DEFAULT_MDNS` 翻回 `true` 并复测 §15.2。
+5. **mDNS 默认关待翻回 —— ✅ 已完成 2026-11-02**：上游闸门（应答前判查询计数）与每网卡独立 socket 落地后，用 `scripts/sync-e2e/mdns-loop-probe.ts` 在 `589b932` 上复测得 `no_loop`（4 包/60s，对照 0）⇒ `SYNC_SERVER_DEFAULT_MDNS` 已翻回 `true`，读数见 §15 末「复测订正」。真机跨设备 browse 仍未实测，该边界不变。
 6. **跨设备与防火墙未验证**：无 Android 真机在线 ⇒「局域网可发现」「跨主机可达」两项标**未验证**（本机 LAN IP 直连 200 只证明绑定面可路由，不证明对端可达）。
 7. **上游 P1 已知缺陷照录**：RSA 私钥明文存于 `app_settings`（`docs/M1_1_LOCAL_SYNC_SERVER.md:77` 自标 P1，DPAPI 未做）。
 8. **需求措辞据实修正**：`GET /v1/assets/{id}/metadata` 不存在（只有签名 `PATCH`），已按实现验收，并改正 `docs/INTEGRATION.md:26` 造成的误述。
@@ -331,7 +332,28 @@ curl -k -s -o /dev/null -w '%{http_code}\n' https://127.0.0.1:28080/v1/assets   
 
 ## 15. mDNS 取证与上游缺陷（2026-10-14 实测）
 
-**结论：上游 `MdnsAdvertiser` 存在组播自激回环，开启后会以约 3.5 万包/秒向局域网泛洪。本仓因此把 `nikkisync.syncMdnsEnabled` 默认改为 `false`（这是对已批准计划 §3「默认 true」的有意偏离，方向是更安全的一侧）。**
+> **【2026-11-02 复测订正 —— 本节结论已被取代，默认位已翻回 `true`】**
+>
+> 下面的 15.1/15.2 是 2026-10-14 在 `NikkiSync@d4ca7d7` 上的真实取证，原文按仓库约定保留备查。
+> 但本仓此后一直拿它当「默认关」的依据，而那段代码后来变了：上游加了「只应答带查询计数的包」
+> 的闸门（**在我们上一轮采纳的锚点 `b397e0e` 里就已存在**，本节当时的复测没覆盖到这一层），
+> `a5a43f9` 又把公告器改成「每块网卡独立 socket + 失败即 `retire()`」。
+>
+> 2026-11-02 在 `589b932` 上用可复跑的探针复量（`scripts/sync-e2e/mdns-loop-probe.ts`，
+> 判据 `scripts/sync-e2e/mdns-loop-verdict.ts`，观测面是**外部**组播监听 socket，不注入公告器内部）：
+>
+> | 窗口              | 60s 内「载荷含本次 serverId」的包 | 速率        |
+> | ----------------- | --------------------------------- | ----------- |
+> | `mdns:true`       | **4**（= 每 15s 一次周期公告）    | 0.067 包/秒 |
+> | `mdns:false` 对照 | **0**                             | 0           |
+>
+> 阈值 5 包/秒 ⇒ `no_loop`；与旧证据的 34,862 包/秒差约 52 万倍，不是「勉强过线」。
+> 因此 `SYNC_SERVER_DEFAULT_MDNS` 已翻回 `true`，判据与读数回写见
+> `docs/plans/2026-11-02-nikkisync-upstream-align-02-实施计划.md` §7 N5。
+> 影响面仍受限：`SYNC_SERVER_ENABLED_DEFAULT = false`，只有用户显式开启同步服务才会组播；
+> 跨设备发现（真机 mDNS browse）本轮仍未实测，§16 的该项继续标「未验证」。
+
+**结论（2026-10-14，`d4ca7d7`）：上游 `MdnsAdvertiser` 存在组播自激回环，开启后会以约 3.5 万包/秒向局域网泛洪。本仓因此把 `nikkisync.syncMdnsEnabled` 默认改为 `false`（这是对已批准计划 §3「默认 true」的有意偏离，方向是更安全的一侧）。**
 
 ### 15.1 机制（读源码定位，非推测）
 

@@ -75,18 +75,20 @@ describe('normalizeJournalPollMs', () => {
 })
 
 describe('resolveSyncServerConfig / embeddedServerConfig', () => {
-  it('默认值：端口/绑定对齐上游桌面版，mDNS 刻意默认关（上游自激回环缺陷，见常量注释）', () => {
+  it('默认值：端口/绑定对齐上游桌面版，mDNS 默认开（589b932 复测 no_loop，见常量注释）', () => {
     const config = resolveSyncServerConfig()
     expect(config).toEqual({
       name: 'Meow Star Map',
       host: '0.0.0.0',
       port: 28080,
-      mdns: false,
+      mdns: true,
       journalPollMs: 250
     })
   })
 
-  it('mDNS 可被显式开启（保留知情开关，不改上游）', () => {
+  it('mDNS 两个方向都可显式覆盖（保留知情开关，不改上游）', () => {
+    expect(resolveSyncServerConfig({ mdns: false }).mdns).toBe(false)
+    expect(embeddedServerConfig({ mdns: false }).mdns).toBe(false)
     expect(resolveSyncServerConfig({ mdns: true }).mdns).toBe(true)
     expect(embeddedServerConfig({ mdns: true }).mdns).toBe(true)
   })

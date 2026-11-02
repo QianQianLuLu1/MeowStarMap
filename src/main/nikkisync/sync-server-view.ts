@@ -33,17 +33,23 @@ export const SYNC_SERVER_DEFAULT_HOST = '0.0.0.0'
 /** mDNS 实例名与 `PairResponse.serverName`：上游 `MdnsAdvertiser.ts:52` 的清洗只去非 ASCII（空格与 `_ -` 放行），故取英文品牌形，中文名会被洗掉。 */
 export const SYNC_SERVER_DEFAULT_NAME = 'Meow Star Map'
 /**
- * mDNS 默认**关闭**——这是对上游缺陷的集成侧兜底，不是随手改的默认值。
+ * mDNS 默认**开启**（2026-11-02 在采纳锚点 `589b932` 上复测后翻转；翻转判据见
+ * `scripts/sync-e2e/mdns-loop-verdict.ts`，复跑命令 `npx tsx scripts/sync-e2e/mdns-loop-probe.ts --seconds 60`）。
  *
- * 实测（2026-10-14，本机 `NikkiSync@d4ca7d7`，A/B 各一次，见 docs/sync-integration/03-sync-server-plan.md §15）：
- * `MdnsAdvertiser` 用同一个 socket 既发公告又把「任何含 `_nikkisync` + `_tcp` 的来包」当作查询立即重发
- * （`MdnsAdvertiser.ts:69-71`），而它自己的公告会经组播回环送回自己（`:72-77`，loopback 默认开，
- * 不判 QR 位、无速率限制）⇒ 正反馈自激：`mdns:true` 时 45s 内被动收到 **1,568,807** 条带本次 serverId
- * 的公告包（≈3.5 万/秒，TTL 255 会打到整个局域网段）；`mdns:false` 时同口径 15s 收到 **0** 条。
- * 手机侧不依赖它：配对二维码已经直接携带 `host:port`（`NS1|` 第 3、4 段）。
- * 因此本仓默认关，并保留 `nikkisync.syncMdnsEnabled` 供用户知情开启；上游修复前不得默认打开。
+ * 历史：本常量原为 `false`，依据是 2026-10-14 在 `NikkiSync@d4ca7d7` 上的实测——公告包经组播
+ * 回环送回自己又被当成查询立即重发，`mdns:true` 时 45s 内被动收到 **1,568,807** 条（≈3.5 万/秒，
+ * TTL 255 会打到整个局域网段），`mdns:false` 同口径为 **0** 条。
+ * 那份证据已经过期：上游后来加了「只响应带查询计数的包」闸门（在我们**上一轮**采纳的 `b397e0e`
+ * 里就已存在，`a5a43f9` 又把公告器改成每网卡独立 socket + `retire()`），本仓却仍按旧读数摁着默认值。
+ *
+ * 复测读数（同一台机器、同一观测面：外部组播监听 socket 数「载荷含本次 serverId 的包」）：
+ * `mdns:true` 60s 收到 **4** 条（= 每 15s 一次周期公告，t=0/15/30/45），`mdns:false` 同窗口 **0** 条，
+ * 速率 0.067/s，阈值 5/s ⇒ `no_loop`。量级差 ~52 万倍，不是「勉强没过线」。
+ *
+ * 影响面仍受约束：`SYNC_SERVER_ENABLED_DEFAULT = false`，只有用户显式开启同步服务才会组播；
+ * 手机侧不依赖它——配对二维码本就带 `host:port`。`nikkisync.syncMdnsEnabled` 保留给用户知情关闭。
  */
-export const SYNC_SERVER_DEFAULT_MDNS = false
+export const SYNC_SERVER_DEFAULT_MDNS = true
 /** 上游 `journalPollMs` 默认（`LocalSyncServer.ts:166`）。 */
 export const SYNC_JOURNAL_POLL_MS = 250
 /** 端口占用归类标记（与上游 `StartupFailure.ts` 的 `PORT_IN_USE` 同字面）。 */

@@ -59,10 +59,12 @@
 
 ### 同步 E2E 联调（`sync-e2e/`）
 
-| 文件                        | 调用方式                                                                                 | 职责                                                                                                    |
-| --------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `sync-e2e/launch-server.ts` | `ELECTRON_RUN_AS_NODE=1 electron --import tsx scripts/sync-e2e/launch-server.ts`（手动） | 进程内启动真实同步服务端（SQLite/TLS 身份/配对/事件汇）+ 本地控制端口，供跨仓库驱动测试（NikkiSync 侧） |
-| `sync-e2e/launch-args.ts`   | 被 `launch-server.ts` import                                                             | CLI 参数解析纯函数（`--port` 0–65535 校验、未知参数拒绝、`--serve` no-op）                              |
+| 文件                            | 调用方式                                                                                  | 职责                                                                                                                                                                         |
+| ------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sync-e2e/launch-server.ts`     | `ELECTRON_RUN_AS_NODE=1 electron --import tsx scripts/sync-e2e/launch-server.ts`（手动）  | 进程内启动真实同步服务端（SQLite/TLS 身份/配对/事件汇）+ 本地控制端口，供跨仓库驱动测试（NikkiSync 侧）                                                                      |
+| `sync-e2e/launch-args.ts`       | 被 `launch-server.ts` import                                                              | CLI 参数解析纯函数（`--port` 0–65535 校验、未知参数拒绝、`--serve` no-op）                                                                                                   |
+| `sync-e2e/mdns-loop-probe.ts`   | `npx tsx scripts/sync-e2e/mdns-loop-probe.ts --seconds 60`（手动，需已 `link:nikkisync`） | mDNS 组播自激复测探针：进程内经真实装载缝起两次 `LocalSyncServer`（开/关组播各一个窗口），用**外部**组播监听 socket 数「载荷含本次 serverId 的包」，只测量不改任何设置与源码 |
+| `sync-e2e/mdns-loop-verdict.ts` | 被 `mdns-loop-probe.ts` import                                                            | 纯判据层（`classifyMdnsLoopReadings` 阈值 5 包/秒、`formatMdnsLoopReadings` 输出、`parseMdnsProbeArgs` 参数校验）；单测在 `__tests__/mdns-loop-verdict.test.ts`              |
 
 ### 诊断与校验
 
@@ -170,7 +172,7 @@
 
 ## 注意事项
 
-- **禁止** 在脚本中直接 `import` 主进程模块（`src/main/`）——脚本运行在 Node 环境，无 Electron 上下文。例外一：`copy-resonance-thumbnails.ts` 等数据生成脚本动态导入 `src/renderer/utils/` 中的纯函数。例外二（记录在案）：`sync-e2e/launch-server.ts` 静态 import 8 个 `src/main/` 模块以装配**真实**同步服务端（不复制装配逻辑，见 `docs/sync-integration/06-e2e-plan.md` §8 的有意决策），运行方式为 `ELECTRON_RUN_AS_NODE=1 electron --import tsx`——原生 better-sqlite3 是 Electron ABI，plain Node 不可加载，Electron 的 Node 侧无渲染进程上下文问题。
+- **禁止** 在脚本中直接 `import` 主进程模块（`src/main/`）——脚本运行在 Node 环境，无 Electron 上下文。例外一：`copy-resonance-thumbnails.ts` 等数据生成脚本动态导入 `src/renderer/utils/` 中的纯函数。例外二（记录在案）：`sync-e2e/launch-server.ts` 静态 import 8 个 `src/main/` 模块以装配**真实**同步服务端（不复制装配逻辑，见 `docs/sync-integration/06-e2e-plan.md` §8 的有意决策），运行方式为 `ELECTRON_RUN_AS_NODE=1 electron --import tsx`——原生 better-sqlite3 是 Electron ABI，plain Node 不可加载，Electron 的 Node 侧无渲染进程上下文问题。例外三（记录在案）：`sync-e2e/mdns-loop-probe.ts` 静态 import `src/main/nikkisync/runtime-facade.ts` 与 `runtime-types.ts`，目的是经**真实装载缝**起上游 `LocalSyncServer` 来量组播行为——复制装配逻辑就测不到要测的东西（判据与参数解析仍在 `mdns-loop-verdict.ts` 纯层）。该链零 `electron` import、只用 `node:sqlite`，因此 plain Node（`npx tsx`）可直接运行，不需要 `ELECTRON_RUN_AS_NODE`；前提是四条 junction 在位。
 - 修改 `pre-dist-check.ts` 的校验项时需同步更新 `npm run dist:win` 的 CI 预期。
 - i18n 脚本链（`_shared.ts` → `guard.ts` / `codemod.ts` / `prune-whitelist.ts`）有内部依赖，修改 `_shared.ts` 需回归测试全部消费方。
 - `after-pack-vc-runtime.cjs` 是 CommonJS 格式（electron-builder 钩子要求），不得改为 ESM。

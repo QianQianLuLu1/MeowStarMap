@@ -861,7 +861,8 @@ describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
     expect(sync.running).toBe(false)
     expect(sync.host).toBe('0.0.0.0')
     expect(sync.port).toBe(28080)
-    expect(sync.mdnsEnabled).toBe(false)
+    // 默认位随 SYNC_SERVER_DEFAULT_MDNS 翻转（589b932 复测 no_loop），不是本层的独立判断
+    expect(sync.mdnsEnabled).toBe(true)
     // 未在监听时不下「是否安全」的判断，也不虚构 serverId / 指纹
     expect(sync.secure).toBeUndefined()
     expect(sync.serverId).toBeUndefined()
@@ -926,16 +927,17 @@ describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
     const { deps, calls } = createDependencies()
     const manager = createRuntimeManager(deps)
     await manager.startSyncServer()
-    expect(calls.syncPorts).toEqual(['28080/false'])
-    const changed = await manager.startSyncServer({ port: 39139, mdnsEnabled: true })
+    // 缺省即 589b932 复测后的默认位（mDNS 开），这里反向变更 mdns 同样要触发重建
+    expect(calls.syncPorts).toEqual(['28080/true'])
+    const changed = await manager.startSyncServer({ port: 39139, mdnsEnabled: false })
     expect(changed.running).toBe(true)
     // 旧会话先被完整 teardown（含 server.stop），再以新 LAN 配置重建
     expect(calls.createSession).toHaveLength(2)
-    expect(calls.syncPorts).toEqual(['28080/false', '39139/true'])
+    expect(calls.syncPorts).toEqual(['28080/true', '39139/false'])
     expect(calls.serverStop).toBe(1)
     expect(calls.dispose).toBe(1)
     // 同端口同 mdns 重复请求不再重建
-    await manager.startSyncServer({ port: 39139, mdnsEnabled: true })
+    await manager.startSyncServer({ port: 39139, mdnsEnabled: false })
     expect(calls.createSession).toHaveLength(2)
   })
 
