@@ -200,6 +200,112 @@ N1 探针（不污染仓库，落 `.cache/exit-probe/`，gitignored，跑完即�
 
 ---
 
-## 9. 执行记录（逐节点真跑后回写）
+## 9. 执行记录（2026-11-02，逐节点真跑）
 
-> 待执行。每个节点记：命令、退出码、关键计数、红→绿证据、与计划的偏差（偏差要保留原预期并另写订正，不得销毁取证）。
+### 9.1 N1 探针实测：`app.exit()` 到底留不留 JS 退出痕迹
+
+草稿落 `.cache/exit-probe/`（gitignored，跑完已删），用 `node_modules/electron/dist/electron.exe` 拉起
+12 行最小 main，事件日志逐条落盘。**三种退出方式对照**（含对照组，排除「探针自身没跑到调用点」的假阴性）：
+
+| 模式           | 日志末态                                                                                    | Node `exit` 处理器 | 结论                                                            |
+| -------------- | ------------------------------------------------------------------------------------------- | ------------------ | --------------------------------------------------------------- |
+| `app.exit(0)`  | `ready → listeners exit=1 → process.exit=function exit() { [native code] } → about-to-exit` | **未执行**         | `last-exit.json` 不会被写                                       |
+| `process-exit` | 同上                                                                                        | **未执行**         | Electron 主进程里 `process.exit` 是原生实现，同样绕过 Node 事件 |
+| `app-quit`     | `… about-to-exit → NODE_EXIT_HANDLER ran code=0 → returned-from-exit-call`                  | 执行               | 只有 `app.quit()` 链触发                                        |
+
+⇒ **B2 判为真缺陷**（不是「需实测的悬案」）：GPU 自愈的 `relaunch + app.exit(0)` 会留心跳、无退出码 ⇒
+下次启动判 `native` ⇒ 在刚落盘的档位上再叠一级 ⇒ 0 级崩一次直接跳 2 级。
+同一探针顺带证伪了 `exit-forensics.ts` 里「`app.quit` / `app.exit` / `process.exit` 均会触发 Node exit 事件」
+这句既有注释——已随 `8c84d13` 订正。
+
+### 9.2 各节点红绿证据与提交
+
+| 节点                          | 红灯证据（改前必红）                                                                                                                                                        | 绿灯证据                                                                                                   | 提交      |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------- |
+| N0 计划落仓                   | —                                                                                                                                                                           | `git ls-files` 可列出、`git check-ignore` 退出 1、无 BOM                                                   | `7b2f6ef` |
+| N2 B1 开关被架空              | `gpu-fallback.test.ts` 用例 b2 **FAIL：`expected 2 to be +0`**（断言行 266，正是计数轴）；套件 **1 failed / 42 passed**                                                     | b2 转绿后 **43/43**（41 → 43 = 新增 b2/b3 两例，账目对平）；`npm run test:main` **4243 passed / 0 failed** | `14a807b` |
+| N3 B2 主动退出伪装成原生杀死  | `exit-forensics.test.ts` 新增 13/14 **双双 FAIL**（13 缺 `last-exit.json`；14 `expected true to be false`——心跳被 5s tick 复活）；套件 2 failed / 16 passed                 | 三套件 **exit-forensics 18/18、gpu-selfheal 17/17**；`test:main` 4243/0                                    | `8c84d13` |
+| N4 三条技术债                 | —（登记面无红灯）                                                                                                                                                           | 台账 `items` 46 → 49 且 JSON 可解析；`check-md-links` 24/24                                                | `90535e2` |
+| N5 装置假红（计划外新增节点） | `npm run test:ci-linux` **F2/F3 FAIL**：待判字符串是 `chromium-debug.log`，实测收到的是 `PK\u0005\u0006\u0000…`（22 字节空 EOCD）；同一断言在真宿主 win 上绿 ⇒ 两侧读数不同 | 改判据后 **真宿主 43/43、装置态 43/43**，`test:ci-linux` 全量 **465 文件 / 7408 passed / 0 failed**        | `4062d22` |
+| N6 CHANGELOG 补账             | —                                                                                                                                                                           | `check-changelog-release` 三条 ✔、`prettier --check` 绿                                                    | `f7a3b79` |
+
+**变异抽查做了两次**（都要恢复后逐字节校验）：
+
+- M1（N3 的调用点）：撤掉 `app.exit` 包装层里的 `flushLastExitRecord(...)` ⇒ 用例 **13 与 selfheal 8 同时真红**、其余 33 绿；恢复后 `sha256 = ce03aca4…` 与变异前备份**全等**。
+- M2（N5 的新判据不是空转 spy）：把 `log-service.ts:211` 的收集清单打空（`for (const name of [] as string[])`）⇒ **F2/F3/F4 三例同时真红**；恢复后 `sha256` 校验 `OK`，`git status` 只剩测试文件。
+
+**与计划的偏差（如实记账，不改写原预期）**：
+
+1. **N3 的落点换了**。计划写的是「`requestSelfHeal` 在 relaunch 前清心跳」，实测发现问题在更上游一层：
+   `last-exit.json` 只有 Node `exit` 处理器会写，而主动 `app.exit` 根本不触发它。于是改为**在既有的
+   `installExitCallSpies` 包装层里当场落退出码**（抽 `flushLastExitRecord()` 供处理器与包装层共用），
+   一处修根同时覆盖 `lifecycle.ts:545` 清理超时的 `app.exit(1)` 与崩溃对话框后的退出；
+   `requestSelfHeal` 自身**零改动**（不引新依赖、不删心跳）。心跳定时器另补 `stopHeartbeatTimer()`
+   （`markCleanShutdown()` 先停表再删文件、`will-quit` 同步停表）。
+2. **新增了计划里没有的 N5**。第六道闸门（`test:ci-linux`）是上一轮从没跑过的那一条，红只在装置态出现；
+   归因证据是 `node_modules/archiver/lib/core.js:8` 的 `var fs = require('fs')`——外部化 CJS 不吃装置
+   第 4 轴的 fs 翻译（`tests/ci-linux.setup.ts` 头注释已把这条列为已知失真）。产品代码零改动，只把
+   判据从「zip 字节」移到「服务把哪些文件放进打包源目录」，与同文件 F4 的既有口径同源。
+3. **出包没走旁路**。前几轮记录的标准配方必死（`fs.rm` 不吞 EBUSY / `EPERM rename`），本轮
+   `npm run dist:win` **一次跑到 `INNER_EXIT=0`**，含 `verify:dist` 与 32 条禁串闸门全绿。
+   这只说明「当下没有锁」，**不构成「配方以后不需要旁路」的结论**，旁路配方继续留在记忆里。
+4. `npm install` 这次**没有重写 `package-lock.json`**（`git status` 空），但它照旧拆掉了 4 条 junction：
+   `--check` 回显 `create` 四行 + `NOT linked (4 item(s) need action)`，`link:nikkisync` 后复原为 4 条 `ok`。
+5. selfheal 用例 8 在计划里标了「视 N1 读数」——N1 判「不跑」，所以它是**真复现例**而非不变量守卫。
+6. 装置态首轮读数曾出现「3 failed / 2 个文件」与次轮「2 failed / 1 个文件」的差异，第三轮起稳定；
+   多出的那条经查是并发压力下的抖动，与本轮改动无因果，收口读数以最终全绿为准。
+
+### 9.3 六道闸门读数（2026-11-02 本机）
+
+| 闸门                                                          | 读数                                                                                                |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `npm install`                                                 | exit 0；拆链 4 条 ⇒ `npm run link:nikkisync` 复原 ⇒ `--check` 四条 ok；`package-lock.json` 未被重写 |
+| `npm run build`                                               | exit 0（`✓ built in 4.84s`，产物刷新）                                                              |
+| `npm test`（全量）                                            | **465 文件 / 7391 passed / 20 skipped / 0 failed**（基线 7386 + 本轮新增 5 例，逐例可对账）         |
+| `npm run typecheck` / `typecheck:e2e` / `lint` / `i18n:guard` | 四条全部 exit 0；`i18n:guard` ✅（本轮零新增键、12 语包未动）                                       |
+| `npm run verify`（对最终内容，手动指定 5 个改动文件）         | 5 项全绿：typecheck / lint / core-gate / format / test                                              |
+| `npm run test:ci-linux`                                       | **465 文件 / 7408 passed / 3 skipped / 0 failed**，exit 0（修 N5 之前为 2 failed）                  |
+
+### 9.4 版本号与产物新鲜度
+
+- **版本号 2.5.6 = 零编辑**：`package.json` `version: 2.5.6`；README 徽章 `version-2.5.6-blue`、
+  `AGENTS.md`（v2.5.6）、`ARCHITECTURE(.en).md`、`DEVELOPMENT(.en).md`、`docs/manual-smoke-checklist.md` 同值；
+  `check-changelog-release.ts` 三条 ✔（`[2.5.6]` 唯一、`[Unreleased]` 无待发布条目）；
+  `check-doc-versions.ts` ✅（只管 README 的 Electron 版本 41.10，与应用版本无关）。
+- **出包前留底**：现役包三件（exe 184,656,080 B / blockmap / `latest.yml`）复制到
+  `_safe_backup_20261102-gpuladder/`（`release/` 与 `_safe_backup_*` 均在 `.gitignore` 内，不入仓）。
+- **两条新鲜度轴都变了**（证明不是空重跑）：
+  | 轴       | 旧（11-02 16:02） | 新（11-02 19:46）   |
+  | -------- | ----------------- | ------------------- |
+  | `size`   | 184,656,080       | **184,657,459**     |
+  | `sha512` | `Kd3ezrpCZlEJ…`   | **`iQTDyktm3Rqs…`** |
+- **包内字节级取证**（`release/win-unpacked/resources/app.asar` 的 `dist\main\main\app\index.js`，46,954 B）：
+
+  | marker                              | 出包前（16:01 包） | 出包后（19:46 包） |
+  | ----------------------------------- | ------------------ | ------------------ |
+  | `recordBootLevel`                   | 0                  | 2                  |
+  | `disable-software-rasterizer`       | 0                  | 3                  |
+  | `compatLevel`                       | 0                  | 24                 |
+  | `getPreviousExitEvidence`           | 0                  | 2                  |
+  | `BOOT_SUCCESS_SETTLE`               | 0                  | 3                  |
+  | `flushLastExitRecord`（本轮 N3）    | —                  | 4                  |
+  | `stopHeartbeatTimer`（本轮 N3）     | —                  | 3                  |
+  | `consecutiveFailures: 0`（本轮 N2） | —                  | 3                  |
+
+  另加一条硬判据：包内该文件与盘上 `dist/main/main/app/index.js` **逐字节相等**（`buf.equals(disk) = true`）。
+  ⇒ 现役安装包此前「完全不含 GPU 阶梯」的缺口已闭合，且本轮两处修复确实在包里。
+
+- **`npm run e2e:smoke`**：exit 0，**19 passed (35.9s)**，日志 `[e2e] executable: …/release/win-unpacked/喵星图.exe`
+  （19:46 新树）——这一条正是上一轮读数作废的原因，本轮按用户裁决移到重打包之后跑。
+  S8 在全新 userData 下回显 `[gpu] reason=default`、`hardwareAcceleration.enabled = true` ⇒
+  阶梯默认档没有把健康设备带偏（计划 E1 判据成立）。
+- **本轮不需要的收尾**：`docs/plans/**` 与本执行记录都不在 `build.files`（`dist/**` + `resources/**` +
+  nikkisync 对象项）范围内，改文档**不需要**再出一次包；包里与源码不一致的成因只有一类——
+  改了被打包的 `src/**` 却不再出包，本轮已在出包前把 `14a807b`/`8c84d13`/`4062d22` 全部提交。
+
+### 9.5 现场
+
+`release/` = 本轮 19:46 三件（Setup 184,657,459 B / blockmap / `latest.yml`）+ 现役 `win-unpacked`
+（`喵星图.exe` 224,013,312 B，与包同为 19:46）+ 5 棵 `build-*` 残壳（各只剩 `app.asar`、
+**无 `app.asar.unpacked`** ⇒ `findAsarUnpacked` 的 readdir 首命中不可能误命中它们，本轮
+`npm run verify:dist` 裸跑绿即为证）。`.cache/exit-probe/` 探针草稿已删除。
