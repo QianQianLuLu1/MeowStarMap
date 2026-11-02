@@ -605,6 +605,50 @@
       ],
       "lines": [439, 271, 404],
       "issue": false
+    },
+    {
+      "id": "DEBT-047",
+      "category": "startup",
+      "section": 19,
+      "status": "open",
+      "priority": "medium",
+      "title": "陈旧心跳把强杀/断电也算成 GPU 阶梯升档证据，健康机器一次强杀即转软件渲染",
+      "description": "2026-11-02 GPU 阶梯复查发现，用户裁决保持现状（本轮先救被困设备，不收窄出口）。链路逐跳：will-quit（exit-forensics.ts:347-355）与 markCleanShutdown()（:370-378）都没跑 ⇒ heartbeat.json 残留 → getPreviousExitEvidence()（:192-197）判 native → index.ts:98-100 作为 prevNativeKill 传入 → gpu-fallback.ts:358 在档位上加一级 → :408 连带置 fallbackActive=true ⇒ 此后 shouldDisableHardwareAcceleration() 同版本戳恒返回 true（:316-323），设备从此走软件渲染，解锁只有版本级复位（resolveCompatLevel:349-356）或用户在设置页重开硬件加速（writeHardwareAccelPref(true)，14a807b 已把计数一并清零）。判据本身无法区分 Chromium FATAL 自杀与任务管理器强杀/断电——两者在 JS 侧痕迹完全相同（心跳在、退出码无）。修法：仅当已存在 GPU 崩溃观测（fallbackActive 或 compatLevel≥1）时才认 native 为升档证据，或用 heartbeat.stage + chromium-debug.log 末行做二次佐证；代价是观测监听器注册前就被 FATAL 杀死的极端设备少一次升档机会。撤销条件：问题设备群体收敛（最迟第 3 次启动落到最大兼容档并能正常使用），或档位改由 child-process-gone 事件驱动。",
+      "files": [
+        "src/main/app/exit-forensics.ts",
+        "src/main/app/gpu-fallback.ts",
+        "src/main/index.ts"
+      ],
+      "lines": [192, 347, 358, 408],
+      "issue": false
+    },
+    {
+      "id": "DEBT-048",
+      "category": "robustness",
+      "section": 19,
+      "status": "open",
+      "priority": "low",
+      "title": "gpu-fallback.json 文件名字面量双写，状态机与诊断包各持一份",
+      "description": "2026-11-02 GPU 阶梯复查发现：同一路径串同时写死在 gpu-fallback.ts:149-151 的私有 getStatePath() 与 log-service.ts:221-223 的诊断包步 3.6 ⇒ 任一处改名会让诊断包静默漏收该文件（整步被 catch {} 吞），而状态机照常运行——失效形态是「证据消失」而非报错。同批已为同类问题立先例：CHROMIUM_LOG_BASENAME（user-diag-path.ts:21）把写入方/弹窗/诊断包三方收口到一个常量。本轮不修的原因：零行为变化 ⇒ 造不出改前必红的复现用例（本仓禁止用空转守卫冒充红灯，也禁止为不可能发生的场景加防御），且不宜让 services/ 反向依赖 app/。修法：把 basename 归入叶子层 src/main/utils/constants.ts（约定为可被任何模块导入、零项目依赖），两处引用；顺带可把 gpu-pref.json / heartbeat.json / last-exit.json 一起收口。撤销条件：按上法归一，或任一次真实改动使两侧出现分歧。",
+      "files": ["src/main/app/gpu-fallback.ts", "src/main/services/log-service.ts"],
+      "lines": [149, 221],
+      "issue": false
+    },
+    {
+      "id": "DEBT-049",
+      "category": "robustness",
+      "section": 19,
+      "status": "open",
+      "priority": "low",
+      "title": "诊断目录每次重算，与启动时烤进 --log-file 的 chromium 路径可能分叉",
+      "description": "2026-11-02 GPU 阶梯复查发现：chromium-debug.log 路径在 index.ts:69 一次性求值并交给 --enable-logging=file + --log-file，此后 Chromium 恒写该绝对路径；而 early-crash-guard.ts:137 与 log-service.ts:210 各自重新调用 getUserFacingDiagDir() / resolveDiagDir()（user-diag-path.ts 的候选链按当下可用性求值）。Documents 目录中途变化（OneDrive Known Folder 重定向、漫游 profile、文档盘临时不可用）会让弹窗指的路径与诊断包收的文件落到不同目录，表现为导出成功但包里缺 chromium-debug.log——恰是 6d633f8 补齐的那条原生 FATAL 证据。修法：启动时求值一次并导出只读访问器（照 getStartupLogPathValue() 的既有口径），下游一律取缓存值；或诊断包改按 --log-file 的实际值收集。撤销条件：候选链被证明在同一进程生命周期内恒定，或已按上法同源。",
+      "files": [
+        "src/main/index.ts",
+        "src/main/utils/early-crash-guard.ts",
+        "src/main/services/log-service.ts"
+      ],
+      "lines": [69, 137, 210],
+      "issue": false
     }
   ]
 }
