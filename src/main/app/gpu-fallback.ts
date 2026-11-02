@@ -67,6 +67,17 @@ const RUNTIME_CRASH_THRESHOLD = 2
 let runtimeGpuCrashTimestamps: number[] = []
 
 /**
+ * 启动成功确认的存活窗口：首绘（did-finish-load）后需连续存活到点才清零
+ * consecutiveFailures。
+ * 为什么不能首绘瞬间就清零：GPU FATAL 类闪退多发生在**页面已经画出来之后几秒**
+ * （2026-11-02 问题设备转储：合成器/渲染线程均已存在，主进程才被 int 3 杀死），
+ * 瞬间清零会让这类设备的计数永远攒不满、阈值兜底路径彻底失效。
+ * 为什么还要 before-quit 这条补充路径：只看定时器会把「打开看一眼就正常关闭」的
+ * 健康设备误计为失败，连续两次即误降级——正是 2026-10-24 优化要避免的过度触发。
+ */
+export const BOOT_SUCCESS_SETTLE_MS = 8_000
+
+/**
  * 纯函数：判断运行期 GPU 崩溃是否达到升级阈值。
  * @param crashTimestamps 崩溃时间戳数组（**含本次刚发生的这条**）
  * @param nowMs 当前时间
@@ -624,5 +635,14 @@ export function setupGpuProcessWatcher(): void {
         // logger 未初始化时仅依赖 diagLog，不重抛
       }
     }
+  })
+
+  // 启动成功确认的第二条路径：已首绘后的**正常退出**同样算成功，清零失败计数。
+  // app.exit()（GPU 自愈、FATAL 自杀、崩溃对话框后的退出）不会触发 before-quit，
+  // 因此被杀死的那次启动仍会保留失败计数并据此升档。
+  // 注：注册顺序有意保持在 child-process-gone 之后——既有用例按下标取首个监听器。
+  app.on('before-quit', () => {
+    if (isStartupPhase()) return // 未首绘：真失败，不清零
+    markBootSuccess()
   })
 }

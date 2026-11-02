@@ -22,6 +22,7 @@ const {
   BrowserWindowCtorMock,
   getFocusedWindowMock,
   markBootSuccessMock,
+  markAppBootedMock,
   requestSelfHealMock,
   isStartupPhaseMock
 } = vi.hoisted(() => ({
@@ -33,6 +34,7 @@ const {
   BrowserWindowCtorMock: vi.fn(),
   getFocusedWindowMock: vi.fn(() => null),
   markBootSuccessMock: vi.fn(),
+  markAppBootedMock: vi.fn(),
   requestSelfHealMock: vi.fn(() => false),
   isStartupPhaseMock: vi.fn(() => false)
 }))
@@ -73,8 +75,10 @@ vi.mock('../../utils/startup-diagnostic', () => ({
 
 vi.mock('../gpu-fallback', () => ({
   markBootSuccess: markBootSuccessMock,
+  markAppBooted: markAppBootedMock,
   requestSelfHeal: requestSelfHealMock,
-  isStartupPhase: isStartupPhaseMock
+  isStartupPhase: isStartupPhaseMock,
+  BOOT_SUCCESS_SETTLE_MS: 8000
 }))
 
 import { createMainWindow, getMainWindow } from '../window-manager'
@@ -155,6 +159,7 @@ beforeEach(() => {
   BrowserWindowCtorMock.mockReset()
   getFocusedWindowMock.mockReset()
   markBootSuccessMock.mockReset()
+  markAppBootedMock.mockReset()
   requestSelfHealMock.mockReset()
   isStartupPhaseMock.mockReset()
   // 默认：非启动期、且自愈不触发（维持既有 dialog 流程）
@@ -428,13 +433,67 @@ describe('createMainWindow', () => {
     }
   })
 
-  it('15. did-finish-load 触发时调用 markBootSuccess（GPU 回退失败计数清零）', async () => {
+  it('15. did-finish-load 立即标记首绘（退出启动期），但失败计数清零延后到存活窗口到点', async () => {
     process.env.NODE_ENV = 'production'
     await createMainWindow(makeAppCtx())
 
     lastCreatedWindow!.webContents._emit('did-finish-load')
 
-    expect(markBootSuccessMock).toHaveBeenCalledTimes(1)
+    expect(markAppBootedMock).toHaveBeenCalledTimes(1)
+    expect(markBootSuccessMock).not.toHaveBeenCalled()
+  })
+
+  it('S1. 首绘后未达存活窗口（7.999s）→ 不清零失败计数（GPU FATAL 多在首绘后数秒杀死进程）', async () => {
+    vi.useFakeTimers({ now: 0 })
+    try {
+      process.env.NODE_ENV = 'production'
+      await createMainWindow(makeAppCtx())
+      lastCreatedWindow!.webContents._emit('did-finish-load')
+
+      vi.advanceTimersByTime(8000 - 1)
+      expect(markBootSuccessMock).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('S2. 首绘后达存活窗口（8s）→ 清零一次；重复 did-finish-load 不二次确认', async () => {
+    vi.useFakeTimers({ now: 0 })
+    try {
+      process.env.NODE_ENV = 'production'
+      await createMainWindow(makeAppCtx())
+      const wc = lastCreatedWindow!.webContents
+      wc._emit('did-finish-load')
+      vi.advanceTimersByTime(8000)
+      expect(markBootSuccessMock).toHaveBeenCalledTimes(1)
+
+      // 页面二次导航（reload）再触发：不得重复写盘确认
+      wc._emit('did-finish-load')
+      vi.advanceTimersByTime(8000)
+      expect(markBootSuccessMock).toHaveBeenCalledTimes(1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('S3. 只有 did-fail-load（白屏）→ 既不标记首绘也不清零失败计数', async () => {
+    vi.useFakeTimers({ now: 0 })
+    try {
+      process.env.NODE_ENV = 'production'
+      await createMainWindow(makeAppCtx())
+      lastCreatedWindow!.webContents._emit(
+        'did-fail-load',
+        -2,
+        'ERR_FAILED',
+        'app://renderer/index.html'
+      )
+
+      vi.advanceTimersByTime(60_000)
+      expect(markAppBootedMock).not.toHaveBeenCalled()
+      expect(markBootSuccessMock).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('16. 开发模式分支不注册 did-finish-load（markBootSuccess 不被调用）', async () => {

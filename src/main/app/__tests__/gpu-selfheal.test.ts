@@ -237,6 +237,41 @@ describe('GPU 崩溃自愈完整链路', () => {
       m.recordBootLevel({ prevNativeKill: fx.getPreviousExitEvidence().kind === 'native' })
     ).toBe(1)
   })
+
+  /** 取按事件名注册的监听器（child-process-gone 必须仍是首个注册者，既有用例按下标取它） */
+  async function getQuitHandler(): Promise<(e: unknown) => void> {
+    const m = await import('../gpu-fallback')
+    m.setupGpuProcessWatcher()
+    const call = mockAppOn.mock.calls.find((c) => c[0] === 'before-quit')
+    expect(call, 'setupGpuProcessWatcher 应注册 before-quit 成功确认钩子').toBeTruthy()
+    return call![1] as (e: unknown) => void
+  }
+
+  it('8. 已首绘后正常退出（before-quit）→ 清零失败计数：快速开合不得被误计为失败', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'gpu-fallback.json'),
+      JSON.stringify({ consecutiveFailures: 2, fallbackActive: false })
+    )
+    const m = await import('../gpu-fallback')
+    const quit = await getQuitHandler()
+    m.markAppBooted() // 首绘已完成（用户看了一眼就关）
+    quit({})
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'gpu-fallback.json'), 'utf8'))
+    expect(raw.consecutiveFailures).toBe(0)
+  })
+
+  it('8b. 未首绘就退出 → 不清零（真失败仍要计数，阈值兜底路径不变）', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'gpu-fallback.json'),
+      JSON.stringify({ consecutiveFailures: 1, fallbackActive: false })
+    )
+    const quit = await getQuitHandler()
+    quit({})
+
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'gpu-fallback.json'), 'utf8'))
+    expect(raw.consecutiveFailures).toBe(1)
+  })
 })
 
 describe('GPU 崩溃升级策略（clean-exit 过滤 + 运行期 60s 窗口计数）', () => {

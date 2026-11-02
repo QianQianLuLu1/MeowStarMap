@@ -5,7 +5,13 @@ import type { AppContext } from './app-context'
 import { logger } from '../utils/logger'
 import { logFault } from '../utils/logger'
 import { logStartupError, diagLog } from '../utils/startup-diagnostic'
-import { markBootSuccess, requestSelfHeal, isStartupPhase } from './gpu-fallback'
+import {
+  markAppBooted,
+  markBootSuccess,
+  requestSelfHeal,
+  isStartupPhase,
+  BOOT_SUCCESS_SETTLE_MS
+} from './gpu-fallback'
 import { logGpuStatusSummary } from './gpu-status'
 import { guardNavigation } from './navigation-guard'
 import { t } from '../i18n'
@@ -161,10 +167,32 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
         `did-fail-load: code=${errorCode} desc=${errorDescription} url=${validatedURL}`
       )
     })
+    // 启动成功确认：首绘瞬间只标记「退出启动期」，清零连续失败计数要等存活窗口到点。
+    // 缘由见 gpu-fallback 的 BOOT_SUCCESS_SETTLE_MS 注释（GPU FATAL 多在首绘后数秒杀死主进程）。
+    let bootSettleTimer: ReturnType<typeof setTimeout> | undefined
+    let bootConfirmed = false
+    const confirmBootSuccess = (why: string): void => {
+      if (bootConfirmed) return // 幂等：二次导航（reload）不得重复确认
+      bootConfirmed = true
+      if (bootSettleTimer) {
+        clearTimeout(bootSettleTimer)
+        bootSettleTimer = undefined
+      }
+      diagLog('WIN', `boot success confirmed (${why})`)
+      markBootSuccess()
+    }
     mainWindow.webContents.on('did-finish-load', () => {
       diagLog('WIN', 'did-finish-load: page loaded successfully')
-      // GPU 回退状态机：页面成功渲染即清零连续启动失败计数（fallbackActive 保留）
-      markBootSuccess()
+      // GPU 回退状态机：首绘即退出启动期（崩溃分级要用），计数清零延后
+      markAppBooted()
+      if (!bootConfirmed && !bootSettleTimer) {
+        bootSettleTimer = setTimeout(() => {
+          bootSettleTimer = undefined
+          confirmBootSuccess(`settled ${BOOT_SUCCESS_SETTLE_MS}ms`)
+        }, BOOT_SUCCESS_SETTLE_MS)
+        // 取证型定时器：绝不因它把进程留在事件循环里
+        bootSettleTimer.unref?.()
+      }
       // D1 兜底：ready-to-show 极端未触发时，页面加载完成即显示窗口并恢复调度器
       if (!mainWindow.isDestroyed() && !mainWindow.isVisible()) {
         onFirstVisible('did-finish-load')
