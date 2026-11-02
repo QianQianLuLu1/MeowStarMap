@@ -13,6 +13,13 @@ import path from 'path'
 export const PRODUCT_DIAG_DIRNAME = '喵星图'
 export const DIAG_SUBDIR = 'Diagnostics'
 
+/**
+ * Chromium 原生日志文件名：`--enable-logging=file` + `--log-file` 的落点（写入方在
+ * src/main/index.ts，读取方在 early-crash-guard 弹窗与 log-service 诊断包）。
+ * GPU/Chromium 层的 FATAL 只进这里，不会进 startup-errors.log，故路径必须三方同源。
+ */
+export const CHROMIUM_LOG_BASENAME = 'chromium-debug.log'
+
 export interface UserDiagDirDeps {
   /** 返回「文档」目录绝对路径；抛错/空值视为不可用，进入下候选。 */
   getDocumentsPath?: () => string

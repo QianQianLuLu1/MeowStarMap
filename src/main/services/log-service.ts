@@ -1,11 +1,19 @@
-// @core-change: 项目更名为喵星图，诊断目录常量取值变更需同步日志打包路径注释
+// @core-change: 诊断包纳入 chromium-debug.log 与 GPU 回退状态，补齐原生 FATAL 取证
 import fs from 'fs'
 import path from 'path'
-import { shell } from 'electron'
+import { app, shell } from 'electron'
 import { logger, FaultRecord, getLogDirectory } from '../utils/logger'
 import { createZipFromDirectory } from '../utils/zip-archive'
 import { getStartupLogPathValue } from '../utils/startup-diagnostic'
+import { getUserFacingDiagDir, CHROMIUM_LOG_BASENAME } from '../utils/user-diag-path'
 import { t } from '../i18n'
+
+/**
+ * 原生日志进包的上限：只保留尾部这么多字节。
+ * Chromium 的 FATAL 写在最后，滚动后的 chromium-debug.log 头部全是历史噪音；
+ * 2MB 足够覆盖「GPU process exited unexpectedly: exit_code=…」与其后的 FATAL。
+ */
+export const DIAG_LOG_TAIL_BYTES = 2 * 1024 * 1024
 
 // 读取所有故障记录（按时间倒序）
 // 业务决策：从所有 faults-*.jsonl 文件读取，文件名按日期倒序遍历
@@ -195,6 +203,27 @@ export async function exportLogsAsZip(
       }
     } catch {}
 
+    // 3.5 复制用户面诊断目录里的 Chromium 原生日志
+    //     原生 FATAL（如 "GPU process isn't usable. Goodbye."）不经过 Node，
+    //     startup-errors.log 里永远没有它；exit_code 只存在于 chromium-debug.log。
+    try {
+      const diagDir = getUserFacingDiagDir()
+      for (const name of [CHROMIUM_LOG_BASENAME, `${CHROMIUM_LOG_BASENAME}.old`, 'diag.log']) {
+        const src = path.join(diagDir, name)
+        if (fs.existsSync(src)) {
+          await copyBounded(src, path.join(tmpDir, name), DIAG_LOG_TAIL_BYTES)
+        }
+      }
+    } catch {}
+
+    // 3.6 GPU 兼容阶梯状态：判断设备卡在哪一级、失败计数多少，只看这一个文件
+    try {
+      const gpuStatePath = path.join(app.getPath('userData'), 'gpu-fallback.json')
+      if (fs.existsSync(gpuStatePath)) {
+        await fs.promises.copyFile(gpuStatePath, path.join(tmpDir, 'gpu-fallback.json'))
+      }
+    } catch {}
+
     // 4. 生成 system-info.json
     const systemInfo = await collectSystemInfo()
     await fs.promises.writeFile(
@@ -209,7 +238,15 @@ export async function exportLogsAsZip(
       generatedAt: new Date().toISOString(),
       appVersion: appInfo.version || 'unknown',
       diagnosticVersion: '1.0',
-      contents: ['logs/', 'crashes/', 'startup-errors.log', 'system-info.json']
+      contents: [
+        'logs/',
+        'crashes/',
+        'startup-errors.log',
+        CHROMIUM_LOG_BASENAME,
+        'diag.log',
+        'gpu-fallback.json',
+        'system-info.json'
+      ]
     }
     await fs.promises.writeFile(
       path.join(tmpDir, 'manifest.json'),
@@ -237,6 +274,26 @@ export async function exportLogsAsZip(
     return { success: false, message: zipResult.message }
   }
   return { success: true, message: t('main.logService.message.exported') }
+}
+
+/**
+ * 有界复制：不超过 maxBytes 就整份 copyFile；超限只把尾部读出来写入。
+ * 用于 Chromium 原生日志（可滚动到 10MB），FATAL 总在文件末尾，保留尾部即可。
+ */
+async function copyBounded(src: string, dst: string, maxBytes: number): Promise<void> {
+  const size = (await fs.promises.stat(src)).size
+  if (size <= maxBytes) {
+    await fs.promises.copyFile(src, dst)
+    return
+  }
+  const handle = await fs.promises.open(src, 'r')
+  try {
+    const buf = Buffer.alloc(maxBytes)
+    await handle.read(buf, 0, maxBytes, size - maxBytes)
+    await fs.promises.writeFile(dst, buf)
+  } finally {
+    await handle.close().catch(() => {})
+  }
 }
 
 /** 清理临时诊断目录 */

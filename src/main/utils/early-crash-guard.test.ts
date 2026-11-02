@@ -145,6 +145,18 @@ describe('showFatalStartupErrorBox', () => {
     expect(String(content)).toContain(path.join('/mock/diag', 'startup-errors.log'))
     expect(showItem).toHaveBeenCalledWith(path.join('/mock/diag', 'startup-errors.log'))
   })
+
+  it('弹框同时指向 chromium-debug.log（原生 FATAL 只进 Chromium 日志，startup-errors.log 装不下）', async () => {
+    const { showFatalStartupErrorBox } = await import('./early-crash-guard')
+    const showErrorBox = vi.fn()
+    showFatalStartupErrorBox(new Error('boom'), {
+      deps: { showErrorBox, shellShowItemInFolder: vi.fn(), getDiagDir: () => '/mock/diag' }
+    })
+    const content = String(showErrorBox.mock.calls[0][1])
+    expect(content).toContain(path.join('/mock/diag', 'chromium-debug.log'))
+    // 必须说清两者分工，否则用户只会发来其中一份
+    expect(content).toContain('原生')
+  })
 })
 
 describe('showNonFatalErrorBox', () => {

@@ -4,7 +4,7 @@ import fs from 'fs'
 import { diagLog, logStartupError, getStartupLogPathValue } from './utils/startup-diagnostic'
 import { verifyCriticalNativeModules, showFatalStartupErrorBox } from './app/native-load-guard'
 import { reportEarlyFatal, getUserFacingDiagDir } from './utils/early-crash-guard'
-import { setDocumentsPathProvider } from './utils/user-diag-path'
+import { setDocumentsPathProvider, CHROMIUM_LOG_BASENAME } from './utils/user-diag-path'
 import { verifyStartupEnvironment } from './app/startup-environment'
 import { electronLogger } from './utils/logger'
 import { registerRendererProtocol } from './app/renderer-protocol'
@@ -61,9 +61,12 @@ try {
 
 // Chromium 原生日志落盘（ready 前 appendSwitch 才生效）：
 // 捕获 Chromium FATAL（如 "GPU process isn't usable. Goodbye."）等原生层退出原因——
-// 此类退出不经过 Node（无 uncaughtException、无崩溃转储），只能靠原生日志取证。
+// 此类退出是原生 int 3 自杀，不经过 Node（无 uncaughtException、无 JS 退出痕迹）。
+// 口径订正（2026-11-02）：转储并非完全没有——crashReporter 在 lifecycle 阶段 4 已启动，
+// 问题设备确实产出了 .dmp；但 dmp 需要专业解析，exit_code 这类关键事实只有本日志里
+// 有原文，且用户能自助打包，故仍把它作为首选取证载体并纳入「导出诊断包」。
 try {
-  const chromiumLogPath = path.join(getUserFacingDiagDir(), 'chromium-debug.log')
+  const chromiumLogPath = path.join(getUserFacingDiagDir(), CHROMIUM_LOG_BASENAME)
   // 轮转：超过 10MB 重命名为 .old（单文件保留一份，防无限增长）
   try {
     if (fs.existsSync(chromiumLogPath) && fs.statSync(chromiumLogPath).size > 10 * 1024 * 1024) {
@@ -101,6 +104,21 @@ if (gpuCompatLevel >= 1) {
     'INDEX',
     `gpu compat level=${gpuCompatLevel}: hardware acceleration DISABLED for this boot`
   )
+  if (gpuCompatLevel >= 2) {
+    // 第 2 级（最大兼容）：上游 SoftwareGLAllowed() 因 --disable-software-rasterizer 变 false，
+    // 与 --disable-gpu 同给时 GpuAccessAllowed() 直接判 false ⇒ GPU 进程根本不再启动，
+    // "GPU process isn't usable. Goodbye." 这条 FATAL 才结构性不可达。
+    // 只调 disableHardwareAcceleration() 到不了这一档：它只把上游模式阶梯往下弹，
+    // GPU 进程照旧启动、照旧崩满 3 次后走空阶梯（2026-11-02 问题设备转储实证）。
+    try {
+      app.commandLine.appendSwitch('disable-gpu')
+      app.commandLine.appendSwitch('disable-software-rasterizer')
+      diagLog('INDEX', 'gpu compat level=2: --disable-gpu + --disable-software-rasterizer appended')
+    } catch (e) {
+      // 开关下发失败只退化为「禁用硬件加速」，绝不因诊断性开关打断启动
+      diagLog('INDEX', `appendSwitch(disable-gpu/disable-software-rasterizer) failed: ${String(e)}`)
+    }
+  }
   try {
     electronLogger.info(t('main.index.log.gpuFallbackActive'))
   } catch {

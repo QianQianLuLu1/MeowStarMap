@@ -50,6 +50,14 @@ vi.mock('../utils/startup-diagnostic', () => ({
   logStartupError: vi.fn()
 }))
 
+// 用户面诊断目录（chromium-debug.log / diag.log 的真实落点）
+let mockDiagDir = ''
+vi.mock('../utils/user-diag-path', async () => {
+  const actual =
+    await vi.importActual<typeof import('../utils/user-diag-path')>('../utils/user-diag-path')
+  return { ...actual, getUserFacingDiagDir: vi.fn(() => mockDiagDir) }
+})
+
 // ============================================================
 // Import after mock
 // ============================================================
@@ -61,9 +69,10 @@ import {
   openLogDirectory,
   exportLogsAsZip,
   clearAllLogs,
-  getLogStats
+  getLogStats,
+  DIAG_LOG_TAIL_BYTES
 } from './log-service'
-import { shell } from 'electron'
+import { shell, app } from 'electron'
 import { getStartupLogPathValue } from '../utils/startup-diagnostic'
 // 真 logger 的目录注入缝：见下方 beforeEach 里的 setLogDirectory 用法
 import { setLogDirectory } from '../utils/logger'
@@ -127,6 +136,8 @@ beforeEach(() => {
   setLogDirectory(mockLogDir)
   mockStartupLogPath = path.join(tmpRoot, 'startup-errors.log')
   fs.writeFileSync(mockStartupLogPath, '[STAGE: boot] simulated startup failure', 'utf-8')
+  mockDiagDir = path.join(tmpRoot, 'diag')
+  fs.mkdirSync(mockDiagDir, { recursive: true })
   // 每个测试前失效缓存
   invalidateFaultsCache()
 })
@@ -457,6 +468,85 @@ describe('exportLogsAsZip', () => {
     copySpy.mockRestore()
     expect(r.success).toBe(true)
     expect(fs.statSync(target).size).toBeGreaterThan(0)
+  })
+
+  // ---------- 原生 FATAL 取证补位（2026-11-02 问题设备转储归因缺口） ----------
+
+  it('F2. 诊断包纳入 chromium-debug.log / diag.log / gpu-fallback.json', async () => {
+    fs.writeFileSync(
+      path.join(mockDiagDir, 'chromium-debug.log'),
+      "[x:1101/220603.443:FATAL:gpu_data_manager_impl_private.cc:417] GPU process isn't usable.\n",
+      'utf-8'
+    )
+    fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] simulated', 'utf-8')
+    const userData = path.join(tmpRoot, 'userData')
+    fs.mkdirSync(userData, { recursive: true })
+    fs.writeFileSync(path.join(userData, 'gpu-fallback.json'), '{"compatLevel":2}', 'utf-8')
+    const getPathMock = vi.mocked(app.getPath)
+    getPathMock.mockImplementation((name: string) =>
+      name === 'userData' ? userData : `/mock/${name}`
+    )
+
+    try {
+      const target = path.join(tmpRoot, 'f2.zip')
+      const r = await exportLogsAsZip(target)
+      expect(r.success).toBe(true)
+
+      // zip 本地头里的条目名是明文，直接按字节判定产物内容是否齐备
+      const zip = fs.readFileSync(target).toString('latin1')
+      expect(zip).toContain('chromium-debug.log')
+      expect(zip).toContain('diag.log')
+      expect(zip).toContain('gpu-fallback.json')
+      expect(zip).toContain('startup-errors.log') // 既有内容不得丢
+    } finally {
+      getPathMock.mockImplementation((name: string) => `/mock/${name}`)
+    }
+  })
+
+  it('F3. 边界：chromium-debug.log 不存在 → 导出不失败，其余文件照收', async () => {
+    fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] only diag', 'utf-8')
+    const target = path.join(tmpRoot, 'f3.zip')
+
+    const r = await exportLogsAsZip(target)
+
+    expect(r.success).toBe(true)
+    const zip = fs.readFileSync(target).toString('latin1')
+    expect(zip).not.toContain('chromium-debug.log')
+    expect(zip).toContain('diag.log')
+  })
+
+  it('F4. 异常：chromium-debug.log 超上限 → 只截尾部，不整文件复制', async () => {
+    const big = Buffer.concat([
+      Buffer.alloc(3 * 1024 * 1024, 0x61), // 3MB 旧内容（应被丢掉）
+      Buffer.from('FATAL-TAIL-MARKER\n', 'utf-8')
+    ])
+    fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log'), big)
+    const writes: { dst: string; buf: Buffer }[] = []
+    const realWrite = fs.promises.writeFile.bind(fs.promises)
+    const writeSpy = vi
+      .spyOn(fs.promises, 'writeFile')
+      .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+        // 临时诊断目录在导出结束后会被清掉，故必须在写入发生时就把内容取出来判定
+        writes.push({
+          dst: String(file),
+          buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+        })
+        return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+      })
+
+    try {
+      const target = path.join(tmpRoot, 'f4.zip')
+      const r = await exportLogsAsZip(target)
+      expect(r.success).toBe(true)
+
+      const tailWrite = writes.find((w) => path.basename(w.dst) === 'chromium-debug.log')
+      expect(tailWrite, '超大原生日志应走截尾写入而非 copyFile').toBeTruthy()
+      expect(tailWrite!.buf.byteLength).toBeLessThanOrEqual(DIAG_LOG_TAIL_BYTES)
+      // 保留的是尾部（FATAL 写在文件末尾），不是头部
+      expect(tailWrite!.buf.subarray(-20).toString('latin1')).toContain('FATAL-TAIL-MARKER')
+    } finally {
+      writeSpy.mockRestore()
+    }
   })
 })
 

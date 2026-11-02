@@ -17,7 +17,7 @@ import { app, dialog, shell, BrowserWindow } from 'electron'
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { getUserFacingDiagDir } from './user-diag-path'
+import { getUserFacingDiagDir, CHROMIUM_LOG_BASENAME } from './user-diag-path'
 import { diagLog, logStartupError, getStartupLogPathValue } from './startup-diagnostic'
 import { logFaultSync } from './logger'
 
@@ -130,6 +130,11 @@ function buildFatalContent(message: string, stack: string, logPath: string): str
     '',
     `日志文件 / Log file:`,
     `  ${logPath}`,
+    '',
+    // Chromium/GPU 层的 FATAL 是原生 int 3 自杀，不经过 Node，startup-errors.log 里
+    // 永远不会有它；只给一份路径会让用户发来不含证据的日志（2026-11-02 转储归因教训）。
+    `原生崩溃日志（若存在）/ Native crash log:`,
+    `  ${path.join(path.dirname(logPath), CHROMIUM_LOG_BASENAME)}`,
     '',
     '请将上述日志文件发给开发者以协助定位问题。',
     'Please send the log file above to the developer to help diagnose the issue.'
