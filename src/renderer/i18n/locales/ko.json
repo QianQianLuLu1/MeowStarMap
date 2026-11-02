@@ -4405,6 +4405,8 @@
       "address": "서버 주소",
       "serverId": "서버 ID",
       "tlsFingerprint": "TLS 지문",
+      "inspiration": "영감 동기화 v1",
+      "inspirationOn": "엔드포인트 게시됨",
       "copied": "복사됨"
     },
     "pairing": {

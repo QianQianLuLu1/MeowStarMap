@@ -4405,6 +4405,8 @@
       "address": "Dirección del servidor",
       "serverId": "ID del servidor",
       "tlsFingerprint": "Huella TLS",
+      "inspiration": "Sincronización de inspiración v1",
+      "inspirationOn": "Endpoint disponible",
       "copied": "Copiado"
     },
     "pairing": {

@@ -4405,6 +4405,8 @@
       "address": "Địa chỉ máy chủ",
       "serverId": "ID máy chủ",
       "tlsFingerprint": "Vân tay TLS",
+      "inspiration": "Đồng bộ cảm hứng v1",
+      "inspirationOn": "Đã công bố điểm cuối",
       "copied": "Đã sao chép"
     },
     "pairing": {

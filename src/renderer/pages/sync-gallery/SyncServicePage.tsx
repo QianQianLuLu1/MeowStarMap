@@ -963,6 +963,13 @@ export const SyncServicePage: React.FC = () => {
                         : t('syncService.status.stopped')}
                   </span>
                 </SettingsRow>
+                {/* 灵感同步 v1（上游 589b932）：值取自主进程对装载面的观测，非渲染层常量。
+                    键缺席只说明当前构建没有这一面，不能据此写「未启用」——那是把环境差异说成用户选择。 */}
+                {status?.inspirationV1 && (
+                  <SettingsRow label={t('syncService.status.inspiration')}>
+                    <span className="text-xs">{t('syncService.status.inspirationOn')}</span>
+                  </SettingsRow>
+                )}
                 {startupStages.length > 0 && (
                   <SettingsRow label={t('syncService.startupStages.label')}>
                     {/* K1：阶段名→i18n 映射；未知阶段不谎报，原样展示英文短码 */}

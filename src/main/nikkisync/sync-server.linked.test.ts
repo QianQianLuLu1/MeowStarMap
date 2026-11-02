@@ -512,6 +512,12 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
         await client.request('/v1/server')
       )
       expect(serverInfo.capabilities.inspirationV1).toBe(true)
+      // 装载侧的判据耦合：本仓的状态位读的是 `server.inspirations` 是否存在（上游 serverInfo()
+      // 是私有方法，能力位没有公开读取面）。这条断言把「代理」钉成「等价」——
+      // 上游若把实例改成条件构造或把广告位摘掉，这里当场分叉报红。
+      expect(Boolean(session.server.inspirations)).toBe(
+        serverInfo.capabilities.inspirationV1 === true
+      )
 
       // ② 路由在挂载：未签名走 401。这条判据刻意不写 404——路由不存在时上游给 404，
       //    只断言「非 200」会把「压根没挂」误当成「挂了但拒绝」放过。

@@ -346,6 +346,31 @@ describe('K4：buildSyncDiagnosticsSnapshot（观测面，纯聚合既有状态�
     expect(diagnostics.lastError).toBe(PORT_IN_USE_MARKER)
     expect(diagnostics.port).toBe(39000)
   })
+
+  // 上游 589b932 把灵感同步挂在 ServerInfoResponse.capabilities 上，但 `serverInfo()` 是私有方法、
+  // 能力位没有公开读取面 ⇒ 本层只能吃「装载缝观测到的挂载事实」（`server.inspirations` 是否存在），
+  // 并且刻意只在为真时下发键：缺席代表老构建，不代表用户关掉了什么，谎报「未启用」会误导。
+  it('灵感同步 v1：装载缝观测到挂载 ⇒ 下发 inspirationV1: true', () => {
+    const snapshot = buildSyncStatusSnapshot({
+      running: true,
+      configured: baseConfig,
+      inspirationAvailable: true
+    })
+    expect(snapshot.inspirationV1).toBe(true)
+  })
+
+  it('灵感同步 v1：未观测到挂载（缺省或 false）⇒ 整个键不下发', () => {
+    expect(buildSyncStatusSnapshot({ running: true, configured: baseConfig })).not.toHaveProperty(
+      'inspirationV1'
+    )
+    expect(
+      buildSyncStatusSnapshot({
+        running: true,
+        configured: baseConfig,
+        inspirationAvailable: false
+      })
+    ).not.toHaveProperty('inspirationV1')
+  })
 })
 
 describe('K5：parsePairingUri 的 nikki-sync://pair? 新格式分支', () => {

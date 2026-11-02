@@ -4405,6 +4405,8 @@
       "address": "Adresse du serveur",
       "serverId": "ID du serveur",
       "tlsFingerprint": "Empreinte TLS",
+      "inspiration": "Synchronisation d’inspiration v1",
+      "inspirationOn": "Point d’entrée en ligne",
       "copied": "Copié"
     },
     "pairing": {

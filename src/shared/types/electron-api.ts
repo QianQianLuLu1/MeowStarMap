@@ -973,6 +973,11 @@ export interface NikkiSyncServerStatusInfo {
   lanHost?: string
   /** 启停失败原因，端口占用归一化为 `PORT_IN_USE`。 */
   error?: string
+  /**
+   * 灵感同步 v1（上游 589b932 的 `/v1/inspiration` 面）：只在主进程观测到上游挂载时给 `true`。
+   * 键缺席 = 当前装载的构建不提供该面，**不是**用户关掉了它 ⇒ 渲染层不留「未启用」行。
+   */
+  inspirationV1?: boolean
   /** K4：连接诊断段（观测面；纯聚合既有状态，不做主动探测）。 */
   diagnostics?: NikkiSyncDiagnosticsInfo
 }

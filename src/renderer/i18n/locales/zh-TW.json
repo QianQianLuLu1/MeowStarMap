@@ -4405,6 +4405,8 @@
       "address": "伺服器位址",
       "serverId": "伺服器 ID",
       "tlsFingerprint": "TLS 指紋",
+      "inspiration": "靈感同步 v1",
+      "inspirationOn": "端點已掛載",
       "copied": "已複製"
     },
     "pairing": {

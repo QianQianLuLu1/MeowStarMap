@@ -509,7 +509,7 @@ scanRootCount, automaticRootCount, extraRootCount}`。要点：
 
 | 通道                           | 入参                                    | 出参                                                                                                                                                                                                                                                    | 失败码                                                                                          |
 | ------------------------------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `nikkisync:server-status`      | 无                                      | `{available, running, host, port, secure?, serverId?, mdnsEnabled, tlsFingerprintSha256?, serverCertificatePem?, lanHost?, pairedDeviceCount?, error?}`                                                                                                 | 不抛：句柄未装配时 `{available:false, running:false, host:'', port:0, mdnsEnabled:false}`       |
+| `nikkisync:server-status`      | 无                                      | `{available, running, host, port, secure?, serverId?, mdnsEnabled, tlsFingerprintSha256?, serverCertificatePem?, lanHost?, pairedDeviceCount?, inspirationV1?, error?}`                                                                                 | 不抛：句柄未装配时 `{available:false, running:false, host:'', port:0, mdnsEnabled:false}`       |
 | `nikkisync:start-server`       | 可选 `{port? (1..65535), mdnsEnabled?}` | 同 `server-status`（`available:true`）                                                                                                                                                                                                                  | `VALIDATION_ERROR`；`PRECONDITION_FAILED`（含 `PORT_IN_USE`）；`INTERNAL_ERROR`（其它启动失败） |
 | `nikkisync:stop-server`        | 无                                      | 同 `server-status`（`running:false`）                                                                                                                                                                                                                   | `PRECONDITION_FAILED`                                                                           |
 | `nikkisync:get-pairing-code`   | 无                                      | `{content, expiresAt, serverId, host, port, tlsFingerprintSha256, hosts?}`（`content` = 上游 `buildPairingUri()`：单 host 为 `NS1\|` 七段串，注入多 host 时为 `nikki-sync://pair?...` 新格式；`hosts` 由 `parsePairingUri` 解出，单 host 形态不含该键） | `PRECONDITION_FAILED`（服务未运行，上游原生文案）                                               |
@@ -520,6 +520,11 @@ scanRootCount, automaticRootCount, extraRootCount}`。要点：
 
 - `secure` 只在真实监听时出现；未运行时 `host/port` 回落**配置值**，好让 UI 能把「配置端口 + `PORT_IN_USE`」显示出来。
 - `mdnsEnabled` 表示**配置意图**：上游 `MdnsAdvertiser` 静默吞掉所有 socket 错误，因此它不能证明广播已生效，UI 与验收都不得把它当发现证据。
+- **`inspirationV1?` 只在为真时出现**（上游 589b932 的 `/v1/inspiration` 面）：主进程观测的是装载事实
+  `server.inspirations` 是否存在，而非读取上游能力位——上游的 `serverInfo()` 是私有方法，能力位没有
+  公开读取面，下钻私有实现会让升级变成静默失效。两者的等价由链接态用例钉住
+  （`sync-server.linked.test.ts` 同时断言 HTTP 广告位与实例存在）。**键缺席只说明当前装载的构建没有
+  这一面，不是用户关掉了它**，渲染层因此不留「未启用」行。
 - `serverCertificatePem` 是公开材料（自签证书，不含私钥），供客户端在 pin 指纹之外做第二重核对。
 - `start-server` 改端口会**重建内嵌会话**（上游把 `LocalSyncServerConfig` 冻结在构造期），调用方应预期一次 SQLite 重开与扫描器重新发现。
 - 撤销是软删（上游 `PairingRepository.revoke` 写 `revoked_at`），**不踢**已建立的 WebSocket 连接；该设备后续签名请求由上游鉴权返回 401。

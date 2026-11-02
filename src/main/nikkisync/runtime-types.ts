@@ -284,6 +284,14 @@ export interface LocalSyncServerLike {
   readonly serverId: string
   /** 1.0.27：上游构造期必建的账号作用域实例（老链接可能缺席 ⇒ 调用方按不可用降级）。 */
   readonly accounts?: AccountSyncSettingsLike
+  /**
+   * 1.0.30（589b932）：上游构造期无条件创建的灵感仓储实例。
+   *
+   * 本仓只把它当**挂载事实**观测（存在 ⇒ 上游会广告 `capabilities.inspirationV1`），
+   * 不调用它的任何方法：上游的 `serverInfo()` 是私有方法，能力位没有公开读取面，
+   * 而下钻私有实现会让升级变成静默失效。两者的耦合由链接态用例钉住。
+   */
+  readonly inspirations?: Record<string, unknown>
   /** 幂等：已在监听时直接回显原地址（`LocalSyncServer.ts:175`）。 */
   start(): Promise<NikkiSyncSyncServerAddress>
   /** 置空内部句柄 ⇒ 可再次 `start()`（`LocalSyncServer.ts:193-201`）。 */
@@ -321,6 +329,11 @@ export interface NikkiSyncSyncServerStatus {
   error?: string
   /** 兼容层（b422193）：`/v1/server` 下发的备选地址（≤8；未配置时缺省，K5）。 */
   connectionHosts?: string[]
+  /**
+   * 灵感同步 v1（589b932）：只在观测到上游挂载时下发 `true`。
+   * 缺席表示当前构建不提供该面，**不等于**用户把它关了，因此渲染层不留「未启用」行。
+   */
+  inspirationV1?: boolean
   /** 兼容层（b422193）：连接诊断快照（K4 自建观测面，仅聚合既有状态，不做主动探测）。 */
   diagnostics?: unknown
 }

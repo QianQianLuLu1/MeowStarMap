@@ -4408,6 +4408,8 @@
       "address": "服务地址",
       "serverId": "服务 ID",
       "tlsFingerprint": "TLS 指纹",
+      "inspiration": "灵感同步 v1",
+      "inspirationOn": "端点已挂载",
       "copied": "已复制"
     },
     "pairing": {

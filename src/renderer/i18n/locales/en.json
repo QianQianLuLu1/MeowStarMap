@@ -4408,6 +4408,8 @@
       "address": "Server address",
       "serverId": "Server ID",
       "tlsFingerprint": "TLS fingerprint",
+      "inspiration": "Inspiration sync v1",
+      "inspirationOn": "Endpoint mounted",
       "copied": "Copied"
     },
     "pairing": {

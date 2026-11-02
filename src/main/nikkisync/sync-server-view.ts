@@ -255,6 +255,8 @@ export function buildSyncStatusSnapshot(input: {
   error?: string
   /** K5：`/v1/server` 同款备选地址（≤8；来源为 listLanIpv4，未接线时缺省）。 */
   connectionHosts?: string[]
+  /** 灵感同步 v1：装载缝观测到 `server.inspirations` 存在时为真（上游能力位的本地代理）。 */
+  inspirationAvailable?: boolean
 }): NikkiSyncSyncServerStatus {
   const { configured, address } = input
   return {
@@ -276,6 +278,9 @@ export function buildSyncStatusSnapshot(input: {
       ? {}
       : { pairedDeviceCount: input.pairedDeviceCount }),
     ...(input.connectionHosts ? { connectionHosts: input.connectionHosts } : {}),
+    // 灵感同步 v1：只在观测到挂载时下发键；不为假写 `false`（缺席 = 老构建，不是用户关的）
+    ...(input.inspirationAvailable ? { inspirationV1: true as const } : {}),
+    // 灵感同步 v1：只在观测到挂载时下发键；不为假写 `false`（缺席 = 老构建，不是用户关的）
     ...(input.error ? { error: input.error } : {})
   }
 }

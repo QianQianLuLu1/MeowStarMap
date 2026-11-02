@@ -83,6 +83,9 @@ const SYNC_SERVICE_LEAVES = [
   'status.address',
   'status.serverId',
   'status.tlsFingerprint',
+  // 上游 589b932 的灵感同步能力位（只在观测到挂载时成对出现，缺席即整行不留）
+  'status.inspiration',
+  'status.inspirationOn',
   'status.copied',
   'pairing.title',
   'pairing.open',

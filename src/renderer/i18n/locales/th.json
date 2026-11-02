@@ -4405,6 +4405,8 @@
       "address": "ที่อยู่เซิร์ฟเวอร์",
       "serverId": "ID เซิร์ฟเวอร์",
       "tlsFingerprint": "ลายนิ้วมือ TLS",
+      "inspiration": "ซิงค์แรงบันดาลใจ v1",
+      "inspirationOn": "เปิดใช้จุดปลายทาง",
       "copied": "คัดลอกแล้ว"
     },
     "pairing": {

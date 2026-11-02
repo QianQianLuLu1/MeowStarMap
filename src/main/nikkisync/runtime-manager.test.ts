@@ -146,7 +146,10 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       calls.serverStop += 1
       calls.order.push('server.stop')
     }),
-    createPairingPayload: vi.fn(() => ({ scheme: 'nikki-sync' }))
+    createPairingPayload: vi.fn(() => ({ scheme: 'nikki-sync' })),
+    // 上游 589b932 起 `LocalSyncServer` 构造期无条件挂 InspirationRepository；
+    // 假面同步带上该成员，灵感能力位的观测判据才不会退化成常量真。
+    inspirations: {}
   }
   const pairingUri = (host: string, ttlMs?: number, hosts?: readonly string[]): string => {
     if (plan.pairingUriThrows) {
@@ -878,6 +881,8 @@ describe('createRuntimeManager 同步服务编排（阶段 3）', () => {
     expect(sync.tlsFingerprintSha256).toHaveLength(64)
     expect(sync.serverCertificatePem).toContain('BEGIN CERTIFICATE')
     expect(sync.pairedDeviceCount).toBe(1)
+    // 能力位来自装载缝对 `server.inspirations` 的观测（假面已带上该成员），不是常量真
+    expect(sync.inspirationV1).toBe(true)
     expect(calls.scannerStart).toBe(1)
     expect(calls.logs.some((item) => item.message.includes('sync server listening on'))).toBe(true)
     // runtime-status 一并带出 sync，UI 只轮询一个通道

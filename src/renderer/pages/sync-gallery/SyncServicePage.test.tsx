@@ -1334,4 +1334,17 @@ describe('SyncServicePage 照片目录自定义（(at)-(be)）', () => {
       'info'
     )
   })
+
+  it('(bj) 灵感同步 v1 能力位：上游挂载时状态区如实给出一行', async () => {
+    installElectronApi({ status: { inspirationV1: true } })
+    renderSection()
+    expect(await screen.findByText('灵感同步 v1')).toBeInTheDocument()
+    expect(screen.getByText('端点已挂载')).toBeInTheDocument()
+  })
+
+  it('(bk) 能力位缺席 ⇒ 不留该行，也不谎报「未启用」（缺席只代表老构建，不是用户关的）', async () => {
+    renderSection()
+    await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalled())
+    expect(screen.queryByText('灵感同步 v1')).not.toBeInTheDocument()
+  })
 })

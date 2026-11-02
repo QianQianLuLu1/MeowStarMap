@@ -684,6 +684,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       ...(state.syncAddress ? { address: state.syncAddress } : {}),
       ...(session ? { serverId: session.server.serverId, tls: session.tlsIdentity() } : {}),
       ...(session ? { pairedDeviceCount: session.listPairedDevices().length } : {}),
+      // 灵感同步 v1 的判据来自装载缝对上游实例的观测（能力位本身是私有方法里的常量，不可下钻）
+      inspirationAvailable: Boolean(session?.server.inspirations),
       lanHost: pairingHost(),
       ...(state.syncError ? { error: state.syncError } : {})
     })

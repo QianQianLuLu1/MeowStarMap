@@ -4405,6 +4405,8 @@
       "address": "サーバーアドレス",
       "serverId": "サーバー ID",
       "tlsFingerprint": "TLS フィンガープリント",
+      "inspiration": "インスピレーション同期 v1",
+      "inspirationOn": "エンドポイントを公開中",
       "copied": "コピーしました"
     },
     "pairing": {
