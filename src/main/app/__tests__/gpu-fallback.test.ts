@@ -62,6 +62,9 @@ import {
   markGpuProcessCrash,
   setupGpuProcessWatcher,
   recordBootDecision,
+  recordBootLevel,
+  resolveCompatLevel,
+  MAX_COMPAT_LEVEL,
   requestSelfHeal,
   readGpuBootPrefs,
   writeGpuDiscretePref,
@@ -83,6 +86,8 @@ function readRaw(): {
   consecutiveFailures: number
   fallbackActive: boolean
   fallbackVersion?: string
+  compatLevel?: number
+  compatLevelVersion?: string
 } {
   return JSON.parse(fs.readFileSync(statePath(), 'utf8'))
 }
@@ -106,6 +111,7 @@ beforeEach(() => {
   diagLogMock.mockReset()
   loggerErrorMock.mockReset()
   if (process.env.NIKKI_FORCE_GPU_COMPAT) delete process.env.NIKKI_FORCE_GPU_COMPAT
+  if (process.env.NIKKI_GPU_FORCE_LEVEL) delete process.env.NIKKI_GPU_FORCE_LEVEL
 })
 
 afterEach(() => {
@@ -270,12 +276,36 @@ describe('gpu-fallback 自愈重启（requestSelfHeal）', () => {
     expect(readRaw().fallbackActive).toBe(true)
   })
 
-  it('c. 已兼容模式仍崩溃 → requestSelfHeal 不重启（防死循环）', () => {
-    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
-    expect(recordBootDecision()).toBe(true) // 已兼容模式
+  it('c. 兼容档（level 1）仍崩 → 升 level 2 落盘并自动重启一次（旧「直接放弃」死胡同已封堵）', () => {
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: true,
+      fallbackVersion: '2.5.5',
+      compatLevel: 1
+    })
+    expect(recordBootLevel()).toBe(1) // 本次已在第一级兼容档
+    const healed = requestSelfHeal('crashed', 1)
+    expect(healed).toBe(true)
+    expect(mockRelaunch).toHaveBeenCalledTimes(1)
+    expect(mockExit).toHaveBeenCalledWith(0)
+    // 升档指令必须先落盘，重启后的下一次启动才会带 --disable-gpu + --disable-software-rasterizer
+    expect(readRaw().compatLevel).toBe(2)
+  })
+
+  it('d. 最大兼容档（level 2）仍崩 → 不重启、不升第三档、记 error（防死循环）', () => {
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: true,
+      fallbackVersion: '2.5.5',
+      compatLevel: 2
+    })
+    expect(recordBootLevel()).toBe(2)
     const healed = requestSelfHeal('crashed', 1)
     expect(healed).toBe(false)
     expect(mockRelaunch).not.toHaveBeenCalled()
+    expect(mockExit).not.toHaveBeenCalled()
+    expect(readRaw().compatLevel).toBe(MAX_COMPAT_LEVEL)
+    expect(loggerErrorMock).toHaveBeenCalled()
   })
 })
 
@@ -372,6 +402,138 @@ describe('gpu-fallback 启动偏好镜像（gpu-pref.json 扩展字段）', () =
       hardwareAcceleration: false,
       discretePreference: 'auto'
     })
+  })
+})
+
+describe('gpu-fallback 三级兼容阶梯（resolveCompatLevel / recordBootLevel）', () => {
+  it('L1. 全新状态且无崩溃证据 → level 0，且判定只读不产生状态文件', () => {
+    expect(recordBootLevel()).toBe(0)
+    expect(fs.existsSync(statePath())).toBe(false)
+    expect(recordBootDecision()).toBe(false)
+  })
+
+  it('L2. fallbackActive=true（同版本戳）→ level 至少 1（既有布尔判定不改语义）', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
+    expect(recordBootLevel()).toBe(1)
+  })
+
+  it('L3. 上次被原生层杀死 → 在「上一次实际使用的档位」上加一级，封顶 2', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: false, compatLevel: 0 })
+    expect(recordBootLevel({ prevNativeKill: true })).toBe(1)
+
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, compatLevel: 1 })
+    expect(recordBootLevel({ prevNativeKill: true })).toBe(2)
+
+    writeRaw({ consecutiveFailures: 0, fallbackActive: true, compatLevel: 2 })
+    expect(recordBootLevel({ prevNativeKill: true })).toBe(MAX_COMPAT_LEVEL)
+  })
+
+  it('L3b. 升级指令回写状态文件（下一次启动才认得该档位）', () => {
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: true,
+      compatLevel: 1,
+      compatLevelVersion: '2.5.5'
+    })
+    expect(recordBootLevel({ prevNativeKill: true })).toBe(2)
+    expect(readRaw().compatLevel).toBe(2)
+    expect(readRaw().compatLevelVersion).toBe('2.5.5')
+  })
+
+  it('L4. compatLevel 非法值（字符串/负数/越界/NaN/null）→ 归一为合法档位且不抛错', () => {
+    for (const bad of ['2', -1, 3, Number.NaN, null, undefined, {}, 1.9]) {
+      writeRaw({
+        consecutiveFailures: 0,
+        fallbackActive: false,
+        compatLevel: bad as unknown as number
+      })
+      expect(() => recordBootLevel()).not.toThrow()
+    }
+    // 纯函数口径：>MAX 夹取、负数/非数字/NaN 落 0、小数向下取整
+    const s = { fallbackActive: false }
+    expect(
+      resolveCompatLevel(s, {
+        prevNativeKill: false,
+        currentVersion: '2.5.5',
+        compatDisabled: false
+      }).level
+    ).toBe(0)
+    expect(
+      resolveCompatLevel(
+        { ...s, compatLevel: 3 },
+        { prevNativeKill: false, currentVersion: '2.5.5', compatDisabled: false }
+      ).level
+    ).toBe(MAX_COMPAT_LEVEL)
+    expect(
+      resolveCompatLevel(
+        { ...s, compatLevel: 1.9 },
+        { prevNativeKill: false, currentVersion: '2.5.5', compatDisabled: false }
+      ).level
+    ).toBe(1)
+    expect(
+      resolveCompatLevel(
+        { ...s, compatLevel: 'x' as unknown as number },
+        { prevNativeKill: false, currentVersion: '2.5.5', compatDisabled: false }
+      ).level
+    ).toBe(0)
+  })
+
+  it('L5. 上次是 JS 管理退出（prevNativeKill=false）→ 绝不由证据升级（避免用户主动退出被误判）', () => {
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: true,
+      fallbackVersion: '2.5.5',
+      compatLevel: 1
+    })
+    expect(recordBootLevel({ prevNativeKill: false })).toBe(1)
+    expect(readRaw().compatLevel).toBe(1)
+  })
+
+  it('L6. 边界：consecutiveFailures=1 且无崩溃证据 → 不升级（保持既有阈值 2）', () => {
+    writeRaw({ consecutiveFailures: 1, fallbackActive: false })
+    expect(recordBootLevel()).toBe(0)
+  })
+
+  it('L7. 版本变更 → 档位复位 0 给一次干净硬件重试，并盖当前 compatLevelVersion', () => {
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: false,
+      compatLevel: 2,
+      compatLevelVersion: '2.5.4'
+    })
+    mockGetVersion.mockReturnValue('2.5.5')
+    expect(recordBootLevel()).toBe(0)
+    expect(readRaw().compatLevel).toBe(0)
+    expect(readRaw().compatLevelVersion).toBe('2.5.5')
+  })
+
+  it('L8. markGpuProcessCrash 抬升并保留 compatLevel（不整体覆盖新字段）', () => {
+    writeRaw({
+      consecutiveFailures: 3,
+      fallbackActive: true,
+      compatLevel: 2,
+      compatLevelVersion: '2.5.5'
+    })
+    markGpuProcessCrash('crashed', 1)
+    expect(readRaw().compatLevel).toBe(2)
+    expect(readRaw().consecutiveFailures).toBe(3) // 不动计数
+    expect(readRaw().compatLevelVersion).toBe('2.5.5')
+  })
+
+  it('L9. NIKKI_GPU_FORCE_LEVEL 仅接受 0/1/2，其它值忽略并记日志', () => {
+    process.env.NIKKI_GPU_FORCE_LEVEL = '2'
+    expect(recordBootLevel()).toBe(2)
+    for (const bad of ['01', '2.0', '3', '', 'foo', '-1']) {
+      writeRaw({ consecutiveFailures: 0, fallbackActive: false, compatLevel: 0 })
+      process.env.NIKKI_GPU_FORCE_LEVEL = bad
+      diagLogMock.mockClear()
+      expect(recordBootLevel({ prevNativeKill: true })).toBe(1) // 非法值 ⇒ 忽略强制，回落真实判定
+      expect(diagLogMock).toHaveBeenCalledWith(
+        'GPU',
+        expect.stringContaining('NIKKI_GPU_FORCE_LEVEL')
+      )
+    }
+    delete process.env.NIKKI_GPU_FORCE_LEVEL
   })
 })
 

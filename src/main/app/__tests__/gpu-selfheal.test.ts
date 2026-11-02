@@ -62,6 +62,7 @@ beforeEach(() => {
   loggerErrorMock.mockReset()
   loggerWarnMock.mockReset()
   delete process.env.NIKKI_FORCE_GPU_COMPAT
+  delete process.env.NIKKI_GPU_FORCE_LEVEL
 })
 
 afterEach(() => {
@@ -93,17 +94,45 @@ describe('GPU 崩溃自愈完整链路', () => {
     expect(m.recordBootDecision()).toBe(true)
   })
 
-  it('3. 已兼容模式仍崩溃 → requestSelfHeal 不自动重启（防死循环）', async () => {
+  it('3. 兼容档（level 1）仍崩 → 升 level 2 落盘并自动重启一次（旧「直接放弃」死胡同已封堵）', async () => {
     fs.writeFileSync(
       path.join(tmpDir, 'gpu-fallback.json'),
-      JSON.stringify({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
+      JSON.stringify({
+        consecutiveFailures: 0,
+        fallbackActive: true,
+        fallbackVersion: '2.5.5',
+        compatLevel: 1
+      })
     )
     const m = await import('../gpu-fallback')
-    expect(m.recordBootDecision()).toBe(true) // 本次已进入兼容模式
+    expect(m.recordBootLevel()).toBe(1) // 本次已在第一级兼容档
+    const healed = m.requestSelfHeal('crashed', 1)
+    expect(healed).toBe(true)
+    expect(mockRelaunch).toHaveBeenCalledTimes(1)
+    expect(mockExit).toHaveBeenCalledWith(0)
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'gpu-fallback.json'), 'utf8'))
+    expect(raw.compatLevel).toBe(2) // 升档指令必须在重启前落盘
+  })
+
+  it('3b. 最大兼容档（level 2）仍崩 → 不重启、不升第三档、记 error（防死循环）', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'gpu-fallback.json'),
+      JSON.stringify({
+        consecutiveFailures: 0,
+        fallbackActive: true,
+        fallbackVersion: '2.5.5',
+        compatLevel: 2
+      })
+    )
+    const m = await import('../gpu-fallback')
+    expect(m.recordBootLevel()).toBe(2)
     const healed = m.requestSelfHeal('crashed', 1)
     expect(healed).toBe(false)
     expect(mockRelaunch).not.toHaveBeenCalled()
     expect(mockExit).not.toHaveBeenCalled()
+    expect(loggerErrorMock).toHaveBeenCalled()
+    const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'gpu-fallback.json'), 'utf8'))
+    expect(raw.compatLevel).toBe(2)
   })
 
   it('4. NIKKI_FORCE_GPU_COMPAT=1 → 强制软件渲染且不触发重启', async () => {

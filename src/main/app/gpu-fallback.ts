@@ -12,14 +12,27 @@ export type { GpuBootDecisionReason }
  * GPU 崩溃自动回退软件渲染（复刻 VS Code 的成熟自愈模式）。
  *
  * 根因背景（2026-08-19 用户机数据裁决）：部分机器 GPU 进程无法运行，
- * Chromium 在 gpu_data_manager_impl_private.cc:415 以
- * FATAL "GPU process isn't usable. Goodbye." 自杀主进程，
- * 表现为启动 loadURL 报 ERR_FAILED(-2) 白屏（app:// 协议层无关）。
+ * Chromium 在 gpu_data_manager_impl_private.cc:417（Electron 41.10.6 实测行号，
+ * 2026-08-19 那次记为 :415）以 FATAL "GPU process isn't usable. Goodbye."
+ * 自杀主进程，表现为启动即闪退或 loadURL 报 ERR_FAILED(-2) 白屏。
+ *
+ * 三级兼容阶梯（compatLevel，跨启动持久化）：
+ *  0 硬件加速（默认）
+ *  1 禁用硬件加速（app.disableHardwareAcceleration）
+ *  2 最大兼容（追加 --disable-gpu + --disable-software-rasterizer）
+ * 之所以要有 2 级：按上游实现，「禁用硬件加速」只是把 GPU 模式阶梯往下弹
+ * （SOFTWARE_GL → DISPLAY_COMPOSITOR），**GPU 进程照样启动**，每档崩满 3 次
+ * 后 fallback_modes_ 仍会走空 → 同一个 FATAL。2 级把两把开关同时给出，使上游
+ * GpuAccessAllowed() 直接判 false（其注释正对这一组合），GPU 进程不再启动，
+ * 该 FATAL 才结构性不可达。本应用渲染层全部使用 2D canvas（无 WebGL/WebGPU），
+ * 2 级的代价只是性能，不损失功能。
  *
  * 状态文件 userData/gpu-fallback.json：
  * - consecutiveFailures：连续启动失败次数（did-finish-load 时清零）
  * - fallbackActive：回退激活标记（一旦置位保留，用户更新显卡驱动后
  *   手动删除该文件即可恢复硬件加速）
+ * - compatLevel：**下一次**启动应采用的档位（缺省视为 0，旧文件向后兼容）
+ * - compatLevelVersion：写入 compatLevel 时的版本；版本变更后给一次干净硬件重试
  *
  * 恢复时序（崩溃检测 → 自动降级 → 重启自愈）：
  *  启动1 GPU/渲染进程崩溃被观测 → requestSelfHeal 同步落盘 fallbackActive
@@ -29,7 +42,7 @@ export type { GpuBootDecisionReason }
  * 在用户下次手动启动时兜底。观测事件若早于监听器注册而丢失亦由该阈值兜底。
  *
  * 崩溃升级分级（防误判，2026-10-24 优化）：
- *  - clean-exit 一律忽略；启动期崩溃立即回退；运行期崩溃 60s 窗口内达 2 次才回退，
+ *  - clean-exit 一律忽略；启动期崩溃立即回退；运行期崩溃 60s 窗口内达 2 次才升级，
  *    单次瞬时崩溃交 Chromium 自行重启 GPU 进程自愈，避免无谓禁用硬件加速。
  *
  * 全部文件读写 try/catch 容错：无文件/损坏 JSON/userData 不可写 →
@@ -71,13 +84,53 @@ interface GpuFallbackState {
   fallbackActive: boolean
   /** 激活回退（或最近一次版本级重试）时的应用版本；用于「升级后自动重试硬件加速」记账 */
   fallbackVersion?: string
+  /** 下一次启动应采用的兼容档位（0|1|2）；缺省/非法视为 0，旧文件向后兼容 */
+  compatLevel?: number
+  /** 写入 compatLevel 时的应用版本；版本变更 → 档位复位给一次干净硬件重试（与 fallbackVersion 同构） */
+  compatLevelVersion?: string
 }
 
 const DEFAULT_STATE: GpuFallbackState = { consecutiveFailures: 0, fallbackActive: false }
 
+/**
+ * 兼容档位：
+ *  0 = 硬件加速（默认）；1 = 禁用硬件加速（软件渲染）；
+ *  2 = 最大兼容（在 1 之上追加 --disable-gpu + --disable-software-rasterizer，
+ *      使上游 GpuAccessAllowed() 判 false，GPU 进程不再启动）
+ */
+export type GpuCompatLevel = 0 | 1 | 2
+
+/** 阶梯顶档：到顶后不再上升，也不再自动重启（防死循环） */
+export const MAX_COMPAT_LEVEL: GpuCompatLevel = 2
+
+/** 档位归一：非数字/非有限/负数 → 0；>MAX 夹取；小数向下取整 */
+function normalizeCompatLevel(v: unknown): GpuCompatLevel {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return 0
+  return Math.min(MAX_COMPAT_LEVEL, Math.floor(v)) as GpuCompatLevel
+}
+
+/** 验证工装：NIKKI_GPU_FORCE_LEVEL 仅接受字面量 '0'|'1'|'2'，其它一律忽略（返回 null） */
+function parseForcedLevel(v: string | undefined): GpuCompatLevel | null {
+  return v === '0' || v === '1' || v === '2' ? (Number(v) as GpuCompatLevel) : null
+}
+
+/** resolveCompatLevel 的档位上下文（全部由调用方算好传入，保持本函数无 fs / 无 electron） */
+export interface CompatLevelContext {
+  /** 上次运行被原生层杀死（无 JS 退出痕迹）——本次比上次实际用过的档位再降一级 */
+  prevNativeKill: boolean
+  /** 当前应用版本；'' 表示不可得（保守：不做版本级复位） */
+  currentVersion: string
+  /** 既有布尔判定（shouldDisableHardwareAcceleration）的结论：本次至少要到 1 级 */
+  compatDisabled: boolean
+}
+
 /** 启动决策缓存：shouldDisableHardwareAcceleration 首次（index.ts 顶层、ready 前）计算后缓存，
  * 供 requestSelfHeal 判定"本次是否为硬件加速启动"——仅硬件加速启动崩溃才自动重启自愈。 */
 let bootDecisionCache: boolean | null = null
+
+/** 本次启动实际采用的兼容档位缓存（recordBootLevel 写入，进程内唯一真相源）。
+ * null 表示 recordBootLevel 尚未调用（如单测直接调 requestSelfHeal），按 0 级处理。 */
+let bootLevelCache: GpuCompatLevel | null = null
 
 /** 首绘是否完成（did-finish-load 成功即标记），用于区分"启动期崩溃"与"运行中崩溃"。 */
 let appBooted = false
@@ -104,13 +157,22 @@ function readState(): GpuFallbackState {
       consecutiveFailures?: unknown
       fallbackActive?: unknown
       fallbackVersion?: unknown
+      compatLevel?: unknown
+      compatLevelVersion?: unknown
     }
     const n = raw?.consecutiveFailures
     const consecutiveFailures =
       typeof n === 'number' && Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0
     const fallbackVersion =
       typeof raw?.fallbackVersion === 'string' ? raw.fallbackVersion : undefined
-    return { consecutiveFailures, fallbackActive: raw?.fallbackActive === true, fallbackVersion }
+    return {
+      consecutiveFailures,
+      fallbackActive: raw?.fallbackActive === true,
+      fallbackVersion,
+      compatLevel: normalizeCompatLevel(raw?.compatLevel),
+      compatLevelVersion:
+        typeof raw?.compatLevelVersion === 'string' ? raw.compatLevelVersion : undefined
+    }
   } catch {
     return { ...DEFAULT_STATE }
   }
@@ -245,19 +307,104 @@ export function shouldDisableHardwareAcceleration(): boolean {
 }
 
 /**
- * 记录本次启动的硬件加速决策（index.ts 顶层、ready 前调用一次）。
- * 结果缓存于 bootDecisionCache，供 requestSelfHeal 判定"本次是否为硬件加速启动"，
- * 从而决定是否自动重启自愈。
- * @returns 是否应禁用硬件加速（即进入兼容模式）
+ * 纯函数：由已落盘的档位 + 本次启动上下文推导「本次应使用的兼容档位」。
+ * 规则（优先级自下而上叠加）：
+ *  1) 取上次留下的档位指令 compatLevel（非法 → 0）；
+ *  2) 版本级复位：档位戳存在且 ≠ 当前版本 → 复位到 0，给新版本一次干净硬件重试
+ *     （与 shouldDisableHardwareAcceleration 的 fallbackVersion 重试同构、同向，不会互相拉扯）；
+ *  3) 既有布尔判定要求软件渲染（用户显式关闭 / 回退标记 / 阈值激活）→ 至少 1 级；
+ *  4) 上次被原生层杀死 → 在本次档位上再加一级，封顶 MAX_COMPAT_LEVEL。
+ * 无 fs、无 electron 依赖，便于矩阵化单测。
  */
-export function recordBootDecision(): boolean {
-  bootDecisionCache = shouldDisableHardwareAcceleration()
-  return bootDecisionCache
+export function resolveCompatLevel(
+  state: { compatLevel?: number; compatLevelVersion?: string },
+  ctx: CompatLevelContext
+): { level: GpuCompatLevel; compatLevelReset: boolean } {
+  let level = normalizeCompatLevel(state.compatLevel)
+  let compatLevelReset = false
+  if (
+    level > 0 &&
+    ctx.currentVersion &&
+    typeof state.compatLevelVersion === 'string' &&
+    state.compatLevelVersion !== ctx.currentVersion
+  ) {
+    level = 0
+    compatLevelReset = true
+  }
+  if (ctx.compatDisabled && level < 1) level = 1
+  if (ctx.prevNativeKill) level = Math.min(MAX_COMPAT_LEVEL, level + 1) as GpuCompatLevel
+  return { level, compatLevelReset }
 }
 
-/** 本次启动是否已进入兼容模式（即已禁用硬件加速）。 */
+/**
+ * 记录本次启动的兼容档位（index.ts 顶层、ready 前**只调用一次**）。
+ * @param evidence 上次退出证据；prevNativeKill 为 true 时在本次档位上再加一级
+ * @returns 本次启动应使用的兼容档位
+ */
+export function recordBootLevel(evidence: { prevNativeKill?: boolean } = {}): GpuCompatLevel {
+  // 既有布尔判定原样复用（其内部已含版本重试 / 阈值激活的写盘副作用），不改语义
+  const compatDisabled = shouldDisableHardwareAcceleration()
+  bootDecisionCache = compatDisabled
+
+  const state = readState()
+  const version = getCurrentAppVersion()
+  const forced = parseForcedLevel(process.env.NIKKI_GPU_FORCE_LEVEL)
+  const prevNativeKill = evidence.prevNativeKill === true
+
+  let level: GpuCompatLevel
+  let stampRequired = false
+  if (forced !== null) {
+    level = forced
+    diagLog('GPU', `NIKKI_GPU_FORCE_LEVEL=${forced}：强制兼容档位（仅用于验证降级路径，不落盘）`)
+  } else {
+    if (process.env.NIKKI_GPU_FORCE_LEVEL !== undefined) {
+      diagLog(
+        'GPU',
+        `NIKKI_GPU_FORCE_LEVEL=${JSON.stringify(process.env.NIKKI_GPU_FORCE_LEVEL)} 非法（仅接受 0/1/2），已忽略`
+      )
+    }
+    const resolved = resolveCompatLevel(state, {
+      prevNativeKill,
+      currentVersion: version,
+      compatDisabled
+    })
+    level = resolved.level
+    stampRequired = resolved.compatLevelReset
+  }
+  bootLevelCache = level
+
+  // 仅在档位变化或需要盖戳时写盘：健康启动（0 级、无证据）不得凭空造出状态文件
+  if (forced === null) {
+    const persisted = normalizeCompatLevel(state.compatLevel)
+    const needStamp = stampRequired && state.compatLevelVersion !== (version || undefined)
+    if (level !== persisted || needStamp) {
+      writeState({
+        ...state,
+        compatLevel: level,
+        compatLevelVersion: version || undefined,
+        fallbackActive: level >= 1 ? true : state.fallbackActive
+      })
+    }
+  }
+  return level
+}
+
+/**
+ * 记录本次启动的硬件加速决策（保留原布尔口径，供既有调用方与用例使用）。
+ * @returns 是否应禁用硬件加速（即进入 ≥1 级兼容档）
+ */
+export function recordBootDecision(): boolean {
+  return recordBootLevel() >= 1
+}
+
+/** 本次启动是否已进入兼容模式（即已禁用硬件加速，档位 ≥ 1）。 */
 export function wasBootInCompatMode(): boolean {
-  return bootDecisionCache === true
+  return bootLevelCache !== null ? bootLevelCache >= 1 : bootDecisionCache === true
+}
+
+/** 本次启动实际使用的兼容档位（recordBootLevel 未调用时按 0 级处理）。 */
+export function currentBootLevel(): GpuCompatLevel {
+  return bootLevelCache ?? 0
 }
 
 /** GPU 状态面板用的回退状态快照（只读、归一化，fallbackVersion 缺失为 null） */
@@ -333,29 +480,67 @@ export function markBootSuccess(): void {
  * GPU 子进程崩溃时调用：同步 writeFileSync 落盘回退标记（盖当前版本戳，
  * 使同版本内下次启动直接回退、不触发版本级重试），抢在 Chromium FATAL
  * 杀死主进程之前完成（使下一次启动即恢复）。
+ * 档位只抬不降：至少到 1 级，但绝不抹掉已升到 2 级的指令。
  */
 export function markGpuProcessCrash(reason: string, exitCode: number): void {
+  const state = readState()
   writeState({
-    consecutiveFailures: readState().consecutiveFailures,
+    ...state,
     fallbackActive: true,
-    fallbackVersion: getCurrentAppVersion() || undefined
+    fallbackVersion: getCurrentAppVersion() || undefined,
+    compatLevel: Math.max(normalizeCompatLevel(state.compatLevel), 1) as GpuCompatLevel
   })
   diagLog('GPU', `GPU process gone (reason=${reason} exitCode=${exitCode})，已置软件渲染回退标记`)
 }
 
 /**
  * 崩溃自愈入口：先同步落盘回退标记（抢在 FATAL 前），再决定是否自动重启。
- * 仅当"本次为硬件加速启动"（bootDecisionCache===false）才 app.relaunch+app.exit
- * 自动重启进入软件渲染；若本次已是兼容模式仍崩，则不重启并返回 false，
- * 交由调用方现有错误对话框处理，避免无限重启死循环。
+ * 阶梯行为（2026-11-02 改版）：
+ *  - 未到顶（level < MAX）：把档位**再加一级并先落盘**，再 app.relaunch+app.exit，
+ *    使重启后的下一次启动真的换档（旧口径「兼容模式仍崩就直接放弃」是死胡同，
+ *    正是「禁用硬件加速也照样被 FATAL 杀死」的设备永久启动即闪退的原因）；
+ *  - 已到顶（level === MAX）：不重启、不再上升，只记 error，交由调用方错误对话框兜底；
+ *  - 验证工装 NIKKI_FORCE_GPU_COMPAT=1：档位由环境固定，不做进程重启以免打断验证。
  * relaunch/exit 全程 try/catch：失败仅保留落盘标记，靠 consecutiveFailures>=2
  * 阈值跨手动启动兜底。
  * @returns 是否已触发自动重启
  */
 export function requestSelfHeal(reason: string, exitCode: number): boolean {
   markGpuProcessCrash(reason, exitCode)
-  // 已兼容模式仍崩：不再自动重启，避免死循环（由调用方错误对话框兜底）
-  if (bootDecisionCache === true) return false
+  const level = currentBootLevel()
+
+  if (process.env.NIKKI_FORCE_GPU_COMPAT === '1') {
+    diagLog(
+      'GPU',
+      `GPU 崩溃（reason=${reason} exitCode=${exitCode}）：NIKKI_FORCE_GPU_COMPAT 强制档，不自动重启`
+    )
+    return false
+  }
+
+  if (level >= MAX_COMPAT_LEVEL) {
+    const msg =
+      `GPU 崩溃发生在最大兼容档（level=${MAX_COMPAT_LEVEL}，reason=${reason} exitCode=${exitCode}）：` +
+      `已无更低档位可退，不再自动重启。请把「导出诊断包」里的 chromium-debug.log 一并反馈`
+    diagLog('GPU', msg)
+    try {
+      logger.error(msg)
+    } catch {
+      // logger 不可用时仅依赖 diagLog，不重抛
+    }
+    return false
+  }
+
+  // 升档指令必须先落盘，否则重启后的下一次启动仍按旧档位跑
+  const next = Math.min(MAX_COMPAT_LEVEL, level + 1) as GpuCompatLevel
+  const state = readState()
+  writeState({
+    ...state,
+    compatLevel: next,
+    compatLevelVersion: getCurrentAppVersion() || undefined,
+    fallbackActive: state.fallbackActive || next >= 1
+  })
+  diagLog('GPU', `GPU 崩溃自愈：档位 ${level} → ${next}，重启进入下一档`)
+
   try {
     app.releaseSingleInstanceLock?.()
   } catch {
