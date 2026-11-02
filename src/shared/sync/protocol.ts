@@ -9,6 +9,9 @@
  *   thumbnailSha256 / previewSha256 / fullPreviewResourceId / fullPreviewSha256 /
  *   mediaFingerprint（fc39fd2）与 sourcePath / sourceFolder / sizeBytes（b397e0e）。
  *   全部为可选扩展，wire 兼容。
+ * - 2026-11-02 对齐至 589b932（tag v1.0.30-public-beta.1）：ServerInfoResponse.capabilities
+ *   追加 inspirationV1?（a5a43f9 引入灵感同步子系统，/v1/inspiration* 由上游
+ *   LocalSyncServer 自挂载）。可选扩展，wire 兼容。
  * 与上游的唯一代码差异：'@nikkisync/core' 的 import / re-export 改为指向 './domain-types'。
  * 协议字段名、路由常量、错误码为客户端兼容硬约束，禁止变更。
  * 维护规则与上游溯源见同目录 README.md。
@@ -119,6 +122,7 @@ export interface ServerInfoResponse {
     suitSearch?: true
     clothingSearch?: true
     profileStats?: true
+    inspirationV1?: true
   }
 }
 

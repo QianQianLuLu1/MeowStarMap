@@ -8,6 +8,7 @@ import {
   diffInterfaceMembers,
   diffProtocolContract,
   extractInterfaceMembers,
+  extractNestedObjectMembers,
   upstreamSnapshotFromModules
 } from './protocol-contract'
 import {
@@ -247,5 +248,50 @@ describe('diffInterfaceMembers', () => {
 
   it('边界：重复成员名与不同顺序都不产生差异', () => {
     expect(diffInterfaceMembers(['a', 'a', 'b'], ['b', 'a'])).toEqual({ missing: [], extra: [] })
+  })
+})
+
+describe('extractNestedObjectMembers', () => {
+  /**
+   * 存在理由：`ServerInfoResponse.capabilities` 这类深度 1 的内联对象也是线格式契约
+   * （上游 589b932 在此新增 `inspirationV1?: true`），而 extractInterfaceMembers 刻意只吃
+   * 深度 0 —— 不补这一层，新增能力位永远不会触发漂移守护（02 计划 §0.2）。
+   */
+  it('正常：取深度 1 成员并保持源码顺序，深度 2 不进入结果', () => {
+    const source = `
+export interface Sample {
+  name: string
+  capabilities: {
+    readonly a: true
+    b?: true
+    deeper?: { leaf: number }
+    run(): void
+  }
+}
+`
+    expect(extractNestedObjectMembers(source, 'Sample', 'capabilities')).toEqual([
+      'a',
+      'b',
+      'deeper',
+      'run'
+    ])
+  })
+
+  it('异常：接口不存在 / 成员不存在 / 成员不是对象类型 ⇒ undefined（不与「读到但为空」混淆）', () => {
+    const source = `export interface Sample { name: string, count: number, capabilities?: { a: true } }`
+    expect(extractNestedObjectMembers(source, 'Missing', 'capabilities')).toBeUndefined()
+    expect(extractNestedObjectMembers(source, 'Sample', 'absent')).toBeUndefined()
+    expect(extractNestedObjectMembers(source, 'Sample', 'count')).toBeUndefined()
+  })
+
+  it('边界：单行内联写法同样可取；前缀同名的成员不得误命中；注释里的花括号不破坏边界', () => {
+    const single = 'export interface S { caps: { a: true; b: true } }'
+    expect(extractNestedObjectMembers(single, 'S', 'caps')).toEqual(['a', 'b'])
+    const prefixed =
+      'export interface S { cap?: true\ncapabilities: { a: true }\ncapabilitiesX: { z: true } }'
+    expect(extractNestedObjectMembers(prefixed, 'S', 'capabilities')).toEqual(['a'])
+    const commented =
+      'export interface S {\n  /** { } */\n  capabilities: { a: true, /* } */ b: true }\n  c: string\n}'
+    expect(extractNestedObjectMembers(commented, 'S', 'capabilities')).toEqual(['a', 'b'])
   })
 })

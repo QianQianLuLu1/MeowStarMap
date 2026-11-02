@@ -331,52 +331,139 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+/** 从 `open` 位置的 `{` 找到配对的 `}`（输入必须已脱注）；未闭合返回 -1。 */
+function findClosingBrace(text: string, open: number): number {
+  let depth = 0
+  for (let index = open; index < text.length; index += 1) {
+    if (text[index] === '{') depth += 1
+    else if (text[index] === '}') {
+      depth -= 1
+      if (depth === 0) return index
+    }
+  }
+  return -1
+}
+
+/** 取接口体（最外层花括号内部文本，已脱注）；接口不存在或未闭合返回 `undefined`。 */
+function extractInterfaceBody(masked: string, interfaceName: string): string | undefined {
+  const declaration = new RegExp(`\\binterface\\s+${escapeRegExp(interfaceName)}\\b`).exec(masked)
+  if (!declaration) return undefined
+  const open = masked.indexOf('{', declaration.index + declaration[0].length)
+  if (open === -1) return undefined
+  const close = findClosingBrace(masked, open)
+  if (close === -1) return undefined
+  return masked.slice(open + 1, close)
+}
+
+/**
+ * 深度 0 成员名扫描（保持源码顺序、去重）：认 `name:` / `name?:` / `readonly name:` / `name(`。
+ *
+ * 用字符游标而不是按行切，因此单行内联（`.d.ts` 里常见 `caps: { a: true; b: true }`）与
+ * 多行写法得到同一结果；花括号、圆括号、方括号一起计深度，`(a: string) => void` 的形参名
+ * 与嵌套对象成员都不会混进来。命中方法签名时把已消费的 `(` 记进深度，否则配对的 `)`
+ * 会把深度压成负数，后续成员会被整体漏掉。
+ */
+function collectZeroDepthMembers(body: string): string[] {
+  const members: string[] = []
+  let depth = 0
+  let index = 0
+  while (index < body.length) {
+    const char = body[index]
+    if (char === '{' || char === '(' || char === '[') {
+      depth += 1
+      index += 1
+      continue
+    }
+    if (char === '}' || char === ')' || char === ']') {
+      depth -= 1
+      index += 1
+      continue
+    }
+    if (depth !== 0 || !/[A-Za-z_$]/.test(char)) {
+      index += 1
+      continue
+    }
+    const rest = body.slice(index)
+    const candidate = /^([A-Za-z_$][\w$]*)\s*\??\s*(:|\()/.exec(rest)
+    if (candidate) {
+      if (!members.includes(candidate[1])) members.push(candidate[1])
+      if (candidate[2] === '(') depth += 1
+      index += candidate[0].length
+      continue
+    }
+    // 不是成员起始（例如 `readonly` 关键字、类型名本身）：整词跳过，避免把类型当成成员
+    index += /^[A-Za-z_$][\w$]*/.exec(rest)![0].length
+  }
+  return members
+}
+
 /**
  * 纯函数：从 TypeScript 源码文本提取接口的一层成员名（保持源码顺序、去重）。
  *
  * 只认深度 0 的 `name:` / `name?:` / `readonly name:` 与 `name(`（方法签名）；
- * 嵌套对象类型内部的成员不进入结果。接口不存在或未闭合时返回 `undefined`——
- * 调用方必须把「读不到」与「读到了但为空」分开处理。
+ * 嵌套对象类型内部的成员不进入结果（那部分由 `extractNestedObjectMembers` 负责）。
+ * 接口不存在或未闭合时返回 `undefined`——调用方必须把「读不到」与「读到了但为空」分开处理。
  */
 export function extractInterfaceMembers(
   source: string,
   interfaceName: string
 ): string[] | undefined {
-  const masked = maskCommentsAndStrings(source)
-  const declaration = new RegExp(`\\binterface\\s+${escapeRegExp(interfaceName)}\\b`).exec(masked)
-  if (!declaration) return undefined
-  const open = masked.indexOf('{', declaration.index + declaration[0].length)
-  if (open === -1) return undefined
-  let depth = 0
-  let close = -1
-  for (let index = open; index < masked.length; index += 1) {
-    if (masked[index] === '{') depth += 1
-    else if (masked[index] === '}') {
-      depth -= 1
-      if (depth === 0) {
-        close = index
-        break
-      }
-    }
-  }
-  if (close === -1) return undefined
+  const body = extractInterfaceBody(maskCommentsAndStrings(source), interfaceName)
+  if (body === undefined) return undefined
+  return collectZeroDepthMembers(body)
+}
 
-  const members: string[] = []
-  let bodyDepth = 0
-  for (const line of masked.slice(open + 1, close).split('\n')) {
-    if (bodyDepth === 0) {
-      const match =
-        /^\s*(?:readonly\s+)?([A-Za-z_$][\w$]*)\s*\??\s*:/.exec(line) ??
-        /^\s*([A-Za-z_$][\w$]*)\s*\??\s*\(/.exec(line)
-      const name = match?.[1]
-      if (name && !members.includes(name)) members.push(name)
+/**
+ * 纯函数：提取接口内某个「内联对象类型成员」的深度 1 成员名（保持源码顺序、去重）。
+ *
+ * 存在理由：`ServerInfoResponse.capabilities` 这类内联对象也是线格式契约的一部分——上游
+ * 589b932 正是在这里新增 `inspirationV1?: true`，而 `extractInterfaceMembers` 刻意只吃深度 0，
+ * 于是「新增能力位」这一类漂移永远不会触发守护。本函数把深度 1 纳入比对面（02 计划 §0.2）。
+ *
+ * 判据收紧在三处：成员必须出现在接口体深度 0（前缀同名的成员不误命中，如 `cap` 与
+ * `capabilitiesX`）；冒号右侧必须以 `{` 开头，否则语义上不是成员集，返回 `undefined`；
+ * 花括号未闭合同样返回 `undefined`。
+ */
+export function extractNestedObjectMembers(
+  source: string,
+  interfaceName: string,
+  memberName: string
+): string[] | undefined {
+  const body = extractInterfaceBody(maskCommentsAndStrings(source), interfaceName)
+  if (body === undefined) return undefined
+  const memberDeclaration = new RegExp(`^${escapeRegExp(memberName)}\\s*\\??\\s*:`)
+  let depth = 0
+  let index = 0
+  while (index < body.length) {
+    const char = body[index]
+    if (char === '{' || char === '(' || char === '[') {
+      depth += 1
+      index += 1
+      continue
     }
-    for (const char of line) {
-      if (char === '{') bodyDepth += 1
-      else if (char === '}') bodyDepth = Math.max(0, bodyDepth - 1)
+    if (char === '}' || char === ')' || char === ']') {
+      depth -= 1
+      index += 1
+      continue
     }
+    if (depth !== 0 || !/[A-Za-z_$]/.test(char)) {
+      index += 1
+      continue
+    }
+    const rest = body.slice(index)
+    const declaration = memberDeclaration.exec(rest)
+    if (declaration) {
+      const afterColon = rest.slice(declaration[0].length)
+      const offset = afterColon.search(/[^ \t\n\r]/)
+      if (offset === -1 || afterColon[offset] !== '{') return undefined
+      const open = index + declaration[0].length + offset
+      const close = findClosingBrace(body, open)
+      if (close === -1) return undefined
+      return collectZeroDepthMembers(body.slice(open + 1, close))
+    }
+    index += /^[A-Za-z_$][\w$]*/.exec(rest)![0].length
   }
-  return members
+  return undefined
 }
 
 /** 纯函数：按成员名集合比较两个接口（顺序不参与判定），返回 missing / extra 明细。 */

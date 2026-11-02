@@ -17,7 +17,7 @@ NikkiSync 逐字一致（客户端兼容硬约束，禁止变更）。
 
 ## 文件
 
-| 文件               | 内容                                                                                                              | 上游对应（commit `b397e0e` = tag `v1.0.27-public-beta.1`） |
+| 文件               | 内容                                                                                                              | 上游对应（commit `589b932` = tag `v1.0.30-public-beta.1`） |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `protocol.ts`      | 协议契约：`PROTOCOL_VERSION`、`API_ROUTES`、`API_ERROR_CODES`、`CHANGE_TYPES`、消息类型、type guard、路由构建函数 | `NikkiSync/packages/protocol/src/index.ts`                 |
 | `domain-types.ts`  | 领域类型：`NikkiAsset`、`MediaResource`、`InfinityPhotoMetadata`、资源角色/资产状态等常量                         | `NikkiSync/packages/core/src/types.ts`                     |
@@ -54,5 +54,9 @@ import type { NikkiAsset, ServerInfoResponse } from '../../shared/sync/protocol'
   与快照采集（否则该文件的键集断言即失败）；链接态漂移由 `protocol-drift.test.ts` 拦截。
 - 接口型 DTO（如 `AssetSummary`）没有运行时值，其字段集由 `protocol-drift.test.ts` 的
   `extractInterfaceMembers` 用例直接比对上游 `dist/src/index.d.ts`；上游加字段而未补移植会转红。
+- **深度 1 的内联对象类型同样可比**：`ServerInfoResponse.capabilities` 的能力位由
+  `extractNestedObjectMembers` 逐名比对。这一层是 2026-11-02 补的——上游 `a5a43f9` 在
+  `capabilities` 里加 `inspirationV1?` 时，只吃深度 0 的旧守护完全看不见（实测推进锚点后
+  本仓零用例转红），故新增能力位一类漂移必须走这条判据，不得再靠人工 diff。
 - 本目录不在 core-path 保护清单内，无需 `@core-change` 注释；但协议内容本身的
   变更视同协议契约变更，需在提交说明中注明上游对应变更。
