@@ -5,10 +5,13 @@
  * 目录推给运行中的会话（重启也不自愈：runtimeEnabled 缺省关）——真实用户态下「选了自定义
  * 路径但板块不出图」。a732c2b 起落库后当场经 `applyGameRoot` 生效；本套件给这条路径真窗证据：
  *
- *   G1（零模态主判据）：桥直调 `setGameRoot(合成安装根A)` ⇒ `applied:true / needRestart:false`，
- *      且 `runtimeStatus` 的 `installation.installRoot` 等于根 A、`lastScan` 键存在。
- *   G2（真实 UI 路径，承重红灯）：同步图库 → 同步服务 → 照片目录节手输根 B → 保存 ⇒
+ *   G1（零模态主判据）：桥直调 `setGameRoot(安装根，真机优先、合成根兜底)` ⇒
+ *      `applied:true / needRestart:false`，
+ *      且 `runtimeStatus` 的 `installation.installRoot` 等于该根、`lastScan` 键存在。
+ *   G2（真实 UI 路径，承重红灯）：同步图库 → 同步服务 → 照片目录节手输**与 G1 同一个根** → 保存 ⇒
  *      「照片目录已保存并立即生效」可见、「配置已保存，但未能立即生效」不可见，留真窗截图。
+ *      （`d86c7c2` 起 G2 不再手输第二个根：同值重复保存本就是真实用户行为，`scanCore` 对同根只
+ *      重扫不重建，判据不受「机器上要有两个合法安装根」的环境约束。）
  *   G3（恢复默认守卫，如实标注为**修复后守卫**：旧 dist 从未出现 applyFailedInstallRoot、
  *      旧 handler 不回 applyError ⇒ 无法对旧 dist 取红；其牙齿由单例 (bf) 证明）：
  *      环境变量指向非安装根 ⇒ reset 真产生 installation-not-found ⇒ 断言**不出现**
@@ -87,8 +90,14 @@ const ROOT_BARE = path.join(SYNTH_ROOT, 'not-install-root')
  * `selected ?? process.env.NIKKISYNC_GAME_ROOT`）：它只在 selectedInstallRoot 缺省时短路整条
  * 枚举链 ⇒ G1/G2 的显式 setGameRoot 不受影响，G3 的 reset（不下发 selected）确定性 not-found。
  * 本仓 `NIKKI_NIKKISYNC_GAME_ROOT` 不设——它会经 buildSessionOptions 压过设置键，反而污染默认快照。
+ *
+ * F7（审查轮）：写入点从模块顶层挪进 `beforeAll`，并由 `afterAll` 复原。本文件与其余 spec
+ * 共用同一 worker 进程（`workers: 1`），而该变量的语义是「短路整条注册表 / PowerShell / 驱动器
+ * 枚举链」——模块级写入既不会被复原、也会在整件 skip（未建链）时照样落进进程环境，
+ * 足以让同批后续的 `nikkisync-runtime.e2e.ts` 与 smoke 用例在自己的 discovery 上拿到别处的根。
  */
-process.env.NIKKISYNC_GAME_ROOT = ROOT_BARE
+const UPSTREAM_GAME_ROOT_ENV = 'NIKKISYNC_GAME_ROOT'
+let previousUpstreamGameRoot: string | undefined
 
 interface GameRootApplyResult {
   gameRoot: string
@@ -159,6 +168,9 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
   test.beforeAll(async () => {
     test.setTimeout(150_000)
     await fs.mkdir(ROOT_BARE, { recursive: true })
+    // F7：写入与复原配对，且只在真正要跑本套件时生效（目录先建好，子进程 stat 才拿得到）
+    previousUpstreamGameRoot = process.env[UPSTREAM_GAME_ROOT_ENV]
+    process.env[UPSTREAM_GAME_ROOT_ENV] = ROOT_BARE
     // 真机根优先（杀软对合成 exe 间歇性拦截，见常量区说明）；无真机根才落合成兜底根。
     const machineRoot = await resolveGameRoot()
     if (machineRoot) {
@@ -218,13 +230,17 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
     ).toBe(true)
     expect(result.needRestart).toBe(false)
 
-    const status = await callGameRootBridge<RuntimeStatusLight>(page, { method: 'runtimeStatus' })
+    // F8（审查轮）：判据必须打在**收敛后**的那份快照上。原实现在 poll 之前先取一次 status，
+    // poll 只校 `state`，最后却拿那份旧快照断言 `installRoot` / `lastScan` ⇒ 惰性拉起或换根
+    // 重建落在 poll 窗口内时，断言读的是重建前的旧会话（既能假绿也能假红）。
+    // 每次 poll 都覆盖 `latest`，收敛退出时它必然是被判据采纳的那一份。
+    let latest: RuntimeStatusLight = await callGameRootBridge<RuntimeStatusLight>(page, {
+      method: 'runtimeStatus'
+    })
     await expect
       .poll(
         async () => {
-          const latest = await callGameRootBridge<RuntimeStatusLight>(page, {
-            method: 'runtimeStatus'
-          })
+          latest = await callGameRootBridge<RuntimeStatusLight>(page, { method: 'runtimeStatus' })
           return latest.state
         },
         { timeout: 30_000, message: '惰性拉起后 runtime 未收敛为 running' }
@@ -233,10 +249,10 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
     // 比较层按约定钉 win32：两侧同用 path.win32.resolve + 小写折叠（NTFS 不区分大小写是产品事实）
     const expectedRoot = path.win32.resolve(gameRoot).toLowerCase()
     const actualRoot = path.win32
-      .resolve(String(status.installation?.installRoot ?? ''))
+      .resolve(String(latest.installation?.installRoot ?? ''))
       .toLowerCase()
-    expect(actualRoot, `installRoot=${String(status.installation?.installRoot)}`).toBe(expectedRoot)
-    expect(status.lastScan).toBeDefined()
+    expect(actualRoot, `installRoot=${String(latest.installation?.installRoot)}`).toBe(expectedRoot)
+    expect(latest.lastScan).toBeDefined()
   })
 
   test('G2 真实 UI 路径：照片目录节手输安装根保存 ⇒ 即时生效文案可见、未生效文案不可见', async () => {
@@ -305,5 +321,12 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
     }
     // 合成根清理失败容忍（上游 watcher 可能仍握句柄）；目录带时间戳，残留也不串轮
     await fs.rm(SYNTH_ROOT, { recursive: true, force: true }).catch(() => {})
+    // F7：复原进程环境——本套件的「短路整条 discovery」变量绝不能留给同批后续 spec
+    if (previousUpstreamGameRoot === undefined) delete process.env[UPSTREAM_GAME_ROOT_ENV]
+    else process.env[UPSTREAM_GAME_ROOT_ENV] = previousUpstreamGameRoot
+    expect(
+      process.env[UPSTREAM_GAME_ROOT_ENV],
+      'afterAll 必须复原 NIKKISYNC_GAME_ROOT，否则泄漏进同 worker 的后续套件'
+    ).not.toBe(ROOT_BARE)
   })
 })
