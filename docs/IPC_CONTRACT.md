@@ -216,30 +216,39 @@ wrapHandler(ctx, schema, handler) =>
 
 ### 2.8 `media:emptyRecycleBin`
 
-| 属性         | 值                                                                                   |
-| ------------ | ------------------------------------------------------------------------------------ |
-| 通道         | `media:emptyRecycleBin`                                                              |
-| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts`                                   |
-| 参数         | 无（`wrapHandlerNoArgs`）                                                            |
-| 返回类型     | `{ message: string; movedCount: number; missingCount: number; failedCount: number }` |
+| 属性         | 值                                                                                     |
+| ------------ | -------------------------------------------------------------------------------------- |
+| 通道         | `media:emptyRecycleBin`                                                                |
+| Handler 文件 | `src/main/ipc/handlers/media-lifecycle-handler.ts`                                     |
+| 参数         | `force?: boolean`（`wrapHandler` + `z.tuple([z.boolean().optional()])`；零实参亦合法） |
+| 返回类型     | `{ message; movedCount; missingCount; failedCount; forceDeletedCount }`                |
 
 **返回值结构**：
 
 ```ts
 {
-  message: string,      // 为空 '回收站为空，无需清理'；成功 '已清空回收站（共 N 项）'；部分失败 '已移入系统回收站 N 项（M 项移入失败，已保留记录供手动处理）'
-  movedCount: number,   // 成功移入系统回收站的文件数（#fix-empty-recyclebin-system-trash 起恢复本语义；a5d154c 至该修复前曾为物理删除数）
+  message: string,      // 为空 '回收站为空，无需清理'；成功 '已清空回收站（共 N 项）'；部分失败 '已移入系统回收站 N 项（M 项移入失败，已保留记录供手动处理）'；
+                        // force 全成功 '已彻底删除 N 项'；force 部分失败 '已彻底删除 N 项（M 项删除失败，文件仍保留在磁盘）'
+  movedCount: number,   // 成功移入系统回收站的文件数（#fix-empty-recyclebin-system-trash 起恢复本语义；a5d154c 至该修复前曾为物理删除数）；force 模式下恒为 0
   missingCount: number, // 文件已不存在（原路径 ENOENT）的项数
-  failedCount: number   // 移入系统回收站失败且文件仍存在的项数（DB 记录保留供重试，渲染端据此判定部分失败）
+  failedCount: number,  // 移入系统回收站失败且文件仍存在的项数（DB 记录保留供重试，渲染端据此判定部分失败）
+  forceDeletedCount: number // #fix-empty-recyclebin-failed-as-success 新增：force 下成功永久删除的项数；非 force 恒为 0
 }
 ```
+
+**`force` 参数（#fix-empty-recyclebin-failed-as-success）**：
+
+- 缺省 / `false` ⇒ 与历史行为逐字一致（逐项 `shell.trashItem`）。`z.tuple([z.boolean().optional()])` 同时接受 `[]` 与 `[undefined]`，旧调用方 `call('media:emptyRecycleBin')` 不受影响；判据已由 `src/main/ipc/validator.test.ts` 用**真实 zod** 钉住（`media.test.ts` 的 mock-validator 不执行 schema，覆盖不到这条）。
+- `true` ⇒ 逐项 `fsp.unlink` 直接永久删除，**不调用 `shell.trashItem`、单次尝试不重试**。只允许在渲染端就「不经过系统回收站、不可恢复」完成显式二次确认后传入（`RecycleBinPage` 的 `recycleBin.emptyForce` 出路）。
+- **默认路径绝不自动升级为 force**：`shell.trashItem` 失败时保留 DB 记录的 B1 不变式在 force 下同样成立（unlink 失败且文件仍在 ⇒ 记录保留），因此不存在"偷偷永久删除用户文件"的路径。
+- 动因（真机取证，`.cache/trash-probe` 分离实验）：`shell.trashItem` 的失败可以是**卷级**的——同一 Electron 进程在 C 盘可正常移入回收站（空格与非 ASCII 路径同样正常），而 H 盘连刚新建的 ASCII 无空格文件也返回 `Failed to perform delete operation`。这类卷上「清空回收站」重试永远不会成功，主进程按 B1 正确保住数据，但用户没有任何出路。
 
 **确认语义与行为（#fix-empty-recyclebin-system-trash / 回收站语义修复 D5）**：
 
 - 二次确认完全由渲染端 `ConfirmDialog` 承担（与 `media:permanentDelete` 同构）；主进程不再弹原生 `dialog.showMessageBox`，无取消路径（原「用户取消抛 `IPC_CANCELED`」行为已移除）。
 - 文件处理：对每条软删除记录的 `file_path` 执行 `shell.trashItem` **移入系统回收站**（与确认文案「文件会先移至系统回收站，之后无法从本应用恢复」一致；`a5d154c` 至 `#fix-empty-recyclebin-system-trash` 间曾为 `fsp.unlink` 物理删除，详见 §2.7 行为变更注记）；软删除记录经 `getSoftDeletedMediaPaths` 返回（含 `thumbnail` 列）。三态判定沿用 `_trash-utils.ts`：成功 / missing（仅删 DB）/ failed（文件仍存在，DB 保留供重试）。
 - 阶段 4（本次新增）：对已删除 DB 记录的缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 严格推导的原生 LQ 及其 DB 记录）。
-- 渲染端按 preload `call()` 契约消费：成功收到 data（不含 `success` 字段），失败抛 `IpcError`；`RecycleBinPage` 仅消费 `message` 与 `failedCount`。
+- 渲染端按 preload `call()` 契约消费：成功收到 data（不含 `success` 字段），失败抛 `IpcError`；`RecycleBinPage` 消费 `message` 与 `failedCount`——`failedCount > 0` 判**业务失败**（红 Toast + 点亮「重试清空」与「跳过系统回收站，直接彻底删除」出路），不得只看 `call()` 未抛错就当成功（#fix-empty-recyclebin-failed-as-success 的原始缺陷正是读了 `message` 却没读 `failedCount`）。
 
 ### 2.9 `media:delete`
 

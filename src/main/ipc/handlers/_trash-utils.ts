@@ -1,4 +1,4 @@
-// @core-change: 清空回收站/彻底删除的原语由 fsp.unlink 换回 shell.trashItem，恢复与确认文案一致的「移入系统回收站」语义
+// @core-change: 清空回收站新增可选 force——真机取证证明部分卷（如 H 盘）卷级不接受 shell.trashItem，B1 规则正确地保留 DB 记录，但用户需一条经显式确认的「跳过系统回收站直接彻底删除」出路
 /**
  * 媒体生命周期域共享工具：文件移入系统回收站的批量操作 + 缩略图清理（缓存 + 游戏原生同图衍生文件）
  *
@@ -104,37 +104,85 @@ export async function trashItemWithFallback(
 
 /** 批量移入系统回收站的聚合结果 */
 export interface TrashBatchOutcome {
-  /** 可安全删除的 DB 记录 id（文件移入成功 或 文件已不存在） */
+  /** 可安全删除的 DB 记录 id（文件移入成功 / 已不存在 / force 下删除成功） */
   idsToDelete: number[]
-  /** 成功移入系统回收站的文件数量 */
+  /** 成功移入系统回收站的文件数量（force 模式下恒为 0，语义固定，不与 forceDeletedCount 混用） */
   movedCount: number
   /** 文件已不存在的数量 */
   missingCount: number
   /** 移入失败且文件仍存在的路径（DB 记录保留供用户重试） */
   failedPaths: string[]
+  /** force 模式下成功永久删除的数量（非 force 恒为 0） */
+  forceDeletedCount: number
+}
+
+/** trashBatch 的可选行为开关 */
+export interface TrashBatchOptions {
+  /**
+   * true ⇒ 不调 shell.trashItem，直接 fsp.unlink 永久删除。
+   * 只允许在渲染端就「不经过系统回收站、不可恢复」做过显式二次确认后传入；
+   * 默认 false，绝不因 trashItem 失败而自动升级为 true（7d4459f 的不变式）。
+   */
+  force?: boolean
 }
 
 /**
- * 批量将文件移入系统回收站，聚合三态统计并在结束后统一记录一条失败日志。
+ * force 原语：不经系统回收站直接永久删除单个文件，单次尝试不重试。
+ *
+ * 存在理由（#fix-empty-recyclebin-failed-as-success 真机取证）：shell.trashItem 在部分卷上
+ * 是**卷级**不可用——同一 Electron 进程在 C 盘可正常移入回收站，而 H 盘连刚新建的
+ * ASCII 无空格文件都返回 `Failed to perform delete operation`（空格与非 ASCII 均已排除）。
+ * 这类卷上「清空回收站」会 100% 失败且重试永远失败，B1 规则正确地保住 DB 记录，
+ * 但用户没有任何出路。force 把「直接删」的选择权交回用户，而不是替用户决定。
+ *
+ * 不重试的理由：重试一个已知坏掉的操作只会把大批量耗时拖成分钟级（熔断器同理）。
+ *
+ * @param filePath 目标文件绝对路径
+ * @returns 三态结果与首个错误（形状与 `trashItemWithFallback` 一致，错误由 `trashBatch` 聚合记录，
+ *   否则 force 失败在日志里只剩「彻底删除失败 N/M 项」，EPERM / EBUSY / 只读卷无从分辨）
+ */
+export async function removeItemPermanently(
+  filePath: string
+): Promise<{ result: TrashItemResult; error?: unknown }> {
+  try {
+    await fsp.unlink(filePath)
+    return { result: 'ok' }
+  } catch (err) {
+    // ENOENT：文件已不在，DB 踪迹可安全清除
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { result: 'missing' }
+    // 非 ENOENT 但复检已消失（并发竞态）：同样按 missing 处理
+    if (!(await pathExists(filePath))) return { result: 'missing' }
+    return { result: 'failed', error: err }
+  }
+}
+
+/**
+ * 批量将文件移入系统回收站（或 force 时直接永久删除），聚合三态统计并在结束后统一记录一条失败日志。
  *
  * FIX(A-log): 原实现在循环内逐项 logger.warn，实测 2474 项失败写出 2474 行日志，
  * 刷爆日志文件且淹没其他诊断信息。改为循环结束后聚合一条（总数 + 样例路径 + 首个错误）。
  * FIX(A-breaker): 连续失败达阈值即停止重试，防止退避延迟在大批量失败时累积成分钟级卡顿。
  *
  * 日志 key 沿用历史 `main.media.log.recycleBinMoveFailed`（12 语言包共享 key 结构，
- * 仅更新 zh-CN 文案为「移入系统回收站失败」语义，避免波及全部语言包的 key 重命名）。
+ * 仅更新 zh-CN 文案为「移入系统回收站失败」语义，避免波及全部语言包的 key 重命名）；
+ * force 模式改用 `recycleBinRemoveFailed`——同一条日志谎称「移入系统回收站失败」会把用户
+ * 引向错误的排查方向。
  *
  * @param rows 待处理的 DB 记录（id + 文件绝对路径）
+ * @param opts 行为开关；`force` 见 {@link TrashBatchOptions}
  * @returns 三态聚合统计；`failedPaths` 对应的记录不得物理删除 DB
  */
 export async function trashBatch(
-  rows: readonly { id: number; file_path: string }[]
+  rows: readonly { id: number; file_path: string }[],
+  opts?: TrashBatchOptions
 ): Promise<TrashBatchOutcome> {
+  const force = opts?.force === true
   const outcome: TrashBatchOutcome = {
     idsToDelete: [],
     movedCount: 0,
     missingCount: 0,
-    failedPaths: []
+    failedPaths: [],
+    forceDeletedCount: 0
   }
   let firstError: unknown
   let consecutiveFailures = 0
@@ -142,7 +190,9 @@ export async function trashBatch(
   for (const row of rows) {
     // 熔断：连续失败过多说明是系统性故障，重试已无意义，直接快速失败
     const retries = consecutiveFailures >= TRASH_CIRCUIT_BREAK_THRESHOLD ? 0 : TRASH_RETRY_MAX
-    const { result, error } = await trashItemWithFallback(row.file_path, retries)
+    const { result, error } = force
+      ? await removeItemPermanently(row.file_path)
+      : await trashItemWithFallback(row.file_path, retries)
 
     if (result === 'failed') {
       outcome.failedPaths.push(row.file_path)
@@ -153,8 +203,9 @@ export async function trashBatch(
 
     consecutiveFailures = 0
     outcome.idsToDelete.push(row.id)
-    if (result === 'ok') outcome.movedCount++
-    else outcome.missingCount++
+    if (result === 'missing') outcome.missingCount++
+    else if (force) outcome.forceDeletedCount++
+    else outcome.movedCount++
   }
 
   if (outcome.failedPaths.length > 0) {
@@ -162,7 +213,7 @@ export async function trashBatch(
     const samples = shown.join(' | ')
     const omitted = outcome.failedPaths.length - shown.length
     logger.warn(
-      t('main.media.log.recycleBinMoveFailed', {
+      t(force ? 'main.media.log.recycleBinRemoveFailed' : 'main.media.log.recycleBinMoveFailed', {
         failed: outcome.failedPaths.length,
         total: rows.length,
         sample: samples,

@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} elementos · {{size}} en total · Los archivos se moverán a la papelera del sistema tras el eliminado permanente",
     "title": "Papelera de reciclaje",
     "toolbarLabel": "Operaciones de papelera",
-    "videoBadge": "Video"
+    "videoBadge": "Video",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "Ubicación",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

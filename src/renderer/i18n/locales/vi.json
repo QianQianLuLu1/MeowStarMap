@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} mục · tổng {{size}} · sau khi xóa vĩnh viễn tệp sẽ được chuyển vào thùng rác hệ thống",
     "title": "Thùng rác",
     "toolbarLabel": "Thao tác thùng rác",
-    "videoBadge": "Video"
+    "videoBadge": "Video",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "Vị trí",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

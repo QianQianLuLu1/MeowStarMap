@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} éléments · {{size}} au total · après suppression définitive, les fichiers seront déplacés vers la corbeille système",
     "title": "Corbeille",
     "toolbarLabel": "Actions de la corbeille",
-    "videoBadge": "Vidéo"
+    "videoBadge": "Vidéo",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "Lieu",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

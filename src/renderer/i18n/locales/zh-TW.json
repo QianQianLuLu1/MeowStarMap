@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} 項 · 共 {{size}} · 徹底刪除後檔案將移至系統回收站",
     "title": "回收站",
     "toolbarLabel": "回收站操作",
-    "videoBadge": "影片"
+    "videoBadge": "影片",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "地點",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

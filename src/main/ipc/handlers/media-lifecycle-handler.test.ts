@@ -85,7 +85,8 @@ describe('registerMediaLifecycleHandlers', () => {
       idsToDelete: [],
       movedCount: 0,
       missingCount: 0,
-      failedPaths: []
+      failedPaths: [],
+      forceDeletedCount: 0
     })
   })
 
@@ -95,7 +96,8 @@ describe('registerMediaLifecycleHandlers', () => {
       idsToDelete: [1],
       movedCount: 1,
       missingCount: 0,
-      failedPaths: []
+      failedPaths: [],
+      forceDeletedCount: 0
     })
     registerMediaLifecycleHandlers(makeCtx())
 
@@ -105,10 +107,62 @@ describe('registerMediaLifecycleHandlers', () => {
     }
 
     expect(showMessageBoxMock).not.toHaveBeenCalled()
-    expect(trashBatchMock).toHaveBeenCalledWith([{ id: 1, file_path: '/a' }])
+    // #fix-empty-recyclebin-failed-as-success：通道新增可选 force，第二参数显式传三态开关；
+    // 老调用方（零实参）必须落到 force=false，保持「默认移入系统回收站」的既有语义
+    expect(trashBatchMock).toHaveBeenCalledWith([{ id: 1, file_path: '/a' }], { force: false })
     expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1])
     expect(result.success).toBe(true)
     expect(result.data.movedCount).toBe(1)
+  })
+
+  it('media:emptyRecycleBin force=true 时把 { force: true } 透传 trashBatch 并回传 forceDeletedCount', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
+    trashBatchMock.mockResolvedValue({
+      idsToDelete: [1],
+      movedCount: 0,
+      missingCount: 0,
+      failedPaths: [],
+      forceDeletedCount: 1
+    })
+    registerMediaLifecycleHandlers(makeCtx())
+
+    const result = (await getHandler('media:emptyRecycleBin')([true])) as {
+      success: boolean
+      data: { movedCount: number; forceDeletedCount: number; failedCount: number; message: string }
+    }
+
+    expect(trashBatchMock).toHaveBeenCalledWith([{ id: 1, file_path: '/a' }], { force: true })
+    expect(result.success).toBe(true)
+    expect(result.data.forceDeletedCount).toBe(1)
+    // force 下 movedCount（移入系统回收站数）必须仍为 0，不得被永久删除数顶替
+    expect(result.data.movedCount).toBe(0)
+    expect(result.data.failedCount).toBe(0)
+    // 契约锁：force 分支同样不得在 data 内层塞 success
+    expect(result.data).not.toHaveProperty('success')
+  })
+
+  it('media:emptyRecycleBin force 部分失败时文案不得谎称「已移入系统回收站」', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([
+      { id: 1, file_path: '/a' },
+      { id: 2, file_path: '/b' }
+    ])
+    trashBatchMock.mockResolvedValue({
+      idsToDelete: [1],
+      movedCount: 0,
+      missingCount: 0,
+      failedPaths: ['/b'],
+      forceDeletedCount: 1
+    })
+    registerMediaLifecycleHandlers(makeCtx())
+
+    const result = (await getHandler('media:emptyRecycleBin')([true])) as {
+      success: boolean
+      data: { message: string; failedCount: number }
+    }
+
+    expect(result.data.failedCount).toBe(1)
+    expect(result.data.message).not.toContain('移入系统回收站')
+    expect(result.data.message).toContain('彻底删除')
   })
 
   it('media:emptyRecycleBin 回收站为空时返回提示且不弹框（空态边界）', async () => {

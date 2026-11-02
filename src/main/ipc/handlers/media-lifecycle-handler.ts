@@ -1,4 +1,4 @@
-// @core-change: 清空回收站与彻底删除换回 shell.trashItem（移入系统回收站），修复与确认文案「文件会先移至系统回收站」矛盾的永久删除缺陷
+// @core-change: 清空回收站新增可选 force 参数——用户显式同意后可跳过系统回收站直接彻底删除，救活「卷级不接受 shell.trashItem」场景（真机 H 盘 41 项恒失败）
 /**
  * 媒体生命周期域 IPC handler：删除 / 恢复 / 回收站
  *
@@ -9,7 +9,7 @@
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
-import { wrapHandler, wrapHandlerNoArgs, schemas } from '../validator'
+import { wrapHandler, schemas } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
 import { MediaRepository } from '../../database/media-repository'
 import { trashBatch, cleanupThumbnailsForRows, makeNativeThumbRecordCleaner } from './_trash-utils'
@@ -131,14 +131,29 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
   )
 
   // F-S6 回收站：清空回收站
+  // #fix-empty-recyclebin-failed-as-success：新增可选 force。
+  // 真机取证（「同卷换路径形态 / 同形态换卷」分离实验，结论见 docs/plans/
+  // 2026-11-02-fix-empty-recyclebin-failed-as-success-实施计划.md 节点 0）：同一 Electron
+  // 进程在 C 盘可正常移入系统回收站（空格与非 ASCII 路径同样正常），而 H 盘连刚新建的
+  // ASCII 无空格文件也返回 `Failed to perform delete operation` ⇒ 属**卷级**不可用，重试永远失败。
+  // 原 B1 行为（移入失败且文件仍在时保留 DB 记录）是正确的，但用户没有任何出路；force 把
+  // 「直接永久删除」的选择权交回用户，仅在渲染端就「不经过系统回收站、不可恢复」显式二次
+  // 确认后传入。零实参调用 ⇒ force=false ⇒ 行为不变。
   ipcMain.handle(
     'media:emptyRecycleBin',
-    wrapHandlerNoArgs(ctx, async () => {
+    wrapHandler(ctx, z.tuple([z.boolean().optional()]), async ([force]) => {
+      const forceMode = force === true
       const repo = getRepo()
       const rows = repo.getSoftDeletedMediaPaths()
 
       if (rows.length === 0) {
-        return { message: t('main.media.message.recycleBinEmpty'), movedCount: 0 }
+        return {
+          message: t('main.media.message.recycleBinEmpty'),
+          movedCount: 0,
+          missingCount: 0,
+          failedCount: 0,
+          forceDeletedCount: 0
+        }
       }
 
       // 回收站语义修复 D5：二次确认由渲染端 ConfirmDialog 承担（与 media:permanentDelete
@@ -147,7 +162,9 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
 
       // B1 修复：移入系统回收站失败且文件仍存在时，不删除 DB 记录，保留供用户重试。
       // 仅当文件移入成功 或 文件已不存在（DB 踪迹已无对应实体）时才删除 DB。
-      const { idsToDelete, movedCount, missingCount, failedPaths } = await trashBatch(rows)
+      // force 模式下同一不变式成立：unlink 失败且文件仍在 ⇒ 记录保留。
+      const { idsToDelete, movedCount, missingCount, failedPaths, forceDeletedCount } =
+        await trashBatch(rows, { force: forceMode })
       await repo.hardDeleteBatch(idsToDelete)
 
       // #fix-recyclebin-permanent-delete：阶段 4 清理已删除记录的缩略图
@@ -164,18 +181,29 @@ export function registerMediaLifecycleHandlers(ctx: HandlerContext): void {
         idsToDelete.map((id) => ({ eventType: 'asset.deleted' as const, assetId: String(id) }))
       )
       ctx.notifyMediaUpdated()
+      // force 下 movedCount（移入系统回收站数）恒为 0，成功数取 forceDeletedCount + missingCount；
+      // 文案必须分支：非 force 的 partial 文案写「已移入系统回收站」，在 force 下是假话。
+      const succeededCount = forceMode ? forceDeletedCount + missingCount : idsToDelete.length
       const msg =
         failedPaths.length > 0
-          ? t('main.media.message.permanentDeletePartial', {
-              deleted: idsToDelete.length,
-              failed: failedPaths.length
-            })
-          : t('main.media.message.recycleBinEmptied', { count: movedCount + missingCount })
+          ? forceMode
+            ? t('main.media.message.permanentDeletePartialForce', {
+                deleted: succeededCount,
+                failed: failedPaths.length
+              })
+            : t('main.media.message.permanentDeletePartial', {
+                deleted: succeededCount,
+                failed: failedPaths.length
+              })
+          : forceMode
+            ? t('main.media.message.permanentDeleted', { count: succeededCount })
+            : t('main.media.message.recycleBinEmptied', { count: movedCount + missingCount })
       return {
         message: msg,
         movedCount,
         missingCount,
-        failedCount: failedPaths.length
+        failedCount: failedPaths.length,
+        forceDeletedCount
       }
     })
   )

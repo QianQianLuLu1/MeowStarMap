@@ -709,6 +709,64 @@ describe('registerMediaHandlers', () => {
     expect(result.data.failedCount).toBe(0)
   })
 
+  // #fix-empty-recyclebin-failed-as-success 真机取证：H 盘卷级不接受 shell.trashItem
+  //（C 盘同形态文件可移入，空格/中文都不是变量），trashBatch 逐项判 failed ⇒ 一行 DB 都不删。
+  // 主进程行为本身是对的（B1：移入失败且文件仍在时保留记录供重试）；缺陷在渲染层把这次失败
+  // 当成成功（既不读 failedCount，也不点亮重试）。force 是用户显式同意后的出路。
+  it('media:emptyRecycleBin force=true 端到端：走 unlink、不调 trashItem、回传 forceDeletedCount 且无 success 字段', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([
+      { id: 1, file_path: '/a' },
+      { id: 2, file_path: '/b' }
+    ])
+    registerMediaHandlers(makeCtx())
+    const handlerResult = await getHandler('media:emptyRecycleBin')([true])
+    const data = await simulateCall<{
+      message: string
+      movedCount: number
+      missingCount: number
+      failedCount: number
+      forceDeletedCount: number
+    }>(handlerResult)
+
+    expect(shellTrashItemMock).not.toHaveBeenCalled()
+    expect(unlinkMock).toHaveBeenCalledWith('/a')
+    expect(unlinkMock).toHaveBeenCalledWith('/b')
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([1, 2])
+    expect(data.forceDeletedCount).toBe(2)
+    expect(data.movedCount).toBe(0)
+    expect(data.failedCount).toBe(0)
+    // 契约锁：force 分支的 data 内层依然不得含 success（preload call() 已剥掉外层）
+    expect(data).not.toHaveProperty('success')
+  })
+
+  it('media:emptyRecycleBin force=true 但 unlink 失败且文件仍在 ⇒ 保留 DB 记录（B1 在 force 下同样成立）', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
+    const eperm = new Error('EPERM: operation not permitted') as NodeJS.ErrnoException
+    eperm.code = 'EPERM'
+    unlinkMock.mockRejectedValue(eperm)
+    pathExistsMock.mockResolvedValue(true)
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')([true])) as {
+      success: true
+      data: { failedCount: number; forceDeletedCount: number }
+    }
+
+    expect(result.data.failedCount).toBe(1)
+    expect(result.data.forceDeletedCount).toBe(0)
+    expect(repoMock.hardDeleteBatch).toHaveBeenCalledWith([])
+  })
+
+  it('media:emptyRecycleBin 不带 force 的旧调用形态仍然只走系统回收站（向后兼容锁）', async () => {
+    repoMock.getSoftDeletedMediaPaths.mockReturnValue([{ id: 1, file_path: '/a' }])
+    registerMediaHandlers(makeCtx())
+    const result = (await getHandler('media:emptyRecycleBin')()) as {
+      success: true
+      data: { movedCount: number; forceDeletedCount: number }
+    }
+    expect(shellTrashItemMock).toHaveBeenCalledWith('/a')
+    expect(result.data.forceDeletedCount).toBe(0)
+  })
+
   // #fix-recyclebin-permanent-delete 红灯 R2/R4：清空回收站删除 DB 记录后必须清理其缩略图缓存
   //（仅限缓存目录内；游戏原生 LQ 路径绝不触碰）——修复前 emptyRecycleBin 无缩略图清理阶段，
   // 缩略图缓存文件成为永久孤儿残留磁盘。

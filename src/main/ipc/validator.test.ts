@@ -261,3 +261,51 @@ describe('schemas.backupFilename（备份名前缀链）', () => {
     expect(backupTuple.safeParse(['xmeow_star_map_20260101_120000.db']).success).toBe(false)
   })
 })
+
+/**
+ * #fix-empty-recyclebin-failed-as-success：media:emptyRecycleBin 由 wrapHandlerNoArgs 改为
+ * 带可选尾参的 wrapHandler(ctx, z.tuple([z.boolean().optional()]))。
+ *
+ * 为什么必须在**本文件**用真实 zod 钉住：media.test.ts 用 vi.mock('../validator') 把
+ * wrapHandler 换成 tests/mocks/mock-validator（忽略 schema、只解包参数元组），所以通道级
+ * 校验语义在那些用例里根本不执行——「老调用方零实参会不会被 zod 拒」这一条若不在这里覆盖，
+ * 就会永远藏在绿灯后面（本文件头部注释已把同一盲区写在 mediaIdArrayBulk 上）。
+ *
+ * 关键判据是 []（preload call() 不带实参时 ipcRenderer.invoke 收到的 rawArgs 就是空数组），
+ * 不是 undefined：zod 4 下 z.tuple([z.boolean().optional()]) 接受 []，但拒绝 undefined。
+ */
+describe('空布尔可选尾参元组（media:emptyRecycleBin force 通道）', () => {
+  const emptyRecycleBinTuple = z.tuple([z.boolean().optional()])
+
+  it('接受零实参调用（[]），且解构出的 force 为 undefined ⇒ 走系统回收站', () => {
+    const parsed = emptyRecycleBinTuple.safeParse([])
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data[0]).toBeUndefined()
+  })
+
+  it('接受 [undefined]——preload 写 call(ch, force) 且 force 缺省时就是这个形态', () => {
+    // 不是理论分支：media-action.ts 无条件把 force 透传成第二个位置参数，
+    // 未选 force 时 rawArgs 就是 [undefined]。若 zod 拒它，默认清空路径会在**生产**里
+    // 报 VALIDATION_ERROR，而 mock-validator 的测试全绿（它压根不跑 schema）。
+    const parsed = emptyRecycleBinTuple.safeParse([undefined])
+    expect(parsed.success).toBe(true)
+    if (parsed.success) expect(parsed.data[0]).toBeUndefined()
+  })
+
+  it('接受 [true] / [false]，值原样保留', () => {
+    expect(emptyRecycleBinTuple.safeParse([true]).success).toBe(true)
+    expect(emptyRecycleBinTuple.safeParse([false]).success).toBe(true)
+    const r = emptyRecycleBinTuple.safeParse([true])
+    if (r.success) expect(r.data[0]).toBe(true)
+  })
+
+  it('拒绝非布尔（字符串 / 数字 / 对象）⇒ VALIDATION_ERROR，不做宽容强转', () => {
+    expect(emptyRecycleBinTuple.safeParse(['true']).success).toBe(false)
+    expect(emptyRecycleBinTuple.safeParse([1]).success).toBe(false)
+    expect(emptyRecycleBinTuple.safeParse([{ force: true }]).success).toBe(false)
+  })
+
+  it('拒绝多余的第二个位置参数（防止静默忽略调用方笔误）', () => {
+    expect(emptyRecycleBinTuple.safeParse([true, true]).success).toBe(false)
+  })
+})

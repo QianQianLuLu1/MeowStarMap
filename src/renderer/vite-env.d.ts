@@ -512,7 +512,16 @@ interface WindowElectronAPI {
     permanentDelete: (
       mediaIds: number[]
     ) => Promise<{ message: string; deletedCount: number; failedCount: number }>
-    emptyRecycleBin: () => Promise<{ message: string }>
+    // #fix-empty-recyclebin-failed-as-success：与 docs/IPC_CONTRACT.md §2.8 的真实 data 对齐
+    //（原声明 { message: string } 让渲染层类型上读不到 failedCount，因而把「41 项移入失败」
+    //  当成成功弹绿 Toast）；force 仅在渲染端二次确认后传入
+    emptyRecycleBin: (force?: boolean) => Promise<{
+      message: string
+      movedCount: number
+      missingCount: number
+      failedCount: number
+      forceDeletedCount: number
+    }>
     // T02：丢失记录清理（批量 / 单条）
     cleanupMissing: () => Promise<{ success: boolean; message: string; cleared?: number }>
     removeMissing: (mediaId: number) => Promise<{ success: boolean; message: string }>

@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} รายการ · รวม {{size}} · หลังลบถาวรไฟล์จะถูกย้ายไปถังขยะระบบ",
     "title": "ถังขยะ",
     "toolbarLabel": "การดำเนินการถังขยะ",
-    "videoBadge": "วิดีโอ"
+    "videoBadge": "วิดีโอ",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "สถานที่",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

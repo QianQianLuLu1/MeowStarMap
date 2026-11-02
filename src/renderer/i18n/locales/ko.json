@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}}개 항목 · 총 {{size}} · 완전 삭제 후 파일은 시스템 휴지통으로 이동합니다",
     "title": "휴지통",
     "toolbarLabel": "휴지통 작업",
-    "videoBadge": "동영상"
+    "videoBadge": "동영상",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "장소",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

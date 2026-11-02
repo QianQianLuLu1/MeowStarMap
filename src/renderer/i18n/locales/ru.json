@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} шт. · всего {{size}} · после окончательного удаления файлы попадут в системную корзину",
     "title": "Корзина",
     "toolbarLabel": "Операции с корзиной",
-    "videoBadge": "Видео"
+    "videoBadge": "Видео",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "Местоположение",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

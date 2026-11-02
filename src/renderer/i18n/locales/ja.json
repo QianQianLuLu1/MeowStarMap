@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} 件 · 合計 {{size}} · 完全削除後、ファイルはシステムのゴミ箱に移動します",
     "title": "ゴミ箱",
     "toolbarLabel": "ゴミ箱操作",
-    "videoBadge": "動画"
+    "videoBadge": "動画",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "場所",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

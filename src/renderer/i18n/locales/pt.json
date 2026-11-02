@@ -1260,7 +1260,10 @@
     "summaryWithHint": "{{count}} itens · {{size}} no total · após exclusão definitiva, os arquivos serão movidos para a lixeira do sistema",
     "title": "Lixeira",
     "toolbarLabel": "Ações da lixeira",
-    "videoBadge": "Vídeo"
+    "videoBadge": "Vídeo",
+    "emptyForce": "",
+    "emptyForceConfirm": "",
+    "emptyForceConfirmTitle": ""
   },
   "sceneLabel": {
     "location": "Localização",
@@ -2925,11 +2928,13 @@
         "cleanedCorrupted": "",
         "corruptedRemoved": "",
         "nothingToAnalyze": "",
-        "sceneTimeAnalyzed": ""
+        "sceneTimeAnalyzed": "",
+        "permanentDeletePartialForce": ""
       },
       "log": {
         "recycleBinMoveFailed": "",
-        "recycleBinMoveOmitted": ""
+        "recycleBinMoveOmitted": "",
+        "recycleBinRemoveFailed": ""
       },
       "validation": {
         "tagsMax": "",

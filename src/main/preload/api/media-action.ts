@@ -1,3 +1,4 @@
+// @core-change: emptyRecycleBin 返回类型补齐 movedCount/missingCount/failedCount/forceDeletedCount 并加可选 force——原声明 { message } 与 docs/IPC_CONTRACT.md §2.8 漂移，导致渲染层类型上读不到 failedCount 而把失败当成功
 // 媒体操作命名空间：对应主进程 handlers/media-handler.ts 注册的 media:* 通道
 import { call } from '../ipc'
 import type { OutfitStatsResult } from '../../../shared/types/electron-api'
@@ -32,7 +33,16 @@ export const mediaActionAPI = {
       'media:permanentDelete',
       mediaIds
     ),
-  emptyRecycleBin: () => call<{ message: string }>('media:emptyRecycleBin'),
+  // #fix-empty-recyclebin-failed-as-success：返回类型与主进程真实 data 对齐（见 §2.8），
+  // 渲染层需要 failedCount 判定部分失败；force=true 仅在渲染端二次确认后传入
+  emptyRecycleBin: (force?: boolean) =>
+    call<{
+      message: string
+      movedCount: number
+      missingCount: number
+      failedCount: number
+      forceDeletedCount: number
+    }>('media:emptyRecycleBin', force),
   // T02：丢失记录清理（批量 / 单条）
   cleanupMissing: () => call<{ cleaned: number }>('media:cleanupMissing'),
   removeMissing: (mediaId: number) => call<{ removed: boolean }>('media:removeMissing', mediaId),

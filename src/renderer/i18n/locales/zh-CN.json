@@ -1627,6 +1627,9 @@
     "emptyConfirm": "将永久删除回收站中的全部 {{count}} 项文件。\n文件会先移至系统回收站，之后无法从本应用恢复。\n确定要清空吗？",
     "emptyConfirmTitle": "清空回收站",
     "emptyFailed": "清空失败",
+    "emptyForce": "跳过系统回收站，直接彻底删除",
+    "emptyForceConfirm": "将立即从磁盘删除回收站中的全部 {{count}} 项文件，不经过系统回收站，本应用和 Windows 都无法恢复。\n注意：本操作作用于回收站当前的全部条目，其中部分文件本可以正常移入系统回收站。\n确定要继续吗？",
+    "emptyForceConfirmTitle": "直接彻底删除（不经过系统回收站）",
     "emptySuccess": "回收站已清空",
     "emptyTitle": "回收站为空",
     "itemLabel": "回收站项 {{name}}",
@@ -2918,6 +2921,7 @@
         "restored": "已恢复 {{count}} 项",
         "permanentDeleted": "已彻底删除 {{count}} 项",
         "permanentDeletePartial": "已移入系统回收站 {{deleted}} 项（{{failed}} 项移入失败，已保留记录供手动处理）",
+        "permanentDeletePartialForce": "已彻底删除 {{deleted}} 项（{{failed}} 项删除失败，文件仍保留在磁盘）",
         "recycleBinEmpty": "回收站为空，无需清理",
         "recycleBinEmptied": "已清空回收站（共 {{count}} 项）",
         "cleanedMissing": "已清理 {{count}} 条丢失记录",
@@ -2929,6 +2933,7 @@
       },
       "log": {
         "recycleBinMoveFailed": "[RecycleBin] 移入系统回收站失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
+        "recycleBinRemoveFailed": "[RecycleBin] 彻底删除失败 {{failed}}/{{total}} 项，DB 记录已保留供重试。样例: {{sample}}{{omitted}}",
         "recycleBinMoveOmitted": " …(另 {{count}} 项)"
       },
       "validation": {

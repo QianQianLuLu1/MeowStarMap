@@ -59,7 +59,10 @@ export const RecycleBinPage: React.FC = () => {
   const showMessage = useGlobalToast()
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [operating, setOperating] = useState(false)
-  const [confirm, setConfirm] = useState<{ open: boolean; type: 'permanent' | 'empty' | null }>({
+  const [confirm, setConfirm] = useState<{
+    open: boolean
+    type: 'permanent' | 'empty' | 'emptyForce' | null
+  }>({
     open: false,
     type: null
   })
@@ -232,41 +235,58 @@ export const RecycleBinPage: React.FC = () => {
   }, [selectedIds, showMessage, t, staged])
 
   // 清空回收站，带阶段步骤进度
-  const handleEmptyRecycleBin = useCallback(async () => {
-    if (!window.electronAPI?.mediaAction?.emptyRecycleBin) return
-    setOperating(true)
-    setFailedAction(null)
-    // 缓存主进程返回的成功文案；call() 成功即代表操作成功（失败抛 IpcError 由 error 分支透传）
-    let successMessage = ''
-    const final = await staged.run({
-      taskType: 'batch',
-      title: t('taskProgress.phase.processing'),
-      stageLabels: [
-        t('taskProgress.phase.preparing'),
-        t('taskProgress.phase.processing'),
-        t('taskProgress.phase.finalizing')
-      ],
-      canCancel: false,
-      execute: async ({ setStage }) => {
-        setStage(0)
-        setStage(0, 'done')
-        setStage(1)
-        // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message, movedCount, missingCount, failedCount }（无 success 字段）；
-        // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError）。
-        const result = await window.electronAPI!.mediaAction!.emptyRecycleBin()
-        successMessage = result.message ?? ''
-        setStage(1, 'done')
-        setStage(2)
-        setSelectedIds(new Set())
-        await loadRecycleBin()
-        setStage(2, 'done')
+  // #fix-empty-recyclebin-failed-as-success：
+  // - force 仅在用户经「跳过系统回收站」二次确认后传 true；默认 false ⇒ 行为与旧版一致。
+  // - 主进程对「移入系统回收站失败且文件仍在」按 B1 保留 DB 记录，此时 IPC 传输仍是成功，
+  //   必须用 failedCount 判定业务失败（同 handlePermanentDelete 的 r.failedCount 分支）；
+  //   修复前这里不看 failedCount，41 项全失败也走 phase='done' 弹绿色成功 Toast。
+  const handleEmptyRecycleBin = useCallback(
+    async (force?: boolean) => {
+      if (!window.electronAPI?.mediaAction?.emptyRecycleBin) return
+      setOperating(true)
+      setFailedAction(null)
+      // 缓存主进程返回的成功文案；call() 成功即代表操作成功（失败抛 IpcError 由 error 分支透传）
+      let successMessage = ''
+      const final = await staged.run({
+        taskType: 'batch',
+        title: t('taskProgress.phase.processing'),
+        stageLabels: [
+          t('taskProgress.phase.preparing'),
+          t('taskProgress.phase.processing'),
+          t('taskProgress.phase.finalizing')
+        ],
+        canCancel: false,
+        execute: async ({ setStage }) => {
+          setStage(0)
+          setStage(0, 'done')
+          setStage(1)
+          // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message, movedCount, missingCount, failedCount, forceDeletedCount }（无 success 字段）；
+          // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError）。
+          const result = await window.electronAPI!.mediaAction!.emptyRecycleBin(force)
+          if (result.failedCount > 0) {
+            // 抛出使 staged 终态为 error ⇒ 红 Toast 透传主进程文案（与彻底删除同一模式）
+            throw new InternalError(result.message)
+          }
+          successMessage = result.message ?? ''
+          setStage(1, 'done')
+          setStage(2)
+          setSelectedIds(new Set())
+          await loadRecycleBin()
+          setStage(2, 'done')
+        }
+      })
+      if (final?.phase === 'error') {
+        showMessage(final.message ?? t('recycleBin.emptyFailed'), 'error')
+        // F-B1：点亮「重试清空」，并让「跳过系统回收站」出路可达（修复前从未置位 ⇒ 死代码）
+        setFailedAction('empty')
+      } else if (final && final.phase !== 'cancelled') {
+        setFailedAction(null)
+        showMessage(successMessage || t('recycleBin.emptySuccess'), 'success')
       }
-    })
-    if (final?.phase === 'error') showMessage(final.message ?? t('recycleBin.emptyFailed'), 'error')
-    else if (final && final.phase !== 'cancelled')
-      showMessage(successMessage || t('recycleBin.emptySuccess'), 'success')
-    setOperating(false)
-  }, [showMessage, t, staged])
+      setOperating(false)
+    },
+    [showMessage, t, staged]
+  )
 
   // F-B1：重试上次失败的操作
   const handleRetry = useCallback(() => {
@@ -280,6 +300,7 @@ export const RecycleBinPage: React.FC = () => {
     setConfirm({ open: false, type: null })
     if (type === 'permanent') handlePermanentDelete()
     else if (type === 'empty') handleEmptyRecycleBin()
+    else if (type === 'emptyForce') handleEmptyRecycleBin(true)
   }, [confirm.type, handlePermanentDelete, handleEmptyRecycleBin])
 
   // 已加载部分的占用空间。服务端未提供总字节数，未翻完页时这里会偏小，
@@ -289,6 +310,30 @@ export const RecycleBinPage: React.FC = () => {
     [recycleBinFiles]
   )
   const totalCount = recycleBinTotal || recycleBinFiles.length
+
+  // 确认弹窗文案按三种操作取值（清空 / 彻底删除选中 / 跳过系统回收站直接彻底删除）
+  const confirmCopy = useMemo(() => {
+    if (confirm.type === 'empty') {
+      return {
+        // 清空作用于服务端全部软删除记录，必须用总数而非已加载页的条数
+        title: t('recycleBin.emptyConfirmTitle'),
+        message: t('recycleBin.emptyConfirm', { count: totalCount }),
+        confirmText: t('recycleBin.confirmEmpty')
+      }
+    }
+    if (confirm.type === 'emptyForce') {
+      return {
+        title: t('recycleBin.emptyForceConfirmTitle'),
+        message: t('recycleBin.emptyForceConfirm', { count: totalCount }),
+        confirmText: t('recycleBin.permanentDelete')
+      }
+    }
+    return {
+      title: t('recycleBin.permanentConfirmTitle'),
+      message: t('recycleBin.permanentConfirm', { count: selectedIds.size }),
+      confirmText: t('recycleBin.permanentDelete')
+    }
+  }, [confirm.type, totalCount, selectedIds.size, t])
 
   // 虚拟网格：List 负责列布局，Footer 负责触底状态提示与底部留白
   const gridComponents = useMemo(
@@ -409,32 +454,38 @@ export const RecycleBinPage: React.FC = () => {
         )}
       </div>
 
-      {/* 底部操作栏（有选中项时显示；视觉体系 v3：统一 FloatingActionBar 容器） */}
-      {selectedIds.size > 0 && (
+      {/* 底部操作栏：有选中项，或清空回收站失败后需要给出「重试 / 出路」时显示
+          （#fix-empty-recyclebin-failed-as-success：清空失败不产生选中项，原条件
+           selectedIds.size > 0 会让重试入口永远不可见） */}
+      {(selectedIds.size > 0 || failedAction === 'empty') && (
         <FloatingActionBar ariaLabel={t('recycleBin.toolbarLabel')}>
-          <span className="text-sm font-medium px-2" style={{ color: 'var(--text-primary)' }}>
-            {t('recycleBin.selectedCount', { count: selectedIds.size })}
-          </span>
-          <div className="w-px h-5 mx-1" style={{ background: 'var(--divider)' }} />
-          <button
-            className="icon-btn text-sm px-3 w-auto gap-1"
-            onClick={handleRestore}
-            disabled={operating}
-            aria-label={t('recycleBin.restoreSelected')}
-          >
-            <IconRestore size={14} />
-            {t('recycleBin.restore')}
-          </button>
-          <button
-            className="icon-btn text-sm px-3 w-auto gap-1"
-            onClick={() => setConfirm({ open: true, type: 'permanent' })}
-            disabled={operating}
-            style={{ color: 'var(--danger)' }}
-            aria-label={t('recycleBin.permanentDeleteSelected')}
-          >
-            <IconClose size={14} />
-            {t('recycleBin.permanentDelete')}
-          </button>
+          {selectedIds.size > 0 && (
+            <>
+              <span className="text-sm font-medium px-2" style={{ color: 'var(--text-primary)' }}>
+                {t('recycleBin.selectedCount', { count: selectedIds.size })}
+              </span>
+              <div className="w-px h-5 mx-1" style={{ background: 'var(--divider)' }} />
+              <button
+                className="icon-btn text-sm px-3 w-auto gap-1"
+                onClick={handleRestore}
+                disabled={operating}
+                aria-label={t('recycleBin.restoreSelected')}
+              >
+                <IconRestore size={14} />
+                {t('recycleBin.restore')}
+              </button>
+              <button
+                className="icon-btn text-sm px-3 w-auto gap-1"
+                onClick={() => setConfirm({ open: true, type: 'permanent' })}
+                disabled={operating}
+                style={{ color: 'var(--danger)' }}
+                aria-label={t('recycleBin.permanentDeleteSelected')}
+              >
+                <IconClose size={14} />
+                {t('recycleBin.permanentDelete')}
+              </button>
+            </>
+          )}
           {/* F-B1：操作失败时显示重试按钮（高亮，引导用户重试） */}
           {failedAction && (
             <>
@@ -449,35 +500,40 @@ export const RecycleBinPage: React.FC = () => {
                 {failedAction === 'permanent' && t('recycleBin.retryDelete')}
                 {failedAction === 'empty' && t('recycleBin.retryEmpty')}
               </button>
+              {/* 移入系统回收站失败后的出路：卷级不接受回收站时重试永远失败，
+                  由用户显式确认后跳过系统回收站直接彻底删除 */}
+              {failedAction === 'empty' && recycleBinFiles.length > 0 && (
+                <button
+                  className="icon-btn text-sm px-3 w-auto gap-1"
+                  onClick={() => setConfirm({ open: true, type: 'emptyForce' })}
+                  disabled={operating}
+                  style={{ color: 'var(--danger)' }}
+                >
+                  {t('recycleBin.emptyForce')}
+                </button>
+              )}
             </>
           )}
-          <div className="w-px h-5 mx-1" style={{ background: 'var(--divider)' }} />
-          <button
-            className="icon-btn"
-            onClick={clearSelection}
-            aria-label={t('recycleBin.clearSelection')}
-          >
-            <IconClose size={14} />
-          </button>
+          {selectedIds.size > 0 && (
+            <>
+              <div className="w-px h-5 mx-1" style={{ background: 'var(--divider)' }} />
+              <button
+                className="icon-btn"
+                onClick={clearSelection}
+                aria-label={t('recycleBin.clearSelection')}
+              >
+                <IconClose size={14} />
+              </button>
+            </>
+          )}
         </FloatingActionBar>
       )}
 
       <ConfirmDialog
         open={confirm.open}
-        title={
-          confirm.type === 'empty'
-            ? t('recycleBin.emptyConfirmTitle')
-            : t('recycleBin.permanentConfirmTitle')
-        }
-        message={
-          confirm.type === 'empty'
-            ? // 清空作用于服务端全部软删除记录，必须用总数而非已加载页的条数
-              t('recycleBin.emptyConfirm', { count: totalCount })
-            : t('recycleBin.permanentConfirm', { count: selectedIds.size })
-        }
-        confirmText={
-          confirm.type === 'empty' ? t('recycleBin.confirmEmpty') : t('recycleBin.permanentDelete')
-        }
+        title={confirmCopy.title}
+        message={confirmCopy.message}
+        confirmText={confirmCopy.confirmText}
         confirmVariant="danger"
         onConfirm={handleConfirm}
         onCancel={() => setConfirm({ open: false, type: null })}
