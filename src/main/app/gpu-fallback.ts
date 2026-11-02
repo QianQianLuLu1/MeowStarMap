@@ -262,8 +262,12 @@ export function writeGpuDiscretePref(value: GpuDiscretePreference): void {
 }
 
 /**
- * 写入硬件加速偏好镜像；value===true 时一并复位崩溃自愈标记 fallbackActive
- * 与兼容档位 compatLevel，给用户一次干净的硬件加速重试机会（仍由真实崩溃观测兜底）。
+ * 写入硬件加速偏好镜像；value===true 时一并复位崩溃自愈标记 fallbackActive、
+ * 兼容档位 compatLevel 与连续失败计数 consecutiveFailures，给用户一次干净的硬件加速
+ * 重试机会（仍由真实崩溃观测兜底）。
+ * 计数也必须清：只清前两者时，残留的 consecutiveFailures 一旦达 FAILURE_THRESHOLD，
+ * 下次启动会立刻落进 shouldDisableHardwareAcceleration 的阈值分支回手置
+ * fallbackActive=true，用户「开启硬件加速」被静默架空。
  */
 export function writeHardwareAccelPref(value: boolean): void {
   mergeWriteGpuBootPrefs({ hardwareAcceleration: value })
@@ -271,8 +275,12 @@ export function writeHardwareAccelPref(value: boolean): void {
     try {
       const state = readState()
       // 档位指令必须一起清：否则设置开关被陈旧档位架空，下次启动仍带 --disable-gpu
-      if (state.fallbackActive || normalizeCompatLevel(state.compatLevel) > 0) {
-        writeState({ ...state, fallbackActive: false, compatLevel: 0 })
+      if (
+        state.fallbackActive ||
+        normalizeCompatLevel(state.compatLevel) > 0 ||
+        state.consecutiveFailures > 0
+      ) {
+        writeState({ ...state, fallbackActive: false, compatLevel: 0, consecutiveFailures: 0 })
       }
     } catch {
       // 静默降级，不影响主流程
@@ -288,7 +296,8 @@ export function writeHardwareAccelPref(value: boolean): void {
  *  2) 未关闭时，崩溃自愈逻辑优先于"用户开启"：若真实 GPU 崩溃已落盘
  *     fallbackActive（或连续失败达阈值），仍回退软件渲染，避免启用后
  *     反复崩溃白屏。用户开启仅通过 writeHardwareAccelPref(true) 清空
- *     fallbackActive 来获得一次干净重试，故正常启动会落入下方返回 false；
+ *     fallbackActive、compatLevel 与 consecutiveFailures 三轴来获得一次干净重试
+ *     （阈值慢路径不会被旧计数立刻重新点燃），故正常启动会落入下方返回 false；
  *  3) **版本级自动重试（2026-10-24 优化）**：fallbackActive 已置位但版本戳
  *     与当前版本不一致（含旧格式无戳）→ 说明回退发生在旧版本时期，显卡
  *     驱动/系统可能已修复——落当前版本戳并返回 false，给每个新版本一次

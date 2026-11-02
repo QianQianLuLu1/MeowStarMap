@@ -247,6 +247,44 @@ describe('gpu-fallback 用户偏好镜像', () => {
     expect(recordBootLevel()).toBe(0)
   })
 
+  it('b2. 用户显式开启硬件加速时，残留的连续失败计数不得架空该开关', () => {
+    // 复现缺陷：计数已达 FAILURE_THRESHOLD=2 时，writeHardwareAccelPref(true) 只清
+    // fallbackActive/compatLevel 而漏掉 consecutiveFailures，下次启动会落进阈值分支
+    // 当场回手置 fallbackActive=true ⇒ 用户在设置页明确要硬件加速却被静默架空。
+    writeRaw({
+      consecutiveFailures: 2,
+      fallbackActive: true,
+      fallbackVersion: '2.5.5',
+      compatLevel: 1,
+      compatLevelVersion: '2.5.5'
+    })
+    writeHardwareAccelPref(true)
+    expect(readHardwareAccelPref()).toBe(true)
+    expect(readRaw().fallbackActive).toBe(false)
+    expect(readRaw().compatLevel).toBe(0)
+    // 计数轴也必须归零，否则「一次干净重试」立刻被阈值路径吃掉
+    expect(readRaw().consecutiveFailures).toBe(0)
+    expect(shouldDisableHardwareAcceleration()).toBe(false)
+    expect(recordBootLevel()).toBe(0)
+  })
+
+  it('b3. 边界守卫：计数未达阈值（1）时开启硬件加速，行为与 b2 同向且不得过度清零', () => {
+    // 本用例在修复前即绿，属不变量守卫（防「顺手把计数一律抹掉」把阈值慢路径拆掉）：
+    // 阈值兜底靠真实累计，用户开关只复位一次干净重试所需的三轴。
+    writeRaw({
+      consecutiveFailures: 1,
+      fallbackActive: true,
+      fallbackVersion: '2.5.5',
+      compatLevel: 1,
+      compatLevelVersion: '2.5.5'
+    })
+    writeHardwareAccelPref(true)
+    expect(readRaw().fallbackActive).toBe(false)
+    expect(readRaw().compatLevel).toBe(0)
+    expect(shouldDisableHardwareAcceleration()).toBe(false)
+    expect(recordBootLevel()).toBe(0)
+  })
+
   it('c. 无偏好镜像（undefined）且 fallbackActive=true（同版本戳）→ 返回 true（维持既有逻辑）', () => {
     writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
     expect(fs.existsSync(prefPath())).toBe(false)
