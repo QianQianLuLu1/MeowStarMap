@@ -18,7 +18,13 @@ import {
 /** GPU 状态载荷的最小结构声明（与 shared/types/electron-api.ts 的 GpuStatusSummary 对齐） */
 interface GpuStatusPayload {
   hardwareAcceleration: { enabled: boolean; reason: string }
-  fallback: { active: boolean; consecutiveFailures: number; fallbackVersion: string | null }
+  /** compatLevel：兼容档位（0 硬件 / 1 禁硬件加速 / 2 最大兼容）；旧载荷缺省按 0 */
+  fallback: {
+    active: boolean
+    consecutiveFailures: number
+    fallbackVersion: string | null
+    compatLevel?: number
+  }
   discretePreference: { mode: 'auto' | 'high-performance'; registry: string | null }
   featureStatus: Record<string, string> | null
   gpus: Array<{
@@ -204,7 +210,7 @@ export const DiagnosticsGpuSection: React.FC = () => {
               }}
             >
               {status.fallback.active
-                ? `${t('settings.gpu.fallbackActive')}（v=${status.fallback.fallbackVersion ?? '?'}, fails=${status.fallback.consecutiveFailures}）`
+                ? `${t('settings.gpu.fallbackActive')}（v=${status.fallback.fallbackVersion ?? '?'}, fails=${status.fallback.consecutiveFailures}, level=${status.fallback.compatLevel ?? 0}）`
                 : t('settings.gpu.fallbackInactive')}
             </span>
           </SettingsCard>

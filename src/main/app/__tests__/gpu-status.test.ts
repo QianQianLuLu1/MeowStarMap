@@ -202,4 +202,23 @@ describe('buildGpuStatusSummaryLine（启动日志摘要）', () => {
     expect(line).toContain('user-disabled')
     expect(line).toContain('gpus=unknown')
   })
+
+  it('l3. 摘要带兼容档位：level 是「设备卡在第几级」的唯一可判定信号', () => {
+    const line = buildGpuStatusSummaryLine({
+      hardwareAcceleration: { enabled: false, reason: 'crash-fallback' },
+      fallback: {
+        active: true,
+        consecutiveFailures: 0,
+        fallbackVersion: '2.5.6',
+        compatLevel: 2
+      },
+      discretePreference: { mode: 'high-performance', registry: 'set' },
+      featureStatus: null,
+      gpus: null,
+      activeGpu: null,
+      electronVersion: '41.0.0',
+      platform: 'win32'
+    })
+    expect(line).toContain('level=2')
+  })
 })

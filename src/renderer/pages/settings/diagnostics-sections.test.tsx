@@ -100,7 +100,12 @@ describe('DiagnosticsGpuSection — GPU 状态卡', () => {
       Promise.resolve({
         ...FULL_STATUS,
         hardwareAcceleration: { enabled: false, reason: 'crash-fallback' },
-        fallback: { active: true, consecutiveFailures: 2, fallbackVersion: '2.5.5' },
+        fallback: {
+          active: true,
+          consecutiveFailures: 2,
+          fallbackVersion: '2.5.5',
+          compatLevel: 2
+        },
         discretePreference: { mode: 'auto', registry: null },
         featureStatus: null,
         gpus: null,
@@ -114,9 +119,26 @@ describe('DiagnosticsGpuSection — GPU 状态卡', () => {
     )
     await waitFor(() => expect(screen.getByText('已关闭')).toBeInTheDocument())
     expect(screen.getByText('(因崩溃自动回退)')).toBeInTheDocument()
-    expect(screen.getByText(/已激活（v=2\.5\.5/)).toBeInTheDocument()
+    // 兼容档位必须可见：只有 level 才能区分「禁硬件加速」与「最大兼容」
+    expect(screen.getByText(/已激活（v=2\.5\.5.*level=2/)).toBeInTheDocument()
     expect(screen.getByText('跟随系统')).toBeInTheDocument()
     const unavailable = screen.getAllByText('不可用')
     expect(unavailable.length).toBeGreaterThanOrEqual(2) // 活动显卡 + 特性/清单
+  })
+
+  it('(边界) 旧 payload 无 compatLevel → 按 0 级展示，不崩', async () => {
+    installElectronApi(
+      Promise.resolve({
+        ...FULL_STATUS,
+        hardwareAcceleration: { enabled: false, reason: 'user-disabled' },
+        fallback: { active: true, consecutiveFailures: 0, fallbackVersion: null }
+      })
+    )
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <DiagnosticsGpuSection />
+      </GlobalToastContext.Provider>
+    )
+    await waitFor(() => expect(screen.getByText(/已激活（.*level=0/)).toBeInTheDocument())
   })
 })

@@ -229,13 +229,22 @@ describe('gpu-fallback 用户偏好镜像', () => {
   })
 
   it('b. 用户显式开启（pref=true）且 fallbackActive=true → 返回 false，且 writeHardwareAccelPref(true) 清空 fallbackActive', () => {
-    writeRaw({ consecutiveFailures: 0, fallbackActive: true })
+    // 同时带着已升到 2 级的兼容档位：用户明确要硬件加速时，档位指令也必须一并复位，
+    // 否则设置开关会被陈旧档位悄悄架空（下次启动仍带 --disable-gpu）。
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: true,
+      compatLevel: 2,
+      compatLevelVersion: '2.5.5'
+    })
     writeHardwareAccelPref(true)
     expect(fs.existsSync(prefPath())).toBe(true)
     expect(readHardwareAccelPref()).toBe(true)
     // 写盘时清空崩溃自愈标记，给用户一次干净重试
     expect(readRaw().fallbackActive).toBe(false)
+    expect(readRaw().compatLevel).toBe(0)
     expect(shouldDisableHardwareAcceleration()).toBe(false)
+    expect(recordBootLevel()).toBe(0)
   })
 
   it('c. 无偏好镜像（undefined）且 fallbackActive=true（同版本戳）→ 返回 true（维持既有逻辑）', () => {
@@ -538,19 +547,30 @@ describe('gpu-fallback 三级兼容阶梯（resolveCompatLevel / recordBootLevel
 })
 
 describe('gpu-fallback 状态查询导出（供 gpu-status，只读）', () => {
-  it('q1. readGpuFallbackState：无文件 → 默认态；有文件 → 归一化透出', () => {
+  it('q1. readGpuFallbackState：无文件 → 默认态；有文件 → 归一化透出（含兼容档位）', () => {
     expect(readGpuFallbackState()).toEqual({
       active: false,
       consecutiveFailures: 0,
-      fallbackVersion: null
+      fallbackVersion: null,
+      compatLevel: 0
     })
 
-    writeRaw({ consecutiveFailures: 3, fallbackActive: true, fallbackVersion: '2.5.4' })
+    writeRaw({
+      consecutiveFailures: 3,
+      fallbackActive: true,
+      fallbackVersion: '2.5.4',
+      compatLevel: 2
+    })
     expect(readGpuFallbackState()).toEqual({
       active: true,
       consecutiveFailures: 3,
-      fallbackVersion: '2.5.4'
+      fallbackVersion: '2.5.4',
+      compatLevel: 2
     })
+
+    // 旧格式（无 compatLevel 字段）→ 归一为 0，不得把 undefined 透出给渲染层
+    writeRaw({ consecutiveFailures: 1, fallbackActive: false })
+    expect(readGpuFallbackState().compatLevel).toBe(0)
   })
 
   it('q2. classifyBootDecisionForStatus 四分类：default / user-disabled / crash-fallback / retry-after-update', () => {

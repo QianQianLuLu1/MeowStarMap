@@ -159,9 +159,10 @@ export async function collectGpuStatus(deps: GpuStatusDeps = {}): Promise<GpuSta
 export function buildGpuStatusSummaryLine(s: GpuStatusSummary): string {
   const hw = s.hardwareAcceleration.enabled ? 'on' : 'off'
   const gpuCount = s.gpus === null ? 'unknown' : String(s.gpus.length)
+  const level = s.fallback.compatLevel ?? 0
   const fallback = s.fallback.active
-    ? `on(v=${s.fallback.fallbackVersion ?? '?'},fails=${s.fallback.consecutiveFailures})`
-    : 'off'
+    ? `on(v=${s.fallback.fallbackVersion ?? '?'},fails=${s.fallback.consecutiveFailures},level=${level})`
+    : `off(level=${level})`
   const active = s.activeGpu ?? 'unknown'
   return (
     `GPU 状态: hwAccel=${hw}(${s.hardwareAcceleration.reason}) activeGPU=${active} ` +

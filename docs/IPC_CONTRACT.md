@@ -773,7 +773,9 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   `collectGpuStatus()`；preload 侧暴露为 `window.electronAPI.app.getGpuStatus()`。
 - **返回**（`GpuStatusSummary`，类型真相源 `src/shared/types/electron-api.ts`）：
   `hardwareAcceleration{enabled, reason: 'default'|'user-disabled'|'crash-fallback'|'retry-after-update'}`、
-  `fallback{active, consecutiveFailures, fallbackVersion}`、
+  `fallback{active, consecutiveFailures, fallbackVersion, compatLevel?}`、
+  （`compatLevel` 为 2026-11-02 新增的**可选**字段：兼容档位 0 硬件加速 / 1 禁用硬件加速 /
+  2 最大兼容（GPU 进程不再启动）；旧载荷缺省视为 0，通道名与既有字段语义不变，向后兼容）
   `discretePreference{mode: 'auto'|'high-performance', registry: 应用结果|null}`、
   `featureStatus: Record<string,string>|null`（chrome://gpu 同源特性状态）、
   `gpus: GpuDeviceSummary[]|null`、`activeGpu: string|null`（auxAttributes.glRenderer）、

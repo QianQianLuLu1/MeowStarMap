@@ -440,7 +440,14 @@ export interface GpuDeviceSummary {
 /** GPU 状态总览（app:gpu-status 返回值；GPU 信息不可得时 gpus/activeGpu/featureStatus 为 null） */
 export interface GpuStatusSummary {
   hardwareAcceleration: { enabled: boolean; reason: GpuBootDecisionReason }
-  fallback: { active: boolean; consecutiveFailures: number; fallbackVersion: string | null }
+  fallback: {
+    active: boolean
+    consecutiveFailures: number
+    fallbackVersion: string | null
+    /** 兼容档位：0 硬件加速 / 1 禁用硬件加速 / 2 最大兼容（GPU 进程不再启动）。
+     *  2026-11-02 新增的可选字段，旧载荷缺省视为 0（向后兼容） */
+    compatLevel?: number
+  }
   discretePreference: { mode: 'auto' | 'high-performance'; registry: string | null }
   /** Chromium GPU Feature Status（chrome://gpu 同源），如 { canvas:'enabled', webgl:'enabled' } */
   featureStatus: Record<string, string> | null

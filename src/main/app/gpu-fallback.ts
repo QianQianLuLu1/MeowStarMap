@@ -262,15 +262,18 @@ export function writeGpuDiscretePref(value: GpuDiscretePreference): void {
 }
 
 /**
- * 写入硬件加速偏好镜像；value===true 时一并复位崩溃自愈标记 fallbackActive，
- * 给用户一次干净的硬件加速重试机会（仍由真实崩溃观测兜底）。
+ * 写入硬件加速偏好镜像；value===true 时一并复位崩溃自愈标记 fallbackActive
+ * 与兼容档位 compatLevel，给用户一次干净的硬件加速重试机会（仍由真实崩溃观测兜底）。
  */
 export function writeHardwareAccelPref(value: boolean): void {
   mergeWriteGpuBootPrefs({ hardwareAcceleration: value })
   if (value === true) {
     try {
       const state = readState()
-      if (state.fallbackActive) writeState({ ...state, fallbackActive: false })
+      // 档位指令必须一起清：否则设置开关被陈旧档位架空，下次启动仍带 --disable-gpu
+      if (state.fallbackActive || normalizeCompatLevel(state.compatLevel) > 0) {
+        writeState({ ...state, fallbackActive: false, compatLevel: 0 })
+      }
     } catch {
       // 静默降级，不影响主流程
     }
@@ -423,6 +426,8 @@ export interface GpuFallbackStateSnapshot {
   active: boolean
   consecutiveFailures: number
   fallbackVersion: string | null
+  /** 当前兼容档位（旧文件无字段 → 0） */
+  compatLevel: GpuCompatLevel
 }
 
 /** 只读透出回退状态文件（供 gpu-status 聚合，不做任何写盘） */
@@ -431,7 +436,8 @@ export function readGpuFallbackState(): GpuFallbackStateSnapshot {
   return {
     active: s.fallbackActive,
     consecutiveFailures: s.consecutiveFailures,
-    fallbackVersion: s.fallbackVersion ?? null
+    fallbackVersion: s.fallbackVersion ?? null,
+    compatLevel: normalizeCompatLevel(s.compatLevel)
   }
 }
 
