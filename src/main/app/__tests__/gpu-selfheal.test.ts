@@ -168,6 +168,75 @@ describe('GPU 崩溃自愈完整链路', () => {
     const raw = JSON.parse(fs.readFileSync(path.join(tmpDir, 'gpu-fallback.json'), 'utf8'))
     expect(raw.fallbackActive).toBe(true)
   })
+
+  it('7. 取证联动：上次被原生层杀死（陈旧心跳、无 last-exit）→ 证据判 native，据此升一档', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'heartbeat.json'),
+      JSON.stringify({
+        bootId: 'killed-boot',
+        pid: 4321,
+        startedAt: '2026-11-01T14:06:00.000Z',
+        updatedAt: '2026-11-01T14:06:03.443Z',
+        stage: 'initialized'
+      })
+    )
+    fs.writeFileSync(
+      path.join(tmpDir, 'gpu-fallback.json'),
+      JSON.stringify({
+        consecutiveFailures: 0,
+        fallbackActive: true,
+        fallbackVersion: '2.5.5',
+        compatLevel: 1,
+        compatLevelVersion: '2.5.5'
+      })
+    )
+    const fx = await import('../exit-forensics')
+    const m = await import('../gpu-fallback')
+    const ev = fx.getPreviousExitEvidence()
+    expect(ev.kind).toBe('native')
+    // 兼容档仍被 FATAL 杀死 → 本次必须落到最大兼容档（2026-11-02 转储证实 1 级救不回来）
+    expect(m.recordBootLevel({ prevNativeKill: ev.kind === 'native' })).toBe(2)
+  })
+
+  it('7b. 取证联动：JS 管理退出不得触发升档（避免用户主动关闭被当成 GPU 故障）', async () => {
+    fs.writeFileSync(
+      path.join(tmpDir, 'heartbeat.json'),
+      JSON.stringify({
+        bootId: 'same-boot',
+        pid: 4321,
+        startedAt: '2026-11-01T14:00:00.000Z',
+        updatedAt: '2026-11-01T14:00:30.000Z',
+        stage: 'cleanup'
+      })
+    )
+    fs.writeFileSync(
+      path.join(tmpDir, 'last-exit.json'),
+      JSON.stringify({
+        bootId: 'same-boot',
+        code: 0,
+        stage: 'cleanup',
+        time: '2026-11-01T14:00:31.000Z',
+        journal: [],
+        uptime: 31
+      })
+    )
+    fs.writeFileSync(
+      path.join(tmpDir, 'gpu-fallback.json'),
+      JSON.stringify({
+        consecutiveFailures: 0,
+        fallbackActive: true,
+        fallbackVersion: '2.5.5',
+        compatLevel: 1,
+        compatLevelVersion: '2.5.5'
+      })
+    )
+    const fx = await import('../exit-forensics')
+    const m = await import('../gpu-fallback')
+    expect(fx.getPreviousExitEvidence().kind).toBe('js')
+    expect(
+      m.recordBootLevel({ prevNativeKill: fx.getPreviousExitEvidence().kind === 'native' })
+    ).toBe(1)
+  })
 })
 
 describe('GPU 崩溃升级策略（clean-exit 过滤 + 运行期 60s 窗口计数）', () => {

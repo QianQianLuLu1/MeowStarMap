@@ -290,3 +290,81 @@ describe('exit-forensics 退出码与清理', () => {
     )
   })
 })
+
+describe('exit-forensics 上次终止性质只读 API（供 GPU 兼容阶梯升级消费）', () => {
+  it('e1. classifyPreviousExit 纯函数四分支：none / js / native / bootId 不匹配 native', async () => {
+    const fx = await freshModule()
+    const hb = {
+      bootId: 'A',
+      pid: 1,
+      startedAt: 't0',
+      updatedAt: 't1',
+      stage: 'initialized'
+    }
+    const ex = { bootId: 'A', code: 0, stage: 'cleanup', time: 't2', journal: [], uptime: 9 }
+
+    expect(fx.classifyPreviousExit(null, null)).toEqual({ kind: 'none' })
+    expect(fx.classifyPreviousExit(hb, ex).kind).toBe('js')
+    expect(fx.classifyPreviousExit(hb, ex)).toEqual({
+      kind: 'js',
+      bootId: 'A',
+      stage: 'cleanup',
+      at: 't2'
+    })
+    expect(fx.classifyPreviousExit(hb, null)).toEqual({
+      kind: 'native',
+      bootId: 'A',
+      stage: 'initialized',
+      at: 't1'
+    })
+    expect(fx.classifyPreviousExit(hb, { ...ex, bootId: 'B' }).kind).toBe('native')
+  })
+
+  it('e2. getPreviousExitEvidence 不依赖 initExitForensics（ready 前即可判定），陈旧心跳 → native', async () => {
+    writeStaleHeartbeat('killed-boot')
+    const fx = await freshModule()
+    const ev = fx.getPreviousExitEvidence()
+    expect(ev).toEqual({
+      kind: 'native',
+      bootId: 'killed-boot',
+      stage: 'initialized',
+      at: '2026-08-29T06:00:18.000Z'
+    })
+    // 只读：绝不清理心跳、绝不写盘（否则随后 initExitForensics 的判别会被吞掉）
+    expect(fs.existsSync(heartbeatPath())).toBe(true)
+    expect(diagLogMock).not.toHaveBeenCalled()
+    // 先取证据、后初始化取证：两者结论一致（同一份判定逻辑，不得两套口径）
+    fx.initExitForensics()
+    expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('e3. JS 管理退出（心跳 + 同 bootId 退出码）→ kind=js（阶梯据此不得升档）', async () => {
+    writeStaleHeartbeat('js-boot')
+    fs.writeFileSync(
+      lastExitPath(),
+      JSON.stringify({
+        bootId: 'js-boot',
+        code: 0,
+        stage: 'cleanup',
+        time: '2026-08-29T06:00:20.000Z',
+        journal: ['will-quit'],
+        uptime: 12
+      })
+    )
+    const fx = await freshModule()
+    expect(fx.getPreviousExitEvidence().kind).toBe('js')
+  })
+
+  it('e4. 无心跳（正常启动）→ none；文件损坏 / 心跳为目录 → none 且不抛（fail-open）', async () => {
+    const fx = await freshModule()
+    expect(fx.getPreviousExitEvidence()).toEqual({ kind: 'none' })
+
+    fs.writeFileSync(heartbeatPath(), 'not-json{{{')
+    expect(fx.getPreviousExitEvidence().kind).toBe('none')
+
+    fs.rmSync(heartbeatPath())
+    fs.mkdirSync(heartbeatPath())
+    expect(() => fx.getPreviousExitEvidence()).not.toThrow()
+    expect(fx.getPreviousExitEvidence().kind).toBe('none')
+  })
+})

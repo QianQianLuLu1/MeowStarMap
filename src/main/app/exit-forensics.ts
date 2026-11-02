@@ -26,8 +26,24 @@ import { logger } from '../utils/logger'
  *   陈旧心跳 + last-exit 缺失 → 外部终止（TerminateProcess 类，logFault）。
  *
  * 全部文件读写 try/catch 容错：userData 不可写 / JSON 损坏 → 视为不存在，
- * 绝不阻塞启动；取证数据不参与任何业务控制流。
+ * 绝不阻塞启动。
+ *
+ * 口径订正（2026-11-02）：本模块**写盘与打点仍不参与业务控制流**，但「上次是否被
+ * 原生层杀死」这一判定结论对外只读暴露（getPreviousExitEvidence），供 GPU 兼容阶梯
+ * 作为升档证据消费——Chromium 的 GPU FATAL 是 int 3 同步自杀，JS 侧没有任何
+ * 异常/退出痕迹可查，陈旧心跳是唯一可用信号。
  */
+
+/** 上次终止性质：none=无陈旧心跳（首次/正常退出）；js=JS 管理退出；native=原生层/外部终止 */
+export type PreviousExitKind = 'none' | 'js' | 'native'
+
+export interface PreviousExitEvidence {
+  kind: PreviousExitKind
+  bootId?: string
+  stage?: string
+  /** js → last-exit 的 time；native → 最后一次心跳时刻 */
+  at?: string
+}
 
 /** 心跳间隔：与启动扫描入队（5s）同量级，死亡时间定位误差 ≤5s */
 const HEARTBEAT_INTERVAL_MS = 5000
@@ -148,13 +164,45 @@ function writeHeartbeat(): void {
   }
 }
 
-/** 上次运行判别：只产出日志，不影响任何业务流程 */
+/**
+ * 纯函数：由心跳与退出码两份文件判定上次终止性质（无 fs / 无 electron）。
+ * 心跳缺席 = 无异常证据；同一 bootId 的 last-exit 存在 = JS 管理退出（含 app.exit /
+ * process.exit / 事件循环排空），否则 = 原生层/外部终止（Chromium FATAL 即此类）。
+ */
+export function classifyPreviousExit(
+  heartbeat: HeartbeatFile | null,
+  lastExit: LastExitFile | null
+): PreviousExitEvidence {
+  if (!heartbeat) return { kind: 'none' }
+  if (lastExit && lastExit.bootId === heartbeat.bootId) {
+    return { kind: 'js', bootId: heartbeat.bootId, stage: lastExit.stage, at: lastExit.time }
+  }
+  return {
+    kind: 'native',
+    bootId: heartbeat.bootId,
+    stage: heartbeat.stage,
+    at: heartbeat.updatedAt
+  }
+}
+
+/**
+ * 对外只读判定上次终止性质：**可在 ready 前调用**，不依赖 initExitForensics 已执行，
+ * 且绝不写盘/不清理（否则随后 readStaleEvidence 的判别会被吞掉）。
+ */
+export function getPreviousExitEvidence(): PreviousExitEvidence {
+  const heartbeat = readJsonFile(getHeartbeatPath(), parseHeartbeat)
+  // 常见路径（上次正常退出，心跳已删）：不必再读退出码文件
+  if (!heartbeat) return { kind: 'none' }
+  return classifyPreviousExit(heartbeat, readJsonFile(getLastExitPath(), parseLastExit))
+}
+
+/** 上次运行判别：产出日志，并把结论同一口径用于对外只读 API */
 function readStaleEvidence(): void {
   const staleHeartbeat = readJsonFile(getHeartbeatPath(), parseHeartbeat)
   if (!staleHeartbeat) return // 首次启动 / 上次正常退出（心跳已清理）/ 文件损坏
 
   const lastExit = readJsonFile(getLastExitPath(), parseLastExit)
-  if (lastExit && lastExit.bootId === staleHeartbeat.bootId) {
+  if (classifyPreviousExit(staleHeartbeat, lastExit).kind === 'js' && lastExit) {
     // JS 管理的退出（app.quit / app.exit / process.exit 均会触发 Node exit 事件）
     const summary =
       `上次运行 JS 管理退出 code=${lastExit.code} stage=${lastExit.stage} ` +

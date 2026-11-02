@@ -9,7 +9,7 @@ import { verifyStartupEnvironment } from './app/startup-environment'
 import { electronLogger } from './utils/logger'
 import { registerRendererProtocol } from './app/renderer-protocol'
 import {
-  recordBootDecision,
+  recordBootLevel,
   markBootAttempt,
   setupGpuProcessWatcher,
   requestSelfHeal,
@@ -17,7 +17,7 @@ import {
   readGpuBootPrefs
 } from './app/gpu-fallback'
 import { applyDiscreteGpuPreference } from './app/gpu-preference'
-import { initExitForensics, markExitStage } from './app/exit-forensics'
+import { getPreviousExitEvidence, initExitForensics, markExitStage } from './app/exit-forensics'
 import { installFfmpegSpawnGuard } from './utils/fluent-ffmpeg-shim'
 import { t } from './i18n'
 
@@ -87,13 +87,20 @@ if (process.env.NIKKI_EARLY_CRASH_SIM === '1') {
 diagLog('INDEX', '=== index.ts loaded ===')
 
 // GPU 崩溃自动回退（VS Code 模式）：部分机器 GPU 进程无法运行时，Chromium 会以
-// FATAL "GPU process isn't usable. Goodbye." 自杀主进程，表现为 loadURL 报
-// ERR_FAILED(-2) 白屏（app:// 协议层无关，2026-08-19 用户机 54 个 dump 裁决）。
-// 上次已激活回退（GPU 崩溃标记或连续启动失败≥2）→ 本次启动禁用硬件加速。
-// 必须在 app ready 之前调用 disableHardwareAcceleration 才生效。
-if (recordBootDecision()) {
+// FATAL "GPU process isn't usable. Goodbye." 自杀主进程，表现为启动即闪退或
+// loadURL 报 ERR_FAILED(-2) 白屏（app:// 协议层无关，2026-08-19 用户机 54 个 dump 裁决）。
+// 三级兼容阶梯：0 硬件加速 / 1 禁用硬件加速 / 2 最大兼容（见 gpu-fallback 头注释）。
+// 上次被原生层杀死（FATAL 是 int 3 同步自杀，JS 侧无异常无退出痕迹，陈旧心跳是唯一信号）
+// → 在上一次实际用过的档位上再降一级；必须在 app ready 之前决策才生效。
+const gpuCompatLevel = recordBootLevel({
+  prevNativeKill: getPreviousExitEvidence().kind === 'native'
+})
+if (gpuCompatLevel >= 1) {
   app.disableHardwareAcceleration()
-  diagLog('INDEX', 'gpu-fallback active: hardware acceleration DISABLED for this boot')
+  diagLog(
+    'INDEX',
+    `gpu compat level=${gpuCompatLevel}: hardware acceleration DISABLED for this boot`
+  )
   try {
     electronLogger.info(t('main.index.log.gpuFallbackActive'))
   } catch {
