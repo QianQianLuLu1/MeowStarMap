@@ -301,6 +301,56 @@ npm run dev     # 进回收站 → 清空 → 观察红色 toast / 重试 / 彻�
 
 磁盘与产物前提：`D:` 可用 202 GB；仓外留底目录 `../WXNN-XiangCe-release-backup-20261101/` 已含上一轮现役三件与一份 `app.asar.old`（74,142,321 B），本轮出包前把当前 `release/` 三件再归档进去。
 
-### 11.5 出包与包内取证读数
+### 11.5 版本号核验与出包读数（N11 / N12）
 
-（随 N12 执行回写。）
+**版本号（零编辑，有判据）**：八处声明位实测同为 2.5.6 —— `package.json` / `package-lock.json` 根 /
+`packages[""]` / `README.md:10` 徽章 / `DEVELOPMENT.md`「当前版本」/ `DEVELOPMENT.en.md`「Current version」/
+`AGENTS.md`「喵星图，v2.5.6」/ `CHANGELOG.md` 首个版本节。两道闸门复跑通过：
+`check-changelog-release.ts`（15 个版本节、`[2.5.6]` 唯一、`[Unreleased]` 无待发布条目）、
+`check-doc-versions.ts`（README 的 Electron 41.10 对 `package.json` 41.10.6）。
+本轮 5 笔提交**未触碰** `package.json` / `package-lock.json`（`git log --name-only` 无命中）
+⇒ 「把版本号设成 2.5.6」的真实交付是「有判据的零编辑」，不是找个地方改一下。
+
+**出包**：标准配方 `npm run dist:win` **一次跑通**（本机杀软本轮未锁新建 asar），`EXIT=0`；
+**未启用** electronDist 旁路、**未改**任何配置文件。新 `release/MeowStarMap-Setup-2.5.6.exe` 184,656,080 B
+（出包前把现役包 184,655,711 B 三件归档到仓外 `../WXNN-XiangCe-release-backup-20261102/`）。
+
+| 判据                            | 实测                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| 新旧 `latest.yml` **size 轴**   | 184,655,711 → 184,656,080（不同）                                                                                                           |
+| 新旧 `latest.yml` **sha512 轴** | `luOCEAnq…` → `Kd3ezrpC…`（不同）⇒ 不是只换 releaseDate 的空重跑                                                                            |
+| `npm run verify:dist` 裸跑      | **exit 0**；禁串步读的是 `release\win-unpacked\resources\app.asar`（74,149,975 B，本轮新树），原生二进制与 `@nikkisync` 迁移 SQL 解包逐项 ✔ |
+| 出包后 `npm run e2e:smoke`      | **19 passed（36.4s）**，`[e2e] executable:` = `release/win-unpacked/喵星图.exe`（新产物）                                                   |
+
+**包内字节级差分取证**（`@electron/asar` 对新包 vs 上一轮归档 `app.asar.old` 逐 needle 取数；条目名是反斜杠
+带前导 `\`，只去前导分隔符、绝不把 `\` 换成 `/`，换了必 `was not found in this archive`）：
+
+| needle                                                  | 新包                         | 旧包（归档） | 结论                                                                                            |
+| ------------------------------------------------------- | ---------------------------- | ------------ | ----------------------------------------------------------------------------------------------- |
+| `recycleBinRemoveFailed`（F1 新日志 key）               | 25                           | **0**        | F1 与主进程 i18n 两个新 key 确实入包                                                            |
+| `本操作作用于回收站当前的全部条目`（F2 新句）           | 2                            | **0**        | F2 文案入包（主进程与渲染层两侧 locale 包）                                                     |
+| `当前无法移入系统回收站`（F2 旧句）                     | **0**                        | 0            | 旧句包内 0 命中；旧包根本没有该键 ⇒ 新文案是本轮新入包的                                        |
+| `(?:\\\\                                                | \/\/)`（F3 新 UNC 起始分支） | 1            | **0**                                                                                           | F3 正则入包 |
+| `/^\\\\[^`（旧 UNC 独占特征）                           | 1                            | **2**        | 新包少一次；余下那次经上下文核对属 `UNC_ADMIN_SHARE_RE`（既有、与本次无关）⇒ 旧形态在包内已消失 |
+| `scanInFlight`（F5 串行句柄属性名，esbuild 不改属性名） | 8                            | **5**        | +3 恰为 `stop()` 挂进闸门所需的「发布 / 比对 / 复位」三处                                       |
+| `forceDeletedCount` / `must be started` / `not running` | 6 / 1 / 2                    | —            | F1 计数与 F4 收敛后的短语集均在主进程产物内                                                     |
+
+**打包态契约真机判据**（临时探针 spec，真实打包产物 + 隔离 userData，跑完即删、不入仓）——在 shipped
+二进制里经**真实 zod**（不是 mock-validator）调用 `media:emptyRecycleBin`：
+
+- 零实参（老调用方形态，preload 传成 `[undefined]`）⇒ `{message:"回收站为空，无需清理", movedCount:0, missingCount:0, failedCount:0, forceDeletedCount:0}`，五字段齐备、内层无 `success`；
+- `emptyRecycleBin(true)` ⇒ 同五字段，同样通过；
+- 故意传字符串 `'true'` ⇒ 被真 zod 拒成 `参数校验失败：[0] Invalid input: expected boolean, received string`（不静默当 false）。
+
+这条补上了单元层看不到的那一面：`media.test.ts` 的 mock-validator 不执行 schema，向后兼容只有打进产物再跑一次
+才算被真机证明。**未执行**：对用户真实 41 项点「跳过系统回收站直接彻底删除」——不可逆的用户数据删除属用户决定，
+仍单独交回。
+
+### 11.6 本轮提交序列
+
+`3401156` fix(recyclebin)（25 files，含计划文档与 CHANGELOG）· `4345980` fix(nikkisync) 盘根闸 + 分类同源 ·
+`00cb7d2` fix(nikkisync) stop/scan 同闸门 · `734214b` test(e2e) 三处判据卫生 · `f434be9` docs(debt) 三条登记 ·
+本次 `chore(release)` 回写收口读数。每笔都过了 `[PRE-COMMIT]` 三步（lint-staged / core-gate / tsc -b），
+未使用 `--no-verify`；提交后对最终内容复跑 `npm test` 得 **465 files / 7357 passed / 20 skipped / 0 failed**
+（与提交前逐字一致 ⇒ 钩子的 prettier 改写没有改变任何读数），并复跑 `npm run build`、`verify:dist`、`e2e:smoke`。
+**未 push**（发布动作需另行批准）。
