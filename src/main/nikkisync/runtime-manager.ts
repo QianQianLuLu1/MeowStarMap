@@ -580,7 +580,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
    *
    * 句柄必须在**第一个 await 之前**同步发布，否则并发的第二次调用读不到在途事实。
    * 不变量：同一 manager 内 `fullScan`/`rescanPath` 在途峰值 ≤ 1，且 teardown
-   * 绝不作用在仍有在途扫描的会话上（`stop()` / `startSyncServer()` 的拆除点同口径 settle）。
+   * 绝不作用在仍有在途扫描的会话上（`startSyncServer()` 的拆除点同口径 settle）。
+   * F5 起这条是**双向**的：`stop()` 也把自己挂进同一句柄，停机在途时新到的扫描排在停机之后
+   * 落地——否则两条拆除链会踩同一个会话（实测同一会话被 dispose 两次）。
    */
   async function scan(input: { gameRoot?: string; path?: string }): Promise<unknown> {
     const inFlight = settleScan().then(() => scanCore(input))
@@ -622,6 +624,24 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   }
 
   async function stop(): Promise<void> {
+    // F5（审查轮）：停机必须占住 D2 的同一把闸门。原实现在入口 `await settleScan()` 之后自行拆除，
+    // 却没把停机发布进 `state.scanInFlight` ⇒ 停机在途时新到的 `scan()` 等的是「上一轮扫描」而不是
+    // 「这次停机」，于是 stop 的拆除链与换根重建的拆除链作用在同一个会话上：实测该会话被 dispose
+    // 两次，而 `dispose()` 关的是同一个 SQLite 句柄、上游不做幂等保护。
+    // 挂进闸门后，停机窗口内的 `scan()` 排在停机之后落地——用户要扫描就给他建新会话，
+    // 而不是让两条拆除链互相踩。
+    const inFlight = settleScan().then(() => stopCore())
+    state.scanInFlight = inFlight
+    try {
+      await inFlight
+    } finally {
+      // 与 `scan()` 同口径：只清自己这一次，后继链已接管句柄时不得把它的互斥抹掉
+      if (state.scanInFlight === inFlight) state.scanInFlight = undefined
+    }
+  }
+
+  /** 停机的实际拆除链，只由 `stop()` 的串行闸门驱动。 */
+  async function stopCore(): Promise<void> {
     // 启动在途时先等它落地再拆：否则本次停止只把状态置 idle，在途 start 的收尾
     // 随后会把会话置 running——用户的停止被静默吞掉（会话成为孤儿）。
     if (state.starting) {
@@ -631,9 +651,6 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
         // 在途启动的失败已如实落入状态快照；这里只关心它落地后的拆除
       }
     }
-    // 同口径等扫描落地（D2）：在途 fullScan 正读着要关的那个库，抢先拆除会让它
-    // 以原生错误 reject，并把失败覆写进停止之后的状态。
-    await settleScan()
     if (!state.session) {
       if (state.state !== 'unavailable') state.state = 'idle'
       return

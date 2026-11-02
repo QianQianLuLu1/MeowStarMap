@@ -1903,4 +1903,48 @@ describe('createRuntimeManager 扫描并发保护（换根重建不得拆掉在�
     expect(calls.createSession).toEqual(['/first/root', '/second/root'])
     expect(manager.status().state).toBe('running')
   })
+
+  /**
+   * 审查轮 F5：D2 的闸门只单向生效。`stop()` 在入口 `await settleScan()` 之后自行 `teardown`，
+   * 却**没把停机本身挂进 `state.scanInFlight`** ⇒ 停机窗口内新到的 `scan()` 只等旧扫描、不等停机，
+   * 于是「停机的拆除链」与「换根重建的拆除链」作用在同一个会话上。
+   *
+   * 判据取「同一会话被拆几次」而不是终态：实测本机会话1 被拆两次（`calls.dispose` 只给总数，
+   * 看不出重复，故按会话对象各自计数）。重复 `dispose()` 关的是同一个 SQLite 句柄，而上游
+   * `dispose` 无幂等保护；终态反而会被后写的 `running` 掩盖，所以不能拿 `status().state` 当判据。
+   */
+  it('停机在途时新到的扫描必须排在停机之后落地：同一会话绝不被拆两次', async () => {
+    const scanGate = createScanGate()
+    const { deps } = createDependencies({}, { fullScanHoldFirst: scanGate.hold })
+    const disposeCounts = new Map<NikkiSyncRuntimeSession, number>()
+    const createSession = deps.createSession
+    const manager = createRuntimeManager({
+      ...deps,
+      createSession: async (options: NikkiSyncSessionOptions) => {
+        const session = await createSession(options)
+        const originalDispose = session.dispose
+        session.dispose = () => {
+          disposeCounts.set(session, (disposeCounts.get(session) ?? 0) + 1)
+          originalDispose()
+        }
+        return session
+      }
+    })
+
+    const first = manager.scan({ gameRoot: '/first/root' })
+    await scanGate.entered
+
+    // 停机停在 settleScan 的 await 上（首轮扫描仍被门闩挂着）——此刻就是竞态窗口
+    const stopping = manager.stop()
+    await flush()
+    const second = manager.scan({ gameRoot: '/second/root' })
+    scanGate.release()
+    await Promise.all([first, stopping, second])
+
+    const repeated = [...disposeCounts.values()].filter((n) => n > 1)
+    expect(
+      repeated,
+      `拆除链交叠：${repeated.length} 个会话被拆了 ${repeated.join('/')} 次（同一 SQLite 句柄重复 close）`
+    ).toEqual([])
+  })
 })
