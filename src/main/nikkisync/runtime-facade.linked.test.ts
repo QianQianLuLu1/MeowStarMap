@@ -36,8 +36,8 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const LINKED = hasNikkiSyncLink(projectRoot)
 const suite = LINKED ? describe : describe.skip
 
-/** 上游 `0001_initial.sql` 的 12 张业务表（sqlite_sequence 为派生对象，不参与断言）。 */
-const BUSINESS_TABLES = [
+/** 上游 `0001_initial.sql` 建的 12 张业务表。 */
+const MIGRATION_TABLES = [
   'app_settings',
   'assets',
   'change_journal',
@@ -51,6 +51,25 @@ const BUSINESS_TABLES = [
   'resources',
   'schema_migrations'
 ]
+
+/**
+ * 上游不写迁移、改在构造期用 `CREATE TABLE IF NOT EXISTS` 自建的表。
+ *
+ * 分两批入列：`organizer_deletions` 自 K8（`DeletionQueue` 构造）就在，此前本文件只钉
+ * 迁移那 12 张，它一直不在视野里；后三张来自 589b932 新增的 inspiration 子系统
+ * （`LocalSyncServer` 构造期无条件建库）。闭集判定把这两批一起钉住，上游再加/改名当场可见。
+ */
+const RUNTIME_DDL_TABLES = [
+  'inspiration_sync_clock',
+  'inspiration_sync_entries',
+  'inspiration_sync_images',
+  'organizer_deletions'
+]
+
+const BUSINESS_TABLES = [...MIGRATION_TABLES, ...RUNTIME_DDL_TABLES]
+
+/** SQLite 因 `AUTOINCREMENT` 派生的内部对象，不是业务表但会出现在 `tableNames()` 里。 */
+const DERIVED_TABLES = ['sqlite_sequence']
 
 const UID = '10001'
 let fixtureRoot = ''
@@ -151,7 +170,7 @@ afterAll(async () => {
 })
 
 suite('runtime-facade 链接态', () => {
-  it('会话创建：库文件落在 userData 下，12 张业务表由上游 migration 建齐', async () => {
+  it('会话创建：库文件落在 userData 下，16 张业务表（12 迁移 + 4 运行期自建）建齐', async () => {
     session = await createRuntimeSession({
       databaseFile,
       gameRoot: path.join(fixtureRoot, 'game'),
@@ -159,8 +178,11 @@ suite('runtime-facade 链接态', () => {
       projectRoot
     })
     expect(fs.existsSync(databaseFile)).toBe(true)
+    // 闭集判定：表集合逐名相等（含派生对象），不再用「至少包含」——旧写法只钉 12 张迁移表 +
+    // `>=12`，上游 589b932 无中生有多出 3 张 inspiration 表时一条都不会转红，
+    // 这正是本轮要消灭的静默欠钉（02 计划 §0.2）。
     const tables = session.tableNames()
-    for (const table of BUSINESS_TABLES) expect(tables).toContain(table)
+    expect([...tables].sort()).toEqual([...BUSINESS_TABLES, ...DERIVED_TABLES].sort())
   })
 
   it('扫描：上游 ScannerService 发现夹具根并把静图/视频聚合入库', async () => {
@@ -328,7 +350,7 @@ suite('完整生命周期（真上游对象，验证退出链）', () => {
     const started = await manager.start(options)
     expect(started.state).toBe('running')
     expect(fs.existsSync(options.databaseFile)).toBe(true)
-    expect((started.tables ?? []).length).toBeGreaterThanOrEqual(12)
+    expect((started.tables ?? []).length).toBe(BUSINESS_TABLES.length + DERIVED_TABLES.length)
 
     const scan = (await manager.scan({})) as { filesObserved: number }
     expect(scan.filesObserved).toBeGreaterThanOrEqual(5)
