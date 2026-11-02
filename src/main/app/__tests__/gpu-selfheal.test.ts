@@ -238,6 +238,27 @@ describe('GPU 崩溃自愈完整链路', () => {
     ).toBe(1)
   })
 
+  it('8. 取证联动：GPU 自愈主动重启（app.exit）不得留下 native 证据 → 下一次启动只按落盘档位走', async () => {
+    // 实测前提（2026-11-02，electron 41.10.6 探针）：app.exit() 不触发 Node 'exit' 事件，
+    // 因此若 last-exit.json 只由该事件写，自愈重启后的下一次启动会读到「心跳在、退出码无」
+    // ⇒ 判成 native ⇒ 在刚写好的档位上再叠一级 ⇒ 0 级崩一次直接跳 2 级（三级阶梯塌成两级）。
+    fs.writeFileSync(
+      path.join(tmpDir, 'gpu-fallback.json'),
+      JSON.stringify({ consecutiveFailures: 1, fallbackActive: false })
+    )
+    const fx = await import('../exit-forensics')
+    fx.initExitForensics() // 生产顺序：ready 后先装载取证（含 app.exit 包装），再建窗
+    const m = await import('../gpu-fallback')
+    expect(m.recordBootLevel()).toBe(0) // 本次为硬件加速启动
+
+    expect(m.requestSelfHeal('crashed', 1)).toBe(true) // 升 1 档落盘 + relaunch + app.exit(0)
+    expect(mockExit).toHaveBeenCalledWith(0)
+
+    const ev = fx.getPreviousExitEvidence()
+    expect(ev.kind, '主动重启不能留 native 证据').not.toBe('native')
+    expect(m.recordBootLevel({ prevNativeKill: ev.kind === 'native' })).toBe(1)
+  })
+
   /** 取按事件名注册的监听器（child-process-gone 必须仍是首个注册者，既有用例按下标取它） */
   async function getQuitHandler(): Promise<(e: unknown) => void> {
     const m = await import('../gpu-fallback')

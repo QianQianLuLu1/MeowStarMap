@@ -289,6 +289,49 @@ describe('exit-forensics 退出码与清理', () => {
       expect.stringContaining('app.exit code=0 stack=')
     )
   })
+
+  it('13. app.exit 不跑 Node exit 处理器（Electron 41 实测）→ 包装层必须自己落 last-exit.json', async () => {
+    // 实测判据（2026-11-02，electron 41.10.6 探针）：app.exit() 与 process.exit() 都不触发
+    // Node 的 'exit' 事件，只有 app.quit() 链会触发。取证模块原先假定三者都触发，
+    // 于是「GPU 自愈主动重启」留下心跳却无退出码 → 下次启动被判 native → 兼容阶梯多升一档。
+    const fx = await freshModule()
+    // 本文件每个用例都会重载模块并各自包装 app.exit，累积的 spy 链会用旧实例的
+    // bootId/stage 覆写同一条记录；生产环境只装载一次，这里先把 mock 复位成干净实现。
+    const electronApp = (await import('electron')).app as unknown as {
+      exit: (c?: number) => void
+    }
+    electronApp.exit = vi.fn()
+    fx.initExitForensics()
+    fx.markExitStage('cleanup')
+    expect(fs.existsSync(heartbeatPath())).toBe(true)
+
+    electronApp.exit(0)
+
+    expect(fs.existsSync(lastExitPath()), '主动退出必须当场落退出码').toBe(true)
+    const rec = JSON.parse(fs.readFileSync(lastExitPath(), 'utf8'))
+    expect(rec.code).toBe(0)
+    expect(rec.stage).toBe('cleanup')
+    expect(String(rec.journal.join())).toContain('app.exit')
+    // 消费侧判据：主动退出不得被 GPU 阶梯当成「被原生层杀死」而叠档
+    const hb = JSON.parse(fs.readFileSync(heartbeatPath(), 'utf8'))
+    expect(fx.classifyPreviousExit(hb, rec).kind).toBe('js')
+  })
+
+  it('14. 正常清理后心跳定时器必须停摆（否则 5s tick 会复活心跳，伪造出 native 证据）', async () => {
+    vi.useFakeTimers()
+    try {
+      const fx = await freshModule()
+      fx.initExitForensics()
+      expect(fs.existsSync(heartbeatPath())).toBe(true)
+      fx.markCleanShutdown()
+      expect(fs.existsSync(heartbeatPath())).toBe(false)
+
+      await vi.advanceTimersByTimeAsync(10_200)
+      expect(fs.existsSync(heartbeatPath()), '已宣告干净退出后不得再写心跳').toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
 
 describe('exit-forensics 上次终止性质只读 API（供 GPU 兼容阶梯升级消费）', () => {

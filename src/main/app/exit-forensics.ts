@@ -203,7 +203,9 @@ function readStaleEvidence(): void {
 
   const lastExit = readJsonFile(getLastExitPath(), parseLastExit)
   if (classifyPreviousExit(staleHeartbeat, lastExit).kind === 'js' && lastExit) {
-    // JS 管理的退出（app.quit / app.exit / process.exit 均会触发 Node exit 事件）
+    // JS 管理的退出。口径订正（2026-11-02 实测）：`app.quit()` 会触发 Node 'exit' 事件，
+    // 而 `app.exit()` / `process.exit()` **不会**（electron 41.10.6 探针），所以后两者由
+    // installExitCallSpies 的包装层当场落退出码，否则主动退出会被误读成原生层杀死。
     const summary =
       `上次运行 JS 管理退出 code=${lastExit.code} stage=${lastExit.stage} ` +
       `uptime=${lastExit.uptime}s journal=[${lastExit.journal.join(' >> ')}]`
@@ -235,12 +237,47 @@ function readStaleEvidence(): void {
   }
 }
 
-/** 拦截 app.exit / process.exit：记录调用点堆栈后透传原实现（纯取证，不改行为） */
+/**
+ * 同步落盘退出码记录（Node 'exit' 处理器与 app.exit / process.exit 包装层共用同一构造）。
+ * 为什么包装层也必须写：electron 41.10.6 本机探针实测 `app.exit()` 与 `process.exit()`
+ * **都不触发** Node 的 'exit' 事件（只有 `app.quit()` 链触发）。只挂处理器时，
+ * 「GPU 自愈主动重启」会留下心跳文件却没有任何退出码 → 下次启动被判成
+ * 「被原生层杀死」→ 兼容阶梯在同一次崩溃上多升一档（三级塌成两级）。
+ */
+function flushLastExitRecord(code: number): void {
+  try {
+    const rec: LastExitFile = {
+      bootId,
+      code: typeof code === 'number' ? code : -1,
+      stage: currentStage,
+      time: new Date().toISOString(),
+      journal: [...journal],
+      uptime: process.uptime()
+    }
+    fs.writeFileSync(getLastExitPath(), JSON.stringify(rec))
+  } catch {
+    // 静默：取证写盘失败不改变退出行为
+  }
+}
+
+/** 停摆心跳定时器：已宣告干净退出后不得再写心跳（复活的心跳 = 假 native 证据） */
+function stopHeartbeatTimer(): void {
+  if (!heartbeatTimer) return // 幂等：未初始化或已停摆都不重复 clearInterval
+  try {
+    clearInterval(heartbeatTimer)
+  } catch {
+    // 静默：停表失败最多多留一次心跳，不影响退出
+  }
+  heartbeatTimer = null
+}
+
+/** 拦截 app.exit / process.exit：记录调用点堆栈并当场落退出码，再透传原实现（纯取证，不改行为） */
 function installExitCallSpies(): void {
   try {
     const original = app.exit.bind(app)
     const wrapped = function patchedAppExit(exitCode?: number): void {
       recordEvent('app.exit', `code=${exitCode} stack=${briefStack(new Error())}`)
+      flushLastExitRecord(typeof exitCode === 'number' ? exitCode : 0)
       return original(exitCode as number)
     } as typeof app.exit
     app.exit = wrapped
@@ -251,6 +288,7 @@ function installExitCallSpies(): void {
     const original = process.exit.bind(process)
     const wrapped = function patchedProcessExit(code?: number): never {
       recordEvent('process.exit', `code=${code} stack=${briefStack(new Error())}`)
+      flushLastExitRecord(typeof code === 'number' ? code : 0)
       return original(code)
     } as typeof process.exit
     process.exit = wrapped
@@ -302,24 +340,13 @@ export function initExitForensics(): void {
 
   // 退出码落盘：Node 规范要求 exit 事件处理器内只做同步操作
   process.on('exit', (code) => {
-    try {
-      const rec: LastExitFile = {
-        bootId,
-        code: typeof code === 'number' ? code : -1,
-        stage: currentStage,
-        time: new Date().toISOString(),
-        journal: [...journal],
-        uptime: process.uptime()
-      }
-      fs.writeFileSync(getLastExitPath(), JSON.stringify(rec))
-    } catch {
-      // 静默：取证写盘失败不改变退出行为
-    }
+    flushLastExitRecord(code)
   })
 
-  // 正常退出收尾：删除心跳，使下次启动不误报异常终止
+  // 正常退出收尾：停摆心跳 + 删除心跳，使下次启动不误报异常终止
   app.on('will-quit', () => {
     recordEvent('will-quit')
+    stopHeartbeatTimer()
     try {
       fs.rmSync(getHeartbeatPath(), { force: true })
     } catch {
@@ -335,9 +362,14 @@ export function markExitStage(stage: string): void {
   currentStage = stage
 }
 
-/** 正常清理完成（performCleanup 末尾调用）：删除心跳 + 标记 cleanup 阶段 */
+/**
+ * 正常清理完成（performCleanup 末尾调用）：停摆心跳 + 删除心跳 + 标记 cleanup 阶段。
+ * 顺序必须是先停表再删文件：只删不停表时，5s tick 会把心跳复活，
+ * 下次启动看到「有心跳、无退出码」就被判成原生层杀死（GPU 兼容阶梯据此白升一档）。
+ */
 export function markCleanShutdown(): void {
   markExitStage('cleanup')
+  stopHeartbeatTimer()
   try {
     fs.rmSync(getHeartbeatPath(), { force: true })
   } catch {
