@@ -1,6 +1,6 @@
-// @core-change: 照片目录校验的四个 throw 改走 userMessage 与 maskPath 脱敏（message 经
-//               主进程 i18n 输出、不再拼接裸路径，details 只留末 2 段），修跨进程后
-//               渲染层拿英文技术串 + 完整盘路径弹 toast 的泄露；盘根闸同步走同口径。
+// @core-change: 审查轮补两处闸门缝——盘根闸认正斜杠 UNC 根（`//nas/share` 与 `\\nas\share` 同指一个共享根，
+//               原正则只匹配反斜杠起始，整块共享可被登记成同步照片源）；生效失败的「未就绪」短语集
+//               与 toAppError 收敛为同一常量，消除同一语义在两条链上拿到不同 applyError 的口径分叉。
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -363,6 +363,18 @@ function requireRuntime(ctx: HandlerContext): NikkiSyncRuntimeHandle {
 }
 
 /**
+ * 「运行期未就绪」族的特征短语（唯一出处）：`toAppError` 的 PRECONDITION_FAILED 映射与
+ * 照片目录生效失败的 `applyError:'runtime-unavailable'` 分类共用它。
+ *
+ * 为什么必须只有一份（审查轮 F4）：`requireSession()`（runtime-manager）与上游
+ * `createPairingPayload` 抛的是 'Server must be started before …' 这一族文案，而生效链原先
+ * 只用 /not ready|unavailable/ 两条——同一语义在两条链上拿到不同分类，渲染层据此给出
+ * 「扫描失败」而不是「Runtime 未就绪」。本模块的错误来自字符串（runtime-manager 抛 plain
+ * `Error`，约定②的完整形态要跨模块改造，另议），能做的收敛就是把判据钉成一处。
+ */
+const RUNTIME_UNREADY_RE = /not ready|unavailable|must be started|not running/i
+
+/**
  * 上游/状态机抛出的原始错误 → IPC 错误码：
  * 「未就绪」是可恢复前置条件失败，「不存在」是 404 语义，其余归一为内部错误并保留原因。
  */
@@ -370,9 +382,9 @@ function toAppError(error: unknown, scope: string): AppError {
   if (error instanceof AppError) return error
   const message = error instanceof Error ? error.message : String(error)
   if (/not found/i.test(message)) return AppError.notFound(`nikkisync ${scope}: ${message}`)
-  // 「未就绪 / 未建链 / 服务没起来」都是可恢复的前置条件失败：
-  // 后者是上游 createPairingPayload 的原生文案（'Server must be started before ...'）
-  if (/not ready|unavailable|must be started|not running/i.test(message)) {
+  // 「未就绪 / 未建链 / 服务没起来」都是可恢复的前置条件失败（'Server must be started …'
+  // 是上游 createPairingPayload 的原生文案）
+  if (RUNTIME_UNREADY_RE.test(message)) {
     return AppError.preconditionFailed(message)
   }
   return AppError.internal(`nikkisync ${scope} failed: ${message}`)
@@ -402,7 +414,7 @@ function consentErrorToAppError(error: unknown): AppError {
 const SETTING_GAME_ROOT_KEY = 'nikkisync.gameRoot'
 
 /**
- * 盘根/UNC 根形态判据（缺陷 D3）：`D:\`、`C:/`、`\`、`/`、`//`、`///`、`\\nas\share`。
+ * 盘根/UNC 根形态判据（缺陷 D3）：`D:\`、`C:/`、`\`、`/`、`//`、`///`、`\\nas\share`、`//nas/share`。
  *
  * 为什么单独设一道：照片源目录的四关是「非敏感 → 存在 → 是目录 → 可读」，而
  * `isSensitivePath` 只按**首段**拦 windows/program files/programdata，盘根没有首段可拦，
@@ -418,8 +430,11 @@ export function isBareDirectoryRoot(p: string): boolean {
   if (/^[\\/]+$/.test(s)) return true
   // 盘符根：`D:` / `D:\` / `D:/` / `D:\\`（分隔符多寡都算同一个根）
   if (/^[A-Za-z]:[\\/]*$/.test(s)) return true
-  // UNC 根：恰好「服务器 + 共享」两段，其后不再有路径段（`\\nas\share\photos` 是子目录，放行）
-  return /^\\\\[^\\/]+[\\/][^\\/]+[\\/]*$/.test(s)
+  // UNC 根：恰好「服务器 + 共享」两段，其后不再有路径段（`\\nas\share\photos` 是子目录，放行）。
+  // 起始分隔符两侧都要认：Windows API 同样接受正斜杠 UNC，`//nas/share` 与 `\\nas\share` 指同一个
+  // 共享根；只写 `\\\\` 一支时正斜杠形态既过 absolutePath schema（`/` 起始被放行）又过本闸，
+  // 整块共享就被登记成同步照片源递给上游当扫描根（审查轮 F3）。
+  return /^(?:\\\\|\/\/)[^\\/]+[\\/][^\\/]+[\\/]*$/.test(s)
 }
 
 /**
@@ -552,13 +567,15 @@ async function applyPersistedGameRoot(
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error)
     // 判据与 `runtime-manager` 同源：`installation-not-found` 的唯一特征就是那一条
-    // installNotfoundMessage（该文件 :496/:540 也是拿它比的）。宽正则 `/not found/i`
-    // 会把任何含 "not found" 的下游故障（缺表、缺资源行）误判成安装根问题，
-    // 让渲染层给出「请改选游戏安装目录」这种无效指向。未建链/未就绪仍走下一支。
+    // `installNotfoundMessage`（runtime-manager 里 `state.error` 的两处比较也是拿它逐字比）。
+    // 宽正则 `/not found/i` 会把任何含 "not found" 的下游故障（缺表、缺资源行）误判成安装根问题，
+    // 让渲染层给出「请改选游戏安装目录」这种无效指向。
     if (message.includes(installNotfoundMessage)) {
       return { applied: false, needRestart: true, applyError: 'installation-not-found' }
     }
-    if (/not ready|unavailable/i.test(message)) {
+    // 未就绪族与 toAppError 共用 RUNTIME_UNREADY_RE（审查轮 F4：两处各写一份短语集时，
+    // 'Server must be started …' 在这条链上会被降级成 scan-failed）
+    if (RUNTIME_UNREADY_RE.test(message)) {
       return { applied: false, needRestart: true, applyError: 'runtime-unavailable' }
     }
     return { applied: false, needRestart: true, applyError: 'scan-failed' }

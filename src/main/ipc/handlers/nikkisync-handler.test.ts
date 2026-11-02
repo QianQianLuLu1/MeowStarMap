@@ -1283,6 +1283,37 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     })
   })
 
+  // F4（审查轮）：本文件里「运行期未就绪」的短语集存在两份——`toAppError` 用
+  // /not ready|unavailable|must be started|not running/i，而生效链的分类只用前两条。
+  // `requireSession()`（runtime-manager）与上游 `createPairingPayload` 的真实文案正是
+  // 'Server must be started before …' 这一族 ⇒ 同一语义在两条链上拿到不同分类码，
+  // 与 f29bd5a 自陈的「生效失败分类判据与 runtime-manager 同源」不符。
+  // 如实限定影响面：今日 applyGameRoot 的可达错误（not ready / unavailable / installation
+  // not found）两侧结论一致，本条钉的是**判据同源**，防的是下一次新增未就绪文案时只改一处。
+  it('set-game-root：未就绪族错误（must be started / not running）与 toAppError 同判 runtime-unavailable', async () => {
+    for (const raw of [
+      'Server must be started before creating a pairing payload',
+      'NikkiSync sync server is not running'
+    ]) {
+      const runtime = createRuntimeStub()
+      runtime.applyGameRoot = vi.fn(async () => {
+        throw new Error(raw)
+      })
+      register(runtime)
+      const dir = await makeTempDir()
+      const res = (await getHandler(handleMock, 'nikkisync:set-game-root')(
+        {},
+        { path: dir }
+      )) as HandleResult
+      expect(res.success, raw).toBe(true)
+      expect(res.data as Record<string, unknown>, raw).toMatchObject({
+        applied: false,
+        needRestart: true,
+        applyError: 'runtime-unavailable'
+      })
+    }
+  })
+
   it('set-game-root：runtime 未装配时不调生效通道，保持旧「重启后生效」语义', async () => {
     const ctx = register(undefined)
     const dir = await makeTempDir()
@@ -1531,6 +1562,8 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
       ['D:\\', true],
       ['C:/', true],
       ['\\\\nas\\share', true],
+      // F3：正斜杠 UNC 根是同一形态的另一侧写法，`/` 起始本就过 absolutePath ⇒ 必须抵达盘根闸
+      ['//nas/share', true],
       ['/', true],
       ['//', true],
       ['///', true],
@@ -1559,6 +1592,11 @@ describe('nikkisync:game-root / admit-directory（照片目录自定义）', () 
     expect(isBareDirectoryRoot('D:\\Photos')).toBe(false)
     expect(isBareDirectoryRoot('D:\\X6Game')).toBe(false)
     expect(isBareDirectoryRoot('\\\\nas\\share\\photos')).toBe(false)
+    // F3（审查轮）：Windows API 同样接受正斜杠 UNC，`//nas/share` 与 `\\nas\share` 指同一个共享根，
+    // 而原 UNC 支只匹配两个反斜杠起始 ⇒ 正斜杠形态既过 absolutePath schema（`/` 起始被放行）
+    // 又过盘根闸，把整个共享根登记成同步照片源——正是 f29bd5a 要拦的 D3 形态从另一侧漏进来
+    expect(isBareDirectoryRoot('//nas/share')).toBe(true)
+    expect(isBareDirectoryRoot('//nas/share/photos')).toBe(false)
     // `//`/`///`：POSIX 语义等同 `/` 且 stat 可过，必须与 `/` 同判——这道缝不补，
     // Linux 装置会把 `//` 登记成同步照片源
     expect(isBareDirectoryRoot('//')).toBe(true)
