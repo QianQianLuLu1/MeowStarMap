@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "Outfit-/Kleidersuche und Profilstatistik",
+      "scope": "Suchbereich",
+      "scopeSuits": "Outfits",
+      "scopeClothing": "Kleidung",
+      "queryLabel": "Schlüsselwort",
+      "queryPlaceholder": "Outfit- oder Kleidungsnamen eingeben",
+      "submit": "Suchen",
+      "searching": "Suche…",
+      "searchIdle": "Schlüsselwort eingeben",
+      "searchEmpty": "Keine Treffer",
+      "searchFailed": "Suche fehlgeschlagen",
+      "photoCount": "{{n}} Fotos",
+      "statsLoading": "Statistik wird geladen…",
+      "statsEmpty": "Noch keine Statistik",
+      "statsFailed": "Statistik konnte nicht geladen werden",
+      "topSuits": "Meist getragene Outfits",
+      "topClothing": "Meist getragene Kleidung"
+    },
     "title": "Synchronisierte Galerie",
     "subtitle": "Objekte aus der eingebetteten NikkiSync-Bibliothek, unabhängig von der lokalen Galerie",
     "loading": "Synchronisierte Galerie wird geladen…",

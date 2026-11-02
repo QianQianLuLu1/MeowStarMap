@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "套裝/服裝檢索與檔案統計",
+      "scope": "檢索範圍",
+      "scopeSuits": "套裝",
+      "scopeClothing": "服裝",
+      "queryLabel": "關鍵詞",
+      "queryPlaceholder": "輸入套裝或服裝名",
+      "submit": "檢索",
+      "searching": "檢索中…",
+      "searchIdle": "輸入關鍵詞後檢索",
+      "searchEmpty": "沒有命中",
+      "searchFailed": "檢索失敗",
+      "photoCount": "{{n}} 張",
+      "statsLoading": "統計載入中…",
+      "statsEmpty": "暫無統計",
+      "statsFailed": "統計讀取失敗",
+      "topSuits": "最常穿的套裝",
+      "topClothing": "最常穿的衣服"
+    },
     "title": "同步圖庫",
     "subtitle": "來自 NikkiSync 內嵌庫的資產，與本地圖庫互不影響",
     "loading": "正在讀取同步圖庫…",

@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "Suit & clothing search, profile stats",
+      "scope": "Search scope",
+      "scopeSuits": "Suits",
+      "scopeClothing": "Clothing",
+      "queryLabel": "Keyword",
+      "queryPlaceholder": "Enter a suit or clothing name",
+      "submit": "Search",
+      "searching": "Searching…",
+      "searchIdle": "Type a keyword to search",
+      "searchEmpty": "No matches",
+      "searchFailed": "Search failed",
+      "photoCount": "{{n}} photos",
+      "statsLoading": "Loading stats…",
+      "statsEmpty": "No stats yet",
+      "statsFailed": "Failed to load stats",
+      "topSuits": "Most worn suits",
+      "topClothing": "Most worn clothing"
+    },
     "title": "Sync Gallery",
     "subtitle": "Assets from the embedded NikkiSync library, independent of the local gallery",
     "loading": "Loading sync gallery…",

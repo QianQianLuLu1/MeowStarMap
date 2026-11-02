@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "コーディネート／衣装検索とプロフィール統計",
+      "scope": "検索対象",
+      "scopeSuits": "コーディネート",
+      "scopeClothing": "衣装",
+      "queryLabel": "キーワード",
+      "queryPlaceholder": "コーディネートまたは衣装名を入力",
+      "submit": "検索",
+      "searching": "検索中…",
+      "searchIdle": "キーワードを入力して検索",
+      "searchEmpty": "該当なし",
+      "searchFailed": "検索に失敗しました",
+      "photoCount": "{{n}} 枚",
+      "statsLoading": "統計を読み込み中…",
+      "statsEmpty": "統計はまだありません",
+      "statsFailed": "統計の取得に失敗しました",
+      "topSuits": "よく使うコーディネート",
+      "topClothing": "よく使う衣装"
+    },
     "title": "同期ギャラリー",
     "subtitle": "NikkiSync 組み込みライブラリの資産。ローカルギャラリーとは干渉しません",
     "loading": "同期ギャラリーを読み込み中…",

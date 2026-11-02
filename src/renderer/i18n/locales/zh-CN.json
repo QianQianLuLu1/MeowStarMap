@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "套装/服装检索与档案统计",
+      "scope": "检索范围",
+      "scopeSuits": "套装",
+      "scopeClothing": "服装",
+      "queryLabel": "关键词",
+      "queryPlaceholder": "输入套装或服装名",
+      "submit": "检索",
+      "searching": "检索中…",
+      "searchIdle": "输入关键词后检索",
+      "searchEmpty": "没有命中",
+      "searchFailed": "检索失败",
+      "photoCount": "{{n}} 张",
+      "statsLoading": "统计加载中…",
+      "statsEmpty": "暂无统计",
+      "statsFailed": "统计读取失败",
+      "topSuits": "最常穿的套装",
+      "topClothing": "最常穿的衣服"
+    },
     "title": "同步图库",
     "subtitle": "来自 NikkiSync 内嵌库的资产，与本地图库互不影响",
     "loading": "正在读取同步图库…",

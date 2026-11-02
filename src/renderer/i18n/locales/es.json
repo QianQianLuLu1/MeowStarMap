@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "Búsqueda de conjuntos/prendas y estadísticas",
+      "scope": "Ámbito de búsqueda",
+      "scopeSuits": "Conjuntos",
+      "scopeClothing": "Prendas",
+      "queryLabel": "Palabra clave",
+      "queryPlaceholder": "Nombre de conjunto o prenda",
+      "submit": "Buscar",
+      "searching": "Buscando…",
+      "searchIdle": "Escribe una palabra clave",
+      "searchEmpty": "Sin coincidencias",
+      "searchFailed": "Búsqueda fallida",
+      "photoCount": "{{n}} fotos",
+      "statsLoading": "Cargando estadísticas…",
+      "statsEmpty": "Aún sin estadísticas",
+      "statsFailed": "No se pudieron cargar las estadísticas",
+      "topSuits": "Conjuntos más usados",
+      "topClothing": "Prendas más usadas"
+    },
     "title": "Galería sincronizada",
     "subtitle": "Recursos de la biblioteca NikkiSync integrada, sin afectar la galería local",
     "loading": "Cargando galería sincronizada…",

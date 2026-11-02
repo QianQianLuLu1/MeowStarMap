@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "코디/의상 검색과 프로필 통계",
+      "scope": "검색 대상",
+      "scopeSuits": "코디",
+      "scopeClothing": "의상",
+      "queryLabel": "키워드",
+      "queryPlaceholder": "코디 또는 의상 이름 입력",
+      "submit": "검색",
+      "searching": "검색 중…",
+      "searchIdle": "키워드를 입력하면 검색",
+      "searchEmpty": "일치하는 결과 없음",
+      "searchFailed": "검색 실패",
+      "photoCount": "{{n}} 장",
+      "statsLoading": "통계 불러오는 중…",
+      "statsEmpty": "통계 없음",
+      "statsFailed": "통계 불러오기 실패",
+      "topSuits": "가장 많이 입은 코디",
+      "topClothing": "가장 많이 입은 의상"
+    },
     "title": "동기화 갤러리",
     "subtitle": "NikkiSync 내장 라이브러리의 자산, 로컬 갤러리와 서로 간섭하지 않습니다",
     "loading": "동기화 갤러리 읽는 중…",

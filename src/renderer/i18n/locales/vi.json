@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "Tìm outfit/trang phục và thống kê hồ sơ",
+      "scope": "Phạm vi tìm",
+      "scopeSuits": "Outfit",
+      "scopeClothing": "Trang phục",
+      "queryLabel": "Từ khóa",
+      "queryPlaceholder": "Nhập tên outfit hoặc trang phục",
+      "submit": "Tìm",
+      "searching": "Đang tìm…",
+      "searchIdle": "Nhập từ khóa để tìm",
+      "searchEmpty": "Không có kết quả",
+      "searchFailed": "Tìm kiếm thất bại",
+      "photoCount": "{{n}} ảnh",
+      "statsLoading": "Đang tải thống kê…",
+      "statsEmpty": "Chưa có thống kê",
+      "statsFailed": "Tải thống kê thất bại",
+      "topSuits": "Outfit mặc nhiều nhất",
+      "topClothing": "Trang phục mặc nhiều nhất"
+    },
     "title": "Thư viện đồng bộ",
     "subtitle": "Tài nguyên từ thư viện NikkiSync nhúng, không ảnh hưởng thư viện cục bộ",
     "loading": "Đang tải thư viện đồng bộ…",

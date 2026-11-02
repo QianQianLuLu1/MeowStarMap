@@ -4341,6 +4341,25 @@
     }
   },
   "syncGallery": {
+    "insight": {
+      "title": "ค้นหาชุด/เสื้อผ้าและสถิติโปรไฟล์",
+      "scope": "ขอบเขตการค้นหา",
+      "scopeSuits": "ชุด",
+      "scopeClothing": "เสื้อผ้า",
+      "queryLabel": "คำค้น",
+      "queryPlaceholder": "ชื่อชุดหรือเสื้อผ้า",
+      "submit": "ค้นหา",
+      "searching": "กำลังค้นหา…",
+      "searchIdle": "พิมพ์คำค้นเพื่อค้นหา",
+      "searchEmpty": "ไม่พบผลลัพธ์",
+      "searchFailed": "ค้นหาไม่สำเร็จ",
+      "photoCount": "{{n}} รูป",
+      "statsLoading": "กำลังโหลดสถิติ…",
+      "statsEmpty": "ยังไม่มีสถิติ",
+      "statsFailed": "โหลดสถิติไม่สำเร็จ",
+      "topSuits": "ชุดที่ใส่บ่อยสุด",
+      "topClothing": "เสื้อผ้าที่ใส่บ่อยสุด"
+    },
     "title": "Sync Gallery",
     "subtitle": "Assets from the embedded NikkiSync library, independent of the local gallery",
     "loading": "Loading sync gallery…",

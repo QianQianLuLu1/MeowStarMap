@@ -8,6 +8,7 @@ import { IconSync } from '../../icons'
 import { useUIStore } from '../../stores/uiStore'
 import { useSyncGalleryStore } from '../../stores/syncGalleryStore'
 import { SyncGalleryToolbar } from './SyncGalleryToolbar'
+import { SyncInsightPanel } from './SyncInsightPanel'
 import { SyncAssetDrawer } from './SyncAssetDrawer'
 import { ShareCardDialog } from '../../components/sync/ShareCardDialog'
 import { extractUserMessage } from '../../../shared/errors/app-error'
@@ -197,6 +198,8 @@ export const SyncGalleryPage: React.FC = () => {
           {t(error)}
         </div>
       ) : null}
+      {/* 上游索引面（套装/服装检索 + 档案统计）：折叠态只占一行，展开才发 IPC */}
+      <SyncInsightPanel />
       <VirtualImageGrid
         items={files}
         selectedIds={[]}
