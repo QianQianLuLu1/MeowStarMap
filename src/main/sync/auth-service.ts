@@ -52,7 +52,7 @@ export interface AuthServiceDeps {
 }
 
 export interface AuthServiceOptions {
-  /** 时钟偏移容许窗口（毫秒）；默认 5 分钟（协议硬约束上限） */
+  /** 时钟偏移容许窗口（毫秒）；默认 5 分钟，构造时会夹到不超过该协议硬上限 */
   clockSkewMs?: number
   /** 时钟注入（测试用）；默认 Date.now */
   now?: () => number
@@ -102,7 +102,13 @@ export class AuthService {
 
   constructor(deps: AuthServiceDeps, options: AuthServiceOptions = {}) {
     this.deps = deps
-    this.clockSkewMs = options.clockSkewMs ?? DEFAULT_CLOCK_SKEW_MS
+    // 硬约定 2「nonce 窗口不超过 5 分钟」由代码承担，不再只靠注释与本目录指引：
+    // 收口方向是只收紧不放宽 —— 有限值夹到 [0, 上限]，非有限值（NaN/±Infinity）退回默认，
+    // 绝不允许装配方把重放窗口开得比协议上限还大。窗口为 0 是合法的「不容时钟差」严格配置。
+    const requested = options.clockSkewMs ?? DEFAULT_CLOCK_SKEW_MS
+    this.clockSkewMs = Number.isFinite(requested)
+      ? Math.min(DEFAULT_CLOCK_SKEW_MS, Math.max(0, requested))
+      : DEFAULT_CLOCK_SKEW_MS
     this.now = options.now ?? Date.now
   }
 

@@ -430,3 +430,77 @@ describe('AuthService.verifyRequest — 设备状态', () => {
     })
   })
 })
+
+// ============================================================================
+// 时间窗硬上限（src/main/sync/AGENTS.md 硬约定 2「nonce 窗口不超过 5 分钟」）
+// ============================================================================
+
+describe('AuthService — 时钟窗口不得被装配方放宽过 5 分钟', () => {
+  it('注入 10 分钟窗口时仍按上限判定：超前 6 分钟的请求必须被拒', async () => {
+    // 该红线此前只写在注释与模块指引里，代码上 `options.clockSkewMs ?? DEFAULT` 不设界
+    // ⇒ 装配方误传（或将来把默认值改掉）就静默放宽重放窗口，而重放防护正是本模块的存在理由
+    const key = makeDeviceKeyPair()
+    const { service } = makeService([makeDeviceRow(key.publicKeyPem)], 10 * 60_000)
+    const request = buildSignedRequest({
+      privateKeyPem: key.privateKeyPem,
+      timestamp: NOW + 6 * 60_000
+    })
+    await expect(service.verifyRequest(request)).resolves.toMatchObject({
+      ok: false,
+      reason: 'clock_skew'
+    })
+  })
+
+  it('非法窗口取值一律归到安全侧，不放宽也不冒泡', async () => {
+    for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, -1, 0]) {
+      const key = makeDeviceKeyPair()
+      const { service } = makeService([makeDeviceRow(key.publicKeyPem)], bad)
+      const request = buildSignedRequest({
+        privateKeyPem: key.privateKeyPem,
+        timestamp: NOW + 6 * 60_000
+      })
+      await expect(service.verifyRequest(request)).resolves.toMatchObject({
+        ok: false,
+        reason: 'clock_skew'
+      })
+    }
+  })
+
+  it('守卫：默认窗口路径语义一字不变（±5min 内放行、同 nonce 重放仍拦）', async () => {
+    const key = makeDeviceKeyPair()
+    const { service } = makeService([makeDeviceRow(key.publicKeyPem)])
+    const request = buildSignedRequest({
+      privateKeyPem: key.privateKeyPem,
+      timestamp: NOW + 4 * 60_000
+    })
+    await expect(service.verifyRequest(request)).resolves.toMatchObject({ ok: true })
+    await expect(service.verifyRequest(request)).resolves.toMatchObject({
+      ok: false,
+      reason: 'replayed_nonce'
+    })
+  })
+
+  it('守卫：过期 nonce 条目会被清掉（pruneNonces 确实在跑，不是无界增长的 Map）', async () => {
+    const key = makeDeviceKeyPair()
+    const row = makeDeviceRow(key.publicKeyPem)
+    const devices = new Map([[row.device_id, row]])
+    let now = NOW
+    const service = new AuthService(
+      { getDevice: (id: string) => devices.get(id) ?? null, touchDevice: async () => {} },
+      { now: () => now, clockSkewMs: FIVE_MIN }
+    )
+    const nonce = randomBytes(16).toString('base64url')
+    await expect(
+      service.verifyRequest(buildSignedRequest({ privateKeyPem: key.privateKeyPem, nonce }))
+    ).resolves.toMatchObject({ ok: true })
+
+    // 推到条目过期之后（过期时刻 = max(now, ts) + 窗口 + 1）：同 nonce 配新时间戳应再次可用，
+    // 且此刻的「再次可用」只可能来自 prune —— 条目若永不回收，这里会是 replayed_nonce
+    now = NOW + 2 * FIVE_MIN + 2_000
+    await expect(
+      service.verifyRequest(
+        buildSignedRequest({ privateKeyPem: key.privateKeyPem, nonce, timestamp: now })
+      )
+    ).resolves.toMatchObject({ ok: true })
+  })
+})
