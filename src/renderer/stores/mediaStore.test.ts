@@ -665,6 +665,44 @@ describe('mediaStore', () => {
       expect(gated.list).toHaveBeenCalledTimes(3)
     })
 
+    it('整刷收尾不得清空在途触底的 loadingMore（复位责任归触底自己的 finally，DEBT-056）', async () => {
+      // 缺陷：整刷收尾的 setState 块无条件写 loadingMore:false。在途触底（已置 loadingMore=true、
+      // 请求未落地）被它顺带清标记 ⇒ 触底的并发闸被提前拆除，迟到的页还没落地用户就能再起一条
+      // 触底，用旧游标并发取数。复位责任完全归属触底自己的 finally（无条件、连弃权路径也不漏）。
+      const gated = setGatedPagedListMock(1200)
+      useMediaStore.setState({
+        mediaFiles: Array.from({ length: 500 }, (_, i) => makeFile({ id: String(1200 - i) })),
+        hasMoreMedia: true,
+        mediaCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 701 },
+        loadingMore: false
+      })
+
+      // ① 触底先起跑：loadingMore=true，请求卡在 gated 队首
+      const late = loadNextMediaPage()
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(1)
+      expect(useMediaStore.getState().loadingMore).toBe(true)
+
+      // ② 整刷起来：请求排在队首之后（逆序放行的前提）
+      const refreshing = fetchMediaFromDatabase({ limit: 500 })
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(2)
+
+      // ③ 放行整刷首页 ⇒ 整刷完整落地（写游标/计数；DEBT-056 缺陷在此顺带清掉 loadingMore）
+      expect(gated.release(1)).toBe(true)
+      const result = await refreshing
+      expect(result).not.toBeNull()
+      // 完整性锚：整刷确实写完了（计数落地），不是中途失败提前返回
+      expect(useMediaStore.getState().mediaTotalCount).toBe(1200)
+      // 牙（修复前红）：在途触底还在，整刷不得替它复位 loadingMore
+      expect(useMediaStore.getState().loadingMore).toBe(true)
+
+      // ④ 迟到页此刻落地（弃权）⇒ 它自己的 finally 无条件复位 —— 对照（修复前亦绿）
+      expect(gated.release(0)).toBe(true)
+      await late
+      expect(useMediaStore.getState().loadingMore).toBe(false)
+    })
+
     it('深度取数：limit 不超过一页时只发一次请求（不产生额外 IPC 往返）', async () => {
       setPagedListMock(300)
       const result = await fetchMediaFromDatabase({ limit: 1200 })

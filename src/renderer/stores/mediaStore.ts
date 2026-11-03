@@ -681,7 +681,9 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     useMediaStore.setState({
       mediaCursor: cursor,
       hasMoreMedia: hasMore,
-      loadingMore: false,
+      // DEBT-056：不在此复位 loadingMore——它只属于触底续页自己的 finally（无条件、连弃权路径
+      // 也不漏）。整刷收尾若替在途触底清标记，等于在迟到的页落地前拆掉并发闸（loadingMore 是
+      // 用户可见的「加载更多…」脚注，也是 loadNextMediaPage 的第一道守卫）。
       // R-1 计数字段：total 与 typeCounts 由主进程按与本次列表同一 WHERE 算出
       mediaTotalCount: toServerCount(mediaResult.total),
       mediaImageCount: toServerCount(mediaResult.typeCounts?.image),
