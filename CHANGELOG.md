@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+### Fixed | 修复
+
+- **图片/视频识别数量被限制为最多 500（2026-11-03）**：状态栏「共 N 个文件（图片 X · 视频 Y）」与侧栏两个计数在库内上千条时仍显示 500。三条独立根因：① **计数取的是已加载分页长度**——`AppShell` / `Sidebar` 遍历 `mediaFiles` 累加，而它是分页切片、首屏只有一页；`media:list` 早已回传 `total`、`fetchMediaFromDatabase` 也早已透出（同文件的回收站更有 `recycleBinTotal` 的正确先例），只是没人消费。② **深度刷新越界后被静默吞掉**——`GalleryPage` 的 `media:updated` 把 `limit = max(500, 已加载条数)` 原样写成 `pageSize` 直传，越过 `media-handler` 的 zod `max(500)` ⇒ `VALIDATION_ERROR` ⇒ 被 `catch` 吞成 `null` ⇒ 整次刷新失效，新扫描到的文件进不了列表；nikkisync 分支在 `39bd786` 之后单独补过 clamp 并写明「不 clamp 会让整表刷新静默失效」，本地 DB 分支是它漏掉的项。③ **grid 视图不自动拉齐**——`d654b9b` 上一轮修的是四个非网格视图，**刻意把默认的 grid 排除在外**（理由是它有触底翻页），还在测试里把「grid 600 条保持首屏 500」钉成契约；触底只由滚动驱动，不滚就停在 500。
+  修法：主进程新增 `countMediaByType()`，与列表命中**同一 WHERE** 的分类型真计数随首页以可选字段 `typeCounts` 返回（`pageSize` 的 500 上界刻意不动——它是真实入口闸门，该修的是越界传参不是拆闸门）；渲染层落到 store，新增 `useGallerySummaryCounts` 统一判据「`hasMoreMedia` 为真且服务端计数到位才用真值，否则用数组长度」，保证收藏/场景/日期/评分/搜索/分组这类纯前端筛选仍显示筛选后数量；`limit` 语义改为**目标深度**，每页恒 ≤ `MEDIA_PAGE_SIZE`、不足按 keyset 游标续页，代次号让并发刷新最新胜出、`MAX_DEPTH_PAGES` 给死循环硬上限、中途失败保住已取数据且不谎报已到齐；五个视图一律逐页拉齐。
+  范围外刻意不改的两处：`GalleryPage` 的 `BatchActions` 分母是「可选择条目数」，换成库中真值会出现「共 1200 却只全选 500」；`SCAN_BATCH_SIZE = 500`（流式写入分批）、`SQL_IN_CHUNK_SIZE`、各处 500ms 进度节流与 NikkiSync 协议侧 `MAX_PAGE_LIMIT` 都不是上限。
+  防复发由 `scripts/__tests__/media-page-limit-guard.test.ts` 钉四条不变式（三处 500 同源、上界不得删除、`pageSize` 必须经 `Math.min` 收口、拉齐判据不得再按视图切开、`typeCounts` 四点齐全）；六次变异注入逐一验证守卫与对应套件**每次都真红**。逐节点红→绿读数与链路取证见 `docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md`
+
 ---
 
 ## [2.5.6] - 2026-11-01

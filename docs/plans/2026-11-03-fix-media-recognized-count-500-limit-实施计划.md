@@ -329,3 +329,65 @@ return { files: collected, categories, total: first.total, typeCounts: first.typ
 - 不改 `SCAN_BATCH_SIZE`、`SQL_IN_CHUNK_SIZE`、500ms 节流（均非上限）。
 - 不合并 `MediaListResult` 的 `items`/`files` 双副本。
 - 不改 `AppShell` 里 `size`/`favorites` 的数组遍历算法（既存行为，非本 bug）。
+
+---
+
+## 10. 执行读数（本轮实测，2026-11-03）
+
+### 提交切分（一节点一提交）
+
+| 提交      | 节点    | 内容                                                    |
+| --------- | ------- | ------------------------------------------------------- |
+| `b633ada` | 第 0 步 | 本计划落仓                                              |
+| `cd0a149` | Node 1  | `countMediaByType` + `typeCounts` 契约面（7 文件）      |
+| `aced830` | Node 2  | store 计数落值 + `useGallerySummaryCounts` + 两处消费方 |
+| `a1b5bb8` | Node 3  | grid 逐页拉齐 + 翻转三处旧判据（3 文件）                |
+| `f915f6a` | Node 4  | 深度取数按游标循环（3 文件）                            |
+| `bb90d52` | Node 5  | `media-page-limit-guard.test.ts` 四不变式               |
+
+### 逐节点红灯 → 绿灯
+
+| 节点   | 红灯实测（修复前）                                                                                     | 修复后                     |
+| ------ | ------------------------------------------------------------------------------------------------------ | -------------------------- |
+| Node 1 | `media-repository.test.ts` typeCounts 组 5 failed，全部 `expected undefined to deeply equal {...}`     | 182 passed（全文件）       |
+| Node 2 | `Sidebar.test.tsx` R-1 例 `expected '3' to be '900'`（组件渲染的是数组长度的值）                       | Sidebar 8 + hook 6 passed  |
+| Node 3 | grid 拉齐例停在 500；「失败不无限重试」例 `to be called 1 times, but got 0 times`——grid 根本不发起续页 | 4 passed；三套件 51 passed |
+| Node 4 | `mediaStore.test.ts` N6 深度例红（当时单次直传 `pageSize: 1200`）                                      | 49 passed（含新增 5 例）   |
+| Node 5 | 守卫写于修复之后、天生绿 ⇒ 以变异取证代替红灯（见下）                                                  | 8 passed                   |
+
+Node 2/4 的部分新增用例（`hasMoreMedia=false` 用数组长度、`limit` 不超一页只发一次、中途失败保住已取）修复前即通过：它们钉的是**新代码路径的正确形状**与**不得过度替换**，不是 bug 复现。每节点的 bug 复现例均如上表红过。
+
+### 变异抽查（六次注入，全部真红后还原）
+
+| 变异 | 注入点                                               | 转红的判据                                                                         |
+| ---- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| M1   | `MEDIA_PAGE_SIZE` 500 → 600                          | 守卫不变式 1（`expected 600 to be 500`）                                           |
+| M2   | 去掉首页 `Math.min` 收口，改回 `options?.limit ?? …` | 守卫 2 **+** `mediaStore` N6 深度例 **+** `refreshMediaAfterScan` 例（3 处同时红） |
+| M3   | 把 `viewMode !== 'grid'` 重新塞回拉齐判据            | 守卫 3 **+** `count.test` grid 拉齐例 **+** 失败不重试例（3 处）                   |
+| M4   | 删掉 handler 的 `typeCounts` 透传                    | 守卫 4 **+** `media.test.ts` 契约例                                                |
+| M6   | 注释掉仓储的 `countMediaByType` 调用点               | `media-repository.test.ts` typeCounts 组 5 例全红                                  |
+| M7   | `useGallerySummaryCounts` 判据恒 false               | hook 单测 **+** `Sidebar.test.tsx` R-1 UI 例（证明 store→UI 真的连着）             |
+
+链路如实说明：单测各自在下一层打桩，因此「仓储 → handler → store → UI」不是由**一条**用例贯通，而是由 M6、`media.test.ts`、`mediaStore.test.ts`、M7 + `Sidebar.test.tsx` 四段分别钉住，任一段断开都有对应用例转红。
+
+### 收尾闸门（全部实跑）
+
+```
+npm run verify            ✓ 每节点各跑一次（typecheck/lint/core-gate/format/test 五步）
+npm test                  ✓ 469 files / 7471 passed / 20 skipped（既有 skip，未新增）
+npm run test:ci-linux     ✓ 469 files / 7488 passed / 3 skipped
+npm run typecheck         ✓ tsc -b + tsc -p tsconfig.scripts.json
+npm run typecheck:e2e     ✓ tsc --noEmit -p e2e
+npm run lint              ✓ eslint . 零 error 零 warning
+npm run i18n:guard        ✓ 未新增 i18n key（复用 gallerySummary 既有插值）
+npm run test:coverage     ✓ stmts 71.54 / branch 63.05 / funcs 64.58 / lines 73.14（阈值 66/58/59/68）
+npm run build             ✓ electron-vite 三端产物构建通过
+```
+
+一处由本轮引入、已当场清偿的红灯：`check-md-links` 报 2 处死引用，指向尚未被 git 跟踪的 `scripts/__tests__/media-page-limit-guard.test.ts`（文档先提交、守卫后跟踪）⇒ Node 5 提交后复跑 24 passed。
+
+### 未执行项（如实记账）
+
+- **§3 的 `npm run dev` 手测五条判据未执行**：前三条要求「库内图片+视频 > 500 的真实数据库」与可见窗口的肉眼读数，本机无该库、且读数不可自动判定，不拿单测冒充实机验证。替代执行的是 `npm run build`（验证三端产物未被改坏）。
+- 需用户在真机确认的三条：状态栏数字等于库中总数；首屏不滚动也会自动补齐到全部条目；点一次收藏后列表不塌回 500、且 Console 无 `VALIDATION_ERROR`。
+- Node 3 的性能风险（超大库首屏 N/500 次串行 IPC）**未压测**，本机无万级库。卡顿时的回滚位见 §8：`git revert a1b5bb8` 单独撤 Node 3，Node 1/2 的服务端真值计数仍然成立。
