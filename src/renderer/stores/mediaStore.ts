@@ -475,6 +475,19 @@ async function loadNextAssetPage(): Promise<void> {
 }
 
 /**
+ * 深度取数的页数硬上限：200 × 500 = 10 万条。
+ * 防的是畸形响应（hasMore=true 但 nextCursor 不推进）把 while 变成死循环——宁可截断并留日志。
+ */
+const MAX_DEPTH_PAGES = 200
+
+/**
+ * 整表刷新代次。media-update.ts 的 100ms trailing throttle 合并了突发广播，那是第一层；
+ * 这是第二层：一次「按已加载深度」的全量重取还没跑完，下一次 media:updated 又起了新一轮，
+ * 旧循环在每个 await 之后发现代次已变即弃权并**不写 store**，避免旧结果覆盖新结果。
+ */
+let depthRefreshSeq = 0
+
+/**
  * 服务端计数归一：只有有限数才算「服务端给了真值」。
  * 刻意不用 `?? ` / `||` 简写——合法的 0（空库、纯视频库的图片数）不能被当成缺失丢弃，
  * 否则空库会被消费方误判为「未就绪」而回落到数组长度。
@@ -546,10 +559,16 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     // 详见 media-repository 的 GALLERY_PATH_CONDITION（HQ ∪ ScreenShot ∪ Video）。
     // 非图库视图（favorites/duplicates/recycle-bin 等）传 false 保持原行为
     const galleryHighQualityOnly = isGalleryView
+    // options.limit 的语义是**目标深度**（不是单页大小）：media:list 的 zod 把 pageSize 钉在
+    // max(500)，越界会被判 VALIDATION_ERROR、被本函数的 catch 吞成 null，整次刷新静默失效。
+    // 故每页恒 ≤ MEDIA_PAGE_SIZE，不足目标深度时按 keyset 游标续页（对照 fetchMediaFromRuntime
+    // 的 clamp：nikkisync 分支补过这层防护，本地分支是它漏掉的项）。
+    const targetDepth = Math.max(1, options?.limit ?? MEDIA_PAGE_SIZE)
+    const myRefresh = ++depthRefreshSeq
     // 性能重构：首屏使用 keyset 游标（cursor=null 即首页），续页由 loadNextMediaPage 推进 mediaCursor
     const mediaResult = await window.electronAPI.media.list({
       cursor: null,
-      pageSize: options?.limit ?? MEDIA_PAGE_SIZE,
+      pageSize: Math.min(targetDepth, MEDIA_PAGE_SIZE),
       accountUid: currentProfileUid,
       hideDuplicates: !showDuplicates,
       corruptedOnly: showCorruptedOnly,
@@ -557,6 +576,7 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
       galleryHighQualityOnly
     })
     // preload 的 call() 已解包 IpcResponse 并在失败时抛出 IpcError，此处仅需防御性检查数据存在
+    if (myRefresh !== depthRefreshSeq) return null
     if (!mediaResult) {
       console.error(i18n.t('mediaStore.log.mediaListNull'))
       return null
@@ -569,6 +589,7 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
       return null
     }
     const categoryResult = await window.electronAPI.category.list()
+    if (myRefresh !== depthRefreshSeq) return null
     if (!categoryResult) {
       console.error(i18n.t('mediaStore.log.categoryListNull'))
       return null
@@ -578,11 +599,39 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
       return null
     }
 
+    // 深度续页：首页取回后仍未达到目标深度且服务端说还有下一页，按游标接着取。
+    // 中途任一页失败即停在这一页——保住已取到的数据（比整刷丢弃有用），并把 hasMoreMedia
+    // 留为 true 让下轮 media:updated / 触底续页能接着走；不谎报「已到齐」，否则
+    // useGallerySummaryCounts 会改用数组长度，服务端真值计数失去兜底。
+    let files = mediaResult.files as MediaFile[]
+    let cursor = mediaResult.nextCursor ?? null
+    let hasMore = mediaResult.hasMore ?? false
+    let pages = 1
+    while (hasMore && files.length < targetDepth && cursor && pages < MAX_DEPTH_PAGES) {
+      const next = await loadMoreMedia(
+        cursor,
+        Math.min(targetDepth - files.length, MEDIA_PAGE_SIZE)
+      )
+      if (myRefresh !== depthRefreshSeq) return null
+      if (!next) break
+      files = [...files, ...dedupeAgainst(files, next.files)]
+      cursor = next.nextCursor
+      hasMore = next.hasMore
+      pages += 1
+    }
+    if (hasMore && pages >= MAX_DEPTH_PAGES) {
+      console.error(
+        i18n.t('mediaStore.log.fetchError'),
+        `深度取数达到 ${MAX_DEPTH_PAGES} 页上限，列表可能不完整（已取 ${files.length} 条）`
+      )
+    }
+
     // 首屏加载即重置 keyset 游标：所有"整表刷新"入口（扫描完成、切换视图、设置页操作等）
     // 都经过本函数，游标随列表一起复位，避免 loadNextMediaPage 从陈旧游标继续翻页
+    // 注意写的是**循环结束后**的游标与 hasMore：整刷已把目标深度吃掉，续页要从这里接着走
     useMediaStore.setState({
-      mediaCursor: mediaResult.nextCursor ?? null,
-      hasMoreMedia: mediaResult.hasMore ?? false,
+      mediaCursor: cursor,
+      hasMoreMedia: hasMore,
       loadingMore: false,
       // R-1 计数字段：total 与 typeCounts 由主进程按与本次列表同一 WHERE 算出
       mediaTotalCount: toServerCount(mediaResult.total),
@@ -591,11 +640,12 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     })
 
     return {
-      files: mediaResult.files as MediaFile[],
+      files,
       categories: categoryResult.categories as Category[],
       total: mediaResult.total,
       typeCounts: mediaResult.typeCounts,
-      hasMore: mediaResult.hasMore
+      // 返回循环结束后的 hasMore，而不是首页那个：调用方据此判断列表是否真的已到目标深度
+      hasMore
     }
   } catch (error) {
     console.error(
@@ -613,7 +663,11 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
  */
 export async function refreshMediaAfterScan(): Promise<void> {
   // fetchMediaFromDatabase 内部已吞掉异常并返回 null，此处无需再 try/catch
-  const res = await fetchMediaFromDatabase()
+  // 与 GalleryPage 的 media:updated 同口径按「已加载深度」取数：扫描完成时用户可能已滚到第 N 页，
+  // 只取首页会把列表整体缩回一页（游标随之复位）。本函数的 limit 语义是目标深度，不再越界。
+  const res = await fetchMediaFromDatabase({
+    limit: Math.max(MEDIA_PAGE_SIZE, useMediaStore.getState().mediaFiles.length)
+  })
   if (res) {
     useMediaStore.getState().setMediaFiles(res.files)
   }
@@ -622,8 +676,11 @@ export async function refreshMediaAfterScan(): Promise<void> {
 // 追加加载更多媒体文件（无限滚动）
 // 性能重构：入参由页码 page 改为 keyset 游标 cursor（首页传 null）
 // P0-02：按当前选中的角色档案 UID 过滤
+// pageSize 供深度取数循环按剩余额度收口；缺省仍是整页 MEDIA_PAGE_SIZE。
+// 除该循环外无人传它，其余调用方（触底续页）行为不变。
 export async function loadMoreMedia(
-  cursor: { sortValue: string | number | null; id: number } | null
+  cursor: { sortValue: string | number | null; id: number } | null,
+  pageSize: number = MEDIA_PAGE_SIZE
 ): Promise<{
   files: MediaFile[]
   hasMore: boolean
@@ -653,7 +710,7 @@ export async function loadMoreMedia(
     // 性能重构：续页用 keyset 游标（loadNextMediaPage 传入当前 mediaCursor），避免大 OFFSET
     const mediaResult = await window.electronAPI.media.list({
       cursor,
-      pageSize: MEDIA_PAGE_SIZE,
+      pageSize,
       accountUid: currentProfileUid,
       hideDuplicates: !showDuplicates,
       corruptedOnly: showCorruptedOnly,

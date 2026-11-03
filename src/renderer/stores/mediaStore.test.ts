@@ -3,6 +3,7 @@ import {
   useMediaStore,
   updateMediaFileAndPersist,
   fetchMediaFromDatabase,
+  refreshMediaAfterScan,
   loadMoreMedia,
   loadRecycleBin,
   type MediaFile
@@ -87,6 +88,38 @@ function clearMockApi(): void {
   ;(globalThis as { window?: { electronAPI?: Record<string, unknown> } }).window = {}
 }
 
+/**
+ * mock media:list 的 keyset 游标分页，语义对齐 media-repository.listMedia 的 DESC 分支：
+ * 首页（cursor=null）取最新 pageSize 条，续页取「排序键 < 锚点」的下一页。
+ * 刻意按**传入的 pageSize** 切片——深度取数正是靠这个观测每页请求量是否越过主进程 zod 上界。
+ */
+function setPagedListMock(total: number): void {
+  const sorted = Array.from({ length: total }, (_, i) => makeFile({ id: String(i + 1) })).sort(
+    (a, b) => Number(b.id) - Number(a.id)
+  )
+  const list = vi.fn(async (args?: { cursor?: { id: number } | null; pageSize?: number }) => {
+    const afterId = args?.cursor?.id ?? null
+    const pageSize = args?.pageSize ?? 500
+    const startIdx = afterId === null ? 0 : sorted.findIndex((f) => Number(f.id) < afterId)
+    const page = startIdx === -1 ? [] : sorted.slice(startIdx, startIdx + pageSize)
+    const hasMore = startIdx !== -1 && startIdx + page.length < sorted.length
+    const last = page[page.length - 1]
+    return {
+      files: page,
+      total,
+      hasMore,
+      nextCursor: hasMore && last ? { sortValue: last.created_at, id: Number(last.id) } : null
+    }
+  })
+  setMockApi({ media: { list } })
+}
+
+/** 取回当前注入的 media.list mock，便于断言每次调用的入参 */
+function listMockFn(): ReturnType<typeof vi.fn> {
+  return (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
+    .electronAPI!.media!.list as ReturnType<typeof vi.fn>
+}
+
 describe('mediaStore', () => {
   beforeEach(() => {
     useMediaStore.setState({
@@ -102,7 +135,14 @@ describe('mediaStore', () => {
       },
       editingMedia: null,
       recycleBinFiles: [],
-      recycleBinLoading: false
+      recycleBinLoading: false,
+      // 深度取数与计数用例都断言这几个字段的终值，必须逐例复位，否则上一例的残留会让断言假绿
+      hasMoreMedia: false,
+      mediaCursor: null,
+      loadingMore: false,
+      mediaTotalCount: null,
+      mediaImageCount: null,
+      mediaVideoCount: null
     })
     // 图库目录限制测试依赖 currentView：恢复默认视图，避免用例间相互污染
     useUIStore.setState({ currentView: 'gallery' })
@@ -449,16 +489,98 @@ describe('mediaStore', () => {
       expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ cursor: null, pageSize: 500 }))
     })
 
-    it('N6：limit 覆盖默认页大小（media:updated 刷新保持已加载深度）', async () => {
-      // 缺陷：media:updated 广播（扫描/批量缩略图期间高频）触发整表刷新时只取首页
-      // 500 条并整体替换——已滚到第 N 页的用户列表瞬间缩回 500 条、游标被重置
-      // （列表闪回开头）。修复：GalleryPage 传 limit = max(500, 当前已加载条数)，
-      // 本函数透传为 pageSize，游标逻辑不变。
-      setMockApi()
-      await fetchMediaFromDatabase({ limit: 1200 })
-      const mockFn = (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
-        .electronAPI!.media!.list
-      expect(mockFn).toHaveBeenCalledWith(expect.objectContaining({ cursor: null, pageSize: 1200 }))
+    it('N6 深度取数：按 keyset 游标逐页循环，单次 pageSize 绝不越过主进程 zod 上界 500', async () => {
+      // 缺陷（R-2）：本函数把调用方传的 limit（media:updated 时为「当前已加载条数」，可 > 500）
+      // 原样写成 pageSize 直传 media:list ⇒ 被 media-handler 的 z….max(500) 判 VALIDATION_ERROR
+      // ⇒ preload 抛 IpcError ⇒ 本函数的 catch 吞成 null ⇒ 整表刷新静默失效，新扫描到的文件进不了列表。
+      // 修复：limit 的语义是「目标深度」，内部按页循环取到该深度，每页 pageSize 恒 ≤ 500。
+      //（对照：nikkisync 分支在 fetchMediaFromRuntime 里做了同款 clamp，本地分支当初漏了。）
+      setPagedListMock(1200)
+      const result = await fetchMediaFromDatabase({ limit: 1200 })
+      const listMock = listMockFn()
+
+      expect(result).not.toBeNull()
+      expect(result!.files).toHaveLength(1200)
+      // 500 + 500 + 200：三次调用，每次都在线上界之内
+      const callCount = listMock.mock.calls.length
+      expect(callCount).toBe(3)
+      const pageSizes = listMock.mock.calls.map((c) => {
+        const arg = c[0] as { pageSize?: number } | undefined
+        return arg?.pageSize ?? 0
+      })
+      expect(pageSizes).toEqual([500, 500, 200])
+      for (const size of pageSizes) {
+        expect(size).toBeLessThanOrEqual(500)
+      }
+      // 首页仍是 cursor:null（整表刷新语义），续页才带游标
+      expect((listMock.mock.calls[0][0] as { cursor?: unknown }).cursor).toBeNull()
+      // 取到全部 ⇒ 游标与 hasMoreMedia 收口，避免下一次 effect 又从陈旧游标续页
+      expect(result!.hasMore).toBe(false)
+      expect(useMediaStore.getState().hasMoreMedia).toBe(false)
+    })
+
+    it('深度取数：limit 不超过一页时只发一次请求（不产生额外 IPC 往返）', async () => {
+      setPagedListMock(300)
+      const result = await fetchMediaFromDatabase({ limit: 1200 })
+      expect(listMockFn()).toHaveBeenCalledTimes(1)
+      expect(result!.files).toHaveLength(300)
+    })
+
+    it('深度取数：中途某页失败时保留已取数据，hasMoreMedia 维持 true 供下轮重试', async () => {
+      const all = Array.from({ length: 1200 }, (_, i) => makeFile({ id: String(i + 1) }))
+      let call = 0
+      const list = vi.fn(async () => {
+        call += 1
+        if (call === 1) {
+          return {
+            files: all.slice(0, 500),
+            total: 1200,
+            hasMore: true,
+            nextCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 500 }
+          }
+        }
+        throw new Error('VALIDATION_ERROR')
+      })
+      setMockApi({ media: { list } })
+
+      const result = await fetchMediaFromDatabase({ limit: 1200 })
+      // 不整刷丢弃：首页 500 条仍然交付
+      expect(result).not.toBeNull()
+      expect(result!.files).toHaveLength(500)
+      // 且不得谎报「已到齐」——否则 useGallerySummaryCounts 会改用数组长度，真值计数失去兜底
+      expect(useMediaStore.getState().hasMoreMedia).toBe(true)
+    })
+
+    it('首屏把服务端 total / typeCounts 写入 store 计数字段（R-1 的落库口）', async () => {
+      setMockApi({
+        media: {
+          list: vi.fn().mockResolvedValue({
+            files: [makeFile({ id: '1' })],
+            total: 1200,
+            typeCounts: { image: 900, video: 300 },
+            hasMore: true
+          })
+        }
+      })
+      await fetchMediaFromDatabase()
+      expect(useMediaStore.getState().mediaTotalCount).toBe(1200)
+      expect(useMediaStore.getState().mediaImageCount).toBe(900)
+      expect(useMediaStore.getState().mediaVideoCount).toBe(300)
+    })
+
+    it('服务端未给 typeCounts 时计数字段置 null，不残留上一次的旧真值', async () => {
+      useMediaStore.setState({
+        mediaTotalCount: 1200,
+        mediaImageCount: 900,
+        mediaVideoCount: 300
+      })
+      setMockApi({
+        media: { list: vi.fn().mockResolvedValue({ files: [], total: 0, hasMore: false }) }
+      })
+      await fetchMediaFromDatabase()
+      expect(useMediaStore.getState().mediaTotalCount).toBe(0)
+      expect(useMediaStore.getState().mediaImageCount).toBeNull()
+      expect(useMediaStore.getState().mediaVideoCount).toBeNull()
     })
 
     it('图库视图调用 list 时传 galleryHighQualityOnly: true', async () => {
@@ -494,6 +616,31 @@ describe('mediaStore', () => {
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({ mediaSource: 'local_screenshot', galleryHighQualityOnly: false })
       )
+    })
+  })
+
+  describe('refreshMediaAfterScan', () => {
+    it('按已加载深度取数：扫描完成不把列表整体缩回首屏一页', async () => {
+      // 用户已滚到 1200 条，扫描完成触发本函数 ⇒ 应把 1200 条整表重取，
+      // 而不是只取首页 500 条再整体替换（游标复位 + 列表闪回开头）。
+      setPagedListMock(1200)
+      useMediaStore.setState({
+        mediaFiles: Array.from({ length: 1200 }, (_, i) => makeFile({ id: String(i + 1) }))
+      })
+      await refreshMediaAfterScan()
+      expect(listMockFn().mock.calls.length).toBe(3)
+      for (const call of listMockFn().mock.calls) {
+        expect((call[0] as { pageSize?: number })?.pageSize ?? 0).toBeLessThanOrEqual(500)
+      }
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(1200)
+    })
+
+    it('尚未滚动（列表不超过一页）时只发一次请求，不产生额外 IPC 往返', async () => {
+      setPagedListMock(300)
+      useMediaStore.setState({ mediaFiles: [makeFile({ id: '1' })] })
+      await refreshMediaAfterScan()
+      expect(listMockFn()).toHaveBeenCalledTimes(1)
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(300)
     })
   })
 
