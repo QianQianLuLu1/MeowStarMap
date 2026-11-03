@@ -112,6 +112,25 @@ describe('useRefreshMedia', () => {
       expect(onError).toHaveBeenCalledWith(expect.stringContaining('媒体数据加载失败'))
     })
 
+    it('被后续整刷取代时不弹加载失败 toast（弃权返回 null ≠ 取数失败）', async () => {
+      // 缺陷：fetchMediaFromDatabase 让「最新一轮胜出」，被顶掉的那轮弃权返回 null——UI 由那一轮
+      // 交付，这是成功语义；本钩子却把它与「真的取数失败」混为一谈，重试耗尽后弹一条用户无从处置的
+      // 红色 toast。判据：自己那轮只占 +1，返回后代次前进更多 ⇒ 是别人起了新一轮。
+      let fakeGen = 0
+      vi.spyOn(mediaStoreModule, 'getMediaRefreshGeneration').mockImplementation(() => fakeGen)
+      loadMediaSpy.mockImplementation(async () => {
+        fakeGen += 1 // 自己这一轮在函数入口领走的代次
+        fakeGen += 1 // 取数在途时另一个调用点又起了新一轮
+        return null
+      })
+      const onError = vi.fn()
+      const { result } = renderHook(() => useRefreshMedia({ onError }))
+      await act(async () => {
+        await result.current()
+      })
+      expect(onError).not.toHaveBeenCalled()
+    })
+
     it('未传 onError 时不抛错', async () => {
       loadMediaSpy.mockResolvedValue(null)
       const { result } = renderHook(() => useRefreshMedia())

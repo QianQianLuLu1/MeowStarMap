@@ -8,7 +8,7 @@ export interface GallerySummaryCounts {
 }
 
 /**
- * 图库计数口径选择器：AppShell 状态栏、Sidebar「图片 / 视频」、GalleryPage 统计条共用。
+ * 图库计数口径选择器：AppShell 状态栏与 Sidebar「图片 / 视频」两处共用。
  *
  * 背景（R-1，计划见 docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md）：
  * 这三处原先都遍历 `mediaFiles` 数组算数量，而 mediaFiles 是分页加载的切片，首屏只有一页 ⇒

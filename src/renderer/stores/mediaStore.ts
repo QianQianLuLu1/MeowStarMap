@@ -499,6 +499,18 @@ let depthRefreshSeq = 0
 let depthFetchActive = false
 
 /**
+ * 最近一次本地整刷领走的代次。
+ *
+ * 消费方存在的理由：`fetchMediaFromDatabase` 让「最新一轮胜出」，被顶掉的那轮弃权返回 `null`——
+ * 这本身是**成功**语义（UI 由那一轮交付），与「真的取数失败」返回的是同一个 `null`。
+ * 调用方（`useRefreshMedia`）据此区分两者，不再对被取代谎报一次加载失败。
+ * nikkisync 数据源不 bump 本代次，故该源下恒判为「未被取代」，真实失败照常上报。
+ */
+export function getMediaRefreshGeneration(): number {
+  return depthRefreshSeq
+}
+
+/**
  * 服务端计数归一：只有有限数才算「服务端给了真值」。
  * 刻意不用 `?? ` / `||` 简写——合法的 0（空库、纯视频库的图片数）不能被当成缺失丢弃，
  * 否则空库会被消费方误判为「未就绪」而回落到数组长度。
@@ -508,10 +520,13 @@ function toServerCount(value: number | undefined | null): number | null {
 }
 
 /**
- * 从数据库查询媒体文件与分类列表（纯查询，不写 store）。
+ * 从数据库查询媒体文件与分类列表。
  *
- * 本函数只负责取数：函数体内没有任何 set(...) 调用，返回 { files, categories, total, hasMore } 或 null。
- * 调用方必须自行把结果写入 store（setMediaFiles / setCategories），否则 UI 不会更新。
+ * 列表本体不写 store：返回 { files, categories, total, typeCounts, hasMore } 或 null，调用方必须自行
+ * 写回（setMediaFiles / setCategories），否则 UI 不会更新——把结果丢掉是这个函数最容易犯的错。
+ * 但**分页与计数的真相源**（mediaCursor / hasMoreMedia / mediaTotalCount 等）由本函数在取数末尾直接
+ * 落进 store：它们必须与本次 WHERE、本次取到的深度同批写入，留给调用方补写就会出现「游标是新轮的、
+ * 数组是旧轮的」错位。
  * 推荐直接使用 useRefreshMedia hook，它已封装「取数 + 写 store + 失败重试」，可杜绝返回值被丢弃。
  *
  * @param options.limit 覆盖默认页大小（N6）：media:updated 整表刷新入口传入
