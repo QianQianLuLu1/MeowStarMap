@@ -273,6 +273,119 @@ npm run e2e:smoke           # 必须看到 [e2e] executable: release/win-unpacke
 
 ---
 
-## 9. 执行记录（2026-11-03，待回写）
+## 9. 执行记录（2026-11-03，逐节点真跑）
 
-阶段 B/C/D 的逐节点红绿读数、变异抽查、六道闸门与旁路出包读数，执行后写入本节。
+### 9.1 提交清单
+
+| 节点  | 提交         | 内容                                                              |
+| ----- | ------------ | ----------------------------------------------------------------- |
+| N0    | `3aacc66`    | 本文落仓（阶段 A 唯一动作，提交后停下等用户回「继续」）           |
+| N1-N3 | `3573729`    | 同步面板代次计数 / 切范围清命中 / 库变更失效统计                  |
+| N4    | `e1437a3`    | 诊断包原生日志逐文件容错                                          |
+| N5    | `6dcf10b`    | mDNS 口径与常量同源 + 去重复注释行                                |
+| N6-N7 | `d4bf8df`    | `inspirationOn` 九语改挂载义 + `photoCount` 五语计数中立          |
+| N8    | `e62c04f`    | GPU 验证工装只出判定不出持久副作用                                |
+| N9    | `db4415d`    | GPU / 退出取证状态文件同步原子写                                  |
+| N10   | `70d2f54`    | `clockSkewMs` 夹到 5 分钟协议硬上限                               |
+| N11   | `4739b98`    | DEBT-050/051/052 登记 + 048/049 行号漂移订正                      |
+| N12   | `6f862d7`    | CHANGELOG 收口（七条 bullet 进 `## [2.5.6]` 的 `### Fixed` 末位） |
+| N13   | 本文所在提交 | 执行读数回写                                                      |
+
+### 9.2 各节点红-绿证据
+
+| 节点  | 改前红灯（实测原文）                                                                                                                                                                                                             | 改后                                                                          |
+| ----- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| N1-N3 | `SyncInsightPanel.test.tsx` → **3 failed \| 8 passed (11)**：竞态例、切范围例、库变更例                                                                                                                                          | 11 passed；sync-gallery 全套 **107 passed**                                   |
+| N4    | `log-service.test.ts` → **1 failed \| 43 passed (44)**，`AssertionError: expected [ 'startup-errors.log', …(3) ] to include 'chromium-debug.log.old'`                                                                            | 44 passed                                                                     |
+| N5    | **无红灯可造**（纯注释、零行为变化），按 DEBT-048 已立口径如实标注                                                                                                                                                               | `sync-server-view.test.ts` 37 passed                                          |
+| N6-N7 | 两守护套件 → **4 failed \| 18 passed (22)**：`ja.json inspirationOn 仍是旧值「エンドポイントを公開中」`、正向词缺失、`expected 'point d’entrée en ligne' not to contain 'entrée'`、`en.json photoCount 仍是旧值「{{n}} photos」` | locales/ + sync-gallery/ 合计 **145 passed**；`i18n:guard` ✅                 |
+| N8    | 两套 GPU 套件 → **4 failed \| 60 passed (64)**：b2 / b3 / L10 / selfheal 例 4                                                                                                                                                    | 64 passed                                                                     |
+| N9    | `gpu-fallback.test.ts` → **1 failed \| 47 passed (48)**，`AssertionError: expected +0 to be 2`（`compatLevel` 被半截文件读成默认 0，即缺陷本体）                                                                                 | atomic-file + gpu-fallback + gpu-selfheal + exit-forensics 四套 **92 passed** |
+| N10   | `auth-service.test.ts` → **2 failed \| 28 passed (30)**（10 分钟注入被接受；非法取值不收敛）                                                                                                                                     | `src/main/sync/` 八套 **116 passed \| 2 skipped**                             |
+
+改前即绿、如实标注为**守卫**而非红灯的 5 例：N3 收起态不追加 IPC、N6 的 `{{n}}` 占位齐备、
+N8 的 `L11 FORCE_LEVEL 不落盘`、N10 的「默认窗口语义不变」与「过期 nonce 确被 prune」
+（后者此前全仓无人断言——把 `pruneNonces` 整段删掉也不会红）。
+
+### 9.3 变异抽查
+
+- **N1**：只撤 `finally` 里的代次守卫 ⇒ 恰好竞态例红（`Unable to find an element with the text: 检索中…`）、
+  其余 10 例绿，证明 loading 守卫不是 `hits` 守卫的重复劳动。恢复后 `sha256` 前缀 `8d2e9598`。
+- **N8**：把工装短路挪回 `markGpuProcessCrash` **之后**、只保留落盘闸的修复 ⇒
+  **3 failed | 61 passed**，且 L10 仍绿。这条分拆恰好证明 §1.2「只补落盘闸不够」的自查有牙。
+  恢复后 64 passed，`sha256` 前缀 `0f2e2a62`。
+- **N4 / N9**：修复前的实现形态本身就等价于「`try` 罩在循环外」「裸 `writeFileSync`」，
+  与撤掉修复的变异同态，故不另做一遍（记在此以免被当成漏做）。
+
+### 9.4 六道闸门与全量回归读数（2026-11-03 本机）
+
+| 命令                         | 读数                                                                                                                                                                                                  |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install`                | 内层 `INNER_EXIT=0`；**确实剪掉四条 `@nikkisync` junction**（`ls node_modules/@nikkisync/` 为空），同批 `link:nikkisync` 恢复、`--check` 四条 ok。本轮 `package-lock.json` 无改写，无需 `git restore` |
+| `npm run build`              | `INNER_EXIT=0`，`✓ built in 5.91s`                                                                                                                                                                    |
+| `npm test`                   | **467 files passed / 7441 passed \| 20 skipped (7461)**，79.04s，`INNER_EXIT=0`                                                                                                                       |
+| `npm run typecheck`          | `EXIT=0`（`tsc -b` + `tsc -p tsconfig.scripts.json`）                                                                                                                                                 |
+| `npm run typecheck:e2e`      | `EXIT=0`                                                                                                                                                                                              |
+| `npm run lint`（`eslint .`） | `EXIT=0`                                                                                                                                                                                              |
+| `npm run i18n:guard`         | ✅ 白名单只减不增、清零必移除、key 已同步                                                                                                                                                             |
+| `npm run verify`             | 0 项（全部变更已提交，工作树对 HEAD 干净 ⇒ 无待验文件，符合预期；各节点的只读检查由 `verify:staged` 逐次跑过，均五项 ✅）                                                                             |
+| `npm run e2e:smoke`          | **19 passed (46.9s)**，`INNER_EXIT=0`；`[e2e] executable:` 打印 `release/win-unpacked/喵星图.exe`，该 exe mtime `18:30:24` **晚于**最后提交 `18:29:42` ⇒ 确实打在新树上                               |
+| `npm run test:ci-linux`      | **467 files passed / 7458 passed \| 3 skipped (7461)**，56.81s，`INNER_EXIT=0`                                                                                                                        |
+
+注：`npm test` 与装置的总数同为 7461，但通过/跳过分裂不同（7441+20 vs 7458+3）——装置侧不 mock
+`@nikkisync` 装载链，若干 `*.linked` 套件的用例在装置里跑、在真宿主里因原生模块 ABI 而 skip，属既有
+两侧语义差，非本轮引入。
+
+### 9.5 版本号：零编辑，附判据
+
+`package.json:3` 与全部随动声明位（README 徽章 / `DEVELOPMENT(.en)` / `ARCHITECTURE(.en)` 头部与 §12.2 /
+`AGENTS.md` / `database-mock.ts:664` / CHANGELOG 唯一版本节）**现状已是 2.5.6** ⇒ 「设定为 2.5.6」不做任何
+编辑。闸门读数：`npx tsx scripts/check-changelog-release.ts` 三条 ✔ ——
+`解析到 15 个版本节（最新：2.5.6，package.json：2.5.6）`、`[2.5.6] 版本节存在且唯一`、`[Unreleased] 已收口（无待发布条目）`；
+`check-changelog-release.test.ts` 17 例全绿。
+
+### 9.6 重打包与新鲜度取证
+
+**标准配方一次跑通，未用旁路**：`npm run dist:win` 全程 48 项 ✔、0 ⚠ 0 ✖，`INNER_EXIT=0`
+（打包前 27 项 + 解包后 21 项，含「产物无旧仓库链接与失效占位：32 条禁串 / 74,197,572 字节」）。
+既往轮次反复出现的 `electronGet.js:186` `fs.rm` EBUSY 与 `EPERM rename('win-unpacked.tmp' → 'win-unpacked')`
+本轮**没有复现**——所以 §8 里准备的 `electronDist` 旁路 + `cp -rf` 回填一行都没用上。这只说明本机
+防护软件此刻不在扫描态，**不构成「锁已根治」的证据**，旁路配方继续保留在 §8。
+
+留底：旧 `MeowStarMap-Setup-2.5.6.exe`（11-02 19:46，184,657,459 B）+ blockmap + latest.yml 已 `cp` 到
+gitignored 的 `_safe_backup_20261103-reviewfix/`（安装包在 git 里零副本，孤本先保全再覆盖）。
+
+两轴差异（排除「只换 releaseDate 的空重跑」）：
+
+| 轴            | 旧包基线                                                                                   | 新包                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------ |
+| `size`        | 184,657,459                                                                                | **184,744,586**（+87,127）                                                                 |
+| `sha512`      | `iQTDyktm3Rqs5Km63yW81om8aXvJ99T5WhXa6kAY3Z9Kt1zWDzZc++/Bikk9pqZiRSqJpw6i8J2R/7qMpXDFGA==` | `CZG9nDg9KFCIqim0f6c9uh8IME4VSFnStoTfdXd+N+ZtB42mexrBkQRf+T/nj+lN++9OI/qak5KhNxS4zAAXtA==` |
+| `releaseDate` | 2026-11-02T11:46:54Z                                                                       | 2026-11-03T10:30:55Z                                                                       |
+
+包内字节判据（`.cache/asar-freshness-20261103.cjs`，`@electron/asar`；条目名是**反斜杠带前导 `\`**，
+只去前导分隔符、绝不把 `\` 换成 `/`——第一次就栽在把盘上路径转成 `/` 去匹配，`checked=0 / 包内缺席=193`）：
+
+- **193 个 `dist/main` + `dist/renderer` 文件**逐文件 sha256 与包内字节比对：**不一致 0、包内缺席 0**。
+- `dist\main\main\app\index.js` 包内字节与盘上 **`equals = true`**（47,177 B）。
+- 应当出现的标记全部 `>0`：`syncGallery.insight.title`=1（cf1364f 的新面板进包了）、`searchSuits`=7、
+  九语新 `inspirationOn` 各 2、`Photos: {{n}}`=2、「验证工装在位」=1、`clock_skew`=1。
+- 应当消失的标记全部 `=0`：九条旧 `inspirationOn` 值、`{{n}} photos`、`{{n}} Fotos`。
+  ⇒ **包等于源码**，不是「测试全绿但包是旧的」那种两侧同时成立的假象。
+
+### 9.7 执行期的两处自我纠错与一处操作失误
+
+1. **DEBT-050 的规模数字**：上一轮架构代理报「en.json 有 64 处插值串」，本人遍历实测是 **60** 处，
+   账本按实测写 60。凡未自己数过的数字不进账本。
+2. **`sqlite_sequence` 闭集用例**：写「判过不算缺陷」那条时先顺手记了「该套件 14 例全绿」，那其实是
+   `sync-server.linked.test.ts` 的读数；实跑 `runtime-facade.linked.test.ts` 得 **19 passed**，已就地订正。
+3. **操作失误（已无损恢复）**：给 `docs/debt-registry.json` 做行号订正的一次 `node -e` 试跑里，收尾写
+   文件的三元表达式恒取空串，把该文件截成 **0 字节**。该文件当时对 HEAD 干净，`git restore docs/debt-registry.json`
+   单路径恢复（64,953 B / 49 条 / 尾部 DEBT-049 校验通过），其余未提交改动未受影响。教训：**改 JSON 一律走
+   落盘脚本 + 断言 + `prettier --write` 归一，不用一行式 `node -e` 拼写回逻辑**。
+
+### 9.8 现场
+
+工作树对 HEAD 干净；`release/` = 本轮新包三件（exe 184,744,586 B / blockmap / latest.yml）+ `win-unpacked`
+新树 + 五个历史 `build-*` 残壳；`_safe_backup_20261103-reviewfix/` 是本轮留底；`.cache/` 下留了本轮各命令
+日志与 `asar-freshness-20261103.cjs`（均 gitignored，供复跑取数）。
