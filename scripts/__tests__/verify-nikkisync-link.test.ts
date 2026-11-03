@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import fs, { readFileSync } from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -12,6 +13,7 @@ import {
   collectOutOfRepoSpecs,
   describeLoadChainClosure,
   evaluateNikkiSyncLink,
+  packedMigrationsReadable,
   type NikkiSyncLinkFacts
 } from '../verify-nikkisync-link'
 
@@ -637,5 +639,104 @@ describe('evaluateNikkiSyncLink 的闭包检查项', () => {
     expect(failing(checks)).not.toContain(CLOSURE_CHECK)
     expect(find(checks, CLOSURE_CHECK)?.level).toBe('warn')
     expect(find(checks, CLOSURE_CHECK)?.detail).toContain('skipped (no links present')
+  })
+})
+
+describe('packedMigrationsReadable：解包根判据与待审 app.asar 同源（DEBT-054 收口）', () => {
+  // 这组用例走真实 tmp 目录 IO（合成 release 树），与文件其余「只测推导、不触磁盘」的用例分开：
+  // 它测的正是「选择器面对真实目录树时的取舍」，不触磁盘就测不出 findAsarUnpacked 旧判据的假绿。
+  // 树路径全部逐字内联（不用动态片段拼路径），目录树只建在 mkdtempSync 给出的 tmp 根之下。
+  const tmpRoots: string[] = []
+
+  afterEach(() => {
+    for (const root of tmpRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
+  })
+
+  it('T1 仅存 win-unpacked.tmp 残留树时不判可读（fail-closed，不回落目录扫描）', () => {
+    // 旧 findAsarUnpacked 会在 release 下递归取首个 app.asar.unpacked 命中 ⇒ 验到解压中途的
+    // 残留树并返回 true（假绿）。收敛后待审目标只认 win-unpacked/resources/app.asar，
+    // 缺失即返回 null（诊断项缺席，不是 false）。
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vnl-asar-'))
+    tmpRoots.push(root)
+    const sql = path.join(
+      root,
+      'release',
+      'win-unpacked.tmp',
+      'resources',
+      'app.asar.unpacked',
+      'node_modules',
+      '@nikkisync',
+      'database',
+      'migrations',
+      '0001_initial.sql'
+    )
+    fs.mkdirSync(path.dirname(sql), { recursive: true })
+    fs.writeFileSync(sql, 'CREATE TABLE IF NOT EXISTS t (id INTEGER);', 'utf8')
+    expect(packedMigrationsReadable(root)).toBeNull()
+  })
+
+  it('T2 win-unpacked 在位但 app.asar 缺失（解压中断）时不判可读', () => {
+    // 解包目录存在、app.asar 尚未落地 ⇒ 待审目标无法确定 ⇒ fail-closed 返回 null；
+    // 旧判据只看 app.asar.unpacked 目录是否命中 ⇒ 会返回 true。
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vnl-asar-'))
+    tmpRoots.push(root)
+    const sql = path.join(
+      root,
+      'release',
+      'win-unpacked',
+      'resources',
+      'app.asar.unpacked',
+      'node_modules',
+      '@nikkisync',
+      'database',
+      'migrations',
+      '0001_initial.sql'
+    )
+    fs.mkdirSync(path.dirname(sql), { recursive: true })
+    fs.writeFileSync(sql, 'CREATE TABLE IF NOT EXISTS t (id INTEGER);', 'utf8')
+    expect(packedMigrationsReadable(root)).toBeNull()
+  })
+
+  it('T3 正常树（app.asar 与 .unpacked 兄弟同在）判可读（对照，修复前亦绿）', () => {
+    // 对照用例：修复前旧判据对新树同样命中 ⇒ 修复前亦绿。作用是钉住「正常路径不被收敛误伤」。
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vnl-asar-'))
+    tmpRoots.push(root)
+    const sql = path.join(
+      root,
+      'release',
+      'win-unpacked',
+      'resources',
+      'app.asar.unpacked',
+      'node_modules',
+      '@nikkisync',
+      'database',
+      'migrations',
+      '0001_initial.sql'
+    )
+    fs.mkdirSync(path.dirname(sql), { recursive: true })
+    fs.writeFileSync(sql, 'CREATE TABLE IF NOT EXISTS t (id INTEGER);', 'utf8')
+    fs.writeFileSync(
+      path.join(root, 'release', 'win-unpacked', 'resources', 'app.asar'),
+      'fake asar',
+      'utf8'
+    )
+    expect(packedMigrationsReadable(root)).toBe(true)
+  })
+
+  it('T4 已解析成功但 .unpacked 内缺迁移 SQL 时判 false（对照，修复前亦绿）', () => {
+    // 对照用例：钉「迁移 SQL 存在性检查」这个载荷真被覆盖——M2 变异（把存在性检查换恒真）
+    // 应使本例红。修复前旧判据对新树同样返回 false ⇒ 修复前亦绿。
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vnl-asar-'))
+    tmpRoots.push(root)
+    fs.mkdirSync(path.join(root, 'release', 'win-unpacked', 'resources', 'app.asar.unpacked'), {
+      recursive: true
+    })
+    fs.writeFileSync(
+      path.join(root, 'release', 'win-unpacked', 'resources', 'app.asar'),
+      'fake asar',
+      'utf8'
+    )
+    // 刻意不放迁移 SQL ⇒ 已打包但缺 SQL，判 false（fail 而非 null）
+    expect(packedMigrationsReadable(root)).toBe(false)
   })
 })

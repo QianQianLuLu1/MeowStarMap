@@ -19,6 +19,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { NIKKISYNC_PACKAGE_DIRS, resolveNikkiSyncRoot, toRootCandidates } from './link-nikkisync'
+import { deriveUnpackedTarget, resolveVerifyAsarTarget } from './verify-asar-target'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -534,36 +535,20 @@ export function countBuildFoldHits(rootDir: string): number | null {
   return hits
 }
 
-/** 在 release 下有限深度查找 app.asar.unpacked 目录（找不到返回 null）。 */
-function findAsarUnpacked(releaseDir: string, maxDepth = 6): string | null {
-  let found: string | null = null
-  const walk = (dir: string, depth: number): void => {
-    if (found || depth > maxDepth) return
-    let entries: fs.Dirent[]
-    try {
-      entries = fs.readdirSync(dir, { withFileTypes: true })
-    } catch {
-      return
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue
-      const full = path.join(dir, entry.name)
-      if (entry.name === 'app.asar.unpacked') {
-        found = full
-        return
-      }
-      walk(full, depth + 1)
-    }
-  }
-  walk(releaseDir, 0)
-  return found
-}
-
-/** 打包产物内迁移 SQL 可读性：未打包返回 null。 */
+/**
+ * 打包产物内迁移 SQL 可读性：未打包/待审 app.asar 未确定返回 null。
+ *
+ * DEBT-054 收口：解包根改由与禁串步同一份选择器（scripts/verify-asar-target.ts）派生——
+ * 原先本文件自持的 `findAsarUnpacked`（递归 readdir、取首个命中）会在两棵完整树并存时验到
+ * 陈旧树；现在只认 release/win-unpacked/resources/app.asar 及其 `.unpacked` 兄弟，
+ * 不命中即 fail-closed 返回 null，绝不回退目录扫描（含拒绝 *.tmp 目录段）。
+ */
 export function packedMigrationsReadable(rootDir: string): boolean | null {
-  const unpacked = findAsarUnpacked(path.join(rootDir, 'release'))
-  if (!unpacked) return null
-  return fs.existsSync(path.join(unpacked, PACKED_MIGRATION_REL))
+  const releaseDir = path.join(rootDir, 'release')
+  const { asarPath } = resolveVerifyAsarTarget([], releaseDir)
+  const { unpackedRoot } = deriveUnpackedTarget(asarPath, (p) => fs.existsSync(p))
+  if (!unpackedRoot) return null
+  return fs.existsSync(path.join(unpackedRoot, PACKED_MIGRATION_REL))
 }
 
 /** 采集事实表（唯一的 I/O 面）。 */
