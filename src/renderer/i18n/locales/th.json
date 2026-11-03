@@ -4425,7 +4425,7 @@
       "serverId": "ID เซิร์ฟเวอร์",
       "tlsFingerprint": "ลายนิ้วมือ TLS",
       "inspiration": "ซิงค์แรงบันดาลใจ v1",
-      "inspirationOn": "เปิดใช้จุดปลายทาง",
+      "inspirationOn": "จุดปลายทางติดตั้งแล้ว",
       "copied": "คัดลอกแล้ว"
     },
     "pairing": {

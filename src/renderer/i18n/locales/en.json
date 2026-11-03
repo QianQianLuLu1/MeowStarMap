@@ -4353,7 +4353,7 @@
       "searchIdle": "Type a keyword to search",
       "searchEmpty": "No matches",
       "searchFailed": "Search failed",
-      "photoCount": "{{n}} photos",
+      "photoCount": "Photos: {{n}}",
       "statsLoading": "Loading stats…",
       "statsEmpty": "No stats yet",
       "statsFailed": "Failed to load stats",

@@ -205,3 +205,44 @@ describe('「运行时未启动」空态改指板块内入口', () => {
 // 元数据解析开关的披露文案守卫（阶段 6 的验收项）已随「同步服务」从设置页剥离，
 // 迁到同目录 `sync-service-keys.test.ts`：守卫对象改成了新命名空间 syncService.metadata.*，
 // 断言内容（必须点名 nuan5.pro、必须交代下发后果）逐条保留，未削弱。
+
+/**
+ * `insight.photoCount` 的计数中立钉（2026-11-03 复查）。
+ *
+ * 这个键用 `{{n}}` 自定义插值而不是 i18next 的 `count`，等于放弃了复数变形 ⇒
+ * en/de/es/fr/pt 五个包会渲染成 "1 photos" / "1 Fotos"。zh/ja/ko/ru/th/vi 是量词或
+ * 不变格语言（`1 张`、`1 ảnh`、`1 фото` 本就正确），**不动**。
+ * 本轮只把这 5 个包改成仓内既有先例的**计数中立**形态（数词收尾：`Экспортировано
+ * файлов: {{count}}`、`{{count}} item(s)`），不做 `_one/_other` 正式复数改造——那会破
+ * 本文件的 REQUIRED_KEYS 字符串断言与 12 语同构断言，且牵动 en 全仓 64 处同类串，
+ * 属独立一轮 i18n 架构改动（已登记技术债）。
+ */
+const PHOTO_COUNT_INFLECTED_BEFORE: Record<string, string> = {
+  en: '{{n}} photos',
+  de: '{{n}} Fotos',
+  es: '{{n}} fotos',
+  fr: '{{n}} photos',
+  pt: '{{n}} fotos'
+}
+
+describe('insight.photoCount 不因缺复数形而写出「1 photos」', () => {
+  it('12 个包都保留 {{n}} 占位（丢了就把占位符当字面量渲染）', () => {
+    for (const [code, locale] of Object.entries(LOCALES)) {
+      expect(
+        String(readPath(locale, 'syncGallery.insight.photoCount')),
+        `${code}.json photoCount 丢了 {{n}}`
+      ).toContain('{{n}}')
+    }
+  })
+
+  it('五个会变格的语言改成数词收尾的中立形态，不再是「{{n}} + 复数名词」', () => {
+    for (const [code, before] of Object.entries(PHOTO_COUNT_INFLECTED_BEFORE)) {
+      const value = String(readPath(LOCALES[code], 'syncGallery.insight.photoCount'))
+      expect(value, `${code}.json photoCount 仍是旧值「${before}」`).not.toBe(before)
+      expect(
+        /\{\{n\}\}\s*$/.test(value),
+        `${code}.json photoCount「${value}」仍以数词开头，后面跟着已变格的名词`
+      ).toBe(true)
+    }
+  })
+})

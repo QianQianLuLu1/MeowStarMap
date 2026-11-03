@@ -373,3 +373,69 @@ describe('元数据解析开关的披露文案', () => {
     expect(zh).toMatch(/局域网|本地网络/)
   })
 })
+
+/**
+ * `status.inspirationOn` 的语义钉（2026-11-03 复查）。
+ *
+ * 契约说这个键表达的是**挂载事实**：`runtime-manager` 观测到上游挂了灵感面就下发
+ * （见 `docs/IPC_CONTRACT.md` 与 nikkisync/AGENTS.md 硬约定 10），服务**没在跑**也照样下发，
+ * 而 `SyncServicePage.tsx` 这一行不按 `running` 门控。9 个包当初把它译成了
+ * 「公開中 / 已发布 / 在线 / 可用」——LAN 服务停着的时候那是一句假话。
+ * zh-CN「端点已挂载」与 en "Endpoint mounted" 本来是对的，逐字不动（组件测试按中文定位）。
+ *
+ * 同 `sync-gallery-keys.test.ts` 的 `RUNTIME_OFF_BEFORE` 口径：精确负向锁旧值 + 各包正向词，
+ * 抓「12 包里漏改一个」和「改完仍不表达挂载义」两类。`i18n:guard` 只做单向 missing，抓不到值。
+ */
+const INSPIRATION_ON_BEFORE: Record<string, string> = {
+  ja: 'エンドポイントを公開中',
+  ko: '엔드포인트 게시됨',
+  de: 'Endpunkt bereitgestellt',
+  fr: 'Point d’entrée en ligne',
+  es: 'Endpoint disponible',
+  pt: 'Endpoint disponível',
+  ru: 'Конечная точка доступна',
+  th: 'เปิดใช้จุดปลายทาง',
+  vi: 'Đã công bố điểm cuối'
+}
+
+/** 各包表达「已挂载」的正向词；th/vi 用各自技术文里实际会出现的借词或固有词 */
+const INSPIRATION_ON_TOKEN: Record<string, string[]> = {
+  'zh-CN': ['挂载'],
+  'zh-TW': ['掛載'],
+  en: ['mounted'],
+  ja: ['マウント'],
+  ko: ['마운트'],
+  de: ['montiert'],
+  fr: ['monté'],
+  es: ['montado'],
+  pt: ['montado'],
+  ru: ['смонтирована'],
+  th: ['ติดตั้ง'],
+  vi: ['gắn']
+}
+
+describe('inspirationOn 只说「端点已挂载」，不谎报在线', () => {
+  it('9 个包不再是把挂载说成在线/已发布的旧文案', () => {
+    for (const [code, before] of Object.entries(INSPIRATION_ON_BEFORE)) {
+      expect(
+        String(readPath(LOCALES[code], 'syncService.status.inspirationOn')),
+        `${code}.json inspirationOn 仍是旧值「${before}」（把挂载事实说成了在线）`
+      ).not.toBe(before)
+    }
+  })
+
+  it('12 个包的 inspirationOn 都含本包的「挂载」正向词', () => {
+    for (const [code, tokens] of Object.entries(INSPIRATION_ON_TOKEN)) {
+      const value = String(readPath(LOCALES[code], 'syncService.status.inspirationOn'))
+      expect(
+        tokens.some((token) => value.toLowerCase().includes(token.toLowerCase())),
+        `${code}.json inspirationOn「${value}」未表达「端点已挂载」义`
+      ).toBe(true)
+    }
+  })
+
+  it('fr 不得再把 endpoint 译成 point d’entrée（入口点，是另一个概念）', () => {
+    const value = String(readPath(LOCALES.fr, 'syncService.status.inspirationOn'))
+    expect(value.toLowerCase()).not.toContain('entrée')
+  })
+})

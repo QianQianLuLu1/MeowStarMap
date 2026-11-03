@@ -4353,7 +4353,7 @@
       "searchIdle": "Escribe una palabra clave",
       "searchEmpty": "Sin coincidencias",
       "searchFailed": "Búsqueda fallida",
-      "photoCount": "{{n}} fotos",
+      "photoCount": "Fotos: {{n}}",
       "statsLoading": "Cargando estadísticas…",
       "statsEmpty": "Aún sin estadísticas",
       "statsFailed": "No se pudieron cargar las estadísticas",
@@ -4425,7 +4425,7 @@
       "serverId": "ID del servidor",
       "tlsFingerprint": "Huella TLS",
       "inspiration": "Sincronización de inspiración v1",
-      "inspirationOn": "Endpoint disponible",
+      "inspirationOn": "Endpoint montado",
       "copied": "Copiado"
     },
     "pairing": {

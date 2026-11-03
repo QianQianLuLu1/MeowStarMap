@@ -4425,7 +4425,7 @@
       "serverId": "ID сервера",
       "tlsFingerprint": "Отпечаток TLS",
       "inspiration": "Синхронизация вдохновения v1",
-      "inspirationOn": "Конечная точка доступна",
+      "inspirationOn": "Конечная точка смонтирована",
       "copied": "Скопировано"
     },
     "pairing": {

@@ -4353,7 +4353,7 @@
       "searchIdle": "Saisissez un mot-clé",
       "searchEmpty": "Aucun résultat",
       "searchFailed": "Échec de la recherche",
-      "photoCount": "{{n}} photos",
+      "photoCount": "Photos : {{n}}",
       "statsLoading": "Chargement des statistiques…",
       "statsEmpty": "Pas encore de statistiques",
       "statsFailed": "Échec du chargement des statistiques",
@@ -4425,7 +4425,7 @@
       "serverId": "ID du serveur",
       "tlsFingerprint": "Empreinte TLS",
       "inspiration": "Synchronisation d’inspiration v1",
-      "inspirationOn": "Point d’entrée en ligne",
+      "inspirationOn": "Point de terminaison monté",
       "copied": "Copié"
     },
     "pairing": {

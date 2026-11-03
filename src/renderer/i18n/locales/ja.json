@@ -4425,7 +4425,7 @@
       "serverId": "サーバー ID",
       "tlsFingerprint": "TLS フィンガープリント",
       "inspiration": "インスピレーション同期 v1",
-      "inspirationOn": "エンドポイントを公開中",
+      "inspirationOn": "エンドポイントをマウント済み",
       "copied": "コピーしました"
     },
     "pairing": {
