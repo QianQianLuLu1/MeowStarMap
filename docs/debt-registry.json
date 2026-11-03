@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-11-02",
+  "updatedAt": "2026-11-03",
   "items": [
     {
       "id": "DEBT-001",
@@ -629,9 +629,9 @@
       "status": "open",
       "priority": "low",
       "title": "gpu-fallback.json 文件名字面量双写，状态机与诊断包各持一份",
-      "description": "2026-11-02 GPU 阶梯复查发现：同一路径串同时写死在 gpu-fallback.ts:149-151 的私有 getStatePath() 与 log-service.ts:221-223 的诊断包步 3.6 ⇒ 任一处改名会让诊断包静默漏收该文件（整步被 catch {} 吞），而状态机照常运行——失效形态是「证据消失」而非报错。同批已为同类问题立先例：CHROMIUM_LOG_BASENAME（user-diag-path.ts:21）把写入方/弹窗/诊断包三方收口到一个常量。本轮不修的原因：零行为变化 ⇒ 造不出改前必红的复现用例（本仓禁止用空转守卫冒充红灯，也禁止为不可能发生的场景加防御），且不宜让 services/ 反向依赖 app/。修法：把 basename 归入叶子层 src/main/utils/constants.ts（约定为可被任何模块导入、零项目依赖），两处引用；顺带可把 gpu-pref.json / heartbeat.json / last-exit.json 一起收口。撤销条件：按上法归一，或任一次真实改动使两侧出现分歧。",
+      "description": "2026-11-02 GPU 阶梯复查发现：同一路径串同时写死在 gpu-fallback.ts:168-170 的私有 getStatePath() 与 log-service.ts:230-232 的诊断包步 3.6 ⇒ 任一处改名会让诊断包静默漏收该文件（整步被 catch {} 吞），而状态机照常运行——失效形态是「证据消失」而非报错。同批已为同类问题立先例：CHROMIUM_LOG_BASENAME（user-diag-path.ts:21）把写入方/弹窗/诊断包三方收口到一个常量。本轮不修的原因：零行为变化 ⇒ 造不出改前必红的复现用例（本仓禁止用空转守卫冒充红灯，也禁止为不可能发生的场景加防御），且不宜让 services/ 反向依赖 app/。修法：把 basename 归入叶子层 src/main/utils/constants.ts（约定为可被任何模块导入、零项目依赖），两处引用；顺带可把 gpu-pref.json / heartbeat.json / last-exit.json 一起收口。撤销条件：按上法归一，或任一次真实改动使两侧出现分歧。",
       "files": ["src/main/app/gpu-fallback.ts", "src/main/services/log-service.ts"],
-      "lines": [149, 221],
+      "lines": [168, 230],
       "issue": false
     },
     {
@@ -641,13 +641,58 @@
       "status": "open",
       "priority": "low",
       "title": "诊断目录每次重算，与启动时烤进 --log-file 的 chromium 路径可能分叉",
-      "description": "2026-11-02 GPU 阶梯复查发现：chromium-debug.log 路径在 index.ts:69 一次性求值并交给 --enable-logging=file + --log-file，此后 Chromium 恒写该绝对路径；而 early-crash-guard.ts:137 与 log-service.ts:210 各自重新调用 getUserFacingDiagDir() / resolveDiagDir()（user-diag-path.ts 的候选链按当下可用性求值）。Documents 目录中途变化（OneDrive Known Folder 重定向、漫游 profile、文档盘临时不可用）会让弹窗指的路径与诊断包收的文件落到不同目录，表现为导出成功但包里缺 chromium-debug.log——恰是 6d633f8 补齐的那条原生 FATAL 证据。修法：启动时求值一次并导出只读访问器（照 getStartupLogPathValue() 的既有口径），下游一律取缓存值；或诊断包改按 --log-file 的实际值收集。撤销条件：候选链被证明在同一进程生命周期内恒定，或已按上法同源。",
+      "description": "2026-11-02 GPU 阶梯复查发现：chromium-debug.log 路径在 index.ts:69 一次性求值并交给 --enable-logging=file + --log-file，此后 Chromium 恒写该绝对路径；而 early-crash-guard.ts:137 与 log-service.ts:213 各自重新调用 getUserFacingDiagDir() / resolveDiagDir()（user-diag-path.ts 的候选链按当下可用性求值）。Documents 目录中途变化（OneDrive Known Folder 重定向、漫游 profile、文档盘临时不可用）会让弹窗指的路径与诊断包收的文件落到不同目录，表现为导出成功但包里缺 chromium-debug.log——恰是 6d633f8 补齐的那条原生 FATAL 证据。修法：启动时求值一次并导出只读访问器（照 getStartupLogPathValue() 的既有口径），下游一律取缓存值；或诊断包改按 --log-file 的实际值收集。撤销条件：候选链被证明在同一进程生命周期内恒定，或已按上法同源。",
       "files": [
         "src/main/index.ts",
         "src/main/utils/early-crash-guard.ts",
         "src/main/services/log-service.ts"
       ],
-      "lines": [69, 137, 210],
+      "lines": [69, 137, 213],
+      "issue": false
+    },
+    {
+      "id": "DEBT-050",
+      "category": "i18n-user",
+      "section": 20,
+      "status": "open",
+      "priority": "low",
+      "title": "全仓插值串不做复数变形，en.json 60 处 {{count}}/{{n}} 里带复数名词的会在 n=1 时说错",
+      "description": "2026-11-03 同步面板复查发现：`syncGallery.insight.photoCount` 用自定义 `{{n}}` 插值而非 i18next 的 `count`，等于放弃复数变形 ⇒ en/de/es/fr/pt 会渲染成 \"1 photos\"。本轮按用户裁决只把这 5 个包改成**计数中立**形态（数词收尾，照仓内既有先例 `Permanently deleted {{count}} item(s)` 与 `Экспортировано файлов: {{count}}`），zh/ja/ko/ru/th/vi 是量词或不变格语言（`1 张`/`1 枚`/`1 장`/`1 фото`/`1 รูป`/`1 ảnh` 本就正确）不动。同族问题在全仓范围更大：实测 `src/renderer/i18n/locales/en.json` 有 60 处含 `{{count}}` 或 `{{n}}` 的串（遍历计数，非估算），其中带复数名词者同样会在 n=1 时说错，例如 `main.file.message.exported` = \"Exported {{count}} files\"。**本轮不修的原因**：① 正式解法要改键形态（`_one`/`_other` + 用 `count` 变量），会破 `sync-gallery-keys.test.ts` 的 REQUIRED_KEYS 字符串断言与 12 语同构断言，还要为 ru 等语言补 few/many 分档；② 面积是「一轮 i18n 架构改动」而非「一个缺陷」，混进本轮违反最小化改动。**修法**：先定复数口径（建议默认计数中立、仅对确需区分单复数的少数键引入 `_one/_other`），再按语言分组批量改写并同步调整那两条断言。**撤销条件**：12 包插值串复扫为 0 复数误形，或已建立复数口径并覆盖全部 60 处同类串。",
+      "files": [
+        "src/renderer/i18n/locales/en.json",
+        "src/renderer/i18n/locales/de.json",
+        "src/renderer/i18n/locales/es.json",
+        "src/renderer/i18n/locales/fr.json",
+        "src/renderer/i18n/locales/pt.json"
+      ],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-051",
+      "category": "robustness",
+      "section": 20,
+      "status": "open",
+      "priority": "low",
+      "title": "GPU 状态卡不认识 NIKKI_GPU_FORCE_LEVEL，工装跑档时显示与真实档位相反",
+      "description": "2026-11-03 GPU 阶梯复查发现：`classifyBootDecisionForStatus()`（`gpu-fallback.ts:484-505`）从状态文件与 env 重新推导「本次启动决策」，其中只处理 `NIKKI_FORCE_GPU_COMPAT`（`:488`），不认 `NIKKI_GPU_FORCE_LEVEL`；而 `currentBootLevel()`（`:455`）除了 `requestSelfHeal` 之外没有消费者。⇒ 用 `FORCE_LEVEL=2` 跑三档实测时（计划 §10.3 的跑法），设置页 GPU 状态卡与启动摘要会打印「硬件加速=默认／未回退」，与当场真实生效的 `--disable-gpu` 相反。**本轮不修的原因**：① 只有开发机工装路径可达，永不影响用户，且不落盘、进程一死即消失（`e62c04f` 之后工装连状态都不写）；② 诚实修法要给 `GpuBootDecisionReason` 增加第 5 个取值 = **IPC 契约变更**（须同步 `docs/IPC_CONTRACT.md` §app:gpu-status），还要动 `diagnostics-sections.tsx:76-79`（它把未知 reason 静默落到「默认」，正是假绿的形状）与 12 语新键，与影响面不成比例；把它硬映射成 `crash-fallback` 是用一个谎换一个更糟的谎。**修法**：`collectGpuStatus()` 改为消费 `currentBootLevel()` 真值（现成入参），并为工装新增显式 reason；同时让 `diagnostics-sections.tsx` 的未知取值不再静默回落「默认」。**撤销条件**：状态卡取值由本次实际档位单一来源承担，或工装 env 从生产构建路径里物理移除。",
+      "files": [
+        "src/main/app/gpu-fallback.ts",
+        "src/renderer/pages/settings/diagnostics-sections.tsx"
+      ],
+      "lines": [455, 484, 488, 76],
+      "issue": false
+    },
+    {
+      "id": "DEBT-052",
+      "category": "robustness",
+      "section": 20,
+      "status": "open",
+      "priority": "low",
+      "title": "nonce 防重放表无容量上限，且每请求做一次 O(size) 全表扫描",
+      "description": "2026-11-03 同步面复查发现：`AuthService.nonces`（`auth-service.ts:101`）是无容量上限的 Map，`pruneNonces()`（`:171-175`）在每次 `verifyRequest` 里做一次全表扫描（调用点 `:129`）。本轮把 `clockSkewMs` 夹到 ≤5 分钟之后，条目驻留已有界（过期时刻 = `max(now, ts) + 窗口 + 1`，而 `|now-ts| ≤ 窗口` ⇒ 不超过约 2 个窗口），量级由「已配对设备数 × 每窗口请求数」决定，桌面 LAN 场景下是小数。**本轮不修的原因**：① **不构成未鉴权 DoS**——条目只在 Ed25519 验签成功后写入（`:162`），伪造请求灌不进表，这条与实现一致、不是注释自我安慰；② 加容量上限必须先设计淘汰语义：淘汰一条**仍在有效期内**的 nonce 会重新打开重放口子，与本目录 `AGENTS.md` 硬约定 2 直接冲突，不能顺手 `size > N` 就删插入序头部。**修法**：按 deviceId 分片 + 每片按过期时刻裁剪，或换成 (expiry → key) 最小堆把 prune 摊成 O(log n)；无论哪种都要配一条「淘汰不得移走在效 nonce」的判据用例。**撤销条件**：给出带界的上界证明，或实现分片/堆淘汰并配套判据。",
+      "files": ["src/main/sync/auth-service.ts"],
+      "lines": [101, 129, 171],
       "issue": false
     }
   ]
