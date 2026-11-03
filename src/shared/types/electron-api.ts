@@ -314,6 +314,11 @@ export interface ShareDetectAppResult {
 export interface MediaListResult {
   items: Array<Record<string, unknown>>
   total: number
+  /**
+   * 分类型真计数（与 total 同 WHERE、同时机，仅首页返回）。
+   * image + video 可能小于 total：file_type 有历史第三种取值，计入 total 但不进本字段。
+   */
+  typeCounts?: { image: number; video: number }
   page: number
   pageSize: number
   /** keyset 下一页游标（深分页优先），无更多页时为 null */

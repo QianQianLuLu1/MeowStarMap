@@ -1265,12 +1265,14 @@ describe('registerMediaHandlers', () => {
     expect(result.data.success).toBe(true)
   })
 
-  it('media:list 返回 files/total/page/pageSize/hasMore', async () => {
+  it('media:list 返回 files/total/typeCounts/page/pageSize/hasMore', async () => {
     repoMock.listMedia.mockReturnValue({
       rows: [
         { id: 1, file_path: '/a', is_favorite: 1, is_deleted: 0, is_missing: 0, is_duplicate: 0 }
       ],
       total: 1,
+      // 与列表同 WHERE 的分类型真计数（R-1：渲染层计数不再取已加载分页长度）
+      typeCounts: { image: 1, video: 0 },
       page: 1,
       pageSize: 50,
       hasMore: false
@@ -1278,11 +1280,16 @@ describe('registerMediaHandlers', () => {
     registerMediaHandlers(makeCtx())
     const result = (await getHandler('media:list')([undefined])) as {
       success: true
-      data: { files: Array<{ id: string; is_favorite: boolean }>; total: number }
+      data: {
+        files: Array<{ id: string; is_favorite: boolean }>
+        total: number
+        typeCounts?: { image: number; video: number }
+      }
     }
     expect(result.data.files[0].id).toBe('1')
     expect(result.data.files[0].is_favorite).toBe(true)
     expect(result.data.total).toBe(1)
+    expect(result.data.typeCounts).toEqual({ image: 1, video: 0 })
   })
 
   it('media:getGroupCounts 调用 repo 并返回 groups', async () => {

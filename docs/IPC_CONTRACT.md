@@ -261,6 +261,24 @@ wrapHandler(ctx, schema, handler) =>
 
 **行为（#fix-gallery-delete-thumbnail-cleanup）**：硬删单条 DB 记录（`hardDelete`）后，对其关联缩略图执行 best-effort 清理，范围同 §2.7 的 #fix-gallery-delete-thumbnail-cleanup 行为变更（缓存三档位 + 由 `file_path` 严格推导的游戏原生 LQ 文件及其 DB 记录）。调用方：**仅**图库/详情页的**永久删除**链路（`file:deletePermanent` 成功后调用，`src/renderer/hooks/useFileOperations.ts:292`）；插件面的权限名见 `plugin-bridge-handler.ts`。详情页与全屏查看器的删除已改走 §2.5 `media:softDelete`（回收站语义修复 D3），**不再**调用本通道——原先它们「先移入系统回收站 + 硬删 DB 行」，记录直接消失、应用回收站里找不到。缩略图清理失败仅记录日志，不影响返回值。
 
+### 2.10 `media:list`
+
+| 属性         | 值                                                                               |
+| ------------ | -------------------------------------------------------------------------------- |
+| 通道         | `media:list`                                                                     |
+| Handler 文件 | `src/main/ipc/handlers/media-handler.ts`                                         |
+| 参数         | 单个可选对象（zod 内联校验，`pageSize` 上界 **500**，越界即 `VALIDATION_ERROR`） |
+| 返回类型     | `{ files, total, typeCounts?, page, pageSize, hasMore, nextCursor }`             |
+
+**`typeCounts?`（本轮新增，向后兼容的可选字段）**：`{ image: number; video: number }`，与 `total` **同一 WHERE 子句、同一时机**（仅首页计算，续页不返回）由 `MediaRepository.countMediaByType()` 按 `file_type` GROUP BY 得出。
+
+- 存在理由：渲染层原先把「已加载分页数组的长度」当识别数量——首屏只有一页，故状态栏与侧栏的「图片 / 视频」数恒等于 `MEDIA_PAGE_SIZE = 500`（`docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md` 的 R-1）。
+- **口径**：只回填 `image` / `video` 两个键。`file_type` 存在历史第三种取值（如 `live_photo`），它们计入 `total` 但不进本字段，因此 **`image + video` 可能小于 `total`**，这是两个字段各自的口径，不是缺陷。展示「共 N 个」用 `total`，展示「图片 X · 视频 Y」用 `typeCounts`，两者不互相推导。
+- 不复用 `profile:getStats` 的 `getProfileBaseStats()`：它的 WHERE 只有 `account_uid + is_deleted`，不含 `hideDuplicates` / `corruptedOnly` / `mediaSource` / `galleryHighQualityOnly`，与图库列表不同口径。
+- `pageSize` 的 500 上界**本轮有意保持不变**：它是防止渲染层一个数字就把主进程同步 SQLite 打成几十 MB 结构化克隆的真实闸门。需要更深取数时，调用方应按 `nextCursor` 逐页续取（见 `src/renderer/stores/mediaStore.ts` 的 `fetchMediaFromDatabase`），而不是抬高上界。判据由 `scripts/__tests__/media-page-limit-guard.test.ts` 钉住。
+
+**已知类型漂移（本轮只登记不清偿）**：`src/shared/types/electron-api.ts` 的 `MediaListResult` 声明的是 `items`，而本 handler 实际返回 `files`；渲染层靠 `src/renderer/vite-env.d.ts` 中对 `media.list` 的内联声明才对上。合并两份类型属独立重构，需另立计划。
+
 ## 3. 共享类型定义
 
 所有跨进程共享的类型定义在 `src/shared/types/duplicate.ts`，通过 `src/shared/types/index.ts` 统一导出。

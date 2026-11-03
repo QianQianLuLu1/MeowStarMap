@@ -358,6 +358,11 @@ export interface MediaListResult {
   rows: MediaRow[]
   /** 仅在 usePagination/cursor 模式返回 */
   total?: number
+  /**
+   * 分类型真计数（与 total 同时机、同 WHERE 计算，仅首页返回）。
+   * image + video 可能小于 total：file_type 存在历史第三种取值，计入 total 但不进本字段。
+   */
+  typeCounts?: { image: number; video: number }
   page?: number
   pageSize?: number
   hasMore?: boolean
@@ -1134,6 +1139,9 @@ export class MediaRepository {
       if (cursor === null || cursor.sortValue === undefined) {
         // 仅首页计算一次 total（默认视图命中 media_count 缓存，避免 O(n) 扫描）
         result.total = this.resolveListTotal(whereClause, whereParams, isDefaultView)
+        // 与 total 同时机算一次分类型真计数（media_count 缓存里没有类型分布，
+        // 宁可多一次 GROUP BY 也不引入第二个缓存真相源）
+        result.typeCounts = this.countMediaByType(whereClause, whereParams)
       }
       if (hasMore) {
         const last = pageRows[pageRows.length - 1]
@@ -1167,6 +1175,10 @@ export class MediaRepository {
       result.total = total
       result.page = page
       result.pageSize = pageSize
+      // 与 keyset 分支同口径：仅首页给分类型真计数，续页不重复 GROUP BY
+      if (page === 0) {
+        result.typeCounts = this.countMediaByType(whereClause, whereParams)
+      }
       // hasMore 必须同时满足"还有下一页"和"本页已满"
       // 仅用 total 计算时，若 media_count 缓存已更新但前端列表尚未刷新（100ms 节流窗口），
       // 会出现 hasMore=true 但实际 rows.length<pageSize 的不一致提示
@@ -1203,6 +1215,33 @@ export class MediaRepository {
       .prepare(`SELECT COUNT(*) as count FROM media_files ${whereClause}`)
       .get(...whereParams) as { count: number }
     return row.count
+  }
+
+  /**
+   * 分类型真计数（与 countMedia 同一 WHERE，口径与列表严格一致）。
+   *
+   * 存在理由：渲染层原先把「已加载分页数组的长度」当识别数量，首屏恒等于页大小 500。
+   * 只回填 image/video 两个键——`file_type` 有历史第三种取值（如 'live_photo'），它们
+   * 计入 total 但不进本字段，故 image + video 可能 < total，是两个字段各自的口径，不是缺陷。
+   * 不复用 getProfileBaseStats：它的 WHERE 只有 account_uid + is_deleted，
+   * 不含 hideDuplicates / corruptedOnly / mediaSource / galleryHighQualityOnly，与图库列表不同口径。
+   */
+  private countMediaByType(
+    whereClause: string,
+    whereParams: unknown[]
+  ): { image: number; video: number } {
+    const rows = this.db
+      .prepare(
+        `SELECT file_type as type, COUNT(*) as count FROM media_files ${whereClause} GROUP BY file_type`
+      )
+      .all(...whereParams) as Array<{ type: string | null; count: number }>
+    const counts = { image: 0, video: 0 }
+    for (const row of rows) {
+      if (row.type === 'image' || row.type === 'video') {
+        counts[row.type] = row.count
+      }
+    }
+    return counts
   }
 
   /**

@@ -1375,6 +1375,83 @@ describe('MediaRepository', () => {
       expect(() => repo.listMedia({ sortOrder: 'asc', page: 0, pageSize: 10 })).not.toThrow()
     })
 
+    // 回归（R-1，计划见 docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md）：
+    // 图库状态栏与侧栏的「图片 / 视频」计数原先取的是已加载分页数组的长度（首屏恒为
+    // MEDIA_PAGE_SIZE=500），不是库中真值。主进程按**与列表同一 WHERE** 给出分类型真计数，
+    // 渲染层才有可消费的真相源。
+    describe('listMedia typeCounts 分类型真计数', () => {
+      it('keyset 首页返回 image/video 两个键的库中真值（不受本页行数限制）', () => {
+        // 500 条 image + 200 条 video，远超一页
+        for (let i = 0; i < 5; i++) {
+          insertMedia(db, {
+            file_path: `/t/img-${i}.jpg`,
+            file_type: 'image',
+            created_at: `2024-01-0${(i % 9) + 1} 10:00:00`
+          })
+        }
+        for (let i = 0; i < 3; i++) {
+          insertMedia(db, {
+            file_path: `/t/vid-${i}.mp4`,
+            file_type: 'video',
+            created_at: `2024-01-1${i} 10:00:00`
+          })
+        }
+        const result = repo.listMedia({ cursor: null, pageSize: 2 })
+        // 本页只取了 2 行，但 typeCounts 是全库口径
+        expect(result.rows).toHaveLength(2)
+        expect(result.typeCounts).toEqual({ image: 5, video: 3 })
+      })
+
+      it('typeCounts 与列表命中同一 WHERE：hideDuplicates=true 时排除 is_duplicate=1', () => {
+        insertMedia(db, { file_path: '/t/a.jpg', file_type: 'image' })
+        insertMedia(db, { file_path: '/t/b.jpg', file_type: 'image', is_duplicate: 1 })
+        insertMedia(db, { file_path: '/t/c.mp4', file_type: 'video' })
+
+        const all = repo.listMedia({ cursor: null, pageSize: 10 })
+        expect(all.typeCounts).toEqual({ image: 2, video: 1 })
+
+        const hidden = repo.listMedia({ cursor: null, pageSize: 10, hideDuplicates: true })
+        expect(hidden.typeCounts).toEqual({ image: 1, video: 1 })
+        // 口径一致性：被排除的那条确实不在列表里
+        expect(hidden.rows.every((r) => r.is_duplicate === 0)).toBe(true)
+      })
+
+      it('typeCounts 只回填 image/video：第三种历史 file_type 计入 total 但不进本字段', () => {
+        insertMedia(db, { file_path: '/t/a.jpg', file_type: 'image' })
+        insertMedia(db, { file_path: '/t/b.mp4', file_type: 'video' })
+        insertMedia(db, { file_path: '/t/c.unknown', file_type: 'live_photo' })
+
+        const result = repo.listMedia({ cursor: null, pageSize: 10 })
+        // image + video < total 是口径事实（不是 bug），渲染层展示 N 用 total、展示 X/Y 用本字段
+        expect(result.typeCounts).toEqual({ image: 1, video: 1 })
+        expect(result.total).toBe(3)
+      })
+
+      it('offset 兼容路径首页同样返回 typeCounts', () => {
+        insertMedia(db, { file_path: '/t/a.jpg', file_type: 'image' })
+        insertMedia(db, { file_path: '/t/b.mp4', file_type: 'video' })
+        insertMedia(db, { file_path: '/t/c.mp4', file_type: 'video' })
+
+        const result = repo.listMedia({ page: 0, pageSize: 2 })
+        expect(result.typeCounts).toEqual({ image: 1, video: 2 })
+      })
+
+      it('keyset 续页不再算 typeCounts（只在首页查询一次）', () => {
+        for (let i = 0; i < 4; i++) {
+          insertMedia(db, {
+            file_path: `/t/img-${i}.jpg`,
+            file_type: 'image',
+            created_at: `2024-01-0${i + 1} 10:00:00`
+          })
+        }
+        const p1 = repo.listMedia({ cursor: null, pageSize: 2 })
+        expect(p1.typeCounts).toEqual({ image: 4, video: 0 })
+        const p2 = repo.listMedia({ cursor: p1.nextCursor, pageSize: 2 })
+        expect(p2.rows).toHaveLength(2)
+        expect(p2.typeCounts).toBeUndefined()
+      })
+    })
+
     // 回归：keyset 续页锚点拼接须守卫前导 AND。whereClause 为空（某 keyset 视图无基础过滤）
     // 时必须用 'WHERE ' 而非 ' AND '，否则会拼出 'FROM media_files AND (...)' 非法 SQL（潜在崩溃）。
     // 该分支经公共 API 当前不可达（所有 keyset 视图均带基础过滤），故直接对纯函数做单测触达。

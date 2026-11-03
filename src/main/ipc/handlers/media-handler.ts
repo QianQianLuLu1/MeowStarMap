@@ -1,5 +1,5 @@
-// @core-change: sync-integration 阶段4/5：媒体元数据写路径接线同步变更日志（阶段4 六处元数据更新；
-//               阶段5 analyzeSceneTime 批量修改 → journal asset.updated）
+// @core-change: media:list 响应新增可选 typeCounts（与列表同 WHERE 的分类型真计数），
+//               解除图库状态栏/侧栏「图片·视频」识别数量只能显示已加载分页长度（首屏恒 500）的上限
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -224,6 +224,7 @@ export function registerMediaMetadataHandlers(ctx: HandlerContext): void {
             is_corrupted: Boolean(f.is_corrupted)
           })),
           total: result.total,
+          typeCounts: result.typeCounts,
           page: result.page,
           pageSize: result.pageSize,
           hasMore: result.hasMore,

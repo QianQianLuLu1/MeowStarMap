@@ -663,6 +663,11 @@ interface WindowElectronAPI {
       files: unknown[]
       message?: string
       total?: number
+      /**
+       * 分类型真计数（与 total 同 WHERE、同时机，仅首页返回）。
+       * image + video 可能小于 total：file_type 有历史第三种取值，计入 total 但不进本字段。
+       */
+      typeCounts?: { image: number; video: number }
       page?: number
       pageSize?: number
       hasMore?: boolean
