@@ -85,40 +85,23 @@ export function useFilteredMediaFiles(): MediaFile[] {
     () => 'idle' as const
   )
 
-  // FIX(组20-1): mediaFiles 是分页加载的子集（首屏仅 500 条），筛选/搜索若只作用于该子集，
-  // 未滚动加载的文件既不参与搜索也不参与筛选，结果不完整。存在激活的筛选/搜索条件且
-  // 还有未加载页时逐页拉齐全库：loadNextMediaPage 自带 loadingMore 并发保护，
-  // 每页追加使 mediaFiles.length 变化并驱动本 effect 再次触发，直至 hasMoreMedia=false。
+  // FIX(组20-1): mediaFiles 是分页加载的子集，筛选/搜索若只作用于该子集，未加载的文件既不参与
+  // 搜索也不参与筛选，结果不完整 —— 故只要还有未加载页就逐页拉齐全库（判据见下方 effect 的 R-3 注释：
+  // 本轮已取消「按是否筛选 / 按视图模式」的取舍，五个视图一律拉齐）。
   const hasMoreMedia = useMediaStore((s) => s.hasMoreMedia)
   const mediaCount = mediaFiles.length
-  const [rangeStart, rangeEnd] = filterDateRange
-  const isFilteringActive =
-    searchQuery !== '' ||
-    filterType !== 'all' ||
-    currentView === 'favorites' ||
-    showMissingOnly ||
-    showCorruptedOnly ||
-    (groupDimension !== 'none' && selectedGroupKey !== 'all') ||
-    selectedSceneCategories.length > 0 ||
-    selectedSceneTimes.length > 0 ||
-    filterOutfit !== '' ||
-    currentCategoryId !== null ||
-    rangeStart !== null ||
-    rangeEnd !== null ||
-    (filterRating !== null && filterRating > 0)
-  // 修复（fix-gallery-non-grid-500-display，计划见 docs/plans/）：GalleryPage 仅 grid 视图
-  // 接线了 VirtualImageGrid 的 onEndReached 触底加载；list/timeline/masonry/event-timeline
-  // 无任何分页入口，无筛选条件时 mediaFiles 永远停在首屏 500 条——即"扫描 >500 个时 UI 仅
-  // 显示 500 个"。视图模式非 grid 时同样逐页拉齐全库（复用 loadNextMediaPage 的并发保护/
-  // 去重/游标推进），每页追加驱动本 effect 再触发，直至 hasMoreMedia=false。
-  const viewMode = useUIStore((s) => s.viewMode)
-  const shouldPullAll = isFilteringActive || viewMode !== 'grid'
+  // 修复（R-3，计划见 docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md）：
+  // d654b9b 曾把拉齐范围限定为「有筛选 或 非 grid 视图」，理由是 grid 有 VirtualImageGrid 的
+  // onEndReached 触底翻页。但触底只由用户滚动驱动，不滚就永远停在首屏一页 ⇒ 列表与计数一起
+  // 停在 500。本轮改为五个视图一律逐页拉齐（复用 loadNextMediaPage 的并发保护/去重/游标推进，
+  // 每页追加驱动本 effect 再触发，直至 hasMoreMedia=false）；onEndReached 保留为兜底入口。
+  // 展示用的「图片 / 视频」数量另由 useGallerySummaryCounts 取主进程真值，不依赖本 effect 的进度。
   useEffect(() => {
     // 回收站视图使用独立的 recycleBinFiles 数据源，不在此触发全库加载
-    if (shouldPullAll && hasMoreMedia && currentView !== 'recycle-bin') {
+    if (hasMoreMedia && currentView !== 'recycle-bin') {
       void loadNextMediaPage()
     }
-  }, [shouldPullAll, hasMoreMedia, mediaCount, currentView])
+  }, [hasMoreMedia, mediaCount, currentView])
 
   return useMemo(() => {
     // 命中缓存：所有依赖引用均未变化时直接返回上次结果

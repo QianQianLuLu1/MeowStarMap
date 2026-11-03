@@ -492,24 +492,25 @@ describe('useFilteredMediaFiles', () => {
       loadNextMediaPageMock.mockClear()
     })
 
-    it('默认无筛选时不触发全库加载', () => {
+    it('默认无筛选时也触发全库加载（R-3 翻转旧判据：不滚就停在首屏一页）', () => {
       useMediaStore.setState({
         mediaFiles: [makeFile({ id: '1' })],
         hasMoreMedia: true
       })
       resetUIStore()
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+      expect(loadNextMediaPageMock).toHaveBeenCalled()
     })
 
-    it('搜索激活且还有未加载页时应触发加载下一页', async () => {
+    it('搜索激活且还有未加载页时同样在加载（判据不再依赖筛选是否激活）', async () => {
       useMediaStore.setState({
         mediaFiles: [makeFile({ id: '1' })],
         hasMoreMedia: true
       })
       resetUIStore()
       const { result } = renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+      // 未筛选时已在拉齐（R-3）；筛选态沿用同一判据
+      expect(loadNextMediaPageMock).toHaveBeenCalled()
       await act(async () => {
         useUIStore.setState({ searchQuery: 'img' })
       })
@@ -557,7 +558,7 @@ describe('useFilteredMediaFiles', () => {
   // 修复「扫描媒体超过 500 个时 UI 仅显示 500 个」：
   // 非网格视图（list/timeline/masonry/event-timeline）无触底加载入口，
   // 无筛选条件时应同样逐页拉齐全库（计划：docs/archive/plans/fix-gallery-non-grid-500-display.md（已归档，不入仓））
-  describe('非网格视图全库加载（fix-gallery-non-grid-500-display）', () => {
+  describe('全视图逐页拉齐全库（R-3，含 grid）', () => {
     beforeEach(() => {
       loadNextMediaPageMock.mockClear()
     })
@@ -582,14 +583,24 @@ describe('useFilteredMediaFiles', () => {
       expect(loadNextMediaPageMock).toHaveBeenCalled()
     })
 
-    it('viewMode=grid 无筛选时不触发（守护首屏分页行为，防回归）', () => {
+    it('viewMode=grid 无筛选时也触发（R-3 翻转：触底入口仅作兜底，不再是不拉齐的理由）', () => {
       useMediaStore.setState({
         mediaFiles: [makeFile({ id: '1' })],
         hasMoreMedia: true
       })
       resetUIStore({ viewMode: 'grid' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+      expect(loadNextMediaPageMock).toHaveBeenCalled()
+    })
+
+    it('viewMode=masonry 与 event-timeline 同样触发', () => {
+      useMediaStore.setState({
+        mediaFiles: [makeFile({ id: '1' })],
+        hasMoreMedia: true
+      })
+      resetUIStore({ viewMode: 'masonry' })
+      renderHook(() => useFilteredMediaFiles())
+      expect(loadNextMediaPageMock).toHaveBeenCalled()
     })
 
     it('viewMode=list 但已加载完毕（hasMoreMedia=false）时不触发', () => {
