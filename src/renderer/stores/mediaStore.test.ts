@@ -128,8 +128,8 @@ function listMockFn(): ReturnType<typeof vi.fn> {
  */
 function setGatedPagedListMock(total: number): {
   list: ReturnType<typeof vi.fn>
-  /** 放行最早的一次未决请求；无请求在等时返回 false */
-  release: () => boolean
+  /** 放行第 `index` 次未决请求（默认最早的一次）；下标越界或无请求在等时返回 false */
+  release: (index?: number) => boolean
 } {
   const sorted = Array.from({ length: total }, (_, i) => makeFile({ id: String(i + 1) })).sort(
     (a, b) => Number(b.id) - Number(a.id)
@@ -155,9 +155,9 @@ function setGatedPagedListMock(total: number): {
   setMockApi({ media: { list } })
   return {
     list,
-    release: () => {
-      const next = queue.shift()
-      if (!next) return false
+    release: (index = 0) => {
+      if (index < 0 || index >= queue.length) return false
+      const next = queue.splice(index, 1)[0]
       next()
       return true
     }
@@ -615,6 +615,53 @@ describe('mediaStore', () => {
       gated.release()
       await flushMicrotasks()
       expect(useMediaStore.getState().mediaFiles).toHaveLength(1100)
+    })
+
+    it('迟到的触底页在整刷写完游标之后落地时不得覆写游标（§10 残留 1 闭合）', async () => {
+      // 缺陷：上一轮的 depthFetchActive 屏障只在**起跑时刻**拦触底，拦不住「已经起跑、尚未收尾」的那一页。
+      // 整刷启动时若在途已有一次 loadNextMediaPage，它不受屏障约束，其 finally 会照常清 loadingMore，
+      // 而它的 setState 落在整刷写游标**之后** ⇒ 用刷新前的旧游标（下一页 201）覆写整刷刚写入的新游标，
+      // 同时把旧快照的 400 条追加进新列表 —— 数组与游标跨在两轮之间。
+      const gated = setGatedPagedListMock(1200)
+      useMediaStore.setState({
+        mediaFiles: Array.from({ length: 500 }, (_, i) => makeFile({ id: String(1200 - i) })),
+        hasMoreMedia: true,
+        mediaCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 701 },
+        loadingMore: false
+      })
+
+      // ① 触底先起跑：此刻还没有屏障，它必须放行（这正是上一轮修的行为，不得回归）
+      const late = loadNextMediaPage()
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(1)
+
+      // ② 随后整刷启动 ⇒ 屏障立起，但拦不住已在途的那一页
+      const refreshing = fetchMediaFromDatabase({ limit: 600 })
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(2)
+      // 队首是迟到页的请求，整刷的两页在其后 ⇒ 用下标逆序放行，让整刷先落地
+      expect(gated.release(1)).toBe(true)
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(3)
+      expect(gated.release(1)).toBe(true)
+      const result = await refreshing
+      expect(result!.files).toHaveLength(600)
+      useMediaStore.getState().setMediaFiles(result!.files)
+      const cursorAfterRefresh = useMediaStore.getState().mediaCursor
+      expect(cursorAfterRefresh?.id).toBe(601)
+
+      // ③ 迟到页此刻才落地：它带的还是刷新前那一刻的下一页游标
+      expect(gated.release(0)).toBe(true)
+      await late
+
+      // 牙 1：游标必须仍是整刷写入的那一个，不得被迟到的旧页覆写
+      expect(useMediaStore.getState().mediaCursor).toEqual(cursorAfterRefresh)
+      // 牙 2：列表不得再混入旧快照的追加（守卫必须放在 addMediaFiles **之前**，不止游标之前）
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(600)
+      // 保险索（非缺陷复现，修复前也是绿的）：弃权不得留下跨轮状态，否则一次迟到页就把触底永久打死
+      expect(useMediaStore.getState().loadingMore).toBe(false)
+      // 弃权路径没有额外代价：没有为这一页再发第四次请求
+      expect(gated.list).toHaveBeenCalledTimes(3)
     })
 
     it('深度取数：limit 不超过一页时只发一次请求（不产生额外 IPC 往返）', async () => {

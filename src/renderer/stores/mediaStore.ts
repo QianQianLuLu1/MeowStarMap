@@ -779,11 +779,20 @@ export async function loadNextMediaPage(): Promise<void> {
   if (loadingMore || depthFetchActive || !hasMoreMedia) return
 
   useMediaStore.setState({ loadingMore: true })
+  // 代次锚点：与 fetchMediaFromDatabase:560 同一协议，在 try 之前领、收尾交给同一个 finally。
+  // 此刻读到的 mediaCursor 只在这一代未被顶掉时仍是「在册游标」；上面的 depthFetchActive 只拦
+  // 「起跑时刻」，拦不住已经起跑的这一页 —— 整刷若在其 await 期间起来并完成，:660 会写入新轮
+  // 的游标与计数，这一页随后落地就会用刷新前的旧游标把它覆写掉。
+  const genAtEntry = depthRefreshSeq
   try {
     // 性能重构：传入当前 keyset 游标（首页为 null，续页为上一页 nextCursor）
     const result = await loadMoreMedia(mediaCursor)
     // 取数失败时保持游标与 hasMoreMedia 不变，用户再次触底即可重试（错误已由 loadMoreMedia 记录）
     if (!result) return
+    // 已被新一轮整刷顶掉 ⇒ 既不追加也不推进游标：追加会把旧快照混进新轮写好的列表，
+    // 只跳过游标而保留追加同样错（数组是一轮的、游标是另一轮的）。loadingMore 仍由
+    // finally 无条件复位 —— 一次弃权不得留下任何跨轮状态，否则触底被永久打死。
+    if (genAtEntry !== depthRefreshSeq) return
 
     const freshFiles = dedupeAgainst(useMediaStore.getState().mediaFiles, result.files)
     if (freshFiles.length > 0) {
