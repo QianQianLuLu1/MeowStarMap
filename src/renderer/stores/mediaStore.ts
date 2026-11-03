@@ -488,6 +488,17 @@ const MAX_DEPTH_PAGES = 200
 let depthRefreshSeq = 0
 
 /**
+ * 深度取数屏障：一次整刷的逐页循环在途时为 true。
+ *
+ * 存在理由：循环只在**结束后**才写 mediaCursor/hasMoreMedia，而触底续页的守卫只看 loadingMore，
+ * 于是用户在整刷在途时触底会拿「刷新前的旧游标」并发取数——两条写者先后覆写 mediaCursor，
+ * 交错后下一次触底从循环快照边界的下一页起取，中间那一页静默丢失。
+ * 刻意用模块级标志而不是复用 store 的 `loadingMore`：后者是用户可见的（VirtualImageGrid 据此渲染
+ * 「加载更多…」脚注），借它会在长时间整刷期间改变渲染表现。
+ */
+let depthFetchActive = false
+
+/**
  * 服务端计数归一：只有有限数才算「服务端给了真值」。
  * 刻意不用 `?? ` / `||` 简写——合法的 0（空库、纯视频库的图片数）不能被当成缺失丢弃，
  * 否则空库会被消费方误判为「未就绪」而回落到数组长度。
@@ -530,6 +541,9 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     return null
   }
 
+  // 代次与屏障都在 try 之前领：任何一条出口（含首个 await 之前的失败）都由同一个 finally 收尾
+  const myRefresh = ++depthRefreshSeq
+  depthFetchActive = true
   try {
     // P0-02：从 store 读取当前选中的角色档案 UID
     const currentProfileUid = useMediaStore.getState().currentProfileUid
@@ -564,7 +578,6 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     // 故每页恒 ≤ MEDIA_PAGE_SIZE，不足目标深度时按 keyset 游标续页（对照 fetchMediaFromRuntime
     // 的 clamp：nikkisync 分支补过这层防护，本地分支是它漏掉的项）。
     const targetDepth = Math.max(1, options?.limit ?? MEDIA_PAGE_SIZE)
-    const myRefresh = ++depthRefreshSeq
     // 性能重构：首屏使用 keyset 游标（cursor=null 即首页），续页由 loadNextMediaPage 推进 mediaCursor
     const mediaResult = await window.electronAPI.media.list({
       cursor: null,
@@ -654,6 +667,10 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
       error
     )
     return null
+  } finally {
+    // 只有本轮仍是最新的一轮才放屏障：被后来者顶掉时屏障归新一轮持有（它在同一处领过），
+    // 旧轮若在此清除，竞态就原地复活了。
+    if (myRefresh === depthRefreshSeq) depthFetchActive = false
   }
 }
 
@@ -742,8 +759,9 @@ export async function loadNextMediaPage(): Promise<void> {
   if (useMediaStore.getState().source === 'nikkisync') return loadNextAssetPage()
 
   const { loadingMore, hasMoreMedia, mediaCursor } = useMediaStore.getState()
-  // 并发保护：VirtuosoGrid 的 endReached 在一次触底中可能连续触发多次
-  if (loadingMore || !hasMoreMedia) return
+  // 并发保护：VirtuosoGrid 的 endReached 在一次触底中可能连续触发多次；
+  // depthFetchActive 是第二道闸——整刷的逐页循环要到结束才写游标，此时钻进来会用刷新前的旧游标并发覆写它
+  if (loadingMore || depthFetchActive || !hasMoreMedia) return
 
   useMediaStore.setState({ loadingMore: true })
   try {

@@ -5,6 +5,7 @@ import {
   fetchMediaFromDatabase,
   refreshMediaAfterScan,
   loadMoreMedia,
+  loadNextMediaPage,
   loadRecycleBin,
   type MediaFile
 } from './mediaStore'
@@ -118,6 +119,54 @@ function setPagedListMock(total: number): void {
 function listMockFn(): ReturnType<typeof vi.fn> {
   return (globalThis as { window?: { electronAPI?: { media?: MockMediaApi } } }).window!
     .electronAPI!.media!.list as ReturnType<typeof vi.fn>
+}
+
+/**
+ * 与 setPagedListMock 同语义，但每次 media:list 返回一个**手动放行**的 promise。
+ * 存在理由：要观测「深度取数卡在某一页的 await 上」与「触底续页同时起来」这两条链的交错，
+ * 自动 resolve 的 mock 会让两条链在同一个微任务批次里跑完，时序根本分不开。
+ */
+function setGatedPagedListMock(total: number): {
+  list: ReturnType<typeof vi.fn>
+  /** 放行最早的一次未决请求；无请求在等时返回 false */
+  release: () => boolean
+} {
+  const sorted = Array.from({ length: total }, (_, i) => makeFile({ id: String(i + 1) })).sort(
+    (a, b) => Number(b.id) - Number(a.id)
+  )
+  const queue: Array<() => void> = []
+  const list = vi.fn((args?: { cursor?: { id: number } | null; pageSize?: number }) => {
+    const afterId = args?.cursor?.id ?? null
+    const pageSize = args?.pageSize ?? 500
+    const startIdx = afterId === null ? 0 : sorted.findIndex((f) => Number(f.id) < afterId)
+    const page = startIdx === -1 ? [] : sorted.slice(startIdx, startIdx + pageSize)
+    const hasMore = startIdx !== -1 && startIdx + page.length < sorted.length
+    const last = page[page.length - 1]
+    const payload = {
+      files: page,
+      total,
+      hasMore,
+      nextCursor: hasMore && last ? { sortValue: last.created_at, id: Number(last.id) } : null
+    }
+    return new Promise((resolve) => {
+      queue.push(() => resolve(payload))
+    })
+  })
+  setMockApi({ media: { list } })
+  return {
+    list,
+    release: () => {
+      const next = queue.shift()
+      if (!next) return false
+      next()
+      return true
+    }
+  }
+}
+
+/** 排空一轮微任务（链上有多个 await，单次 Promise.resolve 不够） */
+function flushMicrotasks(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
 }
 
 describe('mediaStore', () => {
@@ -517,6 +566,55 @@ describe('mediaStore', () => {
       // 取到全部 ⇒ 游标与 hasMoreMedia 收口，避免下一次 effect 又从陈旧游标续页
       expect(result!.hasMore).toBe(false)
       expect(useMediaStore.getState().hasMoreMedia).toBe(false)
+    })
+
+    it('深度取数在途时触底续页不得并发取数（防两条写者交错写坏 mediaCursor）', async () => {
+      // 缺陷：fetchMediaFromDatabase 的逐页循环只在**循环结束后**写 mediaCursor/hasMoreMedia，全程不设屏障；
+      // loadNextMediaPage 的守卫只看 loadingMore/hasMoreMedia ⇒ 用户在整刷在途时触底，会拿**刷新前的旧游标**
+      // 并发取数，两条写者先后覆写 mediaCursor ⇒ 下一次触底从「循环快照边界的下一页」起取，中间那页静默丢失。
+      const gated = setGatedPagedListMock(1200)
+      // 复刻真实前置态：用户已触底滚过一页（库里 1200、屏上 500），此刻 media:updated 按深度整刷
+      useMediaStore.setState({
+        mediaFiles: Array.from({ length: 500 }, (_, i) => makeFile({ id: String(1200 - i) })),
+        hasMoreMedia: true,
+        mediaCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 701 },
+        loadingMore: false
+      })
+
+      const refreshing = fetchMediaFromDatabase({ limit: 600 })
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(1)
+      // 放行首页 ⇒ 循环发现只到 500、未达目标深度 600，发出第二页（额度收口为 100）
+      expect(gated.release()).toBe(true)
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(2)
+      expect((gated.list.mock.calls[1][0] as { pageSize?: number }).pageSize).toBe(100)
+
+      // 关键窗口：循环仍卡在第二页的 await 上，用户此时触底
+      void loadNextMediaPage()
+      await flushMicrotasks()
+      // 修复前这里是 3：触底钻进来与循环并发取数
+      expect(gated.list).toHaveBeenCalledTimes(2)
+
+      // 放行第二页让整刷正常结束，并证明屏障随之释放（否则一次整刷就把触底永久打死）
+      expect(gated.release()).toBe(true)
+      const result = await refreshing
+      expect(result!.files).toHaveLength(600)
+      expect(result!.hasMore).toBe(true)
+      expect(useMediaStore.getState().hasMoreMedia).toBe(true)
+      expect(useMediaStore.getState().loadingMore).toBe(false)
+      // 真实调用方（GalleryPage / Sidebar）拿到结果后会写回 store，这里对齐该动作再触底
+      useMediaStore.getState().setMediaFiles(result!.files)
+
+      void loadNextMediaPage()
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(3)
+      // 续页要从循环写完的那个游标接着走，不能回退到刷新前的旧游标 701
+      const thirdCursor = (gated.list.mock.calls[2][0] as { cursor?: { id: number } }).cursor
+      expect(thirdCursor?.id).toBe(601)
+      gated.release()
+      await flushMicrotasks()
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(1100)
     })
 
     it('深度取数：limit 不超过一页时只发一次请求（不产生额外 IPC 往返）', async () => {
