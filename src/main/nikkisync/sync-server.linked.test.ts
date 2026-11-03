@@ -38,8 +38,9 @@ import type { NikkiSyncRuntimeSession, NikkiSyncSessionOptions } from './runtime
  * pin 指纹的口径），不关验证。
  *
  * 测试构造口径 `host:'127.0.0.1' / port:0 / mdns:false`（避开防火墙与端口争用）；
- * 生产默认为 `0.0.0.0 / 28080`，**mDNS 默认关**（上游组播自激回环缺陷，见
- * `sync-server-view.ts` 的 `SYNC_SERVER_DEFAULT_MDNS` 与计划 §15）。未建链时整件 skip。
+ * 生产默认为 `0.0.0.0 / 28080`，**mDNS 默认开**（`2531316` 在 589b932 上复测裁决，上游
+ * 自激回环闸门已在位；读数与判据见 `sync-server-view.ts` 的 `SYNC_SERVER_DEFAULT_MDNS`
+ * 与计划 §15）。未建链时整件 skip。
  */
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')

@@ -10,8 +10,9 @@
  * - `28080` = `apps/pc-companion/src/windows-app.ts:128` 的 `NIKKISYNC_PORT ?? 28080`
  *   （上游 `LocalSyncServer` 自身默认是 `0` 临时端口，嵌入态不用它：配对二维码需要稳定端口）
  * - `0.0.0.0` = 同文件 `:127` 的 `NIKKISYNC_BIND` 默认
- * - mDNS：**本仓默认关**，与上游 `windows-app.ts:129`（`NIKKISYNC_MDNS !== '0'` 即开）刻意不同，
- *   原因是上游 `MdnsAdvertiser` 存在组播自激回环（详见下方 `SYNC_SERVER_DEFAULT_MDNS` 的实测记录）
+ * - mDNS：**本仓默认开**，与上游 `windows-app.ts:129`（`NIKKISYNC_MDNS !== '0'` 即开）一致。
+ *   历史曾刻意关档（上游 `MdnsAdvertiser` 的组播自激回环），589b932 复测裁决该闸门已在、
+ *   本机两窗口读数为 `no_loop`——量级与判据见下方 `SYNC_SERVER_DEFAULT_MDNS` 的实测记录
  * - `journalPollMs 250` = `LocalSyncServer.ts:166`
  * - `PORT_IN_USE` 分类判据 = `desktop/StartupFailure.ts:8`（`includes('EADDRINUSE')`）
  *
@@ -286,7 +287,6 @@ export function buildSyncStatusSnapshot(input: {
     ...(input.connectionHosts ? { connectionHosts: input.connectionHosts } : {}),
     // 灵感同步 v1：只在观测到挂载时下发键；不为假写 `false`（缺席 = 老构建，不是用户关的）
     ...(input.inspirationAvailable ? { inspirationV1: true as const } : {}),
-    // 灵感同步 v1：只在观测到挂载时下发键；不为假写 `false`（缺席 = 老构建，不是用户关的）
     ...(input.error ? { error: input.error } : {})
   }
 }
