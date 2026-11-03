@@ -703,6 +703,59 @@ describe('mediaStore', () => {
       expect(useMediaStore.getState().loadingMore).toBe(false)
     })
 
+    it('弃权整刷不写 store 时，在途触底页不得被白弃（DEBT-057 交错③）', async () => {
+      // 缺陷：一轮整刷起跑后自己也被顶掉（弃权返回 null 且不写 store），但代次已前移 ⇒
+      // 在途触底在弃权判据处不在位而白弃一页（数据已取到却被丢弃，用户必须再触底一次）。
+      // 后果有界但真实；收口方向：触底弃权判据改按「有没有人真的写过 mediaCursor」——弃权轮
+      // 与失败轮都不写游标，那一页仍是旧游标世界的合法下一页，照常追加。
+      const gated = setGatedPagedListMock(1200)
+      useMediaStore.setState({
+        mediaFiles: Array.from({ length: 500 }, (_, i) => makeFile({ id: String(1200 - i) })),
+        hasMoreMedia: true,
+        mediaCursor: { sortValue: '2026-01-01T00:00:00.000Z', id: 701 },
+        loadingMore: false
+      })
+
+      // ① 触底先起跑（游标 701 的合法下一页 = id 700..201，与在屏 500 条无重叠）
+      const late = loadNextMediaPage()
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(1)
+
+      // ② 整刷 R1 起跑（领代）
+      const r1 = fetchMediaFromDatabase({ limit: 500 })
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(2)
+
+      // ③ 整刷 R2 起跑 ⇒ R1 被顶掉（R1 卡在首页 await 上）
+      const r2 = fetchMediaFromDatabase({ limit: 500 })
+      await flushMicrotasks()
+      expect(gated.list).toHaveBeenCalledTimes(3)
+
+      // ④ 放行 R1 ⇒ 弃权返回 null 且不写任何 store 字段（游标仍是种子态的 701）
+      expect(gated.release(1)).toBe(true)
+      expect(await r1).toBeNull()
+      expect(useMediaStore.getState().mediaCursor).toEqual({
+        sortValue: '2026-01-01T00:00:00.000Z',
+        id: 701
+      })
+
+      // ⑤ 触底页此刻落地：R1/R2 都领过代，但没有任何一轮真的写过游标
+      //    牙（修复前红）：这一页必须照常追加（500 条新行），而不是被代次判据白弃
+      expect(gated.release(0)).toBe(true)
+      await late
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(1000)
+
+      // ⑥ R2 正常落地（它是新游标的写入者）⇒ 对照（修复前亦绿）：终态游标一致、列表整表替换不叠加
+      expect(gated.release(0)).toBe(true)
+      const r2Result = await r2
+      useMediaStore.getState().setMediaFiles(r2Result!.files)
+      expect(useMediaStore.getState().mediaCursor).toEqual({
+        sortValue: '2026-01-01T00:00:00.000Z',
+        id: 701
+      })
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(500)
+    })
+
     it('深度取数：limit 不超过一页时只发一次请求（不产生额外 IPC 往返）', async () => {
       setPagedListMock(300)
       const result = await fetchMediaFromDatabase({ limit: 1200 })

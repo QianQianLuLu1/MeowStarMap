@@ -196,7 +196,9 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
 
   setMediaFiles: (files) => set({ mediaFiles: files }),
 
-  setSource: (source) =>
+  setSource: (source) => {
+    // 切源即复位游标 ⇒ 游标落地代次 +1：在途触底的旧命名空间页必须弃权（DEBT-057）
+    mediaCursorWriteSeq += 1
     set({
       // 切源即复位：两套游标与列表都来自不同 id 命名空间，混用会让翻页与选择集错乱
       source,
@@ -210,7 +212,8 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
       mediaTotalCount: null,
       mediaImageCount: null,
       mediaVideoCount: null
-    }),
+    })
+  },
 
   addMediaFiles: (files) =>
     set((state) => ({
@@ -434,6 +437,8 @@ export async function fetchMediaFromRuntime(options?: {
     console.error(i18n.t('mediaStore.log.categoriesEmpty'))
     return null
   }
+  // mediaCursor 复位 ⇒ 游标落地代次 +1（在途的旧世界触底页据此弃权，DEBT-057）
+  mediaCursorWriteSeq += 1
   useMediaStore.setState({
     nikkiCursor: page.nextCursor,
     nikkiRevision: page.libraryRevision,
@@ -497,6 +502,18 @@ let depthRefreshSeq = 0
  * 「加载更多…」脚注），借它会在长时间整刷期间改变渲染表现。
  */
 let depthFetchActive = false
+
+/**
+ * 游标落地代次（DEBT-057 收口）：mediaCursor 每被**真的写入**一次就 +1。
+ *
+ * 存在理由：触底续页的弃权判据不能再用「有没有人起了一轮整刷」（depthRefreshSeq）——一轮
+ * 弃权式整刷（被顶掉返回 null 且不写 store）或失败整刷都只领代不写游标，按代次判据会把
+ * 在途触底的合法下一页白弃掉。改按本计数器判「有没有人真的写过游标」：写入了新游标
+ * （新世界成立）才必须弃权；四个写入点：setSource 切源复位、nikkisync 首屏、本地整刷收尾、
+ * 触底续页推进。命名模块变量：可 grep、可做包内取证，与游标值解耦（末页 null 游标无判别力
+ * 问题不存在），与整刷侧 :607/:620/:643 的弃权形状互不影响。
+ */
+let mediaCursorWriteSeq = 0
 
 /**
  * 最近一次本地整刷返回 null 的语义（DEBT-053 收口）。
@@ -677,7 +694,9 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
 
     // 首屏加载即重置 keyset 游标：所有"整表刷新"入口（扫描完成、切换视图、设置页操作等）
     // 都经过本函数，游标随列表一起复位，避免 loadNextMediaPage 从陈旧游标继续翻页
-    // 注意写的是**循环结束后**的游标与 hasMore：整刷已把目标深度吃掉，续页要从这里接着走
+    // 注意写的是**循环结束后**的游标与 hasMore：整刷已把目标深度吃掉，续页要从这里接着走。
+    // 游标落地 ⇒ 代次 +1（DEBT-057）：在途触底页的弃权判据据此判定「新世界已成立」。
+    mediaCursorWriteSeq += 1
     useMediaStore.setState({
       mediaCursor: cursor,
       hasMoreMedia: hasMore,
@@ -803,26 +822,29 @@ export async function loadNextMediaPage(): Promise<void> {
   if (loadingMore || depthFetchActive || !hasMoreMedia) return
 
   useMediaStore.setState({ loadingMore: true })
-  // 代次锚点：与 fetchMediaFromDatabase:560 同一协议，在 try 之前领、收尾交给同一个 finally。
-  // 此刻读到的 mediaCursor 只在这一代未被顶掉时仍是「在册游标」；上面的 depthFetchActive 只拦
-  // 「起跑时刻」，拦不住已经起跑的这一页 —— 整刷若在其 await 期间起来并完成，:660 会写入新轮
-  // 的游标与计数，这一页随后落地就会用刷新前的旧游标把它覆写掉。
-  const genAtEntry = depthRefreshSeq
+  // 游标落地锚点（DEBT-057 收口）：弃权判据从「有没有人起了一轮整刷」（depthRefreshSeq）收紧为
+  // 「有没有人真的写过 mediaCursor」（mediaCursorWriteSeq）。弃权式整刷（被顶掉返回 null 且
+  // 不写 store）与失败整刷都只领代不写游标——那一页仍是旧游标世界的合法下一页，不该被白弃；
+  // 只有真的写入了新游标（新世界成立）才必须既不追加也不推进。计数器是命名模块变量：可 grep、
+  // 可做包内取证，与游标值解耦（末页 null 游标无判别力问题不存在）。
+  const cursorWriteAtEntry = mediaCursorWriteSeq
   try {
     // 性能重构：传入当前 keyset 游标（首页为 null，续页为上一页 nextCursor）
     const result = await loadMoreMedia(mediaCursor)
     // 取数失败时保持游标与 hasMoreMedia 不变，用户再次触底即可重试（错误已由 loadMoreMedia 记录）
     if (!result) return
-    // 已被新一轮整刷顶掉 ⇒ 既不追加也不推进游标：追加会把旧快照混进新轮写好的列表，
+    // 已有新游标落地 ⇒ 既不追加也不推进游标：追加会把旧快照混进新轮写好的列表，
     // 只跳过游标而保留追加同样错（数组是一轮的、游标是另一轮的）。loadingMore 仍由
     // finally 无条件复位 —— 一次弃权不得留下任何跨轮状态，否则触底被永久打死。
-    if (genAtEntry !== depthRefreshSeq) return
+    if (cursorWriteAtEntry !== mediaCursorWriteSeq) return
 
     const freshFiles = dedupeAgainst(useMediaStore.getState().mediaFiles, result.files)
     if (freshFiles.length > 0) {
       useMediaStore.getState().addMediaFiles(freshFiles)
     }
-    // 游标推进：以服务端返回的 nextCursor 锚定下一页（无更多页时为 null）
+    // 游标推进：以服务端返回的 nextCursor 锚定下一页（无更多页时为 null）。
+    // 游标落地 ⇒ 代次 +1（DEBT-057）：并发起跑的另一页据此弃权。
+    mediaCursorWriteSeq += 1
     useMediaStore.setState({ mediaCursor: result.nextCursor, hasMoreMedia: result.hasMore })
   } finally {
     useMediaStore.setState({ loadingMore: false })
