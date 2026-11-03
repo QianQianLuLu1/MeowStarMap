@@ -1137,11 +1137,14 @@ export class MediaRepository {
       result.hasMore = hasMore
       // 首页（cursor=null）仍需 total 供"全部删除"等场景；续页不再 COUNT（前端用 hasMore 驱动）
       if (cursor === null || cursor.sortValue === undefined) {
-        // 仅首页计算一次 total（默认视图命中 media_count 缓存，避免 O(n) 扫描）
-        result.total = this.resolveListTotal(whereClause, whereParams, isDefaultView)
         // 与 total 同时机算一次分类型真计数（media_count 缓存里没有类型分布，
         // 宁可多一次 GROUP BY 也不引入第二个缓存真相源）
         result.typeCounts = this.countMediaByType(whereClause, whereParams)
+        // 仅首页计算一次 total（默认视图命中 media_count 缓存，避免 O(n) 扫描）
+        result.total = this.clampTotalToTypeCounts(
+          this.resolveListTotal(whereClause, whereParams, isDefaultView),
+          result.typeCounts
+        )
       }
       if (hasMore) {
         const last = pageRows[pageRows.length - 1]
@@ -1178,6 +1181,9 @@ export class MediaRepository {
       // 与 keyset 分支同口径：仅首页给分类型真计数，续页不重复 GROUP BY
       if (page === 0) {
         result.typeCounts = this.countMediaByType(whereClause, whereParams)
+        // 夹取后一并按同一口径回写：下方 hasMore 也依赖 total，不能一个用实时、一个用缓存
+        total = this.clampTotalToTypeCounts(total, result.typeCounts)
+        result.total = total
       }
       // hasMore 必须同时满足"还有下一页"和"本页已满"
       // 仅用 total 计算时，若 media_count 缓存已更新但前端列表尚未刷新（100ms 节流窗口），
@@ -1242,6 +1248,22 @@ export class MediaRepository {
       }
     }
     return counts
+  }
+
+  /**
+   * total 与 typeCounts 的一致性夹取。
+   *
+   * 不变式 `total >= image + video` 恒成立：total 按**同一 WHERE** 数全部 file_type
+   * （含 live_photo 等历史第三种取值），typeCounts 只回填 image/video，故只可能 total 更大。
+   * 一旦 total 更小，唯一可能是默认视图命中的 media_count 缓存已过期（该缓存由
+   * `app/media-update.ts` 异步重建，扫描后存在短暂滞后窗口），而 typeCounts 是实时 GROUP BY。
+   * 夹取而非补一次 COUNT：缓存存在的理由正是省掉默认视图那次 O(n) 扫描，多查一遍等于把它拆了。
+   */
+  private clampTotalToTypeCounts(
+    total: number,
+    typeCounts: { image: number; video: number }
+  ): number {
+    return Math.max(total, typeCounts.image + typeCounts.video)
   }
 
   /**

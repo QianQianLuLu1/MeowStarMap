@@ -1436,6 +1436,28 @@ describe('MediaRepository', () => {
         expect(result.typeCounts).toEqual({ image: 1, video: 2 })
       })
 
+      // 回归：缓存的 total 与实时 GROUP BY 的 typeCounts 必须互相自洽。
+      // 缺陷：默认视图的 total 走 media_count 缓存（24h TTL + stale 位，由 app/media-update.ts
+      // 异步重建），而 typeCounts 是实时算的。扫描刚入库一批而缓存还没跟上的窗口里，两者同一次
+      // 响应返回 ⇒ 状态栏能渲染出「共 1200 个文件（图片 1400 · 视频 50）」这种算术上不可能的数。
+      // 不变式 total >= image + video 恒成立（total 数全部 file_type，typeCounts 只回填 image/video），
+      // 冲突即证伪缓存过期，以实时值为准夹取——不新增第二次 COUNT，缓存存在的理由正是省掉 O(n) 扫描。
+      it('缓存总数低于实时分类型计数时按不变式夹取（keyset 与 offset 两条首页路径）', async () => {
+        insertMedia(db, { file_path: '/t/a.jpg', file_type: 'image' })
+        insertMedia(db, { file_path: '/t/b.jpg', file_type: 'image' })
+        insertMedia(db, { file_path: '/t/c.mp4', file_type: 'video' })
+        // 库里实有 3 条，缓存里是过期的 1（默认视图 ⇒ total 命中该缓存）
+        await repo.setMediaCountCache(1)
+
+        const keyset = repo.listMedia({ cursor: null, pageSize: 2 })
+        expect(keyset.typeCounts).toEqual({ image: 2, video: 1 })
+        expect(keyset.total).toBe(3)
+
+        const offset = repo.listMedia({ page: 0, pageSize: 2 })
+        expect(offset.typeCounts).toEqual({ image: 2, video: 1 })
+        expect(offset.total).toBe(3)
+      })
+
       it('keyset 续页不再算 typeCounts（只在首页查询一次）', () => {
         for (let i = 0; i < 4; i++) {
           insertMedia(db, {
