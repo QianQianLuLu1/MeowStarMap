@@ -148,4 +148,72 @@ npm run verify              # 只读增量闸门（typecheck + eslint 无 --fix 
 
 ## 10. 执行读数（本轮实测，2026-11-03）
 
-_待各节点实跑后回写。_
+### 提交切分（一节点一提交，未推送）
+
+| 节点 | 提交      | 内容                                                                |
+| ---- | --------- | ------------------------------------------------------------------- |
+| N0   | `06d668f` | `docs(plans)` 本计划落仓                                            |
+| N1   | `a624d86` | `docs(changelog)` 500 计数条目并入 `[2.5.6]`、`[Unreleased]` 清空   |
+| N2   | `ce28125` | `fix(store)` 深度取数屏障（红测试与修复同笔）                       |
+| N3   | `6cedbac` | `fix(database)` `total >= image + video` 夹取（红测试与修复同笔）   |
+| N4   | `ee51e0d` | `fix(renderer)` 被取代不再报失败 + 两处注释订正（红测试与修复同笔） |
+| N7   | 本轮收尾  | `docs(release)` 变更日志登记 + `docs(plans)` 读数回写               |
+
+### 逐节点红灯 → 绿灯（三条修复前红读数均为实测）
+
+| 节点 | 修复前红灯文本                                                                   | 修复后                                |
+| ---- | -------------------------------------------------------------------------------- | ------------------------------------- |
+| N2   | `AssertionError: expected "vi.fn()" to be called 2 times, but got 3 times`       | `mediaStore.test.ts` 50 例全绿        |
+| N3   | `AssertionError: expected 1 to be 3`（停在 keyset 首条断言）                     | `media-repository.test.ts` 183 例全绿 |
+| N4   | `AssertionError: expected "vi.fn()" to not be called at all, but called 1 times` | `useRefreshMedia.test.ts` 11 例全绿   |
+
+三条「红测试 + 修复」各合并一笔提交：`.husky/pre-commit` 的 lint-staged 对 `src/**/*.{ts,tsx}` 会跑匹配套件，刻意留红的 src 提交会被自家闸门拒；未使用 `--no-verify`。N4 的互补用例「真实取数失败仍触发 `onError`」由既有用例 `useRefreshMedia.test.ts:104` 钉住，全程保持绿——没有把真失败改成哑巴。
+
+### 变异抽查（两次，均用 `sha256sum` 证逐字节还原）
+
+- **M1（N2）**：撤掉 `loadNextMediaPage` 里的 `depthFetchActive` 判据 ⇒ 新用例复现同一条红（`called 2 times, but got 3 times`），证缺陷例有牙。
+  本节点另暴露一个工装坑：`sed` 全局替换会连带命中 `loadNextAssetPage` 里字面量相同的另一条守卫（`if (loadingMore || !hasMoreMedia) return`），把未变异的 nikkisync 侧一并改掉；`sha256sum -c` 当场报 WARNING 拦住，按行号定位复原后哈希归位。**教训：变异注入与复原一律用带上下文的定点编辑，不用全局 `sed`。**
+- **M2（N3）**：只撤 **offset** 那一个夹取调用点 ⇒ 红点内移到该分支（keyset 断言先过），证两条首页路径各自都在判据覆盖内，不是只靠一条。
+- **M2（N4）**：把 `else if (!superseded)` 换成恒真 ⇒ 新用例红，恢复后绿。
+
+### 六道闸门（全部实跑，退出码为证）
+
+| 命令                    | 结果 | 实测读数                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install`           | `0`  | 本机 `node v26.3.0 + npm 11.16.0`。**实测如期静默拆掉 4 条 @nikkisync junction**（`link:nikkisync:check` 从 `check OK` 变 `NOT linked (4 need action)`），`npm run link:nikkisync` 重建后复原。本轮 `package-lock.json` **未被重写**（`git status` 空），故无需按「工具链抖动不进提交」还原 |
+| `npm run build`         | `0`  | electron-vite 构建成功，renderer 产物 `built in 4.98s`                                                                                                                                                                                                                                      |
+| `npm test`              | `0`  | **469 文件全绿 / 7474 通过 / 20 跳过 / 55.47s**                                                                                                                                                                                                                                             |
+| `npm run typecheck`     | `0`  | `tsc -b` + `tsc -p tsconfig.scripts.json`                                                                                                                                                                                                                                                   |
+| `npm run e2e:smoke`     | `0`  | **19 passed (39.1s)**，且 `[e2e] executable:` 打印 `release/win-unpacked/喵星图.exe` ⇒ 验到的是本轮新树                                                                                                                                                                                     |
+| `npm run test:ci-linux` | `0`  | **469 文件全绿 / 7491 通过 / 3 跳过 / 42.60s**。与 `npm test` 总数同为 7494，通过/跳过分配不同是**装置改变了哪些套件被链接门控**，不是用例丢失                                                                                                                                              |
+| 另加（CI 同款静态门）   | `0`  | `npm run lint` / `npm run typecheck:e2e` / `npm run i18n:guard` 全绿；每节点收尾 `npm run verify` 均 `总计 5 项, 0 失败`                                                                                                                                                                    |
+
+**次序偏差（按计划 §3 的预定解决方式执行）**：`e2e:smoke` 排在出包之后，不在六道之前——它认 `release/win-unpacked/*.exe`，出包前跑只会 throw「未找到」。这不是跳过，是前提成立的顺序。
+
+### 出包与包内取证
+
+- **旧包归档**：`_safe_backup_20261103-2048/`（`.gitignore:167` 覆盖，git 里无副本）。基线 `size 184,744,586` / `sha512 CZG9nDg9…` / `releaseDate 2026-11-03T10:30:55.722Z`。
+- **标准配方本轮直接走通**：`npm run dist:win` 退出码 0，**未触发**历史反复出现的 `EPERM rename` 锁，因此没有走 `electronDist` 旁路，`pre-dist-check` 与 `verify:dist` 都在链内真跑（禁串步回显 `release\win-unpacked\resources\app.asar`，74,202,861 字节 / 32 条禁串）。出包前 `link:nikkisync:check` 为 `check OK`，包内 @nikkisync 四包与装载链闭包 53 模块全部解包到位。
+- **新包**：`size 184,744,916`（+330 B）/ `sha512 QVXHVYwq…` / `releaseDate 2026-11-03T12:50:05.482Z` ⇒ **两轴都变**，不是只换 `releaseDate` 的空重跑。
+- **包内字节判据**（`@electron/asar` `listPackage` + `extractFile`，条目名只去前导分隔符、不转换 `\`→`/`）：
+
+  | needle                                        | 新包 | 旧包 |
+  | --------------------------------------------- | ---- | ---- |
+  | `clampTotalToTypeCounts`（主进程方法名）      | 3    | 0    |
+  | `Math.max(…, .image + …, .video)` 表达式      | 1    | 0    |
+  | `depthFetchActive`（渲染层屏障）              | 4    | 0    |
+  | `getMediaRefreshGeneration`（渲染层代次读口） | 3    | 0    |
+  | `[useRefreshMedia] 加载失败`（**对照组**）    | 1    | 1    |
+
+  对照组两版都命中 1，证 needle 法是双向取证、不是只在新树里单侧搜索。5120 个 JS/JSON 条目里 **5087 个逐文件哈希与归档包全等**、1 个原地变更（`dist\main\main\app\application.js`）、渲染层 32 个 chunk 名随内容哈希轮换——**外部 @nikkisync 构建产物这一条轴没有过期**。
+
+- **本轮最重的一条取证**：`countMediaByType` 在旧包（18:30）里是 **0 命中**。即 18:30 那个包**连上一轮的 500 计数修复都不含**（那七笔提交 19:02–19:31 才落地），本次重打包才是这批修复真正进包的一次。这印证了「工作树干净 ≠ 包是新的」，判据必须对包内字节取数。
+
+### 属实但本轮不修 / 未做（如实记账）
+
+1. **进入循环时若已有一次触底续页在途**，本轮不抢占它（沿用其自身 `finally` 收尾）。屏障只保证「刷新起来之后不再让触底钻进来」；彻底闭合需要给 `loadNextMediaPage` 也加代次，属另一件事。
+2. **`fetchMediaFromDatabase` 的 `console.warn('加载失败…')` 在「被取代」路径下仍会打印**：它是开发期控制台行、不对用户展示，本轮只收口用户可见的 toast，没有扩大改动面。
+3. **`total` 与 `typeCounts` 的新鲜度仍来自两个源**（缓存 vs 实时 GROUP BY），本轮以不变式夹取消除「显示矛盾」，没有消除「短暂不同源」；彻底同源要么拆掉 `media_count` 缓存、要么给类型分布再加一层缓存，两者都与最小化改动冲突。
+4. **每页首页都做一次 `GROUP BY`**：这是上一轮刻意接受的代价（注释原文「宁可多一次 GROUP BY 也不引入第二个缓存真相源」），本轮未改、也未另测性能基线。
+5. **`findAsarUnpacked` 仍无显式选择参数**：本轮 `release/` 里 5 个历史 `build-*` 残壳经实测都不含 `app.asar.unpacked`，字典序假绿路径被物理堵死；但**代码侧弱点仍在**，不因环境干净就划掉。
+6. **未推送远端、未补 `v2.5.6` tag**（用户裁决「只提交，不推送」）。开工时本地 `main` 领先 `origin/main` 73 笔，本轮在其上按上表追加提交；准确的领先数以 `git rev-list --count origin/main..HEAD` 为准，不在本文重复记账。
