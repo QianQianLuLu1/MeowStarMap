@@ -140,9 +140,13 @@ describe('GPU 崩溃自愈完整链路', () => {
     const m = await import('../gpu-fallback')
     expect(m.shouldDisableHardwareAcceleration()).toBe(true)
     expect(m.recordBootDecision()).toBe(true)
+    // 工装档不得写成用户持久态：此前这条链路会落 compatLevel/fallbackActive + 真版本戳，
+    // 跑一次验证就让用户装机停在软件渲染，直到下次改版才复位
+    expect(fs.existsSync(path.join(tmpDir, 'gpu-fallback.json'))).toBe(false)
     const healed = m.requestSelfHeal('crashed', 1)
     expect(healed).toBe(false)
     expect(mockRelaunch).not.toHaveBeenCalled()
+    expect(fs.existsSync(path.join(tmpDir, 'gpu-fallback.json'))).toBe(false)
   })
 
   it('5. isStartupPhase: 首绘前 true，markAppBooted 后 false', async () => {

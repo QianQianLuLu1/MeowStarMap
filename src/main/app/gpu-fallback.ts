@@ -125,6 +125,24 @@ function parseForcedLevel(v: string | undefined): GpuCompatLevel | null {
   return v === '0' || v === '1' || v === '2' ? (Number(v) as GpuCompatLevel) : null
 }
 
+/**
+ * 验证工装是否在跑：`NIKKI_FORCE_GPU_COMPAT=1`（强制软件渲染）或 `NIKKI_GPU_FORCE_LEVEL=0|1|2`
+ * （强制档位）。
+ *
+ * 工装要求的是**本次进程**的运行方式，而 gpu-fallback.json 是**这台机器的长期档位指令**：
+ * 把工装态落进去，用户装机就停在软件渲染直到下次改版才复位；档位被 env 钉住时「升一级再
+ * 重启」还会重启回同一档位形成死循环。故工装在位时本模块只出判定、不出持久副作用。
+ *
+ * 判据取 `parseForcedLevel(...) !== null` 而不是「env 变量是否存在」：非法值（'01'/'3'/''）
+ * 按既有约定被忽略并回落真实判定，那种情况不算工装，该照原样落盘（L9 钉这条）。
+ */
+function isGpuVerificationRig(): boolean {
+  return (
+    process.env.NIKKI_FORCE_GPU_COMPAT === '1' ||
+    parseForcedLevel(process.env.NIKKI_GPU_FORCE_LEVEL) !== null
+  )
+}
+
 /** resolveCompatLevel 的档位上下文（全部由调用方算好传入，保持本函数无 fs / 无 electron） */
 export interface CompatLevelContext {
   /** 上次运行被原生层杀死（无 JS 退出痕迹）——本次比上次实际用过的档位再降一级 */
@@ -396,8 +414,10 @@ export function recordBootLevel(evidence: { prevNativeKill?: boolean } = {}): Gp
   }
   bootLevelCache = level
 
-  // 仅在档位变化或需要盖戳时写盘：健康启动（0 级、无证据）不得凭空造出状态文件
-  if (forced === null) {
+  // 仅在档位变化或需要盖戳时写盘：健康启动（0 级、无证据）不得凭空造出状态文件。
+  // 工装在位时一律不落盘——旧口径只挡 NIKKI_GPU_FORCE_LEVEL（forced !== null），
+  // 漏了 NIKKI_FORCE_GPU_COMPAT：那把工装经 compatDisabled 抬到 1 级后照样写盘。
+  if (!isGpuVerificationRig()) {
     const persisted = normalizeCompatLevel(state.compatLevel)
     const needStamp = stampRequired && state.compatLevelVersion !== (version || undefined)
     if (level !== persisted || needStamp) {
@@ -526,22 +546,24 @@ export function markGpuProcessCrash(reason: string, exitCode: number): void {
  *    使重启后的下一次启动真的换档（旧口径「兼容模式仍崩就直接放弃」是死胡同，
  *    正是「禁用硬件加速也照样被 FATAL 杀死」的设备永久启动即闪退的原因）；
  *  - 已到顶（level === MAX）：不重启、不再上升，只记 error，交由调用方错误对话框兜底；
- *  - 验证工装 NIKKI_FORCE_GPU_COMPAT=1：档位由环境固定，不做进程重启以免打断验证。
+ *  - 验证工装在位（NIKKI_FORCE_GPU_COMPAT=1 或 NIKKI_GPU_FORCE_LEVEL=0|1|2）：档位由环境固定，
+ *    不落盘也不重启——写盘会把一次性验证变成本机长期档位指令，重启则会被 env 压回同一档成死循环。
  * relaunch/exit 全程 try/catch：失败仅保留落盘标记，靠 consecutiveFailures>=2
  * 阈值跨手动启动兜底。
  * @returns 是否已触发自动重启
  */
 export function requestSelfHeal(reason: string, exitCode: number): boolean {
-  markGpuProcessCrash(reason, exitCode)
-  const level = currentBootLevel()
-
-  if (process.env.NIKKI_FORCE_GPU_COMPAT === '1') {
+  // 工装短路必须放在 markGpuProcessCrash **之前**：那一步无条件写 fallbackActive +
+  // compatLevel（还盖了真版本戳），旧口径把它放在工装闸之后，跑一次验证就污染一次持久态。
+  if (isGpuVerificationRig()) {
     diagLog(
       'GPU',
-      `GPU 崩溃（reason=${reason} exitCode=${exitCode}）：NIKKI_FORCE_GPU_COMPAT 强制档，不自动重启`
+      `GPU 崩溃（reason=${reason} exitCode=${exitCode}）：验证工装在位，不落盘、不自愈重启`
     )
     return false
   }
+  markGpuProcessCrash(reason, exitCode)
+  const level = currentBootLevel()
 
   if (level >= MAX_COMPAT_LEVEL) {
     const msg =

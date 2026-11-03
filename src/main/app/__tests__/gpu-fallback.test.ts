@@ -323,6 +323,27 @@ describe('gpu-fallback 自愈重启（requestSelfHeal）', () => {
     expect(readRaw().fallbackActive).toBe(true)
   })
 
+  // 验证工装（两把 env）跨污染真实持久态：工装要求软件渲染是**本次进程**的事，
+  // 写进 gpu-fallback.json 就成了用户装机的长期档位指令（直到下次改版才复位）。
+  it('b2. 工装 NIKKI_FORCE_GPU_COMPAT=1 ⇒ requestSelfHeal 不写状态文件、不重启', () => {
+    process.env.NIKKI_FORCE_GPU_COMPAT = '1'
+    const healed = requestSelfHeal('crashed', 1)
+    expect(healed).toBe(false)
+    expect(mockRelaunch).not.toHaveBeenCalled()
+    expect(fs.existsSync(statePath())).toBe(false)
+  })
+
+  it('b3. 工装 NIKKI_GPU_FORCE_LEVEL=1 ⇒ requestSelfHeal 不升档落盘、不 relaunch', () => {
+    // 档位被 env 固定时「升一级再重启」毫无意义：新进程又被 env 压回同一档 ⇒ 重启死循环
+    process.env.NIKKI_GPU_FORCE_LEVEL = '1'
+    expect(recordBootLevel()).toBe(1)
+    const healed = requestSelfHeal('crashed', 1)
+    expect(healed).toBe(false)
+    expect(mockRelaunch).not.toHaveBeenCalled()
+    expect(mockExit).not.toHaveBeenCalled()
+    expect(fs.existsSync(statePath())).toBe(false)
+  })
+
   it('c. 兼容档（level 1）仍崩 → 升 level 2 落盘并自动重启一次（旧「直接放弃」死胡同已封堵）', () => {
     writeRaw({
       consecutiveFailures: 0,
@@ -457,6 +478,18 @@ describe('gpu-fallback 三级兼容阶梯（resolveCompatLevel / recordBootLevel
     expect(recordBootLevel()).toBe(0)
     expect(fs.existsSync(statePath())).toBe(false)
     expect(recordBootDecision()).toBe(false)
+  })
+
+  it('L10. 工装 NIKKI_FORCE_GPU_COMPAT=1 → 档位判定生效，但不落盘成用户的长期档位指令', () => {
+    process.env.NIKKI_FORCE_GPU_COMPAT = '1'
+    expect(recordBootLevel()).toBe(1)
+    expect(fs.existsSync(statePath())).toBe(false)
+  })
+
+  it('L11. 工装 NIKKI_GPU_FORCE_LEVEL=2 → 同样不产生状态文件（守卫用例）', () => {
+    process.env.NIKKI_GPU_FORCE_LEVEL = '2'
+    expect(recordBootLevel()).toBe(2)
+    expect(fs.existsSync(statePath())).toBe(false)
   })
 
   it('L2. fallbackActive=true（同版本戳）→ level 至少 1（既有布尔判定不改语义）', () => {
