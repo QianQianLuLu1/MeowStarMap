@@ -236,40 +236,196 @@ npx tsx .cache/spike-media-count-cost/spike.ts
 
 ## 10. 执行读数（本轮实测，2026-11-04）
 
-> 本节在 Node 9 回写。开工时留空，**不得预填任何未经实跑的读数**。
+> 本机实测，2026-11-04 深夜。开工时留空的本节只回填实际跑过的读数；没跑成的写在最后一段。
 
-### 提交切分（一节点一提交，未推送）
+### 提交切分（一节点一提交，未推送、未补 tag）
 
-| 节点 | 提交 | 内容                                                 |
-| ---- | ---- | ---------------------------------------------------- |
-| N0   | 待填 | `docs(plans)` 本计划落仓                             |
-| N1   | 待填 | `fix(pre-dist-check)` 解包根派生（红读数入 body）    |
-| N3   | 待填 | `fix(store)` 触底代次弃权（红测试与修复同笔）        |
-| N4   | 待填 | `fix(renderer)` 重试日志措辞分叉（红测试与修复同笔） |
-| N5   | 待填 | `docs(debt)` §21 与 registry 新条目                  |
-| N6   | 待填 | `docs(release)` 变更日志收口                         |
-| N9   | 待填 | `docs(plans)` 读数回写                               |
+| 节点 | 提交      | 内容                                                    |
+| ---- | --------- | ------------------------------------------------------- |
+| N0   | `d069fb3` | `docs(plans)` 本计划落仓（先 `git add` 再提交）         |
+| N1   | `2963f21` | `fix(pre-dist-check)` 解包根派生（红读数入 body，一笔） |
+| N3   | `73f29b3` | `fix(store)` 触底代次弃权（红测试与修复同笔）           |
+| N4   | `e55a64d` | `fix(renderer)` 重试日志措辞分叉（红测试与修复同笔）    |
+| N5   | `fb1cddd` | `docs(debt)` §21 + registry DEBT-053…059                |
+| N6   | `bcbf4e8` | `docs(release)` 变更日志收口                            |
+| N9   | 本笔      | `docs(plans)` 读数回写                                  |
 
-### 逐节点红灯 → 绿灯（修复前红读数均为实测）
+债编号与 §6 Node 5 的对应：053=重试冗余、054=`verify-nikkisync-link` 副本、**055=项 4**（GROUP BY 代价，附读数）、056=`loadingMore` 无条件复位、057=代次制已知误伤、058=i18n 模板串盲区、**059=项 3**（双源窄路径，按 Node 5 给「单开一条」的选项落地）。
 
-待填。
+### 逐节点红灯 → 绿灯（三条修复前红读数均为实测原文）
+
+**N1 / 项 5**。修复前红（`npx vitest run scripts/__tests__/pre-dist-check.test.ts`）：
+
+```
+Tests  5 failed | 47 passed (52)
+TypeError: deriveUnpackedTarget is not a function   ← T1–T5 全部死于这一条（:510 / :529 等）
+```
+
+修复前的**缺陷本体取证**（临时给 `findAsarUnpacked` 加 `export`，一行、未入库，取证后由 `sha256sum -c` 证逐字节还原）：
+
+```
+禁串步审的树      : …/release/win-unpacked/resources/app.asar
+readdir 首命中    : …/release/build-20250101-old/resources/app.asar.unpacked
+两棵树是否同一棵  : false
+结论              : 已复现 —— 原生二进制校验整份跑在陈旧树上，禁串步却审现役树 ⇒ 假绿
+```
+
+修复后绿：52 passed (52)；`findAsarUnpacked` 在本文件 0 命中；`npm run verify:dist` 对新产物 21 项 ✔ / exit 0；显式 `--asar` 指向旁路输出树亦 exit 0；负例 `--asar=release/build-fake/…` 两步一致 fail-closed 并指路「请传 --asar=<path>」。
+
+**N3 / 项 1**。修复前红：
+
+```
+FAIL > mediaStore > fetchMediaFromDatabase > 迟到的触底页在整刷写完游标之后落地时不得覆写游标（§10 残留 1 闭合）
+AssertionError: expected { …(2) } to deeply equal { …(2) }
+-   "id": 601,
++   "id": 201,
+    "sortValue": "2026-01-01T00:00:00.000Z",
+Tests  1 failed | 50 passed (51)
+```
+
+修复后绿：51 passed (51)；连同三个邻居套件（`mediaStore.integration` / `mediaStore.nikkisync` / `useFilteredMediaFiles.count`）4 文件 78 例全绿。既有的「整刷结束后正常触底从新游标 601 接走」用例保持绿 ⇒ 反证新守卫没有误伤无整刷参与的正常触底。
+
+**N4 / 项 2**。修复前红：
+
+```
+FAIL > useRefreshMedia > 重试日志措辞按「被取代 / 真失败」分叉 > 被取代的 null 打「已被新一轮整刷取代」，不再自称加载失败
+AssertionError: expected '[useRefreshMedia] 加载失败，500ms 后重试 (1/3)' to contain '已被新一轮整刷取代'
+```
+
+修复后绿：13 passed (13)。第二条「真实取数失败仍逐字打加载失败」修复前亦绿（无红牙对照，已在用例里标注）；`npx eslint` 对该 hook 与其测试 0 error；`npm run i18n:guard` ✅ 未新增键。
 
 ### spike 读数与取舍结论（项 3 + 项 4）
 
-待填：命令原文、克隆库行数、Node 版本、两个臂的 min/中位/p95、`S3/(S1+S2+S3)` 占比、三条 EXPLAIN QUERY PLAN、据判据 A/B 做出的结论，以及出包后手测的首屏绝对值。
+装置 `.cache/spike-media-count-cost/spike.ts`（一次性、不入库）。调用原文：
 
-### 变异抽查（两次，均用 sha256sum 证逐字节还原）
+```bash
+npx tsx .cache/spike-media-count-cost/spike.ts
+# 克隆源：%APPDATA%/meow-star-map/database/meow_star_map.db 三件套（.db / -wal / -shm）
+# 只读克隆件，绝不以可写方式打开用户真实库；运行环境 Node v26.3.0
+```
 
-待填。
+字面量自检 9 项全部命中源文件（第一版探针因把「求值后的字符串值」拿去与「源文件原文」比对而 `exit 1` 判读数作废 —— 自检按设计拦住了自己一次）。真库克隆 `media_files` = **266 行**、启用导入根 = 0 ⇒ 触发规模臂（schema 与索引从克隆件的 `sqlite_master` 原样取回，不复制 DDL 文本）。S1=首页分页、S2=实时 COUNT、S3=GROUP BY；30 轮 **轮转**采样、取中位数、单位 ms：
 
-### 六道闸门（全部实跑，退出码为证）
+| 数据集          | S1    | S2    | S3    | 边际 S3−S2 | S3/S2 | S3/(S1+S2+S3) |
+| --------------- | ----- | ----- | ----- | ---------- | ----- | ------------- |
+| 真库克隆 266 行 | 0.17  | 0.07  | 0.07  | 0.00       | 1.00x | 23.8%         |
+| 合成 1 000 行   | 2.00  | 0.46  | 0.51  | 0.05       | 1.10x | 17.0%         |
+| 合成 10 000 行  | 9.29  | 5.66  | 6.42  | 0.76       | 1.13x | 30.0%         |
+| 合成 50 000 行  | 35.77 | 28.75 | 33.80 | 5.05       | 1.18x | 34.4%         |
 
-待填。
+复跑（第二次独立采样，10k）：S1 9.55 / S2 5.87 / S3 6.61，边际 0.74，比值 1.13x ⇒ 读数可复现。
+
+绑定层对照（把「引擎相同、JS 绑定层不同」这唯一一处保真差也消掉）：
+
+```bash
+ELECTRON_RUN_AS_NODE=1 ./node_modules/electron/dist/electron.exe .cache/binding-arm.cjs
+# better-sqlite3@Electron ABI  10k 行  30 轮  S1=8.98  S2=6.38  S3=6.98 ms
+# 边际(S3-S2)=0.61ms  S3/S2=1.10x
+```
+
+`EXPLAIN QUERY PLAN`（S3，两条臂一致）：
+
+```
+profile=all / 规模臂：SEARCH media_files USING INDEX idx_media_files_duplicate_group (is_duplicate=? AND is_deleted=?) | USE TEMP B-TREE FOR GROUP BY
+选中具体档案：      SEARCH media_files USING INDEX idx_media_files_profile_stats (account_uid=? AND is_deleted=?)     （不建 temp b-tree，索引第三列即 file_type）
+```
+
+**判据（测量之前写死于 §Node 2）套用结果**：
+
+- 判据 A（`median(S3) ≤ median(S2) × 1.5` 且 `≤ 8ms`）：真库 0.07 ✓✓；10k 6.42 ≤ 8 且 ≤ 8.49 ✓✓ ⇒ **通过**。
+- 判据 B（10k `≤ 15ms` 且 EQP 不引入第二个全表扫描）：6.42 ✓，EQP 是 `SEARCH … USING INDEX` 而非 `SCAN` ⇒ **通过**。
+- 绝对锚（S1+S2+S3 ≤ `media-list-page500` 基线 10.3 ms 的 3 倍）：10k 合计 21.4 ms ≤ 30.9 ms ✓，且远低于 `hardRules` 的 1000 ms。
+- **结论：维持上一轮「宁可多一次 GROUP BY 也不引入第二个缓存真相源」的取舍，`media-repository.ts` 一字未动。**
+- 外推观察如实记录：50k 档 S3 = 33.80 ms 已超判据 A 的 8 ms 上限，但判据未预设 50k 档 ⇒ 记为观察，不回头改判据、不据此扩范围。
+- 顺带得到的修法线索：temp b-tree 只出现在 `profile=all` 一侧，而 `idx_media_files_profile_stats` 的覆盖形态能省掉它 ⇒ DEBT-055 的「修法」写为加 `(is_deleted, file_type)` 组合索引（零口径代价），并给出复测判据（边际 < 0.3 ms）。
+
+### 变异抽查（六次注入，均带上下文的定点编辑；每次复原后 `sha256sum -c` 与 `git diff --exit-code` 双证）
+
+基线哈希（注入前记于 `.cache/node7-baseline.sha256`）：`mediaStore.ts = 894c2275…`、`useRefreshMedia.ts = 777940d1…`、`pre-dist-check.ts = fb5d3c36…`。
+
+| #   | 目标 | 注入                                                              | 实测红                                                                                                                                |
+| --- | ---- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| M1  | 项 1 | 删掉 `:795` 的代次守卫行                                          | `expected { id: 601 … } to deeply equal { id: 201 … }`，恰 1 例红（1 failed / 50 passed）                                             |
+| M2  | 项 1 | 把守卫下移到 `addMediaFiles` 之后、写游标之前                     | `expected [ …(999) ] to have a length of 600 but got 1000` —— 游标断言转为绿、长度断言红 ⇒ 两条断言各自在覆盖内，且**守卫位置是要件** |
+| M1  | 项 2 | 还原为单条无条件「加载失败」warn                                  | 取代用例红、对照用例绿                                                                                                                |
+| M2  | 项 2 | 把 `superseded ?` 钉成 `!superseded ?`（两分支对调）              | **两条新用例同时红** ⇒ 两个分支的措辞各自被钉，没有一条是空断言                                                                       |
+| M1  | 项 5 | `if (!exists(candidate))` 改为 `if (!exists(candidate) && false)` | 恰 T3 红：`expected '/abs/…/app.asar.unpacked' to be null`（fail-closed 有牙）                                                        |
+| M2  | 项 5 | 成功路径多插一次 `exists(candidate/node_modules)` 探针            | 恰 T1 红：`expected [ …(2) ] to deeply equal [ Array(1) ]`（「不扫目录」有牙）                                                        |
+
+两次误裁如实记：项 5 第一次注入写成 `if (false && !exists(candidate))`，把 `exists` 调用整个短路 ⇒ T1 与 T3 同时红（2 failed），信号不纯，已换成上面的写法重做至「各红一次」；项 1 第一刀连相邻两行一起替换成残缺语句（会编译不过而非「只撤判据」），当场复原、`sha256sum -c` 确认干净后改为「只删守卫行」重注入。两次误裁都未留下残余，最终 `git diff --exit-code` 为空、三文件哈希与基线逐字节相同。
+
+### 六道闸门 + verify（全部实跑，退出码为证）
+
+前提核对：`npm run link:nikkisync:check` ⇒ `root=…\NikkiSync source=sibling`、四条 `ok`、`check OK (all four links in place)`。本轮**未跑过** `npm install` / `npm update`，junction 无被静默删除的风险；出包后另由 `verify:dist` 的 `@nikkisync` 段实测解包在位。
+
+| 门                      | 读数                                                                    | 退出码 |
+| ----------------------- | ----------------------------------------------------------------------- | ------ |
+| `npm run lint`          | `eslint .` 无输出                                                       | 0      |
+| `npm run typecheck`     | `tsc -b` + `tsc -p tsconfig.scripts.json`                               | 0      |
+| `npm run typecheck:e2e` | `tsc --noEmit -p e2e`                                                   | 0      |
+| `npm run i18n:guard`    | ✅ 白名单只减不增、清零必移除、key 已同步                               | 0      |
+| `npm test`              | **469 文件全过 / 7482 passed \| 20 skipped (7502)**                     | 0      |
+| `npm run test:ci-linux` | **469 文件全过 / 7499 passed \| 3 skipped (7502)**                      | 0      |
+| `npm run verify`        | typecheck / lint / core-gate / format / test 五项全过（逐节点各跑一次） | 0      |
+| `npm run docs:links`    | ✅ 无死引用（188 处为既有提醒）                                         | 0      |
+
+计数核对：上一轮基线 7474 passed / 20 skipped（总 7494），本轮 7482 / 20（总 7502），**+8 恰为本轮新增用例数**（`pre-dist-check` T1–T5 = 5、`mediaStore` = 1、`useRefreshMedia` = 2）；`test:ci-linux` 侧 7491 → 7499，两侧总数同为 7502 ⇒ 无套件被静默丢弃。
+
+另记一条本轮踩到的读法陷阱：后台包装层报的退出码是**包装层的**，标准配方那次 `npm run dist:win` 的完成通知写「exit code 0」而日志内层是 `EXIT=1`。判定长任务只认自打的 `EXIT=` / `⨯` 行。
 
 ### 出包、包内取证与 e2e
 
-待填。
+现役孤本先整体移入 `_safe_backup_20261104-2330/`（exe / blockmap / latest.yml / win-unpacked），随后：
+
+1. **标准配方第一次** `npm run dist:win`：`build:recycle-helper` → `build` → `pre-dist-check` ✅ → `@electron/rebuild` ✅ → Electron zip 下载与解压 ✅ → **死在** `⨯ EPERM: rename 'release\win-unpacked.tmp' -> 'release\win-unpacked'`（栈 `electronGet.ts:249 extractArchive` ← `ElectronFramework.ts:254 unpack`），`EXIT=1`。
+2. **旁路** `npx electron-builder --win --publish never --config.electronDist="<abs>/.cache/electron-dist-41.10.6" --config.directories.output=release/build-20261104-countdebt` ⇒ `BUILDER_EXIT=0`，`appOutDir=release\build-20261104-countdebt\win-unpacked`，NSIS exe + blockmap 齐。
+   用的 clean dist 是**现做**的（`cp -rf node_modules/electron/dist` 后剔 `debug.log`）：仓里既存的 `.cache/electron-dist-clean` 没有 `version` 文件、来历版本不可证，为避免悄悄交付陈旧运行时改用与 dev/test 同源的 41.10.6（二者 `electron.exe` 逐字节同哈希 `24e7339a…`、223,764,992 B，说明内容一致，多的只是版本凭据）。
+3. **标准配方重试一次**（锁是偶发的，值得一次确认）：这次死得更准 —— `⨯ EBUSY: resource busy or locked, unlink 'release\win-unpacked.tmp\resources\default_app.asar'`，`RETRY_EXIT=1`。对照 `node_modules/app-builder-lib/out/electron/ElectronFramework.js:233`：`isFullCleanup ? unlinkIfExists(resources/default_app.asar)` —— **被锁的那一步正是标准路径独有的清理动作**，旁路因 `isFullCleanup=false` 根本不做它。这同时解释了下面第 5 条的形态差异。
+4. **搬运用 `cp -rf` 不用 `mv`**（被锁文件只挡 rename/unlink，读与覆盖允许）：旁路树 → `release/win-unpacked`，exe/blockmap/latest.yml → `release/` 根；两侧 `resources/app.asar` 的 `sha256` 同为 `487dccff53e0…` ⇒ 搬运未改内容。
+5. **手工补跑旁路跳过的两步**：`npm run pre-dist-check` ✅（含 `check-doc-versions`、`check-changelog-release`）；`npm run verify:dist` **裸跑** ✅ 21 项 ✔ / exit 0；再按本轮新增的行为面显式跑 `npx tsx scripts/pre-dist-check.ts --verify-asar --asar=release/build-20261104-countdebt/win-unpacked/resources/app.asar` ✅ exit 0 —— 回显的解包根与禁串步**同树**，这正是项 5 收敛后要能做到的事。
+6. `npm run e2e:smoke` ⇒ **19 passed (41.4 s)**，且 `[e2e] executable:` 打印 `release/win-unpacked/喵星图.exe`、`[e2e] userData:` 打印 `.cache\e2e-smoke-<ts>` ⇒ 验的是新树。
+
+**包内新鲜度取证**（`@electron/asar` 的 `listPackage` + `extractFile`；条目名形如 `dist\renderer\assets\…js`，只去前导分隔符、不把 `\` 换成 `/`）：
+
+| needle                                 | 旧包                | 新包                | 判读                                                        |
+| -------------------------------------- | ------------------- | ------------------- | ----------------------------------------------------------- |
+| `genAtEntry`（项 1 的守卫锚点）        | 0                   | 2                   | 项 1 已进包，直接证据                                       |
+| `depthRefreshSeq`                      | 7                   | 9                   | +2 = 新守卫的两处读取，与项 1 自洽                          |
+| `本轮已被新一轮整刷取代`（本轮新串）   | 0                   | 1                   | 项 2 已进包                                                 |
+| `[useRefreshMedia] 加载失败`（对照组） | 1                   | 1                   | 对照组未被改动 ⇒ 「失败分支逐字保持」这条断言在产物层也成立 |
+| JS 条目数 / 总字节                     | 3887 / 39,717,342 B | 3887 / 39,717,575 B | Δ +233 B，与三处改动同量级                                  |
+
+承载 chunk 由 `index-BLxQV4Ke.js` 改名为 `index-4TFxV8pW.js`，`GalleryPage-B6_m4r37.js` → `GalleryPage-CB-HMDGk.js` ⇒ 内容哈希随改动变化。**订正一条我自己先前的错判**：最早那版取证用「同路径 chunk 逐字节比对」，得出「42 个同名 chunk、0 个不同」——那不是矛盾而是**方法失效**（文件名本身带内容哈希），包内证据以上表为准。
+
+**`latest.yml` 两轴对照**：`size 184,744,916 → 184,828,171 B`（+83,255）、`sha512 QVXHVYwqkji… → tKEzk4qQ3PDz…`、`releaseDate 2026-11-03T12:50:05Z → 15:33:38Z` ⇒ 两轴皆不同，不是只换 releaseDate 的空重跑。
+
+**产物形态与标准路径的差异（如实披露，不得读成「旁路 = 等价」）**：逐文件对比旧树与新树，资源树净差 +111,825 B，分解为四处 ——
+
+| 项                             | 旧                    | 新                    | 归因                                                                                                                          |
+| ------------------------------ | --------------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `resources/app.asar`           | 74,202,861            | 74,203,094            | **+233 B**，本轮三处改动，属预期                                                                                              |
+| `resources/default_app.asar`   | 不存在                | 111,073 B             | 旁路 `isFullCleanup=false` ⇒ 不执行标准路径那次 unlink（也正是杀软锁住的那一步）；有 `app.asar` 在，运行期不被加载 ⇒ **惰性** |
+| `version`（解包根）            | 不存在                | 7 B                   | 同上，标准路径会删                                                                                                            |
+| `喵星图.exe`                   | 224,013,312           | 224,013,824           | +512 B；electron.exe 基体两侧同哈希（223,764,992 / `24e7339a…`）⇒ 差在打包期写入的尾部块，**本轮未能进一步归因**              |
+| `nikkisync-recycle-helper.exe` | 5,120 B / `26f6df98…` | 5,120 B / `d8fadcd7…` | 同尺寸不同哈希：`build:recycle-helper` 重编译同一份源码所致（PE 内构建时戳），源码零改动                                      |
+
+⇒ 结论：本轮交付的包与标准路径产物**不是逐字节同形**，差异集中在两处惰性文件与一处未归因的 512 B；功能面由 `verify:dist` 21 项、`e2e:smoke` 19 例与上表 needle 承担。
 
 ### 属实但本轮仍不修 / 未做（如实记账）
 
-待填 —— 本轮结束时，这里的每一项都必须能指向一个 DEBT 编号。
+**代码面七条已全部转成债，逐项有编号**：053 被取代路径仍重试 3 次深度整刷、054 `scripts/verify-nikkisync-link.ts:538` 的 `findAsarUnpacked` 同名副本、**055** 首屏 `GROUP BY file_type` 的边际代价与缺组合索引（附本表读数）、056 整刷无条件复位 `loadingMore`、057 代次制在交错 ③ 的白废一页、058 i18n 护栏对 `TemplateLiteral` 的盲区（本轮新增一条同款）、**059** 双新鲜源订正后的窄路径残余。明细与撤销条件见 `docs/技术债清单.md` §21。
+
+**本轮明确未做的项**（写清「前提不成立 + 缺哪一步」，不记作通过、也不静默省略）：
+
+1. **包内首屏端到端绝对值未取**。计划里那句「在新包里开 DevTools 手打 `performance.now()`」这一形态对我不可执行（我无法向 GUI 的 DevTools 输入），而可自动化的等价路线各缺一环：`e2e:smoke` 的 `launchApp()` 刻意用全新临时 userData（S 用例「userData 隔离校验」实测落在临时目录）⇒ 库里 0 行；`e2e/perf-real.e2e.ts` 需 `PERF_REAL_USERDATA` 且克隆整棵 userData（含 thumbnails）、`setTimeout(300_000)`，且它本身并不测 `media.list` 的耗时。替代证据已给足：SQL 层三段耗时在 node:sqlite 两轮与生产 `better-sqlite3@Electron ABI` 一轮之间互证（边际 0.61–0.76 ms），**而判据 A/B 不依赖 IPC 序列化那一截开销**。解锁动作：下轮要补，写一条一次性脚本复用 `launchApp({ userDataDir })` 指向预置万级行的克隆目录即可（`LaunchOptions.userDataDir` 已存在，成本很低）。
+2. **未加 `(is_deleted, file_type)` 组合索引**（项 4 的廉价修法）。它要动 `connection.ts` 的建索引序列 = 一次迁移，而读数显示万级边际仅 0.61–0.76 ms ⇒ 收益不抵成本，留在 DEBT-055 的「修法」里并附复测判据。
+3. **标准打包路径本轮未跑通**，交付走 `electronDist` 旁路。解锁动作（用户侧，任选）：给工作区目录加实时防护白名单，或重启清掉内核侧句柄；**判据是 `rm -rf release/win-unpacked.tmp` 能动**。跑通后需重打一次以取得逐字节同形的产物。
+4. **`release/win-unpacked.tmp` 残壳未能清掉**：`rm` 报 `Device or resource busy`（`resources/default_app.asar` 在锁）。它被 `.gitignore` 覆盖、不入仓、不影响任何闸门，句柄释放或重启后可删。
+5. **§20 里 DEBT-052 那行被管道符撞坏的表格渲染未顺手修**（与本轮五项无关，违反最小化改动），只在 §21 末尾指路；本轮新增表格逐行核过分隔符数（每行恰 2 个），未复现该问题。
+6. **未推送远端、未补 `v2.5.6` tag**（沿用上一轮裁决）；`docs/技术债清单.md` §0 的索引表仍只列到 DEBT-039（历史滞后、无守卫脚本强制），未回填。
+
+### 一次性装置的去留
+
+以下全部落在 `.cache/`（`eslint.config.js:521` 忽略、`check-md-links.ts:85` 判 artifact、`tsconfig.scripts.json` 不收），**不入库**，本轮收尾即删。已删：`spike-media-count-cost/`（含 `readings.json`、`synthetic-10k.db`、克隆件）、`binding-arm.cjs`、`asar-forensics.cjs`、`asar-needles.cjs`、`gate-*.log`、`dist-win.log` / `dist-win-retry.log` / `dist-bypass.log`、`node7-baseline.sha256`、`pdc-baseline.sha256`。读数已全部转录进本节，删除不损失证据。
+
+**两处删不掉的，如实记账**：`.cache/electron-dist-41.10.6/resources/default_app.asar` 与 `release/win-unpacked.tmp/resources/default_app.asar` 均报 `Device or resource busy` —— 前者是我本轮为旁路新建的那份 `default_app.asar`，被锁的方式与第 3 节里标准的清理步被锁**同一个根因**（防护软件对新落地的 `default_app.asar` 抓句柄），反过来又给那条已知坑补了一个新例证：锁针对的是**文件**而非某个目录名。两者都是本地产物、不入仓、不影响任何闸门，句柄释放或重启后可删。
