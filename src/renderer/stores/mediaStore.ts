@@ -499,15 +499,20 @@ let depthRefreshSeq = 0
 let depthFetchActive = false
 
 /**
- * 最近一次本地整刷领走的代次。
+ * 最近一次本地整刷返回 null 的语义（DEBT-053 收口）。
  *
- * 消费方存在的理由：`fetchMediaFromDatabase` 让「最新一轮胜出」，被顶掉的那轮弃权返回 `null`——
- * 这本身是**成功**语义（UI 由那一轮交付），与「真的取数失败」返回的是同一个 `null`。
- * 调用方（`useRefreshMedia`）据此区分两者，不再对被取代谎报一次加载失败。
- * nikkisync 数据源不 bump 本代次，故该源下恒判为「未被取代」，真实失败照常上报。
+ * 存在理由：`fetchMediaFromDatabase` 的「弃权」与「取数失败」同形返回 `null`——「别人起了一轮」与
+ * 「自己也真的失败」在返回值上不可分，调用方（`useRefreshMedia`）因此只能把弃权也当失败重试 3 次
+ * （白废三次全量深度取数）。现在把语义落在**契约层**：弃权记 `'superseded'`、取数失败记 `'failed'`、
+ * 成功或与本次调用无关保持 `'none'`。hook 在每次取数 await 返回后立即读取（JS 单线程，await 恢复
+ * 与下一次读取之间不会插入其他调用的写）。nikkisync 数据源不参与代次 ⇒ 恒不判弃权，其 null 语义
+ * 保持入口复位的 `'none'`（按失败处理，与修复前行为一致）。
  */
-export function getMediaRefreshGeneration(): number {
-  return depthRefreshSeq
+let depthRefreshAbort: 'superseded' | 'failed' | 'none' = 'none'
+
+/** 只读访问器：见 `depthRefreshAbort` 注释。必须在对应的 `fetchMediaFromDatabase` await 返回后立即读取。 */
+export function getMediaRefreshAbortKind(): 'superseded' | 'failed' | 'none' {
+  return depthRefreshAbort
 }
 
 /**
@@ -540,6 +545,8 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
   typeCounts?: { image: number; video: number }
   hasMore?: boolean
 } | null> {
+  // null 语义复位：每次调用先清空上一次的记录，成功路径保持 'none'（DEBT-053）
+  depthRefreshAbort = 'none'
   // 阶段 4：数据源分流刻意放在**本函数内部** —— useRefreshMedia / Sidebar / GalleryPage
   // 等所有既有调用点因此一行都不用改，切换只影响「数据从哪来」，不影响「谁在取数」。
   if (useMediaStore.getState().source === 'nikkisync') {
@@ -553,6 +560,7 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
         ', category.list=' +
         !!window.electronAPI?.category?.list
     )
+    depthRefreshAbort = 'failed'
     return null
   }
 
@@ -604,9 +612,13 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
       galleryHighQualityOnly
     })
     // preload 的 call() 已解包 IpcResponse 并在失败时抛出 IpcError，此处仅需防御性检查数据存在
-    if (myRefresh !== depthRefreshSeq) return null
+    if (myRefresh !== depthRefreshSeq) {
+      depthRefreshAbort = 'superseded' // DEBT-053：弃权是成功语义，见 getMediaRefreshAbortKind
+      return null
+    }
     if (!mediaResult) {
       console.error(i18n.t('mediaStore.log.mediaListNull'))
+      depthRefreshAbort = 'failed'
       return null
     }
     if (!mediaResult.files) {
@@ -614,16 +626,22 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
         i18n.t('mediaStore.log.filesEmpty'),
         JSON.stringify({ total: mediaResult.total, hasMore: mediaResult.hasMore })
       )
+      depthRefreshAbort = 'failed'
       return null
     }
     const categoryResult = await window.electronAPI.category.list()
-    if (myRefresh !== depthRefreshSeq) return null
+    if (myRefresh !== depthRefreshSeq) {
+      depthRefreshAbort = 'superseded' // DEBT-053：弃权是成功语义，见 getMediaRefreshAbortKind
+      return null
+    }
     if (!categoryResult) {
       console.error(i18n.t('mediaStore.log.categoryListNull'))
+      depthRefreshAbort = 'failed'
       return null
     }
     if (!categoryResult.categories) {
       console.error(i18n.t('mediaStore.log.categoriesEmpty'))
+      depthRefreshAbort = 'failed'
       return null
     }
 
@@ -640,7 +658,10 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
         cursor,
         Math.min(targetDepth - files.length, MEDIA_PAGE_SIZE)
       )
-      if (myRefresh !== depthRefreshSeq) return null
+      if (myRefresh !== depthRefreshSeq) {
+        depthRefreshAbort = 'superseded' // DEBT-053：弃权是成功语义，见 getMediaRefreshAbortKind
+        return null
+      }
       if (!next) break
       files = [...files, ...dedupeAgainst(files, next.files)]
       cursor = next.nextCursor
@@ -681,6 +702,7 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
       error instanceof Error ? error.message : String(error),
       error
     )
+    depthRefreshAbort = 'failed'
     return null
   } finally {
     // 只有本轮仍是最新的一轮才放屏障：被后来者顶掉时屏障归新一轮持有（它在同一处领过），

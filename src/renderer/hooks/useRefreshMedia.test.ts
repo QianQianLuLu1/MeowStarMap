@@ -115,14 +115,10 @@ describe('useRefreshMedia', () => {
     it('被后续整刷取代时不弹加载失败 toast（弃权返回 null ≠ 取数失败）', async () => {
       // 缺陷：fetchMediaFromDatabase 让「最新一轮胜出」，被顶掉的那轮弃权返回 null——UI 由那一轮
       // 交付，这是成功语义；本钩子却把它与「真的取数失败」混为一谈，重试耗尽后弹一条用户无从处置的
-      // 红色 toast。判据：自己那轮只占 +1，返回后代次前进更多 ⇒ 是别人起了新一轮。
-      let fakeGen = 0
-      vi.spyOn(mediaStoreModule, 'getMediaRefreshGeneration').mockImplementation(() => fakeGen)
-      loadMediaSpy.mockImplementation(async () => {
-        fakeGen += 1 // 自己这一轮在函数入口领走的代次
-        fakeGen += 1 // 取数在途时另一个调用点又起了新一轮
-        return null
-      })
+      // 红色 toast。判据：契约访问器判 superseded ⇒ 不重试、不弹错（DEBT-053 收口后语义由
+      // getMediaRefreshAbortKind 承担；mock 自代次启发式迁移到访问器，断言集不变）。
+      vi.spyOn(mediaStoreModule, 'getMediaRefreshAbortKind').mockReturnValue('superseded')
+      loadMediaSpy.mockResolvedValue(null)
       const onError = vi.fn()
       const { result } = renderHook(() => useRefreshMedia({ onError }))
       await act(async () => {
@@ -144,21 +140,12 @@ describe('useRefreshMedia', () => {
 
   describe('重试日志措辞按「被取代 / 真失败」分叉', () => {
     it('被取代的 null 打「已被新一轮整刷取代」，不再自称加载失败', async () => {
-      // 缺陷：:43 的 while 只看 !result、不看 superseded ⇒ 被更新一轮取代时（取数弃权返回 null，
-      // 这本身是**成功**语义）仍会打「加载失败，500ms 后重试」，把开发者往查错了的方向引。
-      // 判据复用同一次取数已经算好的 superseded，只分叉文本，不动重试逻辑本身。
-      let fakeGen = 0
-      vi.spyOn(mediaStoreModule, 'getMediaRefreshGeneration').mockImplementation(() => fakeGen)
-      let calls = 0
-      loadMediaSpy.mockImplementation(async () => {
-        calls++
-        if (calls === 1) {
-          fakeGen += 1 // 自己这一轮在函数入口领走的代次
-          fakeGen += 1 // 取数在途时另一个调用点又起了新一轮 ⇒ 本轮弃权返回 null
-          return null
-        }
-        return { files: [], categories: [] }
-      })
+      // 缺陷：被更新一轮取代时（取数弃权返回 null，这本身是**成功**语义）不能自称「加载失败」，
+      // 把开发者往查错了的方向引。判据：契约访问器判 superseded ⇒ 打一条「已被新一轮整刷取代、
+      // 不再重试」的 warn，且不进重试循环（DEBT-053 收口；mock 自代次启发式迁移到访问器，
+      // 断言集不变）。
+      vi.spyOn(mediaStoreModule, 'getMediaRefreshAbortKind').mockReturnValue('superseded')
+      loadMediaSpy.mockResolvedValue(null)
       const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const onError = vi.fn()
       const { result } = renderHook(() => useRefreshMedia({ onError }))
@@ -186,6 +173,36 @@ describe('useRefreshMedia', () => {
       expect(String(warnMock.mock.calls[0]?.[0] ?? '')).toBe(
         '[useRefreshMedia] 加载失败，500ms 后重试 (1/3)'
       )
+    })
+  })
+
+  describe('被取代路径不再重试（DEBT-053 收口）', () => {
+    it('被取代时不再发出第二次取数（弃权是成功语义，重试只会白废三次深度取数）', async () => {
+      // 判据：契约访问器判 superseded ⇒ 不重试，fetchMediaFromDatabase 恰发一次。
+      // 修复前 hook 的 while 只看 !result，会照常重试 3 次（1+3=4 次取数）——本用例修复前红。
+      vi.spyOn(mediaStoreModule, 'getMediaRefreshAbortKind').mockReturnValue('superseded')
+      loadMediaSpy.mockResolvedValue(null)
+      const onError = vi.fn()
+      const { result } = renderHook(() => useRefreshMedia({ onError }))
+      await act(async () => {
+        await result.current()
+      })
+      expect(loadMediaSpy).toHaveBeenCalledTimes(1)
+      expect(onError).not.toHaveBeenCalled()
+    })
+
+    it('真失败仍重试到耗尽并弹 toast（对照，修复前亦绿：防把真失败改哑）', async () => {
+      // 刻意给契约访问器钉 'failed'：失败语义必须照旧走满 3 次重试（1+3=4 次取数）并弹 onError。
+      // 修复前它就是绿的 —— 作用是把「只收窄被取代路径」钉死，防止顺手把真失败的重试也砍掉。
+      vi.spyOn(mediaStoreModule, 'getMediaRefreshAbortKind').mockReturnValue('failed')
+      loadMediaSpy.mockResolvedValue(null)
+      const onError = vi.fn()
+      const { result } = renderHook(() => useRefreshMedia({ onError }))
+      await act(async () => {
+        await result.current()
+      })
+      expect(loadMediaSpy).toHaveBeenCalledTimes(4)
+      expect(onError).toHaveBeenCalledTimes(1)
     })
   })
 

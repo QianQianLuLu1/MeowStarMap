@@ -2,7 +2,7 @@ import { useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   fetchMediaFromDatabase,
-  getMediaRefreshGeneration,
+  getMediaRefreshAbortKind,
   useMediaStore
 } from '../stores/mediaStore'
 
@@ -25,33 +25,32 @@ export function useRefreshMedia(options?: {
   const refresh = useCallback(async () => {
     if (withLoading) setLoading(true)
     try {
-      // 每次自己发起之前记一代次：本地整刷在函数入口领走 ++depthRefreshSeq（恒 +1），返回后若
-      // 超过「发起前 + 1」，说明期间**别人**起了新一轮 ⇒ 我们这轮的 null 是「被取代」（UI 由那一轮
-      // 交付），不是加载失败，不该弹错误 toast。nikkisync 源不 bump 代次 ⇒ 恒判未被取代 ⇒ 真实
-      // 失败照常上报，与修复前行为一致。
+      // 弃权与取数失败在 fetchMediaFromDatabase 的返回值上同形（都是 null）——语义分离由
+      // mediaStore 的契约访问器承担（DEBT-053 收口）：弃权记 'superseded'、取数失败记 'failed'。
+      // 被取代的 null 是**成功**语义（UI 由最新一轮交付）——不重试、不弹错误 toast；
+      // nikkisync 源不参与代次 ⇒ 恒判非弃权 ⇒ 真实失败照常重试与上报，与修复前行为一致。
       let superseded = false
       const fetchOnce = async () => {
-        const genBeforeCall = getMediaRefreshGeneration()
         const result = await fetchMediaFromDatabase()
-        superseded = getMediaRefreshGeneration() > genBeforeCall + 1
+        superseded = getMediaRefreshAbortKind() === 'superseded'
         return result
       }
 
       let result = await fetchOnce()
       let attempt = 0
-      // 首次加载失败时自动重试：主进程 IPC/DB 可能存在初始化时序窗口
-      while (!result && attempt < MAX_RETRIES) {
+      // 首次加载失败时自动重试：主进程 IPC/DB 可能存在初始化时序窗口。
+      // 被取代路径不进本循环（DEBT-053）：重试会白废 3 次全量深度取数，且最新一轮已经在交付。
+      while (!result && !superseded && attempt < MAX_RETRIES) {
         attempt++
         const delay = RETRY_BASE_DELAY * attempt
-        // 措辞按 superseded 分叉：被新一轮整刷取代时这次 null 是**成功**语义（UI 由那一轮交付），
-        // 不是加载失败。重试逻辑本身不动（见 :43 的循环条件），只换开发者看到的这一行。
-        console.warn(
-          superseded
-            ? `[useRefreshMedia] 本轮已被新一轮整刷取代，${delay}ms 后再取一次 (${attempt}/${MAX_RETRIES})`
-            : `[useRefreshMedia] 加载失败，${delay}ms 后重试 (${attempt}/${MAX_RETRIES})`
-        )
+        console.warn(`[useRefreshMedia] 加载失败，${delay}ms 后重试 (${attempt}/${MAX_RETRIES})`)
         await new Promise<void>((resolve) => setTimeout(resolve, delay))
         result = await fetchOnce()
+      }
+      if (!result && superseded) {
+        // 契约访问器判定的成功语义：打一条开发者可读的说明，不进重试、不算失败。
+        // 沿用本文件既有 dev 日志形态（中文模板串，i18n 护栏盲区，DEBT-058 在案）。
+        console.warn(`[useRefreshMedia] 本轮已被新一轮整刷取代，UI 由最新一轮交付，不再重试`)
       }
       if (result) {
         setMediaFiles(result.files)

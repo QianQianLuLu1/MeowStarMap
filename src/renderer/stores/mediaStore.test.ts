@@ -3,6 +3,7 @@ import {
   useMediaStore,
   updateMediaFileAndPersist,
   fetchMediaFromDatabase,
+  getMediaRefreshAbortKind,
   refreshMediaAfterScan,
   loadMoreMedia,
   loadNextMediaPage,
@@ -761,6 +762,37 @@ describe('mediaStore', () => {
       expect(mockFn).toHaveBeenCalledWith(
         expect.objectContaining({ mediaSource: 'local_screenshot', galleryHighQualityOnly: false })
       )
+    })
+  })
+
+  describe('getMediaRefreshAbortKind（DEBT-053 契约钉：null 的两种语义在访问器层可分）', () => {
+    it('被新一轮整刷顶掉的弃权记 superseded', async () => {
+      const gated = setGatedPagedListMock(1000)
+      // 第一轮卡在首页 await 上（无 limit ⇒ 目标深度恰一页，不进深度循环）
+      const first = fetchMediaFromDatabase()
+      await flushMicrotasks()
+      // 第二轮起来并完整落地 ⇒ 第一轮被顶掉
+      const second = fetchMediaFromDatabase()
+      expect(gated.release(1)).toBe(true)
+      await flushMicrotasks()
+      await second
+      // 放行第一轮的首页 ⇒ 它在弃权判据处返回 null 且不写 store
+      expect(gated.release(0)).toBe(true)
+      expect(await first).toBeNull()
+      expect(getMediaRefreshAbortKind()).toBe('superseded')
+    })
+
+    it('取数失败记 failed；下一次调用先在入口复位，成功后不残留旧语义', async () => {
+      const list = vi.fn(async () => {
+        throw new Error('boom')
+      })
+      setMockApi({ media: { list } })
+      expect(await fetchMediaFromDatabase()).toBeNull()
+      expect(getMediaRefreshAbortKind()).toBe('failed')
+      // 成功路径 ⇒ 入口复位生效，语义保持 'none'（不残留上一次的 failed）
+      setPagedListMock(10)
+      expect(await fetchMediaFromDatabase()).not.toBeNull()
+      expect(getMediaRefreshAbortKind()).toBe('none')
     })
   })
 
