@@ -580,6 +580,37 @@ describe('exportLogsAsZip', () => {
       writeSpy.mockRestore()
     }
   })
+
+  it('F5. 异常：单个原生日志被占用 → 只丢那一份，.old 与 diag.log 照收', async () => {
+    // 本机实况：防护软件把刚落地/历史的日志与 asar 抓成 EBUSY 是常态，不是罕见分支
+    fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log'), 'FATAL gpu not usable\n')
+    fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log.old'), 'previous run tail\n')
+    fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] diag\n')
+    const target = path.join(tmpRoot, 'f5.zip')
+    const realCopy = fs.promises.copyFile.bind(fs.promises)
+    const copySpy = vi
+      .spyOn(fs.promises, 'copyFile')
+      .mockImplementation(async (src: unknown, dst: unknown, ...rest: unknown[]) => {
+        if (path.basename(String(src)) === 'chromium-debug.log') {
+          throw Object.assign(new Error('EBUSY: resource busy or locked'), { code: 'EBUSY' })
+        }
+        return (realCopy as never)(src as never, dst as never, ...(rest as never[]))
+      })
+    const writeSpy = vi.spyOn(fs.promises, 'writeFile')
+
+    try {
+      const r = await exportLogsAsZip(target)
+
+      expect(r.success).toBe(true)
+      const staged = stagedNames(copySpy, writeSpy)
+      // 被占用的那一份收不进来可以接受，但它后面的两份不得一起消失
+      expect(staged).toContain('chromium-debug.log.old')
+      expect(staged).toContain('diag.log')
+    } finally {
+      copySpy.mockRestore()
+      writeSpy.mockRestore()
+    }
+  })
 })
 
 // ============================================================

@@ -1,4 +1,4 @@
-// @core-change: 诊断包纳入 chromium-debug.log 与 GPU 回退状态，补齐原生 FATAL 取证
+// @core-change: 诊断包原生日志改逐文件容错，单个文件被占用不再吞掉其余取证
 import fs from 'fs'
 import path from 'path'
 import { app, shell } from 'electron'
@@ -206,15 +206,24 @@ export async function exportLogsAsZip(
     // 3.5 复制用户面诊断目录里的 Chromium 原生日志
     //     原生 FATAL（如 "GPU process isn't usable. Goodbye."）不经过 Node，
     //     startup-errors.log 里永远没有它；exit_code 只存在于 chromium-debug.log。
+    //     逐文件容错（本轮复查）：此前一个 try 罩住整个循环，chromium-debug.log 被占用
+    //     （防护软件抓刚落地的日志/asar 是常态）就会连后面的 diag.log 一起丢掉，
+    //     而导出仍报成功——缺的恰恰是这次要补的那份原生 FATAL 证据。
     try {
       const diagDir = getUserFacingDiagDir()
       for (const name of [CHROMIUM_LOG_BASENAME, `${CHROMIUM_LOG_BASENAME}.old`, 'diag.log']) {
-        const src = path.join(diagDir, name)
-        if (fs.existsSync(src)) {
-          await copyBounded(src, path.join(tmpDir, name), DIAG_LOG_TAIL_BYTES)
+        try {
+          const src = path.join(diagDir, name)
+          if (fs.existsSync(src)) {
+            await copyBounded(src, path.join(tmpDir, name), DIAG_LOG_TAIL_BYTES)
+          }
+        } catch (err) {
+          logger.warn(`diagnostic bundle: skipped ${name}`, err)
         }
       }
-    } catch {}
+    } catch (err) {
+      logger.warn('diagnostic bundle: diag directory unavailable', err)
+    }
 
     // 3.6 GPU 兼容阶梯状态：判断设备卡在哪一级、失败计数多少，只看这一个文件
     try {
