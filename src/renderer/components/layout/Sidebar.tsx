@@ -5,6 +5,8 @@ import { useShallow } from 'zustand/react/shallow'
 import { useUIStore, type ViewLevel } from '../../stores/uiStore'
 import { useMediaStore, fetchMediaFromDatabase, loadProfiles } from '../../stores/mediaStore'
 import { useFilteredMediaFiles } from '../../hooks/useFilteredMediaFiles'
+// R-1：图片/视频计数改取主进程按同一 WHERE 算出的真值，不再等于已加载分页数组的长度
+import { useGallerySummaryCounts } from '../../hooks/useGallerySummaryCounts'
 // 流体滑块 Tab 指示器：导航切换的双边缘补间（前沿快 / 后沿慢）
 import { useFluidTabIndicator } from '../../hooks/useFluidTabIndicator'
 import { formatFileSize } from '../../utils/format'
@@ -76,6 +78,7 @@ export const Sidebar: React.FC = () => {
     categories,
     currentProfileUid,
     profiles,
+    hasMoreMedia,
     setMediaFiles,
     setCurrentProfileUid
   } = useMediaStore(
@@ -84,6 +87,7 @@ export const Sidebar: React.FC = () => {
       categories: s.categories,
       currentProfileUid: s.currentProfileUid,
       profiles: s.profiles,
+      hasMoreMedia: s.hasMoreMedia,
       setMediaFiles: s.setMediaFiles,
       setCurrentProfileUid: s.setCurrentProfileUid
     }))
@@ -133,6 +137,7 @@ export const Sidebar: React.FC = () => {
   // U-G12：viewStack 深度 > 1 时显示返回按钮（用户已进入子层级）
   const canGoBack = viewStack.length > 1
 
+  // 「已加载」口径：仅供下方「已加载 vs 过滤后」诊断提示与存储占用使用，不是对用户展示的数量
   const { imageCount, videoCount, totalSize } = useMemo(() => {
     let images = 0
     let videos = 0
@@ -144,6 +149,8 @@ export const Sidebar: React.FC = () => {
     }
     return { imageCount: images, videoCount: videos, totalSize: size }
   }, [mediaFiles])
+  // 对用户展示的图片/视频数量（R-1）：未拉齐时取主进程真值
+  const summaryCounts = useGallerySummaryCounts(mediaFiles)
 
   // 诊断：过滤后显示数量（用于显示"已加载 vs 已过滤"差异）
   const filteredFiles = useFilteredMediaFiles()
@@ -159,7 +166,9 @@ export const Sidebar: React.FC = () => {
 
   const loadedTotal = imageCount + videoCount
   const filteredTotal = filteredImageCount + filteredVideoCount
-  const showFilteredHint = filteredTotal < loadedTotal
+  // 列表未拉齐时展示的是主进程真值（库中总量），与「已加载 vs 过滤后」不是同一口径，
+  // 并排显示会把「900 / 3」读成「900 个里过滤后剩 3」——那种比对只在数组即真值时有意义。
+  const showFilteredHint = !hasMoreMedia && filteredTotal < loadedTotal
 
   // P0-02：当前档案显示名
   // P2-01：'全部档案' 改为 i18n key；默认档案（uid='default'）昵称留空，回退 t('profile.defaultProfile')
@@ -368,7 +377,7 @@ export const Sidebar: React.FC = () => {
                   : undefined
               }
             >
-              {imageCount}
+              {summaryCounts.images}
               {showFilteredHint && (
                 <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85em' }}>
                   {' '}
@@ -388,7 +397,7 @@ export const Sidebar: React.FC = () => {
                   : undefined
               }
             >
-              {videoCount}
+              {summaryCounts.videos}
               {showFilteredHint && (
                 <span style={{ color: 'var(--text-tertiary)', fontSize: '0.85em' }}>
                   {' '}

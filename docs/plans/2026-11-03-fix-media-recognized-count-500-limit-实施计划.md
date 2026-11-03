@@ -221,8 +221,10 @@ typeCounts?: { image: number; video: number }
 3. 新增 `src/renderer/hooks/useGallerySummaryCounts.ts`，规则（可判定）：
    **`hasMoreMedia === true` 且服务端计数非 null ⇒ 用服务端三元组；否则 ⇒ 遍历传入数组。**
    理由：`hasMoreMedia === true` 是「客户端数组确定不完整」的唯一可靠信号；一旦拉齐（false），数组即真值，且此时客户端筛选（收藏/场景/日期/评分/搜索/分组）已被 `isFilteringActive` 触发自动拉齐，长度可信。
-4. 三处消费方改为调用该 hook：`AppShell.tsx:64-85`（`stats` useMemo 保留 `size`/`favorites` 两项——服务端没给，仍从数组算；只把 `images`/`videos`/`total` 换成 hook 值）、`Sidebar.tsx:136-162`（`imageCount`/`videoCount` 走 hook；`filteredImageCount` 等「已加载 vs 过滤后」诊断提示保持数组口径，否则提示语义就变了）、`GalleryPage.tsx:783`（`total={filteredFiles.length}` → hook）。
-   注意：`size`/`favorites` 走数组意味着超大库仍有遍历开销，但那是既存行为，本节点不改（避免顺手重构）。
+4. 三处消费方改为调用该 hook：`AppShell.tsx:64-85`（`stats` useMemo 保留 `size`/`favorites` 两项——服务端没给，仍从数组算；只把 `images`/`videos`/`total` 换成 hook 值）、`Sidebar.tsx:136-162`（`imageCount`/`videoCount` 走 hook；`filteredImageCount` 等「已加载 vs 过滤后」诊断提示保持数组口径，否则提示语义就变了）、~~`GalleryPage.tsx:783`（`total={filteredFiles.length}` → hook）~~。
+   - **执行时的偏离（Node 2）**：`GalleryPage.tsx:783` 经复核**不改**。它不是「识别数量」展示位，而是 `BatchActions` 的分母——「已选 N / 共 M」中的 M，且 `handleSelectAll` 只能选中 `filteredFiles` 里的条目。把 M 换成库中真值会显示「共 1200」却只全选 500 条，属于功能错乱而非计数修复。本节点的消费者因此是 **AppShell + Sidebar 两处**。
+   - 另为 Sidebar 补一条判据：`showFilteredHint` 增加 `!hasMoreMedia` 前置。列表未拉齐时展示的是库中真值，此时并在旁边的「/ 过滤后条数」是数组口径，两者不同源会被读成「900 个里过滤后剩 3」；只在数组即真值时才显示该诊断提示。
+   - 注意：`size`/`favorites` 走数组意味着超大库仍有遍历开销，但那是既存行为，本节点不改（避免顺手重构）。
 
 **红灯测试**：`src/renderer/components/layout/Sidebar.test.tsx`（该套件已存在，直接加用例，不新建文件）：把 store 置为「`mediaFiles` 500 条 + `hasMoreMedia: true` + `mediaTotalCount: 1200` + `mediaImageCount: 900` + `mediaVideoCount: 300`」，渲染后断言图片计数文本为 `900`、视频为 `300`。
 **为何修前必红**：修前 store 无这三个字段、组件遍历 500 条数组 ⇒ 渲染 500 口径的数字。

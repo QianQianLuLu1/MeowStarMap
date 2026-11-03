@@ -6,6 +6,8 @@ import { TitleBar } from './TitleBar'
 // 液态玻璃：折射滤镜 defs（全局单例）+ 滚动进度/亮度档位信号
 import { LiquidGlassDefs } from './LiquidGlassDefs'
 import { useGlassScrollSignal } from '../../hooks/useGlassScrollSignal'
+// R-1：状态栏的图片/视频/总数改取主进程真值，不再等于已加载分页数组的长度
+import { useGallerySummaryCounts } from '../../hooks/useGallerySummaryCounts'
 import { useUIStore, selectFocusedMediaId, type ViewLevel } from '../../stores/uiStore'
 import { useMediaStore } from '../../stores/mediaStore'
 import { formatSize } from '../../utils/format'
@@ -60,18 +62,18 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
   // 液态玻璃全局信号：滚动进度（--glass-scroll-progress）+ 亮度档位（data-glass-tone）
   useGlassScrollSignal()
 
+  // R-1：图片/视频/总数改取主进程按同一 WHERE 算出的真值（列表未拉齐时数组长度只是分页切片）；
+  // size 与 favorites 服务端未提供等价口径，仍按已加载数组算（既存行为，本轮不改）。
+  const summaryCounts = useGallerySummaryCounts(mediaFiles)
+
   const stats = useMemo(() => {
-    let images = 0
-    let videos = 0
     let size = 0
     let favorites = 0
     for (const f of mediaFiles) {
-      if (f.file_type === 'image') images++
-      else if (f.file_type === 'video') videos++
       size += f.file_size
       if (f.is_favorite) favorites++
     }
-    return { images, videos, size, favorites }
+    return { size, favorites }
   }, [mediaFiles])
 
   // 根据视图生成左右两侧状态文案（i18n 改造：模板字符串改为 t() 插值）
@@ -82,9 +84,9 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     switch (currentView) {
       case 'gallery':
         leftText = t('appShell.gallerySummary', {
-          total: mediaFiles.length,
-          images: stats.images,
-          videos: stats.videos
+          total: summaryCounts.total,
+          images: summaryCounts.images,
+          videos: summaryCounts.videos
         })
         rightText =
           selectedMediaIds.length > 0
@@ -106,8 +108,8 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
       case 'categories':
         leftText = t('appShell.categoriesSummary', { count: categories.length })
         rightText = t('appShell.imagesVideosSummary', {
-          images: stats.images,
-          videos: stats.videos
+          images: summaryCounts.images,
+          videos: summaryCounts.videos
         })
         break
       case 'settings':
@@ -137,6 +139,7 @@ export const AppShell: React.FC<{ children: React.ReactNode }> = ({ children }) 
     selectedMediaIds.length,
     selectedMediaId,
     stats,
+    summaryCounts,
     t
   ])
 

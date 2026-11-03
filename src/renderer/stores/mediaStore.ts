@@ -112,6 +112,12 @@ interface MediaState {
   hasMoreMedia: boolean
   // 追加加载中标志位，防止滚动到底时重复触发
   loadingMore: boolean
+  // R-1 计数真相源：来自 media:list 首页的 total / typeCounts，与列表命中同一 WHERE。
+  // null = 服务端未给出（续页响应、空库、或 nikkisync 数据源无等价能力），消费方据此回落数组长度。
+  // 此前「图片 / 视频」数量取自 mediaFiles.length 的分页切片，首屏恒等于 MEDIA_PAGE_SIZE ⇒ 表现为「识别数量被限制为最多 500」。
+  mediaTotalCount: number | null
+  mediaImageCount: number | null
+  mediaVideoCount: number | null
   // 扫描进度
   scanProgress: {
     scanning: boolean
@@ -166,6 +172,9 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
   nikkiRevision: null,
   hasMoreMedia: false,
   loadingMore: false,
+  mediaTotalCount: null,
+  mediaImageCount: null,
+  mediaVideoCount: null,
   scanProgress: {
     scanning: false,
     scanned: 0,
@@ -196,7 +205,11 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
       nikkiCursor: null,
       nikkiRevision: null,
       hasMoreMedia: false,
-      loadingMore: false
+      loadingMore: false,
+      // 计数字段随列表一并作废：留着会把上一个数据源/上一次 WHERE 的真值挂在新列表上
+      mediaTotalCount: null,
+      mediaImageCount: null,
+      mediaVideoCount: null
     }),
 
   addMediaFiles: (files) =>
@@ -427,7 +440,11 @@ export async function fetchMediaFromRuntime(options?: {
     // 首屏即复位两套游标：与本地分支的 mediaCursor 复位语义保持对称
     mediaCursor: null,
     hasMoreMedia: page.hasMore,
-    loadingMore: false
+    loadingMore: false,
+    // 上游协议没有「分类型真计数」这一面，刻意置 null 让消费方回落数组长度，不伪造服务端值
+    mediaTotalCount: null,
+    mediaImageCount: null,
+    mediaVideoCount: null
   })
   return {
     files: page.files,
@@ -458,6 +475,15 @@ async function loadNextAssetPage(): Promise<void> {
 }
 
 /**
+ * 服务端计数归一：只有有限数才算「服务端给了真值」。
+ * 刻意不用 `?? ` / `||` 简写——合法的 0（空库、纯视频库的图片数）不能被当成缺失丢弃，
+ * 否则空库会被消费方误判为「未就绪」而回落到数组长度。
+ */
+function toServerCount(value: number | undefined | null): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+/**
  * 从数据库查询媒体文件与分类列表（纯查询，不写 store）。
  *
  * 本函数只负责取数：函数体内没有任何 set(...) 调用，返回 { files, categories, total, hasMore } 或 null。
@@ -472,6 +498,7 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
   files: MediaFile[]
   categories: Category[]
   total?: number
+  typeCounts?: { image: number; video: number }
   hasMore?: boolean
 } | null> {
   // 阶段 4：数据源分流刻意放在**本函数内部** —— useRefreshMedia / Sidebar / GalleryPage
@@ -556,13 +583,18 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     useMediaStore.setState({
       mediaCursor: mediaResult.nextCursor ?? null,
       hasMoreMedia: mediaResult.hasMore ?? false,
-      loadingMore: false
+      loadingMore: false,
+      // R-1 计数字段：total 与 typeCounts 由主进程按与本次列表同一 WHERE 算出
+      mediaTotalCount: toServerCount(mediaResult.total),
+      mediaImageCount: toServerCount(mediaResult.typeCounts?.image),
+      mediaVideoCount: toServerCount(mediaResult.typeCounts?.video)
     })
 
     return {
       files: mediaResult.files as MediaFile[],
       categories: categoryResult.categories as Category[],
       total: mediaResult.total,
+      typeCounts: mediaResult.typeCounts,
       hasMore: mediaResult.hasMore
     }
   } catch (error) {

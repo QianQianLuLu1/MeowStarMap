@@ -23,10 +23,15 @@ const { uiState, mediaState } = vi.hoisted(() => {
       setGroupDimension: noop
     },
     mediaState: {
-      mediaFiles: [],
+      mediaFiles: [] as unknown[],
       categories: [],
       currentProfileUid: 'default',
       profiles: [],
+      hasMoreMedia: false,
+      // R-1：服务端真值计数（null = 未给出，组件回落数组长度）
+      mediaTotalCount: null as number | null,
+      mediaImageCount: null as number | null,
+      mediaVideoCount: null as number | null,
       setMediaFiles: noop,
       setCurrentProfileUid: noop
     }
@@ -104,5 +109,75 @@ describe('Sidebar 液态玻璃接入', () => {
     fireEvent.click(screen.getByTitle('切换角色档案'))
     const menu = screen.getByRole('menu')
     expect(menu.hasAttribute('data-glass-scroll-ignore')).toBe(true)
+  })
+})
+
+describe('Sidebar 图片/视频计数取库中真值（R-1 回归）', () => {
+  // 回归（计划：docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md R-1）：
+  // 这两个数字原先遍历「已加载分页数组」得出，首屏只有一页 ⇒ 恒等于 MEDIA_PAGE_SIZE（500），
+  // 用户看到的是「识别数量被限制为最多 500」。真值口径来自主进程 typeCounts。
+  const snapshot = { ...mediaState }
+
+  afterEach(() => {
+    Object.assign(mediaState, snapshot)
+    mediaState.mediaFiles = []
+    mediaState.hasMoreMedia = false
+    mediaState.mediaTotalCount = null
+    mediaState.mediaImageCount = null
+    mediaState.mediaVideoCount = null
+  })
+
+  const makeFile = (id: number, fileType: 'image' | 'video') => ({
+    id: String(id),
+    file_type: fileType,
+    file_name: `f${id}.bin`,
+    file_size: 1024,
+    tags: [] as string[],
+    is_favorite: false,
+    is_missing: false,
+    is_corrupted: false,
+    is_duplicate: false,
+    is_deleted: false
+  })
+
+  /** 读「图片 / 视频」那一行右侧计数值的首个文本节点（其后再跟的是「过滤后」诊断提示） */
+  const statValue = (label: string): string => {
+    const row = screen.getByText(label).parentElement
+    const spans = Array.from(row?.querySelectorAll(':scope > span') ?? [])
+    return String(spans[spans.length - 1]?.firstChild?.textContent ?? '').trim()
+  }
+
+  it('列表未拉齐（hasMoreMedia=true）时用服务端分类型计数，而非已加载数组长度', () => {
+    mediaState.mediaFiles = [makeFile(1, 'image'), makeFile(2, 'image'), makeFile(3, 'image')]
+    mediaState.hasMoreMedia = true
+    mediaState.mediaTotalCount = 1200
+    mediaState.mediaImageCount = 900
+    mediaState.mediaVideoCount = 300
+    render(<Sidebar />)
+    expect(statValue('图片')).toBe('900')
+    expect(statValue('视频')).toBe('300')
+  })
+
+  it('列表已拉齐（hasMoreMedia=false）时用数组长度——服务端计数不是无脑优先', () => {
+    mediaState.mediaFiles = [makeFile(1, 'image'), makeFile(2, 'image'), makeFile(3, 'video')]
+    mediaState.hasMoreMedia = false
+    // 刻意留下与服务端口径不同的陈旧值：若组件无脑取服务端计数，本用例即红
+    mediaState.mediaTotalCount = 1200
+    mediaState.mediaImageCount = 900
+    mediaState.mediaVideoCount = 300
+    render(<Sidebar />)
+    expect(statValue('图片')).toBe('2')
+    expect(statValue('视频')).toBe('1')
+  })
+
+  it('服务端计数缺失（null，如 nikkisync 数据源）时回落数组长度，不渲染 NaN', () => {
+    mediaState.mediaFiles = [makeFile(1, 'image'), makeFile(2, 'video')]
+    mediaState.hasMoreMedia = true
+    mediaState.mediaTotalCount = null
+    mediaState.mediaImageCount = null
+    mediaState.mediaVideoCount = null
+    render(<Sidebar />)
+    expect(statValue('图片')).toBe('1')
+    expect(statValue('视频')).toBe('1')
   })
 })
