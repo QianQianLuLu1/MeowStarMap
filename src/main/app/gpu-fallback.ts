@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
+import { writeFileAtomicSync } from '../utils/atomic-file'
 import { diagLog } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
@@ -209,7 +210,10 @@ function readState(): GpuFallbackState {
 
 function writeState(state: GpuFallbackState): void {
   try {
-    fs.writeFileSync(getStatePath(), JSON.stringify(state))
+    // 原子写：这个文件是与原生 FATAL 抢时间落盘的档位指令，裸写会在「截断之后、写完之前」
+    // 被打断，留下半截 JSON；readState 把解析失败当默认态 ⇒ compatLevel 静默清零 ⇒
+    // 被困设备又回到 0 级启动，正是阶梯要防的崩溃循环。
+    writeFileAtomicSync(getStatePath(), JSON.stringify(state))
   } catch {
     // userData 不可写等极端场景：静默降级，不影响启动决策
   }
@@ -268,7 +272,9 @@ function mergeWriteGpuBootPrefs(patch: {
 }): void {
   try {
     const current = readGpuBootPrefs()
-    fs.writeFileSync(getHardwareAccelPrefPath(), JSON.stringify({ ...current, ...patch }))
+    // 同 writeState：半截的 gpu-pref.json 会被读成「未设置」，把用户明确关掉的硬件加速
+    // 静默打开回来，与本轮修掉的「开关被残留计数架空」是同一类失效方向。
+    writeFileAtomicSync(getHardwareAccelPrefPath(), JSON.stringify({ ...current, ...patch }))
   } catch {
     // 静默降级，不影响主流程
   }

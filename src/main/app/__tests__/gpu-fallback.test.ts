@@ -180,6 +180,35 @@ describe('gpu-fallback 状态机', () => {
     expect(() => markGpuProcessCrash('crashed', 1)).not.toThrow()
   })
 
+  it('S1. 状态写盘必须是原子的：落盘中途被打断时旧状态保持完整', () => {
+    // 缺陷形状：裸 writeFileSync 先截断后写，进程若在两步之间被 FATAL 打死就留下半截
+    // JSON；readState 的 catch 把它当默认态 ⇒ compatLevel 被静默清零 ⇒ 被困设备又回到
+    // 0 级启动，正是三级阶梯要防的那个崩溃循环。最可能被掐断的恰是 markGpuProcessCrash
+    // ——它存在的意义就是抢在原生自杀之前把档位落盘。
+    writeRaw({
+      consecutiveFailures: 0,
+      fallbackActive: true,
+      fallbackVersion: '2.5.5',
+      compatLevel: 2
+    })
+    const realWrite = fs.writeFileSync.bind(fs)
+    const spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(((
+      target: Parameters<typeof fs.writeFileSync>[0],
+      data: unknown
+    ) => {
+      realWrite(target, String(data).slice(0, 8)) // 只落前缀，模拟写到一半就死
+      throw new Error('simulated kill before write completed')
+    }) as unknown as typeof fs.writeFileSync)
+
+    try {
+      expect(() => markGpuProcessCrash('crashed', 1)).not.toThrow()
+      expect(readGpuFallbackState().compatLevel).toBe(2) // 旧档位指令不得被半截文件抹掉
+      expect(fs.readdirSync(tmpDir).filter((n) => n.includes('.tmp-'))).toHaveLength(0)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
   it('7. fallbackActive=true（同版本戳）且 failures=0 → 仅凭激活标记即返回 true', () => {
     writeRaw({ consecutiveFailures: 0, fallbackActive: true, fallbackVersion: '2.5.5' })
     expect(shouldDisableHardwareAcceleration()).toBe(true)

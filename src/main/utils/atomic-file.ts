@@ -7,6 +7,7 @@
 //
 // 零依赖设计（仅 Node 内置模块）：thumbnail worker 与 media-worker 均可安全引入。
 import fsp from 'fs/promises'
+import fs from 'fs'
 import path from 'path'
 
 /** 生成与最终路径同目录的临时文件名：`.basename.tmp-<pid>-<随机>`（点前缀避免被当作缩略图产物扫描） */
@@ -43,5 +44,48 @@ export async function writeFileAtomic(
   } catch (err) {
     await removeTempFileQuietly(tmpPath)
     throw err
+  }
+}
+
+/** 同步清临时文件（best-effort，与 removeTempFileQuietly 同口径） */
+function removeTempFileSyncly(tmpPath: string): void {
+  try {
+    fs.unlinkSync(tmpPath)
+  } catch {
+    // 不存在/被占用都无所谓：文件名带 pid 与随机后缀，不会与后续写入相撞
+  }
+}
+
+/**
+ * **同步**原子落盘：给「必须在进程被打死之前落完」的状态文件用
+ * （`gpu-fallback.json` 的档位指令、`gpu-pref.json` 的硬件加速偏好、`last-exit.json` 的退出取证）。
+ *
+ * 为什么不能复用上面的异步版：这些写盘是与 Chromium 原生 FATAL 抢时间的同步抢救，
+ * `await` 一次就可能落在被杀之后；而调用点整条启动/退出链都是同步的
+ * （`src/main/app/AGENTS.md`「状态文件持久化：全部同步写入、全部容错」）。
+ *
+ * 失败语义分两档，**不得混为一谈**：
+ *  - 内容写入本身失败 ⇒ 清临时文件并上抛。最终路径从未被动过，调用方按既有容错静默即可。
+ *    这里**不回落直接写**——那等于把「半截内容覆盖最终文件」这个被防的缺陷又请回来。
+ *  - rename 失败（本机实况：防护软件对新落地文件抓句柄 ⇒ EPERM/EBUSY）⇒ 回落直接写。
+ *    此时数据不丢优先于原子性（旧状态本来就会被覆盖），随后仍清掉临时文件。
+ */
+export function writeFileAtomicSync(finalPath: string, text: string): void {
+  const tmpPath = tempSiblingPath(finalPath)
+  try {
+    fs.writeFileSync(tmpPath, text, 'utf-8')
+  } catch (err) {
+    removeTempFileSyncly(tmpPath)
+    throw err
+  }
+  try {
+    fs.renameSync(tmpPath, finalPath)
+  } catch {
+    try {
+      fs.writeFileSync(finalPath, text, 'utf-8')
+    } catch {
+      // 连直接写都写不动：交由调用方的容错决定降级方式，本工具不额外抛
+    }
+    removeTempFileSyncly(tmpPath)
   }
 }

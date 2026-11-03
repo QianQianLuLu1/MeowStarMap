@@ -2,6 +2,7 @@ import { app } from 'electron'
 import fs from 'node:fs'
 import path from 'node:path'
 import { randomUUID } from 'node:crypto'
+import { writeFileAtomicSync } from '../utils/atomic-file'
 import { diagLog } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
 
@@ -254,7 +255,10 @@ function flushLastExitRecord(code: number): void {
       journal: [...journal],
       uptime: process.uptime()
     }
-    fs.writeFileSync(getLastExitPath(), JSON.stringify(rec))
+    // 原子写：半截的 last-exit.json 会读成 null，而「心跳还在 + last-exit 缺席」正是
+    // classifyPreviousExit 判 native 的形状 ⇒ 给一台没被原生杀死的机器白升一级兼容档。
+    // 也就是说 DEBT-047 那个「强杀/断电同形误判」除了环境成因，还能由一次半截写入自己制造。
+    writeFileAtomicSync(getLastExitPath(), JSON.stringify(rec))
   } catch {
     // 静默：取证写盘失败不改变退出行为
   }
