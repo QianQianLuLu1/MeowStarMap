@@ -1347,6 +1347,14 @@ export class DatabaseManager {
       'CREATE INDEX IF NOT EXISTS idx_media_files_profile_stats ON media_files(account_uid, is_deleted, file_type)',
       // 重复分组查询：is_duplicate=1 AND is_deleted=0 AND original_id IS NOT NULL
       'CREATE INDEX IF NOT EXISTS idx_media_files_duplicate_group ON media_files(is_duplicate, is_deleted, original_id)',
+      // 图库首屏分类型真计数（DEBT-055 复测，2026-11-04）：图库默认 WHERE 同时含 is_deleted=0
+      // 与 is_duplicate=0（hideDuplicates），本索引让规划器拿到选择性 seek 且按 file_type 有序扫描
+      // ⇒ GROUP BY 免建 temp b-tree。实测（node:sqlite 克隆件 30 轮轮转采样）：
+      // 10k 行边际(S3-S2) 0.45→0.06 ms、50k 行 2.22→0.56 ms。任务书原定的两列形态
+      // (is_deleted, file_type) 实测不达标（10k 0.36 / 50k 3.27 反而更贵）——规划器会弃
+      // duplicate_group 的选择性 seek 换宽扫描，键序必须把 is_duplicate 放中间。
+      // 读数与判据：docs/plans/2026-11-04-debt-053-059-clearing-实施计划.md §10
+      'CREATE INDEX IF NOT EXISTS idx_media_files_deleted_dup_type ON media_files(is_deleted, is_duplicate, file_type)',
       // 套装聚合统计：is_deleted=0 AND outfit IS NOT NULL AND outfit != ''
       'CREATE INDEX IF NOT EXISTS idx_media_files_outfit_agg ON media_files(is_deleted, outfit)',
       // 场景时段分析：scene_time=? AND file_type=? AND is_deleted=0
