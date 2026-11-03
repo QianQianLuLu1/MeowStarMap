@@ -43,7 +43,13 @@ export function useRefreshMedia(options?: {
       while (!result && attempt < MAX_RETRIES) {
         attempt++
         const delay = RETRY_BASE_DELAY * attempt
-        console.warn(`[useRefreshMedia] 加载失败，${delay}ms 后重试 (${attempt}/${MAX_RETRIES})`)
+        // 措辞按 superseded 分叉：被新一轮整刷取代时这次 null 是**成功**语义（UI 由那一轮交付），
+        // 不是加载失败。重试逻辑本身不动（见 :43 的循环条件），只换开发者看到的这一行。
+        console.warn(
+          superseded
+            ? `[useRefreshMedia] 本轮已被新一轮整刷取代，${delay}ms 后再取一次 (${attempt}/${MAX_RETRIES})`
+            : `[useRefreshMedia] 加载失败，${delay}ms 后重试 (${attempt}/${MAX_RETRIES})`
+        )
         await new Promise<void>((resolve) => setTimeout(resolve, delay))
         result = await fetchOnce()
       }

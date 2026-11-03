@@ -142,6 +142,53 @@ describe('useRefreshMedia', () => {
     })
   })
 
+  describe('重试日志措辞按「被取代 / 真失败」分叉', () => {
+    it('被取代的 null 打「已被新一轮整刷取代」，不再自称加载失败', async () => {
+      // 缺陷：:43 的 while 只看 !result、不看 superseded ⇒ 被更新一轮取代时（取数弃权返回 null，
+      // 这本身是**成功**语义）仍会打「加载失败，500ms 后重试」，把开发者往查错了的方向引。
+      // 判据复用同一次取数已经算好的 superseded，只分叉文本，不动重试逻辑本身。
+      let fakeGen = 0
+      vi.spyOn(mediaStoreModule, 'getMediaRefreshGeneration').mockImplementation(() => fakeGen)
+      let calls = 0
+      loadMediaSpy.mockImplementation(async () => {
+        calls++
+        if (calls === 1) {
+          fakeGen += 1 // 自己这一轮在函数入口领走的代次
+          fakeGen += 1 // 取数在途时另一个调用点又起了新一轮 ⇒ 本轮弃权返回 null
+          return null
+        }
+        return { files: [], categories: [] }
+      })
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const onError = vi.fn()
+      const { result } = renderHook(() => useRefreshMedia({ onError }))
+      await act(async () => {
+        await result.current()
+      })
+      expect(warnMock).toHaveBeenCalledTimes(1)
+      const line = String(warnMock.mock.calls[0]?.[0] ?? '')
+      expect(line).toContain('已被新一轮整刷取代')
+      expect(line).not.toContain('加载失败')
+      expect(onError).not.toHaveBeenCalled()
+    })
+
+    it('真实取数失败的 null 仍逐字打「加载失败…重试」（对照，修复前亦绿）', async () => {
+      // 这条刻意不 spy 代次：取数被 mock 掉时真实 depthRefreshSeq 恒不动 ⇒ superseded 恒 false，
+      // 走的必须还是「加载失败」分支。修复前它就是绿的 —— 作用是把这个改动钉成「只有取代分支变了」，
+      // 防止把真失败的提示改成哑巴（那才是真正的回归）。
+      loadMediaSpy.mockResolvedValueOnce(null)
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const { result } = renderHook(() => useRefreshMedia())
+      await act(async () => {
+        await result.current()
+      })
+      expect(warnMock).toHaveBeenCalledTimes(1)
+      expect(String(warnMock.mock.calls[0]?.[0] ?? '')).toBe(
+        '[useRefreshMedia] 加载失败，500ms 后重试 (1/3)'
+      )
+    })
+  })
+
   describe('异常路径', () => {
     it('fetchMediaFromDatabase reject 时向上抛出且 finally 复位 loading', async () => {
       loadMediaSpy.mockRejectedValue(new Error('boom'))
