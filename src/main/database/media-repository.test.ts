@@ -2332,6 +2332,76 @@ describe('MediaRepository', () => {
 
     // R5：media_count 强一致改造（stale 标记 + TTL + markMediaCountStale）
     // ==========================================================================
+    describe('双新鲜度源口径分叉的证据钉（DEBT-059，对照用例修复前亦绿）', () => {
+      it('media_count 缓存的 WHERE 与列表实时计数 WHERE 不同构，差异项在案', async () => {
+        // 非缺陷复现：DEBT-059 的前置是「两处口径同构才谈得上把类型分布并入缓存」。本用例把
+        // 两条 WHERE 的形态差异钉成可判定证据（图库首屏的差异项：is_duplicate 过滤 +
+        // GALLERY_PATH_CONDITION 路径放行；account_uid / corruptedOnly 由参数分支另行覆盖），
+        // 供下一轮并表前逐项收口；修复前它就是绿的 —— 作用是防止任一侧口径被静默改动而无人知晓。
+        insertMedia(db, { file_path: '/t/1.jpg', is_deleted: 0 })
+        // 补建 import_roots 表（与相邻用例一致）：HQ 条件会查导入根，缺表则 logger 兜底
+        // 在 node 测试环境触发 initLogger → app.getPath 抛错
+        db.exec(`
+          CREATE TABLE import_roots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            root_path TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            disabled INTEGER NOT NULL DEFAULT 0
+          );
+        `)
+
+        const captured: string[] = []
+        const originalPrepare = db.prepare.bind(db)
+        vi.spyOn(db, 'prepare').mockImplementation((sql: string) => {
+          captured.push(sql)
+          return originalPrepare(sql)
+        })
+
+        // 列表侧：图库首屏口径（hideDuplicates + HQ 路径过滤）。走 offset 分支仅为让 mock 可执行，
+        // WHERE 由同一个 buildListWhereClause 构建，与 keyset 首屏完全一致。
+        repo.listMedia({
+          page: 0,
+          pageSize: 500,
+          hideDuplicates: true,
+          galleryHighQualityOnly: true
+        })
+        // 缓存侧：media_count 的重建口径
+        await repo.refreshMediaCountCache()
+
+        const listCountWhere = captured.find(
+          (s) => s.includes('SELECT COUNT(*)') && s.includes('is_duplicate = 0')
+        )
+        const listTypeWhere = captured.find((s) => s.includes('GROUP BY file_type'))
+        const cacheWhere = captured.find((s) => s.includes('is_deleted = 0 AND COALESCE'))
+        expect(listCountWhere).toBeDefined()
+        expect(listTypeWhere).toBeDefined()
+        expect(cacheWhere).toBeDefined()
+
+        const whereOf = (sql: string): string => {
+          const start = sql.indexOf('WHERE')
+          const groupIdx = sql.indexOf(' GROUP BY')
+          return sql.slice(start, groupIdx === -1 ? undefined : groupIdx)
+        }
+
+        // ① 缓存口径：恰两条件（is_deleted=0 + 排除 launcher），不含任何列表侧过滤
+        expect(cacheWhere).toContain(
+          "WHERE is_deleted = 0 AND COALESCE(media_source, 'game') != 'launcher'"
+        )
+        expect(cacheWhere).not.toContain('is_duplicate')
+        expect(cacheWhere).not.toContain("LOWER(REPLACE(file_path, '\\', '/')")
+
+        // ② 列表口径：COUNT 与 GROUP BY 共用同一 WHERE（口径与列表严格一致），且额外含差异项
+        expect(whereOf(listCountWhere!)).toBe(whereOf(listTypeWhere!))
+        expect(whereOf(listCountWhere!)).toContain('is_duplicate = 0')
+        expect(whereOf(listCountWhere!)).toContain(
+          "LOWER(REPLACE(file_path, '\\', '/')) LIKE '%/gameplayphotos/%'"
+        )
+
+        // ③ 分叉非空 ⇒ 「口径同构」前提今天不成立：把类型分布并进缓存等于把这份分叉写进缓存
+        expect(whereOf(listCountWhere!).length).toBeGreaterThan(whereOf(cacheWhere!).length)
+      })
+    })
+
     describe('R5 media_count 强一致', () => {
       it('setMediaCountCache 原子写入 count/dirty/updated_at 三个 key', async () => {
         await repo.setMediaCountCache(7)
