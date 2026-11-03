@@ -90,6 +90,37 @@
 - 输入/输出：`npm run dist:win` 四段链 → 新 `MeowStarMap-Setup-2.5.6.exe`。
 - 验收标准：EXIT=0；`latest.yml` version=2.5.6 且 size/sha512 双轴相对备份件均变化；打包态 `npm run e2e:smoke` 全绿（S4 断言过）；`release/win-unpacked/喵星图.exe` 在位。
 
-## §10 执行记录（回写位）
+## §10 执行记录（2026-11-04 回写）
 
-- 待执行后回写：六项验证读数、备份件与新包双轴、遇到的问题与处置。
+### 六项验证读数（全部 EXIT=0，全绿）
+
+| #   | 命令                                                      | 读数                                                                                                                | 与基线对比                                                                        |
+| --- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| 1   | `npm install` → `link:nikkisync` → `link:nikkisync:check` | lock 零扰动；install 清掉的 4 条 @nikkisync junction 已恢复，check OK "all four links in place"                     | 与近两轮行为一致                                                                  |
+| 2   | `npm run build`                                           | ✓ built in 5.20s；`dist/main/main/app/index.js`、`dist/main/main/preload.js`、`dist/renderer/index.html` 三端产物齐 | —                                                                                 |
+| 3   | `npm run test`                                            | **469 文件 / 7493 通过 / 20 跳过 / 0 失败**，56.8s                                                                  | 基线 463 文件 / 7276 通过 / 20 跳过 ⇒ +6 文件 +217 用例（清偿轮新增全数在列且过） |
+| 4   | `npm run typecheck`                                       | `tsc -b` + `tsc -p tsconfig.scripts.json` 双项目过                                                                  | —                                                                                 |
+| 5   | `npm run e2e:smoke`                                       | **19 passed**，40.0s（含 S4 打包版本断言、G1–G3 真机根用例、N 系列、S8 GPU 探针）                                   | 基线 16 passed ⇒ +3（新增照片目录用例）                                           |
+| 6   | `npm run test:ci-linux`                                   | **469 文件 / 7510 通过 / 3 跳过 / 0 失败**，43.8s                                                                   | 基线 7293 通过 / 3 跳过 ⇒ +217                                                    |
+
+### ⑥ 首轮红与处置（非缺陷，登记备查）
+
+首轮 test:ci-linux 在 `sync-server.linked.test.ts > 签名后的资产/详情/元数据/变更/搜索/统计端点全部可用` 报 `Error: read ECONNRESET`（1 failed / 7509 passed）。同一文件 3 分钟前在普通语义全量 `npm test` 里 9 用例全绿（33.8s）；ci-linux 语义**单独重跑 14/14 全过**（1.77s）⇒ 判定为整链并行高负载下真 TLS 服务端到端用例的 socket 时序噪声，非代码缺陷。**整链重跑全绿（7510 通过 / 3 跳过）**。测试未做任何弱化或跳过。
+
+### 重打包取证
+
+- 解锁判据：`rm -rf release/win-unpacked.tmp` 能动 ⇒ 杀软句柄已释放，**标准 `npm run dist:win` 一次跑通（EXIT=0）**，EPERM/EBUSY 未复现（与清偿轮预判一致）。
+- 备份四件（dist:win 启动前）→ `release/build-20261104-clearing-backup/`：`MeowStarMap-Setup-2.5.6.exe`（184,746,045 B）、`.blockmap`（191,839 B）、`latest.yml`（version=2.5.6，sha512=`OHrP16in…`）、旧包 `app.asar`（74,203,094 B，取自 `build-20261104-countdebt` 取证树，即 11-03 计数轮重打包产物）。
+- **asar 备份顺序教训（继承 11-02 轮）**：本轮实操中 `win-unpacked` 先于 asar 备份被清，改从上一轮取证树补齐——与 11-02 轮「旧形态 asar 从 build-20261101-photo 旁路树取证」同型。**下轮配方固定为：先备份四件（含 asar）、再清 `win-unpacked*`**。
+- 新包：`MeowStarMap-Setup-2.5.6.exe` = **184,745,991 B**；`latest.yml` 双轴均变（size 184,746,045 → 184,745,991；sha512 `OHrP16in…` → `sB80bljp…`）⇒ 非空重跑判定过，清偿轮代码确认进包。
+- 27 项 pre-dist-check 全 ✔（原生二进制 / @nikkisync 迁移 SQL 与装载链闭包 53 模块 / 管理员清单 asInvoker / 32 条禁串扫描，新 asar 74,204,908 字节）；verify:dist fail-closed 通过。
+- 打包态 `npm run e2e:smoke` 复跑 **19 passed**（38.8s），S4 断言新包 `app.getVersion()` === package.json 版本（2.5.6）；`release/win-unpacked/喵星图.exe`（224,013,312 B）在位。
+
+### 版本位终核（S3）
+
+五处声明位复核全部 2.5.6：`package.json:3`、`package-lock.json:3/:9`、`src/renderer/preview/mock/database-mock.ts:664`、重打包后 `release/latest.yml`、文档句（README 徽章 / AGENTS.md / ARCHITECTURE(.en).md / DEVELOPMENT(.en).md / docs/PLUGIN_API.md）。本轮零改动。
+
+### 提交
+
+- `eb392ae` docs(plans): 清偿轮审查验证与 2.5.6 重打包轮实施计划落仓（本计划文档）
+- 本笔回写：执行记录（§10）
