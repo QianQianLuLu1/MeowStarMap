@@ -13,6 +13,7 @@ import {
   artifactBannedStrings,
   scanBufferForBanned,
   resolveVerifyAsarTarget,
+  deriveUnpackedTarget,
   type JsTreeFile
 } from '../pre-dist-check'
 import {
@@ -388,6 +389,147 @@ describe('resolveVerifyAsarTarget：待审 app.asar 的选取', () => {
     } finally {
       rmSync(tmp, { recursive: true, force: true })
     }
+  })
+})
+
+/**
+ * 解包根的选择必须与待审 app.asar **同源**。
+ *
+ * 回归背景：原生二进制校验步原先用 findAsarUnpacked（递归 readdir、取首个命中），
+ * 而禁串步用 resolveVerifyAsarTarget（显式 --asar 或固定 win-unpacked）。两条判据
+ * 各自取根，release/ 下同时躺着两棵完整树时就会分叉：实测（2026-11-04 取证探针）
+ * build-20250101-old 与 win-unpacked 并存时，readdir 首命中返回 **陈旧树** 的
+ * app.asar.unpacked，禁串步却审现役树 ⇒ better-sqlite3/sharp/VC++/@nikkisync 四项
+ * 整份验在旧产物上，闸门绿而新产物缺件，属**假绿**。
+ * 判据收敛为一条：解包根 = 已解析 asarPath 的 `.unpacked` 兄弟；不命中即 fail-closed，
+ * 绝不回退目录扫描。探针「恰好被调用一次」是「不再扫目录」的可证形式。
+ */
+describe('deriveUnpackedTarget：解包根与待审 app.asar 同源', () => {
+  /** 造一棵 release 树：现役 win-unpacked + 名字排在它之前的陈旧完整诱饵树 */
+  function makeTwoTreeRelease(tmp: string): {
+    tmpRelease: string
+    liveRoot: string
+    decoyRoot: string
+  } {
+    const tmpRelease = path.join(tmp, 'release')
+    const live = path.join(tmpRelease, 'win-unpacked', 'resources')
+    const decoy = path.join(tmpRelease, 'aaa-stale-win-unpacked', 'resources')
+    mkdirSync(path.join(live, 'app.asar.unpacked', 'node_modules'), { recursive: true })
+    writeFileSync(path.join(live, 'app.asar'), 'live asar', 'utf8')
+    mkdirSync(
+      path.join(decoy, 'app.asar.unpacked', 'node_modules', 'better-sqlite3', 'build', 'Release'),
+      { recursive: true }
+    )
+    writeFileSync(
+      path.join(
+        decoy,
+        'app.asar.unpacked',
+        'node_modules',
+        'better-sqlite3',
+        'build',
+        'Release',
+        'better_sqlite3.node'
+      ),
+      'stale binary',
+      'utf8'
+    )
+    writeFileSync(path.join(decoy, 'app.asar'), 'stale asar', 'utf8')
+    return {
+      tmpRelease,
+      liveRoot: path.join(live, 'app.asar.unpacked'),
+      decoyRoot: path.join(decoy, 'app.asar.unpacked')
+    }
+  }
+
+  it('正常：只从已解析的 app.asar 派生，字典序更靠前的陈旧诱饵树不得被选中，且不扫目录', () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'pdc-unpacked-'))
+    try {
+      const { tmpRelease, liveRoot, decoyRoot } = makeTwoTreeRelease(tmp)
+      const { asarPath } = resolveVerifyAsarTarget([], tmpRelease)
+      const probed: string[] = []
+      const target = deriveUnpackedTarget(asarPath, (p) => {
+        probed.push(p)
+        return existsSync(p)
+      })
+      expect(target.unpackedRoot).toBe(liveRoot)
+      expect(target.appOutDir).toBe(path.join(tmpRelease, 'win-unpacked'))
+      expect(target.reason).toBe('')
+      // 「不回落扫描」的可证形式：只问了自己那一个候选，没探诱饵树也没遍历目录
+      expect(probed).toEqual([`${asarPath}.unpacked`])
+      // 夹具必须有牙：诱饵树真在位且完整到「按旧判据就会被选中」，否则本用例是空过
+      expect(existsSync(path.join(decoyRoot, 'node_modules', 'better-sqlite3'))).toBe(true)
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('正常：electronDist 旁路时解包根跟着 --asar 走，不跟着目录名走', () => {
+    const tmp = mkdtempSync(path.join(os.tmpdir(), 'pdc-bypass-'))
+    try {
+      const { tmpRelease } = makeTwoTreeRelease(tmp)
+      const bypassAsar = path.join(tmpRelease, 'build-20261104-label', 'resources', 'app.asar')
+      mkdirSync(path.dirname(bypassAsar), { recursive: true })
+      mkdirSync(`${bypassAsar}.unpacked/node_modules`, { recursive: true })
+      writeFileSync(bypassAsar, 'bypass asar', 'utf8')
+      const { asarPath } = resolveVerifyAsarTarget([`--asar=${bypassAsar}`], tmpRelease)
+      const target = deriveUnpackedTarget(asarPath, (p) => existsSync(p))
+      expect(target.unpackedRoot).toBe(`${bypassAsar}.unpacked`)
+      expect(target.appOutDir).toBe(path.join(tmpRelease, 'build-20261104-label'))
+    } finally {
+      rmSync(tmp, { recursive: true, force: true })
+    }
+  })
+
+  it('异常：app.asar 在位而 .unpacked 缺失 ⇒ fail-closed 并给出候选路径，绝不回退扫描', () => {
+    const probed: string[] = []
+    const target = deriveUnpackedTarget('/abs/release/win-unpacked/resources/app.asar', (p) => {
+      probed.push(p)
+      return false
+    })
+    expect(target.unpackedRoot).toBeNull()
+    expect(target.appOutDir).toBeNull()
+    expect(target.reason).toContain('app.asar.unpacked')
+    expect(target.reason).toContain('--asar')
+    expect(probed).toHaveLength(1)
+  })
+
+  it('边界：asarPath 为 null（默认路径缺失 / *.tmp 被拒）时不得凭空造根，且一次都不探盘', () => {
+    const probed: string[] = []
+    const target = deriveUnpackedTarget(null, (p) => {
+      probed.push(p)
+      return true
+    })
+    expect(target.unpackedRoot).toBeNull()
+    expect(target.appOutDir).toBeNull()
+    expect(target.reason.length).toBeGreaterThan(0)
+    expect(probed).toHaveLength(0)
+  })
+
+  // 与 verify-nikkisync-link.test.ts 同口径：唯一读真实产物树的用例按产物在位门控。
+  // 本机未打包 / CI（ubuntu）没有 release/ 树，前提不成立 ⇒ 显式 skip，不判缺陷。
+  const REAL_ASAR = path.join(ROOT, 'release', 'win-unpacked', 'resources', 'app.asar')
+  const HAS_ARTIFACT = existsSync(REAL_ASAR)
+  const realSuite = HAS_ARTIFACT ? describe : describe.skip
+
+  realSuite('实树契约：本机现役产物的派生根就是既学校验所在的那棵树', () => {
+    it('派生根落在 win-unpacked 下且含 better-sqlite3 二进制', () => {
+      const { asarPath } = resolveVerifyAsarTarget([], path.join(ROOT, 'release'))
+      const target = deriveUnpackedTarget(asarPath, (p) => existsSync(p))
+      expect(target.unpackedRoot).toBe(`${REAL_ASAR}.unpacked`)
+      expect(target.appOutDir).toBe(path.join(ROOT, 'release', 'win-unpacked'))
+      expect(
+        existsSync(
+          path.join(
+            String(target.unpackedRoot),
+            'node_modules',
+            'better-sqlite3',
+            'build',
+            'Release',
+            'better_sqlite3.node'
+          )
+        )
+      ).toBe(true)
+    })
   })
 })
 
