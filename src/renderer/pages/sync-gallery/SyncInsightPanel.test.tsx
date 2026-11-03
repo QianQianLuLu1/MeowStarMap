@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { SyncInsightPanel } from './SyncInsightPanel'
 import type { AssetSummary } from '../../../shared/sync/protocol'
@@ -46,18 +46,71 @@ function install(plan: ApiPlan = {}) {
     if (plan.statsError) throw plan.statsError
     return plan.stats ?? { libraryRevision: 1, topSuits: [], topClothing: [] }
   })
+  // 库变更订阅面：返回退订函数，与 preload 的 subscribe() 语义一致
+  const libraryListeners: Array<() => void> = []
+  const onLibraryChanged = vi.fn((callback: () => void) => {
+    libraryListeners.push(callback)
+    return () => {
+      const index = libraryListeners.indexOf(callback)
+      if (index >= 0) libraryListeners.splice(index, 1)
+    }
+  })
+  ;(window as unknown as Record<string, unknown>).electronAPI = {
+    nikkisync: { searchSuits, searchClothing, profileStats, onLibraryChanged }
+  }
+  return {
+    searchSuits,
+    searchClothing,
+    profileStats,
+    onLibraryChanged,
+    emitLibraryChanged: () => {
+      for (const callback of libraryListeners) callback()
+    }
+  }
+}
+
+/** 乱序夹具：searchSuits 的响应由测试按调用序号外部放行，用于构造「后发先至」 */
+function installDeferred() {
+  const queue: Array<{ resolve: (value: unknown) => void }> = []
+  const searchSuits = vi.fn(
+    () =>
+      new Promise((resolve) => {
+        queue.push({ resolve })
+      })
+  )
+  const searchClothing = vi.fn(async () => ({ items: [] }))
+  const profileStats = vi.fn(async () => ({ libraryRevision: 1, topSuits: [], topClothing: [] }))
   ;(window as unknown as Record<string, unknown>).electronAPI = {
     nikkisync: { searchSuits, searchClothing, profileStats }
   }
-  return { searchSuits, searchClothing, profileStats }
+  return {
+    searchSuits,
+    searchClothing,
+    profileStats,
+    /** 放行第 index 条请求的响应（序号自 0 起） */
+    settle: (index: number, value: unknown) => {
+      const handle = queue[index]
+      if (!handle) throw new Error(`乱序夹具缺少第 ${index} 条请求`)
+      handle.resolve(value)
+    }
+  }
 }
 
 const TITLE = '套装/服装检索与档案统计'
 
-function submit(term: string, api: ReturnType<typeof install>): void {
-  fireEvent.change(screen.getByRole('searchbox'), { target: { value: term } })
-  fireEvent.submit(screen.getByRole('button', { name: '检索' }).closest('form') as HTMLElement)
+function submit(term: string, api: unknown): void {
+  // 经 searchbox 定位所属 form：按钮文案在检索中会变成「检索中…」，按名字找会在第二次提交时落空
+  const box = screen.getByRole('searchbox')
+  fireEvent.change(box, { target: { value: term } })
+  fireEvent.submit((box.closest('form') ?? box) as HTMLElement)
   void api
+}
+
+/** 冲刷微任务与 pending 回调，让已放行的响应真正跑到 .then */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
 }
 
 beforeEach(() => {
@@ -174,5 +227,81 @@ describe('SyncInsightPanel', () => {
     render(<SyncInsightPanel />)
     fireEvent.click(screen.getByText(TITLE))
     expect(await screen.findByText('统计读取失败')).toBeInTheDocument()
+  })
+
+  it('竞态：慢的旧响应后到，不得改写新命中、也不得掐掉在途查询的 loading', async () => {
+    const api = installDeferred()
+    render(<SyncInsightPanel />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('旧', api)
+    submit('新', api)
+    await waitFor(() => expect(api.searchSuits).toHaveBeenCalledTimes(2))
+
+    // 第 1 条（旧关键词）晚到：此时第 2 条仍在途 ⇒ 过期代次一律不得改状态
+    api.settle(0, { items: [{ suitId: 's_old', suitName: '旧结果', photoCount: 1, photos: [] }] })
+    await flush()
+    expect(screen.queryByText('旧结果')).not.toBeInTheDocument()
+    expect(screen.getByText('检索中…')).toBeInTheDocument()
+
+    api.settle(1, { items: [{ suitId: 's_new', suitName: '新结果', photoCount: 2, photos: [] }] })
+    await flush()
+    expect(screen.getByText('新结果')).toBeInTheDocument()
+    expect(screen.queryByText('旧结果')).not.toBeInTheDocument()
+    expect(screen.queryByText('检索中…')).not.toBeInTheDocument()
+  })
+
+  it('异常：切换检索范围立即清空上一作用域命中（服装页不得残留套装行）', async () => {
+    const api = install({
+      suits: {
+        items: [{ suitId: 's_suit', suitName: '天鹅童话', photoCount: 3, photos: [] }]
+      }
+    })
+    render(<SyncInsightPanel />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('天鹅', api)
+    expect(await screen.findByText('天鹅童话')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('检索范围'), { target: { value: 'clothing' } })
+    expect(screen.queryByText('天鹅童话')).not.toBeInTheDocument()
+    expect(screen.getByText('输入关键词后检索')).toBeInTheDocument()
+  })
+
+  it('库变更到货：展开态下重新拉档案统计，不再永久缓存', async () => {
+    const api = install({
+      stats: {
+        libraryRevision: 1,
+        topSuits: [{ suitId: 's1', suitName: '旧榜套装', photoCount: 1 }],
+        topClothing: []
+      }
+    })
+    render(<SyncInsightPanel />)
+    fireEvent.click(screen.getByText(TITLE))
+    await waitFor(() => expect(api.profileStats).toHaveBeenCalledTimes(1))
+    expect(screen.getByText('旧榜套装')).toBeInTheDocument()
+
+    await act(async () => {
+      api.emitLibraryChanged()
+    })
+    await waitFor(() => expect(api.profileStats).toHaveBeenCalledTimes(2))
+  })
+
+  it('边界：面板收起时库变更只复位缓存，不追加 IPC（懒加载不得退化成每次开合都拉）', async () => {
+    const api = install({
+      stats: {
+        libraryRevision: 1,
+        topSuits: [{ suitId: 's1', suitName: '旧榜套装', photoCount: 1 }]
+      }
+    })
+    render(<SyncInsightPanel />)
+    fireEvent.click(screen.getByText(TITLE))
+    await waitFor(() => expect(api.profileStats).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByText(TITLE))
+    const details = screen.getByRole('group') as HTMLDetailsElement
+    expect(details.open, '第二次点击未把 <details> 收起，本例的「收起态」前提不成立').toBe(false)
+
+    await act(async () => {
+      api.emitLibraryChanged()
+    })
+    expect(api.profileStats).toHaveBeenCalledTimes(1)
   })
 })
