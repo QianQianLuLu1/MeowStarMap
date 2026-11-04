@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-11-04",
+  "updatedAt": "2026-11-05",
   "items": [
     {
       "id": "DEBT-001",
@@ -777,6 +777,18 @@
       "description": "上一轮（`6cedbac`）用 `clampTotalToTypeCounts`（`media-repository.ts:1262`，`Math.max(total, image + video)`）消除了「显示矛盾」，**没有消除「两个真相源」**。2026-11-04 复核把范围收窄了：`isDefaultView` 要求 conditions **恰好 2 条**（`:660-663`），而图库视图的 HQ 路径条件使其恒为非默认（`:627` 注释自陈「该条件使视图脱离默认状态，media_count 缓存不命中（走实时 COUNT）」）⇒ **图库首屏的 total 与 typeCounts 本就是同一瞬间、同一 WHERE 的两次实时查询，已经同源**。真正还混源的只有 `resolveListTotal`（`:1201`）命中 media_count 缓存那条窄路径，即「非图库视图 + profile=all + showDuplicates=true」，且已被夹取覆盖显示层不变式。**本轮不修的原因**：① 彻底同源的两条路都不划算——把类型分布并入 `media_count` 缓存会重新引入第二个真相源，而 `refreshMediaCountCache`（`:1384`）的口径（`is_deleted=0 AND COALESCE(media_source,'game')!='launcher'`）与 `countMedia` 的 WHERE（`:646`，含 hideDuplicates/corruptedOnly/import roots）**不同构**，并入等于把分叉写进缓存；拆掉缓存则给默认视图重新引入 O(n) COUNT；② 影响面已从「所有视图」订正为「窄路径 + 已有不变式兜底」，收益不抵改动。**修法**：若下轮要动，前置是先让 `refreshMediaCountCache` 与 `buildListWhereClause` 口径同构（或显式声明缓存只对默认视图成立并在所有消费点钉住该前提），再谈并表。**撤销条件**：默认视图缓存被移除，或缓存条目携带类型分布且口径与实时 COUNT 逐字节同构并有判据用例。**2026-11-04 判据用例在案（b2c9a58）**：media-repository.test.ts 对照用例捕获两条 SQL 原文，断言缓存口径恰两条件（is_deleted=0 + 排除 launcher）、图库首屏实时计数 WHERE 额外含 is_duplicate=0 与 GALLERY_PATH_CONDITION ⇒ 「口径同构」前提今天不成立（任一侧口径被静默改动即红）。并表留待下一轮；本轮不修的原因不变。",
       "files": ["src/main/database/media-repository.ts"],
       "lines": [627, 646, 660, 1201, 1262, 1384],
+      "issue": false
+    },
+    {
+      "id": "DEBT-060",
+      "category": "robustness",
+      "section": 23,
+      "status": "open",
+      "priority": "low",
+      "title": "@nikkisync 外部依赖闭包判定核有三条漏报边界（exports-only 入口 / CJS 扩展解析序 / 子串覆盖判据）",
+      "description": "2026-11-05 复查轮为 qrcode 装机缺陷新建的判定核（`scripts/nikkisync-external-deps.ts`）有三条**漏报方向**的边界：① `resolveMainEntry`（`:138`）只读 `package.json` 的 `main`、不读 `exports`——上游若引入只在 `exports` 声明入口的包，主入口可达图从第一步就断，闭包漏包而打包闸门照样绿；② `relativeCandidates`（`:155`）按 CJS 序试「原样 / `.js` / `.mjs` / `.cjs` / 目录 `index.js`」，不试 `.json` 与 `/index.mjs`、`/index.cjs`，同族漏报；③ `missingUnpackCoverage`（`:118`）用 `pattern.includes(dep)` 判 `asarUnpack` 覆盖，短包名可能被含它子串的其它 pattern 误判为已覆盖。**本轮实测不受影响**：`@nikkisync` 四包 dist 的 bare 种子只有 `qrcode`，闭包 `[dijkstrajs, pngjs, qrcode]` 三包均有 `main`，且闸门对带病产物实测报红（EXIT=1）。**本轮不修的原因**：① 三条都是「未来上游引入新形态才会咬人」的漏报，今天没有可复现的红判据，先写实现等于为假设需求造代码；② 误报侧已有兜底（包名形态校验拒绝正则误命中、闸门取「多扫更严」方向、不静默放行缺失包）；③ 子串覆盖判据沿用本仓既有 `unpackedCovers` 同源约定，单独改一处会造出两套覆盖判定，而它只服务开发态配置测试，出货闸门走 `existsSync`。**修法**：`resolveMainEntry` 增读 `exports`（`.` 与 `require`/`default` 支链）、`relativeCandidates` 补 `.json` 与两个 index 形态；若同时把覆盖判定升级为 glob 匹配，必须一并改 `unpackedCovers` 并同步 `pre-dist-check.test.ts` 的接线契约用例。**撤销条件**：外部依赖里出现只声明 `exports` 的包、或出现需 `.json` 相对边才可达的依赖（此时漏报当场可复现），即必须清偿。",
+      "files": ["scripts/nikkisync-external-deps.ts"],
+      "lines": [118, 138, 155],
       "issue": false
     }
   ]
