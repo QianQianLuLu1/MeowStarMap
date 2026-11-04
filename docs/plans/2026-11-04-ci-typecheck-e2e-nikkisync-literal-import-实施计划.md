@@ -281,5 +281,8 @@ pre-commit 会 `eslint --fix` / `prettier --write` 改写并重新暂存，提�
   `npx vitest run src/main/services scripts/__tests__/path-semantics-guard.test.ts` 18 文件 505 passed；
   `npm test` 470 文件 7516 passed | 20 skipped、`npm run test:ci-linux` 470 文件 7533 passed | 3 skipped
   ——两轴与主题一收口时（即 `77b0309` 基线）**逐项相等**，零新增失败、零丢失用例。
-- 待回写：`df8ab01` + 本笔文档推送后的 run #32 结论。判据是整条 workflow `conclusion=success`
-  （含 10 个 test 分片、Coverage Gate 与 Windows build job），不只看单个 job。
+- 主题二修复推送 `bb9f6df..de93921`（`df8ab01` 修复 + `de93921` 本文档）⇒ 触发 run **#32**，实测
+  **`conclusion=success`**：`Lint, Typecheck & Security` success、`Test (shard 1…10/10)` 十个分片全 success、
+  `Coverage Gate` success、`Build & Release (Windows x64 NSIS)` success；
+  `Storybook Docs` skipped 属既有 `if` 守卫（手动触发才跑，与 #29/#30 同形，非本轮引入）。
+  判据「整条 workflow success」达成 ⇒ 两条主题双双关闭。
