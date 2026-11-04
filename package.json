@@ -261,6 +261,9 @@
     ],
     "asarUnpack": [
       "**/@nikkisync/**",
+      "**/qrcode/**",
+      "**/dijkstrajs/**",
+      "**/pngjs/**",
       "**/ffmpeg-static/**",
       "**/ffprobe-static/**",
       "**/better-sqlite3/**",

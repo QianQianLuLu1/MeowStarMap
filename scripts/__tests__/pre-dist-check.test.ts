@@ -23,6 +23,12 @@ import {
   SYNC_SERVER_REQUIRED_ARTIFACTS,
   closureLoadChain
 } from '../verify-nikkisync-link'
+import {
+  collectNikkiSyncExternalDeps,
+  collectRuntimeDepClosure,
+  type NikkiSyncSourceFile,
+  type RuntimePackagePort
+} from '../nikkisync-external-deps'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..', '..')
@@ -667,6 +673,161 @@ describe('打包态装载链闭包：判定核复用同一真相源（DEBT-040�
         probes.exists
       )
       expect(broken.dangling).toEqual([{ from: 'dist/src/src/a.js', specifier: './b.js' }])
+    } finally {
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+    }
+  })
+})
+
+// ===== 打包态 @nikkisync 外部依赖闭包闸门的接线（2026-11-04 qrcode 装机缺陷）=====
+// 回归背景：@nikkisync 经 asarUnpack 解到 app.asar.unpacked 分支后，其外部纯 JS 依赖
+// （qrcode 及传递依赖）若只进 asar 内部 node_modules，Node 从 unpacked 文件向上走真实
+// 目录树、永远够不到 asar 旁支里的 node_modules ⇒ `Cannot find package 'qrcode'` ⇒
+// Runtime 装配必败（同步图库扫描/照片目录全瘫，2026-11-04 装机日志实锤）。既有闸门只跟随
+// 相对 import 边，bare import 不可见。本轮在 checkUnpackedNativeBinaries 内补外部依赖
+// 闭包断言；本 describe 锚三件事（M3/DEBT-040 同款三件套）：打包态确已接线（读源码文本）、
+// 判定核来自单一真相源（本地不得另抄）、判定链在虚拟解包树上判得对——正常过 / qrcode 缺红 /
+// 空集过，与闸门的 pass / fail / skip 三分支一一对应。
+describe('打包态 @nikkisync 外部依赖闭包闸门：判定核复用同一真相源（2026-11-04）', () => {
+  const pdcSource = readFileSync(path.join(ROOT, 'scripts', 'pre-dist-check.ts'), 'utf-8')
+
+  it('接线契约：须对解包树 @nikkisync dist 产物提取外部依赖种子（修复前必红）', () => {
+    expect(pdcSource).toMatch(/collectNikkiSyncExternalDeps\(\s*nikkisyncDistSources/)
+  })
+
+  it('接线契约：须对种子求运行时传递闭包（修复前必红）', () => {
+    expect(pdcSource).toMatch(/collectRuntimeDepClosure\(\s*externalSeed/)
+  })
+
+  it('接线契约：闭包须交 missingPackedCapabilityArtifacts 做存在性断言（修复前必红）', () => {
+    expect(pdcSource).toMatch(/missingPackedCapabilityArtifacts\(\s*externalClosure/)
+  })
+
+  it('接线契约：skip 只留给「无 dist 可扫」，扫到产物而闭包为空须记 pass（2026-11-05 复查）', () => {
+    // 判据失真修复：skip 此前只看 externalClosure.length === 0 ⇒ 「dist 扫到了、只是零
+    // bare 依赖」也会打出「解包树无 dist 可扫」，两件事混成一件（出货闸门读数必须对得上事实）
+    expect(pdcSource).toMatch(/nikkisyncDistSources\.length === 0/)
+    expect(pdcSource).toMatch(/无外部 bare 依赖/)
+  })
+
+  it('单一真相源：外部依赖判定核须从 nikkisync-external-deps import，本地不得另抄一份', () => {
+    const importBlock = pdcSource.match(
+      /import\s*\{[^}]*\}\s*from\s*'\.\/nikkisync-external-deps'/s
+    )
+    expect(importBlock, '前置：须存在从 nikkisync-external-deps 的 import').not.toBeNull()
+    expect(importBlock?.[0]).toContain('collectNikkiSyncExternalDeps')
+    expect(importBlock?.[0]).toContain('collectRuntimeDepClosure')
+    expect(importBlock?.[0]).toContain('isRuntimeScanSkippedDir')
+    // 本地另起判定核 = 两套真相源，正是 M3/DEBT-040 消灭过的形状
+    expect(pdcSource).not.toMatch(
+      /function\s+(collectNikkiSyncExternalDeps|collectRuntimeDepClosure|packageRootOf)\b/
+    )
+  })
+
+  /** 把相对路径文件集写进虚拟解包树的 node_modules 下。 */
+  const writeUnpackedTree = (nmRoot: string, files: Record<string, string>): void => {
+    for (const [relative, text] of Object.entries(files)) {
+      const target = path.join(nmRoot, ...relative.split('/'))
+      mkdirSync(path.dirname(target), { recursive: true })
+      writeFileSync(target, text)
+    }
+  }
+
+  /** 按闸门同款判定链串联（collect → closure → missing），返回三段读数。 */
+  const verdictOf = (
+    root: string,
+    withNikkiSyncDist: boolean
+  ): { seed: string[]; closure: string[]; missing: string[] } => {
+    const nmRoot = path.join(root, 'app.asar.unpacked', 'node_modules')
+    // 闸门的 collectModuleTree 只扫 @nikkisync/*/dist 下的 .js/.mjs/.cjs；虚拟树里只有
+    // GalleryRuntime.mjs 一个产物文件，等价于把扫描结果直接摆出来
+    const sources: NikkiSyncSourceFile[] = withNikkiSyncDist
+      ? [
+          {
+            path: path.join(
+              nmRoot,
+              '@nikkisync',
+              'pc-companion',
+              'dist',
+              'src',
+              'wechat',
+              'GalleryRuntime.mjs'
+            ),
+            content: 'import QRCode from "qrcode"\nexport const runtime = QRCode\n'
+          }
+        ]
+      : []
+    const port: RuntimePackagePort = {
+      readPackageFile(pkg, relative) {
+        try {
+          return {
+            path: relative,
+            content: readFileSync(
+              path.join(nmRoot, ...pkg.split('/'), ...relative.split('/')),
+              'utf8'
+            )
+          }
+        } catch {
+          return undefined
+        }
+      }
+    }
+    const seed = collectNikkiSyncExternalDeps(sources)
+    const closure = collectRuntimeDepClosure(seed, port)
+    const missing = missingPackedCapabilityArtifacts(closure, (pkg) =>
+      existsSync(path.join(nmRoot, ...pkg.split('/')))
+    )
+    return { seed, closure, missing }
+  }
+
+  /** 最小解包树：@nikkisync dist 引 qrcode，qrcode 主入口可达 dijkstrajs/pngjs。 */
+  const MINIMAL_TREE: Record<string, string> = {
+    '@nikkisync/pc-companion/dist/src/wechat/GalleryRuntime.mjs':
+      'import QRCode from "qrcode"\nexport const runtime = QRCode\n',
+    'qrcode/package.json': '{"main":"lib/index.js"}',
+    'qrcode/lib/index.js': "require('dijkstrajs'); const p = require('./png');",
+    'qrcode/lib/png.js': "require('pngjs');",
+    'dijkstrajs/package.json': '{"main":"dijkstra.js"}',
+    'dijkstrajs/dijkstra.js': 'module.exports = function () {};',
+    'pngjs/package.json': '{"main":"lib/png.js"}',
+    'pngjs/lib/png.js': "require('stream');"
+  }
+
+  it('行为：三包齐全时闭包钉住 qrcode/dijkstrajs/pngjs 且不点名（闸门 pass 形状）', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'wxnn-extdeps-'))
+    try {
+      writeUnpackedTree(path.join(root, 'app.asar.unpacked', 'node_modules'), MINIMAL_TREE)
+      const v = verdictOf(root, true)
+      expect(v.seed).toEqual(['qrcode'])
+      expect(v.closure).toEqual(['dijkstrajs', 'pngjs', 'qrcode'])
+      expect(v.missing).toEqual([])
+    } finally {
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+    }
+  })
+
+  it('行为：删掉 qrcode 目录 → 判定链点名 qrcode（2026-11-04 缺陷本体复现，闸门 fail 形状）', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'wxnn-extdeps-'))
+    try {
+      const nmRoot = path.join(root, 'app.asar.unpacked', 'node_modules')
+      writeUnpackedTree(nmRoot, MINIMAL_TREE)
+      rmSync(path.join(nmRoot, 'qrcode'), { recursive: true, force: true })
+      const v = verdictOf(root, true)
+      // 入口没了 ⇒ 传递依赖不可达，闭包只剩种子 qrcode 本身，且存在性探针点名它
+      expect(v.closure).toEqual(['qrcode'])
+      expect(v.missing).toEqual(['qrcode'])
+    } finally {
+      rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
+    }
+  })
+
+  it('行为：解包树无 @nikkisync dist 可扫 → 种子与闭包为空、不点名（闸门 skip 形状）', () => {
+    const root = mkdtempSync(path.join(os.tmpdir(), 'wxnn-extdeps-'))
+    try {
+      const v = verdictOf(root, false)
+      expect(v.seed).toEqual([])
+      expect(v.closure).toEqual([])
+      expect(v.missing).toEqual([])
     } finally {
       rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
     }

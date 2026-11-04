@@ -19,6 +19,13 @@ import {
   SYNC_SERVER_REQUIRED_ARTIFACTS,
   closureLoadChain
 } from './verify-nikkisync-link'
+import {
+  collectNikkiSyncExternalDeps,
+  collectRuntimeDepClosure,
+  isRuntimeScanSkippedDir,
+  type NikkiSyncSourceFile,
+  type RuntimePackagePort
+} from './nikkisync-external-deps'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -816,6 +823,80 @@ function checkUnpackedNativeBinaries(): void {
         `@nikkisync/pc-companion 装载链闭包里的模块读不动：${relative}` +
           '（存在但读不出文本，不能当成「没有出边」放行）: ' +
           path.relative(ROOT, path.join(pcCompanionRoot, relative))
+      )
+    }
+  }
+
+  // ===== @nikkisync 外部依赖在解包树内可解析（2026-11-04 qrcode 装机缺陷的产物级闸门）=====
+  // 背景：@nikkisync 与其外部纯 JS 依赖（qrcode 及其传递依赖）都在 app.asar.unpacked 分支，
+  // Node 从该分支向上走真实目录树、够不到 asar 内部的 node_modules——任何一个 bare import
+  // 目标包缺失，内嵌 Runtime 装配即抛 `Cannot find package 'qrcode'`（同步图库扫描、照片目录
+  // 保存全瘫；2026-11-04 装机日志实锤）。开发态的 asarUnpack 覆盖守护在
+  // scripts/__tests__/nikkisync-unpacked-external-deps.test.ts；本闸门把判据落到出货产物：
+  // 扫解包树内 @nikkisync 产物（及其外部依赖的主入口可达图）里的 bare import，逐包断言
+  // `app.asar.unpacked/node_modules/<pkg>` 真实存在。判定核复用 missingPackedCapabilityArtifacts
+  // （清单与存在性探针分离，两侧不得各自抄录）。
+  const nikkisyncDistSources: NikkiSyncSourceFile[] = []
+  const collectModuleTree = (dir: string): void => {
+    let entries: fs.Dirent[]
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name)
+      if (e.isDirectory()) {
+        if (isRuntimeScanSkippedDir(e.name)) continue
+        collectModuleTree(full)
+      } else if (e.isFile() && /\.(js|mjs|cjs)$/.test(e.name)) {
+        try {
+          nikkisyncDistSources.push({ path: full, content: fs.readFileSync(full, 'utf8') })
+        } catch {
+          // 读不动的文件如实跳过；bare import 提取是「多扫更严」方向，不静默放行缺失包
+        }
+      }
+    }
+  }
+  for (const pkgName of ['core', 'database', 'protocol', 'pc-companion']) {
+    collectModuleTree(path.join(nikkisyncRoot, pkgName, 'dist'))
+  }
+  const externalSeed = collectNikkiSyncExternalDeps(nikkisyncDistSources)
+  const unpackedPort: RuntimePackagePort = {
+    readPackageFile(pkg, relative) {
+      const abs = path.join(nm, ...pkg.split('/'), ...relative.split('/'))
+      try {
+        return { path: relative, content: fs.readFileSync(abs, 'utf8') }
+      } catch {
+        return undefined
+      }
+    }
+  }
+  const externalClosure = collectRuntimeDepClosure(externalSeed, unpackedPort)
+  const externalMissing = missingPackedCapabilityArtifacts(externalClosure, (pkg) =>
+    fs.existsSync(path.join(nm, ...pkg.split('/')))
+  )
+  if (externalMissing.length === 0) {
+    if (nikkisyncDistSources.length === 0) {
+      skip('@nikkisync 外部依赖闭包为空（解包树无 dist 可扫，环境性缺失不伪装成已验证）')
+    } else if (externalClosure.length === 0) {
+      pass(
+        `@nikkisync 产物无外部 bare 依赖（已扫 ${nikkisyncDistSources.length} 个 dist 产物，闭包为空）`
+      )
+    } else {
+      pass(
+        `@nikkisync 外部依赖闭包 ${externalClosure.length} 包已在解包树内可解析` +
+          `（${externalClosure.join(', ')}）`
+      )
+    }
+  } else {
+    for (const pkg of externalMissing) {
+      fail(
+        `@nikkisync 外部依赖 ${pkg} 未随包解到 app.asar.unpacked/node_modules` +
+          `（Node 从 unpacked 分支向上解析够不到 asar 内部的 node_modules，内嵌 Runtime 装配将抛 ` +
+          `Cannot find package '${pkg}'，同步图库扫描/照片目录全瘫）；` +
+          '请在 package.json build.asarUnpack 追加对应包条目后重新打包: ' +
+          path.relative(ROOT, path.join(nm, ...pkg.split('/')))
       )
     }
   }
