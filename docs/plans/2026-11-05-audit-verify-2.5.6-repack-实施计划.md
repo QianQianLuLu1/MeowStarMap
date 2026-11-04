@@ -149,6 +149,61 @@
 4. `e2e:smoke` 是打包态入口（读 `release/win-unpacked/*.exe`），第一次跑验的是**旧包**——它的绿只证明旧包无回归；本轮修复的验收在第 8 步的第二次。
 5. `findAsarUnpacked` 取 readdir 首命中且无显式选择参数（既有弱点，不因环境清干净就从遗留清单里划掉）。
 
-## 八、执行读数（N6 回写）
+## 八、执行读数（2026-11-05 回写，全部为实测）
 
-> 待执行后逐项填写：红绿矩阵、六道闸门读数、变异抽查 M1/M2、包内取证三判据、旁路实况。
+### 8.1 六道闸门（按任务书顺序）
+
+| 命令                    | 退出码        | 关键读数                                                                                                                                                                                                          |
+| ----------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install`           | 0             | 输出 `removed 4 packages` ⇒ 即四条 `@nikkisync` junction 被剪（本机既定现象，非真依赖）。随即 `npm run link:nikkisync` 重建四条 + `npm run link:nikkisync:check` 报 `check OK (all four links in place)`          |
+| `npm run build`         | 0             | `✓ built in 5.28s`；主/渲染/preload 产物全出                                                                                                                                                                      |
+| `npm test`              | 0             | **Test Files 470 passed (470)**，**Tests 7516 passed \| 20 skipped (7536)**，72.96s；链接态 `sync-server.linked.test.ts` 14 例**实跑**（最长单例 23.0s）⇒ 未降级为 skip                                           |
+| `npm run typecheck`     | 0             | `tsc -b` + `tsc -p tsconfig.scripts.json` 两步皆无输出                                                                                                                                                            |
+| `npm run e2e:smoke`     | 0（**两次**） | 各 **19 passed**（41s 级）。第一次对 07:04 旧包（只证现役包无回归）；第二次对 11:14 新包，打印 `[e2e] executable: …/release/win-unpacked/喵星图.exe`，打包态 S1–S8 + 未打包 NikkiSync N1–N4 + 照片目录 G1–G3 全过 |
+| `npm run test:ci-linux` | 0             | **Test Files 470 passed**，**Tests 7533 passed \| 3 skipped (7536)**，56.26s（与全量口径的差异来自装置下宿主门控的分配，两侧文件集一致）                                                                          |
+
+另附：`npm run typecheck:e2e` 0、`npm run i18n:guard` ✅（本轮未新增 i18n 键）、`npm run lint`（全量 `eslint .`）0、`npm run verify` ✅（0 项 0 失败——此时源码已全部提交，工作树无变更，如实记为空集而非跳过）。
+
+**`package-lock.json` 实况订正**：计划第 1 步预留了「本机 npm 重写 lock ⇒ 还原不提交」的分支，实测 `git hash-object package-lock.json` == `git rev-parse HEAD:package-lock.json`（同 `d72cad39…`）⇒ **内容零变化**，` M` 只是 `core.autocrlf` 的 stat 抖动 ⇒ 本轮无抖动可还原，也不为此造提交。
+
+### 8.2 红→绿矩阵
+
+| 节点               | 修复前（红灯原文）                                                                                                                                                                                                                                                                                                                         | 修复后                                                                                                                                     |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| N1 扫描失败文案    | 只翻断言、未动实现：`AssertionError: expected "vi.fn()" to be called with arguments: [ '扫描失败', 'error' ]` / received `+ "NikkiSync runtime is not ready (Cannot find package 'qrcode' imported from D:\\App\\resources\\app.asar.unpacked\\node_modules\\@nikkisync\\pc-companion\\dist\\x.mjs)"` ⇒ `Tests 1 failed \| 11 passed (12)` | `Tests 12 passed (12)`；eslint 0、prettier `All matched files use Prettier code style!`                                                    |
+| N2 skip 判据分流   | 新增接线契约用例：`AssertionError: expected '…' to match /nikkisyncDistSources\.length === 0/` ⇒ `Tests 1 failed \| 59 passed (60)`                                                                                                                                                                                                        | 两测试文件合跑 `Tests 73 passed (73)`                                                                                                      |
+| 缺陷本体（产物级） | `npx tsx scripts/pre-dist-check.ts --verify-asar` 对 07:04 带病树：`✖ @nikkisync 外部依赖 qrcode 未随包解到 app.asar.unpacked/node_modules…`，EXIT=1，`❌ 解包产物校验失败，禁止发布`                                                                                                                                                      | 新树：`✔ @nikkisync 外部依赖闭包 3 包已在解包树内可解析（dijkstrajs, pngjs, qrcode）`，`npm run verify:dist` EXIT=0，`✅ 解包产物校验通过` |
+
+### 8.3 变异抽查两次（含一处把推断升级为实测）
+
+- **M2**（撤调用）：把 `collectRuntimeDepClosure(externalSeed, unpackedPort)` 改成 `externalSeed` ⇒ `× 接线契约：须对种子求运行时传递闭包（修复前必红）`，且**只有这一条红**（行为两例照绿）⇒ 证新增夹具真在被判据覆盖、也证「只靠行为例不够」。还原 `sha256 = fa1aab3ee6de2c0061a9…` 与变异前全等，复跑 73 passed。
+- **M1**（撤覆盖）分两步才做对：先把 `**/qrcode/**` 改成 `**/qrcode-MUTATION-PROBE/**` ⇒ **测试不红**（`pattern.includes('qrcode')` 仍命中）；再改成 `**/qr-code/**` ⇒ `AssertionError: 以下 @nikkisync 外部依赖未被 build.asarUnpack 覆盖…：qrcode；expected [ 'qrcode' ] to deeply equal []`。还原 `sha256 = 203f60f8a4ff05f1…` 全等，复跑 13 passed。
+- **由此把 DEBT-060 的第 ③ 条从「可能有子串误覆盖」升级为「已复现」**，措辞已同步 registry 与清单 §23。
+
+### 8.4 出包实况：标准配方被打断，旁路交付到标准位置
+
+1. 归档现役三包到 `_safe_backup_20261105-qrcodefix/`（exe 184,745,991 B / sha512 `sB80bljpqjVc…` / releaseDate 2026-11-03T23:04Z）——`release/` 不入 git，不归档即不可再生。
+2. `npm run dist:win` **INNER_EXIT=1**：`⨯ EPERM: operation not permitted, rename '…\release\win-unpacked.tmp' -> '…\release\win-unpacked'`（栈在 `app-builder-lib/src/util/electronGet.ts:249`，即 builder 已成功删掉旧 `win-unpacked`、红在把**刚解压好**的 tmp 改名过去）⇒ 本机杀软对每次新解压主动加锁的既有实况，不是仓库缺陷。同轮 `pre-dist-check` 前置 27+ 项、`@electron/rebuild`、Electron 解压全绿。
+3. 旁路（不改任何配置文件）：从官方缓存 `…/electron/Cache/5d86dd63…/electron-v41.10.6-win32-x64.zip`（与另一缓存项 sha256 全等 `5447c50d…`）解到 `.cache/electron-dist-clean`，排除 `resources/default_app.asar` 与 `version`（解后实测连 `resources/` 都不存在，与既定口径一致）；`npx electron-builder --win --publish never --config.electronDist=<该目录> --config.directories.output=release/build-20261105-qrcode` ⇒ EXIT=0。
+4. **`cp -rf`（不是 `mv`）** 把 `win-unpacked` 建回 `release/`，再把 exe/blockmap/latest.yml 搬回标准布局；`cp` 等价性当场证：两侧 `app.asar` sha256 全等 `8a36aa3652d7fae0…`。
+5. `npm run verify:dist` **不带参数**裸跑 EXIT=0，且禁串步回显待审对象是 `release\win-unpacked\resources\app.asar`（新树，32 条禁串 / 73,078,028 字节）⇒ 陈旧树假绿路径未复现（DEBT-054 已把解包根改为由待审 asar 派生，`findAsarUnpacked` 在 `scripts/` 内 0 命中）。
+
+### 8.5 包内取证五判据
+
+1. `app.asar.unpacked/node_modules/@nikkisync` 目录项 = `["core","database","pc-companion","protocol"]`（**恰四包**）⇒ 计划第 9 条担心的点号重复树没有进包。**订正**：那两个 `.{database,pc-companion}-*` 残留并非需要手工删除——`npm install` 的收敛 + `link:nikkisync` 重链已把它们带走（实测 `ls -a` 只剩四包），故清污动作取消、判据改由本条包内实测承担。
+2. `qrcode`（version 1.5.4）、`dijkstrajs`、`pngjs` 三者目录与其 `main` 入口文件在 unpacked 内均实测存在。
+3. 包内 `dist\main\main\app\index.js`（`@electron/asar` `listPackage` + `extractFile`，条目名只去前导分隔符、未把 `\` 换成 `/`）sha256 前缀 `bb114f69cda21d53` 与盘上 `dist/main/main/app/index.js` **逐字节 equals=true**。
+4. 渲染层修复确在包里：asar 内 `toast.scanFailed` 命中 **3**；`dist/renderer/assets/SyncGalleryPage-Cb9XeQ30.js` 内命中新键、旧形状 `showMessage(extractUserMessage` 命中 **0**（全仓唯一残留在 `ResonanceRecordsPage` chunk，属他页既有用法，不在本轮范围）。
+5. 防「空重跑」两轴都不同：`size` 184,745,991 → **184,895,319**（+149,328 B，即三包解出带来的落盘差）；`sha512` `sB80bljpqjVc…` → **`iHqt4SDsGvl9…`**。
+
+### 8.6 版本号
+
+**2.5.6 零编辑**：`package.json:3` 本就是 `"2.5.6"`；`npx tsx scripts/check-changelog-release.ts` 三条 ✔（解析到 15 个版本节，最新 2.5.6 与 package.json 一致 / `[2.5.6]` 存在且唯一 / `[Unreleased]` 已收口）。本轮无版本变更，不造改动凑任务。
+
+### 8.7 提交切分实况
+
+`8a49e02`(N0 计划落仓) → `daaa49d`(N1) → `c9bfcd3`(N2) → `9ace93c`(N3) → `297ab5c`(N4) → 本提交(N6 回写)；未 push（沿用裁决）、未补 `v2.5.6` tag。
+
+### 8.8 现场残留
+
+`release/` = 本轮新包三件 + `win-unpacked`（新树）+ `build-20261105-qrcode`（旁路整树留底，其 `win-unpacked` 与标准名树 `app.asar` 哈希全等）+ 历史 7 棵 `build-*` + `win-unpacked.tmp`（标准配方失败时的半成品，被杀软句柄占住，删不动 ⇒ 如实留置，不谎称已清）。旧包三件在 `_safe_backup_20261105-qrcodefix/`。
