@@ -37,7 +37,12 @@ import { test, expect, type Page } from '@playwright/test'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { hasNikkiSyncLink } from '../src/main/nikkisync/runtime-loader'
+import {
+  buildPackagingContext,
+  resolveDeepEntryUrl,
+  resolveModuleRoot
+} from '../src/main/nikkisync/embedding-paths'
+import { hasNikkiSyncLink, NIKKISYNC_PACKAGES } from '../src/main/nikkisync/runtime-loader'
 import { decideNikkiSyncGate } from './nikkisync-guard'
 import { launchBuiltApp, launchApp, closeApp, collectDiagLogs, type LaunchedApp } from './helpers'
 
@@ -138,16 +143,52 @@ async function callGameRootBridge<T>(page: Page, call: GameRootBridgeCall): Prom
 }
 
 /**
+ * 上游安装根发现的**深入口**段清单：`game-directory-discovery.js` 不在 `pc-companion` 的桶导出内，
+ * 锚定口径同 `src/main/nikkisync/runtime-facade.ts` 的深入口常量（那边锚的是 `server/row-mappers.js`）。
+ */
+const GAME_DISCOVERY_DEEP_ENTRY = ['game-directory-discovery.js'] as const
+
+/** 自检只用到这一个导出；显式结构类型（`no-explicit-any` 为 error）。 */
+interface GameDirectoryDiscoveryModule {
+  discoverInfinityNikkiInstallation: (options?: {
+    selectedInstallRoot?: string
+  }) => Promise<{ installRoot?: string } | undefined>
+}
+
+/**
+ * 经装载缝组出上游深入口的 `file://` URL，替代原先的字面量 `import('@nikkisync/...')`：
+ * - `@nikkisync/*` 不是声明依赖（靠 `npm run link:nikkisync` 在开发机建 junction），CI 走 `npm ci`
+ *   无链接 ⇒ 字面量 specifier 让 `tsc --noEmit -p e2e` 报 TS2307（CI run #30 的独占红）；
+ * - Playwright 的 CJS 转换会把**可静态解析**的 `import()` 折叠成 `require()`，而上游 ESM 图含
+ *   top-level await ⇒ 真走到本分支即 `ERR_REQUIRE_ASYNC_MODULE`。
+ * 变量式 URL 两处一并绕开（同 `src/main/nikkisync/AGENTS.md` 硬性约定 1）。
+ *
+ * `isPackaged` 恒 `false`：自检跑在 Playwright 测试进程（plain Node），拿不到也不该猜打包产物的
+ * `resourcesPath` ⇒ `NIKKI_E2E_PACKAGED=1` 复验的是产物树里的应用，这一步判的仍是开发态链接的上游代码。
+ */
+function resolveGameDiscoveryUrl(): string {
+  const packaging = buildPackagingContext({ isPackaged: false, projectRoot: REPO_ROOT })
+  const root = resolveModuleRoot(NIKKISYNC_PACKAGES.pcCompanion, packaging)
+  return resolveDeepEntryUrl(root.root, GAME_DISCOVERY_DEEP_ENTRY)
+}
+
+/**
  * 上游安装根发现判据的最小合成形态：X6Game 目录 + 主程序文件 + 照片根空目录。
  *
+ * 主程序文件的**落点**由上游 `InstallationSearch.valid()` 钉死三选一（一次装置实测：
+ * `<root>/InfinityNikki.exe` 与 `<root>/X6Game/Binaries/Win64/X6Game.exe` 判 ACCEPT，
+ * 而 `<root>/X6Game/InfinityNikki.exe` 判 REJECT）——本函数原先把 exe 写在 X6Game 里，
+ * 于是合成根永远过不了下面的自检，`envSkipReason` 恒被置上，无真机根的机器上 G1/G2/G3 全 skip。
+ * 取判据第一位的 `<root>/InfinityNikki.exe`：少两层目录，也和真机根形态一致。
+ *
  * 上游 `isFile` 只看形态不看内容，但主程序文件**不能是 0 字节**——本机杀软会实时隔离
- * 0 字节的 `.exe`（实测：写入后 stat 即 missing，43 字节非 PE 文本存留），发现链随即
+ * 0 字节的 `.exe`（实测：写入后 stat 即 missing，37 字节非 PE 文本存留），发现链随即
  * not-found。写非空文本内容即可。
  */
 async function createInstallRootShape(root: string): Promise<void> {
   await fs.mkdir(path.join(root, 'X6Game', 'Saved', 'GamePlayPhotos'), { recursive: true })
   await fs.writeFile(
-    path.join(root, 'X6Game', 'InfinityNikki.exe'),
+    path.join(root, 'InfinityNikki.exe'),
     'e2e synthetic install root marker — not a PE binary\n'
   )
 }
@@ -180,18 +221,13 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
       // 环境自检（环境失败与逻辑失败分开）：测试进程内对合成根跑一次上游判据——失败 ⇒
       // 杀软隔离 / 形态漂移等环境问题，如实 skip 而非让 G1 红成假的逻辑失败（0 字节 exe
       // 被实时隔离、非 PE 文本被间歇性吞，都是这么现形的）。真机根无需自检。
-      const discovery =
-        (await import('@nikkisync/pc-companion/dist/src/game-directory-discovery.js')) as {
-          discoverInfinityNikkiInstallation: (options?: {
-            selectedInstallRoot?: string
-          }) => Promise<{ installRoot?: string } | undefined>
-        }
+      const discovery = (await import(resolveGameDiscoveryUrl())) as GameDirectoryDiscoveryModule
       const selfCheck = await discovery.discoverInfinityNikkiInstallation({
         selectedInstallRoot: SYNTH_INSTALL_ROOT
       })
       if (!selfCheck) {
         const exe = await fs
-          .stat(path.join(SYNTH_INSTALL_ROOT, 'X6Game', 'InfinityNikki.exe'))
+          .stat(path.join(SYNTH_INSTALL_ROOT, 'InfinityNikki.exe'))
           .then((s) => `${s.size}B isFile=${s.isFile()}`)
           .catch((e) => `missing(${(e as NodeJS.ErrnoException).code})`)
         envSkipReason = `合成兜底根未过上游判据（杀软拦截/环境问题，非被测代码缺陷）：exe=${exe}`

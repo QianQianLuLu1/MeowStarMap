@@ -155,6 +155,41 @@ export default [
       ]
     }
   },
+  // ============ NikkiSync 装载护栏扩面：e2e/（CI run #30 复盘） ============
+  // 上方块的 files 只钉 src/main/**，e2e/** 因此不在护栏内：run #30 的
+  // e2e/nikkisync-game-root.e2e.ts 写了字面量 import('@nikkisync/...')，npm run lint 全绿、
+  // 只有 CI 的 tsc --noEmit -p e2e 抓到 TS2307（CI 走 npm ci，无 link:nikkisync 建的 junction ⇒ 解析不到）。
+  // 只补这两条 @nikkisync 禁令、不展开 i18nGuardSelectors：e2e 用例合法包含中文 UI 断言
+  // （照片目录保存即生效那三条真窗判据），展开即成误报风暴。
+  // 同样不得加 Literal[value=/^@nikkisync\//]：会误伤 nikkisync-guard.ts 的 skip 原因串与
+  // scripts/__tests__/verify-nikkisync-link.test.ts 的 fixture 串。
+  // 本块不得设置 local/core-path-guard：core-path-gate.test.ts 按该规则筛块并 diff files 并集。
+  {
+    files: ['e2e/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['@nikkisync/*'],
+              allowTypeImports: true,
+              message:
+                'Load @nikkisync/* at runtime via src/main/nikkisync/runtime-loader.ts (variable dynamic import); use `import type` for types.'
+            }
+          ]
+        }
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: String.raw`ImportExpression[source.value=/^@nikkisync\//]`,
+          message:
+            '禁止字面量 import("@nikkisync/*")：CI 无 @nikkisync junction ⇒ tsc --noEmit -p e2e 报 TS2307，且 Playwright 的 CJS 转换会把可静态解析的 import() 折叠成 require()，上游 ESM 图含 top-level await 即抛 ERR_REQUIRE_ASYNC_MODULE。请经 src/main/nikkisync/embedding-paths.ts 的 resolveModuleRoot + resolveDeepEntryUrl 组出 URL 后变量式动态 import。'
+        }
+      ]
+    }
+  },
   // ============ 渲染进程专属约定护栏（docs/CODING_CONVENTIONS.md §1-§4） ============
   // 在 src/** 块之后覆盖 no-restricted-syntax，同时保留 i18n 护栏并追加以下禁令：
   //   §1 禁止渲染层 import('electron') / import ... from 'electron'
