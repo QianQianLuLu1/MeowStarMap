@@ -7,14 +7,47 @@
 
 ## 〇、CI 实况（全部历史失败运行，经 GitHub Actions API 免鉴权读取）
 
-| Run | 时间（UTC）      | head_sha  | 失败 job / 步骤                                                                 | 根因                                                                                 | 现状                                                                                                                           |
-| --- | ---------------- | --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| #21 | 2026-10-27 13:58 | `59b40a4` | Lint, Typecheck & Security / `Security audit (audit-ci, fail on high/critical)` | 依赖高危通告                                                                         | 已修：`d2ae917 fix(deps)` 把 zod 与 undici 重解析到已修复版本；`9451efd chore(audit)` 豁免 GHSA-jr5w-w6x2-84p9 并登记 DEBT-038 |
-| #22 | 2026-10-27 15:55 | `df2ab84` | 同上 / 同一步                                                                   | 同一轮依赖通告未清（`df2ab84` 那次「移除 package-lock 的 libc 可选依赖字段」未击中） | 同上                                                                                                                           |
-| #23 | 2026-10-28 12:18 | `d28564f` | Test (shard 5/10) / `npm test -- --shard=5/10` 退出码 1                         | CI（ubuntu-latest）上 connection 套件的 logger 落盘写与拆解竞态                      | 已修：`489ffbf fix(test): 静默 connection 套件的 logger 落盘写，修 CI shard 5 的拆解竞态`                                      |
-| #30 | 2026-11-04 05:50 | `77b0309` | Lint, Typecheck & Security / 步骤 11 `Typecheck e2e sources`                    | **本文件主题，未修**                                                                 | 本轮唯一动作项                                                                                                                 |
+| Run | 时间（UTC）      | head_sha  | 失败 job / 步骤                                                                 | 根因                                                                                  | 现状                                                                                                                           |
+| --- | ---------------- | --------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| #21 | 2026-10-27 13:58 | `59b40a4` | Lint, Typecheck & Security / `Security audit (audit-ci, fail on high/critical)` | 依赖高危通告                                                                          | 已修：`d2ae917 fix(deps)` 把 zod 与 undici 重解析到已修复版本；`9451efd chore(audit)` 豁免 GHSA-jr5w-w6x2-84p9 并登记 DEBT-038 |
+| #22 | 2026-10-27 15:55 | `df2ab84` | 同上 / 同一步                                                                   | 同一轮依赖通告未清（`df2ab84` 那次「移除 package-lock 的 libc 可选依赖字段」未击中）  | 同上                                                                                                                           |
+| #23 | 2026-10-28 12:18 | `d28564f` | Test (shard 5/10) / `npm test -- --shard=5/10` 退出码 1                         | CI（ubuntu-latest）上 connection 套件的 logger 落盘写与拆解竞态                       | 已修：`489ffbf fix(test): 静默 connection 套件的 logger 落盘写，修 CI shard 5 的拆解竞态`                                      |
+| #30 | 2026-11-04 05:50 | `77b0309` | Lint, Typecheck & Security / 步骤 11 `Typecheck e2e sources`                    | **本文件主题一**                                                                      | 已修：`229d6bb fix(e2e)`（run #31 该 job 实测转绿）                                                                            |
+| #31 | 2026-11-04 07:12 | `bb9f6df` | Test (shard 10/10) 与 Coverage Gate（同一条用例）                               | **本文件主题二**：`collectSystemInfo` 的裸 `require('electron')` 在无 path.txt 时抛错 | 已修：`df8ab01 fix(log)`；#30 早逝于 lint-typecheck ⇒ 下游全 skip，这两条一直埋在 main 上，直到 #31 才现形                     |
 
 判据：#23 之后 #24…#29 连续六次 `conclusion=success`，说明前三次失败已在树内清偿；本轮不重复处理，只把读数留在本表。
+一条非阻断 notice 每轮都在：`ubuntu-latest` 自 2026-10-19 起迁移到 Ubuntu 26（观察项，本轮不动 workflow）。
+
+## 〇-b、主题二：`log-service.test.ts:523` 的 CI 独占红（#31 现形）
+
+报错（shard 10/10 与 Coverage Gate 两个 job 的 annotation 逐字同文）：
+
+```
+AssertionError: expected [ 'startup-errors.log', …(3) ] to include 'manifest.json'
+ ❯ src/main/services/log-service.test.ts:523:22
+```
+
+机理（本机复刻，非推测）：
+
+1. `collectSystemInfo()` 头部两行 `const os = require('os')` / `const { app } = require('electron')`
+   **不在任何 try 内**（其余六处 `require('electron')` 全在 try 内，唯此一处裸奔）。
+2. CI 用 `npm ci --ignore-scripts` 装依赖 ⇒ electron 的 postinstall 不跑 ⇒ `node_modules/electron/path.txt` 不存在
+   ⇒ 该包 `index.js` 被 require 时直接 `throw new Error('Electron failed to install correctly, …')`。
+3. 抛出点落在 `exportLogsAsZip` 第 4 步之前 ⇒ 外层 catch（`logger.error(buildDiagnosticFailed)`）接管
+   ⇒ 第 4/5 步的 `system-info.json` 与 `manifest.json` 整段缺席 ⇒ staged 恰余 4 项，与 `…(3)` 读数吻合。
+4. 本机取证：把 `node_modules/electron/path.txt` 临时移开（模拟 CI 状态）后跑该文件，得
+   **逐字同一条红**（`1 failed | 43 passed`，同 `…(3)` 数组）；改后同条件 `44 passed`；
+   `path.txt` 已复原并验过 `require('electron')` 可达（本机两条路径都跑过，不留单向证据）。
+
+修法（取仓内既有形态、净删两行、不新增抽象）：`os` 改模块顶部静态 import；electron 复用文件顶部
+**已在 import 的 `app`**——函数内再 require 一份既是第二真相源、又绕过测试的 `vi.mock('electron')`、
+还在未装二进制的宿主上必抛。`log-service.ts` 属受保护路径，故同批替换了顶部 `@core-change` 原因行。
+
+为什么本机与装置都拦不住（如实记账，不在本轮动）：基座 `vitest.config.ts` 把 `electron` 别名到
+`tests/mocks/electron-inert.ts`，而装置第 5 轴（曾把 electron 指向必抛错的壳）已于早前回退
+（见 `vitest.ci-linux.config.ts:28-29` 与 `tests/ci-linux.setup.ts:22-23` 的在案说明）⇒
+`npm test` 与 `npm run test:ci-linux` 都不会加载真 electron，这类「装了包但没二进制」的失真只有 CI 能现形。
+是否把第 5 轴补回装置属另一项裁决，本轮不擅自推翻既有决策。
 
 ## 一、根因（check-run annotations + 本机 program 文件清单双重实锤）
 
@@ -236,6 +269,17 @@ pre-commit 会 `eslint --fix` / `prettier --write` 改写并重新暂存，提�
 `npm run verify` 「总计 4 项, 0 失败」。两组全量读数与 `77b0309` 基线（11-04 复查轮记的 7516 | 20 与 7533 | 3）
 **逐项相等** ⇒ 本轮零新增失败、零丢失用例。
 
-### 节点 5 待办
+### 节点 5（推送与远端复验）读数
 
-提交推送后经 API 读新 run 的 jobs / steps / annotations，把 `Lint, Typecheck & Security` 的实测结论回写本节。
+- push `77b0309..bb9f6df`（三笔：`38abb48` 计划、`229d6bb` 装载与护栏、`bb9f6df` 回写读数）⇒ 触发 run **#31**。
+- **#31 的 `Lint, Typecheck & Security` = success** ⇒ 主题一（本文件原定的动作项）在远端实测关闭，
+  `npm run typecheck:e2e` 在无 `@nikkisync` 链接的宿主上不再报 TS2307。
+- **#31 另有两条红**：`Test (shard 10/10)` 与 `Coverage Gate`，同一条用例 `log-service.test.ts:523`
+  ⇒ 即主题二（机理与取证见 〇-b）。这两个 job 在 #30 里是 `skipped`（needs 的 lint-typecheck 先红），
+  所以它们是**既存缺陷**而非本轮引入的回归——本轮把 main 推到全绿的过程，正是逐层掀开被 skip 掩盖的下游。
+- 主题二修复（`df8ab01`）后的本机读数：`lint` / `typecheck` / `i18n:guard` / `format:check` / `verify`（5 项 0 失败）全 0；
+  `npx vitest run src/main/services scripts/__tests__/path-semantics-guard.test.ts` 18 文件 505 passed；
+  `npm test` 470 文件 7516 passed | 20 skipped、`npm run test:ci-linux` 470 文件 7533 passed | 3 skipped
+  ——两轴与主题一收口时（即 `77b0309` 基线）**逐项相等**，零新增失败、零丢失用例。
+- 待回写：`df8ab01` + 本笔文档推送后的 run #32 结论。判据是整条 workflow `conclusion=success`
+  （含 10 个 test 分片、Coverage Gate 与 Windows build job），不只看单个 job。
