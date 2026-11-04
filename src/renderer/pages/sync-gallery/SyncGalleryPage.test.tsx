@@ -40,30 +40,48 @@ function asset(id: string): AssetMediaFile {
   } as unknown as AssetMediaFile
 }
 
-const { storeState, uiState, loadFirst, loadMore, openFullscreen, navigateTo } = vi.hoisted(() => {
-  const loadFirst = vi.fn(async () => undefined)
-  const loadMore = vi.fn(async () => undefined)
-  const openFullscreen = vi.fn()
-  const navigateTo = vi.fn()
-  const storeState = {
-    files: [] as unknown[],
-    cursor: null as string | null,
-    libraryRevision: null as number | null,
-    hasMore: false,
-    loading: false,
-    loadingMore: false,
-    error: null as string | null,
-    // 页面的 selector 是从 store 上取 action 的（`s.loadFirst`），所以动作必须挂在同一对象上
-    loadFirst,
-    loadMore,
-    reset: vi.fn()
-  }
-  const uiState = {
-    currentView: 'sync-gallery',
-    openFullscreen,
-    navigateTo
-  }
-  return { storeState, uiState, loadFirst, loadMore, openFullscreen, navigateTo }
+const { storeState, uiState, loadFirst, loadMore, openFullscreen, navigateTo, globalShowMessage } =
+  vi.hoisted(() => {
+    const loadFirst = vi.fn(async () => undefined)
+    const loadMore = vi.fn(async () => undefined)
+    const openFullscreen = vi.fn()
+    const navigateTo = vi.fn()
+    // 全局 Toast 的替身：捕获 useGlobalToast 的调用（Toast UI 本体由 ToastProvider.test.tsx 覆盖）
+    const globalShowMessage = vi.fn()
+    const storeState = {
+      files: [] as unknown[],
+      cursor: null as string | null,
+      libraryRevision: null as number | null,
+      hasMore: false,
+      loading: false,
+      loadingMore: false,
+      error: null as string | null,
+      // 页面的 selector 是从 store 上取 action 的（`s.loadFirst`），所以动作必须挂在同一对象上
+      loadFirst,
+      loadMore,
+      reset: vi.fn()
+    }
+    const uiState = {
+      currentView: 'sync-gallery',
+      openFullscreen,
+      navigateTo
+    }
+    return {
+      storeState,
+      uiState,
+      loadFirst,
+      loadMore,
+      openFullscreen,
+      navigateTo,
+      globalShowMessage
+    }
+  })
+
+// 页面将经全局 Toast 展示扫描失败：mock useGlobalToast 以断言接线（默认 context 是 no-op，
+// 不 mock 就什么也断言不到）
+vi.mock('../../components/common/ToastProvider', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>
+  return { ...actual, useGlobalToast: () => globalShowMessage }
 })
 
 vi.mock('../../stores/syncGalleryStore', () => ({
@@ -101,9 +119,12 @@ vi.mock('../../components/gallery/VirtualImageGrid', () => ({
 
 import { SyncGalleryPage } from './SyncGalleryPage'
 
-function setBridge(getRuntimeStatus: ReturnType<typeof vi.fn>): void {
+function setBridge(
+  getRuntimeStatus: ReturnType<typeof vi.fn>,
+  startScan: ReturnType<typeof vi.fn> = vi.fn(async () => undefined)
+): void {
   ;(window as unknown as { electronAPI?: unknown }).electronAPI = {
-    nikkisync: { getRuntimeStatus, startScan: vi.fn(), onLibraryChanged: vi.fn(() => undefined) }
+    nikkisync: { getRuntimeStatus, startScan, onLibraryChanged: vi.fn(() => undefined) }
   }
 }
 
@@ -120,6 +141,7 @@ beforeEach(() => {
   loadMore.mockReset()
   openFullscreen.mockReset()
   navigateTo.mockReset()
+  globalShowMessage.mockReset()
   Object.assign(storeState, {
     files: [],
     cursor: null,
@@ -232,5 +254,39 @@ describe('SyncGalleryPage 接线', () => {
       await Promise.resolve()
     })
     expect(screen.queryByTestId('grid')).toBeNull()
+  })
+
+  describe('扫描失败可见化（2026-11-04：此前只进 console，用户感知是「点了没反应」）', () => {
+    it('异常：startScan 失败时弹本地化「扫描失败」，不把英文原文与安装路径铺进 UI', async () => {
+      // 装机实锤形态：这条链上 AppError.preconditionFailed 不带 userMessage，
+      // extractUserMessage 会退化到 message，而 message 里拼着装配失败原文与绝对路径
+      const startScan = vi.fn(async () => {
+        throw new Error(
+          "NikkiSync runtime is not ready (Cannot find package 'qrcode' imported from " +
+            'D:\\App\\resources\\app.asar.unpacked\\node_modules\\@nikkisync\\pc-companion\\dist\\x.mjs)'
+        )
+      })
+      setBridge(statusMock, startScan)
+      render(<SyncGalleryPage />)
+      await waitFor(() => expect(loadFirst).toHaveBeenCalled())
+      fireEvent.click(screen.getByTitle('扫描游戏相册'))
+      await waitFor(() => expect(globalShowMessage).toHaveBeenCalledWith('扫描失败', 'error'))
+      // 反向钉：Toast 文本里不得出现未翻译原文或本机路径
+      expect(
+        globalShowMessage.mock.calls.every(
+          (call) => !/not ready|app\.asar|D:\\/i.test(String(call[0]))
+        )
+      ).toBe(true)
+    })
+
+    it('正常：startScan 成功时不弹错误 Toast', async () => {
+      const startScan = vi.fn(async () => undefined)
+      setBridge(statusMock, startScan)
+      render(<SyncGalleryPage />)
+      await waitFor(() => expect(loadFirst).toHaveBeenCalled())
+      fireEvent.click(screen.getByTitle('扫描游戏相册'))
+      await waitFor(() => expect(startScan).toHaveBeenCalledTimes(1))
+      expect(globalShowMessage).not.toHaveBeenCalled()
+    })
   })
 })

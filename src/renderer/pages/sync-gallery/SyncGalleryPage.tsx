@@ -11,6 +11,7 @@ import { SyncGalleryToolbar } from './SyncGalleryToolbar'
 import { SyncInsightPanel } from './SyncInsightPanel'
 import { SyncAssetDrawer } from './SyncAssetDrawer'
 import { ShareCardDialog } from '../../components/sync/ShareCardDialog'
+import { useGlobalToast } from '../../components/common/ToastProvider'
 import { extractUserMessage } from '../../../shared/errors/app-error'
 import type { NikkiSyncRuntimeStateInfo } from '../../../shared/types/electron-api'
 import type { AssetMediaFile } from '../../utils/assetViewModel'
@@ -28,6 +29,7 @@ import type { AssetMediaFile } from '../../utils/assetViewModel'
  */
 export const SyncGalleryPage: React.FC = () => {
   const { t } = useTranslation()
+  const showMessage = useGlobalToast()
   const { files, loading, loadingMore, hasMore, error, loadFirst, loadMore } = useSyncGalleryStore(
     useShallow((s) => ({
       files: s.files,
@@ -94,13 +96,17 @@ export const SyncGalleryPage: React.FC = () => {
     try {
       await api.startScan()
     } catch (e) {
-      // 扫描失败只提示，不清空已加载列表
+      // 扫描失败只提示，不清空已加载列表。失败必须让用户看见（此前只进 console，
+      // 用户感知是「点了没反应」），但文案走 i18n：这条链上 AppError.preconditionFailed
+      // 不带 userMessage，extractUserMessage 会退化到 message，而 message 拼着装配失败
+      // 原文与绝对安装路径（约定 §2：UI 不铺技术细节与路径）⇒ 详情只进日志
+      showMessage(t('toast.scanFailed'), 'error')
       console.error('[sync-gallery] startScan failed', extractUserMessage(e))
     } finally {
       setScanning(false)
       void refreshStatus()
     }
-  }, [scanning, refreshStatus])
+  }, [scanning, refreshStatus, showMessage, t])
 
   const handleSelect = useCallback(
     (_id: string, index: number) => {
