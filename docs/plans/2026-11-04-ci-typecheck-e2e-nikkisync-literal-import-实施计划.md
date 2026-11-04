@@ -178,5 +178,64 @@ pre-commit 会 `eslint --fix` / `prettier --write` 改写并重新暂存，提�
 
 ## 七、执行记录（边做边回写）
 
-- 修复前红灯读数（本机实测）：`npm run typecheck:e2e` 退出码 **0**（本机四条 junction 在位 ⇒ 解析得到，
-  正是「本地全绿、CI 独占红」的成因）；`npx tsc --noEmit -p e2e --listFiles` 越界行数 **2**。
+### 修复前红灯读数（本机实测）
+
+- `npm run typecheck:e2e` 退出码 **0**（本机四条 junction 在位 ⇒ 解析得到，正是「本地全绿、CI 独占红」的成因）。
+- `npx tsc --noEmit -p e2e --listFiles | grep -vF "$(pwd -W)"` 越界行数 **2**：
+  `../NikkiSync/apps/pc-companion/dist/src/game-directory-discovery.d.ts` 与
+  `../NikkiSync/apps/pc-companion/dist/src/WindowsInstallationHints.d.ts`（后者是前者的兄弟模块依赖）。
+- 远端 run #30：步骤 11 退出码 2，唯一一条 TS 错误 annotation ⇒ 与「program 只此一处越界」自洽。
+
+### 节点 1（护栏扩面）红灯读数
+
+- 插入 `files: ['e2e/**/*.ts']` 窄块后、改代码前：`npx eslint e2e/nikkisync-game-root.e2e.ts`
+  → `184:16 error 禁止字面量 import("@nikkisync/*")… no-restricted-syntax`，`✖ 1 problem (1 error, 0 warnings)`，退出码 1。
+- 无连带损伤：`npm run lint` 退出码 1 且**全仓只有那一条**。
+- 四个读 `eslint.config.js` 的套件 105 例全绿（core-path-gate 27 / verify-format-scope 36 / pack-identity-name 37 / source-encoding 5）。
+
+### 节点 2（改装载）绿灯读数
+
+- `npx eslint e2e` 退出码 0；`npm run lint` 退出码 0；`npm run typecheck:e2e` 退出码 0。
+- 越界行数 **2 → 0**（同一判据命令，输出为空）⇒ e2e program 已完全自包含，这才是「CI 上 typecheck:e2e 会绿」的充分本地证据
+  （本机永远有链接，直接跑命令看不出差别）。
+- 相关子集：`npx vitest run e2e/__tests__ src/main/nikkisync/embedding-paths.test.ts src/main/nikkisync/runtime-loader.test.ts`
+  → 7 文件 87 passed。
+
+### 节点 3（一次性装置）读数与一条附带发现
+
+装置（`.cache` 下两个一次性脚本，跑完即删、不入库）复刻改后的三步求址并取三段判据：
+
+- ① URL 落点 ✓：`file:///D:/…/WXNN%20XiangCe/node_modules/@nikkisync/pc-companion/dist/src/game-directory-discovery.js`
+  （空格与中文段被 `pathToFileURL` 百分号编码，Node 侧正常解回；仓库根含空格与中文不构成障碍）。
+- ② 导出形态 ✓：`typeof discoverInfinityNikkiInstallation === 'function'`。
+- ③ 首轮 **1 FAILED**：正例（合成安装根）返回 `undefined`。装置随即按上游 `InstallationSearch.valid()`
+  的三个候选落点各造一棵树复测，得矩阵：
+
+  | exe 落点                                  | 上游判定                                                                      |
+  | ----------------------------------------- | ----------------------------------------------------------------------------- |
+  | `<root>/InfinityNikki.exe`                | ACCEPT（`installRoot` 命中，`photoRoots` 收到 `X6Game/Saved/GamePlayPhotos`） |
+  | `<root>/X6Game/InfinityNikki.exe`         | **REJECT**（返回 `undefined`）                                                |
+  | `<root>/X6Game/Binaries/Win64/X6Game.exe` | ACCEPT                                                                        |
+
+  ⇒ 附带缺陷定位：`createInstallRootShape` 把标记 exe 写在 `X6Game` 里，正是被拒的那一形态
+  （文件头原注释「`X6Game/` 为目录 + `InfinityNikki.exe` 为文件」描述的是兄弟形态，实现与之分叉）。
+  后果不是红而是**恒 skip**：合成根永远过不了自己的自检 ⇒ `envSkipReason` 恒被置上 ⇒ 无真机游戏根的机器上
+  G1/G2/G3 三条真窗判据全部静默跳过。本轮把落点订正为判据第一位的 `<root>/InfinityNikki.exe`，
+  装置随即 **ALL PASS**（③ 正例返回所传根、负例返回 `undefined`）。
+
+- 同日顺带读数：37 字节非 PE 文本本轮存留未被隔离（注释里的「43 字节」是更早一份 marker 的读数，已按实测定语订正）。
+- 残留覆盖面缺口（如实记账）：该分支的覆盖只到装置，**没有**匹配套件——`npm run verify` 亦打印
+  `⚠ e2e/nikkisync-game-root.e2e.ts 缺少匹配套件`。补永久用例的前提不成立：跑真链路要 `@nikkisync` 链接（CI 无），
+  不跑真链路就得在本仓另立一份上游落点清单当判据（假真相源）。故按「装置取证 + 本表落档」收口。
+
+### 节点 4（全局回归）退出码读数
+
+`npm run typecheck` 0 / `npm run typecheck:e2e` 0 / `npm run lint` 0 / `npm run i18n:guard` 0 /
+`npm run format:check` 0 / 相关子集 52 文件 **948 passed** / `npm test` 470 文件
+**7516 passed | 20 skipped** / `npm run test:ci-linux` 470 文件 **7533 passed | 3 skipped** /
+`npm run verify` 「总计 4 项, 0 失败」。两组全量读数与 `77b0309` 基线（11-04 复查轮记的 7516 | 20 与 7533 | 3）
+**逐项相等** ⇒ 本轮零新增失败、零丢失用例。
+
+### 节点 5 待办
+
+提交推送后经 API 读新 run 的 jobs / steps / annotations，把 `Lint, Typecheck & Security` 的实测结论回写本节。
