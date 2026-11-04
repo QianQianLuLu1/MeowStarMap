@@ -1,5 +1,6 @@
-// @core-change: 诊断包原生日志改逐文件容错，单个文件被占用不再吞掉其余取证
+// @core-change: collectSystemInfo 的两处裸 require 在 CI 未装 electron 时抛错，拖垮整个诊断包装配
 import fs from 'fs'
+import os from 'os'
 import path from 'path'
 import { app, shell } from 'electron'
 import { logger, FaultRecord, getLogDirectory } from '../utils/logger'
@@ -342,9 +343,11 @@ interface SystemInfoApp {
   buildDate: string
 }
 async function collectSystemInfo(): Promise<Record<string, unknown>> {
-  const os = require('os')
-  const { app } = require('electron')
-
+  // os / app 走模块顶部的静态 import：此前这里写的是裸 require('os') / require('electron')，
+  // 而 CI 用 npm ci --ignore-scripts 装依赖（electron 的 postinstall 不跑 ⇒ 无 path.txt），
+  // node_modules/electron/index.js 在被 require 时直接抛「Electron failed to install correctly」，
+  // 这两行又不在任何 try 内 ⇒ collectSystemInfo 抛出 ⇒ exportLogsAsZip 的外层 catch 接管，
+  // system-info.json 与 manifest.json 双双缺席（CI run #31 的 shard 10 与 Coverage Gate 同一条红）。
   const info: Record<string, unknown> = {
     generatedAt: new Date().toISOString()
   }
