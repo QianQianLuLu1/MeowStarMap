@@ -207,3 +207,13 @@
 ### 8.8 现场残留
 
 `release/` = 本轮新包三件 + `win-unpacked`（新树）+ `build-20261105-qrcode`（旁路整树留底，其 `win-unpacked` 与标准名树 `app.asar` 哈希全等）+ 历史 7 棵 `build-*` + `win-unpacked.tmp`（标准配方失败时的半成品，被杀软句柄占住，删不动 ⇒ 如实留置，不谎称已清）。旧包三件在 `_safe_backup_20261105-qrcodefix/`。
+
+**订正（同日 11:22，用户要求清掉 `win-unpacked.tmp`）**：`fs.rmSync(recursive,force,maxRetries:10,retryDelay:2000)`
+**已成功清光该树除一颗 asar 外的全部内容**（143MB → 116K，`du -sh` 实测），余 `resources/default_app.asar` 一颗；
+对它「就地截断到 0 字节」**成功**（`truncateSync` 可行，印证被锁文件只挡 rename/unlink、允许就地覆盖），
+但 `unlink` 连续 7 次 `EBUSY`、同目录改名与整目录改名 `EPERM`、自底向上 `rmdir` `ENOTEMPTY` ⇒ **句柄仍在且不带 delete 共享**。
+早先「独占打开报 FREE」的判据**不可信**：libuv `openSync` 无法指定 share 模式（默认 READ|WRITE 不含 DELETE），
+它只证明「无人独占」不证明「可删」——判可删要直接用 `unlink`/同目录改名本身。本机 RestartManager 不可用（`rmcore.dll` 缺失），
+历史两批同形句柄一批 1.5–2h 自释、一批不自释 ⇒ **唯一确定清法是重启后 `rm -rf release/win-unpacked.tmp`**。
+影响面如实限定：该残壳已**不含 `app.asar.unpacked`**（`find` 实测 0 命中），不会被 `findAsarUnpacked` 当成待审目标、不干扰 `verify:dist`；
+但下次裸跑 `npm run dist:win` 会死在 builder 自己那句 `fs.rm`（`force` 只吞 ENOENT 不吞 EBUSY）⇒ 重启后先清，或继续走旁路。
