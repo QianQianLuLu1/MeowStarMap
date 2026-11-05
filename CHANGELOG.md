@@ -28,15 +28,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 ### Added | 新增
 
 - **CDN User-Agent 拦截的同名契约测试（2026-11-05）**：新增 `src/main/app/cdn-user-agent.test.ts`，直接单测固定 User-Agent 标识模块，覆盖正常路径（目标主机改写、其它主机零干预）、异常路径（URL 解析失败、requestHeaders 缺失、callback 抛错）、边界条件（空头对象、UA 大小写变体、伪冒主机）。
+- **更新失败归类、发布闸门与 dev 假更新源夹具（2026-11-05，`5edb719`）**：新增纯函数 `src/main/app/update-error-class.ts` 的 `classifyUpdateError`（把 electron-updater 的任意失败分成 `network` / `source`；传输层信号先于 `ERR_UPDATER_` 前缀判定，兜底取 `source`；入参 `unknown` 永不抛错）。`UpdatePayload` 新增**可选** `errorKind`（向后兼容，旧事件不带时仍按「网络繁忙」，`docs/IPC_CONTRACT.md` 补 §17 登记该组此前完全未入契约的 `app:update*` 四条通道）。`scripts/pre-dist-check.ts` 的 `--verify-asar` 尾部新增发布闸门 `verifyUpdateFeedArtifacts`——校验 `latest.yml` 存在、其 `version` 与 package.json 自洽、`path:` 指向的安装包在 `release/` 清单内，把「这份产物配不配被上传成更新源」钉成可判定断言。dev 假源夹具 `scripts/serve-dev-update-feed.ts`（仅 stdlib `node:http` + `node:crypto`，零新依赖）+ 仓库根 `dev-app-update.yml`（`updaterCacheDirName` 与生产包 `meow-star-map-updater` 物理隔离；只服务白名单内两个确切文件名，不做目录遍历；产物目录归一后落在任何 `release` 段内即拒绝启动——CI 发布 glob 是 `release/latest*.yml`，假元数据混入比误报本身更危险）。同名套件三份：`update-error-class.test.ts`（23 例）、`auto-update.test.ts`（17 例，该模块此前零同名套件，观测面为 `sendToRenderer` 入参）、`serve-dev-update-feed.test.ts`（17 例）；文案 12 语包齐补 `settings.about.updateSourceUnavailable` 与 `main.error.updaterNotInit`。
 
 ### Fixed | 修复
 
 - **CDN User-Agent 拦截回调被重复调用（2026-11-05）**：`src/main/app/cdn-user-agent.ts` 成功路径的 callback 若抛错，会被同一 try 的 catch 接住并再次调用，违反 Electron webRequest「callback 恰好一次」。改为在 listener 开头引入一次性 done 守卫，五个出口统一经 done，兜底重复调用直接弃权；fail-open 语义与日志文案不变。修复前先以红灯用例确认「expected 1 times but got 2 times」，修复后转绿。
+- **「检查更新」无论网络通不通都误报「当前网络繁忙」（2026-11-05，`5edb719`）**：设置页点「检查更新」恒弹「当前网络繁忙，点击确定跳转官网」，被告知的原因为假。四条独立根因：R1 更新源从未就绪（`dist:win` 走 `--publish never`，`release/latest.yml` 只留在开发机，实测现存 10 个 Release 无一携带该文件，而 `releases.atom` → 200 证明网络本来就通）；R2 beta 版本号把检查带进预发布分支（`package.json` 为 `2.5.7-beta` ⇒ 上游构造期 `allowPrerelease = hasPrereleaseComponents(currentVersion)` 为 true ⇒ `GitHubProvider` 逐条 `semver.valid(hrefTag)` 筛 feed，而本项目历史 tag 全非合法 semver ⇒ 跳过全部新版、命中远古 `2.5.0` 再取其 404 的 yml）；R3 错误分类缺失 + 文案一刀切（`on('error')` 把任何失败一并推成 `stage:'error'`，渲染层写死 `updateNetworkBusy`，`payload.errorMessage` 全仓只出现在类型定义从未渲染）；R4 开发版点了毫无反应（`checkForUpdates()` 未初始化时静默 return，而 handler 仍返回 `{checking:true}` ⇒ `about-sections.tsx` 里那条「接口不可用时兜底打开仓库」的 catch 永远走不到）。修法四条同批：钉 `allowPrerelease = false`（**不设 `channel`**——其 setter 连带把 `allowDowngrade` 置 true，且 `_channel` 非空会让 prerelease 分支恒取不到 tag）、新增归类器并按 `errorKind` 分流文案、未初始化改抛 `AppError.preconditionFailed`（`IPC_PRECONDITION_FAILED`）、发布闸门把 R1 做成可判定校验。原「确定 → 跳官网」与「发现新版本 → 应用内下载」两条行为逐字不变（各有回归锁钉住）。**代码代做不了的一步**：真实环境要出现下载弹窗，仍须发布人把 `release/latest.yml` 随 `.exe` 一并上传（或推 `v<semver>` tag 走 CI 的 Publish GitHub Release），且 feed 上需存在严格高于装机版本的 release。
+- **`downloadUpdate` 失败被双推成两条 error 事件（审查轮，`5edb719`）**：上游 `AppUpdater.downloadUpdate` 的 `errorHandler` 先 `dispatchError(e)` 再 `throw e`，所以 `on('error')` 已带 `errorKind` 推过一条，本模块 catch 里的 `pushUpdate` 是同失败的第二次推送——`UpdateDialog` 的订阅回调每次推送都 `setDismissed(false)`，用户刚点「关闭」的模态会被第二推弹回来；此外 `CancellationError`（上游刻意不 dispatch 的那一类）此前也会被 catch 误报成错误弹窗。改为 catch 只做带 `errorKind` 的日志、与同文件 `checkForUpdates()` 的 catch 同口径（error 由事件唯一负责）。红灯判据 `expected [ Array(2) ] to have a length of 1 but got 2`（此前该用例只 `mockRejectedValue`，测不到「先 emit 再 reject」的真实形状），修复后 17/17 绿。
 
 ### Changed | 变更
 
 - `src/main/app/__tests__/window-manager.test.ts` 的 UA-4 用例显式绑定 NODE_ENV，避免继承上一用例的运行分支。
 - 落盘本轮实施计划到 `docs/plans/2026-11-05-audit-verify-2.5.7-beta-repack-实施计划.md`。
+- 订正被本轮改动证伪的注释（`5edb719`）：`src/main/ipc/handlers/app-handler.ts` 的「dev 下 checkForUpdates no-op」（现抛 `IPC_PRECONDITION_FAILED`）与 `src/main/app/lifecycle.ts` 两处「仅生产环境」（dev 带 `MEOW_DEV_UPDATE_FEED=1` 时按假源真初始化）；模块指引 `src/main/app/AGENTS.md` 同步为「生产/dev 假源两态」并补齐 `update-error-class.ts` 行、把同名配套测试计数由过时的「27 个源文件 / 23 个有测试」订正为「29 / 26」（计数经实测得出，其余 5 个此前未列表的文件留待下一轮补齐）。
+- 本轮审查取证与全绿读数落盘为 `docs/plans/` 活文档一份；轮次快照的归档位置一律查 `docs/plans/archive/README.md` 的归档清单表。
+- 2.5.7-beta 重打包：产物 `MeowStarMap-Setup-2.5.7-beta.exe`（184,899,418 字节，较上轮 184,943,020 少 43,602），`release/latest.yml` 随构建重生成并由新闸门判自洽；上一轮同版本产物整体归档到 `release/` 下的轮次目录（该目录不入版本控制）。
 
 ---
 
