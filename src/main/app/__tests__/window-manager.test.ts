@@ -242,6 +242,10 @@ describe('createMainWindow', () => {
       )
     )
     expect(out.responseHeaders['Content-Security-Policy'][0]).toContain("script-src 'self'")
+    // img-src 必须放行 cdn.gongeo.us（衣橱/搭配码外链图唯一豁免主机），误删会导致图静默全破。
+    expect(out.responseHeaders['Content-Security-Policy'][0]).toContain(
+      "img-src 'self' media: data: https://cdn.gongeo.us"
+    )
   })
 
   it('5. ready-to-show 事件触发后 mainWindow.show() + taskScheduler.resume()', async () => {

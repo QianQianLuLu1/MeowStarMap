@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Virtuoso } from 'react-virtuoso'
 import { EmptyState } from '../common/EmptyState'
@@ -17,6 +17,7 @@ import {
   type NamePack
 } from '../../utils/resonance/staticData'
 import { processBannerPullData } from '../../utils/resonance/process'
+import { cdnImageUrl, type CdnImageCategory } from '../../utils/resonance/cdnImageUrl'
 import type {
   CatalogItemEntry,
   CatalogMakeupEntry,
@@ -37,8 +38,8 @@ import type { EvoRecord, ProcessedBanner } from '../../utils/resonance/types'
 
 /**
  * 我的衣橱子页：五分类（部件 / 妆容 / Momo / 道具 / 共鸣色）拥有状态管理。
- * 纯文字模式：无任何物品图片，稀有度用色点表达；套装/系列聚合 + 名称搜索 +
- * 拥有状态与稀有度筛选 + 批量勾选 + 「从共鸣记录推断」。全部数据本地，零联网。
+ * 实体图片按 CDN 地址外链热链、按需加载，失败回退色块/品质点；套装/系列聚合 + 名称搜索 +
+ * 拥有状态与稀有度筛选 + 批量勾选 + 「从共鸣记录推断」。全部数据本地，零脚本层联网。
  */
 
 type StatusFilter = 'all' | 'owned' | 'missing'
@@ -79,6 +80,17 @@ const FIELD_BY_CATEGORY = {
   prop: 'ownedPropIds',
   eureka_color: 'ownedEurekaColorIds'
 } as const satisfies Record<ResonanceWardrobeCategory, string>
+
+/** 衣橱分类 → 图片分类；套装图由组卡单独按 outfit 构造 */
+const IMAGE_CATEGORY_BY_WARDROBE: Readonly<
+  Record<ResonanceWardrobeCategory, 'item' | 'makeup' | 'momo' | 'prop' | 'eureka'>
+> = {
+  item: 'item',
+  makeup: 'makeup',
+  momo: 'momo',
+  prop: 'prop',
+  eureka_color: 'eureka'
+}
 
 function qualityColor(quality: number): string {
   if (quality === 5) return 'var(--warning)'
@@ -121,12 +133,19 @@ export const WardrobeView: React.FC = () => {
   const [inferOpen, setInferOpen] = useState(false)
   const [inferBusy, setInferBusy] = useState(false)
   const [pearpalBusy, setPearpalBusy] = useState(false)
+  /** 已加载失败的图片（分类 + 标识），失败后回退既有色块/品质点 */
+  const [failedImages, setFailedImages] = useState<ReadonlySet<string>>(() => new Set())
+
+  const markImageFailed = useCallback((key: string): void => {
+    setFailedImages((prev) => (prev.has(key) ? prev : new Set(prev).add(key)))
+  }, [])
 
   // 图鉴目录懒加载（损坏/缺失降级提示，不崩溃）；名称包跟随界面语言
   useEffect(() => {
     let cancelled = false
     void loadCatalog().then((data) => {
       if (cancelled) return
+      setFailedImages(new Set()) // 数据装载完成后清空失败标记，避免旧标记残留
       if (data) setCatalog(data)
       else setCatalogFailed(true)
     })
@@ -545,6 +564,29 @@ export const WardrobeView: React.FC = () => {
 
   const isFlatCategory = category === 'momo' || category === 'prop'
 
+  /** CDN 外链图片：按需加载、不携带 Referer；地址不可用或已失败时返回 null，由调用方回退占位 */
+  const renderCdnImage = (
+    imageCategory: CdnImageCategory,
+    id: number,
+    name: string,
+    className: string
+  ): React.ReactNode => {
+    const src = cdnImageUrl(imageCategory, id)
+    if (src === null) return null
+    const imageKey = `${imageCategory}:${id}`
+    if (failedImages.has(imageKey)) return null
+    return (
+      <img
+        src={src}
+        alt={name}
+        className={className}
+        loading="lazy"
+        referrerPolicy="no-referrer"
+        onError={() => markImageFailed(imageKey)}
+      />
+    )
+  }
+
   const renderEntityRow = (entity: WardrobeEntity, rowKey: string): React.ReactNode => (
     <label
       key={`${rowKey}-${entity.id}`}
@@ -559,19 +601,25 @@ export const WardrobeView: React.FC = () => {
         onChange={() => void handleToggle(entity.id, entity.owned)}
         aria-label={entity.name}
       />
-      {entity.swatch ? (
-        <span
-          className="w-3.5 h-3.5 rounded flex-shrink-0"
-          style={{ background: entity.swatch, border: '1px solid var(--divider)' }}
-          aria-hidden
-        />
-      ) : (
-        <span
-          className="w-2 h-2 rounded-full flex-shrink-0"
-          style={{ background: qualityColor(entity.quality) }}
-          aria-hidden
-        />
-      )}
+      {renderCdnImage(
+        IMAGE_CATEGORY_BY_WARDROBE[category],
+        entity.id,
+        entity.name,
+        'w-3.5 h-3.5 rounded flex-shrink-0 object-cover'
+      ) ??
+        (entity.swatch ? (
+          <span
+            className="w-3.5 h-3.5 rounded flex-shrink-0"
+            style={{ background: entity.swatch, border: '1px solid var(--divider)' }}
+            aria-hidden
+          />
+        ) : (
+          <span
+            className="w-2 h-2 rounded-full flex-shrink-0"
+            style={{ background: qualityColor(entity.quality) }}
+            aria-hidden
+          />
+        ))}
       <span className="text-sm flex-1 min-w-0 truncate">{entity.name}</span>
       {entity.swatch && (
         <span
@@ -600,11 +648,20 @@ export const WardrobeView: React.FC = () => {
           }
           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left"
         >
-          <span
-            className="w-2 h-2 rounded-full flex-shrink-0"
-            style={{ background: qualityColor(group.quality) }}
-            aria-hidden
-          />
+          {(category === 'item' && group.id !== null
+            ? renderCdnImage(
+                'outfit',
+                group.id,
+                group.name,
+                'w-3.5 h-3.5 rounded flex-shrink-0 object-cover'
+              )
+            : null) ?? (
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ background: qualityColor(group.quality) }}
+              aria-hidden
+            />
+          )}
           <span
             className="text-sm flex-1 min-w-0 truncate"
             style={{ color: 'var(--text-primary)' }}
@@ -699,6 +756,12 @@ export const WardrobeView: React.FC = () => {
               opacity: entity.owned ? 1 : 0.55
             }}
           >
+            {renderCdnImage(
+              'eureka',
+              entity.id,
+              entity.name,
+              'w-8 h-8 rounded-lg flex-shrink-0 object-cover'
+            )}
             {entity.owned && (
               <span
                 className="text-xs font-bold text-white"
@@ -728,7 +791,10 @@ export const WardrobeView: React.FC = () => {
                   ? { background: 'var(--accent)', color: 'var(--text-on-accent)' }
                   : { background: 'var(--bg-tertiary)', color: 'var(--text-secondary)' }
               }
-              onClick={() => setCategory(cat.key)}
+              onClick={() => {
+                setFailedImages(new Set()) // 切分类清空失败标记
+                setCategory(cat.key)
+              }}
             >
               {t(cat.labelKey)}
             </button>

@@ -92,11 +92,42 @@ const NETWORK_PATTERNS: Array<[RegExp, string]> = [
   [/https?:\/\/[^\s'"`<>)\\]+/, 'http(s):// URL 字面量（含外链图片/CSS 资源）']
 ]
 
+/** 经批准的图片主机清单：精确到唯一主机，不含子域、不含其他主机 */
+const APPROVED_IMAGE_HOSTS: readonly string[] = ['cdn.gongeo.us']
+
+const NETWORK_API_PATTERNS = NETWORK_PATTERNS.slice(0, -1)
+const [URL_LITERAL_PATTERN, URL_LITERAL_VIOLATION_LABEL] =
+  NETWORK_PATTERNS[NETWORK_PATTERNS.length - 1]!
+// 与 URL 字面量规则同源，仅额外带 g 以取全部匹配（避免共用正则的 lastIndex 污染）
+const URL_LITERAL_GLOBAL = new RegExp(URL_LITERAL_PATTERN.source, 'g')
+
+/**
+ * 源码中的 http(s) 字面量是否全部属于经批准图片主机。
+ * 仅 https 且 hostname 精确命中清单才放行；解析失败一律视为未批准（判违规），不吞异常。
+ */
+function hasOnlyApprovedImageUrls(code: string): boolean {
+  const literals = code.match(URL_LITERAL_GLOBAL)
+  if (literals === null) return false
+  return literals.every((literal) => {
+    try {
+      const parsed = new URL(literal)
+      return parsed.protocol === 'https:' && APPROVED_IMAGE_HOSTS.includes(parsed.hostname)
+    } catch {
+      return false
+    }
+  })
+}
+
 /** 扫描一段源码文本，返回违规描述列表 */
 export function scanSourceForNetwork(code: string): string[] {
   const violations: string[] = []
-  for (const [pattern, label] of NETWORK_PATTERNS) {
+  // 脚本层网络调用：布尔判定，保持原样
+  for (const [pattern, label] of NETWORK_API_PATTERNS) {
     if (pattern.test(code)) violations.push(label)
+  }
+  // URL 字面量：仅当存在字面量且并非全部来自经批准图片主机时才判违规
+  if (URL_LITERAL_PATTERN.test(code) && !hasOnlyApprovedImageUrls(code)) {
+    violations.push(URL_LITERAL_VIOLATION_LABEL)
   }
   return violations
 }
@@ -301,6 +332,70 @@ describe('离线断言：静态扫描共鸣录源码', () => {
     // 正常本地资源引用不应报警
     expect(scanSourceForNetwork("import thumb from './1.png'")).toEqual([])
     expect(scanSourceForNetwork('const src = getBannerThumbnailUrl(2)')).toEqual([])
+  })
+
+  const URL_LITERAL_LABEL = 'http(s):// URL 字面量（含外链图片/CSS 资源）'
+
+  it('经批准图片主机的 URL 字面量判为无违规（六类路径逐条）', () => {
+    const approvedSamples = [
+      '<img src="https://cdn.gongeo.us/images/outfits/10347.png" />',
+      "<img src='https://cdn.gongeo.us/images/items/icons/1020100001.png' />",
+      "<img src='https://cdn.gongeo.us/images/items/makeups/10399003.png' />",
+      "<img src='https://cdn.gongeo.us/images/momo/icons/1160100134.png' />",
+      "<img src='https://cdn.gongeo.us/images/props/1280010126.png' />",
+      "<img src='https://cdn.gongeo.us/images/eurekas/1341.png' />"
+    ]
+    for (const code of approvedSamples) {
+      expect(scanSourceForNetwork(code)).toEqual([])
+    }
+  })
+
+  it('反向用例：其他主机的 URL 字面量仍判违规', () => {
+    const otherHostSamples = [
+      '<img src="https://cdn.example.com/outfit.png" />',
+      "el.style.backgroundImage = 'url(https://ads.example/bg.png)'",
+      'const endpoint = "https://telemetry.example/collect"',
+      '<img src="https://evil.com/a.png" />'
+    ]
+    for (const code of otherHostSamples) {
+      expect(scanSourceForNetwork(code)).toContain(URL_LITERAL_LABEL)
+    }
+  })
+
+  it('反向用例：伪冒批准主机的 URL 仍判违规（精确 host，拒绝子域/非 https/用户名伪装）', () => {
+    const spoofSamples = [
+      'https://cdn.gongeo.us.evil.com/a.png',
+      'https://evil.com/?x=cdn.gongeo.us',
+      'https://cdn.gongeo.us@evil.com/a.png',
+      'https://sub.cdn.gongeo.us/a.png',
+      'http://cdn.gongeo.us/a.png',
+      'https://evilcdn.gongeo.us/a.png',
+      'https://cdn.gongeo.us.evil.com/?u=https://cdn.gongeo.us'
+    ]
+    for (const code of spoofSamples) {
+      expect(scanSourceForNetwork(code)).toContain(URL_LITERAL_LABEL)
+    }
+  })
+
+  it('反向用例：各类网络接口调用与混合源码仍判违规', () => {
+    const networkSamples: Array<[string, string]> = [
+      ['await fetch(url)', 'fetch() 调用'],
+      ['const x = new XMLHttpRequest()', 'XMLHttpRequest'],
+      ['new WebSocket("wss://x")', 'WebSocket'],
+      ["new EventSource('/sse')", 'EventSource'],
+      ['navigator.sendBeacon("/c", data)', 'sendBeacon'],
+      ["$fetch('/api')", '$fetch（ofetch）'],
+      ["axios.get('/api')", 'axios'],
+      ["import('https://remote.example/m.js')", '动态 import 远程 URL']
+    ]
+    for (const [code, label] of networkSamples) {
+      expect(scanSourceForNetwork(code)).toContain(label)
+    }
+    expect(
+      scanSourceForNetwork(
+        'const a = "https://cdn.gongeo.us/images/outfits/10347.png"\nconst b = "https://evil.com/track.png"'
+      )
+    ).toContain(URL_LITERAL_LABEL)
   })
 
   it('BANNER_DATA 与缩略图索引来自本地打包资源', () => {
