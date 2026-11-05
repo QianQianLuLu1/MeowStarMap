@@ -1,4 +1,4 @@
-// @core-change: 新增 app:gpu-status 只读通道，供诊断面板读取 GPU 硬件加速状态
+// @core-change: 订正 app:update:check 注释——dev 未初始化已改为抛 IPC_PRECONDITION_FAILED，不再是 no-op
 import { ipcMain, app } from 'electron'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandlerNoArgs } from '../validator'
@@ -49,7 +49,9 @@ export function registerAppHandlers(_ctx: HandlerContext): void {
     wrapHandlerNoArgs(_ctx, async () => collectGpuStatus())
   )
 
-  // 自动更新：渲染端主动触发检查（仅生产环境有效，dev 下 checkForUpdates no-op）
+  // 自动更新：渲染端主动触发检查。生产环境生效；dev 默认未初始化 ⇒ 该通道失败为
+  // IPC_PRECONDITION_FAILED（唯一调用方 about-sections 的 catch 据此兜底打开仓库页），
+  // 需要 dev 真检查时由 MEOW_DEV_UPDATE_FEED=1 + 仓库根 dev-app-update.yml 显式打开假更新源
   ipcMain.handle(
     'app:update:check',
     wrapHandlerNoArgs(_ctx, async () => {

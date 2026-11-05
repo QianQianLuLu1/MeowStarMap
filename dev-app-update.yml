@@ -1,0 +1,15 @@
+# dev 假更新源夹具（electron-updater 的 dev 配置文件，仓库根）
+#
+# 生效条件：`!app.isPackaged` 且环境变量 MEOW_DEV_UPDATE_FEED=1 —— 由
+# src/main/app/auto-update.ts 显式设 autoUpdater.forceDevUpdateConfig，缺一不生效。
+# 不会进生产包：package.json 的 build.files 白名单只收 dist/** 与 resources/**，
+# 仓库根的 *.yml 不被收录（由 scripts/__tests__/pre-dist-check.test.ts 的白名单契约用例钉住）。
+#
+# updaterCacheDirName 故意与生产包的 meow-star-map-updater 不同名：下载缓存物理隔离，
+# 用假源验证下载链路时落下的 pending 文件不会污染真包（清理=删这一个目录）。
+#
+# 用法：npx tsx scripts/serve-dev-update-feed.ts --version 9.9.9 --port 8123
+#       然后 MEOW_DEV_UPDATE_FEED=1 npm run dev
+provider: generic
+url: http://127.0.0.1:8123/
+updaterCacheDirName: meow-star-map-updater-dev

@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "アップデート",
       "updateNetworkBusy": "ネットワークが混雑しています。OKをクリックして公式サイトを開きます。",
+      "updateSourceUnavailable": "更新情報を取得できませんでした。OKをクリックして公式サイトを開きます。",
       "updateNoNewVersion": "すでに最新バージョンです",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "自動アップデータが初期化されていません（開発ビルドでは既定でスキップされます）",
       "databaseNotInit": ""
     },
     "favorites": {

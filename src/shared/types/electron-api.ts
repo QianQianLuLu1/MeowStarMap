@@ -407,6 +407,14 @@ export type UpdateStage =
   | 'downloaded' // 下载完成，待用户确认安装并重启
   | 'error' // 出错
 
+/**
+ * 更新失败的归类（2026-11-05 新增，可选字段，旧客户端忽略即可）：
+ *   - `network`：连不上更新源（DNS / 拒连 / 超时 / TLS 证书 / 5xx / 429）
+ *   - `source`：连得上，但更新源未就绪（缺 latest.yml / 无已发布版本 / feed 解析失败 / 4xx）
+ * 渲染层据此区分「当前网络繁忙」与「未获取到可用的更新信息」，避免把发布问题报成用户网络问题。
+ */
+export type UpdateErrorKind = 'network' | 'source'
+
 /** 主进程 → 渲染端 的更新事件载荷（app:update 通道） */
 export interface UpdatePayload {
   stage: UpdateStage
@@ -420,6 +428,8 @@ export interface UpdatePayload {
   releaseName?: string
   /** 错误信息（error 时存在） */
   errorMessage?: string
+  /** 错误归类（error 时存在）；缺省时渲染层按 network 处理，保持旧事件的「网络繁忙」文案不变 */
+  errorKind?: UpdateErrorKind
   /** 下载完成后为 true，渲染端据此展示「安装并重启」按钮 */
   readyToInstall?: boolean
 }

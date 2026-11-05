@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "Обновление",
       "updateNetworkBusy": "Сеть перегружена. Нажмите OK, чтобы открыть официальный сайт.",
+      "updateSourceUnavailable": "Не удалось получить данные об обновлении. Нажмите OK, чтобы открыть официальный сайт.",
       "updateNoNewVersion": "У вас уже установлена последняя версия",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "Автоматический обновитель не инициализирован (в dev-сборках пропускается по умолчанию)",
       "databaseNotInit": ""
     },
     "favorites": {

@@ -893,3 +893,38 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   （共享类型历史声明为 `unknown`，消费方以 `typeof === 'string'` 收窄）。
 - **消费方**：`ShareCodeDecoderDialog` clothDiy tab（阶段 4 起）。
 - **存量缺口**：decrypt 域既有 4 通道仍按 §14 备注待下次实质变更时补齐；本节只登记本次新增字段。
+
+## 17. 自动更新域 `app:update*` 通道与 `errorKind` 归类（2026-11-05 检查更新误报修复补录）
+
+该组通道此前**完全没写进契约文档**，本轮改动 `UpdatePayload` 结构，按契约同步义务一次性补录。
+
+- **通道清单**（注册于 `src/main/ipc/handlers/app-handler.ts`，均 `wrapHandlerNoArgs`；preload 侧
+  `window.electronAPI.app.*`，见 `src/main/preload/api/app.ts`）：
+  | 通道                                                                                           | preload 方法                  | 返回（`IpcResponse.data`） |
+  | ---------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
+  | `app:update:check`                                                                             | `checkUpdate()`               | `{ checking: true }`       |
+  | `app:update:download`                                                                          | `downloadUpdate()`            | `{ downloading: true }`    |
+  | `app:update:install`                                                                           | `installUpdate()`             | `{ installing: true }`     |
+  | `app:update`（主→渲染推送）                                                                    | `onUpdate(cb)`（`subscribe`） | `UpdatePayload`            |
+  | 弹窗「确定」按钮复用既有 `shell:openExternal`（§参数校验 `schemas.httpUrl`），本轮未改该通道。 |
+- **载荷变更**：`UpdatePayload`（真相源 `src/shared/types/electron-api.ts`）新增**可选**字段
+  `errorKind?: 'network' | 'source'`，仅在 `stage: 'error'` 时有意义。通道名、方法签名、
+  `IpcResponse`/`IpcError` 结构、其余字段语义均不变；旧事件不带 `errorKind` 时渲染层按 `network`
+  处理，故原「当前网络繁忙」提示逐字保持。`src/renderer/components/common/UpdateDialog.tsx` 内不再
+  抄副本类型，改为从 shared 引入并再导出（消除 §7 常见陷阱所列的多处副本漂移）。
+- **归类口径**（`src/main/app/update-error-class.ts`，纯函数）：`network` = 连不上更新源（Node
+  DNS/拒连/超时码、TLS 证书、`net::ERR_*`、HTTP 5xx/408/429）；`source` = 连得上但更新源未就绪
+  （`ERR_UPDATER_CHANNEL_FILE_NOT_FOUND` / `NO_PUBLISHED_VERSIONS` / `LATEST_VERSION_NOT_FOUND` /
+  `INVALID_RELEASE_FEED`、其余 4xx）。传输层信号**先于** `ERR_UPDATER_` 前缀判定，因为
+  `GitHubProvider` 会把 DNS 失败包装进 `ERR_UPDATER_LATEST_VERSION_NOT_FOUND` 的 message；
+  兜底方向取 `source`（兜底 `network` 正是本轮要消灭的误报形状）。
+- **行为变化（需调用方注意）**：`app:update:check` 在更新器未初始化（典型为开发版未开假更新源）时，
+  由「静默 no-op 但仍返回 `{checking:true}`」改为失败 `IPC_PRECONDITION_FAILED`
+  （`main.error.updaterNotInit`）。唯一调用方 `src/renderer/pages/settings/about-sections.tsx`
+  已用 try/catch 承接，其 catch 里那条「接口不可用时兜底打开仓库」的跳官网分支此前不可达、现在生效。
+- **i18n 新增键**：`settings.about.updateSourceUnavailable`（渲染层 source 分支正文）、
+  `main.error.updaterNotInit`（主进程 AppError 消息）；12 个语言包已全部补齐，`npm run i18n:guard` 通过。
+- **消费方**：`UpdateDialog`（挂在 `src/renderer/App.tsx`）、`AboutInfoSection`（设置→关于）。
+- **钉住测试**：`src/main/app/update-error-class.test.ts`（23 例，含「被包装的 DNS 失败必须判
+  network」的顺序契约）、`src/main/app/auto-update.test.ts`（17 例，观测面为 `sendToRenderer` 入参）、
+  `src/renderer/components/common/UpdateDialog.test.tsx`（17 例，含 render 型分流与 5 条回归锁）。

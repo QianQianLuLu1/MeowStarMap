@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "Cập nhật",
       "updateNetworkBusy": "Mạng đang bận. Nhấn OK để mở trang chủ.",
+      "updateSourceUnavailable": "Không tải được thông tin cập nhật. Nhấn OK để mở trang chủ.",
       "updateNoNewVersion": "Bạn đã dùng phiên bản mới nhất",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "Trình cập nhật tự động chưa được khởi tạo (bản dev bỏ qua theo mặc định)",
       "databaseNotInit": ""
     },
     "favorites": {

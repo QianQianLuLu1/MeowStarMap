@@ -1286,6 +1286,7 @@
       "checkUpdateHint": "Öffnet das GitHub-Repository im Browser; bitte neueste Version manuell herunterladen",
       "updateTitle": "Aktualisierung",
       "updateNetworkBusy": "Netzwerk ist ausgelastet. Klicken Sie auf OK, um zur Website zu gelangen.",
+      "updateSourceUnavailable": "Keine Update-Informationen verfügbar. Klicken Sie auf OK, um zur Website zu gelangen.",
       "updateNoNewVersion": "Sie verwenden bereits die neueste Version",
       "contactDesc": "GitHub-Repository, QQ-Gruppe und soziale Medien",
       "contactTitle": "Kontakt",
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "Auto-Updater ist nicht initialisiert (in Entwicklungsversionen standardmäßig übersprungen)",
       "databaseNotInit": ""
     },
     "favorites": {

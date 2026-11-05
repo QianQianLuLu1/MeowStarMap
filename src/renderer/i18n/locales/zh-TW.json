@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "更新",
       "updateNetworkBusy": "當前網路繁忙，點擊確定跳轉官網",
+      "updateSourceUnavailable": "未獲取到可用的更新資訊，點擊確定跳轉官網",
       "updateNoNewVersion": "當前已是最新版本",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "自動更新器未初始化（開發版預設跳過）",
       "databaseNotInit": ""
     },
     "favorites": {

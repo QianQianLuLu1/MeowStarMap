@@ -17,18 +17,11 @@ import { useTranslation } from 'react-i18next'
 // 与 about-sections.tsx 保持一致的项目官网
 const GITHUB_URL = 'https://github.com/QianQianLuLu1/MeowStarMap'
 
-export type UpdateStage =
-  'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+// 契约类型的单一来源在 shared（同一份载荷也由 preload 桥与主进程状态机引用）。
+// 此处只做再导出：历史上组件内抄了一份副本，新增 errorKind 时两处会静默漂移。
+import type { UpdatePayload, UpdateStage } from '../../../shared/types/electron-api'
 
-export interface UpdatePayload {
-  stage: UpdateStage
-  version?: string
-  percent?: number
-  releaseNotes?: string
-  releaseName?: string
-  errorMessage?: string
-  readyToInstall?: boolean
-}
+export type { UpdatePayload, UpdateStage }
 
 // error / not-available：带「关闭 / 确定」的模态；available / downloaded：下载安装决策模态
 const isModalStage = (s: UpdateStage): boolean =>
@@ -257,7 +250,11 @@ export const UpdateDialog: React.FC = () => {
                 maxHeight: '30vh'
               }}
             >
-              {t('settings.about.updateNetworkBusy')}
+              {/* 只有真的连不上更新源才配「网络繁忙」；连得上但源未就绪是发布问题，别报给用户当网络故障。
+                  缺省（旧事件不带 errorKind）仍走网络繁忙，保持原提示与跳转行为不变 */}
+              {payload.errorKind === 'source'
+                ? t('settings.about.updateSourceUnavailable')
+                : t('settings.about.updateNetworkBusy')}
             </p>
             <div className="flex justify-end gap-2 mt-auto">
               <button

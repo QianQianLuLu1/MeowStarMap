@@ -1695,6 +1695,7 @@
       "checkUpdateHint": "自动检查更新，发现新版本后可在应用内下载并安装",
       "updateTitle": "更新",
       "updateNetworkBusy": "当前网络繁忙，点击确定跳转官网",
+      "updateSourceUnavailable": "未获取到可用的更新信息，点击确定跳转官网",
       "updateNoNewVersion": "当前已是最新版本",
       "contactDesc": "GitHub 仓库、QQ 群与社交媒体",
       "contactTitle": "联系方式",
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "主窗口未初始化",
+      "updaterNotInit": "自动更新器未初始化（开发版默认跳过）",
       "databaseNotInit": "数据库未初始化"
     },
     "favorites": {

@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "Actualización",
       "updateNetworkBusy": "La red está ocupada. Haga clic en Aceptar para abrir el sitio web.",
+      "updateSourceUnavailable": "No se pudo obtener la información de actualización. Haga clic en Aceptar para abrir el sitio web.",
       "updateNoNewVersion": "Ya tiene la última versión",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "El actualizador automático no está inicializado (se omite de forma predeterminada en versiones de desarrollo)",
       "databaseNotInit": ""
     },
     "favorites": {

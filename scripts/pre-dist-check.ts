@@ -475,6 +475,146 @@ function checkArtifactOldNames(): void {
   )
 }
 
+// ===== 更新元数据自洽闸门（2026-11-05「检查更新误报网络繁忙」修复新增）=====
+// 取证结论：GitHub 上现存 Release 全部只带 .exe、没有 latest.yml（实测
+// `.../releases/download/MeowStarMap-Setup-2.5.6/latest.yml` → 404，而 `releases.atom` → 200，
+// 网络本来就有）。electron-updater 取不到 channel 文件必然抛错，客户端又把任何失败都显示成
+// 「当前网络繁忙」，于是**发布问题被误报成用户的网络问题**。electron-builder 每次构建都会在
+// release/ 生成 latest.yml，但 `dist:win` 走 `--publish never`，元数据一直留在开发机。
+// 本闸门在打包终点校验「这份产物配不配被上传成更新源」，并打印该由发布人执行的动作
+// （上传这一步代码无法代做：CI 的 Publish GitHub Release 步骤只在 push v* tag 时触发）。
+
+/** 更新元数据的缺陷分类（判定核与 fail 文案、单测共用一套码） */
+export type UpdateFeedProblem =
+  'missing-feed' | 'bad-app-version' | 'feed-unparsable' | 'version-mismatch' | 'missing-payload'
+
+export interface UpdateFeedArtifactsInput {
+  /** release/ 目录下的文件名清单（不含子路径） */
+  files: string[]
+  /** latest.yml 正文；文件不存在时为 null */
+  feedYml: string | null
+  /** package.json 的 version */
+  appVersion: string
+}
+
+/** 语义化版本（允许 -beta 一类预发布后缀），与客户端 app.getVersion() 的形态一致 */
+const FEED_SEMVER_RE = /^\d+\.\d+\.\d+(?:-[\w.]+)?$/
+
+/**
+ * 取 YAML 顶层标量（只匹配不缩进的键，避免误吃 files[] 里的同名字段），去引号与行尾空白。
+ * 只做本闸门需要的最小解析，不为此引入 YAML 依赖。
+ */
+function feedScalar(yml: string, key: string): string | null {
+  const matched = new RegExp(`^${key}:[ \\t]*["']?([^"'\\r\\n]+?)["']?[ \\t]*$`, 'm').exec(yml)
+  return matched ? matched[1].trim() : null
+}
+
+/** 取 files: 列表里各条 url（electron-builder 会把多文件都列上） */
+function feedFileUrls(yml: string): string[] {
+  const urls: string[] = []
+  for (const matched of yml.matchAll(
+    /^[ \t]*-[ \t]*url:[ \t]*["']?([^"'\\\r\n]+?)["']?[ \t]*$/gm
+  )) {
+    urls.push(matched[1].trim())
+  }
+  return urls
+}
+
+/**
+ * 判定 release 产物能否作为更新源上传（纯函数：不触磁盘、不改入参）。
+ * 顺序即判据：appVersion 合法性 → 元数据存在 → 可解析 → 版本自洽 → 安装包在列。
+ */
+export function verifyUpdateFeedArtifacts(input: UpdateFeedArtifactsInput): UpdateFeedProblem[] {
+  if (!FEED_SEMVER_RE.test(input.appVersion)) return ['bad-app-version']
+  if (input.feedYml === null) return ['missing-feed']
+  const version = feedScalar(input.feedYml, 'version')
+  const payload = feedScalar(input.feedYml, 'path')
+  if (version === null || payload === null) return ['feed-unparsable']
+  const problems: UpdateFeedProblem[] = []
+  if (version !== input.appVersion) problems.push('version-mismatch')
+  const listed = new Set(input.files)
+  const needed = [payload, ...feedFileUrls(input.feedYml)]
+  if (needed.some((name) => !listed.has(name))) problems.push('missing-payload')
+  return problems
+}
+
+/** 缺陷码 → 发布人可直接执行的修复指引 */
+function updateFeedProblemText(problem: UpdateFeedProblem, appVersion: string): string {
+  const action =
+    '修法：把 release/latest.yml 随安装包一起上传到本次 GitHub Release（编辑 Release 直接拖入），' +
+    '或推 v<semver> 形式的 tag 走 CI —— .github/workflows/build.yml 的 Publish GitHub Release 步骤' +
+    '已按 release/*.exe + release/latest*.yml 上传，但手工建的 Release 不会经过它'
+  switch (problem) {
+    case 'missing-feed':
+      return (
+        '更新元数据缺失：release/latest.yml 不存在 ⇒ 客户端 electron-updater 取不到 channel 文件，' +
+        '检查更新必然失败（当前会被显示成「当前网络繁忙」）'
+      )
+    case 'bad-app-version':
+      return (
+        `更新元数据校验中止：package.json 的 version=${JSON.stringify(appVersion)} 不是合法语义化版本` +
+        ' ⇒ electron-updater 构造期即抛 ERR_UPDATER_INVALID_VERSION'
+      )
+    case 'feed-unparsable':
+      return (
+        '更新元数据无法解析：latest.yml 缺 version 或 path 字段 ⇒ 不是 electron-builder 产出的 ' +
+        `channel 文件，不能拿去发布。${action}`
+      )
+    case 'version-mismatch':
+      return (
+        `更新元数据与本次构建不一致：latest.yml 的 version 不是 package.json 的 ${appVersion}` +
+        ' ⇒ 陈旧元数据会把客户端指向上一版安装包'
+      )
+    case 'missing-payload':
+      return (
+        '更新元数据指向的安装包不在 release/ 清单内 ⇒ 客户端读得到版本却下载不到包，' +
+        '确认 .exe / .blockmap 与 latest.yml 是同一次构建的产物'
+      )
+  }
+}
+
+/** 更新元数据自洽校验（打包终点硬性闸门，接在 --verify-asar 分支尾部） */
+function checkUpdateFeedArtifacts(): void {
+  const releaseDir = path.join(ROOT, 'release')
+  let files: string[]
+  try {
+    files = fs.readdirSync(releaseDir)
+  } catch (err) {
+    fail(`无法读取 release/ 目录：${(err as Error).message}`)
+    return
+  }
+  const feedPath = path.join(releaseDir, 'latest.yml')
+  let feedYml: string | null = null
+  if (fs.existsSync(feedPath)) {
+    try {
+      feedYml = fs.readFileSync(feedPath, 'utf-8')
+    } catch (err) {
+      fail(`无法读取 ${path.relative(ROOT, feedPath)}：${(err as Error).message}`)
+      return
+    }
+  }
+  let appVersion = ''
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf-8')) as {
+      version?: string
+    }
+    appVersion = String(pkg.version ?? '')
+  } catch (err) {
+    fail(`无法读取 package.json 的 version：${(err as Error).message}`)
+    return
+  }
+  const problems = verifyUpdateFeedArtifacts({ files, feedYml, appVersion })
+  if (problems.length === 0) {
+    pass(
+      `更新元数据自洽：latest.yml version=${appVersion} 且安装包在列 ⇒ 随 Release 上传后客户端才能真检查到版本`
+    )
+    return
+  }
+  for (const problem of problems) {
+    fail(updateFeedProblemText(problem, appVersion))
+  }
+}
+
 // ===== 新增：解包后原生二进制存在性校验 =====
 // 在 electron-builder 产出 release 后执行，确认三大原生模块的运行时二进制
 // 确实被解包进安装产物。仅做"存在性 + 路径"校验（R5：不在 Node 里 require，
@@ -1030,12 +1170,13 @@ function checkNoAdminManifest(): void {
 }
 
 function main(): void {
-  // 解包后校验模式：原生二进制存在性 + 管理员清单 + 产物内容禁串，不跑打包前 11 项
+  // 解包后校验模式：原生二进制存在性 + 管理员清单 + 产物内容禁串 + 更新元数据自洽，不跑打包前 11 项
   if (process.argv.includes('--verify-asar')) {
-    console.log('\n[pre-dist-check] 解包后产物校验（原生二进制 + 内容禁串）\n')
+    console.log('\n[pre-dist-check] 解包后产物校验（原生二进制 + 内容禁串 + 更新元数据）\n')
     checkUnpackedNativeBinaries()
     checkNoAdminManifest()
     checkArtifactOldNames()
+    checkUpdateFeedArtifacts()
     console.log('')
     if (failed) {
       console.error('[pre-dist-check] ❌ 解包产物校验失败，禁止发布。\n')

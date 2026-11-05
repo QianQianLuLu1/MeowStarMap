@@ -1,5 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
@@ -14,6 +22,7 @@ import {
   scanBufferForBanned,
   resolveVerifyAsarTarget,
   deriveUnpackedTarget,
+  verifyUpdateFeedArtifacts,
   type JsTreeFile
 } from '../pre-dist-check'
 import {
@@ -831,5 +840,169 @@ describe('打包态 @nikkisync 外部依赖闭包闸门：判定核复用同一�
     } finally {
       rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 300 })
     }
+  })
+})
+
+/**
+ * 更新元数据自洽闸门（2026-11-05「检查更新误报」修复新增）。
+ *
+ * 回归背景：设置页点「检查更新」永远弹「当前网络繁忙，点击确定跳转官网」。取证结论之一是
+ * GitHub 上现存 10 个 Release 全部只带 .exe、**没有一个带 latest.yml**
+ * （实测 `.../releases/download/MeowStarMap-Setup-2.5.6/latest.yml` → 404，而 `releases.atom` → 200
+ * ——网络本来就是通的）。electron-builder 每次构建都在 release/ 生成 latest.yml，但 `dist:win`
+ * 走 `--publish never`，元数据留在开发机，于是「包发出去了、更新源永远读不到」，客户端必然报错
+ * 并被误报成用户网络问题。
+ *
+ * 本闸门把「这份产物配不配被当作更新源上传」钉成可判定断言。R1 的修复动作是发布时把 latest.yml
+ * 一并上传，代码无法代做；真目录（本机 release/）本来自洽，所以**红灯只能来自 fixture**，
+ * 不是来自真目录扫描。
+ */
+describe('verifyUpdateFeedArtifacts —— latest.yml 与安装包必须自洽', () => {
+  const FEED_OK = [
+    'version: 2.5.7-beta',
+    'files:',
+    '  - url: MeowStarMap-Setup-2.5.7-beta.exe',
+    '    sha512: Q2LZJInhlKvLVK3KNzmobBkDitshvizIediUnADUJ4HzN0JX6oI/fkoEyIg+pCZBWWn7b70aU41DWVeiAPwEYw==',
+    '    size: 184943020',
+    'path: MeowStarMap-Setup-2.5.7-beta.exe',
+    "releaseDate: '2026-11-05T03:43:21.279Z'"
+  ].join('\n')
+  const FILES_OK = [
+    'MeowStarMap-Setup-2.5.7-beta.exe',
+    'MeowStarMap-Setup-2.5.7-beta.exe.blockmap',
+    'builder-debug.yml',
+    'latest.yml'
+  ]
+
+  it('正常：元数据自洽 ⇒ 无问题', () => {
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: FEED_OK, appVersion: '2.5.7-beta' })
+    ).toEqual([])
+  })
+
+  it('异常：缺 latest.yml ⇒ missing-feed（线上 10 个 Release 的真实形状）', () => {
+    expect(
+      verifyUpdateFeedArtifacts({
+        files: ['a.exe', 'latest.yml'],
+        feedYml: null,
+        appVersion: '2.5.7-beta'
+      })
+    ).toEqual(['missing-feed'])
+  })
+
+  it('异常：release 目录清单为空 ⇒ missing-feed，不得静默放行', () => {
+    expect(
+      verifyUpdateFeedArtifacts({ files: [], feedYml: null, appVersion: '2.5.7-beta' })
+    ).toEqual(['missing-feed'])
+  })
+
+  it('异常：正文缺 version ⇒ feed-unparsable', () => {
+    const broken = FEED_OK.replace('version: 2.5.7-beta\n', '')
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: broken, appVersion: '2.5.7-beta' })
+    ).toEqual(['feed-unparsable'])
+  })
+
+  it('异常：正文缺 path ⇒ feed-unparsable（只有 files[] 也不算就绪）', () => {
+    const broken = FEED_OK.split('\n')
+      .filter((l) => !l.startsWith('path:'))
+      .join('\n')
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: broken, appVersion: '2.5.7-beta' })
+    ).toEqual(['feed-unparsable'])
+  })
+
+  it('异常：yml 版本与 package.json 不一致 ⇒ version-mismatch（防把上一版的元数据传到新 Release）', () => {
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: FEED_OK, appVersion: '2.5.8' })
+    ).toEqual(['version-mismatch'])
+  })
+
+  it('异常：path 指向的 exe 不在清单 ⇒ missing-payload（防只传 yml 没传包）', () => {
+    expect(
+      verifyUpdateFeedArtifacts({
+        files: ['latest.yml', 'builder-debug.yml'],
+        feedYml: FEED_OK,
+        appVersion: '2.5.7-beta'
+      })
+    ).toEqual(['missing-payload'])
+  })
+
+  it('边界：files[] 里另一个 url 缺件同样点名 missing-payload', () => {
+    const twoFiles = [
+      'version: 2.5.7-beta',
+      'files:',
+      '  - url: MeowStarMap-Setup-2.5.7-beta.exe',
+      '  - url: MeowStarMap-Setup-2.5.7-beta-portable.exe',
+      'path: MeowStarMap-Setup-2.5.7-beta.exe'
+    ].join('\n')
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: twoFiles, appVersion: '2.5.7-beta' })
+    ).toEqual(['missing-payload'])
+  })
+
+  it('边界：appVersion 非法形态 ⇒ bad-app-version，且不再往下判', () => {
+    for (const bad of ['', 'abc', '2.5', 'v2.5.7-beta-beta']) {
+      expect(
+        verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: FEED_OK, appVersion: bad })
+      ).toEqual(['bad-app-version'])
+    }
+  })
+
+  it('边界：值带引号或行尾空格仍能解析（electron-builder 对 releaseDate 加引号）', () => {
+    const quoted = ['version: "2.5.7-beta" ', 'path: "MeowStarMap-Setup-2.5.7-beta.exe"'].join('\n')
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: quoted, appVersion: '2.5.7-beta' })
+    ).toEqual([])
+  })
+
+  it('边界：预发布版本号（含 -beta）必须被认作合法 appVersion', () => {
+    expect(
+      verifyUpdateFeedArtifacts({
+        files: ['x.exe'],
+        feedYml: 'version: 2.5.7-beta\npath: x.exe',
+        appVersion: '2.5.7-beta'
+      })
+    ).toEqual([])
+  })
+
+  it('幂等：同一输入重复判定结果一致（纯函数，不触磁盘、不改入参）', () => {
+    const input = { files: [...FILES_OK], feedYml: FEED_OK, appVersion: '2.5.7-beta' }
+    const first = verifyUpdateFeedArtifacts(input)
+    expect(verifyUpdateFeedArtifacts(input)).toEqual(first)
+    expect(input.files).toHaveLength(FILES_OK.length)
+  })
+
+  // 真实产物契约：本机跑过 dist:win 时，release/latest.yml 必须自洽。
+  // ubuntu CI 上没有 release/（build job 在 windows-latest），按产物在位门控，不伪装成失败。
+  const realFeedPath = path.join(ROOT, 'release', 'latest.yml')
+  it.runIf(existsSync(realFeedPath))(
+    '契约：本机 release/latest.yml 与 package.json 版本自洽',
+    () => {
+      const yml = readFileSync(realFeedPath, 'utf-8')
+      const pkgVersion = String(
+        (JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf-8')) as { version?: string })
+          .version ?? ''
+      )
+      const listed = readdirSync(path.join(ROOT, 'release'))
+      expect(
+        verifyUpdateFeedArtifacts({ files: listed, feedYml: yml, appVersion: pkgVersion })
+      ).toEqual([])
+    }
+  )
+
+  it('契约：dev 假更新源夹具不进生产包（build.files 白名单不收仓库根 yml）', () => {
+    expect(existsSync(path.join(ROOT, 'dev-app-update.yml'))).toBe(true)
+    const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf-8')) as {
+      build?: { files?: unknown[] }
+    }
+    const patterns = (pkg.build?.files ?? []).filter(
+      (entry): entry is string => typeof entry === 'string'
+    )
+    // 能吃掉仓库根 dev-app-update.yml 的只有这几种形态：裸通配 / 根级 yml
+    const rootYmlEaters = patterns.filter(
+      (p) => p === '**/*' || p === '*' || p === '*.yml' || p === '**/*.yml'
+    )
+    expect(rootYmlEaters).toEqual([])
   })
 })

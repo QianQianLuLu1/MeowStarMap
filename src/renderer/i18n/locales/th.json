@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "อัปเดต",
       "updateNetworkBusy": "เครือข่ายไม่ว่าง คลิกตกลงเพื่อเปิดเว็บไซต์ทางการ",
+      "updateSourceUnavailable": "ไม่สามารถโหลดข้อมูลอัปเดตได้ คลิกตกลงเพื่อเปิดเว็บไซต์ทางการ",
       "updateNoNewVersion": "คุณใช้เวอร์ชันล่าสุดอยู่แล้ว",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "ตัวอัปเดตอัตโนมัติยังไม่ถูกเริ่มต้น (จะข้ามไปตามค่าเริ่มต้นในรุ่นนักพัฒนา)",
       "databaseNotInit": ""
     },
     "favorites": {

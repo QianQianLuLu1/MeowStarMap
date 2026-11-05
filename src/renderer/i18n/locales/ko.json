@@ -1334,6 +1334,7 @@
       },
       "updateTitle": "업데이트",
       "updateNetworkBusy": "네트워크가 혼잡합니다. 확인을 눌러 공식 사이트로 이동하세요.",
+      "updateSourceUnavailable": "업데이트 정보를 불러올 수 없습니다. 확인을 눌러 공식 사이트로 이동하세요.",
       "updateNoNewVersion": "이미 최신 버전입니다",
       "depDescTodo": {
         "gongeous": "(This acknowledgment entry is a placeholder in English, pending translation)"
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "자동 업데이트가 초기화되지 않았습니다 (개발 빌드에서는 기본적으로 건너뜁니다)",
       "databaseNotInit": ""
     },
     "favorites": {

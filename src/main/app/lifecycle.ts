@@ -27,7 +27,7 @@ import { applyUITheme, setupThemeListener } from './theme'
 // sync-integration 阶段 4：NikkiSync HTTPS 同步服务器装配与自启
 import { initSyncServer } from './sync-server-setup'
 import { initNikkiSyncRuntime } from './nikkisync-runtime-setup'
-// 自动更新：复用 electron-updater，仅生产环境初始化
+// 自动更新：复用 electron-updater，生产环境初始化（dev 仅在 MEOW_DEV_UPDATE_FEED=1 时按假源初始化）
 import { initAutoUpdater } from './auto-update'
 import {
   performStartupScan,
@@ -360,7 +360,8 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 放在 pluginHost.setMainWindow 之后，确保 dialog 有正确的父级
     flushPendingRecoveryEvents(ctx)
 
-    // 阶段 6.5：初始化自动更新（仅生产环境；dev 下 initAutoUpdater 内部直接跳过）
+    // 阶段 6.5：初始化自动更新（生产环境；dev 下仅 MEOW_DEV_UPDATE_FEED=1 时按 dev-app-update.yml
+    // 的假更新源初始化，其余 dev 场景由 initAutoUpdater 内部直接跳过 ⇒ app:update:check 抛错）
     // 仅注册监听器与 IPC 通道，不自动检查更新——由用户手动触发（设置页 → 检查更新）
     try {
       initAutoUpdater(ctx)

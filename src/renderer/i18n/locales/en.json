@@ -1286,6 +1286,7 @@
       "checkUpdateHint": "Automatically checks for updates; new versions download and install in-app",
       "updateTitle": "Update",
       "updateNetworkBusy": "Network is busy. Click OK to open the official site.",
+      "updateSourceUnavailable": "Couldn't load update info. Click OK to open the official site.",
       "updateNoNewVersion": "You are already on the latest version",
       "contactDesc": "GitHub repo, QQ group, and social media",
       "contactTitle": "Contact",
@@ -2836,6 +2837,7 @@
     },
     "error": {
       "mainWindowNotInit": "",
+      "updaterNotInit": "Auto-updater is not initialized (skipped by default in dev builds)",
       "databaseNotInit": ""
     },
     "favorites": {
