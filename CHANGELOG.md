@@ -21,6 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ---
 
+## [2.5.7-beta] - 2026-11-05
+
+> 2.5.7-beta：预提交审查收口定版。四处版本声明位（package.json / lock 根与 packages[""] / preview mock / release/latest.yml）同步为 2.5.7-beta，安装包名随 artifactName 模板为 MeowStarMap-Setup-2.5.7-beta.exe。
+
+### Added | 新增
+
+- **CDN User-Agent 拦截的同名契约测试（2026-11-05）**：新增 `src/main/app/cdn-user-agent.test.ts`，直接单测固定 User-Agent 标识模块，覆盖正常路径（目标主机改写、其它主机零干预）、异常路径（URL 解析失败、requestHeaders 缺失、callback 抛错）、边界条件（空头对象、UA 大小写变体、伪冒主机）。
+
+### Fixed | 修复
+
+- **CDN User-Agent 拦截回调被重复调用（2026-11-05）**：`src/main/app/cdn-user-agent.ts` 成功路径的 callback 若抛错，会被同一 try 的 catch 接住并再次调用，违反 Electron webRequest「callback 恰好一次」。改为在 listener 开头引入一次性 done 守卫，五个出口统一经 done，兜底重复调用直接弃权；fail-open 语义与日志文案不变。修复前先以红灯用例确认「expected 1 times but got 2 times」，修复后转绿。
+
+### Changed | 变更
+
+- `src/main/app/__tests__/window-manager.test.ts` 的 UA-4 用例显式绑定 NODE_ENV，避免继承上一用例的运行分支。
+- 落盘本轮实施计划到 `docs/plans/2026-11-05-audit-verify-2.5.7-beta-repack-实施计划.md`。
+
+---
+
 ## [2.5.6] - 2026-11-01
 
 > 2.5.6：全屏预览与同步图库缺陷修复的收口定版。四处版本声明位（`package.json` / lock 根 / preview mock / `release/latest.yml`）同步为 `2.5.6`，安装包名随 `artifactName` 模板为 `MeowStarMap-Setup-2.5.6.exe`。
@@ -528,7 +547,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库已有 8 个 tag，但**全部不带 `v` 前缀**——无前缀形式（`2.3.6`、`2.5.0`）与旧项目名前缀形式（`NikkiGallery2.3.6`、`NikkiGallery2.5.0` / `2.5.1` / `2.5.2` / `2.5.3`、`NikkiGallery2.5.5-beta`）。因此下列 `compare/vX...vY` 与 `releases/tag/vX` 链接**实际均不可访问**（2026-10-24 复核）。处置：除 `[Unreleased]` 因 `scripts/__tests__/check-changelog-release.test.ts` 的契约要求必须保持 `compare/v<最新版本>...HEAD` 形式而原样保留外，其余各版本锚点一律改为指向 Releases 页面，确保链接可用；待补打 `vX.Y.Z` tag 后可整体恢复 compare 形式。
 
-[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.6...HEAD
+[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.7-beta...HEAD
+[2.5.7-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.6]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.6-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.5]: https://github.com/QianQianLuLu1/MeowStarMap/releases

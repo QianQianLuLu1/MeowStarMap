@@ -15,6 +15,7 @@ import {
 import { logGpuStatusSummary } from './gpu-status'
 import { guardNavigation } from './navigation-guard'
 import { t } from '../i18n'
+import { registerCdnUserAgent } from './cdn-user-agent'
 
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
 // 单独一处都能被绕过：响应头缺失时靠 meta，HTML 被替换时靠响应头。
@@ -55,6 +56,8 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
   // 开发模式加载 vite dev server，其注入的 react-refresh preamble 是 inline script，
   // 严格 script-src 会挡掉热更新。发布产物走 loadFile 分支，CSP 始终生效。
   const isDev = process.env.NODE_ENV === 'development'
+  // 首个文档/图片请求发出前必须完成注册；与 onHeadersReceived 不同 hook，互不覆盖。
+  registerCdnUserAgent()
   if (!isDev) {
     applyContentSecurityPolicy()
   }

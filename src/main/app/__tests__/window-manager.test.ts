@@ -24,7 +24,8 @@ const {
   markBootSuccessMock,
   markAppBootedMock,
   requestSelfHealMock,
-  isStartupPhaseMock
+  isStartupPhaseMock,
+  loggerWarnMock
 } = vi.hoisted(() => ({
   showMessageBoxMock: vi.fn(),
   appQuitMock: vi.fn(),
@@ -36,7 +37,8 @@ const {
   markBootSuccessMock: vi.fn(),
   markAppBootedMock: vi.fn(),
   requestSelfHealMock: vi.fn(() => false),
-  isStartupPhaseMock: vi.fn(() => false)
+  isStartupPhaseMock: vi.fn(() => false),
+  loggerWarnMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -57,14 +59,15 @@ vi.mock('electron', () => ({
   session: {
     defaultSession: {
       webRequest: {
-        onHeadersReceived: vi.fn()
+        onHeadersReceived: vi.fn(),
+        onBeforeSendHeaders: vi.fn()
       }
     }
   }
 }))
 
 vi.mock('../../utils/logger', () => ({
-  logger: { error: loggerErrorMock },
+  logger: { error: loggerErrorMock, warn: loggerWarnMock },
   logFault: logFaultMock
 }))
 
@@ -162,6 +165,7 @@ beforeEach(() => {
   markAppBootedMock.mockReset()
   requestSelfHealMock.mockReset()
   isStartupPhaseMock.mockReset()
+  loggerWarnMock.mockReset()
   // 默认：非启动期、且自愈不触发（维持既有 dialog 流程）
   isStartupPhaseMock.mockReturnValue(false)
   requestSelfHealMock.mockReturnValue(false)
@@ -676,5 +680,160 @@ describe('getMainWindow', () => {
     const result = getMainWindow(ctx)
     expect(result).toBe(mockWin)
     expect(getFocusedWindowMock).not.toHaveBeenCalled()
+  })
+})
+
+// cdn.gongeo.us 固定 User-Agent 标识的契约测试。
+// 期望值一律用字面量：红灯阶段实现模块尚不存在，不得 import 被测模块。
+type BeforeHeaders = Record<string, string>
+type BeforeResponse = { requestHeaders?: BeforeHeaders }
+type BeforeSendDetails = { url: string; requestHeaders?: BeforeHeaders }
+type BeforeSendListener = (
+  details: BeforeSendDetails,
+  callback: (response: BeforeResponse) => void
+) => void
+
+function webRequestMocks(): {
+  onBeforeSendHeaders: ReturnType<typeof vi.fn>
+  onHeadersReceived: ReturnType<typeof vi.fn>
+} {
+  return session.defaultSession.webRequest as unknown as {
+    onBeforeSendHeaders: ReturnType<typeof vi.fn>
+    onHeadersReceived: ReturnType<typeof vi.fn>
+  }
+}
+
+/** clearMocks:false：共享 vi.fn 的调用历史跨用例累积，取回调前必须手动清 */
+async function getRegisteredListener(nodeEnv: string): Promise<BeforeSendListener> {
+  const onBefore = webRequestMocks().onBeforeSendHeaders
+  onBefore.mockClear()
+  loggerWarnMock.mockClear()
+  process.env.NODE_ENV = nodeEnv
+  await createMainWindow(makeAppCtx())
+  expect(onBefore).toHaveBeenCalledTimes(1)
+  return onBefore.mock.calls[0][0] as BeforeSendListener
+}
+
+function drive(listener: BeforeSendListener, details: BeforeSendDetails): Promise<BeforeResponse> {
+  return new Promise((resolve) => listener(details, resolve))
+}
+
+function hasWarn(text: string): boolean {
+  return loggerWarnMock.mock.calls.some((call) => String(call[0]).includes(text))
+}
+
+describe('createMainWindow / cdn.gongeo.us 固定 User-Agent', () => {
+  it('UA-1 目标主机 cdn.gongeo.us 的请求 User-Agent 被设为 MeowStarMap', async () => {
+    const listener = await getRegisteredListener('production')
+    const original = { Accept: 'image/avif,image/webp,*/*', 'User-Agent': 'Mozilla/5.0 Chrome/131' }
+    const out = await drive(listener, {
+      url: 'https://cdn.gongeo.us/images/items/icons/1020100001.png',
+      requestHeaders: { ...original }
+    })
+
+    expect(out.requestHeaders).toBeDefined()
+    expect(out.requestHeaders!['User-Agent']).toBe('MeowStarMap')
+    expect(
+      Object.keys(out.requestHeaders!).filter((k) => k.toLowerCase() === 'user-agent')
+    ).toHaveLength(1)
+    expect(out.requestHeaders!['Accept']).toBe(original.Accept)
+  })
+
+  it('UA-2 非目标主机请求头原样保留（零干预、不 mutate）', async () => {
+    const listener = await getRegisteredListener('development')
+    for (const url of [
+      'http://localhost:5173/@vite/client',
+      'app://renderer/index.html',
+      'media://file?path=C%3A%2Fa.jpg',
+      'https://cdn.gongeo.us.evil.com/x.png',
+      'https://evilcdn.gongeo.us/x.png',
+      'https://example.com/cdn.gongeo.us/x.png'
+    ]) {
+      const before = { 'User-Agent': 'Mozilla/5.0 Chrome/131', Accept: '*/*' }
+      const snapshot = { ...before }
+      const out = await drive(listener, { url, requestHeaders: before })
+
+      expect(out).toEqual({})
+      expect(before).toEqual(snapshot)
+      expect(before['User-Agent']).toBe('Mozilla/5.0 Chrome/131')
+    }
+  })
+
+  it('UA-3 既有 User-Agent（任意大小写）被覆盖为唯一 MeowStarMap', async () => {
+    const listener = await getRegisteredListener('production')
+    for (const key of ['User-Agent', 'user-agent', 'USER-AGENT', 'uSeR-AgEnT']) {
+      const out = await drive(listener, {
+        url: 'https://cdn.gongeo.us/images/outfits/10001.png',
+        requestHeaders: { [key]: 'OldAgent/1.0', Accept: '*/*' }
+      })
+
+      expect(
+        Object.keys(out.requestHeaders!).filter((k) => k.toLowerCase() === 'user-agent')
+      ).toEqual(['User-Agent'])
+      expect(out.requestHeaders!['User-Agent']).toBe('MeowStarMap')
+      expect(JSON.stringify(out.requestHeaders!)).not.toContain('OldAgent')
+    }
+  })
+
+  it('UA-4 onBeforeSendHeaders 注册早于 loadURL，且加载瞬间即可改写', async () => {
+    const onBefore = webRequestMocks().onBeforeSendHeaders
+    onBefore.mockClear()
+    let uaAtLoad: string | undefined
+
+    BrowserWindowCtorMock.mockImplementation(function createBrowserWindowMockWithUaProbe(
+      options: unknown
+    ) {
+      const win = createMockWindow(options)
+      win.loadURL.mockImplementation(() => {
+        const cb = onBefore.mock.calls[0]?.[0] as BeforeSendListener | undefined
+        if (cb) {
+          cb(
+            { url: 'https://cdn.gongeo.us/images/items/icons/1020100001.png', requestHeaders: {} },
+            (response) => {
+              uaAtLoad = response.requestHeaders?.['User-Agent']
+            }
+          )
+        }
+        return Promise.resolve()
+      })
+      lastCreatedWindow = win
+      return win
+    })
+
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+    expect(onBefore).toHaveBeenCalledTimes(1)
+
+    const regOrder = onBefore.mock.invocationCallOrder[0]
+    const loadOrder = lastCreatedWindow!.loadURL.mock.invocationCallOrder[0]
+    expect(regOrder).toBeLessThan(loadOrder)
+
+    for (let i = 0; i < 20 && uaAtLoad === undefined; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 10))
+    }
+    expect(uaAtLoad).toBe('MeowStarMap')
+  })
+
+  it('UA-5 开发模式（NODE_ENV=development）也注册 UA 改写', async () => {
+    await getRegisteredListener('development')
+    expect(lastCreatedWindow!.loadURL).toHaveBeenCalledWith('http://localhost:5173')
+  })
+
+  it('UA-6 URL 解析失败 / requestHeaders 缺失时 fail-open、不阻断、有诊断', async () => {
+    const listener = await getRegisteredListener('production')
+
+    const out1 = await drive(listener, {
+      url: 'not a valid url',
+      requestHeaders: { 'User-Agent': 'Keep/1.0' }
+    })
+    expect(out1).toEqual({})
+    expect(hasWarn('URL parse failed')).toBe(true)
+
+    const out2 = await drive(listener, {
+      url: 'https://cdn.gongeo.us/x.png',
+      requestHeaders: undefined
+    })
+    expect(out2).toEqual({})
+    expect(hasWarn('requestHeaders')).toBe(true)
   })
 })
