@@ -152,6 +152,7 @@ npm run dist:win:smoke
 - Tests & config: `e2e/smoke.e2e.ts` / `e2e/playwright.config.ts`; manual checklist in `docs/manual-smoke-checklist.md` (tracked), while the original design doc was archived to `docs/archive/plans/e2e-smoke-playwright.md` (excluded by `.gitignore`, kept locally only, recoverable from git history)
 - CI runs it automatically after the build job; failures upload screenshots and main-process logs (artifact `e2e-smoke-failure`)
 - Before a release, also walk through the manual checklist in `docs/manual-smoke-checklist.md` (items that need real samples: scanning/decryption/editing etc.)
+- Script names must have **no spaces around the colon**: `npm run e2e : smoke` is parsed by npm as the script name `e2e`; the mis-input guard `scripts/e2e-usage.ts` intercepts it (listing the real subcommands, exit code 1) instead of npm's "Missing script" error
 
 ---
 
@@ -331,7 +332,7 @@ Key log files:
 
 - `main.log`: application log
 - `faults-YYYY-MM-DD.jsonl`: fault records (18 FaultType categories, rolled by date)
-- `startup-errors.log`: startup error log (in the userData root or `Documents\MeowStarMap\Diagnostics\`, 100KB rolling)
+- `startup-errors.log`: startup error log (in the userData root or `Documents\喵星图\Diagnostics\`, 100KB rolling)
 
 ### 4.5 Inspect the Database
 
@@ -676,13 +677,13 @@ See the troubleshooting manual for "Crash / exit".
 Crash dumps are at (the app redirects them to the user's Documents folder at startup, keeping them out of AppData):
 
 ```
-%USERPROFILE%\Documents\MeowStarMap\Diagnostics\
+%USERPROFILE%\Documents\喵星图\Diagnostics\
 ```
 
 Open in PowerShell:
 
 ```powershell
-explorer "$env:USERPROFILE\Documents\MeowStarMap\Diagnostics"
+explorer "$env:USERPROFILE\Documents\喵星图\Diagnostics"
 ```
 
 > The 10 most recent crash files are retained, and files older than 30 days are auto-cleaned.
@@ -725,7 +726,10 @@ Get-Process | Where-Object { $_.ProcessName -like '*wxnn*' -or $_.ProcessName -l
 
 ### 6.10 More troubleshooting
 
-Full manual: see the troubleshooting sections above.
+- Crash & startup issues: see sections 6.6 - 6.9 above
+- Log location: `%APPDATA%\meow-star-map\logs\` (`main.log` regular log, `faults-*.jsonl` fault records; `startup-errors.log` startup errors)
+- Crash dumps: `%USERPROFILE%\Documents\喵星图\Diagnostics\`
+- Diagnostic bundle export: Settings → Diagnostics → one-click export
 
 ---
 
@@ -825,9 +829,13 @@ release/
 | `nsis.createDesktopShortcut`   | `always`                      | Always create desktop shortcut                    |
 | `nsis.createStartMenuShortcut` | `true`                        | Create Start menu shortcut                        |
 
-**asarUnpack list** (native binaries must be unpacked or they will fail to load):
+**asarUnpack list** (native binaries and external dependencies must be unpacked or they will fail to load; same order as `build.asarUnpack` in `package.json`):
 
 ```
+**/@nikkisync/**
+**/qrcode/**
+**/dijkstrajs/**
+**/pngjs/**
 **/ffmpeg-static/**
 **/ffprobe-static/**
 **/better-sqlite3/**

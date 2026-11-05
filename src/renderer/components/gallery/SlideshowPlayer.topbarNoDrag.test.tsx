@@ -9,7 +9,7 @@
  *   之上 mousedown 仍被窗口拖动吞掉。根容器须声明 .app-no-drag 做几何减法。
  *
  *   断言口径：jsdom 不模拟 app-region 命中测试，断言 class 存在性（真实拖拽行为由
- *   docs/plans/2026-11-01-fullscreen-topbar-fix-实施计划.md T5 真机实测兜底）。
+ *   docs/plans/archive/2026-Q4/2026-11-01-fullscreen-topbar-fix-实施计划.md T5 真机实测兜底）。
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'

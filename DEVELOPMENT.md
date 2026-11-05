@@ -331,7 +331,7 @@ explorer "$env:APPDATA\meow-star-map\logs"
 
 - `main.log`：应用运行日志
 - `faults-YYYY-MM-DD.jsonl`：故障记录（18 类 FaultType，按日期滚动）
-- `startup-errors.log`：启动错误日志（位于 userData 根目录或 `用户文档\MeowStarMap\Diagnostics\`，100KB 滚动）
+- `startup-errors.log`：启动错误日志（位于 userData 根目录或 `用户文档\喵星图\Diagnostics\`，100KB 滚动）
 
 ### 4.5 查看数据库
 
@@ -668,13 +668,13 @@ npx vitest run --reporter=verbose
 崩溃 dump 位于（应用启动时已重定向到用户文档目录，避免藏在 AppData）：
 
 ```
-%USERPROFILE%\Documents\MeowStarMap\Diagnostics\
+%USERPROFILE%\Documents\喵星图\Diagnostics\
 ```
 
 PowerShell 打开：
 
 ```powershell
-explorer "$env:USERPROFILE\Documents\MeowStarMap\Diagnostics"
+explorer "$env:USERPROFILE\Documents\喵星图\Diagnostics"
 ```
 
 > 崩溃文件保留最近 10 份且超过 30 天自动清理。
@@ -719,7 +719,7 @@ Get-Process | Where-Object { $_.ProcessName -like '*wxnn*' -or $_.ProcessName -l
 
 - 崩溃与启动问题：见上方 6.6 - 6.9 节
 - 日志位置：`%APPDATA%\meow-star-map\logs\`（`main.log` 常规日志、`faults-*.jsonl` 故障记录；`startup-errors.log` 启动错误）
-- 崩溃 dump：`%USERPROFILE%\Documents\MeowStarMap\Diagnostics\`
+- 崩溃 dump：`%USERPROFILE%\Documents\喵星图\Diagnostics\`
 - 诊断包导出：设置 → 诊断 → 一键导出诊断包
 
 ---
@@ -820,9 +820,13 @@ release/
 | `nsis.createDesktopShortcut`   | `always`                      | 始终创建桌面快捷方式     |
 | `nsis.createStartMenuShortcut` | `true`                        | 创建开始菜单快捷方式     |
 
-**asarUnpack 列表**（原生二进制必须解包，否则无法加载）：
+**asarUnpack 列表**（原生二进制与外部依赖必须解包，否则无法加载；与 `package.json` 的 `build.asarUnpack` 同序）：
 
 ```
+**/@nikkisync/**
+**/qrcode/**
+**/dijkstrajs/**
+**/pngjs/**
 **/ffmpeg-static/**
 **/ffprobe-static/**
 **/better-sqlite3/**

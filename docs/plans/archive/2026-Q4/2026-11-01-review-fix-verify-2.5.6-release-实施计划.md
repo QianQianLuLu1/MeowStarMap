@@ -74,7 +74,7 @@
 
 ### 子任务 A：落盘本计划文档
 
-- 涉及文件：`docs/plans/2026-11-01-review-fix-verify-2.5.6-release-实施计划.md`（本文件）。
+- 涉及文件：`docs/plans/archive/2026-Q4/2026-11-01-review-fix-verify-2.5.6-release-实施计划.md`（本文件）。
 - 输入/输出：审查结论 → 可执行计划入库。
 - 验收标准：文件存在且随提交 1 入库。
 

@@ -123,7 +123,7 @@ D2：`getSyncAccounts` 调用数定格在 1 导致 `waitFor` 超时；D3：`send
 
 ### 阶段 A（唯一动作 + 停点）
 
-1. 本文件落仓为 `docs/plans/2026-10-31-review-nikkisync-scope-fixes-repack.md`。
+1. 本文件落仓为 `docs/plans/archive/2026-Q4/2026-10-31-review-nikkisync-scope-fixes-repack.md`。
 2. `git add` 并单独提交 `docs(plans): 落盘账号作用域收尾审查与 2.5.6-beta 重打包计划`。
 3. 停下，等用户回「继续 / 按计划执行」后再动代码。
 

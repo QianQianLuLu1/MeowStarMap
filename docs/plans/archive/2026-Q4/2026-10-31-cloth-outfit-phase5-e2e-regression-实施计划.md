@@ -6,7 +6,7 @@
 
 ## 0. 前置事实（探索已确认）
 
-- 冒烟输入直接取自 [`cloth-outfit-data-contract.md`](cloth-outfit-data-contract.md) §3.5 的 **2026-10-31 当天实采码**：
+- 冒烟输入直接取自 [`cloth-outfit-data-contract.md`](../../cloth-outfit-data-contract.md) §3.5 的 **2026-10-31 当天实采码**：
   - A/B 场景：`1aOKp3A5MdA#`（最简形态，9 件、DIY 空对象）
   - C 场景：`zzzz#`（构造无效码，本地校验即拒、不发网络请求）
 - 缓存观测锚点：`src/main/services/cloth-diy-cache.ts:66`（debug 级 `[clothDiy] 搭配码缓存命中 hash=…，跳过网络解码`）与 `:86`（`搭配码缓存已写入`）；主进程 stdout 与 `%APPDATA%\meow-star-map\logs\main-YYYY-MM-DD.log` 双路可观测（每日文件含 debug 级）；缓存文件位于 `%APPDATA%\meow-star-map\cloth-diy-cache\<sha256(code)>.txt`。
@@ -48,14 +48,14 @@
 
 ## 6. 子任务与验收标准
 
-| #   | 任务             | 需修改文件                                                                     | 输入 / 输出            | 验收标准（可判定）                                                                                                                            |
-| --- | ---------------- | ------------------------------------------------------------------------------ | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1  | 本计划落仓       | `docs/plans/2026-10-31-cloth-outfit-phase5-e2e-regression-实施计划.md`（新建） | 已批准计划 → 文档      | 文件存在；`git status --porcelain` 仅新增该文件                                                                                               |
-| T2  | 静态回归         | 无（只读）                                                                     | 命令 → 退出码          | `npm run verify` 5 步全 ✓（含 core-gate）；`npm run typecheck:e2e`、`npm run i18n:guard` 退出码 0                                             |
-| T3  | 全量单测         | 无（只读）                                                                     | `npm test`             | 0 failed、无新增 skip（基线 7197 passed / 20 skipped）                                                                                        |
-| T4  | D 场景单测证据   | 无（只读）                                                                     | 4 个测试文件           | `decryption-service.test.ts`、`cloth-diy-cache.test.ts`、`cloth-data-service.test.ts`、`ShareCodeDecoderDialog.test.tsx` 全绿，报告摘录用例名 |
-| T5  | 实机冒烟 A/B/C/E | 无（只读）                                                                     | npm run dev + 界面操作 | 四场景逐项通过；控制台无未捕获错误；faults 无新增                                                                                             |
-| T6  | 汇总收尾         | 本文档（回写 §7 执行记录）；记忆文件                                           | 全部证据 → 报告        | 验收清单逐项结论；`git status --porcelain` 终态 = 工作区原状 + 本文档                                                                         |
+| #   | 任务             | 需修改文件                                                                                     | 输入 / 输出            | 验收标准（可判定）                                                                                                                            |
+| --- | ---------------- | ---------------------------------------------------------------------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1  | 本计划落仓       | `docs/plans/archive/2026-Q4/2026-10-31-cloth-outfit-phase5-e2e-regression-实施计划.md`（新建） | 已批准计划 → 文档      | 文件存在；`git status --porcelain` 仅新增该文件                                                                                               |
+| T2  | 静态回归         | 无（只读）                                                                                     | 命令 → 退出码          | `npm run verify` 5 步全 ✓（含 core-gate）；`npm run typecheck:e2e`、`npm run i18n:guard` 退出码 0                                             |
+| T3  | 全量单测         | 无（只读）                                                                                     | `npm test`             | 0 failed、无新增 skip（基线 7197 passed / 20 skipped）                                                                                        |
+| T4  | D 场景单测证据   | 无（只读）                                                                                     | 4 个测试文件           | `decryption-service.test.ts`、`cloth-diy-cache.test.ts`、`cloth-data-service.test.ts`、`ShareCodeDecoderDialog.test.tsx` 全绿，报告摘录用例名 |
+| T5  | 实机冒烟 A/B/C/E | 无（只读）                                                                                     | npm run dev + 界面操作 | 四场景逐项通过；控制台无未捕获错误；faults 无新增                                                                                             |
+| T6  | 汇总收尾         | 本文档（回写 §7 执行记录）；记忆文件                                                           | 全部证据 → 报告        | 验收清单逐项结论；`git status --porcelain` 终态 = 工作区原状 + 本文档                                                                         |
 
 ## 7. 执行记录（已回写，2026-10-31）
 

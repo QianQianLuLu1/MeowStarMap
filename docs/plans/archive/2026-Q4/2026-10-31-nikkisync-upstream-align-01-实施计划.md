@@ -133,7 +133,7 @@ npm run dev        # electron-vite dev
 
 ### N0 · 落盘计划 + 基线取证
 
-- 文件：`docs/plans/2026-10-31-nikkisync-upstream-align-01-实施计划.md`（本文件入仓）
+- 文件：`docs/plans/archive/2026-Q4/2026-10-31-nikkisync-upstream-align-01-实施计划.md`（本文件入仓）
 - 输入 → 输出：已批准计划 + 上游双锚点 → 仓内可追溯文档
 - 取证：`npm test` 基线读数（Test Files / Tests / skipped）、`npm run verify:nikkisync` 读数、`git status --porcelain`
 - 验收：文档被跟踪；`npm run docs:links` 退出 0；基线读数写入文档 §7
@@ -260,7 +260,7 @@ npm run dev        # electron-vite dev
   - `src/main/nikkisync/AGENTS.md`（类型清单、facade/manager 职责、硬性约定新增“LAN 内容受账号作用域过滤”）
   - `docs/IPC_CONTRACT.md`（通道表、判据、路径字段、账号选择三态）
   - `docs/sync-integration/README.md`（一条状态说明：账号作用域已接入）
-  - `docs/plans/2026-10-31-nikkisync-upstream-align-01-实施计划.md`（§7 回写实测读数）
+  - `docs/plans/archive/2026-Q4/2026-10-31-nikkisync-upstream-align-01-实施计划.md`（§7 回写实测读数）
 - 全量：
   1. `npm run typecheck`、`npm run typecheck:e2e`
   2. `npm run lint`、`npm run format:check`

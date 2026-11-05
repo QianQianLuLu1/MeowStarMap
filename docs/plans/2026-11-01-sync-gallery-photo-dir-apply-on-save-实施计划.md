@@ -187,7 +187,7 @@ git status --porcelain   # 复核 pre-commit 钩子是否改写文件
 2. `resource-allowlist.ts:65-67` 的 `path.win32.resolve` 与 `media-protocol.ts:112` 的 `realpath` 两侧不对称：目录位于 junction / SUBST / 映射盘 / OneDrive 重定向时，手输同步域的照片可能整批 403（本机 H: 实测 `realpath == resolve`，不受影响）。
 3. 「额外照片目录」整节在会话未装配时因 `extraDirs === null` 而静默消失（`SyncServicePage.tsx:1164` + `refreshExtraDirs` 吞错），是用户被推向「只有重启可用」控件的成因之一——留待下一轮单独裁决。
 4. 官方启动器装在 `Program Files` 时 `isSensitivePath` 会拒绝手工设为 gameRoot（`validatePhotoSourceDirectory:401` 前置黑名单）。
-5. 上述 2/3/4 与 `docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md` 记录的「未跑的人工回归」同源，本轮在计划里显式留痕，不悄悄吞掉。
+5. 上述 2/3/4 与 `docs/plans/archive/2026-Q4/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md` 记录的「未跑的人工回归」同源，本轮在计划里显式留痕，不悄悄吞掉。
 
 ## 10. 执行记录（2026-11-01 实测读数，全部由 Agent 亲自运行）
 

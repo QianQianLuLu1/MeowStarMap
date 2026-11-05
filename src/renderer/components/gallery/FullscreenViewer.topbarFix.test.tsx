@@ -16,7 +16,7 @@
  *
  *   断言口径：jsdom 不应用样式表、也不模拟 app-region 命中测试，故按既有约定断言
  *   class 与内联 style 字符串（与 toolbarContrast 同口径）；真实拖拽区行为由真机
- *   实测兜底（docs/plans/2026-11-01-fullscreen-topbar-fix-实施计划.md T5）。
+ *   实测兜底（docs/plans/archive/2026-Q4/2026-11-01-fullscreen-topbar-fix-实施计划.md T5）。
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'

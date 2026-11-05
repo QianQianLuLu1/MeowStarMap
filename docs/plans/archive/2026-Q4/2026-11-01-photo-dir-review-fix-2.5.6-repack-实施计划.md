@@ -52,7 +52,7 @@
 
 ### N0 计划落仓（本文件）
 
-- 文件：`docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`。
+- 文件：`docs/plans/archive/2026-Q4/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`。
 - 输入/输出：批准的计划 → tracked 计划文档（含空的 §8 读数节）。
 - 验收：`git ls-files` 能列出该文件（`check-md-links` 按 tracked 集判存在，未 `add` 会被 CHANGELOG 引用打回）；单独提交 `docs(plans): …`。**停点：等用户读过再进 N1。**
 

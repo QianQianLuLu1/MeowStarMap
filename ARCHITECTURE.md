@@ -5,7 +5,7 @@
 > **当前版本**：2.5.6
 > **平台**：Windows x64
 > **文档版本**：1.5
-> **最后更新**：2026-10-06
+> **最后更新**：2026-11-05
 
 ---
 
@@ -369,7 +369,9 @@ MeowStarMap/
 │   │   │   ├── auto-update.ts         # 自动更新
 │   │   │   ├── exit-forensics.ts      # 退出取证
 │   │   │   ├── gpu-fallback.ts        # GPU 回退决策
+│   │   │   ├── gpu-preference.ts / gpu-status.ts # GPU 偏好持久化与状态查询
 │   │   │   ├── native-load-guard.ts   # 原生模块加载预检
+│   │   │   ├── nikkisync-runtime-setup.ts / sync-server-setup.ts # 同步运行时与服务端装配
 │   │   │   ├── permission.ts          # 权限管理
 │   │   │   └── app-context.ts         # 应用上下文
 │   │   ├── database/                  # 数据库层
@@ -377,6 +379,8 @@ MeowStarMap/
 │   │   │   ├── media-repository.ts    # MediaRepository（SQL 访问层）
 │   │   │   ├── resonance-repository.ts # 共鸣录 Repository
 │   │   │   ├── import-root-repository.ts # 导入根目录 Repository
+│   │   │   ├── asset-edits-repository.ts # 资产叠加层编辑 Repository
+│   │   │   ├── sync-metadata-repository.ts / sync-pairing-repository.ts / sync-read-repository.ts / sync-row-mappers.ts # 同步域三仓储与行映射
 │   │   │   ├── sql-chunk.ts           # SQL 分块工具
 │   │   │   └── worker/                # database-worker（utilityProcess）
 │   │   ├── scanner/                   # 扫描器
@@ -399,7 +403,7 @@ MeowStarMap/
 │   │   ├── thumbnail/
 │   │   │   ├── generator.ts           # ThumbnailGenerator（单条生成 + LRU）
 │   │   │   └── worker-*.ts            # thumbnail-worker（utilityProcess：sharp 缩放）
-│   │   ├── services/                  # 业务服务层（13 个 service）
+│   │   ├── services/                  # 业务服务层（16 个 service/配置文件）
 │   │   │   ├── file-service.ts
 │   │   │   ├── video-service.ts
 │   │   │   ├── watermark-service.ts
@@ -412,6 +416,8 @@ MeowStarMap/
 │   │   │   ├── thumbnail-phash-service.ts
 │   │   │   ├── decryption-service.ts
 │   │   │   ├── xmp-metadata-service.ts
+│   │   │   ├── cloth-data-service.ts / cloth-data-config.ts # 搭配码服饰数据查询与数据源配置
+│   │   │   ├── cloth-diy-cache.ts     # 搭配码网络解码结果磁盘缓存（sha256 键）
 │   │   │   └── log-service.ts
 │   │   ├── ipc/                       # IPC 层
 │   │   │   ├── handler-context.ts     # 依赖注入上下文
@@ -430,7 +436,8 @@ MeowStarMap/
 │   │   │       ├── operation-history-handler.ts / task-handler.ts
 │   │   │       ├── profile-handler.ts / search-index-handler.ts
 │   │   │       ├── thumbnail-handler.ts / category-handler.ts / plugin.ts / plugin-bridge-handler.ts
-│   │   │       ├── resonance-handler.ts
+│   │   │       ├── resonance-handler.ts / sync-handler.ts / nikkisync-handler.ts
+│   │   │       ├── asset-edits-handler.ts / favorites-handler.ts
 │   │   │       └── set-dir-handler.ts
 │   │   ├── plugins/                   # 插件宿主
 │   │   │   ├── plugin-host.ts         # 插件加载与生命周期
@@ -456,6 +463,8 @@ MeowStarMap/
 │   │   │   ├── runtime-manager.ts     # 生命周期状态机（唯一依赖注入面；start() 永不外抛）
 │   │   │   ├── probe.ts / probe-cli.ts # 链接探针：绝不启动任何服务，数据库只允许 :memory:
 │   │   │   ├── sync-server-view.ts    # 上游 LocalSyncServer 配置的纯函数折算层
+│   │   │   ├── protocol-contract.ts / runtime-types.ts / resource-allowlist.ts # 装载缝契约、运行时类型与资源白名单
+│   │   │   ├── embedding-paths.ts / runtime-cli.ts / runtime-cli-report.ts # 解包路径定位与运行时 CLI 取证
 │   │   │   └── metadata-resolver-driver.ts / metadata-isolation-guards.ts  # 阶段 6 有界驱动与表级隔离护栏
 │   │   ├── i18n/                      # 主进程国际化
 │   │   │   ├── index.ts
@@ -468,6 +477,8 @@ MeowStarMap/
 │   │   │   ├── phash.ts / process-registry.ts / progress-throttle.ts
 │   │   │   ├── scene-brightness.ts / startup-diagnostic.ts
 │   │   │   ├── task-registry.ts / user-diag-path.ts / video-frame.ts / video-probe.ts
+│   │   │   ├── atomic-file.ts / fluent-ffmpeg-shim.ts / image-encode.ts / path-dialect.ts
+│   │   │   ├── physical-file-key.ts / spawn-error-log.ts / zip-archive.ts
 │   │   │   └── worker-restart-policy.ts
 │   │   ├── types/                     # 主进程类型声明
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
@@ -533,7 +544,7 @@ MeowStarMap/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 32 个工具函数文件（含 resonance/ 共鸣录纯函数与 share-card/ 分享卡子目录）
+│   │   ├── utils/                     # 51 个工具函数文件（含 resonance/ 共鸣录纯函数与 share-card/ 分享卡子目录）
 │   │   ├── App.tsx                    # 应用根组件
 │   │   ├── main.tsx                   # 渲染进程入口
 │   │   ├── preview-entry.tsx          # 预览版入口
@@ -719,6 +730,9 @@ MeowStarMap/
 | **DecryptionService**        | 游戏图片参数解密（koffi 调用 nuan5_decryption.dll，ABI 校验 + async mutex 串行化）                                                |
 | **LogService**               | 故障记录管理（faults-*.jsonl 读取，缓存失效机制，ZIP 导出）                                                                       |
 | **XmpMetadataService**       | XMP 元数据写入/读取（EditorMetadata 序列化为自定义命名空间 `wxnn:` 的 XMP packet，支持单图与批量写入）                            |
+| **ClothDataService**         | 搭配码服饰数据查询（名称映射一次全量加载、目录 API 按 ID 查询、图标 URL 由 ID 构造；400/404 负缓存，失败静默降级）                |
+| **ClothDiyCache**            | 搭配码网络解码结果磁盘缓存（`sha256(code)` 键原子写入 `<userData>/cloth-diy-cache/`，同码再次解码离线可用）                       |
+| **ClothDataConfig**          | 服饰数据源配置（目录 API 与名称映射源地址，阶段 2 契约冻结产物）                                                                  |
 
 ### 5.8 IPC 层（ipc/）
 
@@ -754,48 +768,52 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 #### `handlers/` — 47 个域文件（4 个 `_` 前缀辅助与 `set-dir-handler` 工厂，43 个由 `setupIPC()` 注册的 `registerXxxHandlers`）
 
-| 模块                           | 职责                                                                                                                                 |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `media-handler.ts`             | 媒体域（list/findDuplicates/findSimilar/getGroupCounts/评分/收藏/标签/笔记/分类/套装/软删除/恢复/彻底删除/清空/丢失清理/套装图鉴等） |
-| `media-lifecycle-handler.ts`   | 媒体生命周期管理（缺失检测/修复/清理）                                                                                               |
-| `media-cleanup-handler.ts`     | 丢失与损坏记录清理（cleanupMissing/removeMissing/cleanupCorrupted/removeCorrupted）                                                  |
-| `file.ts`                      | 文件操作（delete/copy/getExif），路径白名单校验                                                                                      |
-| `file-export-handler.ts`       | 文件导出 / 另存为（file:export 支持默认目录与命名规则 / file:saveAs）                                                                |
-| `file-rename-handler.ts`       | 文件重命名 / 移动（file:move / file:rename / file:batchRename）                                                                      |
-| `video.ts`                     | 视频（thumbnail/metadata/export/captureFrame/trim/changeSpeed/exportLivePhoto）                                                      |
-| `watermark.ts`                 | 水印（apply/saveTemplate/loadTemplates/deleteTemplate + progress 推送）                                                              |
-| `editor.ts`                    | 编辑器（save/saveAs/preset CRUD/importPresetFromFile/exportPresetToFile）                                                            |
-| `editor-metadata-handler.ts`   | 编辑器 XMP 元数据（导出含参数副本 + 一键恢复编辑参数）                                                                               |
-| `editor-preset-handler.ts`     | 滤镜预设（入库 / JSON 文件导出导入 / 列表 / 删除）                                                                                   |
-| `export-pref-handler.ts`       | 导出偏好读写                                                                                                                         |
-| `backup.ts`                    | 备份（create/list/restore/delete + setDir/resetDir/getDir）                                                                          |
-| `cache.ts`                     | 缓存（getStats/clean/setLimit/enforceLimit + setDir/resetDir/getDir）                                                                |
-| `log.ts`                       | 日志（listFaults/getDetail/openDir/exportZip/clear/getStats + setDir/resetDir/getDir + reportRendererError）                         |
-| `crash.ts`                     | 崩溃（list/stats/openDir/clear + setDir/resetDir/getDir）                                                                            |
-| `share.ts`                     | 分享（startWifi/stop/getStatus + copyFiles/detectApp/launchApp）                                                                     |
-| `scanner-handler.ts`           | 扫描器（start/stop/status）                                                                                                          |
-| `scan-log-handler.ts`          | 扫描诊断日志（只读查询与导出，供诊断工具页回放/导出全链路扫描日志）                                                                  |
-| `shell-handler.ts`             | 系统操作（openPath/showItemInFolder/openExternal）                                                                                   |
-| `app-handler.ts`               | 应用信息（getStatus/getVersions）                                                                                                    |
-| `settings-handler.ts`          | 应用设置读写（get/set）                                                                                                              |
-| `theme-handler.ts`             | 主题切换（set）                                                                                                                      |
-| `dialog-handler.ts`            | 文件/目录选择对话框（openFile/openDirectory）                                                                                        |
-| `import-handler.ts`            | 文件导入（importFiles）                                                                                                              |
-| `import-root-handler.ts`       | 导入根目录管理                                                                                                                       |
-| `data-handler.ts`              | 数据管理（清除/重置）                                                                                                                |
-| `decrypt-handler.ts`           | 游戏参数解密                                                                                                                         |
-| `duplicate-handler.ts`         | 重复检测                                                                                                                             |
-| `similar-handler.ts`           | 相似图片查找                                                                                                                         |
-| `operation-history-handler.ts` | 操作历史（撤销/重做）                                                                                                                |
-| `task-handler.ts`              | 后台任务管理（onStandby 等）                                                                                                         |
-| `profile-handler.ts`           | 角色档案管理                                                                                                                         |
-| `search-index-handler.ts`      | 搜索索引                                                                                                                             |
-| `thumbnail-handler.ts`         | 缩略图生成                                                                                                                           |
-| `category-handler.ts`          | 分类管理                                                                                                                             |
-| `plugin.ts`                    | 插件管理                                                                                                                             |
-| `plugin-bridge-handler.ts`     | 插件能力桥（media/db/fs/watermark/task/i18n 受控调用，配合 `permission-guard` 校验）                                                 |
-| `resonance-handler.ts`         | 共鸣录（10 个通道：getData/手动记录 CRUD/readImportFile/commitImport/export/updateWardrobe/setWishlist/clearAll）                    |
-| `set-dir-handler.ts`           | 工厂：`registerSetDirHandler` / `registerResetDirHandler`，消除 4 个文件同构模板                                                     |
+| 模块                           | 职责                                                                                                                                   |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `media-handler.ts`             | 媒体域（list/findDuplicates/findSimilar/getGroupCounts/评分/收藏/标签/笔记/分类/套装/软删除/恢复/彻底删除/清空/丢失清理/套装图鉴等）   |
+| `media-lifecycle-handler.ts`   | 媒体生命周期管理（缺失检测/修复/清理）                                                                                                 |
+| `media-cleanup-handler.ts`     | 丢失与损坏记录清理（cleanupMissing/removeMissing/cleanupCorrupted/removeCorrupted）                                                    |
+| `file.ts`                      | 文件操作（delete/copy/getExif），路径白名单校验                                                                                        |
+| `file-export-handler.ts`       | 文件导出 / 另存为（file:export 支持默认目录与命名规则 / file:saveAs）                                                                  |
+| `file-rename-handler.ts`       | 文件重命名 / 移动（file:move / file:rename / file:batchRename）                                                                        |
+| `video.ts`                     | 视频（thumbnail/metadata/export/captureFrame/trim/changeSpeed/exportLivePhoto）                                                        |
+| `watermark.ts`                 | 水印（apply/saveTemplate/loadTemplates/deleteTemplate + progress 推送）                                                                |
+| `editor.ts`                    | 编辑器（save/saveAs/preset CRUD/importPresetFromFile/exportPresetToFile）                                                              |
+| `editor-metadata-handler.ts`   | 编辑器 XMP 元数据（导出含参数副本 + 一键恢复编辑参数）                                                                                 |
+| `editor-preset-handler.ts`     | 滤镜预设（入库 / JSON 文件导出导入 / 列表 / 删除）                                                                                     |
+| `export-pref-handler.ts`       | 导出偏好读写                                                                                                                           |
+| `backup.ts`                    | 备份（create/list/restore/delete + setDir/resetDir/getDir）                                                                            |
+| `cache.ts`                     | 缓存（getStats/clean/setLimit/enforceLimit + setDir/resetDir/getDir）                                                                  |
+| `log.ts`                       | 日志（listFaults/getDetail/openDir/exportZip/clear/getStats + setDir/resetDir/getDir + reportRendererError）                           |
+| `crash.ts`                     | 崩溃（list/stats/openDir/clear + setDir/resetDir/getDir）                                                                              |
+| `share.ts`                     | 分享（startWifi/stop/getStatus + copyFiles/detectApp/launchApp）                                                                       |
+| `scanner-handler.ts`           | 扫描器（start/stop/status）                                                                                                            |
+| `scan-log-handler.ts`          | 扫描诊断日志（只读查询与导出，供诊断工具页回放/导出全链路扫描日志）                                                                    |
+| `shell-handler.ts`             | 系统操作（openPath/showItemInFolder/openExternal）                                                                                     |
+| `app-handler.ts`               | 应用信息（getStatus/getVersions）                                                                                                      |
+| `settings-handler.ts`          | 应用设置读写（get/set）                                                                                                                |
+| `theme-handler.ts`             | 主题切换（set）                                                                                                                        |
+| `dialog-handler.ts`            | 文件/目录选择对话框（openFile/openDirectory）                                                                                          |
+| `import-handler.ts`            | 文件导入（importFiles）                                                                                                                |
+| `import-root-handler.ts`       | 导入根目录管理                                                                                                                         |
+| `data-handler.ts`              | 数据管理（清除/重置）                                                                                                                  |
+| `decrypt-handler.ts`           | 游戏参数解密                                                                                                                           |
+| `duplicate-handler.ts`         | 重复检测                                                                                                                               |
+| `similar-handler.ts`           | 相似图片查找                                                                                                                           |
+| `operation-history-handler.ts` | 操作历史（撤销/重做）                                                                                                                  |
+| `task-handler.ts`              | 后台任务管理（onStandby 等）                                                                                                           |
+| `profile-handler.ts`           | 角色档案管理                                                                                                                           |
+| `search-index-handler.ts`      | 搜索索引                                                                                                                               |
+| `thumbnail-handler.ts`         | 缩略图生成                                                                                                                             |
+| `category-handler.ts`          | 分类管理                                                                                                                               |
+| `plugin.ts`                    | 插件管理                                                                                                                               |
+| `plugin-bridge-handler.ts`     | 插件能力桥（media/db/fs/watermark/task/i18n 受控调用，配合 `permission-guard` 校验）                                                   |
+| `resonance-handler.ts`         | 共鸣录（10 个通道：getData/手动记录 CRUD/readImportFile/commitImport/export/updateWardrobe/setWishlist/clearAll）                      |
+| `asset-edits-handler.ts`       | 资产叠加层编辑（asset-edits:list/set，按 asset_id 读取/写入用户编辑）                                                                  |
+| `favorites-handler.ts`         | 收藏独立域（favorites:add/list/remove）                                                                                                |
+| `sync-handler.ts`              | 移植面同步服务控制（startServer/stopServer/getStatus/createPairingQr/listDevices/revokeDevice）                                        |
+| `nikkisync-handler.ts`         | 同步图库运行时面（runtime/start/stop/server 状态机、gameRoot get/set/reset、admit/inspect 额外照片目录、library 变更推送等约 20 通道） |
+| `set-dir-handler.ts`           | 工厂：`registerSetDirHandler` / `registerResetDirHandler`，消除 4 个文件同构模板                                                       |
 
 ### 5.9 工具层（utils/）
 
@@ -1047,9 +1065,9 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **scanner/ScanProgress**：扫描进度条（scanned/found/currentPath + 停止按钮）
 - **video/VideoPlayer**：视频播放器（播放进度按 src 哈希持久化到 localStorage）
 
-### 6.8 自定义 Hooks（30 个非测试文件）
+### 6.8 自定义 Hooks（31 个非测试文件）
 
-#### 媒体操作类（7 个）
+#### 媒体操作类（8 个）
 
 - **useFileOperations**：文件操作核心 hook（删除/移动/重命名/复制/收藏切换/属性更新），注册 4 个 undoHandler
 - **useBatchOperations**：批量操作 hook（水印/批量重命名状态管理）
@@ -1058,6 +1076,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **useFilteredMediaFiles**：筛选+排序+分组 hook（module-level 缓存避免多组件重复计算）
 - **useGallerySearch**：搜索输入 hook（250ms 防抖）
 - **useRefreshMedia**：刷新媒体 hook（封装 fetchMediaFromDatabase）
+- **useGallerySummaryCounts**：图库计数口径选择器（AppShell 状态栏与 Sidebar「图片 / 视频」两处共用）
 
 #### UI 交互类（7 个）
 
@@ -1104,6 +1123,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | **operationHistoryStore** | 否（内存 + IPC 持久化到 operation_history 表） | 全局操作历史。50 上限、10 种 OperationType（本 store 自带的联合类型，含 `notes_update`，与 `src/shared/types/editor.ts` 那份 14 种的 `OperationType` **同名不同集**，勿混用）、按 type 分发的 UndoHandler 注册表（模块级 Map）、数据库写入失败回调 Set 订阅、loadFromDatabase 启动加载                                                                                                  |
 | **resonanceStore**        | 否（内存）                                     | 共鸣录数据（记录/衣橱/统计与导入导出状态），2.5.0 新增                                                                                                                                                                                                                                                                                                                                  |
 | **pluginStore**           | 否（内存）                                     | 插件运行时状态（已安装/启用插件列表、安装卸载等操作进行中标志与错误信息）                                                                                                                                                                                                                                                                                                               |
+| **syncGalleryStore**      | 否（内存）                                     | 同步图库数据（设备/配对状态、扫描进度、目录提案与图库条目等），2.5.6 新增                                                                                                                                                                                                                                                                                                               |
 
 ### 6.10 工具函数（utils/）
 
@@ -1642,7 +1662,7 @@ components / pages (展示)
 - `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**：11 项 native 依赖解包到磁盘 —— `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
+- **`asarUnpack`**：14 项 native/外部依赖解包到磁盘 —— `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` / `qrcode` / `dijkstrajs` / `pngjs`（后三项 2026-11-05 随 @nikkisync 外部依赖随包解出修复追加）
 - **Windows NSIS**：x64、非 one-click、允许自定义安装目录、强制创建桌面快捷方式 + 开始菜单快捷方式
 - `signExecutable: false` / `verifyUpdateCodeSignature: false` —— 未启用代码签名，但 **exe 图标与 PE 版本元数据仍经 resedit 写入**。此前写的是 `signAndEditExecutable: false`，该值会让 electron-builder 连资源编辑一起跳过，导致 app exe / 桌面快捷方式 / 任务栏始终是 Electron 默认图标。
 
@@ -1720,7 +1740,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 ### 12.5 原生二进制依赖
 
 - `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` 必须通过 `asarUnpack` 解包
-- ffmpeg/ffprobe 路径必须通过 `native-path.ts` 工具替换 `app.asar` → `app.asar.unpacked`
+- ffmpeg/ffprobe 路径必须通过 `ffmpeg-paths.ts` 工具替换 `app.asar` → `app.asar.unpacked`
 
 ### 12.6 扫描器约束
 
@@ -1784,7 +1804,7 @@ NSIS 安装器在覆盖安装等场景下可能未创建桌面快捷方式，应
 
 ### 12.14 共鸣录（Resonance）模块约束
 
-- **离线优先**：共鸣录不得发起任何网络请求。静态数据全部随包——图鉴 11 片 + `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json` + 12 语言实体名包 + 77 张卡池缩略图（约 7.1MB）；卡池缩略图经 `src/renderer/data/resonance/thumbnails/index.ts` 静态 import 取得打包内相对 URL（`base: './'`），零外链
+- **离线优先（数据层）**：共鸣录的抽卡记录、衣橱数据、统计与导入导出流程不得发起任何网络请求，静态数据全部随包——图鉴 11 片 + `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json` + 12 语言实体名包 + 77 张卡池缩略图（约 7.1MB）；卡池缩略图经 `src/renderer/data/resonance/thumbnails/index.ts` 静态 import 取得打包内相对 URL（`base: './'`），零外链。**唯一例外**：「我的衣橱」六类实体图片（套装 / 部件 / 妆容 / Momo / 道具 / 共鸣色）由 `cdnImageUrl.ts` 生成 `https://cdn.gongeo.us` 热链地址，经 `<img src>`（`loading="lazy"`、`referrerPolicy="no-referrer"`）按需渲染，加载失败回退占位色块；默认开启、无开关，应用不下载保存、不缓存。该主机是渲染层唯一批准的 `https` 图片主机（见 `offline-guard.test.ts` 的 `APPROVED_IMAGE_HOSTS` 静态扫描白名单）。主进程 `src/main/services/cloth-data-config.ts` 的 `data.gongeo.us` / `raw.githubusercontent.com` 数据接口属另一条链路，不在本节「共鸣录数据层离线」约束范围内。
 - **主进程职责边界**：主进程只做 zod 参数校验、PathGuard 白名单（`assertFileReadPath` / `assertFileWritePath`）、文件读写与 SQLite 存取；导入解析、合并去重、差异计数、导出载荷组装均为渲染层纯函数（`src/renderer/utils/resonance/`）
 - **导入上限**（常量定义在 `src/shared/types/resonance.ts`）：单文件 `MAX_IMPORT_FILE_BYTES` = 64MB、总记录 `MAX_TOTAL_IMPORT_RECORDS` = 200000、单卡池 `MAX_PULLS_PER_BANNER` = 50000、单批提交 `MAX_COMMIT_BATCH_ROWS` = 2000、衣橱单批 `MAX_WARDROBE_BATCH` = 5000
 - **导入提交**：渲染层按 `MAX_COMMIT_BATCH_ROWS` 分批调用 `resonance:commitImport`，每批一个事务、`INSERT OR IGNORE` 幂等，可中断后续传；`wardrobe` 仅最后一个批次携带（全量覆盖）
@@ -2040,13 +2060,13 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- **测试文件数（静态可核，不必实跑）**：Vitest 5.0，**454 个测试文件** = src 421 + scripts 28 + e2e 5
-  （`git ls-files '*.test.ts' '*.test.tsx'` 分目录计数）。相对上一颗 453 是 +1，来自 `59b3377`（2026-10-30）
-  新增的 `src/renderer/styles/app-drag-region.test.ts`。
+- **测试文件数（静态可核，不必实跑）**：Vitest 5.0，**471 个测试文件** = src 434 + scripts 32 + e2e 5
+  （`git ls-files '*.test.ts' '*.test.tsx'` 分目录计数；2026-11-05 盘点静态复核）。相对 2026-10-30 那颗 454
+  是 +17，来自图库计数修复、DEBT-053…059 清偿与 qrcode 解包闸门等轮次的新增套件。
 - **用例通过数（必须实跑才有资格写）**：2026-10-30 本机全量 `npm test` 实跑
   `Test Files 454 passed (454)`、`Tests 7094 passed | 12 skipped (7106)`，耗时 53.45s
-  （宿主 `win32 / node-v26.3.0 / vitest 5.0.3`）。文件数与上一行的静态计数逐项闭合（454 = 421+28+5）；
-  相对 2026-10-28 那颗为 +1 文件 / +31 例 / skip 不变。
+  （宿主 `win32 / node-v26.3.0 / vitest 5.0.3`）。该读数对应当时静态计数 454 = 421+28+5，其后文件数已增至
+  上行的 471，此处保留为最近一次全量实跑快照、不随静态计数刷新。
 - **装置侧（`npm run test:ci-linux`）本机不可达全绿，终判在 CI**：同一命令本机跑出 32 failed | 422 passed (454)，
   轮前基线 `a678393` 为 33 failed | 421 passed (454)——**本轮 0 新增红**。红项集中在两类装载期失败：
   sharp/better-sqlite3 的原生二进制按模拟 Linux 宿主去取（`Could not load the "sharp" module using the linuxnull-x64 runtime`）、

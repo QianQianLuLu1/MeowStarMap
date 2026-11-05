@@ -1,4 +1,4 @@
-// NikkiSync 回收站 helper（K8-a，能力层执行记录见 docs/plans/2026-10-25-nikkisync-upstream-sync-04）。
+// NikkiSync 回收站 helper（K8-a，能力层执行记录见 docs/plans/archive/2026-Q4/2026-10-25-nikkisync-upstream-sync-04-能力层执行记录）。
 //
 // 上游调用契约（pc-companion dist/src/organizer/DeletionQueue.js:379-382）：
 //   execFile(process.env.NIKKISYNC_RECYCLE_HELPER,

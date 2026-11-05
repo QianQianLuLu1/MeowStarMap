@@ -5,7 +5,7 @@
 - 上游锚点（起点）：`ToStardust/NikkiSync` `main` @ `b397e0eb6ca1b4748f13a72f13bb1702a549410e` = tag `v1.0.27-public-beta.1`
 - 上游目标（本轮采纳）：`main` @ `589b932ebb5f3d7c18f7109cb91091f8eb563e2f` = tag `v1.0.30-public-beta.1`（`git ls-remote origin HEAD` 实测）
 - 本地链接检出：`D:\Workbuddy 项目\WXNN YD - 副本\NikkiSync`（四条 junction 指向其 `packages/*` 与 `apps/pc-companion`）
-- 上一轮：`docs/plans/2026-10-31-nikkisync-upstream-align-01-实施计划.md`（N0–N6 全部执行，读数在其 §7）
+- 上一轮：`docs/plans/archive/2026-Q4/2026-10-31-nikkisync-upstream-align-01-实施计划.md`（N0–N6 全部执行，读数在其 §7）
 - 落盘状态：2026-11-02 经用户批准入仓；执行读数回写于 §7
 
 ## Context（为什么做这件事）

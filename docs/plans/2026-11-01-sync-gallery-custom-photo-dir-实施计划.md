@@ -49,7 +49,7 @@
 
 安全说明：gameRoot **不**登记 pathGuard（运行时扫描器在主进程直接 fs 读；扫出的照片经 `resource-allowlist` 授权 `media://`，无需扩权）；K6 admit 登记是为了过 inspect 既有 `isUserPickedDir || assertFileReadPath` 门禁，信任级别与 `dialog:selectDirectory`（同样登记 + 敏感目录拒绝）一致。
 
-> **2026-11-01 二轮审查订正（保留上句原样，仅追加）**：上句「信任级别与 `dialog:selectDirectory` 一致」不成立——`matchesPicked` 按前缀命中，`registerUserPickedDir` 还会经 `addUserPicked` 写入全局 `roots`，而 admit 的入参由渲染层给出、没有对话框手势，等于一次 `admit(D:\)` 就让整盘对 `scanner:start` / `settings:set` / `media://` 免检。已改为只登记同步域专用集合 `registerSyncPhotoDir`（唯一消费方 `nikkisync:inspect-extra-directory`）。修复与实测读数见 `docs/plans/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`。
+> **2026-11-01 二轮审查订正（保留上句原样，仅追加）**：上句「信任级别与 `dialog:selectDirectory` 一致」不成立——`matchesPicked` 按前缀命中，`registerUserPickedDir` 还会经 `addUserPicked` 写入全局 `roots`，而 admit 的入参由渲染层给出、没有对话框手势，等于一次 `admit(D:\)` 就让整盘对 `scanner:start` / `settings:set` / `media://` 免检。已改为只登记同步域专用集合 `registerSyncPhotoDir`（唯一消费方 `nikkisync:inspect-extra-directory`）。修复与实测读数见 `docs/plans/archive/2026-Q4/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`。
 
 设置键写入：`ctx.dbManager.setSetting('nikkisync.gameRoot', dir)`（仿 `nikkisync-handler.ts:216` 直读先例，不 import app 层常量；字符串键加注释交叉引用 `SETTING_GAME_ROOT`）。
 

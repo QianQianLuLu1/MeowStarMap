@@ -75,7 +75,7 @@
 
 ### S2 提交
 
-- 涉及文件：本文档（`docs/plans/2026-11-04-clearing-review-verify-2.5.6-repack-实施计划.md`）；如有修复则含对应代码与测试。
+- 涉及文件：本文档（`docs/plans/archive/2026-Q4/2026-11-04-clearing-review-verify-2.5.6-repack-实施计划.md`）；如有修复则含对应代码与测试。
 - 输入/输出：暂存区 → commit（类型 `docs(plans)`，Conventional Commits，subject ≤72 字符）。
 - 验收标准：commit 通过 commitlint 与 pre-commit 钩子；提交后 `git status --porcelain` 无未预期残留。
 

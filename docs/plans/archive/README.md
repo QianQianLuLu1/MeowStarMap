@@ -11,6 +11,11 @@
    `git -c core.quotePath=false grep -l -F <basename>`：中文文件名在默认 `core.quotepath` 下会被输出成
    `"docs/plans/\350…"` 形态，用 `grep -v '^docs/plans/'` 滤不掉，读数虚高；而**纯否定 pathspec**
    （`-- ':!docs/plans'`）会让 `git grep` 静默返回空，读数全零。本轮两种误判都实际踩到。
+   另须**按完整路径复核重名件**：仓库里有 6 个 `README.md`，只按 basename 计数会把 `archive/README.md`
+   的入站数虚高到 27（真值为 0）。
+   自 2026-11 起 `docs/CODING_CONVENTIONS.md`「校验与提交」节规定 CHANGELOG 新增行只写 commit 短哈希、
+   不点名 `docs/plans/**`，本条满足率应逐轮回升；存量版本节里的路径引用**保留不改**，但归档那些快照时
+   仍须在**同一批**里把对应 CHANGELOG 行改写为 `archive/2026-Q4/<name>.md`，否则 `dead === 0` 契约红。
 2. **文内已自 declared 结案/已交付**——执行记录已回填。注意上一轮记下的反判据：
    **「未 amend ≠ 未回填」**，不得把「创建后没被 amend 过」当判据。
 3. **实质结论已被 CHANGELOG 或 git log 覆盖**，且它不是任何决策/机制的**唯一出处**。
@@ -22,15 +27,33 @@
 
 ## 2. 归档清单
 
-| 归档文件（相对本目录）                                            | 结案 commit                      | 实质结论落点                                                                                  |
-| ----------------------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------- |
-| `2026-Q4/2026-10-24-fix-empty-recyclebin-system-trash.md`         | `4e2a8d6`（2026-10-27 末次回填） | 回收站清空与系统回收站语义修复，已入 `CHANGELOG.md` 对应版本节                                |
-| `2026-Q4/2026-10-25-nikkisync-upstream-sync-01-影响评估.md`       | `9a8a1fb`（2026-10-25）          | 同轮决策在 `../2026-10-25-nikkisync-upstream-sync-02-实施计划.md`（保留，含「不做项」与裁示） |
-| `2026-Q4/2026-10-25-nikkisync-upstream-sync-03-兼容层执行记录.md` | `6402cb5`（2026-10-25）          | 阶段收口读数已结转至本目录 `-05-结案报告`                                                     |
-| `2026-Q4/2026-10-25-nikkisync-upstream-sync-04-能力层执行记录.md` | `9a8a1fb`（2026-10-25）          | 同上；验收矩阵摘要在 `-02-实施计划`                                                           |
-| `2026-Q4/2026-10-25-nikkisync-upstream-sync-05-结案报告.md`       | `c89ed5d`（2026-10-26）          | 结案读数复述进 `CHANGELOG.md` 的 2.5.5/2.5.6 节                                               |
-| `2026-Q4/2026-10-27-fix-test-suite-under-node26.md`               | `e24648f`（2026-10-27）          | Node 26 适配属环境性一次性工作，终验读数见 `docs/perf-regression.md` 与 git log               |
-| `2026-Q4/2026-10-29-nikkisync-upstream-sync-01-影响评估.md`       | `8aea3fd`（2026-10-29）          | 同轮决策在 `../2026-10-29-nikkisync-upstream-sync-02-实施计划.md`（保留）                     |
+| 归档文件（相对本目录）                                                     | 结案 commit                                                  | 实质结论落点                                                                                                                                     |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `2026-Q4/2026-10-24-fix-empty-recyclebin-system-trash.md`                  | `4e2a8d6`（2026-10-27 末次回填）                             | 回收站清空与系统回收站语义修复，已入 `CHANGELOG.md` 对应版本节                                                                                   |
+| `2026-Q4/2026-10-25-nikkisync-upstream-sync-01-影响评估.md`                | `9a8a1fb`（2026-10-25）                                      | 同轮决策在 `../2026-10-25-nikkisync-upstream-sync-02-实施计划.md`（保留，含「不做项」与裁示）                                                    |
+| `2026-Q4/2026-10-25-nikkisync-upstream-sync-03-兼容层执行记录.md`          | `6402cb5`（2026-10-25）                                      | 阶段收口读数已结转至本目录 `-05-结案报告`                                                                                                        |
+| `2026-Q4/2026-10-25-nikkisync-upstream-sync-04-能力层执行记录.md`          | `9a8a1fb`（2026-10-25）                                      | 同上；验收矩阵摘要在 `-02-实施计划`                                                                                                              |
+| `2026-Q4/2026-10-25-nikkisync-upstream-sync-05-结案报告.md`                | `c89ed5d`（2026-10-26）                                      | 结案读数复述进 `CHANGELOG.md` 的 2.5.5/2.5.6 节                                                                                                  |
+| `2026-Q4/2026-10-27-fix-test-suite-under-node26.md`                        | `e24648f`（2026-10-27）                                      | Node 26 适配属环境性一次性工作，终验读数见 `docs/perf-regression.md` 与 git log                                                                  |
+| `2026-Q4/2026-10-29-nikkisync-upstream-sync-01-影响评估.md`                | `8aea3fd`（2026-10-29）                                      | 同轮决策在 `../2026-10-29-nikkisync-upstream-sync-02-实施计划.md`（保留）                                                                        |
+| `2026-Q4/2026-10-30-fix-ci-linux-rig-axes-round5.md`                       | `8d6f0de`（2026-10-30 末次回写）                             | CI Linux 装置三轴修复结案，五闸门读数在本文件；run #30–#32 复验延续至 `2026-Q4/2026-11-04-ci-typecheck-e2e-nikkisync-literal-import-实施计划.md` |
+| `2026-Q4/2026-10-30-review-hardfix-repack-2.5.6-beta.md`                   | `9d25c73`（2026-10-30 末次回写）                             | 2.5.6-beta 全面审查-全量硬修-原地重打包（提交序列 315f3f4…94a96cf），读数已入 `CHANGELOG.md` 2.5.6-beta 节                                       |
+| `2026-Q4/2026-10-31-cloth-outfit-phase3-decode-cache-实施计划.md`          | `200691f`（2026-10-31 feat 链汇总提交）                      | 阶段 3 解码缓存；实质结论随 `CHANGELOG.md` 2.5.6-beta「完整搭配码面板」条目与 git log                                                            |
+| `2026-Q4/2026-10-31-cloth-outfit-phase4-ui-panel-实施计划.md`              | `200691f`（2026-10-31）                                      | 阶段 4 UI 面板，同上；契约真相源在 `../cloth-outfit-data-contract.md`（保留）                                                                    |
+| `2026-Q4/2026-10-31-cloth-outfit-phase5-e2e-regression-实施计划.md`        | `200691f`（2026-10-31）                                      | 阶段 5 端到端回归（真码终验 A–D 场景读数在本文件），同上                                                                                         |
+| `2026-Q4/2026-10-31-nikkisync-upstream-align-01-实施计划.md`               | `133a2bd`（2026-10-31 回写结案）                             | 账号作用域对齐 b397e0e；同轮后续在 `../2026-11-02-nikkisync-upstream-align-02-实施计划.md`（保留）                                               |
+| `2026-Q4/2026-10-31-review-cloth-outfit-commit-repack.md`                  | `9b7a9c2`（2026-10-31 末次回写）                             | 搭配码面板收尾审查与 2.5.6-beta 重打包读数，已入 `CHANGELOG.md` 2.5.6-beta 节                                                                    |
+| `2026-Q4/2026-10-31-review-nikkisync-scope-fixes-repack.md`                | `2610d49`（2026-11-01 末次回写）                             | 账号作用域修复审查（提交序列 0e05b12…2610d49）与 2.5.6-beta 重打包实测                                                                           |
+| `2026-Q4/2026-11-01-fullscreen-topbar-fix-实施计划.md`                     | `0fd7b90`（2026-11-01 代码修复；计划落盘与回填在 `37a6669`） | 全屏顶栏 `.app-no-drag` 几何减法修复，读数已入 `CHANGELOG.md` 2.5.6 节                                                                           |
+| `2026-Q4/2026-11-01-fullscreen-switch-jitter-fix-实施计划.md`              | `0fd7b90`（2026-11-01 代码修复；计划落盘与回填在 `37a6669`） | 全屏切换抖动三联状态原子化修复，读数已入 `CHANGELOG.md` 2.5.6 节                                                                                 |
+| `2026-Q4/2026-11-01-photo-dir-review-fix-2.5.6-repack-实施计划.md`         | `d48f2a8`（2026-11-01 末次回写）                             | 照片目录二轮审查修正（提交序列 a7f0012…2807c8d），已入 `CHANGELOG.md` 2.5.6 节                                                                   |
+| `2026-Q4/2026-11-01-review-fix-verify-2.5.6-release-实施计划.md`           | `7598c29`（2026-11-01 回写定版与打包实测）                   | 2.5.6 定版审查，读数已入 `CHANGELOG.md` 2.5.6 节；其 §10 待填部分由 round2 接续                                                                  |
+| `2026-Q4/2026-11-02-gpu-fatal-level3-compat-实施计划.md`                   | `882b570`（2026-11-02 回写执行记录）                         | GPU 三级兼容阶梯，已入 `CHANGELOG.md` 2.5.6 节；审查续轮在 `../2026-11-02-gpu-ladder-review-fix-2.5.6-repack-实施计划.md`（保留）                |
+| `2026-Q4/2026-11-04-ci-typecheck-e2e-nikkisync-literal-import-实施计划.md` | `970913b`（2026-11-04 回写 run #32 全绿）                    | CI typecheck/e2e 两条主题关闭（修复 229d6bb/df8ab01），上游落点矩阵在本文件                                                                      |
+| `2026-Q4/2026-11-04-clearing-review-verify-2.5.6-repack-实施计划.md`       | `f2ec28f`（2026-11-04 回写读数）                             | 清偿轮审查验证与 2.5.6 重打包六项全绿，已入 `CHANGELOG.md` 2.5.6 节                                                                              |
+
+> 上表第 8–22 行为本轮（round 6，2026-11-05）补登的 15 份：2026-10-30 ～ 2026-11-04 间按单步 `git mv`
+> 移入、但当时漏登台账的批次，补登依据为各文件文内回填记录与 git log 旧路径末次提交。
 
 ## 3. 使用约定
 
@@ -50,3 +73,8 @@
    `README.md` §3 明文禁止移入归档；归档判定只适用于「一轮会话一份执行记录」这种轮次快照。
 5. **移完要同步更新本表**。本表是下一轮的唯一查表依据；漏记会让下一轮重复判断、并把
    「零入站引用」这一条判据建立在过期数据上。
+6. **`npm run docs:links` 对非 md 指针失明**。`scripts/check-md-links.ts` 的被跟踪集合取
+   `git ls-files -z '*.md'`，而 `docs/plans/...` 同样出现在源码注释、`.github/workflows/build.yml`、
+   `docs/debt-registry.json`、`resources/nikkisync/recycle-helper.cs` 里（2026-11-04 实测：55 个非 md
+   被跟踪文件、18 个真实计划路径）。移动被这类注释点名的快照时闸门**不会报警**，指针会静默腐烂——
+   必须先跑 `git -c core.quotepath=false grep -n 'docs/plans/<name>' -- ':!*.md'` 逐条改写再搬。

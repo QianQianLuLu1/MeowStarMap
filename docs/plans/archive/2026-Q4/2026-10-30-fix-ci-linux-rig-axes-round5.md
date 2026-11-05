@@ -50,7 +50,7 @@ node -e "console.log(require('fs').readdirSync('D:/tmp').length)"               
 
 ### N0 计划落盘（本文件）
 
-- 文件：`docs/plans/2026-10-30-fix-ci-linux-rig-axes-round5.md`
+- 文件：`docs/plans/archive/2026-Q4/2026-10-30-fix-ci-linux-rig-axes-round5.md`
 - 验收：`git ls-files` 能列出本文件；`npx tsx scripts/check-md-links.ts` 绿。
 
 ### N1 簇 A：把哨兵换成注册第 7 轴

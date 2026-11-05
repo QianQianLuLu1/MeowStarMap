@@ -153,7 +153,7 @@ Electron 直接吃命令行里的 Chromium 开关。能正常打开 ⇒ 机制�
 
 ### T0 计划与取证落仓（本文件）
 
-- 文件：`docs/plans/2026-11-02-gpu-fatal-level3-compat-实施计划.md`
+- 文件：`docs/plans/archive/2026-Q4/2026-11-02-gpu-fatal-level3-compat-实施计划.md`
 - 验收：`git ls-files` 可列出该文件；`npm run verify` 不因文档失败（`docs/**` 不在闸门格式范围内）
 - commit：`docs(plans): GPU FATAL 根因取证与三级降级出口实施计划`
 

@@ -33,7 +33,7 @@ A local photo album manager for <em>Infinity Nikki</em> players — scan, browse
 - **智能整理** — 系统分类 + 三级自定义分类树（拖拽排序 / 颜色标签），标签管理，5 种智能分组维度（相册类型 / 场景 / 时段 / 套装 / 类型，另含「不分组」）
 - **重复检测** — SHA256 精确比对 + 感知哈希（pHash）双重检测，4 维智能评分推荐保留项
 - **分享与备份** — 微信 / QQ / vivo 剪贴板分享 + WiFi 局域网传输（PIN 鉴权）；自动定时备份 + 手动备份，5 份 LRU 轮转保留
-- **共鸣录（2.5.0 新增）** — 抽卡记录浏览与手动补录、我的衣橱（部件 / 妆容 / Momo / 道具 / 共鸣色）拥有状态与套装收集进度、本地 JSON 导入导出（解析预览 → 分批事务提交 → 可取消、断点幂等）、个人统计（欧非百分位与出货分布）；纯离线运行，静态数据全部随包，零外链
+- **共鸣录（2.5.0 新增）** — 抽卡记录浏览与手动补录、我的衣橱（部件 / 妆容 / Momo / 道具 / 共鸣色）拥有状态与套装收集进度、本地 JSON 导入导出（解析预览 → 分批事务提交 → 可取消、断点幂等）、个人统计（欧非百分位与出货分布）；抽卡与衣橱数据纯离线运行、静态数据全部随包，其中「我的衣橱」六类实体图片经第三方主机 `cdn.gongeo.us` 以 HTTPS 热链按需展示，加载失败时回退为占位色块，应用不下载保存图片、不做本地缓存，也不收集或上传任何用户数据
 - **设备同步（2.5.5 新增）** — 内置 NikkiSync 协议 v1 服务端，局域网 HTTPS + WebSocket 完成配对与认证，移动端可直接同步本机媒体库；「同步图库」板块独立浏览同步资产（默认关闭，需在设置页显式开启）
 - **更多能力** — 12 种语言、双主题（默认 + 柔粉轻奢）、插件系统、角色档案管理（多账号 / UID 隔离）、游戏参数解密、诊断工具
 
@@ -98,7 +98,7 @@ src/
 │   ├── ipc/           # IPC 通道处理（47 个文件：43 个 registerXxxHandlers + 4 个辅助）
 │   ├── preload/       # preload 桥命名空间（33 个 api/*.ts）
 │   ├── scanner/       # 文件扫描器（含子进程）
-│   ├── services/      # 业务服务层（13 个服务）
+│   ├── services/      # 业务服务层（16 个服务/配置文件，含搭配码数据服务）
 │   ├── sync/          # NikkiSync 协议移植面（认证 / 配对 / 服务端）
 │   ├── nikkisync/     # 外部 @nikkisync/* 包的装载缝
 │   ├── thumbnail/     # 单文件缩略图生成
@@ -135,6 +135,11 @@ src/
 - **CSDN博客**：[QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 - **作者官网**：<https://ppebv9al.qwenwork.host/>
 
+### 第三方来源与致谢
+
+- 共鸣录的核心逻辑与「我的衣橱」实体图片数据复用自开源项目 [gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker)（作者 dastrokes，MIT License，已获原作者授权），在此郑重致谢。MIT 许可仅覆盖该项目的代码与随附数据；「无限暖暖」相关的游戏美术资产、名称与商标归其各自权利方所有。
+- 「我的衣橱」六类实体图片（套装 / 部件 / 妆容 / Momo / 道具 / 共鸣色）通过第三方主机 `cdn.gongeo.us` 以 HTTPS 热链按需展示；图片加载失败时显示占位色块，应用不下载保存图片、不做本地缓存，也不收集或上传任何用户数据，图片能否显示取决于该第三方主机的可用性。
+
 ### 许可证
 
 [MIT License](LICENSE)
@@ -156,7 +161,7 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 - **Smart Organization** — System categories + 3-level custom category tree (drag-sort / color tags), tag management, 5 smart grouping dimensions (album type / scene / time / outfit / file type, plus "no grouping")
 - **Duplicate Detection** — SHA256 exact match + perceptual hash (pHash) dual detection, 4-dimensional smart scoring recommends keepers
 - **Share & Backup** — WeChat / QQ / vivo clipboard sharing + WiFi LAN transfer (PIN auth); auto scheduled backup + manual backup, 5-copy LRU rotation
-- **Resonance Records (new in 2.5.0)** — Browse pull records and add manual entries, manage My Wardrobe (items / makeup / Momo / props / eureka colors) with outfit completion progress, import & export local JSON (parse preview → batched transactions → cancellable and idempotent resume), personal stats (luck percentile and drop distribution); fully offline with all static data bundled, zero external requests
+- **Resonance Records (new in 2.5.0)** — Browse pull records and add manual entries, manage My Wardrobe (items / makeup / Momo / props / eureka colors) with outfit completion progress, import & export local JSON (parse preview → batched transactions → cancellable and idempotent resume), personal stats (luck percentile and drop distribution); gacha and wardrobe data run fully offline with all static data bundled, while the six My Wardrobe entity image categories are hot-linked on demand over HTTPS from a third-party host, `cdn.gongeo.us` — a placeholder block is shown if an image fails to load, and the app neither downloads/stores nor caches images, nor collects or uploads any user data
 - **Device Sync (new in 2.5.5)** — Built-in NikkiSync Protocol v1 server: LAN HTTPS + WebSocket pairing and authentication let mobile clients sync this machine's media library; a dedicated **Sync Gallery** section browses synced assets (off by default — enable it explicitly in Settings)
 - **More** — 12 languages, dual themes (default + soft pink luxury), plugin system, character profiles (multi-account / UID isolation), game parameter decryption, diagnostics
 
@@ -221,7 +226,7 @@ src/
 │   ├── ipc/           # IPC channel handlers (47 files: 43 registerXxxHandlers + 4 helpers)
 │   ├── preload/       # Preload bridge namespaces (33 api/*.ts)
 │   ├── scanner/       # File scanner (with worker)
-│   ├── services/      # Business service layer (13 services)
+│   ├── services/      # Business service layer (16 service/config files, incl. cloth data service)
 │   ├── sync/          # NikkiSync protocol port (auth / pairing / server)
 │   ├── nikkisync/     # Loader seam for the external @nikkisync/* packages
 │   ├── thumbnail/     # Single-file thumbnail generation
@@ -258,6 +263,11 @@ src/
 - **GitHub**: [QianQianLuLu1](https://github.com/QianQianLuLu1)
 - **CSDN Blog**: [QianQian-LuLu](https://blog.csdn.net/2604_96788940)
 - **Author Site**: https://ppebv9al.qwenwork.host/
+
+### Data Sources & Credits
+
+- The core logic of Resonance Records and the My Wardrobe entity image data are derived from the open-source project [gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker) by dastrokes (MIT License, used with the original author's permission) — our sincere thanks. The MIT license covers that project's code and bundled data only; all Infinity Nikki game art assets, names, and trademarks belong to their respective owners.
+- The six My Wardrobe entity image categories (outfits / items / makeup / Momo / props / eurekas) are displayed via on-demand HTTPS hot-links from a third-party host, `cdn.gongeo.us`: a placeholder block is shown if an image fails to load, and the app neither downloads/stores nor caches images, nor collects or uploads any user data. Image display depends on that third-party host's availability.
 
 ### License
 

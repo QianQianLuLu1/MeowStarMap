@@ -121,7 +121,7 @@
 ## 执行记录
 
 - 2026-10-31：计划批准，开始执行。
-- 节点 0：本计划落盘 `docs/plans/2026-10-31-cloth-outfit-phase4-ui-panel-实施计划.md`。
+- 节点 0：本计划落盘 `docs/plans/archive/2026-Q4/2026-10-31-cloth-outfit-phase4-ui-panel-实施计划.md`。
 - 节点 1（红→绿）：测试 mock 由 `success` 修正为运行时真实形状 `ok` 并新增「运行时真实形状」复现用例
   → 2 个成功路径用例红（复现 ok/success 漂移 bug）；随后 `vite-env.d.ts`（三处）、
   `electron-api.ts`（`DecodeClothDiyResponse` 补 `structured`）、组件 `handleDecode` 对齐 `ok`

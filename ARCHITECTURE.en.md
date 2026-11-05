@@ -5,7 +5,7 @@
 > **Current Version**: 2.5.6
 > **Platform**: Windows x64
 > **Document Version**: 1.5
-> **Last Updated**: 2026-10-06
+> **Last Updated**: 2026-11-05
 
 ---
 
@@ -369,7 +369,9 @@ MeowStarMap/
 │   │   │   ├── auto-update.ts         # Auto update
 │   │   │   ├── exit-forensics.ts      # Exit forensics
 │   │   │   ├── gpu-fallback.ts        # GPU fallback decision
+│   │   │   ├── gpu-preference.ts / gpu-status.ts # GPU preference persistence and status query
 │   │   │   ├── native-load-guard.ts   # Native module load pre-check
+│   │   │   ├── nikkisync-runtime-setup.ts / sync-server-setup.ts # Sync runtime and server setup
 │   │   │   ├── permission.ts          # Permission management
 │   │   │   └── app-context.ts         # App context
 │   │   ├── database/                  # Database layer
@@ -377,6 +379,8 @@ MeowStarMap/
 │   │   │   ├── media-repository.ts    # MediaRepository (SQL access layer)
 │   │   │   ├── resonance-repository.ts # Resonance repository
 │   │   │   ├── import-root-repository.ts # Import-root repository
+│   │   │   ├── asset-edits-repository.ts # Asset overlay-edit repository
+│   │   │   ├── sync-metadata-repository.ts / sync-pairing-repository.ts / sync-read-repository.ts / sync-row-mappers.ts # Sync-domain repositories and row mappers
 │   │   │   ├── sql-chunk.ts           # SQL chunking utility
 │   │   │   └── worker/                # database-worker (utilityProcess)
 │   │   ├── scanner/                   # Scanner
@@ -399,7 +403,7 @@ MeowStarMap/
 │   │   ├── thumbnail/
 │   │   │   ├── generator.ts           # ThumbnailGenerator (single generation + LRU)
 │   │   │   └── worker-*.ts            # thumbnail-worker (utilityProcess: sharp scaling)
-│   │   ├── services/                  # Business service layer (13 services)
+│   │   ├── services/                  # Business service layer (16 service/config files)
 │   │   │   ├── file-service.ts
 │   │   │   ├── video-service.ts
 │   │   │   ├── watermark-service.ts
@@ -412,6 +416,8 @@ MeowStarMap/
 │   │   │   ├── thumbnail-phash-service.ts
 │   │   │   ├── decryption-service.ts
 │   │   │   ├── xmp-metadata-service.ts
+│   │   │   ├── cloth-data-service.ts / cloth-data-config.ts # Cloth-outfit data query and data source config
+│   │   │   ├── cloth-diy-cache.ts     # Cloth-outfit network decode result disk cache (sha256 key)
 │   │   │   └── log-service.ts
 │   │   ├── ipc/                       # IPC layer
 │   │   │   ├── handler-context.ts     # Dependency injection context
@@ -430,7 +436,8 @@ MeowStarMap/
 │   │   │       ├── operation-history-handler.ts / task-handler.ts
 │   │   │       ├── profile-handler.ts / search-index-handler.ts
 │   │   │       ├── thumbnail-handler.ts / category-handler.ts / plugin.ts / plugin-bridge-handler.ts
-│   │   │       ├── resonance-handler.ts
+│   │   │       ├── resonance-handler.ts / sync-handler.ts / nikkisync-handler.ts
+│   │   │       ├── asset-edits-handler.ts / favorites-handler.ts
 │   │   │       └── set-dir-handler.ts
 │   │   ├── plugins/                   # Plugin host
 │   │   │   ├── plugin-host.ts         # Plugin loading and lifecycle
@@ -456,6 +463,8 @@ MeowStarMap/
 │   │   │   ├── runtime-manager.ts     # Lifecycle state machine (the only DI surface; start() never throws outward)
 │   │   │   ├── probe.ts / probe-cli.ts # Link probe: never starts any service, database restricted to :memory:
 │   │   │   ├── sync-server-view.ts    # Pure-function translation of the upstream LocalSyncServer config
+│   │   │   ├── protocol-contract.ts / runtime-types.ts / resource-allowlist.ts # Seam contract, runtime types and resource allowlist
+│   │   │   ├── embedding-paths.ts / runtime-cli.ts / runtime-cli-report.ts # Unpacked-path resolution and runtime CLI forensics
 │   │   │   └── metadata-resolver-driver.ts / metadata-isolation-guards.ts  # Phase 6 bounded driver and table-level isolation guards
 │   │   ├── i18n/                      # Main process i18n
 │   │   │   ├── index.ts
@@ -468,6 +477,8 @@ MeowStarMap/
 │   │   │   ├── phash.ts / process-registry.ts / progress-throttle.ts
 │   │   │   ├── scene-brightness.ts / startup-diagnostic.ts
 │   │   │   ├── task-registry.ts / user-diag-path.ts / video-frame.ts / video-probe.ts
+│   │   │   ├── atomic-file.ts / fluent-ffmpeg-shim.ts / image-encode.ts / path-dialect.ts
+│   │   │   ├── physical-file-key.ts / spawn-error-log.ts / zip-archive.ts
 │   │   │   └── worker-restart-policy.ts
 │   │   ├── types/                     # Main process type declarations
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
@@ -533,7 +544,7 @@ MeowStarMap/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 32 utility files (incl. resonance/ pure-function and share-card/ subdirs)
+│   │   ├── utils/                     # 51 utility files (incl. resonance/ pure-function and share-card/ subdirs)
 │   │   ├── App.tsx                    # App root component
 │   │   ├── main.tsx                   # Renderer process entry
 │   │   ├── preview-entry.tsx          # Preview entry
@@ -720,6 +731,9 @@ Main-process side priority task scheduler, layered above the utilityProcess work
 | **DecryptionService**            | Game photo param decryption (koffi calls nuan5_decryption.dll, ABI validation + async mutex serialization)                                                          |
 | **LogService**                   | Fault record management (faults-*.jsonl reading, cache invalidation, ZIP export)                                                                                    |
 | **XmpMetadataService**           | XMP metadata write/read (serializes EditorMetadata into a custom `wxnn:` namespace XMP packet; single and batch writes)                                             |
+| **ClothDataService**             | Cloth-outfit data query (name map loaded fully once, catalog API by-ID lookup, icon URL built from ID; 400/404 negative caching, silent degradation on failure)     |
+| **ClothDiyCache**                | Cloth-outfit network decode result disk cache (`sha256(code)` key atomically written to `<userData>/cloth-diy-cache/`; same code reusable offline)                  |
+| **ClothDataConfig**              | Cloth data source config (catalog API and name-map source URLs, phase-2 contract freeze artifact)                                                                   |
 
 ### 5.8 IPC Layer (ipc/)
 
@@ -796,6 +810,10 @@ Three major capabilities:
 | `plugin.ts`                    | Plugin management                                                                                                                                                                     |
 | `plugin-bridge-handler.ts`     | Plugin capability bridge (controlled media/db/fs/watermark/task/i18n calls, with `permission-guard` validation)                                                                       |
 | `resonance-handler.ts`         | Resonance Records (10 channels: getData/manual record CRUD/readImportFile/commitImport/export/updateWardrobe/setWishlist/clearAll)                                                    |
+| `asset-edits-handler.ts`       | Asset overlay edits (asset-edits:list/set — read/write user edits by asset_id)                                                                                                        |
+| `favorites-handler.ts`         | Favorites domain (favorites:add/list/remove)                                                                                                                                          |
+| `sync-handler.ts`              | Ported-side sync service control (startServer/stopServer/getStatus/createPairingQr/listDevices/revokeDevice)                                                                          |
+| `nikkisync-handler.ts`         | Sync gallery runtime surface (~20 channels: runtime/start/stop/server state machine, gameRoot get/set/reset, admit/inspect extra photo dirs, library-change pushes, etc.)             |
 | `set-dir-handler.ts`           | Factory: `registerSetDirHandler` / `registerResetDirHandler`; eliminates 4 isomorphic templates                                                                                       |
 
 ### 5.9 Utility Layer (utils/)
@@ -1050,9 +1068,9 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **scanner/ScanProgress**: Scan progress bar (scanned/found/currentPath + stop button)
 - **video/VideoPlayer**: Video player (playback progress persisted to localStorage by src hash)
 
-### 6.8 Custom Hooks (30 non-test files)
+### 6.8 Custom Hooks (31 non-test files)
 
-#### Media Operation Class (7)
+#### Media Operation Class (8)
 
 - **useFileOperations**: File ops core hook (delete/move/rename/copy/favorite toggle/property update); registers 4 undoHandlers
 - **useBatchOperations**: Batch ops hook (watermark/batch rename state management)
@@ -1061,6 +1079,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **useFilteredMediaFiles**: Filter+sort+group hook (module-level cache avoids duplicate computation across components)
 - **useGallerySearch**: Search input hook (250ms debounce)
 - **useRefreshMedia**: Refresh media hook (wraps fetchMediaFromDatabase)
+- **useGallerySummaryCounts**: gallery summary-count selector (shared by the AppShell status bar and the Sidebar "photos / videos" entries)
 
 #### UI Interaction Class (7)
 
@@ -1107,6 +1126,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | **operationHistoryStore** | No (in-memory + IPC persists to operation_history table) | Global operation history. 50 cap, 10 OperationTypes (the store's own union, including `notes_update` — **same name, different set** from the 14-member `OperationType` in `src/shared/types/editor.ts`; do not conflate them), type-dispatched UndoHandler registry (module-level Map), database write failure callback Set subscription, loadFromDatabase startup load                                          |
 | **resonanceStore**        | No (in-memory)                                           | Resonance Records data (records / wardrobe / stats and import-export state); added in 2.5.0                                                                                                                                                                                                                                                                                                                      |
 | **pluginStore**           | No (in-memory)                                           | Plugin runtime state (installed/enabled plugin list, in-progress install/uninstall operation flags and error info)                                                                                                                                                                                                                                                                                               |
+| **syncGalleryStore**      | No (in-memory)                                           | Sync gallery data (device/pairing state, scan progress, directory proposals, gallery entries, etc.); added in 2.5.6                                                                                                                                                                                                                                                                                              |
 
 ### 6.10 Utility Functions (utils/)
 
@@ -1647,7 +1667,7 @@ commit (preload cannot import main-process modules, so the two cannot share a si
 - `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**: 11 native dependency entries unpacked to disk — `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll`
+- **`asarUnpack`**: 14 native/external dependency entries unpacked to disk — `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` / `qrcode` / `dijkstrajs` / `pngjs` (the last three added on 2026-11-05 with the @nikkisync external-deps unpack fix)
 - **Windows NSIS**: x64, non-one-click, allows custom install dir, force create desktop shortcut + start menu shortcut
 - `signExecutable: false` / `verifyUpdateCodeSignature: false` — code signing not enabled, but **the exe icon and PE version metadata are still written via resedit**. This used to read `signAndEditExecutable: false`, which makes electron-builder skip resource editing along with signing, leaving the app exe / desktop shortcut / taskbar on the Electron default icon.
 
@@ -1725,7 +1745,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 ### 12.5 Native Binary Dependencies
 
 - `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` must be unpacked via `asarUnpack`
-- ffmpeg/ffprobe paths must replace `app.asar` → `app.asar.unpacked` via the `native-path.ts` utility
+- ffmpeg/ffprobe paths must replace `app.asar` → `app.asar.unpacked` via the `ffmpeg-paths.ts` utility
 
 ### 12.6 Scanner Constraints
 
@@ -1789,7 +1809,7 @@ The NSIS installer may fail to create a desktop shortcut in overwrite-install sc
 
 ### 12.14 Resonance Records Module Constraints
 
-- **Offline first**: the resonance module must not issue any network request. All static data ships with the app — 11 catalog shards plus `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json`, a 12-language entity name pack, and 77 banner thumbnails (~7.1 MB). Banner thumbnails are resolved via a static import from `src/renderer/data/resonance/thumbnails/index.ts` to a relative in-bundle URL (`base: './'`) — zero external links
+- **Offline first (data layer)**: gacha records, wardrobe data, statistics and import/export flows in the resonance module must not issue any network request. All static data ships with the app — 11 catalog shards plus `banners.json` / `outfits.json` / `percentile.json` / `snapshot-meta.json`, a 12-language entity name pack, and 77 banner thumbnails (~7.1 MB). Banner thumbnails are resolved via a static import from `src/renderer/data/resonance/thumbnails/index.ts` to a relative in-bundle URL (`base: './'`) — zero external links. **Sole exception**: the six My Wardrobe entity image categories (outfits / items / makeup / Momo / props / eurekas) are rendered from hot-linked URLs generated by `cdnImageUrl.ts` on `https://cdn.gongeo.us` via `<img src>` (`loading="lazy"`, `referrerPolicy="no-referrer"`), with a placeholder fallback on load failure; enabled by default with no toggle, and the app neither downloads/stores nor caches images. This host is the only approved `https` image host for the renderer (see `APPROVED_IMAGE_HOSTS` in `offline-guard.test.ts`). The `data.gongeo.us` / `raw.githubusercontent.com` endpoints in main-process `src/main/services/cloth-data-config.ts` belong to a separate data path and are outside this data-layer offline constraint.
 - **Main-process responsibility boundary**: the main process only does zod validation, PathGuard allow-list checks (`assertFileReadPath` / `assertFileWritePath`), file I/O and SQLite access. Import parsing, merge/dedupe, diff counting and export payload assembly are all renderer-side pure functions (`src/renderer/utils/resonance/`)
 - **Import limits** (constants in `src/shared/types/resonance.ts`): `MAX_IMPORT_FILE_BYTES` = 64 MB per file, `MAX_TOTAL_IMPORT_RECORDS` = 200000, `MAX_PULLS_PER_BANNER` = 50000, `MAX_COMMIT_BATCH_ROWS` = 2000 per commit batch, `MAX_WARDROBE_BATCH` = 5000
 - **Import commit**: the renderer calls `resonance:commitImport` in batches of `MAX_COMMIT_BATCH_ROWS`; each batch is one transaction with `INSERT OR IGNORE` (idempotent, resumable after interruption). `wardrobe` is carried only by the final batch (full overwrite)
@@ -2046,12 +2066,13 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- **Test file count (statically verifiable, no run needed)**: Vitest 5.0, **454 test files** = src 421 + scripts 28 + e2e 5
-  (per-directory count of `git ls-files '*.test.ts' '*.test.tsx'`). Versus the previous 453 this is +1, from
-  `src/renderer/styles/app-drag-region.test.ts` added by `59b3377` (2026-10-30).
+- **Test file count (statically verifiable, no run needed)**: Vitest 5.0, **471 test files** = src 434 + scripts 32 + e2e 5
+  (per-directory count of `git ls-files '*.test.ts' '*.test.tsx'`; static recheck on 2026-11-05). Versus the 2026-10-30
+  snapshot of 454 this is +17, from suites added by the gallery-count fix, DEBT-053…059 clearing and the qrcode unpack-gate rounds.
 - **Passing case count (only quotable from an actual run)**: full `npm test` on 2026-10-30 from this machine —
   `Test Files 454 passed (454)`, `Tests 7094 passed | 12 skipped (7106)`, 53.45s (host `win32 / node-v26.3.0 / vitest 5.0.3`).
-  The file count closes against the static line above (454 = 421+28+5); versus the 2026-10-28 snapshot that is +1 file / +31 cases, skipped unchanged.
+  That reading corresponds to the then-static count 454 = 421+28+5, since grown to the 471 above; kept here as the latest
+  full-run snapshot and not refreshed with the static count.
 - **The device-side run cannot reach green on this machine; CI is the final judge**: the same `npm run test:ci-linux` gives
   32 failed | 422 passed (454) here, against 33 failed | 421 passed (454) on the pre-round baseline `a678393` — **this round adds zero new reds**.
   Failures concentrate in two load-time causes: sharp/better-sqlite3 native binaries are looked up under the emulated Linux host
