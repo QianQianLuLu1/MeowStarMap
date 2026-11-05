@@ -104,7 +104,34 @@
 文档：根目录 6 份 + `docs/` 3 份 + `docs/plans/` 活跃 4 份订正 + 15 个 rename + archive 台账 + 本文件。
 CHANGELOG：F1 去转义 + `[2.5.6]` 台账追加 1 行（[Unreleased] 不动）。
 
-## 9. 读数回写（执行后补）
+## 9. 读数回写
 
-- T3 六项：待补。
-- T6 打包：待补（新包双轴、S4 断言）。
+### 9.1 审查与修复（T0–T2）
+
+- 预审结论与范围见 §3；执行期逐文件复读未发现新缺陷，仅落地 F1 + F2。
+- C0 `ae941fd`（计划落盘 + 15 份归档 rename 随批）、C1 `4fb2e4f`（round 6 治理 28 文件 +367/−127）、C2 `7575082`（衣橱功能 7 文件 +639/−25）；每笔提交后 `git status --porcelain` 干净，commitlint 通过（各 1 条 body 行长 ⚠ 非阻断）。
+- 提交后全量回归：`npm test` **471 文件 / 7544 passed / 20 skipped**（md-links 闸门在全部入库后绿）。
+
+### 9.2 六项验证（T3，2026-11-05 08:18–08:27）
+
+| #   | 命令                    | 读数                                                                                                                                                                | 判定 |
+| --- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| 1   | `npm install`           | exit 0；lock 零扰动（仅行尾规范化，已 checkout 还原）；四条 @nikkisync junction 照例被剪、`link:nikkisync` 复原、`:check` OK；better-sqlite3 装载探针 OK            | ✅   |
+| 2   | `npm run build`         | exit 0，5.22s，`dist/main/main/app/index.js` 在位                                                                                                                   | ✅   |
+| 3   | `npm test`              | **471 文件 / 7544 passed / 20 skipped / 0 failed**（跳过数与 11-04 基线 20 持平，无静默 skip 增长；首轮 1 例 md-links 红为闸门强制同批入库，提前 `git add` 后转绿） | ✅   |
+| 4   | `npm run typecheck`     | exit 0（tsc -b + tsconfig.scripts.json 零错误）                                                                                                                     | ✅   |
+| 5   | `npm run e2e:smoke`     | **19 passed**（41.3s，S1–S8 含 S4 版本断言）                                                                                                                        | ✅   |
+| 6   | `npm run test:ci-linux` | **471 文件 / 7561 passed / 3 skipped / 0 failed**（ECONNRESET 未复现）                                                                                              | ✅   |
+
+### 9.3 定版 2.5.6 确认（T5）
+
+- 四处声明位 grep 终确认：`package.json:3`、`package-lock.json:3` 与 `:9`、`database-mock.ts:664`（`getVersion: async () => '2.5.6'`）、`CHANGELOG.md:24`（`## [2.5.6] - 2026-11-01`）。
+- 双闸 exit 0：`check-doc-versions.ts`（README Electron 版本 41.10 与 package.json 一致）、`check-changelog-release.ts`（15 个版本节、[2.5.6] 存在且唯一、[Unreleased] 已收口）。
+
+### 9.4 重打包（T6）
+
+- 旧包双轴（备份于 `release/build-20261105-precommit/`）：exe 184,896,290 B，sha512 `3lA6wUM3Xo0ply59qcnN6gS4LlaY/8qbHAVcozLBZTyQoTLWRY43b2l9GNBI5DwWsTu2ZPC3bs8HxviQCSY2NQ==`（releaseDate 2026-11-04T12:23Z）；app.asar 73,080,397 B。
+- 清树探针：`rm -rf release/win-unpacked*` 直接成功（杀软句柄未锁），走标准路径；`link:nikkisync:check` four links in place。
+- `npm run dist:win`：**exit 0**（build:recycle-helper → build 989 模块 → pre-dist-check 全部校验通过（含 changelog/doc-versions 双闸）→ electron-builder NSIS x64 → verify:dist 解包产物校验通过；日志 `.cache/dist-win-20261105-precommit.log`）。
+- 新包双轴：**184,896,162 B / sha512 `VonbOeWxWKln+5u6UKZEmiEpdlXL3mHDlL6iwLiPEq1AuieGt7LV/A0reNk3NzWBwrCCozvNg5Yz5b5lG3fvVg==`**（旧包 184,896,290 B / `3lA6wUM3…`，size/sha512 双轴均变 ⇒ 非空重跑判定成立）；releaseDate 2026-11-05T00:38Z。
+- 打包后 `npm run e2e:smoke`：**19 passed**（40.3s，S4 断言包内 `app.getVersion()` === 2.5.6）。
