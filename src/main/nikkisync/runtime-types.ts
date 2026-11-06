@@ -531,7 +531,6 @@ export interface PcCompanionServicesLike {
   wechatStatus(): unknown
 }
 
-/** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
 /**
  * 上游 PC 端能力位（对齐 `apps/pc-companion/src/windows-app.ts` 的干净安装默认态）。
  * 全部默认开；每一项都有 `NIKKI_NIKKISYNC_*=0` 逃生阀，由装配层按 env 收敛后下发。
@@ -546,6 +545,7 @@ export interface NikkiSyncPcCompanionSwitches {
   desktopControl: boolean
 }
 
+/** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
 export interface NikkiSyncSessionOptions {
   /** NikkiSync 库文件绝对路径。 */
   databaseFile: string

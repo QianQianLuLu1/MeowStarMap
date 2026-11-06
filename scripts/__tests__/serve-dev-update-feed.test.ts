@@ -10,6 +10,7 @@ import {
   feedPayloadName,
   buildLatestYml,
   sha512Base64,
+  main,
   type ServeFeedArgs
 } from '../serve-dev-update-feed'
 import { verifyUpdateFeedArtifacts } from '../pre-dist-check'
@@ -20,7 +21,9 @@ const { createServerMock, fakeServer } = vi.hoisted(() => {
   const fakeServer = {
     on: vi.fn(),
     listen: vi.fn(),
-    close: vi.fn()
+    close: vi.fn(),
+    // F10：Node ≥18.2 的 Server 具备该方法；关闭后必须断掉 keep-alive 连接才能退干净
+    closeAllConnections: vi.fn()
   }
   return { fakeServer, createServerMock: vi.fn(() => fakeServer) }
 })
@@ -261,6 +264,7 @@ describe('入口守卫与信号生命周期（A8）', () => {
     fakeServer.on.mockClear()
     fakeServer.listen.mockClear()
     fakeServer.close.mockClear()
+    fakeServer.closeAllConnections.mockClear()
   })
 
   it('(源码) 入口守卫改用 import.meta.url 规范化比对，不再靠 argv[1] 后缀字符串', () => {
@@ -296,5 +300,68 @@ describe('入口守卫与信号生命周期（A8）', () => {
       process.argv = prevArgv
     }
     expect(createServerMock).not.toHaveBeenCalled()
+  })
+})
+
+// ============================================================================
+// F9/F10/F11：请求处理健壮性与退出链收尾（审查轮发现）
+// ============================================================================
+describe('F9/F10/F11 请求处理健壮性', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), 'dev-feed-f9-'))
+    createServerMock.mockClear()
+    fakeServer.on.mockClear()
+    fakeServer.listen.mockClear()
+    fakeServer.close.mockClear()
+    fakeServer.closeAllConnections.mockClear()
+  })
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  /** 经 main() 起一次服务（server 已 mock），取出请求 handler 并打一发请求 */
+  function runHandler(url: string): {
+    writeHead: ReturnType<typeof vi.fn>
+    end: ReturnType<typeof vi.fn>
+  } {
+    main(['--version', '9.9.9', '--dir', tmpDir])
+    // createServerMock 声明为零参工厂，calls 元组无元素类型：经 unknown 数组取首参（handler）
+    const lastCall = createServerMock.mock.calls.at(-1) as unknown as unknown[] | undefined
+    const handler = lastCall?.[0] as unknown as (
+      req: { url?: string },
+      res: { writeHead: unknown; end: unknown }
+    ) => void
+    const res = { writeHead: vi.fn(), end: vi.fn() }
+    handler({ url }, res as never)
+    return res
+  }
+
+  it('F9 畸形百分号编码（GET /%）⇒ 404 且 handler 不抛 URIError（不崩 dev 进程）', () => {
+    // 修复前：decodeURIComponent('/%') 在 request handler 里同步抛 URIError
+    // ⇒ http server 未捕获即 uncaughtException，与 registerShutdown 的优雅退出目标相悖
+    const res = runHandler('/%')
+    expect(res.writeHead).toHaveBeenCalledWith(404, expect.anything())
+    expect(res.end).toHaveBeenCalledWith('not found\n')
+  })
+
+  it('F11 同请求的 Content-Length 与响应体来自同一次读盘（不得读两次）', () => {
+    const src = stripComments(readFileSync(SCRIPT_PATH, 'utf-8'))
+    expect(src).not.toMatch(/Content-Length':\s*String\(readFileSync\(file\)\.length\)/)
+    expect(src).toMatch(/const body = readFileSync\(file\)/)
+  })
+
+  it('F10 SIGINT 关闭后必须补 closeAllConnections（keep-alive 连接不得挂住退出）', async () => {
+    const mod = (await import('../serve-dev-update-feed')) as unknown as Record<string, unknown>
+    const register = mod.registerShutdown as (server: unknown, target: unknown) => () => void
+    const target = new EventEmitter()
+    register(fakeServer, target)
+    target.emit('SIGINT')
+    // 信号连发幂等：close 与 closeAllConnections 都只执行一次
+    target.emit('SIGINT')
+    expect(fakeServer.close).toHaveBeenCalledTimes(1)
+    expect(fakeServer.closeAllConnections).toHaveBeenCalledTimes(1)
   })
 })

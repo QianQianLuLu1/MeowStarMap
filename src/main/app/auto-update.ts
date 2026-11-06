@@ -25,11 +25,14 @@ export type { UpdatePayload, UpdateStage }
 let ctxRef: AppContext | null = null
 let initialized = false
 
-// 本次 checkForUpdates / downloadUpdate 调用期间是否已由 error 事件推过 error。
-// 每次调用开始时重置：上游通常是「先 dispatchError（emit error）再 rethrow」，error 事件会先于
-// reject 到达 catch。catch 据此去重——已由 error 事件推过就绝不再推，否则刚被关闭的模态会被
-// setDismissed(false) 弹回；只有本次全程没收到 error 事件时才兜底补推 1 条。
-let errorEventPushed = false
+// F8：按「调用代」归属 error 事件，替代旧的模块级共享布尔。checkForUpdates / downloadUpdate
+// 并发交错时（download 在途又发起 check，反向同理），共享布尔会把 A 调用的 error 事件错记
+// 到 B 头上——B 失败时误判「已推过」而跳过兜底（渲染端停在 checking/downloading 无声收场），
+// 反向交错则可能双推弹回模态。现行口径：每次调用登记一代；error 事件归属到「当时最旧的一条
+// 在途调用」（单一在途时即命中正确归属）；失败 catch 只在**自己这一代**没收到事件时兜底补推
+// ——保证每次失败至少 1 条 error、且同一失败不双推（上游先 dispatchError 再 rethrow 的形状）。
+let callSeq = 0
+const inFlightUpdateCalls = new Map<number, { eventPushed: boolean }>()
 
 /** 把归一化后的发布说明统一成字符串（electron-updater 两种形态兼容） */
 function normalizeReleaseNotes(
@@ -100,7 +103,13 @@ export function initAutoUpdater(ctx: AppContext): void {
   })
 
   autoUpdater.on('error', (err) => {
-    errorEventPushed = true
+    // F8：事件归属到当时最旧的一条在途调用（Map 保持插入序，首个键即最旧）；
+    // 无在途调用（自发性错误）则只推送不登记。
+    const oldest = inFlightUpdateCalls.keys().next()
+    if (!oldest.done) {
+      const state = inFlightUpdateCalls.get(oldest.value)
+      if (state) state.eventPushed = true
+    }
     const message = err instanceof Error ? err.message : String(err)
     // 归类决定渲染端文案：只有真的连不上更新源才配得上「当前网络繁忙」
     const errorKind = classifyUpdateError(err)
@@ -126,18 +135,22 @@ export function isAutoUpdaterEnabled(): boolean {
  */
 export async function checkForUpdates(): Promise<void> {
   if (!initialized) throw AppError.preconditionFailed(t('main.error.updaterNotInit'))
-  errorEventPushed = false
+  const myToken = ++callSeq
+  const callState = { eventPushed: false }
+  inFlightUpdateCalls.set(myToken, callState)
   pushUpdate({ stage: 'checking' })
   try {
     await autoUpdater.checkForUpdates()
   } catch (err) {
     logger.warn(t('main.autoUpdate.log.checkFailed'), err)
-    // 本次未收到 error 事件 ⇒ 兜底推 1 条（否则调用方只看到 checking 便无声收场）。
-    // 已由 error 事件推过就绝不再推，否则刚被关闭的模态会被 setDismissed(false) 弹回。
-    if (!errorEventPushed) {
+    // 本次未收到归属到自己这一代的 error 事件 ⇒ 兜底推 1 条（否则调用方只看到 checking 便
+    // 无声收场）。已由事件推过就绝不再推，否则刚被关闭的模态会被 setDismissed(false) 弹回。
+    if (!callState.eventPushed) {
       const message = err instanceof Error ? err.message : String(err)
       pushUpdate({ stage: 'error', errorKind: classifyUpdateError(err), errorMessage: message })
     }
+  } finally {
+    inFlightUpdateCalls.delete(myToken)
   }
 }
 
@@ -146,20 +159,24 @@ export async function downloadUpdate(): Promise<void> {
   // 与 checkForUpdates 同口径：未初始化必须让调用方拿到失败，否则 handler 仍返回
   // {downloading:true}，渲染层 catch 永远走不到，用户点「下载更新」毫无反应。
   if (!initialized) throw AppError.preconditionFailed(t('main.error.updaterNotInit'))
-  errorEventPushed = false
+  const myToken = ++callSeq
+  const callState = { eventPushed: false }
+  inFlightUpdateCalls.set(myToken, callState)
   try {
     await autoUpdater.downloadUpdate()
   } catch (err) {
     // 下载期的失败同样要归类（断网导致的 ECONNRESET 不能兜底成「源未就绪」），但**不重复推**：
     // 上游 downloadUpdate 的 errorHandler 先 dispatchError 再 rethrow（AppUpdater.js:650-672），
     // on('error') 已经带 errorKind 推过一条；这里再推一条会让刚被关闭的模态被 setDismissed(false) 弹回。
-    // 因此只有本次全程未收到 error 事件时才兜底推 1 条，已由事件推过则只补日志。
+    // 因此只有自己这一代未收到事件时才兜底推 1 条，已由事件推过则只补日志。
     const errorKind = classifyUpdateError(err)
     logger.error(`${t('main.autoUpdate.log.downloadFailed')} errorKind=${errorKind}`, err)
-    if (!errorEventPushed) {
+    if (!callState.eventPushed) {
       const message = err instanceof Error ? err.message : String(err)
       pushUpdate({ stage: 'error', errorKind, errorMessage: message })
     }
+  } finally {
+    inFlightUpdateCalls.delete(myToken)
   }
 }
 

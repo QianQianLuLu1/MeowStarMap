@@ -235,4 +235,37 @@ describe('mapHitSummariesToFiles（N5 命中回捞映射）', () => {
     expect(files[0].file_path).toBe('')
     expect(files[0].nikkisync?.assetId).toBe('missing')
   })
+
+  // F18：外部 IPC 的 edits 数组逐项不可信——脏元素（null / 非对象 / 缺 assetId）
+  // 一律丢弃，既不崩映射也不留下 undefined 键；合法编辑仍按 assetId 应用。
+  it('edits 含脏元素（null / 缺 assetId）不崩且合法编辑仍应用', () => {
+    const files = mapHitSummariesToFiles({
+      summaries: [summary({ assetId: 'a1' })],
+      metaByAsset: { a1: [resource({ resourceId: 'r-hq' })] },
+      pathByAsset: { a1: paths },
+      edits: [
+        {
+          assetId: 'a1',
+          isFavorite: true,
+          rating: 5,
+          tags: ['花'],
+          notes: 'n',
+          categoryId: 3,
+          outfit: 'spring',
+          sceneCategory: 'screenshot',
+          sceneTime: 'night',
+          isHidden: false,
+          deletedAt: null,
+          updatedAt: '2026-10-14'
+        },
+        null,
+        {},
+        { assetId: 42 }
+      ] as unknown as Parameters<typeof mapHitSummariesToFiles>[0]['edits']
+    })
+    expect(files).toHaveLength(1)
+    expect(files[0].is_favorite).toBe(true)
+    expect(files[0].rating).toBe(5)
+    expect(files[0].tags).toEqual(['花'])
+  })
 })

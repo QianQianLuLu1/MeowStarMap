@@ -5,16 +5,18 @@
  * - 统一错误提示入口：从任意错误对象中提取用户可读消息并显示 Toast
  * - 与 IpcError（preload 暴露的 window.IpcError）兼容，优先使用 userMessage
  * - 与 AppError（shared/errors/app-error）兼容，跨进程错误结构对齐
- * - 按错误类别决定 toast 类型与持续时间（用户取消静默、校验失败 info、内部错误 error）
+ * - 按错误类别决定 toast 类型（用户取消静默、校验失败 info、内部错误 error）
  * - 自动上报非用户面错误到主进程 faults 日志（避免渲染层错误被吞没）
  *
  * 使用约定：
- * - 与 useToast 组合：内部委托 useToast 显示消息
+ * - F25 起：显示委托根节点 GlobalToastProvider 渲染的全局 Toast（App 恒在 Provider 内）。
+ *   此前写入本钩子自持的 useToast 实例，而所有调用方都未渲染其实例 messages，错误实际不可见。
  * - 不重复日志：IPC 错误已在主进程 wrapHandler 中记录，此处仅做兜底上报
  * - 仅做错误展示：业务调用方决定后续恢复行为
  */
 import { useCallback } from 'react'
-import { useToast, type ToastType } from './useToast'
+import type { ToastType } from './useToast'
+import { useGlobalToast } from '../components/common/ToastProvider'
 import { extractUserMessage, isAppError } from '../../shared/errors/app-error'
 import { ERROR_CODES, categoryOfCode, ErrorCategory } from '../../shared/errors/error-codes'
 
@@ -42,31 +44,6 @@ function pickToastType(code: string | undefined): ToastType {
       return 'error'
     default:
       return 'error'
-  }
-}
-
-/**
- * 错误码到持续时间的映射策略
- *
- * - 用户取消：0（不显示）
- * - 校验/不存在：4s（用户需阅读并修正）
- * - 权限/数据库/文件/内部：6s（重要错误，给用户充分时间）
- */
-function pickDuration(code: string | undefined, fallbackDuration: number): number {
-  if (!code) return fallbackDuration
-  if (code === ERROR_CODES.CANCELED) return 0
-  const category = categoryOfCode(code)
-  switch (category) {
-    case ErrorCategory.Validation:
-    case ErrorCategory.NotFound:
-      return Math.max(fallbackDuration, 4000)
-    case ErrorCategory.Permission:
-    case ErrorCategory.Database:
-    case ErrorCategory.FileSystem:
-    case ErrorCategory.Internal:
-      return Math.max(fallbackDuration, 6000)
-    default:
-      return fallbackDuration
   }
 }
 
@@ -103,12 +80,8 @@ function shouldSkipToast(error: unknown, code: string | undefined): boolean {
 /**
  * 错误 toast 钩子
  *
- * @param defaultDuration 默认 toast 持续时间，单位 ms（默认 4000）
- *
  * @returns
- *   - showError(error)：显示错误 toast，自动提取消息与类型
- *   - showMessage(text, type)：直接显示文本（兼容旧用法）
- *   - dismiss/clear/messages：透传 useToast
+ *   - showError(error)：显示错误 toast，自动提取消息与类型并委托全局 Toast 通道
  *
  * @example
  * ```tsx
@@ -121,19 +94,11 @@ function shouldSkipToast(error: unknown, code: string | undefined): boolean {
  * }
  * ```
  */
-export function useErrorToast(defaultDuration = 4000): {
-  /** 错误消息列表（透传 useToast） */
-  messages: ReturnType<typeof useToast>['messages']
+export function useErrorToast(): {
   /** 显示任意错误对象 */
   showError: (error: unknown) => void
-  /** 显示原始文本消息（手动指定类型） */
-  showMessage: (text: string, type?: ToastType) => void
-  /** 关闭单条 toast */
-  dismiss: (id: string) => void
-  /** 清空所有 toast */
-  clear: () => void
 } {
-  const toast = useToast(defaultDuration)
+  const globalShowMessage = useGlobalToast()
 
   const showError = useCallback(
     (error: unknown) => {
@@ -144,13 +109,12 @@ export function useErrorToast(defaultDuration = 4000): {
 
       const text = extractUserMessage(error)
       const toastType = pickToastType(code)
-      const duration = pickDuration(code, defaultDuration)
 
-      // duration 为 0 表示静默（兜底，与 shouldSkipToast 配合）
-      if (duration === 0) return
-
-      // 委托 useToast 显示，注意 showMessage 默认 type 是 'success'，需显式传入
-      toast.showMessage(text, toastType)
+      // F25：委托根节点 GlobalToastProvider 渲染的全局 Toast——此前写入本钩子自持的
+      // useToast 实例，而所有调用方都未渲染该实例的 messages ⇒ 错误 toast 实际不可见
+      // （仅剩 faults 上报这一条副作用生效）。App 恒在 Provider 内渲染；测试经
+      // GlobalToastContext.Provider mock 注入后可直接断言。
+      globalShowMessage(text, toastType)
 
       // 兜底上报到主进程 faults 日志：
       // - IPC 错误已在 wrapHandler 中记录，此处为防止渲染层吞错而做兜底
@@ -177,21 +141,8 @@ export function useErrorToast(defaultDuration = 4000): {
         }
       }
     },
-    [toast, defaultDuration]
+    [globalShowMessage]
   )
 
-  const showMessage = useCallback(
-    (text: string, type: ToastType = 'info') => {
-      toast.showMessage(text, type)
-    },
-    [toast]
-  )
-
-  return {
-    messages: toast.messages,
-    showError,
-    showMessage,
-    dismiss: toast.dismiss,
-    clear: toast.clear
-  }
+  return { showError }
 }

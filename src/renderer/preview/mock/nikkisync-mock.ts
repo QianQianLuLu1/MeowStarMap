@@ -47,10 +47,10 @@ export const nikkisyncMock: Record<string, unknown> = {
   getResource: async () => emptyRecord(),
   getResourceRecords: async () => emptyRecord(),
   getChanges: async () => ({ items: [], fullResyncRequired: false }),
-  // ---- 搜索 / 统计 ----
-  searchSuits: async () => emptyList(),
-  searchClothing: async () => emptyList(),
-  profileStats: async () => emptyRecord(),
+  // ---- 搜索 / 统计（F21：与上游响应同形 {query, items} / ProfileStatsResponse）----
+  searchSuits: async () => ({ query: '', items: [] }),
+  searchClothing: async () => ({ query: '', items: [] }),
+  profileStats: async () => ({ libraryRevision: 0, topSuits: [], topClothing: [] }),
   // ---- 局域网同步服务 ----
   getServerStatus: async () => serverStatus,
   startServer: async () => serverStatus,
@@ -69,18 +69,40 @@ export const nikkisyncMock: Record<string, unknown> = {
   removeExtraDirectory: async () => emptyDirectories(),
   setExtraDirectorySource: async () => emptyDirectories(),
   rescanExtraDirectories: async () => emptyDirectories(),
-  getGameRoot: async () => ({ root: '' }),
-  setGameRoot: async () => ({ needRestart: false, applied: false }),
-  resetGameRoot: async () => ({ needRestart: false, applied: false }),
+  // F21：字段与真实契约同形——get → {gameRoot}；set/reset → 生效结果（preview 无
+  // Runtime，applyError 如实给 runtime-unavailable，needRestart=false 不弹重启询问）
+  getGameRoot: async () => ({ gameRoot: '' }),
+  setGameRoot: async () => ({
+    gameRoot: '',
+    writable: false,
+    applied: false,
+    needRestart: false,
+    applyError: 'runtime-unavailable'
+  }),
+  resetGameRoot: async () => ({
+    applied: false,
+    needRestart: false,
+    applyError: 'runtime-unavailable'
+  }),
   admitDirectory: async () => emptyRecord(),
   // ---- 账号作用域（K9）----
   getSyncAccounts: async () => emptyAccounts(),
   previewSyncAccount: async () => emptyRecord(),
   setSyncAccountSelection: async () => emptyAccounts(),
-  // ---- 整理队列（K8）----
-  getOrganizerQueue: async () => ({ list: [], enabled: false }),
+  // ---- 整理队列（K8；F4：契约是 {items, activity}，不是 {list}）----
+  getOrganizerQueue: async () => ({ items: [], activity: null }),
   decideOrganizerItem: async () => emptyList(),
   approveOrganizerItems: async () => ({ items: [], approved: 0, skipped: 0 }),
+  // ---- N4：灵感库（F20：四通道最小合法形状，preview 无条目不伪造数据）----
+  listInspirations: async () => ({ items: [], nextCursor: null }),
+  saveInspiration: async () => ({ revision: 0, entry: null }),
+  putInspirationImage: async () => ({ ok: true }),
+  getInspirationImage: async () => null,
+  // ---- N7：PC 端控制页 / 微信画廊（F20：四通道最小合法形状）----
+  desktopOpen: async () => ({ url: '' }),
+  wechatStart: async () => ({ status: null, qrSvg: '' }),
+  wechatStop: async () => ({ status: null }),
+  wechatStatus: async () => ({ status: null }),
   // ---- 订阅：同步返回退订函数（与 preload 的 subscribe 一致，不能是 Promise）----
   onLibraryChanged: () => noop
 }

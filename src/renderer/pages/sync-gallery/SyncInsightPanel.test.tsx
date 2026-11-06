@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { SyncInsightPanel } from './SyncInsightPanel'
@@ -464,5 +464,129 @@ describe('SyncInsightPanel', () => {
     submit('天鹅', api)
     await flush()
     expect(api.getResourceRecords).toHaveBeenCalledTimes(2)
+  })
+
+  // ===== 审查轮：F3 回捞去重签名 / F17 统计失败重试 / F18 edits 逐项收敛 =====
+
+  it('F3 同词连续两次检索：第一次回捞在途被第二次顶替，命中照片仍须铺进网格', async () => {
+    const onHits = vi.fn()
+    const suitItems = {
+      items: [
+        {
+          suitId: 's1',
+          suitName: '天鹅童话',
+          photoCount: 1,
+          photos: [{ asset: summary('a1'), matchedParts: [] }]
+        }
+      ]
+    }
+    const metaPage = { a1: [resource('a1')] }
+    const pathPage = { a1: { 'r-a1': 'D:/Game/a1.png' } }
+    // 检索与回捞都走可放行队列，构造「回捞 #1 在途 → 同词检索 #2」的真实交错
+    const searchQueue: Array<{ resolve: (value: unknown) => void }> = []
+    const resourceQueue: Array<{ resolve: (value: unknown) => void }> = []
+    const searchSuits = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          searchQueue.push({ resolve })
+        })
+    )
+    ;(window as unknown as Record<string, unknown>).electronAPI = {
+      nikkisync: {
+        searchSuits,
+        searchClothing: vi.fn(async () => ({ items: [] })),
+        profileStats: vi.fn(async () => ({ libraryRevision: 1, topSuits: [], topClothing: [] })),
+        onLibraryChanged: vi.fn(() => () => undefined),
+        getResourceRecords: vi.fn(
+          () =>
+            new Promise((resolve) => {
+              resourceQueue.push({ resolve })
+            })
+        )
+      },
+      assetEdits: { list: vi.fn(async () => ({ edits: [] })) }
+    }
+    const bridge = (
+      window as unknown as {
+        electronAPI: { nikkisync: { getResourceRecords: Mock } }
+      }
+    ).electronAPI.nikkisync
+    render(<SyncInsightPanel onHits={onHits} />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('天鹅', searchSuits)
+    searchQueue[0]?.resolve(suitItems)
+    await flush()
+    expect(searchSuits).toHaveBeenCalledTimes(1)
+
+    submit('天鹅', searchSuits) // 同词第二次提交
+    searchQueue[1]?.resolve(suitItems)
+    await flush()
+    // 修复前：第二次回捞被第一次占用的签名挡掉（仅 1 次 meta），第一次又因代次过期被丢弃
+    // ⇒ 命中照片静默丢失且无任何提示。
+    expect(bridge.getResourceRecords).toHaveBeenCalledTimes(2)
+
+    // 放行回捞：#0/#1 是两条 meta，随后各自补一条 path
+    resourceQueue[0]?.resolve({ byAsset: metaPage })
+    resourceQueue[1]?.resolve({ byAsset: metaPage })
+    await flush()
+    resourceQueue[2]?.resolve({ byAsset: pathPage })
+    resourceQueue[3]?.resolve({ byAsset: pathPage })
+    await flush()
+    expect(onHits).toHaveBeenCalledTimes(1)
+    const files = onHits.mock.calls[0][0] as AssetMediaFile[]
+    expect(files.map((file) => file.id)).toEqual(['a1'])
+    expect(files[0].file_path).toBe('D:/Game/a1.png')
+  })
+
+  it('F17 统计读取失败后收起再展开能重试（不再死锁在失败态）', async () => {
+    const api = install({ statsError: new Error('boom') })
+    render(<SyncInsightPanel />)
+    fireEvent.click(screen.getByText(TITLE))
+    expect(await screen.findByText('统计读取失败')).toBeInTheDocument()
+    expect(api.profileStats).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByText(TITLE)) // 收起
+    fireEvent.click(screen.getByText(TITLE)) // 再展开 ⇒ 必须重拉
+    await waitFor(() => expect(api.profileStats).toHaveBeenCalledTimes(2))
+  })
+
+  it('F18 edits 含脏元素（null / 非对象）不得崩回捞：合法编辑仍应用', async () => {
+    const onHits = vi.fn()
+    const api = install({
+      suits: {
+        items: [
+          {
+            suitId: 's1',
+            suitName: '天鹅童话',
+            photoCount: 1,
+            photos: [{ asset: summary('a1'), matchedParts: [] }]
+          }
+        ]
+      },
+      backfill: {
+        meta: { a1: [resource('a1')] },
+        paths: { a1: { 'r-a1': 'D:/Game/a1.png' } },
+        edits: [
+          {
+            assetId: 'a1',
+            isFavorite: true,
+            rating: 5,
+            tags: ['花'],
+            notes: 'n',
+            categoryId: null,
+            deletedAt: null,
+            updatedAt: 'x'
+          },
+          null,
+          {}
+        ] as unknown as AssetEditsInfo[]
+      }
+    })
+    render(<SyncInsightPanel onHits={onHits} />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('天鹅', api)
+    await waitFor(() => expect(onHits).toHaveBeenCalledTimes(1))
+    const files = onHits.mock.calls[0][0] as AssetMediaFile[]
+    expect(files[0].is_favorite).toBe(true)
+    expect(files[0].rating).toBe(5)
   })
 })

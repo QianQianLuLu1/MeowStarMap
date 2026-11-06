@@ -94,8 +94,8 @@ export const SyncInsightPanel: React.FC<SyncInsightPanelProps> = ({ onHits }) =>
       if (typeof api?.getResourceRecords !== 'function' || !onHits) return
       const assetIds = uniqueSummaries.map((item) => item.assetId)
       const key = [...assetIds].sort().join('\u0000')
+      // F3：签名只代表「同一批 assetIds 已交付过」——若已交付过同批，重复提交不再发 IPC
       if (lastBackfillKeyRef.current === key) return
-      lastBackfillKeyRef.current = key
       const editsApi = window.electronAPI?.assetEdits
       try {
         const metaResponse = await api.getResourceRecords({ assetIds, mode: 'meta' })
@@ -104,6 +104,11 @@ export const SyncInsightPanel: React.FC<SyncInsightPanelProps> = ({ onHits }) =>
           typeof editsApi?.list === 'function' ? await editsApi.list(assetIds) : undefined
         // 关键词/作用域已换 ⇒ 过期代次不得把旧命中铺进网格
         if (generation !== searchGenerationRef.current) return
+        // F3：签名占用挪到「代次校验通过、即将交付」这一步——此前在 await 前占位，
+        // 过期路径不清签名，同词/换词重查会被残留签名挡掉而静默丢失命中照片。
+        // 到这里签名还等于 key 的唯一情形是并发同键的另一条已交付（双保险）。
+        if (lastBackfillKeyRef.current === key) return
+        lastBackfillKeyRef.current = key
         // 外部输入不可信：判空 + 类型校验 + 缺省兜底
         const metaByAsset = (
           isRecord(metaResponse) && isRecord(metaResponse.byAsset) ? metaResponse.byAsset : {}
@@ -111,8 +116,10 @@ export const SyncInsightPanel: React.FC<SyncInsightPanelProps> = ({ onHits }) =>
         const pathByAsset = (
           isRecord(pathResponse) && isRecord(pathResponse.byAsset) ? pathResponse.byAsset : {}
         ) as Record<string, Record<string, string>>
-        const edits: AssetEditsInfo[] = Array.isArray(editsResponse?.edits)
-          ? (editsResponse.edits as AssetEditsInfo[])
+        // F18：edits 逐项收敛——脏元素（null / 非对象）一律丢弃，绝不带进映射层
+        const rawEdits = isRecord(editsResponse) ? editsResponse.edits : undefined
+        const edits: AssetEditsInfo[] = Array.isArray(rawEdits)
+          ? (rawEdits.filter(isRecord) as AssetEditsInfo[])
           : []
         onHits(
           mapHitSummariesToFiles({ summaries: uniqueSummaries, metaByAsset, pathByAsset, edits })
@@ -121,7 +128,7 @@ export const SyncInsightPanel: React.FC<SyncInsightPanelProps> = ({ onHits }) =>
       } catch {
         if (generation !== searchGenerationRef.current) return
         setBackfillFailed(true)
-        lastBackfillKeyRef.current = null // 允许下次提交重试
+        // F3：失败未占用签名（占用已挪到交付前），下次提交天然允许重试
       }
     },
     [onHits]
@@ -259,8 +266,14 @@ export const SyncInsightPanel: React.FC<SyncInsightPanelProps> = ({ onHits }) =>
         onToggle={(event) => {
           const open = (event.currentTarget as HTMLDetailsElement).open
           // 「只做一次」的闸落在展开动作上而不是 loadStats 内部：库变更要能重新拉，
-          // 但反复开合不得退化成每次开合一次 IPC
-          if (open && stats === null && !statsFailed) void loadStats()
+          // 但反复开合不得退化成每次开合一次 IPC。
+          // F17：失败态收起再展开 ⇒ 复位并重试（对齐灵感面板「失败折叠复位」口径）。
+          if (open && stats === null && !statsFailed) {
+            void loadStats()
+          } else if (open && statsFailed && stats === null) {
+            setStatsFailed(false)
+            void loadStats()
+          }
         }}
       >
         <summary

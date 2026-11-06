@@ -2075,3 +2075,73 @@ describe('C1 pcCompanionContext（真实会话上下文）', () => {
     expect(manager.pcCompanionContext()?.scanRoots).toEqual(['/ok/photos', '/ok/motion'])
   })
 })
+
+// ============================================================================
+// F2：会话生命周期回调——PC 端服务持有的旧会话上下文（database / scanRoots /
+// pairingUri）在 dispose 后全部失效，manager 必须在 teardown（dispose 前）与
+// start 成功尾部各给装配层一个回调，PC 服务才能随会话重建。
+// ============================================================================
+describe('F2 会话生命周期回调（onSessionStopping / onSessionStarted）', () => {
+  it('正常：首启触发一次 started；换根重建先 stopping（dispose 前）再 started；stop 只 stopping', async () => {
+    const { deps, calls } = createDependencies()
+    const started = vi.fn()
+    const stopping = vi.fn(async () => {
+      // 与 dispose 同一账本：stopping 必须记录在 dispose 之前（旧库此刻还开着）
+      calls.order.push('cb:stopping')
+    })
+    const manager = createRuntimeManager({
+      ...deps,
+      onSessionStarted: started,
+      onSessionStopping: stopping
+    })
+    await manager.start(DEFAULTS)
+    expect(started).toHaveBeenCalledTimes(1)
+    expect(stopping).not.toHaveBeenCalled()
+
+    // 换根重建：teardown → start
+    await manager.scan({ gameRoot: '/second/game/root' })
+    expect(started).toHaveBeenCalledTimes(2)
+    expect(stopping).toHaveBeenCalledTimes(1)
+    const disposeIndex = calls.order.indexOf('dispose')
+    expect(disposeIndex).toBeGreaterThan(calls.order.indexOf('cb:stopping'))
+
+    // 优雅停止：只 stopping，不再 started
+    await manager.stop()
+    expect(started).toHaveBeenCalledTimes(2)
+    expect(stopping).toHaveBeenCalledTimes(2)
+  })
+
+  it('异常：createSession 失败不触发 onSessionStarted', async () => {
+    const started = vi.fn()
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager({
+      ...deps,
+      createSession: async () => {
+        throw new Error('assembly boom')
+      },
+      onSessionStarted: started
+    })
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('error')
+    expect(started).not.toHaveBeenCalled()
+  })
+
+  it('边界：回调抛错只落 warn，不影响启动/拆除链', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager({
+      ...deps,
+      onSessionStopping: () => {
+        throw new Error('stopping hook boom')
+      },
+      onSessionStarted: async () => {
+        throw new Error('started hook boom')
+      }
+    })
+    const status = await manager.start(DEFAULTS)
+    expect(['running', 'degraded', 'error']).toContain(status.state)
+    await manager.stop()
+    expect(calls.dispose).toBe(1)
+    expect(calls.logs.some((l) => l.message.includes('onSessionStarted'))).toBe(true)
+    expect(calls.logs.some((l) => l.message.includes('onSessionStopping'))).toBe(true)
+  })
+})

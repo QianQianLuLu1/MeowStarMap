@@ -33,7 +33,16 @@ const IMPLEMENTED_METHODS = [
   'startScan',
   'startServer',
   'stopServer',
-  'onLibraryChanged'
+  'onLibraryChanged',
+  // F20：灵感库四通道 + PC 端四通道（mock 面缺席会让按钮静默无响应）
+  'listInspirations',
+  'saveInspiration',
+  'putInspirationImage',
+  'getInspirationImage',
+  'desktopOpen',
+  'wechatStart',
+  'wechatStop',
+  'wechatStatus'
 ]
 
 beforeEach(() => {
@@ -109,5 +118,63 @@ describe('installPreviewMock 注入的 nikkisync 命名空间', () => {
     for (const error of errors) {
       expect((error as { code?: string }).code).toBe(PREVIEW_UNSUPPORTED)
     }
+  })
+
+  // ===== F4/F20/F21：mock 面与真实契约同形（形状漂移即红）=====
+
+  it('F4 getOrganizerQueue 返回 {items, activity}（页面读 items.length，{list:[]} 会白屏）', async () => {
+    const ns = installedApi().nikkisync
+    const queue = (await ns.getOrganizerQueue()) as Record<string, unknown>
+    expect(Array.isArray(queue.items)).toBe(true)
+    expect(queue.activity).toBeNull()
+    expect(queue).not.toHaveProperty('list')
+  })
+
+  it('F21 searchSuits/searchClothing 返回 {query, items}（与上游响应同形）', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.searchSuits({ query: 'x' })).toEqual({ query: '', items: [] })
+    expect(await ns.searchClothing({ query: 'x' })).toEqual({ query: '', items: [] })
+  })
+
+  it('F21 profileStats 返回 {libraryRevision, topSuits, topClothing}', async () => {
+    const ns = installedApi().nikkisync
+    const stats = (await ns.profileStats()) as Record<string, unknown>
+    expect(stats.libraryRevision).toBe(0)
+    expect(Array.isArray(stats.topSuits)).toBe(true)
+    expect(Array.isArray(stats.topClothing)).toBe(true)
+  })
+
+  it('F21 gameRoot 三方法字段齐全（get → {gameRoot}；set/reset → applied/needRestart/applyError）', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.getGameRoot()).toEqual({ gameRoot: '' })
+    expect(await ns.setGameRoot({ path: 'D:/photos' })).toEqual({
+      gameRoot: '',
+      writable: false,
+      applied: false,
+      needRestart: false,
+      applyError: 'runtime-unavailable'
+    })
+    expect(await ns.resetGameRoot()).toEqual({
+      applied: false,
+      needRestart: false,
+      applyError: 'runtime-unavailable'
+    })
+  })
+
+  it('F20 PC 端四方法与灵感四方法在 mock 面存在且返回最小合法形状', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.desktopOpen()).toEqual({ url: '' })
+    expect(await ns.wechatStart()).toEqual({ status: null, qrSvg: '' })
+    expect(await ns.wechatStop()).toEqual({ status: null })
+    expect(await ns.wechatStatus()).toEqual({ status: null })
+    expect(await ns.listInspirations({ limit: 100 })).toEqual({ items: [], nextCursor: null })
+    expect(await ns.saveInspiration({ entry: {}, baseRevision: 0 })).toEqual({
+      revision: 0,
+      entry: null
+    })
+    expect(
+      await ns.putInspirationImage({ sha256: 'a', mimeType: 'image/png', bytesBase64: '' })
+    ).toEqual({ ok: true })
+    expect(await ns.getInspirationImage({ sha256: 'a' })).toBeNull()
   })
 })

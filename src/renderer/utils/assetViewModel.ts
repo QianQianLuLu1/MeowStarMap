@@ -150,7 +150,19 @@ export interface HitBackfillInput {
 
 export function mapHitSummariesToFiles(input: HitBackfillInput): AssetMediaFile[] {
   const { summaries, metaByAsset, pathByAsset, edits } = input
-  const editByAsset = new Map((edits ?? []).map((edit) => [edit.assetId, edit]))
+  // F18：edits 逐项不可信——null / 非对象 / 缺 assetId 的元素一律丢弃，
+  // 否则 null.assetId 直接 TypeError 崩掉回捞链，{} 会给 Map 留下 undefined 键。
+  const editByAsset = new Map(
+    (edits ?? [])
+      .filter(
+        (edit): edit is AssetEditsInfo =>
+          typeof edit === 'object' &&
+          edit !== null &&
+          typeof (edit as AssetEditsInfo).assetId === 'string' &&
+          (edit as AssetEditsInfo).assetId.length > 0
+      )
+      .map((edit) => [edit.assetId, edit])
+  )
   return summaries.map((summary) =>
     toAssetViewModel({
       summary,

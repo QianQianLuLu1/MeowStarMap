@@ -162,6 +162,9 @@ export function registerShutdown(
     if (closed) return
     closed = true
     server.close()
+    // F10：close() 只停新连接，electron-updater 客户端的 keep-alive 连接会让进程
+    // 迟迟不退；Node ≥18.2 的 closeAllConnections 把存量连接一并断掉，Ctrl+C 立即退出。
+    server.closeAllConnections()
   }
   signalTarget.on('SIGINT', shutdown)
   signalTarget.on('SIGTERM', shutdown)
@@ -207,7 +210,18 @@ export function main(argv: string[]): Server {
   allowed.set(fileName, payloadPath)
 
   const server = createServer((req, res) => {
-    const name = decodeURIComponent((req.url ?? '/').split('?')[0]).replace(/^\/+/, '')
+    const rawName = (req.url ?? '/').split('?')[0]
+    let name: string
+    try {
+      name = decodeURIComponent(rawName).replace(/^\/+/, '')
+    } catch {
+      // F9：畸形百分号编码（如 GET /%）让 decodeURIComponent 抛 URIError——
+      // request handler 未捕获即 uncaughtException 崩掉 dev 进程。404 即可，绝不放行。
+      res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' })
+      res.end('not found\n')
+      console.log('[dev-update-feed] 404 (malformed url encoding)')
+      return
+    }
     const file = allowed.get(name)
     if (!file) {
       // 只服务白名单内的确切文件名：404 而不是目录遍历
@@ -216,8 +230,11 @@ export function main(argv: string[]): Server {
       console.log(`[dev-update-feed] 404 ${name}`)
       return
     }
-    res.writeHead(200, { 'Content-Length': String(readFileSync(file).length) })
-    res.end(readFileSync(file))
+    // F11：只读一次盘，Content-Length 与响应体取同一份 Buffer——
+    // 两次独立读在文件被并发改写的间隙会产出长度与正文不一致的损坏响应。
+    const body = readFileSync(file)
+    res.writeHead(200, { 'Content-Length': String(body.length) })
+    res.end(body)
     console.log(`[dev-update-feed] 200 ${name}`)
   })
 

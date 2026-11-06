@@ -250,6 +250,11 @@ export function createPcCompanionServices(
     typeof options.host === 'function' ? options.host() : (options.host ?? '127.0.0.1')
 
   const brandImage = loadBrandImage(resourcesDir)
+  // F6 语义说明：dashboard 是「本机控制页 + 微信画廊」的**共同 HTTP 宿主**（上游
+  // createDesktopControlServer 把两者的路由挂同一台 server 上）。因此
+  // `desktopControl=false` 而 `wechatGallery=true` 时仍然会 listen——
+  // `NIKKI_NIKKISYNC_DESKTOP=0` 只关「控制页能力位」（状态页不再对外暴露状态），
+  // 并不关闭宿主监听；拆分 listen 会把微信画廊的出码/出图一并拆没，不属逃生阀语义。
   const dashboard = surface.createDesktopControlServer({
     legalDocuments: loadLegalDocuments(resourcesDir),
     ...(brandImage ? { brandImage } : {}),
@@ -274,6 +279,40 @@ export function createPcCompanionServices(
     }
   })
 
+  /**
+   * B3/F1 共用：dashboard.close 永不回调会卡死退出链 ⇒ Promise.race 超时兜底；
+   * 回调带 err 也只落日志。定时器在 finally 立即释放，settled 保证迟到的回调
+   * 不再二次 settle / 误报。stop() 与 start() 的回滚路径都走这里。
+   */
+  const closeDashboardQuietly = async (): Promise<void> => {
+    let closeTimer: ReturnType<typeof setTimeout> | undefined
+    let settled = false
+    try {
+      await Promise.race([
+        new Promise<void>((resolve, reject) => {
+          dashboard.close((error?: unknown) => {
+            if (settled) return
+            settled = true
+            if (error) reject(error)
+            else resolve()
+          })
+        }),
+        new Promise<void>((resolve) => {
+          closeTimer = setTimeout(() => {
+            if (settled) return
+            settled = true
+            safeLog('warn', '[pc-companion] dashboard close timed out; releasing exit chain')
+            resolve()
+          }, closeTimeoutMs)
+        })
+      ])
+    } catch (error) {
+      safeLog('warn', `[pc-companion] dashboard close failed: ${String(error)}`)
+    } finally {
+      if (closeTimer !== undefined) clearTimeout(closeTimer)
+    }
+  }
+
   return {
     async start(): Promise<void> {
       // B2：running 守卫 + 启动 Promise 去重，并发 start 不得重复 listen / 重复挂监听。
@@ -281,6 +320,7 @@ export function createPcCompanionServices(
       if (starting) return starting
       const attempt = (async (): Promise<void> => {
         let onError: ((error: unknown) => void) | undefined
+        let listened = false
         let versionStarted = false
         let memoryStarted = false
         try {
@@ -290,6 +330,10 @@ export function createPcCompanionServices(
             dashboard.once('error', onError)
             dashboard.listen(0, '127.0.0.1', resolve)
           })
+          // F1：listen 已成功（端口已被本服务占用），后续任何一步失败都必须把
+          // dashboard 一并关闭——否则监听 socket 泄漏到进程退出，且 status/desktopUrl
+          // 与实际监听状态背离，再无句柄能收回它。
+          listened = true
           const address = dashboard.address()
           if (!address || typeof address === 'string') {
             throw new Error('desktop control server has no address')
@@ -324,6 +368,10 @@ export function createPcCompanionServices(
               )
             }
           }
+          if (listened) {
+            // F1：与 stop() 同款 race+超时兜底；close 失败只落日志，不掩盖原始错误。
+            await closeDashboardQuietly()
+          }
           running = false
           desktopPort = undefined
           safeLog('warn', `[pc-companion] desktop control start failed: ${String(error)}`)
@@ -340,6 +388,11 @@ export function createPcCompanionServices(
     },
 
     async stop(): Promise<void> {
+      // F5：start 在途时先等它落地（成功或失败）再拆除——否则本 stop 的 close 发生在
+      // attempt 完成之前，attempt 随后把服务重新拉起，留下「stop 已返回但服务在监听」。
+      if (starting) {
+        await starting.catch(() => undefined)
+      }
       // 每步独立 try/catch：任一上游服务抛错都不得卡住退出链
       try {
         versionUpdates?.stop?.()
@@ -357,33 +410,7 @@ export function createPcCompanionServices(
         safeLog('warn', `[pc-companion] wechat stop failed: ${String(error)}`)
       }
       // B3：close 永不回调会卡死退出链 ⇒ Promise.race 超时兜底；同时处理回调里的 err。
-      // 定时器在 finally 立即释放，settled 保证迟到的回调不再二次 settle / 误报。
-      let closeTimer: ReturnType<typeof setTimeout> | undefined
-      let settled = false
-      try {
-        await Promise.race([
-          new Promise<void>((resolve, reject) => {
-            dashboard.close((error?: unknown) => {
-              if (settled) return
-              settled = true
-              if (error) reject(error)
-              else resolve()
-            })
-          }),
-          new Promise<void>((resolve) => {
-            closeTimer = setTimeout(() => {
-              if (settled) return
-              settled = true
-              safeLog('warn', '[pc-companion] dashboard close timed out; releasing exit chain')
-              resolve()
-            }, closeTimeoutMs)
-          })
-        ])
-      } catch (error) {
-        safeLog('warn', `[pc-companion] dashboard close failed: ${String(error)}`)
-      } finally {
-        if (closeTimer !== undefined) clearTimeout(closeTimer)
-      }
+      await closeDashboardQuietly()
       running = false
       desktopPort = undefined
     },

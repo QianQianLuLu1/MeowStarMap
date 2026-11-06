@@ -188,6 +188,18 @@ export interface RuntimeManagerDependencies {
    * pairingUri 走单参形态，NS1 串逐字节不变（第三方旧客户端回归锚）。
    */
   resolvePairingHosts?: () => string[]
+  /**
+   * F2：会话拆除（换根重建 / 端口变更 / stop）前回调——PC 端服务持有的旧会话上下文
+   * （database / scanRoots / pairingUri）在 dispose 后全部失效，装配层借此先停旧服务。
+   * teardown 保证在 `session.dispose()` 之前 await 完成；抛错只落 warn 不影响拆除链。
+   */
+  onSessionStopping?: () => void | Promise<void>
+  /**
+   * F2：会话建成（首启与每次重建共用 start() 单一路径）成功尾部回调——装配层借此
+   * 从新鲜 `pcCompanionContext()` 重装配 PC 端服务。createSession 失败不触发；
+   * 抛错只落 warn，不改判已收敛的启动状态。
+   */
+  onSessionStarted?: () => void | Promise<void>
 }
 
 /**
@@ -415,6 +427,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   async function teardown(label: string): Promise<void> {
     const session = state.session
     if (!session) return
+    // F2：dispose 之前先让装配层停掉 PC 端服务（它们持着本会话的 database /
+    // scanRoots / pairingUri，dispose 后全部失效；此刻旧库还开着，停得最干净）。
+    try {
+      await deps.onSessionStopping?.()
+    } catch (error) {
+      deps.log('warn', `nikkisync onSessionStopping callback failed: ${messageOf(error)}`)
+    }
     // 阶段 6：先作废代次，让在途的解析驱动在「下一轮开始前」自行收手；
     // 再停元数据生产者（它会在库上写 updateMetadata），然后才是传输、扫描、关库。
     state.generation += 1
@@ -530,6 +549,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       }
       // K1：启动后驱动一次缓存解码升级（有界本地操作；失败只落日志不影响启动结果）
       driveCachedMetadata(session)
+      // F2：会话已建成（含换根重建走到的这条单一路径），通知装配层重装配 PC 端服务。
+      // 无论 scanner 成功 / degraded / error，会话与库都已就位，PC 服务可用。
+      try {
+        await deps.onSessionStarted?.()
+      } catch (error) {
+        deps.log('warn', `nikkisync onSessionStarted callback failed: ${messageOf(error)}`)
+      }
       return status()
     })()
     // 并发 start 共享同一次启动（两个会话 = 两个 SQLite 句柄指同一文件，绝不允许）

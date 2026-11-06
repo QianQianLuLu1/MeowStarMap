@@ -31,13 +31,20 @@ function makeSurface(
     closeHangs?: boolean
     closeError?: unknown
     memoryStartThrows?: boolean
+    /** F5：listen 回调挂起不回调，用返回的 resolveListen() 手工放行（构造 stop/start 交错）。 */
+    deferListen?: boolean
   } = {}
 ) {
   // 真实 EventEmitter 语义：B2 要断言成功路径后 error 监听归零，纯 vi.fn 记不到。
   const emitter = new EventEmitter()
+  const deferredListenCbs: Array<() => void> = []
   const server: FakeServer = {
     listen: vi.fn((_port: number, _host: string, cb?: () => void) => {
       if (opts.listenFail) throw new Error('EADDRINUSE')
+      if (opts.deferListen) {
+        if (cb) deferredListenCbs.push(cb)
+        return
+      }
       cb?.()
     }),
     close: vi.fn((cb?: (error?: unknown) => void) => {
@@ -94,7 +101,18 @@ function makeSurface(
       return versionUpdates
     })
   } as unknown as PcCompanionSurface
-  return { surface, server, wechat, memory, versionUpdates }
+  return {
+    surface,
+    server,
+    wechat,
+    memory,
+    versionUpdates,
+    resolveListen: () => {
+      const cbs = [...deferredListenCbs]
+      deferredListenCbs.length = 0
+      cbs.forEach((cb) => cb())
+    }
+  }
 }
 
 function options(surface: PcCompanionSurface, log = vi.fn()) {
@@ -155,6 +173,41 @@ describe('pc-companion-services（N7 上游 PC 端服务装配）', () => {
     expect(memory.stop).toHaveBeenCalledTimes(1)
     expect(log).toHaveBeenCalled()
     expect(server.listenerCount('error')).toBe(0)
+  })
+
+  // F1：listen 已成功（端口已占用）后中途抛错，回滚必须一并关闭 dashboard——
+  // 否则监听 socket 泄漏到进程退出，status/desktopUrl 还与实际监听背离。
+  it('F1 listen 成功后中途抛错 ⇒ 回滚须一并关闭已监听的 dashboard', async () => {
+    const { surface, server, versionUpdates, memory } = makeSurface({
+      memoryStartThrows: true
+    })
+    const log = vi.fn()
+    const services = createPcCompanionServices(options(surface, log))
+    await expect(services.start()).rejects.toThrow('memory boom')
+    expect(versionUpdates.stop).toHaveBeenCalledTimes(1)
+    expect(memory.stop).toHaveBeenCalledTimes(1)
+    // 修复前缺失：已监听的服务器从不 close ⇒ 泄漏
+    expect(server.close).toHaveBeenCalledTimes(1)
+    expect(services.status().running).toBe(false)
+    expect(services.desktopUrl()).toBe('')
+  })
+
+  // F5：stop 与在途 start 交错——Node 允许 close 后再 listen，若 stop 不等 start 落地，
+  // close 会发生在 attempt 完成之前，服务随后又被拉起（running 复位发生在 close 之后）。
+  it('F5 stop 在 start 在途时先等其落地再拆除（close 晚于 attempt 完成）', async () => {
+    const { surface, server, versionUpdates, resolveListen } = makeSurface({ deferListen: true })
+    const services = createPcCompanionServices(options(surface))
+    const startPromise = services.start()
+    const stopPromise = services.stop()
+    resolveListen()
+    await expect(startPromise).resolves.toBeUndefined()
+    await expect(stopPromise).resolves.toBeUndefined()
+    // 修复前：close 先于 attempt 的后台服务启动（versionUpdates.start）发生 ⇒ 竞态窗口
+    const closeOrder = server.close.mock.invocationCallOrder[0] as number
+    const startOrder = versionUpdates.start.mock.invocationCallOrder[0] as number
+    expect(startOrder).toBeLessThan(closeOrder)
+    expect(services.status().running).toBe(false)
+    expect(services.desktopUrl()).toBe('')
   })
 
   it('B1 装配入口失败 ⇒ 返回 undefined（不把半成品递给上层）', async () => {

@@ -168,6 +168,49 @@ describe('initAutoUpdater —— 更新事件归类推送', () => {
     )
     expect(errorPushes).toHaveLength(1)
   })
+
+  // F8：checkForUpdates 与 downloadUpdate 并发交错时，模块级共享布尔会把 A 调用的
+  // error 事件错记到 B 头上——本用例按真实时序构造：download 在途 → check 发起 →
+  // download 先 emit error 再 reject → check 独立失败。修复前 check 的兜底被误跳，
+  // 渲染端停在 checking 无声收场（error 只推了 1 条，而两次失败各须 1 条）。
+  it('F8 并发交错：download 在途时发起 check，两次失败各推一条 error（不得无声收场）', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    let releaseDownload: (() => void) | undefined
+    let releaseCheck: (() => void) | undefined
+    const downloadGate = new Promise<void>((resolve) => {
+      releaseDownload = resolve
+    })
+    const checkGate = new Promise<void>((resolve) => {
+      releaseCheck = resolve
+    })
+    const downloadErr = connectionRefusedError()
+    // download 在途：等门闩 → 先 emit error 再 reject（上游真实形状）
+    autoUpdaterMock.downloadUpdate.mockImplementation(async () => {
+      await downloadGate
+      emit('error', downloadErr)
+      throw downloadErr
+    })
+    const checkErr = channelFileMissingError()
+    // check 独立失败：不 emit error（兜底路径才是它的唯一出路）
+    autoUpdaterMock.checkForUpdates.mockImplementation(async () => {
+      await checkGate
+      throw checkErr
+    })
+
+    const downloadPromise = mod.downloadUpdate()
+    const checkPromise = mod.checkForUpdates()
+    releaseDownload!()
+    await expect(downloadPromise).resolves.toBeUndefined()
+    releaseCheck!()
+    await expect(checkPromise).resolves.toBeUndefined()
+
+    const errorPushes = sendToRendererMock.mock.calls.filter(
+      (call) => (call[2] as UpdatePayload).stage === 'error'
+    )
+    // download 的失败由 error 事件推 1 条；check 的失败（无事件）由 catch 兜底推 1 条。
+    expect(errorPushes).toHaveLength(2)
+  })
 })
 
 describe('downloadUpdate —— 未初始化与失败兜底', () => {
