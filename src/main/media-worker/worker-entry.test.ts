@@ -1619,15 +1619,18 @@ describe('worker-entry 消息处理分支', () => {
     })
     const evt = await waitForEvent(port.messages, 'THUMBNAIL_COMPLETE')
     expect(evt.payload.processed).toBe(12)
-    // 核心语义：首条（时间条件，距预热批已 >500ms）必发 + 计数阈值强制放行（存在 ≥11 的放行）。
-    // 精确相等 [1, 11] 依赖"12 个文件在毫秒内完成、时间条件不可能再次满足"的环境假设，
-    // 慢速环境下时间条件可能额外放行，故改为等价语义断言 + 单调性校验。
+    // 核心语义：首条（时间条件，距预热批已 >500ms）必发 + 计数阈值强制放行。
+    // 旧断言「存在 ≥11 的放行」仍隐含"12 个文件在毫秒内完成、批内无时间放行"的
+    // 环境假设——满载机上批内穿插 500ms 时间放行会重置计数窗口，实测 4 轮全量
+    // 偶发红 2 次。计数分支的可判定不变量是「最后一次放行距最终 processed 至多
+    // 落后 9」（计数分支在差距达 10 的瞬间必放行）；若该分支被移除，快批场景
+    // last=1 必然落在此界之外 ⇒ 依旧红，钉住分支不被移除，且不再偶发假红。
     const progressList = eventsOf(port.messages, 'THUMBNAIL_PROGRESS').map((e) =>
       Number(e.payload.processed)
     )
     expect(progressList.length).toBeGreaterThanOrEqual(1)
     expect(progressList[0]).toBe(1)
-    expect(progressList.some((v) => v >= 11)).toBe(true)
+    expect(progressList[progressList.length - 1]).toBeGreaterThanOrEqual(rows.length - 9)
     for (let i = 1; i < progressList.length; i++) {
       expect(progressList[i]).toBeGreaterThan(progressList[i - 1])
     }
