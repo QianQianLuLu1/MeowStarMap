@@ -2120,6 +2120,8 @@
     "startup": {
       "autoScan": "启动时自动扫描",
       "autoScanDesc": "开启后，应用启动时将自动扫描游戏路径中的新增媒体文件。",
+      "launchAtLogin": "开机自启动",
+      "launchAtLoginDesc": "开启后，登录 Windows 时自动启动本应用。",
       "description": "应用启动时的自动行为配置",
       "title": "启动行为",
       "hardwareAcceleration": "GPU 硬件加速",
@@ -2304,6 +2306,8 @@
   "toast": {
     "autoScanOff": "已关闭启动时自动扫描",
     "autoScanOn": "已开启启动时自动扫描",
+    "launchAtLoginOn": "已开启开机自启动",
+    "launchAtLoginOff": "已关闭开机自启动",
     "gpuOff": "已关闭 GPU 硬件加速（重启后生效）",
     "gpuOn": "已开启 GPU 硬件加速（重启后生效）",
     "gpuDiscreteOn": "已优先使用独立显卡（重启后生效）",
@@ -3487,6 +3491,7 @@
         "valueNotSerializable": "设置值无法序列化",
         "hwAccelNotBoolean": "hardwareAcceleration 必须是布尔值",
         "gpuPreferenceInvalid": "gpu.discretePreference 必须是 auto 或 high-performance",
+        "launchAtLoginNotBoolean": "launchAtLogin 必须是布尔值",
         "securitySensitiveKey": "key \"{{key}}\" 为安全敏感项，请改用通道：{{channel}}",
         "unknownKey": "未知的设置项 key：{{key}}"
       },
@@ -4431,7 +4436,9 @@
       "loading": "加载中…",
       "empty": "暂无灵感条目",
       "edit": "编辑",
-      "delete": "删除"
+      "delete": "删除",
+      "loadMore": "加载更多",
+      "loadMoreFailed": "加载更多失败，点击重试"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "启用同步服务",
     "enableDesc": "开启后本机作为同步服务端运行（HTTPS + WebSocket，默认端口 28080）",
+    "autoStart": "软件启动时自动启用同步服务",
+    "autoStartDesc": "开启后，每次启动软件都会自动启动局域网同步服务；关闭时需在下方手动开启。",
     "gallerySource": "图库数据源使用 NikkiSync 资产库",
     "gallerySourceDesc": "关闭时读本机 media_files（默认）；开启后图库改读内嵌 NikkiSync Runtime 的 assets，并隐含启用运行时与一次扫描",
     "gallerySourceApplied": "图库数据源已切换为 {{source}}",

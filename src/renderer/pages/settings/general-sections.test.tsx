@@ -144,3 +144,52 @@ describe('GeneralStartupSection — 独显优先开关', () => {
     await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('gpu.discretePreference', 'auto'))
   })
 })
+
+// ===== 本次需求：设置板块「开机自启动」开关（默认开启）=====
+describe('GeneralStartupSection — 开机自启动开关', () => {
+  const renderStartup = () =>
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <GeneralStartupSection />
+      </GlobalToastContext.Provider>
+    )
+
+  it('G1 回归：开关默认开，点击后写 launchAtLogin=false', async () => {
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    expect(sw).toBeChecked()
+    fireEvent.click(sw)
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('launchAtLogin', false))
+  })
+
+  it('G2 边界：无持久化值默认开启；持久化 false 时显示关闭', async () => {
+    installElectronApi({})
+    const first = renderStartup()
+    expect(await screen.findByRole('switch', { name: '开机自启动' })).toBeChecked()
+    first.unmount()
+
+    installElectronApi({ launchAtLogin: false })
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    await waitFor(() => expect(sw).not.toBeChecked())
+  })
+
+  it('G3 异常：持久化失败回滚为开启态', async () => {
+    installElectronApi()
+    settingsSet.mockImplementation((key: string, value: unknown) => {
+      if (key === 'launchAtLogin') {
+        void value
+        return Promise.reject(new Error('disk full'))
+      }
+      return Promise.resolve()
+    })
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    fireEvent.click(sw)
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'))
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'))
+    // F22：错误反馈走全局 Toast，文案取 AppError 口径的用户可读消息（非 "Error: …" 全串），
+    // 且以 error 级别呈现（此前 String(err) 落成默认 success 绿 toast）
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('disk full', 'error'))
+  })
+})

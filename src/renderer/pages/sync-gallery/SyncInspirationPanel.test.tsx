@@ -307,3 +307,134 @@ describe('B10：加载失败可重试 + 图片失败不静默', () => {
     )
   })
 })
+
+// ============================================================================
+// 审查轮：F13 imageError 复位 / F14 delete 守卫 / F15 删除 busy 门 /
+// F16 灵感列表加载更多 / F19 空 mime 按失败态
+// ============================================================================
+
+/** 与 B9 同款：绕开 jsdom 对 File.arrayBuffer / WebCrypto 的实现差异。 */
+function stubCryptoForUpload(): void {
+  vi.stubGlobal('crypto', {
+    randomUUID: vi.fn(() => 'uuid-test'),
+    subtle: { digest: async () => new ArrayBuffer(32) }
+  })
+}
+
+function makeUploadFile(bytes: number[] = [1, 2, 3]): unknown {
+  return {
+    type: 'image/png',
+    arrayBuffer: async () => new Uint8Array(bytes).buffer
+  }
+}
+
+describe('审查轮：F13/F14/F15/F16/F19', () => {
+  beforeEach(() => {
+    stubCryptoForUpload()
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('F13 上传失败后取消/新建草稿 ⇒ imageError 复位，不再误显失败标记', async () => {
+    putInspirationImage.mockRejectedValueOnce(new Error('put failed'))
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(listInspirations).toHaveBeenCalled())
+    fireEvent.click(screen.getByTestId('inspiration-new'))
+    fireEvent.change(screen.getByTestId('inspiration-title-input'), {
+      target: { value: '上传' }
+    })
+    fireEvent.change(screen.getByTestId('inspiration-image-input'), {
+      target: { files: [makeUploadFile()] }
+    })
+    await waitFor(() => expect(screen.getByTestId('inspiration-image-error')).toBeInTheDocument())
+    // 取消并新建：错误标记必须复位（此前共享状态残留，新草稿一打开就显示失败）
+    fireEvent.click(screen.getByTestId('inspiration-cancel'))
+    fireEvent.click(screen.getByTestId('inspiration-new'))
+    expect(screen.queryByTestId('inspiration-image-error')).not.toBeInTheDocument()
+  })
+
+  it('F14 entry 缺失的行点击删除 ⇒ 短路不发 saveInspiration（不再递脏条目给上游）', async () => {
+    installApi({ list: { items: [{ revision: 1 }], nextCursor: null } })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1))
+    fireEvent.click(screen.getByTestId('inspiration-delete'))
+    expect(saveInspiration).not.toHaveBeenCalled()
+  })
+
+  it('F15 busy 期间删除被禁用且不执行（在途保存不被过期 baseRevision 撞 conflict）', async () => {
+    let resolveSave: () => void = () => {}
+    saveInspiration.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveSave = resolve
+        })
+    )
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('inspiration-new'))
+    fireEvent.change(screen.getByTestId('inspiration-title-input'), {
+      target: { value: '在途保存' }
+    })
+    fireEvent.click(screen.getByTestId('inspiration-save'))
+    await waitFor(() => expect(saveInspiration).toHaveBeenCalledTimes(1))
+    expect(screen.getByTestId('inspiration-delete')).toBeDisabled()
+    fireEvent.click(screen.getByTestId('inspiration-delete'))
+    expect(saveInspiration).toHaveBeenCalledTimes(1)
+    resolveSave()
+    await waitFor(() => expect(screen.getByTestId('inspiration-delete')).not.toBeDisabled())
+  })
+
+  it('F16 列表 nextCursor 有值 ⇒ 显示加载更多，点击消费游标追加下一页', async () => {
+    installApi({
+      list: {
+        items: [{ revision: 1, entry: makeEntry({ title: '第一页' }) }],
+        nextCursor: 'cursor-1'
+      }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('第一页')).toBeInTheDocument())
+    const more = screen.getByTestId('inspiration-load-more')
+    listInspirations.mockResolvedValueOnce({
+      items: [{ revision: 2, entry: makeEntry({ title: '第二页' }) }],
+      nextCursor: null
+    })
+    fireEvent.click(more)
+    await waitFor(() => expect(screen.getByText('第二页')).toBeInTheDocument())
+    expect(listInspirations).toHaveBeenLastCalledWith({ limit: 100, after: 'cursor-1' })
+    // 游标耗尽 ⇒ 按钮消失
+    await waitFor(() =>
+      expect(screen.queryByTestId('inspiration-load-more')).not.toBeInTheDocument()
+    )
+    expect(screen.getByText('第一页')).toBeInTheDocument()
+  })
+
+  it('F19 回捞图片缺 mimeType ⇒ 按失败态显示，不产出非法 data URL', async () => {
+    installApi({
+      list: {
+        items: [
+          {
+            revision: 1,
+            entry: makeEntry({
+              images: [
+                { id: 'img-1', sha256: 'sha-1', mimeType: 'image/png', bytes: 1, addedAt: 1 }
+              ]
+            })
+          }
+        ],
+        nextCursor: null
+      }
+    })
+    getInspirationImage.mockResolvedValue({ mimeType: '', bytesBase64: 'aa' })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    await waitFor(() =>
+      expect(screen.getByTestId('inspiration-image-load-error')).toBeInTheDocument()
+    )
+  })
+})

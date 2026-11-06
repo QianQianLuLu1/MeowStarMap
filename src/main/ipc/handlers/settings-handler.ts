@@ -1,4 +1,4 @@
-// @core-change: 新增 gpu.discretePreference 偏好（独显优先）值域校验与启动镜像双写
+// @core-change: 新增 launchAtLogin 开机自启设置：布尔校验与系统登录项同步
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -6,6 +6,7 @@ import { wrapHandler, wrapHandlerRaw, assertFileReadPath, pathGuard } from '../v
 import { AppError } from '../../../shared/errors/app-error'
 import { RENDERER_PREF_KEYS, SECURITY_SENSITIVE_KEYS } from '../../../shared/settings-keys'
 import { writeHardwareAccelPref, writeGpuDiscretePref } from '../../app/gpu-fallback'
+import { syncLoginItemSetting } from '../../app/login-item'
 import { t } from '../../i18n'
 
 // 与设置页 MAX_CUSTOM_PATHS / scanner:start schema 保持一致
@@ -114,6 +115,15 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           }
           ctx.dbManager.setSetting(key, value)
           writeGpuDiscretePref(value)
+          return { saved: true }
+        }
+        // launchAtLogin 走内联布尔校验，并把系统登录项同步为设置值
+        if (key === 'launchAtLogin') {
+          if (typeof value !== 'boolean') {
+            throw AppError.validation(t('main.settings.error.launchAtLoginNotBoolean'))
+          }
+          ctx.dbManager.setSetting(key, value)
+          syncLoginItemSetting(value)
           return { saved: true }
         }
         // 其余 key 必须在普通偏好白名单内；命中敏感 key 时给出专用通道指引

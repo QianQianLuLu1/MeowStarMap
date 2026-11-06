@@ -9,14 +9,44 @@ import os from 'node:os'
 import path from 'node:path'
 import { makeCtx, getHandler } from './_test-helpers'
 
-const { handleMock, mockAppGetPath } = vi.hoisted(() => ({
+const {
+  handleMock,
+  mockAppGetPath,
+  mockSetLoginItemSettings,
+  mockGetLoginItemSettings,
+  mockDiagLog,
+  mockLogStartupError,
+  appState
+} = vi.hoisted(() => ({
   handleMock: vi.fn(),
-  mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : ''))
+  mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : '')),
+  mockSetLoginItemSettings: vi.fn(),
+  mockGetLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
+  mockDiagLog: vi.fn(),
+  mockLogStartupError: vi.fn(),
+  appState: { isPackaged: true }
 }))
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() },
-  app: { getPath: mockAppGetPath }
+  app: {
+    getPath: mockAppGetPath,
+    get isPackaged() {
+      return appState.isPackaged
+    },
+    setLoginItemSettings: mockSetLoginItemSettings,
+    getLoginItemSettings: mockGetLoginItemSettings
+  }
+}))
+
+// 开机自启模块会写诊断日志：测试内隔离，避免落真实磁盘（按解析后的模块 ID 命中）
+vi.mock('../../utils/startup-diagnostic', () => ({
+  diagLog: mockDiagLog,
+  logStartupError: mockLogStartupError
+}))
+
+vi.mock('../../utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }))
 
 let tmpUserDir: string
@@ -188,6 +218,90 @@ describe('registerSettingsHandlers', () => {
     expect(result.success).toBe(false)
     expect(result.error.code).toBe('IPC_VALIDATION_ERROR')
     expect(fs.existsSync(path.join(tmpUserDir, 'gpu-pref.json'))).toBe(false)
+  })
+})
+
+// ===== 本次需求：开机自启动设置（launchAtLogin，默认开启）=====
+describe('settings:set launchAtLogin 开机自启动', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    appState.isPackaged = true
+  })
+
+  it('B1 回归：布尔 true 持久化并同步 OS 登录项（打包态）', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
+      success: boolean
+      data?: { saved: boolean }
+      error?: { message: string }
+    }
+    expect(result.success, result.error?.message).toBe(true)
+    expect(result.data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('launchAtLogin', true)
+    expect(mockSetLoginItemSettings).toHaveBeenCalledWith({ openAtLogin: true })
+  })
+
+  it('B2 回归：非布尔值被拒且走专用校验文案，不写库不调系统 API', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    for (const dirty of ['true', 1, null, {}, []]) {
+      const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', dirty])) as {
+        success: boolean
+        error?: { message: string }
+      }
+      expect(result.success).toBe(false)
+      expect(result.error?.message).toContain('launchAtLogin 必须是布尔值')
+      expect(result.error?.message).not.toContain('未知的设置项 key')
+    }
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+    expect(mockSetLoginItemSettings).not.toHaveBeenCalled()
+    // undefined 在通用序列化校验处即被拒，同样不得写库
+    const undef = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', undefined])) as {
+      success: boolean
+    }
+    expect(undef.success).toBe(false)
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+
+  it('B3 边界：false 同步移除登录项', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', false])) as {
+      success: boolean
+      error?: { message: string }
+    }
+    expect(result.success, result.error?.message).toBe(true)
+    expect(mockSetLoginItemSettings).toHaveBeenCalledWith({ openAtLogin: false })
+  })
+
+  it('B4 边界：dev 态只写设置与日志，不调用系统 API', async () => {
+    appState.isPackaged = false
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
+      success: boolean
+      error?: { message: string }
+    }
+    expect(result.success, result.error?.message).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('launchAtLogin', true)
+    expect(mockSetLoginItemSettings).not.toHaveBeenCalled()
+    expect(mockDiagLog).toHaveBeenCalled()
+  })
+
+  it('B5 异常：系统 API 抛错不进 IPC、设置仍已持久化且留痕', async () => {
+    mockSetLoginItemSettings.mockImplementationOnce(() => {
+      throw new Error('EACCES')
+    })
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
+      success: boolean
+      error?: { message: string }
+    }
+    expect(result.success, result.error?.message).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('launchAtLogin', true)
+    expect(mockLogStartupError).toHaveBeenCalled()
   })
 })
 

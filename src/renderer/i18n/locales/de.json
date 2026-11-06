@@ -1720,7 +1720,9 @@
       "title": "Startverhalten",
       "discreteGpu": "Dedizierte GPU bevorzugen",
       "discreteGpuDesc": "Auf Mehr-GPU-Systemen übernimmt die leistungsstarke dedizierte GPU die Oberflächen- und Bildwiedergabe (wirkt nach Neustart)",
-      "discreteGpuRestartHint": "Die Einstellung zur dedizierten GPU ist gespeichert und wird nach dem Neustart wirksam. Jetzt neu starten?"
+      "discreteGpuRestartHint": "Die Einstellung zur dedizierten GPU ist gespeichert und wird nach dem Neustart wirksam. Jetzt neu starten?",
+      "launchAtLogin": "",
+      "launchAtLoginDesc": ""
     },
     "theme": {
       "desc": "Wirkt sofort; Design-Einstellung wird automatisch in lokaler Konfiguration gespeichert.",
@@ -1980,7 +1982,9 @@
     "syncEnabled": "Synchronisierungsdienst aktiviert",
     "syncDisabled": "Synchronisierungsdienst deaktiviert",
     "gpuDiscreteOn": "Dedizierte GPU wird bevorzugt (wirkt nach Neustart)",
-    "gpuDiscreteOff": "Auf System-GPU-Auswahl umgestellt (wirkt nach Neustart)"
+    "gpuDiscreteOff": "Auf System-GPU-Auswahl umgestellt (wirkt nach Neustart)",
+    "launchAtLoginOn": "",
+    "launchAtLoginOff": ""
   },
   "video": {
     "applyEdit": "",
@@ -3482,7 +3486,8 @@
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
         "unknownKey": "",
-        "gpuPreferenceInvalid": "gpu.discretePreference muss auto oder high-performance sein"
+        "gpuPreferenceInvalid": "gpu.discretePreference muss auto oder high-performance sein",
+        "launchAtLoginNotBoolean": ""
       },
       "validation": {
         "keyRequired": "",
@@ -4431,7 +4436,9 @@
       "loading": "Wird geladen…",
       "empty": "Noch keine Inspirationseinträge",
       "edit": "Bearbeiten",
-      "delete": "Löschen"
+      "delete": "Löschen",
+      "loadMore": "Mehr laden",
+      "loadMoreFailed": "Laden fehlgeschlagen, zum Wiederholen klicken"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "Synchronisierungsdienst aktivieren",
     "enableDesc": "Dieser PC dient dann als Synchronisierungsserver (HTTPS + WebSocket, Standardport 28080)",
+    "autoStart": "Sync-Dienst beim App-Start automatisch aktivieren",
+    "autoStartDesc": "Wenn aktiviert, startet der LAN-Sync-Dienst bei jedem App-Start automatisch; sonst unten manuell starten.",
     "status": {
       "label": "Status",
       "running": "Läuft",

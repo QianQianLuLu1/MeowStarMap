@@ -1720,7 +1720,9 @@
       "title": "พฤติกรรมการเริ่มต้น",
       "discreteGpu": "ใช้ GPU แยกเป็นลำดับแรก",
       "discreteGpuDesc": "บนเครื่องที่มีหลาย GPU ให้ GPU แยกประสิทธิภาพสูงรับผิดชอบการเรนเดอร์หน้าจอและรูปภาพ (มีผลหลังรีสตาร์ท)",
-      "discreteGpuRestartHint": "บันทึกการตั้งค่าแล้วและจะมีผลหลังรีสตาร์ท รีสตาร์ทตอนนี้หรือไม่?"
+      "discreteGpuRestartHint": "บันทึกการตั้งค่าแล้วและจะมีผลหลังรีสตาร์ท รีสตาร์ทตอนนี้หรือไม่?",
+      "launchAtLogin": "",
+      "launchAtLoginDesc": ""
     },
     "theme": {
       "desc": "มีผลทันที; ค่ากำหนดธีมจะถูกบันทึกอัตโนมัติในการกำหนดค่าในเครื่อง",
@@ -1980,7 +1982,9 @@
     "syncEnabled": "เปิดใช้บริการซิงค์แล้ว",
     "syncDisabled": "ปิดบริการซิงค์แล้ว",
     "gpuDiscreteOn": "ใช้ GPU แยกเป็นลำดับแรกแล้ว (มีผลหลังรีสตาร์ท)",
-    "gpuDiscreteOff": "สลับเป็นการเลือก GPU ตามระบบแล้ว (มีผลหลังรีสตาร์ท)"
+    "gpuDiscreteOff": "สลับเป็นการเลือก GPU ตามระบบแล้ว (มีผลหลังรีสตาร์ท)",
+    "launchAtLoginOn": "",
+    "launchAtLoginOff": ""
   },
   "video": {
     "applyEdit": "",
@@ -3482,7 +3486,8 @@
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
         "unknownKey": "",
-        "gpuPreferenceInvalid": "ค่าต้องเป็น auto หรือ high-performance"
+        "gpuPreferenceInvalid": "ค่าต้องเป็น auto หรือ high-performance",
+        "launchAtLoginNotBoolean": ""
       },
       "validation": {
         "keyRequired": "",
@@ -4431,7 +4436,9 @@
       "loading": "กำลังโหลด…",
       "empty": "ยังไม่มีรายการแรงบันดาลใจ",
       "edit": "แก้ไข",
-      "delete": "ลบ"
+      "delete": "ลบ",
+      "loadMore": "โหลดเพิ่มเติม",
+      "loadMoreFailed": "โหลดเพิ่มเติมไม่สำเร็จ คลิกเพื่อลองอีกครั้ง"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "เปิดใช้บริการซิงค์",
     "enableDesc": "เครื่องนี้จะทำหน้าที่เป็นเซิร์ฟเวอร์ซิงค์ (HTTPS + WebSocket, พอร์ตเริ่มต้น 28080)",
+    "autoStart": "เปิดใช้งานบริการซิงค์อัตโนมัติเมื่อเริ่มแอป",
+    "autoStartDesc": "เมื่อเปิด บริการซิงค์ LAN จะเริ่มทำงานทุกครั้งที่เปิดแอป หากปิดให้เริ่มด้วยตนเองด้านล่าง",
     "status": {
       "label": "สถานะ",
       "running": "กำลังทำงาน",

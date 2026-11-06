@@ -41,6 +41,8 @@ const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
 const SETTING_RUNTIME_ENABLED = 'nikkisync.runtimeEnabled'
 const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
 const METADATA_TOGGLE_NAME = '解析穿搭与拍摄参数'
+const SETTING_SYNC_AUTOSTART = 'nikkisync.autoStartSyncServer'
+const AUTOSTART_TOGGLE_NAME = '软件启动时自动启用同步服务'
 /** 与页面内的 STATUS_POLL_MS 同值：门控用例靠它推进定时器 */
 const STATUS_POLL_MS = 2000
 
@@ -552,6 +554,41 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     })
     renderSection()
     const toggle = await screen.findByRole('switch', { name: METADATA_TOGGLE_NAME })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
+  })
+
+  // ===== 本次需求：软件启动时是否自动启用同步服务（默认关闭）=====
+  it('(s1) 回归：自动启用开关默认关，点击只写 autoStartSyncServer，不启停服务', async () => {
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: AUTOSTART_TOGGLE_NAME })
+    expect(toggle).toHaveAttribute('aria-checked', 'false')
+    fireEvent.click(toggle)
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith(SETTING_SYNC_AUTOSTART, true))
+    expect(serverApi.startServer).not.toHaveBeenCalled()
+    expect(serverApi.stopServer).not.toHaveBeenCalled()
+    expect(settingsSet).not.toHaveBeenCalledWith(SETTING_SYNC_ENABLED, true)
+    expect(settingsSet).not.toHaveBeenCalledWith(SETTING_RUNTIME_ENABLED, true)
+  })
+
+  it('(s2) 边界：自动启用开关挂载读回已持久化的开启态', async () => {
+    installElectronApi({ persisted: { [SETTING_SYNC_AUTOSTART]: true } })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: AUTOSTART_TOGGLE_NAME })
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'true'))
+  })
+
+  it('(s3) 异常：自动启用开关持久化失败 ⇒ 回滚为关闭态', async () => {
+    installElectronApi()
+    settingsSet.mockImplementation((key: string, value: unknown) => {
+      if (key === SETTING_SYNC_AUTOSTART) {
+        void value
+        return Promise.reject(new Error('disk full'))
+      }
+      return Promise.resolve()
+    })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: AUTOSTART_TOGGLE_NAME })
     fireEvent.click(toggle)
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
   })
@@ -1384,5 +1421,43 @@ describe('SyncServicePage PC 端分区（N7）', () => {
     expect(screen.getByTestId('pc-open-desktop')).toBeInTheDocument()
     expect(screen.getByTestId('pc-wechat-start')).toBeInTheDocument()
     expect(screen.getByTestId('pc-wechat-stop')).toBeInTheDocument()
+  })
+
+  // F12：父页 keep-alive 不卸载本分区，仅挂载取一次会让画廊状态整会话陈旧
+  // （控制页启停画廊后 UI 永不更新）。与页头服务状态卡同口径按 2s 轮询。
+  it('F12 微信画廊状态随轮询刷新，不得只取挂载那一次', async () => {
+    vi.useFakeTimers()
+    try {
+      renderSection()
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0)
+      })
+      const callsAtMount = serverApi.wechatStatus.mock.calls.length
+      expect(callsAtMount).toBeGreaterThanOrEqual(1)
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(STATUS_POLL_MS * 2)
+      })
+      expect(serverApi.wechatStatus.mock.calls.length).toBeGreaterThan(callsAtMount + 1)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // F25：useErrorToast 此前写入钩子自持的 useToast 实例，而所有调用方都未渲染该
+  // 实例的 messages ⇒ 错误 toast 实际不可见。修复后委托根节点全局 Toast（本测试经
+  // GlobalToastContext.Provider mock 注入，可直接断言）。
+  it('F25 自动启用开关持久化失败 ⇒ 全局 toast 显示错误（错误反馈可见）', async () => {
+    installElectronApi()
+    settingsSet.mockImplementation((key: string, value: unknown) => {
+      if (key === SETTING_SYNC_AUTOSTART) {
+        void value
+        return Promise.reject(new Error('disk full'))
+      }
+      return Promise.resolve()
+    })
+    renderSection()
+    const toggle = await screen.findByRole('switch', { name: AUTOSTART_TOGGLE_NAME })
+    fireEvent.click(toggle)
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('disk full', 'error'))
   })
 })

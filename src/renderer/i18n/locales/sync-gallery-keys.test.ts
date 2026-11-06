@@ -132,7 +132,10 @@ const REQUIRED_KEYS = [
   'syncGallery.inspiration.loading',
   'syncGallery.inspiration.empty',
   'syncGallery.inspiration.edit',
-  'syncGallery.inspiration.delete'
+  'syncGallery.inspiration.delete',
+  // F16：灵感列表按 after 游标翻页（首屏 100 条，nextCursor 非空给「加载更多」）
+  'syncGallery.inspiration.loadMore',
+  'syncGallery.inspiration.loadMoreFailed'
 ]
 
 describe('同步图库语言包完整性', () => {

@@ -108,6 +108,11 @@ export const SyncInspirationPanel: React.FC = () => {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [busy, setBusy] = useState(false)
   const [imageError, setImageError] = useState(false)
+  // F16：上游列表按 after 游标翻页（limit 1..100 缺省 100）。首屏只取一页，
+  // nextCursor 非空时给「加载更多」；不再静默截断 100 条之后的条目。
+  const [listCursor, setListCursor] = useState<string | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false)
   const listGenerationRef = useRef(0)
   const saveGenerationRef = useRef(0)
   const imageGenerationRef = useRef(0)
@@ -121,6 +126,12 @@ export const SyncInspirationPanel: React.FC = () => {
     typeof api?.putInspirationImage !== 'function' ||
     typeof api?.getInspirationImage !== 'function'
 
+  /** F16：返回体逐项收敛后另取游标（非串一律视为无游标，绝不做目录遍历式的盲拼）。 */
+  const parseCursor = (value: unknown): string | null =>
+    isRecord(value) && typeof value.nextCursor === 'string' && value.nextCursor.length > 0
+      ? value.nextCursor
+      : null
+
   const loadList = useCallback(async (): Promise<void> => {
     const client = window.electronAPI?.nikkisync
     if (!client?.listInspirations) return
@@ -129,13 +140,49 @@ export const SyncInspirationPanel: React.FC = () => {
       const res = await client.listInspirations({ limit: 100 })
       if (generation !== listGenerationRef.current) return
       setItems(parseList(res))
+      setListCursor(parseCursor(res))
       setLoadFailed(false)
+      setLoadMoreFailed(false)
     } catch {
       if (generation !== listGenerationRef.current) return
       setItems([])
       setLoadFailed(true)
     }
   }, [])
+
+  // F16：消费 after 游标追加下一页；追加按 id+revision 去重（游标抖动不得产出重复行）。
+  const loadMore = useCallback(async (): Promise<void> => {
+    const client = window.electronAPI?.nikkisync
+    if (!client?.listInspirations || !listCursor || loadingMore) return
+    const generation = ++listGenerationRef.current
+    setLoadingMore(true)
+    setLoadMoreFailed(false)
+    try {
+      const res = await client.listInspirations({ limit: 100, after: listCursor })
+      if (generation !== listGenerationRef.current) return
+      const page = parseList(res)
+      setItems((current) => {
+        const base = current ?? []
+        const seen = new Set(base.map((row) => `${String(row.entry?.id ?? 'row')}-${row.revision}`))
+        const merged = [...base]
+        for (const row of page) {
+          const key = `${String(row.entry?.id ?? 'row')}-${row.revision}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            merged.push(row)
+          }
+        }
+        return merged
+      })
+      setListCursor(parseCursor(res))
+    } catch {
+      if (generation !== listGenerationRef.current) return
+      // 追加失败不清已有列表、不丢游标：用户可原位重试
+      setLoadMoreFailed(true)
+    } finally {
+      if (generation === listGenerationRef.current) setLoadingMore(false)
+    }
+  }, [listCursor, loadingMore])
 
   // 库变更 ⇒ 列表可能是旧的；折叠态只复位缓存等下次展开，展开态立刻重取
   useEffect(() => {
@@ -144,6 +191,9 @@ export const SyncInspirationPanel: React.FC = () => {
     return subscribe(() => {
       loadedRef.current = false
       setLoadFailed(false)
+      // F16：库变更后游标下的分页内容也可能变了——回到首屏重新翻页
+      setListCursor(null)
+      setLoadMoreFailed(false)
       if (detailsRef.current?.open) void loadList()
     })
   }, [loadList])
@@ -170,6 +220,8 @@ export const SyncInspirationPanel: React.FC = () => {
       images: parseImages(entry?.images)
     })
     setSaveError(false)
+    // F13：上传失败标记与草稿同生命周期——开新/编辑别的条目时一并复位
+    setImageError(false)
   }
 
   const handleSave = async (): Promise<void> => {
@@ -195,10 +247,16 @@ export const SyncInspirationPanel: React.FC = () => {
     }
   }
 
-  /** 上游软删语义：`deletedAt` 非 0 时 `validate()` 会把 images 清空。 */
+  /**
+   * 上游软删语义：`deletedAt` 非 0 时 `validate()` 会把 images 清空。
+   * F14：entry 非 record 的行直接短路——此前 `row.entry ?? {}` 让守卫恒真，
+   * undefined entry 会以 `{deletedAt, images:[]}`（无 id）递给上游撞 invalid_entry。
+   * F15：busy 期间不得插入删除——删除与保存共享 saveGenerationRef，删除会使在途
+   * 保存的成功路径按代次早退，草稿不关但库已保存，再保存会以过期 baseRevision 撞 conflict。
+   */
   const handleDelete = async (row: NikkiSyncInspirationVersionedInfo): Promise<void> => {
     const client = window.electronAPI?.nikkisync
-    if (!client?.saveInspiration || !isRecord(row.entry ?? {})) return
+    if (!client?.saveInspiration || busy || !isRecord(row.entry)) return
     const generation = ++saveGenerationRef.current
     setBusy(true)
     setSaveError(false)
@@ -385,6 +443,8 @@ export const SyncInspirationPanel: React.FC = () => {
                   onClick={() => {
                     setDraft(null)
                     setSaveError(false)
+                    // F13：取消草稿同样复位上传失败标记
+                    setImageError(false)
                   }}
                 >
                   {t('syncGallery.inspiration.cancel')}
@@ -451,6 +511,7 @@ export const SyncInspirationPanel: React.FC = () => {
                           type="button"
                           data-testid="inspiration-delete"
                           className="icon-btn text-xs"
+                          disabled={busy}
                           onClick={() => void handleDelete(row)}
                         >
                           {t('syncGallery.inspiration.delete')}
@@ -468,6 +529,28 @@ export const SyncInspirationPanel: React.FC = () => {
                 )
               })}
             </ul>
+          )}
+
+          {/* F16：nextCursor 非空才给加载更多（消费 after 游标翻页），失败原位可重试 */}
+          {!loadFailed && items !== null && items.length > 0 && listCursor !== null && (
+            <button
+              type="button"
+              data-testid="inspiration-load-more"
+              className="icon-btn text-xs"
+              disabled={loadingMore || busy}
+              onClick={() => void loadMore()}
+            >
+              {t('syncGallery.inspiration.loadMore')}
+            </button>
+          )}
+          {loadMoreFailed && (
+            <p
+              data-testid="inspiration-load-more-error"
+              className="text-xs"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {t('syncGallery.inspiration.loadMoreFailed')}
+            </p>
           )}
         </div>
       </details>
@@ -488,6 +571,16 @@ const InspirationImage: React.FC<{ sha256: string }> = ({ sha256 }) => {
       .getInspirationImage({ sha256 })
       .then((res) => {
         if (!alive || !res) return
+        // F19：mimeType 缺失（空串）会拼出 `data:;base64,…` 非法 data URL 走浏览器破图，
+        // 与「读图失败」无异——按失败态处理，不产出非法 URL。
+        if (
+          typeof res.mimeType !== 'string' ||
+          res.mimeType.length === 0 ||
+          typeof res.bytesBase64 !== 'string'
+        ) {
+          setFailed(true)
+          return
+        }
         setSrc(`data:${res.mimeType};base64,${res.bytesBase64}`)
       })
       .catch((error: unknown) => {

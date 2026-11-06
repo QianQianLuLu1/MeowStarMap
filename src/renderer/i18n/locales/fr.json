@@ -1720,7 +1720,9 @@
       "title": "Démarrage",
       "discreteGpu": "Préférer le GPU dédié",
       "discreteGpuDesc": "Sur les machines multi-GPU, le GPU dédié haute performance gère le rendu de l'interface et des images (actif après redémarrage)",
-      "discreteGpuRestartHint": "La préférence de GPU dédié est enregistrée et sera active après redémarrage. Redémarrer maintenant ?"
+      "discreteGpuRestartHint": "La préférence de GPU dédié est enregistrée et sera active après redémarrage. Redémarrer maintenant ?",
+      "launchAtLogin": "",
+      "launchAtLoginDesc": ""
     },
     "theme": {
       "desc": "Prend effet immédiatement ; la préférence de thème est sauvegardée automatiquement dans la config locale.",
@@ -1980,7 +1982,9 @@
     "syncEnabled": "Service de synchronisation activé",
     "syncDisabled": "Service de synchronisation désactivé",
     "gpuDiscreteOn": "GPU dédié privilégié (actif après redémarrage)",
-    "gpuDiscreteOff": "Sélection du GPU laissée au système (actif après redémarrage)"
+    "gpuDiscreteOff": "Sélection du GPU laissée au système (actif après redémarrage)",
+    "launchAtLoginOn": "",
+    "launchAtLoginOff": ""
   },
   "video": {
     "applyEdit": "",
@@ -3482,7 +3486,8 @@
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
         "unknownKey": "",
-        "gpuPreferenceInvalid": "gpu.discretePreference doit être auto ou high-performance"
+        "gpuPreferenceInvalid": "gpu.discretePreference doit être auto ou high-performance",
+        "launchAtLoginNotBoolean": ""
       },
       "validation": {
         "keyRequired": "",
@@ -4431,7 +4436,9 @@
       "loading": "Chargement…",
       "empty": "Aucune entrée d’inspiration",
       "edit": "Modifier",
-      "delete": "Supprimer"
+      "delete": "Supprimer",
+      "loadMore": "Charger plus",
+      "loadMoreFailed": "Échec du chargement, cliquez pour réessayer"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "Activer le service de synchronisation",
     "enableDesc": "Ce PC servira de serveur de synchronisation (HTTPS + WebSocket, port par défaut 28080)",
+    "autoStart": "Activer automatiquement le service de synchronisation au démarrage",
+    "autoStartDesc": "Si activé, le service de synchronisation LAN démarre à chaque lancement de l'application ; sinon, démarrez-le manuellement ci-dessous.",
     "status": {
       "label": "État",
       "running": "En cours",

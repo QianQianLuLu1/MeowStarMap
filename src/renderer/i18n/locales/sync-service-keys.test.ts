@@ -73,6 +73,8 @@ const SYNC_SERVICE_LEAVES = [
   'service.description',
   'enable',
   'enableDesc',
+  'autoStart',
+  'autoStartDesc',
   'gallerySource',
   'gallerySourceDesc',
   'gallerySourceApplied',

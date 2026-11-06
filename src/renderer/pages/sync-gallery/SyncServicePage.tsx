@@ -42,6 +42,8 @@ const SETTING_GALLERY_SOURCE = 'gallery.dataSource'
 // 阶段 6：上游远端元数据解析开关。渲染层只能写这个布尔键本身
 // （在 src/shared/settings-keys.ts 白名单里），出站请求的实际端点由主进程侧常量决定。
 const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
+// 软件启动时是否自动启用 LAN 同步服务（默认关，消费点 nikkisync-runtime-setup.ts）
+const SETTING_SYNC_AUTOSTART = 'nikkisync.autoStartSyncServer'
 // K8：整理队列（批量删除）开关。默认关属破坏性能力的双保险之一；
 // 关闭时三条 organizer 通道按契约回 PRECONDITION_FAILED（错误文案指向本开关）。
 const SETTING_ORGANIZER_ENABLED = 'nikkisync.organizerEnabled'
@@ -150,6 +152,8 @@ export const SyncServicePage: React.FC = () => {
   const [gallerySource, setGallerySource] = useState<'local' | 'nikkisync'>('local')
   // 阶段 6：上游远端元数据解析开关（默认关——为真即产生对第三方的出站请求）
   const [metadataEnabled, setMetadataEnabled] = useState(false)
+  // 软件启动时是否自动启用 LAN 同步服务（默认关；只决定下次启动，不立即启停）
+  const [autoStart, setAutoStart] = useState(false)
   // K2：在线解析同意状态（仅解析开启的会话上有；拉取失败/未装配 ⇒ null，同意块隐藏）
   const [consent, setConsent] = useState<NikkiSyncMetadataConsentInfo | null>(null)
   const [status, setStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
@@ -266,6 +270,22 @@ export const SyncServicePage: React.FC = () => {
     }
   }, [])
 
+  /** 自动启用开关读回：读不到一律保持关闭（开启会让 LAN 服务监听 0.0.0.0）。 */
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      try {
+        const value = await window.electronAPI?.settings.get(SETTING_SYNC_AUTOSTART, false)
+        if (alive) setAutoStart(value === true)
+      } catch {
+        // 静默：保持关闭态
+      }
+    })()
+    return () => {
+      alive = false
+    }
+  }, [])
+
   /**
    * K2：同意状态拉取。仅在解析开启时拉——同意面只存在于「解析开启的会话」上，
    * 解析关闭时通道按契约回 PRECONDITION_FAILED，此处降级为 null（同意块隐藏），
@@ -359,6 +379,23 @@ export const SyncServicePage: React.FC = () => {
       await api.settings.set(SETTING_METADATA_RESOLVER, value)
     } catch (error) {
       setMetadataEnabled(previous)
+      showError(error)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** 只写自己那一个设置项：自动启用决定下次启动行为，不立即启停服务。 */
+  const handleAutoStartToggle = async (value: boolean): Promise<void> => {
+    const api = window.electronAPI
+    if (busy || !api) return
+    const previous = autoStart
+    setBusy(true)
+    setAutoStart(value)
+    try {
+      await api.settings.set(SETTING_SYNC_AUTOSTART, value)
+    } catch (error) {
+      setAutoStart(previous)
       showError(error)
     } finally {
       setBusy(false)
@@ -888,6 +925,14 @@ export const SyncServicePage: React.FC = () => {
               checked={enabled}
               disabled={busy}
               onChange={(value) => void handleToggle(value)}
+            />
+            {/* 只影响下次软件启动：开启后无需每次手动点主开关 */}
+            <SettingsToggle
+              label={t('syncService.autoStart')}
+              description={t('syncService.autoStartDesc')}
+              checked={autoStart}
+              disabled={busy}
+              onChange={(value) => void handleAutoStartToggle(value)}
             />
             {/* 阶段 4：图库数据源。默认本地库，切到 NikkiSync 隐含要求 Runtime 已启用，
               否则运行时没跑、它的库也没扫过，切过去必然是一片空白 */}
@@ -1585,6 +1630,7 @@ export const SyncServicePage: React.FC = () => {
  */
 const SyncPcCompanionSection: React.FC = () => {
   const { t } = useTranslation()
+  const currentView = useUIStore((s) => s.currentView)
   const [wechatStatus, setWechatStatus] = useState<unknown>(null)
   const [qrSvg, setQrSvg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -1605,6 +1651,17 @@ const SyncPcCompanionSection: React.FC = () => {
   useEffect(() => {
     void refresh()
   }, [refresh])
+
+  // F12：父页 keep-alive 不卸载本分区，仅挂载取一次会让画廊状态整会话陈旧
+  // （画廊可能被本机控制页在外部启停）。与页头服务状态卡同口径轮询，
+  // 并按 currentView 门控——离开本页不后台常驻定时器。
+  useEffect(() => {
+    if (currentView !== 'sync-service') return
+    const timer = setInterval(() => void refresh(), STATUS_POLL_MS)
+    return () => {
+      clearInterval(timer)
+    }
+  }, [currentView, refresh])
 
   const openDesktop = async (): Promise<void> => {
     const client = window.electronAPI?.nikkisync

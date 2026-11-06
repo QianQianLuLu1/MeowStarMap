@@ -1720,7 +1720,9 @@
       "title": "Comportamiento de inicio",
       "discreteGpu": "Preferir GPU dedicada",
       "discreteGpuDesc": "En equipos con varias GPU, la GPU dedicada de alto rendimiento se encarga del renderizado de la interfaz y las imágenes (surte efecto tras reiniciar)",
-      "discreteGpuRestartHint": "La preferencia de GPU dedicada se ha guardado y surte efecto tras reiniciar. ¿Reiniciar ahora?"
+      "discreteGpuRestartHint": "La preferencia de GPU dedicada se ha guardado y surte efecto tras reiniciar. ¿Reiniciar ahora?",
+      "launchAtLogin": "",
+      "launchAtLoginDesc": ""
     },
     "theme": {
       "desc": "Surte efecto inmediatamente; la preferencia de tema se guarda automáticamente en la configuración local.",
@@ -1980,7 +1982,9 @@
     "syncEnabled": "Servicio de sincronización activado",
     "syncDisabled": "Servicio de sincronización desactivado",
     "gpuDiscreteOn": "GPU dedicada preferida (surte efecto tras reiniciar)",
-    "gpuDiscreteOff": "Cambiado a la selección de GPU del sistema (surte efecto tras reiniciar)"
+    "gpuDiscreteOff": "Cambiado a la selección de GPU del sistema (surte efecto tras reiniciar)",
+    "launchAtLoginOn": "",
+    "launchAtLoginOff": ""
   },
   "video": {
     "applyEdit": "",
@@ -3482,7 +3486,8 @@
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
         "unknownKey": "",
-        "gpuPreferenceInvalid": "gpu.discretePreference debe ser auto o high-performance"
+        "gpuPreferenceInvalid": "gpu.discretePreference debe ser auto o high-performance",
+        "launchAtLoginNotBoolean": ""
       },
       "validation": {
         "keyRequired": "",
@@ -4431,7 +4436,9 @@
       "loading": "Cargando…",
       "empty": "Aún no hay entradas de inspiración",
       "edit": "Editar",
-      "delete": "Eliminar"
+      "delete": "Eliminar",
+      "loadMore": "Cargar más",
+      "loadMoreFailed": "Error al cargar más, haz clic para reintentar"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "Activar servicio de sincronización",
     "enableDesc": "Este PC funcionará como servidor de sincronización (HTTPS + WebSocket, puerto predeterminado 28080)",
+    "autoStart": "Activar automáticamente el servicio de sincronización al iniciar la aplicación",
+    "autoStartDesc": "Si está activado, el servicio de sincronización LAN se inicia cada vez que se abre la aplicación; de lo contrario, inícielo manualmente abajo.",
     "status": {
       "label": "Estado",
       "running": "En ejecución",

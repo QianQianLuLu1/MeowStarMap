@@ -1720,7 +1720,9 @@
       "title": "起動動作",
       "discreteGpu": "ディスクリートGPUを優先",
       "discreteGpuDesc": "マルチGPU環境では高性能なディスクリートGPUに画面と画像の描画を任せます（再起動後に有効）",
-      "discreteGpuRestartHint": "ディスクリートGPU設定を保存しました。再起動後に有効になります。今すぐ再起動しますか？"
+      "discreteGpuRestartHint": "ディスクリートGPU設定を保存しました。再起動後に有効になります。今すぐ再起動しますか？",
+      "launchAtLogin": "",
+      "launchAtLoginDesc": ""
     },
     "theme": {
       "desc": "切り替え後即時反映、テーマ設定はローカル設定に自動保存されます。",
@@ -1980,7 +1982,9 @@
     "syncEnabled": "同期サービスを有効にしました",
     "syncDisabled": "同期サービスを無効にしました",
     "gpuDiscreteOn": "ディスクリートGPUを優先しました（再起動後に有効）",
-    "gpuDiscreteOff": "システムのGPU選択に従うよう切り替えました（再起動後に有効）"
+    "gpuDiscreteOff": "システムのGPU選択に従うよう切り替えました（再起動後に有効）",
+    "launchAtLoginOn": "",
+    "launchAtLoginOff": ""
   },
   "video": {
     "applyEdit": "",
@@ -3482,7 +3486,8 @@
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
         "unknownKey": "",
-        "gpuPreferenceInvalid": "gpu.discretePreference は auto または high-performance である必要があります"
+        "gpuPreferenceInvalid": "gpu.discretePreference は auto または high-performance である必要があります",
+        "launchAtLoginNotBoolean": ""
       },
       "validation": {
         "keyRequired": "",
@@ -4431,7 +4436,9 @@
       "loading": "読み込み中…",
       "empty": "インスピレーションはまだありません",
       "edit": "編集",
-      "delete": "削除"
+      "delete": "削除",
+      "loadMore": "さらに読み込む",
+      "loadMoreFailed": "読み込みに失敗しました。クリックして再試行してください"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "同期サービスを有効化",
     "enableDesc": "有効にするとこの PC が同期サーバーとして動作します（HTTPS + WebSocket、既定ポート 28080）",
+    "autoStart": "アプリ起動時に同期サービスを自動で有効化",
+    "autoStartDesc": "有効にすると、アプリ起動時に LAN 同期サービスが自動で起動します。無効の場合は下で手動で起動してください。",
     "status": {
       "label": "状態",
       "running": "実行中",

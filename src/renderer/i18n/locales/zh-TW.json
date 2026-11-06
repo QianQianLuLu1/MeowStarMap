@@ -1720,7 +1720,9 @@
       "title": "啟動行為",
       "discreteGpu": "優先使用獨立顯卡",
       "discreteGpuDesc": "多顯卡裝置上讓高效能獨立顯卡承擔介面與影像渲染（下次啟動生效）",
-      "discreteGpuRestartHint": "獨立顯卡偏好已儲存，將在應用程式重新啟動後生效。是否立即重新啟動？"
+      "discreteGpuRestartHint": "獨立顯卡偏好已儲存，將在應用程式重新啟動後生效。是否立即重新啟動？",
+      "launchAtLogin": "",
+      "launchAtLoginDesc": ""
     },
     "theme": {
       "desc": "切換後即時生效，主題偏好會自動儲存到本地設定。",
@@ -1980,7 +1982,9 @@
     "syncEnabled": "同步服務已啟用",
     "syncDisabled": "同步服務已關閉",
     "gpuDiscreteOn": "已優先使用獨立顯卡（重新啟動後生效）",
-    "gpuDiscreteOff": "已切換為跟隨系統 GPU 選擇（重新啟動後生效）"
+    "gpuDiscreteOff": "已切換為跟隨系統 GPU 選擇（重新啟動後生效）",
+    "launchAtLoginOn": "",
+    "launchAtLoginOff": ""
   },
   "video": {
     "applyEdit": "",
@@ -3482,7 +3486,8 @@
         "hwAccelNotBoolean": "",
         "securitySensitiveKey": "",
         "unknownKey": "",
-        "gpuPreferenceInvalid": "gpu.discretePreference 必須是 auto 或 high-performance"
+        "gpuPreferenceInvalid": "gpu.discretePreference 必須是 auto 或 high-performance",
+        "launchAtLoginNotBoolean": ""
       },
       "validation": {
         "keyRequired": "",
@@ -4431,7 +4436,9 @@
       "loading": "載入中…",
       "empty": "暫無靈感項目",
       "edit": "編輯",
-      "delete": "刪除"
+      "delete": "刪除",
+      "loadMore": "載入更多",
+      "loadMoreFailed": "載入更多失敗，點擊重試"
     }
   },
   "syncService": {
@@ -4444,6 +4451,8 @@
     },
     "enable": "啟用同步服務",
     "enableDesc": "開啟後本機作為同步伺服器執行（HTTPS + WebSocket，預設連接埠 28080）",
+    "autoStart": "軟體啟動時自動啟用同步服務",
+    "autoStartDesc": "開啟後，每次啟動軟體都會自動啟動區域網路同步服務；關閉時需在下方手動開啟。",
     "status": {
       "label": "執行狀態",
       "running": "執行中",

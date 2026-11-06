@@ -31,6 +31,8 @@ const m = vi.hoisted(() => {
     appReleaseSingleInstanceLockMock: vi.fn(),
     appGetPathMock: vi.fn((p: string) => `/mock/${p}`),
     appIsReadyMock: vi.fn(() => true),
+    appSetLoginItemSettingsMock: vi.fn(),
+    appIsPackagedMock: true,
     // BrowserWindow
     bwGetAllWindowsMock: vi.fn(() => []),
     // dialog
@@ -108,7 +110,11 @@ vi.mock('electron', () => ({
     relaunch: m.appRelaunchMock,
     releaseSingleInstanceLock: m.appReleaseSingleInstanceLockMock,
     getPath: m.appGetPathMock,
-    isReady: m.appIsReadyMock
+    isReady: m.appIsReadyMock,
+    get isPackaged() {
+      return m.appIsPackagedMock
+    },
+    setLoginItemSettings: m.appSetLoginItemSettingsMock
   },
   BrowserWindow: {
     getAllWindows: m.bwGetAllWindowsMock
@@ -292,6 +298,7 @@ describe('lifecycle - bootstrapApplication', () => {
     m.getCrashDirectoryMock.mockReturnValue('/mock/crash')
     m.execFileSyncMock.mockReturnValue('')
     m.performCleanupMock.mockResolvedValue(undefined)
+    m.appIsPackagedMock = true
   })
 
   afterEach(() => {
@@ -687,6 +694,46 @@ describe('lifecycle - bootstrapApplication', () => {
 
       // 此时 shortcutResolved 应为 false（因为没 await 100ms 定时器）
       expect(shortcutResolved).toBe(false)
+    })
+
+    // ===== 本次需求：启动期按设置同步 OS 开机自启登录项 =====
+    it('L1 回归：缺省按默认 true 同步登录项', async () => {
+      const ctx = makeLifecycleCtx()
+      await bootstrapApplication(ctx)
+      expect(m.appSetLoginItemSettingsMock).toHaveBeenCalledWith({ openAtLogin: true })
+    })
+
+    it('L2 回归：launchAtLogin=false 时同步移除登录项', async () => {
+      const ctx = makeLifecycleCtx()
+      ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+        (key: string, dflt: unknown) => (key === 'launchAtLogin' ? false : dflt)
+      )
+      await bootstrapApplication(ctx)
+      expect(m.appSetLoginItemSettingsMock).toHaveBeenCalledWith({ openAtLogin: false })
+    })
+
+    it('L3 边界：launchAtLogin 脏值一律回落 true', async () => {
+      for (const dirty of ['false', null, 1]) {
+        const ctx = makeLifecycleCtx()
+        ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+          (key: string, dflt: unknown) => (key === 'launchAtLogin' ? dirty : dflt)
+        )
+        m.appSetLoginItemSettingsMock.mockClear()
+        await bootstrapApplication(ctx)
+        expect(m.appSetLoginItemSettingsMock, `脏值 ${String(dirty)}`).toHaveBeenCalledWith({
+          openAtLogin: true
+        })
+      }
+    })
+
+    it('L4 异常：系统 API 抛错不阻塞启动链且留痕', async () => {
+      m.appSetLoginItemSettingsMock.mockImplementationOnce(() => {
+        throw new Error('EACCES')
+      })
+      const ctx = makeLifecycleCtx()
+      await expect(bootstrapApplication(ctx)).resolves.toBeUndefined()
+      expect(m.appSetLoginItemSettingsMock).toHaveBeenCalledTimes(1)
+      expect(m.logStartupErrorMock).toHaveBeenCalledWith('setLoginItemSettings', expect.any(Error))
     })
 
     it('22. autoScanOnStartup=true 时 push 启动定时器到 startupTimers', async () => {

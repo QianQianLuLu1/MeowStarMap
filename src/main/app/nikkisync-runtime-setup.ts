@@ -85,6 +85,10 @@ export const METADATA_RESOLVER_ENABLED_DEFAULT = true
 export const MULTI_HOST_PAIRING_DEFAULT = true
 export const SYNC_ENABLED_DEFAULT = true
 
+/** 设置项：软件启动时是否自动启用 LAN 同步服务（必须显式开启，缺省关闭）。 */
+export const SETTING_SYNC_AUTOSTART = 'nikkisync.autoStartSyncServer'
+export const SYNC_AUTOSTART_DEFAULT = false
+
 /** PC 端六个能力的 env 逃生阀（'=0' 单独关闭一项，其他值视为未设置）。 */
 export const PC_COMPANION_ENV_FLAGS = {
   remoteBridge: 'NIKKI_NIKKISYNC_REMOTE_BRIDGE',
@@ -255,15 +259,16 @@ export function buildSessionOptions(input: {
 }
 
 /**
- * 同步服务自启判定：服务开关隐含 Runtime 开关（不开 Runtime 就没有会话可启服务）。
+ * LAN 同步服务自启判定：读 `nikkisync.autoStartSyncServer`（缺省 false）。
  * `RUNTIME=0` 是全局逃生阀，必须连 LAN 服务一起关掉，否则「回到旧形态」名不副实。
+ * `nikkisync.syncServerEnabled` 只表示运行期主开关，不再参与启动期决策。
  */
 export function resolveSyncEnabled(
   settings: NikkiSyncSettingsPort,
   env: Record<string, string | undefined> = {}
 ): boolean {
   if ((env[RUNTIME_ENV_FLAG] ?? '').trim() === '0') return false
-  return settings.getBoolean(SETTING_SYNC_ENABLED, SYNC_ENABLED_DEFAULT)
+  return settings.getBoolean(SETTING_SYNC_AUTOSTART, SYNC_AUTOSTART_DEFAULT)
 }
 
 /**
@@ -317,6 +322,69 @@ function runtimeLog(level: 'info' | 'warn' | 'error', message: string): void {
   }
 }
 
+/** F2：安静停掉本进程装配出的 PC 端服务（拆除/退出链不得被它卡住；失败只留痕）。 */
+async function stopPcCompanionServicesQuietly(reason: string): Promise<void> {
+  if (!pcCompanionServices) return
+  try {
+    await pcCompanionServices.stop()
+    runtimeLog('info', `pc companion services stopped (${reason})`)
+  } catch (error) {
+    runtimeLog('warn', `pc companion services stop failed (${reason}): ${String(error)}`)
+  }
+  pcCompanionServices = undefined
+}
+
+/**
+ * F2：PC 端服务（重）装配。会话建成（首启或重建）后从**新鲜** `pcCompanionContext()`
+ * 取真实 database / 扫描根 / 配对串——旧会话的这些引用在 dispose 后全部失效；
+ * 装配前先停掉残留旧服务。上下文缺席（Runtime 未起 / 老链接缺深入口）只 warn，
+ * 绝不抛进启动/拆除链。
+ */
+async function assemblePcCompanionServices(
+  manager: NikkiSyncRuntimeHandle,
+  options: NikkiSyncSessionOptions
+): Promise<void> {
+  await stopPcCompanionServicesQuietly('stale session context')
+  manager.pcCompanionServices = undefined
+  const liveContext = manager.pcCompanionContext?.()
+  if (!liveContext) {
+    runtimeLog('warn', 'pc companion services unavailable: session not ready')
+    return
+  }
+  try {
+    const switches = options.pcCompanion
+    pcCompanionServices = await startPcCompanionServices({
+      projectRoot: app.getAppPath(),
+      packagingContext: options.packagingContext,
+      resourcesDir: resolvePcAssetsDir({
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        projectRoot: app.getAppPath()
+      }),
+      wechatGallery: switches?.wechatGallery === true,
+      desktopControl: switches?.desktopControl === true,
+      host: () => resolveLanHost(),
+      database: liveContext.database,
+      scanRoots: liveContext.scanRoots,
+      pairingUri: () => {
+        try {
+          return liveContext.pairingUri(resolveLanHost())
+        } catch (error) {
+          runtimeLog('warn', `pc companion pairing uri unavailable: ${String(error)}`)
+          return ''
+        }
+      },
+      log: (level, message) => runtimeLog(level, message)
+    })
+    if (pcCompanionServices) {
+      manager.pcCompanionServices = pcCompanionServices
+      runtimeLog('info', `pc companion services started: ${pcCompanionServices.desktopUrl()}`)
+    }
+  } catch (error) {
+    runtimeLog('warn', `pc companion services unavailable: ${String(error)}`)
+  }
+}
+
 /**
  * 装配内嵌运行时并注入 `ctx.nikkisyncRuntime`。
  * 返回值即状态机句柄；是否自启由 `resolveRuntimeEnabled` 决定。
@@ -367,8 +435,11 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
       )
     }
   }
-  const manager = createRuntimeManager(
-    createManagerDependencies(
+  // F2：PC 端服务随会话生命周期重建——旧会话的 database / scanRoots / pairingUri 在
+  // dispose 后全部失效。manager 在 teardown（dispose 前）与 start 成功尾部各给一个回调：
+  // 先停旧、再从新鲜上下文重装配。回调闭包引用的 manager 变量在运行期已赋值完毕。
+  const manager = createRuntimeManager({
+    ...createManagerDependencies(
       sessionOptions,
       (level, message) => runtimeLog(level, message),
       // 配对二维码里要写真实的局域网地址（与移植面同款解析：默认路由优先 + 虚拟网卡过滤）。
@@ -376,15 +447,20 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
       // listLanIpv4 仅作备选地址来源——见 04 执行记录偏差表。
       resolveLanHost,
       pairingHostsResolver
-    )
-  )
+    ),
+    onSessionStopping: async () => {
+      await stopPcCompanionServicesQuietly('session teardown')
+      manager.pcCompanionServices = undefined
+    },
+    onSessionStarted: () => assemblePcCompanionServices(manager, options)
+  })
   ctx.nikkisyncRuntime = manager
 
   const syncEnabled = resolveSyncEnabled(settings, process.env)
   const switches = options.pcCompanion
   runtimeLog(
     'info',
-    `pc companion switches: runtime=${resolveRuntimeEnabled(process.env, settings)} lan=${syncEnabled} ` +
+    `pc companion switches: runtime=${resolveRuntimeEnabled(process.env, settings)} autostart=${syncEnabled} ` +
       `resolver=${options.metadataResolverEnabled} ` +
       Object.entries(switches ?? {})
         .map(([name, value]) => `${name}=${value}`)
@@ -409,62 +485,16 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
       `sync server autostart: running=${sync.running} port=${sync.port} error=${sync.error ?? 'none'}`
     )
   }
-
-  // C1：PC 端控制页 / 微信画廊必须在会话建成之后装配。此时才能经 manager 的只读
-  // 上下文取到真实 database / 扫描根 / 配对串，避免空 database 与「有二维码无照片」。
-  // 整段独立 try/catch：装载失败（未建链 / 老链接缺深入口）只 warn，不抛进启动链。
-  const liveContext = manager.pcCompanionContext?.()
-  if (!liveContext) {
-    runtimeLog('warn', 'pc companion services unavailable: session not ready')
-    return manager
-  }
-  try {
-    pcCompanionServices = await startPcCompanionServices({
-      projectRoot: app.getAppPath(),
-      packagingContext: options.packagingContext,
-      resourcesDir: resolvePcAssetsDir({
-        isPackaged: app.isPackaged,
-        resourcesPath: process.resourcesPath,
-        projectRoot: app.getAppPath()
-      }),
-      wechatGallery: switches?.wechatGallery === true,
-      desktopControl: switches?.desktopControl === true,
-      host: () => resolveLanHost(),
-      database: liveContext.database,
-      scanRoots: liveContext.scanRoots,
-      pairingUri: () => {
-        try {
-          return liveContext.pairingUri(resolveLanHost())
-        } catch (error) {
-          runtimeLog('warn', `pc companion pairing uri unavailable: ${String(error)}`)
-          return ''
-        }
-      },
-      log: (level, message) => runtimeLog(level, message)
-    })
-    if (pcCompanionServices) {
-      manager.pcCompanionServices = pcCompanionServices
-      runtimeLog('info', `pc companion services started: ${pcCompanionServices.desktopUrl()}`)
-    }
-  } catch (error) {
-    runtimeLog('warn', `pc companion services unavailable: ${String(error)}`)
-  }
+  // C1/F2：PC 端控制页 / 微信画廊的首启装配改由 manager 的 onSessionStarted 回调触发
+  // （start() 成功尾部已 await 它完成），本函数不再内联装配。
   return manager
 }
 
 /** 优雅停止（由 app/cleanup.ts 在 dbManager.close 之前调用；未注入即 no-op）。 */
 export async function stopNikkiSyncRuntime(ctx: AppContext): Promise<void> {
-  // N7：先停 PC 端服务（每步独立 try/catch，绝不卡住退出链）；即使 Runtime 句柄未装配
-  // 也要走这一段，避免 listen 的端口随进程残留。
-  if (pcCompanionServices) {
-    try {
-      await pcCompanionServices.stop()
-      runtimeLog('info', 'pc companion services stopped')
-    } catch (error) {
-      runtimeLog('warn', `pc companion services stop failed: ${String(error)}`)
-    }
-    pcCompanionServices = undefined
-  }
+  // N7：先停 PC 端服务（helper 内每步独立 try/catch，绝不卡住退出链）；即使 Runtime
+  // 句柄未装配也要走这一段，避免 listen 的端口随进程残留。
+  await stopPcCompanionServicesQuietly('app shutdown')
   // N4：会话拆除后清空活动会话注册表，避免灵感库通道拿到已关库的旧 session
   try {
     setActiveRuntimeSession(undefined)

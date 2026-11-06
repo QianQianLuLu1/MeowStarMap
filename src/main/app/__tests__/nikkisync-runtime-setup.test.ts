@@ -39,10 +39,12 @@ import {
   SETTING_GAME_ROOT,
   SETTING_METADATA_RESOLVER,
   SETTING_RUNTIME_ENABLED,
+  SETTING_SYNC_AUTOSTART,
   SETTING_SYNC_ENABLED,
   SETTING_SYNC_MDNS,
   SETTING_SYNC_PORT,
   SETTING_WATCHER,
+  SYNC_AUTOSTART_DEFAULT,
   SYNC_ENABLED_DEFAULT,
   WATCHER_ENABLED_DEFAULT,
   buildSessionOptions,
@@ -72,49 +74,7 @@ const { managerDouble, depsDouble, pcServicesDouble } = vi.hoisted(() => {
       LIVE_DATABASE,
       startPcCompanionServices: vi.fn(async () => undefined)
     },
-    managerDouble: {
-      status: vi.fn(() => ({ state: 'running', dbPath: '', linkReady: true })),
-      start: vi.fn(async () => ({
-        state: 'running',
-        dbPath: '/mock/userdata/nikkisync/nikkisync.db',
-        linkReady: true,
-        tables: ['assets']
-      })),
-      scan: vi.fn(async () => ({ scanId: 'scan_1' })),
-      stop: vi.fn(async () => undefined),
-      listAssets: vi.fn(async () => ({ items: [] })),
-      getAssetDetail: vi.fn(async () => ({ asset: {} })),
-      getResource: vi.fn(async () => ({})),
-      // 阶段 3：同步服务编排面
-      syncStatus: vi.fn(() => ({
-        running: false,
-        host: '0.0.0.0',
-        port: 28080,
-        mdnsEnabled: true
-      })),
-      startSyncServer: vi.fn(async () => ({
-        running: true,
-        host: '0.0.0.0',
-        port: 28080,
-        secure: true,
-        mdnsEnabled: true
-      })),
-      stopSyncServer: vi.fn(async () => ({
-        running: false,
-        host: '0.0.0.0',
-        port: 28080,
-        mdnsEnabled: true
-      })),
-      pairingCode: vi.fn(async () => ({ content: 'NS1|x' })),
-      listPairedDevices: vi.fn(async () => []),
-      revokeDevice: vi.fn(async () => []),
-      // C1：PC 端会话上下文（真实 database / 扫描根 / 配对串）
-      pcCompanionContext: vi.fn(() => ({
-        database: LIVE_DATABASE,
-        scanRoots: ['/game/photos'],
-        pairingUri: () => 'NS1|live-session'
-      }))
-    },
+    managerDouble: buildManagerDouble(LIVE_DATABASE),
     depsDouble: {
       defaults: {},
       createSession: vi.fn(),
@@ -126,12 +86,86 @@ const { managerDouble, depsDouble, pcServicesDouble } = vi.hoisted(() => {
   }
 })
 
+/** manager 替身需自引用 capturedDeps，故在 hoisted 内用函数两步构建。 */
+function buildManagerDouble(liveDatabase: unknown) {
+  const managerDouble = {
+    // F2：createRuntimeManager 的 mock 会把传入 deps 记到这里，供 start 模拟
+    // 真实 manager 的回调契约（start 成功尾部触发 onSessionStarted）。
+    capturedDeps: undefined as unknown,
+    status: vi.fn(() => ({ state: 'running', dbPath: '', linkReady: true })),
+    start: vi.fn(async () => ({
+      state: 'running',
+      dbPath: '/mock/userdata/nikkisync/nikkisync.db',
+      linkReady: true,
+      tables: ['assets']
+    })),
+    scan: vi.fn(async () => ({ scanId: 'scan_1' })),
+    stop: vi.fn(async () => undefined),
+    listAssets: vi.fn(async () => ({ items: [] })),
+    getAssetDetail: vi.fn(async () => ({ asset: {} })),
+    getResource: vi.fn(async () => ({})),
+    // 阶段 3：同步服务编排面
+    syncStatus: vi.fn(() => ({
+      running: false,
+      host: '0.0.0.0',
+      port: 28080,
+      mdnsEnabled: true
+    })),
+    startSyncServer: vi.fn(async () => ({
+      running: true,
+      host: '0.0.0.0',
+      port: 28080,
+      secure: true,
+      mdnsEnabled: true
+    })),
+    stopSyncServer: vi.fn(async () => ({
+      running: false,
+      host: '0.0.0.0',
+      port: 28080,
+      mdnsEnabled: true
+    })),
+    pairingCode: vi.fn(async () => ({ content: 'NS1|x' })),
+    listPairedDevices: vi.fn(async () => []),
+    revokeDevice: vi.fn(async () => []),
+    // C1：PC 端会话上下文（真实 database / 扫描根 / 配对串）
+    pcCompanionContext: vi.fn(() => ({
+      database: liveDatabase,
+      scanRoots: ['/game/photos'],
+      pairingUri: () => 'NS1|live-session'
+    }))
+  }
+  return managerDouble
+}
+
+/**
+ * F2：让 managerDouble.start 遵守真实 runtime-manager 契约——会话建成成功尾部
+ * 触发 deps.onSessionStarted（装配层在此重装配 PC 端服务）。
+ * 以独立帮助函数提供：'阶段2' describe 的 beforeEach 用 mockResolvedValue 覆写
+ * start 实现，依赖回调契约的 describe 必须在其 beforeEach 里重新安装本实现。
+ */
+function installManagerStartContract(): void {
+  managerDouble.start.mockImplementation(async () => {
+    const deps = managerDouble.capturedDeps as { onSessionStarted?: () => unknown } | undefined
+    if (deps && typeof deps.onSessionStarted === 'function') await deps.onSessionStarted()
+    return {
+      state: 'running',
+      dbPath: '/mock/userdata/nikkisync/nikkisync.db',
+      linkReady: true,
+      tables: ['assets']
+    }
+  })
+}
+
 vi.mock('../../nikkisync/runtime-facade', () => ({
   createManagerDependencies: vi.fn(() => depsDouble)
 }))
 
 vi.mock('../../nikkisync/runtime-manager', () => ({
-  createRuntimeManager: vi.fn(() => managerDouble)
+  // F2：捕获传入 deps，让 managerDouble.start 能按真实契约触发 onSessionStarted
+  createRuntimeManager: vi.fn((deps: unknown) => {
+    managerDouble.capturedDeps = deps
+    return managerDouble
+  })
 }))
 
 // C1：PC 端服务装配用替身观察调用时序与入参（本文件不测上游真实装载）
@@ -211,15 +245,24 @@ describe('resolveRuntimeEnabled 开关优先级', () => {
   })
 })
 
-describe('resolveSyncEnabled 服务开关（阶段3）', () => {
-  it('默认开启（上游 PC 端干净安装口径）；RUNTIME=0 逃生阀可整体关闭', () => {
-    expect(SYNC_ENABLED_DEFAULT).toBe(true)
-    expect(resolveSyncEnabled(settings({}))).toBe(true)
-    expect(resolveSyncEnabled(settings({}), { [RUNTIME_ENV_FLAG]: '0' })).toBe(false)
+describe('resolveSyncEnabled 启动期自启开关', () => {
+  it('默认关闭（干净安装不自启 LAN 服务）；RUNTIME=0 逃生阀可整体关闭', () => {
+    expect(SYNC_AUTOSTART_DEFAULT).toBe(false)
+    expect(resolveSyncEnabled(settings({}))).toBe(false)
+    expect(
+      resolveSyncEnabled(settings({ [SETTING_SYNC_AUTOSTART]: true }), {
+        [RUNTIME_ENV_FLAG]: '0'
+      })
+    ).toBe(false)
   })
 
-  it('设置项为 true 时开启', () => {
-    expect(resolveSyncEnabled(settings({ [SETTING_SYNC_ENABLED]: true }))).toBe(true)
+  it('自动启用设置为 true 时开启，且不受运行期主开关持久值影响', () => {
+    expect(resolveSyncEnabled(settings({ [SETTING_SYNC_AUTOSTART]: true }))).toBe(true)
+    expect(
+      resolveSyncEnabled(
+        settings({ [SETTING_SYNC_AUTOSTART]: true, [SETTING_SYNC_ENABLED]: false })
+      )
+    ).toBe(true)
   })
 })
 
@@ -250,13 +293,13 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     })
   })
 
-  it('缺省即自启：注入句柄并启动 Runtime 与 LAN 同步服务（对齐上游 PC 端）', async () => {
+  it('缺省不自启：注入句柄并启动 Runtime，但 LAN 同步服务保持停止', async () => {
     const ctx = makeAppCtx()
     const manager = await initNikkiSyncRuntime(ctx)
     expect(manager).toBe(managerDouble)
     expect(ctx.nikkisyncRuntime).toBe(managerDouble)
     expect(managerDouble.start).toHaveBeenCalledTimes(1)
-    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(1)
+    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(0)
   })
 
   it('env 强开：以 userData 库路径自启，并下传打包态上下文', async () => {
@@ -309,11 +352,11 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     }
   })
 
-  it('只开同步服务开关（Runtime 开关未开）：仍起 Runtime 并随后 startSyncServer', async () => {
+  it('开启自动启用（Runtime 开关未开）：仍起 Runtime 并随后 startSyncServer', async () => {
     const ctx = makeAppCtx()
     // 直接改写 ctx.dbManager.getSetting 的返回：设置项走真实 settingsFrom 收敛路径
     const getSetting = vi.fn((key: string, fallback: unknown) =>
-      key === SETTING_SYNC_ENABLED ? true : fallback
+      key === SETTING_SYNC_AUTOSTART ? true : fallback
     )
     ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
     await initNikkiSyncRuntime(ctx)
@@ -327,7 +370,7 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
   it('服务自启失败不外抛（状态里带 error 即可，UI 经 server-status 可见）', async () => {
     const ctx = makeAppCtx()
     const getSetting = vi.fn((key: string, fallback: unknown) =>
-      key === SETTING_SYNC_ENABLED ? true : fallback
+      key === SETTING_SYNC_AUTOSTART ? true : fallback
     )
     ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
     managerDouble.startSyncServer.mockResolvedValueOnce({
@@ -349,6 +392,53 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     const call = vi.mocked(createManagerDependencies).mock.calls.at(-1)
     expect(call).toBeDefined()
     expect(call?.[2]).toBe(resolveLanHost)
+  })
+
+  // ===== 本次需求：软件启动时是否自动启用同步服务（默认关闭）=====
+  it('A0 新增自启键常量与默认值', () => {
+    expect(SETTING_SYNC_AUTOSTART).toBe('nikkisync.autoStartSyncServer')
+    expect(SYNC_AUTOSTART_DEFAULT).toBe(false)
+  })
+
+  it('A1 默认配置不自动启动 LAN 服务，但 Runtime 仍建会话', async () => {
+    const ctx = makeAppCtx()
+    await initNikkiSyncRuntime(ctx)
+    expect(managerDouble.start).toHaveBeenCalledTimes(1)
+    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(0)
+  })
+
+  it('A2 回归：主开关持久值为 false 但自动启用为 true 时仍自启 LAN 服务', async () => {
+    const ctx = makeAppCtx()
+    const getSetting = vi.fn((key: string, fallback: unknown) => {
+      if (key === 'nikkisync.syncServerEnabled') return false
+      if (key === 'nikkisync.runtimeEnabled') return false
+      if (key === 'nikkisync.autoStartSyncServer') return true
+      return fallback
+    })
+    ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
+    await initNikkiSyncRuntime(ctx)
+    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(1)
+  })
+
+  it('A3 回归：启动期读取 nikkisync.autoStartSyncServer 作为自启决策', async () => {
+    const ctx = makeAppCtx()
+    const getSetting = vi.fn((key: string, fallback: unknown) => fallback)
+    ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
+    await initNikkiSyncRuntime(ctx)
+    expect(getSetting).toHaveBeenCalledWith('nikkisync.autoStartSyncServer', false)
+  })
+
+  it('A4 边界：autoStartSyncServer 脏值一律收敛为 false，不得误开服务', async () => {
+    for (const dirty of ['true', null, 1, {}]) {
+      const ctx = makeAppCtx()
+      const getSetting = vi.fn((key: string, fallback: unknown) =>
+        key === 'nikkisync.autoStartSyncServer' ? dirty : fallback
+      )
+      ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
+      managerDouble.startSyncServer.mockClear()
+      await initNikkiSyncRuntime(ctx)
+      expect(managerDouble.startSyncServer, `脏值 ${String(dirty)}`).toHaveBeenCalledTimes(0)
+    }
   })
 })
 
@@ -620,10 +710,10 @@ describe('PC 端能力默认开启（N1）', () => {
     expect(SYNC_ENABLED_DEFAULT).toBe(true)
   })
 
-  it('缺省判定全部放行，env=0 仍可一键回到旧形态', () => {
+  it('Runtime/元数据缺省放行、LAN 服务自启缺省关闭；env=0 仍可一键回到旧形态', () => {
     const empty = settings({})
     expect(resolveRuntimeEnabled({}, empty)).toBe(true)
-    expect(resolveSyncEnabled(empty)).toBe(true)
+    expect(resolveSyncEnabled(empty)).toBe(false)
     expect(resolveMetadataResolverEnabled({}, empty)).toBe(true)
     expect(resolveRuntimeEnabled({ [RUNTIME_ENV_FLAG]: '0' }, empty)).toBe(false)
   })
@@ -662,6 +752,7 @@ describe('C1 PC 端服务装配时序与会话上下文', () => {
     managerDouble.start.mockClear()
     managerDouble.startSyncServer.mockClear()
     managerDouble.pcCompanionContext.mockClear()
+    installManagerStartContract()
   })
 
   it('正常：PC 服务在 manager.start 之后装配，且逐字拿到真实 database / 扫描根 / 配对串', async () => {
@@ -693,5 +784,93 @@ describe('C1 PC 端服务装配时序与会话上下文', () => {
     } finally {
       if (original) managerDouble.pcCompanionContext.mockImplementation(original)
     }
+  })
+})
+
+// ============================================================================
+// F2：会话重建后 PC 端服务重装配——旧服务持已关闭旧库的上下文，重建路径
+// （换根 / 端口变更 / resync）必须先停旧再从新鲜 pcCompanionContext() 重装配。
+// ============================================================================
+describe('F2 会话重建后 PC 端服务重装配', () => {
+  beforeEach(() => {
+    pcServicesDouble.startPcCompanionServices.mockClear()
+    managerDouble.startSyncServer.mockClear()
+    managerDouble.pcCompanionContext.mockClear()
+    installManagerStartContract()
+  })
+
+  /** 构造一个可被 stop 的 PC 服务替身（装配成功返回值）。 */
+  const serviceStub = () =>
+    ({
+      start: vi.fn(async () => undefined),
+      stop: vi.fn(async () => undefined),
+      status: vi.fn(() => ({ running: true, desktopUrl: 'http://127.0.0.1:1/', wechat: {} })),
+      desktopUrl: vi.fn(() => 'http://127.0.0.1:1/'),
+      wechatStart: vi.fn(async () => ({ status: {}, qrSvg: '<svg/>' })),
+      wechatStop: vi.fn(async () => ({ status: {} })),
+      wechatStatus: vi.fn(() => ({}))
+    }) as never
+
+  /** 从捕获的 deps 取两个生命周期回调（真实 manager 按此契约调用）。 */
+  const lifecycleCallbacks = () =>
+    managerDouble.capturedDeps as {
+      onSessionStopping?: () => Promise<void> | void
+      onSessionStarted?: () => Promise<void> | void
+    }
+
+  it('正常：stopping 先停旧服务；started 以新鲜上下文重装配', async () => {
+    // 首启装配返回旧服务（前提：旧服务在位）
+    const oldStop = vi.fn(async () => undefined)
+    const stub = serviceStub() as { stop: ReturnType<typeof vi.fn> }
+    stub.stop = oldStop
+    pcServicesDouble.startPcCompanionServices.mockResolvedValueOnce(stub as never)
+    const ctx = makeAppCtx()
+    await initNikkiSyncRuntime(ctx)
+    expect(pcServicesDouble.startPcCompanionServices).toHaveBeenCalledTimes(1)
+    expect(managerDouble.pcCompanionServices).toBe(stub)
+
+    // 模拟换根重建：teardown 触发 stopping → 新会话建成触发 started，且上下文已换新
+    const NEW_DATABASE = { connection: { prepare: () => ({ all: () => [] }) } }
+    managerDouble.pcCompanionContext.mockReturnValueOnce({
+      database: NEW_DATABASE,
+      scanRoots: ['/new/root'],
+      pairingUri: () => 'NS1|new'
+    })
+    const stub2 = serviceStub()
+    pcServicesDouble.startPcCompanionServices.mockResolvedValueOnce(stub2 as never)
+    const callbacks = lifecycleCallbacks()
+    await callbacks.onSessionStopping?.()
+    expect(oldStop).toHaveBeenCalledTimes(1)
+    expect(managerDouble.pcCompanionServices).toBeUndefined()
+
+    await callbacks.onSessionStarted?.()
+    expect(pcServicesDouble.startPcCompanionServices).toHaveBeenCalledTimes(2)
+    const passed = pcServicesDouble.startPcCompanionServices.mock.calls[1]![0] as Record<
+      string,
+      unknown
+    >
+    expect(passed.database).toBe(NEW_DATABASE)
+    expect(passed.scanRoots).toEqual(['/new/root'])
+    expect(managerDouble.pcCompanionServices).toBe(stub2)
+  })
+
+  it('异常：重建后上下文缺席（如 stop 后回调误触发）⇒ 只停旧不装配，不抛', async () => {
+    // 首启装配返回旧服务（前提：旧服务在位）
+    const oldStop = vi.fn(async () => undefined)
+    const stub = serviceStub() as { stop: ReturnType<typeof vi.fn> }
+    stub.stop = oldStop
+    pcServicesDouble.startPcCompanionServices.mockResolvedValueOnce(stub as never)
+    const ctx = makeAppCtx()
+    await initNikkiSyncRuntime(ctx)
+    expect(managerDouble.pcCompanionServices).toBe(stub)
+    // 重建：上下文缺席
+    managerDouble.pcCompanionContext.mockReturnValueOnce(undefined)
+
+    const callbacks = lifecycleCallbacks()
+    await expect(callbacks.onSessionStarted?.()).resolves.toBeUndefined()
+    expect(oldStop).toHaveBeenCalledTimes(1)
+    // 上下文缺席 ⇒ 装配在取上下文一步即提前返回，不再触发 startPcCompanionServices
+    expect(pcServicesDouble.startPcCompanionServices).toHaveBeenCalledTimes(1)
+    expect(managerDouble.pcCompanionServices).toBeUndefined()
   })
 })

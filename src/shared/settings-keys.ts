@@ -42,7 +42,11 @@ export const RENDERER_PREF_KEYS = [
   // K8：整理队列（批量删除）开关（布尔，默认 false，消费点 nikkisync-handler.ts 三通道开关门）。
   // 开启后手机端发起的删除意图才可经电脑批准执行（移入 Windows 回收站，可恢复）；
   // 默认关属破坏性能力的双保险之一，关闭时三条通道一律 PRECONDITION_FAILED。
-  'nikkisync.organizerEnabled'
+  'nikkisync.organizerEnabled',
+  // 软件启动时是否自动启用 LAN 同步服务（默认关，消费点 nikkisync-runtime-setup.ts resolveSyncEnabled）
+  'nikkisync.autoStartSyncServer',
+  // 开机自启动（默认开，消费点 login-item.ts / settings-handler.ts / lifecycle.ts）
+  'launchAtLogin'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

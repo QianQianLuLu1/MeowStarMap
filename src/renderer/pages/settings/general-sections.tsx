@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SectionShell, GlobalToastContext, SettingsToggle, SettingsCard } from './shared'
 import { SliderControl } from '../../components/common/SliderControl'
+import { extractUserMessage } from '../../../shared/errors/app-error'
 
 // ============ 通用 ============
 
@@ -10,6 +11,7 @@ export const GeneralStartupSection: React.FC = () => {
   const [autoScan, setAutoScan] = useState(true)
   const [hardwareAccel, setHardwareAccel] = useState(true)
   const [discreteGpu, setDiscreteGpu] = useState(true)
+  const [launchAtLogin, setLaunchAtLogin] = useState(true)
   const showMessage = useContext(GlobalToastContext)
 
   useEffect(() => {
@@ -25,6 +27,8 @@ export const GeneralStartupSection: React.FC = () => {
         'high-performance'
       )) as string
       setDiscreteGpu(d !== 'auto')
+      const l = (await window.electronAPI.settings.get('launchAtLogin', true)) as boolean
+      setLaunchAtLogin(l)
     }
     load()
   }, [])
@@ -33,6 +37,20 @@ export const GeneralStartupSection: React.FC = () => {
     setAutoScan(value)
     if (window.electronAPI) await window.electronAPI.settings.set('autoScanOnStartup', value)
     showMessage(value ? t('toast.autoScanOn') : t('toast.autoScanOff'))
+  }
+
+  const saveLaunchAtLogin = async (value: boolean) => {
+    const previous = launchAtLogin
+    setLaunchAtLogin(value)
+    try {
+      if (window.electronAPI) await window.electronAPI.settings.set('launchAtLogin', value)
+      showMessage(value ? t('toast.launchAtLoginOn') : t('toast.launchAtLoginOff'))
+    } catch (err) {
+      setLaunchAtLogin(previous)
+      // F22：错误走全局 Toast 的 error 级别；文案用 AppError 口径的用户可读消息，
+      // 而非 String(err) 的 "Error: …" 全串
+      showMessage(extractUserMessage(err), 'error')
+    }
   }
 
   const saveHardwareAccel = async (value: boolean) => {
@@ -81,6 +99,13 @@ export const GeneralStartupSection: React.FC = () => {
         description={t('settings.startup.autoScanDesc')}
         checked={autoScan}
         onChange={(value) => void saveAutoScan(value)}
+      />
+
+      <SettingsToggle
+        label={t('settings.startup.launchAtLogin')}
+        description={t('settings.startup.launchAtLoginDesc')}
+        checked={launchAtLogin}
+        onChange={(value) => void saveLaunchAtLogin(value)}
       />
 
       {/* GPU 硬件加速开关（关闭后改用软件渲染，规避部分显卡导致的启动崩溃） */}
