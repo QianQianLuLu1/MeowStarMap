@@ -1,0 +1,177 @@
+/**
+ * N7：把上游 PC 端资源暂存到 `ROOT/resources/nikkisync/pc/`。
+ *
+ * 铁律（遵循 `scripts/AGENTS.md`）：核心逻辑导出为纯函数 + dry-run 默认（`--apply`
+ * 才落地）；UP 检出根找不到时 **warn + 返回 skipped，不阻断** —— CI `npm ci` 不会带
+ * `node_modules/@nikkisync/*` junction，也没有 `../NikkiSync`，这一支是受支持的默认态。
+ * 本脚本不 import 任何 `src/main/` 模块（Node 环境无 Electron 上下文）。
+ *
+ * 用法：`npm run stage:nikkisync-pc`（预览）/ `npx tsx scripts/stage-nikkisync-pc-assets.ts --apply`
+ */
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+import { resolveNikkiSyncRoot, toRootCandidates } from './link-nikkisync'
+
+/** 一份源 → 目标的相对声明（from 相对 UP 根，to 相对目标根）。 */
+export interface PcAssetSpec {
+  from: string
+  to: string
+}
+
+/** 4 份 legal 文档 + 品牌图 + 3 个 PS 脚本（逐字来自上游 windows-app.ts:226/230-232/204-207）。 */
+export const PC_ASSET_SPECS: readonly PcAssetSpec[] = [
+  {
+    from: path.join('docs', 'store-submission', 'PRIVACY_POLICY.md'),
+    to: 'PRIVACY_POLICY.md'
+  },
+  {
+    from: path.join('docs', 'store-submission', 'USER_AGREEMENT.md'),
+    to: 'USER_AGREEMENT.md'
+  },
+  {
+    from: path.join('docs', 'store-submission', 'PERMISSIONS_DATA.md'),
+    to: 'PERMISSIONS_DATA.md'
+  },
+  {
+    from: path.join('docs', 'store-submission', 'SDK_SERVICES.md'),
+    to: 'SDK_SERVICES.md'
+  },
+  { from: path.join('assets', 'branding', 'momo-camera.png'), to: 'momo-camera.png' },
+  {
+    from: path.join('tools', 'wechat-gallery', 'resize-icon.ps1'),
+    to: path.join('wechat', 'resize-icon.ps1')
+  },
+  {
+    from: path.join('tools', 'wechat-gallery', 'resize-preview.ps1'),
+    to: path.join('wechat', 'resize-preview.ps1')
+  },
+  {
+    from: path.join('tools', 'wechat-gallery', 'rotate-png.ps1'),
+    to: path.join('wechat', 'rotate-png.ps1')
+  }
+]
+
+export interface PlannedAsset {
+  from: string
+  to: string
+}
+
+/** 可注入的 IO 面：单测喂假实现，不依赖真实 UP 检出与链接。 */
+export interface StageFsPort {
+  exists(p: string): boolean
+  mkdir(p: string): void
+  copyFile(from: string, to: string): void
+}
+
+export interface StageOptions {
+  upRoot: string
+  targetRoot: string
+  /** 缺省 false = dry-run（只产出计划，不写盘）。 */
+  apply?: boolean
+  warn?: (message: string) => void
+  fsPort?: StageFsPort
+}
+
+export interface StageResult {
+  status: 'applied' | 'dry-run' | 'skipped'
+  planned: string[]
+  copied: string[]
+  skipped: string[]
+  warnings: string[]
+}
+
+const nodeFsPort: StageFsPort = {
+  exists: (p) => fs.existsSync(p),
+  mkdir: (p) => fs.mkdirSync(p, { recursive: true }),
+  copyFile: (from, to) => fs.copyFileSync(from, to)
+}
+
+/** 纯函数：把 8 份声明展开成绝对路径对（不触磁盘）。 */
+export function planPcAssets(upRoot: string, targetRoot: string): PlannedAsset[] {
+  return PC_ASSET_SPECS.map((spec) => ({
+    from: path.join(upRoot, spec.from),
+    to: path.join(targetRoot, spec.to)
+  }))
+}
+
+/** 纯逻辑编排：UP 根缺失 / 单件缺失都是 warn 后跳过，绝不抛到构建链外。 */
+export function stagePcAssets(options: StageOptions): StageResult {
+  const { upRoot, targetRoot, apply = false, warn, fsPort = nodeFsPort } = options
+  const warnings: string[] = []
+  const emit = (message: string): void => {
+    warnings.push(message)
+    warn?.(message)
+  }
+  const planned = planPcAssets(upRoot, targetRoot)
+  const result: StageResult = {
+    status: 'skipped',
+    planned: planned.map((item) => item.to),
+    copied: [],
+    skipped: [],
+    warnings
+  }
+  if (!fsPort.exists(upRoot)) {
+    emit(`[stage:nikkisync-pc] upstream root not found: ${upRoot}; skipped (CI has no junction)`)
+    return result
+  }
+  if (!apply) {
+    result.status = 'dry-run'
+    return result
+  }
+  result.status = 'applied'
+  for (const item of planned) {
+    if (!fsPort.exists(item.from)) {
+      emit(`[stage:nikkisync-pc] missing upstream asset: ${item.from}; skipped`)
+      result.skipped.push(item.from)
+      continue
+    }
+    fsPort.mkdir(path.dirname(item.to))
+    fsPort.copyFile(item.from, item.to)
+    result.copied.push(item.to)
+  }
+  return result
+}
+
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
+function main(): void {
+  const isDirectory = (candidate: string): boolean => {
+    try {
+      return fs.statSync(candidate).isDirectory()
+    } catch {
+      return false
+    }
+  }
+  // 候选根复用 link-nikkisync 的同一条链（NIKKISYNC_ROOT → ../NikkiSync → vendor/NikkiSync），
+  // 避免本脚本自持一套真相源。
+  const upRoot = resolveNikkiSyncRoot(
+    toRootCandidates({ projectRoot, envRoot: process.env.NIKKISYNC_ROOT }),
+    isDirectory
+  ).root
+  if (!upRoot) {
+    console.warn('[stage:nikkisync-pc] no usable NikkiSync checkout; skipped (not blocking)')
+    return
+  }
+  const targetRoot = path.join(projectRoot, 'resources', 'nikkisync', 'pc')
+  const result = stagePcAssets({
+    upRoot,
+    targetRoot,
+    apply: process.argv.includes('--apply'),
+    warn: (message) => console.warn(message)
+  })
+  console.log(
+    `[stage:nikkisync-pc] status=${result.status} planned=${result.planned.length} ` +
+      `copied=${result.copied.length} skipped=${result.skipped.length}`
+  )
+}
+
+const invokedDirectly = (): boolean => {
+  const self = path.resolve(fileURLToPath(import.meta.url))
+  const entry = process.argv[1] ? path.resolve(process.argv[1]) : ''
+  // Windows 盘符大小写在两种入口下可能不一致，按小写比较
+  return self.toLowerCase() === entry.toLowerCase()
+}
+
+if (invokedDirectly()) main()

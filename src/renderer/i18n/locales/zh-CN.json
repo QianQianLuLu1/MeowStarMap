@@ -4360,7 +4360,8 @@
       "statsEmpty": "暂无统计",
       "statsFailed": "统计读取失败",
       "topSuits": "最常穿的套装",
-      "topClothing": "最常穿的衣服"
+      "topClothing": "最常穿的衣服",
+      "backfillFailed": "命中照片回捞失败，仅显示文本结果"
     },
     "title": "同步图库",
     "subtitle": "来自 NikkiSync 内嵌库的资产，与本地图库互不影响",
@@ -4405,7 +4406,32 @@
         "size": "文件大小",
         "hash": "内容哈希",
         "metadata": "元数据"
+      },
+      "upstreamTitle": "上游在线参数",
+      "upstreamFallback": "上游参数不可用，已回退本地解密",
+      "upstream": {
+        "focalLength": "焦距",
+        "aperture": "光圈",
+        "exposure": "曝光",
+        "dressingParts": "服装部件"
       }
+    },
+    "inspiration": {
+      "title": "灵感库",
+      "hint": "与手机端同步的分享码、分类、状态与参考图",
+      "new": "新建",
+      "titleLabel": "标题",
+      "notesLabel": "备注",
+      "imageLabel": "参考图",
+      "imageFailed": "参考图上传失败",
+      "save": "保存",
+      "cancel": "取消",
+      "saveFailed": "保存失败",
+      "loadFailed": "加载失败",
+      "loading": "加载中…",
+      "empty": "暂无灵感条目",
+      "edit": "编辑",
+      "delete": "删除"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "confirmBody": "将把 {{count}} 个文件移入 Windows 系统回收站（可从回收站恢复）。确认继续？",
       "confirmAction": "确认移入回收站",
       "cancel": "取消"
+    },
+    "pc": {
+      "title": "PC 端能力",
+      "description": "本机控制页与微信画廊（上游 NikkiSync PC 端）",
+      "openDesktop": "打开本机控制页",
+      "wechatStart": "启动微信画廊",
+      "wechatStop": "停止微信画廊",
+      "wechatStatus": "微信画廊状态：{{state}}",
+      "unavailable": "PC 端能力未就绪"
     }
   },
   "shareCard": {

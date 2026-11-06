@@ -37,7 +37,8 @@
     "build:recycle-helper": "node scripts/build-recycle-helper.cjs",
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder --publish never",
-    "dist:win": "npm run build:recycle-helper && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+    "dist:win": "npm run build:recycle-helper && npm run stage:nikkisync-pc && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+    "stage:nikkisync-pc": "tsx scripts/stage-nikkisync-pc-assets.ts --apply",
     "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
     "audit": "audit-ci --config ./audit-ci.jsonc",
     "audit:fix": "npm audit fix --registry=https://registry.npmjs.org",
@@ -283,6 +284,13 @@
         "to": "nikkisync",
         "filter": [
           "*.exe"
+        ]
+      },
+      {
+        "from": "resources/nikkisync/pc",
+        "to": "nikkisync/pc",
+        "filter": [
+          "**/*"
         ]
       }
     ],

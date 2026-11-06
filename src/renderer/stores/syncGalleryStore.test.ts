@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { useSyncGalleryStore } from './syncGalleryStore'
 import { fetchAssetPage } from './mediaStore'
 import type { AssetSummary, MediaResource } from '../../shared/sync/protocol'
+import type { AssetMediaFile } from '../utils/assetViewModel'
 
 /**
  * 阶段 5 · A2：同步图库独立入口的取数与状态测试。
@@ -265,5 +266,36 @@ describe('useSyncGalleryStore', () => {
     // a/1 已被刷新替换：续页合并必须基于重读后的最新列表，绝不能把 a/1 复活
     expect(useSyncGalleryStore.getState().files.map((file) => file.id)).toEqual(['b/1', 'a/2'])
     expect(useSyncGalleryStore.getState().loadingMore).toBe(false)
+  })
+})
+
+describe('applyHits（N5：索引面命中结果铺进网格）', () => {
+  it('写入命中列表并把分页/游标/错误全部归零', async () => {
+    setBridge({
+      getAssets: vi.fn().mockResolvedValue({
+        items: [summary('a/1')],
+        nextCursor: 'cur-1',
+        libraryRevision: 42
+      })
+    })
+    await useSyncGalleryStore.getState().loadFirst()
+    useSyncGalleryStore.getState().applyHits([{ id: 'hit-1' } as AssetMediaFile])
+    const state = useSyncGalleryStore.getState()
+    expect(state.files.map((file) => file.id)).toEqual(['hit-1'])
+    expect(state.cursor).toBeNull()
+    expect(state.libraryRevision).toBeNull()
+    expect(state.hasMore).toBe(false)
+    expect(state.loading).toBe(false)
+    expect(state.loadingMore).toBe(false)
+    expect(state.error).toBeNull()
+  })
+
+  it('随后的 loadFirst 覆盖回主列表（命中视图是临时的）', async () => {
+    setBridge({
+      getAssets: vi.fn().mockResolvedValue({ items: [summary('a/9')], libraryRevision: 9 })
+    })
+    useSyncGalleryStore.getState().applyHits([{ id: 'hit-1' } as AssetMediaFile])
+    await useSyncGalleryStore.getState().loadFirst()
+    expect(useSyncGalleryStore.getState().files.map((file) => file.id)).toEqual(['a/9'])
   })
 })

@@ -113,6 +113,16 @@ interface NikkiSyncServerApiStub {
   setGameRoot: Mock
   resetGameRoot: Mock
   admitDirectory: Mock
+  // N4：灵感库
+  listInspirations: Mock
+  saveInspiration: Mock
+  putInspirationImage: Mock
+  getInspirationImage: Mock
+  // N7：PC 端控制页 / 微信画廊
+  desktopOpen: Mock
+  wechatStart: Mock
+  wechatStop: Mock
+  wechatStatus: Mock
 }
 
 /** K9：与 handler 剔除 label 后的账号快照同形（uid 三态 + 样例 assetId）。 */
@@ -346,13 +356,27 @@ function installElectronApi(
             throw opts.admitReject
           }
         : async ({ path }: { path: string }) => ({ path })
-    )
+    ),
+    // N4：灵感库（面板在老桥面缺席时静默隐藏；这里给齐以便后续用例直接驱动）
+    listInspirations: vi.fn(async () => ({ items: [], nextCursor: null })),
+    saveInspiration: vi.fn(async () => ({ revision: 1, entry: {} })),
+    putInspirationImage: vi.fn(async () => ({ ok: true })),
+    getInspirationImage: vi.fn(async () => null),
+    // N7：PC 端控制页 / 微信画廊
+    desktopOpen: vi.fn(async () => ({ url: 'http://127.0.0.1:39123/' })),
+    wechatStart: vi.fn(async () => ({
+      status: { state: 'waiting' },
+      qrSvg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
+    })),
+    wechatStop: vi.fn(async () => ({ status: { state: 'closed' } })),
+    wechatStatus: vi.fn(async () => ({ status: { state: 'idle' } }))
   }
   dialogShowMessageBox = vi.fn(async () => 0)
   appRelaunch = vi.fn(async () => undefined)
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet },
     nikkisync: serverApi,
+    shell: { openExternal: vi.fn(async () => ({ success: true })) },
     dialog: { selectDirectory: serverApi.selectDirectory, showMessageBox: dialogShowMessageBox },
     app: { relaunch: appRelaunch }
   }
@@ -1346,5 +1370,19 @@ describe('SyncServicePage 照片目录自定义（(at)-(be)）', () => {
     renderSection()
     await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalled())
     expect(screen.queryByText('灵感同步 v1')).not.toBeInTheDocument()
+  })
+})
+
+// ============================================================================
+// N7：PC 端分区（打开控制页 / 微信画廊启停 / 状态 / 二维码）
+// ============================================================================
+
+describe('SyncServicePage PC 端分区（N7）', () => {
+  it('渲染 PC 端入口：打开控制页 / 微信画廊启停 / 状态与二维码区', async () => {
+    renderSection()
+    expect(await screen.findByTestId('sync-service-pc-section')).toBeInTheDocument()
+    expect(screen.getByTestId('pc-open-desktop')).toBeInTheDocument()
+    expect(screen.getByTestId('pc-wechat-start')).toBeInTheDocument()
+    expect(screen.getByTestId('pc-wechat-stop')).toBeInTheDocument()
   })
 })

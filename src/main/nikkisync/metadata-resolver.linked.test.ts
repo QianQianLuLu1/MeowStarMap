@@ -273,7 +273,7 @@ suite('阶段 6 元数据解析链接态', () => {
 
   // ---------------------------------------------------------------- K2：在线解析同意
 
-  it('K2 真实同意门：未同意 ⇒ runOnce 零出站、失败归入 failureCategories；同意文件持久化后新会话可解析', async () => {
+  it('K2 真实同意门：干净安装默认放行可解析；显式撤回零出站且跨会话持久化；重新同意后恢复', async () => {
     expect(session).toBeDefined()
     // 独立假解析器：resolve 被调一次就能观测「是否真的出站」
     let fakeResolveCalls = 0
@@ -300,70 +300,77 @@ suite('阶段 6 元数据解析链接态', () => {
       } as unknown as RuntimeSurface['nuan5Resolver']
     }
     const consentFile = path.join(fixtureRoot, 'metadata-online-consent.json')
+    const optionsFor = (name: string) => ({
+      databaseFile: path.join(fixtureRoot, `consent-${name}.db`),
+      watcher: false,
+      projectRoot,
+      metadataResolverEnabled: true,
+      consentFile
+    })
+    const dispose = async (created: Awaited<ReturnType<typeof createRuntimeSession>>) => {
+      created.stopMetadataResolver()
+      await created.scanner.stop().catch(() => undefined)
+      created.dispose()
+    }
+    const drain = async (created: Awaited<ReturnType<typeof createRuntimeSession>>) => {
+      let total = 0
+      for (let round = 0; round < 40 && total < PHOTO_COUNT; round += 1) {
+        const resolved = await created.metadataRunOnce?.()
+        if (!resolved) break
+        total += resolved
+      }
+      return total
+    }
 
-    // ① 未同意（initiallyDisabled + 无同意文件）：runOnce 零出站，失败计数归入诊断
-    const denied = await createRuntimeSession(
-      {
-        databaseFile: path.join(fixtureRoot, 'consent-denied.db'),
-        watcher: false,
-        projectRoot,
-        metadataResolverEnabled: true,
-        consentFile
-      },
-      consentSurface
-    )
+    // ① 干净安装（无同意文件）：与上游 windows-app.ts 一致默认放行 ⇒ 真实出站解析
+    const fresh = await createRuntimeSession(optionsFor('fresh'), consentSurface)
     try {
-      expect(denied.metadataConsent).toBeDefined()
+      expect(fresh.metadataConsent?.state().enabled).toBe(true)
+      seedAssets(fresh.runtime.database)
+      const beforeCalls = fakeResolveCalls
+      expect(await drain(fresh)).toBe(PHOTO_COUNT)
+      expect(fakeResolveCalls).toBeGreaterThan(beforeCalls)
+
+      // ② 显式撤回：写盘持久化（用户仍可随时关闭出站）
+      fresh.metadataConsent?.setEnabled(false)
+      expect(fresh.metadataConsent?.state().enabled).toBe(false)
+      expect(fs.existsSync(consentFile)).toBe(true)
+    } finally {
+      await dispose(fresh)
+    }
+
+    // ③ 新会话读回「已撤回」：runOnce 零出站，失败计数归入诊断
+    const denied = await createRuntimeSession(optionsFor('denied'), consentSurface)
+    try {
       expect(denied.metadataConsent?.state().enabled).toBe(false)
       seedAssets(denied.runtime.database)
       const beforeCalls = fakeResolveCalls
-      const resolved = await denied.metadataRunOnce?.()
-      expect(resolved).toBe(0)
+      expect(await denied.metadataRunOnce?.()).toBe(0)
       expect(fakeResolveCalls).toBe(beforeCalls)
       const counters = denied.metadataDiagnostics() as NikkiSyncMetadataCounters
       expect(counters.failed).toBeGreaterThan(0)
       expect(counters.resolved).toBe(0)
       expect(Object.keys(counters.failureCategories).length).toBeGreaterThan(0)
 
-      // ② 同意写入磁盘（policyVersion 取自 state，与 UI「携带页面展示版本提交」同口径）
+      // ④ 重新同意（policyVersion 取自 state，与 UI「携带页面展示版本提交」同口径）
       denied.metadataConsent?.setEnabled(true, denied.metadataConsent?.state().policyVersion)
       expect(denied.metadataConsent?.state().enabled).toBe(true)
-      expect(fs.existsSync(consentFile)).toBe(true)
     } finally {
-      denied.stopMetadataResolver()
-      await denied.scanner.stop().catch(() => undefined)
-      denied.dispose()
+      await dispose(denied)
     }
 
-    // ③ 同意文件跨会话生效：新会话（新库、同一 consentFile）读回已同意 ⇒ 可解析
-    const granted = await createRuntimeSession(
-      {
-        databaseFile: path.join(fixtureRoot, 'consent-granted.db'),
-        watcher: false,
-        projectRoot,
-        metadataResolverEnabled: true,
-        consentFile
-      },
-      consentSurface
-    )
+    // ⑤ 同意文件跨会话生效：新会话（新库、同一 consentFile）读回已同意 ⇒ 可解析
+    const granted = await createRuntimeSession(optionsFor('granted'), consentSurface)
     try {
       expect(granted.metadataConsent?.state().enabled).toBe(true)
       seedAssets(granted.runtime.database)
       const beforeCalls = fakeResolveCalls
-      let total = 0
-      for (let round = 0; round < 40 && total < PHOTO_COUNT; round += 1) {
-        const resolved = await granted.metadataRunOnce?.()
-        if (!resolved) break
-        total += resolved
-      }
-      expect(total).toBe(PHOTO_COUNT)
+      expect(await drain(granted)).toBe(PHOTO_COUNT)
       expect(fakeResolveCalls).toBeGreaterThan(beforeCalls)
       const counters = granted.metadataDiagnostics() as NikkiSyncMetadataCounters
       expect(counters.resolved).toBe(PHOTO_COUNT)
     } finally {
-      granted.stopMetadataResolver()
-      await granted.scanner.stop().catch(() => undefined)
-      granted.dispose()
+      await dispose(granted)
     }
   })
 })

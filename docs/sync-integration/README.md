@@ -9,6 +9,8 @@
 
 > **2026-11-02 状态**：内嵌面装载锚点已从 `b397e0e`(v1.0.27) 推进到 `589b932`(v1.0.30)，上游 `a5a43f9` 新增的灵感同步（`/v1/inspiration*` + 3 张运行期自建表）与协议能力位已搭载，mDNS 默认位经复测翻回 `true`。全过程与读数见 `docs/plans/2026-11-02-nikkisync-upstream-align-02-实施计划.md`。
 
+> **2026-11-06 状态**：「同步图库」板块与上游 `apps/pc-companion` PC 端功能对齐 —— 五个内嵌面默认开关翻为 `true`、在线元数据同意门默认放行、整理队列缺省 `true`；`PcCompanionRuntime` 构造参数对齐 `windows-app.ts`（4 个新深入口 + `remoteBridge` + 在线字典 + 组合解析器）；显式编排上游后台服务；新增灵感库 4 通道与 `SyncInspirationPanel`；**接入 `desktop/*` 本机控制页与 `wechat/*` 微信画廊两块**（`pc-companion-services.ts` + 4 通道 + PC 端分区 UI），并经 `pcCompanionContext()` 下传真实 database / 扫描根 / 配对串；抽屉优先读上游 metadata、检索命中回捞铺网格；preview 补 `nikkisyncMock`；12 语包补 29 个 key；装载清单扩到 **24 roots / 18 artifacts**。`windows-shell` 托盘/开机自启/自动更新按用户口径**不搬**。全过程、读数与未同步项见 `docs/plans/2026-11-05-sync-gallery-pc-parity-实施计划.md`。
+
 ## 1. 编号 01–05 被两条并行轨道各用了一次
 
 | 轨道                     | 目录归属                                                              | 文档                                                                                                                                                                                                                                                                                                        | LAN 服务真相                                        |

@@ -71,7 +71,11 @@
      库文件落 `{userData}/nikkisync/nikkisync.db`，不走上游默认 `%LOCALAPPDATA%/NikkiSync`。
    - **阶段 3 起，运行面可以启 LAN 服务**（边界仅适用于探针）：`runtime-manager.startSyncServer()`
      调**上游自己的** `runtime.server.start()`（不新建任何 HTTP/TLS/WS/mDNS 实现）。三条硬约束：
-     ① 只在用户显式开启时启（`nikkisync.syncServerEnabled` 默认 `false`，绑 `0.0.0.0` 属敏感暴露）；
+     ① 自 N1（2026-11-06 对齐上游 PC 端）起**默认开启**：`nikkisync.syncServerEnabled`
+     缺省 `true`（`app/nikkisync-runtime-setup.ts` 的 `SYNC_ENABLED_DEFAULT = true`）。
+     绑 `0.0.0.0` 属敏感暴露，故保留 `NIKKI_NIKKISYNC_RUNTIME=0` 全局逃生阀、
+     六个 `NIKKI_NIKKISYNC_*=0` 分项阀与两份 `enabled:false` 离线 JSON 回退；
+     `probe.ts` 不启服务的边界不变；
      ② `probe.ts` / `probe-cli.ts` / `runtime-cli.ts` **仍绝不**调 `server.start()`（探针语义不变）；
      ③ 端口/mdns 冻结在上游构造期 ⇒ 变更只能重建会话，`syncServer` 配置必须由 `createRuntimeSession`
      传入而不是启动后再改。构造 `mdns:true` 不组播（`mdns.start()` 只在 `start()` 内被调）。
@@ -117,3 +121,26 @@
     并把「代理 = 等价」钉在 `sync-server.linked.test.ts`（同时断言 HTTP 广告位与实例存在），
     上游改成条件构造或摘掉广告位时当场分叉。**禁止**直接调私有方法、**禁止**在状态里恒写 `true`；
     键只在为真时下发，缺席表示当前构建没这一面，不等于用户关掉了它（渲染层因此不留「未启用」行）。
+
+## 2026-11-06 对齐上游 PC 端的口径订正（本轮）
+
+- 上表 `runtime-facade.ts` 另含 4 个 N2 深入口常量：`METADATA_STARTUP_COMPOSITION_DEEP_ENTRY`
+  / `METADATA_RESOLVER_CONFIG_DEEP_ENTRY` / `METADATA_DICTIONARY_REMOTE_CONFIG_DEEP_ENTRY` /
+  `METADATA_THUMBNAIL_CACHE_DEEP_ENTRY`，分别装载上游启动组合器与配置/缩略图缓存；
+  构造参数据此对齐 `windows-app.ts`（`remoteBridge: true`、字典 provider/supplement、
+  `composeMetadataResolver`、`MetadataThumbnailCache`）。`runtime-manager.ts` 增
+  `startBackgroundServices` / `stopBackgroundServices` 编排，补偿本仓不调
+  `runtime.start()` 导致的字典 updater / `reenrichResolvedAssets` / resolver 定时器缺失。
+- `runtime-types.ts` 增 `PcCompanionSessionContext`；`runtime-manager.ts` 增只读
+  `pcCompanionContext()`，从 `state.session` 现取 `runtime.database` /
+  `scanner.getScanRoots()` / `pairingUri(host)`。装配层（`app/nikkisync-runtime-setup.ts`）
+  必须**在 `manager.start()` 之后**才构造 PC 端服务，会话未建则 warn 跳过。
+- 新增 `pc-companion-services.ts` / `pc-companion-services.test.ts`：复用上游
+  `createDesktopControlServer` / `WeChatGalleryService` 装配本机控制页与微信画廊，
+  经 `pcCompanionContext()` 拿到**真实** database、扫描根与配对串（旧版三处降级
+  —— 空 database / 空串配对 / 空照片源 —— 已消除）。资源由
+  `scripts/stage-nikkisync-pc-assets.ts` 暂存，深入口清单见
+  `scripts/verify-nikkisync-link.ts`（24 roots / 18 artifacts）。
+- `docs/IPC_CONTRACT.md` §8.2.7/§8.2.8 登记灵感库 4 通道与 PC 端 4 通道；
+  §8.2.4 的整理队列开关自 N1 起默认 `true`（可显式关闭）。
+- 全过程与未同步项见 `docs/plans/2026-11-05-sync-gallery-pc-parity-实施计划.md`。

@@ -1,0 +1,86 @@
+// N6：预览版 nikkisync 命名空间 Mock（空/桩数据）。
+// 预览版没有内嵌 NikkiSync Runtime：这里只提供结构正确的空数据，让「同步图库」
+// 菜单与页面可渲染为空态，不伪造任何真实资产字节。
+// 约定：src/** 禁止硬编码中文字符串与 console.log；桩内不产生错误文案（全部方法
+// 返回空结果），如后续需要错误文案一律用 ASCII；注释可用中文。
+
+// 通用空返回工厂：查询面在无数据时给空集合 / 空对象 / 布尔 / 数值。
+const emptyList = (): unknown[] => []
+const emptyRecord = (): Record<string, never> => ({})
+const emptyPage = (): {
+  items: unknown[]
+  nextCursor: null
+  libraryRevision: number
+  hasMore: boolean
+} => ({ items: [], nextCursor: null, libraryRevision: 0, hasMore: false })
+const noop = (): void => {}
+
+// 运行时状态：预览版未装配 runtime，available/running 均为 false。
+// state / linkReady 为对齐协议 DTO 的可读占位，值为空态。
+const runtimeStatus = {
+  available: false,
+  running: false,
+  state: 'idle',
+  linkReady: false
+}
+
+// 同步服务状态：协议注释约定「句柄未装配时 { available: false }（不抛）」。
+const serverStatus = { available: false }
+
+// 目录面空态：directories / automaticRoots 为空，busy 为 false。
+const emptyDirectories = (): {
+  directories: unknown[]
+  automaticRoots: unknown[]
+  busy: boolean
+} => ({ directories: [], automaticRoots: [], busy: false })
+
+// 账号作用域空态：无分组、默认「全部」。
+const emptyAccounts = (): { accounts: unknown[]; all: boolean } => ({ accounts: [], all: true })
+
+export const nikkisyncMock: Record<string, unknown> = {
+  // ---- 运行时 / 扫描 ----
+  getRuntimeStatus: async () => runtimeStatus,
+  startScan: async () => emptyRecord(),
+  // ---- 资产只读查询 ----
+  getAssets: async () => emptyPage(),
+  getAssetDetail: async () => emptyRecord(),
+  getResource: async () => emptyRecord(),
+  getResourceRecords: async () => emptyRecord(),
+  getChanges: async () => ({ items: [], fullResyncRequired: false }),
+  // ---- 搜索 / 统计 ----
+  searchSuits: async () => emptyList(),
+  searchClothing: async () => emptyList(),
+  profileStats: async () => emptyRecord(),
+  // ---- 局域网同步服务 ----
+  getServerStatus: async () => serverStatus,
+  startServer: async () => serverStatus,
+  stopServer: async () => serverStatus,
+  getPairingCode: async () => emptyRecord(),
+  getPairedDevices: async () => emptyList(),
+  revokeDevice: async () => emptyList(),
+  // ---- 在线解析同意 / 游戏版本 ----
+  getMetadataConsent: async () => ({ enabled: false }),
+  setMetadataConsent: async () => ({ enabled: false }),
+  resolveGameVersion: async () => emptyRecord(),
+  // ---- 照片目录（K6 / gameRoot）----
+  getExtraDirectories: async () => emptyDirectories(),
+  inspectExtraDirectory: async () => emptyRecord(),
+  addExtraDirectory: async () => emptyDirectories(),
+  removeExtraDirectory: async () => emptyDirectories(),
+  setExtraDirectorySource: async () => emptyDirectories(),
+  rescanExtraDirectories: async () => emptyDirectories(),
+  getGameRoot: async () => ({ root: '' }),
+  setGameRoot: async () => ({ needRestart: false, applied: false }),
+  resetGameRoot: async () => ({ needRestart: false, applied: false }),
+  admitDirectory: async () => emptyRecord(),
+  // ---- 账号作用域（K9）----
+  getSyncAccounts: async () => emptyAccounts(),
+  previewSyncAccount: async () => emptyRecord(),
+  setSyncAccountSelection: async () => emptyAccounts(),
+  // ---- 整理队列（K8）----
+  getOrganizerQueue: async () => ({ list: [], enabled: false }),
+  decideOrganizerItem: async () => emptyList(),
+  approveOrganizerItems: async () => ({ items: [], approved: 0, skipped: 0 }),
+  // ---- 订阅：同步返回退订函数（与 preload 的 subscribe 一致，不能是 Promise）----
+  onLibraryChanged: () => noop
+}

@@ -428,6 +428,14 @@ export interface NikkiSyncRuntimeSession {
    */
   stopMetadataResolver(): void
   /**
+   * N3：上游 `runtime.start()` 内「后台服务」阶段的显式补偿。本仓刻意不走
+   * `runtime.start()`（它会无条件启 LAN 服务），因此由 manager 在 `scanner.start()`
+   * 成功后调用本委托；老链接会话无此面 ⇒ 零调用，不抛错。
+   */
+  startBackgroundServices?: () => void
+  /** N3：与 start 成对，必须在 `dispose()` 之前调用，逐步失败不得卡住退出链。 */
+  stopBackgroundServices?: () => void
+  /**
    * 阶段 6：**仅在上游服务存在时**才有此方法（编排层据此判 0 轮，不必再读开关）。
    * 写成属性而非方法：契约是「已绑定好的闭包」，驱动层把它摘下来单独调用时不依赖 `this`
    * （`runtime-facade` 正是以箭头函数赋值，上游 `runOnce()` 内部的 `this` 已在闭包内绑定）。
@@ -468,9 +476,76 @@ export interface NikkiSyncRuntimeSession {
    * 调用一次并把结果放进 `runtime-status.scanDiagnostics`。
    */
   scanDiagnostics?: () => unknown
+  /** N4：上游 `runtime.server.inspirations` 同一引用（构造期必建，老链接缺席）。 */
+  inspirations?: InspirationRepositoryLike
+}
+
+/**
+ * N4：上游 `inspiration/InspirationRepository.ts`（1.0.29 起 `LocalSyncServer` 构造期必建）
+ * 的本仓最小面。五个公开方法逐字对齐上游签名；本仓不重写 HTTP 路由
+ * （`InspirationRoutes.ts`），只在 IPC 层做形态校验后原样调这些方法。错误短码
+ * （conflict / too_large / invalid_entry / invalid_image / image_hash / image_type /
+ * missing_image / invalid_limit / invalid_cursor）由 handler 层映射，不透传渲染层。
+ */
+export interface InspirationRepositoryLike {
+  list(after: string, limit: number): { items: unknown[]; nextCursor: string | null }
+  save(entry: unknown, baseRevision: number): { revision: number; entry: unknown }
+  putImage(hash: string, mime: string, bytes: Uint8Array): void
+  image(hash: string): { mimeType: string; bytes: Uint8Array } | undefined
+  imageInfo(hash: string): { mimeType: string; size: number } | undefined
+  get(id: string): { revision: number; entry: unknown } | undefined
+}
+
+/**
+ * N7：PC 端服务装配（`src/main/nikkisync/pc-companion-services.ts`）暴露的最小面。
+ * 由 `app/nikkisync-runtime-setup.ts` 在装配后挂到 `ctx.nikkisyncRuntime` 句柄上；
+ * 句柄上没有这个可选面 ⇒ 服务未装配，四条 PC 通道一律 PRECONDITION_FAILED。
+ */
+export interface NikkiSyncPcCompanionStatusInfo {
+  running: boolean
+  desktopUrl: string
+  wechat: unknown
+}
+
+/**
+ * C1：PC 端控制页 / 微信画廊所需的**真实会话上下文**。
+ * 会话由 `runtime-manager` 私有持有，装配层只能通过这个只读视图取值；
+ * 所有字段都视为不可信输入，消费侧仍需判空与形态校验。
+ */
+export interface PcCompanionSessionContext {
+  /** 上游 DatabaseManager 句柄（同一引用，不复制、不包装）。 */
+  database: unknown
+  /** 真实扫描根（自动根 + 额外目录），由 `scanner.getScanRoots()` 过滤出字符串路径。 */
+  scanRoots: string[]
+  /** 一次性配对串；host 由主进程解析器提供，不接受渲染层输入。 */
+  pairingUri: (host: string) => string
+}
+
+export interface PcCompanionServicesLike {
+  start(): Promise<void>
+  stop(): Promise<void>
+  status(): NikkiSyncPcCompanionStatusInfo
+  desktopUrl(): string
+  wechatStart(): Promise<{ status: unknown; qrSvg: string }>
+  wechatStop(): Promise<{ status: unknown }>
+  wechatStatus(): unknown
 }
 
 /** 创建会话所需的全部输入（不含 Electron API，便于纯逻辑单测）。 */
+/**
+ * 上游 PC 端能力位（对齐 `apps/pc-companion/src/windows-app.ts` 的干净安装默认态）。
+ * 全部默认开；每一项都有 `NIKKI_NIKKISYNC_*=0` 逃生阀，由装配层按 env 收敛后下发。
+ * 本仓只做「是否装配」的判定，具体服务一律复用上游实现。
+ */
+export interface NikkiSyncPcCompanionSwitches {
+  remoteBridge: boolean
+  metadataDictionary: boolean
+  gameVersionUpdates: boolean
+  runtimeMemoryMaintenance: boolean
+  wechatGallery: boolean
+  desktopControl: boolean
+}
+
 export interface NikkiSyncSessionOptions {
   /** NikkiSync 库文件绝对路径。 */
   databaseFile: string
@@ -494,6 +569,14 @@ export interface NikkiSyncSessionOptions {
    * 该开关一旦为真即产生对第三方端点的出站请求。
    */
   metadataResolverEnabled?: boolean
+  /** 上游 PC 端能力位；缺省视为「全部按装配层默认值」（见 NikkiSyncPcCompanionSwitches）。 */
+  pcCompanion?: NikkiSyncPcCompanionSwitches
+  /** 上游在线解析 provider 配置文件（0600 JSON，与 upstream windows-app.ts 同款）。 */
+  metadataResolverFile?: string
+  /** 上游在线字典远端配置文件（0600 JSON）。 */
+  metadataDictionaryRemoteFile?: string
+  /** 服装缩略图缓存目录（上游 MetadataThumbnailCache 自行创建）。 */
+  metadataThumbnailCacheDir?: string
   /**
    * 兼容层（b422193）：上游启动阶段回调透传缝。本仓编排不调 `runtime.start()`
    * （它会无条件启 LAN 服务），上游六阶段在本仓编排下不会自然发生；K1 由
@@ -608,4 +691,11 @@ export interface NikkiSyncRuntimeHandle {
   organizerDecide(id: string, approve: boolean): Promise<unknown>
   /** K8：批量批准（上游 `approveMany`，≤500 去重由上游校验；错误 `stopping`/`invalid_ids` 原样上抛）。 */
   organizerApproveMany(ids: string[]): Promise<unknown>
+  /**
+   * C1：只读会话上下文。会话未建 / database 不可用时返回 undefined，
+   * 装配层据此跳过 PC 端服务（不抛进启动链、不伪造空 database）。
+   */
+  pcCompanionContext(): PcCompanionSessionContext | undefined
+  /** N7：PC 端服务（setup 装配后挂到句柄；未装配时缺省 ⇒ PRECONDITION_FAILED）。 */
+  pcCompanionServices?: PcCompanionServicesLike
 }

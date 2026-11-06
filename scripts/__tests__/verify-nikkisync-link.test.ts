@@ -312,7 +312,7 @@ describe('evaluateNikkiSyncLink', () => {
 })
 
 describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步）', () => {
-  it('恰好 7 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
+  it('恰好 18 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
     expect(NIKKISYNC_CAPABILITY_ARTIFACTS).toEqual([
       path.join('dist', 'src', 'organizer', 'DeletionQueue.js'),
       path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
@@ -320,7 +320,20 @@ describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步
       path.join('dist', 'src', 'metadata', 'CachedDecodedMetadataService.js'),
       path.join('dist', 'src', 'metadata', 'MetadataOnlineConsent.js'),
       path.join('dist', 'src', 'server', 'LanAddress.js'),
-      path.join('dist', 'src', 'server', 'GameVersionCalendar.js')
+      path.join('dist', 'src', 'server', 'GameVersionCalendar.js'),
+      // N2：上游 PC 端启动组合器与配置/缓存深入口
+      path.join('dist', 'src', 'metadata', 'MetadataStartupComposition.js'),
+      path.join('dist', 'src', 'metadata', 'MetadataResolverConfigFile.js'),
+      path.join('dist', 'src', 'metadata', 'MetadataDictionaryRemoteConfigFile.js'),
+      path.join('dist', 'src', 'metadata', 'MetadataThumbnailCache.js'),
+      // N7：PC 端控制页 / 微信画廊深入口
+      path.join('dist', 'src', 'desktop', 'DesktopControlServer.js'),
+      path.join('dist', 'src', 'desktop', 'DesktopStatusService.js'),
+      path.join('dist', 'src', 'wechat', 'WeChatGalleryService.js'),
+      path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs'),
+      path.join('dist', 'src', 'wechat', 'WeChatIconProvider.js'),
+      path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
+      path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
     ])
   })
 })
@@ -546,8 +559,8 @@ describe('LOAD_CHAIN_ROOTS 结构契约', () => {
   /** 与 `src/main/nikkisync/runtime-facade.ts` 的深入口常量比对时统一成正斜杠键（约定 §6 第 1 档） */
   const toForward = (value: string): string => value.split(path.sep).join('/')
 
-  it('恰好 13 个根：上游桶导出 + 本仓 12 个 *_DEEP_ENTRY', () => {
-    expect(LOAD_CHAIN_ROOTS).toHaveLength(13)
+  it('恰好 24 个根：上游桶导出 + 本仓 23 个 *_DEEP_ENTRY（含 N7 PC 端七个）', () => {
+    expect(LOAD_CHAIN_ROOTS).toHaveLength(24)
     expect(toForward(LOAD_CHAIN_ROOTS[0] as string)).toBe('dist/src/index.js')
   })
 

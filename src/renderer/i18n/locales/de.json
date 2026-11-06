@@ -4360,7 +4360,8 @@
       "statsEmpty": "Noch keine Statistik",
       "statsFailed": "Statistik konnte nicht geladen werden",
       "topSuits": "Meist getragene Outfits",
-      "topClothing": "Meist getragene Kleidung"
+      "topClothing": "Meist getragene Kleidung",
+      "backfillFailed": "Trefferfotos konnten nicht geladen werden; nur Texttreffer werden angezeigt"
     },
     "title": "Synchronisierte Galerie",
     "subtitle": "Objekte aus der eingebetteten NikkiSync-Bibliothek, unabhängig von der lokalen Galerie",
@@ -4405,7 +4406,32 @@
         "hash": "Inhalts-Hash",
         "metadata": "Metadaten",
         "gameVersionInferred": " (abgeleitet)"
+      },
+      "upstreamTitle": "Upstream-Metadaten",
+      "upstreamFallback": "Upstream-Metadaten nicht verfügbar, lokale Dekodierung angezeigt",
+      "upstream": {
+        "focalLength": "Brennweite",
+        "aperture": "Blende",
+        "exposure": "Belichtung",
+        "dressingParts": "Outfit-Teile"
       }
+    },
+    "inspiration": {
+      "title": "Inspirationsbibliothek",
+      "hint": "Mit dem Handy synchronisierte Share-Codes, Kategorien, Status und Referenzbilder",
+      "new": "Neu",
+      "titleLabel": "Titel",
+      "notesLabel": "Notizen",
+      "imageLabel": "Referenzbild",
+      "imageFailed": "Referenzbild konnte nicht hochgeladen werden",
+      "save": "Speichern",
+      "cancel": "Abbrechen",
+      "saveFailed": "Speichern fehlgeschlagen",
+      "loadFailed": "Laden fehlgeschlagen",
+      "loading": "Wird geladen…",
+      "empty": "Noch keine Inspirationseinträge",
+      "edit": "Bearbeiten",
+      "delete": "Löschen"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "Später",
       "invalidEmpty": "Bitte zuerst einen Verzeichnispfad eingeben oder auswählen",
       "invalidAbsolute": "Absoluten Pfad eingeben (z. B. D:\\Photos)"
+    },
+    "pc": {
+      "title": "PC-Begleiter",
+      "description": "Lokale Kontrollseite und WeChat-Galerie (upstream NikkiSync PC)",
+      "openDesktop": "Lokale Kontrollseite öffnen",
+      "wechatStart": "WeChat-Galerie starten",
+      "wechatStop": "WeChat-Galerie stoppen",
+      "wechatStatus": "WeChat-Galerie-Status: {{state}}",
+      "unavailable": "PC-Begleiter nicht verfügbar"
     }
   },
   "shareCard": {

@@ -4360,7 +4360,8 @@
       "statsEmpty": "통계 없음",
       "statsFailed": "통계 불러오기 실패",
       "topSuits": "가장 많이 입은 코디",
-      "topClothing": "가장 많이 입은 의상"
+      "topClothing": "가장 많이 입은 의상",
+      "backfillFailed": "일치 사진을 불러오지 못해 텍스트 결과만 표시합니다"
     },
     "title": "동기화 갤러리",
     "subtitle": "NikkiSync 내장 라이브러리의 자산, 로컬 갤러리와 서로 간섭하지 않습니다",
@@ -4405,7 +4406,32 @@
         "hash": "콘텐츠 해시",
         "metadata": "메타데이터",
         "gameVersionInferred": " (추정)"
+      },
+      "upstreamTitle": "업스트림 메타데이터",
+      "upstreamFallback": "업스트림 메타데이터를 사용할 수 없어 로컬 복호화 결과를 표시합니다",
+      "upstream": {
+        "focalLength": "초점 거리",
+        "aperture": "조리개",
+        "exposure": "노출",
+        "dressingParts": "코디 부품"
       }
+    },
+    "inspiration": {
+      "title": "영감 라이브러리",
+      "hint": "휴대폰과 동기화되는 공유 코드, 분류, 상태 및 참고 이미지",
+      "new": "새로 만들기",
+      "titleLabel": "제목",
+      "notesLabel": "메모",
+      "imageLabel": "참고 이미지",
+      "imageFailed": "참고 이미지 업로드 실패",
+      "save": "저장",
+      "cancel": "취소",
+      "saveFailed": "저장 실패",
+      "loadFailed": "불러오기 실패",
+      "loading": "불러오는 중…",
+      "empty": "영감 항목이 없습니다",
+      "edit": "편집",
+      "delete": "삭제"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "나중에",
       "invalidEmpty": "먼저 디렉터리 경로를 입력하거나 선택하세요",
       "invalidAbsolute": "절대 경로를 입력하세요(예: D:\\Photos)"
+    },
+    "pc": {
+      "title": "PC 동반 기능",
+      "description": "로컬 제어 페이지와 위챗 갤러리(업스트림 NikkiSync PC)",
+      "openDesktop": "로컬 제어 페이지 열기",
+      "wechatStart": "위챗 갤러리 시작",
+      "wechatStop": "위챗 갤러리 중지",
+      "wechatStatus": "위챗 갤러리 상태: {{state}}",
+      "unavailable": "PC 동반 기능을 사용할 수 없습니다"
     }
   },
   "shareCard": {

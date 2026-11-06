@@ -134,3 +134,29 @@ export function toAssetViewModel(input: AssetViewModelInput): AssetMediaFile {
     }
   }
 }
+
+/**
+ * N5：搜索命中照片的回捞映射段。与 `mediaStore.mapAssetPageToFiles` 同口径
+ * （两次 `get-resource-records` 的 byAsset + `asset-edits` 叠加 + `toAssetViewModel`），
+ * 只是入口从「一页摘要」换成「命中的摘要」。IPC 调用、判空、代次由调用方负责，
+ * 这里保持纯函数以便单测，也不新建第二套取数协议。
+ */
+export interface HitBackfillInput {
+  summaries: AssetSummary[]
+  metaByAsset: Record<string, MediaResource[]>
+  pathByAsset: Record<string, Record<string, string>>
+  edits?: AssetEditsInfo[]
+}
+
+export function mapHitSummariesToFiles(input: HitBackfillInput): AssetMediaFile[] {
+  const { summaries, metaByAsset, pathByAsset, edits } = input
+  const editByAsset = new Map((edits ?? []).map((edit) => [edit.assetId, edit]))
+  return summaries.map((summary) =>
+    toAssetViewModel({
+      summary,
+      resources: metaByAsset[summary.assetId] ?? [],
+      pathsByResourceId: pathByAsset[summary.assetId] ?? {},
+      edit: editByAsset.get(summary.assetId)
+    })
+  )
+}

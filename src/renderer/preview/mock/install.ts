@@ -5,6 +5,7 @@ import { databaseMock } from './database-mock'
 import { filesystemMock } from './filesystem-mock'
 import { eventMock } from './event-mock'
 import { resonanceMock } from './resonance-mock'
+import { nikkisyncMock } from './nikkisync-mock'
 import { IpcError } from './ipc-error'
 import { MOCK_FULL_IMAGES } from './data/full-images'
 import { MOCK_THUMBNAILS } from './data/thumbnails'
@@ -18,21 +19,24 @@ function mergeNamespace(ns: string): Record<string, unknown> {
   return { ...db, ...fs, ...ev }
 }
 
-// 已实现的命名空间集合（databaseMock ∪ filesystemMock ∪ eventMock ∪ resonance）
+// 已实现的命名空间集合（databaseMock ∪ filesystemMock ∪ eventMock ∪ resonance ∪ nikkisync）
 const IMPLEMENTED_NAMESPACES = new Set<string>([
   ...Object.keys(databaseMock),
   ...Object.keys(filesystemMock),
   ...Object.keys(eventMock),
-  'resonance'
+  'resonance',
+  'nikkisync'
 ])
 
 // 构建已实现命名空间的对象
 function buildImplementedAPI(): Record<string, Record<string, unknown>> {
   const api: Record<string, Record<string, unknown>> = {}
   for (const ns of IMPLEMENTED_NAMESPACES) {
-    // resonance 独立命名空间，不从 databaseMock/filesystemMock 合并
+    // resonance / nikkisync 为独立命名空间，不从 databaseMock/filesystemMock 合并
     if (ns === 'resonance') {
       api[ns] = resonanceMock as unknown as Record<string, unknown>
+    } else if (ns === 'nikkisync') {
+      api[ns] = nikkisyncMock
     } else {
       api[ns] = mergeNamespace(ns)
     }

@@ -80,7 +80,20 @@ export const NIKKISYNC_CAPABILITY_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'metadata', 'CachedDecodedMetadataService.js'),
   path.join('dist', 'src', 'metadata', 'MetadataOnlineConsent.js'),
   path.join('dist', 'src', 'server', 'LanAddress.js'),
-  path.join('dist', 'src', 'server', 'GameVersionCalendar.js')
+  path.join('dist', 'src', 'server', 'GameVersionCalendar.js'),
+  // N2：上游 PC 端启动组合器（缺任一件 ⇒ 会话装载期 ERR_MODULE_NOT_FOUND）
+  path.join('dist', 'src', 'metadata', 'MetadataStartupComposition.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataResolverConfigFile.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataDictionaryRemoteConfigFile.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataThumbnailCache.js'),
+  // N7：PC 端控制页 / 微信画廊深入口
+  path.join('dist', 'src', 'desktop', 'DesktopControlServer.js'),
+  path.join('dist', 'src', 'desktop', 'DesktopStatusService.js'),
+  path.join('dist', 'src', 'wechat', 'WeChatGalleryService.js'),
+  path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs'),
+  path.join('dist', 'src', 'wechat', 'WeChatIconProvider.js'),
+  path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
+  path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
 ]
 
 /**
@@ -119,7 +132,20 @@ export const LOAD_CHAIN_ROOTS: readonly string[] = [
   path.join('dist', 'src', 'server', 'LanAddress.js'),
   path.join('dist', 'src', 'server', 'GameVersionCalendar.js'),
   path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
-  path.join('dist', 'src', 'scanner', 'ScanDiagnostics.js')
+  path.join('dist', 'src', 'scanner', 'ScanDiagnostics.js'),
+  // N2：与 runtime-facade.ts 新增的四个 *_DEEP_ENTRY 一一对应
+  path.join('dist', 'src', 'metadata', 'MetadataStartupComposition.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataResolverConfigFile.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataDictionaryRemoteConfigFile.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataThumbnailCache.js'),
+  // N7：与 runtime-facade.ts 七个 PC 端 *_DEEP_ENTRY 一一对应
+  path.join('dist', 'src', 'desktop', 'DesktopControlServer.js'),
+  path.join('dist', 'src', 'desktop', 'DesktopStatusService.js'),
+  path.join('dist', 'src', 'wechat', 'WeChatGalleryService.js'),
+  path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs'),
+  path.join('dist', 'src', 'wechat', 'WeChatIconProvider.js'),
+  path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
+  path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
 ]
 
 /** 装载链上「源模块 → 相对说明符」的一条边（只记文本形态，不掺宿主分隔符语义）。 */

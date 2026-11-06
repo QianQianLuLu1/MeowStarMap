@@ -236,7 +236,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 35 条通道（…阶段3 六服务 + K2 两同意 + K3 版本推断 + K6 六条目录 + 照片目录四通道 + K9 三条账号 + K8 三条整理队列）', () => {
+  it('恰好注册 43 条通道（…K8 三条整理队列 + N4 四条灵感库 + N7 四条 PC 端）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -274,7 +274,17 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:set-sync-account-selection',
       'nikkisync:get-organizer-queue',
       'nikkisync:decide-organizer-item',
-      'nikkisync:approve-organizer-items'
+      'nikkisync:approve-organizer-items',
+      // N4：灵感库四条（上游 /v1/inspiration*）
+      'nikkisync:inspiration-list',
+      'nikkisync:inspiration-save',
+      'nikkisync:inspiration-image-put',
+      'nikkisync:inspiration-image-get',
+      // N7：PC 端控制页 / 微信画廊四条
+      'nikkisync:desktop-open',
+      'nikkisync:wechat-start',
+      'nikkisync:wechat-stop',
+      'nikkisync:wechat-status'
     ])
   })
 
@@ -1900,7 +1910,7 @@ describe('nikkisync 整理队列三通道（K8，破坏性能力）', () => {
     return ctx
   }
 
-  it('开关门：nikkisync.organizerEnabled 缺省（false）⇒ 三通道全拒 PRECONDITION_FAILED 且句柄零调用', async () => {
+  it('开关门：nikkisync.organizerEnabled 显式关闭 ⇒ 三通道全拒 PRECONDITION_FAILED 且句柄零调用', async () => {
     const runtime = createRuntimeStub()
     registerWithSwitch(false, runtime)
     const cases: Array<[string, unknown]> = [
@@ -2010,6 +2020,83 @@ describe('nikkisync 整理队列三通道（K8，破坏性能力）', () => {
       const handler = getHandler(handleMock, channel)
       const res = (await handler({}, input)) as HandleResult
       expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+})
+
+// ============================================================================
+// N4：灵感库（上游 /v1/inspiration*，v1.0.29）——注册面 + image-put 三道校验
+// 语义与上游 InspirationRoutes.ts:8-37 逐字对齐：list(limit 1..100 缺省 100)、
+// save(entry, baseRevision:number)、PUT /images/{sha256} 上限 15MiB、sha256
+// 正则 ^[a-f0-9]{64}$、mimeType 必须 image/ 开头；错误码 conflict/too_large/
+// invalid_entry 由 handler 映射。会话 inspirations 面缺席 ⇒ PRECONDITION_FAILED。
+// ============================================================================
+
+describe('N4 灵感库通道（nikkisync:inspiration-*）', () => {
+  const INSPIRATION_CHANNELS = [
+    'nikkisync:inspiration-list',
+    'nikkisync:inspiration-save',
+    'nikkisync:inspiration-image-put',
+    'nikkisync:inspiration-image-get'
+  ]
+
+  it('注册 4 条灵感库通道', () => {
+    register(createRuntimeStub())
+    const channels = handleMock.mock.calls.map((call) => call[0])
+    for (const channel of INSPIRATION_CHANNELS) {
+      expect(channels).toContain(channel)
+    }
+  })
+
+  it('image-put 拒非 image / 超 15MiB / 坏 sha256（VALIDATION_ERROR）', async () => {
+    register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:inspiration-image-put')
+    const cases: unknown[] = [
+      { sha256: 'a'.repeat(64), mimeType: 'application/pdf', bytesBase64: 'AA==' },
+      // 15MiB 字节 → base64 长度上限 ceil(15*1024*1024/3)*4 = 20971520；超出即拒
+      { sha256: 'a'.repeat(64), mimeType: 'image/png', bytesBase64: 'A'.repeat(20971540) },
+      { sha256: 'not-a-sha', mimeType: 'image/png', bytesBase64: 'AA==' }
+    ]
+    for (const input of cases) {
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+  })
+
+  it('未装配（会话 inspirations 面缺席）⇒ 4 条通道统一 PRECONDITION_FAILED', async () => {
+    register(undefined)
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:inspiration-list', {}],
+      ['nikkisync:inspiration-save', { entry: {}, baseRevision: 0 }],
+      [
+        'nikkisync:inspiration-image-put',
+        { sha256: 'a'.repeat(64), mimeType: 'image/png', bytesBase64: 'AA==' }
+      ],
+      ['nikkisync:inspiration-image-get', { sha256: 'a'.repeat(64) }]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+})
+
+// ============================================================================
+// N7：PC 端控制页 / 微信画廊（nikkisync:desktop-open / wechat-*）
+// ============================================================================
+
+describe('N7 PC 端通道（nikkisync:desktop-open / wechat-*）', () => {
+  it('注册 4 条 PC 通道', () => {
+    register(createRuntimeStub())
+    const channels = handleMock.mock.calls.map((call) => call[0])
+    for (const channel of [
+      'nikkisync:desktop-open',
+      'nikkisync:wechat-start',
+      'nikkisync:wechat-stop',
+      'nikkisync:wechat-status'
+    ]) {
+      expect(channels).toContain(channel)
     }
   })
 })

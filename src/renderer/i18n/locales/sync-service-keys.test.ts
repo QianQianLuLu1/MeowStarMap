@@ -231,7 +231,15 @@ const SYNC_SERVICE_LEAVES = [
   'organizer.confirmTitle',
   'organizer.confirmBody',
   'organizer.confirmAction',
-  'organizer.cancel'
+  'organizer.cancel',
+  // N7：上游 PC 端本机控制页与微信画廊分区（SyncServicePage 的 PC 端能力卡）
+  'pc.title',
+  'pc.description',
+  'pc.openDesktop',
+  'pc.wechatStart',
+  'pc.wechatStop',
+  'pc.wechatStatus',
+  'pc.unavailable'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */

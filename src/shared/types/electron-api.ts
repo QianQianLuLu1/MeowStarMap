@@ -1043,3 +1043,98 @@ export interface NikkiSyncPairingCodeInfo {
   /** K5：多 host 配对时的备选地址（≤8；单 host NS1 形态缺省）。 */
   hosts?: string[]
 }
+
+// ---- N4：灵感库（上游 /v1/inspiration*，v1.0.29）----
+
+/** 灵感条目内嵌图片（逐字对齐上游 `InspirationImage`）。 */
+export interface NikkiSyncInspirationImageInfo {
+  id: string
+  sha256: string
+  mimeType: string
+  bytes: number
+  addedAt: number
+}
+
+/** 搭配码解析段（逐字对齐上游 `InspirationEntry.code`）。 */
+export interface NikkiSyncInspirationCodeInfo {
+  id: string
+  rawCode: string
+  type: string
+  sourceText: string
+  sourceUrl: string | null
+  parsedState: string
+  snapshotJson: string | null
+  resolverVersion: string | null
+  dictionaryVersion: string | null
+  resolvedAt: number
+}
+
+export interface NikkiSyncInspirationEntryInfo {
+  id: string
+  title: string
+  notes: string
+  tags: string[]
+  categories: string[]
+  status: string
+  createdAt: number
+  deletedAt: number
+  code: NikkiSyncInspirationCodeInfo
+  images: NikkiSyncInspirationImageInfo[]
+}
+
+export interface NikkiSyncInspirationVersionedInfo {
+  revision: number
+  entry: NikkiSyncInspirationEntryInfo
+}
+
+/** GET /v1/inspiration：after 为上游 UUID 游标，limit 1..100 缺省 100。 */
+export interface NikkiSyncInspirationListQueryInfo {
+  after?: string
+  limit?: number
+}
+
+export interface NikkiSyncInspirationListInfo {
+  items: NikkiSyncInspirationVersionedInfo[]
+  nextCursor: string | null
+}
+
+export interface NikkiSyncInspirationSaveInputInfo {
+  /** 条目形态由上游 `InspirationRepository.validate` 单真相源校验，本层不预校验。 */
+  entry: unknown
+  baseRevision: number
+}
+
+/** PUT /v1/inspiration/images/{sha256}：bytesBase64 上限 15MiB（主进程 zod 拦截）。 */
+export interface NikkiSyncInspirationImagePutInputInfo {
+  sha256: string
+  mimeType: string
+  bytesBase64: string
+}
+
+export interface NikkiSyncInspirationImageGetQueryInfo {
+  sha256: string
+}
+
+export interface NikkiSyncInspirationImageResultInfo {
+  mimeType: string
+  bytesBase64: string
+}
+
+// ---- N7：PC 端控制页 / 微信画廊 ----
+
+export interface NikkiSyncDesktopOpenInfo {
+  url: string
+}
+
+export interface NikkiSyncWeChatStartInfo {
+  status: unknown
+  qrSvg: string
+}
+
+export interface NikkiSyncWeChatStopInfo {
+  status: unknown
+}
+
+export interface NikkiSyncWeChatStatusInfo {
+  status: unknown
+}

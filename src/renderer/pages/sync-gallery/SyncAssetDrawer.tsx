@@ -20,14 +20,54 @@ interface SyncAssetDrawerProps {
   onShare?: () => void
 }
 
+/** 上游 `getAssetDetail` 返回体里本抽屉要展示的字段（判空/类型校验后的窄投影）。 */
+interface UpstreamMetadataView {
+  focalLength?: number
+  apertureSection?: number
+  exposure?: number
+  dressingParts?: number
+}
+
 /**
- * 阶段 5 · A3：同步图库的详情抽屉。
+ * N5：把不可信的 IPC 返回体收敛成可渲染的窄投影。
+ * `detail.asset.metadata` 的 camera/dressing 由上游 row-mappers 产出，但桥可能返回 null、
+ * 畸形体或空对象——一律判空返回 null ⇒ 调用方回落本地解密链，绝不整块替换五个参数面板。
+ */
+function parseUpstreamMetadata(detail: unknown): UpstreamMetadataView | null {
+  if (!detail || typeof detail !== 'object') return null
+  const asset = (detail as { asset?: unknown }).asset
+  if (!asset || typeof asset !== 'object') return null
+  const metadata = (asset as { metadata?: unknown }).metadata
+  if (!metadata || typeof metadata !== 'object') return null
+  const camera = (metadata as { camera?: unknown }).camera
+  const dressing = (metadata as { dressing?: unknown }).dressing
+  const num = (value: unknown): number | undefined =>
+    typeof value === 'number' && Number.isFinite(value) ? value : undefined
+  const cam = camera && typeof camera === 'object' ? (camera as Record<string, unknown>) : {}
+  const view: UpstreamMetadataView = {
+    focalLength: num(cam.focalLength),
+    apertureSection: num(cam.apertureSection),
+    exposure: num(cam.exposure)
+  }
+  if (dressing && typeof dressing === 'object') {
+    const clothes = (dressing as { clothes?: unknown }).clothes
+    if (Array.isArray(clothes)) view.dressingParts = clothes.length
+  }
+  return Object.values(view).some((value) => value !== undefined) ? view : null
+}
+
+/** 'legacy'=老桥面无通道；'loading'=请求在途；'upstream'=上游生效；'local'=回落本地解密链。 */
+type MetadataSource = 'legacy' | 'loading' | 'upstream' | 'local'
+
+/**
+ * 阶段 5 · A3：同步图库的详情抽屉（N5 修订）。
  *
- * 五个参数面板**原样复用**图库那套（它们只吃 `MediaFile`，而 `AssetMediaFile extends MediaFile`）：
- * 穿搭/拍摄参数的实际来源是本地解密链 `decrypt:decodeFile`——内嵌 Runtime 从不传
- * `metadataResolver`/字典，上游 `metadata_json` 的 `camera`/`capture` 恒为空对象（见
- * docs/archive/plans/2026-10-15-sync-gallery-share-card-metadata.md（已归档，不入仓） §0.1），所以这里不需要第二套取数。
- * 抽屉能读到该路径的前提是阶段 5 · C1 把 media:// 第 4 条规则下沉进了 `isMediaPathAllowed`。
+ * 五个参数面板**原样复用**图库那套（它们只吃 `MediaFile`，`AssetMediaFile extends MediaFile`），
+ * 始终保留 = 本地 `decrypt:decodeFile` 回落链恒在，不整块替换。N2/N3 已把在线解析/字典接回，
+ * `nikkisync:getAssetDetail` 通道与上游 row-mappers 的 `asset.metadata`（camera/dressing）齐备，
+ * 故打开时优先取上游 metadata 单独渲染一段；通道缺失/抛错/返回畸形 ⇒ 保留五个本地面板并
+ * 给一条内联提示，明确「已回落」，不静默失败、不弹全局 toast。
+ * 抽屉能读到本地解密路径的前提是阶段 5 · C1 把 media:// 第 4 条规则下沉进 `isMediaPathAllowed`。
  */
 export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
   open,
@@ -39,6 +79,9 @@ export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
   // K3：按拍摄时间推断的游戏版本（上游静态表，纯本地无出站）。
   // 失败/未装配/无法推断一律 null ⇒ 不渲染推断值（推断是展示增强，不报错打扰）。
   const [inferredGameVersion, setInferredGameVersion] = useState<string | null>(null)
+  // N5：上游 metadata 的窄投影与当前生效的数据源（供回落链/内联提示/可观测状态共用）
+  const [upstream, setUpstream] = useState<UpstreamMetadataView | null>(null)
+  const [metadataSource, setMetadataSource] = useState<MetadataSource>('legacy')
 
   useEffect(() => {
     if (!open || !file?.created_at) {
@@ -63,6 +106,34 @@ export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
       alive = false
     }
   }, [open, file?.created_at])
+
+  // N5：打开时优先取上游 metadata；通道缺失/失败/畸形一律回落本地解密链（五个面板保留）。
+  useEffect(() => {
+    const getAssetDetail = window.electronAPI?.nikkisync?.getAssetDetail
+    const assetId = file?.nikkisync?.assetId ?? file?.id
+    if (!open || !file || typeof getAssetDetail !== 'function' || !assetId) {
+      setUpstream(null)
+      setMetadataSource('legacy')
+      return
+    }
+    let alive = true
+    setMetadataSource('loading')
+    void getAssetDetail(assetId)
+      .then((detail) => {
+        if (!alive) return
+        const parsed = parseUpstreamMetadata(detail)
+        setUpstream(parsed)
+        setMetadataSource(parsed ? 'upstream' : 'local')
+      })
+      .catch(() => {
+        if (!alive) return
+        setUpstream(null)
+        setMetadataSource('local')
+      })
+    return () => {
+      alive = false
+    }
+  }, [open, file])
 
   if (!file) return null
 
@@ -107,6 +178,35 @@ export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
     value: extra?.hasMetadata ? t('camera.yes') : t('camera.no')
   })
 
+  // N5：上游在线参数段。文案一律走 i18n key，不在组件里硬编码中文。
+  const upstreamRows: InfoRow[] = []
+  if (upstream) {
+    if (upstream.focalLength !== undefined) {
+      upstreamRows.push({
+        label: t('syncGallery.drawer.upstream.focalLength'),
+        value: `${upstream.focalLength}mm`
+      })
+    }
+    if (upstream.apertureSection !== undefined) {
+      upstreamRows.push({
+        label: t('syncGallery.drawer.upstream.aperture'),
+        value: String(upstream.apertureSection)
+      })
+    }
+    if (upstream.exposure !== undefined) {
+      upstreamRows.push({
+        label: t('syncGallery.drawer.upstream.exposure'),
+        value: String(upstream.exposure)
+      })
+    }
+    if (upstream.dressingParts !== undefined) {
+      upstreamRows.push({
+        label: t('syncGallery.drawer.upstream.dressingParts'),
+        value: String(upstream.dressingParts)
+      })
+    }
+  }
+
   return (
     <Drawer
       open={open}
@@ -125,12 +225,31 @@ export const SyncAssetDrawer: React.FC<SyncAssetDrawerProps> = ({
         className="flex flex-col gap-4 pb-6"
         data-testid="drawer-root"
         data-has-motion={extra?.hasMotion ? 'true' : 'false'}
+        data-metadata-source={metadataSource}
       >
         <InfoRowPanel
           icon={<IconInfo size={16} />}
           title={t('syncGallery.drawer.basic')}
           rows={rows}
         />
+        {upstream && upstreamRows.length > 0 ? (
+          <div data-testid="drawer-upstream-panel">
+            <InfoRowPanel
+              icon={<IconInfo size={16} />}
+              title={t('syncGallery.drawer.upstreamTitle')}
+              rows={upstreamRows}
+            />
+          </div>
+        ) : null}
+        {metadataSource === 'local' ? (
+          <p
+            data-testid="drawer-metadata-fallback-notice"
+            className="text-xs"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            {t('syncGallery.drawer.upstreamFallback')}
+          </p>
+        ) : null}
         <PhotographyPanel file={file} />
         <CameraInfoPanel file={file} />
         <NikkiInfoPanel file={file} />

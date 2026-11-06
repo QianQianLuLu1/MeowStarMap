@@ -804,7 +804,7 @@ describe('createRuntimeSession 元数据解析单缝注入（阶段 6）', () =>
 // ---------------------------------------------------------------- K2：在线解析同意
 
 describe('createRuntimeSession 元数据在线同意（K2）', () => {
-  it('K2-f1 解析开启 + consentFile：构造同意（fail-closed 三元组）并下发 guard 包装后的 resolver', async () => {
+  it('K2-f1 解析开启 + consentFile：构造同意（默认放行三元组）并下发 guard 包装后的 resolver', async () => {
     const fixture = createSessionFixture()
     const session = await createRuntimeSession(
       {
@@ -816,8 +816,8 @@ describe('createRuntimeSession 元数据在线同意（K2）', () => {
     expect(fixture.consentCalls).toHaveLength(1)
     const call = fixture.consentCalls[0]
     expect(call.file).toBe('/tmp/userData/nikkisync/metadata-online-consent.json')
-    // fail-closed 缺省（§14-Q3）：比上游 fresh-install 默认放行更严
-    expect(call.initiallyDisabled).toBe(true)
+    // 与上游 windows-app.ts:110 干净安装一致：默认放行，用户可在控制页显式关闭
+    expect(call.initiallyDisabled).toBe(false)
     // recipients 逐字来自主进程常量：披露文案与实际出口同源
     const recipients = call.recipients as Array<{
       name: string
@@ -1254,5 +1254,128 @@ describe('createRuntimeSession 照片根注入缝（selectedInstallRoot）', () 
     await createRuntimeSession(sessionOptions(), without.surface)
     const plain = without.capturedConfig()?.scanner as Record<string, unknown>
     expect(plain && 'selectedInstallRoot' in plain).toBe(false)
+  })
+})
+
+// ============================================================================
+// N2：与上游 windows-app.ts 的构造参数对齐。
+// 断点：本仓只下发 databaseFile/scanner/server/metadataFragment，上游生产入口
+// 还下发 remoteBridge、在线字典 provider/supplement、组合版 resolver 与缩略图缓存。
+// ============================================================================
+const ALL_PC_SWITCHES = {
+  remoteBridge: true,
+  metadataDictionary: true,
+  gameVersionUpdates: true,
+  runtimeMemoryMaintenance: true,
+  wechatGallery: true,
+  desktopControl: true
+}
+
+/** 只给 N2 用例注入上游 composition 深入口；缺省夹具代表「老链接会话」异常分支。 */
+function alignedSurfaceFixture() {
+  const fixture = createSessionFixture()
+  const composition = {
+    composeMetadataResolver: vi.fn(() => ({ id: 'composed-resolver' })),
+    composeMetadataDictionaryProvider: vi.fn(() => ({ id: 'dictionary-provider' })),
+    composeMetadataDictionarySupplementProvider: vi.fn(() => ({ id: 'supplement-provider' }))
+  }
+  const surface = {
+    ...fixture.surface,
+    metadataStartupComposition: composition,
+    metadataResolverConfigFile: {
+      loadMetadataResolverConfigFile: vi.fn(() => undefined)
+    },
+    metadataDictionaryRemoteConfigFile: {
+      loadMetadataDictionaryRemoteConfigFile: vi.fn(() => undefined)
+    },
+    metadataThumbnailCache: {
+      MetadataThumbnailCache: class {
+        constructor(public readonly config: unknown) {}
+      }
+    }
+  } as unknown as RuntimeSurface
+  return { fixture, surface, composition }
+}
+
+describe('PC 端构造参数对齐（N2）', () => {
+  it('passes remoteBridge:true to PcCompanionRuntime when pcCompanion switches are on', async () => {
+    const fixture = createSessionFixture()
+    await createRuntimeSession(
+      { ...sessionOptions(true), pcCompanion: ALL_PC_SWITCHES },
+      fixture.surface
+    )
+    expect(fixture.capturedConfig()?.remoteBridge).toBe(true)
+  })
+
+  it('passes online dictionary providers when the composition surface is present', async () => {
+    const { fixture, surface, composition } = alignedSurfaceFixture()
+    await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        pcCompanion: ALL_PC_SWITCHES,
+        metadataDictionaryRemoteFile: '/tmp/userData/nikkisync/metadata-dictionary-remote.json',
+        metadataThumbnailCacheDir: '/tmp/userData/nikkisync/metadata-thumbnails'
+      },
+      surface
+    )
+    const config = fixture.capturedConfig() as Record<string, unknown>
+    expect(composition.composeMetadataDictionaryProvider).toHaveBeenCalledTimes(1)
+    expect(composition.composeMetadataDictionarySupplementProvider).toHaveBeenCalledTimes(1)
+    expect(config.metadataDictionaryRemote).toBeDefined()
+    expect(config.metadataDictionarySupplementRemote).toBeDefined()
+    expect((config.server as Record<string, unknown>).metadataThumbnailCache).toBeDefined()
+  })
+
+  it('composes resolver via upstream composeMetadataResolver', async () => {
+    const { fixture, surface, composition } = alignedSurfaceFixture()
+    await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        pcCompanion: ALL_PC_SWITCHES,
+        metadataResolverFile: '/tmp/userData/nikkisync/metadata-resolver.json'
+      },
+      surface
+    )
+    expect(composition.composeMetadataResolver).toHaveBeenCalledTimes(1)
+    const injected = fixture.capturedConfig()?.metadataResolver as {
+      resolver: { id: string }
+    }
+    expect(injected.resolver.id).toBe('composed-resolver')
+  })
+
+  it('异常：深入口缺席时会话照常可用，不注入任何新能力', async () => {
+    const fixture = createSessionFixture()
+    await expect(
+      createRuntimeSession(
+        { ...sessionOptions(true), pcCompanion: ALL_PC_SWITCHES },
+        fixture.surface
+      )
+    ).resolves.toBeDefined()
+    const config = fixture.capturedConfig() as Record<string, unknown>
+    expect(config.metadataDictionaryRemote).toBeUndefined()
+    expect(config.metadataDictionarySupplementRemote).toBeUndefined()
+  })
+
+  it('边界：未声明 pcCompanion 时保持旧配置形状（外部输入不可信）', async () => {
+    const fixture = createSessionFixture()
+    await createRuntimeSession(sessionOptions(false), fixture.surface)
+    expect(Object.keys(fixture.capturedConfig() ?? {}).sort()).toEqual([
+      'databaseFile',
+      'scanner',
+      'server'
+    ])
+  })
+
+  it('C4 回归：干净安装不得把 provider 当作 metadataDictionary manifest 下传', async () => {
+    const { fixture, surface } = alignedSurfaceFixture()
+    await createRuntimeSession({ ...sessionOptions(true), pcCompanion: ALL_PC_SWITCHES }, surface)
+    const config = fixture.capturedConfig() as Record<string, unknown>
+    // 上游 runtime.ts:69 对 config.metadataDictionary 调 replaceManifest()，
+    // 误传 provider 会抛 "metadata dictionary schemaVersion must be 1"（e2e N1 实测 state=error）。
+    // 干净安装该键缺省；provider 只走 metadataDictionaryRemote / SupplementRemote。
+    expect(config.metadataDictionary).toBeUndefined()
+    expect(config.metadataDictionarySupplement).toBeUndefined()
+    expect(config.metadataDictionaryRemote).toBeDefined()
+    expect(config.metadataDictionarySupplementRemote).toBeDefined()
   })
 })

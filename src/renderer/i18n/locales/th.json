@@ -4360,7 +4360,8 @@
       "statsEmpty": "ยังไม่มีสถิติ",
       "statsFailed": "โหลดสถิติไม่สำเร็จ",
       "topSuits": "ชุดที่ใส่บ่อยสุด",
-      "topClothing": "เสื้อผ้าที่ใส่บ่อยสุด"
+      "topClothing": "เสื้อผ้าที่ใส่บ่อยสุด",
+      "backfillFailed": "โหลดรูปที่ตรงกันไม่สำเร็จ แสดงเฉพาะผลลัพธ์ข้อความ"
     },
     "title": "Sync Gallery",
     "subtitle": "Assets from the embedded NikkiSync library, independent of the local gallery",
@@ -4405,7 +4406,32 @@
         "hash": "Content hash",
         "metadata": "Metadata",
         "gameVersionInferred": " (ประมาณจากเวลาถ่าย)"
+      },
+      "upstreamTitle": "ข้อมูลเมตาดาต้าต้นทาง",
+      "upstreamFallback": "ไม่สามารถใช้ข้อมูลเมตาดาต้าต้นทางได้ แสดงผลจากการถอดรหัสในเครื่อง",
+      "upstream": {
+        "focalLength": "ระยะโฟกัส",
+        "aperture": "รูรับแสง",
+        "exposure": "การรับแสง",
+        "dressingParts": "ชิ้นส่วนชุด"
       }
+    },
+    "inspiration": {
+      "title": "คลังแรงบันดาลใจ",
+      "hint": "โค้ดแชร์ หมวดหมู่ สถานะ และภาพอ้างอิงที่ซิงก์กับมือถือ",
+      "new": "สร้างใหม่",
+      "titleLabel": "ชื่อเรื่อง",
+      "notesLabel": "บันทึกย่อ",
+      "imageLabel": "ภาพอ้างอิง",
+      "imageFailed": "อัปโหลดภาพอ้างอิงไม่สำเร็จ",
+      "save": "บันทึก",
+      "cancel": "ยกเลิก",
+      "saveFailed": "บันทึกไม่สำเร็จ",
+      "loadFailed": "โหลดไม่สำเร็จ",
+      "loading": "กำลังโหลด…",
+      "empty": "ยังไม่มีรายการแรงบันดาลใจ",
+      "edit": "แก้ไข",
+      "delete": "ลบ"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "ภายหลัง",
       "invalidEmpty": "กรุณาพิมพ์หรือเลือกพาธโฟลเดอร์ก่อน",
       "invalidAbsolute": "กรุณาพิมพ์พาธแบบสัมบูรณ์ (เช่น D:\\Photos)"
+    },
+    "pc": {
+      "title": "ฟีเจอร์เสริมบน PC",
+      "description": "หน้าควบคุมในเครื่องและแกลเลอรี WeChat (NikkiSync PC ต้นทาง)",
+      "openDesktop": "เปิดหน้าควบคุมในเครื่อง",
+      "wechatStart": "เริ่มแกลเลอรี WeChat",
+      "wechatStop": "หยุดแกลเลอรี WeChat",
+      "wechatStatus": "สถานะแกลเลอรี WeChat: {{state}}",
+      "unavailable": "ฟีเจอร์เสริมบน PC ไม่พร้อมใช้งาน"
     }
   },
   "shareCard": {

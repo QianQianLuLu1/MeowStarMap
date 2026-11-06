@@ -41,6 +41,15 @@ export const SyncGalleryPage: React.FC = () => {
       loadMore: s.loadMore
     }))
   )
+  // N5：索引面命中回捞结果经 store 落进本页列表，网格无需改协议；loadFirst 会覆盖回主列表
+  const applyHits = useSyncGalleryStore((s) => s.applyHits)
+  const handleHits = useCallback(
+    (hitFiles: AssetMediaFile[]) => {
+      // 测试桩/老桥面可能未挂该 action：可选调用，不让命中回捞打断页面
+      applyHits?.(hitFiles)
+    },
+    [applyHits]
+  )
   const currentView = useUIStore((s) => s.currentView)
   const openFullscreen = useUIStore((s) => s.openFullscreen)
   const navigateTo = useUIStore((s) => s.navigateTo)
@@ -204,8 +213,8 @@ export const SyncGalleryPage: React.FC = () => {
           {t(error)}
         </div>
       ) : null}
-      {/* 上游索引面（套装/服装检索 + 档案统计）：折叠态只占一行，展开才发 IPC */}
-      <SyncInsightPanel />
+      {/* 上游索引面（套装/服装检索 + 档案统计 + 命中回捞）：折叠态只占一行，展开才发 IPC */}
+      <SyncInsightPanel onHits={handleHits} />
       <VirtualImageGrid
         items={files}
         selectedIds={[]}

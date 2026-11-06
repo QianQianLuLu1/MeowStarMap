@@ -69,7 +69,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('nikkisync 命名空间方法清单（照片目录自定义接入后共 36 个）', () => {
+  it('nikkisync 命名空间方法清单（N7 PC 端接入后共 44 个）', () => {
     // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
     // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
     const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
@@ -114,7 +114,17 @@ describe('preload 装配完整性', () => {
         // K8：整理队列（批量删除）
         'getOrganizerQueue',
         'decideOrganizerItem',
-        'approveOrganizerItems'
+        'approveOrganizerItems',
+        // N4：灵感库（上游 /v1/inspiration*）
+        'listInspirations',
+        'saveInspiration',
+        'putInspirationImage',
+        'getInspirationImage',
+        // N7：PC 端控制页 / 微信画廊
+        'desktopOpen',
+        'wechatStart',
+        'wechatStop',
+        'wechatStatus'
       ].sort()
     )
   })
@@ -327,6 +337,33 @@ describe('IpcError 错误类', () => {
     expect(err.userMessage).toBe('冲突')
     expect(err.details).toEqual({ k: 'v' })
     expect(err.name).toBe('IpcError')
+  })
+})
+
+describe('N4 灵感库四个 preload 方法（通道名逐字锁定）', () => {
+  it('nikkisyncAPI 暴露 4 个灵感方法并各自命中对应通道名', async () => {
+    const electronAPI = getExposed<{
+      nikkisync: Record<string, (...args: unknown[]) => Promise<unknown>>
+    }>('electronAPI')
+    invokeMock.mockResolvedValue({ success: true, data: { ok: true } })
+    await electronAPI.nikkisync.listInspirations({ limit: 10 })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:inspiration-list', { limit: 10 })
+    await electronAPI.nikkisync.saveInspiration({ entry: { id: 'x' }, baseRevision: 0 })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:inspiration-save', {
+      entry: { id: 'x' },
+      baseRevision: 0
+    })
+    const imagePut = {
+      sha256: 'a'.repeat(64),
+      mimeType: 'image/png',
+      bytesBase64: 'AA=='
+    }
+    await electronAPI.nikkisync.putInspirationImage(imagePut)
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:inspiration-image-put', imagePut)
+    await electronAPI.nikkisync.getInspirationImage({ sha256: imagePut.sha256 })
+    expect(invokeMock).toHaveBeenCalledWith('nikkisync:inspiration-image-get', {
+      sha256: imagePut.sha256
+    })
   })
 })
 

@@ -4360,7 +4360,8 @@
       "statsEmpty": "Chưa có thống kê",
       "statsFailed": "Tải thống kê thất bại",
       "topSuits": "Outfit mặc nhiều nhất",
-      "topClothing": "Trang phục mặc nhiều nhất"
+      "topClothing": "Trang phục mặc nhiều nhất",
+      "backfillFailed": "Không tải được ảnh khớp; chỉ hiển thị kết quả văn bản"
     },
     "title": "Thư viện đồng bộ",
     "subtitle": "Tài nguyên từ thư viện NikkiSync nhúng, không ảnh hưởng thư viện cục bộ",
@@ -4405,7 +4406,32 @@
         "hash": "Hash nội dung",
         "metadata": "Siêu dữ liệu",
         "gameVersionInferred": " (suy ra)"
+      },
+      "upstreamTitle": "Siêu dữ liệu nguồn",
+      "upstreamFallback": "Không có siêu dữ liệu nguồn, hiển thị kết quả giải mã cục bộ",
+      "upstream": {
+        "focalLength": "Tiêu cự",
+        "aperture": "Khẩu độ",
+        "exposure": "Phơi sáng",
+        "dressingParts": "Bộ phận trang phục"
       }
+    },
+    "inspiration": {
+      "title": "Thư viện cảm hứng",
+      "hint": "Mã chia sẻ, phân loại, trạng thái và ảnh tham chiếu đồng bộ với điện thoại",
+      "new": "Tạo mới",
+      "titleLabel": "Tiêu đề",
+      "notesLabel": "Ghi chú",
+      "imageLabel": "Ảnh tham chiếu",
+      "imageFailed": "Tải ảnh tham chiếu thất bại",
+      "save": "Lưu",
+      "cancel": "Hủy",
+      "saveFailed": "Lưu thất bại",
+      "loadFailed": "Tải thất bại",
+      "loading": "Đang tải…",
+      "empty": "Chưa có mục cảm hứng nào",
+      "edit": "Sửa",
+      "delete": "Xóa"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "Để sau",
       "invalidEmpty": "Vui lòng nhập hoặc chọn đường dẫn thư mục trước",
       "invalidAbsolute": "Vui lòng nhập đường dẫn tuyệt đối (ví dụ: D:\\Photos)"
+    },
+    "pc": {
+      "title": "Tiện ích trên PC",
+      "description": "Trang điều khiển cục bộ và thư viện WeChat (NikkiSync PC nguồn)",
+      "openDesktop": "Mở trang điều khiển cục bộ",
+      "wechatStart": "Bắt đầu thư viện WeChat",
+      "wechatStop": "Dừng thư viện WeChat",
+      "wechatStatus": "Trạng thái thư viện WeChat: {{state}}",
+      "unavailable": "Tiện ích trên PC không khả dụng"
     }
   },
   "shareCard": {

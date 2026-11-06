@@ -613,7 +613,7 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
   （已勾选账号的资产会进出作用域），本地图库据此按 `get-changes` 的 `fullResyncRequired` 重取，
   与 `set-sync-account-selection` 同一口径。
 
-### 8.2.4 整理队列（K8，上游 `DeletionQueue` 的 PC 管理面；破坏性能力，开关默认关）
+### 8.2.4 整理队列（K8，上游 `DeletionQueue` 的 PC 管理面；破坏性能力，开关默认开）
 
 | 通道                                | 入参                                      | 出参                                                                                                                | 失败码                                                |
 | ----------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -623,9 +623,11 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
 
 契约要点：
 
-- **开关门**：三通道先读 `nikkisync.organizerEnabled`（渲染层白名单键，默认 **false**），
-  false ⇒ `PRECONDITION_FAILED`（错误文案指向同步服务页开关）；未装配会话同样
-  `PRECONDITION_FAILED`。
+- **开关门**：三通道先读 `nikkisync.organizerEnabled`（渲染层白名单键，自 N1 起默认
+  **true**，与上游 PC 端干净安装一致；见 `src/main/ipc/handlers/nikkisync-handler.ts` 的
+  `getSetting<boolean>('nikkisync.organizerEnabled', true)`）。用户仍可在同步服务页显式
+  写入 `false` 关闭该破坏性能力，关闭时三通道一律 `PRECONDITION_FAILED`（错误文案指向
+  同步服务页开关）；未装配会话同样 `PRECONDITION_FAILED`。
 - **删除语义**：上游确认链 `preparing→pending→PC decide/approveMany→confirming→queued→
 executing（逐文件 sha256+size 复核后经回收 helper 送 Windows 回收站）→recycled`；
   文件变化 ⇒ `changed` 不执行；中断 ⇒ 构造期标记 `failed` 不自动重放。可逆性 =
@@ -711,6 +713,80 @@ recycled/failed/changed/cancelled/rejected`；未知态回退原样展示。
   `resource-allowlist` 授权 `media://`，与上游自动发现同一条授权链。换根重建同样**不**因 `applyGameRoot`
   顺带把局域网同步服务启起来：只有原本在监听时才按同配置复原（`runtime-manager.applyGameRoot` 内）。
 - 入库路径即后续 `start-scan` 的 `gameRoot` 上界（512），两处同规避免双真相源。
+
+### 8.2.7 灵感库（N4，上游 `/v1/inspiration*`，v1.0.29 新增）
+
+后端逐字复用上游 `InspirationRepository`（`LocalSyncServer` 构造期必建的
+`server.inspirations` 同一引用），本仓不实现任何 HTTP 路由；会话面经
+`runtime-facade` 的活动会话注册表取得，句柄未装配 / 老链接会话无该面 ⇒
+`PRECONDITION_FAILED`。渲染层消费方：`SyncServicePage` → `SyncInspirationPanel`
+（`<details>` 折叠 + 首次展开才拉列表）。
+
+| 通道                              | 入参                                                                                      | 出参                                                                             | 失败码                                                                                                                                               |
+| --------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `nikkisync:inspiration-list`      | `{after?: string(≤64), limit?: number(1..100，缺省 100)}`                                 | `{items: [{revision, entry}], nextCursor: string \| null}`（上游 `list()` 原样） | `VALIDATION_ERROR`（limit 越界 / `invalid_cursor` / `invalid_limit`）；`PRECONDITION_FAILED`（未装配 / 会话无面）                                    |
+| `nikkisync:inspiration-save`      | `{entry: unknown, baseRevision: number(≥0)}`（条目形态交上游 `validate()` 单真相源）      | `{revision, entry}`（上游 `save()` 原样）                                        | `VALIDATION_ERROR`（入参非法 / `invalid_entry` / `missing_image`）；`PRECONDITION_FAILED`（`conflict` 乐观锁冲突 / 未装配）                          |
+| `nikkisync:inspiration-image-put` | `{sha256: /^[a-f0-9]{64}$/, mimeType: 必须以 image/ 开头, bytesBase64: string}`（≤15MiB） | `{ok: true}`                                                                     | `VALIDATION_ERROR`（非 image / 超 15MiB / 坏 sha256 / `too_large` / `invalid_image` / `image_hash` / `image_type`）；`PRECONDITION_FAILED`（未装配） |
+| `nikkisync:inspiration-image-get` | `{sha256: /^[a-f0-9]{64}$/}`                                                              | `{mimeType, bytesBase64}`（上游 `image().bytes` 转 base64）                      | `VALIDATION_ERROR`（坏 sha256）；`NOT_FOUND`（图片不存在）；`PRECONDITION_FAILED`（未装配）                                                          |
+
+契约要点：
+
+- 对齐上游 `InspirationRoutes.ts:8-37`：GET list(limit 1..100 默认 100)、POST
+  save(entry, baseRevision)、PUT /images/{sha256} 上限 15MiB、mimeType 必须
+  `image/` 开头、sha256 正则 `^[a-f0-9]{64}$`；错误短码 `conflict` /
+  `too_large` / `invalid_entry` 由主进程映射，不透传渲染层。
+- 图片字节在 IPC 上以 base64 字符串承载（contextBridge 不传 Buffer）；15MiB 上限由
+  主进程 zod 先行拦截，上游 `putImage()` 再校验真实 sha256 与图片魔数（双真相源，缺一不可）。
+- `save` 的乐观锁：`baseRevision` 取自当前条目 `revision`，不符时上游抛 `conflict`
+  （映射 `PRECONDITION_FAILED`），面板内联提示后由用户重读重试。软删走同一条通道：
+  `entry.deletedAt` 非 0 时上游 `validate()` 清空 images。
+- 会话 `inspirations` 面由 `runtime-facade.createRuntimeSession` 挂出；会话重建
+  （换根 / 端口变更）自动改指新仓储，句柄上不缓存旧引用。
+- 渲染层消费方：`src/renderer/pages/sync-gallery/SyncInspirationPanel.tsx`（列表 /
+  新建 / 编辑 / 删除 / 图片），挂载于 `SyncServicePage` 的灵感状态行下。
+
+### 8.2.8 PC 端控制页 / 微信画廊（N7，上游 `desktop/*` + `wechat/*`）
+
+后端复用上游 `createDesktopControlServer` 与 `WeChatGalleryService`（本仓不重写
+HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的页面，API 才校验
+`x-nikkisync-desktop-token`；dashboard `listen(随机端口, '127.0.0.1')`。服务由
+`app/nikkisync-runtime-setup.ts` 按 `options.pcCompanion.wechatGallery` /
+`desktopControl` 开关装配，挂到 `ctx.nikkisyncRuntime.pcCompanionServices` 可选面；
+句柄未装配 / 服务未启动 ⇒ `PRECONDITION_FAILED`。渲染层消费方：
+`SyncServicePage` 的「PC 端」分区。
+
+| 通道                      | 入参 | 出参                                                                                   | 失败码                                                             |
+| ------------------------- | ---- | -------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `nikkisync:desktop-open`  | 无   | `{url: string}`（本机 `http://127.0.0.1:{port}/`；渲染层经 `shell.openExternal` 打开） | `PRECONDITION_FAILED`（服务未装配 / 未监听）                       |
+| `nikkisync:wechat-start`  | 无   | `{status, qrSvg}`（上游 `WeChatGalleryService.start()` 的状态与二维码 SVG）            | `PRECONDITION_FAILED`（服务未装配）；上游错误归一 `INTERNAL_ERROR` |
+| `nikkisync:wechat-stop`   | 无   | `{status}`（上游 `stop()` 后的状态）                                                   | `PRECONDITION_FAILED`（服务未装配）                                |
+| `nikkisync:wechat-status` | 无   | `{status}`（上游 `status()` 只读快照）                                                 | `PRECONDITION_FAILED`（服务未装配）                                |
+
+契约要点：
+
+- 上游 7 个深入口（`desktop/DesktopControlServer.js` / `DesktopStatusService.js`、
+  `wechat/WeChatGalleryService.js` / `GalleryRuntime.mjs` / `WeChatIconProvider.js`、
+  `RuntimeMemoryMaintenance.js`、`server/GameVersionUpdateService.js`）一律经
+  `resolveDeepEntryUrl` **变量式动态 import** 装载，产物存在性由
+  `verify-nikkisync-link.ts` 的 `LOAD_CHAIN_ROOTS` / `NIKKISYNC_CAPABILITY_ARTIFACTS` 守护。
+- 组装顺序对齐 `windows-app.ts:196-245`，shutdown 顺序对齐 `:247-254`
+  （`wechat.stop()` → `dashboard.close()`；`runtime.stop()` 由 `manager.stop()` 负责）；
+  每一步独立 `try/catch`，绝不卡住退出链。
+- 资源路径（4 份 legal 文档 / 品牌图 / 3 个 PS 脚本）由
+  `scripts/stage-nikkisync-pc-assets.ts` 从 UP 暂存到 `resources/nikkisync/pc/` 后
+  由入参注入，**不用上游 `import.meta.dirname` 拼路径**；qrSvg 用本仓 `qrcode`，
+  ffmpeg/ffprobe 取本仓依赖导出的路径（零新增 npm 依赖）。
+- **会话上下文（C1）**：装配必须在 `manager.start()` **之后**执行，由只读
+  `NikkiSyncRuntimeHandle.pcCompanionContext()` 取到 `state.session` 的真实
+  `runtime.database` / `scanner.getScanRoots()` / `pairingUri(host)`，逐字下传给
+  `DesktopStatusService`、`createIndexedPreviewSource` 第二参与控制页
+  `createPairingUri`。会话未建 / database 形态异常 ⇒ 返回 `undefined`，装配层
+  warn 并跳过服务（不伪造空 database、不伪造资产）；扫描根只保留字符串路径，
+  配对串工厂抛错或返回非字符串一律回落空串（配对仍由
+  `nikkisync:get-pairing-code` 提供）。此前「空 database + 空串配对 + 空照片源」
+  的三处降级已消除，微信画廊可列出真实照片。
+- 渲染层：打开控制页走既有 `electronAPI.shell.openExternal(url)` 桥；二维码 SVG 经
+  data URL 渲染；桥面方法缺席时静默降级为不可用提示，不弹全局 toast。
 
 ### 8.3 历史 `sync:` 域（移植面，阶段 3 起不再自启）
 

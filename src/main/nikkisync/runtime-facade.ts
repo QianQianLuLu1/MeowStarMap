@@ -18,7 +18,7 @@
  *    的 `exports` 只暴露 `"."` ⇒ 必须用 `resolveDeepEntryUrl` 给出的 `file://` URL。
  */
 
-import { existsSync, mkdirSync } from 'node:fs'
+import { mkdirSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -44,6 +44,7 @@ import { registerNikkiSyncResourcePaths } from './resource-allowlist'
 import { NUAN5_METADATA_ENDPOINT, buildMetadataResolverConfig } from './metadata-resolver-driver'
 import type {
   EmbeddedRuntimeLike,
+  InspirationRepositoryLike,
   NikkiSyncGameVersionView,
   NikkiSyncPairedDeviceView,
   NikkiSyncRuntimeSession,
@@ -226,6 +227,14 @@ export interface RuntimeSurface {
   extraScanDirectories?: ExtraScanDirectoriesSurface
   /** K7：扫描诊断深入口（可选同上）。 */
   scanDiagnostics?: ScanDiagnosticsSurface
+  /**
+   * N2：上游启动组合器与配置/缓存深入口。**可选**：老链接会话上这些字段可为
+   * undefined，此时只保留既有单 resolver 行为，其余能力整节不挂出（不静默成功）。
+   */
+  metadataStartupComposition?: NikkiSyncModule
+  metadataResolverConfigFile?: NikkiSyncModule
+  metadataDictionaryRemoteConfigFile?: NikkiSyncModule
+  metadataThumbnailCache?: NikkiSyncModule
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -289,6 +298,46 @@ export const EXTRA_SCAN_DIRECTORIES_DEEP_ENTRY = ['scanner', 'ExtraScanDirectori
 
 /** K7 的扫描诊断深入口（上游 `scanner/ScanDiagnostics.js`；产物存在性同上守护）。 */
 export const SCAN_DIAGNOSTICS_DEEP_ENTRY = ['scanner', 'ScanDiagnostics.js'] as const
+
+/**
+ * N2：上游 `windows-app.ts:88-113` 的启动组合器与其配置/缓存深入口。
+ * 全部不在桶导出内，逐个经 `resolveDeepEntryUrl` 变量式装载；
+ * 产物存在性由 `verify-nikkisync-link.ts` 的能力清单与 `LOAD_CHAIN_ROOTS` 守护。
+ */
+export const METADATA_STARTUP_COMPOSITION_DEEP_ENTRY = [
+  'metadata',
+  'MetadataStartupComposition.js'
+] as const
+export const METADATA_RESOLVER_CONFIG_DEEP_ENTRY = [
+  'metadata',
+  'MetadataResolverConfigFile.js'
+] as const
+export const METADATA_DICTIONARY_REMOTE_CONFIG_DEEP_ENTRY = [
+  'metadata',
+  'MetadataDictionaryRemoteConfigFile.js'
+] as const
+export const METADATA_THUMBNAIL_CACHE_DEEP_ENTRY = [
+  'metadata',
+  'MetadataThumbnailCache.js'
+] as const
+
+/**
+ * N7：上游 PC 端控制页 / 微信画廊 / 本机后台服务的七个深入口。
+ * 全部不在上游桶导出内，逐个经 `resolveDeepEntryUrl` 变量式装载；产物存在性由
+ * `verify-nikkisync-link.ts` 的 `LOAD_CHAIN_ROOTS` / `NIKKISYNC_CAPABILITY_ARTIFACTS`
+ * 守护（与既有 16 个入口同口径）。`GalleryRuntime.mjs` 是 esbuild 产物（非 .js），
+ * 由 `SYNC_SERVER_REQUIRED_ARTIFACTS` 与能力清单双重点名。
+ */
+export const DESKTOP_CONTROL_SERVER_DEEP_ENTRY = ['desktop', 'DesktopControlServer.js'] as const
+export const DESKTOP_STATUS_SERVICE_DEEP_ENTRY = ['desktop', 'DesktopStatusService.js'] as const
+export const WECHAT_GALLERY_SERVICE_DEEP_ENTRY = ['wechat', 'WeChatGalleryService.js'] as const
+export const GALLERY_RUNTIME_DEEP_ENTRY = ['wechat', 'GalleryRuntime.mjs'] as const
+export const WECHAT_ICON_PROVIDER_DEEP_ENTRY = ['wechat', 'WeChatIconProvider.js'] as const
+export const RUNTIME_MEMORY_MAINTENANCE_DEEP_ENTRY = ['RuntimeMemoryMaintenance.js'] as const
+export const GAME_VERSION_UPDATE_SERVICE_DEEP_ENTRY = [
+  'server',
+  'GameVersionUpdateService.js'
+] as const
 
 /**
  * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
@@ -356,6 +405,33 @@ export function decodePageCursor(cursor?: string): PageCursorValue | undefined {
   }
 }
 
+/**
+ * N4：当前已组装会话的只读访问面。
+ *
+ * 为什么需要模块级注册而不改 `runtime-manager.ts`（本节点禁止改）：灵感库四条 IPC
+ * 通道要访问的是**会话**上的 `runtime.server.inspirations`（换根重建 / 端口变更时
+ * 会话会被替换），而 `NikkiSyncRuntimeHandle`（`ctx.nikkisyncRuntime`）由 manager
+ * 的闭包持有 session、句柄上没有公开的 session 访问器。注册表在
+ * `createRuntimeSession` 成功返回前写入，因此每次会话重建都自动指向新仓储；
+ * handler 先 `requireRuntime(ctx)` 复用「句柄未装配 ⇒ PRECONDITION_FAILED」口径，
+ * 再经本面取会话，会话缺席同样给 PRECONDITION_FAILED。
+ */
+let activeRuntimeSession: NikkiSyncRuntimeSession | undefined
+
+/** 仅供装配/测试注入；生产由 `createRuntimeSession` 自动调用。 */
+export function setActiveRuntimeSession(session: NikkiSyncRuntimeSession | undefined): void {
+  activeRuntimeSession = session
+}
+
+export function getActiveRuntimeSession(): NikkiSyncRuntimeSession | undefined {
+  return activeRuntimeSession
+}
+
+function registerActiveSession(session: NikkiSyncRuntimeSession): NikkiSyncRuntimeSession {
+  activeRuntimeSession = session
+  return session
+}
+
 /** 由 projectRoot / 打包态上下文推出装载所需的运行位置上下文。 */
 export function packagingContextFor(
   projectRoot: string,
@@ -396,6 +472,14 @@ export async function loadRuntimeSurface(
   const metadataOnlineConsent = await loadDeepModule(METADATA_ONLINE_CONSENT_DEEP_ENTRY)
   const extraScanDirectories = await loadDeepModule(EXTRA_SCAN_DIRECTORIES_DEEP_ENTRY)
   const scanDiagnostics = await loadDeepModule(SCAN_DIAGNOSTICS_DEEP_ENTRY)
+  // N2：上游启动组合器深入口。与既有 12 个入口同为「必须存在」——缺件直接抛
+  // ERR_MODULE_NOT_FOUND（由 verify:nikkisync 的清单提前拦住），绝不静默降级成半套能力。
+  const metadataStartupComposition = await loadDeepModule(METADATA_STARTUP_COMPOSITION_DEEP_ENTRY)
+  const metadataResolverConfigFile = await loadDeepModule(METADATA_RESOLVER_CONFIG_DEEP_ENTRY)
+  const metadataDictionaryRemoteConfigFile = await loadDeepModule(
+    METADATA_DICTIONARY_REMOTE_CONFIG_DEEP_ENTRY
+  )
+  const metadataThumbnailCache = await loadDeepModule(METADATA_THUMBNAIL_CACHE_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -411,7 +495,11 @@ export async function loadRuntimeSurface(
     gameVersionCalendar: gameVersionCalendar as unknown as GameVersionCalendarSurface,
     metadataOnlineConsent: metadataOnlineConsent as unknown as MetadataOnlineConsentSurface,
     extraScanDirectories: extraScanDirectories as unknown as ExtraScanDirectoriesSurface,
-    scanDiagnostics: scanDiagnostics as unknown as ScanDiagnosticsSurface
+    scanDiagnostics: scanDiagnostics as unknown as ScanDiagnosticsSurface,
+    metadataStartupComposition,
+    metadataResolverConfigFile,
+    metadataDictionaryRemoteConfigFile,
+    metadataThumbnailCache
   }
 }
 
@@ -639,13 +727,12 @@ export async function createRuntimeSession(
    */
   const metadataResolverEnabled = options.metadataResolverEnabled === true
   /**
-   * K2 · 同意门（fail-closed）。仅在「解析开启 && consentFile 给出 && 深入口在位」时
-   * 构造。`initiallyDisabled` 按上游真实语义取值（`windows-app.js:105` 传
-   * `resolverFile?.enabled === false`，即「功能整体关闭 ⇒ 无视文件强制不同意」）：
-   * 恒传 true 会让已同意文件在重启后失效，因此本仓取「同意文件不存在（首次安装）
-   * ⇒ true（fail-closed，比上游 fresh-install 默认放行更严，§14-Q3）；文件存在 ⇒
-   * 交上游按内容判定（坏 JSON 走构造器 catch 分支同样 fail-closed）」。
-   * 叠加既有 `nikkisync.metadataResolverEnabled` 默认 false ⇒ 实际出站为双重门。
+   * K2 · 同意门。仅在「解析开启 && consentFile 给出 && 深入口在位」时构造。
+   * `initiallyDisabled` 逐字对齐上游 `windows-app.ts:110` 的干净安装语义：
+   * 上游传 `resolverFile?.enabled === false`，即只有「功能整体关闭」才强制不同意；
+   * 本轮与上游 PC 端对齐为默认放行 ⇒ 恒传 false（首次安装由上游种子化为 enabled，
+   * 用户仍可在控制页显式关闭，关闭后 `setEnabled(false)` 立即停止出站）。
+   * 历史的 fail-closed 取值 `!existsSync(consentFile)` 已按用户口径翻转。
    */
   let metadataConsent: import('./runtime-types').NikkiSyncMetadataConsent | undefined
   if (metadataResolverEnabled && options.consentFile && surface.metadataOnlineConsent) {
@@ -657,12 +744,60 @@ export async function createRuntimeSession(
       recipients: Array<{ name: string; endpoint: string; fields: string[] }>,
       initiallyDisabled?: boolean
     ) => import('./runtime-types').NikkiSyncMetadataConsent
-    metadataConsent = new ConsentCtor(
-      options.consentFile,
-      NUAN5_METADATA_CONSENT_RECIPIENTS,
-      !existsSync(options.consentFile)
-    )
+    metadataConsent = new ConsentCtor(options.consentFile, NUAN5_METADATA_CONSENT_RECIPIENTS, false)
   }
+  /**
+   * N2：复刻上游 `windows-app.ts:88-113` 的启动组合。
+   * 能力位只认显式 `true`（外部输入默认不可信）；深入口缺席时 `call*` 返回 undefined，
+   * 对应整节不挂出，会话其余能力照常——绝不把「没装载到」伪装成「用户关掉了」。
+   */
+  const switches = options.pcCompanion as Record<string, boolean> | undefined
+  const pcOn = (key: string): boolean => switches?.[key] === true
+  const callModule = <T>(
+    mod: NikkiSyncModule | undefined,
+    name: string,
+    ...args: unknown[]
+  ): T | undefined => {
+    const fn = (mod as unknown as Record<string, unknown> | undefined)?.[name]
+    return typeof fn === 'function' ? (fn as (...a: unknown[]) => T)(...args) : undefined
+  }
+  const composition = surface.metadataStartupComposition
+  const resolverFile = options.metadataResolverFile
+    ? callModule<Record<string, unknown> | undefined>(
+        surface.metadataResolverConfigFile,
+        'loadMetadataResolverConfigFile',
+        options.metadataResolverFile
+      )
+    : undefined
+  const dictionaryRemote = options.metadataDictionaryRemoteFile
+    ? callModule<Record<string, unknown> | undefined>(
+        surface.metadataDictionaryRemoteConfigFile,
+        'loadMetadataDictionaryRemoteConfigFile',
+        options.metadataDictionaryRemoteFile
+      )
+    : undefined
+  const dictionaryEnabled = pcOn('metadataDictionary')
+  const dictionaryProvider = dictionaryEnabled
+    ? callModule<unknown>(composition, 'composeMetadataDictionaryProvider', dictionaryRemote)
+    : undefined
+  const supplementProvider = dictionaryEnabled
+    ? callModule<unknown>(
+        composition,
+        'composeMetadataDictionarySupplementProvider',
+        dictionaryRemote
+      )
+    : undefined
+  const ThumbnailCacheCtor = (
+    surface.metadataThumbnailCache as unknown as Record<string, unknown> | undefined
+  )?.MetadataThumbnailCache as (new (config: { cacheDir: string }) => unknown) | undefined
+  const thumbnailCache =
+    dictionaryEnabled && options.metadataThumbnailCacheDir && ThumbnailCacheCtor
+      ? new ThumbnailCacheCtor({ cacheDir: options.metadataThumbnailCacheDir })
+      : undefined
+  const serverConfig = thumbnailCache
+    ? { ...syncServer, metadataThumbnailCache: thumbnailCache }
+    : syncServer
+
   const metadataFragment = buildMetadataResolverConfig({
     enabled: metadataResolverEnabled,
     endpoint: NUAN5_METADATA_ENDPOINT,
@@ -670,14 +805,32 @@ export async function createRuntimeSession(
       // 转型只为复用 nikkisyncExport 的可诊断报错（"Expected export … run `npm run build`"）：
       // 深入口符号不在 NIKKISYNC_REQUIRED_EXPORTS 里，探针与桶导出都覆盖不到它们。
       // 该调用发生在 RuntimeCtor 构造**之前**，因此失败时还没有任何 SQLite 句柄需要归还。
-      const ResolverCtor = nikkisyncExport(
-        surface.nuan5Resolver as unknown as NikkiSyncModule,
-        'Nuan5CompatibleResolver'
-      ) as new (config?: Record<string, unknown>) => unknown
+      const composed =
+        pcOn('metadataDictionary') || pcOn('remoteBridge')
+          ? callModule<unknown>(
+              composition,
+              'composeMetadataResolver',
+              // 无磁盘配置时给一份与披露文案同源的单 provider 配置，而不是吃上游默认值，
+              // 保证「设置页写明的端点」与「实际出口」始终只有一个出处。
+              resolverFile ?? {
+                enabled: true,
+                providers: [{ type: 'nuan5-compatible', endpoint }]
+              },
+              undefined
+            )
+          : undefined
+      const resolver =
+        composed ??
+        (() => {
+          const ResolverCtor = nikkisyncExport(
+            surface.nuan5Resolver as unknown as NikkiSyncModule,
+            'Nuan5CompatibleResolver'
+          ) as new (config?: Record<string, unknown>) => unknown
+          return new ResolverCtor({ endpoint })
+        })()
       // 端点由驱动层校验后下传，这里不另取一份：保证披露文案与实际出口只有一个出处。
       // K2：同意在位 ⇒ 下发 guard 包装后的解析器（未同意时上游在 resolve 首行即抛，
       // 零出站）；深入口缺席（老会话）不包装，行为与 K2 之前逐字节一致。
-      const resolver = new ResolverCtor({ endpoint })
       return metadataConsent
         ? (
             metadataConsent as unknown as {
@@ -693,9 +846,31 @@ export async function createRuntimeSession(
       ...(options.gameRoot ? { selectedInstallRoot: options.gameRoot } : {}),
       watcher: options.watcher
     },
-    server: syncServer,
+    server: serverConfig,
     // 兼容层（b422193）：启动阶段回调透传缝（缺省时连键都不下发；K1 在本仓编排点自报阶段）
     ...(options.onStartupStage ? { onStartupStage: options.onStartupStage } : {}),
+    // N2：上游 PC 端能力位。键只在能力真正可用时出现（不写死 true、不造半套配置）。
+    ...(pcOn('remoteBridge') ? { remoteBridge: true } : {}),
+    // 干净安装按上游 windows-app.ts 口径**不下传** metadataDictionary /
+    // metadataDictionarySupplement：那两键要的是本地 manifest（上游 runtime.ts:69
+    // 会调 replaceManifest，误传 provider 会抛 "schemaVersion must be 1"）。
+    // provider 只作为 Remote / SupplementRemote 的 provider 下传，由上游 updater 拉取。
+    ...(dictionaryProvider
+      ? {
+          metadataDictionaryRemote: {
+            provider: dictionaryProvider,
+            service: { enabled: true }
+          }
+        }
+      : {}),
+    ...(supplementProvider
+      ? {
+          metadataDictionarySupplementRemote: {
+            provider: supplementProvider,
+            service: { mode: 'supplement' }
+          }
+        }
+      : {}),
     ...metadataFragment
   })
   // runtime 构造期即建库并跑 migration：其后任一步（TLS/配对导出缺失、查询面装配）
@@ -752,7 +927,7 @@ export async function createRuntimeSession(
           )
         : undefined
 
-    return {
+    return registerActiveSession({
       runtime,
       scanner: runtime.scanner,
       queries: createQuerySurface(surface, runtime),
@@ -788,6 +963,42 @@ export async function createRuntimeSession(
         // 上游 stop() 对 undefined timer 安全（幂等）；未开启时句柄整个不存在
         metadataService?.stop()
       },
+      /**
+       * N3：显式补偿上游 `runtime.start()` 的「background-services」阶段。
+       * 本仓不调 `runtime.start()`（它会无条件启 LAN 服务），因此上游构造出的
+       * metadataResolver / 两个字典 updater 从未被启动、字典 reenrich 从未发生。
+       * 只驱动真实存在的上游句柄；已启动的记进闭包，stop 时逆序停，保证定时器不泄漏。
+       */
+      ...(() => {
+        const upstream = runtime as unknown as Record<
+          string,
+          | {
+              start?: () => void
+              stop?: () => void
+              reenrichResolvedAssets?: () => void
+            }
+          | undefined
+        >
+        const started: Array<{ stop?: () => void }> = []
+        return {
+          startBackgroundServices: (): void => {
+            for (const key of [
+              'metadataDictionaryUpdater',
+              'metadataDictionarySupplementUpdater',
+              'metadataResolver'
+            ]) {
+              const service = upstream[key]
+              if (!service || typeof service.start !== 'function') continue
+              service.start()
+              started.push(service)
+            }
+            upstream.metadataDictionary?.reenrichResolvedAssets?.()
+          },
+          stopBackgroundServices: (): void => {
+            for (const service of started.splice(0).reverse()) service.stop?.()
+          }
+        }
+      })(),
       // 仅在服务存在时挂出驱动面：编排层据此判 0 轮，无需重复读开关
       ...(metadataService ? { metadataRunOnce: () => metadataService.runOnce() } : {}),
       // 兼容层（b422193）：缓存解码同步驱动闭包（模块缺席即不挂键）
@@ -827,8 +1038,12 @@ export async function createRuntimeSession(
         surface.metadataDiagnostics.metadataResolutionDiagnostics(
           runtime.database,
           metadataResolverEnabled
-        )
-    }
+        ),
+      // N4：上游构造期必建的灵感仓储（老链接 session.server.inspirations 缺席时不挂键）
+      ...(runtime.server.inspirations
+        ? { inspirations: runtime.server.inspirations as unknown as InspirationRepositoryLike }
+        : {})
+    })
   } catch (error) {
     try {
       runtime.database.close()

@@ -36,6 +36,8 @@ export interface SyncGalleryState {
 export interface SyncGalleryActions {
   loadFirst: () => Promise<void>
   loadMore: () => Promise<void>
+  /** N5：把索引面命中的照片铺进网格（临时视图，刷新/扫描/库变更由 loadFirst 覆盖回主列表） */
+  applyHits: (files: AssetMediaFile[]) => void
   reset: () => void
 }
 
@@ -104,6 +106,20 @@ export const useSyncGalleryStore = create<SyncGalleryState & SyncGalleryActions>
       cursor: page.nextCursor,
       libraryRevision: page.libraryRevision,
       hasMore: page.hasMore,
+      loadingMore: false,
+      error: null
+    })
+  },
+
+  applyHits(files) {
+    // 命中结果不是游标分页的一页：分页状态一律归零，避免触底把旧游标续到命中视图后面。
+    // 任何 loadFirst（进页 / 刷新 / 扫描 / 库变更）都会整体覆盖 files ⇒ 自动回到主列表。
+    set({
+      files,
+      cursor: null,
+      libraryRevision: null,
+      hasMore: false,
+      loading: false,
       loadingMore: false,
       error: null
     })

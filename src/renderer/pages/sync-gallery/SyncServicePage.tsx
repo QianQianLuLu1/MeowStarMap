@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { EmptyState } from '../../components/common/EmptyState'
 import { PageHeader } from '../../components/common/PageHeader'
 import { PairingQrDialog } from '../../components/sync/PairingQrDialog'
+import { SyncInspirationPanel } from './SyncInspirationPanel'
 import { useErrorToast } from '../../hooks/useErrorToast'
 import { IconCopyText, IconSync } from '../../icons'
 import { useMediaStore } from '../../stores/mediaStore'
@@ -970,6 +971,8 @@ export const SyncServicePage: React.FC = () => {
                     <span className="text-xs">{t('syncService.status.inspirationOn')}</span>
                   </SettingsRow>
                 )}
+                {/* N4：灵感库列表/编辑器（上游 /v1/inspiration*）；折叠态不发 IPC，桥缺失静默隐藏 */}
+                <SyncInspirationPanel />
                 {startupStages.length > 0 && (
                   <SettingsRow label={t('syncService.startupStages.label')}>
                     {/* K1：阶段名→i18n 映射；未知阶段不谎报，原样展示英文短码 */}
@@ -1533,6 +1536,9 @@ export const SyncServicePage: React.FC = () => {
               )}
             </div>
           </SectionShell>
+
+          {/* N7：PC 端分区（打开控制页 / 微信画廊启停 / 状态 / 二维码），常驻显示 */}
+          <SyncPcCompanionSection />
         </div>
       </div>
 
@@ -1567,6 +1573,151 @@ export const SyncServicePage: React.FC = () => {
         onConfirm={() => void handleConfirmApprove()}
         onCancel={() => setApproveTarget(null)}
       />
+    </div>
+  )
+}
+
+/**
+ * N7：PC 端分区。打开控制页走既有 `electronAPI.shell.openExternal` 桥；微信画廊
+ * 启停/状态经 `nikkisync:wechat-*` 四条通道。桥面方法缺席（老 preload / 服务未装配）
+ * 一律静默降级为不可用提示，绝不把 IPC rejection 冒成未捕获错误或全局 toast。
+ * 二维码 SVG 由本仓主进程 `qrcode` 生成，经 data URL 渲染（不引入 innerHTML）。
+ */
+const SyncPcCompanionSection: React.FC = () => {
+  const { t } = useTranslation()
+  const [wechatStatus, setWechatStatus] = useState<unknown>(null)
+  const [qrSvg, setQrSvg] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+
+  const refresh = useCallback(async (): Promise<void> => {
+    const client = window.electronAPI?.nikkisync
+    if (typeof client?.wechatStatus !== 'function') return
+    try {
+      const res = await client.wechatStatus()
+      setWechatStatus(res?.status ?? null)
+      setFailed(false)
+    } catch {
+      setFailed(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    void refresh()
+  }, [refresh])
+
+  const openDesktop = async (): Promise<void> => {
+    const client = window.electronAPI?.nikkisync
+    const shell = window.electronAPI?.shell
+    if (typeof client?.desktopOpen !== 'function' || typeof shell?.openExternal !== 'function') {
+      return
+    }
+    setFailed(false)
+    try {
+      const { url } = await client.desktopOpen()
+      if (url) await shell.openExternal(url)
+    } catch {
+      setFailed(true)
+    }
+  }
+
+  const startWechat = async (): Promise<void> => {
+    const client = window.electronAPI?.nikkisync
+    if (typeof client?.wechatStart !== 'function') return
+    setBusy(true)
+    setFailed(false)
+    try {
+      const res = await client.wechatStart()
+      setQrSvg(typeof res?.qrSvg === 'string' ? res.qrSvg : null)
+      setWechatStatus(res?.status ?? null)
+    } catch {
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const stopWechat = async (): Promise<void> => {
+    const client = window.electronAPI?.nikkisync
+    if (typeof client?.wechatStop !== 'function') return
+    setBusy(true)
+    setFailed(false)
+    try {
+      const res = await client.wechatStop()
+      setQrSvg(null)
+      setWechatStatus(res?.status ?? null)
+    } catch {
+      setFailed(true)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const stateText =
+    typeof wechatStatus === 'object' && wechatStatus !== null && 'state' in wechatStatus
+      ? String((wechatStatus as Record<string, unknown>).state ?? '')
+      : ''
+
+  return (
+    <div data-testid="sync-service-pc-section">
+      <SectionShell title={t('syncService.pc.title')} description={t('syncService.pc.description')}>
+        <SettingsCard>
+          <div className="space-y-2">
+            <button
+              type="button"
+              data-testid="pc-open-desktop"
+              className="btn-secondary text-sm"
+              onClick={() => void openDesktop()}
+            >
+              {t('syncService.pc.openDesktop')}
+            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                data-testid="pc-wechat-start"
+                className="btn-primary text-sm"
+                disabled={busy}
+                onClick={() => void startWechat()}
+              >
+                {t('syncService.pc.wechatStart')}
+              </button>
+              <button
+                type="button"
+                data-testid="pc-wechat-stop"
+                className="btn-ghost text-sm"
+                disabled={busy}
+                onClick={() => void stopWechat()}
+              >
+                {t('syncService.pc.wechatStop')}
+              </button>
+            </div>
+            <p
+              data-testid="pc-wechat-status"
+              className="text-xs"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {t('syncService.pc.wechatStatus', { state: stateText })}
+            </p>
+            {qrSvg && (
+              <img
+                data-testid="pc-wechat-qr"
+                alt=""
+                className="h-40 w-40"
+                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg)}`}
+              />
+            )}
+            {failed && (
+              <p
+                data-testid="pc-error"
+                className="text-xs"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                {t('syncService.pc.unavailable')}
+              </p>
+            )}
+          </div>
+        </SettingsCard>
+      </SectionShell>
     </div>
   )
 }

@@ -586,6 +586,51 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     syncPort = 28080
   })
 
+  // N7：两条断言与整件一样受 describe 级 `test.skip(gate.action === 'skip', …)` 门控，
+  // 不改变门控语义（未建链时整件 skip，是受支持的默认态）。
+  test('N7 默认能力位全开（对齐上游 PC 端干净安装）', async () => {
+    // 不 import 主进程模块：e2e/tsconfig 的 noUnusedLocals 会顺带把整条 src/main
+    // 依赖链纳入检查，牵出与本次改动无关的既有告警。改读源码文本钉住默认值，
+    // 真正的运行期判定由 nikkisync-runtime-setup.test.ts 的纯函数用例覆盖。
+    const source = await fs.readFile(
+      `${process.cwd()}/src/main/app/nikkisync-runtime-setup.ts`,
+      'utf8'
+    )
+    expect(source).toMatch(/export const RUNTIME_ENABLED_DEFAULT = true/)
+    expect(source).toMatch(/export const SYNC_ENABLED_DEFAULT = true/)
+    expect(source).toMatch(/remoteBridge: !flagOff/)
+  })
+
+  test('N7 PC 控制页 / 微信画廊服务装配（四条桥方法 + 主进程装配轨迹）', async () => {
+    const page = win
+    if (!page || !launched) {
+      test.skip(true, 'N1 未启动应用')
+      return
+    }
+    const bridge = await page.evaluate(() => {
+      const ns = (window as unknown as { electronAPI?: { nikkisync?: Record<string, unknown> } })
+        .electronAPI?.nikkisync
+      return {
+        desktopOpen: typeof ns?.desktopOpen,
+        wechatStart: typeof ns?.wechatStart,
+        wechatStop: typeof ns?.wechatStop,
+        wechatStatus: typeof ns?.wechatStatus
+      }
+    })
+    expect(bridge).toEqual({
+      desktopOpen: 'function',
+      wechatStart: 'function',
+      wechatStop: 'function',
+      wechatStatus: 'function'
+    })
+    // 装配动作本身（started 或未建链时的 unavailable）必须留一条可诊断日志；
+    // electron-log 异步落盘，读不到文本时不把「尚未 flush」误判成装配缺失。
+    const text = await readMainLogTail(launched)
+    if (text) {
+      expect(text).toMatch(/\[NIKKISYNC\] pc companion services (started|unavailable)/)
+    }
+  })
+
   test('N4 退出链：before-quit 走到 stopNikkiSyncRuntime，日志无 stop failed', async () => {
     const session = launched
     if (!session) {

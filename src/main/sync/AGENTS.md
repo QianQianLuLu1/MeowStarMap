@@ -43,6 +43,12 @@ shared/sync/protocol.ts（冻结契约）    database/sync-*-repository
 因此：`sync/` 的服务器代码不是死代码也不是规划中，而是**已交付但默认静默**；
 要改 LAN 服务行为时先确认用户实际走的是哪一面，别只改静默的那一侧。
 
+> **2026-11-06 订正**：本轮仅把**内嵌面** `nikkisync:*` 的五个默认开关翻为开、
+> 在线元数据同意门改为默认放行、整理队列缺省 `true`；并新增灵感库与 PC 端控制页/
+> 微信画廊通道。移植面的 `PORTED_SYNC_AUTOSTART_ENABLED = false` **不变、仍不自启**，
+> 两条轨道的开关互不代换。全过程见
+> `docs/plans/2026-11-05-sync-gallery-pc-parity-实施计划.md`。
+
 ## 文件职责
 
 | 文件                                                | 职责                                                                                                                                                                                                                                                                                |

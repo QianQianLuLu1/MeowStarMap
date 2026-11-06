@@ -3,7 +3,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 import { SyncInsightPanel } from './SyncInsightPanel'
-import type { AssetSummary } from '../../../shared/sync/protocol'
+import type { AssetSummary, MediaResource } from '../../../shared/sync/protocol'
+import type { AssetEditsInfo } from '../../../shared/types/electron-api'
+import type { AssetMediaFile } from '../../utils/assetViewModel'
 
 /**
  * 同步图库「上游索引面」面板测试（02 计划 N6）。
@@ -24,6 +26,15 @@ function summary(assetId: string): AssetSummary {
   } as unknown as AssetSummary
 }
 
+interface BackfillPlan {
+  meta?: Record<string, MediaResource[]>
+  paths?: Record<string, Record<string, string>>
+  edits?: AssetEditsInfo[]
+  metaError?: Error
+  pathError?: Error
+  editsError?: Error
+}
+
 interface ApiPlan {
   suits?: { items: Array<Record<string, unknown>> }
   clothing?: { items: Array<Record<string, unknown>> }
@@ -31,6 +42,8 @@ interface ApiPlan {
   suitsError?: Error
   clothingError?: Error
   statsError?: Error
+  /** 仅传入时才装配回捞能力；既有接线用例保持原夹具不变（老桥面无 getResourceRecords） */
+  backfill?: BackfillPlan
 }
 
 function install(plan: ApiPlan = {}) {
@@ -46,6 +59,19 @@ function install(plan: ApiPlan = {}) {
     if (plan.statsError) throw plan.statsError
     return plan.stats ?? { libraryRevision: 1, topSuits: [], topClothing: [] }
   })
+  // 回捞假桥：仅 backfill 存在时挂到 nikkisync / assetEdits，避免改变既有用例的桥形状
+  const getResourceRecords = vi.fn(async (input: { mode: string }) => {
+    if (input.mode === 'meta') {
+      if (plan.backfill?.metaError) throw plan.backfill.metaError
+      return { byAsset: plan.backfill?.meta ?? {} }
+    }
+    if (plan.backfill?.pathError) throw plan.backfill.pathError
+    return { byAsset: plan.backfill?.paths ?? {} }
+  })
+  const assetEditsList = vi.fn(async () => {
+    if (plan.backfill?.editsError) throw plan.backfill.editsError
+    return { edits: plan.backfill?.edits ?? [] }
+  })
   // 库变更订阅面：返回退订函数，与 preload 的 subscribe() 语义一致
   const libraryListeners: Array<() => void> = []
   const onLibraryChanged = vi.fn((callback: () => void) => {
@@ -55,18 +81,44 @@ function install(plan: ApiPlan = {}) {
       if (index >= 0) libraryListeners.splice(index, 1)
     }
   })
-  ;(window as unknown as Record<string, unknown>).electronAPI = {
-    nikkisync: { searchSuits, searchClothing, profileStats, onLibraryChanged }
+  const nikkisync: Record<string, unknown> = {
+    searchSuits,
+    searchClothing,
+    profileStats,
+    onLibraryChanged
   }
+  const electronAPI: Record<string, unknown> = { nikkisync }
+  if (plan.backfill) {
+    nikkisync.getResourceRecords = getResourceRecords
+    electronAPI.assetEdits = { list: assetEditsList }
+  }
+  ;(window as unknown as Record<string, unknown>).electronAPI = electronAPI
   return {
     searchSuits,
     searchClothing,
     profileStats,
     onLibraryChanged,
+    getResourceRecords,
+    assetEditsList,
     emitLibraryChanged: () => {
       for (const callback of libraryListeners) callback()
     }
   }
+}
+
+/** 回捞所需的最小资源行（与 syncGalleryStore.test.ts 同口径） */
+function resource(assetId: string): MediaResource {
+  return {
+    resourceId: `r-${assetId}`,
+    role: 'source_high_quality',
+    fileName: `${assetId}.png`,
+    mimeType: 'image/png',
+    fileExt: '.png',
+    sizeBytes: 4096,
+    sha256: 'aa',
+    width: 100,
+    height: 200
+  } as MediaResource
 }
 
 /** 乱序夹具：searchSuits 的响应由测试按调用序号外部放行，用于构造「后发先至」 */
@@ -303,5 +355,114 @@ describe('SyncInsightPanel', () => {
       api.emitLibraryChanged()
     })
     expect(api.profileStats).toHaveBeenCalledTimes(1)
+  })
+
+  // ===== N5：命中照片回捞资源记录 → 经 onHits 铺进网格 =====
+
+  it('search hits are resolved into gallery items via getResourceRecords', async () => {
+    const onHits = vi.fn()
+    const api = install({
+      suits: {
+        items: [
+          {
+            suitId: 'suit_swan',
+            suitName: '天鹅童话',
+            observedPartCount: 1,
+            photoCount: 2,
+            photos: [
+              { asset: summary('a1'), matchedParts: [] },
+              { asset: summary('a2'), matchedParts: [] }
+            ]
+          }
+        ]
+      },
+      backfill: {
+        meta: { a1: [resource('a1')], a2: [resource('a2')] },
+        paths: {
+          a1: { 'r-a1': 'D:/Game/a1.png' },
+          a2: { 'r-a2': 'D:/Game/a2.png' }
+        }
+      }
+    })
+    render(<SyncInsightPanel onHits={onHits} />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('天鹅', api)
+    await waitFor(() =>
+      expect(api.getResourceRecords).toHaveBeenCalledWith({
+        assetIds: ['a1', 'a2'],
+        mode: 'meta'
+      })
+    )
+    expect(api.getResourceRecords).toHaveBeenCalledWith({
+      assetIds: ['a1', 'a2'],
+      mode: 'path'
+    })
+    await waitFor(() => expect(onHits).toHaveBeenCalledTimes(1))
+    const files = onHits.mock.calls[0][0] as AssetMediaFile[]
+    expect(files.map((file) => file.id)).toEqual(['a1', 'a2'])
+    expect(files[0].file_path).toBe('D:/Game/a1.png')
+  })
+
+  it('failed resource backfill keeps text hits and shows inline notice', async () => {
+    const onHits = vi.fn()
+    const api = install({
+      suits: {
+        items: [
+          {
+            suitId: 'suit_swan',
+            suitName: '天鹅童话',
+            observedPartCount: 1,
+            photoCount: 1,
+            photos: [{ asset: summary('a1'), matchedParts: [] }]
+          }
+        ]
+      },
+      backfill: { metaError: new Error('runtime is not ready') }
+    })
+    render(<SyncInsightPanel onHits={onHits} />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('天鹅', api)
+    expect(await screen.findByText('天鹅童话')).toBeInTheDocument()
+    expect(await screen.findByTestId('insight-backfill-notice')).toBeInTheDocument()
+    expect(onHits).not.toHaveBeenCalled()
+  })
+
+  it('empty hits and repeated submit do not issue duplicate IPC', async () => {
+    const onHits = vi.fn()
+    // 空命中：即便装配了回捞能力，也不得发 getResourceRecords
+    const emptyApi = install({ backfill: { meta: {}, paths: {} } })
+    const emptyView = render(<SyncInsightPanel onHits={onHits} />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('不存在', emptyApi)
+    await waitFor(() => expect(emptyApi.searchSuits).toHaveBeenCalled())
+    expect(emptyApi.getResourceRecords).not.toHaveBeenCalled()
+    emptyView.unmount()
+
+    // 重复提交同一批命中：回捞 IPC 只发一轮（meta + path），不得翻倍
+    const api = install({
+      suits: {
+        items: [
+          {
+            suitId: 's1',
+            suitName: '天鹅童话',
+            observedPartCount: 1,
+            photoCount: 1,
+            photos: [{ asset: summary('a1'), matchedParts: [] }]
+          }
+        ]
+      },
+      backfill: {
+        meta: { a1: [resource('a1')] },
+        paths: { a1: { 'r-a1': 'D:/Game/a1.png' } }
+      }
+    })
+    render(<SyncInsightPanel onHits={onHits} />)
+    fireEvent.click(screen.getByText(TITLE))
+    submit('天鹅', api)
+    await waitFor(() => expect(onHits).toHaveBeenCalled())
+    expect(api.getResourceRecords).toHaveBeenCalledTimes(2)
+    submit('天鹅', api)
+    await flush()
+    expect(api.getResourceRecords).toHaveBeenCalledTimes(2)
   })
 })

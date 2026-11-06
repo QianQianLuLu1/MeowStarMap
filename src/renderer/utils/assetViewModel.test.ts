@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AssetSummary, MediaResource } from '../../shared/sync/protocol'
-import { toAssetViewModel } from './assetViewModel'
+import { toAssetViewModel, mapHitSummariesToFiles } from './assetViewModel'
 
 /**
  * 资产视图模型单测（阶段 4 · 渲染层唯一转换点）。
@@ -203,5 +203,36 @@ describe('toAssetViewModel 状态与叠加层', () => {
     expect(file.outfit).toBe('spring')
     expect(file.scene_time).toBe('night')
     expect(file.notes).toBe('n')
+  })
+})
+
+describe('mapHitSummariesToFiles（N5 命中回捞映射）', () => {
+  it('按命中顺序把 meta/path 装配成视图模型', () => {
+    const files = mapHitSummariesToFiles({
+      summaries: [summary({ assetId: 'a1' }), summary({ assetId: 'a2' })],
+      metaByAsset: {
+        a1: [resource({ resourceId: 'r-a1' })],
+        a2: [resource({ resourceId: 'r-a2' })]
+      },
+      pathByAsset: {
+        a1: { 'r-a1': 'D:/Game/a1.png' },
+        a2: { 'r-a2': 'D:/Game/a2.png' }
+      }
+    })
+    expect(files.map((file) => file.id)).toEqual(['a1', 'a2'])
+    expect(files[0].file_path).toBe('D:/Game/a1.png')
+    expect(files[1].file_path).toBe('D:/Game/a2.png')
+    expect(files[0].nikkisync?.assetId).toBe('a1')
+  })
+
+  it('byAsset 缺行时按缺省兜底，产出空路径条目而不抛', () => {
+    const files = mapHitSummariesToFiles({
+      summaries: [summary({ assetId: 'missing' })],
+      metaByAsset: {},
+      pathByAsset: {}
+    })
+    expect(files).toHaveLength(1)
+    expect(files[0].file_path).toBe('')
+    expect(files[0].nikkisync?.assetId).toBe('missing')
   })
 })

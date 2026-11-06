@@ -4,7 +4,12 @@ import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
 import { electronLogger } from '../utils/logger'
 import { buildPackagingContext } from '../nikkisync/embedding-paths'
-import { createManagerDependencies, loadLanAddressLister } from '../nikkisync/runtime-facade'
+import {
+  createManagerDependencies,
+  loadLanAddressLister,
+  setActiveRuntimeSession
+} from '../nikkisync/runtime-facade'
+import { startPcCompanionServices } from '../nikkisync/pc-companion-services'
 import { createRuntimeManager } from '../nikkisync/runtime-manager'
 import { resolveMetadataResolverEnabled as resolveMetadataResolverEnabledFlag } from '../nikkisync/metadata-resolver-driver'
 import {
@@ -15,7 +20,12 @@ import {
   normalizeSyncPort
 } from '../nikkisync/sync-server-view'
 import { resolveLanHost } from './sync-server-setup'
-import type { NikkiSyncRuntimeHandle, NikkiSyncSessionOptions } from '../nikkisync/runtime-types'
+import type {
+  NikkiSyncPcCompanionSwitches,
+  NikkiSyncRuntimeHandle,
+  NikkiSyncSessionOptions,
+  PcCompanionServicesLike
+} from '../nikkisync/runtime-types'
 import type { AppContext } from './app-context'
 
 /**
@@ -25,11 +35,14 @@ import type { AppContext } from './app-context'
  * 本文件只碰 Electron（userData 路径、设置项、日志、生命周期挂载），
  * 扫描 / 建库 / DTO 一律由上游组件完成。
  *
- * 启动策略（与阶段 5 的同步服务同口径：**默认关闭**，避免与原扫描器常态化争用）：
- * - 环境变量 `NIKKI_NIKKISYNC_RUNTIME=1` 强开（dev / 验证用），`=0` 强关（排障用），优先级高于设置；
- * - 否则读设置项 `nikkisync.runtimeEnabled`（缺省 false）；
+ * 启动策略（对齐上游 PC 端干净安装：**默认全部开启**）：
+ * - 环境变量 `NIKKI_NIKKISYNC_RUNTIME=1` 强开（dev / 验证用），`=0` 强关（一键回到旧形态，
+ *   同时关掉 LAN 服务与全部 PC 端能力），优先级高于设置；
+ * - 否则读设置项 `nikkisync.runtimeEnabled`（缺省 true）；
  * - 关闭时仍然注册句柄，使 `nikkisync:runtime-status` 始终能给出可读状态，
  *   `nikkisync:start-scan` 也能惰性启动。
+ * 默认开启会产生扫描 IO、0.0.0.0 监听、mDNS 组播与第三方出站请求；
+ * 六个 `NIKKI_NIKKISYNC_*=0` 逃生阀与两个 `enabled:false` 离线 JSON 是回退手段。
  *
  * 库文件落在 `{userData}/nikkisync/nikkisync.db`，**不使用**上游默认的
  * `%LOCALAPPDATA%/NikkiSync`（嵌入态必须与宿主数据目录同源，见计划 §3）。
@@ -58,12 +71,41 @@ export const SETTING_METADATA_RESOLVER = 'nikkisync.metadataResolverEnabled'
  * Android 客户端只认该格式；开启后走 `nikki-sync://pair?` 新格式并附设备可达的备选地址。
  */
 export const SETTING_MULTI_HOST_PAIRING = 'nikkisync.multiHostPairing'
-export const RUNTIME_ENABLED_DEFAULT = false
-export const WATCHER_ENABLED_DEFAULT = false
-export const METADATA_RESOLVER_ENABLED_DEFAULT = false
-export const MULTI_HOST_PAIRING_DEFAULT = false
-/** 同步服务默认关闭：与阶段 5 移植面 `SYNC_SERVER_ENABLED_DEFAULT` 同口径。 */
-export const SYNC_ENABLED_DEFAULT = false
+/** 上游 PC 端干净安装默认开启；逃生阀为 `NIKKI_NIKKISYNC_RUNTIME=0`。 */
+export const RUNTIME_ENABLED_DEFAULT = true
+export const WATCHER_ENABLED_DEFAULT = true
+export const METADATA_RESOLVER_ENABLED_DEFAULT = true
+export const MULTI_HOST_PAIRING_DEFAULT = true
+export const SYNC_ENABLED_DEFAULT = true
+
+/** PC 端六个能力的 env 逃生阀（'=0' 单独关闭一项，其他值视为未设置）。 */
+export const PC_COMPANION_ENV_FLAGS = {
+  remoteBridge: 'NIKKI_NIKKISYNC_REMOTE_BRIDGE',
+  metadataDictionary: 'NIKKI_NIKKISYNC_DICTIONARY',
+  gameVersionUpdates: 'NIKKI_NIKKISYNC_VERSION_UPDATES',
+  runtimeMemoryMaintenance: 'NIKKI_NIKKISYNC_MEMORY_MAINTENANCE',
+  wechatGallery: 'NIKKI_NIKKISYNC_WECHAT',
+  desktopControl: 'NIKKI_NIKKISYNC_DESKTOP'
+} as const
+
+/**
+ * 纯函数：把 env 收敛成六个能力位。默认全开；`RUNTIME=0` 一键全关（旧形态）。
+ * 只认精确字符串 '0'，脏值不误关也不误开，行为可判定。
+ */
+export function resolvePcCompanionSwitches(
+  env: Record<string, string | undefined>
+): NikkiSyncPcCompanionSwitches {
+  const runtimeOff = (env[RUNTIME_ENV_FLAG] ?? '').trim() === '0'
+  const flagOff = (name: string): boolean => runtimeOff || (env[name] ?? '').trim() === '0'
+  return {
+    remoteBridge: !flagOff(PC_COMPANION_ENV_FLAGS.remoteBridge),
+    metadataDictionary: !flagOff(PC_COMPANION_ENV_FLAGS.metadataDictionary),
+    gameVersionUpdates: !flagOff(PC_COMPANION_ENV_FLAGS.gameVersionUpdates),
+    runtimeMemoryMaintenance: !flagOff(PC_COMPANION_ENV_FLAGS.runtimeMemoryMaintenance),
+    wechatGallery: !flagOff(PC_COMPANION_ENV_FLAGS.wechatGallery),
+    desktopControl: !flagOff(PC_COMPANION_ENV_FLAGS.desktopControl)
+  }
+}
 /** 环境变量名（dev / 验证强启）。 */
 export const RUNTIME_ENV_FLAG = 'NIKKI_NIKKISYNC_RUNTIME'
 /** 环境变量名（dev / 验证强指游戏根，与上游 `NIKKISYNC_GAME_ROOT` 区分：这里归宿主管）。 */
@@ -77,6 +119,17 @@ export const METADATA_ENV_FLAG = 'NIKKI_NIKKISYNC_METADATA'
 export const RECYCLE_HELPER_ENV = 'NIKKISYNC_RECYCLE_HELPER'
 /** K8-a：helper 产物文件名（构建脚本 extraResources filter 与此保持一致）。 */
 export const RECYCLE_HELPER_BASENAME = 'nikkisync-recycle-helper.exe'
+/** N7：PC 端资源目录（dev 在仓内，打包态在 resourcesPath 下，由 extraResources 搬运）。 */
+export function resolvePcAssetsDir(input: {
+  isPackaged: boolean
+  resourcesPath: string
+  projectRoot: string
+}): string {
+  return input.isPackaged
+    ? path.join(input.resourcesPath, 'nikkisync', 'pc')
+    : path.join(input.projectRoot, 'resources', 'nikkisync', 'pc')
+}
+
 /** 库文件相对 userData 的路径段。 */
 export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
 /** K2：在线解析同意文件相对 userData 的路径段（上游 0600 JSON，读写全在上游）。 */
@@ -85,6 +138,16 @@ export const NIKKISYNC_CONSENT_SEGMENTS = ['nikkisync', 'metadata-online-consent
 export const NIKKISYNC_EXTRA_DIRECTORIES_SEGMENTS = [
   'nikkisync',
   'extra-scan-directories.json'
+] as const
+/** N2：上游 PC 端在线解析 / 字典配置与缩略图缓存，全部与库同目录（宿主数据同源）。 */
+export const NIKKISYNC_METADATA_RESOLVER_SEGMENTS = ['nikkisync', 'metadata-resolver.json'] as const
+export const NIKKISYNC_METADATA_DICTIONARY_REMOTE_SEGMENTS = [
+  'nikkisync',
+  'metadata-dictionary-remote.json'
+] as const
+export const NIKKISYNC_METADATA_THUMBNAIL_DIR_SEGMENTS = [
+  'nikkisync',
+  'metadata-thumbnails'
 ] as const
 
 /** 设置读取端口（与 `DatabaseManager.getSetting<T>` 对齐，便于注入与单测）。 */
@@ -148,10 +211,22 @@ export function buildSessionOptions(input: {
     // 阶段 6：元数据解析开关。关闭时下游 `createRuntimeSession` 连配置键都不下发，
     // 上游因此不构造 MetadataResolverService ⇒ 零出站请求、零定时器。
     metadataResolverEnabled: resolveMetadataResolverEnabled(input.env, input.settings),
-    // K2：同意文件路径（与库同目录；仅解析开启时被消费，fail-closed 由上游构造器承担）
+    // 上游 PC 端能力位：默认全开，env=0 可逐项或整体关闭（对齐 windows-app.ts 干净安装）
+    pcCompanion: resolvePcCompanionSwitches(input.env),
+    // K2：同意文件路径（与库同目录；仅解析开启时被消费，放行/拒绝由上游构造器按文件状态判定）
     consentFile: nikkisyncMetadataConsentFile(input.userDataDir),
     // K6：额外目录清单文件（上游 0600 JSON 即单一真相源；未给出时 facade 不挂目录面）
     extraDirectoriesFile: path.join(input.userDataDir, ...NIKKISYNC_EXTRA_DIRECTORIES_SEGMENTS),
+    // N2：与上游 windows-app.ts 同款的三份配置/缓存落点；`enabled:false` 即离线开关
+    metadataResolverFile: path.join(input.userDataDir, ...NIKKISYNC_METADATA_RESOLVER_SEGMENTS),
+    metadataDictionaryRemoteFile: path.join(
+      input.userDataDir,
+      ...NIKKISYNC_METADATA_DICTIONARY_REMOTE_SEGMENTS
+    ),
+    metadataThumbnailCacheDir: path.join(
+      input.userDataDir,
+      ...NIKKISYNC_METADATA_THUMBNAIL_DIR_SEGMENTS
+    ),
     projectRoot: input.projectRoot,
     packagingContext: buildPackagingContext({
       isPackaged: input.isPackaged,
@@ -172,8 +247,15 @@ export function buildSessionOptions(input: {
   }
 }
 
-/** 同步服务自启判定：服务开关隐含 Runtime 开关（不开 Runtime 就没有会话可启服务）。 */
-export function resolveSyncEnabled(settings: NikkiSyncSettingsPort): boolean {
+/**
+ * 同步服务自启判定：服务开关隐含 Runtime 开关（不开 Runtime 就没有会话可启服务）。
+ * `RUNTIME=0` 是全局逃生阀，必须连 LAN 服务一起关掉，否则「回到旧形态」名不副实。
+ */
+export function resolveSyncEnabled(
+  settings: NikkiSyncSettingsPort,
+  env: Record<string, string | undefined> = {}
+): boolean {
+  if ((env[RUNTIME_ENV_FLAG] ?? '').trim() === '0') return false
   return settings.getBoolean(SETTING_SYNC_ENABLED, SYNC_ENABLED_DEFAULT)
 }
 
@@ -214,6 +296,9 @@ function settingsFrom(ctx: AppContext): NikkiSyncSettingsPort {
     }
   }
 }
+
+/** N7：本进程装配出的 PC 端服务（供 stopNikkiSyncRuntime 收尾；未装配时为 undefined）。 */
+let pcCompanionServices: PcCompanionServicesLike | undefined
 
 /** 双通道日志：diag.log 本机存在静默失败历史，因此同步走 electron-log（阶段 1 既有口径）。 */
 function runtimeLog(level: 'info' | 'warn' | 'error', message: string): void {
@@ -258,7 +343,7 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
   })
   let sessionOptions = options
   let pairingHostsResolver: (() => string[]) | undefined
-  // K5：多 host 配对（默认关）。开启时装载上游 listLanIpv4（仅枚举本机网卡，无子网扫描），
+  // K5：多 host 配对（默认开）。开启时装载上游 listLanIpv4（仅枚举本机网卡，无子网扫描），
   // 同时作为配对串的 hosts 来源与 /v1/server 的 connectionHosts 回调；装载失败只降级
   // 单 host（warn 可诊断），绝不影响既有配对路径。
   if (settings.getBoolean(SETTING_MULTI_HOST_PAIRING, MULTI_HOST_PAIRING_DEFAULT)) {
@@ -288,7 +373,16 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
   )
   ctx.nikkisyncRuntime = manager
 
-  const syncEnabled = resolveSyncEnabled(settings)
+  const syncEnabled = resolveSyncEnabled(settings, process.env)
+  const switches = options.pcCompanion
+  runtimeLog(
+    'info',
+    `pc companion switches: runtime=${resolveRuntimeEnabled(process.env, settings)} lan=${syncEnabled} ` +
+      `resolver=${options.metadataResolverEnabled} ` +
+      Object.entries(switches ?? {})
+        .map(([name, value]) => `${name}=${value}`)
+        .join(' ')
+  )
   // 开了同步服务就必须开 Runtime：没有会话就没有可 start() 的上游服务器
   if (!resolveRuntimeEnabled(process.env, settings) && !syncEnabled) {
     runtimeLog('info', `embedded runtime registered but disabled (${options.databaseFile})`)
@@ -308,11 +402,68 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
       `sync server autostart: running=${sync.running} port=${sync.port} error=${sync.error ?? 'none'}`
     )
   }
+
+  // C1：PC 端控制页 / 微信画廊必须在会话建成之后装配。此时才能经 manager 的只读
+  // 上下文取到真实 database / 扫描根 / 配对串，避免空 database 与「有二维码无照片」。
+  // 整段独立 try/catch：装载失败（未建链 / 老链接缺深入口）只 warn，不抛进启动链。
+  const liveContext = manager.pcCompanionContext?.()
+  if (!liveContext) {
+    runtimeLog('warn', 'pc companion services unavailable: session not ready')
+    return manager
+  }
+  try {
+    pcCompanionServices = await startPcCompanionServices({
+      projectRoot: app.getAppPath(),
+      packagingContext: options.packagingContext,
+      resourcesDir: resolvePcAssetsDir({
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+        projectRoot: app.getAppPath()
+      }),
+      wechatGallery: switches?.wechatGallery === true,
+      desktopControl: switches?.desktopControl === true,
+      host: () => resolveLanHost(),
+      database: liveContext.database,
+      scanRoots: liveContext.scanRoots,
+      pairingUri: () => {
+        try {
+          return liveContext.pairingUri(resolveLanHost())
+        } catch (error) {
+          runtimeLog('warn', `pc companion pairing uri unavailable: ${String(error)}`)
+          return ''
+        }
+      },
+      log: (level, message) => runtimeLog(level, message)
+    })
+    if (pcCompanionServices) {
+      manager.pcCompanionServices = pcCompanionServices
+      runtimeLog('info', `pc companion services started: ${pcCompanionServices.desktopUrl()}`)
+    }
+  } catch (error) {
+    runtimeLog('warn', `pc companion services unavailable: ${String(error)}`)
+  }
   return manager
 }
 
 /** 优雅停止（由 app/cleanup.ts 在 dbManager.close 之前调用；未注入即 no-op）。 */
 export async function stopNikkiSyncRuntime(ctx: AppContext): Promise<void> {
+  // N7：先停 PC 端服务（每步独立 try/catch，绝不卡住退出链）；即使 Runtime 句柄未装配
+  // 也要走这一段，避免 listen 的端口随进程残留。
+  if (pcCompanionServices) {
+    try {
+      await pcCompanionServices.stop()
+      runtimeLog('info', 'pc companion services stopped')
+    } catch (error) {
+      runtimeLog('warn', `pc companion services stop failed: ${String(error)}`)
+    }
+    pcCompanionServices = undefined
+  }
+  // N4：会话拆除后清空活动会话注册表，避免灵感库通道拿到已关库的旧 session
+  try {
+    setActiveRuntimeSession(undefined)
+  } catch {
+    // 纯内存赋值，理论不抛；仍不让任何异常影响退出链
+  }
   const manager = ctx.nikkisyncRuntime
   if (!manager) return
   try {

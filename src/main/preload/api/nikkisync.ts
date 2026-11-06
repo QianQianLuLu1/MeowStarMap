@@ -1,8 +1,6 @@
-// @core-change: 照片目录契约订正——set/resetGameRoot 由主进程落库后当场走运行期生效通道
-//               （换根重建 + 全量扫描），返回体 needRestart 不再恒 true、新增可选
-//               applied / applyError；本层只做透传，不改方法名与入参。
-//               （历史：三通道与 admitDirectory 预检接入、K9 账号作用域、K6 目录面、K2/K3/K8
-//               历次接入——见各节点提交。）
+// @core-change: 同步图库对齐上游 PC 端：新增灵感库 list/save/image-put/image-get 与
+//               本机控制页 desktop-open、微信画廊 wechat-start/stop/status 共 8 条透传方法，
+//               并同步 docs/IPC_CONTRACT.md；本层不改既有方法名与入参。
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -15,7 +13,15 @@ import type {
   NikkiSyncChangesInfo,
   NikkiSyncChangesQueryInfo,
   NikkiSyncClothingSearchInfo,
+  NikkiSyncDesktopOpenInfo,
   NikkiSyncGameRootInfo,
+  NikkiSyncInspirationImageGetQueryInfo,
+  NikkiSyncInspirationImagePutInputInfo,
+  NikkiSyncInspirationImageResultInfo,
+  NikkiSyncInspirationListInfo,
+  NikkiSyncInspirationListQueryInfo,
+  NikkiSyncInspirationSaveInputInfo,
+  NikkiSyncInspirationVersionedInfo,
   NikkiSyncMetadataConsentInfo,
   NikkiSyncMetadataConsentSetInput,
   NikkiSyncGameVersionInfo,
@@ -45,7 +51,10 @@ import type {
   NikkiSyncSyncAccountPreviewInfo,
   NikkiSyncSyncAccountSelectionInput,
   NikkiSyncSyncAccountsInfo,
-  NikkiSyncSyncStartInputInfo
+  NikkiSyncSyncStartInputInfo,
+  NikkiSyncWeChatStartInfo,
+  NikkiSyncWeChatStatusInfo,
+  NikkiSyncWeChatStopInfo
 } from '../../../shared/types/electron-api'
 
 /** electronAPI.nikkisync：内嵌 NikkiSync Runtime（状态 / 扫描 / 资产只读查询 / 局域网同步服务） */
@@ -151,5 +160,27 @@ export const nikkisyncAPI = {
     call<NikkiSyncOrganizerItemInfo[]>('nikkisync:decide-organizer-item', input),
   /** 批量批准（1..500；返回 {items, approved, skipped}；重复 id 由上游 invalid_ids 拒绝） */
   approveOrganizerItems: (input: NikkiSyncOrganizerApproveInput) =>
-    call<NikkiSyncOrganizerApproveResultInfo>('nikkisync:approve-organizer-items', input)
+    call<NikkiSyncOrganizerApproveResultInfo>('nikkisync:approve-organizer-items', input),
+  // ---- N4：灵感库（上游 /v1/inspiration*，v1.0.29；形状逐字对齐 InspirationRoutes.ts）----
+  /** 列表：after 为 UUID 游标，limit 1..100 缺省 100（主进程 zod 同界） */
+  listInspirations: (input?: NikkiSyncInspirationListQueryInfo) =>
+    call<NikkiSyncInspirationListInfo>('nikkisync:inspiration-list', input ?? {}),
+  /** 保存（乐观锁）：baseRevision 必须取自当前条目的 revision，冲突由主进程映射 PRECONDITION_FAILED */
+  saveInspiration: (input: NikkiSyncInspirationSaveInputInfo) =>
+    call<NikkiSyncInspirationVersionedInfo>('nikkisync:inspiration-save', input),
+  /** 上传图片字节（base64）：sha256 必须是字节的真实摘要、mimeType 必须 image/ 开头、上限 15MiB */
+  putInspirationImage: (input: NikkiSyncInspirationImagePutInputInfo) =>
+    call<{ ok: boolean }>('nikkisync:inspiration-image-put', input),
+  /** 读取图片字节（base64）；不存在时 NOT_FOUND */
+  getInspirationImage: (input: NikkiSyncInspirationImageGetQueryInfo) =>
+    call<NikkiSyncInspirationImageResultInfo>('nikkisync:inspiration-image-get', input),
+  // ---- N7：PC 端控制页 / 微信画廊 ----
+  /** 本机控制页 URL（渲染层经既有 `shell.openExternal` 桥打开，不在此直接开外部进程） */
+  desktopOpen: () => call<NikkiSyncDesktopOpenInfo>('nikkisync:desktop-open'),
+  /** 启动微信画廊并返回状态 + 二维码 SVG */
+  wechatStart: () => call<NikkiSyncWeChatStartInfo>('nikkisync:wechat-start'),
+  /** 停止微信画廊并返回状态 */
+  wechatStop: () => call<NikkiSyncWeChatStopInfo>('nikkisync:wechat-stop'),
+  /** 只读查询微信画廊状态 */
+  wechatStatus: () => call<NikkiSyncWeChatStatusInfo>('nikkisync:wechat-status')
 }

@@ -4360,7 +4360,8 @@
       "statsEmpty": "Ainda sem estatísticas",
       "statsFailed": "Falha ao carregar estatísticas",
       "topSuits": "Conjuntos mais usados",
-      "topClothing": "Peças mais usadas"
+      "topClothing": "Peças mais usadas",
+      "backfillFailed": "Não foi possível carregar as fotos correspondentes; exibindo apenas resultados em texto"
     },
     "title": "Galeria sincronizada",
     "subtitle": "Recursos da biblioteca NikkiSync embutida, sem afetar a galeria local",
@@ -4405,7 +4406,32 @@
         "hash": "Hash do conteúdo",
         "metadata": "Metadados",
         "gameVersionInferred": " (inferida)"
+      },
+      "upstreamTitle": "Metadados de origem",
+      "upstreamFallback": "Metadados de origem indisponíveis, exibindo decodificação local",
+      "upstream": {
+        "focalLength": "Distância focal",
+        "aperture": "Abertura",
+        "exposure": "Exposição",
+        "dressingParts": "Peças do look"
       }
+    },
+    "inspiration": {
+      "title": "Biblioteca de inspiração",
+      "hint": "Códigos, categorias, estado e imagens de referência sincronizados com o telemóvel",
+      "new": "Novo",
+      "titleLabel": "Título",
+      "notesLabel": "Notas",
+      "imageLabel": "Imagem de referência",
+      "imageFailed": "Falha ao enviar a imagem de referência",
+      "save": "Guardar",
+      "cancel": "Cancelar",
+      "saveFailed": "Falha ao guardar",
+      "loadFailed": "Falha ao carregar",
+      "loading": "A carregar…",
+      "empty": "Ainda não há entradas de inspiração",
+      "edit": "Editar",
+      "delete": "Eliminar"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "Mais tarde",
       "invalidEmpty": "Digite ou selecione primeiro um caminho de diretório",
       "invalidAbsolute": "Digite um caminho absoluto (ex.: D:\\Photos)"
+    },
+    "pc": {
+      "title": "Companheiro PC",
+      "description": "Página de controlo local e galeria WeChat (NikkiSync PC original)",
+      "openDesktop": "Abrir página de controlo local",
+      "wechatStart": "Iniciar galeria WeChat",
+      "wechatStop": "Parar galeria WeChat",
+      "wechatStatus": "Estado da galeria WeChat: {{state}}",
+      "unavailable": "Companheiro PC indisponível"
     }
   },
   "shareCard": {

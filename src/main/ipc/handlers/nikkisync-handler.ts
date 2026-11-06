@@ -1,12 +1,16 @@
-// @core-change: 审查轮补两处闸门缝——盘根闸认正斜杠 UNC 根（`//nas/share` 与 `\\nas\share` 同指一个共享根，
-//               原正则只匹配反斜杠起始，整块共享可被登记成同步照片源）；生效失败的「未就绪」短语集
-//               与 toAppError 收敛为同一常量，消除同一语义在两条链上拿到不同 applyError 的口径分叉。
+// @core-change: 同步图库对齐上游 PC 端：整理队列默认开，新增灵感库四条通道与 PC 控制页/微信画廊通道，
+//               能力位默认全开；同步服务页、docs/IPC_CONTRACT.md 与装载清单同批更新。
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
-import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
+import { getActiveRuntimeSession } from '../../nikkisync/runtime-facade'
+import type {
+  InspirationRepositoryLike,
+  NikkiSyncRuntimeHandle,
+  PcCompanionServicesLike
+} from '../../nikkisync/runtime-types'
 // 生效失败分类判据与 runtime-manager 同源（该常量是其状态机判定 degraded 的同一把尺）
 import { installNotfoundMessage } from '../../nikkisync/runtime-manager'
 // 照片目录校验失败的用户可见文案走主进程 i18n（不含路径，路径只在 details 里走 maskPath 脱敏）
@@ -242,11 +246,12 @@ function organizerErrorToAppError(error: unknown): AppError {
 }
 
 /**
- * K8：开关门。三通道先读 `nikkisync.organizerEnabled`（渲染层白名单键，默认 false），
- * false ⇒ PRECONDITION_FAILED——破坏性能力的显式开关，错误文案指向同步服务页开关。
+ * K8：开关门。三通道读 `nikkisync.organizerEnabled`（渲染层白名单键）。
+ * 与上游 PC 端干净安装对齐，缺省为 true；显式写入 false 仍可关闭该破坏性能力，
+ * 关闭时 PRECONDITION_FAILED 的错误文案指向同步服务页开关。
  */
 function requireOrganizerEnabled(ctx: HandlerContext): void {
-  const enabled = ctx.dbManager.getSetting<boolean>('nikkisync.organizerEnabled', false)
+  const enabled = ctx.dbManager.getSetting<boolean>('nikkisync.organizerEnabled', true)
   if (enabled !== true) {
     throw AppError.preconditionFailed(
       'organizer is disabled: enable it via the nikkisync.organizerEnabled switch on the sync service page'
@@ -360,6 +365,106 @@ function requireRuntime(ctx: HandlerContext): NikkiSyncRuntimeHandle {
     throw AppError.preconditionFailed('nikkisync runtime is not assembled yet')
   }
   return ctx.nikkisyncRuntime
+}
+
+// ---- N4：灵感库（上游 /v1/inspiration*，逐字对齐 InspirationRoutes.ts:8-37）----
+
+/** 上游 `InspirationRepository.list` 同界：limit 1..100 缺省 100；after 为 UUID 游标。 */
+const inspirationListSchema = z.object({
+  after: z.string().max(64).optional(),
+  limit: z.number().int().min(1).max(100).default(100)
+})
+
+/** 上游 `save(entry, baseRevision)`：条目形态与 revision 合法性交上游单真相源。 */
+const inspirationSaveSchema = z.object({
+  entry: z.unknown(),
+  baseRevision: z.number().int().min(0)
+})
+
+/** 上游 PUT /images/{sha256}：15MiB 上限 + sha256 正则 + mimeType 必须 image/ 开头。 */
+const INSPIRATION_MAX_IMAGE_BYTES = 15 * 1024 * 1024
+const INSPIRATION_MAX_BASE64_LENGTH = Math.ceil(INSPIRATION_MAX_IMAGE_BYTES / 3) * 4
+const inspirationSha256Schema = z.string().regex(/^[a-f0-9]{64}$/)
+const inspirationImagePutSchema = z.object({
+  sha256: inspirationSha256Schema,
+  mimeType: z
+    .string()
+    .min(1)
+    .max(80)
+    .refine((value) => value.startsWith('image/'), {
+      message: 'mimeType must start with image/'
+    }),
+  bytesBase64: z
+    .string()
+    .min(1)
+    .max(INSPIRATION_MAX_BASE64_LENGTH)
+    .refine((value) => Buffer.from(value, 'base64').byteLength <= INSPIRATION_MAX_IMAGE_BYTES, {
+      message: 'image exceeds 15 MiB'
+    })
+})
+const inspirationImageGetSchema = z.object({ sha256: inspirationSha256Schema })
+
+/**
+ * N4：上游 `InspirationRoutes` / `InspirationRepository` 错误短码 → IPC 错误码
+ * （逐码注释，映射表唯一真相源）。形态类 → VALIDATION_ERROR；乐观锁冲突 →
+ * PRECONDITION_FAILED；图片不存在 → NOT_FOUND。
+ */
+const INSPIRATION_ERROR_CODES: Record<string, 'validation' | 'precondition' | 'notFound'> = {
+  conflict: 'precondition', // baseRevision 与库中 revision 不符（可重读后重试）
+  too_large: 'validation', // 请求体超过 15MiB / 512KiB
+  invalid_entry: 'validation', // 条目形态非法（上游 validate 单真相源）
+  invalid_image: 'validation', // 图片字节/魔数/mime 不匹配
+  image_hash: 'validation', // sha256 与实际字节不符
+  image_type: 'validation', // 同 hash 已存在不同 mime
+  missing_image: 'validation', // 条目引用的图片尚未上传
+  invalid_limit: 'validation', // limit 越界（zod 先行，上游再判一次）
+  invalid_cursor: 'validation', // after 不是合法 UUID 游标
+  not_found: 'notFound' // 图片不存在（HTTP 404 语义）
+}
+
+function inspirationErrorToAppError(error: unknown): AppError {
+  if (error instanceof AppError) return error
+  const message = error instanceof Error ? error.message : String(error)
+  const code = message.trim().split(/[\s:]+/)[0]
+  const mapped = code ? INSPIRATION_ERROR_CODES[code] : undefined
+  if (mapped === 'validation') {
+    return AppError.validation(`inspiration request rejected: ${code}`)
+  }
+  if (mapped === 'precondition') {
+    return AppError.preconditionFailed(`inspiration state rejected: ${code}`)
+  }
+  if (mapped === 'notFound') {
+    return AppError.notFound(`nikkisync inspiration: ${code}`)
+  }
+  return toAppError(error, 'inspiration')
+}
+
+/**
+ * N4：会话 inspirations 面。复用 `requireRuntime(ctx)` 的「句柄未装配」口径，
+ * 会话（或老链接的 inspirations 面）缺席同样是 PRECONDITION_FAILED。
+ */
+function requireInspirations(ctx: HandlerContext): InspirationRepositoryLike {
+  requireRuntime(ctx)
+  const store = getActiveRuntimeSession()?.inspirations
+  if (!store) {
+    throw AppError.preconditionFailed(
+      'inspiration surface is unavailable (runtime session not assembled)'
+    )
+  }
+  return store
+}
+
+/**
+ * N7：PC 端服务挂在 `ctx.nikkisyncRuntime` 句柄的可选面上（由
+ * `app/nikkisync-runtime-setup.ts` 装配后写入）。句柄未装配 / 服务未启动 ⇒
+ * PRECONDITION_FAILED，复用 `requireRuntime` 口径。
+ */
+function requirePcServices(ctx: HandlerContext): PcCompanionServicesLike {
+  const runtime = requireRuntime(ctx)
+  if (!runtime.pcCompanionServices) {
+    throw AppError.preconditionFailed('pc companion services are not assembled')
+  }
+  return runtime.pcCompanionServices
 }
 
 /**
@@ -1147,6 +1252,146 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
           }
         }
       )
+    })
+  )
+
+  // ---- N4：灵感库（上游 /v1/inspiration*，逐字对齐 InspirationRoutes.ts 形状）----
+
+  ipcMain.handle(
+    'nikkisync:inspiration-list',
+    wrapHandlerRaw(ctx, async (args) => {
+      requireRuntime(ctx)
+      return parseAndRun(
+        inspirationListSchema,
+        args[0] ?? {},
+        'inspiration-list',
+        async (input) => {
+          try {
+            return requireInspirations(ctx).list(input.after ?? '', input.limit)
+          } catch (error) {
+            throw inspirationErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:inspiration-save',
+    wrapHandlerRaw(ctx, async (args) => {
+      requireRuntime(ctx)
+      return parseAndRun(
+        inspirationSaveSchema,
+        args[0] ?? {},
+        'inspiration-save',
+        async (input) => {
+          try {
+            return requireInspirations(ctx).save(input.entry, input.baseRevision)
+          } catch (error) {
+            throw inspirationErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:inspiration-image-put',
+    wrapHandlerRaw(ctx, async (args) => {
+      requireRuntime(ctx)
+      return parseAndRun(
+        inspirationImagePutSchema,
+        args[0] ?? {},
+        'inspiration-image-put',
+        async (input) => {
+          try {
+            requireInspirations(ctx).putImage(
+              input.sha256,
+              input.mimeType,
+              Buffer.from(input.bytesBase64, 'base64')
+            )
+            return { ok: true }
+          } catch (error) {
+            throw inspirationErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:inspiration-image-get',
+    wrapHandlerRaw(ctx, async (args) => {
+      requireRuntime(ctx)
+      return parseAndRun(
+        inspirationImageGetSchema,
+        args[0] ?? {},
+        'inspiration-image-get',
+        async (input) => {
+          try {
+            const image = requireInspirations(ctx).image(input.sha256)
+            if (!image) {
+              throw AppError.notFound('nikkisync inspiration image: not_found')
+            }
+            return {
+              mimeType: image.mimeType,
+              bytesBase64: Buffer.from(image.bytes).toString('base64')
+            }
+          } catch (error) {
+            throw inspirationErrorToAppError(error)
+          }
+        }
+      )
+    })
+  )
+
+  // ---- N7：PC 端控制页 / 微信画廊（服务挂在运行时句柄的可选面上）----
+
+  ipcMain.handle(
+    'nikkisync:desktop-open',
+    wrapHandlerNoArgs(ctx, async () => {
+      try {
+        const url = requirePcServices(ctx).desktopUrl()
+        if (!url) {
+          throw AppError.preconditionFailed('pc companion desktop control page is not listening')
+        }
+        return { url }
+      } catch (error) {
+        throw toAppError(error, 'desktop-open')
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:wechat-start',
+    wrapHandlerNoArgs(ctx, async () => {
+      try {
+        return await requirePcServices(ctx).wechatStart()
+      } catch (error) {
+        throw toAppError(error, 'wechat-start')
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:wechat-stop',
+    wrapHandlerNoArgs(ctx, async () => {
+      try {
+        return await requirePcServices(ctx).wechatStop()
+      } catch (error) {
+        throw toAppError(error, 'wechat-stop')
+      }
+    })
+  )
+
+  ipcMain.handle(
+    'nikkisync:wechat-status',
+    wrapHandlerNoArgs(ctx, async () => {
+      try {
+        return { status: requirePcServices(ctx).wechatStatus() }
+      } catch (error) {
+        throw toAppError(error, 'wechat-status')
+      }
     })
   )
 }

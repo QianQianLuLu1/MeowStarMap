@@ -4360,7 +4360,8 @@
       "statsEmpty": "Pas encore de statistiques",
       "statsFailed": "Échec du chargement des statistiques",
       "topSuits": "Tenues les plus portées",
-      "topClothing": "Vêtements les plus portés"
+      "topClothing": "Vêtements les plus portés",
+      "backfillFailed": "Impossible de charger les photos correspondantes ; seuls les résultats texte sont affichés"
     },
     "title": "Galerie synchronisée",
     "subtitle": "Ressources de la bibliothèque NikkiSync intégrée, sans impact sur la galerie locale",
@@ -4405,7 +4406,32 @@
         "hash": "Empreinte du contenu",
         "metadata": "Métadonnées",
         "gameVersionInferred": " (déduit)"
+      },
+      "upstreamTitle": "Métadonnées en amont",
+      "upstreamFallback": "Métadonnées en amont indisponibles, décodage local affiché",
+      "upstream": {
+        "focalLength": "Distance focale",
+        "aperture": "Ouverture",
+        "exposure": "Exposition",
+        "dressingParts": "Pièces de la tenue"
       }
+    },
+    "inspiration": {
+      "title": "Bibliothèque d’inspiration",
+      "hint": "Codes de partage, catégories, statut et images de référence synchronisés avec le téléphone",
+      "new": "Nouveau",
+      "titleLabel": "Titre",
+      "notesLabel": "Notes",
+      "imageLabel": "Image de référence",
+      "imageFailed": "Échec du téléversement de l’image de référence",
+      "save": "Enregistrer",
+      "cancel": "Annuler",
+      "saveFailed": "Échec de l’enregistrement",
+      "loadFailed": "Échec du chargement",
+      "loading": "Chargement…",
+      "empty": "Aucune entrée d’inspiration",
+      "edit": "Modifier",
+      "delete": "Supprimer"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "Plus tard",
       "invalidEmpty": "Saisissez d’abord ou sélectionnez un chemin de dossier",
       "invalidAbsolute": "Saisissez un chemin absolu (ex. D:\\Photos)"
+    },
+    "pc": {
+      "title": "Compagnon PC",
+      "description": "Page de contrôle locale et galerie WeChat (NikkiSync PC en amont)",
+      "openDesktop": "Ouvrir la page de contrôle locale",
+      "wechatStart": "Démarrer la galerie WeChat",
+      "wechatStop": "Arrêter la galerie WeChat",
+      "wechatStatus": "État de la galerie WeChat : {{state}}",
+      "unavailable": "Compagnon PC indisponible"
     }
   },
   "shareCard": {

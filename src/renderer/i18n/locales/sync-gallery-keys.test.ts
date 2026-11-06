@@ -107,7 +107,32 @@ const REQUIRED_KEYS = [
   'syncGallery.drawer.fields.metadata',
   // store 的 error 存的就是这两个键，页面直接 t(error)
   'syncGallery.error.bridgeMissing',
-  'syncGallery.error.loadFailed'
+  'syncGallery.error.loadFailed',
+  // N5：详情抽屉优先读上游 metadata 的上游参数段与回落提示
+  'syncGallery.drawer.upstreamTitle',
+  'syncGallery.drawer.upstreamFallback',
+  'syncGallery.drawer.upstream.focalLength',
+  'syncGallery.drawer.upstream.aperture',
+  'syncGallery.drawer.upstream.exposure',
+  'syncGallery.drawer.upstream.dressingParts',
+  // N5：检索命中回捞失败时保留文本榜并给出内联提示
+  'syncGallery.insight.backfillFailed',
+  // N4：灵感库列表/编辑器（上游 /v1/inspiration*）
+  'syncGallery.inspiration.title',
+  'syncGallery.inspiration.hint',
+  'syncGallery.inspiration.new',
+  'syncGallery.inspiration.titleLabel',
+  'syncGallery.inspiration.notesLabel',
+  'syncGallery.inspiration.imageLabel',
+  'syncGallery.inspiration.imageFailed',
+  'syncGallery.inspiration.save',
+  'syncGallery.inspiration.cancel',
+  'syncGallery.inspiration.saveFailed',
+  'syncGallery.inspiration.loadFailed',
+  'syncGallery.inspiration.loading',
+  'syncGallery.inspiration.empty',
+  'syncGallery.inspiration.edit',
+  'syncGallery.inspiration.delete'
 ]
 
 describe('同步图库语言包完整性', () => {

@@ -60,6 +60,9 @@ interface FakeCalls {
   metadataDiagnostics: number
   /** 阶段 6：上游 `runtime.start()` 是否被调用过（本仓必须恒为 0）。 */
   runtimeStart: number
+  /** N3：上游后台服务启停委托的调用计数（补偿「不调 runtime.start()」）。 */
+  backgroundStart: number
+  backgroundStop: number
   /** K1：缓存解码元数据闭包被调次数。 */
   cachedMetadataRunOnce: number
   /** K2：同意开关 setEnabled 收到的参数序列。 */
@@ -124,7 +127,9 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
     getStatus: () =>
       'scannerStatusRaw' in plan
         ? plan.scannerStatusRaw
-        : { status: 'running', installation, lastScan }
+        : { status: 'running', installation, lastScan },
+    // C1：真实扫描根（缺省给一条合法路径，脏值由 plan.scanRoots 注入）
+    getScanRoots: () => ('scanRoots' in plan ? plan.scanRoots : ['/game/photos'])
   }
   /**
    * 上游同步服务器的假面：`start()` 回显固定地址（真实端口由上游 `start()` 给出，
@@ -220,6 +225,21 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
       calls.order.push('metadataResolver.stop')
       if (plan.metadataStopThrows) throw new Error('metadata resolver stop failed')
     },
+    // N3：上游 runtime.start() 的后台服务阶段在本仓从未发生；委托面「仅存在时挂出」。
+    ...(plan.backgroundServicesPresent
+      ? {
+          startBackgroundServices: () => {
+            calls.backgroundStart += 1
+            calls.order.push('background.start')
+            if (plan.backgroundStartThrows) throw new Error('dictionary updater start failed')
+          },
+          stopBackgroundServices: () => {
+            calls.backgroundStop += 1
+            calls.order.push('background.stop')
+            if (plan.backgroundStopThrows) throw new Error('dictionary updater stop failed')
+          }
+        }
+      : {}),
     // 上游条件构造的镜像：未开启 ⇒ 该成员整个缺席，编排层据此判 0 轮
     ...(plan.metadataResolverPresent
       ? {
@@ -487,6 +507,8 @@ function createDependencies(
     metadataRunOnce: 0,
     metadataDiagnostics: 0,
     runtimeStart: 0,
+    backgroundStart: 0,
+    backgroundStop: 0,
     cachedMetadataRunOnce: 0,
     metadataConsentSet: [],
     resolveGameVersion: [],
@@ -1953,5 +1975,103 @@ describe('createRuntimeManager 扫描并发保护（换根重建不得拆掉在�
       repeated,
       `拆除链交叠：${repeated.length} 个会话被拆了 ${repeated.join('/')} 次（同一 SQLite 句柄重复 close）`
     ).toEqual([])
+  })
+})
+
+// ============================================================================
+// N3：补偿「本仓不调上游 runtime.start()」——上游在 start() 里启的后台服务
+// （字典 updater / reenrich / metadataResolver）在本仓从未发生。
+// ============================================================================
+describe('N3 上游后台服务显式编排', () => {
+  it('正常：scanner.start 成功后启动后台服务，并如实记录 background-services 阶段', async () => {
+    const { deps, calls } = createDependencies({}, { backgroundServicesPresent: true })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    expect(calls.backgroundStart).toBe(1)
+    expect(status.startupStages?.map((item) => item.stage)).toContain('background-services')
+  })
+
+  it('正常：teardown 在 dispose 之前停掉全部后台服务', async () => {
+    const { deps, calls } = createDependencies({}, { backgroundServicesPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.stop()
+    expect(calls.backgroundStop).toBe(1)
+    const stoppedAt = calls.order.indexOf('background.stop')
+    const disposedAt = calls.order.indexOf('dispose')
+    expect(stoppedAt).toBeGreaterThanOrEqual(0)
+    expect(disposedAt).toBeGreaterThan(stoppedAt)
+  })
+
+  it('异常：后台服务 start 抛错不改判已 running 的主状态，且留下 warn 日志', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { backgroundServicesPresent: true, backgroundStartThrows: true }
+    )
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    expect(calls.backgroundStart).toBe(1)
+    expect(
+      calls.logs.some(
+        (item) => item.level === 'warn' && item.message.includes('background services')
+      )
+    ).toBe(true)
+  })
+
+  it('异常：后台服务 stop 抛错不卡住退出链，dispose 仍被调用', async () => {
+    const { deps, calls } = createDependencies(
+      {},
+      { backgroundServicesPresent: true, backgroundStopThrows: true }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.stop()).resolves.toBeUndefined()
+    expect(calls.backgroundStop).toBe(1)
+    expect(calls.dispose).toBeGreaterThan(0)
+  })
+
+  it('边界：会话无后台委托面（老链接）时零调用且无异常', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.stop()
+    expect(calls.backgroundStart).toBe(0)
+    expect(calls.backgroundStop).toBe(0)
+  })
+})
+
+// ============================================================================
+// C1：PC 端会话上下文（补齐 desktop/wechat 三处降级的唯一数据来源）
+// ============================================================================
+describe('C1 pcCompanionContext（真实会话上下文）', () => {
+  it('正常：暴露会话的 database、扫描根与可调用的 pairingUri', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const live = manager.pcCompanionContext()
+    expect(live).toBeDefined()
+    expect(live?.database).toBeDefined()
+    expect(live?.scanRoots).toEqual(['/game/photos'])
+    expect(typeof live?.pairingUri).toBe('function')
+    expect(live?.pairingUri('192.168.1.2')).toContain('NS1|')
+  })
+
+  it('异常：会话未建时返回 undefined 且不抛', () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    expect(() => manager.pcCompanionContext()).not.toThrow()
+    expect(manager.pcCompanionContext()).toBeUndefined()
+  })
+
+  it('边界：getScanRoots 返回脏值时只保留字符串路径', async () => {
+    const { deps } = createDependencies(
+      {},
+      { scanRoots: ['/ok/photos', 12, null, { path: '/bad' }, '/ok/motion'] }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(manager.pcCompanionContext()?.scanRoots).toEqual(['/ok/photos', '/ok/motion'])
   })
 })

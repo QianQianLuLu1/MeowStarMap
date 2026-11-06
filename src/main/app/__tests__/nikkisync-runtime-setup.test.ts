@@ -31,6 +31,7 @@ import {
   GAME_ROOT_ENV_FLAG,
   METADATA_ENV_FLAG,
   METADATA_RESOLVER_ENABLED_DEFAULT,
+  MULTI_HOST_PAIRING_DEFAULT,
   NIKKISYNC_DB_SEGMENTS,
   RECYCLE_HELPER_ENV,
   RUNTIME_ENABLED_DEFAULT,
@@ -64,48 +65,66 @@ import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
 // 依赖以替身注入：本文件验证「装配 → 状态机」的接线（谁被调用、传什么参数），
 // 真装载链由 src/main/nikkisync/runtime-facade.linked.test.ts 在链接态覆盖。
-const { managerDouble, depsDouble } = vi.hoisted(() => ({
-  managerDouble: {
-    status: vi.fn(() => ({ state: 'running', dbPath: '', linkReady: true })),
-    start: vi.fn(async () => ({
-      state: 'running',
-      dbPath: '/mock/userdata/nikkisync/nikkisync.db',
-      linkReady: true,
-      tables: ['assets']
-    })),
-    scan: vi.fn(async () => ({ scanId: 'scan_1' })),
-    stop: vi.fn(async () => undefined),
-    listAssets: vi.fn(async () => ({ items: [] })),
-    getAssetDetail: vi.fn(async () => ({ asset: {} })),
-    getResource: vi.fn(async () => ({})),
-    // 阶段 3：同步服务编排面
-    syncStatus: vi.fn(() => ({ running: false, host: '0.0.0.0', port: 28080, mdnsEnabled: true })),
-    startSyncServer: vi.fn(async () => ({
-      running: true,
-      host: '0.0.0.0',
-      port: 28080,
-      secure: true,
-      mdnsEnabled: true
-    })),
-    stopSyncServer: vi.fn(async () => ({
-      running: false,
-      host: '0.0.0.0',
-      port: 28080,
-      mdnsEnabled: true
-    })),
-    pairingCode: vi.fn(async () => ({ content: 'NS1|x' })),
-    listPairedDevices: vi.fn(async () => []),
-    revokeDevice: vi.fn(async () => [])
-  },
-  depsDouble: {
-    defaults: {},
-    createSession: vi.fn(),
-    isLinkReady: vi.fn(() => true),
-    ensureDatabaseDirectory: vi.fn(),
-    log: vi.fn(),
-    withTimeout: vi.fn()
+const { managerDouble, depsDouble, pcServicesDouble } = vi.hoisted(() => {
+  const LIVE_DATABASE = { connection: { prepare: () => ({ all: () => [] }) } }
+  return {
+    pcServicesDouble: {
+      LIVE_DATABASE,
+      startPcCompanionServices: vi.fn(async () => undefined)
+    },
+    managerDouble: {
+      status: vi.fn(() => ({ state: 'running', dbPath: '', linkReady: true })),
+      start: vi.fn(async () => ({
+        state: 'running',
+        dbPath: '/mock/userdata/nikkisync/nikkisync.db',
+        linkReady: true,
+        tables: ['assets']
+      })),
+      scan: vi.fn(async () => ({ scanId: 'scan_1' })),
+      stop: vi.fn(async () => undefined),
+      listAssets: vi.fn(async () => ({ items: [] })),
+      getAssetDetail: vi.fn(async () => ({ asset: {} })),
+      getResource: vi.fn(async () => ({})),
+      // 阶段 3：同步服务编排面
+      syncStatus: vi.fn(() => ({
+        running: false,
+        host: '0.0.0.0',
+        port: 28080,
+        mdnsEnabled: true
+      })),
+      startSyncServer: vi.fn(async () => ({
+        running: true,
+        host: '0.0.0.0',
+        port: 28080,
+        secure: true,
+        mdnsEnabled: true
+      })),
+      stopSyncServer: vi.fn(async () => ({
+        running: false,
+        host: '0.0.0.0',
+        port: 28080,
+        mdnsEnabled: true
+      })),
+      pairingCode: vi.fn(async () => ({ content: 'NS1|x' })),
+      listPairedDevices: vi.fn(async () => []),
+      revokeDevice: vi.fn(async () => []),
+      // C1：PC 端会话上下文（真实 database / 扫描根 / 配对串）
+      pcCompanionContext: vi.fn(() => ({
+        database: LIVE_DATABASE,
+        scanRoots: ['/game/photos'],
+        pairingUri: () => 'NS1|live-session'
+      }))
+    },
+    depsDouble: {
+      defaults: {},
+      createSession: vi.fn(),
+      isLinkReady: vi.fn(() => true),
+      ensureDatabaseDirectory: vi.fn(),
+      log: vi.fn(),
+      withTimeout: vi.fn()
+    }
   }
-}))
+})
 
 vi.mock('../../nikkisync/runtime-facade', () => ({
   createManagerDependencies: vi.fn(() => depsDouble)
@@ -113,6 +132,11 @@ vi.mock('../../nikkisync/runtime-facade', () => ({
 
 vi.mock('../../nikkisync/runtime-manager', () => ({
   createRuntimeManager: vi.fn(() => managerDouble)
+}))
+
+// C1：PC 端服务装配用替身观察调用时序与入参（本文件不测上游真实装载）
+vi.mock('../../nikkisync/pc-companion-services', () => ({
+  startPcCompanionServices: pcServicesDouble.startPcCompanionServices
 }))
 
 // 局域网地址解析器复用移植面那一份实现（同文件导出）；本文件不测它，避免真碰网卡
@@ -162,9 +186,9 @@ describe('resolveRecycleHelperPath（K8-a：回收 helper 路径）', () => {
 })
 
 describe('resolveRuntimeEnabled 开关优先级', () => {
-  it('默认关闭（缺省值与常量一致）', () => {
-    expect(RUNTIME_ENABLED_DEFAULT).toBe(false)
-    expect(resolveRuntimeEnabled({}, settings({}))).toBe(false)
+  it('默认开启（缺省值与常量一致，对齐上游 PC 端）', () => {
+    expect(RUNTIME_ENABLED_DEFAULT).toBe(true)
+    expect(resolveRuntimeEnabled({}, settings({}))).toBe(true)
   })
 
   it('NIKKI_NIKKISYNC_RUNTIME=1 强开，=0 强关，均优先于设置项', () => {
@@ -188,9 +212,10 @@ describe('resolveRuntimeEnabled 开关优先级', () => {
 })
 
 describe('resolveSyncEnabled 服务开关（阶段3）', () => {
-  it('默认关闭：绑 0.0.0.0 暴露游戏照片库属敏感行为，必须用户显式开启', () => {
-    expect(SYNC_ENABLED_DEFAULT).toBe(false)
-    expect(resolveSyncEnabled(settings({}))).toBe(false)
+  it('默认开启（上游 PC 端干净安装口径）；RUNTIME=0 逃生阀可整体关闭', () => {
+    expect(SYNC_ENABLED_DEFAULT).toBe(true)
+    expect(resolveSyncEnabled(settings({}))).toBe(true)
+    expect(resolveSyncEnabled(settings({}), { [RUNTIME_ENV_FLAG]: '0' })).toBe(false)
   })
 
   it('设置项为 true 时开启', () => {
@@ -209,6 +234,7 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     managerDouble.start.mockClear()
     managerDouble.stop.mockClear()
     managerDouble.startSyncServer.mockClear()
+    pcServicesDouble.startPcCompanionServices.mockClear()
     managerDouble.startSyncServer.mockResolvedValue({
       running: true,
       host: '0.0.0.0',
@@ -224,12 +250,13 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     })
   })
 
-  it('开关关闭（缺省）：仅注入句柄，不自启', async () => {
+  it('缺省即自启：注入句柄并启动 Runtime 与 LAN 同步服务（对齐上游 PC 端）', async () => {
     const ctx = makeAppCtx()
     const manager = await initNikkiSyncRuntime(ctx)
     expect(manager).toBe(managerDouble)
     expect(ctx.nikkisyncRuntime).toBe(managerDouble)
-    expect(managerDouble.start).not.toHaveBeenCalled()
+    expect(managerDouble.start).toHaveBeenCalledTimes(1)
+    expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(1)
   })
 
   it('env 强开：以 userData 库路径自启，并下传打包态上下文', async () => {
@@ -357,7 +384,7 @@ describe('buildSessionOptions', () => {
     settings: settings({})
   }
 
-  it('正常：开发态给出 userData 库路径 + watcher 关闭 + 无 gameRoot 时省略该键', () => {
+  it('正常：开发态给出 userData 库路径 + watcher 取缺省 + 无 gameRoot 时省略该键', () => {
     const options = buildSessionOptions({ ...base, env: {} })
     expect(options.databaseFile).toBe(nikkisyncDatabaseFile('U:'))
     expect(options.watcher).toBe(WATCHER_ENABLED_DEFAULT)
@@ -434,7 +461,7 @@ describe('buildSessionOptions', () => {
   })
 })
 
-describe('阶段 6：元数据解析开关（默认关 + env 优先 + 脏值回落）', () => {
+describe('阶段 6：元数据解析开关（默认开 + env 优先 + 脏值回落）', () => {
   const base = {
     userDataDir: 'U:',
     projectRoot: 'P:',
@@ -443,11 +470,11 @@ describe('阶段 6：元数据解析开关（默认关 + env 优先 + 脏值回�
     settings: settings({})
   }
 
-  it('默认关闭：常量与无设置、无 env 时的判定一致', () => {
-    expect(METADATA_RESOLVER_ENABLED_DEFAULT).toBe(false)
+  it('默认开启：常量与无设置、无 env 时的判定一致（上游 PC 端口径）', () => {
+    expect(METADATA_RESOLVER_ENABLED_DEFAULT).toBe(true)
     expect(SETTING_METADATA_RESOLVER).toBe('nikkisync.metadataResolverEnabled')
     expect(METADATA_ENV_FLAG).toBe('NIKKI_NIKKISYNC_METADATA')
-    expect(resolveMetadataResolverEnabled({}, settings({}))).toBe(false)
+    expect(resolveMetadataResolverEnabled({}, settings({}))).toBe(true)
   })
 
   it('env 逃生阀优先于设置项（dev / 验证强启与强关两个方向都要压过）', () => {
@@ -466,11 +493,11 @@ describe('阶段 6：元数据解析开关（默认关 + env 优先 + 脏值回�
     ).toBe(true)
   })
 
-  it('边界：脏值一律判关（该开关一旦为真即产生出站请求，不得因历史脏数据静默开启）', () => {
+  it('边界：脏值一律回落到缺省开启，不被脏数据改成字符串或任意对象', () => {
     for (const dirty of ['true', 1, 'yes', {}, []]) {
       expect(
         resolveMetadataResolverEnabled({}, settings({ [SETTING_METADATA_RESOLVER]: dirty }))
-      ).toBe(false)
+      ).toBe(true)
     }
     // 非 1/0 的 env 视为未设置，交回设置项判断
     expect(
@@ -487,8 +514,8 @@ describe('阶段 6：元数据解析开关（默认关 + env 优先 + 脏值回�
     ).toBe(false)
   })
 
-  it('buildSessionOptions 把判定结果下传会话参数（默认 false，开启后为 true）', () => {
-    expect(buildSessionOptions({ ...base, env: {} }).metadataResolverEnabled).toBe(false)
+  it('buildSessionOptions 把判定结果下传会话参数（默认 true，显式关闭后为 false）', () => {
+    expect(buildSessionOptions({ ...base, env: {} }).metadataResolverEnabled).toBe(true)
     expect(
       buildSessionOptions({
         ...base,
@@ -538,5 +565,110 @@ describe('gameRoot 设置键：写入端与读取端必须同源（F3 漂移守�
 
   it('读端常量仍为历史值 nikkisync.gameRoot（改它等于作废已入库的设置行）', () => {
     expect(SETTING_GAME_ROOT).toBe('nikkisync.gameRoot')
+  })
+})
+
+// ============================================================================
+// N1：同步图库与上游 PC 端对齐 —— 用户口径「默认全部翻转为开」。
+// 这些断言在改码前必须红：它们锁定的是本次要修的根因（能力位默认全关）。
+// ============================================================================
+describe('PC 端能力默认开启（N1）', () => {
+  const base = {
+    userDataDir: 'U:',
+    projectRoot: 'P:',
+    isPackaged: false,
+    resourcesPath: '',
+    settings: settings({})
+  }
+  const ALL_ON = {
+    remoteBridge: true,
+    metadataDictionary: true,
+    gameVersionUpdates: true,
+    runtimeMemoryMaintenance: true,
+    wechatGallery: true,
+    desktopControl: true
+  }
+
+  it('all runtime switches default to true', () => {
+    expect(RUNTIME_ENABLED_DEFAULT).toBe(true)
+    expect(WATCHER_ENABLED_DEFAULT).toBe(true)
+    expect(METADATA_RESOLVER_ENABLED_DEFAULT).toBe(true)
+    expect(MULTI_HOST_PAIRING_DEFAULT).toBe(true)
+    expect(SYNC_ENABLED_DEFAULT).toBe(true)
+  })
+
+  it('缺省判定全部放行，env=0 仍可一键回到旧形态', () => {
+    const empty = settings({})
+    expect(resolveRuntimeEnabled({}, empty)).toBe(true)
+    expect(resolveSyncEnabled(empty)).toBe(true)
+    expect(resolveMetadataResolverEnabled({}, empty)).toBe(true)
+    expect(resolveRuntimeEnabled({ [RUNTIME_ENV_FLAG]: '0' }, empty)).toBe(false)
+  })
+
+  it('buildSessionOptions exposes every PC companion switch enabled by default', () => {
+    const options = buildSessionOptions({ ...base, env: {} }) as unknown as Record<string, unknown>
+    expect(options.watcher).toBe(true)
+    expect(options.metadataResolverEnabled).toBe(true)
+    expect(options.pcCompanion).toEqual(ALL_ON)
+  })
+
+  it('六个 env 逃生阀各自可单独关闭对应能力', () => {
+    const options = buildSessionOptions({
+      ...base,
+      env: {
+        NIKKI_NIKKISYNC_REMOTE_BRIDGE: '0',
+        NIKKI_NIKKISYNC_DICTIONARY: '0',
+        NIKKI_NIKKISYNC_VERSION_UPDATES: '0',
+        NIKKI_NIKKISYNC_MEMORY_MAINTENANCE: '0',
+        NIKKI_NIKKISYNC_WECHAT: '0',
+        NIKKI_NIKKISYNC_DESKTOP: '0'
+      }
+    }) as unknown as Record<string, unknown>
+    expect(options.pcCompanion).toEqual(
+      Object.fromEntries(Object.keys(ALL_ON).map((key) => [key, false]))
+    )
+  })
+})
+
+// ============================================================================
+// C1：装配时序 + 真实会话上下文（修复「PC 服务在 start 之前构造 ⇒ 拿不到 database」）
+// ============================================================================
+describe('C1 PC 端服务装配时序与会话上下文', () => {
+  beforeEach(() => {
+    pcServicesDouble.startPcCompanionServices.mockClear()
+    managerDouble.start.mockClear()
+    managerDouble.startSyncServer.mockClear()
+    managerDouble.pcCompanionContext.mockClear()
+  })
+
+  it('正常：PC 服务在 manager.start 之后装配，且逐字拿到真实 database / 扫描根 / 配对串', async () => {
+    const ctx = makeAppCtx()
+    await initNikkiSyncRuntime(ctx)
+
+    expect(managerDouble.start).toHaveBeenCalledTimes(1)
+    expect(pcServicesDouble.startPcCompanionServices).toHaveBeenCalledTimes(1)
+    const startOrder = managerDouble.start.mock.invocationCallOrder[0] as number
+    const pcOrder = pcServicesDouble.startPcCompanionServices.mock.invocationCallOrder[0] as number
+    expect(pcOrder).toBeGreaterThan(startOrder)
+
+    const passed = pcServicesDouble.startPcCompanionServices.mock.calls[0]![0] as Record<
+      string,
+      unknown
+    >
+    expect(passed.database).toBe(pcServicesDouble.LIVE_DATABASE)
+    expect(passed.scanRoots).toEqual(['/game/photos'])
+    expect((passed.pairingUri as () => string)()).toBe('NS1|live-session')
+  })
+
+  it('异常：会话上下文缺席时跳过 PC 服务装配，不抛进启动链', async () => {
+    const original = managerDouble.pcCompanionContext.getMockImplementation()
+    managerDouble.pcCompanionContext.mockReturnValueOnce(undefined)
+    try {
+      const ctx = makeAppCtx()
+      await expect(initNikkiSyncRuntime(ctx)).resolves.toBe(managerDouble)
+      expect(pcServicesDouble.startPcCompanionServices).not.toHaveBeenCalled()
+    } finally {
+      if (original) managerDouble.pcCompanionContext.mockImplementation(original)
+    }
   })
 })

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
 import type { AssetMediaFile } from '../../utils/assetViewModel'
 
 /**
@@ -60,7 +60,31 @@ function asset(over: Partial<AssetMediaFile> = {}): AssetMediaFile {
   } as unknown as AssetMediaFile
 }
 
+/**
+ * N5：抽屉假桥装配。默认给一个「老桥面」（没有 getAssetDetail），让既有装配用例同步走
+ * legacy、不被上游请求的异步 setState 打扰；需要上游链路的用例再显式覆盖。
+ */
+function installDrawerBridge(
+  over: { detail?: unknown; detailError?: Error; withGetAssetDetail?: boolean } = {}
+): ReturnType<typeof vi.fn> {
+  const getAssetDetail = vi.fn(async () => {
+    if (over.detailError) throw over.detailError
+    return over.detail
+  })
+  const nikkisync: Record<string, unknown> = {}
+  if (over.withGetAssetDetail !== false) nikkisync.getAssetDetail = getAssetDetail
+  ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+    nikkisync,
+    decrypt: { decodeFile: vi.fn(async () => ({ ok: true, data: {} })) }
+  }
+  return getAssetDetail
+}
+
 describe('SyncAssetDrawer', () => {
+  beforeEach(() => {
+    installDrawerBridge({ withGetAssetDetail: false })
+  })
+
   it('关闭态不渲染任何内容', () => {
     render(<SyncAssetDrawer open={false} file={asset()} onClose={vi.fn()} />)
     expect(screen.queryByTestId('panel-outfit')).toBeNull()
@@ -131,5 +155,50 @@ describe('SyncAssetDrawer', () => {
     )
     expect(await second.findByText(/1\.3/)).toBeTruthy()
     expect(second.queryByText(/2\.5/)).toBeNull()
+  })
+
+  // ===== N5：优先上游 metadata，失败/桥缺失回落本地解密链 =====
+
+  it('loads upstream asset metadata via getAssetDetail when opened', async () => {
+    const getAssetDetail = installDrawerBridge({
+      detail: {
+        asset: { metadata: { camera: { focalLength: 85, apertureSection: 2.8 } } }
+      }
+    })
+    render(<SyncAssetDrawer open onClose={vi.fn()} file={asset()} />)
+    await waitFor(() => expect(getAssetDetail).toHaveBeenCalledTimes(1))
+    expect(getAssetDetail).toHaveBeenCalledWith('a/1')
+    const panel = await screen.findByTestId('drawer-upstream-panel')
+    expect(panel.textContent).toContain('85')
+    await waitFor(() =>
+      expect(screen.getByTestId('drawer-root').getAttribute('data-metadata-source')).toBe(
+        'upstream'
+      )
+    )
+  })
+
+  it('falls back to local decoded metadata when getAssetDetail fails', async () => {
+    const getAssetDetail = installDrawerBridge({
+      detailError: new Error('runtime is not ready')
+    })
+    render(<SyncAssetDrawer open onClose={vi.fn()} file={asset()} />)
+    await waitFor(() => expect(getAssetDetail).toHaveBeenCalledTimes(1))
+    expect(await screen.findByTestId('drawer-metadata-fallback-notice')).toBeTruthy()
+    // 五个本地参数面板仍在 ⇒ decrypt:decodeFile 回落链保留，不整块替换
+    for (const key of ['photography', 'camera', 'nikki', 'outfit', 'interaction']) {
+      expect(screen.getByTestId(`panel-${key}`), `缺少回落面板 ${key}`).toBeTruthy()
+    }
+    expect(screen.getByTestId('drawer-root').getAttribute('data-metadata-source')).toBe('local')
+  })
+
+  it('bridge without getAssetDetail keeps legacy rendering', () => {
+    installDrawerBridge({ withGetAssetDetail: false })
+    render(<SyncAssetDrawer open onClose={vi.fn()} file={asset()} />)
+    expect(screen.getByTestId('drawer-root').getAttribute('data-metadata-source')).toBe('legacy')
+    expect(screen.queryByTestId('drawer-upstream-panel')).toBeNull()
+    expect(screen.queryByTestId('drawer-metadata-fallback-notice')).toBeNull()
+    for (const key of ['photography', 'camera', 'nikki', 'outfit', 'interaction']) {
+      expect(screen.getByTestId(`panel-${key}`), `缺少 legacy 面板 ${key}`).toBeTruthy()
+    }
   })
 })

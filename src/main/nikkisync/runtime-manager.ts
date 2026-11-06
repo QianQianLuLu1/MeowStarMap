@@ -18,6 +18,7 @@
 import type {
   NikkiSyncPairedDeviceView,
   NikkiSyncPairingCode,
+  PcCompanionSessionContext,
   NikkiSyncMetadataConsentState,
   NikkiSyncMetadataCounters,
   NikkiSyncMetadataResolutionStatus,
@@ -92,6 +93,14 @@ export interface FakeSessionPlan {
   metadataResolverPresent?: boolean
   /** 阶段 6：`stopMetadataResolver()` 的抛错形态（验证一个清理步骤失败不影响其余）。 */
   metadataStopThrows?: boolean
+  /** N3：是否模拟会话挂出「上游后台服务启停」委托面（老链接会话缺省缺席）。 */
+  backgroundServicesPresent?: boolean
+  /** N3：模拟后台服务 `start()` 抛错（验证不影响已 running 的主状态）。 */
+  backgroundStartThrows?: boolean
+  /** N3：模拟后台服务 `stop()` 抛错（验证退出链继续走到 dispose）。 */
+  backgroundStopThrows?: boolean
+  /** C1：注入 `scanner.getScanRoots()` 的返回值（脏值用于验证 pcCompanionContext 过滤）。 */
+  scanRoots?: unknown
   /** 阶段 6：逐轮 `runOnce()` 返回值；耗尽后重复最后一个值（缺省每轮 0 ⇒ 驱动只跑一轮）。 */
   metadataRunOnceResults?: number[]
   /** 阶段 6：`runOnce()` 是否抛错（验证驱动故障绝不改写已成功的扫描结果）。 */
@@ -409,6 +418,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     // 阶段 6：先作废代次，让在途的解析驱动在「下一轮开始前」自行收手；
     // 再停元数据生产者（它会在库上写 updateMetadata），然后才是传输、扫描、关库。
     state.generation += 1
+    // N3：先停上游后台服务（字典 updater / metadataResolver / 版本检查定时器），
+    // 再停元数据生产者；逐步独立 try/catch，任何一步失败都继续走到 dispose()。
+    try {
+      session.stopBackgroundServices?.()
+    } catch (error) {
+      deps.log('warn', `nikkisync background services stop failed: ${messageOf(error)}`)
+    }
     try {
       // 上游 stop() 是同步且幂等的（对 undefined timer 安全）⇒ 无需超时包装，
       // 也不该包：包一层只会凭空造出一个需要等它落地的定时器。
@@ -500,6 +516,16 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
         } else {
           state.state = 'error'
           deps.log('error', `nikkisync scanner.start failed: ${state.error}`)
+        }
+      }
+      // N3：上游 runtime.start() 的后台服务阶段在本仓从未发生（本仓不调它，见文件头）。
+      // 只在委托面真实存在时启动；任何一步抛错都只落 warn，不改判已 running 的主状态。
+      if (session.startBackgroundServices) {
+        try {
+          session.startBackgroundServices()
+          recordStage('background-services')
+        } catch (error) {
+          deps.log('warn', `nikkisync background services start failed: ${messageOf(error)}`)
         }
       }
       // K1：启动后驱动一次缓存解码升级（有界本地操作；失败只落日志不影响启动结果）
@@ -957,10 +983,37 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return result
   }
 
+  /**
+   * C1：PC 端控制页 / 微信画廊的真实会话上下文（只读、无副作用）。
+   * 会话未建或 database 形态异常 ⇒ undefined，装配层据此跳过服务，不伪造空 database。
+   * `getScanRoots()` 的返回值视为不可信输入：只保留字符串路径，脏值不拼路径、不伪造资产。
+   */
+  function pcCompanionContext(): PcCompanionSessionContext | undefined {
+    const session = state.session
+    if (!session) return undefined
+    const database = session.runtime?.database
+    if (!database || typeof database !== 'object') return undefined
+    let rawRoots: unknown = []
+    try {
+      rawRoots = session.scanner.getScanRoots()
+    } catch (error) {
+      deps.log('warn', `nikkisync scan roots unavailable: ${messageOf(error)}`)
+    }
+    const scanRoots = Array.isArray(rawRoots)
+      ? rawRoots.filter((root): root is string => typeof root === 'string')
+      : []
+    return {
+      database,
+      scanRoots,
+      pairingUri: (host: string): string => session.pairingUri(host)
+    }
+  }
+
   return {
     status,
     start,
     scan,
+    pcCompanionContext,
     applyGameRoot,
     stop,
     // 查询面一律零转换薄委托：资产行含上游 b397e0e 起的 sourcePath/sourceFolder 与其余可选键，

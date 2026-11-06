@@ -4360,7 +4360,8 @@
       "statsEmpty": "暫無統計",
       "statsFailed": "統計讀取失敗",
       "topSuits": "最常穿的套裝",
-      "topClothing": "最常穿的衣服"
+      "topClothing": "最常穿的衣服",
+      "backfillFailed": "命中照片回撈失敗，僅顯示文字結果"
     },
     "title": "同步圖庫",
     "subtitle": "來自 NikkiSync 內嵌庫的資產，與本地圖庫互不影響",
@@ -4405,7 +4406,32 @@
         "hash": "內容雜湊",
         "metadata": "中繼資料",
         "gameVersionInferred": "（推斷）"
+      },
+      "upstreamTitle": "上游線上參數",
+      "upstreamFallback": "上游參數不可用，已回退本機解密",
+      "upstream": {
+        "focalLength": "焦距",
+        "aperture": "光圈",
+        "exposure": "曝光",
+        "dressingParts": "服裝部件"
       }
+    },
+    "inspiration": {
+      "title": "靈感庫",
+      "hint": "與手機端同步的分享碼、分類、狀態與參考圖",
+      "new": "新增",
+      "titleLabel": "標題",
+      "notesLabel": "備註",
+      "imageLabel": "參考圖",
+      "imageFailed": "參考圖上傳失敗",
+      "save": "儲存",
+      "cancel": "取消",
+      "saveFailed": "儲存失敗",
+      "loadFailed": "載入失敗",
+      "loading": "載入中…",
+      "empty": "暫無靈感項目",
+      "edit": "編輯",
+      "delete": "刪除"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "稍後再說",
       "invalidEmpty": "請先輸入或選擇目錄路徑",
       "invalidAbsolute": "請輸入絕對路徑（如 D:\\Photos）"
+    },
+    "pc": {
+      "title": "PC 端能力",
+      "description": "本機控制頁與微信相簿（上游 NikkiSync PC 端）",
+      "openDesktop": "開啟本機控制頁",
+      "wechatStart": "啟動微信相簿",
+      "wechatStop": "停止微信相簿",
+      "wechatStatus": "微信相簿狀態：{{state}}",
+      "unavailable": "PC 端能力未就緒"
     }
   },
   "shareCard": {

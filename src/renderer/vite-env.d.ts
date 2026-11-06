@@ -1188,6 +1188,24 @@ interface WindowElectronAPI {
     approveOrganizerItems: (input: {
       ids: string[]
     }) => Promise<import('../shared/types/electron-api').NikkiSyncOrganizerApproveResultInfo>
+    // ---- N4：灵感库（上游 /v1/inspiration*，v1.0.29）----
+    listInspirations: (
+      input?: import('../shared/types/electron-api').NikkiSyncInspirationListQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncInspirationListInfo>
+    saveInspiration: (
+      input: import('../shared/types/electron-api').NikkiSyncInspirationSaveInputInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncInspirationVersionedInfo>
+    putInspirationImage: (
+      input: import('../shared/types/electron-api').NikkiSyncInspirationImagePutInputInfo
+    ) => Promise<{ ok: boolean }>
+    getInspirationImage: (
+      input: import('../shared/types/electron-api').NikkiSyncInspirationImageGetQueryInfo
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncInspirationImageResultInfo>
+    // ---- N7：PC 端控制页 / 微信画廊 ----
+    desktopOpen: () => Promise<import('../shared/types/electron-api').NikkiSyncDesktopOpenInfo>
+    wechatStart: () => Promise<import('../shared/types/electron-api').NikkiSyncWeChatStartInfo>
+    wechatStop: () => Promise<import('../shared/types/electron-api').NikkiSyncWeChatStopInfo>
+    wechatStatus: () => Promise<import('../shared/types/electron-api').NikkiSyncWeChatStatusInfo>
   }
   // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
   assetEdits: {

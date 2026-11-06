@@ -4360,7 +4360,8 @@
       "statsEmpty": "No stats yet",
       "statsFailed": "Failed to load stats",
       "topSuits": "Most worn suits",
-      "topClothing": "Most worn clothing"
+      "topClothing": "Most worn clothing",
+      "backfillFailed": "Could not load matched photos; showing text hits only"
     },
     "title": "Sync Gallery",
     "subtitle": "Assets from the embedded NikkiSync library, independent of the local gallery",
@@ -4405,7 +4406,32 @@
         "hash": "Content hash",
         "metadata": "Metadata",
         "gameVersionInferred": " (inferred)"
+      },
+      "upstreamTitle": "Upstream metadata",
+      "upstreamFallback": "Upstream metadata unavailable, showing local decode",
+      "upstream": {
+        "focalLength": "Focal length",
+        "aperture": "Aperture",
+        "exposure": "Exposure",
+        "dressingParts": "Outfit parts"
       }
+    },
+    "inspiration": {
+      "title": "Inspiration library",
+      "hint": "Share codes, categories, status and reference images synced with your phone",
+      "new": "New",
+      "titleLabel": "Title",
+      "notesLabel": "Notes",
+      "imageLabel": "Reference image",
+      "imageFailed": "Reference image upload failed",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saveFailed": "Save failed",
+      "loadFailed": "Load failed",
+      "loading": "Loading…",
+      "empty": "No inspiration entries yet",
+      "edit": "Edit",
+      "delete": "Delete"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "Later",
       "invalidEmpty": "Enter or select a directory path first",
       "invalidAbsolute": "Enter an absolute path (e.g. D:\\Photos)"
+    },
+    "pc": {
+      "title": "PC companion",
+      "description": "Local control page and WeChat gallery (upstream NikkiSync PC)",
+      "openDesktop": "Open local control page",
+      "wechatStart": "Start WeChat gallery",
+      "wechatStop": "Stop WeChat gallery",
+      "wechatStatus": "WeChat gallery status: {{state}}",
+      "unavailable": "PC companion unavailable"
     }
   },
   "shareCard": {

@@ -4360,7 +4360,8 @@
       "statsEmpty": "統計はまだありません",
       "statsFailed": "統計の取得に失敗しました",
       "topSuits": "よく使うコーディネート",
-      "topClothing": "よく使う衣装"
+      "topClothing": "よく使う衣装",
+      "backfillFailed": "該当写真を読み込めなかったためテキスト結果のみ表示"
     },
     "title": "同期ギャラリー",
     "subtitle": "NikkiSync 組み込みライブラリの資産。ローカルギャラリーとは干渉しません",
@@ -4405,7 +4406,32 @@
         "hash": "コンテンツハッシュ",
         "metadata": "メタデータ",
         "gameVersionInferred": "（推定）"
+      },
+      "upstreamTitle": "上流メタデータ",
+      "upstreamFallback": "上流メタデータを取得できないためローカル復号結果を表示",
+      "upstream": {
+        "focalLength": "焦点距離",
+        "aperture": "絞り",
+        "exposure": "露出",
+        "dressingParts": "コーディネート部位"
       }
+    },
+    "inspiration": {
+      "title": "インスピレーションライブラリ",
+      "hint": "スマートフォンと同期する共有コード・分類・状態・参考画像",
+      "new": "新規",
+      "titleLabel": "タイトル",
+      "notesLabel": "メモ",
+      "imageLabel": "参考画像",
+      "imageFailed": "参考画像のアップロードに失敗",
+      "save": "保存",
+      "cancel": "キャンセル",
+      "saveFailed": "保存に失敗",
+      "loadFailed": "読み込みに失敗",
+      "loading": "読み込み中…",
+      "empty": "インスピレーションはまだありません",
+      "edit": "編集",
+      "delete": "削除"
     }
   },
   "syncService": {
@@ -4590,6 +4616,15 @@
       "restartLater": "後で",
       "invalidEmpty": "先にディレクトリパスを入力または選択してください",
       "invalidAbsolute": "絶対パスを入力してください（例：D:\\Photos）"
+    },
+    "pc": {
+      "title": "PC 連携",
+      "description": "ローカル制御ページと WeChat ギャラリー（上流 NikkiSync PC）",
+      "openDesktop": "ローカル制御ページを開く",
+      "wechatStart": "WeChat ギャラリーを開始",
+      "wechatStop": "WeChat ギャラリーを停止",
+      "wechatStatus": "WeChat ギャラリーの状態：{{state}}",
+      "unavailable": "PC 連携を利用できません"
     }
   },
   "shareCard": {
