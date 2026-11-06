@@ -11,6 +11,7 @@ import {
   IconChevronDown
 } from '../../icons'
 import { SectionShell, GlobalToastContext, SettingsCard } from './shared'
+import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
 
 // ============ 关于 ============
 
@@ -19,6 +20,7 @@ const QQ_GROUP = '635492596'
 
 export const AboutInfoSection: React.FC = () => {
   const { t } = useTranslation()
+  const showMessage = useContext(GlobalToastContext)
   // U1：动态读取应用版本号，避免渲染层硬编码
   const [appVersion, setAppVersion] = useState<string>('')
   useEffect(() => {
@@ -37,11 +39,23 @@ export const AboutInfoSection: React.FC = () => {
   }, [])
   const handleCheckUpdate = async () => {
     // 优先走应用内自动更新：主进程经 electron-updater 检查 GitHub Release，
-    // 结果通过 app:update 推送给 UpdateDialog 弹窗。未打包（开发）或接口不可用时兜底打开仓库。
+    // 结果通过 app:update 推送给 UpdateDialog 弹窗。
+    const checkUpdate = window.electronAPI?.app?.checkUpdate
+    if (typeof checkUpdate !== 'function') {
+      // API 缺席（预览版 / preload 未暴露）：给可见兜底，不得静默无反应
+      showMessage(t('settings.about.updateSourceUnavailable'), 'error')
+      return
+    }
     try {
-      await window.electronAPI?.app?.checkUpdate?.()
-    } catch {
-      window.electronAPI?.shell?.openExternal?.(GITHUB_URL)
+      await checkUpdate()
+    } catch (err) {
+      // 按错误码分流：更新器未初始化是预期降级（开发版），回退官网手动下载；
+      // 其余错误码（含 IPC_INTERNAL_ERROR）是真故障，给可见提示，不误导用户跳官网。
+      if ((err as { code?: string } | null)?.code === IPC_ERROR_CODES.PRECONDITION_FAILED) {
+        window.electronAPI?.shell?.openExternal?.(GITHUB_URL)
+        return
+      }
+      showMessage(t('settings.about.updateSourceUnavailable'), 'error')
     }
   }
 

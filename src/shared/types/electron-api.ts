@@ -1082,6 +1082,10 @@ export interface NikkiSyncInspirationEntryInfo {
   images: NikkiSyncInspirationImageInfo[]
 }
 
+/**
+ * GET /v1/inspiration 返回条目的类型快照：`entry` 只描述上游 row-mappers 产出的 DTO 形状，
+ * 不代表运行时已校验。渲染层必须经 `parseList` / `parseImages` 逐项收敛后才能进 state。
+ */
 export interface NikkiSyncInspirationVersionedInfo {
   revision: number
   entry: NikkiSyncInspirationEntryInfo
@@ -1099,7 +1103,12 @@ export interface NikkiSyncInspirationListInfo {
 }
 
 export interface NikkiSyncInspirationSaveInputInfo {
-  /** 条目形态由上游 `InspirationRepository.validate` 单真相源校验，本层不预校验。 */
+  /**
+   * 与 `NikkiSyncInspirationVersionedInfo.entry` 的「一松一紧」是刻意设计，不是漂移：
+   * 写入侧条目形态由上游 `InspirationRepository.validate` 单真相源校验，本层不预校验，
+   * 故保持 `unknown`；若收紧为 `EntryInfo` 会破坏 docs/IPC_CONTRACT.md 记载的入参契约。
+   * 主进程侧另有 zod + 已知键白名单兜底非法形状，读取侧按上一注释做运行时收敛。
+   */
   entry: unknown
   baseRevision: number
 }

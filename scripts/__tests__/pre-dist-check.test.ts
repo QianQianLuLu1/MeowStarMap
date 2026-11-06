@@ -25,6 +25,7 @@ import {
   verifyUpdateFeedArtifacts,
   type JsTreeFile
 } from '../pre-dist-check'
+import { buildLatestYml } from '../serve-dev-update-feed'
 import {
   CHAIN_REQUIRED_ARTIFACTS,
   METADATA_REQUIRED_ARTIFACTS,
@@ -858,15 +859,16 @@ describe('打包态 @nikkisync 外部依赖闭包闸门：判定核复用同一�
  * 不是来自真目录扫描。
  */
 describe('verifyUpdateFeedArtifacts —— latest.yml 与安装包必须自洽', () => {
-  const FEED_OK = [
-    'version: 2.5.7-beta',
-    'files:',
-    '  - url: MeowStarMap-Setup-2.5.7-beta.exe',
-    '    sha512: Q2LZJInhlKvLVK3KNzmobBkDitshvizIediUnADUJ4HzN0JX6oI/fkoEyIg+pCZBWWn7b70aU41DWVeiAPwEYw==',
-    '    size: 184943020',
-    'path: MeowStarMap-Setup-2.5.7-beta.exe',
-    "releaseDate: '2026-11-05T03:43:21.279Z'"
-  ].join('\n')
+  // 用 dev 假源夹具的 buildLatestYml() 产出「完整格式」：含 files[] 列表与顶层 sha512，
+  // 与真实 release/latest.yml 同形（旧 fixture 手抄的 7 行缺顶层 sha512，并非可发布产物）。
+  const FEED_OK = buildLatestYml({
+    version: '2.5.7-beta',
+    fileName: 'MeowStarMap-Setup-2.5.7-beta.exe',
+    sha512:
+      'Q2LZJInhlKvLVK3KNzmobBkDitshvizIediUnADUJ4HzN0JX6oI/fkoEyIg+pCZBWWn7b70aU41DWVeiAPwEYw==',
+    size: 184943020,
+    releaseDate: '2026-11-05T03:43:21.279Z'
+  })
   const FILES_OK = [
     'MeowStarMap-Setup-2.5.7-beta.exe',
     'MeowStarMap-Setup-2.5.7-beta.exe.blockmap',
@@ -929,13 +931,11 @@ describe('verifyUpdateFeedArtifacts —— latest.yml 与安装包必须自洽',
   })
 
   it('边界：files[] 里另一个 url 缺件同样点名 missing-payload', () => {
-    const twoFiles = [
-      'version: 2.5.7-beta',
-      'files:',
+    // 在完整格式基础上追加第二条 url（portable 不在清单 ⇒ missing-payload）
+    const twoFiles = FEED_OK.replace(
       '  - url: MeowStarMap-Setup-2.5.7-beta.exe',
-      '  - url: MeowStarMap-Setup-2.5.7-beta-portable.exe',
-      'path: MeowStarMap-Setup-2.5.7-beta.exe'
-    ].join('\n')
+      '  - url: MeowStarMap-Setup-2.5.7-beta.exe\n  - url: MeowStarMap-Setup-2.5.7-beta-portable.exe'
+    )
     expect(
       verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: twoFiles, appVersion: '2.5.7-beta' })
     ).toEqual(['missing-payload'])
@@ -949,21 +949,34 @@ describe('verifyUpdateFeedArtifacts —— latest.yml 与安装包必须自洽',
     }
   })
 
-  it('边界：值带引号或行尾空格仍能解析（electron-builder 对 releaseDate 加引号）', () => {
-    const quoted = ['version: "2.5.7-beta" ', 'path: "MeowStarMap-Setup-2.5.7-beta.exe"'].join('\n')
+  it('边界：值带引号或行尾空格仍能解析（完整格式 + 带引号的 version）', () => {
+    const quoted = FEED_OK.replace(/^version: .*$/m, 'version: "2.5.7-beta" ')
     expect(
       verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: quoted, appVersion: '2.5.7-beta' })
     ).toEqual([])
   })
 
-  it('边界：预发布版本号（含 -beta）必须被认作合法 appVersion', () => {
+  it('边界：预发布版本号（含 -beta）必须被认作合法 appVersion（完整格式）', () => {
     expect(
       verifyUpdateFeedArtifacts({
         files: ['x.exe'],
-        feedYml: 'version: 2.5.7-beta\npath: x.exe',
+        feedYml: buildLatestYml({
+          version: '2.5.7-beta',
+          fileName: 'x.exe',
+          sha512: 'AAA=',
+          size: 1,
+          releaseDate: 'x'
+        }),
         appVersion: '2.5.7-beta'
       })
     ).toEqual([])
+  })
+
+  it('(缺陷) 缺 files[] 与顶层 sha512 的两行 yml ⇒ feed-unparsable，不得判可发布', () => {
+    const twoLine = ['version: 2.5.7-beta', 'path: MeowStarMap-Setup-2.5.7-beta.exe'].join('\n')
+    expect(
+      verifyUpdateFeedArtifacts({ files: FILES_OK, feedYml: twoLine, appVersion: '2.5.7-beta' })
+    ).toEqual(['feed-unparsable'])
   })
 
   it('幂等：同一输入重复判定结果一致（纯函数，不触磁盘、不改入参）', () => {

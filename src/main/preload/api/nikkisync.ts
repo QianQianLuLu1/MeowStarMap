@@ -1,6 +1,6 @@
-// @core-change: 同步图库对齐上游 PC 端：新增灵感库 list/save/image-put/image-get 与
-//               本机控制页 desktop-open、微信画廊 wechat-start/stop/status 共 8 条透传方法，
-//               并同步 docs/IPC_CONTRACT.md；本层不改既有方法名与入参。
+// @core-change: 本轮审查订正授权注释并补回历史接入括注，8 条透传方法名与入参不变
+//               （历史：三通道与 admitDirectory 预检接入、K9 账号作用域、K6 目录面、K2/K3/K8
+//               历次接入，以及灵感库 4 条与控制页、微信画廊共 8 条透传方法——见各节点提交。）
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'

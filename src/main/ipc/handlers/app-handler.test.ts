@@ -4,6 +4,7 @@
  * @coverage app 域 IPC handler（app:relaunch / getVersion / gpu-status）
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
 import { makeCtx, getHandler } from './_test-helpers'
 
 const { handleMock, appRelaunchMock, appQuitMock, appGetVersionMock, collectGpuStatusMock } =
@@ -89,5 +90,17 @@ describe('registerAppHandlers', () => {
       data: string
     }
     expect(result.data).toBe('2.3.0')
+  })
+
+  it('更新器未初始化时 app:update:download 返回 IPC_PRECONDITION_FAILED（不再返回 downloading:true）', async () => {
+    registerAppHandlers(makeCtx({}))
+    const result = (await getHandler(handleMock, 'app:update:download')()) as {
+      success: boolean
+      data?: { downloading: boolean }
+      error?: { code: string }
+    }
+    expect(result.success).toBe(false)
+    expect(result.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    expect(result.data?.downloading).toBeUndefined()
   })
 })

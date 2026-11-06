@@ -1,33 +1,60 @@
 import { describe, it, expect, vi } from 'vitest'
+import { EventEmitter } from 'node:events'
 
-import { createPcCompanionServices, type PcCompanionSurface } from './pc-companion-services'
+import {
+  createPcCompanionServices,
+  startPcCompanionServices,
+  type PcCompanionSurface
+} from './pc-companion-services'
 import { stagePcAssets } from '../../../scripts/stage-nikkisync-pc-assets'
 
 /**
  * N7 `pc-companion-services.ts` 单测（注入的假 surface，不依赖真实 @nikkisync 链接）。
  *
  * 正常 — 构造两个上游服务（createDesktopControlServer / WeChatGalleryService）+ 启停与 URL
- * 异常 — start 的 listen 失败只落日志，不把错误抛进退出链
+ * 异常 — start 失败回滚已启动后台服务并 rethrow（不再吞错）；装配入口失败返回 undefined
  * 边界 — UP 根缺失时 stage 返回 skipped 且零拷贝
  */
 interface FakeServer {
   listen: ReturnType<typeof vi.fn>
   close: ReturnType<typeof vi.fn>
   address: ReturnType<typeof vi.fn>
-  on: ReturnType<typeof vi.fn>
-  once: ReturnType<typeof vi.fn>
+  on: (event: string, listener: (...args: unknown[]) => void) => void
+  once: (event: string, listener: (...args: unknown[]) => void) => void
+  removeListener: (event: string, listener: (...args: unknown[]) => void) => void
+  listenerCount: (event: string) => number
 }
 
-function makeSurface(opts: { listenFail?: boolean } = {}) {
+function makeSurface(
+  opts: {
+    listenFail?: boolean
+    closeHangs?: boolean
+    closeError?: unknown
+    memoryStartThrows?: boolean
+  } = {}
+) {
+  // 真实 EventEmitter 语义：B2 要断言成功路径后 error 监听归零，纯 vi.fn 记不到。
+  const emitter = new EventEmitter()
   const server: FakeServer = {
     listen: vi.fn((_port: number, _host: string, cb?: () => void) => {
       if (opts.listenFail) throw new Error('EADDRINUSE')
       cb?.()
     }),
-    close: vi.fn((cb?: () => void) => cb?.()),
+    close: vi.fn((cb?: (error?: unknown) => void) => {
+      if (opts.closeHangs) return
+      cb?.(opts.closeError)
+    }),
     address: vi.fn(() => ({ port: 39123 })),
-    on: vi.fn(),
-    once: vi.fn()
+    on: (event, listener) => {
+      emitter.on(event, listener)
+    },
+    once: (event, listener) => {
+      emitter.once(event, listener)
+    },
+    removeListener: (event, listener) => {
+      emitter.removeListener(event, listener)
+    },
+    listenerCount: (event) => emitter.listenerCount(event)
   }
   const wechat = {
     start: vi.fn(async () => ({
@@ -39,7 +66,13 @@ function makeSurface(opts: { listenFail?: boolean } = {}) {
     stop: vi.fn(async () => undefined),
     status: vi.fn(() => ({ state: 'idle', photoCount: 0, originalsSent: 0 }))
   }
-  const memory = { start: vi.fn(), stop: vi.fn(), schedule: vi.fn() }
+  const memory = {
+    start: vi.fn(() => {
+      if (opts.memoryStartThrows) throw new Error('memory boom')
+    }),
+    stop: vi.fn(),
+    schedule: vi.fn()
+  }
   const versionUpdates = { start: vi.fn(), stop: vi.fn() }
   // 必须是可 new 的普通 function（箭头函数不能作构造器）；vi.fn 包装以断言构造次数
   const surface = {
@@ -99,14 +132,66 @@ describe('pc-companion-services（N7 上游 PC 端服务装配）', () => {
     expect(versionUpdates.stop).toHaveBeenCalled()
   })
 
-  it('异常：start 的 listen 失败只落日志，不抛到退出链', async () => {
-    const { surface } = makeSurface({ listenFail: true })
+  it('异常：start 的 listen 失败 ⇒ 回滚 + rethrow（不再吞错）；stop 仍能走完', async () => {
+    const { surface, server } = makeSurface({ listenFail: true })
     const log = vi.fn()
     const services = createPcCompanionServices(options(surface, log))
-    await expect(services.start()).resolves.toBeUndefined()
+    await expect(services.start()).rejects.toThrow('EADDRINUSE')
     expect(log).toHaveBeenCalled()
+    expect(server.listenerCount('error')).toBe(0)
     // 失败后 stop 仍必须能走完（每步独立 try/catch，绝不卡住退出链）
     await expect(services.stop()).resolves.toBeUndefined()
+  })
+
+  it('B1 启动中途抛错：回滚已启动后台服务并 rethrow（不吞错返回半成品）', async () => {
+    const { surface, versionUpdates, memory, server } = makeSurface({
+      memoryStartThrows: true
+    })
+    const log = vi.fn()
+    const services = createPcCompanionServices(options(surface, log))
+    await expect(services.start()).rejects.toThrow('memory boom')
+    expect(versionUpdates.start).toHaveBeenCalledTimes(1)
+    expect(versionUpdates.stop).toHaveBeenCalledTimes(1)
+    expect(memory.stop).toHaveBeenCalledTimes(1)
+    expect(log).toHaveBeenCalled()
+    expect(server.listenerCount('error')).toBe(0)
+  })
+
+  it('B1 装配入口失败 ⇒ 返回 undefined（不把半成品递给上层）', async () => {
+    const log = vi.fn()
+    const res = await startPcCompanionServices({
+      projectRoot: 'D:/NO_SUCH_NIKKISYNC_ROOT_XYZ',
+      resourcesDir: 'D:/ROOT/resources/nikkisync/pc',
+      wechatGallery: true,
+      log
+    })
+    expect(res).toBeUndefined()
+    expect(log).toHaveBeenCalled()
+  })
+
+  it('B2 并发 start 去重：只 listen 一次，成功路径 error 监听归零', async () => {
+    const { surface, server } = makeSurface()
+    const services = createPcCompanionServices(options(surface))
+    await Promise.all([services.start(), services.start(), services.start()])
+    expect(server.listen).toHaveBeenCalledTimes(1)
+    expect(server.listenerCount('error')).toBe(0)
+  })
+
+  it('B3 dashboard.close 永不回调 ⇒ 超时兜底放行退出链', async () => {
+    const { surface, server } = makeSurface({ closeHangs: true })
+    const services = createPcCompanionServices({ ...options(surface), closeTimeoutMs: 20 })
+    await services.start()
+    await expect(services.stop()).resolves.toBeUndefined()
+    expect(server.close).toHaveBeenCalledTimes(1)
+  }, 1500)
+
+  it('B3 dashboard.close 回调带 err ⇒ 记录日志且退出链不卡死', async () => {
+    const { surface } = makeSurface({ closeError: new Error('close failed') })
+    const log = vi.fn()
+    const services = createPcCompanionServices({ ...options(surface, log), closeTimeoutMs: 20 })
+    await services.start()
+    await expect(services.stop()).resolves.toBeUndefined()
+    expect(log).toHaveBeenCalledWith('warn', expect.stringContaining('close failed'))
   })
 
   it('边界：UP 根缺失时 stage 返回 skipped 且零拷贝', () => {

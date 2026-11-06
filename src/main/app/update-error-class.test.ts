@@ -143,9 +143,13 @@ describe('classifyUpdateError —— HTTP 状态码判据', () => {
     expect(classifyUpdateError(httpError(429))).toBe('network')
   })
 
-  it('404 / 403 可达但资源不对 ⇒ source', () => {
+  it('404 可达但资源不对 ⇒ source（回归锁）', () => {
     expect(classifyUpdateError(httpError(404))).toBe('source')
-    expect(classifyUpdateError(httpError(403))).toBe('source')
+  })
+
+  it('403 / 407 限流与代理鉴权按 network 归类（GitHub 限流返 403，不是源内容问题）', () => {
+    expect(classifyUpdateError(httpError(403))).toBe('network')
+    expect(classifyUpdateError(httpError(407))).toBe('network')
   })
 })
 
@@ -169,5 +173,70 @@ describe('classifyUpdateError —— 边界与非法输入（永不抛错）', (
 
   it('兜底方向必须是 source：兜底 network 就是本轮要消灭的误报形状', () => {
     expect(classifyUpdateError(new Error('完全无法归类的第三种失败'))).toBe('source')
+  })
+})
+
+describe('classifyUpdateError —— statusOf / code 沿 cause 链递归提取', () => {
+  it('cause.statusCode=503 ⇒ network（statusOf 不能只查 err 自身）', () => {
+    const outer = errWithCode('Cannot check for updates')
+    ;(outer as Error & { cause?: unknown }).cause = httpError(503)
+    expect(classifyUpdateError(outer)).toBe('network')
+  })
+
+  it('深层 cause（两层）里的 statusCode=503 也要判 network（递归，不止一层）', () => {
+    const outer = errWithCode('Cannot check for updates')
+    const mid = errWithCode('wrapped by provider')
+    ;(mid as Error & { cause?: unknown }).cause = httpError(503)
+    ;(outer as Error & { cause?: unknown }).cause = mid
+    expect(classifyUpdateError(outer)).toBe('network')
+  })
+
+  it('cause.code=ERR_UPDATER_* 沿链识别：深层 cause + 循环引用不抛、归 source', () => {
+    const outer = errWithCode('Cannot check for updates')
+    const mid = errWithCode('wrapped by provider', 'ERR_UPDATER_INVALID_RELEASE_FEED')
+    ;(outer as Error & { cause?: unknown }).cause = mid
+    // 循环引用：递归提取必须带 seen 保护，否则栈溢出
+    ;(mid as Error & { cause?: unknown }).cause = outer
+    expect(() => classifyUpdateError(outer)).not.toThrow()
+    expect(classifyUpdateError(outer)).toBe('source')
+  })
+})
+
+describe('classifyUpdateError —— 属性访问永不抛错（throwing getter / Proxy 边界）', () => {
+  it('code 是 throwing getter 时不抛、归 source（兜底方向不变）', () => {
+    const err = new Error('boom')
+    Object.defineProperty(err, 'code', {
+      get() {
+        throw new Error('code getter exploded')
+      },
+      configurable: true
+    })
+    expect(() => classifyUpdateError(err)).not.toThrow()
+    expect(classifyUpdateError(err)).toBe('source')
+  })
+
+  it('cause 是 throwing getter 时不抛（cause 链遍历也要 safe getter）', () => {
+    const err = new Error('boom')
+    Object.defineProperty(err, 'cause', {
+      get() {
+        throw new Error('cause getter exploded')
+      },
+      configurable: true
+    })
+    expect(() => classifyUpdateError(err)).not.toThrow()
+    expect(classifyUpdateError(err)).toBe('source')
+  })
+
+  it('Proxy 的 get trap 抛错时不抛、归 source', () => {
+    const hostile = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('proxy get exploded')
+        }
+      }
+    )
+    expect(() => classifyUpdateError(hostile)).not.toThrow()
+    expect(classifyUpdateError(hostile)).toBe('source')
   })
 })

@@ -16,8 +16,8 @@ import type {
  * 条目形态由上游 `validate()` 单真相源判定，冲突/大小限制/坏 sha256 都只在主进程
  * 拦一次后映射成错误码；渲染层只把失败内联在本面板，不弹全局 toast 打断浏览。
  *
- * 新增 UI 文案一律走 syncGallery.inspiration 命名空间（不硬编码中文）；locale 由主代理
- * 统一补 12 语言包，本节点不编辑 locale JSON。
+ * 新增 UI 文案一律走 syncGallery.inspiration 命名空间（不硬编码中文）；本节点已随实现
+ * 同步补齐 12 个 locale 语言包的对应文案。
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -83,6 +83,23 @@ function parseList(value: unknown): NikkiSyncInspirationVersionedInfo[] {
   return value.items.filter(isRecord) as unknown as NikkiSyncInspirationVersionedInfo[]
 }
 
+/** 外部 IPC 图片数组逐项收敛：判空 + id/sha256 类型守卫，脏元素一律丢弃。 */
+function parseImages(value: unknown): NikkiSyncInspirationImageInfo[] {
+  if (!Array.isArray(value)) return []
+  const images: NikkiSyncInspirationImageInfo[] = []
+  for (const item of value.filter(isRecord)) {
+    if (typeof item.id !== 'string' || typeof item.sha256 !== 'string') continue
+    images.push({
+      id: item.id,
+      sha256: item.sha256,
+      mimeType: typeof item.mimeType === 'string' ? item.mimeType : '',
+      bytes: typeof item.bytes === 'number' ? item.bytes : 0,
+      addedAt: typeof item.addedAt === 'number' ? item.addedAt : 0
+    })
+  }
+  return images
+}
+
 export const SyncInspirationPanel: React.FC = () => {
   const { t } = useTranslation()
   const [items, setItems] = useState<NikkiSyncInspirationVersionedInfo[] | null>(null)
@@ -93,6 +110,7 @@ export const SyncInspirationPanel: React.FC = () => {
   const [imageError, setImageError] = useState(false)
   const listGenerationRef = useRef(0)
   const saveGenerationRef = useRef(0)
+  const imageGenerationRef = useRef(0)
   const loadedRef = useRef(false)
   const detailsRef = useRef<HTMLDetailsElement | null>(null)
 
@@ -125,6 +143,7 @@ export const SyncInspirationPanel: React.FC = () => {
     if (!subscribe) return
     return subscribe(() => {
       loadedRef.current = false
+      setLoadFailed(false)
       if (detailsRef.current?.open) void loadList()
     })
   }, [loadList])
@@ -134,6 +153,7 @@ export const SyncInspirationPanel: React.FC = () => {
     () => () => {
       listGenerationRef.current++
       saveGenerationRef.current++
+      imageGenerationRef.current++
     },
     []
   )
@@ -147,7 +167,7 @@ export const SyncInspirationPanel: React.FC = () => {
       title: typeof entry?.title === 'string' ? entry.title : '',
       notes: typeof entry?.notes === 'string' ? entry.notes : '',
       baseRevision: typeof row?.revision === 'number' ? row.revision : 0,
-      images: Array.isArray(entry?.images) ? (entry.images as NikkiSyncInspirationImageInfo[]) : []
+      images: parseImages(entry?.images)
     })
     setSaveError(false)
   }
@@ -203,14 +223,17 @@ export const SyncInspirationPanel: React.FC = () => {
 
   const handleImage = async (file: File): Promise<void> => {
     const client = window.electronAPI?.nikkisync
-    if (!draft || !client?.putInspirationImage) return
+    if (!draft || !client?.putInspirationImage || busy) return
+    const generation = ++imageGenerationRef.current
+    const targetId = draft.id
+    setBusy(true)
     setImageError(false)
     try {
       const bytes = new Uint8Array(await file.arrayBuffer())
       const cryptoObj = globalThis.crypto
       if (!cryptoObj?.subtle) {
         // 无 WebCrypto 时不臆造 sha256：明确报错，绝不把错摘要递给上游
-        setImageError(true)
+        if (generation === imageGenerationRef.current) setImageError(true)
         return
       }
       const digest = await cryptoObj.subtle.digest('SHA-256', bytes)
@@ -228,19 +251,21 @@ export const SyncInspirationPanel: React.FC = () => {
         mimeType,
         bytesBase64: btoa(raw)
       })
-      setDraft((current) =>
-        current
-          ? {
-              ...current,
-              images: [
-                ...current.images,
-                { id: newUuid(), sha256, mimeType, bytes: bytes.length, addedAt: Date.now() }
-              ]
-            }
-          : current
-      )
+      setDraft((current) => {
+        if (generation !== imageGenerationRef.current) return current
+        if (!current || current.id !== targetId) return current
+        return {
+          ...current,
+          images: [
+            ...current.images,
+            { id: newUuid(), sha256, mimeType, bytes: bytes.length, addedAt: Date.now() }
+          ]
+        }
+      })
     } catch {
-      setImageError(true)
+      if (generation === imageGenerationRef.current) setImageError(true)
+    } finally {
+      if (generation === imageGenerationRef.current) setBusy(false)
     }
   }
 
@@ -256,6 +281,10 @@ export const SyncInspirationPanel: React.FC = () => {
           if (open && !loadedRef.current && !loadFailed) {
             loadedRef.current = true
             void loadList()
+          } else if (!open && loadFailed) {
+            // 失败态折叠后复位，允许下次展开重试；成功态保留 loadedRef 缓存，不重复发 IPC
+            loadedRef.current = false
+            setLoadFailed(false)
           }
         }}
       >
@@ -397,9 +426,7 @@ export const SyncInspirationPanel: React.FC = () => {
           ) : (
             <ul className="space-y-2">
               {items.map((row) => {
-                const images = Array.isArray(row.entry?.images)
-                  ? (row.entry.images as NikkiSyncInspirationImageInfo[])
-                  : []
+                const images = parseImages(row.entry?.images)
                 return (
                   <li
                     key={`${String(row.entry?.id ?? 'row')}-${row.revision}`}
@@ -448,9 +475,11 @@ export const SyncInspirationPanel: React.FC = () => {
   )
 }
 
-/** 列表项图片：经 getInspirationImage 取 base64 后转 data URL；失败静默留占位。 */
+/** 列表项图片：经 getInspirationImage 取 base64 后转 data URL；失败置错误态并落 warn，不静默吞。 */
 const InspirationImage: React.FC<{ sha256: string }> = ({ sha256 }) => {
+  const { t } = useTranslation()
   const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let alive = true
     const client = window.electronAPI?.nikkisync
@@ -461,11 +490,25 @@ const InspirationImage: React.FC<{ sha256: string }> = ({ sha256 }) => {
         if (!alive || !res) return
         setSrc(`data:${res.mimeType};base64,${res.bytesBase64}`)
       })
-      .catch(() => undefined)
+      .catch((error: unknown) => {
+        console.warn('[SyncInspirationPanel] getInspirationImage failed:', error)
+        if (alive) setFailed(true)
+      })
     return () => {
       alive = false
     }
   }, [sha256])
+  if (failed) {
+    return (
+      <span
+        data-testid="inspiration-image-load-error"
+        className="text-xs"
+        style={{ color: 'var(--text-tertiary)' }}
+      >
+        {t('syncGallery.inspiration.loadFailed')}
+      </span>
+    )
+  }
   if (!src) {
     return (
       <span

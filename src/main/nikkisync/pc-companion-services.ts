@@ -44,10 +44,11 @@ import type { NikkiSyncPcCompanionStatusInfo, PcCompanionServicesLike } from './
 
 export interface PcServerLike {
   listen(port: number, host: string, callback?: () => void): void
-  close(callback?: () => void): void
+  close(callback?: (error?: unknown) => void): void
   address(): { port: number } | string | null
   on(event: string, listener: (...args: unknown[]) => void): void
   once(event: string, listener: (...args: unknown[]) => void): void
+  removeListener(event: string, listener: (...args: unknown[]) => void): void
 }
 
 export interface PcWeChatLike {
@@ -86,6 +87,8 @@ export interface PcCompanionServicesOptions {
   scanRoots?: readonly string[]
   pairingUri?: () => string
   log?: (level: 'info' | 'warn' | 'error', message: string) => void
+  /** dashboard.close 永不回调时的放行时长（缺省 3000ms，与优雅停止同口径）；单测可注入缩短。 */
+  closeTimeoutMs?: number
 }
 
 /** 4 份 legal 文档（键逐字对齐上游 windows-app.ts:226）。缺件不阻断，只留空。 */
@@ -239,6 +242,8 @@ export function createPcCompanionServices(
 
   let desktopPort: number | undefined
   let running = false
+  let starting: Promise<void> | undefined
+  const closeTimeoutMs = options.closeTimeoutMs ?? 3000
   const desktopUrl = (): string =>
     desktopPort === undefined ? '' : `http://127.0.0.1:${desktopPort}/`
   const currentHost = (): string =>
@@ -271,22 +276,67 @@ export function createPcCompanionServices(
 
   return {
     async start(): Promise<void> {
-      try {
-        await new Promise<void>((resolve, reject) => {
-          dashboard.once('error', reject)
-          dashboard.listen(0, '127.0.0.1', resolve)
-        })
-        const address = dashboard.address()
-        if (!address || typeof address === 'string') {
-          throw new Error('desktop control server has no address')
+      // B2：running 守卫 + 启动 Promise 去重，并发 start 不得重复 listen / 重复挂监听。
+      if (running) return
+      if (starting) return starting
+      const attempt = (async (): Promise<void> => {
+        let onError: ((error: unknown) => void) | undefined
+        let versionStarted = false
+        let memoryStarted = false
+        try {
+          await new Promise<void>((resolve, reject) => {
+            // 具名监听：成功/失败路径都能在 finally 精确移除，不用匿名 reject 常驻。
+            onError = (error: unknown): void => reject(error)
+            dashboard.once('error', onError)
+            dashboard.listen(0, '127.0.0.1', resolve)
+          })
+          const address = dashboard.address()
+          if (!address || typeof address === 'string') {
+            throw new Error('desktop control server has no address')
+          }
+          desktopPort = address.port
+          // 先置位再 start：start 中途抛错的服务可能已部分初始化，必须一并纳入回滚。
+          versionStarted = true
+          versionUpdates?.start?.()
+          memoryStarted = true
+          memory?.start?.()
+          running = true
+        } catch (error) {
+          // B1：启动中途抛错必须回滚已启动的后台服务，绝不吞错返回半成品 services。
+          // 逐步独立 try/catch：回滚失败不得掩盖原始启动错误。
+          if (versionStarted) {
+            try {
+              versionUpdates?.stop?.()
+            } catch (rollbackError) {
+              safeLog(
+                'warn',
+                `[pc-companion] version updates rollback failed: ${String(rollbackError)}`
+              )
+            }
+          }
+          if (memoryStarted) {
+            try {
+              memory?.stop?.()
+            } catch (rollbackError) {
+              safeLog(
+                'warn',
+                `[pc-companion] memory maintenance rollback failed: ${String(rollbackError)}`
+              )
+            }
+          }
+          running = false
+          desktopPort = undefined
+          safeLog('warn', `[pc-companion] desktop control start failed: ${String(error)}`)
+          throw error
+        } finally {
+          // B2：成功路径也要移除 error 监听，listenerCount 归零。
+          if (onError) dashboard.removeListener('error', onError)
         }
-        desktopPort = address.port
-        versionUpdates?.start?.()
-        memory?.start?.()
-        running = true
-      } catch (error) {
-        safeLog('warn', `[pc-companion] desktop control start failed: ${String(error)}`)
-      }
+      })()
+      starting = attempt.finally(() => {
+        starting = undefined
+      })
+      return starting
     },
 
     async stop(): Promise<void> {
@@ -306,10 +356,33 @@ export function createPcCompanionServices(
       } catch (error) {
         safeLog('warn', `[pc-companion] wechat stop failed: ${String(error)}`)
       }
+      // B3：close 永不回调会卡死退出链 ⇒ Promise.race 超时兜底；同时处理回调里的 err。
+      // 定时器在 finally 立即释放，settled 保证迟到的回调不再二次 settle / 误报。
+      let closeTimer: ReturnType<typeof setTimeout> | undefined
+      let settled = false
       try {
-        await new Promise<void>((resolve) => dashboard.close(() => resolve()))
+        await Promise.race([
+          new Promise<void>((resolve, reject) => {
+            dashboard.close((error?: unknown) => {
+              if (settled) return
+              settled = true
+              if (error) reject(error)
+              else resolve()
+            })
+          }),
+          new Promise<void>((resolve) => {
+            closeTimer = setTimeout(() => {
+              if (settled) return
+              settled = true
+              safeLog('warn', '[pc-companion] dashboard close timed out; releasing exit chain')
+              resolve()
+            }, closeTimeoutMs)
+          })
+        ])
       } catch (error) {
         safeLog('warn', `[pc-companion] dashboard close failed: ${String(error)}`)
+      } finally {
+        if (closeTimer !== undefined) clearTimeout(closeTimer)
       }
       running = false
       desktopPort = undefined
@@ -360,22 +433,32 @@ export async function startPcCompanionServices(
   options: StartPcCompanionOptions
 ): Promise<PcCompanionServicesLike | undefined> {
   if (options.wechatGallery !== true && options.desktopControl !== true) return undefined
-  const surface = await loadPcCompanionSurface(options.projectRoot, options.packagingContext)
-  // 不用 import.meta（主进程 tsconfig 的 module 不允许该元属性）：以工程 package.json
-  // 为 require 基准解析 ffmpeg-static / ffprobe-static 的包导出路径。
-  const require = createRequire(path.join(options.projectRoot, 'package.json'))
-  const services = createPcCompanionServices({
-    surface,
-    resourcesDir: options.resourcesDir,
-    ffmpegPath: String(require('ffmpeg-static')),
-    ffprobePath: String((require('ffprobe-static') as { path?: string }).path ?? ''),
-    qrSvg: (payload) => QRCode.toString(payload, { type: 'svg' }),
-    database: options.database,
-    scanRoots: options.scanRoots,
-    host: options.host,
-    pairingUri: options.pairingUri,
-    log: options.log
-  })
-  await services.start()
-  return services
+  try {
+    const surface = await loadPcCompanionSurface(options.projectRoot, options.packagingContext)
+    // 不用 import.meta（主进程 tsconfig 的 module 不允许该元属性）：以工程 package.json
+    // 为 require 基准解析 ffmpeg-static / ffprobe-static 的包导出路径。
+    const require = createRequire(path.join(options.projectRoot, 'package.json'))
+    const services = createPcCompanionServices({
+      surface,
+      resourcesDir: options.resourcesDir,
+      ffmpegPath: String(require('ffmpeg-static')),
+      ffprobePath: String((require('ffprobe-static') as { path?: string }).path ?? ''),
+      qrSvg: (payload) => QRCode.toString(payload, { type: 'svg' }),
+      database: options.database,
+      scanRoots: options.scanRoots,
+      host: options.host,
+      pairingUri: options.pairingUri,
+      log: options.log
+    })
+    await services.start()
+    return services
+  } catch (error) {
+    // B1：装配 / start 失败一律返回 undefined，绝不把半成品服务递给上层；留 warn 不静默。
+    try {
+      options.log?.('warn', `[pc-companion] companion services assembly failed: ${String(error)}`)
+    } catch {
+      // 日志通道不可用不得影响装配结果
+    }
+    return undefined
+  }
 }

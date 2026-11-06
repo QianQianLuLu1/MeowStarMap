@@ -72,6 +72,8 @@ export interface StageOptions {
   apply?: boolean
   warn?: (message: string) => void
   fsPort?: StageFsPort
+  /** 可注入的声明清单（缺省用 PC_ASSET_SPECS）；纯函数单测借此验证目标包含性断言。 */
+  specs?: readonly PcAssetSpec[]
 }
 
 export interface StageResult {
@@ -88,9 +90,13 @@ const nodeFsPort: StageFsPort = {
   copyFile: (from, to) => fs.copyFileSync(from, to)
 }
 
-/** 纯函数：把 8 份声明展开成绝对路径对（不触磁盘）。 */
-export function planPcAssets(upRoot: string, targetRoot: string): PlannedAsset[] {
-  return PC_ASSET_SPECS.map((spec) => ({
+/** 纯函数：把声明清单展开成绝对路径对（不触磁盘）。 */
+export function planPcAssets(
+  upRoot: string,
+  targetRoot: string,
+  specs: readonly PcAssetSpec[] = PC_ASSET_SPECS
+): PlannedAsset[] {
+  return specs.map((spec) => ({
     from: path.join(upRoot, spec.from),
     to: path.join(targetRoot, spec.to)
   }))
@@ -98,13 +104,13 @@ export function planPcAssets(upRoot: string, targetRoot: string): PlannedAsset[]
 
 /** 纯逻辑编排：UP 根缺失 / 单件缺失都是 warn 后跳过，绝不抛到构建链外。 */
 export function stagePcAssets(options: StageOptions): StageResult {
-  const { upRoot, targetRoot, apply = false, warn, fsPort = nodeFsPort } = options
+  const { upRoot, targetRoot, apply = false, warn, fsPort = nodeFsPort, specs } = options
   const warnings: string[] = []
   const emit = (message: string): void => {
     warnings.push(message)
     warn?.(message)
   }
-  const planned = planPcAssets(upRoot, targetRoot)
+  const planned = planPcAssets(upRoot, targetRoot, specs)
   const result: StageResult = {
     status: 'skipped',
     planned: planned.map((item) => item.to),
@@ -116,17 +122,21 @@ export function stagePcAssets(options: StageOptions): StageResult {
     emit(`[stage:nikkisync-pc] upstream root not found: ${upRoot}; skipped (CI has no junction)`)
     return result
   }
-  if (!apply) {
-    result.status = 'dry-run'
-    return result
-  }
-  result.status = 'applied'
+  // dry-run 与 apply 都逐件核对单件源：前者只产出 skipped，绝不写盘。
+  result.status = apply ? 'applied' : 'dry-run'
+  const resolvedTargetRoot = path.resolve(targetRoot)
   for (const item of planned) {
+    // targetRoot 外部可控：逐件断言目标落在根内，防 spec.to 里的 `..` 路径逃逸。
+    // 用 resolve + 分隔符前缀而非裸 startsWith，避免 `.../pc-evil` 之类同前缀误放行。
+    if (!path.resolve(item.to).startsWith(resolvedTargetRoot + path.sep)) {
+      throw new Error(`[stage:nikkisync-pc] asset target escapes targetRoot: ${item.to}`)
+    }
     if (!fsPort.exists(item.from)) {
       emit(`[stage:nikkisync-pc] missing upstream asset: ${item.from}; skipped`)
       result.skipped.push(item.from)
       continue
     }
+    if (!apply) continue
     fsPort.mkdir(path.dirname(item.to))
     fsPort.copyFile(item.from, item.to)
     result.copied.push(item.to)

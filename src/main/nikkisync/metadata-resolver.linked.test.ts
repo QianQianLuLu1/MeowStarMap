@@ -273,7 +273,7 @@ suite('阶段 6 元数据解析链接态', () => {
 
   // ---------------------------------------------------------------- K2：在线解析同意
 
-  it('K2 真实同意门：干净安装默认放行可解析；显式撤回零出站且跨会话持久化；重新同意后恢复', async () => {
+  it('K2 真实同意门：干净安装 fail-closed 零出站；显式同意后可解析；显式撤回跨会话持久化；重新同意后恢复', async () => {
     expect(session).toBeDefined()
     // 独立假解析器：resolve 被调一次就能观测「是否真的出站」
     let fakeResolveCalls = 0
@@ -322,16 +322,23 @@ suite('阶段 6 元数据解析链接态', () => {
       return total
     }
 
-    // ① 干净安装（无同意文件）：与上游 windows-app.ts 一致默认放行 ⇒ 真实出站解析
+    // ① 干净安装（无同意文件）：K2 同意门 fail-closed ⇒ 用户显式同意前零出站
     const fresh = await createRuntimeSession(optionsFor('fresh'), consentSurface)
     try {
-      expect(fresh.metadataConsent?.state().enabled).toBe(true)
+      expect(fs.existsSync(consentFile)).toBe(false)
+      expect(fresh.metadataConsent?.state().enabled).toBe(false)
       seedAssets(fresh.runtime.database)
       const beforeCalls = fakeResolveCalls
-      expect(await drain(fresh)).toBe(PHOTO_COUNT)
-      expect(fakeResolveCalls).toBeGreaterThan(beforeCalls)
+      expect(await drain(fresh)).toBe(0)
+      expect(fakeResolveCalls).toBe(beforeCalls)
 
-      // ② 显式撤回：写盘持久化（用户仍可随时关闭出站）
+      // ② 显式同意（policyVersion 取自 state，与 UI 同口径）⇒ 写盘持久化；
+      //    真实出站解析由 ⑥ 的新会话验证（上游把禁用期失败计数落库，同会话重放不等价）
+      fresh.metadataConsent?.setEnabled(true, fresh.metadataConsent?.state().policyVersion)
+      expect(fresh.metadataConsent?.state().enabled).toBe(true)
+      expect(fs.existsSync(consentFile)).toBe(true)
+
+      // ③ 显式撤回：写盘持久化（用户仍可随时关闭出站）
       fresh.metadataConsent?.setEnabled(false)
       expect(fresh.metadataConsent?.state().enabled).toBe(false)
       expect(fs.existsSync(consentFile)).toBe(true)
@@ -339,7 +346,7 @@ suite('阶段 6 元数据解析链接态', () => {
       await dispose(fresh)
     }
 
-    // ③ 新会话读回「已撤回」：runOnce 零出站，失败计数归入诊断
+    // ④ 新会话读回「已撤回」：runOnce 零出站，失败计数归入诊断
     const denied = await createRuntimeSession(optionsFor('denied'), consentSurface)
     try {
       expect(denied.metadataConsent?.state().enabled).toBe(false)
@@ -352,14 +359,14 @@ suite('阶段 6 元数据解析链接态', () => {
       expect(counters.resolved).toBe(0)
       expect(Object.keys(counters.failureCategories).length).toBeGreaterThan(0)
 
-      // ④ 重新同意（policyVersion 取自 state，与 UI「携带页面展示版本提交」同口径）
+      // ⑤ 重新同意（policyVersion 取自 state，与 UI「携带页面展示版本提交」同口径）
       denied.metadataConsent?.setEnabled(true, denied.metadataConsent?.state().policyVersion)
       expect(denied.metadataConsent?.state().enabled).toBe(true)
     } finally {
       await dispose(denied)
     }
 
-    // ⑤ 同意文件跨会话生效：新会话（新库、同一 consentFile）读回已同意 ⇒ 可解析
+    // ⑥ 同意文件跨会话生效：新会话（新库、同一 consentFile）读回已同意 ⇒ 可解析
     const granted = await createRuntimeSession(optionsFor('granted'), consentSurface)
     try {
       expect(granted.metadataConsent?.state().enabled).toBe(true)

@@ -522,7 +522,8 @@ function feedFileUrls(yml: string): string[] {
 
 /**
  * 判定 release 产物能否作为更新源上传（纯函数：不触磁盘、不改入参）。
- * 顺序即判据：appVersion 合法性 → 元数据存在 → 可解析 → 版本自洽 → 安装包在列。
+ * 顺序即判据：appVersion 合法性 → 元数据存在 → 可解析（version/path + files[] + 顶层 sha512）
+ * → 版本自洽 → 安装包在列。
  */
 export function verifyUpdateFeedArtifacts(input: UpdateFeedArtifactsInput): UpdateFeedProblem[] {
   if (!FEED_SEMVER_RE.test(input.appVersion)) return ['bad-app-version']
@@ -530,10 +531,15 @@ export function verifyUpdateFeedArtifacts(input: UpdateFeedArtifactsInput): Upda
   const version = feedScalar(input.feedYml, 'version')
   const payload = feedScalar(input.feedYml, 'path')
   if (version === null || payload === null) return ['feed-unparsable']
+  const fileUrls = feedFileUrls(input.feedYml)
+  // 完整 channel 文件必须列出 files[]（下载目标）并带顶层 sha512（整包校验和）：
+  // 缺任一项都不是 electron-builder 产物，客户端取到版本也下载/校验不了，不得判可发布。
+  if (fileUrls.length === 0 || feedScalar(input.feedYml, 'sha512') === null)
+    return ['feed-unparsable']
   const problems: UpdateFeedProblem[] = []
   if (version !== input.appVersion) problems.push('version-mismatch')
   const listed = new Set(input.files)
-  const needed = [payload, ...feedFileUrls(input.feedYml)]
+  const needed = [payload, ...fileUrls]
   if (needed.some((name) => !listed.has(name))) problems.push('missing-payload')
   return problems
 }
@@ -557,8 +563,8 @@ function updateFeedProblemText(problem: UpdateFeedProblem, appVersion: string): 
       )
     case 'feed-unparsable':
       return (
-        '更新元数据无法解析：latest.yml 缺 version 或 path 字段 ⇒ 不是 electron-builder 产出的 ' +
-        `channel 文件，不能拿去发布。${action}`
+        '更新元数据无法解析：latest.yml 缺 version / path / files[] / 顶层 sha512 任一字段 ⇒ ' +
+        `不是 electron-builder 产出的 channel 文件，不能拿去发布。${action}`
       )
     case 'version-mismatch':
       return (

@@ -81,4 +81,40 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     expect(dryRun.planned).toHaveLength(8)
     expect(dry.copyFile).not.toHaveBeenCalled()
   })
+
+  it('B11 dry-run 也逐件检查上游源：缺件计入 skipped 且零写盘', () => {
+    const planned = planPcAssets(upRoot, targetRoot)
+    const missing = planned[2]!.from
+    const existing = new Set<string>([
+      upRoot,
+      ...planned.map((item) => item.from).filter((item) => item !== missing)
+    ])
+    const { port, copyFile, mkdir } = fakeFs(existing)
+    const warn = vi.fn()
+    const res = stagePcAssets({ upRoot, targetRoot, warn, fsPort: port })
+    expect(res.status).toBe('dry-run')
+    expect(res.skipped).toContain(missing)
+    expect(res.copied).toEqual([])
+    expect(copyFile).not.toHaveBeenCalled()
+    expect(mkdir).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalled()
+  })
+
+  it('B11 目标逃逸出 targetRoot ⇒ 抛错且零写盘（防路径穿越）', () => {
+    const planned = planPcAssets(upRoot, targetRoot)
+    const existing = new Set<string>([upRoot, ...planned.map((item) => item.from)])
+    const { port, copyFile, mkdir } = fakeFs(existing)
+    const escaping = { from: 'docs/ESCAPE.md', to: path.join('..', '..', 'escape.txt') }
+    expect(() =>
+      stagePcAssets({
+        upRoot,
+        targetRoot,
+        apply: true,
+        fsPort: port,
+        specs: [escaping]
+      })
+    ).toThrow(/escape/i)
+    expect(copyFile).not.toHaveBeenCalled()
+    expect(mkdir).not.toHaveBeenCalled()
+  })
 })

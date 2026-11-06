@@ -18,7 +18,8 @@ import path from 'node:path'
 import { makeCtx, getHandler } from './_test-helpers'
 import { isBareDirectoryRoot, registerNikkiSyncHandlers } from './nikkisync-handler'
 import { pathGuard } from '../validator'
-import type { NikkiSyncRuntimeHandle } from '../../nikkisync/runtime-types'
+import { setActiveRuntimeSession } from '../../nikkisync/runtime-facade'
+import type { NikkiSyncRuntimeHandle, NikkiSyncRuntimeSession } from '../../nikkisync/runtime-types'
 import { AppError } from '../../../shared/errors/app-error'
 import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
 
@@ -2040,6 +2041,11 @@ describe('N4 灵感库通道（nikkisync:inspiration-*）', () => {
     'nikkisync:inspiration-image-get'
   ]
 
+  // activeRuntimeSession 是模块级单例：每条用例结束复位，避免跨用例污染。
+  afterEach(() => {
+    setActiveRuntimeSession(undefined)
+  })
+
   it('注册 4 条灵感库通道', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
@@ -2079,6 +2085,101 @@ describe('N4 灵感库通道（nikkisync:inspiration-*）', () => {
       const res = (await handler({}, input)) as HandleResult
       expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
     }
+  })
+
+  it('B5 manager.stop() 后会话已拆除 ⇒ 四条灵感库 IPC 统一 PRECONDITION_FAILED', async () => {
+    const runtime = createRuntimeStub()
+    // teardown 把状态机复位到 idle（会话已 dispose），但模块级 activeRuntimeSession
+    // 仍残留指向旧仓储：四条 IPC 不得在已关库上产生未定义错误。
+    vi.mocked(runtime.status).mockReturnValue({
+      state: 'idle',
+      dbPath: '',
+      linkReady: true,
+      tables: []
+    })
+    const closed = (): never => {
+      throw new Error('SqliteError: database connection is closed')
+    }
+    setActiveRuntimeSession({
+      inspirations: { list: closed, save: closed, putImage: closed, image: closed }
+    } as unknown as NikkiSyncRuntimeSession)
+    register(runtime)
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:inspiration-list', {}],
+      ['nikkisync:inspiration-save', { entry: {}, baseRevision: 0 }],
+      [
+        'nikkisync:inspiration-image-put',
+        { sha256: 'a'.repeat(64), mimeType: 'image/png', bytesBase64: 'AA==' }
+      ],
+      ['nikkisync:inspiration-image-get', { sha256: 'a'.repeat(64) }]
+    ]
+    for (const [channel, input] of cases) {
+      const handler = getHandler(handleMock, channel)
+      const res = (await handler({}, input)) as HandleResult
+      expect(res.error?.code, channel).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    }
+  })
+
+  it('B7 未知错误 token 不得经原型链误命中错误码表（Object.hasOwn 收敛）', async () => {
+    const token = 'polluted_inspiration_token'
+    // 用不可枚举属性模拟原型链污染：动态键索引会把它当成合法错误码，hasOwn 则不会。
+    Object.defineProperty(Object.prototype, token, {
+      value: 'validation',
+      configurable: true
+    })
+    try {
+      setActiveRuntimeSession({
+        inspirations: {
+          list: () => {
+            throw new Error(token)
+          },
+          save: vi.fn(),
+          putImage: vi.fn(),
+          image: vi.fn()
+        }
+      } as unknown as NikkiSyncRuntimeSession)
+      register(createRuntimeStub())
+      const handler = getHandler(handleMock, 'nikkisync:inspiration-list')
+      const res = (await handler({}, {})) as HandleResult
+      // 未知 token 只能归一为内部错误，不得被原型链属性误分类成 VALIDATION_ERROR
+      expect(res.error?.code).toBe(IPC_ERROR_CODES.INTERNAL_ERROR)
+    } finally {
+      delete (Object.prototype as Record<string, unknown>)[token]
+    }
+  })
+
+  it('B7 非法 entry（非记录 / 未知键）⇒ VALIDATION_ERROR 且不触达上游仓储', async () => {
+    const save = vi.fn()
+    setActiveRuntimeSession({
+      inspirations: {
+        list: vi.fn(),
+        save,
+        putImage: vi.fn(),
+        image: vi.fn()
+      }
+    } as unknown as NikkiSyncRuntimeSession)
+    register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:inspiration-save')
+    const badEntries: unknown[] = [
+      'not-an-object',
+      42,
+      null,
+      ['array'],
+      { evil: 'unknown-key' },
+      { id: 'x', unexpected: true }
+    ]
+    for (const entry of badEntries) {
+      const res = (await handler({}, { entry, baseRevision: 0 })) as HandleResult
+      expect(res.error?.code, String(entry)).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    }
+    expect(save).not.toHaveBeenCalled()
+    // 正向守护：已知键的合法条目不得被白名单误拒
+    const okRes = (await handler(
+      {},
+      { entry: { id: 'x', title: 't' }, baseRevision: 0 }
+    )) as HandleResult
+    expect(okRes.error?.code).not.toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(save).toHaveBeenCalledTimes(1)
   })
 })
 

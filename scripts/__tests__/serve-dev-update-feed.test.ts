@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync, mkdtempSync, rmSync } from 'node:fs'
+import * as os from 'node:os'
+import { EventEmitter } from 'node:events'
 import * as path from 'path'
 import { fileURLToPath } from 'url'
 import {
@@ -12,8 +14,41 @@ import {
 } from '../serve-dev-update-feed'
 import { verifyUpdateFeedArtifacts } from '../pre-dist-check'
 
+// main() 会真的 createServer + listen，单测里用 inert server 顶掉，绝不占端口、不留句柄。
+// 保留 node:http 其余导出，避免影响同进程里其它模块的 import。
+const { createServerMock, fakeServer } = vi.hoisted(() => {
+  const fakeServer = {
+    on: vi.fn(),
+    listen: vi.fn(),
+    close: vi.fn()
+  }
+  return { fakeServer, createServerMock: vi.fn(() => fakeServer) }
+})
+vi.mock('node:http', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:http')>()
+  return { ...actual, createServer: createServerMock }
+})
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..', '..')
+const SCRIPT_PATH = path.join(ROOT, 'scripts', 'serve-dev-update-feed.ts')
+
+/** 剔除注释，避免源码结构断言误命中注释里引用的缺陷写法 */
+function stripComments(src: string): string {
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+}
+
+/** 以「脚本直接运行」的形态重新导入模块，借入口守卫触发 main()（不依赖 main 是否导出） */
+async function runMainViaEntry(argv: string[]): Promise<void> {
+  vi.resetModules()
+  const prevArgv = process.argv
+  process.argv = ['node', SCRIPT_PATH, ...argv]
+  try {
+    await import('../serve-dev-update-feed')
+  } finally {
+    process.argv = prevArgv
+  }
+}
 
 /** 取解析成功的 args（失败即抛，让用例断言集中在成功形状上） */
 function okArgs(argv: string[]): ServeFeedArgs {
@@ -178,5 +213,88 @@ describe('buildLatestYml / sha512Base64 —— 元数据格式必须与 electron
       .sort()
     // 真实产物的每个键在夹具里都要出现（夹具可以少不能少结构）
     for (const key of realKeys) expect(fakeKeys).toContain(key)
+  })
+})
+
+describe('--no-yml 不得污染已有 latest.yml（A7）', () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), 'dev-feed-a7-'))
+    createServerMock.mockClear()
+    fakeServer.on.mockClear()
+    fakeServer.listen.mockClear()
+    fakeServer.close.mockClear()
+  })
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('(缺陷) --no-yml 不得写 latest.yml.bak、不得清空已有 yml', async () => {
+    const ymlPath = path.join(tmpDir, 'latest.yml')
+    const original = buildLatestYml({
+      version: '9.9.9',
+      fileName: feedPayloadName('9.9.9'),
+      sha512: 'AAA=',
+      size: 4096,
+      releaseDate: '2026-11-05T03:43:21.279Z'
+    })
+    writeFileSync(ymlPath, original, 'utf-8')
+
+    await runMainViaEntry(['--version', '9.9.9', '--no-yml', '--dir', tmpDir])
+
+    expect(existsSync(ymlPath + '.bak')).toBe(false)
+    expect(readFileSync(ymlPath, 'utf-8')).toBe(original)
+  })
+
+  it('(源码) --no-yml 分支不得再有 .bak 备份与清空写操作', () => {
+    const src = stripComments(readFileSync(SCRIPT_PATH, 'utf-8'))
+    expect(src).not.toContain('.bak')
+    expect(src).not.toMatch(/writeFileSync\(feedPath,\s*''/)
+  })
+})
+
+describe('入口守卫与信号生命周期（A8）', () => {
+  beforeEach(() => {
+    createServerMock.mockClear()
+    fakeServer.on.mockClear()
+    fakeServer.listen.mockClear()
+    fakeServer.close.mockClear()
+  })
+
+  it('(源码) 入口守卫改用 import.meta.url 规范化比对，不再靠 argv[1] 后缀字符串', () => {
+    const src = stripComments(readFileSync(SCRIPT_PATH, 'utf-8'))
+    expect(src).toContain('isDirectRun')
+    expect(src).not.toContain("endsWith('serve-dev-update-feed.ts')")
+  })
+
+  it('(缺陷) SIGINT/SIGTERM → 幂等 server.close()（信号连发只关一次，端口/句柄必释放）', async () => {
+    const mod = (await import('../serve-dev-update-feed')) as unknown as Record<string, unknown>
+    expect(typeof mod.registerShutdown).toBe('function')
+    const register = mod.registerShutdown as (server: unknown, target: unknown) => () => void
+    const target = new EventEmitter()
+
+    register(fakeServer, target)
+    target.emit('SIGINT')
+    target.emit('SIGTERM')
+    target.emit('SIGINT')
+
+    expect(fakeServer.close).toHaveBeenCalledTimes(1)
+  })
+
+  it('(回归锁) 仅导入模块不得触发 main()：不 createServer、不监听端口', async () => {
+    vi.resetModules()
+    const prevArgv = process.argv
+    process.argv = [
+      'node',
+      path.join(ROOT, 'scripts', '__tests__', 'serve-dev-update-feed.test.ts')
+    ]
+    try {
+      await import('../serve-dev-update-feed')
+    } finally {
+      process.argv = prevArgv
+    }
+    expect(createServerMock).not.toHaveBeenCalled()
   })
 })

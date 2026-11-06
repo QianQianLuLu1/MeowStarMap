@@ -144,3 +144,19 @@
 - `docs/IPC_CONTRACT.md` §8.2.7/§8.2.8 登记灵感库 4 通道与 PC 端 4 通道；
   §8.2.4 的整理队列开关自 N1 起默认 `true`（可显式关闭）。
 - 全过程与未同步项见 `docs/plans/2026-11-05-sync-gallery-pc-parity-实施计划.md`。
+
+### B6 风险口径（用户明确决策，仅补说明、不改行为默认值）
+
+- K2 同意门恢复 **fail-closed**：`createRuntimeSession` 以 `!existsSync(consentFile)` 作为
+  `MetadataOnlineConsent` 的 `initiallyDisabled` —— 同意文件不存在（干净安装）时强制不同意，
+  用户显式同意前绝不向第三方元数据端点出站；文件存在则交上游按内容判定（坏 JSON 同样
+  fail-closed）。叠加 `metadataResolverEnabled` 能力位，出站需同时越过两道门。
+- **五个默认开启常量一律保持 `true`，不得撤销上游 PC 端干净安装的产品意图**：
+  `app/nikkisync-runtime-setup.ts` 的 `RUNTIME_ENABLED_DEFAULT` /
+  `WATCHER_ENABLED_DEFAULT` / `METADATA_RESOLVER_ENABLED_DEFAULT` /
+  `MULTI_HOST_PAIRING_DEFAULT` / `SYNC_ENABLED_DEFAULT`。B6 只翻转同意门，不动这五项。
+- 因此干净安装仍会：LAN 同步服务监听 `0.0.0.0`、发起 mDNS 组播、产生扫描 IO，并在能力位
+  开启且用户同意后对第三方端点出站。**逃生阀**：`NIKKI_NIKKISYNC_RUNTIME=0` 全局关、
+  六个 `NIKKI_NIKKISYNC_*=0` 分项关，以及两份 `enabled:false` 离线 JSON。
+- 本目录的 `@nikkisync/*` 仍只许变量式动态 import；上述风险口径是文档说明，不得据此在
+  探针里启动服务或修改上游类型引用。

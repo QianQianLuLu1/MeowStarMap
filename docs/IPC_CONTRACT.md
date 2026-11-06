@@ -989,9 +989,10 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
   处理，故原「当前网络繁忙」提示逐字保持。`src/renderer/components/common/UpdateDialog.tsx` 内不再
   抄副本类型，改为从 shared 引入并再导出（消除 §7 常见陷阱所列的多处副本漂移）。
 - **归类口径**（`src/main/app/update-error-class.ts`，纯函数）：`network` = 连不上更新源（Node
-  DNS/拒连/超时码、TLS 证书、`net::ERR_*`、HTTP 5xx/408/429）；`source` = 连得上但更新源未就绪
+  DNS/拒连/超时码、TLS 证书、`net::ERR_*`、HTTP 5xx/408/429/403/407）；`source` = 连得上但更新源未就绪
   （`ERR_UPDATER_CHANNEL_FILE_NOT_FOUND` / `NO_PUBLISHED_VERSIONS` / `LATEST_VERSION_NOT_FOUND` /
-  `INVALID_RELEASE_FEED`、其余 4xx）。传输层信号**先于** `ERR_UPDATER_` 前缀判定，因为
+  `INVALID_RELEASE_FEED`、其余 4xx）。403/407 归 `network`：GitHub 限流返 403（与 429 同为
+  「现在连不上」），归 `source` 会把限流误报成更新源未就绪。传输层信号**先于** `ERR_UPDATER_` 前缀判定，因为
   `GitHubProvider` 会把 DNS 失败包装进 `ERR_UPDATER_LATEST_VERSION_NOT_FOUND` 的 message；
   兜底方向取 `source`（兜底 `network` 正是本轮要消灭的误报形状）。
 - **行为变化（需调用方注意）**：`app:update:check` 在更新器未初始化（典型为开发版未开假更新源）时，

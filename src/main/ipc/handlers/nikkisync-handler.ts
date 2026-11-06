@@ -1,5 +1,5 @@
-// @core-change: 同步图库对齐上游 PC 端：整理队列默认开，新增灵感库四条通道与 PC 控制页/微信画廊通道，
-//               能力位默认全开；同步服务页、docs/IPC_CONTRACT.md 与装载清单同批更新。
+/// <reference lib="es2022.object" />
+// @core-change: 灵感库错误码改用 Object.hasOwn 收敛、entry 入参加已知键白名单，会话拆除后四条灵感库 IPC 统一回前置失败
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -375,9 +375,34 @@ const inspirationListSchema = z.object({
   limit: z.number().int().min(1).max(100).default(100)
 })
 
+/**
+ * 上游 `InspirationEntry` 顶层已知键（逐字取自上游 `InspirationRepository.validate()`）。
+ * 动态字段名必须白名单：渲染层传来的 entry 不得携带任意键穿透到上游仓储。
+ */
+const INSPIRATION_ENTRY_KEYS: readonly string[] = [
+  'id',
+  'title',
+  'notes',
+  'tags',
+  'categories',
+  'status',
+  'createdAt',
+  'deletedAt',
+  'code',
+  'images'
+]
+
 /** 上游 `save(entry, baseRevision)`：条目形态与 revision 合法性交上游单真相源。 */
 const inspirationSaveSchema = z.object({
-  entry: z.unknown(),
+  // isRecord + 已知键白名单：非对象 / 数组 / null / 未知键一律在 zod 层拒成 VALIDATION_ERROR。
+  entry: z
+    .custom<Record<string, unknown>>(
+      (value) => typeof value === 'object' && value !== null && !Array.isArray(value),
+      { message: 'entry must be a record' }
+    )
+    .refine((entry) => Object.keys(entry).every((key) => INSPIRATION_ENTRY_KEYS.includes(key)), {
+      message: 'entry contains unknown keys'
+    }),
   baseRevision: z.number().int().min(0)
 })
 
@@ -426,7 +451,10 @@ function inspirationErrorToAppError(error: unknown): AppError {
   if (error instanceof AppError) return error
   const message = error instanceof Error ? error.message : String(error)
   const code = message.trim().split(/[\s:]+/)[0]
-  const mapped = code ? INSPIRATION_ERROR_CODES[code] : undefined
+  // B7：外部错误串首 token 是动态键，必须先 hasOwn 收窄到本表自有键，
+  // 否则原型链上的同名属性（如污染出的 constructor/自定义键）会被误当成合法错误码。
+  const mapped =
+    code && Object.hasOwn(INSPIRATION_ERROR_CODES, code) ? INSPIRATION_ERROR_CODES[code] : undefined
   if (mapped === 'validation') {
     return AppError.validation(`inspiration request rejected: ${code}`)
   }
@@ -444,7 +472,17 @@ function inspirationErrorToAppError(error: unknown): AppError {
  * 会话（或老链接的 inspirations 面）缺席同样是 PRECONDITION_FAILED。
  */
 function requireInspirations(ctx: HandlerContext): InspirationRepositoryLike {
-  requireRuntime(ctx)
+  const runtime = requireRuntime(ctx)
+  // B5：manager.stop() 后句柄仍在，但会话已 teardown（状态回 idle/unavailable），
+  // 模块级 activeRuntimeSession 可能仍残留指向已 dispose 的旧仓储。先按状态机做会话
+  // 存活校验：只有 running / degraded / scanning 确认会话在跑时才允许取用注册表会话，
+  // 否则统一回 PRECONDITION_FAILED，杜绝在已关库上调用灵感库产生未定义错误。
+  const state = runtime.status().state
+  if (state !== 'running' && state !== 'degraded' && state !== 'scanning') {
+    throw AppError.preconditionFailed(
+      'inspiration surface is unavailable (runtime session stopped)'
+    )
+  }
   const store = getActiveRuntimeSession()?.inspirations
   if (!store) {
     throw AppError.preconditionFailed(

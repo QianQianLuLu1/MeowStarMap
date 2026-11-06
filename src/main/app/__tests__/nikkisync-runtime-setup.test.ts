@@ -597,6 +597,29 @@ describe('PC 端能力默认开启（N1）', () => {
     expect(SYNC_ENABLED_DEFAULT).toBe(true)
   })
 
+  it('B6 守护：五项默认开启常量仍为 true（恢复同意门 fail-closed 不得撤销产品意图）', () => {
+    // 源码文本级守护：常量若被改成 false 或删掉声明，即便改用字面量绕过也会当场红。
+    const source = readFileSync(
+      path.resolve(process.cwd(), 'src', 'main', 'app', 'nikkisync-runtime-setup.ts'),
+      'utf-8'
+    )
+    for (const name of [
+      'RUNTIME_ENABLED_DEFAULT',
+      'WATCHER_ENABLED_DEFAULT',
+      'METADATA_RESOLVER_ENABLED_DEFAULT',
+      'MULTI_HOST_PAIRING_DEFAULT',
+      'SYNC_ENABLED_DEFAULT'
+    ]) {
+      const match = source.match(new RegExp(`export const ${name} = (true|false)`))
+      expect(match?.[1], name).toBe('true')
+    }
+    expect(RUNTIME_ENABLED_DEFAULT).toBe(true)
+    expect(WATCHER_ENABLED_DEFAULT).toBe(true)
+    expect(METADATA_RESOLVER_ENABLED_DEFAULT).toBe(true)
+    expect(MULTI_HOST_PAIRING_DEFAULT).toBe(true)
+    expect(SYNC_ENABLED_DEFAULT).toBe(true)
+  })
+
   it('缺省判定全部放行，env=0 仍可一键回到旧形态', () => {
     const empty = settings({})
     expect(resolveRuntimeEnabled({}, empty)).toBe(true)

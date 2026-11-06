@@ -14,12 +14,13 @@
  *   npx tsx scripts/serve-dev-update-feed.ts --version 9.9.9 --no-yml   # 复现「源未就绪」
  */
 import { createHash, randomBytes } from 'node:crypto'
-import { createServer } from 'node:http'
+import { createServer, type Server } from 'node:http'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const SELF_PATH = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(SELF_PATH)
 const ROOT = path.join(__dirname, '..')
 
 const DEFAULT_PORT = 8123
@@ -142,7 +143,32 @@ export function sha512Base64(bytes: Buffer): string {
   return createHash('sha512').update(bytes).digest('base64')
 }
 
-function main(argv: string[]): void {
+/** 信号源最小接口：process 与测试注入的 EventEmitter 都满足，避免 any */
+interface SignalEmitter {
+  on(event: 'SIGINT' | 'SIGTERM', listener: () => void): unknown
+}
+
+/**
+ * 注册 SIGINT/SIGTERM → 幂等关闭 server。
+ * Ctrl+C / 终止信号到来时必须释放监听端口与句柄；两个信号可能连发，
+ * 重复 close 会抛 ERR_SERVER_NOT_RUNNING，故用 closed 标志做幂等。
+ */
+export function registerShutdown(
+  server: Server,
+  signalTarget: SignalEmitter = process
+): () => void {
+  let closed = false
+  const shutdown = (): void => {
+    if (closed) return
+    closed = true
+    server.close()
+  }
+  signalTarget.on('SIGINT', shutdown)
+  signalTarget.on('SIGTERM', shutdown)
+  return shutdown
+}
+
+export function main(argv: string[]): Server {
   const parsed = parseServeFeedArgs(argv, ROOT)
   if (!parsed.ok) {
     console.error(`[dev-update-feed] ✖ ${parsed.error}`)
@@ -160,6 +186,8 @@ function main(argv: string[]): void {
   const payload = readFileSync(payloadPath)
   const sha512 = sha512Base64(payload)
   const feedPath = path.join(dir, FEED_FILE)
+  // --no-yml 刻意复现「可达但源未就绪」：白名单本就不含 latest.yml，服务对它一律 404。
+  // 既不必备份也不必清空磁盘上的 yml——那只会污染产物，对 404 语义毫无帮助。
   if (writeFeed) {
     writeFileSync(
       feedPath,
@@ -172,10 +200,6 @@ function main(argv: string[]): void {
       }),
       'utf-8'
     )
-  } else if (existsSync(feedPath)) {
-    // --no-yml 是刻意复现「可达但源未就绪」：删掉旧元数据，否则服务仍会命中上一轮留下的 yml
-    writeFileSync(feedPath + '.bak', readFileSync(feedPath))
-    writeFileSync(feedPath, '', 'utf-8')
   }
 
   const allowed = new Map<string, string>()
@@ -220,9 +244,20 @@ function main(argv: string[]): void {
       '[dev-update-feed] Ctrl+C 结束服务；默认不要点「下载更新」，若点了请删 %LOCALAPPDATA%\\meow-star-map-updater-dev'
     )
   })
+
+  // 信号到达即释放监听端口与句柄（幂等，见 registerShutdown）
+  registerShutdown(server)
+  return server
 }
 
-// 仅在以脚本方式直接运行时启动；被测试导入时不执行
-if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('serve-dev-update-feed.ts')) {
+// 仅在以脚本方式直接运行时启动；被测试导入时不执行。
+// 用 import.meta.url 与 argv[1] 的规范化绝对路径比对：tsx / Windows 下 argv[1] 可能是
+// file: URL 或带不同分隔符，靠后缀字符串匹配会静默失配，导致脚本直接运行时不启动。
+const invokedPath = process.argv[1]
+const isDirectRun =
+  invokedPath !== undefined &&
+  path.resolve(invokedPath.startsWith('file://') ? fileURLToPath(invokedPath) : invokedPath) ===
+    path.resolve(SELF_PATH)
+if (isDirectRun) {
   main(process.argv.slice(2))
 }

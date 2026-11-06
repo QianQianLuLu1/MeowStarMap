@@ -25,6 +25,12 @@ export type { UpdatePayload, UpdateStage }
 let ctxRef: AppContext | null = null
 let initialized = false
 
+// 本次 checkForUpdates / downloadUpdate 调用期间是否已由 error 事件推过 error。
+// 每次调用开始时重置：上游通常是「先 dispatchError（emit error）再 rethrow」，error 事件会先于
+// reject 到达 catch。catch 据此去重——已由 error 事件推过就绝不再推，否则刚被关闭的模态会被
+// setDismissed(false) 弹回；只有本次全程没收到 error 事件时才兜底补推 1 条。
+let errorEventPushed = false
+
 /** 把归一化后的发布说明统一成字符串（electron-updater 两种形态兼容） */
 function normalizeReleaseNotes(
   notes: string | Array<{ version?: string; note?: string | null }> | null | undefined
@@ -94,6 +100,7 @@ export function initAutoUpdater(ctx: AppContext): void {
   })
 
   autoUpdater.on('error', (err) => {
+    errorEventPushed = true
     const message = err instanceof Error ? err.message : String(err)
     // 归类决定渲染端文案：只有真的连不上更新源才配得上「当前网络繁忙」
     const errorKind = classifyUpdateError(err)
@@ -119,27 +126,40 @@ export function isAutoUpdaterEnabled(): boolean {
  */
 export async function checkForUpdates(): Promise<void> {
   if (!initialized) throw AppError.preconditionFailed(t('main.error.updaterNotInit'))
+  errorEventPushed = false
   pushUpdate({ stage: 'checking' })
   try {
     await autoUpdater.checkForUpdates()
   } catch (err) {
-    // 离线 / 404 等：error 事件通常已触发；此处仅补一道日志，不重复推 error
     logger.warn(t('main.autoUpdate.log.checkFailed'), err)
+    // 本次未收到 error 事件 ⇒ 兜底推 1 条（否则调用方只看到 checking 便无声收场）。
+    // 已由 error 事件推过就绝不再推，否则刚被关闭的模态会被 setDismissed(false) 弹回。
+    if (!errorEventPushed) {
+      const message = err instanceof Error ? err.message : String(err)
+      pushUpdate({ stage: 'error', errorKind: classifyUpdateError(err), errorMessage: message })
+    }
   }
 }
 
 /** 用户确认下载后调用：开始下载（autoDownload=false 时需显式触发） */
 export async function downloadUpdate(): Promise<void> {
-  if (!initialized) return
+  // 与 checkForUpdates 同口径：未初始化必须让调用方拿到失败，否则 handler 仍返回
+  // {downloading:true}，渲染层 catch 永远走不到，用户点「下载更新」毫无反应。
+  if (!initialized) throw AppError.preconditionFailed(t('main.error.updaterNotInit'))
+  errorEventPushed = false
   try {
     await autoUpdater.downloadUpdate()
   } catch (err) {
     // 下载期的失败同样要归类（断网导致的 ECONNRESET 不能兜底成「源未就绪」），但**不重复推**：
     // 上游 downloadUpdate 的 errorHandler 先 dispatchError 再 rethrow（AppUpdater.js:650-672），
     // on('error') 已经带 errorKind 推过一条；这里再推一条会让刚被关闭的模态被 setDismissed(false) 弹回。
-    // 与 checkForUpdates() 的 catch 同口径：error 由事件唯一负责，本 catch 只补日志。
+    // 因此只有本次全程未收到 error 事件时才兜底推 1 条，已由事件推过则只补日志。
     const errorKind = classifyUpdateError(err)
     logger.error(`${t('main.autoUpdate.log.downloadFailed')} errorKind=${errorKind}`, err)
+    if (!errorEventPushed) {
+      const message = err instanceof Error ? err.message : String(err)
+      pushUpdate({ stage: 'error', errorKind, errorMessage: message })
+    }
   }
 }
 

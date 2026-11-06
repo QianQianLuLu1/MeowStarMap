@@ -594,7 +594,9 @@ interface SessionFixture {
  * 因此假 Runtime 也按同一条件挂 `metadataResolver`，否则测不出「键缺失」的真实后果。
  * K2 开关 `consentSurfaceDisabled`：模拟「同意深入口缺席的老链接会话」（不包装、不挂 consent 面）。
  */
-function createSessionFixture(options: { consentSurfaceDisabled?: boolean } = {}): SessionFixture {
+function createSessionFixture(
+  options: { consentSurfaceDisabled?: boolean; upstream?: Record<string, unknown> } = {}
+): SessionFixture {
   const consentSurfaceDisabled = options.consentSurfaceDisabled === true
   const close = vi.fn()
   const metadataHandle = {
@@ -631,6 +633,8 @@ function createSessionFixture(options: { consentSurfaceDisabled?: boolean } = {}
     },
     createPairingUri: () => 'NS1|server_fake|127.0.0.1|38137|tok|0|' + 'a'.repeat(64)
   } as Record<string, unknown>
+  // B4：把假上游后台服务句柄挂到 runtime 上，供 start/stopBackgroundServices 用例直接观察。
+  Object.assign(runtimeShape, options.upstream ?? {})
 
   const surface = {
     pcCompanion: {
@@ -804,7 +808,7 @@ describe('createRuntimeSession 元数据解析单缝注入（阶段 6）', () =>
 // ---------------------------------------------------------------- K2：在线解析同意
 
 describe('createRuntimeSession 元数据在线同意（K2）', () => {
-  it('K2-f1 解析开启 + consentFile：构造同意（默认放行三元组）并下发 guard 包装后的 resolver', async () => {
+  it('K2-f1 解析开启 + consentFile：构造同意（fail-closed 三元组）并下发 guard 包装后的 resolver', async () => {
     const fixture = createSessionFixture()
     const session = await createRuntimeSession(
       {
@@ -816,8 +820,8 @@ describe('createRuntimeSession 元数据在线同意（K2）', () => {
     expect(fixture.consentCalls).toHaveLength(1)
     const call = fixture.consentCalls[0]
     expect(call.file).toBe('/tmp/userData/nikkisync/metadata-online-consent.json')
-    // 与上游 windows-app.ts:110 干净安装一致：默认放行，用户可在控制页显式关闭
-    expect(call.initiallyDisabled).toBe(false)
+    // B6：同意文件不存在（干净安装）⇒ fail-closed，强制不同意；用户显式同意后才允许出站
+    expect(call.initiallyDisabled).toBe(true)
     // recipients 逐字来自主进程常量：披露文案与实际出口同源
     const recipients = call.recipients as Array<{
       name: string
@@ -876,6 +880,64 @@ describe('createRuntimeSession 元数据在线同意（K2）', () => {
       resolver: Record<string, unknown>
     }
     expect(injected.resolver.__consentGuarded).toBeUndefined()
+  })
+
+  it('B6 干净安装无 consent 文件 ⇒ 同意门 fail-closed（initiallyDisabled=true）', async () => {
+    const fixture = createSessionFixture()
+    // 该路径在测试环境必然不存在：模拟干净安装，同意门必须关闭出站。
+    const consentFile = '/tmp/userData/nikkisync/metadata-online-consent-clean-install.json'
+    const session = await createRuntimeSession(
+      { ...sessionOptions(true), consentFile },
+      fixture.surface
+    )
+    expect(fixture.consentCalls).toHaveLength(1)
+    expect(fixture.consentCalls[0].file).toBe(consentFile)
+    expect(fixture.consentCalls[0].initiallyDisabled).toBe(true)
+    // 同意面仍挂出（用户可在控制页显式开启），但初始状态是不同意
+    expect(session.metadataConsent).toBe(fixture.consentInstances[0])
+  })
+})
+
+// ---------------------------------------------------------------- N3：后台服务启停（B4）
+
+describe('N3 后台服务启停（B4 顺序与逐步清理）', () => {
+  it('B4 start 中途抛错：已尝试的服务仍入列，stop 必回滚其 stop()', async () => {
+    const updater = {
+      start: vi.fn(() => {
+        throw new Error('updater boom')
+      }),
+      stop: vi.fn()
+    }
+    const fixture = createSessionFixture({
+      upstream: { metadataDictionaryUpdater: updater }
+    })
+    const session = await createRuntimeSession(sessionOptions(true), fixture.surface)
+    expect(() => session.startBackgroundServices!()).toThrow('updater boom')
+    session.stopBackgroundServices!()
+    expect(updater.stop).toHaveBeenCalledTimes(1)
+  })
+
+  it('B4 任一 stop 抛错：后续服务仍被清理，且错误不静默上抛', async () => {
+    const updater = { start: vi.fn(), stop: vi.fn() }
+    const supplement = {
+      start: vi.fn(),
+      stop: vi.fn(() => {
+        throw new Error('supplement stop boom')
+      })
+    }
+    const fixture = createSessionFixture({
+      upstream: {
+        metadataDictionaryUpdater: updater,
+        metadataDictionarySupplementUpdater: supplement
+      }
+    })
+    const session = await createRuntimeSession(sessionOptions(true), fixture.surface)
+    expect(() => session.startBackgroundServices!()).not.toThrow()
+    expect(updater.start).toHaveBeenCalledTimes(1)
+    expect(supplement.start).toHaveBeenCalledTimes(1)
+    expect(() => session.stopBackgroundServices!()).toThrow('supplement stop boom')
+    expect(supplement.stop).toHaveBeenCalledTimes(1)
+    expect(updater.stop).toHaveBeenCalledTimes(1)
   })
 })
 

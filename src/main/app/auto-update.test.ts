@@ -170,6 +170,42 @@ describe('initAutoUpdater —— 更新事件归类推送', () => {
   })
 })
 
+describe('downloadUpdate —— 未初始化与失败兜底', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(listeners)) delete listeners[key]
+    sendToRendererMock.mockClear()
+    appMock.isPackaged = true
+    autoUpdaterMock.downloadUpdate.mockReset().mockResolvedValue(undefined)
+    delete process.env.MEOW_DEV_UPDATE_FEED
+  })
+
+  it('未初始化（从未 init）时 downloadUpdate 必须 reject PRECONDITION_FAILED，不得静默 return', async () => {
+    const mod = await loadFresh()
+
+    await expect(mod.downloadUpdate()).rejects.toMatchObject({
+      code: IPC_ERROR_CODES.PRECONDITION_FAILED
+    })
+    // 不得推任何下载开始信号：失败要先让调用方（handler/渲染层）拿到错误
+    expect(sendToRendererMock.mock.calls).toHaveLength(0)
+  })
+
+  it('下载 reject 且本次未收到 error 事件 ⇒ 兜底推 1 条 error（归类仍须是 network）', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    autoUpdaterMock.downloadUpdate.mockRejectedValue(connectionRefusedError())
+
+    await mod.downloadUpdate()
+
+    expect(lastPushedPayload()).toEqual(
+      expect.objectContaining({ stage: 'error', errorKind: 'network' })
+    )
+    const errorPushes = sendToRendererMock.mock.calls.filter(
+      (call) => (call[2] as UpdatePayload).stage === 'error'
+    )
+    expect(errorPushes).toHaveLength(1)
+  })
+})
+
 describe('initAutoUpdater —— beta 版本号的更新通道', () => {
   beforeEach(() => {
     for (const key of Object.keys(listeners)) delete listeners[key]
@@ -314,7 +350,7 @@ describe('事件透传与检查流程（回归锁：修复前后都应绿）', (
     )
   })
 
-  it('检查抛错但 error 事件已触发时，checkForUpdates 不重复推 error、也不往外抛', async () => {
+  it('检查抛错且本次未收到 error 事件时，checkForUpdates 兜底推 1 条 error、也不往外抛', async () => {
     const mod = await loadFresh()
     mod.initAutoUpdater(fakeCtx)
     autoUpdaterMock.checkForUpdates.mockRejectedValue(channelFileMissingError())
@@ -325,11 +361,31 @@ describe('事件透传与检查流程（回归锁：修复前后都应绿）', (
       sendToRendererMock.mock.calls.filter((call) => (call[2] as UpdatePayload).stage === 'error')
         .length
 
-    // catch 分支只补日志，error 由事件唯一负责
-    expect(countErrorPushes()).toBe(0)
-    emit('error', channelFileMissingError())
+    // 本次未收到 error 事件 ⇒ catch 必须兜底推 1 条（归类与原错误串都要透出）
     expect(countErrorPushes()).toBe(1)
+    expect(lastPushedPayload()).toEqual(
+      expect.objectContaining({ stage: 'error', errorKind: 'source' })
+    )
+    expect(lastPushedPayload()?.errorMessage).toContain('Cannot find latest.yml')
     expect(loggerMock.warn).toHaveBeenCalled()
+  })
+
+  it('检查抛错但上游已 emit error 时，checkForUpdates 不重复推 error（模态不被弹回）', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    const err = channelFileMissingError()
+    // 忠实复刻上游：先 dispatchError（emit error）再 rethrow，catch 必须靠本次标记去重
+    autoUpdaterMock.checkForUpdates.mockImplementation(async () => {
+      emit('error', err)
+      throw err
+    })
+
+    await expect(mod.checkForUpdates()).resolves.toBeUndefined()
+
+    const errorPushes = sendToRendererMock.mock.calls.filter(
+      (call) => (call[2] as UpdatePayload).stage === 'error'
+    )
+    expect(errorPushes).toHaveLength(1)
   })
 
   it('quitAndInstall 透传 (false, true)：显示安装进度并在装完后重启', async () => {

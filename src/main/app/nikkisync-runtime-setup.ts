@@ -44,6 +44,13 @@ import type { AppContext } from './app-context'
  * 默认开启会产生扫描 IO、0.0.0.0 监听、mDNS 组播与第三方出站请求；
  * 六个 `NIKKI_NIKKISYNC_*=0` 逃生阀与两个 `enabled:false` 离线 JSON 是回退手段。
  *
+ * B6 风险口径（不得因恢复 K2 同意门 fail-closed 而撤销下面五个 `true` 默认值）：
+ * 干净安装（无设置 / 无 env）默认全开 ⇒ ① LAN 同步服务监听 `0.0.0.0`；② 发起 mDNS
+ * 组播广播；③ 元数据解析能力位开启后，须经 K2 同意门才对第三方端点出站。回退手段：
+ * `NIKKI_NIKKISYNC_RUNTIME=0` 全局关、六个 `NIKKI_NIKKISYNC_*=0` 分项关
+ * （`PC_COMPANION_ENV_FLAGS` / `METADATA_ENV_FLAG`），以及两份 `enabled:false` 离线 JSON。
+ * K2 同意门只约束「用户同意前不得出站」，不改变上述默认开启口径。
+ *
  * 库文件落在 `{userData}/nikkisync/nikkisync.db`，**不使用**上游默认的
  * `%LOCALAPPDATA%/NikkiSync`（嵌入态必须与宿主数据目录同源，见计划 §3）。
  */

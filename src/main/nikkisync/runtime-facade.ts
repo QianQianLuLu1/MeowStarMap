@@ -18,7 +18,7 @@
  *    的 `exports` 只暴露 `"."` ⇒ 必须用 `resolveDeepEntryUrl` 给出的 `file://` URL。
  */
 
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -727,12 +727,17 @@ export async function createRuntimeSession(
    */
   const metadataResolverEnabled = options.metadataResolverEnabled === true
   /**
-   * K2 · 同意门。仅在「解析开启 && consentFile 给出 && 深入口在位」时构造。
-   * `initiallyDisabled` 逐字对齐上游 `windows-app.ts:110` 的干净安装语义：
-   * 上游传 `resolverFile?.enabled === false`，即只有「功能整体关闭」才强制不同意；
-   * 本轮与上游 PC 端对齐为默认放行 ⇒ 恒传 false（首次安装由上游种子化为 enabled，
-   * 用户仍可在控制页显式关闭，关闭后 `setEnabled(false)` 立即停止出站）。
-   * 历史的 fail-closed 取值 `!existsSync(consentFile)` 已按用户口径翻转。
+   * K2 · 同意门（fail-closed）。仅在「解析开启 && consentFile 给出 && 深入口在位」时构造。
+   * `initiallyDisabled` 取 `!existsSync(consentFile)`：同意文件不存在（干净安装）⇒ true
+   * （强制不同意，比上游 fresh-install 默认放行更严，§14-Q3）；文件存在 ⇒ 交上游按内容
+   * 判定（坏 JSON 走构造器 catch 分支同样 fail-closed）。叠加装配层的
+   * `metadataResolverEnabled` 能力位 ⇒ 出站要同时越过能力位与用户同意两道门。
+   *
+   * B6 风险口径（用户明确决策：只把本门恢复 fail-closed，五个默认开启常量一律不动）：
+   * 干净安装默认全开会让本机监听 `0.0.0.0`（LAN 同步服务）、发起 mDNS 组播，并在用户
+   * 显式同意后对第三方元数据端点出站；逃生阀是 `NIKKI_NIKKISYNC_RUNTIME=0` 全局阀与
+   * 六个 `NIKKI_NIKKISYNC_*=0` 分项阀，以及两份 `enabled:false` 离线 JSON。本门只保证
+   * 「同意文件不存在时，用户同意前不得出站」，不撤销上游 PC 端默认全开的产品意图。
    */
   let metadataConsent: import('./runtime-types').NikkiSyncMetadataConsent | undefined
   if (metadataResolverEnabled && options.consentFile && surface.metadataOnlineConsent) {
@@ -744,7 +749,11 @@ export async function createRuntimeSession(
       recipients: Array<{ name: string; endpoint: string; fields: string[] }>,
       initiallyDisabled?: boolean
     ) => import('./runtime-types').NikkiSyncMetadataConsent
-    metadataConsent = new ConsentCtor(options.consentFile, NUAN5_METADATA_CONSENT_RECIPIENTS, false)
+    metadataConsent = new ConsentCtor(
+      options.consentFile,
+      NUAN5_METADATA_CONSENT_RECIPIENTS,
+      !existsSync(options.consentFile)
+    )
   }
   /**
    * N2：复刻上游 `windows-app.ts:88-113` 的启动组合。
@@ -989,13 +998,24 @@ export async function createRuntimeSession(
             ]) {
               const service = upstream[key]
               if (!service || typeof service.start !== 'function') continue
-              service.start()
+              // B4：先入列再 start —— start 抛错的服务也可能已部分初始化，必须纳入后续清理。
               started.push(service)
+              service.start()
             }
             upstream.metadataDictionary?.reenrichResolvedAssets?.()
           },
           stopBackgroundServices: (): void => {
-            for (const service of started.splice(0).reverse()) service.stop?.()
+            // B4：逐步独立 try/catch，任一上游 stop 抛错都不得中断其余清理；
+            // 首个错误在循环末尾上抛给 teardown 统一记日志（异常绝不静默）。
+            let firstError: unknown
+            for (const service of started.splice(0).reverse()) {
+              try {
+                service.stop?.()
+              } catch (error) {
+                if (firstError === undefined) firstError = error
+              }
+            }
+            if (firstError !== undefined) throw firstError
           }
         }
       })(),

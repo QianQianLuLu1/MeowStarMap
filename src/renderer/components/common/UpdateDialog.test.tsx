@@ -32,13 +32,20 @@ function stripComments(src: string): string {
 
 const code = stripComments(dialogSrc)
 
+const LOCALES_DIR = path.resolve(process.cwd(), 'src', 'renderer', 'i18n', 'locales')
+const ALL_LOCALE_FILES = fs.readdirSync(LOCALES_DIR).filter((f) => f.endsWith('.json'))
+// i18n key 检查逐一覆盖全部 12 个 locale：从目录枚举，新增语言包自动纳入校验
+const CHECKED_LOCALES = ALL_LOCALE_FILES
+
 describe('UpdateDialog 检查更新弹窗改造（error / not-available）', () => {
   it('error 模态标题使用 updateTitle（"更新"），不再硬编码"更新出错"', () => {
     expect(code).toContain("t('settings.about.updateTitle')")
     expect(code).not.toContain('更新出错')
   })
 
-  it('error 模态正文使用 updateNetworkBusy 文案', () => {
+  it('error 模态正文按 errorKind 分流：source 专属文案 + network 原文案都在', () => {
+    expect(code).toContain("payload.errorKind === 'source'")
+    expect(code).toContain("t('settings.about.updateSourceUnavailable')")
     expect(code).toContain("t('settings.about.updateNetworkBusy')")
   })
 
@@ -79,24 +86,23 @@ describe('UpdateDialog 检查更新弹窗改造（error / not-available）', () 
     expect(code).toContain('errorKind')
   })
 
-  it('i18n key 在 zh-CN / en 中均已声明', () => {
-    const zh = fs.readFileSync(
-      path.resolve(process.cwd(), 'src', 'renderer', 'i18n', 'locales', 'zh-CN.json'),
-      'utf-8'
-    )
-    const en = fs.readFileSync(
-      path.resolve(process.cwd(), 'src', 'renderer', 'i18n', 'locales', 'en.json'),
-      'utf-8'
-    )
-    for (const key of [
-      'updateTitle',
-      'updateNetworkBusy',
-      'updateNoNewVersion',
-      'updateSourceUnavailable'
-    ]) {
-      expect(zh).toContain(`"${key}"`)
-      expect(en).toContain(`"${key}"`)
+  it('4 个 i18n key 在覆盖到的每个 locale 中均已声明', () => {
+    for (const locale of CHECKED_LOCALES) {
+      const json = fs.readFileSync(path.join(LOCALES_DIR, locale), 'utf-8')
+      for (const key of [
+        'updateTitle',
+        'updateNetworkBusy',
+        'updateNoNewVersion',
+        'updateSourceUnavailable'
+      ]) {
+        expect(json).toContain(`"${key}"`)
+      }
     }
+  })
+
+  it('i18n key 检查必须逐一覆盖全部 12 个 locale（不得只查 zh-CN/en）', () => {
+    expect(ALL_LOCALE_FILES).toHaveLength(12)
+    expect([...CHECKED_LOCALES].sort()).toEqual([...ALL_LOCALE_FILES].sort())
   })
 })
 
