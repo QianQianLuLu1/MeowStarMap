@@ -53,6 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - 本轮审查取证与全绿读数落盘为 `docs/plans/` 活文档一份；轮次快照的归档位置一律查 `docs/plans/archive/README.md` 的归档清单表。
 - 2.5.7-beta 重打包：产物 `MeowStarMap-Setup-2.5.7-beta.exe`（184,899,418 字节，较上轮 184,943,020 少 43,602），`release/latest.yml` 随构建重生成并由新闸门判自洽；上一轮同版本产物整体归档到 `release/` 下的轮次目录（该目录不入版本控制）。
 - 2.5.7-beta 重打包（审查修复轮，2026-11-07，`f9380fb` / `67ffbcb`）：产物 `MeowStarMap-Setup-2.5.7-beta.exe`（188,568,475 字节），`release/latest.yml` 随构建重生成并由闸门判自洽（sha512/size 与安装包一致）；上一轮同版本产物（188,183,763 字节）整体归档到 `release/build-20261107-align03-pre/`（不入版本控制）；9 项 PC 资源随包，`verify:dist` 全项通过（20 能力产物 / 81 模块装载链闭包 / 26 roots / 外部依赖闭包 3 包）。
+- 2.5.7-beta 复打包（复打包前审查收口轮，2026-11-07，`f1db1af`）：产物 `MeowStarMap-Setup-2.5.7-beta.exe`（188,568,465 字节，较上轮少 10），`release/latest.yml` 随构建重生成并由闸门判自洽（version=2.5.7-beta / sha512 / size 一致）；上一轮同版本产物整体归档到 `release/build-20261107-repack2-pre/`（不入版本控制）；9 项 PC 资源随包且包内 4 份 legal 文档与上游逐字节一致（`953813b` 恢复态首次随包），`verify:dist` 全项通过（20 能力产物 / 81 模块装载链闭包 / 26 roots / 外部依赖闭包 3 包）；收尾对新产物 `win-unpacked` 复跑 `e2e:smoke` 21 passed。六项验证全绿：`npm install`（lock 零漂移 + junction 标准链恢复）/ `build` / `test`（483 文件 7821 passed 20 skipped）/ `typecheck` / `e2e:smoke`（21 passed）/ `test:ci-linux`（483 文件 7838 passed 3 skipped）全部 exit 0。
 
 ---
 
