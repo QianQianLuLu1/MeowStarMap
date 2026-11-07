@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - 订正被本轮改动证伪的注释（`5edb719`）：`src/main/ipc/handlers/app-handler.ts` 的「dev 下 checkForUpdates no-op」（现抛 `IPC_PRECONDITION_FAILED`）与 `src/main/app/lifecycle.ts` 两处「仅生产环境」（dev 带 `MEOW_DEV_UPDATE_FEED=1` 时按假源真初始化）；模块指引 `src/main/app/AGENTS.md` 同步为「生产/dev 假源两态」并补齐 `update-error-class.ts` 行、把同名配套测试计数由过时的「27 个源文件 / 23 个有测试」订正为「29 / 26」（计数经实测得出，其余 5 个此前未列表的文件留待下一轮补齐）。
 - 本轮审查取证与全绿读数落盘为 `docs/plans/` 活文档一份；轮次快照的归档位置一律查 `docs/plans/archive/README.md` 的归档清单表。
 - 2.5.7-beta 重打包：产物 `MeowStarMap-Setup-2.5.7-beta.exe`（184,899,418 字节，较上轮 184,943,020 少 43,602），`release/latest.yml` 随构建重生成并由新闸门判自洽；上一轮同版本产物整体归档到 `release/` 下的轮次目录（该目录不入版本控制）。
+- 2.5.7-beta 重打包（审查修复轮，2026-11-07，`f9380fb` / `67ffbcb`）：产物 `MeowStarMap-Setup-2.5.7-beta.exe`（188,568,475 字节），`release/latest.yml` 随构建重生成并由闸门判自洽（sha512/size 与安装包一致）；上一轮同版本产物（188,183,763 字节）整体归档到 `release/build-20261107-align03-pre/`（不入版本控制）；9 项 PC 资源随包，`verify:dist` 全项通过（20 能力产物 / 81 模块装载链闭包 / 26 roots / 外部依赖闭包 3 包）。
 
 ---
 
