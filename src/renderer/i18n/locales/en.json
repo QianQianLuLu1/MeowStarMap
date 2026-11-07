@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Sync Service"
+      "syncService": "Sync Service",
+      "syncInspiration": "Inspiration library"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Refresh",
       "scan": "Scan game album",
       "service": "Sync Service",
+      "inspiration": "Inspiration library",
       "status": {
         "ready": "Ready",
         "degraded": "Game folder not found",

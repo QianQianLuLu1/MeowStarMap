@@ -26,7 +26,8 @@
       "launcherCache": "缓存",
       "recycleBin": "回收站",
       "settings": "设置",
-      "syncService": "同步服务"
+      "syncService": "同步服务",
+      "syncInspiration": "灵感库"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "刷新",
       "scan": "扫描游戏相册",
       "service": "同步服务",
+      "inspiration": "灵感库",
       "status": {
         "ready": "已就绪",
         "degraded": "未找到游戏目录",

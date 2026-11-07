@@ -44,6 +44,9 @@ function getViewStatusLabel(view: ViewLevel, t: TFunction): string {
     case 'sync-service':
       // 同步服务二级子页：同样受 default: '' 兜底掩盖，由 App.view-registry.test.ts 锁住
       return t('appShell.viewStatus.syncService')
+    case 'sync-inspiration':
+      // 灵感库二级子页：与 sync-service 同口径，由结构断言锁住
+      return t('appShell.viewStatus.syncInspiration')
     default:
       return ''
   }

@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Dịch vụ đồng bộ"
+      "syncService": "Dịch vụ đồng bộ",
+      "syncInspiration": "Thư viện cảm hứng"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Làm mới",
       "scan": "Quét album game",
       "service": "Dịch vụ đồng bộ",
+      "inspiration": "Thư viện cảm hứng",
       "status": {
         "ready": "Sẵn sàng",
         "degraded": "Không tìm thấy thư mục game",

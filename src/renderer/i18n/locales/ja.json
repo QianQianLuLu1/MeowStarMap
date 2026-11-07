@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "同期サービス"
+      "syncService": "同期サービス",
+      "syncInspiration": "インスピレーションライブラリ"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "更新",
       "scan": "ゲーム相册をスキャン",
       "service": "同期サービス",
+      "inspiration": "インスピレーションライブラリ",
       "status": {
         "ready": "準備完了",
         "degraded": "ゲームフォルダが見つかりません",

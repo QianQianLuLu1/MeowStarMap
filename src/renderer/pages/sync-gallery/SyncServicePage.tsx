@@ -9,7 +9,6 @@ import { ConfirmDialog } from '../../components/common/ConfirmDialog'
 import { EmptyState } from '../../components/common/EmptyState'
 import { PageHeader } from '../../components/common/PageHeader'
 import { PairingQrDialog } from '../../components/sync/PairingQrDialog'
-import { SyncInspirationPanel } from './SyncInspirationPanel'
 import { useErrorToast } from '../../hooks/useErrorToast'
 import { IconCopyText, IconSync } from '../../icons'
 import { useMediaStore } from '../../stores/mediaStore'
@@ -1016,8 +1015,8 @@ export const SyncServicePage: React.FC = () => {
                     <span className="text-xs">{t('syncService.status.inspirationOn')}</span>
                   </SettingsRow>
                 )}
-                {/* N4：灵感库列表/编辑器（上游 /v1/inspiration*）；折叠态不发 IPC，桥缺失静默隐藏 */}
-                <SyncInspirationPanel />
+                {/* N4 灵感库面板已迁出为独立二级页 SyncInspirationPage（视图 `sync-inspiration`，
+                    入口在同步图库工具栏）；本页保留上方的能力位观测行，不再挂载面板本体 */}
                 {startupStages.length > 0 && (
                   <SettingsRow label={t('syncService.startupStages.label')}>
                     {/* K1：阶段名→i18n 映射；未知阶段不谎报，原样展示英文短码 */}

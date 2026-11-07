@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "同步服務"
+      "syncService": "同步服務",
+      "syncInspiration": "靈感庫"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "重新整理",
       "scan": "掃描遊戲相簿",
       "service": "同步服務",
+      "inspiration": "靈感庫",
       "status": {
         "ready": "已就緒",
         "degraded": "未找到遊戲目錄",

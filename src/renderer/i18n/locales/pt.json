@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Serviço de sincronização"
+      "syncService": "Serviço de sincronização",
+      "syncInspiration": "Biblioteca de inspiração"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Atualizar",
       "scan": "Escanear álbum do jogo",
       "service": "Serviço de sincronização",
+      "inspiration": "Biblioteca de inspiração",
       "status": {
         "ready": "Pronto",
         "degraded": "Pasta do jogo não encontrada",

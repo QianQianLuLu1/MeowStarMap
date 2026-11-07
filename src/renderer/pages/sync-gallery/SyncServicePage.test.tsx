@@ -1408,6 +1408,14 @@ describe('SyncServicePage 照片目录自定义（(at)-(be)）', () => {
     await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalled())
     expect(screen.queryByText('灵感同步 v1')).not.toBeInTheDocument()
   })
+
+  it('(bl) 灵感库面板已迁出为独立二级页：本页不再渲染 SyncInspirationPanel（能力位观测行保留）', async () => {
+    renderSection()
+    await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalled())
+    // 面板本体迁至 SyncInspirationPage（入口在同步图库工具栏），本页只保留能力位状态行
+    expect(screen.queryByTestId('sync-inspiration-summary')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sync-inspiration-panel')).not.toBeInTheDocument()
+  })
 })
 
 // ============================================================================

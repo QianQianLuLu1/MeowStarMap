@@ -2,7 +2,8 @@
  * @module src/renderer/App.tsx + components/layout/AppShell.tsx
  * @layer L3
  *
- * 视图层级注册表的结构断言（同步服务迁入同步图库板块，新增 `sync-service` 二级页）。
+ * 视图层级注册表的结构断言（同步服务迁入同步图库板块，新增 `sync-service` 二级页；
+ * 灵感库从同步服务页迁出为独立二级页时，同批登记 `sync-inspiration`）。
  *
  * 为什么用源码结构断言而不是渲染测试：`App.tsx` 的 `renderPage` 有 `default: return <GalleryPage />`
  * 兜底、`AppShell.tsx` 的 `getViewStatusLabel` 有 `default: ''` 兜底，`ALL_VIEWS` 漏一项则 keep-alive
@@ -72,6 +73,12 @@ describe('视图层级注册表（App.tsx / AppShell.tsx）', () => {
     expect(viewLevelLiterals(), "uiStore ViewLevel 缺 'sync-service'").toContain('sync-service')
   })
 
+  it("ViewLevel 必须登记 'sync-inspiration'（灵感库二级子页的层级入口）", () => {
+    expect(viewLevelLiterals(), "uiStore ViewLevel 缺 'sync-inspiration'").toContain(
+      'sync-inspiration'
+    )
+  })
+
   it('ViewLevel 的每一个取值都必须登记进 ALL_VIEWS —— 漏一项则 keep-alive 不挂载，点进去整块空白', () => {
     const allViews = extractArrayLiteral(appCode, 'ALL_VIEWS')
     for (const view of viewLevelLiterals()) {
@@ -96,6 +103,10 @@ describe('视图层级注册表（App.tsx / AppShell.tsx）', () => {
     expect(appCode).toMatch(/'sync-service':\s*2\b/)
   })
 
+  it('sync-inspiration 的毛玻璃层级必须是 2（板块内子页，与 sync-service 同层，不是一级板块）', () => {
+    expect(appCode).toMatch(/'sync-inspiration':\s*2\b/)
+  })
+
   it("renderPage 必须有 case 'sync-service' 且渲染 SyncServicePage（default 会静默兜到 GalleryPage）", () => {
     const caseIdx = appCode.indexOf("case 'sync-service'")
     expect(caseIdx, "renderPage 缺 case 'sync-service'").toBeGreaterThan(-1)
@@ -106,6 +117,15 @@ describe('视图层级注册表（App.tsx / AppShell.tsx）', () => {
     ).toContain('SyncServicePage')
   })
 
+  it("renderPage 必须有 case 'sync-inspiration' 且渲染 SyncInspirationPage（default 会静默兜到 GalleryPage）", () => {
+    const caseIdx = appCode.indexOf("case 'sync-inspiration'")
+    expect(caseIdx, "renderPage 缺 case 'sync-inspiration'").toBeGreaterThan(-1)
+    expect(
+      appCode.slice(caseIdx, caseIdx + 200),
+      "case 'sync-inspiration' 未渲染 SyncInspirationPage"
+    ).toContain('SyncInspirationPage')
+  })
+
   it("getViewStatusLabel 必须有 case 'sync-service' 并引用 appShell.viewStatus.syncService（default: '' 会静默留白）", () => {
     const caseIdx = appShellCode.indexOf("case 'sync-service'")
     expect(caseIdx, "getViewStatusLabel 缺 case 'sync-service'").toBeGreaterThan(-1)
@@ -113,5 +133,14 @@ describe('视图层级注册表（App.tsx / AppShell.tsx）', () => {
       appShellCode.slice(caseIdx, caseIdx + 200),
       "case 'sync-service' 未引用 appShell.viewStatus.syncService"
     ).toContain('appShell.viewStatus.syncService')
+  })
+
+  it("getViewStatusLabel 必须有 case 'sync-inspiration' 并引用 appShell.viewStatus.syncInspiration（default: '' 会静默留白）", () => {
+    const caseIdx = appShellCode.indexOf("case 'sync-inspiration'")
+    expect(caseIdx, "getViewStatusLabel 缺 case 'sync-inspiration'").toBeGreaterThan(-1)
+    expect(
+      appShellCode.slice(caseIdx, caseIdx + 200),
+      "case 'sync-inspiration' 未引用 appShell.viewStatus.syncInspiration"
+    ).toContain('appShell.viewStatus.syncInspiration')
   })
 })

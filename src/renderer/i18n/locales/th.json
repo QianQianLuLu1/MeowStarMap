@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "บริการซิงค์"
+      "syncService": "บริการซิงค์",
+      "syncInspiration": "คลังแรงบันดาลใจ"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Refresh",
       "scan": "Scan game album",
       "service": "บริการซิงค์",
+      "inspiration": "คลังแรงบันดาลใจ",
       "status": {
         "ready": "Ready",
         "degraded": "Game folder not found",

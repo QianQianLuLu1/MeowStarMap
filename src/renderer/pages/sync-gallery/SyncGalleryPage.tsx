@@ -178,6 +178,7 @@ export const SyncGalleryPage: React.FC = () => {
           onScan={handleScan}
           scanning={scanning}
           onOpenService={() => navigateTo('sync-service')}
+          onOpenInspiration={() => navigateTo('sync-inspiration')}
         />
         <EmptyState
           status={error === 'syncGallery.error.loadFailed' ? 'error' : 'empty'}
@@ -206,6 +207,7 @@ export const SyncGalleryPage: React.FC = () => {
         onOpenDetail={() => setDetailOpen(true)}
         detailDisabled={active === null}
         onOpenService={() => navigateTo('sync-service')}
+        onOpenInspiration={() => navigateTo('sync-inspiration')}
       />
       {/* 续页失败但已有列表：不能清屏，也不能静默吞掉，给一条行内提示 */}
       {error ? (

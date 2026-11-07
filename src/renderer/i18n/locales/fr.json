@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Service de synchronisation"
+      "syncService": "Service de synchronisation",
+      "syncInspiration": "Bibliothèque d’inspiration"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Actualiser",
       "scan": "Analyser l’album du jeu",
       "service": "Service de synchronisation",
+      "inspiration": "Bibliothèque d’inspiration",
       "status": {
         "ready": "Prêt",
         "degraded": "Dossier du jeu introuvable",

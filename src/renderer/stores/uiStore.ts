@@ -73,6 +73,8 @@ export type ViewLevel =
   | 'sync-gallery'
   // 同步服务二级子页：从设置页 `sync` 分组剥离而来，入口在同步图库工具栏。
   | 'sync-service'
+  // 灵感库二级子页：N4 面板从同步服务页迁出后的独立承载页，入口同样在同步图库工具栏。
+  | 'sync-inspiration'
 export type ViewMode = 'grid' | 'list' | 'timeline' | 'masonry' | 'event-timeline'
 
 /**

@@ -212,6 +212,22 @@ describe('SyncGalleryPage 接线', () => {
     expect(navigateTo).toHaveBeenCalledWith('sync-service')
   })
 
+  it('列表态的工具栏「灵感库」入口压栈到 sync-inspiration 二级页', async () => {
+    storeState.files = [asset('a/1')]
+    render(<SyncGalleryPage />)
+    await waitFor(() => expect(loadFirst).toHaveBeenCalled())
+    fireEvent.click(screen.getByTitle('灵感库'))
+    expect(navigateTo).toHaveBeenCalledWith('sync-inspiration')
+  })
+
+  it('空态的工具栏「灵感库」入口同样压栈到 sync-inspiration 二级页（第二处调用点）', async () => {
+    render(<SyncGalleryPage />)
+    await waitFor(() => expect(loadFirst).toHaveBeenCalled())
+    expect(screen.queryByTestId('grid')).toBeNull()
+    fireEvent.click(screen.getByTitle('灵感库'))
+    expect(navigateTo).toHaveBeenCalledWith('sync-inspiration')
+  })
+
   it('桥缺失空态给出可执行指令（含 npm run link:nikkisync），而不是空白网格', async () => {
     storeState.error = 'syncGallery.error.bridgeMissing'
     statusMock = vi.fn(async () => ({ state: 'unavailable', dbPath: '', linkReady: false }))

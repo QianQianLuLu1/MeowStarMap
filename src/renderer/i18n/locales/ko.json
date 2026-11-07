@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "동기화 서비스"
+      "syncService": "동기화 서비스",
+      "syncInspiration": "영감 라이브러리"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "새로고침",
       "scan": "게임 앨범 스캔",
       "service": "동기화 서비스",
+      "inspiration": "영감 라이브러리",
       "status": {
         "ready": "준비됨",
         "degraded": "게임 폴더를 찾지 못함",

@@ -163,6 +163,59 @@ describe('uiStore sync-service 二级页导航契约', () => {
 })
 
 /**
+ * 灵感库二级子页（层级 2）的导航契约——与上面 sync-service 契约完全同构。
+ *
+ * N4 面板从 SyncServicePage 迁出为独立二级页：入口在 SyncGalleryToolbar 的「灵感库」
+ * 按钮，走泛型 `navigateTo`/`goBack`，实现无需改动 —— 锁的是**行为**而不是新增逻辑：
+ *  ① `'sync-inspiration'` 必须登记进 ViewLevel 联合类型（结构性检查，同法）；
+ *  ② 压栈/出栈语义与 sync-service 一致（Sidebar 的返回按钮由 `viewStack.length > 1` 驱动）；
+ *  ③ 该页**刻意不加入** `MULTI_SELECT_VIEWS`：它没有媒体选中，加了会让进入二级页
+ *     无谓清掉图库的选中集与多选态（防未来「顺手对齐其它板块」的回归锁）。
+ */
+describe('uiStore sync-inspiration 二级页导航契约', () => {
+  afterEach(() => {
+    useUIStore.setState({
+      multiSelectMode: false,
+      selectedMediaIds: [],
+      currentView: 'gallery',
+      viewStack: ['gallery']
+    })
+  })
+
+  it("ViewLevel 联合类型必须登记 'sync-inspiration'", () => {
+    const startIdx = uiStoreSrc.indexOf('export type ViewLevel')
+    expect(startIdx).toBeGreaterThan(-1)
+    const block = uiStoreSrc.slice(startIdx, uiStoreSrc.indexOf('export type', startIdx + 1))
+    expect(block, "ViewLevel 缺 'sync-inspiration'").toContain("'sync-inspiration'")
+  })
+
+  it("navigateTo('sync-inspiration') 压栈、goBack() 出栈并回到上一层；栈顶重复压栈不追加", () => {
+    useUIStore.setState({ currentView: 'sync-gallery', viewStack: ['sync-gallery'] })
+
+    useUIStore.getState().navigateTo('sync-inspiration')
+    expect(useUIStore.getState().currentView).toBe('sync-inspiration')
+    expect(useUIStore.getState().viewStack).toEqual(['sync-gallery', 'sync-inspiration'])
+
+    // 栈顶相同则不重复压栈（keep-alive 下重复点击入口按钮不得把栈越压越长）
+    useUIStore.getState().navigateTo('sync-inspiration')
+    expect(useUIStore.getState().viewStack).toEqual(['sync-gallery', 'sync-inspiration'])
+
+    useUIStore.getState().goBack()
+    expect(useUIStore.getState().currentView).toBe('sync-gallery')
+    expect(useUIStore.getState().viewStack).toEqual(['sync-gallery'])
+  })
+
+  it("进入 'sync-inspiration' 不得清空图库选中集或多选态（该页不在 MULTI_SELECT_VIEWS 内）", () => {
+    const store = useUIStore.getState()
+    store.setMultiSelectMode(true)
+    store.setSelectedMediaIds(['21', '22'])
+    useUIStore.getState().navigateTo('sync-inspiration')
+    expect(useUIStore.getState().selectedMediaIds).toEqual(['21', '22'])
+    expect(useUIStore.getState().multiSelectMode).toBe(true)
+  })
+})
+
+/**
  * 多选模式（图库 / 截图 / 收藏 三大板块）
  * @coverage multiSelectMode 默认关闭、可切换、跨板块清理、不持久化
  */

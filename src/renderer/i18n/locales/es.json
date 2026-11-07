@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Servicio de sincronización"
+      "syncService": "Servicio de sincronización",
+      "syncInspiration": "Biblioteca de inspiración"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Actualizar",
       "scan": "Escanear álbum del juego",
       "service": "Servicio de sincronización",
+      "inspiration": "Biblioteca de inspiración",
       "status": {
         "ready": "Listo",
         "degraded": "Carpeta del juego no encontrada",

@@ -14,6 +14,8 @@ import { toRuntimeGroup, SyncGalleryToolbar } from './SyncGalleryToolbar'
  *  - 传了就能点并回调一次
  *  - **运行时未启动（runtimeState: null）时绝不禁用** —— 服务没起来才是用户最需要
  *    点进「同步服务」子页把它打开的时刻，禁用等于把唯一的入口藏起来
+ *
+ * 「灵感库」入口（N4 面板迁出为独立二级页后落在这里）与同步服务完全同构，同样锁三条。
  */
 
 function renderToolbar(
@@ -31,15 +33,19 @@ function renderToolbar(
     scanning: boolean
     /** 显式开关：不打开就不给组件传 onOpenService（覆盖「未传不渲染」那条契约） */
     withServiceEntry: boolean
+    /** 显式开关：不打开就不给组件传 onOpenInspiration（同上） */
+    withInspirationEntry: boolean
   }> = {}
 ): {
   onRefresh: Mock
   onScan: Mock
   onOpenService: Mock
+  onOpenInspiration: Mock
 } {
   const onRefresh = vi.fn()
   const onScan = vi.fn()
   const onOpenService = vi.fn()
+  const onOpenInspiration = vi.fn()
   render(
     <SyncGalleryToolbar
       runtimeState={props.runtimeState === undefined ? null : props.runtimeState}
@@ -47,9 +53,10 @@ function renderToolbar(
       onScan={onScan}
       scanning={props.scanning ?? false}
       {...(props.withServiceEntry ? { onOpenService } : {})}
+      {...(props.withInspirationEntry ? { onOpenInspiration } : {})}
     />
   )
-  return { onRefresh, onScan, onOpenService }
+  return { onRefresh, onScan, onOpenService, onOpenInspiration }
 }
 
 /**
@@ -131,6 +138,28 @@ describe('SyncGalleryToolbar', () => {
     expect(entry.disabled).toBe(false)
     fireEvent.click(entry)
     expect(onOpenService).toHaveBeenCalledTimes(1)
+  })
+
+  it('未传 onOpenInspiration 时不渲染「灵感库」入口（既有调用点向后兼容）', () => {
+    renderToolbar({ runtimeState: 'running' })
+    expect(screen.queryByTitle('灵感库')).not.toBeInTheDocument()
+  })
+
+  it('传入 onOpenInspiration 后「灵感库」入口可点并回调一次', () => {
+    const { onOpenInspiration } = renderToolbar({
+      runtimeState: 'running',
+      withInspirationEntry: true
+    })
+    fireEvent.click(screen.getByTitle('灵感库'))
+    expect(onOpenInspiration).toHaveBeenCalledTimes(1)
+  })
+
+  it('运行时未启动（runtimeState: null）时「灵感库」入口同样不得禁用', () => {
+    const { onOpenInspiration } = renderToolbar({ runtimeState: null, withInspirationEntry: true })
+    const entry = screen.getByTitle('灵感库') as HTMLButtonElement
+    expect(entry.disabled).toBe(false)
+    fireEvent.click(entry)
+    expect(onOpenInspiration).toHaveBeenCalledTimes(1)
   })
 
   it('渲染出「关于 NikkiSync」入口', () => {

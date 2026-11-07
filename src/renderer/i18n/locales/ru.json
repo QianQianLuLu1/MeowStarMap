@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Служба синхронизации"
+      "syncService": "Служба синхронизации",
+      "syncInspiration": "Библиотека вдохновения"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Обновить",
       "scan": "Сканировать альбом игры",
       "service": "Служба синхронизации",
+      "inspiration": "Библиотека вдохновения",
       "status": {
         "ready": "Готово",
         "degraded": "Папка игры не найдена",

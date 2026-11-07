@@ -26,7 +26,8 @@
       "launcherCache": "",
       "recycleBin": "",
       "settings": "",
-      "syncService": "Synchronisierungsdienst"
+      "syncService": "Synchronisierungsdienst",
+      "syncInspiration": "Inspirationsbibliothek"
     }
   },
   "categories": {
@@ -4376,6 +4377,7 @@
       "refresh": "Aktualisieren",
       "scan": "Spielalbum durchsuchen",
       "service": "Synchronisierungsdienst",
+      "inspiration": "Inspirationsbibliothek",
       "status": {
         "ready": "Bereit",
         "degraded": "Spielordner nicht gefunden",

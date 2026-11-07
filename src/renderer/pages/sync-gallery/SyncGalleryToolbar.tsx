@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../components/common/Button'
-import { IconSync, IconRotateCw, IconInfo, IconSettings, IconGithub } from '../../icons'
+import { IconSync, IconRotateCw, IconInfo, IconSettings, IconGithub, IconStar } from '../../icons'
 import type { NikkiSyncRuntimeStateInfo } from '../../../shared/types/electron-api'
 
 /**
@@ -39,6 +39,8 @@ interface SyncGalleryToolbarProps {
    * 让加载态分支（本页提前 return，本就没有工具栏）与既有测试保持原样。
    */
   onOpenService?: () => void
+  /** 进入板块内的「灵感库」二级子页（纯导航）。可选性语义与 onOpenService 完全同构。 */
+  onOpenInspiration?: () => void
 }
 
 /** 三档各配一个语义色 token（沿用主题已有变量，不自建 class、不写色值字面量）。 */
@@ -67,7 +69,8 @@ export const SyncGalleryToolbar: React.FC<SyncGalleryToolbarProps> = ({
   scanning,
   onOpenDetail,
   detailDisabled,
-  onOpenService
+  onOpenService,
+  onOpenInspiration
 }) => {
   const { t } = useTranslation()
   const group = toRuntimeGroup(runtimeState)
@@ -122,6 +125,19 @@ export const SyncGalleryToolbar: React.FC<SyncGalleryToolbarProps> = ({
           title={t('syncGallery.toolbar.service')}
         >
           {t('syncGallery.toolbar.service')}
+        </Button>
+      ) : null}
+      {/* 灵感库二级子页入口：与「同步服务」同级的纯导航按钮（面板本体已迁出同步服务页），
+          不加 disabled——灵感库读的是本地库，运行时未启动同样可用 */}
+      {onOpenInspiration ? (
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={onOpenInspiration}
+          icon={<IconStar size={14} />}
+          title={t('syncGallery.toolbar.inspiration')}
+        >
+          {t('syncGallery.toolbar.inspiration')}
         </Button>
       ) : null}
       {/* 压尾且无条件渲染：「详情」是条件渲染的，按钮组左端会随选中态漂移；

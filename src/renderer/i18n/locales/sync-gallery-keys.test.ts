@@ -53,6 +53,8 @@ function leafKeys(node: unknown, prefix = ''): string[] {
 const REQUIRED_KEYS = [
   'nav.syncGallery',
   'appShell.viewStatus.syncGallery',
+  // 灵感库独立二级页（sync-inspiration）的状态栏文案，与 toolbar.inspiration 值一致（见下方不变式）
+  'appShell.viewStatus.syncInspiration',
   'syncGallery.title',
   'syncGallery.subtitle',
   'syncGallery.loading',
@@ -79,6 +81,8 @@ const REQUIRED_KEYS = [
   'syncGallery.toolbar.scan',
   // 同步服务从设置页剥离后，入口按钮落在这条键上
   'syncGallery.toolbar.service',
+  // 灵感库独立二级页的工具栏入口按钮（navigateTo('sync-inspiration')，纯导航）
+  'syncGallery.toolbar.inspiration',
   // 工具栏「关于 NikkiSync」入口：用系统浏览器打开上游引擎仓库
   'syncGallery.toolbar.about',
   'syncGallery.toolbar.status.ready',
@@ -161,6 +165,23 @@ describe('同步图库语言包完整性', () => {
         readPath(locale, 'appShell.viewStatus.syncGallery'),
         `${code}.json 两处文案不一致`
       ).toBe(navValue)
+    }
+  })
+
+  // 灵感库独立二级页（sync-inspiration）：工具栏按钮、状态栏、页面标题三处同指一物，
+  // 逐包钉住同值（仿 sync-service-keys.test.ts 的「同步服务」多处一致先例），
+  // 防止单包漏改或三处措辞漂移。
+  it('各语言灵感库的按钮/状态栏/页面标题三处文案一致', () => {
+    for (const [code, locale] of Object.entries(LOCALES)) {
+      const title = readPath(locale, 'syncGallery.inspiration.title')
+      expect(
+        readPath(locale, 'syncGallery.toolbar.inspiration'),
+        `${code}.json 工具栏按钮文案与页面标题不一致`
+      ).toBe(title)
+      expect(
+        readPath(locale, 'appShell.viewStatus.syncInspiration'),
+        `${code}.json 状态栏文案与页面标题不一致`
+      ).toBe(title)
     }
   })
 
