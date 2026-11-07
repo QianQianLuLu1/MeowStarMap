@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import path from 'node:path'
+import { getFileInfo } from 'prettier'
 
 import {
   PC_ASSET_SPECS,
@@ -13,6 +14,11 @@ import {
  *
  * 全部 IO 经 `StageFsPort` 注入，不依赖真实 UP 检出与 junction（CI `npm ci` 无链接）：
  * 这正是「UP 根找不到时 warn + skipped、不阻断」能在 CI 上被测到的前提。
+ *
+ * 末尾另含一组真实仓库契约：暂存资产是上游逐字派生物，`.prettierignore` 必须整目录
+ * 豁免（否则 lint-staged 根键经 matchBase 命中任意深度 .md，pre-commit 的 prettier
+ * --write 会改写逐字形态）。判据落在 prettier 自身的 ignore 判定（getFileInfo）上，
+ * 全程用 import.meta.url 造 URL，免疫 ci-linux 装置对 path/cwd 的 mock。
  */
 function fakeFs(existing: Set<string>) {
   const copyFile = vi.fn()
@@ -116,5 +122,39 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     ).toThrow(/escape/i)
     expect(copyFile).not.toHaveBeenCalled()
     expect(mkdir).not.toHaveBeenCalled()
+  })
+})
+
+describe('真实仓库契约：上游逐字资产必须豁免 prettier', () => {
+  const fileInfoOptions = {
+    ignorePath: new URL('../../.prettierignore', import.meta.url),
+    resolveConfig: false
+  }
+
+  it.each(PC_ASSET_SPECS.filter((spec) => spec.to.endsWith('.md')).map((spec) => spec.to))(
+    'legal 文档 %s 被 .prettierignore 覆盖（--write/--check 两侧都跳过）',
+    async (name) => {
+      const info = await getFileInfo(
+        new URL(`../../resources/nikkisync/pc/${name}`, import.meta.url),
+        fileInfoOptions
+      )
+      expect(
+        info.ignored,
+        `${name} 未被 .prettierignore 豁免：pre-commit 会改写上游逐字形态，stage 重跑不再幂等`
+      ).toBe(true)
+    }
+  )
+
+  it('子目录资产同样被整目录条目覆盖（wechat/resize-icon.ps1）', async () => {
+    const info = await getFileInfo(
+      new URL('../../resources/nikkisync/pc/wechat/resize-icon.ps1', import.meta.url),
+      fileInfoOptions
+    )
+    expect(info.ignored).toBe(true)
+  })
+
+  it('自检：判据非恒真——AGENTS.md 不在 ignore 内', async () => {
+    const info = await getFileInfo(new URL('../../AGENTS.md', import.meta.url), fileInfoOptions)
+    expect(info.ignored).toBe(false)
   })
 })
