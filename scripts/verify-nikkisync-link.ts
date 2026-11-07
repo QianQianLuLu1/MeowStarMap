@@ -92,6 +92,9 @@ export const NIKKISYNC_CAPABILITY_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'wechat', 'WeChatGalleryService.js'),
   path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs'),
   path.join('dist', 'src', 'wechat', 'WeChatIconProvider.js'),
+  // 4cb71e2（v1.0.31）：小程序灵感库 / 批量删除包装器（由 pc-companion-services 消费）
+  path.join('dist', 'src', 'wechat', 'WeChatDeletion.js'),
+  path.join('dist', 'src', 'wechat', 'WeChatInspiration.js'),
   path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
   path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
 ]
@@ -113,9 +116,9 @@ export const CHAIN_REQUIRED_ARTIFACTS: readonly string[] = [
 ]
 
 /**
- * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部 12 个
+ * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部 25 个
  * `*_DEEP_ENTRY` 深入口。判据是「本仓实际会装载什么」，不是「上游有多少文件」。与
- * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那 12 个常量不能被 scripts 直接
+ * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那 25 个常量不能被 scripts 直接
  * import（会牵进 electron 依赖图），故由 `scripts/__tests__/verify-nikkisync-link.test.ts` 从
  * 其源码文本里抽出字面量、与本表逐项相等，任一侧漂移即红。
  */
@@ -144,6 +147,9 @@ export const LOAD_CHAIN_ROOTS: readonly string[] = [
   path.join('dist', 'src', 'wechat', 'WeChatGalleryService.js'),
   path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs'),
   path.join('dist', 'src', 'wechat', 'WeChatIconProvider.js'),
+  // 4cb71e2（v1.0.31）：与 runtime-facade.ts 新增的两个微信包装器深入口一一对应
+  path.join('dist', 'src', 'wechat', 'WeChatDeletion.js'),
+  path.join('dist', 'src', 'wechat', 'WeChatInspiration.js'),
   path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
   path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
 ]

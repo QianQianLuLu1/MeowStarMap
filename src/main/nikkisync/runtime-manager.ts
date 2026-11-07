@@ -101,6 +101,15 @@ export interface FakeSessionPlan {
   backgroundStopThrows?: boolean
   /** C1：注入 `scanner.getScanRoots()` 的返回值（脏值用于验证 pcCompanionContext 过滤）。 */
   scanRoots?: unknown
+  /**
+   * C1 扩展（4cb71e2）：PC 端上下文透传验证用的身份稳定假实例（缺省缺席）。
+   * deletions / accounts / extraDirectories 三面复用各自既有 plan 开关；
+   * inspirations 与 thumbnailCache 在假会话上没有既有入口，经此注入以断言「同一引用透传」。
+   */
+  pcContextInstances?: {
+    inspirations?: unknown
+    thumbnailCache?: unknown
+  }
   /** 阶段 6：逐轮 `runOnce()` 返回值；耗尽后重复最后一个值（缺省每轮 0 ⇒ 驱动只跑一轮）。 */
   metadataRunOnceResults?: number[]
   /** 阶段 6：`runOnce()` 是否抛错（验证驱动故障绝不改写已成功的扫描结果）。 */
@@ -1031,7 +1040,15 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     return {
       database,
       scanRoots,
-      pairingUri: (host: string): string => session.pairingUri(host)
+      pairingUri: (host: string): string => session.pairingUri(host),
+      // 4cb71e2：微信画廊包装器与控制页四面板所需的会话实例，同一引用透传（缺席不挂键）
+      ...(session.inspirations ? { inspirations: session.inspirations } : {}),
+      ...(session.deletions ? { deletions: session.deletions } : {}),
+      ...(session.extraDirectories ? { extraDirectories: session.extraDirectories } : {}),
+      ...(session.accounts ? { accounts: session.accounts } : {}),
+      ...(session.thumbnailCache ? { thumbnailCache: session.thumbnailCache } : {}),
+      // D5：LAN 同步服务实际监听端口（未运行 undefined），控制页状态展示用
+      syncPort: () => state.syncAddress?.port
     }
   }
 

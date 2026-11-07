@@ -29,18 +29,18 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
   const upRoot = 'D:/UP/NikkiSync'
   const targetRoot = 'D:/ROOT/resources/nikkisync/pc'
 
-  it('正常：清单 8 项，apply 时逐项拷贝且目标落在 resources/nikkisync/pc 下', () => {
+  it('正常：清单 9 项，apply 时逐项拷贝且目标落在 resources/nikkisync/pc 下', () => {
     const planned = planPcAssets(upRoot, targetRoot)
-    expect(planned).toHaveLength(8)
-    expect(PC_ASSET_SPECS).toHaveLength(8)
+    expect(planned).toHaveLength(9)
+    expect(PC_ASSET_SPECS).toHaveLength(9)
     const existing = new Set<string>([upRoot, ...planned.map((item) => item.from)])
     const { port, copyFile } = fakeFs(existing)
     const warn = vi.fn()
     const res = stagePcAssets({ upRoot, targetRoot, apply: true, warn, fsPort: port })
     expect(res.status).toBe('applied')
-    expect(res.copied).toHaveLength(8)
+    expect(res.copied).toHaveLength(9)
     expect(res.skipped).toEqual([])
-    expect(copyFile).toHaveBeenCalledTimes(8)
+    expect(copyFile).toHaveBeenCalledTimes(9)
     for (const item of planned) {
       // path.join 在 win32 宿主用反斜杠，比较前统一 normalize（约定 §6 只当键用）
       expect(item.to.startsWith(path.normalize(targetRoot))).toBe(true)
@@ -61,7 +61,7 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     expect(res.skipped).toContain(missing)
     expect(res.warnings.length).toBeGreaterThan(0)
     expect(warn).toHaveBeenCalled()
-    expect(copyFile).toHaveBeenCalledTimes(7)
+    expect(copyFile).toHaveBeenCalledTimes(8)
   })
 
   it('边界：UP 根缺失 ⇒ warn + skipped 且零拷贝；dry-run 默认也零拷贝', () => {
@@ -78,7 +78,7 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     const dry = fakeFs(existing)
     const dryRun = stagePcAssets({ upRoot, targetRoot, warn, fsPort: dry.port })
     expect(dryRun.status).toBe('dry-run')
-    expect(dryRun.planned).toHaveLength(8)
+    expect(dryRun.planned).toHaveLength(9)
     expect(dry.copyFile).not.toHaveBeenCalled()
   })
 

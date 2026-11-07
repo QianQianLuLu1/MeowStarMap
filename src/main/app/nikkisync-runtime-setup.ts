@@ -366,6 +366,14 @@ async function assemblePcCompanionServices(
       host: () => resolveLanHost(),
       database: liveContext.database,
       scanRoots: liveContext.scanRoots,
+      // 4cb71e2（v1.0.31）：微信画廊包装器 / 控制页四面板 / 图标缓存与 LAN 服务端口的
+      // 只读透传（同一会话实例，字段缺席即不挂键——上下文侧已按「缺席不伪造」产出）。
+      inspirations: liveContext.inspirations,
+      deletions: liveContext.deletions,
+      extraDirectories: liveContext.extraDirectories,
+      accounts: liveContext.accounts,
+      thumbnailCache: liveContext.thumbnailCache,
+      syncPort: liveContext.syncPort,
       pairingUri: () => {
         try {
           return liveContext.pairingUri(resolveLanHost())

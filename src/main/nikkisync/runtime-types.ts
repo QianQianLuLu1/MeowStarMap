@@ -478,6 +478,12 @@ export interface NikkiSyncRuntimeSession {
   scanDiagnostics?: () => unknown
   /** N4：上游 `runtime.server.inspirations` 同一引用（构造期必建，老链接缺席）。 */
   inspirations?: InspirationRepositoryLike
+  /**
+   * 4cb71e2（v1.0.31）：上游 `MetadataThumbnailCache` 实例（`metadataThumbnailCacheDir`
+   * 给出且构造成功时存在）。微信画廊的 `WeChatIconProvider` 需要与 server 共享同一缓存
+   * （对齐上游 windows-app.ts 的单实例共享），经会话透传给 PC 端装配层。
+   */
+  thumbnailCache?: unknown
 }
 
 /**
@@ -519,6 +525,20 @@ export interface PcCompanionSessionContext {
   scanRoots: string[]
   /** 一次性配对串；host 由主进程解析器提供，不接受渲染层输入。 */
   pairingUri: (host: string) => string
+  /**
+   * 4cb71e2（v1.0.31）：微信画廊包装器与控制页面板所需的会话实例（**同一引用**透传，
+   * 缺席即不挂键——消费侧据此降级，不伪造空实例）。
+   */
+  inspirations?: unknown
+  deletions?: unknown
+  extraDirectories?: unknown
+  accounts?: unknown
+  thumbnailCache?: unknown
+  /**
+   * LAN 同步服务实际监听端口（未运行 undefined）——控制页「同步与连接」的状态展示用（D5：
+   * 修复前 dashboard 的 getStatus 误传 dashboard 自身端口）。
+   */
+  syncPort?: () => number | undefined
 }
 
 export interface PcCompanionServicesLike {

@@ -160,3 +160,28 @@
   六个 `NIKKI_NIKKISYNC_*=0` 分项关，以及两份 `enabled:false` 离线 JSON。
 - 本目录的 `@nikkisync/*` 仍只许变量式动态 import；上述风险口径是文档说明，不得据此在
   探针里启动服务或修改上游类型引用。
+
+## 2026-11-07 对齐上游 4cb71e2（v1.0.31）的口径订正
+
+- 对齐锚点自 `589b932`（v1.0.30）前进到 `4cb71e2`（v1.0.31-public-beta.1）；**协议层未变**
+  （`packages/protocol` 无改动，`src/shared/sync/` vendored 契约与 `protocol-drift.test.ts` 保持基准）。
+- 新增两个微信画廊包装器深入口：`WECHAT_DELETION_DEEP_ENTRY` /
+  `WECHAT_INSPIRATION_DEEP_ENTRY`（`wechat/WeChatDeletion.js` / `WeChatInspiration.js`），
+  由 `pc-companion-services.loadPcCompanionSurface` 消费节点就地装载、按**可选面**声明
+  （老链接缺件 ⇒ 整段降级不包装，不抛）；字节变换函数（`resizeForWeChat` /
+  `resizeWeChatIcon` / `rotatePng` / `exportLive`）按必需面装载。深入口清单随之扩容：
+  `verify-nikkisync-link.ts` 现为 **26 roots / 20 artifacts**。
+- `pc-companion-services` 组装对齐新版 `windows-app.ts`：scanRoots 逐个 `realpath` 过滤 →
+  `createIndexedPreviewSource` → `withWeChatInspiration(source, inspirations, resize)` →
+  `withWeChatDeletion(source, deletions)`；`WeChatGalleryService` 增 `hosts`（多网卡 QR）、
+  dashboard 增 `wechatEntryImage`（暂存自 `assets/branding/wechat-mini-entry.png`）与控制页
+  四面板（`inspirations` / `accounts` / `deletions` / `scanDirectories`，会话同一实例；
+  目录 add/remove/rescan 成功后联动 `wechat.stop`）。**隐私面板仍走应用内 K2 同意块**
+  （用户裁决，控制页 `metadataPrivacy` 键继续不挂）。
+- 同轮修复五处宿主组装缺陷（D1–D5）：`resize`/`rotatePng` 误传脚本路径、`exportLive`
+  误返回 options 对象、`WeChatIconProvider` 无参构造（上游契约 `(cache, resize)` 必填）、
+  dashboard `getStatus` 误传 dashboard 自身端口（现取 LAN 同步服务实际端口）。
+- 会话上下文（`PcCompanionSessionContext`）增只读透传字段：`inspirations` / `deletions` /
+  `extraDirectories` / `accounts` / `thumbnailCache` / `syncPort`（缺席即不挂键）；
+  `NikkiSyncRuntimeSession` 增 `thumbnailCache?`（与 server 共享的 `MetadataThumbnailCache` 单实例）。
+- 全过程见 `docs/plans/2026-11-07-nikkisync-upstream-align-03-实施计划.md`。

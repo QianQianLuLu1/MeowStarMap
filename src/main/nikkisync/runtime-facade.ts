@@ -338,6 +338,14 @@ export const GAME_VERSION_UPDATE_SERVICE_DEEP_ENTRY = [
   'server',
   'GameVersionUpdateService.js'
 ] as const
+/**
+ * 4cb71e2（v1.0.31）新增：微信画廊的小程序灵感库 / 批量删除包装器。与上面七个入口同处境
+ * （不在上游桶导出内、探针管不到，产物存在性由 `verify-nikkisync-link.ts` 的
+ * `NIKKISYNC_CAPABILITY_ARTIFACTS` 与 `LOAD_CHAIN_ROOTS` 守护）；由
+ * `pc-companion-services.loadPcCompanionSurface` 在消费节点就地装载（沿 N2「不预载未用符号」口径）。
+ */
+export const WECHAT_DELETION_DEEP_ENTRY = ['wechat', 'WeChatDeletion.js'] as const
+export const WECHAT_INSPIRATION_DEEP_ENTRY = ['wechat', 'WeChatInspiration.js'] as const
 
 /**
  * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
@@ -1062,7 +1070,9 @@ export async function createRuntimeSession(
       // N4：上游构造期必建的灵感仓储（老链接 session.server.inspirations 缺席时不挂键）
       ...(runtime.server.inspirations
         ? { inspirations: runtime.server.inspirations as unknown as InspirationRepositoryLike }
-        : {})
+        : {}),
+      // 4cb71e2：缩略图缓存单实例（与 server 共享）；仅构造成功时挂出（见上方 thumbnailCache）
+      ...(thumbnailCache ? { thumbnailCache } : {})
     })
   } catch (error) {
     try {

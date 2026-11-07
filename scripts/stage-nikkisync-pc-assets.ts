@@ -20,7 +20,7 @@ export interface PcAssetSpec {
   to: string
 }
 
-/** 4 份 legal 文档 + 品牌图 + 3 个 PS 脚本（逐字来自上游 windows-app.ts:226/230-232/204-207）。 */
+/** 4 份 legal 文档 + 品牌图 + 小程序入口码 + 3 个 PS 脚本（逐字来自上游 windows-app.ts 的 readFileSync 清单，4cb71e2 起含 wechat-mini-entry.png）。 */
 export const PC_ASSET_SPECS: readonly PcAssetSpec[] = [
   {
     from: path.join('docs', 'store-submission', 'PRIVACY_POLICY.md'),
@@ -39,6 +39,11 @@ export const PC_ASSET_SPECS: readonly PcAssetSpec[] = [
     to: 'SDK_SERVICES.md'
   },
   { from: path.join('assets', 'branding', 'momo-camera.png'), to: 'momo-camera.png' },
+  {
+    // 4cb71e2：控制页 /wechat-entry.png 路由的图片源（缺失时上游不挂路由）
+    from: path.join('assets', 'branding', 'wechat-mini-entry.png'),
+    to: 'wechat-mini-entry.png'
+  },
   {
     from: path.join('tools', 'wechat-gallery', 'resize-icon.ps1'),
     to: path.join('wechat', 'resize-icon.ps1')

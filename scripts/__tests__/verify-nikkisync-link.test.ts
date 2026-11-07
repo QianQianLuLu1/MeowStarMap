@@ -312,7 +312,7 @@ describe('evaluateNikkiSyncLink', () => {
 })
 
 describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步）', () => {
-  it('恰好 18 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
+  it('恰好 20 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
     expect(NIKKISYNC_CAPABILITY_ARTIFACTS).toEqual([
       path.join('dist', 'src', 'organizer', 'DeletionQueue.js'),
       path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
@@ -332,6 +332,9 @@ describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步
       path.join('dist', 'src', 'wechat', 'WeChatGalleryService.js'),
       path.join('dist', 'src', 'wechat', 'GalleryRuntime.mjs'),
       path.join('dist', 'src', 'wechat', 'WeChatIconProvider.js'),
+      // 4cb71e2（v1.0.31）：小程序灵感库 / 批量删除包装器
+      path.join('dist', 'src', 'wechat', 'WeChatDeletion.js'),
+      path.join('dist', 'src', 'wechat', 'WeChatInspiration.js'),
       path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
       path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
     ])
@@ -559,8 +562,8 @@ describe('LOAD_CHAIN_ROOTS 结构契约', () => {
   /** 与 `src/main/nikkisync/runtime-facade.ts` 的深入口常量比对时统一成正斜杠键（约定 §6 第 1 档） */
   const toForward = (value: string): string => value.split(path.sep).join('/')
 
-  it('恰好 24 个根：上游桶导出 + 本仓 23 个 *_DEEP_ENTRY（含 N7 PC 端七个）', () => {
-    expect(LOAD_CHAIN_ROOTS).toHaveLength(24)
+  it('恰好 26 个根：上游桶导出 + 本仓 25 个 *_DEEP_ENTRY（含 N7 PC 端九个）', () => {
+    expect(LOAD_CHAIN_ROOTS).toHaveLength(26)
     expect(toForward(LOAD_CHAIN_ROOTS[0] as string)).toBe('dist/src/index.js')
   })
 

@@ -304,6 +304,13 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
         failureCategories: {}
       }
     },
+    // C1 扩展（4cb71e2）：身份稳定假实例，仅注入时挂出（缺省缺席 ⇒ 上下文不得伪造）
+    ...(plan.pcContextInstances?.inspirations !== undefined
+      ? { inspirations: plan.pcContextInstances.inspirations }
+      : {}),
+    ...(plan.pcContextInstances?.thumbnailCache !== undefined
+      ? { thumbnailCache: plan.pcContextInstances.thumbnailCache }
+      : {}),
     queries: {
       // 上游 b397e0e 起 `mapAssetSummary` 追加两个本机绝对路径键（sourceFolder 由 sourcePath
       // 剥尾段得来 ⇒ 二者成对出现）。夹具如实带上，用于钉住「委托层零转换、两键原样透出」。
@@ -2073,6 +2080,54 @@ describe('C1 pcCompanionContext（真实会话上下文）', () => {
     const manager = createRuntimeManager(deps)
     await manager.start(DEFAULTS)
     expect(manager.pcCompanionContext()?.scanRoots).toEqual(['/ok/photos', '/ok/motion'])
+  })
+
+  // 4cb71e2：微信画廊包装器（inspirations/deletions）与控制页四面板（含 extraDirectories/
+  // accounts）所需的会话实例必须以**同一引用**透传；LAN 同步服务实际端口供控制页状态展示（D5）。
+  it('正常：四面板与微信包装器实例同引用透传，syncPort 回显 LAN 服务实际端口', async () => {
+    const inspirations = { mark: 'inspirations' }
+    const thumbnailCache = { mark: 'thumbnail-cache' }
+    const { deps } = createDependencies(
+      {},
+      {
+        deletionsPlan: { rows: [{ id: 'd1', state: 'pending' }] },
+        accountsPlan: {},
+        extraDirectoriesPresent: true,
+        metadataConsentPresent: true,
+        pcContextInstances: { inspirations, thumbnailCache }
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const live = manager.pcCompanionContext()
+    expect(live).toBeDefined()
+    expect(live?.inspirations).toBe(inspirations)
+    expect(live?.thumbnailCache).toBe(thumbnailCache)
+    expect(live?.deletions).toBeDefined()
+    expect(live?.extraDirectories).toBeDefined()
+    expect(live?.accounts).toBeDefined()
+    // 裁决：隐私面板走应用内 K2 同意块，不走控制页 ⇒ 即使会话带同意面也不透传（align-03 节点 3）
+    expect('metadataConsent' in (live ?? {})).toBe(false)
+    // D5：LAN 服务未运行 ⇒ undefined；start 后回显上游 start() 的实际端口
+    expect(live?.syncPort).toBeInstanceOf(Function)
+    expect(live?.syncPort?.()).toBeUndefined()
+    await manager.startSyncServer()
+    expect(live?.syncPort?.()).toBe(38137)
+  })
+
+  it('边界：假会话缺各能力面时上下文不挂对应键（不伪造空实例）', async () => {
+    const { deps } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    const live = manager.pcCompanionContext()
+    expect(live).toBeDefined()
+    expect('inspirations' in (live ?? {})).toBe(false)
+    expect('deletions' in (live ?? {})).toBe(false)
+    expect('extraDirectories' in (live ?? {})).toBe(false)
+    expect('accounts' in (live ?? {})).toBe(false)
+    expect('metadataConsent' in (live ?? {})).toBe(false)
+    expect('thumbnailCache' in (live ?? {})).toBe(false)
+    expect(typeof live?.syncPort).toBe('function')
   })
 })
 
