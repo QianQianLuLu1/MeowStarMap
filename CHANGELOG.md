@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ### Changed | 变更
 
+- **格式闸门文档口径调和与 scripts 登记补全（2026-11-07 复打包前审查轮）**：对尚未纳入打包的 4 个提交（`4fe1eb7`/`b357eb9`/`953813b`/`6d1f6c3`）与未提交代码做全面审查——无 P0/P1（`953813b` 经 lint-staged 15.5.2 `matchBase` 源码语义与 4 份 legal md 上游逐字节 cmp 双重实证正确），仅 2 处 P2 文档一致性收口：① 根 `AGENTS.md`「必须记住的四点」第 2 条把「`docs/**`、`.qoder/rules/*.md`、`scripts/AGENTS.md` 不在闸门格式范围内」限定为 **verify（只读）侧**口径（verify 侧解析根键只认仓库根一层），与同条「钩子侧根键经 `matchBase` 命中任意深度同扩展名文件」不再互相矛盾——守护 token 与 6 个 prettier 键列举零改动；② `scripts/AGENTS.md` 打包与构建表、测试表补 `stage-nikkisync-pc-assets.ts` 及其配套测试两行，入仓代码文件计数订正为实测 80（75 `.ts` = 41 非测试 + 34 单测，漂移归因 11-03~11-06 四轮新增未同步）。计划与审查证据见 `docs/plans/2026-11-07-2.5.7-beta复打包前审查收口-实施计划.md`。
 - 同步图库口径回写（2026-11-06）：`docs/IPC_CONTRACT.md` §8.2.4 的整理队列开关由「默认关 / 默认 false」订正为「默认开 / 显式可关」，§8.2.8 补 C1 真实会话上下文说明；`src/main/nikkisync/AGENTS.md` 的 `syncServerEnabled 默认 false` 订正为 `true` 并补 N2/N7/C1 模块清单；`src/main/sync/AGENTS.md` 与 `docs/sync-integration/README.md` 补「仅内嵌面默认翻开，移植面仍不自启」；根 `AGENTS.md` 版本由 `v2.5.6` 对齐 `package.json` 的 `2.5.7-beta`。
 - `src/main/app/__tests__/window-manager.test.ts` 的 UA-4 用例显式绑定 NODE_ENV，避免继承上一用例的运行分支。
 - 落盘本轮实施计划到 `docs/plans/2026-11-05-audit-verify-2.5.7-beta-repack-实施计划.md`。
