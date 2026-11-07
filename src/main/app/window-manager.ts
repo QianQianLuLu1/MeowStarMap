@@ -16,6 +16,7 @@ import { logGpuStatusSummary } from './gpu-status'
 import { guardNavigation } from './navigation-guard'
 import { t } from '../i18n'
 import { registerCdnUserAgent } from './cdn-user-agent'
+import { resolveAppIconPath } from './app-icon-path'
 
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
 // 单独一处都能被绕过：响应头缺失时靠 meta，HTML 被替换时靠响应头。
@@ -62,7 +63,19 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     applyContentSecurityPolicy()
   }
 
+  // 窗口/任务栏图标显式指向 icon.ico：dev 下靠 exe 回退会显示 Electron 默认图标，
+  // 打包态指向 asarUnpack 后的真实文件，两种模式同源同图。
+  const iconPath = resolveAppIconPath({
+    isPackaged: app.isPackaged === true,
+    resourcesPath: process.resourcesPath,
+    appDir: __dirname
+  })
+  if (!iconPath) {
+    logger.warn('[WIN] app icon not found; window falls back to exe icon')
+  }
+
   const mainWindow = new BrowserWindow({
+    ...(iconPath ? { icon: iconPath } : {}),
     width: 1400,
     height: 900,
     minWidth: 900,

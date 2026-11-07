@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-80 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
+81 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -75,7 +75,7 @@
 | `e2e-usage.ts`             | `npm run e2e`                                             | **e2e 误输入守卫**：裸 `npm run e2e`（含 `e2e : smoke` 这类把冒号两侧打成空格的笔误）列出真实子命令并以退出码 1 结束，替代 npm 的 Missing script 报错                                                                                                                                                                             |
 | `verify-changes.ts`        | `npm run verify` / `npm run verify:staged`                | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件。typecheck 的 `tsc -b` 产物落点已隔离到 `.cache/tsmain`，不再覆写 `dist/main`（原因见 `docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md`，落点由 `scripts/__tests__/typecheck-emit-isolation.test.ts` 守护） |
 | `verify-format-scope.ts`   | 被 `verify-changes.ts` import                             | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                                                                                                                                                                                                                                           |
-| `check-preview-drift.ts`   | `npm run preview:check`                                   | preview.html 与源码的 10 项漂移检测                                                                                                                                                                                                                                                                                               |
+| `check-preview-drift.ts`   | `npm run preview:check`                                   | preview.html 与源码的 11 项漂移检测（第 11 维 favicon 内联：data URI 解码与 icon.ico 逐字节同源）                                                                                                                                                                                                                                 |
 | `check-md-links.ts`        | `npm run docs:links`                                      | **被跟踪 Markdown 的引用完整性守护**（只读）：抽取 `[x](path)` 与行内反引号路径，按 tracked 集合判定 ok / ignored-local / annotated-gone / upstream-scope / artifact / dead；死引用退出码 1                                                                                                                                       |
 | `verify-nikkisync-link.ts` | `npm run verify:nikkisync`                                | **NikkiSync 依赖与装载面只读诊断**（依赖图是否自包含/`node_modules/@nikkisync/*` 链接/NikkiSync `dist/` 产物/`migrations` 可读/主进程产物未把 ESM 折叠成 `require()`/打包态 unpacked 含 schema），`--json` 可切结构化输出；未链接为 warn 不阻断                                                                                   |
 | `link-nikkisync.ts`        | `npm run link:nikkisync` / `npm run link:nikkisync:check` | **NikkiSync 开发机链接器**：在候选根（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`）中建/校 `node_modules/@nikkisync/*` junction（幂等；`--check` 只读）；无可用根时退出码 1 并逐项给出拒绝原因                                                                                                                         |
@@ -86,6 +86,7 @@
 | 文件                                          | 覆盖范围                                                                                                                                                                                                                                |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `__tests__/audit-config.test.ts`              | 审计配置契约测试（audit-ci.jsonc/package.json/build.yml/.npmrc 一致性）                                                                                                                                                                 |
+| `__tests__/app-icon-slots.test.ts`            | 图标槽位装配守卫：R1–R7 静态钉（窗口 icon/双 HTML favicon/字节同源/nsis 双图标/asarUnpack/AUMID）+ R8–R11 `app-icon-path.ts` 纯函数（正常/异常/边界）；预览版钉「入口 JS import 内联」防 Vite HTML 资产外发断链                         |
 | `__tests__/lock-advisory-floor.test.ts`       | lock 解析版本下限闸门（读真实 package-lock.json，不联网）+ 与 audit-ci.jsonc 豁免清单的互斥断言                                                                                                                                         |
 | `__tests__/logger-escape-ledger.test.ts`      | logger 落盘逃逸台账闸门（静默/真写盘两张封闭集 + `logger.ts` 的 fire-and-forget 与四条告警形状的反遮蔽锁）                                                                                                                              |
 | `__tests__/test-teardown-guard.test.ts`       | 测试侧「资源收尾」闸门（封闭登记表 + 合成源码异常例 + 表规模上限）：钉住「获取动作必须在带无条件收尾的 `try` 内」，防失败路径漏下临时文件与跨用例的桩残留                                                                               |
@@ -109,7 +110,7 @@
 
 ### 语言与执行
 
-- 80 个入仓代码文件里 75 个为 TypeScript（`.ts`：41 个非测试脚本 + 34 个 `__tests__` 单测，2026-11-07 复核全量统计）；2026-11-02 因 mDNS 复测装置 +3，统一使用 `tsx` 直接执行，无需编译步骤。
+- 81 个入仓代码文件里 76 个为 TypeScript（`.ts`：41 个非测试脚本 + 35 个 `__tests__` 单测，2026-11-08 复核全量统计）；2026-11-02 因 mDNS 复测装置 +3，统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
 - **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore` 的 `/scripts/mimosa-*.ps1`、`/scripts/fix-harness-memory-path.ps1`、`/scripts/write-bridge-report.ps1` 三条规则显式排除，`scripts/archive/` 下 3 个由 `/scripts/archive/` 整目录排除（行号会随 `.gitignore` 增长漂移，故按规则文本引用）。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。

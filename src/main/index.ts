@@ -89,6 +89,14 @@ if (process.env.NIKKI_EARLY_CRASH_SIM === '1') {
 
 diagLog('INDEX', '=== index.ts loaded ===')
 
+// Windows 任务栏分组与跳转列表需要显式 AppUserModelID，取值与 build.appId 同源；
+// 必须在 app.whenReady() 之前设置，失败只记日志不阻断启动。
+try {
+  app.setAppUserModelId('com.qianlu.meow-star-map')
+} catch (err) {
+  electronLogger.warn('[INDEX] setAppUserModelId failed', err)
+}
+
 // GPU 崩溃自动回退（VS Code 模式）：部分机器 GPU 进程无法运行时，Chromium 会以
 // FATAL "GPU process isn't usable. Goodbye." 自杀主进程，表现为启动即闪退或
 // loadURL 报 ERR_FAILED(-2) 白屏（app:// 协议层无关，2026-08-19 用户机 54 个 dump 裁决）。

@@ -274,7 +274,8 @@
       "**/@img/**",
       "**/koffi/**",
       "**/@koromix/**",
-      "**/nuan5_decryption.dll"
+      "**/nuan5_decryption.dll",
+      "resources/icons/icon.ico"
     ],
     "npmRebuild": true,
     "asar": true,
@@ -316,7 +317,9 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true,
-      "shortcutName": "喵星图"
+      "shortcutName": "喵星图",
+      "installerIcon": "resources/icons/icon.ico",
+      "uninstallerIcon": "resources/icons/icon.ico"
     }
   },
   "optionalDependencies": {

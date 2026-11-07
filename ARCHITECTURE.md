@@ -1662,7 +1662,7 @@ components / pages (展示)
 - `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**：14 项 native/外部依赖解包到磁盘 —— `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` / `qrcode` / `dijkstrajs` / `pngjs`（后三项 2026-11-05 随 @nikkisync 外部依赖随包解出修复追加）
+- **`asarUnpack`**：15 项 native/外部依赖与运行时图标解包到磁盘 —— `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` / `qrcode` / `dijkstrajs` / `pngjs` / `resources/icons/icon.ico`（qrcode 等后三项 2026-11-05 随 @nikkisync 外部依赖随包解出修复追加；icon.ico 2026-11-08 随窗口图标显式接线追加，原生层按文件路径读取必须落在 unpacked 真实文件上）
 - **Windows NSIS**：x64、非 one-click、允许自定义安装目录、强制创建桌面快捷方式 + 开始菜单快捷方式
 - `signExecutable: false` / `verifyUpdateCodeSignature: false` —— 未启用代码签名，但 **exe 图标与 PE 版本元数据仍经 resedit 写入**。此前写的是 `signAndEditExecutable: false`，该值会让 electron-builder 连资源编辑一起跳过，导致 app exe / 桌面快捷方式 / 任务栏始终是 Electron 默认图标。
 

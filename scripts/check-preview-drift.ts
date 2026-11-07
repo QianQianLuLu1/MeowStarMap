@@ -3,7 +3,7 @@
  * 自动审计手写预览版与 exe 源码的关键漂移点，对应 preview-html治理计划.md Task 1
  * 用法：npm run preview:check
  *
- * 检测维度（10 项）：
+ * 检测维度（11 项）：
  *   1. 侧边栏导航项漂移（preview SIDEBAR_NAV_ITEMS vs Sidebar.tsx navItems）
  *   2. CSS 变量漂移（preview :root/.soft-pink-luxury vs globals.css + themes/soft-pink-luxury.css）
  *   3. i18n 覆盖率（preview 硬编码中文 vs zh-CN.json key 数）
@@ -14,6 +14,7 @@
  *   8. 编辑器 Tab（preview vs exe EditorTabs 7 个 tab id）
  *   9. 状态栏覆盖（gallery/detail/categories/settings 4 个核心页面）
  *  10. CDN 依赖版本一致性（preview CDN 引用 vs package.json dependencies）
+ *  11. favicon 内联同源（preview.html data URI vs resources/icons/icon.ico 逐字节）
  *
  * 退出码：0 = 无致命漂移；1 = 存在致命漂移（i18n 覆盖率过低等）
  * 注：导航项/页面覆盖率检测项已因预览版改为源码构建而降级为 WARN（不再阻断退出码）
@@ -495,6 +496,37 @@ function checkCdnVersions(): void {
   }
 }
 
+// ---------- 11. favicon 内联同源 ----------
+// Vite 对 HTML <link> 引用的资产一律外发文件（assetsInlineLimit 不覆盖 HTML 引用），
+// 单文件 preview.html 的 favicon 必须经 preview-entry.tsx 的 JS import 内联为 data URI。
+function checkFaviconInline(): void {
+  const preview = readText(PREVIEW_PATH)
+  const m = preview.match(/data:image\/x-icon;base64,([A-Za-z0-9+/=]+)/)
+  if (!m) {
+    results.push({
+      name: 'favicon 内联',
+      status: 'FAIL',
+      detail: 'preview.html 未内联 data:image/x-icon（HTML 外链会被 Vite 外发，单文件断链）'
+    })
+    return
+  }
+  const inlined = Buffer.from(m[1], 'base64')
+  const source = fs.readFileSync(path.join(ROOT, 'resources', 'icons', 'icon.ico'))
+  if (!inlined.equals(source)) {
+    results.push({
+      name: 'favicon 内联',
+      status: 'FAIL',
+      detail: `内联 favicon 与 resources/icons/icon.ico 不同源（${inlined.length} vs ${source.length} 字节）`
+    })
+    return
+  }
+  results.push({
+    name: 'favicon 内联',
+    status: 'PASS',
+    detail: `data URI 内联且与 icon.ico 逐字节同源（${source.length} 字节）`
+  })
+}
+
 // ---------- 主流程 ----------
 function main(): void {
   if (!fs.existsSync(PREVIEW_PATH)) {
@@ -515,6 +547,7 @@ function main(): void {
   checkEditorTabs()
   checkStatusBarCoverage()
   checkCdnVersions()
+  checkFaviconInline()
 
   console.log('=== preview.html 漂移检测报告 ===\n')
   console.log('| 检测项 | 状态 | 详情 |')

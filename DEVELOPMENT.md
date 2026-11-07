@@ -837,6 +837,7 @@ release/
 **/koffi/**
 **/@koromix/**
 **/nuan5_decryption.dll
+resources/icons/icon.ico
 ```
 
 ### 7.6 重新生成应用图标

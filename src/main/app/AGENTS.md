@@ -8,7 +8,7 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ## 目录结构
 
-29 个源文件，其中 26 个有同名配套测试（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无）：
+31 个源文件，其中 27 个有同名配套测试（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无；`app-icon-path.ts` 的守卫跨目录在 `scripts/__tests__/app-icon-slots.test.ts`）：
 
 ### 核心编排
 
@@ -55,14 +55,15 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ### 辅助功能
 
-| 文件                    | 职责                                                                   |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `auto-update.ts`        | 自动更新状态机（electron-updater）——生产/dev 假源两态、推送渲染端      |
-| `update-error-class.ts` | 更新失败归类（纯函数）——分成 network / source，兜底 source             |
-| `custom-dirs.ts`        | 4 个自定义目录（backup/thumbnail/log/crash）的解析、迁移、副作用初始化 |
-| `desktop-shortcut.ts`   | 桌面快捷方式补创建（仅打包环境）                                       |
-| `theme.ts`              | 主题切换——持久化 + nativeTheme 同步 + 标题栏叠加色                     |
-| `media-update.ts`       | 媒体变更通知——失效白名单缓存 + 刷新 pathGuard + 节流广播（100ms）      |
+| 文件                    | 职责                                                                                         |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| `auto-update.ts`        | 自动更新状态机（electron-updater）——生产/dev 假源两态、推送渲染端                            |
+| `update-error-class.ts` | 更新失败归类（纯函数）——分成 network / source，兜底 source                                   |
+| `custom-dirs.ts`        | 4 个自定义目录（backup/thumbnail/log/crash）的解析、迁移、副作用初始化                       |
+| `desktop-shortcut.ts`   | 桌面快捷方式补创建（仅打包环境）                                                             |
+| `theme.ts`              | 主题切换——持久化 + nativeTheme 同步 + 标题栏叠加色                                           |
+| `media-update.ts`       | 媒体变更通知——失效白名单缓存 + 刷新 pathGuard + 节流广播（100ms）                            |
+| `app-icon-path.ts`      | 应用图标路径解析纯函数——dev/打包两态候选 + existsSync，找不到返回 null 由调用方回退 exe 图标 |
 
 ## 编码约定
 
@@ -129,4 +130,4 @@ index.ts (入口)
 - `media-protocol.ts` 的路径白名单是安全关键路径，修改时需同时考虑 LRU 缓存一致性和 realpath 解引用。
 - `gpu-fallback.ts` 的状态文件在 `userData` 下，修改格式需向后兼容（旧格式仍能解析）。
 - `window-manager.ts` 中的 CSP 策略修改会影响渲染进程所有外部资源加载，需同步评估。
-- 29 个源文件中有**同名**配套测试的为 26 个（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无同名套件）；其中 `cleanup.ts` 并非无测试，而是由 `__tests__/cleanup-perform-cleanup.test.ts` 与 `__tests__/cleanup-collect-exit-diagnosis.test.ts` 按函数拆分覆盖。`auto-update.ts` 的同名套件由 2026-11-05「检查更新误报」修复轮补上（观测面为 `sendToRenderer` 入参）。修改后运行 `npm run test:main` 确认。
+- 31 个源文件中有**同名**配套测试的为 27 个（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts`、`app-icon-path.ts` 暂无同名套件）；其中 `cleanup.ts` 并非无测试，而是由 `__tests__/cleanup-perform-cleanup.test.ts` 与 `__tests__/cleanup-collect-exit-diagnosis.test.ts` 按函数拆分覆盖，`app-icon-path.ts` 由 `scripts/__tests__/app-icon-slots.test.ts` 跨目录守卫。`auto-update.ts` 的同名套件由 2026-11-05「检查更新误报」修复轮补上（观测面为 `sendToRenderer` 入参）。修改后运行 `npm run test:main` 确认。
