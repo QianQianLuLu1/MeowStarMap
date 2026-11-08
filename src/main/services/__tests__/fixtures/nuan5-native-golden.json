@@ -1,0 +1,67 @@
+{
+  "meta": {
+    "dllSha256": "3f0d88a2510106ff8e66a4730a77ef9f7ffc27c89411f81fa223cc3e1170e601",
+    "platform": "win32",
+    "writtenAt": "2026-11-08T08:25:02.771Z"
+  },
+  "behavior": {
+    "abiVersion": 1,
+    "keys": {
+      "cameraParamNonNull": true,
+      "fromStrNonNull": true,
+      "long4096NonNull": true
+    },
+    "vectorDecrypt": {
+      "status": 0,
+      "bytesLen": 144,
+      "sha256": "d1d10eeea9383e01904a5d14a947a5bfda0eef71d94dc9220cad87d0e81997a6",
+      "looksLikeJson": true
+    },
+    "roundtrip": {
+      "encodeExport": "present",
+      "encode": {
+        "status": 0,
+        "bytesLen": 192,
+        "sha256": "0d400ca3336fd7fd4c0d6c8cd58b6d3ef91c2c4c907bd418502251ba07b5a882"
+      },
+      "decode": {
+        "status": 0,
+        "bytesLen": 144,
+        "sha256": "4e091016ff4ee6ccb3ce2b1dd3f6a86484a66a03e807cbc5c7d612d7418ca785"
+      },
+      "matchesOriginal": false
+    },
+    "errorPaths": {
+      "shortB64DecodesTo8Bytes": {
+        "status": 2,
+        "bytesLen": null,
+        "sha256": null
+      },
+      "notBase64RawNul": {
+        "status": 3,
+        "bytesLen": null,
+        "sha256": null
+      },
+      "noStartFlagScan": {
+        "status": 4,
+        "bytesLen": null,
+        "sha256": null
+      },
+      "emptyInput": {
+        "status": 1,
+        "bytesLen": null,
+        "sha256": null
+      },
+      "invalidClothCodeReturnsNull": true,
+      "invalidHomeCodeReturnsNull": true
+    },
+    "edgeCases": {
+      "zeroBlock16B64": {
+        "status": 0,
+        "bytesLen": 16,
+        "sha256": "740bc2743e525ad07b22da3d49c953ba687012ceb6d180ce5d0fb551f5cfb3ae"
+      },
+      "longKeyFree": true
+    }
+  }
+}
