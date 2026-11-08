@@ -250,7 +250,7 @@ MeowStarMap/
 ├── resources/                 # 应用资源
 │   ├── icons/                 # 应用图标（icon.ico + icon-master.png；后者是唯一真相源，无 .svg）
 │   ├── nikkisync/             # recycle-helper.cs——K8 整理队列的 Windows 回收站链路，由 build:recycle-helper 编译
-│   └── nuan5_decryption.dll   # 游戏内照片参数解密库
+│   └── nuan5_decryption.dll   # 游戏内照片参数解密库（对齐上游 RanAxro/nikki_albums main，读数见 docs/plans/2026-11-08-解密库基线对齐上游main-实施计划.md）
 │
 ├── scripts/                   # 辅助脚本
 │   ├── check-i18n-keys.ts     # i18n 键值完整性检查

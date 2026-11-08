@@ -19,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
+### Changed | 变更
+
+- **解密库基线对齐上游 main（2026-11-08）**：`resources/nuan5_decryption.dll` 更新为上游 RanAxro/nikki_albums main（`dc1b30bda1f99119cbd1fbf9a9e02a62a11631d0`，v3.012.02）随仓分发的预编译库（`rust/lib/windows/nuan5_decryption.dll`，507,392 字节，sha256 `91a9affe…41514`，`git hash-object` = `971615bc…` 与上游树登记一致；原 509,952 字节，sha256 `3f0d88a2…0e601`）。兼容性经真实加载差分验证而非推断：新增 `src/main/services/decryption-native.test.ts`（win32 真实加载，CI/Linux 自动跳过）锁定 17 项 FFI 绑定（含 `media_encode_camera_params_bytes`）、`abi_version()=1`、真实 CameraParams 密文向量解密输出、错误路径 status（2/3/4/1）与边界用例，新旧二进制 behavior 全等后才替换；回归 `test:main` 224 文件 4433 用例、`verify`（5/5）、`doctor`（5/5）全绿。本次更新携带上游 2026-07-04「修复不安全行为」与 07-12「修复错误的数据结构 + 以自定义错误类型替代崩溃语句」两项健壮性修复。读数见 `docs/plans/2026-11-08-解密库基线对齐上游main-实施计划.md`。
+
 ---
 
 ## [2.5.7-beta] - 2026-11-05
