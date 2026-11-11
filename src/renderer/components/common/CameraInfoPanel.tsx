@@ -10,7 +10,7 @@ import {
   getFilterName
 } from '../../utils/enum-mappings'
 import { IconCamera, IconInfo } from '../../icons'
-import { InfoRowPanel, type ParamGroup } from './InfoRowPanel'
+import { InfoRowPanel, type InfoRow, type ParamGroup } from './InfoRowPanel'
 
 type TFunc = (key: string) => string
 
@@ -97,7 +97,7 @@ function cameraToGroups(camera: CameraData, t: TFunc): ParamGroup[] {
   if (adjustRows.length > 0) groups.push({ title: t('camera.sectionAdjust'), rows: adjustRows })
 
   // 场景与特效
-  const sceneRows = []
+  const sceneRows: InfoRow[] = []
   if (c.light)
     sceneRows.push({
       label: t('camera.light'),
@@ -116,6 +116,60 @@ function cameraToGroups(camera: CameraData, t: TFunc): ParamGroup[] {
     sceneRows.push({
       label: t('camera.momoHidden'),
       value: c.momoHidden === 'enabled' ? t('camera.hidden') : t('camera.notHidden')
+    })
+  }
+  // 暖暖动作信息（CameraParams 数组 V3 [40-42]；进度空占位为 null，仅在有值时渲染）
+  if (c.nikkiPoseInfo) {
+    const poseId = c.nikkiPoseInfo.poseId
+    const poseRow: InfoRow = {
+      label: t('camera.nikkiPoseAction'),
+      value: t(getPoseName(poseId) ?? `#${poseId}`)
+    }
+    // CDN 图片取值须为正安全整数；非法不挂图（fail-closed 保持纯文字，不伪造 id）
+    if (Number.isSafeInteger(poseId) && poseId > 0) {
+      poseRow.image = { kind: 'nikkiPose', id: poseId }
+    }
+    sceneRows.push(poseRow)
+    if (c.nikkiPoseInfo.playingPercent !== null) {
+      sceneRows.push({
+        label: t('camera.playingPercent'),
+        value: `${Math.ceil(c.nikkiPoseInfo.playingPercent * 100)} %`
+      })
+    }
+  }
+  // 大喵动作参数（CameraParams 数组 V2+ Disable 分支；poseTime 仅 V3 有值，null 不渲染）
+  if (c.momoAction) {
+    const poseId = c.momoAction.poseId
+    const momoRow: InfoRow = { label: t('camera.momoPose'), value: `#${poseId}` }
+    if (Number.isSafeInteger(poseId) && poseId > 0) {
+      momoRow.image = { kind: 'momoPose', id: poseId }
+    }
+    sceneRows.push(momoRow)
+    if (c.momoAction.poseTime !== null) {
+      sceneRows.push({
+        label: t('camera.momoPoseTime'),
+        value: `${Math.ceil(c.momoAction.poseTime * 100)} %`
+      })
+    }
+    sceneRows.push({
+      label: t('camera.momoAdjust'),
+      value: `${c.momoAction.horizontal} / ${c.momoAction.distance} / ${c.momoAction.height} cm`
+    })
+    sceneRows.push({
+      label: t('camera.momoRotate'),
+      value: `${c.momoAction.rotateMomo.toFixed(1)}°`
+    })
+    sceneRows.push({
+      label: t('camera.autoGroundSnap'),
+      value: c.momoAction.autoGroundSnap ? t('camera.yes') : t('camera.no')
+    })
+    sceneRows.push({
+      label: t('camera.floatingEffect'),
+      value: c.momoAction.floatingEffect ? t('camera.yes') : t('camera.no')
+    })
+    sceneRows.push({
+      label: t('camera.poseWithNikki'),
+      value: c.momoAction.poseWithNikki ? t('camera.yes') : t('camera.no')
     })
   }
   if (sceneRows.length > 0) groups.push({ title: t('camera.scene'), rows: sceneRows })

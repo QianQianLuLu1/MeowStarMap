@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "Chế độ chụp",
+        "typeValue": "Loại {{type}}"
+      },
+      "windIntensity": {
+        "label": "Cường độ gió",
+        "typeValue": "Loại {{type}}"
+      },
+      "windDirection": {
+        "label": "Hướng gió",
+        "typeValue": "Loại {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "Thông tin nhiều người chơi",
+      "anotherPose": "Tư thế của người chơi khác",
+      "poseTime": "Tiến độ",
+      "copyHeader": "=== Thông tin nhiều người chơi ==="
     }
   },
   "dialog": {
@@ -1298,6 +1316,8 @@
       "licenseGpl": "• GPL-3.0: Mã sử dụng hoặc sửa đổi nó cũng phải là mã nguồn mở",
       "licenseMit": "• MIT: Sử dụng, sửa đổi và phân phối tự do; phải giữ thông báo bản quyền",
       "licenseNote": "Ghi chú giấy phép",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "Thông báo bản quyền MIT và toàn bộ văn bản giấy phép của dự án thượng nguồn nikki_albums được lưu giữ nguyên văn trong tệp THIRD_PARTY_NOTICES đi kèm ứng dụng.",
       "licenseTitle": "Cảm ơn và giấy phép",
       "open": "Mở",
       "projectIntro": "Phần mềm này được xây dựng trên các dự án mã nguồn mở ở trên. Cảm ơn tất cả những người đóng góp cho cộng đồng mã nguồn mở. Bản thân phần mềm là mã nguồn mở theo giấy phép MIT; chào đón sử dụng, sửa đổi và phân phối tự do.",
@@ -1323,7 +1343,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "Phân tích tham số chụp và hình thu nhỏ động tác: pipeline dữ liệu tham chiếu (nuan5_database) và tài nguyên ảnh CDN được tái sử dụng từ dự án mã nguồn mở nikki_albums (https://github.com/RanAxro/nikki_albums) (tác giả: RanAxro, giấy phép MIT), đã được tác giả cho phép (nikki_albums#20). Ảnh được tải theo nhu cầu và lưu bộ nhớ đệm cục bộ khoảng 7 ngày; yêu cầu mang định danh nguồn có phiên bản; không phân phối lại. Cách tiếp cận giải mã và cấu trúc dữ liệu cũng bắt nguồn từ dự án này. Xin cảm ơn.",
+        "leaflet": "Thư viện kết xuất bản đồ ô gạch cho bản đồ thế giới (https://leafletjs.com), giấy phép BSD-2-Clause. Bản quyền (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade được giữ lại qua tiêu đề @preserve trong mã nguồn và thông báo này. Xin cảm ơn.",
+        "protobufjs": "Thư viện giải mã Nuan5Config protobuf cho dữ liệu tham chiếu v1.db (https://github.com/protobufjs/protobuf.js), giấy phép Apache-2.0, Copyright (c) 2016 Daniel Wirtz. Xin cảm ơn."
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "Đang khởi động lại với quyền quản trị viên…",
       "elevateFailed": "Khởi động lại với quyền nâng cao thất bại: {{reason}}"
     },
+    "referenceData": {
+      "description": "Hình thu nhỏ của ánh sáng, bộ lọc và dáng chụp đến từ dữ liệu tham chiếu bên ngoài (nikki_albums, giấy phép MIT). Hình ảnh được tải khi cần và lưu trong bộ nhớ đệm cục bộ khoảng 7 ngày. Hai mục bên dưới dành cho bạn tự điền địa chỉ tăng tốc/mirror — ứng dụng không tích hợp hay dựng sẵn nút tăng tốc nào.",
+      "imageMirrorHint": "Để trống để dùng địa chỉ gốc. Chỉ thay thế cổng truy cập của tài nguyên hình ảnh đã được cấp phép, không thay đổi phạm vi cấp phép.",
+      "imageMirrorLabel": "Cổng tăng tốc hình ảnh",
+      "manifestMirrorHint": "Để trống để dùng trang chính thức của nguồn.",
+      "manifestMirrorLabel": "Trang mirror dữ liệu tham chiếu",
+      "save": "Lưu",
+      "saved": "Đã lưu",
+      "imageSourceLabel": "Nguồn ảnh",
+      "imageSourceNotice": "Ảnh thực thể đến từ gongeo.us qua hot-link theo nhu cầu; liên kết nguồn ở bên dưới.",
+      "trademarkNotice": "Mọi tài sản, tên và nhãn hiệu của trò chơi Infinity Nikki thuộc về Infold và các bên sở hữu quyền tương ứng.",
+      "usageNotice": "Các tài sản hình ảnh trò chơi của bên thứ ba này chỉ được hiển thị theo nhu cầu bên trong ứng dụng và không dùng để huấn luyện AI hay cho bất kỳ mục đích thương mại nào. Hạn chế này không áp dụng cho mã nguồn của chính dự án, được phát hành theo MIT License.",
+      "remoteImagesEnabledLabel": "Bật hình ảnh tham chiếu bên ngoài",
+      "remoteImagesEnabledHint": "Khi tắt, không hình ảnh tham chiếu bên ngoài nào (ảnh thu nhỏ hoặc ô bản đồ) được tải. Có thể bật lại bất kỳ lúc nào.",
+      "autoUpdateLabel": "Kiểm tra cập nhật dữ liệu tham chiếu khi khởi động",
+      "autoUpdateHint": "Khi tắt, chỉ kiểm tra khi làm mới thủ công.",
+      "refreshLabel": "Kiểm tra cập nhật",
+      "refreshSuccess": "Đã cập nhật dữ liệu tham chiếu",
+      "refreshFailed": "Cập nhật dữ liệu tham chiếu thất bại, vui lòng thử lại sau"
+    },
     "sections": {
+      "referenceData": "Dữ liệu tham chiếu bên ngoài",
       "aboutContact": "Liên hệ",
       "aboutInfo": "Thông tin ứng dụng",
       "aboutLicense": "Cảm ơn & giấy phép mã nguồn mở",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "Chụp ảnh thường",
+      "1": "Khoảnh khắc đóng băng",
+      "2": "Chụp ảnh đôi",
+      "3": "Ảnh chụp màn hình"
+    },
+    "windIntensity": {
+      "0": "Không có gió",
+      "1": "Gió nhẹ",
+      "2": "Gió vừa",
+      "3": "Gió mạnh",
+      "4": "Gió rất mạnh",
+      "neg1": "Không xác định"
+    },
+    "windDirection": {
+      "0": "Đông",
+      "1": "Nam",
+      "2": "Tây",
+      "3": "Bắc",
+      "4": "Đông Nam",
+      "5": "Tây Nam",
+      "6": "Đông Bắc",
+      "7": "Tây Bắc",
+      "8": "Không",
+      "neg1": "Không xác định"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "Tư thế của Nikki",
+    "playingPercent": "Tiến độ tư thế",
+    "momoPose": "Tư thế của Momo",
+    "momoPoseTime": "Tiến độ tư thế của Momo",
+    "momoAdjust": "Điều chỉnh vị trí Momo (Trái/Trước/Chiều cao)",
+    "momoRotate": "Xoay Momo",
+    "autoGroundSnap": "Tự động bám mặt đất",
+    "floatingEffect": "Hiệu ứng lơ lửng",
+    "poseWithNikki": "Tạo dáng cùng Nikki",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "Giá trị phải là auto hoặc high-performance",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl phải là URL http(s) công khai (để trống để dùng trang chính thức)",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl phải là URL http(s) công khai (để trống để dùng địa chỉ gốc)",
+        "referenceDataSwitchNotBoolean": "Công tắc dữ liệu tham chiếu bên ngoài phải là giá trị boolean"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "Địa điểm chụp",
+    "clickToView": "Nhấn để định vị trên bản đồ",
+    "loading": "Đang tải bản đồ",
+    "outdatedVersion": "Ảnh từ phiên bản 2.9 trở về trước không hỗ trợ xem địa điểm chụp",
+    "lackData": "Thiếu dữ liệu",
+    "notReady": "Dữ liệu tham chiếu chưa sẵn sàng",
+    "noTiles": "Không có dữ liệu bản đồ",
+    "lackWorldMap": "Bản đồ không khả dụng cho địa điểm này",
+    "outsideBounds": "Điểm chụp nằm ngoài phạm vi bản đồ"
   }
 }

@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "Photo Mode",
+        "typeValue": "Type {{type}}"
+      },
+      "windIntensity": {
+        "label": "Wind Intensity",
+        "typeValue": "Type {{type}}"
+      },
+      "windDirection": {
+        "label": "Wind Direction",
+        "typeValue": "Type {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "Online Information",
+      "anotherPose": "The Pose of another player",
+      "poseTime": "Progress",
+      "copyHeader": "=== Multiplayer Info ==="
     }
   },
   "dialog": {
@@ -1302,6 +1320,8 @@
       "licenseGpl": "• GPL-3.0: Code using or modifying it must also be open-sourced",
       "licenseMit": "• MIT: Free use, modification, distribution; must retain copyright notice",
       "licenseNote": "License notes",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "The upstream MIT copyright notice and license text of nikki_albums are preserved verbatim in THIRD_PARTY_NOTICES shipped with the app.",
       "licenseTitle": "Acknowledgements & License",
       "open": "Open",
       "projectIntro": "Built on the open-source projects above. Thanks to all contributors. The software itself is MIT-licensed; feel free to use, modify, and distribute.",
@@ -1327,7 +1347,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "Camera parameter parsing and pose thumbnails: the hot-update reference data pipeline (nuan5_database) and CDN image resources are reused from the open-source project nikki_albums (https://github.com/RanAxro/nikki_albums) (author: RanAxro, MIT License), with the author's permission (nikki_albums#20). Images load on demand and are cached locally for about 7 days; requests carry a versioned source identifier; no redistribution. The decryption approach and data structures also originate from this project. With thanks.",
+        "leaflet": "Tile map rendering library for the world location map (https://leafletjs.com), BSD-2-Clause licensed. Copyright (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade, retained via the source @preserve banner and this notice. Our thanks.",
+        "protobufjs": "Nuan5Config protobuf decoding for the reference data v1.db (https://github.com/protobufjs/protobuf.js), Apache-2.0 licensed, Copyright (c) 2016 Daniel Wirtz. Our thanks."
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "Restarting as administrator…",
       "elevateFailed": "Failed to restart with elevation: {{reason}}"
     },
+    "referenceData": {
+      "description": "Thumbnails for lighting, filters and poses come from external reference data (upstream nikki_albums, MIT licensed). Images are loaded on demand and cached locally for about 7 days. The two entries below are for you to fill in your own acceleration/mirror addresses — the app ships no built-in or hosted accelerator.",
+      "imageMirrorHint": "Leave empty to use the original address. Only replaces the access entry for authorized image resources; the authorization scope is unchanged.",
+      "imageMirrorLabel": "Image accelerator",
+      "manifestMirrorHint": "Leave empty to use the upstream official site.",
+      "manifestMirrorLabel": "Reference data mirror",
+      "save": "Save",
+      "saved": "Saved",
+      "imageSourceLabel": "Image source",
+      "imageSourceNotice": "Entity images come from gongeo.us via on-demand hot-links; the source link is below.",
+      "trademarkNotice": "All Infinity Nikki game assets, names and trademarks belong to Infold and the respective rights holders.",
+      "usageNotice": "These third-party game image assets are displayed on demand inside this app only, and are not used for AI training or for any commercial purpose. This restriction does not apply to the project’s own source code, released under the MIT License.",
+      "remoteImagesEnabledLabel": "Enable external reference images",
+      "remoteImagesEnabledHint": "When off, no external reference images (thumbnails or map tiles) are loaded. You can re-enable at any time.",
+      "autoUpdateLabel": "Check reference data updates on startup",
+      "autoUpdateHint": "When off, updates are checked only on manual refresh.",
+      "refreshLabel": "Check for updates",
+      "refreshSuccess": "Reference data updated",
+      "refreshFailed": "Reference data update failed. Try again later"
+    },
     "sections": {
+      "referenceData": "External Reference Data",
       "aboutContact": "Contact",
       "aboutInfo": "App Information",
       "aboutLicense": "Acknowledgements & License",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "Regular Shot",
+      "1": "Moment Capturer",
+      "2": "Group Shot",
+      "3": "Screenshot"
+    },
+    "windIntensity": {
+      "0": "No Wind",
+      "1": "Light Wind",
+      "2": "Moderate Wind",
+      "3": "Strong Wind",
+      "4": "Very Strong Wind",
+      "neg1": "Unknown"
+    },
+    "windDirection": {
+      "0": "East",
+      "1": "South",
+      "2": "West",
+      "3": "North",
+      "4": "Southeast",
+      "5": "Southwest",
+      "6": "Northeast",
+      "7": "Northwest",
+      "8": "None",
+      "neg1": "Unknown"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "Nikki Pose",
+    "playingPercent": "Pose Progress",
+    "momoPose": "Momo Pose",
+    "momoPoseTime": "Momo Pose Progress",
+    "momoAdjust": "Momo Position Adjust (Left/Forward/Height)",
+    "momoRotate": "Rotate Momo",
+    "autoGroundSnap": "Auto Ground Snap",
+    "floatingEffect": "Floating Effect",
+    "poseWithNikki": "Pose with Nikki",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3494,7 +3573,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference must be auto or high-performance",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl must be a public http(s) URL (leave empty to use the official site)",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl must be a public http(s) URL (leave empty to use the original address)",
+        "referenceDataSwitchNotBoolean": "External reference data switches must be boolean values"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "Shooting Location",
+    "clickToView": "Click to locate on map",
+    "loading": "Loading map",
+    "outdatedVersion": "Photos from version 2.9 and earlier do not support viewing the shooting location",
+    "lackData": "Data missing",
+    "notReady": "Reference data is not ready yet",
+    "noTiles": "No map data available",
+    "lackWorldMap": "Map is not available for this location",
+    "outsideBounds": "Shooting location is outside the map bounds"
   }
 }

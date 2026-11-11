@@ -1,0 +1,135 @@
+# THIRD PARTY NOTICES | 第三方声明与致谢
+
+本文件随 MeowStarMap 的源码与分发物一同保留。MeowStarMap 自身以 MIT License
+发布（见 [LICENSE](LICENSE)，`Copyright (c) 2026 QianLu`）；以下为本项目复用的
+第三方开源成果及其版权声明。
+
+---
+
+## 1. nikki_albums（MIT License）
+
+- **项目**：[RanAxro/nikki_albums](https://github.com/RanAxro/nikki_albums)
+- **作者**：RanAxro（LICENSE 版权行署名为 `Ran`）
+- **对齐版本**：`main @ dc1b30bda1f99119cbd1fbf9a9e02a62a11631d0`
+- **授权依据**：[nikki_albums#20](https://github.com/RanAxro/nikki_albums/issues/20)（作者回复）
+- **版权声明原文**：`Copyright (c) 2025 Ran`
+
+本项目以黑盒方式调用随该仓库分发的原生解密库 `nuan5_decryption.dll`，并参考 /
+复用了其热更新参考数据管道、`aes-gcm-filebox` 认证解密布局、`Nuan5Config`
+protobuf 数据结构、`Nuan5NetworkImage` 类别定义，以及随仓库分发的
+`assets/lang/infinity_nikki/zh-CN.json` 语言资源（见第 4 节）。二进制本身未被修改。
+
+### 上游 MIT 许可全文（逐字保留）
+
+```text
+MIT License
+
+Copyright (c) 2025 Ran
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
+**在线资源使用范围（#20 条款）**：`cdn.nikkialbums.com` 的类别图片按需懒加载、
+不预取、不批量抓取；请求携带 `MeowStarMap/<版本>` 标识；图片仅在本机受控缓存目录
+留存约 7 天供本地展示，不二次分发、不镜像、不重新托管；失败有退避与冷却，不产生
+异常高频重试。瓦片地图仅使用游戏官方 `assets.papegames.com`，未接入上游自有 CDN
+瓦片；`cloth` / `cloth_outfit` 两类不在该授权范围内，未通过本通道接入。
+
+---
+
+## 2. gongeo.us-nikki-tracker（MIT License）
+
+- **项目**：[dastrokes/gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker)
+- **图片来源与回链**：[gongeo.us](https://gongeo.us)（CDN 主机 `cdn.gongeo.us`）
+- **授权依据**：[gongeo.us-nikki-tracker#218](https://github.com/dastrokes/gongeo.us-nikki-tracker/issues/218)
+
+本项目「共鸣录」部分本地逻辑与「我的衣橱」六类实体图片（套装 / 部件 / 妆容 /
+Momo / 道具 / 共鸣色）以 HTTPS 热链按需展示，纯链接引用、不下载字节用于再分发或
+再托管、不批量爬取、失败回退占位。请求携带独立的 `MeowStarMap` User-Agent。
+
+**授权证据状态（如实标注）**：上述 #218 页面正文中未抓到独立的「批准」措辞，
+可抓取到的作者评论为要求添加可识别的 User-Agent；仓库内「已获授权」的记载依据
+来自 nikki_albums#20 中 2026-11-09 的项目方跟帖与本项目内计划文档。核查日期
+2026-11-10。此处不将抓取局限表述为「页面已明确批准」。相关功能保持独立、可回滚。
+
+### 上游 MIT 许可声明
+
+该项目以 MIT License 发布，许可全文见其仓库 LICENSE 文件。其 MIT 许可覆盖该项目的
+代码与随附数据，不覆盖游戏美术资产、名称与商标。
+
+---
+
+## 3. 游戏资产、商标与来源标注
+
+「无限暖暖」（Infinity Nikki）相关的**游戏美术资产、名称与商标归 Infold 等相应
+权利方所有**。本项目不主张对上述资产的任何权利，仅按授权范围作引用式展示。
+
+**外部图片的用途限制（对应 #218 承诺）**：上述通过 CDN 按需展示的第三方游戏图片
+资产，仅用于本应用内的信息展示，**不用于 AI 训练，也不用于任何商业用途**；
+该限制**不适用于本项目自身以 MIT License 发布的源代码**。MeowStarMap 为本地
+桌面粉丝工具，不收集、不上传用户数据。
+
+**来源标注与回链**：应用内「设置 → 外部参考数据」与「致谢与开源协议」页标注
+gongeo.us / nikki_albums 来源并提供回链；图片来源主机与类别均为封闭白名单，
+未获授权的资源类别不接入。
+
+---
+
+## 4. 静态语言底座（`assets/lang/infinity_nikki/zh-CN.json`）
+
+- **来源**：上游 nikki_albums 仓库 `assets/lang/infinity_nikki/zh-CN.json`（MIT，对齐 `main @ dc1b30b`）
+- **随仓副本**：`src/shared/data/infinity_nikki.zh-CN.json` —— 逐字保留上游 `infinity_nikki` 子树，未改写任何译文（9639 字节，与上游 JSON 深度相等）
+- **消费面**：`src/renderer/utils/reference-names.ts` 为纯函数查表（封闭 4 组数值映射、未知值 `null` 兜底），供 `photo_mode` / `wind_intensity` / `wind_direction` / `weather` 的显示名核对；测试见 `src/renderer/utils/reference-names.test.ts`
+- **覆盖度实采结论（2026-11-10）**：上游顶层提供 4 / 6 / 10 / 9 条「数值 → 中文名」映射；`media_params` 中 `pose` / `light` / `filter` / `momo_pose` 仅为标签字符串，**没有**「枚举名 → 数字 id」映射，故灯光/滤镜缩略图保持纯文字，不臆造映射。既有语包 `enums.weather.0`「晴朗」与上游「晴」的差异为既有译文风格差异，按边界未改动。
+- **合规**：该资源为随仓静态数据，**零新增外部主机、零新增运行时网络请求**；上游 MIT 版权声明与许可全文见第 1 节。
+
+---
+
+## 5. 其他运行时依赖
+
+Electron、React、Vite、TypeScript、Tailwind CSS、better-sqlite3、sharp、koffi、
+Zustand、i18next、fluent-ffmpeg、ESLint、Prettier、Vitest 等依赖各自的许可证
+随 `node_modules` 内各包的 LICENSE 文件分发；应用内「设置 → 致谢与开源协议」
+页列有运行时依赖与构建工具的许可标签。
+
+本轮新增的两个运行时依赖单独署名如下（其代码经 Vite 打包进渲染层产物，
+`node_modules` 的 LICENSE 文件不随渲染层 bundle 分发，故在此显式保留）：
+
+### Leaflet（BSD-2-Clause License）
+
+- **项目**：[Leaflet](https://leafletjs.com)（[GitHub](https://github.com/Leaflet/Leaflet)），版本 1.9.4
+- **用途**：世界地图定位的瓦片地图渲染（`MiralandMap`，CRS.Simple）
+- **版权声明原文**（逐字保留自其源码头注）：
+  `(c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade`
+- 打包产物中 Leaflet 源码的 `@preserve` 头注（含上述版权行与许可链接）由构建
+  工具保留；BSD-2-Clause 全文见其仓库 LICENSE 文件。
+
+### protobufjs（Apache-2.0 License）
+
+- **项目**：[protobufjs](https://github.com/protobufjs/protobuf.js)，版本 8.x
+- **用途**：参考数据 v1.db 解密产物的 `Nuan5Config` protobuf 解码（主进程）
+- **版权**：Copyright (c) 2016 Daniel Wirtz；Apache-2.0 全文见其仓库 LICENSE
+  文件，主进程依赖随 `node_modules` 入包分发。
+
+---
+
+> 分发物保留说明：`package.json` 的 `build.files` 显式列入本文件与 `LICENSE`，
+> 并由 `scripts/pre-dist-check.ts` 的 `checkPackedLegalNotices()` 在打包前校验
+> 配置与版权行是否存在。该校验是**源码 / 配置层**的提交前断言，不代替对实际
+> 打包产物（app.asar / 安装包）的核验。

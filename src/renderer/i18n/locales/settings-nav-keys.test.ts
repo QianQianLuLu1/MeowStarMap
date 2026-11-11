@@ -63,8 +63,8 @@ const NEW_KEYS = [
 ]
 
 /**
- * 合并后 SETTINGS_GROUPS 实际消费的全部导航文案：8 个分组标题 + 17 个节标题。
- * 与 SettingsPage.test.tsx 的「8 组 17 项」计数断言互为补充——那边锁结构，这边锁文案。
+ * 合并后 SETTINGS_GROUPS 实际消费的全部导航文案：8 个分组标题 + 18 个节标题。
+ * 与 SettingsPage.test.tsx 的「8 组 19 项」计数断言互为补充——那边锁结构，这边锁文案。
  */
 const GROUP_LABEL_KEYS = [
   'settings.groups.general',
@@ -88,6 +88,7 @@ const SECTION_LABEL_KEYS = [
   'settings.sections.profileManage',
   'settings.sections.dataBackup',
   'settings.sections.cacheCleanup',
+  'settings.sections.referenceData',
   'settings.sections.scanDiagnostic',
   'settings.sections.diagnosticsLogs',
   'settings.sections.diagnosticsCrash',
@@ -130,7 +131,7 @@ describe('设置页导航合并的语言包完整性', () => {
     }
   })
 
-  it('8 个分组标题 + 17 个节标题在 12 个语言包全部非空（抓闸门盲区里的空串）', () => {
+  it('8 个分组标题 + 18 个节标题在 12 个语言包全部非空（抓闸门盲区里的空串）', () => {
     for (const code of Object.keys(LOCALES)) {
       for (const key of NAV_LABEL_KEYS) assertNonEmptyString(code, key)
     }

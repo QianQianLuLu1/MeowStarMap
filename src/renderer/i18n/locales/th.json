@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "โหมดกล้อง",
+        "typeValue": "ประเภท {{type}}"
+      },
+      "windIntensity": {
+        "label": "ความแรงลม",
+        "typeValue": "ประเภท {{type}}"
+      },
+      "windDirection": {
+        "label": "ทิศทางลม",
+        "typeValue": "ประเภท {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "ข้อมูลผู้เล่นหลายคน",
+      "anotherPose": "ท่าทางของผู้เล่นอีกคน",
+      "poseTime": "ความคืบหน้า",
+      "copyHeader": "=== ข้อมูลผู้เล่นหลายคน ==="
     }
   },
   "dialog": {
@@ -1298,6 +1316,8 @@
       "licenseGpl": "• GPL-3.0: โค้ดที่ใช้หรือปรับปรุงต้องเป็นโอเพ่นซอร์สด้วย",
       "licenseMit": "• MIT: ใช้งาน ปรับปรุงและแจกจ่ายได้อย่างเสรี; ต้องเก็บการแจ้งลิขสิทธิ์ไว้",
       "licenseNote": "หมายเหตุลิขสิทธิ์",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "ประกาศลิขสิทธิ์ MIT และข้อความ licenses ฉบับเต็มของโปรเจกต์ต้นทาง nikki_albums ถูกเก็บรักษาตามต้นฉบับในไฟล์ THIRD_PARTY_NOTICES ที่มาพร้อมกับแอป",
       "licenseTitle": "กิตติกรรมประกาศและลิขสิทธิ์",
       "open": "เปิด",
       "projectIntro": "ซอฟต์แวร์นี้สร้างบนโครงการโอเพ่นซอร์สข้างต้น ขอบคุณผู้มีส่วนร่วมในชุมชนโอเพ่นซอร์สทุกคน ซอฟต์แวร์เองเป็นโอเพ่นซอร์สภายใต้ลิขสิทธิ์ MIT; ยินดีต้อนรับการใช้งาน การปรับปรุงและการแจกจ่ายอย่างเสรี",
@@ -1323,7 +1343,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "การแยกพารามิเตอร์กล้องและภาพขนาดย่อของท่าทาง: ไปป์ไลน์ข้อมูลอ้างอิง (nuan5_database) และทรัพยากรภาพ CDN นำกลับมาใช้จากโครงการโอเพนซอร์ส nikki_albums (https://github.com/RanAxro/nikki_albums) (ผู้เขียน: RanAxro, สัญญาอนุญาต MIT) โดยได้รับอนุญาตจากผู้เขียน (nikki_albums#20) ภาพจะโหลดเมื่อต้องการและแคชในเครื่องประมาณ 7 วัน คำขอมีตัวระบุแหล่งที่มาแบบมีเวอร์ชัน ไม่มีการแจกจ่ายซ้ำ แนวคิดการถอดรหัสและโครงสร้างข้อมูลก็มาจากโครงการนี้เช่นกัน ขอขอบคุณ",
+        "leaflet": "ไลบรารีเรนเดอร์แผนที่ไทล์สำหรับแผนที่โลก (https://leafletjs.com) สัญญาอนุญาต BSD-2-Clause สงวนลิขสิทธิ์ (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade ซึ่งเก็บรักษาไว้ในส่วนหัว @preserve ของซอร์สโค้ดและคำประกาศนี้ ขอขอบคุณ",
+        "protobufjs": "ไลบรารีถอดรหัส Nuan5Config protobuf สำหรับข้อมูลอ้างอิง v1.db (https://github.com/protobufjs/protobuf.js) สัญญาอนุญาต Apache-2.0, Copyright (c) 2016 Daniel Wirtz ขอขอบคุณ"
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "กำลังรีสตาร์ทในฐานะผู้ดูแลระบบ…",
       "elevateFailed": "รีสตาร์ทด้วยสิทธิ์ยกระดับไม่สำเร็จ: {{reason}}"
     },
+    "referenceData": {
+      "description": "ภาพขนาดย่อของแสง ฟิลเตอร์ และท่าทางมาจากข้อมูลอ้างอิงภายนอก (nikki_albums ใบอนุญาต MIT) ภาพจะถูกโหลดตามความจำเป็นและแคชไว้ในเครื่องประมาณ 7 วัน ช่องสองช่องด้านล่างมีไว้ให้คุณกรอกที่อยู่ตัวเร่ง/มิเรอร์ของคุณเอง แอปไม่ได้ฝังหรือสร้างโหนดตัวเร่งให้",
+      "imageMirrorHint": "เว้นว่างไว้เพื่อใช้ที่อยู่เดิม แทนที่เฉพาะจุดเข้าถึงของทรัพยากรรูปภาพที่ได้รับอนุญาต ไม่เปลี่ยนขอบเขตการอนุญาต",
+      "imageMirrorLabel": "ตัวเร่งความเร็วรูปภาพ",
+      "manifestMirrorHint": "เว้นว่างไว้เพื่อใช้ไซต์ทางการต้นทาง",
+      "manifestMirrorLabel": "ไซต์มิเรอร์ข้อมูลอ้างอิง",
+      "save": "บันทึก",
+      "saved": "บันทึกแล้ว",
+      "imageSourceLabel": "แหล่งที่มาของภาพ",
+      "imageSourceNotice": "ภาพเอนทิตีมาจาก gongeo.us ผ่าน hot-link ตามความต้องการ ลิงก์ไปยังแหล่งที่มาอยู่ด้านล่าง",
+      "trademarkNotice": "สินทรัพย์ในเกม ชื่อ และเครื่องหมายการค้าของ Infinity Nikki ทั้งหมดเป็นของ Infold และผู้ถือสิทธิ์ที่เกี่ยวข้อง",
+      "usageNotice": "สินทรัพย์ภาพเกมจากบุคคลที่สามเหล่านี้แสดงตามความต้องการภายในแอปนี้เท่านั้น และไม่ได้ใช้สำหรับการฝึก AI หรือเพื่อวัตถุประสงค์เชิงพาณิชย์ใดๆ ข้อจำกัดนี้ไม่ใช้กับซอร์สโค้ดของโปรเจกต์เองซึ่งเผยแพร่ภายใต้ MIT License",
+      "remoteImagesEnabledLabel": "เปิดใช้งานภาพอ้างอิงภายนอก",
+      "remoteImagesEnabledHint": "เมื่อปิด จะไม่โหลดภาพอ้างอิงภายนอกใดๆ (ภาพย่อหรือไทล์แผนที่) สามารถเปิดกลับได้ทุกเมื่อ",
+      "autoUpdateLabel": "ตรวจสอบการอัปเดตข้อมูลอ้างอิงเมื่อเริ่มต้น",
+      "autoUpdateHint": "เมื่อปิด จะตรวจสอบเฉพาะเมื่อรีเฟรชด้วยตนเอง",
+      "refreshLabel": "ตรวจสอบการอัปเดต",
+      "refreshSuccess": "อัปเดตข้อมูลอ้างอิงแล้ว",
+      "refreshFailed": "อัปเดตข้อมูลอ้างอิงไม่สำเร็จ โปรดลองอีกครั้งในภายหลัง"
+    },
     "sections": {
+      "referenceData": "ข้อมูลอ้างอิงภายนอก",
       "aboutContact": "ติดต่อ",
       "aboutInfo": "ข้อมูลแอปพลิเคชัน",
       "aboutLicense": "กิตติกรรมประกาศและลิขสิทธิ์โอเพ่นซอร์ส",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "การถ่ายภาพปกติ",
+      "1": "ตรึงช่วงเวลา",
+      "2": "การถ่ายคู่",
+      "3": "ภาพหน้าจอ"
+    },
+    "windIntensity": {
+      "0": "ไม่มีลม",
+      "1": "ลมเบา",
+      "2": "ลมปานกลาง",
+      "3": "ลมแรง",
+      "4": "ลมแรงมาก",
+      "neg1": "ไม่ทราบ"
+    },
+    "windDirection": {
+      "0": "ตะวันออก",
+      "1": "ใต้",
+      "2": "ตะวันตก",
+      "3": "เหนือ",
+      "4": "ตะวันออกเฉียงใต้",
+      "5": "ตะวันตกเฉียงใต้",
+      "6": "ตะวันออกเฉียงเหนือ",
+      "7": "ตะวันตกเฉียงเหนือ",
+      "8": "ไม่มี",
+      "neg1": "ไม่ทราบ"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "ท่าของนิกกิ",
+    "playingPercent": "ความคืบหน้าของท่า",
+    "momoPose": "ท่าของโมโมะ",
+    "momoPoseTime": "ความคืบหน้าท่าของโมโมะ",
+    "momoAdjust": "ปรับตำแหน่งโมโมะ (ซ้าย/หน้า/สูง)",
+    "momoRotate": "หมุนโมโมะ",
+    "autoGroundSnap": "จัดตำแหน่งอัตโนมัติกับพื้น",
+    "floatingEffect": "เอฟเฟกต์ลอยตัว",
+    "poseWithNikki": "โพสท่ากับนิกกิ",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "ค่าต้องเป็น auto หรือ high-performance",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl ต้องเป็น URL http(s) สาธารณะ (เว้นว่างเพื่อใช้เว็บไซต์ทางการ)",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl ต้องเป็น URL http(s) สาธารณะ (เว้นว่างเพื่อใช้ที่อยู่เดิม)",
+        "referenceDataSwitchNotBoolean": "สวิตช์ข้อมูลอ้างอิงภายนอกต้องเป็นค่าบูลีน"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "สถานที่ถ่ายภาพ",
+    "clickToView": "คลิกเพื่อระบุตำแหน่งบนแผนที่",
+    "loading": "กำลังโหลดแผนที่",
+    "outdatedVersion": "ภาพจากเวอร์ชัน 2.9 และก่อนหน้าไม่รองรับการดูสถานที่ถ่ายภาพ",
+    "lackData": "ไม่มีข้อมูล",
+    "notReady": "ข้อมูลอ้างอิงยังไม่พร้อม",
+    "noTiles": "ไม่มีข้อมูลแผนที่",
+    "lackWorldMap": "ไม่มีแผนที่สำหรับสถานที่นี้",
+    "outsideBounds": "จุดถ่ายภาพอยู่นอกขอบเขตแผนที่"
   }
 }

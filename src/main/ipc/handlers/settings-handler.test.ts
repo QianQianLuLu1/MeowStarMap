@@ -447,3 +447,230 @@ describe('settings:set gpu.discretePreference — 值域校验与镜像双写', 
     expect(fs.existsSync(path.join(tmpUserDir, 'gpu-pref.json'))).toBe(false)
   })
 })
+
+// ===== 外部参考数据镜像站点（referenceData.manifestBaseUrl，总计划阶段 1）=====
+describe('settings:set referenceData.manifestBaseUrl 镜像站点', () => {
+  // 本块在文件顶层：外层 describe 的 beforeEach（handleMock.mockClear）不覆盖这里，
+  // 不清的话 getHandler 会命中此前用例注册的旧 handler（旧 ctx），setSetting 断言落空
+  beforeEach(() => {
+    handleMock.mockClear()
+  })
+
+  it('公网 https 地址放行并持久化', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['referenceData.manifestBaseUrl', 'https://mirror.example.test/'])) as {
+      data?: { saved?: boolean }
+    }
+    expect(result.data?.saved).toBe(true)
+    // 存储值已去尾斜杠由消费方拼接；这里断言原样透传（trim 语义在 handler 内）
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(
+      'referenceData.manifestBaseUrl',
+      'https://mirror.example.test/'
+    )
+  })
+
+  it('空串放行（= 回退上游官方站点）', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['referenceData.manifestBaseUrl', ''])) as { data?: { saved?: boolean } }
+    expect(result.data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('referenceData.manifestBaseUrl', '')
+  })
+
+  it('非字符串（数字/对象）被拒', async () => {
+    registerSettingsHandlers(makeCtx({}))
+    for (const value of [123, { evil: true }, null]) {
+      const result = (await getHandler(
+        handleMock,
+        'settings:set'
+      )(['referenceData.manifestBaseUrl', value])) as { error?: { code?: string } }
+      expect(result.error?.code).toBe('IPC_VALIDATION_ERROR')
+    }
+  })
+
+  it('环回 / 私网 / 非 http(s) 地址被拒（SSRF 闸），不落库', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    for (const value of [
+      'http://127.0.0.1:9',
+      'http://localhost',
+      'http://192.168.1.1',
+      'http://10.0.0.5',
+      'ftp://mirror.example.test',
+      'not-a-url'
+    ]) {
+      const result = (await getHandler(
+        handleMock,
+        'settings:set'
+      )(['referenceData.manifestBaseUrl', value])) as { error?: { code?: string } }
+      expect(result.error?.code, value).toBe('IPC_VALIDATION_ERROR')
+    }
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+})
+
+// ===== 参考图片加速/镜像入口（referenceData.imageMirrorBaseUrl，阶段 5）=====
+describe('settings:set referenceData.imageMirrorBaseUrl 图片加速入口', () => {
+  /**
+   * 与 manifest 镜像键**同款校验、不同语义**：manifest 键覆盖热更站点，本键只替换
+   * 已授权图片资源的取图 host。两键必须各自独立可写，且不得互相串用。
+   * 应用不内置、不代建加速节点——本键是用户自配入口的唯一落点。
+   */
+  const KEY = 'referenceData.imageMirrorBaseUrl'
+
+  beforeEach(() => {
+    handleMock.mockClear()
+  })
+
+  async function set(value: unknown): Promise<{
+    data?: { saved?: boolean }
+    error?: { code?: string }
+  }> {
+    return (await getHandler(handleMock, 'settings:set')([KEY, value])) as {
+      data?: { saved?: boolean }
+      error?: { code?: string }
+    }
+  }
+
+  it('公网 https 地址放行并持久化', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = await set('https://image-mirror.example.test')
+    expect(result.data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(KEY, 'https://image-mirror.example.test')
+  })
+
+  it('带路径前缀的反代形态放行（子路径部署）', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    expect((await set('https://image-mirror.example.test/nikki-cdn/')).data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(
+      KEY,
+      'https://image-mirror.example.test/nikki-cdn/'
+    )
+  })
+
+  it('空串放行（= 未配置，走原始地址）', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    expect((await set('')).data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(KEY, '')
+  })
+
+  it('边界：首尾空白被 trim 后落库', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    expect((await set('  https://image-mirror.example.test  ')).data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(KEY, 'https://image-mirror.example.test')
+  })
+
+  it('边界：仅空白串等同未配置（trim 后为空）', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    expect((await set('   ')).data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(KEY, '')
+  })
+
+  it('异常：非字符串（数字/对象/null/布尔）被拒', async () => {
+    registerSettingsHandlers(makeCtx({}))
+    for (const value of [123, { evil: true }, null, true, ['https://a.example']]) {
+      expect((await set(value)).error?.code, String(value)).toBe('IPC_VALIDATION_ERROR')
+    }
+  })
+
+  it('异常：环回 / 私网 / 保留段 / 非 http(s) / 不可解析地址被拒（SSRF 闸），不落库', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    for (const value of [
+      'http://127.0.0.1:9',
+      'http://localhost',
+      'http://192.168.1.1',
+      'http://10.0.0.5',
+      'http://169.254.169.254/latest/meta-data',
+      'https://[fe80::1]',
+      'ftp://image-mirror.example.test',
+      'file:///etc/passwd',
+      'not-a-url'
+    ]) {
+      expect((await set(value)).error?.code, value).toBe('IPC_VALIDATION_ERROR')
+    }
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+
+  it('异常：超长地址（>256）被拒', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const long = `https://image-mirror.example.test/${'a'.repeat(300)}`
+    expect((await set(long)).error?.code).toBe('IPC_VALIDATION_ERROR')
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+
+  it('两个镜像键互不串用：写图片入口不影响 manifest 键的落库值', async () => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    await set('https://image-mirror.example.test')
+    const manifestResult = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['referenceData.manifestBaseUrl', 'https://manifest-mirror.example.test'])) as {
+      data?: { saved?: boolean }
+    }
+
+    expect(manifestResult.data?.saved).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenNthCalledWith(
+      1,
+      KEY,
+      'https://image-mirror.example.test'
+    )
+    expect(ctx.dbManager.setSetting).toHaveBeenNthCalledWith(
+      2,
+      'referenceData.manifestBaseUrl',
+      'https://manifest-mirror.example.test'
+    )
+  })
+})
+
+// ===== T4：外部图片总开关 / 开机自动检查开关的布尔校验 =====
+describe('settings:set 外部参考数据布尔开关', () => {
+  const keys = ['referenceData.remoteImagesEnabled', 'referenceData.autoUpdate']
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it.each(keys)('%s：true / false 均正确落库', async (key) => {
+    for (const value of [true, false]) {
+      // getHandler 返回首个注册的 handler，每轮清空注册记录以绑定本轮 ctx
+      handleMock.mockClear()
+      const ctx = makeCtx({})
+      registerSettingsHandlers(ctx)
+      const result = (await getHandler(handleMock, 'settings:set')([key, value])) as {
+        success: boolean
+        error?: { message: string }
+      }
+      expect(result.success, result.error?.message).toBe(true)
+      expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(key, value)
+    }
+  })
+
+  it.each(keys)('%s：非布尔值被拒，不写库且给出明确错误', async (key) => {
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    for (const dirty of ['true', 1, null, {}, []]) {
+      const result = (await getHandler(handleMock, 'settings:set')([key, dirty])) as {
+        success: boolean
+        error?: { message: string }
+      }
+      expect(result.success).toBe(false)
+      expect(result.error?.message).toContain('布尔值')
+    }
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
+  })
+})

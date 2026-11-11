@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { buildShareCardInput } from './shareCardInput'
-import type { GameParamsData } from '../../types/decryption'
+import type { GameParamsData, RichCameraParams } from '../../types/decryption'
 
 /**
  * 阶段 5 · B1：解密参数 → 分享图载荷的装配单测。
  * 关注三件事：键取全、缺值不伪造、穿搭名走本地字典（解析不出就留空）。
  */
 
-const fullCamera = {
+const fullCamera: RichCameraParams = {
   focalLength: 50,
   apertureSection: 2.8,
   brightness: 10,
@@ -29,6 +29,7 @@ const fullCamera = {
   pose: 7,
   framedMoment: 0,
   momoHidden: null,
+  cameraVersion: 'v1',
   rawParams: '',
   filter: { id: '201', strength: 1 },
   light: { id: '305', strength: 1 }

@@ -25,6 +25,9 @@ src/main/services/
 ├── video-service.ts               # 视频处理（导出/裁剪/调速/帧截图/元数据）
 ├── watermark-service.ts           # 水印批量应用（文本/图片 + 平铺/定位）
 ├── xmp-metadata-service.ts        # XMP 元数据写入/读取（wxnn: 自定义命名空间）
+├── reference-data-service.ts      # 外部参考数据热更管道（manifest→filebox 解密→protobuf 索引；查询面 fail-soft）
+├── reference-image-service.ts     # 参考数据 CDN 图片按需取图 + 7 天磁盘缓存（授权/退避/版本化 UA，永不 reject）
+├── reference-data/                # 管道子模块（filebox-cipher / nuan5-config-proto / image-url 授权注册表）
 └── *.test.ts                      # 单元测试（与源码同目录，Vitest）
 ```
 
@@ -50,21 +53,23 @@ src/main/services/
 
 ## 2. 关键服务说明
 
-| 服务                      | 核心职责                            | 关键依赖                                                         | 注意事项                                                                                       |
-| ------------------------- | ----------------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `backup-service`          | 数据库自动/手动备份、恢复、LRU 清理 | `better-sqlite3`（惰性加载）、`DatabaseManager`、`TaskScheduler` | 惰性加载 better-sqlite3（`import()` 而非 `require()`），使 ABI 不匹配时崩溃可被 bootstrap 捕获 |
-| `decryption-service`      | 游戏图片 FFI 解密                   | `koffi`、`nuan5_decryption.dll`                                  | async mutex 串行化避免并发操作 C 内存 use-after-free；10MB 文件读取上限                        |
-| `editor-service`          | 图片编辑保存 + 原图备份 + 编辑历史  | `sharp`、`MediaRepository`、`xmp-metadata-service`               | 备份→写入→恢复三段式保障；快照 LRU 上限 50 个                                                  |
-| `file-service`            | 文件导出/移动/删除/重命名           | `sharp`、`exifr`、`pathGuard`                                    | 命名规则支持 `{date}` `{album_type}` `{uid}` 等变量替换                                        |
-| `video-service`           | 视频导出/裁剪/调速/帧截图           | `fluent-ffmpeg`（经 `ffmpeg-runner`）、`video-probe`             | 超时按操作类型区分（导出 5 分钟、元数据 30 秒）；损坏文件回调标记                              |
-| `watermark-service`       | 批量水印应用                        | `sharp`                                                          | 平铺间距必须为正数（`tileSpacingX/Y ≤ 0` 会导致死循环）                                        |
-| `share-wifi-service`      | WiFi 局域网文件分享                 | `http`（Node 内置）、`network-address`                           | PIN 码鉴权；默认 10 分钟超时；仅绑定局域网 IP                                                  |
-| `share-clipboard-service` | Windows 剪贴板文件分享              | `child_process`（PowerShell）                                    | 通过 PowerShell 写标准 CF_HDROP（非 Electron clipboard）                                       |
-| `thumbnail-phash-service` | 缩略图生成 + pHash 计算             | `sharp`、`mediaWorkerManager`                                    | 批量任务下发到 utilityProcess；分级调度（high/low 优先级）                                     |
-| `livephoto-service`       | Apple Live Photo 导出               | `fluent-ffmpeg`                                                  | UUID v4 作为 ContentIdentifier；JPG + MOV 配对                                                 |
-| `xmp-metadata-service`    | XMP 元数据读写                      | `sharp`、`exifr`                                                 | 自定义 `wxnn:` 命名空间；`schemaVersion` 字段向前兼容                                          |
-| `crash-service`           | 崩溃 dump 管理                      | `fs`                                                             | dump 保留上限 10 份 + 30 天过期自动清理                                                        |
-| `log-service`             | 日志/故障记录管理                   | `fs`、`zip-archive`                                              | 基于目录 mtime + 文件列表签名的缓存失效机制                                                    |
+| 服务                      | 核心职责                               | 关键依赖                                                         | 注意事项                                                                                         |
+| ------------------------- | -------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `backup-service`          | 数据库自动/手动备份、恢复、LRU 清理    | `better-sqlite3`（惰性加载）、`DatabaseManager`、`TaskScheduler` | 惰性加载 better-sqlite3（`import()` 而非 `require()`），使 ABI 不匹配时崩溃可被 bootstrap 捕获   |
+| `decryption-service`      | 游戏图片 FFI 解密                      | `koffi`、`nuan5_decryption.dll`                                  | async mutex 串行化避免并发操作 C 内存 use-after-free；10MB 文件读取上限                          |
+| `editor-service`          | 图片编辑保存 + 原图备份 + 编辑历史     | `sharp`、`MediaRepository`、`xmp-metadata-service`               | 备份→写入→恢复三段式保障；快照 LRU 上限 50 个                                                    |
+| `file-service`            | 文件导出/移动/删除/重命名              | `sharp`、`exifr`、`pathGuard`                                    | 命名规则支持 `{date}` `{album_type}` `{uid}` 等变量替换                                          |
+| `video-service`           | 视频导出/裁剪/调速/帧截图              | `fluent-ffmpeg`（经 `ffmpeg-runner`）、`video-probe`             | 超时按操作类型区分（导出 5 分钟、元数据 30 秒）；损坏文件回调标记                                |
+| `watermark-service`       | 批量水印应用                           | `sharp`                                                          | 平铺间距必须为正数（`tileSpacingX/Y ≤ 0` 会导致死循环）                                          |
+| `share-wifi-service`      | WiFi 局域网文件分享                    | `http`（Node 内置）、`network-address`                           | PIN 码鉴权；默认 10 分钟超时；仅绑定局域网 IP                                                    |
+| `share-clipboard-service` | Windows 剪贴板文件分享                 | `child_process`（PowerShell）                                    | 通过 PowerShell 写标准 CF_HDROP（非 Electron clipboard）                                         |
+| `thumbnail-phash-service` | 缩略图生成 + pHash 计算                | `sharp`、`mediaWorkerManager`                                    | 批量任务下发到 utilityProcess；分级调度（high/low 优先级）                                       |
+| `livephoto-service`       | Apple Live Photo 导出                  | `fluent-ffmpeg`                                                  | UUID v4 作为 ContentIdentifier；JPG + MOV 配对                                                   |
+| `xmp-metadata-service`    | XMP 元数据读写                         | `sharp`、`exifr`                                                 | 自定义 `wxnn:` 命名空间；`schemaVersion` 字段向前兼容                                            |
+| `crash-service`           | 崩溃 dump 管理                         | `fs`                                                             | dump 保留上限 10 份 + 30 天过期自动清理                                                          |
+| `log-service`             | 日志/故障记录管理                      | `fs`、`zip-archive`                                              | 基于目录 mtime + 文件列表签名的缓存失效机制                                                      |
+| `reference-data-service`  | 外部参考数据热更管道（获取/解密/查询） | `fetch`（注入）、`node:crypto`、`protobufjs`                     | 全链 fail-soft；staging 原子提交；查询面永不 reject；上游 nikki_albums（MIT，#20 授权）          |
+| `reference-image-service` | 参考数据 CDN 图片按需取图 + 磁盘缓存   | `fetch`（注入）、`image-url` 授权注册表、`atomic-file`           | 7 天 TTL / 404 负缓存 / 失败冷却 / in-flight 去重 / 魔数自愈；UA=MeowStarMap/<版本>；永不 reject |
 
 ## 3. 错误处理约定
 

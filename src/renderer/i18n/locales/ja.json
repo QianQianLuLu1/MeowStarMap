@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "カメラモード",
+        "typeValue": "タイプ {{type}}"
+      },
+      "windIntensity": {
+        "label": "風力",
+        "typeValue": "タイプ {{type}}"
+      },
+      "windDirection": {
+        "label": "風向",
+        "typeValue": "タイプ {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "マルチプレイ情報",
+      "anotherPose": "もう一人のプレイヤーのアクション",
+      "poseTime": "進行度",
+      "copyHeader": "=== マルチプレイ情報 ==="
     }
   },
   "dialog": {
@@ -1298,6 +1316,8 @@
       "licenseGpl": "• GPL-3.0：使用または修正後のコードも同じくオープンソースにする必要あり",
       "licenseMit": "• MIT：自由な使用、修正、配布を許可、著作権表示を保持する必要あり",
       "licenseNote": "ライセンス説明",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "上流 nikki_albums の MIT 著作権表示とライセンス全文は、アプリに同梱される THIRD_PARTY_NOTICES にそのまま保持されています。",
       "licenseTitle": "謝辞とオープンソースライセンス",
       "open": "開く",
       "projectIntro": "本ソフトウェアは上記オープンソースプロジェクトに基づき構築、すべてのオープンソースコミュニティの貢献者に感謝。ソフトウェア自体はMITライセンスでオープンソース、自由な使用、修正、配布を歓迎します。",
@@ -1323,7 +1343,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "撮影パラメータ解析とポーズサムネイル：ホットアップデート参照データパイプライン（nuan5_database）と CDN 画像リソースはオープンソースプロジェクト nikki_albums（https://github.com/RanAxro/nikki_albums）（作者：RanAxro、MIT License）を再利用しており、原作者の許諾を得ています（nikki_albums#20）。画像は必要時に読み込まれローカルに約 7 日間キャッシュされ、リクエストにはバージョン付きソース識別子を付与し、再配布は行いません。復号の着想とデータ構造も同プロジェクトに由来します。感謝申し上げます。",
+        "leaflet": "ワールドマップ位置表示のタイルマップ描画ライブラリ（https://leafletjs.com）、BSD-2-Clause ライセンス。著作権表示 (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade はソースの @preserve ヘッダーと本声明に保持されます。感謝します。",
+        "protobufjs": "参照データ v1.db の Nuan5Config protobuf デコードライブラリ（https://github.com/protobufjs/protobuf.js）、Apache-2.0 ライセンス、Copyright (c) 2016 Daniel Wirtz。感謝します。"
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "管理者として再起動中…",
       "elevateFailed": "昇格再起動に失敗：{{reason}}"
     },
+    "referenceData": {
+      "description": "写真のライティング・フィルター・ポーズのサムネイルは外部参照データ（上流 nikki_albums、MIT ライセンス）から取得します。画像は必要に応じて読み込まれ、約 7 日間ローカルにキャッシュされます。以下の 2 つの入力欄はアクセラレーション／ミラーアドレスを自分で記入するためのもので、アプリは加速ノードを内蔵・代理構築しません。",
+      "imageMirrorHint": "空欄の場合は元のアドレスを使用します。認可済み画像リソースのアクセス入口のみを置き換え、認可範囲は変更しません。",
+      "imageMirrorLabel": "画像アクセラレーター",
+      "manifestMirrorHint": "空欄の場合は上流の公式サイトを使用します。",
+      "manifestMirrorLabel": "参照データミラーサイト",
+      "save": "保存",
+      "saved": "保存しました",
+      "imageSourceLabel": "画像の出典",
+      "imageSourceNotice": "エンティティ画像は gongeo.us からオンデマンドのホットリンクで表示されます。出典リンクは下にあります。",
+      "trademarkNotice": "「無限暖暖」のゲーム素材・名称・商標は Infold および各権利者に帰属します。",
+      "usageNotice": "これらのサードパーティ製ゲーム画像は本アプリ内でのオンデマンド表示にのみ使用し、AI 学習およびいかなる商業目的にも使用しません。この制限は MIT ライセンスで公開されている本プロジェクト自身のソースコードには適用されません。",
+      "remoteImagesEnabledLabel": "外部参照画像を有効にする",
+      "remoteImagesEnabledHint": "オフにすると外部参照画像（サムネイル・地図タイル）は一切読み込まれません。いつでも再有効化できます。",
+      "autoUpdateLabel": "起動時に参照データの更新を確認",
+      "autoUpdateHint": "オフにすると手動更新時のみ確認します。",
+      "refreshLabel": "更新を確認",
+      "refreshSuccess": "参考データを更新しました",
+      "refreshFailed": "参考データの更新に失敗しました。後で再試行してください"
+    },
     "sections": {
+      "referenceData": "外部参照データ",
       "aboutContact": "連絡先",
       "aboutInfo": "アプリ情報",
       "aboutLicense": "謝辞とオープンソースライセンス",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "通常撮影",
+      "1": "一瞬を切り取る",
+      "2": "ペア撮影",
+      "3": "スクリーンショット"
+    },
+    "windIntensity": {
+      "0": "無風",
+      "1": "弱い風",
+      "2": "中程度の風",
+      "3": "強い風",
+      "4": "非常に強い風",
+      "neg1": "不明"
+    },
+    "windDirection": {
+      "0": "東",
+      "1": "南",
+      "2": "西",
+      "3": "北",
+      "4": "南東",
+      "5": "南西",
+      "6": "北東",
+      "7": "北西",
+      "8": "なし",
+      "neg1": "不明"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "ニキのポーズ",
+    "playingPercent": "ポーズの進行状況",
+    "momoPose": "モモのポーズ",
+    "momoPoseTime": "モモのポーズの進行状況",
+    "momoAdjust": "モモの位置調整（左／前／高さ）",
+    "momoRotate": "モモを回転",
+    "autoGroundSnap": "自動接地",
+    "floatingEffect": "浮遊エフェクト",
+    "poseWithNikki": "ニキと一緒にポーズ",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference は auto または high-performance である必要があります",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl は公開 http(s) URL である必要があります（空欄の場合は公式サイトを使用）",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl は公開 http(s) URL である必要があります（空欄の場合は元のアドレスを使用）",
+        "referenceDataSwitchNotBoolean": "外部参照データのスイッチは真偽値である必要があります"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "撮影場所",
+    "clickToView": "クリックして地図で表示",
+    "loading": "地図を読み込み中",
+    "outdatedVersion": "バージョン 2.9 以前の画像は撮影場所を表示できません",
+    "lackData": "データがありません",
+    "notReady": "参照データがまだ準備できていません",
+    "noTiles": "地図データがありません",
+    "lackWorldMap": "この場所では地図を表示できません",
+    "outsideBounds": "撮影地点が地図の範囲外です"
   }
 }

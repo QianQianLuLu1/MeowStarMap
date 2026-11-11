@@ -12,6 +12,9 @@ import { pathOf } from '../utils/path-dialect'
 // 阶段 4：media:// 第 4 条规则的事实来源（NikkiSync 资源路径精确授权表）
 // 阶段 5：该规则的判定点从协议 handler 下沉到 isMediaPathAllowed，展示与读取共用一套口径
 import { isNikkiSyncResourcePath } from '../nikkisync/resource-allowlist'
+// 阶段 5：media:// 第 5 条规则的目录事实来源（参考数据 CDN 图片缓存）。
+// 取写缓存那一侧的同一个函数，避免「写入目录」与「放行目录」两份字面量漂移。
+import { getReferenceImageCacheDir } from '../services/reference-image-service'
 // 图片水印授权（isMediaPathAllowed 规则 0）：判定「用户是否在系统对话框里显式选中过该文件」。
 // validator 只依赖 utils/shared/electron，不反向引本文件，无循环导入。
 import { pathGuard } from '../ipc/validator'
@@ -116,8 +119,9 @@ export function registerMediaProtocol(ctx: AppContext): void {
       }
 
       // 路径白名单校验：允许用户显式选中的媒体文件（规则 0）、已知缩略图、DB 已索引的
-      // file_path/thumbnail、已索引 source_path 下的媒体扩展名文件，以及 NikkiSync 资源
-      // 授权表里的确切路径（规则 0/4 自下沉起与读通道共用一套口径，见 isMediaPathAllowed）。
+      // file_path/thumbnail、已索引 source_path 下的媒体扩展名文件、NikkiSync 资源
+      // 授权表里的确切路径（规则 4），以及参考数据 CDN 图片缓存目录（规则 5）
+      // （规则 0/4/5 自下沉起与读通道共用一套口径，见 isMediaPathAllowed）。
       if (!isMediaPathAllowed(ctx, realPath)) {
         logger.warn(t('main.mediaProtocol.log.denyNotWhitelisted'), filePath)
         return new Response('Forbidden', { status: 403 })
@@ -265,6 +269,19 @@ function parseRangeHeader(
 }
 
 /**
+ * 参考图片缓存目录的安全取值：任何异常（electron 未就绪、userData 不可得）都降级为
+ * null = 「规则 5 不适用」。刻意不让异常冒到 isMediaPathAllowed 的外层 catch——
+ * 那会把整张白名单判成 false，一条可选规则的故障不该连带拒绝缩略图与已索引照片。
+ */
+function safeReferenceImageCacheDir(): string | null {
+  try {
+    return getReferenceImageCacheDir()
+  } catch {
+    return null
+  }
+}
+
+/**
  * 检查请求路径是否在媒体白名单内（`media://` 展示与 IPC 读通道共用的唯一口径）。
  * 安全策略：
  *   0. 用户在系统对话框中显式选中的媒体文件（判在取 DB 之前、不入缓存；见下方规则 0 注释）
@@ -272,9 +289,10 @@ function parseRangeHeader(
  *   2. 数据库中已索引的媒体文件（file_path 精确匹配）或其缩略图路径（thumbnail 精确匹配）
  *   3. 已索引 source_path 目录下的媒体文件（扩展名必须在白名单内，防止读取任意文件）
  *   4. NikkiSync 资源授权表里的**确切**路径（同样过扩展名白名单）
+ *   5. 参考数据 CDN 图片缓存目录下的媒体文件（受控目录，同规则 1；判在取 DB 之前，同规则 4）
  * 注：媒体扩展名白名单已抽到 utils/media-constants.ts 的 MEDIA_EXTENSIONS 常量
- * 注：规则 1-3 走 mediaPathCache（TTL 5 分钟，含否定结果）；规则 0 与 4 刻意绕过缓存，
- *     理由分别是「先判否后登记的时序」与「授权表整表替换的语义」。
+ * 注：规则 1-3 走 mediaPathCache（TTL 5 分钟，含否定结果）；规则 0、4、5 刻意绕过缓存，
+ *     理由分别是「先判否后登记的时序」「授权表整表替换的语义」与「目录独立于业务库」。
  * 已修复 A-S2/C-F5：原实现 source_path 前缀匹配无扩展名限制，扫描 D:\ 后可读取整盘任意文件
  * 已修复 A-S1/C-S2：原实现每次请求都执行数据库查询，现使用内存缓存（TTL 5分钟）
  *
@@ -296,6 +314,24 @@ export function isMediaPathAllowed(ctx: HandlerContext, filePath: string): boole
     if (
       MEDIA_EXTENSIONS.has(path.extname(normalizedRequest).toLowerCase()) &&
       isNikkiSyncResourcePath(normalizedRequest)
+    ) {
+      return true
+    }
+
+    // 5. 参考数据 CDN 图片缓存目录（阶段 5）：`cdn.nikkialbums.com` 的图片由主进程
+    //    reference-image-service 取图并落盘（授权与缓存条款见该服务头注释），渲染层只引用
+    //    media://，永不直连该主机。目录事实来源就是写缓存那一侧的 getReferenceImageCacheDir()，
+    //    两侧共用一个函数，路径口径不会漂移。
+    //    与规则 4 同理判在取 DB **之前**：该目录由参考数据服务独立管理，本 App DB 未就绪
+    //    不该让已缓存的参考图片裂图。同样**不写 mediaPathCache**——纯前缀判定零 IO，
+    //    不需要缓存提速，也避免否定结果被 5 分钟 TTL 压住。
+    //    取目录失败（electron 未就绪 / userData 不可得）按「本规则不适用」降级为 null，
+    //    绝不让它把其余规则的判定一起拖成拒绝。
+    const refImageDir = safeReferenceImageCacheDir()
+    if (
+      refImageDir !== null &&
+      MEDIA_EXTENSIONS.has(path.extname(normalizedRequest).toLowerCase()) &&
+      isPathUnderDir(normalizedRequest, refImageDir)
     ) {
       return true
     }

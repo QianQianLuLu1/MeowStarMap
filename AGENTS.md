@@ -66,10 +66,10 @@ Electron 三层分层（注意：**preload 位于 `src/main/` 下，没有独立
 ### `src/main/`（主进程）
 
 - `app/` — 应用引导、生命周期编排（详见其 AGENTS.md）
-- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、resonance 等 47 个域文件，其中 4 个为 `_` 前缀辅助与 `set-dir-handler` 工厂、43 个 `registerXxxHandlers`）；`handlers/` 详见其 AGENTS.md
+- `ipc/` — IPC 基础设施与 `handlers/`（app、backup、cache、category、data、dialog、duplicate、reference-data、resonance 等 48 个域文件，其中 4 个为 `_` 前缀辅助与 `set-dir-handler` 工厂、44 个 `registerXxxHandlers`）；`handlers/` 详见其 AGENTS.md
 - `preload/` — preload 桥命名空间模块（入口在 `src/main/preload.ts`），详见其 AGENTS.md
 - `database/` — better-sqlite3 连接与仓储（media、resonance、import-root 等）
-- `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享等业务服务（详见其 AGENTS.md）
+- `services/` — 备份、崩溃、解密、缩略图/pHash、视频、水印、XMP、分享、外部参考数据（`reference-data-service.ts` + `reference-data/`：上游热更数据管道；`reference-image-service.ts`：CDN 图片按需取图与 7 天磁盘缓存）等业务服务（详见其 AGENTS.md）
 - `scanner/`、`thumbnail/`、`scheduler/` — 照片扫描与缩略图流水线；`scanner/`、`thumbnail/` 详见其 AGENTS.md
 - `media-worker/`、`decryption-worker/` — 后台 worker；`media-worker/` 详见其 AGENTS.md；解密依赖 koffi + `nuan5_decryption.dll`
 - `sync/`、`nikkisync/` — 同步能力的两面：`sync/` 为 NikkiSync 协议的**移植面**服务层（auth/pairing/identity），`nikkisync/` 为直接复用 NikkiSync 包的**外部包装载缝**（两者分工见各自 AGENTS.md）

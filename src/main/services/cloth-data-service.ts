@@ -1,4 +1,4 @@
-// @core-change: 新增服饰数据查询服务（阶段 2）
+// @core-change: 出站 URL 守卫泛化至 utils/remote-url-guard（供参考数据服务复用），本服务改为复用
 
 /**
  * 服饰数据服务（搭配码面板阶段 2）：服饰 ID → 用户可读信息（名称/图标 URL/标签）。
@@ -20,6 +20,7 @@
  */
 
 import { logger } from '../utils/logger'
+import { assertSafeRemoteUrl as assertSafeOutboundUrl } from '../utils/remote-url-guard'
 import type { ClothDataInfo } from '../../shared/types/electron-api'
 import { DEFAULT_CLOTH_DATA_CONFIG } from './cloth-data-config'
 import type { ClothDataConfig } from './cloth-data-config'
@@ -251,50 +252,15 @@ class ClothDataProtocolError extends Error {
 }
 
 /**
- * 出站 URL 安全守卫（Mimosa 约束）：仅允许 http/https；host 精确白名单；
- * 显式拒绝 localhost、环回、私有与保留地址（白名单之外再兜底，防配置误填）。
+ * 出站 URL 安全守卫：协议与危险地址段兜底走泛化守卫（utils/remote-url-guard.ts，
+ * 供参考数据服务等复用），本服务在此之上追加 host 精确白名单收窄。
  */
 function assertSafeRemoteUrl(url: string): void {
-  let parsed: URL
-  try {
-    parsed = new URL(url)
-  } catch {
-    throw new ClothDataGuardError(`URL 解析失败`)
-  }
-  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-    throw new ClothDataGuardError(`协议不在 http/https 白名单内：${parsed.protocol}`)
-  }
-  const host = parsed.hostname.toLowerCase().replace(/\.$/, '')
-  if (isForbiddenHost(host)) {
-    throw new ClothDataGuardError(`host 属于 localhost/环回/私网/保留地址：${host}`)
-  }
+  assertSafeOutboundUrl(url)
+  const host = new URL(url).hostname.toLowerCase().replace(/\.$/, '')
   if (!config.allowedHosts.includes(host)) {
     throw new ClothDataGuardError(`host 不在白名单内：${host}`)
   }
-}
-
-/** 环回/私网/保留地址判定（IPv4 字面量 + 常见 IPv6 形态；白名单场景下的兜底防线） */
-function isForbiddenHost(host: string): boolean {
-  const h = host.replace(/^\[/, '').replace(/\]$/, '')
-  if (h === 'localhost' || h.endsWith('.localhost')) return true
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) {
-    // 0/8、10/8、127/8、169.254/16、172.16/12、192.168/16、240/4（含广播段）
-    return /^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|2(?:4[0-9]|5[0-5])\.)/.test(
-      h
-    )
-  }
-  if (h === '::' || h === '::1') return true
-  if (h.startsWith('::ffff:')) {
-    const v4 = h.slice('::ffff:'.length)
-    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(v4)) {
-      return /^(0\.|10\.|127\.|169\.254\.|192\.168\.|172\.(?:1[6-9]|2\d|3[01])\.|2(?:4[0-9]|5[0-5])\.)/.test(
-        v4
-      )
-    }
-  }
-  if (/^f[cd]/.test(h)) return true // fc00::/7 唯一本地地址
-  if (/^fe[89ab]/.test(h)) return true // fe80::/10 链路本地地址
-  return false
 }
 
 // ============================================================

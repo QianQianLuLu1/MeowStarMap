@@ -14,6 +14,12 @@
 // （LRU +5000 / 崩溃清理 +6000 / 自动更新 +8000 的梯度随之整体后移）
 export const STARTUP_SCAN_DELAY_MS = 5000
 
+/**
+ * 外部参考数据启动检查延迟（毫秒）：总计划阶段 1 要求 ≥10s 且不阻塞 8 阶段启动。
+ * 在自动更新（+8000）之后排队，经 taskScheduler 低优先级队列执行、失败冷却兜底。
+ */
+export const REFERENCE_DATA_CHECK_DELAY_MS = STARTUP_SCAN_DELAY_MS + 8000
+
 /** 缩略图批量生成并发数（控制 sharp/ffmpeg 并发，避免 OOM） */
 export const THUMBNAIL_CONCURRENCY = 4
 

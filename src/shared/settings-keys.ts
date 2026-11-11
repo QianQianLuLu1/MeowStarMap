@@ -46,7 +46,25 @@ export const RENDERER_PREF_KEYS = [
   // 软件启动时是否自动启用 LAN 同步服务（默认关，消费点 nikkisync-runtime-setup.ts resolveSyncEnabled）
   'nikkisync.autoStartSyncServer',
   // 开机自启动（默认开，消费点 login-item.ts / settings-handler.ts / lifecycle.ts）
-  'launchAtLogin'
+  'launchAtLogin',
+  // 外部参考数据镜像站点（总计划阶段 1；空串 = 上游官方站点 nikki.ranaxro.com）。
+  // 消费点 reference-data-handler.ts 的 refdata:refresh 读出后转发 reference-data-service；
+  // settings:set 内联校验（http/https + 拒绝环回/私网/保留地址）
+  'referenceData.manifestBaseUrl',
+  // 参考图片加速/镜像入口（阶段 5；空串 = 未配置，走原始地址）。
+  // 与上面的 manifest 镜像键**语义不同、不可复用**：本键只替换已授权图片资源
+  // （cdn.nikkialbums.com）的取图 host，path/query 原样保留。
+  // 消费点 reference-data-handler.ts 的 refdata:resolve-image 读出后转发 reference-image-service，
+  // 最终由 services/reference-data/image-url.ts 套用并过 SSRF 守卫。
+  // 应用不内置、不代建加速节点——本键是用户自配入口的唯一落点。
+  'referenceData.imageMirrorBaseUrl',
+  // 外部图片总开关（布尔，默认开启以保持既有行为；关闭后两条链路零网络）。
+  // 消费点：src/renderer/utils/resonance/remote-images-enabled.ts（渲染层 flag，
+  // 启动时由 main.tsx 读本键同步）+ reference-data-handler.ts（主进程短路）。
+  // gongeo #218 授权条件「保持可回滚」的运行时落点。
+  'referenceData.remoteImagesEnabled',
+  // 参考数据开机自动检查开关（布尔，默认开启；消费点 lifecycle.ts）。
+  'referenceData.autoUpdate'
 ] as const
 
 export type RendererPrefKey = (typeof RENDERER_PREF_KEYS)[number]

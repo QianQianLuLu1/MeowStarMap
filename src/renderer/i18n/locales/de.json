@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "Kameramodus",
+        "typeValue": "Typ {{type}}"
+      },
+      "windIntensity": {
+        "label": "Windstärke",
+        "typeValue": "Typ {{type}}"
+      },
+      "windDirection": {
+        "label": "Windrichtung",
+        "typeValue": "Typ {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "Online-Informationen",
+      "anotherPose": "Pose des anderen Spielers",
+      "poseTime": "Fortschritt",
+      "copyHeader": "=== Mehrspieler-Info ==="
     }
   },
   "dialog": {
@@ -1302,6 +1320,8 @@
       "licenseGpl": "• GPL-3.0: Code, der diese verwendet oder ändert, muss ebenfalls Open-Source sein",
       "licenseMit": "• MIT: Freie Nutzung, Änderung, Verbreitung; Urheberrechtshinweis muss erhalten bleiben",
       "licenseNote": "Lizenzhinweise",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "Der MIT-Copyright-Hinweis und der vollständige Lizenztext des Upstream-Projekts nikki_albums sind unverändert in der mitgelieferten Datei THIRD_PARTY_NOTICES enthalten.",
       "licenseTitle": "Danksagung & Lizenz",
       "open": "Öffnen",
       "projectIntro": "Diese Software basiert auf den oben genannten Open-Source-Projekten. Danke an alle Open-Source-Community-Mitwirkenden. Die Software selbst ist unter der MIT-Lizenz Open-Source; freie Nutzung, Änderung und Verbreitung willkommen.",
@@ -1327,7 +1347,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "Aufnahmeparameter-Analyse und Pose-Vorschaubilder: Die Hot-Update-Referenzdaten-Pipeline (nuan5_database) und CDN-Bildressourcen werden aus dem Open-Source-Projekt nikki_albums (https://github.com/RanAxro/nikki_albums) (Autor: RanAxro, MIT-Lizenz) wiederverwendet, mit Genehmigung des Autors (nikki_albums#20). Bilder werden bei Bedarf geladen und etwa 7 Tage lokal zwischengespeichert; Anfragen tragen eine versionierte Quellenkennung; keine Weiterverbreitung. Auch der Entschlüsselungsansatz und die Datenstrukturen stammen aus diesem Projekt. Mit Dank.",
+        "leaflet": "Tile-Map-Rendering-Bibliothek für die Weltkarte (https://leafletjs.com), BSD-2-Clause-Lizenz. Copyright (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade, erhalten über den @preserve-Header im Quellcode und diesen Hinweis. Danke.",
+        "protobufjs": "Nuan5Config-Protobuf-Dekodierung für die Referenzdaten v1.db (https://github.com/protobufjs/protobuf.js), Apache-2.0-Lizenz, Copyright (c) 2016 Daniel Wirtz. Danke."
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "Neustart als Administrator läuft…",
       "elevateFailed": "Neustart mit erhöhten Rechten fehlgeschlagen: {{reason}}"
     },
+    "referenceData": {
+      "description": "Die Vorschaubilder für Beleuchtung, Filter und Posen stammen aus externen Referenzdaten (Upstream nikki_albums, MIT-Lizenz). Bilder werden bei Bedarf geladen und etwa 7 Tage lokal zwischengespeichert. Die beiden folgenden Felder dienen dazu, eigene Beschleunigungs-/Mirror-Adressen einzutragen — die App enthält und betreibt keine Beschleunigungsknoten.",
+      "imageMirrorHint": "Leer lassen, um die Originaladresse zu verwenden. Ersetzt nur den Zugriffspunkt autorisierter Bildressourcen; der Autorisierungsumfang bleibt unverändert.",
+      "imageMirrorLabel": "Bild-Beschleuniger",
+      "manifestMirrorHint": "Leer lassen, um die offizielle Upstream-Seite zu verwenden.",
+      "manifestMirrorLabel": "Referenzdaten-Mirror",
+      "save": "Speichern",
+      "saved": "Gespeichert",
+      "imageSourceLabel": "Bildquelle",
+      "imageSourceNotice": "Entitätsbilder stammen von gongeo.us und werden bei Bedarf per Hot-Link angezeigt; der Quellenlink steht unten.",
+      "trademarkNotice": "Alle Spiel-Assets, Namen und Marken von Infinity Nikki gehören Infold und den jeweiligen Rechteinhabern.",
+      "usageNotice": "Diese fremden Spielbild-Assets werden nur bei Bedarf innerhalb dieser App angezeigt und weder für KI-Training noch für kommerzielle Zwecke verwendet. Diese Einschränkung gilt nicht für den eigenen Quellcode des Projekts, der unter der MIT-Lizenz veröffentlicht ist.",
+      "remoteImagesEnabledLabel": "Externe Referenzbilder aktivieren",
+      "remoteImagesEnabledHint": "Wenn aus, werden keine externen Referenzbilder (Thumbnails oder Kartentiles) geladen. Jederzeit wieder aktivierbar.",
+      "autoUpdateLabel": "Referenzdaten-Updates beim Start prüfen",
+      "autoUpdateHint": "Wenn aus, wird nur bei manueller Aktualisierung geprüft.",
+      "refreshLabel": "Nach Updates suchen",
+      "refreshSuccess": "Referenzdaten aktualisiert",
+      "refreshFailed": "Referenzdaten-Update fehlgeschlagen. Bitte später erneut versuchen"
+    },
     "sections": {
+      "referenceData": "Externe Referenzdaten",
       "aboutContact": "Kontakt",
       "aboutInfo": "App-Informationen",
       "aboutLicense": "Danksagung & Open-Source-Lizenz",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "Normale Aufnahme",
+      "1": "Momentaufnahme",
+      "2": "Zwei-Personen-Aufnahme",
+      "3": "Screenshot"
+    },
+    "windIntensity": {
+      "0": "Windstill",
+      "1": "Leichter Wind",
+      "2": "Mäßiger Wind",
+      "3": "Starker Wind",
+      "4": "Sehr starker Wind",
+      "neg1": "Unbekannt"
+    },
+    "windDirection": {
+      "0": "Ost",
+      "1": "Süd",
+      "2": "West",
+      "3": "Nord",
+      "4": "Südost",
+      "5": "Südwest",
+      "6": "Nordost",
+      "7": "Nordwest",
+      "8": "Keine",
+      "neg1": "Unbekannt"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "Nikkis Pose",
+    "playingPercent": "Pose-Fortschritt",
+    "momoPose": "Momos Pose",
+    "momoPoseTime": "Fortschritt von Momos Pose",
+    "momoAdjust": "Momo-Position anpassen (Links/Vorne/Höhe)",
+    "momoRotate": "Momo drehen",
+    "autoGroundSnap": "Automatische Bodenausrichtung",
+    "floatingEffect": "Schwebeeffekt",
+    "poseWithNikki": "Pose mit Nikki",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference muss auto oder high-performance sein",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl muss eine öffentliche http(s)-URL sein (leer lassen für die offizielle Site)",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl muss eine öffentliche http(s)-URL sein (leer lassen für die ursprüngliche Adresse)",
+        "referenceDataSwitchNotBoolean": "Schalter für externe Referenzdaten müssen boolesche Werte sein"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "Aufnahmeort",
+    "clickToView": "Klicken, um auf der Karte zu lokalisieren",
+    "loading": "Karte wird geladen",
+    "outdatedVersion": "Fotos aus Version 2.9 und früher unterstützen die Anzeige des Aufnahmeorts nicht",
+    "lackData": "Daten fehlen",
+    "notReady": "Referenzdaten sind noch nicht bereit",
+    "noTiles": "Keine Kartendaten vorhanden",
+    "lackWorldMap": "Für diesen Ort ist keine Karte verfügbar",
+    "outsideBounds": "Aufnahmeort liegt außerhalb des Kartenbereichs"
   }
 }

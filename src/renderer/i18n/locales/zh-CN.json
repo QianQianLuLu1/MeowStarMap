@@ -443,6 +443,18 @@
       "weather": {
         "label": "天气",
         "typeValue": "类型 {{type}}"
+      },
+      "photoMode": {
+        "label": "相机模式",
+        "typeValue": "类型 {{type}}"
+      },
+      "windIntensity": {
+        "label": "风力",
+        "typeValue": "类型 {{type}}"
+      },
+      "windDirection": {
+        "label": "风向",
+        "typeValue": "类型 {{type}}"
       }
     },
     "video": {
@@ -455,6 +467,12 @@
       "ariaLabel": "查看大图，滚轮缩放，双击重置",
       "resetButton": "复位",
       "resetZoom": "重置缩放"
+    },
+    "multiPlayer": {
+      "title": "联机信息",
+      "anotherPose": "另一位玩家的动作",
+      "poseTime": "进度",
+      "copyHeader": "=== 联机信息 ==="
     }
   },
   "errorFallback": {
@@ -963,6 +981,32 @@
       "4": "雨",
       "7": "雪",
       "neg1": "未设置"
+    },
+    "photoMode": {
+      "0": "普通拍照",
+      "1": "定格瞬间",
+      "2": "双人合拍",
+      "3": "游戏截图"
+    },
+    "windIntensity": {
+      "0": "无风",
+      "1": "小风",
+      "2": "中风",
+      "3": "大风",
+      "4": "特大风",
+      "neg1": "未知"
+    },
+    "windDirection": {
+      "0": "东",
+      "1": "南",
+      "2": "西",
+      "3": "北",
+      "4": "东南",
+      "5": "西南",
+      "6": "东北",
+      "7": "西北",
+      "8": "无",
+      "neg1": "未知"
     }
   },
   "filter": {
@@ -1711,6 +1755,9 @@
         "ffprobeStatic": "FFprobe 二进制（视频元数据）",
         "fluentFfmpeg": "FFmpeg Node.js 封装",
         "gongeouNikkiTracker": "「共鸣录」板块中的共鸣记录、我的衣橱、导入数据与个人统计等本地功能，部分实现参考并复用了开源项目 gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）（作者：dastrokes，MIT License）中可离线运行的源码，已获原作者授权。特此致谢。",
+        "nikkiAlbums": "拍摄参数解析与动作缩略图：热更新参考数据管道（nuan5_database）与 CDN 图片资源复用自开源项目 nikki_albums（https://github.com/RanAxro/nikki_albums）（作者：RanAxro，MIT License），已获原作者授权（nikki_albums#20）。图片按需加载并在本机缓存约 7 天，请求携带版本化来源标识，不做二次分发。解密思路与数据结构亦源自该项目。特此致谢。",
+        "leaflet": "世界地图定位的瓦片地图渲染库（https://leafletjs.com），BSD-2-Clause 许可。版权声明 (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade，随源码 @preserve 头注与本声明保留。特此致谢。",
+        "protobufjs": "参考数据 v1.db 的 Nuan5Config protobuf 解码库（https://github.com/protobufjs/protobuf.js），Apache-2.0 许可，Copyright (c) 2016 Daniel Wirtz。特此致谢。",
         "motion": "React 动画库（弹簧物理、退出动画、布局动画）",
         "react": "UI 渲染库",
         "reactDom": "React DOM 渲染器",
@@ -1729,6 +1776,8 @@
       "licenseGpl": "• GPL-3.0：使用或修改后的代码必须同样开源",
       "licenseMit": "• MIT：允许自由使用、修改、分发，需保留版权声明",
       "licenseNote": "许可证说明",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "上游 nikki_albums 的 MIT 版权声明与许可全文随分发物保留于 THIRD_PARTY_NOTICES 文件。",
       "licenseTitle": "致谢与开源协议",
       "open": "打开",
       "projectIntro": "本软件基于上述开源项目构建，感谢所有开源社区的贡献者。软件本身遵循 MIT 协议开源，欢迎自由使用、修改和分发。",
@@ -2088,7 +2137,28 @@
       "elevating": "正在以管理员身份重启…",
       "elevateFailed": "提权重启失败：{{reason}}"
     },
+    "referenceData": {
+      "description": "照片的灯光、滤镜与动作缩略图来自外部参考数据（上游 nikki_albums，MIT 许可）。图片按需加载并在本机缓存约 7 天；下方两个入口仅供你自行填写加速/镜像地址，应用不内置、不代建任何加速节点。",
+      "imageMirrorHint": "留空则走原始地址。仅替换已授权图片资源的访问入口，不改变授权范围。",
+      "imageMirrorLabel": "图片加速入口",
+      "manifestMirrorHint": "留空则使用上游官方站点。",
+      "manifestMirrorLabel": "参考数据镜像站点",
+      "save": "保存",
+      "saved": "已保存",
+      "imageSourceLabel": "图片来源",
+      "imageSourceNotice": "实体图片来自 gongeo.us，按需热链展示；下方为来源回链。",
+      "trademarkNotice": "「无限暖暖」游戏资产、名称与商标归 Infold 等相应权利方所有。",
+      "usageNotice": "上述第三方游戏图片资产仅在本应用内按需展示，不用于 AI 训练或任何商业用途；该限制不适用于本项目自身以 MIT 许可发布的源代码。",
+      "remoteImagesEnabledLabel": "启用外部参考图片",
+      "remoteImagesEnabledHint": "关闭后不再加载任何外部参考图片（含缩略图与地图瓦片），可随时恢复。",
+      "autoUpdateLabel": "启动时自动检查参考数据更新",
+      "autoUpdateHint": "关闭后仅在手动刷新时检查更新。",
+      "refreshLabel": "检查更新",
+      "refreshSuccess": "参考数据已更新",
+      "refreshFailed": "参考数据更新失败，可稍后重试"
+    },
     "sections": {
+      "referenceData": "外部参考数据",
       "aboutContact": "联系方式",
       "aboutInfo": "应用信息",
       "aboutLicense": "致谢与开源协议",
@@ -2649,6 +2719,15 @@
     "light": "灯光",
     "loading": "正在解析相机参数...",
     "momoHidden": "隐藏大喵",
+    "nikkiPoseAction": "暖暖动作",
+    "playingPercent": "动作进度",
+    "momoPose": "大喵动作",
+    "momoPoseTime": "大喵动作进度",
+    "momoAdjust": "大喵位置调整（左/前/高）",
+    "momoRotate": "旋转大喵",
+    "autoGroundSnap": "自动贴地",
+    "floatingEffect": "漂浮特效",
+    "poseWithNikki": "暖暖合拍",
     "notHidden": "未隐藏",
     "optic": "光学与光效",
     "pose": "动作场景",
@@ -3493,6 +3572,9 @@
         "hwAccelNotBoolean": "hardwareAcceleration 必须是布尔值",
         "gpuPreferenceInvalid": "gpu.discretePreference 必须是 auto 或 high-performance",
         "launchAtLoginNotBoolean": "launchAtLogin 必须是布尔值",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl 必须是公网 http(s) 地址（留空使用官方站点）",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl 必须是公网 http(s) 地址（留空走原始地址）",
+        "referenceDataSwitchNotBoolean": "外部参考数据开关必须是布尔值",
         "securitySensitiveKey": "key \"{{key}}\" 为安全敏感项，请改用通道：{{channel}}",
         "unknownKey": "未知的设置项 key：{{key}}"
       },
@@ -4680,5 +4762,16 @@
       "labelFilter": "滤镜",
       "labelLocation": "地点"
     }
+  },
+  "locationMap": {
+    "title": "拍摄地点",
+    "clickToView": "点击定位到地图",
+    "loading": "地图加载中",
+    "outdatedVersion": "2.9版本及之前的图片暂不支持查看拍摄地点",
+    "lackData": "数据缺失",
+    "notReady": "参考数据尚未就绪",
+    "noTiles": "暂无地图数据",
+    "lackWorldMap": "该地点暂不支持查看地图",
+    "outsideBounds": "拍摄点超出地图范围"
   }
 }

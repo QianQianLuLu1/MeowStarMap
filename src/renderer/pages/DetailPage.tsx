@@ -28,7 +28,9 @@ import { PhotographyPanel } from '../components/common/PhotographyPanel'
 import { NikkiInfoPanel } from '../components/common/NikkiInfoPanel'
 import { OutfitPanel } from '../components/common/OutfitPanel'
 import { InteractionPanel } from '../components/common/InteractionPanel'
+import { MultiPlayerPanel } from '../components/common/MultiPlayerPanel'
 import { Button } from '../components/common/Button'
+import { LocationMapSection } from '../components/common/map/LocationMapSection'
 import { ShareCardDialog } from '../components/sync/ShareCardDialog'
 
 export const DetailPage: React.FC = () => {
@@ -812,10 +814,13 @@ export const DetailPage: React.FC = () => {
         {/* 游戏图片信息面板 */}
         <div className="space-y-3 text-sm pt-4" style={{ borderTop: '1px solid var(--divider)' }}>
           <PhotographyPanel file={media} />
+          {/* 阶段 4：拍摄地点地图（内嵌视图 + 可单独打开的弹窗） */}
+          <LocationMapSection file={media} />
           <CameraInfoPanel file={media} />
           <NikkiInfoPanel file={media} />
           <OutfitPanel file={media} />
           <InteractionPanel file={media} />
+          <MultiPlayerPanel file={media} />
           {/* 阶段 5：本地图库同样能出分享图（同一套 share-card 移植件，数据源是本地解密链） */}
           <div className="pt-2">
             <Button variant="secondary" size="sm" onClick={() => setShareOpen(true)}>

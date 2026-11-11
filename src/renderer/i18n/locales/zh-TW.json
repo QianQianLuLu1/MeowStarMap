@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "相機模式",
+        "typeValue": "類型 {{type}}"
+      },
+      "windIntensity": {
+        "label": "風力",
+        "typeValue": "類型 {{type}}"
+      },
+      "windDirection": {
+        "label": "風向",
+        "typeValue": "類型 {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "聯機資訊",
+      "anotherPose": "另一位玩家的動作",
+      "poseTime": "進度",
+      "copyHeader": "=== 聯機資訊 ==="
     }
   },
   "dialog": {
@@ -1298,6 +1316,8 @@
       "licenseGpl": "• GPL-3.0：使用或修改後的程式碼必須同樣開源",
       "licenseMit": "• MIT：允許自由使用、修改、分發，需保留版權聲明",
       "licenseNote": "授權說明",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "上游 nikki_albums 的 MIT 版權聲明與授權全文隨散佈物保留於 THIRD_PARTY_NOTICES 檔案。",
       "licenseTitle": "致謝與開源授權",
       "open": "開啟",
       "projectIntro": "本軟體基於上述開源專案構建，感謝所有開源社群的貢獻者。軟體本身遵循 MIT 授權開源，歡迎自由使用、修改和分發。",
@@ -1323,7 +1343,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "拍攝參數解析與動作縮圖：熱更新參考資料管線（nuan5_database）與 CDN 圖片資源复用自開源專案 nikki_albums（https://github.com/RanAxro/nikki_albums）（作者：RanAxro，MIT License），已獲原作者授權（nikki_albums#20）。圖片按需載入並在本機快取約 7 天，請求攜帶版本化來源標識，不做二次分發。解密思路與資料結構亦源自該專案。特此致謝。",
+        "leaflet": "世界地圖定位的瓦片地圖渲染庫（https://leafletjs.com），BSD-2-Clause 許可。版權聲明 (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade，隨原始碼 @preserve 頭注與本聲明保留。特此致謝。",
+        "protobufjs": "參考資料 v1.db 的 Nuan5Config protobuf 解碼庫（https://github.com/protobufjs/protobuf.js），Apache-2.0 許可，Copyright (c) 2016 Daniel Wirtz。特此致謝。"
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "正在以系統管理員身分重新啟動…",
       "elevateFailed": "提權重新啟動失敗：{{reason}}"
     },
+    "referenceData": {
+      "description": "照片的燈光、濾鏡與動作縮圖來自外部參考資料（上游 nikki_albums，MIT 授權）。圖片按需載入並在本機快取約 7 天；下方兩個入口僅供你自行填寫加速／鏡像位址，應用不內建、不代建任何加速節點。",
+      "imageMirrorHint": "留空則走原始位址。僅取代已授權圖片資源的存取入口，不改變授權範圍。",
+      "imageMirrorLabel": "圖片加速入口",
+      "manifestMirrorHint": "留空則使用上游官方站台。",
+      "manifestMirrorLabel": "參考資料鏡像站台",
+      "save": "儲存",
+      "saved": "已儲存",
+      "imageSourceLabel": "圖片來源",
+      "imageSourceNotice": "實體圖片來自 gongeo.us，按需熱鏈展示；下方為來源回鏈。",
+      "trademarkNotice": "「無限暖暖」遊戲資產、名稱與商標歸 Infold 等相應權利方所有。",
+      "usageNotice": "上述第三方遊戲圖片資產僅在本應用程式內按需展示，不用於 AI 訓練或任何商業用途；該限制不適用於本專案自身以 MIT 授權釋出的原始碼。",
+      "remoteImagesEnabledLabel": "啟用外部參考圖片",
+      "remoteImagesEnabledHint": "關閉後不再載入任何外部參考圖片（含縮圖與地圖瓦片），可隨時恢復。",
+      "autoUpdateLabel": "啟動時自動檢查參考資料更新",
+      "autoUpdateHint": "關閉後僅在手動重新整理時檢查更新。",
+      "refreshLabel": "檢查更新",
+      "refreshSuccess": "參考資料已更新",
+      "refreshFailed": "參考資料更新失敗，可稍後重試"
+    },
     "sections": {
+      "referenceData": "外部參考資料",
       "aboutContact": "聯絡方式",
       "aboutInfo": "應用資訊",
       "aboutLicense": "致謝與開源授權",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "普通拍照",
+      "1": "定格瞬間",
+      "2": "雙人合拍",
+      "3": "遊戲截圖"
+    },
+    "windIntensity": {
+      "0": "無風",
+      "1": "小風",
+      "2": "中風",
+      "3": "大風",
+      "4": "特大風",
+      "neg1": "未知"
+    },
+    "windDirection": {
+      "0": "東",
+      "1": "南",
+      "2": "西",
+      "3": "北",
+      "4": "東南",
+      "5": "西南",
+      "6": "東北",
+      "7": "西北",
+      "8": "無",
+      "neg1": "未知"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "暖暖動作",
+    "playingPercent": "動作進度",
+    "momoPose": "大喵動作",
+    "momoPoseTime": "大喵動作進度",
+    "momoAdjust": "大喵位置調整（左/前/高）",
+    "momoRotate": "旋轉大喵",
+    "autoGroundSnap": "自動貼地",
+    "floatingEffect": "漂浮特效",
+    "poseWithNikki": "暖暖合拍",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference 必須是 auto 或 high-performance",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl 必須是公網 http(s) 位址（留空使用官方站點）",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl 必須是公網 http(s) 位址（留空走原始位址）",
+        "referenceDataSwitchNotBoolean": "外部參考資料開關必須是布林值"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "拍攝地點",
+    "clickToView": "點擊定位到地圖",
+    "loading": "地圖載入中",
+    "outdatedVersion": "2.9 版本及之前的圖片暫不支援查看拍攝地點",
+    "lackData": "資料缺失",
+    "notReady": "參考資料尚未就緒",
+    "noTiles": "暫無地圖資料",
+    "lackWorldMap": "該地點暫不支援查看地圖",
+    "outsideBounds": "拍攝點超出地圖範圍"
   }
 }

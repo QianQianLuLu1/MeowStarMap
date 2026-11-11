@@ -188,7 +188,7 @@ describe('preload 装配完整性', () => {
     })
   })
 
-  it('electronAPI 包含全部 34 个键（reportReady + 33 个命名空间，阶段4 增 assetEdits）', () => {
+  it('electronAPI 包含全部 35 个键（reportReady + 34 个命名空间，阶段1 增 referenceData）', () => {
     const electronAPI = getExposed<Record<string, unknown>>('electronAPI')
     expect(Object.keys(electronAPI).sort()).toEqual(
       [
@@ -214,6 +214,7 @@ describe('preload 装配完整性', () => {
         'sync',
         'nikkisync',
         'assetEdits',
+        'referenceData',
         'cache',
         'log',
         'crash',

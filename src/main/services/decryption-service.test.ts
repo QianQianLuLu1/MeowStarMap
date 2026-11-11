@@ -143,6 +143,46 @@ function installBridge(
   return decodeNetwork
 }
 
+/** 全链路驱动：mock koffi（step1 JSON + step3 参数文本）后执行 decodeFileParams */
+async function decodeWithStep3(step3Text: string) {
+  setupAbiVersion()
+  let decodeCallCount = 0
+  const f = path.join(tmpRoot, 'a.jpg')
+  fs.writeFileSync(f, Buffer.alloc(10))
+
+  const step1Json = JSON.stringify({
+    social_photo: { photo_info: {}, time: { day: 1, hour: 10, min: 30, sec: 0 } },
+    CameraParams: 'YmFzZTY0UGFyYW1z'
+  })
+  const step1Bytes = Buffer.from(step1Json, 'utf-8')
+  const step3Bytes = Buffer.from(step3Text, 'utf-8')
+
+  decodeFn.mockImplementation((_ptr: unknown, _type: string, len: number) => {
+    // 按调用次序分发（第 1 次 = Step1 全量 JSON，之后 = Step3 参数文本），
+    // 避免当 step3 文本长度恰好等于 step1 JSON 长度时按长度分发碰撞
+    decodeCallCount += 1
+    if (decodeCallCount === 1) {
+      return Array.from(step1Bytes.subarray(0, Math.min(len, step1Bytes.length)))
+    }
+    return Array.from(step3Bytes)
+  })
+
+  mockFns['media_key_from_str'] = vi.fn().mockReturnValue({ _key: 'uid' })
+  mockFns['media_key_camera_param'] = vi.fn().mockReturnValue({ _key: 'camera' })
+  mockFns['media_decode_file_bytes_unchecked'] = vi.fn().mockReturnValue({
+    status: 0,
+    bytes: { data: {}, len: step1Bytes.length, cap: step1Bytes.length + 16 }
+  })
+  mockFns['media_decrypt'] = vi.fn().mockReturnValue({
+    status: 0,
+    bytes: { data: {}, len: step3Bytes.length, cap: step3Bytes.length + 16 }
+  })
+  mockFns['free_c_bytes'] = vi.fn()
+  mockFns['free_media_key'] = vi.fn()
+
+  return decodeFileParams(f, 'NikkiPhotos', 'default')
+}
+
 // ============================================================
 // decodeFileParams
 // ============================================================
@@ -203,8 +243,11 @@ describe('decodeFileParams', () => {
     const step3Bytes = Buffer.from(step3Arr, 'utf-8')
 
     decodeFn.mockImplementation((_ptr, _type, len) => {
+      // step3 的 len 恒为 84（[0..30]）；step1 一律返回本次完整字节。
+      // 不可用 len 截断 step1：libInstance 被缓存后 bytes.len 可能停留在此前用例的长度，
+      // 跨用例串扰会截掉 JSON 尾部 CameraParams 的闭合引号，产生与被测逻辑无关的假失败。
       if (len === step3Bytes.length) return Array.from(step3Bytes)
-      return Array.from(step1Bytes.subarray(0, Math.min(len, step1Bytes.length)))
+      return Array.from(step1Bytes)
     })
 
     mockFns['media_key_from_str'] = vi.fn().mockReturnValue({ _key: 'uid' })
@@ -381,40 +424,6 @@ describe('decodeFileParams → parseCameraParams 灯光/滤镜 None 判定', () 
     arr[29] = filterId
     arr[30] = filterStrength
     return JSON.stringify(arr)
-  }
-
-  /** 全链路驱动：mock koffi（step1 JSON + step3 参数文本）后执行 decodeFileParams */
-  async function decodeWithStep3(step3Text: string) {
-    setupAbiVersion()
-    const f = path.join(tmpRoot, 'a.jpg')
-    fs.writeFileSync(f, Buffer.alloc(10))
-
-    const step1Json = JSON.stringify({
-      social_photo: { photo_info: {}, time: { day: 1, hour: 10, min: 30, sec: 0 } },
-      CameraParams: 'YmFzZTY0UGFyYW1z'
-    })
-    const step1Bytes = Buffer.from(step1Json, 'utf-8')
-    const step3Bytes = Buffer.from(step3Text, 'utf-8')
-
-    decodeFn.mockImplementation((_ptr: unknown, _type: string, len: number) => {
-      if (len === step3Bytes.length) return Array.from(step3Bytes)
-      return Array.from(step1Bytes.subarray(0, Math.min(len, step1Bytes.length)))
-    })
-
-    mockFns['media_key_from_str'] = vi.fn().mockReturnValue({ _key: 'uid' })
-    mockFns['media_key_camera_param'] = vi.fn().mockReturnValue({ _key: 'camera' })
-    mockFns['media_decode_file_bytes_unchecked'] = vi.fn().mockReturnValue({
-      status: 0,
-      bytes: { data: {}, len: step1Bytes.length, cap: step1Bytes.length + 16 }
-    })
-    mockFns['media_decrypt'] = vi.fn().mockReturnValue({
-      status: 0,
-      bytes: { data: {}, len: step3Bytes.length, cap: step3Bytes.length + 16 }
-    })
-    mockFns['free_c_bytes'] = vi.fn()
-    mockFns['free_media_key'] = vi.fn()
-
-    return decodeFileParams(f, 'NikkiPhotos', 'default')
   }
 
   it('灯光/滤镜 id 为带引号的 "None" 时按"无"处理（light/filter 为 undefined）', async () => {
@@ -1093,5 +1102,478 @@ describe('normalizeClothDiyIdMap（IdMap 预归一化，契约 §3.2 BNF）', ()
 
   it('无 IdMap 语法时原样返回', () => {
     expect(normalizeClothDiyIdMap('{"a":1}')).toBe('{"a":1}')
+  })
+})
+
+// ============================================================
+// 拍摄参数扩展：NormalPhotoInfo / MultiPlayerHandler（阶段 2 T2.3）
+// 上游契约与空值语义冻结于
+// docs/plans/2026-11-08-拍摄参数解析扩展-拍照模式风向联机-实施计划.md §1/§2
+// ============================================================
+
+describe('拍摄参数扩展（NormalPhotoInfo / MultiPlayerHandler）', () => {
+  /** 配置一条完整成功的解密链路：给定 step1 JSON + 标准 31 位 V1 相机参数数组 */
+  async function decodeWithStep1(step1Json: string) {
+    setupAbiVersion()
+    const f = path.join(tmpRoot, 'photo.jpg')
+    fs.writeFileSync(f, Buffer.alloc(10))
+
+    const step3Arr = JSON.stringify(Array.from({ length: 31 }, (_, i) => i))
+    const step1Bytes = Buffer.from(step1Json, 'utf-8')
+    const step3Bytes = Buffer.from(step3Arr, 'utf-8')
+
+    decodeFn.mockImplementation((_ptr, _type, len) => {
+      // step3 的 len 恒为 84（[0..30]）；step1 一律返回本次完整字节。
+      // 不可用 len 截断 step1：libInstance 被缓存后 bytes.len 可能停留在此前用例的长度，
+      // 跨用例串扰会截掉 JSON 尾部 CameraParams 的闭合引号，产生与被测逻辑无关的假失败。
+      if (len === step3Bytes.length) return Array.from(step3Bytes)
+      return Array.from(step1Bytes)
+    })
+
+    mockFns['media_key_from_str'] = vi.fn().mockReturnValue({ _key: 'uid' })
+    mockFns['media_key_camera_param'] = vi.fn().mockReturnValue({ _key: 'camera' })
+    mockFns['media_decode_file_bytes_unchecked'] = vi.fn().mockReturnValue({
+      status: 0,
+      bytes: { data: {}, len: step1Bytes.length, cap: step1Bytes.length + 16 }
+    })
+    mockFns['media_decrypt'] = vi.fn().mockReturnValue({
+      status: 0,
+      bytes: { data: {}, len: step3Bytes.length, cap: step3Bytes.length + 16 }
+    })
+    mockFns['free_c_bytes'] = vi.fn()
+    mockFns['free_media_key'] = vi.fn()
+
+    return decodeFileParams(f, 'NikkiPhotos', 'uid_test')
+  }
+
+  /** 构造顶层含既有字段全量的 step1 JSON（容器键按需以 extra 覆盖） */
+  function buildStep1(extra: Record<string, unknown>): string {
+    return JSON.stringify({
+      social_photo: {
+        photo_info: { nikki_loc_x: 1.5, nikki_loc_y: 2.5, nikki_loc_z: 3.5 },
+        time: { day: 12, hour: 20, min: 34, sec: 5.6 },
+        weather_type: 2
+      },
+      edit_photo_handler: { editState: true, hasSticker: false, hasText: true },
+      photo_wall_plugin: { photo_id: [101, 202] },
+      puzzle_game_plugin: { tag: 30 },
+      risk_photo: { 1: true },
+      interactive_photo: { 2: true },
+      CameraParams: 'YmFzZTY0UGFyYW1z',
+      ...extra
+    })
+  }
+
+  it('正常：NormalPhotoInfo 与 MultiPlayerHandler 全字段解析', async () => {
+    const step1 = buildStep1({
+      NormalPhotoInfo: { PhotoMode: 2, WindIntensity: 3, WindDirection: 6, PlaceableObjIDs: {} },
+      MultiPlayerHandler: {
+        RoleID: 7,
+        PoseID: 12345,
+        PosePlayingPercent: 0.456,
+        LocalPoseID: '',
+        LocalPlayType: 1,
+        OtherPlayType: 2,
+        LocalTransforms: ''
+      }
+    })
+    const r = await decodeWithStep1(step1)
+    expect(r.hasParams).toBe(true)
+    expect(r.photography?.photoMode).toBe(2)
+    expect(r.photography?.windIntensity).toBe(3)
+    expect(r.photography?.windDirection).toBe(6)
+    // 上游 converter 仅保留 roleId/poseId/posePlayingPercent，多余键不进入 DTO
+    expect(r.multiPlayer).toEqual({ roleId: 7, poseId: 12345, posePlayingPercent: 0.456 })
+  })
+
+  it('空值语义：PoseID/PosePlayingPercent 为空串时解析为 null 而非 0', async () => {
+    const step1 = buildStep1({
+      MultiPlayerHandler: { RoleID: 7, PoseID: '', PosePlayingPercent: '' }
+    })
+    const r = await decodeWithStep1(step1)
+    expect(r.multiPlayer).not.toBeNull()
+    expect(r.multiPlayer?.poseId).toBeNull()
+    expect(r.multiPlayer?.posePlayingPercent).toBeNull()
+    expect(r.multiPlayer?.roleId).toBe(7)
+  })
+
+  it('零值语义：WindIntensity=0（无风）/PhotoMode=0（普通拍照）保留为 0 不折叠', async () => {
+    const step1 = buildStep1({
+      NormalPhotoInfo: { PhotoMode: 0, WindIntensity: 0, WindDirection: 8 }
+    })
+    const r = await decodeWithStep1(step1)
+    expect(r.photography?.photoMode).toBe(0)
+    expect(r.photography?.windIntensity).toBe(0)
+    expect(r.photography?.windDirection).toBe(8)
+  })
+
+  it('旧照片降级：顶层无两容器时新字段为 null，既有字段不受影响（回归锁）', async () => {
+    const r = await decodeWithStep1(buildStep1({}))
+    expect(r.photography?.photoMode).toBeNull()
+    expect(r.photography?.windIntensity).toBeNull()
+    expect(r.photography?.windDirection).toBeNull()
+    expect(r.multiPlayer).toBeNull()
+    // 扩展前 photography 无逐字段锁，此处补齐回归锁
+    expect(r.photography?.edit).toEqual({ enabled: true, hasSticker: false, hasText: true })
+    expect(r.photography?.date).toEqual({ day: 12 })
+    expect(r.photography?.time).toEqual({ hour: 20, minute: 34, second: 5.6 })
+    expect(r.photography?.location).toEqual({ pos: { x: 1.5, y: 2.5, z: 3.5 }, name: null })
+    expect(r.photography?.weather).toBe(2)
+    expect(r.photography?.photoWall).toEqual([101, 202])
+    expect(r.photography?.tasks).toEqual([
+      { type: 'puzzle', tag: 30 },
+      { type: 'risk', tag: 0 },
+      { type: 'interactive', tag: 0 }
+    ])
+    // 31 位 V1 相机输出不变（抽验关键位段）
+    expect(r.camera?.focalLength).toBe(14)
+    expect(r.camera?.apertureSection).toBe(15)
+    expect(r.camera?.portraitMode).toBe(true)
+  })
+
+  it('异常：容器为字符串/数组等非法形态时 fail-soft 为 null 且不抛错', async () => {
+    const r = await decodeWithStep1(
+      buildStep1({ NormalPhotoInfo: 'garbage', MultiPlayerHandler: [1, 2, 3] })
+    )
+    expect(r.hasParams).toBe(true)
+    expect(r.photography?.photoMode).toBeNull()
+    expect(r.photography?.windIntensity).toBeNull()
+    expect(r.photography?.windDirection).toBeNull()
+    expect(r.multiPlayer).toBeNull()
+  })
+
+  it('边界：数字字符串容错转换，超范围枚举值原样透传由渲染层兜底', async () => {
+    const r = await decodeWithStep1(
+      buildStep1({
+        NormalPhotoInfo: { PhotoMode: '2', WindIntensity: '4', WindDirection: 99 },
+        MultiPlayerHandler: { RoleID: '7', PoseID: '12345', PosePlayingPercent: '0.5' }
+      })
+    )
+    expect(r.photography?.photoMode).toBe(2)
+    expect(r.photography?.windIntensity).toBe(4)
+    expect(r.photography?.windDirection).toBe(99)
+    expect(r.multiPlayer).toEqual({ roleId: 7, poseId: 12345, posePlayingPercent: 0.5 })
+  })
+
+  it('边界：MultiPlayerHandler 缺 RoleID（非法数据）时其余字段仍解析', async () => {
+    const r = await decodeWithStep1(
+      buildStep1({ MultiPlayerHandler: { PoseID: 9, PosePlayingPercent: 0.25 } })
+    )
+    expect(r.multiPlayer).toEqual({ roleId: null, poseId: 9, posePlayingPercent: 0.25 })
+  })
+
+  // ---- 阶段 4：拍摄地点 worldId（上游 SocialPhoto.TrackInfo.WorldID）----
+  /** 覆盖 social_photo 并保留 photo_info（location 的必要条件），其余键由 social 注入 */
+  function step1WithSocial(social: Record<string, unknown>): string {
+    return buildStep1({
+      social_photo: {
+        photo_info: { nikki_loc_x: 1.5, nikki_loc_y: 2.5, nikki_loc_z: 3.5 },
+        ...social
+      }
+    })
+  }
+
+  it('正常：合法 WorldID 原样带入 location.worldId', async () => {
+    const r = await decodeWithStep1(step1WithSocial({ TrackInfo: { WorldID: 10000001 } }))
+    expect(r.hasParams).toBe(true)
+    expect(r.photography?.location?.worldId).toBe(10000001)
+    expect(r.photography?.location?.pos).toEqual({ x: 1.5, y: 2.5, z: 3.5 })
+  })
+
+  it('正常：容器/值键多命名兜底与数字字符串容错', async () => {
+    const cases: Array<[Record<string, unknown>, number]> = [
+      [{ TrackInfo: { world_id: 4020034 } }, 4020034],
+      [{ track_info: { worldId: 10000002 } }, 10000002],
+      [{ trackInfo: { WorldID: '10000010' } }, 10000010]
+    ]
+    for (const [social, expected] of cases) {
+      const r = await decodeWithStep1(step1WithSocial(social))
+      expect(r.photography?.location?.worldId).toBe(expected)
+    }
+  })
+
+  it('异常：空串/非数字/0/负数/小数/Infinity → 不带 worldId 键且旧字段不变', async () => {
+    for (const bad of ['', 'abc', 0, -1, 1.5, '1e999', null]) {
+      const r = await decodeWithStep1(step1WithSocial({ TrackInfo: { WorldID: bad } }))
+      expect(r.photography?.location).toEqual({ pos: { x: 1.5, y: 2.5, z: 3.5 }, name: null })
+    }
+  })
+
+  it('异常：TrackInfo 为字符串/数组/数字等非法形态时 fail-soft 不抛错', async () => {
+    for (const bad of ['garbage', [1, 2, 3], 123, {}]) {
+      const r = await decodeWithStep1(step1WithSocial({ TrackInfo: bad }))
+      expect(r.hasParams).toBe(true)
+      expect(r.photography?.location).toEqual({ pos: { x: 1.5, y: 2.5, z: 3.5 }, name: null })
+    }
+  })
+
+  it('边界：旧照片无 TrackInfo → location 与改动前逐字段完全一致（回归锁）', async () => {
+    const r = await decodeWithStep1(step1WithSocial({}))
+    expect(r.photography?.location).toEqual({ pos: { x: 1.5, y: 2.5, z: 3.5 }, name: null })
+    expect('worldId' in (r.photography?.location ?? {})).toBe(false)
+  })
+
+  it('边界：photo_info 缺失时 location 仍为 null，不凭空造地点', async () => {
+    const r = await decodeWithStep1(buildStep1({ social_photo: { TrackInfo: { WorldID: 1 } } }))
+    expect(r.photography?.location).toBeNull()
+  })
+})
+
+// ============================================================
+// 相机参数版本分流（V1/V2/V3）
+// 对齐上游 nikki_albums nuan5_structs/camera_params.rs 的 untagged 尝试语义：
+// 版本判定依据是结构（元素个数 + 内部一致性），不是数组第 0 位 version 字段；
+// 三版本长度互斥：31 / 32或40 / 44；无法匹配 → unknown 降级（保留 base + rawParams）
+// ============================================================
+
+describe('相机参数版本分流（V1/V2/V3）', () => {
+  /** 构造参数数组：len 位默认全 0（[1]=1 人像模式），按 overrides 逐位覆盖 */
+  function makeArr(len: number, overrides: Record<number, unknown> = {}): unknown[] {
+    const arr: unknown[] = Array.from({ length: len }, (_, i) => (i === 1 ? 1 : 0))
+    for (const [k, v] of Object.entries(overrides)) arr[Number(k)] = v
+    return arr
+  }
+
+  /** V3-Enable 的空占位覆盖集：[32-39] 与 [43] 均为空串 */
+  function v3EnableEmpties(): Record<number, unknown> {
+    const o: Record<number, unknown> = {}
+    for (let i = 32; i <= 39; i++) o[i] = ''
+    o[43] = ''
+    return o
+  }
+
+  it('V1：31 位数组 → cameraVersion=v1，base 字段不变，无动作字段（回归锁）', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(
+        makeArr(31, { 14: 35, 22: 0.6, 17: 'Light1', 18: 0.5, 29: 'Filter1', 30: 0.8 })
+      )
+    )
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.cameraVersion).toBe('v1')
+    expect(r.camera?.focalLength).toBe(35)
+    expect(r.camera?.brightness).toBe(0.6)
+    expect(r.camera?.portraitMode).toBe(true)
+    expect(r.camera?.light).toEqual({ id: 'Light1', strength: 0.5 })
+    expect(r.camera?.filter).toEqual({ id: 'Filter1', strength: 0.8 })
+    expect(r.camera?.momoAction).toBeUndefined()
+    expect(r.camera?.nikkiPoseInfo).toBeUndefined()
+  })
+
+  it('V2-Enable：32 位 flag=0 → momoAction=null（隐藏态，无动作数据）', async () => {
+    const r = await decodeWithStep3(JSON.stringify(makeArr(32, { 31: 0 })))
+    expect(r.hasParams).toBe(true)
+    expect(r.camera?.cameraVersion).toBe('v2')
+    expect(r.camera?.momoAction).toBeNull()
+    expect(r.camera?.nikkiPoseInfo).toBeUndefined()
+  })
+
+  it('V2-Disable：40 位 flag=1 → 大喵动作字段提取（×400/×180 换算，poseTime=null）', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(
+        makeArr(40, { 31: 1, 32: 7, 33: 0.25, 34: -0.5, 35: 1.2, 36: 0.75, 37: 1, 38: 0, 39: 1 })
+      )
+    )
+    expect(r.camera?.cameraVersion).toBe('v2')
+    expect(r.camera?.momoAction).toEqual({
+      poseId: 7,
+      poseTime: null, // V2 结构无该字段 → null（不伪造 0）
+      horizontal: 100, // 0.25 × 400
+      distance: -200, // -0.5 × 400
+      height: 480, // 1.2 × 400
+      rotateMomo: 135, // 0.75 × 180
+      autoGroundSnap: true,
+      floatingEffect: false,
+      poseWithNikki: true
+    })
+    expect(r.camera?.nikkiPoseInfo).toBeUndefined()
+  })
+
+  it('V3-Enable：44 位 flag=0（32-39 与 43 为空占位）→ momoAction=null，nikkiPoseInfo 提取', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(makeArr(44, { 31: 0, ...v3EnableEmpties(), 40: 123, 41: 0.456, 42: 1 }))
+    )
+    expect(r.camera?.cameraVersion).toBe('v3')
+    expect(r.camera?.momoAction).toBeNull()
+    expect(r.camera?.nikkiPoseInfo).toEqual({ poseId: 123, playingPercent: 0.456, inIdle: true })
+  })
+
+  it('V3-Disable：44 位 flag=1 全数值 → momoAction（含 poseTime）+ nikkiPoseInfo', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(
+        makeArr(44, {
+          31: 1,
+          32: 9,
+          33: 0.1,
+          34: 0.2,
+          35: 0.3,
+          36: 0.5,
+          37: 0,
+          38: 1,
+          39: 0,
+          40: 88,
+          41: 0.42,
+          42: 0,
+          43: 0.75
+        })
+      )
+    )
+    expect(r.camera?.cameraVersion).toBe('v3')
+    expect(r.camera?.momoAction).toEqual({
+      poseId: 9,
+      poseTime: 0.75,
+      horizontal: 40,
+      distance: 80,
+      height: 120,
+      rotateMomo: 90,
+      autoGroundSnap: false,
+      floatingEffect: true,
+      poseWithNikki: false
+    })
+    expect(r.camera?.nikkiPoseInfo).toEqual({ poseId: 88, playingPercent: 0.42, inIdle: false })
+  })
+
+  it('V3 空值编码：[41] 空占位 → playingPercent=null；[41]=0 → 真实 0 保留（空值≠零值）', async () => {
+    const r1 = await decodeWithStep3(
+      JSON.stringify(makeArr(44, { 31: 0, ...v3EnableEmpties(), 40: 123, 41: '', 42: 1 }))
+    )
+    expect(r1.camera?.nikkiPoseInfo).toEqual({ poseId: 123, playingPercent: null, inIdle: true })
+
+    // 同一测试内多次调用须先重置绑定缓存（boundFns 首次绑定后捕获旧 mock 闭包）
+    disposeDecryptionService()
+    const r2 = await decodeWithStep3(
+      JSON.stringify(makeArr(44, { 31: 0, ...v3EnableEmpties(), 40: 123, 41: 0, 42: 1 }))
+    )
+    expect(r2.camera?.nikkiPoseInfo).toEqual({ poseId: 123, playingPercent: 0, inIdle: true })
+  })
+
+  it('V3 pose 字段全空占位 → nikkiPoseInfo=null（无值而非伪造）', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(makeArr(44, { 31: 0, ...v3EnableEmpties(), 40: '', 41: '', 42: '' }))
+    )
+    expect(r.camera?.cameraVersion).toBe('v3')
+    expect(r.camera?.nikkiPoseInfo).toBeNull()
+  })
+
+  it('JSON 形态 [41] 为带引号数字串 → untagged String 分支按无值处理（对齐上游）', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(makeArr(44, { 31: 0, ...v3EnableEmpties(), 40: 123, 41: '0.5', 42: 1 }))
+    )
+    expect(r.camera?.nikkiPoseInfo).toEqual({ poseId: 123, playingPercent: null, inIdle: true })
+  })
+
+  it('长度无法识别（33/45 位）→ unknown 降级：base 照常 + rawParams 保留，不崩溃', async () => {
+    for (const len of [33, 45]) {
+      // 同一测试内多次调用须先重置绑定缓存（boundFns 首次绑定后捕获旧 mock 闭包）
+      disposeDecryptionService()
+      const r = await decodeWithStep3(JSON.stringify(makeArr(len)))
+      expect(r.hasParams).toBe(true)
+      expect(r.camera?.cameraVersion).toBe('unknown')
+      expect(r.camera?.focalLength).toBe(0)
+      expect(r.camera?.rawParams).toBeTruthy()
+      expect(r.camera?.momoAction).toBeUndefined()
+      expect(r.camera?.nikkiPoseInfo).toBeUndefined()
+    }
+  })
+
+  it('V2-Disable 截断（32 位 flag=1）→ unknown 降级', async () => {
+    const r = await decodeWithStep3(JSON.stringify(makeArr(32, { 31: 1 })))
+    expect(r.camera?.cameraVersion).toBe('unknown')
+    expect(r.camera?.momoAction).toBeUndefined()
+  })
+
+  it('长度 40 但 flag=0（Enable 与长度不一致）→ unknown 降级', async () => {
+    const r = await decodeWithStep3(JSON.stringify(makeArr(40, { 31: 0 })))
+    expect(r.camera?.cameraVersion).toBe('unknown')
+    expect(r.camera?.momoAction).toBeUndefined()
+  })
+
+  it('V3 结构内部不一致（flag=0 但 [32] 为数值）→ unknown 降级', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(
+        makeArr(44, {
+          31: 0,
+          32: 5,
+          33: '',
+          34: '',
+          35: '',
+          36: '',
+          37: '',
+          38: '',
+          39: '',
+          43: ''
+        })
+      )
+    )
+    expect(r.camera?.cameraVersion).toBe('unknown')
+  })
+
+  it('V3-Disable 缺尾（flag=1 但 [43] 为空占位）→ unknown 降级', async () => {
+    const r = await decodeWithStep3(
+      JSON.stringify(
+        makeArr(44, {
+          31: 1,
+          32: 1,
+          33: 0,
+          34: 0,
+          35: 0,
+          36: 0,
+          37: 0,
+          38: 0,
+          39: 0,
+          40: 1,
+          41: 0.5,
+          42: 0,
+          43: ''
+        })
+      )
+    )
+    expect(r.camera?.cameraVersion).toBe('unknown')
+  })
+
+  it('CSV 形态 V3：空段为空占位判定，数字段正常提取', async () => {
+    const parts: string[] = Array.from({ length: 44 }, (_, i) => (i === 1 ? '1' : '0'))
+    for (let i = 32; i <= 39; i++) parts[i] = ''
+    parts[40] = '77'
+    parts[41] = '0.3'
+    parts[42] = '1'
+    parts[43] = ''
+    const r = await decodeWithStep3(parts.join(','))
+    expect(r.camera?.cameraVersion).toBe('v3')
+    expect(r.camera?.momoAction).toBeNull()
+    expect(r.camera?.nikkiPoseInfo).toEqual({ poseId: 77, playingPercent: 0.3, inIdle: true })
+  })
+
+  it('CSV 形态带引号空串 "" 亦按空占位处理', async () => {
+    const parts: string[] = Array.from({ length: 44 }, (_, i) => (i === 1 ? '1' : '0'))
+    for (let i = 32; i <= 39; i++) parts[i] = '""'
+    parts[40] = '77'
+    parts[41] = '""'
+    parts[42] = '1'
+    parts[43] = '""'
+    const r = await decodeWithStep3(parts.join(','))
+    expect(r.camera?.cameraVersion).toBe('v3')
+    expect(r.camera?.nikkiPoseInfo).toEqual({ poseId: 77, playingPercent: null, inIdle: true })
+  })
+
+  it('对象形态 {"camera":[...]} 的 V3 数组同样按版本分流', async () => {
+    const obj = JSON.stringify({
+      camera: makeArr(44, { 31: 0, ...v3EnableEmpties(), 40: 66, 41: 0.9, 42: 0 })
+    })
+    const r = await decodeWithStep3(obj)
+    expect(r.camera?.cameraVersion).toBe('v3')
+    expect(r.camera?.nikkiPoseInfo).toEqual({ poseId: 66, playingPercent: 0.9, inIdle: false })
+  })
+
+  it('flag=2（非 0 非 1）按 Enable 处理（对齐上游 match _ => Enable）', async () => {
+    const r = await decodeWithStep3(JSON.stringify(makeArr(32, { 31: 2 })))
+    expect(r.camera?.cameraVersion).toBe('v2')
+    expect(r.camera?.momoAction).toBeNull()
+  })
+
+  it('garbage 文本与 <31 位维持现状：hasParams:false（既有行为回归锁）', async () => {
+    const r1 = await decodeWithStep3('not-a-param-array')
+    expect(r1.hasParams).toBe(false)
+    const r2 = await decodeWithStep3(JSON.stringify(makeArr(30)))
+    expect(r2.hasParams).toBe(false)
   })
 })

@@ -1005,3 +1005,65 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
 - **钉住测试**：`src/main/app/update-error-class.test.ts`（23 例，含「被包装的 DNS 失败必须判
   network」的顺序契约）、`src/main/app/auto-update.test.ts`（17 例，观测面为 `sendToRenderer` 入参）、
   `src/renderer/components/common/UpdateDialog.test.tsx`（17 例，含 render 型分流与 5 条回归锁）。
+
+## 18. 外部参考数据域 `refdata:*`（2026-11-08 拍摄参数扩展与地图定位阶段 1 新增；同日阶段 5 增 `resolve-image`）
+
+- **背景**：对标上游 RanAxro/nikki_albums（MIT，main @ dc1b30b）的热更参考数据管线。v1.db
+  为 aes-gcm-filebox（AES-256-GCM + HKDF）加密的 protobuf，含世界地图瓦片模板与坐标换算
+  参数、各类图片 CDN 地址模板；授权与合规约束见 `docs/plans/2026-11-08-拍摄参数扩展与地图定位-实施计划.md` §2。
+- **契约实现位置**（四件套）：
+  - handler：`src/main/ipc/handlers/reference-data-handler.ts`
+  - service：`src/main/services/reference-data-service.ts`（解密 `reference-data/filebox-cipher.ts`、
+    proto schema `reference-data/nuan5-config-proto.ts`）；阶段 5 图片面另见
+    `src/main/services/reference-image-service.ts` + 授权/地址纯函数 `reference-data/image-url.ts`
+  - preload：`src/main/preload/api/reference-data.ts` → `window.electronAPI.referenceData`
+  - 类型真相源：`src/shared/types/electron-api.ts`（WorldMapTileInfo / NetworkImageTemplateInfo /
+    ReferenceDataStatus / ReferenceImageStatus / ReferenceImageResolveResult）
+- **通道表**（前四条 `wrapHandlerNoArgs` 包装、无入参；第五条 `wrapHandler` + zod 元组）：
+
+  | 通道                                  | 入参                                           | 返回 `data`                                 | 语义                                                                                                                           |
+  | ------------------------------------- | ---------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+  | `refdata:get-status`                  | —                                              | `ReferenceDataStatus`                       | 管道状态：`available`（v1.db 索引就绪）、`packages[]`（各包 versionId，未装为 null）、`lastCheckedAt`、`lastError`、`updating` |
+  | `refdata:refresh`                     | —                                              | `ReferenceDataStatus`                       | 手动检查更新（绕过失败冷却）；镜像地址取设置键 `referenceData.manifestBaseUrl`（空串 = 上游官方站点）                          |
+  | `refdata:get-world-map-tiles`         | —                                              | `{ tiles: WorldMapTileInfo[] }`             | 世界瓦片模板 + 坐标换算参数（urlTemplate/minZoom/maxZoom/地图宽高/originalPoint/pxPreUnit）                                    |
+  | `refdata:get-network-image-templates` | —                                              | `{ templates: NetworkImageTemplateInfo[] }` | 10 类图片 CDN 地址模板（light/filter/momoPose/cloth/clothOutfit/diyPattern/clothType/clothProp/clothTag/nikkiPose）            |
+  | `refdata:resolve-image`               | `(kind: NetworkImageTemplateKind, id: number)` | `ReferenceImageResolveResult`               | 阶段 5：按类别与取值解析一张 CDN 图片，返回**本机缓存路径**（非远端 URL）；镜像取设置键 `referenceData.imageMirrorBaseUrl`     |
+
+- **容错契约（查询面 fail-soft）**：数据不可用（未下载/损坏/离线）时查询通道返回**空数组**而非错误；
+  `available:false` 即降级态信号。`refdata:refresh` 永不 reject——失败经 `lastError`（含阶段标签
+  manifest/download/checksum/decrypt/cache）与日志诊断，本地缓存保留继续服务。
+  `refdata:resolve-image` 同样**永不 reject**：不可用时返回 `{ path: null, status }`，
+  `status` 取 `cached`/`fetched`/`unauthorized`/`not-found`/`cooldown`/`error`/`disabled`
+  （语义见 `ReferenceImageStatus` 注释）；渲染层据 `path` 决定占位、据 `status` 记日志。
+  入参非法（kind 不在枚举内、id 非正整数）才回 `IPC_VALIDATION_ERROR`。
+- **数据语义**：`NetworkImageTemplateInfo` 的最终 URL = `baseUrl.replaceAll(replace, 实际值)`
+  （上游 `getImageUrl` 同款）；`WorldMapTileInfo` 为坐标换算的纯参数面，换算公式由阶段 4 实采校准。
+- **阶段 5 图片面授权与合规**（事实来源：RanAxro/nikki_albums **#20** 与
+  dastrokes/gongeo.us-nikki-tracker **#218**，均已直读原文）：
+
+  | 主机                  | 类别                                                                            | 请求标识（UA）                                             | 处置                                                |
+  | --------------------- | ------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------------------------------------------- |
+  | `cdn.nikkialbums.com` | light/filter/momoPose/nikkiPose/diyPattern/clothType/clothProp/clothTag（8 类） | 主进程 fetch 头 `MeowStarMap/<应用真实版本>`               | 经 `refdata:resolve-image` + 应用层缓存             |
+  | `cdn.gongeo.us`       | cloth/clothOutfit（及既有衣橱 6 类）                                            | 固定串 `MeowStarMap`（`app/cdn-user-agent.ts` webRequest） | **既有热链，不经本通道**（解析返回 `unauthorized`） |
+  | 其他任意主机          | —                                                                               | —                                                          | 授权不明 → fail-closed 不接入                       |
+
+  两套 UA 规则按主机各自独立、不混用；授权判定按 **resolved URL 的实际 hostname**（注册表
+  `AUTHORIZED_REFERENCE_IMAGE_HOSTS` 为封闭集），不按 kind 硬编码信任，故 v1.db 数据漂移到
+  未授权域时安全默认不接入。`cloth`/`cloth_outfit` 经 #20 明确不在 RanAxro 授权范围（归
+  gongeo.us 作者，已由 #218 批准走既有路径）。
+
+- **缓存布局**：`<userData>/reference-data/`（`meta.json` 仅诊断信息；`packages/<id>/<versionId>`
+  空标记文件为版本真相源，对齐上游机制）；损坏自愈 = 删包待重下。
+  阶段 5 图片缓存另落 `<userData>/reference-data/reference-images/<sha256(kind:id)>.<ext>`：
+  有效期 7 天（超期重取）、0 字节或非图片魔数视为损坏（删除后重取一次）、404/403/410 进
+  30 分钟负缓存、网络/5xx/校验失败进 5 分钟 per-key 冷却、同 key 并发 in-flight 去重。
+  该目录由 `app/media-protocol.ts` 的 `isMediaPathAllowed` **规则 5** 放行供图（过媒体扩展名
+  闸门 + realpath 复检），渲染层只引用 `media://file?path=<缓存文件>`，**永不直连 CDN**——
+  因此 `cdn-user-agent.ts` 与 CSP `img-src` 均无需改动。
+- **消费方**：`refdata:resolve-image` 由 `renderer/hooks/useReferenceImage.ts` 按需调用
+  （`components/common/ReferenceImage.tsx` → `CameraInfoPanel` 的灯光/滤镜/暖暖动作/大喵动作行）；
+  懒加载、不预取、不批量。其余三条查询通道本登记时尚无渲染层调用方（地图 UI 属后续阶段）。
+- **钉住测试**：`reference-data-service.test.ts`（20 例）、`filebox-cipher.test.ts`（8 例）、
+  `nuan5-config-proto.test.ts`（5 例）、`reference-data-handler.test.ts`（22 例）、
+  `reference-data/image-url.test.ts`（48 例）、`reference-image-service.test.ts`（32 例）、
+  `app/__tests__/media-protocol.test.ts` 规则 5 组（11 例）。

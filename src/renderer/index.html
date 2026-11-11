@@ -8,8 +8,9 @@
        style-src 需要 inline：React style 属性与运行时注入的样式。
        img-src / media-src 放行 media:：本地图片与视频走自定义 media:// 协议。
        img-src 另放行 https://cdn.gongeo.us：搭配码服饰图标（gongeo CDN，见 src/main/services/cloth-data-config.ts）。
-       注意：charset 必须留在 head 前 1024 字节内，本注释不要再往上挪。 -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; object-src 'none'; img-src 'self' media: data: https://cdn.gongeo.us; media-src 'self' media:; style-src 'self' 'unsafe-inline'">
+       img-src 另放行 https://assets.papegames.com：官方「奇迹大陆大地图」瓦片（v1.db 实采 host，#20 条款 6 无需额外 UA）；
+       上游作者自有 CDN 仅授权图片，瓦片不得接入。注意：charset 必须留在 head 前 1024 字节内，本注释不要再往上挪。 -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; object-src 'none'; img-src 'self' media: data: https://cdn.gongeo.us https://assets.papegames.com; media-src 'self' media:; style-src 'self' 'unsafe-inline'">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>喵星图</title>
   <link rel="icon" type="image/x-icon" href="./favicon.ico" />

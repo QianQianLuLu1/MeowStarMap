@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "Режим камеры",
+        "typeValue": "Тип {{type}}"
+      },
+      "windIntensity": {
+        "label": "Сила ветра",
+        "typeValue": "Тип {{type}}"
+      },
+      "windDirection": {
+        "label": "Направление ветра",
+        "typeValue": "Тип {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "Сетевая информация",
+      "anotherPose": "Поза другого игрока",
+      "poseTime": "Прогресс",
+      "copyHeader": "=== Информация о мультиплеере ==="
     }
   },
   "dialog": {
@@ -1298,6 +1316,8 @@
       "licenseGpl": "• GPL-3.0: Код, использующий или изменяющий его, также должен быть открытым",
       "licenseMit": "• MIT: Свободное использование, изменение и распространение; необходимо сохранять уведомление об авторских правах",
       "licenseNote": "Примечания к лицензии",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "Уведомление об авторских правах MIT и полный текст лицензии вышестоящего проекта nikki_albums дословно сохранены в поставляемом с приложением файле THIRD_PARTY_NOTICES.",
       "licenseTitle": "Благодарности и лицензия",
       "open": "Открыть",
       "projectIntro": "Эта программа построена на вышеуказанных проектах с открытым исходным кодом. Спасибо всем участникам сообщества open-source. Сама программа имеет открытый исходный код по лицензии MIT; свободное использование, изменение и распространение приветствуются.",
@@ -1323,7 +1343,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "Анализ параметров съёмки и миниатюры поз: конвейер справочных данных (nuan5_database) и ресурсы изображений CDN переиспользуются из открытого проекта nikki_albums (https://github.com/RanAxro/nikki_albums) (автор: RanAxro, лицензия MIT) с разрешения автора (nikki_albums#20). Изображения загружаются по требованию и кэшируются локально около 7 дней; запросы несут версионированный идентификатор источника; без повторного распространения. Подход к расшифровке и структуры данных также происходят из этого проекта. С благодарностью.",
+        "leaflet": "Библиотека рендеринга тайловых карт для мировой карты (https://leafletjs.com), лицензия BSD-2-Clause. Copyright (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade сохраняется в заголовке @preserve исходного кода и в этом уведомлении. Спасибо.",
+        "protobufjs": "Декодирование Nuan5Config protobuf для справочных данных v1.db (https://github.com/protobufjs/protobuf.js), лицензия Apache-2.0, Copyright (c) 2016 Daniel Wirtz. Спасибо."
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "Перезапуск от имени администратора…",
       "elevateFailed": "Ошибка перезапуска с повышением прав: {{reason}}"
     },
+    "referenceData": {
+      "description": "Миниатюры освещения, фильтров и поз берутся из внешних справочных данных (nikki_albums, лицензия MIT). Изображения загружаются по мере необходимости и кэшируются локально около 7 дней. Два поля ниже предназначены для ваших собственных адресов ускорения/зеркала — приложение не содержит и не размещает узлы ускорения.",
+      "imageMirrorHint": "Оставьте пустым, чтобы использовать исходный адрес. Заменяет только точку доступа к авторизованным изображениям; объём авторизации не меняется.",
+      "imageMirrorLabel": "Ускоритель изображений",
+      "manifestMirrorHint": "Оставьте пустым, чтобы использовать официальный сайт.",
+      "manifestMirrorLabel": "Зеркало справочных данных",
+      "save": "Сохранить",
+      "saved": "Сохранено",
+      "imageSourceLabel": "Источник изображений",
+      "imageSourceNotice": "Изображения сущностей загружаются по запросу с gongeo.us через горячие ссылки; ссылка на источник ниже.",
+      "trademarkNotice": "Все игровые ассеты, названия и товарные знаки Infinity Nikki принадлежат Infold и соответствующим правообладателям.",
+      "usageNotice": "Эти сторонние игровые изображения показываются по запросу только внутри приложения и не используются для обучения ИИ или в коммерческих целях. Это ограничение не распространяется на собственный исходный код проекта, выпущенный под лицензией MIT.",
+      "remoteImagesEnabledLabel": "Включить внешние справочные изображения",
+      "remoteImagesEnabledHint": "При выключении внешние справочные изображения (миниатюры и тайлы карты) не загружаются. Можно включить снова в любой момент.",
+      "autoUpdateLabel": "Проверять обновления справочных данных при запуске",
+      "autoUpdateHint": "При выключении проверка выполняется только при ручном обновлении.",
+      "refreshLabel": "Проверить обновления",
+      "refreshSuccess": "Справочные данные обновлены",
+      "refreshFailed": "Не удалось обновить справочные данные. Повторите попытку позже"
+    },
     "sections": {
+      "referenceData": "Внешние справочные данные",
       "aboutContact": "Контакты",
       "aboutInfo": "Информация о приложении",
       "aboutLicense": "Благодарности и лицензия с открытым исходным кодом",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "Обычная съёмка",
+      "1": "Запечатленный момент",
+      "2": "Совместная съёмка",
+      "3": "Скриншот"
+    },
+    "windIntensity": {
+      "0": "Безветрие",
+      "1": "Слабый ветер",
+      "2": "Умеренный ветер",
+      "3": "Сильный ветер",
+      "4": "Очень сильный ветер",
+      "neg1": "Неизвестно"
+    },
+    "windDirection": {
+      "0": "Восток",
+      "1": "Юг",
+      "2": "Запад",
+      "3": "Север",
+      "4": "Юго-восток",
+      "5": "Юго-запад",
+      "6": "Северо-восток",
+      "7": "Северо-запад",
+      "8": "Нет",
+      "neg1": "Неизвестно"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "Поза Никки",
+    "playingPercent": "Прогресс позы",
+    "momoPose": "Поза Момо",
+    "momoPoseTime": "Прогресс позы Момо",
+    "momoAdjust": "Настройка положения Момо (Влево/Вперёд/Высота)",
+    "momoRotate": "Повернуть Момо",
+    "autoGroundSnap": "Автопривязка к земле",
+    "floatingEffect": "Эффект парения",
+    "poseWithNikki": "Поза с Никки",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference должен быть auto или high-performance",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl должен быть публичным http(s)-адресом (оставьте пустым для официального сайта)",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl должен быть публичным http(s)-адресом (оставьте пустым для исходного адреса)",
+        "referenceDataSwitchNotBoolean": "Переключатели внешних справочных данных должны быть логическими значениями"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "Место съёмки",
+    "clickToView": "Нажмите, чтобы найти на карте",
+    "loading": "Загрузка карты",
+    "outdatedVersion": "Снимки версии 2.9 и ранее не поддерживают просмотр места съёмки",
+    "lackData": "Данные отсутствуют",
+    "notReady": "Справочные данные ещё не готовы",
+    "noTiles": "Нет данных карты",
+    "lackWorldMap": "Для этого места карта недоступна",
+    "outsideBounds": "Точка съёмки вне границ карты"
   }
 }

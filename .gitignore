@@ -202,3 +202,6 @@ playwright/.cache/
 
 # ===== K8 回收 helper 构建产物（由 npm run build:recycle-helper 生成，不入仓）=====
 /resources/nikkisync/*.exe
+
+# ===== 外部参考数据缓存（参考数据服务运行时缓存，生产落 userData；防开发态误写仓库根）=====
+/reference-data/

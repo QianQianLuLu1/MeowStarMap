@@ -1,9 +1,12 @@
 /**
- * 共鸣录衣橱六类实体的 CDN 图片地址构造（纯逻辑，零网络请求）。
+ * 共鸣录衣橱六类实体的 CDN 图片地址构造（零网络请求）。
  *
  * 主机与路径分段集中在本文件，视图侧不得散落硬编码；图片由调用方以 img 热链按需加载，
  * 加载失败的占位回退由调用方处理。
+ *
+ * 总开关（#218「保持可回滚」）：关闭时一律返回 null，调用方无需改动即回退占位。
  */
+import { isRemoteImagesEnabled } from './remote-images-enabled'
 
 export type CdnImageCategory = 'outfit' | 'item' | 'makeup' | 'momo' | 'prop' | 'eureka'
 
@@ -38,6 +41,7 @@ function isCdnImageCategory(value: unknown): value is CdnImageCategory {
  * 任一不满足返回 null（由调用方回退占位），不抛异常、不产生地址。
  */
 export function cdnImageUrl(category: unknown, id: unknown): string | null {
+  if (!isRemoteImagesEnabled()) return null
   if (!isCdnImageCategory(category)) return null
   if (typeof id !== 'number' || !Number.isSafeInteger(id) || id <= 0) return null
   if (String(id).length !== ID_LENGTHS[category]) return null

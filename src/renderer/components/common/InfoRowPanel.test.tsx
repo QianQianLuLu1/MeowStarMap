@@ -10,6 +10,12 @@ vi.mock('../../icons', () => ({
   IconCopy: (p: ComponentProps<'svg'>) => <svg data-testid="icon-copy" {...p} />
 }))
 
+vi.mock('./ReferenceImage', () => ({
+  ReferenceImage: (p: { kind: string; id: number }) => (
+    <span data-testid="ref-image" data-kind={p.kind} data-id={p.id} />
+  )
+}))
+
 const sampleRows: InfoRow[] = [
   { label: '名称', value: '测试图片.jpg' },
   { label: '路径', value: '/path/to/file' }
@@ -196,5 +202,45 @@ describe('InfoRowPanel', () => {
     expect(screen.getByText('基础')).toBeTruthy()
     // rows 中的 '测试图片.jpg' 不应出现
     expect(screen.queryByText('测试图片.jpg')).toBeNull()
+  })
+})
+
+describe('InfoRowPanel — 行内缩略图（image 可选字段）', () => {
+  it('rows 路径：带 image 的行渲染 ReferenceImage，值文字保留', () => {
+    render(
+      <InfoRowPanel
+        icon={<span>📷</span>}
+        title="相机信息"
+        rows={[{ label: '暖暖动作', value: '#7', image: { kind: 'nikkiPose', id: 7 } }]}
+      />
+    )
+    const thumb = screen.getByTestId('ref-image')
+    expect(thumb.getAttribute('data-kind')).toBe('nikkiPose')
+    expect(thumb.getAttribute('data-id')).toBe('7')
+    expect(screen.getByText('#7')).toBeTruthy()
+  })
+
+  it('groups 路径：带 image 的行同样渲染 ReferenceImage', () => {
+    render(
+      <InfoRowPanel
+        icon={<span>📷</span>}
+        title="相机信息"
+        groups={[
+          {
+            title: '场景与特效',
+            rows: [{ label: '大喵动作', value: '#9', image: { kind: 'momoPose', id: 9 } }]
+          }
+        ]}
+      />
+    )
+    const thumb = screen.getByTestId('ref-image')
+    expect(thumb.getAttribute('data-kind')).toBe('momoPose')
+    expect(thumb.getAttribute('data-id')).toBe('9')
+    expect(screen.getByText('#9')).toBeTruthy()
+  })
+
+  it('无 image 的行不渲染 ReferenceImage（既有面板零回归）', () => {
+    render(<InfoRowPanel icon={<span>📷</span>} title="基础信息" rows={sampleRows} />)
+    expect(screen.queryByTestId('ref-image')).toBeNull()
   })
 })

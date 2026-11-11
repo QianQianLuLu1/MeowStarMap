@@ -1664,3 +1664,17 @@ html.glass-lite .ambient-bg {
   border-radius: 0.5rem;
   padding: 0.5rem;
 }
+
+/* 阶段 4：游戏地图定位（MiralandMap）——颜色一律走主题变量 */
+.miraland-marker {
+  color: var(--accent);
+  background: transparent;
+  border: none;
+}
+
+.miraland-map-container {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}

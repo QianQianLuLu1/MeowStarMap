@@ -69,6 +69,7 @@ const DEMO_CAMERA: RichCameraParams = {
   portraitMode: true,
   filter: { id: 'Fresh_001', strength: 0.5 },
   light: { id: 'DirectionLight_L', strength: 0.7 },
+  cameraVersion: 'v3',
   rawParams: 'focal=35;aperture=2;brightness=50;exposure=55;contrast=48',
   zoom: 1.2,
   rotation: 3.5,

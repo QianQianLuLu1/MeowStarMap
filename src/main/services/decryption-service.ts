@@ -1,4 +1,4 @@
-// @core-change: 搭配码网络解码结果接入本地磁盘缓存（阶段 3）
+// @core-change: 相机参数 V1/V2/V3 结构分流与拍照模式/风力/风向/联机信息解析扩展，并补齐地图定位 worldId（TrackInfo.WorldID 防御读取）
 /**
  * 游戏内图片参数解密服务
  * 严格按 nuan5_decryption_ffi.h 头文件调用 DLL
@@ -29,8 +29,10 @@ import type { NetworkDecodeKind, NetworkDecodeResult } from '../decryption-worke
 import {
   type DecryptionResult,
   type CameraParams,
+  type CameraParamsVersion,
   type RichCameraParams,
   type PhotographyInfo,
+  type MultiPlayerInfo,
   type NikkiParams,
   type DressingParams,
   type InteractionParams,
@@ -44,7 +46,9 @@ import {
   type ClothDiyStructuredCloth,
   type ClothDiyStructuredOutfit,
   type EurekaParams,
-  type MomoHiddenState
+  type MomoActionParams,
+  type MomoHiddenState,
+  type NikkiPoseInfo
 } from '../types/decryption'
 
 // ============================================================
@@ -332,26 +336,174 @@ function isNoneParam(v: unknown): boolean {
   return normalizeParamId(v).toLowerCase() === 'none'
 }
 
+// ============================================================
+// 相机参数版本分流（对齐上游 nuan5_structs/camera_params.rs 的 untagged V1/V2/V3）
+// 版本判定依据是结构本身（元素个数 + flag + 元素类型一致性），不是数组第 0 位的
+// version 字段；三版本长度互斥：31 / 32或40 / 44，无法匹配 → unknown 降级
+// ============================================================
+
+/** 数值 token 提取：有限数 → 原值；其余 → null（禁止把空值/字符串静默折叠为 0）。
+ * JSON 形态仅认真正的 number（带引号数字串按字符串处理，对齐上游 untagged 的类型区分）；
+ * CSV 形态数字段天然为字符串，需转换判定 */
+function numericParamToken(v: unknown, csvForm: boolean): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (csvForm && typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
+}
+
+/** 数值 token → 整数判定（上游 i64/u8 语义：momo_pose、pose_id、标志位等必须为整数） */
+function integerParamToken(v: unknown, csvForm: boolean): number | null {
+  const n = numericParamToken(v, csvForm)
+  return n !== null && Number.isInteger(n) ? n : null
+}
+
+/** V3 Enable 占位判定：[32-39]/[43] 须为字符串型 token（JSON 形态任意字符串；
+ * CSV 形态非数字段），数值即结构不符（上游对数值读 String 会失败 → 整体降级） */
+function isEnablePlaceholder(v: unknown, csvForm: boolean): boolean {
+  if (typeof v !== 'string') return false
+  return !csvForm || numericParamToken(v, true) === null
+}
+
+/** 上游值换算（parser/momo_camera_params_parser.rs）：网格单位 → 厘米/角度 */
+const MOMO_AXIS_SCALE = 400
+const MOMO_ROTATE_SCALE = 180
+
+/** V2/V3 Disable 分支 [32-39]：大喵动作与调整参数；任一位非数值 → null（结构不符） */
+function parseMomoDisableFields(
+  arr: unknown[],
+  csvForm: boolean,
+  poseTime: number | null
+): MomoActionParams | null {
+  const poseId = integerParamToken(arr[32], csvForm)
+  const horizontal = numericParamToken(arr[33], csvForm)
+  const distance = numericParamToken(arr[34], csvForm)
+  const height = numericParamToken(arr[35], csvForm)
+  const rotateMomo = numericParamToken(arr[36], csvForm)
+  const groundSnap = integerParamToken(arr[37], csvForm)
+  const floating = integerParamToken(arr[38], csvForm)
+  const withNikki = integerParamToken(arr[39], csvForm)
+  if (
+    poseId === null ||
+    horizontal === null ||
+    distance === null ||
+    height === null ||
+    rotateMomo === null ||
+    groundSnap === null ||
+    floating === null ||
+    withNikki === null
+  ) {
+    return null
+  }
+  return {
+    poseId,
+    poseTime,
+    horizontal: horizontal * MOMO_AXIS_SCALE,
+    distance: distance * MOMO_AXIS_SCALE,
+    height: height * MOMO_AXIS_SCALE,
+    rotateMomo: rotateMomo * MOMO_ROTATE_SCALE,
+    autoGroundSnap: groundSnap === 1,
+    floatingEffect: floating === 1,
+    poseWithNikki: withNikki === 1
+  }
+}
+
+/** V3 [40-42] 暖暖动作：pose_id 与 in_idle 均为整数才有动作信息（否则 null = 无值）；
+ * playing_percent 数值 → 值，字符串/空占位 → null（对齐上游 untagged Num/String 语义） */
+function parseNikkiPoseFields(arr: unknown[], csvForm: boolean): NikkiPoseInfo | null {
+  const poseId = integerParamToken(arr[40], csvForm)
+  const inIdle = integerParamToken(arr[42], csvForm)
+  if (poseId === null || inIdle === null) return null
+  return {
+    poseId,
+    playingPercent: numericParamToken(arr[41], csvForm),
+    inIdle: inIdle === 1
+  }
+}
+
+/** 版本分流结果：tail 字段仅在匹配到已知版本结构时给出 */
+interface CameraParamsTail {
+  version: Exclude<CameraParamsVersion, 'unknown'>
+  momoAction?: MomoActionParams | null
+  nikkiPoseInfo?: NikkiPoseInfo | null
+}
+
+/**
+ * 按版本分流解析数组尾部（对齐上游 untagged V1→V2→V3 完整消费语义）。
+ * 长度互斥 + flag + 元素类型一致性共同决定版本；flag≠1 一律按 Enable
+ * （上游 match _ => Enable）。无法匹配 → null（调用方降级 unknown）。
+ */
+function matchCameraParamsTail(arr: unknown[], csvForm: boolean): CameraParamsTail | null {
+  const len = arr.length
+  if (len === 31) return { version: 'v1' }
+
+  if (len === 32 || len === 40) {
+    const flag = integerParamToken(arr[31], csvForm)
+    if (flag === null) return null
+    if (flag === 1) {
+      // Disable：大喵可见，40 位才完整（32 位为截断 → 结构不符）
+      if (len !== 40) return null
+      const momo = parseMomoDisableFields(arr, csvForm, null)
+      return momo ? { version: 'v2', momoAction: momo } : null
+    }
+    // Enable：大喵隐藏，仅 32 位完整（40 位但 flag≠1 为内部不一致 → 降级）
+    if (len !== 32) return null
+    return { version: 'v2', momoAction: null }
+  }
+
+  if (len === 44) {
+    const flag = integerParamToken(arr[31], csvForm)
+    if (flag === null) return null
+    const nikkiPoseInfo = parseNikkiPoseFields(arr, csvForm)
+    if (flag === 1) {
+      // Disable：[32-39] 与 [43] 均为数值
+      const poseTime = numericParamToken(arr[43], csvForm)
+      if (poseTime === null) return null
+      const momo = parseMomoDisableFields(arr, csvForm, poseTime)
+      if (!momo) return null
+      return { version: 'v3', momoAction: momo, nikkiPoseInfo }
+    }
+    // Enable：[32-39] 与 [43] 均为字符串型空占位
+    for (let i = 32; i <= 39; i++) {
+      if (!isEnablePlaceholder(arr[i], csvForm)) return null
+    }
+    if (!isEnablePlaceholder(arr[43], csvForm)) return null
+    return { version: 'v3', momoAction: null, nikkiPoseInfo }
+  }
+
+  return null
+}
+
 function parseCameraParams(text: string): CameraParams | undefined {
   if (!text) return undefined
 
   let arr: unknown[]
+  let csvForm = false
   text = text.trim()
 
-  if (text.startsWith('{')) {
-    const obj = JSON.parse(text) as Record<string, unknown>
-    const camera = obj.camera
-    if (!Array.isArray(camera) || camera.length < 31) return undefined
-    arr = camera
-  } else if (text.startsWith('[') && text.endsWith(']')) {
-    arr = JSON.parse(text) as unknown[]
-    if (arr.length < 31) return undefined
-  } else {
-    arr = text.split(',').map((v) => v.trim())
-    if (arr.length < 31) return undefined
+  try {
+    if (text.startsWith('{')) {
+      const obj = JSON.parse(text) as Record<string, unknown>
+      const camera = obj.camera
+      if (!Array.isArray(camera) || camera.length < 31) return undefined
+      arr = camera
+    } else if (text.startsWith('[') && text.endsWith(']')) {
+      arr = JSON.parse(text) as unknown[]
+      if (arr.length < 31) return undefined
+    } else {
+      arr = text.split(',').map((v) => v.trim())
+      if (arr.length < 31) return undefined
+      csvForm = true
+    }
+  } catch {
+    // 以 { 或 [ 开头但非法 JSON：与长度不足同样按"无法识别"降级（undefined → hasParams:false），不向上抛错
+    return undefined
   }
 
-  return {
+  // base 字段（[0-30]，V1/V2/V3 共享同一位序）——保持既有取值语义不变
+  const camera: CameraParams = {
     focalLength: Number(arr[14]) || 0,
     apertureSection: Number(arr[15]) || 0,
     brightness: Number(arr[22]) || 0,
@@ -373,8 +525,18 @@ function parseCameraParams(text: string): CameraParams | undefined {
       arr[17] && !isNoneParam(arr[17])
         ? { id: normalizeParamId(arr[17]), strength: Number(arr[18]) || 0 }
         : undefined,
+    cameraVersion: 'unknown',
     rawParams: text
   }
+
+  // 版本分流：tail 字段仅在匹配到已知版本结构时给出，否则保持 unknown 降级（保留 base + rawParams）
+  const tail = matchCameraParamsTail(arr, csvForm)
+  if (tail) {
+    camera.cameraVersion = tail.version
+    camera.momoAction = tail.momoAction
+    camera.nikkiPoseInfo = tail.nikkiPoseInfo
+  }
+  return camera
 }
 
 // ============================================================
@@ -393,6 +555,18 @@ function pick(obj: Record<string, unknown> | null | undefined, ...keys: string[]
 
 function num(v: unknown): number {
   return typeof v === 'number' ? v : typeof v === 'string' ? Number(v) || 0 : 0
+}
+
+/** 三态数值提取：有限数字 → 原值；非空数字字符串 → 数值；缺失/null/空串/非数字串 → null。
+ * 用于上游 OptionValue 语义字段（空串 "" 表示"存在但无值"）与可缺省枚举容器，
+ * 真实零值（如 WindIntensity=0 无风）必须保留，禁止用 num() 折叠 */
+function numOrNull(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v)
+    return Number.isFinite(n) ? n : null
+  }
+  return null
 }
 
 function bool(v: unknown): boolean {
@@ -422,6 +596,20 @@ function getSocialPhoto(json: SocialPhotoJSON): Record<string, unknown> | null {
 function getPhotoInfo(socialPhoto: Record<string, unknown>): Record<string, unknown> | null {
   const pi = pick(socialPhoto, 'photo_info', 'photoInfo', 'PhotoInfo')
   return typeof pi === 'object' && pi !== null ? (pi as Record<string, unknown>) : null
+}
+
+/**
+ * 地点标识：上游 SocialPhoto.TrackInfo.WorldID（v3.012 起新照片才有，旧照片整键缺失）。
+ * 三态语义：仅正安全整数可定位；空串/非数字/0/负数/小数一律 null，绝不折叠成 0。
+ */
+function extractWorldId(socialPhoto: Record<string, unknown> | null): number | null {
+  if (!socialPhoto) return null
+  const raw = pick(socialPhoto, 'TrackInfo', 'track_info', 'trackInfo')
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
+  const track = raw as Record<string, unknown>
+  const value = numOrNull(pick(track, 'WorldID', 'world_id', 'worldId'))
+  if (value === null || !Number.isSafeInteger(value) || value <= 0) return null
+  return value
 }
 
 /** Step 5a: 解析拍摄信息 */
@@ -455,18 +643,38 @@ function parsePhotographyInfo(json: SocialPhotoJSON): PhotographyInfo {
       }
     : null
 
-  // 地点（原始坐标）
+  // 地点（原始坐标 + 可选世界标识）
   let location: LocationInfo | null = null
   if (photoInfo) {
     const x = num(pick(photoInfo, 'nikki_loc_x', 'nikkiLocX', 'NikkiLocX'))
     const y = num(pick(photoInfo, 'nikki_loc_y', 'nikkiLocY', 'NikkiLocY'))
     const z = num(pick(photoInfo, 'nikki_loc_z', 'nikkiLocZ', 'NikkiLocZ'))
     location = { pos: { x, y, z }, name: null }
+    // 旧照片不写该键，保证既有 DTO 逐字段不变（回归锁）
+    const worldId = extractWorldId(socialPhoto)
+    if (worldId !== null) location.worldId = worldId
   }
 
   // 天气
   const weather = socialPhoto
     ? num(pick(socialPhoto, 'weather_type', 'weatherType', 'WeatherType')) || null
+    : null
+
+  // 拍照模式 / 风向 / 风力（顶层 NormalPhotoInfo 容器；旧照片整键缺失 → null。
+  // 容器内字段上游为必填 i8，此处仍按三态兜底；0 是真实枚举值如"无风"，必须保留）
+  const normalPhotoRaw = pick(json, 'normal_photo_info', 'normalPhotoInfo', 'NormalPhotoInfo')
+  const normalPhoto =
+    typeof normalPhotoRaw === 'object' && normalPhotoRaw !== null && !Array.isArray(normalPhotoRaw)
+      ? (normalPhotoRaw as Record<string, unknown>)
+      : null
+  const photoMode = normalPhoto
+    ? numOrNull(pick(normalPhoto, 'photo_mode', 'photoMode', 'PhotoMode'))
+    : null
+  const windIntensity = normalPhoto
+    ? numOrNull(pick(normalPhoto, 'wind_intensity', 'windIntensity', 'WindIntensity'))
+    : null
+  const windDirection = normalPhoto
+    ? numOrNull(pick(normalPhoto, 'wind_direction', 'windDirection', 'WindDirection'))
     : null
 
   // 照片墙
@@ -503,7 +711,35 @@ function parsePhotographyInfo(json: SocialPhotoJSON): PhotographyInfo {
     tasks.push({ type: 'interactive', tag: 0 })
   }
 
-  return { edit, date, time, location, weather, photoWall, tasks }
+  return {
+    edit,
+    date,
+    time,
+    location,
+    weather,
+    photoMode,
+    windIntensity,
+    windDirection,
+    photoWall,
+    tasks
+  }
+}
+
+/** Step 5g: 解析双人合照（联机）信息：顶层 MultiPlayerHandler 容器（旧照片/单人照缺失 → null）。
+ * 对齐上游 converter 仅保留 roleId/poseId/posePlayingPercent；
+ * PoseID/PosePlayingPercent 为上游 OptionValue：空串 "" 表示存在但无值 → null */
+function parseMultiPlayerInfo(json: SocialPhotoJSON): MultiPlayerInfo | null {
+  const raw = pick(json, 'multi_player_handler', 'multiPlayerHandler', 'MultiPlayerHandler')
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return null
+  const handler = raw as Record<string, unknown>
+  return {
+    // RoleID 上游为必填 i64，仍按三态兜底（非法数据不拖垮 pose 解析）
+    roleId: numOrNull(pick(handler, 'role_id', 'roleId', 'RoleID')),
+    poseId: numOrNull(pick(handler, 'pose_id', 'poseId', 'PoseID')),
+    posePlayingPercent: numOrNull(
+      pick(handler, 'pose_playing_percent', 'posePlayingPercent', 'PosePlayingPercent')
+    )
+  }
 }
 
 /** Step 5b: 解析暖暖信息 */
@@ -1104,15 +1340,31 @@ function decodeCameraParamsFromFile(
     logger.error('[decryption] parseInteractionParams failed:', err)
   }
 
+  let multiPlayer: MultiPlayerInfo | null | undefined
+  try {
+    multiPlayer = parseMultiPlayerInfo(socialPhoto)
+  } catch (err) {
+    logger.error('[decryption] parseMultiPlayerInfo failed:', err)
+  }
+
   logger.info('[decryption] Full parse result:', {
     hasPhotography: !!photography,
     hasNikki: !!nikki,
     hasDressing: !!dressing,
     clothesCount: dressing?.clothes.length ?? 0,
-    hasInteractions: !!interactions
+    hasInteractions: !!interactions,
+    hasMultiPlayer: multiPlayer != null
   })
 
-  return { hasParams: true, camera: richCamera, photography, nikki, dressing, interactions }
+  return {
+    hasParams: true,
+    camera: richCamera,
+    photography,
+    nikki,
+    dressing,
+    interactions,
+    multiPlayer
+  }
 }
 
 // ============================================================

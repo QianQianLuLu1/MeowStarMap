@@ -17,6 +17,10 @@ interface MockInfoRowPanelProps {
   emptyText?: ReactNode
   onCopy?: () => void
   copied?: boolean
+  groups?: {
+    title: string
+    rows: { label: string; value: string; image?: { kind: string; id: number } }[]
+  }[]
 }
 
 vi.mock('./InfoRowPanel', () => ({
@@ -30,6 +34,7 @@ vi.mock('./InfoRowPanel', () => ({
       data-title={props.title}
       data-loading-text={props.loadingText}
       data-empty-text={typeof props.emptyText === 'string' ? props.emptyText : 'reactnode'}
+      data-groups={JSON.stringify(props.groups ?? [])}
     >
       <button data-testid="copy-btn" onClick={props.onCopy}>
         copy
@@ -86,6 +91,15 @@ const mockT = (key: string): string => {
     'camera.momoHidden': '隐藏大喵',
     'camera.hidden': '已隐藏',
     'camera.notHidden': '未隐藏',
+    'camera.nikkiPoseAction': '暖暖动作',
+    'camera.playingPercent': '动作进度',
+    'camera.momoPose': '大喵动作',
+    'camera.momoPoseTime': '大喵动作进度',
+    'camera.momoAdjust': '大喵位置调整（左/前/高）',
+    'camera.momoRotate': '旋转大喵',
+    'camera.autoGroundSnap': '自动贴地',
+    'camera.floatingEffect': '漂浮特效',
+    'camera.poseWithNikki': '暖暖合拍',
     'camera.rawParams': '=== 原始参数 ===',
     'camera.cameraInfo': '相机信息',
     'camera.loading': '正在解析相机参数...',
@@ -143,6 +157,7 @@ const makeCamera = (over: Partial<RichCameraParams> = {}): RichCameraParams =>
     bloomIntensity: 0,
     bloomThreshold: 0,
     portraitMode: false,
+    cameraVersion: 'v1',
     rawParams: 'raw-data',
     zoom: 1,
     rotation: 0,
@@ -339,6 +354,80 @@ describe('formatCameraForCopy', () => {
     expect(text).toContain('隐藏大喵: 未隐藏')
   })
 
+  it('camera 包含 nikkiPoseInfo 时显示暖暖动作与进度（进度 ceil 取整）', () => {
+    const camera = makeCamera({
+      nikkiPoseInfo: { poseId: 1, playingPercent: 0.456, inIdle: false }
+    })
+    const text = formatCameraForCopy(camera, mockT)
+    expect(text).toContain('暖暖动作: 站立')
+    expect(text).toContain('动作进度: 46 %')
+  })
+
+  it('nikkiPoseInfo.playingPercent=null 时动作进度行不渲染（无值不伪造）', () => {
+    const camera = makeCamera({
+      nikkiPoseInfo: { poseId: 2, playingPercent: null, inIdle: true }
+    })
+    const text = formatCameraForCopy(camera, mockT)
+    expect(text).toContain('暖暖动作: #2')
+    expect(text).not.toContain('动作进度')
+  })
+
+  it('camera 包含 momoAction 时显示大喵动作、进度与调整参数', () => {
+    const camera = makeCamera({
+      momoAction: {
+        poseId: 7,
+        poseTime: 0.75,
+        horizontal: 100,
+        distance: -200,
+        height: 480,
+        rotateMomo: 135,
+        autoGroundSnap: true,
+        floatingEffect: false,
+        poseWithNikki: true
+      }
+    })
+    const text = formatCameraForCopy(camera, mockT)
+    expect(text).toContain('大喵动作: #7')
+    expect(text).toContain('大喵动作进度: 75 %')
+    expect(text).toContain('大喵位置调整（左/前/高）: 100 / -200 / 480 cm')
+    expect(text).toContain('旋转大喵: 135.0°')
+    expect(text).toContain('自动贴地: 是')
+    expect(text).toContain('漂浮特效: 否')
+    expect(text).toContain('暖暖合拍: 是')
+  })
+
+  it('momoAction.poseTime=null（V2 结构无该字段）时大喵动作进度行不渲染', () => {
+    const camera = makeCamera({
+      momoAction: {
+        poseId: 7,
+        poseTime: null,
+        horizontal: 0,
+        distance: 0,
+        height: 0,
+        rotateMomo: 0,
+        autoGroundSnap: false,
+        floatingEffect: false,
+        poseWithNikki: false
+      }
+    })
+    const text = formatCameraForCopy(camera, mockT)
+    expect(text).toContain('大喵动作: #7')
+    expect(text).not.toContain('大喵动作进度')
+  })
+
+  it('V1/unknown 数据不渲染任何动作相关新行（回归锁）', () => {
+    const camera = makeCamera({ cameraVersion: 'unknown' })
+    const text = formatCameraForCopy(camera, mockT)
+    expect(text).not.toContain('暖暖动作')
+    expect(text).not.toContain('动作进度')
+    expect(text).not.toContain('大喵动作')
+    expect(text).not.toContain('大喵位置调整')
+    expect(text).not.toContain('旋转大喵')
+    expect(text).not.toContain('自动贴地')
+    expect(text).not.toContain('漂浮特效')
+    expect(text).not.toContain('暖暖合拍')
+  })
+
   it('camera 包含 framedMoment 时显示定格', () => {
     const camera = makeCamera({ framedMoment: 42 })
     const text = formatCameraForCopy(camera, mockT)
@@ -385,5 +474,75 @@ describe('formatCameraForCopy', () => {
     expect(text).toContain('=== 相机参数代码 ===')
     expect(text).toContain('竖构图: 否')
     expect(text).not.toContain('=== 原始参数 ===')
+  })
+})
+
+describe('CameraInfoPanel — 动作行缩略图（阶段 5 CDN 图片）', () => {
+  type MockGroup = {
+    title: string
+    rows: { label: string; value: string; image?: { kind: string; id: number } }[]
+  }
+
+  const renderGroups = (camera: RichCameraParams): MockGroup[] => {
+    mockGameParamsResult.data = { camera }
+    render(<CameraInfoPanel file={makeFile()} />)
+    const raw = screen.getByTestId('info-row-panel').getAttribute('data-groups')
+    return JSON.parse(raw ?? '[]') as MockGroup[]
+  }
+
+  const findRow = (groups: MockGroup[], label: string) =>
+    groups.flatMap((g) => g.rows).find((r) => r.label === label)
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGameParamsResult.data = null
+    mockGameParamsResult.loading = false
+    mockGameParamsResult.error = null
+  })
+
+  it('暖暖动作行挂 nikkiPose 图片（poseId 为数字资源取值）', () => {
+    const groups = renderGroups(
+      makeCamera({ nikkiPoseInfo: { poseId: 7, playingPercent: null, inIdle: false } })
+    )
+    expect(findRow(groups, '暖暖动作')?.image).toEqual({ kind: 'nikkiPose', id: 7 })
+  })
+
+  it('大喵动作行挂 momoPose 图片', () => {
+    const groups = renderGroups(
+      makeCamera({
+        momoAction: {
+          poseId: 9,
+          poseTime: null,
+          horizontal: 0,
+          distance: 0,
+          height: 0,
+          rotateMomo: 0,
+          autoGroundSnap: false,
+          floatingEffect: false,
+          poseWithNikki: false
+        }
+      })
+    )
+    expect(findRow(groups, '大喵动作')?.image).toEqual({ kind: 'momoPose', id: 9 })
+  })
+
+  it('poseId 非正整数 → 不挂 image（fail-closed，保持纯文字）', () => {
+    const groups = renderGroups(
+      makeCamera({ nikkiPoseInfo: { poseId: 0, playingPercent: null, inIdle: true } })
+    )
+    const row = findRow(groups, '暖暖动作')
+    expect(row).toBeDefined()
+    expect(row?.image).toBeUndefined()
+  })
+
+  it('灯光/滤镜行保持纯文字（枚举名 id 无数字映射，本轮不接）', () => {
+    const groups = renderGroups(
+      makeCamera({
+        light: { id: 'light1', strength: 0.5 },
+        filter: { id: 'filter1', strength: 0.5 }
+      })
+    )
+    expect(findRow(groups, '灯光')?.image).toBeUndefined()
+    expect(findRow(groups, '滤镜')?.image).toBeUndefined()
   })
 })

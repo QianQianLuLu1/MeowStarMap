@@ -13,6 +13,8 @@
  */
 import type { FilterParams } from './editor'
 import type { WatermarkConfig } from './watermark'
+import type { NetworkImageTemplateKind } from '../network-image-kinds'
+export type { NetworkImageTemplateKind } from '../network-image-kinds'
 import type {
   AssetDetailResponse,
   AssetSummary,
@@ -586,6 +588,75 @@ export interface ClearClothCacheResponse {
     clearedSize: number
   }
   message?: string
+}
+
+// ============ 外部参考数据（refdata:，上游 nikki_albums 热更管线） ============
+
+/** `refdata:get-world-map-tiles` 单条：某世界的瓦片模板与坐标换算参数（v1.db Nuan5WorldMapTileInfo） */
+export interface WorldMapTileInfo {
+  /** 游戏世界 ID（v1.db world map 的键） */
+  worldId: number
+  /** 瓦片 URL 模板（含 {z}/{x}/{y} 类占位，形似上游 flutter_map TileLayer 入参） */
+  urlTemplate: string
+  minZoom: number
+  maxZoom: number
+  /** 最大 zoom 下整张地图的像素尺寸（坐标换算分母基准） */
+  mapWidthOfMaxZoom: number
+  mapHeightOfMaxZoom: number
+  /** 地图原点（游戏坐标 → 瓦片像素坐标的换算基准点） */
+  originalPointX: number
+  originalPointY: number
+  /** 每游戏单位的像素数 */
+  pxPreUnit: number
+}
+
+/** `refdata:get-network-image-templates` 单条：某类图片的 CDN 地址模板 */
+export interface NetworkImageTemplateInfo {
+  kind: NetworkImageTemplateKind
+  /** URL 基模板（含占位串） */
+  baseUrl: string
+  /** 占位串（消费方以 baseUrl.replaceAll(replace, 实际值) 拼最终 URL） */
+  replace: string
+}
+
+/** `refdata:*` 状态里的单包安装态（versionId 为上游 GUID；未安装为 null） */
+export interface ReferenceDataPackageStatus {
+  id: string
+  versionId: string | null
+}
+
+/** `refdata:get-status` / `refdata:refresh` 返回：参考数据管道整体状态 */
+export interface ReferenceDataStatus {
+  /** v1.db 索引可用（瓦片/图片模板查询面就绪）；false 时查询面返回空数组 */
+  available: boolean
+  packages: ReferenceDataPackageStatus[]
+  lastCheckedAt: string | null
+  /** 最近一次检查/下载/解密失败的阶段与原因（fail-soft 降级时的诊断线索） */
+  lastError: string | null
+  updating: boolean
+}
+
+/**
+ * `refdata:resolve-image` 的语义化状态（诊断用；渲染层只消费 path）：
+ * - `cached` 命中未过期缓存（零网络）
+ * - `fetched` 本次网络取图成功并已落盘
+ * - `unauthorized` 主机未授权 / 模板缺失 / 入参非法 / 镜像非法 —— 一律不接入
+ * - `not-found` 资源不存在（404/403/410），含负缓存期内的复用判定
+ * - `cooldown` 失败冷却期内，刻意不发请求（授权条款禁高频）
+ * - `error` 网络/超时/超限/校验失败/写盘失败
+ * - `disabled` userData 不可得，缓存停用
+ */
+export type ReferenceImageStatus =
+  'cached' | 'fetched' | 'unauthorized' | 'not-found' | 'cooldown' | 'error' | 'disabled'
+
+/**
+ * `refdata:resolve-image` 返回：一张参考图片的本机缓存解析结果。
+ * `path` 为可直接拼 `media://file?path=` 的绝对路径；不可用时为 null，渲染层回退占位。
+ * 该通道**永不 reject**（fail-soft），失败语义全部落在 status 上。
+ */
+export interface ReferenceImageResolveResult {
+  path: string | null
+  status: ReferenceImageStatus
 }
 
 // ============ 任务 ============

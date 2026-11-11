@@ -21,9 +21,13 @@ import { resolveAppIconPath } from './app-icon-path'
 // 与 src/renderer/index.html 的 meta CSP 必须逐字一致，改一处要同步改另一处。
 // 单独一处都能被绕过：响应头缺失时靠 meta，HTML 被替换时靠响应头。
 // img-src 放行 https://cdn.gongeo.us：搭配码服饰图标（gongeo CDN，见 src/main/services/cloth-data-config.ts）。
+// img-src 放行 https://assets.papegames.com：游戏官方「奇迹大陆大地图」瓦片（v1.db urlTemplate 实采 host）。
+//   该资源不要求额外 User-Agent（nikki_albums #20 条款 6），故 cdn-user-agent.ts 保持不变；
+//   上游作者自有 CDN（cdn.nikkialbums.com）仅授权图片资源，瓦片一律不接入。
 const CSP_POLICY =
   "default-src 'self'; script-src 'self'; object-src 'none'; " +
-  "img-src 'self' media: data: https://cdn.gongeo.us; media-src 'self' media:; style-src 'self' 'unsafe-inline'"
+  "img-src 'self' media: data: https://cdn.gongeo.us https://assets.papegames.com; " +
+  "media-src 'self' media:; style-src 'self' 'unsafe-inline'"
 
 // D1 保险丝：ready-to-show 与 did-finish-load 双兜底均失效的极端情况下，
 // 15s 后强制恢复调度器，避免启动扫描任务因调度器永久暂停而静默不触发

@@ -22,7 +22,7 @@
  * 5. `electron`：与基座 `vitest.config.ts` 一致，走 `tests/mocks/electron-inert.ts` 惰性替身。
  *    （装置曾把它指向必抛错的壳来复刻 CI；基座加了别名之后 CI 也不再加载真 electron，
  *    于是这一轴改为「与基座同形」，由自检用例断言替身确实生效。）
- * 6. 原生绑定装载时机：`sharp` 在轴 2 改写 `process.platform` **之前**预载，
+ * 6. 原生绑定装载时机：`sharp` / `koffi` 在轴 2 改写 `process.platform` **之前**预载，
  *    装置里用的是真 sharp 而不是惰性替身（`video-frame.test.ts` 要真 sharp 造素材）。
  * 7. `node:sqlite`：库文件路径经轴 4 同一套 `toReal` 交给原生句柄（工厂见
  *    `./mocks/ci-linux-sqlite`）。sqlite 的构造器拿的是 OS 语义的真路径，轴 4 只接管 `fs` API
@@ -91,6 +91,11 @@ setHostPaths({ tmp: hostTmp, devNull: realOs.devNull })
  * 不 try/catch：预载失败就该打死整个 profile，而不是退回「一片文件静默 collect 失败」。
  */
 await import('sharp')
+
+// koffi 同理：绑定三元组在首次装载时按 process.platform 计算（detectPlatform），
+// 改写后去找 linux 绑定 ⇒ 顶层 import koffi 的 decryption-native.test.ts 整文件收集失败
+// （其 describe.skipIf 来不及生效）。真 CI（ubuntu）装的是真 linux 绑定，不受影响。
+await import('koffi')
 
 // ---------- 轴 2 / 3：宿主身份 ----------
 Object.defineProperty(process, 'platform', { value: 'linux', configurable: true })

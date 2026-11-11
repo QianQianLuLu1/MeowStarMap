@@ -750,10 +750,10 @@ describe('lifecycle - bootstrapApplication', () => {
       const initialLen = ctx.startupTimers.length
       await bootstrapApplication(ctx)
 
-      // 应该 push 了 3 个定时器：autoScan + LRU + crash cleanup
+      // 应该 push 了 4 个定时器：autoScan + LRU + crash cleanup + reference-data check
       // （自动更新不再 push 定时器——阶段 6.5 仅注册监听器，更新由用户手动触发；
       //   后台完整性自检默认不触发）
-      expect(ctx.startupTimers.length).toBe(initialLen + 3)
+      expect(ctx.startupTimers.length).toBe(initialLen + 4)
     })
 
     it('23. autoScanOnStartup=false 时不 push 扫描定时器', async () => {
@@ -770,8 +770,8 @@ describe('lifecycle - bootstrapApplication', () => {
       const initialLen = ctx.startupTimers.length
       await bootstrapApplication(ctx)
 
-      // 应该 push 了 2 个定时器：LRU + crash cleanup（无 autoScan，无 update 定时器）
-      expect(ctx.startupTimers.length).toBe(initialLen + 2)
+      // 应该 push 了 3 个定时器：LRU + crash cleanup + reference-data check（无 autoScan，无 update 定时器）
+      expect(ctx.startupTimers.length).toBe(initialLen + 3)
     })
 
     it('24. LRU 后台任务 + 崩溃清理定时器均被 push', async () => {
@@ -808,8 +808,8 @@ describe('lifecycle - bootstrapApplication', () => {
       await vi.advanceTimersByTimeAsync(STARTUP_SCAN_DELAY_MS)
       await promise
 
-      // autoScan=false：integrity-check + LRU + crash cleanup = 3 个定时器（无 update 定时器）
-      expect(ctx.startupTimers.length).toBe(initialLen + 3)
+      // autoScan=false：integrity-check + LRU + crash cleanup + reference-data check = 4 个定时器
+      expect(ctx.startupTimers.length).toBe(initialLen + 4)
       expect(ctx.taskScheduler.enqueueLow).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({ id: 'startup-integrity-check' })
@@ -1048,5 +1048,78 @@ describe('lifecycle - bootstrapApplication', () => {
       // 不应该调用 app.exit
       expect(m.appExitMock).not.toHaveBeenCalled()
     })
+  })
+})
+
+// ===== T5-A：referenceData.autoUpdate 开关 =====
+describe('参考数据开机自动检查开关', () => {
+  beforeEach(() => {
+    // 与主 describe 同款重置：单实例锁 / whenReady 等桩状态会跨用例残留
+    resetMockCalls()
+    m.requestSingleInstanceLockMock.mockReturnValue(true)
+    m.whenReadyMock.mockResolvedValue(undefined)
+    m.appGetPathMock.mockImplementation((p: string) => `/mock/${p}`)
+    m.dialogShowMessageBoxMock.mockResolvedValue({ response: 0 })
+    m.getProcessRegistryStatsMock.mockReturnValue({
+      childProcessCount: 0,
+      ffmpegCommandCount: 0
+    })
+    m.getCrashDirectoryMock.mockReturnValue('/mock/crash')
+    m.execFileSyncMock.mockReturnValue('')
+    m.performCleanupMock.mockResolvedValue(undefined)
+    m.appIsPackagedMock = true
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('autoUpdate=false → 不 push 开机检查定时器（相对默认态少 1 个）', async () => {
+    const offCtx = makeLifecycleCtx()
+    ;(offCtx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, dflt: unknown) => {
+        if (key === 'referenceData.autoUpdate') return false
+        if (key === 'autoScanOnStartup') return true
+        if (key === 'uiTheme') return 'default'
+        return dflt
+      }
+    )
+    const onCtx = makeLifecycleCtx()
+    ;(onCtx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, dflt: unknown) => {
+        if (key === 'referenceData.autoUpdate') return true
+        if (key === 'autoScanOnStartup') return true
+        if (key === 'uiTheme') return 'default'
+        return dflt
+      }
+    )
+
+    const offLen = offCtx.startupTimers.length
+    await bootstrapApplication(offCtx)
+    const offAdded = offCtx.startupTimers.length - offLen
+
+    const onLen = onCtx.startupTimers.length
+    await bootstrapApplication(onCtx)
+    const onAdded = onCtx.startupTimers.length - onLen
+
+    expect(onAdded - offAdded).toBe(1)
+    expect(offCtx.taskScheduler.enqueueLow).not.toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ id: 'startup-reference-data-check' })
+    )
+  })
+
+  it('边界：键缺省（getSetting 回落默认 true）→ 保持既有开机检查行为', async () => {
+    const ctx = makeLifecycleCtx()
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, dflt: unknown) => {
+        if (key === 'autoScanOnStartup') return true
+        if (key === 'uiTheme') return 'default'
+        return dflt
+      }
+    )
+    const initialLen = ctx.startupTimers.length
+    await bootstrapApplication(ctx)
+    expect(ctx.startupTimers.length).toBe(initialLen + 4)
   })
 })

@@ -11,6 +11,7 @@ import {
   ProfileManageSection,
   DataBackupSection,
   DataCacheClearSection,
+  ReferenceDataMirrorSection,
   DiagnosticsGpuSection,
   DiagnosticsLogsSection,
   DiagnosticsCrashSection,
@@ -113,6 +114,11 @@ const SETTINGS_GROUPS: GroupDef[] = [
         id: 'data-cache-clear',
         nameKey: 'settings.sections.cacheCleanup',
         component: DataCacheClearSection
+      },
+      {
+        id: 'data-reference',
+        nameKey: 'settings.sections.referenceData',
+        component: ReferenceDataMirrorSection
       }
     ]
   },

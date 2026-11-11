@@ -10,7 +10,7 @@
  *    → beforeEach 调用 invalidateMediaPathCache() 清空
  * 3. handler 是 async + 多分支（视频/图片 + Range/无 Range）
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import path from 'path'
 import { Readable } from 'node:stream'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
@@ -82,6 +82,14 @@ import {
   clearNikkiSyncResourcePaths,
   registerNikkiSyncResourcePaths
 } from '../../nikkisync/resource-allowlist'
+// 规则 5 的目录事实来源：不 mock 服务，直接经测试注入 seam 定住 userData，
+// 这样「写缓存的一侧」与「放行供图的一侧」共用同一个 getReferenceImageCacheDir()，
+// 路径口径漂移会让本组用例当场变红
+import {
+  setReferenceImageDeps,
+  disposeReferenceImageService,
+  getReferenceImageCacheDir
+} from '../../services/reference-image-service'
 
 // 捕获 protocol.handle 注册的 handler
 let mediaHandler:
@@ -1086,5 +1094,129 @@ describe('media:// 响应体流安全（2026-10-15 启动闪退修复）', () =>
     expect(done).toBe(true)
     await reader.cancel()
     await reader.cancel()
+  })
+})
+
+describe('media:// 第 5 条规则：参考数据 CDN 图片缓存目录（阶段 5）', () => {
+  /**
+   * 阶段 5 把 `cdn.nikkialbums.com`（RanAxro/nikki_albums#20 授权）的图片收敛到
+   * 主进程取图 + 磁盘缓存，渲染层只引用 `media://file?path=<缓存文件>`，永不直连该主机。
+   * 本组用例锁五件事：
+   * ① 缓存目录内的图片扩展名可示；② 扩展名闸门仍生效（目录内也不放 .json）；
+   * ③ 目录外 / 前缀伪装 / `..` 穿越一律 403；④ 本 App DB 未就绪不影响该规则
+   * （缓存目录由 reference-image-service 独立管理，与规则 4 同理）；
+   * ⑤ 目录不可解析时按「规则不适用」降级，绝不把其余规则一起拖成拒绝。
+   */
+  const USER_DATA = '/mock/refimg-userdata'
+
+  function cacheDir(): string {
+    const dir = getReferenceImageCacheDir()
+    if (!dir) throw new Error('测试前置失败：参考图片缓存目录不可解析')
+    return dir
+  }
+
+  function register(db?: unknown): NonNullable<typeof mediaHandler> {
+    const ctx = makeAppCtx(db === undefined ? {} : ({ db } as never))
+    registerMediaProtocol(ctx)
+    return protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+  }
+
+  beforeEach(() => {
+    setReferenceImageDeps({ getUserDataDir: () => USER_DATA })
+    invalidateMediaPathCache()
+  })
+
+  afterEach(() => {
+    disposeReferenceImageService()
+    invalidateMediaPathCache()
+  })
+
+  it('40. 缓存目录内的 .webp 返回 200（DB 无任何匹配）', async () => {
+    const target = path.join(cacheDir(), 'a'.repeat(64) + '.webp')
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('41. 缓存目录内的 .png 返回 200（无扩展名资源按 .png 落盘的形态）', async () => {
+    const target = path.join(cacheDir(), 'b'.repeat(64) + '.png')
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('42. 扩展名闸门：缓存目录内的 .json 仍返回 403', async () => {
+    const target = path.join(cacheDir(), 'meta.json')
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('43. 缓存目录外的图片返回 403（不做 userData 级授权）', async () => {
+    const target = path.join(USER_DATA, 'reference-data', 'packages', 'nuan5_database', 'v1.jpg')
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('44. 前缀伪装目录返回 403（<缓存目录>-evil 不算目录下）', async () => {
+    const target = path.join(`${cacheDir()}-evil`, 'c'.repeat(64) + '.webp')
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('45. `..` 穿越逃出缓存目录返回 403（即便目标是图片扩展名）', async () => {
+    const target = `${cacheDir()}${path.sep}..${path.sep}thumb.jpg`
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('46. 本 App DB 为 null 时该规则仍生效（缓存目录与业务库彼此独立）', async () => {
+    const target = path.join(cacheDir(), 'd'.repeat(64) + '.webp')
+    const response = await register(null)(makeRequest(target))
+    expect(response.status).toBe(200)
+  })
+
+  it('47. realpath 逃逸：请求路径在目录内但解引用到目录外 ⇒ 403', async () => {
+    const target = path.join(cacheDir(), 'link.webp')
+    fsRealpathMock.mockImplementation(async () => 'C:/Windows/system.webp')
+    const response = await register(makeDb(() => undefined))(makeRequest(target))
+    expect(response.status).toBe(403)
+  })
+
+  it('48. Windows 大小写差异不裂图：请求小写形式仍命中', async () => {
+    const target = path.join(cacheDir(), 'E'.repeat(64) + '.WEBP')
+    const response = await register(makeDb(() => undefined))(makeRequest(target.toLowerCase()))
+    expect(response.status).toBe(200)
+  })
+
+  it('49. 目录不可解析（userData 不可得）时按规则不适用降级，缩略图规则零回归', async () => {
+    setReferenceImageDeps({ getUserDataDir: () => '' })
+    expect(getReferenceImageCacheDir()).toBeNull()
+    const ctx = makeAppCtx({
+      db: makeDb(() => undefined),
+      thumbnailGen: { getCacheDir: vi.fn(() => '/mock/cache'), generate: vi.fn() }
+    })
+    registerMediaProtocol(ctx)
+    const handler = protocolHandleMock.mock.calls[
+      protocolHandleMock.mock.calls.length - 1
+    ][1] as typeof mediaHandler
+
+    // 既有规则 1（缩略图目录）不受影响
+    expect((await handler(makeRequest(`/mock/cache${path.sep}thumb_001.jpg`))).status).toBe(200)
+    // 规则 5 不适用 ⇒ 目录形态的路径回落 403，而不是把整张白名单放开
+    expect(
+      (
+        await handler(
+          makeRequest(path.join(USER_DATA, 'reference-data', 'reference-images', 'x.webp'))
+        )
+      ).status
+    ).toBe(403)
+  })
+
+  it('50. isMediaPathAllowed 直接调用同口径（读通道与展示通道一致）', () => {
+    const ctx = makeAppCtx({ db: makeDb(() => undefined) })
+    const inside = path.join(cacheDir(), 'f'.repeat(64) + '.webp')
+    const outside = path.join(USER_DATA, 'reference-data', 'packages', 'v1.webp')
+    expect(isMediaPathAllowed(ctx, pathOf(inside).resolve(inside))).toBe(true)
+    expect(isMediaPathAllowed(ctx, pathOf(outside).resolve(outside))).toBe(false)
   })
 })

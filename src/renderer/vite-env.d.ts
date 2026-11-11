@@ -214,6 +214,33 @@ interface WindowElectronAPI {
           portraitMode: boolean
           filter?: { id: string; strength: number }
           light?: { id: string; strength: number }
+          /**
+           * 相机参数结构版本（对齐上游 untagged V1/V2/V3，判定依据是结构而非 version 字段）；
+           * 无法匹配任何已知版本结构时降级为 'unknown'
+           */
+          cameraVersion: 'v1' | 'v2' | 'v3' | 'unknown'
+          /** 暖暖动作信息（CameraParams 数组 V3 [40-42]；V1/V2 缺省，空占位 → null） */
+          nikkiPoseInfo?: {
+            poseId: number
+            /** 动作进度 0–1（空占位 → null，真实 0 保留） */
+            playingPercent: number | null
+            inIdle: boolean
+          } | null
+          /** 大喵动作参数（CameraParams 数组 V2+ Disable 分支；Enable 隐藏态 → null，V1/unknown 缺省） */
+          momoAction?: {
+            poseId: number
+            /** 动作进度 0–1（仅 V3 有此字段；V2 结构缺失 → null） */
+            poseTime: number | null
+            /** 左右/前后/高度调整（上游换算 ×400 后的厘米值） */
+            horizontal: number
+            distance: number
+            height: number
+            /** 旋转大喵（上游换算 ×180 后的角度值） */
+            rotateMomo: number
+            autoGroundSnap: boolean
+            floatingEffect: boolean
+            poseWithNikki: boolean
+          } | null
           rawParams: string
           // RichCameraParams 新增字段
           zoom: number
@@ -231,9 +258,24 @@ interface WindowElectronAPI {
           time: { hour: number; minute: number; second: number } | null
           location: { pos: { x: number; y: number; z: number }; name: string | null } | null
           weather: number | null
+          /** 拍照模式 ID（顶层 NormalPhotoInfo.PhotoMode；旧照片缺失 → null；0=普通拍照 是真实值） */
+          photoMode?: number | null
+          /** 风力等级（顶层 NormalPhotoInfo.WindIntensity；缺失 → null；0=无风 是真实值） */
+          windIntensity?: number | null
+          /** 风向 ID（顶层 NormalPhotoInfo.WindDirection；缺失 → null；0=东 是真实值） */
+          windDirection?: number | null
           photoWall: number[]
           tasks: Array<{ type: 'puzzle' | 'risk' | 'interactive'; tag: number }>
         }
+        /** 双人合照（联机）对方信息（顶层 MultiPlayerHandler；缺失 → null/缺省） */
+        multiPlayer?: {
+          /** 对方角色 ID（上游必填 i64；解析保留但 UI 不展示） */
+          roleId: number | null
+          /** 对方动作 ID（空串 → null） */
+          poseId: number | null
+          /** 对方动作进度（0–1；空串 → null） */
+          posePlayingPercent: number | null
+        } | null
         nikki?: {
           giantState: boolean
           hidden: boolean
@@ -1216,6 +1258,22 @@ interface WindowElectronAPI {
       assetId: string,
       patch: import('../shared/types/electron-api').AssetEditsPatchInfo
     ) => Promise<{ edit: import('../shared/types/electron-api').AssetEditsInfo | null }>
+  }
+  // 外部参考数据管道（总计划阶段 1：状态/刷新/地图瓦片/图片模板，查询面 fail-soft；
+  // 阶段 5：resolveImage 按需解析 CDN 图片为本机缓存路径）
+  referenceData: {
+    getStatus: () => Promise<import('../shared/types/electron-api').ReferenceDataStatus>
+    refresh: () => Promise<import('../shared/types/electron-api').ReferenceDataStatus>
+    getWorldMapTiles: () => Promise<{
+      tiles: import('../shared/types/electron-api').WorldMapTileInfo[]
+    }>
+    getNetworkImageTemplates: () => Promise<{
+      templates: import('../shared/types/electron-api').NetworkImageTemplateInfo[]
+    }>
+    resolveImage: (
+      kind: import('../shared/types/electron-api').NetworkImageTemplateKind,
+      id: number
+    ) => Promise<import('../shared/types/electron-api').ReferenceImageResolveResult>
   }
   // T10：缩略图缓存管理
   cache: {

@@ -1,6 +1,8 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconCopy } from '../../icons'
+import type { NetworkImageTemplateKind } from '../../../shared/types/electron-api'
+import { ReferenceImage } from './ReferenceImage'
 
 /**
  * P1-U1：5 个 InfoPanel 组件的公共渲染载体
@@ -18,12 +20,35 @@ import { IconCopy } from '../../icons'
 export interface InfoRow {
   label: string
   value: string
+  /** 可选行内缩略图（参考数据 CDN 图片，按需加载、失败回退占位；不传则纯文字） */
+  image?: { kind: NetworkImageTemplateKind; id: number }
 }
 
 export interface ParamGroup {
   title: string
   rows: InfoRow[]
 }
+
+/** 行值渲染（groups/rows 两路径共用）：有 image 时值文字左侧挂按需缩略图 */
+const RowValue: React.FC<{ row: InfoRow; valueClass: string; isDark: boolean }> = ({
+  row,
+  valueClass,
+  isDark
+}) => (
+  <span
+    className={`flex-1 break-all font-mono ${valueClass}`}
+    style={!isDark ? { color: 'var(--text-primary)' } : undefined}
+  >
+    {row.image ? (
+      <span className="inline-flex items-center gap-1.5 align-middle">
+        <ReferenceImage kind={row.image.kind} id={row.image.id} />
+        <span>{row.value}</span>
+      </span>
+    ) : (
+      row.value
+    )}
+  </span>
+)
 
 interface InfoRowPanelProps {
   /** 标题左侧图标 */
@@ -184,12 +209,7 @@ export const InfoRowPanel: React.FC<InfoRowPanelProps> = ({
                       >
                         {row.label}
                       </span>
-                      <span
-                        className={`flex-1 break-all font-mono ${th.value}`}
-                        style={!isDark ? { color: 'var(--text-primary)' } : undefined}
-                      >
-                        {row.value}
-                      </span>
+                      <RowValue row={row} valueClass={th.value} isDark={isDark} />
                     </div>
                   ))}
                 </div>
@@ -209,12 +229,7 @@ export const InfoRowPanel: React.FC<InfoRowPanelProps> = ({
                 >
                   {row.label}
                 </span>
-                <span
-                  className={`flex-1 break-all font-mono ${th.value}`}
-                  style={!isDark ? { color: 'var(--text-primary)' } : undefined}
-                >
-                  {row.value}
-                </span>
+                <RowValue row={row} valueClass={th.value} isDark={isDark} />
               </div>
             ))}
           </div>

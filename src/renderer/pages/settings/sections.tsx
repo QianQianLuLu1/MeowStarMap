@@ -34,6 +34,8 @@ export { LanguageSection } from './language-sections'
 export { ToolsShareCodeSection } from './tools-sections'
 // 插件管理区块
 export { PluginManageSection } from './plugin-sections'
+// 外部参考数据区块（图片加速入口 + 参考数据镜像站点，用户自配、应用不代建节点）
+export { ReferenceDataMirrorSection } from './reference-data-sections'
 // 同步服务区块已随「同步图库」板块化迁出：现由
 // src/renderer/pages/sync-gallery/SyncServicePage.tsx 承载，不再走本 barrel。
 

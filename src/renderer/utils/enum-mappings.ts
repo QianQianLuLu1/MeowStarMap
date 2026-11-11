@@ -63,6 +63,45 @@ export const WEATHER_TYPE_MAP: Record<number, string> = {
   7: 'enums.weather.7'
 }
 
+// ── 拍照模式（PhotoMode → 上游语言包 media_params.photo_mode）──
+/** 上游已知取值集合（唯一真相源见上游 nikki_albums assets/lang/infinity_nikki/zh-CN.json） */
+export const PHOTO_MODE_VALUES = [0, 1, 2, 3] as const
+export type PhotoModeValue = (typeof PHOTO_MODE_VALUES)[number]
+export const PHOTO_MODE_MAP: Record<number, string> = {
+  0: 'enums.photoMode.0',
+  1: 'enums.photoMode.1',
+  2: 'enums.photoMode.2',
+  3: 'enums.photoMode.3'
+} satisfies Record<PhotoModeValue, string>
+
+// ── 风力（WindIntensity → 上游语言包 media_params.wind_intensity）──
+export const WIND_INTENSITY_VALUES = [-1, 0, 1, 2, 3, 4] as const
+export type WindIntensityValue = (typeof WIND_INTENSITY_VALUES)[number]
+export const WIND_INTENSITY_MAP: Record<number, string> = {
+  [-1]: 'enums.windIntensity.neg1',
+  0: 'enums.windIntensity.0',
+  1: 'enums.windIntensity.1',
+  2: 'enums.windIntensity.2',
+  3: 'enums.windIntensity.3',
+  4: 'enums.windIntensity.4'
+} satisfies Record<WindIntensityValue, string>
+
+// ── 风向（WindDirection → 上游语言包 media_params.wind_direction）──
+export const WIND_DIRECTION_VALUES = [-1, 0, 1, 2, 3, 4, 5, 6, 7, 8] as const
+export type WindDirectionValue = (typeof WIND_DIRECTION_VALUES)[number]
+export const WIND_DIRECTION_MAP: Record<number, string> = {
+  [-1]: 'enums.windDirection.neg1',
+  0: 'enums.windDirection.0',
+  1: 'enums.windDirection.1',
+  2: 'enums.windDirection.2',
+  3: 'enums.windDirection.3',
+  4: 'enums.windDirection.4',
+  5: 'enums.windDirection.5',
+  6: 'enums.windDirection.6',
+  7: 'enums.windDirection.7',
+  8: 'enums.windDirection.8'
+} satisfies Record<WindDirectionValue, string>
+
 // ── 光圈档位（ApertureSection enum → zh-CN.json media_params.aperture_section）──
 export const APERTURE_SECTION_MAP: Record<number, string> = {
   [-1]: 'enums.aperture.neg1',
@@ -238,6 +277,21 @@ export function getClothTypeName(clothType: number): string {
 /** 根据 weather_type 获取天气名称，未知类型返回 null */
 export function getWeatherName(weatherType: number): string | null {
   return WEATHER_TYPE_MAP[weatherType] ?? null
+}
+
+/** 根据 photo_mode 获取拍照模式名称，未知类型返回 null */
+export function getPhotoModeName(photoMode: number): string | null {
+  return PHOTO_MODE_MAP[photoMode] ?? null
+}
+
+/** 根据 wind_intensity 获取风力名称，未知类型返回 null */
+export function getWindIntensityName(windIntensity: number): string | null {
+  return WIND_INTENSITY_MAP[windIntensity] ?? null
+}
+
+/** 根据 wind_direction 获取风向名称，未知类型返回 null */
+export function getWindDirectionName(windDirection: number): string | null {
+  return WIND_DIRECTION_MAP[windDirection] ?? null
 }
 
 /** 根据 pose_id 获取动作名称，未知 ID 返回 null */

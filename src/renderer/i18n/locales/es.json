@@ -454,7 +454,25 @@
       "weather": {
         "label": "",
         "typeValue": ""
+      },
+      "photoMode": {
+        "label": "Modo de cámara",
+        "typeValue": "Tipo {{type}}"
+      },
+      "windIntensity": {
+        "label": "Intensidad del viento",
+        "typeValue": "Tipo {{type}}"
+      },
+      "windDirection": {
+        "label": "Dirección del viento",
+        "typeValue": "Tipo {{type}}"
       }
+    },
+    "multiPlayer": {
+      "title": "Información multijugador",
+      "anotherPose": "Pose del otro jugador",
+      "poseTime": "Progreso",
+      "copyHeader": "=== Información multijugador ==="
     }
   },
   "dialog": {
@@ -1298,6 +1316,8 @@
       "licenseGpl": "• GPL-3.0: El código que lo usa o modifica también debe ser de código abierto",
       "licenseMit": "• MIT: Uso, modificación y distribución libre; debe retain el aviso de copyright",
       "licenseNote": "Notas de licencia",
+      "upstreamCopyright": "Copyright (c) 2025 Ran",
+      "upstreamCopyrightNote": "El aviso de copyright MIT y el texto completo de la licencia del proyecto upstream nikki_albums se conservan literalmente en THIRD_PARTY_NOTICES, incluido con la aplicación.",
       "licenseTitle": "Agradecimientos y licencia",
       "open": "Abrir",
       "projectIntro": "Este software está construido sobre los proyectos de código abierto anteriores. Gracias a todos los contribuidores de la comunidad open-source. El software mismo es de código abierto bajo licencia MIT; libre uso, modificación y distribución.",
@@ -1323,7 +1343,10 @@
         "reactDom": "",
         "sharp": "",
         "zustand": "",
-        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks."
+        "gongeouNikkiTracker": "The local features of the \"Resonance\" section — resonance (wish) records, wardrobe, data import, and personal statistics — partially reuse and adapt the offline-capable source code from the open-source project gongeo.us-nikki-tracker（https://github.com/dastrokes/gongeo.us-nikki-tracker）by dastrokes, licensed under the MIT License, with the original author’s permission. Special thanks.",
+        "nikkiAlbums": "Análisis de parámetros de cámara y miniaturas de poses: la canalización de datos de referencia (nuan5_database) y los recursos de imágenes CDN se reutilizan del proyecto de código abierto nikki_albums (https://github.com/RanAxro/nikki_albums) (autor: RanAxro, licencia MIT), con permiso del autor (nikki_albums#20). Las imágenes se cargan bajo demanda y se almacenan en caché local unos 7 días; las solicitudes llevan un identificador de origen versionado; sin redistribución. El enfoque de descifrado y las estructuras de datos también provienen de este proyecto. Con agradecimiento.",
+        "leaflet": "Biblioteca de renderizado de mapas de teselas para el mapa mundial (https://leafletjs.com), licencia BSD-2-Clause. Copyright (c) 2010-2023 Vladimir Agafonkin, (c) 2010-2011 CloudMade, conservado mediante el encabezado @preserve del código fuente y este aviso. Gracias.",
+        "protobufjs": "Decodificación protobuf Nuan5Config de los datos de referencia v1.db (https://github.com/protobufjs/protobuf.js), licencia Apache-2.0, Copyright (c) 2016 Daniel Wirtz. Gracias."
       },
       "toolDesc": {
         "electronBuilder": "",
@@ -1679,7 +1702,28 @@
       "elevating": "Reiniciando como administrador…",
       "elevateFailed": "Error al reiniciar con permisos elevados: {{reason}}"
     },
+    "referenceData": {
+      "description": "Las miniaturas de iluminación, filtros y poses provienen de datos de referencia externos (nikki_albums, licencia MIT). Las imágenes se cargan bajo demanda y se almacenan en caché localmente unos 7 días. Los dos campos siguientes son para que indiques tus propias direcciones de aceleración/espejo; la aplicación no incluye ni aloja ningún nodo de aceleración.",
+      "imageMirrorHint": "Déjalo vacío para usar la dirección original. Solo sustituye el punto de acceso de los recursos de imagen autorizados; el ámbito de autorización no cambia.",
+      "imageMirrorLabel": "Acelerador de imágenes",
+      "manifestMirrorHint": "Déjalo vacío para usar el sitio oficial original.",
+      "manifestMirrorLabel": "Espejo de datos de referencia",
+      "save": "Guardar",
+      "saved": "Guardado",
+      "imageSourceLabel": "Fuente de las imágenes",
+      "imageSourceNotice": "Las imágenes de entidades proceden de gongeo.us mediante enlaces directos bajo demanda; el enlace a la fuente está abajo.",
+      "trademarkNotice": "Todos los assets, nombres y marcas del juego Infinity Nikki pertenecen a Infold y a los respectivos titulares de derechos.",
+      "usageNotice": "Estos assets de imagen de terceros se muestran bajo demanda solo dentro de esta aplicación y no se usan para entrenamiento de IA ni para ningún fin comercial. Esta restricción no se aplica al código fuente propio del proyecto, publicado bajo licencia MIT.",
+      "remoteImagesEnabledLabel": "Activar imágenes de referencia externas",
+      "remoteImagesEnabledHint": "Si se desactiva, no se carga ninguna imagen de referencia externa (miniaturas o teselas de mapa). Puede reactivarse en cualquier momento.",
+      "autoUpdateLabel": "Comprobar actualizaciones de datos de referencia al iniciar",
+      "autoUpdateHint": "Si se desactiva, la comprobación solo se realiza al actualizar manualmente.",
+      "refreshLabel": "Buscar actualizaciones",
+      "refreshSuccess": "Datos de referencia actualizados",
+      "refreshFailed": "Error al actualizar los datos de referencia. Inténtelo más tarde"
+    },
     "sections": {
+      "referenceData": "Datos de referencia externos",
       "aboutContact": "Contacto",
       "aboutInfo": "Información de la aplicación",
       "aboutLicense": "Agradecimientos y licencia de código abierto",
@@ -2243,6 +2287,32 @@
       "4": "",
       "7": "",
       "neg1": ""
+    },
+    "photoMode": {
+      "0": "Foto normal",
+      "1": "Momento capturado",
+      "2": "Foto en pareja",
+      "3": "Captura de pantalla"
+    },
+    "windIntensity": {
+      "0": "Sin viento",
+      "1": "Viento suave",
+      "2": "Viento moderado",
+      "3": "Viento fuerte",
+      "4": "Viento muy fuerte",
+      "neg1": "Desconocido"
+    },
+    "windDirection": {
+      "0": "Este",
+      "1": "Sur",
+      "2": "Oeste",
+      "3": "Norte",
+      "4": "Sureste",
+      "5": "Suroeste",
+      "6": "Noreste",
+      "7": "Noroeste",
+      "8": "Ninguno",
+      "neg1": "Desconocido"
     }
   },
   "filter": {
@@ -2565,6 +2635,15 @@
     "light": "",
     "loading": "",
     "momoHidden": "",
+    "nikkiPoseAction": "Pose de Nikki",
+    "playingPercent": "Progreso de la pose",
+    "momoPose": "Pose de Momo",
+    "momoPoseTime": "Progreso de la pose de Momo",
+    "momoAdjust": "Ajuste de posición de Momo (Izquierda/Adelante/Altura)",
+    "momoRotate": "Girar a Momo",
+    "autoGroundSnap": "Ajuste automático al suelo",
+    "floatingEffect": "Efecto de flotación",
+    "poseWithNikki": "Pose con Nikki",
     "notHidden": "",
     "optic": "",
     "pose": "",
@@ -3488,7 +3567,10 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference debe ser auto o high-performance",
-        "launchAtLoginNotBoolean": ""
+        "launchAtLoginNotBoolean": "",
+        "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl debe ser una URL http(s) pública (dejar vacío para usar el sitio oficial)",
+        "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl debe ser una URL http(s) pública (dejar vacío para usar la dirección original)",
+        "referenceDataSwitchNotBoolean": "Los interruptores de datos de referencia externos deben ser valores booleanos"
       },
       "validation": {
         "keyRequired": "",
@@ -4680,5 +4762,16 @@
       "labelFilter": "",
       "labelLocation": ""
     }
+  },
+  "locationMap": {
+    "title": "Lugar de la foto",
+    "clickToView": "Haz clic para localizar en el mapa",
+    "loading": "Cargando mapa",
+    "outdatedVersion": "Las fotos de la versión 2.9 y anteriores no permiten ver el lugar de la foto",
+    "lackData": "Faltan datos",
+    "notReady": "Los datos de referencia aún no están listos",
+    "noTiles": "No hay datos del mapa",
+    "lackWorldMap": "El mapa no está disponible para este lugar",
+    "outsideBounds": "El punto de la foto está fuera de los límites del mapa"
   }
 }

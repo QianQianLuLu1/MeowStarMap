@@ -105,7 +105,7 @@ describe('合并后的导航结构', () => {
   /** 取左导航容器（aria-label 来自 settings.navigation.ariaLabel = 「设置导航」） */
   const getNav = () => screen.getByRole('navigation', { name: '设置导航' })
 
-  it('二级侧边栏为 8 个分组、18 个导航项（2026-10-24 GPU 状态分区新增一项）', async () => {
+  it('二级侧边栏为 8 个分组、19 个导航项（2026-11-08 外部参考数据分区新增一项）', async () => {
     localStorage.removeItem(ACTIVE_SECTION_KEY)
     render(<SettingsPage />)
     await screen.findByRole('switch', { name: '启动时自动扫描' })
@@ -113,8 +113,8 @@ describe('合并后的导航结构', () => {
     const nav = getNav()
     expect(
       within(nav).getAllByRole('button'),
-      '合并后导航项应为 18 个（2026-10-16 合并为 17 + GPU 状态诊断分区）'
-    ).toHaveLength(18)
+      '合并后导航项应为 19 个（2026-10-16 合并为 17 + GPU 状态诊断分区 + 外部参考数据分区）'
+    ).toHaveLength(19)
 
     for (const group of [
       '通用',

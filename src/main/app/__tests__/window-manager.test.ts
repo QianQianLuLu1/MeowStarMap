@@ -9,6 +9,8 @@
  * 2. ready-to-show / render-process-gone / console-message 三个事件需通过捕获的 listener 间接触发
  * 3. reload 抛错时递归调用 createMainWindow 的兜底分支
  */
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 
@@ -250,6 +252,16 @@ describe('createMainWindow', () => {
     expect(out.responseHeaders['Content-Security-Policy'][0]).toContain(
       "img-src 'self' media: data: https://cdn.gongeo.us"
     )
+    // 阶段 4：官方「奇迹大陆大地图」瓦片 host 必须放行（#20 条款 6，无需额外 UA）。
+    expect(out.responseHeaders['Content-Security-Policy'][0]).toContain(
+      'https://assets.papegames.com'
+    )
+    // 上游作者自有 CDN 仅授权图片资源，瓦片不得接入（fail-closed）。
+    expect(out.responseHeaders['Content-Security-Policy'][0]).not.toContain('cdn.nikkialbums.com')
+    // 响应头与 index.html meta 必须逐字一致：任一处缺失/改写都会被另一处绕过。
+    const html = readFileSync(resolve(process.cwd(), 'src/renderer/index.html'), 'utf-8')
+    const metaCsp = html.match(/http-equiv="Content-Security-Policy" content="([^"]+)"/)?.[1]
+    expect(metaCsp).toBe(out.responseHeaders['Content-Security-Policy'][0])
   })
 
   it('5. ready-to-show 事件触发后 mainWindow.show() + taskScheduler.resume()', async () => {

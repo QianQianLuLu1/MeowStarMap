@@ -50,6 +50,7 @@ const handlerMocks = vi.hoisted(() => ({
   registerSyncHandlers: vi.fn(),
   registerNikkiSyncHandlers: vi.fn(),
   registerAssetEditsHandlers: vi.fn(),
+  registerReferenceDataHandlers: vi.fn(),
   registerPluginManagementHandlers: vi.fn(),
   registerPluginBridgeHandlers: vi.fn(),
   registerFavoritesHandlers: vi.fn(),
@@ -174,6 +175,10 @@ vi.mock('../../ipc/handlers/nikkisync-handler', () => ({
 // sync-integration 阶段4：资产编辑叠加层 handler
 vi.mock('../../ipc/handlers/asset-edits-handler', () => ({
   registerAssetEditsHandlers: handlerMocks.registerAssetEditsHandlers
+}))
+// 外部参考数据管道 handler
+vi.mock('../../ipc/handlers/reference-data-handler', () => ({
+  registerReferenceDataHandlers: handlerMocks.registerReferenceDataHandlers
 }))
 vi.mock('../../ipc/handlers/plugin', () => ({
   registerPluginManagementHandlers: handlerMocks.registerPluginManagementHandlers
@@ -317,12 +322,12 @@ describe('bindScanProgressListener', () => {
 // setupIPC
 // ============================================================================
 describe('setupIPC', () => {
-  it('5. 调用所有 42 个 registerXxxHandlers', () => {
+  it('5. 调用所有 43 个 registerXxxHandlers', () => {
     const ctx = makeAppCtx({ scannerManager: makeScannerManagerWithProgress() })
 
     setupIPC(ctx)
 
-    // 42 个 registerXxxHandlers
+    // 43 个 registerXxxHandlers
     expect(handlerMocks.registerMediaMetadataHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerMediaLifecycleHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerScanLogHandlers).toHaveBeenCalledWith(ctx)
@@ -368,6 +373,8 @@ describe('setupIPC', () => {
     // sync-integration 阶段2：内嵌 NikkiSync Runtime 只读域 handler
     expect(handlerMocks.registerNikkiSyncHandlers).toHaveBeenCalledWith(ctx)
     expect(handlerMocks.registerAssetEditsHandlers).toHaveBeenCalledWith(ctx)
+    // 外部参考数据管道 handler
+    expect(handlerMocks.registerReferenceDataHandlers).toHaveBeenCalledWith(ctx)
   })
 
   it('6. 调用 pathGuard.initUserDataDir', () => {

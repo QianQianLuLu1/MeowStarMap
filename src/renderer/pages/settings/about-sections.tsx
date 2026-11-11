@@ -369,6 +369,31 @@ export const AboutLicenseSection: React.FC = () => {
       descKey: 'settings.about.depDesc.gongeouNikkiTracker',
       homepage: 'https://github.com/dastrokes/gongeo.us-nikki-tracker',
       todoKey: 'settings.about.depDescTodo.gongeous'
+    },
+    // 拍摄参数与动作缩略图：参考数据管道与 CDN 图片复用 nikki_albums（MIT，
+    // 已获原作者授权，nikki_albums#20）。homepage 为仓库元数据展示；图片经
+    // refdata:resolve-image 按需取图并本机缓存，不直连、不二次分发。
+    {
+      name: 'nikki_albums',
+      version: 'main · dc1b30b',
+      license: 'MIT',
+      descKey: 'settings.about.depDesc.nikkiAlbums',
+      homepage: 'https://github.com/RanAxro/nikki_albums'
+    },
+    // 审查修复（2026-11-11）：本轮新增运行时依赖入致谢表（署名与 NOTICES §5 同源）
+    {
+      name: 'leaflet',
+      version: '1.9.4',
+      license: 'BSD-2-Clause',
+      descKey: 'settings.about.depDesc.leaflet',
+      homepage: 'https://leafletjs.com/'
+    },
+    {
+      name: 'protobufjs',
+      version: '8.x',
+      license: 'Apache-2.0',
+      descKey: 'settings.about.depDesc.protobufjs',
+      homepage: 'https://github.com/protobufjs/protobuf.js'
     }
   ]
 
@@ -521,6 +546,10 @@ export const AboutLicenseSection: React.FC = () => {
         <div>{t('settings.about.licenseMit')}</div>
         <div>{t('settings.about.licenseApache')}</div>
         <div>{t('settings.about.licenseGpl')}</div>
+        <div className="pt-2 border-t" style={{ borderColor: 'var(--divider)' }}>
+          <span className="font-mono">{t('settings.about.upstreamCopyright')}</span>
+          <div className="mt-1">{t('settings.about.upstreamCopyrightNote')}</div>
+        </div>
       </div>
     </SectionShell>
   )

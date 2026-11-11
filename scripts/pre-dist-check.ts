@@ -721,6 +721,110 @@ export function missingPackedCapabilityArtifacts(
 }
 
 /**
+ * 第三方许可证声明的「提交前配置 / 文件」判定核（纯函数，探针由调用方注入）。
+ *
+ * nikki_albums MIT 条款要求版权声明与许可全文随所有副本保留；本轮复用其热更
+ * 管线、解密库与语言资源，故 `build.files` 必须显式列入 LICENSE 与
+ * THIRD_PARTY_NOTICES，且声明文件须逐字包含 `Copyright (c) 2025 Ran` 与 MIT 全文。
+ *
+ * 注意：这里只校验仓库侧配置与文件（提交前可判定），不构建、不读取 asar，
+ * 因此**不能**当作「实际分发物已验证」的证据。
+ */
+export type PackedLegalNoticesProblem =
+  | 'missing-license-entry'
+  | 'missing-third-party-entry'
+  | 'missing-license-file'
+  | 'missing-third-party-file'
+  | 'missing-upstream-copyright'
+  | 'missing-mit-permission-notice'
+  | 'missing-mit-full-text'
+
+export const UPSTREAM_COPYRIGHT_LINE = 'Copyright (c) 2025 Ran'
+export const MIT_PERMISSION_LINE =
+  'Permission is hereby granted, free of charge, to any person obtaining a copy'
+
+/**
+ * MIT 许可正文（条件段 + 担保免责声明段，与 THIRD_PARTY_NOTICES §1 逐字同形）。
+ * 审查修复（2026-11-11）：原判定只钉 Permission 首行，删掉条件/免责声明段落仍通过，
+ * 与「MIT 全文逐字保留」的声明不符；改为整段全文比对。
+ */
+export const MIT_LICENSE_BODY = `Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.`
+
+export function checkPackedLegalNotices(input: {
+  files: readonly unknown[]
+  readText: (relativePath: string) => string | null
+}): PackedLegalNoticesProblem[] {
+  const problems: PackedLegalNoticesProblem[] = []
+  const entries = Array.isArray(input.files) ? input.files : []
+  const names = entries.filter((e): e is string => typeof e === 'string')
+
+  if (!names.includes('LICENSE')) problems.push('missing-license-entry')
+  if (!names.includes('THIRD_PARTY_NOTICES')) problems.push('missing-third-party-entry')
+
+  const licenseText = input.readText('LICENSE')
+  if (licenseText === null) problems.push('missing-license-file')
+  const noticesText = input.readText('THIRD_PARTY_NOTICES')
+  if (noticesText === null) {
+    problems.push('missing-third-party-file')
+    problems.push('missing-upstream-copyright')
+    problems.push('missing-mit-permission-notice')
+    problems.push('missing-mit-full-text')
+    return problems
+  }
+  // 行尾归一只为比较（Windows 工作区 autocrlf 呈 CRLF，index 恒 LF），不改变文件内容
+  const normalized = noticesText.replace(/\r\n/g, '\n')
+  if (!normalized.includes(UPSTREAM_COPYRIGHT_LINE)) problems.push('missing-upstream-copyright')
+  if (!normalized.includes(MIT_PERMISSION_LINE)) problems.push('missing-mit-permission-notice')
+  if (!normalized.includes(MIT_LICENSE_BODY)) problems.push('missing-mit-full-text')
+  return problems
+}
+
+/** 打包前闸门接线：把纯判定核的结果转成 fail()/pass()，出错一律阻断打包。 */
+function checkPackedLegalNoticesConfigured(): void {
+  let files: readonly unknown[] = []
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf-8')) as {
+      build?: { files?: unknown[] }
+    }
+    files = Array.isArray(pkg.build?.files) ? pkg.build.files : []
+  } catch {
+    fail('无法读取 package.json，第三方许可证声明闸门跳过')
+    return
+  }
+  const problems = checkPackedLegalNotices({
+    files,
+    readText: (rel) => {
+      try {
+        return fs.readFileSync(path.join(ROOT, rel), 'utf-8')
+      } catch {
+        return null
+      }
+    }
+  })
+  if (problems.length > 0) {
+    fail(`第三方许可证声明未随包配置：${problems.join(', ')}（见 THIRD_PARTY_NOTICES）`)
+    return
+  }
+  pass('第三方许可证声明随包配置：LICENSE + THIRD_PARTY_NOTICES + 上游 MIT 版权行')
+}
+
+/**
  * 读 @nikkisync scope 目录条目数。读不动时返回 -1 交由调用侧按「已建链」处理——
  * I/O 异常不许被误报成「链被清掉的空壳」。
  */
@@ -1332,6 +1436,9 @@ function main(): void {
 
   // 12.7 管理员清单闸门（降杀软误杀 + 去 UAC 摩擦，防 requireAdministrator 回归）
   checkNoAdminManifest()
+
+  // 12.8 第三方许可证声明闸门（MIT 版权声明与许可全文须随包保留）
+  checkPackedLegalNoticesConfigured()
 
   // 结果
   console.log('')

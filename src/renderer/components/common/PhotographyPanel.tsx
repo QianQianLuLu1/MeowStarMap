@@ -3,7 +3,14 @@ import { useTranslation } from 'react-i18next'
 import type { MediaFile } from '../../stores/mediaStore'
 import { useGameParams } from '../../hooks/useGameParams'
 import type { PhotographyInfo, GameParamsData } from '../../types/decryption'
-import { getWeatherName, getPuzzleName, getInteractiveName } from '../../utils/enum-mappings'
+import {
+  getWeatherName,
+  getPhotoModeName,
+  getWindIntensityName,
+  getWindDirectionName,
+  getPuzzleName,
+  getInteractiveName
+} from '../../utils/enum-mappings'
 import { getLocationName } from '../../utils/location-map'
 import { IconInfo } from '../../icons'
 import { InfoRowPanel, type InfoRow } from './InfoRowPanel'
@@ -79,6 +86,39 @@ function photographyToRows(p: PhotographyInfo | undefined | null, t: TFunc): Inf
       value: weatherName
         ? t(weatherName)
         : t('detail.photography.weather.typeValue', { type: p.weather })
+    })
+  }
+
+  // 拍照模式（null=旧照片无此字段 → 隐藏行；0=普通拍照 是真实枚举值，必须显示）
+  if (p.photoMode !== null && p.photoMode !== undefined) {
+    const photoModeName = getPhotoModeName(p.photoMode)
+    rows.push({
+      label: t('detail.photography.photoMode.label'),
+      value: photoModeName
+        ? t(photoModeName)
+        : t('detail.photography.photoMode.typeValue', { type: p.photoMode })
+    })
+  }
+
+  // 风力（0=无风 是真实枚举值，必须显示）
+  if (p.windIntensity !== null && p.windIntensity !== undefined) {
+    const windIntensityName = getWindIntensityName(p.windIntensity)
+    rows.push({
+      label: t('detail.photography.windIntensity.label'),
+      value: windIntensityName
+        ? t(windIntensityName)
+        : t('detail.photography.windIntensity.typeValue', { type: p.windIntensity })
+    })
+  }
+
+  // 风向
+  if (p.windDirection !== null && p.windDirection !== undefined) {
+    const windDirectionName = getWindDirectionName(p.windDirection)
+    rows.push({
+      label: t('detail.photography.windDirection.label'),
+      value: windDirectionName
+        ? t(windDirectionName)
+        : t('detail.photography.windDirection.typeValue', { type: p.windDirection })
     })
   }
 

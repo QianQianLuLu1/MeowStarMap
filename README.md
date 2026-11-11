@@ -137,8 +137,11 @@ src/
 
 ### 第三方来源与致谢
 
-- 共鸣录的核心逻辑与「我的衣橱」实体图片数据复用自开源项目 [gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker)（作者 dastrokes，MIT License，已获原作者授权），在此郑重致谢。MIT 许可仅覆盖该项目的代码与随附数据；「无限暖暖」相关的游戏美术资产、名称与商标归其各自权利方所有。
-- 「我的衣橱」六类实体图片（套装 / 部件 / 妆容 / Momo / 道具 / 共鸣色）通过第三方主机 `cdn.gongeo.us` 以 HTTPS 热链按需展示；图片加载失败时显示占位色块，应用不下载保存图片、不做本地缓存，也不收集或上传任何用户数据，图片能否显示取决于该第三方主机的可用性。
+- 共鸣录的核心逻辑与「我的衣橱」实体图片数据复用自开源项目 [gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker)（作者 dastrokes，MIT License；授权依据 [gongeo.us-nikki-tracker#218](https://github.com/dastrokes/gongeo.us-nikki-tracker/issues/218)，证据状态如实记录于 THIRD_PARTY_NOTICES 的 gongeo 章节），在此郑重致谢。MIT 许可仅覆盖该项目的代码与随附数据；「无限暖暖」相关的游戏美术资产、名称与商标归 Infold 等相应权利方所有。
+- 「我的衣橱」六类实体图片（套装 / 部件 / 妆容 / Momo / 道具 / 共鸣色）通过第三方主机 `cdn.gongeo.us` 以 HTTPS 热链按需展示，**图片来源：[gongeo.us](https://gongeo.us)**；仅在界面实际展示时按需懒加载、不预取、不批量爬取，应用不下载图片字节用于再分发或再托管、不做本地缓存，也不收集或上传任何用户数据；图片加载失败时显示占位色块，能否显示取决于该第三方主机的可用性。上述第三方游戏图片资产**不用于 AI 训练，也不用于任何商业用途**；该限制不适用于本项目自身以 MIT License 发布的源代码。相关热链保持独立、可回滚。
+- 拍摄参数解析、动作缩略图、热更新参考数据管道（nuan5_database）、`aes-gcm-filebox` 解密布局、`Nuan5Config` 数据结构与随仓分发的 `nuan5_decryption.dll` 原生库，参考并复用自开源项目 [nikki_albums](https://github.com/RanAxro/nikki_albums)（作者 RanAxro，LICENSE 版权行 `Copyright (c) 2025 Ran`，MIT License；授权依据 [nikki_albums#20](https://github.com/RanAxro/nikki_albums/issues/20)），在此郑重致谢。上游 MIT 版权声明与许可全文逐字保留于 [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)，并随分发物提供。
+- 拍摄参数显示名的离线底座逐字取自上游 nikki_albums 的 `assets/lang/infinity_nikki/zh-CN.json`（MIT，同属上述版权声明范围），随仓保留于 `src/shared/data/infinity_nikki.zh-CN.json`；该静态资源不产生任何外部请求，覆盖度实采结论与许可标注见 `THIRD_PARTY_NOTICES` 第 4 节。
+- 完整第三方声明、授权条件、来源标注与证据状态见 [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES)。
 
 ### 许可证
 
@@ -266,8 +269,11 @@ src/
 
 ### Data Sources & Credits
 
-- The core logic of Resonance Records and the My Wardrobe entity image data are derived from the open-source project [gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker) by dastrokes (MIT License, used with the original author's permission) — our sincere thanks. The MIT license covers that project's code and bundled data only; all Infinity Nikki game art assets, names, and trademarks belong to their respective owners.
-- The six My Wardrobe entity image categories (outfits / items / makeup / Momo / props / eurekas) are displayed via on-demand HTTPS hot-links from a third-party host, `cdn.gongeo.us`: a placeholder block is shown if an image fails to load, and the app neither downloads/stores nor caches images, nor collects or uploads any user data. Image display depends on that third-party host's availability.
+- The core logic of Resonance Records and the My Wardrobe entity image data are derived from the open-source project [gongeo.us-nikki-tracker](https://github.com/dastrokes/gongeo.us-nikki-tracker) by dastrokes (MIT License; authorization basis: [gongeo.us-nikki-tracker#218](https://github.com/dastrokes/gongeo.us-nikki-tracker/issues/218), with the evidence status recorded in the gongeo section of THIRD_PARTY_NOTICES) — our sincere thanks. The MIT license covers that project's code and bundled data only; all Infinity Nikki game art assets, names, and trademarks belong to Infold and the respective rights holders.
+- The six My Wardrobe entity image categories (outfits / items / makeup / Momo / props / eurekas) are displayed via on-demand HTTPS hot-links from a third-party host, `cdn.gongeo.us`; **image source: [gongeo.us](https://gongeo.us)**. Images load lazily only when actually shown — no prefetching, no bulk crawling; the app does not download image bytes for redistribution or re-hosting, does not cache them locally, and neither collects nor uploads any user data. A placeholder is shown on failure, and display depends on that host's availability. These third-party game image assets are **not used for AI training or for any commercial purpose**; this restriction does not apply to the project's own source code, released under the MIT License. The hot-link is kept independent and easy to roll back.
+- Camera parameter parsing, pose thumbnails, the hot-update reference data pipeline (nuan5_database), the `aes-gcm-filebox` decryption layout, the `Nuan5Config` data schema and the bundled `nuan5_decryption.dll` native library are derived from the open-source project [nikki_albums](https://github.com/RanAxro/nikki_albums) by RanAxro (LICENSE copyright line `Copyright (c) 2025 Ran`, MIT License; authorization per [nikki_albums#20](https://github.com/RanAxro/nikki_albums/issues/20)) — our sincere thanks. The upstream MIT copyright notice and license text are preserved verbatim in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES) and shipped with the distribution.
+- The offline name lookup table is preserved verbatim from upstream `assets/lang/infinity_nikki/zh-CN.json` (MIT, covered by the copyright notice above) at `src/shared/data/infinity_nikki.zh-CN.json`. It is static bundled data and creates no external requests; the coverage assessment and license attribution are in section 4 of `THIRD_PARTY_NOTICES`.
+- Full third-party notices, authorization conditions, source attribution and evidence status: [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 ### License
 

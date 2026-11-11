@@ -181,6 +181,14 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
     /* DLL 未加载或已卸载，忽略 */
   }
 
+  // 外部参考数据（总计划阶段 1）：清空内存索引与在途状态（缓存文件保留，下次启动懒加载复用）
+  try {
+    const { disposeReferenceDataService } = await import('../services/reference-data-service')
+    disposeReferenceDataService()
+  } catch {
+    /* 服务未加载，忽略 */
+  }
+
   // P0-6：清理后记录诊断信息，对比 before/after 可判断哪些资源被释放
   const afterStats = collectExitDiagnosis('after-cleanup', ctx)
   // P0 根因修复：原实现调用 logFault（async，内部用 fs.promises.appendFile），

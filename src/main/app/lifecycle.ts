@@ -28,6 +28,8 @@ import { applyUITheme, setupThemeListener } from './theme'
 import { initSyncServer } from './sync-server-setup'
 import { initNikkiSyncRuntime } from './nikkisync-runtime-setup'
 import { syncLoginItemSetting, SETTING_LAUNCH_AT_LOGIN, normalizeLaunchAtLogin } from './login-item'
+import { checkForUpdate } from '../services/reference-data-service'
+import { REFERENCE_DATA_CHECK_DELAY_MS } from '../utils/constants'
 // 自动更新：复用 electron-updater，生产环境初始化（dev 仅在 MEOW_DEV_UPDATE_FEED=1 时按假源初始化）
 import { initAutoUpdater } from './auto-update'
 import {
@@ -495,6 +497,41 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
           })
       }, STARTUP_SCAN_DELAY_MS + 6000)
     )
+    // 外部参考数据（总计划阶段 1）：启动后延迟检查版本（≥10s，不阻塞 8 阶段启动）。
+    // fail-soft：checkForUpdate 永不 reject、失败降级旧缓存，仅记诊断日志与 lastError；
+    // 镜像地址经设置键 referenceData.manifestBaseUrl（settings:set 已校验 URL/SSRF）。
+    // autoUpdate 开关（默认 true 保持既有行为）：显式 false 时不注册定时器；
+    // 非 boolean 的脏值按安全默认关闭并记明确诊断，禁止静默当成"开启"。
+    const storedAutoUpdate = ctx.dbManager.getSetting('referenceData.autoUpdate', true)
+    // 外部输入不可信：只有 true（含键缺省回落）才开机检查；显式 false 是用户主动关闭；
+    // 其余脏值按安全默认关闭并记明确诊断，不静默当成「开启」。
+    const autoUpdateEnabled = storedAutoUpdate === undefined || storedAutoUpdate === true
+    if (!autoUpdateEnabled && storedAutoUpdate !== false) {
+      logger?.warn?.(
+        '[referenceData] invalid autoUpdate value, skipping startup check',
+        storedAutoUpdate
+      )
+    }
+    if (autoUpdateEnabled) {
+      ctx.startupTimers.push(
+        setTimeout(() => {
+          void ctx.taskScheduler
+            .enqueueLow(
+              () => {
+                const manifestBaseUrl = ctx.dbManager.getSetting(
+                  'referenceData.manifestBaseUrl',
+                  ''
+                )
+                return checkForUpdate({ manifestBaseUrl })
+              },
+              { id: 'startup-reference-data-check' }
+            )
+            .catch((err) => {
+              logStartupError('referenceDataCheck', err)
+            })
+        }, REFERENCE_DATA_CHECK_DELAY_MS)
+      )
+    }
 
     // 退出清理：确保数据库正确关闭并执行 WAL checkpoint
     // 修复：原实现同步 before-quit 中调用异步清理且未 await，异步清理来不及完成；

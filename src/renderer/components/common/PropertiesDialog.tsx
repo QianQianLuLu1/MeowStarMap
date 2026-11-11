@@ -8,10 +8,12 @@ import { PhotographyPanel, formatPhotographyForCopy } from './PhotographyPanel'
 import { NikkiInfoPanel, formatNikkiForCopy } from './NikkiInfoPanel'
 import { OutfitPanel, formatOutfitForCopy } from './OutfitPanel'
 import { InteractionPanel, formatInteractionsForCopy } from './InteractionPanel'
+import { MultiPlayerPanel, formatMultiPlayerForCopy } from './MultiPlayerPanel'
 import { IconFolderOpen, IconCopyText } from '../../icons'
 import { formatSize } from '../../utils/format'
 import { formatDateTime } from '../../utils/date'
 import { BaseDialog } from './BaseDialog'
+import { LocationMapSection } from './map/LocationMapSection'
 import { useGameParams } from '../../hooks/useGameParams'
 
 interface PropertiesDialogProps {
@@ -171,6 +173,8 @@ export const PropertiesDialog: React.FC<PropertiesDialogProps> = ({ open, file, 
           if (outfitText) sections.push(outfitText)
           const interactionsText = formatInteractionsForCopy(d.interactions)
           if (interactionsText) sections.push(interactionsText)
+          const multiPlayerText = formatMultiPlayerForCopy(d.multiPlayer, t)
+          if (multiPlayerText) sections.push(multiPlayerText)
           if (sections.length > 0) {
             lines.push('', sections.join('\n'))
           }
@@ -283,6 +287,11 @@ export const PropertiesDialog: React.FC<PropertiesDialogProps> = ({ open, file, 
         />
       </div>
 
+      {/* 阶段 4：拍摄地点地图（复用属性弹窗已解密的数据，避免重复调用） */}
+      <div className="pt-2 border-t" style={{ borderColor: 'var(--divider)' }}>
+        <LocationMapSection file={file!} gameParams={gameParamsData} />
+      </div>
+
       {/* 相机信息 */}
       <div className="pt-2 border-t" style={{ borderColor: 'var(--divider)' }}>
         <CameraInfoPanel
@@ -322,6 +331,18 @@ export const PropertiesDialog: React.FC<PropertiesDialogProps> = ({ open, file, 
       {/* 交互物 */}
       <div className="pt-2 border-t" style={{ borderColor: 'var(--divider)' }}>
         <InteractionPanel
+          file={file!}
+          variant="light"
+          showTitle={true}
+          gameParams={gameParamsData}
+          loading={gameParamsLoading}
+          error={gameParamsError}
+        />
+      </div>
+
+      {/* 联机信息（双人合照；单人照/旧照片由组件内部整体隐藏） */}
+      <div className="pt-2 border-t" style={{ borderColor: 'var(--divider)' }}>
+        <MultiPlayerPanel
           file={file!}
           variant="light"
           showTitle={true}

@@ -39,6 +39,9 @@ vi.mock('./InfoRowPanel', () => ({
 
 vi.mock('../../utils/enum-mappings', () => ({
   getWeatherName: (w: number) => (w === 1 ? '晴天' : w === 2 ? '雨天' : null),
+  getPhotoModeName: (m: number) => (m === 0 ? '普通拍照' : m === 2 ? '双人合拍' : null),
+  getWindIntensityName: (w: number) => (w === 0 ? '无风' : w === 3 ? '大风' : null),
+  getWindDirectionName: (d: number) => (d === 6 ? '东北' : null),
   getPuzzleName: (tag: number) => (tag === 100 ? '错位 1' : null),
   getInteractiveName: (tag: number) => (tag === 200 ? '交互 1' : null)
 }))
@@ -68,6 +71,9 @@ const mockT = (key: string, options?: Record<string, unknown>): string => {
     'detail.photography.time.label': '拍摄时间',
     'detail.photography.location.label': '拍摄地点',
     'detail.photography.weather.label': '天气',
+    'detail.photography.photoMode.label': '相机模式',
+    'detail.photography.windIntensity.label': '风力',
+    'detail.photography.windDirection.label': '风向',
     'detail.photography.photoWall.label': '照片墙',
     'detail.photography.photoWall.notJoined': '未加入',
     'detail.photography.task.label': '拍摄任务',
@@ -85,6 +91,13 @@ const mockT = (key: string, options?: Record<string, unknown>): string => {
     return `已加入 (${options?.count ?? ''} 张)`
   }
   if (key === 'detail.photography.weather.typeValue') {
+    return `类型 ${options?.type ?? ''}`
+  }
+  if (
+    key === 'detail.photography.photoMode.typeValue' ||
+    key === 'detail.photography.windIntensity.typeValue' ||
+    key === 'detail.photography.windDirection.typeValue'
+  ) {
     return `类型 ${options?.type ?? ''}`
   }
   if (key === 'detail.photography.task.puzzleFallback') {
@@ -368,6 +381,115 @@ describe('PhotographyPanel', () => {
     render(<PhotographyPanel file={makeFile()} />)
     expect(screen.getByText('类型 99')).toBeTruthy()
   })
+
+  // ---- 拍照模式 / 风向 / 风力行（阶段扩展）----
+
+  it('photoMode 已知枚举时显示"相机模式"行', () => {
+    mockGameParamsResult.data = {
+      photography: {
+        edit: { enabled: false, hasSticker: false, hasText: false },
+        date: null,
+        time: null,
+        location: null,
+        weather: null,
+        photoMode: 2,
+        photoWall: [],
+        tasks: []
+      }
+    }
+    render(<PhotographyPanel file={makeFile()} />)
+    expect(screen.getByText('相机模式')).toBeTruthy()
+    expect(screen.getByText('双人合拍')).toBeTruthy()
+  })
+
+  it('photoMode 未知时显示"类型 N"兜底', () => {
+    mockGameParamsResult.data = {
+      photography: {
+        edit: { enabled: false, hasSticker: false, hasText: false },
+        date: null,
+        time: null,
+        location: null,
+        weather: null,
+        photoMode: 99,
+        photoWall: [],
+        tasks: []
+      }
+    }
+    render(<PhotographyPanel file={makeFile()} />)
+    expect(screen.getByText('相机模式')).toBeTruthy()
+    expect(screen.getByText('类型 99')).toBeTruthy()
+  })
+
+  it('windIntensity=0（无风）是真实零值，显示"无风"而非隐藏', () => {
+    mockGameParamsResult.data = {
+      photography: {
+        edit: { enabled: false, hasSticker: false, hasText: false },
+        date: null,
+        time: null,
+        location: null,
+        weather: null,
+        windIntensity: 0,
+        photoWall: [],
+        tasks: []
+      }
+    }
+    render(<PhotographyPanel file={makeFile()} />)
+    expect(screen.getByText('风力')).toBeTruthy()
+    expect(screen.getByText('无风')).toBeTruthy()
+  })
+
+  it('windIntensity=null（旧数据）时不渲染"风力"行', () => {
+    mockGameParamsResult.data = {
+      photography: {
+        edit: { enabled: false, hasSticker: false, hasText: false },
+        date: null,
+        time: null,
+        location: null,
+        weather: null,
+        windIntensity: null,
+        photoWall: [],
+        tasks: []
+      }
+    }
+    render(<PhotographyPanel file={makeFile()} />)
+    expect(screen.queryByText('风力')).toBeNull()
+  })
+
+  it('windDirection 已知枚举时显示"风向"行', () => {
+    mockGameParamsResult.data = {
+      photography: {
+        edit: { enabled: false, hasSticker: false, hasText: false },
+        date: null,
+        time: null,
+        location: null,
+        weather: null,
+        windDirection: 6,
+        photoWall: [],
+        tasks: []
+      }
+    }
+    render(<PhotographyPanel file={makeFile()} />)
+    expect(screen.getByText('风向')).toBeTruthy()
+    expect(screen.getByText('东北')).toBeTruthy()
+  })
+
+  it('旧数据三字段缺省（undefined）时不渲染拍照模式/风力/风向行', () => {
+    mockGameParamsResult.data = {
+      photography: {
+        edit: { enabled: false, hasSticker: false, hasText: false },
+        date: null,
+        time: null,
+        location: null,
+        weather: null,
+        photoWall: [],
+        tasks: []
+      }
+    }
+    render(<PhotographyPanel file={makeFile()} />)
+    expect(screen.queryByText('相机模式')).toBeNull()
+    expect(screen.queryByText('风力')).toBeNull()
+    expect(screen.queryByText('风向')).toBeNull()
+  })
 })
 
 describe('formatPhotographyForCopy', () => {
@@ -443,5 +565,24 @@ describe('formatPhotographyForCopy', () => {
     }
     const text = formatPhotographyForCopy(p, mockT)
     expect(text).toContain('拍摄时间: 08:05:09')
+  })
+
+  it('拍照模式/风力/风向行进入复制输出（含零值行）', () => {
+    const p: PhotographyInfo = {
+      edit: { enabled: false, hasSticker: false, hasText: false },
+      date: null,
+      time: null,
+      location: null,
+      weather: null,
+      photoMode: 0,
+      windIntensity: 0,
+      windDirection: 6,
+      photoWall: [],
+      tasks: []
+    }
+    const text = formatPhotographyForCopy(p, mockT)
+    expect(text).toContain('相机模式: 普通拍照')
+    expect(text).toContain('风力: 无风')
+    expect(text).toContain('风向: 东北')
   })
 })

@@ -1,4 +1,4 @@
-// @core-change: 新增 launchAtLogin 开机自启设置：布尔校验与系统登录项同步
+// @core-change: 新增外部图片总开关与参考数据自动更新开关的布尔校验
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -7,6 +7,7 @@ import { AppError } from '../../../shared/errors/app-error'
 import { RENDERER_PREF_KEYS, SECURITY_SENSITIVE_KEYS } from '../../../shared/settings-keys'
 import { writeHardwareAccelPref, writeGpuDiscretePref } from '../../app/gpu-fallback'
 import { syncLoginItemSetting } from '../../app/login-item'
+import { assertSafeRemoteUrl } from '../../utils/remote-url-guard'
 import { t } from '../../i18n'
 
 // 与设置页 MAX_CUSTOM_PATHS / scanner:start schema 保持一致
@@ -36,6 +37,34 @@ function assertCustomScanPaths(value: unknown): void {
     // customScanPaths 存的是扫描根，dialog:openFile 挑中的单个文件不能冒充它。
     if (!pathGuard.isUserPickedDir(p)) assertFileReadPath(p)
   }
+}
+
+/**
+ * 镜像/加速入口写入校验（manifest 站点键与图片 CDN 入口键**共用同一套规则**）。
+ *
+ * 空串（或 trim 后为空）= 未配置，回退官方/原始地址（合法回退值）；否则必须是公网
+ * http/https URL（协议 + 环回/私网/保留地址闸，镜像域不设白名单）。
+ * 该值决定出站请求目标，写入面即安全面。
+ *
+ * @param invalidMessage 校验失败时的用户可见文案（两个键各自精确指引，不共用一条）
+ * @returns 校验通过后的 trim 结果（落库值）
+ */
+function assertMirrorBaseUrl(value: unknown, invalidMessage: string): string {
+  if (typeof value !== 'string') {
+    throw AppError.validation(invalidMessage)
+  }
+  const trimmed = value.trim()
+  if (trimmed.length > 256) {
+    throw AppError.validation(invalidMessage)
+  }
+  if (trimmed.length > 0) {
+    try {
+      assertSafeRemoteUrl(trimmed)
+    } catch {
+      throw AppError.validation(invalidMessage)
+    }
+  }
+  return trimmed
 }
 
 /**
@@ -124,6 +153,32 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           }
           ctx.dbManager.setSetting(key, value)
           syncLoginItemSetting(value)
+          return { saved: true }
+        }
+        // referenceData.manifestBaseUrl 走内联 URL/SSRF 校验（空串 = 官方站点）
+        if (key === 'referenceData.manifestBaseUrl') {
+          ctx.dbManager.setSetting(
+            key,
+            assertMirrorBaseUrl(value, t('main.settings.error.manifestBaseUrlInvalid'))
+          )
+          return { saved: true }
+        }
+        // referenceData.imageMirrorBaseUrl（阶段 5）：同款校验、不同语义——只替换已授权
+        // 图片资源的取图 host，与 manifest 站点键各自独立，不得串用
+        if (key === 'referenceData.imageMirrorBaseUrl') {
+          ctx.dbManager.setSetting(
+            key,
+            assertMirrorBaseUrl(value, t('main.settings.error.imageMirrorBaseUrlInvalid'))
+          )
+          return { saved: true }
+        }
+        // 两个布尔开关（外部图片总开关 / 开机自动检查）：非 boolean 一律拒绝，
+        // 不把不可信值（字符串 "false" 等）落库后让消费侧按真值性误判为开启。
+        if (key === 'referenceData.remoteImagesEnabled' || key === 'referenceData.autoUpdate') {
+          if (typeof value !== 'boolean') {
+            throw AppError.validation(t('main.settings.error.referenceDataSwitchNotBoolean'))
+          }
+          ctx.dbManager.setSetting(key, value)
           return { saved: true }
         }
         // 其余 key 必须在普通偏好白名单内；命中敏感 key 时给出专用通道指引
