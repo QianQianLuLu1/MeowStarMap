@@ -89,6 +89,9 @@ export const SYNC_ENABLED_DEFAULT = true
 export const SETTING_SYNC_AUTOSTART = 'nikkisync.autoStartSyncServer'
 export const SYNC_AUTOSTART_DEFAULT = false
 
+/** 设置项：图库数据源（'local' | 'nikkisync'，渲染层 GalleryPage 持久化，缺省 local）。 */
+export const SETTING_GALLERY_SOURCE = 'gallery.dataSource'
+
 /** PC 端六个能力的 env 逃生阀（'=0' 单独关闭一项，其他值视为未设置）。 */
 export const PC_COMPANION_ENV_FLAGS = {
   remoteBridge: 'NIKKI_NIKKISYNC_REMOTE_BRIDGE',
@@ -201,6 +204,20 @@ export function resolveRuntimeEnabled(
   if (flag === '1') return true
   if (flag === '0') return false
   return settings.getBoolean(SETTING_RUNTIME_ENABLED, RUNTIME_ENABLED_DEFAULT)
+}
+
+/**
+ * 图库数据源漂移兜底：`gallery.dataSource='nikkisync'` 时 Runtime 必须随启动运行——
+ * 否则图库取数恒报 "runtime is not ready"，且 `resource-allowlist` 授权表为空导致
+ * 导出恒 IPC_PATH_FORBIDDEN（2026-11-10 故障机诊断包实锤的状态漂移）。
+ * 与「开了同步服务就必须开 Runtime」同形的 forcing 条件；`RUNTIME=0` 逃生阀优先级不变。
+ */
+export function shouldForceRuntimeForGallerySource(
+  env: Record<string, string | undefined>,
+  settings: NikkiSyncSettingsPort
+): boolean {
+  if ((env[RUNTIME_ENV_FLAG] ?? '').trim() === '0') return false
+  return settings.getString(SETTING_GALLERY_SOURCE, 'local') === 'nikkisync'
 }
 
 /** 组装会话参数（纯函数：不碰 Electron API，路径与开关全部显式入参）。 */
@@ -474,10 +491,15 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
         .map(([name, value]) => `${name}=${value}`)
         .join(' ')
   )
-  // 开了同步服务就必须开 Runtime：没有会话就没有可 start() 的上游服务器
-  if (!resolveRuntimeEnabled(process.env, settings) && !syncEnabled) {
+  // 开了同步服务就必须开 Runtime：没有会话就没有可 start() 的上游服务器。
+  // 图库数据源切到 nikkisync 同样 forcing：取数与导出授权都依赖会话在位。
+  const forceForGallery = shouldForceRuntimeForGallerySource(process.env, settings)
+  if (!resolveRuntimeEnabled(process.env, settings) && !syncEnabled && !forceForGallery) {
     runtimeLog('info', `embedded runtime registered but disabled (${options.databaseFile})`)
     return manager
+  }
+  if (forceForGallery) {
+    runtimeLog('info', 'embedded runtime forcing start: gallery.dataSource=nikkisync')
   }
   const status = await manager.start(sessionOptions)
   runtimeLog(

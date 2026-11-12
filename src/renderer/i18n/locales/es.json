@@ -1249,6 +1249,8 @@
     "updateFailed": "Actualización fallida"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "Los {{count}} archivo(s) de la papelera se eliminarán permanentemente.\nLos archivos se eliminan directamente del disco sin pasar por la papelera del sistema; ni esta aplicación ni Windows podrán recuperarlos.\n¿Vaciar la papelera?",
+    "assetPermanentConfirm": "Los {{count}} archivo(s) seleccionados se eliminarán permanentemente.\nLos archivos se eliminan directamente del disco sin pasar por la papelera del sistema; ni esta aplicación ni Windows podrán recuperarlos.\n¿Eliminarlos?",
     "backToGallery": "Volver a la galería",
     "clearSelection": "Borrar selección",
     "confirmEmpty": "Vaciar",

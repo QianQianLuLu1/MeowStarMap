@@ -199,3 +199,114 @@ describe('RecycleBinPage 批量彻底删除（#fix-permanent-delete-error-toast�
     })
   })
 })
+
+describe('RecycleBinPage 彻底删除 nikkisync 分支（assetId 走文件通道 + 叠加层）', () => {
+  let deletePermanent: ReturnType<typeof vi.fn>
+  let assetSet: ReturnType<typeof vi.fn>
+
+  const assetEdit = {
+    assetId: 'a/1',
+    isFavorite: false,
+    rating: 0,
+    tags: [],
+    notes: '',
+    categoryId: null,
+    outfit: null,
+    sceneCategory: null,
+    sceneTime: null,
+    isHidden: true,
+    deletedAt: '2026-11-01T00:00:00.000Z',
+    updatedAt: '2026-11-01T00:00:00.000Z'
+  }
+
+  beforeEach(() => {
+    deletePermanent = vi.fn().mockResolvedValue({ success: true, message: '已彻底删除 1 项' })
+    assetSet = vi.fn().mockResolvedValue({ edit: null })
+    const ext = electron as unknown as Record<string, unknown>
+    ext.file = { deletePermanent }
+    ext.assetEdits = {
+      listHidden: vi.fn().mockResolvedValue({ edits: [assetEdit], total: 1 }),
+      set: assetSet
+    }
+    ext.nikkisync = {
+      getAssetDetail: vi.fn().mockResolvedValue({
+        asset: {
+          schemaVersion: 1,
+          assetId: 'a/1',
+          type: 'photo',
+          state: 'ready',
+          source: {
+            game: 'infinity_nikki',
+            discoveredAt: '2026-10-01T00:00:00.000Z',
+            capturedAt: '2026-10-01T08:00:00.000Z'
+          },
+          resources: [
+            {
+              resourceId: 'r-a/1',
+              role: 'source_high_quality',
+              fileName: 'a1.png',
+              mimeType: 'image/png',
+              fileExt: '.png',
+              sizeBytes: 4096,
+              sha256: 'aa',
+              width: 100,
+              height: 200
+            }
+          ],
+          revision: 3
+        }
+      }),
+      getResourceRecords: vi
+        .fn()
+        .mockResolvedValue({ byAsset: { 'a/1': { 'r-a/1': 'D:\\Game\\a1.png' } } })
+    }
+    useMediaStore.setState({ source: 'nikkisync' })
+  })
+
+  afterEach(() => {
+    useMediaStore.setState({ source: 'local' })
+  })
+
+  function assetCard(): HTMLElement {
+    const cards = screen.getAllByRole('checkbox')
+    const card = cards.find((el) => el.getAttribute('aria-label')?.includes('a1.png'))
+    if (!card) throw new Error('nikkisync 回收站卡片未渲染')
+    return card as HTMLElement
+  }
+
+  async function confirmAssetPermanentDelete(): Promise<void> {
+    fireEvent.contextMenu(assetCard())
+    fireEvent.click(assetCard())
+    fireEvent.click(screen.getByRole('button', { name: '彻底删除选中项' }))
+    await waitFor(() => expect(screen.getByTestId('confirm-ok')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('confirm-ok'))
+  }
+
+  it('nikkisync 项彻底删除走 file.deletePermanent(路径)，本地 permanentDelete 零调用', async () => {
+    render(<RecycleBinPage />)
+    await waitFor(() => expect(assetCard()).toBeTruthy())
+
+    await confirmAssetPermanentDelete()
+
+    await waitFor(() => {
+      expect(deletePermanent).toHaveBeenCalledWith(['D:\\Game\\a1.png'])
+    })
+    expect(electron.mediaAction.permanentDelete).not.toHaveBeenCalled()
+    await waitFor(() => {
+      expect(showMessageMock).toHaveBeenCalledWith('已彻底删除 1 项', 'success')
+    })
+  })
+
+  it('文件通道失败 ⇒ 错误 toast + 重试按钮', async () => {
+    deletePermanent.mockResolvedValue({ success: false, message: '磁盘写入失败' })
+    render(<RecycleBinPage />)
+    await waitFor(() => expect(assetCard()).toBeTruthy())
+
+    await confirmAssetPermanentDelete()
+
+    await waitFor(() => {
+      expect(showMessageMock).toHaveBeenCalledWith('磁盘写入失败', 'error')
+    })
+    expect(screen.getByText('重试删除')).toBeInTheDocument()
+  })
+})

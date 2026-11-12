@@ -2,10 +2,17 @@ import { create } from 'zustand'
 import { toFileUrl } from '../utils/file'
 import i18n from '../i18n'
 // 阶段 4：NikkiSync 数据源的视图模型映射（渲染层唯一转换点）
-import { toAssetViewModel, type AssetMediaFile } from '../utils/assetViewModel'
+import {
+  toAssetViewModel,
+  assetDetailToSummary,
+  type AssetMediaFile
+} from '../utils/assetViewModel'
 import type { AssetSummary } from '../../shared/sync/protocol'
+import type { NikkiAsset } from '../../shared/sync/domain-types'
+import type { AssetEditsInfo } from '../../shared/types/electron-api'
 // 阶段 5：取数层的页大小上界自查（上游 zod 的 listSchema 上界同为 500）
 import { ValidationError } from '../../shared/errors/app-error'
+import { settleWithConcurrency } from '../../shared/utils/concurrency'
 // C-S2：从 shared 导入场景分类，消除渲染进程跨边界导入主进程模块
 import type { SceneCategory, SceneTime } from '../../shared/scene-category'
 // P1-01：读取 showDuplicates 状态用于服务端过滤 is_duplicate=1
@@ -392,10 +399,13 @@ export async function fetchAssetPage(input: {
     // 上游 AssetPageQuery 不支持 uid 过滤（协议只有 limit/cursor/type/afterRevision/
     // includeDeleted 五键），故档案筛选只能在已取回的一页上做，翻页可能显稀疏 —— 见
     // docs/sync-integration/04-ui-bridge-plan.md §16.2，不伪造服务端过滤能力。
+    // 隐藏/已删资产同口径在客户端滤除（叠加层 isHidden 与上游 state=deleted 都映射到
+    // is_deleted）；游标/hasMore 照常推进，整页全隐藏时触底续页仍可继续。
+    const visible = mapped.filter((file) => !file.is_deleted)
     const files =
       profileUid && profileUid !== 'all'
-        ? mapped.filter((file) => file.account_uid === profileUid)
-        : mapped
+        ? visible.filter((file) => file.account_uid === profileUid)
+        : visible
     return {
       files,
       nextCursor: page.nextCursor ?? null,
@@ -868,10 +878,105 @@ export async function loadProfiles(): Promise<CharacterProfile[] | null> {
 // 回收站单页条数：回收站条目自带缩略图渲染，比图库列表更重，取比 MEDIA_PAGE_SIZE 更小的值
 const RECYCLE_BIN_PAGE_SIZE = 200
 
+// nikkisync 回收站：叠加层用 offset 分页（本地分支是 keyset 游标），模块级记录已消费行数。
+// 按「已消费的隐藏行数」而非「映射成功的文件数」推进——孤儿行（上游已删、detail 失败）
+// 跳过但不重取。
+let nikkiRecycleOffset = 0
+
+// 逐条 detail 回捞的并发上限（与批量删除同款）：上游没有按 ids 批量取摘要的查询面
+const NIKKI_RECYCLE_DETAIL_CONCURRENCY = 5
+
+interface NikkiRecyclePage {
+  files: MediaFile[]
+  total: number
+  /** 本页消费的隐藏行数（含跳过的孤儿行），供 offset 推进 */
+  consumed: number
+}
+
+/**
+ * nikkisync 回收站取数：listHidden 拿隐藏集一页 → 并发逐条 get-asset-detail 回捞摘要
+ * （失败跳过）→ 整页一次 path records → assetDetailToSummary + toAssetViewModel。
+ * 整页 detail 全失败（孤儿行）仍返回本页消费结果（files 为空、consumed 为本页行数），
+ * 供分页按已消费行数继续推进；null 仅表示真取数失败（API 缺失 / listHidden 无效 / 抛错）。
+ * 导出供 RecycleBinPage 清空分支复用（同一条回捞链，不另起第二套取数）。
+ */
+export async function fetchNikkiRecyclePage(offset: number): Promise<NikkiRecyclePage | null> {
+  const api = window.electronAPI?.nikkisync
+  const editsApi = window.electronAPI?.assetEdits
+  if (!api?.getAssetDetail || !api.getResourceRecords || !editsApi?.listHidden) return null
+  const page = await editsApi.listHidden({ limit: RECYCLE_BIN_PAGE_SIZE, offset })
+  if (!page || !Array.isArray(page.edits)) return null
+  const total = page.total ?? 0
+  if (page.edits.length === 0) return { files: [], total, consumed: 0 }
+  const editByAsset = new Map(page.edits.map((item) => [item.assetId, item]))
+  const settled = await settleWithConcurrency(
+    page.edits.map((item) => item.assetId),
+    NIKKI_RECYCLE_DETAIL_CONCURRENCY,
+    async (assetId): Promise<NikkiAsset | null> => {
+      try {
+        const detail = await api.getAssetDetail(assetId)
+        return detail?.asset ?? null
+      } catch (error) {
+        // 孤儿行（上游资产已删）：跳过并留痕，不中断其余回捞
+        console.error(i18n.t('mediaStore.log.fetchError'), assetId, error)
+        return null
+      }
+    }
+  )
+  const recovered: Array<{ asset: NikkiAsset; edit: AssetEditsInfo }> = []
+  for (const result of settled) {
+    if (result.status !== 'fulfilled' || !result.value) continue
+    const edit = editByAsset.get(result.value.assetId)
+    if (edit) recovered.push({ asset: result.value, edit })
+  }
+  // 整页孤儿行不是取数失败：按已消费行数返回空结果，让清空/续页能推进到后续页
+  if (recovered.length === 0) return { files: [], total, consumed: page.edits.length }
+  const pathResponse = await api.getResourceRecords({
+    assetIds: recovered.map((item) => item.asset.assetId),
+    mode: 'path'
+  })
+  const pathByAsset = pathResponse?.byAsset ?? {}
+  const files = recovered.map(({ asset, edit }) =>
+    toAssetViewModel({
+      summary: assetDetailToSummary(asset),
+      resources: asset.resources ?? [],
+      pathsByResourceId: pathByAsset[asset.assetId] ?? {},
+      edit
+    })
+  )
+  return { files, total, consumed: page.edits.length }
+}
+
+/** nikkisync 回收站首页：复位 offset 后取第一页。 */
+async function loadNikkiRecycleBin(): Promise<MediaFile[] | null> {
+  useMediaStore.setState({ recycleBinLoading: true })
+  try {
+    nikkiRecycleOffset = 0
+    const page = await fetchNikkiRecyclePage(0)
+    if (!page) return null
+    nikkiRecycleOffset = page.consumed
+    useMediaStore.setState({
+      recycleBinFiles: page.files,
+      recycleBinTotal: page.total,
+      recycleBinCursor: null,
+      recycleBinHasMore: page.consumed > 0 && nikkiRecycleOffset < page.total,
+      recycleBinLoadingMore: false
+    })
+    return page.files
+  } catch (error) {
+    console.error(i18n.t('mediaStore.log.loadRecycleBinFailed'), error)
+    return null
+  } finally {
+    useMediaStore.setState({ recycleBinLoading: false })
+  }
+}
+
 // F-S6 回收站：加载已软删除的媒体文件列表（首页）
 // 待确认#3：改用 useMediaStore.setState 直接更新，避免 getState 快照持有过期引用
 // 所有回收站操作（恢复/彻底删除/清空）完成后都会调用本函数，因此这里同时复位分页游标
 export async function loadRecycleBin(): Promise<MediaFile[] | null> {
+  // nikkisync 源：隐藏资产在叠加层而非本地 media_files，分流到专用取数链
+  if (useMediaStore.getState().source === 'nikkisync') return loadNikkiRecycleBin()
   if (!window.electronAPI?.media?.list) return null
   useMediaStore.setState({ recycleBinLoading: true })
   try {
@@ -903,6 +1008,33 @@ export async function loadRecycleBin(): Promise<MediaFile[] | null> {
 // 回收站无限滚动：滚动到底时追加下一页
 // 与 loadNextMediaPage 同构，但作用于独立的 recycleBin* 游标，两者互不干扰
 export async function loadNextRecycleBinPage(): Promise<void> {
+  // nikkisync 源：offset 续页（叠加层分页），与本地 keyset 游标互不干扰
+  if (useMediaStore.getState().source === 'nikkisync') {
+    const { recycleBinLoadingMore, recycleBinHasMore } = useMediaStore.getState()
+    if (recycleBinLoadingMore || !recycleBinHasMore) return
+    useMediaStore.setState({ recycleBinLoadingMore: true })
+    try {
+      const page = await fetchNikkiRecyclePage(nikkiRecycleOffset)
+      if (!page) return
+      nikkiRecycleOffset += page.consumed
+      const state = useMediaStore.getState()
+      useMediaStore.setState({
+        recycleBinFiles: [
+          ...state.recycleBinFiles,
+          ...dedupeAgainst(state.recycleBinFiles, page.files)
+        ],
+        recycleBinTotal: page.total,
+        // consumed=0 的空页必须终止分页，否则会反复重取同一页
+        recycleBinHasMore: page.consumed > 0 && nikkiRecycleOffset < page.total
+      })
+    } catch (error) {
+      // 取数失败时保持 offset 不变，用户再次触底即可重试
+      console.error(i18n.t('mediaStore.log.loadRecycleBinMoreFailed'), error)
+    } finally {
+      useMediaStore.setState({ recycleBinLoadingMore: false })
+    }
+    return
+  }
   if (!window.electronAPI?.media?.list) return
   const { recycleBinLoadingMore, recycleBinHasMore, recycleBinCursor } = useMediaStore.getState()
   // 并发保护：Virtuoso 的 endReached 在一次触底中可能连续触发多次

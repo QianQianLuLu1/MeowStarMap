@@ -1,5 +1,6 @@
 import type { AssetEditsInfo } from '../../shared/types/electron-api'
 import type { AssetSummary, MediaResource } from '../../shared/sync/protocol'
+import type { NikkiAsset } from '../../shared/sync/domain-types'
 import type { MediaFile } from '../stores/mediaStore'
 
 /**
@@ -132,6 +133,25 @@ export function toAssetViewModel(input: AssetViewModelInput): AssetMediaFile {
       motionVideoResourceId: motion?.resourceId,
       sha256: display?.sha256
     }
+  }
+}
+
+/**
+ * 回收站 nikkisync 分支回捞：`get-asset-detail` 返回的 `NikkiAsset` 派生成
+ * `AssetSummary`，随后复用 `toAssetViewModel`（edit 直接用 listHidden 行）。
+ * 上游没有按 ids 批量取摘要的查询面，逐条 detail 是唯一既有通道；
+ * 派生只透传协议字段 + 由 motion/metadata 存在性派生两个布尔，不伪造其余可选键。
+ */
+export function assetDetailToSummary(asset: NikkiAsset): AssetSummary {
+  return {
+    assetId: asset.assetId,
+    type: asset.type,
+    state: asset.state,
+    revision: asset.revision,
+    capturedAt: asset.source.capturedAt,
+    uid: asset.source.uid,
+    hasMotion: Boolean(asset.motion),
+    hasMetadata: Boolean(asset.metadata)
   }
 }
 

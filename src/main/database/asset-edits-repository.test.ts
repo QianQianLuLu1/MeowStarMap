@@ -93,9 +93,13 @@ class FakeDb {
   }
 
   private get(sql: string, params: unknown[]): FakeRow | undefined {
+    this.executed.push({ sql, params })
     if (this.tableMissing) throw new Error('no such table: asset_edits')
     if (sql.startsWith('SELECT * FROM asset_edits WHERE asset_id = ?')) {
       return this.find(String(params[0]))
+    }
+    if (sql.startsWith('SELECT COUNT(*) AS count FROM asset_edits WHERE is_hidden = 1')) {
+      return { count: this.rows.filter((row) => row.is_hidden === 1).length } as unknown as FakeRow
     }
     if (sql.startsWith('SELECT COUNT(*) AS count FROM asset_edits')) {
       return { count: this.rows.length } as unknown as FakeRow
@@ -104,7 +108,25 @@ class FakeDb {
   }
 
   private all(sql: string, params: unknown[]): FakeRow[] {
+    this.executed.push({ sql, params })
     if (this.tableMissing) throw new Error('no such table: asset_edits')
+    if (
+      sql.startsWith(
+        'SELECT * FROM asset_edits WHERE is_hidden = 1 ORDER BY deleted_at DESC, asset_id ASC'
+      )
+    ) {
+      const [limit, offset] = params as number[]
+      const hidden = this.rows
+        .filter((row) => row.is_hidden === 1)
+        .sort((a, b) => {
+          // SQLite DESC 下 NULL 沉底；同时间戳按 asset_id 升序
+          if (a.deleted_at === b.deleted_at) return a.asset_id < b.asset_id ? -1 : 1
+          if (a.deleted_at === null) return 1
+          if (b.deleted_at === null) return -1
+          return a.deleted_at > b.deleted_at ? -1 : 1
+        })
+      return hidden.slice(offset, offset + limit)
+    }
     if (sql.startsWith('SELECT * FROM asset_edits WHERE asset_id IN (')) {
       const wanted = params as string[]
       return this.rows.filter((row) => wanted.includes(row.asset_id))
@@ -164,6 +186,58 @@ describe('AssetEditsRepository 读面', () => {
     expect(repo.countAll()).toBe(0)
     db.rows.push({ asset_id: 'x' } as unknown as FakeRow)
     expect(repo.countAll()).toBe(1)
+  })
+})
+
+describe('AssetEditsRepository 隐藏集读面（回收站 nikkisync 分支）', () => {
+  function hiddenRow(assetId: string, deletedAt: string | null): FakeRow {
+    return {
+      asset_id: assetId,
+      is_favorite: 0,
+      rating: 0,
+      tags: '[]',
+      notes: '',
+      category_id: null,
+      outfit: null,
+      scene_category: null,
+      scene_time: null,
+      is_hidden: 1,
+      deleted_at: deletedAt,
+      updated_at: '2026-11-11'
+    }
+  }
+
+  it('只回 is_hidden=1 的行，按 deleted_at DESC、asset_id ASC 排序', () => {
+    db.rows.push(hiddenRow('a/1', '2026-11-02T00:00:00.000Z'))
+    db.rows.push(hiddenRow('a/2', '2026-11-03T00:00:00.000Z'))
+    db.rows.push(hiddenRow('a/3', '2026-11-03T00:00:00.000Z'))
+    db.rows.push({ ...hiddenRow('a/4', null), is_hidden: 0 })
+    const rows = repo.listHidden(10, 0)
+    expect(rows.map((row) => row.asset_id)).toEqual(['a/2', 'a/3', 'a/1'])
+  })
+
+  it('limit/offset 逐位绑定到 SQL 参数', () => {
+    db.rows.push(hiddenRow('a/1', '2026-11-01T00:00:00.000Z'))
+    db.rows.push(hiddenRow('a/2', '2026-11-02T00:00:00.000Z'))
+    db.rows.push(hiddenRow('a/3', '2026-11-03T00:00:00.000Z'))
+    const rows = repo.listHidden(1, 1)
+    expect(rows.map((row) => row.asset_id)).toEqual(['a/2'])
+    const call = db.executed.find((item) => item.sql.includes('WHERE is_hidden = 1'))
+    expect(call?.params).toEqual([1, 1])
+  })
+
+  it('空隐藏集回空数组；countHidden 只数隐藏行', () => {
+    db.rows.push({ ...hiddenRow('a/1', null), is_hidden: 0 })
+    expect(repo.listHidden(10, 0)).toEqual([])
+    expect(repo.countHidden()).toBe(0)
+    db.rows.push(hiddenRow('a/2', null))
+    expect(repo.countHidden()).toBe(1)
+  })
+
+  it('缺表（旧库未迁移）如实回退 []/0，不抛错', () => {
+    db.tableMissing = true
+    expect(repo.listHidden(10, 0)).toEqual([])
+    expect(repo.countHidden()).toBe(0)
   })
 })
 

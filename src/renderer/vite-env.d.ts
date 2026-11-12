@@ -1258,6 +1258,10 @@ interface WindowElectronAPI {
       assetId: string,
       patch: import('../shared/types/electron-api').AssetEditsPatchInfo
     ) => Promise<{ edit: import('../shared/types/electron-api').AssetEditsInfo | null }>
+    listHidden: (input: {
+      limit: number
+      offset: number
+    }) => Promise<import('../shared/types/electron-api').AssetEditsHiddenPageInfo>
   }
   // 外部参考数据管道（总计划阶段 1：状态/刷新/地图瓦片/图片模板，查询面 fail-soft；
   // 阶段 5：resolveImage 按需解析 CDN 图片为本机缓存路径）

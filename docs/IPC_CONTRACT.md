@@ -803,10 +803,11 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
 `src/main/database/asset-edits-repository.ts`（DDL 单一事实源 `ASSET_EDITS_DDL_STATEMENTS`，
 由 `connection.ts` 幂等执行）。
 
-| 通道               | 入参                                                      | 出参                               | 失败码                                     |
-| ------------------ | --------------------------------------------------------- | ---------------------------------- | ------------------------------------------ |
-| `asset-edits:list` | `assetIds: string(1..128)[]`（≤500，与一页资产同界）      | `{ edits: AssetEditsInfo[] }`      | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
-| `asset-edits:set`  | `{ assetId: string(1..128), patch: AssetEditsPatchInfo }` | `{ edit: AssetEditsInfo \| null }` | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+| 通道                     | 入参                                                      | 出参                                         | 失败码                                     |
+| ------------------------ | --------------------------------------------------------- | -------------------------------------------- | ------------------------------------------ |
+| `asset-edits:list`       | `assetIds: string(1..128)[]`（≤500，与一页资产同界）      | `{ edits: AssetEditsInfo[] }`                | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+| `asset-edits:set`        | `{ assetId: string(1..128), patch: AssetEditsPatchInfo }` | `{ edit: AssetEditsInfo \| null }`           | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
+| `asset-edits:listHidden` | `{ limit: int(1..500), offset: int(0..1000000) }`         | `{ edits: AssetEditsInfo[], total: number }` | `VALIDATION_ERROR` / `PRECONDITION_FAILED` |
 
 契约要点：
 
@@ -816,6 +817,11 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
 - 归键是 NikkiSync 的 `asset_id`（TEXT），**不是** `media_files.id`。两者不可混用：
   `mediaAction:*` 仍以 `media_files.id` 为准，只服务本地数据源。
 - `updatedAt` 由主进程生成，渲染层不传（避免客户端时钟漂移影响排序与冲突判定）。
+- **`set` 是部分合并**：未给的字段保留既有值（新行按列默认值落库），显式 `undefined`
+  键不覆盖既有值。`deletedAt` 不接受渲染层传入——`isHidden=true` 落首次隐藏时间戳
+  （重复隐藏不刷新），`isHidden=false` 清空，未给 `isHidden` 保留既有值。
+- **`listHidden`** 供回收站 nikkisync 分支取数：只回 `is_hidden=1` 的行，
+  `deleted_at DESC, asset_id ASC` 排序（SQLite DESC 下 NULL 沉底），`total` 为隐藏集总数。
 - 旧库未迁移（缺 `asset_edits` 表）时读取如实回退为空列表；写入则 `PRECONDITION_FAILED`。
 - 回填 `media_files → asset_edits`（按归一化路径匹配）的纯函数已在仓储层实现并单测
   （`planAssetEditSeed`），但**尚未接线任何通道**：需要 `media_files` 与 assets 两侧

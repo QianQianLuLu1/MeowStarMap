@@ -224,3 +224,61 @@ describe('loadNextMediaPage 走 NikkiSync 数据源', () => {
     expect(useMediaStore.getState().hasMoreMedia).toBe(false)
   })
 })
+
+describe('nikkisync 取数过滤隐藏/已删资产（回收站语义）', () => {
+  const hiddenEdit = (assetId: string) => ({
+    assetId,
+    isFavorite: false,
+    rating: 0,
+    tags: [],
+    notes: '',
+    categoryId: null,
+    outfit: null,
+    sceneCategory: null,
+    sceneTime: null,
+    isHidden: true,
+    deletedAt: '2026-11-01T00:00:00.000Z',
+    updatedAt: '2026-11-01T00:00:00.000Z'
+  })
+
+  it('叠加层 isHidden=true 的资产不进图库，游标照常推进', async () => {
+    setBridge({
+      getAssets: vi.fn().mockResolvedValue({
+        items: [summary('a/1'), summary('a/2')],
+        libraryRevision: 7,
+        nextCursor: 'cur-next'
+      }),
+      edits: vi.fn().mockResolvedValue({ edits: [hiddenEdit('a/2')] })
+    })
+    const result = await fetchMediaFromDatabase()
+    expect(result?.files.map((file) => file.id)).toEqual(['a/1'])
+    expect(useMediaStore.getState().nikkiCursor).toBe('cur-next')
+    expect(result?.hasMore).toBe(true)
+  })
+
+  it('上游 state=deleted 的资产同样被滤（视图模型 is_deleted 同口径）', async () => {
+    setBridge({
+      getAssets: vi.fn().mockResolvedValue({
+        items: [summary('a/1'), summary('a/2', { state: 'deleted' })],
+        libraryRevision: 7
+      })
+    })
+    const result = await fetchMediaFromDatabase()
+    expect(result?.files.map((file) => file.id)).toEqual(['a/1'])
+  })
+
+  it('整页全隐藏 ⇒ 空列表但游标/hasMore 不丢（触底续页可继续）', async () => {
+    setBridge({
+      getAssets: vi.fn().mockResolvedValue({
+        items: [summary('a/1')],
+        libraryRevision: 7,
+        nextCursor: 'cur-next'
+      }),
+      edits: vi.fn().mockResolvedValue({ edits: [hiddenEdit('a/1')] })
+    })
+    const result = await fetchMediaFromDatabase()
+    expect(result?.files).toEqual([])
+    expect(useMediaStore.getState().nikkiCursor).toBe('cur-next')
+    expect(result?.hasMore).toBe(true)
+  })
+})

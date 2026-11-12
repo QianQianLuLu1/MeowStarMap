@@ -1,3 +1,4 @@
+// @core-change: extractUserMessage 兼容 preload IpcError 的 userMessage 结构化读取，避免渲染层 toast 回落开发者技术串
 /**
  * 全局应用错误基类与分类错误子类
  *
@@ -328,7 +329,7 @@ export function toIpcError(error: unknown): AppErrorIpcPayload {
 /**
  * 辅助：从任意错误中提取用户可读的消息
  *
- * 优先级：AppError.userMessage > AppError.message > Error.message > String(error)
+ * 优先级：AppError.userMessage > Error.userMessage（preload IpcError）> Error.message > String(error)
  *
  * 渲染层 useErrorToast 钩子使用此函数决定 toast 显示文本。
  */
@@ -340,6 +341,10 @@ export function extractUserMessage(
     return error.userMessage ?? error.message
   }
   if (error instanceof Error) {
+    // preload call() 抛出的 IpcError 继承 Error 而非 AppError，用户文案在 userMessage 上。
+    // 用 duck typing 结构化读取，避免 shared 层反向依赖 preload 的 IpcError 类。
+    const userMessage = (error as Error & { userMessage?: unknown }).userMessage
+    if (typeof userMessage === 'string' && userMessage.length > 0) return userMessage
     return error.message
   }
   if (typeof error === 'string') {

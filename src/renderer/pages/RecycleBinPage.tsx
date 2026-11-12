@@ -5,8 +5,10 @@ import {
   useMediaStore,
   loadRecycleBin,
   loadNextRecycleBinPage,
+  fetchNikkiRecyclePage,
   type MediaFile
 } from '../stores/mediaStore'
+import type { AssetMediaFile } from '../utils/assetViewModel'
 import { resolveThumbnailSrc } from '../utils/thumbnail-src'
 import { useRefreshMedia } from '../hooks/useRefreshMedia'
 import { useOnDemandThumbnails } from '../hooks/useOnDemandThumbnails'
@@ -14,7 +16,7 @@ import { useUIStore } from '../stores/uiStore'
 import { useGlobalToast } from './settings/sections'
 import { ConfirmDialog } from '../components/common/ConfirmDialog'
 import { EmptyState } from '../components/common/EmptyState'
-import { InternalError } from '../../shared/errors/app-error'
+import { InternalError, extractUserMessage } from '../../shared/errors/app-error'
 import { SkeletonGrid } from '../components/common/Skeleton'
 import { ThumbReveal } from '../components/common/ThumbReveal'
 import { TaskProgressOverlay } from '../components/common/TaskProgressOverlay'
@@ -75,6 +77,8 @@ export const RecycleBinPage: React.FC = () => {
   const staged = useStagedTask()
   // 图库刷新写回：useRefreshMedia 封装「取数 + 写 store + 失败重试」
   const refreshMedia = useRefreshMedia()
+  // 数据源：nikkisync 源的回收站条目是叠加层隐藏资产，操作走 assetEdits/文件通道
+  const source = useMediaStore((s) => s.source)
 
   // 回收站语义修复 D4：App 采用 keep-alive（display:none 保活），空依赖 effect 只在
   // 首次挂载拉一次数据——他处删除后切回回收站列表陈旧。改为「首次挂载必拉取 +
@@ -138,6 +142,28 @@ export const RecycleBinPage: React.FC = () => {
     setOperating(true)
     setFailedAction(null)
     try {
+      if (source === 'nikkisync') {
+        // nikkisync 源：恢复 = 叠加层取消隐藏（id 即 assetId，Number() 即 NaN，不走本地通道）
+        const assetIds = Array.from(selectedIds)
+        const settled = await settleWithConcurrency(
+          assetIds,
+          DELETE_CONCURRENCY,
+          async (assetId) => {
+            await window.electronAPI!.assetEdits.set(assetId, { isHidden: false })
+          }
+        )
+        const firstRejected = settled.find((s) => s.status === 'rejected')
+        if (firstRejected && firstRejected.status === 'rejected') {
+          throw firstRejected.reason instanceof Error
+            ? firstRejected.reason
+            : new Error(String(firstRejected.reason))
+        }
+        setSelectedIds(new Set())
+        await loadRecycleBin()
+        await refreshMedia()
+        showMessage(t('main.media.message.restored', { count: assetIds.length }), 'success')
+        return
+      }
       const ids = Array.from(selectedIds).map((id) => Number(id))
       // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message }（无 success 字段）；
       // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError），
@@ -150,12 +176,12 @@ export const RecycleBinPage: React.FC = () => {
       await refreshMedia()
       showMessage(result.message, 'success')
     } catch (error) {
-      showMessage(error instanceof Error ? error.message : t('recycleBin.restoreFailed'), 'error')
+      showMessage(extractUserMessage(error, t('recycleBin.restoreFailed')), 'error')
       setFailedAction('restore')
     } finally {
       setOperating(false)
     }
-  }, [selectedIds, showMessage, t, refreshMedia])
+  }, [selectedIds, showMessage, t, refreshMedia, source])
 
   // 彻底删除选中项（移至系统回收站 + 删除数据库记录），带阶段步骤进度 + 可取消
   const handlePermanentDelete = useCallback(async () => {
@@ -188,6 +214,16 @@ export const RecycleBinPage: React.FC = () => {
               const e = new Error('aborted')
               e.name = 'AbortError'
               throw e
+            }
+            const file = useMediaStore.getState().recycleBinFiles.find((f) => f.id === id)
+            const assetId = (file as AssetMediaFile | undefined)?.nikkisync?.assetId
+            if (assetId) {
+              // nikkisync 源：文件实体直接从磁盘删除（不经系统回收站），叠加层行保持隐藏
+              // （上游 assets 表归 runtime 所有，不直接删行；条目待上游重扫标 missing）
+              if (!file?.file_path) throw new InternalError(t('recycleBin.deleteFailed'))
+              const r = await window.electronAPI!.file.deletePermanent([file.file_path])
+              if (!r.success) throw new InternalError(r.message)
+              return
             }
             // #fix-permanent-delete-error-toast：preload call() 成功只返回 data
             // （media:permanentDelete → { message, deletedCount, failedCount }，无 success 字段），
@@ -225,7 +261,7 @@ export const RecycleBinPage: React.FC = () => {
     if (final?.phase === 'cancelled') {
       showMessage(t('taskProgress.phase.cancelled'), 'error')
     } else if (final?.phase === 'error') {
-      showMessage(final.message ?? t('recycleBin.deleteFailed'), 'error')
+      showMessage(extractUserMessage(final.message ?? t('recycleBin.deleteFailed')), 'error')
     } else if (final && final.stages?.some((s) => s.status === 'failed')) {
       showMessage(t('recycleBin.deleteFailed'), 'error')
     } else {
@@ -242,7 +278,14 @@ export const RecycleBinPage: React.FC = () => {
   //   修复前这里不看 failedCount，41 项全失败也走 phase='done' 弹绿色成功 Toast。
   const handleEmptyRecycleBin = useCallback(
     async (force?: boolean) => {
-      if (!window.electronAPI?.mediaAction?.emptyRecycleBin) return
+      const isNikkiSource = useMediaStore.getState().source === 'nikkisync'
+      if (isNikkiSource) {
+        if (
+          !window.electronAPI?.assetEdits?.listHidden ||
+          !window.electronAPI?.file?.deletePermanent
+        )
+          return
+      } else if (!window.electronAPI?.mediaAction?.emptyRecycleBin) return
       setOperating(true)
       setFailedAction(null)
       // 缓存主进程返回的成功文案；call() 成功即代表操作成功（失败抛 IpcError 由 error 分支透传）
@@ -260,14 +303,42 @@ export const RecycleBinPage: React.FC = () => {
           setStage(0)
           setStage(0, 'done')
           setStage(1)
-          // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message, movedCount, missingCount, failedCount, forceDeletedCount }（无 success 字段）；
-          // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError）。
-          const result = await window.electronAPI!.mediaAction!.emptyRecycleBin(force)
-          if (result.failedCount > 0) {
-            // 抛出使 staged 终态为 error ⇒ 红 Toast 透传主进程文案（与彻底删除同一模式）
-            throw new InternalError(result.message)
+          if (isNikkiSource) {
+            // nikkisync 源：遍历叠加层隐藏集，逐页经文件通道从磁盘删除。
+            // 叠加层行不删除（上游 assets 表归 runtime 所有），offset 按已消费行数稳定推进；
+            // 页数上限 ceil(total/页大小) 防死循环。整页孤儿行是空结果而非失败，仍需推进。
+            let offset = 0
+            const first = await fetchNikkiRecyclePage(offset)
+            // 真取数失败不得当成「清空成功」：抛错使 staged 终态为 error + 重试入口
+            if (!first) throw new InternalError(t('recycleBin.emptyFailed'))
+            const total = first.total
+            const maxPages = Math.ceil(total / 200)
+            let pages = 0
+            let deletedCount = 0
+            let page: Awaited<ReturnType<typeof fetchNikkiRecyclePage>> = first
+            while (offset < total && pages < maxPages) {
+              if (!page) throw new InternalError(t('recycleBin.emptyFailed'))
+              const paths = page.files.map((f) => f.file_path).filter((p) => p.length > 0)
+              if (paths.length > 0) {
+                const r = await window.electronAPI!.file.deletePermanent(paths)
+                if (!r.success) throw new InternalError(r.message)
+                deletedCount += paths.length
+              }
+              offset += page.consumed
+              pages += 1
+              page = offset < total && pages < maxPages ? await fetchNikkiRecyclePage(offset) : null
+            }
+            successMessage = t('recycleBin.permanentDeleteSuccess', { count: deletedCount })
+          } else {
+            // preload call() 解包 IpcResponse 只回传 data，返回值形态为 { message, movedCount, missingCount, failedCount, forceDeletedCount }（无 success 字段）；
+            // 因此不可读取 result.success 判定成败，应直接信任 call() 的解析结果（失败会抛 IpcError）。
+            const result = await window.electronAPI!.mediaAction!.emptyRecycleBin(force)
+            if (result.failedCount > 0) {
+              // 抛出使 staged 终态为 error ⇒ 红 Toast 透传主进程文案（与彻底删除同一模式）
+              throw new InternalError(result.message)
+            }
+            successMessage = result.message ?? ''
           }
-          successMessage = result.message ?? ''
           setStage(1, 'done')
           setStage(2)
           setSelectedIds(new Set())
@@ -276,7 +347,7 @@ export const RecycleBinPage: React.FC = () => {
         }
       })
       if (final?.phase === 'error') {
-        showMessage(final.message ?? t('recycleBin.emptyFailed'), 'error')
+        showMessage(extractUserMessage(final.message ?? t('recycleBin.emptyFailed')), 'error')
         // F-B1：点亮「重试清空」，并让「跳过系统回收站」出路可达（修复前从未置位 ⇒ 死代码）
         setFailedAction('empty')
       } else if (final && final.phase !== 'cancelled') {
@@ -312,28 +383,38 @@ export const RecycleBinPage: React.FC = () => {
   const totalCount = recycleBinTotal || recycleBinFiles.length
 
   // 确认弹窗文案按三种操作取值（清空 / 彻底删除选中 / 跳过系统回收站直接彻底删除）
+  // nikkisync 源的文件删除一律直接从磁盘删除（不经系统回收站），用专用文案如实告知
   const confirmCopy = useMemo(() => {
     if (confirm.type === 'empty') {
       return {
         // 清空作用于服务端全部软删除记录，必须用总数而非已加载页的条数
         title: t('recycleBin.emptyConfirmTitle'),
-        message: t('recycleBin.emptyConfirm', { count: totalCount }),
+        message:
+          source === 'nikkisync'
+            ? t('recycleBin.assetEmptyConfirm', { count: totalCount })
+            : t('recycleBin.emptyConfirm', { count: totalCount }),
         confirmText: t('recycleBin.confirmEmpty')
       }
     }
     if (confirm.type === 'emptyForce') {
       return {
         title: t('recycleBin.emptyForceConfirmTitle'),
-        message: t('recycleBin.emptyForceConfirm', { count: totalCount }),
+        message:
+          source === 'nikkisync'
+            ? t('recycleBin.assetEmptyConfirm', { count: totalCount })
+            : t('recycleBin.emptyForceConfirm', { count: totalCount }),
         confirmText: t('recycleBin.permanentDelete')
       }
     }
     return {
       title: t('recycleBin.permanentConfirmTitle'),
-      message: t('recycleBin.permanentConfirm', { count: selectedIds.size }),
+      message:
+        source === 'nikkisync'
+          ? t('recycleBin.assetPermanentConfirm', { count: selectedIds.size })
+          : t('recycleBin.permanentConfirm', { count: selectedIds.size }),
       confirmText: t('recycleBin.permanentDelete')
     }
-  }, [confirm.type, totalCount, selectedIds.size, t])
+  }, [confirm.type, totalCount, selectedIds.size, t, source])
 
   // 虚拟网格：List 负责列布局，Footer 负责触底状态提示与底部留白
   const gridComponents = useMemo(

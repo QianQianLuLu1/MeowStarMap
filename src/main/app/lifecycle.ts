@@ -7,7 +7,13 @@ import { editorService } from '../services/editor-service'
 import { STARTUP_SCAN_DELAY_MS } from '../utils/constants'
 import { initLogger, logger } from '../utils/logger'
 import { initCrashDir, enforceCrashLimit, getCrashDirectory } from '../services/crash-service'
-import { logStartupError, diagLog, getStartupLogPathValue } from '../utils/startup-diagnostic'
+import {
+  logStartupError,
+  diagLog,
+  getStartupLogPathValue,
+  chromiumLogPresenceLine
+} from '../utils/startup-diagnostic'
+import { getUserFacingDiagDir } from '../utils/user-diag-path'
 import { getProcessRegistryStats } from '../utils/process-registry'
 import { pluginHost } from '../plugins/plugin-host'
 // 阶段 2.2：app 内部模块
@@ -356,6 +362,12 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     diagLog('BOOT', 'before createMainWindow()')
     await createMainWindow(ctx)
     diagLog('BOOT', 'after createMainWindow()')
+    // chromium-debug.log 在位探测：原生 FATAL 取证载体缺席与否在此可判定（T11）
+    try {
+      diagLog('BOOT', chromiumLogPresenceLine(getUserFacingDiagDir()))
+    } catch {
+      // 探测失败不阻塞启动
+    }
     // 主窗口就绪后注入引用，供 confirmInstall 弹窗作为父级
     // 阶段 2.4：使用 window-manager 的 getMainWindow 抛错版本（确保窗口存在）
     pluginHost.setMainWindow(getMainWindow(ctx))

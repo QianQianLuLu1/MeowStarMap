@@ -364,4 +364,34 @@ describe('startup-diagnostic', () => {
       vi.restoreAllMocks()
     })
   })
+
+  describe('chromiumLogPresenceLine（chromium-debug.log 缺席可判定化）', () => {
+    it('文件在位 ⇒ exists=true 且带字节数', async () => {
+      const { chromiumLogPresenceLine } = await loadModule()
+      const dir = path.join(tmpBase, 'diag')
+      await fsp.mkdir(dir, { recursive: true })
+      await fsp.writeFile(path.join(dir, 'chromium-debug.log'), 'FATAL tail\n')
+      const line = chromiumLogPresenceLine(dir)
+      expect(line).toContain('exists=true')
+      expect(line).toContain('size=11')
+    })
+
+    it('文件缺席 ⇒ exists=false（取证盲区判定的关键事实）', async () => {
+      const { chromiumLogPresenceLine } = await loadModule()
+      const dir = path.join(tmpBase, 'diag-empty')
+      await fsp.mkdir(dir, { recursive: true })
+      expect(chromiumLogPresenceLine(dir)).toContain('exists=false')
+    })
+
+    it('stat 抛错 ⇒ fail-open exists=unknown，不向外抛', async () => {
+      const { chromiumLogPresenceLine } = await loadModule()
+      const dir = path.join(tmpBase, 'diag')
+      await fsp.mkdir(dir, { recursive: true })
+      await fsp.writeFile(path.join(dir, 'chromium-debug.log'), 'x')
+      vi.spyOn(fs, 'statSync').mockImplementation(() => {
+        throw new Error('EACCES')
+      })
+      expect(chromiumLogPresenceLine(dir)).toContain('exists=unknown')
+    })
+  })
 })

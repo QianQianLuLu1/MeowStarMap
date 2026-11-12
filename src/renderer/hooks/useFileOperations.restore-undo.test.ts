@@ -76,3 +76,75 @@ describe('useFileOperations media_soft_delete undo（#fix-restore-sync）', () =
     expect(onRefreshMedia).not.toHaveBeenCalled()
   })
 })
+
+describe('useFileOperations undo 的 nikkisync 分支（assetId 走叠加层）', () => {
+  let assetSet: ReturnType<typeof vi.fn>
+  let updateFavorite: ReturnType<typeof vi.fn>
+  let restore: ReturnType<typeof vi.fn>
+  let handlers: Partial<Record<string, UndoHandler>>
+  let originalRegister: ReturnType<typeof useOperationHistoryStore.getState>['registerUndoHandler']
+  let onRefreshMedia: ReturnType<typeof vi.fn>
+
+  beforeEach(() => {
+    onRefreshMedia = vi.fn().mockResolvedValue(undefined)
+    originalRegister = useOperationHistoryStore.getState().registerUndoHandler
+    handlers = {}
+    useOperationHistoryStore.setState({
+      stack: [],
+      undoing: false,
+      registerUndoHandler: (type, handler) => {
+        handlers[type] = handler
+        return () => {}
+      }
+    })
+    assetSet = vi.fn().mockResolvedValue({ edit: null })
+    updateFavorite = vi.fn()
+    restore = vi.fn()
+    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+      mediaAction: { updateFavorite, restore },
+      assetEdits: { set: assetSet }
+    }
+    renderHook(() =>
+      useFileOperations({
+        filteredFiles: [],
+        onShowMessage: vi.fn(),
+        onRefreshMedia: onRefreshMedia as unknown as () => Promise<void>
+      })
+    )
+  })
+
+  afterEach(() => {
+    useOperationHistoryStore.setState({ registerUndoHandler: originalRegister })
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI
+  })
+
+  it('favorite_toggle undo 带 assetId ⇒ assetEdits.set 恢复原收藏态，本地通道零调用', async () => {
+    const handler = handlers['favorite_toggle']
+    expect(handler).toBeTypeOf('function')
+    const result = await handler!(
+      { assetId: 'a/1', originalFavorite: true, newFavorite: false },
+      'a/1'
+    )
+    expect(assetSet).toHaveBeenCalledWith('a/1', { isFavorite: true })
+    expect(updateFavorite).not.toHaveBeenCalled()
+    expect(result.success).toBe(true)
+  })
+
+  it('media_soft_delete undo 带 assetId ⇒ assetEdits.set({isHidden:false}) 并刷新图库', async () => {
+    const handler = handlers['media_soft_delete']
+    expect(handler).toBeTypeOf('function')
+    const result = await handler!({ assetId: 'a/1', mediaId: 'a/1' }, 'a/1')
+    expect(assetSet).toHaveBeenCalledWith('a/1', { isHidden: false })
+    expect(restore).not.toHaveBeenCalled()
+    expect(onRefreshMedia).toHaveBeenCalledTimes(1)
+    expect(result.success).toBe(true)
+  })
+
+  it('叠加层撤销失败 ⇒ success:false 且不刷新图库', async () => {
+    assetSet.mockRejectedValue(new Error('叠加层写入失败'))
+    const handler = handlers['media_soft_delete']
+    const result = await handler!({ assetId: 'a/1' }, 'a/1')
+    expect(result.success).toBe(false)
+    expect(onRefreshMedia).not.toHaveBeenCalled()
+  })
+})

@@ -113,10 +113,13 @@ export const useOperationHistoryStore = create<OperationHistoryState>((set, get)
     })
     // P1-F5：异步写入数据库，失败时通过回调通知 UI（不静默吞掉）
     // 原实现仅 console.error，违反"错误必须被处理"硬约束
+    // mediaId 守卫：nikkisync 源的 assetId 是非数字串，Number() 即 NaN，
+    // 会被主进程 zod 拒收导致每次操作都弹「历史保存失败」；非有限数一律落 undefined
+    const numericMediaId = fullRecord.mediaId ? Number(fullRecord.mediaId) : undefined
     void window.electronAPI?.operationHistory
       ?.add({
         operationType: fullRecord.type,
-        mediaId: fullRecord.mediaId ? Number(fullRecord.mediaId) : undefined,
+        mediaId: Number.isFinite(numericMediaId) ? numericMediaId : undefined,
         payload: fullRecord.payload,
         description: fullRecord.description,
         createdAt: new Date(fullRecord.createdAt).toISOString()

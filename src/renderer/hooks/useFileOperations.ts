@@ -10,6 +10,7 @@ import { settleWithConcurrency } from '../../shared/utils/concurrency'
 import { InternalError } from '../../shared/errors/app-error'
 import { formatFileSize } from '../utils/format'
 import { formatDate } from '../utils/date'
+import type { AssetMediaFile } from '../utils/assetViewModel'
 // DU1：路径工具统一到 utils/file.ts
 import { getDirName, joinPath } from '../utils/file'
 
@@ -92,8 +93,14 @@ export function useFileOperations(options: UseFileOperationsOptions) {
     unsubscribers.push(
       registerUndoHandler('media_soft_delete', async (payload) => {
         if (!window.electronAPI) return { success: false, message: t('toast.undoUnsupported') }
-        const { mediaId } = payload as { mediaId: number }
+        const { mediaId, assetId } = payload as { mediaId: number; assetId?: string }
         try {
+          // nikkisync 源：恢复 = 叠加层取消隐藏（上游 assets 表归 runtime 所有，不直接写）
+          if (assetId) {
+            await window.electronAPI.assetEdits.set(assetId, { isHidden: false })
+            await onRefreshMedia()
+            return { success: true }
+          }
           // preload call() 解包 IpcResponse 只回传 data（{ message }，无 success 字段），
           // 成功 = 未抛 IpcError；缺陷写法读取恒为 undefined 的 undoResult.success
           // 会导致撤销恢复误报失败并跳过图库刷新（#fix-restore-sync）
@@ -111,8 +118,17 @@ export function useFileOperations(options: UseFileOperationsOptions) {
       registerUndoHandler('favorite_toggle', async (payload, mediaId) => {
         if (!window.electronAPI || !mediaId)
           return { success: false, message: t('toast.undoUnsupported') }
-        const { originalFavorite } = payload as { originalFavorite: boolean }
+        const { originalFavorite, assetId } = payload as {
+          originalFavorite: boolean
+          assetId?: string
+        }
         try {
+          // nikkisync 源：收藏态写叠加层，与 useFavoriteToggle 的分流同口径
+          if (assetId) {
+            await window.electronAPI.assetEdits.set(assetId, { isFavorite: originalFavorite })
+            updateMediaFile(mediaId, { is_favorite: originalFavorite })
+            return { success: true }
+          }
           // preload call() 解包 IpcResponse 为 data（{ updated: true }），失败抛 IpcError。
           // 复用与 useFavoriteToggle 一致的契约，不再误判恒为 undefined 的 undoResult.success。
           await window.electronAPI.mediaAction.updateFavorite(Number(mediaId), originalFavorite)
@@ -278,6 +294,7 @@ export function useFileOperations(options: UseFileOperationsOptions) {
           ],
           canCancel: false,
           execute: async ({ setStage, tick }) => {
+            const assetId = (file as AssetMediaFile).nikkisync?.assetId
             if (permanent) {
               setStage(0)
               const result = await api.file.deletePermanent([file.file_path])
@@ -289,7 +306,12 @@ export function useFileOperations(options: UseFileOperationsOptions) {
               // #fix-permanent-delete-error-toast：preload call() 成功只返回 data
               // （media:delete → { deleted: true }，无 success 字段），失败会抛 IpcError
               // 由 staged.run 捕获；不可读取 result.success 判定（恒 undefined → 删除成功却误报失败）
-              await api.mediaAction.delete(Number(file.id))
+              if (assetId) {
+                // nikkisync 源：assets 表归 runtime 所有，不直接删行；叠加层隐藏等价于本地删行
+                await api.assetEdits.set(assetId, { isHidden: true })
+              } else {
+                await api.mediaAction.delete(Number(file.id))
+              }
               setStage(1, 'done')
               setStage(2)
               deleteMediaFiles([file.id])
@@ -301,9 +323,15 @@ export function useFileOperations(options: UseFileOperationsOptions) {
               setStage(0)
               setStage(0, 'done')
               setStage(1)
-              const dbRes = await api.mediaAction.softDelete([Number(file.id)])
-              if (!dbRes.success) throw new InternalError(dbRes.message)
-              toastText = dbRes.message
+              if (assetId) {
+                // nikkisync 源：软删除 = 叠加层隐藏（恢复 = isHidden:false）
+                await api.assetEdits.set(assetId, { isHidden: true })
+                toastText = t('main.media.message.softDeleted', { count: 1 })
+              } else {
+                const dbRes = await api.mediaAction.softDelete([Number(file.id)])
+                if (!dbRes.success) throw new InternalError(dbRes.message)
+                toastText = dbRes.message
+              }
               toastType = 'success'
               setStage(1, 'done')
               setStage(2)
@@ -313,7 +341,9 @@ export function useFileOperations(options: UseFileOperationsOptions) {
                 type: 'media_soft_delete',
                 description: t('toast.undo.moveToRecycle', { name: file.file_name }),
                 mediaId: file.id,
-                payload: { mediaId: Number(file.id), originalPath: file.file_path }
+                payload: assetId
+                  ? { assetId, originalPath: file.file_path }
+                  : { mediaId: Number(file.id), originalPath: file.file_path }
               })
               setStage(2, 'done')
             }
@@ -344,7 +374,7 @@ export function useFileOperations(options: UseFileOperationsOptions) {
 
       // 从 store 全量列表建索引：选中项可能已被当前筛选条件隐藏，filteredFiles 不可靠；
       // id 不在全量列表中视为脏数据（列表已刷新而选中集过期），按失败处理供用户重试
-      const knownIds = new Set(useMediaStore.getState().mediaFiles.map((file) => file.id))
+      const knownFiles = new Map(useMediaStore.getState().mediaFiles.map((file) => [file.id, file]))
 
       const succeeded: string[] = []
       const failed: BatchDeleteFailure[] = []
@@ -373,8 +403,14 @@ export function useFileOperations(options: UseFileOperationsOptions) {
             DELETE_CONCURRENCY,
             async (id) => {
               if (signal.aborted) throw makeAbort()
-              if (!knownIds.has(id))
-                throw new InternalError(t('toast.batchDelete.missingFile', { id }))
+              const file = knownFiles.get(id)
+              if (!file) throw new InternalError(t('toast.batchDelete.missingFile', { id }))
+              const assetId = (file as AssetMediaFile).nikkisync?.assetId
+              if (assetId) {
+                // nikkisync 源：软删除 = 叠加层隐藏（同单文件删除分支）
+                await api.assetEdits.set(assetId, { isHidden: true })
+                return
+              }
               // 回收站语义修复：软删除 = 纯 DB 标记，文件保留在原路径（同单文件删除分支）
               const dbResult = await api.mediaAction.softDelete([Number(id)])
               if (!dbResult.success) throw new InternalError(dbResult.message)

@@ -1249,6 +1249,8 @@
     "updateFailed": "업데이트 실패"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "휴지통의 {{count}}개 파일 전체를 영구 삭제합니다.\n파일은 시스템 휴지통을 거치지 않고 디스크에서 바로 삭제되며, 이 앱과 Windows 모두 복구할 수 없습니다.\n비우시겠습니까?",
+    "assetPermanentConfirm": "선택한 {{count}}개 파일을 영구 삭제합니다.\n파일은 시스템 휴지통을 거치지 않고 디스크에서 바로 삭제되며, 이 앱과 Windows 모두 복구할 수 없습니다.\n삭제하시겠습니까?",
     "backToGallery": "갤러리로 돌아가기",
     "clearSelection": "선택 해제",
     "confirmEmpty": "비우기",

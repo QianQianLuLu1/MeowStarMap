@@ -108,6 +108,20 @@ describe('operationHistoryStore', () => {
       })
       expect(mockApi.add.mock.calls[0][0].mediaId).toBeUndefined()
     })
+
+    it('mediaId 为非数字串（nikkisync assetId）时 IPC mediaId 为 undefined 而非 NaN', async () => {
+      const { push } = useOperationHistoryStore.getState()
+      push({
+        type: 'favorite_toggle',
+        description: '收藏',
+        payload: { assetId: 'a/1' },
+        mediaId: 'a/1'
+      })
+      await vi.waitFor(() => {
+        expect(mockApi.add).toHaveBeenCalledTimes(1)
+      })
+      expect(mockApi.add.mock.calls[0][0].mediaId).toBeUndefined()
+    })
   })
 
   describe('undo', () => {

@@ -1249,6 +1249,8 @@
     "updateFailed": "Update failed"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "All {{count}} file(s) in the Recycle Bin will be permanently deleted.\nFiles are removed directly from disk without going to the system Recycle Bin and cannot be recovered by this app or Windows.\nEmpty it?",
+    "assetPermanentConfirm": "The selected {{count}} file(s) will be permanently deleted.\nFiles are removed directly from disk without going to the system Recycle Bin and cannot be recovered by this app or Windows.\nDelete them?",
     "backToGallery": "Back to gallery",
     "clearSelection": "Clear selection",
     "confirmEmpty": "Empty",

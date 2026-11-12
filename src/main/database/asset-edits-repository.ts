@@ -46,6 +46,9 @@ const SQL_GET_ONE = 'SELECT * FROM asset_edits WHERE asset_id = ?'
 const SQL_COUNT = 'SELECT COUNT(*) AS count FROM asset_edits'
 const SQL_LIST_PREFIX = 'SELECT * FROM asset_edits WHERE asset_id IN ('
 const SQL_ALL_ASSET_IDS = 'SELECT asset_id FROM asset_edits'
+const SQL_LIST_HIDDEN =
+  'SELECT * FROM asset_edits WHERE is_hidden = 1 ORDER BY deleted_at DESC, asset_id ASC LIMIT ? OFFSET ?'
+const SQL_COUNT_HIDDEN = 'SELECT COUNT(*) AS count FROM asset_edits WHERE is_hidden = 1'
 
 /** 表行形态：与列一一对应，数值型布尔保持 raw 值。 */
 export interface AssetEditsRow {
@@ -140,6 +143,25 @@ export class AssetEditsRepository {
   countAll(): number {
     try {
       const row = this.db.prepare(SQL_COUNT).get() as { count?: number } | undefined
+      return Number(row?.count ?? 0)
+    } catch {
+      return 0
+    }
+  }
+
+  /** 隐藏集分页（回收站 nikkisync 分支）：deleted_at DESC、asset_id ASC；缺表回退为空。 */
+  listHidden(limit: number, offset: number): AssetEditsRow[] {
+    try {
+      return this.db.prepare(SQL_LIST_HIDDEN).all(limit, offset) as AssetEditsRow[]
+    } catch {
+      return []
+    }
+  }
+
+  /** 隐藏集总数（回收站分页 hasMore 判据）；缺表回退 0。 */
+  countHidden(): number {
+    try {
+      const row = this.db.prepare(SQL_COUNT_HIDDEN).get() as { count?: number } | undefined
       return Number(row?.count ?? 0)
     } catch {
       return 0

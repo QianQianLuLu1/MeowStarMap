@@ -67,6 +67,30 @@ describe('useStagedTask 编排器', () => {
     expect(result.current.progress?.stages?.[1].detail).toBe('磁盘写满')
   })
 
+  // #fix-ipc-user-message：终态 detail 必须保留主进程 userMessage，
+  // 修复前 useStagedTask 直接取 err.message，用户文案在进入 final 前已丢失。
+  it('IpcError 形态抛错 → 阶段 detail 用 userMessage 而非技术串', async () => {
+    const { result } = renderHook(() => useStagedTask())
+    await act(async () => {
+      await result.current.run({
+        taskType: 'batch',
+        title: '删除',
+        stageLabels: ['准备', '处理'],
+        execute: async ({ setStage }) => {
+          setStage(0, 'done')
+          setStage(1)
+          throw Object.assign(new Error('raw technical: EIO'), {
+            name: 'IpcError',
+            code: 'INTERNAL_ERROR',
+            userMessage: '磁盘空间不足'
+          })
+        }
+      })
+    })
+    expect(result.current.progress?.phase).toBe('error')
+    expect(result.current.progress?.stages?.[1].detail).toBe('磁盘空间不足')
+  })
+
   it('取消 → phase=cancelled，active 阶段回退 pending', async () => {
     const { result } = renderHook(() => useStagedTask())
     let captured: { signal: AbortSignal } | null = null

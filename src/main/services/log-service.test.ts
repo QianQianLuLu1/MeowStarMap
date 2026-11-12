@@ -58,6 +58,10 @@ vi.mock('../utils/user-diag-path', async () => {
   return { ...actual, getUserFacingDiagDir: vi.fn(() => mockDiagDir) }
 })
 
+// GPU 状态探针（诊断包 system-info 的 gpu 段来源；动态 import 同样被拦截）
+const { collectGpuStatusMock } = vi.hoisted(() => ({ collectGpuStatusMock: vi.fn() }))
+vi.mock('../app/gpu-status', () => ({ collectGpuStatus: collectGpuStatusMock }))
+
 // ============================================================
 // Import after mock
 // ============================================================
@@ -610,6 +614,109 @@ describe('exportLogsAsZip', () => {
       copySpy.mockRestore()
       writeSpy.mockRestore()
     }
+  })
+
+  // ---------- T10 花屏取证补全：GPU 段 / gpu-pref.json / manifest 如实化 ----------
+
+  describe('诊断包取证补全（GPU 段 / gpu-pref / manifest 如实）', () => {
+    const GPU_SUMMARY = {
+      hwAccel: 'off(crash-fallback)',
+      activeGpu: 'ANGLE (Intel, Iris Xe)',
+      gpus: [{ vendor: 'Intel', device: 'Iris Xe', active: true }],
+      fallback: { compatLevel: 2 },
+      discrete: { mode: 'high-performance', registry: 'set' }
+    }
+
+    beforeEach(() => {
+      collectGpuStatusMock.mockResolvedValue(GPU_SUMMARY)
+    })
+
+    /** 导出并捕获 writeFile 内容（临时诊断目录导出后即清理，须在写入时取内容） */
+    async function exportWithCapture(target: string) {
+      const writes: Array<{ dst: string; buf: Buffer }> = []
+      const realWrite = fs.promises.writeFile.bind(fs.promises)
+      const writeSpy = vi
+        .spyOn(fs.promises, 'writeFile')
+        .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+          writes.push({
+            dst: String(file),
+            buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+          })
+          return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+        })
+      const copySpy = vi.spyOn(fs.promises, 'copyFile')
+      try {
+        const r = await exportLogsAsZip(target)
+        return { r, writes, staged: stagedNames(copySpy, writeSpy) }
+      } finally {
+        writeSpy.mockRestore()
+        copySpy.mockRestore()
+      }
+    }
+
+    function readJson(
+      writes: Array<{ dst: string; buf: Buffer }>,
+      name: string
+    ): Record<string, unknown> | null {
+      const w = writes.find((x) => path.basename(x.dst) === name)
+      return w ? (JSON.parse(w.buf.toString('utf-8')) as Record<string, unknown>) : null
+    }
+
+    it('system-info.json 含 gpu 段（探针摘要原样嵌入）', async () => {
+      const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'gpu.zip'))
+      expect(r.success).toBe(true)
+      const info = readJson(writes, 'system-info.json')
+      expect(info?.gpu).toEqual(GPU_SUMMARY)
+    })
+
+    it('GPU 探针 reject ⇒ 导出仍成功且 gpu=null（fail-open）', async () => {
+      collectGpuStatusMock.mockRejectedValue(new Error('gpu info unavailable'))
+      const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'gpu-fail.zip'))
+      expect(r.success).toBe(true)
+      const info = readJson(writes, 'system-info.json')
+      expect(info?.gpu).toBeNull()
+    })
+
+    it('gpu-pref.json 存在时入包', async () => {
+      const userData = path.join(tmpRoot, 'userData')
+      fs.mkdirSync(userData, { recursive: true })
+      fs.writeFileSync(path.join(userData, 'gpu-pref.json'), '{"hardwareAcceleration":false}')
+      const getPathMock = vi.mocked(app.getPath)
+      getPathMock.mockImplementation((name: string) =>
+        name === 'userData' ? userData : `/mock/${name}`
+      )
+      try {
+        const { r, staged } = await exportWithCapture(path.join(tmpRoot, 'pref.zip'))
+        expect(r.success).toBe(true)
+        expect(staged).toContain('gpu-pref.json')
+      } finally {
+        getPathMock.mockImplementation((name: string) => `/mock/${name}`)
+      }
+    })
+
+    it('manifest 如实：chromium-debug.log 缺席 ⇒ contents 不含、missing 含；diag.log 在位 ⇒ contents 含', async () => {
+      fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] diag', 'utf-8')
+      const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'manifest-missing.zip'))
+      expect(r.success).toBe(true)
+      const manifest = readJson(writes, 'manifest.json')
+      const contents = manifest?.contents as string[]
+      const missing = manifest?.missing as string[]
+      expect(contents).not.toContain('chromium-debug.log')
+      expect(missing).toContain('chromium-debug.log')
+      expect(contents).toContain('diag.log')
+      expect(missing).not.toContain('diag.log')
+    })
+
+    it('manifest 如实：chromium-debug.log 在位 ⇒ contents 含、missing 不含', async () => {
+      fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log'), 'FATAL tail\n', 'utf-8')
+      const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'manifest-present.zip'))
+      expect(r.success).toBe(true)
+      const manifest = readJson(writes, 'manifest.json')
+      const contents = manifest?.contents as string[]
+      const missing = manifest?.missing as string[]
+      expect(contents).toContain('chromium-debug.log')
+      expect(missing).not.toContain('chromium-debug.log')
+    })
   })
 })
 

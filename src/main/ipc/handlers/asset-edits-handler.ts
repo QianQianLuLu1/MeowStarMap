@@ -1,4 +1,4 @@
-// @core-change: 阶段4 新增 asset-edits 叠加层 2 条通道（按 asset_id 列表读取 / 写入用户编辑）
+// @core-change: set 改部分合并保留既有编辑并由主进程落 deletedAt；新增 listHidden 隐藏集分页通道
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -45,6 +45,14 @@ const patchSchema = z.object({
 })
 
 const setSchema = z.tuple([z.object({ assetId: assetIdSchema, patch: patchSchema })])
+
+// 隐藏集分页（回收站 nikkisync 分支）：limit 与 asset-edits:list 同界（一页上限 500）
+const hiddenPageSchema = z.tuple([
+  z.object({
+    limit: z.number().int().min(1).max(500),
+    offset: z.number().int().min(0).max(1_000_000)
+  })
+])
 
 /** tags 列的历史脏数据不能把整页列表带崩：解析失败一律降级为空数组。 */
 function parseTags(raw: string): string[] {
@@ -95,11 +103,50 @@ export function registerAssetEditsHandlers(ctx: HandlerContext): void {
     'asset-edits:set',
     wrapHandler(ctx, setSchema, async ([{ assetId, patch }]) => {
       const repo = getRepo()
-      // 写入时刻由主进程生成：渲染层不参与，避免客户端时钟漂移污染排序与冲突判定
-      const payload: AssetEditsPatch = { ...patch, updatedAt: new Date().toISOString() }
-      await repo.upsert(assetId, payload)
+      // 部分合并：仓储 upsert 是整行覆盖（缺省字段落列默认值），直接透传补丁会把
+      // 未提及的 rating/tags/notes 等清零。先取既有行折成 base，再叠上本次补丁。
+      const existing = repo.getOne(assetId)
+      const base: Partial<AssetEditsPatch> = existing
+        ? {
+            isFavorite: existing.is_favorite === 1,
+            rating: existing.rating,
+            tags: parseTags(existing.tags),
+            notes: existing.notes,
+            categoryId: existing.category_id,
+            outfit: existing.outfit,
+            sceneCategory: existing.scene_category,
+            sceneTime: existing.scene_time,
+            isHidden: existing.is_hidden === 1,
+            deletedAt: existing.deleted_at
+          }
+        : {}
+      // 显式 undefined 不得覆盖既有值（zod 与 structured clone 都会保留 undefined 键）
+      const definedPatch = Object.fromEntries(
+        Object.entries(patch).filter(([, value]) => value !== undefined)
+      ) as Partial<AssetEditsPatch>
+      const merged: AssetEditsPatch = {
+        ...base,
+        ...definedPatch,
+        updatedAt: new Date().toISOString()
+      }
+      // deletedAt 由主进程生成：隐藏取首次时间戳（重复隐藏不刷新），恢复清空，
+      // 未给 isHidden 时保留既有值。渲染层不参与，避免客户端时钟漂移。
+      if (patch.isHidden === true) {
+        merged.deletedAt = existing?.deleted_at ?? new Date().toISOString()
+      } else if (patch.isHidden === false) {
+        merged.deletedAt = null
+      }
+      await repo.upsert(assetId, merged)
       const saved = repo.getOne(assetId)
       return { edit: saved ? shapeRow(saved) : null }
+    })
+  )
+
+  ipcMain.handle(
+    'asset-edits:listHidden',
+    wrapHandler(ctx, hiddenPageSchema, async ([{ limit, offset }]) => {
+      const repo = getRepo()
+      return { edits: repo.listHidden(limit, offset).map(shapeRow), total: repo.countHidden() }
     })
   )
 }

@@ -1,4 +1,4 @@
-// @core-change: collectSystemInfo 的两处裸 require 在 CI 未装 electron 时抛错，拖垮整个诊断包装配
+// @core-change: 诊断包补 GPU 状态段与 gpu-pref.json，manifest 按实际入包文件登记并声明缺失
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -234,6 +234,14 @@ export async function exportLogsAsZip(
       }
     } catch {}
 
+    // 3.7 硬件加速偏好镜像：用户是否手动关过硬件加速（花屏取证的另一半事实）
+    try {
+      const gpuPrefPath = path.join(app.getPath('userData'), 'gpu-pref.json')
+      if (fs.existsSync(gpuPrefPath)) {
+        await fs.promises.copyFile(gpuPrefPath, path.join(tmpDir, 'gpu-pref.json'))
+      }
+    } catch {}
+
     // 4. 生成 system-info.json
     const systemInfo = await collectSystemInfo()
     await fs.promises.writeFile(
@@ -242,21 +250,32 @@ export async function exportLogsAsZip(
       'utf-8'
     )
 
-    // 5. 生成 manifest.json
+    // 5. 生成 manifest.json（如实化：contents 按实际入包条目登记，期望但缺席的进 missing。
+    //    旧版 contents 是静态期望清单——chromium-debug.log 缺席时仍声称包含，取证方被误导）
     const appInfo = (systemInfo.app || {}) as { version?: string }
+    const expectedOptional = [
+      'startup-errors.log',
+      CHROMIUM_LOG_BASENAME,
+      'diag.log',
+      'gpu-fallback.json',
+      'gpu-pref.json'
+    ]
+    let contents: string[] = ['logs/', 'crashes/', ...expectedOptional, 'system-info.json']
+    let missing: string[] = []
+    try {
+      const entries = await fs.promises.readdir(tmpDir, { withFileTypes: true })
+      const names = entries.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
+      contents = [...names.sort(), 'manifest.json']
+      missing = expectedOptional.filter((name) => !names.includes(name))
+    } catch {
+      // 目录读取失败时保留静态期望清单（兜底，不阻断导出）
+    }
     const manifest = {
       generatedAt: new Date().toISOString(),
       appVersion: appInfo.version || 'unknown',
-      diagnosticVersion: '1.0',
-      contents: [
-        'logs/',
-        'crashes/',
-        'startup-errors.log',
-        CHROMIUM_LOG_BASENAME,
-        'diag.log',
-        'gpu-fallback.json',
-        'system-info.json'
-      ]
+      diagnosticVersion: '1.1',
+      contents,
+      missing
     }
     await fs.promises.writeFile(
       path.join(tmpDir, 'manifest.json'),
@@ -391,6 +410,15 @@ async function collectSystemInfo(): Promise<Record<string, unknown>> {
       freeMemory: os.freemem()
     }
   } catch {}
+
+  // GPU 状态（花屏取证：显卡型号/驱动/活动显卡 + 兼容档位）。动态引入避免 services→app
+  // 静态耦合；探针自带三级 fail-open，这里再兜一层：任何失败 ⇒ gpu=null，不拖垮诊断包。
+  try {
+    const { collectGpuStatus } = await import('../app/gpu-status')
+    info.gpu = await collectGpuStatus()
+  } catch {
+    info.gpu = null
+  }
 
   // 进程信息
   try {

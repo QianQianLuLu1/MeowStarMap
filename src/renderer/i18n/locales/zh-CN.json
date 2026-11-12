@@ -1664,6 +1664,8 @@
     "updateFailed": "更新失败"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "将永久删除回收站中的全部 {{count}} 项文件。\n文件会直接从磁盘删除，不经过系统回收站，本应用和 Windows 都无法恢复。\n确定要清空吗？",
+    "assetPermanentConfirm": "将彻底删除选中的 {{count}} 项文件。\n文件会直接从磁盘删除，不经过系统回收站，本应用和 Windows 都无法恢复。\n确定要删除吗？",
     "backToGallery": "返回图库",
     "clearSelection": "清除选择",
     "confirmEmpty": "清空",

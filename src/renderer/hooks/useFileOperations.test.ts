@@ -931,4 +931,85 @@ describe('useFileOperations', () => {
       expect(result.current).toHaveProperty('formatProperties')
     })
   })
+
+  describe('nikkisync 数据源删除分支（assetId 走叠加层）', () => {
+    let assetSet: ReturnType<typeof vi.fn>
+
+    beforeEach(() => {
+      assetSet = vi.fn().mockResolvedValue({ edit: null })
+      ;(window.electronAPI as unknown as Record<string, unknown>).assetEdits = { set: assetSet }
+    })
+
+    function makeAssetFile(overrides: Partial<MediaFile> = {}): MediaFile {
+      return {
+        ...makeFile({ id: 'a/1', file_path: '/src/a.jpg' }),
+        nikkisync: {
+          assetId: 'a/1',
+          assetType: 'photo',
+          state: 'ready',
+          revision: 1,
+          hasMotion: false,
+          hasMetadata: false
+        },
+        ...overrides
+      } as MediaFile
+    }
+
+    function renderOps(files: MediaFile[]) {
+      return renderHook(() =>
+        useFileOperations({ filteredFiles: files, onShowMessage, onRefreshMedia })
+      )
+    }
+
+    it('软删除 ⇒ assetEdits.set({isHidden:true})，本地 softDelete 零调用，卡片移出并记历史', async () => {
+      const file = makeAssetFile()
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderOps([file])
+      await result.current.getDeleteConfirm(file, false).onConfirm()
+      expect(assetSet).toHaveBeenCalledWith('a/1', { isHidden: true })
+      expect(api.mediaAction.softDelete).not.toHaveBeenCalled()
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(0)
+      expect(onShowMessage).toHaveBeenCalledWith(expect.stringContaining('回收站'), 'success')
+      const stack = useOperationHistoryStore.getState().stack
+      expect(stack).toHaveLength(1)
+      expect(stack[0].payload).toMatchObject({ assetId: 'a/1' })
+    })
+
+    it('彻底删除 ⇒ file.deletePermanent + 叠加层隐藏，不调 mediaAction.delete', async () => {
+      api.file.deletePermanent.mockResolvedValue({ success: true, message: '已永久删除' })
+      const file = makeAssetFile()
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderOps([file])
+      await result.current.getDeleteConfirm(file, true).onConfirm()
+      expect(api.file.deletePermanent).toHaveBeenCalledWith(['/src/a.jpg'])
+      expect(assetSet).toHaveBeenCalledWith('a/1', { isHidden: true })
+      expect(api.mediaAction.delete).not.toHaveBeenCalled()
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(0)
+    })
+
+    it('批量删除混合 id 集 ⇒ 逐 id 分流，两路各自成功', async () => {
+      const asset = makeAssetFile()
+      const local = makeFile({ id: '9' })
+      useMediaStore.setState({ mediaFiles: [asset, local] })
+      api.mediaAction.softDelete.mockResolvedValue({ success: true, message: 'ok' })
+      const { result } = renderOps([asset, local])
+      const res = await result.current.deleteFilesBatch(['a/1', '9'])
+      expect(assetSet).toHaveBeenCalledWith('a/1', { isHidden: true })
+      expect(api.mediaAction.softDelete).toHaveBeenCalledWith([9])
+      expect(res.succeeded).toEqual(['a/1', '9'])
+      expect(res.failed).toHaveLength(0)
+    })
+
+    it('叠加层软删失败 ⇒ 该 id 计失败且保留在列表', async () => {
+      assetSet.mockRejectedValue(new Error('叠加层写入失败'))
+      const file = makeAssetFile()
+      useMediaStore.setState({ mediaFiles: [file] })
+      const { result } = renderOps([file])
+      const res = await result.current.deleteFilesBatch(['a/1'])
+      expect(assetSet).toHaveBeenCalledWith('a/1', { isHidden: true })
+      expect(res.failed).toHaveLength(1)
+      expect(res.failed[0].id).toBe('a/1')
+      expect(useMediaStore.getState().mediaFiles).toHaveLength(1)
+    })
+  })
 })

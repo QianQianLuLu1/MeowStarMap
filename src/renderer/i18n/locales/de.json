@@ -1249,6 +1249,8 @@
     "updateFailed": "Aktualisierung fehlgeschlagen"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "Alle {{count}} Datei(en) im Papierkorb werden endgültig gelöscht.\nDateien werden direkt von der Festplatte gelöscht, ohne den System-Papierkorb zu verwenden; weder diese App noch Windows können sie wiederherstellen.\nPapierkorb leeren?",
+    "assetPermanentConfirm": "Die ausgewählten {{count}} Datei(en) werden endgültig gelöscht.\nDateien werden direkt von der Festplatte gelöscht, ohne den System-Papierkorb zu verwenden; weder diese App noch Windows können sie wiederherstellen.\nLöschen?",
     "backToGallery": "Zurück zur Galerie",
     "clearSelection": "Auswahl aufheben",
     "confirmEmpty": "Leeren",

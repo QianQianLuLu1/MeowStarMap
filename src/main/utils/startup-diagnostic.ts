@@ -12,7 +12,7 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { getUserFacingDiagDir } from './user-diag-path'
+import { getUserFacingDiagDir, CHROMIUM_LOG_BASENAME } from './user-diag-path'
 
 let startupLogPath: string | null = null
 
@@ -162,4 +162,24 @@ export function clearStartupErrors(): void {
  */
 export function getStartupLogPathValue(): string {
   return getStartupLogPath()
+}
+
+/**
+ * chromium-debug.log 在位探测行（fail-open）。
+ * 背景：2026-11-10 故障机诊断包的 manifest 声称包含 chromium-debug.log 但包内实际没有，
+ * 而原生 FATAL 的 exit_code 只存在于该文件——缺席原因（未创建/被占用/被清理）此前不可判定。
+ * 启动期把「意图路径 + 实际在位状态」写进 diag.log，下一份诊断包即可裁决。
+ * 宿主 path.join 属 IO 层口径（本模块既有约定），不引入 win32 钉。
+ */
+export function chromiumLogPresenceLine(diagDir: string): string {
+  const target = path.join(diagDir, CHROMIUM_LOG_BASENAME)
+  try {
+    if (fs.existsSync(target)) {
+      const size = fs.statSync(target).size
+      return `chromium-debug.log presence: exists=true size=${size} path=${target}`
+    }
+    return `chromium-debug.log presence: exists=false path=${target}`
+  } catch {
+    return `chromium-debug.log presence: exists=unknown path=${target}`
+  }
 }

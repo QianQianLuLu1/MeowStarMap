@@ -19,8 +19,25 @@ function makeFile(id: string): MediaFile {
   } as MediaFile
 }
 
+function makeAssetFile(id: string): MediaFile {
+  return {
+    ...makeFile(id),
+    nikkisync: {
+      assetId: id,
+      assetType: 'photo',
+      state: 'ready',
+      revision: 1,
+      hasMotion: false,
+      hasMetadata: false
+    }
+  } as MediaFile
+}
+
 function stubApi(success = true) {
   const api = {
+    assetEdits: {
+      set: vi.fn(async () => ({ edit: null }))
+    },
     file: {
       delete: vi.fn(async () =>
         success ? { success: true, message: '已删除' } : { success: false, message: '失败' }
@@ -122,5 +139,76 @@ describe('useFileOperations 阶段步骤进度接入', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+})
+
+// T6 覆盖补齐：nikkisync 数据源的删除进度回归（assetEdits 叠加层分流）。
+// 断言收窄到通道实参、本地通道零调用、失败项精确保留，避免只验证「终态 done」的弱覆盖。
+describe('useFileOperations nikkisync 删除进度（T6 覆盖补齐）', () => {
+  it('单文件软删除：assetEdits.set(assetId,{isHidden:true})，本地 softDelete 零调用', async () => {
+    const api = stubApi(true)
+    const get = mount()
+    const confirm = get()!.getDeleteConfirm(makeAssetFile('a/1'), false)
+    await act(async () => {
+      await confirm.onConfirm()
+    })
+    expect(api.assetEdits.set).toHaveBeenCalledWith('a/1', { isHidden: true })
+    expect(api.assetEdits.set).toHaveBeenCalledTimes(1)
+    expect(api.mediaAction.softDelete).not.toHaveBeenCalled()
+    expect(api.file.deletePermanent).not.toHaveBeenCalled()
+    expect(get()!.deleteProgress?.phase).toBe('done')
+    expect(get()!.deleteProgress?.stages?.every((s) => s.status === 'done')).toBe(true)
+  })
+
+  it('单文件永久删除：文件通道删实体 + 叠加层隐藏，本地 delete 零调用', async () => {
+    const api = stubApi(true)
+    const file = makeAssetFile('a/1')
+    const get = mount()
+    const confirm = get()!.getDeleteConfirm(file, true)
+    await act(async () => {
+      await confirm.onConfirm()
+    })
+    expect(api.file.deletePermanent).toHaveBeenCalledWith([file.file_path])
+    expect(api.file.deletePermanent).toHaveBeenCalledTimes(1)
+    expect(api.assetEdits.set).toHaveBeenCalledWith('a/1', { isHidden: true })
+    expect(api.mediaAction.delete).not.toHaveBeenCalled()
+    expect(api.mediaAction.softDelete).not.toHaveBeenCalled()
+    expect(get()!.deleteProgress?.phase).toBe('done')
+  })
+
+  it('批量混合 nikkisync / 本地 id：分别走叠加层与本地 softDelete', async () => {
+    const api = stubApi(true)
+    useMediaStore.getState().setMediaFiles([makeAssetFile('a/1'), makeFile('2')])
+    const get = mount()
+    let res: { succeeded: string[]; failed: { id: string; error: string }[] } | undefined
+    await act(async () => {
+      res = await get()!.deleteFilesBatch(['a/1', '2'])
+    })
+    expect(res?.succeeded).toEqual(['a/1', '2'])
+    expect(res?.failed).toEqual([])
+    expect(api.assetEdits.set).toHaveBeenCalledWith('a/1', { isHidden: true })
+    expect(api.assetEdits.set).toHaveBeenCalledTimes(1)
+    expect(api.mediaAction.softDelete).toHaveBeenCalledWith([2])
+    expect(api.mediaAction.softDelete).toHaveBeenCalledTimes(1)
+    expect(get()!.deleteProgress?.phase).toBe('done')
+  })
+
+  it('叠加层写入失败：失败项保留在 failed，succeeded 不含，终态仍 done', async () => {
+    const api = stubApi(true)
+    api.assetEdits.set.mockRejectedValue(new Error('叠加层写入失败'))
+    useMediaStore.getState().setMediaFiles([makeAssetFile('a/1'), makeFile('2')])
+    const get = mount()
+    let res: { succeeded: string[]; failed: { id: string; error: string }[] } | undefined
+    await act(async () => {
+      res = await get()!.deleteFilesBatch(['a/1', '2'])
+    })
+    expect(res?.succeeded).toEqual(['2'])
+    expect(res?.failed).toHaveLength(1)
+    expect(res?.failed[0].id).toBe('a/1')
+    expect(res?.failed[0].error).toBe('叠加层写入失败')
+    expect(api.assetEdits.set).toHaveBeenCalledTimes(1)
+    expect(api.mediaAction.softDelete).toHaveBeenCalledWith([2])
+    expect(get()!.deleteProgress?.phase).toBe('done')
+    expect(get()!.deleteProgress?.stages?.every((s) => s.status === 'done')).toBe(true)
   })
 })

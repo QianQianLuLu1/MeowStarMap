@@ -1249,6 +1249,8 @@
     "updateFailed": "Atualização falhou"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "Todos os {{count}} arquivo(s) da lixeira serão excluídos permanentemente.\nOs arquivos são removidos diretamente do disco sem passar pela lixeira do sistema; nem este aplicativo nem o Windows poderão recuperá-los.\nEsvaziar a lixeira?",
+    "assetPermanentConfirm": "Os {{count}} arquivo(s) selecionados serão excluídos permanentemente.\nOs arquivos são removidos diretamente do disco sem passar pela lixeira do sistema; nem este aplicativo nem o Windows poderão recuperá-los.\nExcluí-los?",
     "backToGallery": "Voltar à galeria",
     "clearSelection": "Limpar seleção",
     "confirmEmpty": "Esvaziar",

@@ -1249,6 +1249,8 @@
     "updateFailed": "Échec de la mise à jour"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "Les {{count}} fichier(s) de la corbeille seront définitivement supprimés.\nLes fichiers sont supprimés directement du disque sans passer par la corbeille système ; ni cette application ni Windows ne pourront les récupérer.\nVider la corbeille ?",
+    "assetPermanentConfirm": "Les {{count}} fichier(s) sélectionné(s) seront définitivement supprimés.\nLes fichiers sont supprimés directement du disque sans passer par la corbeille système ; ni cette application ni Windows ne pourront les récupérer.\nLes supprimer ?",
     "backToGallery": "Retour à la galerie",
     "clearSelection": "Effacer la sélection",
     "confirmEmpty": "Vider",

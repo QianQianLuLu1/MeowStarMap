@@ -1249,6 +1249,8 @@
     "updateFailed": "更新失敗"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "將永久刪除資源回收筒中的全部 {{count}} 項檔案。\n檔案會直接從磁碟刪除，不經過系統資源回收筒，本應用程式和 Windows 都無法復原。\n確定要清空嗎？",
+    "assetPermanentConfirm": "將徹底刪除選取的 {{count}} 項檔案。\n檔案會直接從磁碟刪除，不經過系統資源回收筒，本應用程式和 Windows 都無法復原。\n確定要刪除嗎？",
     "backToGallery": "返回圖庫",
     "clearSelection": "清除選擇",
     "confirmEmpty": "清空",

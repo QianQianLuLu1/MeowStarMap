@@ -78,6 +78,8 @@ try {
   }
   app.commandLine.appendSwitch('enable-logging', 'file')
   app.commandLine.appendSwitch('log-file', chromiumLogPath)
+  // 意图路径留痕：与 lifecycle 的在位探测行配对，诊断包可判定 chromium 日志缺席原因（T11）
+  diagLog('INDEX', `chromium log target: ${chromiumLogPath}`)
 } catch {
   // 诊断目录不可用时静默降级：不影响启动
 }

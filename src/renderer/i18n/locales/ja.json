@@ -1249,6 +1249,8 @@
     "updateFailed": "更新失敗"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "ごみ箱内の {{count}} 件すべてのファイルを完全に削除します。\nファイルはシステムのごみ箱を経由せずディスクから直接削除され、本アプリからも Windows からも復元できません。\n空にしますか？",
+    "assetPermanentConfirm": "選択した {{count}} 件のファイルを完全に削除します。\nファイルはシステムのごみ箱を経由せずディスクから直接削除され、本アプリからも Windows からも復元できません。\n削除しますか？",
     "backToGallery": "ギャラリーに戻る",
     "clearSelection": "選択を解除",
     "confirmEmpty": "空にする",

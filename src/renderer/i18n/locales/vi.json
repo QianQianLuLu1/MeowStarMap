@@ -1249,6 +1249,8 @@
     "updateFailed": "Cập nhật thất bại"
   },
   "recycleBin": {
+    "assetEmptyConfirm": "Toàn bộ {{count}} tệp trong thùng rác sẽ bị xóa vĩnh viễn.\nTệp bị xóa trực tiếp khỏi đĩa mà không qua thùng rác hệ thống; cả ứng dụng này lẫn Windows đều không thể khôi phục.\nDọn sạch thùng rác?",
+    "assetPermanentConfirm": "{{count}} tệp đã chọn sẽ bị xóa vĩnh viễn.\nTệp bị xóa trực tiếp khỏi đĩa mà không qua thùng rác hệ thống; cả ứng dụng này lẫn Windows đều không thể khôi phục.\nXóa chúng?",
     "backToGallery": "Về thư viện",
     "clearSelection": "Bỏ chọn",
     "confirmEmpty": "Dọn",

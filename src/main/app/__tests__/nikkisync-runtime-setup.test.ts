@@ -54,6 +54,7 @@ import {
   resolveRecycleHelperPath,
   resolveRuntimeEnabled,
   resolveSyncEnabled,
+  shouldForceRuntimeForGallerySource,
   stopNikkiSyncRuntime,
   type NikkiSyncSettingsPort
 } from '../nikkisync-runtime-setup'
@@ -872,5 +873,87 @@ describe('F2 会话重建后 PC 端服务重装配', () => {
     // 上下文缺席 ⇒ 装配在取上下文一步即提前返回，不再触发 startPcCompanionServices
     expect(pcServicesDouble.startPcCompanionServices).toHaveBeenCalledTimes(1)
     expect(managerDouble.pcCompanionServices).toBeUndefined()
+  })
+})
+
+describe('gallery.dataSource=nikkisync 启动漂移 forcing', () => {
+  beforeEach(() => {
+    delete process.env[RUNTIME_ENV_FLAG]
+    delete process.env[GAME_ROOT_ENV_FLAG]
+    managerDouble.start.mockClear()
+    managerDouble.stop.mockClear()
+    managerDouble.startSyncServer.mockClear()
+    managerDouble.startSyncServer.mockResolvedValue({
+      running: true,
+      host: '0.0.0.0',
+      port: 28080,
+      secure: true,
+      mdnsEnabled: true
+    })
+    managerDouble.start.mockResolvedValue({
+      state: 'running',
+      dbPath: '/mock/userdata/nikkisync/nikkisync.db',
+      linkReady: true,
+      tables: ['assets']
+    })
+  })
+
+  function ctxWithSettings(overrides: Record<string, unknown>) {
+    const ctx = makeAppCtx()
+    const getSetting = vi.fn((key: string, fallback: unknown) =>
+      key in overrides ? overrides[key] : fallback
+    )
+    ;(ctx as { dbManager: { getSetting: unknown } }).dbManager = { getSetting } as never
+    return ctx
+  }
+
+  it('runtimeEnabled=false + dataSource=nikkisync ⇒ 仍启动 Runtime（漂移兜底）', async () => {
+    const ctx = ctxWithSettings({
+      [SETTING_RUNTIME_ENABLED]: false,
+      'gallery.dataSource': 'nikkisync'
+    })
+    await initNikkiSyncRuntime(ctx)
+    expect(managerDouble.start).toHaveBeenCalledTimes(1)
+  })
+
+  it('同漂移场景 + env=0 ⇒ 逃生阀优先，不启动', async () => {
+    const original = process.env[RUNTIME_ENV_FLAG]
+    process.env[RUNTIME_ENV_FLAG] = '0'
+    try {
+      const ctx = ctxWithSettings({
+        [SETTING_RUNTIME_ENABLED]: false,
+        'gallery.dataSource': 'nikkisync'
+      })
+      await initNikkiSyncRuntime(ctx)
+      expect(managerDouble.start).not.toHaveBeenCalled()
+    } finally {
+      if (original === undefined) delete process.env[RUNTIME_ENV_FLAG]
+      else process.env[RUNTIME_ENV_FLAG] = original
+    }
+  })
+
+  it('dataSource=local + runtimeEnabled=false ⇒ 不启动（既有行为不变）', async () => {
+    const ctx = ctxWithSettings({
+      [SETTING_RUNTIME_ENABLED]: false,
+      'gallery.dataSource': 'local'
+    })
+    await initNikkiSyncRuntime(ctx)
+    expect(managerDouble.start).not.toHaveBeenCalled()
+  })
+
+  it('纯函数：脏值（非字符串/空串/未知值）一律判 false，nikkisync 判 true', () => {
+    const settings = (value: unknown): NikkiSyncSettingsPort => ({
+      getBoolean: (_key, fallback) => fallback,
+      getString: () => value as string,
+      getNumber: (_key, fallback) => fallback
+    })
+    expect(shouldForceRuntimeForGallerySource({}, settings('nikkisync'))).toBe(true)
+    expect(shouldForceRuntimeForGallerySource({}, settings('local'))).toBe(false)
+    expect(shouldForceRuntimeForGallerySource({}, settings(''))).toBe(false)
+    expect(shouldForceRuntimeForGallerySource({}, settings(undefined))).toBe(false)
+    expect(shouldForceRuntimeForGallerySource({}, settings(42))).toBe(false)
+    expect(
+      shouldForceRuntimeForGallerySource({ [RUNTIME_ENV_FLAG]: '0' }, settings('nikkisync'))
+    ).toBe(false)
   })
 })

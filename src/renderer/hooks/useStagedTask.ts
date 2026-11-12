@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TaskProgress, TaskStageStatus, TaskType } from '../../shared/types/progress'
 import { clampPercent, createStages, setStageStatus } from '../../shared/utils/taskStages'
+import { extractUserMessage, isAppError } from '../../shared/errors/app-error'
 
 /** 执行期可调用接口：驱动阶段状态与条目进度，并携带取消信号 */
 export interface StageApi {
@@ -162,7 +163,9 @@ export function useStagedTask() {
       } catch (err) {
         const aborted =
           controller.signal.aborted || (err instanceof Error && err.name === 'AbortError')
-        const message = err instanceof Error ? err.message : String(err)
+        // AppError 子类的 message 是业务具体文案，其默认 userMessage 是通用兜底，
+        // 必须保持原有的 err.message 透传；仅对 preload IpcError（非 AppError）取 userMessage。
+        const message = isAppError(err) ? err.message : extractUserMessage(err, String(err))
         const final = terminateStages(latestRef.current!, aborted, message)
         commit(() => final)
         scheduleAutoReset()

@@ -181,6 +181,96 @@ describe('useFavoriteToggle', () => {
       // 仅断言回滚发生
       expect(updateMediaFileSpy).toHaveBeenNthCalledWith(2, '1', { is_favorite: false })
     })
+
+    // #fix-ipc-user-message：preload call() 抛的是 IpcError（extends Error，非 AppError），
+    // 携带主进程给用户的 userMessage；修复前 extractUserMessage 只认 AppError，
+    // toast 会退化成开发者技术串。
+    it('IpcError 携带 userMessage 时 toast 显示用户文案', async () => {
+      updateFavorite.mockRejectedValue(
+        Object.assign(new Error('DB raw: UNIQUE constraint failed'), {
+          name: 'IpcError',
+          code: 'INTERNAL_ERROR',
+          userMessage: '收藏失败，请稍后重试'
+        })
+      )
+      const onShowMessage = vi.fn()
+      const { result } = renderHook(() => useFavoriteToggle(onShowMessage))
+      await act(async () => {
+        await result.current(makeFile({ is_favorite: false }))
+      })
+      expect(onShowMessage).toHaveBeenCalledWith('收藏失败，请稍后重试', 'error')
+    })
+  })
+
+  describe('nikkisync 数据源（assetId 走叠加层）', () => {
+    let assetSet: MockInstance
+
+    beforeEach(() => {
+      assetSet = vi.fn()
+      ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+        mediaAction: { updateFavorite },
+        assetEdits: { set: assetSet }
+      }
+    })
+
+    function makeAssetFile(overrides: Partial<MediaFile> = {}): MediaFile {
+      return {
+        ...makeFile({ id: 'a/1', is_favorite: false }),
+        nikkisync: {
+          assetId: 'a/1',
+          assetType: 'photo',
+          state: 'ready',
+          revision: 1,
+          hasMotion: false,
+          hasMetadata: false
+        },
+        ...overrides
+      } as MediaFile
+    }
+
+    it('收藏走 assetEdits.set(assetId)，本地 updateFavorite 零调用，payload 带 assetId', async () => {
+      assetSet.mockResolvedValue({ edit: null })
+      const { result } = renderHook(() => useFavoriteToggle())
+      await act(async () => {
+        await result.current(makeAssetFile())
+      })
+      expect(assetSet).toHaveBeenCalledWith('a/1', { isFavorite: true })
+      expect(updateFavorite).not.toHaveBeenCalled()
+      expect(updateMediaFileSpy).toHaveBeenCalledWith('a/1', { is_favorite: true })
+      const record = pushHistorySpy.mock.calls[0][0] as {
+        type: string
+        payload: { assetId: string; originalFavorite: boolean; newFavorite: boolean }
+      }
+      expect(record.type).toBe('favorite_toggle')
+      expect(record.payload).toEqual({
+        assetId: 'a/1',
+        originalFavorite: false,
+        newFavorite: true
+      })
+    })
+
+    it('set 失败时回滚并弹错误 toast', async () => {
+      assetSet.mockRejectedValue(new Error('叠加层写入失败'))
+      const onShowMessage = vi.fn()
+      const { result } = renderHook(() => useFavoriteToggle(onShowMessage))
+      await act(async () => {
+        await result.current(makeAssetFile())
+      })
+      expect(updateMediaFileSpy).toHaveBeenNthCalledWith(1, 'a/1', { is_favorite: true })
+      expect(updateMediaFileSpy).toHaveBeenNthCalledWith(2, 'a/1', { is_favorite: false })
+      expect(onShowMessage).toHaveBeenCalledWith('叠加层写入失败', 'error')
+      expect(pushHistorySpy).not.toHaveBeenCalled()
+    })
+
+    it('取消收藏同样走叠加层（isFavorite:false）', async () => {
+      assetSet.mockResolvedValue({ edit: null })
+      const { result } = renderHook(() => useFavoriteToggle())
+      await act(async () => {
+        await result.current(makeAssetFile({ is_favorite: true }))
+      })
+      expect(assetSet).toHaveBeenCalledWith('a/1', { isFavorite: false })
+      expect(updateFavorite).not.toHaveBeenCalled()
+    })
   })
 
   describe('引用稳定性', () => {

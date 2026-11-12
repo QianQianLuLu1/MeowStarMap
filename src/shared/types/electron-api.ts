@@ -1021,7 +1021,8 @@ export interface AssetEditsInfo {
   updatedAt: string
 }
 
-/** `asset-edits:set` 的补丁：全部可选，未给的字段按列默认值落库。 */
+/** `asset-edits:set` 的补丁：全部可选；未给的字段保留既有值（新行按列默认值落库）。
+ *  `deletedAt` 不接受渲染层传入——隐藏/恢复的时间戳由主进程生成。 */
 export interface AssetEditsPatchInfo {
   isFavorite?: boolean
   rating?: number
@@ -1032,6 +1033,12 @@ export interface AssetEditsPatchInfo {
   sceneCategory?: string | null
   sceneTime?: string | null
   isHidden?: boolean
+}
+
+/** `asset-edits:listHidden` 的响应：隐藏集一页 + 总数（回收站分页 hasMore 判据）。 */
+export interface AssetEditsHiddenPageInfo {
+  edits: AssetEditsInfo[]
+  total: number
 }
 
 // ============ NikkiSync 局域网同步服务（sync-integration 阶段3） ============

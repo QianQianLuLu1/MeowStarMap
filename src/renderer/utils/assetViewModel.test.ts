@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AssetSummary, MediaResource } from '../../shared/sync/protocol'
-import { toAssetViewModel, mapHitSummariesToFiles } from './assetViewModel'
+import type { NikkiAsset } from '../../shared/sync/domain-types'
+import { toAssetViewModel, mapHitSummariesToFiles, assetDetailToSummary } from './assetViewModel'
 
 /**
  * 资产视图模型单测（阶段 4 · 渲染层唯一转换点）。
@@ -267,5 +268,71 @@ describe('mapHitSummariesToFiles（N5 命中回捞映射）', () => {
     expect(files[0].is_favorite).toBe(true)
     expect(files[0].rating).toBe(5)
     expect(files[0].tags).toEqual(['花'])
+  })
+})
+
+describe('assetDetailToSummary（回收站 nikkisync 分支回捞）', () => {
+  const detail = (over: Partial<NikkiAsset> = {}): NikkiAsset => ({
+    schemaVersion: 1,
+    assetId: 'a/1',
+    type: 'photo',
+    state: 'ready',
+    source: {
+      game: 'infinity_nikki',
+      uid: '101622755',
+      discoveredAt: '2026-10-01T00:00:00.000Z',
+      capturedAt: '2026-10-01T08:00:00.000Z'
+    },
+    resources: [resource()],
+    revision: 12,
+    ...over
+  })
+
+  it('协议字段透传，uid/capturedAt 取 source，hasMotion/hasMetadata 由存在性派生', () => {
+    const derived = assetDetailToSummary(detail())
+    expect(derived.assetId).toBe('a/1')
+    expect(derived.type).toBe('photo')
+    expect(derived.state).toBe('ready')
+    expect(derived.revision).toBe(12)
+    expect(derived.uid).toBe('101622755')
+    expect(derived.capturedAt).toBe('2026-10-01T08:00:00.000Z')
+    expect(derived.hasMotion).toBe(false)
+    expect(derived.hasMetadata).toBe(false)
+  })
+
+  it('motion/metadata 在位 ⇒ hasMotion/hasMetadata 为 true', () => {
+    const derived = assetDetailToSummary(
+      detail({
+        motion: {} as NikkiAsset['motion'],
+        metadata: {} as NikkiAsset['metadata']
+      })
+    )
+    expect(derived.hasMotion).toBe(true)
+    expect(derived.hasMetadata).toBe(true)
+  })
+
+  it('toAssetViewModel 消费派生 summary + edit.isHidden ⇒ is_deleted=true、deleted_at 取 edit', () => {
+    const file = toAssetViewModel({
+      summary: assetDetailToSummary(detail()),
+      resources: [resource()],
+      pathsByResourceId: paths,
+      edit: {
+        assetId: 'a/1',
+        isFavorite: false,
+        rating: 0,
+        tags: [],
+        notes: '',
+        categoryId: null,
+        outfit: null,
+        sceneCategory: null,
+        sceneTime: null,
+        isHidden: true,
+        deletedAt: '2026-11-01T00:00:00.000Z',
+        updatedAt: '2026-11-01T00:00:00.000Z'
+      }
+    })
+    expect(file.id).toBe('a/1')
+    expect(file.is_deleted).toBe(true)
+    expect(file.deleted_at).toBe('2026-11-01T00:00:00.000Z')
   })
 })
