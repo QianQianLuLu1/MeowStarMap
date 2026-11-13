@@ -618,6 +618,14 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     state.state = 'scanning'
     let result: unknown
     try {
+      // F11b：allowMissingInstallation:true 同样短路了 fullScan 的旧 notfound 抛错
+      // （ScannerService.ts:74）。宿主在扫描前按同条件（无安装根且无额外目录）复现旧抛错，
+      // 让下方 catch 分类 degraded 并把错误上抛 ⇒ applyGameRoot/恢复默认得到 applied:false
+      // 的 savedDeferred 语义（e2e G3 回归钉）；有额外目录时扫描合法运行。
+      const preScan = readScannerSnapshot(session.scanner.getStatus())
+      if (!preScan.installation && session.scanner.getScanRoots().length === 0) {
+        throw new Error(installNotfoundMessage)
+      }
       result = await (input.path
         ? session.scanner.rescanPath(input.path)
         : session.scanner.fullScan())

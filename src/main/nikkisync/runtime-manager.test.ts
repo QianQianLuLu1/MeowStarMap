@@ -2304,3 +2304,35 @@ describe('F11 allowMissingInstallation 下的 degraded 分类（G3 对齐回归�
     await manager.stop()
   })
 })
+
+describe('F11b scanCore 路径的 degraded 守卫（applyGameRoot/恢复默认真实路径）', () => {
+  it('异常：无安装根且无额外目录时 scan 必须抛 notfound 并判 degraded（fullScan 不再抛的同条件复现）', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        scannerStatusRaw: { status: 'running' },
+        scanRoots: []
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await expect(manager.scan({})).rejects.toThrow('installation was not found')
+    expect(manager.status().state).toBe('degraded')
+    await manager.stop()
+  })
+
+  it('边界：有额外目录时 scan 正常完成判 running', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        scannerStatusRaw: { status: 'running' },
+        scanRoots: ['D:/extra-photos']
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    await manager.scan({})
+    expect(manager.status().state).toBe('running')
+    await manager.stop()
+  })
+})
