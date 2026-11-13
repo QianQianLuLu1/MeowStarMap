@@ -1,4 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import {
   CLOTHING_SEARCH_DEEP_ENTRY,
   METADATA_DIAGNOSTICS_DEEP_ENTRY,
@@ -595,7 +598,11 @@ interface SessionFixture {
  * K2 开关 `consentSurfaceDisabled`：模拟「同意深入口缺席的老链接会话」（不包装、不挂 consent 面）。
  */
 function createSessionFixture(
-  options: { consentSurfaceDisabled?: boolean; upstream?: Record<string, unknown> } = {}
+  options: {
+    consentSurfaceDisabled?: boolean
+    upstream?: Record<string, unknown>
+    scannerStatus?: unknown
+  } = {}
 ): SessionFixture {
   const consentSurfaceDisabled = options.consentSurfaceDisabled === true
   const close = vi.fn()
@@ -623,7 +630,7 @@ function createSessionFixture(
       stop: async () => {},
       fullScan: async () => ({}),
       rescanPath: async () => ({}),
-      getStatus: () => ({})
+      getStatus: () => options.scannerStatus ?? {}
     },
     server: {
       serverId: 'server_fake',
@@ -1607,5 +1614,93 @@ describe('a49764bb 图标包注入会话（正常 / 异常 / 边界）', () => {
     ).localClothingIcons as Record<string, unknown>
     expect(merged.cacheVersion).toBe(second.main.cacheVersion)
     expect(merged.supplement).toBeUndefined()
+  })
+})
+
+describe('F2 本地照片解析器观测面（localPhotoResolverActive）', () => {
+  it('正常：本地解码缝在位时会话面如实报 true', async () => {
+    const fixture = createSessionFixture()
+    ;(fixture.surface as unknown as Record<string, unknown>).localPhotoMetadata = {
+      parseLocalPhotoMetadata: () => ({}),
+      withLocalPhotoFallback: (local: unknown) => local
+    }
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        decodeLocalPhotoRawTexts: async () => ({ cameraText: '[]', photoText: '{}' })
+      },
+      fixture.surface
+    )
+    expect(session.localPhotoResolverActive?.()).toBe(true)
+  })
+
+  it('边界：深入口缺席（老链接）时如实报 false，不伪造', async () => {
+    const fixture = createSessionFixture()
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        decodeLocalPhotoRawTexts: async () => ({ cameraText: '[]', photoText: '{}' })
+      },
+      fixture.surface
+    )
+    expect(session.localPhotoResolverActive?.()).toBe(false)
+  })
+})
+
+describe('F4 安装根缓存回写（cacheInstallRoot，对齐上游 windows-app.ts:221-224）', () => {
+  it('正常：启动后回写安装根（含换行符，与上游格式逐字一致）', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-f4-'))
+    try {
+      const cacheFile = path.join(dir, 'game-install-root.txt')
+      const fixture = createSessionFixture({
+        scannerStatus: { installation: { installRoot: 'C:/Games/InfinityNikki' } }
+      })
+      const session = await createRuntimeSession(
+        { ...sessionOptions(), gameRootCacheFile: cacheFile },
+        fixture.surface
+      )
+      expect(session.cacheInstallRoot).toBeTypeOf('function')
+      session.cacheInstallRoot?.()
+      expect(fs.readFileSync(cacheFile, 'utf8')).toBe('C:/Games/InfinityNikki\n')
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('边界：无安装根时 no-op（不写空文件、不删旧缓存）', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-f4-'))
+    try {
+      const cacheFile = path.join(dir, 'game-install-root.txt')
+      const fixture = createSessionFixture({ scannerStatus: { status: 'running' } })
+      const session = await createRuntimeSession(
+        { ...sessionOptions(), gameRootCacheFile: cacheFile },
+        fixture.surface
+      )
+      session.cacheInstallRoot?.()
+      expect(fs.existsSync(cacheFile)).toBe(false)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('异常：写失败只 warn 不抛（best-effort，不中断启动）', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wxnn-f4-'))
+    try {
+      // 缓存落点是一个已存在目录 ⇒ writeFileSync 必失败
+      const cacheFile = path.join(dir, 'occupied')
+      fs.mkdirSync(cacheFile)
+      const onWarning = vi.fn()
+      const fixture = createSessionFixture({
+        scannerStatus: { installation: { installRoot: 'C:/Games/InfinityNikki' } }
+      })
+      const session = await createRuntimeSession(
+        { ...sessionOptions(), gameRootCacheFile: cacheFile, onWarning },
+        fixture.surface
+      )
+      expect(() => session.cacheInstallRoot?.()).not.toThrow()
+      expect(onWarning).toHaveBeenCalledTimes(1)
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 })

@@ -45,6 +45,14 @@ export const RENDERER_PREF_KEYS = [
   'nikkisync.organizerEnabled',
   // 软件启动时是否自动启用 LAN 同步服务（默认关，消费点 nikkisync-runtime-setup.ts resolveSyncEnabled）
   'nikkisync.autoStartSyncServer',
+  // Windows 外壳能力的 6 个 opt-in 开关（全部默认 false；关闭时零网络、零子进程、零托盘）。
+  // 消费点：src/main/app/shell/shell-capabilities.ts 与 nikkisync:shell-* 通道。
+  'nikkisync.shellIconUpdateEnabled',
+  'nikkisync.shellProgramUpdateEnabled',
+  'nikkisync.shellTrayEnabled',
+  'nikkisync.shellSupportEnabled',
+  'nikkisync.shellNetworkRepairEnabled',
+  'nikkisync.shellHotspotEnabled',
   // 开机自启动（默认开，消费点 login-item.ts / settings-handler.ts / lifecycle.ts）
   'launchAtLogin',
   // 外部参考数据镜像站点（总计划阶段 1；空串 = 上游官方站点 nikki.ranaxro.com）。

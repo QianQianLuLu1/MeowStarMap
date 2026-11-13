@@ -4720,6 +4720,54 @@
       "wechatStop": "Stop WeChat gallery",
       "wechatStatus": "WeChat gallery status: {{state}}",
       "unavailable": "PC companion unavailable"
+    },
+    "shell": {
+      "title": "Windows Shell Capabilities",
+      "description": "Upstream PC shell capabilities. All off by default; verify the source before enabling.",
+      "icon": {
+        "title": "Signed Icon Pack Delta",
+        "check": "Check for updates",
+        "current": "Current icon pack"
+      },
+      "program": {
+        "title": "Differential Program Update",
+        "check": "Check for updates",
+        "notes": "Release notes"
+      },
+      "support": {
+        "title": "Anonymous Diagnostics",
+        "submit": "Submit diagnostics"
+      },
+      "network": {
+        "repair": "Repair Network Conflict",
+        "hotspot": "Temporary Hotspot"
+      },
+      "toggle": {
+        "iconUpdate": "Signed Icon Pack Delta",
+        "programUpdate": "Differential Program Update",
+        "tray": "System Tray",
+        "support": "Anonymous Diagnostics",
+        "networkRepair": "Network Conflict Repair",
+        "hotspot": "Temporary Hotspot"
+      },
+      "status": {
+        "disabled": "Disabled",
+        "unavailable": "Unavailable",
+        "confirmation-required": "Confirmation required",
+        "failed": "Failed",
+        "submitted": "Submitted",
+        "invalid-receipt": "Invalid receipt",
+        "toggled": "Toggled",
+        "unsupported-action": "Unsupported action",
+        "staged": "Staged",
+        "error": "Error"
+      },
+      "event": {
+        "checking": "Checking…",
+        "downloading": "Downloading…",
+        "staged": "Staged",
+        "rolled-back": "Rolled back"
+      }
     }
   },
   "shareCard": {

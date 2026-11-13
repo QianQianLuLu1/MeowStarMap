@@ -78,7 +78,8 @@ import {
   setDecryptionWorkerBridge,
   decomposeClothId,
   parseClothDiyNetworkData,
-  normalizeClothDiyIdMap
+  normalizeClothDiyIdMap,
+  decodeLocalPhotoRawTexts
 } from './decryption-service'
 import { setClothDiyCacheRoot } from './cloth-diy-cache'
 
@@ -1575,5 +1576,27 @@ describe('相机参数版本分流（V1/V2/V3）', () => {
     expect(r1.hasParams).toBe(false)
     const r2 = await decodeWithStep3(JSON.stringify(makeArr(30)))
     expect(r2.hasParams).toBe(false)
+  })
+})
+
+// ============================================================
+// decodeLocalPhotoRawTexts（F5：FileSystemError 必须携带原始 cause）
+// ============================================================
+
+describe('decodeLocalPhotoRawTexts（本地照片原始文本导出）', () => {
+  it('异常：文件不存在时 FileSystemError 携带原始 ENOENT cause（约定 §2）', async () => {
+    setupAbiVersion()
+    const missing = path.join(tmpRoot, 'missing-photo.jpg')
+    await expect(decodeLocalPhotoRawTexts(missing, '123', 'a'.repeat(64))).rejects.toMatchObject({
+      name: 'FileSystemError',
+      cause: expect.objectContaining({ code: 'ENOENT' })
+    })
+  })
+
+  it('异常：非法 uid 在触盘前即被 ValidationError 拒绝', async () => {
+    setupAbiVersion()
+    await expect(
+      decodeLocalPhotoRawTexts(path.join(tmpRoot, 'x.jpg'), 'not-a-uid', 'a'.repeat(64))
+    ).rejects.toMatchObject({ name: 'ValidationError' })
   })
 })

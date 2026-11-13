@@ -312,7 +312,7 @@ describe('evaluateNikkiSyncLink', () => {
 })
 
 describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步）', () => {
-  it('恰好 24 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
+  it('恰好 26 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
     expect(NIKKISYNC_CAPABILITY_ARTIFACTS).toEqual([
       path.join('dist', 'src', 'organizer', 'DeletionQueue.js'),
       path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
@@ -343,7 +343,10 @@ describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步
       path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js'),
       path.join('dist', 'src', 'metadata', 'LocalPhotoMetadataResolver.js'),
       path.join('dist', 'src', 'metadata', 'MetadataInputFingerprint.js'),
-      path.join('dist', 'src', 'metadata', 'VerifiedPhotographyNames.js')
+      path.join('dist', 'src', 'metadata', 'VerifiedPhotographyNames.js'),
+      // G4：本地字典 manifest 与已核验服装名补充
+      path.join('dist', 'src', 'metadata', 'MetadataDictionaryConfigFile.js'),
+      path.join('dist', 'src', 'metadata', 'VerifiedClothingNames.js')
     ])
   })
 })
@@ -569,8 +572,8 @@ describe('LOAD_CHAIN_ROOTS 结构契约', () => {
   /** 与 `src/main/nikkisync/runtime-facade.ts` 的深入口常量比对时统一成正斜杠键（约定 §6 第 1 档） */
   const toForward = (value: string): string => value.split(path.sep).join('/')
 
-  it('恰好 27 个根：上游桶导出 + 本仓 26 个 *_DEEP_ENTRY（含 a49764bb 图标包深入口）', () => {
-    expect(LOAD_CHAIN_ROOTS).toHaveLength(27)
+  it('恰好 30 个根：上游桶导出 + 本仓 29 个 *_DEEP_ENTRY（含本地字典两个深入口）', () => {
+    expect(LOAD_CHAIN_ROOTS).toHaveLength(30)
     expect(toForward(LOAD_CHAIN_ROOTS[0] as string)).toBe('dist/src/index.js')
   })
 

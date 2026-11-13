@@ -4720,6 +4720,54 @@
       "wechatStop": "위챗 갤러리 중지",
       "wechatStatus": "위챗 갤러리 상태: {{state}}",
       "unavailable": "PC 동반 기능을 사용할 수 없습니다"
+    },
+    "shell": {
+      "title": "Windows 셸 기능",
+      "description": "업스트림 PC 셸 기능입니다. 기본적으로 모두 꺼져 있으며, 활성화하기 전에 출처가 신뢰할 수 있는지 확인하세요.",
+      "icon": {
+        "title": "서명된 아이콘 팩 델타",
+        "check": "업데이트 확인",
+        "current": "현재 아이콘 팩"
+      },
+      "program": {
+        "title": "프로그램 차등 업데이트",
+        "check": "업데이트 확인",
+        "notes": "릴리스 노트"
+      },
+      "support": {
+        "title": "익명 진단",
+        "submit": "진단 제출"
+      },
+      "network": {
+        "repair": "네트워크 충돌 복구",
+        "hotspot": "임시 핫스팟"
+      },
+      "toggle": {
+        "iconUpdate": "서명된 아이콘 팩 델타",
+        "programUpdate": "프로그램 차등 업데이트",
+        "tray": "시스템 트레이",
+        "support": "익명 진단",
+        "networkRepair": "네트워크 충돌 복구",
+        "hotspot": "임시 핫스팟"
+      },
+      "status": {
+        "disabled": "비활성화됨",
+        "unavailable": "사용 불가",
+        "confirmation-required": "확인 필요",
+        "failed": "실패",
+        "submitted": "제출됨",
+        "invalid-receipt": "잘못된 영수증",
+        "toggled": "전환됨",
+        "unsupported-action": "지원되지 않는 작업",
+        "staged": "스테이징됨",
+        "error": "오류"
+      },
+      "event": {
+        "checking": "확인 중…",
+        "downloading": "다운로드 중…",
+        "staged": "스테이징됨",
+        "rolled-back": "롤백됨"
+      }
     }
   },
   "shareCard": {

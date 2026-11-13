@@ -762,6 +762,31 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
 | `nikkisync:wechat-stop`   | 无   | `{status}`（上游 `stop()` 后的状态）                                                   | `PRECONDITION_FAILED`（服务未装配）                                |
 | `nikkisync:wechat-status` | 无   | `{status}`（上游 `status()` 只读快照）                                                 | `PRECONDITION_FAILED`（服务未装配）                                |
 
+#### 8.x Windows 外壳能力（2026-11-13 全量对齐，全部 opt-in / 默认关闭）
+
+6 个开关：`nikkisync.shell{IconUpdate,ProgramUpdate,Tray,Support,NetworkRepair,Hotspot}Enabled`，
+全部默认 `false`。**开关为 false 时对应通道一律返回 `{status:'disabled'}` 且零网络、零子进程、
+零托盘对象**；签名私钥与 CNB 上传凭据不在本仓，真实签名通道未配置时返回
+`{status:'unavailable'}`，绝不伪造成功。所有动作入参经 zod 白名单校验
+（`confirm?: boolean`、`id?: string(1..128)`），非法入参返回 `VALIDATION_ERROR`。
+
+| 通道                             | 入参                         | 出参                                                                                                                                                                    | 失败码                                |
+| -------------------------------- | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| `nikkisync:shell-status`         | 无                           | `NikkiSyncShellStatusInfo`（6 个开关 + `trayActive` + `localPhotoResolverActive`；后两键是**真实观测**——托盘句柄 / 会话本地解析器挂载，缺席缺省 `false`，不是设置开关） | 无（只读快照，恒成功）                |
+| `nikkisync:icon-update-check`    | `NikkiSyncShellActionInput?` | `NikkiSyncShellActionResultInfo`（本构建无签名 feed ⇒ 恒 `{status:'unavailable'}`）                                                                                     | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:icon-update-activate` | `NikkiSyncShellActionInput`  | 同上：`confirm!==true` ⇒ `{status:'confirmation-required'}` 对象；`confirm===true` ⇒ `{status:'unavailable'}`（无已暂存签名增量）。**不抛 PRECONDITION_FAILED**         | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:program-update-check` | `NikkiSyncShellActionInput?` | 同上（本构建无签名 feed ⇒ 恒 `{status:'unavailable'}`）                                                                                                                 | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:program-update-stage` | `NikkiSyncShellActionInput`  | 同上（`status=staged` 时附 `candidatePath` 的**文件名**，不含绝对路径；生产无签名 feed 时 `unavailable`）                                                               | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:program-update-apply` | `NikkiSyncShellActionInput`  | 同上：`confirm!==true` ⇒ `{status:'confirmation-required'}` 对象；`confirm===true` ⇒ `{status:'unavailable'}`（本仓不做 EXE 原地自替换）。**不抛 PRECONDITION_FAILED**  | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:support-submit`       | `NikkiSyncShellActionInput`  | 同上（`status=submitted` 时附 `issue` 与回执；网关未配置 ⇒ `{status:'unavailable'}` 对象，不抛错）                                                                      | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:network-repair`       | `NikkiSyncShellActionInput?` | 同上（本构建防火墙规则枚举未接线 ⇒ 开启时恒 `{status:'unavailable'}`，绝不报 `repaired` 伪成功；`runRepair` 纯函数保留供未来接线）                                      | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+| `nikkisync:hotspot-toggle`       | `NikkiSyncShellActionInput`  | 同上（`confirm===true` 请求开启、`false` 请求关闭；本构建未注入执行器 ⇒ 开启时 `{status:'failed'}`）                                                                    | `VALIDATION_ERROR` / `INTERNAL_ERROR` |
+
+推送事件 `nikkisync:shell-event`（main → renderer，`subscribe` 语义，返回退订函数）：
+载荷 `NikkiSyncShellEventInfo { type, message?, percent? }`，阶段为
+`checking / downloading(percent) / staged / error / rolled-back`。**不新增 `ipcMain.handle`**，
+故 handler 注册面计数仍为 52 条。
+
 契约要点：
 
 - 上游 7 个深入口（`desktop/DesktopControlServer.js` / `DesktopStatusService.js`、

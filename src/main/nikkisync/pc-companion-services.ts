@@ -78,6 +78,8 @@ export interface PcCompanionSurface {
   convertWeChatWebp?: (bytes: Uint8Array, ffmpeg: string) => Promise<Uint8Array>
   RuntimeMemoryMaintenance?: new (...args: unknown[]) => PcLifecycleLike
   GameVersionUpdateService?: new (...args: unknown[]) => PcLifecycleLike
+  /** G5：GalleryRuntime.mjs 的版本表投影（onCalendarChanged 回调的消费方）。 */
+  setRemoteGameVersionReleases?: (releases: unknown) => void
   /**
    * 4cb71e2（v1.0.31）新增的可选面：两个微信画廊包装器（老链接缺深入口时为 undefined，
    * 组装据此整段跳过对应能力，不抛错）。字节变换函数（resizeForWeChat 等）自 589b932
@@ -285,6 +287,15 @@ export async function loadPcCompanionSurface(
             'GameVersionUpdateService'
           ) as PcCompanionSurface['GameVersionUpdateService']
         }
+      : {}),
+    // G5：GalleryRuntime.mjs 的 setRemoteGameVersionReleases（老链接可缺席）。
+    ...(pick(runtime, 'setRemoteGameVersionReleases')
+      ? {
+          setRemoteGameVersionReleases: pick(
+            runtime,
+            'setRemoteGameVersionReleases'
+          ) as PcCompanionSurface['setRemoteGameVersionReleases']
+        }
       : {})
   }
 }
@@ -362,8 +373,20 @@ export function createPcCompanionServices(
   const memory = surface.RuntimeMemoryMaintenance
     ? new surface.RuntimeMemoryMaintenance()
     : undefined
+  // G5：上游构造器签名是 (database, options)；零参会让 restoreEnglishNames(database)
+  // 与 AppSettingsRepository 拿到 undefined。仅当画廊侧投影导出在位时下传回调。
   const versionUpdates = surface.GameVersionUpdateService
-    ? new surface.GameVersionUpdateService()
+    ? new surface.GameVersionUpdateService(
+        options.database ?? {},
+        ...(surface.setRemoteGameVersionReleases
+          ? [
+              {
+                onCalendarChanged: (releases: unknown) =>
+                  surface.setRemoteGameVersionReleases?.(releases)
+              }
+            ]
+          : [])
+      )
     : undefined
 
   /**

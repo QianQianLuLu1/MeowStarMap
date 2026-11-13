@@ -1,6 +1,4 @@
-// @core-change: 本轮审查订正授权注释并补回历史接入括注，8 条透传方法名与入参不变
-//               （历史：三通道与 admitDirectory 预检接入、K9 账号作用域、K6 目录面、K2/K3/K8
-//               历次接入，以及灵感库 4 条与控制页、微信画廊共 8 条透传方法——见各节点提交。）
+// @core-change: 同步图库新增 Windows 外壳能力只读状态与 opt-in 动作透传方法（9 通道 + 1 事件订阅），均为加法
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, subscribe } from '../ipc'
@@ -54,7 +52,11 @@ import type {
   NikkiSyncSyncStartInputInfo,
   NikkiSyncWeChatStartInfo,
   NikkiSyncWeChatStatusInfo,
-  NikkiSyncWeChatStopInfo
+  NikkiSyncWeChatStopInfo,
+  NikkiSyncShellStatusInfo,
+  NikkiSyncShellActionInput,
+  NikkiSyncShellActionResultInfo,
+  NikkiSyncShellEventInfo
 } from '../../../shared/types/electron-api'
 
 /** electronAPI.nikkisync：内嵌 NikkiSync Runtime（状态 / 扫描 / 资产只读查询 / 局域网同步服务） */
@@ -182,5 +184,25 @@ export const nikkisyncAPI = {
   /** 停止微信画廊并返回状态 */
   wechatStop: () => call<NikkiSyncWeChatStopInfo>('nikkisync:wechat-stop'),
   /** 只读查询微信画廊状态 */
-  wechatStatus: () => call<NikkiSyncWeChatStatusInfo>('nikkisync:wechat-status')
+  wechatStatus: () => call<NikkiSyncWeChatStatusInfo>('nikkisync:wechat-status'),
+  // ---- Windows 外壳能力（6 个开关默认全关；关闭时任何动作都零网络、零子进程）----
+  getShellStatus: () => call<NikkiSyncShellStatusInfo>('nikkisync:shell-status'),
+  checkIconUpdate: (input?: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:icon-update-check', input ?? {}),
+  activateIconUpdate: (input: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:icon-update-activate', input),
+  checkProgramUpdate: (input?: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:program-update-check', input ?? {}),
+  stageProgramUpdate: (input: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:program-update-stage', input),
+  applyProgramUpdate: (input: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:program-update-apply', input),
+  submitSupportReport: (input: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:support-submit', input),
+  repairNetwork: (input?: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:network-repair', input ?? {}),
+  toggleHotspot: (input: NikkiSyncShellActionInput) =>
+    call<NikkiSyncShellActionResultInfo>('nikkisync:hotspot-toggle', input),
+  onShellEvent: (callback: (event: NikkiSyncShellEventInfo) => void) =>
+    subscribe('nikkisync:shell-event', callback)
 }

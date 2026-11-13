@@ -74,7 +74,15 @@ export function clampMetadataMaxPasses(value: number | undefined): number {
 export interface MetadataResolverConfigFragment {
   metadataResolver?: {
     resolver: unknown
-    service: { enabled: boolean; batchSize: number; retryAfterMs?: number }
+    service: {
+      enabled: boolean
+      batchSize: number
+      retryAfterMs?: number
+      /** 上游 windows-app.ts:189 的判据：无本地解码器且未同意时不得发起解析。 */
+      canResolve?: () => boolean
+      /** 上游 windows-app.ts:189 的收尾回调：刷新内存维护与解析诊断。 */
+      onWorkSettled?: () => void
+    }
   }
 }
 
@@ -86,6 +94,9 @@ export interface MetadataResolverConfigInput {
   createResolver: (endpoint: string) => unknown
   batchSize?: number
   retryAfterMs?: number
+  /** 可选回调：只在显式给出时下发，保持老链接会话逐字一致。 */
+  canResolve?: () => boolean
+  onWorkSettled?: () => void
 }
 
 /**
@@ -108,7 +119,9 @@ export function buildMetadataResolverConfig(
         batchSize: clampMetadataBatchSize(input.batchSize),
         ...(input.retryAfterMs === undefined
           ? {}
-          : { retryAfterMs: Math.max(0, Math.floor(input.retryAfterMs)) })
+          : { retryAfterMs: Math.max(0, Math.floor(input.retryAfterMs)) }),
+        ...(input.canResolve === undefined ? {} : { canResolve: input.canResolve }),
+        ...(input.onWorkSettled === undefined ? {} : { onWorkSettled: input.onWorkSettled })
       }
     }
   }

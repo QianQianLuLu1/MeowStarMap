@@ -4720,6 +4720,54 @@
       "wechatStop": "Dừng thư viện WeChat",
       "wechatStatus": "Trạng thái thư viện WeChat: {{state}}",
       "unavailable": "Tiện ích trên PC không khả dụng"
+    },
+    "shell": {
+      "title": "Tính năng shell Windows",
+      "description": "Tính năng shell PC từ upstream. Mặc định tắt tất cả; hãy xác minh nguồn trước khi bật.",
+      "icon": {
+        "title": "Bản delta gói biểu tượng có chữ ký",
+        "check": "Kiểm tra cập nhật",
+        "current": "Gói biểu tượng hiện tại"
+      },
+      "program": {
+        "title": "Cập nhật chương trình dạng delta",
+        "check": "Kiểm tra cập nhật",
+        "notes": "Ghi chú phát hành"
+      },
+      "support": {
+        "title": "Chẩn đoán ẩn danh",
+        "submit": "Gửi chẩn đoán"
+      },
+      "network": {
+        "repair": "Sửa xung đột mạng",
+        "hotspot": "Điểm phát sóng tạm thời"
+      },
+      "toggle": {
+        "iconUpdate": "Bản delta gói biểu tượng có chữ ký",
+        "programUpdate": "Cập nhật chương trình dạng delta",
+        "tray": "Khay hệ thống",
+        "support": "Chẩn đoán ẩn danh",
+        "networkRepair": "Sửa xung đột mạng",
+        "hotspot": "Điểm phát sóng tạm thời"
+      },
+      "status": {
+        "disabled": "Đã tắt",
+        "unavailable": "Không khả dụng",
+        "confirmation-required": "Cần xác nhận",
+        "failed": "Thất bại",
+        "submitted": "Đã gửi",
+        "invalid-receipt": "Biên nhận không hợp lệ",
+        "toggled": "Đã chuyển",
+        "unsupported-action": "Hành động không được hỗ trợ",
+        "staged": "Đã chuẩn bị",
+        "error": "Lỗi"
+      },
+      "event": {
+        "checking": "Đang kiểm tra…",
+        "downloading": "Đang tải xuống…",
+        "staged": "Đã chuẩn bị",
+        "rolled-back": "Đã khôi phục"
+      }
     }
   },
   "shareCard": {

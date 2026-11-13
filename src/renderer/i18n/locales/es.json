@@ -4720,6 +4720,54 @@
       "wechatStop": "Detener galería de WeChat",
       "wechatStatus": "Estado de la galería de WeChat: {{state}}",
       "unavailable": "Compañero de PC no disponible"
+    },
+    "shell": {
+      "title": "Funciones de shell de Windows",
+      "description": "Funciones de shell de PC upstream. Todas desactivadas por defecto; verifica la fuente antes de activarlas.",
+      "icon": {
+        "title": "Delta firmado del paquete de iconos",
+        "check": "Buscar actualizaciones",
+        "current": "Paquete de iconos actual"
+      },
+      "program": {
+        "title": "Actualización diferencial del programa",
+        "check": "Buscar actualizaciones",
+        "notes": "Notas de la versión"
+      },
+      "support": {
+        "title": "Diagnósticos anónimos",
+        "submit": "Enviar diagnósticos"
+      },
+      "network": {
+        "repair": "Reparar conflicto de red",
+        "hotspot": "Punto de acceso temporal"
+      },
+      "toggle": {
+        "iconUpdate": "Delta firmado del paquete de iconos",
+        "programUpdate": "Actualización diferencial del programa",
+        "tray": "Bandeja del sistema",
+        "support": "Diagnósticos anónimos",
+        "networkRepair": "Reparación de conflictos de red",
+        "hotspot": "Punto de acceso temporal"
+      },
+      "status": {
+        "disabled": "Desactivado",
+        "unavailable": "No disponible",
+        "confirmation-required": "Confirmación requerida",
+        "failed": "Fallido",
+        "submitted": "Enviado",
+        "invalid-receipt": "Recibo no válido",
+        "toggled": "Alternado",
+        "unsupported-action": "acción no compatible",
+        "staged": "Preparado",
+        "error": "Error"
+      },
+      "event": {
+        "checking": "Comprobando…",
+        "downloading": "Descargando…",
+        "staged": "Preparado",
+        "rolled-back": "Revertido"
+      }
     }
   },
   "shareCard": {

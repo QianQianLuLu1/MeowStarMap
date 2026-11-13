@@ -125,6 +125,9 @@ interface NikkiSyncServerApiStub {
   wechatStart: Mock
   wechatStop: Mock
   wechatStatus: Mock
+  // Windows 外壳能力（F3/F7）
+  toggleHotspot: Mock
+  checkIconUpdate: Mock
 }
 
 /** K9：与 handler 剔除 label 后的账号快照同形（uid 三态 + 样例 assetId）。 */
@@ -371,7 +374,13 @@ function installElectronApi(
       qrSvg: '<svg xmlns="http://www.w3.org/2000/svg"></svg>'
     })),
     wechatStop: vi.fn(async () => ({ status: { state: 'closed' } })),
-    wechatStatus: vi.fn(async () => ({ status: { state: 'idle' } }))
+    wechatStatus: vi.fn(async () => ({ status: { state: 'idle' } })),
+    // Windows 外壳能力（F3/F7）：默认 toggled / unavailable，用例内可覆写
+    toggleHotspot: vi.fn(async () => ({
+      status: 'toggled',
+      state: { startedHere: true, active: true }
+    })),
+    checkIconUpdate: vi.fn(async () => ({ status: 'unavailable' }))
   }
   dialogShowMessageBox = vi.fn(async () => 0)
   appRelaunch = vi.fn(async () => undefined)
@@ -1467,5 +1476,40 @@ describe('SyncServicePage PC 端分区（N7）', () => {
     const toggle = await screen.findByRole('switch', { name: AUTOSTART_TOGGLE_NAME })
     fireEvent.click(toggle)
     await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('disk full', 'error'))
+  })
+})
+
+describe('F3 Windows 外壳热点按钮交替请求', () => {
+  it('正常：首点请求开启（confirm:true），toggled 后再点请求关闭', async () => {
+    renderSection()
+    const button = await screen.findByRole('button', { name: '临时热点' })
+    fireEvent.click(button)
+    await waitFor(() => expect(serverApi.toggleHotspot).toHaveBeenCalledWith({ confirm: true }))
+    await waitFor(() => expect(button).not.toBeDisabled())
+    fireEvent.click(button)
+    await waitFor(() => expect(serverApi.toggleHotspot).toHaveBeenCalledWith({ confirm: false }))
+  })
+
+  it('异常：失败不翻转状态，连点两次均请求开启', async () => {
+    serverApi.toggleHotspot.mockResolvedValue({ status: 'failed' })
+    renderSection()
+    const button = await screen.findByRole('button', { name: '临时热点' })
+    fireEvent.click(button)
+    await waitFor(() => expect(serverApi.toggleHotspot).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(button).not.toBeDisabled())
+    fireEvent.click(button)
+    await waitFor(() => expect(serverApi.toggleHotspot).toHaveBeenCalledTimes(2))
+    expect(serverApi.toggleHotspot).toHaveBeenNthCalledWith(1, { confirm: true })
+    expect(serverApi.toggleHotspot).toHaveBeenNthCalledWith(2, { confirm: true })
+  })
+})
+
+describe('F7a 外壳动作结果码本地化', () => {
+  it('正常：unavailable 渲染为中文文案而非英文原码', async () => {
+    renderSection()
+    const checks = await screen.findAllByRole('button', { name: '检查更新' })
+    fireEvent.click(checks[0])
+    await screen.findByText('功能不可用')
+    expect(screen.queryByText('unavailable')).toBeNull()
   })
 })

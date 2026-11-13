@@ -4720,6 +4720,54 @@
       "wechatStop": "停止微信相簿",
       "wechatStatus": "微信相簿狀態：{{state}}",
       "unavailable": "PC 端能力未就緒"
+    },
+    "shell": {
+      "title": "Windows 外殼能力",
+      "description": "上游 PC 端外殼能力，全部預設關閉；開啟前請確認來源可信。",
+      "icon": {
+        "title": "圖示包簽章增量",
+        "check": "檢查更新",
+        "current": "目前圖示包"
+      },
+      "program": {
+        "title": "程式差分更新",
+        "check": "檢查更新",
+        "notes": "更新說明"
+      },
+      "support": {
+        "title": "匿名診斷提交",
+        "submit": "提交診斷"
+      },
+      "network": {
+        "repair": "修復網路衝突",
+        "hotspot": "臨時熱點"
+      },
+      "toggle": {
+        "iconUpdate": "圖示包簽章增量",
+        "programUpdate": "程式差分更新",
+        "tray": "托盤常駐",
+        "support": "匿名診斷提交",
+        "networkRepair": "網路衝突修復",
+        "hotspot": "臨時熱點"
+      },
+      "status": {
+        "disabled": "功能未啟用",
+        "unavailable": "功能不可用",
+        "confirmation-required": "需要二次確認",
+        "failed": "操作失敗",
+        "submitted": "已提交",
+        "invalid-receipt": "回執無效",
+        "toggled": "已切換",
+        "unsupported-action": "不支援的操作",
+        "staged": "已暫存",
+        "error": "發生錯誤"
+      },
+      "event": {
+        "checking": "正在檢查…",
+        "downloading": "正在下載…",
+        "staged": "已暫存",
+        "rolled-back": "已回滾"
+      }
     }
   },
   "shareCard": {

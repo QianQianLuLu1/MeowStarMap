@@ -1583,6 +1583,8 @@ export const SyncServicePage: React.FC = () => {
 
           {/* N7：PC 端分区（打开控制页 / 微信画廊启停 / 状态 / 二维码），常驻显示 */}
           <SyncPcCompanionSection />
+          {/* Windows 外壳能力：6 个开关默认关闭，关闭时所有动作零网络/零子进程 */}
+          <SyncShellSection />
         </div>
       </div>
 
@@ -1627,6 +1629,189 @@ export const SyncServicePage: React.FC = () => {
  * 一律静默降级为不可用提示，绝不把 IPC rejection 冒成未捕获错误或全局 toast。
  * 二维码 SVG 由本仓主进程 `qrcode` 生成，经 data URL 渲染（不引入 innerHTML）。
  */
+/** Windows 外壳能力的 6 个 opt-in 开关（与 settings-keys.ts 白名单逐字一致）。 */
+const SHELL_SETTING_KEYS = [
+  'nikkisync.shellIconUpdateEnabled',
+  'nikkisync.shellProgramUpdateEnabled',
+  'nikkisync.shellTrayEnabled',
+  'nikkisync.shellSupportEnabled',
+  'nikkisync.shellNetworkRepairEnabled',
+  'nikkisync.shellHotspotEnabled'
+] as const
+
+/** 6 个开关的可读标签（与上面键顺序一一对应，全部走 i18n，不硬编码用户可见文案）。 */
+const SHELL_TOGGLE_LABELS = [
+  'syncService.shell.toggle.iconUpdate',
+  'syncService.shell.toggle.programUpdate',
+  'syncService.shell.toggle.tray',
+  'syncService.shell.toggle.support',
+  'syncService.shell.toggle.networkRepair',
+  'syncService.shell.toggle.hotspot'
+] as const
+
+/**
+ * Windows 外壳能力分区。6 个开关默认全关；所有动作经 nikkisync:shell-* 通道，
+ * 关闭时主进程返回 {status:'disabled'} 且零网络/零子进程。
+ * 事件订阅在 cleanup 中退订（keep-alive 页面不卸载，必须显式清理监听器）。
+ */
+const SyncShellSection: React.FC = () => {
+  const { t } = useTranslation()
+  const [flags, setFlags] = useState<Record<string, boolean>>({})
+  const [status, setStatus] = useState('')
+  const [busy, setBusy] = useState(false)
+  // F3：热点期望状态本地跟踪；只有主进程确认 toggled 才翻转，失败不翻转（诚实）。
+  const [hotspotOn, setHotspotOn] = useState(false)
+
+  // F7a：结果码/事件阶段走 i18n 封闭键集；未知码兜底原样（不崩溃、不伪造翻译）。
+  const shellStatusText = (code: string): string =>
+    t(`syncService.shell.status.${code}`, {
+      defaultValue: t(`syncService.shell.event.${code}`, { defaultValue: code })
+    })
+
+  const refreshFlags = useCallback(async () => {
+    const api = window.electronAPI?.settings
+    if (!api) return
+    const next: Record<string, boolean> = {}
+    for (const key of SHELL_SETTING_KEYS) {
+      next[key] = Boolean(await api.get(key, false))
+    }
+    setFlags(next)
+  }, [])
+
+  useEffect(() => {
+    void refreshFlags()
+    const client = window.electronAPI?.nikkisync
+    if (typeof client?.onShellEvent !== 'function') return
+    return client.onShellEvent((event) => {
+      setStatus(event.message ?? event.type)
+    })
+  }, [refreshFlags])
+
+  const toggle = async (key: string, value: boolean): Promise<void> => {
+    const api = window.electronAPI?.settings
+    if (!api) return
+    setFlags((prev) => ({ ...prev, [key]: value }))
+    try {
+      await api.set(key, value)
+    } catch {
+      setFlags((prev) => ({ ...prev, [key]: !value }))
+      setStatus('error')
+    }
+  }
+
+  const run = async (
+    action: 'icon' | 'program' | 'support' | 'network' | 'hotspot'
+  ): Promise<void> => {
+    const client = window.electronAPI?.nikkisync
+    if (!client || busy) return
+    setBusy(true)
+    try {
+      if (action === 'hotspot') {
+        // F3：交替请求开/关；confirm===true 请求开启，false 请求关闭。
+        const next = !hotspotOn
+        const result = await client.toggleHotspot({ confirm: next })
+        if (result.status === 'toggled') setHotspotOn(next)
+        setStatus(result.status)
+        return
+      }
+      const result =
+        action === 'icon'
+          ? await client.checkIconUpdate({})
+          : action === 'program'
+            ? await client.checkProgramUpdate({})
+            : action === 'support'
+              ? await client.submitSupportReport({})
+              : await client.repairNetwork({})
+      setStatus(result.status)
+    } catch {
+      setStatus('error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div data-testid="sync-service-shell-section">
+      <SectionShell
+        title={t('syncService.shell.title')}
+        description={t('syncService.shell.description')}
+      >
+        <SettingsCard>
+          <div className="space-y-2">
+            {SHELL_SETTING_KEYS.map((key, index) => (
+              <SettingsToggle
+                key={key}
+                label={t(SHELL_TOGGLE_LABELS[index] as string)}
+                checked={flags[key] === true}
+                onChange={(value) => void toggle(key, value)}
+              />
+            ))}
+            <SettingsRow label={t('syncService.shell.icon.title')}>
+              <button
+                type="button"
+                className="btn-secondary text-sm"
+                disabled={busy}
+                onClick={() => void run('icon')}
+              >
+                {t('syncService.shell.icon.check')}
+              </button>
+            </SettingsRow>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('syncService.shell.icon.current')}
+            </p>
+            <SettingsRow label={t('syncService.shell.program.title')}>
+              <button
+                type="button"
+                className="btn-secondary text-sm"
+                disabled={busy}
+                onClick={() => void run('program')}
+              >
+                {t('syncService.shell.program.check')}
+              </button>
+            </SettingsRow>
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('syncService.shell.program.notes')}
+            </p>
+            <SettingsRow label={t('syncService.shell.support.title')}>
+              <button
+                type="button"
+                className="btn-secondary text-sm"
+                disabled={busy}
+                onClick={() => void run('support')}
+              >
+                {t('syncService.shell.support.submit')}
+              </button>
+            </SettingsRow>
+            {status && (
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {shellStatusText(status)}
+              </p>
+            )}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                disabled={busy}
+                onClick={() => void run('network')}
+              >
+                {t('syncService.shell.network.repair')}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                disabled={busy}
+                onClick={() => void run('hotspot')}
+              >
+                {t('syncService.shell.network.hotspot')}
+              </button>
+            </div>
+          </div>
+        </SettingsCard>
+      </SectionShell>
+    </div>
+  )
+}
+
 const SyncPcCompanionSection: React.FC = () => {
   const { t } = useTranslation()
   const currentView = useUIStore((s) => s.currentView)

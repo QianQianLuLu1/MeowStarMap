@@ -20,6 +20,9 @@ import {
   normalizeSyncPort
 } from '../nikkisync/sync-server-view'
 import { resolveLanHost } from './sync-server-setup'
+import { writeAggregateDiagnostic } from './shell/diagnostic-files'
+import { disposeTray, syncTray } from './shell/tray-lifecycle'
+import { createTray, type TrayElectronApi } from './shell/tray-service'
 import type {
   NikkiSyncPcCompanionSwitches,
   NikkiSyncRuntimeHandle,
@@ -159,10 +162,25 @@ export const NIKKISYNC_METADATA_DICTIONARY_REMOTE_SEGMENTS = [
   'nikkisync',
   'metadata-dictionary-remote.json'
 ] as const
+/** G4：本地字典 manifest 与服装名补充（与库同目录，缺省文件即不下传）。 */
+export const NIKKISYNC_METADATA_DICTIONARY_SEGMENTS = [
+  'nikkisync',
+  'metadata-dictionary.json'
+] as const
+export const NIKKISYNC_METADATA_DICTIONARY_SUPPLEMENT_SEGMENTS = [
+  'nikkisync',
+  'metadata-dictionary-supplement.json'
+] as const
 export const NIKKISYNC_METADATA_THUMBNAIL_DIR_SEGMENTS = [
   'nikkisync',
   'metadata-thumbnails'
 ] as const
+/** G3：上游 game-install-root.txt 的本仓等价缓存文件（仅存安装根）。 */
+export const NIKKISYNC_GAME_ROOT_CACHE_SEGMENTS = ['nikkisync', 'game-install-root.txt'] as const
+/** G6：5 个聚合诊断文件与库同目录。 */
+export const NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS = ['nikkisync'] as const
+/** Windows 外壳托盘开关（默认关；关闭时零 Electron Tray 对象）。 */
+export const SETTING_SHELL_TRAY = 'nikkisync.shellTrayEnabled'
 
 /** 设置读取端口（与 `DatabaseManager.getSetting<T>` 对齐，便于注入与单测）。 */
 export interface NikkiSyncSettingsPort {
@@ -257,12 +275,62 @@ export function buildSessionOptions(input: {
       input.userDataDir,
       ...NIKKISYNC_METADATA_DICTIONARY_REMOTE_SEGMENTS
     ),
+    // G4：只有真实存在本地字典文件时才下传，干净安装不产生无谓 warning。
+    ...(existsSync(path.join(input.userDataDir, ...NIKKISYNC_METADATA_DICTIONARY_SEGMENTS))
+      ? {
+          metadataDictionaryFile: path.join(
+            input.userDataDir,
+            ...NIKKISYNC_METADATA_DICTIONARY_SEGMENTS
+          )
+        }
+      : {}),
+    ...(existsSync(
+      path.join(input.userDataDir, ...NIKKISYNC_METADATA_DICTIONARY_SUPPLEMENT_SEGMENTS)
+    )
+      ? {
+          metadataDictionarySupplementFile: path.join(
+            input.userDataDir,
+            ...NIKKISYNC_METADATA_DICTIONARY_SUPPLEMENT_SEGMENTS
+          )
+        }
+      : {}),
     metadataThumbnailCacheDir: path.join(
       input.userDataDir,
       ...NIKKISYNC_METADATA_THUMBNAIL_DIR_SEGMENTS
     ),
     clothingIconsDir: path.join(pcAssetsDir, 'clothing-icons'),
     photoFilterIconsDir: path.join(pcAssetsDir, 'photo-filter-icons'),
+    // 「电脑端优先本地解析照片」：惰性动态 import，构造期不加载 koffi/DLL，
+    // 也不把 services 层牵进装载缝的静态依赖图。
+    decodeLocalPhotoRawTexts: async (filePath: string, uid: string, sha256: string) =>
+      (await import('../services/decryption-service')).decodeLocalPhotoRawTexts(
+        filePath,
+        uid,
+        sha256
+      ),
+    // G3/G6：聚合诊断落盘缝。失败只 warn，不中断启动/扫描；不含路径/UID/原始异常。
+    diagnosticsDir: path.join(input.userDataDir, ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
+    gameRootCacheFile: path.join(input.userDataDir, ...NIKKISYNC_GAME_ROOT_CACHE_SEGMENTS),
+    onDiagnostic: (name: string, payload: unknown) => {
+      const result = writeAggregateDiagnostic(
+        path.join(input.userDataDir, ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
+        name,
+        payload
+      )
+      if (!result.ok) {
+        runtimeLog('warn', `diagnostic write failed: ${result.reason ?? 'unknown'}`)
+      }
+    },
+    onMetadataWorkSettled: () => {
+      const result = writeAggregateDiagnostic(
+        path.join(input.userDataDir, ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
+        'metadata-status.json',
+        { settled: true }
+      )
+      if (!result.ok) {
+        runtimeLog('warn', `metadata diagnostic write failed: ${result.reason ?? 'unknown'}`)
+      }
+    },
     projectRoot: input.projectRoot,
     packagingContext: buildPackagingContext({
       isPackaged: input.isPackaged,
@@ -443,6 +511,29 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
     )
   }
   const settings = settingsFrom(ctx)
+  // Windows 外壳托盘：默认关 ⇒ 工厂不被调用、不加载 Electron Tray。
+  // 开关由用户在同步服务页显式开启；shutdown 时统一 dispose。
+  try {
+    await syncTray(settings.getBoolean(SETTING_SHELL_TRAY, false), async () => {
+      const electron = (await import('electron')) as unknown as TrayElectronApi
+      const iconPath = app.isPackaged
+        ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'icons', 'icon.ico')
+        : path.join(app.getAppPath(), 'resources', 'icons', 'icon.ico')
+      return createTray({
+        iconPath,
+        onShow: () => {
+          const window = ctx.getMainWindow()
+          window?.show()
+          window?.focus()
+        },
+        onQuit: () => app.quit(),
+        electron
+      })
+    })
+  } catch (error) {
+    // 托盘是可选能力：装配失败只 warn，绝不阻断内嵌 Runtime 启动。
+    runtimeLog('warn', `system tray unavailable: ${String(error)}`)
+  }
   const options = buildSessionOptions({
     userDataDir: app.getPath('userData'),
     projectRoot: app.getAppPath(),
@@ -532,6 +623,8 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
 
 /** 优雅停止（由 app/cleanup.ts 在 dbManager.close 之前调用；未注入即 no-op）。 */
 export async function stopNikkiSyncRuntime(ctx: AppContext): Promise<void> {
+  // Windows 外壳托盘：即使 Runtime 句柄未装配也要销毁，避免托盘图标随进程残留。
+  disposeTray()
   // N7：先停 PC 端服务（helper 内每步独立 try/catch，绝不卡住退出链）；即使 Runtime
   // 句柄未装配也要走这一段，避免 listen 的端口随进程残留。
   await stopPcCompanionServicesQuietly('app shutdown')

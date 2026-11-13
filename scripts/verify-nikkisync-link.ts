@@ -103,7 +103,10 @@ export const NIKKISYNC_CAPABILITY_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js'),
   path.join('dist', 'src', 'metadata', 'LocalPhotoMetadataResolver.js'),
   path.join('dist', 'src', 'metadata', 'MetadataInputFingerprint.js'),
-  path.join('dist', 'src', 'metadata', 'VerifiedPhotographyNames.js')
+  path.join('dist', 'src', 'metadata', 'VerifiedPhotographyNames.js'),
+  // G4：本地字典 manifest 与已核验服装名补充
+  path.join('dist', 'src', 'metadata', 'MetadataDictionaryConfigFile.js'),
+  path.join('dist', 'src', 'metadata', 'VerifiedClothingNames.js')
 ]
 
 /**
@@ -160,7 +163,12 @@ export const LOAD_CHAIN_ROOTS: readonly string[] = [
   path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
   path.join('dist', 'src', 'server', 'GameVersionUpdateService.js'),
   // a49764bb：与 runtime-facade.ts 的 LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY 一一对应
-  path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js')
+  path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js'),
+  // 「电脑端优先本地解析照片」：与 LOCAL_PHOTO_METADATA_DEEP_ENTRY 一一对应
+  path.join('dist', 'src', 'metadata', 'LocalPhotoMetadataResolver.js'),
+  // G4：与 runtime-facade.ts 两个本地字典深入口一一对应
+  path.join('dist', 'src', 'metadata', 'MetadataDictionaryConfigFile.js'),
+  path.join('dist', 'src', 'metadata', 'VerifiedClothingNames.js')
 ]
 
 /** 装载链上「源模块 → 相对说明符」的一条边（只记文本形态，不掺宿主分隔符语义）。 */

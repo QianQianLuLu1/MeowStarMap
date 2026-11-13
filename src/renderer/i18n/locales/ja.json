@@ -4720,6 +4720,54 @@
       "wechatStop": "WeChat ギャラリーを停止",
       "wechatStatus": "WeChat ギャラリーの状態：{{state}}",
       "unavailable": "PC 連携を利用できません"
+    },
+    "shell": {
+      "title": "Windows シェル機能",
+      "description": "上游 PC 端シェル機能。デフォルトはすべてオフ。有効にする前に入手元が信頼できるか確認してください。",
+      "icon": {
+        "title": "署名付きアイコンパック差分",
+        "check": "更新を確認",
+        "current": "現在のアイコンパック"
+      },
+      "program": {
+        "title": "プログラム差分更新",
+        "check": "更新を確認",
+        "notes": "リリースノート"
+      },
+      "support": {
+        "title": "匿名診断",
+        "submit": "診断を送信"
+      },
+      "network": {
+        "repair": "ネットワーク競合を修復",
+        "hotspot": "一時ホットスポット"
+      },
+      "toggle": {
+        "iconUpdate": "署名付きアイコンパック差分",
+        "programUpdate": "プログラム差分更新",
+        "tray": "システムトレイ",
+        "support": "匿名診断",
+        "networkRepair": "ネットワーク競合修復",
+        "hotspot": "一時ホットスポット"
+      },
+      "status": {
+        "disabled": "無効",
+        "unavailable": "利用不可",
+        "confirmation-required": "確認が必要",
+        "failed": "失敗",
+        "submitted": "送信済み",
+        "invalid-receipt": "無効な受領書",
+        "toggled": "切り替え済み",
+        "unsupported-action": "非対応の操作",
+        "staged": "ステージ済み",
+        "error": "エラー"
+      },
+      "event": {
+        "checking": "確認中…",
+        "downloading": "ダウンロード中…",
+        "staged": "ステージ済み",
+        "rolled-back": "ロールバック済み"
+      }
     }
   },
   "shareCard": {

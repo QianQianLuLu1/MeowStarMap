@@ -4720,6 +4720,54 @@
       "wechatStop": "停止微信画廊",
       "wechatStatus": "微信画廊状态：{{state}}",
       "unavailable": "PC 端能力未就绪"
+    },
+    "shell": {
+      "title": "Windows 外壳能力",
+      "description": "上游 PC 端外壳能力，全部默认关闭；开启前请确认来源可信。",
+      "icon": {
+        "title": "图标包签名增量",
+        "check": "检查更新",
+        "current": "当前图标包"
+      },
+      "program": {
+        "title": "程序差分更新",
+        "check": "检查更新",
+        "notes": "更新说明"
+      },
+      "support": {
+        "title": "匿名诊断提交",
+        "submit": "提交诊断"
+      },
+      "network": {
+        "repair": "修复网络冲突",
+        "hotspot": "临时热点"
+      },
+      "toggle": {
+        "iconUpdate": "图标包签名增量",
+        "programUpdate": "程序差分更新",
+        "tray": "托盘常驻",
+        "support": "匿名诊断提交",
+        "networkRepair": "网络冲突修复",
+        "hotspot": "临时热点"
+      },
+      "status": {
+        "disabled": "功能未启用",
+        "unavailable": "功能不可用",
+        "confirmation-required": "需要二次确认",
+        "failed": "操作失败",
+        "submitted": "已提交",
+        "invalid-receipt": "回执无效",
+        "toggled": "已切换",
+        "unsupported-action": "不支持的操作",
+        "staged": "已暂存",
+        "error": "发生错误"
+      },
+      "event": {
+        "checking": "正在检查…",
+        "downloading": "正在下载…",
+        "staged": "已暂存",
+        "rolled-back": "已回滚"
+      }
     }
   },
   "shareCard": {

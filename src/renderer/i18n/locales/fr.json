@@ -4720,6 +4720,54 @@
       "wechatStop": "Arrêter la galerie WeChat",
       "wechatStatus": "État de la galerie WeChat : {{state}}",
       "unavailable": "Compagnon PC indisponible"
+    },
+    "shell": {
+      "title": "Fonctionnalités shell Windows",
+      "description": "Fonctionnalités shell PC amont. Toutes désactivées par défaut ; vérifiez la source avant activation.",
+      "icon": {
+        "title": "Delta signé du pack d'icônes",
+        "check": "Rechercher des mises à jour",
+        "current": "Pack d'icônes actuel"
+      },
+      "program": {
+        "title": "Mise à jour différentielle du programme",
+        "check": "Rechercher des mises à jour",
+        "notes": "Notes de version"
+      },
+      "support": {
+        "title": "Diagnostics anonymes",
+        "submit": "Envoyer les diagnostics"
+      },
+      "network": {
+        "repair": "Réparer le conflit réseau",
+        "hotspot": "Point d'accès temporaire"
+      },
+      "toggle": {
+        "iconUpdate": "Delta signé du pack d'icônes",
+        "programUpdate": "Mise à jour différentielle du programme",
+        "tray": "Barre d'état système",
+        "support": "Diagnostics anonymes",
+        "networkRepair": "Réparation des conflits réseau",
+        "hotspot": "Point d'accès temporaire"
+      },
+      "status": {
+        "disabled": "Désactivé",
+        "unavailable": "Indisponible",
+        "confirmation-required": "Confirmation requise",
+        "failed": "Échec",
+        "submitted": "Envoyé",
+        "invalid-receipt": "Reçu invalide",
+        "toggled": "Basculé",
+        "unsupported-action": "Action non prise en charge",
+        "staged": "Préparé",
+        "error": "Erreur"
+      },
+      "event": {
+        "checking": "Vérification…",
+        "downloading": "Téléchargement…",
+        "staged": "Préparé",
+        "rolled-back": "Restauré"
+      }
     }
   },
   "shareCard": {

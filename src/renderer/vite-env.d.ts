@@ -1248,6 +1248,35 @@ interface WindowElectronAPI {
     wechatStart: () => Promise<import('../shared/types/electron-api').NikkiSyncWeChatStartInfo>
     wechatStop: () => Promise<import('../shared/types/electron-api').NikkiSyncWeChatStopInfo>
     wechatStatus: () => Promise<import('../shared/types/electron-api').NikkiSyncWeChatStatusInfo>
+    // ---- Windows 外壳能力（6 个开关默认关闭）----
+    getShellStatus: () => Promise<import('../shared/types/electron-api').NikkiSyncShellStatusInfo>
+    checkIconUpdate: (
+      input?: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    activateIconUpdate: (
+      input: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    checkProgramUpdate: (
+      input?: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    stageProgramUpdate: (
+      input: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    applyProgramUpdate: (
+      input: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    submitSupportReport: (
+      input: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    repairNetwork: (
+      input?: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    toggleHotspot: (
+      input: import('../shared/types/electron-api').NikkiSyncShellActionInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    onShellEvent: (
+      callback: (event: import('../shared/types/electron-api').NikkiSyncShellEventInfo) => void
+    ) => () => void
   }
   // sync-integration 阶段4：资产编辑叠加层（本 App 专有编辑，按 NikkiSync asset_id 归键）
   assetEdits: {

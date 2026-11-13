@@ -67,6 +67,10 @@ export interface FakeSessionPlan {
   startError?: 'notfound' | 'other'
   stopHangs?: boolean
   stopThrows?: boolean
+  /** F2：模拟会话挂出本地解析器观测面（缺省缺席 ⇒ status 不下发该键）。 */
+  localResolverActive?: boolean
+  /** F4：模拟会话 cacheInstallRoot() 抛错（验证 best-effort 不影响 running）。 */
+  cacheInstallRootThrows?: boolean
   /** 整体覆盖 `scanner.getStatus()` 返回值（测试专用：注入非对象/缺字段等边界形态）。 */
   scannerStatusRaw?: unknown
   /**
@@ -423,6 +427,9 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       snapshot.sync = syncStatus()
       // 阶段 6：元数据解析状态同批给出（计数是缓存值，轮询不触发聚合 SQL）
       snapshot.metadata = metadataSnapshot()
+      // F2：本地解析器观测仅在会话面在位时下发（老链接缺席 ⇒ 键不存在，不伪造 false）
+      const localResolverActive = state.session.localPhotoResolverActive?.()
+      if (localResolverActive !== undefined) snapshot.localPhotoResolverActive = localResolverActive
       // K1：真实发生的启动阶段（无新通道，随 runtime-status 响应体给出）
       if (state.startupStages.length > 0) snapshot.startupStages = state.startupStages
       // K7：最近一次扫描的诊断快照（未扫描时缺省；无新通道）
@@ -534,6 +541,13 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
         // K1：scanner.start 成功 = scanner 阶段真实发生；start 完成 = runtime-ready
         recordStage('scanner')
         recordStage('runtime-ready')
+        // F4：对齐上游 windows-app.ts:221-224——启动成功后回写一次安装根缓存。
+        // best-effort：写失败只 warn，绝不影响已 running 的主状态。
+        try {
+          session.cacheInstallRoot?.()
+        } catch (error) {
+          deps.log('warn', `nikkisync install root cache write failed: ${messageOf(error)}`)
+        }
         deps.log('info', `nikkisync runtime started (gameRoot=${options.gameRoot ?? 'auto'})`)
       } catch (error) {
         state.error = messageOf(error)
@@ -884,6 +898,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
   ): NikkiSyncMetadataConsentState {
     const consent = requireConsent()
     consent.setEnabled(enabled, policyVersion)
+    // G7：同意一变就要重算解析队列，否则已排期的解析会沿用旧 consent 判据。
+    requireSession().reconsiderMetadataResolver?.()
     return consent.state()
   }
 

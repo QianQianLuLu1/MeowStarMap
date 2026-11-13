@@ -533,10 +533,12 @@ suite('旧库升级：4cb71e2 结构的 nikkisync.db 在新版启动后自动补
     // 0001_initial.sql 全文（IF NOT EXISTS 幂等）。因此旧库重启会自然获得新增对象，
     // 本仓不需要另写一套迁移；此用例把「旧库 → 新版」的结果钉成可判定判据。
     const upRoot = process.env.NIKKISYNC_ROOT || path.join(projectRoot, '..', 'NikkiSync')
+    // ci-linux 装置只翻译 options.cwd、不翻译 args 数组（tests/mocks/ci-linux-child-process.ts）：
+    // 上游根经 cwd 下传（与 -C 语义等价），真宿主与 CI 装置两侧都成立。
     const legacySql = execFileSync(
       'git',
-      ['-C', upRoot, 'show', '4cb71e2:packages/database/migrations/0001_initial.sql'],
-      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+      ['show', '4cb71e2:packages/database/migrations/0001_initial.sql'],
+      { cwd: upRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
     )
 
     const legacyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nikkisync-legacy-db-'))

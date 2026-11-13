@@ -19,6 +19,7 @@ import { makeCtx, getHandler } from './_test-helpers'
 import { isBareDirectoryRoot, registerNikkiSyncHandlers } from './nikkisync-handler'
 import { pathGuard } from '../validator'
 import { setActiveRuntimeSession } from '../../nikkisync/runtime-facade'
+import { disposeTray, syncTray } from '../../app/shell/tray-lifecycle'
 import type { NikkiSyncRuntimeHandle, NikkiSyncRuntimeSession } from '../../nikkisync/runtime-types'
 import { AppError } from '../../../shared/errors/app-error'
 import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
@@ -237,7 +238,7 @@ beforeEach(() => {
 })
 
 describe('nikkisync handler 注册面', () => {
-  it('恰好注册 43 条通道（…K8 三条整理队列 + N4 四条灵感库 + N7 四条 PC 端）', () => {
+  it('恰好注册 52 条通道（…K8 三条 + N4 四条 + N7 四条 + 外壳能力九条）', () => {
     register(createRuntimeStub())
     const channels = handleMock.mock.calls.map((call) => call[0])
     expect(channels).toEqual([
@@ -285,7 +286,17 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:desktop-open',
       'nikkisync:wechat-start',
       'nikkisync:wechat-stop',
-      'nikkisync:wechat-status'
+      'nikkisync:wechat-status',
+      // Windows 外壳能力（9 条 ipcMain.handle；shell-event 是推送，不注册 handle）
+      'nikkisync:shell-status',
+      'nikkisync:icon-update-check',
+      'nikkisync:icon-update-activate',
+      'nikkisync:program-update-check',
+      'nikkisync:program-update-stage',
+      'nikkisync:program-update-apply',
+      'nikkisync:support-submit',
+      'nikkisync:network-repair',
+      'nikkisync:hotspot-toggle'
     ])
   })
 
@@ -2199,5 +2210,35 @@ describe('N7 PC 端通道（nikkisync:desktop-open / wechat-*）', () => {
     ]) {
       expect(channels).toContain(channel)
     }
+  })
+})
+
+describe('F2 shell-status 诚实观测（trayActive / localPhotoResolverActive）', () => {
+  afterEach(() => {
+    disposeTray()
+  })
+
+  it('正常：托盘句柄与会话观测面如实透出', async () => {
+    const runtime = createRuntimeStub()
+    ;(runtime.status as ReturnType<typeof vi.fn>).mockReturnValue({
+      state: 'running',
+      dbPath: '/mock/userData/nikkisync/nikkisync.db',
+      linkReady: true,
+      localPhotoResolverActive: true
+    })
+    await syncTray(true, () => ({ notify: vi.fn(), dispose: vi.fn() }))
+    register(runtime)
+    const handler = getHandler(handleMock, 'nikkisync:shell-status')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({ trayActive: true, localPhotoResolverActive: true })
+  })
+
+  it('边界：无托盘且会话无观测面时两键均 false', async () => {
+    register(createRuntimeStub())
+    const handler = getHandler(handleMock, 'nikkisync:shell-status')
+    const res = (await handler({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect(res.data).toMatchObject({ trayActive: false, localPhotoResolverActive: false })
   })
 })

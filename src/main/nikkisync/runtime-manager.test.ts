@@ -67,6 +67,10 @@ interface FakeCalls {
   cachedMetadataRunOnce: number
   /** K2：同意开关 setEnabled 收到的参数序列。 */
   metadataConsentSet: Array<{ enabled: boolean; policyVersion?: string }>
+  /** G7：同意切换后会话面 reconsiderMetadataResolver 的调用次数。 */
+  reconsiderMetadataResolver: number
+  /** F4：启动成功后会话面 cacheInstallRoot 的调用次数。 */
+  cacheInstallRoot: number
   /** K3：会话面收到的 capturedAt 序列。 */
   resolveGameVersion: Array<string | undefined>
   /** K5：会话面 pairingUri 收到的参数序列。 */
@@ -286,6 +290,19 @@ function createFakeSession(calls: FakeCalls, plan: FakeSessionPlan = {}): NikkiS
           }
         }
       : {}),
+    // G7：同意切换后必须重算解析队列（上游 reconsider() 的宿主委托面）。
+    reconsiderMetadataResolver: () => {
+      calls.reconsiderMetadataResolver += 1
+    },
+    // F2：本地解析器观测面的镜像（默认缺席 ⇒ status 不下发该键）。
+    ...(plan.localResolverActive === undefined
+      ? {}
+      : { localPhotoResolverActive: () => plan.localResolverActive as boolean }),
+    // F4：安装根缓存回写委托面（启动成功后由编排层调一次）。
+    cacheInstallRoot: () => {
+      calls.cacheInstallRoot += 1
+      if (plan.cacheInstallRootThrows) throw new Error('disk full')
+    },
     metadataDiagnostics: () => {
       calls.metadataDiagnostics += 1
       return {
@@ -518,6 +535,8 @@ function createDependencies(
     backgroundStop: 0,
     cachedMetadataRunOnce: 0,
     metadataConsentSet: [],
+    reconsiderMetadataResolver: 0,
+    cacheInstallRoot: 0,
     resolveGameVersion: [],
     organizerDecide: [],
     organizerApproveMany: [],
@@ -1368,6 +1387,14 @@ describe('K2：元数据在线同意读写', () => {
     manager.setMetadataConsent(true, '2026-10-13.1')
     expect(calls.metadataConsentSet).toEqual([{ enabled: true, policyVersion: '2026-10-13.1' }])
   })
+
+  it('G7 同意切换后触发会话面 reconsiderMetadataResolver（修复前计数为 0）', async () => {
+    const { deps, calls } = createDependencies({}, { metadataConsentPresent: true })
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    manager.setMetadataConsent(true, '2026-10-13.1')
+    expect(calls.reconsiderMetadataResolver).toBe(1)
+  })
 })
 
 describe('K3：游戏版本推断', () => {
@@ -2198,5 +2225,51 @@ describe('F2 会话生命周期回调（onSessionStopping / onSessionStarted）'
     expect(calls.dispose).toBe(1)
     expect(calls.logs.some((l) => l.message.includes('onSessionStarted'))).toBe(true)
     expect(calls.logs.some((l) => l.message.includes('onSessionStopping'))).toBe(true)
+  })
+})
+
+describe('F2 localPhotoResolverActive 观测透传', () => {
+  it('正常：会话面在位时 status 原样透出', async () => {
+    const { deps } = createDependencies({}, { localResolverActive: true })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.localPhotoResolverActive).toBe(true)
+    await manager.stop()
+  })
+
+  it('边界：会话面缺席（老链接）时键不下发', async () => {
+    const { deps } = createDependencies({}, {})
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect('localPhotoResolverActive' in status).toBe(false)
+    await manager.stop()
+  })
+})
+
+describe('F4 安装根缓存回写编排（cacheInstallRoot）', () => {
+  it('正常：scanner.start 成功后调一次 cacheInstallRoot', async () => {
+    const { deps, calls } = createDependencies({}, {})
+    const manager = createRuntimeManager(deps)
+    await manager.start(DEFAULTS)
+    expect(calls.cacheInstallRoot).toBe(1)
+    await manager.stop()
+  })
+
+  it('边界：degraded（无游戏目录）时不调 cacheInstallRoot', async () => {
+    const { deps, calls } = createDependencies({}, { startError: 'notfound' })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('degraded')
+    expect(calls.cacheInstallRoot).toBe(0)
+    await manager.stop()
+  })
+
+  it('异常：cacheInstallRoot 抛错只 warn，不改判 running', async () => {
+    const { deps, calls } = createDependencies({}, { cacheInstallRootThrows: true })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    expect(calls.logs.some((l) => l.level === 'warn' && l.message.includes('cache'))).toBe(true)
+    await manager.stop()
   })
 })

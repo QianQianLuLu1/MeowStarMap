@@ -1,5 +1,5 @@
 /// <reference lib="es2022.object" />
-// @core-change: 灵感库错误码改用 Object.hasOwn 收敛、entry 入参加已知键白名单，会话拆除后四条灵感库 IPC 统一回前置失败
+// @core-change: 新增 Windows 外壳能力九条 IPC 通道并让 shell-status 如实透出托盘与本地解析器观测事实
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -13,6 +13,8 @@ import type {
 } from '../../nikkisync/runtime-types'
 // 生效失败分类判据与 runtime-manager 同源（该常量是其状态机判定 degraded 的同一把尺）
 import { installNotfoundMessage } from '../../nikkisync/runtime-manager'
+import { getShellStatus, runShellAction, type ShellActionName } from '../../app/shell/shell-ipc'
+import { isTrayActive } from '../../app/shell/tray-lifecycle'
 // 照片目录校验失败的用户可见文案走主进程 i18n（不含路径，路径只在 details 里走 maskPath 脱敏）
 import { t } from '../../i18n'
 import {
@@ -1432,4 +1434,50 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
       }
     })
   )
+
+  // ---- Windows 外壳能力（6 个开关默认关闭；关闭时零网络/零子进程）----
+  const shellSettings = {
+    getBoolean: (key: string, fallback: boolean): boolean =>
+      ctx.dbManager.getSetting<boolean>(key, fallback)
+  }
+  const shellActionSchema = z
+    .object({
+      confirm: z.boolean().optional(),
+      id: z.string().trim().min(1).max(128).optional()
+    })
+    .strict()
+  const emitShellEvent = (event: unknown): void => {
+    ctx.getMainWindow()?.webContents.send('nikkisync:shell-event', event)
+  }
+  const registerShellAction = (channel: string, action: ShellActionName): void => {
+    ipcMain.handle(
+      channel,
+      wrapHandlerRaw(ctx, async (args) => {
+        const input = shellActionSchema.parse(args ?? {})
+        try {
+          return await runShellAction(action, input, shellSettings, emitShellEvent)
+        } catch (error) {
+          throw toAppError(error, action)
+        }
+      })
+    )
+  }
+
+  ipcMain.handle(
+    'nikkisync:shell-status',
+    wrapHandlerNoArgs(ctx, () =>
+      getShellStatus(shellSettings, {
+        trayActive: isTrayActive(),
+        localPhotoResolverActive: ctx.nikkisyncRuntime?.status().localPhotoResolverActive ?? false
+      })
+    )
+  )
+  registerShellAction('nikkisync:icon-update-check', 'icon-check')
+  registerShellAction('nikkisync:icon-update-activate', 'icon-activate')
+  registerShellAction('nikkisync:program-update-check', 'program-check')
+  registerShellAction('nikkisync:program-update-stage', 'program-stage')
+  registerShellAction('nikkisync:program-update-apply', 'program-apply')
+  registerShellAction('nikkisync:support-submit', 'support-submit')
+  registerShellAction('nikkisync:network-repair', 'network-repair')
+  registerShellAction('nikkisync:hotspot-toggle', 'hotspot-toggle')
 }

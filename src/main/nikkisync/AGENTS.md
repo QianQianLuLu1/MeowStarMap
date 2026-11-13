@@ -205,7 +205,7 @@
   `photo-filter-icons/manifest.json` + 21 张 `filter-1090020NNN.webp`，NNN ∈ 1..17、19..22，
   上游缺 0018）；另有 `resources/nikkisync/pc/clothing-icons/` 主包（9162 服装条目 +
   394 效果条目），由官方 `MomoCamera-PC-1.0.40.exe` 内嵌 ZIP 经
-  `scripts/extract-nikkisync-icon-pack.ts`（本轮新增，尚未纳入版本控制）四组 SHA 校验后落位，
+  `scripts/extract-nikkisync-icon-pack.ts` 四组 SHA 校验后落位，
   不经过 stage 清单。
 - **图标包注入**（复刻上游 `windows-app.ts:103-117`）：`createRuntimeSession` 两次
   `loadLocalClothingIconPack`（主包 + 滤镜补充包）→ `withLocalPhotoEffectIcons` → 仅主包
@@ -222,7 +222,16 @@
   自动补齐 `nuan5_resolution` / `nuan5_endpoint_state` / `idx_assets_resolver_fingerprint`。
   本仓**不写自研 DDL**，改由 `runtime-facade.linked.test.ts` 的「旧库 → 新版启动」用例钉住；
   业务表闭集 16 → **18 张**（14 迁移 + 4 运行期自建）。
-- **R1 维持**：C# WPF 自动更新 / xdelta3 差分 / 托盘自启 / 支持网关 / `UpdateWindow` /
-  Android / 小程序本体仍不搬；本轮唯一扩展是**引入服装图标静态包**（用户裁决），不含其
-  自动更新与验签通道。第三方署名见 `THIRD_PARTY_NOTICES` 第 6 节。
-- 全过程与逐节点读数见 `docs/plans/2026-11-13-nikkisync-pc-align-1.0.40-实施计划.md`（本轮新增，尚未纳入版本控制）。
+- **历史 R1（已被 2026-11-13 用户裁决推翻，保留作沿革）**：C# WPF 自动更新 / xdelta3 差分 /
+  托盘自启 / 支持网关 / `UpdateWindow` / Android / 小程序本体曾「仍不搬」；当时唯一扩展是
+  **引入服装图标静态包**，不含其自动更新与验签通道。第三方署名见 `THIRD_PARTY_NOTICES` 第 6 节。
+- **2026-11-13 起按用户裁决全量对齐 windows-shell 能力**：宿主装配补齐 G1–G7
+  （本地照片解析优先、解析回调、scanner 构造期选项、诊断落盘、本地字典 manifest、
+  版本服务构造签名、同意切换重算），并新增 6 个默认关闭的 opt-in 外壳能力
+  （签名图标增量 / 签名程序差分 / 托盘 / 匿名诊断 / 网络冲突修复 / 临时热点）。
+  已与 `electron-updater` / `login-item.ts` / `log-service.ts` / koffi 解码链重复的
+  成熟实现一律不重写，只做最小对齐与观测。签名私钥、CNB 上传凭据与支持网关服务端
+  不在本仓，无有效签名 feed 时通道如实返回 `unavailable`。详见
+  `docs/plans/2026-11-13-nikkisync-windows-shell-full-align-实施计划.md` 与
+  `docs/IPC_CONTRACT.md` §8.x；第三方署名见 `THIRD_PARTY_NOTICES` 第 7 节。
+- 全过程与逐节点读数见 `docs/plans/2026-11-13-nikkisync-pc-align-1.0.40-实施计划.md`。

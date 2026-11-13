@@ -4720,6 +4720,54 @@
       "wechatStop": "WeChat-Galerie stoppen",
       "wechatStatus": "WeChat-Galerie-Status: {{state}}",
       "unavailable": "PC-Begleiter nicht verfügbar"
+    },
+    "shell": {
+      "title": "Windows-Shell-Funktionen",
+      "description": "Upstream-PC-Shell-Funktionen. Standardmäßig alle deaktiviert; vor dem Aktivieren die Quelle prüfen.",
+      "icon": {
+        "title": "Signiertes Icon-Paket-Delta",
+        "check": "Nach Updates suchen",
+        "current": "Aktuelles Icon-Paket"
+      },
+      "program": {
+        "title": "Differenzielles Programm-Update",
+        "check": "Nach Updates suchen",
+        "notes": "Versionshinweise"
+      },
+      "support": {
+        "title": "Anonyme Diagnose",
+        "submit": "Diagnose senden"
+      },
+      "network": {
+        "repair": "Netzwerkkonflikt beheben",
+        "hotspot": "Temporärer Hotspot"
+      },
+      "toggle": {
+        "iconUpdate": "Signiertes Icon-Paket-Delta",
+        "programUpdate": "Differenzielles Programm-Update",
+        "tray": "Systemtray",
+        "support": "Anonyme Diagnose",
+        "networkRepair": "Netzwerkkonflikt-Reparatur",
+        "hotspot": "Temporärer Hotspot"
+      },
+      "status": {
+        "disabled": "Deaktiviert",
+        "unavailable": "Nicht verfügbar",
+        "confirmation-required": "Bestätigung erforderlich",
+        "failed": "Fehlgeschlagen",
+        "submitted": "Gesendet",
+        "invalid-receipt": "Ungültiger Beleg",
+        "toggled": "Umgeschaltet",
+        "unsupported-action": "Nicht unterstützte Aktion",
+        "staged": "Bereitgestellt",
+        "error": "Fehler"
+      },
+      "event": {
+        "checking": "Prüfung läuft…",
+        "downloading": "Download läuft…",
+        "staged": "Bereitgestellt",
+        "rolled-back": "Zurückgerollt"
+      }
     }
   },
   "shareCard": {

@@ -241,12 +241,47 @@ const SYNC_SERVICE_LEAVES = [
   'pc.wechatStart',
   'pc.wechatStop',
   'pc.wechatStatus',
-  'pc.unavailable'
+  'pc.unavailable',
+  // Windows 外壳能力分区（12 个 opt-in 能力的文案；全部默认关闭）
+  'shell.title',
+  'shell.description',
+  'shell.icon.title',
+  'shell.icon.check',
+  'shell.icon.current',
+  'shell.program.title',
+  'shell.program.check',
+  'shell.program.notes',
+  'shell.support.title',
+  'shell.support.submit',
+  'shell.network.repair',
+  'shell.network.hotspot',
+  'shell.toggle.iconUpdate',
+  'shell.toggle.programUpdate',
+  'shell.toggle.tray',
+  'shell.toggle.support',
+  'shell.toggle.networkRepair',
+  'shell.toggle.hotspot',
+  // F7a：动作结果码与事件阶段的本地化（UI 不再渲染英文原码）
+  'shell.status.disabled',
+  'shell.status.unavailable',
+  'shell.status.confirmation-required',
+  'shell.status.failed',
+  'shell.status.submitted',
+  'shell.status.invalid-receipt',
+  'shell.status.toggled',
+  'shell.status.unsupported-action',
+  'shell.status.staged',
+  'shell.status.error',
+  'shell.event.checking',
+  'shell.event.downloading',
+  'shell.event.staged',
+  'shell.event.rolled-back'
 ]
 
 /** 页面、状态栏与板块入口实际消费的全部键（漏加即此测试红，避免运行期渲染原始 key）。 */
 const REQUIRED_KEYS = [
   ...SYNC_SERVICE_LEAVES.map((k) => `syncService.${k}`),
+
   'appShell.viewStatus.syncService',
   // 同步图库工具栏上的入口按钮名，与本页标题同源同值
   'syncGallery.toolbar.service'
@@ -447,5 +482,37 @@ describe('inspirationOn 只说「端点已挂载」，不谎报在线', () => {
   it('fr 不得再把 endpoint 译成 point d’entrée（入口点，是另一个概念）', () => {
     const value = String(readPath(LOCALES.fr, 'syncService.status.inspirationOn'))
     expect(value.toLowerCase()).not.toContain('entrée')
+  })
+})
+
+describe('F7b 9 个非中文语言包 shell.* 不再是英文占位', () => {
+  const SHELL_OLD_LEAVES = [
+    'title',
+    'description',
+    'icon.title',
+    'icon.check',
+    'icon.current',
+    'program.title',
+    'program.check',
+    'program.notes',
+    'support.title',
+    'support.submit',
+    'network.repair',
+    'network.hotspot',
+    'toggle.iconUpdate',
+    'toggle.programUpdate',
+    'toggle.tray',
+    'toggle.support',
+    'toggle.networkRepair',
+    'toggle.hotspot'
+  ]
+  const NON_EN_LOCALES = ['ja', 'ko', 'fr', 'de', 'es', 'pt', 'ru', 'th', 'vi']
+
+  it.each(NON_EN_LOCALES)('%s.json 的 18 个 shell 旧键逐键不等于英文占位', (code) => {
+    for (const leaf of SHELL_OLD_LEAVES) {
+      const localized = readPath(LOCALES[code].syncService as LocaleNode, `shell.${leaf}`)
+      const english = readPath(LOCALES.en.syncService as LocaleNode, `shell.${leaf}`)
+      expect(localized, `${code}.json shell.${leaf} 仍是英文占位`).not.toBe(english)
+    }
   })
 })

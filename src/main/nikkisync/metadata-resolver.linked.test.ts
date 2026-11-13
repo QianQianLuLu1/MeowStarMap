@@ -297,7 +297,14 @@ suite('阶段 6 元数据解析链接态', () => {
       ...surface,
       nuan5Resolver: {
         Nuan5CompatibleResolver: CountingResolverCtor
-      } as unknown as RuntimeSurface['nuan5Resolver']
+      } as unknown as RuntimeSurface['nuan5Resolver'],
+      // G1/G2：夹具需模拟本仓新挂的本地解析缝，否则 canResolve 恒 false、
+      // 上游 runOnce 首行即返回 0，同意门拒绝时的失败计数无从产生。
+      // 这里让 fallback 直接返回在线 resolver，保持本用例原有的计数语义不变。
+      localPhotoMetadata: {
+        parseLocalPhotoMetadata: () => ({}),
+        withLocalPhotoFallback: (_local: unknown, online: unknown) => online
+      } as unknown as RuntimeSurface['localPhotoMetadata']
     }
     const consentFile = path.join(fixtureRoot, 'metadata-online-consent.json')
     const optionsFor = (name: string) => ({
@@ -305,7 +312,8 @@ suite('阶段 6 元数据解析链接态', () => {
       watcher: false,
       projectRoot,
       metadataResolverEnabled: true,
-      consentFile
+      consentFile,
+      decodeLocalPhotoRawTexts: async () => ({ cameraText: '[]', photoText: '{}' })
     })
     const dispose = async (created: Awaited<ReturnType<typeof createRuntimeSession>>) => {
       created.stopMetadataResolver()

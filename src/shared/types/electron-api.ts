@@ -1225,3 +1225,36 @@ export interface NikkiSyncWeChatStopInfo {
 export interface NikkiSyncWeChatStatusInfo {
   status: unknown
 }
+
+// ---- Windows 外壳能力（全部 opt-in，默认关闭）----
+
+/** 6 个开关的只读快照；不返回任何本机路径、UID 或凭据。 */
+export interface NikkiSyncShellStatusInfo {
+  enabled: Record<string, boolean>
+  /** 托盘句柄的真实观测（isTrayActive），不是设置开关；无托盘时 false。 */
+  trayActive: boolean
+  /** 当前会话是否已经挂上本地照片解析器（G1 的可观测结果）；会话未装配/老链接时 false。 */
+  localPhotoResolverActive: boolean
+}
+
+/** opt-in 动作的统一入参：动作由通道名决定，input 只带可校验的少量字段。 */
+export interface NikkiSyncShellActionInput {
+  /** 用户确认过的二次操作标识；缺省一律按只读检查处理。 */
+  confirm?: boolean
+  /** 回执/候选标识，1..128 字符。 */
+  id?: string
+}
+
+/** 统一返回：status 为 disabled / unavailable / confirmation-required / staged / failed / submitted / invalid-receipt / toggled / unsupported-action 等可判定值（network-repair 本构建恒 unavailable，无 repaired）。 */
+export interface NikkiSyncShellActionResultInfo {
+  status: string
+  reason?: string
+  [key: string]: unknown
+}
+
+/** main → renderer 的进度事件（订阅式，不产生额外 ipcMain.handle）。 */
+export interface NikkiSyncShellEventInfo {
+  type: string
+  message?: string
+  percent?: number
+}

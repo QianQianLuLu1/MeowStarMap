@@ -1,4 +1,4 @@
-// @core-change: 相机参数 V1/V2/V3 结构分流与拍照模式/风力/风向/联机信息解析扩展，并补齐地图定位 worldId（TrackInfo.WorldID 防御读取）
+// @core-change: 新增本地照片解码原始文本导出供同步本地解析器复用，并为文件系统错误携带原始 cause 供日志排查
 /**
  * 游戏内图片参数解密服务
  * 严格按 nuan5_decryption_ffi.h 头文件调用 DLL
@@ -18,10 +18,11 @@
  */
 import koffi from 'koffi'
 import fsp from 'fs/promises'
+import { createHash } from 'node:crypto'
 import { z } from 'zod'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
-import { InternalError } from '../../shared/errors/app-error'
+import { FileSystemError, InternalError, ValidationError } from '../../shared/errors/app-error'
 import { findDllPath } from '../decryption-worker/dll-path'
 import { readClothDiyCache, writeClothDiyCache } from './cloth-diy-cache'
 import type { DecryptionWorkerBridge } from '../decryption-worker/bridge'
@@ -1183,11 +1184,22 @@ function readCBytes(bytes: { data: koffi.PointerObject; len: number; cap: number
 // 核心解密逻辑（使用缓存的函数绑定）
 // ============================================================
 
+/**
+ * 本地照片解析适配器要的是两段**原始文本**（上游 parseLocalPhotoMetadata 的输入），
+ * 而不是本服务已归一化的 DecryptionResult。用一个可选捕获对象在既有解码链里原样带出，
+ * 避免复制整条 koffi 调用链（复用优先、零重复实现）。
+ */
+interface LocalPhotoRawTextsCapture {
+  cameraText?: string
+  photoText?: string
+}
+
 function decodeCameraParamsFromFile(
   fns: BoundFunctions,
   fileData: Buffer,
   uidKey: koffi.PointerObject,
-  camKey: koffi.PointerObject
+  camKey: koffi.PointerObject,
+  capture?: LocalPhotoRawTextsCapture
 ): DecryptionResult {
   // Step 1: 用 UID key + FFD9 flag 解密文件
   const flag = Buffer.from([0xff, 0xd9])
@@ -1227,6 +1239,7 @@ function decodeCameraParamsFromFile(
   }
 
   const step1Text = step1Buf.toString('utf-8')
+  if (capture) capture.photoText = step1Text
   logger.info(
     '[decryption] Step 1 text length:',
     step1Text.length,
@@ -1283,6 +1296,7 @@ function decodeCameraParamsFromFile(
   }
 
   const step3Text = step3Buf.toString('utf-8').trim()
+  if (capture) capture.cameraText = step3Text
   logger.info(
     '[decryption] Step 3 text length:',
     step3Text.length,
@@ -1501,6 +1515,99 @@ export async function decodeFileParams(
       return {
         hasParams: false,
         error: err instanceof Error ? err.message : t('main.decryption.error.unknown')
+      }
+    }
+  })
+}
+
+/**
+ * 「电脑端优先本地解析照片」宿主适配器需要的两段原始文本。
+ * 复用既有 koffi 解码链（同一 DLL、同一 UID/Camera 双密钥、同一 mutex 与释放纪律），
+ * 不再新建 helper 进程，也不重复实现 FFI 绑定。
+ */
+export interface LocalPhotoRawTexts {
+  readonly cameraText: string
+  readonly photoText: string
+}
+
+/**
+ * 由游戏原图直接产出上游 parseLocalPhotoMetadata 的输入文本。
+ * 校验口径对齐上游 `windows-app/Services/LocalPhotoDecoder.cs:56-72`：
+ * 绝对/可读文件、大小上限、JPEG SOI、UID 数字串、源照片 SHA256 复核。
+ * 任一不满足即抛错（由上层 withLocalPhotoFallback 决定是否回退在线候补）。
+ */
+export async function decodeLocalPhotoRawTexts(
+  filePath: string,
+  uid: string,
+  sha256: string
+): Promise<LocalPhotoRawTexts> {
+  if (
+    typeof filePath !== 'string' ||
+    filePath.length === 0 ||
+    typeof uid !== 'string' ||
+    !/^[0-9]{1,20}$/.test(uid) ||
+    typeof sha256 !== 'string' ||
+    !/^[a-fA-F0-9]{64}$/.test(sha256)
+  ) {
+    throw new ValidationError('Invalid local photo request')
+  }
+
+  return withMutex(async () => {
+    const fns = getBoundFunctions()
+    let fileData: Buffer
+    try {
+      const stat = await fsp.stat(filePath)
+      if (stat.size < 4 || stat.size > MAX_FILE_SIZE) {
+        throw new ValidationError('Invalid local photo size')
+      }
+      fileData = await fsp.readFile(filePath)
+    } catch (cause) {
+      // message 不含本机绝对路径；原始错误经 cause 携带（约定 §2），
+      // cause 不跨 IPC（toIpcError 剥除），仅供主进程日志排查。
+      throw new FileSystemError('Original photo unavailable', undefined, { cause })
+    }
+    if (fileData[0] !== 0xff || fileData[1] !== 0xd8) {
+      throw new ValidationError('Invalid local photo format')
+    }
+    const actualHash = createHash('sha256').update(fileData).digest('hex')
+    if (actualHash !== sha256.toLowerCase()) {
+      throw new ValidationError('Local photo hash mismatch')
+    }
+
+    const uidKey = fns.mediaKeyFromStr(uid) as koffi.PointerObject
+    const camKey = fns.mediaKeyCameraParam() as koffi.PointerObject
+    if (!uidKey || !camKey) {
+      if (uidKey)
+        try {
+          fns.freeMediaKey(uidKey)
+        } catch {
+          /* ignore */
+        }
+      if (camKey)
+        try {
+          fns.freeMediaKey(camKey)
+        } catch {
+          /* ignore */
+        }
+      throw new InternalError('Local photo key unavailable')
+    }
+    try {
+      const capture: LocalPhotoRawTextsCapture = {}
+      const result = decodeCameraParamsFromFile(fns, fileData, uidKey, camKey, capture)
+      if (!result.hasParams || !capture.cameraText || !capture.photoText) {
+        throw new InternalError('Local photo decode failed')
+      }
+      return { cameraText: capture.cameraText, photoText: capture.photoText }
+    } finally {
+      try {
+        fns.freeMediaKey(uidKey)
+      } catch {
+        /* ignore */
+      }
+      try {
+        fns.freeMediaKey(camKey)
+      } catch {
+        /* ignore */
       }
     }
   })

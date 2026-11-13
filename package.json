@@ -149,6 +149,7 @@
     "sanitize-filename": "^1.6.4",
     "sharp": "^0.35.5",
     "tinyglobby": "^0.2.17",
+    "yauzl": "^3.4.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"
   },
@@ -177,6 +178,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/yauzl": "^2.10.3",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitest/coverage-v8": "^5.0.3",
     "audit-ci": "^7.1.0",

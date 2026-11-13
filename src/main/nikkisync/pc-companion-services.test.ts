@@ -110,6 +110,7 @@ function makeSurface(
     GameVersionUpdateService: vi.fn().mockImplementation(function () {
       return versionUpdates
     }),
+    setRemoteGameVersionReleases: vi.fn(),
     // 4cb71e2：微信画廊两个包装器与字节变换函数（省略型降级用例经 opts 去掉）
     ...(opts.omitWrappers
       ? {}
@@ -155,6 +156,23 @@ function options(surface: PcCompanionSurface, log = vi.fn()) {
 }
 
 describe('pc-companion-services（N7 上游 PC 端服务装配）', () => {
+  it('G5 版本服务按上游签名构造：(database, {onCalendarChanged})，修复前为零参', () => {
+    const { surface } = makeSurface()
+    const database = { prepare: vi.fn() }
+    createPcCompanionServices({ ...options(surface), database })
+    expect(surface.GameVersionUpdateService).toHaveBeenCalledWith(database, {
+      onCalendarChanged: expect.any(Function)
+    })
+  })
+
+  it('G5 边界：老链接无画廊版本导出时只传 database，不伪造回调', () => {
+    const { surface } = makeSurface()
+    delete (surface as unknown as Record<string, unknown>).setRemoteGameVersionReleases
+    const database = { prepare: vi.fn() }
+    createPcCompanionServices({ ...options(surface), database })
+    expect(surface.GameVersionUpdateService).toHaveBeenCalledWith(database)
+  })
+
   it('正常：构造两个上游服务，start 监听随机 127.0.0.1 端口，stop 逆序收尾', async () => {
     const { surface, server, wechat, versionUpdates } = makeSurface()
     const services = createPcCompanionServices(options(surface))

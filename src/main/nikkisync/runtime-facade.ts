@@ -18,7 +18,7 @@
  *    的 `exports` 只暴露 `"."` ⇒ 必须用 `resolveDeepEntryUrl` 给出的 `file://` URL。
  */
 
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -42,6 +42,12 @@ import {
 import { embeddedServerConfig, mapPairedDeviceRow } from './sync-server-view'
 import { registerNikkiSyncResourcePaths } from './resource-allowlist'
 import { NUAN5_METADATA_ENDPOINT, buildMetadataResolverConfig } from './metadata-resolver-driver'
+import {
+  composeLocalPhotoResolver,
+  createLocalPhotoResolverAdapter
+} from './local-photo-resolver-adapter'
+import { buildScannerConfig } from './scanner-config'
+import { loadDictionaryInputs } from './dictionary-manifest'
 import type {
   EmbeddedRuntimeLike,
   InspirationRepositoryLike,
@@ -237,6 +243,11 @@ export interface RuntimeSurface {
   metadataThumbnailCache?: NikkiSyncModule
   /** a49764bb：本地服装/效果图标包深入口（可选，老链接会话上缺席时不启用本地图标模式）。 */
   localClothingIconPack?: NikkiSyncModule
+  /** 「电脑端优先本地解析照片」深入口（可选，缺席时沿用既有在线 resolver）。 */
+  localPhotoMetadata?: NikkiSyncModule
+  /** G4：本地字典 manifest 与服装名补充深入口（可选）。 */
+  metadataDictionaryConfig?: NikkiSyncModule
+  verifiedClothingNames?: NikkiSyncModule
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -355,6 +366,28 @@ export const WECHAT_INSPIRATION_DEEP_ENTRY = ['wechat', 'WeChatInspiration.js'] 
  * 在会话构造期装载主包与滤镜补充包；产物存在性由 verify-nikkisync-link.ts 的能力清单守护。
  */
 export const LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY = ['metadata', 'LocalClothingIconPack.js'] as const
+
+/**
+ * 「电脑端优先本地解析照片」：上游 `LocalPhotoMetadataResolver.js` 导出
+ * `parseLocalPhotoMetadata` 与 `withLocalPhotoFallback`。本仓不实现 C# helper exe，
+ * 而是把这两枚上游纯函数接到本仓 koffi 解码链产出的原始文本上（见
+ * local-photo-resolver-adapter.ts）。产物已在能力清单，装载链根表同步新增一项。
+ */
+export const LOCAL_PHOTO_METADATA_DEEP_ENTRY = [
+  'metadata',
+  'LocalPhotoMetadataResolver.js'
+] as const
+
+/**
+ * G4：本地字典 manifest 与已核验服装名补充的两个深入口。
+ * `loadMetadataDictionaryFile` 产出的是 manifest（不是 provider），
+ * `clothingNameSupplement` 产出服装名补充表；两者都只在本仓显式给出配置文件时才装载。
+ */
+export const METADATA_DICTIONARY_CONFIG_DEEP_ENTRY = [
+  'metadata',
+  'MetadataDictionaryConfigFile.js'
+] as const
+export const VERIFIED_CLOTHING_NAMES_DEEP_ENTRY = ['metadata', 'VerifiedClothingNames.js'] as const
 
 /**
  * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
@@ -508,6 +541,11 @@ export async function loadRuntimeSurface(
   )
   const metadataThumbnailCache = await loadDeepModule(METADATA_THUMBNAIL_CACHE_DEEP_ENTRY)
   const localClothingIconPack = await loadOptionalDeepModule(LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY)
+  const localPhotoMetadata = await loadOptionalDeepModule(LOCAL_PHOTO_METADATA_DEEP_ENTRY)
+  const metadataDictionaryConfig = await loadOptionalDeepModule(
+    METADATA_DICTIONARY_CONFIG_DEEP_ENTRY
+  )
+  const verifiedClothingNames = await loadOptionalDeepModule(VERIFIED_CLOTHING_NAMES_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -528,7 +566,10 @@ export async function loadRuntimeSurface(
     metadataResolverConfigFile,
     metadataDictionaryRemoteConfigFile,
     metadataThumbnailCache,
-    ...(localClothingIconPack ? { localClothingIconPack } : {})
+    ...(localClothingIconPack ? { localClothingIconPack } : {}),
+    ...(localPhotoMetadata ? { localPhotoMetadata } : {}),
+    ...(metadataDictionaryConfig ? { metadataDictionaryConfig } : {}),
+    ...(verifiedClothingNames ? { verifiedClothingNames } : {})
   }
 }
 
@@ -896,9 +937,16 @@ export async function createRuntimeSession(
     ...(localClothingIcons ? { localClothingIcons } : {})
   }
 
+  // G2：本地解码器在 createResolver 内构造，判据需要读到「本次是否真的挂上本地面」。
+  let hasLocalPhotoResolver = false
   const metadataFragment = buildMetadataResolverConfig({
     enabled: metadataResolverEnabled,
     endpoint: NUAN5_METADATA_ENDPOINT,
+    // 有本地解码器 ⇒ 即使未同意在线也允许解析；否则严格按 K2 同意门放行。
+    canResolve: () =>
+      hasLocalPhotoResolver || (metadataConsent ? metadataConsent.state().enabled : true),
+    // 装配层注入诊断落盘（N3）；缺省为上游默认 no-op，绝不静默吞掉回调。
+    onWorkSettled: () => options.onMetadataWorkSettled?.(),
     createResolver: (endpoint) => {
       // 转型只为复用 nikkisyncExport 的可诊断报错（"Expected export … run `npm run build`"）：
       // 深入口符号不在 NIKKISYNC_REQUIRED_EXPORTS 里，探针与桶导出都覆盖不到它们。
@@ -929,22 +977,117 @@ export async function createRuntimeSession(
       // 端点由驱动层校验后下传，这里不另取一份：保证披露文案与实际出口只有一个出处。
       // K2：同意在位 ⇒ 下发 guard 包装后的解析器（未同意时上游在 resolve 首行即抛，
       // 零出站）；深入口缺席（老会话）不包装，行为与 K2 之前逐字节一致。
-      return metadataConsent
+      const guarded = metadataConsent
         ? (
             metadataConsent as unknown as {
               guard(resolver: unknown): unknown
             }
           ).guard(resolver)
         : resolver
+
+      // 「电脑端优先本地解析照片」：仅当上游纯函数、本仓 koffi 解码缝同时在位时启用。
+      // 任一缺席都保持既有在线 resolver，绝不把「没装载到」伪装成「本地解码成功」。
+      const parseLocalPhotoMetadata = (
+        surface.localPhotoMetadata as unknown as Record<string, unknown> | undefined
+      )?.parseLocalPhotoMetadata
+      const decodeRawTexts = options.decodeLocalPhotoRawTexts
+      if (typeof parseLocalPhotoMetadata !== 'function' || typeof decodeRawTexts !== 'function') {
+        return guarded
+      }
+      const local = createLocalPhotoResolverAdapter({
+        decodeRawTexts,
+        parseLocalPhotoMetadata: parseLocalPhotoMetadata as (
+          cameraText: string,
+          photoText: string
+        ) => unknown
+      })
+      const withLocalPhotoFallback = (
+        surface.localPhotoMetadata as unknown as Record<string, unknown> | undefined
+      )?.withLocalPhotoFallback
+      hasLocalPhotoResolver = true
+      return composeLocalPhotoResolver({
+        local,
+        online: guarded,
+        onlineEnabled: () => (metadataConsent ? metadataConsent.state().enabled : true),
+        withLocalPhotoFallback:
+          typeof withLocalPhotoFallback === 'function'
+            ? (withLocalPhotoFallback as (
+                local: unknown,
+                online: unknown,
+                onlineEnabled: () => boolean
+              ) => unknown)
+            : undefined
+      })
     }
   })
+  // G3/G6：上游构造期选项 + 5 个聚合诊断文件。诊断落盘由装配层注入，
+  // 装载缝不直接依赖 app/shell（避免目录循环），且写入失败只是 warn-fallback。
+  const diagnostics = (name: string, payload: unknown): void => {
+    options.onDiagnostic?.(name, payload)
+  }
+  const readCachedInstallRoot = (): string | undefined => {
+    const file = options.gameRootCacheFile
+    if (!file || !existsSync(file)) return undefined
+    try {
+      const value = readFileSync(file, 'utf8').trim()
+      return value.length > 0 && value.length <= 4096 ? value : undefined
+    } catch {
+      return undefined
+    }
+  }
+  const extraAtConstruction = (() => {
+    const file = options.extraDirectoriesFile
+    const mod = surface.extraScanDirectories as unknown as NikkiSyncModule | undefined
+    if (!file || !mod) return { extra: undefined, retired: undefined }
+    return {
+      extra: callModule<unknown>(mod, 'loadExtraScanDirectories', file),
+      retired: callModule<unknown>(mod, 'loadRetiredExtraDirectories', file)
+    }
+  })()
+  const cachedInstallRoot = readCachedInstallRoot()
+  let progressReported = false
+  const scannerConfig = buildScannerConfig({
+    watcher: options.watcher,
+    ...(options.gameRoot ? { gameRoot: options.gameRoot } : {}),
+    ...(extraAtConstruction.extra === undefined
+      ? {}
+      : { extraDirectories: extraAtConstruction.extra }),
+    ...(extraAtConstruction.retired === undefined
+      ? {}
+      : { retiredExtraDirectories: extraAtConstruction.retired }),
+    ...(cachedInstallRoot ? { cachedInstallRoot } : {}),
+    onProgress: () => {
+      if (progressReported) return
+      progressReported = true
+      diagnostics('startup-service-timings.json', { stage: 'scanner', started: true })
+    },
+    onSettled: () => diagnostics('scan-status.json', { settled: true }),
+    onDiscoveryComplete: (report) => diagnostics('game-discovery.log', { report })
+  })
+  // G4：只有显式给出本地字典配置文件才下传 manifest/supplement；
+  // 干净安装保持既有「不下传」语义，避免误把 provider 当 manifest 触发上游 replaceManifest 报错。
+  const dictionary = loadDictionaryInputs({
+    dictionaryFile: options.metadataDictionaryFile,
+    supplementFile: options.metadataDictionarySupplementFile,
+    loadDictionary: (file) =>
+      callModule<unknown>(
+        surface.metadataDictionaryConfig as unknown as NikkiSyncModule | undefined,
+        'loadMetadataDictionaryFile',
+        file
+      ),
+    nameSupplement: (local) =>
+      callModule<unknown>(
+        surface.verifiedClothingNames as unknown as NikkiSyncModule | undefined,
+        'clothingNameSupplement',
+        local
+      )
+  })
+  for (const warning of dictionary.warnings) options.onWarning?.(warning)
   const runtime = new RuntimeCtor({
     databaseFile: options.databaseFile,
-    scanner: {
-      ...(options.gameRoot ? { selectedInstallRoot: options.gameRoot } : {}),
-      watcher: options.watcher
-    },
+    scanner: scannerConfig,
     server: serverConfig,
+    ...dictionary.config,
     // 兼容层（b422193）：启动阶段回调透传缝（缺省时连键都不下发；K1 在本仓编排点自报阶段）
     ...(options.onStartupStage ? { onStartupStage: options.onStartupStage } : {}),
     // N2：上游 PC 端能力位。键只在能力真正可用时出现（不写死 true、不造半套配置）。
@@ -1061,6 +1204,37 @@ export async function createRuntimeSession(
         // 上游 stop() 对 undefined timer 安全（幂等）；未开启时句柄整个不存在
         metadataService?.stop()
       },
+      // G7：同意切换后清空 checked/retryAt 并重算下一轮；老链接无此面 ⇒ 安全 no-op。
+      reconsiderMetadataResolver: () => metadataService?.reconsider?.(),
+      // F2：本地照片解析器挂载观测（G1 可观测结果）。构造期已定格，闭包如实；
+      // 深入口/解码缝缺席时为 false，绝不伪造。
+      localPhotoResolverActive: () => hasLocalPhotoResolver,
+      // F4：安装根缓存回写（对齐上游 windows-app.ts:221-224：启动后取
+      // scanner.getStatus().installation.installRoot，非空才写，best-effort）。
+      // 读侧 readCachedInstallRoot 的 trim + 4096 上限与此处写入判据咬合。
+      ...(options.gameRootCacheFile
+        ? {
+            cacheInstallRoot: () => {
+              const file = options.gameRootCacheFile as string
+              const scannerStatus = runtime.scanner.getStatus() as {
+                installation?: { installRoot?: unknown }
+              } | null
+              const installRoot = scannerStatus?.installation?.installRoot
+              if (
+                typeof installRoot !== 'string' ||
+                installRoot.length === 0 ||
+                installRoot.length > 4096
+              ) {
+                return
+              }
+              try {
+                writeFileSync(file, `${installRoot}\n`, 'utf8')
+              } catch {
+                options.onWarning?.('game root cache write failed')
+              }
+            }
+          }
+        : {}),
       /**
        * N3：显式补偿上游 `runtime.start()` 的「background-services」阶段。
        * 本仓不调 `runtime.start()`（它会无条件启 LAN 服务），因此上游构造出的
@@ -1159,6 +1333,11 @@ export async function createRuntimeSession(
       ...(localClothingIcons ? { localClothingIcons } : {})
     })
   } catch (error) {
+    // G6：只记聚合阶段与错误类别，绝不把本机路径/UID/原始异常文本写盘。
+    diagnostics('startup-error.log', {
+      stage: 'session-assembly',
+      code: error instanceof Error ? error.name : 'unknown'
+    })
     try {
       runtime.database.close()
     } catch {

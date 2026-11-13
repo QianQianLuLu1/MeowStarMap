@@ -154,6 +154,24 @@ Zustand、i18next、fluent-ffmpeg、ESLint、Prettier、Vitest 等依赖各自�
   上游已迁移为自行托管的本地包，相关背景见 NikkiSync issue #14。本文件保留上述
   来源标注与回链，不对游戏美术资产主张任何权利。
 
+## 7. Windows 外壳能力所需的两个上游二进制资产
+
+- **xdelta3 3.2.2（Apache License 2.0）**：`resources/nikkisync/xdelta3.exe`（340992 B），
+  来源为上游仓库 `assets/tools/xdelta3/xdelta3.exe`，SHA256
+  `732980d52f9220dc81817ccdd0c295eadce8a0048a24c2a771a73f791ac824e9`（与上游
+  `DesktopUpdates.cs` / `package-portable.ps1` 的固定校验值一致）。许可证全文见上游
+  `assets/tools/xdelta3/LICENSE`。本仓只在用户显式开启「签名差分更新」时以
+  `-d -f -s` 解码补丁，不改写现有 `electron-updater` 全量更新通道。
+- **更新验签公钥**：`resources/nikkisync/pc/signing/update-public-key.pem`（634 B，
+  3072-bit RSA SPKI），来源为上游 `apps/windows-shell/Assets/update-public-key.pem`，
+  SHA256 `c3faae9168387fbafc8e2f0bbb4965a49c0d952b7ea650cf5dbf4dffc5897197`。
+  **仅含公钥**；签名私钥由上游维护者以 Windows DPAPI 保存在发布机
+  `%USERPROFILE%\.momo-camera-updates\update-signing.dpapi`，从未、也不会进入本仓。
+  本仓只实现客户端验签/下载/应用/回滚，不具备签发能力。
+- **随包分发**：`package.json` 既有的 `build.extraResources` 两项
+  （`resources/nikkisync` 的 `*.exe`、`resources/nikkisync/pc` 的 `**/*`）已覆盖上述
+  两个资产，无需新增条目；`scripts/pre-dist-check.ts` 的既有断言保持不动。
+
 ---
 
 > 分发物保留说明：`package.json` 的 `build.files` 显式列入本文件与 `LICENSE`，

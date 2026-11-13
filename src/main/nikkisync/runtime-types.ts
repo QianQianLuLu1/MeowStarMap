@@ -47,6 +47,8 @@ export interface NikkiSyncRuntimeStatus {
   sync?: NikkiSyncSyncServerStatus
   /** 元数据解析状态（阶段 6；未组装会话时缺省）。 */
   metadata?: NikkiSyncMetadataResolutionStatus
+  /** F2：会话本地照片解析器挂载观测（会话面在位才下发；老链接缺省，不伪造）。 */
+  localPhotoResolverActive?: boolean
   /** 兼容层（b422193）：真实发生的启动阶段记录（K1 在自身编排点自报，非上游枚举照抄）。 */
   startupStages?: { stage: string; at: string }[]
   /** 兼容层（b422193）：扫描诊断聚合计数（K7 消费；上游承诺不含路径/UID/错误原文）。 */
@@ -243,6 +245,8 @@ export interface MetadataResolverServiceLike {
   start(): void
   stop(): void
   runOnce(): Promise<number>
+  /** 上游同意切换后的重算入口（老链接缺席时宿主按可选处理）。 */
+  reconsider?: () => void
 }
 
 /**
@@ -461,6 +465,21 @@ export interface NikkiSyncRuntimeSession {
    */
   metadataConsent?: NikkiSyncMetadataConsent
   /**
+   * G7：同意切换后重算解析队列的可选委托面（上游 `reconsider()`）。
+   * 老链接/未开启解析的会话可缺省，宿主必须用可选调用，不得伪造成功。
+   */
+  reconsiderMetadataResolver?: () => void
+  /**
+   * F2：当前会话是否挂上本地照片解析器的观测面（G1 可观测结果）。
+   * 构造期定格；深入口/解码缝缺席时如实为 false。假会话可缺省。
+   */
+  localPhotoResolverActive?: () => boolean
+  /**
+   * F4：启动成功后回写安装根缓存（对齐上游 windows-app.ts:221-224 的时机与格式）。
+   * 仅装配层给出 gameRootCacheFile 时挂键；best-effort，失败只 warn。
+   */
+  cacheInstallRoot?: () => void
+  /**
    * K3：按拍摄时间推断游戏版本（上游静态表纯函数经 facade 接线）。
    * 深入口缺席（老 surface）时恒返回两键缺省，不抛。
    */
@@ -599,6 +618,10 @@ export interface NikkiSyncSessionOptions {
   metadataResolverFile?: string
   /** 上游在线字典远端配置文件（0600 JSON）。 */
   metadataDictionaryRemoteFile?: string
+  /** G4：本地字典 manifest 文件（上游 loadMetadataDictionaryFile 读取）。 */
+  metadataDictionaryFile?: string
+  /** G4：已核验服装名补充字典文件。 */
+  metadataDictionarySupplementFile?: string
   /** 服装缩略图缓存目录（上游 MetadataThumbnailCache 自行创建）。 */
   metadataThumbnailCacheDir?: string
   /**
@@ -608,6 +631,15 @@ export interface NikkiSyncSessionOptions {
   clothingIconsDir?: string
   /** a49764bb：1.0.40 滤镜效果补充包目录（同上）。 */
   photoFilterIconsDir?: string
+  /**
+   * 「电脑端优先本地解析照片」：由装配层注入本仓 koffi 解码链的原始文本函数。
+   * 可选（纯逻辑测试与老链接会话可缺省）；缺席时会话保持既有在线 resolver 行为。
+   */
+  decodeLocalPhotoRawTexts?: (
+    filePath: string,
+    uid: string,
+    sha256: string
+  ) => Promise<{ cameraText: string; photoText: string }>
   /**
    * 兼容层（b422193）：上游启动阶段回调透传缝。本仓编排不调 `runtime.start()`
    * （它会无条件启 LAN 服务），上游六阶段在本仓编排下不会自然发生；K1 由
@@ -627,6 +659,20 @@ export interface NikkiSyncSessionOptions {
   extraDirectoriesFile?: string
   /** a49764bb：非致命降级告警通道（装配层注入 runtimeLog 的 warn 级）。 */
   onWarning?: (message: string) => void
+  /**
+   * G2：上游 metadataResolver 的 onWorkSettled 委托面（装配层注入诊断落盘）。
+   * 缺省时该回调为 no-op，与上游默认 `() => {}` 一致，不伪装成已落盘。
+   */
+  onMetadataWorkSettled?: () => void
+  /** G6：聚合诊断文件落盘目录（与库同在 userData/nikkisync）。 */
+  diagnosticsDir?: string
+  /** G3：上游 game-install-root.txt 的本仓等价缓存文件（仅存安装根，不含任何个人信息）。 */
+  gameRootCacheFile?: string
+  /**
+   * G6：装配层注入的诊断写入缝。装载缝只传聚合字段，落盘失败由装配层 warn，
+   * 绝不因诊断 IO 失败中断启动/扫描。
+   */
+  onDiagnostic?: (name: string, payload: unknown) => void
 }
 
 /** IPC / 装配层消费的句柄（`ctx.nikkisyncRuntime`）。 */
