@@ -1768,8 +1768,8 @@
       "discreteGpu": "Preferir GPU dedicada",
       "discreteGpuDesc": "Em máquinas com várias GPUs, a GPU dedicada de alto desempenho assume a renderização da interface e das imagens (aplica-se após reiniciar)",
       "discreteGpuRestartHint": "A preferência de GPU dedicada foi salva e aplica-se após reiniciar. Reiniciar agora?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "Iniciar ao entrar",
+      "launchAtLoginDesc": "Iniciar o aplicativo automaticamente ao entrar no Windows."
     },
     "theme": {
       "desc": "Surte efeito imediatamente; a preferência de tema é salva automaticamente na configuração local.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "Serviço de sincronização desativado",
     "gpuDiscreteOn": "GPU dedicada preferida (aplica-se após reiniciar)",
     "gpuDiscreteOff": "Alterado para seleção de GPU do sistema (aplica-se após reiniciar)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "Início automático ativado",
+    "launchAtLoginOff": "Início automático desativado",
+    "launchAtLoginDevSkipped": "O modo de desenvolvimento não altera o item de inicialização do sistema; a configuração foi salva",
+    "launchAtLoginSaveFailed": "Falha ao salvar a configuração de início automático, tente novamente"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference deve ser auto ou high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin deve ser um valor booleano",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl deve ser uma URL http(s) pública (deixe vazio para usar o site oficial)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl deve ser uma URL http(s) pública (deixe vazio para usar o endereço original)",
-        "referenceDataSwitchNotBoolean": "Os interruptores de dados de referência externos devem ser valores booleanos"
+        "referenceDataSwitchNotBoolean": "Os interruptores de dados de referência externos devem ser valores booleanos",
+        "launchAtLoginSyncFailed": "Falha ao sincronizar o estado de início automático, tente novamente ou verifique as permissões"
       },
       "validation": {
         "keyRequired": "",

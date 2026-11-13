@@ -1768,8 +1768,8 @@
       "discreteGpu": "Prefer discrete GPU",
       "discreteGpuDesc": "On multi-GPU systems, the high-performance discrete GPU handles interface and image rendering (takes effect after restart)",
       "discreteGpuRestartHint": "The discrete GPU preference is saved and takes effect after restart. Restart now?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "Launch at login",
+      "launchAtLoginDesc": "Start the app automatically when you sign in to Windows."
     },
     "theme": {
       "desc": "Takes effect immediately; theme preference is auto-saved to local config.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "Sync service disabled",
     "gpuDiscreteOn": "Discrete GPU preferred (takes effect after restart)",
     "gpuDiscreteOff": "Switched to system GPU selection (takes effect after restart)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "Launch at login enabled",
+    "launchAtLoginOff": "Launch at login disabled",
+    "launchAtLoginDevSkipped": "Dev mode does not change the system login item; the setting has been saved",
+    "launchAtLoginSaveFailed": "Failed to save launch-at-login setting, please try again"
   },
   "video": {
     "applyEdit": "Apply and export",
@@ -3575,10 +3577,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference must be auto or high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin must be a boolean",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl must be a public http(s) URL (leave empty to use the official site)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl must be a public http(s) URL (leave empty to use the original address)",
-        "referenceDataSwitchNotBoolean": "External reference data switches must be boolean values"
+        "referenceDataSwitchNotBoolean": "External reference data switches must be boolean values",
+        "launchAtLoginSyncFailed": "Failed to sync launch-at-login state, please retry or check system login item permissions"
       },
       "validation": {
         "keyRequired": "",

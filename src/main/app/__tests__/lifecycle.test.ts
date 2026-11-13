@@ -20,7 +20,11 @@ import type { AppContext } from '../app-context'
 // vi.hoisted：所有共享 mock 在此定义
 // ============================================================================
 const m = vi.hoisted(() => {
+  // 对齐真实 Windows Run 项：主路径写入后 getLoginItemSettings() 立即回读到同一值；
+  // 未写过时返回 undefined，模拟「OS 状态读取失败」→ 启动期保守仍同步一次。
+  const loginItemState: { openAtLogin: boolean | undefined } = { openAtLogin: undefined }
   return {
+    loginItemState,
     // electron app
     requestSingleInstanceLockMock: vi.fn(() => true),
     whenReadyMock: vi.fn(() => Promise.resolve()),
@@ -31,7 +35,14 @@ const m = vi.hoisted(() => {
     appReleaseSingleInstanceLockMock: vi.fn(),
     appGetPathMock: vi.fn((p: string) => `/mock/${p}`),
     appIsReadyMock: vi.fn(() => true),
-    appSetLoginItemSettingsMock: vi.fn(),
+    appSetLoginItemSettingsMock: vi.fn((s: { openAtLogin: boolean; name?: string }) => {
+      if (s.name === undefined) loginItemState.openAtLogin = s.openAtLogin
+    }),
+    appGetLoginItemSettingsMock: vi.fn(() =>
+      loginItemState.openAtLogin === undefined
+        ? undefined
+        : { openAtLogin: loginItemState.openAtLogin }
+    ),
     appIsPackagedMock: true,
     // BrowserWindow
     bwGetAllWindowsMock: vi.fn(() => []),
@@ -84,6 +95,7 @@ const m = vi.hoisted(() => {
 
     // diagnostic
     logStartupErrorMock: vi.fn(),
+    diagLogMock: vi.fn(),
 
     // process-registry
     getProcessRegistryStatsMock: vi.fn(() => ({
@@ -114,7 +126,8 @@ vi.mock('electron', () => ({
     get isPackaged() {
       return m.appIsPackagedMock
     },
-    setLoginItemSettings: m.appSetLoginItemSettingsMock
+    setLoginItemSettings: m.appSetLoginItemSettingsMock,
+    getLoginItemSettings: m.appGetLoginItemSettingsMock
   },
   BrowserWindow: {
     getAllWindows: m.bwGetAllWindowsMock
@@ -201,7 +214,7 @@ vi.mock('../../utils/logger', () => ({
 }))
 vi.mock('../../utils/startup-diagnostic', () => ({
   logStartupError: m.logStartupErrorMock,
-  diagLog: vi.fn(),
+  diagLog: m.diagLogMock,
   getStartupLogPathValue: m.getStartupLogPathValueMock
 }))
 vi.mock('../../utils/process-registry', () => ({
@@ -277,6 +290,8 @@ function resetMockCalls() {
       mock.mockClear()
     }
   })
+  // Run 项状态跨用例隔离：每个用例都从「OS 状态未知」起步
+  m.loginItemState.openAtLogin = undefined
 }
 
 // ============================================================================
@@ -719,6 +734,9 @@ describe('lifecycle - bootstrapApplication', () => {
           (key: string, dflt: unknown) => (key === 'launchAtLogin' ? dirty : dflt)
         )
         m.appSetLoginItemSettingsMock.mockClear()
+        // 每个脏值场景都从「OS 状态未知」起步：否则上一轮写入的 Run 状态会让本轮
+        // 被新的幂等比对正确跳过，掩盖「脏值应回落 true」的验证意图
+        m.loginItemState.openAtLogin = undefined
         await bootstrapApplication(ctx)
         expect(m.appSetLoginItemSettingsMock, `脏值 ${String(dirty)}`).toHaveBeenCalledWith({
           openAtLogin: true
@@ -734,6 +752,19 @@ describe('lifecycle - bootstrapApplication', () => {
       await expect(bootstrapApplication(ctx)).resolves.toBeUndefined()
       expect(m.appSetLoginItemSettingsMock).toHaveBeenCalledTimes(1)
       expect(m.logStartupErrorMock).toHaveBeenCalledWith('setLoginItemSettings', expect.any(Error))
+      // 外层启动链 catch 的语义名也须留痕，避免只测到内层失败出口
+      expect(m.logStartupErrorMock).toHaveBeenCalledWith('launchAtLoginSync', expect.any(Error))
+    })
+
+    it('L5 边界：OS 状态与设置一致时启动期不重复写登录项，并留痕 skip write', async () => {
+      m.appGetLoginItemSettingsMock.mockReturnValueOnce({ openAtLogin: true })
+      const ctx = makeLifecycleCtx()
+      await expect(bootstrapApplication(ctx)).resolves.toBeUndefined()
+      expect(m.appSetLoginItemSettingsMock).not.toHaveBeenCalled()
+      expect(m.diagLogMock).toHaveBeenCalledWith(
+        'LOGIN',
+        expect.stringContaining('unchanged, skip write')
+      )
     })
 
     it('22. autoScanOnStartup=true 时 push 启动定时器到 startupTimers', async () => {

@@ -1768,8 +1768,8 @@
       "discreteGpu": "Dedizierte GPU bevorzugen",
       "discreteGpuDesc": "Auf Mehr-GPU-Systemen übernimmt die leistungsstarke dedizierte GPU die Oberflächen- und Bildwiedergabe (wirkt nach Neustart)",
       "discreteGpuRestartHint": "Die Einstellung zur dedizierten GPU ist gespeichert und wird nach dem Neustart wirksam. Jetzt neu starten?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "Beim Anmelden starten",
+      "launchAtLoginDesc": "Die App automatisch starten, wenn Sie sich bei Windows anmelden."
     },
     "theme": {
       "desc": "Wirkt sofort; Design-Einstellung wird automatisch in lokaler Konfiguration gespeichert.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "Synchronisierungsdienst deaktiviert",
     "gpuDiscreteOn": "Dedizierte GPU wird bevorzugt (wirkt nach Neustart)",
     "gpuDiscreteOff": "Auf System-GPU-Auswahl umgestellt (wirkt nach Neustart)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "Automatischer Start aktiviert",
+    "launchAtLoginOff": "Automatischer Start deaktiviert",
+    "launchAtLoginDevSkipped": "Im Entwicklungsmodus wird der System-Autostart nicht geändert; die Einstellung wurde gespeichert",
+    "launchAtLoginSaveFailed": "Einstellung für automatischen Start konnte nicht gespeichert werden, bitte erneut versuchen"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference muss auto oder high-performance sein",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin muss ein Boolean sein",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl muss eine öffentliche http(s)-URL sein (leer lassen für die offizielle Site)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl muss eine öffentliche http(s)-URL sein (leer lassen für die ursprüngliche Adresse)",
-        "referenceDataSwitchNotBoolean": "Schalter für externe Referenzdaten müssen boolesche Werte sein"
+        "referenceDataSwitchNotBoolean": "Schalter für externe Referenzdaten müssen boolesche Werte sein",
+        "launchAtLoginSyncFailed": "Status des automatischen Starts konnte nicht synchronisiert werden, bitte erneut versuchen oder Berechtigungen prüfen"
       },
       "validation": {
         "keyRequired": "",

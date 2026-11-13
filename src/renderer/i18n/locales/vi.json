@@ -1768,8 +1768,8 @@
       "discreteGpu": "Ưu tiên GPU rời",
       "discreteGpuDesc": "Trên máy có nhiều GPU, GPU rời hiệu năng cao đảm nhận kết xuất giao diện và hình ảnh (có hiệu lực sau khi khởi động lại)",
       "discreteGpuRestartHint": "Đã lưu tùy chọn GPU rời và sẽ có hiệu lực sau khi khởi động lại. Khởi động lại ngay?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "Khởi động khi đăng nhập",
+      "launchAtLoginDesc": "Tự động khởi động ứng dụng khi đăng nhập Windows."
     },
     "theme": {
       "desc": "Có hiệu lực ngay lập tức; tùy chọn chủ đề được lưu tự động trong cấu hình cục bộ.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "Đã tắt dịch vụ đồng bộ",
     "gpuDiscreteOn": "Đã ưu tiên GPU rời (hiệu lực sau khi khởi động lại)",
     "gpuDiscreteOff": "Đã chuyển sang lựa chọn GPU của hệ thống (hiệu lực sau khi khởi động lại)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "Đã bật khởi động khi đăng nhập",
+    "launchAtLoginOff": "Đã tắt khởi động khi đăng nhập",
+    "launchAtLoginDevSkipped": "Chế độ phát triển không thay đổi mục khởi động hệ thống; cài đặt đã được lưu",
+    "launchAtLoginSaveFailed": "Không lưu được cài đặt khởi động, vui lòng thử lại"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "Giá trị phải là auto hoặc high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin phải là giá trị boolean",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl phải là URL http(s) công khai (để trống để dùng trang chính thức)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl phải là URL http(s) công khai (để trống để dùng địa chỉ gốc)",
-        "referenceDataSwitchNotBoolean": "Công tắc dữ liệu tham chiếu bên ngoài phải là giá trị boolean"
+        "referenceDataSwitchNotBoolean": "Công tắc dữ liệu tham chiếu bên ngoài phải là giá trị boolean",
+        "launchAtLoginSyncFailed": "Không đồng bộ được trạng thái khởi động, vui lòng thử lại hoặc kiểm tra quyền"
       },
       "validation": {
         "keyRequired": "",

@@ -23,6 +23,8 @@ preload call<T>() 解包
 
 如果前端代码检查 `res.success`，则 handler 的返回值**必须包含 `success: true` 字段**。否则 `res.success` 为 `undefined`（falsy），前端会误判为失败。
 
+> `settings:set` 的返回体（含 `launchAtLogin` 分支的 `synced` / `skipped`）与失败语义见本文 §19。
+
 ### 1.3 preload `call()` 解包逻辑
 
 ```ts
@@ -1098,3 +1100,51 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
   `nuan5-config-proto.test.ts`（5 例）、`reference-data-handler.test.ts`（22 例）、
   `reference-data/image-url.test.ts`（48 例）、`reference-image-service.test.ts`（32 例）、
   `app/__tests__/media-protocol.test.ts` 规则 5 组（11 例）。
+
+---
+
+## 19. settings:set / launchAtLogin 响应契约（2026-11-13 开机自启动修复补录）
+
+### 19.1 通道与返回体
+
+`settings:get` / `settings:set`（常量见 `src/shared/types/ipc.ts:503-504`）的**通道名、方法名、
+`electronAPI` 键集合均未变**；`launchAtLogin` 仍在 `RENDERER_PREF_KEYS` 白名单
+（`src/shared/settings-keys.ts`，键名常量 `SETTING_KEY_LAUNCH_AT_LOGIN`）。本次只调整
+`settings:set` 成功返回体的可选字段：
+
+| 分支                              | 返回体                                           | 说明                                                      |
+| --------------------------------- | ------------------------------------------------ | --------------------------------------------------------- |
+| 通用 key                          | `{ saved: boolean }`                             | 语义与历史一致，无新增字段                                |
+| `launchAtLogin`（打包态同步成功） | `{ saved: true, synced: true }`                  | 写入 OS 登录项后回读校验通过                              |
+| `launchAtLogin`（dev 态）         | `{ saved: true, synced: false, skipped: 'dev' }` | `app.isPackaged !== true` 时不写 OS，但不再谎报「已生效」 |
+| `launchAtLogin`（同步失败）       | 无返回体，抛 `AppError.internal` → `IpcError`    | `error.code = IPC_INTERNAL_ERROR`，带 `userMessage`       |
+
+`synced` / `skipped` 为**可选、向后兼容**字段；旧调用方只读 `saved` 不受影响。
+前端拿到的是 handler 原始返回对象（§1.2）——历史上 `src/renderer/vite-env.d.ts` 把
+`settings.set` 误声明为 `Promise<{ success: boolean }>`，本次纠正为
+`Promise<{ saved: boolean; synced?: boolean; skipped?: 'dev' }>`，
+`src/main/preload/api/settings.ts` 的 `call<T>` 泛型同步对齐。
+
+### 19.2 失败语义（不再谎报成功）
+
+`launchAtLogin` 分支顺序：布尔校验 → 读旧值 → `dbManager.setSetting` →
+`syncLoginItemSetting` → 成功返回；OS 同步抛错 / 写入后 `getLoginItemSettings()` 回读不一致 /
+回读非布尔，一律先 `setSetting(key, previous)` **回滚 DB**，再抛 `AppError.internal`。
+失败经 `wrapHandler` → `IpcResponse{success:false,error}` → preload `call()` 抛 `IpcError`
+→ 渲染层 `saveLaunchAtLogin` 的既有 `catch` 回滚开关并弹 error toast。
+参数校验边界（非布尔 / 超长 key / >1MB value）仍沿用既有 zod + 序列化校验。
+
+### 19.3 dev 态、回读盲区与历史 Run 值名
+
+- `app.isPackaged !== true` 时**不调用** `setLoginItemSettings`、不清理历史项（护栏：
+  避免把 `electron.exe` 写进 `HKCU\...\Run`）；返回 `skipped:'dev'`，渲染层给专门提示，
+  不显示 `launchAtLoginOn/Off` 成功 toast。
+- Electron 41 Windows 下 `setLoginItemSettings` 的 Run 值名缺省取 `AppUserModelId()`，
+  而 `app.getLoginItemSettings(options)` 的 options **没有 `name` 参数**
+  （`node_modules/electron/electron.d.ts:1255` / `LoginItemSettingsOptions`）。
+  因此主路径**不传 `name`**，保证写入/删除/回读同名；历史遗留值名只用
+  `setLoginItemSettings({ openAtLogin:false, name })` 单独清理，不参与回读。
+  **回读校验发现不了旧名残留**，两者是独立路径；现场取证与清理名单见
+  本次修复的实施计划文档（2026-11-13 开机自启动开关失效修复）§10。
+- 启动期（`src/main/app/lifecycle.ts` 阶段 8）先比对 OS 实际状态，一致则跳过写入；
+  读失败保守仍同步一次；整体失败不阻塞启动链，仅 `logStartupError` 留痕。

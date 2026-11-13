@@ -1,14 +1,20 @@
-// @core-change: 新增外部图片总开关与参考数据自动更新开关的布尔校验
+// @core-change: 开机自启动同步失败改为抛 AppError 可感知、dev 跳过态回传渲染层、历史 Run 值名清理与写入后回读校验
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandler, wrapHandlerRaw, assertFileReadPath, pathGuard } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
-import { RENDERER_PREF_KEYS, SECURITY_SENSITIVE_KEYS } from '../../../shared/settings-keys'
+import {
+  RENDERER_PREF_KEYS,
+  SECURITY_SENSITIVE_KEYS,
+  SETTING_KEY_LAUNCH_AT_LOGIN,
+  LAUNCH_AT_LOGIN_DEFAULT
+} from '../../../shared/settings-keys'
 import { writeHardwareAccelPref, writeGpuDiscretePref } from '../../app/gpu-fallback'
 import { syncLoginItemSetting } from '../../app/login-item'
 import { assertSafeRemoteUrl } from '../../utils/remote-url-guard'
 import { t } from '../../i18n'
+import { logger } from '../../utils/logger'
 
 // 与设置页 MAX_CUSTOM_PATHS / scanner:start schema 保持一致
 const MAX_CUSTOM_SCAN_PATHS = 64
@@ -146,14 +152,34 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           writeGpuDiscretePref(value)
           return { saved: true }
         }
-        // launchAtLogin 走内联布尔校验，并把系统登录项同步为设置值
-        if (key === 'launchAtLogin') {
+        // launchAtLogin：布尔校验 → 落库 → 同步 OS 登录项 → 按真实结果返回。
+        // 同步失败必须回滚 DB，否则「UI 已回滚但 DB 是失败后的新值」会在下次启动被重新写回 OS。
+        if (key === SETTING_KEY_LAUNCH_AT_LOGIN) {
           if (typeof value !== 'boolean') {
             throw AppError.validation(t('main.settings.error.launchAtLoginNotBoolean'))
           }
+          const previous = ctx.dbManager.getSetting<unknown>(key, LAUNCH_AT_LOGIN_DEFAULT)
           ctx.dbManager.setSetting(key, value)
-          syncLoginItemSetting(value)
-          return { saved: true }
+          try {
+            const sync = syncLoginItemSetting(value)
+            if (sync.synced) return { saved: true, synced: true }
+            return { saved: true, synced: false, skipped: sync.skipped }
+          } catch (err) {
+            // 回滚失败只留痕：绝不能让它覆盖原始同步失败，否则用户会看到无关的 DB 错误串。
+            try {
+              ctx.dbManager.setSetting(key, previous)
+            } catch (rollbackErr) {
+              logger.warn(`[settings] login item rollback failed: ${String(rollbackErr)}`)
+            }
+            if (err instanceof AppError) throw err
+            throw AppError.internal(
+              `[settings] login item sync failed: ${String(err)}`,
+              undefined,
+              {
+                userMessage: t('main.settings.error.launchAtLoginSyncFailed')
+              }
+            )
+          }
         }
         // referenceData.manifestBaseUrl 走内联 URL/SSRF 校验（空串 = 官方站点）
         if (key === 'referenceData.manifestBaseUrl') {

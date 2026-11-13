@@ -887,7 +887,10 @@ interface WindowElectronAPI {
   }
   settings: {
     get: (key: string, defaultValue?: unknown) => Promise<unknown>
-    set: (key: string, value: unknown) => Promise<{ success: boolean }>
+    set: (
+      key: string,
+      value: unknown
+    ) => Promise<{ saved: boolean; synced?: boolean; skipped?: 'dev' }>
   }
   // 导出偏好专用通道（export.defaultDir / export.namingPattern 属安全敏感项，不走 settings:set）
   export: {

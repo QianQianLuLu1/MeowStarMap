@@ -1768,8 +1768,8 @@
       "discreteGpu": "Предпочитать дискретный GPU",
       "discreteGpuDesc": "На компьютерах с несколькими GPU рендеринг интерфейса и изображений берёт на себя производительный дискретный GPU (действует после перезапуска)",
       "discreteGpuRestartHint": "Настройка сохранена и вступит в силу после перезапуска. Перезапустить сейчас?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "Запуск при входе",
+      "launchAtLoginDesc": "Автоматически запускать приложение при входе в Windows."
     },
     "theme": {
       "desc": "Вступает в силу немедленно; предпочтение темы сохраняется автоматически в локальной конфигурации.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "Служба синхронизации выключена",
     "gpuDiscreteOn": "Дискретный GPU выбран приоритетно (действует после перезапуска)",
     "gpuDiscreteOff": "Переключено на выбор GPU системой (действует после перезапуска)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "Автозапуск при входе включён",
+    "launchAtLoginOff": "Автозапуск при входе выключен",
+    "launchAtLoginDevSkipped": "В режиме разработки системный элемент автозапуска не изменяется; настройка сохранена",
+    "launchAtLoginSaveFailed": "Не удалось сохранить настройку автозапуска, повторите попытку"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference должен быть auto или high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin должно быть логическим значением",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl должен быть публичным http(s)-адресом (оставьте пустым для официального сайта)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl должен быть публичным http(s)-адресом (оставьте пустым для исходного адреса)",
-        "referenceDataSwitchNotBoolean": "Переключатели внешних справочных данных должны быть логическими значениями"
+        "referenceDataSwitchNotBoolean": "Переключатели внешних справочных данных должны быть логическими значениями",
+        "launchAtLoginSyncFailed": "Не удалось синхронизировать состояние автозапуска, повторите попытку или проверьте разрешения"
       },
       "validation": {
         "keyRequired": "",

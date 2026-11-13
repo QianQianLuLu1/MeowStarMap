@@ -1768,8 +1768,8 @@
       "discreteGpu": "ใช้ GPU แยกเป็นลำดับแรก",
       "discreteGpuDesc": "บนเครื่องที่มีหลาย GPU ให้ GPU แยกประสิทธิภาพสูงรับผิดชอบการเรนเดอร์หน้าจอและรูปภาพ (มีผลหลังรีสตาร์ท)",
       "discreteGpuRestartHint": "บันทึกการตั้งค่าแล้วและจะมีผลหลังรีสตาร์ท รีสตาร์ทตอนนี้หรือไม่?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "เริ่มต้นเมื่อเข้าสู่ระบบ",
+      "launchAtLoginDesc": "เริ่มแอปโดยอัตโนมัติเมื่อลงชื่อเข้าใช้ Windows"
     },
     "theme": {
       "desc": "มีผลทันที; ค่ากำหนดธีมจะถูกบันทึกอัตโนมัติในการกำหนดค่าในเครื่อง",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "ปิดบริการซิงค์แล้ว",
     "gpuDiscreteOn": "ใช้ GPU แยกเป็นลำดับแรกแล้ว (มีผลหลังรีสตาร์ท)",
     "gpuDiscreteOff": "สลับเป็นการเลือก GPU ตามระบบแล้ว (มีผลหลังรีสตาร์ท)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "เปิดการเริ่มต้นอัตโนมัติแล้ว",
+    "launchAtLoginOff": "ปิดการเริ่มต้นอัตโนมัติแล้ว",
+    "launchAtLoginDevSkipped": "โหมดพัฒนาไม่เปลี่ยนรายการเริ่มต้นของระบบ (บันทึกการตั้งค่าแล้ว)",
+    "launchAtLoginSaveFailed": "บันทึกการตั้งค่าเริ่มต้นอัตโนมัติไม่สำเร็จ โปรดลองอีกครั้ง"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "ค่าต้องเป็น auto หรือ high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin ต้องเป็นค่าบูลีน",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl ต้องเป็น URL http(s) สาธารณะ (เว้นว่างเพื่อใช้เว็บไซต์ทางการ)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl ต้องเป็น URL http(s) สาธารณะ (เว้นว่างเพื่อใช้ที่อยู่เดิม)",
-        "referenceDataSwitchNotBoolean": "สวิตช์ข้อมูลอ้างอิงภายนอกต้องเป็นค่าบูลีน"
+        "referenceDataSwitchNotBoolean": "สวิตช์ข้อมูลอ้างอิงภายนอกต้องเป็นค่าบูลีน",
+        "launchAtLoginSyncFailed": "ซิงก์สถานะเริ่มต้นอัตโนมัติไม่สำเร็จ โปรดลองอีกครั้งหรือตรวจสอบสิทธิ์"
       },
       "validation": {
         "keyRequired": "",

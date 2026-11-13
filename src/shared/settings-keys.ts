@@ -1,4 +1,20 @@
 /** 渲染进程可经 settings:set 自由写入的普通偏好 key（安全敏感项不在此列，见 SECURITY 注释） */
+
+/**
+ * 开机自启动设置键：main / shared / renderer 共用的单一真相源。
+ * 渲染层不得 import src/main，故常量放 shared 层；白名单元素也复用本常量，
+ * 避免「改键名漏改一处 → 只写配置不调系统 API」的静默失效。
+ */
+export const SETTING_KEY_LAUNCH_AT_LOGIN = 'launchAtLogin' as const
+
+/** 开机自启动缺省值（默认开启）。 */
+export const LAUNCH_AT_LOGIN_DEFAULT = true
+
+/** 外部输入（SQLite 历史脏值 / IPC 脏值）一律收敛：非布尔回落到默认开启。 */
+export function normalizeLaunchAtLoginSetting(value: unknown): boolean {
+  return typeof value === 'boolean' ? value : LAUNCH_AT_LOGIN_DEFAULT
+}
+
 export const RENDERER_PREF_KEYS = [
   'uiTheme',
   'autoScanOnStartup',
@@ -54,7 +70,7 @@ export const RENDERER_PREF_KEYS = [
   'nikkisync.shellNetworkRepairEnabled',
   'nikkisync.shellHotspotEnabled',
   // 开机自启动（默认开，消费点 login-item.ts / settings-handler.ts / lifecycle.ts）
-  'launchAtLogin',
+  SETTING_KEY_LAUNCH_AT_LOGIN,
   // 外部参考数据镜像站点（总计划阶段 1；空串 = 上游官方站点 nikki.ranaxro.com）。
   // 消费点 reference-data-handler.ts 的 refdata:refresh 读出后转发 reference-data-service；
   // settings:set 内联校验（http/https + 拒绝环回/私网/保留地址）

@@ -1768,8 +1768,8 @@
       "discreteGpu": "Préférer le GPU dédié",
       "discreteGpuDesc": "Sur les machines multi-GPU, le GPU dédié haute performance gère le rendu de l'interface et des images (actif après redémarrage)",
       "discreteGpuRestartHint": "La préférence de GPU dédié est enregistrée et sera active après redémarrage. Redémarrer maintenant ?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "Lancer au démarrage",
+      "launchAtLoginDesc": "Lancer automatiquement l'application lors de la connexion à Windows."
     },
     "theme": {
       "desc": "Prend effet immédiatement ; la préférence de thème est sauvegardée automatiquement dans la config locale.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "Service de synchronisation désactivé",
     "gpuDiscreteOn": "GPU dédié privilégié (actif après redémarrage)",
     "gpuDiscreteOff": "Sélection du GPU laissée au système (actif après redémarrage)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "Lancement au démarrage activé",
+    "launchAtLoginOff": "Lancement au démarrage désactivé",
+    "launchAtLoginDevSkipped": "Le mode développement ne modifie pas l'élément de démarrage système ; le réglage est enregistré",
+    "launchAtLoginSaveFailed": "Échec de l'enregistrement du réglage de démarrage, veuillez réessayer"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference doit être auto ou high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin doit être un booléen",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl doit être une URL http(s) publique (laisser vide pour utiliser le site officiel)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl doit être une URL http(s) publique (laisser vide pour utiliser l’adresse d’origine)",
-        "referenceDataSwitchNotBoolean": "Les interrupteurs de données de référence externes doivent être des booléens"
+        "referenceDataSwitchNotBoolean": "Les interrupteurs de données de référence externes doivent être des booléens",
+        "launchAtLoginSyncFailed": "Échec de la synchronisation de l'état de démarrage, veuillez réessayer ou vérifier les autorisations"
       },
       "validation": {
         "keyRequired": "",

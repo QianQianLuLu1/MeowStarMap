@@ -2,7 +2,11 @@ import React, { useEffect, useState, useContext } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SectionShell, GlobalToastContext, SettingsToggle, SettingsCard } from './shared'
 import { SliderControl } from '../../components/common/SliderControl'
-import { extractUserMessage } from '../../../shared/errors/app-error'
+import { AppError, extractUserMessage } from '../../../shared/errors/app-error'
+import {
+  SETTING_KEY_LAUNCH_AT_LOGIN,
+  normalizeLaunchAtLoginSetting
+} from '../../../shared/settings-keys'
 
 // ============ 通用 ============
 
@@ -15,23 +19,34 @@ export const GeneralStartupSection: React.FC = () => {
   const showMessage = useContext(GlobalToastContext)
 
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
       if (!window.electronAPI) return
-      const a = (await window.electronAPI.settings.get('autoScanOnStartup', true)) as boolean
-      setAutoScan(a)
-      const h = (await window.electronAPI.settings.get('hardwareAcceleration', true)) as boolean
-      setHardwareAccel(h)
-      // 独显优先：缺省视为 high-performance（默认开启）；仅 'auto' 为关闭态
-      const d = (await window.electronAPI.settings.get(
-        'gpu.discretePreference',
-        'high-performance'
-      )) as string
-      setDiscreteGpu(d !== 'auto')
-      const l = (await window.electronAPI.settings.get('launchAtLogin', true)) as boolean
-      setLaunchAtLogin(l)
+      try {
+        // 并发读取：任一失败都要有用户可见反馈，且不得产生未处理 Promise rejection
+        const [a, h, d, l] = await Promise.all([
+          window.electronAPI.settings.get('autoScanOnStartup', true),
+          window.electronAPI.settings.get('hardwareAcceleration', true),
+          window.electronAPI.settings.get('gpu.discretePreference', 'high-performance'),
+          window.electronAPI.settings.get(SETTING_KEY_LAUNCH_AT_LOGIN, true)
+        ])
+        if (cancelled) return
+        setAutoScan(typeof a === 'boolean' ? a : true)
+        setHardwareAccel(typeof h === 'boolean' ? h : true)
+        // 独显优先：缺省视为 high-performance（默认开启）；仅 'auto' 为关闭态
+        setDiscreteGpu(d !== 'auto')
+        // null / 非布尔脏值收敛为默认开启，避免 UI 显示关而 OS 实际开
+        setLaunchAtLogin(normalizeLaunchAtLoginSetting(l))
+      } catch (err) {
+        if (cancelled) return
+        showMessage(extractUserMessage(err), 'error')
+      }
     }
-    load()
-  }, [])
+    void load()
+    return () => {
+      cancelled = true
+    }
+  }, [showMessage])
 
   const saveAutoScan = async (value: boolean) => {
     setAutoScan(value)
@@ -43,7 +58,17 @@ export const GeneralStartupSection: React.FC = () => {
     const previous = launchAtLogin
     setLaunchAtLogin(value)
     try {
-      if (window.electronAPI) await window.electronAPI.settings.set('launchAtLogin', value)
+      if (!window.electronAPI) throw AppError.validation(t('toast.launchAtLoginSaveFailed'))
+      const res = await window.electronAPI.settings.set(SETTING_KEY_LAUNCH_AT_LOGIN, value)
+      // 部分成功（saved:false）与无响应都必须走回滚，不能弹成功 toast
+      if (!res || res.saved !== true) {
+        throw AppError.validation(t('toast.launchAtLoginSaveFailed'))
+      }
+      // dev 态不写 OS：仅认 handler 明确回传的 skipped='dev'，避免契约漂移时误报提示
+      if (res.synced === false && res.skipped === 'dev') {
+        showMessage(t('toast.launchAtLoginDevSkipped'), 'info')
+        return
+      }
       showMessage(value ? t('toast.launchAtLoginOn') : t('toast.launchAtLoginOff'))
     } catch (err) {
       setLaunchAtLogin(previous)

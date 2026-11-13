@@ -16,16 +16,25 @@ const {
   mockGetLoginItemSettings,
   mockDiagLog,
   mockLogStartupError,
-  appState
-} = vi.hoisted(() => ({
-  handleMock: vi.fn(),
-  mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : '')),
-  mockSetLoginItemSettings: vi.fn(),
-  mockGetLoginItemSettings: vi.fn(() => ({ openAtLogin: false })),
-  mockDiagLog: vi.fn(),
-  mockLogStartupError: vi.fn(),
-  appState: { isPackaged: true }
-}))
+  appState,
+  loginItemState
+} = vi.hoisted(() => {
+  // 对齐真实 Windows Run 项语义：主路径写入后，getLoginItemSettings() 立即能回读到同一值。
+  // Settings.name 只用于历史残留值名清理，不改变主状态。
+  const loginItemState = { openAtLogin: false }
+  return {
+    handleMock: vi.fn(),
+    mockAppGetPath: vi.fn((name: string) => (name === 'userData' ? '' : '')),
+    mockSetLoginItemSettings: vi.fn((s: { openAtLogin: boolean; name?: string }) => {
+      if (s.name === undefined) loginItemState.openAtLogin = s.openAtLogin
+    }),
+    mockGetLoginItemSettings: vi.fn(() => ({ openAtLogin: loginItemState.openAtLogin })),
+    mockDiagLog: vi.fn(),
+    mockLogStartupError: vi.fn(),
+    appState: { isPackaged: true },
+    loginItemState
+  }
+})
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() },
@@ -226,6 +235,7 @@ describe('settings:set launchAtLogin 开机自启动', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     appState.isPackaged = true
+    loginItemState.openAtLogin = false
   })
 
   it('B1 回归：布尔 true 持久化并同步 OS 登录项（打包态）', async () => {
@@ -233,11 +243,12 @@ describe('settings:set launchAtLogin 开机自启动', () => {
     registerSettingsHandlers(ctx)
     const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
       success: boolean
-      data?: { saved: boolean }
+      data?: { saved: boolean; synced?: boolean }
       error?: { message: string }
     }
     expect(result.success, result.error?.message).toBe(true)
     expect(result.data?.saved).toBe(true)
+    expect(result.data?.synced).toBe(true)
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('launchAtLogin', true)
     expect(mockSetLoginItemSettings).toHaveBeenCalledWith({ openAtLogin: true })
   })
@@ -269,39 +280,120 @@ describe('settings:set launchAtLogin 开机自启动', () => {
     registerSettingsHandlers(ctx)
     const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', false])) as {
       success: boolean
+      data?: { saved: boolean; synced?: boolean }
       error?: { message: string }
     }
     expect(result.success, result.error?.message).toBe(true)
+    expect(result.data?.saved).toBe(true)
+    expect(result.data?.synced).toBe(true)
     expect(mockSetLoginItemSettings).toHaveBeenCalledWith({ openAtLogin: false })
   })
 
-  it('B4 边界：dev 态只写设置与日志，不调用系统 API', async () => {
+  it('B4′ 边界：dev 态不写 OS，且必须回传可区分的 skipped 态（不得谎报已生效）', async () => {
     appState.isPackaged = false
     const ctx = makeCtx({})
     registerSettingsHandlers(ctx)
     const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
       success: boolean
+      data?: { saved: boolean; synced?: boolean; skipped?: string }
       error?: { message: string }
     }
     expect(result.success, result.error?.message).toBe(true)
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('launchAtLogin', true)
     expect(mockSetLoginItemSettings).not.toHaveBeenCalled()
     expect(mockDiagLog).toHaveBeenCalled()
+    expect(result.data?.synced).toBe(false)
+    expect(result.data?.skipped).toBe('dev')
   })
 
-  it('B5 异常：系统 API 抛错不进 IPC、设置仍已持久化且留痕', async () => {
+  it('B5′ 异常（主红测）：系统 API 抛错必须可感知地失败、回滚 DB 且留痕', async () => {
     mockSetLoginItemSettings.mockImplementationOnce(() => {
       throw new Error('EACCES')
+    })
+    const ctx = makeCtx({})
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', false])) as {
+      success: boolean
+      error?: { code: string; message: string; userMessage?: string }
+    }
+    // 原 B5 断言 success===true，把「静默失败」固化成期望；此处纠正为可感知失败
+    expect(result.success, result.error?.message).toBe(false)
+    expect(result.error?.code).toBe('IPC_INTERNAL_ERROR')
+    expect(result.error?.userMessage).toBeTruthy()
+    // 同步失败后 DB 必须回滚到旧值 true，避免下次启动把失败意图重新写回 OS
+    expect(ctx.dbManager.setSetting).toHaveBeenLastCalledWith('launchAtLogin', true)
+    expect(mockLogStartupError).toHaveBeenCalled()
+  })
+
+  it('B6 异常：写入后回读与期望不一致时必须失败（不得谎报成功）', async () => {
+    // 模拟系统 API 调用成功但 Run 项并未真正改变
+    mockGetLoginItemSettings.mockReturnValueOnce({ openAtLogin: false })
+    const ctx = makeCtx({})
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
+      success: boolean
+      error?: { code: string; message: string; userMessage?: string }
+    }
+    expect(result.success, result.error?.message).toBe(false)
+    expect(result.error?.code).toBe('IPC_INTERNAL_ERROR')
+    expect(result.error?.userMessage).toContain('开机自启动状态同步失败')
+  })
+
+  it('B7 异常：OS 状态回读抛错时必须失败（不得静默当作成功）', async () => {
+    mockGetLoginItemSettings.mockImplementationOnce(() => {
+      throw new Error('read failed')
     })
     const ctx = makeCtx({})
     registerSettingsHandlers(ctx)
     const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', true])) as {
       success: boolean
+      error?: { code: string; message: string; userMessage?: string }
+    }
+    expect(result.success, result.error?.message).toBe(false)
+    expect(result.error?.code).toBe('IPC_INTERNAL_ERROR')
+    expect(result.error?.userMessage).toContain('开机自启动状态同步失败')
+  })
+
+  it('B8 异常（红测）：DB 回滚自身抛错时不得覆盖原始同步失败与用户文案', async () => {
+    mockSetLoginItemSettings.mockImplementationOnce(() => {
+      throw new Error('EACCES')
+    })
+    const ctx = makeCtx({})
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    let setCall = 0
+    ;(ctx.dbManager.setSetting as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      setCall += 1
+      // 第一次是写入新值，第二次是失败后的 DB 回滚
+      if (setCall === 2) throw new Error('rollback disk full')
+    })
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', false])) as {
+      success: boolean
+      error?: { code: string; message: string; userMessage?: string }
+    }
+    expect(result.success, result.error?.message).toBe(false)
+    expect(result.error?.code).toBe('IPC_INTERNAL_ERROR')
+    expect(result.error?.userMessage ?? '').toContain('开机自启动状态同步失败')
+    expect(result.error?.message).not.toContain('rollback disk full')
+  })
+
+  it('B9 边界：键原本未设置时回滚写入默认值，语义与默认开启等价', async () => {
+    mockSetLoginItemSettings.mockImplementationOnce(() => {
+      throw new Error('EACCES')
+    })
+    const ctx = makeCtx({})
+    // 对齐真实 getSetting(key, defaultValue)：键未设置时返回调用方给的默认值
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (_key: string, dflt: unknown) => dflt
+    )
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(handleMock, 'settings:set')(['launchAtLogin', false])) as {
+      success: boolean
       error?: { message: string }
     }
-    expect(result.success, result.error?.message).toBe(true)
-    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('launchAtLogin', true)
-    expect(mockLogStartupError).toHaveBeenCalled()
+    expect(result.success, result.error?.message).toBe(false)
+    expect(ctx.dbManager.setSetting).toHaveBeenLastCalledWith('launchAtLogin', true)
   })
 })
 

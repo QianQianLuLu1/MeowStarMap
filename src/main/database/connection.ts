@@ -1995,7 +1995,9 @@ export class DatabaseManager {
         return defaultValue
       }
       return parsed as T
-    } catch {
+    } catch (err) {
+      // 解析/查询异常不得静默失败：留痕后回落默认值
+      logger.warn(`[DB] getSetting 解析失败，回落默认值: key=${key}, err=${String(err)}`)
       return defaultValue
     }
   }
@@ -2003,13 +2005,14 @@ export class DatabaseManager {
   /**
    * 基础类型兼容性检查：判断 parsed 是否与 defaultValue 的类型一致。
    * 仅做浅层类型守卫，不递归校验对象内部结构。
-   * - null/undefined：与任何类型兼容（视为"未设置"）
+   * - null/undefined：视为脏值，不兼容（由 getSetting 回落 defaultValue，
+   *   避免把 null 直出给消费侧造成「UI 关 / OS 开」分叉）
    * - 基础类型（string/number/boolean）：typeof 必须一致
    * - 数组：parsed 必须是数组
    * - 对象：parsed 必须是非 null 对象且非数组
    */
   private isSettingTypeCompatible(parsed: unknown, defaultValue: unknown): boolean {
-    if (parsed === null || parsed === undefined) return true
+    if (parsed === null || parsed === undefined) return false
     const defaultType = typeof defaultValue
     const parsedType = typeof parsed
     // 基础类型：typeof 必须一致

@@ -1768,8 +1768,8 @@
       "discreteGpu": "독립 그래픽 카드 우선",
       "discreteGpuDesc": "듀얼 그래픽 환경에서 고성능 독립 그래픽 카드가 화면 및 이미지 렌더링을 담당합니다(재시작 후 적용)",
       "discreteGpuRestartHint": "독립 그래픽 카드 설정이 저장되었으며 재시작 후 적용됩니다. 지금 재시작할까요?",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "로그인 시 자동 실행",
+      "launchAtLoginDesc": "켜면 Windows 로그인 시 앱이 자동으로 실행됩니다."
     },
     "theme": {
       "desc": "전환 후 즉시 적용, 테마 설정은 로컬 설정에 자동 저장됩니다.",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "동기화 서비스가 중지되었습니다",
     "gpuDiscreteOn": "독립 그래픽 카드를 우선 사용합니다(재시작 후 적용)",
     "gpuDiscreteOff": "시스템 GPU 선택을 따르도록 전환했습니다(재시작 후 적용)",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "로그인 시 자동 실행을 켰습니다",
+    "launchAtLoginOff": "로그인 시 자동 실행을 껐습니다",
+    "launchAtLoginDevSkipped": "개발 모드에서는 시스템 시작 항목을 변경하지 않습니다. 설정은 저장되었습니다",
+    "launchAtLoginSaveFailed": "로그인 시 자동 실행 설정 저장에 실패했습니다. 다시 시도해 주세요"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference 값은 auto 또는 high-performance여야 합니다",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin 값은 boolean이어야 합니다",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl은 공개 http(s) URL이어야 합니다(비워 두면 공식 사이트 사용)",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl은 공개 http(s) URL이어야 합니다(비워 두면 원래 주소 사용)",
-        "referenceDataSwitchNotBoolean": "외부 참조 데이터 스위치는 불리언 값이어야 합니다"
+        "referenceDataSwitchNotBoolean": "외부 참조 데이터 스위치는 불리언 값이어야 합니다",
+        "launchAtLoginSyncFailed": "로그인 시 자동 실행 상태 동기화에 실패했습니다. 다시 시도하거나 시작 항목 권한을 확인해 주세요"
       },
       "validation": {
         "keyRequired": "",

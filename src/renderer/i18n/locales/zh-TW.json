@@ -1768,8 +1768,8 @@
       "discreteGpu": "優先使用獨立顯卡",
       "discreteGpuDesc": "多顯卡裝置上讓高效能獨立顯卡承擔介面與影像渲染（下次啟動生效）",
       "discreteGpuRestartHint": "獨立顯卡偏好已儲存，將在應用程式重新啟動後生效。是否立即重新啟動？",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "開機自啟動",
+      "launchAtLoginDesc": "開啟後，登入 Windows 時自動啟動本應用程式。"
     },
     "theme": {
       "desc": "切換後即時生效，主題偏好會自動儲存到本地設定。",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "同步服務已關閉",
     "gpuDiscreteOn": "已優先使用獨立顯卡（重新啟動後生效）",
     "gpuDiscreteOff": "已切換為跟隨系統 GPU 選擇（重新啟動後生效）",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "已開啟開機自啟動",
+    "launchAtLoginOff": "已關閉開機自啟動",
+    "launchAtLoginDevSkipped": "開發模式不會修改系統啟動項，設定已儲存",
+    "launchAtLoginSaveFailed": "開機自啟動設定儲存失敗，請重試"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference 必須是 auto 或 high-performance",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin 必須是布林值",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl 必須是公網 http(s) 位址（留空使用官方站點）",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl 必須是公網 http(s) 位址（留空走原始位址）",
-        "referenceDataSwitchNotBoolean": "外部參考資料開關必須是布林值"
+        "referenceDataSwitchNotBoolean": "外部參考資料開關必須是布林值",
+        "launchAtLoginSyncFailed": "開機自啟動狀態同步失敗，請重試或檢查系統啟動項權限"
       },
       "validation": {
         "keyRequired": "",

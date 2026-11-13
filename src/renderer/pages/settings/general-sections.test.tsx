@@ -29,7 +29,9 @@ function installElectronApi(persisted: Record<string, unknown> = {}) {
   )
   settingsSet = vi.fn((key: string, value: unknown) => {
     store[key] = value
-    return Promise.resolve()
+    // 对齐真实 preload call() 解包后的 handler 返回对象（此前返回 undefined，
+    // 掩盖了「部分成功 {saved:false}」「dev skipped」等未检查返回值的缺陷）
+    return Promise.resolve({ saved: true })
   })
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
     settings: { get: settingsGet, set: settingsSet }
@@ -191,5 +193,71 @@ describe('GeneralStartupSection — 开机自启动开关', () => {
     // F22：错误反馈走全局 Toast，文案取 AppError 口径的用户可读消息（非 "Error: …" 全串），
     // 且以 error 级别呈现（此前 String(err) 落成默认 success 绿 toast）
     await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('disk full', 'error'))
+  })
+
+  it('G4 边界：settings.get 返回 null 脏值时开关仍与默认值一致（开启）', async () => {
+    installElectronApi({ launchAtLogin: null })
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    await waitFor(() => expect(sw).toBeChecked())
+  })
+
+  it('G5 异常：IPC 返回 {saved:false} 部分成功时必须回滚并给 error toast', async () => {
+    installElectronApi()
+    settingsSet.mockImplementation(() => Promise.resolve({ saved: false }))
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    fireEvent.click(sw)
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'false'))
+    await waitFor(() => expect(sw).toHaveAttribute('aria-checked', 'true'))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith('开机自启动设置保存失败，请重试', 'error')
+    )
+  })
+
+  it('G6 边界：dev skipped 态必须给专门 info 提示，不得显示成功或 error toast', async () => {
+    installElectronApi()
+    settingsSet.mockImplementation(() =>
+      Promise.resolve({ saved: true, synced: false, skipped: 'dev' })
+    )
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    fireEvent.click(sw)
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('launchAtLogin', false))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith('开发模式不修改系统启动项，设置已保存', 'info')
+    )
+    const calls = mockShowMessage.mock.calls as unknown[][]
+    expect(calls.some((c) => c.length === 1)).toBe(false)
+    expect(calls.some((c) => c.length >= 2)).toBe(true)
+    expect(calls.some((c) => c[1] === 'error')).toBe(false)
+    expect(calls).toHaveLength(1)
+  })
+
+  it('G6b 边界（红测）：synced:false 但缺 skipped 属契约漂移，不得误报 dev 提示', async () => {
+    installElectronApi()
+    settingsSet.mockImplementation(() => Promise.resolve({ saved: true, synced: false }))
+    renderStartup()
+    const sw = await screen.findByRole('switch', { name: '开机自启动' })
+    fireEvent.click(sw)
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('launchAtLogin', false))
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalled())
+    const calls = mockShowMessage.mock.calls as unknown[][]
+    expect(calls.some((c) => c[1] === 'error')).toBe(false)
+    expect(mockShowMessage).not.toHaveBeenCalledWith('开发模式不修改系统启动项，设置已保存', 'info')
+  })
+
+  it('G7 异常：settings.get reject 不得产生未处理 rejection，四个开关保持默认态且卸载后不 setState', async () => {
+    installElectronApi()
+    settingsGet.mockImplementation(() => Promise.reject(new Error('IPC down')))
+    const view = renderStartup()
+    for (const name of ['开机自启动', '启动时自动扫描', 'GPU 硬件加速', '优先使用独立显卡']) {
+      expect(await screen.findByRole('switch', { name })).toBeChecked()
+    }
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith(expect.any(String), 'error'))
+    const callCount = mockShowMessage.mock.calls.length
+    view.unmount()
+    await Promise.resolve()
+    expect(mockShowMessage.mock.calls.length).toBe(callCount)
   })
 })

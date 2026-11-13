@@ -1447,23 +1447,33 @@ describe('DatabaseManager', () => {
       expect(manager.getSetting('typed_key', 'default')).toBe('default')
     })
 
-    it('存储值为 null 时视为兼容，返回 null', async () => {
+    it('存储值为 null 时回落 defaultValue（不得把脏值直出给消费侧）', async () => {
       await manager.initialize()
       manager.execute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [
         'null_key',
         'null'
       ])
-      // JSON.parse('null') === null，isSettingTypeCompatible 对 null 返回 true
-      expect(manager.getSetting('null_key', 'default')).toBeNull()
+      expect(manager.getSetting('null_key', 'default')).toBe('default')
     })
 
-    it('存储值为 null 且 defaultValue 为对象时返回 null', async () => {
+    it('存储值为 null 且 defaultValue 为对象时回落该对象', async () => {
       await manager.initialize()
       manager.execute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [
         'null_obj_key',
         'null'
       ])
-      expect(manager.getSetting('null_obj_key', { foo: 'bar' })).toBeNull()
+      expect(manager.getSetting('null_obj_key', { foo: 'bar' })).toEqual({ foo: 'bar' })
+    })
+
+    it('存储值为 null 且 defaultValue 为 null 时仍返回 null（可空设置消费侧语义不变）', async () => {
+      // 钉住 isSettingTypeCompatible 对 null 由「兼容」改「不兼容」前后的等价行为：
+      // file-export-handler 用 getSetting<string | null>(key, null) 读取可空导出目录。
+      await manager.initialize()
+      manager.execute('INSERT OR REPLACE INTO app_settings (key, value) VALUES (?, ?)', [
+        'nullable_key',
+        'null'
+      ])
+      expect(manager.getSetting<string | null>('nullable_key', null)).toBeNull()
     })
   })
 

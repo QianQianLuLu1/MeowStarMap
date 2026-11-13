@@ -1768,8 +1768,8 @@
       "discreteGpu": "ディスクリートGPUを優先",
       "discreteGpuDesc": "マルチGPU環境では高性能なディスクリートGPUに画面と画像の描画を任せます（再起動後に有効）",
       "discreteGpuRestartHint": "ディスクリートGPU設定を保存しました。再起動後に有効になります。今すぐ再起動しますか？",
-      "launchAtLogin": "",
-      "launchAtLoginDesc": ""
+      "launchAtLogin": "ログイン時に起動",
+      "launchAtLoginDesc": "有効にすると、Windows へのサインイン時に本アプリを自動起動します。"
     },
     "theme": {
       "desc": "切り替え後即時反映、テーマ設定はローカル設定に自動保存されます。",
@@ -2030,8 +2030,10 @@
     "syncDisabled": "同期サービスを無効にしました",
     "gpuDiscreteOn": "ディスクリートGPUを優先しました（再起動後に有効）",
     "gpuDiscreteOff": "システムのGPU選択に従うよう切り替えました（再起動後に有効）",
-    "launchAtLoginOn": "",
-    "launchAtLoginOff": ""
+    "launchAtLoginOn": "ログイン時の自動起動を有効にしました",
+    "launchAtLoginOff": "ログイン時の自動起動を無効にしました",
+    "launchAtLoginDevSkipped": "開発モードではシステムのスタートアップ項目を変更しません（設定は保存済み）",
+    "launchAtLoginSaveFailed": "ログイン時起動の設定保存に失敗しました。再試行してください"
   },
   "video": {
     "applyEdit": "",
@@ -3569,10 +3571,11 @@
         "securitySensitiveKey": "",
         "unknownKey": "",
         "gpuPreferenceInvalid": "gpu.discretePreference は auto または high-performance である必要があります",
-        "launchAtLoginNotBoolean": "",
+        "launchAtLoginNotBoolean": "launchAtLogin は boolean でなければなりません",
         "manifestBaseUrlInvalid": "referenceData.manifestBaseUrl は公開 http(s) URL である必要があります（空欄の場合は公式サイトを使用）",
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl は公開 http(s) URL である必要があります（空欄の場合は元のアドレスを使用）",
-        "referenceDataSwitchNotBoolean": "外部参照データのスイッチは真偽値である必要があります"
+        "referenceDataSwitchNotBoolean": "外部参照データのスイッチは真偽値である必要があります",
+        "launchAtLoginSyncFailed": "ログイン時起動の状態同期に失敗しました。再試行するかスタートアップ項目の権限を確認してください"
       },
       "validation": {
         "keyRequired": "",

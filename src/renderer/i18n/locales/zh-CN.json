@@ -2479,7 +2479,9 @@
     "imageProcessorCanvasFailed": "无法获取 Canvas 2D 上下文，请检查浏览器 GPU 加速是否启用",
     "imageProcessorLoadFailed": "加载图片失败: {{src}}",
     "syncEnabled": "同步服务已启用",
-    "syncDisabled": "同步服务已关闭"
+    "syncDisabled": "同步服务已关闭",
+    "launchAtLoginDevSkipped": "开发模式不修改系统启动项，设置已保存",
+    "launchAtLoginSaveFailed": "开机自启动设置保存失败，请重试"
   },
   "video": {
     "applyEdit": "应用并导出",
@@ -3578,7 +3580,8 @@
         "imageMirrorBaseUrlInvalid": "referenceData.imageMirrorBaseUrl 必须是公网 http(s) 地址（留空走原始地址）",
         "referenceDataSwitchNotBoolean": "外部参考数据开关必须是布尔值",
         "securitySensitiveKey": "key \"{{key}}\" 为安全敏感项，请改用通道：{{channel}}",
-        "unknownKey": "未知的设置项 key：{{key}}"
+        "unknownKey": "未知的设置项 key：{{key}}",
+        "launchAtLoginSyncFailed": "开机自启动状态同步失败，请重试或检查系统启动项权限"
       },
       "validation": {
         "keyRequired": "key 不能为空",

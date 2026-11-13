@@ -33,7 +33,13 @@ import { applyUITheme, setupThemeListener } from './theme'
 // sync-integration 阶段 4：NikkiSync HTTPS 同步服务器装配与自启
 import { initSyncServer } from './sync-server-setup'
 import { initNikkiSyncRuntime } from './nikkisync-runtime-setup'
-import { syncLoginItemSetting, SETTING_LAUNCH_AT_LOGIN, normalizeLaunchAtLogin } from './login-item'
+import {
+  syncLoginItemSetting,
+  readLoginItemOpenAtLogin,
+  SETTING_LAUNCH_AT_LOGIN,
+  LAUNCH_AT_LOGIN_DEFAULT,
+  normalizeLaunchAtLogin
+} from './login-item'
 import { checkForUpdate } from '../services/reference-data-service'
 import { REFERENCE_DATA_CHECK_DELAY_MS } from '../utils/constants'
 // 自动更新：复用 electron-updater，生产环境初始化（dev 仅在 MEOW_DEV_UPDATE_FEED=1 时按假源初始化）
@@ -429,12 +435,24 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 阶段 8：启动后延迟任务（非关键，失败不阻塞）
     // 分级调度改造：启动期任务通过 taskScheduler.enqueueLow 入队，等主窗口 ready-to-show 后 resume 才执行
     // 修复：保存定时器引用，退出时清理，避免回调在数据库关闭后访问或启动新子进程
-    // 开机自启动：按应用内设置同步 OS 登录项（dev 态由 login-item 内部仅记录日志）
+    // 开机自启动：先比对 OS 实际状态，一致则跳过写入（不再每次启动无条件重写）
     try {
-      const saved = ctx.dbManager.getSetting<unknown>(SETTING_LAUNCH_AT_LOGIN, true)
+      const saved = ctx.dbManager.getSetting<unknown>(
+        SETTING_LAUNCH_AT_LOGIN,
+        LAUNCH_AT_LOGIN_DEFAULT
+      )
       const openAtLogin = normalizeLaunchAtLogin(saved)
       diagLog('LOGIN', `launchAtLogin resolved: openAtLogin=${openAtLogin}`)
-      syncLoginItemSetting(openAtLogin)
+      const osState = readLoginItemOpenAtLogin()
+      if (osState === openAtLogin) {
+        diagLog('LOGIN', `login item unchanged, skip write: openAtLogin=${openAtLogin}`)
+      } else {
+        // 读失败（undefined）保守仍同步一次，不静默跳过
+        if (osState === undefined) {
+          diagLog('LOGIN', 'login item read failed, fallback to sync')
+        }
+        syncLoginItemSetting(openAtLogin)
+      }
     } catch (err) {
       logStartupError('launchAtLoginSync', err)
     }
