@@ -1441,3 +1441,171 @@ describe('PC 端构造参数对齐（N2）', () => {
     expect(config.metadataDictionarySupplementRemote).toBeDefined()
   })
 })
+
+// ============================================================================
+// a49764bb：本地服装/效果图标包注入 PcCompanionRuntime 与会话句柄
+// 复刻上游 windows-app.ts:103-117：两次 loadLocalClothingIconPack → withLocalPhotoEffectIcons
+// → server.localClothingIcons；有包时不再构造在线 MetadataThumbnailCache。
+// ============================================================================
+const ICON_DIRS = {
+  clothingIconsDir: '/tmp/userData/nikkisync/clothing-icons',
+  photoFilterIconsDir: '/tmp/userData/nikkisync/photo-filter-icons'
+}
+
+function iconPackFixture(mainValid = true, supplementValid = true) {
+  const { fixture, surface: base } = alignedSurfaceFixture()
+  const main = { valid: mainValid, cacheVersion: 'a'.repeat(64) }
+  const supplement = { valid: supplementValid, cacheVersion: 'b'.repeat(64) }
+  const loadLocalClothingIconPack = vi.fn(async (directory: string) =>
+    directory.includes('photo-filter-icons') ? supplement : main
+  )
+  const withLocalPhotoEffectIcons = vi.fn(
+    (pack: Record<string, unknown>, supp: Record<string, unknown>) =>
+      !supp?.valid ? pack : { ...pack, cacheVersion: 'c'.repeat(64), supplement: supp }
+  )
+  const surface = {
+    ...base,
+    localClothingIconPack: { loadLocalClothingIconPack, withLocalPhotoEffectIcons }
+  } as unknown as RuntimeSurface
+  return {
+    fixture,
+    surface,
+    main,
+    supplement,
+    loadLocalClothingIconPack,
+    withLocalPhotoEffectIcons
+  }
+}
+
+describe('a49764bb 图标包注入会话（正常 / 异常 / 边界）', () => {
+  it('异常 F1：本地图标包有效时仍须向 PC 装配层下发在线缩略图缓存（老链接缺转换器可回落）', async () => {
+    const { surface } = iconPackFixture()
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        pcCompanion: ALL_PC_SWITCHES,
+        metadataThumbnailCacheDir: '/tmp/userData/nikkisync/metadata-thumbnails',
+        ...ICON_DIRS
+      },
+      surface
+    )
+    // 会话层只按「有本地包」抑制 server.metadataThumbnailCache，不得连带抽掉
+    // pcCompanionContext() 下发的 thumbnailCache：装配层在缺 convertWeChatWebp 时
+    // 需要它构造在线 WeChatIconProvider，否则本地/在线两条图标链同时断开。
+    expect((session as unknown as Record<string, unknown>).thumbnailCache).toBeDefined()
+  })
+
+  it('异常 F4：withLocalPhotoEffectIcons 抛错不得令会话失败，且未传 onWarning 时不得静默', async () => {
+    const { fixture, surface } = iconPackFixture()
+    ;(surface as unknown as Record<string, unknown>).localClothingIconPack = {
+      loadLocalClothingIconPack: vi.fn(async () => ({
+        valid: true,
+        cacheVersion: 'a'.repeat(64)
+      })),
+      withLocalPhotoEffectIcons: vi.fn(() => {
+        throw new Error('merge boom')
+      })
+    }
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    try {
+      const session = await createRuntimeSession(
+        {
+          ...sessionOptions(true),
+          pcCompanion: ALL_PC_SWITCHES,
+          metadataThumbnailCacheDir: '/tmp/userData/nikkisync/metadata-thumbnails',
+          ...ICON_DIRS
+        },
+        surface
+      )
+      expect(session).toBeDefined()
+      const server = (fixture.capturedConfig() as Record<string, unknown>).server as Record<
+        string,
+        unknown
+      >
+      expect(server.localClothingIcons).toBeUndefined()
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('icon pack'))
+    } finally {
+      warnSpy.mockRestore()
+    }
+  })
+
+  it('正常：完整 pack 注入 server.localClothingIcons，停建在线缩略图缓存，句柄挂出 pack', async () => {
+    const {
+      fixture,
+      surface,
+      main,
+      supplement,
+      loadLocalClothingIconPack,
+      withLocalPhotoEffectIcons
+    } = iconPackFixture()
+    const warn = vi.fn()
+    const session = await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        pcCompanion: ALL_PC_SWITCHES,
+        metadataThumbnailCacheDir: '/tmp/userData/nikkisync/metadata-thumbnails',
+        ...ICON_DIRS,
+        onWarning: warn
+      },
+      surface
+    )
+    const server = (fixture.capturedConfig() as Record<string, unknown>).server as Record<
+      string,
+      unknown
+    >
+    expect(server.localClothingIcons).toBeDefined()
+    expect((server.localClothingIcons as { cacheVersion: string }).cacheVersion).toMatch(
+      /^[a-f0-9]{64}$/
+    )
+    expect(server.metadataThumbnailCache).toBeUndefined()
+    expect((session as unknown as Record<string, unknown>).localClothingIcons).toBeDefined()
+    expect(loadLocalClothingIconPack).toHaveBeenCalledTimes(2)
+    expect(withLocalPhotoEffectIcons).toHaveBeenCalledWith(main, supplement)
+    expect(warn).not.toHaveBeenCalled()
+  })
+
+  it('异常：主包 valid:false ⇒ 不注入、留 warn、在线缩略图缓存照常构造', async () => {
+    const { fixture, surface } = iconPackFixture(false)
+    const warn = vi.fn()
+    await createRuntimeSession(
+      {
+        ...sessionOptions(true),
+        pcCompanion: ALL_PC_SWITCHES,
+        metadataThumbnailCacheDir: '/tmp/userData/nikkisync/metadata-thumbnails',
+        ...ICON_DIRS,
+        onWarning: warn
+      },
+      surface
+    )
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('icon pack'))
+    const server = (fixture.capturedConfig() as Record<string, unknown>).server as Record<
+      string,
+      unknown
+    >
+    expect(server.localClothingIcons).toBeUndefined()
+    expect(server.metadataThumbnailCache).toBeDefined()
+  })
+
+  it('边界：目录缺省 ⇒ loader 零调用、不注入；补充包无效时只用主包', async () => {
+    const first = iconPackFixture()
+    await createRuntimeSession(
+      { ...sessionOptions(true), pcCompanion: ALL_PC_SWITCHES },
+      first.surface
+    )
+    expect(first.loadLocalClothingIconPack).not.toHaveBeenCalled()
+    const firstServer = (first.fixture.capturedConfig() as Record<string, unknown>)
+      .server as Record<string, unknown>
+    expect(firstServer.localClothingIcons).toBeUndefined()
+
+    const second = iconPackFixture(true, false)
+    await createRuntimeSession(
+      { ...sessionOptions(true), pcCompanion: ALL_PC_SWITCHES, ...ICON_DIRS },
+      second.surface
+    )
+    const merged = (
+      (second.fixture.capturedConfig() as Record<string, unknown>).server as Record<string, unknown>
+    ).localClothingIcons as Record<string, unknown>
+    expect(merged.cacheVersion).toBe(second.main.cacheVersion)
+    expect(merged.supplement).toBeUndefined()
+  })
+})

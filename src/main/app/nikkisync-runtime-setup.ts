@@ -232,6 +232,12 @@ export function buildSessionOptions(input: {
   const gameRoot =
     (input.env[GAME_ROOT_ENV_FLAG] ?? '').trim() ||
     input.settings.getString(SETTING_GAME_ROOT, '').trim()
+  // a49764bb：两个本地图标包目录与上游资源同根；打包态由 extraResources 搬到 nikkisync/pc。
+  const pcAssetsDir = resolvePcAssetsDir({
+    isPackaged: input.isPackaged,
+    resourcesPath: input.resourcesPath,
+    projectRoot: input.projectRoot
+  })
   return {
     databaseFile: nikkisyncDatabaseFile(input.userDataDir),
     ...(gameRoot ? { gameRoot } : {}),
@@ -255,6 +261,8 @@ export function buildSessionOptions(input: {
       input.userDataDir,
       ...NIKKISYNC_METADATA_THUMBNAIL_DIR_SEGMENTS
     ),
+    clothingIconsDir: path.join(pcAssetsDir, 'clothing-icons'),
+    photoFilterIconsDir: path.join(pcAssetsDir, 'photo-filter-icons'),
     projectRoot: input.projectRoot,
     packagingContext: buildPackagingContext({
       isPackaged: input.isPackaged,
@@ -390,6 +398,8 @@ async function assemblePcCompanionServices(
       extraDirectories: liveContext.extraDirectories,
       accounts: liveContext.accounts,
       thumbnailCache: liveContext.thumbnailCache,
+      // a49764bb：本地图标包（与会话同一实例），供画廊侧注入 localClothingIcons
+      localClothingIcons: liveContext.localClothingIcons,
       syncPort: liveContext.syncPort,
       pairingUri: () => {
         try {

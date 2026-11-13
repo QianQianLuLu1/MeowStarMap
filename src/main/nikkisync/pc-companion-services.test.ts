@@ -41,6 +41,8 @@ function makeSurface(
     omitWrappers?: boolean
     /** 4cb71e2 降级用例：省略 listLanIpv4（多 host 深入口不可装载）。 */
     omitLanLister?: boolean
+    /** a49764bb 降级用例：省略 convertWeChatWebp（老链接缺导出，本地图标模式必须回落在线）。 */
+    omitWebpConverter?: boolean
   } = {}
 ) {
   // 真实 EventEmitter 语义：B2 要断言成功路径后 error 监听归零，纯 vi.fn 记不到。
@@ -120,6 +122,9 @@ function makeSurface(
         }),
     resizeForWeChat: vi.fn(async (bytes: Uint8Array) => bytes),
     resizeWeChatIcon: vi.fn(async (bytes: Uint8Array) => bytes),
+    ...(opts.omitWebpConverter
+      ? {}
+      : { convertWeChatWebp: vi.fn(async (bytes: Uint8Array) => bytes) }),
     rotatePng: vi.fn(async (bytes: Uint8Array) => bytes),
     exportLive: vi.fn(async () => ({ image: new Uint8Array(8), mime: 'application/x-livp' })),
     ...(opts.omitLanLister ? {} : { listLanIpv4: vi.fn(() => ['192.168.1.10', '192.168.1.11']) })
@@ -729,5 +734,76 @@ describe('loadPcCompanionSurface 深入口装载（4cb71e2 可选面降级）', 
     } finally {
       fs.rmSync(root, { recursive: true, force: true })
     }
+  })
+})
+
+// ============================================================================
+// a49764bb：本地服装/效果图标包（主包 + 1.0.40 滤镜补充包）注入画廊侧
+// ============================================================================
+describe('a49764bb 本地图标包注入（正常 / 异常 / 边界）', () => {
+  const pack = { valid: true, cacheVersion: 'a'.repeat(64) }
+
+  const previewOptionsOf = async (
+    surface: PcCompanionSurface
+  ): Promise<Record<string, unknown>> => {
+    const config = ctorCalls(surface.WeChatGalleryService)[0]?.[0] as Record<string, unknown>
+    await (config.snapshot as () => Promise<unknown>)()
+    return ctorCalls(surface.createIndexedPreviewSource)[0]?.[2] as Record<string, unknown>
+  }
+
+  it('正常：注入 localClothingIcons + convertLocalWebp，停建在线图标 provider，loadIcon 不挂', async () => {
+    const { surface } = makeSurface()
+    createPcCompanionServices({
+      ...options(surface),
+      thumbnailCache: { mark: 'cache' },
+      localClothingIcons: pack
+    })
+    expect(ctorCalls(surface.WeChatIconProvider)).toHaveLength(0)
+    const preview = await previewOptionsOf(surface)
+    expect(preview.localClothingIcons).toBe(pack)
+    expect(typeof preview.convertLocalWebp).toBe('function')
+    expect(preview.loadIcon).toBeUndefined()
+
+    const bytes = new Uint8Array([137, 80, 78, 71])
+    await (preview.convertLocalWebp as (b: Uint8Array) => Promise<Uint8Array>)(bytes)
+    const converter = (surface as unknown as Record<string, unknown>).convertWeChatWebp
+    expect(ctorCalls(converter)[0]).toEqual([bytes, 'D:/bin/ffmpeg.exe'])
+  })
+
+  it('异常 F1：无在线缓存且转换器缺席时，warn 不得误称「online icons retained」', async () => {
+    const { surface } = makeSurface({ omitWebpConverter: true })
+    const log = vi.fn()
+    // 会话层下发本地包却不给 thumbnailCache 时，装配层两条图标链都建不起来；
+    // 此时日志必须如实说明图标不可用，而不是宣称在线图标已保留。
+    createPcCompanionServices({ ...options(surface, log), localClothingIcons: pack })
+    const warnings = log.mock.calls
+      .filter((call) => call[0] === 'warn')
+      .map((call) => String(call[1]))
+    expect(warnings.some((message) => message.includes('local icon pack'))).toBe(true)
+    expect(warnings.some((message) => message.includes('online icons retained'))).toBe(false)
+  })
+
+  it('异常：convertWeChatWebp 缺席 ⇒ warn 且回落在线图标，不注入半套本地模式', async () => {
+    const { surface } = makeSurface({ omitWebpConverter: true })
+    const log = vi.fn()
+    createPcCompanionServices({
+      ...options(surface, log),
+      thumbnailCache: { mark: 'cache' },
+      localClothingIcons: pack
+    })
+    expect(log).toHaveBeenCalledWith('warn', expect.stringContaining('local icon pack'))
+    expect(ctorCalls(surface.WeChatIconProvider)).toHaveLength(1)
+    const preview = await previewOptionsOf(surface)
+    expect(preview.localClothingIcons).toBeUndefined()
+    expect(typeof preview.loadIcon).toBe('function')
+  })
+
+  it('边界：未给 localClothingIcons ⇒ 与既有在线模式逐字一致', async () => {
+    const { surface } = makeSurface()
+    createPcCompanionServices({ ...options(surface), thumbnailCache: { mark: 'cache' } })
+    expect(ctorCalls(surface.WeChatIconProvider)).toHaveLength(1)
+    const preview = await previewOptionsOf(surface)
+    expect(preview.localClothingIcons).toBeUndefined()
+    expect(typeof preview.loadIcon).toBe('function')
   })
 })

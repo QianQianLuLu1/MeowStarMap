@@ -50,6 +50,7 @@ SOFTWARE.
 留存约 7 天供本地展示，不二次分发、不镜像、不重新托管；失败有退避与冷却，不产生
 异常高频重试。瓦片地图仅使用游戏官方 `assets.papegames.com`，未接入上游自有 CDN
 瓦片；`cloth` / `cloth_outfit` 两类不在该授权范围内，未通过本通道接入。
+上述口径约束的是**在线按需取图通道**；与本通道相互独立的本地静态图标包另见第 6 节。
 
 ---
 
@@ -126,6 +127,32 @@ Zustand、i18next、fluent-ffmpeg、ESLint、Prettier、Vitest 等依赖各自�
 - **用途**：参考数据 v1.db 解密产物的 `Nuan5Config` protobuf 解码（主进程）
 - **版权**：Copyright (c) 2016 Daniel Wirtz；Apache-2.0 全文见其仓库 LICENSE
   文件，主进程依赖随 `node_modules` 入包分发。
+
+---
+
+## 6. NikkiSync 本地服装图标包（随仓静态资源）
+
+- **来源**：[ToStardust/NikkiSync](https://github.com/ToStardust/NikkiSync) 官方 release
+  `v1.0.40-public-beta.2` 的 `MomoCamera-PC-1.0.40.exe` 内嵌资源
+  `NikkiSync.Icons.Full.zip`（该资源不单独发布，由 .NET single-file 包携带）。
+- **完整性与来源校验**（提取脚本 `scripts/extract-nikkisync-icon-pack.ts` 逐项强制）：
+  - EXE SHA256 `7d4aad76d9fe7355cea9d695cf7e67f32be09dfe0e4b1e9d65533953932bf250`
+  - 内嵌 ZIP 大小 `77678905` B、SHA256 `ddd70fbf87ebeb9722e37365a76a5d159951f1104c2e378578316e884e840b4f`
+  - `manifest.json` SHA256 `c39e0f672867c7ee59fe9f7865510d95a0f2bbbf6d47f56a21f9a95e134752f0`
+- **随仓副本**：`resources/nikkisync/pc/clothing-icons/`（`manifest.json`、9162 张
+  `icons/<id>.webp`、`fallbacks/`、`effects/<kind>-<id>.webp`）；另附
+  `resources/nikkisync/pc/photo-filter-icons/`（21 张滤镜图标，取自上游仓库
+  `assets/photo-filter-icons/`）。
+- **用途**：同步图库 / 微信画廊的离线服装与拍摄效果图标，由上游
+  `LocalClothingIconPack.loadLocalClothingIconPack()` 本地读取；**运行时零网络请求**，
+  不经第 1 节的在线按需取图通道，也不替换或镜像任何在线服务。
+- **上游署名与授权口径**（逐字对齐上游 `THIRD_PARTY_NOTICES.md`）：NikkiSync 自身源码
+  以 MIT License 发布；其 MIT 许可**不覆盖**「Infinity Nikki 角色、服装图像、截图或
+  外部服务返回的资源」，这些权利归各自权利人；验证过的摄影效果名称来源另含
+  [sumopenny/Infinity-Nikki-Toolkit](https://github.com/sumopenny/Infinity-Nikki-Toolkit)
+  （MIT）；历史服装图标曾由 [gongeo.us](https://gongeo.us)（暖暖共鸣录）维护托管，
+  上游已迁移为自行托管的本地包，相关背景见 NikkiSync issue #14。本文件保留上述
+  来源标注与回链，不对游戏美术资产主张任何权利。
 
 ---
 

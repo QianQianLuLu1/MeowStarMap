@@ -20,12 +20,15 @@ import {
   missingPackedCapabilityArtifacts,
   artifactBannedStrings,
   scanBufferForBanned,
+  missingStagedIconPackAssets,
+  stagedIconPackGate,
   resolveVerifyAsarTarget,
   deriveUnpackedTarget,
   verifyUpdateFeedArtifacts,
   type JsTreeFile
 } from '../pre-dist-check'
 import { buildLatestYml } from '../serve-dev-update-feed'
+import { PHOTO_FILTER_ICON_IDS } from '../stage-nikkisync-pc-assets'
 import {
   CHAIN_REQUIRED_ARTIFACTS,
   METADATA_REQUIRED_ARTIFACTS,
@@ -198,6 +201,112 @@ describe('nikkiSyncMissingDiagnosis — @nikkisync 缺失的原因分档', () =>
     expect(nikkiSyncMissingDiagnosis({ scopeDirExists: true, scopeEntryCount: 1 })).toContain(
       'build.files'
     )
+  })
+})
+
+describe('a49764bb 暂存图标包打包面断言（正常 / 异常 / 边界 / 真实仓库）', () => {
+  const pcAssetsDir = path.join('D:', 'ROOT', 'resources', 'nikkisync', 'pc')
+  const effectFiles = PHOTO_FILTER_ICON_IDS.map((id) => `filter-${id}.webp`)
+
+  it('正常：两个 manifest 与 21 张效果图全部在位 ⇒ 空缺失清单', () => {
+    expect(missingStagedIconPackAssets(pcAssetsDir, effectFiles, () => true)).toEqual([])
+  })
+
+  it('异常：缺一张效果图 ⇒ 逐项点名缺失的绝对路径', () => {
+    const missing = path.join(pcAssetsDir, 'photo-filter-icons', 'effects', effectFiles[0]!)
+    const result = missingStagedIconPackAssets(pcAssetsDir, effectFiles, (file) => file !== missing)
+    expect(result).toEqual([missing])
+  })
+
+  it('边界：效果清单为空时仍强制校验两个 manifest', () => {
+    const result = missingStagedIconPackAssets(pcAssetsDir, [], () => false)
+    expect(result).toEqual([
+      path.join(pcAssetsDir, 'clothing-icons', 'manifest.json'),
+      path.join(pcAssetsDir, 'photo-filter-icons', 'manifest.json')
+    ])
+  })
+
+  const stagedDir = path.join(ROOT, 'resources', 'nikkisync', 'pc')
+  // F3：图标包是上游派生产物（约 74 MiB、不入仓），干净克隆 / CI 上没有这棵树。
+  // 与 :569 的 HAS_ARTIFACT 同口径：资产不齐时显式 skip，不判缺陷。
+  it.skipIf(stagedIconPackGate(stagedDir, effectFiles, (file) => existsSync(file)).skip)(
+    '真实仓库：extraResources 覆盖 resources/nikkisync/pc 整树，且两包已 stage',
+    () => {
+      const pkg = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
+        build?: {
+          extraResources?: Array<{ from?: string; to?: string; filter?: string[] }>
+        }
+      }
+      // package.json 里的路径用正斜杠字面量，win32 下 path.join 会产出反斜杠，统一归一后比较
+      const normalize = (value: string): string => value.split(/[\\/]/).join('/')
+      const entry = pkg.build?.extraResources?.find(
+        (item) => normalize(item.from ?? '') === 'resources/nikkisync/pc'
+      )
+      expect(normalize(entry?.to ?? '')).toBe('nikkisync/pc')
+      expect(entry?.filter).toContain('**/*')
+
+      expect(
+        missingStagedIconPackAssets(stagedDir, effectFiles, (file) => existsSync(file))
+      ).toEqual([])
+    }
+  )
+})
+
+describe('F2/F3 暂存图标包闸门接线与产物门控（正常 / 异常 / 边界 / 接线）', () => {
+  const staged = path.join(ROOT, 'resources', 'nikkisync', 'pc')
+  const effectFiles = PHOTO_FILTER_ICON_IDS.map((id) => `filter-${id}.webp`)
+  type Gate = (
+    dir: string,
+    files: readonly string[],
+    exists: (p: string) => boolean
+  ) => { skip: boolean; missing: string[] }
+  const gateOf = async (): Promise<Gate> => {
+    const mod = (await import('../pre-dist-check')) as unknown as Record<string, unknown>
+    expect(typeof mod.stagedIconPackGate).toBe('function')
+    return mod.stagedIconPackGate as Gate
+  }
+
+  it('正常：两个 manifest 与 21 张效果图全在位 ⇒ skip=false 且缺失清单为空', async () => {
+    const gate = await gateOf()
+    expect(gate(staged, effectFiles, () => true)).toEqual({ skip: false, missing: [] })
+  })
+
+  it('异常：缺一张效果图 ⇒ skip=true 且逐项点名绝对路径', async () => {
+    const gate = await gateOf()
+    const missing = path.join(staged, 'photo-filter-icons', 'effects', effectFiles[0]!)
+    const result = gate(staged, effectFiles, (file) => file !== missing)
+    expect(result.skip).toBe(true)
+    expect(result.missing).toContain(missing)
+  })
+
+  it('边界：效果清单为空且探针恒 false ⇒ 两个 manifest 仍被强制点名', async () => {
+    const gate = await gateOf()
+    const result = gate(staged, [], () => false)
+    expect(result.skip).toBe(true)
+    expect(result.missing).toEqual([
+      path.join(staged, 'clothing-icons', 'manifest.json'),
+      path.join(staged, 'photo-filter-icons', 'manifest.json')
+    ])
+  })
+
+  it('接线：main() 在最后的 if (failed) 之前调用 checkStagedIconPackAssets(...)，缺件计入 blocking', () => {
+    const source = readFileSync(path.join(ROOT, 'scripts', 'pre-dist-check.ts'), 'utf8')
+    const mainStart = source.indexOf('function main(): void {')
+    // 最后一个 if (failed) 才是打包前校验的结果聚合（--verify-asar 分支里还有一个）
+    const failedGate = source.lastIndexOf('if (failed) {')
+    expect(mainStart).toBeGreaterThan(-1)
+    expect(failedGate).toBeGreaterThan(mainStart)
+    expect(source.slice(mainStart, failedGate)).toContain('checkStagedIconPackAssets(')
+  })
+
+  it('F3 边界：真实仓库用例必须由资产门控包裹（干净克隆不误红）', () => {
+    const source = readFileSync(
+      path.join(ROOT, 'scripts', '__tests__', 'pre-dist-check.test.ts'),
+      'utf8'
+    )
+    // 拼接避免本用例自身的字面量造成自指：门控后不得再出现裸用例声明
+    const legacy = 'it' + '(' + "'" + '真实仓库'
+    expect(source).not.toContain(legacy)
   })
 })
 

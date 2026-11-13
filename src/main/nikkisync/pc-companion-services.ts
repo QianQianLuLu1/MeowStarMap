@@ -74,6 +74,8 @@ export interface PcCompanionSurface {
   createIndexedPreviewSource: (...args: unknown[]) => unknown
   /** 上游具体类的 `get` 是必有方法（非可选），本仓最小面如实声明。 */
   WeChatIconProvider?: new (...args: unknown[]) => { get(descriptor: unknown): unknown }
+  /** a49764bb：本地 WebP 图标 → PNG 的字节转换器（画廊侧 icon() 强制输出 PNG）。 */
+  convertWeChatWebp?: (bytes: Uint8Array, ffmpeg: string) => Promise<Uint8Array>
   RuntimeMemoryMaintenance?: new (...args: unknown[]) => PcLifecycleLike
   GameVersionUpdateService?: new (...args: unknown[]) => PcLifecycleLike
   /**
@@ -125,6 +127,8 @@ export interface PcCompanionServicesOptions {
   extraDirectories?: unknown
   accounts?: unknown
   thumbnailCache?: unknown
+  /** a49764bb：会话级本地图标包（与 server 同一实例），缺席即保持在线图标模式。 */
+  localClothingIcons?: unknown
   syncPort?: () => number | undefined
 }
 
@@ -257,6 +261,15 @@ export async function loadPcCompanionSurface(
           ) as PcCompanionSurface['WeChatIconProvider']
         }
       : {}),
+    // a49764bb：本地 WebP 图标转 PNG（老链接缺导出 ⇒ 不挂键，画廊保持在线图标模式）
+    ...(pick(icons, 'convertWeChatWebp')
+      ? {
+          convertWeChatWebp: pick(
+            icons,
+            'convertWeChatWebp'
+          ) as PcCompanionSurface['convertWeChatWebp']
+        }
+      : {}),
     ...(pick(memory, 'RuntimeMemoryMaintenance')
       ? {
           RuntimeMemoryMaintenance: pick(
@@ -305,13 +318,43 @@ export function createPcCompanionServices(
   const resizeBytes = (bytes: Uint8Array): Promise<Uint8Array> =>
     surface.resizeForWeChat(bytes, ps1Script('resize-preview.ps1'))
   /**
+   * a49764bb：本地图标包 + WebP→PNG 转换器齐备才切本地模式。
+   * 上游 `source.mjs` 的 icon() 是 localClothingIcons / loadIcon 二选一且无回退，
+   * 缺转换器时硬切会让所有图标不可用 ⇒ fail-closed 回落在线模式并留 warn。
+   */
+  const localIconsReady =
+    options.localClothingIcons !== undefined &&
+    typeof surface.convertWeChatWebp === 'function' &&
+    ffmpegPath.length > 0
+  if (options.localClothingIcons !== undefined && !localIconsReady) {
+    // F1：只有在线缓存也在位时才能宣称回落在线；两条链都建不起来时必须如实报错，
+    // 否则日志会掩盖「本地 + 在线图标同时不可用」这一真实故障。
+    safeLog(
+      'warn',
+      options.thumbnailCache
+        ? '[pc-companion] local icon pack unavailable for gallery; online icons retained'
+        : '[pc-companion] local icon pack unavailable for gallery; no online icon cache, icons unavailable'
+    )
+  }
+  const convertLocalWebp = async (bytes: Uint8Array): Promise<Uint8Array> => {
+    try {
+      return await surface.convertWeChatWebp!(bytes, ffmpegPath)
+    } catch (error) {
+      safeLog(
+        'warn',
+        `[pc-companion] webp conversion failed; falling back to resize: ${String(error)}`
+      )
+      return surface.resizeWeChatIcon(bytes, ps1Script('resize-icon.ps1'))
+    }
+  }
+  /**
    * D4 修复：WeChatIconProvider 的上游构造契约是 (cache, resize) 必填（589b932 起）——
    * 缓存与 server 共享同一实例（对齐上游单实例共享），resize 委托上游 resizeWeChatIcon +
    * 暂存脚本。任一缺席（老链接/无缓存目录）⇒ 不构造图标面，preview options 相应省略
    * loadIcon（上游按可选处理），不伪造空实例。
    */
   const icons =
-    surface.WeChatIconProvider && options.thumbnailCache
+    !localIconsReady && surface.WeChatIconProvider && options.thumbnailCache
       ? new surface.WeChatIconProvider(options.thumbnailCache, (bytes: Uint8Array) =>
           surface.resizeWeChatIcon(bytes, ps1Script('resize-icon.ps1'))
         )
@@ -344,7 +387,12 @@ export function createPcCompanionServices(
       )
     ).filter((root): root is string => typeof root === 'string' && root.length > 0)
     let source: unknown = surface.createIndexedPreviewSource(options.database ?? {}, roots, {
-      ...(icons ? { loadIcon: (descriptor: unknown) => icons.get(descriptor) } : {}),
+      // a49764bb：两套图标路径互斥，只挂其一；其余 options 全部可选，缺省走上游安全默认
+      ...(localIconsReady
+        ? { localClothingIcons: options.localClothingIcons, convertLocalWebp }
+        : icons
+          ? { loadIcon: (descriptor: unknown) => icons.get(descriptor) }
+          : {}),
       // 上游 4cb71e2 新增 motionFfmpeg：宿主等价物为 ffmpeg-static 的二进制路径
       ...(ffmpegPath ? { motionFfmpeg: ffmpegPath } : {}),
       // D1–D3 修复：三个回调必须是字节变换函数并委托上游实现（修复前误传脚本路径/options 对象）
@@ -653,6 +701,8 @@ export interface StartPcCompanionOptions {
   extraDirectories?: unknown
   accounts?: unknown
   thumbnailCache?: unknown
+  /** a49764bb：会话级本地图标包（与 server 同一实例），缺席即保持在线图标模式。 */
+  localClothingIcons?: unknown
   syncPort?: () => number | undefined
 }
 
@@ -692,6 +742,7 @@ export async function startPcCompanionServices(
       extraDirectories: options.extraDirectories,
       accounts: options.accounts,
       thumbnailCache: options.thumbnailCache,
+      localClothingIcons: options.localClothingIcons,
       syncPort: options.syncPort,
       log: options.log
     })

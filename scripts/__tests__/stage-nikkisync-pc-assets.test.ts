@@ -4,6 +4,7 @@ import { getFileInfo } from 'prettier'
 
 import {
   PC_ASSET_SPECS,
+  PHOTO_FILTER_ICON_IDS,
   planPcAssets,
   stagePcAssets,
   type StageFsPort
@@ -35,18 +36,18 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
   const upRoot = 'D:/UP/NikkiSync'
   const targetRoot = 'D:/ROOT/resources/nikkisync/pc'
 
-  it('正常：清单 9 项，apply 时逐项拷贝且目标落在 resources/nikkisync/pc 下', () => {
+  it('正常：清单 31 项，apply 时逐项拷贝且目标落在 resources/nikkisync/pc 下', () => {
     const planned = planPcAssets(upRoot, targetRoot)
-    expect(planned).toHaveLength(9)
-    expect(PC_ASSET_SPECS).toHaveLength(9)
+    expect(planned).toHaveLength(31)
+    expect(PC_ASSET_SPECS).toHaveLength(31)
     const existing = new Set<string>([upRoot, ...planned.map((item) => item.from)])
     const { port, copyFile } = fakeFs(existing)
     const warn = vi.fn()
     const res = stagePcAssets({ upRoot, targetRoot, apply: true, warn, fsPort: port })
     expect(res.status).toBe('applied')
-    expect(res.copied).toHaveLength(9)
+    expect(res.copied).toHaveLength(31)
     expect(res.skipped).toEqual([])
-    expect(copyFile).toHaveBeenCalledTimes(9)
+    expect(copyFile).toHaveBeenCalledTimes(31)
     for (const item of planned) {
       // path.join 在 win32 宿主用反斜杠，比较前统一 normalize（约定 §6 只当键用）
       expect(item.to.startsWith(path.normalize(targetRoot))).toBe(true)
@@ -67,7 +68,7 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     expect(res.skipped).toContain(missing)
     expect(res.warnings.length).toBeGreaterThan(0)
     expect(warn).toHaveBeenCalled()
-    expect(copyFile).toHaveBeenCalledTimes(8)
+    expect(copyFile).toHaveBeenCalledTimes(30)
   })
 
   it('边界：UP 根缺失 ⇒ warn + skipped 且零拷贝；dry-run 默认也零拷贝', () => {
@@ -84,7 +85,7 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     const dry = fakeFs(existing)
     const dryRun = stagePcAssets({ upRoot, targetRoot, warn, fsPort: dry.port })
     expect(dryRun.status).toBe('dry-run')
-    expect(dryRun.planned).toHaveLength(9)
+    expect(dryRun.planned).toHaveLength(31)
     expect(dry.copyFile).not.toHaveBeenCalled()
   })
 
@@ -122,6 +123,27 @@ describe('stage-nikkisync-pc-assets（N7 资源暂存）', () => {
     ).toThrow(/escape/i)
     expect(copyFile).not.toHaveBeenCalled()
     expect(mkdir).not.toHaveBeenCalled()
+  })
+})
+
+describe('a49764bb 滤镜效果图标资源（1.0.40 补充包）', () => {
+  it('恰好 22 项 photo-filter-icons spec：1 份 manifest + 21 张 webp，逐项与 ID 清单相等', () => {
+    const prefix = 'photo-filter-icons' + path.sep
+    const icons = PC_ASSET_SPECS.filter((spec) => spec.to.startsWith(prefix))
+    expect(icons).toHaveLength(22)
+    expect(PHOTO_FILTER_ICON_IDS).toHaveLength(21)
+
+    const manifest = icons.find((spec) => spec.to.endsWith('manifest.json'))
+    expect(manifest?.from).toBe(path.join('assets', 'photo-filter-icons', 'manifest.json'))
+    expect(manifest?.to).toBe(path.join('photo-filter-icons', 'manifest.json'))
+
+    const webpTos = icons
+      .filter((spec) => spec.to.endsWith('.webp'))
+      .map((spec) => path.basename(spec.to))
+      .sort()
+    expect(webpTos).toEqual(PHOTO_FILTER_ICON_IDS.map((id) => `filter-${id}.webp`).sort())
+    // 上游 manifest 缺 1090020018，钉住该缺口防止误加不存在的资源
+    expect(PHOTO_FILTER_ICON_IDS).not.toContain('1090020018')
   })
 })
 

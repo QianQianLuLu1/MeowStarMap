@@ -312,7 +312,7 @@ describe('evaluateNikkiSyncLink', () => {
 })
 
 describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步）', () => {
-  it('恰好 20 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
+  it('恰好 24 个能力深入口产物，逐项钉死（pre-dist-check 打包断言共用此表）', () => {
     expect(NIKKISYNC_CAPABILITY_ARTIFACTS).toEqual([
       path.join('dist', 'src', 'organizer', 'DeletionQueue.js'),
       path.join('dist', 'src', 'scanner', 'ExtraScanDirectories.js'),
@@ -336,7 +336,14 @@ describe('NIKKISYNC_CAPABILITY_ARTIFACTS 结构契约（兼容层 b422193 同步
       path.join('dist', 'src', 'wechat', 'WeChatDeletion.js'),
       path.join('dist', 'src', 'wechat', 'WeChatInspiration.js'),
       path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
-      path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
+      path.join('dist', 'src', 'server', 'GameVersionUpdateService.js'),
+      // a49764bb（v1.0.39/1.0.40）：本地图标包与本地照片解码的 4 个新 metadata 产物。
+      // 其中只有 LocalClothingIconPack.js 由本仓主动深入口装载，其余 3 个是上游静态传递依赖，
+      // 由 closureLoadChain 沿 import 边覆盖（不预载未用符号）。
+      path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js'),
+      path.join('dist', 'src', 'metadata', 'LocalPhotoMetadataResolver.js'),
+      path.join('dist', 'src', 'metadata', 'MetadataInputFingerprint.js'),
+      path.join('dist', 'src', 'metadata', 'VerifiedPhotographyNames.js')
     ])
   })
 })
@@ -562,8 +569,8 @@ describe('LOAD_CHAIN_ROOTS 结构契约', () => {
   /** 与 `src/main/nikkisync/runtime-facade.ts` 的深入口常量比对时统一成正斜杠键（约定 §6 第 1 档） */
   const toForward = (value: string): string => value.split(path.sep).join('/')
 
-  it('恰好 26 个根：上游桶导出 + 本仓 25 个 *_DEEP_ENTRY（含 N7 PC 端九个）', () => {
-    expect(LOAD_CHAIN_ROOTS).toHaveLength(26)
+  it('恰好 27 个根：上游桶导出 + 本仓 26 个 *_DEEP_ENTRY（含 a49764bb 图标包深入口）', () => {
+    expect(LOAD_CHAIN_ROOTS).toHaveLength(27)
     expect(toForward(LOAD_CHAIN_ROOTS[0] as string)).toBe('dist/src/index.js')
   })
 

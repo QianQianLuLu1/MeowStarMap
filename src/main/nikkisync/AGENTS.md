@@ -185,3 +185,44 @@
   `extraDirectories` / `accounts` / `thumbnailCache` / `syncPort`（缺席即不挂键）；
   `NikkiSyncRuntimeSession` 增 `thumbnailCache?`（与 server 共享的 `MetadataThumbnailCache` 单实例）。
 - 全过程见 `docs/plans/2026-11-07-nikkisync-upstream-align-03-实施计划.md`。
+
+## 2026-11-13 对齐上游 a49764bb（v1.0.40-public-beta.2）的口径订正
+
+- 对齐锚点自 `4cb71e2`（v1.0.31）前进到 `a49764bbf98fcb26a84f2356b78d48c459d3da2e`
+  （main HEAD / `v1.0.40-public-beta.2`），区间共 4 提交：`bc3f636b`（1.0.39 PC TS 主变更）、
+  `6c967831`（纯测试/文档）、`ec139a2c`（1.0.40 滤镜图标）、`a49764bb`（纯文档/测试）。
+  本地克隆由 `git fetch origin` + `checkout --detach <sha>` 推进，`npm run build`
+  （Node ≥24，本机用 v26.3.0）重建；`dist/` 与 `GalleryRuntime.mjs` 未入库，**只跑 tsc 不够**。
+- **零变化、明确不动**：四个 workspace 包的入口 `index.ts`、`packages/protocol/src/index.ts`、
+  根与 pc-companion `package.json` 两端 blob 一致 ⇒ `NIKKISYNC_REQUIRED_EXPORTS`、`probe.ts`、
+  `runtime-loader.ts`、`src/shared/sync/**`、`protocol-contract.ts` 全部不改；上游无新增
+  IPC/协议字段/能力位 ⇒ 本轮**不新增 `nikkisync:*` 通道、不改 preload / handler / IPC_CONTRACT /
+  i18n 键 / UI 开关**。受保护核心路径零改动，`// @core-change:` 无需新增。
+- **装载链**：新增 `LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY`（`dist/src/metadata/LocalClothingIconPack.js`）
+  为第 26 个深入口；`verify-nikkisync-link.ts` 现为 **27 roots / 24 artifacts**（能力清单新增
+  4 个 `metadata/*.js`，其中 3 个是上游静态传递依赖，由 `closureLoadChain` 覆盖，不另加根）。
+- **资源**：`scripts/stage-nikkisync-pc-assets.ts` 清单 9 → **31 项**（新增 1 份
+  `photo-filter-icons/manifest.json` + 21 张 `filter-1090020NNN.webp`，NNN ∈ 1..17、19..22，
+  上游缺 0018）；另有 `resources/nikkisync/pc/clothing-icons/` 主包（9162 服装条目 +
+  394 效果条目），由官方 `MomoCamera-PC-1.0.40.exe` 内嵌 ZIP 经
+  `scripts/extract-nikkisync-icon-pack.ts`（本轮新增，尚未纳入版本控制）四组 SHA 校验后落位，
+  不经过 stage 清单。
+- **图标包注入**（复刻上游 `windows-app.ts:103-117`）：`createRuntimeSession` 两次
+  `loadLocalClothingIconPack`（主包 + 滤镜补充包）→ `withLocalPhotoEffectIcons` → 仅主包
+  `valid===true` 时把**完整 pack** 注入 `server.localClothingIcons`（`LocalSyncServer` 会调
+  `read()` / `readEffect()`，只给 `cacheVersion` 会 TypeError）。有包时**不再构造**
+  `MetadataThumbnailCache`，会话句柄挂出 `localClothingIcons`，经 `pcCompanionContext()` →
+  `assemblePcCompanionServices()` → `createPcCompanionServices()` 同一引用透传到画廊侧。
+  画廊侧 `createIndexedPreviewSource` 注入 `localClothingIcons` + `convertLocalWebp`
+  （委托上游 `convertWeChatWebp`，失败回落 `resizeWeChatIcon`），并**省略** `loadIcon`、
+  不构造 `WeChatIconProvider`：上游 `source.mjs` 的 `icon()` 二选一且无回退，两套路径必须互斥。
+  目录/深入口/转换器/manifest 任一不通过 ⇒ `warn` 并保持在线图标模式，绝不注入半套。
+- **旧库事实更正**：上游 `DatabaseManager.initialize()` 无 `schema_migrations` 版本门禁，
+  每次启动都 `exec(0001_initial.sql)` 全文（`CREATE TABLE IF NOT EXISTS` 幂等）⇒ 存量库
+  自动补齐 `nuan5_resolution` / `nuan5_endpoint_state` / `idx_assets_resolver_fingerprint`。
+  本仓**不写自研 DDL**，改由 `runtime-facade.linked.test.ts` 的「旧库 → 新版启动」用例钉住；
+  业务表闭集 16 → **18 张**（14 迁移 + 4 运行期自建）。
+- **R1 维持**：C# WPF 自动更新 / xdelta3 差分 / 托盘自启 / 支持网关 / `UpdateWindow` /
+  Android / 小程序本体仍不搬；本轮唯一扩展是**引入服装图标静态包**（用户裁决），不含其
+  自动更新与验签通道。第三方署名见 `THIRD_PARTY_NOTICES` 第 6 节。
+- 全过程与逐节点读数见 `docs/plans/2026-11-13-nikkisync-pc-align-1.0.40-实施计划.md`（本轮新增，尚未纳入版本控制）。

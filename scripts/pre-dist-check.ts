@@ -26,6 +26,7 @@ import {
   type NikkiSyncSourceFile,
   type RuntimePackagePort
 } from './nikkisync-external-deps'
+import { PHOTO_FILTER_ICON_IDS } from './stage-nikkisync-pc-assets'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -718,6 +719,73 @@ export function missingPackedCapabilityArtifacts(
   exists: (relativeToPcCompanion: string) => boolean
 ): string[] {
   return artifacts.filter((relative) => !exists(relative))
+}
+
+/**
+ * a49764bb：暂存态本地图标包的缺失清单（纯判定核，存在性由调用方注入）。
+ *
+ * 与 `missingPackedCapabilityArtifacts` 的分工：那张表管 `@nikkisync` 解包树里的
+ * 深入口产物；这里管 `resources/nikkisync/pc/` 下由 stage / 资产门禁落位的静态包
+ * （服装主包 + 1.0.40 滤镜补充包）。`build.extraResources` 把该目录整树搬到
+ * `nikkisync/pc`，因此缺 manifest 或任一效果图标都意味着装机后图标能力不可用。
+ */
+export function missingStagedIconPackAssets(
+  pcAssetsDir: string,
+  effectFiles: readonly string[],
+  exists: (absolutePath: string) => boolean
+): string[] {
+  const required = [
+    path.join(pcAssetsDir, 'clothing-icons', 'manifest.json'),
+    path.join(pcAssetsDir, 'photo-filter-icons', 'manifest.json'),
+    ...effectFiles.map((file) => path.join(pcAssetsDir, 'photo-filter-icons', 'effects', file))
+  ]
+  return required.filter((file) => !exists(file))
+}
+
+/**
+ * F2：暂存图标包闸门的统一判定核（纯函数，探针由调用方注入）。
+ *
+ * `skip` 供单测的「真实仓库」用例做产物门控；`missing` 供打包前闸门逐项 fail。
+ * 入参非法一律抛 TypeError，绝不静默返回空清单让闸门假绿。
+ */
+export interface StagedIconPackGateResult {
+  skip: boolean
+  missing: string[]
+}
+
+export function stagedIconPackGate(
+  pcAssetsDir: string,
+  effectFiles: readonly string[],
+  exists: (absolutePath: string) => boolean
+): StagedIconPackGateResult {
+  if (typeof pcAssetsDir !== 'string' || pcAssetsDir.length === 0) {
+    throw new TypeError('pcAssetsDir must be a non-empty string')
+  }
+  if (!Array.isArray(effectFiles)) {
+    throw new TypeError('effectFiles must be an array')
+  }
+  if (typeof exists !== 'function') {
+    throw new TypeError('exists must be a function')
+  }
+  const missing = missingStagedIconPackAssets(pcAssetsDir, effectFiles, exists)
+  return { skip: missing.length > 0, missing }
+}
+
+/**
+ * F2：打包前闸门接线点。extraResources 会把 resources/nikkisync/pc 整树搬进安装包，
+ * 缺 manifest 或任一效果图标都意味着装机后图标能力不可用，必须计入 blocking。
+ */
+function checkStagedIconPackAssets(): void {
+  const pcAssetsDir = path.join(ROOT, 'resources', 'nikkisync', 'pc')
+  const effectFiles = PHOTO_FILTER_ICON_IDS.map((id) => `filter-${id}.webp`)
+  const { missing } = stagedIconPackGate(pcAssetsDir, effectFiles, (file) => fs.existsSync(file))
+  if (missing.length > 0) {
+    for (const file of missing) {
+      fail(`暂存图标包缺失: ${file}（请先执行 npm run stage:nikkisync-pc）`)
+    }
+  } else {
+    pass(`暂存图标包齐备：两个 manifest + ${effectFiles.length} 张效果图`)
+  }
 }
 
 /**
@@ -1439,6 +1507,9 @@ function main(): void {
 
   // 12.8 第三方许可证声明闸门（MIT 版权声明与许可全文须随包保留）
   checkPackedLegalNoticesConfigured()
+
+  // 12.9 暂存图标包闸门（服装主包 + 滤镜补充包，缺件阻断打包）
+  checkStagedIconPackAssets()
 
   // 结果
   console.log('')

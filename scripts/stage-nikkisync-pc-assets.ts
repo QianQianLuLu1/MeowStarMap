@@ -20,7 +20,28 @@ export interface PcAssetSpec {
   to: string
 }
 
-/** 4 份 legal 文档 + 品牌图 + 小程序入口码 + 3 个 PS 脚本（逐字来自上游 windows-app.ts 的 readFileSync 清单，4cb71e2 起含 wechat-mini-entry.png）。 */
+/**
+ * a49764bb：上游 `assets/photo-filter-icons/manifest.json` 的 21 条 `effectEntries`。
+ * 实测缺 `1090020018`，故 1..17 + 19..22 两段拼接，不臆造不存在的资源。
+ */
+export const PHOTO_FILTER_ICON_IDS: readonly string[] = [
+  ...Array.from({ length: 17 }, (_, index) => String(1090020001 + index)),
+  ...Array.from({ length: 4 }, (_, index) => String(1090020019 + index))
+]
+
+/** 1.0.40 补充包：manifest + effects/filter-<id>.webp，目标目录与上游同构（loadLocalClothingIconPack 按相对路径读）。 */
+const PHOTO_FILTER_ICON_SPECS: readonly PcAssetSpec[] = [
+  {
+    from: path.join('assets', 'photo-filter-icons', 'manifest.json'),
+    to: path.join('photo-filter-icons', 'manifest.json')
+  },
+  ...PHOTO_FILTER_ICON_IDS.map((id) => ({
+    from: path.join('assets', 'photo-filter-icons', 'effects', `filter-${id}.webp`),
+    to: path.join('photo-filter-icons', 'effects', `filter-${id}.webp`)
+  }))
+]
+
+/** 4 份 legal 文档 + 品牌图 + 小程序入口码 + 3 个 PS 脚本 + 22 项滤镜图标（逐字来自上游 windows-app.ts 的 readFileSync 清单，4cb71e2 起含 wechat-mini-entry.png）。 */
 export const PC_ASSET_SPECS: readonly PcAssetSpec[] = [
   {
     from: path.join('docs', 'store-submission', 'PRIVACY_POLICY.md'),
@@ -55,7 +76,8 @@ export const PC_ASSET_SPECS: readonly PcAssetSpec[] = [
   {
     from: path.join('tools', 'wechat-gallery', 'rotate-png.ps1'),
     to: path.join('wechat', 'rotate-png.ps1')
-  }
+  },
+  ...PHOTO_FILTER_ICON_SPECS
 ]
 
 export interface PlannedAsset {

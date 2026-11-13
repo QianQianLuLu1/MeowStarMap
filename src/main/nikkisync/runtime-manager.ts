@@ -1047,6 +1047,8 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       ...(session.extraDirectories ? { extraDirectories: session.extraDirectories } : {}),
       ...(session.accounts ? { accounts: session.accounts } : {}),
       ...(session.thumbnailCache ? { thumbnailCache: session.thumbnailCache } : {}),
+      // a49764bb：本地图标包同一引用透传给微信画廊（缺席即回落在线模式）
+      ...(session.localClothingIcons ? { localClothingIcons: session.localClothingIcons } : {}),
       // D5：LAN 同步服务实际监听端口（未运行 undefined），控制页状态展示用
       syncPort: () => state.syncAddress?.port
     }

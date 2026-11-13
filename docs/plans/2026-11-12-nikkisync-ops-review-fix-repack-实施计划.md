@@ -137,7 +137,7 @@ ls release/win-unpacked/*.exe          # e2e:smoke 硬依赖（当前存在，�
 
 ### T3｜P3 错误文案收口（根因修复）
 
-- **涉及文件**：`src/shared/errors/app-error.ts`（**受保护路径**）、`src/renderer/hooks/useStagedTask.ts`、`src/renderer/pages/RecycleBinPage.tsx`（`:19`、`:179`、`:264`、`:346`）、`src/renderer/hooks/useFavoriteToggle.test.ts`、`src/renderer/hooks/useStagedTask.test.tsx`、`src/renderer/pages/RecycleBinPage.restore.test.tsx`、可选新建 `src/shared/errors/app-error.test.ts`
+- **涉及文件**：`src/shared/errors/app-error.ts`（**受保护路径**）、`src/renderer/hooks/useStagedTask.ts`、`src/renderer/pages/RecycleBinPage.tsx`（`:19`、`:179`、`:264`、`:346`）、`src/renderer/hooks/useFavoriteToggle.test.ts`、`src/renderer/hooks/useStagedTask.test.tsx`、`src/renderer/pages/RecycleBinPage.restore.test.tsx`、计划新增且未实施的 `src/shared/errors/app-error.test.ts`
 - **输入 / 输出**：任意 `unknown` 错误（含 `IpcError` 形态 `Error & {userMessage}`）→ toast / `final.message` 用户文案
 - **验收标准**：`extractUserMessage` 对 `AppError` 行为零变化；对 `IpcError` 形态返回 `userMessage`；3 处 toast 均经 `extractUserMessage`；`npx tsx scripts/core-path-gate.ts` 与 `npm run lint`（`local/core-path-guard`）通过；`useErrorToast.test.ts`、`useIpcCall.test.ts`、`useFavoriteToggle.test.ts` 既有用例全绿
 - **裁定：选根因修复（改 shared 函数），不在渲染层复制 helper**。依据：`src/main/preload/AGENTS.md:116` 明文「userMessage 经 `extractUserMessage(error)` 取用」，`src/shared/AGENTS.md:73` 要求 toast 必经该函数；一次修复同时惠及 `useErrorToast.ts:110`、`useIpcCall.ts:207`、`useFavoriteToggle` 等既有调用点，比新增第 3、4 份本地 helper（违反 `src/renderer/AGENTS.md:69`）改动更小。用 duck typing，**不 import preload 的 `IpcError`**，shared 层保持零 electron 依赖。
@@ -160,7 +160,7 @@ ls release/win-unpacked/*.exe          # e2e:smoke 硬依赖（当前存在，�
      不改 `toIpcError` / `isAppError` / 任何子类。
   2. `useStagedTask.ts:165` → `const message = extractUserMessage(err, String(err))`，加 `import { extractUserMessage } from '../../shared/errors/app-error'`（传 fallback 保持原非 Error 语义）。该文件在 `src/renderer/hooks/`，**非受保护路径**。
   3. `RecycleBinPage.tsx:19` 引入 `extractUserMessage`；`:179` → `showMessage(extractUserMessage(error, t('recycleBin.restoreFailed')),'error')`；`:264` / `:346` → `showMessage(extractUserMessage(final.message ?? t('recycleBin.…Failed')),'error')`。
-  4. 可选 `src/shared/errors/app-error.test.ts`：正常（`AppError.userMessage` 优先）/ 异常（IpcError 形态）/ 边界（`userMessage` 非字符串、空白串、`null`、数字 → 回落）三例。
+  4. 计划新增且未实施的 `src/shared/errors/app-error.test.ts`：正常（`AppError.userMessage` 优先）/ 异常（IpcError 形态）/ 边界（`userMessage` 非字符串、空白串、`null`、数字 → 回落）三例。
 
 ### T4｜P5 补 nikkisync 删除进度回归用例
 
@@ -308,7 +308,7 @@ npx tsx scripts/core-path-gate.ts --staged    # 暂存前可跳过，T8 时由�
 | 边界 | `page.edits.length===0`                | `mediaStore.recycle-nikkisync.test.ts`（R3）                                | 续页后 `recycleBinHasMore===false`                                          |
 | 边界 | `consumed===0` 且 `total>0`            | 同上                                                                        | 不重复取同一页（`listHidden` 调用次数有上限）                               |
 | 边界 | 非 Error 的 reject 值                  | `useFavoriteToggle.test.ts:163-172`（既有）                                 | `onShowMessage('收藏操作失败','error')`                                     |
-| 边界 | `userMessage` 非字符串/空白串/`null`   | `src/shared/errors/app-error.test.ts`（可选）                               | 回落 `error.message` / `fallback`，不抛错                                   |
+| 边界 | `userMessage` 非字符串/空白串/`null`   | `src/shared/errors/app-error.test.ts`（计划新增且未实施）                   | 回落 `error.message` / `fallback`，不抛错                                   |
 
 **TDD 硬性要求**：T1/T2/T3 的每条新增回归用例在修复前必须处于失败状态并留证；若修复前即通过，重写断言直至准确暴露问题再修代码。**不得**跳过、注释掉、删除测试，不得伪造或弱化失败结果。
 

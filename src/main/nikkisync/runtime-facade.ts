@@ -235,6 +235,8 @@ export interface RuntimeSurface {
   metadataResolverConfigFile?: NikkiSyncModule
   metadataDictionaryRemoteConfigFile?: NikkiSyncModule
   metadataThumbnailCache?: NikkiSyncModule
+  /** a49764bb：本地服装/效果图标包深入口（可选，老链接会话上缺席时不启用本地图标模式）。 */
+  localClothingIconPack?: NikkiSyncModule
 }
 
 /** `row-mappers.js` 的深入口相对路径（不在上游 `src/index.ts` 桶导出内）。 */
@@ -346,6 +348,13 @@ export const GAME_VERSION_UPDATE_SERVICE_DEEP_ENTRY = [
  */
 export const WECHAT_DELETION_DEEP_ENTRY = ['wechat', 'WeChatDeletion.js'] as const
 export const WECHAT_INSPIRATION_DEEP_ENTRY = ['wechat', 'WeChatInspiration.js'] as const
+
+/**
+ * a49764bb（v1.0.39/1.0.40）：本地服装/拍摄效果图标包的装载深入口。
+ * 导出 `loadLocalClothingIconPack` / `withLocalPhotoEffectIcons`，由 createRuntimeSession
+ * 在会话构造期装载主包与滤镜补充包；产物存在性由 verify-nikkisync-link.ts 的能力清单守护。
+ */
+export const LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY = ['metadata', 'LocalClothingIconPack.js'] as const
 
 /**
  * K2-0 落档（上游 `Nuan5CompatibleResolver.resolve` 的实际出站体，逐字段核实于 b422193）：
@@ -468,6 +477,16 @@ export async function loadRuntimeSurface(
   // 变量式 import：URL 来自变量而非字面量，保持与 runtime-loader 同一护栏口径
   const loadDeepModule = async (segments: readonly string[]): Promise<NikkiSyncModule> =>
     await import(/* @vite-ignore */ resolveDeepEntryUrl(root.root, segments))
+  /** a49764bb 图标包是新增可选深入口：老链接缺件时只不挂该面，不牵连整条装载链。 */
+  const loadOptionalDeepModule = async (
+    segments: readonly string[]
+  ): Promise<NikkiSyncModule | undefined> => {
+    try {
+      return await loadDeepModule(segments)
+    } catch {
+      return undefined
+    }
+  }
   const rowMappers = await loadDeepModule(ROW_MAPPER_DEEP_ENTRY)
   const suitSearchIndex = await loadDeepModule(SUIT_SEARCH_DEEP_ENTRY)
   const clothingSearchIndex = await loadDeepModule(CLOTHING_SEARCH_DEEP_ENTRY)
@@ -488,6 +507,7 @@ export async function loadRuntimeSurface(
     METADATA_DICTIONARY_REMOTE_CONFIG_DEEP_ENTRY
   )
   const metadataThumbnailCache = await loadDeepModule(METADATA_THUMBNAIL_CACHE_DEEP_ENTRY)
+  const localClothingIconPack = await loadOptionalDeepModule(LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY)
   return {
     pcCompanion,
     database,
@@ -507,7 +527,8 @@ export async function loadRuntimeSurface(
     metadataStartupComposition,
     metadataResolverConfigFile,
     metadataDictionaryRemoteConfigFile,
-    metadataThumbnailCache
+    metadataThumbnailCache,
+    ...(localClothingIconPack ? { localClothingIconPack } : {})
   }
 }
 
@@ -778,6 +799,55 @@ export async function createRuntimeSession(
     const fn = (mod as unknown as Record<string, unknown> | undefined)?.[name]
     return typeof fn === 'function' ? (fn as (...a: unknown[]) => T)(...args) : undefined
   }
+
+  /**
+   * a49764bb：复刻上游 `windows-app.ts:103-117` 的本地图标包装配。
+   * 主包（服装 + pose/lighting/filter 效果）为必需，滤镜补充包可选合并；
+   * 仅主包 `valid===true` 时切本地模式，其余一律保持在线图标模式并留 warn。
+   * 全部读取复用上游 `loadLocalClothingIconPack` / `withLocalPhotoEffectIcons`，不重写校验。
+   */
+  const iconPackModule = surface.localClothingIconPack as unknown as
+    Record<string, unknown> | undefined
+  // F4：createRuntimeSession 允许被 CLI / 单测直调（此时没有 createManagerDependencies
+  // 注入的 onWarning），缺省时用 console.warn 兜底，绝不静默吞掉图标包异常。
+  const warn = (message: string): void => {
+    if (options.onWarning) options.onWarning(message)
+    else console.warn(message)
+  }
+  const loadIconPack = async (directory?: string): Promise<Record<string, unknown> | undefined> => {
+    if (!directory || !path.isAbsolute(directory) || !iconPackModule) return undefined
+    const loader = iconPackModule.loadLocalClothingIconPack
+    if (typeof loader !== 'function') return undefined
+    try {
+      const pack = await loader(directory)
+      return typeof pack === 'object' && pack !== null
+        ? (pack as Record<string, unknown>)
+        : undefined
+    } catch (error) {
+      warn(`[NIKKISYNC] icon pack load failed: ${String(error)}`)
+      return undefined
+    }
+  }
+  const mainIconPack = await loadIconPack(options.clothingIconsDir)
+  const supplementIconPack = await loadIconPack(options.photoFilterIconsDir)
+  const mergeIconPacks = iconPackModule?.withLocalPhotoEffectIcons
+  let localClothingIcons: Record<string, unknown> | undefined
+  if (mainIconPack?.valid === true) {
+    // F4：合并调用不在 :961 的组装大 try 内，上游抛错会直接令会话失败；
+    // 按 :806 约定回落在线图标模式并留 warn，不牵连整个会话。
+    try {
+      localClothingIcons =
+        typeof mergeIconPacks === 'function'
+          ? (mergeIconPacks(mainIconPack, supplementIconPack) as Record<string, unknown>)
+          : mainIconPack
+    } catch (error) {
+      localClothingIcons = undefined
+      warn(`[NIKKISYNC] icon pack merge failed; online icons retained: ${String(error)}`)
+    }
+  } else if (mainIconPack) {
+    warn('[NIKKISYNC] icon pack manifest invalid; online icons retained')
+  }
+
   const composition = surface.metadataStartupComposition
   const resolverFile = options.metadataResolverFile
     ? callModule<Record<string, unknown> | undefined>(
@@ -807,13 +877,24 @@ export async function createRuntimeSession(
   const ThumbnailCacheCtor = (
     surface.metadataThumbnailCache as unknown as Record<string, unknown> | undefined
   )?.MetadataThumbnailCache as (new (config: { cacheDir: string }) => unknown) | undefined
-  const thumbnailCache =
+  /**
+   * F1：server 侧沿用上游 windows-app.ts:111 的互斥语义（有本地包就不挂
+   * metadataThumbnailCache），但 pcCompanionContext() 仍须下发同一个缓存实例：
+   * 装配层在老链接缺 convertWeChatWebp / ffmpeg 时会 fail-closed 回落在线图标，
+   * 若这里连缓存一起抽掉，本地与在线两条图标链会同时断开。
+   */
+  const onlineThumbnailCache =
     dictionaryEnabled && options.metadataThumbnailCacheDir && ThumbnailCacheCtor
       ? new ThumbnailCacheCtor({ cacheDir: options.metadataThumbnailCacheDir })
       : undefined
-  const serverConfig = thumbnailCache
-    ? { ...syncServer, metadataThumbnailCache: thumbnailCache }
-    : syncServer
+  const serverConfig = {
+    ...syncServer,
+    ...(onlineThumbnailCache && !localClothingIcons
+      ? { metadataThumbnailCache: onlineThumbnailCache }
+      : {}),
+    // 必须传完整 pack：LocalSyncServer 会调 read()/readEffect()，只给 cacheVersion 会 TypeError
+    ...(localClothingIcons ? { localClothingIcons } : {})
+  }
 
   const metadataFragment = buildMetadataResolverConfig({
     enabled: metadataResolverEnabled,
@@ -1071,8 +1152,11 @@ export async function createRuntimeSession(
       ...(runtime.server.inspirations
         ? { inspirations: runtime.server.inspirations as unknown as InspirationRepositoryLike }
         : {}),
-      // 4cb71e2：缩略图缓存单实例（与 server 共享）；仅构造成功时挂出（见上方 thumbnailCache）
-      ...(thumbnailCache ? { thumbnailCache } : {})
+      // 4cb71e2：缩略图缓存单实例（与 server 共享）；仅构造成功时挂出。
+      // F1：即使本地图标包生效也要下发，供装配层在转换器缺席时回落在线图标。
+      ...(onlineThumbnailCache ? { thumbnailCache: onlineThumbnailCache } : {}),
+      // a49764bb：合并后的本地图标包，供 PC 端装配层在画廊侧复用同一实例
+      ...(localClothingIcons ? { localClothingIcons } : {})
     })
   } catch (error) {
     try {
@@ -1100,7 +1184,11 @@ export function createManagerDependencies(
     defaults,
     ...(pairingHostResolver ? { resolvePairingHost: pairingHostResolver } : {}),
     ...(pairingHostsResolver ? { resolvePairingHosts: pairingHostsResolver } : {}),
-    createSession: (options) => createRuntimeSession(options),
+    createSession: (options) =>
+      createRuntimeSession({
+        ...options,
+        onWarning: options.onWarning ?? ((message) => log('warn', message))
+      }),
     isLinkReady: (projectRoot) => hasNikkiSyncLink(projectRoot),
     ensureDatabaseDirectory: (databaseFile) => {
       mkdirSync(path.dirname(databaseFile), { recursive: true })

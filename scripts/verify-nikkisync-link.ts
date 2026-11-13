@@ -96,7 +96,14 @@ export const NIKKISYNC_CAPABILITY_ARTIFACTS: readonly string[] = [
   path.join('dist', 'src', 'wechat', 'WeChatDeletion.js'),
   path.join('dist', 'src', 'wechat', 'WeChatInspiration.js'),
   path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
-  path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
+  path.join('dist', 'src', 'server', 'GameVersionUpdateService.js'),
+  // a49764bb（v1.0.39/1.0.40）：本地图标包与本地照片解码的 4 个新增 metadata 产物。
+  // 只有 LocalClothingIconPack.js 是本仓主动深入口；其余 3 个是上游静态传递依赖，
+  // 由 closureLoadChain 沿 import 边覆盖，不另加 LOAD_CHAIN_ROOTS 根。
+  path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js'),
+  path.join('dist', 'src', 'metadata', 'LocalPhotoMetadataResolver.js'),
+  path.join('dist', 'src', 'metadata', 'MetadataInputFingerprint.js'),
+  path.join('dist', 'src', 'metadata', 'VerifiedPhotographyNames.js')
 ]
 
 /**
@@ -116,9 +123,9 @@ export const CHAIN_REQUIRED_ARTIFACTS: readonly string[] = [
 ]
 
 /**
- * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部 25 个
+ * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部 26 个
  * `*_DEEP_ENTRY` 深入口。判据是「本仓实际会装载什么」，不是「上游有多少文件」。与
- * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那 25 个常量不能被 scripts 直接
+ * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那 26 个常量不能被 scripts 直接
  * import（会牵进 electron 依赖图），故由 `scripts/__tests__/verify-nikkisync-link.test.ts` 从
  * 其源码文本里抽出字面量、与本表逐项相等，任一侧漂移即红。
  */
@@ -151,7 +158,9 @@ export const LOAD_CHAIN_ROOTS: readonly string[] = [
   path.join('dist', 'src', 'wechat', 'WeChatDeletion.js'),
   path.join('dist', 'src', 'wechat', 'WeChatInspiration.js'),
   path.join('dist', 'src', 'RuntimeMemoryMaintenance.js'),
-  path.join('dist', 'src', 'server', 'GameVersionUpdateService.js')
+  path.join('dist', 'src', 'server', 'GameVersionUpdateService.js'),
+  // a49764bb：与 runtime-facade.ts 的 LOCAL_CLOTHING_ICON_PACK_DEEP_ENTRY 一一对应
+  path.join('dist', 'src', 'metadata', 'LocalClothingIconPack.js')
 ]
 
 /** 装载链上「源模块 → 相对说明符」的一条边（只记文本形态，不掺宿主分隔符语义）。 */

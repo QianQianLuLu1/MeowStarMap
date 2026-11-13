@@ -484,6 +484,8 @@ export interface NikkiSyncRuntimeSession {
    * （对齐上游 windows-app.ts 的单实例共享），经会话透传给 PC 端装配层。
    */
   thumbnailCache?: unknown
+  /** a49764bb：合并后的本地服装/效果图标包（主包 valid 时挂出，供 PC 端装配层复用同一实例）。 */
+  localClothingIcons?: unknown
 }
 
 /**
@@ -534,6 +536,8 @@ export interface PcCompanionSessionContext {
   extraDirectories?: unknown
   accounts?: unknown
   thumbnailCache?: unknown
+  /** a49764bb：会话级本地图标包（同一引用透传给微信画廊，缺席即回落在线模式）。 */
+  localClothingIcons?: unknown
   /**
    * LAN 同步服务实际监听端口（未运行 undefined）——控制页「同步与连接」的状态展示用（D5：
    * 修复前 dashboard 的 getStatus 误传 dashboard 自身端口）。
@@ -598,6 +602,13 @@ export interface NikkiSyncSessionOptions {
   /** 服装缩略图缓存目录（上游 MetadataThumbnailCache 自行创建）。 */
   metadataThumbnailCacheDir?: string
   /**
+   * a49764bb：本地服装图标主包目录（必为绝对路径）。缺席时会话保持在线图标模式。
+   * 由 `buildSessionOptions` 从 `resolvePcAssetsDir` 派生，不接受渲染层输入。
+   */
+  clothingIconsDir?: string
+  /** a49764bb：1.0.40 滤镜效果补充包目录（同上）。 */
+  photoFilterIconsDir?: string
+  /**
    * 兼容层（b422193）：上游启动阶段回调透传缝。本仓编排不调 `runtime.start()`
    * （它会无条件启 LAN 服务），上游六阶段在本仓编排下不会自然发生；K1 由
    * runtime-manager 在自身编排点自报**真实发生**的阶段，缺省时连键都不下发。
@@ -614,6 +625,8 @@ export interface NikkiSyncSessionOptions {
    * retiredRoots}` 形状——上游文件即单一真相源，本仓不落设置键）。
    */
   extraDirectoriesFile?: string
+  /** a49764bb：非致命降级告警通道（装配层注入 runtimeLog 的 warn 级）。 */
+  onWarning?: (message: string) => void
 }
 
 /** IPC / 装配层消费的句柄（`ctx.nikkisyncRuntime`）。 */

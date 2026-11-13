@@ -205,3 +205,7 @@ playwright/.cache/
 
 # ===== 外部参考数据缓存（参考数据服务运行时缓存，生产落 userData；防开发态误写仓库根）=====
 /reference-data/
+
+# ===== NikkiSync PC 派生图标包（上游 EXE 抽取 / stage 生成，约 74 MiB，不入库）=====
+/resources/nikkisync/pc/clothing-icons/
+/resources/nikkisync/pc/photo-filter-icons/

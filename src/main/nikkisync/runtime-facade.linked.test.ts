@@ -1,6 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
+import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -36,7 +38,12 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const LINKED = hasNikkiSyncLink(projectRoot)
 const suite = LINKED ? describe : describe.skip
 
-/** 上游 `0001_initial.sql` 建的 12 张业务表。 */
+/**
+ * 上游 `0001_initial.sql` 建的 14 张业务表。
+ * a49764bb：迁移全文原地追加 `nuan5_resolution` / `nuan5_endpoint_state`，
+ * 上游 `DatabaseManager.initialize()` 无版本门禁、每次都 exec 全文（IF NOT EXISTS），
+ * 因此新建库与存量库都会得到这两张表。
+ */
 const MIGRATION_TABLES = [
   'app_settings',
   'assets',
@@ -45,6 +52,8 @@ const MIGRATION_TABLES = [
   'library_state',
   'metadata_dictionary_entries',
   'metadata_dictionary_state',
+  'nuan5_endpoint_state',
+  'nuan5_resolution',
   'paired_devices',
   'pairing_sessions',
   'resolver_candidates',
@@ -166,11 +175,13 @@ afterAll(async () => {
     session.dispose()
     session = undefined
   }
-  if (fixtureRoot) fs.rmSync(fixtureRoot, { recursive: true, force: true })
+  if (fixtureRoot) {
+    fs.rmSync(fixtureRoot, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+  }
 })
 
 suite('runtime-facade 链接态', () => {
-  it('会话创建：库文件落在 userData 下，16 张业务表（12 迁移 + 4 运行期自建）建齐', async () => {
+  it('会话创建：库文件落在 userData 下，18 张业务表（14 迁移 + 4 运行期自建）建齐', async () => {
     session = await createRuntimeSession({
       databaseFile,
       gameRoot: path.join(fixtureRoot, 'game'),
@@ -183,6 +194,11 @@ suite('runtime-facade 链接态', () => {
     // 这正是本轮要消灭的静默欠钉（02 计划 §0.2）。
     const tables = session.tableNames()
     expect([...tables].sort()).toEqual([...BUSINESS_TABLES, ...DERIVED_TABLES].sort())
+    // a49764bb：0001_initial.sql 追加的 resolver 指纹索引必须随新库一起落地。
+    const indexes = session.runtime.database.connection
+      .prepare("SELECT name FROM sqlite_master WHERE type='index'")
+      .all() as Array<{ name: string }>
+    expect(indexes.map((row) => row.name)).toContain('idx_assets_resolver_fingerprint')
   })
 
   it('扫描：上游 ScannerService 发现夹具根并把静图/视频聚合入库', async () => {
@@ -508,6 +524,62 @@ suite('同一库文件二次 createRuntimeSession 重开（兼容层 C3-3：老�
       name: 'initial_asset_resource_sync_schema'
     })
     second.dispose()
+  }, 30000)
+})
+
+suite('旧库升级：4cb71e2 结构的 nikkisync.db 在新版启动后自动补齐 2 表 1 索引', () => {
+  it('本仓零自研 DDL，上游 initialize() 重跑全文迁移即补齐；表集合与新版闭集一致', async () => {
+    // 事实证明：DatabaseManager.initialize() 无 schema_migrations 版本门禁，每次都 exec
+    // 0001_initial.sql 全文（IF NOT EXISTS 幂等）。因此旧库重启会自然获得新增对象，
+    // 本仓不需要另写一套迁移；此用例把「旧库 → 新版」的结果钉成可判定判据。
+    const upRoot = process.env.NIKKISYNC_ROOT || path.join(projectRoot, '..', 'NikkiSync')
+    const legacySql = execFileSync(
+      'git',
+      ['-C', upRoot, 'show', '4cb71e2:packages/database/migrations/0001_initial.sql'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    )
+
+    const legacyDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nikkisync-legacy-db-'))
+    let upgraded: NikkiSyncRuntimeSession | undefined
+    try {
+      const legacyFile = path.join(legacyDir, 'nikkisync.db')
+      const db = new DatabaseSync(legacyFile)
+      db.exec(legacySql)
+      const before = db
+        .prepare("SELECT name FROM sqlite_master WHERE type='table'")
+        .all() as Array<{ name: string }>
+      expect(before.map((row) => row.name)).not.toContain('nuan5_resolution')
+      db.close()
+
+      upgraded = await createRuntimeSession({
+        databaseFile: legacyFile,
+        gameRoot: path.join(fixtureRoot, 'game'),
+        watcher: false,
+        projectRoot
+      })
+      const tables = upgraded.tableNames()
+      expect(tables).toContain('nuan5_resolution')
+      expect(tables).toContain('nuan5_endpoint_state')
+      expect([...tables].sort()).toEqual([...BUSINESS_TABLES, ...DERIVED_TABLES].sort())
+
+      const indexes = upgraded.runtime.database.connection
+        .prepare("SELECT name FROM sqlite_master WHERE type='index'")
+        .all() as Array<{ name: string }>
+      expect(indexes.map((row) => row.name)).toContain('idx_assets_resolver_fingerprint')
+
+      const migrationRows = upgraded.runtime.database.connection
+        .prepare('SELECT version, name FROM schema_migrations ORDER BY version')
+        .all() as Array<{ version: number; name: string }>
+      expect(migrationRows).toHaveLength(1)
+      expect(migrationRows[0]).toMatchObject({
+        version: 1,
+        name: 'initial_asset_resource_sync_schema'
+      })
+    } finally {
+      upgraded?.dispose()
+      // Windows 上 node:sqlite 关闭后文件句柄可能稍晚释放，重试避免 EBUSY 掩盖真实断言。
+      fs.rmSync(legacyDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+    }
   }, 30000)
 })
 
