@@ -20,6 +20,8 @@ export function buildScannerConfig(input: ScannerConfigInput): Record<string, un
   return {
     ...(input.gameRoot ? { selectedInstallRoot: input.gameRoot } : {}),
     watcher: input.watcher,
+    // F11：此开关使上游缺安装根时不再抛 notfound；宿主的 degraded 分类由
+    // runtime-manager start 成功支按同条件（无安装根且无额外目录）自行保证。
     allowMissingInstallation: true,
     ...(input.extraDirectories === undefined ? {} : { extraDirectories: input.extraDirectories }),
     ...(input.retiredExtraDirectories === undefined

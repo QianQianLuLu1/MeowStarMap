@@ -2273,3 +2273,34 @@ describe('F4 安装根缓存回写编排（cacheInstallRoot）', () => {
     await manager.stop()
   })
 })
+
+describe('F11 allowMissingInstallation 下的 degraded 分类（G3 对齐回归）', () => {
+  it('异常：无安装根且无额外目录 ⇒ degraded（上游不再抛 notfound，宿主同条件自行分类）', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        scannerStatusRaw: { status: 'running' },
+        scanRoots: []
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('degraded')
+    expect(status.error).toContain('installation was not found')
+    await manager.stop()
+  })
+
+  it('边界：无安装根但有额外目录 ⇒ running（上游旧抛错条件含 extraDirectories.length===0）', async () => {
+    const { deps } = createDependencies(
+      {},
+      {
+        scannerStatusRaw: { status: 'running' },
+        scanRoots: ['D:/extra-photos']
+      }
+    )
+    const manager = createRuntimeManager(deps)
+    const status = await manager.start(DEFAULTS)
+    expect(status.state).toBe('running')
+    await manager.stop()
+  })
+})

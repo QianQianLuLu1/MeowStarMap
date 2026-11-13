@@ -537,18 +537,29 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
       captureMetadataCounters(session)
       try {
         await session.scanner.start()
-        state.state = 'running'
-        // K1：scanner.start 成功 = scanner 阶段真实发生；start 完成 = runtime-ready
-        recordStage('scanner')
-        recordStage('runtime-ready')
-        // F4：对齐上游 windows-app.ts:221-224——启动成功后回写一次安装根缓存。
-        // best-effort：写失败只 warn，绝不影响已 running 的主状态。
-        try {
-          session.cacheInstallRoot?.()
-        } catch (error) {
-          deps.log('warn', `nikkisync install root cache write failed: ${messageOf(error)}`)
+        // F11：G3 对齐下传 allowMissingInstallation:true 后，上游在缺安装根时不再抛
+        // notfound（ScannerService.ts:51 的旧抛错条件被该开关短路）。宿主必须按旧抛错
+        // 的同条件（无安装根且无额外目录）自行分类 degraded，保住 applyGameRoot /
+        // 恢复默认的 savedDeferred 语义（e2e G3 回归钉）；有额外目录时扫描合法运行。
+        const started = readScannerSnapshot(session.scanner.getStatus())
+        if (!started.installation && session.scanner.getScanRoots().length === 0) {
+          state.state = 'degraded'
+          state.error = installNotfoundMessage
+          deps.log('warn', `nikkisync scanner not started: ${installNotfoundMessage}`)
+        } else {
+          state.state = 'running'
+          // K1：scanner.start 成功 = scanner 阶段真实发生；start 完成 = runtime-ready
+          recordStage('scanner')
+          recordStage('runtime-ready')
+          // F4：对齐上游 windows-app.ts:221-224——启动成功后回写一次安装根缓存。
+          // best-effort：写失败只 warn，绝不影响已 running 的主状态。
+          try {
+            session.cacheInstallRoot?.()
+          } catch (error) {
+            deps.log('warn', `nikkisync install root cache write failed: ${messageOf(error)}`)
+          }
+          deps.log('info', `nikkisync runtime started (gameRoot=${options.gameRoot ?? 'auto'})`)
         }
-        deps.log('info', `nikkisync runtime started (gameRoot=${options.gameRoot ?? 'auto'})`)
       } catch (error) {
         state.error = messageOf(error)
         if (state.error.includes(installNotfoundMessage)) {
