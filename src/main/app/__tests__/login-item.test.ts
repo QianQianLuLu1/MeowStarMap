@@ -3,6 +3,8 @@
  * 运行：npx vitest run src/main/app/__tests__/login-item.test.ts
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { AppError } from '../../../shared/errors/app-error'
 
 const m = vi.hoisted(() => {
@@ -13,7 +15,11 @@ const m = vi.hoisted(() => {
     setLoginItemSettings: vi.fn((s: { openAtLogin: boolean; name?: string }) => {
       if (s.name === undefined) loginItemState.openAtLogin = s.openAtLogin
     }),
-    getLoginItemSettings: vi.fn(() => ({ openAtLogin: loginItemState.openAtLogin })),
+    // 返回 unknown：各用例可用 mockReturnValueOnce 模拟非布尔 / 带 launchItems 的真实 OS 读数
+    getLoginItemSettings: vi.fn((): unknown => ({
+      openAtLogin: loginItemState.openAtLogin,
+      launchItems: []
+    })),
     diagLog: vi.fn(),
     logStartupError: vi.fn(),
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
@@ -47,12 +53,18 @@ import {
   cleanupLegacyLoginItemNames,
   LEGACY_LOGIN_ITEM_NAMES
 } from '../login-item'
+import * as loginItemModule from '../login-item'
 
 describe('login-item 开机自启共享模块', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     m.appIsPackaged = true
     m.loginItemState.openAtLogin = false
+    // 每个用例都从干净的 OS 读数起步，避免 mockImplementationOnce 队列跨用例残留
+    m.getLoginItemSettings.mockImplementation(() => ({
+      openAtLogin: m.loginItemState.openAtLogin,
+      launchItems: []
+    }))
   })
 
   it('C1 正常/边界：常量正确，脏值一律回落默认 true', () => {
@@ -173,5 +185,83 @@ describe('login-item 开机自启共享模块', () => {
       m.getLoginItemSettings.mockReturnValueOnce({ openAtLogin: false })
       expect(() => syncLoginItemSetting(true)).toThrow(AppError)
     }
+  })
+
+  // ===== 历史 Run 值名残留（Electron launchItems 动态发现）=====
+  // 根因：setLoginItemSettings 不传 name 时，Run 值名取 AppUserModelId()；
+  // 该 AUMID 是 c7c7c92 才引入的，晚于引入自启功能的 69343e3，故中间分发的构建
+  // 写入过旧默认名。不再靠人工猜名单，改由 OS 读数按 exe 路径精确识别。
+
+  const launchItem = (name: string, exePath = process.execPath, scope = 'user') => ({
+    name,
+    path: exePath,
+    args: [],
+    scope,
+    enabled: true
+  })
+
+  const cleanedNames = () =>
+    m.setLoginItemSettings.mock.calls
+      .map(([settings]) => (settings as { name?: string }).name)
+      .filter((name) => name !== undefined)
+
+  it('D1 正常（红测）：OS 报出指向本应用 exe 的历史值名时必须清理', () => {
+    m.getLoginItemSettings.mockImplementation(() => ({
+      openAtLogin: true,
+      launchItems: [launchItem('legacy-aumid')]
+    }))
+    expect(syncLoginItemSetting(true)).toEqual({ synced: true })
+    expect(m.setLoginItemSettings).toHaveBeenCalledWith({
+      openAtLogin: false,
+      name: 'legacy-aumid'
+    })
+  })
+
+  it('D2 边界（红测）：当前受管名 / 其它应用 / machine 作用域一律不得清理', () => {
+    m.getLoginItemSettings.mockImplementation(() => ({
+      openAtLogin: true,
+      launchItems: [
+        launchItem('legacy-aumid'),
+        launchItem('com.qianlu.meow-star-map'),
+        launchItem('legacy-machine', process.execPath, 'machine'),
+        launchItem('other-app', 'C:\\Other\\app.exe')
+      ]
+    }))
+    expect(syncLoginItemSetting(true)).toEqual({ synced: true })
+    expect(cleanedNames()).toEqual(['legacy-aumid'])
+  })
+
+  it('D3 边界（红测）：注册表路径带引号与大小写差异时仍能识别本应用 exe', () => {
+    const quotedUpper = `"${process.execPath.toUpperCase()}"`
+    m.getLoginItemSettings.mockImplementation(() => ({
+      openAtLogin: true,
+      launchItems: [launchItem('legacy-quoted', quotedUpper)]
+    }))
+    expect(syncLoginItemSetting(true)).toEqual({ synced: true })
+    expect(m.setLoginItemSettings).toHaveBeenCalledWith({
+      openAtLogin: false,
+      name: 'legacy-quoted'
+    })
+  })
+
+  it('D4 异常（红测）：枚举启动项抛错只留痕，不得阻断主设置同步', () => {
+    let calls = 0
+    m.getLoginItemSettings.mockImplementation(() => {
+      calls += 1
+      if (calls === 2) throw new Error('enum failed')
+      return { openAtLogin: true, launchItems: [] }
+    })
+    expect(syncLoginItemSetting(true)).toEqual({ synced: true })
+    expect(m.diagLog).toHaveBeenCalledWith(
+      'LOGIN',
+      expect.stringContaining('legacy detection failed')
+    )
+  })
+
+  it('D5 边界（红测）：当前受管名必须与 build.appId 同源，防止漂移', () => {
+    const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf8')) as {
+      build: { appId: string }
+    }
+    expect(loginItemModule.CURRENT_LOGIN_ITEM_NAME).toBe(pkg.build.appId)
   })
 })

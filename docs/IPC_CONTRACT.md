@@ -1144,7 +1144,9 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
   （`node_modules/electron/electron.d.ts:1255` / `LoginItemSettingsOptions`）。
   因此主路径**不传 `name`**，保证写入/删除/回读同名；历史遗留值名只用
   `setLoginItemSettings({ openAtLogin:false, name })` 单独清理，不参与回读。
-  **回读校验发现不了旧名残留**，两者是独立路径；现场取证与清理名单见
+  **回读校验发现不了旧名残留**，两者是独立路径。残留值名由
+  `app.getLoginItemSettings().launchItems` 按 exe 路径与 `scope === 'user'` 动态识别
+  （不猜测值名、不误删第三方项），枚举异常只留痕并返回空名单；证据链与真机验收边界见
   本次修复的实施计划文档（2026-11-13 开机自启动开关失效修复）§10。
 - 启动期（`src/main/app/lifecycle.ts` 阶段 8）先比对 OS 实际状态，一致则跳过写入；
   读失败保守仍同步一次；整体失败不阻塞启动链，仅 `logStartupError` 留痕。
