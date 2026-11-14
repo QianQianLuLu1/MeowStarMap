@@ -4,8 +4,8 @@
 > **应用名称**：喵星图（Meow Star Map）
 > **当前版本**：2.5.7-beta
 > **平台**：Windows x64
-> **文档版本**：1.5
-> **最后更新**：2026-11-05
+> **文档版本**：1.6
+> **最后更新**：2026-11-14
 
 ---
 
@@ -259,7 +259,7 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 
 10. scannerManager.setDbPath() + mediaWorkerManager.setDbPath()
 
-11. setupIPC()（注册 43 组 `registerXxxHandlers`，对应 `src/main/ipc/handlers/` 的 43 个域文件 + pathGuard 初始化）
+11. setupIPC()（注册 44 组 `registerXxxHandlers`，对应 `src/main/ipc/handlers/` 的域文件 + pathGuard 初始化）
 
 12. createMainWindow()
     ├─ loadFile('dist/renderer/index.html')
@@ -348,7 +348,7 @@ MeowStarMap/
 │   └── perf-test/                     # 性能基线脚本
 ├── src/
 │   ├── main/                          # 主进程
-│   │   ├── app/                       # 应用生命周期管理（27 个源文件）
+│   │   ├── app/                       # 应用生命周期管理（31 个源文件）
 │   │   │   ├── application.ts         # 应用主类（阶段化编排）
 │   │   │   ├── lifecycle.ts           # 生命周期管理（单实例锁等）
 │   │   │   ├── cleanup.ts             # 退出清理
@@ -372,7 +372,12 @@ MeowStarMap/
 │   │   │   ├── gpu-preference.ts / gpu-status.ts # GPU 偏好持久化与状态查询
 │   │   │   ├── native-load-guard.ts   # 原生模块加载预检
 │   │   │   ├── nikkisync-runtime-setup.ts / sync-server-setup.ts # 同步运行时与服务端装配
+│   │   │   ├── login-item.ts          # 开机自启动开关（app.setLoginItemSettings，2026-11-13）
+│   │   │   ├── cdn-user-agent.ts      # 参考数据 CDN 请求的固定 User-Agent（cdn.gongeo.us 网关加白要求）
+│   │   │   ├── app-icon-path.ts       # 应用图标路径解析（asar.unpacked 布局回退，纯函数）
+│   │   │   ├── update-error-class.ts  # 自动更新错误归类（连不上源 vs 源未就绪）
 │   │   │   ├── permission.ts          # 权限管理
+│   │   │   ├── shell/                 # windows-shell 上游外壳对齐（托盘、签名差分/图标增量、匿名诊断、网络冲突修复、临时热点、支持网关客户端等 opt-in 能力）
 │   │   │   └── app-context.ts         # 应用上下文
 │   │   ├── database/                  # 数据库层
 │   │   │   ├── connection.ts          # DatabaseManager
@@ -403,7 +408,7 @@ MeowStarMap/
 │   │   ├── thumbnail/
 │   │   │   ├── generator.ts           # ThumbnailGenerator（单条生成 + LRU）
 │   │   │   └── worker-*.ts            # thumbnail-worker（utilityProcess：sharp 缩放）
-│   │   ├── services/                  # 业务服务层（16 个 service/配置文件）
+│   │   ├── services/                  # 业务服务层（18 个 service/配置文件）
 │   │   │   ├── file-service.ts
 │   │   │   ├── video-service.ts
 │   │   │   ├── watermark-service.ts
@@ -418,12 +423,14 @@ MeowStarMap/
 │   │   │   ├── xmp-metadata-service.ts
 │   │   │   ├── cloth-data-service.ts / cloth-data-config.ts # 搭配码服饰数据查询与数据源配置
 │   │   │   ├── cloth-diy-cache.ts     # 搭配码网络解码结果磁盘缓存（sha256 键）
+│   │   │   ├── reference-data-service.ts / reference-image-service.ts # 外部参考数据查询与参考图服务（2026-11-08）
+│   │   │   ├── reference-data/        # 参考数据子模块（filebox-cipher / image-url / nuan5-config-proto）
 │   │   │   └── log-service.ts
 │   │   ├── ipc/                       # IPC 层
 │   │   │   ├── handler-context.ts     # 依赖注入上下文
 │   │   │   ├── validator.ts           # wrapHandler + PathGuard + schemas
 │   │   │   ├── media-read-guard.ts    # assertMediaReadPath（含 realpath 复检）
-│   │   │   └── handlers/              # 47 个域文件（4 个 _ 前缀辅助与 set-dir-handler 工厂，43 个 registerXxxHandlers）
+│   │   │   └── handlers/              # 48 个域文件（4 个 _ 前缀辅助与 set-dir-handler 工厂，44 个 registerXxxHandlers）
 │   │   │       ├── media-handler.ts / media-lifecycle-handler.ts / media-cleanup-handler.ts
 │   │   │       ├── file.ts / file-export-handler.ts / file-rename-handler.ts
 │   │   │       ├── video.ts / watermark.ts / editor.ts
@@ -469,7 +476,7 @@ MeowStarMap/
 │   │   ├── i18n/                      # 主进程国际化
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # worker 内纯查表翻译
-│   │   ├── utils/                     # 主进程工具（33 个模块）
+│   │   ├── utils/                     # 主进程工具（34 个模块）
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -478,7 +485,7 @@ MeowStarMap/
 │   │   │   ├── scene-brightness.ts / startup-diagnostic.ts
 │   │   │   ├── task-registry.ts / user-diag-path.ts / video-frame.ts / video-probe.ts
 │   │   │   ├── atomic-file.ts / fluent-ffmpeg-shim.ts / image-encode.ts / path-dialect.ts
-│   │   │   ├── physical-file-key.ts / spawn-error-log.ts / zip-archive.ts
+│   │   │   ├── physical-file-key.ts / remote-url-guard.ts / spawn-error-log.ts / zip-archive.ts
 │   │   │   └── worker-restart-policy.ts
 │   │   ├── types/                     # 主进程类型声明
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
@@ -486,7 +493,7 @@ MeowStarMap/
 │   │   ├── index.ts                   # 主进程入口（早期防护 + 协议注册 + 启动 Application）
 │   │   ├── preload.ts                 # preload 入口（装配 + contextBridge 暴露）
 │   │   ├── preload-logger.ts          # 渲染层日志转发 preload
-│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 33 个命名空间）
+│   │   ├── preload/                   # preload 拆分模块（ipc 基础层 / plugin-bridge / api/ 34 个命名空间）
 │   │   └── tsconfig.json
 │   ├── renderer/                      # 渲染进程
 │   │   ├── assets/                    # 静态资源
@@ -501,7 +508,7 @@ MeowStarMap/
 │   │   │   ├── scanner/               # 扫描组件（ScanButton/ScanProgress）
 │   │   │   └── video/                 # VideoPlayer
 │   │   ├── data/resonance/            # 共鸣录静态数据（图鉴/卡池/百分位/12 语言名/缩略图）
-│   │   ├── hooks/                     # 30 个自定义 hooks
+│   │   ├── hooks/                     # 33 个自定义 hooks
 │   │   ├── i18n/                      # 国际化
 │   │   │   ├── index.ts
 │   │   │   └── locales/               # 12 种语言 JSON
@@ -544,7 +551,7 @@ MeowStarMap/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 51 个工具函数文件（含 resonance/ 共鸣录纯函数与 share-card/ 分享卡子目录）
+│   │   ├── utils/                     # 54 个工具函数文件（含 resonance/ 共鸣录纯函数与 share-card/ 分享卡子目录）
 │   │   ├── App.tsx                    # 应用根组件
 │   │   ├── main.tsx                   # 渲染进程入口
 │   │   ├── preview-entry.tsx          # 预览版入口
@@ -561,7 +568,9 @@ MeowStarMap/
 │       │   ├── resonance.ts / electron-api.ts
 │       │   └── index.ts
 │       ├── sync/                      # 同步协议契约（protocol.ts / domain-types.ts；协议唯一真相源，禁改）
-│       ├── utils/                     # concurrency.ts / taskStages.ts
+│       ├── utils/                     # concurrency.ts / extremum.ts / taskStages.ts / watermark-text.ts
+│       ├── data/                      # infinity_nikki.zh-CN.json（参考数据基线包）
+│       ├── network-image-kinds.ts     # 网络图片类型判定（参考图/CDN 图标等）
 │       ├── settings-keys.ts           # 渲染层可写偏好 key 白名单
 │       ├── dimension.ts               # 智能分组维度
 │       └── scene-category.ts          # 游戏场景分类
@@ -617,7 +626,7 @@ MeowStarMap/
 2026-08 命名空间化拆分重构：原 1176 行单体文件拆为入口装配 + 按功能域的模块树，
 对外契约（全局名 / 方法签名 / 通道字符串）不变，并有单元测试守护（`preload/__tests__/`）。
 
-- `preload.ts` 入口：装配 `electronAPI`（reportReady + 33 个命名空间，共 34 个键）并执行 5 个 `exposeInMainWorld`
+- `preload.ts` 入口：装配 `electronAPI`（reportReady + 34 个命名空间，共 35 个键）并执行 5 个 `exposeInMainWorld`
   ——全部经 `exposeIfTrusted()` 门禁：非授信文档（origin 非 app:// / media:// / dev 5173）零暴露
 - `preload/ipc.ts`：`IpcError` 类 + 统一调用入口 `call<T>(channel, ...args)`（解包 `IpcResponse<T>`，失败抛 `IpcError`）+ `subscribe` 事件订阅助手
 - `preload/api/*.ts`：每文件一个命名空间对象（`scannerAPI`、`fileAPI`…），方法与通道字符串与拆分前逐字一致
@@ -766,7 +775,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 3. **`schemas`** 通用 zod schema 集合：`filePath` / `filePathArray` / `mediaId` / `mediaIdArray` / `rating` / `positiveIntId` / `shortString` / `uid` / `httpUrl` / `uiTheme` / `thumbnailQuality` / `backupFilename` / `shortId` / `cacheLimitBytes`
 
-#### `handlers/` — 47 个域文件（4 个 `_` 前缀辅助与 `set-dir-handler` 工厂，43 个由 `setupIPC()` 注册的 `registerXxxHandlers`）
+#### `handlers/` — 48 个域文件（4 个 `_` 前缀辅助与 `set-dir-handler` 工厂，44 个由 `setupIPC()` 注册的 `registerXxxHandlers`）
 
 | 模块                           | 职责                                                                                                                                   |
 | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
@@ -853,33 +862,34 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.10 应用生命周期管理（app/）
 
-从 `index.ts` 引导启动的 Application 编排层，27 个源文件各司其职：
+从 `index.ts` 引导启动的 Application 编排层，31 个源文件各司其职：
 
-| 文件                     | 职责                                                                             |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| `application.ts`         | 应用主类，编排初始化与退出流程                                                   |
-| `lifecycle.ts`           | 生命周期管理（单实例锁、ready/before-quit/will-quit 事件编排）                   |
-| `cleanup.ts`             | 退出清理（WAL checkpoint + 子进程 kill + worker dispose + 强制超时兜底）         |
-| `startup-tasks.ts`       | 启动后任务（自动扫描、数据库修复、缩略图补全）                                   |
-| `startup-environment.ts` | 启动环境检测（原生依赖/路径可用性校验）                                          |
-| `window-manager.ts`      | 窗口管理（创建、ready-to-show、最小化/恢复/关闭处理）                            |
-| `navigation-guard.ts`    | 主窗口导航授信判定（app:// / media:// + dev 5173；拦截写 navigation-blocked）    |
-| `desktop-shortcut.ts`    | 桌面快捷方式自动补建（检测缺失并重建）                                           |
-| `error-handlers.ts`      | 全局错误处理（uncaughtException、unhandledRejection、render-process-gone）       |
-| `ipc-setup.ts`           | IPC 注册编排（构造 HandlerContext 并按域调用 register 函数）                     |
-| `media-protocol.ts`      | media:// 协议注册与白名单（5 层 LRU 缓存路径校验）                               |
-| `renderer-protocol.ts`   | app:// 渲染文档协议注册                                                          |
-| `renderer-bridge.ts`     | 渲染层事件桥（主进程 → 渲染层事件推送）                                          |
-| `media-update.ts`        | 媒体更新通知（节流 100ms 后通过 webContents.send 通知渲染层刷新）                |
-| `recovery.ts`            | 恢复逻辑（异常退出后的数据库修复与状态恢复）                                     |
-| `theme.ts`               | 主题同步（applyUITheme 同步 nativeTheme + TitleBarOverlay + setBackgroundColor） |
-| `custom-dirs.ts`         | 自定义目录管理（4 个功能可配置路径的 resolve/ensure/migrate）                    |
-| `auto-update.ts`         | 自动更新（electron-updater）                                                     |
-| `exit-forensics.ts`      | 退出取证（异常退出现场记录）                                                     |
-| `gpu-fallback.ts`        | GPU 回退决策（GPU 异常时禁用硬件加速）                                           |
-| `native-load-guard.ts`   | 原生模块加载预检（VC++ 运行库等，失败 showErrorBox）                             |
-| `permission.ts`          | 系统权限管理                                                                     |
-| `app-context.ts`         | 应用上下文（全局共享的应用状态与依赖容器）                                       |
+| 文件                     | 职责                                                                                   |
+| ------------------------ | -------------------------------------------------------------------------------------- |
+| `application.ts`         | 应用主类，编排初始化与退出流程                                                         |
+| `lifecycle.ts`           | 生命周期管理（单实例锁、ready/before-quit/will-quit 事件编排）                         |
+| `cleanup.ts`             | 退出清理（WAL checkpoint + 子进程 kill + worker dispose + 强制超时兜底）               |
+| `startup-tasks.ts`       | 启动后任务（自动扫描、数据库修复、缩略图补全）                                         |
+| `startup-environment.ts` | 启动环境检测（原生依赖/路径可用性校验）                                                |
+| `window-manager.ts`      | 窗口管理（创建、ready-to-show、最小化/恢复/关闭处理）                                  |
+| `navigation-guard.ts`    | 主窗口导航授信判定（app:// / media:// + dev 5173；拦截写 navigation-blocked）          |
+| `desktop-shortcut.ts`    | 桌面快捷方式自动补建（检测缺失并重建）                                                 |
+| `login-item.ts`          | 开机自启动开关（`app.setLoginItemSettings` 写入 + 回读校验 + legacy 清理，详见 §5.15） |
+| `error-handlers.ts`      | 全局错误处理（uncaughtException、unhandledRejection、render-process-gone）             |
+| `ipc-setup.ts`           | IPC 注册编排（构造 HandlerContext 并按域调用 register 函数）                           |
+| `media-protocol.ts`      | media:// 协议注册与白名单（5 层 LRU 缓存路径校验）                                     |
+| `renderer-protocol.ts`   | app:// 渲染文档协议注册                                                                |
+| `renderer-bridge.ts`     | 渲染层事件桥（主进程 → 渲染层事件推送）                                                |
+| `media-update.ts`        | 媒体更新通知（节流 100ms 后通过 webContents.send 通知渲染层刷新）                      |
+| `recovery.ts`            | 恢复逻辑（异常退出后的数据库修复与状态恢复）                                           |
+| `theme.ts`               | 主题同步（applyUITheme 同步 nativeTheme + TitleBarOverlay + setBackgroundColor）       |
+| `custom-dirs.ts`         | 自定义目录管理（4 个功能可配置路径的 resolve/ensure/migrate）                          |
+| `auto-update.ts`         | 自动更新（electron-updater）                                                           |
+| `exit-forensics.ts`      | 退出取证（异常退出现场记录）                                                           |
+| `gpu-fallback.ts`        | GPU 回退决策（GPU 异常时禁用硬件加速）                                                 |
+| `native-load-guard.ts`   | 原生模块加载预检（VC++ 运行库等，失败 showErrorBox）                                   |
+| `permission.ts`          | 系统权限管理                                                                           |
+| `app-context.ts`         | 应用上下文（全局共享的应用状态与依赖容器）                                             |
 
 ### 5.11 插件宿主（plugins/）
 
@@ -907,6 +917,68 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 | ---------------- | ----------------------------------------------------- |
 | `index.ts`       | 主进程国际化入口，为主进程日志/错误消息提供多语言支持 |
 | `worker-safe.ts` | worker 进程内可用的纯查表翻译（不依赖 i18next 实例）  |
+
+### 5.14 Windows 外壳能力（app/shell/）
+
+windows-shell 上游外壳对齐（2026-11-13）交付的 opt-in 能力层。设计基线：**全部默认关闭、能力不可用时恒返回 `unavailable`，绝不伪造成功**：
+
+| 文件                         | 职责                                                                                         |
+| ---------------------------- | -------------------------------------------------------------------------------------------- |
+| `tray-service.ts`            | 纯宿主层托盘工厂（菜单 Show/Quit、双击显示；托盘气泡 notify 为空实现，进度走事件 hub）       |
+| `tray-lifecycle.ts`          | 托盘单例句柄（syncTray / disposeTray / isTrayActive——真实观测，非设置开关回显）              |
+| `shell-ipc.ts`               | shell 动作分发（runShellAction，8 条 `nikkisync:*` 动作通道经 registerShellAction 变量注册） |
+| `shell-capabilities.ts`      | 能力判定核（feed/网关未配置等场景返回 unavailable，绝不伪造成功）                            |
+| `signed-feed.ts`             | 签名 feed 校验（签名差分更新的前置判定）                                                     |
+| `https-download.ts`          | shell 能力共用的 HTTPS 下载工具                                                              |
+| `icon-pack-update-client.ts` | 图标包增量更新客户端                                                                         |
+| `program-update-client.ts`   | 签名差分程序更新客户端（xdelta3 差分逻辑已实现，无生产 feed 时 unavailable）                 |
+| `support-gateway-client.ts`  | 支持网关客户端（端点来自环境变量 `MOMO_SUPPORT_URL`，host 白名单封闭集）                     |
+| `network-conflict-repair.ts` | 网络冲突修复纯函数（本构建未接线，恒 unavailable）                                           |
+| `temporary-hotspot.ts`       | 临时热点（WinRT，属管理员态能力面）                                                          |
+| `diagnostic-files.ts`        | 聚合诊断文件生成                                                                             |
+
+**托盘行为边界**：设置键 `nikkisync.shellTrayEnabled`（默认 false），入口在同步服务页「Windows 外壳能力」分区（`SyncServicePage.tsx` 六开关之一），**运行期切换需重启应用生效**。装配点在 `nikkisync-runtime-setup.ts`（`initNikkiSyncRuntime` 内、Runtime 自身启停判定之前）——托盘独立于内嵌 Runtime 的启停，同步服务关闭时托盘仍按开关保持。菜单文案为硬编码英文（Show MeowStarMap / Quit MeowStarMap）。图标路径：打包态 `process.resourcesPath/app.asar.unpacked/resources/icons/icon.ico`，dev 态 `app.getAppPath()/resources/icons/icon.ico`；装配失败仅 `runtimeLog('warn')`，不阻断启动。真实状态经 `nikkisync:shell-status` 暴露（`trayActive` 等字段为真实观测）。
+
+**诚实桩边界（已知限制）**：签名图标 feed（icon-check / icon-activate）、程序更新（program-check / program-stage / program-apply）、支持网关（support-submit）、防火墙修复（network-repair）、热点开关（hotspot-toggle）在无生产配置时恒 `unavailable` / `failed`，契约见 docs/IPC_CONTRACT.md §20。
+
+**与主应用/NikkiSync 的关系**：属 windows-shell 上游外壳对齐产物，挂在 nikkisync 运行时装配链上，但不属于 `@nikkisync/*` 装载面（纯宿主层实现，无上游包依赖）。
+
+**开发/调试注意**：托盘为纯宿主注入设计（`tray-service` 无 Electron 直接依赖，可单测）；装配日志走 `runtimeLog` 双通道（diagLog + electron-log `[NIKKISYNC]` 前缀）；无托盘专用环境变量，dev/打包差异仅图标路径解析。
+
+### 5.15 开机自启（app/login-item.ts）
+
+设置键真相源在 `src/shared/settings-keys.ts`（`launchAtLogin`，默认 true，`normalizeLaunchAtLoginSetting` 收敛非法值）。用户入口：设置 → 通用 → 启动「开机自启动」。
+
+- **写入链**：`syncLoginItemSetting(openAtLogin)` → `app.setLoginItemSettings({ openAtLogin })`（不传 name，与 `getLoginItemSettings()` 默认 AUMID 值名严格一致）→ **回读校验**（读不可用与明确不一致是两类失败，均抛 `AppError`，userMessage 走 i18n）→ 成功后顺手清理 legacy 登录项。受管 Windows Run 值名 `com.qianlu.meow-star-map`（与 build.appId 同源）。
+- **失败回滚**：`settings-handler.ts` 先落库再同步 OS，同步失败**回滚 DB**，防止「UI 已回滚但 DB 是失败后的新值」被下次启动期对账重写回 OS。
+- **启动期对账**：`lifecycle.ts` 启动时读 DB 设置 → 与 OS 实际状态比对，一致则跳过写入；读失败保守仍同步。
+- **dev 语义**：`app.isPackaged !== true` 时不触碰 OS——读返回 undefined、legacy 检测/清理跳过、sync 返回 `skipped:'dev'` 并提示 toast「开发模式不修改系统启动项，设置已保存」，绝不把 electron.exe 写进 Run 项。
+- **legacy 清理边界**：`LEGACY_LOGIN_ITEM_NAMES` 保持空数组（绝不猜值名误删第三方启动项）；`detectLegacyLoginItemNames()` 按「user 作用域 + exe 路径精确等于 `process.execPath`」识别——**安装目录变更后检测不到**（已登记 DEBT-063）。
+
+### 5.16 参考数据管道（reference-data）
+
+上游 RanAxro/nikki_albums 热更数据的合规接入（2026-11-08 CDN 管道；渲染层消费视角见 §6.8）：
+
+| 文件                                            | 职责                                                                                                                                                                                                                                          |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `services/reference-data-service.ts`            | manifest 拉取（`<manifestBaseUrl>/app_api/hot_update.json`）→ v1.db（AES-GCM 密文）→ protobuf 解码 → 内存索引：世界地图瓦片模板 + 网络图片 CDN 地址模板；staging 原子提交；全链 fail-soft（查询返回空数组、检查永不 reject、失败冷却 5 分钟） |
+| `services/reference-data/filebox-cipher.ts`     | v1.db 密文解封装                                                                                                                                                                                                                              |
+| `services/reference-data/nuan5-config-proto.ts` | 内嵌 protobuf schema（Nuan5World / Nuan5NetworkImage 等）                                                                                                                                                                                     |
+| `services/reference-data/image-url.ts`          | 授权注册表（封闭集）：nikkialbums → versioned-ua，gongeo → existing-hotlink；`resolveNetworkImageUrl` 按实际 hostname fail-closed（未登记/子域伪装 → null → 渲染层占位）                                                                      |
+| `services/reference-image-service.ts`           | 图片磁盘缓存：`<userData>/reference-data/reference-images/<sha256(kind:id)>.<ext>`；TTL 7 天、404 负缓存 30 分钟、魔数校验拒收假图片、单图上限 8MB、同 key in-flight 去重；`resolveReferenceImage` 永不 reject（status 封闭集）               |
+
+**安全边界**：
+
+- SSRF 闸门 `src/main/utils/remote-url-guard.ts`（`assertSafeRemoteUrl` 拒环回/私网保留段）覆盖 manifest 拉取、下载链路、镜像 baseUrl，且 `redirect:'error'` 禁跟重定向；
+- 镜像入口 `referenceData.imageMirrorBaseUrl` 只替换**已授权图片资源**的 protocol+host+port，与 manifest 镜像键 `referenceData.manifestBaseUrl` 各自独立、不得串用；镜像非法时**刻意不回退原始地址**（避免「配了没生效」静默失败）；
+- media:// 白名单规则 5 放行参考图片缓存目录（目录事实来源复用写入侧 `getReferenceImageCacheDir()`，防两份字面量漂移）；
+- UA 双轨：`cdn.gongeo.us` 渲染层热链注入固定 UA `'MeowStarMap'`（`cdn-user-agent.ts`，fail-open 不阻断窗口创建）；`cdn.nikkialbums.com` 主进程 fetch 携带版本化 UA `MeowStarMap/<version>`。
+
+**数据与授权口径**：图片类别 `NETWORK_IMAGE_KINDS` 共 10 类（light / filter / momoPose / cloth / clothOutfit / diyPattern / clothType / clothProp / clothTag / nikkiPose）；**类别存在 ≠ 已授权**，cloth / clothOutfit 暂未授权，取图 fail-closed 回占位色块。
+
+**用户入口**：设置 → 外部参考数据（图片加速入口 / 参考数据镜像站点两个输入框、开机自动检查开关、手动检查更新按钮、外部图片总开关、来源权利声明卡）；总开关关闭时 `refdata:resolve-image` 直接返回 `disabled`（零网络）。
+
+**与主应用/NikkiSync 的关系**：独立 reference-data 服务，不依赖 `@nikkisync/*` 装载面；数据供世界地图瓦片（useWorldMapTiles）与参考图（useReferenceImage，§6.8）消费。
 
 ---
 
@@ -1065,7 +1137,7 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **scanner/ScanProgress**：扫描进度条（scanned/found/currentPath + 停止按钮）
 - **video/VideoPlayer**：视频播放器（播放进度按 src 哈希持久化到 localStorage）
 
-### 6.8 自定义 Hooks（31 个非测试文件）
+### 6.8 自定义 Hooks（33 个非测试文件）
 
 #### 媒体操作类（8 个）
 
@@ -1112,6 +1184,11 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 - **useNeighborPrefetch**：邻近项预取（缩略图优化计划节点 4，围绕当前索引预取邻域）
 - **useOnDemandThumbnails**：可视区缩略图按需生成入口（模块级 Promise 缓存保证同一目标只发一次）
 - **useWheelPageNav**：全屏预览「滚轮翻页」钩子（含冷却与侧键 / 边缘热区协同）
+
+#### 参考数据类（2 个，2026-11-08 CDN 管道）
+
+- **useReferenceImage**：按需解析一张参考数据 CDN 图片（`refdata:resolve-image` → 主进程授权核实/磁盘缓存/退避 → 本机缓存 `media://` 供图；渲染进程永不直连 CDN，一次一张不预取）
+- **useWorldMapTiles**：消费既有 `refdata:get-world-map-tiles` / `refdata:get-status` 查询通道（只读取不改契约，fail-soft 降级空态，不缓存不预取）
 
 ### 6.9 状态管理（stores/）
 
@@ -1601,7 +1678,7 @@ components / pages (展示)
 "build:preview": "vite build --config vite.preview.config.ts",
 "preview": "electron-vite preview",
 "dist": "npm run build && electron-builder --publish never",
-"dist:win": "npm run build:recycle-helper && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+"dist:win": "npm run build:recycle-helper && npm run stage:nikkisync-pc && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
 "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
 "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
 "typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
@@ -2060,13 +2137,13 @@ DB 写 / 扫描 / 缩略图+pHash+重复检测 / sharp 缩放 / 视频编辑 各
 
 ### C.3 测试规模
 
-- **测试文件数（静态可核，不必实跑）**：Vitest 5.0，**471 个测试文件** = src 434 + scripts 32 + e2e 5
-  （`git ls-files '*.test.ts' '*.test.tsx'` 分目录计数；2026-11-05 盘点静态复核）。相对 2026-10-30 那颗 454
-  是 +17，来自图库计数修复、DEBT-053…059 清偿与 qrcode 解包闸门等轮次的新增套件。
+- **测试文件数（静态可核，不必实跑）**：Vitest 5.0，**520 个测试文件** = src 474 + scripts 41 + e2e 5
+  （`git ls-files '*.test.ts' '*.test.tsx'` 分目录计数；2026-11-14 盘点静态复核）。相对 2026-11-05 那颗 471
+  是 +49，来自 windows-shell 对齐、参考数据 CDN 管道、图库计数修复等轮次的新增套件。
 - **用例通过数（必须实跑才有资格写）**：2026-10-30 本机全量 `npm test` 实跑
   `Test Files 454 passed (454)`、`Tests 7094 passed | 12 skipped (7106)`，耗时 53.45s
   （宿主 `win32 / node-v26.3.0 / vitest 5.0.3`）。该读数对应当时静态计数 454 = 421+28+5，其后文件数已增至
-  上行的 471，此处保留为最近一次全量实跑快照、不随静态计数刷新。
+  上行的 520，此处保留为最近一次全量实跑快照、不随静态计数刷新。
 - **装置侧（`npm run test:ci-linux`）本机不可达全绿，终判在 CI**：同一命令本机跑出 32 failed | 422 passed (454)，
   轮前基线 `a678393` 为 33 failed | 421 passed (454)——**本轮 0 新增红**。红项集中在两类装载期失败：
   sharp/better-sqlite3 的原生二进制按模拟 Linux 宿主去取（`Could not load the "sharp" module using the linuxnull-x64 runtime`）、

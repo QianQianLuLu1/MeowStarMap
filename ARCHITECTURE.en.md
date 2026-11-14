@@ -4,8 +4,8 @@
 > **Application Name**: Meow Star Map (喵星图)
 > **Current Version**: 2.5.7-beta
 > **Platform**: Windows x64
-> **Document Version**: 1.5
-> **Last Updated**: 2026-11-05
+> **Document Version**: 1.6
+> **Last Updated**: 2026-11-14
 
 ---
 
@@ -259,7 +259,7 @@ The six utilityProcesses use a consistent pattern but independent message protoc
 
 10. scannerManager.setDbPath() + mediaWorkerManager.setDbPath()
 
-11. setupIPC() (registers 43 `registerXxxHandlers` groups, one per domain file under `src/main/ipc/handlers/`, plus pathGuard init)
+11. setupIPC() (registers 44 `registerXxxHandlers` groups, one per domain file under `src/main/ipc/handlers/`, plus pathGuard init)
 
 12. createMainWindow()
     ├─ loadFile('dist/renderer/index.html')
@@ -348,7 +348,7 @@ MeowStarMap/
 │   └── perf-test/                     # Performance baseline scripts
 ├── src/
 │   ├── main/                          # Main process
-│   │   ├── app/                       # App lifecycle management (27 source files)
+│   │   ├── app/                       # App lifecycle management (31 source files)
 │   │   │   ├── application.ts         # App main class (phased orchestration)
 │   │   │   ├── lifecycle.ts           # Lifecycle management (single-instance lock etc.)
 │   │   │   ├── cleanup.ts             # Exit cleanup
@@ -372,7 +372,12 @@ MeowStarMap/
 │   │   │   ├── gpu-preference.ts / gpu-status.ts # GPU preference persistence and status query
 │   │   │   ├── native-load-guard.ts   # Native module load pre-check
 │   │   │   ├── nikkisync-runtime-setup.ts / sync-server-setup.ts # Sync runtime and server setup
+│   │   │   ├── login-item.ts          # Launch-at-login toggle (app.setLoginItemSettings, 2026-11-13)
+│   │   │   ├── cdn-user-agent.ts      # Fixed User-Agent for reference-data CDN requests (cdn.gongeo.us gateway allow-list requirement)
+│   │   │   ├── app-icon-path.ts       # App icon path resolution (asar.unpacked layout fallback, pure function)
+│   │   │   ├── update-error-class.ts  # Auto-update error classification (source unreachable vs source not ready)
 │   │   │   ├── permission.ts          # Permission management
+│   │   │   ├── shell/                 # windows-shell upstream shell alignment (tray, signed delta/icon increments, anonymous diagnostics, network-conflict repair, temporary hotspot, support-gateway client — opt-in capabilities)
 │   │   │   └── app-context.ts         # App context
 │   │   ├── database/                  # Database layer
 │   │   │   ├── connection.ts          # DatabaseManager
@@ -403,7 +408,7 @@ MeowStarMap/
 │   │   ├── thumbnail/
 │   │   │   ├── generator.ts           # ThumbnailGenerator (single generation + LRU)
 │   │   │   └── worker-*.ts            # thumbnail-worker (utilityProcess: sharp scaling)
-│   │   ├── services/                  # Business service layer (16 service/config files)
+│   │   ├── services/                  # Business service layer (18 service/config files)
 │   │   │   ├── file-service.ts
 │   │   │   ├── video-service.ts
 │   │   │   ├── watermark-service.ts
@@ -418,12 +423,14 @@ MeowStarMap/
 │   │   │   ├── xmp-metadata-service.ts
 │   │   │   ├── cloth-data-service.ts / cloth-data-config.ts # Cloth-outfit data query and data source config
 │   │   │   ├── cloth-diy-cache.ts     # Cloth-outfit network decode result disk cache (sha256 key)
+│   │   │   ├── reference-data-service.ts / reference-image-service.ts # External reference-data query and reference-image services (2026-11-08)
+│   │   │   ├── reference-data/        # Reference-data submodule (filebox-cipher / image-url / nuan5-config-proto)
 │   │   │   └── log-service.ts
 │   │   ├── ipc/                       # IPC layer
 │   │   │   ├── handler-context.ts     # Dependency injection context
 │   │   │   ├── validator.ts           # wrapHandler + PathGuard + schemas
 │   │   │   ├── media-read-guard.ts    # assertMediaReadPath (with realpath re-check)
-│   │   │   └── handlers/              # 47 domain files (4 `_`-prefixed helpers and the set-dir-handler factory, 43 registerXxxHandlers)
+│   │   │   └── handlers/              # 48 domain files (4 `_`-prefixed helpers and the set-dir-handler factory, 44 registerXxxHandlers)
 │   │   │       ├── media-handler.ts / media-lifecycle-handler.ts / media-cleanup-handler.ts
 │   │   │       ├── file.ts / file-export-handler.ts / file-rename-handler.ts
 │   │   │       ├── video.ts / watermark.ts / editor.ts
@@ -469,7 +476,7 @@ MeowStarMap/
 │   │   ├── i18n/                      # Main process i18n
 │   │   │   ├── index.ts
 │   │   │   └── worker-safe.ts         # Worker-side pure lookup translation
-│   │   ├── utils/                     # Main process utilities (33 modules)
+│   │   ├── utils/                     # Main process utilities (34 modules)
 │   │   │   ├── active-task-store.ts / concurrency.ts / constants.ts / dir-manager.ts
 │   │   │   ├── disk.ts / duplicate-scoring.ts / early-crash-guard.ts / eta-calculator.ts
 │   │   │   ├── ffmpeg-paths.ts / ffmpeg-runner.ts / file-utils.ts / ipc-validate.ts
@@ -478,7 +485,7 @@ MeowStarMap/
 │   │   │   ├── scene-brightness.ts / startup-diagnostic.ts
 │   │   │   ├── task-registry.ts / user-diag-path.ts / video-frame.ts / video-probe.ts
 │   │   │   ├── atomic-file.ts / fluent-ffmpeg-shim.ts / image-encode.ts / path-dialect.ts
-│   │   │   ├── physical-file-key.ts / spawn-error-log.ts / zip-archive.ts
+│   │   │   ├── physical-file-key.ts / remote-url-guard.ts / spawn-error-log.ts / zip-archive.ts
 │   │   │   └── worker-restart-policy.ts
 │   │   ├── types/                     # Main process type declarations
 │   │   │   ├── decryption.ts / file.ts / ipc.ts
@@ -486,7 +493,7 @@ MeowStarMap/
 │   │   ├── index.ts                   # Main process entry (early guards + protocol registration + Application bootstrap)
 │   │   ├── preload.ts                 # preload entry (assembly + contextBridge exposure)
 │   │   ├── preload-logger.ts          # Renderer log forwarding preload
-│   │   ├── preload/                   # preload split modules (ipc base layer / plugin-bridge / api/ 33 namespaces)
+│   │   ├── preload/                   # preload split modules (ipc base layer / plugin-bridge / api/ 34 namespaces)
 │   │   └── tsconfig.json
 │   ├── renderer/                      # Renderer process
 │   │   ├── assets/                    # Static assets
@@ -501,7 +508,7 @@ MeowStarMap/
 │   │   │   ├── scanner/               # Scanner components (ScanButton/ScanProgress)
 │   │   │   └── video/                 # VideoPlayer
 │   │   ├── data/resonance/            # Resonance static data (catalog/banners/percentile/12-language names/thumbnails)
-│   │   ├── hooks/                     # 30 custom hooks
+│   │   ├── hooks/                     # 33 custom hooks
 │   │   ├── i18n/                      # Internationalization
 │   │   │   ├── index.ts
 │   │   │   └── locales/               # 12 language JSON files
@@ -544,7 +551,7 @@ MeowStarMap/
 │   │   │       └── soft-pink-luxury.css
 │   │   ├── types/
 │   │   │   └── decryption.ts
-│   │   ├── utils/                     # 51 utility files (incl. resonance/ pure-function and share-card/ subdirs)
+│   │   ├── utils/                     # 54 utility files (incl. resonance/ pure-function and share-card/ subdirs)
 │   │   ├── App.tsx                    # App root component
 │   │   ├── main.tsx                   # Renderer process entry
 │   │   ├── preview-entry.tsx          # Preview entry
@@ -561,7 +568,9 @@ MeowStarMap/
 │       │   ├── resonance.ts / electron-api.ts
 │       │   └── index.ts
 │       ├── sync/                      # Sync protocol contract (protocol.ts / domain-types.ts; single source of truth, frozen)
-│       ├── utils/                     # concurrency.ts / taskStages.ts
+│       ├── utils/                     # concurrency.ts / extremum.ts / taskStages.ts / watermark-text.ts
+│       ├── data/                      # infinity_nikki.zh-CN.json (reference-data baseline pack)
+│       ├── network-image-kinds.ts     # Network image kind classification (reference images / CDN icons etc.)
 │       ├── settings-keys.ts           # Renderer-writable preference key whitelist
 │       ├── dimension.ts               # Smart grouping dimensions
 │       └── scene-category.ts          # Game scene categories
@@ -618,7 +627,7 @@ Namespace-oriented split refactor (Aug 2026): the original 1176-line monolithic 
 entry assembly plus a module tree by functional domain. The external contract (global names / method
 signatures / channel strings) is unchanged, guarded by unit tests (`preload/__tests__/`).
 
-- `preload.ts` entry: assembles `electronAPI` (reportReady + 33 namespaces, 34 keys in total) and performs 5 `exposeInMainWorld`
+- `preload.ts` entry: assembles `electronAPI` (reportReady + 34 namespaces, 35 keys in total) and performs 5 `exposeInMainWorld`
   calls — all gated by `exposeIfTrusted()`: untrusted documents (origin not app:// / media:// / dev 5173) get zero exposure
 - `preload/ipc.ts`: `IpcError` class + unified call entry `call<T>(channel, ...args)` (unwraps `IpcResponse<T>`, throws `IpcError` on failure) + `subscribe` event helper
 - `preload/api/*.ts`: one namespace object per file (`scannerAPI`, `fileAPI`…); methods and channel strings are verbatim identical to pre-split
@@ -767,7 +776,7 @@ Three major capabilities:
 
 3. **`schemas`** common zod schema collection: `filePath` / `filePathArray` / `mediaId` / `mediaIdArray` / `rating` / `positiveIntId` / `shortString` / `uid` / `httpUrl` / `uiTheme` / `thumbnailQuality` / `backupFilename` / `shortId` / `cacheLimitBytes`
 
-#### `handlers/` — 47 Domain Files (4 `_`-prefixed helpers, the `set-dir-handler` factory, and 43 `registerXxxHandlers` invoked by `setupIPC()`)
+#### `handlers/` — 48 Domain Files (4 `_`-prefixed helpers, the `set-dir-handler` factory, and 44 `registerXxxHandlers` invoked by `setupIPC()`)
 
 | Module                         | Responsibilities                                                                                                                                                                      |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -856,33 +865,34 @@ stream into an HTTP response, the caller must also attach `error`/`close` listen
 
 ### 5.10 App Lifecycle Management (app/)
 
-Application orchestration layer bootstrapped from `index.ts`, with 27 source files each handling a specific responsibility:
+Application orchestration layer bootstrapped from `index.ts`, with 31 source files each handling a specific responsibility:
 
-| File                     | Responsibilities                                                                                          |
-| ------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `application.ts`         | App main class; orchestrates initialization and shutdown                                                  |
-| `lifecycle.ts`           | Lifecycle management (single-instance lock, ready/before-quit/will-quit event orchestration)              |
-| `cleanup.ts`             | Exit cleanup (WAL checkpoint + subprocess kill + worker dispose + forced timeout fallback)                |
-| `startup-tasks.ts`       | Post-startup tasks (auto-scan, database repair, thumbnail completion)                                     |
-| `startup-environment.ts` | Startup environment checks (native dependency / path availability)                                        |
-| `window-manager.ts`      | Window management (creation, ready-to-show, minimize/restore/close handling)                              |
-| `navigation-guard.ts`    | Main window navigation trust check (app:// / media:// + dev 5173; intercepts and logs navigation-blocked) |
-| `desktop-shortcut.ts`    | Desktop shortcut auto-repair (detect missing and recreate)                                                |
-| `error-handlers.ts`      | Global error handling (uncaughtException, unhandledRejection, render-process-gone)                        |
-| `ipc-setup.ts`           | IPC registration orchestration (constructs HandlerContext and calls register functions per domain)        |
-| `media-protocol.ts`      | media:// protocol registration and whitelist (5-layer LRU cached path validation)                         |
-| `renderer-protocol.ts`   | app:// renderer document protocol registration                                                            |
-| `renderer-bridge.ts`     | Renderer event bridge (main process → renderer event push)                                                |
-| `media-update.ts`        | Media update notification (throttled 100ms, notifies renderer via webContents.send to refresh)            |
-| `recovery.ts`            | Recovery logic (database repair and state restoration after abnormal exit)                                |
-| `theme.ts`               | Theme sync (applyUITheme syncs nativeTheme + TitleBarOverlay + setBackgroundColor)                        |
-| `custom-dirs.ts`         | Custom directory management (resolve/ensure/migrate for 4 configurable paths)                             |
-| `auto-update.ts`         | Auto update (electron-updater)                                                                            |
-| `exit-forensics.ts`      | Exit forensics (abnormal exit scene recording)                                                            |
-| `gpu-fallback.ts`        | GPU fallback decision (disable hardware acceleration on GPU anomalies)                                    |
-| `native-load-guard.ts`   | Native module load pre-check (VC++ runtime etc.; showErrorBox on failure)                                 |
-| `permission.ts`          | System permission management                                                                              |
-| `app-context.ts`         | App context (globally shared app state and dependency container)                                          |
+| File                     | Responsibilities                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| `application.ts`         | App main class; orchestrates initialization and shutdown                                                       |
+| `lifecycle.ts`           | Lifecycle management (single-instance lock, ready/before-quit/will-quit event orchestration)                   |
+| `cleanup.ts`             | Exit cleanup (WAL checkpoint + subprocess kill + worker dispose + forced timeout fallback)                     |
+| `startup-tasks.ts`       | Post-startup tasks (auto-scan, database repair, thumbnail completion)                                          |
+| `startup-environment.ts` | Startup environment checks (native dependency / path availability)                                             |
+| `window-manager.ts`      | Window management (creation, ready-to-show, minimize/restore/close handling)                                   |
+| `navigation-guard.ts`    | Main window navigation trust check (app:// / media:// + dev 5173; intercepts and logs navigation-blocked)      |
+| `desktop-shortcut.ts`    | Desktop shortcut auto-repair (detect missing and recreate)                                                     |
+| `login-item.ts`          | Launch-at-login toggle (`app.setLoginItemSettings` write + read-back verification + legacy cleanup; see §5.15) |
+| `error-handlers.ts`      | Global error handling (uncaughtException, unhandledRejection, render-process-gone)                             |
+| `ipc-setup.ts`           | IPC registration orchestration (constructs HandlerContext and calls register functions per domain)             |
+| `media-protocol.ts`      | media:// protocol registration and whitelist (5-layer LRU cached path validation)                              |
+| `renderer-protocol.ts`   | app:// renderer document protocol registration                                                                 |
+| `renderer-bridge.ts`     | Renderer event bridge (main process → renderer event push)                                                     |
+| `media-update.ts`        | Media update notification (throttled 100ms, notifies renderer via webContents.send to refresh)                 |
+| `recovery.ts`            | Recovery logic (database repair and state restoration after abnormal exit)                                     |
+| `theme.ts`               | Theme sync (applyUITheme syncs nativeTheme + TitleBarOverlay + setBackgroundColor)                             |
+| `custom-dirs.ts`         | Custom directory management (resolve/ensure/migrate for 4 configurable paths)                                  |
+| `auto-update.ts`         | Auto update (electron-updater)                                                                                 |
+| `exit-forensics.ts`      | Exit forensics (abnormal exit scene recording)                                                                 |
+| `gpu-fallback.ts`        | GPU fallback decision (disable hardware acceleration on GPU anomalies)                                         |
+| `native-load-guard.ts`   | Native module load pre-check (VC++ runtime etc.; showErrorBox on failure)                                      |
+| `permission.ts`          | System permission management                                                                                   |
+| `app-context.ts`         | App context (globally shared app state and dependency container)                                               |
 
 ### 5.11 Plugin Host (plugins/)
 
@@ -910,6 +920,68 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 | ---------------- | --------------------------------------------------------------------------------------------- |
 | `index.ts`       | Main process i18n entry; provides multi-language support for main process logs/error messages |
 | `worker-safe.ts` | Worker-process-safe pure lookup translation (no i18next instance dependency)                  |
+
+### 5.14 Windows Shell Capabilities (app/shell/)
+
+The opt-in capability layer delivered by the windows-shell upstream alignment (2026-11-13). Design baseline: **everything defaults to off; when a capability is unavailable it always returns `unavailable` — never faking success**:
+
+| File                         | Responsibilities                                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `tray-service.ts`            | Pure-host tray factory (Show/Quit menu, double-click to show; tray balloon `notify` is a no-op — progress goes through the event hub) |
+| `tray-lifecycle.ts`          | Tray singleton handle (syncTray / disposeTray / isTrayActive — real observation, not a settings echo)                                 |
+| `shell-ipc.ts`               | Shell action dispatch (runShellAction; 8 `nikkisync:*` action channels registered via registerShellAction)                            |
+| `shell-capabilities.ts`      | Capability decision core (returns unavailable when feed/gateway is unconfigured — never faking success)                               |
+| `signed-feed.ts`             | Signed feed verification (prerequisite check for signed delta updates)                                                                |
+| `https-download.ts`          | HTTPS download utility shared by shell capabilities                                                                                   |
+| `icon-pack-update-client.ts` | Icon pack incremental update client                                                                                                   |
+| `program-update-client.ts`   | Signed delta program update client (xdelta3 logic implemented; unavailable without a production feed)                                 |
+| `support-gateway-client.ts`  | Support gateway client (endpoint from env `MOMO_SUPPORT_URL`, closed-set host allowlist)                                              |
+| `network-conflict-repair.ts` | Network conflict repair pure function (not wired in this build; always unavailable)                                                   |
+| `temporary-hotspot.ts`       | Temporary hotspot (WinRT; belongs to the admin-context capability surface)                                                            |
+| `diagnostic-files.ts`        | Aggregated diagnostic file generation                                                                                                 |
+
+**Tray behavior boundary**: setting key `nikkisync.shellTrayEnabled` (default false), entry under the Sync Service page "Windows Shell" section (one of the six toggles in `SyncServicePage.tsx`); **runtime toggling requires an app restart to take effect**. Assembly point is `nikkisync-runtime-setup.ts` (inside `initNikkiSyncRuntime`, before the Runtime's own enable/disable decision) — the tray is independent of the embedded Runtime's start/stop: it persists per the toggle even when the sync service is off. Menu labels are hardcoded English (Show MeowStarMap / Quit MeowStarMap). Icon path: packaged `process.resourcesPath/app.asar.unpacked/resources/icons/icon.ico`, dev `app.getAppPath()/resources/icons/icon.ico`; assembly failure only logs `runtimeLog('warn')` without blocking startup. Real state is exposed via `nikkisync:shell-status` (`trayActive` and friends are real observations).
+
+**Honest-stub boundary (known limitations)**: signed icon feed (icon-check / icon-activate), program update (program-check / program-stage / program-apply), support gateway (support-submit), firewall repair (network-repair), and hotspot toggle (hotspot-toggle) always return `unavailable` / `failed` without production configuration; contract see docs/IPC_CONTRACT.md §20.
+
+**Relation to the main app / NikkiSync**: a product of the windows-shell upstream alignment, mounted on the nikkisync runtime assembly chain, but **not** part of the `@nikkisync/*` load surface (pure host layer, no upstream package dependency).
+
+**Dev/debug notes**: the tray is designed for pure host injection (`tray-service` has no direct Electron dependency, unit-testable); assembly logs go through the `runtimeLog` dual channel (diagLog + electron-log `[NIKKISYNC]` prefix); no tray-specific env vars — the dev/packaged difference is only icon path resolution.
+
+### 5.15 Launch at Login (app/login-item.ts)
+
+The setting-key source of truth lives in `src/shared/settings-keys.ts` (`launchAtLogin`, default true, `normalizeLaunchAtLoginSetting` coerces invalid values). User entry: Settings → General → Startup "Launch at login".
+
+- **Write chain**: `syncLoginItemSetting(openAtLogin)` → `app.setLoginItemSettings({ openAtLogin })` (no `name` passed — strictly matches the default AUMID value name of `getLoginItemSettings()`) → **read-back verification** (unreadable vs explicit mismatch are two distinct failures; both throw `AppError` with i18n userMessage) → on success, legacy login-item cleanup runs as well. Managed Windows Run value name: `com.qianlu.meow-star-map` (same source as build.appId).
+- **Failure rollback**: `settings-handler.ts` persists to DB first, then syncs the OS; on sync failure it **rolls back the DB**, preventing "UI rolled back but DB holds the post-failure value" from being rewritten back to the OS by the next startup reconciliation.
+- **Startup reconciliation**: `lifecycle.ts` reads the DB setting at startup → compares with the actual OS state, skipping the write when they match; if the read fails it conservatively still syncs.
+- **Dev semantics**: when `app.isPackaged !== true` the OS is never touched — reads return undefined, legacy detection/cleanup is skipped, sync returns `skipped:'dev'` with the toast "dev mode does not modify system login items; setting saved" — electron.exe is never written into the Run key.
+- **Legacy cleanup boundary**: `LEGACY_LOGIN_ITEM_NAMES` stays an empty array (never guessing value names that could delete third-party launch entries); `detectLegacyLoginItemNames()` identifies by "user scope + exe path exactly equal to `process.execPath`" — **undetectable after the install directory changes** (registered as DEBT-063).
+
+### 5.16 Reference Data Pipeline (reference-data)
+
+Compliant integration of the upstream RanAxro/nikki_albums hot-update data (2026-11-08 CDN pipeline; for the renderer consumption view see §6.8):
+
+| File                                            | Responsibilities                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `services/reference-data-service.ts`            | Manifest fetch (`<manifestBaseUrl>/app_api/hot_update.json`) → v1.db (AES-GCM ciphertext) → protobuf decoding → in-memory index: world map tile templates + network image CDN URL templates; staging atomic commit; fail-soft throughout (queries return empty arrays, checks never reject, 5-minute failure cooldown) |
+| `services/reference-data/filebox-cipher.ts`     | v1.db ciphertext unwrapping                                                                                                                                                                                                                                                                                            |
+| `services/reference-data/nuan5-config-proto.ts` | Embedded protobuf schema (Nuan5World / Nuan5NetworkImage etc.)                                                                                                                                                                                                                                                         |
+| `services/reference-data/image-url.ts`          | Authorization registry (closed set): nikkialbums → versioned-ua, gongeo → existing-hotlink; `resolveNetworkImageUrl` fails closed on the actual hostname (unregistered / subdomain spoofing → null → renderer placeholder)                                                                                             |
+| `services/reference-image-service.ts`           | Image disk cache: `<userData>/reference-data/reference-images/<sha256(kind:id)>.<ext>`; TTL 7 days, 404 negative cache 30 minutes, magic-byte validation rejects fake images, 8MB per-image cap, same-key in-flight dedup; `resolveReferenceImage` never rejects (closed status set)                                   |
+
+**Security boundary**:
+
+- SSRF gate `src/main/utils/remote-url-guard.ts` (`assertSafeRemoteUrl` rejects loopback/private reserved ranges) covers manifest fetch, download paths, and mirror baseUrls, with `redirect:'error'` forbidding redirect following;
+- Mirror entry `referenceData.imageMirrorBaseUrl` only replaces protocol+host+port of **authorized image resources** and is independent from the manifest mirror key `referenceData.manifestBaseUrl` (must not be swapped); an invalid mirror deliberately does **not** fall back to the original address (avoiding silent "configured but ineffective");
+- media:// allowlist rule 5 admits the reference-image cache directory (the directory fact source reuses the write-side `getReferenceImageCacheDir()`, preventing literal drift);
+- Dual UA tracks: `cdn.gongeo.us` renderer hot-links get a fixed UA `'MeowStarMap'` (`cdn-user-agent.ts`, fail-open, does not block window creation); `cdn.nikkialbums.com` main-process fetches carry the versioned UA `MeowStarMap/<version>`.
+
+**Data and authorization semantics**: image categories `NETWORK_IMAGE_KINDS` — 10 kinds total (light / filter / momoPose / cloth / clothOutfit / diyPattern / clothType / clothProp / clothTag / nikkiPose); **a kind existing ≠ being authorized** — cloth / clothOutfit are not yet authorized and fail closed to the placeholder block.
+
+**User entry**: Settings → External Reference Data (two mirror inputs for image acceleration / manifest site, auto-check-on-startup toggle, manual check button, external-images master switch, source attribution card); when the master switch is off, `refdata:resolve-image` returns `disabled` immediately (zero network).
+
+**Relation to the main app / NikkiSync**: a standalone reference-data service with no `@nikkisync/*` load-surface dependency; its data feeds world map tiles (useWorldMapTiles) and reference images (useReferenceImage, §6.8).
 
 ---
 
@@ -1068,7 +1140,7 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **scanner/ScanProgress**: Scan progress bar (scanned/found/currentPath + stop button)
 - **video/VideoPlayer**: Video player (playback progress persisted to localStorage by src hash)
 
-### 6.8 Custom Hooks (31 non-test files)
+### 6.8 Custom Hooks (33 non-test files)
 
 #### Media Operation Class (8)
 
@@ -1115,6 +1187,11 @@ A standalone utilityProcess handling FFmpeg command construction and execution f
 - **useNeighborPrefetch**: neighbour prefetch (thumbnail-optimization plan node 4, prefetching around the current index)
 - **useOnDemandThumbnails**: on-demand thumbnail generation entry point for the visible area (module-level Promise cache ensures one request per target)
 - **useWheelPageNav**: wheel page-turn hook for the fullscreen preview (with cooldown and side-button / edge hotzone coordination)
+
+#### Reference-data group (2, 2026-11-08 CDN pipeline)
+
+- **useReferenceImage**: resolves one reference-data CDN image on demand (`refdata:resolve-image` → main-process authorization check / disk cache / backoff → local cache served via `media://`; the renderer never hits the CDN directly, one image at a time, no prefetch)
+- **useWorldMapTiles**: consumes the existing `refdata:get-world-map-tiles` / `refdata:get-status` query channels (read-only, no contract changes; fail-soft degradation to an empty state, no caching, no prefetch)
 
 ### 6.9 State Management (stores/)
 
@@ -1605,7 +1682,7 @@ commit (preload cannot import main-process modules, so the two cannot share a si
 "build:preview": "vite build --config vite.preview.config.ts",
 "preview": "electron-vite preview",
 "dist": "npm run build && electron-builder --publish never",
-"dist:win": "npm run build:recycle-helper && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
+"dist:win": "npm run build:recycle-helper && npm run stage:nikkisync-pc && npm run build && npm run pre-dist-check && electron-builder --win --publish never && npm run verify:dist",
 "pre-dist-check": "tsx scripts/pre-dist-check.ts && tsx scripts/check-doc-versions.ts && tsx scripts/check-changelog-release.ts",
 "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
 "typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
@@ -1667,7 +1744,7 @@ commit (preload cannot import main-process modules, so the two cannot share a si
 - `productName: 喵星图`
 - `directories.output: release`
 - `files: [dist/**/*, resources/**/*]`
-- **`asarUnpack`**: 14 native/external dependency entries unpacked to disk — `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` / `qrcode` / `dijkstrajs` / `pngjs` (the last three added on 2026-11-05 with the @nikkisync external-deps unpack fix)
+- **`asarUnpack`**: 15 native/external dependency and runtime icon entries unpacked to disk — `@nikkisync` / `ffmpeg-static` / `ffprobe-static` / `better-sqlite3` / `bindings` / `file-uri-to-path` / `sharp` / `@img` / `koffi` / `@koromix` / `nuan5_decryption.dll` / `qrcode` / `dijkstrajs` / `pngjs` / `resources/icons/icon.ico` (the last three were added on 2026-11-05 with the @nikkisync external-deps unpack fix; icon.ico was added on 2026-11-08 when the window icon was wired up explicitly — the native layer reads it by file path, which must resolve to the unpacked real file)
 - **Windows NSIS**: x64, non-one-click, allows custom install dir, force create desktop shortcut + start menu shortcut
 - `signExecutable: false` / `verifyUpdateCodeSignature: false` — code signing not enabled, but **the exe icon and PE version metadata are still written via resedit**. This used to read `signAndEditExecutable: false`, which makes electron-builder skip resource editing along with signing, leaving the app exe / desktop shortcut / taskbar on the Electron default icon.
 
@@ -2066,12 +2143,12 @@ Theme switching with zero JS re-render.
 
 ### C.3 Test Scale
 
-- **Test file count (statically verifiable, no run needed)**: Vitest 5.0, **471 test files** = src 434 + scripts 32 + e2e 5
-  (per-directory count of `git ls-files '*.test.ts' '*.test.tsx'`; static recheck on 2026-11-05). Versus the 2026-10-30
-  snapshot of 454 this is +17, from suites added by the gallery-count fix, DEBT-053…059 clearing and the qrcode unpack-gate rounds.
+- **Test file count (statically verifiable, no run needed)**: Vitest 5.0, **520 test files** = src 474 + scripts 41 + e2e 5
+  (per-directory count of `git ls-files '*.test.ts' '*.test.tsx'`; static recheck on 2026-11-14). Versus the 2026-11-05
+  snapshot of 471 this is +49, from suites added by the windows-shell alignment, reference-data CDN pipeline and gallery-count fix rounds.
 - **Passing case count (only quotable from an actual run)**: full `npm test` on 2026-10-30 from this machine —
   `Test Files 454 passed (454)`, `Tests 7094 passed | 12 skipped (7106)`, 53.45s (host `win32 / node-v26.3.0 / vitest 5.0.3`).
-  That reading corresponds to the then-static count 454 = 421+28+5, since grown to the 471 above; kept here as the latest
+  That reading corresponds to the then-static count 454 = 421+28+5, since grown to the 520 above; kept here as the latest
   full-run snapshot and not refreshed with the static count.
 - **The device-side run cannot reach green on this machine; CI is the final judge**: the same `npm run test:ci-linux` gives
   32 failed | 422 passed (454) here, against 33 failed | 421 passed (454) on the pre-round baseline `a678393` — **this round adds zero new reds**.

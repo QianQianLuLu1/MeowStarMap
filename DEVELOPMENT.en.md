@@ -168,8 +168,8 @@ MeowStarMap/
 │   │   ├── preload/           # Preload split modules (namespaced by domain)
 │   │   │   ├── ipc.ts               # IpcError class + call<T> unwrapping + subscribe event helper
 │   │   │   ├── plugin-bridge.ts     # Plugin capability bridge (window.pluginAPI) + i18n.t injection point
-│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 33 files; each exports a <key>API object)
-│   │   ├── app/               # App lifecycle management (27 source files)
+│   │   │   └── api/                 # electronAPI namespaces (scanner/file/editor/... 34 files; each exports a <key>API object)
+│   │   ├── app/               # App lifecycle management (31 source files)
 │   │   │   ├── application.ts       # App main class
 │   │   │   ├── lifecycle.ts         # Lifecycle management
 │   │   │   ├── cleanup.ts           # Exit cleanup
@@ -194,7 +194,7 @@ MeowStarMap/
 │   │   ├── scheduler/         # Priority-based task scheduler
 │   │   ├── services/          # Business services (file/video/watermark/share/backup/xmp...)
 │   │   ├── thumbnail/         # Thumbnail generator (sharp-based)
-│   │   ├── ipc/handlers/      # IPC channel handlers (one file per domain; 47 domain files — 4 `_`-prefixed helpers plus the set-dir-handler factory, 43 registered by setupIPC())
+│   │   ├── ipc/handlers/      # IPC channel handlers (one file per domain; 48 domain files — 4 `_`-prefixed helpers plus the set-dir-handler factory, 44 registered by setupIPC())
 │   │   ├── plugins/           # Plugin host (plugin-host/permission-guard)
 │   │   ├── video-editor/      # Video editor subprocess (bridge/filter-builder/watermark-builder)
 │   │   ├── i18n/              # Main-process internationalization
@@ -773,10 +773,11 @@ npm run dist:win
 This runs sequentially:
 
 1. `npm run build:recycle-helper`: `node scripts/build-recycle-helper.cjs` compiles `resources/nikkisync/recycle-helper.cs` into `nikkisync-recycle-helper.exe` with the .NET Framework `csc.exe` (skipped with exit 0 on non-win32; ordered before `clean` because `clean` does not touch `resources/`)
-2. `npm run build`: `clean` → `electron-vite build` → write `dist/main/package.json` (`{"type":"commonjs"}`)
-3. `npm run pre-dist-check`: three chained steps — artifacts newer than sources (this replaced the old main-vs-renderer timestamp comparison), key fixpoints, Git working tree; README Electron version matching `package.json`; the CHANGELOG back-fill obligation for the version section
-4. `electron-builder --win --publish never`: package the Windows NSIS installer
-5. `npm run verify:dist`: verify runtime dependencies such as the VC++ runtime are bundled inside the asar
+2. `npm run stage:nikkisync-pc`: `tsx scripts/stage-nikkisync-pc-assets.ts --apply` stages upstream NikkiSync PC assets (compliance docs, branding icons, photo-filter icons, etc., see `resources/nikkisync/`) into the packaging resource location so they ship with the installer
+3. `npm run build`: `clean` → `electron-vite build` → write `dist/main/package.json` (`{"type":"commonjs"}`)
+4. `npm run pre-dist-check`: three chained steps — artifacts newer than sources (this replaced the old main-vs-renderer timestamp comparison), key fixpoints, Git working tree; README Electron version matching `package.json`; the CHANGELOG back-fill obligation for the version section
+5. `electron-builder --win --publish never`: package the Windows NSIS installer
+6. `npm run verify:dist`: verify runtime dependencies such as the VC++ runtime are bundled inside the asar
 
 ### 7.3 Step-by-Step (for debugging)
 
@@ -796,13 +797,14 @@ npx electron-builder --win --publish never
 >
 > ```bash
 > npm run build:recycle-helper
+> npm run stage:nikkisync-pc   # stage upstream NikkiSync PC assets into resources/nikkisync/
 > npx electron-vite build
 > npm run pre-dist-check
 > npx electron-builder --win --publish never
 > npm run verify:dist
 > ```
 >
-> `npm run dist:win` is equivalent to the five steps above (`npm run build` = `clean` + `electron-vite build` + writing `dist/main/package.json`; the `clean` step may fail on this machine due to the Safe-Delete gateway — see [2.6](#26-build-artifacts-no-installer)).
+> `npm run dist:win` is equivalent to the six steps above (`npm run build` = `clean` + `electron-vite build` + writing `dist/main/package.json`; the `clean` step may fail on this machine due to the Safe-Delete gateway — see [2.6](#26-build-artifacts-no-installer)).
 
 ### 7.4 Output Location
 
@@ -1095,7 +1097,7 @@ you no longer need.
 - [docs/CODING_CONVENTIONS.md](docs/CODING_CONVENTIONS.md): the four hard coding conventions and the verify/commit contract (single source of truth)
 - [docs/技术债清单.md](docs/技术债清单.md): tech debt ledger (Chinese)
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md): component docs site usage (Chinese)
-- [docs/sync-integration/](docs/sync-integration/): NikkiSync integration stage plans and audit reports (16 files, design-of-record; paths mix this repo and upstream — see the scope declaration at the top of each file)
+- [docs/sync-integration/](docs/sync-integration/): NikkiSync integration stage plans and audit reports (17 md files: 16 plans/reports + 1 index, design-of-record; paths mix this repo and upstream — see the scope declaration at the top of each file)
 - [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md): project architecture overview (Chinese) — `docs/archive/` is excluded by `.gitignore`, kept locally only, not in the repo
 
 ---

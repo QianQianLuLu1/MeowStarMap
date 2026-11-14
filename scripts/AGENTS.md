@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-84 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
+89 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -20,21 +20,23 @@
 | `check-changelog-release.ts`     | `npm run pre-dist-check` 内部调用                                       | 校验 CHANGELOG.md 已收口（package.json 版本有对应节、`[Unreleased]` 无待发布条目），未收口即阻断打包                                                                                                                                                                                                                                                                                                                 |
 | `hotlink-policy.ts`              | `pre-dist-check.ts` 内部调用（热链合规一致性闸门，12.10 项）            | **热链合规一致性判定核**（#218 / #20 授权条款）：CSP `img-src` 外部主机 == 渲染层直连注册表并集、versioned-ua 主机不入 CSP、两处 CSP 逐字一致（产物级）、固定 UA 串完好、`src/` 无硬编码版本 UA、AGENTS.md 规范章节在场；判据解析自各注册表源文件（不抄录主机清单），未同批同步即阻断打包。规范正文见根 AGENTS.md「热链与外部资源请求规范」；纯函数判定由 `__tests__/hotlink-policy.test.ts` 单测 + 真实仓库契约钉住 |
 | `stage-nikkisync-pc-assets.ts`   | `npm run stage:nikkisync-pc`（`dist:win` 链前置步）                     | **上游逐字派生 PC 资产暂存器**：从上游真相源（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`，候选链同 `link-nikkisync.ts`）逐字拷贝 **31 项**资产到 `resources/nikkisync/pc/`（4 份 legal md / 品牌图 2 张 / wechat 3 脚本 / a49764bb 滤镜 `manifest.json` + 21 张 `filter-*.webp`）；整目录 `.prettierignore` 豁免保证重跑幂等（工作区不脏），逐字契约由同名测试源码级钉住                                 |
+| `verify-asar-target.ts`          | 被 `pre-dist-check.ts` / `verify-nikkisync-link.ts` import              | 待审 `app.asar` 选取与解包根派生的**共享单一事实源**（DEBT-054 收口）：两道闸门不再各持一份 `findAsarUnpacked` 同名副本，两棵完整产物树并存时按同判据选取                                                                                                                                                                                                                                                            |
 | `extract-nikkisync-icon-pack.ts` | `npx tsx scripts/extract-nikkisync-icon-pack.ts --exe <path> [--apply]` | **官方服装图标包资产门禁**（a49764bb）：校验 EXE / 内嵌 ZIP / `manifest.json` 四组 SHA → 从 .NET single-file PE 中 carve ZIP → `unzip -t` → 逐文件抽样 SHA → 落位 `resources/nikkisync/pc/clothing-icons/`。纯函数 `carveZipFromBuffer` / `verifyIconPackManifest` 供单测；任一校验失败退出码 1，不落半套资源。**注意该主包不经过 stage 清单**                                                                       |
 | `reset.ts`                       | `npm run reset`                                                         | 全量清理 dist/cache/.vite/tsbuildinfo                                                                                                                                                                                                                                                                                                                                                                                |
 | `electron-browser-stub.js`       | 构建配置引用                                                            | Vite resolve.alias 目标，将渲染进程残留的 `import 'electron'` 替换为空 stub                                                                                                                                                                                                                                                                                                                                          |
 
 ### i18n 治理（`i18n/`）
 
-| 文件                       | 调用方式                       | 职责                                                     |
-| -------------------------- | ------------------------------ | -------------------------------------------------------- |
-| `i18n/_shared.ts`          | 被其他 i18n 脚本 import        | i18n 工具公共层（白名单解析/ESLint lint/值反查表），只读 |
-| `i18n/guard.ts`            | `npm run i18n:guard`           | CI 守卫（白名单只减不增 + 清零必移除 + key 对齐）        |
-| `i18n/codemod.ts`          | `npm run i18n:codemod`         | i18n 自动改写 codemod（dry-run 预览 / `--apply` 落地）   |
-| `i18n/extract-i18n.ts`     | `npm run i18n:extract-legacy`  | 提取中文硬编码修复建议（只读）                           |
-| `i18n/prune-whitelist.ts`  | `npm run i18n:prune-whitelist` | 白名单自动瘦身（移除违规清零文件）                       |
-| `i18n/whitelist-status.ts` | `npm run i18n:status`          | 白名单现状分析报告（控制台/JSON/Markdown）               |
-| `check-i18n-keys.ts`       | `npm run i18n:check`           | 对比所有 locale 文件与 zh-CN.json 的 key 对齐            |
+| 文件                       | 调用方式                       | 职责                                                                                                 |
+| -------------------------- | ------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `i18n/_shared.ts`          | 被其他 i18n 脚本 import        | i18n 工具公共层（白名单解析/ESLint lint/值反查表），只读                                             |
+| `i18n/guard.ts`            | `npm run i18n:guard`           | CI 守卫（白名单只减不增 + 清零必移除 + key 对齐）                                                    |
+| `i18n/codemod.ts`          | `npm run i18n:codemod`         | i18n 自动改写 codemod（dry-run 预览 / `--apply` 落地）                                               |
+| `i18n/extract-i18n.ts`     | `npm run i18n:extract-legacy`  | 提取中文硬编码修复建议（只读）                                                                       |
+| `i18n/prune-whitelist.ts`  | `npm run i18n:prune-whitelist` | 白名单自动瘦身（移除违规清零文件）                                                                   |
+| `i18n/whitelist-status.ts` | `npm run i18n:status`          | 白名单现状分析报告（控制台/JSON/Markdown）                                                           |
+| `check-i18n-keys.ts`       | `npm run i18n:check`           | 对比所有 locale 文件与 zh-CN.json 的 key 对齐                                                        |
+| `sync-i18n-keys.ts`        | `npm run sync-i18n-keys`       | 以 zh-CN.json 为基线同步 key：缺失 key 以空串补齐到其他 locale，多余 key 删除（落地前自行确认 diff） |
 
 ### 技术债管理（`debt/`）
 
@@ -71,17 +73,23 @@
 
 ### 诊断与校验
 
-| 文件                       | 调用方式                                                  | 职责                                                                                                                                                                                                                                                                                                                              |
-| -------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `doctor.ts`                | `npm run doctor`                                          | 环境健康诊断（Node 版本/原生模块/DLL/数据库）                                                                                                                                                                                                                                                                                     |
-| `e2e-usage.ts`             | `npm run e2e`                                             | **e2e 误输入守卫**：裸 `npm run e2e`（含 `e2e : smoke` 这类把冒号两侧打成空格的笔误）列出真实子命令并以退出码 1 结束，替代 npm 的 Missing script 报错                                                                                                                                                                             |
-| `verify-changes.ts`        | `npm run verify` / `npm run verify:staged`                | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件。typecheck 的 `tsc -b` 产物落点已隔离到 `.cache/tsmain`，不再覆写 `dist/main`（原因见 `docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md`，落点由 `scripts/__tests__/typecheck-emit-isolation.test.ts` 守护） |
-| `verify-format-scope.ts`   | 被 `verify-changes.ts` import                             | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                                                                                                                                                                                                                                           |
-| `check-preview-drift.ts`   | `npm run preview:check`                                   | preview.html 与源码的 11 项漂移检测（第 11 维 favicon 内联：data URI 解码与 icon.ico 逐字节同源）                                                                                                                                                                                                                                 |
-| `check-md-links.ts`        | `npm run docs:links`                                      | **被跟踪 Markdown 的引用完整性守护**（只读）：抽取 `[x](path)` 与行内反引号路径，按 tracked 集合判定 ok / ignored-local / annotated-gone / upstream-scope / artifact / dead；死引用退出码 1                                                                                                                                       |
-| `verify-nikkisync-link.ts` | `npm run verify:nikkisync`                                | **NikkiSync 依赖与装载面只读诊断**（依赖图是否自包含/`node_modules/@nikkisync/*` 链接/NikkiSync `dist/` 产物/`migrations` 可读/主进程产物未把 ESM 折叠成 `require()`/打包态 unpacked 含 schema），`--json` 可切结构化输出；未链接为 warn 不阻断                                                                                   |
-| `link-nikkisync.ts`        | `npm run link:nikkisync` / `npm run link:nikkisync:check` | **NikkiSync 开发机链接器**：在候选根（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`）中建/校 `node_modules/@nikkisync/*` junction（幂等；`--check` 只读）；无可用根时退出码 1 并逐项给出拒绝原因                                                                                                                         |
-| `generate-icon.js`         | 手动执行                                                  | 主源 PNG → 四档圆角 ICO 图标生成（导出 `radiusFor` / `roundedRectCoverage` 等纯函数，由 `__tests__/app-icon.test.ts` 覆盖）                                                                                                                                                                                                       |
+| 文件                                   | 调用方式                                                  | 职责                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `doctor.ts`                            | `npm run doctor`                                          | 环境健康诊断（Node 版本/原生模块/DLL/数据库）                                                                                                                                                                                                                                                                                     |
+| `e2e-usage.ts`                         | `npm run e2e`                                             | **e2e 误输入守卫**：裸 `npm run e2e`（含 `e2e : smoke` 这类把冒号两侧打成空格的笔误）列出真实子命令并以退出码 1 结束，替代 npm 的 Missing script 报错                                                                                                                                                                             |
+| `verify-changes.ts`                    | `npm run verify` / `npm run verify:staged`                | **变更后只读验证闸门**（typecheck + eslint 无 `--fix` + prettier `--check` + 相关单测）；铁律：只读，绝不写文件。typecheck 的 `tsc -b` 产物落点已隔离到 `.cache/tsmain`，不再覆写 `dist/main`（原因见 `docs/plans/2026-10-19-fix-e2e-smoke-dist-pollution.md`，落点由 `scripts/__tests__/typecheck-emit-isolation.test.ts` 守护） |
+| `verify-format-scope.ts`               | 被 `verify-changes.ts` import                             | 从 `package.json` 的 `lint-staged` 键推导钩子格式作用域（纯函数，只读）                                                                                                                                                                                                                                                           |
+| `check-preview-drift.ts`               | `npm run preview:check`                                   | preview.html 与源码的 11 项漂移检测（第 11 维 favicon 内联：data URI 解码与 icon.ico 逐字节同源）                                                                                                                                                                                                                                 |
+| `check-md-links.ts`                    | `npm run docs:links`                                      | **被跟踪 Markdown 的引用完整性守护**（只读）：抽取 `[x](path)` 与行内反引号路径，按 tracked 集合判定 ok / ignored-local / annotated-gone / upstream-scope / artifact / dead；死引用退出码 1                                                                                                                                       |
+| `verify-nikkisync-link.ts`             | `npm run verify:nikkisync`                                | **NikkiSync 依赖与装载面只读诊断**（依赖图是否自包含/`node_modules/@nikkisync/*` 链接/NikkiSync `dist/` 产物/`migrations` 可读/主进程产物未把 ESM 折叠成 `require()`/打包态 unpacked 含 schema），`--json` 可切结构化输出；未链接为 warn 不阻断                                                                                   |
+| `link-nikkisync.ts`                    | `npm run link:nikkisync` / `npm run link:nikkisync:check` | **NikkiSync 开发机链接器**：在候选根（`NIKKISYNC_ROOT` → `../NikkiSync` → `vendor/NikkiSync`）中建/校 `node_modules/@nikkisync/*` junction（幂等；`--check` 只读）；无可用根时退出码 1 并逐项给出拒绝原因                                                                                                                         |
+| `generate-icon.js`                     | 手动执行                                                  | 主源 PNG → 四档圆角 ICO 图标生成（导出 `radiusFor` / `roundedRectCoverage` 等纯函数，由 `__tests__/app-icon.test.ts` 覆盖）                                                                                                                                                                                                       |
+| `core-path-gate.ts`                    | 被 `verify-changes.ts` 调用 / `--staged`（pre-commit）    | **核心路径授权闸门**（提交面 diff 判定）：受保护文件存在实质改动 ⇒ 必须同批新增一行含真实原因的 `@core-change:` 授权注释；与 ESLint `local/core-path-guard` 构成两层闸门。纯函数导出供同名单测                                                                                                                                    |
+| `find-related-tests.ts`                | 被 `verify-changes.ts` / `run-precommit-tests.ts` import  | 源文件 → 相关测试文件匹配的**共享规则单一实现**：保证 `npm run verify` 与 pre-commit 两条入口的匹配规则一致不分叉                                                                                                                                                                                                                 |
+| `run-precommit-tests.ts`               | `npm run test:precommit`（由 lint-staged 调用）           | pre-commit 测试运行器：接收暂存源文件路径，按 `find-related-tests.ts` 共享规则查找对应测试并仅运行这些测试                                                                                                                                                                                                                        |
+| `diagnose-duplicate-false-positive.ts` | 手动 CLI（只读，绝不写库）                                | 「重复文件」误判诊断：游戏/启动器以 Windows 硬链接把同一物理文件暴露在两个扫描根下导致双记录，本脚本按物理文件归并核对判定链路并输出诊断报告                                                                                                                                                                                      |
+| `nikkisync-external-deps.ts`           | 被 `pre-dist-check.ts` import                             | `@nikkisync` 装载面的外部依赖守护（纯函数层，零 I/O）：`qrcode`/`dijkstrajs`/`pngjs` 等外部纯 JS 依赖必须随 `asarUnpack` 解出，缺件即打包闸门红                                                                                                                                                                                   |
+| `serve-dev-update-feed.ts`             | 手动 CLI（dev 假更新源）                                  | 开发机冒充 generic provider 更新源，在真实界面里验证「有更新 / 无更新 / 源未就绪 / 连不上」四条分支（判据见 `docs/plans/2026-11-05-fix-update-check-network-busy-misreport.md` §六）                                                                                                                                              |
 
 ### 测试
 
@@ -114,7 +122,7 @@
 
 ### 语言与执行
 
-- 81 个入仓代码文件里 76 个为 TypeScript（`.ts`：41 个非测试脚本 + 35 个 `__tests__` 单测，2026-11-08 复核全量统计）；2026-11-02 因 mDNS 复测装置 +3，统一使用 `tsx` 直接执行，无需编译步骤。
+- 89 个入仓代码文件里 84 个为 TypeScript（`.ts`：43 个非测试脚本 + 41 个 `__tests__` 单测，2026-11-14 复核全量统计）；统一使用 `tsx` 直接执行，无需编译步骤。
 - 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
 - **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore` 的 `/scripts/mimosa-*.ps1`、`/scripts/fix-harness-memory-path.ps1`、`/scripts/write-bridge-report.ps1` 三条规则显式排除，`scripts/archive/` 下 3 个由 `/scripts/archive/` 整目录排除（行号会随 `.gitignore` 增长漂移，故按规则文本引用）。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
@@ -155,6 +163,8 @@
 | 命令                           | 说明                                                                             |
 | ------------------------------ | -------------------------------------------------------------------------------- |
 | `npm run reset`                | 全量清理构建产物                                                                 |
+| `npm run stage:nikkisync-pc`   | 从上游暂存 PC 资产到 `resources/nikkisync/pc/`（`dist:win` 链前置步）            |
+| `npm run test:precommit`       | pre-commit 测试运行器：按共享匹配规则仅跑暂存文件的相关测试                      |
 | `npm run pre-dist-check`       | 打包前产物校验                                                                   |
 | `npm run verify:dist`          | 打包后 asar 校验                                                                 |
 | `npm run verify:nikkisync`     | NikkiSync 依赖与装载面只读诊断（自包含 / 链接 / dist 产物 / schema）             |
@@ -165,6 +175,7 @@
 | `npm run verify`               | 变更后只读验证（工作区 vs HEAD）                                                 |
 | `npm run verify:staged`        | 仅暂存文件的只读验证（检查集对齐 pre-commit，但不改写文件）                      |
 | `npm run i18n:check`           | i18n key 对齐检查                                                                |
+| `npm run sync-i18n-keys`       | 以 zh-CN.json 为基线同步 locale key（缺失补空串、多余删除）                      |
 | `npm run i18n:guard`           | CI i18n 守卫                                                                     |
 | `npm run i18n:status`          | 白名单现状报告                                                                   |
 | `npm run i18n:extract-legacy`  | 提取硬编码中文                                                                   |
@@ -185,4 +196,4 @@
 - `after-pack-vc-runtime.cjs` 是 CommonJS 格式（electron-builder 钩子要求），不得改为 ESM。
 - `doctor.ts` 的诊断结果会被 CI 和 `npm run verify` 引用，修改输出格式需评估下游。
 - 修改 `package.json` 的 `lint-staged` 键**形态**（不只是内容）时必须同步 `verify-format-scope.ts`，否则新增键会被跳过格式检查；`__tests__/verify-format-scope.test.ts` 中的配置契约测试会先失败（不可解析键另在 `npm run verify` 输出 `[VERIFY] ⚠`）。
-- 测试配对率偏低：37 个非测试脚本中 12 个有同名配套单测（`X.ts` ↔ `__tests__/X.test.ts`，≈32%；2026-10-22 性能基线分段轮把 `save-perf-baseline.ts` / `emit-perf-readings.ts` 补齐了同名配套）；且 `scripts/**` 不在 `vitest.config.ts` 的 `include: 'src/**'` 覆盖率统计范围内，本目录**没有行覆盖率读数**，历史写的「约 8%」无法复现，已改为可实测的文件配对口径。新增脚本时建议将核心逻辑导出为纯函数并补充单测。
+- 测试配对率偏低：27 个顶层非测试脚本中 12 个有同名配套单测（`X.ts` ↔ `__tests__/X.test.ts`，≈44%；2026-11-14 复核；2026-10-22 性能基线分段轮把 `save-perf-baseline.ts` / `emit-perf-readings.ts` 补齐了同名配套）；且 `scripts/**` 不在 `vitest.config.ts` 的 `include: 'src/**'` 覆盖率统计范围内，本目录**没有行覆盖率读数**，历史写的「约 8%」无法复现，已改为可实测的文件配对口径。新增脚本时建议将核心逻辑导出为纯函数并补充单测。

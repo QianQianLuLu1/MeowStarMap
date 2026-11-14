@@ -47,6 +47,7 @@ worker 进程（独立 utilityProcess）               ← 全部扫描核心逻
 | [`scan-abort.ts`](scan-abort.ts)                                   | **主 + worker** | 中止标志（零依赖纯状态）：`abortScan` / `isScanAborted` / `resetScanAbort`                                                                     |
 | [`scan-logger.ts`](scan-logger.ts)                                 | worker          | `sendScanLogEntry` / `sendScanLogInfo`：经 `parentPort` 发 `SCAN_LOG`（零依赖）                                                                |
 | [`scan-log-store.ts`](scan-log-store.ts)                           | **主 + worker** | 诊断日志环形仓库（2000 条）+ 可选 JSONL 落盘 + `classifyFsError` + `ScanErrorCode`（**不 import electron**）                                   |
+| [`scan-journal.ts`](scan-journal.ts)                               | 主              | 扫描变更日志辅助（sync-integration 阶段 5 自 scanner-handler 抽取）：scanner-handler 与 startup-tasks 共用的变更留痕，带同名测试               |
 | `__tests__/` 与同目录 `*.test.ts`                                  | —               | Vitest 单测（`npm run test:main`）                                                                                                             |
 
 ## 1. 进程拓扑与装配

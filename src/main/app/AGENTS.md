@@ -32,7 +32,7 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 | 文件           | 职责                                                                               |
 | -------------- | ---------------------------------------------------------------------------------- |
-| `ipc-setup.ts` | `setupIPC()` 注册 43 个 `registerXxxHandlers`（按域拆分），初始化 pathGuard 白名单 |
+| `ipc-setup.ts` | `setupIPC()` 注册 44 个 `registerXxxHandlers`（按域拆分），初始化 pathGuard 白名单 |
 | `recovery.ts`  | 数据库恢复 + worker 崩溃监听器，事件暂存 → 主窗口就绪后弹窗                        |
 
 ### 启动与退出
@@ -46,24 +46,29 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ### 自愈与安全
 
-| 文件                     | 职责                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------ |
-| `gpu-fallback.ts`        | GPU 崩溃自动回退软件渲染（VS Code 模式）——状态文件持久化、连续失败阈值、自动 relaunch 自愈 |
-| `native-load-guard.ts`   | 原生模块加载预检——better-sqlite3/koffi/sharp 分类错误（ABI/VC++/缺失）+ 双语弹窗           |
-| `startup-environment.ts` | 启动环境检测——userData 可写性阻塞检测                                                      |
-| `permission.ts`          | 管理员权限提升——UAC 提权重启 + 幂等弹窗                                                    |
+| 文件                                | 职责                                                                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ |
+| `gpu-fallback.ts`                   | GPU 崩溃自动回退软件渲染（VS Code 模式）——状态文件持久化、连续失败阈值、自动 relaunch 自愈 |
+| `gpu-preference.ts / gpu-status.ts` | GPU 偏好持久化与状态查询（配合 `gpu-fallback` 的回退决策）                                 |
+| `login-item.ts`                     | 开机自启动开关——`app.setLoginItemSettings` 写入/回读/清理，dev 态跳过（2026-11-13）        |
+| `native-load-guard.ts`              | 原生模块加载预检——better-sqlite3/koffi/sharp 分类错误（ABI/VC++/缺失）+ 双语弹窗           |
+| `startup-environment.ts`            | 启动环境检测——userData 可写性阻塞检测                                                      |
+| `permission.ts`                     | 管理员权限提升——UAC 提权重启 + 幂等弹窗                                                    |
 
 ### 辅助功能
 
-| 文件                    | 职责                                                                                         |
-| ----------------------- | -------------------------------------------------------------------------------------------- |
-| `auto-update.ts`        | 自动更新状态机（electron-updater）——生产/dev 假源两态、推送渲染端                            |
-| `update-error-class.ts` | 更新失败归类（纯函数）——分成 network / source，兜底 source                                   |
-| `custom-dirs.ts`        | 4 个自定义目录（backup/thumbnail/log/crash）的解析、迁移、副作用初始化                       |
-| `desktop-shortcut.ts`   | 桌面快捷方式补创建（仅打包环境）                                                             |
-| `theme.ts`              | 主题切换——持久化 + nativeTheme 同步 + 标题栏叠加色                                           |
-| `media-update.ts`       | 媒体变更通知——失效白名单缓存 + 刷新 pathGuard + 节流广播（100ms）                            |
-| `app-icon-path.ts`      | 应用图标路径解析纯函数——dev/打包两态候选 + existsSync，找不到返回 null 由调用方回退 exe 图标 |
+| 文件                                                | 职责                                                                                                                                  |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `auto-update.ts`                                    | 自动更新状态机（electron-updater）——生产/dev 假源两态、推送渲染端                                                                     |
+| `update-error-class.ts`                             | 更新失败归类（纯函数）——分成 network / source，兜底 source                                                                            |
+| `custom-dirs.ts`                                    | 4 个自定义目录（backup/thumbnail/log/crash）的解析、迁移、副作用初始化                                                                |
+| `desktop-shortcut.ts`                               | 桌面快捷方式补创建（仅打包环境）                                                                                                      |
+| `theme.ts`                                          | 主题切换——持久化 + nativeTheme 同步 + 标题栏叠加色                                                                                    |
+| `media-update.ts`                                   | 媒体变更通知——失效白名单缓存 + 刷新 pathGuard + 节流广播（100ms）                                                                     |
+| `app-icon-path.ts`                                  | 应用图标路径解析纯函数——dev/打包两态候选 + existsSync，找不到返回 null 由调用方回退 exe 图标                                          |
+| `cdn-user-agent.ts`                                 | 参考数据 CDN 请求的固定 User-Agent 常量（cdn.gongeo.us 网关按 UA 加白）                                                               |
+| `nikkisync-runtime-setup.ts / sync-server-setup.ts` | NikkiSync 运行时与同步服务端装配（五个默认开启常量与 `PORTED_SYNC_AUTOSTART_ENABLED=false` 所在地）                                   |
+| `shell/`                                            | windows-shell 上游外壳对齐子目录——托盘、签名差分/图标增量、匿名诊断、网络冲突修复、临时热点、支持网关客户端等 opt-in 能力（默认关闭） |
 
 ## 编码约定
 

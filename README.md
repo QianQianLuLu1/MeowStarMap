@@ -35,6 +35,8 @@ A local photo album manager for <em>Infinity Nikki</em> players — scan, browse
 - **分享与备份** — 微信 / QQ / vivo 剪贴板分享 + WiFi 局域网传输（PIN 鉴权）；自动定时备份 + 手动备份，5 份 LRU 轮转保留
 - **共鸣录（2.5.0 新增）** — 抽卡记录浏览与手动补录、我的衣橱（部件 / 妆容 / Momo / 道具 / 共鸣色）拥有状态与套装收集进度、本地 JSON 导入导出（解析预览 → 分批事务提交 → 可取消、断点幂等）、个人统计（欧非百分位与出货分布）；抽卡与衣橱数据纯离线运行、静态数据全部随包，其中「我的衣橱」六类实体图片经第三方主机 `cdn.gongeo.us` 以 HTTPS 热链按需展示，加载失败时回退为占位色块，应用不下载保存图片、不做本地缓存，也不收集或上传任何用户数据
 - **设备同步（2.5.5 新增）** — 内置 NikkiSync 协议 v1 服务端，局域网 HTTPS + WebSocket 完成配对与认证，移动端可直接同步本机媒体库；「同步图库」板块独立浏览同步资产（默认关闭，需在设置页显式开启）
+- **Windows 外壳（2.5.7-beta 新增）** — 托盘常驻：在 设置 → 同步服务 → Windows 外壳能力 中开启（默认关；切换后需重启应用生效），任务栏通知区常驻图标，双击图标或菜单「Show MeowStarMap」唤起主窗口、菜单「Quit MeowStarMap」退出应用；开机自启动：在 设置 → 通用 → 启动 中开启（默认开），登录 Windows 时自动启动本应用，开发模式仅保存设置、不修改系统启动项
+- **参考数据（2.5.7-beta 新增）** — 世界地图瓦片与授权参考图经参考数据 CDN 按需拉取：请求由主进程代理、渲染层永不直连 CDN，图片本机缓存 7 天，加载失败回退占位色块；覆盖 10 类参考图片（其中 cloth / clothOutfit 两类暂未授权，取图 fail-closed 回占位），全部外部图片可在 设置 → 外部参考数据 中一键关闭
 - **更多能力** — 12 种语言、双主题（默认 + 柔粉轻奢）、插件系统、角色档案管理（多账号 / UID 隔离）、游戏参数解密、诊断工具
 
 ### 技术栈
@@ -59,7 +61,7 @@ A local photo album manager for <em>Infinity Nikki</em> players — scan, browse
 ### 下载安装
 
 - **GitHub Releases**：前往 [Releases 页面](https://github.com/QianQianLuLu1/MeowStarMap/releases) 获取安装包
-- **版本 tag 说明**：仓库已打过 8 个 tag，但**均不带 `v` 前缀**（`2.3.6`、`2.5.0` 与一批以旧项目名开头的 tag），`v2.5.5` 等 `v` 前缀 tag 尚未建立，故 CHANGELOG 中的 compare 链接暂不可用，请以 Releases 页面实际条目为准
+- **版本 tag 说明**：仓库已打过 11 个 tag，但**均不带 `v` 前缀**（`2.3.6`、`2.5.0` 与一批以旧项目名开头的 tag），`v2.5.5` 等 `v` 前缀 tag 尚未建立，故 CHANGELOG 中的 compare 链接暂不可用，请以 Releases 页面实际条目为准
 - **其他渠道**：抖音 / B站 搜索「纤璐不会玩摄影」获取下载指引
 
 **系统要求**：Windows 10 (1803+) / Windows 11，x64 架构
@@ -95,10 +97,10 @@ src/
 ├── main/          # Electron 主进程（IPC 通信、数据库、扫描器、服务层）
 │   ├── app/           # 应用生命周期编排
 │   ├── database/      # SQLite + 写入子进程
-│   ├── ipc/           # IPC 通道处理（47 个文件：43 个 registerXxxHandlers + 4 个辅助）
-│   ├── preload/       # preload 桥命名空间（33 个 api/*.ts）
+│   ├── ipc/           # IPC 通道处理（48 个文件：44 个 registerXxxHandlers + 4 个辅助）
+│   ├── preload/       # preload 桥命名空间（34 个 api/*.ts）
 │   ├── scanner/       # 文件扫描器（含子进程）
-│   ├── services/      # 业务服务层（16 个服务/配置文件，含搭配码数据服务）
+│   ├── services/      # 业务服务层（18 个服务/配置文件，含搭配码数据与外部参考数据服务）
 │   ├── sync/          # NikkiSync 协议移植面（认证 / 配对 / 服务端）
 │   ├── nikkisync/     # 外部 @nikkisync/* 包的装载缝
 │   ├── thumbnail/     # 单文件缩略图生成
@@ -166,6 +168,8 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 - **Share & Backup** — WeChat / QQ / vivo clipboard sharing + WiFi LAN transfer (PIN auth); auto scheduled backup + manual backup, 5-copy LRU rotation
 - **Resonance Records (new in 2.5.0)** — Browse pull records and add manual entries, manage My Wardrobe (items / makeup / Momo / props / eureka colors) with outfit completion progress, import & export local JSON (parse preview → batched transactions → cancellable and idempotent resume), personal stats (luck percentile and drop distribution); gacha and wardrobe data run fully offline with all static data bundled, while the six My Wardrobe entity image categories are hot-linked on demand over HTTPS from a third-party host, `cdn.gongeo.us` — a placeholder block is shown if an image fails to load, and the app neither downloads/stores nor caches images, nor collects or uploads any user data
 - **Device Sync (new in 2.5.5)** — Built-in NikkiSync Protocol v1 server: LAN HTTPS + WebSocket pairing and authentication let mobile clients sync this machine's media library; a dedicated **Sync Gallery** section browses synced assets (off by default — enable it explicitly in Settings)
+- **Windows Shell (new in 2.5.7-beta)** — Tray icon: enable it under Settings → Sync Service → Windows Shell (off by default; takes effect after an app restart); the icon stays in the notification area, double-clicking it or choosing "Show MeowStarMap" brings up the main window, and "Quit MeowStarMap" exits the app; Launch at login: enable it under Settings → General → Startup (on by default), the app starts automatically when you sign in to Windows — in dev mode the setting is saved without touching OS login items
+- **Reference Data (new in 2.5.7-beta)** — World map tiles and authorized reference images are fetched on demand from the reference-data CDN: requests are proxied by the main process (the renderer never connects to the CDN directly), images are cached locally for 7 days, and failures fall back to a placeholder block; covers 10 reference image categories (cloth / clothOutfit are not yet authorized and fail closed to the placeholder); all external images can be turned off at once under Settings → External Reference Data
 - **More** — 12 languages, dual themes (default + soft pink luxury), plugin system, character profiles (multi-account / UID isolation), game parameter decryption, diagnostics
 
 ### Tech Stack
@@ -190,7 +194,7 @@ A **Windows desktop** photo album manager designed for _Infinity Nikki_ players.
 ### Download
 
 - **GitHub Releases**: Visit the [Releases page](https://github.com/QianQianLuLu1/MeowStarMap/releases) for the installer
-- **Version tags**: the repo has 8 tags, but **none carry the `v` prefix** (`2.3.6`, `2.5.0`, and a batch of legacy-project-name-prefixed tags); `v`-prefixed tags such as `v2.5.5` do not exist yet, so the CHANGELOG compare links are unavailable — rely on the actual Releases entries
+- **Version tags**: the repo has 11 tags, but **none carry the `v` prefix** (`2.3.6`, `2.5.0`, and a batch of legacy-project-name-prefixed tags); `v`-prefixed tags such as `v2.5.5` do not exist yet, so the CHANGELOG compare links are unavailable — rely on the actual Releases entries
 - **Other channels**: Search "纤璐不会玩摄影" on Douyin / Bilibili for download guides
 
 **Requirements**: Windows 10 (1803+) / Windows 11, x64 architecture
@@ -226,10 +230,10 @@ src/
 ├── main/          # Electron main process (IPC, database, scanner, services)
 │   ├── app/           # Application lifecycle orchestration
 │   ├── database/      # SQLite + write worker
-│   ├── ipc/           # IPC channel handlers (47 files: 43 registerXxxHandlers + 4 helpers)
-│   ├── preload/       # Preload bridge namespaces (33 api/*.ts)
+│   ├── ipc/           # IPC channel handlers (48 files: 44 registerXxxHandlers + 4 helpers)
+│   ├── preload/       # Preload bridge namespaces (34 api/*.ts)
 │   ├── scanner/       # File scanner (with worker)
-│   ├── services/      # Business service layer (16 service/config files, incl. cloth data service)
+│   ├── services/      # Business service layer (18 service/config files, incl. cloth data & reference data services)
 │   ├── sync/          # NikkiSync protocol port (auth / pairing / server)
 │   ├── nikkisync/     # Loader seam for the external @nikkisync/* packages
 │   ├── thumbnail/     # Single-file thumbnail generation

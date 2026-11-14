@@ -1150,3 +1150,22 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
   本次修复的实施计划文档（2026-11-13 开机自启动开关失效修复）§10。
 - 启动期（`src/main/app/lifecycle.ts` 阶段 8）先比对 OS 实际状态，一致则跳过写入；
   读失败保守仍同步一次；整体失败不阻塞启动链，仅 `logStartupError` 留痕。
+
+---
+
+## 20. shell 域（2026-11-14 盘点补录；windows-shell 轮次落地、此前未成节登记）
+
+`src/main/ipc/handlers/shell-handler.ts` 的 `registerShellHandlers()` 注册 3 条系统外壳通道，
+preload 侧对应 `src/main/preload/api/shell.ts` 的 `electronAPI.shell` 命名空间
+（`shellAPI`，2026-11-13 windows-shell 对齐轮新增，故 api/ 计 34 个命名空间）：
+
+| 通道                     | preload 方法                | 入参（zod）        | 返回（`IpcResponse.data`） | 行为                                                                                          |
+| ------------------------ | --------------------------- | ------------------ | -------------------------- | --------------------------------------------------------------------------------------------- |
+| `shell:openExternal`     | `shell.openExternal(url)`   | `schemas.httpUrl`  | `{ opened: true }`         | `shell.openExternal` 打开外部链接；失败抛 `AppError.internal`（`main.shell.error.*` i18n）    |
+| `shell:openPath`         | `shell.openPath(dirPath)`   | `schemas.filePath` | `{ opened: true }`         | 资源管理器打开目录；`assertShellPathSafe` + `assertNotExecutablePath`（T01，可执行/脚本拦截） |
+| `shell:showItemInFolder` | `shell.showItemInFolder(p)` | `schemas.filePath` | `{ opened: true }`         | 定位并选中文件；Electron 内置 API，仅 Windows/macOS 支持                                      |
+
+三条通道均为**系统级定位语义**：入参仅做绝对路径 + 系统敏感目录黑名单校验
+（`assertShellPathSafe`，`shell-handler.ts:16`），不走媒体库 PathGuard 白名单；
+`openPath` 额外拦截可执行/脚本路径（等效双击防护）。失败一律抛 `AppError.internal`
+→ `IpcError`，渲染层按既有 `catch` 分支处理，无静默失败路径。

@@ -168,8 +168,8 @@ MeowStarMap/
 │   │   ├── preload/           # preload 拆分模块（按功能域命名空间化）
 │   │   │   ├── ipc.ts               # IpcError 类 + call<T> 解包 + subscribe 事件订阅
 │   │   │   ├── plugin-bridge.ts     # 插件能力桥（window.pluginAPI）+ i18n.t 注入点
-│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 33 个文件，每文件导出 <key>API 对象）
-│   │   ├── app/               # 应用生命周期管理（27 个源文件）
+│   │   │   └── api/                 # electronAPI 各命名空间（scanner/file/editor/... 共 34 个文件，每文件导出 <key>API 对象）
+│   │   ├── app/               # 应用生命周期管理（31 个源文件）
 │   │   │   ├── application.ts       # 应用主类
 │   │   │   ├── lifecycle.ts         # 生命周期管理
 │   │   │   ├── cleanup.ts           # 退出清理
@@ -194,7 +194,7 @@ MeowStarMap/
 │   │   ├── scheduler/         # 分级任务调度队列
 │   │   ├── services/          # 业务服务层（文件/视频/水印/分享/备份...）
 │   │   ├── thumbnail/         # 缩略图生成器（基于 sharp）
-│   │   ├── ipc/handlers/      # IPC 通道处理函数（按业务分文件，47 个域文件：4 个 _ 前缀辅助与 set-dir-handler 工厂，43 个由 setupIPC() 注册）
+│   │   ├── ipc/handlers/      # IPC 通道处理函数（按业务分文件，48 个域文件：4 个 _ 前缀辅助与 set-dir-handler 工厂，44 个由 setupIPC() 注册）
 │   │   ├── plugins/           # 插件宿主（plugin-host/permission-guard）
 │   │   ├── video-editor/      # 视频编辑器子进程（bridge/filter-builder/watermark-builder）
 │   │   ├── i18n/              # 主进程国际化
@@ -764,10 +764,11 @@ npm run dist:win
 该命令依次执行：
 
 1. `npm run build:recycle-helper`：`node scripts/build-recycle-helper.cjs` 用 .NET Framework 的 `csc.exe` 编译 `resources/nikkisync/recycle-helper.cs` → `nikkisync-recycle-helper.exe`（非 win32 跳过退出 0；排在 `clean` 前是因为 `clean` 不动 `resources/`）
-2. `npm run build`：`clean` → `electron-vite build` → 写入 `dist/main/package.json`（`{"type":"commonjs"}`）
-3. `npm run pre-dist-check`：三段串接——产物比源码新（已替代旧的 main vs renderer 时间戳差比较）、关键修复点、Git 工作区；README 中 Electron 版本与 `package.json` 一致；版本节的 CHANGELOG 补录义务
-4. `electron-builder --win --publish never`：打包 Windows NSIS 安装程序
-5. `npm run verify:dist`：校验 asar 内 VC++ 运行库等原生依赖已随包
+2. `npm run stage:nikkisync-pc`：`tsx scripts/stage-nikkisync-pc-assets.ts --apply` 从上游 NikkiSync 仓库暂存 PC 端资产（合规文档、品牌图标、滤镜图标等，见 `resources/nikkisync/`）到打包资源位，保证随安装包分发
+3. `npm run build`：`clean` → `electron-vite build` → 写入 `dist/main/package.json`（`{"type":"commonjs"}`）
+4. `npm run pre-dist-check`：三段串接——产物比源码新（已替代旧的 main vs renderer 时间戳差比较）、关键修复点、Git 工作区；README 中 Electron 版本与 `package.json` 一致；版本节的 CHANGELOG 补录义务
+5. `electron-builder --win --publish never`：打包 Windows NSIS 安装程序
+6. `npm run verify:dist`：校验 asar 内 VC++ 运行库等原生依赖已随包
 
 ### 7.3 分步执行（用于排错）
 
@@ -787,13 +788,14 @@ npx electron-builder --win --publish never
 >
 > ```bash
 > npm run build:recycle-helper
+> npm run stage:nikkisync-pc   # 暂存上游 NikkiSync PC 资产到 resources/nikkisync/
 > npx electron-vite build
 > npm run pre-dist-check   # 产物比源码新、关键修复点、Git 工作区；README 的 Electron 版本与 package.json 一致；CHANGELOG 补录义务
 > npx electron-builder --win --publish never
 > npm run verify:dist      # 校验 asar 内 VC++ 运行库等原生依赖已随包
 > ```
 >
-> `npm run dist:win` 等价于上述五步（其中 `npm run build` = `clean` + `electron-vite build` + 写入 `dist/main/package.json`，`clean` 这一步在本机可能因 Safe-Delete 网关失败，见 [2.6](#26-构建产物不打包安装程序)）。
+> `npm run dist:win` 等价于上述六步（其中 `npm run build` = `clean` + `electron-vite build` + 写入 `dist/main/package.json`，`clean` 这一步在本机可能因 Safe-Delete 网关失败，见 [2.6](#26-构建产物不打包安装程序)）。
 
 ### 7.4 产物位置
 
@@ -1073,7 +1075,7 @@ npm run build-storybook
 - [docs/CODING_CONVENTIONS.md](docs/CODING_CONVENTIONS.md)：四条硬性编码约定与校验/提交口径（唯一真相源）
 - [docs/技术债清单.md](docs/技术债清单.md)：技术债台账
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md)：组件文档站使用说明
-- [docs/sync-integration/](docs/sync-integration/)：NikkiSync 同步集成的阶段计划与审计报告（16 份，属设计真相源；文中路径混指本仓与上游仓，见各文件首部「路径作用域」声明）
+- [docs/sync-integration/](docs/sync-integration/)：NikkiSync 同步集成的阶段计划与审计报告（17 份 md：16 份计划/报告 + 1 份索引，属设计真相源；文中路径混指本仓与上游仓，见各文件首部「路径作用域」声明）
 - [docs/archive/项目架构全景.md](docs/archive/项目架构全景.md)：项目架构全景（零基础导读）——`docs/archive/` 被 `.gitignore` 排除，仅本机留存，不入仓
 
 ---

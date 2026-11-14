@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-11-05",
+  "updatedAt": "2026-11-14",
   "items": [
     {
       "id": "DEBT-001",
@@ -789,6 +789,196 @@
       "description": "2026-11-05 复查轮为 qrcode 装机缺陷新建的判定核（`scripts/nikkisync-external-deps.ts`）有三条**漏报方向**的边界：① `resolveMainEntry`（`:138`）只读 `package.json` 的 `main`、不读 `exports`——上游若引入只在 `exports` 声明入口的包，主入口可达图从第一步就断，闭包漏包而打包闸门照样绿；② `relativeCandidates`（`:155`）按 CJS 序试「原样 / `.js` / `.mjs` / `.cjs` / 目录 `index.js`」，不试 `.json` 与 `/index.mjs`、`/index.cjs`，同族漏报；③ `missingUnpackCoverage`（`:118`）用 `pattern.includes(dep)` 判 asarUnpack 覆盖，短包名可能被含它子串的其它 pattern 误判为已覆盖——**本轮变异抽查 M1 已复现，不是推断**：把 `**/qrcode/**` 改成 `**/qrcode-MUTATION-PROBE/**` 时契约测试仍判绿，改成不含子串的 `**/qr-code/**` 才红。**本轮实测不受影响**：`@nikkisync` 四包 dist 的 bare 种子只有 `qrcode`，闭包 `[dijkstrajs, pngjs, qrcode]` 三包均有 `main`，且闸门对带病产物实测报红（EXIT=1）。**本轮不修的原因**：① 三条都是「未来上游引入新形态才会咬人」的漏报，今天没有可复现的红判据，先写实现等于为假设需求造代码；② 误报侧已有兜底（包名形态校验拒绝正则误命中、闸门取「多扫更严」方向、不静默放行缺失包）；③ 子串覆盖判据沿用本仓既有 `unpackedCovers` 同源约定，单独改一处会造出两套覆盖判定，而它只服务开发态配置测试，出货闸门走 `existsSync`。**修法**：`resolveMainEntry` 增读 `exports`（`.` 与 `require`/`default` 支链）、`relativeCandidates` 补 `.json` 与两个 index 形态；若同时把覆盖判定升级为 glob 匹配，必须一并改 `unpackedCovers` 并同步 `pre-dist-check.test.ts` 的接线契约用例。**撤销条件**：外部依赖里出现只声明 `exports` 的包、或出现需 `.json` 相对边才可达的依赖（此时漏报当场可复现），即必须清偿。",
       "files": ["scripts/nikkisync-external-deps.ts"],
       "lines": [118, 138, 155],
+      "issue": false
+    },
+    {
+      "id": "DEBT-061",
+      "category": "docs",
+      "section": 24,
+      "status": "open",
+      "priority": "medium",
+      "title": "src/main/nikkisync/AGENTS.md「干净安装仍会 LAN 监听」与 autoStartSyncServer 默认不自启的文档口径张力",
+      "description": "2026-11-06 同步服务与开机自启轮 §9.4 明文「留作单独文档任务」，至今未处理：`src/main/nikkisync/AGENTS.md:158-162` 仍保留「干净安装仍会 LAN 监听 0.0.0.0」的旧口径，而同轮已交付 `nikkisync.autoStartSyncServer`（默认 false，LAN 服务启动期门控）——文档与实际默认行为已分叉。影响面：误导后来人评估 LAN 暴露面。修法：按当前实际语义改写该段（默认不自启、显式开启才监听），并同步「电脑端优先本地解析」宿主装配已接线的现状。撤销条件：AGENTS.md 该段落与代码实际语义一致。",
+      "files": ["src/main/nikkisync/AGENTS.md"],
+      "lines": [158],
+      "issue": false
+    },
+    {
+      "id": "DEBT-062",
+      "category": "consistency",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "同步服务页主开关「设置值≠运行态」回显裂缝",
+      "description": "2026-11-06 同步服务与开机自启轮 §9.3 明示「本次不修」：SyncServicePage 主开关读 `nikkisync.syncServerEnabled`（缺省 false），而自动启用（autoStartSyncServer）开启且服务已自启时主开关可能显示「关」而服务实际在跑——设置值与运行态可能相反。影响面：用户可见状态与真实服务状态不一致（低危：仅回显错位，不损坏数据）。修法：主开关回显合并运行态观测，或显式标注两键语义差异。撤销条件：主开关回显与运行态一致并有判据用例。",
+      "files": ["src/renderer/pages/sync-gallery/SyncServicePage.tsx"],
+      "lines": [37, 150],
+      "issue": false
+    },
+    {
+      "id": "DEBT-063",
+      "category": "robustness",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "legacy 登录项检测边界：仅匹配当前 execPath，安装目录变更后检测不到",
+      "description": "代码注释自陈（`src/main/app/login-item.ts:99-102`）：`detectLegacyLoginItemNames()` 按「user 作用域 + exe 路径精确等于 process.execPath + 不等于当前受管名」识别旧登录项，安装目录变更后旧 Run 值名检测不到、自动清理失效；`LEGACY_LOGIN_ITEM_NAMES` 保持空数组待人工取证（绝不猜值名误删第三方启动项）。2026-11-13/11-14 两轮开机自启修复（P1 历史 Run 值名残留闭环）后仍未覆盖该边界。影响面：换目录升级用户可能残留旧自启项（重复启动或指向失效路径）。修法：取得真实历史值名清单后填入 LEGACY_LOGIN_ITEM_NAMES，或升级为同 AUMID 归属判定。撤销条件：legacy 名单覆盖已知历史值名或检测判据升级，并有真机回归。",
+      "files": ["src/main/app/login-item.ts"],
+      "lines": [99, 102, 104],
+      "issue": false
+    },
+    {
+      "id": "DEBT-064",
+      "category": "test-gap",
+      "section": 24,
+      "status": "open",
+      "priority": "medium",
+      "title": "probe.test.ts 宿主 Node≥24 断言与 engines/.node-version=22 基线冲突，全量验证口径分裂",
+      "description": "2026-11-13 三份计划反复记载：`src/main/nikkisync/probe.test.ts:176` 断言宿主 Node≥24，而 package.json engines 为 >=22.12.0、CI `.node-version` 为 22——默认 Node 22 下全量 `npm test` 恒 1 failed，每轮被迫会话级切 Node 26 才能全绿（2026-11-14 盘点机 Node 26.13.1 实测全绿）。影响面：验证口径分裂（Node 22/26 两套读数），存在忘记切 PATH 就误判红的流程风险。修法：二选一——`.node-version` 抬至 24 并同步 CI；或给该断言补文档化说明与显式逃生阀。撤销条件：engines/.node-version/断言三者口径一致，Node 22 下全量可复现绿（或显式豁免有据）。",
+      "files": ["src/main/nikkisync/probe.test.ts", ".node-version"],
+      "lines": [176],
+      "issue": false
+    },
+    {
+      "id": "DEBT-065",
+      "category": "supply-chain",
+      "section": 24,
+      "status": "open",
+      "priority": "medium",
+      "title": "打包/测试依赖不入库磁盘资产（74MiB 图标包、resources/nikkisync/*.exe），干净克隆无法打包",
+      "description": "2026-11-13 计划决策表与 windows-shell 对齐轮 §8.8：9600 个服装图标 webp（约 74MiB，`.gitignore:210-211`）与 `resources/nikkisync/*.exe`（含 xdelta3.exe、recycle-helper，`.gitignore:204`）均不入库，相关测试靠 skipIf 产物存在性门控；干净克隆/CI 上 pre-dist-check 对真实缺失 exit 1——「干净克隆打包必红」属设计内，但依赖单机磁盘状态这一事实未入登记簿。影响面：新人接手/换机/CI 即踩，打包面不可在无资产环境复现。修法：DEVELOPMENT.md 给出资产获取指引（上游仓库路径 + stage:nikkisync-pc 流程），或引入带凭据的资产拉取脚本。撤销条件：资产落地指引入册或资产可拉取。",
+      "files": [".gitignore", "scripts/stage-nikkisync-pc-assets.ts"],
+      "lines": [204, 210],
+      "issue": false
+    },
+    {
+      "id": "DEBT-066",
+      "category": "robustness",
+      "section": 24,
+      "status": "open",
+      "priority": "medium",
+      "title": "windows-shell 诚实桩群组：签名 feed/程序更新/支持网关/防火墙修复/热点 无生产配置恒 unavailable",
+      "description": "2026-11-13 windows-shell 对齐轮 §0.3C/§8.1-4 与审查轮明确不修清单：签名图标 feed（icon-check/icon-activate，`shell-capabilities.ts:104-111`）、程序更新（program-check/stage/apply，xdelta3 差分逻辑已实现但无生产配置，program-apply 恒 unavailable「EXE self-replacement is out of scope」，`shell-ipc.ts:78-81`）、支持网关（support-submit，端点仅从 MOMO_SUPPORT_URL 读，host 白名单封闭集）、防火墙修复（network-repair，本构建恒 unavailable，runRepair 纯函数保留待接线，`shell-ipc.ts:87-93`）、热点开关（hotspot-toggle，无执行器）。另：托盘开关运行期切换需重启生效。影响面：已交付的 UI/IPC 面在真实环境永远不可用（UI 可开但恒 unavailable），需跟踪补齐条件。修法：逐通道补生产配置（签名 feed/网关凭据/防火墙 COM 接线），或按真实进度收窄 UI 面并同步 IPC_CONTRACT.md。撤销条件：各通道具备生产配置且真机验证可用，或明确收窄并文档化。",
+      "files": [
+        "src/main/app/shell/shell-capabilities.ts",
+        "src/main/app/shell/program-update-client.ts",
+        "src/main/app/shell/shell-ipc.ts"
+      ],
+      "lines": [104, 78, 87],
+      "issue": false
+    },
+    {
+      "id": "DEBT-067",
+      "category": "consistency",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "宿主与上游边界差异固化：MAX_FILE_SIZE 10MiB vs 上游 MaxPhotoBytes 64MiB；只校 ABI 不校 DLL SHA",
+      "description": "2026-11-13 windows-shell 对齐轮 §8.6「本轮不改既有值」：① 本仓 `src/main/services/decryption-service.ts:63` `MAX_FILE_SIZE = 10MiB` 与上游 MaxPhotoBytes 64MiB 分叉；② 上游校验解密 DLL SHA，本仓只校 `abi_version()===1`（`src/main/decryption-worker/worker-entry.ts:109`）。影响面：与上游行为分叉的隐性契约，未来上游改公式/换库时无闸门兜底。修法：对齐取值并写明差异理由，或给 DLL 增加 SHA 校验对齐上游判据。撤销条件：两侧值一致或差异被文档化并被判据用例钉住。",
+      "files": [
+        "src/main/services/decryption-service.ts",
+        "src/main/decryption-worker/worker-entry.ts"
+      ],
+      "lines": [63, 109],
+      "issue": false
+    },
+    {
+      "id": "DEBT-068",
+      "category": "robustness",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "本地解码适配器省略 previousLocalValues：换算公式变更时必须递增 resolver version 强制重算",
+      "description": "2026-11-13 windows-shell 对齐轮 §8.5 + §0.2 取证：本地照片解码适配器（`src/main/nikkisync/local-photo-resolver-adapter.ts`）未实现上游的 previousLocalValues 传递——换算公式未来变更时必须递增 resolver version 强制全量重算，否则静默读旧缓存。该约束目前只存在于计划文档，代码/测试未钉。影响面：数据正确性隐患（旧缓存与新公式混用）。修法：补齐 previousLocalValues 传递，或加判据测试钉住「公式变更必须 bump version」。撤销条件：适配器补齐或判据测试落位。",
+      "files": ["src/main/nikkisync/local-photo-resolver-adapter.ts"],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-069",
+      "category": "docs",
+      "section": 24,
+      "status": "done",
+      "priority": "medium",
+      "title": "manual-smoke-checklist 未覆盖 11-06 后新功能（托盘/自启/自动更新等）",
+      "description": "2026-11-06 起新功能面（托盘/开机自启/自动更新/参考数据 CDN/世界地图/拍摄参数新行/图标包等）未进入发布前人工冒烟清单（`docs/manual-smoke-checklist.md` 原文 65 行，最后标记 2026-10-30 新增）。影响面：发布前人工冒烟对新功能面盲跑。**2026-11-14 清偿（内容扩容补章轮）**：新增【托盘】【开机自启】【自动更新】三组条目（含前置条件/预期结果/失败判定口径与 dev/打包模式区分）；README 与 ARCHITECTURE 同步补章。撤销条件：已达成。",
+      "files": ["docs/manual-smoke-checklist.md"],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-070",
+      "category": "test-gap",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "新 shell UI 与管理员态能力未人工复核、未装机实测",
+      "description": "2026-11-13 windows-shell 对齐轮 §2 人工 GUI 判据一律标「未人工复核」、§8.3/§9：防火墙 COM、WinRT 热点、EXE 原地自替换等管理员态能力与全部新 shell UI（托盘菜单/UpdateDialog 新段/12 语分区，`SyncServicePage.tsx:1633/1657`）仅代码级 + i18n 守卫背书，该轮 dist:win/e2e:smoke 未跑、靠后续轮补。影响面：真实 GUI 行为验收缺口。修法：装机实测一轮（含管理员态场景），实测读数回写计划文档与 IPC_CONTRACT.md。撤销条件：GUI 逐项人工复核读数在案。",
+      "files": ["src/renderer/pages/sync-gallery/SyncServicePage.tsx"],
+      "lines": [1633, 1657],
+      "issue": false
+    },
+    {
+      "id": "DEBT-071",
+      "category": "i18n-log",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "主进程 i18n 恒 zh-CN（既有架构限制，P8 明确不改，保留跟踪）",
+      "description": "2026-11-13 未提交改动审查轮 §0/§8 P8：主进程 i18n（`src/main/i18n/index.ts`）实际恒 zh-CN——既有架构限制，本轮明确不改，登记保留跟踪。与 DEBT-009/010（主进程日志硬编码中文批量清理）不同面：本条是「主进程运行时语言不随 UI 语言切换」的架构限制。影响面：非中文用户在系统对话框/错误弹窗中看到中文文案。修法：主进程语言随应用 locale 初始化（涉及 i18n/ worker-safe 查表与 AppError userMessage 链路）。撤销条件：主进程文案语言与 UI locale 联动并有真机验证。",
+      "files": ["src/main/i18n/index.ts"],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-072",
+      "category": "test-gap",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "flaky 观测：test:ci-linux SyncServicePage 满载时序抖动；zip-archive ENOTEMPTY 既有偶发",
+      "description": "两条既有偶发红（2026-11-08 实录，均隔离复跑绿）：① `test:ci-linux` SyncServicePage.test.tsx 满载时序抖动（`docs/plans/2026-11-08-图标轮审查验证重打包-实施计划.md:139`）；② zip-archive.test.ts ENOTEMPTY 偶发（`docs/plans/2026-11-08-参考数据CDN图片合规接入-实施计划.md` §10，现场 `src/main/utils/zip-archive.test.ts`）。登记目的：偶发红需人工复判，不登记会被当成回归误修。修法：为两用例补重试/隔离策略或根因修复（临时目录清理时序）。撤销条件：连续若干轮无复现，或根因修复落位。",
+      "files": [
+        "src/renderer/pages/sync-gallery/SyncServicePage.test.tsx",
+        "src/main/utils/zip-archive.test.ts"
+      ],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-073",
+      "category": "coverage",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "灯光/滤镜「枚举名→数字 id」映射缺失，相机面板两行保持纯文字",
+      "description": "2026-11-08 拍摄参数扩展与地图定位总计划 §12 未勾项（CHANGELOG 2026-11-10 条目同步）：上游参考数据只有灯光/滤镜的标签字符串，缺「枚举名→数字 id」映射，相机面板灯光/滤镜两行保持纯文字展示（不渲染图标），「需后续取得授权数据源后再补」。影响面：功能性遗留，有明确补齐触发条件。修法：取得授权映射数据后按 NETWORK_IMAGE_KINDS 管道接入（复用 reference-data 链路，`src/shared/network-image-kinds.ts:20`）。撤销条件：映射数据授权到位并接入渲染。",
+      "files": ["src/shared/network-image-kinds.ts"],
+      "lines": [20],
+      "issue": false
+    },
+    {
+      "id": "DEBT-074",
+      "category": "robustness",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "livephoto 导出 JPG 未写 Apple MakerNote ContentIdentifier，iCloud 同步可能丢配对",
+      "description": "`src/main/services/livephoto-service.ts:34-35` 代码注释自陈「已知限制」：导出的 JPG 侧未写 Apple MakerNote ContentIdentifier（需 piexifjs 库），iCloud 同步可能丢失 MOV/JPG 的 Live Photo 配对，本地导入正常。影响面：iCloud 用户导出件配对丢失（导出本体不损坏）。修法：引入 piexifjs（或等效方案）写 ContentIdentifier，与 MOV 侧 com.apple.quicktime.content.identifier 对齐。撤销条件：导出件经 iCloud 实测配对成功。",
+      "files": ["src/main/services/livephoto-service.ts"],
+      "lines": [34],
+      "issue": false
+    },
+    {
+      "id": "DEBT-075",
+      "category": "consistency",
+      "section": 24,
+      "status": "open",
+      "priority": "low",
+      "title": "2.5.7-beta 全部工作未推送（origin/main 停在 a542616），单点磁盘风险",
+      "description": "2026-11-14 盘点核实：origin/main 停在 a542616（clone 基点），本地 HEAD 已领先多条 2.5.7-beta 提交（1b74e646 等），各轮计划口径「不 push 属外部动作需另行确认」。影响面：单点磁盘故障即丢失整段 2.5.7-beta 历史；协作/CI 看不到这些提交。属流程债。修法：需求方确认后 git push origin main（外部动作）。撤销条件：推送完成且远端可见。",
+      "files": [],
+      "lines": [],
       "issue": false
     }
   ]

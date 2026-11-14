@@ -25,6 +25,9 @@ src/main/services/
 ├── video-service.ts               # 视频处理（导出/裁剪/调速/帧截图/元数据）
 ├── watermark-service.ts           # 水印批量应用（文本/图片 + 平铺/定位）
 ├── xmp-metadata-service.ts        # XMP 元数据写入/读取（wxnn: 自定义命名空间）
+├── cloth-data-service.ts          # 搭配码服饰数据查询（解密域数据源）
+├── cloth-data-config.ts           # 搭配码数据 API 授权注册表（数据源端点与热链合规口径）
+├── cloth-diy-cache.ts             # 搭配码网络解码结果磁盘缓存（sha256 键）
 ├── reference-data-service.ts      # 外部参考数据热更管道（manifest→filebox 解密→protobuf 索引；查询面 fail-soft）
 ├── reference-image-service.ts     # 参考数据 CDN 图片按需取图 + 7 天磁盘缓存（授权/退避/版本化 UA，永不 reject）
 ├── reference-data/                # 管道子模块（filebox-cipher / nuan5-config-proto / image-url 授权注册表）
