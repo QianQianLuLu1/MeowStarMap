@@ -222,7 +222,10 @@ describe('路径语义守卫（比较层钉 win32 / 混合输入走方言 / IO �
     expect(existsSync(path.join(repoRoot, 'tests/ci-linux.setup.ts'))).toBe(true)
     const rig = read('vitest.ci-linux.config.ts')
     expect(rig).toContain('tests/ci-linux.setup.ts')
-    const setup = read('tests/ci-linux.setup.ts')
+    // 装置本体在 ci-linux-node.setup.ts（2026-11-14 起 ci-linux.setup.ts 为环境闸门：
+    // client 环境（@vitest-environment jsdom 逐文件注解）不装载本体，绕开 vite 6 对
+    // node:sqlite 内置模块的打包缺口），轴清单锚本体文件
+    const setup = read('tests/ci-linux-node.setup.ts')
     // 每一轴都要还在：拆掉任一轴，装置就不再是 CI 的替身，据它作的判据全部失效
     for (const token of [
       "vi.mock('path'",

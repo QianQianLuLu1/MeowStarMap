@@ -361,9 +361,11 @@ describe('logger.ts 的 fire-and-forget 形状（反遮蔽锁）', () => {
   })
 
   it('异常：删掉 [Logger] 写入失败 告警必须判违规', () => {
+    // 合成锚点只锚语句本身，不带行尾换行——工作区行尾可能是 CRLF（autocrlf=true），
+    // 硬编码 `\n` 会让 replace 空转、合成样本失效（见 docs/CODING_CONVENTIONS.md 行尾口径）
     const suppressed = source.replace(
-      "    console.error('[Logger] 写入失败:', err)\n",
-      '    // 写盘失败静默吞掉\n'
+      "console.error('[Logger] 写入失败:', err)",
+      '// 写盘失败静默吞掉'
     )
     expect(suppressed, '合成样本没生效：真实 logger.ts 的该行文本已变，请同步本用例').not.toBe(
       source

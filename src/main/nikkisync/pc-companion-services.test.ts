@@ -359,9 +359,12 @@ describe('C1 PC 端真实会话上下文装配', () => {
         snapshot: () => Promise<unknown>
       }
       await wechatConfig.snapshot()
+      // 期望侧须用与生产同方言的 realpath：生产走 promises realpath（libuv native，
+      // 展开 8.3 短名）；JS 版 realpathSync 在 TEMP 为短名形态（如 QIANLU~1）的
+      // Windows 机器上不展开，两方言逐字不等 ⇒ 期望值必须取 promises 版
       expect(ctorCalls(surface.createIndexedPreviewSource)[0]?.slice(0, 2)).toEqual([
         database,
-        [fs.realpathSync(first), fs.realpathSync(second)]
+        [await fs.promises.realpath(first), await fs.promises.realpath(second)]
       ])
       // ③ 控制页配对接口拿到真实配对串
       const desktopConfig = ctorCalls(surface.createDesktopControlServer)[0]?.[0] as {

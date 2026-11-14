@@ -176,3 +176,49 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 - 代码注释与文档以中文为主；UI 文案走 i18next（12 个 locale 包，zh-CN 为基准静态加载、其余 11 种动态加载，另有「跟随系统」auto），勿硬编码用户可见文本。
 - 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、源文件编码 UTF-8 无 BOM 与行尾 LF、路径语义三分法「比较层钉 win32 / IO 层保宿主 / 混合输入走方言」、校验与提交等）见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md)，该文件是唯一真相源。路径语义的落档由 `scripts/__tests__/path-semantics-guard.test.ts` 登记并守卫（PINNED / DIALECT / HOST_IO 三张表；新文件引入 win32 钉或方言引用而未登记 ⇒ 守卫红）。
 - 版本控制边界：根与模块级 `AGENTS.md`、`docs/CODING_CONVENTIONS.md` 均入仓，本文件导航表列出的每个路径都必须能解析到已跟踪文件；`.qoder/` 目录与 `.mimosa/`、`.trae/`、`.zcode/`、`.codebuddy/`、`.workbuddy*/`、`.codegraph/` 一样保持本地化（`.gitignore` 排除），其下的 IDE 规则文件仅作 `docs/CODING_CONVENTIONS.md` 的逐字镜像、skills 仅作本地装配，不得作为任何被跟踪指引的出处。
+
+## 热链与外部资源请求规范（上游授权合规，打包闸门强制）
+
+外部资源引用不是普通常量，而是**授权合同**：本项目展示/拉取的第三方主机资源均以权利方的书面授权为前提，授权条款已固化为代码注册表 + CSP 白名单 + UA 策略，并由打包闸门核验一致性。Agent 涉及任何外部资源改动前必须读本节。
+
+### 1. 热链判定标准
+
+- **热链（本节管）**：运行时由渲染进程 `<img>`/CSS/地图瓦片**直连**、或主进程按需 fetch 加载的第三方主机资源（图片、瓦片、图标类）。判定看「实际发出的请求主机」，不看代码书写位置。
+- **排除项（不属热链但仍受治理）**：`shell.openExternal` 外跳浏览器（不加载进应用）；不产生网络请求的标识 URI（如 XMP 命名空间 `wxnn.qianlu.com`）；随包静态资源。数据 API / 更新源（`data.gongeo.us`、`nikki.ranaxro.com`、`cnb.cool`、`api.github.com`、`nuan5.pro` 等）虽非图片热链，**新增任何出站主机同样须先核实授权**并登记到对应服务的主机白名单（fail-closed）。
+- 测试假域名（`example.test` 等）不构成热链；`dev-app-update.yml` 的 127.0.0.1 仅 dev 生效。
+
+### 2. 授权主机注册表（封闭集，fail-closed）
+
+- `cdn.gongeo.us` — 图片（衣橱六类实体 + 搭配码图标）。渲染层 `<img>` 直连；授权依据 [gongeo.us-nikki-tracker#218](https://github.com/dastrokes/gongeo.us-nikki-tracker/issues/218)；UA 固定串 `MeowStarMap`（webRequest 注入）；不落盘仅展示；注册表 `src/renderer/utils/resonance/cdnImageUrl.ts`。
+- `assets.papegames.com` — 图片（游戏官方「奇迹大陆大地图」瓦片）。渲染层 Leaflet 直连；授权依据 nikki_albums#20 条款三（不要求 UA）；不缓存/不代理/不镜像；注册表 `src/renderer/utils/world-map-tile-host.ts`。
+- `cdn.nikkialbums.com` — 图片（Nuan5NetworkImage）。主进程 fetch（UA `MeowStarMap/<版本>`，取自 `app.getVersion()`）→ 7 天磁盘缓存（负缓存/冷却/去重）→ `media://` 本地供图，渲染层禁直连；授权依据 [nikki_albums#20](https://github.com/RanAxro/nikki_albums/issues/20) 条款一；注册表 `src/main/services/reference-data/image-url.ts`。
+- `nikki.ranaxro.com` / `file-nikki.ranaxro.com` — 数据（参考数据 manifest/数据包）。主进程 fetch，版本化 UA；注册表 `src/main/services/reference-data-service.ts`。
+- `data.gongeo.us` / `raw.githubusercontent.com` — 数据（服饰目录 API / locale JSON）。主进程 fetch；图标仅构造 URL 不下载字节；注册表 `src/main/services/cloth-data-config.ts`。
+
+未登记主机一律 fail-closed 拒绝（渲染层回退占位、主进程不请求）。**新增主机的准入顺序**：先在对应上游 Issue 书面同步并取得授权 → 再登记注册表 → 同批更新 CSP 与署名（见第 4 条）→ 打包闸门放行。授权原文的义务条款摘要见 `THIRD_PARTY_NOTICES` 与 README「第三方来源与致谢」节。
+
+### 3. 处理方式（硬性条款）
+
+- **按需懒加载、不预取、不批量爬取**：渲染层 `<img loading="lazy">`；一次展示里同资源并发去重。
+- **失败回退占位**：地址不可用或加载失败回退内置占位，不因外链失效影响使用。
+- **不下载图片字节用于再分发/再托管/离线打包**：nikkialbums 图片字节只落本机受控缓存目录、仅供 `media://` 本地展示；瓦片不缓存不代理。
+- **禁高频**：负缓存（404 → 30 分钟）、失败冷却（5 分钟）、in-flight 去重；手动刷新入口有 busy 门。
+- **UA 策略两套互不混用**：gongeo 固定串经 `src/main/app/cdn-user-agent.ts` 的 webRequest 精确主机注入；nikkialbums/参考数据版本化 UA 在主进程 fetch 头携带，**必须**来自 `app.getVersion()`，禁止硬编码版本号字面量。
+- **可回滚**：总开关 `referenceData.remoteImagesEnabled` 关闭后两条图片链路零请求；热链改动保持独立、低回滚成本（#218 承诺）。
+- **镜像/加速不内置**：`referenceData.imageMirrorBaseUrl` 为用户自填入口（SSRF 守卫），应用不内置、不代建任何加速节点。
+
+### 4. 更新时机（同批同步清单）
+
+新增/变更热链（主机、路径模板、资源类型、UA、缓存策略）时，**同一批改动**必须覆盖：
+
+1. 注册表文件（第 2 条各清单项末尾的注册表路径，按链路选对应文件）；
+2. CSP 两处且逐字一致：`src/main/app/window-manager.ts` 的 `CSP_POLICY` 与 `src/renderer/index.html` 的 meta CSP（渲染层直连主机进 `img-src`；versioned-ua 主机**禁止**入 CSP）；
+3. UA 策略：新主机按权利方要求选择固定串或版本化 UA，登记进对应注入点；
+4. 署名四处：zh-CN locale 声明键（`settings.referenceData.*`）、README「第三方来源与致谢」节、`THIRD_PARTY_NOTICES` 对应章节、关于页致谢表；
+5. 本文件第 2 条的注册表清单。
+
+**版本更新**：版本化 UA 随 `app.getVersion()` 自动生效，无需手工同步；改动打进安装包前由打包闸门核验（下条），未同步即阻断。
+
+### 5. 打包闸门（`scripts/hotlink-policy.ts`）
+
+接入 `npm run pre-dist-check`（即 `dist:win` 链路）的热链一致性闸门，核验：CSP `img-src` 外部主机 == 渲染层直连注册表并集（不多不少）；versioned-ua 主机不入 CSP；两处 CSP（响应头/产物 meta）一致；固定 UA 串完好；`src/` 无硬编码 `MeowStarMap/<semver>` 字面量；本节章节在场。判据解析自注册表源文件（本节清单与闸门都不抄录主机清单），改动任何一处而未同批同步其余处 → 打包失败并列出缺口。

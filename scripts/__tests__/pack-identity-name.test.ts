@@ -239,7 +239,9 @@ describe('CI 宿主装置的工作区根字面值（四站点必须同值）', (
   const CI_ROOT_NEW = '/home/runner/work/MeowStarMap/MeowStarMap'
   const CI_ROOT_OLD = '/home/runner/work/NikkiGallery/NikkiGallery'
   const RIG_FILES: Array<[string, number]> = [
-    ['tests/ci-linux.setup.ts', 2],
+    // 装置根字面值在装置本体文件（2026-11-14 起 ci-linux.setup.ts 为环境闸门，本体迁至
+    // ci-linux-node.setup.ts：client 环境不装载本体，绕开 vite 6 对 node:sqlite 的打包缺口）
+    ['tests/ci-linux-node.setup.ts', 2],
     ['tests/mocks/ci-linux-fs.ts', 2],
     ['src/main/utils/ci-linux-emulation.test.ts', 3]
   ]
@@ -252,14 +254,14 @@ describe('CI 宿主装置的工作区根字面值（四站点必须同值）', (
 
   it('CI_ROOT 常量与装置注入的 cwd 同源（两侧不同值即伪装成产品缺陷）', () => {
     const mock = read('tests/mocks/ci-linux-fs.ts')
-    const setup = read('tests/ci-linux.setup.ts')
+    const setup = read('tests/ci-linux-node.setup.ts')
     expect(mock).toContain(`export const CI_ROOT = '${CI_ROOT_NEW}'`)
     expect(setup).toContain(`value: () => '${CI_ROOT_NEW}'`)
     expect(setup).toContain(`root: '${CI_ROOT_NEW}'`)
   })
 
   it('装置标识符未被改名（__wxnnCiLinuxEmulation 是代码标识，不是产品名）', () => {
-    expect(read('tests/ci-linux.setup.ts')).toContain('__wxnnCiLinuxEmulation')
+    expect(read('tests/ci-linux-node.setup.ts')).toContain('__wxnnCiLinuxEmulation')
   })
 })
 

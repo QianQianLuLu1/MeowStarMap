@@ -27,6 +27,7 @@ import {
   type RuntimePackagePort
 } from './nikkisync-external-deps'
 import { PHOTO_FILTER_ICON_IDS } from './stage-nikkisync-pc-assets'
+import { checkHotlinkPolicy } from './hotlink-policy'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -1323,6 +1324,101 @@ function checkVcRuntimeAfterPackConfigured(): void {
   pass(`VC++ 运行库随包钩子已接线: ${afterPack}`)
 }
 
+// ===== 热链合规一致性闸门（#218 / #20 授权条款的打包阶段固化）=====
+// 事实来源与判据链见 scripts/hotlink-policy.ts 头注与根 AGENTS.md「热链与外部资源请求规范」。
+// 核验：CSP img-src 外部主机 == 渲染层直连注册表并集（不多不少）；versioned-ua 主机不入 CSP；
+// 两处 CSP（响应头/meta）产物级一致；固定 UA 串完好；src 无硬编码版本 UA；AGENTS.md 规范章节在场。
+// 新增/变更热链若未同批同步注册表 + CSP 两处 + UA 策略 + 文档，本闸门在打包时阻断。
+function readTextOrNull(relativePath: string): string | null {
+  try {
+    return fs.readFileSync(path.join(ROOT, relativePath), 'utf-8')
+  } catch {
+    return null
+  }
+}
+
+/** 硬编码版本 UA 扫描域：src/main + src/renderer 的非测试源文件（测试/Storybook 不随包） */
+function collectUaScanSources(): {
+  sources: { path: string; content: string }[]
+  unreadable: string[]
+} {
+  const sources: { path: string; content: string }[] = []
+  const unreadable: string[] = []
+  for (const base of [SRC_MAIN, SRC_RENDERER]) {
+    const walk = (dir: string): void => {
+      let entries: fs.Dirent[]
+      try {
+        entries = fs.readdirSync(dir, { withFileTypes: true })
+      } catch {
+        unreadable.push(path.relative(ROOT, dir).replace(/\\/g, '/'))
+        return
+      }
+      for (const entry of entries) {
+        const full = path.join(dir, entry.name)
+        if (entry.isDirectory()) {
+          if (entry.name === '__tests__') continue
+          walk(full)
+        } else if (entry.isFile() && /\.(ts|tsx)$/.test(entry.name)) {
+          if (/\.test\.|\.stories\./.test(entry.name)) continue
+          const content = readTextOrNull(path.relative(ROOT, full))
+          if (content !== null) {
+            sources.push({ path: path.relative(ROOT, full).replace(/\\/g, '/'), content })
+          } else {
+            unreadable.push(path.relative(ROOT, full).replace(/\\/g, '/'))
+          }
+        }
+      }
+    }
+    walk(base)
+  }
+  return { sources, unreadable }
+}
+
+/** 打包前热链一致性闸门接线：任何源文件读不动都 fail-closed，绝不把缺证据当合规 */
+function checkHotlinkConsistency(): void {
+  const sourceFiles = {
+    cdnImageUrlSrc: 'src/renderer/utils/resonance/cdnImageUrl.ts',
+    tileHostSrc: 'src/renderer/utils/world-map-tile-host.ts',
+    imageUrlRegistrySrc: 'src/main/services/reference-data/image-url.ts',
+    windowManagerSrc: 'src/main/app/window-manager.ts',
+    cdnUserAgentSrc: 'src/main/app/cdn-user-agent.ts',
+    agentsDocSrc: 'AGENTS.md'
+  }
+  const contents: Record<string, string> = {}
+  for (const [key, relative] of Object.entries(sourceFiles)) {
+    const text = readTextOrNull(relative)
+    if (text === null) {
+      fail(`热链闸门无法读取注册表/规范文件 ${relative}（文件缺失或不可读），fail-closed 阻断打包`)
+      return
+    }
+    contents[key] = text
+  }
+  const distHtml = readTextOrNull(path.relative(ROOT, path.join(DIST_RENDERER, 'index.html')))
+  const { sources: uaScanSources, unreadable } = collectUaScanSources()
+  if (unreadable.length > 0) {
+    // 扫描域文件读不动 = 覆盖面缺口，按静默失败禁区处理（fail-closed，不降级放行）
+    fail(`热链闸门无法读取 UA 扫描域文件（覆盖面缺口）：${unreadable.join(', ')}`)
+    return
+  }
+  const problems = checkHotlinkPolicy({
+    cdnImageUrlSrc: contents.cdnImageUrlSrc,
+    tileHostSrc: contents.tileHostSrc,
+    imageUrlRegistrySrc: contents.imageUrlRegistrySrc,
+    windowManagerSrc: contents.windowManagerSrc,
+    cdnUserAgentSrc: contents.cdnUserAgentSrc,
+    agentsDocSrc: contents.agentsDocSrc,
+    distRendererHtml: distHtml,
+    uaScanSources
+  })
+  if (problems.length > 0) {
+    for (const problem of problems) {
+      fail(`热链合规（${problem.code}）：${problem.detail}`)
+    }
+    return
+  }
+  pass('热链合规一致性：CSP 与直连注册表对齐、versioned-ua 主机不直连、UA 策略与规范文档在位')
+}
+
 // ===== 管理员清单闸门（降杀软误杀 + 去 UAC 摩擦）=====
 // requireAdministrator 清单是杀软强力启发式特征，且强制每次启动弹 UAC，
 // 既增加误杀概率又造成"权限不足"错觉。本闸门在打包前 / 解包后均拦截该回归，
@@ -1510,6 +1606,9 @@ function main(): void {
 
   // 12.9 暂存图标包闸门（服装主包 + 滤镜补充包，缺件阻断打包）
   checkStagedIconPackAssets()
+
+  // 12.10 热链合规一致性闸门（#218 / #20 授权条款，注册表↔CSP↔UA↔文档漂移阻断打包）
+  checkHotlinkConsistency()
 
   // 结果
   console.log('')
