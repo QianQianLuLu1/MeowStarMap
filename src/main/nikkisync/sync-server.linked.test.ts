@@ -41,6 +41,14 @@ import type { NikkiSyncRuntimeSession, NikkiSyncSessionOptions } from './runtime
  * 生产默认为 `0.0.0.0 / 28080`，**mDNS 默认开**（`2531316` 在 589b932 上复测裁决，上游
  * 自激回环闸门已在位；读数与判据见 `sync-server-view.ts` 的 `SYNC_SERVER_DEFAULT_MDNS`
  * 与计划 §15）。未建链时整件 skip。
+ *
+ * 超时预算统一 120s（全局默认 10s）：全部用例驱动真实 HTTPS/TLS/SQLite/子进程链路，
+ * 全量并发（8537 例 forks pool）下 Windows Defender 实时扫描放大 IO 延迟，60s 实测
+ * 高频超时（隔离复跑恒绿，DEBT-072 同源）。「签名端点全链」用例外加 retry: 1 兜瞬时
+ * 网络错误（实测出现过 read ECONNRESET：并发下系统 socket 栈紧张，服务端提前断连）；
+ * 重跑沿用同名库文件走兼容层重开路径（C3-3），断言均为读链路，重试安全。
+ * 注意 vitest 5 已移除 `test(name, fn, options)` 签名，options 必须位于第二参。
+ * 断言逻辑零改动。
  */
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -487,7 +495,7 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
       await session.server.stop()
       session.dispose()
     }
-  }, 60000)
+  }, 120000)
 
   it('灵感同步 v1（上游 589b932 新增面）：能力位广告 / 未签名 401 / 图片与条目闭环 / 冲突 409', async () => {
     const session = await createRuntimeSession(
@@ -640,142 +648,151 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
     }
   }, 30000)
 
-  it('签名后的资产/详情/元数据/变更/搜索/统计端点全部可用', async () => {
-    const session = await createRuntimeSession(testOptions({ databaseFile: databaseIn('routes') }))
-    const address = await session.server.start()
-    const client = createClient(address.port, session.tlsIdentity().certPem)
-    try {
-      await seedAsset(session, 'asset_test')
-      const qr = parsePairingUri(session.pairingUri('127.0.0.1'))
-      expect((await client.pair('phone_test', qr.token)).status).toBe(200)
-
-      const list = await client.signedGet('phone_test', '/v1/assets?limit=10')
-      expect(list.status).toBe(200)
-      const listJson = jsonOf<{
-        items: Array<{ assetId: string; type: string }>
-        libraryRevision: number
-      }>(list)
-      expect(listJson.items.map((item) => item.assetId)).toContain('asset_test')
-      expect(listJson.libraryRevision).toBeGreaterThan(0)
-      // 边界：limit 由上游限定 1..500
-      expect((await client.signedGet('phone_test', '/v1/assets?limit=0')).status).toBe(400)
-      expect((await client.signedGet('phone_test', '/v1/assets?limit=501')).status).toBe(400)
-
-      const detail = await client.signedGet('phone_test', '/v1/assets/asset_test')
-      expect(detail.status).toBe(200)
-      const detailJson = jsonOf<{
-        asset: { resources: unknown[]; metadata?: { raw?: Record<string, unknown> } }
-      }>(detail)
-      expect(detailJson.asset.resources).toHaveLength(1)
-      expect(detailJson.asset.metadata?.raw?.nativeParamToken).toBe('token-visible')
-      // 上游脱敏：PC-only 字段不得下发
-      expect('nativeParamPayload' in (detailJson.asset.metadata?.raw ?? {})).toBe(false)
-      expect('nativeParamNuan5Md5' in (detailJson.asset.metadata?.raw ?? {})).toBe(false)
-      expect((await client.signedGet('phone_test', '/v1/assets/missing_asset')).status).toBe(404)
-
-      // 真值修正：`GET …/metadata` 不存在（`LocalSyncServer.ts:231-236` 只注册了签名 PATCH）
-      expect((await client.signedGet('phone_test', '/v1/assets/asset_test/metadata')).status).toBe(
-        404
+  it(
+    '签名后的资产/详情/元数据/变更/搜索/统计端点全部可用',
+    // 全量并发下偶发 read ECONNRESET（并发紧张时服务端提前断连的瞬时网络错误），单次重试兜底；
+    // 重跑沿用同名库文件走兼容层重开路径（C3-3），断言均为读链路，重试安全。
+    { timeout: 120000, retry: 1 },
+    async () => {
+      const session = await createRuntimeSession(
+        testOptions({ databaseFile: databaseIn('routes') })
       )
+      const address = await session.server.start()
+      const client = createClient(address.port, session.tlsIdentity().certPem)
+      try {
+        await seedAsset(session, 'asset_test')
+        const qr = parsePairingUri(session.pairingUri('127.0.0.1'))
+        expect((await client.pair('phone_test', qr.token)).status).toBe(200)
 
-      const metadataPath = '/v1/assets/asset_test/metadata'
-      const patchBody = Buffer.from(
-        JSON.stringify({
-          camera: { exposure: 0.75 },
-          dressing: {
-            clothes: [
-              {
-                id: 'cloth_star_hair',
-                name: '星夜长发',
-                category: 'hair',
-                suitId: 'suit_star',
-                suitName: '星夜回响'
-              }
-            ]
-          }
+        const list = await client.signedGet('phone_test', '/v1/assets?limit=10')
+        expect(list.status).toBe(200)
+        const listJson = jsonOf<{
+          items: Array<{ assetId: string; type: string }>
+          libraryRevision: number
+        }>(list)
+        expect(listJson.items.map((item) => item.assetId)).toContain('asset_test')
+        expect(listJson.libraryRevision).toBeGreaterThan(0)
+        // 边界：limit 由上游限定 1..500
+        expect((await client.signedGet('phone_test', '/v1/assets?limit=0')).status).toBe(400)
+        expect((await client.signedGet('phone_test', '/v1/assets?limit=501')).status).toBe(400)
+
+        const detail = await client.signedGet('phone_test', '/v1/assets/asset_test')
+        expect(detail.status).toBe(200)
+        const detailJson = jsonOf<{
+          asset: { resources: unknown[]; metadata?: { raw?: Record<string, unknown> } }
+        }>(detail)
+        expect(detailJson.asset.resources).toHaveLength(1)
+        expect(detailJson.asset.metadata?.raw?.nativeParamToken).toBe('token-visible')
+        // 上游脱敏：PC-only 字段不得下发
+        expect('nativeParamPayload' in (detailJson.asset.metadata?.raw ?? {})).toBe(false)
+        expect('nativeParamNuan5Md5' in (detailJson.asset.metadata?.raw ?? {})).toBe(false)
+        expect((await client.signedGet('phone_test', '/v1/assets/missing_asset')).status).toBe(404)
+
+        // 真值修正：`GET …/metadata` 不存在（`LocalSyncServer.ts:231-236` 只注册了签名 PATCH）
+        expect(
+          (await client.signedGet('phone_test', '/v1/assets/asset_test/metadata')).status
+        ).toBe(404)
+
+        const metadataPath = '/v1/assets/asset_test/metadata'
+        const patchBody = Buffer.from(
+          JSON.stringify({
+            camera: { exposure: 0.75 },
+            dressing: {
+              clothes: [
+                {
+                  id: 'cloth_star_hair',
+                  name: '星夜长发',
+                  category: 'hair',
+                  suitId: 'suit_star',
+                  suitName: '星夜回响'
+                }
+              ]
+            }
+          })
+        )
+        const patch = await client.request(metadataPath, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            ...signedHeaders(deviceKeys.privateKey, 'phone_test', 'PATCH', metadataPath, patchBody)
+          },
+          body: patchBody
         })
-      )
-      const patch = await client.request(metadataPath, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...signedHeaders(deviceKeys.privateKey, 'phone_test', 'PATCH', metadataPath, patchBody)
-        },
-        body: patchBody
-      })
-      expect(patch.status).toBe(200)
-      expect(
-        jsonOf<{ asset: { metadata?: { camera?: { exposure?: number } } } }>(patch).asset.metadata
-          ?.camera?.exposure
-      ).toBe(0.75)
+        expect(patch.status).toBe(200)
+        expect(
+          jsonOf<{ asset: { metadata?: { camera?: { exposure?: number } } } }>(patch).asset.metadata
+            ?.camera?.exposure
+        ).toBe(0.75)
 
-      const changes = await client.signedGet('phone_test', '/v1/changes?after=0')
-      expect(changes.status).toBe(200)
-      expect(jsonOf<{ changes: unknown[] }>(changes).changes.length).toBeGreaterThanOrEqual(2)
-      expect((await client.signedGet('phone_test', '/v1/changes')).status).toBe(400)
+        const changes = await client.signedGet('phone_test', '/v1/changes?after=0')
+        expect(changes.status).toBe(200)
+        expect(jsonOf<{ changes: unknown[] }>(changes).changes.length).toBeGreaterThanOrEqual(2)
+        expect((await client.signedGet('phone_test', '/v1/changes')).status).toBe(400)
 
-      const suits = await client.signedGet(
-        'phone_test',
-        `/v1/search/suits?q=${encodeURIComponent('星夜回响')}`
-      )
-      expect(suits.status).toBe(200)
-      expect(
-        jsonOf<{ items: Array<{ suitName: string; photoCount: number }> }>(suits).items[0]?.suitName
-      ).toBe('星夜回响')
-      expect((await client.signedGet('phone_test', '/v1/search/suits')).status).toBe(400)
+        const suits = await client.signedGet(
+          'phone_test',
+          `/v1/search/suits?q=${encodeURIComponent('星夜回响')}`
+        )
+        expect(suits.status).toBe(200)
+        expect(
+          jsonOf<{ items: Array<{ suitName: string; photoCount: number }> }>(suits).items[0]
+            ?.suitName
+        ).toBe('星夜回响')
+        expect((await client.signedGet('phone_test', '/v1/search/suits')).status).toBe(400)
 
-      const clothing = await client.signedGet(
-        'phone_test',
-        `/v1/search/clothing?q=${encodeURIComponent('星夜长发')}`
-      )
-      expect(clothing.status).toBe(200)
-      expect(jsonOf<{ items: Array<{ clothingId: string }> }>(clothing).items[0]?.clothingId).toBe(
-        'cloth_star_hair'
-      )
+        const clothing = await client.signedGet(
+          'phone_test',
+          `/v1/search/clothing?q=${encodeURIComponent('星夜长发')}`
+        )
+        expect(clothing.status).toBe(200)
+        expect(
+          jsonOf<{ items: Array<{ clothingId: string }> }>(clothing).items[0]?.clothingId
+        ).toBe('cloth_star_hair')
 
-      const stats = await client.signedGet('phone_test', '/v1/profile/stats')
-      expect(stats.status).toBe(200)
-      expect(
-        jsonOf<{ topSuits: unknown[]; topClothing: unknown[] }>(stats).topSuits.length
-      ).toBeGreaterThanOrEqual(1)
+        const stats = await client.signedGet('phone_test', '/v1/profile/stats')
+        expect(stats.status).toBe(200)
+        expect(
+          jsonOf<{ topSuits: unknown[]; topClothing: unknown[] }>(stats).topSuits.length
+        ).toBeGreaterThanOrEqual(1)
 
-      // 上游 589b932：`/v1/organizer/sync` 请求体上限 128→256 KiB，溢出改由 RequestBodyTooLarge
-      // 归 413（此前落到 500）。readBody 在验签之前，所以这条不需要签名头即可判定路由已挂载。
-      expect(
-        (
-          await client.request('/v1/organizer/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: Buffer.alloc(300 * 1024, 0x20)
-          })
-        ).status
-      ).toBe(413)
-      // 反向判据：200 KiB 落在旧 128 KiB 上限内会误判、在新 256 KiB 下应放行到验签那步（401）。
-      // 只断言 413 的话，上限其实没抬也会绿——这条才把「128→256」钉住。
-      expect(
-        (
-          await client.request('/v1/organizer/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: Buffer.alloc(200 * 1024, 0x20)
-          })
-        ).status
-      ).toBe(401)
+        // 上游 589b932：`/v1/organizer/sync` 请求体上限 128→256 KiB，溢出改由 RequestBodyTooLarge
+        // 归 413（此前落到 500）。readBody 在验签之前，所以这条不需要签名头即可判定路由已挂载。
+        expect(
+          (
+            await client.request('/v1/organizer/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: Buffer.alloc(300 * 1024, 0x20)
+            })
+          ).status
+        ).toBe(413)
+        // 反向判据：200 KiB 落在旧 128 KiB 上限内会误判、在新 256 KiB 下应放行到验签那步（401）。
+        // 只断言 413 的话，上限其实没抬也会绿——这条才把「128→256」钉住。
+        expect(
+          (
+            await client.request('/v1/organizer/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: Buffer.alloc(200 * 1024, 0x20)
+            })
+          ).status
+        ).toBe(401)
 
-      // 服装缩略图：嵌入态刻意**不注入** `metadataThumbnailCache` ⇒ 上游按 404 resource_not_ready 处理
-      expect(
-        (
-          await client.signedGet(
-            'phone_test',
-            '/v1/assets/asset_test/clothing/cloth_star_hair/thumbnail'
-          )
-        ).status
-      ).toBe(404)
-    } finally {
-      await session.server.stop()
-      session.dispose()
+        // 服装缩略图：嵌入态刻意**不注入** `metadataThumbnailCache` ⇒ 上游按 404 resource_not_ready 处理
+        expect(
+          (
+            await client.signedGet(
+              'phone_test',
+              '/v1/assets/asset_test/clothing/cloth_star_hair/thumbnail'
+            )
+          ).status
+        ).toBe(404)
+      } finally {
+        await session.server.stop()
+        session.dispose()
+      }
     }
-  }, 60000)
+  )
 
   it('资源下载支持 Range：200/206 + Content-Range + Accept-Ranges + ETag；越界 416', async () => {
     const session = await createRuntimeSession(testOptions({ databaseFile: databaseIn('range') }))
@@ -817,7 +834,7 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
       await session.server.stop()
       session.dispose()
     }
-  }, 60000)
+  }, 120000)
 
   it('WebSocket /ws/v1：签名握手收 server.hello；写 change_journal 后收 asset.created', async () => {
     const session = await createRuntimeSession(testOptions({ databaseFile: databaseIn('ws') }))
@@ -873,7 +890,7 @@ suite('LocalSyncServer 端到端（协议 v1 全端点，真起 TLS 服务）', 
       await session.server.stop()
       session.dispose()
     }
-  }, 60000)
+  }, 120000)
 
   it('stop() 后端口拒绝连接，start() 可恢复监听（重启）', async () => {
     const session = await createRuntimeSession(testOptions({ databaseFile: databaseIn('restart') }))
@@ -938,7 +955,7 @@ suite('RuntimeManager 同步服务编排', () => {
       await manager.stop()
     }
     expect(manager.syncStatus().running).toBe(false)
-  }, 60000)
+  }, 120000)
 
   it('K5：默认态 NS1 逐字节不变（回归锚）；注入多 host ⇒ nikki-sync://pair? 新格式且 hosts ≤8', async () => {
     // ① 默认态：content 以 NS1| 开头、恰 6 个竖线、hosts 缺省（第三方旧客户端回归锚）
@@ -981,7 +998,7 @@ suite('RuntimeManager 同步服务编排', () => {
     const listed = lister()
     expect(Array.isArray(listed)).toBe(true)
     expect(listed.length).toBeLessThanOrEqual(8)
-  }, 60000)
+  }, 120000)
 
   it('端口被占用 ⇒ 不外抛、状态分类 PORT_IN_USE，只读查询面不受影响', async () => {
     const blocker = http.createServer()
@@ -1011,7 +1028,7 @@ suite('RuntimeManager 同步服务编排', () => {
       await new Promise<void>((resolve) => blocker.close(() => resolve()))
       await manager.stop()
     }
-  }, 60000)
+  }, 120000)
 
   it('停止后配对码不可得；未启动时设备列表/撤销按前置条件失败', async () => {
     const options = testOptions({ databaseFile: databaseIn('mgr-code') })
@@ -1029,7 +1046,7 @@ suite('RuntimeManager 同步服务编排', () => {
     )
     await expect(fresh.listPairedDevices()).rejects.toThrow(/not ready/i)
     await expect(fresh.revokeDevice('x')).rejects.toThrow(/not ready/i)
-  }, 60000)
+  }, 120000)
 
   it('设备列表与撤销经管理面可见（真实配对 + 上游 revoke）', async () => {
     const options = testOptions({ databaseFile: databaseIn('mgr-devices') })
@@ -1055,5 +1072,5 @@ suite('RuntimeManager 同步服务编排', () => {
       await manager.stopSyncServer()
       await manager.stop()
     }
-  }, 60000)
+  }, 120000)
 })

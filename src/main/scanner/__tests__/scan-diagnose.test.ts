@@ -63,11 +63,14 @@ afterAll(async () => {
 })
 
 describe('Bug C 诊断：扫描发现 0 文件根因', () => {
+  // 超时预算 30s（全局默认 10s）：本文件驱动真实 fs 递归扫描，全量并发（8537 例 forks pool）
+  // 下 Windows Defender 实时扫描放大 IO 延迟，10s 预算三轮全量实测必超（隔离复跑恒绿，DEBT-072
+  // 同源）。仅放宽时间容量，断言逻辑零改动。
   it('findMediaDirectories：数组形式自定义路径应原样返回该目录', async () => {
     const dirs = await findMediaDirectories([fixtureRoot])
     expect(dirs).toContain(fixtureRoot)
     expect(dirs.length).toBeGreaterThanOrEqual(1)
-  })
+  }, 30000)
 
   it('scanDirectory（applyFilters=true）：应发现 3 张正常图片，<5KB 被过滤', async () => {
     const { files } = await scanDirectory(fixtureRoot, false, true)
@@ -75,11 +78,11 @@ describe('Bug C 诊断：扫描发现 0 文件根因', () => {
     expect(files.length, 'applyFilters=true 应发现 3 张图片').toBe(3)
     const names = files.map((f) => f.file_name).sort()
     expect(names).toEqual(['photo1.jpg', 'photo2.png', 'photo3.jpg'])
-  })
+  }, 30000)
 
   it('scanDirectory（applyFilters=false）：<5KB 小图也应被计入', async () => {
     const { files } = await scanDirectory(fixtureRoot, false, false)
     // 不过滤：photo1/photo2/中文photo3/tiny = 4
     expect(files.length, 'applyFilters=false 应发现 4 张图片').toBe(4)
-  })
+  }, 30000)
 })

@@ -671,7 +671,14 @@ suite('K3：游戏版本日历深入口的实测边界（真实产物，无出�
 
 suite('K9：目录来源标注与旋转吧大喵分组（真上游 ExtraScanDirectories）', () => {
   it('setSource 触发来源组出现/消失，并在已保存选择时推进 revision', async () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'nikkisync-k9-source-'))
+    // 夹具落点必须宿主绑定（路径三分法第 2 档）：本套件扫描链路经上游 dist CJS 深入口
+    // 直读宿主 fs，绕过 ci-linux 装置的 fs 翻译轴（装置已知失真——外置 CJS 内部 require
+    // 不经翻译）。os.tmpdir() 在装置态是 CI 形态假路径，直读链路会判成不存在目录 ⇒ 扫描
+    // 0 文件假红；.cache/ 为仓库 gitignored 落点，win32 / 装置 / 真 Linux CI 三态下均为
+    // 真实可写路径。装置翻译轴对非 CI 前缀的真实路径双向原样放行（tests/mocks/ci-linux-fs.ts
+    // toReal/toEmulated 的默认分支），宿主面与直读面看到同一份目录。
+    fs.mkdirSync(path.join(projectRoot, '.cache'), { recursive: true })
+    const root = fs.mkdtempSync(path.join(projectRoot, '.cache', 'nikkisync-k9-source-'))
     const imagesDir = path.join(root, 'SpinningMomo')
     const dbFile = path.join(root, 'userData', 'nikkisync.db')
     fs.mkdirSync(imagesDir, { recursive: true })

@@ -126,11 +126,13 @@ export const CHAIN_REQUIRED_ARTIFACTS: readonly string[] = [
 ]
 
 /**
- * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部 26 个
+ * 装载链闭包的根（相对 pc-companion 包根）：上游桶导出 `dist/src/index.js` + 本仓全部
  * `*_DEEP_ENTRY` 深入口。判据是「本仓实际会装载什么」，不是「上游有多少文件」。与
- * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那 26 个常量不能被 scripts 直接
+ * `src/main/nikkisync/runtime-facade.ts` 的深入口常量一一对应——那些常量不能被 scripts 直接
  * import（会牵进 electron 依赖图），故由 `scripts/__tests__/verify-nikkisync-link.test.ts` 从
  * 其源码文本里抽出字面量、与本表逐项相等，任一侧漂移即红。
+ * 深入口数量与清单以该测试的钉死断言为准，注释不硬编码数字——历史上此处的固定数字已
+ * 随上游对齐轮次两次过期，写死必然腐化。
  */
 export const LOAD_CHAIN_ROOTS: readonly string[] = [
   path.join('dist', 'src', 'index.js'),

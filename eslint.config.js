@@ -6,7 +6,7 @@ import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
 // i18n 护栏选择器：禁止硬编码中文（JSX 文本 / 字符串字面量）+ 禁用调试噪声 console 调用。
-// severity 由各配置块决定：src 普通源码 error 硬阻断；存量技术债文件 warn 渐进收敛。
+// severity 由各配置块决定：源码一律 error 硬阻断；测试文件块整体豁免（断言/fixture 合法包含中文）。
 const i18nGuardSelectors = [
   {
     selector: 'JSXText[value=/[\\u4e00-\\u9fa5]/]',
@@ -111,7 +111,7 @@ export default [
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'error',
       // i18n 改造完成（2026-08-22）：中文硬编码检测升级为 error 硬阻断。
-      // 存量技术债文件在下方 legacy 白名单块中降级为 warn 渐进收敛，修复一个删一个；
+      // 历史上的 legacy 白名单已于 2026-08-23 全量清偿删除（文末留有墓碑注释）；
       // 测试文件在下方 tests 块整体豁免（断言/fixture 合法包含中文）。
       'no-restricted-syntax': ['error', ...i18nGuardSelectors]
     },

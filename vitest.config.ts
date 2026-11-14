@@ -55,7 +55,16 @@ export default defineConfig({
     ],
     exclude: ['node_modules', 'dist', 'release'],
     globals: true,
-    testTimeout: 10000,
+    // 全局默认 30s（原 10s）：真实 IO/图像处理类用例（扫描递归、sharp 编码、TLS 链路）在
+    // 全量并发下 Windows Defender 实时扫描放大 IO 延迟，10s 预算实测高频超时且失败面在
+    // 文件间漂移（隔离复跑恒绿，DEBT-072 同源）。仅放宽时间容量，断言逻辑零改动；
+    // 真死锁用例的失败检测延迟从 10s 变 30s，对全量时长无实质影响。
+    testTimeout: 30000,
+    // workers 上限 6（vitest 默认 = CPU 核数）：本机 12 核全量并发下，jsdom 渲染类用例
+    // （i18n 就绪、异步交互链）与真实 TLS/IO 用例竞争 CPU 出现失败面漂移的瞬时错误
+    // （ECONNRESET / mock 调用 0 次 / 渲染文本缺失，隔离复跑均恒绿）。减半 forks 消除
+    // 竞争；4 核 CI 取 min(6, 4) = 4，行为与时长均不受影响。
+    maxWorkers: 6,
     // 默认 threads 池在历史版本 + Node 22 下曾出现 teardown 挂起；继续使用每文件独立 forks。
     // Vitest 4+ 已移除 poolOptions，原 singleFork:false 即当前默认行为，无需额外配置。
     pool: 'forks',
