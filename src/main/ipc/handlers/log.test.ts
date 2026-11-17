@@ -22,7 +22,8 @@ const {
   loggerInfoMock,
   loggerErrorMock,
   registerSetDirHandlerMock,
-  registerResetDirHandlerMock
+  registerResetDirHandlerMock,
+  registerUnifiedDirHandlerMock
 } = vi.hoisted(() => {
   return {
     handleMock: vi.fn(),
@@ -39,7 +40,8 @@ const {
     loggerInfoMock: vi.fn(),
     loggerErrorMock: vi.fn(),
     registerSetDirHandlerMock: vi.fn(),
-    registerResetDirHandlerMock: vi.fn()
+    registerResetDirHandlerMock: vi.fn(),
+    registerUnifiedDirHandlerMock: vi.fn()
   }
 })
 
@@ -66,7 +68,8 @@ vi.mock('../../utils/logger', () => ({
 
 vi.mock('./set-dir-handler', () => ({
   registerSetDirHandler: registerSetDirHandlerMock,
-  registerResetDirHandler: registerResetDirHandlerMock
+  registerResetDirHandler: registerResetDirHandlerMock,
+  registerUnifiedDirHandler: registerUnifiedDirHandlerMock
 }))
 
 vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-validator'))
@@ -124,13 +127,9 @@ describe('registerLogHandlers', () => {
       'log:reportRendererError',
       'log:getDir'
     ])
-    expect(registerSetDirHandlerMock).toHaveBeenCalledWith(
+    expect(registerUnifiedDirHandlerMock).toHaveBeenCalledWith(
       expect.anything(),
       'log:setDir',
-      'logDir'
-    )
-    expect(registerResetDirHandlerMock).toHaveBeenCalledWith(
-      expect.anything(),
       'log:resetDir',
       'logDir'
     )

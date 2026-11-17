@@ -1441,7 +1441,6 @@
       "hint": "크래시 덤프 파일은 Electron crashpad가 자동 생성, 최신 10개 보관, 30일 초과 시 자동 정리. 프로세스 크래시 정보만 기록, 사용자 개인정보 없음.",
       "listCount": "총 {{count}}개",
       "listTitle": "크래시 기록 (최신순)",
-      "modifyDir": "디렉토리 변경",
       "oldest": "가장 오래된 기록",
       "openDir": "디렉토리 열기",
       "processMain": "메인 프로세스",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "총 {{count}}건 · {{groups}}그룹",
       "listTimeline": "고장 기록 (최신순)",
       "logFiles": "로그 파일",
-      "modifyDir": "디렉토리 변경",
       "notInit": "초기화되지 않음",
       "occurrenceCount": "발생 횟수: {{count}}",
       "openDir": "디렉토리 열기",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

@@ -94,7 +94,7 @@
     "owner": "QianQianLuLu1",
     "extra": ["github.com/your-repo/issues", "QQ群: 123456789", "QQ Group: 123456789"]
   },
-  "expectedTotal": 172,
+  "expectedTotal": 171,
   "allowed": {
     "ARCHITECTURE.en.md": {
       "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
@@ -178,9 +178,9 @@
       }
     },
     "scripts/__tests__/pack-identity-name.test.ts": {
-      "reason": "打包身份守卫的反向锁与禁改锁（OLD_PACK_TOKENS、perf-real/装置/e2e 逐字比对），属判据而非残留",
+      "reason": "打包身份守卫的反向锁与禁改锁（OLD_PACK_TOKENS、perf-real/装置/e2e 逐字比对），属判据而非残留；2026-11-17 GPU 脚本用例收口到取证真相源，NikkiGallery 12→11",
       "hits": {
-        "NikkiGallery": 12,
+        "NikkiGallery": 11,
         "nikkiGallery": 1,
         "nikki-gallery": 1,
         "无限暖暖相册管理工具": 2,

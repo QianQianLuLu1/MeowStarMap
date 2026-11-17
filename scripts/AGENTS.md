@@ -8,7 +8,7 @@
 
 ## 目录结构
 
-89 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
+90 个入仓代码文件（另有 1 个本 AGENTS.md；**9 个 `.ps1` 辅助脚本不入仓**，见下「语言与执行」），按功能分为以下子域：
 
 ### 打包与构建
 
@@ -122,8 +122,8 @@
 
 ### 语言与执行
 
-- 89 个入仓代码文件里 84 个为 TypeScript（`.ts`：43 个非测试脚本 + 41 个 `__tests__` 单测，2026-11-14 复核全量统计）；统一使用 `tsx` 直接执行，无需编译步骤。
-- 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本），2 个 `.js`（Vite stub 和图标生成）。
+- 90 个入仓代码文件里 85 个为 TypeScript（`.ts`：43 个非测试脚本 + 42 个 `__tests__` 单测，2026-11-17 复核全量统计）；统一使用 `tsx` 直接执行，无需编译步骤。
+- 其余 5 个：3 个 `.cjs`（`after-pack-vc-runtime.cjs` 是 electron-builder 钩子、`build-recycle-helper.cjs` 是 K8 回收 helper 构建器、`simulate-gpu-crash.cjs` 是 GPU 崩溃复现脚本——2026-11-17 取证收口后经 `npx tsx` 运行、require 取证真相源 `forensics-dir.ts`，见「注意事项」例外四），2 个 `.js`（Vite stub 和图标生成）。
 - **口径纠正**：另有 9 个 `.ps1` PowerShell 辅助脚本**只在开发机本机存在、不入仓**——`scripts/mimosa-*.ps1`（4 个）、`scripts/fix-harness-memory-path.ps1`、`scripts/write-bridge-report.ps1` 由 `.gitignore` 的 `/scripts/mimosa-*.ps1`、`/scripts/fix-harness-memory-path.ps1`、`/scripts/write-bridge-report.ps1` 三条规则显式排除，`scripts/archive/` 下 3 个由 `/scripts/archive/` 整目录排除（行号会随 `.gitignore` 增长漂移，故按规则文本引用）。此前把 `.ps1` 计入「代码文件总数」会使新克隆的协作者按目录数不到它们；引用这些脚本时须写明「未纳入版本控制」。
 - 项目 `"type": "module"`，所有 TS 脚本使用 `import.meta.url` 推导 `__dirname`。
 
@@ -190,7 +190,7 @@
 
 ## 注意事项
 
-- **禁止** 在脚本中直接 `import` 主进程模块（`src/main/`）——脚本运行在 Node 环境，无 Electron 上下文。例外一：`copy-resonance-thumbnails.ts` 等数据生成脚本动态导入 `src/renderer/utils/` 中的纯函数。例外二（记录在案）：`sync-e2e/launch-server.ts` 静态 import 8 个 `src/main/` 模块以装配**真实**同步服务端（不复制装配逻辑，见 `docs/sync-integration/06-e2e-plan.md` §8 的有意决策），运行方式为 `ELECTRON_RUN_AS_NODE=1 electron --import tsx`——原生 better-sqlite3 是 Electron ABI，plain Node 不可加载，Electron 的 Node 侧无渲染进程上下文问题。例外三（记录在案）：`sync-e2e/mdns-loop-probe.ts` 静态 import `src/main/nikkisync/runtime-facade.ts` 与 `runtime-types.ts`，目的是经**真实装载缝**起上游 `LocalSyncServer` 来量组播行为——复制装配逻辑就测不到要测的东西（判据与参数解析仍在 `mdns-loop-verdict.ts` 纯层）。该链零 `electron` import、只用 `node:sqlite`，因此 plain Node（`npx tsx`）可直接运行，不需要 `ELECTRON_RUN_AS_NODE`；前提是四条 junction 在位。
+- **禁止** 在脚本中直接 `import` 主进程模块（`src/main/`）——脚本运行在 Node 环境，无 Electron 上下文。例外一：`copy-resonance-thumbnails.ts` 等数据生成脚本动态导入 `src/renderer/utils/` 中的纯函数。例外二（记录在案）：`sync-e2e/launch-server.ts` 静态 import 8 个 `src/main/` 模块以装配**真实**同步服务端（不复制装配逻辑，见 `docs/sync-integration/06-e2e-plan.md` §8 的有意决策），运行方式为 `ELECTRON_RUN_AS_NODE=1 electron --import tsx`——原生 better-sqlite3 是 Electron ABI，plain Node 不可加载，Electron 的 Node 侧无渲染进程上下文问题。例外三（记录在案）：`sync-e2e/mdns-loop-probe.ts` 静态 import `src/main/nikkisync/runtime-facade.ts` 与 `runtime-types.ts`，目的是经**真实装载缝**起上游 `LocalSyncServer` 来量组播行为——复制装配逻辑就测不到要测的东西（判据与参数解析仍在 `mdns-loop-verdict.ts` 纯层）。该链零 `electron` import、只用 `node:sqlite`，因此 plain Node（`npx tsx`）可直接运行，不需要 `ELECTRON_RUN_AS_NODE`；前提是四条 junction 在位。例外四（记录在案，2026-11-17 取证存储统一收口）：`simulate-gpu-crash.cjs` 惰性 require `../src/main/utils/forensics-dir.ts`（零 electron 依赖叶子模块），使模拟标记与生产读写侧 `gpu-fallback.ts` 共用取证根单一真相源——复制候选链逻辑会造成双处漂移；运行方式为 `npx tsx scripts/simulate-gpu-crash.cjs`（plain node 直跑会给出 tsx 指引报错），行为级单测在 `__tests__/simulate-gpu-crash.test.ts`。
 - 修改 `pre-dist-check.ts` 的校验项时需同步更新 `npm run dist:win` 的 CI 预期。
 - i18n 脚本链（`_shared.ts` → `guard.ts` / `codemod.ts` / `prune-whitelist.ts`）有内部依赖，修改 `_shared.ts` 需回归测试全部消费方。
 - `after-pack-vc-runtime.cjs` 是 CommonJS 格式（electron-builder 钩子要求），不得改为 ESM。

@@ -1,10 +1,10 @@
-// @core-change: 项目更名为喵星图，诊断目录常量取值变更需同步崩溃转储落盘目录注释
+// @core-change: 取证统一收口——崩溃转储目录改由 forensics-dir 单一真相源给出（打包态安装目录 Diagnostics）
 import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
 import { shell } from 'electron'
 import { t } from '../i18n'
-import { getUserFacingDiagDir } from '../utils/user-diag-path'
+import { getForensicsRoot } from '../utils/forensics-dir'
 
 // T13：崩溃 dump 文件保留份数上限（建议 ≤ 20 份，避免磁盘占用膨胀）
 // P2-2：从 20 调整为 10（够用且节省空间）
@@ -31,15 +31,14 @@ let crashDir: string | null = null
 
 /**
  * T13：初始化崩溃目录，返回路径
- * 必须在 app.whenReady 之后调用（依赖 app.getPath('userData')）
- * 自定义目录：applyCustomDirectories 已通过 setCrashDirectory 设置最终路径
+ * 必须在 app.whenReady 之后调用
+ * 2026-11-17 统一收口：随全部取证文件归集到取证根目录单一真相源（forensics-dir），
+ * 与 index.ts 早期 app.setPath('crashDumps', getForensicsRoot()) 保持一致，
+ * 确保 crashpad 实际写入位置 == crash-service 读取/列举位置。
  */
 export function initCrashDir(): string {
   if (crashDir) return crashDir
-  // 崩溃转储统一到用户友好目录（文档/喵星图/Diagnostics），
-  // 与 index.ts 早期 app.setPath('crashDumps', ...) 保持一致，
-  // 确保 crashpad 实际写入位置 == crash-service 读取/列举位置。
-  crashDir = getUserFacingDiagDir()
+  crashDir = getForensicsRoot()
   return crashDir
 }
 

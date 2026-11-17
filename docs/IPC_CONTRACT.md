@@ -1169,3 +1169,25 @@ preload 侧对应 `src/main/preload/api/shell.ts` 的 `electronAPI.shell` 命名
 （`assertShellPathSafe`，`shell-handler.ts:16`），不走媒体库 PathGuard 白名单；
 `openPath` 额外拦截可执行/脚本路径（等效双击防护）。失败一律抛 `AppError.internal`
 → `IpcError`，渲染层按既有 `catch` 分支处理，无静默失败路径。
+
+## 21. 取证目录统一：log/crash setDir/resetDir 语义变更与 exportZip manifest 1.2（2026-11-17 收口补全）
+
+日志与崩溃目录属「问题取证清单」，强制统一到取证根（`utils/forensics-dir.ts` 单一真相源：
+打包态且安装目录可写 = `<exe 所在目录>\Diagnostics`；否则回落 `Documents\喵星图\Diagnostics`
+→ homedir → tmpdir 三级链）。**通道名与返回结构不变，语义变更如下**：
+
+| 通道             | preload 方法        | 入参（zod）        | 返回（`IpcResponse.data`，DirOpResult）                         | 行为                                                                 |
+| ---------------- | ------------------- | ------------------ | --------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `log:setDir`     | `log.setDir(dir)`   | `schemas.filePath` | `{ success: false, needRestart: false, message: <已统一说明> }` | 不再写盘/持久化；统一目录不支持自定义（`registerUnifiedDirHandler`） |
+| `log:resetDir`   | `log.resetDir()`    | 无                 | `{ success: true, needRestart: false, message: <已统一说明> }`  | 清 `logDir` 历史键（幂等）；统一目录每次启动现算，无需重启           |
+| `crash:setDir`   | `crash.setDir(dir)` | `schemas.filePath` | 同 `log:setDir`                                                 | 同上                                                                 |
+| `crash:resetDir` | `crash.resetDir()`  | 无                 | 同 `log:resetDir`                                               | 清 `crashDir` 历史键                                                 |
+
+`backup:setDir/resetDir`、`cache:setDir/resetDir` 语义不变（仍走 `registerSetDirHandler`）。
+设置页日志/崩溃区的「修改目录」按钮已移除，路径展示（`log:getDir` / `crash:getDir` /
+`log:getDirectoryPath`）返回统一目录实际值。
+
+`log:exportZip` 内容升级（manifest `diagnosticVersion: '1.2'`）：读取侧全部走取证根，
+新增收集 `heartbeat.json` / `last-exit.json` / `second-instance-ack.json` / `boot-ok.marker` /
+`logs/scan-log.jsonl` / `nikkisync/`（5 个聚合诊断文件白名单）；`system-info.json` 增
+`forensics: { root, source: 'install' | 'fallback' }`；`contents`/`missing` 仍按实际入包如实登记。

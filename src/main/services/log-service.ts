@@ -1,4 +1,4 @@
-// @core-change: 诊断包补 GPU 状态段与 gpu-pref.json，manifest 按实际入包文件登记并声明缺失
+// @core-change: 诊断包暂存目录名加进程内递增序号，修同毫秒并发导出互删暂存
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -6,7 +6,14 @@ import { app, shell } from 'electron'
 import { logger, FaultRecord, getLogDirectory } from '../utils/logger'
 import { createZipFromDirectory } from '../utils/zip-archive'
 import { getStartupLogPathValue } from '../utils/startup-diagnostic'
-import { getUserFacingDiagDir, CHROMIUM_LOG_BASENAME } from '../utils/user-diag-path'
+import { CHROMIUM_LOG_BASENAME } from '../utils/user-diag-path'
+import {
+  getForensicsRoot,
+  getForensicsFilePath,
+  getForensicsRootSource,
+  FORENSICS_ROOT_FILE_NAMES
+} from '../utils/forensics-dir'
+import { DIAGNOSTIC_FILE_NAMES } from '../app/shell/diagnostic-files'
 import { t } from '../i18n'
 
 /**
@@ -152,6 +159,13 @@ export async function openLogDirectory(): Promise<{ success: boolean; message: s
 // 业务决策：进程内流式压缩（archiver，纯 JS），不再调用外部 tar.exe
 // 原因：tar.exe 在部分机器不可用（spawn EFTYPE），且子进程路径难以保证结果可达，
 //       现实现恒有结果（成功 / 失败 / 超时），UI 不会永久停留在「正在导出」
+
+/**
+ * R-a2：暂存目录名的进程内递增序号。仅用 Date.now() 时同毫秒并发导出会共用
+ * 同一暂存目录，先完成者的 cleanupTmpDir 把后完成者正在打包的暂存整个删掉。
+ */
+let diagnosticTmpSeq = 0
+
 export async function exportLogsAsZip(
   targetPath: string
 ): Promise<{ success: boolean; message: string }> {
@@ -163,7 +177,8 @@ export async function exportLogsAsZip(
   }
 
   // P1-4：构建临时诊断目录，整合 logs + crashes + startup-errors.log + system-info.json
-  const tmpDir = path.join(logDir, '..', 'diagnostic-tmp-' + Date.now())
+  // 暂存目录固定落取证根（不随 logDir 漂移）：异常退出残留也只在统一目录内
+  const tmpDir = path.join(getForensicsRoot(), `diagnostic-tmp-${Date.now()}-${++diagnosticTmpSeq}`)
   try {
     await fs.promises.mkdir(tmpDir, { recursive: true })
 
@@ -204,17 +219,17 @@ export async function exportLogsAsZip(
       }
     } catch {}
 
-    // 3.5 复制用户面诊断目录里的 Chromium 原生日志
+    // 3.5 复制取证根里的 Chromium 原生日志
     //     原生 FATAL（如 "GPU process isn't usable. Goodbye."）不经过 Node，
     //     startup-errors.log 里永远没有它；exit_code 只存在于 chromium-debug.log。
-    //     逐文件容错（本轮复查）：此前一个 try 罩住整个循环，chromium-debug.log 被占用
-    //     （防护软件抓刚落地的日志/asar 是常态）就会连后面的 diag.log 一起丢掉，
-    //     而导出仍报成功——缺的恰恰是这次要补的那份原生 FATAL 证据。
+    //     读取侧必须与写入侧（index.ts --log-file）同源走取证根——此前读 Documents
+    //     回退目录，打包态（取证根=安装目录）导出包系统性缺这份原生 FATAL 证据。
+    //     逐文件容错：chromium-debug.log 被占用（防护软件抓刚落地的日志是常态）
+    //     不得连后面的 diag.log 一起丢掉。
     try {
-      const diagDir = getUserFacingDiagDir()
       for (const name of [CHROMIUM_LOG_BASENAME, `${CHROMIUM_LOG_BASENAME}.old`, 'diag.log']) {
         try {
-          const src = path.join(diagDir, name)
+          const src = getForensicsFilePath(name)
           if (fs.existsSync(src)) {
             await copyBounded(src, path.join(tmpDir, name), DIAG_LOG_TAIL_BYTES)
           }
@@ -223,12 +238,12 @@ export async function exportLogsAsZip(
         }
       }
     } catch (err) {
-      logger.warn('diagnostic bundle: diag directory unavailable', err)
+      logger.warn('diagnostic bundle: forensics root unavailable', err)
     }
 
     // 3.6 GPU 兼容阶梯状态：判断设备卡在哪一级、失败计数多少，只看这一个文件
     try {
-      const gpuStatePath = path.join(app.getPath('userData'), 'gpu-fallback.json')
+      const gpuStatePath = getForensicsFilePath('gpu-fallback.json')
       if (fs.existsSync(gpuStatePath)) {
         await fs.promises.copyFile(gpuStatePath, path.join(tmpDir, 'gpu-fallback.json'))
       }
@@ -236,9 +251,48 @@ export async function exportLogsAsZip(
 
     // 3.7 硬件加速偏好镜像：用户是否手动关过硬件加速（花屏取证的另一半事实）
     try {
-      const gpuPrefPath = path.join(app.getPath('userData'), 'gpu-pref.json')
+      const gpuPrefPath = getForensicsFilePath('gpu-pref.json')
       if (fs.existsSync(gpuPrefPath)) {
         await fs.promises.copyFile(gpuPrefPath, path.join(tmpDir, 'gpu-pref.json'))
+      }
+    } catch {}
+
+    // 3.8 其余根级取证文件（退出取证/单实例握手/启动成功标记），逐文件 fail-open
+    const handledRootFiles = new Set<string>([
+      CHROMIUM_LOG_BASENAME,
+      `${CHROMIUM_LOG_BASENAME}.old`,
+      'diag.log',
+      'startup-errors.log',
+      'gpu-fallback.json',
+      'gpu-pref.json'
+    ])
+    for (const name of FORENSICS_ROOT_FILE_NAMES) {
+      if (handledRootFiles.has(name)) continue
+      try {
+        const src = getForensicsFilePath(name)
+        if (fs.existsSync(src)) {
+          await fs.promises.copyFile(src, path.join(tmpDir, name))
+        }
+      } catch (err) {
+        logger.warn(`diagnostic bundle: skipped ${name}`, err)
+      }
+    }
+
+    // 3.9 NikkiSync 聚合诊断（5 文件白名单，取证根\nikkisync）；缺席不建目录，
+    //     manifest.missing 如实登记 'nikkisync/'
+    try {
+      const nikkiSrcDir = path.join(getForensicsRoot(), 'nikkisync')
+      const nikkiDstDir = path.join(tmpDir, 'nikkisync')
+      for (const name of DIAGNOSTIC_FILE_NAMES) {
+        try {
+          const src = path.join(nikkiSrcDir, name)
+          if (fs.existsSync(src)) {
+            await fs.promises.mkdir(nikkiDstDir, { recursive: true })
+            await fs.promises.copyFile(src, path.join(nikkiDstDir, name))
+          }
+        } catch (err) {
+          logger.warn(`diagnostic bundle: skipped nikkisync/${name}`, err)
+        }
       }
     } catch {}
 
@@ -253,13 +307,7 @@ export async function exportLogsAsZip(
     // 5. 生成 manifest.json（如实化：contents 按实际入包条目登记，期望但缺席的进 missing。
     //    旧版 contents 是静态期望清单——chromium-debug.log 缺席时仍声称包含，取证方被误导）
     const appInfo = (systemInfo.app || {}) as { version?: string }
-    const expectedOptional = [
-      'startup-errors.log',
-      CHROMIUM_LOG_BASENAME,
-      'diag.log',
-      'gpu-fallback.json',
-      'gpu-pref.json'
-    ]
+    const expectedOptional: string[] = [...FORENSICS_ROOT_FILE_NAMES, 'nikkisync/']
     let contents: string[] = ['logs/', 'crashes/', ...expectedOptional, 'system-info.json']
     let missing: string[] = []
     try {
@@ -273,7 +321,7 @@ export async function exportLogsAsZip(
     const manifest = {
       generatedAt: new Date().toISOString(),
       appVersion: appInfo.version || 'unknown',
-      diagnosticVersion: '1.1',
+      diagnosticVersion: '1.2',
       contents,
       missing
     }
@@ -325,23 +373,10 @@ async function copyBounded(src: string, dst: string, maxBytes: number): Promise<
   }
 }
 
-/** 清理临时诊断目录 */
+/** 清理临时诊断目录（递归：含 logs/ crashes/ nikkisync/ 子目录，不留残留） */
 async function cleanupTmpDir(tmpDir: string): Promise<void> {
   try {
-    const entries = await fs.promises.readdir(tmpDir)
-    for (const entry of entries) {
-      const entryPath = path.join(tmpDir, entry)
-      const stat = await fs.promises.stat(entryPath)
-      if (stat.isDirectory()) {
-        const subEntries = await fs.promises.readdir(entryPath)
-        for (const sub of subEntries) {
-          await fs.promises.unlink(path.join(entryPath, sub)).catch(() => {})
-        }
-      } else {
-        await fs.promises.unlink(entryPath).catch(() => {})
-      }
-    }
-    await fs.promises.rmdir(tmpDir).catch(() => {})
+    await fs.promises.rm(tmpDir, { recursive: true, force: true })
   } catch {}
 }
 
@@ -438,6 +473,14 @@ async function collectSystemInfo(): Promise<Record<string, unknown>> {
         logDir: getLogDirectory(),
         crashDir: getCrashDirectory()
       }
+    }
+  } catch {}
+
+  // 取证根与候选来源：取证方据此判断 install（安装目录）/ fallback（Documents 链）
+  try {
+    info.forensics = {
+      root: getForensicsRoot(),
+      source: getForensicsRootSource()
     }
   } catch {}
 

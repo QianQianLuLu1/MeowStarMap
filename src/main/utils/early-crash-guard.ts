@@ -25,6 +25,26 @@ const FATAL_TITLE = '启动失败 / Startup Failed'
 const NONFATAL_TITLE = '程序出错 / Runtime Error'
 const STARTUP_LOG_BASENAME = 'startup-errors.log'
 
+// 启动编排是否已走完。启动期的 unhandledRejection 必须致命化：否则进程存活、无窗口、
+// 无提示、还可能持有单实例锁，用户反复双击只会不断撞「已有实例运行」。
+// 启动完成后仍保留「游离 rejection 不杀应用」的既有意图（index.ts:37-38）。
+let startupSettled = false
+
+/** 标记启动编排已结束（成功或已走 FATAL catch），此后 rejection 不再致命。幂等。 */
+export function markStartupSettled(): void {
+  startupSettled = true
+}
+
+/** 供 index.ts 的 unhandledRejection 分级与 second-instance 的 0 窗口兜底闸门读取。 */
+export function isStartupSettled(): boolean {
+  return startupSettled
+}
+
+/** 仅严格 true 视为「启动已完成」；其它任何值（含非法值）一律按启动期保守致命化。 */
+export function shouldEscalateUnhandledRejection(settled: unknown): boolean {
+  return settled !== true
+}
+
 export interface EarlyCrashDeps {
   showErrorBox?: (title: string, content: string) => void
   logStartupError?: (stage: string, err: unknown) => void

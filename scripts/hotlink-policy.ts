@@ -141,11 +141,16 @@ export function extractVersionedUaHosts(src: string): Set<string> | null {
   if (!registry) return null
   const hosts = new Set<string>()
   // 策略值含连字符（versioned-ua / existing-hotlink），\w 不匹配 `-`，须用 [\w-]+
+  let parsedEntries = 0
   for (const entry of registry[1].matchAll(/\[(\w+)\]\s*:\s*(['"])([\w-]+)\2/g)) {
+    parsedEntries += 1
     if (entry[3] !== 'versioned-ua') continue
     const host = consts.get(entry[1])
     if (host) hosts.add(normalizeHost(host))
   }
+  // fail-closed：注册表命中但一个条目形态都解析不出（如内联字符串键替代计算键）=
+  // 形态漂移，返回 null 记 unparsable；返回空集会让 versioned-ua 禁入 CSP 检查静默失效。
+  if (parsedEntries === 0) return null
   return hosts
 }
 
@@ -179,7 +184,7 @@ export function extractFixedUa(src: string): string | null {
  * 热链合规一致性判定（纯函数）。
  *
  * 判据链：CSP img-src 外部主机 == 渲染层直连注册表并集（图片 + 瓦片），不多不少；
- * versioned-ua 主机不在 CSP（渲染层禁直连）；两处 CSP 外部主机一致（产物级）；
+ * versioned-ua 主机不在 CSP（渲染层禁直连）；两处 CSP 逐字一致（产物级）；
  * 固定 UA 串完好；全 src 无硬编码版本 UA；AGENTS.md 规范章节在场。
  * 任何输入缺失/解析不出都产出 `unparsable` 问题，绝不静默放行。
  */
@@ -276,7 +281,7 @@ export function checkHotlinkPolicy(input: HotlinkPolicyInput): HotlinkProblem[] 
         detail:
           'dist/renderer/index.html 解析不出 CSP meta（构建产物缺兜底 CSP，打包后白屏/热链被拦风险）'
       })
-    } else if (mainCspHosts) {
+    } else if (mainCspHosts && mainCsp !== null && distCsp !== null) {
       const mismatch = [
         ...[...mainCspHosts].filter((h) => !distHosts.has(h)).map((h) => `响应头有/产物无: ${h}`),
         ...[...distHosts].filter((h) => !mainCspHosts.has(h)).map((h) => `产物有/响应头无: ${h}`)
@@ -287,6 +292,16 @@ export function checkHotlinkPolicy(input: HotlinkPolicyInput): HotlinkProblem[] 
           detail:
             `window-manager.ts 的 CSP_POLICY 与 src/renderer/index.html 的 meta CSP 外部主机不一致：` +
             `${mismatch.join('；')}（两处必须逐字一致，改一处必须同步改另一处并重新 build）`
+        })
+      } else if (mainCsp !== distCsp) {
+        // 主机集合相同不代表合规：非 img-src 指令（object-src/script-src/…）或空白漂移
+        // 同样违背「两处 CSP 逐字一致（产物级）」契约，必须整串比对兜住。
+        problems.push({
+          code: 'csp-meta-mismatch',
+          detail:
+            'window-manager.ts 的 CSP_POLICY 与 src/renderer/index.html 的 meta CSP 逐字不一致' +
+            `（img-src 外部主机集合相同，但其余指令/空白已漂移）：响应头="${mainCsp}"；产物="${distCsp}"` +
+            '（两处必须逐字一致，改一处必须同步改另一处并重新 build）'
         })
       }
     }

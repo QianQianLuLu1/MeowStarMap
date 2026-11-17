@@ -1,13 +1,14 @@
 /**
  * @layer L3
  * @module src/main/app/custom-dirs
- * @coverage applyCustomDirectories + 私有 applyCustomDir（4 个目录通用迁移流程）
- * @dependencies electron (app)、services/backup-service、utils/logger (setLogDirectory)、
- *               services/crash-service (setCrashDirectory)、utils/dir-manager、utils/startup-diagnostic
+ * @coverage applyCustomDirectories + 私有 applyCustomDir（backup/thumbnail 通用迁移流程）
+ * @dependencies electron (app)、services/backup-service、utils/dir-manager、
+ *               utils/startup-diagnostic、app/forensics-migrate（mock）
  *
  * 难点：
- * 1. 4 个目录（backupDir / thumbnailCacheDir / logDir / crashDir）共用 applyCustomDir 私有函数，需逐个验证副作用
- * 2. resolveCustomDir / ensureDir / migrateDirFiles 是 dir-manager 导出，需 mock
+ * 1. backupDir / thumbnailCacheDir 共用 applyCustomDir 私有函数，需逐个验证副作用
+ * 2. logDir / crashDir 已强制统一，委托 unifyForensicsDirs（真实迁移/接线逻辑由
+ *    forensics-migrate.test.ts 覆盖），本套件 mock 之并断言委托发生
  * 3. fallback 分支：resolveCustomDir 抛错时回退到默认目录，postSetup 仍被调用
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -25,7 +26,8 @@ const {
   ensureDirMock,
   migrateDirFilesMock,
   logStartupErrorMock,
-  loggerInfoMock
+  loggerInfoMock,
+  unifyForensicsDirsMock
 } = vi.hoisted(() => ({
   appGetPathMock: vi.fn(() => '/mock/userData'),
   appSetPathMock: vi.fn(),
@@ -36,7 +38,8 @@ const {
   ensureDirMock: vi.fn(),
   migrateDirFilesMock: vi.fn(),
   logStartupErrorMock: vi.fn(),
-  loggerInfoMock: vi.fn()
+  loggerInfoMock: vi.fn(),
+  unifyForensicsDirsMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -81,6 +84,10 @@ vi.mock('../../utils/startup-diagnostic', () => ({
   logStartupError: logStartupErrorMock
 }))
 
+vi.mock('../forensics-migrate', () => ({
+  unifyForensicsDirs: unifyForensicsDirsMock
+}))
+
 import { applyCustomDirectories } from '../custom-dirs'
 
 beforeEach(() => {
@@ -94,6 +101,8 @@ beforeEach(() => {
   migrateDirFilesMock.mockReset()
   logStartupErrorMock.mockReset()
   loggerInfoMock.mockReset()
+  unifyForensicsDirsMock.mockReset()
+  unifyForensicsDirsMock.mockResolvedValue(undefined)
 
   appGetPathMock.mockReturnValue('/mock/userData')
   // 默认：resolveCustomDir 返回与默认目录不同的路径（触发迁移）
@@ -105,28 +114,27 @@ beforeEach(() => {
 })
 
 describe('applyCustomDirectories', () => {
-  it('1. 4 个目录均调用 resolveCustomDir + ensureDir', async () => {
+  it('1. backup/thumbnail 走通用流程，logDir/crashDir 委托统一接线', async () => {
     const ctx = makeAppCtx({ thumbnailGenExt: { setDir: vi.fn(), setCacheLimitBytes: vi.fn() } })
 
     await applyCustomDirectories(ctx)
 
-    expect(resolveCustomDirMock).toHaveBeenCalledTimes(4)
-    expect(ensureDirMock).toHaveBeenCalledTimes(4)
-    // 验证 4 个 key 都被解析
+    expect(resolveCustomDirMock).toHaveBeenCalledTimes(2)
+    expect(ensureDirMock).toHaveBeenCalledTimes(2)
     const keys = resolveCustomDirMock.mock.calls.map((c) => c[1] as string)
     expect(keys).toContain('backupDir')
     expect(keys).toContain('thumbnailCacheDir')
-    expect(keys).toContain('logDir')
-    expect(keys).toContain('crashDir')
+    expect(keys).not.toContain('logDir')
+    expect(keys).not.toContain('crashDir')
+    expect(unifyForensicsDirsMock).toHaveBeenCalledWith(ctx)
   })
 
-  it('2. 自定义目录与默认目录不同时调用 migrateDirFiles', async () => {
+  it('2. 自定义目录与默认目录不同时调用 migrateDirFiles（仅 backup/thumbnail）', async () => {
     const ctx = makeAppCtx({ thumbnailGenExt: { setDir: vi.fn(), setCacheLimitBytes: vi.fn() } })
 
     await applyCustomDirectories(ctx)
 
-    // resolveCustomDir 返回 /custom/{key}，默认是 /mock/userData/{subdir}，所以会调用 migrateDirFiles 4 次
-    expect(migrateDirFilesMock).toHaveBeenCalledTimes(4)
+    expect(migrateDirFilesMock).toHaveBeenCalledTimes(2)
   })
 
   it('3. 自定义目录与默认目录相同时跳过迁移', async () => {
@@ -134,9 +142,7 @@ describe('applyCustomDirectories', () => {
     resolveCustomDirMock.mockImplementation((_dbManager: unknown, key: string) => {
       const subdirs: Record<string, string> = {
         backupDir: 'backups',
-        thumbnailCacheDir: 'thumbnails',
-        logDir: 'logs',
-        crashDir: 'crashes'
+        thumbnailCacheDir: 'thumbnails'
       }
       return path.join('/mock/userData', subdirs[key])
     })
@@ -200,21 +206,26 @@ describe('applyCustomDirectories', () => {
     expect(setCacheLimitBytes).not.toHaveBeenCalled()
   })
 
-  it('8. logDir 副作用：调用 setLogDirectory', async () => {
+  it('8. logDir/crashDir 不再走自定义流程，统一委托 unifyForensicsDirs（接线断言见 forensics-migrate.test.ts）', async () => {
     const ctx = makeAppCtx({ thumbnailGenExt: { setDir: vi.fn(), setCacheLimitBytes: vi.fn() } })
 
     await applyCustomDirectories(ctx)
 
-    expect(setLogDirectoryMock).toHaveBeenCalledWith('/custom/logDir')
+    expect(unifyForensicsDirsMock).toHaveBeenCalledTimes(1)
+    expect(unifyForensicsDirsMock).toHaveBeenCalledWith(ctx)
+    // 通用流程不得再触碰日志/崩溃目录
+    expect(setLogDirectoryMock).not.toHaveBeenCalled()
+    expect(setCrashDirectoryMock).not.toHaveBeenCalled()
+    expect(appSetPathMock).not.toHaveBeenCalled()
   })
 
-  it('9. crashDir 副作用：调用 app.setPath("crashDumps") + setCrashDirectory', async () => {
+  it('9. unifyForensicsDirs 在 backup/thumbnail 之后调用（crashReporter.start 前完成接线）', async () => {
     const ctx = makeAppCtx({ thumbnailGenExt: { setDir: vi.fn(), setCacheLimitBytes: vi.fn() } })
 
     await applyCustomDirectories(ctx)
 
-    expect(appSetPathMock).toHaveBeenCalledWith('crashDumps', '/custom/crashDir')
-    expect(setCrashDirectoryMock).toHaveBeenCalledWith('/custom/crashDir')
+    expect(backupSetDirMock).toHaveBeenCalled()
+    expect(unifyForensicsDirsMock).toHaveBeenCalled()
   })
 
   it('10. resolveCustomDir 抛错时回退到默认目录，postSetup 仍被调用', async () => {
@@ -262,19 +273,18 @@ describe('applyCustomDirectories', () => {
     )
   })
 
-  it('12. setSetting 持久化目录路径（4 次调用）', async () => {
+  it('12. setSetting 仅持久化 backup/thumbnail（logDir/crashDir 由统一接线清键，不在此持久化）', async () => {
     const ctx = makeAppCtx({ thumbnailGenExt: { setDir: vi.fn(), setCacheLimitBytes: vi.fn() } })
 
     await applyCustomDirectories(ctx)
 
-    expect(ctx.dbManager.setSetting).toHaveBeenCalledTimes(4)
-    // 各 key 持久化
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledTimes(2)
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('backupDir', '/custom/backupDir')
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(
       'thumbnailCacheDir',
       '/custom/thumbnailCacheDir'
     )
-    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('logDir', '/custom/logDir')
-    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('crashDir', '/custom/crashDir')
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalledWith('logDir', expect.anything())
+    expect(ctx.dbManager.setSetting).not.toHaveBeenCalledWith('crashDir', expect.anything())
   })
 })

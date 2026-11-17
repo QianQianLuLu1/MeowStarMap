@@ -56,10 +56,16 @@ process.setMaxListeners(30)
 /** 每用例重新加载模块，隔离 bootId / stage 等模块级状态 */
 async function freshModule(): Promise<ExitForensics> {
   vi.resetModules()
+  // resetModules 后 forensics-dir 是新实例：须把 beforeEach 登记的取证环境重新注入，
+  // 否则写入侧回落真实 Documents 目录，与 tmpDir 断言分裂
+  const { setForensicsEnvProvider } = await import('../../utils/forensics-dir')
+  setForensicsEnvProvider(forensicsEnv)
   return await import('../exit-forensics')
 }
 
 let tmpDir: string
+let forensicsEnv: (() => { isPackaged: boolean; defaultApp: boolean; exePath: string }) | null =
+  null
 
 function heartbeatPath(): string {
   return path.join(tmpDir, 'heartbeat.json')
@@ -69,12 +75,12 @@ function lastExitPath(): string {
   return path.join(tmpDir, 'last-exit.json')
 }
 
-function writeStaleHeartbeat(bootId = 'prev-boot'): void {
+function writeStaleHeartbeat(bootId = 'prev-boot', pid = 4321): void {
   fs.writeFileSync(
     heartbeatPath(),
     JSON.stringify({
       bootId,
-      pid: 4321,
+      pid,
       startedAt: '2026-08-29T06:00:00.000Z',
       updatedAt: '2026-08-29T06:00:18.000Z',
       stage: 'initialized'
@@ -83,7 +89,15 @@ function writeStaleHeartbeat(bootId = 'prev-boot'): void {
 }
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'exit-fx-'))
+  // 取证统一：heartbeat/last-exit 写入侧走 forensics-dir。让 tmpDir 本身成为取证根
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'exit-fx-'))
+  tmpDir = path.join(base, 'Diagnostics')
+  fs.mkdirSync(tmpDir, { recursive: true })
+  forensicsEnv = () => ({
+    isPackaged: true,
+    defaultApp: false,
+    exePath: path.join(base, 'app.exe')
+  })
   mockGetPath.mockReset().mockReturnValue(tmpDir)
   mockAppOn.mockReset()
   mockAppExit.mockReset()
@@ -93,7 +107,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true })
+  forensicsEnv = null
+  fs.rmSync(path.dirname(tmpDir), { recursive: true, force: true })
 })
 
 describe('exit-forensics 上次运行判别', () => {
@@ -114,44 +129,59 @@ describe('exit-forensics 上次运行判别', () => {
 
   it('2. 陈旧心跳存在且无 last-exit → 记录 exitDiagnosis 故障（外部/原生层终止）', async () => {
     writeStaleHeartbeat()
-    const fx = await freshModule()
-    fx.initExitForensics()
+    const killSpy = stubProcessKill([]) // pid 4321 确认已死（F1 活性判定的确定性前置）
+    try {
+      const fx = await freshModule()
+      fx.initExitForensics()
 
-    expect(loggerFaultMock).toHaveBeenCalledTimes(1)
-    expect(loggerFaultMock.mock.calls[0][0]).toBe('exitDiagnosis')
-    expect(String(loggerFaultMock.mock.calls[0][1]?.message)).toContain('外部/原生层终止')
-    expect(diagLogMock).toHaveBeenCalledWith('EXIT-FX', expect.stringContaining('prev-boot'))
+      expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+      expect(loggerFaultMock.mock.calls[0][0]).toBe('exitDiagnosis')
+      expect(String(loggerFaultMock.mock.calls[0][1]?.message)).toContain('外部/原生层终止')
+      expect(diagLogMock).toHaveBeenCalledWith('EXIT-FX', expect.stringContaining('prev-boot'))
+    } finally {
+      killSpy.mockRestore()
+    }
   })
 
   it('3. 陈旧心跳 + 匹配的 last-exit（同一 bootId）→ 仅记 info，不告警', async () => {
     writeStaleHeartbeat('prev-boot')
-    fs.writeFileSync(
-      lastExitPath(),
-      JSON.stringify({
-        bootId: 'prev-boot',
-        code: 0,
-        stage: 'cleanup',
-        time: '2026-08-29T06:00:20Z'
-      })
-    )
-    const fx = await freshModule()
-    fx.initExitForensics()
+    const killSpy = stubProcessKill([])
+    try {
+      fs.writeFileSync(
+        lastExitPath(),
+        JSON.stringify({
+          bootId: 'prev-boot',
+          code: 0,
+          stage: 'cleanup',
+          time: '2026-08-29T06:00:20Z'
+        })
+      )
+      const fx = await freshModule()
+      fx.initExitForensics()
 
-    expect(loggerFaultMock).not.toHaveBeenCalled()
-    expect(loggerInfoMock).toHaveBeenCalledWith(expect.stringContaining('code=0'))
+      expect(loggerFaultMock).not.toHaveBeenCalled()
+      expect(loggerInfoMock).toHaveBeenCalledWith(expect.stringContaining('code=0'))
+    } finally {
+      killSpy.mockRestore()
+    }
   })
 
   it('4. 陈旧心跳 + last-exit bootId 不匹配 → 视为异常终止（无有效退出痕迹）', async () => {
     writeStaleHeartbeat('prev-boot')
-    fs.writeFileSync(
-      lastExitPath(),
-      JSON.stringify({ bootId: 'another-boot', code: 0, stage: 'cleanup', time: '' })
-    )
-    const fx = await freshModule()
-    fx.initExitForensics()
+    const killSpy = stubProcessKill([])
+    try {
+      fs.writeFileSync(
+        lastExitPath(),
+        JSON.stringify({ bootId: 'another-boot', code: 0, stage: 'cleanup', time: '' })
+      )
+      const fx = await freshModule()
+      fx.initExitForensics()
 
-    expect(loggerFaultMock).toHaveBeenCalledTimes(1)
-    expect(loggerFaultMock.mock.calls[0][0]).toBe('exitDiagnosis')
+      expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+      expect(loggerFaultMock.mock.calls[0][0]).toBe('exitDiagnosis')
+    } finally {
+      killSpy.mockRestore()
+    }
   })
 
   it('5. 文件损坏（心跳非法 JSON / last-exit 字段非法 / 心跳为目录）→ 不抛错、按默认分支', async () => {
@@ -164,9 +194,14 @@ describe('exit-forensics 上次运行判别', () => {
     fs.writeFileSync(lastExitPath(), 'corrupt{{{')
     fs.rmSync(heartbeatPath(), { force: true })
     writeStaleHeartbeat()
-    fx = await freshModule()
-    expect(() => fx.initExitForensics()).not.toThrow()
-    expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+    const killSpy = stubProcessKill([])
+    try {
+      fx = await freshModule()
+      expect(() => fx.initExitForensics()).not.toThrow()
+      expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+    } finally {
+      killSpy.mockRestore()
+    }
 
     // 心跳路径是目录 → 读写均 EISDIR，静默降级
     fx = await freshModule()
@@ -334,6 +369,141 @@ describe('exit-forensics 退出码与清理', () => {
   })
 })
 
+/**
+ * F1 心跳活性判定辅助：stub process.kill，让指定 pid 的存活判定确定化。
+ * （pid 4321 在测试机大概率不存在，但为消除 pid 复用/环境差异导致的偶发翻转，显式钉死。）
+ */
+function stubProcessKill(alivePids: number[]): ReturnType<typeof vi.spyOn> {
+  return vi.spyOn(process, 'kill').mockImplementation(((pid: number, signal?: string | number) => {
+    if ((signal === undefined || signal === 0) && alivePids.includes(pid)) return true
+    const err = new Error('no such process') as NodeJS.ErrnoException
+    err.code = 'ESRCH'
+    throw err
+  }) as typeof process.kill)
+}
+
+describe('exit-forensics 心跳活性判定（F1：前实例仍存活时不得误判死亡）', () => {
+  it('f1. 心跳 pid 仍存活 → getPreviousExitEvidence 返回 none（阶梯据此不升档）', async () => {
+    // 场景：实例 A 正常运行（心跳 5s 在写），用户双击拉起 B。
+    // 修复前：B 读到 A 的心跳 + last-exit 不匹配 → 误判 native → GPU 兼容档白升一级。
+    writeStaleHeartbeat('running-boot')
+    const killSpy = stubProcessKill([4321])
+    try {
+      const fx = await freshModule()
+      const ev = fx.getPreviousExitEvidence()
+      expect(ev.kind).toBe('none')
+      // 只读口径不变：不清理心跳
+      expect(fs.existsSync(heartbeatPath())).toBe(true)
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  it('f2. 显式注入 isAlive=false（pid 确认已死）→ 维持 native 判定（防漏判）', async () => {
+    writeStaleHeartbeat('killed-boot')
+    const fx = await freshModule()
+    const ev = fx.getPreviousExitEvidence({ isAlive: () => false })
+    expect(ev.kind).toBe('native')
+    expect(ev.bootId).toBe('killed-boot')
+  })
+
+  it('f3. classifyPreviousExit 纯函数：isAlive=true → none；isAlive=false → native；缺省第三参保持原行为', async () => {
+    const fx = await freshModule()
+    const hb = {
+      bootId: 'A',
+      pid: 4321,
+      startedAt: 't0',
+      updatedAt: 't1',
+      stage: 'initialized'
+    }
+    expect(fx.classifyPreviousExit(hb, null, () => true).kind).toBe('none')
+    expect(fx.classifyPreviousExit(hb, null, () => false).kind).toBe('native')
+    // 缺省 isAlive：保持既有判定（js 分支不受活性影响）
+    const ex = { bootId: 'A', code: 0, stage: 'cleanup', time: 't2', journal: [], uptime: 9 }
+    expect(fx.classifyPreviousExit(hb, ex).kind).toBe('js')
+    expect(fx.classifyPreviousExit(hb, null).kind).toBe('native')
+  })
+
+  it('f4. 心跳 pid 仍存活时 initExitForensics 不记 exitDiagnosis 故障（只留 info 级 diagLog）', async () => {
+    writeStaleHeartbeat('running-boot')
+    const killSpy = stubProcessKill([4321])
+    try {
+      const fx = await freshModule()
+      fx.initExitForensics()
+      expect(loggerFaultMock).not.toHaveBeenCalled()
+      expect(diagLogMock).toHaveBeenCalledWith('EXIT-FX', expect.stringContaining('4321'))
+    } finally {
+      killSpy.mockRestore()
+    }
+  })
+
+  it('f5. defaultIsProcessAlive：kill(pid,0) 成功/EPERM → 存活；ESRCH/其他 → 不存活', async () => {
+    const fx = await freshModule()
+    expect(typeof fx.defaultIsProcessAlive).toBe('function')
+    const isAlive = fx.defaultIsProcessAlive
+
+    // 成功 → 存活
+    const killSpy = vi.spyOn(process, 'kill').mockReturnValue(true as never)
+    try {
+      expect(isAlive(4321)).toBe(true)
+    } finally {
+      killSpy.mockRestore()
+    }
+
+    // EPERM（存在但无权限，如提权僵尸）→ 存活
+    const epermSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('operation not permitted') as NodeJS.ErrnoException
+      err.code = 'EPERM'
+      throw err
+    })
+    try {
+      expect(isAlive(4321)).toBe(true)
+    } finally {
+      epermSpy.mockRestore()
+    }
+
+    // ESRCH（不存在）→ 不存活
+    const esrchSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('no such process') as NodeJS.ErrnoException
+      err.code = 'ESRCH'
+      throw err
+    })
+    try {
+      expect(isAlive(4321)).toBe(false)
+    } finally {
+      esrchSpy.mockRestore()
+    }
+
+    // 其他错误码 → 保守判不自存活（漏判只损失一次升档，误判会永久降级健康机器）
+    const otherSpy = vi.spyOn(process, 'kill').mockImplementation(() => {
+      const err = new Error('boom') as NodeJS.ErrnoException
+      err.code = 'EINVAL'
+      throw err
+    })
+    try {
+      expect(isAlive(4321)).toBe(false)
+    } finally {
+      otherSpy.mockRestore()
+    }
+  })
+
+  it('f6. clearDeathEvidenceForRelaunch：删除心跳文件，目录占位也不抛错', async () => {
+    // F3 场景：清理并重启 taskkill 掉的僵尸会留下陈旧心跳，relaunch 后的
+    // 新实例会把"我们主动的杀进程"误判成"被原生层杀死"而白升 GPU 兼容档——
+    // 所以重启前必须显式清掉这份死亡证据。
+    const fx = await freshModule()
+    fx.initExitForensics()
+    expect(fs.existsSync(heartbeatPath())).toBe(true)
+
+    fx.clearDeathEvidenceForRelaunch()
+    expect(fs.existsSync(heartbeatPath())).toBe(false)
+
+    // 心跳路径为目录（EISDIR）→ 静默，绝不阻塞重启流程
+    fs.mkdirSync(heartbeatPath())
+    expect(() => fx.clearDeathEvidenceForRelaunch()).not.toThrow()
+  })
+})
+
 describe('exit-forensics 上次终止性质只读 API（供 GPU 兼容阶梯升级消费）', () => {
   it('e1. classifyPreviousExit 纯函数四分支：none / js / native / bootId 不匹配 native', async () => {
     const fx = await freshModule()
@@ -365,37 +535,47 @@ describe('exit-forensics 上次终止性质只读 API（供 GPU 兼容阶梯升�
 
   it('e2. getPreviousExitEvidence 不依赖 initExitForensics（ready 前即可判定），陈旧心跳 → native', async () => {
     writeStaleHeartbeat('killed-boot')
-    const fx = await freshModule()
-    const ev = fx.getPreviousExitEvidence()
-    expect(ev).toEqual({
-      kind: 'native',
-      bootId: 'killed-boot',
-      stage: 'initialized',
-      at: '2026-08-29T06:00:18.000Z'
-    })
-    // 只读：绝不清理心跳、绝不写盘（否则随后 initExitForensics 的判别会被吞掉）
-    expect(fs.existsSync(heartbeatPath())).toBe(true)
-    expect(diagLogMock).not.toHaveBeenCalled()
-    // 先取证据、后初始化取证：两者结论一致（同一份判定逻辑，不得两套口径）
-    fx.initExitForensics()
-    expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+    const killSpy = stubProcessKill([]) // pid 确认已死，维持 native 判定
+    try {
+      const fx = await freshModule()
+      const ev = fx.getPreviousExitEvidence()
+      expect(ev).toEqual({
+        kind: 'native',
+        bootId: 'killed-boot',
+        stage: 'initialized',
+        at: '2026-08-29T06:00:18.000Z'
+      })
+      // 只读：绝不清理心跳、绝不写盘（否则随后 initExitForensics 的判别会被吞掉）
+      expect(fs.existsSync(heartbeatPath())).toBe(true)
+      expect(diagLogMock).not.toHaveBeenCalled()
+      // 先取证据、后初始化取证：两者结论一致（同一份判定逻辑，不得两套口径）
+      fx.initExitForensics()
+      expect(loggerFaultMock).toHaveBeenCalledTimes(1)
+    } finally {
+      killSpy.mockRestore()
+    }
   })
 
   it('e3. JS 管理退出（心跳 + 同 bootId 退出码）→ kind=js（阶梯据此不得升档）', async () => {
     writeStaleHeartbeat('js-boot')
-    fs.writeFileSync(
-      lastExitPath(),
-      JSON.stringify({
-        bootId: 'js-boot',
-        code: 0,
-        stage: 'cleanup',
-        time: '2026-08-29T06:00:20.000Z',
-        journal: ['will-quit'],
-        uptime: 12
-      })
-    )
-    const fx = await freshModule()
-    expect(fx.getPreviousExitEvidence().kind).toBe('js')
+    const killSpy = stubProcessKill([])
+    try {
+      fs.writeFileSync(
+        lastExitPath(),
+        JSON.stringify({
+          bootId: 'js-boot',
+          code: 0,
+          stage: 'cleanup',
+          time: '2026-08-29T06:00:20.000Z',
+          journal: ['will-quit'],
+          uptime: 12
+        })
+      )
+      const fx = await freshModule()
+      expect(fx.getPreviousExitEvidence().kind).toBe('js')
+    } finally {
+      killSpy.mockRestore()
+    }
   })
 
   it('e4. 无心跳（正常启动）→ none；文件损坏 / 心跳为目录 → none 且不抛（fail-open）', async () => {
@@ -409,5 +589,39 @@ describe('exit-forensics 上次终止性质只读 API（供 GPU 兼容阶梯升�
     fs.mkdirSync(heartbeatPath())
     expect(() => fx.getPreviousExitEvidence()).not.toThrow()
     expect(fx.getPreviousExitEvidence().kind).toBe('none')
+  })
+})
+
+describe('exit-forensics 心跳 pid 形态校验（非法 pid 不得成为死亡证据）', () => {
+  // 缺陷背景：pid=0 穿透 parseHeartbeat 后，defaultIsProcessAlive 的 kill(0,0)
+  // 探测的是**进程组**而非单进程 → 恒返回 true → 死亡证据被永久遮蔽；
+  // 负数/小数 pid 同样不是合法进程标识，一律按「心跳损坏 = 视为不存在」处理。
+  it.each([0, -1, 4.5])(
+    'pid=%s（非正整数）→ 心跳视为不存在，getPreviousExitEvidence 返回 none',
+    async (pid) => {
+      writeStaleHeartbeat('bad-pid-boot', pid)
+      const fx = await freshModule()
+      expect(fx.getPreviousExitEvidence({ isAlive: () => false }).kind).toBe('none')
+    }
+  )
+})
+
+describe('exit-forensics 心跳落盘原子性', () => {
+  it('writeFileSync 不得直接命中 heartbeat.json（原子写只写 temp sibling 再 rename）', async () => {
+    // 缺陷背景：裸 writeFileSync 覆写心跳存在「截断之后、写完之前」的窗口，
+    // 读者（下次启动的 getPreviousExitEvidence / 诊断包导出）撞上即读到半截 JSON
+    // → 证据丢失。与 gpu-fallback.json / last-exit.json 同口径走 writeFileAtomicSync。
+    const spy = vi.spyOn(fs, 'writeFileSync')
+    try {
+      const fx = await freshModule()
+      fx.initExitForensics()
+      expect(fs.existsSync(heartbeatPath()), '心跳仍须真实落盘').toBe(true)
+      const directHits = spy.mock.calls.filter((c) => c[0] === heartbeatPath())
+      expect(directHits, '心跳必须先写同目录临时文件再 rename，不得直接覆写最终路径').toHaveLength(
+        0
+      )
+    } finally {
+      spy.mockRestore()
+    }
   })
 })

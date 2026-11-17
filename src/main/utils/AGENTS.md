@@ -8,20 +8,21 @@
 
 ## 目录结构
 
-34 个源文件 + 32 个测试文件（30 个源文件有同名配套测试，即覆盖率 ≈ 88%），按职责可分为以下子域：
+35 个源文件 + 33 个测试文件（31 个源文件有同名配套测试，即覆盖率 ≈ 89%），按职责可分为以下子域：
 
 ### 叶子层（零项目依赖，可安全被任何模块导入）
 
-| 文件                  | 职责                                                                   |
-| --------------------- | ---------------------------------------------------------------------- |
-| `constants.ts`        | 全局常量（扫描延迟、缩略图并发、驱动器字母范围、缓存 TTL、数组上限等） |
-| `concurrency.ts`      | `runWithConcurrency<T>()` / `createConcurrencyLimiter()` 并发控制      |
-| `atomic-file.ts`      | `writeFileAtomic()` 原子写入（temp sibling + rename）                  |
-| `eta-calculator.ts`   | `EtaCalculator` 类，滑动窗口 ETA 估算                                  |
-| `image-encode.ts`     | 图片编码格式归一化、无损压缩选项                                       |
-| `process-registry.ts` | 子进程/ffmpeg 命令跟踪与统一 kill                                      |
-| `task-registry.ts`    | `TaskRegistry` 类，通用任务注册/查询                                   |
-| `user-diag-path.ts`   | 用户面诊断目录路径候选链（Documents → appData → temp）                 |
+| 文件                  | 职责                                                                                                                           |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `constants.ts`        | 全局常量（扫描延迟、缩略图并发、驱动器字母范围、缓存 TTL、数组上限等）                                                         |
+| `concurrency.ts`      | `runWithConcurrency<T>()` / `createConcurrencyLimiter()` 并发控制                                                              |
+| `atomic-file.ts`      | `writeFileAtomic()` 原子写入（temp sibling + rename）                                                                          |
+| `eta-calculator.ts`   | `EtaCalculator` 类，滑动窗口 ETA 估算                                                                                          |
+| `image-encode.ts`     | 图片编码格式归一化、无损压缩选项                                                                                               |
+| `process-registry.ts` | 子进程/ffmpeg 命令跟踪与统一 kill                                                                                              |
+| `task-registry.ts`    | `TaskRegistry` 类，通用任务注册/查询                                                                                           |
+| `user-diag-path.ts`   | 用户面诊断目录路径候选链（Documents → appData → temp）                                                                         |
+| `forensics-dir.ts`    | 取证根目录单一真相源（零 electron、provider 注入；打包态 <安装目录>\Diagnostics，不可写/dev 回落 getUserFacingDiagDir 候选链） |
 
 ### 日志与诊断
 
@@ -72,7 +73,7 @@
 
 | 文件                       | 职责                                                                                                                                                                   |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `dir-manager.ts`           | 自定义目录解析/迁移/确保（backup/thumbnail/log/crash）                                                                                                                 |
+| `dir-manager.ts`           | 自定义目录解析/迁移/确保（backup/thumbnail 保留自定义；log/crash 强制取证目录）；migrateDirFiles 支持 skipExisting                                                     |
 | `file-utils.ts`            | 文件工具（存在性检查、唯一路径、DataUrl 转换、哈希计算、移动）                                                                                                         |
 | `managed-read-stream.ts`   | 受管读取流（字节范围 + 生命周期跟踪）；media:// 响应体由调用方经 `Readable.toWeb` 转换后供给 `new Response`（绕开 undici 对 Node 流的无守卫包装，2026-10-15 闪退根因） |
 | `worker-restart-policy.ts` | `WorkerRestartPolicy` 类，worker 崩溃重启策略                                                                                                                          |

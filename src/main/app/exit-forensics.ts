@@ -1,10 +1,10 @@
 import { app } from 'electron'
 import fs from 'node:fs'
-import path from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { writeFileAtomicSync } from '../utils/atomic-file'
 import { diagLog } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
+import { getForensicsFilePath } from '../utils/forensics-dir'
 
 /**
  * 退出取证（复刻 Chrome「Chrome 未正确关闭」检测模式）。
@@ -16,14 +16,16 @@ import { logger } from '../utils/logger'
  * exit(0) 调用或事件循环排空。本模块负责把"谁调用的退出"变成可观测事件。
  *
  * 机制：
- * - 心跳：每 5s 同步覆写 userData/heartbeat.json（mtime = 最后存活时刻，
+ * - 心跳：每 5s 同步覆写取证根目录 heartbeat.json（mtime = 最后存活时刻，
  *   精确定位死亡时间；正常退出时删除）。
  * - 事件日志：内存环形缓冲记录关键退出链事件（before-quit / window-all-closed /
  *   second-instance / app.exit / process.exit / beforeExit），退出时随
  *   last-exit.json 一并落盘。app.exit / process.exit 记录调用点 JS 堆栈；
  *   beforeExit 出现 = 事件循环自然排空（无显式退出调用）。
  * - 下次启动判别（readStaleEvidence）：
- *   陈旧心跳 + last-exit 匹配 → JS 管理退出（记 info，附 code/stage/事件链）；
+ *   心跳 pid 仍存活 → 前实例还在运行（健康实例或僵尸持锁），无死亡证据
+ *   （F1，2026-11-15；此前会被误判为外部终止并记故障）；
+ *   陈旧心跳（pid 已死）+ last-exit 匹配 → JS 管理退出（记 info，附 code/stage/事件链）；
  *   陈旧心跳 + last-exit 缺失 → 外部终止（TerminateProcess 类，logFault）。
  *
  * 全部文件读写 try/catch 容错：userData 不可写 / JSON 损坏 → 视为不存在，
@@ -76,11 +78,11 @@ let heartbeatTimer: NodeJS.Timeout | null = null
 const journal: string[] = []
 
 function getHeartbeatPath(): string {
-  return path.join(app.getPath('userData'), 'heartbeat.json')
+  return getForensicsFilePath('heartbeat.json')
 }
 
 function getLastExitPath(): string {
-  return path.join(app.getPath('userData'), 'last-exit.json')
+  return getForensicsFilePath('last-exit.json')
 }
 
 /** 记录一条退出链事件（环形缓冲 + diagLog 同步留痕） */
@@ -121,7 +123,9 @@ function parseHeartbeat(raw: unknown): HeartbeatFile | null {
   if (!raw || typeof raw !== 'object') return null
   const r = raw as Record<string, unknown>
   if (typeof r.bootId !== 'string' || r.bootId.length === 0) return null
-  if (typeof r.pid !== 'number' || !Number.isFinite(r.pid)) return null
+  // pid 必须是正整数：pid=0 穿透后 defaultIsProcessAlive 的 kill(0,0) 探测的是**进程组**
+  // → 恒返回 true → 死亡证据被永久遮蔽；负数/小数同样不是合法进程标识，按损坏处理。
+  if (typeof r.pid !== 'number' || !Number.isInteger(r.pid) || r.pid <= 0) return null
   if (typeof r.stage !== 'string') return null
   return {
     bootId: r.bootId,
@@ -159,9 +163,32 @@ function writeHeartbeat(): void {
       updatedAt: new Date().toISOString(),
       stage: currentStage
     }
-    fs.writeFileSync(getHeartbeatPath(), JSON.stringify(rec))
+    // 原子写：裸 writeFileSync 覆写存在「截断之后、写完之前」的窗口，读者（下次启动的
+    // 判别 / 诊断包导出）撞上即读到半截 JSON → 证据丢失。与 last-exit.json / gpu-fallback.json
+    // 同口径：先写同目录临时文件再 rename。
+    writeFileAtomicSync(getHeartbeatPath(), JSON.stringify(rec))
   } catch {
     // userData 不可写等极端场景：静默降级，绝不影响启动
+  }
+}
+
+/**
+ * 进程存活探针签名（F1 活性判定的可注入点，便于测试矩阵化）。
+ */
+export type IsProcessAliveProbe = (pid: number) => boolean
+
+/**
+ * 默认存活探针：`kill(pid, 0)` 只探测进程存在性。
+ * - 成功 → 存活；EPERM（存在但无权限，如提权僵尸）→ 存活
+ * - ESRCH（不存在）→ 不存活；其余错误保守判「不自存活」——
+ *   漏判只损失一次 GPU 升档机会，误判会让健康机器被永久降级软件渲染
+ */
+export function defaultIsProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (err) {
+    return (err as NodeJS.ErrnoException)?.code === 'EPERM'
   }
 }
 
@@ -169,12 +196,21 @@ function writeHeartbeat(): void {
  * 纯函数：由心跳与退出码两份文件判定上次终止性质（无 fs / 无 electron）。
  * 心跳缺席 = 无异常证据；同一 bootId 的 last-exit 存在 = JS 管理退出（含 app.exit /
  * process.exit / 事件循环排空），否则 = 原生层/外部终止（Chromium FATAL 即此类）。
+ *
+ * F1（2026-11-15）：`isAlive` 存活探针——心跳 pid 仍存活 = 前实例还在运行
+ * （健康实例或僵尸持锁），这不是「死亡证据」。此前只要心跳文件存在且
+ * last-exit bootId 不匹配就判 native：运行中实例的心跳被后来者读成
+ * 「被原生层杀死」→ GPU 兼容阶梯白升档（第二实例每双击一次升一级，
+ * fallbackActive 被永久置位）。活性判定优先于 js 分支：进程活着就没有
+ * 「退出性质」可言。缺省 isAlive 时保持既有判定（历史调用方零改动）。
  */
 export function classifyPreviousExit(
   heartbeat: HeartbeatFile | null,
-  lastExit: LastExitFile | null
+  lastExit: LastExitFile | null,
+  isAlive?: IsProcessAliveProbe
 ): PreviousExitEvidence {
   if (!heartbeat) return { kind: 'none' }
+  if (isAlive && isAlive(heartbeat.pid)) return { kind: 'none' }
   if (lastExit && lastExit.bootId === heartbeat.bootId) {
     return { kind: 'js', bootId: heartbeat.bootId, stage: lastExit.stage, at: lastExit.time }
   }
@@ -189,18 +225,37 @@ export function classifyPreviousExit(
 /**
  * 对外只读判定上次终止性质：**可在 ready 前调用**，不依赖 initExitForensics 已执行，
  * 且绝不写盘/不清理（否则随后 readStaleEvidence 的判别会被吞掉）。
+ * 默认启用活性探针（心跳 pid 存活 → none）；测试可注入 isAlive 覆盖。
  */
-export function getPreviousExitEvidence(): PreviousExitEvidence {
+export function getPreviousExitEvidence(
+  options: { isAlive?: IsProcessAliveProbe } = {}
+): PreviousExitEvidence {
   const heartbeat = readJsonFile(getHeartbeatPath(), parseHeartbeat)
   // 常见路径（上次正常退出，心跳已删）：不必再读退出码文件
   if (!heartbeat) return { kind: 'none' }
-  return classifyPreviousExit(heartbeat, readJsonFile(getLastExitPath(), parseLastExit))
+  return classifyPreviousExit(
+    heartbeat,
+    readJsonFile(getLastExitPath(), parseLastExit),
+    options.isAlive ?? defaultIsProcessAlive
+  )
 }
 
 /** 上次运行判别：产出日志，并把结论同一口径用于对外只读 API */
 function readStaleEvidence(): void {
   const staleHeartbeat = readJsonFile(getHeartbeatPath(), parseHeartbeat)
   if (!staleHeartbeat) return // 首次启动 / 上次正常退出（心跳已清理）/ 文件损坏
+
+  // F1（2026-11-15）：心跳 pid 仍存活 = 前实例（健康实例或僵尸持锁）还在运行，
+  // 不是「被外部/原生层终止」。此前会误记 exitDiagnosis 故障污染诊断日志，
+  // 与 getPreviousExitEvidence 的误判同源（每来一个第二实例就误报一次）。
+  if (defaultIsProcessAlive(staleHeartbeat.pid)) {
+    diagLog(
+      'EXIT-FX',
+      `上次实例可能仍在运行（心跳 pid=${staleHeartbeat.pid} 存活）: ` +
+        `bootId=${staleHeartbeat.bootId} stage=${staleHeartbeat.stage}`
+    )
+    return
+  }
 
   const lastExit = readJsonFile(getLastExitPath(), parseLastExit)
   if (classifyPreviousExit(staleHeartbeat, lastExit).kind === 'js' && lastExit) {
@@ -378,5 +433,21 @@ export function markCleanShutdown(): void {
     fs.rmSync(getHeartbeatPath(), { force: true })
   } catch {
     // 静默：清理失败不影响退出流程
+  }
+}
+
+/**
+ * 「清理并重启」专用（F3，2026-11-15）：taskkill /F 杀掉的僵尸/实例必然留下
+ * 陈旧心跳（pid 已死、无退出码）——这正是 classifyPreviousExit 判 native 的形状。
+ * 不清掉就 relaunch，新实例会把「我们主动的杀进程」误判成「被原生层杀死」，
+ * GPU 兼容阶梯白升一档（fallbackActive 被永久置位 → 健康机器被静默降级软件渲染）。
+ * 本进程是锁失败实例，从未 initExitForensics（F2），无需停表，直接删文件即可。
+ */
+export function clearDeathEvidenceForRelaunch(): void {
+  try {
+    fs.rmSync(getHeartbeatPath(), { force: true })
+  } catch {
+    // 静默：清证据失败不影响重启流程（最坏情况是新实例多一条误判、兼容档多升一档、
+    // 封顶 2 级；档位仅在版本更新或用户开启硬件加速时复位，同版本内不会自动重试）
   }
 }

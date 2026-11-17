@@ -8,9 +8,9 @@
  * 测试策略：
  * 1. 所有内部模块用 vi.mock 替换为 stub，每个返回 resolved promise
  * 2. 按阶段拆分 describe 块，每个用例只验证 1-2 个调用点
- * 3. 单实例锁重试用 vi.useFakeTimers + advanceTimersByTimeAsync
- * 4. before-quit 处理器通过 app.on mock 调用记录提取回调，手动 emit
- * 5. fatal catch 用 dbManager.initialize 抛错触发
+ * 3. before-quit 处理器通过 app.on mock 调用记录提取回调，手动 emit
+ * 4. fatal catch 用 dbManager.initialize 抛错触发
+ * （单实例锁获取/失败路径用例已随 R1 迁移至 single-instance.test.ts）
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
@@ -104,8 +104,25 @@ const m = vi.hoisted(() => {
     })),
 
     // plugin-host
-    pluginHostInitMock: vi.fn(() => Promise.resolve()),
-    pluginHostSetMainWindowMock: vi.fn()
+    pluginHostInitMock: vi.fn(),
+    pluginHostSetMainWindowMock: vi.fn(),
+
+    // F2+F5：赢家专属启动打点（exit-forensics / gpu-fallback / native-load-guard）
+    initExitForensicsMock: vi.fn(),
+    markExitStageMock: vi.fn(),
+    markBootAttemptMock: vi.fn(),
+    setupGpuProcessWatcherMock: vi.fn(),
+    verifyCriticalNativeModulesMock: vi.fn(() => true),
+    // F3：清理并重启前复位死亡证据
+    clearDeathEvidenceForRelaunchMock: vi.fn(),
+    // F6：NikkiSync 运行时初始化不阻塞首窗
+    initSyncServerMock: vi.fn(() => Promise.resolve()),
+    initNikkiSyncRuntimeMock: vi.fn(() => Promise.resolve()),
+    // 启动 settled 闸门（second-instance 0 窗口兜底防重入）
+    isStartupSettledMock: vi.fn(() => false),
+    markStartupSettledMock: vi.fn(),
+    // 启动失败统一可见兜底（dialog catch 不再静默退出）
+    showStartupFailureWithFallbackMock: vi.fn()
   }
 })
 
@@ -226,6 +243,35 @@ vi.mock('../../plugins/plugin-host', () => ({
     setMainWindow: m.pluginHostSetMainWindowMock
   }
 }))
+vi.mock('../single-instance', () => ({
+  writeSecondInstanceAck: vi.fn(),
+  clearSecondInstanceAck: vi.fn(),
+  acquireSingleInstanceLockOrHandleFailure: vi.fn(() => Promise.resolve(true))
+}))
+
+vi.mock('../exit-forensics', () => ({
+  initExitForensics: m.initExitForensicsMock,
+  markExitStage: m.markExitStageMock,
+  clearDeathEvidenceForRelaunch: m.clearDeathEvidenceForRelaunchMock
+}))
+vi.mock('../gpu-fallback', () => ({
+  markBootAttempt: m.markBootAttemptMock,
+  setupGpuProcessWatcher: m.setupGpuProcessWatcherMock
+}))
+vi.mock('../native-load-guard', () => ({
+  verifyCriticalNativeModules: m.verifyCriticalNativeModulesMock,
+  showStartupFailureWithFallback: m.showStartupFailureWithFallbackMock
+}))
+vi.mock('../sync-server-setup', () => ({
+  initSyncServer: m.initSyncServerMock
+}))
+vi.mock('../nikkisync-runtime-setup', () => ({
+  initNikkiSyncRuntime: m.initNikkiSyncRuntimeMock
+}))
+vi.mock('../../utils/early-crash-guard', () => ({
+  isStartupSettled: m.isStartupSettledMock,
+  markStartupSettled: m.markStartupSettledMock
+}))
 
 import { bootstrapApplication } from '../lifecycle'
 import { STARTUP_SCAN_DELAY_MS } from '../../utils/constants'
@@ -324,178 +370,57 @@ describe('lifecycle - bootstrapApplication', () => {
   // 单实例锁阶段
   // ==========================================================================
   describe('单实例锁阶段', () => {
-    it('1. requestSingleInstanceLock 首次返回 true，直接进入 whenReady', async () => {
+    it('1. 【守护·R1】bootstrapApplication 不得再调用 requestSingleInstanceLock（锁已在 index.ts 获取）', async () => {
+      // R1 后锁获取前移到 index.ts whenReady 首行（single-instance.ts）；lifecycle 内的
+      // 二次获取是迁移漏删的死代码（同进程二次调用恒 true，!gotLock 分支生产不可达），
+      // 必须清除以防双真相源与测试绿灯失真。
       const ctx = makeLifecycleCtx()
 
       await bootstrapApplication(ctx)
 
+      expect(m.requestSingleInstanceLockMock).not.toHaveBeenCalled()
       expect(m.whenReadyMock).toHaveBeenCalled()
       // 没有弹出"已有实例运行"对话框（fatal catch 的 dialog 不应触发）
       expect(m.dialogShowMessageBoxMock).not.toHaveBeenCalled()
     })
 
-    it('2. 首次返回 false，1s 后重试，3 次内拿到锁', async () => {
-      vi.useFakeTimers()
-      // 第 1 次 false，第 2 次 true
-      m.requestSingleInstanceLockMock.mockReturnValueOnce(false).mockReturnValueOnce(true)
-
+    it('1b. 赢家路径（拿到锁）执行启动打点：取证初始化 / 原生模块预检 / 失败计数 / GPU 观测', async () => {
+      // F2+F5：这些打点原先位于 index.ts whenReady 内、锁检查之前——
+      // 锁失败实例也会执行，污染共享证据文件并拖慢"已有实例运行"弹窗。
+      // 现在必须只有拿到锁的赢家才执行，且都发生在 DB 初始化之前。
       const ctx = makeLifecycleCtx()
 
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(1000)
-      await promise
+      await bootstrapApplication(ctx)
 
-      // 应该被调用 2 次（首次 + 1 次重试）
-      expect(m.requestSingleInstanceLockMock).toHaveBeenCalledTimes(2)
-      // 没弹"已有实例运行"对话框
-      expect(m.dialogShowMessageBoxMock).not.toHaveBeenCalled()
+      expect(m.initExitForensicsMock).toHaveBeenCalledTimes(1)
+      expect(m.verifyCriticalNativeModulesMock).toHaveBeenCalledTimes(1)
+      expect(m.markBootAttemptMock).toHaveBeenCalledTimes(1)
+      expect(m.setupGpuProcessWatcherMock).toHaveBeenCalledTimes(1)
     })
 
-    it('3. 3 次重试均失败时弹出"已有实例运行"对话框，3 个按钮', async () => {
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      // 用户选"退出"
-      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 2 })
-
+    it('1d. 窗口创建不被 NikkiSync 运行时初始化阻塞：createMainWindow 先于 initNikkiSyncRuntime', async () => {
+      // F6：运行时启动含游戏目录全盘发现（未装游戏的机器实测 ~14s，慢盘/多盘更久），
+      // 修复前在 createMainWindow 之前 await——首窗被拖住，"双击后无响应"的直接机制之一
       const ctx = makeLifecycleCtx()
 
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(3000)
-      await promise
+      await bootstrapApplication(ctx)
 
-      // 4 次调用（首次 + 3 次重试）
-      expect(m.requestSingleInstanceLockMock).toHaveBeenCalledTimes(4)
-      // 第一次 dialog 是"已有实例运行"
-      const firstDialog = m.dialogShowMessageBoxMock.mock.calls[0][0]
-      expect(firstDialog.buttons).toHaveLength(3)
-      expect(firstDialog.buttons).toEqual(['清理并重启', '手动处理', '退出'])
-    })
-
-    it('4. 用户选"清理并重启"，PowerShell 杀死其他进程后 relaunch + exit(0)', async () => {
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      // 用户选"清理并重启"
-      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 0 })
-      // execFileSync 返回 PID 列表
-      m.execFileSyncMock.mockImplementation((cmd: unknown) => {
-        if (cmd === 'powershell') return '12345\n'
-        return ''
-      })
-
-      const ctx = makeLifecycleCtx()
-
-      const promise = bootstrapApplication(ctx)
-      // 推进重试循环（3s）+ 微任务（whenReady + dialog）+ relaunch 定时器（2s）
-      await vi.advanceTimersByTimeAsync(3000)
-      await vi.advanceTimersByTimeAsync(0)
-      await vi.advanceTimersByTimeAsync(2000)
-      await promise
-
-      expect(m.appRelaunchMock).toHaveBeenCalledTimes(1)
-      expect(m.appExitMock).toHaveBeenCalledWith(0)
-    })
-
-    it('5. PowerShell 杀进程全部失败（killedAny=false）时弹"清理失败"对话框，不重启', async () => {
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      // 用户选"清理并重启"，第二次选"退出"
-      m.dialogShowMessageBoxMock
-        .mockResolvedValueOnce({ response: 0 })
-        .mockResolvedValueOnce({ response: 1 })
-      // execFileSync 全部抛错
-      m.execFileSyncMock.mockImplementation(() => {
-        throw new Error('powershell failed')
-      })
-
-      const ctx = makeLifecycleCtx()
-
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(3000)
-      await vi.advanceTimersByTimeAsync(0)
-      await promise
-
-      // 弹了 2 次对话框
-      expect(m.dialogShowMessageBoxMock).toHaveBeenCalledTimes(2)
-      // 第二次是"清理失败"对话框
-      const secondCall = m.dialogShowMessageBoxMock.mock.calls[1][0]
-      expect(secondCall.title).toBe('清理失败')
-      // 未重启
-      expect(m.appRelaunchMock).not.toHaveBeenCalled()
-      // 调用了 app.quit
-      expect(m.appQuitMock).toHaveBeenCalledTimes(1)
-    })
-
-    it('6. 用户选"手动处理"，打开任务管理器', async () => {
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      // 用户选"手动处理"
-      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 1 })
-
-      const ctx = makeLifecycleCtx()
-
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(3000)
-      await vi.advanceTimersByTimeAsync(0)
-      await promise
-
-      // exec('taskmgr') 被调用
-      expect(m.execMock).toHaveBeenCalledWith('taskmgr', { windowsHide: false })
-      // 之后 app.quit
-      expect(m.appQuitMock).toHaveBeenCalledTimes(1)
-    })
-
-    it('6b. exec("taskmgr") 启动失败时错误被 error 监听记录，不冒泡为未捕获异常', async () => {
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 1 })
-      // exec 返回带 on() 的子进程句柄
-      const onMock = vi.fn()
-      m.execMock.mockReturnValueOnce({ on: onMock })
-
-      const ctx = makeLifecycleCtx()
-
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(3000)
-      await vi.advanceTimersByTimeAsync(0)
-      await promise
-
-      expect(m.execMock).toHaveBeenCalledWith('taskmgr', { windowsHide: false })
-      // 必须挂载 error 监听：否则 spawn 失败（如 taskmgr 被禁用）会冒泡成
-      // uncaughtException → reportEarlyFatal → 假「启动失败 / 程序已退出」
-      const errorCall = onMock.mock.calls.find((c) => c[0] === 'error')
-      expect(errorCall).toBeDefined()
-
-      const spawnErr = Object.assign(new Error('spawn EFTYPE'), {
-        code: 'EFTYPE',
-        syscall: 'spawn EFTYPE'
-      })
-      const handler = errorCall![1] as (e: unknown) => void
-      expect(() => handler(spawnErr)).not.toThrow()
-      expect(m.logStartupErrorMock).toHaveBeenCalledWith('exec-taskmgr', spawnErr)
-    })
-
-    it('7. 用户选"退出"，调用 app.quit()', async () => {
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 2 })
-
-      const ctx = makeLifecycleCtx()
-
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(3000)
-      await vi.advanceTimersByTimeAsync(0)
-      await promise
-
-      expect(m.appQuitMock).toHaveBeenCalledTimes(1)
-      expect(m.appRelaunchMock).not.toHaveBeenCalled()
+      expect(m.createMainWindowMock).toHaveBeenCalledTimes(1)
+      expect(m.initNikkiSyncRuntimeMock).toHaveBeenCalledTimes(1)
+      expect(m.createMainWindowMock.mock.invocationCallOrder[0]).toBeLessThan(
+        m.initNikkiSyncRuntimeMock.mock.invocationCallOrder[0]
+      )
     })
 
     it('8. 第二实例启动时聚焦已有窗口', async () => {
       const focusMock = vi.fn()
       const restoreMock = vi.fn()
+      const showMock = vi.fn()
       const fakeWin = {
         isMinimized: vi.fn(() => true),
+        isDestroyed: vi.fn(() => false),
         restore: restoreMock,
+        show: showMock,
         focus: focusMock
       }
       m.bwGetAllWindowsMock.mockReturnValue([fakeWin])
@@ -508,6 +433,109 @@ describe('lifecycle - bootstrapApplication', () => {
       cb()
       expect(focusMock).toHaveBeenCalledTimes(1)
       expect(restoreMock).toHaveBeenCalledTimes(1)
+      expect(showMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // ==========================================================================
+  // second-instance 窗口激活（红灯：无 show / 0 窗口静默 / 注册过晚）
+  // 修复前：handler 只 restore+focus，0 窗口静默 return，注册在赢家打点之后。
+  // ==========================================================================
+  describe('second-instance 窗口激活', () => {
+    function makeFakeWin(overrides: Record<string, unknown> = {}) {
+      return {
+        isMinimized: vi.fn(() => false),
+        isDestroyed: vi.fn(() => false),
+        restore: vi.fn(),
+        show: vi.fn(),
+        focus: vi.fn(),
+        ...overrides
+      }
+    }
+
+    it('S1【红灯】最小化窗口必须 restore + show + focus', async () => {
+      const win = makeFakeWin({ isMinimized: vi.fn(() => true) })
+      m.bwGetAllWindowsMock.mockReturnValue([win])
+      m.isStartupSettledMock.mockReturnValue(false)
+
+      await bootstrapApplication(makeLifecycleCtx())
+      getEventCallback('second-instance')()
+
+      expect(win.restore).toHaveBeenCalledTimes(1)
+      expect(win.show).toHaveBeenCalledTimes(1)
+      expect(win.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('S2【红灯】未最小化窗口也要 show + focus（隐藏窗口必须重新可见）', async () => {
+      const win = makeFakeWin()
+      m.bwGetAllWindowsMock.mockReturnValue([win])
+      m.isStartupSettledMock.mockReturnValue(false)
+
+      await bootstrapApplication(makeLifecycleCtx())
+      getEventCallback('second-instance')()
+
+      expect(win.show).toHaveBeenCalledTimes(1)
+      expect(win.focus).toHaveBeenCalledTimes(1)
+    })
+
+    it('S3【红灯】0 窗口且启动已 settled → 重建主窗口', async () => {
+      m.bwGetAllWindowsMock.mockReturnValue([])
+      m.isStartupSettledMock.mockReturnValue(true)
+
+      await bootstrapApplication(makeLifecycleCtx())
+      m.createMainWindowMock.mockClear()
+      getEventCallback('second-instance')()
+
+      expect(m.createMainWindowMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('S4【红灯】0 窗口且启动未 settled → 不重入，但必须留下日志痕迹', async () => {
+      m.bwGetAllWindowsMock.mockReturnValue([])
+      m.isStartupSettledMock.mockReturnValue(false)
+
+      await bootstrapApplication(makeLifecycleCtx())
+      m.createMainWindowMock.mockClear()
+      m.diagLogMock.mockClear()
+      getEventCallback('second-instance')()
+
+      expect(m.createMainWindowMock).not.toHaveBeenCalled()
+      expect(m.diagLogMock).toHaveBeenCalled()
+    })
+
+    it('S5【红灯】窗口已销毁 → 不抛错，走 0 窗口兜底重建', async () => {
+      m.bwGetAllWindowsMock.mockReturnValue([makeFakeWin({ isDestroyed: vi.fn(() => true) })])
+      m.isStartupSettledMock.mockReturnValue(true)
+
+      await bootstrapApplication(makeLifecycleCtx())
+      m.createMainWindowMock.mockClear()
+      expect(() => getEventCallback('second-instance')()).not.toThrow()
+      expect(m.createMainWindowMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('S6【红灯】second-instance 注册必须早于赢家专属启动打点 initExitForensics', async () => {
+      await bootstrapApplication(makeLifecycleCtx())
+
+      const idx = m.appOnMock.mock.calls.findIndex((c) => c[0] === 'second-instance')
+      expect(idx, 'second-instance 未注册').toBeGreaterThan(-1)
+      const registerOrder = m.appOnMock.mock.invocationCallOrder[idx]
+      const forensicsOrder = m.initExitForensicsMock.mock.invocationCallOrder[0]
+      expect(registerOrder).toBeLessThan(forensicsOrder)
+    })
+  })
+
+  // ==========================================================================
+  // 启动失败出口的可见兜底（红灯：dialog 抛错后只 logStartupError 就退出）
+  // ==========================================================================
+  describe('启动失败出口可见兜底', () => {
+    it('E2【红灯】启动 fatal 对话框抛错时仍有一次可见兜底', async () => {
+      m.registerMediaProtocolMock.mockImplementationOnce(() => {
+        throw new Error('fatal')
+      })
+      m.dialogShowMessageBoxMock.mockRejectedValueOnce(new Error('dialog unavailable'))
+
+      await bootstrapApplication(makeLifecycleCtx())
+
+      expect(m.showStartupFailureWithFallbackMock).toHaveBeenCalled()
     })
   })
 
@@ -558,7 +586,7 @@ describe('lifecycle - bootstrapApplication', () => {
 
       // fatal catch 被触发
       expect(m.logStartupErrorMock).toHaveBeenCalledWith('initialize-fatal', initErr)
-      // 因为 lockAcquired=true，应该调用 app.exit(1)
+      // bootstrap 仅由锁赢家执行（index.ts 已在重模块加载前获取锁），fatal 一律 app.exit(1)
       expect(m.appExitMock).toHaveBeenCalledWith(1)
     })
 
@@ -905,7 +933,7 @@ describe('lifecycle - bootstrapApplication', () => {
       expect(m.appExitMock).not.toHaveBeenCalled()
 
       // 推进到 5s，应该触发强制退出
-      await vi.advanceTimersByTimeAsync(3000)
+      await vi.advanceTimersByTimeAsync(6000)
       expect(m.appExitMock).toHaveBeenCalledWith(1)
       expect(m.logStartupErrorMock).toHaveBeenCalledWith('force-exit-timeout', expect.any(Error))
     })
@@ -1045,8 +1073,8 @@ describe('lifecycle - bootstrapApplication', () => {
       expect(openPathArg).toBe('/mock/喵星图/Diagnostics')
     })
 
-    it('35. lockAcquired=true 时 dbManager.close + releaseSingleInstanceLock + app.exit(1) 被调用', async () => {
-      // 单实例锁获取成功后，阶段 6 抛错 → lockAcquired=true → fatal catch
+    it('35. fatal 时 dbManager.close + releaseSingleInstanceLock + app.exit(1) 被调用', async () => {
+      // 阶段 6 抛错 → fatal catch；bootstrap 仅由锁赢家执行（index.ts 保证），锁必持
       const fatalErr = new Error('fatal after lock')
       m.registerMediaProtocolMock.mockImplementationOnce(() => {
         throw fatalErr
@@ -1059,25 +1087,6 @@ describe('lifecycle - bootstrapApplication', () => {
       expect(ctx.dbManager.close).toHaveBeenCalledTimes(1)
       expect(m.appReleaseSingleInstanceLockMock).toHaveBeenCalledTimes(1)
       expect(m.appExitMock).toHaveBeenCalledWith(1)
-    })
-
-    it('36. lockAcquired=false 时调用 app.quit()', async () => {
-      // 单实例锁获取失败 + 用户选"退出" → lockAcquired=false
-      vi.useFakeTimers()
-      m.requestSingleInstanceLockMock.mockReturnValue(false)
-      m.dialogShowMessageBoxMock.mockResolvedValue({ response: 2 }) // 退出
-
-      const ctx = makeLifecycleCtx()
-
-      const promise = bootstrapApplication(ctx)
-      await vi.advanceTimersByTimeAsync(3000)
-      await vi.advanceTimersByTimeAsync(0)
-      await promise
-
-      // lockAcquired=false → app.quit()
-      expect(m.appQuitMock).toHaveBeenCalledTimes(1)
-      // 不应该调用 app.exit
-      expect(m.appExitMock).not.toHaveBeenCalled()
     })
   })
 })
@@ -1152,5 +1161,45 @@ describe('参考数据开机自动检查开关', () => {
     const initialLen = ctx.startupTimers.length
     await bootstrapApplication(ctx)
     expect(ctx.startupTimers.length).toBe(initialLen + 4)
+  })
+})
+
+describe('lifecycle 启动时序守卫（审查修复轮 G1-F3/F5/F6/F8）', () => {
+  it('t1. before-quit/window-all-closed 注册先于 initNikkiSyncRuntime（F6 后移不得推迟退出链注册）', async () => {
+    const { bootstrapApplication } = await import('../lifecycle')
+    const ctx = makeLifecycleCtx()
+    await bootstrapApplication(ctx)
+    const beforeQuitOrder = m.appOnMock.mock.calls.findIndex((c) => c[0] === 'before-quit')
+    const wacOrder = m.appOnMock.mock.calls.findIndex((c) => c[0] === 'window-all-closed')
+    const nikkiOrder = m.initNikkiSyncRuntimeMock.mock.invocationCallOrder[0]
+    expect(beforeQuitOrder).toBeGreaterThan(-1)
+    expect(wacOrder).toBeGreaterThan(-1)
+    expect(m.appOnMock.mock.invocationCallOrder[beforeQuitOrder]).toBeLessThan(nikkiOrder)
+    expect(m.appOnMock.mock.invocationCallOrder[wacOrder]).toBeLessThan(nikkiOrder)
+  })
+})
+
+describe('lifecycle settled 与清理期守卫（审查修复轮 G1-F6/F8）', () => {
+  it('t2. 首窗创建完成后即 markStartupSettled（NikkiSync 长初始化期间游离 rejection 不得致命化）', async () => {
+    const { bootstrapApplication } = await import('../lifecycle')
+    await bootstrapApplication(makeLifecycleCtx())
+    expect(m.markStartupSettledMock).toHaveBeenCalled()
+    expect(m.createMainWindowMock.mock.invocationCallOrder[0]).toBeLessThan(
+      m.markStartupSettledMock.mock.invocationCallOrder[0]
+    )
+  })
+
+  it('t3. 清理期（isCleaningUp=true）second-instance 不得在正在关闭的 DB 上重建窗口', async () => {
+    const { bootstrapApplication } = await import('../lifecycle')
+    await bootstrapApplication(makeLifecycleCtx({ isCleaningUp: true }))
+    m.isStartupSettledMock.mockReturnValue(true)
+    m.bwGetAllWindowsMock.mockReturnValue([])
+    m.createMainWindowMock.mockClear()
+    // 取最后一次注册（本用例 bootstrap 的 handler）——appOnMock 跨用例累积，find 首个会拿到旧 ctx
+    const calls = m.appOnMock.mock.calls.filter((c) => c[0] === 'second-instance')
+    expect(calls.length).toBeGreaterThan(0)
+    ;(calls[calls.length - 1][1] as () => void)()
+    expect(m.createMainWindowMock).not.toHaveBeenCalled()
+    m.isStartupSettledMock.mockReturnValue(false)
   })
 })

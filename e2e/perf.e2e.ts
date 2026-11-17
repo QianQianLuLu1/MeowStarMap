@@ -97,7 +97,7 @@ test.afterAll(async ({}, testInfo: TestInfo) => {
     await savePerfReport(partial)
   }
   if (launched) {
-    await collectDiagLogs(launched.userDataDir, testInfo.outputDir)
+    await collectDiagLogs(launched.userDataDir, testInfo.outputDir, launched.exePath)
   }
   await closeApp(launched)
   launched = undefined

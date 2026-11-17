@@ -13,7 +13,8 @@ import {
   closeApp,
   collectDiagLogs,
   readExpectedVersion,
-  type LaunchedApp
+  type LaunchedApp,
+  forensicsLogsDirOf
 } from './helpers'
 
 /** preload 暴露的 window 全局对象最小类型声明（仅覆盖冒烟断言所需面） */
@@ -44,7 +45,7 @@ let win: Page
 // eslint-disable-next-line no-empty-pattern -- Playwright hook 首参必须是对象解构模式
 test.afterAll(async ({}, testInfo: TestInfo) => {
   if (launched) {
-    await collectDiagLogs(launched.userDataDir, testInfo.outputDir)
+    await collectDiagLogs(launched.userDataDir, testInfo.outputDir, launched.exePath)
   }
   await closeApp(launched)
   launched = undefined
@@ -115,7 +116,7 @@ test.describe('打包产物冒烟（win-unpacked）', () => {
 
   test('S7 首装自动扫描：扫描执行、完成且目录发现可观测', async () => {
     test.setTimeout(120_000) // 全盘签名搜索需扫完所有可用盘符，慢机器放宽
-    const logsDir = path.join(launched!.userDataDir, 'logs')
+    const logsDir = forensicsLogsDirOf(launched!.exePath)
     await expect
       .poll(
         async () => {

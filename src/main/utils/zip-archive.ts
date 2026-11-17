@@ -130,6 +130,13 @@ export function createZipFromDirectory(
     }
 
     archive.on('error', (err) => {
+      // 与 output-error / timeout 分支对称：先 abort archive 停掉内部队列，
+      // 再 destroy 输出流——只 destroy output 会让 archiver 句柄继续存活
+      try {
+        archive.abort()
+      } catch {
+        // 忽略
+      }
       output.destroy()
       done(fail(t('main.zip.error.writeFailed', { reason: err.message })))
     })

@@ -534,30 +534,7 @@ export const DiagnosticsLogsSection: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              className="btn-secondary text-xs px-3 py-1.5"
-              onClick={async () => {
-                const dir = await window.electronAPI?.dialog?.selectDirectory()
-                if (!dir) return
-                const res = await window.electronAPI?.log?.setDir(dir)
-                if (res?.success && res.needRestart) {
-                  const confirmed = await window.electronAPI?.dialog?.showMessageBox({
-                    type: 'question',
-                    title: t('settings.backup.restartTitle'),
-                    message: res.message,
-                    buttons: [t('settings.backup.restartNow'), t('settings.backup.restartLater')]
-                  })
-                  if (confirmed === 0) {
-                    await window.electronAPI?.app?.relaunch()
-                  }
-                } else if (!res?.success) {
-                  showMessage(res?.message || t('logAction.settingFailed'), 'error')
-                }
-              }}
-              title={t('settings.logs.modifyDir')}
-            >
-              {t('settings.logs.modifyDir')}
-            </button>
+            {/* 取证统一：日志目录不再支持自定义（2026-11-17 收口补全），仅保留打开入口 */}
             <button
               className="btn-secondary text-xs px-3 py-1.5"
               onClick={handleOpenLogDir}
@@ -1101,30 +1078,7 @@ export const DiagnosticsCrashSection: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              className="btn-secondary text-xs px-3 py-1.5"
-              onClick={async () => {
-                const dir = await window.electronAPI?.dialog?.selectDirectory()
-                if (!dir) return
-                const res = await window.electronAPI?.crash?.setDir(dir)
-                if (res?.success && res.needRestart) {
-                  const confirmed = await window.electronAPI?.dialog?.showMessageBox({
-                    type: 'question',
-                    title: t('settings.backup.restartTitle'),
-                    message: res.message,
-                    buttons: [t('settings.backup.restartNow'), t('settings.backup.restartLater')]
-                  })
-                  if (confirmed === 0) {
-                    await window.electronAPI?.app?.relaunch()
-                  }
-                } else if (!res?.success) {
-                  showMessage(res?.message || t('logAction.settingFailed'), 'error')
-                }
-              }}
-              title={t('settings.crash.modifyDir')}
-            >
-              {t('settings.crash.modifyDir')}
-            </button>
+            {/* 取证统一：崩溃目录不再支持自定义（2026-11-17 收口补全），仅保留打开入口 */}
             <button
               className="btn-secondary text-xs px-3 py-1.5"
               onClick={handleOpenDir}

@@ -6,9 +6,10 @@
  * `initNikkiSyncRuntime` 的真实装载链由 `src/main/nikkisync/runtime-facade.linked.test.ts`
  * 在链接态覆盖；此处只锁「默认关闭 + userData 落点 + 开关优先级」这三条任务硬性口径。
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { readFileSync, existsSync, mkdtempSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import os from 'node:os'
 
 vi.mock('electron', () => ({
   app: {
@@ -26,6 +27,21 @@ vi.mock('../../utils/logger', () => ({
 vi.mock('../../utils/startup-diagnostic', () => ({
   diagLog: vi.fn()
 }))
+
+// 取证回退态的 documents provider 指向 tmp：initNikkiSyncRuntime 接线 diagnosticsDir
+// 会解析取证根，不得真实创建用户 Documents 目录
+import { setDocumentsPathProvider } from '../../utils/user-diag-path'
+import { setForensicsEnvProvider } from '../../utils/forensics-dir'
+
+beforeEach(() => {
+  setDocumentsPathProvider(() => path.join(os.tmpdir(), 'wxnn-nikkisync-setup-diag'))
+})
+
+afterEach(() => {
+  setDocumentsPathProvider(null)
+  setForensicsEnvProvider(null)
+  rmSync(path.join(os.tmpdir(), 'wxnn-nikkisync-setup-diag'), { recursive: true, force: true })
+})
 
 import {
   GAME_ROOT_ENV_FLAG,
@@ -472,8 +488,21 @@ describe('buildSessionOptions', () => {
     projectRoot: 'P:',
     isPackaged: false,
     resourcesPath: '',
+    diagnosticsDir: 'F:\\forensics\\nikkisync',
     settings: settings({})
   }
+
+  it('diagnosticsDir 显式入参：options 与 onDiagnostic 落盘同源（取证根改向，不再拼 userData）', () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'wxnn-nikkisync-diag-'))
+    try {
+      const options = buildSessionOptions({ ...base, env: {}, diagnosticsDir: dir })
+      expect(options.diagnosticsDir).toBe(dir)
+      options.onDiagnostic?.('scan-status.json', { ok: true })
+      expect(existsSync(path.join(dir, 'scan-status.json'))).toBe(true)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
 
   it('正常：开发态给出 userData 库路径 + watcher 取缺省 + 无 gameRoot 时省略该键', () => {
     const options = buildSessionOptions({ ...base, env: {} })

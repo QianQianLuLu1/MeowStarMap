@@ -27,6 +27,8 @@ import {
   MIGRATE_PATTERNS
 } from './dir-manager'
 import { logger, setLogDirectory } from './logger'
+import { setForensicsEnvProvider, getForensicsRoot, getForensicsLogsDir } from './forensics-dir'
+import { setDocumentsPathProvider } from './user-diag-path'
 
 // 构造满足 DatabaseManager 接口的最小 mock
 function createMockDbManager(settings: Record<string, unknown> = {}): {
@@ -59,6 +61,14 @@ describe('dir-manager', () => {
     tmpBase = await fsp.mkdtemp(path.join(os.tmpdir(), 'wxnn-dir-test-'))
     mockUserData = path.join(tmpBase, 'userData')
     await fsp.mkdir(mockUserData, { recursive: true })
+    // 取证环境注入 install 态：exe 在 tmpBase\install 下 → 取证根=tmpBase\install\Diagnostics；
+    // documents provider 指向 tmp，避免 getUserFacingDiagDir 回退时真实创建用户 Documents 目录。
+    setForensicsEnvProvider(() => ({
+      isPackaged: true,
+      defaultApp: false,
+      exePath: path.join(tmpBase, 'install', 'app.exe')
+    }))
+    setDocumentsPathProvider(() => path.join(tmpBase, 'documents'))
     // logDir 是 logger.ts:123 的模块态，而 Vitest 只按**文件**隔离模块：不设这一行，它会被冻结在
     // 「本文件第一个触发 logger 的用例」的旧 tmpBase 上，其后用例的 logger 写与 electron-log 的
     // main.log（resolvePathFn 同样读 logDir，见 logger.ts:191-192）都往已被 afterEach 删掉的目录里写。
@@ -68,6 +78,8 @@ describe('dir-manager', () => {
   })
 
   afterEach(async () => {
+    setForensicsEnvProvider(null)
+    setDocumentsPathProvider(null)
     await fsp.rm(tmpBase, { recursive: true, force: true })
   })
 
@@ -156,16 +168,20 @@ describe('dir-manager', () => {
       expect(result).toBe(path.join(mockUserData, 'thumbnails'))
     })
 
-    it('logDir 回退到 userData/logs', () => {
-      const db = createMockDbManager()
+    it('logDir 强制统一到取证 logs 目录（忽略历史自定义值）', () => {
+      const customDir = path.join(tmpBase, 'custom-logs')
+      fs.mkdirSync(customDir, { recursive: true })
+      const db = createMockDbManager({ [SETTING_KEYS.logDir]: customDir })
       const result = resolveCustomDir(db as never, 'logDir')
-      expect(result).toBe(path.join(mockUserData, 'logs'))
+      expect(result).toBe(getForensicsLogsDir())
     })
 
-    it('crashDir 回退到用户友好目录（文档/喵星图/Diagnostics），避免藏在 AppData', () => {
-      const db = createMockDbManager()
+    it('crashDir 强制统一到取证根目录（忽略历史自定义值）', () => {
+      const customDir = path.join(tmpBase, 'custom-crashes')
+      fs.mkdirSync(customDir, { recursive: true })
+      const db = createMockDbManager({ [SETTING_KEYS.crashDir]: customDir })
       const result = resolveCustomDir(db as never, 'crashDir')
-      expect(result).toMatch(/喵星图[\\/]Diagnostics$/)
+      expect(result).toBe(getForensicsRoot())
     })
 
     it('只读目录回退到默认（W_OK 校验失败）', () => {
@@ -380,6 +396,39 @@ describe('dir-manager', () => {
       expect(result.failed).toBe(1)
       expect(result.moved).toBe(1)
       renameSpy.mockRestore()
+    })
+
+    it('skipExisting：目标已有同名文件时跳过且保留源、不覆盖目标', async () => {
+      const src = path.join(tmpBase, 'src')
+      const dst = path.join(tmpBase, 'dst')
+      fs.mkdirSync(src)
+      fs.mkdirSync(dst)
+      fs.writeFileSync(path.join(src, 'a.txt'), 'old')
+      fs.writeFileSync(path.join(src, 'b.txt'), 'bbb')
+      fs.writeFileSync(path.join(dst, 'a.txt'), 'fresh-evidence')
+
+      const result = await migrateDirFiles(src, dst, /\.txt$/, { skipExisting: true })
+      expect(result).toEqual({ moved: 1, failed: 0 })
+      // 新鲜证据不被覆盖，源文件保留
+      expect(fs.readFileSync(path.join(dst, 'a.txt'), 'utf8')).toBe('fresh-evidence')
+      expect(fs.existsSync(path.join(src, 'a.txt'))).toBe(true)
+      // 无冲突文件正常迁移
+      expect(fs.existsSync(path.join(dst, 'b.txt'))).toBe(true)
+      expect(fs.existsSync(path.join(src, 'b.txt'))).toBe(false)
+    })
+
+    it('默认（不传 skipExisting）行为不变：rename 覆盖目标同名文件', async () => {
+      const src = path.join(tmpBase, 'src')
+      const dst = path.join(tmpBase, 'dst')
+      fs.mkdirSync(src)
+      fs.mkdirSync(dst)
+      fs.writeFileSync(path.join(src, 'a.txt'), 'new-content')
+      fs.writeFileSync(path.join(dst, 'a.txt'), 'old-content')
+
+      const result = await migrateDirFiles(src, dst, /\.txt$/)
+      expect(result).toEqual({ moved: 1, failed: 0 })
+      expect(fs.readFileSync(path.join(dst, 'a.txt'), 'utf8')).toBe('new-content')
+      expect(fs.existsSync(path.join(src, 'a.txt'))).toBe(false)
     })
   })
 

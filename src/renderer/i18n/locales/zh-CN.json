@@ -1876,7 +1876,6 @@
       "hint": "崩溃 dump 文件由 Electron crashpad 自动生成，保留最近 10 份且超过 30 天自动清理。仅记录进程崩溃信息，不含用户隐私数据。",
       "listCount": "共 {{count}} 个",
       "listTitle": "崩溃记录（按时间倒序）",
-      "modifyDir": "修改目录",
       "oldest": "最早记录",
       "openDir": "打开目录",
       "processMain": "主进程",
@@ -1988,7 +1987,6 @@
       "listCountWithGroup": "共 {{count}} 条 · {{groups}} 组",
       "listTimeline": "故障记录（按时间倒序）",
       "logFiles": "日志文件",
-      "modifyDir": "修改目录",
       "notInit": "未初始化",
       "occurrenceCount": "出现次数: {{count}}",
       "openDir": "打开目录",
@@ -2901,7 +2899,7 @@
       "instanceRunning": {
         "title": "已有实例运行",
         "message": "应用已在运行中",
-        "detail": "可能是之前的进程异常未退出，导致单实例锁未释放。\n\n点击\"清理并重启\"将自动结束所有残留进程并重启应用；\n点击\"手动处理\"将打开任务管理器供您手动结束进程；\n点击\"退出\"将直接关闭本窗口。",
+        "detail": "检测到另一个实例仍在运行（可能是上一次启动的后台进程尚未退出，或应用窗口被隐藏到托盘）。\n\n点击\"清理并重启\"将结束残留进程并重启应用；\n点击\"手动处理\"将打开任务管理器供您手动结束进程；\n点击\"退出\"将直接关闭本窗口。",
         "cleanupButton": "清理并重启",
         "manualButton": "手动处理",
         "exitButton": "退出"
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": "已恢复为默认目录，需要重启应用才能生效。是否立即重启？"
+        "resetToDefault": "已恢复为默认目录，需要重启应用才能生效。是否立即重启？",
+        "unified": "日志与崩溃目录已统一到软件取证目录，不再支持自定义。",
+        "unifiedReset": "日志与崩溃目录已统一到软件取证目录。"
       },
       "error": {
         "resetFailed": "恢复默认失败：{{reason}}"

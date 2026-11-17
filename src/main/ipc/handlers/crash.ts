@@ -1,3 +1,4 @@
+// @core-change: crash:setDir/resetDir 改用取证统一兼容工厂，不再支持自定义崩溃目录
 import { ipcMain } from 'electron'
 import type { HandlerContext } from '../handler-context'
 import { logger } from '../../utils/logger'
@@ -10,7 +11,7 @@ import {
   clearAllCrashes,
   getCrashDirectory
 } from '../../services/crash-service'
-import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import { registerUnifiedDirHandler } from './set-dir-handler'
 import { t } from '../../i18n'
 
 /**
@@ -78,9 +79,8 @@ export function registerCrashHandlers(ctx: HandlerContext): void {
     })
   )
 
-  // P1-A11：setDir/resetDir 改用工厂函数（原 45 行模板代码消除）
-  registerSetDirHandler(ctx, 'crash:setDir', 'crashDir')
-  registerResetDirHandler(ctx, 'crash:resetDir', 'crashDir')
+  // 取证统一：crashDir 不再支持自定义，通道保留兼容语义（见 registerUnifiedDirHandler）
+  registerUnifiedDirHandler(ctx, 'crash:setDir', 'crash:resetDir', 'crashDir')
 
   // 获取崩溃目录路径（供 UI 显示，避免 UI 硬编码）
   ipcMain.handle(

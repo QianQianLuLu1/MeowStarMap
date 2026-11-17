@@ -1,3 +1,4 @@
+// @core-change: log:setDir/resetDir 改用取证统一兼容工厂，不再支持自定义日志目录
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -12,7 +13,7 @@ import {
   clearAllLogs,
   getLogStats
 } from '../../services/log-service'
-import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import { registerUnifiedDirHandler } from './set-dir-handler'
 import { t } from '../../i18n'
 
 /**
@@ -189,9 +190,8 @@ export function registerLogHandlers(ctx: HandlerContext): void {
     )
   )
 
-  // P1-A11：setDir/resetDir 改用工厂函数（原 45 行模板代码消除）
-  registerSetDirHandler(ctx, 'log:setDir', 'logDir')
-  registerResetDirHandler(ctx, 'log:resetDir', 'logDir')
+  // 取证统一：logDir 不再支持自定义，通道保留兼容语义（见 registerUnifiedDirHandler）
+  registerUnifiedDirHandler(ctx, 'log:setDir', 'log:resetDir', 'logDir')
 
   // 获取日志目录路径（供 UI 显示，避免 UI 硬编码）
   ipcMain.handle(

@@ -24,7 +24,8 @@ const {
   logStartupErrorMock,
   wifiShareStopMock,
   backupDisposeMock,
-  disposeDecryptionServiceMock
+  disposeDecryptionServiceMock,
+  getFaultLogPathMock
 } = vi.hoisted(() => ({
   appGetPathMock: vi.fn(() => '/mock/userData'),
   appReleaseSingleInstanceLockMock: vi.fn(),
@@ -34,7 +35,8 @@ const {
   logStartupErrorMock: vi.fn(),
   wifiShareStopMock: vi.fn(),
   backupDisposeMock: vi.fn(),
-  disposeDecryptionServiceMock: vi.fn()
+  disposeDecryptionServiceMock: vi.fn(),
+  getFaultLogPathMock: vi.fn(() => '/mock/forensics/logs/faults-2026-11-17.jsonl')
 }))
 
 vi.mock('electron', () => ({
@@ -54,6 +56,12 @@ vi.mock('fs', () => ({
 vi.mock('../../utils/process-registry', () => ({
   killAllProcesses: killAllProcessesMock,
   getProcessRegistryStats: getProcessRegistryStatsMock
+}))
+
+vi.mock('../../utils/logger', () => ({
+  getFaultLogPath: getFaultLogPathMock,
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  electronLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
 }))
 
 vi.mock('../../utils/startup-diagnostic', () => ({
@@ -338,13 +346,15 @@ describe('performCleanup', () => {
     expect(disposeDecryptionServiceMock).toHaveBeenCalledTimes(1)
   })
 
-  it('16. fault 日志同步写入 fs.appendFileSync（含 before:/after:）', async () => {
+  it('16. fault 日志同步写入 fs.appendFileSync（含 before:/after:），落点走 getFaultLogPath（取证 logs，不得硬编码 userData）', async () => {
     const ctx = makeAppCtx({ scannerManager: makeScannerManagerStub() })
 
     await performCleanup(ctx)
 
     expect(fsAppendFileSyncMock).toHaveBeenCalledTimes(1)
     const writeArgs = fsAppendFileSyncMock.mock.calls[0]
+    // 落点必须是 logger 的故障日志路径（随 logDir=取证 logs），而非 userData\logs 硬编码
+    expect(writeArgs[0]).toBe(getFaultLogPathMock())
     // 第二参数是日志内容字符串
     const content = writeArgs[1] as string
     expect(content).toContain('before:')

@@ -18,7 +18,7 @@ let win: Page
 // eslint-disable-next-line no-empty-pattern -- Playwright hook 首参必须是对象解构模式
 test.afterAll(async ({}, testInfo: TestInfo) => {
   if (launched) {
-    await collectDiagLogs(launched.userDataDir, testInfo.outputDir)
+    await collectDiagLogs(launched.userDataDir, testInfo.outputDir, launched.exePath)
   }
   await closeApp(launched)
   launched = undefined

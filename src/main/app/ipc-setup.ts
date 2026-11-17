@@ -28,6 +28,7 @@ import { registerCrashHandlers } from '../ipc/handlers/crash'
 import { registerScannerHandlers } from '../ipc/handlers/scanner-handler'
 import { registerScanLogHandlers } from '../ipc/handlers/scan-log-handler'
 import { scanLogStore } from '../scanner/scan-log-store'
+import { getForensicsLogsDir } from '../utils/forensics-dir'
 import { registerDecryptHandlers } from '../ipc/handlers/decrypt-handler'
 import path from 'path'
 import { registerThumbnailHandlers } from '../ipc/handlers/thumbnail-handler'
@@ -146,16 +147,12 @@ export function setupIPC(ctx: AppContext): void {
   // 系统敏感目录（C:\Windows\System32 等）作为黑名单兜底始终拒绝
   pathGuard.initUserDataDir()
 
-  // 全链路诊断：注入落盘路径（userData/scan-log.jsonl），使诊断日志持久化可回放
-  // 惰性 require electron（主进程运行时可用；node 测试环境无 electron 时静默降级为仅内存）
+  // 全链路诊断：注入落盘路径（取证根 logs/scan-log.jsonl），使诊断日志持久化可回放，
+  // 并随「导出诊断包」的 logs 收集循环自动入包（2026-11-17 收口补全）
   try {
-    const electron = require('electron')
-    const userDataPath = electron.app?.getPath?.('userData')
-    if (typeof userDataPath === 'string') {
-      scanLogStore.setLogFilePath(path.join(userDataPath, 'scan-log.jsonl'))
-    }
+    scanLogStore.setLogFilePath(path.join(getForensicsLogsDir(), 'scan-log.jsonl'))
   } catch {
-    // userData 不可用时退化为仅内存（诊断日志不影响主流程）
+    // 取证根不可用时退化为仅内存（诊断日志不影响主流程）
   }
 
   // 补接线：把已扫描的媒体根目录注册进 pathGuard，避免媒体在非主目录盘时被默认拒绝

@@ -351,7 +351,9 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
   // eslint-disable-next-line no-empty-pattern -- Playwright hook 首参必须是对象解构模式
   test.afterAll(async ({}, testInfo) => {
     if (launched) {
-      await collectDiagLogs(launched.userDataDir, testInfo.outputDir).catch(() => {})
+      await collectDiagLogs(launched.userDataDir, testInfo.outputDir, launched.exePath).catch(
+        () => {}
+      )
       await closeApp(launched)
       launched = undefined
     }

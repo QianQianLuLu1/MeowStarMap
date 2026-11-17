@@ -28,6 +28,7 @@ import {
   getLogDirectory,
   setLogDirectory,
   getRecentLogs,
+  getFaultLogPath,
   logFault,
   FAULT_TYPE_LABELS,
   logger,
@@ -130,6 +131,19 @@ describe('logger', () => {
       const newDir = path.join(tmpBase, 'new-logs')
       setLogDirectory(newDir)
       expect(getLogDirectory()).toBe(newDir)
+    })
+  })
+
+  describe('getFaultLogPath', () => {
+    it('落当前日志目录下 faults-<UTC日期>.jsonl（供 cleanup 退出诊断复用，杜绝硬编码 userData）', () => {
+      const dateStr = new Date().toISOString().slice(0, 10)
+      expect(getFaultLogPath()).toBe(path.join(logDir, `faults-${dateStr}.jsonl`))
+    })
+
+    it('随 setLogDirectory 切换目录', () => {
+      const newDir = path.join(tmpBase, 'forensics-logs')
+      setLogDirectory(newDir)
+      expect(getFaultLogPath().startsWith(newDir + path.sep)).toBe(true)
     })
   })
 

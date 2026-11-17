@@ -715,7 +715,13 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     })
     serverApi.setMetadataConsent.mockRejectedValueOnce(new Error('policy version mismatch'))
     renderSection()
-    const toggle = await screen.findByRole('switch', { name: '同意发送照片参数' })
+    // 同意块依赖异步会话装配；全量并发（jsdom 环境构建 + 8 核 forks）下默认 1s 预算
+    // 不足致瞬时假红（隔离恒绿）——按 50a0b45 预算口径放宽到 5s，断言不弱化。
+    const toggle = await screen.findByRole(
+      'switch',
+      { name: '同意发送照片参数' },
+      { timeout: 5000 }
+    )
     fireEvent.click(toggle)
     await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
   })

@@ -80,6 +80,11 @@ import { shell, app } from 'electron'
 import { getStartupLogPathValue } from '../utils/startup-diagnostic'
 // 真 logger 的目录注入缝：见下方 beforeEach 里的 setLogDirectory 用法
 import { setLogDirectory } from '../utils/logger'
+import {
+  setForensicsEnvProvider,
+  getForensicsRoot,
+  FORENSICS_ROOT_FILE_NAMES
+} from '../utils/forensics-dir'
 
 // ============================================================
 // Helpers
@@ -125,6 +130,8 @@ function makeFault(id: string, timestamp: string): FaultJson {
 }
 
 let tmpRoot: string
+// 取证根（install 态）：导出读取侧的单一真相源，所有取证文件落这里
+let mockForensicsRoot = ''
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -142,11 +149,21 @@ beforeEach(() => {
   fs.writeFileSync(mockStartupLogPath, '[STAGE: boot] simulated startup failure', 'utf-8')
   mockDiagDir = path.join(tmpRoot, 'diag')
   fs.mkdirSync(mockDiagDir, { recursive: true })
+  // 取证环境注入 install 态：exe 在 tmpRoot\install 下 → 取证根=tmpRoot\install\Diagnostics。
+  // 打包态真实布局的复现缝——此前 provider 未注册恒走回退，导出读写错位被掩盖。
+  mockForensicsRoot = path.join(tmpRoot, 'install', 'Diagnostics')
+  fs.mkdirSync(mockForensicsRoot, { recursive: true })
+  setForensicsEnvProvider(() => ({
+    isPackaged: true,
+    defaultApp: false,
+    exePath: path.join(tmpRoot, 'install', 'app.exe')
+  }))
   // 每个测试前失效缓存
   invalidateFaultsCache()
 })
 
 afterEach(() => {
+  setForensicsEnvProvider(null)
   fs.rmSync(tmpRoot, { recursive: true, force: true })
 })
 
@@ -497,14 +514,16 @@ describe('exportLogsAsZip', () => {
 
   it('F2. 诊断包纳入 chromium-debug.log / diag.log / gpu-fallback.json', async () => {
     fs.writeFileSync(
-      path.join(mockDiagDir, 'chromium-debug.log'),
+      path.join(mockForensicsRoot, 'chromium-debug.log'),
       "[x:1101/220603.443:FATAL:gpu_data_manager_impl_private.cc:417] GPU process isn't usable.\n",
       'utf-8'
     )
-    fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] simulated', 'utf-8')
-    const userData = path.join(tmpRoot, 'userData')
-    fs.mkdirSync(userData, { recursive: true })
-    fs.writeFileSync(path.join(userData, 'gpu-fallback.json'), '{"compatLevel":2}', 'utf-8')
+    fs.writeFileSync(path.join(mockForensicsRoot, 'diag.log'), '[GPU] simulated', 'utf-8')
+    fs.writeFileSync(
+      path.join(mockForensicsRoot, 'gpu-fallback.json'),
+      '{"compatLevel":2}',
+      'utf-8'
+    )
     const getPathMock = vi.mocked(app.getPath)
     getPathMock.mockImplementation((name: string) =>
       name === 'userData' ? userData : `/mock/${name}`
@@ -533,7 +552,7 @@ describe('exportLogsAsZip', () => {
   })
 
   it('F3. 边界：chromium-debug.log 不存在 → 导出不失败，其余文件照收', async () => {
-    fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] only diag', 'utf-8')
+    fs.writeFileSync(path.join(mockForensicsRoot, 'diag.log'), '[GPU] only diag', 'utf-8')
     const target = path.join(tmpRoot, 'f3.zip')
     const copySpy = vi.spyOn(fs.promises, 'copyFile')
     const writeSpy = vi.spyOn(fs.promises, 'writeFile')
@@ -556,7 +575,7 @@ describe('exportLogsAsZip', () => {
       Buffer.alloc(3 * 1024 * 1024, 0x61), // 3MB 旧内容（应被丢掉）
       Buffer.from('FATAL-TAIL-MARKER\n', 'utf-8')
     ])
-    fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log'), big)
+    fs.writeFileSync(path.join(mockForensicsRoot, 'chromium-debug.log'), big)
     const writes: { dst: string; buf: Buffer }[] = []
     const realWrite = fs.promises.writeFile.bind(fs.promises)
     const writeSpy = vi
@@ -587,9 +606,9 @@ describe('exportLogsAsZip', () => {
 
   it('F5. 异常：单个原生日志被占用 → 只丢那一份，.old 与 diag.log 照收', async () => {
     // 本机实况：防护软件把刚落地/历史的日志与 asar 抓成 EBUSY 是常态，不是罕见分支
-    fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log'), 'FATAL gpu not usable\n')
-    fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log.old'), 'previous run tail\n')
-    fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] diag\n')
+    fs.writeFileSync(path.join(mockForensicsRoot, 'chromium-debug.log'), 'FATAL gpu not usable\n')
+    fs.writeFileSync(path.join(mockForensicsRoot, 'chromium-debug.log.old'), 'previous run tail\n')
+    fs.writeFileSync(path.join(mockForensicsRoot, 'diag.log'), '[GPU] diag\n')
     const target = path.join(tmpRoot, 'f5.zip')
     const realCopy = fs.promises.copyFile.bind(fs.promises)
     const copySpy = vi
@@ -678,24 +697,17 @@ describe('exportLogsAsZip', () => {
     })
 
     it('gpu-pref.json 存在时入包', async () => {
-      const userData = path.join(tmpRoot, 'userData')
-      fs.mkdirSync(userData, { recursive: true })
-      fs.writeFileSync(path.join(userData, 'gpu-pref.json'), '{"hardwareAcceleration":false}')
-      const getPathMock = vi.mocked(app.getPath)
-      getPathMock.mockImplementation((name: string) =>
-        name === 'userData' ? userData : `/mock/${name}`
+      fs.writeFileSync(
+        path.join(mockForensicsRoot, 'gpu-pref.json'),
+        '{"hardwareAcceleration":false}'
       )
-      try {
-        const { r, staged } = await exportWithCapture(path.join(tmpRoot, 'pref.zip'))
-        expect(r.success).toBe(true)
-        expect(staged).toContain('gpu-pref.json')
-      } finally {
-        getPathMock.mockImplementation((name: string) => `/mock/${name}`)
-      }
+      const { r, staged } = await exportWithCapture(path.join(tmpRoot, 'pref.zip'))
+      expect(r.success).toBe(true)
+      expect(staged).toContain('gpu-pref.json')
     })
 
     it('manifest 如实：chromium-debug.log 缺席 ⇒ contents 不含、missing 含；diag.log 在位 ⇒ contents 含', async () => {
-      fs.writeFileSync(path.join(mockDiagDir, 'diag.log'), '[GPU] diag', 'utf-8')
+      fs.writeFileSync(path.join(mockForensicsRoot, 'diag.log'), '[GPU] diag', 'utf-8')
       const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'manifest-missing.zip'))
       expect(r.success).toBe(true)
       const manifest = readJson(writes, 'manifest.json')
@@ -708,7 +720,7 @@ describe('exportLogsAsZip', () => {
     })
 
     it('manifest 如实：chromium-debug.log 在位 ⇒ contents 含、missing 不含', async () => {
-      fs.writeFileSync(path.join(mockDiagDir, 'chromium-debug.log'), 'FATAL tail\n', 'utf-8')
+      fs.writeFileSync(path.join(mockForensicsRoot, 'chromium-debug.log'), 'FATAL tail\n', 'utf-8')
       const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'manifest-present.zip'))
       expect(r.success).toBe(true)
       const manifest = readJson(writes, 'manifest.json')
@@ -717,6 +729,135 @@ describe('exportLogsAsZip', () => {
       expect(contents).toContain('chromium-debug.log')
       expect(missing).not.toContain('chromium-debug.log')
     })
+  })
+
+  // ---------- 2026-11-17 收口补全：打包态读写同源复现 ----------
+  //
+  // 此前读取侧从 Documents/userData 取 chromium/diag/gpu 文件，而写入端全在取证根
+  // （打包态=安装目录\Diagnostics）→ 导出包系统性缺项。provider 未注册时恒走回退，
+  // 缺口被掩盖；本组用例注入 install 态复现真实打包布局。
+
+  it('打包态复现：全部取证文件从取证根收齐，manifest 1.2 且 missing 为空', async () => {
+    for (const name of FORENSICS_ROOT_FILE_NAMES) {
+      fs.writeFileSync(path.join(mockForensicsRoot, name), `evidence-${name}`, 'utf-8')
+    }
+    fs.mkdirSync(path.join(mockForensicsRoot, 'nikkisync'), { recursive: true })
+    fs.writeFileSync(
+      path.join(mockForensicsRoot, 'nikkisync', 'scan-status.json'),
+      '{"ok":true}',
+      'utf-8'
+    )
+    fs.writeFileSync(path.join(mockLogDir, 'scan-log.jsonl'), '{"scan":1}', 'utf-8')
+
+    const writes: Array<{ dst: string; buf: Buffer }> = []
+    const realWrite = fs.promises.writeFile.bind(fs.promises)
+    const writeSpy = vi
+      .spyOn(fs.promises, 'writeFile')
+      .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+        writes.push({
+          dst: String(file),
+          buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+        })
+        return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+      })
+    const copySpy = vi.spyOn(fs.promises, 'copyFile')
+
+    try {
+      const r = await exportLogsAsZip(path.join(tmpRoot, 'install-full.zip'))
+      expect(r.success).toBe(true)
+      const staged = stagedNames(copySpy, writeSpy)
+      for (const name of FORENSICS_ROOT_FILE_NAMES) {
+        expect(staged, `打包态导出缺取证文件: ${name}`).toContain(name)
+      }
+      expect(staged).toContain('scan-status.json')
+      expect(staged).toContain('scan-log.jsonl')
+      expect(staged).toContain('startup-errors.log')
+
+      // 暂存目录固定落取证根（不再随 logDir 漂移）
+      const tmpPrefix = path.join(mockForensicsRoot, 'diagnostic-tmp-')
+      expect(copySpy.mock.calls.some((c) => String(c[1]).startsWith(tmpPrefix))).toBe(true)
+
+      const manifestWrite = writes.find((w) => path.basename(w.dst) === 'manifest.json')
+      const manifest = JSON.parse(manifestWrite!.buf.toString('utf-8')) as {
+        diagnosticVersion: string
+        contents: string[]
+        missing: string[]
+      }
+      expect(manifest.diagnosticVersion).toBe('1.2')
+      expect(manifest.missing).toEqual([])
+      expect(manifest.contents).toContain('nikkisync/')
+
+      // system-info 携带取证根与候选来源（install/fallback 可判）
+      const infoWrite = writes.find((w) => path.basename(w.dst) === 'system-info.json')
+      const info = JSON.parse(infoWrite!.buf.toString('utf-8')) as {
+        forensics?: { root: string; source: string }
+      }
+      expect(info.forensics?.root).toBe(getForensicsRoot())
+      expect(info.forensics?.source).toBe('install')
+    } finally {
+      writeSpy.mockRestore()
+      copySpy.mockRestore()
+    }
+    // 导出结束后暂存目录必须清理，取证根不留 diagnostic-tmp-* 残留
+    expect(
+      fs.readdirSync(mockForensicsRoot).filter((n) => n.startsWith('diagnostic-tmp-'))
+    ).toEqual([])
+  })
+
+  it('边界：nikkisync 诊断缺席 ⇒ 导出仍成功，manifest.missing 如实登记', async () => {
+    const writes: Array<{ dst: string; buf: Buffer }> = []
+    const realWrite = fs.promises.writeFile.bind(fs.promises)
+    const writeSpy = vi
+      .spyOn(fs.promises, 'writeFile')
+      .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+        writes.push({
+          dst: String(file),
+          buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+        })
+        return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+      })
+    try {
+      const r = await exportLogsAsZip(path.join(tmpRoot, 'no-nikkisync.zip'))
+      expect(r.success).toBe(true)
+      const manifestWrite = writes.find((w) => path.basename(w.dst) === 'manifest.json')
+      const manifest = JSON.parse(manifestWrite!.buf.toString('utf-8')) as {
+        missing: string[]
+      }
+      expect(manifest.missing).toContain('nikkisync/')
+    } finally {
+      writeSpy.mockRestore()
+    }
+  })
+
+  it('R-a2：同毫秒两次导出的暂存目录必须不同（Date.now 固定复现碰撞）', async () => {
+    // 暂存目录名仅用 Date.now() 时，同毫秒并发导出共用同一目录：
+    // 先完成者的 cleanupTmpDir 会把后完成者正在打包的暂存整个删掉。
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000)
+    const realMkdir = fs.promises.mkdir.bind(fs.promises)
+    const tmpDirs: string[] = []
+    const mkdirSpy = vi
+      .spyOn(fs.promises, 'mkdir')
+      .mockImplementation(async (p: unknown, ...rest: unknown[]) => {
+        const s = String(p)
+        if (
+          path.dirname(s) === mockForensicsRoot &&
+          path.basename(s).startsWith('diagnostic-tmp-')
+        ) {
+          tmpDirs.push(s)
+        }
+        return (realMkdir as never)(p as never, ...(rest as never[]))
+      })
+    try {
+      const r1 = await exportLogsAsZip(path.join(tmpRoot, 'same-ms-1.zip'))
+      const r2 = await exportLogsAsZip(path.join(tmpRoot, 'same-ms-2.zip'))
+      expect(r1.success).toBe(true)
+      expect(r2.success).toBe(true)
+      expect(tmpDirs.length).toBe(2)
+      expect(tmpDirs[0]).not.toBe(tmpDirs[1])
+    } finally {
+      mkdirSpy.mockRestore()
+      nowSpy.mockRestore()
+    }
   })
 })
 

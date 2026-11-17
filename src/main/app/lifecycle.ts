@@ -1,6 +1,5 @@
 import { app, BrowserWindow, dialog, shell, crashReporter } from 'electron'
 import path from 'path'
-import { execFileSync, exec } from 'child_process'
 import type { AppContext } from './app-context'
 import { backupService } from '../services/backup-service'
 import { editorService } from '../services/editor-service'
@@ -13,7 +12,7 @@ import {
   getStartupLogPathValue,
   chromiumLogPresenceLine
 } from '../utils/startup-diagnostic'
-import { getUserFacingDiagDir } from '../utils/user-diag-path'
+import { getForensicsRoot } from '../utils/forensics-dir'
 import { getProcessRegistryStats } from '../utils/process-registry'
 import { pluginHost } from '../plugins/plugin-host'
 // 阶段 2.2：app 内部模块
@@ -53,10 +52,20 @@ import {
   runPostRestoreRepair
 } from './startup-tasks'
 import { t, initMainI18n } from '../i18n'
+// F2+F5（2026-11-15）：赢家专属启动打点——从 index.ts whenReady 内（锁检查之前）后移至此
+import { initExitForensics, markExitStage } from './exit-forensics'
+import { markBootAttempt, setupGpuProcessWatcher } from './gpu-fallback'
+import { verifyCriticalNativeModules, showStartupFailureWithFallback } from './native-load-guard'
+// 启动 settled 闸门：启动未完成时不重建窗口，避免与 8 阶段启动链重入
+import { isStartupSettled, markStartupSettled } from '../utils/early-crash-guard'
+import { clearSecondInstanceAck } from './single-instance'
 
 /**
- * 应用启动主流程：单实例锁 → whenReady → 阶段 1-8 → 生命周期事件注册。
+ * 应用启动主流程（赢家路径）：whenReady → 阶段 1-8 → 生命周期事件注册。
  * 启动失败兜底：任何阶段抛错都走 fatal catch，确保进程退出 + 释放单实例锁。
+ *
+ * R1（2026-11-15）：单实例锁获取已前移到 index.ts whenReady 首行（single-instance.ts），
+ * bootstrapApplication 仅由拿到锁的赢家执行；此处原先内联的重复锁逻辑是死代码，已删除。
  *
  * 阶段 2.5：从 Application.initialize() 迁移而来，零逻辑改动，
  * 所有原 this.xxx 字段通过 ctx 访问。
@@ -65,171 +74,172 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
   // 启动失败兜底：任何阶段抛错都走 failStartup，确保进程退出 + 释放单实例锁
   // 修复"前几次正常，后续无法启动"的核心问题：原实现 initialize 失败后只 .catch(console.error)，
   // 进程不退出、持单实例锁、无窗口、无日志，变僵尸；后续启动全部 gotLock=false 静默退出
-  let lockAcquired = false
   try {
     diagLog('BOOT', 'bootstrapApplication start')
-    // 单实例锁：防止多实例并发操作同一 SQLite 数据库导致竞争
-    let gotLock = app.requestSingleInstanceLock()
-    diagLog('BOOT', 'requestSingleInstanceLock returned: ' + gotLock)
-    if (!gotLock) {
-      // P0 修复：旧实例可能正在 before-quit 清理流程中（DB WAL checkpoint 耗时 2-5s），
-      // 锁尚未释放。等待 1s 后重试，最多 3 次，避免频繁弹出"已有实例运行"对话框。
-      // 场景：用户关闭应用后立即重新打开，旧进程仍在 cleanup 中持锁。
-      for (let retry = 0; retry < 3 && !gotLock; retry++) {
-        diagLog('BOOT', `retry ${retry + 1}/3 waiting 1s for lock...`)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-        gotLock = app.requestSingleInstanceLock()
-        diagLog('BOOT', `retry ${retry + 1} gotLock=` + gotLock)
-      }
-    }
-    if (!gotLock) {
-      // P0-5：已有实例运行（可能是僵尸进程持锁），提供三选项对话框
-      // 修复：原实现静默退出，用户完全不知道为何软件没启动
-      // 改用 showMessageBox 提供"清理并重启 / 手动处理 / 退出"三个选项
-      diagLog('BOOT', '!gotLock branch: awaiting app.whenReady() before dialog')
-      await app.whenReady()
-      diagLog('BOOT', '!gotLock branch: app.whenReady() ok, showing dialog')
+    // R1（2026-11-15）：单实例锁获取已前移到 index.ts whenReady 首行（single-instance.ts），
+    // 本函数仅由拿到锁的赢家执行。此处原先内联的重复锁逻辑是死代码（同进程二次调用
+    // 恒 true，!gotLock 分支生产不可达），已删除——由 lifecycle.test.ts 守护用例防回退。
+
+    // 第二实例尝试启动时，让已有窗口真正可见（补 show()），并按启动状态兜底 0 窗口。
+    // 注册前移到赢家打点之前：主实例还在 8 阶段初始化时二次双击也应能亮窗/留痕，
+    // 而不是等下一个实例走完 6s 重试才弹「已有实例运行」。
+    app.on('second-instance', () => {
       try {
-        // 诊断：记录 i18n 文本是否成功获取（i18n 在此阶段可能未初始化）
-        const titleText = t('main.dialog.instanceRunning.title')
-        const msgText = t('main.dialog.instanceRunning.message')
-        diagLog('BOOT', `!gotLock dialog i18n: title="${titleText}" msg="${msgText}"`)
-        const result = await dialog.showMessageBox({
-          type: 'warning',
-          title: titleText,
-          message: msgText,
-          detail: t('main.dialog.instanceRunning.detail'),
-          buttons: [
-            t('main.dialog.instanceRunning.cleanupButton'),
-            t('main.dialog.instanceRunning.manualButton'),
-            t('main.dialog.instanceRunning.exitButton')
-          ],
-          defaultId: 0,
-          cancelId: 2,
-          noLink: true
-        })
-        diagLog('BOOT', `!gotLock dialog response: ${result.response}`)
-
-        if (result.response === 0) {
-          // 清理并重启：结束除当前进程外的所有同名进程，然后重启
-          // 修复1：原 wmic 在 Win11 24H2+ 已移除，回退分支 taskkill /F /IM 会杀死自己
-          // 修复2：中文进程名在 PowerShell 5.1 -Command 模式下编码错误，改用 -EncodedCommand
-          // 修复3：taskkill 不带 /T 无法杀死 crashpad_handler 子进程，子进程可能持锁
-          //        改用 taskkill /F /T /PID 递归杀整个进程树
-          // 修复4：延长等待到 2000ms，给 OS 更多时间释放 named mutex
-          const appName = path.basename(app.getPath('exe'))
-          const currentPid = process.pid
-          let killedAny = false
-          try {
-            // 用 -EncodedCommand 避免 PowerShell 5.1 的中文编码问题
-            const psCommand = `Get-CimInstance Win32_Process -Filter "Name='${appName}'" | Where-Object { $_.ProcessId -ne ${currentPid} } | Select-Object -ExpandProperty ProcessId`
-            const encoded = Buffer.from(psCommand, 'utf16le').toString('base64')
-            const output = execFileSync('powershell', ['-NoProfile', '-EncodedCommand', encoded], {
-              windowsHide: true,
-              encoding: 'utf8',
-              timeout: 10000
-            })
-            const pids = output
-              .split('\n')
-              .map((line: string) => line.trim())
-              .filter((p: string) => /^\d+$/.test(p))
-              .map((p: string) => parseInt(p, 10))
-
-            for (const pid of pids) {
-              try {
-                // /T 递归杀整个进程树（含 crashpad_handler 等子进程）
-                execFileSync('taskkill', ['/F', '/T', '/PID', String(pid)], { windowsHide: true })
-                killedAny = true
-              } catch {
-                // 单个进程杀失败忽略（可能已自行退出）
-              }
-            }
-          } catch {
-            // 回退：用 -EncodedCommand 调用 Stop-Process，排除当前 PID
-            try {
-              const psCommand2 = `Get-Process -Name '${appName.replace('.exe', '')}' -ErrorAction SilentlyContinue | Where-Object { $_.Id -ne ${currentPid} } | Stop-Process -Force`
-              const encoded2 = Buffer.from(psCommand2, 'utf16le').toString('base64')
-              execFileSync('powershell', ['-NoProfile', '-EncodedCommand', encoded2], {
-                windowsHide: true,
-                timeout: 10000
-              })
-              killedAny = true
-            } catch {
-              // 两种方案都失败，跳过杀进程，直接重启（新实例会再次尝试获取锁）
-            }
-          }
-          // 等待旧进程完全退出后重启
-          // 修复：延长到 2000ms，给 OS 足够时间释放 named mutex 和清理子进程
-          // P1 修复：若 taskkill 未杀死任何进程（killedAny=false），不重启
-          // 避免新实例再次拿不到锁 → 再次弹窗 → 用户再点"清理并重启" → 无限循环
-          if (!killedAny) {
-            try {
-              await dialog
-                .showMessageBox({
-                  type: 'warning',
-                  title: t('main.dialog.cleanupFailed.title'),
-                  message: t('main.dialog.cleanupFailed.message'),
-                  detail: t('main.dialog.cleanupFailed.detail'),
-                  buttons: [
-                    t('main.dialog.cleanupFailed.openTaskManager'),
-                    t('main.dialog.instanceRunning.exitButton')
-                  ],
-                  defaultId: 0,
-                  cancelId: 1,
-                  noLink: true
-                })
-                .then((r) => {
-                  if (r.response === 0) {
-                    // 必须显式挂 error 监听：exec 返回的子进程无 error 监听时，
-                    // spawn 失败（如 taskmgr 被组策略禁用）会冒泡成 uncaughtException
-                    // → 假「启动失败 / 程序已退出」弹窗
-                    try {
-                      exec('taskmgr', { windowsHide: false }).on('error', (e) => {
-                        logStartupError('exec-taskmgr', e)
-                      })
-                    } catch {}
-                  }
-                })
-            } catch {}
-            app.quit()
-            return
-          }
-          setTimeout(() => {
-            // 当前进程没有锁（gotLock=false），但安全起见仍尝试释放
-            try {
-              app.releaseSingleInstanceLock?.()
-            } catch {}
-            app.relaunch()
-            app.exit(0)
-          }, 2000)
+        const windows = BrowserWindow.getAllWindows()
+        const win = Array.isArray(windows)
+          ? windows.find((w) => w && typeof w.isDestroyed === 'function' && !w.isDestroyed())
+          : undefined
+        if (win) {
+          if (typeof win.isMinimized === 'function' && win.isMinimized()) win.restore()
+          // 隐藏（非最小化）窗口也必须显示，否则用户感知为「双击没反应」
+          win.show()
+          win.focus()
           return
-        } else if (result.response === 1) {
-          // 手动处理：打开任务管理器
-          // 同上：必须挂 error 监听，避免 spawn 失败冒泡为 uncaughtException
-          try {
-            exec('taskmgr', { windowsHide: false }).on('error', (e) => {
-              logStartupError('exec-taskmgr', e)
-            })
-          } catch {}
+        }
+        if (isStartupSettled() && !ctx.isCleaningUp) {
+          // 启动已完成但无窗口（托盘/隐藏）：复用 activate 的既有重建语义
+          void Promise.resolve(createMainWindow(ctx)).catch((err) =>
+            logStartupError('second-instance-recreate', err)
+          )
+        } else {
+          // 启动链仍在创建首窗，重建会重入；只留痕，由启动链自己完成
+          diagLog('BOOT', 'second-instance during startup: deferred to bootstrap')
         }
       } catch (err) {
-        // 对话框显示失败时记录到诊断日志
-        logStartupError('gotLock-false-dialog', err)
-      }
-      app.quit()
-      return
-    }
-    lockAcquired = true
-    diagLog('BOOT', 'lockAcquired = true')
-    // 第二实例尝试启动时，聚焦到已有窗口
-    app.on('second-instance', () => {
-      const windows = BrowserWindow.getAllWindows()
-      if (windows.length > 0) {
-        const win = windows[0]
-        if (win.isMinimized()) win.restore()
-        win.focus()
+        logStartupError('second-instance-handler', err)
       }
     })
+
+    // G1-F3（审查修复轮）：退出链注册必须先于 initNikkiSyncRuntime 的长 await（~14s）——
+    // 否则首窗刚现即关窗走 Electron 默认 quit，跳过 performCleanup（worker 不 dispose、WAL 不 checkpoint）。
+    // 退出清理：确保数据库正确关闭并执行 WAL checkpoint
+    // 修复：原实现同步 before-quit 中调用异步清理且未 await，异步清理来不及完成；
+    // 且未 kill ffmpeg/ffprobe 子进程，这些子进程保持事件循环活跃 → 进程不退出 → 持有单实例锁 → 下次启动失败
+    // 改为 event.preventDefault + 异步清理 + app.exit(0) 强制退出兜底
+    // P1-8：增加超时强制退出兜底，防止 performCleanup 卡住（如 db.close 阻塞）
+    // P1-A8：根据 WAL 文件大小动态调整超时——WAL 较大时延长到 5s，避免强制退出时 WAL 未合并
+    //        （配合 dbManager.close() 改用 PASSIVE 非阻塞 checkpoint，正常情况下 2s 足够）
+    app.on('before-quit', (event) => {
+      // G1-F5（审查修复轮）：赢家开始退出即删除 ack——慢退（清理 >6s）时输家不得
+      // 再按陈旧新鲜 ack 静默让位，否则双双消失无提示；删后输家回退三选项框。
+      clearSecondInstanceAck()
+      if (ctx.isCleaningUp) return
+      ctx.setCleaningUp(true)
+      event.preventDefault()
+
+      // P1-A8：根据 WAL 文件大小动态计算超时
+      // 默认 2s；WAL > 10MB 时延长到 5s（万级日志场景兜底）
+      let forceExitTimeoutMs = 2000
+      try {
+        const walSize = ctx.dbManager.getWalFileSize()
+        if (walSize > 10 * 1024 * 1024) {
+          forceExitTimeoutMs = 5000
+        }
+      } catch {}
+      const forceExitReason =
+        forceExitTimeoutMs > 2000
+          ? t('main.lifecycle.log.forceExitReasonWal')
+          : t('main.lifecycle.log.forceExitReasonDefault')
+
+      // P1-8：超时强制退出定时器——清理逻辑超时则 app.exit(1)
+      // 用 logStartupError 记录超时诊断信息，便于排查卡死原因
+      const forceExitTimer = setTimeout(() => {
+        try {
+          logStartupError(
+            'force-exit-timeout',
+            new Error(
+              `performCleanup 超过 ${forceExitTimeoutMs}ms 未完成，强制退出（${forceExitReason}）`
+            )
+          )
+          const stats = getProcessRegistryStats()
+          logStartupError(
+            'force-exit-stats',
+            new Error(
+              JSON.stringify({
+                childProcessCount: stats.childProcessCount,
+                ffmpegCommandCount: stats.ffmpegCommandCount,
+                startupTimers: ctx.startupTimers.length,
+                hasMediaUpdateTimer: !!ctx.getMediaUpdateTimer(),
+                forceExitTimeoutMs
+              })
+            )
+          )
+        } catch {}
+        // P0 修复：强制退出前显式释放单实例锁
+        // 原用 setTimeout(100ms) 延迟 app.exit(1)，但 I/O 活跃时 setTimeout 会被延迟
+        // 改为直接 app.exit(1)，确保进程立即终止
+        try {
+          app.releaseSingleInstanceLock?.()
+        } catch {}
+        try {
+          app.exit(1)
+        } catch {}
+      }, forceExitTimeoutMs)
+
+      // 异步清理后清除超时定时器并正常退出
+      // 阶段 2.2：实现迁移到 app/cleanup.ts
+      performCleanup(ctx).finally(() => {
+        try {
+          clearTimeout(forceExitTimer)
+        } catch {}
+        // P0 修复：锁已在 performCleanup 中 DB 关闭后释放
+        // 此处仅兜底：若 performCleanup 在 DB 关闭前异常退出，确保锁被释放
+        try {
+          app.releaseSingleInstanceLock?.()
+        } catch {}
+        // P0 根因修复：原用 setTimeout(100ms) 延迟 app.exit(0)，但 performCleanup 末尾的
+        // logFault 产生 FileHandleCloseReq 活跃请求，保持事件循环活跃，setTimeout 回调
+        // 被 I/O 操作延迟，进程挂着不退出。现在 logFault 已改为同步写入，直接 app.exit(0)
+        // app.exit 立即终止进程，不触发 before-quit/will-quit，不等事件循环清空
+        try {
+          app.exit(0)
+        } catch {}
+      })
+    })
+
+    app.on('window-all-closed', () => {
+      if (process.platform !== 'darwin') {
+        app.quit()
+      }
+    })
+
+    app.on('activate', async () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        // 阶段 2.4：createMainWindow 迁移到 app/window-manager.ts
+        await createMainWindow(ctx)
+      }
+    })
+
+    // F2+F5（2026-11-15）：赢家专属启动打点，从 index.ts whenReady 内后移至此。
+    // 此前这些步骤在单实例锁检查之前执行，锁失败实例（第二双击）也会：
+    // ① markBootAttempt 给共享 gpu-fallback.json 的 consecutiveFailures +1
+    //   （FAILURE_THRESHOLD=2：对运行中实例双击两次，下次真实启动即被静默打进
+    //   软件渲染兼容模式，且锁失败实例永远走不到 markBootSuccess 清零）；
+    // ② initExitForensics 覆写/删除运行实例的 heartbeat.json，污染 GPU 自愈证据链；
+    // ③ verifyCriticalNativeModules 白白加载 better-sqlite3/koffi/sharp（数百 ms），
+    //   拖慢"已有实例运行"弹窗，坏环境下还可能以"启动失败"误导用户。
+    // 现在只有真正拿到锁的赢家才做预检与打点；顺序沿用原 index.ts（取证 → 预检 → 打点）。
+    try {
+      initExitForensics()
+      markExitStage('when-ready')
+    } catch {
+      // 取证初始化失败绝不阻塞启动
+    }
+    // 原生模块加载预检：在加载 Application 之前确保 better-sqlite3 / koffi / sharp 可在本环境加载。
+    // 缺失 VC++ 运行库 / ABI 不匹配 / 解包缺失都会在此被捕获并弹出可操作提示，避免静默崩溃。
+    // （失败时已持锁，显式释放后再退出。）
+    if (!verifyCriticalNativeModules()) {
+      try {
+        app.releaseSingleInstanceLock?.()
+      } catch {}
+      app.exit(1)
+      return
+    }
+    // GPU 回退：登记本次启动尝试（失败计数+1，did-finish-load 时清零），
+    // 并注册 GPU 子进程崩溃观测（须在窗口创建前，抢在 Chromium FATAL 前落盘回退标记）
+    markBootAttempt()
+    setupGpuProcessWatcher()
+    diagLog('BOOT', 'winner-only startup marks done (forensics / native check / gpu watcher)')
 
     diagLog('BOOT', 'before app.whenReady()')
     await app.whenReady()
@@ -354,13 +364,6 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     } catch (err) {
       logStartupError('initSyncServer', err)
     }
-    // sync-integration 阶段 2：内嵌 NikkiSync PcCompanion Runtime（库+发现+扫描，不起 LAN 服务）
-    // 独立 try/catch：未建链 / 无游戏目录 / 装载失败都只能降级，绝不阻塞启动
-    try {
-      await initNikkiSyncRuntime(ctx)
-    } catch (err) {
-      logStartupError('initNikkiSyncRuntime', err)
-    }
     // 插件系统初始化：在 createMainWindow 之前完成，确保窗口加载时 facade 可用
     // 失败不阻塞应用启动（init 内部已捕获异常并记录日志）
     await pluginHost.init()
@@ -368,9 +371,12 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     diagLog('BOOT', 'before createMainWindow()')
     await createMainWindow(ctx)
     diagLog('BOOT', 'after createMainWindow()')
+    // G1-F3（审查修复轮）：首窗可用即退出启动期——NikkiSync 长初始化（~14s）期间的
+    // 游离 rejection 不得再被致命化弹框退出（窗口已可用，应用事实上已就绪）。
+    markStartupSettled()
     // chromium-debug.log 在位探测：原生 FATAL 取证载体缺席与否在此可判定（T11）
     try {
-      diagLog('BOOT', chromiumLogPresenceLine(getUserFacingDiagDir()))
+      diagLog('BOOT', chromiumLogPresenceLine(getForensicsRoot()))
     } catch {
       // 探测失败不阻塞启动
     }
@@ -380,6 +386,18 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 主窗口创建后，弹出暂存的数据库恢复 / worker 崩溃事件提示
     // 放在 pluginHost.setMainWindow 之后，确保 dialog 有正确的父级
     flushPendingRecoveryEvents(ctx)
+
+    // sync-integration 阶段 2：内嵌 NikkiSync PcCompanion Runtime（库+发现+扫描，不起 LAN 服务）
+    // 独立 try/catch：未建链 / 无游戏目录 / 装载失败都只能降级，绝不阻塞启动。
+    // F6（2026-11-15）：从 createMainWindow 之前移到之后——运行时启动含游戏目录全盘
+    // 发现（未装游戏的机器实测 ~14s，慢盘/多盘更久），原在位会把首窗出现时间整个
+    // 拖住，是"双击后软件无响应"的直接机制之一。窗口先行，运行时后台就位，
+    // 状态经 IPC sync:getStatus 对渲染层可见。
+    try {
+      await initNikkiSyncRuntime(ctx)
+    } catch (err) {
+      logStartupError('initNikkiSyncRuntime', err)
+    }
 
     // 阶段 6.5：初始化自动更新（生产环境；dev 下仅 MEOW_DEV_UPDATE_FEED=1 时按 dev-app-update.yml
     // 的假更新源初始化，其余 dev 场景由 initAutoUpdater 内部直接跳过 ⇒ app:update:check 抛错）
@@ -562,102 +580,10 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
         }, REFERENCE_DATA_CHECK_DELAY_MS)
       )
     }
-
-    // 退出清理：确保数据库正确关闭并执行 WAL checkpoint
-    // 修复：原实现同步 before-quit 中调用异步清理且未 await，异步清理来不及完成；
-    // 且未 kill ffmpeg/ffprobe 子进程，这些子进程保持事件循环活跃 → 进程不退出 → 持有单实例锁 → 下次启动失败
-    // 改为 event.preventDefault + 异步清理 + app.exit(0) 强制退出兜底
-    // P1-8：增加超时强制退出兜底，防止 performCleanup 卡住（如 db.close 阻塞）
-    // P1-A8：根据 WAL 文件大小动态调整超时——WAL 较大时延长到 5s，避免强制退出时 WAL 未合并
-    //        （配合 dbManager.close() 改用 PASSIVE 非阻塞 checkpoint，正常情况下 2s 足够）
-    app.on('before-quit', (event) => {
-      if (ctx.isCleaningUp) return
-      ctx.setCleaningUp(true)
-      event.preventDefault()
-
-      // P1-A8：根据 WAL 文件大小动态计算超时
-      // 默认 2s；WAL > 10MB 时延长到 5s（万级日志场景兜底）
-      let forceExitTimeoutMs = 2000
-      try {
-        const walSize = ctx.dbManager.getWalFileSize()
-        if (walSize > 10 * 1024 * 1024) {
-          forceExitTimeoutMs = 5000
-        }
-      } catch {}
-      const forceExitReason =
-        forceExitTimeoutMs > 2000
-          ? t('main.lifecycle.log.forceExitReasonWal')
-          : t('main.lifecycle.log.forceExitReasonDefault')
-
-      // P1-8：超时强制退出定时器——清理逻辑超时则 app.exit(1)
-      // 用 logStartupError 记录超时诊断信息，便于排查卡死原因
-      const forceExitTimer = setTimeout(() => {
-        try {
-          logStartupError(
-            'force-exit-timeout',
-            new Error(
-              `performCleanup 超过 ${forceExitTimeoutMs}ms 未完成，强制退出（${forceExitReason}）`
-            )
-          )
-          const stats = getProcessRegistryStats()
-          logStartupError(
-            'force-exit-stats',
-            new Error(
-              JSON.stringify({
-                childProcessCount: stats.childProcessCount,
-                ffmpegCommandCount: stats.ffmpegCommandCount,
-                startupTimers: ctx.startupTimers.length,
-                hasMediaUpdateTimer: !!ctx.getMediaUpdateTimer(),
-                forceExitTimeoutMs
-              })
-            )
-          )
-        } catch {}
-        // P0 修复：强制退出前显式释放单实例锁
-        // 原用 setTimeout(100ms) 延迟 app.exit(1)，但 I/O 活跃时 setTimeout 会被延迟
-        // 改为直接 app.exit(1)，确保进程立即终止
-        try {
-          app.releaseSingleInstanceLock?.()
-        } catch {}
-        try {
-          app.exit(1)
-        } catch {}
-      }, forceExitTimeoutMs)
-
-      // 异步清理后清除超时定时器并正常退出
-      // 阶段 2.2：实现迁移到 app/cleanup.ts
-      performCleanup(ctx).finally(() => {
-        try {
-          clearTimeout(forceExitTimer)
-        } catch {}
-        // P0 修复：锁已在 performCleanup 中 DB 关闭后释放
-        // 此处仅兜底：若 performCleanup 在 DB 关闭前异常退出，确保锁被释放
-        try {
-          app.releaseSingleInstanceLock?.()
-        } catch {}
-        // P0 根因修复：原用 setTimeout(100ms) 延迟 app.exit(0)，但 performCleanup 末尾的
-        // logFault 产生 FileHandleCloseReq 活跃请求，保持事件循环活跃，setTimeout 回调
-        // 被 I/O 操作延迟，进程挂着不退出。现在 logFault 已改为同步写入，直接 app.exit(0)
-        // app.exit 立即终止进程，不触发 before-quit/will-quit，不等事件循环清空
-        try {
-          app.exit(0)
-        } catch {}
-      })
-    })
-
-    app.on('window-all-closed', () => {
-      if (process.platform !== 'darwin') {
-        app.quit()
-      }
-    })
-
-    app.on('activate', async () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
-        // 阶段 2.4：createMainWindow 迁移到 app/window-manager.ts
-        await createMainWindow(ctx)
-      }
-    })
   } catch (fatalErr) {
+    // G1-F8（审查修复轮）：fatal 对话框 await 期间游离 rejection 不得再触发第二张致命框
+    // 抢先 exit 截断用户交互——进入 fatal 即视为启动已终结。
+    markStartupSettled()
     // 启动失败兜底：记录错误 + 显示用户可见错误对话框 + 释放锁 + 退出
     logStartupError('initialize-fatal', fatalErr)
     try {
@@ -692,24 +618,23 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
           await shell.openPath(path.dirname(startupLogPath))
         } catch {}
       }
-    } catch {}
+    } catch (err) {
+      // 启动失败对话框自身抛错时仍要有一次可见提示，绝不静默退出
+      showStartupFailureWithFallback(err, { stage: 'initialize-fatal-dialog-fallback' })
+    }
 
-    // 释放资源并退出
+    // 释放资源并退出（bootstrap 仅由锁赢家执行——index.ts 已保证，锁必持）
     try {
       ctx.dbManager?.close?.()
     } catch {}
-    if (lockAcquired) {
-      try {
-        app.releaseSingleInstanceLock?.()
-      } catch {}
-      // 修复：直接 app.exit 而非 app.quit，避免触发 before-quit 异步清理流程
-      // 启动失败时 performCleanup 中的 dbManager.close 可能再次抛错（已关闭）
-      // P0 根因修复：原用 setTimeout(100ms)，改为直接 app.exit(1) 立即终止
-      try {
-        app.exit(1)
-      } catch {}
-    } else {
-      app.quit()
-    }
+    try {
+      app.releaseSingleInstanceLock?.()
+    } catch {}
+    // 修复：直接 app.exit 而非 app.quit，避免触发 before-quit 异步清理流程
+    // 启动失败时 performCleanup 中的 dbManager.close 可能再次抛错（已关闭）
+    // P0 根因修复：原用 setTimeout(100ms)，改为直接 app.exit(1) 立即终止
+    try {
+      app.exit(1)
+    } catch {}
   }
 }

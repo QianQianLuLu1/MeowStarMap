@@ -9,8 +9,14 @@
  * 2. bindScanProgressListener 用 WeakMap 缓存监听器引用，第二次调用应 removeListener 旧的再 on
  * 3. injectCorruptedMarkers 内部 new MediaRepository(db, workerBridge, dbPath) 后调用 getMediaIdByPath / markCorrupted / clearCorrupted
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import path from 'path'
+import os from 'os'
+import fs from 'fs'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
+import { scanLogStore } from '../../scanner/scan-log-store'
+import { getForensicsLogsDir, setForensicsEnvProvider } from '../../utils/forensics-dir'
+import { setDocumentsPathProvider } from '../../utils/user-diag-path'
 
 // 共享 mock：42 个 registerXxxHandlers
 const handlerMocks = vi.hoisted(() => ({
@@ -401,6 +407,28 @@ describe('setupIPC', () => {
 
     expect(handlerMocks.refreshPathGuardRoots).toHaveBeenCalledWith(ctx)
   })
+
+  it('9. scan-log 落盘路径统一到取证 logs 目录（不再游离于 userData 根）', () => {
+    const ctx = makeAppCtx({ scannerManager: makeScannerManagerWithProgress() })
+    const spy = vi.spyOn(scanLogStore, 'setLogFilePath')
+
+    setupIPC(ctx)
+
+    expect(spy).toHaveBeenCalledWith(path.join(getForensicsLogsDir(), 'scan-log.jsonl'))
+    spy.mockRestore()
+  })
+})
+
+// 取证 provider 注入：setupIPC 的 scan-log 接线会解析取证根，回退态不得真实创建
+// 用户 Documents 目录——documents provider 指向 tmp，用例结束后清理
+beforeEach(() => {
+  setDocumentsPathProvider(() => path.join(os.tmpdir(), 'wxnn-ipc-setup-test-diag'))
+})
+
+afterEach(() => {
+  setDocumentsPathProvider(null)
+  setForensicsEnvProvider(null)
+  fs.rmSync(path.join(os.tmpdir(), 'wxnn-ipc-setup-test-diag'), { recursive: true, force: true })
 })
 
 // ============================================================================

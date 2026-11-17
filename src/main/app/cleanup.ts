@@ -1,5 +1,4 @@
 import { app } from 'electron'
-import path from 'path'
 import fs from 'fs'
 import type { AppContext } from './app-context'
 import { logStartupError } from '../utils/startup-diagnostic'
@@ -8,6 +7,7 @@ import { wifiShareService } from '../services/share-wifi-service'
 import { backupService } from '../services/backup-service'
 import { markCleanShutdown, markExitStage } from './exit-forensics'
 import { stopNikkiSyncRuntime } from './nikkisync-runtime-setup'
+import { getFaultLogPath } from '../utils/logger'
 import { t } from '../i18n'
 
 /**
@@ -204,11 +204,9 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
       pid: process.pid,
       uptime: process.uptime()
     }
-    const faultPath = path.join(
-      app.getPath('userData'),
-      'logs',
-      `faults-${new Date().toISOString().slice(0, 10)}.jsonl`
-    )
+    // 落点走 logger 的故障日志路径（随 logDir=取证 logs）——不得硬编码 userData\logs，
+    // 否则退出诊断记录与 log:listFaults / 诊断包读取侧分裂
+    const faultPath = getFaultLogPath()
     fs.appendFileSync(faultPath, JSON.stringify(faultRecord) + '\n', 'utf-8')
   } catch {}
 }

@@ -168,4 +168,45 @@ describe('createZipFromDirectory', () => {
     expect(r.success).toBe(false)
     expect(r.message).toContain('archive boom')
   })
+
+  it('异常：archive error 分支必须 abort archive 并收尾输出流（与 output-error/timeout 对称）', async () => {
+    const src = makeSource({ 'a.log': 'x' })
+    const target = path.join(tmpRoot, 'err-abort.zip')
+    const abortSpy = vi.fn()
+    const errArchive = {
+      pipe: (out: NodeJS.WritableStream) => out,
+      directory: () => errArchive,
+      on: (event: string, cb: (err: Error) => void) => {
+        if (event === 'error') {
+          setTimeout(() => cb(new Error('archive boom')), 0)
+        }
+        return errArchive
+      },
+      abort: abortSpy,
+      finalize: () => Promise.resolve()
+    } as unknown as Archiver
+    // 透传式 spy：捕获真实输出流以断言其被 destroy 收尾
+    const realCreateWriteStream = fs.createWriteStream.bind(fs)
+    const streams: fs.WriteStream[] = []
+    const streamSpy = vi
+      .spyOn(fs, 'createWriteStream')
+      .mockImplementation((...args: Parameters<typeof fs.createWriteStream>) => {
+        const s = realCreateWriteStream(...args)
+        streams.push(s)
+        return s
+      })
+
+    try {
+      const r = await createZipFromDirectory(src, target, { createArchive: () => errArchive })
+
+      expect(r.success).toBe(false)
+      expect(r.message).toContain('archive boom')
+      // 只 destroy output 不 abort archive 会让 archiver 内部队列/句柄继续存活
+      expect(abortSpy).toHaveBeenCalledTimes(1)
+      expect(streams.length).toBe(1)
+      expect(streams[0].destroyed).toBe(true)
+    } finally {
+      streamSpy.mockRestore()
+    }
+  })
 })

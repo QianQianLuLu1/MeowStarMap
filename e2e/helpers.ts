@@ -4,6 +4,8 @@ import { glob } from 'tinyglobby'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs/promises'
+import os from 'node:os'
+import { execFileSync } from 'node:child_process'
 import type { Dirent } from 'node:fs'
 import path from 'node:path'
 import { detectTscOverwrittenDist } from './dist-guard'
@@ -54,6 +56,10 @@ export interface LaunchedApp {
   app: ElectronApplication
   /** 本次冒烟独占的临时 userData 目录（全新用户 → 覆盖首启建库/迁移路径） */
   userDataDir: string
+  /** 启动用可执行文件绝对路径（打包态取证根 = exe 同目录 Diagnostics，e2e 断言用） */
+  exePath: string
+  /** true=打包产物（取证根=exe 同目录）；false=launchBuiltApp dev 态（取证根=用户面候选链） */
+  packaged: boolean
 }
 
 export interface LaunchOptions {
@@ -86,7 +92,7 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
     env: launchEnv(),
     timeout: 30_000
   })
-  return { app, userDataDir }
+  return { app, userDataDir, exePath: exe, packaged: true }
 }
 
 /**
@@ -98,11 +104,49 @@ export async function launchApp(options: LaunchOptions = {}): Promise<LaunchedAp
  * 3. %APPDATA%/meow-star-map/diag.log（whenReady 前 diagLog 的 APPDATA fallback，
  *    INDEX loaded 等早期行落在那里；仅保留最近 5 分钟行，避免混入历史运行）
  */
-export async function collectDiagLogs(userDataDir: string, destDir: string): Promise<void> {
+/** 打包态取证根日志目录（exe 同目录 Diagnostics/logs，forensics-dir install 分支）。
+ * 取证统一收口后主进程日志不再落 userData/logs；e2e 读日志必须走这里。 */
+export function forensicsLogsDirOf(exePath: string): string {
+  return path.join(path.dirname(exePath), 'Diagnostics', 'logs')
+}
+
+/** dev 态（launchBuiltApp）取证根日志目录：与 user-diag-path 候选链同序
+ * （Documents/喵星图/Diagnostics → homedir/喵星图/Diagnostics → tmpdir/喵星图-Diagnostics），
+ * 取首个存在者；均不存在时回落 Documents 候选（首启写盘前的读侧口径）。 */
+export function devForensicsLogsDir(): string {
+  // Documents 是 Windows 已知文件夹，可能被重定向（本机实测 D:Users...Documents）；
+  // os.homedir()/Documents 猜测会读错根。经 Shell API 取真实路径，失败回落 homedir 猜测。
+  let realDocs = path.join(os.homedir(), 'Documents')
+  try {
+    const out = execFileSync(
+      'powershell',
+      ['-NoProfile', '-Command', "[Environment]::GetFolderPath('MyDocuments')"],
+      { encoding: 'utf8', timeout: 10_000, windowsHide: true }
+    ).trim()
+    if (out) realDocs = out
+  } catch {
+    // 回落 homedir 猜测
+  }
+  const candidates = [
+    path.join(realDocs, '喵星图', 'Diagnostics'),
+    path.join(os.homedir(), '喵星图', 'Diagnostics'),
+    path.join(os.tmpdir(), '喵星图-Diagnostics')
+  ]
+  for (const c of candidates) {
+    if (fsSync.existsSync(c)) return path.join(c, 'logs')
+  }
+  return path.join(candidates[0], 'logs')
+}
+
+export async function collectDiagLogs(
+  userDataDir: string,
+  destDir: string,
+  exePath?: string
+): Promise<void> {
   await fs.mkdir(destDir, { recursive: true })
 
-  // 1) 主进程日志目录 logs/*.log|*.jsonl（正常路径）
-  const logDir = path.join(userDataDir, 'logs')
+  // 1) 主进程日志目录（取证统一后落取证根 logs；未提供 exePath 时回落旧 userData 口径）
+  const logDir = exePath ? forensicsLogsDirOf(exePath) : path.join(userDataDir, 'logs')
   let entries: Dirent[] = []
   try {
     entries = await fs.readdir(logDir, { withFileTypes: true })
@@ -198,7 +242,7 @@ export async function launchBuiltApp(
     env: launchEnv(extraEnv),
     timeout: 60_000
   })
-  return { app, userDataDir }
+  return { app, userDataDir, exePath: exe, packaged: false }
 }
 
 /**

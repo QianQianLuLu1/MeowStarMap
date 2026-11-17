@@ -4,7 +4,7 @@ import fsp from 'fs/promises'
 import { app } from 'electron'
 import type { DatabaseManager } from '../database/connection'
 import { logger } from './logger'
-import { getUserFacingDiagDir } from './user-diag-path'
+import { getForensicsRoot, getForensicsLogsDir } from './forensics-dir'
 
 // 自定义目录设置项 key（统一 camelCase 命名规范）
 export const SETTING_KEYS = {
@@ -25,19 +25,19 @@ const DEFAULT_SUBDIRS = {
 /**
  * 解析功能的实际目录：优先使用自定义路径，否则回退到 userData 子目录
  * 自定义路径无效（不存在 / 不是目录 / 不可写）时回退到默认值
+ *
+ * 例外：logDir / crashDir 属「问题取证清单」，强制统一到取证根（forensics-dir 单一真相源），
+ * 一律忽略历史自定义值——否则启动时序与导出读取侧会再次分裂（2026-11-17 收口补全）。
  */
 export function resolveCustomDir(
   dbManager: DatabaseManager,
   key: keyof typeof SETTING_KEYS
 ): string {
+  if (key === 'logDir') return getForensicsLogsDir()
+  if (key === 'crashDir') return getForensicsRoot()
   const custom = dbManager.getSetting<string>(SETTING_KEYS[key], '')
   if (custom && isValidDir(custom)) {
     return custom
-  }
-  // 崩溃转储默认输出到用户友好目录（文档/喵星图/Diagnostics），避免藏在 AppData；
-  // 与 index.ts 早期 app.setPath('crashDumps', ...) 及 crash-service.initCrashDir 对齐
-  if (key === 'crashDir') {
-    return getUserFacingDiagDir()
   }
   return path.join(app.getPath('userData'), DEFAULT_SUBDIRS[key])
 }
@@ -73,11 +73,14 @@ export function ensureDir(dir: string): void {
  *
  * P1-C6：全部改用 fs.promises 异步 API，避免 GB 级文件迁移阻塞主进程事件循环
  * P1-C7：copy 后校验 dst.size === src.size，一致才 unlink；不一致删除 dst 保留 src 供下次重试
+ * options.skipExisting：目标已有同名文件时跳过并保留源（取证迁移用——保护本次启动已写的
+ * 新鲜证据不被旧文件覆盖）；默认 false 保持既有 rename 覆盖语义
  */
 export async function migrateDirFiles(
   oldDir: string,
   newDir: string,
-  filePattern: RegExp
+  filePattern: RegExp,
+  options: { skipExisting?: boolean } = {}
 ): Promise<{ moved: number; failed: number }> {
   if (oldDir === newDir) return { moved: 0, failed: 0 }
   try {
@@ -103,6 +106,7 @@ export async function migrateDirFiles(
 
     const srcPath = path.join(oldDir, entry.name)
     const dstPath = path.join(newDir, entry.name)
+    if (options.skipExisting && fs.existsSync(dstPath)) continue
     try {
       await fsp.rename(srcPath, dstPath)
       moved++

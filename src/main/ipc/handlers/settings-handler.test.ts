@@ -65,6 +65,7 @@ vi.mock('../validator', async () => await import('../../../../tests/mocks/mock-v
 import { registerSettingsHandlers } from './settings-handler'
 import { assertFileReadPath, pathGuard } from '../validator'
 import { AppError } from '../../../shared/errors/app-error'
+import { setForensicsEnvProvider } from '../../utils/forensics-dir'
 
 const assertFileReadPathMock = vi.mocked(assertFileReadPath)
 
@@ -76,15 +77,23 @@ describe('registerSettingsHandlers', () => {
   beforeAll(() => {
     tmpUserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-pref-'))
     mockAppGetPath.mockImplementation((name: string) => (name === 'userData' ? tmpUserDir : ''))
+    // gpu-pref 镜像写入侧已统一走取证根（install 态 = tmpUserDir\Diagnostics），
+    // 注入 provider 使读写同源；不注入会回落真实 Documents 目录
+    setForensicsEnvProvider(() => ({
+      isPackaged: true,
+      defaultApp: false,
+      exePath: path.join(tmpUserDir, 'app.exe')
+    }))
   })
 
   afterAll(() => {
+    setForensicsEnvProvider(null)
     fs.rmSync(tmpUserDir, { recursive: true, force: true })
   })
 
   afterEach(() => {
     // 隔离：清理硬件加速偏好镜像，避免跨用例残留导致断言误判
-    const pref = path.join(tmpUserDir, 'gpu-pref.json')
+    const pref = path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json')
     if (fs.existsSync(pref)) fs.rmSync(pref, { force: true })
   })
 
@@ -197,7 +206,7 @@ describe('registerSettingsHandlers', () => {
     expect(result.error.message).toContain('过大')
   })
 
-  it('settings:set hardwareAcceleration=false 双写到 userData/gpu-pref.json', async () => {
+  it('settings:set hardwareAcceleration=false 双写到取证根/gpu-pref.json', async () => {
     const ctx = makeCtx({})
     registerSettingsHandlers(ctx)
     const result = (await getHandler(
@@ -209,7 +218,9 @@ describe('registerSettingsHandlers', () => {
     }
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith('hardwareAcceleration', false)
     expect(result.data.saved).toBe(true)
-    const pref = JSON.parse(fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')) as {
+    const pref = JSON.parse(
+      fs.readFileSync(path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json'), 'utf8')
+    ) as {
       hardwareAcceleration: boolean
     }
     expect(pref.hardwareAcceleration).toBe(false)
@@ -226,7 +237,7 @@ describe('registerSettingsHandlers', () => {
     }
     expect(result.success).toBe(false)
     expect(result.error.code).toBe('IPC_VALIDATION_ERROR')
-    expect(fs.existsSync(path.join(tmpUserDir, 'gpu-pref.json'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json'))).toBe(false)
   })
 })
 
@@ -473,21 +484,28 @@ describe('settings:set gpu.discretePreference — 值域校验与镜像双写', 
   beforeAll(() => {
     tmpUserDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-pref2-'))
     mockAppGetPath.mockImplementation((name: string) => (name === 'userData' ? tmpUserDir : ''))
+    setForensicsEnvProvider(() => ({
+      isPackaged: true,
+      defaultApp: false,
+      exePath: path.join(tmpUserDir, 'app.exe')
+    }))
   })
 
   afterAll(() => {
+    setForensicsEnvProvider(null)
     fs.rmSync(tmpUserDir, { recursive: true, force: true })
   })
 
   beforeEach(() => {
     handleMock.mockClear()
-    const pref = path.join(tmpUserDir, 'gpu-pref.json')
+    const pref = path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json')
     if (fs.existsSync(pref)) fs.rmSync(pref, { force: true })
   })
 
   it('d1: 合法值 high-performance 持久化并双写到 gpu-pref.json（保留 hardwareAcceleration）', async () => {
+    fs.mkdirSync(path.join(tmpUserDir, 'Diagnostics'), { recursive: true })
     fs.writeFileSync(
-      path.join(tmpUserDir, 'gpu-pref.json'),
+      path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json'),
       JSON.stringify({ hardwareAcceleration: true })
     )
     const ctx = makeCtx({})
@@ -504,7 +522,9 @@ describe('settings:set gpu.discretePreference — 值域校验与镜像双写', 
       'high-performance'
     )
     expect(result.data.saved).toBe(true)
-    const pref = JSON.parse(fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')) as {
+    const pref = JSON.parse(
+      fs.readFileSync(path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json'), 'utf8')
+    ) as {
       hardwareAcceleration: boolean
       discretePreference: string
     }
@@ -520,7 +540,9 @@ describe('settings:set gpu.discretePreference — 值域校验与镜像双写', 
       'settings:set'
     )(['gpu.discretePreference', 'auto'])) as { success: boolean }
     expect(result.success).toBe(true)
-    const pref = JSON.parse(fs.readFileSync(path.join(tmpUserDir, 'gpu-pref.json'), 'utf8')) as {
+    const pref = JSON.parse(
+      fs.readFileSync(path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json'), 'utf8')
+    ) as {
       discretePreference: string
     }
     expect(pref.discretePreference).toBe('auto')
@@ -536,7 +558,7 @@ describe('settings:set gpu.discretePreference — 值域校验与镜像双写', 
       expect(result.success).toBe(false)
       expect(result.error?.code).toBe('IPC_VALIDATION_ERROR')
     }
-    expect(fs.existsSync(path.join(tmpUserDir, 'gpu-pref.json'))).toBe(false)
+    expect(fs.existsSync(path.join(tmpUserDir, 'Diagnostics', 'gpu-pref.json'))).toBe(false)
   })
 })
 

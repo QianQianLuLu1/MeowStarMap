@@ -1441,7 +1441,6 @@
       "hint": "Los archivos de volcado de fallos son generados automáticamente por Electron crashpad, conserva los 10 más recientes, limpieza automática después de 30 días. Solo registra información de fallos de proceso, sin datos de privacidad del usuario.",
       "listCount": "{{count}} registros",
       "listTitle": "Registros de fallos (más recientes primero)",
-      "modifyDir": "Cambiar directorio",
       "oldest": "Registro más antiguo",
       "openDir": "Abrir directorio",
       "processMain": "Proceso principal",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "{{count}} entradas · {{groups}} grupos",
       "listTimeline": "Registros de fallos (más recientes primero)",
       "logFiles": "Archivos de registro",
-      "modifyDir": "Cambiar directorio",
       "notInit": "No inicializado",
       "occurrenceCount": "Ocurrencias: {{count}}",
       "openDir": "Abrir directorio",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

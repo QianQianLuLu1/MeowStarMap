@@ -12,29 +12,34 @@
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
-import { getUserFacingDiagDir, CHROMIUM_LOG_BASENAME } from './user-diag-path'
+import { CHROMIUM_LOG_BASENAME } from './user-diag-path'
+import { getForensicsRoot } from './forensics-dir'
 
 let startupLogPath: string | null = null
 
 /**
- * 诊断目录单一真相源：启动日志与 diag.log 一律走 getUserFacingDiagDir()。
+ * 诊断目录单一真相源：启动日志与 diag.log 一律走 getForensicsRoot()。
  *
- * documents 候选由主进程入口通过 setDocumentsPathProvider(() => app.getPath('documents'))
- * 注册，使「写盘路径」与「弹窗展示路径」严格同源。
+ * 取证根候选链：打包态 <安装目录>\Diagnostics（可写性探测通过后采用），
+ * dev/不可写回落 getUserFacingDiagDir()（Documents/喵星图/Diagnostics → homedir → tmpdir）。
+ * 运行环境由主进程入口通过 setForensicsEnvProvider(...) 注册，使「写盘路径」与
+ * 「弹窗展示路径」严格同源。
  * 修复前本模块未注入 documents，真实落盘回落到 <homedir>/NikkiGallery/Diagnostics（当时常量值），
  * 而弹窗仍展示 文档/NikkiGallery/Diagnostics → 用户在弹窗路径下找不到日志。
  */
 function resolveDiagDir(): string {
-  return getUserFacingDiagDir()
+  // 2026-11-17 统一收口：诊断日志随全部取证文件归集到取证根目录单一真相源
+  // （打包态 <安装目录>\Diagnostics，不可写回落 Documents 候选链）
+  return getForensicsRoot()
 }
 
 function getStartupLogPath(): string {
   if (startupLogPath) return startupLogPath
   try {
-    // 用户友好目录：文档/喵星图/Diagnostics（非隐藏，普通用户易查找）
+    // 用户友好目录：文档/喵星图/Diagnostics（非隐藏，普通用户易查找；取证统一后为 fallback 候选首位）
     startupLogPath = path.join(resolveDiagDir(), 'startup-errors.log')
   } catch {
-    // 极端情况：getUserFacingDiagDir 失败，回退到 os.tmpdir
+    // 极端情况：getForensicsRoot 失败，回退到 os.tmpdir
     startupLogPath = path.join(os.tmpdir(), 'MeowStarMap-startup-errors.log')
   }
   return startupLogPath
@@ -45,8 +50,8 @@ let diagLogPath: string | null = null
 /**
  * 获取诊断日志路径。
  *
- * 统一输出到用户友好目录（getUserFacingDiagDir）：
- *   文档/喵星图/Diagnostics/diag.log
+ * 统一输出到取证根（getForensicsRoot）下的 diag.log：
+ *   打包态 <安装目录>\Diagnostics\diag.log，回落 Documents/喵星图/Diagnostics/diag.log
  * 而非隐藏的 AppData，确保普通用户在启动失败时也能轻松找到日志。
  */
 function getDiagLogPath(): string {

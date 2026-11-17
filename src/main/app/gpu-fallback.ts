@@ -1,9 +1,10 @@
 import { app } from 'electron'
 import fs from 'node:fs'
-import path from 'node:path'
 import { writeFileAtomicSync } from '../utils/atomic-file'
-import { diagLog } from '../utils/startup-diagnostic'
+import { diagLog, logStartupError } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
+import { getForensicsFilePath } from '../utils/forensics-dir'
+import { showStartupFailureWithFallback } from './native-load-guard'
 import { t } from '../i18n'
 import type { GpuBootDecisionReason } from '../../shared/types/electron-api'
 
@@ -28,7 +29,7 @@ export type { GpuBootDecisionReason }
  * 该 FATAL 才结构性不可达。本应用渲染层全部使用 2D canvas（无 WebGL/WebGPU），
  * 2 级的代价只是性能，不损失功能。
  *
- * 状态文件 userData/gpu-fallback.json：
+ * 状态文件（取证根目录 gpu-fallback.json）：
  * - consecutiveFailures：连续启动失败次数（did-finish-load 时清零）
  * - fallbackActive：回退激活标记（一旦置位保留，用户更新显卡驱动后
  *   手动删除该文件即可恢复硬件加速）
@@ -166,7 +167,7 @@ let bootLevelCache: GpuCompatLevel | null = null
 let appBooted = false
 
 function getStatePath(): string {
-  return path.join(app.getPath('userData'), 'gpu-fallback.json')
+  return getForensicsFilePath('gpu-fallback.json')
 }
 
 /** 当前应用版本；不可得（异常/空串）返回 ''，调用方须按「保守不重试」处理 */
@@ -220,13 +221,13 @@ function writeState(state: GpuFallbackState): void {
 }
 
 /**
- * 用户偏好镜像 userData/gpu-pref.json：
+ * 用户偏好镜像（取证根目录 gpu-pref.json）：
  * { hardwareAcceleration?: boolean, discretePreference?: 'auto' | 'high-performance' }，
  * 供 whenReady 前同步读取（sqlite 业务库在 whenReady 后才初始化、启动期无法读库）。
  * 与 app_settings 对应键由 settings:set 双写保持一致；两个写入口互不覆盖对方字段。
  */
 function getHardwareAccelPrefPath(): string {
-  return path.join(app.getPath('userData'), 'gpu-pref.json')
+  return getForensicsFilePath('gpu-pref.json')
 }
 
 /** 独显偏好合法值域（与 gpu-preference.ts 的 GpuPreferenceMode 对齐） */
@@ -332,7 +333,7 @@ export function writeHardwareAccelPref(value: boolean): void {
  * 注意：本函数保持纯函数（每次从磁盘重读），以便既有状态机测试可重复调用；
  * 启动决策仅由 recordBootDecision() 在 index.ts 顶层缓存一次，供 requestSelfHeal 使用。
  */
-export function shouldDisableHardwareAcceleration(): boolean {
+export function shouldDisableHardwareAcceleration(options: { readOnly?: boolean } = {}): boolean {
   if (process.env.NIKKI_FORCE_GPU_COMPAT === '1') return true
   const pref = readHardwareAccelPref()
   if (pref === false) return true
@@ -342,12 +343,13 @@ export function shouldDisableHardwareAcceleration(): boolean {
     if (!currentVersion) return true // 版本不可得：保守回退，不做重试
     if (state.fallbackVersion === currentVersion) return true // 同版本已回退/已重试过
     // 版本升级（或旧格式无戳）：记录本次重试并保留硬件加速
-    writeState({ ...state, fallbackVersion: currentVersion })
+    if (!options.readOnly) writeState({ ...state, fallbackVersion: currentVersion })
     return false
   }
   if (state.consecutiveFailures >= FAILURE_THRESHOLD) {
     const currentVersion = getCurrentAppVersion()
-    writeState({ ...state, fallbackActive: true, fallbackVersion: currentVersion || undefined })
+    if (!options.readOnly)
+      writeState({ ...state, fallbackActive: true, fallbackVersion: currentVersion || undefined })
     return true
   }
   return false
@@ -388,9 +390,13 @@ export function resolveCompatLevel(
  * @param evidence 上次退出证据；prevNativeKill 为 true 时在本次档位上再加一级
  * @returns 本次启动应使用的兼容档位
  */
-export function recordBootLevel(evidence: { prevNativeKill?: boolean } = {}): GpuCompatLevel {
-  // 既有布尔判定原样复用（其内部已含版本重试 / 阈值激活的写盘副作用），不改语义
-  const compatDisabled = shouldDisableHardwareAcceleration()
+export function recordBootLevel(
+  evidence: { prevNativeKill?: boolean; readOnly?: boolean } = {}
+): GpuCompatLevel {
+  // 既有布尔判定原样复用（其内部已含版本重试 / 阈值激活的写盘副作用），不改语义。
+  // readOnly（审查修复轮 G1-F1）：输家实例在锁获取前的模块加载期也执行本函数，
+  // 只取决策不得写共享 gpu-fallback.json（否则双击可把赢家打进软件渲染）。
+  const compatDisabled = shouldDisableHardwareAcceleration({ readOnly: evidence.readOnly })
   bootDecisionCache = compatDisabled
 
   const state = readState()
@@ -423,7 +429,7 @@ export function recordBootLevel(evidence: { prevNativeKill?: boolean } = {}): Gp
   // 仅在档位变化或需要盖戳时写盘：健康启动（0 级、无证据）不得凭空造出状态文件。
   // 工装在位时一律不落盘——旧口径只挡 NIKKI_GPU_FORCE_LEVEL（forced !== null），
   // 漏了 NIKKI_FORCE_GPU_COMPAT：那把工装经 compatDisabled 抬到 1 级后照样写盘。
-  if (!isGpuVerificationRig()) {
+  if (!isGpuVerificationRig() && !evidence.readOnly) {
     const persisted = normalizeCompatLevel(state.compatLevel)
     const needStamp = stampRequired && state.compatLevelVersion !== (version || undefined)
     if (level !== persisted || needStamp) {
@@ -545,6 +551,66 @@ export function markGpuProcessCrash(reason: string, exitCode: number): void {
   diagLog('GPU', `GPU process gone (reason=${reason} exitCode=${exitCode})，已置软件渲染回退标记`)
 }
 
+/** 自愈留痕/提示的可注入依赖，便于单测覆盖落盘失败与档位到顶分支。 */
+export interface SelfHealEvidenceDeps {
+  log?: (stage: string, err: unknown) => void
+  showFailure?: (err: unknown, stage: string) => void
+}
+
+/**
+ * 自愈重启前 / 兼容档到顶时的可靠留痕与可见提示。
+ * 全程 fail-open：留痕或提示自身失败绝不阻断自愈重启，也不把异常抛回调用方。
+ * 修复此前「启动期渲染崩溃 → 静默 relaunch+exit(0)，事后查不到重启原因」。
+ */
+export function writeSelfHealEvidence(
+  reason: string,
+  exitCode: number,
+  exhausted: boolean,
+  deps: SelfHealEvidenceDeps | null | undefined = {}
+): void {
+  const options = deps && typeof deps === 'object' ? deps : {}
+  const code = Number.isFinite(exitCode) ? exitCode : -1
+  const stage = exhausted ? 'gpu-selfheal-exhausted' : 'gpu-selfheal-relaunch'
+  const err = new Error(`reason=${reason} exitCode=${code} exhausted=${exhausted}`)
+
+  // 默认通道走顶层静态 import（logStartupError / showStartupFailureWithFallback）：
+  // 裸 require('../utils/startup-diagnostic') 的相对路径在 electron-vite 打包 CJS 产物中
+  // 不存在（MODULE_NOT_FOUND）→ 空 catch 静默 no-op；vitest ESM 下 require 未定义同样 no-op。
+  // deps 注入仍优先，try/catch fail-open 语义不变。
+  const log =
+    typeof options.log === 'function'
+      ? options.log
+      : (s: string, e: unknown) => {
+          try {
+            logStartupError(s, e)
+          } catch {
+            /* 落盘失败不阻断自愈 */
+          }
+        }
+  try {
+    log(stage, err)
+  } catch {
+    /* fail-open：留痕失败仍继续自愈 */
+  }
+
+  if (!exhausted) return
+  const showFailure =
+    typeof options.showFailure === 'function'
+      ? options.showFailure
+      : (e: unknown, s: string) => {
+          try {
+            showStartupFailureWithFallback(e, { stage: s })
+          } catch {
+            /* 兜底失败不阻断 */
+          }
+        }
+  try {
+    showFailure(err, stage)
+  } catch {
+    /* fail-open */
+  }
+}
+
 /**
  * 崩溃自愈入口：先同步落盘回退标记（抢在 FATAL 前），再决定是否自动重启。
  * 阶梯行为（2026-11-02 改版）：
@@ -581,6 +647,8 @@ export function requestSelfHeal(reason: string, exitCode: number): boolean {
     } catch {
       // logger 不可用时仅依赖 diagLog，不重抛
     }
+    // 已无更低档位可退：留痕 + 给一次可见提示，避免用户面对反复静默闪退
+    writeSelfHealEvidence(reason, exitCode, true)
     return false
   }
 
@@ -594,6 +662,8 @@ export function requestSelfHeal(reason: string, exitCode: number): boolean {
     fallbackActive: state.fallbackActive || next >= 1
   })
   diagLog('GPU', `GPU 崩溃自愈：档位 ${level} → ${next}，重启进入下一档`)
+  // 静默重启前必留可检索痕迹（startup-errors.log），否则用户永远不知道为什么重启
+  writeSelfHealEvidence(reason, exitCode, false)
 
   try {
     app.releaseSingleInstanceLock?.()

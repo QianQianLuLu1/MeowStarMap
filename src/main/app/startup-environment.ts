@@ -13,6 +13,7 @@
  */
 import { ensureWritableDir } from '../utils/path-safety'
 import { logStartupError } from '../utils/startup-diagnostic'
+import { showStartupFailureWithFallback } from './native-load-guard'
 
 export interface StartupEnvDeps {
   /** 注入的错误框（测试用 mock）。默认走 electron.dialog.showErrorBox。 */
@@ -31,9 +32,19 @@ function defaultShowErrorBox(title: string, content: string): void {
   try {
     // 运行时惰性 require，避免顶层 import electron 在测试环境抛错（src/** 已关闭 no-require-imports）
     const electron = require('electron') as {
-      dialog?: { showErrorBox: (t: string, c: string) => void }
+      dialog?: { showErrorBox?: (t: string, c: string) => void }
     }
-    electron.dialog?.showErrorBox(title, content)
+    const showErrorBox = electron?.dialog?.showErrorBox
+    if (typeof showErrorBox === 'function') {
+      showErrorBox(title, content)
+      return
+    }
+    // dialog 不可用：改走统一兜底（再尝试 P0 + 同步落盘），绝不静默短路。
+    // 修复前 `electron.dialog?.showErrorBox(...)` 在 dialog 为 undefined 时直接静默返回。
+    showStartupFailureWithFallback(new Error(content), {
+      title,
+      stage: 'startup-environment-dialog'
+    })
   } catch {
     console.error(`[startup-environment] ${title}\n${content}`)
   }

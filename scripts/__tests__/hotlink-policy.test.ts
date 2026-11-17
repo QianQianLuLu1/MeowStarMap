@@ -157,6 +157,16 @@ describe('extractVersionedUaHosts', () => {
   it('注册表缺失返回 null（fail-closed）', () => {
     expect(extractVersionedUaHosts("export const A = 'a.test'")).toBeNull()
   })
+
+  it('注册表命中但条目形态漂移（内联字符串键替代计算键）返回 null，不得静默返回空集', () => {
+    // 漂移形态：Object.freeze 注册表仍在，但条目从 [CONST]: "policy" 漂成 'host': "policy"。
+    // 返回空集会让 versioned-ua 禁入 CSP 检查静默失效（无判据 ≠ 合规），必须 unparsable。
+    const drifted = IMAGE_URL_FIXTURE.replace(
+      '[NIKKI_ALBUMS_CDN_HOST]: "versioned-ua",',
+      '\'cdn.nikkialbums.com\': "versioned-ua",'
+    ).replace('[GONGEO_CDN_HOST]: "existing-hotlink"', '\'cdn.gongeo.us\': "existing-hotlink"')
+    expect(extractVersionedUaHosts(drifted)).toBeNull()
+  })
 })
 
 describe('注册表/UA 提取', () => {
@@ -233,6 +243,17 @@ describe('checkHotlinkPolicy', () => {
     )
   })
 
+  it('csp-meta-mismatch：img-src 主机集合相同但非 img-src 指令漂移仍须红（产物级逐字一致）', () => {
+    // 只改 object-src（'none' → 'self'），img-src 外部主机集合完全不变——
+    // 仅比主机集合会静默放行，违背「两处 CSP 逐字一致（产物级）」契约。
+    const problems = checkHotlinkPolicy(
+      happyInput({
+        distRendererHtml: DIST_HTML_FIXTURE.replace("object-src 'none'", "object-src 'self'")
+      })
+    )
+    expect(problems.map((p) => p.code)).toContainEqual('csp-meta-mismatch')
+  })
+
   it('dist-html-csp-missing：产物缺失或无 meta CSP 均 fail-closed', () => {
     for (const distRendererHtml of [null, '<html><head></head></html>']) {
       const problems = checkHotlinkPolicy(happyInput({ distRendererHtml }))
@@ -294,13 +315,23 @@ describe('checkHotlinkPolicy', () => {
     )
     expect(problems.filter((p) => p.code === 'unparsable').length).toBeGreaterThanOrEqual(3)
   })
+
+  it('unparsable：versioned-ua 注册表命中但条目形态漂移不得当成「无 versioned-ua 主机」放行', () => {
+    const drifted = IMAGE_URL_FIXTURE.replace(
+      '[NIKKI_ALBUMS_CDN_HOST]: "versioned-ua",',
+      '\'cdn.nikkialbums.com\': "versioned-ua",'
+    ).replace('[GONGEO_CDN_HOST]: "existing-hotlink"', '\'cdn.gongeo.us\': "existing-hotlink"')
+    const problems = checkHotlinkPolicy(happyInput({ imageUrlRegistrySrc: drifted }))
+    expect(problems.map((p) => p.code)).toContainEqual('unparsable')
+    expect(problems.find((p) => p.code === 'unparsable')?.detail).toContain('image-url.ts')
+  })
 })
 
 // ============================================================
 // 真实仓库契约：注册表 / CSP 两处 / UA / 规范章节 不同批改即红
 // ============================================================
 
-/** 与 pre-dist-check.collectUaScanSources 同域：src/main + src/renderer 的非测试源文件 */
+/** 与 pre-dist-check.collectUaScanSources 同域：src/main + src/shared + src/renderer 的非测试源文件 */
 function collectUaScanSourcesForContract(): { path: string; content: string }[] {
   const out: { path: string; content: string }[] = []
   const walk = (dir: string): void => {
@@ -319,11 +350,27 @@ function collectUaScanSourcesForContract(): { path: string; content: string }[] 
     }
   }
   walk(path.join(repoRoot, 'src', 'main'))
+  walk(path.join(repoRoot, 'src', 'shared'))
   walk(path.join(repoRoot, 'src', 'renderer'))
   return out
 }
 
 describe('真实仓库热链契约', () => {
+  it('UA 扫描域覆盖 src/shared：pre-dist-check.collectUaScanSources 不得漏掉共享契约层', () => {
+    // 闸门宣称「src/ 无硬编码版本 UA」，扫描域却曾只有 src/main + src/renderer——
+    // src/shared 随包且可被渲染层引用，漏扫即宣称失真。源码级钉住扫描域三根。
+    const src = readFileSync(path.join(repoRoot, 'scripts', 'pre-dist-check.ts'), 'utf-8')
+    const start = src.indexOf('function collectUaScanSources')
+    expect(start).toBeGreaterThan(-1)
+    const nextFn = src.indexOf('\nfunction ', start + 1)
+    const body = src.slice(start, nextFn === -1 ? undefined : nextFn)
+    const loop = /for \(const base of \[([\s\S]*?)\]\)/.exec(body)
+    expect(loop).not.toBeNull()
+    expect(loop![1]).toContain('SRC_MAIN')
+    expect(loop![1]).toContain('SRC_SHARED')
+    expect(loop![1]).toContain('SRC_RENDERER')
+  })
+
   it('当前仓库 0 问题：CSP == 直连注册表并集、versioned-ua 不直连、UA 与规范在位', () => {
     const read = (relative: string): string => readFileSync(path.join(repoRoot, relative), 'utf-8')
     const problems = checkHotlinkPolicy({

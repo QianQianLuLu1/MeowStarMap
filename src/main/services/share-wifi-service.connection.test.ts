@@ -47,10 +47,22 @@ const MOCK_INTERFACES: Record<string, unknown[]> = {
   ]
 }
 vi.mock('electron', () => ({
-  app: { getPath: vi.fn((name: string) => `C:\\mock\\${name}`) }
+  app: {
+    // 指向 tmp：logger 取证回退链会经 app.getPath('documents') 真实 mkdir，
+    // 不得在盘根留下 C:\mock 垃圾目录
+    getPath: vi.fn(
+      (name: string) => `${process.env.TEMP || process.env.TMP || '/tmp'}\\wxnn-wifi-mock\\${name}`
+    )
+  }
 }))
 vi.mock('os', () => ({
-  default: { networkInterfaces: vi.fn(() => MOCK_INTERFACES) }
+  default: {
+    networkInterfaces: vi.fn(() => MOCK_INTERFACES),
+    // logger 取证回退链（user-diag-path）消费 homedir/tmpdir，缺省会抛
+    // "default.tmpdir is not a function"；一律指向 tmp，避免污染真实用户目录
+    homedir: () => process.env.TEMP || process.env.TMP || '/tmp',
+    tmpdir: () => process.env.TEMP || process.env.TMP || '/tmp'
+  }
 }))
 
 const { wifiShareService } = await import('./share-wifi-service')

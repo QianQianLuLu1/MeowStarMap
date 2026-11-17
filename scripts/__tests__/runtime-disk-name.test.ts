@@ -58,17 +58,17 @@ describe('诊断目录落盘名取中文名（用户在文档目录里直接看�
   })
 
   it('描述当前行为的注释逐处跟随新名（四站）', () => {
+    // 2026-11-17 收口补全：dir-manager/crash-service/index 的崩溃/日志目录注释已改为
+    // 「取证根（forensics-dir 单一真相源）」语义，不再直述 Documents 用户友好目录；
+    // 喵星图/Diagnostics 命名本身仍由 user-diag-path.ts 常量段守卫（上方用例）。
     const sites: Array<[string, string]> = [
       ['src/main/utils/startup-diagnostic.ts', `用户友好目录：文档/${CJK}/Diagnostics`],
-      [
-        'src/main/utils/dir-manager.ts',
-        `崩溃转储默认输出到用户友好目录（文档/${CJK}/Diagnostics）`
-      ],
+      ['src/main/utils/dir-manager.ts', '强制统一到取证根（forensics-dir 单一真相源）'],
       [
         'src/main/services/crash-service.ts',
-        `崩溃转储统一到用户友好目录（文档/${CJK}/Diagnostics）`
+        '随全部取证文件归集到取证根目录单一真相源（forensics-dir）'
       ],
-      ['src/main/index.ts', `崩溃转储目录用户友好化：文档/${CJK}/Diagnostics`]
+      ['src/main/index.ts', '崩溃转储目录统一到取证根（须在 crashReporter.start 前设定）']
     ]
     for (const [file, needle] of sites) {
       expect(read(file), file).toContain(needle)
@@ -112,7 +112,14 @@ describe('诊断目录落盘名取中文名（用户在文档目录里直接看�
       `path.join('/mock/tmp', '${CJK}-Diagnostics')`
     )
     expect(read('src/main/services/crash-service.test.ts')).toContain(`/${CJK}[\\\\/]Diagnostics$/`)
-    expect(read('src/main/utils/dir-manager.test.ts')).toContain(`/${CJK}[\\\\/]Diagnostics$/`)
+    // 2026-11-17 收口补全：dir-manager.test.ts 的 crashDir 断言改锚 forensics 根
+    // （getForensicsRoot()），Documents 形态断言由 forensics-migrate.test.ts 的回退态用例承接
+    expect(read('src/main/utils/dir-manager.test.ts')).toContain(
+      'expect(result).toBe(getForensicsRoot())'
+    )
+    expect(read('src/main/app/__tests__/forensics-migrate.test.ts')).toContain(
+      `path.join(documentsDir, '${CJK}', 'Diagnostics')`
+    )
   })
 
   it('断言侧不再锁定旧诊断目录名', () => {

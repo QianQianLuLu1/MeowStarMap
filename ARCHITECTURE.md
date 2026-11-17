@@ -227,9 +227,12 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 
 ```
 1. app.requestSingleInstanceLock()
-   ├─ 失败：3 次重试（每次间隔 1s）
+   ├─ 失败：6 次重试（每次间隔 1s，覆盖退出清理的 WAL checkpoint 2-5s）
    ├─ 仍失败：弹窗"清理并重启 / 手动处理 / 退出"
-   └─ 用户选"清理并重启"：taskkill /F /T /PID → app.relaunch + app.exit(0)
+   └─ 用户选"清理并重启"：taskkill /F /T /PID → 清除死亡证据（心跳）→ app.relaunch + app.exit(0)
+
+1.5 赢家专属启动打点（拿到锁后才执行，锁失败实例不触碰共享证据文件）：
+   initExitForensics → verifyCriticalNativeModules → markBootAttempt + setupGpuProcessWatcher
 
 2. app.whenReady()
 
@@ -263,7 +266,9 @@ node-ffi-napi 已停止维护，koffi 是现代替代方案，性能更好，Typ
 
 12. createMainWindow()
     ├─ loadFile('dist/renderer/index.html')
-    └─ ready-to-show → taskScheduler.resume()
+    ├─ ready-to-show → taskScheduler.resume()
+    └─ 之后 await initNikkiSyncRuntime()（F6：游戏目录全盘发现可达数十秒，不阻塞首窗；
+       独立 try/catch，失败仅降级，状态经 IPC sync:getStatus 可见）
 
 13. applyUITheme() + cleanupAndRepairDatabase() + setupThemeListener()
 
@@ -603,7 +608,7 @@ MeowStarMap/
 主进程最早期入口，承担：
 
 - **最早期异常捕获**：uncaughtException / unhandledRejection 经 startup-diagnostic 落盘 startup-errors.log
-- **crashDumps 重定向**：崩溃 dump 输出到 用户文档/喵星图/Diagnostics（`user-diag-path.ts`），Chromium 原生日志落盘与轮转
+- **crashDumps 重定向**：崩溃 dump 输出到取证根（`forensics-dir.ts` 的 `getForensicsRoot()`：打包态为 <安装目录>\Diagnostics，不可写/dev 回落 Documents/喵星图/Diagnostics → homedir → tmpdir），Chromium 原生日志落盘与轮转
 - **GPU 回退决策**：`recordBootDecision()` → 必要时 `disableHardwareAcceleration()`
 - **协议特权声明**：`registerSchemesAsPrivileged` 注册 media:// 与 app://
 - **启动 Application**：`app.whenReady()` 后动态 import `app/application.ts` 的 Application 并 `initialize()`
@@ -612,7 +617,7 @@ MeowStarMap/
 
 `Application.initialize()` 编排以下职责（各模块实现见 §5.10）：
 
-- **单实例锁管理**：`requestSingleInstanceLock` + 3 次重试 + 三选项对话框（清理并重启 / 手动处理 / 退出）
+- **单实例锁管理**：`requestSingleInstanceLock` + 6 次重试 + 三选项对话框（清理并重启 / 手动处理 / 退出）
 - **阶段化初始化**：DB → 自定义目录 → logger → crash → backup → IPC → 窗口 → 主题 → 启动后任务
 - **media:// 协议注册与白名单**：5 层 LRU 缓存路径校验
 - **主题同步**：`applyUITheme` 同步 nativeTheme + TitleBarOverlay + setBackgroundColor
@@ -826,33 +831,33 @@ applyUITheme(theme) / isThumbnailsGenerating() / setThumbnailsGenerating(v)
 
 ### 5.9 工具层（utils/）
 
-| 文件                       | 职责                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `active-task-store.ts`     | 活跃任务状态存储（供任务进度查询与取消）                                                                     |
-| `concurrency.ts`           | 自研并发控制（`runWithConcurrency`），替代 p-limit 避免 ESM/CJS 兼容问题                                     |
-| `constants.ts`             | 主进程全局命名常量（STARTUP_SCAN_DELAY_MS=5000、THUMBNAIL_CONCURRENCY=4、MEDIA_CACHE_TTL_MS=5min 等）        |
-| `dir-manager.ts`           | 自定义目录管理（4 个功能可配置路径），`resolveCustomDir` / `ensureDir` / `migrateDirFiles`                   |
-| `disk.ts`                  | 磁盘空间检查 `assertDiskSpace`（基于 `fsp.statfs`）                                                          |
-| `duplicate-scoring.ts`     | 智能去重评分（4 维：分辨率 40 + 文件大小 30 + 拍摄时间 20 + 收藏加权 10）                                    |
-| `early-crash-guard.ts`     | 早期致命错误上报（`reportEarlyFatal`：落盘 diagLog + showErrorBox + 释放单实例锁 + exit）                    |
-| `ffmpeg-paths.ts`          | 统一 ffmpeg/ffprobe 二进制路径解析，`resolveAsarUnpackedPath` 替换 `app.asar` → `app.asar.unpacked`          |
-| `ffmpeg-runner.ts`         | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                   |
-| `file-utils.ts`            | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash） |
-| `ipc-validate.ts`          | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                       |
-| `logger.ts`                | 日志管理（18 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                           |
-| `managed-read-stream.ts`   | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                   |
-| `media-constants.ts`       | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                         |
-| `path-safety.ts`           | 路径安全工具（敏感目录判定 / 只读目录检测等）                                                                |
-| `phash.ts`                 | 感知哈希计算（8x8 DCT-II 64 位 hash，预计算余弦矩阵）                                                        |
-| `process-registry.ts`      | 全局活跃子进程注册表（trackProcess/trackFfmpegCommand/killAllProcesses，60s 兜底清理）                       |
-| `progress-throttle.ts`     | 任务进度推送节流                                                                                             |
-| `scene-brightness.ts`      | 基于图像亮度直方图的场景时段分析（sharp.stats() + BT.601 加权）                                              |
-| `startup-diagnostic.ts`    | 启动诊断（logger 就绪前的独立错误记录，写入 `用户文档/喵星图/Diagnostics/startup-errors.log`，100KB 滚动）   |
-| `task-registry.ts`         | 任务注册表（后台任务登记与查询）                                                                             |
-| `user-diag-path.ts`        | 用户友好诊断目录定位（`文档/喵星图/Diagnostics`）                                                            |
-| `video-frame.ts`           | 视频帧提取工具                                                                                               |
-| `video-probe.ts`           | 共享 ffprobe 实现（probeVideoMetadata，安全解析 "30000/1001" 帧率格式）                                      |
-| `worker-restart-policy.ts` | worker 重启策略（崩溃后重启次数/退避判定）                                                                   |
+| 文件                       | 职责                                                                                                                                                                             |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `active-task-store.ts`     | 活跃任务状态存储（供任务进度查询与取消）                                                                                                                                         |
+| `concurrency.ts`           | 自研并发控制（`runWithConcurrency`），替代 p-limit 避免 ESM/CJS 兼容问题                                                                                                         |
+| `constants.ts`             | 主进程全局命名常量（STARTUP_SCAN_DELAY_MS=5000、THUMBNAIL_CONCURRENCY=4、MEDIA_CACHE_TTL_MS=5min 等）                                                                            |
+| `dir-manager.ts`           | 自定义目录管理（4 个功能可配置路径），`resolveCustomDir` / `ensureDir` / `migrateDirFiles`                                                                                       |
+| `disk.ts`                  | 磁盘空间检查 `assertDiskSpace`（基于 `fsp.statfs`）                                                                                                                              |
+| `duplicate-scoring.ts`     | 智能去重评分（4 维：分辨率 40 + 文件大小 30 + 拍摄时间 20 + 收藏加权 10）                                                                                                        |
+| `early-crash-guard.ts`     | 早期致命错误上报（`reportEarlyFatal`：落盘 diagLog + showErrorBox + 释放单实例锁 + exit）                                                                                        |
+| `ffmpeg-paths.ts`          | 统一 ffmpeg/ffprobe 二进制路径解析，`resolveAsarUnpackedPath` 替换 `app.asar` → `app.asar.unpacked`                                                                              |
+| `ffmpeg-runner.ts`         | ffmpeg 命令执行工具，统一 trackFfmpegCommand 注册/反注册 + 超时 + 事件处理                                                                                                       |
+| `file-utils.ts`            | 文件系统工具（pathExists/getUniqueFilePath/parseDataUrlToBuffer/bufferToDataUrl/moveFile/calculateFileHash）                                                                     |
+| `ipc-validate.ts`          | IPC 参数校验工具（SYSTEM_SENSITIVE_DIRS 黑名单 + validateFilePath/validateMediaId 等）                                                                                           |
+| `logger.ts`                | 日志管理（18 类 FaultType、FaultRecord 含完整环境信息、2GB 上限按 mtime 删除最旧）                                                                                               |
+| `managed-read-stream.ts`   | 文件读流生命周期工具（`createManagedReadStream`：error 监听 + AbortSignal 取消 + fd 归还）                                                                                       |
+| `media-constants.ts`       | 媒体扩展名与 MIME 类型统一常量（IMAGE/VIDEO/MEDIA_EXTENSIONS、ALBUM_TYPE_MAP 22 项）                                                                                             |
+| `path-safety.ts`           | 路径安全工具（敏感目录判定 / 只读目录检测等）                                                                                                                                    |
+| `phash.ts`                 | 感知哈希计算（8x8 DCT-II 64 位 hash，预计算余弦矩阵）                                                                                                                            |
+| `process-registry.ts`      | 全局活跃子进程注册表（trackProcess/trackFfmpegCommand/killAllProcesses，60s 兜底清理）                                                                                           |
+| `progress-throttle.ts`     | 任务进度推送节流                                                                                                                                                                 |
+| `scene-brightness.ts`      | 基于图像亮度直方图的场景时段分析（sharp.stats() + BT.601 加权）                                                                                                                  |
+| `startup-diagnostic.ts`    | 启动诊断（logger 就绪前的独立错误记录，写入取证根 `getForensicsRoot()` 下的 `startup-errors.log`——打包态 <安装目录>\Diagnostics，回落 Documents/喵星图/Diagnostics，100KB 滚动） |
+| `task-registry.ts`         | 任务注册表（后台任务登记与查询）                                                                                                                                                 |
+| `user-diag-path.ts`        | 用户友好诊断目录定位（`文档/喵星图/Diagnostics`）                                                                                                                                |
+| `video-frame.ts`           | 视频帧提取工具                                                                                                                                                                   |
+| `video-probe.ts`           | 共享 ffprobe 实现（probeVideoMetadata，安全解析 "30000/1001" 帧率格式）                                                                                                          |
+| `worker-restart-policy.ts` | worker 重启策略（崩溃后重启次数/退避判定）                                                                                                                                       |
 
 **读流约束**：任何把本地文件流写出去的场景（`media://` 协议、WiFi 分享下载/缩略图）都必须走
 `createManagedReadStream`，禁止裸写 `fs.createReadStream(path).pipe(dest)`——`pipe()` 一返回外层
@@ -1654,8 +1659,10 @@ components / pages (展示)
 
 #### 10.3.2 单实例锁
 
-- `app.requestSingleInstanceLock()` + 3 次重试（每次间隔 1s）
+- `app.requestSingleInstanceLock()` + 6 次重试（每次间隔 1s）
 - 三选项对话框：清理并重启 / 手动处理 / 退出
+- 「清理并重启」重启前清除心跳死亡证据（`clearDeathEvidenceForRelaunch`，防 GPU 阶梯白升档）
+- 赢家专属打点：`initExitForensics` / `verifyCriticalNativeModules` / `markBootAttempt` / `setupGpuProcessWatcher` 仅在拿锁后执行（锁失败实例不触碰共享证据文件）
 - `before-quit` 中显式 `app.releaseSingleInstanceLock()`
 - `uncaughtException` / `unhandledRejection` 处理器中显式释放锁 + `app.exit(1)`
 

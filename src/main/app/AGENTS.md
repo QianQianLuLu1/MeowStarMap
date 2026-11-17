@@ -8,15 +8,16 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 
 ## 目录结构
 
-31 个源文件，其中 27 个有同名配套测试（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无；`app-icon-path.ts` 的守卫跨目录在 `scripts/__tests__/app-icon-slots.test.ts`）：
+33 个源文件，其中 29 个有同名配套测试（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts` 暂无；`app-icon-path.ts` 的守卫跨目录在 `scripts/__tests__/app-icon-slots.test.ts`）：
 
 ### 核心编排
 
-| 文件             | 职责                                                                                                                                                                                     |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `application.ts` | `Application` 类——构造所有服务实例（DB/Scanner/Media/Thumbnail/VideoEditor/Decryption worker bridges、TaskScheduler、Services），构建 `AppContext`，`initialize()` 委托给 `lifecycle.ts` |
-| `app-context.ts` | `AppContext` 接口——扩展 `HandlerContext`，包含所有 worker bridges、可变状态（mainWindow、timers、cleaningUp）和状态访问器                                                                |
-| `lifecycle.ts`   | `bootstrapApplication()` 启动主流程——单实例锁 → whenReady → 8 阶段初始化 → 退出清理链                                                                                                    |
+| 文件                 | 职责                                                                                                                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `application.ts`     | `Application` 类——构造所有服务实例（DB/Scanner/Media/Thumbnail/VideoEditor/Decryption worker bridges、TaskScheduler、Services），构建 `AppContext`，`initialize()` 委托给 `lifecycle.ts` |
+| `app-context.ts`     | `AppContext` 接口——扩展 `HandlerContext`，包含所有 worker bridges、可变状态（mainWindow、timers、cleaningUp）和状态访问器                                                                |
+| `lifecycle.ts`       | `bootstrapApplication()` 启动主流程——单实例锁 → whenReady → 8 阶段初始化 → 退出清理链                                                                                                    |
+| `single-instance.ts` | 单实例锁获取 + 6×1s 重试 + 三选项对话框（清理并重启/手动处理/退出）+ taskkill 递归清理 + ack 静默让位（2026-11-15 从 `lifecycle.ts` 搬移，锁获取前移到 index.ts whenReady 首行）         |
 
 ### 窗口与协议
 
@@ -61,7 +62,8 @@ Electron 主进程的应用核心模块，负责应用完整生命周期的编�
 | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | `auto-update.ts`                                    | 自动更新状态机（electron-updater）——生产/dev 假源两态、推送渲染端                                                                     |
 | `update-error-class.ts`                             | 更新失败归类（纯函数）——分成 network / source，兜底 source                                                                            |
-| `custom-dirs.ts`                                    | 4 个自定义目录（backup/thumbnail/log/crash）的解析、迁移、副作用初始化                                                                |
+| `custom-dirs.ts`                                    | backup/thumbnail 自定义目录解析、迁移、副作用初始化；log/crash 委托 forensics-migrate 强制统一到取证根                                |
+| `forensics-migrate.ts`                              | 取证统一接线 + 历史残留归集迁移（skipExisting 保护新鲜证据、清键幂等、失败不阻塞启动）                                                |
 | `desktop-shortcut.ts`                               | 桌面快捷方式补创建（仅打包环境）                                                                                                      |
 | `theme.ts`                                          | 主题切换——持久化 + nativeTheme 同步 + 标题栏叠加色                                                                                    |
 | `media-update.ts`                                   | 媒体变更通知——失效白名单缓存 + 刷新 pathGuard + 节流广播（100ms）                                                                     |
@@ -135,4 +137,4 @@ index.ts (入口)
 - `media-protocol.ts` 的路径白名单是安全关键路径，修改时需同时考虑 LRU 缓存一致性和 realpath 解引用。
 - `gpu-fallback.ts` 的状态文件在 `userData` 下，修改格式需向后兼容（旧格式仍能解析）。
 - `window-manager.ts` 中的 CSP 策略修改会影响渲染进程所有外部资源加载，需同步评估。
-- 31 个源文件中有**同名**配套测试的为 27 个（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts`、`app-icon-path.ts` 暂无同名套件）；其中 `cleanup.ts` 并非无测试，而是由 `__tests__/cleanup-perform-cleanup.test.ts` 与 `__tests__/cleanup-collect-exit-diagnosis.test.ts` 按函数拆分覆盖，`app-icon-path.ts` 由 `scripts/__tests__/app-icon-slots.test.ts` 跨目录守卫。`auto-update.ts` 的同名套件由 2026-11-05「检查更新误报」修复轮补上（观测面为 `sendToRenderer` 入参）。修改后运行 `npm run test:main` 确认。
+- 33 个源文件中有**同名**配套测试的为 29 个（`app-context.ts`、`cleanup.ts`、`renderer-bridge.ts`、`app-icon-path.ts` 暂无同名套件）；其中 `cleanup.ts` 并非无测试，而是由 `__tests__/cleanup-perform-cleanup.test.ts` 与 `__tests__/cleanup-collect-exit-diagnosis.test.ts` 按函数拆分覆盖，`app-icon-path.ts` 由 `scripts/__tests__/app-icon-slots.test.ts` 跨目录守卫。`auto-update.ts` 的同名套件由 2026-11-05「检查更新误报」修复轮补上（观测面为 `sendToRenderer` 入参）。修改后运行 `npm run test:main` 确认。

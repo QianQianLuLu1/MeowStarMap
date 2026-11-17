@@ -1,3 +1,4 @@
+// @core-change: 新增统一目录工厂，log/crash 的 setDir/resetDir 改为取证统一兼容语义
 import { ipcMain } from 'electron'
 import fs from 'fs'
 import path from 'path'
@@ -81,6 +82,44 @@ export function registerResetDirHandler(
             reason: err instanceof Error ? err.message : String(err)
           })
         }
+      }
+    })
+  )
+}
+
+/**
+ * 取证统一后的兼容工厂（logDir/crashDir 专用）：通道名与 DirOpResult 结构保持不变，
+ * setDir 不再写盘/持久化，返回 success:false + 已统一说明（旧渲染端按 res.success
+ * 判断不会误以为设置成功）；resetDir 清键幂等且无需重启（统一目录每次启动现算）。
+ */
+export function registerUnifiedDirHandler(
+  ctx: HandlerContext,
+  setChannel: string,
+  resetChannel: string,
+  settingKey: keyof typeof SETTING_KEYS
+): void {
+  ipcMain.handle(
+    setChannel,
+    wrapHandler(ctx, z.tuple([schemas.filePath]), async (): Promise<DirOpResult> => {
+      return {
+        success: false,
+        needRestart: false,
+        message: t('main.setDir.message.unified')
+      }
+    })
+  )
+  ipcMain.handle(
+    resetChannel,
+    wrapHandlerNoArgs(ctx, async (): Promise<DirOpResult> => {
+      try {
+        ctx.dbManager.setSetting(SETTING_KEYS[settingKey], '')
+      } catch {
+        // 清键失败不影响统一语义（启动接线不读该键）
+      }
+      return {
+        success: true,
+        needRestart: false,
+        message: t('main.setDir.message.unifiedReset')
       }
     })
   )

@@ -1441,7 +1441,6 @@
       "hint": "Arquivos de despejo de falhas são gerados automaticamente pelo Electron crashpad, mantém os 10 mais recentes, limpeza automática após 30 dias. Registra apenas informações de falhas de processo, sem dados de privacidade do usuário.",
       "listCount": "{{count}} registros",
       "listTitle": "Registros de falhas (mais recentes primeiro)",
-      "modifyDir": "Mudar diretório",
       "oldest": "Registro mais antigo",
       "openDir": "Abrir diretório",
       "processMain": "Processo principal",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "{{count}} entradas · {{groups}} grupos",
       "listTimeline": "Registros de falhas (mais recentes primeiro)",
       "logFiles": "Arquivos de log",
-      "modifyDir": "Mudar diretório",
       "notInit": "Não inicializado",
       "occurrenceCount": "Ocorrências: {{count}}",
       "openDir": "Abrir diretório",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

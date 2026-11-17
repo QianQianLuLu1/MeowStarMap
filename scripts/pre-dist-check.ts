@@ -1327,7 +1327,7 @@ function checkVcRuntimeAfterPackConfigured(): void {
 // ===== 热链合规一致性闸门（#218 / #20 授权条款的打包阶段固化）=====
 // 事实来源与判据链见 scripts/hotlink-policy.ts 头注与根 AGENTS.md「热链与外部资源请求规范」。
 // 核验：CSP img-src 外部主机 == 渲染层直连注册表并集（不多不少）；versioned-ua 主机不入 CSP；
-// 两处 CSP（响应头/meta）产物级一致；固定 UA 串完好；src 无硬编码版本 UA；AGENTS.md 规范章节在场。
+// 两处 CSP（响应头/meta）产物级逐字一致；固定 UA 串完好；src 无硬编码版本 UA；AGENTS.md 规范章节在场。
 // 新增/变更热链若未同批同步注册表 + CSP 两处 + UA 策略 + 文档，本闸门在打包时阻断。
 function readTextOrNull(relativePath: string): string | null {
   try {
@@ -1337,14 +1337,14 @@ function readTextOrNull(relativePath: string): string | null {
   }
 }
 
-/** 硬编码版本 UA 扫描域：src/main + src/renderer 的非测试源文件（测试/Storybook 不随包） */
+/** 硬编码版本 UA 扫描域：src/main + src/shared + src/renderer 的非测试源文件（测试/Storybook 不随包） */
 function collectUaScanSources(): {
   sources: { path: string; content: string }[]
   unreadable: string[]
 } {
   const sources: { path: string; content: string }[] = []
   const unreadable: string[] = []
-  for (const base of [SRC_MAIN, SRC_RENDERER]) {
+  for (const base of [SRC_MAIN, SRC_SHARED, SRC_RENDERER]) {
     const walk = (dir: string): void => {
       let entries: fs.Dirent[]
       try {

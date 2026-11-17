@@ -1441,7 +1441,6 @@
       "hint": "クラッシュダンプファイルはElectron crashpadが自動生成、最新10件を保持、30日超過で自動クリーンアップ。プロセスクラッシュ情報のみ記録、ユーザープライバシーデータは含みません。",
       "listCount": "計 {{count}} 件",
       "listTitle": "クラッシュ記録（新着順）",
-      "modifyDir": "ディレクトリ変更",
       "oldest": "最古の記録",
       "openDir": "ディレクトリを開く",
       "processMain": "メインプロセス",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "計 {{count}} 件 · {{groups}} グループ",
       "listTimeline": "故障記録（新着順）",
       "logFiles": "ログファイル",
-      "modifyDir": "ディレクトリ変更",
       "notInit": "未初期化",
       "occurrenceCount": "出現回数: {{count}}",
       "openDir": "ディレクトリを開く",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

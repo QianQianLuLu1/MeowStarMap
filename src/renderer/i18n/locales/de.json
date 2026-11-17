@@ -1441,7 +1441,6 @@
       "hint": "Absturz-Dump-Dateien werden von Electron crashpad automatisch generiert, die 10 neuesten werden behalten, automatische Bereinigung nach 30 Tagen. Nur Prozessabsturzinformationen, keine Benutzerdaten.",
       "listCount": "{{count}} Einträge",
       "listTitle": "Absturzberichte (neueste zuerst)",
-      "modifyDir": "Verzeichnis ändern",
       "oldest": "Ältester Eintrag",
       "openDir": "Verzeichnis öffnen",
       "processMain": "Hauptprozess",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "{{count}} Einträge · {{groups}} Gruppen",
       "listTimeline": "Fehlereinträge (neueste zuerst)",
       "logFiles": "Protokolldateien",
-      "modifyDir": "Verzeichnis ändern",
       "notInit": "Nicht initialisiert",
       "occurrenceCount": "Vorkommen: {{count}}",
       "openDir": "Verzeichnis öffnen",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

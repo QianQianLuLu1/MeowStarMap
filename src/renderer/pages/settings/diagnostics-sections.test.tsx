@@ -13,7 +13,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
-import { DiagnosticsGpuSection } from './diagnostics-sections'
+import {
+  DiagnosticsGpuSection,
+  DiagnosticsLogsSection,
+  DiagnosticsCrashSection
+} from './diagnostics-sections'
 import { GlobalToastContext } from './shared'
 
 let getGpuStatus: ReturnType<typeof vi.fn>
@@ -140,5 +144,59 @@ describe('DiagnosticsGpuSection — GPU 状态卡', () => {
       </GlobalToastContext.Provider>
     )
     await waitFor(() => expect(screen.getByText(/已激活（.*level=0/)).toBeInTheDocument())
+  })
+})
+
+describe('日志/崩溃诊断区 — 取证目录统一（取消自定义入口）', () => {
+  function installDirApi() {
+    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+      log: {
+        listFaults: vi.fn(() => Promise.resolve({ success: true, faults: [] })),
+        getDirectoryPath: vi.fn(() =>
+          Promise.resolve({ success: true, path: 'D:\\install\\Diagnostics\\logs' })
+        ),
+        getStats: vi.fn(() =>
+          Promise.resolve({ success: true, faultCount: 0, totalSize: 0, fileCount: 0 })
+        ),
+        openDirectory: vi.fn(),
+        exportZip: vi.fn(),
+        clear: vi.fn()
+      },
+      crash: {
+        list: vi.fn(() => Promise.resolve({ success: true, crashes: [] })),
+        getStats: vi.fn(() =>
+          Promise.resolve({ success: true, fileCount: 0, totalSize: 0, oldestTime: null })
+        ),
+        getDir: vi.fn(() => Promise.resolve('D:\\install\\Diagnostics')),
+        openDirectory: vi.fn(),
+        clear: vi.fn()
+      }
+    }
+  }
+
+  it('日志区：不渲染「修改目录」按钮，保留「打开目录」与统一路径展示', async () => {
+    installDirApi()
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <DiagnosticsLogsSection />
+      </GlobalToastContext.Provider>
+    )
+    await waitFor(() =>
+      expect(screen.getByText('D:\\install\\Diagnostics\\logs')).toBeInTheDocument()
+    )
+    expect(screen.queryByText('修改目录')).not.toBeInTheDocument()
+    expect(screen.getByText('打开目录')).toBeInTheDocument()
+  })
+
+  it('崩溃区：不渲染「修改目录」按钮，保留「打开目录」与统一路径展示', async () => {
+    installDirApi()
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <DiagnosticsCrashSection />
+      </GlobalToastContext.Provider>
+    )
+    await waitFor(() => expect(screen.getByText('D:\\install\\Diagnostics')).toBeInTheDocument())
+    expect(screen.queryByText('修改目录')).not.toBeInTheDocument()
+    expect(screen.getByText('打开目录')).toBeInTheDocument()
   })
 })

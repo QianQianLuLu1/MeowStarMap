@@ -106,7 +106,11 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
   // 窗口关闭后立即清空 ctx 引用：closed 后窗口对象虽在但底层 webContents 已销毁，
   // sendToRenderer 的 isDestroyed 检查依赖此处置 null 才能可靠短路
   mainWindow.on('closed', () => {
-    ctx.setMainWindow(null)
+    // G1-F7（审查修复轮）：仅当关闭的仍是当前窗口时才清引用——重建兜底后旧空白窗
+    // 晚到的 closed 不得把新窗引用清空（否则 sendToRenderer 永久短路）。
+    if (ctx.getMainWindow() === mainWindow) {
+      ctx.setMainWindow(null)
+    }
   })
 
   // 导航防护：阻断任意新窗口，并拦截主框架/子帧被导向非应用文档。
@@ -293,7 +297,16 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     // 直接解决"双击无窗口、无弹窗直接退出"——无需用户手动重开或点对话框。
     if (isStartupPhase()) {
       const healed = requestSelfHeal(details.reason ?? 'unknown', details.exitCode ?? -1)
-      if (healed) return // 已自动重启进入兼容模式，跳过对话框
+      if (healed) {
+        // 自愈会静默 relaunch+exit(0) 并跳过对话框：return 之前必留可检索痕迹，
+        // 否则用户只看到「闪一下就没了」，事后无法定位重启原因
+        try {
+          logStartupError('startup-renderer-gone', err)
+        } catch {
+          // 落盘失败不阻断自愈
+        }
+        return
+      }
       // 已兼容模式仍崩：fallback 失败，继续走错误对话框（避免死循环）
     }
 
@@ -320,7 +333,12 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
         }
       } catch (reloadErr) {
         logStartupError('renderer-reload-failed', reloadErr)
-        // reload 失败时重建窗口作为最后兜底
+        // reload 失败时重建窗口作为最后兜底。
+        // G1-F7（审查修复轮）：先销毁旧空白窗——否则旧窗及其监听器残留，
+        // 且其晚到的 closed 会与新窗引用竞态（closed 守卫之外的第二道防线）。
+        try {
+          if (!mainWindow.isDestroyed()) mainWindow.destroy()
+        } catch {}
         try {
           await createMainWindow(ctx)
         } catch {}

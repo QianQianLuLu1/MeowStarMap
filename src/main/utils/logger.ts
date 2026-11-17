@@ -5,6 +5,7 @@ import crypto from 'crypto'
 import { app } from 'electron'
 import electronLog from 'electron-log'
 import { t } from '../i18n'
+import { getForensicsLogsDir } from './forensics-dir'
 
 // 日志级别
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
@@ -136,7 +137,8 @@ let enforceTimer: ReturnType<typeof setTimeout> | null = null
 // 初始化日志目录（必须在 app.whenReady 之后调用）
 export function initLogger(): void {
   if (logDir) return
-  logDir = path.join(app.getPath('userData'), 'logs')
+  // 2026-11-17 统一收口：主日志/故障 JSONL 随取证文件归集到取证根目录 logs/ 子目录
+  logDir = getForensicsLogsDir()
   fs.mkdirSync(logDir, { recursive: true })
 }
 
@@ -165,19 +167,20 @@ function getMainLogPath(): string {
 }
 
 // 故障日志文件（按日期滚动，JSONL 格式）
-function getFaultLogPath(): string {
-  return path.join(logDir, `faults-${getDateStr()}.jsonl`)
+// 导出供 cleanup 退出诊断复用——落点必须随 logDir（取证 logs），不得另硬编码 userData
+export function getFaultLogPath(): string {
+  return path.join(getLogDirectory(), `faults-${getDateStr()}.jsonl`)
 }
 
 // 计算 electron-log 兜底文件路径
-// 目的：app.whenReady() 之前 app.getPath('userData') 会抛错，此时 logDir 尚未初始化，
-// 用 APPDATA / tmp 兜底，确保 electron-log 早期也能落盘，不抛错也不吞日志。
+// 目的：initLogger 尚未执行（app.whenReady 之前）时 logDir 未初始化，
+// 先落取证根 logs/（provider 未注册的极端早期再回落 APPDATA / tmp），
+// 确保 electron-log 早期也能落盘，不抛错也不吞日志。
 function getFallbackElectronLogPath(): string {
   try {
-    const userData = app.getPath('userData')
-    return path.join(userData, 'logs', 'main.log')
+    return path.join(getForensicsLogsDir(), 'main.log')
   } catch {
-    // app.whenReady() 之前触发：回退到 APPDATA（Windows 一定存在）
+    // 取证根不可用的极端场景：回退到 APPDATA（Windows 一定存在）
     const appData = process.env.APPDATA
     if (appData) return path.join(appData, 'meow-star-map', 'logs', 'main.log')
     return path.join(os.tmpdir(), 'meow-star-map-logs', 'main.log')

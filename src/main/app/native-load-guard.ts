@@ -66,11 +66,21 @@ function defaultShowErrorBox(title: string, content: string): void {
   try {
     // electron 仅在打包/运行期可用；测试环境注入 showErrorBox 故不会走到这里（src/** 已关闭 no-require-imports）
     const electron = require('electron') as {
-      dialog?: { showErrorBox: (t: string, c: string) => void }
+      dialog?: { showErrorBox?: (t: string, c: string) => void }
     }
-    electron.dialog?.showErrorBox(title, content)
+    const showErrorBox = electron?.dialog?.showErrorBox
+    if (typeof showErrorBox === 'function') {
+      showErrorBox(title, content)
+      return
+    }
+    // dialog 不可用：改走统一兜底（再尝试 P0 + 同步落盘），绝不静默短路。
+    // 修复前 `electron.dialog?.showErrorBox(...)` 在 dialog 为 undefined 时直接静默返回。
+    showStartupFailureWithFallback(new Error(content), {
+      title,
+      stage: 'native-load-guard-dialog'
+    })
   } catch {
-    // 极端兜底：electron 不可用时退化为 stderr（console.error 不在 i18n 护栏拦截范围内）
+    // 极端兜底：electron 不可用时退化为 stderr
     console.error(`[native-load-guard] ${title}\n${content}`)
   }
 }
@@ -242,5 +252,71 @@ export function showFatalStartupErrorBox(err: unknown, logPath?: string): void {
     } catch {
       /* 忽略：shell 不可用时不影响弹窗 */
     }
+  }
+}
+
+/** 启动失败兜底的可注入依赖，便于单测覆盖 dialog 不可用等异常分支。 */
+export interface StartupFailureDeps {
+  showErrorBox?: (title: string, content: string) => void
+  log?: (stage: string, err: unknown) => void
+  getLogPath?: () => string
+}
+
+/**
+ * 启动失败出口的统一可见兜底：先尝试 P0 同步弹框（dialog.showErrorBox，不依赖 i18n /
+ * 渲染进程，可在 ready 前调用），无论成功与否都再同步落盘留痕。
+ * 修复此前「dialog catch 只 logStartupError 就 app.quit()/exit()」以及
+ * 「可选链静默短路」导致的用户完全无提示退出。
+ * 所有分支自身再包 try/catch，绝不把异常抛回 unhandledRejection。
+ */
+export function showStartupFailureWithFallback(
+  err: unknown,
+  opts: { title?: string; stage?: string; deps?: StartupFailureDeps } = {}
+): void {
+  const deps = opts.deps && typeof opts.deps === 'object' ? opts.deps : {}
+  const title =
+    typeof opts.title === 'string' && opts.title.trim() ? opts.title : '启动失败 / Startup Failed'
+  const stage =
+    typeof opts.stage === 'string' && opts.stage.trim() ? opts.stage : 'startup-failure-fallback'
+  const message = err instanceof Error ? err.message : String(err)
+
+  let logPath = ''
+  try {
+    if (typeof deps.getLogPath === 'function') {
+      logPath = deps.getLogPath()
+    } else {
+      const diag = require('../utils/startup-diagnostic') as {
+        getStartupLogPathValue?: () => string
+      }
+      logPath = diag.getStartupLogPathValue?.() ?? ''
+    }
+  } catch {
+    // 日志路径不可用不影响弹框
+  }
+  if (typeof logPath !== 'string') logPath = ''
+  const content = logPath ? `${message}\n\n错误详情已记录到：\n${logPath}` : message
+
+  try {
+    const showErrorBox =
+      typeof deps.showErrorBox === 'function'
+        ? deps.showErrorBox
+        : (t: string, c: string) => {
+            const electron = require('electron') as {
+              dialog?: { showErrorBox?: (t: string, c: string) => void }
+            }
+            const fn = electron?.dialog?.showErrorBox
+            if (typeof fn !== 'function') throw new Error('dialog.showErrorBox unavailable')
+            fn(t, c)
+          }
+    showErrorBox(title, content)
+  } catch {
+    // 弹框通道不可用：继续同步落盘，绝不静默短路
+  }
+
+  const log = typeof deps.log === 'function' ? deps.log : defaultLog
+  try {
+    log(stage, err)
+  } catch {
+    // 落盘失败不阻塞调用方退出
   }
 }

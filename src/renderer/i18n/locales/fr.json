@@ -1441,7 +1441,6 @@
       "hint": "Les fichiers de vidage de crash sont générés automatiquement par Electron crashpad, conserve les 10 plus récents, nettoyage automatique après 30 jours. Enregistre uniquement les infos de crash de processus, sans données de vie privée utilisateur.",
       "listCount": "{{count}} enregistrements",
       "listTitle": "Enregistrements de crash (plus récents d'abord)",
-      "modifyDir": "Modifier le répertoire",
       "oldest": "Enregistrement le plus ancien",
       "openDir": "Ouvrir le répertoire",
       "processMain": "Processus principal",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "{{count}} entrées · {{groups}} groupes",
       "listTimeline": "Enregistrements de pannes (plus récents d'abord)",
       "logFiles": "Fichiers journaux",
-      "modifyDir": "Modifier le répertoire",
       "notInit": "Non initialisé",
       "occurrenceCount": "Occurrences : {{count}}",
       "openDir": "Ouvrir le répertoire",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

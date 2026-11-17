@@ -36,6 +36,7 @@ const SMOKE_COVERAGE = [
   'fullscreen-diagnose.e2e.ts',
   'nikkisync-game-root.e2e.ts',
   'nikkisync-runtime.e2e.ts',
+  'second-instance.e2e.ts',
   'smoke.e2e.ts'
 ]
 

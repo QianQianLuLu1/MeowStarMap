@@ -181,12 +181,15 @@ describe('userData 根跟随新包名（手工拼 %APPDATA% 的站点）', () =>
     expect(src).not.toContain('无限暖暖相册管理工具')
   })
 
-  it('GPU 崩溃模拟脚本的兜底猜路径落正（历史上写死 NikkiGallery 从来不是真实 userData）', () => {
+  it('GPU 崩溃模拟脚本收口到取证真相源（不再猜 userData；2026-11-17 取证存储统一收口）', () => {
     const src = read('scripts/simulate-gpu-crash.cjs')
-    expect(src).toContain(`path.join(os.homedir(), '.config', '${KEBAB}')`)
-    expect(src).toContain(`Roaming\\${KEBAB}"`)
+    // 写契约复用 forensics-dir.ts 单一真相源（经 npx tsx 运行），不再扫描/猜测 %APPDATA% userData
+    expect(src).toContain("require('../src/main/utils/forensics-dir.ts')")
+    expect(src).toContain("getForensicsFilePath('gpu-fallback.json')")
     expect(src).not.toContain('NikkiGallery')
-    // 环境变量键属私有配置而非产品名，与 WXNN_RENDERER_DIR 同口径不动
+    expect(src).not.toContain(KEBAB)
+    expect(src).not.toContain('readdirSync')
+    // 环境变量键属私有配置而非产品名，与 WXNN_RENDERER_DIR 同口径不动（语义改为显式取证根覆盖）
     expect(src).toContain('NIKKI_USERDATA')
   })
 

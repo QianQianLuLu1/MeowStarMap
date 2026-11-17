@@ -1441,7 +1441,6 @@
       "hint": "崩潰 dump 檔案由 Electron crashpad 自動生成，保留最近 10 份且超過 30 天自動清理。僅記錄程序崩潰資訊，不含使用者隱私資料。",
       "listCount": "共 {{count}} 個",
       "listTitle": "崩潰記錄（按時間倒序）",
-      "modifyDir": "修改目錄",
       "oldest": "最早記錄",
       "openDir": "開啟目錄",
       "processMain": "主程序",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "共 {{count}} 條 · {{groups}} 組",
       "listTimeline": "故障記錄（按時間倒序）",
       "logFiles": "日誌檔案",
-      "modifyDir": "修改目錄",
       "notInit": "未初始化",
       "occurrenceCount": "出現次數: {{count}}",
       "openDir": "開啟目錄",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

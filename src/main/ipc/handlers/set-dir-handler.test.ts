@@ -62,7 +62,11 @@ function getHandler(channel: string): (...args: unknown[]) => Promise<unknown> {
   throw new Error(`未找到 channel: ${channel}`)
 }
 
-import { registerSetDirHandler, registerResetDirHandler } from './set-dir-handler'
+import {
+  registerSetDirHandler,
+  registerResetDirHandler,
+  registerUnifiedDirHandler
+} from './set-dir-handler'
 import { assertFileWritePath } from '../validator'
 
 const assertFileWritePathMock = vi.mocked(assertFileWritePath)
@@ -198,5 +202,44 @@ describe('registerResetDirHandler', () => {
     }
     expect(result.data.success).toBe(false)
     expect(result.data.message).toContain('字符串错误')
+  })
+})
+
+describe('registerUnifiedDirHandler（logDir/crashDir 强制统一后的兼容语义）', () => {
+  beforeEach(() => {
+    handleMock.mockClear()
+    fsMkdirMock.mockReset()
+    fsWriteFileMock.mockReset()
+    fsUnlinkMock.mockReset()
+  })
+
+  it('setDir：不写盘不持久化，返回 success=false + 已统一说明（通道与结构保持兼容）', async () => {
+    const setSettingMock = vi.fn()
+    registerUnifiedDirHandler(makeCtx(setSettingMock), 'u:setDir', 'u:resetDir', 'logDir')
+    expect(handleMock.mock.calls.map((c) => c[0])).toEqual(['u:setDir', 'u:resetDir'])
+
+    const result = (await getHandler('u:setDir')(['/home/user/custom'])) as {
+      success: true
+      data: { success: boolean; needRestart: boolean; message: string }
+    }
+    expect(result.success).toBe(true)
+    expect(result.data.success).toBe(false)
+    expect(result.data.needRestart).toBe(false)
+    expect(result.data.message.length).toBeGreaterThan(0)
+    expect(setSettingMock).not.toHaveBeenCalled()
+    expect(fsMkdirMock).not.toHaveBeenCalled()
+    expect(fsWriteFileMock).not.toHaveBeenCalled()
+  })
+
+  it('resetDir：清键幂等，返回 success=true + needRestart=false（统一目录无需重启）', async () => {
+    const setSettingMock = vi.fn()
+    registerUnifiedDirHandler(makeCtx(setSettingMock), 'u:setDir', 'u:resetDir', 'crashDir')
+    const result = (await getHandler('u:resetDir')()) as {
+      success: true
+      data: { success: boolean; needRestart: boolean; message: string }
+    }
+    expect(result.data.success).toBe(true)
+    expect(result.data.needRestart).toBe(false)
+    expect(setSettingMock).toHaveBeenCalledWith('crashDir', '')
   })
 })

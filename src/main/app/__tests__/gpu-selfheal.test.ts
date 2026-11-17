@@ -49,9 +49,19 @@ vi.mock('../../i18n', () => ({ t: (k: string) => k }))
 
 let tmpDir: string
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.resetModules()
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-selfheal-'))
+  // 取证统一：状态文件写入侧走 forensics-dir。让 tmpDir 本身成为取证根；
+  // resetModules 后须对新模块实例注入 provider（用例内动态 import 复用同一实例）
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-selfheal-'))
+  tmpDir = path.join(base, 'Diagnostics')
+  fs.mkdirSync(tmpDir, { recursive: true })
+  const { setForensicsEnvProvider } = await import('../../utils/forensics-dir')
+  setForensicsEnvProvider(() => ({
+    isPackaged: true,
+    defaultApp: false,
+    exePath: path.join(base, 'app.exe')
+  }))
   mockGetPath.mockImplementation((name: string) => (name === 'userData' ? tmpDir : ''))
   mockAppOn.mockReset()
   mockRelaunch.mockReset()
@@ -66,7 +76,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true })
+  fs.rmSync(path.dirname(tmpDir), { recursive: true, force: true })
 })
 
 describe('GPU 崩溃自愈完整链路', () => {
@@ -196,7 +206,8 @@ describe('GPU 崩溃自愈完整链路', () => {
     )
     const fx = await import('../exit-forensics')
     const m = await import('../gpu-fallback')
-    const ev = fx.getPreviousExitEvidence()
+    // 注入 isAlive：默认探针走真实 process.kill(pid,0)，宿主机恰有 pid=4321 存活会误判 none
+    const ev = fx.getPreviousExitEvidence({ isAlive: () => false })
     expect(ev.kind).toBe('native')
     // 兼容档仍被 FATAL 杀死 → 本次必须落到最大兼容档（2026-11-02 转储证实 1 级救不回来）
     expect(m.recordBootLevel({ prevNativeKill: ev.kind === 'native' })).toBe(2)
@@ -236,9 +247,11 @@ describe('GPU 崩溃自愈完整链路', () => {
     )
     const fx = await import('../exit-forensics')
     const m = await import('../gpu-fallback')
-    expect(fx.getPreviousExitEvidence().kind).toBe('js')
+    expect(fx.getPreviousExitEvidence({ isAlive: () => false }).kind).toBe('js')
     expect(
-      m.recordBootLevel({ prevNativeKill: fx.getPreviousExitEvidence().kind === 'native' })
+      m.recordBootLevel({
+        prevNativeKill: fx.getPreviousExitEvidence({ isAlive: () => false }).kind === 'native'
+      })
     ).toBe(1)
   })
 

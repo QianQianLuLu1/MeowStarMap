@@ -1441,7 +1441,6 @@
       "hint": "Tệp đổ bộ sự cố được tạo tự động bởi Electron crashpad, giữ 10 bản mới nhất, tự động xóa sau 30 ngày. Chỉ ghi lại thông tin sự cố tiến trình, không có dữ liệu quyền riêng tư của người dùng.",
       "listCount": "{{count}} bản ghi",
       "listTitle": "Bản ghi sự cố (mới nhất trước)",
-      "modifyDir": "Thay đổi thư mục",
       "oldest": "Bản ghi cũ nhất",
       "openDir": "Mở thư mục",
       "processMain": "Tiến trình chính",
@@ -1553,7 +1552,6 @@
       "listCountWithGroup": "{{count}} mục · {{groups}} nhóm",
       "listTimeline": "Bản ghi lỗi (mới nhất trước)",
       "logFiles": "Tệp nhật ký",
-      "modifyDir": "Thay đổi thư mục",
       "notInit": "Chưa khởi tạo",
       "occurrenceCount": "Số lần xuất hiện: {{count}}",
       "openDir": "Mở thư mục",
@@ -3319,7 +3317,9 @@
     },
     "setDir": {
       "message": {
-        "resetToDefault": ""
+        "resetToDefault": "",
+        "unified": "",
+        "unifiedReset": ""
       },
       "error": {
         "resetFailed": ""

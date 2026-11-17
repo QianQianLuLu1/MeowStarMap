@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
 import { electronLogger } from '../utils/logger'
+import { getForensicsRoot } from '../utils/forensics-dir'
 import { buildPackagingContext } from '../nikkisync/embedding-paths'
 import {
   createManagerDependencies,
@@ -177,7 +178,8 @@ export const NIKKISYNC_METADATA_THUMBNAIL_DIR_SEGMENTS = [
 ] as const
 /** G3：上游 game-install-root.txt 的本仓等价缓存文件（仅存安装根）。 */
 export const NIKKISYNC_GAME_ROOT_CACHE_SEGMENTS = ['nikkisync', 'game-install-root.txt'] as const
-/** G6：5 个聚合诊断文件与库同目录。 */
+/** G6：5 个聚合诊断文件相对取证根的路径段（2026-11-17 收口补全：随取证清单统一到
+ * forensics 根\nikkisync，不再落 userData；库/同意/字典等数据文件仍留 userData）。 */
 export const NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS = ['nikkisync'] as const
 /** Windows 外壳托盘开关（默认关；关闭时零 Electron Tray 对象）。 */
 export const SETTING_SHELL_TRAY = 'nikkisync.shellTrayEnabled'
@@ -244,6 +246,8 @@ export function buildSessionOptions(input: {
   projectRoot: string
   isPackaged: boolean
   resourcesPath: string
+  /** 聚合诊断落盘目录（宿主注入取证根\nikkisync，与库目录解耦） */
+  diagnosticsDir: string
   env: Record<string, string | undefined>
   settings: NikkiSyncSettingsPort
 }): NikkiSyncSessionOptions {
@@ -309,24 +313,18 @@ export function buildSessionOptions(input: {
         sha256
       ),
     // G3/G6：聚合诊断落盘缝。失败只 warn，不中断启动/扫描；不含路径/UID/原始异常。
-    diagnosticsDir: path.join(input.userDataDir, ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
+    diagnosticsDir: input.diagnosticsDir,
     gameRootCacheFile: path.join(input.userDataDir, ...NIKKISYNC_GAME_ROOT_CACHE_SEGMENTS),
     onDiagnostic: (name: string, payload: unknown) => {
-      const result = writeAggregateDiagnostic(
-        path.join(input.userDataDir, ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
-        name,
-        payload
-      )
+      const result = writeAggregateDiagnostic(input.diagnosticsDir, name, payload)
       if (!result.ok) {
         runtimeLog('warn', `diagnostic write failed: ${result.reason ?? 'unknown'}`)
       }
     },
     onMetadataWorkSettled: () => {
-      const result = writeAggregateDiagnostic(
-        path.join(input.userDataDir, ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
-        'metadata-status.json',
-        { settled: true }
-      )
+      const result = writeAggregateDiagnostic(input.diagnosticsDir, 'metadata-status.json', {
+        settled: true
+      })
       if (!result.ok) {
         runtimeLog('warn', `metadata diagnostic write failed: ${result.reason ?? 'unknown'}`)
       }
@@ -539,6 +537,7 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
     projectRoot: app.getAppPath(),
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
+    diagnosticsDir: path.join(getForensicsRoot(), ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
     env: process.env,
     settings
   })
@@ -603,6 +602,14 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
     runtimeLog('info', 'embedded runtime forcing start: gallery.dataSource=nikkisync')
   }
   const status = await manager.start(sessionOptions)
+  // G1-F3（审查修复轮）：F6 后移使 gallery.dataSource=nikkisync 的首屏取数早于装配完成，
+  // requireSession 未就绪 → 首屏空且无重试。装配成功后经既有 library-changed 通道
+  // （GalleryPage 已订阅）通知渲染层刷新，无需新增 IPC 通道。
+  try {
+    ctx.getMainWindow()?.webContents.send('nikkisync:library-changed')
+  } catch {
+    // 通知失败不阻塞装配：用户手动刷新仍可恢复
+  }
   runtimeLog(
     status.state === 'error' ? 'error' : 'info',
     `embedded runtime start result: state=${status.state} linkReady=${status.linkReady} ` +

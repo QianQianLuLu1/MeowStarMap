@@ -15,7 +15,8 @@ const {
   clearAllCrashesMock,
   getCrashDirectoryMock,
   registerSetDirHandlerMock,
-  registerResetDirHandlerMock
+  registerResetDirHandlerMock,
+  registerUnifiedDirHandlerMock
 } = vi.hoisted(() => {
   return {
     handleMock: vi.fn(),
@@ -25,7 +26,8 @@ const {
     clearAllCrashesMock: vi.fn(),
     getCrashDirectoryMock: vi.fn(),
     registerSetDirHandlerMock: vi.fn(),
-    registerResetDirHandlerMock: vi.fn()
+    registerResetDirHandlerMock: vi.fn(),
+    registerUnifiedDirHandlerMock: vi.fn()
   }
 })
 
@@ -43,7 +45,8 @@ vi.mock('../../services/crash-service', () => ({
 
 vi.mock('./set-dir-handler', () => ({
   registerSetDirHandler: registerSetDirHandlerMock,
-  registerResetDirHandler: registerResetDirHandlerMock
+  registerResetDirHandler: registerResetDirHandlerMock,
+  registerUnifiedDirHandler: registerUnifiedDirHandlerMock
 }))
 
 vi.mock('../../utils/logger', () => ({
@@ -97,13 +100,9 @@ describe('registerCrashHandlers', () => {
       'crash:clear',
       'crash:getDir'
     ])
-    expect(registerSetDirHandlerMock).toHaveBeenCalledWith(
+    expect(registerUnifiedDirHandlerMock).toHaveBeenCalledWith(
       expect.anything(),
       'crash:setDir',
-      'crashDir'
-    )
-    expect(registerResetDirHandlerMock).toHaveBeenCalledWith(
-      expect.anything(),
       'crash:resetDir',
       'crashDir'
     )

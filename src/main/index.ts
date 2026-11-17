@@ -1,23 +1,39 @@
 import { app, protocol } from 'electron'
-import path from 'path'
 import fs from 'fs'
+import path from 'path'
 import { diagLog, logStartupError, getStartupLogPathValue } from './utils/startup-diagnostic'
-import { verifyCriticalNativeModules, showFatalStartupErrorBox } from './app/native-load-guard'
-import { reportEarlyFatal, getUserFacingDiagDir } from './utils/early-crash-guard'
+import { showFatalStartupErrorBox } from './app/native-load-guard'
+import {
+  reportEarlyFatal,
+  markStartupSettled,
+  isStartupSettled,
+  shouldEscalateUnhandledRejection
+} from './utils/early-crash-guard'
 import { setDocumentsPathProvider, CHROMIUM_LOG_BASENAME } from './utils/user-diag-path'
+// 2026-11-17 取证统一收口：取证根目录单一真相源（详见 forensics-dir 头注释）
+import {
+  setForensicsEnvProvider,
+  migrateLegacyUserDataRootSync,
+  getForensicsRoot,
+  getForensicsFilePath
+} from './utils/forensics-dir'
 import { verifyStartupEnvironment } from './app/startup-environment'
 import { electronLogger } from './utils/logger'
 import { registerRendererProtocol } from './app/renderer-protocol'
+// R1（2026-11-15）：单实例锁获取前移到重模块加载之前（详见 single-instance.ts 头注释）
+// B（2026-11-15）：writeSecondInstanceAck 供下方赢家侧 ack 写入监听使用（详见函数注释）
+import {
+  acquireSingleInstanceLockOrHandleFailure,
+  writeSecondInstanceAck
+} from './app/single-instance'
 import {
   recordBootLevel,
-  markBootAttempt,
-  setupGpuProcessWatcher,
   requestSelfHeal,
   wasBootInCompatMode,
   readGpuBootPrefs
 } from './app/gpu-fallback'
 import { applyDiscreteGpuPreference } from './app/gpu-preference'
-import { getPreviousExitEvidence, initExitForensics, markExitStage } from './app/exit-forensics'
+import { getPreviousExitEvidence, markExitStage } from './app/exit-forensics'
 import { installFfmpegSpawnGuard } from './utils/fluent-ffmpeg-shim'
 import { t } from './i18n'
 
@@ -36,7 +52,14 @@ process.on('unhandledRejection', (reason) => {
   diagLog('INDEX', `unhandledRejection: ${String(reason)}`)
   // electron-log 统一落盘原始 reason，便于崩溃诊断
   electronLogger.error('unhandledRejection:', reason)
-  // 不再直接 app.exit(1)：非致命的游离 rejection 不应杀死整个应用，
+  // 启动期（编排未走完）致命化：此时多半是 189-214 行、动态 import 或初始化抛错，
+  // 若只记日志不退出，进程会存活但无窗口、无提示，还可能持有单实例锁 ——
+  // 用户反复双击只会不断撞「已有实例运行」。由 reportEarlyFatal 统一弹框 + 落盘 +
+  // 释放锁 + 退出（内部去重守卫避免与 .catch 重复）。
+  if (shouldEscalateUnhandledRejection(isStartupSettled())) {
+    reportEarlyFatal(reason, { stage: 'index.unhandledRejection' })
+  }
+  // 启动完成后不直接 app.exit(1)：非致命的游离 rejection 不应杀死整个应用，
   // 避免一条边缘异步路径导致扫描进度/用户数据丢失。
 })
 
@@ -52,9 +75,40 @@ try {
   // 不可用时保持未注册，由 user-diag-path 回落到 homedir / tmpdir 候选
 }
 
-// 崩溃转储目录用户友好化：文档/喵星图/Diagnostics（须在 crashReporter.start 前设定）
+// 2026-11-17 取证统一收口：注册取证环境提供器（打包态 → <安装目录>\Diagnostics，
+// 不可写回落 Documents 候选链）。defaultApp 是权威 dev 信号——Electron 41 下
+// `electron.exe <显式 app 目录>` 的 isPackaged 恒为 true（探针实证），只凭它会
+// 把 dev/e2e 的取证写进 node_modules。provider 注册必须先于任何取证写入与
+// recordBootLevel（后者读 gpu-fallback.json）。
 try {
-  app.setPath('crashDumps', getUserFacingDiagDir())
+  setForensicsEnvProvider(() => ({
+    isPackaged: app.isPackaged === true,
+    defaultApp: process.defaultApp === true,
+    exePath: process.execPath
+  }))
+} catch {
+  // 注册失败保持未注册态：forensics-dir 解析自动回落 Documents 候选链
+}
+
+// R-a3（审查修复轮）：升级首启先把 userData 根级历史取证文件（gpu-fallback 档位 /
+// gpu-pref 用户偏好等 6 文件）同步迁入取证根——必须先于 recordBootLevel 读取，
+// 否则旧版 GPU 档位与显式关闭硬件加速偏好在升级后被静默架空。同步版零 electron，
+// 可在模块加载期执行；userData 不可得（ready 前受限）时跳过，阶段 2 异步版兜底。
+try {
+  let legacyUserDataDir = ''
+  try {
+    legacyUserDataDir = app.getPath('userData')
+  } catch {
+    legacyUserDataDir = path.join(app.getPath('appData'), app.getName())
+  }
+  migrateLegacyUserDataRootSync(legacyUserDataDir)
+} catch {
+  // 迁移失败不阻塞启动：GPU 决策按取证根现有证据进行
+}
+
+// 崩溃转储目录统一到取证根（须在 crashReporter.start 前设定）
+try {
+  app.setPath('crashDumps', getForensicsRoot())
 } catch {
   // crashDumps 路径不可用时沿用 electron 默认
 }
@@ -66,7 +120,7 @@ try {
 // 问题设备确实产出了 .dmp；但 dmp 需要专业解析，exit_code 这类关键事实只有本日志里
 // 有原文，且用户能自助打包，故仍把它作为首选取证载体并纳入「导出诊断包」。
 try {
-  const chromiumLogPath = path.join(getUserFacingDiagDir(), CHROMIUM_LOG_BASENAME)
+  const chromiumLogPath = getForensicsFilePath(CHROMIUM_LOG_BASENAME)
   // 轮转：超过 10MB 重命名为 .old（单文件保留一份，防无限增长）
   try {
     if (fs.existsSync(chromiumLogPath) && fs.statSync(chromiumLogPath).size > 10 * 1024 * 1024) {
@@ -105,8 +159,14 @@ try {
 // 三级兼容阶梯：0 硬件加速 / 1 禁用硬件加速 / 2 最大兼容（见 gpu-fallback 头注释）。
 // 上次被原生层杀死（FATAL 是 int 3 同步自杀，JS 侧无异常无退出痕迹，陈旧心跳是唯一信号）
 // → 在上一次实际用过的档位上再降一级；必须在 app ready 之前决策才生效。
+// 审查修复轮 G1-F1：recordBootLevel 在模块加载期执行（早于 whenReady 内的完整锁流程），
+// 输家也会跑到这里。先做一次同步锁探测：未持锁 ⇒ 本次为输家，GPU 决策只读化，
+// 不得写共享 gpu-fallback.json（阈值激活/盖戳会把运行中的赢家打进软件渲染）。
+// 完整的重试+三选项框失败路径仍在 whenReady 内 acquireSingleInstanceLockOrHandleFailure 闭环。
+const holdsInstanceLockAtBoot = app.requestSingleInstanceLock()
 const gpuCompatLevel = recordBootLevel({
-  prevNativeKill: getPreviousExitEvidence().kind === 'native'
+  prevNativeKill: getPreviousExitEvidence().kind === 'native',
+  readOnly: !holdsInstanceLockAtBoot
 })
 if (gpuCompatLevel >= 1) {
   app.disableHardwareAcceleration()
@@ -180,27 +240,27 @@ diagLog('INDEX', 'protocol.registerSchemesAsPrivileged done')
 // 都调用了 app.getPath('userData')，这在 app.whenReady() 之前会抛错
 // （打包环境下错误为 "Cannot create app data folder before app.whenReady()"）
 // 因此必须将 new Application() 延迟到 app.whenReady() 之后执行
-app.whenReady().then(async () => {
+const readyStartup = app.whenReady().then(async () => {
   diagLog('INDEX', 'app.whenReady() fired')
 
-  // 退出取证（心跳 + 退出码落盘 + 异常终止检测）：userData 在 ready 后才可用，
-  // 此处为最早可写时机；后续任何退出路径（含 app.exit/外部终止）都有迹可循
-  try {
-    initExitForensics()
-    markExitStage('when-ready')
-  } catch {
-    // 取证初始化失败绝不阻塞启动
-  }
+  // R1（2026-11-15）：单实例锁必须在动态 import Application / 构造 16 个服务之前获取。
+  // 修复前锁在 lifecycle.ts 内才获取：慢机/杀软扫描首实例的数秒加载窗口内，第二次
+  // 双击的实例可抢先拿锁（实例角色颠倒），且失败实例会白加载重模块、继续执行
+  // initialize() 完成段写共享 userData 的 boot-ok.marker（污染诊断标记）。
+  // 失败路径（6×1s 重试 + 三选项对话框）在 single-instance.ts 内闭环，不加载重模块。
+  const gotLock = await acquireSingleInstanceLockOrHandleFailure()
+  if (!gotLock) return
 
-  // 原生模块加载预检：在加载 Application 之前确保 better-sqlite3 / koffi / sharp 可在本环境加载。
-  // 缺失 VC++ 运行库 / ABI 不匹配 / 解包缺失都会在此被捕获并弹出可操作提示，避免静默崩溃（双击无响应、无弹窗）。
-  if (!verifyCriticalNativeModules()) {
-    try {
-      app.releaseSingleInstanceLock?.()
-    } catch {}
-    app.exit(1)
-    return
-  }
+  // B（2026-11-15）：赢家最早注册 ack 写入器——动态 import Application 的数秒窗口内
+  // （杀软扫描热点）发生的第二次双击也能留下「赢家存活」证据，输家据此在重试耗尽后
+  // 静默让位而不是 6s 后弹「已有实例运行」。lifecycle 稍后注册的完整 handler 负责
+  // 聚焦窗口，两个监听器并存不冲突（EventEmitter 多播）。
+  app.on('second-instance', () => writeSecondInstanceAck())
+
+  // F2+F5（2026-11-15）：退出取证 / 原生模块预检 / markBootAttempt / GPU 观测
+  // 已后移到 lifecycle.ts 单实例锁获取成功之后（赢家专属）。
+  // 此前它们在锁检查之前执行：锁失败实例会给共享 gpu-fallback.json 的失败计数 +1、
+  // 覆写运行实例的 heartbeat.json，并白白加载原生模块拖慢"已有实例运行"弹窗。
 
   // 启动期环境检测：安装路径特殊字符（仅提示）+ userData 可写性（阻塞）。
   // 不可写（权限不足 / 杀毒软件拦截）时弹双语友好引导并终止启动，替代静默失败。
@@ -220,12 +280,6 @@ app.whenReady().then(async () => {
   // 首个窗口导航前注册 app:// 处理器（此时 session 已可用）
   registerRendererProtocol()
   diagLog('INDEX', 'registerRendererProtocol done')
-
-  // GPU 回退：登记本次启动尝试（失败计数+1，did-finish-load 时清零），
-  // 并注册 GPU 子进程崩溃观测（须在窗口创建前，抢在 Chromium FATAL 前落盘回退标记）
-  markBootAttempt()
-  setupGpuProcessWatcher()
-  diagLog('INDEX', 'gpu-fallback attempt marked, watcher registered')
 
   // 开发/测试：模拟 GPU 崩溃以演示"崩溃→自动降级→重启自愈"链路。
   // 仅当本次为硬件加速启动（未禁用）时触发一次；进入兼容模式后的启动不再触发，避免死循环。
@@ -283,11 +337,15 @@ app.whenReady().then(async () => {
       }
     }
     markExitStage('initialized')
-    // 启动成功标记：供纯净系统 / CI 断言启动成功
+    // 启动编排完成：此后 unhandledRejection 降级为「只记日志不退出」，
+    // second-instance 的 0 窗口兜底也从此才允许重建窗口（避免与启动链重入）。
+    markStartupSettled()
+    // 启动成功标记：供纯净系统 / CI 断言启动成功（2026-11-17 随取证统一收口迁至取证根）
     try {
-      fs.writeFileSync(path.join(app.getPath('userData'), 'boot-ok.marker'), 'ok')
+      fs.writeFileSync(getForensicsFilePath('boot-ok.marker'), 'ok')
     } catch {}
   } catch (err) {
+    markStartupSettled()
     const msg = err instanceof Error ? err.message : String(err)
     const stack = err instanceof Error ? err.stack : ''
     diagLog('INDEX', `FATAL ERROR in startup: ${msg}\n${stack}`)
@@ -304,4 +362,12 @@ app.whenReady().then(async () => {
     }
     app.exit(1)
   }
+})
+
+// 启动早期兜底：189-214 行不在 try 内（环境检测 / 协议注册 / GPU 模拟分支），
+// 或上面的 FATAL catch 自身抛错时，必须给出可见提示并退出，绝不留下
+// 「进程存活、无窗口、无提示、还持锁」的静默挂起状态。
+readyStartup.catch((err) => {
+  markStartupSettled()
+  reportEarlyFatal(err, { stage: 'index.whenReady.catch' })
 })

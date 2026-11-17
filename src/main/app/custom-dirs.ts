@@ -2,8 +2,7 @@ import { app } from 'electron'
 import path from 'path'
 import type { AppContext } from './app-context'
 import { backupService } from '../services/backup-service'
-import { setLogDirectory, logger } from '../utils/logger'
-import { setCrashDirectory } from '../services/crash-service'
+import { logger } from '../utils/logger'
 import {
   resolveCustomDir,
   ensureDir,
@@ -12,17 +11,16 @@ import {
   SETTING_KEYS
 } from '../utils/dir-manager'
 import { logStartupError } from '../utils/startup-diagnostic'
+import { unifyForensicsDirs } from './forensics-migrate'
 import { t } from '../i18n'
 
 /**
- * 4 个自定义目录（backupDir / thumbnailCacheDir / logDir / crashDir）的解析、迁移、副作用初始化。
+ * 目录初始化：backupDir / thumbnailCacheDir 保留自定义（通用迁移流程）；
+ * logDir / crashDir 属「问题取证清单」，强制统一到取证根（unifyForensicsDirs：
+ * 历史残留归集迁移 + 清键 + setLogDirectory / crashDumps / setCrashDirectory 接线）。
  * 必须在 initLogger / crashReporter.start / backupService.init / ThumbnailGenerator 初始化前调用。
- * - backupDir：数据库备份目录
- * - thumbnailCacheDir：缩略图缓存目录
- * - logDir：日志目录
- * - crashDir：崩溃 dump 目录（必须通过 app.setPath('crashDumps', ...) 设置，crashReporter 才会写入）
  *
- * P1-A10：抽取 applyCustomDir 辅助函数消除 4 段重复 try/catch + migrateDirFiles 模板
+ * P1-A10：抽取 applyCustomDir 辅助函数消除重复 try/catch + migrateDirFiles 模板
  */
 export async function applyCustomDirectories(ctx: AppContext): Promise<void> {
   // P1-A10：通用迁移流程抽取为辅助函数，每个目录仅 1 行调用 + postSetup 回调
@@ -51,27 +49,9 @@ export async function applyCustomDirectories(ctx: AppContext): Promise<void> {
     }
   )
 
-  await applyCustomDir(
-    ctx,
-    'logDir',
-    'logs',
-    MIGRATE_PATTERNS.logDir,
-    t('main.customDirs.label.logFiles'),
-    (dir) => setLogDirectory(dir)
-  )
-
-  // crashDir 必须在 crashReporter.start() 之前调用 app.setPath，crashpad 子进程才能正确写入
-  await applyCustomDir(
-    ctx,
-    'crashDir',
-    'crashes',
-    MIGRATE_PATTERNS.crashDir,
-    t('main.customDirs.label.crashDump'),
-    (dir) => {
-      app.setPath('crashDumps', dir)
-      setCrashDirectory(dir)
-    }
-  )
+  // 取证目录统一：不走通用 applyCustomDir——其「setSetting 持久化解析结果」与
+  // 「失败回退 userData 子目录」语义对统一目录都是错的（会重新引入分散存储）
+  await unifyForensicsDirs(ctx)
 }
 
 /**

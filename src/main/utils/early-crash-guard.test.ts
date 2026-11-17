@@ -415,3 +415,38 @@ describe('reportEarlyFatal 流状态竞态错误分级（2026-10-15 启动闪退
     expect(exitApp).toHaveBeenCalledWith(1)
   })
 })
+
+// ============================================================================
+// 启动期 unhandledRejection 分级 + settled 闸门
+// 修复前：index.ts 的 unhandledRejection 一律「只记日志不退出」，启动早期异常
+// 导致进程存活、无窗口、无提示、可能持锁（双击无响应 → 反复双击弹「已有实例运行」）。
+// ============================================================================
+describe('shouldEscalateUnhandledRejection（启动期拒绝分级）', () => {
+  it('正常：启动已 settled → 不升级，运行期游离 rejection 不杀应用', async () => {
+    const { shouldEscalateUnhandledRejection } = await import('./early-crash-guard')
+    expect(shouldEscalateUnhandledRejection(true)).toBe(false)
+  })
+
+  it('异常：启动未 settled → 升级为致命（可见提示 + 释放锁 + 退出）', async () => {
+    const { shouldEscalateUnhandledRejection } = await import('./early-crash-guard')
+    expect(shouldEscalateUnhandledRejection(false)).toBe(true)
+  })
+
+  it('边界：非法/非布尔入参一律保守升级，防止漏报', async () => {
+    const { shouldEscalateUnhandledRejection } = await import('./early-crash-guard')
+    for (const value of [undefined, null, 0, 1, 'true', '', {}, NaN]) {
+      expect(shouldEscalateUnhandledRejection(value)).toBe(true)
+    }
+  })
+})
+
+describe('启动 settled 闸门', () => {
+  it('初始未 settled；markStartupSettled() 后为 true 且重复调用幂等', async () => {
+    const guard = await import('./early-crash-guard')
+    expect(guard.isStartupSettled()).toBe(false)
+    guard.markStartupSettled()
+    expect(guard.isStartupSettled()).toBe(true)
+    guard.markStartupSettled()
+    expect(guard.isStartupSettled()).toBe(true)
+  })
+})

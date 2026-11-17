@@ -71,6 +71,7 @@ import {
   readGpuFallbackState,
   classifyBootDecisionForStatus
 } from '../gpu-fallback'
+import { setForensicsEnvProvider } from '../../utils/forensics-dir'
 
 let tmpDir: string
 
@@ -101,7 +102,16 @@ function writePref(value: unknown): void {
 }
 
 beforeEach(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-fb-'))
+  // 取证统一：状态文件写入侧走 forensics-dir。让 tmpDir 本身成为取证根
+  // （exe 置于其父目录 → dirname(exe)\Diagnostics == tmpDir），既有断言路径不变。
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'gpu-fb-'))
+  tmpDir = path.join(base, 'Diagnostics')
+  fs.mkdirSync(tmpDir, { recursive: true })
+  setForensicsEnvProvider(() => ({
+    isPackaged: true,
+    defaultApp: false,
+    exePath: path.join(base, 'app.exe')
+  }))
   mockGetPath.mockReset().mockReturnValue(tmpDir)
   mockAppOn.mockReset()
   mockRelaunch.mockReset()
@@ -115,7 +125,8 @@ beforeEach(() => {
 })
 
 afterEach(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true })
+  setForensicsEnvProvider(null)
+  fs.rmSync(path.dirname(tmpDir), { recursive: true, force: true })
 })
 
 describe('gpu-fallback 状态机', () => {
@@ -714,5 +725,43 @@ describe('gpu-fallback 状态查询导出（供 gpu-status，只读）', () => {
     writeRaw({ consecutiveFailures: 2, fallbackActive: false })
     classifyBootDecisionForStatus()
     expect(readRaw()).toEqual({ consecutiveFailures: 2, fallbackActive: false }) // 阈值路径也不写盘
+  })
+})
+
+describe('gpu-fallback 输家只读决策（审查修复轮 G1-F1：锁前模块加载期不得写共享状态）', () => {
+  it('r1. readOnly：阈值激活分支只返回决策，不落盘 fallbackActive（输家不得污染赢家）', () => {
+    writeRaw({ consecutiveFailures: 2, fallbackActive: false })
+    const before = fs.readFileSync(statePath(), 'utf8')
+    const level = recordBootLevel({ prevNativeKill: false, readOnly: true })
+    expect(level).toBeGreaterThanOrEqual(1)
+    expect(fs.readFileSync(statePath(), 'utf8')).toBe(before)
+  })
+
+  it('r2. readOnly：native 升档与盖戳分支同样不落盘', () => {
+    writeRaw({ consecutiveFailures: 0, fallbackActive: false, compatLevel: 0 })
+    const before = fs.readFileSync(statePath(), 'utf8')
+    const level = recordBootLevel({ prevNativeKill: true, readOnly: true })
+    expect(level).toBe(1)
+    expect(fs.readFileSync(statePath(), 'utf8')).toBe(before)
+  })
+
+  it('r3. 静态守卫：index.ts 的单实例锁探测必须先于 recordBootLevel（输家只读的前提）', () => {
+    const src = fs.readFileSync(path.resolve(process.cwd(), 'src/main/index.ts'), 'utf8')
+    const probeIdx = src.indexOf('app.requestSingleInstanceLock()')
+    const recordIdx = src.indexOf('recordBootLevel({')
+    expect(probeIdx, 'index.ts 缺少锁探测').toBeGreaterThan(-1)
+    expect(recordIdx, 'index.ts 缺少 recordBootLevel').toBeGreaterThan(-1)
+    expect(probeIdx).toBeLessThan(recordIdx)
+  })
+})
+
+describe('gpu-fallback 升级首启证据迁移时序（审查修复轮 R-a3）', () => {
+  it('r4. 静态守卫：index.ts 的 userData 根级同步迁移必须先于 recordBootLevel（否则升级首启丢 GPU 档位/用户偏好）', () => {
+    const src = fs.readFileSync(path.resolve(process.cwd(), 'src/main/index.ts'), 'utf8')
+    const migIdx = src.indexOf('migrateLegacyUserDataRootSync(')
+    const recordIdx = src.indexOf('recordBootLevel({')
+    expect(migIdx, 'index.ts 缺少 userData 根级迁移接线').toBeGreaterThan(-1)
+    expect(recordIdx).toBeGreaterThan(-1)
+    expect(migIdx).toBeLessThan(recordIdx)
   })
 })

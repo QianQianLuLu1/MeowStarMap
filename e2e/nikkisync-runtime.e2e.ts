@@ -38,7 +38,14 @@ import {
   isUpstreamDbTouched,
   type DbSnapshot
 } from './nikkisync-guard'
-import { launchBuiltApp, closeApp, collectDiagLogs, type LaunchedApp } from './helpers'
+import {
+  launchBuiltApp,
+  closeApp,
+  collectDiagLogs,
+  forensicsLogsDirOf,
+  devForensicsLogsDir,
+  type LaunchedApp
+} from './helpers'
 
 const DEFAULT_GAME_ROOT_CANDIDATES = [
   'H:\\InfinityNikki Launcher\\InfinityNikki',
@@ -192,10 +199,10 @@ async function readUpstreamDbSnapshot(): Promise<DbSnapshot> {
 /** N1 在启动应用**之前**取的上游默认库读数；N2 用它比对「本次运行有没有改动它」。 */
 let upstreamDbBefore: DbSnapshot | undefined
 
-/** 读取本次会话的主进程日志（electron-log 落在 `{userData}/logs/*.log`）。 */
+/** 读取本次会话的主进程日志（取证统一收口后 electron-log 落「exe 同目录 Diagnostics/logs」）。 */
 async function readMainLogTail(session: LaunchedApp | undefined): Promise<string> {
   if (!session) return ''
-  const logDir = path.join(session.userDataDir, 'logs')
+  const logDir = session.packaged ? forensicsLogsDirOf(session.exePath) : devForensicsLogsDir()
   let names: string[] = []
   try {
     names = (await fs.readdir(logDir)).filter((name) => name.endsWith('.log'))
@@ -313,7 +320,9 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
   test.afterAll(async ({}, testInfo) => {
     if (!launched) return
     // 失败路径兜底：成功路径已在 N4 内正常 close（那才是要验的退出链）
-    await collectDiagLogs(launched.userDataDir, testInfo.outputDir).catch(() => {})
+    await collectDiagLogs(launched.userDataDir, testInfo.outputDir, launched.exePath).catch(
+      () => {}
+    )
     await closeApp(launched, { keepUserData: true })
   })
 
