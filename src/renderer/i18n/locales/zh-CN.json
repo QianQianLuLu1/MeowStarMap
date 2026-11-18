@@ -4635,6 +4635,7 @@
       "cancelAdd": "取消",
       "rescan": "重新扫描",
       "proposalSummary": "识别到 {{images}} 张照片 / {{videos}} 个视频",
+      "selectionExpired": "选择结果已过期，请重新选择目录",
       "addSpinning": "添加旋转吧大喵目录",
       "markSpinning": "标为旋转吧大喵",
       "unmarkSpinning": "取消旋转吧大喵标记",

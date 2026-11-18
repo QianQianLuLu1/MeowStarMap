@@ -218,6 +218,10 @@ async function getCommonLauncherInstallCandidates(): Promise<string[]> {
   const drives = await getAvailableDrives()
   const programFilesRoots = ['Program Files', 'Program Files (x86)']
   for (const drive of drives) {
+    // 1.0.41（上游 6bdab4b）：APP\NIKKI 容器（官方移动端/渠道安装形态），
+    // 置于 Program Files 变体之前以镜像上游 commonLocations 的容器优先级
+    candidates.push(joinUnder(drive, 'APP', 'NIKKI', 'InfinityNikki Launcher', 'InfinityNikki'))
+    candidates.push(joinUnder(drive, 'APP', 'NIKKI', 'InfinityNikki'))
     for (const pf of programFilesRoots) {
       candidates.push(joinUnder(drive, pf, 'InfinityNikki Launcher', 'InfinityNikki'))
     }

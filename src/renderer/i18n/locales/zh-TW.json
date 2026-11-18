@@ -4642,7 +4642,8 @@
       "sourceOther": "其他來源",
       "sourceUpdated": "目錄來源已更新",
       "typedPlaceholder": "或手動輸入目錄路徑",
-      "inspectTyped": "預檢並新增"
+      "inspectTyped": "預檢並新增",
+      "selectionExpired": "選擇結果已過期，請重新選擇目錄"
     },
     "syncAccounts": {
       "title": "同步帳號",

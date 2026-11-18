@@ -4642,7 +4642,8 @@
       "sourceOther": "その他のソース",
       "sourceUpdated": "フォルダーのソースを更新しました",
       "typedPlaceholder": "または手動でディレクトリパスを入力",
-      "inspectTyped": "プレビューして追加"
+      "inspectTyped": "プレビューして追加",
+      "selectionExpired": "選択結果の有効期限が切れました。ディレクトリを選択し直してください"
     },
     "syncAccounts": {
       "title": "同期アカウント",

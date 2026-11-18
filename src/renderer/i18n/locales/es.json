@@ -4642,7 +4642,8 @@
       "sourceOther": "Otra fuente",
       "sourceUpdated": "Origen de la carpeta actualizado",
       "typedPlaceholder": "O escriba manualmente una ruta de directorio",
-      "inspectTyped": "Inspeccionar y añadir"
+      "inspectTyped": "Inspeccionar y añadir",
+      "selectionExpired": "La selección ha caducado. Vuelva a elegir la carpeta."
     },
     "syncAccounts": {
       "title": "Cuentas sincronizadas",

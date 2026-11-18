@@ -4642,7 +4642,8 @@
       "sourceOther": "Autre source",
       "sourceUpdated": "Source du dossier mise à jour",
       "typedPlaceholder": "Ou saisir manuellement un chemin de dossier",
-      "inspectTyped": "Analyser et ajouter"
+      "inspectTyped": "Analyser et ajouter",
+      "selectionExpired": "La sélection a expiré. Veuillez choisir à nouveau le dossier."
     },
     "syncAccounts": {
       "title": "Comptes synchronisés",

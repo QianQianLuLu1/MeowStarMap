@@ -1,11 +1,13 @@
 /**
- * N0 基准钉子：把「同步图库装载的上游源码/编译产物」锁在 a49764bb（v1.0.40-public-beta.2）。
+ * N0 基准钉子：把「同步图库装载的上游源码/编译产物」锁在 6bdab4b（v1.0.41-public-beta.2）。
  *
  * 为什么存在：本仓通过 junction 消费工作区外 NikkiSync 克隆的 dist/，而 dist/ 未入库、
  * GalleryRuntime.mjs 是生成物。只推进源码或只跑一半构建都不会被既有测试发现。
  * 未链接/无克隆是受支持的默认态（CI npm ci 不带 junction），此时整件 skip。
  *
- * 红灯来源（推进前）：克隆停在 4cb71e2，且 4 个新 metadata 产物不存在。
+ * 红灯来源（推进前）：克隆停在 a49764bb；1.0.41 轮另实测到「dist 半新半旧」漂移
+ * （ExtraScanDirectories/discovery 已含新行为而 GalleryRuntime.mjs 未再生），
+ * 故字节数下界同步提至 a49764bb 完整构建的实测值，捕获「checkout 了但没重建」。
  */
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -16,8 +18,8 @@ import { describe, expect, it } from 'vitest'
 
 import { resolveNikkiSyncRoot, toRootCandidates } from '../link-nikkisync'
 
-const EXPECTED_HEAD = 'a49764bbf98fcb26a84f2356b78d48c459d3da2e'
-const OLD_GALLERY_RUNTIME_BYTES = 277961
+const EXPECTED_HEAD = '6bdab4b4b29b0af5103aafb2d3223e7903c6306c'
+const OLD_GALLERY_RUNTIME_BYTES = 297158
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const isDirectory = (candidate: string): boolean => {
@@ -61,10 +63,10 @@ const readHeadSha = (up: string): string => {
   }
 }
 
-describe.skipIf(upRoot === undefined)('NikkiSync 基准 a49764bb（链接态）', () => {
+describe.skipIf(upRoot === undefined)('NikkiSync 基准 6bdab4b（链接态）', () => {
   const up = upRoot as string
 
-  it('克隆 HEAD 恰好等于 v1.0.40-public-beta.2 的提交', () => {
+  it('克隆 HEAD 恰好等于 v1.0.41-public-beta.2 的提交', () => {
     expect(readHeadSha(up)).toBe(EXPECTED_HEAD)
   })
 

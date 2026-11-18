@@ -4642,7 +4642,8 @@
       "sourceOther": "기타 소스",
       "sourceUpdated": "폴더 소스가 업데이트되었습니다",
       "typedPlaceholder": "또는 디렉터리 경로를 직접 입력",
-      "inspectTyped": "검사 후 추가"
+      "inspectTyped": "검사 후 추가",
+      "selectionExpired": "선택 결과가 만료되었습니다. 디렉터리를 다시 선택해 주세요"
     },
     "syncAccounts": {
       "title": "동기화 계정",

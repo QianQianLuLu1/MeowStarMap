@@ -10,9 +10,13 @@
  *   capture.capturedAt、filter/lighting/location.name、dressing.clothes[].name），
  *   raw 等其余字段（含 nativeParam* 敏感键）绝不进入导出文件
  * - 未移植 liveJpeg/contentIdentifier 分支：WXNN v1 不提供 Live Photo 打包
+ * - 1.0.41（上游 6bdab4b）：exportJpeg 增第 4 参 maxBytes（默认/下界 16MiB，
+ *   上限 128MiB，输出余量 +65536），与上游 photo-export.mjs 逐字对齐
  */
 
 const MAX = 16_777_216
+/** 1.0.41（上游 6bdab4b）：显式 maxBytes 的硬上限，与上游 photo-export.mjs 逐字一致 */
+const MAX_EXPORT_BYTES = 128 * 1024 * 1024
 const EXIF_HEADER = Buffer.from('Exif\0\0')
 
 const CAMERA_KEYS = [
@@ -122,8 +126,11 @@ interface JpegSegment {
 }
 
 /** 解析 JPEG 段结构（到 SOS 为止），校验 SOI/标记/长度 */
-function layout(input: Uint8Array): { bytes: Buffer; segments: JpegSegment[]; sos: number } {
-  if (!(input instanceof Uint8Array) || input.length < 4 || input.length > MAX) {
+function layout(
+  input: Uint8Array,
+  maxBytes: number = MAX
+): { bytes: Buffer; segments: JpegSegment[]; sos: number } {
+  if (!(input instanceof Uint8Array) || input.length < 4 || input.length > maxBytes) {
     throw new Error('JPEG export size')
   }
   const bytes = Buffer.from(input.buffer, input.byteOffset, input.byteLength)
@@ -241,14 +248,19 @@ export interface ExportJpegOptions {
 export function exportJpeg(
   input: Uint8Array,
   metadata: unknown,
-  options: ExportJpegOptions = {}
+  options: ExportJpegOptions = {},
+  maxBytes: number = MAX
 ): Buffer {
+  // 1.0.41：区间校验先于 options（与上游顺序一致）；缺省保持 16MiB 旧语义
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < MAX || maxBytes > MAX_EXPORT_BYTES) {
+    throw new Error('JPEG export size limit')
+  }
   const exif = options.exif ?? true
   const rotation = options.rotation ?? 0
   if (typeof exif !== 'boolean' || ![0, 90, 180, 270].includes(rotation)) {
     throw new Error('Export options')
   }
-  const { bytes, segments } = layout(input)
+  const { bytes, segments } = layout(input, maxBytes)
   if (!exif && !rotation) return Buffer.from(bytes)
   const existing = segments.filter(
     (x) => x.marker === 0xe1 && x.data.subarray(0, 6).equals(EXIF_HEADER)
@@ -374,7 +386,8 @@ export function exportJpeg(
   }
   pieces.push(bytes.subarray(previous))
   const output = Buffer.concat(pieces)
-  if (output.length > MAX) {
+  // 1.0.41：显式上限时允许 EXIF 注入带来的至多 65536 字节余量（上游同判据）
+  if (output.length > (maxBytes === MAX ? MAX : maxBytes + 65536)) {
     output.fill(0)
     throw new Error('Export size limit')
   }

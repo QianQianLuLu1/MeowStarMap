@@ -812,7 +812,15 @@ export const SyncServicePage: React.FC = () => {
       // 新目录可能带来旋转吧大喵分组；仅在账号节可见时刷新，老链接不制造噪声
       if (syncAccounts) await refreshAccounts()
     } catch (error) {
-      showError(error)
+      // 1.0.41 对齐上游控制页：提案确已过期 ⇒ 收起预览让用户重选；其余拒绝保留预览可重试
+      const upstreamCode = (error as { details?: { upstreamCode?: unknown } } | null)?.details
+        ?.upstreamCode
+      if (upstreamCode === 'selection_expired') {
+        setProposal(null)
+        showMessage(t('syncService.extraDirectories.selectionExpired'), 'error')
+      } else {
+        showError(error)
+      }
     } finally {
       setBusy(false)
     }

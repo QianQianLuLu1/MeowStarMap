@@ -608,6 +608,31 @@ describe('findOfficialLauncherGamePaths - 常见安装路径枚举（C: 及自�
       'D:\\InfinityNikki Launcher\\InfinityNikki'
     ])
   })
+
+  it('1.0.41：APP\\NIKKI 容器下的启动器安装命中（对齐上游 commonLocations 新增容器）', async () => {
+    stubAccess([
+      'D:\\',
+      'D:\\APP\\NIKKI\\InfinityNikki Launcher\\InfinityNikki\\X6Game\\Saved\\GamePlayPhotos'
+    ])
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubPowershellFail()
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'D:\\APP\\NIKKI\\InfinityNikki Launcher\\InfinityNikki'
+    ])
+  })
+
+  it('1.0.41：APP\\NIKKI 容器下的裸安装命中', async () => {
+    stubAccess(['E:\\', 'E:\\APP\\NIKKI\\InfinityNikki\\X6Game'])
+    stubExecFile(() => null)
+    mockReadFile.mockRejectedValue(new Error('ENOENT'))
+    stubPowershellFail()
+
+    await expect(findOfficialLauncherGamePaths()).resolves.toEqual([
+      'E:\\APP\\NIKKI\\InfinityNikki'
+    ])
+  })
 })
 
 // ============ findGameInstallRootsByPriority（Subtask B 优先级解析） ============

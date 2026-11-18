@@ -516,4 +516,60 @@ describe('export route（/v1/assets/{id}/resources/{rid}/export）', () => {
     expect(state.status).toBe(200)
     expect(state.headers['X-NikkiSync-SHA256']).toBe(sha256(state.raw))
   })
+
+  it('1.0.41：20MiB 资源在 128MiB 新上限下导出成功（旧 16MiB 上限会 409）', async () => {
+    const end = jpeg.length - 2
+    const large = Buffer.concat([
+      jpeg.subarray(0, end),
+      Buffer.alloc(20 * 1024 * 1024, 7),
+      jpeg.subarray(end)
+    ])
+    writeFileSync(fixturePath, large)
+    const search = '?exif=true&rotation=90'
+    const state = await callExport(
+      createServices(fixturePath, large),
+      'GET',
+      search,
+      signedHeaders('GET', `/v1/assets/1/resources/res_1_primary/export${search}`)
+    )
+    expect(state.status).toBe(200)
+    expect(state.headers['X-NikkiSync-Export']).toBe('jpeg-exif-v1')
+    expect(state.headers['X-NikkiSync-SHA256']).toBe(sha256(state.raw))
+    expect(state.headers['X-NikkiSync-Rotation']).toBe('90')
+    const scanMarker = Buffer.from([0xff, 0xda])
+    expect(
+      state.raw
+        .subarray(state.raw.indexOf(scanMarker))
+        .equals(large.subarray(large.indexOf(scanMarker)))
+    ).toBe(true)
+  })
+
+  it('1.0.41：记录尺寸超 128MiB 仍在打开文件前拒绝（409 resource_not_ready）', async () => {
+    const services = createServices(fixturePath, jpeg, {
+      getResourceLocation: async (assetId, resourceId) =>
+        assetId === '1' && resourceId === 'res_1_primary'
+          ? {
+              resource: {
+                resourceId,
+                role: 'source_primary',
+                fileName: 'photo.jpg',
+                mimeType: 'image/jpeg',
+                fileExt: 'jpg',
+                sizeBytes: 128 * 1024 * 1024 + 1,
+                sha256: sha256(jpeg)
+              },
+              absolutePath: fixturePath
+            }
+          : null
+    })
+    const search = '?exif=true&rotation=0'
+    const state = await callExport(
+      services,
+      'GET',
+      search,
+      signedHeaders('GET', `/v1/assets/1/resources/res_1_primary/export${search}`)
+    )
+    expect(state.status).toBe(409)
+    expect(JSON.parse(state.text)).toMatchObject({ error: { code: 'resource_not_ready' } })
+  })
 })

@@ -4642,7 +4642,8 @@
       "sourceOther": "Other source",
       "sourceUpdated": "Folder source updated",
       "typedPlaceholder": "Or type a directory path manually",
-      "inspectTyped": "Inspect & add"
+      "inspectTyped": "Inspect & add",
+      "selectionExpired": "The selection has expired. Please choose the folder again."
     },
     "syncAccounts": {
       "title": "Sync accounts",

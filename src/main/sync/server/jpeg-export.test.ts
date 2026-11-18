@@ -149,3 +149,77 @@ function readImageDescription(output: Buffer): string {
   }
   throw new Error('ImageDescription not found')
 }
+
+/**
+ * 1.0.41 对齐（上游 6bdab4b）：exportJpeg 第 4 参 maxBytes。
+ * 默认与下界仍为 16MiB；显式上限最高 128MiB；输出余量 maxBytes+65536。
+ * 推进前红灯：旧签名忽略第 4 参且 layout 钉死 16MiB。
+ */
+describe('exportJpeg maxBytes（1.0.41 大图导出）', () => {
+  const MAX = 16_777_216
+  const CAP = 128 * 1024 * 1024
+
+  /** EOI 前插填充造大输入（上游 local-sync-server.test.ts 同款形态，扫描段字节不变） */
+  function largeJpeg(paddingBytes: number): Buffer {
+    const source = minimalJpeg()
+    const end = source.length - 2
+    return Buffer.concat([
+      source.subarray(0, end),
+      Buffer.alloc(paddingBytes, 7),
+      source.subarray(end)
+    ])
+  }
+
+  const scanOf = (b: Buffer): Buffer => b.subarray(b.indexOf(Buffer.from([0xff, 0xda])))
+
+  it('17MiB 输入在显式 128MiB 上限下原样导出（exif=false）', () => {
+    const large = largeJpeg(17 * 1024 * 1024)
+    const output = exportJpeg(large, {}, { exif: false, rotation: 0 }, CAP)
+    expect(output.length).toBe(large.length)
+    expect(output.equals(large)).toBe(true)
+  })
+
+  it('17MiB 输入显式上限下注入 EXIF 且扫描段逐字节不动', () => {
+    const large = largeJpeg(17 * 1024 * 1024)
+    const output = exportJpeg(
+      large,
+      { camera: { focalLength: 35, apertureSection: 1.2 } },
+      { exif: true, rotation: 90 },
+      CAP
+    )
+    expect(scanOf(output).equals(scanOf(large))).toBe(true)
+    expect(output.includes(Buffer.from('"focalLength":35'))).toBe(true)
+  })
+
+  it('非法 maxBytes（低于下界/高于上限/非整数/NaN）一律拒绝', () => {
+    const jpeg = minimalJpeg()
+    for (const bad of [MAX - 1, CAP + 1, 1.5, Number.NaN]) {
+      expect(() => exportJpeg(jpeg, {}, { exif: false, rotation: 0 }, bad)).toThrow(
+        'JPEG export size limit'
+      )
+    }
+  })
+
+  it('守护：缺省第 4 参时 16MiB 边界语义不变；显式 maxBytes=MAX 合法', () => {
+    expect(() => exportJpeg(largeJpeg(17 * 1024 * 1024), {}, { exif: false, rotation: 0 })).toThrow(
+      'JPEG export size'
+    )
+    const jpeg = minimalJpeg()
+    expect(exportJpeg(jpeg, {}, { exif: false, rotation: 0 }, MAX)).toEqual(jpeg)
+  })
+
+  it('输出余量：显式上限下输出可超 maxBytes 但不得超 maxBytes+65536', () => {
+    const maxBytes = MAX + 100
+    const input = largeJpeg(MAX + 90 - minimalJpeg().length)
+    expect(input.length).toBe(MAX + 90)
+    const output = exportJpeg(
+      input,
+      { camera: { focalLength: 35 } },
+      { exif: true, rotation: 0 },
+      maxBytes
+    )
+    expect(output.length).toBeGreaterThan(maxBytes)
+    expect(output.length).toBeLessThanOrEqual(maxBytes + 65536)
+    expect(scanOf(output).equals(scanOf(input))).toBe(true)
+  })
+})

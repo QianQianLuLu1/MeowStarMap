@@ -242,3 +242,35 @@
   `docs/plans/2026-11-13-nikkisync-windows-shell-full-align-实施计划.md` 与
   `docs/IPC_CONTRACT.md` §8.x；第三方署名见 `THIRD_PARTY_NOTICES` 第 7 节。
 - 全过程与逐节点读数见 `docs/plans/2026-11-13-nikkisync-pc-align-1.0.40-实施计划.md`。
+
+## 2026-11-18 对齐上游 6bdab4b（v1.0.41-public-beta.2）的口径订正
+
+- 对齐锚点自 `a49764bb`（v1.0.40-public-beta.2）前进到 `6bdab4b4b29b0af5103aafb2d3223e7903c6306c`
+  （main HEAD / `v1.0.41-public-beta.2`），区间 2 提交：`860ff0f`（beta.1：APP/NIKKI 发现 +
+  confirm 幂等回执 + 控制页过期收预览）、`6bdab4b`（beta.2：大图 JPEG 导出 128MiB）。
+  上游克隆 `checkout --detach` + `npm run build` 完整重建。**推进前实测到「dist 半新半旧」漂移**
+  （ExtraScanDirectories/discovery 产物已含新行为而 GalleryRuntime.mjs 未再生）——基准钉子
+  字节数下界因此提至 a49764bb 完整构建实测值 **297158**（新构建 297377），捕获「checkout 了没重建」。
+- **零变化、明确不动**：`packages/protocol` / 数据库迁移 / 四包入口与 package.json 两端 blob 一致
+  ⇒ `src/shared/sync/**`、`protocol-contract.ts`、`NIKKISYNC_REQUIRED_EXPORTS`、`runtime-loader.ts`、
+  `verify-nikkisync-link.ts` 清单（30 roots / 26 artifacts）、`stage-nikkisync-pc-assets.ts` 31 项、
+  18 张表闭集全部不改；无新增 `nikkisync:*` 通道、不改 preload。
+- **自动流入面**（重建后经 junction 生效，宿主零复刻）：APP/NIKKI 容器发现（同步库走真上游
+  discovery）、ExtraScanDirectories 幂等回执（`add` 成功保留 confirmed 回执 + TTL 续期，重复
+  confirm 幂等返回 state；`remove` 清理对应回执）、控制页脚本 `selection_expired` 收预览、
+  LocalSyncServer 导出上限 128MiB、GalleryRuntime `exportJpeg` 第 4 参 maxBytes。
+  三个新行为由 `runtime-facade.linked.test.ts` 的「1.0.41 钉 A/B/C」suite 钉住
+  （夹具落 `.cache/`、exe 非空、大 JPEG 断言用长度 + 扫描段采样避免 worker OOM）。
+- **本轮有核心路径改动**（与 1.0.40 轮不同）：`nikkisync-handler.ts` 的 K6 错误映射两分支附带
+  `details: {upstreamCode: <短码>}`（`// @core-change:` 已登记），渲染层 `SyncServicePage`
+  `handleConfirmAdd` 据此在 `selection_expired` 时收起提案预览 + 新 i18n 键
+  `syncService.extraDirectories.selectionExpired`（12 语包），其余拒绝保留预览可重试。
+  判定走 details 结构化通道，**不得**改回 message 字符串匹配。`docs/IPC_CONTRACT.md` §8.2.3 已登记。
+- **移植面跟进**（用户裁决）：`src/main/sync/server/jpeg-export.ts` 增第 4 参 maxBytes
+  （默认/下界 16MiB、上限 128MiB、校验先于 options、输出余量 `maxBytes+65536`，逐字对齐上游
+  photo-export.mjs），`api-router.ts` 记录尺寸上限同步 128MiB 并传第 4 参；wire 错误码/头名不变，
+  `PORTED_SYNC_AUTOSTART_ENABLED=false` 不变。
+- **宿主扫描器顺带补齐**（用户裁决）：`src/main/scanner/game-directory-discovery.ts`
+  `getCommonLauncherInstallCandidates` 每盘符增 `APP\NIKKI` 启动器/裸装两模板（置于 pf 变体前
+  镜像上游容器优先级）；不补 WeGameApps（非本轮 diff，最小改动）。
+- 全过程与逐节点红绿读数见 `docs/plans/2026-11-18-nikkisync-1.0.41-beta2-对齐-实施计划.md`。

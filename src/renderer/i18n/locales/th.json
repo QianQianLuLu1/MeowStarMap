@@ -4642,7 +4642,8 @@
       "sourceOther": "แหล่งอื่น",
       "sourceUpdated": "อัปเดตแหล่งของโฟลเดอร์แล้ว",
       "typedPlaceholder": "หรือพิมพ์พาธโฟลเดอร์ด้วยตนเอง",
-      "inspectTyped": "ตรวจสอบและเพิ่ม"
+      "inspectTyped": "ตรวจสอบและเพิ่ม",
+      "selectionExpired": "ผลการเลือกหมดอายุแล้ว กรุณาเลือกไดเรกทอรีอีกครั้ง"
     },
     "syncAccounts": {
       "title": "บัญชีที่ซิงค์",

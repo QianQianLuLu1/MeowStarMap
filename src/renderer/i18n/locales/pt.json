@@ -4642,7 +4642,8 @@
       "sourceOther": "Outra origem",
       "sourceUpdated": "Origem da pasta atualizada",
       "typedPlaceholder": "Ou digite manualmente um caminho de diretório",
-      "inspectTyped": "Inspecionar e adicionar"
+      "inspectTyped": "Inspecionar e adicionar",
+      "selectionExpired": "A seleção expirou. Escolha a pasta novamente."
     },
     "syncAccounts": {
       "title": "Contas sincronizadas",

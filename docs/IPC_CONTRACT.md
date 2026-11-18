@@ -607,6 +607,13 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
   `choose_photo_folder` / `already_covered` / `invalid_source` → `VALIDATION_ERROR`；
   `directory_unavailable` / `too_many_directories` / `selection_expired` /
   `directory_not_found` → `PRECONDITION_FAILED`。
+- **1.0.41（上游 6bdab4b）**：映射产生的 `AppError` 附带 `details: {upstreamCode: <短码>}`
+  结构化透传（通道签名不变，`IpcError.details` 既有字段）。渲染层据此在
+  `selection_expired` 时收起提案预览并提示重新选择（`syncService.extraDirectories.selectionExpired`），
+  其余拒绝保留预览可重试；不得以 message 字符串匹配替代。
+- **1.0.41 幂等回执**：上游 `add`（confirm）成功后保留提案回执（TTL 续期），同一 id 重复
+  confirm 幂等返回当前 state（桌面端丢失首次响应可安全重发）；`remove` 目录后对应回执作废，
+  再 confirm 返回 `selection_expired`。语义全部由上游承担，本仓只透传。
 - **仅作用于 NikkiSync 同步库扫描器**，不影响本地图库自有扫描目录（`customScanPaths`）。
 - 来源标注（`source`）是 1.0.27 新增：`spinning_momo` 让该目录的照片进入「旋转吧大喵」
   账号分组；`other` 显式排除（未标注时上游仍按路径自动识别 `SpinningMomo` / `旋转吧大喵`）。

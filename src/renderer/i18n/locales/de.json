@@ -4642,7 +4642,8 @@
       "sourceOther": "Andere Quelle",
       "sourceUpdated": "Ordnerquelle aktualisiert",
       "typedPlaceholder": "Oder Verzeichnispfad manuell eingeben",
-      "inspectTyped": "Prüfen und hinzufügen"
+      "inspectTyped": "Prüfen und hinzufügen",
+      "selectionExpired": "Die Auswahl ist abgelaufen. Bitte wählen Sie den Ordner erneut."
     },
     "syncAccounts": {
       "title": "Synchronisierte Konten",

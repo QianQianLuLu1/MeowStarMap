@@ -40,7 +40,7 @@ vi.mock('../../utils/logger', () => ({
 interface HandleResult {
   success: boolean
   data?: unknown
-  error?: { code: string; message: string }
+  error?: { code: string; message: string; details?: unknown }
 }
 
 /** 与上游 LocalSyncServer 状态同形的服务状态替身。 */
@@ -1154,6 +1154,22 @@ describe('nikkisync:*-extra-directories（K6）', () => {
       const res = (await handler({}, { path: 'D:\\X' })) as HandleResult
       expect(res.error?.code, code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
     }
+  })
+
+  it('1.0.41：错误映射附带 upstreamCode details，渲染层据此在 selection_expired 时收起提案预览', async () => {
+    const runtime = createRuntimeStub()
+    vi.mocked(runtime.addExtraDirectory).mockRejectedValueOnce(new Error('selection_expired'))
+    vi.mocked(runtime.inspectExtraDirectory).mockRejectedValueOnce(new Error('already_covered'))
+    register(runtime)
+    pathGuard.registerUserPickedDir('D:\\X')
+    const add = getHandler(handleMock, 'nikkisync:add-extra-directory')
+    const expired = (await add({ sender: { send: vi.fn() } }, { id: 'p1' })) as HandleResult
+    expect(expired.error?.code).toBe(IPC_ERROR_CODES.PRECONDITION_FAILED)
+    expect(expired.error?.details).toEqual({ upstreamCode: 'selection_expired' })
+    const inspect = getHandler(handleMock, 'nikkisync:inspect-extra-directory')
+    const covered = (await inspect({}, { path: 'D:\\X' })) as HandleResult
+    expect(covered.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+    expect(covered.error?.details).toEqual({ upstreamCode: 'already_covered' })
   })
 
   it('未装配 ⇒ 六通道统一 PRECONDITION_FAILED', async () => {

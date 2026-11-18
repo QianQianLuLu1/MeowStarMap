@@ -158,6 +158,8 @@ const SYNC_SERVICE_LEAVES = [
   'extraDirectories.cancelAdd',
   'extraDirectories.rescan',
   'extraDirectories.proposalSummary',
+  // 1.0.41：confirm 遭 selection_expired 时收起提案预览的提示（对齐上游控制页）
+  'extraDirectories.selectionExpired',
   // K9：目录来源标注（spinning_momo / other）
   'extraDirectories.addSpinning',
   'extraDirectories.markSpinning',

@@ -1,5 +1,5 @@
 /// <reference lib="es2022.object" />
-// @core-change: 新增 Windows 外壳能力九条 IPC 通道并让 shell-status 如实透出托盘与本地解析器观测事实
+// @core-change: K6 错误映射附带 upstreamCode details，供渲染层在 selection_expired 时收起提案预览（对齐上游 1.0.41）
 import fs from 'node:fs'
 import { ipcMain } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
@@ -283,11 +283,14 @@ function extraDirectoryErrorToAppError(error: unknown): AppError {
   const message = error instanceof Error ? error.message : String(error)
   const code = message.trim().split(/[\s:]+/)[0]
   const mapped = code ? EXTRA_DIRECTORY_ERROR_CODES[code] : undefined
+  // 1.0.41：短码随 details 结构化透传，渲染层据此区分 selection_expired（收起提案预览）
   if (mapped === 'validation') {
-    return AppError.validation(`extra directory request rejected: ${code}`)
+    return AppError.validation(`extra directory request rejected: ${code}`, { upstreamCode: code })
   }
   if (mapped === 'precondition') {
-    return AppError.preconditionFailed(`extra directory state rejected: ${code}`)
+    return AppError.preconditionFailed(`extra directory state rejected: ${code}`, {
+      upstreamCode: code
+    })
   }
   return toAppError(error, 'extra-directories')
 }

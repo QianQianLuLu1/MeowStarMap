@@ -4642,7 +4642,8 @@
       "sourceOther": "Nguồn khác",
       "sourceUpdated": "Đã cập nhật nguồn thư mục",
       "typedPlaceholder": "Hoặc nhập thủ công đường dẫn thư mục",
-      "inspectTyped": "Kiểm tra và thêm"
+      "inspectTyped": "Kiểm tra và thêm",
+      "selectionExpired": "Kết quả lựa chọn đã hết hạn. Vui lòng chọn lại thư mục."
     },
     "syncAccounts": {
       "title": "Tài khoản đồng bộ",

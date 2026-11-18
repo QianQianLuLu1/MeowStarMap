@@ -839,6 +839,42 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     await waitFor(() => expect(serverApi.rescanExtraDirectories).toHaveBeenCalled())
   })
 
+  it('(z2) 1.0.41：confirm 遭 selection_expired ⇒ 收起提案预览并提示重新选择（对齐上游控制页）', async () => {
+    installElectronApi()
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '添加目录' }))
+    expect(await screen.findByText('识别到 12 张照片 / 2 个视频')).toBeInTheDocument()
+    serverApi.addExtraDirectory.mockRejectedValueOnce(
+      Object.assign(new Error('extra directory state rejected: selection_expired'), {
+        code: 'PRECONDITION_FAILED',
+        details: { upstreamCode: 'selection_expired' }
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }))
+    await waitFor(() =>
+      expect(mockShowMessage).toHaveBeenCalledWith('选择结果已过期，请重新选择目录', 'error')
+    )
+    expect(screen.queryByText('识别到 12 张照片 / 2 个视频')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '确认添加' })).not.toBeInTheDocument()
+  })
+
+  it('(z3) 1.0.41：confirm 遭其他拒绝（directory_unavailable）⇒ 预览保留可重试，不误清', async () => {
+    installElectronApi()
+    renderSection()
+    fireEvent.click(await screen.findByRole('button', { name: '添加目录' }))
+    expect(await screen.findByText('识别到 12 张照片 / 2 个视频')).toBeInTheDocument()
+    serverApi.addExtraDirectory.mockRejectedValueOnce(
+      Object.assign(new Error('extra directory state rejected: directory_unavailable'), {
+        code: 'PRECONDITION_FAILED',
+        details: { upstreamCode: 'directory_unavailable' }
+      })
+    )
+    fireEvent.click(screen.getByRole('button', { name: '确认添加' }))
+    await waitFor(() => expect(serverApi.addExtraDirectory).toHaveBeenCalled())
+    expect(screen.getByText('识别到 12 张照片 / 2 个视频')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '确认添加' })).toBeInTheDocument()
+  })
+
   // ===== K8：整理队列（批量删除，破坏性能力） =====
 
   /** 与上游 DeletionQueue.list() 行同形（message 已在 manager 层剔除）。 */

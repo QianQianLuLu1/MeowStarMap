@@ -434,10 +434,12 @@ export function createApiRequestHandler(input: {
       const size = location.resource.sizeBytes
       // digest('hex') 恒小写；DB 记录的形状正则允许大写十六进制，比较前归一
       const hash = location.resource.sha256.toLowerCase()
+      // 1.0.41（上游 6bdab4b）：导出上限 16MiB → 128MiB，与上游 LocalSyncServer 同判据
+      const maxExportSize = 128 * 1024 * 1024
       if (
         !Number.isSafeInteger(size) ||
         size < 4 ||
-        size > 16_777_216 ||
+        size > maxExportSize ||
         !/^[a-f0-9]{64}$/i.test(hash)
       ) {
         throw new Error('Resource bounds')
@@ -465,10 +467,15 @@ export function createApiRequestHandler(input: {
       } finally {
         await file.close()
       }
-      output = exportJpeg(bytes, detail.asset.metadata, {
-        exif: exif === 'true',
-        rotation: Number(rotation) as 0 | 90 | 180 | 270
-      })
+      output = exportJpeg(
+        bytes,
+        detail.asset.metadata,
+        {
+          exif: exif === 'true',
+          rotation: Number(rotation) as 0 | 90 | 180 | 270
+        },
+        maxExportSize
+      )
       const exportedHash = createHash('sha256').update(output).digest('hex')
       res.writeHead(200, {
         'Content-Type': 'image/jpeg',

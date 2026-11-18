@@ -6,12 +6,14 @@ import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { hasNikkiSyncLink } from './runtime-loader'
+import { hasNikkiSyncLink, NIKKISYNC_PACKAGES } from './runtime-loader'
+import { buildPackagingContext, resolveDeepEntryUrl, resolveModuleRoot } from './embedding-paths'
 import {
   createManagerDependencies,
   createRuntimeSession,
   decodePageCursor,
   encodePageCursor,
+  GALLERY_RUNTIME_DEEP_ENTRY,
   loadRuntimeSurface
 } from './runtime-facade'
 import { createRuntimeManager } from './runtime-manager'
@@ -738,5 +740,195 @@ suite('K9：目录来源标注与旋转吧大喵分组（真上游 ExtraScanDire
       k9Session?.dispose()
       fs.rmSync(root, { recursive: true, force: true })
     }
+  }, 30000)
+})
+
+/**
+ * 1.0.41 对齐钉（上游 860ff0f / 6bdab4b，v1.0.41-public-beta.1/2）。
+ * 三个 suite 各钉一个上游新行为，推进前对 a49764bb 旧 dist 必须红：
+ * A 幂等 confirm 回执（旧 add 成功即删 proposal，重复 confirm 抛 selection_expired）；
+ * B APP/NIKKI 容器自动发现（旧 commonLocations 无该容器，沙箱内返回 undefined）；
+ * C exportJpeg 第 4 参 maxBytes（旧签名忽略第 4 参且 layout 钉死 16MiB）。
+ */
+suite('1.0.41 钉 A：ExtraScanDirectories confirm 幂等回执（真上游）', () => {
+  it('重复 confirm 同一提案幂等返回 state；remove 后回执作废', async () => {
+    fs.mkdirSync(path.join(projectRoot, '.cache'), { recursive: true })
+    const root = fs.mkdtempSync(path.join(projectRoot, '.cache', 'nikkisync-141-confirm-'))
+    const imagesDir = path.join(root, 'ExtraPhotos')
+    const dbFile = path.join(root, 'userData', 'nikkisync.db')
+    fs.mkdirSync(imagesDir, { recursive: true })
+    fs.mkdirSync(path.dirname(dbFile), { recursive: true })
+    fs.writeFileSync(
+      path.join(imagesDir, 'shot.jpg'),
+      Buffer.from([0xff, 0xd8, 0xff, 0xdb, 1, 2, 3, 4, 0xff, 0xd9])
+    )
+    let confirmSession: NikkiSyncRuntimeSession | undefined
+    try {
+      confirmSession = await createRuntimeSession(
+        {
+          databaseFile: dbFile,
+          gameRoot: path.join(fixtureRoot, 'game'),
+          watcher: false,
+          projectRoot,
+          extraDirectoriesFile: path.join(root, 'extra-scan-directories.json')
+        },
+        await loadRuntimeSurface(projectRoot)
+      )
+      const extra = confirmSession.extraDirectories
+      expect(extra).toBeDefined()
+      const proposal = (await extra!.inspect(imagesDir)) as { id?: string }
+      expect(proposal.id).toBeTruthy()
+      const first = (await extra!.add(String(proposal.id))) as {
+        directories: Array<{ id: string }>
+      }
+      expect(first.directories).toHaveLength(1)
+      // 上游新语义：桌面端可能丢失首次成功响应而重发同一确认 ⇒ 幂等返回 state，不抛过期
+      const retry = (await extra!.add(String(proposal.id))) as {
+        directories: Array<{ id: string }>
+      }
+      expect(retry.directories).toHaveLength(1)
+      // 守护：目录被移除后回执随之作废，再 confirm 必须拒绝
+      await extra!.remove(first.directories[0].id)
+      await expect(extra!.add(String(proposal.id))).rejects.toThrow(/selection_expired/)
+    } finally {
+      await confirmSession?.scanner.stop()
+      confirmSession?.dispose()
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }, 30000)
+})
+
+/** 上游安装根发现深入口（不在桶导出内，锚定口径同 e2e/nikkisync-game-root.e2e.ts）。 */
+const GAME_DISCOVERY_DEEP_ENTRY = ['game-directory-discovery.js'] as const
+
+interface GameDirectoryDiscoveryModule {
+  discoverInfinityNikkiInstallation: (options?: {
+    includeDefaultPaths?: boolean
+    runningExecutablePaths?: string[]
+    windowsHints?: { registryPaths: string[]; shortcutPaths: string[]; driveRoots: string[] }
+  }) => Promise<{ installRoot?: string; photoRoots?: string[]; source?: string } | undefined>
+}
+
+suite('1.0.41 钉 B：APP/NIKKI 容器自动发现（真上游深入口）', () => {
+  it('游戏关闭且无注册表/快捷方式提示时仍能发现 APP/NIKKI 下的安装', async () => {
+    fs.mkdirSync(path.join(projectRoot, '.cache'), { recursive: true })
+    const sandbox = fs.mkdtempSync(path.join(projectRoot, '.cache', 'nikkisync-141-app-'))
+    const installRoot = path.join(
+      sandbox,
+      'APP',
+      'NIKKI',
+      'InfinityNikki Launcher',
+      'InfinityNikki'
+    )
+    const photos = path.join(installRoot, 'X6Game', 'Saved', 'GamePlayPhotos')
+    try {
+      fs.mkdirSync(photos, { recursive: true })
+      // 主程序文件不能 0 字节（本机杀软实时隔离，见 e2e 同形态注释）
+      fs.writeFileSync(
+        path.join(installRoot, 'InfinityNikki.exe'),
+        'linked-test synthetic install root marker — not a PE binary\n'
+      )
+      const packaging = buildPackagingContext({ isPackaged: false, projectRoot })
+      const moduleRoot = resolveModuleRoot(NIKKISYNC_PACKAGES.pcCompanion, packaging)
+      const discoveryUrl = resolveDeepEntryUrl(moduleRoot.root, GAME_DISCOVERY_DEEP_ENTRY)
+      const discovery = (await import(
+        /* @vite-ignore */ discoveryUrl
+      )) as GameDirectoryDiscoveryModule
+      const result = await discovery.discoverInfinityNikkiInstallation({
+        includeDefaultPaths: false,
+        runningExecutablePaths: [],
+        windowsHints: { registryPaths: [], shortcutPaths: [], driveRoots: [sandbox] }
+      })
+      expect(result).toBeDefined()
+      expect(fs.realpathSync(String(result?.installRoot))).toBe(fs.realpathSync(installRoot))
+      expect(result?.source).toBe('common-location')
+      expect(result?.photoRoots).toEqual([photos])
+    } finally {
+      fs.rmSync(sandbox, { recursive: true, force: true })
+    }
+  }, 30000)
+})
+
+interface GalleryRuntimeExportModule {
+  exportJpeg: (
+    input: Uint8Array,
+    metadata: unknown,
+    options: { exif: boolean; rotation: number; cameraName?: string },
+    maxBytes?: number
+  ) => Buffer
+}
+
+/** 最小 JPEG（段构造形态同上游 tools/wechat-gallery/jpeg-fixture.mjs，exportJpeg 不解码像素）。 */
+function minimalJpegBytes(): Buffer {
+  const segment = (marker: number, data: Buffer): Buffer => {
+    const b = Buffer.alloc(data.length + 4)
+    b[0] = 255
+    b[1] = marker
+    b.writeUInt16BE(data.length + 2, 2)
+    data.copy(b, 4)
+    return b
+  }
+  return Buffer.concat([
+    Buffer.from([255, 216]),
+    segment(0xc0, Buffer.from([8, 0, 64, 0, 48, 1, 1, 0x11, 0])),
+    segment(0xda, Buffer.from([1, 1, 0, 0, 63, 0])),
+    Buffer.from([9, 8, 255, 0, 7, 255, 217])
+  ])
+}
+
+/** EOI 前插填充造大输入（上游 local-sync-server.test.ts 同款形态，扫描段字节不变）。 */
+function largeJpegBytes(paddingBytes: number): Buffer {
+  const source = minimalJpegBytes()
+  const end = source.length - 2
+  return Buffer.concat([
+    source.subarray(0, end),
+    Buffer.alloc(paddingBytes, 7),
+    source.subarray(end)
+  ])
+}
+
+suite('1.0.41 钉 C：GalleryRuntime exportJpeg 显式 maxBytes（真上游再生成产物）', () => {
+  const loadGalleryRuntime = async (): Promise<GalleryRuntimeExportModule> => {
+    const packaging = buildPackagingContext({ isPackaged: false, projectRoot })
+    const moduleRoot = resolveModuleRoot(NIKKISYNC_PACKAGES.pcCompanion, packaging)
+    const url = resolveDeepEntryUrl(moduleRoot.root, GALLERY_RUNTIME_DEEP_ENTRY)
+    return (await import(/* @vite-ignore */ url)) as GalleryRuntimeExportModule
+  }
+
+  it('17MiB 输入在显式 128MiB 上限下导出成功且像素字节不动', async () => {
+    const { exportJpeg } = await loadGalleryRuntime()
+    const large = largeJpegBytes(17 * 1024 * 1024)
+    const output = exportJpeg(large, {}, { exif: false, rotation: 0 }, 128 * 1024 * 1024)
+    // 不做全量 toEqual（17MiB 深比较会在 vitest worker 堆里放大数倍导致 OOM）：
+    // 长度 + 首尾 + 扫描段逐字节足以钉住「原样返回、像素不动」
+    expect(output.length).toBe(large.length)
+    expect(output.subarray(0, 64)).toEqual(large.subarray(0, 64))
+    const scanMarker = Buffer.from([0xff, 0xda])
+    const outputScan = output.subarray(output.indexOf(scanMarker))
+    const inputScan = large.subarray(large.indexOf(scanMarker))
+    expect(outputScan.length).toBe(inputScan.length)
+    expect(outputScan.equals(inputScan)).toBe(true)
+    const withExif = exportJpeg(
+      large,
+      { camera: { focalLength: 35 } },
+      { exif: true, rotation: 90 },
+      128 * 1024 * 1024
+    )
+    const exifScan = withExif.subarray(withExif.indexOf(scanMarker))
+    expect(exifScan.length).toBe(inputScan.length)
+    expect(exifScan.equals(inputScan)).toBe(true)
+    expect(withExif.includes(Buffer.from('"focalLength":35'))).toBe(true)
+  }, 30000)
+
+  it('低于 16MiB 下界的 maxBytes 被拒绝；缺省上限仍钉 16MiB', async () => {
+    const { exportJpeg } = await loadGalleryRuntime()
+    const small = minimalJpegBytes()
+    expect(() => exportJpeg(small, {}, { exif: false, rotation: 0 }, 8 * 1024 * 1024)).toThrow(
+      /JPEG export size limit/
+    )
+    // 守护：不传第 4 参时旧 16MiB 边界语义不变
+    expect(() =>
+      exportJpeg(largeJpegBytes(17 * 1024 * 1024), {}, { exif: false, rotation: 0 })
+    ).toThrow(/JPEG export size/)
   }, 30000)
 })
