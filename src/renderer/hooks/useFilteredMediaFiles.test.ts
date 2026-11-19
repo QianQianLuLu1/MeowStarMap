@@ -12,11 +12,11 @@ import { useFilteredMediaFiles } from './useFilteredMediaFiles'
 import { useMediaStore, type MediaFile } from '../stores/mediaStore'
 import { useUIStore } from '../stores/uiStore'
 
-// FIX(组20-1): hook 在筛选激活时会调用 loadNextMediaPage 拉齐全库，桩掉以断言触发时机
-const loadNextMediaPageMock = vi.hoisted(() => vi.fn())
+// FIX(组20-1): hook 在还有未加载页时会调用 fillRemainingMediaPages 拉齐全库，桩掉以断言触发时机
+const fillRemainingMediaPagesMock = vi.hoisted(() => vi.fn())
 vi.mock('../stores/mediaStore', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../stores/mediaStore')>()
-  return { ...actual, loadNextMediaPage: loadNextMediaPageMock }
+  return { ...actual, fillRemainingMediaPages: fillRemainingMediaPagesMock }
 })
 
 function makeFile(overrides: Partial<MediaFile> = {}): MediaFile {
@@ -489,7 +489,7 @@ describe('useFilteredMediaFiles', () => {
   // FIX(组20-1): 筛选/搜索只作用于已加载分页子集的问题——筛选激活且还有未加载页时应逐页拉齐全库
   describe('全库加载（组20-1）', () => {
     beforeEach(() => {
-      loadNextMediaPageMock.mockClear()
+      fillRemainingMediaPagesMock.mockClear()
     })
 
     it('默认无筛选时也触发全库加载（R-3 翻转旧判据：不滚就停在首屏一页）', () => {
@@ -499,7 +499,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore()
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
     })
 
     it('搜索激活且还有未加载页时同样在加载（判据不再依赖筛选是否激活）', async () => {
@@ -510,11 +510,11 @@ describe('useFilteredMediaFiles', () => {
       resetUIStore()
       const { result } = renderHook(() => useFilteredMediaFiles())
       // 未筛选时已在拉齐（R-3）；筛选态沿用同一判据
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
       await act(async () => {
         useUIStore.setState({ searchQuery: 'img' })
       })
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
       expect(result.current).toHaveLength(1)
     })
 
@@ -528,7 +528,7 @@ describe('useFilteredMediaFiles', () => {
       await act(async () => {
         useUIStore.setState({ filterRating: 3 })
       })
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
     })
 
     it('已加载完毕（hasMoreMedia=false）时即使筛选也不触发', async () => {
@@ -541,7 +541,7 @@ describe('useFilteredMediaFiles', () => {
       await act(async () => {
         useUIStore.setState({ searchQuery: 'img' })
       })
-      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).not.toHaveBeenCalled()
     })
 
     it('回收站视图不触发（独立数据源）', async () => {
@@ -551,7 +551,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore({ currentView: 'recycle-bin', searchQuery: 'img' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).not.toHaveBeenCalled()
     })
   })
 
@@ -560,7 +560,7 @@ describe('useFilteredMediaFiles', () => {
   // 无筛选条件时应同样逐页拉齐全库（计划：docs/archive/plans/fix-gallery-non-grid-500-display.md（已归档，不入仓））
   describe('全视图逐页拉齐全库（R-3，含 grid）', () => {
     beforeEach(() => {
-      loadNextMediaPageMock.mockClear()
+      fillRemainingMediaPagesMock.mockClear()
     })
 
     it('viewMode=list 无筛选且 hasMoreMedia=true 时触发全库加载', () => {
@@ -570,7 +570,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore({ viewMode: 'list' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
     })
 
     it('viewMode=timeline 同样触发全库加载', () => {
@@ -580,7 +580,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore({ viewMode: 'timeline' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
     })
 
     it('viewMode=grid 无筛选时也触发（R-3 翻转：触底入口仅作兜底，不再是不拉齐的理由）', () => {
@@ -590,7 +590,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore({ viewMode: 'grid' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
     })
 
     it('viewMode=masonry 与 event-timeline 同样触发', () => {
@@ -600,7 +600,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore({ viewMode: 'masonry' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).toHaveBeenCalled()
     })
 
     it('viewMode=list 但已加载完毕（hasMoreMedia=false）时不触发', () => {
@@ -610,7 +610,7 @@ describe('useFilteredMediaFiles', () => {
       })
       resetUIStore({ viewMode: 'list' })
       renderHook(() => useFilteredMediaFiles())
-      expect(loadNextMediaPageMock).not.toHaveBeenCalled()
+      expect(fillRemainingMediaPagesMock).not.toHaveBeenCalled()
     })
   })
 })

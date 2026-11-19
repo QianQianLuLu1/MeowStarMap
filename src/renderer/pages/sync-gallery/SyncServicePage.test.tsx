@@ -839,6 +839,24 @@ describe('SyncServicePage（真实 NikkiSync 服务，(a)-(p) 自设置页搬入
     await waitFor(() => expect(serverApi.rescanExtraDirectories).toHaveBeenCalled())
   })
 
+  it('系统选择器等待期间只启动一次，取消后可再次选择', async () => {
+    installElectronApi()
+    renderSection()
+    const add = await screen.findByRole('button', { name: '添加目录' })
+    let cancel!: () => void
+    serverApi.selectDirectory.mockReturnValueOnce(
+      new Promise<null>((resolve) => {
+        cancel = () => resolve(null)
+      })
+    )
+    fireEvent.click(add)
+    fireEvent.click(add)
+    expect(serverApi.selectDirectory).toHaveBeenCalledTimes(1)
+    cancel()
+    await waitFor(() => expect(add).toBeEnabled())
+    expect(serverApi.inspectExtraDirectory).not.toHaveBeenCalled()
+  })
+
   it('(z2) 1.0.41：confirm 遭 selection_expired ⇒ 收起提案预览并提示重新选择（对齐上游控制页）', async () => {
     installElectronApi()
     renderSection()

@@ -63,6 +63,23 @@ beforeEach(() => {
 })
 
 describe('preload 装配完整性', () => {
+  it('目录提案过期的拒绝复制到主世界后保留结构化短码', async () => {
+    const api = getExposed<{
+      nikkisync: typeof import('../api/nikkisync').nikkisyncAPI
+    }>('electronAPI')
+    const error = {
+      code: 'PRECONDITION_FAILED',
+      message: 'extra directory state rejected: selection_expired',
+      details: { upstreamCode: 'selection_expired' }
+    }
+    invokeMock.mockResolvedValueOnce({ success: false, error })
+    await expect(
+      api.nikkisync.addExtraDirectory({ id: 'expired' }).catch((reason: unknown) => {
+        throw structuredClone(reason)
+      })
+    ).rejects.toMatchObject(error)
+  })
+
   it('暴露 5 个全局对象（e2e S3 契约）', () => {
     expect(exposedNames.sort()).toEqual(
       ['IpcError', '__setPluginI18nT', 'electronAPI', 'pluggableElectronIpc', 'pluginAPI'].sort()

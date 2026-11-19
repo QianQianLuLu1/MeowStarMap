@@ -12,6 +12,11 @@ const { mockGetVersion, diagLogMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({ app: { getVersion: mockGetVersion } }))
+// 默认偏好场景使用空的启动镜像，避免读取开发机用户已有的 GPU 选择。
+vi.mock('../gpu-fallback', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../gpu-fallback')>()),
+  readGpuBootPrefs: () => ({})
+}))
 vi.mock('../../utils/startup-diagnostic', () => ({ diagLog: diagLogMock }))
 vi.mock('../../utils/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 

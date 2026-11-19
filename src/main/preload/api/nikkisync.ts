@@ -1,7 +1,7 @@
-// @core-change: 同步图库新增 Windows 外壳能力只读状态与 opt-in 动作透传方法（9 通道 + 1 事件订阅），均为加法
+// @core-change: 目录提案过期拒绝改用可跨隔离桥复制的结构化载荷，保留短码
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
-import { call, subscribe } from '../ipc'
+import { call, IpcError, subscribe } from '../ipc'
 import type {
   NikkiSyncAdmitDirectoryInput,
   NikkiSyncAdmitDirectoryResult,
@@ -123,7 +123,22 @@ export const nikkisyncAPI = {
     call<NikkiSyncExtraDirectoryProposalInfo>('nikkisync:inspect-extra-directory', input),
   /** 按预检 id 加入目录清单（触发上游重扫） */
   addExtraDirectory: (input: { id: string }) =>
-    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:add-extra-directory', input),
+    call<NikkiSyncExtraDirectoriesInfo>('nikkisync:add-extra-directory', input).catch(
+      (error: unknown) => {
+        if (
+          error instanceof IpcError &&
+          (error.details as { upstreamCode?: unknown } | null)?.upstreamCode === 'selection_expired'
+        ) {
+          // contextBridge 会丢弃 Error 的自定义字段，提案过期必须以可复制对象交给页面。
+          return Promise.reject({
+            code: error.code,
+            message: error.message,
+            details: error.details
+          })
+        }
+        throw error
+      }
+    ),
   /** 按目录 id 移除（触发上游重扫） */
   removeExtraDirectory: (input: { id: string }) =>
     call<NikkiSyncExtraDirectoriesInfo>('nikkisync:remove-extra-directory', input),

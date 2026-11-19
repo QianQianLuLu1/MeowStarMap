@@ -608,7 +608,7 @@ tlsFingerprintTail8?, connectionHosts?, lastError?, updatedAt}`——本仓自�
   `directory_unavailable` / `too_many_directories` / `selection_expired` /
   `directory_not_found` → `PRECONDITION_FAILED`。
 - **1.0.41（上游 6bdab4b）**：映射产生的 `AppError` 附带 `details: {upstreamCode: <短码>}`
-  结构化透传（通道签名不变，`IpcError.details` 既有字段）。渲染层据此在
+  结构化透传。确认提案过期时，preload 以普通对象传递 `code/message/details`，保留跨隔离桥的短码。渲染层据此在
   `selection_expired` 时收起提案预览并提示重新选择（`syncService.extraDirectories.selectionExpired`），
   其余拒绝保留预览可重试；不得以 message 字符串匹配替代。
 - **1.0.41 幂等回执**：上游 `add`（confirm）成功后保留提案回执（TTL 续期），同一 id 重复

@@ -31,6 +31,7 @@ import https from 'node:https'
 import net from 'node:net'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parsePairingUri } from '../src/main/nikkisync/sync-server-view'
 import { hasNikkiSyncLink } from '../src/main/nikkisync/runtime-loader'
 import {
   decideNikkiSyncGate,
@@ -511,11 +512,14 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     expect(serverInfo).toBe(200)
 
     const code = await callBridge<PairingCode>({ method: 'pairingCode' })
-    const segments = code.content.split('|')
-    expect(segments).toHaveLength(7)
-    expect(segments[0]).toBe('NS1')
-    expect(segments[1]).toBe(started.serverId)
-    expect(Number(segments[3])).toBe(started.port)
+    // 单网卡为 NS1，多网卡为带 hosts 的 URI。逐字段校验，避免断言失败时输出配对令牌。
+    const decoded = parsePairingUri(code.content)
+    expect(decoded !== null).toBe(true)
+    expect(decoded?.serverId).toBe(started.serverId)
+    expect(decoded?.port).toBe(started.port)
+    expect(decoded?.host).toBe(code.host)
+    expect(decoded?.tlsFingerprintSha256).toBe(started.tlsFingerprintSha256)
+    expect(decoded?.expiresAt).toBe(code.expiresAt)
     // 二维码 pin 的指纹必须与库内 TLS 身份一致（否则手机侧 pinning 无从谈起）
     expect(code.tlsFingerprintSha256).toBe(started.tlsFingerprintSha256)
     expect(Date.parse(code.expiresAt)).toBeGreaterThan(Date.now())

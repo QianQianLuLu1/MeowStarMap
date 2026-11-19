@@ -448,6 +448,28 @@ describe('export route（/v1/assets/{id}/resources/{rid}/export）', () => {
     expect(JSON.parse(second.state.text)).toMatchObject({ error: { code: 'resource_not_ready' } })
   })
 
+  it('客户端在查询资源期间关闭响应后仍可继续导出', async () => {
+    const url = '/v1/assets/1/resources/res_1_primary/export?exif=false&rotation=0'
+    const closed = mockRes()
+    const services = createServices(fixturePath, jpeg)
+    const getDetail = services.getAssetDetail
+    services.getAssetDetail = async (id) => {
+      closed.res.destroy()
+      return getDetail(id)
+    }
+    const handler = createApiRequestHandler({
+      services,
+      config: { maxJsonBodyBytes: 1024 },
+      logger
+    })
+    await handler(mockReq('GET', url, signedHeaders('GET', url)), closed.res)
+    expect(closed.state.status).toBe(0)
+
+    const next = mockRes()
+    await handler(mockReq('GET', url, signedHeaders('GET', url)), next.res)
+    expect(next.state.status).toBe(200)
+  })
+
   it('logs a warning when the export fails instead of swallowing the error silently', async () => {
     const warn = vi.fn()
     // DB 侧保留损坏前的哈希 → 走「源字节哈希失配」409 支路（而非 exportJpeg 解析失败）

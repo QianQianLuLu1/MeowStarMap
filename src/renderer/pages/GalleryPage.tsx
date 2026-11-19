@@ -206,7 +206,13 @@ export const GalleryPage: React.FC = () => {
     const refresh = async () => {
       setLoading(true)
       try {
-        const result = await fetchMediaFromDatabase()
+        // N6 同口径（2026-11-19 修复）：limit 是「目标深度」而非单页大小，按已加载条数取数。
+        // 不传则回落 MEDIA_PAGE_SIZE，已拉深的列表会在切视图/首屏整刷时被整份替换成 500 条
+        // 并把游标复位；keep-alive 下三个 GalleryPage 实例共享同一 store，任一实例切视图都会触发。
+        // 长度必须在 refresh 内读取，不得放进依赖数组（否则「变长 → 重取 → 变长」自激）。
+        const result = await fetchMediaFromDatabase({
+          limit: Math.max(MEDIA_PAGE_SIZE, useMediaStore.getState().mediaFiles.length)
+        })
         if (result) {
           setMediaFiles(result.files)
         }
@@ -250,7 +256,10 @@ export const GalleryPage: React.FC = () => {
         const next = value === 'nikkisync' ? 'nikkisync' : 'local'
         if (next === useMediaStore.getState().source) return
         useMediaStore.getState().setSource(next)
-        return fetchMediaFromDatabase().then((result) => {
+        // 与 useEffect 1 / 2 同口径按已加载条数取数（切源已复位列表，此处恒为首次加载语义）
+        return fetchMediaFromDatabase({
+          limit: Math.max(MEDIA_PAGE_SIZE, useMediaStore.getState().mediaFiles.length)
+        }).then((result) => {
           if (result) setMediaFiles(result.files)
         })
       })

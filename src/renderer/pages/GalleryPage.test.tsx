@@ -87,7 +87,7 @@ vi.mock('./settings/sections', () => ({ useGlobalToast: () => vi.fn() }))
 vi.mock('../utils/gallery', () => ({ getContextMenuItems: vi.fn(() => []) }))
 
 import { GalleryPage } from './GalleryPage'
-import { useMediaStore } from '../stores/mediaStore'
+import { useMediaStore, type MediaFile } from '../stores/mediaStore'
 import { useUIStore } from '../stores/uiStore'
 
 const galleryPageSrc = fs.readFileSync(
@@ -430,5 +430,97 @@ describe('GalleryPage 打开全屏的提交时序（G5：选中态重渲染移�
     const openAt = clickBranch.indexOf('openFullscreen(fileIndex)')
     expect(lastSelect).toBeGreaterThan(-1)
     expect(lastSelect < openAt, '发现晚于 openFullscreen 的 selectMedia 写入').toBe(true)
+  })
+})
+
+/**
+ * 整刷深度对齐（计划：docs/plans/2026-11-19-图库仅显示500张-拉齐链断死修复-实施计划.md）
+ *
+ * 缺陷：useEffect 1（首屏 / 切视图）与 useEffect 3（读回数据源）调用 fetchMediaFromDatabase()
+ * 不传 limit ⇒ targetDepth 回落为 MEDIA_PAGE_SIZE，已加载到 1200 的列表被整份替换成 500、
+ * 游标一并复位。keep-alive 下三个 GalleryPage 实例共享同一 store，任一实例切换视图都会缩回。
+ * 契约：两处整刷与 useEffect 2 同口径，按「已加载条数」取数（limit = max(500, mediaFiles.length)）。
+ */
+describe('GalleryPage 整刷深度对齐（缩回 500 回归）', () => {
+  const TOTAL = 600
+  const PAGE_SIZE = 500
+
+  function makeFiles(total: number): MediaFile[] {
+    return Array.from({ length: total }, (_, i) => ({
+      id: String(i + 1),
+      file_path: `/test/img-${i + 1}.jpg`,
+      file_name: `img-${i + 1}.jpg`,
+      file_type: 'image',
+      file_ext: '.jpg',
+      file_size: 1024,
+      created_at: new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString(),
+      modified_at: new Date(Date.UTC(2026, 0, 1, 0, 0, i)).toISOString(),
+      tags: [],
+      rating: 0,
+      is_favorite: false,
+      notes: '',
+      scene_category: 'other'
+    })) as unknown as MediaFile[]
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    const all = makeFiles(TOTAL)
+    const sorted = [...all].sort((a, b) => Number(b.id) - Number(a.id))
+    // 与 media-repository 的 DESC keyset 同构：按 cursor 锚点切页
+    const listMock = vi.fn(async (args?: { cursor?: { id: number } | null; pageSize?: number }) => {
+      const afterId = args?.cursor?.id ?? null
+      const size = args?.pageSize ?? PAGE_SIZE
+      const startIdx = afterId === null ? 0 : sorted.findIndex((f) => Number(f.id) < afterId)
+      const page = startIdx === -1 ? [] : sorted.slice(startIdx, startIdx + size)
+      const last = page[page.length - 1]
+      const hasMore = startIdx !== -1 && startIdx + size < sorted.length
+      return {
+        files: page,
+        total: sorted.length,
+        typeCounts: { image: sorted.length, video: 0 },
+        hasMore,
+        nextCursor: hasMore && last ? { sortValue: last.created_at, id: Number(last.id) } : null
+      }
+    })
+    ;(window as unknown as { electronAPI: Record<string, unknown> }).electronAPI = {
+      scanner: {
+        status: vi.fn().mockResolvedValue({ status: 'idle' }),
+        onComplete: vi.fn(() => () => {})
+      },
+      media: { list: listMock, onUpdated: vi.fn(() => () => {}) },
+      category: { list: vi.fn().mockResolvedValue({ categories: [] }) }
+    }
+    // 模拟「已拉深到 600 条」的列表，随后一次整刷（挂载 = 首屏 / 切视图同一条路径）
+    useMediaStore.setState({
+      mediaFiles: sorted,
+      mediaCursor: {
+        sortValue: sorted[sorted.length - 1].created_at,
+        id: Number(sorted[sorted.length - 1].id)
+      },
+      hasMoreMedia: true,
+      loading: false,
+      loadingMore: false
+    })
+    useUIStore.setState({
+      currentView: 'gallery',
+      viewMode: 'grid',
+      selectedMediaIds: [],
+      showDuplicates: false,
+      showCorruptedOnly: false
+    })
+  })
+
+  it('首屏整刷不把已加载深度缩回 500（按「已加载条数」取数）', async () => {
+    render(<GalleryPage />)
+
+    // 单条断言：整刷结束后「条数 + 是否还有下一页」同时到位，避免逐条断言在重试期间假通过
+    await waitFor(() => {
+      const state = useMediaStore.getState()
+      expect({ len: state.mediaFiles.length, hasMore: state.hasMoreMedia }).toEqual({
+        len: TOTAL,
+        hasMore: false
+      })
+    })
   })
 })

@@ -125,6 +125,12 @@ interface MediaState {
   mediaTotalCount: number | null
   mediaImageCount: number | null
   mediaVideoCount: number | null
+  // 拉齐重启信号：每完成一轮整刷（fetchMediaFromDatabase 出 finally）就 +1。
+  // 存在理由：逐页拉齐链（fillRemainingMediaPages）的每次尝试都可能被 depthFetchActive 闸门
+  // 挡下或顶掉而不产生任何 state 变化，此时 hasMoreMedia / mediaFiles.length 全都没变，
+  // useFilteredMediaFiles 的 effect 不会重跑 ⇒ 列表永久停在第 500 张而计数仍显示真值。
+  // 本字段只作为 effect 依赖做「闸门已放开」的信号，不参与运算。
+  mediaRefreshEpoch: number
   // 扫描进度
   scanProgress: {
     scanning: boolean
@@ -182,6 +188,7 @@ export const useMediaStore = create<MediaState>((set, _get) => ({
   mediaTotalCount: null,
   mediaImageCount: null,
   mediaVideoCount: null,
+  mediaRefreshEpoch: 0,
   scanProgress: {
     scanning: false,
     scanned: 0,
@@ -739,6 +746,10 @@ export async function fetchMediaFromDatabase(options?: { limit?: number }): Prom
     // 只有本轮仍是最新的一轮才放屏障：被后来者顶掉时屏障归新一轮持有（它在同一处领过），
     // 旧轮若在此清除，竞态就原地复活了。
     if (myRefresh === depthRefreshSeq) depthFetchActive = false
+    // 一轮整刷结束（成功 / 失败 / 弃权皆然）：闸门已放开，递增代次让逐页拉齐链立刻重启一次。
+    // 拉齐链的尝试可能就在本轮整刷期间被 depthFetchActive 挡下或顶掉，若不加这个信号，
+    // 它的三个 effect 依赖全都不会变化 ⇒ 列表永久停在首屏一页（计数仍显示服务端真值）。
+    useMediaStore.setState((state) => ({ mediaRefreshEpoch: state.mediaRefreshEpoch + 1 }))
   }
 }
 
@@ -858,6 +869,75 @@ export async function loadNextMediaPage(): Promise<void> {
     useMediaStore.setState({ mediaCursor: result.nextCursor, hasMoreMedia: result.hasMore })
   } finally {
     useMediaStore.setState({ loadingMore: false })
+  }
+}
+
+/**
+ * 连续无进展时的退避阶梯（ms）：跑完即放弃，等下一个信号（mediaRefreshEpoch / 触底 / 视图切换）重启。
+ * 阶梯而不是死循环，是因为「不得无限重试」——每帧重试会把主进程 IPC 打满。
+ */
+const FILL_RETRY_DELAYS_MS = [150, 300, 600, 1200]
+
+/**
+ * 拉齐链单飞标志。四个 useFilteredMediaFiles 消费方（App / Sidebar / GalleryPage / DetailPage）
+ * 都会在 effect 里调本函数，单飞把它们合并成一条链；否则同一份 store 会被多条链交错推进。
+ */
+let fillPumpActive = false
+
+/**
+ * 逐页拉齐全库：把 mediaFiles 从首屏一页推进到 `hasMoreMedia === false`。
+ *
+ * 存在理由（计划见 docs/plans/2026-11-19-图库仅显示500张-拉齐链断死修复-实施计划.md）：
+ * useFilteredMediaFiles 原先只在 effect 里调一次 loadNextMediaPage，而被 `loadingMore` /
+ * `depthFetchActive` 闸门挡下、取数失败、或被整刷顶掉（mediaCursorWriteSeq 变化）时，
+ * loadNextMediaPage 会**静默返回且不改任何 state** ⇒ effect 的三个依赖（hasMoreMedia /
+ * mediaFiles.length / currentView）全都没变 ⇒ effect 永不重跑 ⇒ 列表永久停在第 500 张，
+ * 而左下角计数仍取服务端真值（1200）——即用户看到的两处数字打架。
+ *
+ * 本函数把「一次性触发」变成「带退避的循环」，并在连续无进展时**有界**放弃：
+ * - 有进展（mediaFiles 变长）⇒ 立即续页，进度重置；
+ * - 无进展 ⇒ 按阶梯退避后重试，阶梯耗尽则告警退出（hasMoreMedia 保持 true，
+ *   下一次整刷结束 / 触底 / 切视图仍能接着走）。
+ * 采用「数组长度是否变化」作唯一进展判据：闸门、失败、弃权三条路径都不写 state，
+ * 而游标推进若真取到了新数据，长度必然变化。
+ *
+ * 副作用边界：只经 loadNextMediaPage 写 store，不抛异常（内部消化并记录日志）。
+ */
+export async function fillRemainingMediaPages(): Promise<void> {
+  if (fillPumpActive) return
+  fillPumpActive = true
+  try {
+    let idleAttempts = 0
+    let pages = 0
+    while (useMediaStore.getState().hasMoreMedia && pages < MAX_DEPTH_PAGES) {
+      const before = useMediaStore.getState().mediaFiles.length
+      // 复用既有并发保护 / 去重追加 / 游标推进，本函数不重复实现
+      await loadNextMediaPage()
+      pages += 1
+      if (useMediaStore.getState().mediaFiles.length > before) {
+        idleAttempts = 0
+        continue
+      }
+      if (!useMediaStore.getState().hasMoreMedia) break
+      if (idleAttempts >= FILL_RETRY_DELAYS_MS.length) {
+        console.warn('[mediaStore] auto-fill stalled', {
+          loaded: before,
+          idleAttempts,
+          pages
+        })
+        break
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, FILL_RETRY_DELAYS_MS[idleAttempts]))
+      idleAttempts += 1
+    }
+    if (pages >= MAX_DEPTH_PAGES) {
+      // 与深度取数同口径的硬顶：防「服务端持续吐新数据」把循环无限拉长
+      console.warn('[mediaStore] auto-fill hit page cap', { pages })
+    }
+  } catch (error) {
+    console.error(i18n.t('mediaStore.log.loadMoreFailed'), error)
+  } finally {
+    fillPumpActive = false
   }
 }
 

@@ -792,12 +792,15 @@ export const SyncServicePage: React.FC = () => {
   const handleAddDirectory = async (): Promise<void> => {
     const api = window.electronAPI
     if (busy || !api) return
+    setBusy(true)
     try {
       const selected = await api.dialog.selectDirectory()
       if (!selected) return
       setProposal(await api.nikkisync.inspectExtraDirectory({ path: selected }))
     } catch (error) {
       showError(error)
+    } finally {
+      setBusy(false)
     }
   }
 

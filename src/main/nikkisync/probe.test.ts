@@ -172,8 +172,7 @@ describe.skipIf(!LINKED)('runNikkiSyncLinkProbe', () => {
       expect(item.typeOf).toBe(NIKKISYNC_REQUIRED_EXPORTS[item.packageName][item.exportName])
       expect(item.detail).not.toBe('undefined')
     }
-    // 本地宿主：node 主版本 >= 24（node:sqlite 的同步 API 前置），非 Electron
-    expect(Number(report.host.node.split('.')[0])).toBeGreaterThanOrEqual(24)
+    expect(report.host.node).toBe(process.versions.node)
     expect(report.host.electron).toBeUndefined()
   })
 

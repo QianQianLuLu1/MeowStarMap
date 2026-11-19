@@ -407,6 +407,7 @@ export function createApiRequestHandler(input: {
       services.getResourceLocation(assetId, resourceId),
       services.getAssetDetail(assetId)
     ])
+    if (res.destroyed) return
     // 仅就绪普通照片的 JPEG 源（motion/缩略图/视频一律 404，对齐上游约束集）
     if (
       !location ||
@@ -467,6 +468,8 @@ export function createApiRequestHandler(input: {
       } finally {
         await file.close()
       }
+      // 异步读取期间连接也可能关闭；此时 close 已发出，不能再等待发送完成。
+      if (res.destroyed) return
       output = exportJpeg(
         bytes,
         detail.asset.metadata,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react'
 import { useUIStore } from '../stores/uiStore'
-import { useMediaStore, loadNextMediaPage, type MediaFile } from '../stores/mediaStore'
+import { useMediaStore, fillRemainingMediaPages, type MediaFile } from '../stores/mediaStore'
 // P1-U4：复用共享字段映射函数，消除 dual-source-of-truth
 import { getGroupFieldValue } from '../utils/group-field'
 // 全文搜索（flexsearch）：索引就绪时优先用 flexsearch 召回；未就绪返回 null 触发降级
@@ -86,22 +86,27 @@ export function useFilteredMediaFiles(): MediaFile[] {
   )
 
   // FIX(组20-1): mediaFiles 是分页加载的子集，筛选/搜索若只作用于该子集，未加载的文件既不参与
-  // 搜索也不参与筛选，结果不完整 —— 故只要还有未加载页就逐页拉齐全库（判据见下方 effect 的 R-3 注释：
-  // 本轮已取消「按是否筛选 / 按视图模式」的取舍，五个视图一律拉齐）。
-  const hasMoreMedia = useMediaStore((s) => s.hasMoreMedia)
-  const mediaCount = mediaFiles.length
+  // 搜索也不参与筛选，结果不完整 —— 故只要还有未加载页就逐页拉齐全库。
   // 修复（R-3，计划见 docs/plans/2026-11-03-fix-media-recognized-count-500-limit-实施计划.md）：
   // d654b9b 曾把拉齐范围限定为「有筛选 或 非 grid 视图」，理由是 grid 有 VirtualImageGrid 的
   // onEndReached 触底翻页。但触底只由用户滚动驱动，不滚就永远停在首屏一页 ⇒ 列表与计数一起
-  // 停在 500。本轮改为五个视图一律逐页拉齐（复用 loadNextMediaPage 的并发保护/去重/游标推进，
-  // 每页追加驱动本 effect 再触发，直至 hasMoreMedia=false）；onEndReached 保留为兜底入口。
+  // 停在 500。R-3 改为五个视图一律逐页拉齐；onEndReached 保留为兜底入口。
+  // 修复（2026-11-19，计划见 docs/plans/2026-11-19-图库仅显示500张-拉齐链断死修复-实施计划.md）：
+  // R-3 的实现只在 effect 里调一次 loadNextMediaPage，而它被并发闸门挡下 / 取数失败 / 被整刷顶掉时
+  // 是**静默返回且不改 state**，三个依赖（hasMoreMedia / mediaCount / currentView）全都不变
+  // ⇒ effect 永不重跑 ⇒ 列表永久停在第 500 张，而左下角计数仍显示服务端真值。现改调
+  // fillRemainingMediaPages（带退避的拉齐链 + 有界放弃），并把 mediaRefreshEpoch 纳入依赖：
+  // 每轮整刷收尾都会递增它，闸门放开后拉齐链据此重启。
   // 展示用的「图片 / 视频」数量另由 useGallerySummaryCounts 取主进程真值，不依赖本 effect 的进度。
+  const hasMoreMedia = useMediaStore((s) => s.hasMoreMedia)
+  const mediaCount = mediaFiles.length
+  const mediaRefreshEpoch = useMediaStore((s) => s.mediaRefreshEpoch)
   useEffect(() => {
     // 回收站视图使用独立的 recycleBinFiles 数据源，不在此触发全库加载
     if (hasMoreMedia && currentView !== 'recycle-bin') {
-      void loadNextMediaPage()
+      void fillRemainingMediaPages()
     }
-  }, [hasMoreMedia, mediaCount, currentView])
+  }, [hasMoreMedia, mediaCount, currentView, mediaRefreshEpoch])
 
   return useMemo(() => {
     // 命中缓存：所有依赖引用均未变化时直接返回上次结果
