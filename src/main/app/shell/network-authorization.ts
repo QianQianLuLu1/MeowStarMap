@@ -48,13 +48,21 @@ export function parsePresence(stdout: string): boolean {
   return Number.isInteger(count) && count > 0
 }
 
-/** Wrap a script for self-elevation (UAC). Declining the prompt surfaces as a cancellation error. */
+/**
+ * Wrap a script for self-elevation (UAC). Declining the prompt surfaces as a cancellation error.
+ * 审查修复 M3/M6：-PassThru 取内层进程并透出 ExitCode（内层失败不再假成功）；
+ * 外层声明 UTF8 输出编码，修 Windows PowerShell 5.1 按 OEM 代码页（GBK）输出 stderr
+ * 导致中文取消文案被 utf8 解码成乱码、拒绝识别失效的问题。
+ */
 export function buildElevatedArgs(script: string): string[] {
   const encoded = Buffer.from(script, 'utf16le').toString('base64')
   const inner = `-NoProfile -NonInteractive -EncodedCommand ${encoded}`
-  const wrapped = `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '${inner.replace(/'/g, "''")}'`
-  const wrappedEncoded = Buffer.from(wrapped, 'utf16le').toString('base64')
-  return ['-NoProfile', '-NonInteractive', '-EncodedCommand', wrappedEncoded]
+  const wrapped = [
+    `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`,
+    `$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList '${inner.replace(/'/g, "''")}'`,
+    `if ($p.ExitCode -ne 0) { exit $p.ExitCode }`
+  ].join('\n')
+  return buildDirectArgs(wrapped)
 }
 
 export function buildDirectArgs(script: string): string[] {
@@ -66,10 +74,10 @@ export function buildDirectArgs(script: string): string[] {
   ]
 }
 
-/** Detect a declined UAC prompt from the PowerShell cancellation error text. */
+/** Detect a declined UAC prompt: ERROR_CANCELLED 退出码（1223/0x800704C7）为主判据，多语言文本兜底。 */
 export function isElevationDeclined(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /cancelled|canceled|操作已取消|用户取消|0x800704C7/i.test(message)
+  return /cancelled|canceled|操作已取消|用户取消|0x800704C7|\b1223\b/i.test(message)
 }
 
 export async function runNetworkAuth(input: {

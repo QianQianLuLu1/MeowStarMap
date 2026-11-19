@@ -730,7 +730,14 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     } catch (error) {
       deps.log('warn', `nikkisync restart failed: ${messageOf(error)}`)
     } finally {
-      if (wasServing) await startSyncServer()
+      // 审查修复 M8：finally 里的复原也可能抛（start() 路径），同样归一日志，保住「永不上抛」
+      if (wasServing) {
+        try {
+          await startSyncServer()
+        } catch (error) {
+          deps.log('warn', `nikkisync restart relisten failed: ${messageOf(error)}`)
+        }
+      }
     }
     return syncStatus()
   }

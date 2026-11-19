@@ -24,11 +24,27 @@ import type { NikkiSyncRuntimeHandle, NikkiSyncRuntimeSession } from '../../nikk
 import { AppError } from '../../../shared/errors/app-error'
 import { IPC_ERROR_CODES } from '../../../shared/types/ipc-types'
 
-const { handleMock } = vi.hoisted(() => ({ handleMock: vi.fn() }))
+const { handleMock, execFileMock, appGetPathMock } = vi.hoisted(() => ({
+  handleMock: vi.fn(),
+  // 默认模拟非管理员（net session 失败）；需要成功路径的用例自行 mockImplementation
+  execFileMock: vi.fn((...args: unknown[]) => {
+    const cb = args[args.length - 1] as (err: Error | null, result?: { stdout: string }) => void
+    cb(new Error('access denied (mock non-admin)'))
+  }),
+  appGetPathMock: vi.fn()
+}))
 
 vi.mock('electron', () => ({
   ipcMain: { handle: handleMock, on: vi.fn() },
-  BrowserWindow: { getFocusedWindow: () => null }
+  BrowserWindow: { getFocusedWindow: () => null },
+  app: { getPath: appGetPathMock },
+  safeStorage: { isEncryptionAvailable: () => false },
+  shell: { openExternal: vi.fn(async () => {}) }
+}))
+
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()),
+  execFile: execFileMock
 }))
 
 vi.mock('../../utils/logger', () => ({
@@ -2263,5 +2279,105 @@ describe('F2 shell-status 诚实观测（trayActive / localPhotoResolverActive�
     const res = (await handler({})) as HandleResult
     expect(res.success).toBe(true)
     expect(res.data).toMatchObject({ trayActive: false, localPhotoResolverActive: false })
+  })
+})
+
+// ===== 审查修复轮（2026-11-19）：M1 位置参数形状 / M7 journal 安全 =====
+
+describe('外壳/控制台通道参数形状（M1：位置参数数组不得当对象解析）', () => {
+  function registerShell(settings: Record<string, boolean> = {}) {
+    const ctx = register(createRuntimeStub())
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, fallback: unknown) => settings[key] ?? fallback
+    )
+    return ctx
+  }
+
+  it('合法入参 + 默认关闭 ⇒ success 且 status:disabled（而非校验错）', async () => {
+    registerShell()
+    const cases: Array<[string, unknown]> = [
+      ['nikkisync:network-auth', { action: 'status' }],
+      ['nikkisync:network-conflict', { action: 'inspect' }],
+      ['nikkisync:hotspot-control', { action: 'status' }],
+      ['nikkisync:hotspot-toggle', { confirm: true }],
+      ['nikkisync:network-repair', {}],
+      ['nikkisync:icon-update-check', {}],
+      ['nikkisync:program-update-check', {}],
+      ['nikkisync:support-submit', {}]
+    ]
+    for (const [channel, input] of cases) {
+      const res = (await getHandler(handleMock, channel)({}, input)) as HandleResult
+      expect(res.success, channel).toBe(true)
+      expect((res.data as { status: string }).status, channel).toBe('disabled')
+    }
+  })
+
+  it('零参调用 ⇒ 缺省 {} 同样 disabled（preload 可选入参形态）', async () => {
+    registerShell()
+    const res = (await getHandler(handleMock, 'nikkisync:icon-update-check')({})) as HandleResult
+    expect(res.success).toBe(true)
+    expect((res.data as { status: string }).status).toBe('disabled')
+  })
+
+  it('非法 action ⇒ VALIDATION_ERROR（结构化校验，而非 INTERNAL_ERROR）', async () => {
+    registerShell()
+    const res = (await getHandler(handleMock, 'nikkisync:network-auth')(
+      {},
+      { action: 'x' }
+    )) as HandleResult
+    expect(res.success).toBe(false)
+    expect(res.error?.code).toBe(IPC_ERROR_CODES.VALIDATION_ERROR)
+  })
+})
+
+describe('journal 形状与注入门（M7：篡改/损坏 journal 拒绝 restore）', () => {
+  let tmpDir: string
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nikkisync-shell-'))
+    appGetPathMock.mockReturnValue(tmpDir)
+  })
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    appGetPathMock.mockReset()
+  })
+
+  function registerWithNetworkRepair() {
+    const ctx = register(createRuntimeStub())
+    ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+      (key: string, fallback: unknown) =>
+        key === 'nikkisync.shellNetworkRepairEnabled' ? true : fallback
+    )
+    return ctx
+  }
+
+  function writeJournalFile(entries: unknown): void {
+    const dir = path.join(tmpDir, 'nikkisync')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(path.join(dir, 'network-repair-journal.json'), JSON.stringify(entries))
+  }
+
+  it('name 非字符串 ⇒ nothing-to-restore，不抛 TypeError', async () => {
+    registerWithNetworkRepair()
+    writeJournalFile([{ name: 123, enabled: true, profile: 'Any' }])
+    const res = (await getHandler(handleMock, 'nikkisync:network-conflict')(
+      {},
+      { action: 'restore' }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect((res.data as { status: string }).status).toBe('nothing-to-restore')
+  })
+
+  it('profile 携带注入载荷 ⇒ nothing-to-restore，零子进程', async () => {
+    registerWithNetworkRepair()
+    writeJournalFile([{ name: 'x', enabled: true, profile: 'Any; Start-Process evil' }])
+    execFileMock.mockClear()
+    const res = (await getHandler(handleMock, 'nikkisync:network-conflict')(
+      {},
+      { action: 'restore' }
+    )) as HandleResult
+    expect(res.success).toBe(true)
+    expect((res.data as { status: string }).status).toBe('nothing-to-restore')
+    // net session（管理员探测）是合法前置；安全属性是零防火墙脚本执行
+    expect(execFileMock.mock.calls.filter((call) => call[0] === 'powershell.exe')).toHaveLength(0)
   })
 })

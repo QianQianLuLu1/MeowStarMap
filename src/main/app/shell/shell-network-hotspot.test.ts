@@ -14,13 +14,19 @@ import {
   parseFirewallRules,
   buildApplyScript,
   runNetworkConflict,
-  type ConflictJournalEntry
+  planRepair,
+  matchesPort,
+  runRepair,
+  parseConflictJournal,
+  type ConflictJournalEntry,
+  type FirewallRule
 } from './network-conflict-repair'
 import {
   buildHotspotScript,
   parseHotspotOutput,
   controlHotspot,
-  nextHotspotState
+  nextHotspotState,
+  toggleHotspot
 } from './temporary-hotspot'
 
 const okExec = (stdout: string) => vi.fn(async () => ({ stdout }))
@@ -307,5 +313,206 @@ describe('hotspot 纯函数与控制', () => {
       execFile: failExec('boom')
     })
     expect(result.status).toBe('failed')
+  })
+})
+
+// ===== 审查修复轮（2026-11-19）：M2/M3/M4/M6/M7/M9/M10 红灯 =====
+
+const decodeScript = (args: string[]): string =>
+  Buffer.from(args[args.length - 1], 'base64').toString('utf16le')
+
+describe('审查修复 M2：热点归属门先于脚本执行 + 持久化 fail-closed', () => {
+  it('stop 外来热点 ⇒ unchanged 且零脚本执行（不得先关再查归属）', async () => {
+    const execFile = vi.fn(async () => ({ stdout: '{"active":true}' }))
+    const writeState = vi.fn(async () => {})
+    const result = await controlHotspot({
+      action: 'stop',
+      enabled: true,
+      execFile,
+      readState: async () => ({ startedHere: false, active: true }),
+      writeState
+    })
+    expect(result.status).toBe('unchanged')
+    expect(execFile).not.toHaveBeenCalled()
+    expect(writeState).not.toHaveBeenCalled()
+  })
+  it('start 后 writeState 失败 ⇒ failed 带 reason（不假报 started）', async () => {
+    const result = await controlHotspot({
+      action: 'start',
+      enabled: true,
+      execFile: okExec('{"active":true,"ssid":"S","password":"P"}'),
+      readState: async () => ({ startedHere: false, active: false }),
+      writeState: async () => {
+        throw new Error('disk full')
+      }
+    })
+    expect(result.status).toBe('failed')
+    expect(result.reason).toBeTruthy()
+  })
+  it('stop 自开热点但 writeState 失败 ⇒ failed（可重试，不假报 stopped）', async () => {
+    const result = await controlHotspot({
+      action: 'stop',
+      enabled: true,
+      execFile: okExec('{"active":false}'),
+      readState: async () => ({ startedHere: true, active: true }),
+      writeState: async () => {
+        throw new Error('disk full')
+      }
+    })
+    expect(result.status).toBe('failed')
+    expect(result.reason).toBeTruthy()
+  })
+  it('legacy toggleHotspot：外来热点 stop ⇒ unchanged 零脚本执行', async () => {
+    const execFile = vi.fn(async () => {})
+    const result = await toggleHotspot({
+      enabled: true,
+      current: { startedHere: false, active: true },
+      requested: false,
+      execFile
+    })
+    expect(result.status).toBe('unchanged')
+    expect(execFile).not.toHaveBeenCalled()
+  })
+  it('legacy toggleHotspot：已在跑的自开热点再 start ⇒ unchanged 零脚本执行', async () => {
+    const execFile = vi.fn(async () => {})
+    const result = await toggleHotspot({
+      enabled: true,
+      current: { startedHere: true, active: true },
+      requested: true,
+      execFile
+    })
+    expect(result.status).toBe('unchanged')
+    expect(execFile).not.toHaveBeenCalled()
+  })
+})
+
+describe('审查修复 M3/M6：提权内层退出码透出 + 外层 UTF8 编码', () => {
+  it('buildElevatedArgs 外层含 -PassThru / ExitCode 检查 / OutputEncoding UTF8', () => {
+    const script = decodeScript(buildElevatedArgs('Write-Output 1'))
+    expect(script).toContain('-PassThru')
+    expect(script).toContain('ExitCode')
+    expect(script).toContain('[Console]::OutputEncoding')
+  })
+  it('isElevationDeclined 识别 ERROR_CANCELLED 数字码 1223', () => {
+    expect(isElevationDeclined(new Error('powershell exited with code 1223'))).toBe(true)
+  })
+  it('restore 命令失败 ⇒ clearJournal 零调用（恢复基线保住）', async () => {
+    const clearJournal = vi.fn(async () => {})
+    const result = await runNetworkConflict({
+      action: 'restore',
+      port: 28080,
+      enabled: true,
+      isAdmin: true,
+      execFile: failExec('boom'),
+      readJournal: async () => [{ name: 'b1', enabled: true, profile: 'Private' }],
+      writeJournal: vi.fn(async () => {}),
+      clearJournal
+    })
+    expect(result.status).toBe('failed')
+    expect(clearJournal).not.toHaveBeenCalled()
+  })
+})
+
+describe('审查修复 M4/M7/M9/M10：修复方向 / journal 基线 / 注入门 / 端口口径', () => {
+  const rule = (over: Partial<FirewallRule>): FirewallRule => ({
+    name: 'r',
+    enabled: true,
+    profile: 'Any',
+    action: 'Block',
+    direction: 'Inbound',
+    localPorts: '28080',
+    ...over
+  })
+  it('planRepair：启用的 Block ⇒ enabled:false；禁用的 Allow ⇒ enabled:true', () => {
+    const plan = planRepair(
+      [rule({ name: 'b' }), rule({ name: 'a', action: 'Allow', enabled: false })],
+      28080
+    )
+    expect(plan.find((p) => p.name === 'b')?.changes.enabled).toBe(false)
+    expect(plan.find((p) => p.name === 'a')?.changes.enabled).toBe(true)
+  })
+  it('matchesPort 识别 Any（全端口规则不再漏检）', () => {
+    expect(matchesPort(rule({ localPorts: 'Any' }), 28080)).toBe(true)
+  })
+  it('二次 repair：journal 合并首见优先，原始基线不被当前状态覆写', async () => {
+    const written: ConflictJournalEntry[][] = []
+    const rules = JSON.stringify([
+      rule({ name: 'b1', enabled: false, profile: 'Private,Public' }),
+      rule({ name: 'b2', profile: 'Private' })
+    ])
+    const result = await runNetworkConflict({
+      action: 'repair',
+      port: 28080,
+      enabled: true,
+      isAdmin: true,
+      execFile: okExec(rules),
+      readJournal: async () => [{ name: 'b1', enabled: true, profile: 'Private' }],
+      writeJournal: async (e) => {
+        written.push(e)
+      },
+      clearJournal: async () => {}
+    })
+    expect(result.status).toBe('repaired')
+    expect(written[0]).toEqual(
+      expect.arrayContaining([
+        { name: 'b1', enabled: true, profile: 'Private' },
+        { name: 'b2', enabled: true, profile: 'Private' }
+      ])
+    )
+  })
+  it('writeJournal 失败 ⇒ failed 且 apply 零执行（fail-closed）', async () => {
+    const execFile = vi.fn(async () => ({ stdout: JSON.stringify([rule({ name: 'b1' })]) }))
+    const result = await runNetworkConflict({
+      action: 'repair',
+      port: 28080,
+      enabled: true,
+      isAdmin: true,
+      execFile,
+      readJournal: async () => null,
+      writeJournal: async () => {
+        throw new Error('disk full')
+      },
+      clearJournal: async () => {}
+    })
+    expect(result.status).toBe('failed')
+    expect(execFile).toHaveBeenCalledTimes(1) // 仅枚举，无 apply
+  })
+  it('port=0（runtime 缺席）⇒ failed 而非假 ok', async () => {
+    const result = await runNetworkConflict({
+      action: 'inspect',
+      port: 0,
+      enabled: true,
+      isAdmin: true,
+      execFile: okExec('[]'),
+      readJournal: async () => null,
+      writeJournal: async () => {},
+      clearJournal: async () => {}
+    })
+    expect(result.status).toBe('failed')
+    expect(result.reason).toBeTruthy()
+  })
+  it('runRepair 编码的是 PowerShell 脚本而非 JSON', async () => {
+    const execFile = vi.fn(async () => {})
+    await runRepair({ enabled: true, rules: [rule({ name: 'b1' })], port: 28080, execFile })
+    expect(decodeScript(execFile.mock.calls[0][1] as string[])).toContain('Set-NetFirewallRule')
+  })
+  it('buildApplyScript 拒绝非法 profile（注入门）', () => {
+    expect(() =>
+      buildApplyScript([
+        { name: 'x', changes: { enabled: true, profile: 'Any; Start-Process evil' } }
+      ])
+    ).toThrow()
+  })
+  it('parseConflictJournal：合法条目透传；形状/白名单非法 ⇒ null 整体拒绝', () => {
+    expect(parseConflictJournal([{ name: 'x', enabled: true, profile: 'Any' }])).toEqual([
+      { name: 'x', enabled: true, profile: 'Any' }
+    ])
+    expect(parseConflictJournal([{ name: 123, enabled: true, profile: 'Any' }])).toBeNull()
+    expect(parseConflictJournal([{ name: 'x', enabled: 'yes', profile: 'Any' }])).toBeNull()
+    expect(
+      parseConflictJournal([{ name: 'x', enabled: true, profile: 'Any; Start-Process evil' }])
+    ).toBeNull()
+    expect(parseConflictJournal('nope')).toBeNull()
+    expect(parseConflictJournal([])).toEqual([])
   })
 })

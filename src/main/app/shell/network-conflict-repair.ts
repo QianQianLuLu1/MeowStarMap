@@ -31,19 +31,26 @@ export function matchesPort(rule: FirewallRule, port: number): boolean {
     .some((part) => {
       const range = /^(\d+)-(\d+)$/.exec(part)
       if (range) return port >= Number(range[1]) && port <= Number(range[2])
-      return part === String(port) || part === '*'
+      // Get-NetFirewallPortFilter.LocalPort 无限制时输出 'Any'（审查修复 M10，与 '*' 同义）
+      return part === String(port) || part === '*' || part === 'Any'
     })
 }
 
-/** Only enabled/profile fields may change; rules are never deleted. */
+/**
+ * Only enabled/profile fields may change; rules are never deleted.
+ * 审查修复 M4：启用的 Block ⇒ 禁用（enabled:false）；禁用的 Allow ⇒ 启用。
+ * 原实现对 Block 也设 enabled:true，只会加强封锁却报告 repaired。
+ */
 export function planRepair(rules: FirewallRule[], port: number): RepairChange[] {
   if (!Number.isInteger(port) || port < 1 || port > 65535) return []
   return rules
-    .filter((rule) => matchesPort(rule, port) && (rule.action === 'Block' || !rule.enabled))
+    .filter(
+      (rule) => matchesPort(rule, port) && (rule.action === 'Block' ? rule.enabled : !rule.enabled)
+    )
     .slice(0, 32)
     .map((rule) => ({
       name: rule.name,
-      changes: { enabled: true, profile: 'Private,Public' }
+      changes: { enabled: rule.action !== 'Block', profile: 'Private,Public' }
     }))
 }
 
@@ -58,7 +65,8 @@ export async function runRepair(input: {
   if (plan.length === 0) return { status: 'repaired', changed: 0 }
   if (!input.execFile) return { status: 'failed', changed: 0 }
   try {
-    const encoded = Buffer.from(JSON.stringify(plan), 'utf16le').toString('base64')
+    // 审查修复 M9：编码的必须是 PowerShell 脚本（原实现把 JSON 当脚本执行，必然失败）
+    const encoded = Buffer.from(buildApplyScript(plan), 'utf16le').toString('base64')
     await input.execFile('powershell.exe', [
       '-NoProfile',
       '-NonInteractive',
@@ -161,13 +169,36 @@ function encodeArgs(script: string): string[] {
 
 function elevatedArgs(script: string): string[] {
   const inner = `-NoProfile -NonInteractive -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`
-  const wrapped = `Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList '${inner.replace(/'/g, "''")}'`
+  // 审查修复 M3/M6：-PassThru 透出内层 ExitCode（失败不再假成功）；外层 UTF8 修 GBK stderr 乱码
+  const wrapped = [
+    `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`,
+    `$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList '${inner.replace(/'/g, "''")}'`,
+    `if ($p.ExitCode -ne 0) { exit $p.ExitCode }`
+  ].join('\n')
   return encodeArgs(wrapped)
 }
 
 function isDeclined(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error)
-  return /cancelled|canceled|操作已取消|用户取消|0x800704C7/i.test(message)
+  return /cancelled|canceled|操作已取消|用户取消|0x800704C7|\b1223\b/i.test(message)
+}
+
+/** profile 白名单（审查修复 M7）：journal 可被本地篡改，内插进 PowerShell 前必须封闭值域。 */
+const FIREWALL_PROFILE_RE = /^(Any|Domain|Private|Public)(,(Domain|Private|Public))*$/
+
+/** journal 逐条形状校验：任一非法 ⇒ null 整体拒绝（不做部分恢复，防篡改/损坏基线）。 */
+export function parseConflictJournal(parsed: unknown): ConflictJournalEntry[] | null {
+  if (!Array.isArray(parsed)) return null
+  const entries: ConflictJournalEntry[] = []
+  for (const item of parsed) {
+    if (!item || typeof item !== 'object') return null
+    const record = item as Record<string, unknown>
+    if (typeof record.name !== 'string' || record.name.length === 0) return null
+    if (typeof record.enabled !== 'boolean') return null
+    if (typeof record.profile !== 'string' || !FIREWALL_PROFILE_RE.test(record.profile)) return null
+    entries.push({ name: record.name, enabled: record.enabled, profile: record.profile })
+  }
+  return entries
 }
 
 /** Apply enabled/profile changes by rule name (never deletes rules). */
@@ -177,6 +208,8 @@ export function buildApplyScript(changes: RepairChange[]): string {
     const enabled = change.changes.enabled === true ? 'True' : 'False'
     const profile =
       typeof change.changes.profile === 'string' ? change.changes.profile : 'Private,Public'
+    // 注入门（M7）：profile 直接内插进 cmdlet 参数，白名单外一律拒绝
+    if (!FIREWALL_PROFILE_RE.test(profile)) throw new Error('Invalid firewall profile')
     const name = change.name.replace(/'/g, "''")
     lines.push(
       `Set-NetFirewallRule -Name '${name}' -Enabled ${enabled} -Profile ${profile} | Out-Null`
@@ -197,13 +230,19 @@ export async function runNetworkConflict(input: {
   clearJournal: () => Promise<void>
 }): Promise<NetworkConflictResult> {
   if (!input.enabled) return { status: 'disabled' }
+  // 审查修复 M10：runtime 缺席/未监听时 port=0，不得假 ok 掩盖「未取到端口」
+  if (!Number.isInteger(input.port) || input.port < 1 || input.port > 65535) {
+    return { status: 'failed', reason: 'invalid sync port' }
+  }
   const journal = await input.readJournal().catch(() => null)
-  const canRestore = Array.isArray(journal) && journal.length > 0
+  // 审查修复 M7：形状/白名单校验后才承认基线（篡改/损坏 journal ⇒ 视同无可恢复）
+  const journalEntries = parseConflictJournal(journal)
+  const canRestore = journalEntries !== null && journalEntries.length > 0
 
   if (input.action === 'restore') {
     if (!canRestore) return { status: 'nothing-to-restore', canRestore: false }
     const script = buildApplyScript(
-      journal!.map((entry) => ({
+      journalEntries!.map((entry) => ({
         name: entry.name,
         changes: { enabled: entry.enabled, profile: entry.profile }
       }))
@@ -248,7 +287,17 @@ export async function runNetworkConflict(input: {
     const rule = rules.find((candidate) => candidate.name === change.name)
     return { name: change.name, enabled: rule?.enabled ?? false, profile: rule?.profile ?? 'Any' }
   })
-  await input.writeJournal(originals).catch(() => undefined)
+  // 审查修复 M4：二次 repair 合并首见优先——已有基线绝不被当前（可能已修复过的）状态覆写
+  const merged: ConflictJournalEntry[] = [...(journalEntries ?? [])]
+  for (const entry of originals) {
+    if (!merged.some((existing) => existing.name === entry.name)) merged.push(entry)
+  }
+  // fail-closed：journal 写失败 ⇒ 不 apply（否则做出不可恢复的修改）
+  try {
+    await input.writeJournal(merged)
+  } catch {
+    return { status: 'failed', canRestore, reason: 'journal persistence failed' }
+  }
   const script = buildApplyScript(plan)
   const args = input.isAdmin ? encodeArgs(script) : elevatedArgs(script)
   try {

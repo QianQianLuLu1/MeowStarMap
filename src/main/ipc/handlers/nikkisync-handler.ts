@@ -1,5 +1,5 @@
 /// <reference lib="es2022.object" />
-// @core-change: 新增同步控制台六通道（library-overview/restart-server/network-auth/network-conflict/hotspot-control/open-hotspot-settings），接线真实防火墙与热点能力（对齐上游 1.0.41 PC 端）
+// @core-change: 审查修复——外壳/控制台通道位置参数校验恒失败改 wrapHandler 元组、子进程分层超时/缓冲、journal 形状与 profile 白名单校验
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFile } from 'node:child_process'
@@ -25,7 +25,11 @@ import {
   type ShellActionName,
   type ShellActionDeps
 } from '../../app/shell/shell-ipc'
-import type { ConflictJournalEntry } from '../../app/shell/network-conflict-repair'
+import {
+  parseConflictJournal,
+  type ConflictJournalEntry
+} from '../../app/shell/network-conflict-repair'
+import { shellExecOptions, isElevatedScriptArgs } from '../../app/shell/shell-exec'
 import type { HotspotState } from '../../app/shell/temporary-hotspot'
 import { isTrayActive } from '../../app/shell/tray-lifecycle'
 // 照片目录校验失败的用户可见文案走主进程 i18n（不含路径，路径只在 details 里走 maskPath 脱敏）
@@ -34,6 +38,7 @@ import {
   assertFileReadPath,
   maskPath,
   pathGuard,
+  wrapHandler,
   wrapHandlerNoArgs,
   wrapHandlerRaw
 } from '../validator'
@@ -1471,10 +1476,14 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   let adminPromise: Promise<boolean> | undefined
   const checkAdmin = (): Promise<boolean> => {
     // Windows：`net session` 仅在管理员态成功退出；结果缓存，避免每次动作都 spawn。
+    // 审查修复 M5：失败/超时重置缓存允许重试，避免一次挂起把所有后续动作连带锁死。
     if (!adminPromise) {
-      adminPromise = execFileAsync('net', ['session'])
+      adminPromise = execFileAsync('net', ['session'], shellExecOptions('query'))
         .then(() => true)
-        .catch(() => false)
+        .catch(() => {
+          adminPromise = undefined
+          return false
+        })
     }
     return adminPromise
   }
@@ -1487,7 +1496,8 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
         ? safeStorage.decryptString(buf)
         : buf.toString('utf8')
       const parsed: unknown = JSON.parse(text)
-      return Array.isArray(parsed) ? (parsed as ConflictJournalEntry[]) : null
+      // 审查修复 M7：逐条形状 + profile 白名单校验，任一非法整体拒绝（防篡改/损坏基线）
+      return parseConflictJournal(parsed)
     } catch {
       return null
     }
@@ -1525,7 +1535,13 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   const buildShellDeps = async (): Promise<ShellActionDeps> => ({
     port: ctx.nikkisyncRuntime?.syncStatus().port ?? 0,
     isAdmin: await checkAdmin(),
-    execFile: (file, args) => execFileAsync(file, args),
+    // 审查修复 M5：分层超时（UAC 300s / 查询 60s）+ 16MB maxBuffer（防火墙全量枚举可超默认 1MB）
+    execFile: (file, args) =>
+      execFileAsync(
+        file,
+        args,
+        shellExecOptions(isElevatedScriptArgs(args) ? 'elevated' : 'query')
+      ),
     readJournal,
     writeJournal,
     clearJournal,
@@ -1533,11 +1549,12 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
     writeHotspotState
   })
 
+  // 审查修复 M1：wrapHandlerRaw 传入的是位置参数数组，原实现用 z.object 解析数组恒失败；
+  // 改项目标准 wrapHandler + z.tuple（缺省 {} 兼容 preload 可选入参）。
   const registerShellAction = (channel: string, action: ShellActionName): void => {
     ipcMain.handle(
       channel,
-      wrapHandlerRaw(ctx, async (args) => {
-        const input = shellActionSchema.parse(args ?? {})
+      wrapHandler(ctx, z.tuple([shellActionSchema.optional().default({})]), async ([input]) => {
         try {
           return await runShellAction(
             action,
@@ -1594,8 +1611,7 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   const networkAuthSchema = z.object({ action: z.enum(['authorize', 'revoke', 'status']) }).strict()
   ipcMain.handle(
     'nikkisync:network-auth',
-    wrapHandlerRaw(ctx, async (args) => {
-      const { action } = networkAuthSchema.parse(args ?? {})
+    wrapHandler(ctx, z.tuple([networkAuthSchema]), async ([{ action }]) => {
       try {
         return await runNetworkAuthAction(action, shellSettings, await buildShellDeps())
       } catch (error) {
@@ -1608,8 +1624,7 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
     .strict()
   ipcMain.handle(
     'nikkisync:network-conflict',
-    wrapHandlerRaw(ctx, async (args) => {
-      const { action } = networkConflictSchema.parse(args ?? {})
+    wrapHandler(ctx, z.tuple([networkConflictSchema]), async ([{ action }]) => {
       try {
         return await runNetworkConflictAction(action, shellSettings, await buildShellDeps())
       } catch (error) {
@@ -1620,8 +1635,7 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   const hotspotControlSchema = z.object({ action: z.enum(['start', 'stop', 'status']) }).strict()
   ipcMain.handle(
     'nikkisync:hotspot-control',
-    wrapHandlerRaw(ctx, async (args) => {
-      const { action } = hotspotControlSchema.parse(args ?? {})
+    wrapHandler(ctx, z.tuple([hotspotControlSchema]), async ([{ action }]) => {
       try {
         return await runHotspotControlAction(action, shellSettings, await buildShellDeps())
       } catch (error) {

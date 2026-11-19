@@ -100,6 +100,10 @@ export async function controlHotspot(input: {
 }): Promise<HotspotControlResult> {
   const persisted = await input.readState().catch(() => ({ startedHere: false, active: false }))
   if (!input.enabled) return { status: 'disabled', state: persisted }
+  // stop: never close a hotspot we did not start — 归属门先于任何脚本执行（审查修复 M2）。
+  if (input.action === 'stop' && !persisted.startedHere) {
+    return { status: 'unchanged', state: persisted }
+  }
   try {
     const { stdout } = await input.execFile(
       'powershell.exe',
@@ -118,15 +122,20 @@ export async function controlHotspot(input: {
         return { status: 'unchanged', state: persisted, ssid: output.ssid }
       }
       const state: HotspotState = { startedHere: true, active: true }
-      await input.writeState(state).catch(() => undefined)
+      // 持久化失败 fail-closed：不假报 started（startedHere 未落盘 ⇒ 后续 stop 不会误关）
+      try {
+        await input.writeState(state)
+      } catch {
+        return { status: 'failed', state: persisted, reason: 'hotspot state persistence failed' }
+      }
       return { status: 'started', state, ssid: output.ssid, password: output.password }
     }
-    // stop: never close a hotspot we did not start.
-    if (!persisted.startedHere) {
-      return { status: 'unchanged', state: persisted }
-    }
     const state: HotspotState = { startedHere: false, active: false }
-    await input.writeState(state).catch(() => undefined)
+    try {
+      await input.writeState(state)
+    } catch {
+      return { status: 'failed', state: persisted, reason: 'hotspot state persistence failed' }
+    }
     return { status: 'stopped', state }
   } catch {
     return { status: 'failed', state: persisted, reason: 'hotspot command failed' }
@@ -143,6 +152,8 @@ export async function toggleHotspot(input: {
   if (!input.enabled) return { status: 'disabled', state: input.current }
   const next = nextHotspotState(input.current, input.requested)
   if (!input.execFile) return { status: 'failed', state: input.current }
+  // unchanged（外来热点 / 已在跑）⇒ 零脚本执行（审查修复 M2，与 controlHotspot 同口径）
+  if (next === input.current) return { status: 'unchanged', state: input.current }
   try {
     await input.execFile(
       'powershell.exe',

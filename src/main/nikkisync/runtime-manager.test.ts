@@ -1907,6 +1907,28 @@ describe('restartSyncService：重启同步服务（2026-11-19 PC 对齐轮）',
     expect(status.running).toBe(false)
     expect(manager.status().state).toBe('unavailable')
   })
+
+  it('异常：finally 复原 LAN 失败也永不上抛，归一进 warn 日志（M8 审查修复）', async () => {
+    // ensureDatabaseDirectory 在 start() 的 try 之外：重启后目录不可写 ⇒ 重建支真实上抛，
+    // 原实现 finally 里 await startSyncServer() 会把该异常透出，违背「永不上抛」承诺。
+    const base = createDependencies()
+    let failEnsure = false
+    const manager = createRuntimeManager({
+      ...base.deps,
+      ensureDatabaseDirectory: (file) => {
+        if (failEnsure) throw new Error('disk gone on relisten')
+        base.deps.ensureDatabaseDirectory(file)
+      }
+    })
+    await manager.startSyncServer()
+    expect(manager.syncStatus().running).toBe(true)
+    failEnsure = true
+    const status = await manager.restartSyncService()
+    expect(status.running).toBe(false)
+    expect(
+      base.calls.logs.some((l) => l.level === 'warn' && /restart relisten failed/.test(l.message))
+    ).toBe(true)
+  })
 })
 
 /**
