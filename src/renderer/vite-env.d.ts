@@ -1277,6 +1277,23 @@ interface WindowElectronAPI {
     toggleHotspot: (
       input: import('../shared/types/electron-api').NikkiSyncShellActionInput
     ) => Promise<import('../shared/types/electron-api').NikkiSyncShellActionResultInfo>
+    // ---- 2026-11-19 PC 对齐轮：同步控制台新增通道 ----
+    getLibraryOverview: () => Promise<
+      import('../shared/types/electron-api').NikkiSyncLibraryOverviewInfo
+    >
+    restartServer: () => Promise<import('../shared/types/electron-api').NikkiSyncServerStatusInfo>
+    networkAuth: (
+      input: import('../shared/types/electron-api').NikkiSyncNetworkAuthInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncNetworkAuthResultInfo>
+    networkConflict: (
+      input: import('../shared/types/electron-api').NikkiSyncNetworkConflictInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncNetworkConflictResultInfo>
+    hotspotControl: (
+      input: import('../shared/types/electron-api').NikkiSyncHotspotControlInput
+    ) => Promise<import('../shared/types/electron-api').NikkiSyncHotspotControlResultInfo>
+    openHotspotSettings: () => Promise<
+      import('../shared/types/electron-api').NikkiSyncOpenHotspotSettingsInfo
+    >
     onShellEvent: (
       callback: (event: import('../shared/types/electron-api').NikkiSyncShellEventInfo) => void
     ) => () => void

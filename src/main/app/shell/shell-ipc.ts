@@ -9,7 +9,10 @@
 import type {
   NikkiSyncShellActionInput,
   NikkiSyncShellActionResultInfo,
-  NikkiSyncShellStatusInfo
+  NikkiSyncShellStatusInfo,
+  NikkiSyncNetworkAuthResultInfo,
+  NikkiSyncNetworkConflictResultInfo,
+  NikkiSyncHotspotControlResultInfo
 } from '../../../shared/types/electron-api'
 
 import {
@@ -22,7 +25,9 @@ import {
 import { checkIconUpdate } from './shell-capabilities'
 import { stageProgramUpdate } from './program-update-client'
 import { configuredEndpoint, submitDiagnosticReport } from './support-gateway-client'
-import { toggleHotspot } from './temporary-hotspot'
+import { toggleHotspot, controlHotspot, type HotspotState } from './temporary-hotspot'
+import { runNetworkAuth, type NetworkAuthAction } from './network-authorization'
+import { runNetworkConflict, type ConflictJournalEntry } from './network-conflict-repair'
 
 export type ShellActionName =
   | 'icon-check'
@@ -33,6 +38,18 @@ export type ShellActionName =
   | 'support-submit'
   | 'network-repair'
   | 'hotspot-toggle'
+
+/** Side-effect dependencies for the real network / hotspot actions (injected by the handler). */
+export interface ShellActionDeps {
+  port: number
+  isAdmin: boolean
+  execFile: (file: string, args: string[]) => Promise<{ stdout: string }>
+  readJournal: () => Promise<ConflictJournalEntry[] | null>
+  writeJournal: (entries: ConflictJournalEntry[]) => Promise<void>
+  clearJournal: () => Promise<void>
+  readHotspotState: () => Promise<HotspotState>
+  writeHotspotState: (state: HotspotState) => Promise<void>
+}
 
 const ACTION_FLAGS: Record<ShellActionName, string> = {
   'icon-check': SHELL_SETTING_KEYS.iconUpdate,
@@ -61,7 +78,8 @@ export async function runShellAction(
   action: ShellActionName,
   input: NikkiSyncShellActionInput,
   settings: ShellSettingsReader,
-  emit?: (event: ShellEvent) => void
+  emit?: (event: ShellEvent) => void,
+  deps?: ShellActionDeps
 ): Promise<NikkiSyncShellActionResultInfo> {
   if (!isShellFeatureEnabled(settings, ACTION_FLAGS[action])) return { status: 'disabled' }
   emit?.({ type: 'checking' })
@@ -85,13 +103,33 @@ export async function runShellAction(
         endpoint: configuredEndpoint(process.env) ?? undefined
       })) as NikkiSyncShellActionResultInfo
     case 'network-repair':
-      // 本构建未接线防火墙规则枚举（需要管理员态 COM/PowerShell），绝不报 repaired 伪成功。
-      // runRepair 纯函数保留在 network-conflict-repair.ts 供未来接线，其单测不变。
-      return {
-        status: 'unavailable',
-        reason: 'firewall rule enumeration is not wired in this build'
+      // 2026-11-19：接线真实防火墙枚举/修复（deps 由 handler 注入）。无 deps 时仍诚实 unavailable。
+      if (!deps) {
+        return {
+          status: 'unavailable',
+          reason: 'firewall rule enumeration is not wired in this build'
+        }
       }
+      return (await runNetworkConflict({
+        action: 'repair',
+        port: deps.port,
+        enabled: true,
+        isAdmin: deps.isAdmin,
+        execFile: deps.execFile,
+        readJournal: deps.readJournal,
+        writeJournal: deps.writeJournal,
+        clearJournal: deps.clearJournal
+      })) as unknown as NikkiSyncShellActionResultInfo
     case 'hotspot-toggle':
+      if (deps) {
+        return (await controlHotspot({
+          action: input.confirm === true ? 'start' : 'stop',
+          enabled: true,
+          execFile: deps.execFile,
+          readState: deps.readHotspotState,
+          writeState: deps.writeHotspotState
+        })) as unknown as NikkiSyncShellActionResultInfo
+      }
       return (await toggleHotspot({
         enabled: true,
         current: { startedHere: false, active: false },
@@ -100,4 +138,52 @@ export async function runShellAction(
     default:
       return { status: 'unsupported-action' }
   }
+}
+
+/** `nikkisync:network-auth`：授权 / 撤销 / 查询（opt-in 门 + 真实 netsh 等价 cmdlet）。 */
+export async function runNetworkAuthAction(
+  action: NetworkAuthAction,
+  settings: ShellSettingsReader,
+  deps: ShellActionDeps
+): Promise<NikkiSyncNetworkAuthResultInfo> {
+  return runNetworkAuth({
+    action,
+    port: deps.port,
+    enabled: isShellFeatureEnabled(settings, SHELL_SETTING_KEYS.networkRepair),
+    isAdmin: deps.isAdmin,
+    execFile: deps.execFile
+  })
+}
+
+/** `nikkisync:network-conflict`：检查 / 修复 / 撤销修复（journal 持久化由 deps 注入）。 */
+export async function runNetworkConflictAction(
+  action: 'inspect' | 'repair' | 'restore',
+  settings: ShellSettingsReader,
+  deps: ShellActionDeps
+): Promise<NikkiSyncNetworkConflictResultInfo> {
+  return runNetworkConflict({
+    action,
+    port: deps.port,
+    enabled: isShellFeatureEnabled(settings, SHELL_SETTING_KEYS.networkRepair),
+    isAdmin: deps.isAdmin,
+    execFile: deps.execFile,
+    readJournal: deps.readJournal,
+    writeJournal: deps.writeJournal,
+    clearJournal: deps.clearJournal
+  })
+}
+
+/** `nikkisync:hotspot-control`：开启 / 结束 / 查询（startedHere 持久化由 deps 注入）。 */
+export async function runHotspotControlAction(
+  action: 'start' | 'stop' | 'status',
+  settings: ShellSettingsReader,
+  deps: ShellActionDeps
+): Promise<NikkiSyncHotspotControlResultInfo> {
+  return controlHotspot({
+    action,
+    enabled: isShellFeatureEnabled(settings, SHELL_SETTING_KEYS.hotspot),
+    execFile: deps.execFile,
+    readState: deps.readHotspotState,
+    writeState: deps.writeHotspotState
+  })
 }

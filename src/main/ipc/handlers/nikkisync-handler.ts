@@ -1,7 +1,10 @@
 /// <reference lib="es2022.object" />
-// @core-change: K6 错误映射附带 upstreamCode details，供渲染层在 selection_expired 时收起提案预览（对齐上游 1.0.41）
+// @core-change: 新增同步控制台六通道（library-overview/restart-server/network-auth/network-conflict/hotspot-control/open-hotspot-settings），接线真实防火墙与热点能力（对齐上游 1.0.41 PC 端）
 import fs from 'node:fs'
-import { ipcMain } from 'electron'
+import path from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+import { app, ipcMain, safeStorage, shell } from 'electron'
 import type { IpcMainInvokeEvent } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -13,7 +16,17 @@ import type {
 } from '../../nikkisync/runtime-types'
 // 生效失败分类判据与 runtime-manager 同源（该常量是其状态机判定 degraded 的同一把尺）
 import { installNotfoundMessage } from '../../nikkisync/runtime-manager'
-import { getShellStatus, runShellAction, type ShellActionName } from '../../app/shell/shell-ipc'
+import {
+  getShellStatus,
+  runShellAction,
+  runNetworkAuthAction,
+  runNetworkConflictAction,
+  runHotspotControlAction,
+  type ShellActionName,
+  type ShellActionDeps
+} from '../../app/shell/shell-ipc'
+import type { ConflictJournalEntry } from '../../app/shell/network-conflict-repair'
+import type { HotspotState } from '../../app/shell/temporary-hotspot'
 import { isTrayActive } from '../../app/shell/tray-lifecycle'
 // 照片目录校验失败的用户可见文案走主进程 i18n（不含路径，路径只在 details 里走 maskPath 脱敏）
 import { t } from '../../i18n'
@@ -1452,13 +1465,87 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   const emitShellEvent = (event: unknown): void => {
     ctx.getMainWindow()?.webContents.send('nikkisync:shell-event', event)
   }
+
+  // 2026-11-19 PC 对齐轮：真实防火墙/热点能力的副作用依赖（opt-in 门仍在纯层把守）。
+  const execFileAsync = promisify(execFile)
+  let adminPromise: Promise<boolean> | undefined
+  const checkAdmin = (): Promise<boolean> => {
+    // Windows：`net session` 仅在管理员态成功退出；结果缓存，避免每次动作都 spawn。
+    if (!adminPromise) {
+      adminPromise = execFileAsync('net', ['session'])
+        .then(() => true)
+        .catch(() => false)
+    }
+    return adminPromise
+  }
+  const journalFile = (): string =>
+    path.join(app.getPath('userData'), 'nikkisync', 'network-repair-journal.json')
+  const readJournal = async (): Promise<ConflictJournalEntry[] | null> => {
+    try {
+      const buf = await fs.promises.readFile(journalFile())
+      const text = safeStorage.isEncryptionAvailable()
+        ? safeStorage.decryptString(buf)
+        : buf.toString('utf8')
+      const parsed: unknown = JSON.parse(text)
+      return Array.isArray(parsed) ? (parsed as ConflictJournalEntry[]) : null
+    } catch {
+      return null
+    }
+  }
+  const writeJournal = async (entries: ConflictJournalEntry[]): Promise<void> => {
+    const file = journalFile()
+    await fs.promises.mkdir(path.dirname(file), { recursive: true })
+    const text = JSON.stringify(entries)
+    const data = safeStorage.isEncryptionAvailable()
+      ? safeStorage.encryptString(text)
+      : Buffer.from(text, 'utf8')
+    await fs.promises.writeFile(file, data)
+  }
+  const clearJournal = async (): Promise<void> => {
+    await fs.promises.unlink(journalFile()).catch(() => undefined)
+  }
+  const hotspotFile = (): string =>
+    path.join(app.getPath('userData'), 'nikkisync', 'hotspot-state.json')
+  const readHotspotState = async (): Promise<HotspotState> => {
+    try {
+      const parsed = JSON.parse(await fs.promises.readFile(hotspotFile(), 'utf8')) as Record<
+        string,
+        unknown
+      >
+      return { startedHere: parsed.startedHere === true, active: parsed.active === true }
+    } catch {
+      return { startedHere: false, active: false }
+    }
+  }
+  const writeHotspotState = async (state: HotspotState): Promise<void> => {
+    const file = hotspotFile()
+    await fs.promises.mkdir(path.dirname(file), { recursive: true })
+    await fs.promises.writeFile(file, JSON.stringify(state), 'utf8')
+  }
+  const buildShellDeps = async (): Promise<ShellActionDeps> => ({
+    port: ctx.nikkisyncRuntime?.syncStatus().port ?? 0,
+    isAdmin: await checkAdmin(),
+    execFile: (file, args) => execFileAsync(file, args),
+    readJournal,
+    writeJournal,
+    clearJournal,
+    readHotspotState,
+    writeHotspotState
+  })
+
   const registerShellAction = (channel: string, action: ShellActionName): void => {
     ipcMain.handle(
       channel,
       wrapHandlerRaw(ctx, async (args) => {
         const input = shellActionSchema.parse(args ?? {})
         try {
-          return await runShellAction(action, input, shellSettings, emitShellEvent)
+          return await runShellAction(
+            action,
+            input,
+            shellSettings,
+            emitShellEvent,
+            await buildShellDeps()
+          )
         } catch (error) {
           throw toAppError(error, action)
         }
@@ -1483,4 +1570,71 @@ export function registerNikkiSyncHandlers(ctx: HandlerContext): void {
   registerShellAction('nikkisync:support-submit', 'support-submit')
   registerShellAction('nikkisync:network-repair', 'network-repair')
   registerShellAction('nikkisync:hotspot-toggle', 'hotspot-toggle')
+
+  // ---- 2026-11-19 PC 对齐轮：同步控制台新增六通道 ----
+  ipcMain.handle(
+    'nikkisync:library-overview',
+    wrapHandlerNoArgs(ctx, () => {
+      const services = ctx.nikkisyncRuntime?.pcCompanionServices
+      if (!services) return { available: false as const }
+      return { available: true as const, ...services.libraryOverview() }
+    })
+  )
+  ipcMain.handle(
+    'nikkisync:restart-server',
+    wrapHandlerNoArgs(ctx, async () => {
+      const runtime = ctx.nikkisyncRuntime
+      if (!runtime) {
+        return { available: false as const, running: false, host: '', port: 0, mdnsEnabled: false }
+      }
+      const status = await runtime.restartSyncService()
+      return { available: true as const, ...status }
+    })
+  )
+  const networkAuthSchema = z.object({ action: z.enum(['authorize', 'revoke', 'status']) }).strict()
+  ipcMain.handle(
+    'nikkisync:network-auth',
+    wrapHandlerRaw(ctx, async (args) => {
+      const { action } = networkAuthSchema.parse(args ?? {})
+      try {
+        return await runNetworkAuthAction(action, shellSettings, await buildShellDeps())
+      } catch (error) {
+        throw toAppError(error, 'network-auth')
+      }
+    })
+  )
+  const networkConflictSchema = z
+    .object({ action: z.enum(['inspect', 'repair', 'restore']) })
+    .strict()
+  ipcMain.handle(
+    'nikkisync:network-conflict',
+    wrapHandlerRaw(ctx, async (args) => {
+      const { action } = networkConflictSchema.parse(args ?? {})
+      try {
+        return await runNetworkConflictAction(action, shellSettings, await buildShellDeps())
+      } catch (error) {
+        throw toAppError(error, 'network-conflict')
+      }
+    })
+  )
+  const hotspotControlSchema = z.object({ action: z.enum(['start', 'stop', 'status']) }).strict()
+  ipcMain.handle(
+    'nikkisync:hotspot-control',
+    wrapHandlerRaw(ctx, async (args) => {
+      const { action } = hotspotControlSchema.parse(args ?? {})
+      try {
+        return await runHotspotControlAction(action, shellSettings, await buildShellDeps())
+      } catch (error) {
+        throw toAppError(error, 'hotspot-control')
+      }
+    })
+  )
+  ipcMain.handle(
+    'nikkisync:open-hotspot-settings',
+    wrapHandlerNoArgs(ctx, async () => {
+      // 固定常量，不放宽 shell:openExternal 的 http/https 白名单。
+      await shell.openExternal('ms-settings:network-mobilehotspot')
+      return { opened: true as const }
+    })
+  )
 }

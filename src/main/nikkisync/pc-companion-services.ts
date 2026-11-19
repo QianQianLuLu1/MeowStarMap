@@ -686,6 +686,24 @@ export function createPcCompanionServices(
 
     desktopUrl,
 
+    libraryOverview() {
+      // 2026-11-19：透传上游 DesktopStatusService.getStatus()（countVisible + countActiveDevices）。
+      try {
+        const raw = statusService.getStatus({
+          host: currentHost(),
+          port: options.syncPort?.() ?? 0
+        }) as Record<string, unknown> | null
+        return {
+          assets: typeof raw?.assets === 'number' ? raw.assets : undefined,
+          pairedDevices: typeof raw?.pairedDevices === 'number' ? raw.pairedDevices : undefined,
+          firstRun: typeof raw?.firstRun === 'boolean' ? raw.firstRun : undefined
+        }
+      } catch (error) {
+        safeLog('warn', `[pc-companion] library overview unavailable: ${String(error)}`)
+        return {}
+      }
+    },
+
     async wechatStart() {
       const result = await wechat.start()
       return {

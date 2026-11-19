@@ -717,6 +717,24 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     }
   }
 
+  /**
+   * 2026-11-19 PC 对齐轮：重启同步服务（对齐上游壳「重启同步服务」语义）。
+   * stop() 拆除会话 → scan({}) 惰性重建 + 全量扫描（onSessionStarted 自动重装配 PC 服务）→
+   * 原本在监听才复原 LAN 服务。失败归一进日志与状态，永不上抛（与 start() 同口径）。
+   */
+  async function restartSyncService(): Promise<NikkiSyncSyncServerStatus> {
+    const wasServing = Boolean(state.syncAddress)
+    try {
+      await stop()
+      await scan({})
+    } catch (error) {
+      deps.log('warn', `nikkisync restart failed: ${messageOf(error)}`)
+    } finally {
+      if (wasServing) await startSyncServer()
+    }
+    return syncStatus()
+  }
+
   async function stop(): Promise<void> {
     // F5（审查轮）：停机必须占住 D2 的同一把闸门。原实现在入口 `await settleScan()` 之后自行拆除，
     // 却没把停机发布进 `state.scanInFlight` ⇒ 停机在途时新到的 `scan()` 等的是「上一轮扫描」而不是
@@ -1095,6 +1113,7 @@ export function createRuntimeManager(deps: RuntimeManagerDependencies): NikkiSyn
     scan,
     pcCompanionContext,
     applyGameRoot,
+    restartSyncService,
     stop,
     // 查询面一律零转换薄委托：资产行含上游 b397e0e 起的 sourcePath/sourceFolder 与其余可选键，
     // 由上游 row-mappers 原样产出。getResource / listResourceRecords 的 mode:'path' 给出绝对路径

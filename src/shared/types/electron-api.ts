@@ -1258,3 +1258,88 @@ export interface NikkiSyncShellEventInfo {
   message?: string
   percent?: number
 }
+
+// ---- 2026-11-19 PC 对齐轮：同步控制台新增通道（上游 6bdab4b / v1.0.41-public-beta.2）----
+
+/** `nikkisync:library-overview` 响应：透传上游 DesktopStatusService.getStatus()；PC 服务缺席 ⇒ available:false（不抛）。 */
+export interface NikkiSyncLibraryOverviewInfo {
+  available: boolean
+  /** 可见资产总数（上游 AssetRepository.countVisible()）。 */
+  assets?: number
+  /** 已配对（未撤销）设备数（上游 PairingRepository.countActiveDevices()）。 */
+  pairedDevices?: number
+  /** 配对数为 0 ⇒ true（上游首跑判据，驱动内联首次配对二维码）。 */
+  firstRun?: boolean
+}
+
+export type NikkiSyncNetworkAuthAction = 'authorize' | 'revoke' | 'status'
+
+export interface NikkiSyncNetworkAuthInput {
+  action: NikkiSyncNetworkAuthAction
+}
+
+/** `nikkisync:network-auth` 响应；opt-in 关闭 ⇒ disabled（零子进程）；UAC 拒绝 ⇒ elevation-declined。 */
+export interface NikkiSyncNetworkAuthResultInfo {
+  status:
+    'authorized' | 'revoked' | 'present' | 'absent' | 'disabled' | 'elevation-declined' | 'failed'
+  /** 防火墙规则组名（逐字对齐上游 "MomoCamera LAN Authorization v1"）。 */
+  ruleGroup: string
+  reason?: string
+}
+
+export type NikkiSyncNetworkConflictAction = 'inspect' | 'repair' | 'restore'
+
+export interface NikkiSyncNetworkConflictInput {
+  action: NikkiSyncNetworkConflictAction
+}
+
+/** 冲突规则摘要（不含本机路径/凭据）。 */
+export interface NikkiSyncNetworkConflictRuleInfo {
+  name: string
+  action: string
+  enabled: boolean
+  profile: string
+}
+
+/** `nikkisync:network-conflict` 响应；restore 无 journal ⇒ nothing-to-restore。 */
+export interface NikkiSyncNetworkConflictResultInfo {
+  status:
+    | 'ok'
+    | 'repaired'
+    | 'restored'
+    | 'nothing-to-restore'
+    | 'disabled'
+    | 'elevation-declined'
+    | 'failed'
+  conflicts?: NikkiSyncNetworkConflictRuleInfo[]
+  changed?: number
+  /** journal 是否存在（驱动「撤销上次修复」按钮可用性）。 */
+  canRestore?: boolean
+  reason?: string
+}
+
+export type NikkiSyncHotspotAction = 'start' | 'stop' | 'status'
+
+export interface NikkiSyncHotspotControlInput {
+  action: NikkiSyncHotspotAction
+}
+
+export interface NikkiSyncHotspotStateInfo {
+  active: boolean
+  /** 仅本应用开启的热点才允许由本应用结束（不误关用户自开热点）。 */
+  startedHere: boolean
+}
+
+/** `nikkisync:hotspot-control` 响应；密码仅 start 成功时给出。 */
+export interface NikkiSyncHotspotControlResultInfo {
+  status: 'started' | 'stopped' | 'unchanged' | 'disabled' | 'failed'
+  state: NikkiSyncHotspotStateInfo
+  ssid?: string
+  password?: string
+  reason?: string
+}
+
+/** `nikkisync:open-hotspot-settings` 响应（固定常量 ms-settings:network-mobilehotspot，无入参）。 */
+export interface NikkiSyncOpenHotspotSettingsInfo {
+  opened: boolean
+}

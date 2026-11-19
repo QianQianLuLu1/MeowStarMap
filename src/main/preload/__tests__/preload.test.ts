@@ -86,7 +86,7 @@ describe('preload 装配完整性', () => {
     )
   })
 
-  it('nikkisync 命名空间方法清单（Windows 外壳能力接入后共 54 个）', () => {
+  it('nikkisync 命名空间方法清单（同步控制台六通道接入后共 60 个）', () => {
     // 逐个方法名而不是只数键：命名空间内的方法就是渲染层拿到的对外契约，
     // 少一个方法 = 图库某项能力静默不可用，而键数断言看不出来
     const electronAPI = getExposed<{ nikkisync: Record<string, unknown> }>('electronAPI')
@@ -152,6 +152,13 @@ describe('preload 装配完整性', () => {
         'submitSupportReport',
         'repairNetwork',
         'toggleHotspot',
+        // 2026-11-19 PC 对齐轮：同步控制台六通道
+        'getLibraryOverview',
+        'restartServer',
+        'networkAuth',
+        'networkConflict',
+        'hotspotControl',
+        'openHotspotSettings',
         'onShellEvent'
       ].sort()
     )

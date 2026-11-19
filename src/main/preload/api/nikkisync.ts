@@ -1,4 +1,4 @@
-// @core-change: 目录提案过期拒绝改用可跨隔离桥复制的结构化载荷，保留短码
+// @core-change: 新增同步控制台六通道透传（library-overview/restart-server/network-auth/network-conflict/hotspot-control/open-hotspot-settings），对齐上游 1.0.41 PC 端
 // 内嵌运行时命名空间：对应主进程 handlers/nikkisync-handler.ts 注册的 nikkisync:* 通道。
 // 返回体为 NikkiSync 协议 DTO（由上游 row-mappers 产出），本层不解包、不改字段名。
 import { call, IpcError, subscribe } from '../ipc'
@@ -56,7 +56,15 @@ import type {
   NikkiSyncShellStatusInfo,
   NikkiSyncShellActionInput,
   NikkiSyncShellActionResultInfo,
-  NikkiSyncShellEventInfo
+  NikkiSyncShellEventInfo,
+  NikkiSyncLibraryOverviewInfo,
+  NikkiSyncNetworkAuthInput,
+  NikkiSyncNetworkAuthResultInfo,
+  NikkiSyncNetworkConflictInput,
+  NikkiSyncNetworkConflictResultInfo,
+  NikkiSyncHotspotControlInput,
+  NikkiSyncHotspotControlResultInfo,
+  NikkiSyncOpenHotspotSettingsInfo
 } from '../../../shared/types/electron-api'
 
 /** electronAPI.nikkisync：内嵌 NikkiSync Runtime（状态 / 扫描 / 资产只读查询 / 局域网同步服务） */
@@ -218,6 +226,23 @@ export const nikkisyncAPI = {
     call<NikkiSyncShellActionResultInfo>('nikkisync:network-repair', input ?? {}),
   toggleHotspot: (input: NikkiSyncShellActionInput) =>
     call<NikkiSyncShellActionResultInfo>('nikkisync:hotspot-toggle', input),
+  // ---- 2026-11-19 PC 对齐轮：同步控制台新增六通道 ----
+  /** 资产总览（上游 DesktopStatusService 计数）；PC 服务缺席 ⇒ available:false */
+  getLibraryOverview: () => call<NikkiSyncLibraryOverviewInfo>('nikkisync:library-overview'),
+  /** 重启同步服务（stop → 重建会话 + 全量扫描 → 原本在监听则复原 LAN） */
+  restartServer: () => call<NikkiSyncServerStatusInfo>('nikkisync:restart-server'),
+  /** 局域网防火墙授权 / 撤销 / 查询（opt-in 门） */
+  networkAuth: (input: NikkiSyncNetworkAuthInput) =>
+    call<NikkiSyncNetworkAuthResultInfo>('nikkisync:network-auth', input),
+  /** 防火墙冲突检查 / 修复 / 撤销修复（journal 持久化） */
+  networkConflict: (input: NikkiSyncNetworkConflictInput) =>
+    call<NikkiSyncNetworkConflictResultInfo>('nikkisync:network-conflict', input),
+  /** 临时热点开启 / 结束 / 查询（startedHere 持久化，不误关外来热点） */
+  hotspotControl: (input: NikkiSyncHotspotControlInput) =>
+    call<NikkiSyncHotspotControlResultInfo>('nikkisync:hotspot-control', input),
+  /** 打开系统热点设置（固定常量 ms-settings:network-mobilehotspot） */
+  openHotspotSettings: () =>
+    call<NikkiSyncOpenHotspotSettingsInfo>('nikkisync:open-hotspot-settings'),
   onShellEvent: (callback: (event: NikkiSyncShellEventInfo) => void) =>
     subscribe('nikkisync:shell-event', callback)
 }

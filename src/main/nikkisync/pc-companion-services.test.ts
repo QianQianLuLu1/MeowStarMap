@@ -638,6 +638,32 @@ describe('4cb71e2 微信画廊组装与控制页面板', () => {
       port: 0
     })
   })
+
+  it('正常：libraryOverview 透传上游计数（2026-11-19 PC 对齐轮）', () => {
+    const { surface } = makeSurface()
+    const services = createPcCompanionServices(options(surface))
+    const instance = (
+      surface.DesktopStatusService as unknown as {
+        mock: { results: Array<{ value: { getStatus: ReturnType<typeof vi.fn> } }> }
+      }
+    ).mock.results[0]!.value
+    instance.getStatus.mockReturnValue({ assets: 97, pairedDevices: 2, firstRun: false })
+    expect(services.libraryOverview()).toEqual({ assets: 97, pairedDevices: 2, firstRun: false })
+  })
+
+  it('异常：getStatus 抛错 ⇒ libraryOverview 返回空对象不抛', () => {
+    const { surface } = makeSurface()
+    const services = createPcCompanionServices(options(surface))
+    const instance = (
+      surface.DesktopStatusService as unknown as {
+        mock: { results: Array<{ value: { getStatus: ReturnType<typeof vi.fn> } }> }
+      }
+    ).mock.results[0]!.value
+    instance.getStatus.mockImplementation(() => {
+      throw new Error('db closed')
+    })
+    expect(services.libraryOverview()).toEqual({})
+  })
 })
 
 describe('loadPcCompanionSurface 深入口装载（4cb71e2 可选面降级）', () => {

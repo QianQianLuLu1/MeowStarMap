@@ -296,7 +296,14 @@ describe('nikkisync handler 注册面', () => {
       'nikkisync:program-update-apply',
       'nikkisync:support-submit',
       'nikkisync:network-repair',
-      'nikkisync:hotspot-toggle'
+      'nikkisync:hotspot-toggle',
+      // 2026-11-19 PC 对齐轮：同步控制台六通道
+      'nikkisync:library-overview',
+      'nikkisync:restart-server',
+      'nikkisync:network-auth',
+      'nikkisync:network-conflict',
+      'nikkisync:hotspot-control',
+      'nikkisync:open-hotspot-settings'
     ])
   })
 

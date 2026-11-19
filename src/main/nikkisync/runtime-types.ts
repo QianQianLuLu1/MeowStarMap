@@ -569,6 +569,8 @@ export interface PcCompanionServicesLike {
   stop(): Promise<void>
   status(): NikkiSyncPcCompanionStatusInfo
   desktopUrl(): string
+  /** 2026-11-19：上游 DesktopStatusService 计数透传（缺席字段为 undefined）。 */
+  libraryOverview(): { assets?: number; pairedDevices?: number; firstRun?: boolean }
   wechatStart(): Promise<{ status: unknown; qrSvg: string }>
   wechatStop(): Promise<{ status: unknown }>
   wechatStatus(): unknown
@@ -687,6 +689,11 @@ export interface NikkiSyncRuntimeHandle {
    * 失败（未建链 / 目录不是安装根）原样上抛，由 handler 归一成 `applyError`。
    */
   applyGameRoot(gameRoot: string): Promise<unknown>
+  /**
+   * 2026-11-19 PC 对齐轮：重启同步服务（stop → 重建会话 + 全量扫描 → 原本在监听则复原 LAN）。
+   * 失败归一进状态与日志，永不上抛；返回重启后的同步服务状态快照。
+   */
+  restartSyncService(): Promise<NikkiSyncSyncServerStatus>
   /** 优雅停止：scanner.stop() → database.close()，幂等。 */
   stop(): Promise<void>
   /** `{items,nextCursor?,libraryRevision}`；资产行（含 `sourcePath`/`sourceFolder`）与上游 DTO 同形透出。 */

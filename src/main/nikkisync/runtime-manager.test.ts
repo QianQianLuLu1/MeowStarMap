@@ -1878,6 +1878,37 @@ describe('applyGameRoot：照片目录的运行期生效通道', () => {
   })
 })
 
+describe('restartSyncService：重启同步服务（2026-11-19 PC 对齐轮）', () => {
+  it('正常：原本在监听 ⇒ teardown 后重建会话并复原 LAN', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.startSyncServer()
+    expect(manager.syncStatus().running).toBe(true)
+    const status = await manager.restartSyncService()
+    expect(calls.serverStop).toBe(1)
+    expect(calls.serverStart).toBe(2)
+    expect(status.running).toBe(true)
+    expect(manager.status().state).toBe('running')
+  })
+
+  it('边界：原本没在跑 ⇒ 不代为开启 LAN', async () => {
+    const { deps, calls } = createDependencies()
+    const manager = createRuntimeManager(deps)
+    await manager.scan({ gameRoot: '/first' })
+    await manager.restartSyncService()
+    expect(calls.serverStart).toBe(0)
+    expect(manager.syncStatus().running).toBe(false)
+  })
+
+  it('异常：未建链时永不上抛，归一进 unavailable 状态', async () => {
+    const { deps } = createDependencies({ isLinkReady: () => false })
+    const manager = createRuntimeManager(deps)
+    const status = await manager.restartSyncService()
+    expect(status.running).toBe(false)
+    expect(manager.status().state).toBe('unavailable')
+  })
+})
+
 /**
  * 扫描并发保护（缺陷 D2）。
  *
