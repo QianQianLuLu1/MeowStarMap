@@ -4527,7 +4527,27 @@
       "edit": "Bearbeiten",
       "delete": "Löschen",
       "loadMore": "Mehr laden",
-      "loadMoreFailed": "Laden fehlgeschlagen, zum Wiederholen klicken"
+      "loadMoreFailed": "Laden fehlgeschlagen, zum Wiederholen klicken",
+      "searchPlaceholder": "Titel, Notizen, Tags durchsuchen…",
+      "categoryPlaceholder": "Nach Kategorie filtern",
+      "statusLabel": "Status",
+      "statusAll": "Alle Status",
+      "status": {
+        "self": "Eigenes Outfit",
+        "want": "Wunsch-Outfit",
+        "reproduced": "Nachgebaut",
+        "tried": "Anprobiert",
+        "archived": "Archiviert"
+      },
+      "refresh": "Aktualisieren",
+      "countNote": "{{count}} Einträge",
+      "tagsLabel": "Tags",
+      "tagsPlaceholder": "Kommagetrennt, z. B. Färbung, Outfit",
+      "categoriesLabel": "Kategorien",
+      "categoriesPlaceholder": "Kommagetrennt, z. B. Kleider, Mäntel",
+      "codeLabel": "Teilen-Code",
+      "codeRecognized": "Teilen-Code {{code}} erkannt — zum Eintragen klicken",
+      "filterEmpty": "Keine Einträge entsprechen den Filtern"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "Keine Kartendaten vorhanden",
     "lackWorldMap": "Für diesen Ort ist keine Karte verfügbar",
     "outsideBounds": "Aufnahmeort liegt außerhalb des Kartenbereichs"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "Telefonverbindung",
+      "settings": "Sync-Einstellungen",
+      "organizer": "Zuletzt gelöscht",
+      "inspiration": "Inspirationsbibliothek",
+      "about": "Über"
+    },
+    "heading": {
+      "connect": {
+        "title": "Nikki-Album",
+        "subtitle": "Telefon koppeln, Bibliotheksstatistik ansehen und Verbindungs-Selbstprüfung"
+      },
+      "settings": {
+        "title": "Sync-Einstellungen",
+        "subtitle": "Dienst, Verzeichnisse, Konten und Windows-Shell-Funktionen"
+      },
+      "organizer": {
+        "title": "Zuletzt gelöscht",
+        "subtitle": "Löschanfragen vom Telefon werden nach Genehmigung auf diesem PC in den Papierkorb verschoben"
+      },
+      "inspiration": {
+        "title": "Inspirationsbibliothek",
+        "subtitle": "Outfit-Inspirationen sammeln und verwalten, mit Filtern und Teilcodes"
+      },
+      "about": {
+        "title": "Über",
+        "subtitle": "Versionen, Download-Kanäle und Upstream-Projektquellen"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "Bibliotheksübersicht",
+        "assetsUnit": "Assets",
+        "devicesUnit": "gekoppelte Geräte",
+        "caption": "Aus der Sync-Bibliothek beobachtet; aktualisiert sich mit Scans und Kopplungen",
+        "unavailable": "Bibliotheksübersicht nicht verfügbar (Sync-Komponenten nicht bereit oder Kanal fehlgeschlagen)"
+      },
+      "firstRun": {
+        "hint": "Erste Kopplung: Scannen Sie den QR-Code unten mit der NikkiSync-Mobile-App"
+      },
+      "android": {
+        "title": "Android-Client",
+        "description": "Installieren Sie die NikkiSync-Android-App auf dem Telefon und scannen Sie zum Koppeln und Synchronisieren",
+        "paired": "Geräte bereits gekoppelt",
+        "pairedHint": "Nach Gerätewechsel oder Neuinstallation können Sie einen neuen QR-Code zum Koppeln erzeugen",
+        "newQrNote": "Solange der Dienst läuft, können Sie jederzeit einen neuen Kopplungs-QR-Code erzeugen (5 Minuten gültig)",
+        "newQr": "Neuen QR-Code erzeugen",
+        "download": "Android-APK herunterladen",
+        "export": "Diagnosepaket exportieren",
+        "exportNote": "Bei Verbindungsproblemen exportieren Sie ein Diagnosepaket und fügen es Ihrem Feedback bei"
+      },
+      "guide": {
+        "title": "Erste-Schritte-Anleitung",
+        "summary": "Telefon in drei Schritten verbinden",
+        "step1Title": "Schritt 1: Mobile App installieren",
+        "step1Body": "Laden Sie das NikkiSync-Android-Installationspaket von Quark Drive oder Baidu Netdisk herunter und installieren Sie es.",
+        "step2Title": "Schritt 2: Sync-Dienst aktivieren und koppeln",
+        "step2Body": "Schalten Sie den Sync-Dienst oben ein und scannen Sie den Kopplungs-QR-Code mit dem Telefon.",
+        "step3Title": "Schritt 3: Netzwerk- und Scan-Einstellungen prüfen",
+        "step3Body": "Stellen Sie sicher, dass die lokale Netzwerkberechtigung erteilt ist und Fotoverzeichnisse sowie Scan-Einstellungen wie erwartet sind.",
+        "quark": "Quark-Drive-Download",
+        "baidu": "Baidu-Netdisk-Download",
+        "openNetwork": "Zu Netzwerkberechtigungen",
+        "openScan": "Zu Scan- und Auflösungseinstellungen"
+      },
+      "privacyNote": "Fotos und Parameter werden nur im LAN zwischen diesem PC und gekoppelten Geräten übertragen, nie über die Cloud; die Online-Parameterauflösung ist optional und holt vor der Aktivierung eine separate Einwilligung ein.",
+      "selfCheck": {
+        "title": "Verbindungs-Selbstprüfung",
+        "connectionTitle": "Telefon verbindet sich nicht?",
+        "serviceLabel": "Dienststatus",
+        "serviceUnavailable": "Sync-Komponenten nicht eingebunden",
+        "serviceOnline": "Dienst läuft",
+        "serviceOffline": "Dienst gestoppt",
+        "connectionStep1": "Stellen Sie sicher, dass Telefon und PC im selben LAN sind und der Sync-Dienst aktiviert ist.",
+        "connectionStep2": "Prüfen Sie, ob die Windows-Firewall diese App zulässt (unten „Verbindungsberechtigung prüfen“ nutzen).",
+        "connectionStep3": "Wenn es weiter scheitert, exportieren Sie ein Diagnosepaket und prüfen Sie den letzten Fehler und die Bind-Adresse.",
+        "openNetwork": "Verbindungsberechtigung prüfen",
+        "metadataTitle": "Fotoparameter nicht lesbar?",
+        "metadataStep1": "Stellen Sie sicher, dass das Fotoverzeichnis im Scan enthalten ist und der Scan abgeschlossen wurde.",
+        "metadataStep2": "Die Online-Parameterauflösung ist standardmäßig aus; aktivieren Sie sie in den Sync-Einstellungen und stimmen Sie der Offenlegung zu.",
+        "metadataStep3": "Die lokale Dekodierung ist in die Sync-Komponenten integriert; keine zusätzliche Installation nötig.",
+        "openScan": "Scan- und Auflösungseinstellungen prüfen"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "Verbindungsinformationen",
+        "address": "Verbindungsadresse",
+        "addressUnknown": "Dienst läuft nicht"
+      },
+      "static": {
+        "albumUpdate": "Album-Update",
+        "albumUpdateValue": "Neue Fotos werden automatisch aufgenommen",
+        "tray": "Nach dem Schließen des Fensters",
+        "trayValue": "Läuft weiter im Infobereich"
+      },
+      "startup": {
+        "title": "Starteinstellungen",
+        "launchAtLogin": "MeowStarMap bei Anmeldung starten",
+        "launchAtLoginDesc": "Startet MeowStarMap automatisch nach der Windows-Anmeldung; ob der Sync-Dienst automatisch aktiviert wird, regelt der Schalter oben separat."
+      },
+      "legal": {
+        "title": "Rechtliches",
+        "privacy": "Datenschutzerklärung",
+        "terms": "Nutzungsvertrag",
+        "services": "Servicebedingungen",
+        "unavailable": "PC-Dienst nicht bereit; die Bedingungen können derzeit nicht geöffnet werden"
+      },
+      "network": {
+        "title": "Lokale Netzwerkberechtigung",
+        "description": "Fügt eine Windows-Firewall-Eingangsregel für den Sync-Dienst hinzu, damit das Telefon diesen PC erreichen kann.",
+        "disabled": "Der Schalter „Netzwerkkonflikt-Reparatur“ ist aus; aktivieren Sie ihn, um die lokale Netzwerkberechtigung zu verwalten.",
+        "enableJump": "Aktivieren",
+        "unavailable": "In diesem Build nicht verfügbar: Der Hauptprozess hat den Netzwerkberechtigungskanal noch nicht.",
+        "authorize": "Telefonverbindungen erlauben",
+        "revoke": "Netzwerkautorisierung dieses Dienstes widerrufen",
+        "note": "Die Autorisierung fügt nur eine Firewall-Regel für diese App hinzu; nach dem Widerruf kann sich das Telefon nicht verbinden, bis Sie erneut autorisieren.",
+        "conflictTitle": "Netzwerkkonflikt-Prüfung",
+        "conflictDesc": "Prüft, ob von anderer Software hinterlassene Firewall-Regeln mit dem Sync-Dienst kollidieren, und repariert sie auf Klick.",
+        "inspect": "Erneut prüfen",
+        "repair": "Prüfen und reparieren auf Klick",
+        "restore": "Letzte Reparatur rückgängig machen",
+        "conflictsFound": "{{count}} Konfliktregeln gefunden",
+        "noConflicts": "Keine Konfliktregeln gefunden",
+        "conflictNote": "Vor der Reparatur werden die Originalregeln protokolliert und können jederzeit rückgängig gemacht werden; nur Konflikte dieser App werden behandelt.",
+        "status": {
+          "authorized": "Lokale Netzwerkberechtigung hinzugefügt",
+          "revoked": "Netzwerkautorisierung widerrufen",
+          "present": "Firewall-Regel bereits vorhanden",
+          "absent": "Noch nicht autorisiert",
+          "disabled": "Funktion deaktiviert",
+          "elevation-declined": "Administrator-Erhöhung abgelehnt",
+          "failed": "Vorgang fehlgeschlagen",
+          "ok": "Prüfung abgeschlossen",
+          "repaired": "Reparatur abgeschlossen",
+          "restored": "Letzte Reparatur rückgängig gemacht",
+          "nothing-to-restore": "Keine Reparatur zum Rückgängigmachen"
+        }
+      },
+      "hotspot": {
+        "title": "Temporärer Hotspot",
+        "description": "Wenn kein LAN verfügbar ist, nutzen Sie den mobilen Windows-Hotspot dieses PCs, um das Telefon temporär zu vernetzen.",
+        "disabled": "Der Schalter „Temporärer Hotspot“ ist aus; aktivieren Sie ihn, um die temporäre Vernetzung zu nutzen.",
+        "unavailable": "In diesem Build nicht verfügbar: Der Hauptprozess hat den Hotspot-Steuerkanal noch nicht.",
+        "start": "Temporären Hotspot starten",
+        "stop": "Temporäre Vernetzung beenden",
+        "openSettings": "System-Hotspot-Einstellungen öffnen",
+        "ssid": "Hotspot-Name (SSID)",
+        "password": "Hotspot-Passwort",
+        "hide": "Verbergen",
+        "reveal": "Anzeigen",
+        "note": "Nur von dieser App gestartete Hotspots können von ihr beendet werden; das Passwort ist standardmäßig maskiert — achten Sie auf Schulterblicke.",
+        "status": {
+          "started": "Hotspot gestartet",
+          "stopped": "Hotspot beendet",
+          "unchanged": "Hotspot-Status unverändert",
+          "disabled": "Funktion deaktiviert",
+          "failed": "Vorgang fehlgeschlagen"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "{{approved}} Einträge genehmigt, {{skipped}} übersprungen",
+      "openRecycleBin": "Zuletzt gelöscht öffnen",
+      "batchFailed": "Stapelgenehmigung fehlgeschlagen; bitte erneut versuchen"
+    },
+    "about": {
+      "version": {
+        "title": "Versionsinformationen",
+        "tagline": "NikkiSync — die Nikki-Album-Sync-Komponente (Upstream-Portierung)",
+        "host": "Host-Version",
+        "aligned": "Abgestimmte Upstream-Version",
+        "commit": "Abgestimmter Commit",
+        "author": "Upstream-Autor: ToStardust (Momo-Kamera-Assistent)",
+        "attribution": "Credit der Fotoparameter-Dekodierungskomponente: RanAxro / Nikki Albums (nikki_albums)"
+      },
+      "download": {
+        "title": "Downloads und Updates",
+        "networkHint": "Die folgenden Links verweisen auf die Upstream-Veröffentlichungskanäle von NikkiSync; Download und Installation liegen upstream.",
+        "cnb": "CNB-Testbuild",
+        "cnbNote": "Von der Upstream-CI gebautes Android-Testpaket (direkter APK-Link).",
+        "quark": "Quark Drive",
+        "quarkNote": "Upstream-gepflegter Quark-Drive-Spiegel mit Android-Installationspaket.",
+        "baidu": "Baidu Netdisk",
+        "baiduNote": "Upstream-gepflegter Baidu-Netdisk-Spiegel mit Android-Installationspaket.",
+        "github": "GitHub Releases",
+        "githubNote": "Upstream-GitHub-Release-Seite (PC-Begleiter und Quellcode)."
+      },
+      "update": {
+        "unavailable": "Update-Kanal nicht verfügbar",
+        "started": "Update-Prüfung gestartet",
+        "check": "Nach Updates suchen",
+        "note": "Prüft über den appinternen Update-Kanal der Host-App auf neue Versionen."
+      },
+      "feedback": {
+        "title": "Diagnose und Feedback",
+        "exportNote": "Exportiert ein Zip der Diagnoseprotokolle dieser App; als Anhang zum Feedback beschleunigt es die Fehlersuche.",
+        "support": "Diagnose senden",
+        "supportNote": "Erfordert zuerst aktivierte „Anonyme Diagnoseübermittlung“ in den Sync-Einstellungen; dieser Build hat den Übermittlungskanal nicht eingebunden, die Schaltfläche ist deaktiviert."
+      },
+      "repos": {
+        "title": "Projekt-Repositories und Quellen",
+        "momo": "Momo-Kamera-Assistent · NikkiSync",
+        "nuannuanStudio": "Nikki-Fotostudio",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "MeowStarMap · Katzensternkarte",
+        "nuan5": "NUAN5.PRO · Online-Parameterauflösung",
+        "gongeo": "Nikki-Resonanzregister · gongeo.us",
+        "nikkiAlbumsNote": "Quell-Repository der Fotoparameter-Dekodierungskomponente.",
+        "meowStarMapNote": "Repository dieser App: der Host der Sync-Konsole.",
+        "nuan5Note": "Quelle des Online-Parameterauflösungs-Endpunkts.",
+        "gongeoNote": "Quelle der Resonanzregister-Daten und des Kleiderkatalogs."
+      }
+    },
+    "statusBar": {
+      "unavailable": "In diesem Build nicht verfügbar",
+      "restartSuccess": "Sync-Dienst neu gestartet",
+      "restartFailed": "Neustart des Sync-Dienstes fehlgeschlagen",
+      "version": "Host-Version",
+      "aligned": "Upstream abgestimmt",
+      "restart": "Sync-Dienst neu starten",
+      "export": "Diagnosepaket exportieren",
+      "exportCanceled": "Export abgebrochen",
+      "exported": "Diagnosepaket exportiert: {{path}}",
+      "exportFailed": "Export des Diagnosepakets fehlgeschlagen"
+    }
   }
 }

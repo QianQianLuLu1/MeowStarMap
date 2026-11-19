@@ -4527,7 +4527,27 @@
       "edit": "編集",
       "delete": "削除",
       "loadMore": "さらに読み込む",
-      "loadMoreFailed": "読み込みに失敗しました。クリックして再試行してください"
+      "loadMoreFailed": "読み込みに失敗しました。クリックして再試行してください",
+      "searchPlaceholder": "タイトル・メモ・タグを検索…",
+      "categoryPlaceholder": "カテゴリで絞り込み",
+      "statusLabel": "ステータス",
+      "statusAll": "すべてのステータス",
+      "status": {
+        "self": "自作コーデ",
+        "want": "作りたいコーデ",
+        "reproduced": "再現済み",
+        "tried": "試着済み",
+        "archived": "アーカイブ済み"
+      },
+      "refresh": "更新",
+      "countNote": "全 {{count}} 件",
+      "tagsLabel": "タグ",
+      "tagsPlaceholder": "カンマ区切り（例：染色, コーデ）",
+      "categoriesLabel": "カテゴリ",
+      "categoriesPlaceholder": "カンマ区切り（例：ワンピース, アウター）",
+      "codeLabel": "共有コード",
+      "codeRecognized": "共有コード {{code}} を検出しました。クリックで入力",
+      "filterEmpty": "条件に一致する項目がありません"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "地図データがありません",
     "lackWorldMap": "この場所では地図を表示できません",
     "outsideBounds": "撮影地点が地図の範囲外です"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "スマホ接続",
+      "settings": "同期設定",
+      "organizer": "最近の削除",
+      "inspiration": "インスピレーション",
+      "about": "概要"
+    },
+    "heading": {
+      "connect": {
+        "title": "ニキアルバム",
+        "subtitle": "スマホのペアリング、ライブラリ統計の確認、接続セルフチェック"
+      },
+      "settings": {
+        "title": "同期設定",
+        "subtitle": "サービス・ディレクトリ・アカウント・Windows シェル機能"
+      },
+      "organizer": {
+        "title": "最近の削除",
+        "subtitle": "スマホからの削除要求は、この PC で承認後にごみ箱へ移動されます"
+      },
+      "inspiration": {
+        "title": "インスピレーション",
+        "subtitle": "コーデのインスピレーションを収集・管理。フィルターと共有コードに対応"
+      },
+      "about": {
+        "title": "概要",
+        "subtitle": "バージョン、ダウンロードチャネル、アップストリームプロジェクトの出典"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "ライブラリ概要",
+        "assetsUnit": "件のアセット",
+        "devicesUnit": "台のペアリング済みデバイス",
+        "caption": "同期ライブラリの観測値。スキャンとペアリングに応じて更新されます",
+        "unavailable": "ライブラリ概要は利用できません（同期コンポーネント未準備またはチャネル失敗）"
+      },
+      "firstRun": {
+        "hint": "初回ペアリング：NikkiSync モバイルアプリで下の QR コードをスキャンしてください"
+      },
+      "android": {
+        "title": "Android クライアント",
+        "description": "スマホに NikkiSync Android アプリをインストールし、スキャンでペアリングして同期",
+        "paired": "ペアリング済みデバイスあり",
+        "pairedHint": "機種変更や再インストール後は、新しい QR コードで再ペアリングできます",
+        "newQrNote": "サービス実行中はいつでも新しいペアリング QR コードを生成できます（5 分間有効）",
+        "newQr": "新しい QR コードを生成",
+        "download": "Android APK をダウンロード",
+        "export": "診断パッケージをエクスポート",
+        "exportNote": "接続異常時は診断パッケージをエクスポートし、フィードバックに添付すると調査がスムーズです"
+      },
+      "guide": {
+        "title": "はじめてのガイド",
+        "summary": "3 ステップでスマホを接続",
+        "step1Title": "ステップ 1：モバイルアプリをインストール",
+        "step1Body": "Quark ドライブまたは Baidu ネットディスクから NikkiSync Android インストーラーをダウンロードしてインストールします。",
+        "step2Title": "ステップ 2：同期サービスを有効化してペアリング",
+        "step2Body": "上で同期サービスをオンにし、スマホでペアリング QR コードをスキャンします。",
+        "step3Title": "ステップ 3：ネットワークとスキャン設定を確認",
+        "step3Body": "ローカルネットワーク権限が許可され、写真ディレクトリとスキャン設定が想定どおりか確認します。",
+        "quark": "Quark ドライブからダウンロード",
+        "baidu": "Baidu ネットディスクからダウンロード",
+        "openNetwork": "ネットワーク権限へ",
+        "openScan": "スキャン・解析設定へ"
+      },
+      "privacyNote": "写真とパラメータは、この PC とペアリング済みデバイス間の LAN 内でのみ転送され、クラウドを経由しません。オンラインパラメータ解析は任意機能で、有効化前に個別の同意を求めます。",
+      "selfCheck": {
+        "title": "接続セルフチェック",
+        "connectionTitle": "スマホが接続できない？",
+        "serviceLabel": "サービス状態",
+        "serviceUnavailable": "同期コンポーネント未マウント",
+        "serviceOnline": "サービス実行中",
+        "serviceOffline": "サービス停止中",
+        "connectionStep1": "スマホと PC が同じ LAN にあり、同期サービスが有効か確認します。",
+        "connectionStep2": "Windows ファイアウォールがこのアプリを許可しているか確認します（下の「接続権限を確認」を利用）。",
+        "connectionStep3": "それでも失敗する場合は診断パッケージをエクスポートし、最新エラーとバインドアドレスを確認します。",
+        "openNetwork": "接続権限を確認",
+        "metadataTitle": "写真パラメータが読み取れない？",
+        "metadataStep1": "写真ディレクトリがスキャン対象に含まれ、スキャンが完了しているか確認します。",
+        "metadataStep2": "オンラインパラメータ解析はデフォルトでオフです。同期設定で有効にし、開示条項に同意してください。",
+        "metadataStep3": "ローカルデコードは同期コンポーネントに内蔵されており、追加インストールは不要です。",
+        "openScan": "スキャン・解析設定を確認"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "接続情報",
+        "address": "接続アドレス",
+        "addressUnknown": "サービス未実行"
+      },
+      "static": {
+        "albumUpdate": "アルバム更新",
+        "albumUpdateValue": "新しい写真を自動取り込み",
+        "tray": "ウィンドウを閉じた後",
+        "trayValue": "トレイで実行を継続"
+      },
+      "startup": {
+        "title": "起動設定",
+        "launchAtLogin": "サインイン時に MeowStarMap を自動起動",
+        "launchAtLoginDesc": "Windows サインイン後に MeowStarMap を自動起動します。同期サービスの自動有効化は上のスイッチで個別に制御します。"
+      },
+      "legal": {
+        "title": "法的情報",
+        "privacy": "プライバシーポリシー",
+        "terms": "利用規約",
+        "services": "サービス条項",
+        "unavailable": "PC サービスが未準備のため、条項を開けません"
+      },
+      "network": {
+        "title": "ローカルネットワーク権限",
+        "description": "同期サービス用の Windows ファイアウォール受信規則を追加し、スマホからこの PC に接続できるようにします。",
+        "disabled": "「ネットワーク競合修復」スイッチがオフです。有効にするとローカルネットワーク権限を管理できます。",
+        "enableJump": "有効にする",
+        "unavailable": "このビルドでは利用できません：メインプロセスにネットワーク権限チャネルが未実装です。",
+        "authorize": "スマホの接続を許可",
+        "revoke": "このサービスのネットワーク認可を取り消す",
+        "note": "認可はこのアプリ用のファイアウォール規則を追加するだけです。取り消すとスマホは接続できなくなり、再認可が必要です。",
+        "conflictTitle": "ネットワーク競合チェック",
+        "conflictDesc": "他のソフトが残したファイアウォール規則が同期サービスと競合していないか確認し、ワンクリックで修復できます。",
+        "inspect": "再チェック",
+        "repair": "ワンクリックでチェック＆修復",
+        "restore": "前回の修復を取り消す",
+        "conflictsFound": "競合規則が {{count}} 件見つかりました",
+        "noConflicts": "競合規則は見つかりませんでした",
+        "conflictNote": "修復前に元の規則を記録するため、いつでも取り消せます。このアプリに関連する競合のみ処理します。",
+        "status": {
+          "authorized": "ローカルネットワーク権限を追加済み",
+          "revoked": "ネットワーク認可を取り消しました",
+          "present": "ファイアウォール規則は既に存在します",
+          "absent": "未認可",
+          "disabled": "機能が無効",
+          "elevation-declined": "管理者昇格がキャンセルされました",
+          "failed": "操作に失敗",
+          "ok": "チェック完了",
+          "repaired": "修復完了",
+          "restored": "前回の修復を取り消しました",
+          "nothing-to-restore": "取り消せる修復記録がありません"
+        }
+      },
+      "hotspot": {
+        "title": "一時ホットスポット",
+        "description": "利用可能な LAN がない場合、この PC の Windows モバイルホットスポットで一時的にネットワークを構成し、スマホを接続します。",
+        "disabled": "「一時ホットスポット」スイッチがオフです。有効にすると一時ネットワークを利用できます。",
+        "unavailable": "このビルドでは利用できません：メインプロセスにホットスポット制御チャネルが未実装です。",
+        "start": "一時ホットスポットを開始",
+        "stop": "一時ネットワークを終了",
+        "openSettings": "システムのホットスポット設定を開く",
+        "ssid": "ホットスポット名（SSID）",
+        "password": "ホットスポットパスワード",
+        "hide": "隠す",
+        "reveal": "表示",
+        "note": "このアプリが開始したホットスポットのみこのアプリから終了できます。パスワードはデフォルトでマスクされます。覗き見にご注意ください。",
+        "status": {
+          "started": "ホットスポット開始済み",
+          "stopped": "ホットスポット終了済み",
+          "unchanged": "ホットスポット状態は変化なし",
+          "disabled": "機能が無効",
+          "failed": "操作に失敗"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "{{approved}} 件を承認、{{skipped}} 件をスキップ",
+      "openRecycleBin": "最近の削除を開く",
+      "batchFailed": "一括承認に失敗しました。再試行してください"
+    },
+    "about": {
+      "version": {
+        "title": "バージョン情報",
+        "tagline": "NikkiSync —— ニキアルバム同期コンポーネント（アップストリーム移植）",
+        "host": "ホストバージョン",
+        "aligned": "アップストリーム対応バージョン",
+        "commit": "対応コミット",
+        "author": "アップストリーム作者：ToStardust（大喵カメラアシスタント）",
+        "attribution": "写真パラメータデコードコンポーネントのクレジット：RanAxro / Nikki Albums（nikki_albums）"
+      },
+      "download": {
+        "title": "ダウンロードと更新",
+        "networkHint": "以下のリンクは NikkiSync アップストリームのリリースチャネルを指します。ダウンロードとインストールはアップストリームが担当します。",
+        "cnb": "CNB テスト版",
+        "cnbNote": "アップストリーム CI がビルドした Android テストパッケージ（APK 直リンク）。",
+        "quark": "Quark ドライブ",
+        "quarkNote": "アップストリームが管理する Quark ドライブのミラー。Android インストーラーを含みます。",
+        "baidu": "Baidu ネットディスク",
+        "baiduNote": "アップストリームが管理する Baidu ネットディスクのミラー。Android インストーラーを含みます。",
+        "github": "GitHub Releases",
+        "githubNote": "アップストリーム GitHub リリースページ（PC コンパニオンとソース）。"
+      },
+      "update": {
+        "unavailable": "更新チャネルは利用できません",
+        "started": "更新チェックを開始しました",
+        "check": "更新を確認",
+        "note": "ホストアプリのアプリ内更新チャネルで新しいバージョンを確認します。"
+      },
+      "feedback": {
+        "title": "診断とフィードバック",
+        "exportNote": "このアプリの診断ログを zip にエクスポートします。フィードバックに添付すると調査が早まります。",
+        "support": "診断を送信",
+        "supportNote": "まず同期設定で「匿名診断送信」を有効にする必要があります。このビルドには送信チャネルが未マウントのため、ボタンは無効です。"
+      },
+      "repos": {
+        "title": "プロジェクトリポジトリと出典",
+        "momo": "大喵カメラアシスタント · NikkiSync",
+        "nuannuanStudio": "ニキ写真館",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "MeowStarMap · 喵星図",
+        "nuan5": "NUAN5.PRO · オンラインパラメータ解析",
+        "gongeo": "ニキ共鳴録 · gongeo.us",
+        "nikkiAlbumsNote": "写真パラメータデコードコンポーネントの出典リポジトリ。",
+        "meowStarMapNote": "このアプリのリポジトリ：同期コンソールのホスト。",
+        "nuan5Note": "オンラインパラメータ解析エンドポイントの出典。",
+        "gongeoNote": "共鳴録データと服装カタログの出典。"
+      }
+    },
+    "statusBar": {
+      "unavailable": "このビルドでは利用できません",
+      "restartSuccess": "同期サービスを再起動しました",
+      "restartFailed": "同期サービスの再起動に失敗",
+      "version": "ホストバージョン",
+      "aligned": "アップストリーム対応",
+      "restart": "同期サービスを再起動",
+      "export": "診断パッケージをエクスポート",
+      "exportCanceled": "エクスポートをキャンセルしました",
+      "exported": "診断パッケージをエクスポートしました：{{path}}",
+      "exportFailed": "診断パッケージのエクスポートに失敗"
+    }
   }
 }

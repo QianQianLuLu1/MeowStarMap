@@ -4527,7 +4527,27 @@
       "edit": "Sửa",
       "delete": "Xóa",
       "loadMore": "Tải thêm",
-      "loadMoreFailed": "Tải thêm thất bại, nhấp để thử lại"
+      "loadMoreFailed": "Tải thêm thất bại, nhấp để thử lại",
+      "searchPlaceholder": "Tìm tiêu đề, ghi chú, thẻ…",
+      "categoryPlaceholder": "Lọc theo danh mục",
+      "statusLabel": "Trạng thái",
+      "statusAll": "Tất cả trạng thái",
+      "status": {
+        "self": "Tự phối",
+        "want": "Muốn phối",
+        "reproduced": "Đã tái hiện",
+        "tried": "Đã thử đồ",
+        "archived": "Đã lưu trữ"
+      },
+      "refresh": "Làm mới",
+      "countNote": "Tổng cộng {{count}} mục",
+      "tagsLabel": "Thẻ",
+      "tagsPlaceholder": "Phân cách bằng dấu phẩy, ví dụ: nhuộm, phối đồ",
+      "categoriesLabel": "Danh mục",
+      "categoriesPlaceholder": "Phân cách bằng dấu phẩy, ví dụ: váy, áo khoác",
+      "codeLabel": "Mã chia sẻ",
+      "codeRecognized": "Phát hiện mã chia sẻ {{code}} — nhấp để điền",
+      "filterEmpty": "Không có mục nào khớp bộ lọc"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "Không có dữ liệu bản đồ",
     "lackWorldMap": "Bản đồ không khả dụng cho địa điểm này",
     "outsideBounds": "Điểm chụp nằm ngoài phạm vi bản đồ"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "Kết nối điện thoại",
+      "settings": "Cài đặt đồng bộ",
+      "organizer": "Đã xóa gần đây",
+      "inspiration": "Thư viện cảm hứng",
+      "about": "Giới thiệu"
+    },
+    "heading": {
+      "connect": {
+        "title": "Album Nikki",
+        "subtitle": "Ghép nối điện thoại, xem thống kê thư viện và tự kiểm tra kết nối"
+      },
+      "settings": {
+        "title": "Cài đặt đồng bộ",
+        "subtitle": "Dịch vụ, thư mục, tài khoản và các khả năng shell của Windows"
+      },
+      "organizer": {
+        "title": "Đã xóa gần đây",
+        "subtitle": "Yêu cầu xóa từ điện thoại sẽ chuyển vào thùng rác sau khi được duyệt trên PC này"
+      },
+      "inspiration": {
+        "title": "Thư viện cảm hứng",
+        "subtitle": "Sưu tầm và quản lý cảm hứng phối đồ, kèm bộ lọc và mã chia sẻ"
+      },
+      "about": {
+        "title": "Giới thiệu",
+        "subtitle": "Phiên bản, kênh tải xuống và nguồn các dự án thượng nguồn"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "Tổng quan thư viện",
+        "assetsUnit": "mục",
+        "devicesUnit": "thiết bị đã ghép nối",
+        "caption": "Quan sát từ thư viện đồng bộ; cập nhật theo quét và ghép nối",
+        "unavailable": "Không xem được tổng quan thư viện (thành phần đồng bộ chưa sẵn sàng hoặc kênh lỗi)"
+      },
+      "firstRun": {
+        "hint": "Ghép nối lần đầu: quét mã QR bên dưới bằng ứng dụng di động NikkiSync"
+      },
+      "android": {
+        "title": "Ứng dụng Android",
+        "description": "Cài ứng dụng Android của NikkiSync lên điện thoại rồi quét mã để ghép nối và đồng bộ",
+        "paired": "Đã có thiết bị ghép nối",
+        "pairedHint": "Sau khi đổi điện thoại hoặc cài lại, hãy tạo mã QR mới để ghép nối",
+        "newQrNote": "Khi dịch vụ đang chạy, bạn có thể tạo mã QR ghép nối mới bất cứ lúc nào (hiệu lực 5 phút)",
+        "newQr": "Tạo mã QR mới",
+        "download": "Tải APK Android",
+        "export": "Xuất gói chẩn đoán",
+        "exportNote": "Nếu kết nối thất bại, hãy xuất gói chẩn đoán và đính kèm khi gửi phản hồi"
+      },
+      "guide": {
+        "title": "Hướng dẫn lần đầu sử dụng",
+        "summary": "Kết nối điện thoại trong ba bước",
+        "step1Title": "Bước 1: cài ứng dụng di động",
+        "step1Body": "Tải bộ cài Android của NikkiSync từ Quark Drive hoặc Baidu Netdisk rồi cài đặt.",
+        "step2Title": "Bước 2: bật dịch vụ đồng bộ và ghép nối",
+        "step2Body": "Bật dịch vụ ở trên rồi dùng điện thoại quét mã QR ghép nối.",
+        "step3Title": "Bước 3: kiểm tra mạng và cài đặt quét",
+        "step3Body": "Xác nhận quyền mạng nội bộ đã được cấp, thư mục ảnh và cài đặt quét đúng như mong đợi.",
+        "quark": "Tải từ Quark Drive",
+        "baidu": "Tải từ Baidu Netdisk",
+        "openNetwork": "Đến quyền mạng",
+        "openScan": "Đến cài đặt quét và phân giải"
+      },
+      "privacyNote": "Ảnh và tham số chỉ truyền trong mạng LAN giữa PC này và các thiết bị đã ghép nối, không qua đám mây; phân giải tham số trực tuyến là tính năng tùy chọn, sẽ hỏi riêng sự đồng ý trước khi bật.",
+      "selfCheck": {
+        "title": "Tự kiểm tra kết nối",
+        "connectionTitle": "Điện thoại không kết nối được?",
+        "serviceLabel": "Trạng thái dịch vụ",
+        "serviceUnavailable": "Chưa nạp thành phần đồng bộ",
+        "serviceOnline": "Dịch vụ đang chạy",
+        "serviceOffline": "Dịch vụ đã dừng",
+        "connectionStep1": "Xác nhận điện thoại và PC cùng một mạng LAN và dịch vụ đồng bộ đã bật.",
+        "connectionStep2": "Kiểm tra tường lửa Windows có cho phép ứng dụng này (dùng «Kiểm tra quyền kết nối» bên dưới).",
+        "connectionStep3": "Nếu vẫn lỗi, hãy xuất gói chẩn đoán và xem lỗi gần nhất cùng địa chỉ kết nối.",
+        "openNetwork": "Kiểm tra quyền kết nối",
+        "metadataTitle": "Không đọc được tham số ảnh?",
+        "metadataStep1": "Xác nhận thư mục ảnh đã nằm trong phạm vi quét và quét đã hoàn tất.",
+        "metadataStep2": "Phân giải tham số trực tuyến mặc định tắt; hãy bật trong cài đặt đồng bộ và chấp nhận thông báo trước.",
+        "metadataStep3": "Giải mã cục bộ đã tích hợp trong thành phần đồng bộ; không cần cài thêm.",
+        "openScan": "Kiểm tra cài đặt quét và phân giải"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "Thông tin kết nối",
+        "address": "Địa chỉ kết nối",
+        "addressUnknown": "Dịch vụ chưa chạy"
+      },
+      "static": {
+        "albumUpdate": "Cập nhật album",
+        "albumUpdateValue": "Tự động thu nhận ảnh mới",
+        "tray": "Sau khi đóng cửa sổ",
+        "trayValue": "Tiếp tục chạy ở khay hệ thống"
+      },
+      "startup": {
+        "title": "Tùy chọn khởi động",
+        "launchAtLogin": "Khởi động MeowStarMap khi đăng nhập",
+        "launchAtLoginDesc": "Tự khởi động MeowStarMap sau khi đăng nhập Windows; việc tự bật dịch vụ đồng bộ do công tắc phía trên điều khiển riêng."
+      },
+      "legal": {
+        "title": "Điều khoản pháp lý",
+        "privacy": "Chính sách bảo mật",
+        "terms": "Thỏa thuận người dùng",
+        "services": "Điều khoản dịch vụ",
+        "unavailable": "Dịch vụ PC chưa sẵn sàng, tạm thời không mở được điều khoản"
+      },
+      "network": {
+        "title": "Quyền mạng nội bộ",
+        "description": "Thêm quy tắc tường lửa Windows chiều vào cho dịch vụ đồng bộ để điện thoại truy cập được PC này.",
+        "disabled": "Công tắc «Sửa xung đột mạng» đang tắt; hãy bật để quản lý quyền mạng nội bộ.",
+        "enableJump": "Đi bật",
+        "unavailable": "Bản dựng này chưa dùng được: tiến trình chính chưa có kênh quyền mạng.",
+        "authorize": "Cho phép điện thoại kết nối",
+        "revoke": "Thu hồi quyền mạng của dịch vụ này",
+        "note": "Cấp quyền chỉ thêm một quy tắc tường lửa cho ứng dụng này; sau khi thu hồi, điện thoại không kết nối được cho đến khi cấp lại.",
+        "conflictTitle": "Kiểm tra xung đột mạng",
+        "conflictDesc": "Kiểm tra các quy tắc tường lửa do phần mềm khác để lại có xung đột với dịch vụ đồng bộ không, và sửa chỉ bằng một cú nhấp.",
+        "inspect": "Kiểm tra lại",
+        "repair": "Kiểm tra và sửa một chạm",
+        "restore": "Hoàn tác lần sửa trước",
+        "conflictsFound": "Phát hiện {{count}} quy tắc xung đột",
+        "noConflicts": "Không phát hiện quy tắc xung đột",
+        "conflictNote": "Quy tắc gốc được ghi lại trước khi sửa và có thể hoàn tác bất cứ lúc nào; chỉ xử lý xung đột liên quan đến ứng dụng này.",
+        "status": {
+          "authorized": "Đã thêm quyền mạng nội bộ",
+          "revoked": "Đã thu hồi quyền mạng",
+          "present": "Quy tắc tường lửa đã tồn tại",
+          "absent": "Chưa được cấp quyền",
+          "disabled": "Tính năng đang tắt",
+          "elevation-declined": "Đã hủy nâng quyền quản trị",
+          "failed": "Thao tác thất bại",
+          "ok": "Kiểm tra hoàn tất",
+          "repaired": "Sửa hoàn tất",
+          "restored": "Đã hoàn tác lần sửa trước",
+          "nothing-to-restore": "Không có bản ghi sửa để hoàn tác"
+        }
+      },
+      "hotspot": {
+        "title": "Điểm phát tạm thời",
+        "description": "Khi không có mạng LAN, dùng điểm phát di động của Windows trên PC này để kết nối điện thoại tạm thời.",
+        "disabled": "Công tắc «Điểm phát tạm thời» đang tắt; hãy bật để dùng mạng tạm thời.",
+        "unavailable": "Bản dựng này chưa dùng được: tiến trình chính chưa có kênh điều khiển điểm phát.",
+        "start": "Bật điểm phát tạm thời",
+        "stop": "Kết thúc mạng tạm thời",
+        "openSettings": "Mở cài đặt điểm phát của hệ thống",
+        "ssid": "Tên điểm phát (SSID)",
+        "password": "Mật khẩu điểm phát",
+        "hide": "Ẩn",
+        "reveal": "Hiện",
+        "note": "Ứng dụng chỉ kết thúc được điểm phát do chính nó bật; mật khẩu mặc định được che, hãy đề phòng người nhìn trộm.",
+        "status": {
+          "started": "Đã bật điểm phát",
+          "stopped": "Đã kết thúc điểm phát",
+          "unchanged": "Trạng thái điểm phát không đổi",
+          "disabled": "Tính năng đang tắt",
+          "failed": "Thao tác thất bại"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "Đã duyệt {{approved}} mục, bỏ qua {{skipped}} mục",
+      "openRecycleBin": "Mở đã xóa gần đây",
+      "batchFailed": "Duyệt hàng loạt thất bại, vui lòng thử lại"
+    },
+    "about": {
+      "version": {
+        "title": "Thông tin phiên bản",
+        "tagline": "NikkiSync — thành phần đồng bộ album Nikki (bản chuyển thể thượng nguồn)",
+        "host": "Phiên bản ứng dụng chủ",
+        "aligned": "Phiên bản thượng nguồn tương ứng",
+        "commit": "Commit tương ứng",
+        "author": "Tác giả thượng nguồn: ToStardust (Trợ lý máy ảnh Momo)",
+        "attribution": "Ghi công thành phần giải mã tham số ảnh: RanAxro / Nikki Albums (nikki_albums)"
+      },
+      "download": {
+        "title": "Tải xuống và cập nhật",
+        "networkHint": "Các liên kết dưới đây trỏ đến kênh phát hành thượng nguồn của NikkiSync; việc tải và cài đặt do phía thượng nguồn đảm nhiệm.",
+        "cnb": "Bản thử nghiệm CNB",
+        "cnbNote": "Gói thử nghiệm Android do CI thượng nguồn dựng (liên kết APK trực tiếp).",
+        "quark": "Quark Drive",
+        "quarkNote": "Bản sao trên Quark Drive do thượng nguồn duy trì, kèm bộ cài Android.",
+        "baidu": "Baidu Netdisk",
+        "baiduNote": "Bản sao trên Baidu Netdisk do thượng nguồn duy trì, kèm bộ cài Android.",
+        "github": "GitHub Releases",
+        "githubNote": "Trang phát hành GitHub thượng nguồn (ứng dụng đồng hành PC và mã nguồn)."
+      },
+      "update": {
+        "unavailable": "Kênh cập nhật không khả dụng",
+        "started": "Đã bắt đầu kiểm tra cập nhật",
+        "check": "Kiểm tra cập nhật",
+        "note": "Kiểm tra phiên bản mới qua kênh cập nhật tích hợp của ứng dụng chủ."
+      },
+      "feedback": {
+        "title": "Chẩn đoán và phản hồi",
+        "exportNote": "Xuất file zip nhật ký chẩn đoán của ứng dụng; đính kèm khi gửi phản hồi để xử lý nhanh hơn.",
+        "support": "Gửi chẩn đoán",
+        "supportNote": "Cần bật «Gửi chẩn đoán ẩn danh» trong cài đặt đồng bộ trước; bản dựng này chưa nạp kênh gửi nên nút tạm thời bị vô hiệu."
+      },
+      "repos": {
+        "title": "Kho dự án và nguồn",
+        "momo": "Trợ lý máy ảnh Momo · NikkiSync",
+        "nuannuanStudio": "Tiệm ảnh Nikki",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "MeowStarMap · Bản đồ sao mèo",
+        "nuan5": "NUAN5.PRO · Phân giải tham số trực tuyến",
+        "gongeo": "Nhật ký cộng hưởng Nikki · gongeo.us",
+        "nikkiAlbumsNote": "Kho nguồn của thành phần giải mã tham số ảnh.",
+        "meowStarMapNote": "Kho của ứng dụng này, nơi đặt bảng điều khiển đồng bộ.",
+        "nuan5Note": "Nguồn của điểm cuối phân giải tham số trực tuyến.",
+        "gongeoNote": "Nguồn dữ liệu nhật ký cộng hưởng và danh mục trang phục."
+      }
+    },
+    "statusBar": {
+      "unavailable": "Bản dựng này không khả dụng",
+      "restartSuccess": "Đã khởi động lại dịch vụ đồng bộ",
+      "restartFailed": "Khởi động lại dịch vụ đồng bộ thất bại",
+      "version": "Phiên bản ứng dụng chủ",
+      "aligned": "Khớp thượng nguồn",
+      "restart": "Khởi động lại dịch vụ đồng bộ",
+      "export": "Xuất gói chẩn đoán",
+      "exportCanceled": "Đã hủy xuất",
+      "exported": "Đã xuất gói chẩn đoán: {{path}}",
+      "exportFailed": "Xuất gói chẩn đoán thất bại"
+    }
   }
 }

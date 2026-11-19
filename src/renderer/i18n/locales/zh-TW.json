@@ -4527,7 +4527,27 @@
       "edit": "編輯",
       "delete": "刪除",
       "loadMore": "載入更多",
-      "loadMoreFailed": "載入更多失敗，點擊重試"
+      "loadMoreFailed": "載入更多失敗，點擊重試",
+      "searchPlaceholder": "搜尋標題、備註、標籤…",
+      "categoryPlaceholder": "依分類篩選",
+      "statusLabel": "狀態",
+      "statusAll": "全部狀態",
+      "status": {
+        "self": "自搭",
+        "want": "想搭",
+        "reproduced": "已復刻",
+        "tried": "已試穿",
+        "archived": "已封存"
+      },
+      "refresh": "重新整理",
+      "countNote": "共 {{count}} 筆",
+      "tagsLabel": "標籤",
+      "tagsPlaceholder": "逗號分隔，如：染色, 搭配",
+      "categoriesLabel": "分類",
+      "categoriesPlaceholder": "逗號分隔，如：裙裝, 外套",
+      "codeLabel": "分享碼",
+      "codeRecognized": "偵測到分享碼 {{code}}，點擊填入",
+      "filterEmpty": "沒有符合篩選條件的項目"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "暫無地圖資料",
     "lackWorldMap": "該地點暫不支援查看地圖",
     "outsideBounds": "拍攝點超出地圖範圍"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "手機連線",
+      "settings": "同步設定",
+      "organizer": "最近刪除",
+      "inspiration": "靈感庫",
+      "about": "關於"
+    },
+    "heading": {
+      "connect": {
+        "title": "暖暖相簿",
+        "subtitle": "配對手機、檢視資產總覽與連線自查"
+      },
+      "settings": {
+        "title": "同步設定",
+        "subtitle": "服務、目錄、帳號與 Windows 外殼能力"
+      },
+      "organizer": {
+        "title": "最近刪除",
+        "subtitle": "手機端發起的刪除請求，經本機批准後移入回收站"
+      },
+      "inspiration": {
+        "title": "靈感庫",
+        "subtitle": "收集與管理搭配靈感，支援篩選與分享碼"
+      },
+      "about": {
+        "title": "關於",
+        "subtitle": "版本、下載管道與上游專案來源"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "資產總覽",
+        "assetsUnit": "項資產",
+        "devicesUnit": "台已配對裝置",
+        "caption": "資料來自同步庫觀測，隨掃描與配對即時更新",
+        "unavailable": "資產總覽不可用（同步元件未就緒或通道失敗）"
+      },
+      "firstRun": {
+        "hint": "首次配對：用 NikkiSync 行動端掃描下方 QR 碼"
+      },
+      "android": {
+        "title": "Android 用戶端",
+        "description": "在手機上安裝 NikkiSync Android 端，掃碼即可配對同步",
+        "paired": "已有配對裝置",
+        "pairedHint": "換機或重裝後可重新產生 QR 碼配對",
+        "newQrNote": "服務執行中可隨時產生新的配對 QR 碼（5 分鐘內有效）",
+        "newQr": "產生新 QR 碼",
+        "download": "下載 Android APK",
+        "export": "匯出診斷包",
+        "exportNote": "連線異常時可匯出診斷包，隨回饋附上以便排查"
+      },
+      "guide": {
+        "title": "首次使用引導",
+        "summary": "三步驟完成手機連線",
+        "step1Title": "第一步：安裝行動端",
+        "step1Body": "從夸克網盤或百度網盤下載 NikkiSync Android 安裝包並安裝。",
+        "step2Title": "第二步：啟用同步服務並配對",
+        "step2Body": "在上方開啟同步服務，用手機掃描配對 QR 碼完成配對。",
+        "step3Title": "第三步：檢查網路與掃描設定",
+        "step3Body": "確認本地網路權限已授權、照片目錄與掃描設定符合預期。",
+        "quark": "夸克網盤下載",
+        "baidu": "百度網盤下載",
+        "openNetwork": "前往網路權限",
+        "openScan": "前往掃描與解析設定"
+      },
+      "privacyNote": "照片與參數僅在本機與已配對裝置之間的區域網路內傳輸，不經過雲端；線上參數解析為可選功能，開啟前會單獨徵求同意。",
+      "selfCheck": {
+        "title": "連線自查",
+        "connectionTitle": "手機連不上？",
+        "serviceLabel": "服務狀態",
+        "serviceUnavailable": "同步元件未裝配",
+        "serviceOnline": "服務執行中",
+        "serviceOffline": "服務已停止",
+        "connectionStep1": "確認手機與電腦在同一區域網路，且同步服務已啟用。",
+        "connectionStep2": "檢查 Windows 防火牆是否放行本應用（可用下方「檢查連線權限」）。",
+        "connectionStep3": "仍失敗時匯出診斷包，檢視最近錯誤與綁定位址。",
+        "openNetwork": "檢查連線權限",
+        "metadataTitle": "照片參數讀取不到？",
+        "metadataStep1": "確認照片目錄已納入掃描，且掃描已完成。",
+        "metadataStep2": "線上參數解析預設關閉，需在同步設定中開啟並同意披露條款。",
+        "metadataStep3": "本地解碼內建於同步元件，無需額外安裝。",
+        "openScan": "檢查掃描與解析設定"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "連線資訊",
+        "address": "連線位址",
+        "addressUnknown": "服務未執行"
+      },
+      "static": {
+        "albumUpdate": "相簿更新",
+        "albumUpdateValue": "自動收錄新照片",
+        "tray": "關閉視窗後",
+        "trayValue": "在托盤繼續執行"
+      },
+      "startup": {
+        "title": "啟動偏好",
+        "launchAtLogin": "開機時自動啟動喵星圖",
+        "launchAtLoginDesc": "登入 Windows 後自動啟動喵星圖；同步服務是否自動啟用由上方開關單獨控制。"
+      },
+      "legal": {
+        "title": "法律條款",
+        "privacy": "隱私政策",
+        "terms": "使用者協議",
+        "services": "服務條款",
+        "unavailable": "PC 服務未就緒，暫無法開啟條款"
+      },
+      "network": {
+        "title": "本地網路權限",
+        "description": "為同步服務新增 Windows 防火牆輸入規則，讓手機可以連入本機。",
+        "disabled": "未啟用「網路衝突修復」開關，啟用後方可管理本地網路權限。",
+        "enableJump": "去開啟",
+        "unavailable": "目前構建暫不可用：主行程未落地網路權限通道。",
+        "authorize": "允許手機連線",
+        "revoke": "撤銷目前服務的網路授權",
+        "note": "授權僅為本應用新增防火牆規則；撤銷後手機將無法連入，需重新授權。",
+        "conflictTitle": "網路衝突檢查",
+        "conflictDesc": "檢查其他軟體遺留的防火牆規則是否與同步服務衝突，並可一鍵修復。",
+        "inspect": "重新檢查",
+        "repair": "一鍵檢查並修復",
+        "restore": "撤銷上次修復",
+        "conflictsFound": "發現 {{count}} 條衝突規則",
+        "noConflicts": "未發現衝突規則",
+        "conflictNote": "修復前會記錄原始規則，可隨時撤銷；僅處理與本應用相關的衝突。",
+        "status": {
+          "authorized": "已新增本地網路權限",
+          "revoked": "已撤銷網路授權",
+          "present": "防火牆規則已存在",
+          "absent": "尚未授權",
+          "disabled": "功能未啟用",
+          "elevation-declined": "已取消管理員提權",
+          "failed": "操作失敗",
+          "ok": "檢查完成",
+          "repaired": "修復完成",
+          "restored": "已撤銷上次修復",
+          "nothing-to-restore": "沒有可撤銷的修復記錄"
+        }
+      },
+      "hotspot": {
+        "title": "臨時熱點",
+        "description": "沒有可用區域網路時，用本機 Windows 行動熱點臨時組網供手機連線。",
+        "disabled": "未啟用「臨時熱點」開關，啟用後方可使用臨時組網。",
+        "unavailable": "目前構建暫不可用：主行程未落地熱點控制通道。",
+        "start": "開啟臨時熱點",
+        "stop": "結束臨時組網",
+        "openSettings": "開啟系統熱點設定",
+        "ssid": "熱點名稱（SSID）",
+        "password": "熱點密碼",
+        "hide": "隱藏",
+        "reveal": "顯示",
+        "note": "僅本應用開啟的熱點可由本應用結束；密碼預設遮罩，注意肩屏防窺。",
+        "status": {
+          "started": "熱點已開啟",
+          "stopped": "熱點已結束",
+          "unchanged": "熱點狀態未變化",
+          "disabled": "功能未啟用",
+          "failed": "操作失敗"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "已批准 {{approved}} 項，跳過 {{skipped}} 項",
+      "openRecycleBin": "開啟最近刪除",
+      "batchFailed": "批量批准失敗，請重試"
+    },
+    "about": {
+      "version": {
+        "title": "版本資訊",
+        "tagline": "NikkiSync —— 暖暖相簿同步元件（上游移植）",
+        "host": "宿主版本",
+        "aligned": "上游對齊版本",
+        "commit": "對齊提交",
+        "author": "上游作者：ToStardust（大喵相機助手）",
+        "attribution": "照片參數解碼元件署名：RanAxro / Nikki Albums（nikki_albums）"
+      },
+      "download": {
+        "title": "下載與更新",
+        "networkHint": "以下連結指向 NikkiSync 上游發布管道，下載與安裝由上游負責。",
+        "cnb": "CNB 測試版",
+        "cnbNote": "上游 CI 構建的 Android 測試包（APK 直鏈）。",
+        "quark": "夸克網盤",
+        "quarkNote": "上游維護的夸克網盤分流，含 Android 安裝包。",
+        "baidu": "百度網盤",
+        "baiduNote": "上游維護的百度網盤分流，含 Android 安裝包。",
+        "github": "GitHub Releases",
+        "githubNote": "上游 GitHub 發布頁（PC 端與源碼）。"
+      },
+      "update": {
+        "unavailable": "更新通道不可用",
+        "started": "已發起更新檢查",
+        "check": "檢查更新",
+        "note": "使用宿主應用內更新通道檢查新版本。"
+      },
+      "feedback": {
+        "title": "診斷與回饋",
+        "exportNote": "匯出本應用診斷日誌壓縮包，回饋問題時附上可加快排查。",
+        "support": "傳送診斷",
+        "supportNote": "需先在同步設定開啟「匿名診斷提交」；目前構建未裝配提交通道，按鈕暫不可用。"
+      },
+      "repos": {
+        "title": "專案倉庫與來源",
+        "momo": "大喵相機助手 · NikkiSync",
+        "nuannuanStudio": "暖暖照相館",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "喵星圖 · MeowStarMap",
+        "nuan5": "NUAN5.PRO · 線上參數解析",
+        "gongeo": "暖暖共鳴錄 · gongeo.us",
+        "nikkiAlbumsNote": "照片參數解碼元件的來源倉庫。",
+        "meowStarMapNote": "本應用倉庫：同步控制台的宿主。",
+        "nuan5Note": "線上參數解析服務端點來源。",
+        "gongeoNote": "共鳴錄資料與服飾目錄來源。"
+      }
+    },
+    "statusBar": {
+      "unavailable": "目前構建不可用",
+      "restartSuccess": "同步服務已重啟",
+      "restartFailed": "重啟同步服務失敗",
+      "version": "宿主版本",
+      "aligned": "上游對齊",
+      "restart": "重啟同步服務",
+      "export": "匯出診斷包",
+      "exportCanceled": "已取消匯出",
+      "exported": "診斷包已匯出：{{path}}",
+      "exportFailed": "匯出診斷包失敗"
+    }
   }
 }

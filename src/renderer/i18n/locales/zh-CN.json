@@ -4527,7 +4527,27 @@
       "edit": "编辑",
       "delete": "删除",
       "loadMore": "加载更多",
-      "loadMoreFailed": "加载更多失败，点击重试"
+      "loadMoreFailed": "加载更多失败，点击重试",
+      "searchPlaceholder": "搜索标题、备注、标签…",
+      "categoryPlaceholder": "按分类过滤",
+      "statusLabel": "状态",
+      "statusAll": "全部状态",
+      "status": {
+        "self": "自搭",
+        "want": "想搭",
+        "reproduced": "已复刻",
+        "tried": "已试穿",
+        "archived": "已归档"
+      },
+      "refresh": "刷新",
+      "countNote": "共 {{count}} 条",
+      "tagsLabel": "标签",
+      "tagsPlaceholder": "逗号分隔，如：染色, 搭配",
+      "categoriesLabel": "分类",
+      "categoriesPlaceholder": "逗号分隔，如：裙装, 外套",
+      "codeLabel": "分享码",
+      "codeRecognized": "识别到分享码 {{code}}，点击填入",
+      "filterEmpty": "没有符合过滤条件的条目"
     }
   },
   "syncService": {
@@ -4772,6 +4792,234 @@
         "staged": "已暂存",
         "rolled-back": "已回滚"
       }
+    }
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "手机连接",
+      "settings": "同步设置",
+      "organizer": "最近删除",
+      "inspiration": "灵感库",
+      "about": "关于"
+    },
+    "heading": {
+      "connect": {
+        "title": "暖暖相册",
+        "subtitle": "配对手机、查看资产总览与连接自查"
+      },
+      "settings": {
+        "title": "同步设置",
+        "subtitle": "服务、目录、账号与 Windows 外壳能力"
+      },
+      "organizer": {
+        "title": "最近删除",
+        "subtitle": "手机端发起的删除请求，经本机批准后移入回收站"
+      },
+      "inspiration": {
+        "title": "灵感库",
+        "subtitle": "收集与管理搭配灵感，支持筛选与分享码"
+      },
+      "about": {
+        "title": "关于",
+        "subtitle": "版本、下载渠道与上游项目来源"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "资产总览",
+        "assetsUnit": "项资产",
+        "devicesUnit": "台已配对设备",
+        "caption": "数据来自同步库观测，随扫描与配对实时更新",
+        "unavailable": "资产总览不可用（同步组件未就绪或通道失败）"
+      },
+      "firstRun": {
+        "hint": "首次配对：用 NikkiSync 移动端扫描下方二维码"
+      },
+      "android": {
+        "title": "Android 客户端",
+        "description": "在手机上安装 NikkiSync Android 端，扫码即可配对同步",
+        "paired": "已有配对设备",
+        "pairedHint": "换机或重装后可重新生成二维码配对",
+        "newQrNote": "服务运行中可随时生成新的配对二维码（5 分钟内有效）",
+        "newQr": "生成新二维码",
+        "download": "下载 Android APK",
+        "export": "导出诊断包",
+        "exportNote": "连接异常时可导出诊断包，随反馈附上以便排查"
+      },
+      "guide": {
+        "title": "首次使用引导",
+        "summary": "三步完成手机连接",
+        "step1Title": "第一步：安装移动端",
+        "step1Body": "从夸克网盘或百度网盘下载 NikkiSync Android 安装包并安装。",
+        "step2Title": "第二步：启用同步服务并配对",
+        "step2Body": "在上方开启同步服务，用手机扫描配对二维码完成配对。",
+        "step3Title": "第三步：检查网络与扫描设置",
+        "step3Body": "确认本地网络权限已授权、照片目录与扫描设置符合预期。",
+        "quark": "夸克网盘下载",
+        "baidu": "百度网盘下载",
+        "openNetwork": "前往网络权限",
+        "openScan": "前往扫描与解析设置"
+      },
+      "privacyNote": "照片与参数仅在本机与已配对设备之间的局域网内传输，不经过云端；在线参数解析为可选功能，开启前会单独征求同意。",
+      "selfCheck": {
+        "title": "连接自查",
+        "connectionTitle": "手机连不上？",
+        "serviceLabel": "服务状态",
+        "serviceUnavailable": "同步组件未装配",
+        "serviceOnline": "服务运行中",
+        "serviceOffline": "服务已停止",
+        "connectionStep1": "确认手机与电脑在同一局域网，且同步服务已启用。",
+        "connectionStep2": "检查 Windows 防火墙是否放行本应用（可用下方「检查连接权限」）。",
+        "connectionStep3": "仍失败时导出诊断包，查看最近错误与绑定地址。",
+        "openNetwork": "检查连接权限",
+        "metadataTitle": "照片参数读取不到？",
+        "metadataStep1": "确认照片目录已纳入扫描，且扫描已完成。",
+        "metadataStep2": "在线参数解析默认关闭，需在同步设置中开启并同意披露条款。",
+        "metadataStep3": "本地解码内置于同步组件，无需额外安装。",
+        "openScan": "检查扫描与解析设置"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "连接信息",
+        "address": "连接地址",
+        "addressUnknown": "服务未运行"
+      },
+      "static": {
+        "albumUpdate": "相册更新",
+        "albumUpdateValue": "自动收录新照片",
+        "tray": "关闭窗口后",
+        "trayValue": "在托盘继续运行"
+      },
+      "startup": {
+        "title": "启动偏好",
+        "launchAtLogin": "开机时自动启动喵星图",
+        "launchAtLoginDesc": "登录 Windows 后自动启动喵星图；同步服务是否自动启用由上方开关单独控制。"
+      },
+      "legal": {
+        "title": "法律条款",
+        "privacy": "隐私政策",
+        "terms": "用户协议",
+        "services": "服务条款",
+        "unavailable": "PC 服务未就绪，暂无法打开条款"
+      },
+      "network": {
+        "title": "本地网络权限",
+        "description": "为同步服务添加 Windows 防火墙入站规则，让手机可以连入本机。",
+        "disabled": "未启用「网络冲突修复」开关，启用后方可管理本地网络权限。",
+        "enableJump": "去开启",
+        "unavailable": "当前构建暂不可用：主进程未落地网络权限通道。",
+        "authorize": "允许手机连接",
+        "revoke": "撤销当前服务的网络授权",
+        "note": "授权仅为本应用添加防火墙规则；撤销后手机将无法连入，需重新授权。",
+        "conflictTitle": "网络冲突检查",
+        "conflictDesc": "检查其他软件遗留的防火墙规则是否与同步服务冲突，并可一键修复。",
+        "inspect": "重新检查",
+        "repair": "一键检查并修复",
+        "restore": "撤销上次修复",
+        "conflictsFound": "发现 {{count}} 条冲突规则",
+        "noConflicts": "未发现冲突规则",
+        "conflictNote": "修复前会记录原始规则，可随时撤销；仅处理与本应用相关的冲突。",
+        "status": {
+          "authorized": "已添加本地网络权限",
+          "revoked": "已撤销网络授权",
+          "present": "防火墙规则已存在",
+          "absent": "尚未授权",
+          "disabled": "功能未启用",
+          "elevation-declined": "已取消管理员提权",
+          "failed": "操作失败",
+          "ok": "检查完成",
+          "repaired": "修复完成",
+          "restored": "已撤销上次修复",
+          "nothing-to-restore": "没有可撤销的修复记录"
+        }
+      },
+      "hotspot": {
+        "title": "临时热点",
+        "description": "没有可用局域网时，用本机 Windows 移动热点临时组网供手机连接。",
+        "disabled": "未启用「临时热点」开关，启用后方可使用临时组网。",
+        "unavailable": "当前构建暂不可用：主进程未落地热点控制通道。",
+        "start": "开启临时热点",
+        "stop": "结束临时组网",
+        "openSettings": "打开系统热点设置",
+        "ssid": "热点名称（SSID）",
+        "password": "热点密码",
+        "hide": "隐藏",
+        "reveal": "显示",
+        "note": "仅本应用开启的热点可由本应用结束；密码默认掩码，注意肩屏防窥。",
+        "status": {
+          "started": "热点已开启",
+          "stopped": "热点已结束",
+          "unchanged": "热点状态未变化",
+          "disabled": "功能未启用",
+          "failed": "操作失败"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "已批准 {{approved}} 项，跳过 {{skipped}} 项",
+      "openRecycleBin": "打开最近删除",
+      "batchFailed": "批量批准失败，请重试"
+    },
+    "about": {
+      "version": {
+        "title": "版本信息",
+        "tagline": "NikkiSync —— 暖暖相册同步组件（上游移植）",
+        "host": "宿主版本",
+        "aligned": "上游对齐版本",
+        "commit": "对齐提交",
+        "author": "上游作者：ToStardust（大喵相机助手）",
+        "attribution": "照片参数解码组件署名：RanAxro / Nikki Albums（nikki_albums）"
+      },
+      "download": {
+        "title": "下载与更新",
+        "networkHint": "以下链接指向 NikkiSync 上游发布渠道，下载与安装由上游负责。",
+        "cnb": "CNB 测试版",
+        "cnbNote": "上游 CI 构建的 Android 测试包（APK 直链）。",
+        "quark": "夸克网盘",
+        "quarkNote": "上游维护的夸克网盘分流，含 Android 安装包。",
+        "baidu": "百度网盘",
+        "baiduNote": "上游维护的百度网盘分流，含 Android 安装包。",
+        "github": "GitHub Releases",
+        "githubNote": "上游 GitHub 发布页（PC 端与源码）。"
+      },
+      "update": {
+        "unavailable": "更新通道不可用",
+        "started": "已发起更新检查",
+        "check": "检查更新",
+        "note": "使用宿主应用内更新通道检查新版本。"
+      },
+      "feedback": {
+        "title": "诊断与反馈",
+        "exportNote": "导出本应用诊断日志压缩包，反馈问题时附上可加快排查。",
+        "support": "发送诊断",
+        "supportNote": "需先在同步设置开启「匿名诊断提交」；当前构建未装载提交通道，按钮暂不可用。"
+      },
+      "repos": {
+        "title": "项目仓库与来源",
+        "momo": "大喵相机助手 · NikkiSync",
+        "nuannuanStudio": "暖暖照相馆",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "喵星图 · MeowStarMap",
+        "nuan5": "NUAN5.PRO · 在线参数解析",
+        "gongeo": "暖暖共鸣录 · gongeo.us",
+        "nikkiAlbumsNote": "照片参数解码组件的来源仓库。",
+        "meowStarMapNote": "本应用仓库：同步控制台的宿主。",
+        "nuan5Note": "在线参数解析服务端点来源。",
+        "gongeoNote": "共鸣录数据与服饰目录来源。"
+      }
+    },
+    "statusBar": {
+      "unavailable": "当前构建不可用",
+      "restartSuccess": "同步服务已重启",
+      "restartFailed": "重启同步服务失败",
+      "version": "宿主版本",
+      "aligned": "上游对齐",
+      "restart": "重启同步服务",
+      "export": "导出诊断包",
+      "exportCanceled": "已取消导出",
+      "exported": "诊断包已导出：{{path}}",
+      "exportFailed": "导出诊断包失败"
     }
   },
   "shareCard": {

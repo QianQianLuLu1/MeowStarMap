@@ -4527,7 +4527,27 @@
       "edit": "Edit",
       "delete": "Delete",
       "loadMore": "Load more",
-      "loadMoreFailed": "Failed to load more, click to retry"
+      "loadMoreFailed": "Failed to load more, click to retry",
+      "searchPlaceholder": "Search titles, notes, tags…",
+      "categoryPlaceholder": "Filter by category",
+      "statusLabel": "Status",
+      "statusAll": "All statuses",
+      "status": {
+        "self": "Self-styled",
+        "want": "Want to style",
+        "reproduced": "Reproduced",
+        "tried": "Tried on",
+        "archived": "Archived"
+      },
+      "refresh": "Refresh",
+      "countNote": "{{count}} items",
+      "tagsLabel": "Tags",
+      "tagsPlaceholder": "Comma-separated, e.g. dye, outfit",
+      "categoriesLabel": "Categories",
+      "categoriesPlaceholder": "Comma-separated, e.g. dresses, coats",
+      "codeLabel": "Share code",
+      "codeRecognized": "Share code {{code}} detected — click to fill in",
+      "filterEmpty": "No entries match the filters"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "No map data available",
     "lackWorldMap": "Map is not available for this location",
     "outsideBounds": "Shooting location is outside the map bounds"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "Phone Connection",
+      "settings": "Sync Settings",
+      "organizer": "Recently Deleted",
+      "inspiration": "Inspiration Library",
+      "about": "About"
+    },
+    "heading": {
+      "connect": {
+        "title": "Nikki Album",
+        "subtitle": "Pair your phone, view library stats, and run connection self-checks"
+      },
+      "settings": {
+        "title": "Sync Settings",
+        "subtitle": "Service, directories, accounts, and Windows shell capabilities"
+      },
+      "organizer": {
+        "title": "Recently Deleted",
+        "subtitle": "Deletion requests from your phone, moved to the Recycle Bin after approval on this PC"
+      },
+      "inspiration": {
+        "title": "Inspiration Library",
+        "subtitle": "Collect and manage outfit inspirations, with filters and share codes"
+      },
+      "about": {
+        "title": "About",
+        "subtitle": "Versions, download channels, and upstream project sources"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "Library overview",
+        "assetsUnit": "assets",
+        "devicesUnit": "paired devices",
+        "caption": "Observed from the sync library; updates as scans and pairing progress",
+        "unavailable": "Library overview unavailable (sync components not ready or channel failed)"
+      },
+      "firstRun": {
+        "hint": "First pairing: scan the QR code below with the NikkiSync mobile app"
+      },
+      "android": {
+        "title": "Android client",
+        "description": "Install the NikkiSync Android app on your phone, then scan to pair and sync",
+        "paired": "Devices already paired",
+        "pairedHint": "After switching phones or reinstalling, generate a new QR code to pair again",
+        "newQrNote": "While the service is running you can generate a new pairing QR code at any time (valid for 5 minutes)",
+        "newQr": "Generate new QR code",
+        "download": "Download Android APK",
+        "export": "Export diagnostics",
+        "exportNote": "If the connection fails, export a diagnostics bundle and attach it to your feedback"
+      },
+      "guide": {
+        "title": "First-use guide",
+        "summary": "Connect your phone in three steps",
+        "step1Title": "Step 1: Install the mobile app",
+        "step1Body": "Download the NikkiSync Android installer from Quark Drive or Baidu Netdisk and install it.",
+        "step2Title": "Step 2: Enable the sync service and pair",
+        "step2Body": "Turn on the sync service above, then scan the pairing QR code with your phone.",
+        "step3Title": "Step 3: Check network and scan settings",
+        "step3Body": "Make sure local network permission is granted and the photo directories and scan settings are as expected.",
+        "quark": "Quark Drive download",
+        "baidu": "Baidu Netdisk download",
+        "openNetwork": "Go to network permission",
+        "openScan": "Go to scan & resolve settings"
+      },
+      "privacyNote": "Photos and parameters travel only over the LAN between this PC and paired devices, never via the cloud; online parameter resolving is optional and asks for separate consent before it is enabled.",
+      "selfCheck": {
+        "title": "Connection self-check",
+        "connectionTitle": "Phone can't connect?",
+        "serviceLabel": "Service state",
+        "serviceUnavailable": "Sync components not mounted",
+        "serviceOnline": "Service running",
+        "serviceOffline": "Service stopped",
+        "connectionStep1": "Make sure the phone and PC are on the same LAN and the sync service is enabled.",
+        "connectionStep2": "Check that Windows Firewall allows this app (use \"Check connection permission\" below).",
+        "connectionStep3": "If it still fails, export a diagnostics bundle and review the latest error and bind address.",
+        "openNetwork": "Check connection permission",
+        "metadataTitle": "Photo parameters can't be read?",
+        "metadataStep1": "Make sure the photo directory is included in the scan and the scan has completed.",
+        "metadataStep2": "Online parameter resolving is off by default; enable it in Sync Settings and accept the disclosure.",
+        "metadataStep3": "Local decoding is built into the sync components; no extra installation is needed.",
+        "openScan": "Check scan & resolve settings"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "Connection info",
+        "address": "Connection address",
+        "addressUnknown": "Service not running"
+      },
+      "static": {
+        "albumUpdate": "Album updates",
+        "albumUpdateValue": "New photos are ingested automatically",
+        "tray": "After closing the window",
+        "trayValue": "Keeps running in the tray"
+      },
+      "startup": {
+        "title": "Startup preferences",
+        "launchAtLogin": "Launch MeowStarMap at sign-in",
+        "launchAtLoginDesc": "Start MeowStarMap automatically after signing in to Windows; whether the sync service auto-enables is controlled separately above."
+      },
+      "legal": {
+        "title": "Legal",
+        "privacy": "Privacy Policy",
+        "terms": "User Agreement",
+        "services": "Terms of Service",
+        "unavailable": "PC service not ready; the terms cannot be opened right now"
+      },
+      "network": {
+        "title": "Local network permission",
+        "description": "Add a Windows Firewall inbound rule for the sync service so your phone can reach this PC.",
+        "disabled": "The \"Network conflict repair\" switch is off; enable it to manage local network permission.",
+        "enableJump": "Enable it",
+        "unavailable": "Not available in this build: the main process has not landed the network permission channel.",
+        "authorize": "Allow phone connections",
+        "revoke": "Revoke network authorization for this service",
+        "note": "Authorization only adds a firewall rule for this app; after revoking, phones cannot connect until you authorize again.",
+        "conflictTitle": "Network conflict check",
+        "conflictDesc": "Check whether firewall rules left by other software conflict with the sync service, and repair them in one click.",
+        "inspect": "Re-check",
+        "repair": "Check & repair in one click",
+        "restore": "Undo last repair",
+        "conflictsFound": "Found {{count}} conflicting rules",
+        "noConflicts": "No conflicting rules found",
+        "conflictNote": "Original rules are journaled before repair and can be undone at any time; only conflicts related to this app are handled.",
+        "status": {
+          "authorized": "Local network permission added",
+          "revoked": "Network authorization revoked",
+          "present": "Firewall rule already present",
+          "absent": "Not authorized yet",
+          "disabled": "Feature not enabled",
+          "elevation-declined": "Administrator elevation declined",
+          "failed": "Operation failed",
+          "ok": "Check completed",
+          "repaired": "Repair completed",
+          "restored": "Last repair undone",
+          "nothing-to-restore": "No repair to undo"
+        }
+      },
+      "hotspot": {
+        "title": "Temporary hotspot",
+        "description": "When no LAN is available, use this PC's Windows mobile hotspot to network your phone temporarily.",
+        "disabled": "The \"Temporary hotspot\" switch is off; enable it to use temporary networking.",
+        "unavailable": "Not available in this build: the main process has not landed the hotspot control channel.",
+        "start": "Start temporary hotspot",
+        "stop": "Stop temporary networking",
+        "openSettings": "Open system hotspot settings",
+        "ssid": "Hotspot name (SSID)",
+        "password": "Hotspot password",
+        "hide": "Hide",
+        "reveal": "Show",
+        "note": "Only hotspots started by this app can be stopped by it; the password is masked by default — beware of shoulder surfing.",
+        "status": {
+          "started": "Hotspot started",
+          "stopped": "Hotspot stopped",
+          "unchanged": "Hotspot state unchanged",
+          "disabled": "Feature not enabled",
+          "failed": "Operation failed"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "Approved {{approved}} items, skipped {{skipped}}",
+      "openRecycleBin": "Open Recently Deleted",
+      "batchFailed": "Batch approval failed; please retry"
+    },
+    "about": {
+      "version": {
+        "title": "Version info",
+        "tagline": "NikkiSync — the Nikki album sync component (upstream port)",
+        "host": "Host version",
+        "aligned": "Aligned upstream version",
+        "commit": "Aligned commit",
+        "author": "Upstream author: ToStardust (Momo Camera Assistant)",
+        "attribution": "Photo parameter decoding component credit: RanAxro / Nikki Albums (nikki_albums)"
+      },
+      "download": {
+        "title": "Downloads & updates",
+        "networkHint": "The links below point to NikkiSync upstream release channels; downloading and installation are handled upstream.",
+        "cnb": "CNB test build",
+        "cnbNote": "Android test package built by upstream CI (direct APK link).",
+        "quark": "Quark Drive",
+        "quarkNote": "Upstream-maintained Quark Drive mirror with the Android installer.",
+        "baidu": "Baidu Netdisk",
+        "baiduNote": "Upstream-maintained Baidu Netdisk mirror with the Android installer.",
+        "github": "GitHub Releases",
+        "githubNote": "Upstream GitHub releases page (PC companion and source)."
+      },
+      "update": {
+        "unavailable": "Update channel unavailable",
+        "started": "Update check started",
+        "check": "Check for updates",
+        "note": "Checks for new versions via the host app's in-app update channel."
+      },
+      "feedback": {
+        "title": "Diagnostics & feedback",
+        "exportNote": "Export a zip of this app's diagnostic logs; attaching it to feedback speeds up troubleshooting.",
+        "support": "Send diagnostics",
+        "supportNote": "Requires enabling \"Anonymous diagnostics submission\" in Sync Settings first; this build has not mounted the submission channel, so the button is disabled."
+      },
+      "repos": {
+        "title": "Project repositories & sources",
+        "momo": "Momo Camera Assistant · NikkiSync",
+        "nuannuanStudio": "Nikki Photo Studio",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "MeowStarMap · Meow Star Map",
+        "nuan5": "NUAN5.PRO · Online parameter resolving",
+        "gongeo": "Nikki Resonance Records · gongeo.us",
+        "nikkiAlbumsNote": "Source repository of the photo parameter decoding component.",
+        "meowStarMapNote": "This app's repository: the host of the sync console.",
+        "nuan5Note": "Source of the online parameter resolving endpoint.",
+        "gongeoNote": "Source of resonance records data and the clothing catalog."
+      }
+    },
+    "statusBar": {
+      "unavailable": "Not available in this build",
+      "restartSuccess": "Sync service restarted",
+      "restartFailed": "Failed to restart the sync service",
+      "version": "Host version",
+      "aligned": "Upstream aligned",
+      "restart": "Restart sync service",
+      "export": "Export diagnostics",
+      "exportCanceled": "Export canceled",
+      "exported": "Diagnostics exported: {{path}}",
+      "exportFailed": "Failed to export diagnostics"
+    }
   }
 }

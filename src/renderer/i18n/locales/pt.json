@@ -4527,7 +4527,27 @@
       "edit": "Editar",
       "delete": "Eliminar",
       "loadMore": "Carregar mais",
-      "loadMoreFailed": "Falha ao carregar mais, clique para tentar novamente"
+      "loadMoreFailed": "Falha ao carregar mais, clique para tentar novamente",
+      "searchPlaceholder": "Pesquisar títulos, notas, tags…",
+      "categoryPlaceholder": "Filtrar por categoria",
+      "statusLabel": "Status",
+      "statusAll": "Todos os status",
+      "status": {
+        "self": "Conjunto próprio",
+        "want": "Conjunto desejado",
+        "reproduced": "Reproduzido",
+        "tried": "Experimentado",
+        "archived": "Arquivado"
+      },
+      "refresh": "Atualizar",
+      "countNote": "{{count}} itens",
+      "tagsLabel": "Tags",
+      "tagsPlaceholder": "Separadas por vírgulas, ex.: tingimento, conjunto",
+      "categoriesLabel": "Categorias",
+      "categoriesPlaceholder": "Separadas por vírgulas, ex.: vestidos, casacos",
+      "codeLabel": "Código de compartilhamento",
+      "codeRecognized": "Código de compartilhamento {{code}} detectado — clique para preencher",
+      "filterEmpty": "Nenhum item corresponde aos filtros"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "Sem dados de mapa",
     "lackWorldMap": "O mapa não está disponível para este local",
     "outsideBounds": "O ponto da foto está fora dos limites do mapa"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "Conexão do celular",
+      "settings": "Configurações de sincronização",
+      "organizer": "Excluídos recentemente",
+      "inspiration": "Biblioteca de inspiração",
+      "about": "Sobre"
+    },
+    "heading": {
+      "connect": {
+        "title": "Álbum Nikki",
+        "subtitle": "Pareie o celular, veja as estatísticas da biblioteca e o autodiagnóstico de conexão"
+      },
+      "settings": {
+        "title": "Configurações de sincronização",
+        "subtitle": "Serviço, diretórios, contas e recursos do shell do Windows"
+      },
+      "organizer": {
+        "title": "Excluídos recentemente",
+        "subtitle": "Pedidos de exclusão do celular vão para a lixeira após aprovação neste PC"
+      },
+      "inspiration": {
+        "title": "Biblioteca de inspiração",
+        "subtitle": "Colete e gerencie inspirações de looks, com filtros e códigos de compartilhamento"
+      },
+      "about": {
+        "title": "Sobre",
+        "subtitle": "Versões, canais de download e fontes dos projetos upstream"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "Visão geral da biblioteca",
+        "assetsUnit": "itens",
+        "devicesUnit": "dispositivos pareados",
+        "caption": "Observado a partir da biblioteca de sincronização; atualiza com varreduras e pareamentos",
+        "unavailable": "Visão geral da biblioteca indisponível (componentes de sincronização não prontos ou falha no canal)"
+      },
+      "firstRun": {
+        "hint": "Primeiro pareamento: escaneie o QR code abaixo com o app móvel NikkiSync"
+      },
+      "android": {
+        "title": "Cliente Android",
+        "description": "Instale o app Android do NikkiSync no celular e escaneie para parear e sincronizar",
+        "paired": "Dispositivos já pareados",
+        "pairedHint": "Ao trocar de celular ou reinstalar, gere um novo QR code para parear",
+        "newQrNote": "Com o serviço em execução você pode gerar um novo QR code de pareamento a qualquer momento (válido por 5 minutos)",
+        "newQr": "Gerar novo QR code",
+        "download": "Baixar APK Android",
+        "export": "Exportar pacote de diagnóstico",
+        "exportNote": "Se a conexão falhar, exporte um pacote de diagnóstico e anexe ao seu feedback"
+      },
+      "guide": {
+        "title": "Guia de primeiro uso",
+        "summary": "Conecte o celular em três passos",
+        "step1Title": "Passo 1: instalar o app móvel",
+        "step1Body": "Baixe o instalador Android do NikkiSync pelo Quark Drive ou Baidu Netdisk e instale.",
+        "step2Title": "Passo 2: ativar o serviço de sincronização e parear",
+        "step2Body": "Ative o serviço acima e escaneie o QR code de pareamento com o celular.",
+        "step3Title": "Passo 3: revisar a rede e as configurações de varredura",
+        "step3Body": "Confirme que a permissão de rede local foi concedida e que os diretórios de fotos e as configurações de varredura estão como esperado.",
+        "quark": "Download no Quark Drive",
+        "baidu": "Download no Baidu Netdisk",
+        "openNetwork": "Ir para permissões de rede",
+        "openScan": "Ir para configurações de varredura e resolução"
+      },
+      "privacyNote": "Fotos e parâmetros trafegam apenas pela LAN entre este PC e os dispositivos pareados, nunca pela nuvem; a resolução de parâmetros online é opcional e pede um consentimento separado antes de ser ativada.",
+      "selfCheck": {
+        "title": "Autodiagnóstico de conexão",
+        "connectionTitle": "O celular não conecta?",
+        "serviceLabel": "Status do serviço",
+        "serviceUnavailable": "Componentes de sincronização não montados",
+        "serviceOnline": "Serviço em execução",
+        "serviceOffline": "Serviço parado",
+        "connectionStep1": "Confirme que o celular e o PC estão na mesma LAN e que o serviço de sincronização está ativado.",
+        "connectionStep2": "Verifique se o firewall do Windows permite este app (use «Verificar permissão de conexão» abaixo).",
+        "connectionStep3": "Se ainda falhar, exporte um pacote de diagnóstico e verifique o último erro e o endereço de conexão.",
+        "openNetwork": "Verificar permissão de conexão",
+        "metadataTitle": "Os parâmetros das fotos não são lidos?",
+        "metadataStep1": "Confirme que o diretório de fotos está incluído na varredura e que ela terminou.",
+        "metadataStep2": "A resolução de parâmetros online vem desativada; ative-a nas configurações de sincronização e aceite a divulgação.",
+        "metadataStep3": "A decodificação local está integrada aos componentes de sincronização; não exige instalação extra.",
+        "openScan": "Verificar configurações de varredura e resolução"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "Informações de conexão",
+        "address": "Endereço de conexão",
+        "addressUnknown": "Serviço não está em execução"
+      },
+      "static": {
+        "albumUpdate": "Atualização do álbum",
+        "albumUpdateValue": "Novas fotos são incluídas automaticamente",
+        "tray": "Após fechar a janela",
+        "trayValue": "Continua rodando na bandeja"
+      },
+      "startup": {
+        "title": "Preferências de inicialização",
+        "launchAtLogin": "Iniciar o MeowStarMap ao fazer login",
+        "launchAtLoginDesc": "Inicia o MeowStarMap automaticamente após o login no Windows; a ativação automática do serviço de sincronização é controlada separadamente acima."
+      },
+      "legal": {
+        "title": "Termos legais",
+        "privacy": "Política de privacidade",
+        "terms": "Contrato do usuário",
+        "services": "Termos de serviço",
+        "unavailable": "Serviço de PC não pronto; não é possível abrir os termos no momento"
+      },
+      "network": {
+        "title": "Permissão de rede local",
+        "description": "Adiciona uma regra de entrada no firewall do Windows para o serviço de sincronização, permitindo que o celular alcance este PC.",
+        "disabled": "A opção «Correção de conflitos de rede» está desligada; ative-a para gerenciar a permissão de rede local.",
+        "enableJump": "Ativar",
+        "unavailable": "Indisponível nesta compilação: o processo principal ainda não tem o canal de permissão de rede.",
+        "authorize": "Permitir conexões do celular",
+        "revoke": "Revogar a autorização de rede deste serviço",
+        "note": "A autorização apenas adiciona uma regra de firewall para este app; após revogar, o celular não poderá conectar até nova autorização.",
+        "conflictTitle": "Verificação de conflitos de rede",
+        "conflictDesc": "Verifica se regras de firewall deixadas por outros softwares conflitam com o serviço de sincronização e corrige com um clique.",
+        "inspect": "Verificar novamente",
+        "repair": "Verificar e corrigir com um clique",
+        "restore": "Desfazer a última correção",
+        "conflictsFound": "Encontradas {{count}} regras em conflito",
+        "noConflicts": "Nenhuma regra em conflito encontrada",
+        "conflictNote": "As regras originais são registradas antes da correção e podem ser desfeitas a qualquer momento; apenas conflitos relacionados a este app são tratados.",
+        "status": {
+          "authorized": "Permissão de rede local adicionada",
+          "revoked": "Autorização de rede revogada",
+          "present": "A regra de firewall já existe",
+          "absent": "Ainda não autorizado",
+          "disabled": "Recurso desativado",
+          "elevation-declined": "Elevação de administrador cancelada",
+          "failed": "Operação falhou",
+          "ok": "Verificação concluída",
+          "repaired": "Correção concluída",
+          "restored": "Última correção desfeita",
+          "nothing-to-restore": "Não há correção para desfazer"
+        }
+      },
+      "hotspot": {
+        "title": "Hotspot temporário",
+        "description": "Quando não há LAN disponível, use o hotspot móvel do Windows deste PC para conectar o celular temporariamente.",
+        "disabled": "A opção «Hotspot temporário» está desligada; ative-a para usar a rede temporária.",
+        "unavailable": "Indisponível nesta compilação: o processo principal ainda não tem o canal de controle do hotspot.",
+        "start": "Iniciar hotspot temporário",
+        "stop": "Encerrar rede temporária",
+        "openSettings": "Abrir configurações de hotspot do sistema",
+        "ssid": "Nome do hotspot (SSID)",
+        "password": "Senha do hotspot",
+        "hide": "Ocultar",
+        "reveal": "Mostrar",
+        "note": "Apenas hotspots iniciados por este app podem ser encerrados por ele; a senha fica mascarada por padrão — cuidado com olhares por cima do ombro.",
+        "status": {
+          "started": "Hotspot iniciado",
+          "stopped": "Hotspot encerrado",
+          "unchanged": "Estado do hotspot inalterado",
+          "disabled": "Recurso desativado",
+          "failed": "Operação falhou"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "{{approved}} itens aprovados, {{skipped}} ignorados",
+      "openRecycleBin": "Abrir excluídos recentemente",
+      "batchFailed": "Falha na aprovação em lote; tente novamente"
+    },
+    "about": {
+      "version": {
+        "title": "Informações de versão",
+        "tagline": "NikkiSync — componente de sincronização do álbum Nikki (port upstream)",
+        "host": "Versão do host",
+        "aligned": "Versão upstream alinhada",
+        "commit": "Commit alinhado",
+        "author": "Autor upstream: ToStardust (Assistente de câmera Momo)",
+        "attribution": "Crédito do componente de decodificação de parâmetros de fotos: RanAxro / Nikki Albums (nikki_albums)"
+      },
+      "download": {
+        "title": "Downloads e atualizações",
+        "networkHint": "Os links abaixo apontam para os canais de publicação upstream do NikkiSync; download e instalação são responsabilidade do upstream.",
+        "cnb": "Build de teste CNB",
+        "cnbNote": "Pacote de teste Android compilado pela CI upstream (link direto do APK).",
+        "quark": "Quark Drive",
+        "quarkNote": "Espelho no Quark Drive mantido pelo upstream, com o instalador Android.",
+        "baidu": "Baidu Netdisk",
+        "baiduNote": "Espelho no Baidu Netdisk mantido pelo upstream, com o instalador Android.",
+        "github": "GitHub Releases",
+        "githubNote": "Página de releases do GitHub upstream (companheiro de PC e código-fonte)."
+      },
+      "update": {
+        "unavailable": "Canal de atualização indisponível",
+        "started": "Verificação de atualização iniciada",
+        "check": "Verificar atualizações",
+        "note": "Verifique novas versões pelo canal de atualização integrado do app host."
+      },
+      "feedback": {
+        "title": "Diagnóstico e feedback",
+        "exportNote": "Exporta um zip dos logs de diagnóstico deste app; anexá-lo ao feedback agiliza a resolução.",
+        "support": "Enviar diagnóstico",
+        "supportNote": "Exige ativar antes «Envio anônimo de diagnóstico» nas configurações de sincronização; esta compilação não tem o canal de envio montado, então o botão está desativado."
+      },
+      "repos": {
+        "title": "Repositórios e fontes dos projetos",
+        "momo": "Assistente de câmera Momo · NikkiSync",
+        "nuannuanStudio": "Estúdio fotográfico Nikki",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "MeowStarMap · Mapa estelar felino",
+        "nuan5": "NUAN5.PRO · Resolução de parâmetros online",
+        "gongeo": "Registro de ressonância Nikki · gongeo.us",
+        "nikkiAlbumsNote": "Repositório de origem do componente de decodificação de parâmetros de fotos.",
+        "meowStarMapNote": "Repositório deste app: o host do console de sincronização.",
+        "nuan5Note": "Origem do endpoint de resolução de parâmetros online.",
+        "gongeoNote": "Origem dos dados do registro de ressonância e do catálogo de roupas."
+      }
+    },
+    "statusBar": {
+      "unavailable": "Indisponível nesta compilação",
+      "restartSuccess": "Serviço de sincronização reiniciado",
+      "restartFailed": "Falha ao reiniciar o serviço de sincronização",
+      "version": "Versão do host",
+      "aligned": "Alinhado ao upstream",
+      "restart": "Reiniciar serviço de sincronização",
+      "export": "Exportar pacote de diagnóstico",
+      "exportCanceled": "Exportação cancelada",
+      "exported": "Pacote de diagnóstico exportado: {{path}}",
+      "exportFailed": "Falha ao exportar o pacote de diagnóstico"
+    }
   }
 }

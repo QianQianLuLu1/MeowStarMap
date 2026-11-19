@@ -4527,7 +4527,27 @@
       "edit": "편집",
       "delete": "삭제",
       "loadMore": "더 불러오기",
-      "loadMoreFailed": "불러오기에 실패했습니다. 클릭해서 재시도하세요"
+      "loadMoreFailed": "불러오기에 실패했습니다. 클릭해서 재시도하세요",
+      "searchPlaceholder": "제목, 메모, 태그 검색…",
+      "categoryPlaceholder": "카테고리로 필터",
+      "statusLabel": "상태",
+      "statusAll": "모든 상태",
+      "status": {
+        "self": "자체 코디",
+        "want": "하고 싶은 코디",
+        "reproduced": "재현 완료",
+        "tried": "착용 완료",
+        "archived": "보관됨"
+      },
+      "refresh": "새로고침",
+      "countNote": "총 {{count}}건",
+      "tagsLabel": "태그",
+      "tagsPlaceholder": "쉼표로 구분(예: 염색, 코디)",
+      "categoriesLabel": "카테고리",
+      "categoriesPlaceholder": "쉼표로 구분(예: 원피스, 아우터)",
+      "codeLabel": "공유 코드",
+      "codeRecognized": "공유 코드 {{code}} 감지됨 — 클릭해 입력",
+      "filterEmpty": "필터 조건에 맞는 항목이 없습니다"
     }
   },
   "syncService": {
@@ -4827,5 +4847,233 @@
     "noTiles": "지도 데이터가 없습니다",
     "lackWorldMap": "이 장소에서는 지도를 사용할 수 없습니다",
     "outsideBounds": "촬영 지점이 지도 범위를 벗어났습니다"
+  },
+  "syncConsole": {
+    "nav": {
+      "connect": "휴대폰 연결",
+      "settings": "동기화 설정",
+      "organizer": "최근 삭제",
+      "inspiration": "영감 라이브러리",
+      "about": "정보"
+    },
+    "heading": {
+      "connect": {
+        "title": "니키 앨범",
+        "subtitle": "휴대폰 페어링, 라이브러리 통계 확인, 연결 자가 점검"
+      },
+      "settings": {
+        "title": "동기화 설정",
+        "subtitle": "서비스, 디렉터리, 계정 및 Windows 셸 기능"
+      },
+      "organizer": {
+        "title": "최근 삭제",
+        "subtitle": "휴대폰에서 요청한 삭제는 이 PC에서 승인한 후 휴지통으로 이동됩니다"
+      },
+      "inspiration": {
+        "title": "영감 라이브러리",
+        "subtitle": "코디 영감을 수집·관리하며 필터와 공유 코드를 지원합니다"
+      },
+      "about": {
+        "title": "정보",
+        "subtitle": "버전, 다운로드 채널, 업스트림 프로젝트 출처"
+      }
+    },
+    "connect": {
+      "stats": {
+        "label": "라이브러리 개요",
+        "assetsUnit": "개 자산",
+        "devicesUnit": "대 페어링된 기기",
+        "caption": "동기화 라이브러리 관측값으로, 스캔과 페어링에 따라 실시간 업데이트됩니다",
+        "unavailable": "라이브러리 개요를 사용할 수 없음(동기화 구성 요소 준비 안 됨 또는 채널 실패)"
+      },
+      "firstRun": {
+        "hint": "첫 페어링: NikkiSync 모바일 앱으로 아래 QR 코드를 스캔하세요"
+      },
+      "android": {
+        "title": "Android 클라이언트",
+        "description": "휴대폰에 NikkiSync Android 앱을 설치하고 스캔하여 페어링·동기화하세요",
+        "paired": "페어링된 기기 있음",
+        "pairedHint": "기기 변경 또는 재설치 후 새 QR 코드로 다시 페어링할 수 있습니다",
+        "newQrNote": "서비스 실행 중에는 언제든지 새 페어링 QR 코드를 생성할 수 있습니다(5분간 유효)",
+        "newQr": "새 QR 코드 생성",
+        "download": "Android APK 다운로드",
+        "export": "진단 패키지 내보내기",
+        "exportNote": "연결 이상 시 진단 패키지를 내보내 피드백에 첨부하면 문제 해결에 도움이 됩니다"
+      },
+      "guide": {
+        "title": "첫 사용 가이드",
+        "summary": "3단계로 휴대폰 연결",
+        "step1Title": "1단계: 모바일 앱 설치",
+        "step1Body": "Quark 드라이브 또는 Baidu 넷디스크에서 NikkiSync Android 설치 파일을 다운로드하여 설치하세요.",
+        "step2Title": "2단계: 동기화 서비스 활성화 및 페어링",
+        "step2Body": "위에서 동기화 서비스를 켜고 휴대폰으로 페어링 QR 코드를 스캔하세요.",
+        "step3Title": "3단계: 네트워크 및 스캔 설정 확인",
+        "step3Body": "로컬 네트워크 권한이 허용되었고 사진 디렉터리와 스캔 설정이 예상대로인지 확인하세요.",
+        "quark": "Quark 드라이브 다운로드",
+        "baidu": "Baidu 넷디스크 다운로드",
+        "openNetwork": "네트워크 권한으로 이동",
+        "openScan": "스캔·해석 설정으로 이동"
+      },
+      "privacyNote": "사진과 매개변수는 이 PC와 페어링된 기기 간 LAN에서만 전송되며 클라우드를 거치지 않습니다. 온라인 매개변수 해석은 선택 기능으로, 활성화 전에 별도 동의를 요청합니다.",
+      "selfCheck": {
+        "title": "연결 자가 점검",
+        "connectionTitle": "휴대폰이 연결되지 않나요?",
+        "serviceLabel": "서비스 상태",
+        "serviceUnavailable": "동기화 구성 요소 미마운트",
+        "serviceOnline": "서비스 실행 중",
+        "serviceOffline": "서비스 중지됨",
+        "connectionStep1": "휴대폰과 PC가 같은 LAN에 있고 동기화 서비스가 활성화되었는지 확인하세요.",
+        "connectionStep2": "Windows 방화벽이 이 앱을 허용하는지 확인하세요(아래 '연결 권한 확인' 사용).",
+        "connectionStep3": "그래도 실패하면 진단 패키지를 내보내 최근 오류와 바인드 주소를 확인하세요.",
+        "openNetwork": "연결 권한 확인",
+        "metadataTitle": "사진 매개변수를 읽을 수 없나요?",
+        "metadataStep1": "사진 디렉터리가 스캔에 포함되었고 스캔이 완료되었는지 확인하세요.",
+        "metadataStep2": "온라인 매개변수 해석은 기본적으로 꺼져 있습니다. 동기화 설정에서 켜고 공개 조항에 동의하세요.",
+        "metadataStep3": "로컬 디코딩은 동기화 구성 요소에 내장되어 있어 추가 설치가 필요 없습니다.",
+        "openScan": "스캔·해석 설정 확인"
+      }
+    },
+    "settings": {
+      "connection": {
+        "title": "연결 정보",
+        "address": "연결 주소",
+        "addressUnknown": "서비스 실행 중 아님"
+      },
+      "static": {
+        "albumUpdate": "앨범 업데이트",
+        "albumUpdateValue": "새 사진 자동 수집",
+        "tray": "창을 닫은 후",
+        "trayValue": "트레이에서 계속 실행"
+      },
+      "startup": {
+        "title": "시작 환경설정",
+        "launchAtLogin": "로그인 시 MeowStarMap 자동 시작",
+        "launchAtLoginDesc": "Windows 로그인 후 MeowStarMap을 자동으로 시작합니다. 동기화 서비스 자동 활성화는 위 스위치에서 별도로 제어합니다."
+      },
+      "legal": {
+        "title": "법적 조항",
+        "privacy": "개인정보 처리방침",
+        "terms": "사용자 계약",
+        "services": "서비스 약관",
+        "unavailable": "PC 서비스가 준비되지 않아 조항을 열 수 없습니다"
+      },
+      "network": {
+        "title": "로컬 네트워크 권한",
+        "description": "동기화 서비스용 Windows 방화벽 인바운드 규칙을 추가하여 휴대폰이 이 PC에 연결할 수 있게 합니다.",
+        "disabled": "'네트워크 충돌 복구' 스위치가 꺼져 있습니다. 켜면 로컬 네트워크 권한을 관리할 수 있습니다.",
+        "enableJump": "켜기",
+        "unavailable": "이 빌드에서는 사용할 수 없습니다: 메인 프로세스에 네트워크 권한 채널이 구현되지 않았습니다.",
+        "authorize": "휴대폰 연결 허용",
+        "revoke": "이 서비스의 네트워크 인증 취소",
+        "note": "인증은 이 앱용 방화벽 규칙만 추가합니다. 취소 후에는 휴대폰이 연결할 수 없으며 다시 인증해야 합니다.",
+        "conflictTitle": "네트워크 충돌 검사",
+        "conflictDesc": "다른 소프트웨어가 남긴 방화벽 규칙이 동기화 서비스와 충돌하는지 확인하고 원클릭으로 복구할 수 있습니다.",
+        "inspect": "다시 검사",
+        "repair": "원클릭 검사 및 복구",
+        "restore": "마지막 복구 취소",
+        "conflictsFound": "충돌 규칙 {{count}}개 발견",
+        "noConflicts": "충돌 규칙이 없습니다",
+        "conflictNote": "복구 전 원래 규칙을 기록하므로 언제든 취소할 수 있습니다. 이 앱과 관련된 충돌만 처리합니다.",
+        "status": {
+          "authorized": "로컬 네트워크 권한 추가됨",
+          "revoked": "네트워크 인증 취소됨",
+          "present": "방화벽 규칙이 이미 존재함",
+          "absent": "아직 인증되지 않음",
+          "disabled": "기능 비활성화",
+          "elevation-declined": "관리자 권한 상승 취소됨",
+          "failed": "작업 실패",
+          "ok": "검사 완료",
+          "repaired": "복구 완료",
+          "restored": "마지막 복구 취소됨",
+          "nothing-to-restore": "취소할 복구 기록 없음"
+        }
+      },
+      "hotspot": {
+        "title": "임시 핫스팟",
+        "description": "사용 가능한 LAN이 없을 때 이 PC의 Windows 모바일 핫스팟으로 임시 네트워크를 구성하여 휴대폰을 연결합니다.",
+        "disabled": "'임시 핫스팟' 스위치가 꺼져 있습니다. 켜면 임시 네트워킹을 사용할 수 있습니다.",
+        "unavailable": "이 빌드에서는 사용할 수 없습니다: 메인 프로세스에 핫스팟 제어 채널이 구현되지 않았습니다.",
+        "start": "임시 핫스팟 시작",
+        "stop": "임시 네트워킹 종료",
+        "openSettings": "시스템 핫스팟 설정 열기",
+        "ssid": "핫스팟 이름(SSID)",
+        "password": "핫스팟 비밀번호",
+        "hide": "숨기기",
+        "reveal": "표시",
+        "note": "이 앱이 시작한 핫스팟만 이 앱에서 종료할 수 있습니다. 비밀번호는 기본적으로 마스킹되니 어깨너머 훔쳐보기를 주의하세요.",
+        "status": {
+          "started": "핫스팟 시작됨",
+          "stopped": "핫스팟 종료됨",
+          "unchanged": "핫스팟 상태 변화 없음",
+          "disabled": "기능 비활성화",
+          "failed": "작업 실패"
+        }
+      }
+    },
+    "organizer": {
+      "batchResult": "{{approved}}개 승인, {{skipped}}개 건너뜀",
+      "openRecycleBin": "최근 삭제 열기",
+      "batchFailed": "일괄 승인 실패, 다시 시도하세요"
+    },
+    "about": {
+      "version": {
+        "title": "버전 정보",
+        "tagline": "NikkiSync — 니키 앨범 동기화 구성 요소(업스트림 포팅)",
+        "host": "호스트 버전",
+        "aligned": "업스트림 대응 버전",
+        "commit": "대응 커밋",
+        "author": "업스트림 작성자: ToStardust(다먀오 카메라 도우미)",
+        "attribution": "사진 매개변수 디코딩 구성 요소 크레딧: RanAxro / Nikki Albums(nikki_albums)"
+      },
+      "download": {
+        "title": "다운로드 및 업데이트",
+        "networkHint": "아래 링크는 NikkiSync 업스트림 릴리스 채널을 가리킵니다. 다운로드와 설치는 업스트림이 담당합니다.",
+        "cnb": "CNB 테스트 빌드",
+        "cnbNote": "업스트림 CI가 빌드한 Android 테스트 패키지(APK 직접 링크).",
+        "quark": "Quark 드라이브",
+        "quarkNote": "업스트림이 관리하는 Quark 드라이브 미러로 Android 설치 파일 포함.",
+        "baidu": "Baidu 넷디스크",
+        "baiduNote": "업스트림이 관리하는 Baidu 넷디스크 미러로 Android 설치 파일 포함.",
+        "github": "GitHub Releases",
+        "githubNote": "업스트림 GitHub 릴리스 페이지(PC 컴패니언 및 소스)."
+      },
+      "update": {
+        "unavailable": "업데이트 채널 사용 불가",
+        "started": "업데이트 검사 시작됨",
+        "check": "업데이트 확인",
+        "note": "호스트 앱의 앱 내 업데이트 채널로 새 버전을 확인합니다."
+      },
+      "feedback": {
+        "title": "진단 및 피드백",
+        "exportNote": "이 앱의 진단 로그 zip을 내보냅니다. 피드백에 첨부하면 문제 해결이 빨라집니다.",
+        "support": "진단 보내기",
+        "supportNote": "먼저 동기화 설정에서 '익명 진단 제출'을 켜야 합니다. 이 빌드에는 제출 채널이 마운트되지 않아 버튼이 비활성화되었습니다."
+      },
+      "repos": {
+        "title": "프로젝트 저장소 및 출처",
+        "momo": "다먀오 카메라 도우미 · NikkiSync",
+        "nuannuanStudio": "니키 사진관",
+        "nikkiAlbums": "RanAxro · Nikki Albums",
+        "meowStarMap": "MeowStarMap · 먀오싱투",
+        "nuan5": "NUAN5.PRO · 온라인 매개변수 해석",
+        "gongeo": "니키 공명록 · gongeo.us",
+        "nikkiAlbumsNote": "사진 매개변수 디코딩 구성 요소의 출처 저장소.",
+        "meowStarMapNote": "이 앱의 저장소: 동기화 콘솔의 호스트.",
+        "nuan5Note": "온라인 매개변수 해석 엔드포인트 출처.",
+        "gongeoNote": "공명록 데이터 및 의상 카탈로그 출처."
+      }
+    },
+    "statusBar": {
+      "unavailable": "이 빌드에서는 사용할 수 없음",
+      "restartSuccess": "동기화 서비스 재시작됨",
+      "restartFailed": "동기화 서비스 재시작 실패",
+      "version": "호스트 버전",
+      "aligned": "업스트림 대응",
+      "restart": "동기화 서비스 재시작",
+      "export": "진단 패키지 내보내기",
+      "exportCanceled": "내보내기 취소됨",
+      "exported": "진단 패키지 내보냄: {{path}}",
+      "exportFailed": "진단 패키지 내보내기 실패"
+    }
   }
 }
