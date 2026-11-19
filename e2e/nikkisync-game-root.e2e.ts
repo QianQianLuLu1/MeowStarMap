@@ -305,6 +305,9 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
     await serviceEntry.waitFor({ timeout: 30_000 })
     await serviceEntry.click()
 
+    // 控制台五视图 IA：照片目录节在 settings 子视图（默认 connect 不挂载该节）
+    await page.getByTestId('sync-console-nav-settings').click()
+
     // 照片目录节常驻显示（只碰设置库，不经运行时装配）
     const photoDirInput = page.getByPlaceholder('输入或浏览选择本地目录')
     await photoDirInput.waitFor({ timeout: 30_000 })
@@ -336,6 +339,8 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
       return
     }
     // 环境变量指向非安装根 ⇒ reset 清空后走上游自动发现必然 not-found（枚举链已被短路）
+    // 恢复默认按钮在 settings 子视图（G2 已切过；显式再切一次保证单独运行亦成立）
+    await page.getByTestId('sync-console-nav-settings').click()
     await page.getByRole('button', { name: '恢复默认', exact: true }).click()
     expect(
       await page.getByText('该目录不是有效的游戏安装根').count(),
