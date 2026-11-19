@@ -31,7 +31,8 @@ import {
   getNetworkImageTemplates,
   setReferenceDataDeps,
   setReferenceDataConfig,
-  disposeReferenceDataService
+  disposeReferenceDataService,
+  type ReferenceDataDeps
 } from './reference-data-service'
 import { getNuan5ConfigType } from './reference-data/nuan5-config-proto'
 
@@ -135,8 +136,13 @@ let root = ''
 let nowMs = 1_000_000_000_000
 let calls: RecordedCall[] = []
 
-/** 注入 mock fetch（userDataDir 指向当前测试的临时根目录）；同一测试内可重复注入（模拟重启） */
-function installDeps(responder: (url: string) => Response | Promise<Response>): RecordedCall[] {
+/** 注入 mock fetch（userDataDir 指向当前测试的临时根目录）；同一测试内可重复注入（模拟重启）。
+ * overrides 在默认注入之后展开——需要覆盖单项（如 getUserDataDir）时必须经此参数，
+ * 不得二次调 setReferenceDataDeps（其语义是 {...DEFAULT_DEPS, ...overrides}，会把 fetcher 打回真实 fetch）。 */
+function installDeps(
+  responder: (url: string) => Response | Promise<Response>,
+  overrides?: Partial<ReferenceDataDeps>
+): RecordedCall[] {
   calls = []
   const fetchMock = vi.fn((url: string | URL | Request, init?: RequestInit) => {
     calls.push({ url: String(url), init })
@@ -146,7 +152,8 @@ function installDeps(responder: (url: string) => Response | Promise<Response>): 
     fetcher: fetchMock as unknown as typeof fetch,
     getUserDataDir: () => root,
     getAppVersion: () => '2.5.7-test',
-    now: () => nowMs
+    now: () => nowMs,
+    ...overrides
   })
   return calls
 }
@@ -677,13 +684,17 @@ describe('reference-data-service 边界场景', () => {
 
   it('userData 目录不可得（空串）→ 拒绝写出相对路径，检查失败记入 lastError', async () => {
     const dbBytes = encryptFileboxForTest(buildDbBytes())
-    installDeps((url) => {
-      if (url === MANIFEST_PATH_URL) return jsonResponse(manifestBody(defaultManifest(dbBytes)))
-      if (url === DB_URL) return jsonResponse(dbBytes)
-      if (url === BIN_URL) return jsonResponse(Buffer.from('bin'))
-      throw new Error(`unexpected url: ${url}`)
-    })
-    setReferenceDataDeps({ getUserDataDir: () => '' })
+    // 上一用例遗留 lastFailedAt 在旧 nowMs；推进假时钟越过 5 分钟失败冷却（不得借真实时钟）
+    nowMs += 24 * 60 * 60 * 1000
+    installDeps(
+      (url) => {
+        if (url === MANIFEST_PATH_URL) return jsonResponse(manifestBody(defaultManifest(dbBytes)))
+        if (url === DB_URL) return jsonResponse(dbBytes)
+        if (url === BIN_URL) return jsonResponse(Buffer.from('bin'))
+        throw new Error(`unexpected url: ${url}`)
+      },
+      { getUserDataDir: () => '' }
+    )
 
     const status = await checkForUpdate()
     expect(status.lastError).toContain('userData 目录不可用')
