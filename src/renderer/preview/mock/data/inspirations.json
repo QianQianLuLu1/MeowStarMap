@@ -1,0 +1,213 @@
+{
+  "items": [
+    {
+      "revision": 1,
+      "entry": {
+        "id": "a1b2c3d4-0001-4a01-9a01-000000000001",
+        "title": "星愿蝶语",
+        "notes": "夜空下的蝴蝶结长裙，适合星光舞台截图。",
+        "tags": ["连衣裙", "蝴蝶结", "星空"],
+        "categories": ["甜美", "奇幻"],
+        "status": "self",
+        "createdAt": 1793491200000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0001-4a01-9a01-0000000000c1",
+          "rawCode": "12345678901",
+          "type": "unknown",
+          "sourceText": "12345678901#",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 1,
+      "entry": {
+        "id": "a1b2c3d4-0002-4a02-9a02-000000000002",
+        "title": "湖畔野餐",
+        "notes": "草帽 + 碎花裙的清新野餐搭配，想复刻一套。",
+        "tags": ["野餐", "草帽", "碎花"],
+        "categories": ["清新"],
+        "status": "want",
+        "createdAt": 1793577600000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0002-4a02-9a02-0000000000c2",
+          "rawCode": "10987654321",
+          "type": "unknown",
+          "sourceText": "10987654321#",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 2,
+      "entry": {
+        "id": "a1b2c3d4-0003-4a03-9a03-000000000003",
+        "title": "雪夜巡礼",
+        "notes": "已按分享码复刻成功的冬装披风，雪景拍照很出片。",
+        "tags": ["冬装", "披风", "雪景"],
+        "categories": ["优雅"],
+        "status": "reproduced",
+        "createdAt": 1793664000000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0003-4a03-9a03-0000000000c3",
+          "rawCode": "11223344556",
+          "type": "unknown",
+          "sourceText": "11223344556#",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 1,
+      "entry": {
+        "id": "a1b2c3d4-0004-4a04-9a04-000000000004",
+        "title": "舞台星光",
+        "notes": "礼服试穿记录：裙摆偏大，拍照时注意站位。无分享码。",
+        "tags": ["舞台", "礼服"],
+        "categories": ["优雅", "帅气"],
+        "status": "tried",
+        "createdAt": 1793750400000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0004-4a04-9a04-0000000000c4",
+          "rawCode": "",
+          "type": "unknown",
+          "sourceText": "",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 3,
+      "entry": {
+        "id": "a1b2c3d4-0005-4a05-9a05-000000000005",
+        "title": "机械旅人",
+        "notes": "自搭的机械风外套，配护目镜更有旅行感。",
+        "tags": ["机械", "外套", "护目镜"],
+        "categories": ["帅气"],
+        "status": "self",
+        "createdAt": 1793836800000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0005-4a05-9a05-0000000000c5",
+          "rawCode": "19876543210",
+          "type": "unknown",
+          "sourceText": "19876543210#",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 1,
+      "entry": {
+        "id": "a1b2c3d4-0006-4a06-9a06-000000000006",
+        "title": "花田信步",
+        "notes": "花田场景的草帽清新搭，先收藏待复刻。无分享码。",
+        "tags": ["花田", "草帽"],
+        "categories": ["清新", "甜美"],
+        "status": "want",
+        "createdAt": 1793923200000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0006-4a06-9a06-0000000000c6",
+          "rawCode": "",
+          "type": "unknown",
+          "sourceText": "",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 4,
+      "entry": {
+        "id": "a1b2c3d4-0007-4a07-9a07-000000000007",
+        "title": "旧梦剧场",
+        "notes": "复古剧场搭配，已归档留作参考。",
+        "tags": ["复古", "剧场"],
+        "categories": ["优雅"],
+        "status": "archived",
+        "createdAt": 1794009600000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0007-4a07-9a07-0000000000c7",
+          "rawCode": "15555666677",
+          "type": "unknown",
+          "sourceText": "15555666677#",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    },
+    {
+      "revision": 2,
+      "entry": {
+        "id": "a1b2c3d4-0008-4a08-9a08-000000000008",
+        "title": "云端漫游",
+        "notes": "翅膀 + 轻纱的奇幻搭配，已复刻并在云海场景拍过。",
+        "tags": ["云端", "翅膀", "轻纱"],
+        "categories": ["奇幻"],
+        "status": "reproduced",
+        "createdAt": 1794096000000,
+        "deletedAt": 0,
+        "code": {
+          "id": "a1b2c3d4-0008-4a08-9a08-0000000000c8",
+          "rawCode": "13333444455",
+          "type": "unknown",
+          "sourceText": "13333444455#",
+          "sourceUrl": null,
+          "parsedState": "pending",
+          "snapshotJson": null,
+          "resolverVersion": null,
+          "dictionaryVersion": null,
+          "resolvedAt": 0
+        },
+        "images": []
+      }
+    }
+  ],
+  "nextCursor": null
+}

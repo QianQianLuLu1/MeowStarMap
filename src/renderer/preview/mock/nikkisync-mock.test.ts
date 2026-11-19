@@ -42,7 +42,14 @@ const IMPLEMENTED_METHODS = [
   'desktopOpen',
   'wechatStart',
   'wechatStop',
-  'wechatStatus'
+  'wechatStatus',
+  // T12：同步控制台六通道（mock 面缺席会让卡片走「当前构建暂不可用」降级）
+  'getLibraryOverview',
+  'restartServer',
+  'networkAuth',
+  'networkConflict',
+  'hotspotControl',
+  'openHotspotSettings'
 ]
 
 beforeEach(() => {
@@ -161,13 +168,12 @@ describe('installPreviewMock 注入的 nikkisync 命名空间', () => {
     })
   })
 
-  it('F20 PC 端四方法与灵感四方法在 mock 面存在且返回最小合法形状', async () => {
+  it('F20 PC 端四方法与灵感写入三方法在 mock 面存在且返回最小合法形状', async () => {
     const ns = installedApi().nikkisync
     expect(await ns.desktopOpen()).toEqual({ url: '' })
     expect(await ns.wechatStart()).toEqual({ status: null, qrSvg: '' })
     expect(await ns.wechatStop()).toEqual({ status: null })
     expect(await ns.wechatStatus()).toEqual({ status: null })
-    expect(await ns.listInspirations({ limit: 100 })).toEqual({ items: [], nextCursor: null })
     expect(await ns.saveInspiration({ entry: {}, baseRevision: 0 })).toEqual({
       revision: 0,
       entry: null
@@ -176,5 +182,85 @@ describe('installPreviewMock 注入的 nikkisync 命名空间', () => {
       await ns.putInspirationImage({ sha256: 'a', mimeType: 'image/png', bytesBase64: '' })
     ).toEqual({ ok: true })
     expect(await ns.getInspirationImage({ sha256: 'a' })).toBeNull()
+  })
+
+  // ===== T12：同步控制台六通道 + 灵感库示例数据（形状/多样性漂移即红）=====
+
+  it('T12 getLibraryOverview 返回协议空态 {available:false}（不抛、不伪造统计）', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.getLibraryOverview()).toEqual({ available: false })
+  })
+
+  it('T12 restartServer 与 start/stop 同形（句柄未装配 ⇒ {available:false}）', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.restartServer()).toEqual({ available: false })
+    expect(await ns.restartServer()).toEqual(await ns.getServerStatus())
+  })
+
+  it('T12 networkAuth/networkConflict/hotspotControl 降级为 disabled（零子进程语义）', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.networkAuth({ action: 'status' })).toEqual({
+      status: 'disabled',
+      ruleGroup: 'MomoCamera LAN Authorization v1'
+    })
+    expect(await ns.networkConflict({ action: 'inspect' })).toEqual({
+      status: 'disabled',
+      conflicts: [],
+      canRestore: false
+    })
+    expect(await ns.hotspotControl({ action: 'status' })).toEqual({
+      status: 'disabled',
+      state: { active: false, startedHere: false }
+    })
+  })
+
+  it('T12 openHotspotSettings 返回 {opened:false}（浏览器环境拉不起 ms-settings:）', async () => {
+    const ns = installedApi().nikkisync
+    expect(await ns.openHotspotSettings()).toEqual({ opened: false })
+  })
+
+  it('T12 listInspirations 返回示例元数据：五态齐备、分类/标签多样、分享码可识别', async () => {
+    const ns = installedApi().nikkisync
+    const page = (await ns.listInspirations({ limit: 100 })) as {
+      items: Array<{ revision: number; entry: Record<string, unknown> }>
+      nextCursor: string | null
+    }
+    expect(page.nextCursor).toBeNull()
+    expect(page.items.length).toBeGreaterThanOrEqual(8)
+    const statuses = new Set<string>()
+    const categories = new Set<string>()
+    const tags = new Set<string>()
+    let withCode = 0
+    let withoutCode = 0
+    for (const row of page.items) {
+      expect(typeof row.revision).toBe('number')
+      const entry = row.entry
+      expect(typeof entry.id).toBe('string')
+      expect(typeof entry.title).toBe('string')
+      expect((entry.title as string).length).toBeGreaterThan(0)
+      expect(entry.deletedAt).toBe(0)
+      expect(Array.isArray(entry.images)).toBe(true)
+      // 不伪造图片字节：示例条目 images 恒空
+      expect(entry.images).toHaveLength(0)
+      statuses.add(entry.status as string)
+      for (const c of entry.categories as string[]) categories.add(c)
+      for (const tag of entry.tags as string[]) tags.add(tag)
+      const code = entry.code as { rawCode: string }
+      expect(typeof code.rawCode).toBe('string')
+      if (code.rawCode === '') {
+        withoutCode += 1
+      } else {
+        withCode += 1
+        // 可识别分享码：1 开头 11 位数字
+        expect(code.rawCode).toMatch(/^1\d{10}$/)
+      }
+    }
+    // 五态全覆盖（self/want/reproduced/tried/archived），过滤演示才有意义
+    expect([...statuses].sort()).toEqual(['archived', 'reproduced', 'self', 'tried', 'want'])
+    expect(categories.size).toBeGreaterThanOrEqual(4)
+    expect(tags.size).toBeGreaterThanOrEqual(8)
+    // 有码/无码两种形态都要有（分享码徽章与空码分支都可演示）
+    expect(withCode).toBeGreaterThanOrEqual(4)
+    expect(withoutCode).toBeGreaterThanOrEqual(1)
   })
 })

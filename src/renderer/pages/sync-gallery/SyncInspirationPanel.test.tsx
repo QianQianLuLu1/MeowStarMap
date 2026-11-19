@@ -189,11 +189,14 @@ describe('B8：外部 IPC 图片数组逐项收敛（判空 + 类型守卫）', 
     expect(screen.queryAllByTestId('inspiration-image-preview')).toHaveLength(0)
   })
 
-  it('entry 缺失不崩面板，正常渲染列表项且无图片', async () => {
+  it('entry 缺失不崩面板：脏行被 filterEntries 排除，不渲染列表项与图片', async () => {
+    // T8 过滤契约（inspiration-filter.test.ts 钉住）：entry 缺失/脏行直接排除，
+    // 面板消费 filterEntries ⇒ 脏行不再有渲染面（旧「渲染无图片行」口径已被过滤设计取代）。
     installApi({ list: { items: [{ revision: 1 }], nextCursor: null } })
     render(<SyncInspirationPanel />)
     openPanel()
-    await waitFor(() => expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1))
+    await waitFor(() => expect(listInspirations).toHaveBeenCalled())
+    expect(screen.queryAllByTestId('inspiration-item')).toHaveLength(0)
     expect(screen.queryAllByTestId('inspiration-image-preview')).toHaveLength(0)
   })
 })
@@ -355,12 +358,13 @@ describe('审查轮：F13/F14/F15/F16/F19', () => {
     expect(screen.queryByTestId('inspiration-image-error')).not.toBeInTheDocument()
   })
 
-  it('F14 entry 缺失的行点击删除 ⇒ 短路不发 saveInspiration（不再递脏条目给上游）', async () => {
+  it('F14 entry 缺失的脏行不渲染 ⇒ 无删除入口、零 saveInspiration（不递脏条目给上游）', async () => {
     installApi({ list: { items: [{ revision: 1 }], nextCursor: null } })
     render(<SyncInspirationPanel />)
     openPanel()
-    await waitFor(() => expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1))
-    fireEvent.click(screen.getByTestId('inspiration-delete'))
+    await waitFor(() => expect(listInspirations).toHaveBeenCalled())
+    expect(screen.queryAllByTestId('inspiration-item')).toHaveLength(0)
+    expect(screen.queryByTestId('inspiration-delete')).not.toBeInTheDocument()
     expect(saveInspiration).not.toHaveBeenCalled()
   })
 
@@ -436,5 +440,375 @@ describe('审查轮：F13/F14/F15/F16/F19', () => {
     await waitFor(() =>
       expect(screen.getByTestId('inspiration-image-load-error')).toBeInTheDocument()
     )
+  })
+})
+
+// ============================================================================
+// T8：fetch-all 全量翻页 / 过滤条 / 手动刷新 / 15s 节流自动刷新（fake timers）
+// ============================================================================
+
+describe('T8：fetch-all 沿游标取全量', () => {
+  it('多页游标逐页取全：limit=100 + after 链，游标耗尽即停且无加载更多', async () => {
+    listInspirations
+      .mockResolvedValueOnce({
+        items: [{ revision: 1, entry: makeEntry({ title: '甲' }) }],
+        nextCursor: 'c1'
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            revision: 1,
+            entry: makeEntry({ id: '33333333-3333-4333-8333-333333333333', title: '乙' })
+          }
+        ],
+        nextCursor: 'c2'
+      })
+      .mockResolvedValueOnce({ items: [], nextCursor: null })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    expect(await screen.findByText('甲')).toBeInTheDocument()
+    expect(screen.getByText('乙')).toBeInTheDocument()
+    expect(listInspirations).toHaveBeenCalledTimes(3)
+    expect(listInspirations.mock.calls[0][0]).toEqual({ limit: 100 })
+    expect(listInspirations.mock.calls[1][0]).toEqual({ limit: 100, after: 'c1' })
+    expect(listInspirations.mock.calls[2][0]).toEqual({ limit: 100, after: 'c2' })
+    expect(screen.queryByTestId('inspiration-load-more')).not.toBeInTheDocument()
+  })
+
+  it('跨页重复 id+revision 去重（游标抖动不得产出重复行）', async () => {
+    listInspirations
+      .mockResolvedValueOnce({
+        items: [{ revision: 1, entry: makeEntry() }],
+        nextCursor: 'c1'
+      })
+      .mockResolvedValueOnce({
+        items: [{ revision: 1, entry: makeEntry() }],
+        nextCursor: null
+      })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(2))
+    expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1)
+  })
+})
+
+describe('T8：过滤条（搜索/分类/状态）与手动刷新', () => {
+  const FILTER_ITEMS = {
+    items: [
+      {
+        revision: 1,
+        entry: makeEntry({ title: '红裙染色', categories: ['裙装'], status: 'want' })
+      },
+      {
+        revision: 1,
+        entry: makeEntry({
+          id: '33333333-3333-4333-8333-333333333333',
+          title: '外套搭配',
+          categories: ['外套'],
+          status: 'reproduced',
+          tags: ['保暖']
+        })
+      }
+    ],
+    nextCursor: null
+  }
+
+  it('搜索命中标题/标签 haystack；分类与状态精确过滤；无命中给过滤空态', async () => {
+    installApi({ list: FILTER_ITEMS })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getAllByTestId('inspiration-item')).toHaveLength(2))
+    expect(screen.getByTestId('inspiration-count-note')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('inspiration-search'), { target: { value: '保暖' } })
+    expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1)
+    expect(screen.getByText('外套搭配')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('inspiration-search'), { target: { value: '' } })
+    fireEvent.change(screen.getByTestId('inspiration-category-filter'), {
+      target: { value: '裙装' }
+    })
+    expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1)
+    expect(screen.getByText('红裙染色')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('inspiration-category-filter'), {
+      target: { value: '' }
+    })
+    fireEvent.change(screen.getByTestId('inspiration-status-filter'), {
+      target: { value: 'reproduced' }
+    })
+    expect(screen.getAllByTestId('inspiration-item')).toHaveLength(1)
+    expect(screen.getByText('外套搭配')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByTestId('inspiration-status-filter'), {
+      target: { value: 'archived' }
+    })
+    expect(screen.queryAllByTestId('inspiration-item')).toHaveLength(0)
+    expect(screen.getByTestId('inspiration-filter-empty')).toBeInTheDocument()
+    // 过滤空态 ≠ 库空态（不谎报「没有灵感」）
+    expect(screen.queryByTestId('inspiration-empty')).not.toBeInTheDocument()
+  })
+
+  it('手动刷新按钮重取全量列表', async () => {
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(1))
+    fireEvent.click(screen.getByTestId('inspiration-refresh'))
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(2))
+  })
+})
+
+describe('T8：15s 节流自动刷新（fake timers，上游 maybeRefresh 判据）', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  async function flush(ms = 0) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+
+  it('可见 + 展开：15s 内不重取，到点才刷；卸载后定时器清零', async () => {
+    vi.useFakeTimers()
+    render(<SyncInspirationPanel autoRefreshVisible />)
+    openPanel()
+    await flush()
+    expect(listInspirations).toHaveBeenCalledTimes(1)
+    await flush(10000)
+    expect(listInspirations).toHaveBeenCalledTimes(1)
+    await flush(5000)
+    expect(listInspirations).toHaveBeenCalledTimes(2)
+    await flush(15000)
+    expect(listInspirations).toHaveBeenCalledTimes(3)
+  })
+
+  it('编辑器打开期间跳过自动刷新；关闭后恢复', async () => {
+    vi.useFakeTimers()
+    render(<SyncInspirationPanel autoRefreshVisible />)
+    openPanel()
+    await flush()
+    fireEvent.click(screen.getByTestId('inspiration-new'))
+    await flush(30000)
+    expect(listInspirations).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByTestId('inspiration-cancel'))
+    await flush(15000)
+    expect(listInspirations).toHaveBeenCalledTimes(2)
+  })
+
+  it('折叠态不自动刷新；不可见（缺省门控）不留定时器；卸载清零', async () => {
+    vi.useFakeTimers()
+    const { unmount } = render(<SyncInspirationPanel autoRefreshVisible />)
+    openPanel()
+    await flush()
+    setPanelOpen(false)
+    await flush(30000)
+    expect(listInspirations).toHaveBeenCalledTimes(1)
+    unmount()
+    expect(vi.getTimerCount()).toBe(0)
+
+    // 缺省门控：currentView 非 sync-inspiration（uiStore 初始 gallery）⇒ 零定时器
+    const second = render(<SyncInspirationPanel />)
+    openPanel()
+    await flush()
+    expect(vi.getTimerCount()).toBe(0)
+    await flush(30000)
+    expect(listInspirations).toHaveBeenCalledTimes(2)
+    second.unmount()
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
+  it('桥缺失 ⇒ 不渲染也不留定时器', () => {
+    vi.useFakeTimers()
+    installApi({ missingBridge: true })
+    render(<SyncInspirationPanel autoRefreshVisible />)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+})
+
+// ============================================================================
+// T9：编辑器字段（标签/分类/五态/分享码）与列表卡徽标
+// ============================================================================
+
+describe('T9：编辑器字段与保存语义', () => {
+  it('新建：逗号/顿号拆分去重 tags/categories；五态落库；rawCode 不臆造解析结果', async () => {
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(listInspirations).toHaveBeenCalled())
+    fireEvent.click(screen.getByTestId('inspiration-new'))
+    fireEvent.change(screen.getByTestId('inspiration-title-input'), {
+      target: { value: '新灵感' }
+    })
+    fireEvent.change(screen.getByTestId('inspiration-tags-input'), {
+      target: { value: '染色, 搭配，染色' }
+    })
+    fireEvent.change(screen.getByTestId('inspiration-categories-input'), {
+      target: { value: '裙装、 外套' }
+    })
+    fireEvent.change(screen.getByTestId('inspiration-status-input'), {
+      target: { value: 'reproduced' }
+    })
+    fireEvent.change(screen.getByTestId('inspiration-code-input'), {
+      target: { value: 'a=1abcdefghij#' }
+    })
+    fireEvent.click(screen.getByTestId('inspiration-save'))
+    await waitFor(() => expect(saveInspiration).toHaveBeenCalled())
+    const entry = saveInspiration.mock.calls[0][0].entry
+    expect(entry.tags).toEqual(['染色', '搭配'])
+    expect(entry.categories).toEqual(['裙装', '外套'])
+    expect(entry.status).toBe('reproduced')
+    expect(entry.code.rawCode).toBe('a=1abcdefghij#')
+    // 新建 code 只给基线空形态，不臆造 type/快照
+    expect(entry.code.type).toBe('unknown')
+    expect(entry.code.parsedState).toBe('pending')
+    expect(entry.code.snapshotJson).toBeNull()
+  })
+
+  it('编辑回填：tags/categories join、状态、rawCode；码未变 ⇒ 基线 code 原样保留', async () => {
+    const baseCode = {
+      ...makeEntry().code,
+      rawCode: 'old-code',
+      type: 'dye',
+      parsedState: 'resolved',
+      snapshotJson: '{"k":1}',
+      resolverVersion: 'r1',
+      dictionaryVersion: 'd1',
+      resolvedAt: 42
+    }
+    installApi({
+      list: {
+        items: [
+          {
+            revision: 3,
+            entry: makeEntry({
+              tags: ['x', 'y'],
+              categories: ['裙装'],
+              status: 'tried',
+              code: baseCode
+            })
+          }
+        ],
+        nextCursor: null
+      }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('inspiration-edit'))
+    expect(screen.getByTestId('inspiration-tags-input')).toHaveValue('x, y')
+    expect(screen.getByTestId('inspiration-categories-input')).toHaveValue('裙装')
+    expect(screen.getByTestId('inspiration-status-input')).toHaveValue('tried')
+    expect(screen.getByTestId('inspiration-code-input')).toHaveValue('old-code')
+    fireEvent.click(screen.getByTestId('inspiration-save'))
+    await waitFor(() => expect(saveInspiration).toHaveBeenCalled())
+    const saved = saveInspiration.mock.calls[0][0]
+    expect(saved.baseRevision).toBe(3)
+    expect(saved.entry.code).toEqual(baseCode)
+  })
+
+  it('编辑改码 ⇒ parsedState 回 pending、快照/版本/时间清空（type 保留，交上游重解析）', async () => {
+    const baseCode = {
+      ...makeEntry().code,
+      rawCode: 'old-code',
+      type: 'dye',
+      parsedState: 'resolved',
+      snapshotJson: '{"k":1}',
+      resolverVersion: 'r1',
+      dictionaryVersion: 'd1',
+      resolvedAt: 42
+    }
+    installApi({
+      list: { items: [{ revision: 3, entry: makeEntry({ code: baseCode }) }], nextCursor: null }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('inspiration-edit'))
+    fireEvent.change(screen.getByTestId('inspiration-code-input'), {
+      target: { value: 'new-code' }
+    })
+    fireEvent.click(screen.getByTestId('inspiration-save'))
+    await waitFor(() => expect(saveInspiration).toHaveBeenCalled())
+    const code = saveInspiration.mock.calls[0][0].entry.code
+    expect(code.rawCode).toBe('new-code')
+    expect(code.type).toBe('dye')
+    expect(code.parsedState).toBe('pending')
+    expect(code.snapshotJson).toBeNull()
+    expect(code.resolverVersion).toBeNull()
+    expect(code.dictionaryVersion).toBeNull()
+    expect(code.resolvedAt).toBe(0)
+  })
+
+  it('备注中的候选分享码给识别提示；点击采纳写入 rawCode；无候选不渲染提示', async () => {
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(listInspirations).toHaveBeenCalled())
+    fireEvent.click(screen.getByTestId('inspiration-new'))
+    expect(screen.queryByTestId('inspiration-code-hint')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByTestId('inspiration-notes-input'), {
+      target: { value: '试试 a=1abcdefghij# 这个码' }
+    })
+    const hint = await screen.findByTestId('inspiration-code-hint')
+    fireEvent.click(hint)
+    // 上游 insCandidates 逐字判据：'=' 非字母数字，回看即停 ⇒ 候选为 11 位码体 + '#'
+    // （inspiration-filter.test.ts「回看遇 ASCII 标点即停」钉住同一口径）
+    expect(screen.getByTestId('inspiration-code-input')).toHaveValue('1abcdefghij#')
+  })
+
+  it('未知状态收敛为 want（不臆造枚举外值）', async () => {
+    installApi({
+      list: {
+        items: [{ revision: 1, entry: makeEntry({ status: 'alien-state' }) }],
+        nextCursor: null
+      }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    fireEvent.click(screen.getByTestId('inspiration-edit'))
+    expect(screen.getByTestId('inspiration-status-input')).toHaveValue('want')
+  })
+})
+
+describe('T9：列表卡状态徽标 / 标签 chips / 分享码片段', () => {
+  it('已知状态渲染徽标，tags 渲染 chips，rawCode 渲染片段', async () => {
+    installApi({
+      list: {
+        items: [
+          {
+            revision: 1,
+            entry: makeEntry({
+              status: 'reproduced',
+              tags: ['染色', '搭配'],
+              code: { ...makeEntry().code, rawCode: 'a=1abcdefghij#' }
+            })
+          }
+        ],
+        nextCursor: null
+      }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    expect(screen.getByTestId('inspiration-status-badge')).toHaveTextContent(
+      'syncGallery.inspiration.status.reproduced'
+    )
+    expect(screen.getAllByTestId('inspiration-tag-chip')).toHaveLength(2)
+    expect(screen.getByTestId('inspiration-code-snippet')).toHaveTextContent('a=1abcdefghij#')
+  })
+
+  it('未知状态不渲染徽标；无 tags/码不占位', async () => {
+    installApi({
+      list: {
+        items: [{ revision: 1, entry: makeEntry({ status: 'alien-state' }) }],
+        nextCursor: null
+      }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('示例灵感')).toBeInTheDocument())
+    expect(screen.queryByTestId('inspiration-status-badge')).not.toBeInTheDocument()
+    expect(screen.queryAllByTestId('inspiration-tag-chip')).toHaveLength(0)
+    expect(screen.queryByTestId('inspiration-code-snippet')).not.toBeInTheDocument()
   })
 })

@@ -1,12 +1,9 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React from 'react'
 import { useTranslation } from 'react-i18next'
-import QRCode from 'qrcode'
 import { BaseDialog } from '../common/BaseDialog'
 import { Button } from '../common/Button'
 import { IconCopyText, IconRefresh } from '../../icons'
-import { useErrorToast } from '../../hooks/useErrorToast'
-import { useGlobalToast } from '../common/ToastProvider'
-import type { NikkiSyncPairingCodeInfo } from '../../../shared/types/electron-api'
+import { usePairingQr } from './usePairingQr'
 
 interface PairingQrDialogProps {
   open: boolean
@@ -16,6 +13,8 @@ interface PairingQrDialogProps {
 /**
  * 配对二维码对话框（sync-integration 阶段5 落地，阶段3 改接真实 NikkiSync 服务）。
  *
+ * T3 起生成/倒计时/防竞态逻辑抽至 `usePairingQr`（与 Connect 视图首次运行内嵌二维码共享），
+ * 本组件只保留对话框展示面；行为契约由 PairingQrDialog.test.tsx (a)–(g) 钉住：
  * - 二维码内容来自上游配对 URI 构造（`buildPairingUri`，经会话 `pairingUri()` 转发）：
  *   单 host 为 NS1 七段串，K5 注入多 host 时为 `nikki-sync://pair?...&hosts=` 新格式，
  *   图形在渲染层本地生成（qrcode → SVG，参数与上游 pc-companion src/qr.ts 一致），无网络请求
@@ -26,107 +25,8 @@ interface PairingQrDialogProps {
  */
 export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose }) => {
   const { t } = useTranslation()
-  const { showError } = useErrorToast()
-  const showMessage = useGlobalToast()
-  const [offer, setOffer] = useState<NikkiSyncPairingCodeInfo | null>(null)
-  const [svg, setSvg] = useState<string | null>(null)
-  const [failed, setFailed] = useState(false)
-  const [now, setNow] = useState(() => Date.now())
-  // 生成计数防竞态：慢响应返回时若已有更新的生成发起，丢弃本次结果（上游 DesktopPageScript 同款）
-  const generationRef = useRef(0)
-  // 过期判据由 1s tick 直接读这个 ref（渲染回流的 effect 总慢一拍，见下方 catch 里的同步作废）
-  const offerRef = useRef<NikkiSyncPairingCodeInfo | null>(null)
-  useEffect(() => {
-    offerRef.current = offer
-  }, [offer])
-
-  const generate = useCallback(async (): Promise<void> => {
-    const api = window.electronAPI
-    if (!api) {
-      setFailed(true)
-      return
-    }
-    const generation = ++generationRef.current
-    setFailed(false)
-    setSvg(null)
-    try {
-      const info = await api.nikkisync.getPairingCode()
-      if (generation !== generationRef.current) return
-      const svgText = await QRCode.toString(info.content, {
-        type: 'svg',
-        errorCorrectionLevel: 'M',
-        margin: 4,
-        width: 512
-      })
-      if (generation !== generationRef.current) return
-      setOffer(info)
-      setSvg(svgText)
-      setNow(Date.now())
-    } catch (err) {
-      if (generation !== generationRef.current) return
-      setFailed(true)
-      // offer 必须一并作废：过期重生成由 1s tick 按 `offerRef.current.expiresAt <= now` 驱动，
-      // 留着已过期的 offer 会让每个 tick 再发一次请求、每秒弹一次错误 toast（弹窗开着就停不下）。
-      // ref 同步写：等 [offer] 的 effect 回流要慢一拍，那一秒的多几次重试是真实发生的。
-      offerRef.current = null
-      setOffer(null)
-      showError(err)
-    }
-  }, [showError])
-
-  // generate 经 ref 供 effect 调用：其身份可能随 showError 变化，
-  // 直接入 deps 会造成"渲染 → effect 重跑 → setState → 渲染"风暴
-  const generateRef = useRef(generate)
-  useEffect(() => {
-    generateRef.current = generate
-  })
-
-  useEffect(() => {
-    if (open) {
-      void generateRef.current()
-    } else {
-      // 关闭时作废在途生成并清空展示
-      generationRef.current++
-      setOffer(null)
-      setSvg(null)
-      setFailed(false)
-    }
-  }, [open])
-
-  // 每秒 tick 驱动倒计时；过期自动重新生成（对话框仍打开时，经 ref 读最新 offer，无渲染期 setState）
-  useEffect(() => {
-    if (!open) return
-    const timer = setInterval(() => {
-      const current = Date.now()
-      setNow(current)
-      const expiresAt = offerRef.current ? Date.parse(offerRef.current.expiresAt) : null
-      if (expiresAt !== null && expiresAt <= current) void generateRef.current()
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [open])
-
-  const expiresInSeconds =
-    offer !== null ? Math.max(0, Math.floor((Date.parse(offer.expiresAt) - now) / 1000)) : null
-
-  const copyContent = async (): Promise<void> => {
-    if (!offer) return
-    try {
-      await navigator.clipboard.writeText(offer.content)
-      showMessage(t('syncService.status.copied'))
-    } catch (err) {
-      showError(err)
-    }
-  }
-
-  const copyAddress = async (): Promise<void> => {
-    if (!offer) return
-    try {
-      await navigator.clipboard.writeText(`${offer.host}:${offer.port}`)
-      showMessage(t('syncService.status.copied'))
-    } catch (err) {
-      showError(err)
-    }
-  }
+  const { offer, svg, failed, expiresInSeconds, generate, copyContent, copyAddress } =
+    usePairingQr(open)
 
   return (
     <BaseDialog open={open} onClose={onClose} size="md" title={t('syncService.pairing.title')}>

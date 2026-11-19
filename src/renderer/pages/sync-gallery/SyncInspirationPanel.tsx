@@ -6,6 +6,14 @@ import type {
   NikkiSyncInspirationImageInfo,
   NikkiSyncInspirationVersionedInfo
 } from '../../../shared/types/electron-api'
+import { useUIStore } from '../../stores/uiStore'
+import {
+  INSPIRATION_STATUSES,
+  filterEntries,
+  insCandidates,
+  splitListInput,
+  type InspirationStatus
+} from './inspiration-filter'
 
 /**
  * N4：灵感库列表/编辑器（上游 `/v1/inspiration*`，v1.0.29）。
@@ -41,6 +49,13 @@ interface Draft {
   notes: string
   baseRevision: number
   images: NikkiSyncInspirationImageInfo[]
+  /** T9：逗号分隔输入态（保存时经 splitListInput 拆分为数组，上游拆分判据） */
+  tags: string
+  categories: string
+  /** T9：五态枚举（上游 InspirationPanel.ts:7 同款 option 集） */
+  status: InspirationStatus
+  /** T9：分享码原文。type/parsedState/snapshotJson 不臆造——沿用基线条目值 */
+  rawCode: string
 }
 
 function emptyCode(): NikkiSyncInspirationEntryInfo['code'] {
@@ -58,6 +73,29 @@ function emptyCode(): NikkiSyncInspirationEntryInfo['code'] {
   }
 }
 
+/**
+ * T9：分享码变更语义（上游 InspirationPanel.ts 保存分支逐字对齐）：
+ * rawCode 相对基线有变 ⇒ parsedState 回 'pending'、快照/解析版本/解析时间清空，
+ * 交由上游解析链重跑；未变则原样保留基线 code（绝不臆造 type/快照）。
+ */
+function buildCode(
+  rawCode: string,
+  base: NikkiSyncInspirationEntryInfo | undefined
+): NikkiSyncInspirationEntryInfo['code'] {
+  const old = base?.code
+  if (!old) return { ...emptyCode(), rawCode }
+  if (old.rawCode === rawCode) return old
+  return {
+    ...old,
+    rawCode,
+    parsedState: 'pending',
+    snapshotJson: null,
+    resolverVersion: null,
+    dictionaryVersion: null,
+    resolvedAt: 0
+  }
+}
+
 /** 组装上游 `validate()` 接受的最小合法条目（其余字段沿用被编辑条目或给缺省）。 */
 function buildEntry(
   draft: Draft,
@@ -67,12 +105,12 @@ function buildEntry(
     id: draft.id || newUuid(),
     title: draft.title,
     notes: draft.notes,
-    tags: base?.tags ?? [],
-    categories: base?.categories ?? [],
-    status: base?.status ?? 'want',
+    tags: splitListInput(draft.tags),
+    categories: splitListInput(draft.categories),
+    status: draft.status,
     createdAt: base?.createdAt ?? Date.now(),
     deletedAt: 0,
-    code: base?.code ?? emptyCode(),
+    code: buildCode(draft.rawCode, base),
     images: draft.images
   }
 }
@@ -100,7 +138,22 @@ function parseImages(value: unknown): NikkiSyncInspirationImageInfo[] {
   return images
 }
 
-export const SyncInspirationPanel: React.FC = () => {
+/** T8：自动刷新节流（上游 maybeRefresh 的 `Date.now()-insLastLoad>=15000` 判据）。 */
+const AUTO_REFRESH_THROTTLE_MS = 15000
+/** 节流检查心跳：5s 一跳，到点且距上次拉取 ≥15s 才真正重取（编辑器打开时跳过）。 */
+const AUTO_REFRESH_TICK_MS = 5000
+
+interface SyncInspirationPanelProps {
+  /**
+   * T8：自动刷新的可见性门控。缺省 = 独立灵感库页（currentView==='sync-inspiration'）；
+   * 控制台灵感视图显式传 currentView==='sync-service'。keep-alive 下不可见一律不刷。
+   */
+  autoRefreshVisible?: boolean
+}
+
+export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
+  autoRefreshVisible
+}) => {
   const { t } = useTranslation()
   const [items, setItems] = useState<NikkiSyncInspirationVersionedInfo[] | null>(null)
   const [loadFailed, setLoadFailed] = useState(false)
@@ -108,6 +161,10 @@ export const SyncInspirationPanel: React.FC = () => {
   const [draft, setDraft] = useState<Draft | null>(null)
   const [busy, setBusy] = useState(false)
   const [imageError, setImageError] = useState(false)
+  // T8：过滤条（搜索/分类/状态），判据走 inspiration-filter 纯函数（上游逐字）
+  const [filterQ, setFilterQ] = useState('')
+  const [filterCategory, setFilterCategory] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
   // F16：上游列表按 after 游标翻页（limit 1..100 缺省 100）。首屏只取一页，
   // nextCursor 非空时给「加载更多」；不再静默截断 100 条之后的条目。
   const [listCursor, setListCursor] = useState<string | null>(null)
@@ -118,6 +175,12 @@ export const SyncInspirationPanel: React.FC = () => {
   const imageGenerationRef = useRef(0)
   const loadedRef = useRef(false)
   const detailsRef = useRef<HTMLDetailsElement | null>(null)
+  /** T8：上次成功拉取时刻（节流基准）；编辑器开关态经 ref 读，避免心跳定时器反复重建。 */
+  const lastLoadRef = useRef(0)
+  const draftRef = useRef<Draft | null>(null)
+  draftRef.current = draft
+  const currentView = useUIStore((s) => s.currentView)
+  const visible = autoRefreshVisible ?? currentView === 'sync-inspiration'
 
   const api = window.electronAPI?.nikkisync
   const bridgeMissing =
@@ -132,17 +195,41 @@ export const SyncInspirationPanel: React.FC = () => {
       ? value.nextCursor
       : null
 
+  /**
+   * T8：fetch-all——沿 after 游标逐页取全量（limit=100），按 id+revision 去重；
+   * 游标为空或重复（服务端游标抖动/恒定）即停，绝不盲拼目录。
+   * F16 兼容：停止时若游标仍非空，保留「加载更多」入口供用户显式续翻。
+   */
   const loadList = useCallback(async (): Promise<void> => {
     const client = window.electronAPI?.nikkisync
     if (!client?.listInspirations) return
     const generation = ++listGenerationRef.current
     try {
-      const res = await client.listInspirations({ limit: 100 })
+      const collected: NikkiSyncInspirationVersionedInfo[] = []
+      const seen = new Set<string>()
+      let after: string | null = null
+      let cursor: string | null = null
+      for (;;) {
+        const res = await client.listInspirations(after ? { limit: 100, after } : { limit: 100 })
+        if (generation !== listGenerationRef.current) return
+        for (const row of parseList(res)) {
+          const key = `${String(row.entry?.id ?? 'row')}-${row.revision}`
+          if (!seen.has(key)) {
+            seen.add(key)
+            collected.push(row)
+          }
+        }
+        const next = parseCursor(res)
+        cursor = next
+        if (!next || next === after) break
+        after = next
+      }
       if (generation !== listGenerationRef.current) return
-      setItems(parseList(res))
-      setListCursor(parseCursor(res))
+      setItems(collected)
+      setListCursor(cursor)
       setLoadFailed(false)
       setLoadMoreFailed(false)
+      lastLoadRef.current = Date.now()
     } catch {
       if (generation !== listGenerationRef.current) return
       setItems([])
@@ -175,6 +262,7 @@ export const SyncInspirationPanel: React.FC = () => {
         return merged
       })
       setListCursor(parseCursor(res))
+      lastLoadRef.current = Date.now()
     } catch {
       if (generation !== listGenerationRef.current) return
       // 追加失败不清已有列表、不丢游标：用户可原位重试
@@ -208,16 +296,48 @@ export const SyncInspirationPanel: React.FC = () => {
     []
   )
 
+  /**
+   * T8：15s 节流自动刷新（上游 maybeRefresh 判据逐字）：
+   * 仅「可见 + 面板展开 + 已拉过 + 编辑器关闭 + 距上次拉取 ≥15s」才重取。
+   * 5s 心跳只做节流检查；不可见/桥缺失时不留任何定时器（keep-alive 纪律）。
+   */
+  useEffect(() => {
+    if (!visible || bridgeMissing) return
+    const timer = setInterval(() => {
+      if (!detailsRef.current?.open) return
+      if (draftRef.current) return
+      if (!loadedRef.current) return
+      if (Date.now() - lastLoadRef.current < AUTO_REFRESH_THROTTLE_MS) return
+      void loadList()
+    }, AUTO_REFRESH_TICK_MS)
+    return () => clearInterval(timer)
+  }, [visible, bridgeMissing, loadList])
+
   if (bridgeMissing) return null
+
+  // T8：过滤后的可见列表（纯函数判据，上游逐字）；计数与空态都基于过滤结果
+  const visibleItems = filterEntries(items ?? [], {
+    q: filterQ,
+    category: filterCategory,
+    status: filterStatus
+  })
 
   const openDraft = (row?: NikkiSyncInspirationVersionedInfo): void => {
     const entry = row?.entry
+    const status = entry?.status
     setDraft({
       id: typeof entry?.id === 'string' ? entry.id : '',
       title: typeof entry?.title === 'string' ? entry.title : '',
       notes: typeof entry?.notes === 'string' ? entry.notes : '',
       baseRevision: typeof row?.revision === 'number' ? row.revision : 0,
-      images: parseImages(entry?.images)
+      images: parseImages(entry?.images),
+      // T9：数组 → 逗号分隔输入态；未知状态收敛为 'want'（不臆造枚举外值）
+      tags: (Array.isArray(entry?.tags) ? entry.tags : []).join(', '),
+      categories: (Array.isArray(entry?.categories) ? entry.categories : []).join(', '),
+      status: (INSPIRATION_STATUSES as readonly string[]).includes(status ?? '')
+        ? (status as InspirationStatus)
+        : 'want',
+      rawCode: typeof entry?.code?.rawCode === 'string' ? entry.code.rawCode : ''
     })
     setSaveError(false)
     // F13：上传失败标记与草稿同生命周期——开新/编辑别的条目时一并复位
@@ -369,6 +489,61 @@ export const SyncInspirationPanel: React.FC = () => {
             </button>
           </div>
 
+          {/* T8：过滤条（搜索/分类/状态/刷新）——判据走 inspiration-filter 纯函数 */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              data-testid="inspiration-search"
+              type="text"
+              className="min-w-32 flex-1 rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              placeholder={t('syncGallery.inspiration.searchPlaceholder')}
+              value={filterQ}
+              onChange={(event) => setFilterQ(event.target.value)}
+            />
+            <input
+              data-testid="inspiration-category-filter"
+              type="text"
+              className="w-28 rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              placeholder={t('syncGallery.inspiration.categoryPlaceholder')}
+              value={filterCategory}
+              onChange={(event) => setFilterCategory(event.target.value)}
+            />
+            <select
+              data-testid="inspiration-status-filter"
+              className="rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              aria-label={t('syncGallery.inspiration.statusLabel')}
+              value={filterStatus}
+              onChange={(event) => setFilterStatus(event.target.value)}
+            >
+              <option value="">{t('syncGallery.inspiration.statusAll')}</option>
+              {INSPIRATION_STATUSES.map((status) => (
+                <option key={status} value={status}>
+                  {t(`syncGallery.inspiration.status.${status}`)}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              data-testid="inspiration-refresh"
+              className="icon-btn rounded-md border px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              onClick={() => void loadList()}
+            >
+              {t('syncGallery.inspiration.refresh')}
+            </button>
+          </div>
+          {items !== null && !loadFailed && (
+            <p
+              data-testid="inspiration-count-note"
+              className="text-xs"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {t('syncGallery.inspiration.countNote', { count: visibleItems.length })}
+            </p>
+          )}
+
           {draft && (
             <div
               className="space-y-2 rounded-lg border p-2"
@@ -401,6 +576,90 @@ export const SyncInspirationPanel: React.FC = () => {
                   onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
                 />
               </label>
+              {/* T9：标签/分类（逗号分隔输入，保存时按上游判据拆分去重） */}
+              <label
+                className="flex flex-col gap-1 text-xs"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                {t('syncGallery.inspiration.tagsLabel')}
+                <input
+                  data-testid="inspiration-tags-input"
+                  type="text"
+                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
+                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                  placeholder={t('syncGallery.inspiration.tagsPlaceholder')}
+                  value={draft.tags}
+                  onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
+                />
+              </label>
+              <label
+                className="flex flex-col gap-1 text-xs"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                {t('syncGallery.inspiration.categoriesLabel')}
+                <input
+                  data-testid="inspiration-categories-input"
+                  type="text"
+                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
+                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                  placeholder={t('syncGallery.inspiration.categoriesPlaceholder')}
+                  value={draft.categories}
+                  onChange={(event) => setDraft({ ...draft, categories: event.target.value })}
+                />
+              </label>
+              {/* T9：状态五态（上游枚举）；分享码原文 + 备注中的候选识别提示 */}
+              <label
+                className="flex flex-col gap-1 text-xs"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                {t('syncGallery.inspiration.statusLabel')}
+                <select
+                  data-testid="inspiration-status-input"
+                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
+                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                  value={draft.status}
+                  onChange={(event) =>
+                    setDraft({ ...draft, status: event.target.value as InspirationStatus })
+                  }
+                >
+                  {INSPIRATION_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {t(`syncGallery.inspiration.status.${status}`)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label
+                className="flex flex-col gap-1 text-xs"
+                style={{ color: 'var(--text-tertiary)' }}
+              >
+                {t('syncGallery.inspiration.codeLabel')}
+                <input
+                  data-testid="inspiration-code-input"
+                  type="text"
+                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
+                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+                  value={draft.rawCode}
+                  onChange={(event) => setDraft({ ...draft, rawCode: event.target.value })}
+                />
+              </label>
+              {(() => {
+                // T9：识别提示只做候选展示，点击采纳才写入 rawCode；不臆造解析结果
+                const candidates = insCandidates(draft.notes)
+                if (candidates.length === 0) return null
+                const candidate = candidates[0]
+                return (
+                  <button
+                    type="button"
+                    data-testid="inspiration-code-hint"
+                    className="text-left text-xs underline"
+                    style={{ color: 'var(--text-tertiary)' }}
+                    onClick={() => setDraft({ ...draft, rawCode: candidate })}
+                  >
+                    {t('syncGallery.inspiration.codeRecognized', { code: candidate })}
+                  </button>
+                )
+              })()}
               <label
                 className="flex flex-col gap-1 text-xs"
                 style={{ color: 'var(--text-tertiary)' }}
@@ -483,10 +742,26 @@ export const SyncInspirationPanel: React.FC = () => {
             >
               {t('syncGallery.inspiration.empty')}
             </p>
+          ) : visibleItems.length === 0 ? (
+            <p
+              data-testid="inspiration-filter-empty"
+              className="text-xs"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {t('syncGallery.inspiration.filterEmpty')}
+            </p>
           ) : (
             <ul className="space-y-2">
-              {items.map((row) => {
+              {visibleItems.map((row) => {
                 const images = parseImages(row.entry?.images)
+                const entry = row.entry
+                const tags = Array.isArray(entry?.tags) ? entry.tags : []
+                const rawCode = typeof entry?.code?.rawCode === 'string' ? entry.code.rawCode : ''
+                const status =
+                  typeof entry?.status === 'string' &&
+                  (INSPIRATION_STATUSES as readonly string[]).includes(entry.status)
+                    ? entry.status
+                    : null
                 return (
                   <li
                     key={`${String(row.entry?.id ?? 'row')}-${row.revision}`}
@@ -495,8 +770,23 @@ export const SyncInspirationPanel: React.FC = () => {
                     style={{ borderColor: 'var(--border-subtle)' }}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                        {String(row.entry?.title ?? '')}
+                      <span className="flex items-center gap-2">
+                        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                          {String(row.entry?.title ?? '')}
+                        </span>
+                        {/* T9：状态徽标（未知状态不渲染，不谎报枚举外值） */}
+                        {status && (
+                          <span
+                            data-testid="inspiration-status-badge"
+                            className="rounded-full border px-1.5 text-xs"
+                            style={{
+                              borderColor: 'var(--border-subtle)',
+                              color: 'var(--text-secondary)'
+                            }}
+                          >
+                            {t(`syncGallery.inspiration.status.${status}`)}
+                          </span>
+                        )}
                       </span>
                       <span className="flex items-center gap-2">
                         <button
@@ -518,6 +808,33 @@ export const SyncInspirationPanel: React.FC = () => {
                         </button>
                       </span>
                     </div>
+                    {/* T9：标签 chips + 分享码片段（有则展示，无则不占位） */}
+                    {(tags.length > 0 || rawCode !== '') && (
+                      <div className="mt-1 flex flex-wrap items-center gap-1">
+                        {tags.map((tag) => (
+                          <span
+                            key={tag}
+                            data-testid="inspiration-tag-chip"
+                            className="rounded-full border px-1.5 text-xs"
+                            style={{
+                              borderColor: 'var(--border-subtle)',
+                              color: 'var(--text-tertiary)'
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                        {rawCode !== '' && (
+                          <code
+                            data-testid="inspiration-code-snippet"
+                            className="max-w-48 truncate text-xs"
+                            style={{ color: 'var(--text-tertiary)' }}
+                          >
+                            {rawCode}
+                          </code>
+                        )}
+                      </div>
+                    )}
                     {images.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {images.map((image) => (
