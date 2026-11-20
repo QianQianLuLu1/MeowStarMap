@@ -77,7 +77,9 @@ vi.mock('electron', () => ({
   BrowserWindow: h.FakeWindow,
   dialog: { showMessageBox: vi.fn(async () => h.dialogResponse) },
   session: { defaultSession: { webRequest: { onHeadersReceived: vi.fn() } } },
-  ipcMain: { on: vi.fn(), removeListener: vi.fn() }
+  ipcMain: { on: vi.fn(), removeListener: vi.fn() },
+  // P5：createMainWindow 注册 display-metrics-changed 监听并在 closed 解绑，需 screen 形状
+  screen: { on: vi.fn(), removeListener: vi.fn() }
 }))
 vi.mock('../../utils/logger', () => ({
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
