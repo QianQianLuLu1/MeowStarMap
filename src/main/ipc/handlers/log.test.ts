@@ -242,8 +242,29 @@ describe('registerLogHandlers', () => {
       success: true
       data: { success: boolean }
     }
-    expect(exportLogsAsZipMock).toHaveBeenCalledWith('/out.zip')
+    expect(exportLogsAsZipMock).toHaveBeenCalledWith('/out.zip', undefined)
     expect(result.data.success).toBe(true)
+  })
+
+  it('log:exportZip 透传可选 options 到 exportLogsAsZip', async () => {
+    showSaveDialogMock.mockResolvedValue({ canceled: false, filePath: '/out.zip' })
+    exportLogsAsZipMock.mockResolvedValue({ success: true, filePath: '/out.zip' })
+    getFocusedWindowMock.mockReturnValue({ webContents: { send: vi.fn() } })
+    registerLogHandlers(makeCtx())
+    const options = { description: '问题描述', attachLogs: true, attachSystemInfo: false }
+    await getHandler('log:exportZip')(options)
+    expect(exportLogsAsZipMock).toHaveBeenCalledWith('/out.zip', options)
+  })
+
+  it('logExportOptionsSchema：超长 description 拒、无参/空对象/合法值接受', async () => {
+    const { logExportOptionsSchema } = await import('./log')
+    expect(logExportOptionsSchema.safeParse({ description: 'x'.repeat(2001) }).success).toBe(false)
+    expect(logExportOptionsSchema.safeParse({}).success).toBe(true)
+    expect(logExportOptionsSchema.safeParse(undefined).success).toBe(true)
+    expect(logExportOptionsSchema.safeParse({ description: 'ok', attachLogs: true }).success).toBe(
+      true
+    )
+    expect(logExportOptionsSchema.safeParse({ attachLogs: 'yes' }).success).toBe(false)
   })
 
   it('log:exportZip 主窗口不存在时抛 preconditionFailed', async () => {

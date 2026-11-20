@@ -1,11 +1,13 @@
-// @core-change: 诊断包暂存目录名加进程内递增序号，修同毫秒并发导出互删暂存
+// @core-change: 诊断包 1.3——feedback.txt/filePath 返回/应急落点与 userData 跨目录收集/manifest 缺席原因
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
 import { app, shell } from 'electron'
-import { logger, FaultRecord, getLogDirectory } from '../utils/logger'
+import { logger, FaultRecord, getLogDirectory, getEmergencyLogCandidates } from '../utils/logger'
 import { createZipFromDirectory } from '../utils/zip-archive'
-import { getStartupLogPathValue } from '../utils/startup-diagnostic'
+import { getStartupLogPathValue, getDiagLogPathValue } from '../utils/startup-diagnostic'
+import { BOOT_ID } from '../utils/boot-id'
+import type { LogExportOptions } from '../../shared/types/electron-api'
 import { CHROMIUM_LOG_BASENAME } from '../utils/user-diag-path'
 import {
   getForensicsRoot,
@@ -167,8 +169,9 @@ export async function openLogDirectory(): Promise<{ success: boolean; message: s
 let diagnosticTmpSeq = 0
 
 export async function exportLogsAsZip(
-  targetPath: string
-): Promise<{ success: boolean; message: string }> {
+  targetPath: string,
+  options?: LogExportOptions
+): Promise<{ success: boolean; message: string; filePath?: string }> {
   const logDir = getLogDirectory()
 
   // 安全校验：目标路径必须是 .zip 扩展名
@@ -179,8 +182,25 @@ export async function exportLogsAsZip(
   // P1-4：构建临时诊断目录，整合 logs + crashes + startup-errors.log + system-info.json
   // 暂存目录固定落取证根（不随 logDir 漂移）：异常退出残留也只在统一目录内
   const tmpDir = path.join(getForensicsRoot(), `diagnostic-tmp-${Date.now()}-${++diagnosticTmpSeq}`)
+  // 应急落点来源登记（manifest.fallbackSources）与读取失败登记（missing.reason=unreadable）
+  const fallbackSources: Record<string, string> = {}
+  const unreadable = new Set<string>()
   try {
     await fs.promises.mkdir(tmpDir, { recursive: true })
+
+    // 0. feedback.txt：用户问题描述与附件勾选（勾选仅记录意愿，不裁剪包内容）
+    if (options?.description) {
+      const feedback = [
+        `generatedAt: ${new Date().toISOString()}`,
+        `bootId: ${BOOT_ID}`,
+        `appVersion: ${app.getVersion?.() || 'unknown'}`,
+        `attachLogs: ${options.attachLogs ?? true}`,
+        `attachSystemInfo: ${options.attachSystemInfo ?? true}`,
+        '',
+        options.description
+      ].join('\n')
+      await fs.promises.writeFile(path.join(tmpDir, 'feedback.txt'), feedback, 'utf-8')
+    }
 
     // 1. 复制 logs 目录
     const logsTarget = path.join(tmpDir, 'logs')
@@ -227,15 +247,37 @@ export async function exportLogsAsZip(
     //     逐文件容错：chromium-debug.log 被占用（防护软件抓刚落地的日志是常态）
     //     不得连后面的 diag.log 一起丢掉。
     try {
-      for (const name of [CHROMIUM_LOG_BASENAME, `${CHROMIUM_LOG_BASENAME}.old`, 'diag.log']) {
+      for (const name of [CHROMIUM_LOG_BASENAME, `${CHROMIUM_LOG_BASENAME}.old`]) {
         try {
           const src = getForensicsFilePath(name)
           if (fs.existsSync(src)) {
-            await copyBounded(src, path.join(tmpDir, name), DIAG_LOG_TAIL_BYTES)
+            if (name === CHROMIUM_LOG_BASENAME) {
+              // 截断时额外提取全文件 FATAL/exit_code 行——头部关键取证不因尾部策略丢失
+              await copyChromiumWithHighlights(
+                src,
+                path.join(tmpDir, name),
+                DIAG_LOG_TAIL_BYTES,
+                path.join(tmpDir, 'chromium-debug.highlights.txt')
+              )
+            } else {
+              await copyBounded(src, path.join(tmpDir, name), DIAG_LOG_TAIL_BYTES)
+            }
           }
         } catch (err) {
+          unreadable.add(name)
           logger.warn(`diagnostic bundle: skipped ${name}`, err)
         }
+      }
+      // diag.log 走真实写路径（应急态可能回落 tmpdir，与写入侧同源）；
+      // diag.log.old（轮转历史）在取证根，由 3.8 白名单循环收集
+      try {
+        const diagSrc = getDiagLogPathValue()
+        if (fs.existsSync(diagSrc)) {
+          await copyBounded(diagSrc, path.join(tmpDir, 'diag.log'), DIAG_LOG_TAIL_BYTES)
+        }
+      } catch (err) {
+        unreadable.add('diag.log')
+        logger.warn('diagnostic bundle: skipped diag.log', err)
       }
     } catch (err) {
       logger.warn('diagnostic bundle: forensics root unavailable', err)
@@ -274,6 +316,7 @@ export async function exportLogsAsZip(
           await fs.promises.copyFile(src, path.join(tmpDir, name))
         }
       } catch (err) {
+        unreadable.add(name)
         logger.warn(`diagnostic bundle: skipped ${name}`, err)
       }
     }
@@ -296,6 +339,39 @@ export async function exportLogsAsZip(
       }
     } catch {}
 
+    // 3.10 NikkiSync userData 侧两 JSON（网络修复日志/热点状态）：跨目录收集，不迁移写入点
+    try {
+      const udDir = path.join(app.getPath('userData'), 'nikkisync')
+      const dstDir = path.join(tmpDir, 'nikkisync-userdata')
+      for (const name of ['network-repair-journal.json', 'hotspot-state.json']) {
+        try {
+          const src = path.join(udDir, name)
+          if (fs.existsSync(src)) {
+            await fs.promises.mkdir(dstDir, { recursive: true })
+            await fs.promises.copyFile(src, path.join(dstDir, name))
+          }
+        } catch (err) {
+          logger.warn(`diagnostic bundle: skipped nikkisync-userdata/${name}`, err)
+        }
+      }
+    } catch {}
+
+    // 3.11 应急落点（logger 极端兜底 / startup-diagnostic tmpdir 回落）：存在才收，来源登记进 manifest
+    try {
+      const fbDir = path.join(tmpDir, 'fallback')
+      for (const cand of getEmergencyLogCandidates()) {
+        try {
+          if (fs.existsSync(cand.path)) {
+            await fs.promises.mkdir(fbDir, { recursive: true })
+            await fs.promises.copyFile(cand.path, path.join(fbDir, cand.name))
+            fallbackSources[cand.name] = cand.path
+          }
+        } catch (err) {
+          logger.warn(`diagnostic bundle: skipped fallback/${cand.name}`, err)
+        }
+      }
+    } catch {}
+
     // 4. 生成 system-info.json
     const systemInfo = await collectSystemInfo()
     await fs.promises.writeFile(
@@ -309,21 +385,40 @@ export async function exportLogsAsZip(
     const appInfo = (systemInfo.app || {}) as { version?: string }
     const expectedOptional: string[] = [...FORENSICS_ROOT_FILE_NAMES, 'nikkisync/']
     let contents: string[] = ['logs/', 'crashes/', ...expectedOptional, 'system-info.json']
-    let missing: string[] = []
+    let missing: Array<{ name: string; reason: string }> = []
+    // 应急落点别名 → 期望根文件：从 fallback/ 收编的，缺席原因记 collected-from-fallback
+    const fallbackAlias: Record<string, string> = {
+      'tmp-diag.log': 'diag.log',
+      'tmp-startup-errors.log': 'startup-errors.log'
+    }
     try {
       const entries = await fs.promises.readdir(tmpDir, { withFileTypes: true })
       const names = entries.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
       contents = [...names.sort(), 'manifest.json']
-      missing = expectedOptional.filter((name) => !names.includes(name))
+      missing = expectedOptional
+        .filter((name) => !names.includes(name))
+        .map((name) => {
+          const fromFallback = Object.entries(fallbackAlias).some(
+            ([fb, root]) => root === name && fallbackSources[fb]
+          )
+          const reason = fromFallback
+            ? 'collected-from-fallback'
+            : unreadable.has(name)
+              ? 'unreadable'
+              : 'absent'
+          return { name, reason }
+        })
     } catch {
       // 目录读取失败时保留静态期望清单（兜底，不阻断导出）
     }
     const manifest = {
       generatedAt: new Date().toISOString(),
       appVersion: appInfo.version || 'unknown',
-      diagnosticVersion: '1.2',
+      diagnosticVersion: '1.3',
+      bootId: BOOT_ID,
       contents,
-      missing
+      missing,
+      ...(Object.keys(fallbackSources).length > 0 ? { fallbackSources } : {})
     }
     await fs.promises.writeFile(
       path.join(tmpDir, 'manifest.json'),
@@ -350,7 +445,7 @@ export async function exportLogsAsZip(
   if (!zipResult.success) {
     return { success: false, message: zipResult.message }
   }
-  return { success: true, message: t('main.logService.message.exported') }
+  return { success: true, message: t('main.logService.message.exported'), filePath: targetPath }
 }
 
 /**
@@ -370,6 +465,37 @@ async function copyBounded(src: string, dst: string, maxBytes: number): Promise<
     await fs.promises.writeFile(dst, buf)
   } finally {
     await handle.close().catch(() => {})
+  }
+}
+
+/**
+ * Chromium 主日志专用有界复制：截断时额外扫全文件提取 FATAL/exit_code 行（≤500 行）
+ * 写入 highlights——GPU 崩溃原文若落在被丢弃的头部，取证方仍能在 highlights 里找到。
+ * highlights 提取失败不影响尾部复制（fail-open）。
+ */
+async function copyChromiumWithHighlights(
+  src: string,
+  dst: string,
+  maxBytes: number,
+  highlightsDst: string
+): Promise<void> {
+  const size = (await fs.promises.stat(src)).size
+  if (size <= maxBytes) {
+    await fs.promises.copyFile(src, dst)
+    return
+  }
+  await copyBounded(src, dst, maxBytes)
+  try {
+    const content = await fs.promises.readFile(src, 'utf-8')
+    const lines = content
+      .split('\n')
+      .filter((line) => /FATAL|exit_code/.test(line))
+      .slice(0, 500)
+    if (lines.length > 0) {
+      await fs.promises.writeFile(highlightsDst, lines.join('\n') + '\n', 'utf-8')
+    }
+  } catch {
+    // highlights 只是补位证据，失败不阻断导出
   }
 }
 

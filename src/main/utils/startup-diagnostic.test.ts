@@ -395,3 +395,11 @@ describe('startup-diagnostic', () => {
     })
   })
 })
+
+describe('P2: getDiagLogPathValue 导出面', () => {
+  it('返回 diag.log 真实写路径（与 diagLog 同源）', async () => {
+    const mod = await import('./startup-diagnostic')
+    expect(typeof mod.getDiagLogPathValue).toBe('function')
+    expect(mod.getDiagLogPathValue()).toContain('diag.log')
+  })
+})

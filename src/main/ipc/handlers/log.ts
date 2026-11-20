@@ -1,4 +1,4 @@
-// @core-change: log:setDir/resetDir 改用取证统一兼容工厂，不再支持自定义日志目录
+// @core-change: log:exportZip 增可选 feedback options 入参（zod 校验）并透传导出服务
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -26,6 +26,19 @@ function requireMainWindow(ctx: HandlerContext): BrowserWindow {
   if (!win) throw AppError.preconditionFailed(t('main.error.mainWindowNotInit'))
   return win
 }
+
+/**
+ * log:exportZip 可选入参：FeedbackDialog 的问题描述与附件勾选。
+ * 勾选仅记录用户意愿（写入 feedback.txt），不裁剪诊断包内容。
+ * UI textarea maxLength=500，schema 上限 2000 留余量。
+ */
+export const logExportOptionsSchema = z
+  .object({
+    description: z.string().max(2000).optional(),
+    attachLogs: z.boolean().optional(),
+    attachSystemInfo: z.boolean().optional()
+  })
+  .optional()
 
 /**
  * P0-A1：从 Application.setupIPC() 迁移的日志域 IPC handler 集合。
@@ -97,10 +110,10 @@ export function registerLogHandlers(ctx: HandlerContext): void {
   )
 
   // 导出全部日志为 zip 压缩包
-  // 业务决策：先弹出保存对话框让用户选择保存位置，再调用 PowerShell 打包
+  // 业务决策：先弹出保存对话框让用户选择保存位置，再进程内流式打包（archiver）
   ipcMain.handle(
     'log:exportZip',
-    wrapHandlerNoArgs(ctx, async () => {
+    wrapHandler(ctx, z.tuple([logExportOptionsSchema]), async ([options]) => {
       // 弹出保存对话框，让用户选择 zip 文件保存位置
       const defaultName = `wxnn-logs-${new Date().toISOString().slice(0, 10)}.zip`
       const result = await dialog.showSaveDialog(requireMainWindow(ctx), {
@@ -110,7 +123,7 @@ export function registerLogHandlers(ctx: HandlerContext): void {
       if (result.canceled || !result.filePath) {
         throw AppError.canceled(t('main.log.error.userCanceledSave'))
       }
-      return exportLogsAsZip(result.filePath)
+      return exportLogsAsZip(result.filePath, options)
     })
   )
 

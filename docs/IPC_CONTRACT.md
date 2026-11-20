@@ -1223,9 +1223,20 @@ preload 侧对应 `src/main/preload/api/shell.ts` 的 `electronAPI.shell` 命名
 - **取消**：用户在保存对话框点取消 ⇒ 主进程 `throw AppError.canceled` ⇒ 渲染层收到
   `IpcError`，`code === IPC_ERROR_CODES.CANCELED`（`'IPC_CANCELED'`）。**不存在 `canceled`
   返回字段**（历史类型漂移已清除）；渲染层一律对该码静默，不得误报「导出失败」。
-- **成功**：`success: true`，`filePath` 为落盘绝对路径（P2 起兑现），Toast 展示真实路径。
+- **成功**：`success: true`，`filePath` 为落盘绝对路径，Toast 展示真实路径。
 - **失败**：`success: false` + `message`；导出恒 settle（archiver 进程内流式 + 60s 超时兜底）。
 - `options.description`/勾选写入包内 `feedback.txt`；勾选仅记录用户意愿，**不裁剪包内容**
   （诊断包恒含全部日志种类）。
 - 类型单一真相源：`shared/types/electron-api.ts` 的 `LogExportOptions` / `LogExportZipResult`；
   `renderer/vite-env.d.ts` 经 `import()` 类型引用，不再内联副本。
+
+诊断包 manifest 升级 `diagnosticVersion: '1.3'`（2026-11-21，P2）：
+
+- `missing` 由 `string[]` 改为 `{ name, reason }[]`，`reason ∈ absent | unreadable | collected-from-fallback`；
+- 新增 `bootId`（与主日志行/heartbeat/last-exit 同源，`utils/boot-id.ts`）与可选
+  `fallbackSources`（应急落点文件 → 原始路径映射）；
+- 新增收集：`feedback.txt`（有描述时）、`diag.log.old`（轮转历史）、`chromium-debug.highlights.txt`
+  （chromium 日志截断时提取全文件 FATAL/exit_code 行 ≤500 行）、`nikkisync-userdata/`
+  （userData 侧 network-repair-journal.json / hotspot-state.json 跨目录收集）、`fallback/`
+  （logger 极端兜底与 startup-diagnostic tmpdir 应急落点，存在才收）；
+- `diag.log` 读取改走 `getDiagLogPathValue()` 真实写路径（应急态不漏收）。

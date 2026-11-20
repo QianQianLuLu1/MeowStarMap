@@ -45,8 +45,10 @@ vi.mock('./crash-service', () => ({
 
 // startup-diagnostic mock：导出时会复制启动日志，须指向临时目录避免污染真实用户目录
 let mockStartupLogPath = ''
+let mockDiagLogPath = ''
 vi.mock('../utils/startup-diagnostic', () => ({
   getStartupLogPathValue: vi.fn(() => mockStartupLogPath),
+  getDiagLogPathValue: vi.fn(() => mockDiagLogPath),
   logStartupError: vi.fn()
 }))
 
@@ -153,6 +155,7 @@ beforeEach(() => {
   // 打包态真实布局的复现缝——此前 provider 未注册恒走回退，导出读写错位被掩盖。
   mockForensicsRoot = path.join(tmpRoot, 'install', 'Diagnostics')
   fs.mkdirSync(mockForensicsRoot, { recursive: true })
+  mockDiagLogPath = path.join(mockForensicsRoot, 'diag.log')
   setForensicsEnvProvider(() => ({
     isPackaged: true,
     defaultApp: false,
@@ -712,7 +715,9 @@ describe('exportLogsAsZip', () => {
       expect(r.success).toBe(true)
       const manifest = readJson(writes, 'manifest.json')
       const contents = manifest?.contents as string[]
-      const missing = manifest?.missing as string[]
+      const missing = (manifest?.missing as Array<{ name: string; reason: string }>).map(
+        (m) => m.name
+      )
       expect(contents).not.toContain('chromium-debug.log')
       expect(missing).toContain('chromium-debug.log')
       expect(contents).toContain('diag.log')
@@ -725,7 +730,9 @@ describe('exportLogsAsZip', () => {
       expect(r.success).toBe(true)
       const manifest = readJson(writes, 'manifest.json')
       const contents = manifest?.contents as string[]
-      const missing = manifest?.missing as string[]
+      const missing = (manifest?.missing as Array<{ name: string; reason: string }>).map(
+        (m) => m.name
+      )
       expect(contents).toContain('chromium-debug.log')
       expect(missing).not.toContain('chromium-debug.log')
     })
@@ -737,7 +744,7 @@ describe('exportLogsAsZip', () => {
   // （打包态=安装目录\Diagnostics）→ 导出包系统性缺项。provider 未注册时恒走回退，
   // 缺口被掩盖；本组用例注入 install 态复现真实打包布局。
 
-  it('打包态复现：全部取证文件从取证根收齐，manifest 1.2 且 missing 为空', async () => {
+  it('打包态复现：全部取证文件从取证根收齐，manifest 1.3 且 missing 为空', async () => {
     for (const name of FORENSICS_ROOT_FILE_NAMES) {
       fs.writeFileSync(path.join(mockForensicsRoot, name), `evidence-${name}`, 'utf-8')
     }
@@ -783,7 +790,7 @@ describe('exportLogsAsZip', () => {
         contents: string[]
         missing: string[]
       }
-      expect(manifest.diagnosticVersion).toBe('1.2')
+      expect(manifest.diagnosticVersion).toBe('1.3')
       expect(manifest.missing).toEqual([])
       expect(manifest.contents).toContain('nikkisync/')
 
@@ -821,9 +828,9 @@ describe('exportLogsAsZip', () => {
       expect(r.success).toBe(true)
       const manifestWrite = writes.find((w) => path.basename(w.dst) === 'manifest.json')
       const manifest = JSON.parse(manifestWrite!.buf.toString('utf-8')) as {
-        missing: string[]
+        missing: Array<{ name: string; reason: string }>
       }
-      expect(manifest.missing).toContain('nikkisync/')
+      expect(manifest.missing.map((m) => m.name)).toContain('nikkisync/')
     } finally {
       writeSpy.mockRestore()
     }
@@ -985,5 +992,149 @@ describe('getLogStats', () => {
     expect(r.totalSize).toBe(0)
     expect(r.fileCount).toBe(0)
     expect(r.oldestTimestamp).toBeNull()
+  })
+})
+
+// ============================================================
+// describe: P2 诊断包 1.3 增强（feedback / filePath / fallback / highlights）
+// ============================================================
+
+describe('exportLogsAsZip — 诊断包 1.3', () => {
+  interface Captured {
+    dst: string
+    buf: Buffer
+  }
+
+  async function exportCapture(
+    target: string,
+    options?: { description?: string; attachLogs?: boolean; attachSystemInfo?: boolean }
+  ) {
+    const writes: Captured[] = []
+    const realWrite = fs.promises.writeFile.bind(fs.promises)
+    const writeSpy = vi
+      .spyOn(fs.promises, 'writeFile')
+      .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+        writes.push({
+          dst: String(file),
+          buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+        })
+        return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+      })
+    const copySpy = vi.spyOn(fs.promises, 'copyFile')
+    try {
+      const r = await exportLogsAsZip(target, options)
+      const staged = [
+        ...copySpy.mock.calls.map((c) => path.basename(String(c[1]))),
+        ...writes.map((w) => path.basename(w.dst))
+      ]
+      return { r, writes, staged }
+    } finally {
+      writeSpy.mockRestore()
+      copySpy.mockRestore()
+    }
+  }
+
+  function readJson(writes: Captured[], name: string): Record<string, unknown> | null {
+    const w = writes.find((x) => path.basename(x.dst) === name)
+    return w ? (JSON.parse(w.buf.toString('utf-8')) as Record<string, unknown>) : null
+  }
+
+  it('成功返回 filePath = 目标路径', async () => {
+    const target = path.join(tmpRoot, 'fp.zip')
+    const { r } = await exportCapture(target)
+    expect(r.success).toBe(true)
+    expect(r.filePath).toBe(target)
+  })
+
+  it('options.description 写入 feedback.txt（含勾选值）', async () => {
+    const { r, writes, staged } = await exportCapture(path.join(tmpRoot, 'fb.zip'), {
+      description: '闪屏复现描述',
+      attachLogs: true,
+      attachSystemInfo: false
+    })
+    expect(r.success).toBe(true)
+    expect(staged).toContain('feedback.txt')
+    const fb = writes.find((w) => path.basename(w.dst) === 'feedback.txt')
+    expect(fb!.buf.toString('utf-8')).toContain('闪屏复现描述')
+    expect(fb!.buf.toString('utf-8')).toContain('attachSystemInfo: false')
+  })
+
+  it('边界：无 options ⇒ 不产生 feedback.txt', async () => {
+    const { r, staged } = await exportCapture(path.join(tmpRoot, 'no-fb.zip'))
+    expect(r.success).toBe(true)
+    expect(staged).not.toContain('feedback.txt')
+  })
+
+  it('manifest 1.3：bootId 在场，missing 为 {name,reason}[] 且缺席原因如实', async () => {
+    const { r, writes } = await exportCapture(path.join(tmpRoot, 'm13.zip'))
+    expect(r.success).toBe(true)
+    const m = readJson(writes, 'manifest.json')
+    expect(m?.diagnosticVersion).toBe('1.3')
+    expect(typeof m?.bootId).toBe('string')
+    const missing = m?.missing as Array<{ name: string; reason: string }>
+    expect(missing.find((x) => x.name === 'chromium-debug.log')?.reason).toBe('absent')
+  })
+
+  it('diag.log.old 入包（轮转历史不丢）', async () => {
+    fs.writeFileSync(path.join(mockForensicsRoot, 'diag.log.old'), 'rotated-history', 'utf-8')
+    const { r, staged } = await exportCapture(path.join(tmpRoot, 'diag-old.zip'))
+    expect(r.success).toBe(true)
+    expect(staged).toContain('diag.log.old')
+  })
+
+  it('chromium 截断 ⇒ highlights 保留头部 FATAL/exit_code 原文', async () => {
+    const big = Buffer.concat([
+      Buffer.from('FATAL:head-gpu exit_code=65539\n', 'utf-8'),
+      Buffer.alloc(3 * 1024 * 1024, 0x61),
+      Buffer.from('TAIL-MARKER\n', 'utf-8')
+    ])
+    fs.writeFileSync(path.join(mockForensicsRoot, 'chromium-debug.log'), big)
+    const { r, writes } = await exportCapture(path.join(tmpRoot, 'hl.zip'))
+    expect(r.success).toBe(true)
+    const hl = writes.find((w) => path.basename(w.dst) === 'chromium-debug.highlights.txt')
+    expect(hl, '截断时应生成 highlights 文件').toBeTruthy()
+    expect(hl!.buf.toString('utf-8')).toContain('FATAL:head-gpu exit_code=65539')
+  })
+
+  it('应急落点收入 fallback/ 且 manifest.fallbackSources 登记来源', async () => {
+    const emergDir = path.join(tmpRoot, 'emergency')
+    fs.mkdirSync(emergDir, { recursive: true })
+    fs.writeFileSync(path.join(emergDir, 'MeowStarMap-diag.log'), 'emerg-diag', 'utf-8')
+    const appDataDir = path.join(tmpRoot, 'appdata')
+    fs.mkdirSync(path.join(appDataDir, 'meow-star-map', 'logs'), { recursive: true })
+    fs.writeFileSync(path.join(appDataDir, 'meow-star-map', 'logs', 'main.log'), 'emerg-main')
+    const tmpSpy = vi.spyOn(os, 'tmpdir').mockReturnValue(emergDir)
+    const oldAppData = process.env.APPDATA
+    process.env.APPDATA = appDataDir
+    try {
+      const { r, staged, writes } = await exportCapture(path.join(tmpRoot, 'fallback.zip'))
+      expect(r.success).toBe(true)
+      expect(staged).toContain('tmp-diag.log')
+      expect(staged).toContain('appdata-main.log')
+      const m = readJson(writes, 'manifest.json')
+      const sources = m?.fallbackSources as Record<string, string>
+      expect(sources['tmp-diag.log']).toBe(path.join(emergDir, 'MeowStarMap-diag.log'))
+    } finally {
+      tmpSpy.mockRestore()
+      if (oldAppData === undefined) delete process.env.APPDATA
+      else process.env.APPDATA = oldAppData
+    }
+  })
+
+  it('nikkisync-userdata：userData/nikkisync 两 JSON 跨目录收集', async () => {
+    const ud = path.join(tmpRoot, 'userData-p2')
+    fs.mkdirSync(path.join(ud, 'nikkisync'), { recursive: true })
+    fs.writeFileSync(path.join(ud, 'nikkisync', 'network-repair-journal.json'), '{"j":1}')
+    fs.writeFileSync(path.join(ud, 'nikkisync', 'hotspot-state.json'), '{"h":1}')
+    const getPathMock = vi.mocked(app.getPath)
+    getPathMock.mockImplementation((name: string) => (name === 'userData' ? ud : `/mock/${name}`))
+    try {
+      const { r, staged } = await exportCapture(path.join(tmpRoot, 'nsud.zip'))
+      expect(r.success).toBe(true)
+      expect(staged).toContain('network-repair-journal.json')
+      expect(staged).toContain('hotspot-state.json')
+    } finally {
+      getPathMock.mockImplementation((name: string) => `/mock/${name}`)
+    }
   })
 })

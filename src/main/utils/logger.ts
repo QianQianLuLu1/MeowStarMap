@@ -197,6 +197,35 @@ electronLogger.transports.file.resolvePathFn = () =>
 // 供 index.ts 等外部模块在 unhandledRejection 等处直接写入 electron-log
 export { electronLogger }
 
+/**
+ * 应急落点候选清单（纯函数，导出侧探测存在者收入诊断包 fallback/）。
+ * 与 getFallbackElectronLogPath / startup-diagnostic 的 tmpdir 兜底写入点一一对应；
+ * 写入侧逻辑不变（fail-open 兜底语义），这里只负责让导出能发现它们。
+ */
+export function getEmergencyLogCandidates(): Array<{ name: string; path: string }> {
+  const candidates: Array<{ name: string; path: string }> = []
+  const appData = process.env.APPDATA
+  if (appData) {
+    candidates.push({
+      name: 'appdata-main.log',
+      path: path.join(appData, 'meow-star-map', 'logs', 'main.log')
+    })
+  }
+  candidates.push({
+    name: 'tmp-main.log',
+    path: path.join(os.tmpdir(), 'meow-star-map-logs', 'main.log')
+  })
+  candidates.push({
+    name: 'tmp-diag.log',
+    path: path.join(os.tmpdir(), 'MeowStarMap-diag.log')
+  })
+  candidates.push({
+    name: 'tmp-startup-errors.log',
+    path: path.join(os.tmpdir(), 'MeowStarMap-startup-errors.log')
+  })
+  return candidates
+}
+
 // P1-3：推入最近日志缓冲区（环形，超限自动淘汰最旧）
 function pushToRecentBuffer(level: string, message: string): void {
   recentLogs.push({ timestamp: new Date().toISOString(), level, message })
@@ -274,7 +303,8 @@ function collectEnvInfo(): {
 
 // 构建故障记录（logFault / logFaultSync 共用，保证两条路径记录结构一致）
 // P0-1：自动填充环境信息字段；P1-3：自动附带 recentLogs 上下文
-function buildFaultRecord(
+// P2（诊断日志体系完善）：导出供 cleanup 退出诊断复用——只复用构造，写入侧仍须纯同步
+export function buildFaultRecord(
   type: FaultType,
   error: unknown,
   context?: Record<string, unknown>

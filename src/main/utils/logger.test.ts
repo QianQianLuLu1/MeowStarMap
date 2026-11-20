@@ -393,3 +393,22 @@ describe('logger', () => {
     })
   })
 })
+
+describe('P2 导出面：应急候选与故障记录构造', () => {
+  it('getEmergencyLogCandidates 覆盖 tmpdir 应急落点', async () => {
+    const mod = await import('./logger')
+    expect(typeof mod.getEmergencyLogCandidates).toBe('function')
+    const candidates = mod.getEmergencyLogCandidates()
+    expect(candidates.some((c) => c.path.endsWith('MeowStarMap-diag.log'))).toBe(true)
+    expect(candidates.some((c) => c.path.endsWith('MeowStarMap-startup-errors.log'))).toBe(true)
+  })
+
+  it('buildFaultRecord 导出且含环境字段与 recentLogs 上下文', async () => {
+    const mod = await import('./logger')
+    expect(typeof mod.buildFaultRecord).toBe('function')
+    const record = mod.buildFaultRecord('exitDiagnosis', new Error('exit probe'), { stage: 'test' })
+    expect(record.pid).toBe(process.pid)
+    expect(record.context?.recentLogs).toBeDefined()
+    expect(record.appVersion).toBeDefined()
+  })
+})

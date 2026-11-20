@@ -1,9 +1,11 @@
+// @core-change: exportZip 增可选 LogExportOptions 透传，feedback 描述进诊断包
 // 日志命名空间：对应主进程 handlers/log.ts 注册的 log:* 通道
 import { call } from '../ipc'
 import type {
   DirOpResult,
   LogClearResult,
   LogDirectoryPathResult,
+  LogExportOptions,
   LogExportZipResult,
   LogFaultDetailResult,
   LogFaultListResult,
@@ -22,8 +24,8 @@ export const logAPI = {
   getDirectoryPath: () => call<LogDirectoryPathResult>('log:getDirectoryPath'),
   // 获取日志统计信息
   getStats: () => call<LogStats>('log:getStats'),
-  // 导出全部日志为 zip（主进程会弹出保存对话框）
-  exportZip: () => call<LogExportZipResult>('log:exportZip'),
+  // 导出全部日志为 zip（主进程会弹出保存对话框）；取消 throw IpcError(IPC_CANCELED)
+  exportZip: (options?: LogExportOptions) => call<LogExportZipResult>('log:exportZip', options),
   // 清空所有日志
   clear: () => call<LogClearResult>('log:clear'),
   // 自定义目录支持

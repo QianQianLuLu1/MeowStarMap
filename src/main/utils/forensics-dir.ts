@@ -34,6 +34,7 @@ export const FORENSICS_LOGS_SUBDIR = 'logs'
  */
 export const FORENSICS_ROOT_FILE_NAMES = [
   'diag.log',
+  'diag.log.old',
   'startup-errors.log',
   'chromium-debug.log',
   'chromium-debug.log.old',

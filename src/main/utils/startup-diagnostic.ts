@@ -170,6 +170,13 @@ export function getStartupLogPathValue(): string {
 }
 
 /**
+ * 获取 diag.log 真实写路径（导出侧同源读取；应急态可能回落 tmpdir）
+ */
+export function getDiagLogPathValue(): string {
+  return getDiagLogPath()
+}
+
+/**
  * chromium-debug.log 在位探测行（fail-open）。
  * 背景：2026-11-10 故障机诊断包的 manifest 声称包含 chromium-debug.log 但包内实际没有，
  * 而原生 FATAL 的 exit_code 只存在于该文件——缺席原因（未创建/被占用/被清理）此前不可判定。
