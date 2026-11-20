@@ -44,6 +44,10 @@ vi.mock('electron', () => ({
   BrowserWindow: { getAllWindows: () => [] }
 }))
 
+vi.mock('../utils/logger', () => ({
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
+}))
+
 import { schemas, pathGuard } from './validator'
 
 // handler 实际使用 z.tuple([schema]) 包裹，这里复刻同样的解析路径
@@ -307,5 +311,19 @@ describe('空布尔可选尾参元组（media:emptyRecycleBin force 通道）', 
 
   it('拒绝多余的第二个位置参数（防止静默忽略调用方笔误）', () => {
     expect(emptyRecycleBinTuple.safeParse([true, true]).success).toBe(false)
+  })
+})
+
+describe('P5: PathGuard 拒绝留痕', () => {
+  it('assertAllowed 拒绝时记录完整路径与操作类型（日志侧不脱敏，IPC details 仍走 maskPath）', async () => {
+    const { logger } = await import('../utils/logger')
+    const warnMock = vi.mocked(logger.warn)
+    warnMock.mockClear()
+    const denied = String.raw`Z:\p5-deny-probe\secret.jpg`
+    expect(() => pathGuard.assertAllowed(denied, 'read')).toThrow()
+    expect(warnMock).toHaveBeenCalledWith(
+      expect.stringContaining('[PathGuard]'),
+      expect.objectContaining({ path: denied, op: 'read' })
+    )
   })
 })

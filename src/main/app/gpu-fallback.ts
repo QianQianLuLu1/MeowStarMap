@@ -296,6 +296,7 @@ export function writeGpuDiscretePref(value: GpuDiscretePreference): void {
  */
 export function writeHardwareAccelPref(value: boolean): void {
   mergeWriteGpuBootPrefs({ hardwareAcceleration: value })
+  let fallbackReset = false
   if (value === true) {
     try {
       const state = readState()
@@ -306,10 +307,17 @@ export function writeHardwareAccelPref(value: boolean): void {
         state.consecutiveFailures > 0
       ) {
         writeState({ ...state, fallbackActive: false, compatLevel: 0, consecutiveFailures: 0 })
+        fallbackReset = true
       }
     } catch {
       // 静默降级，不影响主流程
     }
+  }
+  // 偏好写入与档位复位留痕：诊断包需要回答「用户何时开/关硬件加速、自愈标记是否被复位」
+  try {
+    logger.info('[GPU] hardwareAcceleration pref written', { value, fallbackReset })
+  } catch {
+    // 留痕 fail-open
   }
 }
 

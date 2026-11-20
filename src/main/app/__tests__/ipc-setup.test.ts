@@ -18,6 +18,14 @@ import { scanLogStore } from '../../scanner/scan-log-store'
 import { getForensicsLogsDir, setForensicsEnvProvider } from '../../utils/forensics-dir'
 import { setDocumentsPathProvider } from '../../utils/user-diag-path'
 
+// P5：setupIPC 入口安装 IPC 可观测性拦截器（WeakSet 要求对象形状）。全局 inert mock 的
+// ipcMain 为 undefined（历史上 setupIPC 不消费它），此处按真实形状补最小 handle 面，
+// 其余 electron API 保持 inert 原样。
+vi.mock('electron', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ipcMain: { handle: vi.fn(), on: vi.fn(), removeListener: vi.fn() }
+}))
+
 // 共享 mock：42 个 registerXxxHandlers
 const handlerMocks = vi.hoisted(() => ({
   registerMediaMetadataHandlers: vi.fn(),

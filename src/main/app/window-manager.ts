@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, session, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, session, ipcMain, screen } from 'electron'
 import path from 'path'
 import fs from 'fs'
 import type { AppContext } from './app-context'
@@ -100,17 +100,62 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     show: false,
     roundedCorners: true
   })
+  // 窗口创建配置留痕：背景色/透明/隐藏首显是闪屏取证的直接相关项
+  logger.info('[Window] created', {
+    backgroundColor: '#F5F5F5',
+    transparent: false,
+    show: false,
+    titleBarStyle: 'hidden',
+    width: 1400,
+    height: 900
+  })
+  const winCreatedAt = performance.now()
+
+  // 显示器拓扑/DPI 变化留痕（多屏拔插、缩放切换是闪屏诱因之一）；窗口关闭时解绑
+  const onDisplayMetricsChanged = (
+    _event: Electron.Event,
+    _display: Electron.Display,
+    changedMetrics: string[]
+  ): void => {
+    logger.info('[Window] display-metrics-changed', { changedMetrics })
+  }
+  screen.on('display-metrics-changed', onDisplayMetricsChanged)
 
   // 通过 ctx 注入回 AppContext，供其他模块访问最新窗口引用
   ctx.setMainWindow(mainWindow)
   // 窗口关闭后立即清空 ctx 引用：closed 后窗口对象虽在但底层 webContents 已销毁，
   // sendToRenderer 的 isDestroyed 检查依赖此处置 null 才能可靠短路
   mainWindow.on('closed', () => {
+    screen.removeListener('display-metrics-changed', onDisplayMetricsChanged)
     // G1-F7（审查修复轮）：仅当关闭的仍是当前窗口时才清引用——重建兜底后旧空白窗
     // 晚到的 closed 不得把新窗引用清空（否则 sendToRenderer 永久短路）。
     if (ctx.getMainWindow() === mainWindow) {
       ctx.setMainWindow(null)
     }
+  })
+
+  // 窗口运行态可观测：卡死/恢复、全屏、尺寸、缩放全部留痕，
+  // 与 bootId/pid 行格式拼接可还原闪屏/卡死时间线（logger 自身 fail-open）
+  mainWindow.on('unresponsive', () => {
+    logger.warn('[Window] unresponsive (renderer not responding to input)')
+  })
+  mainWindow.on('responsive', () => {
+    logger.info('[Window] responsive')
+  })
+  mainWindow.on('enter-full-screen', () => {
+    logger.info('[Window] enter-full-screen')
+  })
+  mainWindow.on('leave-full-screen', () => {
+    logger.info('[Window] leave-full-screen')
+  })
+  mainWindow.on('resized', () => {
+    logger.info('[Window] resized', { size: mainWindow.getSize() })
+  })
+  mainWindow.webContents.on('zoom-changed', (_event, zoomDirection) => {
+    logger.info('[Window] zoom-changed', {
+      direction: zoomDirection,
+      level: mainWindow.webContents.getZoomLevel()
+    })
   })
 
   // 导航防护：阻断任意新窗口，并拦截主框架/子帧被导向非应用文档。
@@ -153,6 +198,9 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
     firstVisibleDone = true
     clearTimeout(resumeFuse)
     mainWindow.show()
+    logger.info(
+      `[Window] first visible via ${via} (+${Math.round(performance.now() - winCreatedAt)}ms)`
+    )
     // 分级调度：主窗口显示后恢复调度器，启动期入队的低优先级任务开始执行
     ctx.taskScheduler.resume()
     diagLog('WIN', `scheduler resumed via ${via}`)
@@ -162,6 +210,7 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
   // GPU 状态可观测：首帧加载完成后异步记一行摘要（hwAccel 开关态/活动显卡/回退/独显偏好）。
   // getGPUInfo 在 GPU 进程就绪后才有数据，故挂 did-finish-load；fire-and-forget 不影响窗口流程。
   mainWindow.webContents.once('did-finish-load', () => {
+    logger.info(`[Window] did-finish-load (+${Math.round(performance.now() - winCreatedAt)}ms)`)
     void logGpuStatusSummary()
   })
 
@@ -327,6 +376,7 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
 
     if (result.response === 0) {
       // 重新加载：reload 之前先确保 webContents 仍可用
+      logger.info('[Window] reload after renderer crash (user chose reload)')
       try {
         if (!mainWindow?.isDestroyed()) {
           mainWindow?.webContents.reload()

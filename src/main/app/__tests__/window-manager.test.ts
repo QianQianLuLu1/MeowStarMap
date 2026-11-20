@@ -27,7 +27,10 @@ const {
   markAppBootedMock,
   requestSelfHealMock,
   isStartupPhaseMock,
-  loggerWarnMock
+  loggerWarnMock,
+  loggerInfoMock,
+  screenOnMock,
+  screenRemoveListenerMock
 } = vi.hoisted(() => ({
   showMessageBoxMock: vi.fn(),
   appQuitMock: vi.fn(),
@@ -40,7 +43,10 @@ const {
   markAppBootedMock: vi.fn(),
   requestSelfHealMock: vi.fn(() => false),
   isStartupPhaseMock: vi.fn(() => false),
-  loggerWarnMock: vi.fn()
+  loggerWarnMock: vi.fn(),
+  loggerInfoMock: vi.fn(),
+  screenOnMock: vi.fn(),
+  screenRemoveListenerMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -57,6 +63,10 @@ vi.mock('electron', () => ({
     on: vi.fn(),
     removeListener: vi.fn()
   },
+  screen: {
+    on: screenOnMock,
+    removeListener: screenRemoveListenerMock
+  },
   // CSP 下发的响应头经此注册；生产路径 createMainWindow 会调用。
   session: {
     defaultSession: {
@@ -69,7 +79,7 @@ vi.mock('electron', () => ({
 }))
 
 vi.mock('../../utils/logger', () => ({
-  logger: { error: loggerErrorMock, warn: loggerWarnMock },
+  logger: { error: loggerErrorMock, warn: loggerWarnMock, info: loggerInfoMock },
   logFault: logFaultMock
 }))
 
@@ -100,11 +110,13 @@ interface MockWindow {
     reload: ReturnType<typeof vi.fn>
     send: ReturnType<typeof vi.fn>
     isDestroyed: ReturnType<typeof vi.fn>
+    getZoomLevel: ReturnType<typeof vi.fn>
     _emit: (event: string, ...args: unknown[]) => void
   }
   once: ReturnType<typeof vi.fn>
   on: ReturnType<typeof vi.fn>
   show: ReturnType<typeof vi.fn>
+  getSize: ReturnType<typeof vi.fn>
   loadURL: ReturnType<typeof vi.fn>
   loadFile: ReturnType<typeof vi.fn>
   isDestroyed: ReturnType<typeof vi.fn>
@@ -130,6 +142,7 @@ function createMockWindow(options: unknown): MockWindow {
       send: vi.fn(),
       setWindowOpenHandler: vi.fn(),
       isDestroyed: vi.fn(() => false),
+      getZoomLevel: vi.fn(() => 0),
       _emit: (event: string, ...args: unknown[]): void => {
         ;(wcListeners[event] ?? []).forEach((cb) => cb(...args))
       }
@@ -141,6 +154,7 @@ function createMockWindow(options: unknown): MockWindow {
       ;(winListeners[event] ??= []).push(cb)
     }),
     show: vi.fn(),
+    getSize: vi.fn(() => [1400, 900]),
     loadURL: vi.fn(() => Promise.resolve()),
     loadFile: vi.fn(() => Promise.resolve()),
     isDestroyed: vi.fn(() => false),
@@ -168,6 +182,9 @@ beforeEach(() => {
   requestSelfHealMock.mockReset()
   isStartupPhaseMock.mockReset()
   loggerWarnMock.mockReset()
+  loggerInfoMock.mockReset()
+  screenOnMock.mockReset()
+  screenRemoveListenerMock.mockReset()
   // 默认：非启动期、且自愈不触发（维持既有 dialog 流程）
   isStartupPhaseMock.mockReturnValue(false)
   requestSelfHealMock.mockReturnValue(false)
@@ -847,5 +864,64 @@ describe('createMainWindow / cdn.gongeo.us 固定 User-Agent', () => {
     })
     expect(out2).toEqual({})
     expect(hasWarn('requestHeaders')).toBe(true)
+  })
+})
+
+describe('P5: 窗口运行态可观测', () => {
+  it('p1. unresponsive / responsive 留痕（卡死与恢复可拼时间线）', async () => {
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+    loggerWarnMock.mockClear()
+    loggerInfoMock.mockClear()
+    lastCreatedWindow!._emit('unresponsive')
+    expect(loggerWarnMock).toHaveBeenCalledWith(expect.stringContaining('unresponsive'))
+    lastCreatedWindow!._emit('responsive')
+    expect(loggerInfoMock).toHaveBeenCalledWith(expect.stringContaining('responsive'))
+  })
+
+  it('p2. 全屏进入/退出留痕', async () => {
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+    loggerInfoMock.mockClear()
+    lastCreatedWindow!._emit('enter-full-screen')
+    lastCreatedWindow!._emit('leave-full-screen')
+    const lines = loggerInfoMock.mock.calls.map((c) => String(c[0]))
+    expect(lines.some((s) => s.includes('enter-full-screen'))).toBe(true)
+    expect(lines.some((s) => s.includes('leave-full-screen'))).toBe(true)
+  })
+
+  it('p3. display-metrics-changed 留痕（DPI/多屏变化取证），窗口关闭后解绑', async () => {
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+    const entry = screenOnMock.mock.calls.find((c) => c[0] === 'display-metrics-changed')
+    expect(entry).toBeDefined()
+    loggerInfoMock.mockClear()
+    ;(entry![1] as (...args: unknown[]) => void)({}, {}, ['bounds', 'workArea'])
+    expect(loggerInfoMock).toHaveBeenCalledWith(
+      expect.stringContaining('display-metrics-changed'),
+      expect.anything()
+    )
+    lastCreatedWindow!._emit('closed')
+    expect(screenRemoveListenerMock).toHaveBeenCalledWith('display-metrics-changed', entry![1])
+  })
+
+  it('p4. resized 与 zoom-changed 留痕（尺寸/缩放变化取证）', async () => {
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+    loggerInfoMock.mockClear()
+    lastCreatedWindow!._emit('resized')
+    lastCreatedWindow!.webContents._emit('zoom-changed', {}, 'in')
+    const lines = loggerInfoMock.mock.calls.map((c) => String(c[0]))
+    expect(lines.some((s) => s.includes('resized'))).toBe(true)
+    expect(lines.some((s) => s.includes('zoom-changed'))).toBe(true)
+  })
+
+  it('p5. 首次可见打点含 [Window] 标签与耗时 ms', async () => {
+    process.env.NODE_ENV = 'production'
+    await createMainWindow(makeAppCtx())
+    loggerInfoMock.mockClear()
+    lastCreatedWindow!._emit('ready-to-show')
+    const lines = loggerInfoMock.mock.calls.map((c) => String(c[0]))
+    expect(lines.some((s) => s.includes('[Window]') && s.includes('ms'))).toBe(true)
   })
 })

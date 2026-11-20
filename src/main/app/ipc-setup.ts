@@ -1,4 +1,6 @@
 import type { AppContext } from './app-context'
+import { ipcMain } from 'electron'
+import { installIpcObservability } from '../ipc/ipc-observability'
 import { sendToRenderer } from './renderer-bridge'
 import { MediaRepository } from '../database/media-repository'
 import { pathGuard } from '../ipc/validator'
@@ -85,6 +87,11 @@ export function bindScanProgressListener(ctx: AppContext): void {
  * 3. 初始化 pathGuard userData 目录白名单
  */
 export function setupIPC(ctx: AppContext): void {
+  // IPC 可观测性单点拦截器：常驻幂等包装 ipcMain.handle，覆盖本函数内全部注册
+  // 及任何晚注册通道（失败落 fault / 校验失败 warn / CANCELED 静默 / >500ms 慢调用 warn）。
+  // 必须先于所有 registerXxxHandlers 安装。
+  installIpcObservability(ipcMain)
+
   // 扫描操作（进度监听只注册一次，避免重复累积）
   bindScanProgressListener(ctx)
 

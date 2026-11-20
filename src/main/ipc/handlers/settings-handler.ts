@@ -1,4 +1,4 @@
-// @core-change: 开机自启动同步失败改为抛 AppError 可感知、dev 跳过态回传渲染层、历史 Run 值名清理与写入后回读校验
+// @core-change: settings:set 记录 old→new 变更留痕（>1KB 截断），诊断包可还原设置变更时间线
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -126,6 +126,23 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
         } catch (err) {
           if (err instanceof AppError) throw err
           throw AppError.validation(t('main.settings.error.valueNotSerializable'))
+        }
+        // 变更留痕 old→new：读旧值/序列化失败一律 fail-open，绝不影响写入主流程。
+        // 单值 >1KB 截断是纯体积约束（已授权不脱敏，路径/标识全量记录）。
+        try {
+          const oldValue = ctx.dbManager.getSetting<unknown>(key, undefined)
+          const fmt = (v: unknown): string => {
+            let s: string
+            try {
+              s = JSON.stringify(v) ?? String(v)
+            } catch {
+              s = String(v)
+            }
+            return s.length > 1024 ? `${s.slice(0, 1024)}…(截断,总长${s.length})` : s
+          }
+          logger.info(`[Settings] ${key}: ${fmt(oldValue)} → ${fmt(value)}`)
+        } catch {
+          // 留痕失败不影响设置写入
         }
         // customScanPaths 走内联校验放行（方案 A：维持现状，不迁专用通道）
         if (key === 'customScanPaths') {

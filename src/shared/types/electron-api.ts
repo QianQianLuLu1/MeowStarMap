@@ -460,6 +460,8 @@ export interface GpuDeviceSummary {
   vendor: string | null
   device: string | null
   active: boolean | null
+  /** 驱动版本（Chromium GPUInfo 防御式解析，缺省 null）——闪屏/TDR 取证需要 */
+  driverVersion?: string | null
 }
 
 /** GPU 状态总览（app:gpu-status 返回值；GPU 信息不可得时 gpus/activeGpu/featureStatus 为 null） */

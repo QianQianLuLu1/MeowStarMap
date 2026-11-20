@@ -765,3 +765,16 @@ describe('gpu-fallback 升级首启证据迁移时序（审查修复轮 R-a3）'
     expect(migIdx).toBeLessThan(recordIdx)
   })
 })
+
+describe('P5: writeHardwareAccelPref 留痕', () => {
+  it('偏好写入记录 [GPU] 标签与写入值（复位动作可观测）', async () => {
+    const { logger } = await import('../../utils/logger')
+    const infoMock = vi.mocked(logger.info)
+    infoMock.mockClear()
+    writeHardwareAccelPref(true)
+    expect(infoMock).toHaveBeenCalledWith(
+      expect.stringContaining('[GPU] hardwareAcceleration'),
+      expect.objectContaining({ value: true })
+    )
+  })
+})

@@ -374,6 +374,13 @@ class PathGuard {
    */
   assertAllowed(p: string, op: 'read' | 'write' = 'write'): void {
     if (!this.isAllowed(p)) {
+      // 日志侧记完整路径（已授权不脱敏）；IPC 错误 details 仍走 maskPath（对外契约不变）。
+      // media-read-guard 的全部拒绝分支最终都落到这里，单点留痕即全覆盖。
+      try {
+        logger.warn(`[PathGuard] deny ${op}`, { path: p, op, sensitive: isSensitivePath(p) })
+      } catch {
+        // 留痕 fail-open，不影响拒绝判定
+      }
       throw AppError.forbidden(
         t('main.validator.pathNotAllowed', {
           op: op === 'write' ? t('main.validator.opWrite') : t('main.validator.opRead')

@@ -788,3 +788,31 @@ describe('settings:set 外部参考数据布尔开关', () => {
     expect(ctx.dbManager.setSetting).not.toHaveBeenCalled()
   })
 })
+
+describe('P5: settings:set 变更留痕', () => {
+  beforeEach(() => {
+    handleMock.mockClear()
+  })
+
+  it('hardwareAcceleration 写入记录 [Settings] old→new（旧值 false 新值 true 均可见）', async () => {
+    const { logger } = await import('../../utils/logger')
+    const infoMock = vi.mocked(logger.info)
+    infoMock.mockClear()
+    const ctx = makeCtx({})
+    vi.mocked(ctx.dbManager.getSetting).mockReturnValue(false)
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['hardwareAcceleration', true])) as { success: boolean; error?: { message: string } }
+    expect(result.success, result.error?.message).toBe(true)
+    const lines = infoMock.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.includes('[Settings]'))
+    expect(lines.length).toBeGreaterThan(0)
+    const joined = lines.join('\n')
+    expect(joined).toContain('hardwareAcceleration')
+    expect(joined).toContain('false')
+    expect(joined).toContain('true')
+  })
+})
