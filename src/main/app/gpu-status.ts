@@ -76,7 +76,8 @@ export function parseGpuInfo(info: unknown): {
           deviceId: asNonEmptyString(dev.deviceId),
           vendor: asNonEmptyString(dev.vendor),
           device: asNonEmptyString(dev.device),
-          active: typeof dev.active === 'boolean' ? dev.active : null
+          active: typeof dev.active === 'boolean' ? dev.active : null,
+          driverVersion: asNonEmptyString(dev.driverVersion)
         }
       })
     }
@@ -164,11 +165,33 @@ export function buildGpuStatusSummaryLine(s: GpuStatusSummary): string {
     ? `on(v=${s.fallback.fallbackVersion ?? '?'},fails=${s.fallback.consecutiveFailures},level=${level})`
     : `off(level=${level})`
   const active = s.activeGpu ?? 'unknown'
+  // 逐卡型号/驱动版本与 featureStatus 明细：闪屏/TDR 取证需要知道「哪块卡、哪个驱动、
+  // 哪些特性被降级到软件」，仅有 activeGPU 串不足以定位驱动级问题。
+  const devices =
+    s.gpus === null
+      ? 'unknown'
+      : s.gpus
+          .map(
+            (g) =>
+              `${g.vendor ?? '?'} ${g.device ?? '?'}(drv=${g.driverVersion ?? '?'},active=${g.active ?? '?'})`
+          )
+          .join(' | ')
+  const features = s.featureStatus ? JSON.stringify(s.featureStatus) : 'unknown'
   return (
     `GPU 状态: hwAccel=${hw}(${s.hardwareAcceleration.reason}) activeGPU=${active} ` +
     `gpus=${gpuCount} fallback=${fallback} ` +
-    `discrete=${s.discretePreference.mode}(${s.discretePreference.registry ?? 'n/a'})`
+    `discrete=${s.discretePreference.mode}(${s.discretePreference.registry ?? 'n/a'}) ` +
+    `devices=[${devices}] features=${features}`
   )
+}
+
+/** 兼容档位启动的结构化 diag 行（2026-11-20 N2：reason 属实化——
+ *  user-disabled 等非崩溃原因不得再冒充「检测到 GPU 崩溃回退标记」文案） */
+export function buildGpuCompatBootDiagLine(
+  level: number,
+  decision: { enabled: boolean; reason: GpuBootDecisionReason }
+): string {
+  return `gpu compat boot: level=${level} reason=${decision.reason} hwAccel=${decision.enabled ? 'on' : 'off'}`
 }
 
 /** 首帧加载完成后记一行 GPU 状态摘要（异步、fire-and-forget，绝不影响窗口流程） */

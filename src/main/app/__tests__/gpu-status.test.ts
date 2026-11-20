@@ -20,7 +20,12 @@ vi.mock('../gpu-fallback', async (importOriginal) => ({
 vi.mock('../../utils/startup-diagnostic', () => ({ diagLog: diagLogMock }))
 vi.mock('../../utils/logger', () => ({ logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }))
 
-import { collectGpuStatus, buildGpuStatusSummaryLine } from '../gpu-status'
+import {
+  collectGpuStatus,
+  buildGpuStatusSummaryLine,
+  buildGpuCompatBootDiagLine,
+  parseGpuInfo
+} from '../gpu-status'
 
 /** Chromium complete GPU info 典型形态（防御式解析，只取我们需要的字段） */
 const COMPLETE_INFO = {
@@ -225,5 +230,65 @@ describe('buildGpuStatusSummaryLine（启动日志摘要）', () => {
       platform: 'win32'
     })
     expect(line).toContain('level=2')
+  })
+})
+
+describe('buildGpuCompatBootDiagLine（2026-11-20 N2 GPU 启动日志属实化）', () => {
+  it('n1. level2 + user-disabled → 行内含 level=2 / user-disabled / hwAccel=off（不得冒充崩溃回退）', () => {
+    const line = buildGpuCompatBootDiagLine(2, { enabled: false, reason: 'user-disabled' })
+    expect(line).toContain('level=2')
+    expect(line).toContain('user-disabled')
+    expect(line).toContain('hwAccel=off')
+  })
+
+  it('n2. level1 + crash-fallback → 行内含 crash-fallback', () => {
+    const line = buildGpuCompatBootDiagLine(1, { enabled: false, reason: 'crash-fallback' })
+    expect(line).toContain('level=1')
+    expect(line).toContain('crash-fallback')
+  })
+
+  it('n3. 边界：level0 + default → hwAccel=on', () => {
+    const line = buildGpuCompatBootDiagLine(0, { enabled: true, reason: 'default' })
+    expect(line).toContain('level=0')
+    expect(line).toContain('hwAccel=on')
+  })
+})
+
+describe('P5: GPU 探针取证补全', () => {
+  it('g1. parseGpuInfo 提取 driverVersion（设备级优先，缺失为 null）', () => {
+    const { gpus } = parseGpuInfo({
+      gpuDevice: [
+        { vendorId: '0x10de', device: 'RTX 4060 Laptop', driverVersion: '31.0.15.5186' },
+        { vendorId: '0x8086', device: 'Iris Xe' }
+      ],
+      auxAttributes: {}
+    })
+    expect(gpus?.[0]?.driverVersion).toBe('31.0.15.5186')
+    expect(gpus?.[1]?.driverVersion).toBeNull()
+  })
+
+  it('g2. 摘要行含逐卡型号/驱动版本与 featureStatus 明细', () => {
+    const line = buildGpuStatusSummaryLine({
+      hardwareAcceleration: { enabled: true, reason: 'default' },
+      fallback: { active: false, consecutiveFailures: 0, fallbackVersion: null },
+      discretePreference: { mode: 'auto', registry: null },
+      featureStatus: { canvas: 'enabled', gpu_compositing: 'disabled' },
+      gpus: [
+        {
+          vendorId: '0x10de',
+          deviceId: '0x28e0',
+          vendor: 'NVIDIA',
+          device: 'RTX 4060 Laptop',
+          active: true,
+          driverVersion: '31.0.15.5186'
+        }
+      ],
+      activeGpu: 'ANGLE (NVIDIA RTX 4060 Laptop)',
+      electronVersion: '41.0.0',
+      platform: 'win32'
+    })
+    expect(line).toContain('RTX 4060 Laptop')
+    expect(line).toContain('31.0.15.5186')
+    expect(line).toContain('gpu_compositing')
   })
 })

@@ -18,7 +18,8 @@ import {
   getForensicsFilePath
 } from './utils/forensics-dir'
 import { verifyStartupEnvironment } from './app/startup-environment'
-import { electronLogger } from './utils/logger'
+import { electronLogger, logger } from './utils/logger'
+import { buildBootSnapshot } from './utils/boot-snapshot'
 import { registerRendererProtocol } from './app/renderer-protocol'
 // R1（2026-11-15）：单实例锁获取前移到重模块加载之前（详见 single-instance.ts 头注释）
 // B（2026-11-15）：writeSecondInstanceAck 供下方赢家侧 ack 写入监听使用（详见函数注释）
@@ -30,12 +31,17 @@ import {
   recordBootLevel,
   requestSelfHeal,
   wasBootInCompatMode,
-  readGpuBootPrefs
+  readGpuBootPrefs,
+  classifyBootDecisionForStatus
 } from './app/gpu-fallback'
+import { buildGpuCompatBootDiagLine } from './app/gpu-status'
 import { applyDiscreteGpuPreference } from './app/gpu-preference'
 import { getPreviousExitEvidence, markExitStage } from './app/exit-forensics'
 import { installFfmpegSpawnGuard } from './utils/fluent-ffmpeg-shim'
 import { t } from './i18n'
+
+// P4：本次启动实际下发的 Chromium 命令行开关清单（供启动环境快照记录）
+const appliedChromiumSwitches: string[] = []
 
 // 捕获未处理异常和未处理的 Promise 拒绝。
 // 必须放在任何可能抛错的模块级代码（registerSchemesAsPrivileged 等）之前：
@@ -132,6 +138,7 @@ try {
   }
   app.commandLine.appendSwitch('enable-logging', 'file')
   app.commandLine.appendSwitch('log-file', chromiumLogPath)
+  appliedChromiumSwitches.push('enable-logging=file', `log-file=${chromiumLogPath}`)
   // 意图路径留痕：与 lifecycle 的在位探测行配对，诊断包可判定 chromium 日志缺席原因（T11）
   diagLog('INDEX', `chromium log target: ${chromiumLogPath}`)
 } catch {
@@ -183,16 +190,23 @@ if (gpuCompatLevel >= 1) {
     try {
       app.commandLine.appendSwitch('disable-gpu')
       app.commandLine.appendSwitch('disable-software-rasterizer')
+      appliedChromiumSwitches.push('disable-gpu', 'disable-software-rasterizer')
       diagLog('INDEX', 'gpu compat level=2: --disable-gpu + --disable-software-rasterizer appended')
     } catch (e) {
       // 开关下发失败只退化为「禁用硬件加速」，绝不因诊断性开关打断启动
       diagLog('INDEX', `appendSwitch(disable-gpu/disable-software-rasterizer) failed: ${String(e)}`)
     }
   }
-  try {
-    electronLogger.info(t('main.index.log.gpuFallbackActive'))
-  } catch {
-    // electronLogger 未就绪时仅依赖 diagLog
+  // N2（2026-11-20）：启动档位日志属实化——结构化行无条件记录真实 reason；
+  // 「检测到 GPU 崩溃回退标记」文案仅在确属崩溃回退时输出，user-disabled 不得冒充
+  const bootDecision = classifyBootDecisionForStatus()
+  diagLog('INDEX', buildGpuCompatBootDiagLine(gpuCompatLevel, bootDecision))
+  if (bootDecision.reason === 'crash-fallback') {
+    try {
+      electronLogger.info(t('main.index.log.gpuFallbackActive'))
+    } catch {
+      // electronLogger 未就绪时仅依赖 diagLog
+    }
   }
 }
 
@@ -256,6 +270,20 @@ const readyStartup = app.whenReady().then(async () => {
   // 静默让位而不是 6s 后弹「已有实例运行」。lifecycle 稍后注册的完整 handler 负责
   // 聚焦窗口，两个监听器并存不冲突（EventEmitter 多播）。
   app.on('second-instance', () => writeSecondInstanceAck())
+
+  // P4：启动环境一次性快照（argv / 已应用开关 / env 全量 / 取证根与 userData 最终路径）。
+  // 赢家专属（输家不得污染取证）；fail-open，快照失败不阻断启动。
+  try {
+    logger.info(
+      '[Boot] environment snapshot',
+      buildBootSnapshot({
+        userDataPath: app.getPath('userData'),
+        appliedSwitches: appliedChromiumSwitches
+      })
+    )
+  } catch {
+    // 快照失败仅损失取证维度，不影响启动
+  }
 
   // F2+F5（2026-11-15）：退出取证 / 原生模块预检 / markBootAttempt / GPU 观测
   // 已后移到 lifecycle.ts 单实例锁获取成功之后（赢家专属）。
