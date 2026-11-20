@@ -240,9 +240,13 @@ export const SettingsView: React.FC = () => {
    */
   useEffect(() => {
     if (!metadataEnabled) return
+    // 可选链只护住 electronAPI：老 preload 没有 nikkisync 命名空间时，
+    // `window.electronAPI?.nikkisync.getMetadataConsent` 会在 effect 同步体里抛 TypeError，
+    // 而同步抛出不会被下面的 .catch 接到（提交期抛出会打掉整棵子树）。故先取方法再判类型。
+    const getConsent = window.electronAPI?.nikkisync?.getMetadataConsent
+    if (typeof getConsent !== 'function') return
     let alive = true
-    void window.electronAPI?.nikkisync
-      .getMetadataConsent()
+    void getConsent()
       .then((next) => {
         if (alive) setConsent(next)
       })
@@ -1246,7 +1250,13 @@ const SyncShellSection: React.FC<{
     if (!api) return
     const next: Record<string, boolean> = {}
     for (const key of SHELL_SETTING_KEYS) {
-      next[key] = Boolean(await api.get(key, false))
+      // 单个键读失败按 fail-closed 记 false 继续：外壳开关是「观测 + 显式拨动」，
+      // 一次 IPC 抖动不该让整组观测丢失，更不该变成未处理 rejection（规范 §4）。
+      try {
+        next[key] = Boolean(await api.get(key, false))
+      } catch {
+        next[key] = false
+      }
     }
     if (!mountedRef.current) return
     flagsRef.current = next

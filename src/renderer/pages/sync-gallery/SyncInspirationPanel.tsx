@@ -142,6 +142,11 @@ function parseImages(value: unknown): NikkiSyncInspirationImageInfo[] {
 const AUTO_REFRESH_THROTTLE_MS = 15000
 /** 节流检查心跳：5s 一跳，到点且距上次拉取 ≥15s 才真正重取（编辑器打开时跳过）。 */
 const AUTO_REFRESH_TICK_MS = 5000
+/**
+ * 单轮 fetch-all 的页数硬顶（100 条/页 ⇒ 5000 条）。
+ * 存在理由：服务端游标异常时逐页链必须**有界**，否则一次打开面板就能把 IPC 打满。
+ */
+const MAX_LIST_PAGES = 50
 
 interface SyncInspirationPanelProps {
   /**
@@ -197,21 +202,28 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
 
   /**
    * T8：fetch-all——沿 after 游标逐页取全量（limit=100），按 id+revision 去重；
-   * 游标为空或重复（服务端游标抖动/恒定）即停，绝不盲拼目录。
+   * 游标为空 / 已走过同一游标 / 页数触顶即停，绝不盲拼目录。
+   * 「已走过」用整条链的游标集合判：只比对相邻游标挡不住服务端 A→B→A 的往复。
    * F16 兼容：停止时若游标仍非空，保留「加载更多」入口供用户显式续翻。
    */
   const loadList = useCallback(async (): Promise<void> => {
     const client = window.electronAPI?.nikkisync
     if (!client?.listInspirations) return
     const generation = ++listGenerationRef.current
+    // 新代次接管：在途 loadMore 的代次就此作废，它的 finally 按代次门闩不会再复位，
+    // 这里必须补一次——否则「加载更多」被 disabled 与 loadMore 守卫双封，非重挂载不可恢复。
+    setLoadingMore(false)
     try {
       const collected: NikkiSyncInspirationVersionedInfo[] = []
       const seen = new Set<string>()
+      const visitedCursors = new Set<string>()
       let after: string | null = null
       let cursor: string | null = null
+      let pages = 0
       for (;;) {
         const res = await client.listInspirations(after ? { limit: 100, after } : { limit: 100 })
         if (generation !== listGenerationRef.current) return
+        pages += 1
         for (const row of parseList(res)) {
           const key = `${String(row.entry?.id ?? 'row')}-${row.revision}`
           if (!seen.has(key)) {
@@ -221,7 +233,8 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
         }
         const next = parseCursor(res)
         cursor = next
-        if (!next || next === after) break
+        if (!next || visitedCursors.has(next) || pages >= MAX_LIST_PAGES) break
+        visitedCursors.add(next)
         after = next
       }
       if (generation !== listGenerationRef.current) return

@@ -171,6 +171,10 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
     }
   }
 
+  // 外部行的防御式收敛：items 缺失（契约破坏/老主进程）按空队列处理，与
+  // SyncConsoleLayout 的 `queue?.items ?? []` 同口径，不在渲染期抛错。
+  const queueItems = organizerQueue?.items ?? []
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -213,14 +217,14 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
                   title={t('syncService.organizer.unavailable')}
                   subtitle={t('syncService.organizer.unavailableHint')}
                 />
-              ) : !organizerQueue || organizerQueue.items.length === 0 ? (
+              ) : queueItems.length === 0 ? (
                 <EmptyState
                   title={t('syncService.organizer.empty')}
                   subtitle={t('syncService.organizer.emptyHint')}
                 />
               ) : (
                 <>
-                  {organizerQueue.items.map((item) => {
+                  {queueItems.map((item) => {
                     const actionable = ORGANIZER_ACTIONABLE_STATES.has(item.state)
                     // 已知 11 态走 i18n 映射；未知状态回退原样英文短码（不谎报，K1 同款口径）
                     const stateKey = ORGANIZER_STATE_I18N_KEYS[item.state]
@@ -266,7 +270,7 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
                       className="btn-danger text-sm"
                       disabled={
                         busy ||
-                        !organizerQueue.items.some(
+                        !queueItems.some(
                           (item) => ORGANIZER_ACTIONABLE_STATES.has(item.state) && item.online
                         )
                       }

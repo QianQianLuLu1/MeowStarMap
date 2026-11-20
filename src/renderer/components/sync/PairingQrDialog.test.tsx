@@ -124,4 +124,13 @@ describe('PairingQrDialog', () => {
     expect(getPairingCode).toHaveBeenCalledTimes(2)
     expect(screen.getByText('生成配对二维码失败')).toBeInTheDocument()
   })
+
+  it('(h) expiresAt 不可解析 ⇒ 倒计时退化为 0:00，不得渲染 NaN', async () => {
+    getPairingCode.mockResolvedValueOnce({ ...QR_OFFER, expiresAt: 'not-a-timestamp' })
+    render(<PairingQrDialog open onClose={() => {}} />)
+    await waitFor(() => expect(screen.getByText('192.168.1.10:28080')).toBeInTheDocument())
+    // NaN 经 `?? 0` 不会被兜住（NaN 既不是 null 也不是 undefined），会直通到 UI
+    expect(screen.queryByText(/NaN/)).not.toBeInTheDocument()
+    expect(screen.getByText(/0:00/)).toBeInTheDocument()
+  })
 })

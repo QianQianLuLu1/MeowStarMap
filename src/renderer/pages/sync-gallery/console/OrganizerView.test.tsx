@@ -248,3 +248,15 @@ describe('T10：回收站入口 / 批量聚合提示 / 轮询纪律', () => {
     }
   })
 })
+
+describe('OrganizerView 队列响应契约破坏的兜底', () => {
+  it('getOrganizerQueue 返回缺 items ⇒ 走空态，不得渲染期抛错', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      // 通道契约破坏（items 缺失）：同仓 SyncConsoleLayout 用 `?? []` 兜底，本视图必须同口径
+      organizerQueue: { activity: { catalogPasses: 0 } }
+    })
+    renderOrganizer()
+    expect(await screen.findByText('暂无待整理删除项')).toBeInTheDocument()
+  })
+})

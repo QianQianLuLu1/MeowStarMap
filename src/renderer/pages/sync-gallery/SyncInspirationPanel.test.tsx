@@ -475,6 +475,55 @@ describe('T8：fetch-all 沿游标取全量', () => {
     expect(screen.queryByTestId('inspiration-load-more')).not.toBeInTheDocument()
   })
 
+  it('游标往复（c1→c2→c1）⇒ 重复游标即停，不得无限翻页', async () => {
+    listInspirations
+      .mockResolvedValueOnce({
+        items: [{ revision: 1, entry: makeEntry({ title: '甲' }) }],
+        nextCursor: 'c1'
+      })
+      .mockResolvedValueOnce({ items: [], nextCursor: 'c2' })
+      .mockResolvedValueOnce({ items: [], nextCursor: 'c1' })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('甲')).toBeInTheDocument())
+    // 第三次拿到的 c1 已走过 ⇒ 立即停（不进入 c1→c2→c1 的死循环）
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(3))
+    expect(screen.getByTestId('inspiration-load-more')).toBeInTheDocument()
+  })
+
+  it('竞态：加载更多在途时整刷顶掉代次 ⇒ 按钮不得永久禁用', async () => {
+    installApi({
+      list: {
+        items: [{ revision: 1, entry: makeEntry({ title: '第一页' }) }],
+        nextCursor: 'cursor-1'
+      }
+    })
+    render(<SyncInspirationPanel />)
+    openPanel()
+    await waitFor(() => expect(screen.getByText('第一页')).toBeInTheDocument())
+    // 续页挂起不返回
+    let resolveMore: (value: unknown) => void = () => {}
+    listInspirations.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveMore = resolve
+        })
+    )
+    fireEvent.click(screen.getByTestId('inspiration-load-more'))
+    // 在途期间整表刷新：代次被顶掉，续页响应回来时必须被丢弃
+    listInspirations.mockResolvedValueOnce({
+      items: [{ revision: 1, entry: makeEntry({ title: '刷新页' }) }],
+      nextCursor: 'cursor-1'
+    })
+    fireEvent.click(screen.getByTestId('inspiration-refresh'))
+    await waitFor(() => expect(screen.getByText('刷新页')).toBeInTheDocument())
+    await act(async () => {
+      resolveMore({ items: [], nextCursor: null })
+    })
+    // 代次已作废 ⇒ loadingMore 必须复位，否则按钮被 disabled + 守卫双封，非重挂载不可恢复
+    await waitFor(() => expect(screen.getByTestId('inspiration-load-more')).not.toBeDisabled())
+  })
+
   it('跨页重复 id+revision 去重（游标抖动不得产出重复行）', async () => {
     listInspirations
       .mockResolvedValueOnce({

@@ -109,8 +109,12 @@ export function usePairingQr(active: boolean): PairingQrState {
     return () => clearInterval(timer)
   }, [active])
 
-  const expiresInSeconds =
-    offer !== null ? Math.max(0, Math.floor((Date.parse(offer.expiresAt) - now) / 1000)) : null
+  // expiresAt 来自 IPC（外部输入）：不可解析时给 null 而不是 NaN——NaN 既不是 null 也不是
+  // undefined，`?? 0` 兜不住，会直通 UI 渲染成 `NaN:NaN` 且让过期判据恒 false（永不自刷）。
+  const expiresAtMs = offer !== null ? Date.parse(offer.expiresAt) : Number.NaN
+  const expiresInSeconds = Number.isFinite(expiresAtMs)
+    ? Math.max(0, Math.floor((expiresAtMs - now) / 1000))
+    : null
 
   const copyContent = useCallback(async (): Promise<void> => {
     if (!offer) return
