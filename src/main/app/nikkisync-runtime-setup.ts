@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { diagLog } from '../utils/startup-diagnostic'
-import { electronLogger } from '../utils/logger'
+import { electronLogger, logger } from '../utils/logger'
 import { getForensicsRoot } from '../utils/forensics-dir'
 import { buildPackagingContext } from '../nikkisync/embedding-paths'
 import {
@@ -312,7 +312,8 @@ export function buildSessionOptions(input: {
         uid,
         sha256
       ),
-    // G3/G6：聚合诊断落盘缝。失败只 warn，不中断启动/扫描；不含路径/UID/原始异常。
+    // G3/G6：聚合诊断落盘缝。失败只 warn，不中断启动/扫描；
+    // P6（用户已批准）：不脱敏，路径/UID/sha256 等原始字段全量落盘。
     diagnosticsDir: input.diagnosticsDir,
     gameRootCacheFile: path.join(input.userDataDir, ...NIKKISYNC_GAME_ROOT_CACHE_SEGMENTS),
     onDiagnostic: (name: string, payload: unknown) => {
@@ -403,13 +404,19 @@ function settingsFrom(ctx: AppContext): NikkiSyncSettingsPort {
 /** N7：本进程装配出的 PC 端服务（供 stopNikkiSyncRuntime 收尾；未装配时为 undefined）。 */
 let pcCompanionServices: PcCompanionServicesLike | undefined
 
-/** 双通道日志：diag.log 本机存在静默失败历史，因此同步走 electron-log（阶段 1 既有口径）。 */
+/** 双通道日志：diag.log 本机存在静默失败历史，因此同步走 electron-log（阶段 1 既有口径）。
+ * P6：并入统一 logger（ring buffer + main-日期.log），按 level 映射；各通道独立 fail-open。 */
 function runtimeLog(level: 'info' | 'warn' | 'error', message: string): void {
   diagLog('NIKKISYNC', message)
   try {
     electronLogger[level](`[NIKKISYNC] ${message}`)
   } catch {
     // 日志通道不可用时仅依赖 diagLog，绝不影响启动链
+  }
+  try {
+    logger[level](`[NikkiSync] ${message}`)
+  } catch {
+    // 统一 logger 不可用时仍保留上面两条通道，绝不影响启动链
   }
 }
 

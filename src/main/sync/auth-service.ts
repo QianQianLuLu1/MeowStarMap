@@ -1,5 +1,6 @@
 import { createHash, createPublicKey, verify } from 'node:crypto'
 import type { SyncPairedDeviceRow } from '../database/sync-metadata-repository'
+import type { SyncLogger } from './identity-service'
 
 /**
  * 同步请求认证服务 — NikkiSync 协议 Ed25519 请求签名验证。
@@ -49,6 +50,8 @@ export interface AuthServiceDeps {
   getDevice: (deviceId: string) => SyncPairedDeviceRow | null
   /** last_seen 记录（SyncMetadataRepository.touchDevice）；失败不影响认证结果 */
   touchDevice?: (deviceId: string) => Promise<void> | void
+  /** P6：认证拒绝留痕（装配层接统一 logger）；缺省静默，异常不外抛 */
+  logger?: SyncLogger
 }
 
 export interface AuthServiceOptions {
@@ -113,6 +116,22 @@ export class AuthService {
   }
 
   async verifyRequest(input: AuthRequestInput): Promise<AuthResult> {
+    const result = await this.verifyRequestCore(input)
+    if (!result.ok) {
+      // P6：拒绝留痕（reason/deviceId/url 全量，用户已批准不脱敏）；fail-open 不影响认证结果
+      try {
+        this.deps.logger?.warn(
+          `[NikkiSync] auth rejected: reason=${result.reason} ` +
+            `deviceId=${pickHeader(input.headers, AUTH_HEADERS[0]) ?? 'unknown'} url=${input.url}`
+        )
+      } catch {
+        // 日志通道故障静默降级
+      }
+    }
+    return result
+  }
+
+  private async verifyRequestCore(input: AuthRequestInput): Promise<AuthResult> {
     const deviceId = pickHeader(input.headers, AUTH_HEADERS[0])
     const timestamp = pickHeader(input.headers, AUTH_HEADERS[1])
     const nonce = pickHeader(input.headers, AUTH_HEADERS[2])

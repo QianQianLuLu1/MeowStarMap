@@ -777,6 +777,19 @@ describe('DatabaseManager', () => {
       expect(manager.isMigrationApplied('non_existent')).toBe(false)
     })
 
+    it('P6：迁移执行留 [DB] migration from→to 痕（全新库 0→已应用最高版本）', async () => {
+      const infoSpy = vi.spyOn(logger, 'info')
+      await manager.initialize()
+      expect(infoSpy).toHaveBeenCalledWith(expect.stringMatching(/\[DB\] migration 0→[1-9]/))
+    })
+
+    it('P6：无待执行迁移时重复 initialize 不再留迁移痕', async () => {
+      await manager.initialize()
+      const infoSpy = vi.spyOn(logger, 'info')
+      await manager.initialize()
+      expect(infoSpy.mock.calls.some((c) => String(c[0]).includes('[DB] migration'))).toBe(false)
+    })
+
     it('初始化后 media_files 表已创建', async () => {
       await manager.initialize()
       // 通过 execute 间接验证表存在（不抛错即表存在）

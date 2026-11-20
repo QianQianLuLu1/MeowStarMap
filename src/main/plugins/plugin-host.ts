@@ -89,6 +89,14 @@ class PluginHost {
       try {
         logger.info(`[PluginHost] 插件系统已初始化，pluginsPath=${this.pluginsPath}`)
       } catch {}
+      // P6：逐个已加载插件留痕（名/版本/激活态/完整路径）；fail-open 不影响启动
+      try {
+        for (const p of this.getAllPlugins()) {
+          logger.info(
+            `[Plugin] 插件已加载 loaded name=${p.name} version=${p.version} active=${p.active} path=${path.join(this.pluginsPath, p.name)}`
+          )
+        }
+      } catch {}
       return true
     } catch (err) {
       // 初始化失败不阻塞应用启动，仅记录日志
@@ -245,8 +253,22 @@ class PluginHost {
     }
     try {
       const installed = (await this.pluginManager.installPlugins(specifiers, true)) as PePlugin[]
+      // P6：逐个新装插件留痕（名/版本/完整路径）；fail-open
+      try {
+        for (const p of installed) {
+          logger.info(
+            `[Plugin] 插件安装成功 installed name=${p.name} version=${p.version} path=${path.join(this.pluginsPath, p.name)}`
+          )
+        }
+      } catch {}
       return installed
     } catch (err) {
+      // P6：安装失败留痕（specifier 与错误全量）；fail-open，不改变向外抛错语义
+      try {
+        logger.error(
+          `[Plugin] 插件安装失败 specifiers=${specifiers.join(', ')} error=${err instanceof Error ? err.message : String(err)}`
+        )
+      } catch {}
       logStartupError('PluginHost.installPlugins', err)
       throw err
     }
@@ -282,7 +304,19 @@ class PluginHost {
     }
     try {
       plugin.setActive(active)
+      // P6：激活/停用结果留痕（名/目标状态/完整路径）；fail-open
+      try {
+        logger.info(
+          `[Plugin] 插件激活状态变更 name=${name} active=${active} path=${path.join(this.pluginsPath, name)}`
+        )
+      } catch {}
     } catch (err) {
+      // P6：激活失败留痕（名与错误全量）；fail-open，不改变向外抛错语义
+      try {
+        logger.error(
+          `[Plugin] 插件激活失败 name=${name} active=${active} error=${err instanceof Error ? err.message : String(err)}`
+        )
+      } catch {}
       logStartupError(`PluginHost.toggleActive(${name}, ${active})`, err)
       throw err
     }
@@ -323,6 +357,12 @@ class PluginHost {
   recordPluginError(name: string, error: unknown): void {
     const msg = error instanceof Error ? error.message : String(error)
     this.pluginErrors.set(name, msg)
+    // P6：单个插件加载失败留痕（名/路径/错误全量）；fail-open
+    try {
+      logger.error(
+        `[Plugin] 插件加载失败 name=${name} path=${path.join(this.pluginsPath, name)} error=${msg}`
+      )
+    } catch {}
   }
 
   /**

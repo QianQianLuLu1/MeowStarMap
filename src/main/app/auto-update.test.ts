@@ -37,7 +37,9 @@ const { appMock, autoUpdaterMock, listeners, sendToRendererMock, loggerMock } = 
     },
     checkForUpdates: vi.fn(async () => undefined),
     downloadUpdate: vi.fn(async () => undefined),
-    quitAndInstall: vi.fn()
+    quitAndInstall: vi.fn(),
+    // P6：生命周期日志需要 feed 信息；真实 AppUpdater 恒有该方法
+    getFeedURL: vi.fn(async () => 'https://updates.example.test/latest.yml')
   }
   return {
     listeners,
@@ -437,6 +439,68 @@ describe('事件透传与检查流程（回归锁：修复前后都应绿）', (
 
     mod.quitAndInstall()
 
+    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
+  })
+})
+
+describe('P6：更新生命周期日志（[Update]，含版本与 feed 信息）', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(listeners)) delete listeners[key]
+    sendToRendererMock.mockClear()
+    loggerMock.info.mockClear()
+    appMock.isPackaged = true
+    autoUpdaterMock.checkForUpdates.mockReset().mockResolvedValue(undefined)
+    autoUpdaterMock.quitAndInstall.mockReset()
+    delete process.env.MEOW_DEV_UPDATE_FEED
+  })
+
+  /** init 后等一个宏任务：getFeedURL 的异步回填完成 */
+  async function initAndSettleFeed() {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    await new Promise((r) => setTimeout(r, 0))
+    return mod
+  }
+
+  it('checking-for-update 事件留痕（含 feed 信息）', async () => {
+    await initAndSettleFeed()
+    emit('checking-for-update', undefined)
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      expect.stringContaining('[Update] checking-for-update')
+    )
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      expect.stringContaining('https://updates.example.test/latest.yml')
+    )
+  })
+
+  it('update-available 留痕含版本号与 feed', async () => {
+    await initAndSettleFeed()
+    emit('update-available', { version: '9.9.9', releaseNotes: null, releaseName: null })
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      expect.stringContaining('[Update] update-available version=9.9.9')
+    )
+  })
+
+  it('update-not-available 留痕含版本号', async () => {
+    await initAndSettleFeed()
+    emit('update-not-available', { version: '2.5.7-beta' })
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      expect.stringContaining('[Update] update-not-available version=2.5.7-beta')
+    )
+  })
+
+  it('update-downloaded 留痕含版本号', async () => {
+    await initAndSettleFeed()
+    emit('update-downloaded', { version: '9.9.9', releaseNotes: null, releaseName: null })
+    expect(loggerMock.info).toHaveBeenCalledWith(
+      expect.stringContaining('[Update] update-downloaded version=9.9.9')
+    )
+  })
+
+  it('quitAndInstall 留痕（安装并重启是生命周期终点，必须可诊断）', async () => {
+    const mod = await initAndSettleFeed()
+    mod.quitAndInstall()
+    expect(loggerMock.info).toHaveBeenCalledWith(expect.stringContaining('[Update] quitAndInstall'))
     expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
   })
 })

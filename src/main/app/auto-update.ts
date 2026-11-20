@@ -25,6 +25,18 @@ export type { UpdatePayload, UpdateStage }
 let ctxRef: AppContext | null = null
 let initialized = false
 
+// P6：feed 地址缓存，供生命周期日志携带（init 时异步回填；取不到保持 unknown）
+let feedUrlForLog = 'unknown'
+
+/** P6：生命周期留痕 fail-open——logger 故障不得影响更新状态机与事件分发 */
+function logUpdate(message: string): void {
+  try {
+    logger.info(message)
+  } catch {
+    // 静默降级
+  }
+}
+
 // F8：按「调用代」归属 error 事件，替代旧的模块级共享布尔。checkForUpdates / downloadUpdate
 // 并发交错时（download 在途又发起 check，反向同理），共享布尔会把 A 调用的 error 事件错记
 // 到 B 头上——B 失败时误判「已推过」而跳过兜底（渲染端停在 checking/downloading 无声收场），
@@ -73,7 +85,30 @@ export function initAutoUpdater(ctx: AppContext): void {
   autoUpdater.allowPrerelease = false
   autoUpdater.forceDevUpdateConfig = devFeedForced
 
+  // P6：缓存 feed 地址供生命周期日志（fail-open；取不到保持 unknown）。
+  // 真实 AppUpdater.getFeedURL() 为同步返回（string|null|undefined）；
+  // 同时容忍 Promise 形态返回（测试替身），统一收敛为字符串。
+  try {
+    const feed: unknown = autoUpdater.getFeedURL()
+    if (typeof feed === 'string') {
+      feedUrlForLog = feed
+    } else if (feed && typeof (feed as { then?: unknown }).then === 'function') {
+      void (feed as Promise<string | null | undefined>)
+        .then((url) => {
+          feedUrlForLog = url ?? 'default'
+        })
+        .catch(() => {})
+    }
+  } catch {
+    // fail-open：feed 信息只服务诊断，绝不影响初始化
+  }
+
+  autoUpdater.on('checking-for-update', () => {
+    logUpdate(`[Update] checking-for-update feed=${feedUrlForLog}`)
+  })
+
   autoUpdater.on('update-available', (info) => {
+    logUpdate(`[Update] update-available version=${info.version} feed=${feedUrlForLog}`)
     pushUpdate({
       stage: 'available',
       version: info.version,
@@ -83,6 +118,7 @@ export function initAutoUpdater(ctx: AppContext): void {
   })
 
   autoUpdater.on('update-not-available', (info) => {
+    logUpdate(`[Update] update-not-available version=${info.version} feed=${feedUrlForLog}`)
     pushUpdate({ stage: 'not-available', version: info.version })
   })
 
@@ -93,6 +129,7 @@ export function initAutoUpdater(ctx: AppContext): void {
   })
 
   autoUpdater.on('update-downloaded', (info) => {
+    logUpdate(`[Update] update-downloaded version=${info.version} feed=${feedUrlForLog}`)
     pushUpdate({
       stage: 'downloaded',
       version: info.version,
@@ -182,6 +219,8 @@ export async function downloadUpdate(): Promise<void> {
 
 /** 用户确认安装并重启后调用 */
 export function quitAndInstall(): void {
+  // P6：生命周期终点留痕（此后进程即退出，这条日志是「用户确认安装」的唯一证据）
+  logUpdate(`[Update] quitAndInstall (isSilent=false, forceRunAfter=true) feed=${feedUrlForLog}`)
   // isSilent=false 显示原生安装进度；isForceRunAfter=true 安装后自动重启
   autoUpdater.quitAndInstall(false, true)
 }

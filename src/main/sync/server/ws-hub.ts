@@ -49,8 +49,20 @@ function closeFrame(): Buffer {
 
 export class WebSocketHub {
   private readonly sockets = new Set<Duplex>()
+  private readonly logger: SyncLogger | undefined
 
-  constructor(_logger?: SyncLogger) {}
+  constructor(logger?: SyncLogger) {
+    this.logger = logger
+  }
+
+  /** P6：连接开闭留痕 fail-open——logger 缺席或抛错都不得影响 WS 主流程 */
+  private log(level: 'info' | 'warn', message: string): void {
+    try {
+      this.logger?.[level](message)
+    } catch {
+      // 日志通道故障静默降级
+    }
+  }
 
   get size(): number {
     return this.sockets.size
@@ -59,7 +71,13 @@ export class WebSocketHub {
   upgrade(req: IncomingMessage, socket: Duplex): boolean {
     const key = req.headers['sec-websocket-key']
     const version = req.headers['sec-websocket-version']
-    if (typeof key !== 'string' || version !== '13') return false
+    if (typeof key !== 'string' || version !== '13') {
+      this.log(
+        'warn',
+        `[NikkiSync] ws handshake rejected: missing key or bad version (remote=${this.remoteOf(socket)})`
+      )
+      return false
+    }
     const accept = createHash('sha1').update(`${key}${WS_GUID}`).digest('base64')
     socket.write(
       [
@@ -71,13 +89,26 @@ export class WebSocketHub {
       ].join('\r\n')
     )
     this.sockets.add(socket)
+    this.log(
+      'info',
+      `[NikkiSync] ws connection opened: remote=${this.remoteOf(socket)} total=${this.sockets.size}`
+    )
     const remove = () => {
-      this.sockets.delete(socket)
+      if (!this.sockets.delete(socket)) return
+      this.log(
+        'info',
+        `[NikkiSync] ws connection closed: remote=${this.remoteOf(socket)} total=${this.sockets.size}`
+      )
     }
     socket.on('close', remove)
     socket.on('error', remove)
     socket.on('data', (chunk: Buffer) => this.handleClientFrame(socket, chunk))
     return true
+  }
+
+  /** 远端地址（net.Socket 才有；测试桩/其他 Duplex 缺省时回 unknown） */
+  private remoteOf(socket: Duplex): string {
+    return (socket as Duplex & { remoteAddress?: string }).remoteAddress ?? 'unknown'
   }
 
   send(socket: Duplex, event: WsEvent): void {
@@ -93,6 +124,7 @@ export class WebSocketHub {
 
   /** 优雅关闭：全部客户端发 close 帧后结束连接（服务器停机路径） */
   close(): void {
+    const count = this.sockets.size
     for (const socket of this.sockets) {
       if (!socket.destroyed) {
         socket.write(closeFrame())
@@ -100,6 +132,9 @@ export class WebSocketHub {
       }
     }
     this.sockets.clear()
+    if (count > 0) {
+      this.log('info', `[NikkiSync] ws connections closed by server shutdown: count=${count}`)
+    }
   }
 
   private handleClientFrame(socket: Duplex, chunk: Buffer): void {

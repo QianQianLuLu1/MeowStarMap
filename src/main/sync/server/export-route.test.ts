@@ -594,4 +594,25 @@ describe('export route（/v1/assets/{id}/resources/{rid}/export）', () => {
     expect(state.status).toBe(409)
     expect(JSON.parse(state.text)).toMatchObject({ error: { code: 'resource_not_ready' } })
   })
+
+  it('P6：导出成功 info 留痕含 [NikkiSync]、资产/资源标识与导出 sha256', async () => {
+    vi.mocked(logger.info).mockClear()
+    const search = '?exif=true&rotation=0'
+    const state = await callExport(
+      createServices(fixturePath, jpeg),
+      'GET',
+      search,
+      signedHeaders('GET', `/v1/assets/1/resources/res_1_primary/export${search}`)
+    )
+    expect(state.status).toBe(200)
+    const line = vi
+      .mocked(logger.info)
+      .mock.calls.map((c) => String(c[0]))
+      .find((m) => m.includes('jpeg exported'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain('assetId=1')
+    expect(line).toContain('res_1_primary')
+    expect(line).toContain(String(state.headers['X-NikkiSync-SHA256']))
+  })
 })

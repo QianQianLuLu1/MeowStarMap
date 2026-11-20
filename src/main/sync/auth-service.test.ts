@@ -504,3 +504,59 @@ describe('AuthService — 时钟窗口不得被装配方放宽过 5 分钟', () 
     ).resolves.toMatchObject({ ok: true })
   })
 })
+
+// ============================================================================
+// P6：认证拒绝留痕（[NikkiSync]，经注入 logger；用户已批准不脱敏）
+// ============================================================================
+
+describe('P6：认证拒绝日志', () => {
+  function makeLoggedService(rows: Array<SyncPairedDeviceRow>) {
+    const logs = { info: [] as string[], warn: [] as string[] }
+    const devices = new Map(rows.map((row) => [row.device_id, row]))
+    const service = new AuthService(
+      {
+        getDevice: (id) => devices.get(id) ?? null,
+        logger: {
+          info: (message: string) => logs.info.push(message),
+          warn: (message: string) => logs.warn.push(message)
+        }
+      },
+      { now: () => NOW }
+    )
+    return { service, logs }
+  }
+
+  it('验签失败：warn 留痕含 [NikkiSync]、reason、deviceId 与请求 url', async () => {
+    const key = makeDeviceKeyPair()
+    const { service, logs } = makeLoggedService([makeDeviceRow(key.publicKeyPem)])
+    const result = await service.verifyRequest(
+      buildSignedRequest({ privateKeyPem: key.privateKeyPem, signature: 'forged-signature' })
+    )
+    expect(result.ok).toBe(false)
+    const line = logs.warn.find((m) => m.includes('auth rejected'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain('invalid_signature')
+    expect(line).toContain(DEVICE_ID)
+    expect(line).toContain('/v1/assets')
+  })
+
+  it('未知设备拒绝：warn 留痕含 unknown_device 与 deviceId', async () => {
+    const key = makeDeviceKeyPair()
+    const { service, logs } = makeLoggedService([])
+    await service.verifyRequest(buildSignedRequest({ privateKeyPem: key.privateKeyPem }))
+    const line = logs.warn.find((m) => m.includes('auth rejected'))
+    expect(line).toContain('unknown_device')
+    expect(line).toContain(DEVICE_ID)
+  })
+
+  it('合法请求：不产生拒绝留痕', async () => {
+    const key = makeDeviceKeyPair()
+    const { service, logs } = makeLoggedService([makeDeviceRow(key.publicKeyPem)])
+    const result = await service.verifyRequest(
+      buildSignedRequest({ privateKeyPem: key.privateKeyPem })
+    )
+    expect(result.ok).toBe(true)
+    expect(logs.warn).toHaveLength(0)
+  })
+})

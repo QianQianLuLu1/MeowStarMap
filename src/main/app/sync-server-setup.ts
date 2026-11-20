@@ -73,9 +73,22 @@ export async function initSyncServer(ctx: AppContext): Promise<SyncServerHandle>
   const workerBridge = ctx.dbManager.getWorkerBridge()
   const dbPath = ctx.dbManager.getDbPath()
 
+  // P6：统一 logger 适配器 fail-open——日志通道故障不得影响同步服务主流程
   const syncLogger: SyncLogger = {
-    info: (message) => logger.info(message),
-    warn: (message) => logger.warn(message)
+    info: (message) => {
+      try {
+        logger.info(message)
+      } catch {
+        // 静默降级
+      }
+    },
+    warn: (message) => {
+      try {
+        logger.warn(message)
+      } catch {
+        // 静默降级
+      }
+    }
   }
   const identity = new SyncIdentityService({
     directory: path.join(app.getPath('userData'), 'sync'),
@@ -87,9 +100,10 @@ export async function initSyncServer(ctx: AppContext): Promise<SyncServerHandle>
   const reads = new SyncReadRepository(db, workerBridge, dbPath)
   const auth = new AuthService({
     getDevice: (deviceId) => metadata.getPairedDevice(deviceId),
-    touchDevice: (deviceId) => metadata.touchDevice(deviceId)
+    touchDevice: (deviceId) => metadata.touchDevice(deviceId),
+    logger: syncLogger
   })
-  const pairing = new PairingService({ sessions, devices: metadata, identity })
+  const pairing = new PairingService({ sessions, devices: metadata, identity, logger: syncLogger })
 
   const services: SyncApiServices = {
     getServerInfo: () => reads.getServerInfo(),

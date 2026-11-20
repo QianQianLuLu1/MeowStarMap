@@ -353,3 +353,63 @@ describe('PairingService.redeemToken — 重复配对', () => {
     expect(row.revoked_at).toBeNull()
   })
 })
+
+// ============================================================================
+// P6：配对关键结果留痕（[NikkiSync]，经注入 logger；用户已批准不脱敏）
+// ============================================================================
+
+describe('P6：配对关键结果日志', () => {
+  function makeLoggedService() {
+    const logs = { info: [] as string[], warn: [] as string[] }
+    const sessions = new FakeSessionsRepo()
+    const devices = new FakeDevicesRepo()
+    const identity = makeIdentityStub()
+    const service = new PairingService({
+      sessions,
+      devices,
+      identity: identity.provider,
+      now: () => NOW,
+      logger: {
+        info: (message: string) => logs.info.push(message),
+        warn: (message: string) => logs.warn.push(message)
+      }
+    })
+    return { service, logs }
+  }
+
+  it('令牌生成：info 留痕含 [NikkiSync]、serverId 与过期时间', async () => {
+    const { service, logs } = makeLoggedService()
+    const offer = await service.createPairingToken()
+    const line = logs.info.find((m) => m.includes('pairing token created'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain(SERVER_ID)
+    expect(line).toContain(offer.expiresAt)
+  })
+
+  it('配对成功：info 留痕含 deviceId/deviceName/platform/serverId 全量标识', async () => {
+    const { service, logs } = makeLoggedService()
+    const offer = await service.createPairingToken()
+    const request = makePairRequest({}, offer.token)
+    await service.redeemToken(request)
+    const line = logs.info.find((m) => m.includes('pairing succeeded'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain(request.device.deviceId)
+    expect(line).toContain('Pixel Test')
+    expect(line).toContain('android')
+    expect(line).toContain(SERVER_ID)
+  })
+
+  it('配对失败（过期令牌）：warn 留痕含错误码与 deviceId', async () => {
+    const { service, logs } = makeLoggedService()
+    const offer = await service.createPairingToken({ ttlMs: -1000 })
+    const request = makePairRequest({}, offer.token)
+    await expectPairingError(service.redeemToken(request), 'pairing_expired')
+    const line = logs.warn.find((m) => m.includes('pairing failed'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain('pairing_expired')
+    expect(line).toContain(request.device.deviceId)
+  })
+})

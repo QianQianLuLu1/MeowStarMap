@@ -861,8 +861,18 @@ export class DatabaseManager {
 
     const backupPath = this.createPreMigrationBackup()
 
+    // P6：迁移前后各读一次已应用最高版本，仅在确有推进时留痕（诊断用，不参与迁移决策）
+    const fromVersion = this.readAppliedMigrationVersion()
     try {
       db.transaction(() => this.applyMigrations())()
+      const toVersion = this.readAppliedMigrationVersion()
+      if (toVersion !== fromVersion) {
+        try {
+          logger.info(`[DB] migration ${fromVersion}→${toVersion} (${this.dbPath})`)
+        } catch {
+          // 日志 fail-open：绝不影响迁移结果
+        }
+      }
     } catch (err) {
       await this.handleMigrationFailure(err, backupPath)
       // 向上抛出中断启动：迁移没成功就让 bootstrapApplication 弹错误页，
@@ -877,6 +887,21 @@ export class DatabaseManager {
 
   /** 已知的版本号迁移；任一未应用即视为"有待执行的迁移" */
   private static readonly KNOWN_MIGRATION_VERSIONS = [1, 2, 3]
+
+  /**
+   * P6：读已应用的最高迁移版本（纯诊断）。表/列缺失或查询失败一律回 0，
+   * fail-open——本方法只服务迁移留痕，绝不影响迁移决策与启动链。
+   */
+  private readAppliedMigrationVersion(): number {
+    if (!this.db) return 0
+    try {
+      const row = this.db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get() as
+        { v: number | null } | undefined
+      return typeof row?.v === 'number' ? row.v : 0
+    } catch {
+      return 0
+    }
+  }
 
   /**
    * 迁移前备份（VACUUM INTO 生成独立 .db 文件）。

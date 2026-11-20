@@ -81,6 +81,8 @@ import {
   SYNC_SERVER_DEFAULT_PORT
 } from '../../nikkisync/sync-server-view'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
+// P6：runtimeLog 必须并入统一 logger（ring buffer + main-日期.log），此处取 mock 断言
+import { logger } from '../../utils/logger'
 
 // 依赖以替身注入：本文件验证「装配 → 状态机」的接线（谁被调用、传什么参数），
 // 真装载链由 src/main/nikkisync/runtime-facade.linked.test.ts 在链接态覆盖。
@@ -317,6 +319,19 @@ describe('initNikkiSyncRuntime 接线（阶段2）', () => {
     expect(ctx.nikkisyncRuntime).toBe(managerDouble)
     expect(managerDouble.start).toHaveBeenCalledTimes(1)
     expect(managerDouble.startSyncServer).toHaveBeenCalledTimes(0)
+  })
+
+  it('P6：runtimeLog 并入统一 logger——info/warn 按级别映射且带 [NikkiSync] 前缀', async () => {
+    vi.mocked(logger.info).mockClear()
+    vi.mocked(logger.warn).mockClear()
+    const ctx = makeAppCtx()
+    await initNikkiSyncRuntime(ctx)
+    // 启动结果必须进 logger.info（ring buffer + main-日期.log），不再只走 diagLog/electron-log
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.stringContaining('[NikkiSync] embedded runtime start result')
+    )
+    // warn 级别同样映射（测试环境 recycle helper 未构建，必有一条 warn）
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('[NikkiSync]'))
   })
 
   it('env 强开：以 userData 库路径自启，并下传打包态上下文', async () => {

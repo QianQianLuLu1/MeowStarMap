@@ -91,9 +91,14 @@ export class SyncIdentityService {
     const existing = this.readTlsIdentity(certPath, keyPath)
     if (existing) return existing
     const identity = this.generateTlsIdentity(certPath, keyPath)
-    this.logger?.info(
-      `[sync] self-signed TLS certificate generated (fingerprint ${identity.fingerprintSha256})`
-    )
+    // P6：关键结果留痕带完整目录路径（用户已批准不脱敏；密钥材料仍不进日志）；fail-open
+    try {
+      this.logger?.info(
+        `[NikkiSync] self-signed TLS certificate generated (fingerprint ${identity.fingerprintSha256}, dir ${this.rootDirectory})`
+      )
+    } catch {
+      // 日志通道故障静默降级
+    }
     return identity
   }
 
@@ -179,7 +184,13 @@ export class SyncIdentityService {
     fs.mkdirSync(this.rootDirectory, { recursive: true })
     writePrivateKeyFile(keyPath, pair.privateKey)
     fs.writeFileSync(pubPath, pair.publicKey, 'utf8')
-    this.logger?.info('[sync] server Ed25519 identity keypair generated')
+    try {
+      this.logger?.info(
+        `[NikkiSync] server Ed25519 identity keypair generated (dir ${this.rootDirectory})`
+      )
+    } catch {
+      // 日志通道故障静默降级
+    }
     return { publicKeyPem: pair.publicKey, privateKeyPem: pair.privateKey }
   }
 

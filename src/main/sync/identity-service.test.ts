@@ -219,3 +219,38 @@ describe('SyncIdentityService.getTlsFingerprintSha256', () => {
     expect(service.getTlsFingerprintSha256()).toMatch(/^[0-9a-f]{64}$/)
   })
 })
+
+// ============================================================================
+// P6：身份生成关键结果留痕（[NikkiSync]，含完整目录路径；用户已批准不脱敏）
+// ============================================================================
+
+describe('P6：身份生成日志', () => {
+  it('TLS 身份生成：info 留痕含 [NikkiSync]、指纹与完整目录路径', () => {
+    const dir = makeDirectory()
+    const infos: string[] = []
+    const service = new SyncIdentityService({
+      directory: dir,
+      logger: { info: (message: string) => infos.push(message), warn: () => {} }
+    })
+    const identity = service.getOrCreateTlsIdentity()
+    const line = infos.find((m) => m.includes('TLS certificate generated'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain(identity.fingerprintSha256)
+    expect(line).toContain(path.resolve(dir))
+  })
+
+  it('服务器 Ed25519 身份生成：info 留痕含 [NikkiSync] 与完整目录路径', () => {
+    const dir = makeDirectory()
+    const infos: string[] = []
+    const service = new SyncIdentityService({
+      directory: dir,
+      logger: { info: (message: string) => infos.push(message), warn: () => {} }
+    })
+    service.getOrCreateServerIdentity()
+    const line = infos.find((m) => m.includes('Ed25519 identity keypair generated'))
+    expect(line).toBeDefined()
+    expect(line).toContain('[NikkiSync]')
+    expect(line).toContain(path.resolve(dir))
+  })
+})

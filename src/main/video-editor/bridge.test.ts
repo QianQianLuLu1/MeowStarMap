@@ -33,6 +33,7 @@ vi.mock('../utils/logger', () => ({
 }))
 
 import { VideoEditorBridge } from './bridge'
+import { logger } from '../utils/logger'
 import type { VideoEditTask } from './types'
 
 function createMockWorker(): UtilityProcess & {
@@ -128,5 +129,21 @@ describe('VideoEditorBridge 并发互斥（组16-1）', () => {
       payload: { success: true, message: 'ok', index: 0, outputPath: '/out/second.mp4' }
     })
     await expect(second).resolves.toBe('/out/second.mp4')
+  })
+
+  it('P6：worker 异常退出必须记录 workerCrash 故障（对齐 media-worker 既有模式）', async () => {
+    await startPendingEdit('/out/crash.mp4')
+    mockWorker.emit('exit', 1)
+    expect(logger.fault).toHaveBeenCalledWith(
+      'workerCrash',
+      expect.objectContaining({ message: expect.stringContaining('video-editor') }),
+      expect.objectContaining({ workerName: 'video-editor', exitCode: 1 })
+    )
+  })
+
+  it('P6：worker 正常退出（code=0）不记录 workerCrash', async () => {
+    await startPendingEdit('/out/normal.mp4')
+    mockWorker.emit('exit', 0)
+    expect(logger.fault).not.toHaveBeenCalled()
   })
 })

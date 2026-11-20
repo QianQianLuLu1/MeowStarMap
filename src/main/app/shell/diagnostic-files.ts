@@ -1,9 +1,10 @@
 /**
  * G6：上游 windows-app.ts 落盘的 5 个聚合诊断文件在本仓的等价实现。
  *
- * 只写聚合计数/阶段/白名单 code；绝不把本机绝对路径、UID、sha256、原始异常文本
- * 写进文件（交接文档明确要求诊断与分享时使用整理过的字段）。写入失败是
- * best-effort（不中断启动/扫描），但必须返回可判定的 `{ok:false}` 而不是静默吞掉。
+ * P6（用户已明确批准反转原脱敏契约）：诊断不脱敏——绝对路径、UID、sha256、
+ * 设备标识等全量原样写入，便于故障机诊断包直接定位问题；原 sanitizeAggregate
+ * 脱敏层已删除，调用点直传原始聚合数据。写入失败仍是 best-effort（不中断
+ * 启动/扫描），但必须返回可判定的 `{ok:false}` 而不是静默吞掉。
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -17,36 +18,6 @@ export const DIAGNOSTIC_FILE_NAMES = [
 ] as const
 
 export type DiagnosticFileName = (typeof DIAGNOSTIC_FILE_NAMES)[number]
-
-/** 敏感串判据：Windows/POSIX 绝对路径、纯数字 UID、64 位 hex 摘要。 */
-const SENSITIVE_STRING =
-  /(?:^[A-Za-z]:[\\/]|^\\\\|^\/(?:Users|home)\/|[\\/]Users[\\/]|^\d{6,20}$|^[a-fA-F0-9]{64}$)/
-
-function sanitizeValue(value: unknown, depth: number): unknown {
-  if (depth > 8) return undefined
-  if (typeof value === 'string') return SENSITIVE_STRING.test(value) ? undefined : value
-  if (typeof value === 'number' || typeof value === 'boolean' || value === null) return value
-  if (Array.isArray(value)) {
-    return value.map((item) => sanitizeValue(item, depth + 1)).filter((item) => item !== undefined)
-  }
-  if (typeof value === 'object') {
-    const out: Record<string, unknown> = {}
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      const clean = sanitizeValue(item, depth + 1)
-      if (clean !== undefined) out[key] = clean
-    }
-    return out
-  }
-  return undefined
-}
-
-/** 递归剔除敏感串，返回可直接 JSON 序列化的聚合对象。 */
-export function sanitizeAggregate(payload: unknown): Record<string, unknown> {
-  const clean = sanitizeValue(payload, 0)
-  return typeof clean === 'object' && clean !== null && !Array.isArray(clean)
-    ? (clean as Record<string, unknown>)
-    : {}
-}
 
 export interface DiagnosticWriteResult {
   readonly ok: boolean
@@ -82,9 +53,14 @@ export function writeAggregateDiagnostic(
   const target = path.join(dir, name)
   const temp = `${target}.tmp`
   try {
+    // P6：原始聚合数据直传（不脱敏）；非对象载荷收敛为空对象，保持文件形状稳定
+    const aggregate =
+      typeof payload === 'object' && payload !== null && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : {}
     const body = JSON.stringify({
       generatedAt: new Date().toISOString(),
-      ...sanitizeAggregate(payload)
+      ...aggregate
     })
     write(temp, name.endsWith('.log') ? `${body}\n` : body)
     rename(temp, target)

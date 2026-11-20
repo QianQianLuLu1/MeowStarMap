@@ -7,6 +7,7 @@ import {
   type PairingQrPayload
 } from '../../shared/sync/protocol'
 import type { UpsertPairDeviceInput } from '../database/sync-metadata-repository'
+import type { SyncLogger } from './identity-service'
 
 /**
  * 配对服务 — 一次性配对令牌的生成与兑换、设备公钥入库、配对二维码内容生成。
@@ -52,6 +53,8 @@ export interface PairingServiceDeps {
   ttlMs?: number
   /** 时钟注入（测试用）；默认 Date.now */
   now?: () => number
+  /** P6：关键结果留痕（装配层接统一 logger）；缺省静默，异常不外抛 */
+  logger?: SyncLogger
 }
 
 export interface PairingTokenOffer {
@@ -118,6 +121,15 @@ export class PairingService {
     this.now = deps.now ?? Date.now
   }
 
+  /** P6：诊断留痕 fail-open——logger 缺席或抛错都不得影响配对主流程 */
+  private log(level: 'info' | 'warn', message: string): void {
+    try {
+      this.deps.logger?.[level](message)
+    } catch {
+      // 日志通道故障静默降级
+    }
+  }
+
   /** 生成一次性配对令牌（返回原始令牌；仓储只存其 sha256） */
   async createPairingToken(options: { ttlMs?: number } = {}): Promise<PairingTokenOffer> {
     const ttlMs = options.ttlMs ?? this.ttlMs
@@ -125,6 +137,10 @@ export class PairingService {
     const expiresAt = new Date(this.now() + ttlMs).toISOString()
     const { serverId } = await this.deps.devices.ensureServerIdentity()
     await this.deps.sessions.createSession({ tokenHash: sha256Hex(token), serverId, expiresAt })
+    this.log(
+      'info',
+      `[NikkiSync] pairing token created: serverId=${serverId} expiresAt=${expiresAt} tokenHash=${sha256Hex(token)}`
+    )
     return { token, expiresAt, serverId }
   }
 
@@ -158,8 +174,29 @@ export class PairingService {
    * 兑换配对令牌：消费（一次性）→ 生成 deviceCredential → 设备公钥入库（UPSERT，
    * 重复配对换钥并清撤销态）→ 返回 PairResponse。
    * 参数校验先于令牌消费：bad_request 不占号。
+   * P6：成功/失败均留痕（设备/配对标识全量，用户已批准不脱敏；密钥材料仍不进日志）。
    */
   async redeemToken(request: PairRequest): Promise<PairResponse> {
+    try {
+      const response = await this.redeemTokenCore(request)
+      this.log(
+        'info',
+        `[NikkiSync] pairing succeeded: deviceId=${request.device.deviceId} ` +
+          `deviceName=${request.device.deviceName} platform=${request.device.platform} ` +
+          `serverId=${response.serverId}`
+      )
+      return response
+    } catch (error) {
+      this.log(
+        'warn',
+        `[NikkiSync] pairing failed: code=${error instanceof PairingError ? error.code : 'unexpected'} ` +
+          `deviceId=${request?.device?.deviceId ?? 'unknown'} error=${String(error)}`
+      )
+      throw error
+    }
+  }
+
+  private async redeemTokenCore(request: PairRequest): Promise<PairResponse> {
     assertNonEmpty(request?.pairingToken, 'pairingToken')
     const device = request.device
     if (!device) throw new PairingError('bad_request')

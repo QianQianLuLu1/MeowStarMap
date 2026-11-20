@@ -68,6 +68,15 @@ export function createApiRequestHandler(input: {
 }): ApiRequestHandler {
   const { services, config, logger } = input
 
+  /** P6：关键结果留痕 fail-open——logger 缺席或抛错都不得影响请求处理 */
+  const log = (level: 'info' | 'warn', message: string): void => {
+    try {
+      logger?.[level](message)
+    } catch {
+      // 日志通道故障静默降级
+    }
+  }
+
   async function verify(req: IncomingMessage, body?: Buffer): Promise<boolean> {
     const result = await services.verifyRequest({
       method: req.method ?? 'GET',
@@ -94,6 +103,7 @@ export function createApiRequestHandler(input: {
     if (method === 'PATCH' && metadataMatch) {
       const body = await readBody(req, config.maxJsonBodyBytes)
       if (!(await verify(req, body))) {
+        log('warn', `[NikkiSync] request unauthorized: PATCH ${req.url ?? '/'}`)
         writeJson(res, 401, apiErrorBody('unauthorized', AUTH_FAILURE_MESSAGE))
         return
       }
@@ -102,6 +112,7 @@ export function createApiRequestHandler(input: {
     }
 
     if (!(await verify(req))) {
+      log('warn', `[NikkiSync] request unauthorized: ${method} ${req.url ?? '/'}`)
       writeJson(res, 401, apiErrorBody('unauthorized', AUTH_FAILURE_MESSAGE))
       return
     }
@@ -353,6 +364,11 @@ export function createApiRequestHandler(input: {
       headers['Content-Range'] = `bytes ${range.start}-${range.end}/${size}`
       headers['Content-Length'] = range.end - range.start + 1
       res.writeHead(206, headers)
+      log(
+        'info',
+        `[NikkiSync] resource served: assetId=${assetId} resourceId=${resourceId} status=206 ` +
+          `bytes=${range.end - range.start + 1} path=${location.absolutePath}`
+      )
       if (isHead) {
         res.end()
         return
@@ -362,6 +378,11 @@ export function createApiRequestHandler(input: {
     }
     headers['Content-Length'] = size
     res.writeHead(200, headers)
+    log(
+      'info',
+      `[NikkiSync] resource served: assetId=${assetId} resourceId=${resourceId} status=200 ` +
+        `bytes=${size} path=${location.absolutePath}`
+    )
     if (isHead) {
       res.end()
       return
@@ -480,6 +501,11 @@ export function createApiRequestHandler(input: {
         maxExportSize
       )
       const exportedHash = createHash('sha256').update(output).digest('hex')
+      log(
+        'info',
+        `[NikkiSync] jpeg exported: assetId=${assetId} resourceId=${resourceId} ` +
+          `bytes=${output.length} sha256=${exportedHash} exif=${exif} rotation=${rotation}`
+      )
       res.writeHead(200, {
         'Content-Type': 'image/jpeg',
         'Content-Length': output.length,

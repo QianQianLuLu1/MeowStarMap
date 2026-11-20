@@ -1,4 +1,7 @@
 import { createHash, generateKeyPairSync, randomBytes, sign } from 'node:crypto'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
 import { AuthService } from '../auth-service'
@@ -531,3 +534,59 @@ function minimalAsset() {
     revision: 7
   }
 }
+
+// ============================================================================
+// P6：路由关键结果留痕（[NikkiSync]；用户已批准不脱敏，含完整路径）
+// ============================================================================
+
+describe('P6：路由关键结果日志', () => {
+  it('认证拒绝（401）：warn 留痕含 [NikkiSync] 与请求路径', async () => {
+    vi.mocked(logger.warn).mockClear()
+    const { res, state } = mockRes()
+    await call(createServices(), mockReq('GET', '/v1/assets'), res)
+    expect(state.status).toBe(401)
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('[NikkiSync]'))
+    expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('/v1/assets'))
+  })
+
+  it('资源传输（HEAD 200）：info 留痕含资产/资源标识、字节数与完整路径', async () => {
+    vi.mocked(logger.info).mockClear()
+    const dir = mkdtempSync(path.join(tmpdir(), 'wxnn-router-log-'))
+    try {
+      const file = path.join(dir, 'photo.jpg')
+      const bytes = Buffer.from('fake-jpeg-bytes-for-log')
+      writeFileSync(file, bytes)
+      const services = createServices({
+        getResourceLocation: async () => ({
+          resource: {
+            resourceId: 'res_1',
+            role: 'source_primary',
+            fileName: 'photo.jpg',
+            mimeType: 'image/jpeg',
+            fileExt: 'jpg',
+            sizeBytes: bytes.length,
+            sha256: createHash('sha256').update(bytes).digest('hex')
+          },
+          absolutePath: file
+        })
+      })
+      // HEAD 走与 GET 相同的响应头/日志路径，但不产生文件流（mock res 无 pipe 语义）
+      const url = '/v1/assets/42/resources/res_1'
+      const { res, state } = mockRes()
+      await call(services, mockReq('HEAD', url, signedHeaders('HEAD', url)), res)
+      expect(state.status).toBe(200)
+      const line = vi
+        .mocked(logger.info)
+        .mock.calls.map((c) => String(c[0]))
+        .find((m) => m.includes('resource served'))
+      expect(line).toBeDefined()
+      expect(line).toContain('[NikkiSync]')
+      expect(line).toContain('assetId=42')
+      expect(line).toContain('res_1')
+      expect(line).toContain(file)
+      expect(line).toContain(`bytes=${bytes.length}`)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})

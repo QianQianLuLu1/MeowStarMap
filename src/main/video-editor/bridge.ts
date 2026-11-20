@@ -225,6 +225,12 @@ export class VideoEditorBridge {
   private handleWorkerExit(code: number): void {
     if (code !== 0) {
       logger.error(t('main.videoEditor.log.abnormalExit', { code: String(code) }))
+      // P6：异常退出进故障记录（对齐 media-worker/bridge.ts 的 workerCrash 模式；
+      // utilityProcess 的 exit 事件只给 code，无 signal 可取）。logFault 内部 fail-open。
+      void logger.fault('workerCrash', new Error(`video-editor 异常退出 exit=${code}`), {
+        workerName: 'video-editor',
+        exitCode: code
+      })
     }
     // reject 所有 pending promise，避免主进程卡死
     const errorMsg = t('main.videoEditor.error.workerAbnormalExit')
