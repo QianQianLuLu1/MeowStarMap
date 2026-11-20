@@ -937,10 +937,11 @@
       "status": "open",
       "priority": "low",
       "title": "flaky 观测：test:ci-linux SyncServicePage 满载时序抖动；zip-archive ENOTEMPTY 既有偶发",
-      "description": "两条既有偶发红（2026-11-08 实录，均隔离复跑绿）：① `test:ci-linux` SyncServicePage.test.tsx 满载时序抖动（`docs/plans/2026-11-08-图标轮审查验证重打包-实施计划.md:139`）；② zip-archive.test.ts ENOTEMPTY 偶发（`docs/plans/2026-11-08-参考数据CDN图片合规接入-实施计划.md` §10，现场 `src/main/utils/zip-archive.test.ts`）。登记目的：偶发红需人工复判，不登记会被当成回归误修。修法：为两用例补重试/隔离策略或根因修复（临时目录清理时序）。撤销条件：连续若干轮无复现，或根因修复落位。",
+      "description": "两条既有偶发红（2026-11-08 实录，均隔离复跑绿）：① `test:ci-linux` SyncServicePage.test.tsx 满载时序抖动（`docs/plans/2026-11-08-图标轮审查验证重打包-实施计划.md:139`）；② zip-archive.test.ts ENOTEMPTY 偶发（`docs/plans/2026-11-08-参考数据CDN图片合规接入-实施计划.md` §10，现场 `src/main/utils/zip-archive.test.ts`）。登记目的：偶发红需人工复判，不登记会被当成回归误修。修法：为两用例补重试/隔离策略或根因修复（临时目录清理时序）。撤销条件：连续若干轮无复现，或根因修复落位。 2026-11-21 诊断日志体系完善轮新增观测：src/main/nikkisync/sync-server.linked.test.ts 的「syncStatus 初始未运行；startSyncServer 惰性建会话」在全量并发负载下两度 120s 超时、隔离复跑亦偶发一败（93s 档），随后连续两次隔离复跑 14/14 绿（55–60s）——链接态真实 HTTPS 服务启停的时序/端口敏感型 flaky，非确定性回归；本轮 P6 对该路径仅增 fail-open 日志。处置同前：隔离复跑甄别，不视为本轮修复项。",
       "files": [
         "src/renderer/pages/sync-gallery/SyncServicePage.test.tsx",
-        "src/main/utils/zip-archive.test.ts"
+        "src/main/utils/zip-archive.test.ts",
+        "src/main/nikkisync/sync-server.linked.test.ts"
       ],
       "lines": [],
       "issue": false
