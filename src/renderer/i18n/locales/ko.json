@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "영감 라이브러리",
-        "subtitle": "코디 영감을 수집·관리하며 필터와 공유 코드를 지원합니다"
+        "subtitle": "코디 영감을 수집·관리하며 필터와 공유 코드를 지원합니다",
+        "cardTitle": "코디 영감 라이브러리",
+        "cardDescription": "염색 코드, 코디 코드, 참고 이미지를 저장하세요. 휴대폰에서 오프라인으로 기록하고 연결 후 동기화할 수 있습니다."
       },
       "about": {
         "title": "정보",
@@ -4898,7 +4900,10 @@
         "newQr": "새 QR 코드 생성",
         "download": "Android APK 다운로드",
         "export": "진단 패키지 내보내기",
-        "exportNote": "연결 이상 시 진단 패키지를 내보내 피드백에 첨부하면 문제 해결에 도움이 됩니다"
+        "exportNote": "연결 이상 시 진단 패키지를 내보내 피드백에 첨부하면 문제 해결에 도움이 됩니다",
+        "stepInstall": "NikkiSync Android 패키지 다운로드 및 설치",
+        "stepPair": "앱으로 컴퓨터 페어링 코드 스캔",
+        "stepBrowse": "같은 Wi-Fi에서 원본 보기 및 저장"
       },
       "guide": {
         "title": "첫 사용 가이드",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "온라인 매개변수 해석은 기본적으로 꺼져 있습니다. 동기화 설정에서 켜고 공개 조항에 동의하세요.",
         "metadataStep3": "로컬 디코딩은 동기화 구성 요소에 내장되어 있어 추가 설치가 필요 없습니다.",
         "openScan": "스캔·해석 설정 확인"
+      },
+      "section": {
+        "title": "휴대폰 연결",
+        "networkHint": "컴퓨터와 휴대폰이 같은 Wi-Fi에 있어야 합니다"
+      },
+      "wechat": {
+        "title": "WeChat 미니프로그램",
+        "description": "WeChat으로 스캔하여 앨범을 보고 사진과 동영상을 저장합니다.",
+        "entrySummary": "처음이신가요? WeChat으로 미니프로그램 코드 스캔",
+        "entryAlt": "Momo Camera WeChat 미니프로그램 코드",
+        "entryHint": "먼저 WeChat으로 미니프로그램을 연 뒤 아래에서 생성된 컴퓨터 연결 코드를 스캔하세요. 다음에는 WeChat의 최근 사용 미니프로그램에서 열 수 있습니다.",
+        "platforms": "iPhone · Android",
+        "step1": "위 미니프로그램 코드를 WeChat으로 스캔",
+        "step2": "미니프로그램에서 스캔하여 컴퓨터 연결",
+        "step3": "사진을 골라 원본을 휴대폰에 저장",
+        "note": "사진과 동영상은 각각 저장 · 연결 코드 10분 유효"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "진단 패키지 내보내기",
       "exportCanceled": "내보내기 취소됨",
       "exported": "진단 패키지 내보냄: {{path}}",
-      "exportFailed": "진단 패키지 내보내기 실패"
+      "exportFailed": "진단 패키지 내보내기 실패",
+      "recoveryHint": "동기화 서비스가 중지되었습니다. 데이터와 페어링 기록은 유지됩니다. 계속하려면 서비스를 다시 시작하세요."
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "주요 탐색",
+      "footerCompat": "Windows 클라이언트 · 미니프로그램 및 앱 지원",
+      "footerDisclaimer": "인피니티 니키 · 비공식 촬영 도우미"
+    },
+    "status": {
+      "running": "동기화 서비스 실행 중",
+      "stopped": "동기화 서비스 중지됨",
+      "unavailable": "동기화 구성 요소 사용 불가"
     }
   }
 }

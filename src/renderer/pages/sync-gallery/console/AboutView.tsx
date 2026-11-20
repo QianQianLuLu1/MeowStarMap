@@ -1,13 +1,12 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, SettingsCard, SettingsRow } from '../../settings/shared'
+import { ConsoleRow, ConsoleSection } from './console-ui'
 import { useGlobalToast } from '../../../components/common/ToastProvider'
 import { useErrorToast } from '../../../hooks/useErrorToast'
 import {
   NIKKISYNC_ALIGNED_VERSION,
   NIKKISYNC_ALIGNED_COMMIT
 } from '../../../../shared/nikkisync-version'
-import { CONSOLE_HEADING_KEYS } from './console-views'
 import {
   UPSTREAM_ANDROID_APK_URL,
   UPSTREAM_QUARK_URL,
@@ -75,49 +74,47 @@ export const AboutView: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
-      <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-        {t(CONSOLE_HEADING_KEYS.about.title)}
-      </h3>
-
+    <div className="sc-about">
       {/* 版本卡：宿主版本 + 上游对齐版本/提交双版本口径（与底栏同源常量） */}
-      <SectionShell title={t('syncConsole.about.version.title')}>
-        <SettingsCard>
-          <div className="space-y-2">
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              {t('syncConsole.about.version.tagline')}
-            </p>
-            <SettingsRow
-              label={t('syncConsole.about.version.host')}
-              description={hostVersion ?? '—'}
-            />
-            <SettingsRow
-              label={t('syncConsole.about.version.aligned')}
-              description={NIKKISYNC_ALIGNED_VERSION}
-            />
-            <SettingsRow
-              label={t('syncConsole.about.version.commit')}
-              description={NIKKISYNC_ALIGNED_COMMIT}
-            />
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.about.version.author')}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.about.version.attribution')}
-            </p>
-          </div>
-        </SettingsCard>
-      </SectionShell>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.about.version.title')}>
+        {/* tagline 与脚注直接挂在卡片体（grid gap 负责节奏）；服务行整组独占一块，
+            这样组内首行命中 `:first-child`，不再多出一条贴住 tagline 的分割线 */}
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          {t('syncConsole.about.version.tagline')}
+        </p>
+        <div className="sc-service-rows">
+          <ConsoleRow
+            label={t('syncConsole.about.version.host')}
+            description={hostVersion ?? '—'}
+          />
+          <ConsoleRow
+            label={t('syncConsole.about.version.aligned')}
+            description={NIKKISYNC_ALIGNED_VERSION}
+          />
+          <ConsoleRow
+            label={t('syncConsole.about.version.commit')}
+            description={NIKKISYNC_ALIGNED_COMMIT}
+          />
+        </div>
+        <div>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncConsole.about.version.author')}
+          </p>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncConsole.about.version.attribution')}
+          </p>
+        </div>
+      </ConsoleSection>
 
       {/* 下载与更新：四渠道外链逐字上游；检查更新走宿主通道 */}
-      <SectionShell title={t('syncConsole.about.download.title')}>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.about.download.title')}>
         <div className="space-y-2">
           <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
             {t('syncConsole.about.download.networkHint')}
           </p>
           {DOWNLOAD_CHANNELS.map((channel) => (
-            <SettingsCard key={channel.key}>
-              <SettingsRow
+            <div className="sc-service-rows" key={channel.key}>
+              <ConsoleRow
                 label={t(`syncConsole.about.download.${channel.key}`)}
                 description={t(`syncConsole.about.download.${channel.key}Note`)}
               >
@@ -128,8 +125,8 @@ export const AboutView: React.FC = () => {
                 >
                   {t(`syncConsole.about.download.${channel.key}`)}
                 </button>
-              </SettingsRow>
-            </SettingsCard>
+              </ConsoleRow>
+            </div>
           ))}
           <div className="flex items-center gap-2">
             <button
@@ -146,13 +143,13 @@ export const AboutView: React.FC = () => {
             </p>
           </div>
         </div>
-      </SectionShell>
+      </ConsoleSection>
 
       {/* 诊断与反馈：导出走既有 log:exportZip；support-submit 未装载 ⇒ 诚实置灰 */}
-      <SectionShell title={t('syncConsole.about.feedback.title')}>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.about.feedback.title')}>
         <div className="space-y-2">
-          <SettingsCard>
-            <SettingsRow
+          <div className="sc-service-rows">
+            <ConsoleRow
               label={t('syncConsole.statusBar.export')}
               description={t('syncConsole.about.feedback.exportNote')}
             >
@@ -164,27 +161,27 @@ export const AboutView: React.FC = () => {
               >
                 {t('syncConsole.statusBar.export')}
               </button>
-            </SettingsRow>
-          </SettingsCard>
-          <SettingsCard>
-            <SettingsRow
+            </ConsoleRow>
+          </div>
+          <div className="sc-service-rows">
+            <ConsoleRow
               label={t('syncConsole.about.feedback.support')}
               description={t('syncConsole.about.feedback.supportNote')}
             >
               <button type="button" className="btn-secondary text-xs" disabled>
                 {t('syncConsole.about.feedback.support')}
               </button>
-            </SettingsRow>
-          </SettingsCard>
+            </ConsoleRow>
+          </div>
         </div>
-      </SectionShell>
+      </ConsoleSection>
 
       {/* 项目仓库与来源：五链（上游六链减去已失效旧址，理由见 upstream-links.ts） */}
-      <SectionShell title={t('syncConsole.about.repos.title')}>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.about.repos.title')}>
         <div className="space-y-2">
           {UPSTREAM_REPO_LINKS.map((repo) => (
-            <SettingsCard key={repo.key}>
-              <SettingsRow
+            <div className="sc-service-rows" key={repo.key}>
+              <ConsoleRow
                 label={t(`syncConsole.about.repos.${repo.key}`)}
                 description={
                   repo.key === 'momo' ? repo.url : t(`syncConsole.about.repos.${repo.key}Note`)
@@ -197,11 +194,11 @@ export const AboutView: React.FC = () => {
                 >
                   {t(`syncConsole.about.repos.${repo.key}`)}
                 </button>
-              </SettingsRow>
-            </SettingsCard>
+              </ConsoleRow>
+            </div>
           ))}
         </div>
-      </SectionShell>
+      </ConsoleSection>
     </div>
   )
 }

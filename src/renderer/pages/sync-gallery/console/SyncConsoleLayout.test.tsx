@@ -15,6 +15,7 @@ import {
   installElectronApi,
   makeOrganizerItem,
   makeOrganizerView,
+  makeStatus,
   serverApi
 } from './sync-console-test-utils'
 import { useUIStore } from '../../../stores/uiStore'
@@ -35,9 +36,9 @@ afterEach(() => {
 })
 
 describe('T1：五视图骨架与切换', () => {
-  it('(q 随迁) 页面级 h2 钉住「同步服务」；左侧子导航五项齐备，默认停在连接视图', async () => {
+  it('(q 随迁) 页面级 h2 随视图切换；左侧子导航五项齐备，默认停在连接视图', async () => {
     renderLayout()
-    expect(await screen.findByRole('heading', { level: 2, name: '同步服务' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '暖暖相册' })).toBeInTheDocument()
     for (const [id, label] of [
       ['connect', '手机连接'],
       ['settings', '同步设置'],
@@ -48,58 +49,110 @@ describe('T1：五视图骨架与切换', () => {
       expect(screen.getByTestId(`sync-console-nav-${id}`)).toHaveTextContent(label)
     }
     expect(screen.getByTestId('sync-console-nav-connect')).toHaveAttribute('aria-current', 'page')
-    expect(screen.getByRole('heading', { level: 3, name: '暖暖相册' })).toBeInTheDocument()
     // 底栏在场（T11）
     expect(screen.getByTestId('sync-status-bar')).toBeInTheDocument()
   })
 
   it('五视图逐一切换：目标视图 hero 在场，切走的视图卸载（内容不残留）', async () => {
     renderLayout()
-    await screen.findByRole('heading', { level: 3, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
 
     fireEvent.click(screen.getByTestId('sync-console-nav-settings'))
-    expect(await screen.findByRole('heading', { level: 3, name: '同步设置' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 3, name: '暖暖相册' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '同步设置' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: '暖暖相册' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('sync-console-nav-organizer'))
-    expect(await screen.findByRole('heading', { level: 3, name: '最近删除' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '最近删除' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('sync-console-nav-inspiration'))
-    expect(await screen.findByRole('heading', { level: 3, name: '灵感库' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '灵感库' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('sync-console-nav-about'))
-    expect(await screen.findByRole('heading', { level: 3, name: '关于' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '关于' })).toBeInTheDocument()
     expect(screen.getByTestId('sync-console-nav-about')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sync-console-nav-connect')).not.toHaveAttribute('aria-current')
   })
 
+  it('页头 chip 三态：运行中/已停止/未就绪，文案与 data-state 同源', async () => {
+    const first = renderLayout()
+    const chip = await screen.findByTestId('sync-console-status-chip')
+    await waitFor(() => expect(chip).toHaveAttribute('data-state', 'ready'))
+    expect(chip).toHaveTextContent('同步服务运行中')
+    first.unmount()
+
+    installElectronApi({ status: makeStatus({ running: false }) })
+    const stopped = renderLayout()
+    const stoppedChip = await screen.findByTestId('sync-console-status-chip')
+    await waitFor(() => expect(stoppedChip).toHaveAttribute('data-state', 'offline'))
+    expect(stoppedChip).toHaveTextContent('同步服务已停止')
+    stopped.unmount()
+
+    installElectronApi({ status: { available: false, running: false } })
+    renderLayout()
+    const unavailableChip = await screen.findByTestId('sync-console-status-chip')
+    await waitFor(() => expect(unavailableChip).toHaveAttribute('data-state', 'unavailable'))
+    expect(unavailableChip).toHaveTextContent('同步组件未就绪')
+  })
+
+  it('状态通道缺席 / 返回 null ⇒ chip 未就绪，不臆造运行中', async () => {
+    installElectronApi({ omitMethods: ['getServerStatus'] })
+    const missing = renderLayout()
+    const missingChip = await screen.findByTestId('sync-console-status-chip')
+    await waitFor(() => expect(missingChip).toHaveAttribute('data-state', 'unavailable'))
+    expect(missingChip).toHaveTextContent('同步组件未就绪')
+    missing.unmount()
+
+    installElectronApi()
+    serverApi.getServerStatus.mockResolvedValue(null)
+    renderLayout()
+    const nullChip = await screen.findByTestId('sync-console-status-chip')
+    await waitFor(() => expect(nullChip).toHaveAttribute('data-state', 'unavailable'))
+  })
+
+  it('品牌图加载失败 ⇒ 回退内置相机图标，不留破图', async () => {
+    renderLayout()
+    const image = await screen.findByTestId('sync-console-brand-image')
+    fireEvent.error(image)
+    expect(screen.queryByTestId('sync-console-brand-image')).toBeNull()
+    expect(document.querySelector('.sc-brand-fallback svg')).not.toBeNull()
+  })
+
+  it('品牌图与五项导航图标挂载（图片/图标缺失不阻塞导航）', async () => {
+    renderLayout()
+    expect(await screen.findByTestId('sync-console-status-chip')).toBeInTheDocument()
+    expect(screen.getByTestId('sync-console-brand-image')).toBeInTheDocument()
+    for (const id of ['connect', 'settings', 'organizer', 'inspiration', 'about']) {
+      expect(screen.getByTestId(`sync-console-nav-${id}`).querySelector('svg')).not.toBeNull()
+    }
+  })
+
   it('子视图持久化：切换落盘 syncConsole.view；重挂载恢复上次停留位', async () => {
     const { unmount } = renderLayout()
-    await screen.findByRole('heading', { level: 3, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
     fireEvent.click(screen.getByTestId('sync-console-nav-about'))
-    await screen.findByRole('heading', { level: 3, name: '关于' })
+    await screen.findByRole('heading', { level: 2, name: '关于' })
     expect(window.localStorage.getItem('syncConsole.view')).toBe('about')
     unmount()
 
     renderLayout()
-    expect(await screen.findByRole('heading', { level: 3, name: '关于' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 3, name: '暖暖相册' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '关于' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 2, name: '暖暖相册' })).not.toBeInTheDocument()
   })
 
   it('持久化值非法/缺席 ⇒ 回默认连接视图（不臆造视图态）', async () => {
     window.localStorage.setItem('syncConsole.view', 'bogus-view')
     renderLayout()
-    expect(await screen.findByRole('heading', { level: 3, name: '暖暖相册' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: '暖暖相册' })).toBeInTheDocument()
   })
 
   it('返回不丢栈：子视图切换不动宿主 viewStack；goBack 弹的是宿主视图栈', async () => {
     useUIStore.setState({ currentView: 'sync-service', viewStack: ['gallery', 'sync-service'] })
     renderLayout()
-    await screen.findByRole('heading', { level: 3, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
     fireEvent.click(screen.getByTestId('sync-console-nav-settings'))
-    await screen.findByRole('heading', { level: 3, name: '同步设置' })
+    await screen.findByRole('heading', { level: 2, name: '同步设置' })
     fireEvent.click(screen.getByTestId('sync-console-nav-organizer'))
-    await screen.findByRole('heading', { level: 3, name: '最近删除' })
+    await screen.findByRole('heading', { level: 2, name: '最近删除' })
     // 宿主路由栈原封不动（子视图是控制台内部态，不新增 ViewLevel）
     expect(useUIStore.getState().viewStack).toEqual(['gallery', 'sync-service'])
     expect(useUIStore.getState().currentView).toBe('sync-service')
@@ -236,7 +289,7 @@ describe('T10：待批角标（Layout 自持 5s 轮询）', () => {
 describe('T11：底栏重启 ⇒ 连接视图重挂载', () => {
   it('重启成功后连接视图即时重读状态（refreshTick 重挂载）', async () => {
     renderLayout()
-    await screen.findByRole('heading', { level: 3, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
     await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalled())
     const before = serverApi.getServerStatus.mock.calls.length
     fireEvent.click(screen.getByTestId('sync-status-restart'))

@@ -4795,6 +4795,19 @@
     }
   },
   "syncConsole": {
+    "shell": {
+      "brandName": "大喵相机助手",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "大喵相机助手",
+      "navAria": "同步控制台导航",
+      "footerCompat": "Windows 客户端 · 兼容小程序和 APP",
+      "footerDisclaimer": "无限暖暖 · 非官方摄影助手"
+    },
+    "status": {
+      "running": "同步服务运行中",
+      "stopped": "同步服务已停止",
+      "unavailable": "同步组件未就绪"
+    },
     "nav": {
       "connect": "手机连接",
       "settings": "同步设置",
@@ -4817,7 +4830,9 @@
       },
       "inspiration": {
         "title": "灵感库",
-        "subtitle": "收集与管理搭配灵感，支持筛选与分享码"
+        "subtitle": "收集与管理搭配灵感，支持筛选与分享码",
+        "cardTitle": "穿搭灵感库",
+        "cardDescription": "收藏染色码、搭配码和参考图。手机离线时可先记录，连接后同步。"
       },
       "about": {
         "title": "关于",
@@ -4832,13 +4847,20 @@
         "caption": "数据来自同步库观测，随扫描与配对实时更新",
         "unavailable": "资产总览不可用（同步组件未就绪或通道失败）"
       },
+      "section": {
+        "title": "连接到手机",
+        "networkHint": "电脑和手机需连接同一 Wi-Fi"
+      },
       "firstRun": {
         "hint": "首次配对：用 NikkiSync 移动端扫描下方二维码"
       },
       "android": {
-        "title": "Android 客户端",
-        "description": "在手机上安装 NikkiSync Android 端，扫码即可配对同步",
-        "paired": "已有配对设备",
+        "title": "Android App",
+        "description": "缓存照片，离线整理，查看穿搭与拍摄参数。",
+        "stepInstall": "下载并安装 NikkiSync Android 安装包",
+        "stepPair": "用 App 扫描电脑端配对码",
+        "stepBrowse": "在同一 Wi-Fi 下浏览与保存原图",
+        "paired": "设备已配对",
         "pairedHint": "换机或重装后可重新生成二维码配对",
         "newQrNote": "服务运行中可随时生成新的配对二维码（5 分钟内有效）",
         "newQr": "生成新二维码",
@@ -4860,7 +4882,19 @@
         "openNetwork": "前往网络权限",
         "openScan": "前往扫描与解析设置"
       },
-      "privacyNote": "照片与参数仅在本机与已配对设备之间的局域网内传输，不经过云端；在线参数解析为可选功能，开启前会单独征求同意。",
+      "privacyNote": "照片与参数仅在本机与已配对设备间经局域网传输，不经过云端；在线参数解析为可选功能，开启前会单独征求同意。",
+      "wechat": {
+        "title": "微信小程序",
+        "description": "微信扫码，浏览相册，保存照片与视频。",
+        "entrySummary": "首次使用？微信扫码打开小程序",
+        "entryAlt": "大喵相机助手微信小程序码",
+        "entryHint": "先用微信扫一扫打开小程序，再扫描下方按钮生成的电脑连接码。下次可从微信「最近使用的小程序」进入。",
+        "platforms": "iPhone · Android",
+        "step1": "用微信扫描上方小程序码",
+        "step2": "在小程序内扫码连接电脑",
+        "step3": "挑选照片，保存原图到手机",
+        "note": "照片与视频分别保存 · 连接码 10 分钟内有效"
+      },
       "selfCheck": {
         "title": "连接自查",
         "connectionTitle": "手机连不上？",
@@ -5017,6 +5051,7 @@
       "aligned": "上游对齐",
       "restart": "重启同步服务",
       "export": "导出诊断包",
+      "recoveryHint": "服务恢复入口始终在此，无需切换页面",
       "exportCanceled": "已取消导出",
       "exported": "诊断包已导出：{{path}}",
       "exportFailed": "导出诊断包失败"

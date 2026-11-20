@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, SettingsToggle, SettingsCard, SettingsRow } from '../../settings/shared'
+import { SettingsToggle } from '../../settings/shared'
+import { ConsoleRow, ConsoleSection } from './console-ui'
 import { useGlobalToast } from '../../../components/common/ToastProvider'
 import { ConfirmDialog } from '../../../components/common/ConfirmDialog'
 import { EmptyState } from '../../../components/common/EmptyState'
@@ -10,7 +11,6 @@ import type {
   NikkiSyncOrganizerItemInfo,
   NikkiSyncOrganizerViewInfo
 } from '../../../../shared/types/electron-api'
-import { CONSOLE_HEADING_KEYS } from './console-views'
 import { ORGANIZER_STATE_I18N_KEYS, ORGANIZER_ACTIONABLE_STATES } from './organizer-states'
 
 // 状态轮询间隔（上游 pc-companion DesktopPageScript 同款 2s）
@@ -42,6 +42,14 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
   const { t } = useTranslation()
   const showMessage = useGlobalToast()
   const { showError } = useErrorToast()
+  /** 卸载后作废在途轮询：切走视图即卸载，慢响应不得回写已卸载组件。 */
+  const aliveRef = useRef(true)
+  useEffect(
+    () => () => {
+      aliveRef.current = false
+    },
+    []
+  )
   // K8：整理队列（破坏性能力，开关默认关）。null = 未拉到/不可用 ⇒ 队列区显示不可用而非报错
   const [organizerEnabled, setOrganizerEnabled] = useState(false)
   const [organizerQueue, setOrganizerQueue] = useState<NikkiSyncOrganizerViewInfo | null>(null)
@@ -82,9 +90,11 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
   const refreshOrganizerQueue = useCallback(async (): Promise<void> => {
     try {
       const next = await window.electronAPI?.nikkisync.getOrganizerQueue()
+      if (!aliveRef.current) return
       setOrganizerQueue(next ?? null)
       setOrganizerUnavailable(false)
     } catch {
+      if (!aliveRef.current) return
       setOrganizerQueue(null)
       setOrganizerUnavailable(true)
     }
@@ -174,13 +184,18 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
   // 外部行的防御式收敛：items 缺失（契约破坏/老主进程）按空队列处理，与
   // SyncConsoleLayout 的 `queue?.items ?? []` 同口径，不在渲染期抛错。
   const queueItems = organizerQueue?.items ?? []
+  /** 批量批准覆盖的文件总数（约定 §4：JSX 内不做数据变换，抽成 useMemo）。 */
+  const batchApproveCount = useMemo(
+    () =>
+      (organizerQueue?.items ?? [])
+        .filter((item) => ORGANIZER_ACTIONABLE_STATES.has(item.state) && item.online)
+        .reduce((sum, item) => sum + item.count, 0),
+    [organizerQueue]
+  )
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {t(CONSOLE_HEADING_KEYS.organizer.title)}
-        </h3>
+    <div className="sc-organizer">
+      <div className="flex items-center justify-end gap-3">
         {/* T10：宿主回收站入口（最近删除的最终去向，深链压栈可返回） */}
         <button
           type="button"
@@ -192,7 +207,7 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
       </div>
 
       {/* K8：整理队列（批量删除；破坏性能力默认关，开关门由主进程三通道强制） */}
-      <SectionShell title={t('syncService.organizer.title')}>
+      <ConsoleSection titleAs="h2" title={t('syncService.organizer.title')}>
         <div className="space-y-2">
           <SettingsToggle
             label={t('syncService.organizer.toggle')}
@@ -229,8 +244,8 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
                     // 已知 11 态走 i18n 映射；未知状态回退原样英文短码（不谎报，K1 同款口径）
                     const stateKey = ORGANIZER_STATE_I18N_KEYS[item.state]
                     return (
-                      <SettingsCard key={item.id}>
-                        <SettingsRow
+                      <div className="sc-service-rows" key={item.id}>
+                        <ConsoleRow
                           label={stateKey ? t(stateKey) : item.state}
                           description={`${t('syncService.organizer.filesCount', {
                             count: item.count
@@ -260,8 +275,8 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
                               </button>
                             </div>
                           )}
-                        </SettingsRow>
-                      </SettingsCard>
+                        </ConsoleRow>
+                      </div>
                     )
                   })}
                   <div className="flex justify-end">
@@ -284,7 +299,7 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
             </>
           )}
         </div>
-      </SectionShell>
+      </ConsoleSection>
 
       {/* K8：破坏性确认弹窗——列明将移入 Windows 回收站的文件总数与去向，取消可退；
           未确认绝不发起 decide/approveMany（由 approveTarget 是否为 null 把关）。 */}
@@ -292,12 +307,7 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
         open={approveTarget !== null}
         title={t('syncService.organizer.confirmTitle')}
         message={t('syncService.organizer.confirmBody', {
-          count:
-            approveTarget?.mode === 'single'
-              ? approveTarget.item.count
-              : (organizerQueue?.items ?? [])
-                  .filter((item) => ORGANIZER_ACTIONABLE_STATES.has(item.state) && item.online)
-                  .reduce((sum, item) => sum + item.count, 0)
+          count: approveTarget?.mode === 'single' ? approveTarget.item.count : batchApproveCount
         })}
         confirmText={t('syncService.organizer.confirmAction')}
         cancelText={t('syncService.organizer.cancel')}

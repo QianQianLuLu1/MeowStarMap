@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 // 复用设置页的展示原语（与迁出前 SyncServicePage 同款跨目录引用，见其原注释）。
-import { SectionShell, SettingsToggle, SettingsCard, SettingsRow } from '../../settings/shared'
+import { SettingsToggle } from '../../settings/shared'
 import { useGlobalToast } from '../../../components/common/ToastProvider'
 import { EmptyState } from '../../../components/common/EmptyState'
 import { Tooltip } from '../../../components/common/Tooltip'
@@ -18,9 +18,9 @@ import type {
   NikkiSyncServerStatusInfo,
   NikkiSyncSyncAccountsInfo
 } from '../../../../shared/types/electron-api'
-import { CONSOLE_HEADING_KEYS } from './console-views'
 import { NetworkPermissionCard } from './NetworkPermissionCard'
 import { HotspotCard } from './HotspotCard'
+import { ConsoleRow, ConsoleSection } from './console-ui'
 import { openUpstreamLink } from './export-diagnostics'
 
 // 阶段 3：服务开关隐含 Runtime 开关（切数据源时也要落 Runtime，见 handleGallerySourceToggle）
@@ -63,6 +63,14 @@ export const SettingsView: React.FC = () => {
   const { t } = useTranslation()
   const showMessage = useGlobalToast()
   const { showError } = useErrorToast()
+  /** 卸载后作废在途拉取：切走子视图即卸载，慢响应不得回写已卸载组件。 */
+  const aliveRef = useRef(true)
+  useEffect(
+    () => () => {
+      aliveRef.current = false
+    },
+    []
+  )
   const [gallerySource, setGallerySource] = useState<'local' | 'nikkisync'>('local')
   // 阶段 6：上游远端元数据解析开关（默认关——为真即产生对第三方的出站请求）
   const [metadataEnabled, setMetadataEnabled] = useState(false)
@@ -402,9 +410,9 @@ export const SettingsView: React.FC = () => {
   const refreshExtraDirs = useCallback(async (): Promise<void> => {
     try {
       const next = await window.electronAPI?.nikkisync.getExtraDirectories()
-      setExtraDirs(next ?? null)
+      if (aliveRef.current) setExtraDirs(next ?? null)
     } catch {
-      setExtraDirs(null)
+      if (aliveRef.current) setExtraDirs(null)
     }
   }, [])
 
@@ -421,12 +429,13 @@ export const SettingsView: React.FC = () => {
     try {
       const next = await window.electronAPI?.nikkisync.getSyncAccounts()
       if (!next) return false
+      if (!aliveRef.current) return false
       setSyncAccounts(next)
       setAllAccounts(next.all)
       setSelectedAccounts(next.accounts.filter((account) => account.selected).map((a) => a.uid))
       return true
     } catch {
-      setSyncAccounts(null)
+      if (aliveRef.current) setSyncAccounts(null)
       return false
     }
   }, [])
@@ -752,35 +761,29 @@ export const SettingsView: React.FC = () => {
       : null
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {t(CONSOLE_HEADING_KEYS.settings.title)}
-        </h3>
-      </div>
-
+    <div className="sc-settings">
       {/* T4：同步与连接（地址快照 + 两条纯静态说明行 + 图库数据源 + 元数据解析/同意） */}
-      <SectionShell title={t('syncConsole.settings.connection.title')}>
-        <SettingsCard>
-          <div className="space-y-2">
-            <SettingsRow label={t('syncConsole.settings.connection.address')}>
-              <span className="font-mono text-xs">
-                {address ?? t('syncConsole.settings.connection.addressUnknown')}
-              </span>
-            </SettingsRow>
-            {/* 两条纯静态说明行（上游 settings 页同款）：描述既有行为，不落设置键 */}
-            <SettingsRow label={t('syncConsole.settings.static.albumUpdate')}>
-              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {t('syncConsole.settings.static.albumUpdateValue')}
-              </span>
-            </SettingsRow>
-            <SettingsRow label={t('syncConsole.settings.static.tray')}>
-              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {t('syncConsole.settings.static.trayValue')}
-              </span>
-            </SettingsRow>
-          </div>
-        </SettingsCard>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.settings.connection.title')}>
+        {/* 行组独占一块，组内首行因此命中 `:first-child`（不再重复画一条上分割线）；
+            与后续开关/披露之间的节奏由 `.sc-card-body` 的 grid gap 负责 */}
+        <div className="sc-service-rows">
+          <ConsoleRow label={t('syncConsole.settings.connection.address')}>
+            <span className="font-mono text-xs">
+              {address ?? t('syncConsole.settings.connection.addressUnknown')}
+            </span>
+          </ConsoleRow>
+          {/* 两条纯静态说明行（上游 settings 页同款）：描述既有行为，不落设置键 */}
+          <ConsoleRow label={t('syncConsole.settings.static.albumUpdate')}>
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('syncConsole.settings.static.albumUpdateValue')}
+            </span>
+          </ConsoleRow>
+          <ConsoleRow label={t('syncConsole.settings.static.tray')}>
+            <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('syncConsole.settings.static.trayValue')}
+            </span>
+          </ConsoleRow>
+        </div>
         {/* 阶段 4：图库数据源。默认本地库，切到 NikkiSync 隐含要求 Runtime 已启用，
             否则运行时没跑、它的库也没扫过，切过去必然是一片空白 */}
         <SettingsToggle
@@ -805,24 +808,24 @@ export const SettingsView: React.FC = () => {
         </p>
         {/* K2：在线解析同意块（仅解析开启且会话挂出同意面时显示；同意前零出站） */}
         {metadataEnabled && consent && (
-          <SettingsCard>
+          <div className="sc-service-rows">
             <div className="space-y-2">
               <p className="text-xs font-medium">{t('syncService.consent.title')}</p>
-              <SettingsRow label={t('syncService.consent.endpoint')}>
+              <ConsoleRow label={t('syncService.consent.endpoint')}>
                 <span className="font-mono text-xs break-all">
                   {consent.recipients[0]?.endpoint}
                 </span>
-              </SettingsRow>
-              <SettingsRow label={t('syncService.consent.policyVersion')}>
+              </ConsoleRow>
+              <ConsoleRow label={t('syncService.consent.policyVersion')}>
                 <span className="font-mono text-xs">{consent.policyVersion}</span>
-              </SettingsRow>
-              <SettingsRow label={t('syncService.consent.fields')}>
+              </ConsoleRow>
+              <ConsoleRow label={t('syncService.consent.fields')}>
                 <ul className="list-disc pl-4 text-xs" style={{ color: 'var(--text-tertiary)' }}>
                   {consent.recipients[0]?.fields.map((field) => (
                     <li key={field}>{field}</li>
                   ))}
                 </ul>
-              </SettingsRow>
+              </ConsoleRow>
               <SettingsToggle
                 label={t('syncService.consent.enable')}
                 description={t('syncService.consent.enableDesc')}
@@ -834,12 +837,97 @@ export const SettingsView: React.FC = () => {
                 {t('syncService.consent.revokeNote')}
               </p>
             </div>
-          </SettingsCard>
+          </div>
         )}
-      </SectionShell>
+      </ConsoleSection>
+
+      {/* ⑤K9：账号同步作用域（1.0.27 上游 AccountSyncSettings；会话无 accounts 时整节隐藏） */}
+      {syncAccounts && (
+        <ConsoleSection
+          titleAs="h2"
+          title={t('syncService.syncAccounts.title')}
+          description={t('syncService.syncAccounts.scopeNote')}
+        >
+          <div className="space-y-2">
+            <SettingsToggle
+              label={t('syncService.syncAccounts.all')}
+              checked={allAccounts}
+              disabled={accountSaving}
+              onChange={setAllAccounts}
+            />
+            {syncAccounts.accounts.length === 0 ? (
+              <EmptyState
+                title={t('syncService.syncAccounts.empty')}
+                subtitle={t('syncService.syncAccounts.emptyHint')}
+              />
+            ) : (
+              <>
+                {syncAccounts.accounts.map((account) => {
+                  const label = accountLabel(account.uid, t)
+                  return (
+                    <div className="sc-service-rows" key={account.uid}>
+                      <ConsoleRow
+                        label={label}
+                        description={t('syncService.syncAccounts.count', {
+                          count: account.count
+                        })}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span
+                            className="flex items-center gap-1"
+                            aria-label={t('syncService.syncAccounts.samples')}
+                          >
+                            {account.samples.length === 0 ? (
+                              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                                {t('syncService.syncAccounts.previewEmpty')}
+                              </span>
+                            ) : (
+                              account.samples.map((assetId) => {
+                                const url = accountSampleUrls[assetId]
+                                return url ? (
+                                  <img
+                                    key={assetId}
+                                    src={url}
+                                    alt=""
+                                    className="h-10 w-10 rounded object-cover"
+                                  />
+                                ) : null
+                              })
+                            )}
+                          </span>
+                          <input
+                            type="checkbox"
+                            aria-label={label}
+                            className="w-4 h-4"
+                            checked={allAccounts || selectedAccounts.includes(account.uid)}
+                            disabled={allAccounts || accountSaving}
+                            onChange={(event) => toggleAccount(account.uid, event.target.checked)}
+                          />
+                        </div>
+                      </ConsoleRow>
+                    </div>
+                  )
+                })}
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="btn-primary text-sm"
+                    disabled={accountSaving}
+                    onClick={() => void handleSaveAccounts()}
+                  >
+                    {accountSaving
+                      ? t('syncService.syncAccounts.saving')
+                      : t('syncService.syncAccounts.save')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </ConsoleSection>
+      )}
 
       {/* T4：启动偏好（服务自启 + 开机自启，两个独立键各管一件事） */}
-      <SectionShell title={t('syncConsole.settings.startup.title')}>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.settings.startup.title')}>
         {/* 只影响下次软件启动：开启后无需每次手动点主开关 */}
         <SettingsToggle
           label={t('syncService.autoStart')}
@@ -855,15 +943,20 @@ export const SettingsView: React.FC = () => {
           disabled={busy}
           onChange={(value) => void handleLaunchAtLoginToggle(value)}
         />
-      </SectionShell>
+      </ConsoleSection>
+
+      {/* T7：本地网络权限 / 临时热点（opt-in 门控；关闭时整卡「未启用」+ 去开启） */}
+      <NetworkPermissionCard enabled={networkRepairEnabled} onEnableJump={jumpToShellSection} />
+      <HotspotCard enabled={hotspotEnabled} onEnableJump={jumpToShellSection} />
 
       {/* ③b：照片目录（gameRoot 替代默认路径；只碰设置库，不经运行时装配 ⇒ 常驻显示） */}
-      <SectionShell
+      <ConsoleSection
+        titleAs="h2"
         title={t('syncService.photoDirectories.title')}
         description={t('syncService.photoDirectories.description')}
       >
-        <SettingsCard>
-          <SettingsRow label={t('syncService.photoDirectories.currentLabel')}>
+        <div className="sc-service-rows">
+          <ConsoleRow label={t('syncService.photoDirectories.currentLabel')}>
             <span
               className="font-mono text-xs truncate max-w-[24rem]"
               style={{ color: 'var(--text-tertiary)' }}
@@ -871,8 +964,8 @@ export const SettingsView: React.FC = () => {
             >
               {gameRoot || t('syncService.photoDirectories.defaultValue')}
             </span>
-          </SettingsRow>
-        </SettingsCard>
+          </ConsoleRow>
+        </div>
         <div className="space-y-2">
           <input
             type="text"
@@ -916,11 +1009,12 @@ export const SettingsView: React.FC = () => {
             </button>
           </div>
         </div>
-      </SectionShell>
+      </ConsoleSection>
 
       {/* ④K6：额外照片目录（仅作用于同步库扫描器；会话未挂面时整节隐藏） */}
       {extraDirs && (
-        <SectionShell
+        <ConsoleSection
+          titleAs="h2"
           title={t('syncService.extraDirectories.title')}
           description={t('syncService.extraDirectories.scopeNote')}
         >
@@ -932,8 +1026,8 @@ export const SettingsView: React.FC = () => {
               />
             ) : (
               extraDirs.directories.map((dir) => (
-                <SettingsCard key={dir.id}>
-                  <SettingsRow label={dir.path}>
+                <div className="sc-service-rows" key={dir.id}>
+                  <ConsoleRow label={dir.path}>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-xs" style={{ color: 'var(--text-tertiary)' }}>
                         {dir.mode}
@@ -974,14 +1068,14 @@ export const SettingsView: React.FC = () => {
                         {t('syncService.extraDirectories.remove')}
                       </button>
                     </div>
-                  </SettingsRow>
-                </SettingsCard>
+                  </ConsoleRow>
+                </div>
               ))
             )}
             {/* 预检确认区：展示识别到的照片/视频计数，确认后才真正加入 */}
             {proposal && (
-              <SettingsCard>
-                <SettingsRow label={proposal.id}>
+              <div className="sc-service-rows">
+                <ConsoleRow label={proposal.id}>
                   <div className="flex items-center gap-3">
                     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       {t('syncService.extraDirectories.proposalSummary', {
@@ -1005,8 +1099,8 @@ export const SettingsView: React.FC = () => {
                       {t('syncService.extraDirectories.cancelAdd')}
                     </button>
                   </div>
-                </SettingsRow>
-              </SettingsCard>
+                </ConsoleRow>
+              </div>
             )}
             {/* 手输目录入口：先 admit（主进程校验 + 登记 pathGuard）再走既有 inspect 提案流。
                 系统选择器选中的目录在 dialog-handler 登记后同样能过 inspect 门禁，两条路同权。 */}
@@ -1063,99 +1157,11 @@ export const SettingsView: React.FC = () => {
               </button>
             </div>
           </div>
-        </SectionShell>
+        </ConsoleSection>
       )}
-
-      {/* ⑤K9：账号同步作用域（1.0.27 上游 AccountSyncSettings；会话无 accounts 时整节隐藏） */}
-      {syncAccounts && (
-        <SectionShell
-          title={t('syncService.syncAccounts.title')}
-          description={t('syncService.syncAccounts.scopeNote')}
-        >
-          <div className="space-y-2">
-            <SettingsToggle
-              label={t('syncService.syncAccounts.all')}
-              checked={allAccounts}
-              disabled={accountSaving}
-              onChange={setAllAccounts}
-            />
-            {syncAccounts.accounts.length === 0 ? (
-              <EmptyState
-                title={t('syncService.syncAccounts.empty')}
-                subtitle={t('syncService.syncAccounts.emptyHint')}
-              />
-            ) : (
-              <>
-                {syncAccounts.accounts.map((account) => {
-                  const label = accountLabel(account.uid, t)
-                  return (
-                    <SettingsCard key={account.uid}>
-                      <SettingsRow
-                        label={label}
-                        description={t('syncService.syncAccounts.count', {
-                          count: account.count
-                        })}
-                      >
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="flex items-center gap-1"
-                            aria-label={t('syncService.syncAccounts.samples')}
-                          >
-                            {account.samples.length === 0 ? (
-                              <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                                {t('syncService.syncAccounts.previewEmpty')}
-                              </span>
-                            ) : (
-                              account.samples.map((assetId) => {
-                                const url = accountSampleUrls[assetId]
-                                return url ? (
-                                  <img
-                                    key={assetId}
-                                    src={url}
-                                    alt=""
-                                    className="h-10 w-10 rounded object-cover"
-                                  />
-                                ) : null
-                              })
-                            )}
-                          </span>
-                          <input
-                            type="checkbox"
-                            aria-label={label}
-                            className="w-4 h-4"
-                            checked={allAccounts || selectedAccounts.includes(account.uid)}
-                            disabled={allAccounts || accountSaving}
-                            onChange={(event) => toggleAccount(account.uid, event.target.checked)}
-                          />
-                        </div>
-                      </SettingsRow>
-                    </SettingsCard>
-                  )
-                })}
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="btn-primary text-sm"
-                    disabled={accountSaving}
-                    onClick={() => void handleSaveAccounts()}
-                  >
-                    {accountSaving
-                      ? t('syncService.syncAccounts.saving')
-                      : t('syncService.syncAccounts.save')}
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </SectionShell>
-      )}
-
-      {/* T7：本地网络权限 / 临时热点（opt-in 门控；关闭时整卡「未启用」+ 去开启） */}
-      <NetworkPermissionCard enabled={networkRepairEnabled} onEnableJump={jumpToShellSection} />
-      <HotspotCard enabled={hotspotEnabled} onEnableJump={jumpToShellSection} />
 
       {/* T4：法律条款三链（desktopOpen().url + /legal/*；PC 服务缺席 ⇒ 禁用 + Tooltip） */}
-      <SectionShell title={t('syncConsole.settings.legal.title')}>
+      <ConsoleSection titleAs="h2" title={t('syncConsole.settings.legal.title')}>
         <div className="flex flex-wrap items-center gap-2">
           {(
             [
@@ -1190,7 +1196,7 @@ export const SettingsView: React.FC = () => {
             {t('syncConsole.settings.legal.unavailable')}
           </p>
         )}
-      </SectionShell>
+      </ConsoleSection>
 
       {/* Windows 外壳能力：6 个开关默认关闭，关闭时所有动作零网络/零子进程 */}
       <SyncShellSection onFlagsChanged={handleShellFlagsChanged} />
@@ -1332,11 +1338,12 @@ const SyncShellSection: React.FC<{
 
   return (
     <div data-testid="sync-service-shell-section">
-      <SectionShell
+      <ConsoleSection
+        titleAs="h2"
         title={t('syncService.shell.title')}
         description={t('syncService.shell.description')}
       >
-        <SettingsCard>
+        <div className="sc-service-rows">
           <div className="space-y-2">
             {SHELL_SETTING_KEYS.map((key, index) => (
               <SettingsToggle
@@ -1346,7 +1353,7 @@ const SyncShellSection: React.FC<{
                 onChange={(value) => void toggle(key, value)}
               />
             ))}
-            <SettingsRow label={t('syncService.shell.icon.title')}>
+            <ConsoleRow label={t('syncService.shell.icon.title')}>
               <button
                 type="button"
                 className="btn-secondary text-sm"
@@ -1355,11 +1362,11 @@ const SyncShellSection: React.FC<{
               >
                 {t('syncService.shell.icon.check')}
               </button>
-            </SettingsRow>
+            </ConsoleRow>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('syncService.shell.icon.current')}
             </p>
-            <SettingsRow label={t('syncService.shell.program.title')}>
+            <ConsoleRow label={t('syncService.shell.program.title')}>
               <button
                 type="button"
                 className="btn-secondary text-sm"
@@ -1368,11 +1375,11 @@ const SyncShellSection: React.FC<{
               >
                 {t('syncService.shell.program.check')}
               </button>
-            </SettingsRow>
+            </ConsoleRow>
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
               {t('syncService.shell.program.notes')}
             </p>
-            <SettingsRow label={t('syncService.shell.support.title')}>
+            <ConsoleRow label={t('syncService.shell.support.title')}>
               <button
                 type="button"
                 className="btn-secondary text-sm"
@@ -1381,7 +1388,7 @@ const SyncShellSection: React.FC<{
               >
                 {t('syncService.shell.support.submit')}
               </button>
-            </SettingsRow>
+            </ConsoleRow>
             {status && (
               <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                 {shellStatusText(status)}
@@ -1406,8 +1413,8 @@ const SyncShellSection: React.FC<{
               </button>
             </div>
           </div>
-        </SettingsCard>
-      </SectionShell>
+        </div>
+      </ConsoleSection>
     </div>
   )
 }

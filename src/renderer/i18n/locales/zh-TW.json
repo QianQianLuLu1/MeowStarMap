@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "靈感庫",
-        "subtitle": "收集與管理搭配靈感，支援篩選與分享碼"
+        "subtitle": "收集與管理搭配靈感，支援篩選與分享碼",
+        "cardTitle": "穿搭靈感庫",
+        "cardDescription": "收藏染色碼、搭配碼和參考圖。手機離線時可先記錄，連接後同步。"
       },
       "about": {
         "title": "關於",
@@ -4898,7 +4900,10 @@
         "newQr": "產生新 QR 碼",
         "download": "下載 Android APK",
         "export": "匯出診斷包",
-        "exportNote": "連線異常時可匯出診斷包，隨回饋附上以便排查"
+        "exportNote": "連線異常時可匯出診斷包，隨回饋附上以便排查",
+        "stepInstall": "下載並安裝 NikkiSync Android 安裝包",
+        "stepPair": "用 App 掃描電腦端配對碼",
+        "stepBrowse": "在同一 Wi-Fi 下瀏覽與保存原圖"
       },
       "guide": {
         "title": "首次使用引導",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "線上參數解析預設關閉，需在同步設定中開啟並同意披露條款。",
         "metadataStep3": "本地解碼內建於同步元件，無需額外安裝。",
         "openScan": "檢查掃描與解析設定"
+      },
+      "section": {
+        "title": "連接到手機",
+        "networkHint": "電腦和手機需連接同一 Wi-Fi"
+      },
+      "wechat": {
+        "title": "微信小程式",
+        "description": "微信掃碼，瀏覽相簿，保存照片與影片。",
+        "entrySummary": "首次使用？微信掃碼開啟小程式",
+        "entryAlt": "大喵相機助手微信小程式碼",
+        "entryHint": "先用微信掃一掃開啟小程式，再掃描下方按鈕生成的電腦連接碼。下次可從微信「最近使用的小程式」進入。",
+        "platforms": "iPhone · Android",
+        "step1": "用微信掃描上方小程式碼",
+        "step2": "在小程式內掃碼連接電腦",
+        "step3": "挑選照片，保存原圖到手機",
+        "note": "照片與影片分別保存 · 連接碼 10 分鐘內有效"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "匯出診斷包",
       "exportCanceled": "已取消匯出",
       "exported": "診斷包已匯出：{{path}}",
-      "exportFailed": "匯出診斷包失敗"
+      "exportFailed": "匯出診斷包失敗",
+      "recoveryHint": "同步服務已停止。資料與配對紀錄仍保留；重新啟動服務即可繼續。"
+    },
+    "shell": {
+      "brandName": "大喵相機助手",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "大喵相機助手",
+      "navAria": "主導覽",
+      "footerCompat": "Windows 用戶端 · 相容小程式與 App",
+      "footerDisclaimer": "無限暖暖 · 非官方攝影助手"
+    },
+    "status": {
+      "running": "同步服務執行中",
+      "stopped": "同步服務已停止",
+      "unavailable": "同步元件未就緒"
     }
   }
 }

@@ -21,6 +21,8 @@ const listInspirations = vi.fn()
 const saveInspiration = vi.fn()
 const putInspirationImage = vi.fn()
 const getInspirationImage = vi.fn()
+/** `onLibraryChanged` 的订阅回调（测试内手动触发库变更） */
+let libraryChangedHandler: (() => void) | null = null
 
 const ENTRY_ID = '11111111-1111-4111-8111-111111111111'
 const CODE_ID = '22222222-2222-4222-8222-222222222222'
@@ -75,10 +77,22 @@ function installApi(opts: InstallOpts = {}) {
   )
   putInspirationImage.mockResolvedValue({ ok: true })
   getInspirationImage.mockResolvedValue(null)
+  libraryChangedHandler = null
   ;(window as unknown as { electronAPI?: unknown }).electronAPI = {
     nikkisync: opts.missingBridge
       ? {}
-      : { listInspirations, saveInspiration, putInspirationImage, getInspirationImage }
+      : {
+          listInspirations,
+          saveInspiration,
+          putInspirationImage,
+          getInspirationImage,
+          onLibraryChanged: (cb: () => void) => {
+            libraryChangedHandler = cb
+            return () => {
+              libraryChangedHandler = null
+            }
+          }
+        }
   }
 }
 
@@ -131,6 +145,32 @@ describe('SyncInspirationPanel（N4 灵感库）', () => {
     expect(screen.queryByTestId('sync-inspiration-panel')).toBeNull()
     expect(container.firstChild).toBeNull()
     expect(listInspirations).not.toHaveBeenCalled()
+  })
+})
+
+describe('R4：内嵌模式（控制台灵感库页）', () => {
+  it('不渲染 details/summary——避免浏览器合成未翻译的匿名折叠头，且挂载即取首屏', async () => {
+    const { container } = render(<SyncInspirationPanel embedded />)
+    const panel = screen.getByTestId('sync-inspiration-panel')
+    expect(panel.tagName).toBe('DIV')
+    expect(container.querySelector('details')).toBeNull()
+    expect(container.querySelector('summary')).toBeNull()
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(1))
+    expect(await screen.findByText('示例灵感')).toBeInTheDocument()
+  })
+
+  it('内嵌模式：上次失败 + 库变更 ⇒ 只重取一次（不重复发 fetch-all）', async () => {
+    installApi({ listReject: true })
+    render(<SyncInspirationPanel embedded />)
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(screen.getByTestId('inspiration-load-error')).toBeInTheDocument())
+
+    listInspirations.mockImplementation(() =>
+      Promise.resolve({ items: [{ revision: 1, entry: makeEntry() }], nextCursor: null })
+    )
+    act(() => libraryChangedHandler?.())
+    await waitFor(() => expect(listInspirations).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('示例灵感')).toBeInTheDocument()
   })
 })
 

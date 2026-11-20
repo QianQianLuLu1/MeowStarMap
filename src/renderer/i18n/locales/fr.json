@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "Bibliothèque d'inspiration",
-        "subtitle": "Collectez et gérez vos inspirations de tenues, avec filtres et codes de partage"
+        "subtitle": "Collectez et gérez vos inspirations de tenues, avec filtres et codes de partage",
+        "cardTitle": "Bibliothèque d’inspirations",
+        "cardDescription": "Enregistrez codes de teinture, codes de tenue et images de référence. Notez hors ligne sur mobile et synchronisez une fois connecté."
       },
       "about": {
         "title": "À propos",
@@ -4898,7 +4900,10 @@
         "newQr": "Générer un nouveau code QR",
         "download": "Télécharger l'APK Android",
         "export": "Exporter le diagnostic",
-        "exportNote": "En cas d'échec de connexion, exportez un lot de diagnostic et joignez-le à votre retour"
+        "exportNote": "En cas d'échec de connexion, exportez un lot de diagnostic et joignez-le à votre retour",
+        "stepInstall": "Télécharger et installer le paquet Android NikkiSync",
+        "stepPair": "Scanner le code d’appairage de l’ordinateur avec l’application",
+        "stepBrowse": "Parcourir et enregistrer les originaux sur le même Wi-Fi"
       },
       "guide": {
         "title": "Guide de première utilisation",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "La résolution en ligne des paramètres est désactivée par défaut ; activez-la dans les paramètres de synchronisation et acceptez la divulgation.",
         "metadataStep3": "Le décodage local est intégré aux composants de synchronisation ; aucune installation supplémentaire n'est requise.",
         "openScan": "Vérifier les paramètres d'analyse et de résolution"
+      },
+      "section": {
+        "title": "Se connecter au téléphone",
+        "networkHint": "L’ordinateur et le téléphone doivent être sur le même Wi-Fi"
+      },
+      "wechat": {
+        "title": "Mini-programme WeChat",
+        "description": "Scannez avec WeChat pour parcourir l’album et enregistrer photos et vidéos.",
+        "entrySummary": "Première fois ? Scannez le code du mini-programme avec WeChat",
+        "entryAlt": "Code du mini-programme WeChat Momo Camera",
+        "entryHint": "Ouvrez d’abord le mini-programme avec WeChat, puis scannez le code de connexion ci-dessous. Retrouvez-le ensuite dans les mini-programmes récents.",
+        "platforms": "iPhone · Android",
+        "step1": "Scannez le code du mini-programme ci-dessus avec WeChat",
+        "step2": "Scannez dans le mini-programme pour connecter l’ordinateur",
+        "step3": "Choisissez des photos et enregistrez les originaux sur le téléphone",
+        "note": "Photos et vidéos enregistrées séparément · code valable 10 minutes"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "Exporter le diagnostic",
       "exportCanceled": "Export annulé",
       "exported": "Diagnostic exporté : {{path}}",
-      "exportFailed": "Échec de l'export du diagnostic"
+      "exportFailed": "Échec de l'export du diagnostic",
+      "recoveryHint": "Service arrêté. Les données et appairages sont conservés ; redémarrez le service pour reprendre."
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "Navigation principale",
+      "footerCompat": "Client Windows · compatible avec le mini-programme et l’application",
+      "footerDisclaimer": "Infinity Nikki · assistant photo non officiel"
+    },
+    "status": {
+      "running": "Service de synchronisation actif",
+      "stopped": "Service de synchronisation arrêté",
+      "unavailable": "Composant de synchronisation indisponible"
     }
   }
 }

@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 // 复用设置页的展示原语（与迁出前 SyncServicePage 同款跨目录引用，见其原注释）。
-import { SectionShell, SettingsToggle, SettingsCard, SettingsRow } from '../../settings/shared'
+import { SettingsToggle } from '../../settings/shared'
+import { ConsoleCard, ConsoleBadge, ConsoleHint, ConsoleRow, ConsoleSection } from './console-ui'
+import { ConsoleIcon } from './ConsoleIcons'
+import { WECHAT_MINI_ENTRY_IMAGE } from './brand-assets'
 import { useGlobalToast } from '../../../components/common/ToastProvider'
 import { ConfirmDialog } from '../../../components/common/ConfirmDialog'
 import { EmptyState } from '../../../components/common/EmptyState'
@@ -14,7 +17,7 @@ import type {
   NikkiSyncPairedDeviceInfo,
   NikkiSyncServerStatusInfo
 } from '../../../../shared/types/electron-api'
-import { CONSOLE_HEADING_KEYS, type ConsoleView } from './console-views'
+import type { ConsoleView } from './console-views'
 import { useSyncOverview } from './useSyncOverview'
 import { SelfCheckCard } from './SelfCheckCard'
 import { exportDiagnostics, openUpstreamLink } from './export-diagnostics'
@@ -74,6 +77,8 @@ const WECHAT_ENTRY_SEEN_KEY = 'momo.wechat-entry.seen.v1'
 
 interface ConnectViewProps {
   onNavigate: (view: ConsoleView) => void
+  /** N3：把轮询到的服务快照回传给 Layout 的页头状态 chip（不新增全局定时器）。 */
+  onServerStatusChange?: (status: NikkiSyncServerStatusInfo | null) => void
 }
 
 /**
@@ -94,7 +99,7 @@ interface ConnectViewProps {
  * keep-alive 纪律：本页挂在 App.tsx 的 keep-alive 循环里，切走只 display:none 不卸载，
  * 所有轮询必须按 currentView 门控；控制台子视图切走时本组件整体卸载，定时器随 cleanup 清零。
  */
-export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
+export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerStatusChange }) => {
   const { t } = useTranslation()
   const showMessage = useGlobalToast()
   const { showError } = useErrorToast()
@@ -118,28 +123,7 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
   const firstRunActive = visible && running && overview?.firstRun === true
   const firstRunQr = usePairingQr(firstRunActive)
 
-  // T3：微信卡折叠态（看过一次即收起；持久化键逐字对齐上游）
-  const [wechatOpen, setWechatOpen] = useState(() => {
-    try {
-      return window.localStorage.getItem(WECHAT_ENTRY_SEEN_KEY) !== '1'
-    } catch {
-      return true
-    }
-  })
-  const persistWechatFold = useCallback((open: boolean): void => {
-    try {
-      if (open) window.localStorage.removeItem(WECHAT_ENTRY_SEEN_KEY)
-      else window.localStorage.setItem(WECHAT_ENTRY_SEEN_KEY, '1')
-    } catch {
-      // 隐私模式等存储不可用场景：折叠态仅本次会话生效
-    }
-  }, [])
-
-  // 微信画廊连上即收起入口卡（稳定身份，避免轮询渲染反复触发 effect）
-  const handleWechatConnected = useCallback((): void => {
-    setWechatOpen(false)
-    persistWechatFold(false)
-  }, [persistWechatFold])
+  // 微信入口码的「看过即收起」由通道卡内的 details 自己持久化（上游 momo.wechat-entry.seen.v1）
 
   // R3 审查修复：在途刷新守卫——切走/卸载后慢响应不得再 setState（轮询与手动刷新共用）
   const pollAliveRef = useRef(false)
@@ -158,8 +142,19 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
       ])
       if (!pollAliveRef.current) return
       setStatus(nextStatus)
-      setDevices(nextDevices)
-      setStartupStages(nextRuntime?.startupStages ?? [])
+      onServerStatusChange?.(nextStatus)
+      // 外部输入一律不可信：畸形设备项/启动阶段项直接丢，不让脏数据在渲染期抛错（整页变错误页）
+      setDevices(
+        (nextDevices ?? []).filter(
+          (device) => typeof device?.deviceId === 'string' && device.deviceId.length > 0
+        )
+      )
+      setStartupStages(
+        (nextRuntime?.startupStages ?? []).filter(
+          (item): item is { stage: string; at: string } =>
+            typeof item?.stage === 'string' && typeof item?.at === 'string'
+        )
+      )
       setScanDiagnostics(
         (nextRuntime as { scanDiagnostics?: Record<string, unknown> } | null)?.scanDiagnostics ??
           null
@@ -167,7 +162,7 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
     } catch {
       // 状态查询失败静默：轮询下一轮重试（未组装时 getServerStatus 返回 available:false 不抛）
     }
-  }, [])
+  }, [onServerStatusChange])
 
   useEffect(() => {
     // keep-alive 下本页切走不卸载，不门控就会后台常驻 2s 定时器（用例 (r)）
@@ -262,88 +257,213 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
   const pairedCount = overview?.pairedDevices ?? devices.length
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {t(CONSOLE_HEADING_KEYS.connect.title)}
-        </h3>
-      </div>
-
-      {/* T3：资产总览统计卡（上游 connect 页首卡；数值来自 library-overview 观测，不虚构） */}
-      <SettingsCard>
-        <div className="space-y-1" data-testid="sync-console-stats">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {t('syncConsole.connect.stats.label')}
-          </p>
+    <div className="sc-connect">
+      {/* T3：资产总览（上游 library-overview 大数字卡；数值只取观测，不虚构 0） */}
+      <ConsoleCard className="sc-library-overview" testId="sync-console-stats">
+        <span className="sc-library-icon">
+          <ConsoleIcon name="album" />
+        </span>
+        <div className="sc-library-main">
+          <p className="sc-library-label">{t('syncConsole.connect.stats.label')}</p>
           {overview?.available ? (
             <>
-              <p className="text-sm font-medium">
-                {overview.assets ?? 0} {t('syncConsole.connect.stats.assetsUnit')} · {pairedCount}{' '}
-                {t('syncConsole.connect.stats.devicesUnit')}
-              </p>
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {t('syncConsole.connect.stats.caption')}
-              </p>
+              <div className="sc-library-number">
+                <b>{overview.assets ?? 0}</b>
+                <span>{t('syncConsole.connect.stats.assetsUnit')}</span>
+              </div>
+              <p className="sc-library-caption">{t('syncConsole.connect.stats.caption')}</p>
             </>
           ) : (
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.connect.stats.unavailable')}
-            </p>
+            <p className="sc-library-caption">{t('syncConsole.connect.stats.unavailable')}</p>
           )}
         </div>
-      </SettingsCard>
+        <div className="sc-device-summary">
+          <ConsoleIcon name="phone" />
+          <span>
+            <b>{pairedCount}</b>
+            {t('syncConsole.connect.stats.devicesUnit')}
+          </span>
+        </div>
+      </ConsoleCard>
 
-      {/* T3：firstRun 内联首次配对二维码（配对数为 0 且服务在跑；与对话框共享生成/过期判据） */}
-      {firstRunActive && (
-        <SettingsCard>
-          <div className="flex flex-col items-center gap-2" data-testid="sync-first-run-qr">
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.connect.firstRun.hint')}
-            </p>
-            {firstRunQr.svg !== null ? (
-              // qrcode 库输出的是受控 SVG（无外部内容）；白底承载面见 globals.css .sync-qr-surface
-              <div
-                className="sync-qr-surface w-48 h-48 [&>svg]:w-full [&>svg]:h-full"
-                dangerouslySetInnerHTML={{ __html: firstRunQr.svg }}
-              />
-            ) : (
-              <div
-                className="w-48 h-48 rounded-lg animate-pulse"
-                style={{ background: 'var(--bg-tertiary)' }}
-              />
-            )}
-            {firstRunQr.offer && (
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {t('syncService.pairing.expiresIn')}：
-                {Math.floor((firstRunQr.expiresInSeconds ?? 0) / 60)}:
-                {String((firstRunQr.expiresInSeconds ?? 0) % 60).padStart(2, '0')}
-              </p>
-            )}
+      <div className="sc-section-heading">
+        <h2>{t('syncConsole.connect.section.title')}</h2>
+        <ConsoleHint>{t('syncConsole.connect.section.networkHint')}</ConsoleHint>
+      </div>
+
+      <div className="sc-connection-grid">
+        {/* T3：Android 通道卡（上游 androidCard 移植；首配二维码与宿主操作同卡） */}
+        <ConsoleCard className="sc-connection-card" testId="sync-console-android-card">
+          <div className="sc-channel-top">
+            <span className="sc-channel-icon">
+              <ConsoleIcon name="android" />
+            </span>
+            <ConsoleBadge>{t('syncConsole.shell.brandLatin')}</ConsoleBadge>
           </div>
-        </SettingsCard>
-      )}
+          <h2>{t('syncConsole.connect.android.title')}</h2>
+          <p className="sc-channel-description">{t('syncConsole.connect.android.description')}</p>
+          {firstRunActive && (
+            <div className="sc-first-pairing" data-testid="sync-first-run-qr">
+              <p className="sc-channel-note">{t('syncConsole.connect.firstRun.hint')}</p>
+              {firstRunQr.svg !== null ? (
+                <div
+                  className="sync-qr-surface [&>svg]:w-full [&>svg]:h-full"
+                  dangerouslySetInnerHTML={{ __html: firstRunQr.svg }}
+                />
+              ) : (
+                <div className="sync-qr-surface animate-pulse" />
+              )}
+              {firstRunQr.offer && (
+                <p className="sc-channel-note">
+                  {t('syncService.pairing.expiresIn')}：
+                  {Math.floor((firstRunQr.expiresInSeconds ?? 0) / 60)}:
+                  {String((firstRunQr.expiresInSeconds ?? 0) % 60).padStart(2, '0')}
+                </p>
+              )}
+            </div>
+          )}
+          {pairedCount > 0 && (
+            <div className="sc-paired-note">
+              <ConsoleIcon name="check" />
+              <div>
+                <strong>{t('syncConsole.connect.android.paired')}</strong>
+                <span>{t('syncConsole.connect.android.pairedHint')}</span>
+              </div>
+            </div>
+          )}
+          <ol className="sc-connection-steps">
+            <li>
+              <span className="sc-step-number">1</span>
+              {t('syncConsole.connect.android.stepInstall')}
+            </li>
+            <li>
+              <span className="sc-step-number">2</span>
+              {t('syncConsole.connect.android.stepPair')}
+            </li>
+            <li>
+              <span className="sc-step-number">3</span>
+              {t('syncConsole.connect.android.stepBrowse')}
+            </li>
+          </ol>
+          <button
+            type="button"
+            className="btn-primary sc-channel-action"
+            disabled={!running}
+            onClick={() => setQrOpen(true)}
+          >
+            {t('syncConsole.connect.android.newQr')}
+          </button>
+          <p className="sc-channel-note">
+            {running
+              ? t('syncConsole.connect.android.newQrNote')
+              : t('syncService.pairing.hintDisabled')}
+          </p>
+          <div className="sc-button-row">
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              onClick={() => void openUpstreamLink(UPSTREAM_ANDROID_APK_URL, showError)}
+            >
+              {t('syncConsole.connect.android.download')}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              onClick={() => void exportDiagnostics(t, showMessage, showError)}
+            >
+              {t('syncConsole.connect.android.export')}
+            </button>
+          </div>
+          <p className="sc-channel-note">{t('syncConsole.connect.android.exportNote')}</p>
+        </ConsoleCard>
 
-      {/* ①状态总览与总开关（自 SyncServicePage 原样迁入） */}
-      <SectionShell
-        title={t('syncService.service.title')}
-        description={t('syncService.service.description')}
-      >
-        <SettingsToggle
-          label={t('syncService.enable')}
-          description={t('syncService.enableDesc')}
-          checked={enabled}
-          disabled={busy}
-          onChange={(value) => void handleToggle(value)}
-        />
-        <SettingsCard>
-          <div className="space-y-2">
-            <SettingsRow label={t('syncService.status.label')}>
+        {/* N7：微信小程序通道卡（上游 wechatPanelHtml：入口码 + 步骤 + 连接码 + 底部入口） */}
+        <SyncPcCompanionSection />
+      </div>
+
+      {/* T3：首次使用引导（上游 firstUse 移植；details 不做完成态持久化） */}
+      <details className="sc-details sc-card">
+        <summary>
+          {t('syncConsole.connect.guide.title')}
+          <span>{t('syncConsole.connect.guide.summary')}</span>
+        </summary>
+        <ol className="sc-connection-steps">
+          {(
+            [
+              ['step1Title', 'step1Body'],
+              ['step2Title', 'step2Body'],
+              ['step3Title', 'step3Body']
+            ] as const
+          ).map(([titleKey, bodyKey]) => (
+            <li key={titleKey}>
+              <div>
+                <strong className="sc-setting-title">
+                  {t(`syncConsole.connect.guide.${titleKey}`)}
+                </strong>
+                <p className="sc-setting-help">{t(`syncConsole.connect.guide.${bodyKey}`)}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className="sc-button-row">
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            onClick={() => void openUpstreamLink(UPSTREAM_QUARK_URL, showError)}
+          >
+            {t('syncConsole.connect.guide.quark')}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            onClick={() => void openUpstreamLink(UPSTREAM_BAIDU_URL, showError)}
+          >
+            {t('syncConsole.connect.guide.baidu')}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            onClick={() => onNavigate('settings')}
+          >
+            {t('syncConsole.connect.guide.openNetwork')}
+          </button>
+          <button
+            type="button"
+            className="btn-secondary text-xs"
+            onClick={() => onNavigate('settings')}
+          >
+            {t('syncConsole.connect.guide.openScan')}
+          </button>
+        </div>
+      </details>
+
+      {/* T3：连接自查（掉线自动展开） */}
+      <SelfCheckCard status={status} onNavigate={onNavigate} />
+
+      <p className="sc-privacy-note">
+        <ConsoleIcon name="shield" size={14} />
+        {t('syncConsole.connect.privacyNote')}
+      </p>
+
+      {/* 宿主增强：上游控制页不暴露的服务开关/配对/设备管理，控制台保留为独立卡片 */}
+      <div className="sc-service-stack">
+        <ConsoleSection
+          title={t('syncService.service.title')}
+          description={t('syncService.service.description')}
+        >
+          <SettingsToggle
+            label={t('syncService.enable')}
+            description={t('syncService.enableDesc')}
+            checked={enabled}
+            disabled={busy}
+            onChange={(value) => void handleToggle(value)}
+          />
+          <div className="sc-service-rows">
+            <ConsoleRow label={t('syncService.status.label')}>
               <span className="flex items-center gap-2 text-sm">
                 <span
                   className="w-2 h-2 rounded-full"
-                  style={{
-                    background: running ? 'var(--accent)' : 'var(--text-tertiary)'
-                  }}
+                  style={{ background: running ? 'var(--accent)' : 'var(--text-tertiary)' }}
                 />
                 {!status?.available
                   ? t('syncService.status.unavailable')
@@ -351,18 +471,15 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
                     ? t('syncService.status.running')
                     : t('syncService.status.stopped')}
               </span>
-            </SettingsRow>
-            {/* 灵感同步 v1（上游 589b932）：值取自主进程对装载面的观测，非渲染层常量。
-                键缺席只说明当前构建没有这一面，不能据此写「未启用」——那是把环境差异说成用户选择。 */}
+            </ConsoleRow>
+            {/* 灵感同步 v1：键缺席只说明当前构建没有这一面，不能说成用户关掉了 */}
             {status?.inspirationV1 && (
-              <SettingsRow label={t('syncService.status.inspiration')}>
+              <ConsoleRow label={t('syncService.status.inspiration')}>
                 <span className="text-xs">{t('syncService.status.inspirationOn')}</span>
-              </SettingsRow>
+              </ConsoleRow>
             )}
-            {/* 灵感库面板在控制台 Inspiration 视图复用（sync-inspiration 独立二级页保留深链） */}
             {startupStages.length > 0 && (
-              <SettingsRow label={t('syncService.startupStages.label')}>
-                {/* K1：阶段名→i18n 映射；未知阶段不谎报，原样展示英文短码 */}
+              <ConsoleRow label={t('syncService.startupStages.label')}>
                 <span className="flex flex-wrap items-center gap-1 text-xs">
                   {startupStages.map((item, index) => (
                     <React.Fragment key={`${item.stage}-${item.at}`}>
@@ -378,14 +495,14 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
                     </React.Fragment>
                   ))}
                 </span>
-              </SettingsRow>
+              </ConsoleRow>
             )}
             {running && status && (
               <>
-                <SettingsRow label={t('syncService.status.address')}>
+                <ConsoleRow label={t('syncService.status.address')}>
                   <button
                     type="button"
-                    className="icon-btn font-mono text-sm"
+                    className="btn-secondary font-mono text-xs"
                     onClick={() => {
                       const address = `${status.lanHost ?? status.host}:${status.port}`
                       void navigator.clipboard
@@ -397,119 +514,109 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
                     {status.lanHost ?? status.host}:{status.port}
                     <IconCopyText />
                   </button>
-                </SettingsRow>
-                <SettingsRow label={t('syncService.status.serverId')}>
-                  <span className="font-mono text-sm">{status.serverId ?? '—'}</span>
-                </SettingsRow>
-                <SettingsRow label={t('syncService.status.tlsFingerprint')}>
+                </ConsoleRow>
+                <ConsoleRow label={t('syncService.status.serverId')}>
+                  <span className="font-mono text-xs">{status.serverId ?? '—'}</span>
+                </ConsoleRow>
+                <ConsoleRow label={t('syncService.status.tlsFingerprint')}>
                   <button
                     type="button"
-                    className="icon-btn font-mono text-xs"
+                    className="btn-secondary font-mono text-xs"
                     title={status.tlsFingerprintSha256 ?? ''}
                     onClick={() => void copyFingerprint()}
                   >
                     {(status.tlsFingerprintSha256 ?? '').slice(0, 16)}…
                     <IconCopyText />
                   </button>
-                </SettingsRow>
+                </ConsoleRow>
               </>
             )}
           </div>
-        </SettingsCard>
 
-        {/* K4：连接诊断折叠卡（观测面：纯聚合既有状态，不做主动探测；未装配时无此段） */}
-        {status?.diagnostics && (
-          <details className="group">
-            <summary
-              className="cursor-pointer select-none text-sm"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              {t('syncService.diagnostics.title')}
-            </summary>
-            <SettingsCard>
-              <div className="space-y-2">
-                <SettingsRow label={t('syncService.diagnostics.bindAddress')}>
+          {/* K4：连接诊断折叠卡（只聚合既有观测，不做主动探测） */}
+          {status?.diagnostics && (
+            <details className="sc-details">
+              <summary>{t('syncService.diagnostics.title')}</summary>
+              <div className="sc-service-rows">
+                <ConsoleRow label={t('syncService.diagnostics.bindAddress')}>
                   <span className="font-mono text-xs">{status.diagnostics.host}</span>
-                </SettingsRow>
-                <SettingsRow label={t('syncService.diagnostics.port')}>
+                </ConsoleRow>
+                <ConsoleRow label={t('syncService.diagnostics.port')}>
                   <span className="font-mono text-xs">{status.diagnostics.port}</span>
-                </SettingsRow>
-                <SettingsRow label={t('syncService.diagnostics.secure')}>
+                </ConsoleRow>
+                <ConsoleRow label={t('syncService.diagnostics.secure')}>
                   <span className="text-xs">
                     {status.diagnostics.secure
                       ? t('syncService.diagnostics.secureOn')
                       : t('syncService.diagnostics.secureOff')}
                   </span>
-                </SettingsRow>
+                </ConsoleRow>
                 {status.diagnostics.tlsFingerprintTail8 && (
-                  <SettingsRow label={t('syncService.diagnostics.tlsTail')}>
+                  <ConsoleRow label={t('syncService.diagnostics.tlsTail')}>
                     <span className="font-mono text-xs">
                       {status.diagnostics.tlsFingerprintTail8}
                     </span>
-                  </SettingsRow>
+                  </ConsoleRow>
                 )}
                 {status.diagnostics.pairedDeviceCount !== undefined && (
-                  <SettingsRow label={t('syncService.diagnostics.devices')}>
+                  <ConsoleRow label={t('syncService.diagnostics.devices')}>
                     <span className="text-xs">{status.diagnostics.pairedDeviceCount}</span>
-                  </SettingsRow>
+                  </ConsoleRow>
                 )}
                 {status.diagnostics.connectionHosts &&
                   status.diagnostics.connectionHosts.length > 0 && (
-                    <SettingsRow label={t('syncService.diagnostics.altHosts')}>
+                    <ConsoleRow label={t('syncService.diagnostics.altHosts')}>
                       <span className="font-mono text-xs">
                         {status.diagnostics.connectionHosts.join(' · ')}
                       </span>
-                    </SettingsRow>
+                    </ConsoleRow>
                   )}
-                {/* K7：上次扫描计数（runtime-status 响应体；仅计数无路径/UID/错误原文） */}
                 {lastScanText && (
-                  <SettingsRow label={t('syncService.diagnostics.lastScan')}>
+                  <ConsoleRow label={t('syncService.diagnostics.lastScan')}>
                     <span className="font-mono text-xs">{lastScanText}</span>
-                  </SettingsRow>
+                  </ConsoleRow>
                 )}
                 {status.diagnostics.lastError && (
-                  <SettingsRow label={t('syncService.diagnostics.lastError')}>
+                  <ConsoleRow label={t('syncService.diagnostics.lastError')}>
                     <span className="font-mono text-xs" style={{ color: 'var(--danger)' }}>
                       {status.diagnostics.lastError}
                     </span>
-                  </SettingsRow>
+                  </ConsoleRow>
                 )}
               </div>
-            </SettingsCard>
-          </details>
-        )}
-      </SectionShell>
+            </details>
+          )}
+        </ConsoleSection>
 
-      {/* ②配对：服务没跑起来时二维码无内容可生成，按钮按 running 禁用 */}
-      <SectionShell title={t('syncService.pairing.title')}>
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {running ? t('syncService.pairing.hintRunning') : t('syncService.pairing.hintDisabled')}
-          </p>
-          <button
-            type="button"
-            className="btn-primary text-sm"
-            disabled={!running}
-            onClick={() => setQrOpen(true)}
-          >
-            {t('syncService.pairing.open')}
-          </button>
-        </div>
-      </SectionShell>
+        <ConsoleSection title={t('syncService.pairing.title')}>
+          <div className="sc-button-row">
+            <p className="sc-setting-help">
+              {running
+                ? t('syncService.pairing.hintRunning')
+                : t('syncService.pairing.hintDisabled')}
+            </p>
+            <button
+              type="button"
+              className="btn-primary text-sm"
+              disabled={!running}
+              onClick={() => setQrOpen(true)}
+            >
+              {t('syncService.pairing.open')}
+            </button>
+          </div>
+        </ConsoleSection>
 
-      {/* ③设备管理 */}
-      <SectionShell title={t('syncService.devices.title')}>
-        {devices.length === 0 ? (
-          <EmptyState
-            title={t('syncService.devices.empty')}
-            subtitle={t('syncService.devices.emptyHint')}
-          />
-        ) : (
-          <div className="space-y-2">
-            {devices.map((device) => (
-              <SettingsCard key={device.deviceId}>
-                <SettingsRow label={device.deviceName}>
-                  <div className="flex items-center gap-3">
+        <ConsoleSection title={t('syncService.devices.title')}>
+          {devices.length === 0 ? (
+            <EmptyState
+              title={t('syncService.devices.empty')}
+              subtitle={t('syncService.devices.emptyHint')}
+            />
+          ) : (
+            <div className="sc-service-rows">
+              {devices.map((device) => (
+                <ConsoleRow key={device.deviceId} label={device.deviceName}>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
                     <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
                       {device.platform === 'ios' ? 'iOS' : 'Android'}
                       {device.appVersion ? ` · v${device.appVersion}` : ''}
@@ -528,149 +635,12 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
                       {t('syncService.devices.revoke')}
                     </button>
                   </div>
-                </SettingsRow>
-              </SettingsCard>
-            ))}
-          </div>
-        )}
-      </SectionShell>
-
-      {/* T3：Android App 卡（上游 connect 页 androidCard 移植） */}
-      <SectionShell
-        title={t('syncConsole.connect.android.title')}
-        description={t('syncConsole.connect.android.description')}
-      >
-        <div className="space-y-2">
-          {pairedCount > 0 ? (
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.connect.android.paired')} ·{' '}
-              {t('syncConsole.connect.android.pairedHint')}
-            </p>
-          ) : null}
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.connect.android.newQrNote')}
-            </p>
-            <button
-              type="button"
-              className="btn-primary text-sm"
-              disabled={!running}
-              onClick={() => setQrOpen(true)}
-            >
-              {t('syncConsole.connect.android.newQr')}
-            </button>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="btn-secondary text-sm"
-              onClick={() => void openUpstreamLink(UPSTREAM_ANDROID_APK_URL, showError)}
-            >
-              {t('syncConsole.connect.android.download')}
-            </button>
-            <button
-              type="button"
-              className="btn-ghost text-sm"
-              onClick={() => void exportDiagnostics(t, showMessage, showError)}
-            >
-              {t('syncConsole.connect.android.export')}
-            </button>
-          </div>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {t('syncConsole.connect.android.exportNote')}
-          </p>
-        </div>
-      </SectionShell>
-
-      {/* N7：PC 端分区（微信画廊）——T3 起包进可折叠卡，折叠态持久化（上游同款键） */}
-      <details
-        className="group"
-        open={wechatOpen}
-        onToggle={(event) => {
-          const open = event.currentTarget.open
-          setWechatOpen(open)
-          persistWechatFold(open)
-        }}
-      >
-        <summary
-          className="cursor-pointer select-none text-sm"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          {t('syncService.pc.title')}
-        </summary>
-        <SyncPcCompanionSection onConnected={handleWechatConnected} />
-      </details>
-
-      {/* T3：首次使用引导（上游 firstUse 移植；<details> 不做完成态持久化） */}
-      <details className="group">
-        <summary
-          className="cursor-pointer select-none text-sm"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          {t('syncConsole.connect.guide.title')} · {t('syncConsole.connect.guide.summary')}
-        </summary>
-        <SettingsCard>
-          <div className="space-y-3">
-            <ol className="space-y-2">
-              {(
-                [
-                  ['step1Title', 'step1Body'],
-                  ['step2Title', 'step2Body'],
-                  ['step3Title', 'step3Body']
-                ] as const
-              ).map(([titleKey, bodyKey]) => (
-                <li key={titleKey} className="text-xs">
-                  <strong className="block text-sm font-medium">
-                    {t(`syncConsole.connect.guide.${titleKey}`)}
-                  </strong>
-                  <span style={{ color: 'var(--text-tertiary)' }}>
-                    {t(`syncConsole.connect.guide.${bodyKey}`)}
-                  </span>
-                </li>
+                </ConsoleRow>
               ))}
-            </ol>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                className="btn-secondary text-xs"
-                onClick={() => void openUpstreamLink(UPSTREAM_QUARK_URL, showError)}
-              >
-                {t('syncConsole.connect.guide.quark')}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary text-xs"
-                onClick={() => void openUpstreamLink(UPSTREAM_BAIDU_URL, showError)}
-              >
-                {t('syncConsole.connect.guide.baidu')}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-xs"
-                onClick={() => onNavigate('settings')}
-              >
-                {t('syncConsole.connect.guide.openNetwork')}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-xs"
-                onClick={() => onNavigate('settings')}
-              >
-                {t('syncConsole.connect.guide.openScan')}
-              </button>
             </div>
-          </div>
-        </SettingsCard>
-      </details>
-
-      {/* T3：连接自查（掉线自动展开） */}
-      <SelfCheckCard status={status} onNavigate={onNavigate} />
-
-      {/* T3：隐私口径（上游 connect 页脚注逐字） */}
-      <p className="text-xs leading-relaxed" style={{ color: 'var(--text-tertiary)' }}>
-        {t('syncConsole.connect.privacyNote')}
-      </p>
-
+          )}
+        </ConsoleSection>
+      </div>
       <PairingQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
       <ConfirmDialog
         open={revokeTarget !== null}
@@ -693,13 +663,21 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate }) => {
  * 一律静默降级为不可用提示，绝不把 IPC rejection 冒成未捕获错误或全局 toast。
  * 二维码 SVG 由本仓主进程 `qrcode` 生成，经 data URL 渲染（不引入 innerHTML）。
  */
-const SyncPcCompanionSection: React.FC<{ onConnected?: () => void }> = ({ onConnected }) => {
+const SyncPcCompanionSection: React.FC = () => {
   const { t } = useTranslation()
   const currentView = useUIStore((s) => s.currentView)
   const [wechatStatus, setWechatStatus] = useState<unknown>(null)
   const [qrSvg, setQrSvg] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
+  // 上游 momo.wechat-entry.seen.v1：首次展开入口码，收起一次后记住
+  const [entryOpen, setEntryOpen] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem(WECHAT_ENTRY_SEEN_KEY) !== '1'
+    } catch {
+      return true
+    }
+  })
 
   // R3 审查修复：在途刷新守卫（与页头状态卡同口径）
   const sectionAliveRef = useRef(true)
@@ -739,10 +717,16 @@ const SyncPcCompanionSection: React.FC<{ onConnected?: () => void }> = ({ onConn
       ? String((wechatStatus as Record<string, unknown>).state ?? '')
       : ''
 
-  // T3：微信画廊连上即收起入口卡（上游同款「看过一次即折叠」语义的完成态分支）
+  // T3：微信画廊连上即收起入口码（上游同款「看过一次即折叠」）
   useEffect(() => {
-    if (stateText === 'connected') onConnected?.()
-  }, [stateText, onConnected])
+    if (stateText !== 'connected') return
+    setEntryOpen(false)
+    try {
+      window.localStorage.setItem(WECHAT_ENTRY_SEEN_KEY, '1')
+    } catch {
+      // localStorage 不可用时仅本次会话收起
+    }
+  }, [stateText])
 
   const openDesktop = async (): Promise<void> => {
     const client = window.electronAPI?.nikkisync
@@ -792,65 +776,100 @@ const SyncPcCompanionSection: React.FC<{ onConnected?: () => void }> = ({ onConn
   }
 
   return (
-    <div data-testid="sync-service-pc-section">
-      <SectionShell title={t('syncService.pc.title')} description={t('syncService.pc.description')}>
-        <SettingsCard>
-          <div className="space-y-2">
-            <button
-              type="button"
-              data-testid="pc-open-desktop"
-              className="btn-secondary text-sm"
-              onClick={() => void openDesktop()}
-            >
-              {t('syncService.pc.openDesktop')}
-            </button>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                data-testid="pc-wechat-start"
-                className="btn-primary text-sm"
-                disabled={busy}
-                onClick={() => void startWechat()}
-              >
-                {t('syncService.pc.wechatStart')}
-              </button>
-              <button
-                type="button"
-                data-testid="pc-wechat-stop"
-                className="btn-ghost text-sm"
-                disabled={busy}
-                onClick={() => void stopWechat()}
-              >
-                {t('syncService.pc.wechatStop')}
-              </button>
-            </div>
-            <p
-              data-testid="pc-wechat-status"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncService.pc.wechatStatus', { state: stateText })}
-            </p>
-            {qrSvg && (
-              <img
-                data-testid="pc-wechat-qr"
-                alt=""
-                className="h-40 w-40"
-                src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg)}`}
-              />
-            )}
-            {failed && (
-              <p
-                data-testid="pc-error"
-                className="text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncService.pc.unavailable')}
-              </p>
-            )}
-          </div>
-        </SettingsCard>
-      </SectionShell>
-    </div>
+    <ConsoleCard className="sc-connection-card" testId="sync-service-pc-section">
+      <div className="sc-channel-top">
+        <span className="sc-channel-icon sc-channel-icon-wechat">
+          <ConsoleIcon name="wechat" />
+        </span>
+        <ConsoleBadge>{t('syncConsole.connect.wechat.platforms')}</ConsoleBadge>
+      </div>
+      <h2>{t('syncConsole.connect.wechat.title')}</h2>
+      <p className="sc-channel-description">{t('syncConsole.connect.wechat.description')}</p>
+      {/* 上游 wechatPanelHtml：入口码 details 首次展开，看过一次后收起 */}
+      <details
+        className="sc-wechat-entry-code"
+        open={entryOpen}
+        onToggle={(event) => {
+          const open = event.currentTarget.open
+          setEntryOpen(open)
+          try {
+            if (open) window.localStorage.removeItem(WECHAT_ENTRY_SEEN_KEY)
+            else window.localStorage.setItem(WECHAT_ENTRY_SEEN_KEY, '1')
+          } catch {
+            // localStorage 不可用时仅本次会话保留展开态
+          }
+        }}
+      >
+        <summary>{t('syncConsole.connect.wechat.entrySummary')}</summary>
+        <img
+          src={WECHAT_MINI_ENTRY_IMAGE}
+          alt={t('syncConsole.connect.wechat.entryAlt')}
+          width={220}
+          height={220}
+        />
+        <p className="sc-channel-note">{t('syncConsole.connect.wechat.entryHint')}</p>
+      </details>
+      <ol className="sc-connection-steps">
+        <li>
+          <span className="sc-step-number">1</span>
+          {t('syncConsole.connect.wechat.step1')}
+        </li>
+        <li>
+          <span className="sc-step-number">2</span>
+          {t('syncConsole.connect.wechat.step2')}
+        </li>
+        <li>
+          <span className="sc-step-number">3</span>
+          {t('syncConsole.connect.wechat.step3')}
+        </li>
+      </ol>
+      <button
+        type="button"
+        data-testid="pc-wechat-start"
+        className="btn-primary sc-channel-action"
+        disabled={busy}
+        onClick={() => void startWechat()}
+      >
+        {t('syncService.pc.wechatStart')}
+      </button>
+      <p data-testid="pc-wechat-status" className="sc-channel-note" role="status">
+        {t('syncService.pc.wechatStatus', { state: stateText })}
+      </p>
+      {qrSvg && (
+        <div className="sc-wechat-qr">
+          <img
+            data-testid="pc-wechat-qr"
+            alt=""
+            className="h-40 w-40"
+            src={`data:image/svg+xml;charset=utf-8,${encodeURIComponent(qrSvg)}`}
+          />
+        </div>
+      )}
+      {failed && (
+        <p data-testid="pc-error" className="sc-channel-note">
+          {t('syncService.pc.unavailable')}
+        </p>
+      )}
+      <div className="sc-button-row">
+        <button
+          type="button"
+          data-testid="pc-wechat-stop"
+          className="btn-secondary text-sm"
+          disabled={busy}
+          onClick={() => void stopWechat()}
+        >
+          {t('syncService.pc.wechatStop')}
+        </button>
+        <button
+          type="button"
+          data-testid="pc-open-desktop"
+          className="btn-ghost text-sm"
+          onClick={() => void openDesktop()}
+        >
+          {t('syncService.pc.openDesktop')}
+        </button>
+      </div>
+      <p className="sc-channel-note">{t('syncConsole.connect.wechat.note')}</p>
+    </ConsoleCard>
   )
 }

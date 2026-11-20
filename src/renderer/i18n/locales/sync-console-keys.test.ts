@@ -61,7 +61,7 @@ function leafKeys(node: unknown, prefix = ''): string[] {
 }
 
 /**
- * `syncConsole` 子树的全部叶子（166 个）。
+ * `syncConsole` 子树的全部叶子（192 个）。
  * 与控制台各视图/卡片的 `t('syncConsole.…')` 调用点一一对应：
  *  - nav/heading ← console-views.ts（CONSOLE_NAV_KEYS / CONSOLE_HEADING_KEYS）
  *  - connect.* ← ConnectView / SelfCheckCard
@@ -84,6 +84,8 @@ const SYNC_CONSOLE_LEAVES = [
   'heading.organizer.subtitle',
   'heading.inspiration.title',
   'heading.inspiration.subtitle',
+  'heading.inspiration.cardTitle',
+  'heading.inspiration.cardDescription',
   'heading.about.title',
   'heading.about.subtitle',
   'connect.stats.label',
@@ -91,9 +93,33 @@ const SYNC_CONSOLE_LEAVES = [
   'connect.stats.devicesUnit',
   'connect.stats.caption',
   'connect.stats.unavailable',
+  'shell.brandName',
+  'shell.brandLatin',
+  'shell.brandAlt',
+  'shell.navAria',
+  'shell.footerCompat',
+  'shell.footerDisclaimer',
+  'status.running',
+  'status.stopped',
+  'status.unavailable',
+  'connect.section.title',
+  'connect.section.networkHint',
   'connect.firstRun.hint',
   'connect.android.title',
   'connect.android.description',
+  'connect.android.stepInstall',
+  'connect.android.stepPair',
+  'connect.android.stepBrowse',
+  'connect.wechat.title',
+  'connect.wechat.description',
+  'connect.wechat.entrySummary',
+  'connect.wechat.entryAlt',
+  'connect.wechat.entryHint',
+  'connect.wechat.platforms',
+  'connect.wechat.step1',
+  'connect.wechat.step2',
+  'connect.wechat.step3',
+  'connect.wechat.note',
   'connect.android.paired',
   'connect.android.pairedHint',
   'connect.android.newQrNote',
@@ -236,7 +262,8 @@ const SYNC_CONSOLE_LEAVES = [
   'statusBar.export',
   'statusBar.exportCanceled',
   'statusBar.exported',
-  'statusBar.exportFailed'
+  'statusBar.exportFailed',
+  'statusBar.recoveryHint'
 ]
 
 /** 动态状态键的闭集（与 shared 枚举一致，未知码走 defaultValue 兜底不新增键）。 */
@@ -317,7 +344,7 @@ describe('syncConsole 语言包守卫（12 locale）', () => {
       ['nav.organizer', '最近删除'],
       ['nav.inspiration', '灵感库'],
       ['nav.about', '关于'],
-      ['connect.android.title', 'Android 客户端'],
+      ['connect.android.title', 'Android App'],
       ['connect.android.newQr', '生成新二维码'],
       ['connect.android.download', '下载 Android APK'],
       ['connect.android.export', '导出诊断包'],
@@ -356,6 +383,15 @@ describe('syncConsole 语言包守卫（12 locale）', () => {
     for (const [leaf, value] of pinned) {
       expect(readPath(LOCALES['zh-CN'], `syncConsole.${leaf}`), leaf).toBe(value)
     }
+  })
+
+  it('④d 隐私承诺不得被裁短（不经云端 + 开启前单独征求同意）', () => {
+    const zh = readPath(LOCALES['zh-CN'], 'syncConsole.connect.privacyNote') as string
+    expect(zh).toContain('不经过云端')
+    expect(zh).toContain('征求同意')
+    const enValue = readPath(LOCALES['en'], 'syncConsole.connect.privacyNote') as string
+    expect(enValue).toContain('never via the cloud')
+    expect(enValue).toContain('consent')
   })
 
   it('④c 易撞名文案互不重复（jsdom 不隐藏折叠 details，按名定位需全页唯一）', () => {

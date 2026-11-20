@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "Thư viện cảm hứng",
-        "subtitle": "Sưu tầm và quản lý cảm hứng phối đồ, kèm bộ lọc và mã chia sẻ"
+        "subtitle": "Sưu tầm và quản lý cảm hứng phối đồ, kèm bộ lọc và mã chia sẻ",
+        "cardTitle": "Thư viện cảm hứng phối đồ",
+        "cardDescription": "Lưu mã nhuộm, mã phối đồ và ảnh tham khảo. Ghi ngoại tuyến trên điện thoại và đồng bộ khi kết nối."
       },
       "about": {
         "title": "Giới thiệu",
@@ -4898,7 +4900,10 @@
         "newQr": "Tạo mã QR mới",
         "download": "Tải APK Android",
         "export": "Xuất gói chẩn đoán",
-        "exportNote": "Nếu kết nối thất bại, hãy xuất gói chẩn đoán và đính kèm khi gửi phản hồi"
+        "exportNote": "Nếu kết nối thất bại, hãy xuất gói chẩn đoán và đính kèm khi gửi phản hồi",
+        "stepInstall": "Tải và cài gói NikkiSync Android",
+        "stepPair": "Quét mã ghép nối của máy tính bằng ứng dụng",
+        "stepBrowse": "Duyệt và lưu ảnh gốc trên cùng Wi-Fi"
       },
       "guide": {
         "title": "Hướng dẫn lần đầu sử dụng",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "Phân giải tham số trực tuyến mặc định tắt; hãy bật trong cài đặt đồng bộ và chấp nhận thông báo trước.",
         "metadataStep3": "Giải mã cục bộ đã tích hợp trong thành phần đồng bộ; không cần cài thêm.",
         "openScan": "Kiểm tra cài đặt quét và phân giải"
+      },
+      "section": {
+        "title": "Kết nối với điện thoại",
+        "networkHint": "Máy tính và điện thoại phải dùng cùng một Wi-Fi"
+      },
+      "wechat": {
+        "title": "Tiểu trình WeChat",
+        "description": "Quét bằng WeChat để xem album và lưu ảnh, video.",
+        "entrySummary": "Lần đầu? Quét mã tiểu trình bằng WeChat",
+        "entryAlt": "Mã tiểu trình WeChat Momo Camera",
+        "entryHint": "Mở tiểu trình bằng WeChat trước, sau đó quét mã kết nối máy tính được tạo bên dưới. Lần sau mở từ tiểu trình dùng gần đây của WeChat.",
+        "platforms": "iPhone · Android",
+        "step1": "Quét mã tiểu trình ở trên bằng WeChat",
+        "step2": "Quét trong tiểu trình để kết nối máy tính",
+        "step3": "Chọn ảnh và lưu ảnh gốc vào điện thoại",
+        "note": "Ảnh và video được lưu riêng · mã kết nối có hiệu lực 10 phút"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "Xuất gói chẩn đoán",
       "exportCanceled": "Đã hủy xuất",
       "exported": "Đã xuất gói chẩn đoán: {{path}}",
-      "exportFailed": "Xuất gói chẩn đoán thất bại"
+      "exportFailed": "Xuất gói chẩn đoán thất bại",
+      "recoveryHint": "Dịch vụ đồng bộ đã dừng. Dữ liệu và bản ghi ghép nối vẫn được giữ; khởi động lại dịch vụ để tiếp tục."
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "Điều hướng chính",
+      "footerCompat": "Ứng dụng Windows · tương thích tiểu trình và ứng dụng",
+      "footerDisclaimer": "Infinity Nikki · trợ lý chụp ảnh không chính thức"
+    },
+    "status": {
+      "running": "Dịch vụ đồng bộ đang chạy",
+      "stopped": "Dịch vụ đồng bộ đã dừng",
+      "unavailable": "Thành phần đồng bộ chưa sẵn sàng"
     }
   }
 }

@@ -154,10 +154,16 @@ interface SyncInspirationPanelProps {
    * 控制台灵感视图显式传 currentView==='sync-service'。keep-alive 下不可见一律不刷。
    */
   autoRefreshVisible?: boolean
+  /**
+   * 控制台灵感视图内嵌：隐藏折叠摘要并默认展开，让页面直接呈现列表/筛选/编辑区。
+   * 独立灵感库页保持原有可折叠结构。
+   */
+  embedded?: boolean
 }
 
 export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
-  autoRefreshVisible
+  autoRefreshVisible,
+  embedded = false
 }) => {
   const { t } = useTranslation()
   const [items, setItems] = useState<NikkiSyncInspirationVersionedInfo[] | null>(null)
@@ -285,19 +291,31 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
     }
   }, [listCursor, loadingMore])
 
-  // 库变更 ⇒ 列表可能是旧的；折叠态只复位缓存等下次展开，展开态立刻重取
+  // 控制台内嵌模式默认展开，无 summary 可点 ⇒ 挂载即取首屏
+  useEffect(() => {
+    if (!embedded || loadedRef.current || loadFailed) return
+    loadedRef.current = true
+    void loadList()
+  }, [embedded, loadFailed, loadList])
+
+  // 库变更 ⇒ 列表可能是旧的；折叠态复位缓存等下次展开，展开态立刻重取。
+  // 内嵌态常展开：直接重取，且不在此复位 loadFailed——否则会连带触发挂载 effect 发起第二轮。
   useEffect(() => {
     const subscribe = window.electronAPI?.nikkisync?.onLibraryChanged
     if (!subscribe) return
     return subscribe(() => {
       loadedRef.current = false
-      setLoadFailed(false)
       // F16：库变更后游标下的分页内容也可能变了——回到首屏重新翻页
       setListCursor(null)
       setLoadMoreFailed(false)
+      if (embedded) {
+        void loadList()
+        return
+      }
+      setLoadFailed(false)
       if (detailsRef.current?.open) void loadList()
     })
-  }, [loadList])
+  }, [embedded, loadList])
 
   // 卸载后作废全部在途代次：过期响应不得回调已卸载组件
   useEffect(
@@ -317,14 +335,15 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
   useEffect(() => {
     if (!visible || bridgeMissing) return
     const timer = setInterval(() => {
-      if (!detailsRef.current?.open) return
+      // 内嵌态没有 <details>（恒展开）；折叠态读真实 open
+      if (!embedded && !detailsRef.current?.open) return
       if (draftRef.current) return
       if (!loadedRef.current) return
       if (Date.now() - lastLoadRef.current < AUTO_REFRESH_THROTTLE_MS) return
       void loadList()
     }, AUTO_REFRESH_TICK_MS)
     return () => clearInterval(timer)
-  }, [visible, bridgeMissing, loadList])
+  }, [visible, bridgeMissing, embedded, loadList])
 
   if (bridgeMissing) return null
 
@@ -460,430 +479,435 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
     }
   }
 
-  return (
-    <div className="mt-2 space-y-2">
-      <details
-        ref={detailsRef}
-        data-testid="sync-inspiration-panel"
-        className="rounded-lg border"
-        style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-secondary)' }}
-        onToggle={(event) => {
-          const open = (event.currentTarget as HTMLDetailsElement).open
-          if (open && !loadedRef.current && !loadFailed) {
-            loadedRef.current = true
-            void loadList()
-          } else if (!open && loadFailed) {
-            // 失败态折叠后复位，允许下次展开重试；成功态保留 loadedRef 缓存，不重复发 IPC
-            loadedRef.current = false
-            setLoadFailed(false)
-          }
-        }}
-      >
-        <summary
-          data-testid="sync-inspiration-summary"
-          className="cursor-pointer select-none px-3 py-2 text-sm"
-          style={{ color: 'var(--text-secondary)' }}
-        >
-          {t('syncGallery.inspiration.title')}
-        </summary>
-        <div className="space-y-3 px-3 pb-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncGallery.inspiration.hint')}
-            </p>
-            <button
-              type="button"
-              data-testid="inspiration-new"
-              className="icon-btn rounded-md border px-2 py-1 text-sm"
-              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-              onClick={() => openDraft()}
-            >
-              {t('syncGallery.inspiration.new')}
-            </button>
+  /**
+   * 面板主体（两种外壳共用）。内嵌态必须是普通 div：`<details>` 缺 `<summary>` 时
+   * Chromium 会合成一个未翻译的匿名折叠头（英文 "Details"），而且用户能把它收起、
+   * 却找不到再展开的入口。
+   */
+  const panelBody = (
+    <div className={embedded ? 'sc-inspiration-body' : 'space-y-3 px-3 pb-3'}>
+      {embedded && (
+        <div className="sc-card-head">
+          <div className="sc-card-head-text">
+            <h3 className="sc-card-title">{t('syncConsole.heading.inspiration.cardTitle')}</h3>
+            <p className="sc-card-desc">{t('syncConsole.heading.inspiration.cardDescription')}</p>
           </div>
+        </div>
+      )}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          {t('syncGallery.inspiration.hint')}
+        </p>
+        <button
+          type="button"
+          data-testid="inspiration-new"
+          className="icon-btn rounded-md border px-2 py-1 text-sm"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+          onClick={() => openDraft()}
+        >
+          {t('syncGallery.inspiration.new')}
+        </button>
+      </div>
 
-          {/* T8：过滤条（搜索/分类/状态/刷新）——判据走 inspiration-filter 纯函数 */}
-          <div className="flex flex-wrap items-center gap-2">
+      {/* T8：过滤条（搜索/分类/状态/刷新）——判据走 inspiration-filter 纯函数 */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          data-testid="inspiration-search"
+          type="text"
+          className="min-w-32 flex-1 rounded-md border bg-transparent px-2 py-1 text-sm"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+          placeholder={t('syncGallery.inspiration.searchPlaceholder')}
+          value={filterQ}
+          onChange={(event) => setFilterQ(event.target.value)}
+        />
+        <input
+          data-testid="inspiration-category-filter"
+          type="text"
+          className="w-28 rounded-md border bg-transparent px-2 py-1 text-sm"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+          placeholder={t('syncGallery.inspiration.categoryPlaceholder')}
+          value={filterCategory}
+          onChange={(event) => setFilterCategory(event.target.value)}
+        />
+        <select
+          data-testid="inspiration-status-filter"
+          className="rounded-md border bg-transparent px-2 py-1 text-sm"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+          aria-label={t('syncGallery.inspiration.statusLabel')}
+          value={filterStatus}
+          onChange={(event) => setFilterStatus(event.target.value)}
+        >
+          <option value="">{t('syncGallery.inspiration.statusAll')}</option>
+          {INSPIRATION_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {t(`syncGallery.inspiration.status.${status}`)}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          data-testid="inspiration-refresh"
+          className="icon-btn rounded-md border px-2 py-1 text-sm"
+          style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+          onClick={() => void loadList()}
+        >
+          {t('syncGallery.inspiration.refresh')}
+        </button>
+      </div>
+      {items !== null && !loadFailed && (
+        <p
+          data-testid="inspiration-count-note"
+          className="text-xs"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          {t('syncGallery.inspiration.countNote', { count: visibleItems.length })}
+        </p>
+      )}
+
+      {draft && (
+        <div
+          className="space-y-2 rounded-lg border p-2"
+          style={{ borderColor: 'var(--border-subtle)' }}
+        >
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.titleLabel')}
             <input
-              data-testid="inspiration-search"
+              data-testid="inspiration-title-input"
               type="text"
-              className="min-w-32 flex-1 rounded-md border bg-transparent px-2 py-1 text-sm"
-              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-              placeholder={t('syncGallery.inspiration.searchPlaceholder')}
-              value={filterQ}
-              onChange={(event) => setFilterQ(event.target.value)}
-            />
-            <input
-              data-testid="inspiration-category-filter"
-              type="text"
-              className="w-28 rounded-md border bg-transparent px-2 py-1 text-sm"
-              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-              placeholder={t('syncGallery.inspiration.categoryPlaceholder')}
-              value={filterCategory}
-              onChange={(event) => setFilterCategory(event.target.value)}
-            />
-            <select
-              data-testid="inspiration-status-filter"
               className="rounded-md border bg-transparent px-2 py-1 text-sm"
               style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-              aria-label={t('syncGallery.inspiration.statusLabel')}
-              value={filterStatus}
-              onChange={(event) => setFilterStatus(event.target.value)}
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.notesLabel')}
+            <textarea
+              data-testid="inspiration-notes-input"
+              className="rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              value={draft.notes}
+              onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
+            />
+          </label>
+          {/* T9：标签/分类（逗号分隔输入，保存时按上游判据拆分去重） */}
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.tagsLabel')}
+            <input
+              data-testid="inspiration-tags-input"
+              type="text"
+              className="rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              placeholder={t('syncGallery.inspiration.tagsPlaceholder')}
+              value={draft.tags}
+              onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.categoriesLabel')}
+            <input
+              data-testid="inspiration-categories-input"
+              type="text"
+              className="rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              placeholder={t('syncGallery.inspiration.categoriesPlaceholder')}
+              value={draft.categories}
+              onChange={(event) => setDraft({ ...draft, categories: event.target.value })}
+            />
+          </label>
+          {/* T9：状态五态（上游枚举）；分享码原文 + 备注中的候选识别提示 */}
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.statusLabel')}
+            <select
+              data-testid="inspiration-status-input"
+              className="rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              value={draft.status}
+              onChange={(event) =>
+                setDraft({ ...draft, status: event.target.value as InspirationStatus })
+              }
             >
-              <option value="">{t('syncGallery.inspiration.statusAll')}</option>
               {INSPIRATION_STATUSES.map((status) => (
                 <option key={status} value={status}>
                   {t(`syncGallery.inspiration.status.${status}`)}
                 </option>
               ))}
             </select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.codeLabel')}
+            <input
+              data-testid="inspiration-code-input"
+              type="text"
+              className="rounded-md border bg-transparent px-2 py-1 text-sm"
+              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
+              value={draft.rawCode}
+              onChange={(event) => setDraft({ ...draft, rawCode: event.target.value })}
+            />
+          </label>
+          {(() => {
+            // T9：识别提示只做候选展示，点击采纳才写入 rawCode；不臆造解析结果
+            const candidates = insCandidates(draft.notes)
+            if (candidates.length === 0) return null
+            const candidate = candidates[0]
+            return (
+              <button
+                type="button"
+                data-testid="inspiration-code-hint"
+                className="text-left text-xs underline"
+                style={{ color: 'var(--text-tertiary)' }}
+                onClick={() => setDraft({ ...draft, rawCode: candidate })}
+              >
+                {t('syncGallery.inspiration.codeRecognized', { code: candidate })}
+              </button>
+            )
+          })()}
+          <label className="flex flex-col gap-1 text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncGallery.inspiration.imageLabel')}
+            <input
+              data-testid="inspiration-image-input"
+              type="file"
+              accept="image/*"
+              className="text-sm"
+              onChange={(event) => {
+                const file = event.target.files?.[0]
+                if (file) void handleImage(file)
+              }}
+            />
+          </label>
+          {imageError && (
+            <p
+              data-testid="inspiration-image-error"
+              className="text-xs"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              {t('syncGallery.inspiration.imageFailed')}
+            </p>
+          )}
+          <div className="flex items-center gap-2">
             <button
               type="button"
-              data-testid="inspiration-refresh"
-              className="icon-btn rounded-md border px-2 py-1 text-sm"
-              style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-              onClick={() => void loadList()}
+              data-testid="inspiration-save"
+              className="btn-primary text-sm"
+              disabled={busy || draft.title.trim() === ''}
+              onClick={() => void handleSave()}
             >
-              {t('syncGallery.inspiration.refresh')}
+              {t('syncGallery.inspiration.save')}
+            </button>
+            <button
+              type="button"
+              data-testid="inspiration-cancel"
+              className="btn-ghost text-sm"
+              onClick={() => {
+                setDraft(null)
+                setSaveError(false)
+                // F13：取消草稿同样复位上传失败标记
+                setImageError(false)
+              }}
+            >
+              {t('syncGallery.inspiration.cancel')}
             </button>
           </div>
-          {items !== null && !loadFailed && (
-            <p
-              data-testid="inspiration-count-note"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncGallery.inspiration.countNote', { count: visibleItems.length })}
-            </p>
-          )}
-
-          {draft && (
-            <div
-              className="space-y-2 rounded-lg border p-2"
-              style={{ borderColor: 'var(--border-subtle)' }}
-            >
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.titleLabel')}
-                <input
-                  data-testid="inspiration-title-input"
-                  type="text"
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                  value={draft.title}
-                  onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-                />
-              </label>
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.notesLabel')}
-                <textarea
-                  data-testid="inspiration-notes-input"
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                  value={draft.notes}
-                  onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-                />
-              </label>
-              {/* T9：标签/分类（逗号分隔输入，保存时按上游判据拆分去重） */}
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.tagsLabel')}
-                <input
-                  data-testid="inspiration-tags-input"
-                  type="text"
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                  placeholder={t('syncGallery.inspiration.tagsPlaceholder')}
-                  value={draft.tags}
-                  onChange={(event) => setDraft({ ...draft, tags: event.target.value })}
-                />
-              </label>
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.categoriesLabel')}
-                <input
-                  data-testid="inspiration-categories-input"
-                  type="text"
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                  placeholder={t('syncGallery.inspiration.categoriesPlaceholder')}
-                  value={draft.categories}
-                  onChange={(event) => setDraft({ ...draft, categories: event.target.value })}
-                />
-              </label>
-              {/* T9：状态五态（上游枚举）；分享码原文 + 备注中的候选识别提示 */}
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.statusLabel')}
-                <select
-                  data-testid="inspiration-status-input"
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                  value={draft.status}
-                  onChange={(event) =>
-                    setDraft({ ...draft, status: event.target.value as InspirationStatus })
-                  }
-                >
-                  {INSPIRATION_STATUSES.map((status) => (
-                    <option key={status} value={status}>
-                      {t(`syncGallery.inspiration.status.${status}`)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.codeLabel')}
-                <input
-                  data-testid="inspiration-code-input"
-                  type="text"
-                  className="rounded-md border bg-transparent px-2 py-1 text-sm"
-                  style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
-                  value={draft.rawCode}
-                  onChange={(event) => setDraft({ ...draft, rawCode: event.target.value })}
-                />
-              </label>
-              {(() => {
-                // T9：识别提示只做候选展示，点击采纳才写入 rawCode；不臆造解析结果
-                const candidates = insCandidates(draft.notes)
-                if (candidates.length === 0) return null
-                const candidate = candidates[0]
-                return (
-                  <button
-                    type="button"
-                    data-testid="inspiration-code-hint"
-                    className="text-left text-xs underline"
-                    style={{ color: 'var(--text-tertiary)' }}
-                    onClick={() => setDraft({ ...draft, rawCode: candidate })}
-                  >
-                    {t('syncGallery.inspiration.codeRecognized', { code: candidate })}
-                  </button>
-                )
-              })()}
-              <label
-                className="flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text-tertiary)' }}
-              >
-                {t('syncGallery.inspiration.imageLabel')}
-                <input
-                  data-testid="inspiration-image-input"
-                  type="file"
-                  accept="image/*"
-                  className="text-sm"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0]
-                    if (file) void handleImage(file)
-                  }}
-                />
-              </label>
-              {imageError && (
-                <p
-                  data-testid="inspiration-image-error"
-                  className="text-xs"
-                  style={{ color: 'var(--text-tertiary)' }}
-                >
-                  {t('syncGallery.inspiration.imageFailed')}
-                </p>
-              )}
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-testid="inspiration-save"
-                  className="btn-primary text-sm"
-                  disabled={busy || draft.title.trim() === ''}
-                  onClick={() => void handleSave()}
-                >
-                  {t('syncGallery.inspiration.save')}
-                </button>
-                <button
-                  type="button"
-                  data-testid="inspiration-cancel"
-                  className="btn-ghost text-sm"
-                  onClick={() => {
-                    setDraft(null)
-                    setSaveError(false)
-                    // F13：取消草稿同样复位上传失败标记
-                    setImageError(false)
-                  }}
-                >
-                  {t('syncGallery.inspiration.cancel')}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {saveError && (
-            <p
-              data-testid="inspiration-save-error"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncGallery.inspiration.saveFailed')}
-            </p>
-          )}
-
-          {loadFailed ? (
-            <p
-              data-testid="inspiration-load-error"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncGallery.inspiration.loadFailed')}
-            </p>
-          ) : items === null ? (
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncGallery.inspiration.loading')}
-            </p>
-          ) : items.length === 0 ? (
-            <p
-              data-testid="inspiration-empty"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncGallery.inspiration.empty')}
-            </p>
-          ) : visibleItems.length === 0 ? (
-            <p
-              data-testid="inspiration-filter-empty"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncGallery.inspiration.filterEmpty')}
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {visibleItems.map((row) => {
-                const images = parseImages(row.entry?.images)
-                const entry = row.entry
-                const tags = Array.isArray(entry?.tags) ? entry.tags : []
-                const rawCode = typeof entry?.code?.rawCode === 'string' ? entry.code.rawCode : ''
-                const status =
-                  typeof entry?.status === 'string' &&
-                  (INSPIRATION_STATUSES as readonly string[]).includes(entry.status)
-                    ? entry.status
-                    : null
-                return (
-                  <li
-                    key={`${String(row.entry?.id ?? 'row')}-${row.revision}`}
-                    data-testid="inspiration-item"
-                    className="rounded-md border px-2 py-1"
-                    style={{ borderColor: 'var(--border-subtle)' }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-2">
-                        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
-                          {String(row.entry?.title ?? '')}
-                        </span>
-                        {/* T9：状态徽标（未知状态不渲染，不谎报枚举外值） */}
-                        {status && (
-                          <span
-                            data-testid="inspiration-status-badge"
-                            className="rounded-full border px-1.5 text-xs"
-                            style={{
-                              borderColor: 'var(--border-subtle)',
-                              color: 'var(--text-secondary)'
-                            }}
-                          >
-                            {t(`syncGallery.inspiration.status.${status}`)}
-                          </span>
-                        )}
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          data-testid="inspiration-edit"
-                          className="icon-btn text-xs"
-                          onClick={() => openDraft(row)}
-                        >
-                          {t('syncGallery.inspiration.edit')}
-                        </button>
-                        <button
-                          type="button"
-                          data-testid="inspiration-delete"
-                          className="icon-btn text-xs"
-                          disabled={busy}
-                          onClick={() => void handleDelete(row)}
-                        >
-                          {t('syncGallery.inspiration.delete')}
-                        </button>
-                      </span>
-                    </div>
-                    {/* T9：标签 chips + 分享码片段（有则展示，无则不占位） */}
-                    {(tags.length > 0 || rawCode !== '') && (
-                      <div className="mt-1 flex flex-wrap items-center gap-1">
-                        {tags.map((tag) => (
-                          <span
-                            key={tag}
-                            data-testid="inspiration-tag-chip"
-                            className="rounded-full border px-1.5 text-xs"
-                            style={{
-                              borderColor: 'var(--border-subtle)',
-                              color: 'var(--text-tertiary)'
-                            }}
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {rawCode !== '' && (
-                          <code
-                            data-testid="inspiration-code-snippet"
-                            className="max-w-48 truncate text-xs"
-                            style={{ color: 'var(--text-tertiary)' }}
-                          >
-                            {rawCode}
-                          </code>
-                        )}
-                      </div>
-                    )}
-                    {images.length > 0 && (
-                      <div className="mt-1 flex flex-wrap gap-1">
-                        {images.map((image) => (
-                          <InspirationImage key={image.id} sha256={image.sha256} />
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-
-          {/* F16：nextCursor 非空才给加载更多（消费 after 游标翻页），失败原位可重试 */}
-          {!loadFailed && items !== null && items.length > 0 && listCursor !== null && (
-            <button
-              type="button"
-              data-testid="inspiration-load-more"
-              className="icon-btn text-xs"
-              disabled={loadingMore || busy}
-              onClick={() => void loadMore()}
-            >
-              {t('syncGallery.inspiration.loadMore')}
-            </button>
-          )}
-          {loadMoreFailed && (
-            <p
-              data-testid="inspiration-load-more-error"
-              className="text-xs"
-              style={{ color: 'var(--text-tertiary)' }}
-            >
-              {t('syncGallery.inspiration.loadMoreFailed')}
-            </p>
-          )}
         </div>
-      </details>
+      )}
+
+      {saveError && (
+        <p
+          data-testid="inspiration-save-error"
+          className="text-xs"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          {t('syncGallery.inspiration.saveFailed')}
+        </p>
+      )}
+
+      {loadFailed ? (
+        <p
+          data-testid="inspiration-load-error"
+          className="text-xs"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          {t('syncGallery.inspiration.loadFailed')}
+        </p>
+      ) : items === null ? (
+        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+          {t('syncGallery.inspiration.loading')}
+        </p>
+      ) : items.length === 0 ? (
+        <p
+          data-testid="inspiration-empty"
+          className="text-xs"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          {t('syncGallery.inspiration.empty')}
+        </p>
+      ) : visibleItems.length === 0 ? (
+        <p
+          data-testid="inspiration-filter-empty"
+          className="text-xs"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          {t('syncGallery.inspiration.filterEmpty')}
+        </p>
+      ) : (
+        <ul className="space-y-2">
+          {visibleItems.map((row) => {
+            const images = parseImages(row.entry?.images)
+            const entry = row.entry
+            const tags = Array.isArray(entry?.tags) ? entry.tags : []
+            const rawCode = typeof entry?.code?.rawCode === 'string' ? entry.code.rawCode : ''
+            const status =
+              typeof entry?.status === 'string' &&
+              (INSPIRATION_STATUSES as readonly string[]).includes(entry.status)
+                ? entry.status
+                : null
+            return (
+              <li
+                key={`${String(row.entry?.id ?? 'row')}-${row.revision}`}
+                data-testid="inspiration-item"
+                className="rounded-md border px-2 py-1"
+                style={{ borderColor: 'var(--border-subtle)' }}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                      {String(row.entry?.title ?? '')}
+                    </span>
+                    {/* T9：状态徽标（未知状态不渲染，不谎报枚举外值） */}
+                    {status && (
+                      <span
+                        data-testid="inspiration-status-badge"
+                        className="rounded-full border px-1.5 text-xs"
+                        style={{
+                          borderColor: 'var(--border-subtle)',
+                          color: 'var(--text-secondary)'
+                        }}
+                      >
+                        {t(`syncGallery.inspiration.status.${status}`)}
+                      </span>
+                    )}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      data-testid="inspiration-edit"
+                      className="icon-btn text-xs"
+                      onClick={() => openDraft(row)}
+                    >
+                      {t('syncGallery.inspiration.edit')}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="inspiration-delete"
+                      className="icon-btn text-xs"
+                      disabled={busy}
+                      onClick={() => void handleDelete(row)}
+                    >
+                      {t('syncGallery.inspiration.delete')}
+                    </button>
+                  </span>
+                </div>
+                {/* T9：标签 chips + 分享码片段（有则展示，无则不占位） */}
+                {(tags.length > 0 || rawCode !== '') && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        data-testid="inspiration-tag-chip"
+                        className="rounded-full border px-1.5 text-xs"
+                        style={{
+                          borderColor: 'var(--border-subtle)',
+                          color: 'var(--text-tertiary)'
+                        }}
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                    {rawCode !== '' && (
+                      <code
+                        data-testid="inspiration-code-snippet"
+                        className="max-w-48 truncate text-xs"
+                        style={{ color: 'var(--text-tertiary)' }}
+                      >
+                        {rawCode}
+                      </code>
+                    )}
+                  </div>
+                )}
+                {images.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {images.map((image) => (
+                      <InspirationImage key={image.id} sha256={image.sha256} />
+                    ))}
+                  </div>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      )}
+
+      {/* F16：nextCursor 非空才给加载更多（消费 after 游标翻页），失败原位可重试 */}
+      {!loadFailed && items !== null && items.length > 0 && listCursor !== null && (
+        <button
+          type="button"
+          data-testid="inspiration-load-more"
+          className="icon-btn text-xs"
+          disabled={loadingMore || busy}
+          onClick={() => void loadMore()}
+        >
+          {t('syncGallery.inspiration.loadMore')}
+        </button>
+      )}
+      {loadMoreFailed && (
+        <p
+          data-testid="inspiration-load-more-error"
+          className="text-xs"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          {t('syncGallery.inspiration.loadMoreFailed')}
+        </p>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="mt-2 space-y-2">
+      {embedded ? (
+        <div
+          data-testid="sync-inspiration-panel"
+          className="sc-details sc-card sc-inspiration-embedded"
+        >
+          {panelBody}
+        </div>
+      ) : (
+        <details
+          ref={detailsRef}
+          data-testid="sync-inspiration-panel"
+          className="rounded-lg border"
+          style={{ borderColor: 'var(--border-subtle)', background: 'var(--bg-secondary)' }}
+          onToggle={(event) => {
+            const open = event.currentTarget.open
+            if (open && !loadedRef.current && !loadFailed) {
+              loadedRef.current = true
+              void loadList()
+            } else if (!open && loadFailed) {
+              // 失败态折叠后复位，允许下次展开重试；成功态保留 loadedRef 缓存，不重复发 IPC
+              loadedRef.current = false
+              setLoadFailed(false)
+            }
+          }}
+        >
+          <summary
+            data-testid="sync-inspiration-summary"
+            className="cursor-pointer select-none px-3 py-2 text-sm"
+            style={{ color: 'var(--text-secondary)' }}
+          >
+            {t('syncGallery.inspiration.title')}
+          </summary>
+          {panelBody}
+        </details>
+      )}
     </div>
   )
 }

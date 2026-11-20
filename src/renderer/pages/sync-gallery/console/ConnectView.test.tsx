@@ -463,7 +463,7 @@ describe('T3：SelfCheckCard 掉线自动展开', () => {
 
 describe('T3：微信卡折叠持久化（momo.wechat-entry.seen.v1）', () => {
   function wechatDetails(): HTMLDetailsElement {
-    return screen.getByTestId('sync-service-pc-section').closest('details') as HTMLDetailsElement
+    return document.querySelector('.sc-wechat-entry-code') as HTMLDetailsElement
   }
 
   it('首次展开态；手动收起 ⇒ 落盘 1；重挂载读回仍收起', async () => {

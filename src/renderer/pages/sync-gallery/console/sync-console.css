@@ -1,0 +1,892 @@
+/**
+ * N2：同步控制台局部设计系统。
+ *
+ * 唯一参照：NikkiSync/apps/pc-companion/src/desktop/DesktopPage.ts:19-33。
+ * 全部选择器限定在 .sync-console；颜色映射宿主主题 token，不覆盖全局主题。
+ */
+
+.sync-console {
+  /* 一律映射宿主主题 token（globals.css :root 恒有定义），不写硬编码兜底色 */
+  --sc-bg: var(--bg-primary);
+  --sc-surface: var(--bg-secondary);
+  --sc-text: var(--text-primary);
+  --sc-secondary: var(--text-secondary);
+  --sc-tertiary: var(--text-tertiary);
+  --sc-border: var(--divider);
+  --sc-tint: var(--accent-soft);
+  --sc-accent: var(--accent);
+  --sc-brand: var(--accent-deep);
+  --sc-radius: 23px;
+  --sc-radius-sm: 14px;
+  /**
+   * 纯白亮度锚点（非主题色）：多处用 color-mix 往纯白方向提亮局部表面、二维码承载面
+   * 也需要纯白底以保证扫码对比度。集中成一个变量表达，避免在规则里散落色值字面量。
+   * 影响面：仅本作用域；回滚方案：删掉本行并还原为 `#fff` 字面量。
+   */
+  --sc-paper: #fff;
+  --sc-card-shadow: 0 5px 24px color-mix(in srgb, var(--sc-text) 6%, transparent);
+  --sc-line: color-mix(in srgb, var(--sc-border) 78%, transparent);
+  display: flex;
+  flex-direction: column;
+  /* `height:100%` 只等于父内容盒高度，而下方 `margin:-20px` 会再向外扩一圈：
+     必须补回上下两个 20px（AppShell 内容区 `p-5`），否则底栏上方露出 40px 接缝。
+     回滚方案：还原为 `height: 100%`。 */
+  height: calc(100% + 40px);
+  min-height: 0;
+  margin: -20px;
+  overflow: hidden;
+  color: var(--sc-text);
+  background:
+    radial-gradient(
+      1200px 520px at 18% -10%,
+      color-mix(in srgb, var(--sc-tint) 72%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      160deg,
+      color-mix(in srgb, var(--sc-tint) 42%, var(--sc-bg)) 0%,
+      var(--sc-bg) 58%
+    );
+}
+
+.sync-console .sc-shell {
+  display: grid;
+  grid-template-columns: 188px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+}
+
+.sync-console .sc-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 30px 18px 22px;
+  background: color-mix(in srgb, var(--sc-bg) 82%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--sc-paper) 70%, transparent);
+}
+
+.sync-console .sc-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.sync-console .sc-brand-avatar {
+  width: 42px;
+  height: 42px;
+  flex: none;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--sc-text) 7%, transparent);
+}
+
+.sync-console .sc-brand-fallback {
+  display: grid;
+  place-items: center;
+  color: var(--sc-accent);
+  background: var(--sc-tint);
+}
+
+.sync-console .sc-brand-name {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-brand-english {
+  margin-top: 1px;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-nav {
+  display: grid;
+  gap: 7px;
+  margin-top: 42px;
+  overflow-y: auto;
+}
+
+.sync-console .sc-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  padding: 11px 15px;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--sc-secondary);
+  text-align: left;
+  font-size: 13px;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.sync-console .sc-nav-item:hover {
+  background: color-mix(in srgb, var(--sc-paper) 44%, transparent);
+}
+
+.sync-console .sc-nav-item[aria-current='page'] {
+  color: var(--sc-accent);
+  background: var(--sc-tint);
+  font-weight: 600;
+}
+
+.sync-console .sc-nav-label {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.sync-console .sc-nav-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sc-brand) 18%, var(--sc-paper));
+  color: var(--sc-accent);
+  font-size: 11px;
+  text-align: center;
+}
+
+.sync-console .sc-sidebar-footer {
+  margin-top: auto;
+  padding: 24px 9px 0;
+  color: var(--sc-secondary);
+  font-size: 11px;
+  line-height: 1.9;
+}
+
+.sync-console .sc-sidebar-footer span {
+  display: block;
+}
+
+.sync-console .sc-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.sync-console .sc-workspace {
+  width: 100%;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 36px 38px 26px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.sync-console .sc-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+.sync-console .sc-page-title {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.3;
+  letter-spacing: -0.7px;
+  font-weight: 650;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-page-subtitle {
+  margin-top: 9px;
+  font-size: 12px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+  margin-top: 5px;
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--sc-paper) 76%, transparent);
+  border-radius: 24px;
+  background: color-mix(in srgb, var(--sc-paper) 50%, transparent);
+  color: var(--success-deep);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sync-console .sc-chip-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--success);
+}
+
+.sync-console .sc-chip[data-state='ready'] {
+  color: var(--success-deep);
+  background: color-mix(in srgb, var(--sc-paper) 50%, transparent);
+}
+
+.sync-console .sc-chip[data-state='ready'] .sc-chip-dot {
+  background: var(--success);
+}
+
+.sync-console .sc-chip[data-state='offline'] {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+}
+
+.sync-console .sc-chip[data-state='offline'] .sc-chip-dot {
+  background: var(--warning);
+}
+
+.sync-console .sc-chip[data-state='unavailable'] {
+  color: var(--sc-secondary);
+  background: color-mix(in srgb, var(--sc-bg) 74%, var(--sc-paper));
+}
+
+.sync-console .sc-chip[data-state='unavailable'] .sc-chip-dot {
+  background: var(--sc-tertiary);
+}
+
+.sync-console .sc-card {
+  padding: 26px;
+  border: 1px solid color-mix(in srgb, var(--sc-paper) 82%, transparent);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  box-shadow: var(--sc-card-shadow);
+  margin-bottom: 16px;
+}
+
+.sync-console .sc-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sync-console .sc-card-head-text {
+  min-width: 0;
+}
+
+.sync-console .sc-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-card-desc {
+  margin-top: 5px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-card-aside {
+  flex: none;
+}
+
+.sync-console .sc-card-body {
+  /* 卡片体内各段（开关行/说明行/服务行组）的节奏由这里统一给，避免零间距粘连 */
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sync-console .sc-card:last-child {
+  margin-bottom: 0;
+}
+
+.sync-console .sc-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 0;
+  border-top: 1px solid var(--sc-line);
+}
+
+.sync-console .sc-setting-row:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.sync-console .sc-setting-row-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.sync-console .sc-setting-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-setting-help {
+  margin-top: 4px;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-setting-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  max-width: 60%;
+  color: var(--sc-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.sync-console .sc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border: 1px solid var(--sc-line);
+  border-radius: 20px;
+  color: var(--sc-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sync-console .sc-badge-accent {
+  border-color: color-mix(in srgb, var(--sc-brand) 32%, transparent);
+  background: var(--sc-tint);
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--sc-secondary);
+  font-size: 11px;
+}
+
+.sync-console .sc-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 15px;
+}
+
+.sync-console .sc-section-heading h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-library-overview {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 27px;
+  padding: 23px 26px;
+  border-radius: var(--sc-radius);
+}
+
+.sync-console .sc-library-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  flex: none;
+  border-radius: 16px;
+  background: var(--sc-tint);
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-library-icon .sc-icon {
+  width: 25px;
+  height: 25px;
+}
+
+.sync-console .sc-library-label {
+  margin-bottom: 2px;
+  font-size: 11px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-library-number {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.sync-console .sc-library-number b {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -1.3px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-console .sc-library-number span {
+  font-size: 12px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-library-caption {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-device-summary {
+  margin-left: auto;
+  padding-left: 24px;
+  border-left: 1px solid var(--sc-line);
+  color: var(--sc-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sync-console .sc-device-summary .sc-icon {
+  display: block;
+  width: 19px;
+  height: 19px;
+  margin-bottom: 7px;
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-device-summary b {
+  margin-right: 4px;
+  color: var(--sc-text);
+  font-weight: 600;
+}
+
+.sync-console .sc-connection-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.sync-console .sc-connection-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 24px;
+  border-radius: var(--sc-radius);
+}
+
+.sync-console .sc-channel-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.sync-console .sc-channel-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--sc-tint);
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-channel-icon .sc-icon {
+  width: 25px;
+  height: 25px;
+}
+
+.sync-console .sc-connection-card h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-channel-description {
+  margin-top: 7px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-connection-steps {
+  display: grid;
+  gap: 14px;
+  margin: 26px 0 30px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-connection-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sync-console .sc-step-number {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border: 1px solid var(--sc-border);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sc-paper) 50%, transparent);
+  color: var(--sc-accent);
+  font-size: 11px;
+}
+
+.sync-console .sc-channel-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 42px;
+  margin-top: 12px;
+}
+
+.sync-console .sc-channel-note {
+  margin-top: 10px;
+  color: var(--sc-secondary);
+  font-size: 11px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.sync-console .sc-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.sync-console .sc-button-row .btn-primary,
+.sync-console .sc-button-row .btn-secondary,
+.sync-console .sc-button-row .btn-ghost {
+  flex: 1;
+  min-height: 42px;
+}
+
+.sync-console .sc-paired-note {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  padding: 16px 14px;
+  border-radius: var(--sc-radius-sm);
+  background: var(--sc-tint);
+}
+
+.sync-console .sc-paired-note .sc-icon {
+  width: 28px;
+  height: 28px;
+  flex: none;
+  padding: 5px;
+  border: 1px solid var(--sc-border);
+  border-radius: 50%;
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-paired-note strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.sync-console .sc-paired-note span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-first-pairing {
+  margin: 18px 0 22px;
+  text-align: center;
+}
+
+.sync-console .sc-first-pairing .sync-qr-surface {
+  margin: 0 auto 10px;
+  width: 176px;
+  height: 176px;
+}
+
+.sync-console .sc-first-pairing p {
+  font-size: 11px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-wechat-entry-code {
+  margin-top: 18px;
+  padding: 14px;
+  border: 1px solid var(--sc-line);
+  border-radius: 16px;
+  background: var(--sc-tint);
+}
+
+.sync-console .sc-wechat-entry-code summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-wechat-entry-code img {
+  display: block;
+  width: 220px;
+  max-width: 100%;
+  height: auto;
+  margin: 14px auto 0;
+  border-radius: 14px;
+}
+
+.sync-console .sc-privacy-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 22px 0 0;
+  color: var(--sc-secondary);
+  font-size: 11px;
+}
+
+.sync-console .sc-details {
+  padding: 18px 22px;
+  border-radius: var(--sc-radius);
+}
+
+.sync-console .sc-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-details summary span {
+  margin-left: 12px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-details[open] summary {
+  margin-bottom: 14px;
+}
+
+.sync-console .sc-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  min-height: 54px;
+  padding: 12px 38px;
+  border-top: 1px solid var(--sc-line);
+  background: color-mix(in srgb, var(--sc-bg) 74%, var(--sc-paper));
+}
+
+.sync-console .sc-status-bar-text {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 11px;
+  color: var(--sc-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-console .sc-status-bar-spacer {
+  flex: 1;
+}
+
+.sync-console .sc-status-bar .btn-secondary {
+  min-height: 32px;
+}
+
+/* 注意：`.sync-console .glass-card` 不是死规则——BaseDialog 不走 portal，
+   控制台内打开的确认弹窗就在本子树内，靠这条规则换肤。 */
+.sync-console .glass-card {
+  border: 1px solid color-mix(in srgb, var(--sc-paper) 82%, transparent);
+  border-radius: var(--sc-radius);
+  background: var(--sc-surface);
+  box-shadow: var(--sc-card-shadow);
+  padding: 26px;
+}
+
+.sync-console .glass-card h3 {
+  color: var(--sc-text);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.sync-console .glass-card h4 {
+  color: var(--sc-text);
+}
+
+.sync-console .sync-qr-surface {
+  background: var(--sc-paper);
+  border: 1px solid var(--sc-border);
+  border-radius: 16px;
+  padding: 12px;
+}
+
+@media (min-width: 1220px) {
+  .sync-console .sc-workspace {
+    padding-top: 46px;
+  }
+
+  .sync-console .sc-connection-card {
+    padding: 30px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .sync-console .sc-shell {
+    grid-template-columns: 150px minmax(0, 1fr);
+  }
+
+  .sync-console .sc-sidebar {
+    padding: 25px 12px 20px;
+  }
+
+  .sync-console .sc-brand-avatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 11px;
+  }
+
+  .sync-console .sc-brand-name {
+    font-size: 12px;
+  }
+
+  .sync-console .sc-workspace {
+    padding: 29px 25px;
+  }
+
+  .sync-console .sc-page-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .sync-console .sc-page-header .sc-chip {
+    margin-top: 0;
+  }
+
+  .sync-console .sc-connection-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sync-console .sc-library-overview {
+    padding: 20px;
+    gap: 13px;
+  }
+
+  .sync-console .sc-device-summary {
+    padding-left: 15px;
+  }
+}
+
+@media (max-width: 760px) {
+  .sync-console {
+    margin: 0;
+  }
+
+  .sync-console .sc-shell {
+    display: block;
+  }
+
+  .sync-console .sc-sidebar {
+    position: static;
+    height: auto;
+    padding: 18px 20px 12px;
+    border-right: 0;
+    border-bottom: 1px solid color-mix(in srgb, var(--sc-paper) 70%, transparent);
+  }
+
+  .sync-console .sc-nav {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+    overflow-x: auto;
+  }
+
+  .sync-console .sc-nav-item {
+    flex: 1;
+    justify-content: center;
+    min-height: 38px;
+    padding: 9px;
+    white-space: nowrap;
+  }
+
+  .sync-console .sc-sidebar-footer {
+    display: none;
+  }
+
+  .sync-console .sc-workspace {
+    padding: 25px 20px;
+  }
+
+  .sync-console .sc-page-title {
+    font-size: 25px;
+  }
+
+  .sync-console .sc-status-bar {
+    padding: 12px 20px;
+  }
+
+  .sync-console .sc-device-summary {
+    padding-left: 12px;
+  }
+}
+
+/* 宿主增强区与微信连接码承载面 */
+.sync-console .sc-connect {
+  min-width: 0;
+}
+
+.sync-console .sc-service-stack {
+  margin-top: 8px;
+}
+
+.sync-console .sc-wechat-qr {
+  display: grid;
+  place-items: center;
+  margin: 10px 0 14px;
+  padding: 14px;
+  border: 1px solid var(--sc-border);
+  border-radius: 16px;
+  background: var(--sc-paper);
+}
+
+.sync-console .sc-channel-icon-wechat {
+  background: color-mix(in srgb, var(--success) 14%, transparent);
+  color: var(--success-deep);
+}
+
+/* 控制台内嵌灵感库：隐藏折叠摘要后由卡片自身承担留白 */
+.sync-console .sc-inspiration-body {
+  display: grid;
+  gap: 12px;
+}
+
+.sync-console .sc-inspiration-embedded .sc-card-head {
+  margin-bottom: 2px;
+}

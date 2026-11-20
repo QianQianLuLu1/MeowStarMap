@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { PageHeader } from '../../../components/common/PageHeader'
-import { IconSync } from '../../../icons'
 import { useUIStore } from '../../../stores/uiStore'
+import type { NikkiSyncServerStatusInfo } from '../../../../shared/types/electron-api'
+import { CONSOLE_BRAND_IMAGE } from './brand-assets'
+import { ConsoleIcon, type ConsoleIconName } from './ConsoleIcons'
 import {
   CONSOLE_VIEWS,
   CONSOLE_VIEW_STORAGE_KEY,
@@ -18,10 +19,19 @@ import { OrganizerView } from './OrganizerView'
 import { InspirationView } from './InspirationView'
 import { AboutView } from './AboutView'
 import { SyncStatusBar } from './SyncStatusBar'
+import './sync-console.css'
 
 /** T10：待批角标轮询间隔（上游 DesktopPageScript 的 5s 节奏）。 */
 const BADGE_POLL_MS = 5000
 const SETTING_ORGANIZER_ENABLED = 'nikkisync.organizerEnabled'
+
+const NAV_ICONS: Record<ConsoleView, ConsoleIconName> = {
+  connect: 'phone',
+  settings: 'settings',
+  organizer: 'trash',
+  inspiration: 'album',
+  about: 'info'
+}
 
 /** 读回上次停留的子视图；非法/缺席一律回 connect（不臆造视图态）。 */
 function readStoredView(): ConsoleView {
@@ -35,15 +45,15 @@ function readStoredView(): ConsoleView {
 }
 
 /**
- * T1：同步控制台骨架——PageHeader + 左侧五视图子导航 + 视图容器 + 底栏。
+ * N2/N3：同步控制台骨架——上游 DesktopPage 同款 188px 品牌子导航 +
+ * 当前视图页头（h2/副标题/状态 chip）+ 视图容器 + 全宽底栏。
  *
  * 设计约束：
- * - 页头标题钉住 syncService.page.title（页面级 h2 语义不变），副标题随视图切换；
- * - 子导航复用 Sidebar 的 nav-item 词汇，不新增 ViewLevel（宿主路由栈不受影响，
- *   返回键弹的是宿主视图栈，控制台子视图态经 localStorage 持久化，返回不丢栈）；
- * - 视图按需挂载（切走即卸载）：各视图内的轮询定时器随卸载结构性清零；
- * - 待批角标由 Layout 自持 5s 轮询，双门控 currentView==='sync-service' &&
- *   organizerEnabled（keep-alive 下页面隐藏 ≠ 卸载，必须显式停表）。
+ * - 标题随视图切换（CONSOLE_HEADING_KEYS），视图内不再重复页面级 h3；
+ * - 子导航复用宿主 nav 语义，但外观走 .sync-console 局部设计系统，不改全局主题；
+ * - 视图按需挂载（切走即卸载）：轮询定时器随卸载结构性清零；
+ * - 状态 chip 只在视图切换时取一次快照；Connect 可见时由其 2s 轮询回传，
+ *   不新增常驻全局定时器。
  */
 export const SyncConsoleLayout: React.FC = () => {
   const { t } = useTranslation()
@@ -53,6 +63,8 @@ export const SyncConsoleLayout: React.FC = () => {
   const [pendingCount, setPendingCount] = useState(0)
   /** 底栏重启成功 ⇒ 连接视图重挂载即时重读状态（其余视图不受影响）。 */
   const [refreshTick, setRefreshTick] = useState(0)
+  const [serverStatus, setServerStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
+  const [brandImageFailed, setBrandImageFailed] = useState(false)
 
   // 子视图持久化：切换即落盘，返回/重进恢复上次停留位
   useEffect(() => {
@@ -78,6 +90,29 @@ export const SyncConsoleLayout: React.FC = () => {
       alive = false
     }
   }, [])
+
+  // 页头 chip：进入控制台时取一次快照；后续由 Connect 可见轮询回传。
+  // 不在**子视图切换**时追加 IPC（`view` 不进依赖），保证「切到关于即停表」的轮询门控不退化；
+  // 底栏重启成功（refreshTick）是显式动作，需要补拉一次，否则停在其它子视图时 chip 会一直是旧值。
+  useEffect(() => {
+    if (currentView !== 'sync-service') return
+    let alive = true
+    const getStatus = window.electronAPI?.nikkisync?.getServerStatus
+    if (typeof getStatus !== 'function') {
+      setServerStatus(null)
+      return
+    }
+    void getStatus()
+      .then((next) => {
+        if (alive) setServerStatus(next ?? null)
+      })
+      .catch(() => {
+        if (alive) setServerStatus(null)
+      })
+    return () => {
+      alive = false
+    }
+  }, [currentView, refreshTick])
 
   const handleNavigate = useCallback((next: ConsoleView): void => {
     setView(next)
@@ -121,56 +156,120 @@ export const SyncConsoleLayout: React.FC = () => {
     }
   }, [currentView, organizerEnabled])
 
+  const chipState = !serverStatus
+    ? 'unavailable'
+    : serverStatus.available === false
+      ? 'unavailable'
+      : serverStatus.running
+        ? 'ready'
+        : 'offline'
+  const chipText =
+    chipState === 'ready'
+      ? t('syncConsole.status.running')
+      : chipState === 'offline'
+        ? t('syncConsole.status.stopped')
+        : t('syncConsole.status.unavailable')
+
+  // 部分语种 brandName 与 brandLatin 同值（如英文包两键都是 Momo Camera），第二行会整行重复
+  const brandName = t('syncConsole.shell.brandName')
+  const brandLatin = t('syncConsole.shell.brandLatin')
+
   return (
-    <div className="flex h-full flex-col">
-      <PageHeader
-        title={t('syncService.page.title')}
-        subtitle={t(CONSOLE_HEADING_KEYS[view].subtitle)}
-        icon={<IconSync size={20} />}
-      />
-      <div className="flex min-h-0 flex-1">
-        {/* 左侧子导航：复用 Sidebar nav-item 词汇（glass/active），不新增 ViewLevel */}
-        <nav
-          className="w-40 shrink-0 space-y-1 overflow-y-auto border-r p-3"
-          style={{ borderColor: 'var(--divider)' }}
-          aria-label={t('syncService.page.title')}
-        >
-          {CONSOLE_VIEWS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              data-testid={`sync-console-nav-${id}`}
-              className={`nav-item w-full ${view === id ? 'active' : ''}`}
-              aria-current={view === id ? 'page' : undefined}
-              onClick={() => handleNavigate(id)}
-            >
-              <span className="flex-1 text-left">{t(CONSOLE_NAV_KEYS[id])}</span>
-              {id === 'organizer' && pendingCount > 0 && (
-                <span
-                  data-testid="sync-console-organizer-badge"
-                  className="ml-1 rounded-full px-1.5 text-xs"
-                  style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
-                >
-                  {pendingCount}
-                </span>
-              )}
-            </button>
-          ))}
-        </nav>
-        {/* 视图容器：按需挂载，切走即卸载（轮询随卸载清零） */}
-        <main className="min-w-0 flex-1 overflow-y-auto p-6">
-          {view === 'connect' && (
-            <ConnectView key={`connect-${refreshTick}`} onNavigate={handleNavigate} />
-          )}
-          {view === 'settings' && <SettingsView />}
-          {view === 'organizer' && <OrganizerView onEnabledChange={handleOrganizerEnabledChange} />}
-          {view === 'inspiration' && <InspirationView />}
-          {view === 'about' && <AboutView />}
-        </main>
-      </div>
-      {/* T11：底栏（双版本 + 重启 + 导出诊断） */}
-      <div className="px-6 py-3" style={{ borderTop: '1px solid var(--divider)' }}>
-        <SyncStatusBar onRefresh={handleRefresh} />
+    <div className="sync-console" data-testid="sync-console">
+      <div className="sc-shell">
+        {/* 188px 品牌子导航：显式内部导航，不新增宿主 ViewLevel */}
+        <aside className="sc-sidebar">
+          <div className="sc-brand">
+            {brandImageFailed ? (
+              <span className="sc-brand-avatar sc-brand-fallback" aria-hidden="true">
+                <ConsoleIcon name="camera" size={22} />
+              </span>
+            ) : (
+              <img
+                className="sc-brand-avatar"
+                data-testid="sync-console-brand-image"
+                src={CONSOLE_BRAND_IMAGE}
+                alt={t('syncConsole.shell.brandAlt')}
+                width={42}
+                height={42}
+                onError={() => setBrandImageFailed(true)}
+              />
+            )}
+            <div>
+              <div className="sc-brand-name">{brandName}</div>
+              {brandLatin !== brandName ? (
+                <div className="sc-brand-english">{brandLatin}</div>
+              ) : null}
+            </div>
+          </div>
+
+          <nav className="sc-nav" aria-label={t('syncConsole.shell.navAria')}>
+            {CONSOLE_VIEWS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                data-testid={`sync-console-nav-${id}`}
+                className="sc-nav-item"
+                aria-current={view === id ? 'page' : undefined}
+                aria-label={t(CONSOLE_NAV_KEYS[id])}
+                onClick={() => handleNavigate(id)}
+              >
+                <ConsoleIcon name={NAV_ICONS[id]} size={18} />
+                <span className="sc-nav-label">{t(CONSOLE_NAV_KEYS[id])}</span>
+                {id === 'organizer' && pendingCount > 0 && (
+                  <span className="sc-nav-badge" data-testid="sync-console-organizer-badge">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </nav>
+
+          <div className="sc-sidebar-footer">
+            <span>{t('syncConsole.shell.footerCompat')}</span>
+            <span>{t('syncConsole.shell.footerDisclaimer')}</span>
+          </div>
+        </aside>
+
+        <div className="sc-main">
+          <main className="sc-workspace">
+            {/* N3：一页一个标题；状态 chip 与上游 page-header 同位 */}
+            <header className="sc-page-header">
+              <div>
+                <h2 className="sc-page-title">{t(CONSOLE_HEADING_KEYS[view].title)}</h2>
+                <p className="sc-page-subtitle">{t(CONSOLE_HEADING_KEYS[view].subtitle)}</p>
+              </div>
+              <span
+                className="sc-chip"
+                data-testid="sync-console-status-chip"
+                data-state={chipState}
+                role="status"
+                aria-label={chipText}
+              >
+                <span className="sc-chip-dot" aria-hidden="true" />
+                <span>{chipText}</span>
+              </span>
+            </header>
+
+            {view === 'connect' && (
+              <ConnectView
+                key={`connect-${refreshTick}`}
+                onNavigate={handleNavigate}
+                onServerStatusChange={setServerStatus}
+              />
+            )}
+            {view === 'settings' && <SettingsView />}
+            {view === 'organizer' && (
+              <OrganizerView onEnabledChange={handleOrganizerEnabledChange} />
+            )}
+            {view === 'inspiration' && <InspirationView />}
+            {view === 'about' && <AboutView />}
+          </main>
+
+          {/* T11：全宽底栏（双版本 + 重启 + 导出诊断）；服务快照与页头 chip 同源，
+              恢复提示只在确认停机时出现 */}
+          <SyncStatusBar onRefresh={handleRefresh} serverStatus={serverStatus} />
+        </div>
       </div>
     </div>
   )

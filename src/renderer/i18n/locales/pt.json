@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "Biblioteca de inspiração",
-        "subtitle": "Colete e gerencie inspirações de looks, com filtros e códigos de compartilhamento"
+        "subtitle": "Colete e gerencie inspirações de looks, com filtros e códigos de compartilhamento",
+        "cardTitle": "Biblioteca de inspirações de looks",
+        "cardDescription": "Salve códigos de tingimento, códigos de look e imagens de referência. Registre offline no celular e sincronize ao conectar."
       },
       "about": {
         "title": "Sobre",
@@ -4898,7 +4900,10 @@
         "newQr": "Gerar novo QR code",
         "download": "Baixar APK Android",
         "export": "Exportar pacote de diagnóstico",
-        "exportNote": "Se a conexão falhar, exporte um pacote de diagnóstico e anexe ao seu feedback"
+        "exportNote": "Se a conexão falhar, exporte um pacote de diagnóstico e anexe ao seu feedback",
+        "stepInstall": "Baixe e instale o pacote NikkiSync para Android",
+        "stepPair": "Escaneie o código de emparelhamento do computador com o app",
+        "stepBrowse": "Navegue e salve originais no mesmo Wi-Fi"
       },
       "guide": {
         "title": "Guia de primeiro uso",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "A resolução de parâmetros online vem desativada; ative-a nas configurações de sincronização e aceite a divulgação.",
         "metadataStep3": "A decodificação local está integrada aos componentes de sincronização; não exige instalação extra.",
         "openScan": "Verificar configurações de varredura e resolução"
+      },
+      "section": {
+        "title": "Conectar ao celular",
+        "networkHint": "Computador e celular precisam estar no mesmo Wi-Fi"
+      },
+      "wechat": {
+        "title": "Miniprograma do WeChat",
+        "description": "Escaneie com o WeChat para ver o álbum e salvar fotos e vídeos.",
+        "entrySummary": "Primeira vez? Escaneie o código do miniprograma com o WeChat",
+        "entryAlt": "Código do miniprograma WeChat do Momo Camera",
+        "entryHint": "Abra primeiro o miniprograma no WeChat e depois escaneie o código de conexão gerado abaixo. Na próxima vez, abra pelos miniprogramas recentes do WeChat.",
+        "platforms": "iPhone · Android",
+        "step1": "Escaneie o código do miniprograma acima com o WeChat",
+        "step2": "Escaneie no miniprograma para conectar ao computador",
+        "step3": "Escolha fotos e salve os originais no celular",
+        "note": "Fotos e vídeos são salvos separadamente · código válido por 10 minutos"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "Exportar pacote de diagnóstico",
       "exportCanceled": "Exportação cancelada",
       "exported": "Pacote de diagnóstico exportado: {{path}}",
-      "exportFailed": "Falha ao exportar o pacote de diagnóstico"
+      "exportFailed": "Falha ao exportar o pacote de diagnóstico",
+      "recoveryHint": "Serviço parado. Dados e registros de emparelhamento foram mantidos; reinicie o serviço para continuar."
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "Navegação principal",
+      "footerCompat": "Cliente Windows · compatível com miniprograma e app",
+      "footerDisclaimer": "Infinity Nikki · assistente de fotografia não oficial"
+    },
+    "status": {
+      "running": "Serviço de sincronização em execução",
+      "stopped": "Serviço de sincronização parado",
+      "unavailable": "Componente de sincronização indisponível"
     }
   }
 }

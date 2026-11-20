@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "Inspiration Library",
-        "subtitle": "Collect and manage outfit inspirations, with filters and share codes"
+        "subtitle": "Collect and manage outfit inspirations, with filters and share codes",
+        "cardTitle": "Outfit inspiration library",
+        "cardDescription": "Save dye codes, outfit codes and reference images. Record offline on your phone and sync when connected."
       },
       "about": {
         "title": "About",
@@ -4898,7 +4900,10 @@
         "newQr": "Generate new QR code",
         "download": "Download Android APK",
         "export": "Export diagnostics",
-        "exportNote": "If the connection fails, export a diagnostics bundle and attach it to your feedback"
+        "exportNote": "If the connection fails, export a diagnostics bundle and attach it to your feedback",
+        "stepInstall": "Download and install the NikkiSync Android package",
+        "stepPair": "Scan the computer pairing code with the app",
+        "stepBrowse": "Browse and save originals on the same Wi-Fi"
       },
       "guide": {
         "title": "First-use guide",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "Online parameter resolving is off by default; enable it in Sync Settings and accept the disclosure.",
         "metadataStep3": "Local decoding is built into the sync components; no extra installation is needed.",
         "openScan": "Check scan & resolve settings"
+      },
+      "section": {
+        "title": "Connect to phone",
+        "networkHint": "Computer and phone must be on the same Wi-Fi"
+      },
+      "wechat": {
+        "title": "WeChat mini program",
+        "description": "Scan with WeChat to browse the album and save photos and videos.",
+        "entrySummary": "First time? Scan the mini program code with WeChat",
+        "entryAlt": "Momo Camera WeChat mini program code",
+        "entryHint": "Open the mini program with WeChat first, then scan the computer connection code generated below. Next time open it from WeChat recently used mini programs.",
+        "platforms": "iPhone · Android",
+        "step1": "Scan the mini program code above with WeChat",
+        "step2": "Scan inside the mini program to connect to the computer",
+        "step3": "Pick photos and save originals to your phone",
+        "note": "Photos and videos are saved separately · connection code valid for 10 minutes"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "Export diagnostics",
       "exportCanceled": "Export canceled",
       "exported": "Diagnostics exported: {{path}}",
-      "exportFailed": "Failed to export diagnostics"
+      "exportFailed": "Failed to export diagnostics",
+      "recoveryHint": "Sync service stopped. Data and pairing records remain; restart the service to resume."
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "Main navigation",
+      "footerCompat": "Windows client · compatible with mini program and app",
+      "footerDisclaimer": "Infinity Nikki · unofficial photography assistant"
+    },
+    "status": {
+      "running": "Sync service running",
+      "stopped": "Sync service stopped",
+      "unavailable": "Sync component unavailable"
     }
   }
 }

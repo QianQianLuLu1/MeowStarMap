@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "Inspirationsbibliothek",
-        "subtitle": "Outfit-Inspirationen sammeln und verwalten, mit Filtern und Teilcodes"
+        "subtitle": "Outfit-Inspirationen sammeln und verwalten, mit Filtern und Teilcodes",
+        "cardTitle": "Outfit-Inspirationsbibliothek",
+        "cardDescription": "Färbe- und Outfit-Codes sowie Referenzbilder speichern. Offline auf dem Handy erfassen und nach dem Verbinden synchronisieren."
       },
       "about": {
         "title": "Über",
@@ -4898,7 +4900,10 @@
         "newQr": "Neuen QR-Code erzeugen",
         "download": "Android-APK herunterladen",
         "export": "Diagnosepaket exportieren",
-        "exportNote": "Bei Verbindungsproblemen exportieren Sie ein Diagnosepaket und fügen es Ihrem Feedback bei"
+        "exportNote": "Bei Verbindungsproblemen exportieren Sie ein Diagnosepaket und fügen es Ihrem Feedback bei",
+        "stepInstall": "NikkiSync-Android-Paket herunterladen und installieren",
+        "stepPair": "Kopplungscode des Computers mit der App scannen",
+        "stepBrowse": "Im selben WLAN stöbern und Originale speichern"
       },
       "guide": {
         "title": "Erste-Schritte-Anleitung",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "Die Online-Parameterauflösung ist standardmäßig aus; aktivieren Sie sie in den Sync-Einstellungen und stimmen Sie der Offenlegung zu.",
         "metadataStep3": "Die lokale Dekodierung ist in die Sync-Komponenten integriert; keine zusätzliche Installation nötig.",
         "openScan": "Scan- und Auflösungseinstellungen prüfen"
+      },
+      "section": {
+        "title": "Mit Handy verbinden",
+        "networkHint": "Computer und Handy müssen im selben WLAN sein"
+      },
+      "wechat": {
+        "title": "WeChat-Mini-Programm",
+        "description": "Mit WeChat scannen, Album ansehen, Fotos und Videos speichern.",
+        "entrySummary": "Zum ersten Mal? Mini-Programm-Code mit WeChat scannen",
+        "entryAlt": "WeChat-Mini-Programm-Code von Momo Camera",
+        "entryHint": "Öffne zuerst das Mini-Programm mit WeChat und scanne dann den unten erzeugten Computer-Verbindungscode. Beim nächsten Mal über die zuletzt verwendeten Mini-Programme öffnen.",
+        "platforms": "iPhone · Android",
+        "step1": "Den Mini-Programm-Code oben mit WeChat scannen",
+        "step2": "Im Mini-Programm scannen, um den Computer zu verbinden",
+        "step3": "Fotos auswählen und Originale auf dem Handy speichern",
+        "note": "Fotos und Videos werden getrennt gespeichert · Verbindungscode 10 Minuten gültig"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "Diagnosepaket exportieren",
       "exportCanceled": "Export abgebrochen",
       "exported": "Diagnosepaket exportiert: {{path}}",
-      "exportFailed": "Export des Diagnosepakets fehlgeschlagen"
+      "exportFailed": "Export des Diagnosepakets fehlgeschlagen",
+      "recoveryHint": "Synchronisierungsdienst gestoppt. Daten und Kopplungseinträge bleiben erhalten; Dienst neu starten, um fortzufahren."
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "Hauptnavigation",
+      "footerCompat": "Windows-Client · kompatibel mit Mini-Programm und App",
+      "footerDisclaimer": "Infinity Nikki · inoffizieller Foto-Assistent"
+    },
+    "status": {
+      "running": "Synchronisierungsdienst läuft",
+      "stopped": "Synchronisierungsdienst gestoppt",
+      "unavailable": "Sync-Komponente nicht verfügbar"
     }
   }
 }

@@ -4871,7 +4871,9 @@
       },
       "inspiration": {
         "title": "インスピレーション",
-        "subtitle": "コーデのインスピレーションを収集・管理。フィルターと共有コードに対応"
+        "subtitle": "コーデのインスピレーションを収集・管理。フィルターと共有コードに対応",
+        "cardTitle": "コーディネートインスピレーション",
+        "cardDescription": "染色コード、コーデコード、参考画像を保存。スマホでオフライン記録し、接続後に同期できます。"
       },
       "about": {
         "title": "概要",
@@ -4898,7 +4900,10 @@
         "newQr": "新しい QR コードを生成",
         "download": "Android APK をダウンロード",
         "export": "診断パッケージをエクスポート",
-        "exportNote": "接続異常時は診断パッケージをエクスポートし、フィードバックに添付すると調査がスムーズです"
+        "exportNote": "接続異常時は診断パッケージをエクスポートし、フィードバックに添付すると調査がスムーズです",
+        "stepInstall": "NikkiSync Android パッケージをダウンロードしてインストール",
+        "stepPair": "アプリで PC のペアリングコードをスキャン",
+        "stepBrowse": "同じ Wi-Fi で閲覧し原画を保存"
       },
       "guide": {
         "title": "はじめてのガイド",
@@ -4931,6 +4936,22 @@
         "metadataStep2": "オンラインパラメータ解析はデフォルトでオフです。同期設定で有効にし、開示条項に同意してください。",
         "metadataStep3": "ローカルデコードは同期コンポーネントに内蔵されており、追加インストールは不要です。",
         "openScan": "スキャン・解析設定を確認"
+      },
+      "section": {
+        "title": "スマホに接続",
+        "networkHint": "PC とスマホは同じ Wi-Fi に接続してください"
+      },
+      "wechat": {
+        "title": "WeChat ミニプログラム",
+        "description": "WeChat でスキャンしてアルバムを閲覧し、写真と動画を保存。",
+        "entrySummary": "初めての方？WeChat でミニプログラムコードをスキャン",
+        "entryAlt": "Momo Camera WeChat ミニプログラムコード",
+        "entryHint": "先に WeChat でミニプログラムを開き、下の PC 接続コードをスキャンします。次回は WeChat の最近使ったミニプログラムから開けます。",
+        "platforms": "iPhone · Android",
+        "step1": "上のミニプログラムコードを WeChat でスキャン",
+        "step2": "ミニプログラム内でスキャンして PC に接続",
+        "step3": "写真を選び、原画をスマホに保存",
+        "note": "写真と動画は別々に保存 · 接続コードは 10 分間有効"
       }
     },
     "settings": {
@@ -5073,7 +5094,21 @@
       "export": "診断パッケージをエクスポート",
       "exportCanceled": "エクスポートをキャンセルしました",
       "exported": "診断パッケージをエクスポートしました：{{path}}",
-      "exportFailed": "診断パッケージのエクスポートに失敗"
+      "exportFailed": "診断パッケージのエクスポートに失敗",
+      "recoveryHint": "同期サービスが停止しています。データとペアリング記録は保持されています。再開するにはサービスを再起動してください。"
+    },
+    "shell": {
+      "brandName": "Momo Camera",
+      "brandLatin": "Momo Camera",
+      "brandAlt": "Momo Camera",
+      "navAria": "メインナビゲーション",
+      "footerCompat": "Windows クライアント · ミニプログラムとアプリに対応",
+      "footerDisclaimer": "インフィニティニキ · 非公式撮影アシスタント"
+    },
+    "status": {
+      "running": "同期サービス稼働中",
+      "stopped": "同期サービス停止中",
+      "unavailable": "同期コンポーネント未準備"
     }
   }
 }

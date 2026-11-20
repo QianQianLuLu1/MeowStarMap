@@ -15,14 +15,17 @@ import {
   mockShowMessage,
   serverApi,
   logExportZip,
-  appGetVersion
+  appGetVersion,
+  makeStatus
 } from './sync-console-test-utils'
 import { NIKKISYNC_ALIGNED_VERSION } from '../../../../shared/nikkisync-version'
+import type { NikkiSyncServerStatusInfo } from '../../../../shared/types/electron-api'
 
 const mockRefresh = vi.fn()
+const RECOVERY_HINT = '服务恢复入口始终在此，无需切换页面'
 
-function renderBar() {
-  return renderView(<SyncStatusBar onRefresh={mockRefresh} />)
+function renderBar(serverStatus?: NikkiSyncServerStatusInfo | null) {
+  return renderView(<SyncStatusBar onRefresh={mockRefresh} serverStatus={serverStatus} />)
 }
 
 beforeEach(() => {
@@ -49,6 +52,28 @@ describe('T11：双版本口径', () => {
     const bar = screen.getByTestId('sync-status-bar')
     await waitFor(() => expect(bar).toHaveTextContent('—'))
     expect(bar).toHaveTextContent(NIKKISYNC_ALIGNED_VERSION)
+  })
+})
+
+describe('R2：恢复提示随服务状态门控', () => {
+  it('服务运行中 ⇒ 不渲染「已停止/去重启」类恢复提示', () => {
+    renderBar(makeStatus({ running: true }) as NikkiSyncServerStatusInfo)
+    expect(screen.queryByText(RECOVERY_HINT)).toBeNull()
+  })
+
+  it('服务已停止 ⇒ 渲染恢复提示', () => {
+    renderBar(makeStatus({ running: false }) as NikkiSyncServerStatusInfo)
+    expect(screen.getByText(RECOVERY_HINT)).toBeInTheDocument()
+  })
+
+  it('状态未知（null）⇒ 不伪造停机提示', () => {
+    renderBar(null)
+    expect(screen.queryByText(RECOVERY_HINT)).toBeNull()
+  })
+
+  it('桥缺失（available:false）⇒ 不提示去重启服务', () => {
+    renderBar(makeStatus({ available: false, running: false }) as NikkiSyncServerStatusInfo)
+    expect(screen.queryByText(RECOVERY_HINT)).toBeNull()
   })
 })
 
