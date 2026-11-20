@@ -159,7 +159,7 @@
       "exportButton": "診断バンドルをエクスポート",
       "exportFailed": "エクスポートに失敗しました",
       "exportHint": "診断バンドルにはログ、クラッシュファイル、システム情報が含まれます。エクスポート後、下記の連絡先から開発者に送信できます。",
-      "exportSuccess": "診断バンドルをエクスポートしました。下記の連絡先から開発者に送信してください",
+      "exportSuccess": "診断パッケージをエクスポートしました：{{path}}。下記の連絡先から開発者へお送りください",
       "exporting": "エクスポート中...",
       "githubCopyHint": "クリックしてリンクをコピー",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "チェック失敗",
     "enforceNoop": "キャッシュは上限未満、削除不要",
     "exportFailed": "エクスポート失敗",
-    "exportSuccess": "ログをエクスポートしました",
+    "exportSuccess": "ログをエクスポートしました：{{path}}",
     "fontSizeSet": "フォントサイズを{{label}}に設定",
     "incrementalOff": "インクリメンタルスキャンを無効化",
     "incrementalOn": "インクリメンタルスキャンを有効化",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "診断パッケージをエクスポートしました（ログ・クラッシュファイル・システム情報を含む）"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "アップストリーム対応",
       "restart": "同期サービスを再起動",
       "export": "診断パッケージをエクスポート",
-      "exportCanceled": "エクスポートをキャンセルしました",
       "exported": "診断パッケージをエクスポートしました：{{path}}",
       "exportFailed": "診断パッケージのエクスポートに失敗",
       "recoveryHint": "同期サービスが停止しています。データとペアリング記録は保持されています。再開するにはサービスを再起動してください。"

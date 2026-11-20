@@ -260,7 +260,6 @@ const SYNC_CONSOLE_LEAVES = [
   'statusBar.aligned',
   'statusBar.restart',
   'statusBar.export',
-  'statusBar.exportCanceled',
   'statusBar.exported',
   'statusBar.exportFailed',
   'statusBar.recoveryHint'
@@ -377,8 +376,7 @@ describe('syncConsole 语言包守卫（12 locale）', () => {
       ['about.feedback.support', '发送诊断'],
       ['statusBar.restart', '重启同步服务'],
       ['statusBar.export', '导出诊断包'],
-      ['statusBar.restartSuccess', '同步服务已重启'],
-      ['statusBar.exportCanceled', '已取消导出']
+      ['statusBar.restartSuccess', '同步服务已重启']
     ]
     for (const [leaf, value] of pinned) {
       expect(readPath(LOCALES['zh-CN'], `syncConsole.${leaf}`), leaf).toBe(value)

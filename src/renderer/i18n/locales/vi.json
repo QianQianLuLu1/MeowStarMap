@@ -159,7 +159,7 @@
       "exportButton": "Xuất gói chẩn đoán",
       "exportFailed": "Xuất thất bại",
       "exportHint": "Gói chẩn đoán chứa nhật ký, tệp sự cố và thông tin hệ thống. Sau khi xuất, bạn có thể gửi cho nhà phát triển qua các phương thức liên hệ bên dưới.",
-      "exportSuccess": "Đã xuất gói chẩn đoán, vui lòng gửi cho nhà phát triển qua các phương thức liên hệ bên dưới",
+      "exportSuccess": "Đã xuất gói chẩn đoán: {{path}}. Vui lòng gửi cho nhà phát triển qua các phương thức liên hệ bên dưới",
       "exporting": "Đang xuất...",
       "githubCopyHint": "Nhấp để sao chép liên kết",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "Kiểm tra thất bại",
     "enforceNoop": "Bộ nhớ đệm dưới giới hạn, không cần loại bỏ",
     "exportFailed": "Xuất thất bại",
-    "exportSuccess": "Đã xuất nhật ký",
+    "exportSuccess": "Đã xuất nhật ký: {{path}}",
     "fontSizeSet": "Kích thước phông chữ đặt thành {{label}}",
     "incrementalOff": "Đã tắt quét tăng dần",
     "incrementalOn": "Đã bật quét tăng dần",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "Đã xuất gói chẩn đoán (gồm nhật ký, tệp sự cố, thông tin hệ thống)"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "Khớp thượng nguồn",
       "restart": "Khởi động lại dịch vụ đồng bộ",
       "export": "Xuất gói chẩn đoán",
-      "exportCanceled": "Đã hủy xuất",
       "exported": "Đã xuất gói chẩn đoán: {{path}}",
       "exportFailed": "Xuất gói chẩn đoán thất bại",
       "recoveryHint": "Dịch vụ đồng bộ đã dừng. Dữ liệu và bản ghi ghép nối vẫn được giữ; khởi động lại dịch vụ để tiếp tục."

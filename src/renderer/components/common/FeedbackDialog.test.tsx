@@ -12,8 +12,9 @@ vi.mock('./BaseDialog', () => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, opts?: { label?: string }) => {
+    t: (key: string, opts?: { label?: string; path?: string }) => {
       if (opts && opts.label) return `${key}:${opts.label}`
+      if (opts && opts.path) return `${key}:${opts.path}`
       return key
     }
   })
@@ -132,6 +133,36 @@ describe('FeedbackDialog', () => {
       fireEvent.click(screen.getByText('common.feedbackDialog.exportButton'))
     })
     expect(screen.getByText('common.feedbackDialog.exportSuccess')).toBeTruthy()
+  })
+
+  it('导出时传递描述与勾选到 IPC', async () => {
+    const exportZip = vi.fn().mockResolvedValue({ success: true, filePath: 'C:/x.zip' })
+    setLogExportAPI(exportZip)
+
+    render(<FeedbackDialog open={true} onClose={vi.fn()} />)
+    fireEvent.change(screen.getByPlaceholderText('common.feedbackDialog.descriptionPlaceholder'), {
+      target: { value: '闪屏' }
+    })
+    fireEvent.click(screen.getAllByRole('checkbox')[1])
+    await act(async () => {
+      fireEvent.click(screen.getByText('common.feedbackDialog.exportButton'))
+    })
+    expect(exportZip).toHaveBeenCalledWith({
+      description: '闪屏',
+      attachLogs: true,
+      attachSystemInfo: false
+    })
+  })
+
+  it('导出成功展示真实落盘路径', async () => {
+    const exportZip = vi.fn().mockResolvedValue({ success: true, filePath: 'C:/diag.zip' })
+    setLogExportAPI(exportZip)
+
+    render(<FeedbackDialog open={true} onClose={vi.fn()} />)
+    await act(async () => {
+      fireEvent.click(screen.getByText('common.feedbackDialog.exportButton'))
+    })
+    expect(screen.getByText('common.feedbackDialog.exportSuccess:C:/diag.zip')).toBeTruthy()
   })
 
   it('导出失败时显示失败消息', async () => {

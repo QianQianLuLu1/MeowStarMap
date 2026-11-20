@@ -159,7 +159,7 @@
       "exportButton": "Export Diagnostic Bundle",
       "exportFailed": "Export failed",
       "exportHint": "The diagnostic bundle contains logs, crash files, and system info. After export, you can send it to the developer via the contact methods below.",
-      "exportSuccess": "Diagnostic bundle exported, please send it to the developer via the contact methods below",
+      "exportSuccess": "Diagnostic bundle exported: {{path}}. Please send it to the developer via the contact methods below",
       "exporting": "Exporting...",
       "githubCopyHint": "Click to copy link",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "Check failed",
     "enforceNoop": "Cache not over limit, no eviction needed",
     "exportFailed": "Export failed",
-    "exportSuccess": "Logs exported",
+    "exportSuccess": "Logs exported: {{path}}",
     "fontSizeSet": "Font size set to {{label}}",
     "incrementalOff": "Incremental scan disabled",
     "incrementalOn": "Incremental scan enabled",
@@ -3830,7 +3830,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "Diagnostic bundle exported (logs, crash files, system info)"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "Upstream aligned",
       "restart": "Restart sync service",
       "export": "Export diagnostics",
-      "exportCanceled": "Export canceled",
       "exported": "Diagnostics exported: {{path}}",
       "exportFailed": "Failed to export diagnostics",
       "recoveryHint": "Sync service stopped. Data and pairing records remain; restart the service to resume."

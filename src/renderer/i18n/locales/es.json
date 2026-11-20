@@ -159,7 +159,7 @@
       "exportButton": "Exportar paquete de diagnóstico",
       "exportFailed": "Exportación fallida",
       "exportHint": "El paquete de diagnóstico contiene registros, archivos de fallos e información del sistema. Tras la exportación, puede enviarlo al desarrollador a través de los métodos de contacto a continuación.",
-      "exportSuccess": "Paquete de diagnóstico exportado, por favor envíelo al desarrollador a través de los métodos de contacto a continuación",
+      "exportSuccess": "Paquete de diagnóstico exportado: {{path}}. Por favor envíelo al desarrollador a través de los métodos de contacto a continuación",
       "exporting": "Exportando...",
       "githubCopyHint": "Haga clic para copiar el enlace",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "Verificación fallida",
     "enforceNoop": "Caché bajo límite, no se necesita expulsión",
     "exportFailed": "Exportación fallida",
-    "exportSuccess": "Registros exportados",
+    "exportSuccess": "Registros exportados: {{path}}",
     "fontSizeSet": "Tamaño de fuente ajustado a {{label}}",
     "incrementalOff": "Escaneo incremental desactivado",
     "incrementalOn": "Escaneo incremental activado",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "Paquete de diagnóstico exportado (registros, archivos de fallo, información del sistema)"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "Alineado upstream",
       "restart": "Reiniciar servicio de sincronización",
       "export": "Exportar paquete de diagnóstico",
-      "exportCanceled": "Exportación cancelada",
       "exported": "Paquete de diagnóstico exportado: {{path}}",
       "exportFailed": "Falló la exportación del paquete de diagnóstico",
       "recoveryHint": "Servicio detenido. Los datos y registros de emparejamiento se conservan; reinicia el servicio para continuar."

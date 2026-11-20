@@ -213,6 +213,40 @@ describe('日志/崩溃诊断区 — 取证目录统一（取消自定义入口�
     expect(mockShowMessage).not.toHaveBeenCalled()
   })
 
+  it('日志区：faultCount=0 时导出按钮仍可点击（诊断包≠故障记录）', async () => {
+    installDirApi()
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <DiagnosticsLogsSection />
+      </GlobalToastContext.Provider>
+    )
+    const btn = await screen.findByText('导出日志')
+    expect((btn.closest('button') as HTMLButtonElement).disabled).toBe(false)
+  })
+
+  it('日志区：导出成功 Toast 带真实落盘路径', async () => {
+    installDirApi()
+    const api = (
+      window as unknown as { electronAPI: { log: { exportZip: ReturnType<typeof vi.fn> } } }
+    ).electronAPI
+    api.log.exportZip.mockResolvedValue({
+      success: true,
+      filePath: 'D:/diag/out.zip',
+      message: '诊断包已导出'
+    })
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <DiagnosticsLogsSection />
+      </GlobalToastContext.Provider>
+    )
+    fireEvent.click(await screen.findByText('导出日志'))
+    await waitFor(() => expect(api.log.exportZip).toHaveBeenCalledTimes(1))
+    expect(mockShowMessage).toHaveBeenCalledWith(
+      expect.stringContaining('D:/diag/out.zip'),
+      'success'
+    )
+  })
+
   it('崩溃区：不渲染「修改目录」按钮，保留「打开目录」与统一路径展示', async () => {
     installDirApi()
     render(

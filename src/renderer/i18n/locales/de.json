@@ -159,7 +159,7 @@
       "exportButton": "Diagnose-Bundle exportieren",
       "exportFailed": "Export fehlgeschlagen",
       "exportHint": "Das Diagnose-Bundle enthält Protokolle, Absturzdateien und Systeminformationen. Nach dem Export können Sie es über die untenstehenden Kontaktmöglichkeiten an den Entwickler senden.",
-      "exportSuccess": "Diagnose-Bundle exportiert, bitte über die untenstehenden Kontaktmöglichkeiten an den Entwickler senden",
+      "exportSuccess": "Diagnosepaket exportiert: {{path}}. Bitte senden Sie es über die unten stehenden Kontaktwege an den Entwickler",
       "exporting": "Exportiere...",
       "githubCopyHint": "Klicken, um Link zu kopieren",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "Prüfung fehlgeschlagen",
     "enforceNoop": "Cache unter Limit, keine Auslagerung erforderlich",
     "exportFailed": "Export fehlgeschlagen",
-    "exportSuccess": "Protokoll exportiert",
+    "exportSuccess": "Protokolle exportiert: {{path}}",
     "fontSizeSet": "Schriftgröße auf {{label}} gesetzt",
     "incrementalOff": "Inkrementeller Scan deaktiviert",
     "incrementalOn": "Inkrementeller Scan aktiviert",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "Diagnosepaket exportiert (Protokolle, Absturzdateien, Systeminfos)"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "Upstream abgestimmt",
       "restart": "Sync-Dienst neu starten",
       "export": "Diagnosepaket exportieren",
-      "exportCanceled": "Export abgebrochen",
       "exported": "Diagnosepaket exportiert: {{path}}",
       "exportFailed": "Export des Diagnosepakets fehlgeschlagen",
       "recoveryHint": "Synchronisierungsdienst gestoppt. Daten und Kopplungseinträge bleiben erhalten; Dienst neu starten, um fortzufahren."

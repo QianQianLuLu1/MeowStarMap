@@ -29,11 +29,18 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onClose })
     setExporting(true)
     setExportResult(null)
     try {
-      // 通过 IPC 调用主进程导出诊断包
+      // 通过 IPC 调用主进程导出诊断包（描述与勾选写入包内 feedback.txt）
       // 主进程会弹出保存对话框让用户选择保存位置
-      const result = await window.electronAPI?.log?.exportZip?.()
+      const result = await window.electronAPI?.log?.exportZip?.({
+        description,
+        attachLogs,
+        attachSystemInfo
+      })
       if (result?.success) {
-        setExportResult({ success: true, message: t('common.feedbackDialog.exportSuccess') })
+        setExportResult({
+          success: true,
+          message: t('common.feedbackDialog.exportSuccess', { path: result.filePath ?? '' })
+        })
       } else {
         setExportResult({
           success: false,

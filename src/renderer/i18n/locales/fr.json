@@ -159,7 +159,7 @@
       "exportButton": "Exporter le bundle de diagnostic",
       "exportFailed": "Échec de l'export",
       "exportHint": "Le bundle de diagnostic contient les journaux, les fichiers de crash et les informations système. Après l'export, vous pouvez l'envoyer au développeur via les méthodes de contact ci-dessous.",
-      "exportSuccess": "Bundle de diagnostic exporté, veuillez l'envoyer au développeur via les méthodes de contact ci-dessous",
+      "exportSuccess": "Bundle de diagnostic exporté : {{path}}. Veuillez l'envoyer au développeur via les méthodes de contact ci-dessous",
       "exporting": "Exportation...",
       "githubCopyHint": "Cliquez pour copier le lien",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "Échec de la vérification",
     "enforceNoop": "Cache sous la limite, aucune éviction nécessaire",
     "exportFailed": "Échec de l'exportation",
-    "exportSuccess": "Journaux exportés",
+    "exportSuccess": "Journaux exportés : {{path}}",
     "fontSizeSet": "Taille de police définie sur {{label}}",
     "incrementalOff": "Analyse incrémentale désactivée",
     "incrementalOn": "Analyse incrémentale activée",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "Bundle de diagnostic exporté (journaux, fichiers de plantage, infos système)"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "Aligné amont",
       "restart": "Redémarrer le service de synchronisation",
       "export": "Exporter le diagnostic",
-      "exportCanceled": "Export annulé",
       "exported": "Diagnostic exporté : {{path}}",
       "exportFailed": "Échec de l'export du diagnostic",
       "recoveryHint": "Service arrêté. Les données et appairages sont conservés ; redémarrez le service pour reprendre."

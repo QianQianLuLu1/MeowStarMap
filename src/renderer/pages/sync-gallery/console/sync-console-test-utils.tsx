@@ -471,7 +471,11 @@ export function installElectronApi(opts: InstallOpts = {}) {
   }
   dialogShowMessageBox = vi.fn(async () => 0)
   appRelaunch = vi.fn(async () => undefined)
-  logExportZip = vi.fn(async () => ({ success: true, message: 'C:/diagnostics/nikkisync.zip' }))
+  logExportZip = vi.fn(async () => ({
+    success: true,
+    filePath: 'C:/diagnostics/nikkisync.zip',
+    message: '诊断包已导出'
+  }))
   appGetVersion = vi.fn(async () => '2.5.7-beta')
   appCheckUpdate = vi.fn(async () => ({ checking: true }))
   shellOpenExternal = vi.fn(async () => ({ success: true }))

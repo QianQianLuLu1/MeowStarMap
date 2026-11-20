@@ -159,7 +159,7 @@
       "exportButton": "진단 번들 내보내기",
       "exportFailed": "내보내기 실패",
       "exportHint": "진단 번들은 로그, 크래시 파일, 시스템 정보를 포함합니다. 내보낸 후 아래 연락처를 통해 개발자에게 보낼 수 있습니다.",
-      "exportSuccess": "진단 번들이 내보내졌습니다. 아래 연락처를 통해 개발자에게 보내주세요",
+      "exportSuccess": "진단 패키지를 내보냈습니다: {{path}}. 아래 연락처로 개발자에게 보내주세요",
       "exporting": "내보내는 중...",
       "githubCopyHint": "클릭하여 링크 복사",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "확인 실패",
     "enforceNoop": "캐시가 상한 미만, 제거 불필요",
     "exportFailed": "내보내기 실패",
-    "exportSuccess": "로그를 내보냈습니다",
+    "exportSuccess": "로그를 내보냈습니다: {{path}}",
     "fontSizeSet": "글꼴 크기를 {{label}}로 설정",
     "incrementalOff": "증분 스캔 비활성화",
     "incrementalOn": "증분 스캔 활성화",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "진단 패키지를 내보냈습니다(로그, 충돌 파일, 시스템 정보 포함)"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "업스트림 대응",
       "restart": "동기화 서비스 재시작",
       "export": "진단 패키지 내보내기",
-      "exportCanceled": "내보내기 취소됨",
       "exported": "진단 패키지 내보냄: {{path}}",
       "exportFailed": "진단 패키지 내보내기 실패",
       "recoveryHint": "동기화 서비스가 중지되었습니다. 데이터와 페어링 기록은 유지됩니다. 계속하려면 서비스를 다시 시작하세요."

@@ -159,7 +159,7 @@
       "exportButton": "匯出診斷包",
       "exportFailed": "匯出失敗",
       "exportHint": "診斷包包含日誌、崩潰檔案、系統資訊，匯出後可透過下方聯絡方式回饋給開發者。",
-      "exportSuccess": "診斷包已匯出，請透過下方聯絡方式回饋給開發者",
+      "exportSuccess": "診斷包已匯出：{{path}}，請透過下方聯絡方式回饋給開發者",
       "exporting": "正在匯出...",
       "githubCopyHint": "點擊複製連結",
       "githubLabel": "GitHub Issues",
@@ -1117,7 +1117,7 @@
     "enforceFailed": "檢查失敗",
     "enforceNoop": "快取未超限，無需淘汰",
     "exportFailed": "匯出失敗",
-    "exportSuccess": "日誌已匯出",
+    "exportSuccess": "日誌已匯出：{{path}}",
     "fontSizeSet": "字型已設為{{label}}",
     "incrementalOff": "已關閉增量掃描",
     "incrementalOn": "已開啟增量掃描",
@@ -3824,7 +3824,7 @@
     "logService": {
       "message": {
         "opened": "",
-        "exported": ""
+        "exported": "診斷包已匯出（含日誌、崩潰檔案、系統資訊）"
       },
       "error": {
         "openDirFailed": "",
@@ -5092,7 +5092,6 @@
       "aligned": "上游對齊",
       "restart": "重啟同步服務",
       "export": "匯出診斷包",
-      "exportCanceled": "已取消匯出",
       "exported": "診斷包已匯出：{{path}}",
       "exportFailed": "匯出診斷包失敗",
       "recoveryHint": "同步服務已停止。資料與配對紀錄仍保留；重新啟動服務即可繼續。"

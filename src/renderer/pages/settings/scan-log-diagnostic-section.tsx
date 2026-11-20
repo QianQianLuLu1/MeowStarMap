@@ -10,6 +10,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GlobalToastContext } from './shared'
+import { ERROR_CODES } from '../../../shared/errors/error-codes'
 
 const KIND_META: Record<string, { dot: string; ring: string }> = {
   ok: { dot: 'bg-emerald-400', ring: 'ring-emerald-400/30' },
@@ -96,12 +97,19 @@ export function ScanLogDiagnosticSection() {
     }
   }, [showMessage, t])
 
-  // 复用既有 log:exportZip 导出全部应用日志（含崩溃/主进程日志）
+  // 复用既有 log:exportZip 导出全部应用日志（含崩溃/主进程日志），语义与设置页/反馈弹窗一致
   const exportAllLogs = useCallback(async () => {
     if (!window.electronAPI?.log?.exportZip) return
     try {
-      await window.electronAPI.log.exportZip()
+      const res = await window.electronAPI.log.exportZip()
+      if (res?.success) {
+        showMessage(t('diagnostics.scan.exportedTo', { path: res.filePath ?? '' }), 'success')
+      } else {
+        showMessage(t('diagnostics.scan.exportFailed', { reason: res?.message ?? '' }), 'error')
+      }
     } catch (err) {
+      // 用户取消保存对话框：主进程 throw IpcError(IPC_CANCELED)，静默不报错
+      if ((err as { code?: unknown })?.code === ERROR_CODES.CANCELED) return
       showMessage(
         t('diagnostics.scan.exportFailed', {
           reason: err instanceof Error ? err.message : String(err)

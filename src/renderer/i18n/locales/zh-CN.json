@@ -167,7 +167,7 @@
       "exportButton": "导出诊断包",
       "exportFailed": "导出失败",
       "exportHint": "诊断包包含日志、崩溃文件、系统信息，导出后可通过下方联系方式反馈给开发者。",
-      "exportSuccess": "诊断包已导出，请通过下方联系方式反馈给开发者",
+      "exportSuccess": "诊断包已导出：{{path}}，请通过下方联系方式反馈给开发者",
       "exporting": "正在导出...",
       "githubCopyHint": "点击复制链接",
       "githubLabel": "GitHub Issues",
@@ -1532,7 +1532,7 @@
     "enforceFailed": "检查失败",
     "enforceNoop": "缓存未超限，无需淘汰",
     "exportFailed": "导出失败",
-    "exportSuccess": "日志已导出",
+    "exportSuccess": "日志已导出：{{path}}",
     "fontSizeSet": "字号已设为{{label}}",
     "glassEffectSet": "玻璃效果已切换为 {{label}}",
     "incrementalOff": "已关闭增量扫描",
@@ -5052,7 +5052,6 @@
       "restart": "重启同步服务",
       "export": "导出诊断包",
       "recoveryHint": "服务恢复入口始终在此，无需切换页面",
-      "exportCanceled": "已取消导出",
       "exported": "诊断包已导出：{{path}}",
       "exportFailed": "导出诊断包失败"
     }

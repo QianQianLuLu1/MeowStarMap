@@ -20,7 +20,7 @@ export async function exportDiagnostics(
   try {
     const result = await exportZip()
     if (result.success) {
-      showMessage(t('syncConsole.statusBar.exported', { path: result.message ?? '' }), 'success')
+      showMessage(t('syncConsole.statusBar.exported', { path: result.filePath ?? '' }), 'success')
     } else {
       showMessage(t('syncConsole.statusBar.exportFailed'), 'error')
     }

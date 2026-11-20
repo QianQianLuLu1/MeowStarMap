@@ -378,7 +378,8 @@ export const DiagnosticsLogsSection: React.FC = () => {
     setExporting(true)
     try {
       const res = await window.electronAPI.log.exportZip()
-      if (res?.success) showMessage(res.message || t('logAction.exportSuccess'), 'success')
+      if (res?.success)
+        showMessage(t('logAction.exportSuccess', { path: res.filePath ?? '' }), 'success')
       else showMessage(res?.message || t('logAction.exportFailed'), 'error')
     } catch (err) {
       // 用户取消保存对话框：主进程 throw IpcError(IPC_CANCELED)，静默不报错
@@ -462,12 +463,8 @@ export const DiagnosticsLogsSection: React.FC = () => {
             <button
               className="btn-primary text-xs px-3 py-1.5"
               onClick={handleExportLogs}
-              disabled={exporting || faultCount === 0}
-              title={
-                faultCount === 0
-                  ? t('settings.logs.exportDisabled')
-                  : t('diagnostics.logs.exportAllHint')
-              }
+              disabled={exporting}
+              title={t('diagnostics.logs.exportAllHint')}
             >
               {exporting ? t('settings.logs.exporting') : t('settings.logs.export')}
             </button>
