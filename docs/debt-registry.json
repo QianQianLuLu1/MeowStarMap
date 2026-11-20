@@ -1,7 +1,7 @@
 {
   "$schema": "tech-debt-registry-v1",
   "_comment": "技术债机器可读注册表——与 docs/技术债清单.md 保持同步。每项 debt 对应一个 GitHub Issue（tech-debt 标签），issue 号回填至 issue 字段。CI 通过 scripts/debt/check-debt-fix.ts 读取本文件，当 PR 变更 files 中的源码时提醒更新文档与关闭 Issue。",
-  "updatedAt": "2026-11-14",
+  "updatedAt": "2026-11-21",
   "items": [
     {
       "id": "DEBT-001",
@@ -978,6 +978,114 @@
       "title": "2.5.7-beta 全部工作未推送（origin/main 停在 a542616），单点磁盘风险",
       "description": "2026-11-14 盘点核实：origin/main 停在 a542616（clone 基点），本地 HEAD 已领先多条 2.5.7-beta 提交（1b74e646 等），各轮计划口径「不 push 属外部动作需另行确认」。影响面：单点磁盘故障即丢失整段 2.5.7-beta 历史；协作/CI 看不到这些提交。属流程债。修法：需求方确认后 git push origin main（外部动作）。撤销条件：推送完成且远端可见。",
       "files": [],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-076",
+      "category": "robustness",
+      "section": 25,
+      "status": "open",
+      "priority": "medium",
+      "title": "FullscreenViewer 关闭→重开异图首帧闪旧图（jitter 修复未覆盖重开路径）",
+      "description": "2026-11-20 闪屏排查轮定位（与本轮主诉「滚动整块白黑闪」症状不符，未修）：组件常驻挂载（App.tsx:413-415），关闭仅 return null，displayUrl/displayedFile/displayedUrlRef 三联状态保留旧图；重开异图时首帧 paint 仍旧图+旧宽高盒，换源 effect 绘制后才跑且要等 whenTransitionSettled()（~220ms）+decode。jitter 修复只钉住查看器内翻页。修法：fullscreenOpen 上升沿渲染期复位三联状态至新目标 initialUrl（ThumbReveal.tsx:70-74 同模式），重开同图走 ref 命中快路径零降级；红灯测试设计见 docs/plans/2026-11-20-视图闪屏软件渲染自动降级-实施计划.md。撤销条件：重开异图首帧 src≠旧图 URL 的回归测试落地且 jitter 六用例不回归。",
+      "files": ["src/renderer/components/gallery/FullscreenViewer.tsx"],
+      "lines": [96, 390],
+      "issue": false
+    },
+    {
+      "id": "DEBT-077",
+      "category": "robustness",
+      "section": 25,
+      "status": "open",
+      "priority": "medium",
+      "title": "EventTimelineView 行 key 用 row-${index}（TimelineView N8 同型漏网）",
+      "description": "2026-11-20 闪屏排查轮定位（症状不符未修）：src/renderer/components/gallery/EventTimelineView.tsx:189 computeItemKey 行单元用下标作 key，数据增删/分组变化→行下标移位→行子树重挂载→ThumbReveal 骨架重放（软件渲染下更显眼）。TimelineView 已在 N8 修为行内首个文件 id（TimelineView.tsx:146-153）。修法：`row-${unit.files[0]?.id ?? index}` 一行对齐 N8；红灯测试断言插入分组后既有行 DOM 节点同一性。撤销条件：行 key 稳定性回归测试落地。",
+      "files": ["src/renderer/components/gallery/EventTimelineView.tsx"],
+      "lines": [189],
+      "issue": false
+    },
+    {
+      "id": "DEBT-078",
+      "category": "perf",
+      "section": 25,
+      "status": "open",
+      "priority": "low",
+      "title": "MediaThumbnail 无已加载记忆且 complete 兜底为 passive effect（重挂载必闪一帧骨架）",
+      "description": "2026-11-20 闪屏排查轮定位（症状不符未修）：src/renderer/components/common/MediaThumbnail.tsx:83 loaded 恒 useState(false)，:105-108 complete 兜底用 passive useEffect（绘制后才跑）；ThumbReveal 的模块级 loadedSrcs 记忆（512 FIFO）未共享。消费方：DuplicatesPage.tsx:1608。修法：抽 ThumbReveal 记忆为共享模块（hasLoadedSrc/rememberLoadedSrc），MediaThumbnail 改 useLayoutEffect + 记忆查/写，onError 永不入记忆；既有 MediaThumbnail.test.tsx 需 beforeEach 重置记忆。撤销条件：同 src 重挂载首帧无骨架的回归测试落地。",
+      "files": ["src/renderer/components/common/MediaThumbnail.tsx"],
+      "lines": [83, 105],
+      "issue": false
+    },
+    {
+      "id": "DEBT-079",
+      "category": "perf",
+      "section": 25,
+      "status": "open",
+      "priority": "low",
+      "title": "搜索索引每次启动 indexed=0 全量重建（持久化疑似失效）",
+      "description": "2026-11-20 日志包取证：故障机 10-29/10-30/11-01/11-19 每次启动均报「[Search] 索引文档数与数据库不一致，触发重建: indexed=0」（diag.log），持久化索引疑似从未写成功或启动读取路径分叉。与滚动闪屏无直接因果（启动性能域），本轮未修。修法：排查 src/renderer/search/search-index.ts 持久化写入/读取链路，钉住「二次启动 indexed>0」回归。撤销条件：连续两次启动不触发全量重建的实测读数。",
+      "files": ["src/renderer/search/search-index.ts"],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-080",
+      "category": "type-drift",
+      "section": 2,
+      "status": "done",
+      "priority": "medium",
+      "title": "log:exportZip 返回类型三处漂移（filePath 无实现/canceled 死字段/Toast 拿 message 当路径）",
+      "description": "shared 声明 filePath 但实现不返回；vite-env 内联 canceled 死字段；sync 控制台成功 Toast 把 message 文案当 {{path}} 插值。2026-11-21 诊断日志体系完善 P1/P3 修复：类型单一真相源 + filePath 真实返回 + 三入口 Toast 统一真实路径。",
+      "files": [
+        "src/shared/types/electron-api.ts",
+        "src/renderer/vite-env.d.ts",
+        "src/renderer/pages/sync-gallery/console/export-diagnostics.ts"
+      ],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-081",
+      "category": "robustness",
+      "section": 2,
+      "status": "done",
+      "priority": "medium",
+      "title": "FeedbackDialog 描述/勾选摆设控件 + 设置页 faultCount=0 禁用导出",
+      "description": "描述与勾选从未传 IPC，用户填写内容不进诊断包；无故障记录时导出按钮被禁用（取证包恰恰在无故障时也需要）。2026-11-21 P2/P3 修复：options 接通 feedback.txt（勾选仅记录意愿不裁剪包内容），移除禁用条件。",
+      "files": [
+        "src/renderer/components/common/FeedbackDialog.tsx",
+        "src/renderer/pages/settings/diagnostics-sections.tsx"
+      ],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-082",
+      "category": "coverage",
+      "section": 2,
+      "status": "done",
+      "priority": "high",
+      "title": "exitDiagnosis 绕过 fault 体系 + IPC 失败静默 + 设置变更无痕",
+      "description": "cleanup 手写 JSON 无 recentLogs/环境/bootId；IPC 失败（AppError/PathGuard/zod）不落盘、FaultType ipcError 闲置；settings:set 零日志。2026-11-21 P4/P5 修复：buildFaultRecord 复用（保持同步写）、setupIPC 单点拦截器、[Settings] old→new 留痕、PathGuard 拒绝全路径 warn。",
+      "files": [
+        "src/main/app/cleanup.ts",
+        "src/main/ipc/ipc-observability.ts",
+        "src/main/ipc/validator.ts",
+        "src/main/ipc/handlers/settings-handler.ts"
+      ],
+      "lines": [],
+      "issue": false
+    },
+    {
+      "id": "DEBT-083",
+      "category": "test-gap",
+      "section": 2,
+      "status": "open",
+      "priority": "low",
+      "title": "诊断包导出链无打包态 e2e 自动化验证",
+      "description": "导出链已被 service/handler/preload/渲染四层单测夹住，但打包产物（app:// 协议 + asar 路径）下的真实导出未自动化；需人工按实施计划 §6 的还原时间线步骤验证。2026-11-21 诊断日志体系完善轮列为后续可选项。",
+      "files": ["e2e/"],
       "lines": [],
       "issue": false
     }

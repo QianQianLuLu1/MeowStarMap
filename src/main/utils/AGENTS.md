@@ -26,12 +26,14 @@
 
 ### 日志与诊断
 
-| 文件                    | 职责                                                                                                          |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `logger.ts`             | `logger` 单例 + `initLogger` + `logFault` 故障记录（基于 electron-log）                                       |
-| `startup-diagnostic.ts` | 启动期错误文件持久化（`diagLog` / `readStartupErrors`）                                                       |
-| `early-crash-guard.ts`  | 启动早期致命错误弹窗 + 非致命错误提示（i18n 未就绪时的兜底；含 spawn 错误与流状态竞态两类"已就绪后降级"分类） |
-| `spawn-error-log.ts`    | 子进程 spawn 错误分类与诊断日志                                                                               |
+| 文件                    | 职责                                                                                                                                                                           |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `logger.ts`             | `logger` 单例 + `initLogger` + `logFault` 故障记录（基于 electron-log）；行格式 `[ISO] [LEVEL] [b:<boot8> p:<pid>] msg`；导出 `buildFaultRecord` / `getEmergencyLogCandidates` |
+| `boot-id.ts`            | 零依赖叶子模块：模块加载期生成 `BOOT_ID` / `BOOT_ID_SHORT`（logger/exit-forensics/manifest 同源，可拼跨文件时间线）                                                            |
+| `boot-snapshot.ts`      | 启动环境一次性快照（argv/已应用开关/env 全量/取证根与 source/userData），whenReady 早期经 `logger.info('[Boot] …')` 落盘                                                       |
+| `startup-diagnostic.ts` | 启动期错误文件持久化（`diagLog` / `readStartupErrors`）；diag.log 1MB rename 轮转保 `.old`；导出 `getDiagLogPathValue()` 真实写路径                                            |
+| `early-crash-guard.ts`  | 启动早期致命错误弹窗 + 非致命错误提示（i18n 未就绪时的兜底；含 spawn 错误与流状态竞态两类"已就绪后降级"分类）                                                                  |
+| `spawn-error-log.ts`    | 子进程 spawn 错误分类与诊断日志                                                                                                                                                |
 
 ### 安全与校验
 

@@ -1240,3 +1240,28 @@ preload 侧对应 `src/main/preload/api/shell.ts` 的 `electronAPI.shell` 命名
   （userData 侧 network-repair-journal.json / hotspot-state.json 跨目录收集）、`fallback/`
   （logger 极端兜底与 startup-diagnostic tmpdir 应急落点，存在才收）；
 - `diag.log` 读取改走 `getDiagLogPathValue()` 真实写路径（应急态不漏收）。
+
+## 23. IPC 可观测性单点拦截器（2026-11-21 诊断日志体系完善 P5）
+
+全部 `ipcMain.handle` 注册都经 `app/ipc-setup.ts` 的 `setupIPC()`，故在其入口安装一次
+**常驻幂等包装**（`ipc/ipc-observability.ts` 的 `installIpcObservability(ipcMain)`）即覆盖
+所有通道（含晚注册），**不改变任何通道的入参/返回契约**，47 个 handler 文件零迁移。
+
+拦截器行为（全程 fail-open，观测自身异常绝不影响业务响应）：
+
+| 情形                                                    | 动作                                                                            |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 响应 `success === false` 且 `code === IPC_CANCELED`     | 静默（用户取消属正常交互）                                                      |
+| 响应 `success === false` 且 `code === VALIDATION_ERROR` | `logger.warn('[IPC] validation failed: <channel>', { code, message, details })` |
+| 响应 `success === false`（其余错误码）                  | `logFault('ipcError', Error(message), { channel, code, details })`              |
+| listener 抛错（wrap* 家族之外）                         | 记 `ipcError` fault 后**原样重抛**                                              |
+| 耗时 > 500ms（`IPC_SLOW_THRESHOLD_MS`）                 | `logger.warn('[IPC] slow: <channel> elapsed=<ms>ms')`                           |
+| 成功且 ≤500ms                                           | **零写盘**（热路径仅两次 `performance.now()`）                                  |
+
+配套留痕点：
+
+- `PathGuard.assertAllowed` 拒绝时 `logger.warn('[PathGuard] deny <op>', { path 完整, op, sensitive })`
+  ——日志侧记全量路径（已授权不脱敏）；IPC 错误 `details` 仍走 `maskPath`（对外契约不变）。
+  `media-read-guard` 的全部拒绝分支最终落到该单点，无需逐处加日志。
+- `settings:set` 在值大小校验后记录 `[Settings] <key>: <old> → <new>`（单值序列化 >1KB
+  截断，纯体积约束）；读旧值失败 fail-open，不影响写入。

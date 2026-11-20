@@ -42,6 +42,7 @@ export function registerCategoryHandlers(ctx: HandlerContext): void {
 - 三者都自动：① 成功时把返回值包为 `{ success: true, data }`；② 捕获 `AppError` 转 `IpcError`（`{ success: false, error }`）；③ 捕获普通 `Error` 记日志并标 `INTERNAL_ERROR`。
 - **双层 `success` 结构**：外层 `IpcResponse.success` 由 `wrapHandler` 生成，preload 的 `call<T>()` 只透出 `res.data`。若前端会检查 `res.success`（如 `media:findDuplicates`），本 handler **必须真的返回含 `success: true` 的对象**（见 `docs/IPC_CONTRACT.md` §2），否则前端恒得 `undefined`。
 - handler 内 **不要** 手写 `try/catch + return { success:false }` 去模拟错误——直接 `throw` `AppError`，由包装器统一转译。
+- **IPC 可观测性不在本层逐通道实现**：`setupIPC()` 入口安装常驻幂等拦截器（`../ipc-observability.ts`），统一记录失败 fault（`ipcError`）/校验失败 warn/CANCELED 静默/>500ms 慢调用 warn，成功快调用零写盘，不改变响应契约（见 `docs/IPC_CONTRACT.md` §23）。新增 handler 无需也不应自带观测日志。
 
 ## 3. 参数校验（zod `schemas`）
 
