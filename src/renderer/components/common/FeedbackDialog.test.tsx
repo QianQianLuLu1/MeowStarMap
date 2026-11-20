@@ -32,6 +32,7 @@ const setLogExportAPI = (exportZip: ExportZipFn): void => {
 }
 
 import { FeedbackDialog } from './FeedbackDialog'
+import { ERROR_CODES } from '../../../shared/errors/error-codes'
 
 describe('FeedbackDialog', () => {
   beforeEach(() => {
@@ -165,14 +166,20 @@ describe('FeedbackDialog', () => {
     })
   })
 
-  it('用户取消保存对话框时不显示错误', async () => {
-    const exportZip = vi.fn().mockResolvedValue({ canceled: true })
+  it('用户取消保存对话框（throw CANCELED）时不显示错误', async () => {
+    // 真实桥语义：主进程取消 throw IpcError(CANCELED)，不存在 canceled 返回字段
+    const exportZip = vi
+      .fn()
+      .mockRejectedValue(
+        Object.assign(new Error('CANCELED_BY_USER'), { code: ERROR_CODES.CANCELED })
+      )
     setLogExportAPI(exportZip)
 
     render(<FeedbackDialog open={true} onClose={vi.fn()} />)
     await act(async () => {
       fireEvent.click(screen.getByText('common.feedbackDialog.exportButton'))
     })
+    expect(screen.queryByText('CANCELED_BY_USER')).toBeNull()
     expect(screen.queryByText('common.feedbackDialog.exportFailed')).toBeNull()
   })
 

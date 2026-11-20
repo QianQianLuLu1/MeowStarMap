@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { IconClose } from '../../icons'
 import { BaseDialog } from './BaseDialog'
+import { ERROR_CODES } from '../../../shared/errors/error-codes'
 
 /**
  * P2-5：错误反馈对话框
@@ -33,9 +34,6 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onClose })
       const result = await window.electronAPI?.log?.exportZip?.()
       if (result?.success) {
         setExportResult({ success: true, message: t('common.feedbackDialog.exportSuccess') })
-      } else if (result?.canceled) {
-        // 用户取消保存对话框，不显示错误
-        setExportResult(null)
       } else {
         setExportResult({
           success: false,
@@ -43,7 +41,15 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onClose })
         })
       }
     } catch (err) {
-      setExportResult({ success: false, message: err instanceof Error ? err.message : String(err) })
+      // 用户取消保存对话框：主进程 throw IpcError(IPC_CANCELED)，静默不报错
+      if ((err as { code?: unknown })?.code === ERROR_CODES.CANCELED) {
+        setExportResult(null)
+      } else {
+        setExportResult({
+          success: false,
+          message: err instanceof Error ? err.message : String(err)
+        })
+      }
     } finally {
       setExporting(false)
     }

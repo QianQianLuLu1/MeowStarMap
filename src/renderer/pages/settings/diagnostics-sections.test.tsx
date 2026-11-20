@@ -11,7 +11,7 @@
  * 运行：npx vitest run src/renderer/pages/settings/diagnostics-sections.test.tsx
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import {
   DiagnosticsGpuSection,
@@ -19,6 +19,7 @@ import {
   DiagnosticsCrashSection
 } from './diagnostics-sections'
 import { GlobalToastContext } from './shared'
+import { ERROR_CODES } from '../../../shared/errors/error-codes'
 
 let getGpuStatus: ReturnType<typeof vi.fn>
 
@@ -186,6 +187,30 @@ describe('日志/崩溃诊断区 — 取证目录统一（取消自定义入口�
     )
     expect(screen.queryByText('修改目录')).not.toBeInTheDocument()
     expect(screen.getByText('打开目录')).toBeInTheDocument()
+  })
+
+  it('日志区：用户取消导出（throw CANCELED）⇒ 静默不报错', async () => {
+    installDirApi()
+    const api = (
+      window as unknown as {
+        electronAPI: {
+          log: { exportZip: ReturnType<typeof vi.fn>; getStats: ReturnType<typeof vi.fn> }
+        }
+      }
+    ).electronAPI
+    api.log.getStats.mockResolvedValue({ success: true, faultCount: 1, totalSize: 0, fileCount: 0 })
+    api.log.exportZip.mockRejectedValue(
+      Object.assign(new Error('CANCELED_BY_USER'), { code: ERROR_CODES.CANCELED })
+    )
+    render(
+      <GlobalToastContext.Provider value={mockShowMessage}>
+        <DiagnosticsLogsSection />
+      </GlobalToastContext.Provider>
+    )
+    const btn = await screen.findByText('导出日志')
+    fireEvent.click(btn)
+    await waitFor(() => expect(api.log.exportZip).toHaveBeenCalledTimes(1))
+    expect(mockShowMessage).not.toHaveBeenCalled()
   })
 
   it('崩溃区：不渲染「修改目录」按钮，保留「打开目录」与统一路径展示', async () => {

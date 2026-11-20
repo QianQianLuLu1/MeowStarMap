@@ -4,7 +4,8 @@ import type { TFunction } from 'i18next'
  * T3/T11：导出诊断包（复用既有 `log:exportZip` 通道）。
  * Android 卡 / 底栏 / About 三处入口共用同一判据：
  * - 桥面缺席（老 preload）⇒ 诚实提示不可用，不伪造成功；
- * - 用户取消 ⇒ info；成功 ⇒ success 且 Toast 带落盘路径（message）；失败 ⇒ error。
+ * - 用户取消 ⇒ 主进程 throw IpcError(IPC_CANCELED)，经 showError（useErrorToast）静默；
+ *   成功 ⇒ success 且 Toast 带落盘路径；失败 ⇒ error。
  */
 export async function exportDiagnostics(
   t: TFunction,
@@ -18,10 +19,6 @@ export async function exportDiagnostics(
   }
   try {
     const result = await exportZip()
-    if (result.canceled) {
-      showMessage(t('syncConsole.statusBar.exportCanceled'), 'info')
-      return
-    }
     if (result.success) {
       showMessage(t('syncConsole.statusBar.exported', { path: result.message ?? '' }), 'success')
     } else {

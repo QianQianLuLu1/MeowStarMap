@@ -19,6 +19,7 @@ import {
   makeStatus
 } from './sync-console-test-utils'
 import { NIKKISYNC_ALIGNED_VERSION } from '../../../../shared/nikkisync-version'
+import { ERROR_CODES } from '../../../../shared/errors/error-codes'
 import type { NikkiSyncServerStatusInfo } from '../../../../shared/types/electron-api'
 
 const mockRefresh = vi.fn()
@@ -116,11 +117,15 @@ describe('T11：导出诊断包', () => {
     )
   })
 
-  it('用户取消 ⇒ info 提示（不报错）', async () => {
-    logExportZip.mockResolvedValue({ success: false, canceled: true })
+  it('用户取消（throw CANCELED）⇒ 静默不报错', async () => {
+    // 真实桥语义：主进程取消 throw IpcError(CANCELED)，useErrorToast 对其静默
+    logExportZip.mockRejectedValue(
+      Object.assign(new Error('canceled'), { code: ERROR_CODES.CANCELED })
+    )
     renderBar()
     fireEvent.click(screen.getByTestId('sync-status-export'))
-    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('已取消导出', 'info'))
+    await waitFor(() => expect(logExportZip).toHaveBeenCalledTimes(1))
+    expect(mockShowMessage).not.toHaveBeenCalled()
   })
 
   it('导出失败（success:false）⇒ error 提示', async () => {

@@ -263,9 +263,17 @@ export interface LogStats {
   oldestTime?: string
   newestTime?: string
 }
+export interface LogExportOptions {
+  /** 用户问题描述（FeedbackDialog），写入诊断包 feedback.txt */
+  description?: string
+  /** 用户意愿记录（不裁剪包内容，诊断包恒含全部日志） */
+  attachLogs?: boolean
+  attachSystemInfo?: boolean
+}
 export interface LogExportZipResult {
   success: boolean
-  filePath: string
+  /** 成功导出时的落盘绝对路径 */
+  filePath?: string
   message?: string
 }
 export interface LogClearResult {

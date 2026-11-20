@@ -1211,3 +1211,21 @@ preload 侧对应 `src/main/preload/api/shell.ts` 的 `electronAPI.shell` 命名
 新增收集 `heartbeat.json` / `last-exit.json` / `second-instance-ack.json` / `boot-ok.marker` /
 `logs/scan-log.jsonl` / `nikkisync/`（5 个聚合诊断文件白名单）；`system-info.json` 增
 `forensics: { root, source: 'install' | 'fallback' }`；`contents`/`missing` 仍按实际入包如实登记。
+
+## 22. log:exportZip 完整契约（2026-11-21 诊断日志体系完善）
+
+| 通道            | preload 方法              | 入参（zod）                                                                                                       | 返回（`IpcResponse.data`）                                  |
+| --------------- | ------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `log:exportZip` | `log.exportZip(options?)` | 可选单对象：`{ description?: string(≤2000), attachLogs?: boolean, attachSystemInfo?: boolean }`；无参调用完全兼容 | `{ success: boolean, message?: string, filePath?: string }` |
+
+语义约定（三入口——设置页日志区、FeedbackDialog、sync 控制台 AboutView/底栏/ConnectView——共用）：
+
+- **取消**：用户在保存对话框点取消 ⇒ 主进程 `throw AppError.canceled` ⇒ 渲染层收到
+  `IpcError`，`code === IPC_ERROR_CODES.CANCELED`（`'IPC_CANCELED'`）。**不存在 `canceled`
+  返回字段**（历史类型漂移已清除）；渲染层一律对该码静默，不得误报「导出失败」。
+- **成功**：`success: true`，`filePath` 为落盘绝对路径（P2 起兑现），Toast 展示真实路径。
+- **失败**：`success: false` + `message`；导出恒 settle（archiver 进程内流式 + 60s 超时兜底）。
+- `options.description`/勾选写入包内 `feedback.txt`；勾选仅记录用户意愿，**不裁剪包内容**
+  （诊断包恒含全部日志种类）。
+- 类型单一真相源：`shared/types/electron-api.ts` 的 `LogExportOptions` / `LogExportZipResult`；
+  `renderer/vite-env.d.ts` 经 `import()` 类型引用，不再内联副本。

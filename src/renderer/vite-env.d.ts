@@ -1379,8 +1379,10 @@ interface WindowElectronAPI {
       oldestTimestamp: string | null
       message?: string
     }>
-    // 导出全部日志为 zip（主进程会弹出保存对话框）
-    exportZip: () => Promise<{ success: boolean; message?: string; canceled?: boolean }>
+    // 导出全部日志为 zip（主进程会弹出保存对话框）；取消 throw IpcError(IPC_CANCELED)
+    exportZip: (
+      options?: import('../shared/types/electron-api').LogExportOptions
+    ) => Promise<import('../shared/types/electron-api').LogExportZipResult>
     // 清空所有日志
     clear: () => Promise<{ success: boolean; message: string; cleared: number }>
     // 自定义目录支持
@@ -1429,7 +1431,13 @@ interface WindowElectronAPI {
     // GPU 状态只读探针（app:gpu-status）：硬件加速开关态/活动显卡/特性降级/独显偏好
     getGpuStatus: () => Promise<{
       hardwareAcceleration: { enabled: boolean; reason: string }
-      fallback: { active: boolean; consecutiveFailures: number; fallbackVersion: string | null }
+      fallback: {
+        active: boolean
+        consecutiveFailures: number
+        fallbackVersion: string | null
+        /** 兼容档位 0/1/2（与 shared/types/electron-api.ts GpuStatusSummary 同步；旧载荷缺省视为 0） */
+        compatLevel?: number
+      }
       discretePreference: { mode: 'auto' | 'high-performance'; registry: string | null }
       featureStatus: Record<string, string> | null
       gpus: Array<{

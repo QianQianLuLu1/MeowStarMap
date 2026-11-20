@@ -12,6 +12,7 @@ import {
   type FaultRecord,
   type CrashRecord
 } from './shared'
+import { ERROR_CODES } from '../../../shared/errors/error-codes'
 
 // ============ GPU 状态（app:gpu-status 只读探针） ============
 
@@ -377,10 +378,11 @@ export const DiagnosticsLogsSection: React.FC = () => {
     setExporting(true)
     try {
       const res = await window.electronAPI.log.exportZip()
-      if (res?.canceled) return
       if (res?.success) showMessage(res.message || t('logAction.exportSuccess'), 'success')
       else showMessage(res?.message || t('logAction.exportFailed'), 'error')
     } catch (err) {
+      // 用户取消保存对话框：主进程 throw IpcError(IPC_CANCELED)，静默不报错
+      if ((err as { code?: unknown })?.code === ERROR_CODES.CANCELED) return
       showMessage(err instanceof Error ? err.message : t('logAction.exportFailed'), 'error')
     } finally {
       setExporting(false)
