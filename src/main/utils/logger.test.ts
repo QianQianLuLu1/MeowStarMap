@@ -106,6 +106,27 @@ describe('logger', () => {
     })
   })
 
+  describe('P4 行格式与 bootId', () => {
+    it('主日志行含 [b:<boot8> p:<pid>]（跨文件时间线可拼接）', async () => {
+      logger.info('p4-format-probe')
+      await new Promise((r) => setTimeout(r, 50))
+      const files = await fsp.readdir(logDir)
+      const main = files.find((f) => f.startsWith('main-') && f.endsWith('.log'))
+      expect(main).toBeTruthy()
+      const content = await fsp.readFile(path.join(logDir, main!), 'utf-8')
+      expect(content).toContain(`p:${process.pid}`)
+      expect(content).toMatch(/\[b:[0-9a-f]{8} p:\d+\]/)
+    })
+
+    it('buildFaultRecord 含 bootId；ipcError 附 recentLogs 上下文', async () => {
+      const mod = await import('./logger')
+      const { BOOT_ID } = await import('./boot-id')
+      const rec = mod.buildFaultRecord('ipcError', new Error('x'), { channel: 'test:ch' })
+      expect(rec.bootId).toBe(BOOT_ID)
+      expect(rec.context?.recentLogs).toBeDefined()
+    })
+  })
+
   describe('initLogger', () => {
     it('创建 logs 目录', () => {
       expect(fs.existsSync(logDir)).toBe(true)

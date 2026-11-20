@@ -489,6 +489,12 @@ describe('single-instance - second-instance ack 静默让位（B）', () => {
     expect(JSON.parse(raw)).toEqual({ pid: process.pid, ts: t0 })
   })
 
+  it('B10b writeSecondInstanceAck 留痕（赢家侧握手不再静默）', () => {
+    m.diagLogMock.mockClear()
+    writeSecondInstanceAck()
+    expect(m.diagLogMock).toHaveBeenCalledWith('BOOT', expect.stringContaining('ack written'))
+  })
+
   it('B11【单元】writeSecondInstanceAck 写入失败（取证根与全部回退候选均不可写）不抛出', () => {
     const blocker = path.join(tmpDir, 'blocker.txt')
     fs.writeFileSync(blocker, 'not a dir')

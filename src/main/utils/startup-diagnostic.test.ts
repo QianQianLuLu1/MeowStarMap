@@ -403,3 +403,42 @@ describe('P2: getDiagLogPathValue 导出面', () => {
     expect(mod.getDiagLogPathValue()).toContain('diag.log')
   })
 })
+
+describe('P4: diag.log 1MB 轮转（rename 保历史，尾部永不丢）', () => {
+  let base: string
+
+  beforeEach(async () => {
+    base = await fsp.mkdtemp(path.join(os.tmpdir(), 'wxnn-diag-rot-'))
+    setTmpBase(base)
+    mockGetPathImpl = (name: string) => path.join(base, name)
+    vi.resetModules()
+    await registerDocumentsProvider()
+  })
+
+  afterEach(async () => {
+    await fsp.rm(base, { recursive: true, force: true })
+  })
+
+  it('超过 1MB ⇒ rename 为 diag.log.old，新文件继续累积，历史完整', async () => {
+    const mod = await loadModule()
+    const big = 'x'.repeat(600 * 1024)
+    mod.diagLog('ROT', 'first-' + big)
+    mod.diagLog('ROT', 'second-' + big)
+    const p = mod.getDiagLogPathValue()
+    expect(fs.existsSync(p + '.old'), '超限后应产生 diag.log.old').toBe(true)
+    expect(fs.readFileSync(p + '.old', 'utf-8')).toContain('first-')
+    const current = fs.readFileSync(p, 'utf-8')
+    expect(current).toContain('second-')
+    expect(current).not.toContain('first-')
+  })
+
+  it('未超限 ⇒ 不轮转（边界）', async () => {
+    const mod = await loadModule()
+    mod.diagLog('ROT', 'small-a')
+    mod.diagLog('ROT', 'small-b')
+    const p = mod.getDiagLogPathValue()
+    expect(fs.existsSync(p + '.old')).toBe(false)
+    expect(fs.readFileSync(p, 'utf-8')).toContain('small-a')
+    expect(fs.readFileSync(p, 'utf-8')).toContain('small-b')
+  })
+})

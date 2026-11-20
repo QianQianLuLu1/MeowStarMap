@@ -61,7 +61,25 @@ vi.mock('../../utils/process-registry', () => ({
 vi.mock('../../utils/logger', () => ({
   getFaultLogPath: getFaultLogPathMock,
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
-  electronLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
+  electronLogger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  // P4：cleanup 退出诊断改用 logger 的统一构造（含 recentLogs/环境/bootId），写入侧仍纯同步
+  buildFaultRecord: vi.fn((type: string, error: unknown, context?: Record<string, unknown>) => ({
+    id: 'fid',
+    timestamp: 'ts',
+    type,
+    summary: String(error),
+    detail: 'd',
+    context: { ...(context || {}), recentLogs: [] },
+    file: 'faults.jsonl',
+    appVersion: '9.9.9-test',
+    electronVersion: 'e',
+    nodeVersion: 'n',
+    platform: 'win32',
+    osVersion: '10',
+    pid: 1,
+    uptime: 1,
+    bootId: 'boot-test'
+  }))
 }))
 
 vi.mock('../../utils/startup-diagnostic', () => ({
@@ -82,6 +100,7 @@ vi.mock('../../services/decryption-service', () => ({
 }))
 
 import { performCleanup } from '../cleanup'
+import { buildFaultRecord } from '../../utils/logger'
 
 // 构造可控的 worker bridge：dispose 返回可控制的 promise
 function makeDisposableBridge(name: string) {
@@ -346,7 +365,7 @@ describe('performCleanup', () => {
     expect(disposeDecryptionServiceMock).toHaveBeenCalledTimes(1)
   })
 
-  it('16. fault 日志同步写入 fs.appendFileSync（含 before:/after:），落点走 getFaultLogPath（取证 logs，不得硬编码 userData）', async () => {
+  it('16. fault 日志经 buildFaultRecord 统一构造后同步写入（含 recentLogs/环境字段），落点走 getFaultLogPath', async () => {
     const ctx = makeAppCtx({ scannerManager: makeScannerManagerStub() })
 
     await performCleanup(ctx)
@@ -355,11 +374,16 @@ describe('performCleanup', () => {
     const writeArgs = fsAppendFileSyncMock.mock.calls[0]
     // 落点必须是 logger 的故障日志路径（随 logDir=取证 logs），而非 userData\logs 硬编码
     expect(writeArgs[0]).toBe(getFaultLogPathMock())
-    // 第二参数是日志内容字符串
+    // P4：必须经统一构造（附 recentLogs + 环境 + bootId），不得手写缺字段的 JSON
+    expect(vi.mocked(buildFaultRecord)).toHaveBeenCalledWith(
+      'exitDiagnosis',
+      expect.any(Error),
+      expect.objectContaining({ before: expect.anything(), after: expect.anything() })
+    )
     const content = writeArgs[1] as string
-    expect(content).toContain('before:')
-    expect(content).toContain('after:')
     expect(content).toContain('exitDiagnosis')
+    expect(content).toContain('recentLogs')
+    expect(content).toContain('appVersion')
     // 第三参数是 utf-8 编码
     expect(writeArgs[2]).toBe('utf-8')
   })

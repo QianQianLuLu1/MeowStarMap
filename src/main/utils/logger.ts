@@ -6,6 +6,7 @@ import { app } from 'electron'
 import electronLog from 'electron-log'
 import { t } from '../i18n'
 import { getForensicsLogsDir } from './forensics-dir'
+import { BOOT_ID, BOOT_ID_SHORT } from './boot-id'
 
 // 日志级别
 type LogLevel = 'info' | 'warn' | 'error' | 'debug'
@@ -49,6 +50,7 @@ export interface FaultRecord {
   osVersion: string // os.release()
   pid: number // process.pid
   uptime: number // process.uptime() 秒
+  bootId?: string // P4：本次运行标识（与 heartbeat/last-exit/manifest 同源，时间线可拼接）
 }
 
 // 故障类型中文映射（诊断面板展示，走 i18n，复用 faultTypes 命名空间）
@@ -247,7 +249,8 @@ function writeLog(level: LogLevel, message: string, ...args: unknown[]): void {
     args.length > 0
       ? ' ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')
       : ''
-  const line = `[${timestamp}] [${level.toUpperCase()}] ${message}${argsStr}\n`
+  // P4：行内嵌 bootId 短码 + pid，同一次运行的 main/faults/diag/heartbeat 可拼成时间线
+  const line = `[${timestamp}] [${level.toUpperCase()}] [b:${BOOT_ID_SHORT} p:${process.pid}] ${message}${argsStr}\n`
   // P1-3：同步推入环形缓冲区（内存操作，零开销）
   pushToRecentBuffer(level, message + argsStr)
   // 异步写入，失败时至少在控制台暴露问题，便于排查磁盘满/权限问题
@@ -325,7 +328,8 @@ export function buildFaultRecord(
     type === 'workerCrash' ||
     type === 'workerRestart' ||
     type === 'databaseCorruption' ||
-    type === 'databaseRestore'
+    type === 'databaseRestore' ||
+    type === 'ipcError'
   ) {
     finalContext.recentLogs = getRecentLogs()
   }
@@ -354,7 +358,8 @@ export function buildFaultRecord(
     platform: env.platform,
     osVersion: env.osVersion,
     pid: process.pid,
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    bootId: BOOT_ID
   }
 }
 

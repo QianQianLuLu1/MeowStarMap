@@ -1,10 +1,10 @@
 import { app } from 'electron'
 import fs from 'node:fs'
-import { randomUUID } from 'node:crypto'
 import { writeFileAtomicSync } from '../utils/atomic-file'
 import { diagLog } from '../utils/startup-diagnostic'
 import { logger } from '../utils/logger'
 import { getForensicsFilePath } from '../utils/forensics-dir'
+import { BOOT_ID } from '../utils/boot-id'
 
 /**
  * 退出取证（复刻 Chrome「Chrome 未正确关闭」检测模式）。
@@ -363,7 +363,8 @@ function installExitCallSpies(): void {
 export function initExitForensics(): void {
   if (bootId) return // 幂等：防止重复注册监听器
 
-  bootId = randomUUID()
+  // P4：与主日志行/manifest 共用全局 BOOT_ID（模块加载期生成），时间线可拼接
+  bootId = BOOT_ID
   readStaleEvidence()
   writeHeartbeat()
 

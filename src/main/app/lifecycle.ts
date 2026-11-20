@@ -60,6 +60,16 @@ import { verifyCriticalNativeModules, showStartupFailureWithFallback } from './n
 import { isStartupSettled, markStartupSettled } from '../utils/early-crash-guard'
 import { clearSecondInstanceAck } from './single-instance'
 
+// P4：启动阶段耗时打点——每个 BOOT 标记携带距上一标记的毫秒差，
+// 诊断包可直接读出各阶段耗时，无需靠时间戳差推算
+let lastBootMarkAt = 0
+function bootMark(msg: string): void {
+  const now = performance.now()
+  const delta = lastBootMarkAt === 0 ? 0 : Math.round(now - lastBootMarkAt)
+  lastBootMarkAt = now
+  diagLog('BOOT', `${msg} (+${delta}ms)`)
+}
+
 /**
  * 应用启动主流程（赢家路径）：whenReady → 阶段 1-8 → 生命周期事件注册。
  * 启动失败兜底：任何阶段抛错都走 fatal catch，确保进程退出 + 释放单实例锁。
@@ -75,6 +85,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
   // 修复"前几次正常，后续无法启动"的核心问题：原实现 initialize 失败后只 .catch(console.error)，
   // 进程不退出、持单实例锁、无窗口、无日志，变僵尸；后续启动全部 gotLock=false 静默退出
   try {
+    lastBootMarkAt = performance.now()
     diagLog('BOOT', 'bootstrapApplication start')
     // R1（2026-11-15）：单实例锁获取已前移到 index.ts whenReady 首行（single-instance.ts），
     // 本函数仅由拿到锁的赢家执行。此处原先内联的重复锁逻辑是死代码（同进程二次调用
@@ -239,24 +250,24 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 并注册 GPU 子进程崩溃观测（须在窗口创建前，抢在 Chromium FATAL 前落盘回退标记）
     markBootAttempt()
     setupGpuProcessWatcher()
-    diagLog('BOOT', 'winner-only startup marks done (forensics / native check / gpu watcher)')
+    bootMark('winner-only startup marks done (forensics / native check / gpu watcher)')
 
-    diagLog('BOOT', 'before app.whenReady()')
+    bootMark('before app.whenReady()')
     await app.whenReady()
-    diagLog('BOOT', 'after app.whenReady()')
+    bootMark('after app.whenReady()')
 
     // 提前注册全局异常捕获（在 dbManager.initialize 之前）
     // 修复：原实现注册时机太晚，dbManager.initialize 抛错时此处理器未注册
     // 即便此处 logFault 不可用（logDir 未设置），logStartupError 仍能写入独立文件
     registerGlobalErrorHandlers()
-    diagLog('BOOT', 'registerGlobalErrorHandlers done')
+    bootMark('registerGlobalErrorHandlers done')
 
     // 阶段 1：数据库初始化（最可能失败的阶段）
     // 修复：包裹 try/catch，失败时记录到独立诊断日志（不依赖 logger 系统）
     // 注册恢复 / 崩溃监听器：在 dbManager.initialize() 之前注册，确保 initialize 期间的恢复事件能被捕获
     // 阶段 2.2：ctx 在此处提前构造（由 Application 注入），实现迁移到 app/recovery.ts
     registerRecoveryListeners(ctx)
-    diagLog('BOOT', 'registerRecoveryListeners done')
+    bootMark('registerRecoveryListeners done')
     // 自恢复（attemptRecovery）前注入 scanner / media worker bridge：
     // 让数据库自恢复在 rename 覆盖在线库前能显式停止这些持有 dbPath 连接的 worker，
     // 避免 Windows EPERM 共享冲突（databaseWorkerBridge 在 initialize 后才注入，启动期其为 null → 安全 no-op）。
@@ -264,7 +275,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     ctx.dbManager.setScannerWorkerBridge(ctx.scannerWorkerBridge)
     ctx.dbManager.setMediaWorkerBridge(ctx.mediaWorkerBridge)
     try {
-      diagLog('BOOT', 'before dbManager.initialize()')
+      bootMark('before dbManager.initialize()')
       await ctx.dbManager.initialize()
       // 数据库写操作进程拆分：initialize 完成后注入 worker bridge，
       // MediaRepository 通过 getWorkerBridge() 走 worker 进程执行写操作
@@ -278,7 +289,7 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
       // 数据库初始化失败属于致命错误，无法继续
       throw dbErr
     }
-    diagLog('BOOT', 'dbManager.initialize done')
+    bootMark('dbManager.initialize done')
     // 补查 dbManager.initialize() 期间的恢复事件（监听器已注册，但 initialize 内部触发的事件已存入 lastRecovery）
     checkPendingDatabaseRecovery(ctx)
 
@@ -368,9 +379,9 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // 失败不阻塞应用启动（init 内部已捕获异常并记录日志）
     await pluginHost.init()
     // 阶段 2.4：createMainWindow 迁移到 app/window-manager.ts
-    diagLog('BOOT', 'before createMainWindow()')
+    bootMark('before createMainWindow()')
     await createMainWindow(ctx)
-    diagLog('BOOT', 'after createMainWindow()')
+    bootMark('after createMainWindow()')
     // G1-F3（审查修复轮）：首窗可用即退出启动期——NikkiSync 长初始化（~14s）期间的
     // 游离 rejection 不得再被致命化弹框退出（窗口已可用，应用事实上已就绪）。
     markStartupSettled()

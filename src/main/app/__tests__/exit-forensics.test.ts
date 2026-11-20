@@ -625,3 +625,13 @@ describe('exit-forensics 心跳落盘原子性', () => {
     }
   })
 })
+
+describe('P4: bootId 与全局 BOOT_ID 同源', () => {
+  it('heartbeat.bootId === BOOT_ID（主日志行与退出取证时间线可拼接）', async () => {
+    const fx = await freshModule()
+    const { BOOT_ID } = await import('../../utils/boot-id')
+    fx.initExitForensics()
+    const hb = JSON.parse(fs.readFileSync(heartbeatPath(), 'utf8'))
+    expect(hb.bootId).toBe(BOOT_ID)
+  })
+})

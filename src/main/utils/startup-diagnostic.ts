@@ -64,8 +64,13 @@ function getDiagLogPath(): string {
   return diagLogPath
 }
 
+/** diag.log 单文件上限：超限 rename 为 .old 保完整历史（尾部永不丢，优于重置式轮转） */
+const DIAG_LOG_MAX_BYTES = 1024 * 1024
+let diagLogBytes = -1
+let diagLogBytesPath = ''
+
 /**
- * 通用诊断日志：用于启动早期追踪流程，写入 userData/diag.log
+ * 通用诊断日志：用于启动早期追踪流程，写入取证根 diag.log
  * 替代各文件中分散的 _diag 函数（原函数用 process.cwd() 在打包后无法写入）
  *
  * @param tag 模块标签（如 'BOOT'、'DB'、'WIN'）
@@ -76,7 +81,22 @@ export function diagLog(tag: string, msg: string): void {
     const logPath = getDiagLogPath()
     const timestamp = new Date().toISOString()
     const line = `[${timestamp}] [${tag}] ${msg}\n`
+    const lineBytes = Buffer.byteLength(line)
+    // P4：1MB 轮转——rename 覆盖旧 .old，历史完整保留；导出侧两份均尾部 2MB 有界收集
+    try {
+      if (diagLogBytesPath !== logPath) {
+        diagLogBytesPath = logPath
+        diagLogBytes = fs.existsSync(logPath) ? fs.statSync(logPath).size : 0
+      }
+      if (diagLogBytes > 0 && diagLogBytes + lineBytes > DIAG_LOG_MAX_BYTES) {
+        fs.renameSync(logPath, logPath + '.old')
+        diagLogBytes = 0
+      }
+    } catch {
+      // 轮转失败降级为继续追加，不得丢日志
+    }
     fs.appendFileSync(logPath, line)
+    if (diagLogBytes >= 0) diagLogBytes += lineBytes
   } catch {
     // 静默失败：诊断日志本身失败不应影响启动流程
   }

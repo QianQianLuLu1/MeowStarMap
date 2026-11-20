@@ -48,6 +48,8 @@ function secondInstanceAckPath(): string {
 export function writeSecondInstanceAck(): void {
   try {
     fs.writeFileSync(secondInstanceAckPath(), JSON.stringify({ pid: process.pid, ts: Date.now() }))
+    // P4：赢家侧握手留痕（此前完全静默，双实例时序无法从日志还原）
+    diagLog('BOOT', `second-instance ack written pid=${process.pid}`)
   } catch {
     // 写失败静默：输家将走既有三选项对话框路径
   }

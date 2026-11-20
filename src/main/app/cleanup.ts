@@ -7,7 +7,7 @@ import { wifiShareService } from '../services/share-wifi-service'
 import { backupService } from '../services/backup-service'
 import { markCleanShutdown, markExitStage } from './exit-forensics'
 import { stopNikkiSyncRuntime } from './nikkisync-runtime-setup'
-import { getFaultLogPath } from '../utils/logger'
+import { getFaultLogPath, buildFaultRecord } from '../utils/logger'
 import { t } from '../i18n'
 
 /**
@@ -195,15 +195,14 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
   // 产生 FileHandleCloseReq 活跃请求，保持事件循环活跃，导致 app.exit(0) 被延迟
   // 改用同步写入 fs.appendFileSync，不产生异步请求，确保进程能立即退出
   try {
-    const faultRecord = {
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
-      timestamp: new Date().toISOString(),
-      type: 'exitDiagnosis',
-      summary: t('main.cleanup.log.exitDiagnosisSummary'),
-      detail: `before: ${JSON.stringify(beforeStats)}\nafter: ${JSON.stringify(afterStats)}`,
-      pid: process.pid,
-      uptime: process.uptime()
-    }
+    // P4：经 buildFaultRecord 统一构造（附 recentLogs + 环境字段 + bootId），
+    // 修复此前手写 JSON 缺上下文导致「关键时刻无取证」；写入侧仍纯同步——
+    // 异步 appendFile 会产生 FileHandleCloseReq 活跃请求拖延 app.exit（P0 根因修复不得回退）
+    const faultRecord = buildFaultRecord(
+      'exitDiagnosis',
+      new Error(t('main.cleanup.log.exitDiagnosisSummary')),
+      { before: beforeStats, after: afterStats }
+    )
     // 落点走 logger 的故障日志路径（随 logDir=取证 logs）——不得硬编码 userData\logs，
     // 否则退出诊断记录与 log:listFaults / 诊断包读取侧分裂
     const faultPath = getFaultLogPath()

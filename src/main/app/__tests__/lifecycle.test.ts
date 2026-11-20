@@ -795,6 +795,12 @@ describe('lifecycle - bootstrapApplication', () => {
       )
     })
 
+    it('P4：启动各阶段 BOOT 标记携带耗时（+Nms）', async () => {
+      const ctx = makeLifecycleCtx()
+      await expect(bootstrapApplication(ctx)).resolves.toBeUndefined()
+      expect(m.diagLogMock).toHaveBeenCalledWith('BOOT', expect.stringMatching(/\(\+\d+ms\)/))
+    })
+
     it('22. autoScanOnStartup=true 时 push 启动定时器到 startupTimers', async () => {
       const ctx = makeLifecycleCtx()
       // 覆盖 getSetting：autoScanOnStartup 返回 true，uiTheme 返回 default，其余返回 dflt
