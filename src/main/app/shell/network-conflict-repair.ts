@@ -38,20 +38,31 @@ export function matchesPort(rule: FirewallRule, port: number): boolean {
 
 /**
  * Only enabled/profile fields may change; rules are never deleted.
- * 审查修复 M4：启用的 Block ⇒ 禁用（enabled:false）；禁用的 Allow ⇒ 启用。
- * 原实现对 Block 也设 enabled:true，只会加强封锁却报告 repaired。
+ * 审查修复 M4 的方向在 2026-11-20 再收窄（见 planRepair）：只碰**入站启用的 Block**。
+ */
+/** 修复目标判据（与恢复侧的交叉校验共用）：本端口 + 入站 + Block。 */
+function isRepairTarget(rule: FirewallRule, port: number): boolean {
+  return matchesPort(rule, port) && rule.direction === 'Inbound' && rule.action === 'Block'
+}
+
+/**
+ * 只处理「入站 + Block + 启用」的冲突规则：禁用它对端口的封锁即解除冲突。
+ * 2026-11-20 收窄口径（原实现会动任意方向的同端口规则）：
+ * - **不碰出站**：禁用他人 Outbound Block 属削弱出站管控，与本功能目的无关；
+ * - **不启用 Allow**：枚举里没有 Program，无法确认是被禁用的本程序规则，
+ *   贸然启用等于替别人放开端口；
+ * - **不改 profile**：原实现一律改写为 `Private,Public`，会把 Domain 抹掉并把规则扩散到公共网络。
  */
 export function planRepair(rules: FirewallRule[], port: number): RepairChange[] {
   if (!Number.isInteger(port) || port < 1 || port > 65535) return []
-  return rules
-    .filter(
-      (rule) => matchesPort(rule, port) && (rule.action === 'Block' ? rule.enabled : !rule.enabled)
-    )
-    .slice(0, 32)
-    .map((rule) => ({
-      name: rule.name,
-      changes: { enabled: rule.action !== 'Block', profile: 'Private,Public' }
-    }))
+  return (
+    rules
+      .filter((rule) => rule.enabled && isRepairTarget(rule, port))
+      // profile 无法安全落基线（白名单外）的规则不进计划：宁可少修，不可做出不可恢复的改动
+      .filter((rule) => FIREWALL_PROFILE_RE.test(rule.profile))
+      .slice(0, 32)
+      .map((rule) => ({ name: rule.name, changes: { enabled: false } }))
+  )
 }
 
 export async function runRepair(input: {
@@ -149,7 +160,9 @@ export function parseFirewallRules(stdout: string): FirewallRule[] {
       name: record.name,
       displayName: typeof record.displayName === 'string' ? record.displayName : undefined,
       enabled: record.enabled === true,
-      profile: typeof record.profile === 'string' ? record.profile : 'Any',
+      // 归一 profile 空白：PowerShell 对多 profile 规则输出 `Domain, Private`（带空格），
+      // 原样落 journal 会被 FIREWALL_PROFILE_RE 拒掉 ⇒ canRestore 永久 false、基线静默丢失。
+      profile: typeof record.profile === 'string' ? record.profile.replace(/\s+/g, '') : 'Any',
       localPorts: typeof record.localPorts === 'string' ? record.localPorts : undefined,
       action: typeof record.action === 'string' ? record.action : 'Allow',
       direction: typeof record.direction === 'string' ? record.direction : 'Inbound'
@@ -171,14 +184,22 @@ function elevatedArgs(script: string): string[] {
   const inner = `-NoProfile -NonInteractive -EncodedCommand ${Buffer.from(script, 'utf16le').toString('base64')}`
   // 审查修复 M3/M6：-PassThru 透出内层 ExitCode（失败不再假成功）；外层 UTF8 修 GBK stderr 乱码
   const wrapped = [
+    // UAC 拒绝抛非终止错误：不声明 Stop 会继续执行，`$null.ExitCode`/`exit $null` 最终得到
+    // 退出码 0 ⇒ 外层 resolve ⇒ 把「用户取消」报成 repaired。终止性 + 空进程两道闸。
+    `$ErrorActionPreference = 'Stop'`,
     `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`,
     `$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList '${inner.replace(/'/g, "''")}'`,
+    `if ($null -eq $p) { exit 1223 }`,
     `if ($p.ExitCode -ne 0) { exit $p.ExitCode }`
   ].join('\n')
   return encodeArgs(wrapped)
 }
 
 function isDeclined(error: unknown): boolean {
+  // 退出码主判据（与 network-authorization.isElevationDeclined 同口径）：error.message
+  // 不含退出码，只靠正则会把 `exit 1223` 的提权拒绝误归为通用 failed。
+  const code = (error as { code?: unknown } | null)?.code
+  if (code === 1223 || code === 0x800704c7) return true
   const message = error instanceof Error ? error.message : String(error)
   return /cancelled|canceled|操作已取消|用户取消|0x800704C7|\b1223\b/i.test(message)
 }
@@ -241,8 +262,23 @@ export async function runNetworkConflict(input: {
 
   if (input.action === 'restore') {
     if (!canRestore) return { status: 'nothing-to-restore', canRestore: false }
+    // journal 落在 userData 下、同用户可写：恢复前按当前枚举交叉校验，只承认「本端口入站 Block」
+    // 规则——否则改一条 JSON 就能借提权 PowerShell 打开任意被禁用的防火墙规则。
+    let rules: FirewallRule[]
+    try {
+      const { stdout } = await input.execFile('powershell.exe', encodeArgs(buildEnumerateScript()))
+      rules = parseFirewallRules(stdout)
+    } catch {
+      return { status: 'failed', canRestore, reason: 'firewall enumeration failed' }
+    }
+    const allowed = new Set(
+      rules.filter((rule) => isRepairTarget(rule, input.port)).map((r) => r.name)
+    )
+    const entries = journalEntries!.filter((entry) => allowed.has(entry.name))
+    // 基线里的规则已被删除/改名 ⇒ 没有可安全恢复的对象，如实回 nothing-to-restore
+    if (entries.length === 0) return { status: 'nothing-to-restore', canRestore: false }
     const script = buildApplyScript(
-      journalEntries!.map((entry) => ({
+      entries.map((entry) => ({
         name: entry.name,
         changes: { enabled: entry.enabled, profile: entry.profile }
       }))
@@ -251,7 +287,7 @@ export async function runNetworkConflict(input: {
     try {
       await input.execFile('powershell.exe', args)
       await input.clearJournal().catch(() => undefined)
-      return { status: 'restored', changed: journal!.length, canRestore: false }
+      return { status: 'restored', changed: entries.length, canRestore: false }
     } catch (error) {
       if (!input.isAdmin && isDeclined(error)) return { status: 'elevation-declined', canRestore }
       return { status: 'failed', canRestore, reason: 'restore command failed' }

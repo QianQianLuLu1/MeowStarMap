@@ -261,11 +261,13 @@ describe('hotspot 纯函数与控制', () => {
   it('parseHotspotOutput：正常/畸形', () => {
     expect(parseHotspotOutput('{"active":true,"ssid":"S","password":"P"}')).toEqual({
       active: true,
+      // 产物未带 wasActive（旧脚本）⇒ 按「本次开启」处理，与升级前行为一致
+      wasActive: false,
       ssid: 'S',
       password: 'P'
     })
-    expect(parseHotspotOutput('bad')).toEqual({ active: false })
-    expect(parseHotspotOutput('')).toEqual({ active: false })
+    expect(parseHotspotOutput('bad')).toEqual({ active: false, wasActive: false })
+    expect(parseHotspotOutput('')).toEqual({ active: false, wasActive: false })
   })
   it('nextHotspotState：不关外来热点', () => {
     expect(nextHotspotState({ startedHere: false, active: true }, false)).toEqual({
@@ -423,13 +425,15 @@ describe('审查修复 M4/M7/M9/M10：修复方向 / journal 基线 / 注入门 
     localPorts: '28080',
     ...over
   })
-  it('planRepair：启用的 Block ⇒ enabled:false；禁用的 Allow ⇒ enabled:true', () => {
+  // 2026-11-20 收窄：原用例钉的「禁用的 Allow ⇒ enabled:true」是越权面（枚举无 Program，
+  // 等于替别人放开端口），改为钉「不启用、不改 profile」，覆盖面由下方收窄套件补齐。
+  it('planRepair：入站启用的 Block ⇒ enabled:false；禁用的 Allow 不进计划', () => {
     const plan = planRepair(
       [rule({ name: 'b' }), rule({ name: 'a', action: 'Allow', enabled: false })],
       28080
     )
-    expect(plan.find((p) => p.name === 'b')?.changes.enabled).toBe(false)
-    expect(plan.find((p) => p.name === 'a')?.changes.enabled).toBe(true)
+    expect(plan).toHaveLength(1)
+    expect(plan[0]).toEqual({ name: 'b', changes: { enabled: false } })
   })
   it('matchesPort 识别 Any（全端口规则不再漏检）', () => {
     expect(matchesPort(rule({ localPorts: 'Any' }), 28080)).toBe(true)
@@ -514,5 +518,168 @@ describe('审查修复 M4/M7/M9/M10：修复方向 / journal 基线 / 注入门 
     ).toBeNull()
     expect(parseConflictJournal('nope')).toBeNull()
     expect(parseConflictJournal([])).toEqual([])
+  })
+})
+
+// ===== 审查修复轮（2026-11-20）：热点归属 / UAC 退出码 / 提权终止性 / 修复面收窄 =====
+
+describe('审查修复：热点归属不得夺取用户已开的热点', () => {
+  it('脚本报告热点本就开着 ⇒ start 返回 unchanged 且不写 startedHere', async () => {
+    const state = { startedHere: false, active: false }
+    const writeState = vi.fn(async (next: { startedHere: boolean; active: boolean }) => {
+      Object.assign(state, next)
+    })
+    const result = await controlHotspot({
+      action: 'start',
+      enabled: true,
+      execFile: async () => ({
+        stdout: JSON.stringify({ active: true, wasActive: true, ssid: 'S', password: 'P' })
+      }),
+      readState: async () => ({ ...state }),
+      writeState
+    })
+    expect(result.status).toBe('unchanged')
+    expect(result.state).toEqual({ startedHere: false, active: true })
+    // 归属没被夺取 ⇒ 后续 stop 的归属门自然拒绝（不会关掉用户自己的热点）
+    expect(writeState).not.toHaveBeenCalled()
+  })
+
+  it('脚本报告热点原本关闭 ⇒ 仍按「自开」记录归属', async () => {
+    const writeState = vi.fn(async () => undefined)
+    const result = await controlHotspot({
+      action: 'start',
+      enabled: true,
+      execFile: async () => ({
+        stdout: JSON.stringify({ active: true, wasActive: false, ssid: 'S', password: 'P' })
+      }),
+      readState: async () => ({ startedHere: false, active: false }),
+      writeState
+    })
+    expect(result.status).toBe('started')
+    expect(result.state.startedHere).toBe(true)
+  })
+
+  it('start 脚本在启动前读取热点状态并回传 wasActive', () => {
+    const script = buildHotspotScript('start')
+    expect(script).toContain('$wasActive')
+    expect(script).toMatch(/TetheringOperationalState/)
+    expect(parseHotspotOutput(JSON.stringify({ active: true, wasActive: true })).wasActive).toBe(
+      true
+    )
+    expect(parseHotspotOutput(JSON.stringify({ active: true })).wasActive).toBe(false)
+  })
+})
+
+describe('审查修复：UAC 取消的退出码主判据与提权脚本终止性', () => {
+  it('isElevationDeclined 以退出码 1223 / 0x800704C7 为主判据（message 无线索也成立）', () => {
+    const withCode = (code: number): Error =>
+      Object.assign(new Error('Command failed: powershell.exe'), { code })
+    expect(isElevationDeclined(withCode(1223))).toBe(true)
+    expect(isElevationDeclined(withCode(0x800704c7))).toBe(true)
+    expect(isElevationDeclined(withCode(1))).toBe(false)
+  })
+
+  it('提权包装脚本声明 Stop 并拒绝空进程：UAC 拒绝不得解析成退出码 0', () => {
+    const script = decodeScript(buildElevatedArgs('Write-Output ok'))
+    expect(script).toContain("$ErrorActionPreference = 'Stop'")
+    expect(script).toContain('if ($null -eq $p) { exit 1223 }')
+  })
+})
+
+describe('审查修复：修复面收窄（只碰入站启用的 Block，不改 profile）', () => {
+  const rule = (over: Partial<FirewallRule>): FirewallRule => ({
+    name: 'r',
+    enabled: true,
+    profile: 'Any',
+    action: 'Block',
+    direction: 'Inbound',
+    localPorts: '28080',
+    ...over
+  })
+
+  it('出站 Block 与禁用 Allow 一律不进计划，改动只含 enabled:false', () => {
+    const plan = planRepair(
+      [
+        rule({ name: 'in-block' }),
+        rule({ name: 'out-block', direction: 'Outbound' }),
+        rule({ name: 'disabled-allow', action: 'Allow', enabled: false })
+      ],
+      28080
+    )
+    expect(plan.map((item) => item.name)).toEqual(['in-block'])
+    expect(plan[0].changes).toEqual({ enabled: false })
+  })
+
+  it('parseFirewallRules 归一 profile 空白：多 profile 规则的基线可被 journal 接受', () => {
+    const [parsed] = parseFirewallRules(
+      JSON.stringify([{ name: 'r', profile: 'Domain, Private', action: 'Block' }])
+    )
+    expect(parsed.profile).toBe('Domain,Private')
+    expect(
+      parseConflictJournal([{ name: 'r', enabled: true, profile: parsed.profile }])
+    ).not.toBeNull()
+  })
+})
+
+describe('审查修复：journal 恢复前交叉校验当前枚举（篡改不得提权改任意规则）', () => {
+  it('journal 条目不在「本端口入站 Block」集合内 ⇒ nothing-to-restore 且零 apply', async () => {
+    const execFile = vi.fn(async () => ({
+      stdout: JSON.stringify([
+        {
+          name: 'other-out-allow',
+          enabled: true,
+          profile: 'Any',
+          action: 'Allow',
+          direction: 'Outbound',
+          localPorts: '28080'
+        }
+      ])
+    }))
+    const clearJournal = vi.fn(async () => undefined)
+    const result = await runNetworkConflict({
+      action: 'restore',
+      port: 28080,
+      enabled: true,
+      isAdmin: true,
+      execFile,
+      readJournal: async () => [{ name: 'evil', enabled: true, profile: 'Any' }],
+      writeJournal: async () => undefined,
+      clearJournal
+    })
+    expect(result.status).toBe('nothing-to-restore')
+    // 只有一次只读枚举；没有提权写防火墙
+    expect(execFile).toHaveBeenCalledTimes(1)
+    expect(clearJournal).not.toHaveBeenCalled()
+  })
+
+  it('journal 与当前枚举一致 ⇒ restored，changed 取实际条目数', async () => {
+    const execFile = vi.fn(async () => ({
+      stdout: JSON.stringify([
+        {
+          name: 'b1',
+          enabled: false,
+          profile: 'Private',
+          action: 'Block',
+          direction: 'Inbound',
+          localPorts: '28080'
+        }
+      ])
+    }))
+    const result = await runNetworkConflict({
+      action: 'restore',
+      port: 28080,
+      enabled: true,
+      isAdmin: true,
+      execFile,
+      readJournal: async () => [
+        { name: 'b1', enabled: true, profile: 'Private' },
+        { name: 'gone', enabled: true, profile: 'Private' }
+      ],
+      writeJournal: async () => undefined,
+      clearJournal: async () => undefined
+    })
+    expect(result.status).toBe('restored')
+    expect(result.changed).toBe(1)
+    expect(execFile).toHaveBeenCalledTimes(2)
   })
 })

@@ -40,10 +40,13 @@ export function buildHotspotScript(action: 'start' | 'stop' | 'status'): string 
     `[Windows.Networking.Connectivity.NetworkInformation,Windows.Networking.Connectivity,ContentType=WindowsRuntime] | Out-Null`,
     `$connectionProfile = [Windows.Networking.Connectivity.NetworkInformation]::GetInternetConnectionProfile()`,
     `$mgr = [Windows.Networking.NetworkOperators.NetworkOperatorTetheringManager]::CreateFromConnectionProfile($connectionProfile)`,
+    // 动作前先记一次状态：start 之后无法再区分「本来就在跑（用户自开）」与「本次开启」，
+    // 归属判定只认这个动作前快照，否则会把用户的热点记成自开、随后 stop 时关掉它。
+    `$wasActive = $mgr.TetheringOperationalState.ToString() -eq 'On'`,
     awaitBlock,
     `$state = $mgr.TetheringOperationalState.ToString()`,
     `$cfg = $mgr.GetCurrentAccessPointConfiguration()`,
-    `[PSCustomObject]@{ active = ($state -eq 'On'); ssid = $cfg.Ssid; password = $cfg.Passphrase } | ConvertTo-Json`
+    `[PSCustomObject]@{ active = ($state -eq 'On'); wasActive = $wasActive; ssid = $cfg.Ssid; password = $cfg.Passphrase } | ConvertTo-Json`
   ]
     .filter((line) => line.length > 0)
     .join('\n')
@@ -51,22 +54,25 @@ export function buildHotspotScript(action: 'start' | 'stop' | 'status'): string 
 
 export interface HotspotOutput {
   active: boolean
+  /** 动作执行**前**热点是否已在运行（用户自开的判据）。 */
+  wasActive: boolean
   ssid?: string
   password?: string
 }
 
 export function parseHotspotOutput(stdout: string): HotspotOutput {
   const trimmed = stdout.trim()
-  if (!trimmed) return { active: false }
+  if (!trimmed) return { active: false, wasActive: false }
   try {
     const parsed = JSON.parse(trimmed) as Record<string, unknown>
     return {
       active: parsed.active === true,
+      wasActive: parsed.wasActive === true,
       ssid: typeof parsed.ssid === 'string' ? parsed.ssid : undefined,
       password: typeof parsed.password === 'string' ? parsed.password : undefined
     }
   } catch {
-    return { active: false }
+    return { active: false, wasActive: false }
   }
 }
 
@@ -118,6 +124,15 @@ export async function controlHotspot(input: {
       }
     }
     if (input.action === 'start') {
+      // 动作前热点已在跑（用户自己开的）：不夺取归属、不写盘。
+      // 否则 startedHere 会记成 true，后续 stop 的归属门放行 ⇒ 关掉别人的热点。
+      if (output.wasActive) {
+        return {
+          status: 'unchanged',
+          state: { startedHere: persisted.startedHere, active: true },
+          ssid: output.ssid
+        }
+      }
       if (persisted.active && output.active) {
         return { status: 'unchanged', state: persisted, ssid: output.ssid }
       }

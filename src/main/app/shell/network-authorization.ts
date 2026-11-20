@@ -58,8 +58,13 @@ export function buildElevatedArgs(script: string): string[] {
   const encoded = Buffer.from(script, 'utf16le').toString('base64')
   const inner = `-NoProfile -NonInteractive -EncodedCommand ${encoded}`
   const wrapped = [
+    // Start-Process 被 UAC 拒绝时抛的是**非终止**错误：不声明 Stop 的话脚本会继续往下走，
+    // `$null.ExitCode` 静默为 $null ⇒ `$null -ne 0` 为真…但 exit $null 得到退出码 0，
+    // 外层 execFile 正常 resolve ⇒ 把「用户取消」当成成功。这里两道闸：终止性 + 空进程判定。
+    `$ErrorActionPreference = 'Stop'`,
     `[Console]::OutputEncoding = [System.Text.Encoding]::UTF8`,
     `$p = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList '${inner.replace(/'/g, "''")}'`,
+    `if ($null -eq $p) { exit 1223 }`,
     `if ($p.ExitCode -ne 0) { exit $p.ExitCode }`
   ].join('\n')
   return buildDirectArgs(wrapped)
@@ -76,6 +81,10 @@ export function buildDirectArgs(script: string): string[] {
 
 /** Detect a declined UAC prompt: ERROR_CANCELLED 退出码（1223/0x800704C7）为主判据，多语言文本兜底。 */
 export function isElevationDeclined(error: unknown): boolean {
+  // 退出码是主判据：execFile 失败时 error.message 只有 `Command failed: <cmd>` 与 stderr，
+  // 非零退出码本身不进 message（提权包装用 `exit $p.ExitCode` 传播 1223 时尤其如此）。
+  const code = (error as { code?: unknown } | null)?.code
+  if (code === 1223 || code === 0x800704c7) return true
   const message = error instanceof Error ? error.message : String(error)
   return /cancelled|canceled|操作已取消|用户取消|0x800704C7|\b1223\b/i.test(message)
 }
