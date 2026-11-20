@@ -19,20 +19,20 @@
 
 区间文件（`git diff --name-status a49764b..6bdab4b`）：
 
-| 状态 | 文件                                                         | PC 同步图库相关性                                |
-| ---- | ------------------------------------------------------------ | ------------------------------------------------ |
-| M    | `apps/pc-companion/src/desktop/ExtraScanDirectoriesPanel.ts` | 额外扫描目录：`selection_expired` 后收起提案预览 |
-| M    | `apps/pc-companion/src/game-directory-discovery.ts`          | 安装目录发现（APP/NIKKI 变体）                   |
-| M    | `apps/pc-companion/src/scanner/ExtraScanDirectories.ts`      | 目录提案过期语义                                 |
-| M    | `apps/pc-companion/src/server/LocalSyncServer.ts`            | 本机服务/大 JPEG 导出边界                        |
-| M    | `apps/pc-companion/src/wechat/GalleryRuntime.d.mts`          | 微信画廊运行时类型                               |
-| M    | `apps/pc-companion/test/desktop-page.test.ts`                | 控制页契约                                       |
-| M    | `apps/pc-companion/test/extra-scan-directories.test.ts`      | 目录过期契约                                     |
-| M    | `apps/pc-companion/test/game-directory-discovery.test.ts`    | 目录发现契约                                     |
-| M    | `apps/pc-companion/test/local-sync-server.test.ts`           | 导出边界契约                                     |
-| A    | `docs/releases/v1.0.41-public-beta.1.md`                     | 发布说明（非代码）                               |
-| M    | `tools/wechat-gallery/export.test.mjs`                       | 移动端画廊导出测试（不搬）                       |
-| M    | `tools/wechat-gallery/photo-export.mjs`                      | 大 JPEG 保留元数据（小程序侧，不搬）             |
+| 状态 | 文件                                                                      | PC 同步图库相关性                                |
+| ---- | ------------------------------------------------------------------------- | ------------------------------------------------ |
+| M    | `apps/pc-companion/src/desktop/ExtraScanDirectoriesPanel.ts`              | 额外扫描目录：`selection_expired` 后收起提案预览 |
+| M    | `apps/pc-companion/src/game-directory-discovery.ts`                       | 安装目录发现（APP/NIKKI 变体）                   |
+| M    | `apps/pc-companion/src/scanner/ExtraScanDirectories.ts`                   | 目录提案过期语义                                 |
+| M    | `apps/pc-companion/src/server/LocalSyncServer.ts`                         | 本机服务/大 JPEG 导出边界                        |
+| M    | `apps/pc-companion/src/wechat/GalleryRuntime.d.mts`                       | 微信画廊运行时类型                               |
+| M    | `apps/pc-companion/test/desktop-page.test.ts`                             | 控制页契约                                       |
+| M    | `apps/pc-companion/test/extra-scan-directories.test.ts`                   | 目录过期契约                                     |
+| M    | `apps/pc-companion/test/game-directory-discovery.test.ts`                 | 目录发现契约                                     |
+| M    | `apps/pc-companion/test/local-sync-server.test.ts`                        | 导出边界契约                                     |
+| A    | `docs/releases/v1.0.41-public-beta.1.md`（上游 NikkiSync 仓路径，不入仓） | 发布说明（非代码）                               |
+| M    | `tools/wechat-gallery/export.test.mjs`                                    | 移动端画廊导出测试（不搬）                       |
+| M    | `tools/wechat-gallery/photo-export.mjs`                                   | 大 JPEG 保留元数据（小程序侧，不搬）             |
 
 ## 2. 上游 PC 端模块 → 本仓映射
 
