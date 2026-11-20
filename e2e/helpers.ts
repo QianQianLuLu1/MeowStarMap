@@ -31,14 +31,29 @@ function launchEnv(extra: Record<string, string> = {}): Record<string, string> {
 }
 
 /**
+ * 打包产物目录（`npm run dist:win` 的落点 `release/win-unpacked`）。
+ * 部分开发机/CI 的 `release/` 被外部句柄占用而无法重打包，此时可用
+ * `MEOWSTARMAP_E2E_PACKAGED_DIR` 指向另一个 electron-builder 输出目录；
+ * 相对路径按仓库根解析，缺省仍是 `release/win-unpacked`。
+ */
+export function packagedAppDir(): string {
+  const override = process.env.MEOWSTARMAP_E2E_PACKAGED_DIR?.trim()
+  if (!override) return path.join(ROOT_DIR, 'release', 'win-unpacked')
+  return path.isAbsolute(override) ? override : path.join(ROOT_DIR, override)
+}
+
+/**
  * 定位 win-unpacked 产物 exe。
  * exe 名跟随 productName（"喵星图"，含中文），禁止硬编码文件名；
  * 统一用 glob 结果的绝对路径传给 executablePath，避免 PowerShell/编码拼接问题。
  */
 export async function findUnpackedExe(): Promise<string> {
-  const [exe] = await glob(['release/win-unpacked/*.exe'], { absolute: true, cwd: ROOT_DIR })
+  const dir = packagedAppDir()
+  const [exe] = await glob(['*.exe'], { absolute: true, cwd: dir })
   if (!exe) {
-    throw new Error('未找到 release/win-unpacked/*.exe，请先执行 npm run dist:win 产出打包产物')
+    throw new Error(
+      `未找到 ${path.relative(ROOT_DIR, dir)}/*.exe，请先执行 npm run dist:win 产出打包产物`
+    )
   }
   return exe
 }
