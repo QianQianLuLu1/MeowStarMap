@@ -112,11 +112,10 @@ describe('T11：诊断与反馈', () => {
 })
 
 describe('T11：项目仓库与来源', () => {
-  it('六链逐字上游（含解码署名链），点击经 shell.openExternal 打开', async () => {
+  it('五链逐字上游（含解码署名链），点击经 shell.openExternal 打开', async () => {
     renderAbout()
     const names = [
       '大喵相机助手 · NikkiSync',
-      '暖暖照相馆',
       'RanAxro · Nikki Albums',
       '喵星图 · MeowStarMap',
       'NUAN5.PRO · 在线参数解析',
@@ -128,6 +127,6 @@ describe('T11：项目仓库与来源', () => {
         expect(shellOpenExternal).toHaveBeenCalledWith(UPSTREAM_REPO_LINKS[i].url)
       )
     }
-    expect(shellOpenExternal).toHaveBeenCalledTimes(6)
+    expect(shellOpenExternal).toHaveBeenCalledTimes(5)
   })
 })

@@ -179,7 +179,7 @@ export const AboutView: React.FC = () => {
         </div>
       </SectionShell>
 
-      {/* 项目仓库与来源：六链逐字上游（含解码组件署名链） */}
+      {/* 项目仓库与来源：五链（上游六链减去已失效旧址，理由见 upstream-links.ts） */}
       <SectionShell title={t('syncConsole.about.repos.title')}>
         <div className="space-y-2">
           {UPSTREAM_REPO_LINKS.map((repo) => (
@@ -187,9 +187,7 @@ export const AboutView: React.FC = () => {
               <SettingsRow
                 label={t(`syncConsole.about.repos.${repo.key}`)}
                 description={
-                  repo.key === 'momo' || repo.key === 'nuannuanStudio'
-                    ? repo.url
-                    : t(`syncConsole.about.repos.${repo.key}Note`)
+                  repo.key === 'momo' ? repo.url : t(`syncConsole.about.repos.${repo.key}Note`)
                 }
               >
                 <button

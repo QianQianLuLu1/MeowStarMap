@@ -17,12 +17,17 @@ export const UPSTREAM_BAIDU_URL = 'https://pan.baidu.com/s/5bb_o2A8iJ2MR4f_hRBlP
 /** GitHub Releases（上游 DesktopPage.ts:102 逐字）。 */
 export const UPSTREAM_GITHUB_RELEASES_URL = 'https://github.com/ToStardust/NikkiSync/releases'
 
-/** 项目仓库与来源六链（上游 DesktopPage.ts:111 逐字，顺序一致）。
- * 内部键 nuannuanStudio 对应上游 data-project="nikkiGallery"：旧名不得入语包键/值
- * （ui-brand-name 守卫），URL 属上游逐字契约保持不动（旧名台账已登记豁免）。 */
+/**
+ * 项目仓库与来源五链（上游 DesktopPage.ts:111 的逐字契约，**减去一条已失效旧址**）。
+ *
+ * 上游该列表含一条指向本仓改名前的旧仓库（`data-project` 仍是旧名，内部键已改为
+ * nuannuanStudio）。`npm run verify:dist` 的产物禁串闸门会扫 app.asar 并拒绝发布带
+ * 旧仓库地址的安装包（2026-10-23 事故口径），该闸门 fail-closed、无豁免通道；
+ * 本仓对外地址已是 `QianQianLuLu1/MeowStarMap`（下方 meowStarMap 一条），
+ * 故该旧址条目不随包出厂（删条目经用户裁决，见本轮提交）。
+ */
 export const UPSTREAM_REPO_LINKS = [
   { key: 'momo', url: 'https://github.com/ToStardust/NikkiSync' },
-  { key: 'nuannuanStudio', url: 'https://github.com/QianQianLuLu1/NikkiGallery' },
   { key: 'nikkiAlbums', url: 'https://github.com/RanAxro/nikki_albums' },
   { key: 'meowStarMap', url: 'https://github.com/QianQianLuLu1/MeowStarMap' },
   { key: 'nuan5', url: 'https://nuan5.pro/' },

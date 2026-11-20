@@ -94,7 +94,7 @@
     "owner": "QianQianLuLu1",
     "extra": ["github.com/your-repo/issues", "QQ群: 123456789", "QQ Group: 123456789"]
   },
-  "expectedTotal": 173,
+  "expectedTotal": 171,
   "allowed": {
     "ARCHITECTURE.en.md": {
       "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
@@ -312,13 +312,7 @@
         "nikkiGallery": 3
       }
     },
-    "src/renderer/pages/sync-gallery/console/upstream-links.ts": {
-      "reason": "About 视图上游仓库外链逐字契约：URL 中 NikkiGallery 为上游仓库真实地址（用户裁决上游 URL 不动），注释中 nikkiGallery 为上游控制页 data-project 属性逐字锚点，内部键已改名 nuannuanStudio",
-      "hits": {
-        "NikkiGallery": 1,
-        "nikkiGallery": 1
-      }
-    },
+
     "src/renderer/utils/resonance/exportPayload.ts": {
       "reason": "导入信封线格式 app:'nikkigallery' 两处（zod literal，改则历史导出被拒；文件名已随 C3 转新名）",
       "hits": {
