@@ -195,7 +195,7 @@ npm run dev
 
 ### N6 · 点亮检索与统计（`searchSuits` / `searchClothing` / `profileStats` 现零调用方）
 
-- 文件：`src/renderer/pages/sync-gallery/SyncGalleryPage.tsx` + `SyncGalleryToolbar.tsx`（检索入口，复用既有 `MasonryView`/`VirtualImageGrid` 出结果）、`src/renderer/stores/syncGalleryStore.ts`（结果注入，沿用其按 asset id 去重与 `reset/loadFirst` 语义）、`src/renderer/pages/sync-gallery/*.test.tsx`、`src/renderer/pages/sync-gallery/SyncServicePage.tsx`（档案统计区块，复用 `SectionShell`/`Button`/`Switch` 与 CSS 变量，禁硬编码色）、`src/renderer/i18n/locales/*.json`（12 包真译文）+ `sync-service-keys.test.ts`、`docs/IPC_CONTRACT.md`（仅补「渲染层消费方」说明）
+- 文件：`src/renderer/pages/sync-gallery/SyncGalleryPage.tsx` + `SyncGalleryToolbar.tsx`（检索入口，复用既有 `MasonryView`/`VirtualImageGrid` 出结果；两文件均已随 2026-11-21 sync-service-promote 轮删除）、`src/renderer/stores/syncGalleryStore.ts`（结果注入，沿用其按 asset id 去重与 `reset/loadFirst` 语义；已删除）、`src/renderer/pages/sync-gallery/*.test.tsx`、`src/renderer/pages/sync-gallery/SyncServicePage.tsx`（档案统计区块，复用 `SectionShell`/`Button`/`Switch` 与 CSS 变量，禁硬编码色）、`src/renderer/i18n/locales/*.json`（12 包真译文）+ `sync-service-keys.test.ts`、`docs/IPC_CONTRACT.md`（仅补「渲染层消费方」说明）
 - 输入 → 输出：查询词 → `window.electronAPI.nikkisync.searchSuits/searchClothing` → 命中资产喂给现有列表；`profileStats()` → 统计卡片
 - 实现要点：**不新增 IPC/preload 方法**（三面已在契约里），不新建 store，不改 `mediaStore.fetchAssetPage` 的分页协议；结果态经 `useMemo` 派生，禁止 JSX 内联变换；`getAssetDetail`/`getResource` 本轮不动（无实测价值判据，避免镀金）
 - 红灯：页面用例先失败——搜索框发起 `searchSuits` 并把命中渲染为列表；档案统计在 `profileStats` 失败时整节隐藏且出 toast

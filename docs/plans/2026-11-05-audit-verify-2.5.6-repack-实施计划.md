@@ -50,7 +50,7 @@
 
 ### N1 扫描失败可见化改本地化（src 节点，红 + 绿合并一次提交）
 
-- 涉及文件：`src/renderer/pages/sync-gallery/SyncGalleryPage.tsx`、`src/renderer/pages/sync-gallery/SyncGalleryPage.test.tsx`
+- 涉及文件：`src/renderer/pages/sync-gallery/SyncGalleryPage.tsx`、`src/renderer/pages/sync-gallery/SyncGalleryPage.test.tsx`（两文件已删除——随 2026-11-21 sync-service-promote 轮）
 - 输入：`handleScan` catch 收到的 `unknown`；输出：Toast 文本 = `t('toast.scanFailed')`，`console.error('[sync-gallery] startScan failed', detail)` 保留诊断链；`useCallback` 依赖数组补 `t`
 - 红灯（只翻断言、不动实现时）：`npx vitest run src/renderer/pages/sync-gallery/SyncGalleryPage.test.tsx` ⇒ 期望 `received 'NikkiSync runtime is not ready'` / `expected '扫描失败'`
 - 绿灯验收：同命令全绿；`npx eslint` 两文件 0 error

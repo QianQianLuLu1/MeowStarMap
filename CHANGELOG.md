@@ -19,15 +19,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
-（已收口：2026-11-11 发版轮将阶段 1–5 与收尾条目并入 [2.5.7-beta] 节。）
+（已收口：2026-11-21 2.5.7 正式版发版轮将更新错误归类补口条目并入 [2.5.7] 节。）
 
 ---
 
-## [2.5.7-beta] - 2026-11-05
+## [2.5.7] - 2026-11-21
 
-> 2.5.7-beta：预提交审查收口定版。四处版本声明位（package.json / lock 根与 packages[""] / preview mock / release/latest.yml）同步为 2.5.7-beta，安装包名随 artifactName 模板为 MeowStarMap-Setup-2.5.7-beta.exe。
+> 2.5.7：正式版定版（由 2026-11-05 定版的 2.5.7-beta 预提交收口演进，beta 轮条目随本节发布）。四处版本声明位（package.json / lock 根与 packages[""] / preview mock / release/latest.yml）同步为 2.5.7，安装包名随 artifactName 模板为 MeowStarMap-Setup-2.5.7.exe。
 
 ### Added | 新增
+
+- **同步服务控制台提升为 sync-gallery 二级界面（2026-11-21，`3322d8d`）**：删除侧边栏「同步图库」入口页全部 UI（SyncGalleryPage/Toolbar/InsightPanel/AssetDrawer/SyncInspirationPage/syncGalleryStore 共 12 文件），同步服务控制台（SyncServicePage → SyncConsoleLayout）提升为 `sync-gallery` 视图宿主；撤销 `sync-service`/`sync-inspiration` 两个二级 ViewLevel；侧边栏入口与状态栏改名「同步服务」（12 语包 `nav.syncService` + `appShell.viewStatus.syncService` 同值）；9 处轮询门控从 `'sync-service'` 字面量翻转 `SYNC_CONSOLE_HOST_VIEW` 单点常量。数据链与 IPC 零改动；i18n 键一律不删（旧命名空间按守卫约定保留）；接线五处登记（ViewLevel/ALL_VIEWS/VIEW_LEVEL_MAP/lazy+renderPage/AppShell 状态栏）由 App.view-registry 负向锁 + uiStore 导航契约 + Sidebar 真实 i18n 断言三层焊死；e2e N3c/G2/G3 改走「同步服务」直达控制台。
 
 - **外部参考数据管道（阶段 1，2026-11-08）**：`src/main/services/reference-data-service.ts` 实现 manifest 检查 → 下载（sha256 完整性 / GCM 兜底）→ `aes-gcm-filebox` 认证解密 → protobuf 解码 → 内存查询面；数据契约实采自上游 `RanAxro/nikki_albums main @ dc1b30b`（MIT）。全链 fail-soft、失败冷却防高频重试、缓存损坏自愈；manifest 镜像入口 `referenceData.manifestBaseUrl` 经 URL + SSRF 校验。配套 `filebox-cipher.ts` / `nuan5-config-proto.ts` / `remote-url-guard.ts` 与各自单测。
 - **拍摄参数解析扩展（阶段 2，2026-11-08）**：扩展相机参数解析（拍照模式 / 风力 / 风向 / 联机信息），新增 3 组数值→名称映射（`PHOTO_MODE_MAP` / `WIND_INTENSITY_MAP` / `WIND_DIRECTION_MAP`），沿用既有 `Record<number,string>` + `get*Name` + `?? null` 风格与 `*.typeValue` 兜底；详情面板新增联机信息组与拍摄参数行。
@@ -47,6 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 - **诊断日志体系系统性完善（2026-11-21，`4836dbe` / `9b99c6b` / `1b14849` / `fe9b519` / `86361b6` / `bc8bf90` / `0fbac0e`）**：三目标——扩大覆盖（用户显式授权诊断数据不脱敏）/ 单一体系完全互通 / 不引入稳定性问题。① 时间线骨架：日志行统一注入 `bootId`（8 位短码，`utils/boot-id.ts` 零依赖叶子）与 `pid`，`FaultRecord.bootId` 与 heartbeat/last-exit 同源可拼接；`recentLogs` 附带名单激活闲置 `ipcError`。② 启动取证：argv/已应用 Chromium 开关/env 全量/取证根与 source/userData 一次性环境快照（`boot-snapshot.ts`）、启动各阶段耗时 ms 打点、second-instance ack 留痕。③ IPC 可观测性单点拦截器（`ipc/ipc-observability.ts` 经 `setupIPC` 常驻幂等安装，覆盖全部 250 处注册、47 个 handler 文件零迁移，契约 `docs/IPC_CONTRACT.md` §23）：失败落 `ipcError` fault / 校验失败 warn / CANCELED 静默 / >500ms 慢调用 warn，成功快调用零写盘、不改响应契约；PathGuard 拒绝记完整路径（IPC details 仍 maskPath）；`settings:set` 记录 old→new（>1KB 截断纯体积约束）。④ 窗口/GPU：create→首显→did-finish-load 耗时、unresponsive/responsive、全屏、resized/zoom、display-metrics-changed（closed 解绑）、崩溃后 reload、创建配置留痕；GPU 探针补逐卡型号/驱动版本/featureStatus 明细，hwAccel 偏好写入与档位复位留痕。⑤ 业务链：NikkiSync runtimeLog 并入统一 logger（三通道各自 fail-open）、配对/认证/连接/传输结果留痕（设备/配对标识全量，私钥与原始令牌仍不进日志——安全红线不变）、video-editor workerCrash fault、更新全生命周期、单插件安装/激活结果、DB 迁移 from→to。⑥ 导出链：manifest 升 `diagnosticVersion: '1.3'`（missing 带原因 absent/unreadable/collected-from-fallback、增 bootId/fallbackSources），新增收集 feedback.txt / diag.log.old / chromium-debug.highlights.txt（截断时全文件 FATAL/exit_code 行提取 ≤500 行）/ nikkisync-userdata 两 JSON / fallback 应急落点；FeedbackDialog 描述与勾选接通 `log:exportZip(options?)`（勾选仅记录意愿、不裁剪包内容）；三入口成功 Toast 统一真实 filePath、取消一律静默、设置页移除 faultCount=0 禁用；返回类型三处漂移清除（shared/vite-env/sync 台）、en 空串修复、删不可达 exportCanceled key（12 语包）。⑦ 稳定性：全部新日志点 fail-open；diag.log 1MB rename 轮转保 .old；cleanup exitDiagnosis 复用 buildFaultRecord（保持 appendFileSync 同步写，不引入退出竞态）；移除 nikkisync 聚合诊断 sanitizeAggregate 脱敏层（钉住测试同批反转，白名单与 {ok:false} 语义不弱化）。严格 TDD 各阶段先红后绿，读数与剩余盲区见计划文档 §10–12。
 
 ### Fixed | 修复
+
+- **2.5.7 发版前全面审查修复（2026-11-21，`072da8b`，TDD 红-绿闭环）**：对 `bed034ac`（2.5.6 发布点）之后全部未发布提交与工作区未提交改动做全面审查（四路并行深审：取证日志体系/log-export/glass-lite/scanner 看门狗 + 两摊在途改动），确认 4 个中级缺陷与 5 个低危缺口并逐项修复：① `render-process-gone` 崩溃弹窗在 await 期间窗口销毁/dialog reject 会成为游离 unhandledRejection——try/catch 兜底 + `logFault` 留痕后安全返回（FaultType 复用 rendererCrash，source 区分）；② 诊断包 `logs/`/`crashes/` 目录读取失败整段 `catch {}` 静默、manifest 仍声称 contents 含目录、主日志无声缺席——改为缺席不建目录 + `manifest.missing` 如实登记；③ `settings:set` 变更留痕发生在业务校验之前、失败的变更被记成已发生——留痕时序修正为「校验通过且写库成功后」（launchAtLogin 回滚路径不留痕）；④ scanner 心跳看门狗嫌疑期用墙钟度量、嫌疑期内二次睡眠跳变会瞬间耗尽宽限误杀扫描——静默/嫌疑/宽限全部切 `performance.now` 单调钟（睡眠期不走），宽限机制保留为第二道防线；⑤ 低危五项：FeedbackDialog 剪贴板 Promise 拒绝未捕获、`vite-env.d.ts` getGpuStatus 内联类型与 shared `GpuStatusSummary` 漂移、cleanup 缩略图 dispose 缺超时竞速、copyBounded 轮转竞态 NUL 填充尾巴、logger writeLog 循环引用崩溃、`nav.syncService` 补专项键钉子。TDD 读数：F1 红（捕获游离 rejection）→ 44/44；F2/F8 红 → 绿；F3 红（留痕先行）→ 108/108；F4 红（跳变误杀）→ 5/5；全量 8934 passed（收口前仅余 2 项在途 CHANGELOG 态红灯，随本提交解决）；typecheck / eslint exit 0。留观项（设计取舍）：唤醒偏斜 >10s 跨进程预算、GPU 探针会话级缓存无重试、桥面缺席 dev 态 UX 差异。
+- **网络可达仍误弹「未获取到可用的更新信息」：更新错误归类传输信号补口（2026-11-21，`1beee9f`，TDD 红-绿闭环）**：electron-updater 的三种「无码可查」传输层失败此前兜底成 `source`，把可达但链路不稳/被限流的更新源误报成「更新源未就绪」（契约 `electron-api.ts` 明确超时 ⇒ network、403/429/5xx ⇒ network）。补口三处（仅 `src/main/app/update-error-class.ts`）：① `NETWORK_SIGNAL` 增补 `REQUEST TIMED OUT`（builder-util-runtime `httpExecutor.js:282` 的 60s socket 超时抛 `Error("Request timed out")`，无 code 无 statusCode，不匹配既有 `ETIMEDOUT`）与 `ABORTED BY THE SERVER`（`httpExecutor.js:145` 服务端中途断开，同样无码）；② `statusOf` 增补 `/HttpError:\s*(\d{3})/i` 提取 `GitHubProvider.getLatestTagName()`（`GitHubProvider.js:172-174`）把 `/releases/latest` 任何失败包装成 `ERR_UPDATER_LATEST_VERSION_NOT_FOUND` 时丢失的 statusCode——包装后只剩 message 内嵌「HttpError: 403 …」文本，限流 403 / 网关 5xx 由此捞回 network，内嵌 404（无已发布版本）仍判 source 防过度矫正。渲染层 / IPC / i18n 零改动，`latest.yml` 404 ⇒ source 的 by-design 语义不变。测试面：`update-error-class.test.ts` 增 5 例（超时 / 服务端断开 / 包装 403 / 包装 502 ⇒ network，包装 404 ⇒ source 锁）、`auto-update.test.ts` 增 1 例（error 事件推 `errorKind:'network'`）；红灯 4+1 全部 FAILED、既有用例全绿 → 绿灯 62/62；dev 假源真机实测三场景（有更新弹「发现新版本 v9.9.9」、杀源致 RST 日志 `errorKind=network` 且弹「当前网络繁忙」、`--no-yml` 404 弹「未获取到可用的更新信息」）。
 
 - **软件渲染机器滚动白/黑闪自动降级 glass-lite（2026-11-21，`15c6145`，TDD 红-绿闭环）**：故障机（GPU 兼容档位 ≥1 / 硬件加速禁用）下液态玻璃 SVG 折射 + 氛围层动画在纯 CPU 合成下逐帧全量重光栅 backdrop-filter 区域，是滚动白闪/黑闪的头号负载源；glass-lite 降级链早已存在但只接用户设置、从未接能力检测。新增 `src/renderer/utils/glass-degradation.ts`：`detectSoftwareRendering()` 经 `app.getGpuStatus()` 判定并会话级缓存（探针 fail-open——失败/缺失一律视为硬件健康，绝不因探针失败改变用户视觉设置）；`applyGlassMode()` 统一根类决策，App 启动与设置页玻璃档位共用同一入口，设置操作不得覆写自动降级；强制降级时 console.warn 留痕（经 window-manager console-message 落 diag.log，真机取证用）。测试面：glass-degradation 行为套件（正常/异常/边界，jsdom）+ App/设置页接线结构断言（沿用 App.theme.test.tsx 源码结构断言先例）+ AppearanceDisplaySection 三例（软件渲染下 rich 仍挂 lite、点击「明显流动感」不覆写降级、健康机器不误伤）。红灯 `4 文件 6 failed` → 绿灯 `52 文件 637 passed`。
 - **scanner worker 心跳看门狗补睡眠/唤醒宽限（2026-11-21，`0a48dde`，TDD 红-绿闭环）**：看门狗用 Date.now() 墙钟判父进程死亡（>15s 无 ping 即 abortScan+exit），笔记本睡眠/唤醒墙钟跳变必触发误判，误杀进行中的扫描（故障机 2026-11-19 03:10 heartbeatTimeout 实证，父进程实际存活——bridge 每 5s 无条件 ping）。超时先进入嫌疑宽限（`HEARTBEAT_GRACE_MS=10s`，期间绝不 abort/exit）；任何父消息都刷新心跳时间戳续命（bridge 每 5s 无条件 ping 必在宽限内到达）；宽限耗尽才走原退出链（父真死：退出 15s→约 25s，延迟但必达，孤儿写库防护语义保留）。测试面：worker-heartbeat-sleep 四例（墙钟 +8h 跳变后不退出不中止扫描、父真死宽限耗尽 exit 恰一次、嫌疑期收到 SCAN_STOP 续命、跳变前 ping 被消息吸收）；红灯 `3 failed | 1 passed` → 绿灯 `4/4`。
@@ -603,8 +608,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 > 注：本仓库已有 8 个 tag，但**全部不带 `v` 前缀**——无前缀形式（`2.3.6`、`2.5.0`）与旧项目名前缀形式（`NikkiGallery2.3.6`、`NikkiGallery2.5.0` / `2.5.1` / `2.5.2` / `2.5.3`、`NikkiGallery2.5.5-beta`）。因此下列 `compare/vX...vY` 与 `releases/tag/vX` 链接**实际均不可访问**（2026-10-24 复核）。处置：除 `[Unreleased]` 因 `scripts/__tests__/check-changelog-release.test.ts` 的契约要求必须保持 `compare/v<最新版本>...HEAD` 形式而原样保留外，其余各版本锚点一律改为指向 Releases 页面，确保链接可用；待补打 `vX.Y.Z` tag 后可整体恢复 compare 形式。
 
-[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.7-beta...HEAD
-[2.5.7-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
+[Unreleased]: https://github.com/QianQianLuLu1/MeowStarMap/compare/v2.5.7...HEAD
+[2.5.7]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.6]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.6-beta]: https://github.com/QianQianLuLu1/MeowStarMap/releases
 [2.5.5]: https://github.com/QianQianLuLu1/MeowStarMap/releases

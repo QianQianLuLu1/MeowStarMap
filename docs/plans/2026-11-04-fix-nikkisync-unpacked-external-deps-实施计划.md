@@ -55,7 +55,7 @@
 
 ### 节点 4：扫描失败可见化
 
-- `src/renderer/pages/sync-gallery/SyncGalleryPage.tsx`：handleScan catch 里 `setScanError(extractUserMessage(e))`（保留 console.error），行内提示条复用本页续页错误同款样式；i18n 全 locale 新增 `syncGallery.scanFailed`。
+- `src/renderer/pages/sync-gallery/SyncGalleryPage.tsx`：handleScan catch 里 `setScanError(extractUserMessage(e))`（保留 console.error），行内提示条复用本页续页错误同款样式；i18n 全 locale 新增 `syncGallery.scanFailed`。（原文件已随 2026-11-21 sync-service-promote 轮删除）
 - 测试先红：startScan reject → 页面出现失败提示；再扫描清除旧提示；成功无提示。
 
 > **订正（2026-11-05 复查轮，预期与落地分叉要显式记账而不是改原文迁就实际）**：实现没有走「行内提示条 + 新增 `syncGallery.scanFailed`」，

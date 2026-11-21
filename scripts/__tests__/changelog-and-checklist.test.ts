@@ -4,6 +4,8 @@
  * 本轮只勾「真实达成」的项，并把既有失败 / 未完成项如实注记，禁止虚假勾选。
  * 2026-11-11 发版轮：CHANGELOG 断言随发版收口迁移——阶段 1–5 条目并入
  * [2.5.7-beta] 版本节、[Unreleased] 清空（check-changelog-release 闸门同判据）。
+ * 2026-11-21 2.5.7 正式版发版轮：版本节由 [2.5.7-beta] 更名 [2.5.7]（beta 轮条目
+ * 随正式节发布），断言锚点同步迁移。
  */
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
@@ -23,16 +25,16 @@ describe('CHANGELOG 发版收口', () => {
   const text = () => read('CHANGELOG.md') ?? ''
   const versionSection = () => {
     const t = text()
-    const start = t.indexOf('## [2.5.7-beta]')
+    const start = t.indexOf('## [2.5.7]')
     const end = t.indexOf('## [2.5.6]')
     return t.slice(start, end === -1 ? undefined : end)
   }
   const unreleased = () => {
     const t = text()
-    return t.slice(t.indexOf('## [Unreleased]'), t.indexOf('## [2.5.7-beta]'))
+    return t.slice(t.indexOf('## [Unreleased]'), t.indexOf('## [2.5.7]'))
   }
 
-  it('[2.5.7-beta] 版本节含阶段 1–5 的完整条目（收口后不得丢失）', () => {
+  it('[2.5.7] 版本节含阶段 1–5 的完整条目（收口后不得丢失）', () => {
     const section = versionSection()
     expect(section).toContain('阶段 1')
     expect(section).toContain('阶段 2')
@@ -48,7 +50,7 @@ describe('CHANGELOG 发版收口', () => {
 
   it('[Unreleased] 已收口：节标题保留但无待发布条目（与打包闸门同判据）', () => {
     expect(text()).toContain('## [Unreleased] | 未发布')
-    expect(text()).toContain('## [2.5.7-beta] - 2026-11-05')
+    expect(text()).toContain('## [2.5.7] - 2026-11-21')
     // 条目行（- / * 列表）不得残留；说明性文字允许
     const entryLines = unreleased()
       .split('\n')

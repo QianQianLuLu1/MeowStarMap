@@ -57,7 +57,7 @@
 
 ### 步骤 2 — 新页面（红→绿）
 
-- **需修改文件**：新增 `src/renderer/pages/sync-gallery/SyncInspirationPage.test.tsx`（红）→ 新增 `src/renderer/pages/sync-gallery/SyncInspirationPage.tsx`（绿）。
+- **需修改文件**：新增 `src/renderer/pages/sync-gallery/SyncInspirationPage.test.tsx`（红）→ 新增 `src/renderer/pages/sync-gallery/SyncInspirationPage.tsx`（绿）。（新增两文件已删除——随 2026-11-21 sync-service-promote 轮）
 - **输入/输出**：测试引用不存在的模块即为红。用例三类：①正常——渲染 PageHeader（标题「灵感库」）+ 面板 `sync-inspiration-summary` 可见；②异常——桥缺失时页面壳仍渲染、面板静默隐藏（`queryByTestId` 为 null）；③边界——面板折叠态不发 IPC（面板既有契约，页面级断言挂载即可）。mock 模式仿 `SyncServicePage.test.tsx`（整只替换 `window.electronAPI`）。
 - **实现**：仿 `SyncServicePage` 页壳（`PageHeader` + `flex-1 min-h-0 overflow-y-auto px-6 py-4` 滚动容器 + `mx-auto max-w-2xl`），容器内仅 `<SyncInspirationPanel />`。
 - **验收标准**：新测试文件先红后绿。
@@ -70,7 +70,7 @@
 
 ### 步骤 4 — 工具栏按钮与接线（红→绿）
 
-- **需修改文件**：`src/renderer/pages/sync-gallery/SyncGalleryToolbar.test.tsx`、`SyncGalleryPage.test.tsx`（红）→ `SyncGalleryToolbar.tsx`、`SyncGalleryPage.tsx`（绿）。
+- **需修改文件**：`src/renderer/pages/sync-gallery/SyncGalleryToolbar.test.tsx`、`SyncGalleryPage.test.tsx`（红）→ `SyncGalleryToolbar.tsx`、`SyncGalleryPage.tsx`（绿）。（涉及四文件已删除——随 2026-11-21 sync-service-promote 轮）
 - **输入/输出**：Toolbar 三条契约（未传 `onOpenInspiration` 不渲染、传入后点击回调恰好一次、`runtimeState: null` 时不得禁用）；Page 测试断言 `navigateTo('sync-inspiration')` → 实现加可选 prop + 按钮；SyncGalleryPage 两处调用点传 `onOpenInspiration={() => navigateTo('sync-inspiration')}`。
 - **验收标准**：两组测试先红后绿。
 
@@ -103,9 +103,9 @@
 
 ## 八、修改文件清单
 
-**改**：`src/renderer/stores/uiStore.ts`、`src/renderer/App.tsx`、`src/renderer/components/layout/AppShell.tsx`、`src/renderer/pages/sync-gallery/SyncGalleryToolbar.tsx`、`SyncGalleryPage.tsx`、`SyncServicePage.tsx`、12 个 `src/renderer/i18n/locales/*.json`、`sync-gallery-keys.test.ts`、`src/renderer/App.view-registry.test.ts`、`src/renderer/stores/uiStore.test.ts`、`SyncGalleryToolbar.test.tsx`、`SyncGalleryPage.test.tsx`、`SyncServicePage.test.tsx`。
+**改**：`src/renderer/stores/uiStore.ts`、`src/renderer/App.tsx`、`src/renderer/components/layout/AppShell.tsx`、`src/renderer/pages/sync-gallery/SyncGalleryToolbar.tsx`、`SyncGalleryPage.tsx`（两者已随 2026-11-21 sync-service-promote 轮删除）、`SyncServicePage.tsx`、12 个 `src/renderer/i18n/locales/*.json`、`sync-gallery-keys.test.ts`、`src/renderer/App.view-registry.test.ts`、`src/renderer/stores/uiStore.test.ts`、`SyncGalleryToolbar.test.tsx`、`SyncGalleryPage.test.tsx`（测试亦已删除）。
 
-**增**：`src/renderer/pages/sync-gallery/SyncInspirationPage.tsx` + `SyncInspirationPage.test.tsx`、本计划文档。
+**增**：`src/renderer/pages/sync-gallery/SyncInspirationPage.tsx` + `SyncInspirationPage.test.tsx`（已删除——随 2026-11-21 sync-service-promote 轮）、本计划文档。
 
 **不改**：`Sidebar.tsx`、`SyncInspirationPanel.tsx`（零改动）、`sync-service-keys.test.ts`、主进程/preload/shared 全部、`docs/IPC_CONTRACT.md`。
 

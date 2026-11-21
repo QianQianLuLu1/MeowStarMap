@@ -73,7 +73,7 @@
 - `old-name-ledger.json` 收窄豁免后，守卫计数与台账**精确相等**（170 == `expectedTotal`，0 未登记、0 逐文件偏差）。
 - URL 仅用于展示与 `shell.openExternal`；更新检查走主进程 `electron-updater`（不破「渲染层不直连 HTTP」约定），
   产物内 `app-update.yml` 已是 `owner: QianQianLuLu1 / repo: MeowStarMap`。
-- `src/renderer/pages/sync-gallery/SyncGalleryToolbar.test.tsx` 只改注释，断言未被弱化。
+- `src/renderer/pages/sync-gallery/SyncGalleryToolbar.test.tsx` 只改注释，断言未被弱化。（原文件已随 2026-11-21 sync-service-promote 轮删除）
 
 两处缺陷（用户逐项批准后修）：
 
