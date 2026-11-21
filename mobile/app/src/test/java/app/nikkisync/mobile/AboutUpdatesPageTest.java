@@ -57,14 +57,15 @@ public class AboutUpdatesPageTest {
             assertTrue(allText(content).contains(BuildConfig.VERSION_NAME));
             assertTrue(allText(content).contains("构建号 " + BuildConfig.VERSION_CODE));
             assertTrue(allText(content).contains("星尘（支持粉毛拯救世界版）"));
-            assertTrue(allText(content).contains("https://github.com/ToStardust/NikkiSync/releases"));
+            assertTrue(allText(content).contains("https://github.com/QianQianLuLu1/MeowStarMap/releases"));
             assertTrue(allText(content).contains("https://github.com/QianQianLuLu1/NikkiGallery"));
             assertTrue(allText(content).contains("RanAxro · Nikki Albums"));
             assertTrue(allText(content).contains("https://github.com/QianQianLuLu1/MeowStarMap"));
             assertTrue(allText(content).contains("NUAN5.PRO"));
             assertTrue(allText(content).contains("暖暖共鸣录"));
-            assertNotNull(button(content, "检查更新"));
-            assertNotNull(button(content, "开启更新提醒"));
+            // 移植版默认 SELF_UPDATE=false：关于页不得出现自更新入口（自建 feed 翻开开关后再恢复存在性断言）
+            assertNull(button(content, "检查更新"));
+            assertNull(button(content, "开启更新提醒"));
             ImageView avatar = avatar(content);
             assertNotNull(avatar);
             assertNotNull(avatar.getDrawable());
@@ -78,15 +79,11 @@ public class AboutUpdatesPageTest {
         try {
             Button about = button((View) field(activity, "settingsContent"), "关于&更新");
             assertNotNull(about); about.performClick();
-            button((View) field(activity, "aboutContent"), "打开百度网盘").performClick();
+            // 移植版分发渠道：GitHub Releases（原百度网盘卡随身份改造移除）
+            button((View) field(activity, "aboutContent"), "打开 Releases 页").performClick();
             Intent download = Shadows.shadowOf(activity).getNextStartedActivity();
             assertEquals(Intent.ACTION_VIEW, download.getAction());
-            assertEquals("https://pan.baidu.com/s/5bb_o2A8iJ2MR4f_hRBlPCw", download.getDataString());
-            button((View) field(activity, "aboutContent"), "查看更新").performClick();
-            Intent intent = Shadows.shadowOf(activity).getNextStartedActivity();
-            assertNotNull(intent);
-            assertEquals(Intent.ACTION_VIEW, intent.getAction());
-            assertEquals("https://github.com/ToStardust/NikkiSync/releases", intent.getDataString());
+            assertEquals("https://github.com/QianQianLuLu1/MeowStarMap/releases", download.getDataString());
             button((View) field(activity, "aboutContent"), "GitHub 项目").performClick();
             assertEquals("https://github.com/ToStardust/NikkiSync", Shadows.shadowOf(activity).getNextStartedActivity().getDataString());
             button((View) field(activity, "aboutContent"), "NikkiGallery 仓库").performClick();

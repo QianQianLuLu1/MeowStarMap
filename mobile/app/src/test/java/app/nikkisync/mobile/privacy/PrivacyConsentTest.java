@@ -59,9 +59,10 @@ public final class PrivacyConsentTest {
         try {
             String policy=PrivacyDocuments.read(activity,"privacy");
             assertTrue(policy.contains("NUAN5"));assertTrue(policy.contains("UID"));
-            assertTrue(policy.contains("https://github.com/ToStardust/NikkiSync/issues"));
+            // 移植版反馈渠道随身份切换为喵星图仓库（披露真实可达渠道的不变量不变）
+            assertTrue(policy.contains("https://github.com/QianQianLuLu1/MeowStarMap/issues"));
             assertFalse(policy.matches("(?s).*[0-9]+@qq\\.com.*"));
-            assertTrue(PrivacyDocuments.read(activity,"terms").contains("https://github.com/ToStardust/NikkiSync/issues"));
+            assertTrue(PrivacyDocuments.read(activity,"terms").contains("https://github.com/QianQianLuLu1/MeowStarMap/issues"));
             assertTrue(PrivacyDocuments.read(activity,"permissions").contains("CAMERA"));
             assertTrue(PrivacyDocuments.read(activity,"services").contains("nuan5.pro"));
         } finally {activity.finish();((java.util.concurrent.ExecutorService)field(activity,"io")).shutdownNow();activity.navigationHost().close();}

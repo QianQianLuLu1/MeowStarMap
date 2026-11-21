@@ -36,3 +36,23 @@
 - 本目录与上游 `apps/mobile` 是**分叉**关系，不做自动同步；
 - 上游有价值变更按需**手工择优 backport**，backport 时必须复跑 `npm run mobile:freeze` 与 `./gradlew testDebugUnitTest`；
 - 出树引用已全部改接本仓（原 3 处：法务文档 → `mobile/legal/`、更新公钥 → `mobile/signing/`、APK 输出 → 仓库根 `release/`），对上游仓库目录零依赖。
+
+## 本机 Windows 构建须知（2026-11-22 实测）
+
+本仓路径含中文（…\项目\软件\…），AGP 有两条已知限制，绕行方案如下（CI 的 ubuntu ASCII 路径不受影响）：
+
+1. **路径检查**：AGP 默认拒绝非 ASCII 项目路径，已在 `gradle.properties` 加 `android.overridePathCheck=true`（上游无此行）；
+2. **单测类加载**：非 ASCII 路径下 Gradle 测试 worker 会对全部测试类抛 `ClassNotFoundException`（AGP 已知缺陷，override 不豁免）。绕行：把 `mobile/` 镜像到 ASCII 路径后在其中构建，产物拷回——
+   ```powershell
+   robocopy "D:\项目\软件\MeowStarMap\MeowStarMap\mobile" "D:\msm-build\mobile" /MIR /XD build .gradle .cxx
+   cd D:\msm-build\mobile
+   gradlew.bat --no-daemon testDebugUnitTest assembleDebug
+   ```
+3. **Gradle 发行包**：`services.gradle.org` 在本网络偶发 TLS 劫持（PKIX 失败）。临时把 `gradle/wrapper/gradle-wrapper.properties` 的 distributionUrl 指向 `https://mirrors.cloud.tencent.com/gradle/gradle-8.13-bin.zip` 可解，**用后必须还原官方 URL**（仓库当前保持官方 URL）。
+
+## 签名资产（2026-11-22 生成）
+
+- keystore：`D:\Android\keystore\meowstarmap-release.keystore`（alias `meowstarmap`，RSA 3072，有效期 30 年，仓库外保存）
+- 密码：同目录 `meowstarmap-password.txt`（随机生成，未入仓、未入文档）
+- **发布前必办**：所有者改用自选密码重签（发布前重签无兼容成本）并完成异地双备份；keystore 丢失 = 已发布版本永远无法升级。
+- 环境变量机制沿用上游 `MOMO_RELEASE_STORE_FILE/_STORE_PASSWORD/_KEY_ALIAS`（alias 缺省值 `momo-camera` 为上游遗留，本仓显式传 `meowstarmap`）。

@@ -924,7 +924,7 @@ public final class MainActivity extends ComponentActivity implements NsdDiscover
             LinearLayout.LayoutParams updateLayout=new LinearLayout.LayoutParams(-1,-2);
             updateLayout.bottomMargin=dp(10);aboutContent.addView(appUpdatePanel,updateLayout);
         }
-        addMyActionCard(aboutContent,"GitHub Releases · 下载与更新","下载最新版 APK 后按系统提示手动安装；App 内不自动检查或安装更新。","打开 Releases 页",()->openProjectLink(UPDATES_URL));
+        addMyActionCard(aboutContent,"GitHub Releases · 下载与更新","下载最新版 APK 后按系统提示手动安装；App 内不自动检查或安装更新。"+UPDATES_URL,"打开 Releases 页",()->openProjectLink(UPDATES_URL));
         addMyActionCard(aboutContent,"开源项目","安卓端移植自 ToStardust/NikkiSync · "+PROJECT_URL,"GitHub 项目",()->openProjectLink(PROJECT_URL));
         addMyActionCard(aboutContent,"NikkiGallery · 暖暖照相馆",NIKKI_GALLERY_URL,"NikkiGallery 仓库",()->openProjectLink(NIKKI_GALLERY_URL));
         addMyActionCard(aboutContent,"RanAxro · Nikki Albums","本地参数解码组件 nuan5_decryption 的作者与项目 · "+NIKKI_ALBUMS_URL,"查看项目",()->openProjectLink(NIKKI_ALBUMS_URL));
