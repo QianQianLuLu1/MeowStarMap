@@ -409,6 +409,33 @@ describe('createMainWindow', () => {
     expect(showMessageBoxMock).not.toHaveBeenCalled()
   })
 
+  it('9b. 崩溃弹窗自身 reject（await 期间窗口销毁）不得产生游离 rejection、不得触发 reload/quit', async () => {
+    await createMainWindow(makeAppCtx())
+    const unhandled: unknown[] = []
+    const onUnhandled = (err: unknown): void => {
+      unhandled.push(err)
+    }
+    process.on('unhandledRejection', onUnhandled)
+    showMessageBoxMock.mockRejectedValue(new Error('dialog host gone'))
+
+    try {
+      lastCreatedWindow!.webContents._emit(
+        'render-process-gone',
+        {},
+        { reason: 'crashed', exitCode: 1 }
+      )
+      // 游离 rejection 在微任务清空后才报告，多等几拍确保可观测
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    } finally {
+      process.off('unhandledRejection', onUnhandled)
+    }
+
+    expect(showMessageBoxMock).toHaveBeenCalledTimes(1)
+    expect(unhandled).toEqual([])
+    expect(lastCreatedWindow!.webContents.reload).not.toHaveBeenCalled()
+    expect(appQuitMock).not.toHaveBeenCalled()
+  })
+
   it('10. reload 抛错时调用 createMainWindow 重建', async () => {
     await createMainWindow(makeAppCtx())
     showMessageBoxMock.mockResolvedValue({ response: 0 })

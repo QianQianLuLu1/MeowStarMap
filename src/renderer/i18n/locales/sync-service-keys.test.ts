@@ -285,6 +285,9 @@ const REQUIRED_KEYS = [
   ...SYNC_SERVICE_LEAVES.map((k) => `syncService.${k}`),
 
   'appShell.viewStatus.syncService',
+  // 侧边栏「同步服务」入口（sync-service-promote 后 nav.syncGallery 按约定保留但不再消费，
+  // 真正在用的是 nav.syncService——专项钉住防单包漏删/整体漏加，参照 nav-resonance-records 先例）
+  'nav.syncService',
   // 同步图库工具栏上的入口按钮名，与本页标题同源同值
   'syncGallery.toolbar.service'
 ]

@@ -736,6 +736,94 @@ describe('exportLogsAsZip', () => {
       expect(contents).toContain('chromium-debug.log')
       expect(missing).not.toContain('chromium-debug.log')
     })
+
+    // ---------- 2026-11-21 审查修复轮：logs/crashes 目录缺席登记 ----------
+    //
+    // 此前两段复制整段 catch {} 静默：logDir/crashDir 不可读时包内目录为空，
+    // manifest 仍声称 contents 含 logs/（chromium/diag/根级文件均有 unreadable 登记，
+    // 唯独最核心的主日志无声缺席）。修复：缺席不建目录，missing 如实登记。
+
+    it('审查修复轮：logs 目录不可读 ⇒ 不建目录、missing 登记 logs/（reason=unreadable）', async () => {
+      fs.writeFileSync(path.join(mockLogDir, 'app.log'), 'evidence', 'utf-8')
+      const realReaddir = fs.promises.readdir.bind(fs.promises)
+      const readdirSpy = vi
+        .spyOn(fs.promises, 'readdir')
+        .mockImplementation(async (dir: unknown, ...rest: unknown[]) => {
+          if (String(dir) === mockLogDir) throw new Error('EACCES: logs dir locked')
+          return (realReaddir as never)(dir as never, ...(rest as never[]))
+        })
+      try {
+        const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'logs-locked.zip'))
+        expect(r.success).toBe(true)
+        const manifest = readJson(writes, 'manifest.json')
+        const contents = manifest?.contents as string[]
+        const missing = manifest?.missing as Array<{ name: string; reason: string }>
+        expect(contents, '缺席目录不得声称在包').not.toContain('logs/')
+        const logsMissing = missing.find((m) => m.name === 'logs/')
+        expect(logsMissing?.reason, '主日志缺席必须可从 manifest 判定').toBe('unreadable')
+      } finally {
+        readdirSpy.mockRestore()
+      }
+    })
+
+    it('审查修复轮：crashes 目录纳入期望清单 ⇒ 未配置崩溃目录时 missing 如实登记 absent', async () => {
+      // getCrashDirectoryAsync 经 require('./crash-service') 动态装配，vitest ESM 下
+      // require 抛错走 catch → null（fail-open，见 getCrashDirectoryAsync 注释）：
+      // 装置里只能复现「未配置崩溃目录」形态；「已配置但不可读」形态与 logs/ 用例
+      // 同构（同一代码形状），由 logs/ 用例覆盖 unreadable 分支。
+      const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'crash-absent.zip'))
+      expect(r.success).toBe(true)
+      const manifest = readJson(writes, 'manifest.json')
+      const missing = manifest?.missing as Array<{ name: string; reason: string }>
+      expect(
+        missing.find((m) => m.name === 'crashes/')?.reason,
+        '崩溃目录缺席必须可从 manifest 判定'
+      ).toBe('absent')
+    })
+
+    it('审查修复轮：截尾复制遇轮转竞态（stat 后文件缩小）⇒ 按实读字节数截断，无 NUL 填充尾巴', async () => {
+      // 走 copyBounded 截尾路径：.old 原生日志 > DIAG_LOG_TAIL_BYTES
+      const big = Buffer.alloc(3 * 1024 * 1024, 0x61) // 'a' 填充，便于区分 NUL
+      fs.writeFileSync(path.join(mockForensicsRoot, 'chromium-debug.log.old'), big)
+      // 模拟 stat 与 read 之间文件被轮转缩小：read 的 bytesRead 比 stat 少 16 字节
+      const realOpen = fs.promises.open.bind(fs.promises)
+      const openSpy = vi
+        .spyOn(fs.promises, 'open')
+        .mockImplementation(async (file: unknown, flags: unknown, ...rest: unknown[]) => {
+          const handle = (await (realOpen as never)(
+            file as never,
+            flags as never,
+            ...(rest as never[])
+          )) as fs.promises.FileHandle
+          return new Proxy(handle, {
+            get(target, prop, receiver) {
+              if (prop === 'read') {
+                return async (buf: Buffer, off: number, len: number, pos: number) => {
+                  const res = await target.read(buf, off, len, pos)
+                  return { ...res, bytesRead: Math.max(0, res.bytesRead - 16) }
+                }
+              }
+              const value = Reflect.get(target, prop, receiver)
+              return typeof value === 'function'
+                ? (value as (...a: unknown[]) => unknown).bind(target)
+                : value
+            }
+          })
+        })
+      try {
+        const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'shrink-race.zip'))
+        expect(r.success).toBe(true)
+        const tailWrite = writes.find((w) => path.basename(w.dst) === 'chromium-debug.log.old')
+        expect(tailWrite, '超大原生日志应走截尾写入').toBeTruthy()
+        expect(tailWrite!.buf.byteLength).toBe(DIAG_LOG_TAIL_BYTES - 16)
+        expect(
+          tailWrite!.buf.subarray(-16).every((b) => b === 0x61),
+          '尾部 16 字节应是真实内容而非 NUL 填充'
+        ).toBe(true)
+      } finally {
+        openSpy.mockRestore()
+      }
+    })
   })
 
   // ---------- 2026-11-17 收口补全：打包态读写同源复现 ----------
@@ -788,10 +876,11 @@ describe('exportLogsAsZip', () => {
       const manifest = JSON.parse(manifestWrite!.buf.toString('utf-8')) as {
         diagnosticVersion: string
         contents: string[]
-        missing: string[]
+        missing: Array<{ name: string; reason: string }>
       }
       expect(manifest.diagnosticVersion).toBe('1.3')
-      expect(manifest.missing).toEqual([])
+      // 审查修复轮起 crashes/ 纳入期望清单如实登记：测试环境未配置崩溃目录 ⇒ absent
+      expect(manifest.missing).toEqual([{ name: 'crashes/', reason: 'absent' }])
       expect(manifest.contents).toContain('nikkisync/')
 
       // system-info 携带取证根与候选来源（install/fallback 可判）

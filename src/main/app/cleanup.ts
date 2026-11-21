@@ -145,10 +145,14 @@ export async function performCleanup(ctx: AppContext): Promise<void> {
     ])
   } catch {}
 
-  // 6.5 缩略图 worker 化：dispose worker 进程（DISPOSE → 500ms 等待 → kill 兜底）
-  // 单文件 worker 无 DB 连接，dispose 仅清理 pending + 退出 worker 进程
+  // 6.5 缩略图 worker 化：dispose worker 进程（DISPOSE → 500ms 等待 → kill 兜底）。
+  // 与上方 flushAccessTimes 同款超时竞速兜底：dispose 卡住（worker 挂死）时
+  // 不拖住整条退出链（lifecycle.ts 的 force-exit 兜底是最后防线，不必等它）
   try {
-    await ctx.thumbnailWorkerBridge.dispose()
+    await Promise.race([
+      ctx.thumbnailWorkerBridge.dispose().catch(() => {}),
+      new Promise<void>((resolve) => setTimeout(resolve, 1000))
+    ])
   } catch {}
 
   // 7. 关闭数据库（同步，含 WAL checkpoint）

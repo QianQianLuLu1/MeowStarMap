@@ -245,9 +245,18 @@ export function getRecentLogs(): Array<{ timestamp: string; level: string; messa
 function writeLog(level: LogLevel, message: string, ...args: unknown[]): void {
   if (!logDir) initLogger()
   const timestamp = new Date().toISOString()
+  // 循环引用对象 JSON.stringify 会抛 TypeError：日志是兜底链路，序列化失败降级为
+  // String() 也不能让调用方（含 uncaughtException 处理链）跟着崩
+  const safeStringify = (a: unknown): string => {
+    try {
+      return JSON.stringify(a) ?? String(a)
+    } catch {
+      return String(a)
+    }
+  }
   const argsStr =
     args.length > 0
-      ? ' ' + args.map((a) => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')
+      ? ' ' + args.map((a) => (typeof a === 'object' ? safeStringify(a) : String(a))).join(' ')
       : ''
   // P4：行内嵌 bootId 短码 + pid，同一次运行的 main/faults/diag/heartbeat 可拼成时间线
   const line = `[${timestamp}] [${level.toUpperCase()}] [b:${BOOT_ID_SHORT} p:${process.pid}] ${message}${argsStr}\n`

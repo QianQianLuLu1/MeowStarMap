@@ -815,4 +815,24 @@ describe('P5: settings:set 变更留痕', () => {
     expect(joined).toContain('false')
     expect(joined).toContain('true')
   })
+
+  it('审查修复轮：校验失败的写入不得留下 [Settings] old→new 留痕（留痕时序修正）', async () => {
+    const { logger } = await import('../../utils/logger')
+    const infoMock = vi.mocked(logger.info)
+    infoMock.mockClear()
+    const ctx = makeCtx({})
+    vi.mocked(ctx.dbManager.getSetting).mockReturnValue(false)
+    registerSettingsHandlers(ctx)
+    // hardwareAcceleration 传非布尔值：走内联校验分支抛 ValidationError
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )(['hardwareAcceleration', 'yes-not-boolean'])) as { success: boolean }
+    expect(result.success).toBe(false)
+    // 留痕必须在「校验通过且写库成功」之后发生：失败的变更记录成已发生会污染诊断时间线
+    const lines = infoMock.mock.calls
+      .map((c) => String(c[0]))
+      .filter((s) => s.includes('[Settings]'))
+    expect(lines).toEqual([])
+  })
 })

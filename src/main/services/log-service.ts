@@ -1,4 +1,4 @@
-// @core-change: 诊断包 1.3——feedback.txt/filePath 返回/应急落点与 userData 跨目录收集/manifest 缺席原因
+// @core-change: 审查修复轮——logs/crashes 目录读取失败从静默吞掉改为 manifest.missing 如实登记
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
@@ -202,31 +202,38 @@ export async function exportLogsAsZip(
       await fs.promises.writeFile(path.join(tmpDir, 'feedback.txt'), feedback, 'utf-8')
     }
 
-    // 1. 复制 logs 目录
+    // 1. 复制 logs 目录（缺席不建目录：readdir 失败时 manifest.missing 如实登记 unreadable。
+    //    此前整段 catch {} 静默——logDir 被防护软件/权限锁住时主日志无声缺席，取证方被误导）
     const logsTarget = path.join(tmpDir, 'logs')
-    await fs.promises.mkdir(logsTarget, { recursive: true })
     try {
       const logFiles = await fs.promises.readdir(logDir)
+      await fs.promises.mkdir(logsTarget, { recursive: true })
       for (const f of logFiles) {
         if (f.endsWith('.log') || f.endsWith('.jsonl')) {
           await fs.promises.copyFile(path.join(logDir, f), path.join(logsTarget, f))
         }
       }
-    } catch {}
+    } catch (err) {
+      unreadable.add('logs/')
+      logger.warn('diagnostic bundle: skipped logs/', err)
+    }
 
-    // 2. 复制 crashes 目录（崩溃 dump 文件）
+    // 2. 复制 crashes 目录（崩溃 dump 文件；缺席不建目录，同款登记）
     const crashDir = await getCrashDirectoryAsync()
     if (crashDir) {
       const crashesTarget = path.join(tmpDir, 'crashes')
-      await fs.promises.mkdir(crashesTarget, { recursive: true })
       try {
         const crashFiles = await fs.promises.readdir(crashDir)
+        await fs.promises.mkdir(crashesTarget, { recursive: true })
         for (const f of crashFiles) {
           if (f.endsWith('.dmp') || f.endsWith('.dump') || f.endsWith('.crash')) {
             await fs.promises.copyFile(path.join(crashDir, f), path.join(crashesTarget, f))
           }
         }
-      } catch {}
+      } catch (err) {
+        unreadable.add('crashes/')
+        logger.warn('diagnostic bundle: skipped crashes/', err)
+      }
     }
 
     // 3. 复制 startup-errors.log
@@ -383,7 +390,12 @@ export async function exportLogsAsZip(
     // 5. 生成 manifest.json（如实化：contents 按实际入包条目登记，期望但缺席的进 missing。
     //    旧版 contents 是静态期望清单——chromium-debug.log 缺席时仍声称包含，取证方被误导）
     const appInfo = (systemInfo.app || {}) as { version?: string }
-    const expectedOptional: string[] = [...FORENSICS_ROOT_FILE_NAMES, 'nikkisync/']
+    const expectedOptional: string[] = [
+      ...FORENSICS_ROOT_FILE_NAMES,
+      'nikkisync/',
+      'logs/',
+      'crashes/'
+    ]
     let contents: string[] = ['logs/', 'crashes/', ...expectedOptional, 'system-info.json']
     let missing: Array<{ name: string; reason: string }> = []
     // 应急落点别名 → 期望根文件：从 fallback/ 收编的，缺席原因记 collected-from-fallback
@@ -461,8 +473,9 @@ async function copyBounded(src: string, dst: string, maxBytes: number): Promise<
   const handle = await fs.promises.open(src, 'r')
   try {
     const buf = Buffer.alloc(maxBytes)
-    await handle.read(buf, 0, maxBytes, size - maxBytes)
-    await fs.promises.writeFile(dst, buf)
+    const { bytesRead } = await handle.read(buf, 0, maxBytes, size - maxBytes)
+    // stat 与 read 之间文件可能被轮转缩小：按实读字节数截断，避免 NUL 填充尾巴入包
+    await fs.promises.writeFile(dst, buf.subarray(0, bytesRead))
   } finally {
     await handle.close().catch(() => {})
   }

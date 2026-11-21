@@ -1,4 +1,4 @@
-// @core-change: settings:set 记录 old→new 变更留痕（>1KB 截断），诊断包可还原设置变更时间线
+// @core-change: 审查修复轮——settings:set 变更留痕时序修正为「校验通过且写库成功后」发生，失败的变更不再留下未发生的 old→new 时间线
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -74,6 +74,53 @@ function assertMirrorBaseUrl(value: unknown, invalidMessage: string): string {
 }
 
 /**
+ * 变更留痕 old→new（fail-open）：读旧值/序列化失败一律不影响写入主流程；
+ * 单值 >1KB 截断是纯体积约束（已授权不脱敏，路径/标识全量记录）。
+ * 必须在「校验通过且写库成功」之后调用——留痕发生在变更确定生效之后，
+ * 校验失败/回滚路径不得留下未发生的 old→new 时间线（2026-11-21 审查修复轮时序修正）。
+ */
+function auditSettingChange(
+  ctx: HandlerContext,
+  key: string,
+  value: unknown,
+  oldValue: unknown
+): void {
+  try {
+    const fmt = (v: unknown): string => {
+      let s: string
+      try {
+        s = JSON.stringify(v) ?? String(v)
+      } catch {
+        s = String(v)
+      }
+      return s.length > 1024 ? `${s.slice(0, 1024)}…(截断,总长${s.length})` : s
+    }
+    logger.info(`[Settings] ${key}: ${fmt(oldValue)} → ${fmt(value)}`)
+  } catch {
+    // 留痕失败不影响设置写入
+  }
+}
+
+/** 校验通过后的统一落库+留痕：旧值须在写库前读取（写库成功后即留痕），读旧值失败不留痕不阻断。 */
+function writeSettingAndAudit(
+  ctx: HandlerContext,
+  key: string,
+  value: unknown,
+  finalValue?: unknown
+): void {
+  let oldValue: unknown
+  let oldReadOk = true
+  try {
+    oldValue = ctx.dbManager.getSetting<unknown>(key, undefined)
+  } catch {
+    oldReadOk = false
+  }
+  ctx.dbManager.setSetting(key, finalValue ?? value)
+  if (!oldReadOk) return
+  auditSettingChange(ctx, key, value, oldValue)
+}
+
+/**
  * settings 域 IPC handler：应用设置读写。
  */
 export function registerSettingsHandlers(ctx: HandlerContext): void {
@@ -127,27 +174,12 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           if (err instanceof AppError) throw err
           throw AppError.validation(t('main.settings.error.valueNotSerializable'))
         }
-        // 变更留痕 old→new：读旧值/序列化失败一律 fail-open，绝不影响写入主流程。
-        // 单值 >1KB 截断是纯体积约束（已授权不脱敏，路径/标识全量记录）。
-        try {
-          const oldValue = ctx.dbManager.getSetting<unknown>(key, undefined)
-          const fmt = (v: unknown): string => {
-            let s: string
-            try {
-              s = JSON.stringify(v) ?? String(v)
-            } catch {
-              s = String(v)
-            }
-            return s.length > 1024 ? `${s.slice(0, 1024)}…(截断,总长${s.length})` : s
-          }
-          logger.info(`[Settings] ${key}: ${fmt(oldValue)} → ${fmt(value)}`)
-        } catch {
-          // 留痕失败不影响设置写入
-        }
+        // 变更留痕在各分支「校验通过且写库成功」后统一发生（见 writeSettingAndAudit /
+        // auditSettingChange）：此前留痕先于校验，失败的变更会被记录成已发生。
         // customScanPaths 走内联校验放行（方案 A：维持现状，不迁专用通道）
         if (key === 'customScanPaths') {
           assertCustomScanPaths(value)
-          ctx.dbManager.setSetting(key, value)
+          writeSettingAndAudit(ctx, key, value)
           return { saved: true }
         }
         // hardwareAcceleration 走内联布尔校验，并双写启动期可同步读取的偏好镜像
@@ -155,7 +187,7 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           if (typeof value !== 'boolean') {
             throw AppError.validation(t('main.settings.error.hwAccelNotBoolean'))
           }
-          ctx.dbManager.setSetting(key, value)
+          writeSettingAndAudit(ctx, key, value)
           writeHardwareAccelPref(value)
           return { saved: true }
         }
@@ -165,7 +197,7 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           if (value !== 'auto' && value !== 'high-performance') {
             throw AppError.validation(t('main.settings.error.gpuPreferenceInvalid'))
           }
-          ctx.dbManager.setSetting(key, value)
+          writeSettingAndAudit(ctx, key, value)
           writeGpuDiscretePref(value)
           return { saved: true }
         }
@@ -179,7 +211,12 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           ctx.dbManager.setSetting(key, value)
           try {
             const sync = syncLoginItemSetting(value)
-            if (sync.synced) return { saved: true, synced: true }
+            // 留痕在 OS 同步结果确定后发生：回滚路径（同步失败）不得留下未发生的变更
+            if (sync.synced) {
+              auditSettingChange(ctx, key, value, previous)
+              return { saved: true, synced: true }
+            }
+            auditSettingChange(ctx, key, value, previous)
             return { saved: true, synced: false, skipped: sync.skipped }
           } catch (err) {
             // 回滚失败只留痕：绝不能让它覆盖原始同步失败，否则用户会看到无关的 DB 错误串。
@@ -200,8 +237,11 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
         }
         // referenceData.manifestBaseUrl 走内联 URL/SSRF 校验（空串 = 官方站点）
         if (key === 'referenceData.manifestBaseUrl') {
-          ctx.dbManager.setSetting(
+          // assertMirrorBaseUrl 作为实参先求值：校验抛错时不会落库、不留痕
+          writeSettingAndAudit(
+            ctx,
             key,
+            value,
             assertMirrorBaseUrl(value, t('main.settings.error.manifestBaseUrlInvalid'))
           )
           return { saved: true }
@@ -209,8 +249,10 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
         // referenceData.imageMirrorBaseUrl（阶段 5）：同款校验、不同语义——只替换已授权
         // 图片资源的取图 host，与 manifest 站点键各自独立，不得串用
         if (key === 'referenceData.imageMirrorBaseUrl') {
-          ctx.dbManager.setSetting(
+          writeSettingAndAudit(
+            ctx,
             key,
+            value,
             assertMirrorBaseUrl(value, t('main.settings.error.imageMirrorBaseUrlInvalid'))
           )
           return { saved: true }
@@ -221,7 +263,7 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           if (typeof value !== 'boolean') {
             throw AppError.validation(t('main.settings.error.referenceDataSwitchNotBoolean'))
           }
-          ctx.dbManager.setSetting(key, value)
+          writeSettingAndAudit(ctx, key, value)
           return { saved: true }
         }
         // 其余 key 必须在普通偏好白名单内；命中敏感 key 时给出专用通道指引
@@ -234,7 +276,7 @@ export function registerSettingsHandlers(ctx: HandlerContext): void {
           }
           throw AppError.validation(t('main.settings.error.unknownKey', { key }))
         }
-        ctx.dbManager.setSetting(key, value)
+        writeSettingAndAudit(ctx, key, value)
         return { saved: true }
       }
     )

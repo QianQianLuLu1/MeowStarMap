@@ -65,7 +65,11 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({ open, onClose })
   // 复制联系方式
   const handleCopyContact = (text: string, label: string) => {
     try {
-      navigator.clipboard.writeText(text)
+      // writeText 返回的 Promise 拒绝不会进入同步 try/catch：异步失败也翻转提示，
+      // 否则用户看到「已复制」而剪贴板实际为空，且 rejection 会成为渲染层游离错误
+      navigator.clipboard.writeText(text).catch(() => {
+        setExportResult({ success: false, message: t('common.feedbackDialog.copyFailed') })
+      })
       setExportResult({ success: true, message: t('common.feedbackDialog.copySuccess', { label }) })
     } catch {
       setExportResult({ success: false, message: t('common.feedbackDialog.copyFailed') })

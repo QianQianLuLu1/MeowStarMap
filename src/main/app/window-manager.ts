@@ -361,18 +361,32 @@ export async function createMainWindow(ctx: AppContext): Promise<void> {
 
     // P1-6：弹窗询问用户是否重新加载（崩溃后窗口可能已不可用，需先销毁重建）
     if (!mainWindow || mainWindow.isDestroyed()) return
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: 'error',
-      title: t('main.window.dialog.crashTitle'),
-      message: t('main.window.dialog.crashMessage'),
-      detail: t('main.window.dialog.crashDetail', {
-        reason: details.reason,
-        exitCode: details.exitCode
-      }),
-      buttons: [t('main.window.dialog.reload'), t('main.window.dialog.closeApp')],
-      defaultId: 0,
-      cancelId: 1
-    })
+    let result: Awaited<ReturnType<typeof dialog.showMessageBox>>
+    try {
+      result = await dialog.showMessageBox(mainWindow, {
+        type: 'error',
+        title: t('main.window.dialog.crashTitle'),
+        message: t('main.window.dialog.crashMessage'),
+        detail: t('main.window.dialog.crashDetail', {
+          reason: details.reason,
+          exitCode: details.exitCode
+        }),
+        buttons: [t('main.window.dialog.reload'), t('main.window.dialog.closeApp')],
+        defaultId: 0,
+        cancelId: 1
+      })
+    } catch (dialogErr) {
+      // 弹窗失败（await 期间窗口被销毁/宿主异常）：异步回调里再抛只会成为游离
+      // rejection 污染故障时间线——留痕后安全返回，用户可手动重启应用。
+      // FaultType 复用 rendererCrash（本路径即渲染崩溃处理链的一环，source 已区分）
+      logger.warn('[Window] crash dialog failed', dialogErr)
+      logFault(
+        'rendererCrash',
+        dialogErr instanceof Error ? dialogErr : new Error(String(dialogErr)),
+        { source: 'webContents.render-process-gone.crashDialog', reason: details.reason }
+      ).catch(() => {})
+      return
+    }
 
     if (result.response === 0) {
       // 重新加载：reload 之前先确保 webContents 仍可用

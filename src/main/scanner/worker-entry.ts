@@ -150,9 +150,13 @@ function getDatabaseImpl(): typeof import('better-sqlite3') {
 
 let db: DatabaseType.Database | null = null
 let currentDbPath = ''
+// 心跳度量统一走单调钟（performance.now）：睡眠期单调钟不走、唤醒后墙钟跳变不进入
+// 任何度量面（静默/嫌疑/宽限全按单调钟），墙钟跳变——含嫌疑期内二次跳变——从根上
+// 退出误杀面；墙钟仅用于日志展示。跨进程活性仍以父进程消息为准（与单调钟基准无关）。
+const monotonicNow = (): number => performance.now()
 // R14：主进程心跳时间戳。主进程每 5s 发送 WORKER_PING，worker 每 5s 检查一次，
 // 超过 15s（3 次未收到）视为父进程已退出/崩溃，立即停止扫描并清理退出。
-let lastPingTime = Date.now()
+let lastPingTime = monotonicNow()
 let progress: ScanProgress = {
   scanned: 0,
   found: 0,
@@ -1572,7 +1576,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
   const msg = event.data as WorkerCommand
   // N3（2026-11-20）：任何父消息都是父进程存活证明，统一刷新心跳时间戳——
   // 睡眠/唤醒墙钟跳变后，bridge 的无条件 ping（≤5s）或任意指令即可为看门狗续命
-  lastPingTime = Date.now()
+  lastPingTime = monotonicNow()
   if (msg.type === 'SCAN_START') {
     try {
       const result = await startScan(msg.payload.dbPath, msg.payload.options)
@@ -1592,7 +1596,7 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
     cleanupAndExit(true)
   } else if (msg.type === 'WORKER_PING') {
     // R14：收到主进程心跳，刷新时间戳
-    lastPingTime = Date.now()
+    lastPingTime = monotonicNow()
   }
 })
 
@@ -1609,26 +1613,28 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
  */
 const HEARTBEAT_INTERVAL_MS = 5000
 const HEARTBEAT_TIMEOUT_MS = 15000
-// N3（2026-11-20）：睡眠/唤醒宽限——墙钟（Date.now()）在笔记本睡眠后跳变，
-// 旧实现把跳变当父进程死亡立即 abortScan+exit，误杀扫描（故障机 2026-11-19 实证）。
-// 超时先进入嫌疑期：期间绝不 abort/exit；父存活 ⇒ bridge 每 5s 无条件 ping 必在
-// 宽限内到达续命；宽限耗尽才走原退出链（父真死：退出 15s→~25s，孤儿防护语义保留）。
+// N3（2026-11-20）：睡眠/唤醒宽限——墙钟在笔记本睡眠后跳变，最初实现把跳变当父进程
+// 死亡立即 abortScan+exit，误杀扫描（故障机 2026-11-19 实证）；2026-11-21 修复轮把
+// 静默/嫌疑/宽限全部切到单调钟（睡眠期不走），墙钟跳变彻底退出度量面，宽限机制
+// 保留为第二道防线。超时先进入嫌疑期：期间绝不 abort/exit；父存活 ⇒ bridge 每 5s
+// 无条件 ping 必在宽限内到达续命；宽限耗尽才走原退出链（父真死：退出 15s→~25s，
+// 孤儿防护语义保留）。
 const HEARTBEAT_GRACE_MS = 10000
 let heartbeatSuspectSince: number | null = null
 const heartbeatTimer: NodeJS.Timeout | null = process.parentPort
   ? setInterval(() => {
-      const silentFor = Date.now() - lastPingTime
+      const silentFor = monotonicNow() - lastPingTime
       if (silentFor <= HEARTBEAT_TIMEOUT_MS) {
         heartbeatSuspectSince = null
         return
       }
       if (heartbeatSuspectSince === null) {
-        heartbeatSuspectSince = Date.now()
+        heartbeatSuspectSince = monotonicNow()
         // eslint-disable-next-line no-restricted-syntax -- 诊断日志，worker 进程早于 i18n 初始化，日志仍须可读
         workerLog('warn', '心跳超时进入嫌疑宽限（可能为睡眠/唤醒墙钟跳变），等待父进程活性信号')
         return
       }
-      if (Date.now() - heartbeatSuspectSince >= HEARTBEAT_GRACE_MS) {
+      if (monotonicNow() - heartbeatSuspectSince >= HEARTBEAT_GRACE_MS) {
         workerLog('error', t('main.scanner.log.heartbeatTimeout'))
         abortScan()
         cleanupAndExit()
