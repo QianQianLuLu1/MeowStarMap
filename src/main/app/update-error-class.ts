@@ -12,6 +12,14 @@ import type { UpdateErrorKind } from '../../shared/types/electron-api'
  * Error: getaddrinfo ENOTFOUND github.com`），所以传输层信号必须先于 `ERR_UPDATER_` 前缀判定，
  * 否则真断网仍会被误报成「源未就绪」。
  *
+ * 2026-11-21 补口（「网络可达 GitHub 仍弹『未获取到可用的更新信息』」取证）：传输层还有三种
+ * 「无码可查」的失败会被兜底成 source——① httpExecutor.js:282 的 60s socket 超时抛
+ * `Error("Request timed out")`，无 code 无 statusCode；② httpExecutor.js:145 服务端中途断开抛
+ * `Error("Request has been aborted by the server")`，同样无码；③ getLatestTagName() 包装 HTTP 失败
+ * 时把 statusCode 属性剥掉，只剩 message 内嵌的「HttpError: 403 …」文本。三者契约上都该判 network
+ * （electron-api.ts:423：超时 ⇒ network），故 NETWORK_SIGNAL 增补两个无码信号、statusOf 增补
+ * 包装内嵌状态码提取。
+ *
  * 兜底方向取 `source`：兜底 `network` 会把任何内部异常都转译成「你的网络有问题」，正是本轮要消灭的形状。
  */
 
@@ -39,8 +47,9 @@ const NETWORK_CODES = [
   'UNABLE_TO_VERIFY_LEAF_SIGNATURE'
 ]
 
-/** 无错误码、只在 message 里露面的 TLS / Electron net 栈信号（统一按大写文本匹配） */
-const NETWORK_SIGNAL = /NET::ERR_|SSL ROUTINES|UNABLE TO VERIFY THE FIRST CERTIFICATE|TLS HANDSHAKE/
+/** 无错误码、只在 message 里露面的 TLS / Electron net 栈信号与超时/服务端断开信号（统一按大写文本匹配） */
+const NETWORK_SIGNAL =
+  /NET::ERR_|SSL ROUTINES|UNABLE TO VERIFY THE FIRST CERTIFICATE|TLS HANDSHAKE|REQUEST TIMED OUT|ABORTED BY THE SERVER/
 
 /** cause 链遍历深度上限：异常构造的超长链不得把归类拖成死循环 */
 const MAX_CAUSE_DEPTH = 8
@@ -93,7 +102,14 @@ function textOf(err: unknown): string {
   }`
 }
 
-/** 读 HTTP 状态码：沿 cause 链逐节点查 statusCode/status，缺失时从 `Response code 404` 文案里取 */
+/**
+ * 读 HTTP 状态码：沿 cause 链逐节点查 statusCode/status，缺失时从错误文本里取——
+ * 除 `Response code 404` 外还认 `HttpError: 403`：GitHubProvider.getLatestTagName()
+ * （GitHubProvider.js:172-174）把 /releases/latest 的任何失败包装成 ERR_UPDATER_LATEST_VERSION_NOT_FOUND，
+ * statusCode 属性丢失、只剩 e.stack 内嵌的「HttpError: <status> …」首行，限流（403）/网关故障（5xx）
+ * 必须从这里捞回来才配得上「网络繁忙」。要求冒号后紧跟 3 位数字，「HttpError: Response code 404」
+ * 这类既有形态不被误提取。
+ */
 function statusOf(err: unknown): number | null {
   for (const node of [err, ...causeChain(err).slice(1)]) {
     const rec = asRecord(node)
@@ -101,8 +117,11 @@ function statusOf(err: unknown): number | null {
     if (typeof statusCode === 'number') return statusCode
     const status = safeGet(rec, 'status')
     if (typeof status === 'number') return status
-    const matched = /Response code (\d{3})/i.exec(textOf(node))
+    const text = textOf(node)
+    const matched = text.match(/Response code (\d{3})/i)
     if (matched) return Number(matched[1])
+    const wrapped = text.match(/HttpError:\s*(\d{3})/i)
+    if (wrapped) return Number(wrapped[1])
   }
   return null
 }

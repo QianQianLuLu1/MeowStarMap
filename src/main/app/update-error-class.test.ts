@@ -153,6 +153,57 @@ describe('classifyUpdateError —— HTTP 状态码判据', () => {
   })
 })
 
+describe('classifyUpdateError —— 传输层无码信号与包装状态码（2026-11-21 补口）', () => {
+  // 取证：builder-util-runtime httpExecutor.js:282 的 60s socket 超时抛 new Error("Request timed out")，
+  // 无 code、无 statusCode；atom feed / /releases/latest / latest.yml 三个请求任一超时都落到这个形状。
+  // 契约（electron-api.ts:423）超时 ⇒ network，落到兜底就是「网络可达却弹『未获取到可用的更新信息』」本尊。
+  it('60s socket 超时（「Request timed out」无码无状态）⇒ network', () => {
+    expect(classifyUpdateError(new Error('Request timed out'))).toBe('network')
+  })
+
+  // httpExecutor.js:145：响应中途被服务端断开，同样无码。
+  it('服务端中途断开（「Request has been aborted by the server」无码）⇒ network', () => {
+    expect(classifyUpdateError(new Error('Request has been aborted by the server'))).toBe('network')
+  })
+
+  // GitHubProvider.getLatestTagName()（GitHubProvider.js:172-174）把 /releases/latest 的任何失败
+  // 包成 ERR_UPDATER_LATEST_VERSION_NOT_FOUND：statusCode 丢失，只剩 e.stack 内嵌文本
+  // 「HttpError: 403 …」。GitHub 限流返 403，归 source 会把限流误报成「更新源未就绪」。
+  it('/releases/latest 包装丢失 statusCode：内嵌 HttpError: 403 ⇒ network', () => {
+    expect(
+      classifyUpdateError(
+        errWithCode(
+          'Unable to find latest version on GitHub (https://github.com/QianQianLuLu1/MeowStarMap/releases/latest), please ensure a production release exists: HttpError: 403 rate limit exceeded\n    at createHttpError (node_modules/builder-util-runtime/out/httpExecutor.js:53:12)',
+          'ERR_UPDATER_LATEST_VERSION_NOT_FOUND'
+        )
+      )
+    ).toBe('network')
+  })
+
+  it('内嵌 HttpError: 502（网关故障被包装）⇒ network', () => {
+    expect(
+      classifyUpdateError(
+        errWithCode(
+          'Unable to find latest version on GitHub (https://github.com/QianQianLuLu1/MeowStarMap/releases/latest), please ensure a production release exists: HttpError: 502 Bad Gateway\n    at createHttpError (node_modules/builder-util-runtime/out/httpExecutor.js:53:12)',
+          'ERR_UPDATER_LATEST_VERSION_NOT_FOUND'
+        )
+      )
+    ).toBe('network')
+  })
+
+  // 防过度矫正：该端点内嵌 404 是「没有已发布版本」，仍属源未就绪，不得被新提取拔成 network。
+  it('包装内嵌 HttpError: 404 ⇒ 仍 source（防过度矫正）', () => {
+    expect(
+      classifyUpdateError(
+        errWithCode(
+          'Unable to find latest version on GitHub (https://github.com/QianQianLuLu1/MeowStarMap/releases/latest), please ensure a production release exists: HttpError: 404 Not Found',
+          'ERR_UPDATER_LATEST_VERSION_NOT_FOUND'
+        )
+      )
+    ).toBe('source')
+  })
+})
+
 describe('classifyUpdateError —— 边界与非法输入（永不抛错）', () => {
   it('非 Error 的字符串 ⇒ 兜底 source', () => {
     expect(classifyUpdateError('boom')).toBe('source')

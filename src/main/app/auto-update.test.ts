@@ -94,6 +94,11 @@ function connectionRefusedError(): Error {
   return err
 }
 
+/** electron-updater 60s socket 超时形态：httpExecutor.js:282 抛 new Error("Request timed out")，无 code 无 statusCode */
+function timeoutError(): Error {
+  return new Error('Request timed out')
+}
+
 describe('initAutoUpdater —— 更新事件归类推送', () => {
   beforeEach(() => {
     for (const key of Object.keys(listeners)) delete listeners[key]
@@ -130,6 +135,17 @@ describe('initAutoUpdater —— 更新事件归类推送', () => {
     mod.initAutoUpdater(fakeCtx)
 
     emit('error', connectionRefusedError())
+
+    expect(lastPushedPayload()).toEqual(
+      expect.objectContaining({ stage: 'error', errorKind: 'network' })
+    )
+  })
+
+  it('60s socket 超时（Request timed out 无码）必须归为 network，不得冒充「源未就绪」', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+
+    emit('error', timeoutError())
 
     expect(lastPushedPayload()).toEqual(
       expect.objectContaining({ stage: 'error', errorKind: 'network' })
