@@ -99,6 +99,23 @@ export const Sidebar: React.FC = () => {
   // P0-03：智能分组快捷面板展开状态
   const [groupPanelOpen, setGroupPanelOpen] = useState(false)
 
+  // 移动视口强制图标栏：窄屏（≤640px）下 220px 侧栏会挤压内容区（同步服务控制台、
+  // 图库网格等），与用户手动折叠选择无关地收成 64px 图标栏；宽屏保持用户持久化选择。
+  // matchMedia 缺席的环境（jsdom 测试）视为宽屏，不改变既有行为。
+  const [isNarrowViewport, setIsNarrowViewport] = useState(() =>
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(max-width: 640px)').matches
+      : false
+  )
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    const query = window.matchMedia('(max-width: 640px)')
+    const handleChange = (event: MediaQueryListEvent): void => setIsNarrowViewport(event.matches)
+    query.addEventListener('change', handleChange)
+    return () => query.removeEventListener('change', handleChange)
+  }, [])
+  const collapsed = isNarrowViewport || sidebarCollapsed
+
   // 流体滑块 Tab 指示器：currentView 不在导航项内（detail / editor）时自动隐藏
   const { containerRef, indicatorRef, registerItem } = useFluidTabIndicator(currentView)
 
@@ -183,11 +200,11 @@ export const Sidebar: React.FC = () => {
   return (
     <motion.aside
       className="h-full flex flex-col glass-panel liquid-glass liquid-glass--sidebar overflow-hidden"
-      animate={{ width: sidebarCollapsed ? 64 : 220 }}
+      animate={{ width: collapsed ? 64 : 220 }}
       transition={springSoft}
     >
       <div className="flex items-center justify-between p-4 h-10">
-        {!sidebarCollapsed && (
+        {!collapsed && (
           <button
             className={`flex items-center gap-1 text-sm font-semibold transition-colors ${canGoBack ? 'cursor-pointer' : 'cursor-default'}`}
             style={{ color: canGoBack ? 'var(--accent)' : 'var(--glass-ink)' }}
@@ -199,21 +216,19 @@ export const Sidebar: React.FC = () => {
             <span>{canGoBack ? t('common.back') : t('nav.menu')}</span>
           </button>
         )}
-        <button
-          className="icon-btn motion-hover-scale-lg"
-          onClick={toggleSidebar}
-          title={sidebarCollapsed ? t('nav.expand') : t('nav.collapse')}
-        >
-          {sidebarCollapsed ? (
-            <IconDoubleChevronRight size={16} />
-          ) : (
-            <IconDoubleChevronLeft size={16} />
-          )}
-        </button>
+        {!isNarrowViewport && (
+          <button
+            className="icon-btn motion-hover-scale-lg"
+            onClick={toggleSidebar}
+            title={collapsed ? t('nav.expand') : t('nav.collapse')}
+          >
+            {collapsed ? <IconDoubleChevronRight size={16} /> : <IconDoubleChevronLeft size={16} />}
+          </button>
+        )}
       </div>
 
       {/* P0-02：角色档案切换器（未折叠时显示） */}
-      {!sidebarCollapsed && (
+      {!collapsed && (
         <div ref={profileMenuRef} className="px-2 relative">
           <button
             className="w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors hover:bg-[var(--hover-bg)]"
@@ -277,7 +292,7 @@ export const Sidebar: React.FC = () => {
       )}
 
       {/* U-G12：折叠状态下显示返回图标按钮 */}
-      {sidebarCollapsed && canGoBack && (
+      {collapsed && canGoBack && (
         <div className="px-2">
           <button
             className="nav-item w-full justify-center"
@@ -302,12 +317,12 @@ export const Sidebar: React.FC = () => {
             title={t(item.labelKey)}
           >
             {item.icon}
-            {!sidebarCollapsed && <span className="text-sm font-medium">{t(item.labelKey)}</span>}
+            {!collapsed && <span className="text-sm font-medium">{t(item.labelKey)}</span>}
           </button>
         ))}
 
         {/* P0-03：智能分组快捷区（仅在图库视图且侧边栏未折叠时显示） */}
-        {!sidebarCollapsed && currentView === 'gallery' && (
+        {!collapsed && currentView === 'gallery' && (
           <div className="pt-3 mt-3" style={{ borderTop: '1px solid var(--divider)' }}>
             <button
               className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold transition-colors hover:bg-[var(--hover-bg)]"
@@ -362,7 +377,7 @@ export const Sidebar: React.FC = () => {
         )}
       </nav>
 
-      {!sidebarCollapsed && (
+      {!collapsed && (
         <div
           className="p-4 space-y-3 text-xs"
           style={{ color: 'var(--glass-ink-2)', borderTop: '1px solid var(--divider)' }}

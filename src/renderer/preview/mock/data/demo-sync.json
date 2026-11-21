@@ -1,0 +1,125 @@
+{
+  "comment": "URL demo=sync 时预览版 nikkisync mock 的演示数据集（仅预览构建可及，不伪造真实资产字节；示例文案按约定放本数据文件）",
+  "runtimeStatus": {
+    "available": true,
+    "running": true,
+    "state": "running",
+    "linkReady": true
+  },
+  "serverStatus": {
+    "available": true,
+    "running": true,
+    "host": "192.168.1.8",
+    "port": 27124,
+    "secure": true,
+    "serverId": "demo-server-preview",
+    "mdnsEnabled": true,
+    "pairedDeviceCount": 1,
+    "lanHost": "192.168.1.8",
+    "tlsFingerprintSha256": "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    "inspirationV1": true,
+    "diagnostics": {
+      "running": true,
+      "host": "192.168.1.8",
+      "port": 27124,
+      "secure": true,
+      "mdnsEnabled": true,
+      "pairedDeviceCount": 1,
+      "tlsFingerprintTail8": "77:88:99",
+      "connectionHosts": ["192.168.1.8", "127.0.0.1"],
+      "updatedAt": "2026-11-21T10:00:00.000Z"
+    }
+  },
+  "overview": {
+    "available": true,
+    "assets": 224,
+    "pairedDevices": 1,
+    "firstRun": false
+  },
+  "pairedDevices": [
+    {
+      "deviceId": "demo-device-01",
+      "deviceName": "Nikki Demo Phone",
+      "platform": "android",
+      "appVersion": "1.0.41",
+      "pairedAt": "2026-11-20T09:30:00.000Z",
+      "lastSeenAt": "2026-11-21T09:58:00.000Z"
+    }
+  ],
+  "pairing": {
+    "content": "NS1|demo-server-preview|192.168.1.8|27124|demo-preview-token-not-pairable|0|AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99",
+    "serverId": "demo-server-preview",
+    "host": "192.168.1.8",
+    "port": 27124,
+    "tlsFingerprintSha256": "AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99"
+  },
+  "organizer": {
+    "items": [
+      {
+        "id": "demo-organizer-1",
+        "assetId": "demo-asset-1",
+        "state": "pending",
+        "online": true,
+        "files": [{ "name": "photo_20261121_01.jpg", "size": 4823501, "folder": "GamePlayPhotos" }],
+        "count": 1
+      },
+      {
+        "id": "demo-organizer-2",
+        "assetId": "demo-asset-2",
+        "state": "recycled",
+        "online": true,
+        "files": [{ "name": "photo_20261120_07.jpg", "size": 3918242, "folder": "GamePlayPhotos" }],
+        "count": 1
+      }
+    ],
+    "activity": {
+      "metrics": { "approvedToday": 3, "skippedToday": 1 },
+      "queued": 1,
+      "active": 0
+    }
+  },
+  "directories": {
+    "directories": [
+      {
+        "id": "demo-dir-1",
+        "path": "D:/Photos/SpinningMomo",
+        "mode": "native",
+        "source": "spinning_momo"
+      }
+    ],
+    "automaticRoots": ["D:/Games/InfinityNikki/X6Game/Saved/GamePlayPhotos"],
+    "busy": false
+  },
+  "accounts": {
+    "all": false,
+    "accounts": [
+      {
+        "uid": "source:spinning_momo",
+        "count": 120,
+        "selected": true,
+        "samples": ["demo-asset-s1", "demo-asset-s2", "demo-asset-s3"]
+      },
+      {
+        "uid": "100000001",
+        "count": 104,
+        "selected": false,
+        "samples": []
+      }
+    ]
+  },
+  "accountPreview": [
+    { "resourceId": "demo-asset-s1", "mimeType": "image/jpeg", "sourcePath": "mock://thumb-1.jpg" },
+    { "resourceId": "demo-asset-s2", "mimeType": "image/jpeg", "sourcePath": "mock://thumb-2.jpg" },
+    { "resourceId": "demo-asset-s3", "mimeType": "image/jpeg", "sourcePath": "mock://thumb-3.jpg" }
+  ],
+  "wechat": {
+    "state": "waiting",
+    "photoCount": 215,
+    "originalsSent": 0,
+    "qrSvg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 100 100\"><rect width=\"100\" height=\"100\" fill=\"#fff\"/><rect x=\"10\" y=\"10\" width=\"80\" height=\"80\" fill=\"none\" stroke=\"#62425a\" stroke-width=\"4\"/><rect x=\"25\" y=\"25\" width=\"20\" height=\"20\" fill=\"#62425a\"/><rect x=\"55\" y=\"25\" width=\"20\" height=\"20\" fill=\"#62425a\"/><rect x=\"25\" y=\"55\" width=\"20\" height=\"20\" fill=\"#62425a\"/><rect x=\"55\" y=\"55\" width=\"20\" height=\"20\" fill=\"#F6BCC0\"/></svg>"
+  },
+  "gameVersion": {
+    "version": "1.5.2",
+    "effectiveAt": "2026-11-21T00:00:00.000Z"
+  }
+}

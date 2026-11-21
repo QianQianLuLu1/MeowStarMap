@@ -44,6 +44,13 @@ function buildImplementedAPI(): Record<string, Record<string, unknown>> {
   return api
 }
 
+// 顶层非命名空间方法：reportReady 是 electronAPI 唯一的顶层方法（白屏诊断上报，
+// fire-and-forget）。Proxy 兜底会把未知顶层属性当命名空间抛 PREVIEW_UNSUPPORTED，
+// 造成预览版每次启动都产生一条未处理 rejection——按 preload 语义给静默 noop。
+const TOP_LEVEL_NOOP_METHODS: Record<string, () => void> = {
+  reportReady: () => undefined
+}
+
 // 在 window 上注入 electronAPI Mock 与 IpcError 类
 export function installPreviewMock(): void {
   if (typeof window === 'undefined') return
@@ -55,6 +62,7 @@ export function installPreviewMock(): void {
   }
 
   const implemented = buildImplementedAPI()
+  Object.assign(implemented, TOP_LEVEL_NOOP_METHODS)
 
   // Proxy 兜底：未实现的命名空间/方法自动抛 PREVIEW_UNSUPPORTED
   const electronAPI = new Proxy(implemented, {

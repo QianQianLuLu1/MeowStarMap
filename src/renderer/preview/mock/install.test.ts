@@ -38,4 +38,10 @@ describe('installPreviewMock 命名空间装配', () => {
   it('既有 database 命名空间不受影响', () => {
     expect(installedApi().database).toBeDefined()
   })
+
+  it('顶层 reportReady 是静默 noop（不再走 Proxy 兜底抛 PREVIEW_UNSUPPORTED）', () => {
+    const api = installedApi() as unknown as Record<string, () => void>
+    expect(typeof api.reportReady).toBe('function')
+    expect(() => api.reportReady()).not.toThrow()
+  })
 })

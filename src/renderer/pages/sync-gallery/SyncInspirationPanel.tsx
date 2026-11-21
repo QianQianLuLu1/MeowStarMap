@@ -502,7 +502,7 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
         <button
           type="button"
           data-testid="inspiration-new"
-          className="icon-btn rounded-md border px-2 py-1 text-sm"
+          className="icon-btn icon-btn-text rounded-md border px-2 py-1 text-sm"
           style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
           onClick={() => openDraft()}
         >
@@ -548,7 +548,7 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
         <button
           type="button"
           data-testid="inspiration-refresh"
-          className="icon-btn rounded-md border px-2 py-1 text-sm"
+          className="icon-btn icon-btn-text rounded-md border px-2 py-1 text-sm"
           style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-primary)' }}
           onClick={() => void loadList()}
         >
@@ -792,7 +792,7 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
                     <button
                       type="button"
                       data-testid="inspiration-edit"
-                      className="icon-btn text-xs"
+                      className="icon-btn icon-btn-text text-xs"
                       onClick={() => openDraft(row)}
                     >
                       {t('syncGallery.inspiration.edit')}
@@ -800,7 +800,7 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
                     <button
                       type="button"
                       data-testid="inspiration-delete"
-                      className="icon-btn text-xs"
+                      className="icon-btn icon-btn-text text-xs"
                       disabled={busy}
                       onClick={() => void handleDelete(row)}
                     >
@@ -853,7 +853,7 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
         <button
           type="button"
           data-testid="inspiration-load-more"
-          className="icon-btn text-xs"
+          className="icon-btn icon-btn-text text-xs"
           disabled={loadingMore || busy}
           onClick={() => void loadMore()}
         >

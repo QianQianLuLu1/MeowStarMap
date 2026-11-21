@@ -154,6 +154,10 @@ export async function initializeI18n(): Promise<void> {
   const ok = await loadLanguage(initialLang)
   if (ok) {
     await i18n.changeLanguage(initialLang)
+    // a11y：启动即按持久化语言同步 <html lang>
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = initialLang
+    }
   }
 }
 
@@ -165,6 +169,10 @@ export async function changeLanguage(code: string): Promise<string> {
     await loadLanguage(resolved)
   }
   await i18n.changeLanguage(resolved)
+  // a11y：同步 <html lang>，让屏幕阅读器按当前界面语言发音（index.html 硬编码 zh-CN）
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = resolved
+  }
   try {
     localStorage.setItem('app-language', code)
   } catch {

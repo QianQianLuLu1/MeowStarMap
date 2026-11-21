@@ -7,6 +7,12 @@
 // 返回空结果），如后续需要错误文案一律用 ASCII；注释可用中文（示例文案放 JSON 数据文件）。
 
 import inspirationSeeds from './data/inspirations.json'
+import demoSyncData from './data/demo-sync.json'
+
+// URL ?demo=sync：预览版演示数据集（仅预览构建可及）。默认（无参数）保持空态契约，
+// nikkisync-mock.test.ts 钉住的形状全部走空态分支，不受演示态影响；示例文案放 data 文件。
+const demoSync =
+  typeof location !== 'undefined' && new URLSearchParams(location.search).get('demo') === 'sync'
 
 // 通用空返回工厂：查询面在无数据时给空集合 / 空对象 / 布尔 / 数值。
 const emptyList = (): unknown[] => []
@@ -31,6 +37,18 @@ const runtimeStatus = {
 // 同步服务状态：协议注释约定「句柄未装配时 { available: false }（不抛）」。
 const serverStatus = { available: false }
 
+// 演示态可变量：微信图库状态随启停切换（waiting → closed）。
+const demoWechatWaiting = (): Record<string, unknown> => ({
+  ...demoSyncData.wechat,
+  expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
+})
+let demoWechatStatus: Record<string, unknown> = { state: 'closed' }
+// 演示配对码：expiresAt 每次调用现算，让倒计时/过期重生成可演示。
+const demoPairingCode = (): Record<string, unknown> => ({
+  ...demoSyncData.pairing,
+  expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+})
+
 // 目录面空态：directories / automaticRoots 为空，busy 为 false。
 const emptyDirectories = (): {
   directories: unknown[]
@@ -43,7 +61,7 @@ const emptyAccounts = (): { accounts: unknown[]; all: boolean } => ({ accounts: 
 
 export const nikkisyncMock: Record<string, unknown> = {
   // ---- 运行时 / 扫描 ----
-  getRuntimeStatus: async () => runtimeStatus,
+  getRuntimeStatus: async () => (demoSync ? demoSyncData.runtimeStatus : runtimeStatus),
   startScan: async () => emptyRecord(),
   // ---- 资产只读查询 ----
   getAssets: async () => emptyPage(),
@@ -56,18 +74,18 @@ export const nikkisyncMock: Record<string, unknown> = {
   searchClothing: async () => ({ query: '', items: [] }),
   profileStats: async () => ({ libraryRevision: 0, topSuits: [], topClothing: [] }),
   // ---- 局域网同步服务 ----
-  getServerStatus: async () => serverStatus,
-  startServer: async () => serverStatus,
-  stopServer: async () => serverStatus,
+  getServerStatus: async () => (demoSync ? demoSyncData.serverStatus : serverStatus),
+  startServer: async () => (demoSync ? demoSyncData.serverStatus : serverStatus),
+  stopServer: async () => (demoSync ? demoSyncData.serverStatus : serverStatus),
   // T12：重启与 start/stop 同形（句柄未装配 ⇒ { available: false }，不抛）
-  restartServer: async () => serverStatus,
-  getPairingCode: async () => emptyRecord(),
-  getPairedDevices: async () => emptyList(),
-  revokeDevice: async () => emptyList(),
+  restartServer: async () => (demoSync ? demoSyncData.serverStatus : serverStatus),
+  getPairingCode: async () => (demoSync ? demoPairingCode() : emptyRecord()),
+  getPairedDevices: async () => (demoSync ? demoSyncData.pairedDevices : emptyList()),
+  revokeDevice: async () => (demoSync ? [] : emptyList()),
   // ---- T12：同步控制台新增六通道（形状对齐 shared/types/electron-api.ts）----
   // 资产总览：预览版无 PC 服务 ⇒ available:false（协议约定不抛），
-  // ConnectView 据此渲染「资产总览不可用」空态而非伪造统计。
-  getLibraryOverview: async () => ({ available: false }),
+  // ConnectView 据此渲染「资产总览不可用」空态而非伪造统计；演示态给合成计数。
+  getLibraryOverview: async () => (demoSync ? demoSyncData.overview : { available: false }),
   // 网络权限 / 冲突修复 / 热点：预览版无主进程能力且 opt-in 默认关闭 ⇒ disabled
   //（与真实 handler「opt-in 关闭 ⇒ disabled（零子进程）」的降级语义一致）。
   networkAuth: async () => ({
@@ -84,14 +102,15 @@ export const nikkisyncMock: Record<string, unknown> = {
   // ---- 在线解析同意 / 游戏版本 ----
   getMetadataConsent: async () => ({ enabled: false }),
   setMetadataConsent: async () => ({ enabled: false }),
-  resolveGameVersion: async () => emptyRecord(),
+  resolveGameVersion: async () => (demoSync ? demoSyncData.gameVersion : emptyRecord()),
   // ---- 照片目录（K6 / gameRoot）----
-  getExtraDirectories: async () => emptyDirectories(),
+  getExtraDirectories: async () => (demoSync ? demoSyncData.directories : emptyDirectories()),
   inspectExtraDirectory: async () => emptyRecord(),
-  addExtraDirectory: async () => emptyDirectories(),
-  removeExtraDirectory: async () => emptyDirectories(),
-  setExtraDirectorySource: async () => emptyDirectories(),
-  rescanExtraDirectories: async () => emptyDirectories(),
+  addExtraDirectory: async () => (demoSync ? demoSyncData.directories : emptyDirectories()),
+  removeExtraDirectory: async () =>
+    demoSync ? { ...demoSyncData.directories, directories: [] } : emptyDirectories(),
+  setExtraDirectorySource: async () => (demoSync ? demoSyncData.directories : emptyDirectories()),
+  rescanExtraDirectories: async () => (demoSync ? demoSyncData.directories : emptyDirectories()),
   // F21：字段与真实契约同形——get → {gameRoot}；set/reset → 生效结果（preview 无
   // Runtime，applyError 如实给 runtime-unavailable，needRestart=false 不弹重启询问）
   getGameRoot: async () => ({ gameRoot: '' }),
@@ -109,11 +128,17 @@ export const nikkisyncMock: Record<string, unknown> = {
   }),
   admitDirectory: async () => emptyRecord(),
   // ---- 账号作用域（K9）----
-  getSyncAccounts: async () => emptyAccounts(),
-  previewSyncAccount: async () => emptyRecord(),
-  setSyncAccountSelection: async () => emptyAccounts(),
+  getSyncAccounts: async () => (demoSync ? demoSyncData.accounts : emptyAccounts()),
+  // 契约是单对象（NikkiSyncSyncAccountPreviewInfo），页面读 preview?.sourcePath——
+  // 按入参 assetId 命中样例行；未知 id 给空对象（不抛、不越权返回他人样例）。
+  previewSyncAccount: async (input: { assetId?: string }) => {
+    if (!demoSync) return emptyRecord()
+    return demoSyncData.accountPreview.find((p) => p.resourceId === input?.assetId) ?? emptyRecord()
+  },
+  setSyncAccountSelection: async () => (demoSync ? demoSyncData.accounts : emptyAccounts()),
   // ---- 整理队列（K8；F4：契约是 {items, activity}，不是 {list}）----
-  getOrganizerQueue: async () => ({ items: [], activity: null }),
+  getOrganizerQueue: async () =>
+    demoSync ? demoSyncData.organizer : { items: [], activity: null },
   decideOrganizerItem: async () => emptyList(),
   approveOrganizerItems: async () => ({ items: [], approved: 0, skipped: 0 }),
   // ---- N4：灵感库（F20：四通道最小合法形状）----
@@ -125,9 +150,17 @@ export const nikkisyncMock: Record<string, unknown> = {
   getInspirationImage: async () => null,
   // ---- N7：PC 端控制页 / 微信画廊（F20：四通道最小合法形状）----
   desktopOpen: async () => ({ url: '' }),
-  wechatStart: async () => ({ status: null, qrSvg: '' }),
-  wechatStop: async () => ({ status: null }),
-  wechatStatus: async () => ({ status: null }),
+  wechatStart: async () => {
+    if (!demoSync) return { status: null, qrSvg: '' }
+    demoWechatStatus = demoWechatWaiting()
+    return { status: demoWechatStatus, qrSvg: demoWechatStatus.qrSvg }
+  },
+  wechatStop: async () => {
+    if (!demoSync) return { status: null }
+    demoWechatStatus = { state: 'closed' }
+    return { status: demoWechatStatus }
+  },
+  wechatStatus: async () => ({ status: demoSync ? demoWechatStatus : null }),
   // ---- 订阅：同步返回退订函数（与 preload 的 subscribe 一致，不能是 Promise）----
   onLibraryChanged: () => noop
 }

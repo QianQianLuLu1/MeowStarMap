@@ -59,7 +59,7 @@ export const PairingQrDialog: React.FC<PairingQrDialogProps> = ({ open, onClose 
                 <button
                   type="button"
                   onClick={() => void copyAddress()}
-                  className="icon-btn text-sm font-mono"
+                  className="icon-btn icon-btn-text text-sm font-mono"
                   title={t('syncService.status.copied')}
                 >
                   {offer.host}:{offer.port}
