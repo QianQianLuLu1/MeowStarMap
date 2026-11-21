@@ -39,14 +39,9 @@ function getViewStatusLabel(view: ViewLevel, t: TFunction): string {
     case 'screenshots':
       return t('nav.screenshots')
     case 'sync-gallery':
-      // 阶段 5：本函数有 default: '' 兜底，漏 case 表现为状态栏空白且不会编译失败
-      return t('appShell.viewStatus.syncGallery')
-    case 'sync-service':
-      // 同步服务二级子页：同样受 default: '' 兜底掩盖，由 App.view-registry.test.ts 锁住
+      // 同步服务控制台的宿主视图：状态栏文案跟随侧边栏入口（同步服务）。
+      // 本函数有 default: '' 兜底，漏 case 表现为状态栏空白且不会编译失败
       return t('appShell.viewStatus.syncService')
-    case 'sync-inspiration':
-      // 灵感库二级子页：与 sync-service 同口径，由结构断言锁住
-      return t('appShell.viewStatus.syncInspiration')
     default:
       return ''
   }

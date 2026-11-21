@@ -148,7 +148,7 @@ describe('ConnectView（(a)-(i) 自 SyncServicePage 随迁）', () => {
     ).not.toHaveBeenCalled()
 
     vi.useFakeTimers()
-    useUIStore.setState({ currentView: 'sync-service' })
+    useUIStore.setState({ currentView: 'sync-gallery' })
     await act(async () => {
       await Promise.resolve()
     })
@@ -365,7 +365,7 @@ describe('T3：资产总览统计卡（useSyncOverview）', () => {
       })
       expect(serverApi.getLibraryOverview).not.toHaveBeenCalled()
 
-      useUIStore.setState({ currentView: 'sync-service' })
+      useUIStore.setState({ currentView: 'sync-gallery' })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })

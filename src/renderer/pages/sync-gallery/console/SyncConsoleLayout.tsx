@@ -9,6 +9,7 @@ import {
   CONSOLE_VIEW_STORAGE_KEY,
   CONSOLE_HEADING_KEYS,
   CONSOLE_NAV_KEYS,
+  SYNC_CONSOLE_HOST_VIEW,
   isConsoleView,
   type ConsoleView
 } from './console-views'
@@ -95,7 +96,7 @@ export const SyncConsoleLayout: React.FC = () => {
   // 不在**子视图切换**时追加 IPC（`view` 不进依赖），保证「切到关于即停表」的轮询门控不退化；
   // 底栏重启成功（refreshTick）是显式动作，需要补拉一次，否则停在其它子视图时 chip 会一直是旧值。
   useEffect(() => {
-    if (currentView !== 'sync-service') return
+    if (currentView !== SYNC_CONSOLE_HOST_VIEW) return
     let alive = true
     const getStatus = window.electronAPI?.nikkisync?.getServerStatus
     if (typeof getStatus !== 'function') {
@@ -129,7 +130,7 @@ export const SyncConsoleLayout: React.FC = () => {
   // T10：待批角标 5s 轮询。门控关闭时清零计数且不留定时器；
   // 计数口径 = 上游 activeStates（含 executing），与 OrganizerPanel.ts:14 逐字一致。
   useEffect(() => {
-    if (currentView !== 'sync-service' || !organizerEnabled) {
+    if (currentView !== SYNC_CONSOLE_HOST_VIEW || !organizerEnabled) {
       setPendingCount(0)
       return
     }

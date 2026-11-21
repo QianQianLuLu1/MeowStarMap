@@ -13,9 +13,8 @@ function installedApi(): ApiShape {
   return (globalThis as unknown as { window: { electronAPI: ApiShape } }).window.electronAPI
 }
 
-// 覆盖 SyncGalleryPage / SyncServicePage / SyncInsightPanel / SyncAssetDrawer /
-// syncGalleryStore / mediaStore / 配对弹窗会调用的方法（以 preload/api/nikkisync.ts
-// 的真实方法名为准）。桩只需覆盖这些；本列表即「已实现方法」契约。
+// 覆盖同步服务控制台（SyncServicePage/console/*）/ mediaStore / 配对弹窗会调用的方法
+//（以 preload/api/nikkisync.ts 的真实方法名为准）。桩只需覆盖这些；本列表即「已实现方法」契约。
 const IMPLEMENTED_METHODS = [
   'getRuntimeStatus',
   'getAssets',

@@ -299,11 +299,10 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
       test.skip(true, '应用未启动或无可用安装根')
       return
     }
-    // 同步服务是同步图库板块下的二级子页（与 nikkisync-runtime.e2e N3c 同一导航口径）
-    await page.getByTitle('同步图库').first().click()
-    const serviceEntry = page.getByTitle('同步服务').first()
-    await serviceEntry.waitFor({ timeout: 30_000 })
-    await serviceEntry.click()
+    // 同步服务控制台是侧边栏「同步服务」（sync-gallery 视图）的直接宿主界面
+    //（与 nikkisync-runtime.e2e N3c 同一导航口径）
+    await page.getByTitle('同步服务').first().click()
+    await page.getByRole('heading', { level: 2, name: '暖暖相册' }).waitFor({ timeout: 30_000 })
 
     // 控制台五视图 IA：照片目录节在 settings 子视图（默认 connect 不挂载该节）
     await page.getByTestId('sync-console-nav-settings').click()

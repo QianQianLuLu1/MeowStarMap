@@ -7,6 +7,7 @@ import type {
   NikkiSyncInspirationVersionedInfo
 } from '../../../shared/types/electron-api'
 import { useUIStore } from '../../stores/uiStore'
+import { SYNC_CONSOLE_HOST_VIEW } from './console/console-views'
 import {
   INSPIRATION_STATUSES,
   filterEntries,
@@ -18,7 +19,7 @@ import {
 /**
  * N4：灵感库列表/编辑器（上游 `/v1/inspiration*`，v1.0.29）。
  *
- * 复用 `SyncInsightPanel` 的既有设计：`<details>` 折叠 + 首次展开才发 IPC +
+ * 复用同步板块已验证的折叠面板设计：`<details>` 折叠 + 首次展开才发 IPC +
  * 在途请求各自代次计数（IPC 无顺序保证，「后发先至」是常态）+ 桥面存在性守卫。
  * 本仓不重写 HTTP/协议：四条 IPC 通道逐字转发上游 `InspirationRepository`，
  * 条目形态由上游 `validate()` 单真相源判定，冲突/大小限制/坏 sha256 都只在主进程
@@ -150,8 +151,8 @@ const MAX_LIST_PAGES = 50
 
 interface SyncInspirationPanelProps {
   /**
-   * T8：自动刷新的可见性门控。缺省 = 独立灵感库页（currentView==='sync-inspiration'）；
-   * 控制台灵感视图显式传 currentView==='sync-service'。keep-alive 下不可见一律不刷。
+   * T8：自动刷新的可见性门控。缺省 = 宿主视图前台（currentView===SYNC_CONSOLE_HOST_VIEW）；
+   * 控制台灵感视图显式传前台态。keep-alive 下不可见一律不刷。
    */
   autoRefreshVisible?: boolean
   /**
@@ -191,7 +192,7 @@ export const SyncInspirationPanel: React.FC<SyncInspirationPanelProps> = ({
   const draftRef = useRef<Draft | null>(null)
   draftRef.current = draft
   const currentView = useUIStore((s) => s.currentView)
-  const visible = autoRefreshVisible ?? currentView === 'sync-inspiration'
+  const visible = autoRefreshVisible ?? currentView === SYNC_CONSOLE_HOST_VIEW
 
   const api = window.electronAPI?.nikkisync
   const bridgeMissing =

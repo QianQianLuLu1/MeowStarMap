@@ -12,6 +12,7 @@ import type {
   NikkiSyncOrganizerViewInfo
 } from '../../../../shared/types/electron-api'
 import { ORGANIZER_STATE_I18N_KEYS, ORGANIZER_ACTIONABLE_STATES } from './organizer-states'
+import { SYNC_CONSOLE_HOST_VIEW } from './console-views'
 
 // 状态轮询间隔（上游 pc-companion DesktopPageScript 同款 2s）
 const STATUS_POLL_MS = 2000
@@ -102,7 +103,7 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
 
   useEffect(() => {
     // 仅队列区可见（开关开 + 本页在前台）时轮询；否则不留后台定时器
-    if (!organizerEnabled || currentView !== 'sync-service') return
+    if (!organizerEnabled || currentView !== SYNC_CONSOLE_HOST_VIEW) return
     void refreshOrganizerQueue()
     const timer = setInterval(() => void refreshOrganizerQueue(), STATUS_POLL_MS)
     return () => clearInterval(timer)

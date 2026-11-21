@@ -503,5 +503,5 @@ export function setupConsoleTest(opts: InstallOpts = {}) {
   installElectronApi(opts)
   mockShowMessage.mockClear()
   // 轮询按 currentView 门控（用例 (r)），不进本页就一条状态都不拉
-  useUIStore.setState({ currentView: 'sync-service' })
+  useUIStore.setState({ currentView: 'sync-gallery' })
 }

@@ -87,7 +87,7 @@ function loadImage(url: string, userMessage: string): Promise<HTMLImageElement> 
 /**
  * 阶段 5 · B4：分享图面板。
  *
- * 容器复用 `Drawer` 而不是新造一个模态：焦点陷阱、遮罩、动效与 `SyncAssetDrawer` 保持同源，
+ * 容器复用 `Drawer` 而不是新造一个模态：焦点陷阱、遮罩、动效与全站抽屉实现保持同源，
  * 避免出现两套对话框实现。出图链路的编排（布局 → 绘制 → 导出）在 `shareCardJob` 里，
  * 本文件只负责真 canvas、进度、保存与取消。
  */

@@ -35,14 +35,15 @@ import { GROUP_DIMENSION_OPTIONS } from '../../../shared/dimension'
 const SIDEBAR_GROUP_OPTIONS = GROUP_DIMENSION_OPTIONS.filter((opt) => opt.value !== 'none')
 
 // P2-01：navItems label 改为 i18n key，渲染时通过 t() 翻译
-// 阶段 5：sync-gallery（同步图库）插在 resonance-records 之后 —— 该位置的既有测试
+// sync-gallery（同步服务控制台）插在 resonance-records 之后 —— 该位置的既有测试
 // （Sidebar.test.tsx 断言第 4 项仍是「共鸣录」）依赖 index 3 不动，新入口只能往后插。
+// 文案用 nav.syncService（同步服务）：控制台提升后入口与状态栏都跟页面身份对齐。
 const navItems: { id: ViewLevel; labelKey: string; icon: React.ReactNode }[] = [
   { id: 'gallery', labelKey: 'nav.gallery', icon: <IconGallery size={20} /> },
   { id: 'screenshots', labelKey: 'nav.screenshots', icon: <IconCamera size={20} /> },
   { id: 'favorites', labelKey: 'nav.favorites', icon: <IconStar size={20} /> },
   { id: 'resonance-records', labelKey: 'nav.resonanceRecords', icon: <IconMessage size={20} /> },
-  { id: 'sync-gallery', labelKey: 'nav.syncGallery', icon: <IconSync size={20} /> },
+  { id: 'sync-gallery', labelKey: 'nav.syncService', icon: <IconSync size={20} /> },
   { id: 'launcher-cache', labelKey: 'nav.launcherCache', icon: <IconImage size={20} /> },
   { id: 'categories', labelKey: 'nav.categories', icon: <IconList size={20} /> },
   { id: 'duplicates', labelKey: 'nav.duplicates', icon: <IconDuplicate size={20} /> },

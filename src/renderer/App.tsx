@@ -50,19 +50,10 @@ const DuplicatesPage = lazy(() =>
 const ResonanceRecordsPage = lazy(() =>
   import('./pages/ResonanceRecordsPage').then((m) => ({ default: m.ResonanceRecordsPage }))
 )
-// 阶段 5：同步图库一级入口（内嵌 NikkiSync Runtime 的资产，独立列表状态）
-const SyncGalleryPage = lazy(() =>
-  import('./pages/sync-gallery/SyncGalleryPage').then((m) => ({ default: m.SyncGalleryPage }))
-)
-// 同步服务二级子页：由设置页 `sync` 分组剥离而来，入口在同步图库工具栏
+// 同步服务控制台（暖暖相册）：`sync-gallery` 视图的宿主界面。原「同步图库」入口页
+// 删除后控制台由此直接承载，侧边栏入口文案为「同步服务」（nav.syncService）。
 const SyncServicePage = lazy(() =>
   import('./pages/sync-gallery/SyncServicePage').then((m) => ({ default: m.SyncServicePage }))
-)
-// 灵感库二级子页：N4 面板从同步服务页迁出后的独立承载页，入口同样在同步图库工具栏
-const SyncInspirationPage = lazy(() =>
-  import('./pages/sync-gallery/SyncInspirationPage').then((m) => ({
-    default: m.SyncInspirationPage
-  }))
 )
 
 // 浅色轻量 Suspense fallback：仅加载期占位一屏，无毛玻璃无重资源。
@@ -109,9 +100,7 @@ const ALL_VIEWS: ViewLevel[] = [
   'launcher-cache',
   'resonance-records',
   'screenshots',
-  'sync-gallery',
-  'sync-service',
-  'sync-inspiration'
+  'sync-gallery'
 ]
 
 // C 阶段：界面层级映射，用于毛玻璃分层应用
@@ -126,11 +115,8 @@ const VIEW_LEVEL_MAP: Record<ViewLevel, number> = {
   'launcher-cache': 1,
   'resonance-records': 1,
   screenshots: 1,
+  // 同步服务控制台是侧边栏一级板块的宿主界面（原「同步图库」入口页已删除）
   'sync-gallery': 1,
-  // 同步服务是同步图库板块下的二级子页，与详情页同层
-  'sync-service': 2,
-  // 灵感库是同步图库板块下的二级子页，与同步服务同层
-  'sync-inspiration': 2,
   detail: 2,
   editor: 3
 }
@@ -353,16 +339,10 @@ const App: React.FC = () => {
         // F-S10：重复文件检测独立视图
         return <DuplicatesPage />
       case 'sync-gallery':
-        // 阶段 5：同步图库是**独立页面**，不复用 GalleryPage——本 switch 有 default 兜到
-        // GalleryPage，漏写这个 case 不会编译失败，只会静默把图库渲染两遍。
-        return <SyncGalleryPage />
-      case 'sync-service':
-        // 同步服务二级子页：同样由 default 兜到 GalleryPage，漏 case 不会编译失败。
+        // 同步服务控制台（暖暖相册）是本视图的宿主界面，不复用 GalleryPage——本 switch
+        // 有 default 兜到 GalleryPage，漏写这个 case 不会编译失败，只会静默渲染错页面。
         // 由 App.view-registry.test.ts 的结构断言锁住。
         return <SyncServicePage />
-      case 'sync-inspiration':
-        // 灵感库二级子页：与 sync-service 同口径，由结构断言锁住。
-        return <SyncInspirationPage />
       default:
         return <GalleryPage />
     }

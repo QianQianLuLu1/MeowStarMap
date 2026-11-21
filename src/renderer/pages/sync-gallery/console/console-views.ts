@@ -1,9 +1,16 @@
 /**
  * T1：同步控制台五视图标识（上游 DesktopPage.ts:74 的 nav 五项，顺序一致）。
- * 子视图是控制台内部状态（localStorage 'syncConsole.view' 持久化），
- * 不新增 ViewLevel——`sync-inspiration` 独立二级页保留深链兼容。
+ * 子视图是控制台内部状态（localStorage 'syncConsole.view' 持久化），不新增 ViewLevel。
  */
+import type { ViewLevel } from '../../../stores/uiStore'
+
 export const CONSOLE_VIEWS = ['connect', 'settings', 'organizer', 'inspiration', 'about'] as const
+
+/**
+ * 控制台宿主视图：控制台是 `sync-gallery`（侧边栏「同步服务」）的直接界面。
+ * 所有轮询/可见性门控一律比对本常量，不得散写字面量——宿主视图再变更时只改这里。
+ */
+export const SYNC_CONSOLE_HOST_VIEW: ViewLevel = 'sync-gallery'
 
 export type ConsoleView = (typeof CONSOLE_VIEWS)[number]
 

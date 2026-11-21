@@ -1,6 +1,12 @@
 // 阶段 5 · A4：同步图库语言包完整性回归。
 // 背景教训见同目录 nav-resonance-records.test.ts：key 曾在 12 个语言包整体缺失，
 // 侧边栏直接渲染原始 key 文本。本文件把同类回归前移成守卫，覆盖导航项、状态栏与整块文案。
+//
+// 注：原「同步图库」入口页（SyncGalleryPage 及其工具栏/检索面板/详情抽屉）已删除，
+// `sync-gallery` 视图由同步服务控制台（SyncServicePage → SyncConsoleLayout）承载。
+// 本文件守卫的 `syncGallery.*` 文案键按仓库约定随语言包原样保留，不随 UI 删除清理
+// （`syncConsole-keys.test.ts` ③ 同款约束）；`SyncInspirationPanel` 仍消费其中的
+// `syncGallery.inspiration.*` 子树。
 import { describe, expect, it } from 'vitest'
 import zhCN from './zh-CN.json'
 import zhTW from './zh-TW.json'
@@ -58,7 +64,8 @@ const REQUIRED_KEYS = [
   'syncGallery.title',
   'syncGallery.subtitle',
   'syncGallery.loading',
-  // 02 计划 N6 点亮的上游索引面（套装/服装检索 + 档案统计），由 SyncInsightPanel 消费
+  // 02 计划 N6 点亮的上游索引面（套装/服装检索 + 档案统计）：原 SyncInsightPanel 消费，
+  // 该面板已随入口页删除；键按约定保留
   'syncGallery.insight.title',
   'syncGallery.insight.scope',
   'syncGallery.insight.scopeSuits',
@@ -81,7 +88,7 @@ const REQUIRED_KEYS = [
   'syncGallery.toolbar.scan',
   // 同步服务从设置页剥离后，入口按钮落在这条键上
   'syncGallery.toolbar.service',
-  // 灵感库独立二级页的工具栏入口按钮（navigateTo('sync-inspiration')，纯导航）
+  // 灵感库独立二级页（已撤销）的工具栏入口按钮；键按约定保留
   'syncGallery.toolbar.inspiration',
   // 工具栏「关于 NikkiSync」入口：用系统浏览器打开上游引擎仓库
   'syncGallery.toolbar.about',

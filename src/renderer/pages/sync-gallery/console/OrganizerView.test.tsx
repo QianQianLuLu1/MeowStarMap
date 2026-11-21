@@ -231,7 +231,7 @@ describe('T10：回收站入口 / 批量聚合提示 / 轮询纪律', () => {
       })
       expect(serverApi.getOrganizerQueue).not.toHaveBeenCalled()
 
-      useUIStore.setState({ currentView: 'sync-service' })
+      useUIStore.setState({ currentView: 'sync-gallery' })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })

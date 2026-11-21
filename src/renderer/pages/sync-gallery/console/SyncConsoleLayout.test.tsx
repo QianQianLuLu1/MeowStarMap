@@ -146,7 +146,7 @@ describe('T1：五视图骨架与切换', () => {
   })
 
   it('返回不丢栈：子视图切换不动宿主 viewStack；goBack 弹的是宿主视图栈', async () => {
-    useUIStore.setState({ currentView: 'sync-service', viewStack: ['gallery', 'sync-service'] })
+    useUIStore.setState({ currentView: 'sync-gallery', viewStack: ['gallery', 'sync-gallery'] })
     renderLayout()
     await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
     fireEvent.click(screen.getByTestId('sync-console-nav-settings'))
@@ -154,8 +154,8 @@ describe('T1：五视图骨架与切换', () => {
     fireEvent.click(screen.getByTestId('sync-console-nav-organizer'))
     await screen.findByRole('heading', { level: 2, name: '最近删除' })
     // 宿主路由栈原封不动（子视图是控制台内部态，不新增 ViewLevel）
-    expect(useUIStore.getState().viewStack).toEqual(['gallery', 'sync-service'])
-    expect(useUIStore.getState().currentView).toBe('sync-service')
+    expect(useUIStore.getState().viewStack).toEqual(['gallery', 'sync-gallery'])
+    expect(useUIStore.getState().currentView).toBe('sync-gallery')
     // 宿主返回键语义不变：弹栈回 gallery
     act(() => {
       useUIStore.getState().goBack()
@@ -241,7 +241,7 @@ describe('T10：待批角标（Layout 自持 5s 轮询）', () => {
       })
       expect(serverApi.getOrganizerQueue).not.toHaveBeenCalled()
 
-      useUIStore.setState({ currentView: 'sync-service' })
+      useUIStore.setState({ currentView: 'sync-gallery' })
       await act(async () => {
         await vi.advanceTimersByTimeAsync(0)
       })

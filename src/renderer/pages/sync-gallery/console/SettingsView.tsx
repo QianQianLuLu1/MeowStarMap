@@ -8,6 +8,7 @@ import { Tooltip } from '../../../components/common/Tooltip'
 import { useErrorToast } from '../../../hooks/useErrorToast'
 import { useMediaStore } from '../../../stores/mediaStore'
 import { useUIStore } from '../../../stores/uiStore'
+import { SYNC_CONSOLE_HOST_VIEW } from './console-views'
 import { toFileUrl } from '../../../utils/file'
 import { SETTING_KEY_LAUNCH_AT_LOGIN } from '../../../../shared/settings-keys'
 import type {
@@ -417,7 +418,7 @@ export const SettingsView: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    if (currentView !== 'sync-service') return
+    if (currentView !== SYNC_CONSOLE_HOST_VIEW) return
     void refreshExtraDirs()
   }, [currentView, refreshExtraDirs])
 
@@ -441,7 +442,7 @@ export const SettingsView: React.FC = () => {
   }, [])
 
   useEffect(() => {
-    if (currentView !== 'sync-service') return
+    if (currentView !== SYNC_CONSOLE_HOST_VIEW) return
     void refreshAccounts()
   }, [currentView, refreshAccounts])
 

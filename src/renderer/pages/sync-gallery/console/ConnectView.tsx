@@ -17,7 +17,7 @@ import type {
   NikkiSyncPairedDeviceInfo,
   NikkiSyncServerStatusInfo
 } from '../../../../shared/types/electron-api'
-import type { ConsoleView } from './console-views'
+import { SYNC_CONSOLE_HOST_VIEW, type ConsoleView } from './console-views'
 import { useSyncOverview } from './useSyncOverview'
 import { SelfCheckCard } from './SelfCheckCard'
 import { exportDiagnostics, openUpstreamLink } from './export-diagnostics'
@@ -114,7 +114,7 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
   const [qrOpen, setQrOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<NikkiSyncPairedDeviceInfo | null>(null)
   const currentView = useUIStore((s) => s.currentView)
-  const visible = currentView === 'sync-service'
+  const visible = currentView === SYNC_CONSOLE_HOST_VIEW
 
   // T3：资产总览（仅可见时轮询；桥面缺席恒 null）
   const overview = useSyncOverview(visible)
@@ -166,7 +166,7 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
 
   useEffect(() => {
     // keep-alive 下本页切走不卸载，不门控就会后台常驻 2s 定时器（用例 (r)）
-    if (currentView !== 'sync-service') return
+    if (currentView !== SYNC_CONSOLE_HOST_VIEW) return
     let alive = true
     pollAliveRef.current = true
     void (async () => {
@@ -703,7 +703,7 @@ const SyncPcCompanionSection: React.FC = () => {
   // （画廊可能被本机控制页在外部启停）。与页头服务状态卡同口径轮询，
   // 并按 currentView 门控——离开本页不后台常驻定时器。
   useEffect(() => {
-    if (currentView !== 'sync-service') return
+    if (currentView !== SYNC_CONSOLE_HOST_VIEW) return
     sectionAliveRef.current = true
     const timer = setInterval(() => void refresh(), STATUS_POLL_MS)
     return () => {

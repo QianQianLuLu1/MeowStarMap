@@ -535,7 +535,7 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     // 服务停止链的日志判据放在 N4（app.close() 之后，日志已 flush）。
   })
 
-  test('N3c 同步服务二级子页真实渲染：开关起服务、二维码 SVG 与设备列表在真实窗口里出图', async () => {
+  test('N3c 同步服务控制台真实渲染：开关起服务、二维码 SVG 与设备列表在真实窗口里出图', async () => {
     const session = launched
     if (!session || !win) {
       test.skip(true, 'N1 未启动应用')
@@ -551,12 +551,10 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
       localStorage.setItem('app-language', 'zh-CN')
     })
     await page.reload({ waitUntil: 'domcontentloaded' })
-    // 同步服务已不再是设置页的一节，而是同步图库板块下的 sync-service 二级子页：
-    // 先进板块，再点工具栏入口。等入口出现即隐式跨过加载态分支（那一支不渲染工具栏）。
-    await page.getByTitle('同步图库').first().click()
-    const serviceEntry = page.getByTitle('同步服务').first()
-    await serviceEntry.waitFor({ timeout: 20_000 })
-    await serviceEntry.click()
+    // 同步服务控制台是侧边栏「同步服务」（sync-gallery 视图）的直接宿主界面：
+    // 点入口即达，无需再经任何二级入口。
+    await page.getByTitle('同步服务').first().click()
+    await page.getByRole('heading', { level: 2, name: '暖暖相册' }).waitFor({ timeout: 20_000 })
 
     // 节标题与开关都来自真实 i18n 文本（不是测试内构造的 DOM）
     const toggle = page.getByRole('switch', { name: '启用同步服务' }).first()
