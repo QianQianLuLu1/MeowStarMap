@@ -1570,6 +1570,9 @@ function cleanupAndExit(graceful = false): void {
 // 此处用最小结构类型 { data: unknown } 避免冲突，运行时只读 data 字段
 process.parentPort?.on('message', async (event: { data: unknown }) => {
   const msg = event.data as WorkerCommand
+  // N3（2026-11-20）：任何父消息都是父进程存活证明，统一刷新心跳时间戳——
+  // 睡眠/唤醒墙钟跳变后，bridge 的无条件 ping（≤5s）或任意指令即可为看门狗续命
+  lastPingTime = Date.now()
   if (msg.type === 'SCAN_START') {
     try {
       const result = await startScan(msg.payload.dbPath, msg.payload.options)
@@ -1606,9 +1609,26 @@ process.parentPort?.on('message', async (event: { data: unknown }) => {
  */
 const HEARTBEAT_INTERVAL_MS = 5000
 const HEARTBEAT_TIMEOUT_MS = 15000
+// N3（2026-11-20）：睡眠/唤醒宽限——墙钟（Date.now()）在笔记本睡眠后跳变，
+// 旧实现把跳变当父进程死亡立即 abortScan+exit，误杀扫描（故障机 2026-11-19 实证）。
+// 超时先进入嫌疑期：期间绝不 abort/exit；父存活 ⇒ bridge 每 5s 无条件 ping 必在
+// 宽限内到达续命；宽限耗尽才走原退出链（父真死：退出 15s→~25s，孤儿防护语义保留）。
+const HEARTBEAT_GRACE_MS = 10000
+let heartbeatSuspectSince: number | null = null
 const heartbeatTimer: NodeJS.Timeout | null = process.parentPort
   ? setInterval(() => {
-      if (Date.now() - lastPingTime > HEARTBEAT_TIMEOUT_MS) {
+      const silentFor = Date.now() - lastPingTime
+      if (silentFor <= HEARTBEAT_TIMEOUT_MS) {
+        heartbeatSuspectSince = null
+        return
+      }
+      if (heartbeatSuspectSince === null) {
+        heartbeatSuspectSince = Date.now()
+        // eslint-disable-next-line no-restricted-syntax -- 诊断日志，worker 进程早于 i18n 初始化，日志仍须可读
+        workerLog('warn', '心跳超时进入嫌疑宽限（可能为睡眠/唤醒墙钟跳变），等待父进程活性信号')
+        return
+      }
+      if (Date.now() - heartbeatSuspectSince >= HEARTBEAT_GRACE_MS) {
         workerLog('error', t('main.scanner.log.heartbeatTimeout'))
         abortScan()
         cleanupAndExit()
