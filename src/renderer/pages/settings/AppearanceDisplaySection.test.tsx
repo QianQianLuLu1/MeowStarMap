@@ -17,6 +17,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { AppearanceDisplaySection, normalizeGlassEffect } from './appearance-sections'
 import { GlobalToastContext } from './shared'
+import {
+  __resetGlassDegradationForTest,
+  detectSoftwareRendering
+} from '../../utils/glass-degradation'
 
 const mockShowMessage = vi.fn()
 
@@ -51,6 +55,7 @@ const htmlClasses = () => document.documentElement.className
 beforeEach(() => {
   installElectronApi()
   mockShowMessage.mockClear()
+  __resetGlassDegradationForTest()
   document.documentElement.className = ''
 })
 
@@ -104,5 +109,58 @@ describe('normalizeGlassEffect', () => {
     expect(normalizeGlassEffect('garbage')).toBe('rich')
     expect(normalizeGlassEffect(undefined)).toBe('rich')
     expect(normalizeGlassEffect(null)).toBe('rich')
+  })
+})
+
+/** 在既有 electronAPI 桩上补 app.getGpuStatus 并预热探测缓存（模拟 App 启动期已探测） */
+async function primeGpuStatus(status: {
+  hardwareAcceleration: { enabled: boolean; reason?: string }
+  fallback: { compatLevel: number }
+}) {
+  const api = (window as unknown as { electronAPI: Record<string, unknown> }).electronAPI
+  api.app = { getGpuStatus: vi.fn(async () => status) }
+  await detectSoftwareRendering()
+}
+
+describe('AppearanceDisplaySection — 软件渲染自动降级（2026-11-20 N1）', () => {
+  afterEach(() => {
+    __resetGlassDegradationForTest()
+  })
+
+  it('软件渲染（level2）下持久化为 rich，挂载后仍应用 html.glass-lite', async () => {
+    installElectronApi({ 'display.glassEffect': 'rich' })
+    await primeGpuStatus({
+      hardwareAcceleration: { enabled: false, reason: 'user-disabled' },
+      fallback: { compatLevel: 2 }
+    })
+    renderSection()
+    await waitFor(() => expect(settingsGet).toHaveBeenCalledWith('display.glassEffect', 'rich'))
+    expect(htmlClasses()).toContain('glass-lite')
+  })
+
+  it('软件渲染下点击「明显流动感」：设置照写 rich，但根类保持 glass-lite（不得覆写自动降级）', async () => {
+    installElectronApi({ 'display.glassEffect': 'lite' })
+    await primeGpuStatus({
+      hardwareAcceleration: { enabled: false, reason: 'crash-fallback' },
+      fallback: { compatLevel: 1 }
+    })
+    renderSection()
+    await waitFor(() => expect(htmlClasses()).toContain('glass-lite'))
+
+    fireEvent.click(screen.getByRole('radio', { name: '明显流动感' }))
+
+    await waitFor(() => expect(settingsSet).toHaveBeenCalledWith('display.glassEffect', 'rich'))
+    expect(htmlClasses()).toContain('glass-lite')
+  })
+
+  it('守卫：硬件健康时 rich 不挂 glass-lite（自动降级不得误伤健康机器）', async () => {
+    installElectronApi({ 'display.glassEffect': 'rich' })
+    await primeGpuStatus({
+      hardwareAcceleration: { enabled: true, reason: 'default' },
+      fallback: { compatLevel: 0 }
+    })
+    renderSection()
+    await waitFor(() => expect(settingsGet).toHaveBeenCalledWith('display.glassEffect', 'rich'))
+    expect(htmlClasses()).not.toContain('glass-lite')
   })
 })

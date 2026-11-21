@@ -6,6 +6,7 @@ import { useUIStore, type ViewLevel } from './stores/uiStore'
 import { useThemeStore, applyThemeClass } from './stores/themeStore'
 import { type UITheme } from './styles/themes'
 import { useRefreshMedia } from './hooks/useRefreshMedia'
+import { applyGlassMode, detectSoftwareRendering } from './utils/glass-degradation'
 import { useFilteredMediaFiles } from './hooks/useFilteredMediaFiles'
 import { useGlobalUndo } from './hooks/useGlobalUndo'
 import { useOperationHistoryStore } from './stores/operationHistoryStore'
@@ -278,7 +279,15 @@ const App: React.FC = () => {
           'display.glassEffect',
           'rich'
         )) as string
-        html.classList.toggle('glass-lite', glass === 'lite')
+        // 软件渲染（GPU 兼容档位 ≥1 / 硬件加速禁用）强制 glass-lite：SVG 折射 +
+        // 氛围层动画在纯 CPU 合成下逐帧重光栅，是故障机滚动闪屏的头号负载源
+        // （2026-11-19 level2 取证）；探针 fail-open，失败保持用户设置
+        const softwareRendering = await detectSoftwareRendering()
+        applyGlassMode(glass)
+        if (softwareRendering && glass !== 'lite') {
+          // 诊断留痕（经 window-manager console-message 落 diag.log，真机取证用）
+          console.warn('[Glass] software rendering detected, forcing glass-lite')
+        }
         // 视觉体系 v3：氛围层细项开关（默认开启，关闭时挂对应根类隐藏）
         const ambientGrain = (await window.electronAPI.settings.get(
           'display.ambientGrain',

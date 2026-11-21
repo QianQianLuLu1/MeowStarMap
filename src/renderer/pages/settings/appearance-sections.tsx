@@ -5,6 +5,7 @@ import { themes, type UITheme } from '../../styles/themes'
 import { Select } from '../../components/common/Select'
 import { SegmentedControl } from '../../components/common/SegmentedControl'
 import { SectionShell, GlobalToastContext, SettingsToggle } from './shared'
+import { applyGlassMode } from '../../utils/glass-degradation'
 
 // ============ 外观 ============
 
@@ -73,7 +74,8 @@ export const normalizeGlassEffect = (value: unknown): GlassEffect =>
   value === 'lite' ? 'lite' : 'rich'
 
 const applyGlassEffect = (effect: GlassEffect) => {
-  document.documentElement.classList.toggle('glass-lite', effect === 'lite')
+  // 统一走 glass-degradation 决策：软件渲染下强制 lite，设置操作不得覆写自动降级
+  applyGlassMode(effect)
 }
 
 // 视觉体系 v3：氛围层细项开关（颗粒纹理 / 漂浮几何体，默认开启；关闭时挂根类隐藏）
