@@ -11,6 +11,9 @@
  *   ERR_UPDATER_LATEST_VERSION_NOT_FOUND 的 message（`Unable to find latest version on GitHub
  *   (url), please ensure a production release exists: <inner stack>`），因此字符串级网络信号
  *   必须优先于 ERR_UPDATER_ 前缀判定，否则真断网仍被误报成「源未就绪」。
+ *   二轮（2026-11-21）：线上 latest tag（MeowStarMap-Setup-2.5.6）的 release 缺 latest.yml，404 归
+ *   source 按契约没错，错在「明明没有更新版本还弹错误弹窗」。新增 missingChannelUpToDateVersion：
+ *   缺通道文件且 tag 版本 ≤ 当前版本 ⇒ 返回 tag 版本供主进程推 not-available；其余一律 null 保守回退。
  */
 import { describe, it, expect } from 'vitest'
 import { classifyUpdateError } from './update-error-class'
@@ -289,5 +292,71 @@ describe('classifyUpdateError —— 属性访问永不抛错（throwing getter 
     )
     expect(() => classifyUpdateError(hostile)).not.toThrow()
     expect(classifyUpdateError(hostile)).toBe('source')
+  })
+})
+
+describe('missingChannelUpToDateVersion —— 缺通道文件且无更新版本 ⇒ not-available（2026-11-21 二轮）', () => {
+  // 线上实况（2026-11-21 实测）：/releases/latest = MeowStarMap-Setup-2.5.6，该 release 只有 exe、
+  // 缺 latest.yml（404）。老行为弹「未获取到可用的更新信息」错误弹窗；新行为：tag 版本 ≤ 当前版本
+  // ⇒ 返回 tag 版本供主进程推 not-available（「当前已是最新版本」）。
+  // 红灯阶段函数尚未实现，用动态 import 保证既有用例不受影响地先跑红。
+  const load = async (): Promise<typeof import('./update-error-class')> =>
+    await import('./update-error-class')
+
+  /** 线上真实抛错形状：channel 文件 404，message 内嵌带 tag 的下载 URL */
+  function channelMissing(tag: string): Error {
+    const e = new Error(
+      `Cannot find latest.yml in the latest release artifacts (https://github.com/QianQianLuLu1/MeowStarMap/releases/download/${tag}/latest.yml): HttpError: Response code 404 (Not Found)`
+    ) as Error & { code?: string }
+    e.code = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'
+    return e
+  }
+
+  it('线上真实形态：tag MeowStarMap-Setup-2.5.6 + 当前 2.5.7 ⇒ 返回 2.5.6（→ not-available）', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    expect(missingChannelUpToDateVersion(channelMissing('MeowStarMap-Setup-2.5.6'), '2.5.7')).toBe(
+      '2.5.6'
+    )
+  })
+
+  it('版本相等：tag 2.5.7 + 当前 2.5.7 ⇒ 返回 2.5.7（已是最新）', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    expect(missingChannelUpToDateVersion(channelMissing('2.5.7'), '2.5.7')).toBe('2.5.7')
+  })
+
+  it('确有更新版本：tag 9.9.9 > 当前 2.5.7 ⇒ null（维持 source 错误弹窗）', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    expect(missingChannelUpToDateVersion(channelMissing('9.9.9'), '2.5.7')).toBeNull()
+  })
+
+  it('v 前缀 tag：v2.5.7 + 当前 2.5.7 ⇒ 返回 2.5.7', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    expect(missingChannelUpToDateVersion(channelMissing('v2.5.7'), '2.5.7')).toBe('2.5.7')
+  })
+
+  it('非缺失通道错误（ECONNREFUSED / Request timed out / INVALID_RELEASE_FEED）⇒ null', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    const refused = new Error('connect ECONNREFUSED 127.0.0.1:8123') as Error & { code?: string }
+    refused.code = 'ECONNREFUSED'
+    const feed = new Error('Cannot parse releases feed: ...') as Error & { code?: string }
+    feed.code = 'ERR_UPDATER_INVALID_RELEASE_FEED'
+    expect(missingChannelUpToDateVersion(refused, '2.5.7')).toBeNull()
+    expect(missingChannelUpToDateVersion(new Error('Request timed out'), '2.5.7')).toBeNull()
+    expect(missingChannelUpToDateVersion(feed, '2.5.7')).toBeNull()
+  })
+
+  it('tag 无数字三元组（nightly）⇒ null（保守回退错误弹窗）', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    expect(missingChannelUpToDateVersion(channelMissing('nightly'), '2.5.7')).toBeNull()
+  })
+
+  it('字符串 / null 入参 ⇒ null 且不抛；cause 链内嵌的缺失通道错误也要提取到', async () => {
+    const { missingChannelUpToDateVersion } = await load()
+    expect(() => missingChannelUpToDateVersion('boom', '2.5.7')).not.toThrow()
+    expect(missingChannelUpToDateVersion('boom', '2.5.7')).toBeNull()
+    expect(missingChannelUpToDateVersion(null, '2.5.7')).toBeNull()
+    const outer = new Error('Cannot check for updates')
+    ;(outer as Error & { cause?: unknown }).cause = channelMissing('2.5.0')
+    expect(missingChannelUpToDateVersion(outer, '2.5.7')).toBe('2.5.0')
   })
 })

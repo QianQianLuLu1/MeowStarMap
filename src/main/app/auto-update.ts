@@ -2,7 +2,7 @@ import { app } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import type { AppContext } from './app-context'
 import { sendToRenderer } from './renderer-bridge'
-import { classifyUpdateError } from './update-error-class'
+import { classifyUpdateError, missingChannelUpToDateVersion } from './update-error-class'
 import { AppError } from '../../shared/errors/app-error'
 import { logger } from '../utils/logger'
 import { t } from '../i18n'
@@ -60,6 +60,26 @@ function normalizeReleaseNotes(
 function pushUpdate(payload: UpdatePayload): void {
   if (!ctxRef) return
   sendToRenderer(ctxRef, 'app:update', payload)
+}
+
+/**
+ * 失败 → 渲染端载荷的统一决策点（error 事件与两处 catch 兜底共用）。
+ * 2026-11-21 二轮：缺通道文件（ERR_UPDATER_CHANNEL_FILE_NOT_FOUND）且远端发布版本 ≤ 当前版本时，
+ * 发布源上并没有比用户更装的版本（线上实况：MeowStarMap-Setup-2.5.6 只传了 exe、缺 latest.yml），
+ * 此时弹「未获取到可用的更新信息」对用户是误导——改推 not-available，渲染层复用既有
+ * 「当前已是最新版本」视图（UpdateDialog not-available 分支，零渲染层改动）。
+ * 确有更新版本（tag > 当前）才维持归类后的 error 载荷；提取失败一律保守走错误。
+ */
+function buildErrorPayload(err: unknown): UpdatePayload {
+  const upToDate = missingChannelUpToDateVersion(err, app.getVersion())
+  if (upToDate) {
+    logUpdate(`[Update] missing channel file → not-available v${upToDate} (≤ current)`)
+    return { stage: 'not-available', version: upToDate }
+  }
+  const message = err instanceof Error ? err.message : String(err)
+  const errorKind = classifyUpdateError(err)
+  logger.error(`${t('main.autoUpdate.log.updateError')} errorKind=${errorKind}`, message)
+  return { stage: 'error', errorKind, errorMessage: message }
 }
 
 /**
@@ -147,11 +167,9 @@ export function initAutoUpdater(ctx: AppContext): void {
       const state = inFlightUpdateCalls.get(oldest.value)
       if (state) state.eventPushed = true
     }
-    const message = err instanceof Error ? err.message : String(err)
-    // 归类决定渲染端文案：只有真的连不上更新源才配得上「当前网络繁忙」
-    const errorKind = classifyUpdateError(err)
-    logger.error(`${t('main.autoUpdate.log.updateError')} errorKind=${errorKind}`, message)
-    pushUpdate({ stage: 'error', errorKind, errorMessage: message })
+    // 归类决定渲染端文案：只有真的连不上更新源才配得上「当前网络繁忙」；
+    // 缺通道文件且无更新版本时转 not-available（决策细节见 buildErrorPayload）
+    pushUpdate(buildErrorPayload(err))
   })
 
   initialized = true
@@ -183,8 +201,7 @@ export async function checkForUpdates(): Promise<void> {
     // 本次未收到归属到自己这一代的 error 事件 ⇒ 兜底推 1 条（否则调用方只看到 checking 便
     // 无声收场）。已由事件推过就绝不再推，否则刚被关闭的模态会被 setDismissed(false) 弹回。
     if (!callState.eventPushed) {
-      const message = err instanceof Error ? err.message : String(err)
-      pushUpdate({ stage: 'error', errorKind: classifyUpdateError(err), errorMessage: message })
+      pushUpdate(buildErrorPayload(err))
     }
   } finally {
     inFlightUpdateCalls.delete(myToken)
@@ -205,12 +222,14 @@ export async function downloadUpdate(): Promise<void> {
     // 下载期的失败同样要归类（断网导致的 ECONNRESET 不能兜底成「源未就绪」），但**不重复推**：
     // 上游 downloadUpdate 的 errorHandler 先 dispatchError 再 rethrow（AppUpdater.js:650-672），
     // on('error') 已经带 errorKind 推过一条；这里再推一条会让刚被关闭的模态被 setDismissed(false) 弹回。
-    // 因此只有自己这一代未收到事件时才兜底推 1 条，已由事件推过则只补日志。
-    const errorKind = classifyUpdateError(err)
-    logger.error(`${t('main.autoUpdate.log.downloadFailed')} errorKind=${errorKind}`, err)
+    // 因此只有自己这一代未收到事件时才兜底推 1 条（缺通道文件且无更新版本的转换见 buildErrorPayload），
+    // 已由事件推过则只补日志。
+    logger.error(
+      `${t('main.autoUpdate.log.downloadFailed')} errorKind=${classifyUpdateError(err)}`,
+      err
+    )
     if (!callState.eventPushed) {
-      const message = err instanceof Error ? err.message : String(err)
-      pushUpdate({ stage: 'error', errorKind, errorMessage: message })
+      pushUpdate(buildErrorPayload(err))
     }
   } finally {
     inFlightUpdateCalls.delete(myToken)

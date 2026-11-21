@@ -16,6 +16,9 @@
  *   生产包 forceDevUpdateConfig 恒 false，以及「事件透传与检查流程」describe 全部用例。
  *   审查轮（同日）另加一盏红：downloadUpdate 那条此前只 mockRejectedValue，测不到上游「先 emit 再
  *   rethrow」的双推；改按真实形状 mock 后，catch 里多推的那一条即被 `toHaveLength(1)` 判红。
+ *   二轮（2026-11-21）：线上 latest tag（MeowStarMap-Setup-2.5.6）的 release 缺 latest.yml 且版本 ≤
+ *   当前 ⇒ buildErrorPayload 改推 not-available（「当前已是最新版本」）；确有更新版本（9.9.9）才维持
+ *   source 错误弹窗。归类语义原用例换 9.9.9 fixture 保意图，not-available 转换另设专项用例。
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { IPC_ERROR_CODES } from '../../shared/types/ipc-types'
@@ -44,7 +47,8 @@ const { appMock, autoUpdaterMock, listeners, sendToRendererMock, loggerMock } = 
   return {
     listeners,
     autoUpdaterMock,
-    appMock: { isPackaged: true },
+    // 2026-11-21 二轮：buildErrorPayload 需要 app.getVersion() 判「tag 版本 ≤ 当前版本」
+    appMock: { isPackaged: true, getVersion: vi.fn(() => '2.5.7') },
     sendToRendererMock: vi.fn(),
     loggerMock: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
   }
@@ -94,6 +98,24 @@ function connectionRefusedError(): Error {
   return err
 }
 
+/** 缺通道文件但 tag 指向**更新**版本（9.9.9 > 当前 2.5.7）：确有新版只是元数据缺失，必须维持错误弹窗 */
+function channelFileMissingNewerReleaseError(): Error {
+  const err = new Error(
+    'Cannot find latest.yml in the latest release artifacts (https://github.com/QianQianLuLu1/MeowStarMap/releases/download/9.9.9/latest.yml): HttpError: Response code 404 (Not Found)'
+  ) as Error & { code?: string }
+  err.code = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'
+  return err
+}
+
+/** 2026-11-21 线上实况形态：/releases/latest = MeowStarMap-Setup-2.5.6，该 release 只上传了 exe、缺 latest.yml */
+function channelFileMissingLiveReleaseError(): Error {
+  const err = new Error(
+    'Cannot find latest.yml in the latest release artifacts (https://github.com/QianQianLuLu1/MeowStarMap/releases/download/MeowStarMap-Setup-2.5.6/latest.yml): HttpError: Response code 404 (Not Found)'
+  ) as Error & { code?: string }
+  err.code = 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'
+  return err
+}
+
 /** electron-updater 60s socket 超时形态：httpExecutor.js:282 抛 new Error("Request timed out")，无 code 无 statusCode */
 function timeoutError(): Error {
   return new Error('Request timed out')
@@ -117,17 +139,44 @@ describe('initAutoUpdater —— 更新事件归类推送', () => {
     delete process.env.MEOW_DEV_UPDATE_FEED
   })
 
-  it('latest.yml 缺失（线上真实错误）必须归为 source，不得再冒充网络问题', async () => {
+  // 2026-11-21 二轮：tag ≤ 当前版本时缺失通道文件改推 not-available（见下方专项用例），
+  // 本用例换 9.9.9 fixture 保住「确有新版却缺元数据 ⇒ 仍归 source」的归类契约
+  it('latest.yml 缺失且确有更新版本（tag 9.9.9 > 当前）必须归为 source，不得再冒充网络问题', async () => {
     const mod = await loadFresh()
     mod.initAutoUpdater(fakeCtx)
 
-    emit('error', channelFileMissingError())
+    emit('error', channelFileMissingNewerReleaseError())
 
     expect(lastPushedPayload()).toEqual(
       expect.objectContaining({ stage: 'error', errorKind: 'source' })
     )
     // 真实原因不得丢失：既要多推一份给渲染端，也要进主进程日志（UI 不显示技术串）
     expect(lastPushedPayload()?.errorMessage).toContain('Cannot find latest.yml')
+  })
+
+  // 2026-11-21 二轮（用户口径）：发布源没有比当前更新的版本时，缺通道文件不再弹错误，
+  // 改推 not-available 复用渲染层「当前已是最新版本」视图（修复前推 {stage:'error'} ⇒ 红灯）
+  it('缺通道文件且 tag 版本 ≤ 当前版本（线上 2.5.6 实况）⇒ 推 not-available，不再弹错误', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+
+    emit('error', channelFileMissingLiveReleaseError())
+
+    expect(lastPushedPayload()).toEqual({ stage: 'not-available', version: '2.5.6' })
+  })
+
+  it('checkForUpdates 兜底路径同样转换：tag ≤ 当前 ⇒ 推 not-available（不推 error）', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    autoUpdaterMock.checkForUpdates.mockRejectedValue(channelFileMissingError())
+
+    await expect(mod.checkForUpdates()).resolves.toBeUndefined()
+
+    const errorPushes = sendToRendererMock.mock.calls.filter(
+      (call) => (call[2] as UpdatePayload).stage === 'error'
+    )
+    expect(errorPushes).toHaveLength(0)
+    expect(lastPushedPayload()).toEqual({ stage: 'not-available', version: '2.5.0' })
   })
 
   it('连接被拒必须归为 network，保留原「当前网络繁忙」语义', async () => {
@@ -156,7 +205,8 @@ describe('initAutoUpdater —— 更新事件归类推送', () => {
     const mod = await loadFresh()
     mod.initAutoUpdater(fakeCtx)
 
-    emit('error', channelFileMissingError())
+    // 2026-11-21 二轮：换 9.9.9 fixture，维持「确实弹 error」的原语义（tag ≤ 当前会转 not-available）
+    emit('error', channelFileMissingNewerReleaseError())
 
     const errorPushes = sendToRendererMock.mock.calls.filter(
       (call) => (call[2] as UpdatePayload).stage === 'error'
@@ -209,7 +259,8 @@ describe('initAutoUpdater —— 更新事件归类推送', () => {
       emit('error', downloadErr)
       throw downloadErr
     })
-    const checkErr = channelFileMissingError()
+    // 2026-11-21 二轮：换 9.9.9 fixture，check 失败须维持 error 语义（tag ≤ 当前会转 not-available）
+    const checkErr = channelFileMissingNewerReleaseError()
     // check 独立失败：不 emit error（兜底路径才是它的唯一出路）
     autoUpdaterMock.checkForUpdates.mockImplementation(async () => {
       await checkGate
@@ -414,7 +465,8 @@ describe('事件透传与检查流程（回归锁：修复前后都应绿）', (
   it('检查抛错且本次未收到 error 事件时，checkForUpdates 兜底推 1 条 error、也不往外抛', async () => {
     const mod = await loadFresh()
     mod.initAutoUpdater(fakeCtx)
-    autoUpdaterMock.checkForUpdates.mockRejectedValue(channelFileMissingError())
+    // 2026-11-21 二轮：换 9.9.9 fixture 维持 error 语义（tag ≤ 当前的兜底转换由上面新增用例钉住）
+    autoUpdaterMock.checkForUpdates.mockRejectedValue(channelFileMissingNewerReleaseError())
 
     await expect(mod.checkForUpdates()).resolves.toBeUndefined()
 
@@ -434,7 +486,8 @@ describe('事件透传与检查流程（回归锁：修复前后都应绿）', (
   it('检查抛错但上游已 emit error 时，checkForUpdates 不重复推 error（模态不被弹回）', async () => {
     const mod = await loadFresh()
     mod.initAutoUpdater(fakeCtx)
-    const err = channelFileMissingError()
+    // 2026-11-21 二轮：换 9.9.9 fixture 维持 error 语义（tag ≤ 当前会转 not-available）
+    const err = channelFileMissingNewerReleaseError()
     // 忠实复刻上游：先 dispatchError（emit error）再 rethrow，catch 必须靠本次标记去重
     autoUpdaterMock.checkForUpdates.mockImplementation(async () => {
       emit('error', err)

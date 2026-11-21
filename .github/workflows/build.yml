@@ -268,12 +268,21 @@ jobs:
           else
             echo "generate=true" >> "$GITHUB_OUTPUT"
           fi
+      # 发布闸门（2026-11-21）：线上曾出现「手工 Release 只传 exe、缺 latest.yml」⇒ 客户端检查更新
+      # 必 404（ERR_UPDATER_CHANNEL_FILE_NOT_FOUND），用户看到误导性错误弹窗。缺通道文件的发布在
+      # 此处直接中止，杜绝 exe-only 发布复发（softprops 对空 glob 只建空 Release，不会自行报错）。
+      - name: Guard latest.yml exists before publish
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        shell: bash
+        run: |
+          test -f release/latest.yml || { echo "::error::release/latest.yml 不存在——更新通道将 404，发布中止"; exit 1; }
       - name: Publish GitHub Release
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: softprops/action-gh-release@v3
         with:
           files: |
             release/*.exe
+            release/*.blockmap
             release/latest*.yml
           body: ${{ steps.release-body.outputs.body }}
           generate_release_notes: ${{ steps.release-body.outputs.generate == 'true' }}

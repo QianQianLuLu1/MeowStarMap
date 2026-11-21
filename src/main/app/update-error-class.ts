@@ -20,6 +20,12 @@ import type { UpdateErrorKind } from '../../shared/types/electron-api'
  * （electron-api.ts:423：超时 ⇒ network），故 NETWORK_SIGNAL 增补两个无码信号、statusOf 增补
  * 包装内嵌状态码提取。
  *
+ * 二轮（同日，用户口径「没有更新版本就别弹错误」）：404 归 source 按契约没错，错在呈现——线上
+ * latest tag（MeowStarMap-Setup-2.5.6，实测 /releases/latest）的 release 只传了 exe、缺 latest.yml，
+ * 404 弹「未获取到可用的更新信息」对「确实没有更新版本」的用户是误导。ERR_UPDATER_CHANNEL_FILE_NOT_FOUND
+ * 的 message 内嵌 `…/download/<tag>/latest.yml`，tag 即远端发布版本：≤ 当前版本 ⇒ 应呈现
+ * 「当前已是最新版本」（missingChannelUpToDateVersion），> 当前版本 ⇒ 维持 source 错误（元数据真缺失）。
+ *
  * 兜底方向取 `source`：兜底 `network` 会把任何内部异常都转译成「你的网络有问题」，正是本轮要消灭的形状。
  */
 
@@ -157,4 +163,50 @@ export function classifyUpdateError(err: unknown): UpdateErrorKind {
 
   // 4) 兜底 source
   return 'source'
+}
+
+/** 版本三元组：取首个 `X.Y.Z` 数字段（`2.5.7-beta` 等后缀忽略），不可解析返回 null */
+function versionTripleOf(version: string): [number, number, number] | null {
+  const matched = version.match(/(\d+)\.(\d+)\.(\d+)/)
+  if (!matched) return null
+  return [Number(matched[1]), Number(matched[2]), Number(matched[3])]
+}
+
+/** 远端发布版本 ≤ 当前版本 ⇒ true（等价即「没有更新版本」）；任一方不可解析 ⇒ false 保守走错误弹窗 */
+function releaseVersionAtMost(currentVersion: string, releaseTag: string): boolean {
+  const current = versionTripleOf(currentVersion)
+  const release = versionTripleOf(releaseTag)
+  if (!current || !release) return false
+  for (let i = 0; i < 3; i += 1) {
+    if (release[i] !== current[i]) return release[i] < current[i]
+  }
+  return true
+}
+
+/**
+ * 缺通道文件（ERR_UPDATER_CHANNEL_FILE_NOT_FOUND）且远端发布版本不高于当前版本 ⇒ 返回远端发布
+ * 版本号（主进程据此推 not-available「当前已是最新版本」，替代误导性错误弹窗）；其余一律 null
+ * （维持 source 错误）。永不抛错：入参 unknown 经既有 safeGet / causeChain 收窄，只读不抛。
+ *
+ * 为什么比较用自研三元组而非 semver 依赖：semver 在依赖树中但未声明、@types/semver@6 断代；
+ * 本函数只决定弹窗文案（真实更新决策仍由 electron-updater 的 semver 负责），保守失败即可。
+ */
+export function missingChannelUpToDateVersion(err: unknown, currentVersion: string): string | null {
+  const nodes: unknown[] = [err, ...causeChain(err).slice(1)]
+  const isMissingChannel = nodes.some((node) => {
+    const code = safeGet(asRecord(node), 'code')
+    return typeof code === 'string' && code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'
+  })
+  if (!isMissingChannel) return null
+
+  // tag 只在 GitHubProvider 形态的 message 里（…/download/<tag>/latest.yml）；generic 假源等
+  // 无 tag 形态提取不到 ⇒ null 维持错误。首个命中的节点定结论，不得继续翻链（防误配其他 URL）。
+  for (const node of nodes) {
+    const matched = textOf(node).match(/\/download\/([^/]+)\/latest[^/]*\.yml/i)
+    if (!matched) continue
+    if (!releaseVersionAtMost(currentVersion, matched[1])) return null
+    const release = versionTripleOf(matched[1])
+    return release ? `${release[0]}.${release[1]}.${release[2]}` : null
+  }
+  return null
 }

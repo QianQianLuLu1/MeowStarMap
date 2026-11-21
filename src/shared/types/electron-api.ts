@@ -412,7 +412,7 @@ export interface UiThemeGetResult {
 export type UpdateStage =
   | 'checking' // 正在检查（手动/启动触发）
   | 'available' // 发现新版本，待用户确认下载
-  | 'not-available' // 已是最新
+  | 'not-available' // 已是最新（含兜底：缺 latest.yml 但发布版本 ≤ 当前版本，2026-11-21）
   | 'downloading' // 下载中
   | 'downloaded' // 下载完成，待用户确认安装并重启
   | 'error' // 出错
@@ -428,7 +428,7 @@ export type UpdateErrorKind = 'network' | 'source'
 /** 主进程 → 渲染端 的更新事件载荷（app:update 通道） */
 export interface UpdatePayload {
   stage: UpdateStage
-  /** 目标版本号（available/downloaded 时存在） */
+  /** 目标版本号（available/downloaded 时存在；not-available 兜底场景 = 远端发布版本） */
   version?: string
   /** 下载进度百分比 0-100（downloading 时存在） */
   percent?: number
