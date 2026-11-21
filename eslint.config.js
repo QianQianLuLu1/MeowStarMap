@@ -498,7 +498,7 @@ export default [
   // UI 文案改 t()、日志走 logger + t()、数据值/DB 标识加 eslint-disable 豁免。
   // 全量源码现直接受上方 error 硬阻断约束，新增文件一律不得 reintroduce 白名单。
   {
-    files: ['scripts/**/*.{ts,js,cjs}', '*.config.{ts,js,cjs}'],
+    files: ['scripts/**/*.{ts,js,cjs,mjs}', '*.config.{ts,js,cjs,mjs}'],
     languageOptions: {
       globals: {
         ...globals.node,
@@ -554,7 +554,9 @@ export default [
       // 本地工具缓存目录（.gitignore 已忽略，CI 干净环境不存在；加入避免本地 lint 误报，
       // 保持本地 `npm run lint` 与 CI 行为一致）
       '.cache/**',
-      '.qoder/**'
+      '.qoder/**',
+      // 移植的 Android 工程（Java/Gradle 源码，见 mobile/PORTING.md；不参与本仓 lint）
+      'mobile/**'
     ]
   }
 ]

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_square">喵星相册 · 正方形</string>
+    <string name="widget_wide">喵星相册 · 长条</string>
+    <string name="widget_square_description">粉色圆角相框，自动轮播已保存照片</string>
+    <string name="widget_wide_description">粉色横向相框，自动轮播已保存横向照片</string>
+    <string name="widget_no_landscape">暂无可用的横向照片\n保存横图后自动轮播</string>
+    <string name="widget_no_photos">保存照片后\n这里就会开始轮播</string>
+    <string name="widget_needs_consent">打开喵星图\n完成首次设置</string>
+    <string name="widget_next_photo">下一张照片</string>
+    <string name="widget_open_photo">查看这张已保存照片</string>
+    <string name="widget_open_saved">打开已保存相册</string>
+</resources>

@@ -1,0 +1,5 @@
+<resources>
+    <!-- UI identity is independent of revisioned disk-cache and download tags. -->
+    <item name="photo_source_asset_id" type="id" />
+    <item name="photo_source_identity" type="id" />
+</resources>

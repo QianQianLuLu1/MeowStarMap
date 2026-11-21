@@ -172,6 +172,43 @@ Zustand、i18next、fluent-ffmpeg、ESLint、Prettier、Vitest 等依赖各自�
   （`resources/nikkisync` 的 `*.exe`、`resources/nikkisync/pc` 的 `**/*`）已覆盖上述
   两个资产，无需新增条目；`scripts/pre-dist-check.ts` 的既有断言保持不动。
 
+## 8. NikkiSync 安卓端移植（`mobile/`，MIT License）
+
+- **项目**：[ToStardust/NikkiSync](https://github.com/ToStardust/NikkiSync) 的 `apps/mobile`
+- **作者**：ToStardust（星尘）
+- **移植基线**：`apps/mobile @ 6bdab4b4b29b0af5103aafb2d3223e7903c6306c`（2026-11-21 经 `git archive` 逐字节拷入本仓 `mobile/`）
+- **授权依据**：上游仓库 LICENSE（MIT）；上游作者明示同意复用，条件为保留原 LICENSE 与版权声明、不引入第三方游戏美术、商店侧使用独立应用名/包名/签名/图标（均已满足，见 `mobile/PORTING.md`）
+- **版权声明原文**：`Copyright (c) 2026 ToStardust and NikkiSync contributors`
+- **随目录保留**：`mobile/LICENSE` 为上游 MIT 全文逐字副本
+- **范围声明**：上游 MIT 仅覆盖其原创源码，**不覆盖**「无限暖暖」角色、服装美术、截图与外部服务资源（口径同上游 `THIRD_PARTY_NOTICES.md`，与第 3、6 节一致）；本仓未拷贝上游仓库级游戏美术目录（`assets/photo-filter-icons` 等），移植产物 APK 内不含第三方游戏美术
+- **APK 内随包许可**：libjpeg-turbo 3.2.0（IJG）与 desugar_jdk_libs 许可文本随 `assets/licenses/` 分发、Bouncy Castle 许可随 `res/raw/bouncycastle_license.txt` 分发（沿用上游打包形态）
+
+### 上游 MIT 许可全文（逐字保留）
+
+```text
+MIT License
+
+Copyright (c) 2026 ToStardust and NikkiSync contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
+
 ---
 
 > 分发物保留说明：`package.json` 的 `build.files` 显式列入本文件与 `LICENSE`，

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="app_background">#FFF8F0</color>
+    <color name="card_background">#F2FFFFFF</color>
+    <color name="text_primary">#262321</color>
+    <color name="text_secondary">#716B66</color>
+    <color name="photo_detail_text">#FFF9FA</color>
+    <color name="photo_detail_text_secondary">#EEE4E9</color>
+    <color name="photo_detail_glass_ink">#151116</color>
+    <color name="brand">#D780AA</color>
+    <color name="accent">#7A6F91</color>
+    <color name="primary_action">#F6BCC0</color>
+    <color name="primary_foreground">#62425A</color>
+    <color name="primary_pressed">#F0ABB6</color>
+    <color name="accent_surface">#FBE6ED</color>
+    <color name="ui_border">#EED5DD</color>
+    <color name="background_top">#F5DCE5</color>
+    <color name="background_middle">#FAE6DF</color>
+    <color name="peach">#F8D4BF</color>
+    <color name="cream">#FFF1CF</color>
+    <color name="violet">#8B719D</color>
+    <color name="selection_wash">#12F6BCC0</color>
+    <color name="selection_mark">#B74673</color>
+</resources>

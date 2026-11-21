@@ -115,9 +115,18 @@ src/
 │   ├── data/          # 共鸣录静态数据（图鉴 / 卡池 / 百分位快照 / 12 语言名称 / 卡池缩略图）
 │   └── i18n/          # 12 种语言文件
 └── shared/        # 跨进程共享类型与错误码
+
+mobile/           # Android 伴侣应用（自 NikkiSync 移植，独立 Gradle 工程）
 ```
 
 > 完整架构说明请参阅 [ARCHITECTURE.md](ARCHITECTURE.md)
+
+### 移动端伴侣应用（Android）
+
+- **喵星图 Android**（`mobile/`）自 [ToStardust/NikkiSync](https://github.com/ToStardust/NikkiSync) 的 `apps/mobile` 以 MIT 授权移植（基线 `6bdab4b`），上游 LICENSE 与版权声明随目录保留，移植说明与红线见 [mobile/PORTING.md](mobile/PORTING.md)
+- 商店身份独立：applicationId `com.qianlu.meowstarmap`、应用名「喵星图」、独立签名与图标；协议冻结项（配对 deep link / NSD 服务类型 / HTTP-WS 路径 / EXIF / 落盘目录 / 本地键名与库名）与上游逐字节一致，由 `npm run mobile:freeze` 常驻守护（76 条断言）
+- 构建：JDK 17 + Android SDK 35 + NDK 28.1.13356709 + CMake 3.22.1；`cd mobile && ./gradlew testDebugUnitTest assembleDebug` 或 `npm run mobile:build`；APK 产出仓库根 `release/MeowStarMap-Android.apk`
+- APK 内置自更新默认关闭（`meowSelfUpdate=false`），分发走 GitHub Releases 手动安装
 
 ### 相关文档
 
@@ -127,6 +136,7 @@ src/
 - [docs/](docs/) — IPC 契约、插件 API、排障手册等
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — 组件文档站（`npm run storybook` 启动，端口 6006）
 - [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md) — 面向玩家的图文使用教程
+- [mobile/PORTING.md](mobile/PORTING.md) — Android 端移植说明（来源 / 身份映射 / 冻结红线）
 
 ### 开发者信息 / 作者与社交平台
 
@@ -248,9 +258,18 @@ src/
 │   ├── data/          # Resonance static data (catalog / banners / percentile snapshot / 12-language names / banner thumbnails)
 │   └── i18n/          # 12 language files
 └── shared/        # Cross-process shared types & error codes
+
+mobile/           # Android companion app (ported from NikkiSync, standalone Gradle project)
 ```
 
 > See [ARCHITECTURE.en.md](ARCHITECTURE.en.md) for the full architecture document
+
+### Mobile Companion App (Android)
+
+- **Meow Star Map Android** (`mobile/`) is ported from [ToStardust/NikkiSync](https://github.com/ToStardust/NikkiSync) `apps/mobile` under the MIT license (baseline `6bdab4b`); the upstream LICENSE and copyright notice are kept in the directory — see [mobile/PORTING.md](mobile/PORTING.md)
+- Independent store identity: applicationId `com.qianlu.meowstarmap`, app name 「喵星图」, standalone signing and icon; protocol-frozen constants (pairing deep link / NSD service type / HTTP-WS routes / EXIF / album directories / local keys & database names) stay byte-identical to upstream, guarded by `npm run mobile:freeze` (76 assertions)
+- Build: JDK 17 + Android SDK 35 + NDK 28.1.13356709 + CMake 3.22.1; `cd mobile && ./gradlew testDebugUnitTest assembleDebug` or `npm run mobile:build`; the APK lands at `release/MeowStarMap-Android.apk`
+- In-app self-update is disabled by default (`meowSelfUpdate=false`); distribution goes through GitHub Releases manual installs
 
 ### Documentation
 
@@ -260,6 +279,7 @@ src/
 - [docs/](docs/) — IPC contracts, plugin API, troubleshooting, and more
 - [docs/Storybook使用指南.md](docs/Storybook使用指南.md) — Component docs site (`npm run storybook`, port 6006)
 - [docs/tutorial/用户使用教程.md](docs/tutorial/用户使用教程.md) — Illustrated user guide (in Chinese)
+- [mobile/PORTING.md](mobile/PORTING.md) — Android porting notes (provenance / identity mapping / frozen red lines)
 
 ### Developer Info / Author & Social Platforms
 

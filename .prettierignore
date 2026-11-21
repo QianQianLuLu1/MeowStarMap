@@ -12,3 +12,5 @@ src/renderer/assets/outfit-names.json
 src/renderer/data/resonance/
 # NikkiSync 上游派生 PC 资产（stage-nikkisync-pc-assets.ts 逐字暂存，保持上游形态）
 resources/nikkisync/pc/
+# 移植的 Android 工程（Java/Gradle 源码与上游文档保持上游形态，不参与 prettier）
+mobile/

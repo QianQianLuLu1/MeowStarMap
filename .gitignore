@@ -177,6 +177,15 @@ _safe_backup_*/
 # ===== 运行时缩略图缓存（dir-manager thumbnailCacheDir，应用生成，不入仓）=====
 /thumbnails/
 
+# ===== 移植的 Android 工程（mobile/，见 mobile/PORTING.md；Gradle 构建产物与本地配置不入仓）=====
+mobile/.gradle/
+mobile/build/
+mobile/app/build/
+mobile/app/.cxx/
+mobile/local.properties
+*.keystore
+*.jks
+
 # ===== 调试期遗留副本（根目录孤儿测试文件，不入仓）=====
 /.orig-validator.test.ts
 

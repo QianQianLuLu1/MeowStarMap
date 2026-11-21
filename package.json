@@ -73,6 +73,10 @@
     "debt:check": "tsx scripts/debt/check-debt-fix.ts",
     "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
     "verify:nikkisync": "tsx scripts/verify-nikkisync-link.ts",
+    "mobile:validate": "node mobile/scripts/validate-m2.mjs",
+    "mobile:freeze": "node scripts/check-mobile-freeze.mjs",
+    "mobile:icons": "node scripts/generate-android-icons.mjs",
+    "mobile:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File mobile/scripts/build-android.ps1",
     "link:nikkisync": "tsx scripts/link-nikkisync.ts",
     "link:nikkisync:check": "tsx scripts/link-nikkisync.ts --check",
     "e2e": "tsx scripts/e2e-usage.ts",
@@ -231,6 +235,7 @@
       "LICENSE",
       "THIRD_PARTY_NOTICES",
       "!resources/nikkisync/*.exe",
+      "!mobile/**",
       {
         "from": "node_modules/@nikkisync",
         "to": "node_modules/@nikkisync",

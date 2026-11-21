@@ -291,6 +291,40 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # 移植的 Android 端（mobile/，见 mobile/PORTING.md）守护构建：Gradle wrapper 单测 + 出包。
+  # 独立并行 job，不进入桌面发布的 needs 链（独立交付物，失败不阻断桌面 Release，但 PR/push 上会显红）。
+  # 组件版本与上游 NikkiSync ci.yml 的 android job 对齐（JDK 17 / SDK 35 / NDK 28.1.13356709 / CMake 3.22.1）。
+  android:
+    name: Android (mobile/ Gradle)
+    runs-on: ubuntu-latest
+    # 手动触发（workflow_dispatch）仅跑 storybook 文档站，保持既有 job 的原触发行为不变
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    # 护栏：sdkmanager 组件安装 + 首次 Gradle 依赖解析耗时兜底
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          # 缓存 Gradle wrapper 发行包与依赖解析，避免每次冷下载 Gradle 8.13
+          cache: 'gradle'
+      - name: Install Android SDK components
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;28.1.13356709' 'cmake;3.22.1'
+      - name: Freeze guard (protocol constants)
+        run: node scripts/check-mobile-freeze.mjs
+      - name: Build debug APK and run unit tests
+        working-directory: mobile
+        run: ./gradlew testDebugUnitTest assembleDebug --no-daemon
+      - name: Upload debug APK artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: MeowStarMap-Android-debug-apk
+          path: mobile/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
   # 组件文档站（Storybook）静态构建：独立并行 job，不进入任何现有 job 的 needs 链，
   # 也不被其他 job 依赖，失败不阻断发布链。
   # 触发条件：手动触发（workflow_dispatch）+ tag push；Storybook 构建是纯前端产物，
