@@ -22,6 +22,7 @@ import {
   scanBufferForBanned,
   missingStagedIconPackAssets,
   stagedIconPackGate,
+  stagedIconPackVerdict,
   resolveVerifyAsarTarget,
   deriveUnpackedTarget,
   verifyUpdateFeedArtifacts,
@@ -307,6 +308,47 @@ describe('F2/F3 暂存图标包闸门接线与产物门控（正常 / 异常 / �
     // 拼接避免本用例自身的字面量造成自指：门控后不得再出现裸用例声明
     const legacy = 'it' + '(' + "'" + '真实仓库'
     expect(source).not.toContain(legacy)
+  })
+})
+
+describe('F2 CI 环境判定核 stagedIconPackVerdict（2026-11-21 CI 红灯根治，正常 / 异常 / 边界 / 接线）', () => {
+  it('正常：暂存图标包齐备 ⇒ pass，与建链状态无关', () => {
+    expect(stagedIconPackVerdict({ stagedMissing: false, nikkiSyncLinked: true })).toBe('pass')
+    expect(stagedIconPackVerdict({ stagedMissing: false, nikkiSyncLinked: false })).toBe('pass')
+  })
+
+  it('异常：资产缺失 + 已建链 ⇒ fail（开发机真实打包回归，绝不放行）', () => {
+    expect(stagedIconPackVerdict({ stagedMissing: true, nikkiSyncLinked: true })).toBe('fail')
+  })
+
+  it('边界：资产缺失 + 未建链 ⇒ skip（CI/干净克隆的受支持默认态，不伪装成已验证）', () => {
+    // 2026-11-21 修复前此处恒 fail：CI（无 NikkiSync 检出、npm ci 不建链）资产必然缺席，
+    // runs #40~#43 的 Windows job 全部死于 pre-dist-check（红灯取证见本轮计划 §7）
+    expect(stagedIconPackVerdict({ stagedMissing: true, nikkiSyncLinked: false })).toBe('skip')
+  })
+
+  it('边界：入参非布尔 ⇒ TypeError 且消息含特征串（fail-closed，不静默归一）', () => {
+    // 消息特征串钉住「真实现自带的参数校验」：函数缺席时引擎抛的是
+    // "stagedIconPackVerdict is not a function"，与特征串不符 ⇒ 修复前本用例必红
+    expect(() =>
+      stagedIconPackVerdict({ stagedMissing: 1 as unknown as boolean, nikkiSyncLinked: true })
+    ).toThrow(/^stagedIconPackVerdict requires boolean/)
+    expect(() =>
+      stagedIconPackVerdict({ stagedMissing: true, nikkiSyncLinked: null as unknown as boolean })
+    ).toThrow('stagedIconPackVerdict requires boolean')
+  })
+
+  it('接线：checkStagedIconPackAssets 经判定核分流，skip 分支带修复指引', () => {
+    const source = readFileSync(path.join(ROOT, 'scripts', 'pre-dist-check.ts'), 'utf8')
+    const fnStart = source.indexOf('function checkStagedIconPackAssets(): void {')
+    expect(fnStart).toBeGreaterThan(-1)
+    // 切到下一个函数声明为止（切片偏宽无妨，断言只做包含性判定）
+    const fnEnd = source.indexOf('\nfunction ', fnStart + 1)
+    expect(fnEnd).toBeGreaterThan(fnStart)
+    const body = source.slice(fnStart, fnEnd)
+    expect(body).toContain('stagedIconPackVerdict(')
+    expect(body).toContain("verdict === 'skip'")
+    expect(body).toContain('未建链环境属预期')
   })
 })
 

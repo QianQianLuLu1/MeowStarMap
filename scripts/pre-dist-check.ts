@@ -773,19 +773,61 @@ export function stagedIconPackGate(
 }
 
 /**
+ * F2 闸门的 CI 环境判定核（纯函数，入参为调用方探测出的布尔事实）。
+ *
+ * 回归背景（2026-11-21 CI 红灯根治，runs #40~#43）：暂存图标包由 stage:nikkisync-pc
+ * 从本地 NikkiSync 检出生成，2026-11-13（eda2464）起不入库（约 74MiB + 许可约束）；
+ * CI 干净克隆既无检出也无 @nikkisync 链 ⇒ stage 按设计优雅跳过 ⇒ 资产必然缺席，
+ * 而原闸门不分环境一律 fail ⇒ Windows job 全部死于 pre-dist-check（开发机因资产在位
+ * 全绿，形成「本地绿、CI 必红」盲区）。判定语义镜像同文件 nikkiSyncPackedVerdict：
+ * - 资产齐备 ⇒ 'pass'（照常逐项放行）
+ * - 资产缺失 + 已建链 ⇒ 'fail'（开发机真实打包回归，绝不放行）
+ * - 资产缺失 + 未建链 ⇒ 'skip'（CI/干净克隆的受支持默认态；preview 包本就不含
+ *   @nikkisync 运行时，图标能力由 mergeIconPacks 的 try/catch 回落在线模式）
+ */
+export type StagedIconPackVerdict = 'pass' | 'fail' | 'skip'
+
+export function stagedIconPackVerdict(input: {
+  stagedMissing: boolean
+  nikkiSyncLinked: boolean
+}): StagedIconPackVerdict {
+  if (typeof input?.stagedMissing !== 'boolean' || typeof input?.nikkiSyncLinked !== 'boolean') {
+    throw new TypeError('stagedIconPackVerdict requires boolean stagedMissing and nikkiSyncLinked')
+  }
+  if (!input.stagedMissing) return 'pass'
+  return input.nikkiSyncLinked ? 'fail' : 'skip'
+}
+
+/**
  * F2：打包前闸门接线点。extraResources 会把 resources/nikkisync/pc 整树搬进安装包，
  * 缺 manifest 或任一效果图标都意味着装机后图标能力不可用，必须计入 blocking。
+ * 2026-11-21 起按 stagedIconPackVerdict 分流：未建链环境（CI/干净克隆）skip——
+ * 与 @nikkisync 打包态判定的既有 skip 语义同口径；已建链缺件仍是 blocking。
  */
 function checkStagedIconPackAssets(): void {
   const pcAssetsDir = path.join(ROOT, 'resources', 'nikkisync', 'pc')
   const effectFiles = PHOTO_FILTER_ICON_IDS.map((id) => `filter-${id}.webp`)
   const { missing } = stagedIconPackGate(pcAssetsDir, effectFiles, (file) => fs.existsSync(file))
-  if (missing.length > 0) {
-    for (const file of missing) {
-      fail(`暂存图标包缺失: ${file}（请先执行 npm run stage:nikkisync-pc）`)
-    }
-  } else {
+  if (missing.length === 0) {
     pass(`暂存图标包齐备：两个 manifest + ${effectFiles.length} 张效果图`)
+    return
+  }
+  // 「已建链」判据与 nikkiSyncMissingDiagnosis 同口径：scope 目录存在且条目数 ≠ 0
+  // （npm install 会把 link:nikkisync 的 junction 剪成空 scope 目录）；读不动（-1）
+  // 按已建链处理，fail-closed。
+  const scopeDir = path.join(ROOT, 'node_modules', '@nikkisync')
+  const scopeDirExists = fs.existsSync(scopeDir)
+  const nikkiSyncLinked = countNikkiSyncScopeEntries(scopeDir, scopeDirExists) !== 0
+  const verdict = stagedIconPackVerdict({ stagedMissing: missing.length > 0, nikkiSyncLinked })
+  if (verdict === 'skip') {
+    skip(
+      '暂存图标包缺席（未建链环境属预期）：CI/干净克隆无 NikkiSync 检出，stage:nikkisync-pc 已按设计跳过；' +
+        '发布包请在已建链开发机执行 npm run link:nikkisync && npm run stage:nikkisync-pc 后重新打包'
+    )
+    return
+  }
+  for (const file of missing) {
+    fail(`暂存图标包缺失: ${file}（请先执行 npm run stage:nikkisync-pc）`)
   }
 }
 
