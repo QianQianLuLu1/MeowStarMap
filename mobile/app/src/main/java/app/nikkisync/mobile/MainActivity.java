@@ -1516,12 +1516,12 @@ public final class MainActivity extends ComponentActivity implements NsdDiscover
             info.addView(sourceButton, sourceLp);
         }
 
-        Button removeRecord = button("仅移除 NikkiSync 记录");
+        Button removeRecord = button("仅移除喵星图记录");
         LinearLayout.LayoutParams removeLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         removeLp.topMargin = dp(6);
         removeRecord.setOnClickListener(v -> new AlertDialog.Builder(this)
                 .setTitle("移除保存记录？")
-                .setMessage("只会从 NikkiSync 的“已保存”中移除记录，不会删除系统相册里的照片。")
+                .setMessage("只会从喵星图的“已保存”中移除记录，不会删除系统相册里的照片。")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("移除", (d, which) -> {
                     savedPhotoStore.removeUri(record.uri());
@@ -1697,7 +1697,7 @@ public final class MainActivity extends ComponentActivity implements NsdDiscover
         unlinkLp.topMargin = dp(8);
         unlink.setOnClickListener(v -> new AlertDialog.Builder(this)
                 .setTitle("解除修图关联？")
-                .setMessage("只会移除 NikkiSync 内的关联，不会删除或修改系统相册里的图片。")
+                .setMessage("只会移除喵星图内的关联，不会删除或修改系统相册里的图片。")
                 .setNegativeButton("取消", null)
                 .setPositiveButton("解除关联", (d, which) -> {
                     String uri = variant.uri();

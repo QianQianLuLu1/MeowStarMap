@@ -38,7 +38,7 @@ public final class NikkiSyncClient {
     }
 
     public static PairedServer pair(PairingPayload payload, DeviceIdentity identity) throws Exception {
-        PairedServer provisional = new PairedServer(payload.serverId(), "NikkiSync PC", payload.host(), payload.port(),
+        PairedServer provisional = new PairedServer(payload.serverId(), "Meow Star Map", payload.host(), payload.port(),
                 payload.tlsFingerprintSha256(), "", "", 0).withHosts(payload.hosts());
         if(provisional.hosts().size()>1)provisional=VerifiedEndpointResolver.resolve(provisional);
         SignedHttpClient http = new SignedHttpClient(provisional, identity);

@@ -148,7 +148,7 @@ public final class PlayerFacingMyPageTest {
         input.setText("暖暖摄影师");findText(activity.navigationHost(),"保存并设置为默认").performClick();
         activity.navigationHost().interrupt();
         assertEquals("12345",new app.nikkisync.mobile.storage.StylistProfileStore(activity).defaultUid());
-        assertEquals("暖暖摄影师的大喵相机",new app.nikkisync.mobile.storage.ExportWatermarkStore(activity).shareBranding(null).title());
+        assertEquals("暖暖摄影师的喵星图",new app.nikkisync.mobile.storage.ExportWatermarkStore(activity).shareBranding(null).title());
         org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle();
         assertTrue(allText((View)field(activity,"myContent")).contains("暖暖摄影师"));
         Field store=MainActivity.class.getDeclaredField("stylistProfiles");store.setAccessible(true);store.set(activity,null);

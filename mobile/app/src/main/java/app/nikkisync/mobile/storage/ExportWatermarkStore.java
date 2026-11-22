@@ -23,7 +23,7 @@ public final class ExportWatermarkStore {
     public void setShareText(String title,String footer){prefs.edit().putString("title",clean(title,96)).putString("footer",clean(footer,128)).apply();}
     public void setExifText(String name){prefs.edit().putString("camera",clean(name,64)).apply();}
     public Branding shareBranding(String json){
-        if(!shareEnabled())return new Branding("大喵相机","MomoCamera");
+        if(!shareEnabled())return new Branding("喵星图","MomoCamera");
         String uid=uid(json),name=profiles.nickname(uid);
         String title=shareTitle(),footer=shareFooter();
         return new Branding(title.isEmpty()?camera(name):title,footer.isEmpty()?(uid.isEmpty()?"":"UID："+uid+" ")+"MomoCamera":footer);
@@ -35,7 +35,7 @@ public final class ExportWatermarkStore {
         String uid=profiles.defaultUid();if(!uid.isEmpty())return uid;
         try{JSONObject identity=new JSONObject(json).optJSONObject("identity");Object value=identity==null?null:identity.opt("uid");return value instanceof String?clean((String)value,64):"";}catch(Exception ignored){return "";}
     }
-    private static String camera(String name){return name.isEmpty()?"大喵相机":name+"的大喵相机";}
+    private static String camera(String name){return name.isEmpty()?"喵星图":name+"的喵星图";}
     private static String clean(String value,int limit){
         if(value==null)return "";String result=value.trim();
         if(result.length()>limit)throw new IllegalArgumentException("水印文字过长");

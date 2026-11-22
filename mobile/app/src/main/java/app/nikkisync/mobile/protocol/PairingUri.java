@@ -14,7 +14,7 @@ public final class PairingUri {
         if (raw != null && raw.trim().startsWith("NS1|")) return parseCompact(raw.trim());
         Uri uri = Uri.parse(raw.trim());
         if (!"nikki-sync".equals(uri.getScheme()) || !"pair".equals(uri.getHost())) {
-            throw new IllegalArgumentException("这不是 NikkiSync 配对链接");
+            throw new IllegalArgumentException("这不是喵星图配对链接");
         }
         String serverId = required(uri, "serverId");
         String host = required(uri, "host");

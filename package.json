@@ -76,6 +76,7 @@
     "mobile:validate": "node mobile/scripts/validate-m2.mjs",
     "mobile:freeze": "node scripts/check-mobile-freeze.mjs",
     "mobile:icons": "node scripts/generate-android-icons.mjs",
+    "mobile:icons:verify": "node mobile/scripts/verify-launcher-icons.mjs",
     "mobile:build": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File mobile/scripts/build-android.ps1",
     "link:nikkisync": "tsx scripts/link-nikkisync.ts",
     "link:nikkisync:check": "tsx scripts/link-nikkisync.ts --check",

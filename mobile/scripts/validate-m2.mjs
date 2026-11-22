@@ -235,7 +235,7 @@ expect(mainActivity.includes('"在系统相册打开"') && mainActivity.includes
 expect(mainActivity.includes('SavedPhotoCollection.select') || mainActivity.includes('SavedPhotoGroups.select'), 'M2.4.1 Saved filter/sort application is missing')
 expect(mainActivity.includes('SavedPhotoVerifier.verify'), 'M2.4.1 Saved MediaStore health refresh is missing')
 expect(playerFacingDetails.includes('文件不存在'), 'M2.4.1 missing saved-file detail state is missing')
-expect(mainActivity.includes('"仅移除 NikkiSync 记录"'), 'M2.4.1 local record removal action is missing')
+expect(mainActivity.includes('"仅移除喵星图记录"'), 'M2.4.1 local record removal action is missing')
 expect(savedFilterSheet.includes('"全部"') && savedFilterSheet.includes('"LIVE"') && savedFilterSheet.includes('"普通"'), 'M2.4.1 Saved filter controls are missing')
 expect(savedFilterSheet.includes('"最近保存"') && savedFilterSheet.includes('"拍摄时间"'), 'M2.4.1 Saved sort controls are missing')
 expect(savedFilterSheet.includes('"找回历史保存"') && mainActivity.includes('SavedPhotoRecovery.recover'), 'M2.4.2 historical recovery action is missing')

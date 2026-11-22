@@ -94,7 +94,7 @@ public final class PairQrScannerActivity extends Activity {
         scanner.decodeContinuous(new BarcodeCallback() {
             @Override public void barcodeResult(BarcodeResult result) {
                 if (completed || result == null) return; String text = result.getText();
-                if (text == null || !(text.startsWith("NS1|") || text.startsWith("nikki-sync://pair?"))) { Toast.makeText(PairQrScannerActivity.this, "这不是 NikkiSync 配对二维码", Toast.LENGTH_SHORT).show(); return; }
+                if (text == null || !(text.startsWith("NS1|") || text.startsWith("nikki-sync://pair?"))) { Toast.makeText(PairQrScannerActivity.this, "这不是喵星图配对二维码", Toast.LENGTH_SHORT).show(); return; }
                 completed = true; scannerRunning = false; scanner.pauseAndWait(); setResult(RESULT_OK, new Intent().putExtra(EXTRA_PAIRING_URI, text)); finish();
             }
             @Override public void possibleResultPoints(List<ResultPoint> resultPoints) {}
@@ -189,7 +189,7 @@ public final class PairQrScannerActivity extends Activity {
             retryButton.setOnClickListener(view -> {
                 if (!settingsRequired) { requestCameraPermission(); return; }
                 try { startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + getPackageName()))); }
-                catch (ActivityNotFoundException error) { Toast.makeText(this, "请在手机设置中打开 NikkiSync 的相机权限", Toast.LENGTH_LONG).show(); }
+                catch (ActivityNotFoundException error) { Toast.makeText(this, "请在手机设置中打开喵星图的相机权限", Toast.LENGTH_LONG).show(); }
             });
         }
     }

@@ -53,7 +53,7 @@ public final class OriginalSaver {
         HttpsURLConnection connection = exported ? client.exportStill(asset.assetId(), original.resourceId(), attachExif, normalizedRotation,cameraName)
                 : client.resource(asset.assetId(), original.resourceId());
         int status = connection.getResponseCode();
-        if (status != 200) { connection.disconnect(); throw new IllegalStateException(exported ? "照片导出失败，请确认电脑已更新 NikkiSync：HTTP " + status : "原图请求失败：HTTP " + status); }
+        if (status != 200) { connection.disconnect(); throw new IllegalStateException(exported ? "照片导出失败，请确认电脑已更新喵星图：HTTP " + status : "原图请求失败：HTTP " + status); }
         if (exported && (!Integer.toString(normalizedRotation).equals(connection.getHeaderField("X-NikkiSync-Rotation"))
                 || !(attachExif ? "1" : "0").equals(connection.getHeaderField("X-NikkiSync-Exif"))
                 || !"jpeg-exif-v1".equals(connection.getHeaderField("X-NikkiSync-Export")))) {

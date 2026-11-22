@@ -21,7 +21,7 @@
 |---|---|---|
 | applicationId | `app.nikkisync.mobile` | `com.qianlu.meowstarmap` |
 | 应用显示名 | 大喵相机助手 | 喵星图 |
-| versionCode / versionName | 66 / 1.0.40（基线） | 67 / 1.0.41 起（沿用上游计数） |
+| versionCode / versionName | 66 / 1.0.40（基线） | 68 / 2.5.7 起（对齐桌面包 2.5.7，versionCode 自上游计数递增） |
 | 签名 | 上游 keystore（`MOMO_RELEASE_*` 环境变量机制保留） | 独立新 keystore（alias `meowstarmap`，仓库外保存） |
 | 启动图标 | 上游自绘 mipmap | 由本仓 `resources/icons/icon-master.png` 生成 |
 | APK 自更新 | cnb.cool 上游 feed + 上游验签公钥 | 默认禁用（`meowSelfUpdate=false`，见 `mobile/app/build.gradle.kts`）；启用前必须同时更换 feed 与密钥对 |

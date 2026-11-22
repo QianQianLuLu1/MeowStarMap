@@ -24,7 +24,7 @@ public final class OrganizerPage {
     public boolean isOpen(){return !closed&&page.isShowing();}
     public OrganizerPage(Activity activity,OrganizerStore store,PairedServer server,NikkiSyncClient client,ImageLoader images,Executor worker,Handler main,Runnable changed){
         this.activity=activity;this.store=store;this.scope=OrganizerStore.scope(server);this.worker=worker;this.main=main;this.changed=changed;
-        page=new ChromePage(activity);page.useAmbientBackground();LinearLayout body=new LinearLayout(activity);body.setOrientation(1);int pad=(int)(16*activity.getResources().getDisplayMetrics().density);body.setPadding(pad,pad,pad,pad);
+        page=new ChromePage(activity);page.useAmbientBackground();LinearLayout body=new LinearLayout(activity);body.setOrientation(LinearLayout.VERTICAL);int pad=(int)(16*activity.getResources().getDisplayMetrics().density);body.setPadding(pad,pad,pad,pad);
         LinearLayout header=new LinearLayout(activity);header.setOrientation(LinearLayout.VERTICAL);header.setPadding(0,dp(8),0,dp(8));
         LinearLayout titleRow=new LinearLayout(activity);titleRow.setGravity(Gravity.CENTER_VERTICAL);
         TextView title=new TextView(activity);title.setText("最近删除");title.setTextSize(22);title.setSingleLine(true);title.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);title.setTextColor(activity.getColor(R.color.text_primary));title.setIncludeFontPadding(false);

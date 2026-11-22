@@ -19,7 +19,7 @@ public final class ServerStore {
         if (serverId == null || host == null || fingerprint == null) return null;
         PairedServer server=new PairedServer(
                 serverId,
-                prefs.getString("serverName", "NikkiSync PC"),
+                prefs.getString("serverName", "Meow Star Map"),
                 host,
                 prefs.getInt("port", 0),
                 fingerprint,

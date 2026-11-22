@@ -23,8 +23,8 @@ android {
         applicationId = "com.qianlu.meowstarmap"
         minSdk = 30
         targetSdk = 35
-        versionCode = 67
-        versionName = "1.0.41"
+        versionCode = 68
+        versionName = "2.5.7"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64", "x86") }
         externalNativeBuild { cmake { targets += "momo_jpeg" } }
         buildConfigField("boolean", "STORE_SUBMISSION", storeSubmission)
@@ -81,7 +81,7 @@ tasks.named("preBuild") { dependsOn(bundleLegalDocuments) }
 tasks.configureEach {
     if (name == "preReleaseBuild") doFirst {
         check(releaseSigningReady && file(releaseStore!!).isFile) {
-            "Official signing is required. Use scripts/build-official-android.ps1; an unsigned release must not be distributed."
+            "Official signing is required. Set MOMO_RELEASE_STORE_FILE, MOMO_RELEASE_STORE_PASSWORD and MOMO_RELEASE_KEY_ALIAS; an unsigned release must not be distributed."
         }
     }
 }
