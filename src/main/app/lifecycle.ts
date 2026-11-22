@@ -35,6 +35,7 @@ import { initNikkiSyncRuntime } from './nikkisync-runtime-setup'
 import {
   syncLoginItemSetting,
   readLoginItemOpenAtLogin,
+  cleanupLegacyLoginItems,
   SETTING_LAUNCH_AT_LOGIN,
   LAUNCH_AT_LOGIN_DEFAULT,
   normalizeLaunchAtLogin
@@ -475,6 +476,9 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
       const osState = readLoginItemOpenAtLogin()
       if (osState === openAtLogin) {
         diagLog('LOGIN', `login item unchanged, skip write: openAtLogin=${openAtLogin}`)
+        // 一致跳过写入 ≠ 无残留：残留项按当前名回读恰为 false，正好落进本分支；
+        // 不在这里做残留清理，旧值名残留项将永久存活并继续开机拉起应用（2026-11-22 取证）
+        cleanupLegacyLoginItems()
       } else {
         // 读失败（undefined）保守仍同步一次，不静默跳过
         if (osState === undefined) {

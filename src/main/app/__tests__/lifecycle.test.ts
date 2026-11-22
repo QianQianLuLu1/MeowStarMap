@@ -13,6 +13,7 @@
  * （单实例锁获取/失败路径用例已随 R1 迁移至 single-instance.test.ts）
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { basename } from 'node:path'
 import { makeAppCtx } from '../../ipc/handlers/_test-helpers'
 import type { AppContext } from '../app-context'
 
@@ -789,6 +790,43 @@ describe('lifecycle - bootstrapApplication', () => {
       const ctx = makeLifecycleCtx()
       await expect(bootstrapApplication(ctx)).resolves.toBeUndefined()
       expect(m.appSetLoginItemSettingsMock).not.toHaveBeenCalled()
+      expect(m.diagLogMock).toHaveBeenCalledWith(
+        'LOGIN',
+        expect.stringContaining('unchanged, skip write')
+      )
+    })
+
+    it('L6 边界（红测）：skip write 分支仍要清理历史残留启动项', async () => {
+      // 2026-11-22 取证：残留项让当前名回读为 false，恰好与 DB=false 一致而落入 skip 分支，
+      // 旧实现在此分支零清理，残留项永久存活并继续开机拉起应用
+      const ownBase = basename(process.execPath)
+      m.appGetLoginItemSettingsMock.mockImplementation(() => ({
+        openAtLogin: false,
+        launchItems: [
+          {
+            name: 'legacy-boot-leftover',
+            path: `D:\\old-install-dir\\${ownBase}`,
+            args: [],
+            scope: 'user',
+            enabled: true
+          }
+        ]
+      }))
+      const ctx = makeLifecycleCtx()
+      ;(ctx.dbManager.getSetting as ReturnType<typeof vi.fn>).mockImplementation(
+        (key: string, dflt: unknown) => (key === 'launchAtLogin' ? false : dflt)
+      )
+      await expect(bootstrapApplication(ctx)).resolves.toBeUndefined()
+      // 残留项被点名清理（带 name 的独立删除）
+      expect(m.appSetLoginItemSettingsMock).toHaveBeenCalledWith({
+        openAtLogin: false,
+        name: 'legacy-boot-leftover'
+      })
+      // 主路径（不带 name 的写/删）零调用：OS 当前名状态本就与 DB 一致，不得重复写
+      const mainPathCalls = m.appSetLoginItemSettingsMock.mock.calls.filter(
+        ([settings]) => (settings as { name?: string }).name === undefined
+      )
+      expect(mainPathCalls).toEqual([])
       expect(m.diagLogMock).toHaveBeenCalledWith(
         'LOGIN',
         expect.stringContaining('unchanged, skip write')

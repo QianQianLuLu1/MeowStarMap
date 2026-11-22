@@ -91,13 +91,29 @@ function normalizeExePath(value: unknown): string | undefined {
   return trimmed.replace(/\//g, '\\').toLowerCase()
 }
 
+/** 取规范化路径（已统一 `\` 与小写）的 exe 基名；无分隔符时原样返回。 */
+function exeBasename(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined
+  const idx = value.lastIndexOf('\\')
+  return idx >= 0 ? value.slice(idx + 1) : value
+}
+
+/** 启动项枚举读数留痕（name|path|scope|enabled），现场取证的唯一窗口。 */
+function describeLaunchItems(items: readonly unknown[]): string {
+  return items
+    .map((item) => {
+      if (typeof item !== 'object' || item === null) return String(item)
+      const rec = item as Record<string, unknown>
+      return `${String(rec.name)}|${String(rec.path)}|${String(rec.scope)}|${String(rec.enabled)}`
+    })
+    .join('; ')
+}
+
 /**
- * 从 Electron 官方 `getLoginItemSettings().launchItems` 读数中，按 exe 路径精确识别
- * 本应用的历史残留 Run 值名。只认 user 作用域、指向当前 exe、且不是当前受管名的项；
- * 绝不按猜测值名清理，也不会误删其它应用的启动项。枚举失败只留痕并返回空名单。
- *
- * 局限：升级后安装目录变更时，旧项的 path 不再等于 process.execPath，此时检测不到，
- * 需由现场人工验收清单处理（见开机自启动修复计划 §7）。
+ * 从 Electron 官方 `getLoginItemSettings().launchItems` 读数中识别本应用的历史残留
+ * Run 值名。只认 user 作用域、指向当前 exe（全路径相等，或 exe 基名相等——覆盖
+ * 升级更换安装目录后旧项 path 不再等于 process.execPath 的场景）且不是当前受管名的
+ * 项；绝不按猜测值名清理，也不会误删其它应用的启动项。枚举失败只留痕并返回空名单。
  */
 export function detectLegacyLoginItemNames(): string[] {
   if (app.isPackaged !== true) return []
@@ -105,12 +121,18 @@ export function detectLegacyLoginItemNames(): string[] {
     const settings: unknown = app.getLoginItemSettings()
     const items = (settings as { launchItems?: unknown } | null | undefined)?.launchItems
     if (!Array.isArray(items)) return []
+    diagLog('LOGIN', `launchItems enumerated: ${describeLaunchItems(items)}`)
     const ownPath = normalizeExePath(process.execPath)
     if (ownPath === undefined) return []
+    const ownBase = exeBasename(ownPath)
     return items
       .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
       .filter((item) => item.scope === 'user')
-      .filter((item) => normalizeExePath(item.path) === ownPath)
+      .filter((item) => {
+        const itemPath = normalizeExePath(item.path)
+        if (itemPath === undefined) return false
+        return itemPath === ownPath || exeBasename(itemPath) === ownBase
+      })
       .map((item) => item.name)
       .filter((name): name is string => typeof name === 'string')
       .filter((name) => name !== CURRENT_LOGIN_ITEM_NAME)
@@ -141,6 +163,18 @@ export function cleanupLegacyLoginItemNames(names: readonly string[]): void {
       logger.warn(`[LOGIN] legacy cleanup failed: name=${name}`, err)
     }
   }
+}
+
+/**
+ * 启动期与同步成功路径共用的残留清理入口：人工确认名单 + OS 读数动态识别，
+ * 去重后逐项删除。启动期「一致跳过写入」分支也必须调用——残留项会让当前名
+ * 回读为 false，恰好与 DB 一致而落入跳过分支，不在这里清理则残留项永久存活
+ * 并继续开机拉起应用（2026-11-22 真机取证）。
+ */
+export function cleanupLegacyLoginItems(): void {
+  cleanupLegacyLoginItemNames([
+    ...new Set([...LEGACY_LOGIN_ITEM_NAMES, ...detectLegacyLoginItemNames()])
+  ])
 }
 
 /**
@@ -184,9 +218,6 @@ export function syncLoginItemSetting(openAtLogin: boolean): LoginItemSyncResult 
 
   diagLog('LOGIN', `login item synced: openAtLogin=${openAtLogin}`)
   logger.info(`[LOGIN] login item synced: openAtLogin=${openAtLogin}`)
-  // 人工确认名单 + OS 读数动态识别，去重后逐项清理（动态识别不猜测值名）
-  cleanupLegacyLoginItemNames([
-    ...new Set([...LEGACY_LOGIN_ITEM_NAMES, ...detectLegacyLoginItemNames()])
-  ])
+  cleanupLegacyLoginItems()
   return { synced: true }
 }

@@ -4,7 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { AppError } from '../../../shared/errors/app-error'
 
 const m = vi.hoisted(() => {
@@ -51,6 +51,7 @@ import {
   normalizeLaunchAtLogin,
   syncLoginItemSetting,
   cleanupLegacyLoginItemNames,
+  detectLegacyLoginItemNames,
   LEGACY_LOGIN_ITEM_NAMES
 } from '../login-item'
 import * as loginItemModule from '../login-item'
@@ -263,5 +264,28 @@ describe('login-item 开机自启共享模块', () => {
       build: { appId: string }
     }
     expect(loginItemModule.CURRENT_LOGIN_ITEM_NAME).toBe(pkg.build.appId)
+  })
+
+  it('D6 边界（红测）：安装目录变更（同 exe 基名、不同路径）的历史值名也能识别', () => {
+    // 2026-11-22 取证：升级换安装目录后旧项 path 不再等于 process.execPath，
+    // 全路径精确匹配漏检，残留项继续开机拉起应用；按 exe 基名兜底识别
+    const movedPath = `D:\\old-install-dir\\${basename(process.execPath)}`
+    m.getLoginItemSettings.mockImplementation(() => ({
+      openAtLogin: true,
+      launchItems: [launchItem('legacy-moved', movedPath)]
+    }))
+    expect(detectLegacyLoginItemNames()).toEqual(['legacy-moved'])
+  })
+
+  it('D7 安全护栏：异基名与 machine 作用域一律不得识别（绝不误删第三方启动项）', () => {
+    const ownBase = basename(process.execPath)
+    m.getLoginItemSettings.mockImplementation(() => ({
+      openAtLogin: true,
+      launchItems: [
+        launchItem('other-tool', 'C:\\other-tool\\tool.exe'),
+        launchItem('same-base-machine', `E:\\elsewhere\\${ownBase}`, 'machine')
+      ]
+    }))
+    expect(detectLegacyLoginItemNames()).toEqual([])
   })
 })
