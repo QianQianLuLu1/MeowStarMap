@@ -66,6 +66,7 @@ import {
   buildSessionOptions,
   initNikkiSyncRuntime,
   nikkisyncDatabaseFile,
+  resolveAssetPackaging,
   resolveMetadataResolverEnabled,
   resolveRecycleHelperPath,
   resolveRuntimeEnabled,
@@ -235,6 +236,22 @@ describe('resolveRecycleHelperPath（K8-a：回收 helper 路径）', () => {
     expect(
       resolveRecycleHelperPath({ isPackaged: false, resourcesPath: '/res', projectRoot: '/app' })
     ).toBe(path.join('/app', 'resources', 'nikkisync', 'nikkisync-recycle-helper.exe'))
+  })
+})
+
+describe('resolveAssetPackaging（资产解析用是否打包）', () => {
+  it('正常：真实打包态（isPackaged=true 且非 defaultApp）按打包资源布局解析', () => {
+    expect(resolveAssetPackaging({ isPackaged: true, defaultApp: false })).toBe(true)
+    expect(resolveAssetPackaging({ isPackaged: true, defaultApp: undefined })).toBe(true)
+  })
+
+  it('异常：electron.exe <显式 app 目录> 形态（isPackaged 恒 true）必须判为非打包', () => {
+    expect(resolveAssetPackaging({ isPackaged: true, defaultApp: true })).toBe(false)
+  })
+
+  it('边界：未打包态无论 defaultApp 取值都判为非打包', () => {
+    expect(resolveAssetPackaging({ isPackaged: false, defaultApp: true })).toBe(false)
+    expect(resolveAssetPackaging({ isPackaged: false, defaultApp: false })).toBe(false)
   })
 })
 
