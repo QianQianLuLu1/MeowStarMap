@@ -30,6 +30,7 @@ import {
   STATUS_POLL_MS
 } from './sync-console-test-utils'
 import { useUIStore } from '../../../stores/uiStore'
+import { ERROR_CODES } from '../../../../shared/errors/error-codes'
 
 const mockNavigate = vi.fn()
 
@@ -125,15 +126,32 @@ describe('ConnectView（(a)-(i) 自 SyncServicePage 随迁）', () => {
     await waitFor(() => expect(screen.getByText('同步组件未就绪')).toBeInTheDocument())
   })
 
-  it('(q) 三段层级：页头 h2 由 Layout 承担；控制/配对/设备三个 h3 同视图存在', async () => {
-    // 锚点适配：h2 页头钉在 SyncConsoleLayout（见其套件），视图内三段 h3 判据不变
+  it('(q2) 宿主能力收口：服务/配对/设备进 Android 卡，隐私说明是页面最后一个区块', async () => {
+    const { container } = renderConnect()
+    await screen.findByRole('switch', { name: '启用同步服务' })
+    const androidCard = screen.getByTestId('sync-console-android-card')
+    // 重启入口回到上游同位（Android 卡按钮行）
+    expect(androidCard).toContainElement(screen.getByTestId('sync-status-restart'))
+    // 隐私说明回页尾：它之后只剩弹窗节点
+    const root = container.querySelector('.sc-connect') as HTMLElement
+    expect(root.lastElementChild?.className).toContain('sc-privacy-note')
+  })
+
+  it('(q) 三段层级：页头 h1 由 Layout 承担；控制/配对/设备三个折叠区块同卡存在', async () => {
+    // 锚点适配：页面标题钉在 SyncConsoleLayout（h1，见其套件）；
+    // 三个宿主区块按上游 IA 收进 Android 卡，用 details 承载
     renderConnect()
     await screen.findByRole('switch', { name: '启用同步服务' })
-    expect(screen.getByRole('heading', { level: 3, name: '同步服务' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: '配对新设备' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 3, name: '已配对设备' })).toBeInTheDocument()
+    const androidCard = screen.getByTestId('sync-console-android-card')
+    expect(androidCard).toContainElement(screen.getByTestId('sync-service-details'))
+    expect(androidCard).toContainElement(screen.getByTestId('sync-pairing-details'))
+    expect(androidCard).toContainElement(screen.getByTestId('sync-devices-details'))
+    // 主开关/配对/设备是主操作面，默认展开（收进 details 但不得藏在折叠后）
+    for (const id of ['sync-service-details', 'sync-pairing-details', 'sync-devices-details']) {
+      expect(screen.getByTestId(id)).toHaveAttribute('open')
+    }
     // 配对入口按钮落在配对区内，而不是挤在开关区里
-    expect(screen.getByRole('button', { name: '配对新设备' })).toBeInTheDocument()
+    expect(screen.getByTestId('sync-pairing-open')).toBeInTheDocument()
   })
 
   it('(r) 状态轮询按 currentView 门控：不在本页时一次都不拉，回到本页才恢复 2s 轮询', async () => {
@@ -516,6 +534,46 @@ describe('T3：Android 卡与导出诊断', () => {
         'success'
       )
     )
+  })
+
+  it('重启失败 ⇒ error Toast（原始技术串不直出）', async () => {
+    serverApi.restartServer.mockRejectedValue(new Error('spawn EACCES'))
+    renderConnect()
+    fireEvent.click(await screen.findByTestId('sync-status-restart'))
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('重启同步服务失败', 'error'))
+  })
+
+  it('重启桥面缺席 ⇒ info Toast，不抛 TypeError', async () => {
+    renderConnect()
+    delete (window.electronAPI as unknown as { nikkisync: { restartServer?: unknown } }).nikkisync
+      .restartServer
+    const button = await screen.findByTestId('sync-status-restart')
+    expect(() => fireEvent.click(button)).not.toThrow()
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('当前构建不可用', 'info'))
+  })
+
+  it('导出失败（success:false）⇒ error Toast', async () => {
+    logExportZip.mockResolvedValue({ success: false })
+    renderConnect()
+    fireEvent.click(await screen.findByTestId('sync-status-export'))
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('导出诊断包失败', 'error'))
+  })
+
+  it('导出桥面缺席 ⇒ info Toast', async () => {
+    renderConnect()
+    delete (window.electronAPI as unknown as { log: { exportZip?: unknown } }).log.exportZip
+    fireEvent.click(await screen.findByTestId('sync-status-export'))
+    await waitFor(() => expect(mockShowMessage).toHaveBeenCalledWith('当前构建不可用', 'info'))
+  })
+
+  it('导出取消（CANCELED）⇒ 静默，不弹 Toast', async () => {
+    logExportZip.mockRejectedValue(
+      Object.assign(new Error('canceled'), { code: ERROR_CODES.CANCELED })
+    )
+    renderConnect()
+    fireEvent.click(await screen.findByTestId('sync-status-export'))
+    await waitFor(() => expect(logExportZip).toHaveBeenCalledTimes(1))
+    expect(mockShowMessage).not.toHaveBeenCalled()
   })
 
   it('服务未运行 ⇒ 生成新二维码按钮禁用（无内容可编）', async () => {

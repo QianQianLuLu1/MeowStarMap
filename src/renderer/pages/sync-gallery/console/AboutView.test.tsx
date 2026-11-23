@@ -57,10 +57,22 @@ describe('T11：版本卡', () => {
     renderAbout()
     expect(await screen.findByText('—')).toBeInTheDocument()
   })
+
+  it('品牌 hero（上游 about-summary）：76px 头像 + 24px 标题，版本/作者/署名同卡', async () => {
+    const { container } = renderAbout()
+    await waitFor(() => expect(appGetVersion).toHaveBeenCalledTimes(1))
+    const hero = screen.getByTestId('sync-about-hero')
+    expect(hero).toHaveClass('sc-about-hero')
+    expect(hero.querySelector('.sc-about-mark .sc-brand-avatar')).not.toBeNull()
+    expect(screen.getByRole('heading', { level: 2, name: '大喵相机助手' })).toBeInTheDocument()
+    expect(hero).toContainElement(screen.getByText(/RanAxro \/ Nikki Albums/))
+    // hero 在页面最前（上游关于页顺序）
+    expect(container.querySelector('.sc-about')?.firstElementChild).toBe(hero)
+  })
 })
 
 describe('T11：下载与更新', () => {
-  it('四渠道外链逐字上游（APK/夸克/百度/GitHub），经 shell.openExternal 打开', async () => {
+  it('四渠道磁贴逐字上游（APK/夸克/百度/GitHub）：href 精确 + 经 shell.openExternal 打开', async () => {
     renderAbout()
     const channels: Array<[string, string]> = [
       ['CNB 测试版', UPSTREAM_ANDROID_APK_URL],
@@ -69,7 +81,9 @@ describe('T11：下载与更新', () => {
       ['GitHub Releases', UPSTREAM_GITHUB_RELEASES_URL]
     ]
     for (const [name, url] of channels) {
-      fireEvent.click(await screen.findByRole('button', { name }))
+      const tile = await screen.findByRole('link', { name })
+      expect(tile).toHaveAttribute('href', url)
+      fireEvent.click(tile)
       await waitFor(() => expect(shellOpenExternal).toHaveBeenCalledWith(url))
     }
     expect(shellOpenExternal).toHaveBeenCalledTimes(4)

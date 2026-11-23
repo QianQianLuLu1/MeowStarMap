@@ -1059,3 +1059,46 @@ describe('R4：目录操作 busy 门（在途期间二次点击只启动一次�
     )
   })
 })
+
+describe('T4：设置页 IA 对齐上游（账号/目录/外壳/法律收口）', () => {
+  it('网络权限/热点卡走控制台卡体系（.sc-card），不再套宿主 .glass-card', async () => {
+    installElectronApi({
+      persisted: {
+        'nikkisync.shellNetworkRepairEnabled': true,
+        'nikkisync.shellHotspotEnabled': true
+      }
+    })
+    renderSettings()
+    for (const testId of ['sync-network-card', 'sync-hotspot-card']) {
+      const card = await screen.findByTestId(testId)
+      expect(card.querySelector('.sc-card')).not.toBeNull()
+      expect(card.querySelector('.glass-card')).toBeNull()
+    }
+  })
+
+  it('账号行组 + 外壳 details 嵌在「同步与连接」卡；额外目录在照片目录卡；法律三链落页脚', async () => {
+    installElectronApi()
+    const { container } = renderSettings()
+    await screen.findByTestId('sync-extra-directories')
+    const cards = container.querySelectorAll('.sc-card')
+    expect(cards.length).toBeGreaterThan(2)
+
+    // 第一张卡 = 同步与连接：账号作用域与 Windows 外壳能力都收在它内部
+    const connectionCard = cards[0] as HTMLElement
+    expect(connectionCard).toContainElement(screen.getByTestId('sync-account-section'))
+    expect(connectionCard).toContainElement(screen.getByTestId('sync-shell-details'))
+
+    // 外壳能力不再单开整卡：全页只有一份外壳开关子树
+    expect(container.querySelectorAll('[data-testid="sync-service-shell-section"]')).toHaveLength(1)
+
+    // 照片目录与额外照片目录合并为一张卡
+    const directoryCard = screen.getByTestId('sync-extra-directories').closest('.sc-card')
+    expect(directoryCard).not.toBeNull()
+    expect(directoryCard).toContainElement(screen.getByText('照片目录'))
+
+    // 法律三链落在 settings-about 页脚，且页脚是设置页最后一个区块
+    const about = screen.getByTestId('sync-settings-about')
+    expect(about).toContainElement(screen.getByRole('button', { name: '用户协议' }))
+    expect(container.querySelector('.sc-settings')?.lastElementChild).toBe(about)
+  })
+})

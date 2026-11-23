@@ -4866,25 +4866,25 @@
     "heading": {
       "connect": {
         "title": "Nikki Album",
-        "subtitle": "Pair your phone, view library stats, and run connection self-checks"
+        "subtitle": "Scenery and outfits from your PC, to enjoy slowly on your phone."
       },
       "settings": {
         "title": "Sync Settings",
-        "subtitle": "Service, directories, accounts, and Windows shell capabilities"
+        "subtitle": "Manage this PC's connection and startup preferences."
       },
       "organizer": {
         "title": "Recently Deleted",
-        "subtitle": "Deletion requests from your phone, moved to the Recycle Bin after approval on this PC"
+        "subtitle": "Review photos sorted on your phone and move them to the PC Recycle Bin."
       },
       "inspiration": {
         "title": "Inspiration Library",
-        "subtitle": "Collect and manage outfit inspirations, with filters and share codes",
+        "subtitle": "Keep the dye codes, outfit codes and outfit references you like.",
         "cardTitle": "Outfit inspiration library",
         "cardDescription": "Save dye codes, outfit codes and reference images. Record offline on your phone and sync when connected."
       },
       "about": {
         "title": "About",
-        "subtitle": "Versions, download channels, and upstream project sources"
+        "subtitle": "Version, updates, and project repositories."
       }
     },
     "connect": {
@@ -5108,7 +5108,7 @@
       "brandLatin": "Momo Camera",
       "brandAlt": "Momo Camera",
       "navAria": "Main navigation",
-      "footerCompat": "Windows client · compatible with mini program and app",
+      "footerCompat": "Windows client · app only",
       "footerDisclaimer": "Infinity Nikki · unofficial photography assistant"
     },
     "status": {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 /**
  * T1：控制台骨架套件——五视图切换 / 待批角标 / 子视图持久化 / 返回不丢栈。
- * (q) 的页面级 h2 判据随迁至此（Connect 套件只保留视图内 h3）。
+ * (q) 的页面级 h1 判据随迁至此（Connect 套件只保留视图内折叠区块）。
  *
  * 运行：npx vitest run src/renderer/pages/sync-gallery/console/SyncConsoleLayout.test.tsx
  */
@@ -38,7 +38,7 @@ afterEach(() => {
 describe('T1：五视图骨架与切换', () => {
   it('(q 随迁) 页面级 h2 随视图切换；左侧子导航五项齐备，默认停在连接视图', async () => {
     renderLayout()
-    expect(await screen.findByRole('heading', { level: 2, name: '暖暖相册' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '暖暖相册' })).toBeInTheDocument()
     for (const [id, label] of [
       ['connect', '手机连接'],
       ['settings', '同步设置'],
@@ -49,26 +49,26 @@ describe('T1：五视图骨架与切换', () => {
       expect(screen.getByTestId(`sync-console-nav-${id}`)).toHaveTextContent(label)
     }
     expect(screen.getByTestId('sync-console-nav-connect')).toHaveAttribute('aria-current', 'page')
-    // 底栏在场（T11）
-    expect(screen.getByTestId('sync-status-bar')).toBeInTheDocument()
+    // 全宽底栏已按上游移除：能力迁回关于 hero / Android 卡
+    expect(screen.queryByTestId('sync-status-bar')).not.toBeInTheDocument()
   })
 
   it('五视图逐一切换：目标视图 hero 在场，切走的视图卸载（内容不残留）', async () => {
     renderLayout()
-    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 1, name: '暖暖相册' })
 
     fireEvent.click(screen.getByTestId('sync-console-nav-settings'))
-    expect(await screen.findByRole('heading', { level: 2, name: '同步设置' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 2, name: '暖暖相册' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '同步设置' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1, name: '暖暖相册' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('sync-console-nav-organizer'))
-    expect(await screen.findByRole('heading', { level: 2, name: '最近删除' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '最近删除' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('sync-console-nav-inspiration'))
-    expect(await screen.findByRole('heading', { level: 2, name: '灵感库' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '灵感库' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByTestId('sync-console-nav-about'))
-    expect(await screen.findByRole('heading', { level: 2, name: '关于' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '关于' })).toBeInTheDocument()
     expect(screen.getByTestId('sync-console-nav-about')).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('sync-console-nav-connect')).not.toHaveAttribute('aria-current')
   })
@@ -109,6 +109,24 @@ describe('T1：五视图骨架与切换', () => {
     await waitFor(() => expect(nullChip).toHaveAttribute('data-state', 'unavailable'))
   })
 
+  it('页头副标题逐视图对齐上游文案（DesktopPageScript.ts:28）', async () => {
+    renderLayout()
+    await screen.findByRole('heading', { level: 1, name: '暖暖相册' })
+    expect(screen.getByText('电脑里的风景与穿搭，在手机上慢慢欣赏。')).toBeInTheDocument()
+
+    const expected: Array<[string, string, string]> = [
+      ['settings', '同步设置', '管理这台电脑的连接与启动偏好。'],
+      ['organizer', '最近删除', '核对手机整理的照片，确认后移入电脑回收站。'],
+      ['inspiration', '灵感库', '收藏喜欢的染色码、搭配码和穿搭参考图。'],
+      ['about', '关于', '版本、更新与项目仓库。']
+    ]
+    for (const [id, title, subtitle] of expected) {
+      fireEvent.click(screen.getByTestId(`sync-console-nav-${id}`))
+      expect(await screen.findByRole('heading', { level: 1, name: title })).toBeInTheDocument()
+      expect(screen.getByText(subtitle)).toBeInTheDocument()
+    }
+  })
+
   it('品牌图加载失败 ⇒ 回退内置相机图标，不留破图', async () => {
     renderLayout()
     const image = await screen.findByTestId('sync-console-brand-image')
@@ -128,31 +146,31 @@ describe('T1：五视图骨架与切换', () => {
 
   it('子视图持久化：切换落盘 syncConsole.view；重挂载恢复上次停留位', async () => {
     const { unmount } = renderLayout()
-    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 1, name: '暖暖相册' })
     fireEvent.click(screen.getByTestId('sync-console-nav-about'))
-    await screen.findByRole('heading', { level: 2, name: '关于' })
+    await screen.findByRole('heading', { level: 1, name: '关于' })
     expect(window.localStorage.getItem('syncConsole.view')).toBe('about')
     unmount()
 
     renderLayout()
-    expect(await screen.findByRole('heading', { level: 2, name: '关于' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { level: 2, name: '暖暖相册' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '关于' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1, name: '暖暖相册' })).not.toBeInTheDocument()
   })
 
   it('持久化值非法/缺席 ⇒ 回默认连接视图（不臆造视图态）', async () => {
     window.localStorage.setItem('syncConsole.view', 'bogus-view')
     renderLayout()
-    expect(await screen.findByRole('heading', { level: 2, name: '暖暖相册' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 1, name: '暖暖相册' })).toBeInTheDocument()
   })
 
   it('返回不丢栈：子视图切换不动宿主 viewStack；goBack 弹的是宿主视图栈', async () => {
     useUIStore.setState({ currentView: 'sync-gallery', viewStack: ['gallery', 'sync-gallery'] })
     renderLayout()
-    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 1, name: '暖暖相册' })
     fireEvent.click(screen.getByTestId('sync-console-nav-settings'))
-    await screen.findByRole('heading', { level: 2, name: '同步设置' })
+    await screen.findByRole('heading', { level: 1, name: '同步设置' })
     fireEvent.click(screen.getByTestId('sync-console-nav-organizer'))
-    await screen.findByRole('heading', { level: 2, name: '最近删除' })
+    await screen.findByRole('heading', { level: 1, name: '最近删除' })
     // 宿主路由栈原封不动（子视图是控制台内部态，不新增 ViewLevel）
     expect(useUIStore.getState().viewStack).toEqual(['gallery', 'sync-gallery'])
     expect(useUIStore.getState().currentView).toBe('sync-gallery')
@@ -286,10 +304,10 @@ describe('T10：待批角标（Layout 自持 5s 轮询）', () => {
   })
 })
 
-describe('T11：底栏重启 ⇒ 连接视图重挂载', () => {
-  it('重启成功后连接视图即时重读状态（refreshTick 重挂载）', async () => {
+describe('T11：重启入口（已迁至 Connect 的 Android 卡）', () => {
+  it('Android 卡内重启成功后连接视图即时重读状态', async () => {
     renderLayout()
-    await screen.findByRole('heading', { level: 2, name: '暖暖相册' })
+    await screen.findByRole('heading', { level: 1, name: '暖暖相册' })
     await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalled())
     const before = serverApi.getServerStatus.mock.calls.length
     fireEvent.click(screen.getByTestId('sync-status-restart'))

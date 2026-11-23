@@ -554,7 +554,7 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     // 同步服务控制台是侧边栏「同步服务」（sync-gallery 视图）的直接宿主界面：
     // 点入口即达，无需再经任何二级入口。
     await page.getByTitle('同步服务').first().click()
-    await page.getByRole('heading', { level: 2, name: '暖暖相册' }).waitFor({ timeout: 20_000 })
+    await page.getByRole('heading', { level: 1, name: '暖暖相册' }).waitFor({ timeout: 20_000 })
 
     // 节标题与开关都来自真实 i18n 文本（不是测试内构造的 DOM）
     const toggle = page.getByRole('switch', { name: '启用同步服务' }).first()
@@ -579,7 +579,7 @@ test.describe('内嵌 NikkiSync Runtime（真实应用会话）', () => {
     await expect(page.getByText('暂无已配对设备').first()).toBeVisible()
 
     // 二维码：真实窗口里由 qrcode 生成的 SVG 必须出图，且下方地址段与运行端口一致
-    await page.getByRole('button', { name: '配对新设备' }).first().click()
+    await page.getByTestId('sync-pairing-open').click()
     const surface = page.locator('.sync-qr-surface').first()
     await expect(surface.locator('svg')).toHaveCount(1, { timeout: 20_000 })
     const svgMarkup = await surface.innerHTML()
