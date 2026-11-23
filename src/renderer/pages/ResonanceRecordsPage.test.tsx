@@ -25,8 +25,11 @@ const emptyData: ResonanceGetDataResult = {
   }
 }
 
+const openExternalMock = vi.fn(() => Promise.resolve({ opened: true }))
+
 function installElectronApi(overrides: Record<string, unknown> = {}): void {
   ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+    shell: { openExternal: openExternalMock },
     resonance: {
       getData: vi.fn(() => Promise.resolve(emptyData)),
       addManualRecord: vi.fn(),
@@ -45,6 +48,7 @@ function installElectronApi(overrides: Record<string, unknown> = {}): void {
 describe('ResonanceRecordsPage 容器', () => {
   beforeEach(() => {
     useResonanceStore.getState().reset()
+    openExternalMock.mockClear()
     installElectronApi()
   })
   afterEach(() => {
@@ -108,5 +112,28 @@ describe('ResonanceRecordsPage 容器', () => {
     fireEvent.click(screen.getByRole('button', { name: '重试' }))
     await waitFor(() => expect(useResonanceStore.getState().loaded).toBe(true))
     expect(getData).toHaveBeenCalledTimes(2)
+  })
+
+  it('挂载即弹出身份门，主标题与两个操作按钮齐备', () => {
+    render(<ResonanceRecordsPage />)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByText('共鸣录暂停更新')).toBeTruthy()
+    expect(screen.getByRole('button', { name: '仍要继续' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '跳转网页' })).toBeTruthy()
+  })
+
+  it('点击「仍要继续」关闭身份门后子页可交互', async () => {
+    render(<ResonanceRecordsPage />)
+    fireEvent.click(screen.getByRole('button', { name: '仍要继续' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    fireEvent.click(screen.getByRole('radio', { name: '个人统计' }))
+    expect(useResonanceStore.getState().activeTab).toBe('stats')
+  })
+
+  it('身份门内点击「跳转网页」调用系统浏览器打开 gongeo.us', () => {
+    render(<ResonanceRecordsPage />)
+    fireEvent.click(screen.getByRole('button', { name: '跳转网页' }))
+    expect(openExternalMock).toHaveBeenCalledTimes(1)
+    expect(openExternalMock).toHaveBeenCalledWith('https://gongeo.us')
   })
 })

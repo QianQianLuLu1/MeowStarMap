@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { EmptyState } from '../components/common/EmptyState'
 import { SkeletonGrid } from '../components/common/Skeleton'
 import { PageHeader } from '../components/common/PageHeader'
 import { SegmentedControl } from '../components/common/SegmentedControl'
+import { ResonanceGateDialog } from '../components/resonance/ResonanceGateDialog'
 import { RecordsView } from '../components/resonance/RecordsView'
 import { WardrobeView } from '../components/resonance/WardrobeView'
 import { ImportExportView } from '../components/resonance/ImportExportView'
@@ -18,6 +19,7 @@ import {
 /**
  * 共鸣录页面容器：首次挂载懒加载本地数据（store 去重），顶部分段切换器切换四个子页。
  * 加载态走 SkeletonGrid 骨架，错误态走 EmptyState（提供重试 CTA），不白屏不静默。
+ * 首次进入时以身份门弹窗告知板块暂停更新（keep-alive 下每次启动仅首入触发一次）。
  */
 
 const TAB_OPTIONS: Array<{ id: ResonanceTab; labelKey: string; icon: React.ReactNode }> = [
@@ -29,6 +31,8 @@ const TAB_OPTIONS: Array<{ id: ResonanceTab; labelKey: string; icon: React.React
 
 export const ResonanceRecordsPage: React.FC = () => {
   const { t } = useTranslation()
+  // 身份门：页面挂载（= 本会话首次进入共鸣录）即弹出，「仍要继续」后关闭不再重现
+  const [gateOpen, setGateOpen] = useState(true)
   const activeTab = useResonanceStore((s) => s.activeTab)
   const setActiveTab = useResonanceStore((s) => s.setActiveTab)
   const loaded = useResonanceStore((s) => s.loaded)
@@ -64,6 +68,7 @@ export const ResonanceRecordsPage: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col gap-4 overflow-hidden">
+      <ResonanceGateDialog open={gateOpen} onContinue={() => setGateOpen(false)} />
       {/* 视觉体系 v3：统一页头（原小字标题行） */}
       <PageHeader
         icon={<IconMessage size={20} />}

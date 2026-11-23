@@ -4434,6 +4434,12 @@
       "colPulls": "Total pulls",
       "colAvg": "Avg. pulls",
       "colPercentile": "Percentile"
+    },
+    "gate": {
+      "title": "Resonance Records Paused",
+      "notice": "Due to the author's limited development capacity, the Resonance Records section in the app is now paused. However, capable contributors are welcome to continue developing this section via PRs. Alternatively, you can visit gongeo.us in your browser.",
+      "continue": "Continue Anyway",
+      "visit": "Open Website"
     }
   },
   "syncGallery": {

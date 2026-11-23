@@ -4434,6 +4434,12 @@
       "colPulls": "總抽取次數",
       "colAvg": "平均出貨",
       "colPercentile": "百分位"
+    },
+    "gate": {
+      "title": "共鳴錄暫停更新",
+      "notice": "由於作者開發精力有限，軟體內的共鳴錄板塊暫停更新。但如有能力的暖媽，也可以透過 PR 的方式繼續更新該板塊的功能。也可以直接在瀏覽器中前往 gongeo.us。",
+      "continue": "仍要繼續",
+      "visit": "前往網頁"
     }
   },
   "syncGallery": {
