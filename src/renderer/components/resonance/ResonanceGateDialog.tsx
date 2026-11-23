@@ -14,7 +14,8 @@ interface ResonanceGateDialogProps {
 
 /**
  * 共鸣录身份门：板块暂停更新告知弹窗。
- * 居中覆盖层拦截（遮罩点击不可关闭），仅有「仍要继续」「跳转网页」两个出口；
+ * 局部遮罩：absolute 定位覆盖共鸣录页面容器（祖先需 relative），不拦截侧边栏/标题栏；
+ * 遮罩点击不可关闭，仅有「仍要继续」「跳转网页」两个出口；
  * 视觉复用 BaseDialog 玻璃卡片与 CSS 变量主题，文案全部走 i18n。
  */
 export const ResonanceGateDialog: React.FC<ResonanceGateDialogProps> = ({ open, onContinue }) => {
@@ -33,6 +34,7 @@ export const ResonanceGateDialog: React.FC<ResonanceGateDialogProps> = ({ open, 
       onClose={onContinue}
       closeOnOverlayClick={false}
       overlayBackground="var(--overlay-bg-strong)"
+      overlayPosition="absolute"
       ariaLabelledby="resonance-gate-title"
     >
       <h2

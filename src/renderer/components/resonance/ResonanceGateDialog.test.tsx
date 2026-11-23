@@ -95,4 +95,11 @@ describe('ResonanceGateDialog 身份门弹窗', () => {
     render(<ResonanceGateDialog open={false} onContinue={onContinue} />)
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+
+  it('遮罩为局部绝对定位（不覆盖整个应用窗口）', () => {
+    renderGate()
+    const dialog = screen.getByRole('dialog')
+    expect(dialog.className).toContain('absolute')
+    expect(dialog.className).not.toContain('fixed')
+  })
 })

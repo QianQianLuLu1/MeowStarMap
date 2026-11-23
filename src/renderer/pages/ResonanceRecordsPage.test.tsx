@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup, act } from '@testing-library/react'
 import { ResonanceRecordsPage } from './ResonanceRecordsPage'
 import { useResonanceStore } from '../stores/resonanceStore'
+import { useUIStore } from '../stores/uiStore'
 import type { ResonanceGetDataResult } from '../../shared/types/resonance'
 
 /**
@@ -48,12 +49,18 @@ function installElectronApi(overrides: Record<string, unknown> = {}): void {
 describe('ResonanceRecordsPage 容器', () => {
   beforeEach(() => {
     useResonanceStore.getState().reset()
+    // 身份门可见性依赖当前视图：默认置于共鸣录（与 App 中 keep-alive 激活态一致）
+    useUIStore.setState({
+      currentView: 'resonance-records',
+      viewStack: ['gallery', 'resonance-records']
+    })
     openExternalMock.mockClear()
     installElectronApi()
   })
   afterEach(() => {
     cleanup()
     delete (window as unknown as { electronAPI?: unknown }).electronAPI
+    useUIStore.setState({ currentView: 'gallery', viewStack: ['gallery'] })
   })
 
   it('渲染品牌标题与四个子页切换按钮', () => {
@@ -135,5 +142,39 @@ describe('ResonanceRecordsPage 容器', () => {
     fireEvent.click(screen.getByRole('button', { name: '跳转网页' }))
     expect(openExternalMock).toHaveBeenCalledTimes(1)
     expect(openExternalMock).toHaveBeenCalledWith('https://gongeo.us')
+  })
+
+  it('身份门挂载在共鸣录页面容器内且为局部遮罩', () => {
+    const { container } = render(<ResonanceRecordsPage />)
+    const pageRoot = container.firstElementChild as HTMLElement
+    const dialog = screen.getByRole('dialog')
+    expect(pageRoot.contains(dialog)).toBe(true)
+    expect(dialog.className).toContain('absolute')
+    expect(dialog.className).not.toContain('fixed')
+    expect(pageRoot.className).toContain('relative')
+  })
+
+  it('非激活视图下不渲染身份门（避免隐藏页吞焦点）', () => {
+    useUIStore.setState({ currentView: 'gallery' })
+    render(<ResonanceRecordsPage />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('未确认时切走再切回，身份门重新显示', async () => {
+    render(<ResonanceRecordsPage />)
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    act(() => useUIStore.setState({ currentView: 'gallery' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    act(() => useUIStore.setState({ currentView: 'resonance-records' }))
+    expect(screen.getByRole('dialog')).toBeTruthy()
+  })
+
+  it('点击「仍要继续」后切走再切回，不再显示身份门', async () => {
+    render(<ResonanceRecordsPage />)
+    fireEvent.click(screen.getByRole('button', { name: '仍要继续' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    act(() => useUIStore.setState({ currentView: 'gallery' }))
+    act(() => useUIStore.setState({ currentView: 'resonance-records' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
