@@ -45,29 +45,6 @@
     "GHSA-r292-9mhp-454m",
     // —— sigstore 1 项
     "GHSA-52v5-jr5w-gjxr",
-    // —— electron 1 项
-    "GHSA-9f4c-93c8-jc8g",
-    // —— vitest / vite 2 项
-    "GHSA-5xrq-8626-4rwp",
-    "GHSA-fx2h-pf6j-xcff",
-    // —— 2026-09 新披露批次 15 项
-    "GHSA-2v37-7h3g-55p8",
-    "GHSA-3jxr-9vmj-r5cp",
-    "GHSA-4cwx-7wf7-3272",
-    "GHSA-5j98-mcp5-4vw2",
-    "GHSA-5jgf-p345-68v8",
-    "GHSA-5p4m-2wfm-xmqj",
-    "GHSA-73wf-gq98-2v4g",
-    "GHSA-7p8r-x3mc-p8w7",
-    "GHSA-c83g-rgw3-j3cx",
-    "GHSA-f65p-4m7j-42xc",
-    "GHSA-fph4-wmhf-6fwf",
-    "GHSA-jqff-g426-hqxp",
-    "GHSA-mh99-v99m-4gvg",
-    "GHSA-mwp4-54f8-5fhr",
-    "GHSA-rgw5-rvv9-x895",
-    // —— braces 1 项（DEBT-034，dev 工具链、上游无修复版）
-    "GHSA-vfj7-8cjw-p6xm",
     // —— electron 2026-10 新披露 1 项（DEBT-038，41 线无回移补丁，跨大版本待专项）
     "GHSA-jr5w-w6x2-84p9"
   ]
