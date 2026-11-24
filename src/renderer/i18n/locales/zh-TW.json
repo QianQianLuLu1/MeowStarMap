@@ -4434,6 +4434,12 @@
       "colPulls": "總抽取次數",
       "colAvg": "平均出貨",
       "colPercentile": "百分位"
+    },
+    "gate": {
+      "title": "共鳴錄暫停更新",
+      "notice": "由於作者開發精力有限，軟體內的共鳴錄板塊暫停更新。但如有能力的暖媽，也可以透過 PR 的方式繼續更新該板塊的功能。也可以直接在瀏覽器中前往 gongeo.us。",
+      "continue": "仍要繼續",
+      "visit": "前往網頁"
     }
   },
   "syncGallery": {
@@ -4860,25 +4866,25 @@
     "heading": {
       "connect": {
         "title": "暖暖相簿",
-        "subtitle": "配對手機、檢視資產總覽與連線自查"
+        "subtitle": "電腦裡的風景與穿搭，在手機上慢慢欣賞。"
       },
       "settings": {
         "title": "同步設定",
-        "subtitle": "服務、目錄、帳號與 Windows 外殼能力"
+        "subtitle": "管理這台電腦的連線與啟動偏好。"
       },
       "organizer": {
         "title": "最近刪除",
-        "subtitle": "手機端發起的刪除請求，經本機批准後移入回收站"
+        "subtitle": "核對手機整理的照片，確認後移入電腦回收站。"
       },
       "inspiration": {
         "title": "靈感庫",
-        "subtitle": "收集與管理搭配靈感，支援篩選與分享碼",
+        "subtitle": "收藏喜歡的染色碼、搭配碼和穿搭參考圖。",
         "cardTitle": "穿搭靈感庫",
         "cardDescription": "收藏染色碼、搭配碼和參考圖。手機離線時可先記錄，連接後同步。"
       },
       "about": {
         "title": "關於",
-        "subtitle": "版本、下載管道與上游專案來源"
+        "subtitle": "版本、更新與專案儲存庫。"
       }
     },
     "connect": {
@@ -5102,7 +5108,7 @@
       "brandLatin": "Momo Camera",
       "brandAlt": "大喵相機助手",
       "navAria": "主導覽",
-      "footerCompat": "Windows 用戶端 · 相容小程式與 App",
+      "footerCompat": "Windows 用戶端 · 僅需 App",
       "footerDisclaimer": "無限暖暖 · 非官方攝影助手"
     },
     "status": {

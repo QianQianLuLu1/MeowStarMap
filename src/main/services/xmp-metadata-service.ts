@@ -1,3 +1,4 @@
+// @core-change: 修复 exifr 读取路径在解析抛错时泄漏 FileHandle（Node 26 下 GC 抛未捕获异常），改走句柄安全封装 parseExifFile
 /**
  * XMP 元数据写入/读取服务
  *
@@ -26,12 +27,12 @@ import fs from 'fs'
 import fsp from 'fs/promises'
 import path from 'path'
 import sharp from 'sharp'
-import exifr from 'exifr'
 import { app } from 'electron'
 import { ValidationError, NotFoundError } from '../../shared/errors/app-error'
 import { getUniqueFilePath } from '../utils/file-utils'
 import { isImageExt } from '../utils/media-constants'
 import { getLosslessEncodeOptions } from '../utils/image-encode'
+import { parseExifFile } from '../utils/exif-file'
 import { t } from '../i18n'
 import {
   EDITOR_METADATA_SCHEMA_VERSION,
@@ -217,7 +218,8 @@ export async function readMetadataFromFile(filePath: string): Promise<EditorMeta
     // exifr xmp 模式：仅解析 XMP 段，输出原始字符串与解析后对象
     // exifr v7 的 ifd0 类型仅接受 FormatOptions 对象（注释明确 cannot be disabled）
     // 故不传 ifd0 字段；其余禁用项保持 false
-    const result = (await exifr.parse(filePath, {
+    // 走句柄安全封装：exifr 高层 parse(filePath) 在解析抛错时不关闭内部 FileHandle
+    const result = await parseExifFile(filePath, {
       xmp: true,
       iptc: false,
       exif: false,
@@ -225,7 +227,7 @@ export async function readMetadataFromFile(filePath: string): Promise<EditorMeta
       ihdr: false,
       icc: false,
       tiff: false
-    })) as Record<string, unknown> | null
+    })
 
     if (!result) return null
 

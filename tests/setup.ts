@@ -16,13 +16,19 @@
  */
 import '@testing-library/jest-dom/vitest'
 import { vi, afterEach } from 'vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import '../src/renderer/i18n'
 import {
   recordMotionAnimateCall,
   type MotionAnimateCall,
   type MotionAnimateOptions
 } from './motion-animate-stub'
+
+// 异步 UI 断言预算：全量并发（551 文件 / 6 worker）下，默认 1s 的 findBy*/waitFor 会在
+// 重型 jsdom 文件上被判「找不到元素」而假红——2026-11-23 两轮全量的红灯分别落在
+// LocationMapCard 与 ConnectView 两个无关文件上，单跑稳定通过，确认是调度争用而非
+// 断言失败。按仓库既有 50a0b45 口径统一放宽到 5s：断言内容一字不改，只放宽等待。
+configure({ asyncUtilTimeout: 5000 })
 
 // jsdom 环境补齐
 if (typeof window !== 'undefined') {

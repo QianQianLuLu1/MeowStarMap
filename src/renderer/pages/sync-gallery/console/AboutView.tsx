@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ConsoleRow, ConsoleSection } from './console-ui'
+import { ConsoleCard, ConsoleRow, ConsoleSection } from './console-ui'
+import { CONSOLE_BRAND_IMAGE } from './brand-assets'
 import { useGlobalToast } from '../../../components/common/ToastProvider'
 import { useErrorToast } from '../../../hooks/useErrorToast'
 import {
@@ -75,127 +76,124 @@ export const AboutView: React.FC = () => {
 
   return (
     <div className="sc-about">
-      {/* 版本卡：宿主版本 + 上游对齐版本/提交双版本口径（与底栏同源常量） */}
-      <ConsoleSection titleAs="h2" title={t('syncConsole.about.version.title')}>
-        {/* tagline 与脚注直接挂在卡片体（grid gap 负责节奏）；服务行整组独占一块，
-            这样组内首行命中 `:first-child`，不再多出一条贴住 tagline 的分割线 */}
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          {t('syncConsole.about.version.tagline')}
+      {/* 品牌 hero：对齐上游 about-summary（76px 头像 / 24px 标题 / 版本 / 作者 / 署名） */}
+      <ConsoleCard className="sc-about-hero" testId="sync-about-hero">
+        <div className="sc-about-mark">
+          <img
+            className="sc-brand-avatar"
+            src={CONSOLE_BRAND_IMAGE}
+            alt={t('syncConsole.shell.brandAlt')}
+            width={76}
+            height={76}
+          />
+        </div>
+        <h2>{t('syncConsole.shell.brandName')}</h2>
+        <p className="sc-about-version">
+          <span>{hostVersion ?? '—'}</span>
+          <span> · </span>
+          <span>{NIKKISYNC_ALIGNED_VERSION}</span>
+          <span> · </span>
+          <span>{NIKKISYNC_ALIGNED_COMMIT}</span>
         </p>
-        <div className="sc-service-rows">
-          <ConsoleRow
-            label={t('syncConsole.about.version.host')}
-            description={hostVersion ?? '—'}
-          />
-          <ConsoleRow
-            label={t('syncConsole.about.version.aligned')}
-            description={NIKKISYNC_ALIGNED_VERSION}
-          />
-          <ConsoleRow
-            label={t('syncConsole.about.version.commit')}
-            description={NIKKISYNC_ALIGNED_COMMIT}
-          />
-        </div>
-        <div>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {t('syncConsole.about.version.author')}
-          </p>
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {t('syncConsole.about.version.attribution')}
-          </p>
-        </div>
-      </ConsoleSection>
+        <p className="sc-about-author">{t('syncConsole.about.version.author')}</p>
+        <p className="sc-about-lines">{t('syncConsole.about.version.attribution')}</p>
+        <p className="sc-about-lines">
+          {t('syncConsole.about.version.host')} · {t('syncConsole.about.version.aligned')}
+        </p>
+      </ConsoleCard>
 
-      {/* 下载与更新：四渠道外链逐字上游；检查更新走宿主通道 */}
-      <ConsoleSection titleAs="h2" title={t('syncConsole.about.download.title')}>
-        <div className="space-y-2">
-          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-            {t('syncConsole.about.download.networkHint')}
-          </p>
-          {DOWNLOAD_CHANNELS.map((channel) => (
-            <div className="sc-service-rows" key={channel.key}>
-              <ConsoleRow
-                label={t(`syncConsole.about.download.${channel.key}`)}
-                description={t(`syncConsole.about.download.${channel.key}Note`)}
+      {/* 下载与更新：四渠道磁贴（上游 download-link 2 列网格）+ 宿主内更新通道 */}
+      <ConsoleSection
+        titleAs="h2"
+        title={t('syncConsole.about.download.title')}
+        description={t('syncConsole.about.download.networkHint')}
+      >
+        <div className="sc-download-grid">
+          {DOWNLOAD_CHANNELS.map((channel) => {
+            const label = t(`syncConsole.about.download.${channel.key}`)
+            return (
+              <a
+                key={channel.key}
+                href={channel.url}
+                aria-label={label}
+                className="sc-download-link"
+                data-testid={`sync-about-download-${channel.key}`}
+                onClick={(event) => {
+                  event.preventDefault()
+                  void openUpstreamLink(channel.url, showError)
+                }}
               >
-                <button
-                  type="button"
-                  className="btn-secondary text-xs"
-                  onClick={() => void openUpstreamLink(channel.url, showError)}
-                >
-                  {t(`syncConsole.about.download.${channel.key}`)}
-                </button>
-              </ConsoleRow>
-            </div>
-          ))}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              data-testid="sync-about-check-update"
-              className="btn-primary text-sm"
-              disabled={checking}
-              onClick={() => void handleCheckUpdate()}
-            >
-              {t('syncConsole.about.update.check')}
-            </button>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncConsole.about.update.note')}
-            </p>
-          </div>
+                <span className="sc-download-label">
+                  <span>{t('syncConsole.shell.brandLatin')}</span>
+                </span>
+                <strong>{label}</strong>
+                <small>{t(`syncConsole.about.download.${channel.key}Note`)}</small>
+              </a>
+            )
+          })}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            data-testid="sync-about-check-update"
+            className="btn-primary text-sm"
+            disabled={checking}
+            onClick={() => void handleCheckUpdate()}
+          >
+            {t('syncConsole.about.update.check')}
+          </button>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncConsole.about.update.note')}
+          </p>
         </div>
       </ConsoleSection>
 
       {/* 诊断与反馈：导出走既有 log:exportZip；support-submit 未装载 ⇒ 诚实置灰 */}
       <ConsoleSection titleAs="h2" title={t('syncConsole.about.feedback.title')}>
-        <div className="space-y-2">
-          <div className="sc-service-rows">
-            <ConsoleRow
-              label={t('syncConsole.statusBar.export')}
-              description={t('syncConsole.about.feedback.exportNote')}
+        <div className="sc-service-rows">
+          <ConsoleRow
+            label={t('syncConsole.statusBar.export')}
+            description={t('syncConsole.about.feedback.exportNote')}
+          >
+            <button
+              type="button"
+              data-testid="sync-about-export"
+              className="btn-secondary text-xs"
+              onClick={() => void exportDiagnostics(t, showMessage, showError)}
             >
-              <button
-                type="button"
-                data-testid="sync-about-export"
-                className="btn-secondary text-xs"
-                onClick={() => void exportDiagnostics(t, showMessage, showError)}
-              >
-                {t('syncConsole.statusBar.export')}
-              </button>
-            </ConsoleRow>
-          </div>
-          <div className="sc-service-rows">
-            <ConsoleRow
-              label={t('syncConsole.about.feedback.support')}
-              description={t('syncConsole.about.feedback.supportNote')}
-            >
-              <button type="button" className="btn-secondary text-xs" disabled>
-                {t('syncConsole.about.feedback.support')}
-              </button>
-            </ConsoleRow>
-          </div>
+              {t('syncConsole.statusBar.export')}
+            </button>
+          </ConsoleRow>
+          <ConsoleRow
+            label={t('syncConsole.about.feedback.support')}
+            description={t('syncConsole.about.feedback.supportNote')}
+          >
+            <button type="button" className="btn-secondary text-xs" disabled>
+              {t('syncConsole.about.feedback.support')}
+            </button>
+          </ConsoleRow>
         </div>
       </ConsoleSection>
 
       {/* 项目仓库与来源：五链（上游六链减去已失效旧址，理由见 upstream-links.ts） */}
       <ConsoleSection titleAs="h2" title={t('syncConsole.about.repos.title')}>
-        <div className="space-y-2">
+        <div className="sc-service-rows">
           {UPSTREAM_REPO_LINKS.map((repo) => (
-            <div className="sc-service-rows" key={repo.key}>
-              <ConsoleRow
-                label={t(`syncConsole.about.repos.${repo.key}`)}
-                description={
-                  repo.key === 'momo' ? repo.url : t(`syncConsole.about.repos.${repo.key}Note`)
-                }
+            <ConsoleRow
+              key={repo.key}
+              label={t(`syncConsole.about.repos.${repo.key}`)}
+              description={
+                repo.key === 'momo' ? repo.url : t(`syncConsole.about.repos.${repo.key}Note`)
+              }
+            >
+              <button
+                type="button"
+                className="btn-secondary text-xs"
+                onClick={() => void openUpstreamLink(repo.url, showError)}
               >
-                <button
-                  type="button"
-                  className="btn-secondary text-xs"
-                  onClick={() => void openUpstreamLink(repo.url, showError)}
-                >
-                  {t(`syncConsole.about.repos.${repo.key}`)}
-                </button>
-              </ConsoleRow>
-            </div>
+                {t(`syncConsole.about.repos.${repo.key}`)}
+              </button>
+            </ConsoleRow>
           ))}
         </div>
       </ConsoleSection>

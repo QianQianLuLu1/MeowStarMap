@@ -4434,6 +4434,12 @@
       "colPulls": "Invocações",
       "colAvg": "Média",
       "colPercentile": "Percentil"
+    },
+    "gate": {
+      "title": "Diário de Ressonância Nikki pausado",
+      "notice": "Devido ao tempo de desenvolvimento limitado do autor, a seção «Diário de Ressonância» do aplicativo está pausada. Quem tiver disponibilidade pode continuar atualizando essa seção via PR. Você também pode visitar gongeo.us no navegador.",
+      "continue": "Continuar mesmo assim",
+      "visit": "Abrir site"
     }
   },
   "syncGallery": {

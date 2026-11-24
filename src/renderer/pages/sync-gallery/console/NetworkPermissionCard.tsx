@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, SettingsCard } from '../../settings/shared'
+import { ConsoleSection } from './console-ui'
 import { useErrorToast } from '../../../hooks/useErrorToast'
 import type {
   NikkiSyncNetworkAuthResultInfo,
@@ -96,7 +96,8 @@ export const NetworkPermissionCard: React.FC<NetworkPermissionCardProps> = ({
 
   return (
     <div data-testid="sync-network-card">
-      <SectionShell
+      <ConsoleSection
+        titleAs="h2"
         title={t('syncConsole.settings.network.title')}
         description={t('syncConsole.settings.network.description')}
       >
@@ -110,109 +111,107 @@ export const NetworkPermissionCard: React.FC<NetworkPermissionCardProps> = ({
             </button>
           </div>
         ) : (
-          <SettingsCard>
-            <div className="space-y-2">
-              {!authAvailable || !conflictAvailable ? (
-                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('syncConsole.settings.network.unavailable')}
-                </p>
-              ) : null}
+          <div className="sc-stack">
+            {!authAvailable || !conflictAvailable ? (
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {t('syncConsole.settings.network.unavailable')}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn-primary text-sm"
+                disabled={busy || !authAvailable}
+                onClick={() => void runAuth('authorize')}
+              >
+                {t('syncConsole.settings.network.authorize')}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                disabled={busy || !authAvailable}
+                onClick={() => void runAuth('revoke')}
+              >
+                {t('syncConsole.settings.network.revoke')}
+              </button>
+            </div>
+            {authStatus && (
+              <p className="text-xs" data-testid="sync-network-auth-status">
+                {statusText(authStatus)}
+              </p>
+            )}
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('syncConsole.settings.network.note')}
+            </p>
+            <div className="sc-stack pt-1">
+              <p className="text-xs font-medium">
+                {t('syncConsole.settings.network.conflictTitle')}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {t('syncConsole.settings.network.conflictDesc')}
+              </p>
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   type="button"
-                  className="btn-primary text-sm"
-                  disabled={busy || !authAvailable}
-                  onClick={() => void runAuth('authorize')}
+                  className="btn-secondary text-xs"
+                  disabled={busy || !conflictAvailable}
+                  onClick={() => void runConflict('inspect')}
                 >
-                  {t('syncConsole.settings.network.authorize')}
+                  {t('syncConsole.settings.network.inspect')}
                 </button>
                 <button
                   type="button"
-                  className="btn-ghost text-sm"
-                  disabled={busy || !authAvailable}
-                  onClick={() => void runAuth('revoke')}
+                  className="btn-secondary text-xs"
+                  disabled={busy || !conflictAvailable}
+                  onClick={() => void runConflict('repair')}
                 >
-                  {t('syncConsole.settings.network.revoke')}
+                  {t('syncConsole.settings.network.repair')}
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost text-xs"
+                  disabled={busy || !conflictAvailable || conflict?.canRestore !== true}
+                  onClick={() => void runConflict('restore')}
+                >
+                  {t('syncConsole.settings.network.restore')}
                 </button>
               </div>
-              {authStatus && (
-                <p className="text-xs" data-testid="sync-network-auth-status">
-                  {statusText(authStatus)}
-                </p>
+              {conflict && (
+                <div className="sc-stack" data-testid="sync-network-conflict-result">
+                  <p className="text-xs">{statusText(conflict.status)}</p>
+                  {conflict.conflicts && conflict.conflicts.length > 0 ? (
+                    <>
+                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        {t('syncConsole.settings.network.conflictsFound', {
+                          count: conflict.conflicts.length
+                        })}
+                      </p>
+                      <ul className="flex flex-col gap-1">
+                        {conflict.conflicts.map((rule) => (
+                          <li
+                            key={`${rule.name}-${rule.profile}`}
+                            className="font-mono text-xs"
+                            style={{ color: 'var(--text-tertiary)' }}
+                          >
+                            {rule.name} · {rule.action} · {rule.profile}
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                      {t('syncConsole.settings.network.noConflicts')}
+                    </p>
+                  )}
+                </div>
               )}
               <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {t('syncConsole.settings.network.note')}
+                {t('syncConsole.settings.network.conflictNote')}
               </p>
-              <div className="space-y-2 pt-1">
-                <p className="text-xs font-medium">
-                  {t('syncConsole.settings.network.conflictTitle')}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('syncConsole.settings.network.conflictDesc')}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    className="btn-secondary text-xs"
-                    disabled={busy || !conflictAvailable}
-                    onClick={() => void runConflict('inspect')}
-                  >
-                    {t('syncConsole.settings.network.inspect')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-secondary text-xs"
-                    disabled={busy || !conflictAvailable}
-                    onClick={() => void runConflict('repair')}
-                  >
-                    {t('syncConsole.settings.network.repair')}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn-ghost text-xs"
-                    disabled={busy || !conflictAvailable || conflict?.canRestore !== true}
-                    onClick={() => void runConflict('restore')}
-                  >
-                    {t('syncConsole.settings.network.restore')}
-                  </button>
-                </div>
-                {conflict && (
-                  <div className="space-y-1" data-testid="sync-network-conflict-result">
-                    <p className="text-xs">{statusText(conflict.status)}</p>
-                    {conflict.conflicts && conflict.conflicts.length > 0 ? (
-                      <>
-                        <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                          {t('syncConsole.settings.network.conflictsFound', {
-                            count: conflict.conflicts.length
-                          })}
-                        </p>
-                        <ul className="space-y-1">
-                          {conflict.conflicts.map((rule) => (
-                            <li
-                              key={`${rule.name}-${rule.profile}`}
-                              className="font-mono text-xs"
-                              style={{ color: 'var(--text-tertiary)' }}
-                            >
-                              {rule.name} · {rule.action} · {rule.profile}
-                            </li>
-                          ))}
-                        </ul>
-                      </>
-                    ) : (
-                      <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                        {t('syncConsole.settings.network.noConflicts')}
-                      </p>
-                    )}
-                  </div>
-                )}
-                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('syncConsole.settings.network.conflictNote')}
-                </p>
-              </div>
             </div>
-          </SettingsCard>
+          </div>
         )}
-      </SectionShell>
+      </ConsoleSection>
     </div>
   )
 }

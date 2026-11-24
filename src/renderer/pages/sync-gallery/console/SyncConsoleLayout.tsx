@@ -19,7 +19,6 @@ import { SettingsView } from './SettingsView'
 import { OrganizerView } from './OrganizerView'
 import { InspirationView } from './InspirationView'
 import { AboutView } from './AboutView'
-import { SyncStatusBar } from './SyncStatusBar'
 import './sync-console.css'
 
 /** T10：待批角标轮询间隔（上游 DesktopPageScript 的 5s 节奏）。 */
@@ -47,10 +46,10 @@ function readStoredView(): ConsoleView {
 
 /**
  * N2/N3：同步控制台骨架——上游 DesktopPage 同款 188px 品牌子导航 +
- * 当前视图页头（h2/副标题/状态 chip）+ 视图容器 + 全宽底栏。
+ * 当前视图页头（h1/副标题/状态 chip）+ 视图容器。
  *
  * 设计约束：
- * - 标题随视图切换（CONSOLE_HEADING_KEYS），视图内不再重复页面级 h3；
+ * - 标题随视图切换（CONSOLE_HEADING_KEYS），视图内不再重复页面级 h1；
  * - 子导航复用宿主 nav 语义，但外观走 .sync-console 局部设计系统，不改全局主题；
  * - 视图按需挂载（切走即卸载）：轮询定时器随卸载结构性清零；
  * - 状态 chip 只在视图切换时取一次快照；Connect 可见时由其 2s 轮询回传，
@@ -62,8 +61,6 @@ export const SyncConsoleLayout: React.FC = () => {
   const [view, setView] = useState<ConsoleView>(readStoredView)
   const [organizerEnabled, setOrganizerEnabled] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
-  /** 底栏重启成功 ⇒ 连接视图重挂载即时重读状态（其余视图不受影响）。 */
-  const [refreshTick, setRefreshTick] = useState(0)
   const [serverStatus, setServerStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
   const [brandImageFailed, setBrandImageFailed] = useState(false)
 
@@ -93,8 +90,7 @@ export const SyncConsoleLayout: React.FC = () => {
   }, [])
 
   // 页头 chip：进入控制台时取一次快照；后续由 Connect 可见轮询回传。
-  // 不在**子视图切换**时追加 IPC（`view` 不进依赖），保证「切到关于即停表」的轮询门控不退化；
-  // 底栏重启成功（refreshTick）是显式动作，需要补拉一次，否则停在其它子视图时 chip 会一直是旧值。
+  // 不在**子视图切换**时追加 IPC（`view` 不进依赖），保证「切到关于即停表」的轮询门控不退化。
   useEffect(() => {
     if (currentView !== SYNC_CONSOLE_HOST_VIEW) return
     let alive = true
@@ -113,7 +109,7 @@ export const SyncConsoleLayout: React.FC = () => {
     return () => {
       alive = false
     }
-  }, [currentView, refreshTick])
+  }, [currentView])
 
   const handleNavigate = useCallback((next: ConsoleView): void => {
     setView(next)
@@ -121,10 +117,6 @@ export const SyncConsoleLayout: React.FC = () => {
 
   const handleOrganizerEnabledChange = useCallback((enabled: boolean): void => {
     setOrganizerEnabled(enabled)
-  }, [])
-
-  const handleRefresh = useCallback((): void => {
-    setRefreshTick((tick) => tick + 1)
   }, [])
 
   // T10：待批角标 5s 轮询。门控关闭时清零计数且不留定时器；
@@ -237,7 +229,7 @@ export const SyncConsoleLayout: React.FC = () => {
             {/* N3：一页一个标题；状态 chip 与上游 page-header 同位 */}
             <header className="sc-page-header">
               <div>
-                <h2 className="sc-page-title">{t(CONSOLE_HEADING_KEYS[view].title)}</h2>
+                <h1 className="sc-page-title">{t(CONSOLE_HEADING_KEYS[view].title)}</h1>
                 <p className="sc-page-subtitle">{t(CONSOLE_HEADING_KEYS[view].subtitle)}</p>
               </div>
               <span
@@ -253,11 +245,7 @@ export const SyncConsoleLayout: React.FC = () => {
             </header>
 
             {view === 'connect' && (
-              <ConnectView
-                key={`connect-${refreshTick}`}
-                onNavigate={handleNavigate}
-                onServerStatusChange={setServerStatus}
-              />
+              <ConnectView onNavigate={handleNavigate} onServerStatusChange={setServerStatus} />
             )}
             {view === 'settings' && <SettingsView />}
             {view === 'organizer' && (
@@ -266,10 +254,6 @@ export const SyncConsoleLayout: React.FC = () => {
             {view === 'inspiration' && <InspirationView />}
             {view === 'about' && <AboutView />}
           </main>
-
-          {/* T11：全宽底栏（双版本 + 重启 + 导出诊断）；服务快照与页头 chip 同源，
-              恢复提示只在确认停机时出现 */}
-          <SyncStatusBar onRefresh={handleRefresh} serverStatus={serverStatus} />
         </div>
       </div>
     </div>

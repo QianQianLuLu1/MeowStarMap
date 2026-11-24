@@ -169,4 +169,26 @@ describe('BaseDialog', () => {
     // trapFocus=false 时 overlayRef 不传入，组件仍可渲染
     expect(screen.getByRole('dialog')).toBeTruthy()
   })
+
+  it('默认遮罩使用 fixed 定位（向后兼容）', () => {
+    render(
+      <BaseDialog open={true} onClose={vi.fn()}>
+        <p>内容</p>
+      </BaseDialog>
+    )
+    const overlay = screen.getByRole('dialog')
+    expect(overlay.className).toContain('fixed')
+    expect(overlay.className).not.toContain('absolute')
+  })
+
+  it("overlayPosition='absolute' 时遮罩使用局部绝对定位", () => {
+    render(
+      <BaseDialog open={true} onClose={vi.fn()} overlayPosition="absolute">
+        <p>内容</p>
+      </BaseDialog>
+    )
+    const overlay = screen.getByRole('dialog')
+    expect(overlay.className).toContain('absolute')
+    expect(overlay.className).not.toContain('fixed')
+  })
 })

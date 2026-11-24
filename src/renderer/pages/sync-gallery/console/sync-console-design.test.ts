@@ -30,9 +30,39 @@ describe('N2 控制台设计系统', () => {
       ".sc-chip[data-state='ready']",
       '.sc-connection-grid',
       '.sc-card',
-      '.sc-status-bar'
+      '.sc-settings-about',
+      '.sc-about-hero',
+      '.sc-download-grid'
     ]) {
       expect(css).toContain(selector)
+    }
+    // 卡面不得再引用宿主的半透明 surface（rgba(255,255,255,.75)）：
+    // 上游 --surface 是实底，半透明会让下层内容透出、观感像卡片重叠
+    expect(css).not.toMatch(/--sc-surface:\s*var\(--bg-secondary\)/)
+  })
+
+  it('卡内间距单轨：视图层不得再用 space-y-* 包裹（改由 .sc-card-body 的 gap 承担）', () => {
+    for (const file of ['SettingsView.tsx', 'ConnectView.tsx', 'AboutView.tsx']) {
+      const source = readFileSync(resolve(consoleDir, file), 'utf8')
+      expect(source, `${file} 仍在用 space-y-*`).not.toContain('space-y-')
+    }
+  })
+
+  it('列表行不得逐项套 sc-service-rows（会吃掉 :first-child 分隔线与内边距）', () => {
+    for (const file of ['SettingsView.tsx', 'AboutView.tsx']) {
+      const source = readFileSync(resolve(consoleDir, file), 'utf8')
+      expect(source, `${file} 仍有逐项 sc-service-rows 包裹`).not.toMatch(
+        /<div className="sc-service-rows" key=/
+      )
+    }
+  })
+
+  it('嵌套非行组用 .sc-stack 承担 8px 节奏（sc-service-rows 无样式）', () => {
+    const css = readFileSync(cssPath, 'utf8')
+    expect(css).toContain('.sync-console .sc-stack')
+    for (const file of ['SettingsView.tsx', 'HotspotCard.tsx', 'NetworkPermissionCard.tsx']) {
+      const source = readFileSync(resolve(consoleDir, file), 'utf8')
+      expect(source, `${file} 未使用 sc-stack`).toContain('className="sc-stack"')
     }
   })
 
@@ -58,7 +88,14 @@ describe('N2 控制台设计系统', () => {
     expect(layout).toContain("import './sync-console.css'")
     expect(layout).toContain('sc-sidebar')
     expect(layout).toContain('sc-brand')
-    const statusBar = readFileSync(resolve(consoleDir, 'SyncStatusBar.tsx'), 'utf8')
-    expect(statusBar).toContain('sc-status-bar')
+    // 底栏已按上游形态移除：版本/重启/导出分别回到关于 hero、Android 卡与关于页
+    expect(layout).not.toContain('sc-status-bar')
+    expect(layout).toContain('<h1 className="sc-page-title">')
+  })
+
+  it('五入口图标互不重复：最近删除保留 trash 以区分灵感库', () => {
+    const layout = readFileSync(layoutPath, 'utf8')
+    expect(layout).toContain("organizer: 'trash'")
+    expect(layout).not.toContain("organizer: 'album'")
   })
 })

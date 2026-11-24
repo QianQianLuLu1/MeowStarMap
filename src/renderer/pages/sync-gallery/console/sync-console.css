@@ -8,7 +8,9 @@
 .sync-console {
   /* 一律映射宿主主题 token（globals.css :root 恒有定义），不写硬编码兜底色 */
   --sc-bg: var(--bg-primary);
-  --sc-surface: var(--bg-secondary);
+  /* 卡面必须不透明：上游 --surface:#FFFCF7 为实底。宿主 --bg-secondary 是
+     75% 半透明（globals.css），任何跨卡绘制都会透出下层文字，观感像卡片重叠。 */
+  --sc-surface: var(--sc-paper);
   --sc-text: var(--text-primary);
   --sc-secondary: var(--text-secondary);
   --sc-tertiary: var(--text-tertiary);
@@ -24,7 +26,7 @@
    * 影响面：仅本作用域；回滚方案：删掉本行并还原为 `#fff` 字面量。
    */
   --sc-paper: #fff;
-  --sc-card-shadow: 0 5px 24px color-mix(in srgb, var(--sc-text) 6%, transparent);
+  --sc-card-shadow: 0 5px 24px color-mix(in srgb, var(--sc-text) 4%, transparent);
   --sc-line: color-mix(in srgb, var(--sc-border) 78%, transparent);
   display: flex;
   flex-direction: column;
@@ -105,7 +107,7 @@
 .sync-console .sc-nav {
   display: grid;
   gap: 7px;
-  margin-top: 42px;
+  margin-top: 48px;
   overflow-y: auto;
 }
 
@@ -131,7 +133,7 @@
 }
 
 .sync-console .sc-nav-item[aria-current='page'] {
-  color: var(--sc-accent);
+  color: var(--sc-brand);
   background: var(--sc-tint);
   font-weight: 600;
 }
@@ -147,8 +149,8 @@
   min-width: 20px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--sc-brand) 18%, var(--sc-paper));
-  color: var(--sc-accent);
+  background: var(--sc-brand);
+  color: var(--sc-paper);
   font-size: 11px;
   text-align: center;
 }
@@ -269,7 +271,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 21px;
 }
 
 .sync-console .sc-card-head-text {
@@ -302,8 +304,143 @@
   min-width: 0;
 }
 
+/* 嵌套非行组（说明/输入/按钮）的纵向节奏：card-body 的 gap 只作用于直接子级，
+   行列表由 .sc-setting-row 的 padding/border 分隔，这里补回旧 space-y-2 的 8px。 */
+.sync-console .sc-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
 .sync-console .sc-card:last-child {
   margin-bottom: 0;
+}
+
+/* 空态承载：EmptyState 根节点是 h-full(=height:100%)，放在 grid 卡体里会形成
+   百分比高度循环，令卡片高度与内容不一致。控制台内统一由本容器给高度。 */
+.sync-console .sc-empty-holder {
+  padding: 14px 0 4px;
+}
+
+.sync-console .sc-details-summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-empty-holder > * {
+  height: auto;
+}
+
+/* 设置页页脚（上游 .settings-about）：署名两行 + 法律三链 */
+.sync-console .sc-settings-about {
+  padding: 7px 5px 0;
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-settings-about-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  margin-top: 6px;
+}
+
+/* 关于页品牌 hero（上游 .about-summary） */
+.sync-console .sc-about-hero {
+  text-align: center;
+}
+
+.sync-console .sc-about-mark {
+  display: flex;
+  justify-content: center;
+  margin: 2px 0 16px;
+}
+
+.sync-console .sc-about-mark .sc-brand-avatar {
+  width: 76px;
+  height: 76px;
+  border-radius: 24px;
+}
+
+.sync-console .sc-about-hero h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-about-version {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--sc-secondary);
+}
+
+.sync-console .sc-about-author {
+  margin-top: 20px;
+  font-size: 13px;
+  color: var(--sc-text);
+}
+
+.sync-console .sc-about-lines {
+  margin-top: 12px;
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--sc-secondary);
+}
+
+/* 关于页下载磁贴（上游 .download-link，2 列网格） */
+.sync-console .sc-download-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sync-console .sc-download-link {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  min-width: 0;
+  min-height: 96px;
+  padding: 16px;
+  border: 1px solid var(--sc-border);
+  border-radius: 17px;
+  background: var(--sc-tint);
+  color: var(--sc-brand);
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    transform 0.15s;
+}
+
+.sync-console .sc-download-link:hover {
+  background: color-mix(in srgb, var(--sc-tint) 70%, var(--sc-paper));
+  transform: translateY(-1px);
+}
+
+.sync-console .sc-download-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  color: var(--sc-accent);
+}
+
+.sync-console .sc-download-link strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sync-console .sc-download-link small {
+  font-size: 10px;
+  line-height: 1.7;
+  color: var(--sc-secondary);
 }
 
 .sync-console .sc-setting-row {
@@ -692,35 +829,6 @@
   margin-bottom: 14px;
 }
 
-.sync-console .sc-status-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  flex: none;
-  min-height: 54px;
-  padding: 12px 38px;
-  border-top: 1px solid var(--sc-line);
-  background: color-mix(in srgb, var(--sc-bg) 74%, var(--sc-paper));
-}
-
-.sync-console .sc-status-bar-text {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  font-size: 11px;
-  color: var(--sc-secondary);
-  font-variant-numeric: tabular-nums;
-}
-
-.sync-console .sc-status-bar-spacer {
-  flex: 1;
-}
-
-.sync-console .sc-status-bar .btn-secondary {
-  min-height: 32px;
-}
-
 /* 注意：`.sync-console .glass-card` 不是死规则——BaseDialog 不走 portal，
    控制台内打开的确认弹窗就在本子树内，靠这条规则换肤。 */
 .sync-console .glass-card {
@@ -846,10 +954,6 @@
 
   .sync-console .sc-page-title {
     font-size: 25px;
-  }
-
-  .sync-console .sc-status-bar {
-    padding: 12px 20px;
   }
 
   .sync-console .sc-device-summary {

@@ -4434,6 +4434,12 @@
       "colPulls": "Tiradas",
       "colAvg": "Tiradas medias",
       "colPercentile": "Percentil"
+    },
+    "gate": {
+      "title": "Diario de resonancia Nikki en pausa",
+      "notice": "Debido al tiempo de desarrollo limitado del autor, la sección «Diario de resonancia» de la aplicación queda en pausa. No obstante, quienes tengan capacidad pueden seguir actualizando esta sección mediante PR. También puedes visitar gongeo.us en tu navegador.",
+      "continue": "Continuar de todos modos",
+      "visit": "Abrir sitio web"
     }
   },
   "syncGallery": {
