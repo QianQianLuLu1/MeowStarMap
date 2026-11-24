@@ -148,6 +148,26 @@ export function resolvePcAssetsDir(input: {
     : path.join(input.projectRoot, 'resources', 'nikkisync', 'pc')
 }
 
+/**
+ * 资产解析用「是否打包」判据。
+ *
+ * Electron 41 下 `electron.exe <显式 app 目录>`（dev 直跑 / e2e launchBuiltApp）的
+ * `app.isPackaged` 恒为 true，但资源布局仍是仓内开发态；`process.defaultApp` 是该形态的
+ * 权威信号（与 index.ts 取证 provider 同口径）。只看 isPackaged 会把 @nikkisync、图标、
+ * 回收 helper 误解析到 `node_modules/electron/dist/resources/app.asar` 下而装载失败。
+ */
+export function resolveAssetPackaging(input: {
+  isPackaged: boolean
+  defaultApp: boolean | undefined
+}): boolean {
+  return input.isPackaged === true && input.defaultApp !== true
+}
+
+/** 当前进程的资产解析档位（生产打包 vs 仓内开发态，含 `electron.exe <app 目录>` 形态）。 */
+function assetPackaging(): boolean {
+  return resolveAssetPackaging({ isPackaged: app.isPackaged, defaultApp: process.defaultApp })
+}
+
 /** 库文件相对 userData 的路径段。 */
 export const NIKKISYNC_DB_SEGMENTS = ['nikkisync', 'nikkisync.db'] as const
 /** K2：在线解析同意文件相对 userData 的路径段（上游 0600 JSON，读写全在上游）。 */
@@ -455,7 +475,7 @@ async function assemblePcCompanionServices(
       projectRoot: app.getAppPath(),
       packagingContext: options.packagingContext,
       resourcesDir: resolvePcAssetsDir({
-        isPackaged: app.isPackaged,
+        isPackaged: assetPackaging(),
         resourcesPath: process.resourcesPath,
         projectRoot: app.getAppPath()
       }),
@@ -503,7 +523,7 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
   // recycle_unavailable，删除任务标 failed、绝不退化为永久删除）。exe 尚未构建
   // （fresh dev 环境未跑 build:recycle-helper）时保持未设置并 warn，可诊断不静默。
   const recycleHelperPath = resolveRecycleHelperPath({
-    isPackaged: app.isPackaged,
+    isPackaged: assetPackaging(),
     resourcesPath: process.resourcesPath,
     projectRoot: app.getAppPath()
   })
@@ -521,7 +541,7 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
   try {
     await syncTray(settings.getBoolean(SETTING_SHELL_TRAY, false), async () => {
       const electron = (await import('electron')) as unknown as TrayElectronApi
-      const iconPath = app.isPackaged
+      const iconPath = assetPackaging()
         ? path.join(process.resourcesPath, 'app.asar.unpacked', 'resources', 'icons', 'icon.ico')
         : path.join(app.getAppPath(), 'resources', 'icons', 'icon.ico')
       return createTray({
@@ -542,7 +562,7 @@ export async function initNikkiSyncRuntime(ctx: AppContext): Promise<NikkiSyncRu
   const options = buildSessionOptions({
     userDataDir: app.getPath('userData'),
     projectRoot: app.getAppPath(),
-    isPackaged: app.isPackaged,
+    isPackaged: assetPackaging(),
     resourcesPath: process.resourcesPath,
     diagnosticsDir: path.join(getForensicsRoot(), ...NIKKISYNC_DIAGNOSTICS_DIR_SEGMENTS),
     env: process.env,

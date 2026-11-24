@@ -4323,6 +4323,12 @@
       "updated": "已更新补录时间",
       "deleted": "已删除记录"
     },
+    "gate": {
+      "title": "共鸣录暂停更新",
+      "notice": "由于作者开发精力有限，软件内的共鸣录板块暂停更新。但如有能力的暖妈，也可以通过 PR 的方式继续更新该板块的功能。也可以直接在浏览器中访问 gongeo.us。",
+      "continue": "仍要继续",
+      "visit": "跳转网页"
+    },
     "wardrobe": {
       "cat": {
         "item": "部件",
@@ -4801,7 +4807,7 @@
       "brandLatin": "Momo Camera",
       "brandAlt": "大喵相机助手",
       "navAria": "同步控制台导航",
-      "footerCompat": "Windows 客户端 · 兼容小程序和 APP",
+      "footerCompat": "Windows 客户端 · 仅需 APP",
       "footerDisclaimer": "无限暖暖 · 非官方摄影助手"
     },
     "status": {
@@ -4819,25 +4825,25 @@
     "heading": {
       "connect": {
         "title": "暖暖相册",
-        "subtitle": "配对手机、查看资产总览与连接自查"
+        "subtitle": "电脑里的风景与穿搭，在手机上慢慢欣赏。"
       },
       "settings": {
         "title": "同步设置",
-        "subtitle": "服务、目录、账号与 Windows 外壳能力"
+        "subtitle": "管理这台电脑的连接与启动偏好。"
       },
       "organizer": {
         "title": "最近删除",
-        "subtitle": "手机端发起的删除请求，经本机批准后移入回收站"
+        "subtitle": "核对手机整理的照片，确认后移入电脑回收站。"
       },
       "inspiration": {
         "title": "灵感库",
-        "subtitle": "收集与管理搭配灵感，支持筛选与分享码",
+        "subtitle": "收藏喜欢的染色码、搭配码和穿搭参考图。",
         "cardTitle": "穿搭灵感库",
         "cardDescription": "收藏染色码、搭配码和参考图。手机离线时可先记录，连接后同步。"
       },
       "about": {
         "title": "关于",
-        "subtitle": "版本、下载渠道与上游项目来源"
+        "subtitle": "版本、更新与项目仓库。"
       }
     },
     "connect": {

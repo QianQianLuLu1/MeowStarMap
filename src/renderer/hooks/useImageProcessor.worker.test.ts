@@ -64,6 +64,8 @@ interface RenderRequest {
   width?: number
   height?: number
   watermark?: unknown
+  /** 渲染参数（调参用例据此定位带目标参数的帧，而非硬锁数组下标） */
+  params?: { contrast: number }
 }
 
 /** 可控 worker 替身：记录收到的 RENDER 请求，并按 mode 决定回复 RESULT / ERROR / 不回复 */
@@ -196,9 +198,12 @@ describe('useImageProcessor · worker 出图', () => {
     await act(async () => {
       result.current.updateParam('contrast', 40)
     })
-    await waitUntil(() => workers[0].requests.length >= 1)
-
-    const request = workers[0].requests[0]
+    // 调参前首帧（contrast 默认 0）与调参帧的入队顺序受调度影响，
+    // 故按「存在 contrast=40 的帧」定位请求，不硬锁 requests[0]（并发下可能拿到首帧假红）；
+    // 找不到目标帧时回落到 requests[0]，断言照旧判红。
+    await waitUntil(() => workers[0].requests.some((r) => r.params?.contrast === 40))
+    const request =
+      workers[0].requests.find((r) => r.params?.contrast === 40) ?? workers[0].requests[0]
     expect(request.buffer).toBeInstanceOf(ArrayBuffer)
     expect(request.width).toBe(8)
     expect(request.height).toBe(8)

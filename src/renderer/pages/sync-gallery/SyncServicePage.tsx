@@ -10,7 +10,7 @@ import { SyncConsoleLayout } from './console/SyncConsoleLayout'
  * - Organizer（K8 最近删除队列）→ console/OrganizerView
  * - Inspiration（灵感库，复用 SyncInspirationPanel）→ console/InspirationView
  * - About（版本/下载/仓库/署名）→ console/AboutView
- * 底栏（双版本/重启/导出诊断）→ console/SyncStatusBar。
+ * 版本/重启/导出诊断按上游同位分散承载（关于 hero / Android 卡 / 关于页），不设全宽底栏。
  *
  * 导出名与懒加载路径保持不变（App.tsx 零改动）；行为判据随断言迁至
  * console/ 下按视图套件（原判据不重写），本文件只保留装配冒烟。

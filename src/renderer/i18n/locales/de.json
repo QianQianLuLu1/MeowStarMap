@@ -4434,6 +4434,12 @@
       "colPulls": "Züge",
       "colAvg": "Ø Züge",
       "colPercentile": "Perzentil"
+    },
+    "gate": {
+      "title": "Nikki-Resonanzbuch pausiert",
+      "notice": "Aufgrund der begrenzten Entwicklungszeit des Autors ist das Nikki-Resonanzbuch in der App vorübergehend eingestellt. Engagierte Mitwirkende können diesen Bereich jedoch per PR weiterentwickeln. Alternativ können Sie gongeo.us im Browser besuchen.",
+      "continue": "Trotzdem fortfahren",
+      "visit": "Webseite öffnen"
     }
   },
   "syncGallery": {

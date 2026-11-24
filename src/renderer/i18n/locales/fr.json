@@ -4434,6 +4434,12 @@
       "colPulls": "Invocations",
       "colAvg": "Moyenne",
       "colPercentile": "Percentile"
+    },
+    "gate": {
+      "title": "Journal de résonance Nikki en pause",
+      "notice": "En raison du temps de développement limité de l'auteur, la section « Journal de résonance » de l'application est en pause. Les contributeurs compétents peuvent toutefois continuer à la faire évoluer via des PR. Vous pouvez également consulter gongeo.us dans votre navigateur.",
+      "continue": "Continuer quand même",
+      "visit": "Ouvrir le site web"
     }
   },
   "syncGallery": {

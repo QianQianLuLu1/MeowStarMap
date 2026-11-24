@@ -745,9 +745,12 @@ export const SettingsView: React.FC = () => {
 
   /** T7：「去开启」——滚到同视图的外壳开关分区（opt-in 开关就在那里）。 */
   const jumpToShellSection = (): void => {
-    document
-      .querySelector('[data-testid="sync-service-shell-section"]')
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    const target = document.querySelector('[data-testid="sync-service-shell-section"]')
+    if (!target) return
+    // 外壳能力已折叠进「同步与连接」卡：先展开 details 再滚动，否则跳到收起区块等于空跳
+    const host = target.closest('details')
+    if (host) host.open = true
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   /** T7：外壳开关观测同步（稳定身份——refreshFlags 经 deps 依赖它，抖动会造成重读风暴）。 */
@@ -810,7 +813,7 @@ export const SettingsView: React.FC = () => {
         {/* K2：在线解析同意块（仅解析开启且会话挂出同意面时显示；同意前零出站） */}
         {metadataEnabled && consent && (
           <div className="sc-service-rows">
-            <div className="space-y-2">
+            <div className="sc-service-rows">
               <p className="text-xs font-medium">{t('syncService.consent.title')}</p>
               <ConsoleRow label={t('syncService.consent.endpoint')}>
                 <span className="font-mono text-xs break-all">
@@ -840,34 +843,36 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
         )}
-      </ConsoleSection>
 
-      {/* ⑤K9：账号同步作用域（1.0.27 上游 AccountSyncSettings；会话无 accounts 时整节隐藏） */}
-      {syncAccounts && (
-        <ConsoleSection
-          titleAs="h2"
-          title={t('syncService.syncAccounts.title')}
-          description={t('syncService.syncAccounts.scopeNote')}
-        >
-          <div className="space-y-2">
-            <SettingsToggle
-              label={t('syncService.syncAccounts.all')}
-              checked={allAccounts}
-              disabled={accountSaving}
-              onChange={setAllAccounts}
-            />
-            {syncAccounts.accounts.length === 0 ? (
-              <EmptyState
-                title={t('syncService.syncAccounts.empty')}
-                subtitle={t('syncService.syncAccounts.emptyHint')}
+        {/* ⑤K9：账号同步作用域（1.0.27 上游 AccountSyncSettings；会话无 accounts 时整节隐藏）
+          —— 上游把它嵌在「同步与连接」卡内，这里同样不单开整卡 */}
+        {syncAccounts && (
+          <div className="sc-service-rows" data-testid="sync-account-section">
+            <div>
+              <h3 className="sc-card-title">{t('syncService.syncAccounts.title')}</h3>
+              <p className="sc-card-desc">{t('syncService.syncAccounts.scopeNote')}</p>
+            </div>
+            <div className="sc-service-rows">
+              <SettingsToggle
+                label={t('syncService.syncAccounts.all')}
+                checked={allAccounts}
+                disabled={accountSaving}
+                onChange={setAllAccounts}
               />
-            ) : (
-              <>
-                {syncAccounts.accounts.map((account) => {
-                  const label = accountLabel(account.uid, t)
-                  return (
-                    <div className="sc-service-rows" key={account.uid}>
+              {syncAccounts.accounts.length === 0 ? (
+                <div className="sc-empty-holder">
+                  <EmptyState
+                    title={t('syncService.syncAccounts.empty')}
+                    subtitle={t('syncService.syncAccounts.emptyHint')}
+                  />
+                </div>
+              ) : (
+                <>
+                  {syncAccounts.accounts.map((account) => {
+                    const label = accountLabel(account.uid, t)
+                    return (
                       <ConsoleRow
+                        key={account.uid}
                         label={label}
                         description={t('syncService.syncAccounts.count', {
                           count: account.count
@@ -906,26 +911,35 @@ export const SettingsView: React.FC = () => {
                           />
                         </div>
                       </ConsoleRow>
-                    </div>
-                  )
-                })}
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    className="btn-primary text-sm"
-                    disabled={accountSaving}
-                    onClick={() => void handleSaveAccounts()}
-                  >
-                    {accountSaving
-                      ? t('syncService.syncAccounts.saving')
-                      : t('syncService.syncAccounts.save')}
-                  </button>
-                </div>
-              </>
-            )}
+                    )
+                  })}
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      className="btn-primary text-sm"
+                      disabled={accountSaving}
+                      onClick={() => void handleSaveAccounts()}
+                    >
+                      {accountSaving
+                        ? t('syncService.syncAccounts.saving')
+                        : t('syncService.syncAccounts.save')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </ConsoleSection>
-      )}
+        )}
+
+        {/* Windows 外壳能力：上游无对应卡，收进本卡 details（默认收起，零网络/零子进程） */}
+        <details className="sc-details" data-testid="sync-shell-details">
+          <summary className="sc-details-summary">{t('syncService.shell.title')}</summary>
+          <p className="sc-card-desc">{t('syncService.shell.description')}</p>
+          <div className="pt-2">
+            <SyncShellSection onFlagsChanged={handleShellFlagsChanged} />
+          </div>
+        </details>
+      </ConsoleSection>
 
       {/* T4：启动偏好（服务自启 + 开机自启，两个独立键各管一件事） */}
       <ConsoleSection titleAs="h2" title={t('syncConsole.settings.startup.title')}>
@@ -967,7 +981,7 @@ export const SettingsView: React.FC = () => {
             </span>
           </ConsoleRow>
         </div>
-        <div className="space-y-2">
+        <div className="sc-stack" data-testid="sync-photo-directory-form">
           <input
             type="text"
             value={gameRootInput}
@@ -1010,25 +1024,25 @@ export const SettingsView: React.FC = () => {
             </button>
           </div>
         </div>
-      </ConsoleSection>
 
-      {/* ④K6：额外照片目录（仅作用于同步库扫描器；会话未挂面时整节隐藏） */}
-      {extraDirs && (
-        <ConsoleSection
-          titleAs="h2"
-          title={t('syncService.extraDirectories.title')}
-          description={t('syncService.extraDirectories.scopeNote')}
-        >
-          <div className="space-y-2">
-            {extraDirs.directories.length === 0 ? (
-              <EmptyState
-                title={t('syncService.extraDirectories.empty')}
-                subtitle={t('syncService.extraDirectories.emptyHint')}
-              />
-            ) : (
-              extraDirs.directories.map((dir) => (
-                <div className="sc-service-rows" key={dir.id}>
-                  <ConsoleRow label={dir.path}>
+        {/* ④K6：额外照片目录（上游把当前目录与额外扫描目录放在同一张卡里；未挂面时整节隐藏） */}
+        {extraDirs && (
+          <div className="sc-stack" data-testid="sync-extra-directories">
+            <div>
+              <h3 className="sc-card-title">{t('syncService.extraDirectories.title')}</h3>
+              <p className="sc-card-desc">{t('syncService.extraDirectories.scopeNote')}</p>
+            </div>
+            <div className="sc-service-rows">
+              {extraDirs.directories.length === 0 ? (
+                <div className="sc-empty-holder">
+                  <EmptyState
+                    title={t('syncService.extraDirectories.empty')}
+                    subtitle={t('syncService.extraDirectories.emptyHint')}
+                  />
+                </div>
+              ) : (
+                extraDirs.directories.map((dir) => (
+                  <ConsoleRow key={dir.id} label={dir.path}>
                     <div className="flex items-center gap-3">
                       <span className="font-mono text-xs" style={{ color: 'var(--text-tertiary)' }}>
                         {dir.mode}
@@ -1070,100 +1084,104 @@ export const SettingsView: React.FC = () => {
                       </button>
                     </div>
                   </ConsoleRow>
+                ))
+              )}
+              {/* 预检确认区：展示识别到的照片/视频计数，确认后才真正加入 */}
+              {proposal && (
+                <div className="sc-service-rows">
+                  <ConsoleRow label={proposal.id}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        {t('syncService.extraDirectories.proposalSummary', {
+                          images: proposal.images,
+                          videos: proposal.videos
+                        })}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-primary text-xs"
+                        disabled={busy}
+                        onClick={() => void handleConfirmAdd()}
+                      >
+                        {t('syncService.extraDirectories.confirmAdd')}
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs"
+                        onClick={() => setProposal(null)}
+                      >
+                        {t('syncService.extraDirectories.cancelAdd')}
+                      </button>
+                    </div>
+                  </ConsoleRow>
                 </div>
-              ))
-            )}
-            {/* 预检确认区：展示识别到的照片/视频计数，确认后才真正加入 */}
-            {proposal && (
-              <div className="sc-service-rows">
-                <ConsoleRow label={proposal.id}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      {t('syncService.extraDirectories.proposalSummary', {
-                        images: proposal.images,
-                        videos: proposal.videos
-                      })}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn-primary text-xs"
-                      disabled={busy}
-                      onClick={() => void handleConfirmAdd()}
-                    >
-                      {t('syncService.extraDirectories.confirmAdd')}
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-ghost text-xs"
-                      onClick={() => setProposal(null)}
-                    >
-                      {t('syncService.extraDirectories.cancelAdd')}
-                    </button>
-                  </div>
-                </ConsoleRow>
-              </div>
-            )}
-            {/* 手输目录入口：先 admit（主进程校验 + 登记 pathGuard）再走既有 inspect 提案流。
+              )}
+              {/* 手输目录入口：先 admit（主进程校验 + 登记 pathGuard）再走既有 inspect 提案流。
                 系统选择器选中的目录在 dialog-handler 登记后同样能过 inspect 门禁，两条路同权。 */}
-            <div className="flex items-center gap-2">
-              <input
-                type="text"
-                value={typedDirInput}
-                onChange={(e) => setTypedDirInput(e.target.value)}
-                placeholder={t('syncService.extraDirectories.typedPlaceholder')}
-                spellCheck={false}
-                className="flex-1 px-3 py-2 text-sm rounded-lg border"
-                style={{
-                  background: 'var(--bg-tertiary)',
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-primary)'
-                }}
-              />
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                disabled={busy || extraDirs.busy}
-                onClick={() => void handleInspectTypedDirectory()}
-              >
-                {t('syncService.extraDirectories.inspectTyped')}
-              </button>
-            </div>
-            <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={typedDirInput}
+                  onChange={(e) => setTypedDirInput(e.target.value)}
+                  placeholder={t('syncService.extraDirectories.typedPlaceholder')}
+                  spellCheck={false}
+                  className="flex-1 px-3 py-2 text-sm rounded-lg border"
+                  style={{
+                    background: 'var(--bg-tertiary)',
+                    borderColor: 'var(--border-subtle)',
+                    color: 'var(--text-primary)'
+                  }}
+                />
                 <button
                   type="button"
                   className="btn-secondary text-sm"
-                  disabled={busy}
-                  onClick={() => void handleAddDirectory()}
+                  disabled={busy || extraDirs.busy}
+                  onClick={() => void handleInspectTypedDirectory()}
                 >
-                  {t('syncService.extraDirectories.add')}
+                  {t('syncService.extraDirectories.inspectTyped')}
                 </button>
-                {/* K9：直接添加并标为旋转吧大喵（inspect 带 source） */}
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary text-sm"
+                    disabled={busy}
+                    onClick={() => void handleAddDirectory()}
+                  >
+                    {t('syncService.extraDirectories.add')}
+                  </button>
+                  {/* K9：直接添加并标为旋转吧大喵（inspect 带 source） */}
+                  <button
+                    type="button"
+                    className="btn-ghost text-sm"
+                    disabled={busy}
+                    onClick={() => void handleAddSpinningDirectory()}
+                  >
+                    {t('syncService.extraDirectories.addSpinning')}
+                  </button>
+                </div>
                 <button
                   type="button"
                   className="btn-ghost text-sm"
-                  disabled={busy}
-                  onClick={() => void handleAddSpinningDirectory()}
+                  disabled={busy || extraDirs.busy}
+                  onClick={() => void handleRescanExtraDirs()}
                 >
-                  {t('syncService.extraDirectories.addSpinning')}
+                  {t('syncService.extraDirectories.rescan')}
                 </button>
               </div>
-              <button
-                type="button"
-                className="btn-ghost text-sm"
-                disabled={busy || extraDirs.busy}
-                onClick={() => void handleRescanExtraDirs()}
-              >
-                {t('syncService.extraDirectories.rescan')}
-              </button>
             </div>
           </div>
-        </ConsoleSection>
-      )}
+        )}
+      </ConsoleSection>
 
-      {/* T4：法律条款三链（desktopOpen().url + /legal/*；PC 服务缺席 ⇒ 禁用 + Tooltip） */}
-      <ConsoleSection titleAs="h2" title={t('syncConsole.settings.legal.title')}>
-        <div className="flex flex-wrap items-center gap-2">
+      {/* T4：法律三链并入页脚（上游 settings-about 位置；PC 服务缺席 ⇒ 禁用 + Tooltip） */}
+      <div className="sc-settings-about" data-testid="sync-settings-about">
+        <p>
+          {t('syncConsole.shell.brandName')} · {t('syncConsole.shell.brandLatin')}
+        </p>
+        <p>{t('syncConsole.shell.footerDisclaimer')}</p>
+        <div className="sc-settings-about-links">
           {(
             [
               ['privacy', 'privacy'],
@@ -1197,10 +1215,7 @@ export const SettingsView: React.FC = () => {
             {t('syncConsole.settings.legal.unavailable')}
           </p>
         )}
-      </ConsoleSection>
-
-      {/* Windows 外壳能力：6 个开关默认关闭，关闭时所有动作零网络/零子进程 */}
-      <SyncShellSection onFlagsChanged={handleShellFlagsChanged} />
+      </div>
     </div>
   )
 }
@@ -1339,83 +1354,77 @@ const SyncShellSection: React.FC<{
 
   return (
     <div data-testid="sync-service-shell-section">
-      <ConsoleSection
-        titleAs="h2"
-        title={t('syncService.shell.title')}
-        description={t('syncService.shell.description')}
-      >
+      <div className="sc-service-rows">
         <div className="sc-service-rows">
-          <div className="space-y-2">
-            {SHELL_SETTING_KEYS.map((key, index) => (
-              <SettingsToggle
-                key={key}
-                label={t(SHELL_TOGGLE_LABELS[index] as string)}
-                checked={flags[key] === true}
-                onChange={(value) => void toggle(key, value)}
-              />
-            ))}
-            <ConsoleRow label={t('syncService.shell.icon.title')}>
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                disabled={busy}
-                onClick={() => void run('icon')}
-              >
-                {t('syncService.shell.icon.check')}
-              </button>
-            </ConsoleRow>
+          {SHELL_SETTING_KEYS.map((key, index) => (
+            <SettingsToggle
+              key={key}
+              label={t(SHELL_TOGGLE_LABELS[index] as string)}
+              checked={flags[key] === true}
+              onChange={(value) => void toggle(key, value)}
+            />
+          ))}
+          <ConsoleRow label={t('syncService.shell.icon.title')}>
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              disabled={busy}
+              onClick={() => void run('icon')}
+            >
+              {t('syncService.shell.icon.check')}
+            </button>
+          </ConsoleRow>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncService.shell.icon.current')}
+          </p>
+          <ConsoleRow label={t('syncService.shell.program.title')}>
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              disabled={busy}
+              onClick={() => void run('program')}
+            >
+              {t('syncService.shell.program.check')}
+            </button>
+          </ConsoleRow>
+          <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            {t('syncService.shell.program.notes')}
+          </p>
+          <ConsoleRow label={t('syncService.shell.support.title')}>
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              disabled={busy}
+              onClick={() => void run('support')}
+            >
+              {t('syncService.shell.support.submit')}
+            </button>
+          </ConsoleRow>
+          {status && (
             <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncService.shell.icon.current')}
+              {shellStatusText(status)}
             </p>
-            <ConsoleRow label={t('syncService.shell.program.title')}>
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                disabled={busy}
-                onClick={() => void run('program')}
-              >
-                {t('syncService.shell.program.check')}
-              </button>
-            </ConsoleRow>
-            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-              {t('syncService.shell.program.notes')}
-            </p>
-            <ConsoleRow label={t('syncService.shell.support.title')}>
-              <button
-                type="button"
-                className="btn-secondary text-sm"
-                disabled={busy}
-                onClick={() => void run('support')}
-              >
-                {t('syncService.shell.support.submit')}
-              </button>
-            </ConsoleRow>
-            {status && (
-              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {shellStatusText(status)}
-              </p>
-            )}
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                className="btn-ghost text-sm"
-                disabled={busy}
-                onClick={() => void run('network')}
-              >
-                {t('syncService.shell.network.repair')}
-              </button>
-              <button
-                type="button"
-                className="btn-ghost text-sm"
-                disabled={busy}
-                onClick={() => void run('hotspot')}
-              >
-                {t('syncService.shell.network.hotspot')}
-              </button>
-            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              disabled={busy}
+              onClick={() => void run('network')}
+            >
+              {t('syncService.shell.network.repair')}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost text-sm"
+              disabled={busy}
+              onClick={() => void run('hotspot')}
+            >
+              {t('syncService.shell.network.hotspot')}
+            </button>
           </div>
         </div>
-      </ConsoleSection>
+      </div>
     </div>
   )
 }

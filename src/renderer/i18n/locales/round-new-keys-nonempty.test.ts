@@ -88,7 +88,12 @@ export const REQUIRED_NON_EMPTY_KEYS: readonly string[] = [
   // 审查修复（2026-11-11）：新增运行时依赖 Leaflet / protobufjs 入致谢表
   'settings.about.depDesc.leaflet',
   'settings.about.depDesc.protobufjs',
-  'main.settings.error.referenceDataSwitchNotBoolean'
+  'main.settings.error.referenceDataSwitchNotBoolean',
+  // 共鸣录身份门（2026-11-23）：板块暂停更新拦截弹窗
+  'resonance.gate.title',
+  'resonance.gate.notice',
+  'resonance.gate.continue',
+  'resonance.gate.visit'
 ]
 
 /** 纯函数：空串 / 缺失 / 非字符串一律抛明确断言错误，不静默通过。 */
