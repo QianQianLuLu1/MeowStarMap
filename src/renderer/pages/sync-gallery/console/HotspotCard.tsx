@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { SectionShell, SettingsCard, SettingsRow } from '../../settings/shared'
+import { SettingsRow } from '../../settings/shared'
+import { ConsoleSection } from './console-ui'
 import { useErrorToast } from '../../../hooks/useErrorToast'
 import type { NikkiSyncHotspotControlResultInfo } from '../../../../shared/types/electron-api'
 
@@ -90,7 +91,8 @@ export const HotspotCard: React.FC<HotspotCardProps> = ({ enabled, onEnableJump 
 
   return (
     <div data-testid="sync-hotspot-card">
-      <SectionShell
+      <ConsoleSection
+        titleAs="h2"
         title={t('syncConsole.settings.hotspot.title')}
         description={t('syncConsole.settings.hotspot.description')}
       >
@@ -104,77 +106,75 @@ export const HotspotCard: React.FC<HotspotCardProps> = ({ enabled, onEnableJump 
             </button>
           </div>
         ) : (
-          <SettingsCard>
-            <div className="space-y-2">
-              {!controlAvailable ? (
-                <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                  {t('syncConsole.settings.hotspot.unavailable')}
-                </p>
-              ) : null}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  className="btn-primary text-sm"
-                  disabled={busy || !controlAvailable}
-                  onClick={() => void runControl('start')}
-                >
-                  {t('syncConsole.settings.hotspot.start')}
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost text-sm"
-                  disabled={busy || !controlAvailable || !startedHere}
-                  onClick={() => void runControl('stop')}
-                >
-                  {t('syncConsole.settings.hotspot.stop')}
-                </button>
-                <button
-                  type="button"
-                  className="btn-ghost text-sm"
-                  disabled={busy || !settingsAvailable}
-                  onClick={() => void openSettings()}
-                >
-                  {t('syncConsole.settings.hotspot.openSettings')}
-                </button>
-              </div>
-              {result && (
-                <p className="text-xs" data-testid="sync-hotspot-status">
-                  {statusText(result.status)}
-                </p>
-              )}
-              {/* 密码仅 start 成功时给出；默认掩码，点击显示（上游肩屏防窥同款） */}
-              {result?.status === 'started' && result.ssid && (
-                <div className="space-y-1" data-testid="sync-hotspot-credentials">
-                  <SettingsRow label={t('syncConsole.settings.hotspot.ssid')}>
-                    <span className="font-mono text-xs">{result.ssid}</span>
-                  </SettingsRow>
-                  {result.password && (
-                    <SettingsRow label={t('syncConsole.settings.hotspot.password')}>
-                      <span className="flex items-center gap-2">
-                        <span className="font-mono text-xs">
-                          {revealed ? result.password : '••••••••'}
-                        </span>
-                        <button
-                          type="button"
-                          className="btn-ghost text-xs"
-                          onClick={() => setRevealed((prev) => !prev)}
-                        >
-                          {revealed
-                            ? t('syncConsole.settings.hotspot.hide')
-                            : t('syncConsole.settings.hotspot.reveal')}
-                        </button>
-                      </span>
-                    </SettingsRow>
-                  )}
-                </div>
-              )}
+          <div className="sc-stack">
+            {!controlAvailable ? (
               <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                {t('syncConsole.settings.hotspot.note')}
+                {t('syncConsole.settings.hotspot.unavailable')}
               </p>
+            ) : null}
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className="btn-primary text-sm"
+                disabled={busy || !controlAvailable}
+                onClick={() => void runControl('start')}
+              >
+                {t('syncConsole.settings.hotspot.start')}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                disabled={busy || !controlAvailable || !startedHere}
+                onClick={() => void runControl('stop')}
+              >
+                {t('syncConsole.settings.hotspot.stop')}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost text-sm"
+                disabled={busy || !settingsAvailable}
+                onClick={() => void openSettings()}
+              >
+                {t('syncConsole.settings.hotspot.openSettings')}
+              </button>
             </div>
-          </SettingsCard>
+            {result && (
+              <p className="text-xs" data-testid="sync-hotspot-status">
+                {statusText(result.status)}
+              </p>
+            )}
+            {/* 密码仅 start 成功时给出；默认掩码，点击显示（上游肩屏防窥同款） */}
+            {result?.status === 'started' && result.ssid && (
+              <div className="sc-service-rows" data-testid="sync-hotspot-credentials">
+                <SettingsRow label={t('syncConsole.settings.hotspot.ssid')}>
+                  <span className="font-mono text-xs">{result.ssid}</span>
+                </SettingsRow>
+                {result.password && (
+                  <SettingsRow label={t('syncConsole.settings.hotspot.password')}>
+                    <span className="flex items-center gap-2">
+                      <span className="font-mono text-xs">
+                        {revealed ? result.password : '••••••••'}
+                      </span>
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs"
+                        onClick={() => setRevealed((prev) => !prev)}
+                      >
+                        {revealed
+                          ? t('syncConsole.settings.hotspot.hide')
+                          : t('syncConsole.settings.hotspot.reveal')}
+                      </button>
+                    </span>
+                  </SettingsRow>
+                )}
+              </div>
+            )}
+            <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+              {t('syncConsole.settings.hotspot.note')}
+            </p>
+          </div>
         )}
-      </SectionShell>
+      </ConsoleSection>
     </div>
   )
 }

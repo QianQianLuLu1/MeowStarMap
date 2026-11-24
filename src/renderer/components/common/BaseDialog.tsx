@@ -15,6 +15,12 @@ const SIZE_CLASS: Record<DialogSize, string> = {
   xl: 'max-w-xl'
 }
 
+// 定位类必须写成完整字面量，保证 Tailwind 静态扫描可命中
+const POSITION_CLASS: Record<'fixed' | 'absolute', string> = {
+  fixed: 'fixed inset-0',
+  absolute: 'absolute inset-0'
+}
+
 interface BaseDialogProps {
   open: boolean
   onClose: () => void
@@ -36,6 +42,9 @@ interface BaseDialogProps {
   overlayClassName?: string
   /** P1-U2：遮罩背景色，默认 var(--overlay-bg)；批量操作/重要操作可传 var(--overlay-bg-strong) 增强视觉对比 */
   overlayBackground?: string
+  /** 遮罩定位方式：fixed = 覆盖整个应用窗口（默认，保持既有调用方行为）；
+   *  absolute = 相对最近的定位祖先局部覆盖（页面内遮罩用，需祖先容器 relative） */
+  overlayPosition?: 'fixed' | 'absolute'
   /** 标题：传入后自动渲染 Header（标题文字 + 右上角关闭按钮）
    *  不传时调用方需自行渲染 Header（向后兼容历史调用方） */
   title?: string
@@ -90,6 +99,7 @@ export const BaseDialog: React.FC<BaseDialogProps> = ({
   cardClassName = '',
   overlayClassName = '',
   overlayBackground = 'var(--overlay-bg)',
+  overlayPosition = 'fixed',
   title,
   footer,
   headerExtra
@@ -117,7 +127,7 @@ export const BaseDialog: React.FC<BaseDialogProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby={ariaLabelledby}
-          className={`fixed inset-0 z-[100] flex items-center justify-center ${overlayClassName}`}
+          className={`${POSITION_CLASS[overlayPosition]} z-[100] flex items-center justify-center ${overlayClassName}`}
           style={{ background: overlayBackground }}
           onClick={handleOverlayClick}
         >

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 // 复用设置页的展示原语（与迁出前 SyncServicePage 同款跨目录引用，见其原注释）。
 import { SettingsToggle } from '../../settings/shared'
-import { ConsoleCard, ConsoleBadge, ConsoleHint, ConsoleRow, ConsoleSection } from './console-ui'
+import { ConsoleCard, ConsoleBadge, ConsoleHint, ConsoleRow } from './console-ui'
 import { ConsoleIcon } from './ConsoleIcons'
 import { WECHAT_MINI_ENTRY_IMAGE } from './brand-assets'
 import { useGlobalToast } from '../../../components/common/ToastProvider'
@@ -91,7 +91,7 @@ interface ConnectViewProps {
  * T3 新增（上游 DesktopPage.ts:46-82 connect 页移植）：
  * - 资产总览统计卡（useSyncOverview，仅本视图可见时 2s 轮询）
  * - firstRun（配对数为 0）内联首次配对二维码（usePairingQr，与对话框共享 5 分钟过期判据）
- * - Android App 卡（新二维码 / APK 直链 / 连接失败导出诊断包）
+ * - Android App 卡（新二维码 / APK 直链 / 重启服务 / 连接失败导出诊断包）
  * - 首次使用引导（<details>，不做完成态持久化）
  * - SelfCheckCard（掉线自动展开）
  * - 微信卡折叠持久化（'momo.wechat-entry.seen.v1'）
@@ -222,6 +222,26 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
     } finally {
       setBusy(false)
       void refresh()
+    }
+  }
+
+  /** 重启同步服务（原底栏能力，收口到 Android 卡按钮行）。桥缺席诚实提示。 */
+  const handleRestart = async (): Promise<void> => {
+    const restartServer = window.electronAPI?.nikkisync?.restartServer
+    if (typeof restartServer !== 'function') {
+      showMessage(t('syncConsole.statusBar.unavailable'), 'info')
+      return
+    }
+    setBusy(true)
+    try {
+      await restartServer()
+      showMessage(t('syncConsole.statusBar.restartSuccess'), 'success')
+      void refresh()
+    } catch {
+      // 单一提示：原始错误可能是技术串，用户可见文案统一走固定翻译键
+      showMessage(t('syncConsole.statusBar.restartFailed'), 'error')
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -366,15 +386,226 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
             >
               {t('syncConsole.connect.android.download')}
             </button>
+            {/* 底栏去掉后，重启入口回到上游同位：Android 卡按钮行 */}
             <button
               type="button"
               className="btn-secondary text-sm"
+              data-testid="sync-status-restart"
+              disabled={busy}
+              onClick={() => void handleRestart()}
+            >
+              {t('syncConsole.statusBar.restart')}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary text-sm"
+              data-testid="sync-status-export"
               onClick={() => void exportDiagnostics(t, showMessage, showError)}
             >
               {t('syncConsole.connect.android.export')}
             </button>
           </div>
           <p className="sc-channel-note">{t('syncConsole.connect.android.exportNote')}</p>
+          {/* 宿主增强：上游控制页不暴露的服务开关/配对/设备管理，控制台保留为独立卡片 */}
+          <div className="sc-service-stack">
+            <details className="sc-details" data-testid="sync-service-details" open>
+              <summary>{t('syncService.service.title')}</summary>
+              <p className="sc-card-desc">{t('syncService.service.description')}</p>
+              <SettingsToggle
+                label={t('syncService.enable')}
+                description={t('syncService.enableDesc')}
+                checked={enabled}
+                disabled={busy}
+                onChange={(value) => void handleToggle(value)}
+              />
+              <div className="sc-service-rows">
+                <ConsoleRow label={t('syncService.status.label')}>
+                  <span className="flex items-center gap-2 text-sm">
+                    <span
+                      className="w-2 h-2 rounded-full"
+                      style={{ background: running ? 'var(--accent)' : 'var(--text-tertiary)' }}
+                    />
+                    {!status?.available
+                      ? t('syncService.status.unavailable')
+                      : running
+                        ? t('syncService.status.running')
+                        : t('syncService.status.stopped')}
+                  </span>
+                </ConsoleRow>
+                {/* 灵感同步 v1：键缺席只说明当前构建没有这一面，不能说成用户关掉了 */}
+                {status?.inspirationV1 && (
+                  <ConsoleRow label={t('syncService.status.inspiration')}>
+                    <span className="text-xs">{t('syncService.status.inspirationOn')}</span>
+                  </ConsoleRow>
+                )}
+                {startupStages.length > 0 && (
+                  <ConsoleRow label={t('syncService.startupStages.label')}>
+                    <span className="flex flex-wrap items-center gap-1 text-xs">
+                      {startupStages.map((item, index) => (
+                        <React.Fragment key={`${item.stage}-${item.at}`}>
+                          {index > 0 && <span style={{ color: 'var(--text-tertiary)' }}>→</span>}
+                          <span
+                            className="rounded px-1.5 py-0.5"
+                            style={{ background: 'var(--bg-secondary)' }}
+                          >
+                            {STARTUP_STAGE_I18N_KEYS[item.stage]
+                              ? t(STARTUP_STAGE_I18N_KEYS[item.stage])
+                              : item.stage}
+                          </span>
+                        </React.Fragment>
+                      ))}
+                    </span>
+                  </ConsoleRow>
+                )}
+                {running && status && (
+                  <>
+                    <ConsoleRow label={t('syncService.status.address')}>
+                      <button
+                        type="button"
+                        className="btn-secondary font-mono text-xs"
+                        onClick={() => {
+                          const address = `${status.lanHost ?? status.host}:${status.port}`
+                          void navigator.clipboard
+                            .writeText(address)
+                            .then(() => showMessage(t('syncService.status.copied')))
+                            .catch((err) => showError(err))
+                        }}
+                      >
+                        {status.lanHost ?? status.host}:{status.port}
+                        <IconCopyText />
+                      </button>
+                    </ConsoleRow>
+                    <ConsoleRow label={t('syncService.status.serverId')}>
+                      <span className="font-mono text-xs">{status.serverId ?? '—'}</span>
+                    </ConsoleRow>
+                    <ConsoleRow label={t('syncService.status.tlsFingerprint')}>
+                      <button
+                        type="button"
+                        className="btn-secondary font-mono text-xs"
+                        title={status.tlsFingerprintSha256 ?? ''}
+                        onClick={() => void copyFingerprint()}
+                      >
+                        {(status.tlsFingerprintSha256 ?? '').slice(0, 16)}…
+                        <IconCopyText />
+                      </button>
+                    </ConsoleRow>
+                  </>
+                )}
+              </div>
+
+              {/* K4：连接诊断折叠卡（只聚合既有观测，不做主动探测） */}
+              {status?.diagnostics && (
+                <details className="sc-details">
+                  <summary>{t('syncService.diagnostics.title')}</summary>
+                  <div className="sc-service-rows">
+                    <ConsoleRow label={t('syncService.diagnostics.bindAddress')}>
+                      <span className="font-mono text-xs">{status.diagnostics.host}</span>
+                    </ConsoleRow>
+                    <ConsoleRow label={t('syncService.diagnostics.port')}>
+                      <span className="font-mono text-xs">{status.diagnostics.port}</span>
+                    </ConsoleRow>
+                    <ConsoleRow label={t('syncService.diagnostics.secure')}>
+                      <span className="text-xs">
+                        {status.diagnostics.secure
+                          ? t('syncService.diagnostics.secureOn')
+                          : t('syncService.diagnostics.secureOff')}
+                      </span>
+                    </ConsoleRow>
+                    {status.diagnostics.tlsFingerprintTail8 && (
+                      <ConsoleRow label={t('syncService.diagnostics.tlsTail')}>
+                        <span className="font-mono text-xs">
+                          {status.diagnostics.tlsFingerprintTail8}
+                        </span>
+                      </ConsoleRow>
+                    )}
+                    {status.diagnostics.pairedDeviceCount !== undefined && (
+                      <ConsoleRow label={t('syncService.diagnostics.devices')}>
+                        <span className="text-xs">{status.diagnostics.pairedDeviceCount}</span>
+                      </ConsoleRow>
+                    )}
+                    {status.diagnostics.connectionHosts &&
+                      status.diagnostics.connectionHosts.length > 0 && (
+                        <ConsoleRow label={t('syncService.diagnostics.altHosts')}>
+                          <span className="font-mono text-xs">
+                            {status.diagnostics.connectionHosts.join(' · ')}
+                          </span>
+                        </ConsoleRow>
+                      )}
+                    {lastScanText && (
+                      <ConsoleRow label={t('syncService.diagnostics.lastScan')}>
+                        <span className="font-mono text-xs">{lastScanText}</span>
+                      </ConsoleRow>
+                    )}
+                    {status.diagnostics.lastError && (
+                      <ConsoleRow label={t('syncService.diagnostics.lastError')}>
+                        <span className="font-mono text-xs" style={{ color: 'var(--danger)' }}>
+                          {status.diagnostics.lastError}
+                        </span>
+                      </ConsoleRow>
+                    )}
+                  </div>
+                </details>
+              )}
+            </details>
+
+            <details className="sc-details" data-testid="sync-pairing-details" open>
+              <summary>{t('syncService.pairing.title')}</summary>
+              <div className="sc-button-row">
+                <p className="sc-setting-help">
+                  {running
+                    ? t('syncService.pairing.hintRunning')
+                    : t('syncService.pairing.hintDisabled')}
+                </p>
+                <button
+                  type="button"
+                  data-testid="sync-pairing-open"
+                  className="btn-primary text-sm"
+                  disabled={!running}
+                  onClick={() => setQrOpen(true)}
+                >
+                  {t('syncService.pairing.open')}
+                </button>
+              </div>
+            </details>
+
+            <details className="sc-details" data-testid="sync-devices-details" open>
+              <summary>{t('syncService.devices.title')}</summary>
+              {devices.length === 0 ? (
+                <div className="sc-empty-holder">
+                  <EmptyState
+                    title={t('syncService.devices.empty')}
+                    subtitle={t('syncService.devices.emptyHint')}
+                  />
+                </div>
+              ) : (
+                <div className="sc-service-rows">
+                  {devices.map((device) => (
+                    <ConsoleRow key={device.deviceId} label={device.deviceName}>
+                      <div className="flex flex-wrap items-center justify-end gap-3">
+                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {device.platform === 'ios' ? 'iOS' : 'Android'}
+                          {device.appVersion ? ` · v${device.appVersion}` : ''}
+                        </span>
+                        <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                          {t('syncService.devices.lastSeen')}：
+                          {device.lastSeenAt
+                            ? new Date(device.lastSeenAt).toLocaleString()
+                            : t('syncService.devices.never')}
+                        </span>
+                        <button
+                          type="button"
+                          className="btn-danger text-xs"
+                          onClick={() => setRevokeTarget(device)}
+                        >
+                          {t('syncService.devices.revoke')}
+                        </button>
+                      </div>
+                    </ConsoleRow>
+                  ))}
+                </div>
+              )}
+            </details>
+          </div>
         </ConsoleCard>
 
         {/* N7：微信小程序通道卡（上游 wechatPanelHtml：入口码 + 步骤 + 连接码 + 底部入口） */}
@@ -445,202 +676,6 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
         {t('syncConsole.connect.privacyNote')}
       </p>
 
-      {/* 宿主增强：上游控制页不暴露的服务开关/配对/设备管理，控制台保留为独立卡片 */}
-      <div className="sc-service-stack">
-        <ConsoleSection
-          title={t('syncService.service.title')}
-          description={t('syncService.service.description')}
-        >
-          <SettingsToggle
-            label={t('syncService.enable')}
-            description={t('syncService.enableDesc')}
-            checked={enabled}
-            disabled={busy}
-            onChange={(value) => void handleToggle(value)}
-          />
-          <div className="sc-service-rows">
-            <ConsoleRow label={t('syncService.status.label')}>
-              <span className="flex items-center gap-2 text-sm">
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ background: running ? 'var(--accent)' : 'var(--text-tertiary)' }}
-                />
-                {!status?.available
-                  ? t('syncService.status.unavailable')
-                  : running
-                    ? t('syncService.status.running')
-                    : t('syncService.status.stopped')}
-              </span>
-            </ConsoleRow>
-            {/* 灵感同步 v1：键缺席只说明当前构建没有这一面，不能说成用户关掉了 */}
-            {status?.inspirationV1 && (
-              <ConsoleRow label={t('syncService.status.inspiration')}>
-                <span className="text-xs">{t('syncService.status.inspirationOn')}</span>
-              </ConsoleRow>
-            )}
-            {startupStages.length > 0 && (
-              <ConsoleRow label={t('syncService.startupStages.label')}>
-                <span className="flex flex-wrap items-center gap-1 text-xs">
-                  {startupStages.map((item, index) => (
-                    <React.Fragment key={`${item.stage}-${item.at}`}>
-                      {index > 0 && <span style={{ color: 'var(--text-tertiary)' }}>→</span>}
-                      <span
-                        className="rounded px-1.5 py-0.5"
-                        style={{ background: 'var(--bg-secondary)' }}
-                      >
-                        {STARTUP_STAGE_I18N_KEYS[item.stage]
-                          ? t(STARTUP_STAGE_I18N_KEYS[item.stage])
-                          : item.stage}
-                      </span>
-                    </React.Fragment>
-                  ))}
-                </span>
-              </ConsoleRow>
-            )}
-            {running && status && (
-              <>
-                <ConsoleRow label={t('syncService.status.address')}>
-                  <button
-                    type="button"
-                    className="btn-secondary font-mono text-xs"
-                    onClick={() => {
-                      const address = `${status.lanHost ?? status.host}:${status.port}`
-                      void navigator.clipboard
-                        .writeText(address)
-                        .then(() => showMessage(t('syncService.status.copied')))
-                        .catch((err) => showError(err))
-                    }}
-                  >
-                    {status.lanHost ?? status.host}:{status.port}
-                    <IconCopyText />
-                  </button>
-                </ConsoleRow>
-                <ConsoleRow label={t('syncService.status.serverId')}>
-                  <span className="font-mono text-xs">{status.serverId ?? '—'}</span>
-                </ConsoleRow>
-                <ConsoleRow label={t('syncService.status.tlsFingerprint')}>
-                  <button
-                    type="button"
-                    className="btn-secondary font-mono text-xs"
-                    title={status.tlsFingerprintSha256 ?? ''}
-                    onClick={() => void copyFingerprint()}
-                  >
-                    {(status.tlsFingerprintSha256 ?? '').slice(0, 16)}…
-                    <IconCopyText />
-                  </button>
-                </ConsoleRow>
-              </>
-            )}
-          </div>
-
-          {/* K4：连接诊断折叠卡（只聚合既有观测，不做主动探测） */}
-          {status?.diagnostics && (
-            <details className="sc-details">
-              <summary>{t('syncService.diagnostics.title')}</summary>
-              <div className="sc-service-rows">
-                <ConsoleRow label={t('syncService.diagnostics.bindAddress')}>
-                  <span className="font-mono text-xs">{status.diagnostics.host}</span>
-                </ConsoleRow>
-                <ConsoleRow label={t('syncService.diagnostics.port')}>
-                  <span className="font-mono text-xs">{status.diagnostics.port}</span>
-                </ConsoleRow>
-                <ConsoleRow label={t('syncService.diagnostics.secure')}>
-                  <span className="text-xs">
-                    {status.diagnostics.secure
-                      ? t('syncService.diagnostics.secureOn')
-                      : t('syncService.diagnostics.secureOff')}
-                  </span>
-                </ConsoleRow>
-                {status.diagnostics.tlsFingerprintTail8 && (
-                  <ConsoleRow label={t('syncService.diagnostics.tlsTail')}>
-                    <span className="font-mono text-xs">
-                      {status.diagnostics.tlsFingerprintTail8}
-                    </span>
-                  </ConsoleRow>
-                )}
-                {status.diagnostics.pairedDeviceCount !== undefined && (
-                  <ConsoleRow label={t('syncService.diagnostics.devices')}>
-                    <span className="text-xs">{status.diagnostics.pairedDeviceCount}</span>
-                  </ConsoleRow>
-                )}
-                {status.diagnostics.connectionHosts &&
-                  status.diagnostics.connectionHosts.length > 0 && (
-                    <ConsoleRow label={t('syncService.diagnostics.altHosts')}>
-                      <span className="font-mono text-xs">
-                        {status.diagnostics.connectionHosts.join(' · ')}
-                      </span>
-                    </ConsoleRow>
-                  )}
-                {lastScanText && (
-                  <ConsoleRow label={t('syncService.diagnostics.lastScan')}>
-                    <span className="font-mono text-xs">{lastScanText}</span>
-                  </ConsoleRow>
-                )}
-                {status.diagnostics.lastError && (
-                  <ConsoleRow label={t('syncService.diagnostics.lastError')}>
-                    <span className="font-mono text-xs" style={{ color: 'var(--danger)' }}>
-                      {status.diagnostics.lastError}
-                    </span>
-                  </ConsoleRow>
-                )}
-              </div>
-            </details>
-          )}
-        </ConsoleSection>
-
-        <ConsoleSection title={t('syncService.pairing.title')}>
-          <div className="sc-button-row">
-            <p className="sc-setting-help">
-              {running
-                ? t('syncService.pairing.hintRunning')
-                : t('syncService.pairing.hintDisabled')}
-            </p>
-            <button
-              type="button"
-              className="btn-primary text-sm"
-              disabled={!running}
-              onClick={() => setQrOpen(true)}
-            >
-              {t('syncService.pairing.open')}
-            </button>
-          </div>
-        </ConsoleSection>
-
-        <ConsoleSection title={t('syncService.devices.title')}>
-          {devices.length === 0 ? (
-            <EmptyState
-              title={t('syncService.devices.empty')}
-              subtitle={t('syncService.devices.emptyHint')}
-            />
-          ) : (
-            <div className="sc-service-rows">
-              {devices.map((device) => (
-                <ConsoleRow key={device.deviceId} label={device.deviceName}>
-                  <div className="flex flex-wrap items-center justify-end gap-3">
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      {device.platform === 'ios' ? 'iOS' : 'Android'}
-                      {device.appVersion ? ` · v${device.appVersion}` : ''}
-                    </span>
-                    <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
-                      {t('syncService.devices.lastSeen')}：
-                      {device.lastSeenAt
-                        ? new Date(device.lastSeenAt).toLocaleString()
-                        : t('syncService.devices.never')}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn-danger text-xs"
-                      onClick={() => setRevokeTarget(device)}
-                    >
-                      {t('syncService.devices.revoke')}
-                    </button>
-                  </div>
-                </ConsoleRow>
-              ))}
-            </div>
-          )}
-        </ConsoleSection>
-      </div>
       <PairingQrDialog open={qrOpen} onClose={() => setQrOpen(false)} />
       <ConfirmDialog
         open={revokeTarget !== null}

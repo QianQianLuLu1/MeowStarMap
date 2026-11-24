@@ -1,9 +1,8 @@
-// @core-change: 导出改为逐文件失败收集并如实回报计数，修复批量导出中途断裂
+// @core-change: getExif 改走句柄安全封装 parseExifFile，修复 exifr 解析失败路径的 FileHandle 泄漏
 import fsp from 'fs/promises'
 import path from 'path'
 import { shell, dialog } from 'electron'
 import sharp from 'sharp'
-import exifr from 'exifr'
 import type { ExportOptions, ExifData, ExportFileMetadata } from '../types/file'
 // C-3：统一文件工具函数与媒体常量；C-G2：moveFile 替代 fs-extra.move
 import { pathExists, getUniqueFilePath, parseDataUrlToBuffer, moveFile } from '../utils/file-utils'
@@ -17,6 +16,7 @@ import {
 import { ERROR_CODES } from '../../shared/errors/error-codes'
 import { isImageExt, MEDIA_EXTENSIONS, isVideoExt } from '../utils/media-constants'
 import { assertDiskSpace } from '../utils/disk'
+import { parseExifFile } from '../utils/exif-file'
 import { t } from '../i18n'
 import { logger } from '../utils/logger'
 
@@ -42,6 +42,25 @@ function resolveNamingPattern(
     .replace(/\{uid\}/g, safe(uid))
     .replace(/\{original_name\}/g, safe(originalName))
     .replace(/\{sequence\}/g, seqStr)
+}
+
+/** getExif 消费的 exifr 原始 EXIF 字段最小投影 */
+interface RawExifRecord {
+  Make?: string
+  Model?: string
+  LensModel?: string
+  FNumber?: number
+  ExposureTime?: number
+  ISO?: number
+  PhotographicSensitivity?: number
+  FocalLength?: number
+  latitude?: number
+  longitude?: number
+  DateTimeOriginal?: Date
+  ExifImageWidth?: number
+  ImageWidth?: number
+  ExifImageHeight?: number
+  ImageLength?: number
 }
 
 export class FileService {
@@ -484,7 +503,8 @@ export class FileService {
 
   async getExif(filePath: string): Promise<ExifData> {
     try {
-      const exif = await exifr.parse(filePath, {
+      // 走句柄安全封装：exifr 高层 parse(filePath) 在解析抛错时不关闭内部 FileHandle
+      const exif = await parseExifFile<RawExifRecord>(filePath, {
         ifd0: { translateValues: false, reviveValues: true },
         exif: { translateValues: false, reviveValues: true },
         gps: { translateValues: false, reviveValues: true }

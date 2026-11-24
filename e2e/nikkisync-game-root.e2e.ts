@@ -302,7 +302,7 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
     // 同步服务控制台是侧边栏「同步服务」（sync-gallery 视图）的直接宿主界面
     //（与 nikkisync-runtime.e2e N3c 同一导航口径）
     await page.getByTitle('同步服务').first().click()
-    await page.getByRole('heading', { level: 2, name: '暖暖相册' }).waitFor({ timeout: 30_000 })
+    await page.getByRole('heading', { level: 1, name: '暖暖相册' }).waitFor({ timeout: 30_000 })
 
     // 控制台五视图 IA：照片目录节在 settings 子视图（默认 connect 不挂载该节）
     await page.getByTestId('sync-console-nav-settings').click()
@@ -310,7 +310,7 @@ test.describe('照片目录保存即生效（真实应用会话）', () => {
     // 照片目录节常驻显示（只碰设置库，不经运行时装配）
     const photoDirInput = page.getByPlaceholder('输入或浏览选择本地目录')
     await photoDirInput.waitFor({ timeout: 30_000 })
-    const container = page.locator('div.space-y-2', { has: photoDirInput })
+    const container = page.getByTestId('sync-photo-directory-form')
     // 手输与 G1 同一根：同值重复保存是真实用户行为（幂等），且不受「需要两个合法根」的
     // 环境约束——scanCore 对同根只重扫不重建，保存流与文案判据完全一致
     await photoDirInput.fill(gameRoot)

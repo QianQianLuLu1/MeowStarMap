@@ -4434,6 +4434,12 @@
       "colPulls": "Total pulls",
       "colAvg": "Avg. pulls",
       "colPercentile": "Percentile"
+    },
+    "gate": {
+      "title": "Tạm dừng cập nhật Nhật ký Cộng hưởng Nikki",
+      "notice": "Do thời gian phát triển của tác giả có hạn, mục Nhật ký Cộng hưởng trong ứng dụng tạm dừng cập nhật. Tuy nhiên, những ai có khả năng vẫn có thể tiếp tục cập nhật tính năng của mục này thông qua PR. Bạn cũng có thể truy cập gongeo.us trong trình duyệt.",
+      "continue": "Vẫn tiếp tục",
+      "visit": "Mở trang web"
     }
   },
   "syncGallery": {

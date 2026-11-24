@@ -39,12 +39,17 @@ vi.mock('sharp', () => {
   return { default: vi.fn(() => chain) }
 })
 
-// exifr mock
-vi.mock('exifr', () => ({
-  default: {
-    parse: vi.fn().mockResolvedValue(null)
+// exifr mock：getExif 走低层 Exifr（src/main/utils/exif-file 的句柄安全封装），
+// 解析结果仍由 default.parse 桩控制，便于既有断言复用
+vi.mock('exifr', () => {
+  const parse = vi.fn().mockResolvedValue(null)
+  class Exifr {
+    file = { close: vi.fn(async () => undefined) }
+    read = vi.fn(async () => undefined)
+    parse = vi.fn(() => parse())
   }
-}))
+  return { default: { parse }, Exifr }
+})
 
 vi.mock('../utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
