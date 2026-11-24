@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "default capability for the installer window",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "core:event:default"]
 }

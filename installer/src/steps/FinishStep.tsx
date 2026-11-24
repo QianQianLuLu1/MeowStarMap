@@ -1,14 +1,25 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { launchApp } from '../api'
 import type { InstallSummary } from '../types'
 
 interface FinishStepProps {
   summary: InstallSummary
+  silent: boolean
   onClose: () => void
 }
 
-const FinishStep = ({ summary, onClose }: FinishStepProps): React.JSX.Element => {
+const FinishStep = ({ summary, silent, onClose }: FinishStepProps): React.JSX.Element => {
   const [launchError, setLaunchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!silent) {
+      return
+    }
+    const timer = setTimeout(() => {
+      onClose()
+    }, 1500)
+    return () => clearTimeout(timer)
+  }, [silent, onClose])
 
   const handleLaunch = async (): Promise<void> => {
     try {
@@ -21,7 +32,9 @@ const FinishStep = ({ summary, onClose }: FinishStepProps): React.JSX.Element =>
   return (
     <div>
       <h1>安装完成</h1>
-      <p className="lead">{summary.mode === 'upgrade' ? '覆盖安装已完成。' : '喵星图已安装到你的电脑。'}</p>
+      <p className="lead">
+        {summary.mode === 'upgrade' ? '覆盖安装已完成。' : '喵星图已安装到你的电脑。'}
+      </p>
 
       <dl className="summary-grid">
         <dt>安装目录</dt>

@@ -81,10 +81,14 @@ npm run build        # tauri build --no-bundle（产出独立 exe）
 - [x] 工程骨架（React 向导 UI + Tauri 后端命令桩）
 - [x] 工具链（Rust 1.100 / VS Build Tools 17.14 / Windows SDK 10.0.26100）与 `cargo check` 通过
 - [x] 向导 UI 本机启动截图验证（欢迎页/侧边栏步骤）
-- [ ] `detect_state` 读取旧安装（注册表/install-manifest）——已实现首版
-- [ ] 载荷校验（sha256）与解压
-- [ ] 进程互斥/结束旧应用
-- [ ] 快捷方式 + HKCU 卸载项 + 证书导入——已实现首版
-- [ ] 覆盖安装回滚（staged + 备份）
-- [ ] `/S` 静默与旧客户端兼容联调
+- [x] `detect_state` 读取旧安装（注册表/install-manifest）
+- [x] 载荷 sha256/size 校验（`payload.zip.json` 清单，缺失时跳过并告警）
+- [x] staged 解包 + 备份替换 + 失败回滚（`installer-progress` 事件 0→100%）
+- [x] 进程互斥/结束旧应用（taskkill）
+- [x] 快捷方式 + HKCU 卸载项 + 证书导入
+- [x] `/S`、`--silent`、`-s` 静默检测；静默模式自动安装并在完成后关闭
+- [x] `/D=` / `--install-dir=` 目录覆盖参数
+- [ ] 覆盖安装“旧 NSIS 注册表”迁移联调
+- [ ] 卸载器（`--uninstall` 清理文件/快捷方式/证书）完善
+- [ ] 旧客户端更新联调（2.5.6 实包 → 自定义安装器）
 - [ ] 打包流程接入（`dist:win` 产载荷 → 安装器构建 → latest.yml）

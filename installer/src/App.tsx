@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { detectState, startInstall } from './api'
 import type { InstallOptions, InstallSummary, InstallerState } from './types'
 import WelcomeStep from './steps/WelcomeStep'
@@ -20,15 +20,7 @@ const App = (): React.JSX.Element => {
   const [options, setOptions] = useState<InstallOptions>(DEFAULT_OPTIONS)
   const [summary, setSummary] = useState<InstallSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    detectState()
-      .then((s) => {
-        setState(s)
-        setOptions((prev) => ({ ...prev, installDir: s.installDir ?? '' }))
-      })
-      .catch((err: unknown) => setError(String(err)))
-  }, [])
+  const silentStarted = useRef(false)
 
   const runInstall = async (opts: InstallOptions): Promise<void> => {
     setOptions(opts)
@@ -42,6 +34,28 @@ const App = (): React.JSX.Element => {
       setError(String(err))
     }
   }
+
+  useEffect(() => {
+    detectState()
+      .then((s) => {
+        setState(s)
+        setOptions((prev) => ({ ...prev, installDir: s.installDir ?? '' }))
+      })
+      .catch((err: unknown) => setError(String(err)))
+  }, [])
+
+  useEffect(() => {
+    if (state === null || !state.silent || silentStarted.current) {
+      return
+    }
+    silentStarted.current = true
+    void runInstall({
+      installDir: state.installDir ?? '',
+      createDesktopShortcut: true,
+      importCertificate: true
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state])
 
   const modeLabel =
     state?.mode === 'upgrade' ? '覆盖安装' : state?.mode === 'repair' ? '修复安装' : '全新安装'
@@ -72,11 +86,7 @@ const App = (): React.JSX.Element => {
 
       <main className="panel">
         {step === 0 && (
-          <WelcomeStep
-            state={state}
-            error={error}
-            onNext={() => setStep(1)}
-          />
+          <WelcomeStep state={state} error={error} onNext={() => setStep(1)} />
         )}
         {step === 1 && (
           <OptionsStep
@@ -88,7 +98,7 @@ const App = (): React.JSX.Element => {
         )}
         {step === 2 && <ProgressStep />}
         {step === 3 && summary !== null && (
-          <FinishStep summary={summary} onClose={() => window.close()} />
+          <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => window.close()} />
         )}
       </main>
     </div>

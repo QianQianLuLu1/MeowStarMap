@@ -11,6 +11,8 @@ pub struct InstallerState {
     pub app_running: bool,
     pub mode: String,
     pub payload_path: Option<String>,
+    /// 是否由更新流程/命令行以静默模式启动（/S、--silent、-s）
+    pub silent: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -38,8 +40,11 @@ pub fn detect_state() -> Result<InstallerState, String> {
 }
 
 #[tauri::command]
-pub fn start_install(options: InstallOptions) -> Result<InstallSummary, String> {
-    platform::install(options).map_err(|err| err.to_string())
+pub fn start_install(
+    app: tauri::AppHandle,
+    options: InstallOptions,
+) -> Result<InstallSummary, String> {
+    platform::install(options, &app).map_err(|err| err.to_string())
 }
 
 #[tauri::command]

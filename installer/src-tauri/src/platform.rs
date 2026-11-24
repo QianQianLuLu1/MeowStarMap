@@ -1,17 +1,23 @@
 use std::env;
-use std::fs;
+use std::fs::{self, File};
+use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+use sha2::{Digest, Sha256};
+use tauri::{AppHandle, Emitter};
 
 use crate::commands::{InstallOptions, InstallSummary, InstallerState};
 
 const UNINSTALL_KEY: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.qianlu.meow-star-map";
 const DISPLAY_NAME: &str = "喵星图";
-const PRODUCT_NAME: &str = "MeowStarMap";
 
 pub fn detect_state() -> InstallerState {
-    let install_dir = read_install_dir();
+    let registry_dir = read_install_dir();
+    let override_dir = arg_value("--install-dir=").or_else(|| arg_value("/D="));
+    let install_dir = override_dir.map(PathBuf::from).or(registry_dir);
+
     let installed = install_dir
         .as_ref()
         .map(|dir| dir.exists())
@@ -30,10 +36,11 @@ pub fn detect_state() -> InstallerState {
         app_running,
         mode: mode.to_string(),
         payload_path: payload_path().map(|path| path.to_string_lossy().to_string()),
+        silent: has_silent_flag(),
     }
 }
 
-pub fn install(options: InstallOptions) -> Result<InstallSummary, String> {
+pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummary, String> {
     let install_dir = PathBuf::from(options.install_dir.trim());
     if !install_dir.is_absolute() {
         return Err("安装目录必须是绝对路径".to_string());
@@ -43,13 +50,23 @@ pub fn install(options: InstallOptions) -> Result<InstallSummary, String> {
     let mut steps: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
 
+    emit_progress(app, 2, "准备安装");
     stop_running_app(&mut steps, &mut warnings);
-    fs::create_dir_all(&install_dir).map_err(|err| format!("创建安装目录失败: {err}"))?;
-    steps.push(format!("创建安装目录: {}", install_dir.display()));
+    emit_progress(app, 8, "已结束旧进程（如有）");
 
-    match payload_path() {
-        Some(payload) => extract_payload(&payload, &install_dir, &mut steps, &mut warnings)?,
-        None => warnings.push("未找到安装载荷（骨架阶段），已跳过文件解包".to_string()),
+    let payload = payload_path();
+    if let Some(payload) = payload.as_ref() {
+        verify_payload(payload)?;
+        emit_progress(app, 16, "载荷校验通过");
+        let staging = staging_dir(&install_dir)?;
+        extract_to(payload, &staging)?;
+        emit_progress(app, 48, "安装文件已展开");
+        swap_in(&install_dir, &staging, &mut steps, &mut warnings)?;
+        emit_progress(app, 78, "文件替换完成");
+    } else {
+        warnings.push("未找到安装载荷（骨架阶段），已跳过文件解包".to_string());
+        fs::create_dir_all(&install_dir).map_err(|err| format!("创建安装目录失败: {err}"))?;
+        steps.push(format!("创建安装目录: {}", install_dir.display()));
     }
 
     let version = read_manifest_version(&install_dir)
@@ -63,6 +80,7 @@ pub fn install(options: InstallOptions) -> Result<InstallSummary, String> {
     if options.create_desktop_shortcut {
         create_shortcuts(&install_dir, &mut warnings);
     }
+    emit_progress(app, 100, "安装完成");
 
     Ok(InstallSummary {
         ok: true,
@@ -87,7 +105,9 @@ pub fn uninstall() -> Result<(), String> {
 }
 
 pub fn launch_app() -> Result<(), String> {
-    let install_dir = read_install_dir().ok_or("未找到安装目录".to_string())?;
+    let install_dir = read_install_dir()
+        .or_else(|| arg_value("--install-dir=").map(PathBuf::from))
+        .ok_or("未找到安装目录".to_string())?;
     let exe = find_app_exe(&install_dir).ok_or("安装目录中未找到应用可执行文件".to_string())?;
     Command::new(exe)
         .spawn()
@@ -95,14 +115,36 @@ pub fn launch_app() -> Result<(), String> {
         .map_err(|err| format!("启动应用失败: {err}"))
 }
 
-fn read_install_dir() -> Option<PathBuf> {
-    if let Some(value) = query_reg_value(UNINSTALL_KEY, "InstallLocation") {
-        let path = PathBuf::from(value);
-        if path.exists() {
-            return Some(path);
+fn emit_progress(app: &AppHandle, percent: u8, message: &str) {
+    let _ = app.emit(
+        "installer-progress",
+        serde_json::json!({ "percent": percent, "message": message }),
+    );
+}
+
+fn has_silent_flag() -> bool {
+    env::args().any(|arg| {
+        let lower = arg.to_ascii_lowercase();
+        lower == "/s" || lower == "--silent" || lower == "-s"
+    })
+}
+
+fn arg_value(prefix: &str) -> Option<String> {
+    env::args().find_map(|arg| {
+        let lower = arg.to_ascii_lowercase();
+        let prefix_lower = prefix.to_ascii_lowercase();
+        if lower.starts_with(&prefix_lower) {
+            Some(arg[prefix.len()..].to_string())
+        } else {
+            None
         }
-    }
-    None
+    })
+}
+
+fn read_install_dir() -> Option<PathBuf> {
+    let value = query_reg_value(UNINSTALL_KEY, "InstallLocation")?;
+    let path = PathBuf::from(value);
+    Some(path)
 }
 
 fn read_manifest_version(install_dir: &Path) -> Option<String> {
@@ -178,25 +220,85 @@ fn stop_running_app(steps: &mut Vec<String>, warnings: &mut Vec<String>) {
     }
 }
 
-fn extract_payload(
-    payload: &Path,
-    install_dir: &Path,
-    steps: &mut Vec<String>,
-    warnings: &mut Vec<String>,
-) -> Result<(), String> {
+fn sha256_file(path: &Path) -> Result<String, String> {
+    let file = File::open(path).map_err(|err| format!("打开载荷失败: {err}"))?;
+    let mut reader = BufReader::new(file);
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        let read = reader
+            .read(&mut buffer)
+            .map_err(|err| format!("读取载荷失败: {err}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn verify_payload(payload: &Path) -> Result<(), String> {
+    let manifest_path = PathBuf::from(format!("{}.json", payload.display()));
+    if !manifest_path.exists() {
+        // 清单可选：没有清单时跳过哈希校验（由发布流程决定是否提供）
+        return Ok(());
+    }
+    let raw =
+        fs::read_to_string(&manifest_path).map_err(|err| format!("读取载荷清单失败: {err}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|err| format!("解析载荷清单失败: {err}"))?;
+    let expected = value
+        .get("sha256")
+        .and_then(|item| item.as_str())
+        .ok_or("载荷清单缺少 sha256")?;
+    if let Some(size) = value.get("size").and_then(|item| item.as_u64()) {
+        let actual_size = fs::metadata(payload)
+            .map_err(|err| format!("读取载荷大小失败: {err}"))?
+            .len();
+        if actual_size != size {
+            return Err(format!("载荷大小不匹配（期望 {size}，实际 {actual_size}）"));
+        }
+    }
+    let actual = sha256_file(payload)?;
+    if !actual.eq_ignore_ascii_case(expected) {
+        return Err("载荷 sha256 校验失败，安装包可能已损坏".to_string());
+    }
+    Ok(())
+}
+
+fn staging_dir(install_dir: &Path) -> Result<PathBuf, String> {
+    let parent = install_dir
+        .parent()
+        .ok_or("安装目录缺少父目录")?
+        .to_path_buf();
+    fs::create_dir_all(&parent).map_err(|err| format!("创建安装父目录失败: {err}"))?;
+    let name = format!(
+        ".{}.staging",
+        install_dir
+            .file_name()
+            .map(|item| item.to_string_lossy().to_string())
+            .unwrap_or_else(|| "meow-starmap".to_string())
+    );
+    Ok(parent.join(name))
+}
+
+fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
+    if staging.exists() {
+        fs::remove_dir_all(staging).map_err(|err| format!("清理暂存目录失败: {err}"))?;
+    }
+    fs::create_dir_all(staging).map_err(|err| format!("创建暂存目录失败: {err}"))?;
+
     if payload.is_dir() {
-        warnings.push("载荷目录解包尚未实现（骨架阶段）".to_string());
+        copy_dir_all(payload, staging)?;
         return Ok(());
     }
     if payload.extension().and_then(|ext| ext.to_str()) != Some("zip") {
-        warnings.push(format!("暂不支持的载荷类型: {}", payload.display()));
-        return Ok(());
+        return Err(format!("暂不支持的载荷类型: {}", payload.display()));
     }
-
     let script = format!(
         "Expand-Archive -LiteralPath '{}' -DestinationPath '{}' -Force",
         payload.display(),
-        install_dir.display()
+        staging.display()
     );
     let status = Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
@@ -205,8 +307,63 @@ fn extract_payload(
     if !status.success() {
         return Err("解包安装文件失败".to_string());
     }
-    steps.push(format!("解包安装文件: {}", payload.display()));
     Ok(())
+}
+
+fn copy_dir_all(source: &Path, destination: &Path) -> Result<(), String> {
+    fs::create_dir_all(destination).map_err(|err| format!("创建目录失败: {err}"))?;
+    for entry in fs::read_dir(source).map_err(|err| format!("读取目录失败: {err}"))? {
+        let entry = entry.map_err(|err| format!("读取目录项失败: {err}"))?;
+        let target = destination.join(entry.file_name());
+        if entry.path().is_dir() {
+            copy_dir_all(&entry.path(), &target)?;
+        } else {
+            fs::copy(entry.path(), &target).map_err(|err| format!("复制文件失败: {err}"))?;
+        }
+    }
+    Ok(())
+}
+
+fn swap_in(
+    install_dir: &Path,
+    staging: &Path,
+    steps: &mut Vec<String>,
+    warnings: &mut Vec<String>,
+) -> Result<(), String> {
+    let parent = install_dir.parent().ok_or("安装目录缺少父目录")?;
+    let backup = parent.join(format!(
+        ".{}.backup",
+        install_dir
+            .file_name()
+            .map(|item| item.to_string_lossy().to_string())
+            .unwrap_or_else(|| "meow-starmap".to_string())
+    ));
+    if backup.exists() {
+        let _ = fs::remove_dir_all(&backup);
+    }
+
+    let had_existing = install_dir.exists();
+    if had_existing {
+        fs::rename(install_dir, &backup).map_err(|err| format!("备份旧版本失败: {err}"))?;
+        steps.push("已备份旧版本".to_string());
+    }
+
+    match fs::rename(staging, install_dir) {
+        Ok(()) => {
+            if had_existing {
+                let _ = fs::remove_dir_all(&backup);
+            }
+            steps.push(format!("安装文件已就位: {}", install_dir.display()));
+            Ok(())
+        }
+        Err(err) => {
+            if had_existing {
+                let _ = fs::rename(&backup, install_dir);
+                warnings.push("文件替换失败，已回滚到安装前状态".to_string());
+            }
+            Err(format!("替换安装目录失败: {err}"))
+        }
+    }
 }
 
 fn write_uninstall_registry(
@@ -348,10 +505,4 @@ fn find_app_exe(install_dir: &Path) -> Option<PathBuf> {
         }
     }
     None
-}
-
-// 占位：避免未使用常量告警（品牌名后续用于 AUMID/注册表扩展）
-#[allow(dead_code)]
-fn product_name() -> &'static str {
-    PRODUCT_NAME
 }
