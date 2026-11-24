@@ -54,6 +54,8 @@ import {
 import { t, initMainI18n } from '../i18n'
 // F2+F5（2026-11-15）：赢家专属启动打点——从 index.ts whenReady 内（锁检查之前）后移至此
 import { initExitForensics, markExitStage } from './exit-forensics'
+// 兼容版本：安装信息清单（供自定义安装器读取安装目录/版本/渠道）
+import { writeInstallManifest } from './install-manifest'
 import { markBootAttempt, setupGpuProcessWatcher } from './gpu-fallback'
 import { verifyCriticalNativeModules, showStartupFailureWithFallback } from './native-load-guard'
 // 启动 settled 闸门：启动未完成时不重建窗口，避免与 8 阶段启动链重入
@@ -319,6 +321,13 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
       await initMainI18n()
     } catch (err) {
       logger.warn('[MainI18n] init failed, fallback to zh-CN:', err)
+    }
+
+    // 阶段 3.6：安装信息清单（兼容版本——自定义安装器覆盖升级时读取；失败不阻塞启动）
+    try {
+      writeInstallManifest()
+    } catch (err) {
+      logStartupError('writeInstallManifest', err)
     }
 
     // 阶段 4：崩溃报告系统

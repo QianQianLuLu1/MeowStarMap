@@ -1027,15 +1027,21 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
 
 该组通道此前**完全没写进契约文档**，本轮改动 `UpdatePayload` 结构，按契约同步义务一次性补录。
 
-- **通道清单**（注册于 `src/main/ipc/handlers/app-handler.ts`，均 `wrapHandlerNoArgs`；preload 侧
+- **通道清单**（注册于 `src/main/ipc/handlers/app-handler.ts`，`check/download` 为 `wrapHandlerNoArgs`、
+  `install` 为 `wrapHandler`（可选参数，见下）；preload 侧
   `window.electronAPI.app.*`，见 `src/main/preload/api/app.ts`）：
   | 通道                                                                                           | preload 方法                  | 返回（`IpcResponse.data`） |
   | ---------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
   | `app:update:check`                                                                             | `checkUpdate()`               | `{ checking: true }`       |
   | `app:update:download`                                                                          | `downloadUpdate()`            | `{ downloading: true }`    |
-  | `app:update:install`                                                                           | `installUpdate()`             | `{ installing: true }`     |
+  | `app:update:install`                                                                           | `installUpdate(installerPath?: string)` | `{ installing: true }`     |
   | `app:update`（主→渲染推送）                                                                    | `onUpdate(cb)`（`subscribe`） | `UpdatePayload`            |
   | 弹窗「确定」按钮复用既有 `shell:openExternal`（§参数校验 `schemas.httpUrl`），本轮未改该通道。 |
+- **安装器兼容扩展（2026-11-24，向后兼容）**：`app:update:install` 新增**可选**载荷
+  `{ installerPath?: string }`（位置参数，缺省/不传等价于旧行为）。传入时主进程改用本地自定义安装器
+  覆盖安装（启动后退出应用，安装器按 `--updated --force-run` 契约执行）；未传时保持 electron-updater
+  原有 `quitAndInstall` 路径。校验规则：绝对路径、`.exe`、文件存在且非空，非法输入返回
+  `VALIDATION_ERROR`/`NOT_FOUND`。旧渲染层调用 `installUpdate()` 零改动。
 - **载荷变更**：`UpdatePayload`（真相源 `src/shared/types/electron-api.ts`）新增**可选**字段
   `errorKind?: 'network' | 'source'`，仅在 `stage: 'error'` 时有意义。通道名、方法签名、
   `IpcResponse`/`IpcError` 结构、其余字段语义均不变；旧事件不带 `errorKind` 时渲染层按 `network`
