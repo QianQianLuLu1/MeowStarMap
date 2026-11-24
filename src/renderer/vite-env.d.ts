@@ -1437,7 +1437,8 @@ interface WindowElectronAPI {
     // 自动更新：用户确认后开始下载
     downloadUpdate: () => Promise<{ downloading: boolean }>
     // 自动更新：用户确认「安装并重启」
-    installUpdate: () => Promise<{ installing: boolean }>
+    // 兼容版本：可选传入本机安装器路径（自定义安装器覆盖升级）；不传保持旧行为
+    installUpdate: (installerPath?: string) => Promise<{ installing: boolean }>
     // 自动更新：订阅主进程推送的更新状态/进度
     onUpdate: (
       callback: (payload: {

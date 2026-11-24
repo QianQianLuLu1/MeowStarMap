@@ -73,6 +73,7 @@
     "debt:check": "tsx scripts/debt/check-debt-fix.ts",
     "verify:dist": "tsx scripts/pre-dist-check.ts --verify-asar",
     "verify:nikkisync": "tsx scripts/verify-nikkisync-link.ts",
+    "generate:update-feed": "tsx scripts/generate-update-feed.ts",
     "link:nikkisync": "tsx scripts/link-nikkisync.ts",
     "link:nikkisync:check": "tsx scripts/link-nikkisync.ts --check",
     "e2e": "tsx scripts/e2e-usage.ts",

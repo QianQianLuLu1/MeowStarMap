@@ -5,6 +5,7 @@ import { sendToRenderer } from './renderer-bridge'
 import { classifyUpdateError } from './update-error-class'
 import { AppError } from '../../shared/errors/app-error'
 import { logger } from '../utils/logger'
+import { launchExternalInstaller } from './external-installer'
 import { t } from '../i18n'
 
 /**
@@ -223,4 +224,18 @@ export function quitAndInstall(): void {
   logUpdate(`[Update] quitAndInstall (isSilent=false, forceRunAfter=true) feed=${feedUrlForLog}`)
   // isSilent=false 显示原生安装进度；isForceRunAfter=true 安装后自动重启
   autoUpdater.quitAndInstall(false, true)
+}
+
+/**
+ * 兼容版本：改用自定义安装器完成安装/覆盖升级。
+ *
+ * 与 electron-updater 旧路径的区别仅在于"由谁执行安装"：这里启动外部安装器并退出应用，
+ * 安装器按 `--updated --force-run` 契约完成覆盖安装后重启应用。校验失败会抛 AppError，
+ * 由调用方（app:update:install handler）转成 IpcError 返回渲染层。
+ */
+export function installWithExternalInstaller(installerPath: string): void {
+  logUpdate(`[Update] installWithExternalInstaller path=${installerPath} feed=${feedUrlForLog}`)
+  // 先启动安装器，再退出应用：安装器内部会等待旧进程退出后覆盖文件
+  launchExternalInstaller(installerPath)
+  app.quit()
 }

@@ -1,9 +1,15 @@
-// @core-change: 订正 app:update:check 注释——dev 未初始化已改为抛 IPC_PRECONDITION_FAILED，不再是 no-op
+// @core-change: app:update:install 增加可选 installerPath（兼容自定义安装器覆盖升级）
 import { ipcMain, app } from 'electron'
+import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
-import { wrapHandlerNoArgs } from '../validator'
+import { wrapHandler, wrapHandlerNoArgs } from '../validator'
 // 自动更新：handler 直接委托给 auto-update 模块的已初始化实例
-import { checkForUpdates, downloadUpdate, quitAndInstall } from '../../app/auto-update'
+import {
+  checkForUpdates,
+  downloadUpdate,
+  installWithExternalInstaller,
+  quitAndInstall
+} from '../../app/auto-update'
 // 需求五.2：权限不足（E003）时由渲染层触发「一键重启并提升权限」
 import { requestAdminRelaunch } from '../../app/permission'
 // GPU 状态可观测：只读聚合探针（硬件加速开关态/活动显卡/特性降级/独显偏好）
@@ -69,12 +75,22 @@ export function registerAppHandlers(_ctx: HandlerContext): void {
     })
   )
 
-  // 自动更新：用户确认「安装并重启」
+  // 自动更新：用户确认「安装并重启」。
+  // 兼容版本：可选 `installerPath` —— 传入时改用自定义安装器覆盖安装（启动后退出应用），
+  // 不传时保持原有 electron-updater / NSIS 行为，老渲染层调用零改动。
   ipcMain.handle(
     'app:update:install',
-    wrapHandlerNoArgs(_ctx, async () => {
-      quitAndInstall()
-      return { installing: true }
-    })
+    wrapHandler(
+      _ctx,
+      z.tuple([z.object({ installerPath: z.string().min(1).optional() }).optional()]),
+      async ([input]) => {
+        if (input?.installerPath !== undefined) {
+          installWithExternalInstaller(input.installerPath)
+        } else {
+          quitAndInstall()
+        }
+        return { installing: true }
+      }
+    )
   )
 }

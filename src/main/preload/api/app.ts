@@ -17,7 +17,11 @@ export const appAPI = {
   // 自动更新：用户确认后开始下载
   downloadUpdate: () => call<{ downloading: boolean }>('app:update:download'),
   // 自动更新：用户确认「安装并重启」
-  installUpdate: () => call<{ installing: boolean }>('app:update:install'),
+  // 兼容版本：可选传入本机安装器路径，主进程将改用自定义安装器覆盖安装；不传保持旧行为
+  installUpdate: (installerPath?: string) =>
+    installerPath === undefined
+      ? call<{ installing: boolean }>('app:update:install')
+      : call<{ installing: boolean }>('app:update:install', { installerPath }),
   // 自动更新：订阅主进程推送的更新状态/进度事件
   onUpdate: (callback: (payload: UpdatePayload) => void) => subscribe('app:update', callback)
 }
