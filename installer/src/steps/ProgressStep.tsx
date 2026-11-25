@@ -21,7 +21,10 @@ const ProgressStep = (): React.JSX.Element => {
       void Promise.all([getInstallProgress(), getInstallLog()])
         .then(([next, nextLogs]) => {
           if (!alive) return
-          setProgress(next)
+          setProgress((prev) => ({
+            ...next,
+            percent: Math.max(prev.percent, next.percent)
+          }))
           setLogs(nextLogs)
         })
         .catch(() => {
@@ -31,7 +34,10 @@ const ProgressStep = (): React.JSX.Element => {
 
     let unlisten: (() => void) | undefined
     const pending = listen<ProgressPayload>('installer-progress', (event) => {
-      setProgress(event.payload)
+      setProgress((prev) => ({
+        ...event.payload,
+        percent: Math.max(prev.percent, event.payload.percent)
+      }))
     })
     void pending
       .then((fn) => {

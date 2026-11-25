@@ -31,6 +31,11 @@ export function uninstall(): Promise<void> {
   return invoke<void>('uninstall')
 }
 
+/** 关闭安装器进程（避免只关 WebView 留下白屏窗口）。 */
+export function closeInstaller(): Promise<void> {
+  return invoke<void>('close_installer')
+}
+
 /** 安装完成后启动应用。 */
 export function launchApp(): Promise<void> {
   return invoke<void>('launch_app')

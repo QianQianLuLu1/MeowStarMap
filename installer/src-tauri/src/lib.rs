@@ -20,6 +20,7 @@ pub fn run() {
             commands::start_install,
             commands::cancel_install,
             commands::uninstall,
+            commands::close_installer,
             commands::launch_app
         ])
         .run(tauri::generate_context!())

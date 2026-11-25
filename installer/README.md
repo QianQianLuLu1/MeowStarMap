@@ -84,7 +84,7 @@ npm run build        # tauri build --no-bundle（产出独立 exe）
 - [x] `detect_state` 读取旧安装（注册表/install-manifest）
 - [x] 载荷 sha256/size 校验（`payload.zip.json` 清单，缺失时跳过并告警）
 - [x] 子进程统一 CREATE_NO_WINDOW，安装过程不闪 cmd/控制台窗口
-- [x] 单文件安装包：payload 追加在 exe 末尾（`[zip][manifest][size][magic]`），不依赖同目录 `payload.zip`
+- [x] 安装目录内生成 `Uninstall.exe`（截取安装器 PE 本体，约 10MB），UninstallString 指向它；卸载时先复制到临时目录避免自删失败`n- [x] 关闭按钮走 `close_installer`/app.exit(0)；启动应用成功后约 800ms 自动关闭安装器`n- [x] 进度：sha256 按字节推进、解包/替换分阶段、UI 单调不回退`n- [x] 单文件安装包：payload 追加在 exe 末尾（`[zip][manifest][size][magic]`），不依赖同目录 `payload.zip`
 - [x] 缺少载荷视为安装失败（不再“安装完成”并写空目录/注册表）
 - [x] staged 解包 + 备份替换 + 失败回滚（`installer-progress` 事件 0→100%）
 - [x] 安装命令放到 blocking 线程（2026-11-25 冒烟发现页面卡 0%，已修复）

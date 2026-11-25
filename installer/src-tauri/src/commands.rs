@@ -94,6 +94,11 @@ pub fn uninstall() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn launch_app() -> Result<(), String> {
-    platform::launch_app().map_err(|err| err.to_string())
+pub fn launch_app(app: tauri::AppHandle) -> Result<(), String> {
+    platform::launch_app(app).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn close_installer(app: tauri::AppHandle) {
+    app.exit(0);
 }

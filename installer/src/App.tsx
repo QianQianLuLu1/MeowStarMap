@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { detectState, startInstall } from './api'
+import { closeInstaller, detectState, startInstall } from './api'
 import type { InstallOptions, InstallSummary, InstallerState } from './types'
 import WelcomeStep from './steps/WelcomeStep'
 import OptionsStep from './steps/OptionsStep'
@@ -58,7 +58,7 @@ const App = (): React.JSX.Element => {
     }
     silentStarted.current = true
     void runInstall({
-      installDir: state.installDir ?? '',
+      installDir: state.installDir ?? state.defaultInstallDir ?? '',
       createDesktopShortcut: true,
       importCertificate: true
     })
@@ -123,7 +123,7 @@ const App = (): React.JSX.Element => {
           </>
         )}
         {step === 3 && summary !== null && (
-          <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => window.close()} />
+          <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => void closeInstaller()} />
         )}
       </main>
     </div>
