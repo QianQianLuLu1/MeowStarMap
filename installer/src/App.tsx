@@ -39,9 +39,12 @@ const App = (): React.JSX.Element => {
     detectState()
       .then((s) => {
         setState(s)
+        // 中文路径在部分机器会乱码；非 ASCII 的旧路径直接回落到英文默认目录
+        const asciiDir =
+          s.installDir !== null && /^[\x20-\x7E]+$/.test(s.installDir) ? s.installDir : null
         setOptions((prev) => ({
           ...prev,
-          installDir: s.installDir ?? s.defaultInstallDir ?? ''
+          installDir: asciiDir ?? s.defaultInstallDir ?? ''
         }))
       })
       .catch((err: unknown) => setError(String(err)))

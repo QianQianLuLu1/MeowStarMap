@@ -8,18 +8,25 @@ interface OptionsStepProps {
   onInstall: (options: InstallOptions) => void
 }
 
+const isAsciiPath = (value: string): boolean => /^[\x20-\x7E]+$/.test(value)
+
 const OptionsStep = ({ state, options, onBack, onInstall }: OptionsStepProps): React.JSX.Element => {
-  const [installDir, setInstallDir] = useState(options.installDir || state?.defaultInstallDir || '')
+  const initialDir = isAsciiPath(options.installDir)
+    ? options.installDir
+    : (state?.defaultInstallDir ?? '')
+  const [installDir, setInstallDir] = useState(initialDir)
   const [createDesktopShortcut, setCreateDesktopShortcut] = useState(options.createDesktopShortcut)
   const [importCertificate, setImportCertificate] = useState(options.importCertificate)
 
   // 状态是异步加载的：若挂载时路径为空，等默认值/状态到达后补上，避免输入框一直空白
   useEffect(() => {
-    if (installDir.trim() !== '') {
+    if (installDir.trim() !== '' && isAsciiPath(installDir)) {
       return
     }
-    const fallback = options.installDir || state?.defaultInstallDir || ''
-    if (fallback !== '') {
+    const fallback = isAsciiPath(options.installDir)
+      ? options.installDir
+      : (state?.defaultInstallDir ?? '')
+    if (fallback !== '' && fallback !== installDir) {
       setInstallDir(fallback)
     }
   }, [options.installDir, state?.defaultInstallDir, installDir])
