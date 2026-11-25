@@ -1,4 +1,4 @@
-// @core-change: 暴露 app.getGpuStatus()（app:gpu-status 只读探针，诊断面板用）
+// @core-change: installUpdate 恢复无参契约（不再向渲染层暴露安装器路径）
 // 应用控制命名空间：对应主进程 handlers/app-handler.ts 注册的 app:* 通道
 import { call, subscribe } from '../ipc'
 import type { UpdatePayload, GpuStatusSummary } from '../../../shared/types/electron-api'
@@ -17,6 +17,7 @@ export const appAPI = {
   // 自动更新：用户确认后开始下载
   downloadUpdate: () => call<{ downloading: boolean }>('app:update:download'),
   // 自动更新：用户确认「安装并重启」
+  // 安全约束：不向渲染层暴露安装器路径参数（主进程内部持有可信产物）
   installUpdate: () => call<{ installing: boolean }>('app:update:install'),
   // 自动更新：订阅主进程推送的更新状态/进度事件
   onUpdate: (callback: (payload: UpdatePayload) => void) => subscribe('app:update', callback)

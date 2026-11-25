@@ -1027,7 +1027,8 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
 
 该组通道此前**完全没写进契约文档**，本轮改动 `UpdatePayload` 结构，按契约同步义务一次性补录。
 
-- **通道清单**（注册于 `src/main/ipc/handlers/app-handler.ts`，均 `wrapHandlerNoArgs`；preload 侧
+- **通道清单**（注册于 `src/main/ipc/handlers/app-handler.ts`，`check/download` 为 `wrapHandlerNoArgs`、
+  `install` 为 `wrapHandler`（可选参数，见下）；preload 侧
   `window.electronAPI.app.*`，见 `src/main/preload/api/app.ts`）：
   | 通道                                                                                           | preload 方法                  | 返回（`IpcResponse.data`） |
   | ---------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
@@ -1036,6 +1037,9 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
   | `app:update:install`                                                                           | `installUpdate()`             | `{ installing: true }`     |
   | `app:update`（主→渲染推送）                                                                    | `onUpdate(cb)`（`subscribe`） | `UpdatePayload`            |
   | 弹窗「确定」按钮复用既有 `shell:openExternal`（§参数校验 `schemas.httpUrl`），本轮未改该通道。 |
+- **安装器路径安全约束（2026-11-25 审查后收紧）**：`app:update:install` **不接受**渲染层传入的安装器路径；
+  自定义安装器只能由主进程持有可信产物时内部调用（`src/main/app/external-installer.ts` 校验：绝对路径、
+  拒绝 UNC 与符号链接、`.exe`、存在且非空）。旧渲染层 `installUpdate()` 契约不变。
 - **载荷变更**：`UpdatePayload`（真相源 `src/shared/types/electron-api.ts`）新增**可选**字段
   `errorKind?: 'network' | 'source'`，仅在 `stage: 'error'` 时有意义。通道名、方法签名、
   `IpcResponse`/`IpcError` 结构、其余字段语义均不变；旧事件不带 `errorKind` 时渲染层按 `network`

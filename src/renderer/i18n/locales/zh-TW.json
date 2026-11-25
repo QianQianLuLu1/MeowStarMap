@@ -4070,6 +4070,19 @@
       "photoDirNotDirectory": "該路徑不是目錄",
       "photoDirNotReadable": "照片來源目錄不可讀",
       "photoDirBareRoot": "照片來源目錄不能是磁碟根目錄或 UNC 根目錄"
+    },
+    "externalInstaller": {
+      "pathRequired": "安裝器路徑不能為空",
+      "mustBeExe": "安裝器必須是 .exe 檔案",
+      "notFound": "安裝器檔案不存在",
+      "invalidFile": "安裝器路徑不是有效檔案",
+      "mustBeAbsolute": "安裝器必須是絕對路徑",
+      "uncNotAllowed": "不支援網路共享路徑",
+      "symlinkNotAllowed": "安裝器不能是符號連結"
+    },
+    "installManifest": {
+      "logWriteFailed": "[install-manifest] 寫入失敗: {{target}}",
+      "logConstructFailed": "[install-manifest] 建構/寫入安裝資訊清單失敗（不阻塞啟動）"
     }
   },
   "appError": {

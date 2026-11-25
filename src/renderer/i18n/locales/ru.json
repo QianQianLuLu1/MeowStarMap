@@ -4070,6 +4070,19 @@
       "photoDirNotDirectory": "Указанный путь не является каталогом",
       "photoDirNotReadable": "Каталог источника фотографий недоступен для чтения",
       "photoDirBareRoot": "Источник фотографий не может быть корнем диска или UNC-каталогом"
+    },
+    "externalInstaller": {
+      "pathRequired": "Installer path is required",
+      "mustBeExe": "Installer must be an .exe file",
+      "notFound": "Installer file not found",
+      "invalidFile": "Installer path is not a valid file",
+      "mustBeAbsolute": "Installer path must be absolute",
+      "uncNotAllowed": "Network share paths are not allowed",
+      "symlinkNotAllowed": "Installer must not be a symbolic link"
+    },
+    "installManifest": {
+      "logWriteFailed": "[install-manifest] failed to write: {{target}}",
+      "logConstructFailed": "[install-manifest] failed to build/write install manifest (startup continues)"
     }
   },
   "appError": {

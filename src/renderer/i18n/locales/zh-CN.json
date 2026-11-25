@@ -4070,6 +4070,19 @@
       "photoDirNotDirectory": "该路径不是目录",
       "photoDirNotReadable": "照片源目录不可读",
       "photoDirBareRoot": "照片源目录不能是盘根或 UNC 根目录"
+    },
+    "externalInstaller": {
+      "pathRequired": "安装器路径不能为空",
+      "mustBeExe": "安装器必须是 .exe 文件",
+      "notFound": "安装器文件不存在",
+      "invalidFile": "安装器路径不是有效文件",
+      "mustBeAbsolute": "安装器必须是绝对路径",
+      "uncNotAllowed": "不支持网络共享路径",
+      "symlinkNotAllowed": "安装器不能是符号链接"
+    },
+    "installManifest": {
+      "logWriteFailed": "[install-manifest] 写入失败: {{target}}",
+      "logConstructFailed": "[install-manifest] 构造/写入安装信息清单失败（不阻塞启动）"
     }
   },
   "appError": {

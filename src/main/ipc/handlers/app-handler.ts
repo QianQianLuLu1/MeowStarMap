@@ -1,4 +1,4 @@
-// @core-change: 订正 app:update:check 注释——dev 未初始化已改为抛 IPC_PRECONDITION_FAILED，不再是 no-op
+// @core-change: app:update:install 恢复无参契约（不再接受渲染层 installerPath）
 import { ipcMain, app } from 'electron'
 import type { HandlerContext } from '../handler-context'
 import { wrapHandlerNoArgs } from '../validator'
@@ -69,7 +69,9 @@ export function registerAppHandlers(_ctx: HandlerContext): void {
     })
   )
 
-  // 自动更新：用户确认「安装并重启」
+  // 自动更新：用户确认「安装并重启」。
+  // 安全约束：不再接受渲染层传入的安装器路径（避免任意 exe 执行）；自定义安装器
+  // 只能由主进程在持有可信下载产物时内部调用。
   ipcMain.handle(
     'app:update:install',
     wrapHandlerNoArgs(_ctx, async () => {
