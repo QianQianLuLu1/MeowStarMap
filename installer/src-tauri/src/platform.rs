@@ -236,16 +236,15 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
     let payload = payload_path();
     if let Some(payload) = payload.as_ref() {
         log_line(format!("载荷: {}", payload.display()));
-        verify_payload(payload, app)?;
+        let unpacked_size = verify_payload(payload, app)?;
         log_line("载荷 sha256/大小校验通过");
-        emit_progress(app, 30, "载荷校验通过");
         let staging = staging_dir(&install_dir)?;
         let prepare_result: Result<(), String> = (|| {
-            emit_progress(app, 32, "正在解包安装文件…");
-            extract_to(payload, &staging)?;
+            emit_progress(app, 20, "正在解包安装文件…");
+            extract_to(payload, &staging, app, unpacked_size)?;
             check_cancel()?;
-            emit_progress(app, 62, "安装文件已展开");
-            emit_progress(app, 70, "正在替换安装目录…");
+            emit_progress(app, 85, "安装文件已展开");
+            emit_progress(app, 90, "正在替换安装目录…");
             swap_in(&install_dir, &staging, &mut steps, &mut warnings)?;
             Ok(())
         })();
@@ -255,7 +254,7 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
             log_line(format!("安装失败: {err}"));
             return Err(err);
         }
-        emit_progress(app, 80, "文件替换完成");
+        emit_progress(app, 92, "文件替换完成");
         log_line("安装文件替换完成");
     } else {
         // 没有载荷属于安装包不完整：必须失败并保持安装目录/注册表不变（可回滚）。
@@ -604,7 +603,7 @@ fn sha256_file_with_progress(path: &Path, app: &AppHandle) -> Result<String, Str
         hasher.update(&buffer[..read]);
         done += read as u64;
         let percent = if total > 0 {
-            2 + ((done.min(total) as f64 / total as f64) * 28.0) as u8
+            2 + ((done.min(total) as f64 / total as f64) * 18.0) as u8
         } else {
             2
         };
@@ -616,11 +615,11 @@ fn sha256_file_with_progress(path: &Path, app: &AppHandle) -> Result<String, Str
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn verify_payload(payload: &Path, app: &AppHandle) -> Result<(), String> {
+fn verify_payload(payload: &Path, app: &AppHandle) -> Result<Option<u64>, String> {
     let manifest_path = PathBuf::from(format!("{}.json", payload.display()));
     if !manifest_path.exists() {
         // 清单可选：没有清单时跳过哈希校验（由发布流程决定是否提供）
-        return Ok(());
+        return Ok(None);
     }
     let raw =
         fs::read_to_string(&manifest_path).map_err(|err| format!("读取载荷清单失败: {err}"))?;
@@ -642,7 +641,7 @@ fn verify_payload(payload: &Path, app: &AppHandle) -> Result<(), String> {
     if !actual.eq_ignore_ascii_case(expected) {
         return Err("载荷 sha256 校验失败，安装包可能已损坏".to_string());
     }
-    Ok(())
+    Ok(value.get("unpackedSize").and_then(|item| item.as_u64()))
 }
 
 fn staging_dir(install_dir: &Path) -> Result<PathBuf, String> {
@@ -661,7 +660,12 @@ fn staging_dir(install_dir: &Path) -> Result<PathBuf, String> {
     Ok(parent.join(name))
 }
 
-fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
+fn extract_to(
+    payload: &Path,
+    staging: &Path,
+    app: &AppHandle,
+    expected_unpacked: Option<u64>,
+) -> Result<(), String> {
     if staging.exists() {
         fs::remove_dir_all(staging).map_err(|err| format!("清理暂存目录失败: {err}"))?;
     }
@@ -711,11 +715,37 @@ fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
                 log_line("解包完成");
                 break;
             }
-            Ok(None) => thread::sleep(Duration::from_millis(200)),
+            Ok(None) => {
+                if let Some(expected) = expected_unpacked.filter(|value| *value > 0) {
+                    let extracted = dir_size(staging);
+                    let percent =
+                        20 + ((extracted.min(expected) as f64 / expected as f64) * 65.0) as u8;
+                    emit_progress(app, percent.min(84), "正在解包安装文件…");
+                }
+                thread::sleep(Duration::from_millis(200))
+            }
             Err(err) => return Err(format!("等待解包进程失败: {err}")),
         }
     }
     Ok(())
+}
+
+fn dir_size(path: &Path) -> u64 {
+    let Ok(entries) = fs::read_dir(path) else {
+        return 0;
+    };
+    let mut total = 0u64;
+    for entry in entries.flatten() {
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.is_dir() {
+            total += dir_size(&entry.path());
+        } else {
+            total += metadata.len();
+        }
+    }
+    total
 }
 
 fn copy_dir_all(source: &Path, destination: &Path) -> Result<(), String> {

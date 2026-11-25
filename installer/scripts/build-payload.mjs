@@ -61,10 +61,22 @@ execFileSync('tar', ['-a', '-c', '-f', out, '-C', unpacked, '.'], { stdio: 'inhe
 
 const buffer = fs.readFileSync(out)
 const sha256 = createHash('sha256').update(buffer).digest('hex')
+
+function directorySize(dir) {
+  let total = 0
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name)
+    if (entry.isDirectory()) total += directorySize(full)
+    else if (entry.isFile()) total += fs.statSync(full).size
+  }
+  return total
+}
+
 const manifest = {
   version,
   file: path.basename(out),
   size: buffer.length,
+  unpackedSize: directorySize(unpacked),
   sha256,
   createdAt: new Date().toISOString()
 }
