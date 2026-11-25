@@ -525,6 +525,16 @@ export default [
       'no-undef': 'off'
     }
   },
+  // 脚本层（Node）：.mjs/.cjs 需要 Node globals，否则 console/Buffer/process 会 no-undef。
+  {
+    files: ['scripts/**/*.{js,mjs,cjs}', 'installer/scripts/**/*.{js,mjs,cjs}', '*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+        ...globals.es2021
+      }
+    }
+  },
   {
     ignores: [
       'dist/**',
@@ -540,6 +550,11 @@ export default [
       // 否则 `npm run lint` 会把 183 KB 的压缩产物收为源码并冒出数十条 no-unused-expressions
       'preview-worker-*.js',
       'src/renderer/dist/**',
+      'installer/dist/**',
+      'installer/src-tauri/target/**',
+      'installer/node_modules/**',
+      'installer/Microsoft/**',
+      'Microsoft/**',
       'tools/**',
       'project-issues-fix-guide/**',
       'wxnn-photo-manager/**',

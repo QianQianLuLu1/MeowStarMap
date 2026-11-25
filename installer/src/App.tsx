@@ -62,7 +62,6 @@ const App = (): React.JSX.Element => {
       createDesktopShortcut: true,
       importCertificate: true
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
   const modeLabel =

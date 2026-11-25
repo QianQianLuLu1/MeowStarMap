@@ -94,7 +94,7 @@
     "owner": "QianQianLuLu1",
     "extra": ["github.com/your-repo/issues", "QQ群: 123456789", "QQ Group: 123456789"]
   },
-  "expectedTotal": 171,
+  "expectedTotal": 185,
   "allowed": {
     "ARCHITECTURE.en.md": {
       "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
@@ -312,7 +312,6 @@
         "nikkiGallery": 3
       }
     },
-
     "src/renderer/utils/resonance/exportPayload.ts": {
       "reason": "导入信封线格式 app:'nikkigallery' 两处（zod literal，改则历史导出被拒；文件名已随 C3 转新名）",
       "hits": {
@@ -343,6 +342,33 @@
       "hits": {
         "wxnn-photo-manager": 1,
         "WXNN XiangCe": 1
+      }
+    },
+    "docs/legacy-migration.md": {
+      "reason": "旧版迁移文档必须逐字记录旧产品名与旧目录名，供安装器识别旧版数据；属迁移事实而非产品自称",
+      "hits": {
+        "无限暖暖相册管理工具": 1,
+        "wxnn-photo-manager": 7,
+        "wxnn_photo_manager": 2
+      }
+    },
+    "scripts/migrate-legacy-wxnn.ts": {
+      "reason": "旧版数据迁移脚本注释/参数说明必须写旧产品名与旧库名",
+      "hits": {
+        "wxnn-photo-manager": 1
+      }
+    },
+    "src/main/app/lifecycle.ts": {
+      "reason": "lifecycle 注释说明旧版 wxnn-photo-manager 数据迁移入口",
+      "hits": {
+        "wxnn-photo-manager": 1
+      }
+    },
+    "src/main/database/legacy-migration.ts": {
+      "reason": "旧版迁移模块注释/路径约定必须写旧产品名与旧库名",
+      "hits": {
+        "wxnn-photo-manager": 1,
+        "wxnn_photo_manager": 1
       }
     }
   },
