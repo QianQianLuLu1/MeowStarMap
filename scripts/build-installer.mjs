@@ -97,7 +97,45 @@ const installerExe = path.join(releaseDir, `MeowStarMap-Installer-${version}.exe
 fs.copyFileSync(builtExe, installerExe)
 console.log(`[build-installer] ✓ 安装器: ${path.relative(root, installerExe)}`)
 
-// 运行时安装器会在自身目录查找 payload.zip；发布前把载荷放到安装器 exe 同级
+// 把 payload 追加到 exe 末尾（[zip][size u64 LE][magic 8]），实现单文件安装包
+if (fs.existsSync(payloadOut)) {
+  embedPayload(installerExe, payloadOut)
+}
+
+function embedPayload(targetExe, payloadFile) {
+  const manifestFile = `${payloadFile}.json`
+  if (!fs.existsSync(manifestFile)) {
+    throw new Error(`缺少载荷清单: ${manifestFile}`)
+  }
+  const manifest = fs.readFileSync(manifestFile)
+  const tempExe = `${targetExe}.embedding`
+  fs.copyFileSync(targetExe, tempExe)
+  const out = fs.openSync(tempExe, 'a')
+  const input = fs.openSync(payloadFile, 'r')
+  const size = fs.fstatSync(input).size
+  const buffer = Buffer.allocUnsafe(8 * 1024 * 1024)
+  let position = 0
+  while (position < size) {
+    const read = fs.readSync(input, buffer, 0, Math.min(buffer.length, size - position), position)
+    if (read <= 0) break
+    fs.writeSync(out, buffer, 0, read)
+    position += read
+  }
+  fs.closeSync(input)
+  fs.writeSync(out, manifest)
+  const footer = Buffer.alloc(24)
+  footer.writeBigUInt64LE(BigInt(size), 0)
+  footer.writeBigUInt64LE(BigInt(manifest.length), 8)
+  footer.write('MEOWPAY1', 16, 'ascii')
+  fs.writeSync(out, footer)
+  fs.closeSync(out)
+  fs.renameSync(tempExe, targetExe)
+  console.log(
+    `[build-installer] ✓ 已内嵌载荷 ${(size / 1024 / 1024).toFixed(1)} MB + 清单 ${manifest.length} B`
+  )
+}
+
+// 运行时安装器会在自身目录查找 payload.zip；发布前把载荷放到安装器 exe 同级（兼容旧用法）
 const releasePayload = path.join(releaseDir, 'payload.zip')
 if (fs.existsSync(payloadOut)) {
   fs.copyFileSync(payloadOut, releasePayload)

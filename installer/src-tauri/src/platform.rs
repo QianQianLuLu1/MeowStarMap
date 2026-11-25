@@ -1,6 +1,6 @@
 use std::env;
 use std::fs::{self, File};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -173,9 +173,8 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
         }
         emit_progress(app, 78, "文件替换完成");
     } else {
-        warnings.push("未找到安装载荷（骨架阶段），已跳过文件解包".to_string());
-        fs::create_dir_all(&install_dir).map_err(|err| format!("创建安装目录失败: {err}"))?;
-        steps.push(format!("创建安装目录: {}", install_dir.display()));
+        // 没有载荷属于安装包不完整：必须失败并保持安装目录/注册表不变（可回滚）。
+        return Err("未找到安装载荷：安装包不完整（缺少 payload.zip 或内嵌载荷）".to_string());
     }
 
     match crate::legacy::prepare() {
@@ -315,6 +314,9 @@ fn payload_path() -> Option<PathBuf> {
             return Some(path);
         }
     }
+    if let Some(path) = embedded_payload() {
+        return Some(path);
+    }
     let exe_dir = env::current_exe().ok()?.parent()?.to_path_buf();
     for candidate in ["payload.zip", "payload"] {
         let path = exe_dir.join(candidate);
@@ -323,6 +325,67 @@ fn payload_path() -> Option<PathBuf> {
         }
     }
     None
+}
+
+const PAYLOAD_TRAILER_MAGIC: &[u8; 8] = b"MEOWPAY1";
+const PAYLOAD_TRAILER_LEN: u64 = 24;
+
+/// 读取追加在安装器 exe 末尾的内嵌载荷：
+/// [zip][manifest json][zip_size u64 le][manifest_size u64 le][magic 8]，
+/// 解出 zip 与同名 .json 清单到临时目录，供校验/版本读取。
+fn embedded_payload() -> Option<PathBuf> {
+    let exe = env::current_exe().ok()?;
+    let mut file = File::open(&exe).ok()?;
+    let len = file.metadata().ok()?.len();
+    if len <= PAYLOAD_TRAILER_LEN {
+        return None;
+    }
+    file.seek(SeekFrom::End(-8)).ok()?;
+    let mut magic = [0u8; 8];
+    file.read_exact(&mut magic).ok()?;
+    if &magic != PAYLOAD_TRAILER_MAGIC {
+        return None;
+    }
+    file.seek(SeekFrom::End(-24)).ok()?;
+    let mut zip_size_buf = [0u8; 8];
+    let mut manifest_size_buf = [0u8; 8];
+    file.read_exact(&mut zip_size_buf).ok()?;
+    file.read_exact(&mut manifest_size_buf).ok()?;
+    let zip_size = u64::from_le_bytes(zip_size_buf);
+    let manifest_size = u64::from_le_bytes(manifest_size_buf);
+    if zip_size == 0 || zip_size + manifest_size + PAYLOAD_TRAILER_LEN >= len {
+        return None;
+    }
+    let zip_offset = len - PAYLOAD_TRAILER_LEN - zip_size - manifest_size;
+    let manifest_offset = zip_offset + zip_size;
+    let stem = env::temp_dir().join(format!("meow-installer-payload-{}", std::process::id()));
+    let zip_path = stem.with_extension("zip");
+    let manifest_path = stem.with_extension("zip.json");
+    file.seek(SeekFrom::Start(zip_offset)).ok()?;
+    copy_range(&mut file, &zip_path, zip_size)?;
+    file.seek(SeekFrom::Start(manifest_offset)).ok()?;
+    copy_range(&mut file, &manifest_path, manifest_size)?;
+    Some(zip_path)
+}
+
+fn copy_range(file: &mut File, target: &Path, mut remaining: u64) -> Option<()> {
+    let mut out = File::create(target).ok()?;
+    let mut buffer = [0u8; 64 * 1024];
+    while remaining > 0 {
+        let want = std::cmp::min(buffer.len() as u64, remaining) as usize;
+        let read = file.read(&mut buffer[..want]).ok()?;
+        if read == 0 {
+            break;
+        }
+        out.write_all(&buffer[..read]).ok()?;
+        remaining -= read as u64;
+    }
+    if remaining == 0 {
+        Some(())
+    } else {
+        let _ = fs::remove_file(target);
+        None
+    }
 }
 
 fn is_app_running() -> bool {

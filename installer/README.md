@@ -83,6 +83,8 @@ npm run build        # tauri build --no-bundle（产出独立 exe）
 - [x] 向导 UI 本机启动截图验证（欢迎页/侧边栏步骤）
 - [x] `detect_state` 读取旧安装（注册表/install-manifest）
 - [x] 载荷 sha256/size 校验（`payload.zip.json` 清单，缺失时跳过并告警）
+- [x] 单文件安装包：payload 追加在 exe 末尾（`[zip][manifest][size][magic]`），不依赖同目录 `payload.zip`
+- [x] 缺少载荷视为安装失败（不再“安装完成”并写空目录/注册表）
 - [x] staged 解包 + 备份替换 + 失败回滚（`installer-progress` 事件 0→100%）
 - [x] 安装命令放到 blocking 线程（2026-11-25 冒烟发现页面卡 0%，已修复）
 - [x] 进度事件 + `get_install_progress` 轮询兜底（事件通道不可用时 UI 仍能刷新）
