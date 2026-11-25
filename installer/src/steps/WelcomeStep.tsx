@@ -36,7 +36,6 @@ const WelcomeStep = ({ state, error, onNext }: WelcomeStepProps): React.JSX.Elem
       </div>
 
       <div className="welcome-foot">
-        <p className="hero-note">本地优先 · 覆盖升级 · 安装失败可回滚</p>
         {error !== null && <div className="error">读取安装状态失败：{error}</div>}
         <button type="button" className="primary hero-button" onClick={onNext}>
           开始安装

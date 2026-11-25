@@ -387,16 +387,10 @@ button:disabled {
 .welcome-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   padding-top: 20px;
   border-top: 1px solid var(--line);
-}
-
-.hero-note {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 0;
 }
 
 .hero-button {
