@@ -40,11 +40,8 @@ pub fn prepare() -> Result<Option<String>, String> {
     fs::create_dir_all(&staging).map_err(|err| format!("创建迁移暂存目录失败: {err}"))?;
 
     if legacy.db_path.exists() {
-        fs::copy(
-            &legacy.db_path,
-            staging.join("wxnn_photo_manager.db"),
-        )
-        .map_err(|err| format!("复制旧数据库失败: {err}"))?;
+        fs::copy(&legacy.db_path, staging.join("wxnn_photo_manager.db"))
+            .map_err(|err| format!("复制旧数据库失败: {err}"))?;
     }
 
     for dir in ["thumbnails", "backups", "plugins", "logs"] {
@@ -93,8 +90,7 @@ fn copy_missing(source: &Path, target: &Path) -> Result<(), String> {
         if file_type.is_dir() {
             copy_missing(&entry.path(), &target_path)?;
         } else if !target_path.exists() {
-            fs::copy(entry.path(), &target_path)
-                .map_err(|err| format!("复制文件失败: {err}"))?;
+            fs::copy(entry.path(), &target_path).map_err(|err| format!("复制文件失败: {err}"))?;
         }
     }
     Ok(())
