@@ -40,11 +40,24 @@ pub fn detect_state() -> Result<InstallerState, String> {
 }
 
 #[tauri::command]
-pub fn start_install(
+pub async fn start_install(
     app: tauri::AppHandle,
     options: InstallOptions,
 ) -> Result<InstallSummary, String> {
-    platform::install(options, &app).map_err(|err| err.to_string())
+    // 安装是大文件 IO（解包/哈希/替换），放到 blocking 线程，避免阻塞主线程导致
+    // 进度事件无法重绘（2026-11-25 冒烟测试发现页面会停在 0%）。
+    let install_app = app.clone();
+    let result =
+        tauri::async_runtime::spawn_blocking(move || platform::install(options, &install_app))
+            .await
+            .map_err(|err| format!("安装线程异常: {err}"))?;
+    let summary = result.map_err(|err| err.to_string())?;
+
+    // 静默模式（/S、--silent、-s）：安装完成后直接退出进程，供旧 electron-updater 等待退出码。
+    if platform::is_silent() {
+        app.exit(0);
+    }
+    Ok(summary)
 }
 
 #[tauri::command]

@@ -2,6 +2,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { app } from 'electron'
+import { t } from '../i18n'
 import { logger } from '../utils/logger'
 
 /** 安装信息清单 schema 版本（自定义安装器读取时据此判兼容）。 */
@@ -39,7 +40,10 @@ export interface InstallManifestInput {
 }
 
 /** 纯函数：构造清单对象（不触磁盘，便于单测）。 */
-export function buildInstallManifest(input: InstallManifestInput, now: Date = new Date()): InstallManifestV1 {
+export function buildInstallManifest(
+  input: InstallManifestInput,
+  now: Date = new Date()
+): InstallManifestV1 {
   return {
     schemaVersion: INSTALL_MANIFEST_SCHEMA_VERSION,
     appId: input.appId,
@@ -110,10 +114,12 @@ export function writeInstallManifest(): InstallManifestV1 | null {
         logger.warn(`[install-manifest] 写入失败: ${target}`, err)
       }
     }
-    logger.info(`[install-manifest] 已写入安装信息清单 v${manifest.schemaVersion}（${manifest.productName} ${manifest.version}）`)
+    logger.info(
+      `[install-manifest] 已写入安装信息清单 v${manifest.schemaVersion}（${manifest.productName} ${manifest.version}）`
+    )
     return manifest
   } catch (err) {
-    logger.warn('[install-manifest] 构造/写入安装信息清单失败（不阻塞启动）', err)
+    logger.warn(t('main.installManifest.logConstructFailed'), err)
     return null
   }
 }

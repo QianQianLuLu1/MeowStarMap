@@ -4070,6 +4070,19 @@
       "photoDirNotDirectory": "이 경로는 디렉터리가 아닙니다",
       "photoDirNotReadable": "사진 소스 디렉터리를 읽을 수 없습니다",
       "photoDirBareRoot": "사진 소스 디렉터리는 드라이브 루트나 UNC 루트일 수 없습니다"
+    },
+    "externalInstaller": {
+      "pathRequired": "Installer path is required",
+      "mustBeExe": "Installer must be an .exe file",
+      "notFound": "Installer file not found",
+      "invalidFile": "Installer path is not a valid file",
+      "mustBeAbsolute": "Installer path must be absolute",
+      "uncNotAllowed": "Network share paths are not allowed",
+      "symlinkNotAllowed": "Installer must not be a symbolic link"
+    },
+    "installManifest": {
+      "logWriteFailed": "[install-manifest] failed to write: {{target}}",
+      "logConstructFailed": "[install-manifest] failed to build/write install manifest (startup continues)"
     }
   },
   "appError": {

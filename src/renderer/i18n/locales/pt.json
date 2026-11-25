@@ -4070,6 +4070,19 @@
       "photoDirNotDirectory": "Este caminho não é um diretório",
       "photoDirNotReadable": "O diretório de origem das fotos não pode ser lido",
       "photoDirBareRoot": "O diretório de origem das fotos não pode ser a raiz de uma unidade ou raiz UNC"
+    },
+    "externalInstaller": {
+      "pathRequired": "Installer path is required",
+      "mustBeExe": "Installer must be an .exe file",
+      "notFound": "Installer file not found",
+      "invalidFile": "Installer path is not a valid file",
+      "mustBeAbsolute": "Installer path must be absolute",
+      "uncNotAllowed": "Network share paths are not allowed",
+      "symlinkNotAllowed": "Installer must not be a symbolic link"
+    },
+    "installManifest": {
+      "logWriteFailed": "[install-manifest] failed to write: {{target}}",
+      "logConstructFailed": "[install-manifest] failed to build/write install manifest (startup continues)"
     }
   },
   "appError": {

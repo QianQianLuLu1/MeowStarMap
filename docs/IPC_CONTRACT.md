@@ -1034,14 +1034,12 @@ HTTP/协议）：本机控制页根路径 `/` 免 token 返回内嵌 token 的�
   | ---------------------------------------------------------------------------------------------- | ----------------------------- | -------------------------- |
   | `app:update:check`                                                                             | `checkUpdate()`               | `{ checking: true }`       |
   | `app:update:download`                                                                          | `downloadUpdate()`            | `{ downloading: true }`    |
-  | `app:update:install`                                                                           | `installUpdate(installerPath?: string)` | `{ installing: true }`     |
+  | `app:update:install`                                                                           | `installUpdate()`             | `{ installing: true }`     |
   | `app:update`（主→渲染推送）                                                                    | `onUpdate(cb)`（`subscribe`） | `UpdatePayload`            |
   | 弹窗「确定」按钮复用既有 `shell:openExternal`（§参数校验 `schemas.httpUrl`），本轮未改该通道。 |
-- **安装器兼容扩展（2026-11-24，向后兼容）**：`app:update:install` 新增**可选**载荷
-  `{ installerPath?: string }`（位置参数，缺省/不传等价于旧行为）。传入时主进程改用本地自定义安装器
-  覆盖安装（启动后退出应用，安装器按 `--updated --force-run` 契约执行）；未传时保持 electron-updater
-  原有 `quitAndInstall` 路径。校验规则：绝对路径、`.exe`、文件存在且非空，非法输入返回
-  `VALIDATION_ERROR`/`NOT_FOUND`。旧渲染层调用 `installUpdate()` 零改动。
+- **安装器路径安全约束（2026-11-25 审查后收紧）**：`app:update:install` **不接受**渲染层传入的安装器路径；
+  自定义安装器只能由主进程持有可信产物时内部调用（`src/main/app/external-installer.ts` 校验：绝对路径、
+  拒绝 UNC 与符号链接、`.exe`、存在且非空）。旧渲染层 `installUpdate()` 契约不变。
 - **载荷变更**：`UpdatePayload`（真相源 `src/shared/types/electron-api.ts`）新增**可选**字段
   `errorKind?: 'network' | 'source'`，仅在 `stage: 'error'` 时有意义。通道名、方法签名、
   `IpcResponse`/`IpcError` 结构、其余字段语义均不变；旧事件不带 `errorKind` 时渲染层按 `network`

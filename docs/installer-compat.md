@@ -16,17 +16,17 @@
 
 ## 2. 应用侧改动
 
-| 文件 | 改动 | 说明 |
-|---|---|---|
-| `src/main/app/install-manifest.ts` | 新增 | 打包态启动时向**安装目录**与 `userData` 各写一份 `install-manifest.json`（best-effort，失败不阻塞启动；dev 态不写）。字段：`schemaVersion/appId/productName/version/channel/arch/installDir/exePath/electronVersion/generatedAt` |
-| `src/main/app/external-installer.ts` | 新增 | 自定义安装器路径校验（绝对路径、`.exe`、存在且非空）与启动（detached）；固定参数 `--updated --force-run`，与 electron-updater 旧调用契约一致 |
-| `src/main/app/auto-update.ts` | 修改 | 新增 `installWithExternalInstaller(installerPath)`：启动安装器后退出应用；原 `quitAndInstall()` 保留 |
-| `src/main/ipc/handlers/app-handler.ts` | 修改 | `app:update:install` 增加**可选**载荷 `{ installerPath?: string }`；传入时走自定义安装器，不传时走原 `quitAndInstall` |
-| `src/main/preload/api/app.ts` | 修改 | `installUpdate(installerPath?: string)`，不传参数时调用契约与旧版完全一致 |
-| `src/main/app/lifecycle.ts` | 修改 | 阶段 3.6 调用 `writeInstallManifest()`（try/catch，不阻塞启动） |
-| `scripts/generate-update-feed.ts` | 新增 | 以安装器 exe 生成 electron-updater 兼容 `latest.yml`（sha512 为 base64，含 size/files[]） |
-| `docs/IPC_CONTRACT.md` §17 | 修改 | 同步 `app:update:install` 的可选参数契约（向后兼容） |
-| `CHANGELOG.md` | 修改 | Unreleased 记录兼容层 |
+| 文件                                   | 改动 | 说明                                                                                                                                                                                                                             |
+| -------------------------------------- | ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/main/app/install-manifest.ts`     | 新增 | 打包态启动时向**安装目录**与 `userData` 各写一份 `install-manifest.json`（best-effort，失败不阻塞启动；dev 态不写）。字段：`schemaVersion/appId/productName/version/channel/arch/installDir/exePath/electronVersion/generatedAt` |
+| `src/main/app/external-installer.ts`   | 新增 | 自定义安装器路径校验（绝对路径、拒绝 UNC/符号链接、`.exe`、存在且非空）与启动（detached）；固定参数 `--updated --force-run`，与 electron-updater 旧调用契约一致。**仅主进程内部调用**                                            |
+| `src/main/app/auto-update.ts`          | 修改 | 新增 `installWithExternalInstaller(installerPath)`：启动安装器后退出应用；原 `quitAndInstall()` 保留                                                                                                                             |
+| `src/main/ipc/handlers/app-handler.ts` | 修改 | 保持 `wrapHandlerNoArgs`；**不接受**渲染层 `installerPath`（2026-11-25 安全审查后收紧）                                                                                                                                          |
+| `src/main/preload/api/app.ts`          | 修改 | `installUpdate()` 保持无参契约                                                                                                                                                                                                   |
+| `src/main/app/lifecycle.ts`            | 修改 | 阶段 3.6 调用 `writeInstallManifest()`（try/catch，不阻塞启动）                                                                                                                                                                  |
+| `scripts/generate-update-feed.ts`      | 新增 | 以安装器 exe 生成 electron-updater 兼容 `latest.yml`（sha512 为 base64，含 size/files[]）                                                                                                                                        |
+| `docs/IPC_CONTRACT.md` §17             | 修改 | 同步 `app:update:install` 的可选参数契约（向后兼容）                                                                                                                                                                             |
+| `CHANGELOG.md`                         | 修改 | Unreleased 记录兼容层                                                                                                                                                                                                            |
 
 ## 3. 自定义安装器契约（后续实现方遵守）
 
@@ -90,7 +90,7 @@ npx tsx scripts/generate-update-feed.ts --installer=... --version=2.5.8 --out=re
 
 建议维护者/评审者优先核对：
 
-- **外部安装器路径校验**：仅绝对路径、`.exe`、存在且非空；失败返回 IPC 错误而非静默（`external-installer.ts`）；
+- **外部安装器路径校验**：仅绝对路径（拒绝 UNC/符号链接）、`.exe`、存在且非空；且该能力不通过 IPC 暴露给渲染层。失败返回 AppError 而非静默（`external-installer.ts`）；
 - **启动语义**：先启动安装器再 `app.quit()`，安装器负责等待旧进程退出并覆盖；`--force-run` 负责重启；
 - **清单写入**：仅打包态、双写失败均不阻塞启动（`install-manifest.ts`）；
 - **向后兼容**：不传 `installerPath` 时行为与 2.5.7 完全一致；旧渲染层无需改动；

@@ -1,38 +1,50 @@
-// @core-change: 新增自定义安装器启动通道（兼容版本，供覆盖升级使用）
+// @core-change: 安装器路径校验收紧（绝对路径/拒绝 UNC 与符号链接）并接入 i18n
 import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { AppError } from '../../shared/errors/app-error'
+import { t } from '../i18n'
 import { logger } from '../utils/logger'
 
 /**
- * 兼容版本：自定义安装器启动通道。
+ * 兼容版本：自定义安装器启动通道（仅供主进程内部调用）。
  *
- * 背景：后续版本将用自研安装器替代 NSIS 安装/覆盖升级。为了让"当前版本"能先成为
- * 过渡载体，这里提供与 electron-updater 旧行为等价的启动契约：
- *   - 参数固定 `--updated --force-run`（旧客户端/旧安装器也按这组参数调用安装器，安装完自动重启）；
- *   - 安装器只接受本地已存在、非空、以 .exe 结尾的绝对路径；
- *   - 启动后由调用方退出应用（见 auto-update.installWithExternalInstaller）。
+ * 安全约束（2026-11-25 审查后收紧）：
+ *   - 不再通过 IPC 接受渲染层传入的路径；
+ *   - 只接受绝对路径，拒绝 UNC 网络路径与符号链接；
+ *   - 扩展名必须 .exe、文件存在且非空；
+ *   - 参数固定 `--updated --force-run`（旧客户端/旧安装器契约）。
  */
 export const EXTERNAL_INSTALLER_ARGS = ['--updated', '--force-run'] as const
 
-/** 校验并规范化安装器路径；非法输入抛 AppError（经 handler 转成 IpcError）。 */
+/** 校验并规范化安装器路径；非法输入抛 AppError。 */
 export function validateInstallerPath(raw: unknown): string {
   if (typeof raw !== 'string' || raw.trim() === '') {
-    throw AppError.validation('安装器路径不能为空')
+    throw AppError.validation(t('main.externalInstaller.pathRequired'))
   }
-  const resolved = path.resolve(raw.trim())
+  const input = raw.trim()
+  if (!path.isAbsolute(input)) {
+    throw AppError.validation(t('main.externalInstaller.mustBeAbsolute'), { path: input })
+  }
+  if (input.startsWith('\\\\')) {
+    throw AppError.validation(t('main.externalInstaller.uncNotAllowed'), { path: input })
+  }
+  const resolved = path.normalize(input)
   if (path.extname(resolved).toLowerCase() !== '.exe') {
-    throw AppError.validation('安装器必须是 .exe 文件', { path: resolved })
+    throw AppError.validation(t('main.externalInstaller.mustBeExe'), { path: resolved })
   }
-  let stat: fs.Stats
+
+  let linkStat: fs.Stats
   try {
-    stat = fs.statSync(resolved)
+    linkStat = fs.lstatSync(resolved)
   } catch {
-    throw AppError.notFound('安装器文件不存在', { path: resolved })
+    throw AppError.notFound(t('main.externalInstaller.notFound'), { path: resolved })
   }
-  if (!stat.isFile() || stat.size <= 0) {
-    throw AppError.validation('安装器路径不是有效文件', { path: resolved })
+  if (linkStat.isSymbolicLink()) {
+    throw AppError.validation(t('main.externalInstaller.symlinkNotAllowed'), { path: resolved })
+  }
+  if (!linkStat.isFile() || linkStat.size <= 0) {
+    throw AppError.validation(t('main.externalInstaller.invalidFile'), { path: resolved })
   }
   return resolved
 }
@@ -41,7 +53,10 @@ export function validateInstallerPath(raw: unknown): string {
  * 启动外部安装器（detached，不等待退出）。
  * @returns 子进程 pid（拿不到时返回 -1）
  */
-export function launchExternalInstaller(installerPath: string, extraArgs: readonly string[] = []): number {
+export function launchExternalInstaller(
+  installerPath: string,
+  extraArgs: readonly string[] = []
+): number {
   const resolved = validateInstallerPath(installerPath)
   const args = [...EXTERNAL_INSTALLER_ARGS, ...extraArgs]
   const child = spawn(resolved, args, {

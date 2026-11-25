@@ -13,6 +13,10 @@ const UNINSTALL_KEY: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.qianlu.meow-star-map";
 const DISPLAY_NAME: &str = "喵星图";
 
+pub fn is_silent() -> bool {
+    has_silent_flag()
+}
+
 pub fn detect_state() -> InstallerState {
     let registry_dir = read_install_dir();
     let override_dir = arg_value("--install-dir=").or_else(|| arg_value("/D="));
@@ -70,8 +74,13 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
     }
 
     let version = read_manifest_version(&install_dir)
+        .or_else(|| {
+            payload
+                .as_ref()
+                .and_then(|path| payload_manifest_version(path))
+        })
         .or_else(|| query_reg_value(UNINSTALL_KEY, "DisplayVersion"))
-        .unwrap_or_else(|| "0.0.0-skeleton".to_string());
+        .unwrap_or_else(|| "0.0.0".to_string());
 
     write_uninstall_registry(&install_dir, &version, &mut steps, &mut warnings);
     if options.import_certificate {
@@ -145,6 +154,16 @@ fn read_install_dir() -> Option<PathBuf> {
     let value = query_reg_value(UNINSTALL_KEY, "InstallLocation")?;
     let path = PathBuf::from(value);
     Some(path)
+}
+
+fn payload_manifest_version(payload: &Path) -> Option<String> {
+    let manifest = PathBuf::from(format!("{}.json", payload.display()));
+    let raw = fs::read_to_string(manifest).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&raw).ok()?;
+    value
+        .get("version")
+        .and_then(|version| version.as_str())
+        .map(|version| version.to_string())
 }
 
 fn read_manifest_version(install_dir: &Path) -> Option<String> {
