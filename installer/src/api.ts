@@ -11,6 +11,11 @@ export function getInstallProgress(): Promise<{ percent: number; message: string
   return invoke<{ percent: number; message: string }>('get_install_progress')
 }
 
+/** 读取本次安装的日志（逐行）。 */
+export function getInstallLog(): Promise<string[]> {
+  return invoke<string[]>('get_install_log')
+}
+
 /** 执行安装/覆盖升级；返回执行日志。 */
 export function startInstall(options: InstallOptions): Promise<InstallSummary> {
   return invoke<InstallSummary>('start_install', { options })

@@ -50,6 +50,11 @@ pub fn get_install_progress() -> InstallProgress {
 }
 
 #[tauri::command]
+pub fn get_install_log() -> Vec<String> {
+    platform::install_log()
+}
+
+#[tauri::command]
 pub fn detect_state() -> Result<InstallerState, String> {
     Ok(platform::detect_state())
 }

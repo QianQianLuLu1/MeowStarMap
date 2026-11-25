@@ -16,6 +16,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::detect_state,
             commands::get_install_progress,
+            commands::get_install_log,
             commands::start_install,
             commands::cancel_install,
             commands::uninstall,

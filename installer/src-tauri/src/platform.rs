@@ -2,7 +2,7 @@ use std::env;
 use std::fs::{self, File};
 use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Mutex;
 use std::thread;
@@ -19,7 +19,32 @@ const DISPLAY_NAME: &str = "喵星图";
 
 static PROGRESS_PERCENT: AtomicU8 = AtomicU8::new(0);
 static PROGRESS_MESSAGE: Mutex<String> = Mutex::new(String::new());
+static INSTALL_LOGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+pub fn log_line(message: impl Into<String>) {
+    if let Ok(mut logs) = INSTALL_LOGS.lock() {
+        logs.push(message.into());
+        // 防止极端情况下无限增长
+        if logs.len() > 500 {
+            let drain = logs.len() - 500;
+            logs.drain(0..drain);
+        }
+    }
+}
+
+pub fn install_log() -> Vec<String> {
+    INSTALL_LOGS
+        .lock()
+        .map(|logs| logs.clone())
+        .unwrap_or_default()
+}
+
+fn clear_log() {
+    if let Ok(mut logs) = INSTALL_LOGS.lock() {
+        logs.clear();
+    }
+}
 
 pub fn request_cancel() {
     CANCEL_REQUESTED.store(true, Ordering::SeqCst);
@@ -117,7 +142,7 @@ pub fn is_silent() -> bool {
 fn default_install_dir() -> Option<PathBuf> {
     env::var("LOCALAPPDATA")
         .ok()
-        .map(|base| Path::new(&base).join("Programs").join("喵星图"))
+        .map(|base| Path::new(&base).join("Programs").join("MeowStarMap"))
 }
 
 pub fn detect_state() -> InstallerState {
@@ -163,15 +188,21 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
     let mut steps: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
     reset_cancel();
+    clear_log();
+    log_line(format!("安装目录: {}", install_dir.display()));
     check_cancel()?;
 
     emit_progress(app, 2, "准备安装");
+    log_line("开始安装");
     stop_running_app(&mut steps, &mut warnings);
     emit_progress(app, 8, "已结束旧进程（如有）");
+    log_line("已结束旧进程（如有）");
 
     let payload = payload_path();
     if let Some(payload) = payload.as_ref() {
+        log_line(format!("载荷: {}", payload.display()));
         verify_payload(payload)?;
+        log_line("载荷 sha256/大小校验通过");
         emit_progress(app, 16, "载荷校验通过");
         let staging = staging_dir(&install_dir)?;
         let prepare_result: Result<(), String> = (|| {
@@ -184,18 +215,26 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
         if let Err(err) = prepare_result {
             // 取消/失败：清理暂存目录；swap_in 内部已负责恢复旧版本目录
             let _ = fs::remove_dir_all(&staging);
+            log_line(format!("安装失败: {err}"));
             return Err(err);
         }
         emit_progress(app, 78, "文件替换完成");
+        log_line("安装文件替换完成");
     } else {
         // 没有载荷属于安装包不完整：必须失败并保持安装目录/注册表不变（可回滚）。
         return Err("未找到安装载荷：安装包不完整（缺少 payload.zip 或内嵌载荷）".to_string());
     }
 
     match crate::legacy::prepare() {
-        Ok(Some(message)) => steps.push(message),
-        Ok(None) => {}
-        Err(err) => warnings.push(format!("旧版数据迁移准备失败: {err}")),
+        Ok(Some(message)) => {
+            log_line(message.clone());
+            steps.push(message);
+        }
+        Ok(None) => log_line("未检测到旧版数据"),
+        Err(err) => {
+            log_line(format!("旧版数据迁移准备失败: {err}"));
+            warnings.push(format!("旧版数据迁移准备失败: {err}"));
+        }
     }
 
     let version = read_manifest_version(&install_dir)
@@ -208,13 +247,17 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
         .unwrap_or_else(|| "0.0.0".to_string());
 
     write_uninstall_registry(&install_dir, &version, &mut steps, &mut warnings);
+    log_line("卸载项注册表已写入");
     if options.import_certificate {
         import_certificate(&mut warnings);
+        log_line("证书导入完成（如有）");
     }
     if options.create_desktop_shortcut {
         create_shortcuts(&install_dir, &mut warnings);
+        log_line("快捷方式创建完成");
     }
     emit_progress(app, 100, "安装完成");
+    log_line("安装完成");
 
     Ok(InstallSummary {
         ok: true,
@@ -511,19 +554,34 @@ fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
     );
     let mut child = hidden_command("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|err| format!("调用 PowerShell 解包失败: {err}"))?;
     loop {
         if is_cancel_requested() {
             let _ = child.kill();
             let _ = child.wait();
+            log_line("用户取消：已终止解包进程");
             return Err("安装已取消".to_string());
         }
         match child.try_wait() {
             Ok(Some(status)) => {
+                let mut output = String::new();
+                if let Some(mut stdout) = child.stdout.take() {
+                    let _ = stdout.read_to_string(&mut output);
+                }
+                if let Some(mut stderr) = child.stderr.take() {
+                    let _ = stderr.read_to_string(&mut output);
+                }
+                for line in output.lines().filter(|line| !line.trim().is_empty()) {
+                    log_line(format!("[unzip] {line}"));
+                }
                 if !status.success() {
+                    log_line("解包失败");
                     return Err("解包安装文件失败".to_string());
                 }
+                log_line("解包完成");
                 break;
             }
             Ok(None) => thread::sleep(Duration::from_millis(200)),

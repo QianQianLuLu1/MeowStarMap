@@ -398,3 +398,36 @@ button:disabled {
   font-size: 15px;
   border-radius: 12px;
 }
+/* 安装进度页：日志区 + 底部取消 */
+.progress-page {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.install-log {
+  flex: 1;
+  min-height: 180px;
+  max-height: 320px;
+  overflow: auto;
+  background: #14161a;
+  color: #d7e0ea;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin: 16px 0;
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.progress-footer {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
