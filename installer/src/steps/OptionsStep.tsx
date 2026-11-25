@@ -8,7 +8,8 @@ interface OptionsStepProps {
   onInstall: (options: InstallOptions) => void
 }
 
-const isAsciiPath = (value: string): boolean => /^[\x20-\x7E]+$/.test(value)
+const isAsciiPath = (value: string): boolean =>
+  /^[\x20-\x7E]+$/.test(value) && !/[?*<>|"]/.test(value)
 
 const OptionsStep = ({ state, options, onBack, onInstall }: OptionsStepProps): React.JSX.Element => {
   const initialDir = isAsciiPath(options.installDir)

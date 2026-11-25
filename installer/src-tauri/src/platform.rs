@@ -145,8 +145,16 @@ fn default_install_dir() -> Option<PathBuf> {
         .map(|base| Path::new(&base).join("Programs").join("MeowStarMap"))
 }
 
+fn is_sane_install_path(path: &Path) -> bool {
+    let text = path.to_string_lossy();
+    !text.is_empty()
+        && text
+            .chars()
+            .all(|ch| ch.is_ascii() && !matches!(ch, '?' | '*' | '<' | '>' | '|' | '"'))
+}
+
 pub fn detect_state() -> InstallerState {
-    let registry_dir = read_install_dir();
+    let registry_dir = read_install_dir().filter(|path| is_sane_install_path(path));
     let override_dir = arg_value("--install-dir=").or_else(|| arg_value("/D="));
     let install_dir = override_dir
         .map(PathBuf::from)
