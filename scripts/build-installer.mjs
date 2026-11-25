@@ -20,7 +20,7 @@ import process from 'node:process'
 
 const root = process.cwd()
 const installerDir = path.join(root, 'installer')
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+
 
 function argValue(name, fallback) {
   const prefix = `--${name}=`
@@ -75,11 +75,16 @@ if (payloadOnly) {
 const cargoBin = path.join(process.env.USERPROFILE ?? '', '.cargo', 'bin')
 const env = { ...process.env }
 if (fs.existsSync(cargoBin)) {
-  env.PATH = `${cargoBin}${path.delimiter}${env.PATH ?? ''}`
+  // Windows 环境变量名大小写不敏感，但 Node 的 env 对象保留大小写（本机为 Path）；
+  // 必须改已经存在的键，否则会同时存在 Path/PATH 两个键，cmd 可能取到被清空的那个。
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === 'path') ?? 'Path'
+  env[pathKey] = `${cargoBin}${path.delimiter}${env[pathKey] ?? ''}`
 }
 
 console.log('[build-installer] 构建 Tauri 安装器（tauri build --no-bundle）…')
-run(npm, ['run', 'build'], { cwd: installerDir, env })
+const tauriCli = path.join(installerDir, 'node_modules', '@tauri-apps', 'cli', 'tauri.js')
+if (!fs.existsSync(tauriCli)) fail(`未找到 tauri CLI: ${tauriCli}`)
+run(process.execPath, [tauriCli, 'build', '--no-bundle'], { cwd: installerDir, env })
 
 const builtExe = path.join(installerDir, 'src-tauri', 'target', 'release', 'meowstarmap-installer.exe')
 if (!fs.existsSync(builtExe)) {
@@ -100,10 +105,11 @@ if (fs.existsSync(payloadOut)) {
 }
 
 const latestYml = path.join(releaseDir, 'latest-installer.yml')
-run(npm, [
-  'run',
-  'generate:update-feed',
-  '--',
+const tsxCli = path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs')
+if (!fs.existsSync(tsxCli)) fail(`未找到 tsx CLI: ${tsxCli}`)
+run(process.execPath, [
+  tsxCli,
+  path.join(root, 'scripts', 'generate-update-feed.ts'),
   `--installer=${installerExe}`,
   `--version=${version}`,
   `--out=${latestYml}`
