@@ -44,6 +44,9 @@
       错误 0、`integrity_check=ok`，新版应用启动正常
 - [x] 文件复制：thumbnails / backups / plugins / search-index / logs
 - [ ] 安装器/应用首启自动检测与触发（目前为手动脚本）
+- [x] 安装器集成：检测旧版 → 拷贝旧库/目录到新版数据目录 + 写 `legacy-migration-pending.json`（旧数据不删）
+- [x] 应用首启集成：`src/main/database/legacy-migration.ts` 在 DB 初始化前合并，写报告并删除标记；
+      有错误时启动后弹窗提示（`main.legacyMigration.*` i18n）
 - [ ] 插件兼容性标记的自动化（当前旧 `plugins.json` 为空，无实际插件可迁）
 - [ ] 迁移成功后删除旧安装目录/旧用户数据/旧更新缓存/旧卸载项（待人工复核后执行）
 
