@@ -6,7 +6,10 @@ pub fn run() {
     // 卸载模式（UninstallString 调用，或直接双击安装目录内的 Uninstall.exe）
     let is_uninstaller_binary = std::env::current_exe()
         .ok()
-        .and_then(|path| path.file_name().map(|name| name.to_string_lossy().to_string()))
+        .and_then(|path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().to_string())
+        })
         .map(|name| name.eq_ignore_ascii_case("Uninstall.exe"))
         .unwrap_or(false);
     if platform::is_uninstall_requested() || is_uninstaller_binary {
