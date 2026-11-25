@@ -97,6 +97,23 @@ const App = (): React.JSX.Element => {
           />
         )}
         {step === 2 && <ProgressStep />}
+        {step === 2 && error !== null && (
+          <>
+            <div className="error">安装失败：{error}（已回滚到安装前状态）</div>
+            <div className="actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setError(null)
+                  setStep(1)
+                }}
+              >
+                返回安装选项
+              </button>
+            </div>
+          </>
+        )}
         {step === 3 && summary !== null && (
           <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => window.close()} />
         )}

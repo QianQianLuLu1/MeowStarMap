@@ -3,8 +3,10 @@ use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
@@ -17,6 +19,27 @@ const DISPLAY_NAME: &str = "喵星图";
 
 static PROGRESS_PERCENT: AtomicU8 = AtomicU8::new(0);
 static PROGRESS_MESSAGE: Mutex<String> = Mutex::new(String::new());
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+pub fn request_cancel() {
+    CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+fn reset_cancel() {
+    CANCEL_REQUESTED.store(false, Ordering::SeqCst);
+}
+
+fn is_cancel_requested() -> bool {
+    CANCEL_REQUESTED.load(Ordering::SeqCst)
+}
+
+fn check_cancel() -> Result<(), String> {
+    if is_cancel_requested() {
+        Err("安装已取消".to_string())
+    } else {
+        Ok(())
+    }
+}
 
 fn set_progress(percent: u8, message: &str) {
     PROGRESS_PERCENT.store(percent, Ordering::Relaxed);
@@ -112,6 +135,8 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
     let installed_before = detect_state().installed;
     let mut steps: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
+    reset_cancel();
+    check_cancel()?;
 
     emit_progress(app, 2, "准备安装");
     stop_running_app(&mut steps, &mut warnings);
@@ -122,9 +147,18 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
         verify_payload(payload)?;
         emit_progress(app, 16, "载荷校验通过");
         let staging = staging_dir(&install_dir)?;
-        extract_to(payload, &staging)?;
-        emit_progress(app, 48, "安装文件已展开");
-        swap_in(&install_dir, &staging, &mut steps, &mut warnings)?;
+        let prepare_result: Result<(), String> = (|| {
+            extract_to(payload, &staging)?;
+            check_cancel()?;
+            emit_progress(app, 48, "安装文件已展开");
+            swap_in(&install_dir, &staging, &mut steps, &mut warnings)?;
+            Ok(())
+        })();
+        if let Err(err) = prepare_result {
+            // 取消/失败：清理暂存目录；swap_in 内部已负责恢复旧版本目录
+            let _ = fs::remove_dir_all(&staging);
+            return Err(err);
+        }
         emit_progress(app, 78, "文件替换完成");
     } else {
         warnings.push("未找到安装载荷（骨架阶段），已跳过文件解包".to_string());
@@ -385,12 +419,26 @@ fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
         payload.display(),
         staging.display()
     );
-    let status = Command::new("powershell")
+    let mut child = Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .status()
+        .spawn()
         .map_err(|err| format!("调用 PowerShell 解包失败: {err}"))?;
-    if !status.success() {
-        return Err("解包安装文件失败".to_string());
+    loop {
+        if is_cancel_requested() {
+            let _ = child.kill();
+            let _ = child.wait();
+            return Err("安装已取消".to_string());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                if !status.success() {
+                    return Err("解包安装文件失败".to_string());
+                }
+                break;
+            }
+            Ok(None) => thread::sleep(Duration::from_millis(200)),
+            Err(err) => return Err(format!("等待解包进程失败: {err}")),
+        }
     }
     Ok(())
 }

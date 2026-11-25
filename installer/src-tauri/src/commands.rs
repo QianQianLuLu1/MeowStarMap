@@ -75,7 +75,7 @@ pub async fn start_install(
 
 #[tauri::command]
 pub fn cancel_install() -> Result<(), String> {
-    // 骨架阶段：安装为同步短流程，暂无可取消点
+    platform::request_cancel();
     Ok(())
 }
 

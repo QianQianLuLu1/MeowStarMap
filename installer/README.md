@@ -87,6 +87,8 @@ npm run build        # tauri build --no-bundle（产出独立 exe）
 - [x] 安装命令放到 blocking 线程（2026-11-25 冒烟发现页面卡 0%，已修复）
 - [x] 进度事件 + `get_install_progress` 轮询兜底（事件通道不可用时 UI 仍能刷新）
 - [x] 静默模式安装完成后直接退出进程（供旧 electron-updater 等待退出码）
+- [x] 取消安装：提取/校验阶段可取消（保留旧版本目录、清理 staging）；失败自动回滚
+- [x] 替换文件前失败/取消不会修改安装目录；`swap_in` 失败会恢复旧目录
 - [x] 版本号回退 payload 清单（`payload.zip.json` 的 version）
 - [x] 进程互斥/结束旧应用（taskkill）
 - [x] 快捷方式 + HKCU 卸载项 + 证书导入（PS1 加 UTF-8 BOM + 预建目录，修复开始菜单 lnk 缺失）
