@@ -41,6 +41,21 @@ fn check_cancel() -> Result<(), String> {
     }
 }
 
+/// 启动控制台子进程时隐藏窗口（CREATE_NO_WINDOW），避免安装过程中闪 cmd 黑框。
+#[cfg(windows)]
+fn hidden_command(program: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut command = Command::new(program);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
+#[cfg(not(windows))]
+fn hidden_command(program: &str) -> Command {
+    Command::new(program)
+}
+
 fn set_progress(percent: u8, message: &str) {
     PROGRESS_PERCENT.store(percent, Ordering::Relaxed);
     if let Ok(mut guard) = PROGRESS_MESSAGE.lock() {
@@ -69,7 +84,7 @@ pub fn run_uninstall() -> Result<(), String> {
             let _ = fs::remove_dir_all(&install_dir);
         }
     }
-    let _ = Command::new("reg")
+    let _ = hidden_command("reg")
         .args(["delete", UNINSTALL_KEY, "/f"])
         .output();
     Ok(())
@@ -217,7 +232,7 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
 }
 
 pub fn uninstall() -> Result<(), String> {
-    let _ = Command::new("reg")
+    let _ = hidden_command("reg")
         .args(["delete", UNINSTALL_KEY, "/f"])
         .output();
     Ok(())
@@ -288,7 +303,7 @@ fn read_manifest_version(install_dir: &Path) -> Option<String> {
 }
 
 fn query_reg_value(key: &str, value: &str) -> Option<String> {
-    let output = Command::new("reg")
+    let output = hidden_command("reg")
         .args(["query", key, "/v", value])
         .output()
         .ok()?;
@@ -389,7 +404,7 @@ fn copy_range(file: &mut File, target: &Path, mut remaining: u64) -> Option<()> 
 }
 
 fn is_app_running() -> bool {
-    let output = Command::new("tasklist")
+    let output = hidden_command("tasklist")
         .args(["/FI", "IMAGENAME eq 喵星图.exe", "/NH"])
         .output();
     if let Ok(output) = output {
@@ -405,7 +420,7 @@ fn stop_running_app(steps: &mut Vec<String>, warnings: &mut Vec<String>) {
     if !is_app_running() {
         return;
     }
-    let status = Command::new("taskkill")
+    let status = hidden_command("taskkill")
         .args(["/IM", "喵星图.exe", "/F"])
         .status();
     match status {
@@ -494,7 +509,7 @@ fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
         payload.display(),
         staging.display()
     );
-    let mut child = Command::new("powershell")
+    let mut child = hidden_command("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .spawn()
         .map_err(|err| format!("调用 PowerShell 解包失败: {err}"))?;
@@ -595,7 +610,7 @@ fn write_uninstall_registry(
     ];
 
     for (name, value) in pairs {
-        let status = Command::new("reg")
+        let status = hidden_command("reg")
             .args([
                 "add",
                 UNINSTALL_KEY,
@@ -629,7 +644,7 @@ fn import_certificate(warnings: &mut Vec<String>) {
         return;
     };
 
-    let status = Command::new("certutil")
+    let status = hidden_command("certutil")
         .args(["-user", "-addstore", "-f", "Root"])
         .arg(&cert)
         .status();
@@ -681,7 +696,7 @@ fn create_shortcut(target: &Path, exe: &Path, workdir: &Path) -> Result<(), Stri
         exe.display()
     );
     fs::write(&script_path, script).map_err(|err| err.to_string())?;
-    let status = Command::new("powershell")
+    let status = hidden_command("powershell")
         .args([
             "-NoProfile",
             "-NonInteractive",
