@@ -39,7 +39,10 @@ const App = (): React.JSX.Element => {
     detectState()
       .then((s) => {
         setState(s)
-        setOptions((prev) => ({ ...prev, installDir: s.installDir ?? '' }))
+        setOptions((prev) => ({
+          ...prev,
+          installDir: s.installDir ?? s.defaultInstallDir ?? ''
+        }))
       })
       .catch((err: unknown) => setError(String(err)))
   }, [])

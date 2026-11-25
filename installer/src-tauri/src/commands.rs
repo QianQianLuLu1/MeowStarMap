@@ -11,6 +11,8 @@ pub struct InstallerState {
     pub app_running: bool,
     pub mode: String,
     pub payload_path: Option<String>,
+    /// 默认安装目录（输入框兜底，避免空值）
+    pub default_install_dir: String,
     /// 是否由更新流程/命令行以静默模式启动（/S、--silent、-s）
     pub silent: bool,
 }

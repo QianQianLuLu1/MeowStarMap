@@ -131,6 +131,9 @@ pub fn detect_state() -> InstallerState {
         app_running,
         mode: mode.to_string(),
         payload_path: payload_path().map(|path| path.to_string_lossy().to_string()),
+        default_install_dir: default_install_dir()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_default(),
         silent: has_silent_flag(),
     }
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { InstallOptions, InstallerState } from '../types'
 
 interface OptionsStepProps {
@@ -9,9 +9,20 @@ interface OptionsStepProps {
 }
 
 const OptionsStep = ({ state, options, onBack, onInstall }: OptionsStepProps): React.JSX.Element => {
-  const [installDir, setInstallDir] = useState(options.installDir)
+  const [installDir, setInstallDir] = useState(options.installDir || state?.defaultInstallDir || '')
   const [createDesktopShortcut, setCreateDesktopShortcut] = useState(options.createDesktopShortcut)
   const [importCertificate, setImportCertificate] = useState(options.importCertificate)
+
+  // 状态是异步加载的：若挂载时路径为空，等默认值/状态到达后补上，避免输入框一直空白
+  useEffect(() => {
+    if (installDir.trim() !== '') {
+      return
+    }
+    const fallback = options.installDir || state?.defaultInstallDir || ''
+    if (fallback !== '') {
+      setInstallDir(fallback)
+    }
+  }, [options.installDir, state?.defaultInstallDir, installDir])
 
   const disabled = installDir.trim() === ''
 
