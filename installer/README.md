@@ -85,13 +85,15 @@ npm run build        # tauri build --no-bundle（产出独立 exe）
 - [x] 载荷 sha256/size 校验（`payload.zip.json` 清单，缺失时跳过并告警）
 - [x] staged 解包 + 备份替换 + 失败回滚（`installer-progress` 事件 0→100%）
 - [x] 安装命令放到 blocking 线程（2026-11-25 冒烟发现页面卡 0%，已修复）
+- [x] 进度事件 + `get_install_progress` 轮询兜底（事件通道不可用时 UI 仍能刷新）
 - [x] 静默模式安装完成后直接退出进程（供旧 electron-updater 等待退出码）
 - [x] 版本号回退 payload 清单（`payload.zip.json` 的 version）
 - [x] 进程互斥/结束旧应用（taskkill）
-- [x] 快捷方式 + HKCU 卸载项 + 证书导入
+- [x] 快捷方式 + HKCU 卸载项 + 证书导入（PS1 加 UTF-8 BOM + 预建目录，修复开始菜单 lnk 缺失）
 - [x] `/S`、`--silent`、`-s` 静默检测；静默模式自动安装并在完成后退出
 - [x] `/D=` / `--install-dir=` 目录覆盖参数
-- [ ] 卸载器（`--uninstall` 清理文件/快捷方式/证书）——当前 UninstallString 已写入但未实现 CLI 卸载
+- [x] `--uninstall` CLI：删除安装目录、桌面/开始菜单快捷方式与 HKCU 卸载项，退出码 0
+- [ ] 卸载器“自删除”边界（卸载器位于安装目录内时需先复制到临时目录）——当前 UninstallString 指向安装器 exe
 - [ ] 覆盖安装“旧 NSIS 注册表”迁移联调
 - [ ] 旧客户端更新联调（2.5.6 实包 → 自定义安装器）
 - [ ] 打包流程接入（`dist:win` 产载荷 → 安装器构建 → latest.yml）

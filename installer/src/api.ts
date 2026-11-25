@@ -6,6 +6,11 @@ export function detectState(): Promise<InstallerState> {
   return invoke<InstallerState>('detect_state')
 }
 
+/** 读取安装进度的最新快照（事件通道不可用时的兜底轮询）。 */
+export function getInstallProgress(): Promise<{ percent: number; message: string }> {
+  return invoke<{ percent: number; message: string }>('get_install_progress')
+}
+
 /** 执行安装/覆盖升级；返回执行日志。 */
 export function startInstall(options: InstallOptions): Promise<InstallSummary> {
   return invoke<InstallSummary>('start_install', { options })

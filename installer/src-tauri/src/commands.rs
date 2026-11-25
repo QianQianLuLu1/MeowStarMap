@@ -34,6 +34,19 @@ pub struct InstallSummary {
     pub warnings: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallProgress {
+    pub percent: u8,
+    pub message: String,
+}
+
+#[tauri::command]
+pub fn get_install_progress() -> InstallProgress {
+    let (percent, message) = platform::progress_snapshot();
+    InstallProgress { percent, message }
+}
+
 #[tauri::command]
 pub fn detect_state() -> Result<InstallerState, String> {
     Ok(platform::detect_state())

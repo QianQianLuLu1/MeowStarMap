@@ -3,6 +3,8 @@ use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::Mutex;
 
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
@@ -12,6 +14,63 @@ use crate::commands::{InstallOptions, InstallSummary, InstallerState};
 const UNINSTALL_KEY: &str =
     r"HKCU\Software\Microsoft\Windows\CurrentVersion\Uninstall\com.qianlu.meow-star-map";
 const DISPLAY_NAME: &str = "喵星图";
+
+static PROGRESS_PERCENT: AtomicU8 = AtomicU8::new(0);
+static PROGRESS_MESSAGE: Mutex<String> = Mutex::new(String::new());
+
+fn set_progress(percent: u8, message: &str) {
+    PROGRESS_PERCENT.store(percent, Ordering::Relaxed);
+    if let Ok(mut guard) = PROGRESS_MESSAGE.lock() {
+        *guard = message.to_string();
+    }
+}
+
+pub fn progress_snapshot() -> (u8, String) {
+    let percent = PROGRESS_PERCENT.load(Ordering::Relaxed);
+    let message = PROGRESS_MESSAGE
+        .lock()
+        .map(|guard| guard.clone())
+        .unwrap_or_default();
+    (percent, message)
+}
+
+pub fn is_uninstall_requested() -> bool {
+    env::args().any(|arg| arg.eq_ignore_ascii_case("--uninstall"))
+}
+
+pub fn run_uninstall() -> Result<(), String> {
+    remove_shortcuts();
+    if let Some(install_dir) = read_install_dir() {
+        if install_dir.exists() {
+            // 若卸载器自身就在安装目录内，删除自身会失败，忽略该错误并继续清注册表。
+            let _ = fs::remove_dir_all(&install_dir);
+        }
+    }
+    let _ = Command::new("reg")
+        .args(["delete", UNINSTALL_KEY, "/f"])
+        .output();
+    Ok(())
+}
+
+fn remove_shortcuts() {
+    let mut targets: Vec<PathBuf> = Vec::new();
+    if let Ok(profile) = env::var("USERPROFILE") {
+        targets.push(Path::new(&profile).join("Desktop").join("喵星图.lnk"));
+    }
+    if let Ok(appdata) = env::var("APPDATA") {
+        targets.push(
+            Path::new(&appdata)
+                .join("Microsoft")
+                .join("Windows")
+                .join("Start Menu")
+                .join("Programs")
+                .join("喵星图.lnk"),
+        );
+    }
+    for target in targets {
+        let _ = fs::remove_file(target);
+    }
+}
 
 pub fn is_silent() -> bool {
     has_silent_flag()
@@ -125,6 +184,7 @@ pub fn launch_app() -> Result<(), String> {
 }
 
 fn emit_progress(app: &AppHandle, percent: u8, message: &str) {
+    set_progress(percent, message);
     let _ = app.emit(
         "installer-progress",
         serde_json::json!({ "percent": percent, "message": message }),
@@ -479,9 +539,13 @@ fn create_shortcuts(install_dir: &Path, warnings: &mut Vec<String>) {
 }
 
 fn create_shortcut(target: &Path, exe: &Path, workdir: &Path) -> Result<(), String> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent).map_err(|err| format!("创建快捷方式目录失败: {err}"))?;
+    }
     let script_path = env::temp_dir().join("meow-installer-shortcut.ps1");
+    // PowerShell 5.1 读取无 BOM 的 UTF-8 会按 ANSI 解释，中文路径会变乱码；加 BOM 修正。
     let script = format!(
-        "$W = New-Object -ComObject WScript.Shell\n$s = $W.CreateShortcut('{}')\n$s.TargetPath = '{}'\n$s.WorkingDirectory = '{}'\n$s.IconLocation = '{}'\n$s.Save()\n",
+        "\u{feff}$W = New-Object -ComObject WScript.Shell\n$s = $W.CreateShortcut('{}')\n$s.TargetPath = '{}'\n$s.WorkingDirectory = '{}'\n$s.IconLocation = '{}'\n$s.Save()\n",
         target.display(),
         exe.display(),
         workdir.display(),
@@ -500,7 +564,7 @@ fn create_shortcut(target: &Path, exe: &Path, workdir: &Path) -> Result<(), Stri
         .status()
         .map_err(|err| err.to_string())?;
     if !status.success() {
-        return Err("PowerShell 创建快捷方式失败".to_string());
+        return Err(format!("PowerShell 创建快捷方式失败: {}", target.display()));
     }
     Ok(())
 }
