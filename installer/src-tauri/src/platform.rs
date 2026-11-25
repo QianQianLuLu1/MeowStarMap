@@ -178,7 +178,7 @@ pub fn detect_state() -> InstallerState {
         install_dir: install_dir.map(|dir| dir.to_string_lossy().to_string()),
         app_running,
         mode: mode.to_string(),
-        payload_path: payload_path().map(|path| path.to_string_lossy().to_string()),
+        payload_path: payload_hint(),
         default_install_dir: default_install_dir()
             .map(|path| path.to_string_lossy().to_string())
             .unwrap_or_default(),
@@ -371,6 +371,58 @@ fn query_reg_value(key: &str, value: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn payload_hint() -> Option<String> {
+    if let Ok(custom) = env::var("MEOW_INSTALLER_PAYLOAD") {
+        let path = PathBuf::from(custom);
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    if has_embedded_payload() {
+        return Some("embedded".to_string());
+    }
+    let exe_dir = env::current_exe().ok()?.parent()?.to_path_buf();
+    for candidate in ["payload.zip", "payload"] {
+        let path = exe_dir.join(candidate);
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
+/// 只检查 exe 尾部 footer（不复制/解包 245MB 载荷），供 detect_state 快速返回。
+fn has_embedded_payload() -> bool {
+    let Ok(exe) = env::current_exe() else {
+        return false;
+    };
+    let Ok(mut file) = File::open(exe) else {
+        return false;
+    };
+    let Ok(len) = file.metadata().map(|meta| meta.len()) else {
+        return false;
+    };
+    if len <= PAYLOAD_TRAILER_LEN {
+        return false;
+    }
+    if file.seek(SeekFrom::End(-8)).is_err() {
+        return false;
+    }
+    let mut magic = [0u8; 8];
+    if file.read_exact(&mut magic).is_err() || &magic != PAYLOAD_TRAILER_MAGIC {
+        return false;
+    }
+    if file.seek(SeekFrom::End(-24)).is_err() {
+        return false;
+    }
+    let mut size_buf = [0u8; 8];
+    if file.read_exact(&mut size_buf).is_err() {
+        return false;
+    }
+    let size = u64::from_le_bytes(size_buf);
+    size > 0 && size + PAYLOAD_TRAILER_LEN < len
 }
 
 fn payload_path() -> Option<PathBuf> {

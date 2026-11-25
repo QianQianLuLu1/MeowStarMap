@@ -55,8 +55,10 @@ pub fn get_install_log() -> Vec<String> {
 }
 
 #[tauri::command]
-pub fn detect_state() -> Result<InstallerState, String> {
-    Ok(platform::detect_state())
+pub async fn detect_state() -> Result<InstallerState, String> {
+    tauri::async_runtime::spawn_blocking(platform::detect_state)
+        .await
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
