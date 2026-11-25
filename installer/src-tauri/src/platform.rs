@@ -132,6 +132,12 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
         steps.push(format!("创建安装目录: {}", install_dir.display()));
     }
 
+    match crate::legacy::prepare() {
+        Ok(Some(message)) => steps.push(message),
+        Ok(None) => {}
+        Err(err) => warnings.push(format!("旧版数据迁移准备失败: {err}")),
+    }
+
     let version = read_manifest_version(&install_dir)
         .or_else(|| {
             payload

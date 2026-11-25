@@ -4083,6 +4083,13 @@
     "installManifest": {
       "logWriteFailed": "[install-manifest] 寫入失敗: {{target}}",
       "logConstructFailed": "[install-manifest] 建構/寫入安裝資訊清單失敗（不阻塞啟動）"
+    },
+    "legacyMigration": {
+      "dialogTitle": "舊版資料遷移未完全成功",
+      "dialogMessage": "有 {{count}} 筆舊版記錄遷移失敗，其餘資料已合併。",
+      "dialogDetail": "遷移報告：{{report}}\n可把報告回饋給開發者逐筆修復；舊版資料未被刪除。",
+      "markerMissing": "[legacy-migration] 標記存在但舊庫/新庫缺失，跳過",
+      "failed": "[legacy-migration] 遷移失敗"
     }
   },
   "appError": {

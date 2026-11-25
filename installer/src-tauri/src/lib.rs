@@ -1,4 +1,5 @@
 mod commands;
+mod legacy;
 mod platform;
 
 pub fn run() {

@@ -4083,6 +4083,13 @@
     "installManifest": {
       "logWriteFailed": "[install-manifest] failed to write: {{target}}",
       "logConstructFailed": "[install-manifest] failed to build/write install manifest (startup continues)"
+    },
+    "legacyMigration": {
+      "dialogTitle": "Legacy data migration incomplete",
+      "dialogMessage": "{{count}} legacy records failed to migrate; the rest were merged.",
+      "dialogDetail": "Report: {{report}}\nSend it to the developer for repair; legacy data was not deleted.",
+      "markerMissing": "[legacy-migration] marker present but old/new database missing, skipped",
+      "failed": "[legacy-migration] migration failed"
     }
   },
   "appError": {
