@@ -94,12 +94,30 @@ if (!fs.existsSync(builtExe)) {
 const releaseDir = path.join(root, 'release')
 fs.mkdirSync(releaseDir, { recursive: true })
 const installerExe = path.join(releaseDir, `MeowStarMap-Installer-${version}.exe`)
-fs.copyFileSync(builtExe, installerExe)
-console.log(`[build-installer] ✓ 安装器: ${path.relative(root, installerExe)}`)
+const stagingExe = `${installerExe}.staging`
+fs.rmSync(stagingExe, { force: true })
+fs.copyFileSync(builtExe, stagingExe)
 
-// 把 payload 追加到 exe 末尾（[zip][size u64 LE][magic 8]），实现单文件安装包
-if (fs.existsSync(payloadOut)) {
-  embedPayload(installerExe, payloadOut)
+// 把 payload 追加到 exe 末尾（[zip][manifest][size][magic]），实现单文件安装包。
+// 先写 staging，内嵌成功后再替换 release 产物，避免失败时留下 10MB 半成品。
+if (!fs.existsSync(payloadOut)) {
+  fs.rmSync(stagingExe, { force: true })
+  throw new Error(`缺少载荷: ${payloadOut}（不会发布未内嵌的裸安装器）`)
+}
+try {
+  embedPayload(stagingExe, payloadOut)
+  const finalSize = fs.statSync(stagingExe).size
+  const payloadSize = fs.statSync(payloadOut).size
+  if (finalSize <= payloadSize) {
+    throw new Error(`内嵌后大小异常: exe=${finalSize} payload=${payloadSize}`)
+  }
+  fs.renameSync(stagingExe, installerExe)
+  console.log(
+    `[build-installer] ✓ 安装器: ${path.relative(root, installerExe)} (${(finalSize / 1024 / 1024).toFixed(1)} MB)`
+  )
+} catch (err) {
+  fs.rmSync(stagingExe, { force: true })
+  throw err
 }
 
 function embedPayload(targetExe, payloadFile) {
