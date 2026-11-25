@@ -316,3 +316,91 @@ button:disabled {
   margin: 0;
   word-break: break-all;
 }
+
+/* 欢迎页：参考 Salt Player 的左右分栏 hero + 底部按钮 */
+.panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.welcome {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 100%;
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 48px;
+  align-items: center;
+  flex: 1;
+  padding: 12px 6px 24px;
+}
+
+.hero-kicker {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--accent-strong);
+  margin-bottom: 18px;
+}
+
+.hero-title {
+  font-size: 46px;
+  line-height: 1.18;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+}
+
+.hero-title span {
+  color: var(--accent-strong);
+}
+
+.hero-lead {
+  font-size: 15px;
+  line-height: 1.9;
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+.hero-platform {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.hero-art {
+  display: flex;
+  justify-content: center;
+}
+
+.hero-art img {
+  width: 280px;
+  height: 280px;
+  object-fit: contain;
+  border-radius: 56px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgba(210, 99, 143, 0.18);
+}
+
+.welcome-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.hero-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.hero-button {
+  padding: 14px 38px;
+  font-size: 15px;
+  border-radius: 12px;
+}

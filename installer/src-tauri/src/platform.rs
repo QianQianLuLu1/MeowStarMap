@@ -99,10 +99,19 @@ pub fn is_silent() -> bool {
     has_silent_flag()
 }
 
+fn default_install_dir() -> Option<PathBuf> {
+    env::var("LOCALAPPDATA")
+        .ok()
+        .map(|base| Path::new(&base).join("Programs").join("喵星图"))
+}
+
 pub fn detect_state() -> InstallerState {
     let registry_dir = read_install_dir();
     let override_dir = arg_value("--install-dir=").or_else(|| arg_value("/D="));
-    let install_dir = override_dir.map(PathBuf::from).or(registry_dir);
+    let install_dir = override_dir
+        .map(PathBuf::from)
+        .or(registry_dir)
+        .or_else(default_install_dir);
 
     let installed = install_dir
         .as_ref()
