@@ -7,6 +7,8 @@
   （归档判据取自其 §1.1，反判据警告「未 amend ≠ 未回填」取自其 §5，遗留项取自其 §8/§9——本轮逐条复核见下）
 - 基线计数：被跟踪 `.md` **97**，`docs/plans/` 活目录 **42**
 
+> **现状备注（2026-11-26，round 7 补记）**：本文件是第 5 轮历史快照，下文所有路径/计数均为当时读数，不代表现状。文中提到的受跟踪归档区及其台账已于 2026-11-26 物理删除，判据知识迁入 `docs/CODING_CONVENTIONS.md`「校验与提交」。
+
 ## 1. 结论摘要
 
 1. **本轮删除 0 份，改为「受跟踪归档」7 份**。前四轮的落点是 `docs/archive/plans/`，靠
@@ -87,23 +89,23 @@
 
 ## 5. 执行计划与结果
 
-| 步  | 内容                                                                    | 验证                                                       | 结果                                                                 |
-| --- | ----------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
-| S0  | 本计划入库                                                              | `npm run verify`                                           | ✅ `c2a1524`，另补 `3235f99` 收口（见 §9 偏差 1）                    |
-| S1  | A/B/C/D 的静态部分（含 DEVELOPMENT 两处）                               | `format:check` + `old-name-ledger` 命中数仍 172            | ✅ `b74f8be`；台账 5 例通过                                          |
-| S2  | E/F/G，zh 与 en 孪生同批                                                | `verify-format-scope` + `npm run verify`                   | ✅ `15bd21f`；`verify-format-scope` 36 例通过，镜像未破              |
-| S3  | J 补译两节入 en                                                         | `npm run docs:links`                                       | ✅ `ef49bd8`；两版 `#### 10.1.x` 各 5 条，节号恢复对齐               |
-| S4  | K 诊断目录订正                                                          | `docs:links`                                               | ✅ `f1ea78c`；顺带查出 ARCHITECTURE 双语共 9 处同一失真（§2-Q）      |
-| S5  | L/M/N                                                                   | `npx vitest run scripts/__tests__/old-name-ledger.test.ts` | ✅ `7b18ed8`；PLUGIN_API 改前改后均 NikkiGallery 2 / nikkiGallery 10 |
-| S6  | H + I                                                                   | `npx tsx scripts/check-changelog-release.ts`               | ✅ `e6d439a`；14 个版本节、`[Unreleased]` 零列表条目                 |
-| S7  | 7 份 `git mv` → `docs/plans/archive/2026-Q4/` + 归档账本 + 入站路径改写 | `docs:links` → 全量 `npm test`                             | ✅ `2c25067`；改写 20 处、git 识别 7 个 rename、454 文件全绿         |
-| S8  | 实跑读数回填、O 补格、未验证记账、结案                                  | 全量回归                                                   | 见 §6 与 §9                                                          |
+| 步  | 内容                                                                         | 验证                                                       | 结果                                                                 |
+| --- | ---------------------------------------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------- |
+| S0  | 本计划入库                                                                   | `npm run verify`                                           | ✅ `c2a1524`，另补 `3235f99` 收口（见 §9 偏差 1）                    |
+| S1  | A/B/C/D 的静态部分（含 DEVELOPMENT 两处）                                    | `format:check` + `old-name-ledger` 命中数仍 172            | ✅ `b74f8be`；台账 5 例通过                                          |
+| S2  | E/F/G，zh 与 en 孪生同批                                                     | `verify-format-scope` + `npm run verify`                   | ✅ `15bd21f`；`verify-format-scope` 36 例通过，镜像未破              |
+| S3  | J 补译两节入 en                                                              | `npm run docs:links`                                       | ✅ `ef49bd8`；两版 `#### 10.1.x` 各 5 条，节号恢复对齐               |
+| S4  | K 诊断目录订正                                                               | `docs:links`                                               | ✅ `f1ea78c`；顺带查出 ARCHITECTURE 双语共 9 处同一失真（§2-Q）      |
+| S5  | L/M/N                                                                        | `npx vitest run scripts/__tests__/old-name-ledger.test.ts` | ✅ `7b18ed8`；PLUGIN_API 改前改后均 NikkiGallery 2 / nikkiGallery 10 |
+| S6  | H + I                                                                        | `npx tsx scripts/check-changelog-release.ts`               | ✅ `e6d439a`；14 个版本节、`[Unreleased]` 零列表条目                 |
+| S7  | 7 份移入受跟踪归档 + 归档账本 + 入站路径改写（该归档区已于 2026-11-26 清理） | `docs:links` → 全量 `npm test`                             | ✅ `2c25067`；改写 20 处、git 识别 7 个 rename、454 文件全绿         |
+| S8  | 实跑读数回填、O 补格、未验证记账、结案                                       | 全量回归                                                   | 见 §6 与 §9                                                          |
 
 ## 6. 读数（实跑回填，未跑到的一律记 not-run）
 
 - 基线（开工前实测）：`npm run docs:links` ⇒ **0 死引用 / 177 提醒**；被跟踪 `.md` 97；`docs/plans/` 42。
 - 终态（S8 实测）：`npm run docs:links` ⇒ **0 死引用 / 183 提醒**；被跟踪 `.md` **99**（+2：本轮计划文档、归档账本）；
-  `docs/plans/` 活目录 **36**，`docs/plans/archive/2026-Q4/` **7**。提醒数从 186 降到 183，是因为 5 条原本
+  `docs/plans/` 活目录 **36**，受跟踪归档区 **7**（该区已于 2026-11-26 清理）。提醒数从 186 降到 183，是因为 5 条原本
   「已交代去向」的归档引用在移动后变成可解析的 `ok`。
 - **真宿主（`win32 / node-v26.3.0 / vitest 5.0.3`）全量 `npm test`**：`Test Files 454 passed (454)`、
   `Tests 7094 passed | 12 skipped (7106)`、耗时 53.45s。文件数与静态计数 454 = src 421 + scripts 28 + e2e 5 逐项闭合。
@@ -137,7 +139,7 @@
 - DEBT-035：应用内「关于」页仍显示 Electron 28 / React 18 / TS 5.3（`src/renderer/pages/settings/about-sections.tsx:65`），是**用户可见**的文档失真，10-27 §8 已登记、仍未修。
 - 10-10 §8.3：`src/main/media-worker/bktree-js.ts:9` 指向不存在的 `docs/archive/BKTREE-REPLACE-PLAN.md`。
 - 10-10 §8.1：`check-doc-versions.ts` 仍只守 README 的 Electron 版本。
-- 归档自动化：本轮已建立 `docs/plans/archive/README.md` 账本（S7 落地），把「移档」变成查表操作，但**仍未有脚本闸门**判定「已结案 ∧ 零入站 ∧ 非唯一出处」，膨胀根因未除。可按该账本 §1 的口径写只读诊断脚本，复用 §9.3 的正确 grep 方法。
+- 归档自动化：本轮已建立归档台账（S7 落地），把「移档」变成查表操作，但**仍未有脚本闸门**判定「已结案 ∧ 零入站 ∧ 非唯一出处」，膨胀根因未除。归档区与台账已于 2026-11-26 物理清理，判据知识迁入 `docs/CODING_CONVENTIONS.md`「校验与提交」；可按该口径写只读诊断脚本，复用 §9.3 的正确 grep 方法。
 - **新增｜`%TEMP%` 兜底文件名收口**（见 §9.1-Q2）：`early-crash-guard.ts:64` 与 `startup-diagnostic.ts:38` 的
   `MeowStarMap-startup-errors.log` 应统一走 `PRODUCT_DIAG_DIRNAME`，属代码侧改动需单独立项；注意兼容性——
   改完后老用户 `%TEMP%` 里会同时存在新旧两个文件，需要一个「两者都读」的过渡或直接认新名。
@@ -175,8 +177,8 @@
   `check-md-links.ts:72-82` 的 `IGNORED_LOCAL_PREFIXES` 内，判级本就是 `ignored-local` 而非 `dead`，
   逐行加字对闸门毫无作用。改为在 `CHANGELOG.md` 头部加一段统一口径说明，一次覆盖全部 16 条引用及将来新增。
 - **偏差 3｜归档件的回填引用少写一级**：pass2 把归档件里指向「留在 `docs/plans/` 的活计划」的裸名补成 `../<name>`，
-  但归档件在 `docs/plans/archive/2026-Q4/`，正确写法是 `../../<name>`。`docs:links` 当场抓出 2 处死引用并已在
-  S7 提交前修正，规则也已写进 `docs/plans/archive/README.md` §3.2，供下轮查表。
+  但归档件当时在受跟踪归档区（已清理），正确写法曾是 `../../<name>`。`docs:links` 当场抓出 2 处死引用并已在
+  S7 提交前修正；相对路径写法规则已迁入 `docs/CODING_CONVENTIONS.md`（原归档台账已清理）。
 
 ### 9.3 判据修正：上一轮「零入站引用」的统计方法有两个坑
 

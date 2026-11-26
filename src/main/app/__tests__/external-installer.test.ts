@@ -19,7 +19,24 @@ vi.mock('../../utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
 }))
 
-import { EXTERNAL_INSTALLER_ARGS, launchExternalInstaller, validateInstallerPath } from '../external-installer'
+import { AppError } from '../../../shared/errors/app-error'
+import {
+  EXTERNAL_INSTALLER_ARGS,
+  launchExternalInstaller,
+  validateInstallerPath
+} from '../external-installer'
+
+/** 断言路径被 UNC 判据拦截（validation 分类，而非 lstat notFound 兜底） */
+function expectUncRejected(input: string): void {
+  try {
+    validateInstallerPath(input)
+    expect.unreachable(`应拒绝 UNC 形态: ${input}`)
+  } catch (err) {
+    expect(err).toBeInstanceOf(AppError)
+    expect((err as AppError).code).toBe('IPC_VALIDATION_ERROR')
+    expect((err as AppError).details).toEqual({ path: expect.stringContaining('nas') })
+  }
+}
 
 let tempDir = ''
 
@@ -43,6 +60,15 @@ describe('validateInstallerPath', () => {
     expect(() => validateInstallerPath(123)).toThrow()
   })
 
+  it('拒绝 UNC 形态（反斜杠与正斜杠同判）', () => {
+    // 反斜杠 UNC：现有判据已拦截
+    expectUncRejected('\\\\nas\\share\\Setup.exe')
+    // 正斜杠 UNC：normalize 后同指网络共享，与 isBareDirectoryRoot 修复的同型绕过形态
+    expectUncRejected('//nas/share/Setup.exe')
+    // UNC 子目录形态同样不得放行
+    expectUncRejected('//nas/share/sub/Setup.exe')
+  })
+
   it('拒绝非 .exe 与不存在的文件', () => {
     const txt = path.join(tempDir, 'installer.txt')
     fs.writeFileSync(txt, 'x')
@@ -64,7 +90,11 @@ describe('launchExternalInstaller', () => {
     const pid = launchExternalInstaller(exe)
     expect(pid).toBe(1234)
     expect(spawnMock).toHaveBeenCalledTimes(1)
-    const [command, args, options] = spawnMock.mock.calls[0] as [string, string[], { detached: boolean }]
+    const [command, args, options] = spawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { detached: boolean }
+    ]
     expect(command).toBe(path.resolve(exe))
     expect(args).toEqual([...EXTERNAL_INSTALLER_ARGS])
     expect(options.detached).toBe(true)

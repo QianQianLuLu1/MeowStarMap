@@ -102,6 +102,8 @@ npm run typecheck:e2e # tsc --noEmit -p e2e（e2e/ 层）；上面两者都收�
 npm run lint         # eslint .（lint:fix 自动修复）
 npm run format       # prettier
 npm run verify       # 变更后只读验证（typecheck + eslint 只读 + prettier --check + 相关单测；不改动文件）
+npm run audit       # audit-ci --config ./audit-ci.jsonc（依赖漏洞审计，与 CI 同源，需网络）
+npm run i18n:guard  # i18n key/白名单守卫（CI 必跑）
 
 npm run e2e:smoke    # Playwright 冒烟测试（perf 为性能用例）
 npm run e2e          # 误输入守卫：冒号两侧被打上空格时列出真实子命令并以 1 退出
@@ -150,11 +152,19 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 
 ### Agent 工作流
 
+**开发前红线**：任何代码改动前必须先输出完整 Markdown 实施计划并写入仓库 `docs/plans/`（命名 `YYYY-MM-DD-<主题>-实施计划.md`），经确认后方可开发。计划六节齐全：`依赖声明`（新增/变更依赖、版本要求、安装方式）、`启动说明`（环境准备、启动命令、功能验证方式）、`错误处理`（异常分支、兜底策略、日志输出规范）、`参数校验`（类型、必填、边界、非法值）、`基础测试用例`（正常/异常/边界三类）、`子任务`（每个子任务写明需修改文件的完整路径、输入→输出定义、可量化可判定的验收标准，例「启动服务后点击共鸣录入口弹窗正常弹出」「点击跳转网页按钮正确打开目标链接」）。格式与写法直接沿用 `docs/plans/` 既有计划，不新造模板。
+
 1. 修改代码文件后，立即运行 `npm run verify`
 2. 查看输出中的 `[VERIFY]` 或 `[PRE-COMMIT]` 标记行定位失败阶段
 3. 若 `format` 或 `lint` 失败，自行落地修复（`npm run format` / `npx prettier --write <文件>`、`npm run lint:fix`），再重跑 `npm run verify`
 4. 全部通过后再 `git add` 并 `git commit`（pre-commit 钩子会再次确认，并可能改写文件）
 5. 提交后运行 `git status --porcelain`，确认钩子没有留下未预期的改动
+
+**分步与闭环**：每完成一个子任务立即验证通过后才进入下一步；每个功能节点走「红灯-绿灯」——先写可复现场景的测试用例并确认其运行失败（红灯），再改代码，最后重跑同一用例确认通过（绿灯）；无红灯可立须说明理由，不得编造测试凑流程。回归用例在开发前必须处于失败状态，若开发前已通过说明测试未覆盖目标场景，须重写后再执行。每小节点后跑相关测试子集（已含在 `npm run verify` 的相关单测阶段内）。
+
+**全量收口**：全部子任务完成后，在增量 `npm run verify` 之外还须本地补跑全量并确认无新增失败项——静态检查 `npm run lint` 与 `npm run i18n:guard`；类型检查 `npm run typecheck` 与 `npm run typecheck:e2e`；全量测试 `npm test`（CI 分片叠加 `npm run test:coverage` 阈值门控，`npm run test:ci-linux` 复现 CI 宿主语义、只读诊断）；安全检查 `npm run audit`（配置 `audit-ci.jsonc`，与 CI 同源）。命令以「常用命令」与 `.github/workflows/build.yml` 为准，不得假设不存在的脚本。
+
+**禁止**：不得假设项目中不存在的命令、文件、流程，使用前先确认，不存在则先创建或改用已有等价实现；所有代码报错由 Agent 自行修复，不得让用户代跑命令；不得跳过测试，不得伪造、忽略或弱化失败结果。
 
 ### 输出诊断格式
 
@@ -175,6 +185,8 @@ npm run verify:staged   # 仅验证暂存文件（检查集与 pre-commit 对齐
 - 单元测试与源码同目录，命名 `*.test.ts(x)`（Vitest）。
 - 代码注释与文档以中文为主；UI 文案走 i18next（12 个 locale 包，zh-CN 为基准静态加载、其余 11 种动态加载，另有「跟随系统」auto），勿硬编码用户可见文本。
 - 详细编码约束（IPC 白名单、AppError 错误分类、CSS 变量主题、React 组件模式、源文件编码 UTF-8 无 BOM 与行尾 LF、路径语义三分法「比较层钉 win32 / IO 层保宿主 / 混合输入走方言」、校验与提交等）见 [`docs/CODING_CONVENTIONS.md`](docs/CODING_CONVENTIONS.md)，该文件是唯一真相源。路径语义的落档由 `scripts/__tests__/path-semantics-guard.test.ts` 登记并守卫（PINNED / DIALECT / HOST_IO 三张表；新文件引入 win32 钉或方言引用而未登记 ⇒ 守卫红）。
+- 改动范围只限当前需求：禁止顺手重构、格式化、改无关功能或夹带无关清理。
+- 优先复用仓库已有工具函数、成熟组件与开源方案，禁止重复造轮子；确需自行实现时代码量压到最低。
 - 版本控制边界：根与模块级 `AGENTS.md`、`docs/CODING_CONVENTIONS.md` 均入仓，本文件导航表列出的每个路径都必须能解析到已跟踪文件；`.qoder/` 目录与 `.mimosa/`、`.trae/`、`.zcode/`、`.codebuddy/`、`.workbuddy*/`、`.codegraph/` 一样保持本地化（`.gitignore` 排除），其下的 IDE 规则文件仅作 `docs/CODING_CONVENTIONS.md` 的逐字镜像、skills 仅作本地装配，不得作为任何被跟踪指引的出处。
 
 ## 热链与外部资源请求规范（上游授权合规，打包闸门强制）

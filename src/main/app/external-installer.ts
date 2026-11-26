@@ -26,7 +26,11 @@ export function validateInstallerPath(raw: unknown): string {
   if (!path.isAbsolute(input)) {
     throw AppError.validation(t('main.externalInstaller.mustBeAbsolute'), { path: input })
   }
-  if (input.startsWith('\\\\')) {
+  // UNC 判据走纯字符串形态（与 isBareDirectoryRoot 同口径：不依赖 path 语义、不触盘，
+  // Windows 真宿主与 CI posix 装置同判据，无需在 path-semantics-guard 登记）：
+  // Windows API 同样接受正斜杠 UNC，`//server/share/x.exe` 与 `\\server\share\x.exe`
+  // 指同一个网络共享，只查 `\\` 前缀会放行正斜杠形态（同型绕过见 isBareDirectoryRoot F3）。
+  if (input.startsWith('\\\\') || input.startsWith('//')) {
     throw AppError.validation(t('main.externalInstaller.uncNotAllowed'), { path: input })
   }
   const resolved = path.normalize(input)

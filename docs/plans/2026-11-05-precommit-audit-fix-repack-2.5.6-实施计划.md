@@ -39,7 +39,7 @@
 ### T1 修复 F1（CHANGELOG 转义路径统一）
 
 - 涉及文件：`CHANGELOG.md`（1 行）。
-- 输入/输出：转义串 → 未转义 `docs/plans/archive/2026-Q4/2026-10-31-review-nikkisync-scope-fixes-repack.md`；不新增/删除任何条目行。
+- 输入/输出：转义串 → 未转义 review-nikkisync-scope-fixes 轮次快照（已清理，取证见 commit）；不新增/删除任何条目行。
 - 验收标准：`grep -c '\\-' CHANGELOG.md` 中该条不再含转义连字符；`npx tsx scripts/check-changelog-release.ts` exit 0（[2.5.6] 节在、[Unreleased] 无条目）；`npm run verify` 全绿。
 
 ### T2 修复 F2（CSP img-src 断言加固）
@@ -61,7 +61,7 @@
 
 ### T4 分批提交
 
-- C1 `docs(plans): markdown 盘点 round 6 归档治理与全仓引用订正`：15 个 rename（含 RM 内容订正）+ `docs/plans/archive/README.md` 台账 + 根目录 6 文档 + `docs/CODING_CONVENTIONS.md` / `docs/PLUGIN_API.md` / `docs/debt-registry.json` / 教程 + round6 计划文档 + `recycle-helper.cs` 与 2 个 gallery 测试的注释路径 + CHANGELOG 路径改写（含 F1）。
+- C1 `docs(plans): markdown 盘点 round 6 归档治理与全仓引用订正`：15 个 rename（含 RM 内容订正）+ 归档台账（已清理，判据见 docs/CODING_CONVENTIONS.md「校验与提交」） + 根目录 6 文档 + `docs/CODING_CONVENTIONS.md` / `docs/PLUGIN_API.md` / `docs/debt-registry.json` / 教程 + round6 计划文档 + `recycle-helper.cs` 与 2 个 gallery 测试的注释路径 + CHANGELOG 路径改写（含 F1）。
 - C2 `feat(resonance): 衣橱六类实体图片走 cdn.gongeo.us 热链并失败回退`：**必须含两个未跟踪新文件** `src/renderer/utils/resonance/cdnImageUrl.ts` / `.test.ts` + `WardrobeView.tsx` / `.test.tsx` + `offline-guard.test.ts` + `window-manager.test.ts`（F2）+ CHANGELOG `[2.5.6]` 节台账追加一行（`> 2026-11-05 追加：…`；**[Unreleased] 必须保持空壳**，否则打包闸门红）。
 - C3（打包后）`docs(plans): 回写预提交审查与 2.5.6 重打包读数`：本文件 §9。
 - 每笔提交后 `git status --porcelain` 复核钩子未留意外改动；subject ≤72 字符、body 每行 ≤120。
