@@ -398,7 +398,7 @@ npm run dev
 **修改**
 
 - `src/renderer/pages/sync-gallery/console/SyncConsoleLayout.tsx`
-- `src/renderer/pages/sync-gallery/console/SyncStatusBar.tsx`
+- （原 `SyncStatusBar.tsx` 已并入 `SyncConsoleLayout.tsx`）
 - `src/renderer/pages/sync-gallery/console/ConnectView.tsx`
 - `src/renderer/pages/sync-gallery/console/SettingsView.tsx`
 - `src/renderer/pages/sync-gallery/console/OrganizerView.tsx`

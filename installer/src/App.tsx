@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { detectState, startInstall } from './api'
+import { closeInstaller, detectState, startInstall } from './api'
 import type { InstallOptions, InstallSummary, InstallerState } from './types'
 import WelcomeStep from './steps/WelcomeStep'
 import OptionsStep from './steps/OptionsStep'
@@ -39,7 +39,15 @@ const App = (): React.JSX.Element => {
     detectState()
       .then((s) => {
         setState(s)
-        setOptions((prev) => ({ ...prev, installDir: s.installDir ?? '' }))
+        // 中文/问号等异常路径在部分机器会乱码或不可用；非 ASCII 或含非法字符的旧路径直接回落英文默认目录
+        const asciiDir =
+          s.installDir !== null && /^[\x20-\x7E]+$/.test(s.installDir) && !/[?*<>|"]/.test(s.installDir)
+            ? s.installDir
+            : null
+        setOptions((prev) => ({
+          ...prev,
+          installDir: asciiDir ?? s.defaultInstallDir ?? ''
+        }))
       })
       .catch((err: unknown) => setError(String(err)))
   }, [])
@@ -50,11 +58,10 @@ const App = (): React.JSX.Element => {
     }
     silentStarted.current = true
     void runInstall({
-      installDir: state.installDir ?? '',
+      installDir: state.installDir ?? state.defaultInstallDir ?? '',
       createDesktopShortcut: true,
       importCertificate: true
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state])
 
   const modeLabel =
@@ -97,8 +104,25 @@ const App = (): React.JSX.Element => {
           />
         )}
         {step === 2 && <ProgressStep />}
+        {step === 2 && error !== null && (
+          <>
+            <div className="error">安装失败：{error}（已回滚到安装前状态）</div>
+            <div className="actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  setError(null)
+                  setStep(1)
+                }}
+              >
+                返回安装选项
+              </button>
+            </div>
+          </>
+        )}
         {step === 3 && summary !== null && (
-          <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => window.close()} />
+          <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => void closeInstaller()} />
         )}
       </main>
     </div>

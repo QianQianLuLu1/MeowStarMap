@@ -11,6 +11,8 @@ pub struct InstallerState {
     pub app_running: bool,
     pub mode: String,
     pub payload_path: Option<String>,
+    /// 默认安装目录（输入框兜底，避免空值）
+    pub default_install_dir: String,
     /// 是否由更新流程/命令行以静默模式启动（/S、--silent、-s）
     pub silent: bool,
 }
@@ -48,8 +50,15 @@ pub fn get_install_progress() -> InstallProgress {
 }
 
 #[tauri::command]
-pub fn detect_state() -> Result<InstallerState, String> {
-    Ok(platform::detect_state())
+pub fn get_install_log() -> Vec<String> {
+    platform::install_log()
+}
+
+#[tauri::command]
+pub async fn detect_state() -> Result<InstallerState, String> {
+    tauri::async_runtime::spawn_blocking(platform::detect_state)
+        .await
+        .map_err(|err| err.to_string())
 }
 
 #[tauri::command]
@@ -75,7 +84,7 @@ pub async fn start_install(
 
 #[tauri::command]
 pub fn cancel_install() -> Result<(), String> {
-    // 骨架阶段：安装为同步短流程，暂无可取消点
+    platform::request_cancel();
     Ok(())
 }
 
@@ -85,6 +94,11 @@ pub fn uninstall() -> Result<(), String> {
 }
 
 #[tauri::command]
-pub fn launch_app() -> Result<(), String> {
-    platform::launch_app().map_err(|err| err.to_string())
+pub fn launch_app(app: tauri::AppHandle) -> Result<(), String> {
+    platform::launch_app(app).map_err(|err| err.to_string())
+}
+
+#[tauri::command]
+pub fn close_installer(app: tauri::AppHandle) {
+    app.exit(0);
 }

@@ -1,10 +1,12 @@
 use std::env;
 use std::fs::{self, File};
-use std::io::{BufReader, Read};
+use std::io::{BufReader, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Mutex;
+use std::thread;
+use std::time::Duration;
 
 use sha2::{Digest, Sha256};
 use tauri::{AppHandle, Emitter};
@@ -17,6 +19,66 @@ const DISPLAY_NAME: &str = "喵星图";
 
 static PROGRESS_PERCENT: AtomicU8 = AtomicU8::new(0);
 static PROGRESS_MESSAGE: Mutex<String> = Mutex::new(String::new());
+static INSTALL_LOGS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static CANCEL_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+pub fn log_line(message: impl Into<String>) {
+    if let Ok(mut logs) = INSTALL_LOGS.lock() {
+        logs.push(message.into());
+        if logs.len() > 500 {
+            let drain = logs.len() - 500;
+            logs.drain(0..drain);
+        }
+    }
+}
+
+pub fn install_log() -> Vec<String> {
+    INSTALL_LOGS
+        .lock()
+        .map(|logs| logs.clone())
+        .unwrap_or_default()
+}
+
+fn clear_log() {
+    if let Ok(mut logs) = INSTALL_LOGS.lock() {
+        logs.clear();
+    }
+}
+
+pub fn request_cancel() {
+    CANCEL_REQUESTED.store(true, Ordering::SeqCst);
+}
+
+fn reset_cancel() {
+    CANCEL_REQUESTED.store(false, Ordering::SeqCst);
+}
+
+fn is_cancel_requested() -> bool {
+    CANCEL_REQUESTED.load(Ordering::SeqCst)
+}
+
+fn check_cancel() -> Result<(), String> {
+    if is_cancel_requested() {
+        Err("安装已取消".to_string())
+    } else {
+        Ok(())
+    }
+}
+
+/// 启动控制台子进程时隐藏窗口（CREATE_NO_WINDOW），避免安装过程中闪 cmd 黑框。
+#[cfg(windows)]
+fn hidden_command(program: &str) -> Command {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut command = Command::new(program);
+    command.creation_flags(CREATE_NO_WINDOW);
+    command
+}
+
+#[cfg(not(windows))]
+fn hidden_command(program: &str) -> Command {
+    Command::new(program)
+}
 
 fn set_progress(percent: u8, message: &str) {
     PROGRESS_PERCENT.store(percent, Ordering::Relaxed);
@@ -39,16 +101,44 @@ pub fn is_uninstall_requested() -> bool {
 }
 
 pub fn run_uninstall() -> Result<(), String> {
+    let current = env::current_exe().ok();
+    // 卸载器位于安装目录内时，先复制到临时目录再执行，避免删除正在运行的文件失败
+    if let (Some(install_dir), Some(exe)) = (read_install_dir(), current.as_ref()) {
+        if exe.starts_with(&install_dir) {
+            let temp = env::temp_dir().join(format!(
+                "MeowStarMap-Uninstaller-{}.exe",
+                std::process::id()
+            ));
+            fs::copy(exe, &temp).map_err(|err| format!("准备卸载器失败: {err}"))?;
+            Command::new(&temp)
+                .arg("--uninstall")
+                .spawn()
+                .map_err(|err| format!("启动卸载器失败: {err}"))?;
+            return Ok(());
+        }
+    }
+
     remove_shortcuts();
     if let Some(install_dir) = read_install_dir() {
         if install_dir.exists() {
-            // 若卸载器自身就在安装目录内，删除自身会失败，忽略该错误并继续清注册表。
             let _ = fs::remove_dir_all(&install_dir);
         }
     }
-    let _ = Command::new("reg")
+    let _ = hidden_command("reg")
         .args(["delete", UNINSTALL_KEY, "/f"])
         .output();
+
+    // 临时卸载器：退出前安排删除自身
+    if let Some(exe) = current {
+        let name = exe
+            .file_name()
+            .map(|name| name.to_string_lossy().to_string())
+            .unwrap_or_default();
+        if name.starts_with("MeowStarMap-Uninstaller-") {
+            let command = format!("ping -n 2 127.0.0.1 >NUL & del /F /Q \"{}\"", exe.display());
+            let _ = hidden_command("cmd").args(["/C", &command]).spawn();
+        }
+    }
     Ok(())
 }
 
@@ -76,10 +166,27 @@ pub fn is_silent() -> bool {
     has_silent_flag()
 }
 
+fn default_install_dir() -> Option<PathBuf> {
+    env::var("LOCALAPPDATA")
+        .ok()
+        .map(|base| Path::new(&base).join("Programs").join("MeowStarMap"))
+}
+
+fn is_sane_install_path(path: &Path) -> bool {
+    let text = path.to_string_lossy();
+    !text.is_empty()
+        && text
+            .chars()
+            .all(|ch| ch.is_ascii() && !matches!(ch, '?' | '*' | '<' | '>' | '|' | '"'))
+}
+
 pub fn detect_state() -> InstallerState {
-    let registry_dir = read_install_dir();
+    let registry_dir = read_install_dir().filter(|path| is_sane_install_path(path));
     let override_dir = arg_value("--install-dir=").or_else(|| arg_value("/D="));
-    let install_dir = override_dir.map(PathBuf::from).or(registry_dir);
+    let install_dir = override_dir
+        .map(PathBuf::from)
+        .or(registry_dir)
+        .or_else(default_install_dir);
 
     let installed = install_dir
         .as_ref()
@@ -98,7 +205,10 @@ pub fn detect_state() -> InstallerState {
         install_dir: install_dir.map(|dir| dir.to_string_lossy().to_string()),
         app_running,
         mode: mode.to_string(),
-        payload_path: payload_path().map(|path| path.to_string_lossy().to_string()),
+        payload_path: payload_hint(),
+        default_install_dir: default_install_dir()
+            .map(|path| path.to_string_lossy().to_string())
+            .unwrap_or_default(),
         silent: has_silent_flag(),
     }
 }
@@ -112,26 +222,67 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
     let installed_before = detect_state().installed;
     let mut steps: Vec<String> = Vec::new();
     let mut warnings: Vec<String> = Vec::new();
+    reset_cancel();
+    clear_log();
+    log_line(format!("安装目录: {}", install_dir.display()));
+    check_cancel()?;
 
     emit_progress(app, 2, "准备安装");
+    log_line("开始安装");
     stop_running_app(&mut steps, &mut warnings);
     emit_progress(app, 8, "已结束旧进程（如有）");
+    log_line("已结束旧进程（如有）");
 
     let payload = payload_path();
     if let Some(payload) = payload.as_ref() {
-        verify_payload(payload)?;
-        emit_progress(app, 16, "载荷校验通过");
+        log_line(format!("载荷: {}", payload.display()));
+        let unpacked_size = verify_payload(payload, app)?;
+        log_line("载荷 sha256/大小校验通过");
         let staging = staging_dir(&install_dir)?;
-        extract_to(payload, &staging)?;
-        emit_progress(app, 48, "安装文件已展开");
-        swap_in(&install_dir, &staging, &mut steps, &mut warnings)?;
-        emit_progress(app, 78, "文件替换完成");
+        let prepare_result: Result<(), String> = (|| {
+            emit_progress(app, 20, "正在解包安装文件…");
+            extract_to(payload, &staging, app, unpacked_size)?;
+            check_cancel()?;
+            emit_progress(app, 85, "安装文件已展开");
+            emit_progress(app, 90, "正在替换安装目录…");
+            swap_in(&install_dir, &staging, &mut steps, &mut warnings)?;
+            Ok(())
+        })();
+        if let Err(err) = prepare_result {
+            // 取消/失败：清理暂存目录；swap_in 内部已负责恢复旧版本目录
+            let _ = fs::remove_dir_all(&staging);
+            log_line(format!("安装失败: {err}"));
+            return Err(err);
+        }
+        emit_progress(app, 92, "文件替换完成");
+        log_line("安装文件替换完成");
     } else {
-        warnings.push("未找到安装载荷（骨架阶段），已跳过文件解包".to_string());
-        fs::create_dir_all(&install_dir).map_err(|err| format!("创建安装目录失败: {err}"))?;
-        steps.push(format!("创建安装目录: {}", install_dir.display()));
+        // 没有载荷属于安装包不完整：必须失败并保持安装目录/注册表不变（可回滚）。
+        return Err("未找到安装载荷：安装包不完整（缺少 payload.zip 或内嵌载荷）".to_string());
     }
 
+    match crate::legacy::prepare() {
+        Ok(Some(message)) => {
+            log_line(message.clone());
+            steps.push(message);
+        }
+        Ok(None) => log_line("未检测到旧版数据"),
+        Err(err) => {
+            log_line(format!("旧版数据迁移准备失败: {err}"));
+            warnings.push(format!("旧版数据迁移准备失败: {err}"));
+        }
+    }
+    let uninstaller = match write_uninstaller(&install_dir) {
+        Ok(path) => {
+            log_line(format!("卸载器已写入: {}", path.display()));
+            Some(path)
+        }
+        Err(err) => {
+            log_line(format!("写入卸载器失败: {err}"));
+            warnings.push(format!("写入卸载器失败: {err}"));
+            None
+        }
+    };
     let version = read_manifest_version(&install_dir)
         .or_else(|| {
             payload
@@ -141,14 +292,24 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
         .or_else(|| query_reg_value(UNINSTALL_KEY, "DisplayVersion"))
         .unwrap_or_else(|| "0.0.0".to_string());
 
-    write_uninstall_registry(&install_dir, &version, &mut steps, &mut warnings);
+    write_uninstall_registry(
+        &install_dir,
+        uninstaller.as_deref(),
+        &version,
+        &mut steps,
+        &mut warnings,
+    );
+    log_line("卸载项注册表已写入");
     if options.import_certificate {
         import_certificate(&mut warnings);
+        log_line("证书导入完成（如有）");
     }
     if options.create_desktop_shortcut {
         create_shortcuts(&install_dir, &mut warnings);
+        log_line("快捷方式创建完成");
     }
     emit_progress(app, 100, "安装完成");
+    log_line("安装完成");
 
     Ok(InstallSummary {
         ok: true,
@@ -166,21 +327,27 @@ pub fn install(options: InstallOptions, app: &AppHandle) -> Result<InstallSummar
 }
 
 pub fn uninstall() -> Result<(), String> {
-    let _ = Command::new("reg")
+    let _ = hidden_command("reg")
         .args(["delete", UNINSTALL_KEY, "/f"])
         .output();
     Ok(())
 }
 
-pub fn launch_app() -> Result<(), String> {
+pub fn launch_app(app: AppHandle) -> Result<(), String> {
     let install_dir = read_install_dir()
         .or_else(|| arg_value("--install-dir=").map(PathBuf::from))
         .ok_or("未找到安装目录".to_string())?;
     let exe = find_app_exe(&install_dir).ok_or("安装目录中未找到应用可执行文件".to_string())?;
-    Command::new(exe)
+    let child = Command::new(exe)
         .spawn()
-        .map(|_| ())
-        .map_err(|err| format!("启动应用失败: {err}"))
+        .map_err(|err| format!("启动应用失败: {err}"))?;
+    // 应用进程成功创建后自动关闭安装器，避免残留窗口
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(800));
+        let _ = child.id();
+        app.exit(0);
+    });
+    Ok(())
 }
 
 fn emit_progress(app: &AppHandle, percent: u8, message: &str) {
@@ -237,7 +404,7 @@ fn read_manifest_version(install_dir: &Path) -> Option<String> {
 }
 
 fn query_reg_value(key: &str, value: &str) -> Option<String> {
-    let output = Command::new("reg")
+    let output = hidden_command("reg")
         .args(["query", key, "/v", value])
         .output()
         .ok()?;
@@ -256,12 +423,67 @@ fn query_reg_value(key: &str, value: &str) -> Option<String> {
     None
 }
 
+fn payload_hint() -> Option<String> {
+    if let Ok(custom) = env::var("MEOW_INSTALLER_PAYLOAD") {
+        let path = PathBuf::from(custom);
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    if has_embedded_payload() {
+        return Some("embedded".to_string());
+    }
+    let exe_dir = env::current_exe().ok()?.parent()?.to_path_buf();
+    for candidate in ["payload.zip", "payload"] {
+        let path = exe_dir.join(candidate);
+        if path.exists() {
+            return Some(path.to_string_lossy().to_string());
+        }
+    }
+    None
+}
+
+/// 只检查 exe 尾部 footer（不复制/解包 245MB 载荷），供 detect_state 快速返回。
+fn has_embedded_payload() -> bool {
+    let Ok(exe) = env::current_exe() else {
+        return false;
+    };
+    let Ok(mut file) = File::open(exe) else {
+        return false;
+    };
+    let Ok(len) = file.metadata().map(|meta| meta.len()) else {
+        return false;
+    };
+    if len <= PAYLOAD_TRAILER_LEN {
+        return false;
+    }
+    if file.seek(SeekFrom::End(-8)).is_err() {
+        return false;
+    }
+    let mut magic = [0u8; 8];
+    if file.read_exact(&mut magic).is_err() || &magic != PAYLOAD_TRAILER_MAGIC {
+        return false;
+    }
+    if file.seek(SeekFrom::End(-24)).is_err() {
+        return false;
+    }
+    let mut size_buf = [0u8; 8];
+    if file.read_exact(&mut size_buf).is_err() {
+        return false;
+    }
+    let size = u64::from_le_bytes(size_buf);
+    size > 0 && size + PAYLOAD_TRAILER_LEN < len
+}
+
 fn payload_path() -> Option<PathBuf> {
     if let Ok(custom) = env::var("MEOW_INSTALLER_PAYLOAD") {
         let path = PathBuf::from(custom);
         if path.exists() {
             return Some(path);
         }
+    }
+    if let Some(path) = embedded_payload() {
+        return Some(path);
     }
     let exe_dir = env::current_exe().ok()?.parent()?.to_path_buf();
     for candidate in ["payload.zip", "payload"] {
@@ -273,8 +495,69 @@ fn payload_path() -> Option<PathBuf> {
     None
 }
 
+const PAYLOAD_TRAILER_MAGIC: &[u8; 8] = b"MEOWPAY1";
+const PAYLOAD_TRAILER_LEN: u64 = 24;
+
+/// 读取追加在安装器 exe 末尾的内嵌载荷：
+/// [zip][manifest json][zip_size u64 le][manifest_size u64 le][magic 8]，
+/// 解出 zip 与同名 .json 清单到临时目录，供校验/版本读取。
+fn embedded_payload() -> Option<PathBuf> {
+    let exe = env::current_exe().ok()?;
+    let mut file = File::open(&exe).ok()?;
+    let len = file.metadata().ok()?.len();
+    if len <= PAYLOAD_TRAILER_LEN {
+        return None;
+    }
+    file.seek(SeekFrom::End(-8)).ok()?;
+    let mut magic = [0u8; 8];
+    file.read_exact(&mut magic).ok()?;
+    if &magic != PAYLOAD_TRAILER_MAGIC {
+        return None;
+    }
+    file.seek(SeekFrom::End(-24)).ok()?;
+    let mut zip_size_buf = [0u8; 8];
+    let mut manifest_size_buf = [0u8; 8];
+    file.read_exact(&mut zip_size_buf).ok()?;
+    file.read_exact(&mut manifest_size_buf).ok()?;
+    let zip_size = u64::from_le_bytes(zip_size_buf);
+    let manifest_size = u64::from_le_bytes(manifest_size_buf);
+    if zip_size == 0 || zip_size + manifest_size + PAYLOAD_TRAILER_LEN >= len {
+        return None;
+    }
+    let zip_offset = len - PAYLOAD_TRAILER_LEN - zip_size - manifest_size;
+    let manifest_offset = zip_offset + zip_size;
+    let stem = env::temp_dir().join(format!("meow-installer-payload-{}", std::process::id()));
+    let zip_path = stem.with_extension("zip");
+    let manifest_path = stem.with_extension("zip.json");
+    file.seek(SeekFrom::Start(zip_offset)).ok()?;
+    copy_range(&mut file, &zip_path, zip_size)?;
+    file.seek(SeekFrom::Start(manifest_offset)).ok()?;
+    copy_range(&mut file, &manifest_path, manifest_size)?;
+    Some(zip_path)
+}
+
+fn copy_range(file: &mut File, target: &Path, mut remaining: u64) -> Option<()> {
+    let mut out = File::create(target).ok()?;
+    let mut buffer = [0u8; 64 * 1024];
+    while remaining > 0 {
+        let want = std::cmp::min(buffer.len() as u64, remaining) as usize;
+        let read = file.read(&mut buffer[..want]).ok()?;
+        if read == 0 {
+            break;
+        }
+        out.write_all(&buffer[..read]).ok()?;
+        remaining -= read as u64;
+    }
+    if remaining == 0 {
+        Some(())
+    } else {
+        let _ = fs::remove_file(target);
+        None
+    }
+}
+
 fn is_app_running() -> bool {
-    let output = Command::new("tasklist")
+    let output = hidden_command("tasklist")
         .args(["/FI", "IMAGENAME eq 喵星图.exe", "/NH"])
         .output();
     if let Ok(output) = output {
@@ -290,7 +573,7 @@ fn stop_running_app(steps: &mut Vec<String>, warnings: &mut Vec<String>) {
     if !is_app_running() {
         return;
     }
-    let status = Command::new("taskkill")
+    let status = hidden_command("taskkill")
         .args(["/IM", "喵星图.exe", "/F"])
         .status();
     match status {
@@ -299,11 +582,17 @@ fn stop_running_app(steps: &mut Vec<String>, warnings: &mut Vec<String>) {
     }
 }
 
-fn sha256_file(path: &Path) -> Result<String, String> {
+fn sha256_file_with_progress(path: &Path, app: &AppHandle) -> Result<String, String> {
     let file = File::open(path).map_err(|err| format!("打开载荷失败: {err}"))?;
+    let total = file
+        .metadata()
+        .map_err(|err| format!("读取载荷大小失败: {err}"))?
+        .len();
     let mut reader = BufReader::new(file);
     let mut hasher = Sha256::new();
-    let mut buffer = [0u8; 64 * 1024];
+    let mut buffer = [0u8; 1024 * 1024];
+    let mut done: u64 = 0;
+    let mut last_percent = 0u8;
     loop {
         let read = reader
             .read(&mut buffer)
@@ -312,15 +601,25 @@ fn sha256_file(path: &Path) -> Result<String, String> {
             break;
         }
         hasher.update(&buffer[..read]);
+        done += read as u64;
+        let percent = if total > 0 {
+            2 + ((done.min(total) as f64 / total as f64) * 18.0) as u8
+        } else {
+            2
+        };
+        if percent != last_percent {
+            last_percent = percent;
+            emit_progress(app, percent, "正在校验载荷…");
+        }
     }
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn verify_payload(payload: &Path) -> Result<(), String> {
+fn verify_payload(payload: &Path, app: &AppHandle) -> Result<Option<u64>, String> {
     let manifest_path = PathBuf::from(format!("{}.json", payload.display()));
     if !manifest_path.exists() {
         // 清单可选：没有清单时跳过哈希校验（由发布流程决定是否提供）
-        return Ok(());
+        return Ok(None);
     }
     let raw =
         fs::read_to_string(&manifest_path).map_err(|err| format!("读取载荷清单失败: {err}"))?;
@@ -338,11 +637,11 @@ fn verify_payload(payload: &Path) -> Result<(), String> {
             return Err(format!("载荷大小不匹配（期望 {size}，实际 {actual_size}）"));
         }
     }
-    let actual = sha256_file(payload)?;
+    let actual = sha256_file_with_progress(payload, app)?;
     if !actual.eq_ignore_ascii_case(expected) {
         return Err("载荷 sha256 校验失败，安装包可能已损坏".to_string());
     }
-    Ok(())
+    Ok(value.get("unpackedSize").and_then(|item| item.as_u64()))
 }
 
 fn staging_dir(install_dir: &Path) -> Result<PathBuf, String> {
@@ -361,7 +660,12 @@ fn staging_dir(install_dir: &Path) -> Result<PathBuf, String> {
     Ok(parent.join(name))
 }
 
-fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
+fn extract_to(
+    payload: &Path,
+    staging: &Path,
+    app: &AppHandle,
+    expected_unpacked: Option<u64>,
+) -> Result<(), String> {
     if staging.exists() {
         fs::remove_dir_all(staging).map_err(|err| format!("清理暂存目录失败: {err}"))?;
     }
@@ -379,14 +683,69 @@ fn extract_to(payload: &Path, staging: &Path) -> Result<(), String> {
         payload.display(),
         staging.display()
     );
-    let status = Command::new("powershell")
+    let mut child = hidden_command("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-        .status()
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(|err| format!("调用 PowerShell 解包失败: {err}"))?;
-    if !status.success() {
-        return Err("解包安装文件失败".to_string());
+    loop {
+        if is_cancel_requested() {
+            let _ = child.kill();
+            let _ = child.wait();
+            log_line("用户取消：已终止解包进程");
+            return Err("安装已取消".to_string());
+        }
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                let mut output = String::new();
+                if let Some(mut stdout) = child.stdout.take() {
+                    let _ = stdout.read_to_string(&mut output);
+                }
+                if let Some(mut stderr) = child.stderr.take() {
+                    let _ = stderr.read_to_string(&mut output);
+                }
+                for line in output.lines().filter(|line| !line.trim().is_empty()) {
+                    log_line(format!("[unzip] {line}"));
+                }
+                if !status.success() {
+                    log_line("解包失败");
+                    return Err("解包安装文件失败".to_string());
+                }
+                log_line("解包完成");
+                break;
+            }
+            Ok(None) => {
+                if let Some(expected) = expected_unpacked.filter(|value| *value > 0) {
+                    let extracted = dir_size(staging);
+                    let percent =
+                        20 + ((extracted.min(expected) as f64 / expected as f64) * 65.0) as u8;
+                    emit_progress(app, percent.min(84), "正在解包安装文件…");
+                }
+                thread::sleep(Duration::from_millis(200))
+            }
+            Err(err) => return Err(format!("等待解包进程失败: {err}")),
+        }
     }
     Ok(())
+}
+
+fn dir_size(path: &Path) -> u64 {
+    let Ok(entries) = fs::read_dir(path) else {
+        return 0;
+    };
+    let mut total = 0u64;
+    for entry in entries.flatten() {
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
+        if metadata.is_dir() {
+            total += dir_size(&entry.path());
+        } else {
+            total += metadata.len();
+        }
+    }
+    total
 }
 
 fn copy_dir_all(source: &Path, destination: &Path) -> Result<(), String> {
@@ -445,8 +804,53 @@ fn swap_in(
     }
 }
 
+fn write_uninstaller(install_dir: &Path) -> Result<PathBuf, String> {
+    let current = env::current_exe().map_err(|err| format!("读取安装器路径失败: {err}"))?;
+    let total = fs::metadata(&current)
+        .map_err(|err| format!("读取安装器大小失败: {err}"))?
+        .len();
+    // 单文件安装包 = [原始 exe][payload][footer]；只复制 PE 本体，卸载器约 10MB
+    let exe_len = payload_offset(&current).unwrap_or(total);
+    let destination = install_dir.join("Uninstall.exe");
+    let source = File::open(&current).map_err(|err| format!("打开安装器失败: {err}"))?;
+    let mut target = File::create(&destination).map_err(|err| format!("创建卸载器失败: {err}"))?;
+    let copied = std::io::copy(&mut source.take(exe_len), &mut target)
+        .map_err(|err| format!("写入卸载器失败: {err}"))?;
+    if copied != exe_len {
+        let _ = fs::remove_file(&destination);
+        return Err("写入卸载器不完整".to_string());
+    }
+    Ok(destination)
+}
+
+fn payload_offset(exe: &Path) -> Option<u64> {
+    let mut file = File::open(exe).ok()?;
+    let len = file.metadata().ok()?.len();
+    if len <= PAYLOAD_TRAILER_LEN {
+        return None;
+    }
+    file.seek(SeekFrom::End(-8)).ok()?;
+    let mut magic = [0u8; 8];
+    file.read_exact(&mut magic).ok()?;
+    if &magic != PAYLOAD_TRAILER_MAGIC {
+        return None;
+    }
+    file.seek(SeekFrom::End(-24)).ok()?;
+    let mut zip_size_buf = [0u8; 8];
+    let mut manifest_size_buf = [0u8; 8];
+    file.read_exact(&mut zip_size_buf).ok()?;
+    file.read_exact(&mut manifest_size_buf).ok()?;
+    let zip_size = u64::from_le_bytes(zip_size_buf);
+    let manifest_size = u64::from_le_bytes(manifest_size_buf);
+    if zip_size == 0 || zip_size + manifest_size + PAYLOAD_TRAILER_LEN >= len {
+        return None;
+    }
+    Some(len - PAYLOAD_TRAILER_LEN - zip_size - manifest_size)
+}
+
 fn write_uninstall_registry(
     install_dir: &Path,
+    uninstaller: Option<&Path>,
     version: &str,
     steps: &mut Vec<String>,
     warnings: &mut Vec<String>,
@@ -454,8 +858,13 @@ fn write_uninstall_registry(
     let exe = find_app_exe(install_dir)
         .map(|path| path.to_string_lossy().to_string())
         .unwrap_or_default();
-    let uninstall_string = env::current_exe()
+    let uninstall_string = uninstaller
         .map(|path| format!("\"{}\" --uninstall", path.display()))
+        .or_else(|| {
+            env::current_exe()
+                .ok()
+                .map(|path| format!("\"{}\" --uninstall", path.display()))
+        })
         .unwrap_or_default();
     let pairs: [(&str, String); 5] = [
         ("DisplayName", DISPLAY_NAME.to_string()),
@@ -466,7 +875,7 @@ fn write_uninstall_registry(
     ];
 
     for (name, value) in pairs {
-        let status = Command::new("reg")
+        let status = hidden_command("reg")
             .args([
                 "add",
                 UNINSTALL_KEY,
@@ -500,7 +909,7 @@ fn import_certificate(warnings: &mut Vec<String>) {
         return;
     };
 
-    let status = Command::new("certutil")
+    let status = hidden_command("certutil")
         .args(["-user", "-addstore", "-f", "Root"])
         .arg(&cert)
         .status();
@@ -552,7 +961,7 @@ fn create_shortcut(target: &Path, exe: &Path, workdir: &Path) -> Result<(), Stri
         exe.display()
     );
     fs::write(&script_path, script).map_err(|err| err.to_string())?;
-    let status = Command::new("powershell")
+    let status = hidden_command("powershell")
         .args([
             "-NoProfile",
             "-NonInteractive",

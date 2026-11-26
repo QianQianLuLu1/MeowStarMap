@@ -83,10 +83,15 @@ npm run build        # tauri build --no-bundle（产出独立 exe）
 - [x] 向导 UI 本机启动截图验证（欢迎页/侧边栏步骤）
 - [x] `detect_state` 读取旧安装（注册表/install-manifest）
 - [x] 载荷 sha256/size 校验（`payload.zip.json` 清单，缺失时跳过并告警）
+- [x] 子进程统一 CREATE_NO_WINDOW，安装过程不闪 cmd/控制台窗口
+- [x] 安装目录内生成 `Uninstall.exe`（截取安装器 PE 本体，约 10MB），UninstallString 指向它；卸载时先复制到临时目录避免自删失败`n- [x] 关闭按钮走 `close_installer`/app.exit(0)；启动应用成功后约 800ms 自动关闭安装器`n- [x] 进度：sha256 按字节推进、解包/替换分阶段、UI 单调不回退`n- [x] 单文件安装包：payload 追加在 exe 末尾（`[zip][manifest][size][magic]`），不依赖同目录 `payload.zip`
+- [x] 缺少载荷视为安装失败（不再“安装完成”并写空目录/注册表）
 - [x] staged 解包 + 备份替换 + 失败回滚（`installer-progress` 事件 0→100%）
 - [x] 安装命令放到 blocking 线程（2026-11-25 冒烟发现页面卡 0%，已修复）
 - [x] 进度事件 + `get_install_progress` 轮询兜底（事件通道不可用时 UI 仍能刷新）
 - [x] 静默模式安装完成后直接退出进程（供旧 electron-updater 等待退出码）
+- [x] 取消安装：提取/校验阶段可取消（保留旧版本目录、清理 staging）；失败自动回滚
+- [x] 替换文件前失败/取消不会修改安装目录；`swap_in` 失败会恢复旧目录
 - [x] 版本号回退 payload 清单（`payload.zip.json` 的 version）
 - [x] 进程互斥/结束旧应用（taskkill）
 - [x] 快捷方式 + HKCU 卸载项 + 证书导入（PS1 加 UTF-8 BOM + 预建目录，修复开始菜单 lnk 缺失）

@@ -21,15 +21,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 ### Added | 新增
 
-- **安装器兼容层（自研安装器前置，2026-11-24）**：为后续用自研安装器替代 NSIS 提供应用侧兼容能力——
-  ① `src/main/app/install-manifest.ts`：打包态启动时写 `install-manifest.json`（安装目录 + userData 双份，
-  含 appId/version/channel/arch/installDir/exePath），供安装器读取安装布局，避免猜注册表；
-  ② `src/main/app/external-installer.ts`：自定义安装器校验与启动通道（只接受绝对路径、`.exe`、非空文件；
-  固定 `--updated --force-run` 参数，兼容旧 electron-updater 调用契约）；
-  ③ `scripts/generate-update-feed.ts`：以自定义安装器产物生成 electron-updater 兼容的 `latest.yml`
-  （version/path/sha512/size/files[]），供发布流程上传。
-- **`app:update:install` 兼容扩展**：新增可选载荷 `{ installerPath?: string }`；传入时改用自定义安装器
-  覆盖安装，不传保持 electron-updater 原行为（向后兼容，旧渲染层零改动）。详见 `docs/installer-compat.md`。
+**安装器兼容层（自研安装器前置，2026-11-24）**：为后续用自研安装器替代 NSIS 提供应用侧兼容能力——
+① `src/main/app/install-manifest.ts`：打包态启动时写 `install-manifest.json`（安装目录 + userData 双份，
+含 appId/version/channel/arch/installDir/exePath），供安装器读取安装布局，避免猜注册表；
+② `src/main/app/external-installer.ts`：自定义安装器校验与启动通道（只接受绝对路径、`.exe`、非空文件；
+固定 `--updated --force-run` 参数，兼容旧 electron-updater 调用契约）；
+③ `scripts/generate-update-feed.ts`：以自定义安装器产物生成 electron-updater 兼容的 `latest.yml`
+（version/path/sha512/size/files[]），供发布流程上传。
+**`app:update:install` 兼容扩展**：新增可选载荷 `{ installerPath?: string }`；传入时改用自定义安装器
+覆盖安装，不传保持 electron-updater 原行为（向后兼容，旧渲染层零改动）。详见 `docs/installer-compat.md`。
 
 （已收口：2026-11-21 2.5.7 正式版发版轮将更新错误归类补口条目并入 [2.5.7] 节。）
 

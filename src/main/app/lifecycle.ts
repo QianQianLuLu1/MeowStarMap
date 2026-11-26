@@ -27,6 +27,10 @@ import { applyCustomDirectories } from './custom-dirs'
 import { ensureDesktopShortcut } from './desktop-shortcut'
 import { registerMediaProtocol } from './media-protocol'
 import { createMainWindow, getMainWindow } from './window-manager'
+import {
+  runLegacyMigrationIfPending,
+  type LegacyMigrationResult
+} from '../database/legacy-migration'
 import { setupIPC, injectCorruptedMarkers } from './ipc-setup'
 import { applyUITheme, setupThemeListener } from './theme'
 // sync-integration 阶段 4：NikkiSync HTTPS 同步服务器装配与自启
@@ -276,6 +280,13 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     // scanner / media worker 为惰性启动，启动期 worker 为 null，stopWorkerForRestore 同样是安全的 no-op。
     ctx.dbManager.setScannerWorkerBridge(ctx.scannerWorkerBridge)
     ctx.dbManager.setMediaWorkerBridge(ctx.mediaWorkerBridge)
+    // 旧版（wxnn-photo-manager）数据迁移：安装器写入标记后，在数据库初始化前合并旧库
+    let legacyMigration: LegacyMigrationResult | null = null
+    try {
+      legacyMigration = runLegacyMigrationIfPending()
+    } catch (err) {
+      logStartupError('legacyMigration', err)
+    }
     try {
       bootMark('before dbManager.initialize()')
       await ctx.dbManager.initialize()
@@ -391,6 +402,18 @@ export async function bootstrapApplication(ctx: AppContext): Promise<void> {
     bootMark('before createMainWindow()')
     await createMainWindow(ctx)
     bootMark('after createMainWindow()')
+
+    if (legacyMigration !== null && legacyMigration.errors.length > 0) {
+      void dialog.showMessageBox({
+        type: 'warning',
+        title: t('main.legacyMigration.dialogTitle'),
+        message: t('main.legacyMigration.dialogMessage', {
+          count: String(legacyMigration.errors.length)
+        }),
+        detail: t('main.legacyMigration.dialogDetail', { report: legacyMigration.reportPath }),
+        buttons: [t('main.dialog.defaultOk')]
+      })
+    }
     // G1-F3（审查修复轮）：首窗可用即退出启动期——NikkiSync 长初始化（~14s）期间的
     // 游离 rejection 不得再被致命化弹框退出（窗口已可用，应用事实上已就绪）。
     markStartupSettled()

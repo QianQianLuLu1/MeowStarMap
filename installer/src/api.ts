@@ -11,6 +11,11 @@ export function getInstallProgress(): Promise<{ percent: number; message: string
   return invoke<{ percent: number; message: string }>('get_install_progress')
 }
 
+/** 读取本次安装的日志（逐行）。 */
+export function getInstallLog(): Promise<string[]> {
+  return invoke<string[]>('get_install_log')
+}
+
 /** 执行安装/覆盖升级；返回执行日志。 */
 export function startInstall(options: InstallOptions): Promise<InstallSummary> {
   return invoke<InstallSummary>('start_install', { options })
@@ -24,6 +29,11 @@ export function cancelInstall(): Promise<void> {
 /** 卸载当前安装。 */
 export function uninstall(): Promise<void> {
   return invoke<void>('uninstall')
+}
+
+/** 关闭安装器进程（避免只关 WebView 留下白屏窗口）。 */
+export function closeInstaller(): Promise<void> {
+  return invoke<void>('close_installer')
 }
 
 /** 安装完成后启动应用。 */
