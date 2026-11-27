@@ -1,6 +1,6 @@
 [package]
 name = "meowstarmap-installer"
-version = "0.1.0"
+version = "2.5.7"
 description = "MeowStarMap custom installer (Tauri)"
 authors = ["MeowStarMap"]
 edition = "2021"

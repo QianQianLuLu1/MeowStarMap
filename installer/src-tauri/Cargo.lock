@@ -1893,7 +1893,7 @@ dependencies = [
 
 [[package]]
 name = "meowstarmap-installer"
-version = "0.1.0"
+version = "2.5.7"
 dependencies = [
  "serde",
  "serde_json",
