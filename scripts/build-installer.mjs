@@ -4,7 +4,7 @@
  *   1. 从 win-unpacked 生成 payload.zip + sha256 清单；
  *   2. 调用 tauri build --no-bundle 产出安装器 exe；
  *   3. 复制为 release/MeowStarMap-Installer-<version>.exe；
- *   4. 生成 latest-installer.yml（electron-updater 兼容，指向安装器）。
+ *   4. 生成正式 latest.yml 与兼容 latest-installer.yml（均指向 Tauri 安装器）。
  *
  * 用法（仓库根目录）：
  *   node scripts/build-installer.mjs
@@ -17,10 +17,10 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
+import { embedPayload } from './installer-payload.mjs'
 
 const root = process.cwd()
 const installerDir = path.join(root, 'installer')
-
 
 function argValue(name, fallback) {
   const prefix = `--${name}=`
@@ -55,7 +55,9 @@ if (!fs.existsSync(path.join(installerDir, 'node_modules'))) {
 }
 
 if (!fs.existsSync(path.join(unpacked, 'resources', 'app.asar'))) {
-  fail(`win-unpacked 不存在或缺 resources/app.asar（${unpacked}）；请先执行 npm run build 并 electron-builder --win --dir`)
+  fail(
+    `win-unpacked 不存在或缺 resources/app.asar（${unpacked}）；请先执行 npm run build 并 electron-builder --win --dir`
+  )
 }
 
 console.log(`[build-installer] 载荷源: ${unpacked}`)
@@ -86,7 +88,13 @@ const tauriCli = path.join(installerDir, 'node_modules', '@tauri-apps', 'cli', '
 if (!fs.existsSync(tauriCli)) fail(`未找到 tauri CLI: ${tauriCli}`)
 run(process.execPath, [tauriCli, 'build', '--no-bundle'], { cwd: installerDir, env })
 
-const builtExe = path.join(installerDir, 'src-tauri', 'target', 'release', 'meowstarmap-installer.exe')
+const builtExe = path.join(
+  installerDir,
+  'src-tauri',
+  'target',
+  'release',
+  'meowstarmap-installer.exe'
+)
 if (!fs.existsSync(builtExe)) {
   fail(`未找到构建产物: ${builtExe}`)
 }
@@ -120,39 +128,6 @@ try {
   throw err
 }
 
-function embedPayload(targetExe, payloadFile) {
-  const manifestFile = `${payloadFile}.json`
-  if (!fs.existsSync(manifestFile)) {
-    throw new Error(`缺少载荷清单: ${manifestFile}`)
-  }
-  const manifest = fs.readFileSync(manifestFile)
-  const tempExe = `${targetExe}.embedding`
-  fs.copyFileSync(targetExe, tempExe)
-  const out = fs.openSync(tempExe, 'a')
-  const input = fs.openSync(payloadFile, 'r')
-  const size = fs.fstatSync(input).size
-  const buffer = Buffer.allocUnsafe(8 * 1024 * 1024)
-  let position = 0
-  while (position < size) {
-    const read = fs.readSync(input, buffer, 0, Math.min(buffer.length, size - position), position)
-    if (read <= 0) break
-    fs.writeSync(out, buffer, 0, read)
-    position += read
-  }
-  fs.closeSync(input)
-  fs.writeSync(out, manifest)
-  const footer = Buffer.alloc(24)
-  footer.writeBigUInt64LE(BigInt(size), 0)
-  footer.writeBigUInt64LE(BigInt(manifest.length), 8)
-  footer.write('MEOWPAY1', 16, 'ascii')
-  fs.writeSync(out, footer)
-  fs.closeSync(out)
-  fs.renameSync(tempExe, targetExe)
-  console.log(
-    `[build-installer] ✓ 已内嵌载荷 ${(size / 1024 / 1024).toFixed(1)} MB + 清单 ${manifest.length} B`
-  )
-}
-
 // 运行时安装器会在自身目录查找 payload.zip；发布前把载荷放到安装器 exe 同级（兼容旧用法）
 const releasePayload = path.join(releaseDir, 'payload.zip')
 if (fs.existsSync(payloadOut)) {
@@ -160,7 +135,8 @@ if (fs.existsSync(payloadOut)) {
   console.log(`[build-installer] ✓ 载荷: ${path.relative(root, releasePayload)}`)
 }
 
-const latestYml = path.join(releaseDir, 'latest-installer.yml')
+const latestYml = path.join(releaseDir, 'latest.yml')
+const legacyLatestYml = path.join(releaseDir, 'latest-installer.yml')
 const tsxCli = path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 if (!fs.existsSync(tsxCli)) fail(`未找到 tsx CLI: ${tsxCli}`)
 run(process.execPath, [
@@ -170,5 +146,7 @@ run(process.execPath, [
   `--version=${version}`,
   `--out=${latestYml}`
 ])
-console.log(`[build-installer] ✓ 更新元数据: ${path.relative(root, latestYml)}`)
+fs.copyFileSync(latestYml, legacyLatestYml)
+console.log(`[build-installer] ✓ 正式更新元数据: ${path.relative(root, latestYml)}`)
+console.log(`[build-installer] ✓ 兼容更新元数据: ${path.relative(root, legacyLatestYml)}`)
 console.log('[build-installer] 完成')

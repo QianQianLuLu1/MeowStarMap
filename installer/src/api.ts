@@ -7,8 +7,12 @@ export function detectState(): Promise<InstallerState> {
 }
 
 /** 读取安装进度的最新快照（事件通道不可用时的兜底轮询）。 */
-export function getInstallProgress(): Promise<{ percent: number; message: string }> {
-  return invoke<{ percent: number; message: string }>('get_install_progress')
+export function getInstallProgress(): Promise<{
+  percent: number
+  message: string
+  cancellable?: boolean
+}> {
+  return invoke<{ percent: number; message: string; cancellable?: boolean }>('get_install_progress')
 }
 
 /** 读取本次安装的日志（逐行）。 */

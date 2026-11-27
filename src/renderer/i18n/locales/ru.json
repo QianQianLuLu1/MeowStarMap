@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "Автоматический обновитель не инициализирован (в dev-сборках пропускается по умолчанию)",
+      "updateInstallerNotReady": "Установщик обновления не готов. Скачайте обновление повторно.",
       "databaseNotInit": ""
     },
     "favorites": {

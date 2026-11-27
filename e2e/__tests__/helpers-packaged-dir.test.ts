@@ -8,7 +8,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { packagedAppDir } from '../helpers'
+import { assertPackagedArtifactFreshness, packagedAppDir } from '../helpers'
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const ENV_KEY = 'MEOWSTARMAP_E2E_PACKAGED_DIR'
@@ -45,5 +45,16 @@ describe('packagedAppDir 产物目录覆盖', () => {
     const absolute = path.resolve(ROOT_DIR, 'elsewhere', 'win-unpacked')
     process.env[ENV_KEY] = absolute
     expect(packagedAppDir()).toBe(absolute)
+  })
+})
+
+describe('packaged artifact freshness', () => {
+  it('同版本旧产物不得冒充当前源码构建', () => {
+    expect(() => assertPackagedArtifactFreshness(1_000, 5_000)).toThrow(/陈旧/)
+  })
+
+  it('产物不早于源码时放行，并容忍 2 秒文件系统精度', () => {
+    expect(() => assertPackagedArtifactFreshness(5_000, 5_000)).not.toThrow()
+    expect(() => assertPackagedArtifactFreshness(4_500, 5_000)).not.toThrow()
   })
 })

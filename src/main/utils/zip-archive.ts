@@ -96,30 +96,19 @@ export function createZipFromDirectory(
     const output = fs.createWriteStream(targetPath)
     const created = createArchiveSafe(opts)
     if (!created.archive) {
-      output.destroy()
-      resolve(
-        fail(
-          t('main.zip.error.writeFailed', {
-            reason: created.error instanceof Error ? created.error.message : String(created.error)
-          })
-        )
+      const result = fail(
+        t('main.zip.error.writeFailed', {
+          reason: created.error instanceof Error ? created.error.message : String(created.error)
+        })
       )
+      output.once('close', () => resolve(result))
+      output.destroy()
       return
     }
     const archive = created.archive
 
     let settled = false
-
-    // 超时兜底：模拟卡死场景也必须让调用方拿到结果
-    const timer = setTimeout(() => {
-      try {
-        archive.abort()
-      } catch {
-        // abort 失败不影响超时返回
-      }
-      output.destroy()
-      done(fail(t('main.zip.error.timeout', { ms: String(timeoutMs) })))
-    }, timeoutMs)
+    let pendingFailure: CreateZipResult | undefined
 
     // 唯一出口：任何分支都只 resolve 一次
     const done = (result: CreateZipResult): void => {
@@ -129,6 +118,24 @@ export function createZipFromDirectory(
       resolve(result)
     }
 
+    // 失败必须先等文件句柄真正关闭，避免调用方清理临时目录时仍有异步写入。
+    const failAfterClose = (result: CreateZipResult): void => {
+      if (pendingFailure) return
+      pendingFailure = result
+      if (output.closed) done(result)
+      else output.destroy()
+    }
+
+    // 超时兜底：模拟卡死场景也必须让调用方拿到结果
+    const timer = setTimeout(() => {
+      try {
+        archive.abort()
+      } catch {
+        // abort 失败不影响超时返回
+      }
+      failAfterClose(fail(t('main.zip.error.timeout', { ms: String(timeoutMs) })))
+    }, timeoutMs)
+
     archive.on('error', (err) => {
       // 与 output-error / timeout 分支对称：先 abort archive 停掉内部队列，
       // 再 destroy 输出流——只 destroy output 会让 archiver 句柄继续存活
@@ -137,8 +144,7 @@ export function createZipFromDirectory(
       } catch {
         // 忽略
       }
-      output.destroy()
-      done(fail(t('main.zip.error.writeFailed', { reason: err.message })))
+      failAfterClose(fail(t('main.zip.error.writeFailed', { reason: err.message })))
     })
     output.on('error', (err) => {
       try {
@@ -146,9 +152,13 @@ export function createZipFromDirectory(
       } catch {
         // 忽略
       }
-      done(fail(t('main.zip.error.writeFailed', { reason: err.message })))
+      failAfterClose(fail(t('main.zip.error.writeFailed', { reason: err.message })))
     })
     output.on('close', () => {
+      if (pendingFailure) {
+        done(pendingFailure)
+        return
+      }
       try {
         if (fs.statSync(targetPath).size === 0) {
           done(fail(t('main.zip.error.emptyArchive')))
@@ -164,8 +174,7 @@ export function createZipFromDirectory(
     archive.pipe(output)
     archive.directory(sourceDir, false)
     void archive.finalize().catch((err: unknown) => {
-      output.destroy()
-      done(
+      failAfterClose(
         fail(
           t('main.zip.error.writeFailed', {
             reason: err instanceof Error ? err.message : String(err)

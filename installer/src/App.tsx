@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { closeInstaller, detectState, startInstall } from './api'
 import type { InstallOptions, InstallSummary, InstallerState } from './types'
 import WelcomeStep from './steps/WelcomeStep'
-import OptionsStep from './steps/OptionsStep'
+import OptionsStep, { isUsablePath } from './steps/OptionsStep'
 import ProgressStep from './steps/ProgressStep'
 import FinishStep from './steps/FinishStep'
 
@@ -39,14 +39,10 @@ const App = (): React.JSX.Element => {
     detectState()
       .then((s) => {
         setState(s)
-        // 中文/问号等异常路径在部分机器会乱码或不可用；非 ASCII 或含非法字符的旧路径直接回落英文默认目录
-        const asciiDir =
-          s.installDir !== null && /^[\x20-\x7E]+$/.test(s.installDir) && !/[?*<>|"]/.test(s.installDir)
-            ? s.installDir
-            : null
+        const usableDir = s.installDir !== null && isUsablePath(s.installDir) ? s.installDir : null
         setOptions((prev) => ({
           ...prev,
-          installDir: asciiDir ?? s.defaultInstallDir ?? ''
+          installDir: usableDir ?? s.defaultInstallDir ?? ''
         }))
       })
       .catch((err: unknown) => setError(String(err)))
@@ -92,9 +88,7 @@ const App = (): React.JSX.Element => {
       </aside>
 
       <main className="panel">
-        {step === 0 && (
-          <WelcomeStep state={state} error={error} onNext={() => setStep(1)} />
-        )}
+        {step === 0 && <WelcomeStep state={state} error={error} onNext={() => setStep(1)} />}
         {step === 1 && (
           <OptionsStep
             state={state}
@@ -106,7 +100,7 @@ const App = (): React.JSX.Element => {
         {step === 2 && <ProgressStep />}
         {step === 2 && error !== null && (
           <>
-            <div className="error">安装失败：{error}（已回滚到安装前状态）</div>
+            <div className="error">安装失败：{error}</div>
             <div className="actions">
               <button
                 type="button"
@@ -122,7 +116,11 @@ const App = (): React.JSX.Element => {
           </>
         )}
         {step === 3 && summary !== null && (
-          <FinishStep summary={summary} silent={state?.silent ?? false} onClose={() => void closeInstaller()} />
+          <FinishStep
+            summary={summary}
+            silent={state?.silent ?? false}
+            onClose={() => void closeInstaller()}
+          />
         )}
       </main>
     </div>

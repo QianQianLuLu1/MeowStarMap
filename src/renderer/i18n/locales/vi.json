@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "Trình cập nhật tự động chưa được khởi tạo (bản dev bỏ qua theo mặc định)",
+      "updateInstallerNotReady": "Trình cài đặt bản cập nhật chưa sẵn sàng. Vui lòng tải lại bản cập nhật.",
       "databaseNotInit": ""
     },
     "favorites": {

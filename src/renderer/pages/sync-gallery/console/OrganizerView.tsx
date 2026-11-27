@@ -45,12 +45,12 @@ export const OrganizerView: React.FC<OrganizerViewProps> = ({ onEnabledChange })
   const { showError } = useErrorToast()
   /** 卸载后作废在途轮询：切走视图即卸载，慢响应不得回写已卸载组件。 */
   const aliveRef = useRef(true)
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
       aliveRef.current = false
-    },
-    []
-  )
+    }
+  }, [])
   // K8：整理队列（破坏性能力，开关默认关）。null = 未拉到/不可用 ⇒ 队列区显示不可用而非报错
   const [organizerEnabled, setOrganizerEnabled] = useState(false)
   const [organizerQueue, setOrganizerQueue] = useState<NikkiSyncOrganizerViewInfo | null>(null)

@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "主窗口未初始化",
       "updaterNotInit": "自动更新器未初始化（开发版默认跳过）",
+      "updateInstallerNotReady": "更新安装器尚未就绪，请重新下载更新。",
       "databaseNotInit": "数据库未初始化"
     },
     "favorites": {

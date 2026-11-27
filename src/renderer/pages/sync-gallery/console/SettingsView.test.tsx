@@ -8,8 +8,10 @@
  *
  * 运行：npx vitest run src/renderer/pages/sync-gallery/console/SettingsView.test.tsx
  */
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { screen, fireEvent, waitFor } from '@testing-library/react'
+import { act, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 import { SettingsView } from './SettingsView'
 import {
@@ -18,6 +20,7 @@ import {
   installElectronApi,
   mockShowMessage,
   serverApi,
+  makeSyncAccounts,
   settingsSet,
   dialogShowMessageBox,
   appRelaunch,
@@ -29,6 +32,7 @@ import {
   AUTOSTART_TOGGLE_NAME
 } from './sync-console-test-utils'
 import { useMediaStore } from '../../../stores/mediaStore'
+import { GlobalToastContext } from '../../../components/common/ToastProvider'
 
 const SETTING_SYNC_ENABLED = 'nikkisync.syncServerEnabled'
 const GALLERY_SOURCE_TOGGLE_NAME = '图库数据源使用 NikkiSync 资产库'
@@ -46,6 +50,57 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
+})
+
+describe('SettingsView StrictMode 生命周期', () => {
+  it('setup → cleanup → setup 后仍接受异步目录与账号响应', async () => {
+    const directoryResolvers: Array<(value: unknown) => void> = []
+    const accountResolvers: Array<(value: unknown) => void> = []
+    serverApi.getExtraDirectories.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          directoryResolvers.push(resolve)
+        })
+    )
+    serverApi.getSyncAccounts.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          accountResolvers.push(resolve)
+        })
+    )
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <StrictMode>
+            <GlobalToastContext.Provider value={mockShowMessage}>
+              <SettingsView />
+            </GlobalToastContext.Provider>
+          </StrictMode>
+        )
+      })
+
+      await waitFor(() => {
+        expect(serverApi.getExtraDirectories).toHaveBeenCalledTimes(2)
+        expect(serverApi.getSyncAccounts).toHaveBeenCalledTimes(2)
+      })
+      await act(async () => {
+        for (const resolve of directoryResolvers) {
+          resolve({ directories: [{ id: 'dir_1', path: 'D:\\ExtraPhotos', mode: 'native' }] })
+        }
+        for (const resolve of accountResolvers) resolve(makeSyncAccounts())
+      })
+
+      expect(await screen.findByText('额外照片目录')).toBeInTheDocument()
+      expect(await screen.findByText('同步账号')).toBeInTheDocument()
+      expect(await screen.findByText('UID 10001')).toBeInTheDocument()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
 })
 
 describe('SettingsView 阶段 4：图库数据源开关（(j)-(l) 随迁）', () => {

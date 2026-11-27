@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "El actualizador automático no está inicializado (se omite de forma predeterminada en versiones de desarrollo)",
+      "updateInstallerNotReady": "El instalador de actualización no está listo. Vuelve a descargar la actualización.",
       "databaseNotInit": ""
     },
     "favorites": {

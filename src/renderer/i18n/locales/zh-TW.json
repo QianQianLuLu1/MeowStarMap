@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "自動更新器未初始化（開發版預設跳過）",
+      "updateInstallerNotReady": "更新安裝程式尚未就緒，請重新下載更新。",
       "databaseNotInit": ""
     },
     "favorites": {

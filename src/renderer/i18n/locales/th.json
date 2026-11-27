@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "ตัวอัปเดตอัตโนมัติยังไม่ถูกเริ่มต้น (จะข้ามไปตามค่าเริ่มต้นในรุ่นนักพัฒนา)",
+      "updateInstallerNotReady": "ตัวติดตั้งอัปเดตยังไม่พร้อม โปรดดาวน์โหลดอัปเดตอีกครั้ง",
       "databaseNotInit": ""
     },
     "favorites": {

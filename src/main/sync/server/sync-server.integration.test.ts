@@ -599,6 +599,65 @@ describe('sync server (integration)', () => {
     expect(body.fullResyncRequired).toBe(false)
   })
 
+  it('未鉴权 POST /v1/pair 的失败日志转义 deviceId 中的 CR/LF，禁止伪造日志行', async () => {
+    const warnings: string[] = []
+    const pairing = new PairingService({
+      sessions: {
+        createSession: async () => {},
+        consumeSession: async () => 'missing'
+      },
+      devices: {
+        upsertPairDevice: async () => {},
+        ensureServerIdentity: async () => ({
+          serverId: 'wxnn-integration',
+          serverName: 'MeowStarMap Test'
+        })
+      },
+      identity: {
+        getOrCreateTlsIdentity: () => ({
+          keyPem: 'unused',
+          certPem: 'unused',
+          fingerprintSha256: 'a'.repeat(64),
+          createdAt: new Date(NOW).toISOString()
+        }),
+        getOrCreateServerIdentity: () => ({
+          publicKeyPem: 'unused',
+          privateKeyPem: 'unused'
+        })
+      },
+      now: () => NOW,
+      logger: {
+        info: () => {},
+        warn: (message) => warnings.push(message)
+      }
+    })
+    const originalRedeemToken = services.redeemToken
+    services.redeemToken = (request) => pairing.redeemToken(request)
+    try {
+      const deviceId = 'android_remote\r\n[NikkiSync] forged warning'
+      const body = Buffer.from(
+        JSON.stringify({
+          pairingToken: 'not-valid',
+          device: {
+            deviceId,
+            deviceName: 'Remote Phone',
+            platform: 'android',
+            publicKey: DEVICE_PUBLIC_B64URL,
+            appVersion: '1.0.0'
+          }
+        })
+      )
+      const response = await httpsRequest(port, 'POST', '/v1/pair', {}, body)
+      expect(response.status).toBe(401)
+      const line = warnings.find((message) => message.includes('pairing failed'))
+      expect(line).toBeDefined()
+      expect(line).not.toMatch(/[\r\n]/)
+      expect(line).toContain('android_remote\\r\\n[NikkiSync] forged warning')
+    } finally {
+      services.redeemToken = originalRedeemToken
+    }
+  })
+
   it('maps PairingError codes to 410/401 and completes a full pairing handshake', async () => {
     // 一次性会话存储（真实 SyncPairingRepository 行为的内存替身）
     const sessions = new Map<string, { expiresAt: string; used: boolean }>()

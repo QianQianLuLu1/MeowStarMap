@@ -1,13 +1,15 @@
-// @core-change: 审查修复轮——logs/crashes 目录读取失败从静默吞掉改为 manifest.missing 如实登记
+// @core-change: 审查修复轮——诊断日志复制失败如实登记，高亮提取改为有界流式读取并保留轮转后的新尾部
 import fs from 'fs'
 import os from 'os'
 import path from 'path'
+import { StringDecoder } from 'node:string_decoder'
 import { app, shell } from 'electron'
 import { logger, FaultRecord, getLogDirectory, getEmergencyLogCandidates } from '../utils/logger'
 import { createZipFromDirectory } from '../utils/zip-archive'
 import { getStartupLogPathValue, getDiagLogPathValue } from '../utils/startup-diagnostic'
 import { BOOT_ID } from '../utils/boot-id'
 import type { LogExportOptions } from '../../shared/types/electron-api'
+import { FileSystemError } from '../../shared/errors/app-error'
 import { CHROMIUM_LOG_BASENAME } from '../utils/user-diag-path'
 import {
   getForensicsRoot,
@@ -24,6 +26,9 @@ import { t } from '../i18n'
  * 2MB 足够覆盖「GPU process exited unexpectedly: exit_code=…」与其后的 FATAL。
  */
 export const DIAG_LOG_TAIL_BYTES = 2 * 1024 * 1024
+const HIGHLIGHT_READ_CHUNK_BYTES = 64 * 1024
+const HIGHLIGHT_LINE_MAX_CHARS = 64 * 1024
+const HIGHLIGHT_MAX_LINES = 500
 
 // 读取所有故障记录（按时间倒序）
 // 业务决策：从所有 faults-*.jsonl 文件读取，文件名按日期倒序遍历
@@ -210,7 +215,12 @@ export async function exportLogsAsZip(
       await fs.promises.mkdir(logsTarget, { recursive: true })
       for (const f of logFiles) {
         if (f.endsWith('.log') || f.endsWith('.jsonl')) {
-          await fs.promises.copyFile(path.join(logDir, f), path.join(logsTarget, f))
+          try {
+            await fs.promises.copyFile(path.join(logDir, f), path.join(logsTarget, f))
+          } catch (err) {
+            unreadable.add(`logs/${f}`)
+            logger.warn(`diagnostic bundle: skipped logs/${f}`, err)
+          }
         }
       }
     } catch (err) {
@@ -244,7 +254,10 @@ export async function exportLogsAsZip(
       if (fs.existsSync(startupLogPath)) {
         await fs.promises.copyFile(startupLogPath, path.join(tmpDir, 'startup-errors.log'))
       }
-    } catch {}
+    } catch (err) {
+      unreadable.add('startup-errors.log')
+      logger.warn('diagnostic bundle: skipped startup-errors.log', err)
+    }
 
     // 3.5 复制取证根里的 Chromium 原生日志
     //     原生 FATAL（如 "GPU process isn't usable. Goodbye."）不经过 Node，
@@ -407,7 +420,7 @@ export async function exportLogsAsZip(
       const entries = await fs.promises.readdir(tmpDir, { withFileTypes: true })
       const names = entries.map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
       contents = [...names.sort(), 'manifest.json']
-      missing = expectedOptional
+      missing = Array.from(new Set([...expectedOptional, ...unreadable]))
         .filter((name) => !names.includes(name))
         .map((name) => {
           const fromFallback = Object.entries(fallbackAlias).some(
@@ -472,10 +485,26 @@ async function copyBounded(src: string, dst: string, maxBytes: number): Promise<
   }
   const handle = await fs.promises.open(src, 'r')
   try {
-    const buf = Buffer.alloc(maxBytes)
-    const { bytesRead } = await handle.read(buf, 0, maxBytes, size - maxBytes)
-    // stat 与 read 之间文件可能被轮转缩小：按实读字节数截断，避免 NUL 填充尾巴入包
-    await fs.promises.writeFile(dst, buf.subarray(0, bytesRead))
+    let before = await handle.stat()
+    // stat 与 read 之间文件可能被轮转截断；大小变化时按新大小重取尾部，避免旧位置读出空包。
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const length = Math.min(before.size, maxBytes)
+      const start = before.size - length
+      const buf = Buffer.alloc(length)
+      let bytesRead = 0
+      while (bytesRead < length) {
+        const result = await handle.read(buf, bytesRead, length - bytesRead, start + bytesRead)
+        if (result.bytesRead === 0) break
+        bytesRead += result.bytesRead
+      }
+      const after = await handle.stat()
+      if (after.size === before.size) {
+        await fs.promises.writeFile(dst, buf.subarray(0, bytesRead))
+        return
+      }
+      before = after
+    }
+    throw new FileSystemError('log changed repeatedly while reading tail')
   } finally {
     await handle.close().catch(() => {})
   }
@@ -499,17 +528,52 @@ async function copyChromiumWithHighlights(
   }
   await copyBounded(src, dst, maxBytes)
   try {
-    const content = await fs.promises.readFile(src, 'utf-8')
-    const lines = content
-      .split('\n')
-      .filter((line) => /FATAL|exit_code/.test(line))
-      .slice(0, 500)
+    const lines = await readChromiumHighlights(src)
     if (lines.length > 0) {
       await fs.promises.writeFile(highlightsDst, lines.join('\n') + '\n', 'utf-8')
     }
   } catch {
     // highlights 只是补位证据，失败不阻断导出
   }
+}
+
+/** 有界流式扫描：文件再大也只保留少量命中行；单行超过上限时截断，避免无换行日志撑爆内存。 */
+async function readChromiumHighlights(src: string): Promise<string[]> {
+  const handle = await fs.promises.open(src, 'r')
+  const highlights: string[] = []
+  const chunk = Buffer.alloc(HIGHLIGHT_READ_CHUNK_BYTES)
+  const decoder = new StringDecoder('utf8')
+  let pending = ''
+  let discardingLongLine = false
+  const collectLine = (line: string): void => {
+    if (highlights.length >= HIGHLIGHT_MAX_LINES || !/FATAL|exit_code/.test(line)) return
+    highlights.push(line.slice(0, HIGHLIGHT_LINE_MAX_CHARS))
+  }
+  try {
+    for (;;) {
+      const { bytesRead } = await handle.read(chunk, 0, chunk.length, null)
+      if (bytesRead === 0) break
+      pending += decoder.write(chunk.subarray(0, bytesRead))
+      let newlineIndex = pending.indexOf('\n')
+      while (newlineIndex !== -1) {
+        const line = pending.slice(0, newlineIndex).replace(/\r$/, '')
+        pending = pending.slice(newlineIndex + 1)
+        if (!discardingLongLine) collectLine(line)
+        discardingLongLine = false
+        newlineIndex = pending.indexOf('\n')
+      }
+      if (pending.length > HIGHLIGHT_LINE_MAX_CHARS) {
+        pending = ''
+        discardingLongLine = true
+      }
+      if (highlights.length >= HIGHLIGHT_MAX_LINES) break
+    }
+    pending += decoder.end()
+    if (!discardingLongLine && pending.length > 0) collectLine(pending.replace(/\r$/, ''))
+  } finally {
+    await handle.close().catch(() => {})
+  }
+  return highlights
 }
 
 /** 清理临时诊断目录（递归：含 logs/ crashes/ nikkisync/ 子目录，不留残留） */

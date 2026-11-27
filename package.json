@@ -49,7 +49,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
     "format:check": "prettier --check --end-of-line auto \"src/**/*.{ts,tsx,js,jsx,json,css,md}\" \"scripts/**/*.{ts,js}\" \".storybook/**/*.{ts,tsx}\" \"*.{ts,js,json,md}\"",
-    "typecheck": "tsc -b && tsc -p tsconfig.scripts.json",
+    "typecheck": "tsc -b && tsc -p tsconfig.scripts.json && tsc --noEmit -p installer/tsconfig.json",
     "test": "vitest run",
     "test:precommit": "tsx scripts/run-precommit-tests.ts",
     "test:watch": "vitest",

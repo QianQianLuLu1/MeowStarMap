@@ -57,10 +57,30 @@ fs.rmSync(out, { force: true })
 fs.mkdirSync(path.dirname(out), { recursive: true })
 
 console.log(`[build-payload] 打包 ${unpacked} -> ${out}`)
-execFileSync('tar', ['-a', '-c', '-f', out, '-C', unpacked, '.'], { stdio: 'inherit' })
+execFileSync(
+  'tar',
+  ['-a', '-c', '-f', out.replaceAll('\\', '/'), '-C', unpacked.replaceAll('\\', '/'), '.'],
+  { stdio: 'inherit' }
+)
 
-const buffer = fs.readFileSync(out)
-const sha256 = createHash('sha256').update(buffer).digest('hex')
+const fd = fs.openSync(out, 'r')
+let sha256
+try {
+  const size = fs.fstatSync(fd).size
+  const hash = createHash('sha256')
+  const buffer = Buffer.allocUnsafe(1024 * 1024)
+  let position = 0
+  while (position < size) {
+    const read = fs.readSync(fd, buffer, 0, Math.min(buffer.length, size - position), position)
+    if (read <= 0) throw new Error(`读取载荷失败: ${out}`)
+    hash.update(buffer.subarray(0, read))
+    position += read
+  }
+  sha256 = hash.digest('hex')
+} finally {
+  fs.closeSync(fd)
+}
+const payloadSize = fs.statSync(out).size
 
 function directorySize(dir) {
   let total = 0
@@ -75,7 +95,8 @@ function directorySize(dir) {
 const manifest = {
   version,
   file: path.basename(out),
-  size: buffer.length,
+  format: 'zip',
+  size: payloadSize,
   unpackedSize: directorySize(unpacked),
   sha256,
   createdAt: new Date().toISOString()
@@ -83,5 +104,5 @@ const manifest = {
 fs.writeFileSync(`${out}.json`, JSON.stringify(manifest, null, 2), 'utf8')
 
 console.log(
-  `[build-payload] ✓ ${path.basename(out)} ${(buffer.length / 1024 / 1024).toFixed(1)} MB sha256=${sha256.slice(0, 12)}…`
+  `[build-payload] ✓ ${path.basename(out)} ${(payloadSize / 1024 / 1024).toFixed(1)} MB sha256=${sha256.slice(0, 12)}…`
 )

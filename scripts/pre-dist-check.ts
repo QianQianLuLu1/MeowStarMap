@@ -673,12 +673,20 @@ function findFirstFile(base: string, subDirs: string[], nameRe: RegExp): string 
  */
 export type NikkiSyncPackedVerdict = 'assert' | 'fail' | 'skip'
 
+export function isReleaseBuild(): boolean {
+  return (
+    process.env.MEOW_RELEASE_BUILD === '1' || !!process.env.GITHUB_REF?.startsWith('refs/tags/')
+  )
+}
+
 export function nikkiSyncPackedVerdict(input: {
   packedNikkiSyncExists: boolean
   projectNikkiSyncLinkExists: boolean
+  releaseMode?: boolean
 }): NikkiSyncPackedVerdict {
   if (input.packedNikkiSyncExists) return 'assert'
-  return input.projectNikkiSyncLinkExists ? 'fail' : 'skip'
+  if (input.releaseMode === true || input.projectNikkiSyncLinkExists) return 'fail'
+  return 'skip'
 }
 
 /**
@@ -790,12 +798,13 @@ export type StagedIconPackVerdict = 'pass' | 'fail' | 'skip'
 export function stagedIconPackVerdict(input: {
   stagedMissing: boolean
   nikkiSyncLinked: boolean
+  releaseMode?: boolean
 }): StagedIconPackVerdict {
   if (typeof input?.stagedMissing !== 'boolean' || typeof input?.nikkiSyncLinked !== 'boolean') {
     throw new TypeError('stagedIconPackVerdict requires boolean stagedMissing and nikkiSyncLinked')
   }
   if (!input.stagedMissing) return 'pass'
-  return input.nikkiSyncLinked ? 'fail' : 'skip'
+  return input.releaseMode === true || input.nikkiSyncLinked ? 'fail' : 'skip'
 }
 
 /**
@@ -818,7 +827,11 @@ function checkStagedIconPackAssets(): void {
   const scopeDir = path.join(ROOT, 'node_modules', '@nikkisync')
   const scopeDirExists = fs.existsSync(scopeDir)
   const nikkiSyncLinked = countNikkiSyncScopeEntries(scopeDir, scopeDirExists) !== 0
-  const verdict = stagedIconPackVerdict({ stagedMissing: missing.length > 0, nikkiSyncLinked })
+  const verdict = stagedIconPackVerdict({
+    stagedMissing: missing.length > 0,
+    nikkiSyncLinked,
+    releaseMode: isReleaseBuild()
+  })
   if (verdict === 'skip') {
     skip(
       '暂存图标包缺席（未建链环境属预期）：CI/干净克隆无 NikkiSync 检出，stage:nikkisync-pc 已按设计跳过；' +
@@ -1004,7 +1017,8 @@ function checkUnpackedNativeBinaries(): void {
   const scopeDirExists = fs.existsSync(scopeDir)
   const verdict = nikkiSyncPackedVerdict({
     packedNikkiSyncExists: fs.existsSync(nikkisyncRoot),
-    projectNikkiSyncLinkExists: scopeDirExists
+    projectNikkiSyncLinkExists: scopeDirExists,
+    releaseMode: isReleaseBuild()
   })
   if (verdict === 'skip') {
     skip('@nikkisync 未随包（开发机未 `npm run link:nikkisync` 时属预期）')

@@ -48,8 +48,20 @@ function readPackageVersion(projectRoot: string): string {
 
 function sha512Base64(filePath: string): string {
   const hash = createHash('sha512')
-  const buffer = fs.readFileSync(filePath)
-  hash.update(buffer)
+  const fd = fs.openSync(filePath, 'r')
+  try {
+    const size = fs.fstatSync(fd).size
+    const buffer = Buffer.allocUnsafe(1024 * 1024)
+    let position = 0
+    while (position < size) {
+      const read = fs.readSync(fd, buffer, 0, Math.min(buffer.length, size - position), position)
+      if (read <= 0) throw new Error(`读取安装器失败: ${filePath}`)
+      hash.update(buffer.subarray(0, read))
+      position += read
+    }
+  } finally {
+    fs.closeSync(fd)
+  }
   return hash.digest('base64')
 }
 
@@ -77,14 +89,19 @@ export function buildUpdateFeed(argv: string[], projectRoot: string): FeedOption
   const args = parseArgs(argv)
   const installerArg = args.installer
   if (installerArg === undefined || installerArg.trim() === '') {
-    throw new Error('缺少 --installer=<安装器 exe 路径>（例如 --installer=release/MeowStarMap-Setup-2.5.8.exe）')
+    throw new Error(
+      '缺少 --installer=<安装器 exe 路径>（例如 --installer=release/MeowStarMap-Setup-2.5.8.exe）'
+    )
   }
   const installerPath = path.resolve(projectRoot, installerArg)
   if (!fs.existsSync(installerPath)) {
     throw new Error(`安装器不存在: ${installerPath}`)
   }
   const version = args.version ?? readPackageVersion(projectRoot)
-  const outputPath = args.out !== undefined ? path.resolve(projectRoot, args.out) : path.join(path.dirname(installerPath), 'latest.yml')
+  const outputPath =
+    args.out !== undefined
+      ? path.resolve(projectRoot, args.out)
+      : path.join(path.dirname(installerPath), 'latest.yml')
   return {
     installerPath,
     version,
@@ -103,7 +120,18 @@ export function writeUpdateFeed(options: FeedOptions): string {
     sha512: sha512Base64(options.installerPath),
     releaseDate: options.releaseDate
   })
-  fs.writeFileSync(options.outputPath, yml, 'utf8')
+  fs.mkdirSync(path.dirname(options.outputPath), { recursive: true })
+  const tempPath = path.join(
+    path.dirname(options.outputPath),
+    `.${path.basename(options.outputPath)}.tmp-${process.pid}-${Math.random().toString(36).slice(2, 10)}`
+  )
+  try {
+    fs.writeFileSync(tempPath, yml, 'utf8')
+    fs.renameSync(tempPath, options.outputPath)
+  } catch (err) {
+    fs.rmSync(tempPath, { force: true })
+    throw err
+  }
   return options.outputPath
 }
 
@@ -111,9 +139,14 @@ function main(): void {
   const projectRoot = process.cwd()
   const options = buildUpdateFeed(process.argv.slice(2), projectRoot)
   const written = writeUpdateFeed(options)
-  console.log(`[generate-update-feed] 已生成 ${written}（version=${options.version}，安装器=${options.installerPath}）`)
+  console.log(
+    `[generate-update-feed] 已生成 ${written}（version=${options.version}，安装器=${options.installerPath}）`
+  )
 }
 
-if (process.argv[1] !== undefined && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+if (
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))
+) {
   main()
 }

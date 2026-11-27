@@ -42,6 +42,44 @@ export function packagedAppDir(): string {
   return path.isAbsolute(override) ? override : path.join(ROOT_DIR, override)
 }
 
+function newestMtime(root: string): number {
+  let newest = 0
+  const visit = (current: string): void => {
+    const stat = fsSync.statSync(current)
+    newest = Math.max(newest, stat.mtimeMs)
+    if (!stat.isDirectory()) return
+    for (const entry of fsSync.readdirSync(current, { withFileTypes: true }) as Dirent[]) {
+      if (entry.isSymbolicLink()) continue
+      visit(path.join(current, entry.name))
+    }
+  }
+  visit(root)
+  return newest
+}
+
+function currentSourceMtime(): number {
+  let newest = 0
+  for (const relative of [
+    'src',
+    'resources',
+    'scripts',
+    'package.json',
+    'electron.vite.config.ts'
+  ]) {
+    newest = Math.max(newest, newestMtime(path.join(ROOT_DIR, relative)))
+  }
+  return newest
+}
+
+export function assertPackagedArtifactFreshness(artifactMtime: number, sourceMtime: number): void {
+  if (!Number.isFinite(artifactMtime) || !Number.isFinite(sourceMtime) || sourceMtime <= 0) {
+    throw new Error('无法验证打包产物新鲜度：产物或源码时间戳无效')
+  }
+  if (artifactMtime + 2_000 < sourceMtime) {
+    throw new Error('打包产物陈旧：请先执行 npm run dist:win，再运行 e2e:smoke')
+  }
+}
+
 /**
  * 定位 win-unpacked 产物 exe。
  * exe 名跟随 productName（"喵星图"，含中文），禁止硬编码文件名；
@@ -55,6 +93,7 @@ export async function findUnpackedExe(): Promise<string> {
       `未找到 ${path.relative(ROOT_DIR, dir)}/*.exe，请先执行 npm run dist:win 产出打包产物`
     )
   }
+  assertPackagedArtifactFreshness(newestMtime(path.join(dir, 'resources')), currentSourceMtime())
   return exe
 }
 

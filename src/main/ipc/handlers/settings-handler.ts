@@ -1,4 +1,4 @@
-// @core-change: 审查修复轮——settings:set 变更留痕时序修正为「校验通过且写库成功后」发生，失败的变更不再留下未发生的 old→new 时间线
+// @core-change: 审查修复轮——settings:set 变更留痕记录校验归一化后的实际落库值，避免审计值与数据库值不一致
 import { ipcMain } from 'electron'
 import { z } from 'zod'
 import type { HandlerContext } from '../handler-context'
@@ -115,9 +115,10 @@ function writeSettingAndAudit(
   } catch {
     oldReadOk = false
   }
-  ctx.dbManager.setSetting(key, finalValue ?? value)
+  const storedValue = finalValue ?? value
+  ctx.dbManager.setSetting(key, storedValue)
   if (!oldReadOk) return
-  auditSettingChange(ctx, key, value, oldValue)
+  auditSettingChange(ctx, key, storedValue, oldValue)
 }
 
 /**

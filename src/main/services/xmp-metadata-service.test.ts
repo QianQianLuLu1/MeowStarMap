@@ -12,7 +12,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => ({
   close: vi.fn(async () => undefined),
-  read: vi.fn(async () => undefined),
+  read: vi.fn(async (_input: string) => undefined),
   parse: vi.fn(async (): Promise<unknown> => null)
 }))
 
@@ -30,7 +30,19 @@ vi.mock('exifr', () => {
     read = h.read
     parse = h.parse
   }
-  return { default: { Exifr }, Exifr }
+  class FsReader {
+    close = h.close
+    read = () => h.read(this.input)
+    constructor(
+      private input: string,
+      _options: unknown
+    ) {}
+  }
+  return {
+    default: { Exifr },
+    Exifr,
+    fileReaders: new Map([['fs', FsReader]])
+  }
 })
 
 import { readMetadataFromFile } from './xmp-metadata-service'

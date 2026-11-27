@@ -8,11 +8,17 @@ interface OptionsStepProps {
   onInstall: (options: InstallOptions) => void
 }
 
-const isAsciiPath = (value: string): boolean =>
-  /^[\x20-\x7E]+$/.test(value) && !/[?*<>|"]/.test(value)
+export const isUsablePath = (value: string): boolean =>
+  value.trim() !== '' &&
+  ![...value].some((char) => '?*<>|"'.includes(char) || char.charCodeAt(0) <= 0x1f)
 
-const OptionsStep = ({ state, options, onBack, onInstall }: OptionsStepProps): React.JSX.Element => {
-  const initialDir = isAsciiPath(options.installDir)
+const OptionsStep = ({
+  state,
+  options,
+  onBack,
+  onInstall
+}: OptionsStepProps): React.JSX.Element => {
+  const initialDir = isUsablePath(options.installDir)
     ? options.installDir
     : (state?.defaultInstallDir ?? '')
   const [installDir, setInstallDir] = useState(initialDir)
@@ -21,10 +27,10 @@ const OptionsStep = ({ state, options, onBack, onInstall }: OptionsStepProps): R
 
   // 状态是异步加载的：若挂载时路径为空，等默认值/状态到达后补上，避免输入框一直空白
   useEffect(() => {
-    if (installDir.trim() !== '' && isAsciiPath(installDir)) {
+    if (installDir.trim() !== '' && isUsablePath(installDir)) {
       return
     }
-    const fallback = isAsciiPath(options.installDir)
+    const fallback = isUsablePath(options.installDir)
       ? options.installDir
       : (state?.defaultInstallDir ?? '')
     if (fallback !== '' && fallback !== installDir) {

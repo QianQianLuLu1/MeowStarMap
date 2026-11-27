@@ -17,8 +17,14 @@ import { logger } from '../utils/logger'
  */
 export const EXTERNAL_INSTALLER_ARGS = ['--updated', '--force-run'] as const
 
-/** 校验并规范化安装器路径；非法输入抛 AppError。 */
-export function validateInstallerPath(raw: unknown): string {
+interface InstallerFileIdentity {
+  dev: number
+  ino: number
+  size: number
+  mtimeMs: number
+}
+
+function inspectInstallerPath(raw: unknown): { path: string; identity: InstallerFileIdentity } {
   if (typeof raw !== 'string' || raw.trim() === '') {
     throw AppError.validation(t('main.externalInstaller.pathRequired'))
   }
@@ -50,7 +56,24 @@ export function validateInstallerPath(raw: unknown): string {
   if (!linkStat.isFile() || linkStat.size <= 0) {
     throw AppError.validation(t('main.externalInstaller.invalidFile'), { path: resolved })
   }
-  return resolved
+  return {
+    path: resolved,
+    identity: {
+      dev: linkStat.dev,
+      ino: linkStat.ino,
+      size: linkStat.size,
+      mtimeMs: linkStat.mtimeMs
+    }
+  }
+}
+
+/** 校验并规范化安装器路径；非法输入抛 AppError。 */
+export function validateInstallerPath(raw: unknown): string {
+  return inspectInstallerPath(raw).path
+}
+
+function sameInstallerIdentity(a: InstallerFileIdentity, b: InstallerFileIdentity): boolean {
+  return a.dev === b.dev && a.ino === b.ino && a.size === b.size && a.mtimeMs === b.mtimeMs
 }
 
 /**
@@ -61,7 +84,12 @@ export function launchExternalInstaller(
   installerPath: string,
   extraArgs: readonly string[] = []
 ): number {
-  const resolved = validateInstallerPath(installerPath)
+  const first = inspectInstallerPath(installerPath)
+  const resolved = first.path
+  const second = inspectInstallerPath(resolved)
+  if (!sameInstallerIdentity(first.identity, second.identity)) {
+    throw AppError.validation(t('main.externalInstaller.invalidFile'), { path: resolved })
+  }
   const args = [...EXTERNAL_INSTALLER_ARGS, ...extraArgs]
   const child = spawn(resolved, args, {
     detached: true,

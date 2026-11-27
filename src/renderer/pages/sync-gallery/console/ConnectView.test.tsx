@@ -326,6 +326,76 @@ describe('ConnectView（(a)-(i) 自 SyncServicePage 随迁）', () => {
   })
 })
 
+describe('ConnectView 刷新请求代次', () => {
+  it('重启前的旧轮询最后返回时，不得回滚状态、设备、启动阶段与首配二维码', async () => {
+    installElectronApi({
+      overview: { available: true, assets: 0, pairedDevices: 0, firstRun: true }
+    })
+    const statusResolvers: Array<(value: unknown) => void> = []
+    const deviceResolvers: Array<(value: unknown) => void> = []
+    const runtimeResolvers: Array<(value: unknown) => void> = []
+    serverApi.getServerStatus.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          statusResolvers.push(resolve)
+        })
+    )
+    serverApi.getPairedDevices.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          deviceResolvers.push(resolve)
+        })
+    )
+    serverApi.getRuntimeStatus.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          runtimeResolvers.push(resolve)
+        })
+    )
+    renderConnect()
+    await waitFor(() => {
+      expect(serverApi.getServerStatus).toHaveBeenCalledTimes(1)
+      expect(serverApi.getPairedDevices).toHaveBeenCalledTimes(1)
+      expect(serverApi.getRuntimeStatus).toHaveBeenCalledTimes(1)
+    })
+
+    fireEvent.click(await screen.findByTestId('sync-status-restart'))
+    await waitFor(() => {
+      expect(serverApi.restartServer).toHaveBeenCalledTimes(1)
+      expect(serverApi.getServerStatus).toHaveBeenCalledTimes(2)
+      expect(serverApi.getPairedDevices).toHaveBeenCalledTimes(2)
+      expect(serverApi.getRuntimeStatus).toHaveBeenCalledTimes(2)
+    })
+    await act(async () => {
+      statusResolvers[1](makeStatus({ lanHost: '192.168.1.20' }))
+      deviceResolvers[1]([makeDevice({ deviceName: 'New Phone' })])
+      runtimeResolvers[1]({
+        startupStages: [{ stage: 'scanner', at: '2026-10-25T08:00:02.000Z' }]
+      })
+    })
+    expect(await screen.findByText('192.168.1.20:28080')).toBeInTheDocument()
+    expect(await screen.findByText('New Phone')).toBeInTheDocument()
+    expect(await screen.findByText('扫描器')).toBeInTheDocument()
+    expect(await screen.findByTestId('sync-first-run-qr')).toBeInTheDocument()
+
+    await act(async () => {
+      statusResolvers[0](makeStatus({ running: false, lanHost: '192.168.1.10' }))
+      deviceResolvers[0]([makeDevice({ deviceName: 'Old Phone' })])
+      runtimeResolvers[0]({
+        startupStages: [{ stage: 'custom-old', at: '2026-10-25T08:00:01.000Z' }]
+      })
+    })
+
+    expect(screen.getByText('192.168.1.20:28080')).toBeInTheDocument()
+    expect(screen.queryByText('192.168.1.10:28080')).not.toBeInTheDocument()
+    expect(screen.getByText('New Phone')).toBeInTheDocument()
+    expect(screen.queryByText('Old Phone')).not.toBeInTheDocument()
+    expect(screen.getByText('扫描器')).toBeInTheDocument()
+    expect(screen.queryByText('custom-old')).not.toBeInTheDocument()
+    expect(screen.getByTestId('sync-first-run-qr')).toBeInTheDocument()
+  })
+})
+
 describe('ConnectView PC 端分区（N7/F12 随迁）', () => {
   it('渲染 PC 端入口：打开控制页 / 微信画廊启停 / 状态与二维码区', async () => {
     renderConnect()

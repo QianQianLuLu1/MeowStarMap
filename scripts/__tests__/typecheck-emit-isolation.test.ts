@@ -118,17 +118,18 @@ describe('tsc -b 的 emit 必须与 electron-vite 产物树隔离', () => {
     expect(pkg.scripts.typecheck).toContain('tsc -b')
     expect(hook).toContain('npx --no-install tsc -b\n')
     expect(verifySrc).toContain("'tsc', '-b'")
-    // 且都不许带 --noEmit：加了它 typecheck 会以 TS6310 直接失败
-    expect(pkg.scripts.typecheck).not.toContain('--noEmit')
+    // build 模式检查本身不得带 --noEmit；安装器是独立非 composite 项目，允许单独 noEmit。
+    expect(pkg.scripts.typecheck).not.toMatch(/\btsc\s+-b\s+--noEmit\b/)
+    expect(pkg.scripts.typecheck).toContain('tsc --noEmit -p installer/tsconfig.json')
     expect(hook).not.toContain('tsc -b --noEmit')
     expect(verifySrc).not.toMatch(/'tsc',\s*'-b',\s*'--noEmit'/)
   })
 
   it('闸门覆盖面：CI 必须对 e2e 层单独跑类型检查', () => {
-    // 既有空档：npm run typecheck = tsc -b && tsc -p tsconfig.scripts.json，两者都收不到 e2e/
-    // ——根 tsconfig 只 include src/renderer 与 src/common 并 reference src/main，
-    // tsconfig.scripts.json 只收 scripts/。于是 e2e/** 的守卫与用例源码在 CI 上没有类型闸门，
-    // 只能靠本机手动 npm run typecheck:e2e 兜住。
+    // 既有空档：npm run typecheck 的 tsc -b 与 tsconfig.scripts.json 都收不到 e2e/；
+    // 安装器 tsconfig 是独立 noEmit 项目，也不覆盖 e2e/。根 tsconfig 只 include src/renderer
+    // 与 src/common 并 reference src/main，tsconfig.scripts.json 只收 scripts/。于是 e2e/**
+    // 的守卫与用例源码在 CI 上没有类型闸门，只能靠本机手动 npm run typecheck:e2e 兜住。
     const pkg = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf-8')) as {
       scripts: Record<string, string>
     }
@@ -138,7 +139,8 @@ describe('tsc -b 的 emit 必须与 electron-vite 产物树隔离', () => {
     expect(workflow).toContain('npm run typecheck:e2e')
     // 也不得为省事把 e2e 折进 typecheck：那要么给被引用的 composite 项目塞 --noEmit（TS6310），
     // 要么改掉本地 verify / pre-commit 的 tsc -b 覆盖面口径
-    expect(pkg.scripts.typecheck).not.toContain('--noEmit')
+    expect(pkg.scripts.typecheck).not.toMatch(/\btsc\s+-b\s+--noEmit\b/)
+    expect(pkg.scripts.typecheck).not.toContain('tsc --noEmit -p e2e')
   })
 
   it('边界：src/main/tsconfig.json 必须保持严格 JSON 可解析（不得加 // 注释）', () => {

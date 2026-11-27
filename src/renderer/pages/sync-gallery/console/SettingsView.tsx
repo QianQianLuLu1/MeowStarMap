@@ -66,12 +66,12 @@ export const SettingsView: React.FC = () => {
   const { showError } = useErrorToast()
   /** 卸载后作废在途拉取：切走子视图即卸载，慢响应不得回写已卸载组件。 */
   const aliveRef = useRef(true)
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    aliveRef.current = true
+    return () => {
       aliveRef.current = false
-    },
-    []
-  )
+    }
+  }, [])
   const [gallerySource, setGallerySource] = useState<'local' | 'nikkisync'>('local')
   // 阶段 6：上游远端元数据解析开关（默认关——为真即产生对第三方的出站请求）
   const [metadataEnabled, setMetadataEnabled] = useState(false)

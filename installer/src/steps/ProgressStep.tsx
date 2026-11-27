@@ -5,12 +5,14 @@ import { cancelInstall, getInstallLog, getInstallProgress } from '../api'
 interface ProgressPayload {
   percent: number
   message: string
+  cancellable?: boolean
 }
 
 const ProgressStep = (): React.JSX.Element => {
   const [progress, setProgress] = useState<ProgressPayload>({
     percent: 0,
-    message: '准备安装'
+    message: '准备安装',
+    cancellable: true
   })
   const [logs, setLogs] = useState<string[]>([])
   const [canceling, setCanceling] = useState(false)
@@ -23,7 +25,8 @@ const ProgressStep = (): React.JSX.Element => {
           if (!alive) return
           setProgress((prev) => ({
             ...next,
-            percent: Math.max(prev.percent, next.percent)
+            percent: Math.max(prev.percent, next.percent),
+            cancellable: next.cancellable ?? prev.cancellable
           }))
           setLogs(nextLogs)
         })
@@ -36,12 +39,17 @@ const ProgressStep = (): React.JSX.Element => {
     const pending = listen<ProgressPayload>('installer-progress', (event) => {
       setProgress((prev) => ({
         ...event.payload,
-        percent: Math.max(prev.percent, event.payload.percent)
+        percent: Math.max(prev.percent, event.payload.percent),
+        cancellable: event.payload.cancellable ?? prev.cancellable
       }))
     })
     void pending
       .then((fn) => {
-        unlisten = fn
+        if (alive) {
+          unlisten = fn
+        } else {
+          fn()
+        }
       })
       .catch(() => {
         // 事件通道不可用时由轮询兜底
@@ -78,8 +86,17 @@ const ProgressStep = (): React.JSX.Element => {
       </div>
 
       <div className="progress-footer">
-        <p className="lead">取消后会回滚到安装前状态，已安装的旧版本不受影响。</p>
-        <button type="button" className="ghost" disabled={canceling} onClick={() => void handleCancel()}>
+        <p className="lead">
+          {progress.cancellable === false
+            ? '文件替换已进入不可逆提交点，安装将继续完成。'
+            : '取消后会回滚到安装前状态，已安装的旧版本不受影响。'}
+        </p>
+        <button
+          type="button"
+          className="ghost"
+          disabled={canceling || progress.cancellable === false}
+          onClick={() => void handleCancel()}
+        >
           {canceling ? '正在取消…' : '取消安装'}
         </button>
       </div>

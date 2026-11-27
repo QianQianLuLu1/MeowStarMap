@@ -48,7 +48,16 @@ vi.mock('exifr', () => {
     read = vi.fn(async () => undefined)
     parse = vi.fn(() => parse())
   }
-  return { default: { parse }, Exifr }
+  class FsReader {
+    close = vi.fn(async () => undefined)
+    read = vi.fn(async () => undefined)
+    constructor(_input: string, _options: unknown) {}
+  }
+  return {
+    default: { parse },
+    Exifr,
+    fileReaders: new Map([['fs', FsReader]])
+  }
 })
 
 vi.mock('../utils/logger', () => ({

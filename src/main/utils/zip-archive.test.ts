@@ -169,7 +169,7 @@ describe('createZipFromDirectory', () => {
     expect(r.message).toContain('archive boom')
   })
 
-  it('异常：archive error 分支必须 abort archive 并收尾输出流（与 output-error/timeout 对称）', async () => {
+  it('异常：archive error 分支必须 abort archive 并等输出流 close 后再返回', async () => {
     const src = makeSource({ 'a.log': 'x' })
     const target = path.join(tmpRoot, 'err-abort.zip')
     const abortSpy = vi.fn()
@@ -188,11 +188,15 @@ describe('createZipFromDirectory', () => {
     // 透传式 spy：捕获真实输出流以断言其被 destroy 收尾
     const realCreateWriteStream = fs.createWriteStream.bind(fs)
     const streams: fs.WriteStream[] = []
+    let outputClosed = false
     const streamSpy = vi
       .spyOn(fs, 'createWriteStream')
       .mockImplementation((...args: Parameters<typeof fs.createWriteStream>) => {
         const s = realCreateWriteStream(...args)
         streams.push(s)
+        s.once('close', () => {
+          outputClosed = true
+        })
         return s
       })
 
@@ -205,6 +209,7 @@ describe('createZipFromDirectory', () => {
       expect(abortSpy).toHaveBeenCalledTimes(1)
       expect(streams.length).toBe(1)
       expect(streams[0].destroyed).toBe(true)
+      expect(outputClosed).toBe(true)
     } finally {
       streamSpy.mockRestore()
     }

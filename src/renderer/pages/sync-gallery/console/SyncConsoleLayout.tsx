@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useUIStore } from '../../../stores/uiStore'
 import type { NikkiSyncServerStatusInfo } from '../../../../shared/types/electron-api'
@@ -62,6 +62,8 @@ export const SyncConsoleLayout: React.FC = () => {
   const [organizerEnabled, setOrganizerEnabled] = useState(false)
   const [pendingCount, setPendingCount] = useState(0)
   const [serverStatus, setServerStatus] = useState<NikkiSyncServerStatusInfo | null>(null)
+  // Layout 初始快照与 Connect 刷新共用请求代次，乱序旧响应不得覆盖新状态。
+  const statusRequestRef = useRef(0)
   const [brandImageFailed, setBrandImageFailed] = useState(false)
 
   // 子视图持久化：切换即落盘，返回/重进恢复上次停留位
@@ -99,17 +101,23 @@ export const SyncConsoleLayout: React.FC = () => {
       setServerStatus(null)
       return
     }
+    const request = ++statusRequestRef.current
     void getStatus()
       .then((next) => {
-        if (alive) setServerStatus(next ?? null)
+        if (alive && request === statusRequestRef.current) setServerStatus(next ?? null)
       })
       .catch(() => {
-        if (alive) setServerStatus(null)
+        if (alive && request === statusRequestRef.current) setServerStatus(null)
       })
     return () => {
       alive = false
     }
   }, [currentView])
+
+  const handleServerStatusChange = useCallback((next: NikkiSyncServerStatusInfo | null): void => {
+    statusRequestRef.current += 1
+    setServerStatus(next)
+  }, [])
 
   const handleNavigate = useCallback((next: ConsoleView): void => {
     setView(next)
@@ -245,7 +253,10 @@ export const SyncConsoleLayout: React.FC = () => {
             </header>
 
             {view === 'connect' && (
-              <ConnectView onNavigate={handleNavigate} onServerStatusChange={setServerStatus} />
+              <ConnectView
+                onNavigate={handleNavigate}
+                onServerStatusChange={handleServerStatusChange}
+              />
             )}
             {view === 'settings' && <SettingsView />}
             {view === 'organizer' && (

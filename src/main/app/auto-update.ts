@@ -5,7 +5,7 @@ import { sendToRenderer } from './renderer-bridge'
 import { classifyUpdateError } from './update-error-class'
 import { AppError } from '../../shared/errors/app-error'
 import { logger } from '../utils/logger'
-import { launchExternalInstaller } from './external-installer'
+import { launchExternalInstaller, validateInstallerPath } from './external-installer'
 import { t } from '../i18n'
 
 /**
@@ -25,6 +25,7 @@ export type { UpdatePayload, UpdateStage }
 // 模块级单例：listeners 注册后由 checkForUpdates/quitAndInstall 复用同一 autoUpdater 实例
 let ctxRef: AppContext | null = null
 let initialized = false
+let trustedInstallerPath: string | null = null
 
 // P6：feed 地址缓存，供生命周期日志携带（init 时异步回填；取不到保持 unknown）
 let feedUrlForLog = 'unknown'
@@ -35,6 +36,16 @@ function logUpdate(message: string): void {
     logger.info(message)
   } catch {
     // 静默降级
+  }
+}
+
+function rememberTrustedInstaller(raw: unknown): void {
+  if (typeof raw !== 'string') return
+  try {
+    trustedInstallerPath = validateInstallerPath(raw)
+  } catch (err) {
+    trustedInstallerPath = null
+    logUpdate(`[Update] 拒绝不可信安装器路径: ${err instanceof Error ? err.message : String(err)}`)
   }
 }
 
@@ -130,6 +141,7 @@ export function initAutoUpdater(ctx: AppContext): void {
   })
 
   autoUpdater.on('update-downloaded', (info) => {
+    rememberTrustedInstaller(info.downloadedFile)
     logUpdate(`[Update] update-downloaded version=${info.version} feed=${feedUrlForLog}`)
     pushUpdate({
       stage: 'downloaded',
@@ -200,8 +212,13 @@ export async function downloadUpdate(): Promise<void> {
   const myToken = ++callSeq
   const callState = { eventPushed: false }
   inFlightUpdateCalls.set(myToken, callState)
+  trustedInstallerPath = null
   try {
-    await autoUpdater.downloadUpdate()
+    const downloadedFiles = await autoUpdater.downloadUpdate()
+    for (const file of downloadedFiles) {
+      rememberTrustedInstaller(file)
+      if (trustedInstallerPath !== null) break
+    }
   } catch (err) {
     // 下载期的失败同样要归类（断网导致的 ECONNRESET 不能兜底成「源未就绪」），但**不重复推**：
     // 上游 downloadUpdate 的 errorHandler 先 dispatchError 再 rethrow（AppUpdater.js:650-672），
@@ -220,10 +237,12 @@ export async function downloadUpdate(): Promise<void> {
 
 /** 用户确认安装并重启后调用 */
 export function quitAndInstall(): void {
+  if (trustedInstallerPath === null) {
+    throw AppError.preconditionFailed(t('main.error.updateInstallerNotReady'))
+  }
   // P6：生命周期终点留痕（此后进程即退出，这条日志是「用户确认安装」的唯一证据）
   logUpdate(`[Update] quitAndInstall (isSilent=false, forceRunAfter=true) feed=${feedUrlForLog}`)
-  // isSilent=false 显示原生安装进度；isForceRunAfter=true 安装后自动重启
-  autoUpdater.quitAndInstall(false, true)
+  installWithExternalInstaller(trustedInstallerPath)
 }
 
 /**
@@ -233,7 +252,7 @@ export function quitAndInstall(): void {
  * 安装器按 `--updated --force-run` 契约完成覆盖安装后重启应用。校验失败会抛 AppError，
  * 由调用方（app:update:install handler）转成 IpcError 返回渲染层。
  */
-export function installWithExternalInstaller(installerPath: string): void {
+function installWithExternalInstaller(installerPath: string): void {
   logUpdate(`[Update] installWithExternalInstaller path=${installerPath} feed=${feedUrlForLog}`)
   // 先启动安装器，再退出应用：安装器内部会等待旧进程退出后覆盖文件
   launchExternalInstaller(installerPath)

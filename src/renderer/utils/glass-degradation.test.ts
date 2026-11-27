@@ -34,6 +34,16 @@ const healthy: GpuStatusLike = {
   fallback: { compatLevel: 0 }
 }
 
+const deferred = <T>() => {
+  let resolve!: (value: T | PromiseLike<T>) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
 beforeEach(() => {
   __resetGlassDegradationForTest()
   document.documentElement.classList.remove('glass-lite')
@@ -95,6 +105,33 @@ describe('detectSoftwareRendering', () => {
     __resetGlassDegradationForTest()
     await detectSoftwareRendering()
     expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('并发：两个调用共享延迟探针，后到失败不得覆盖正向降级结果', async () => {
+    const firstProbe = deferred<GpuStatusLike>()
+    const lateFailure = deferred<GpuStatusLike>()
+    // 单探针修复后第二个桩不会被调用；预先接住拒绝，避免未使用桩产生未处理拒绝。
+    void lateFailure.promise.catch(() => undefined)
+    const getGpuStatus = vi
+      .fn<() => Promise<GpuStatusLike>>()
+      .mockImplementationOnce(() => firstProbe.promise)
+      .mockImplementationOnce(() => lateFailure.promise)
+    ;(window as unknown as { electronAPI: unknown }).electronAPI = {
+      app: { getGpuStatus }
+    }
+
+    const firstCall = detectSoftwareRendering()
+    const secondCall = detectSoftwareRendering()
+    firstProbe.resolve({ hardwareAcceleration: { enabled: false }, fallback: { compatLevel: 2 } })
+    await expect(firstCall).resolves.toBe(true)
+    lateFailure.reject(new Error('late probe failure'))
+    await expect(secondCall).resolves.toBe(true)
+
+    expect(getGpuStatus).toHaveBeenCalledTimes(1)
+    applyGlassMode('rich')
+    expect(document.documentElement.classList.contains('glass-lite')).toBe(true)
+    await expect(detectSoftwareRendering()).resolves.toBe(true)
+    expect(getGpuStatus).toHaveBeenCalledTimes(1)
   })
 })
 

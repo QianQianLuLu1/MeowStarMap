@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "Auto-Updater ist nicht initialisiert (in Entwicklungsversionen standardmäßig übersprungen)",
+      "updateInstallerNotReady": "Der Update-Installer ist noch nicht bereit. Bitte laden Sie das Update erneut herunter.",
       "databaseNotInit": ""
     },
     "favorites": {

@@ -6,6 +6,8 @@
  *
  * 运行：npx vitest run src/renderer/pages/sync-gallery/console/OrganizerView.test.tsx
  */
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { act, screen, fireEvent, waitFor } from '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
@@ -22,6 +24,7 @@ import {
   STATUS_POLL_MS
 } from './sync-console-test-utils'
 import { useUIStore } from '../../../stores/uiStore'
+import { GlobalToastContext } from '../../../components/common/ToastProvider'
 
 const mockEnabledChange = vi.fn()
 
@@ -37,6 +40,46 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks()
   vi.useRealTimers()
+})
+
+describe('OrganizerView StrictMode 生命周期', () => {
+  it('setup → cleanup → setup 后仍接受异步队列响应', async () => {
+    installElectronApi({
+      persisted: { 'nikkisync.organizerEnabled': true },
+      organizerQueue: makeOrganizerView()
+    })
+    const resolvers: Array<(value: unknown) => void> = []
+    serverApi.getOrganizerQueue.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <StrictMode>
+            <GlobalToastContext.Provider value={mockShowMessage}>
+              <OrganizerView />
+            </GlobalToastContext.Provider>
+          </StrictMode>
+        )
+      })
+
+      await waitFor(() => expect(serverApi.getOrganizerQueue).toHaveBeenCalled())
+      await act(async () => {
+        for (const resolve of resolvers) resolve(makeOrganizerView())
+      })
+
+      expect(await screen.findByText('等待电脑确认')).toBeInTheDocument()
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+    }
+  })
 })
 
 describe('OrganizerView K8（(aa)-(ah) 自 SyncServicePage 随迁）', () => {

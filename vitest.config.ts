@@ -33,7 +33,11 @@ export default defineConfig({
         test: {
           name: 'jsdom',
           environment: 'jsdom',
-          include: ['./src/renderer/**/*.test.tsx', './src/renderer/hooks/**/*.test.ts']
+          include: [
+            './src/renderer/**/*.test.tsx',
+            './src/renderer/hooks/**/*.test.ts',
+            './installer/src/**/*.test.tsx'
+          ]
         }
       },
       {
@@ -47,7 +51,9 @@ export default defineConfig({
             './src/**/*.test.ts',
             './src/**/*.test.tsx',
             './scripts/**/*.test.ts',
-            './e2e/**/*.test.ts'
+            './e2e/**/*.test.ts',
+            './installer/**/*.test.mjs',
+            './scripts/**/*.test.mjs'
           ],
           exclude: ['./src/renderer/**/*.test.tsx', './src/renderer/hooks/**/*.test.ts']
         }

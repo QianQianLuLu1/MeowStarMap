@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "자동 업데이트가 초기화되지 않았습니다 (개발 빌드에서는 기본적으로 건너뜁니다)",
+      "updateInstallerNotReady": "업데이트 설치 프로그램이 준비되지 않았습니다. 업데이트를 다시 다운로드하세요.",
       "databaseNotInit": ""
     },
     "favorites": {

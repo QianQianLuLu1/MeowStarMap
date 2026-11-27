@@ -150,14 +150,14 @@ const UNRELEASED_AT_EOF_FIXTURE = [
   '- 文件末尾待发布条目'
 ].join('\n')
 
-/** 边界夹具：说明段 / 引用 / HTML 注释 / 无空格列表均不算条目 */
+/** 边界夹具：仅样板说明 / HTML 注释 / 分隔线 / 子标题不算待发布内容 */
 const NON_ENTRY_FIXTURE = [
   '## [Unreleased] | 未发布',
   '',
-  '这是一段说明文字，不是条目。',
-  '> 引用行也不是条目',
+  '新增、即将在下个版本发布的功能或修复。',
   '<!-- HTML 注释不是条目 -->',
-  '-item 没有空格不算条目',
+  '---',
+  '### Added | 新增',
   '',
   '## [2.5.3] - 2026-10-11'
 ].join('\n')
@@ -206,6 +206,22 @@ describe('checkChangelogRelease：异常场景', () => {
     expect(result.errors.join('\n')).toContain('4')
     expect(result.errors.join('\n')).toContain('[Unreleased]')
     expect(result.errors.join('\n')).toContain('[2.5.3]')
+  })
+
+  it('Unreleased 含粗体段落但不是列表 → 也必须判失败', () => {
+    const result = checkChangelogRelease({
+      changelogText: [
+        '## [Unreleased] | 未发布',
+        '',
+        '**安装器兼容层**：已经随包发布但尚未并入版本节。',
+        '',
+        '## [2.5.3] - 2026-10-11'
+      ].join('\n'),
+      packageVersion: '2.5.3'
+    })
+    expect(result.ok).toBe(false)
+    expect(result.unreleasedEntries).toHaveLength(1)
+    expect(result.errors.join('\n')).toContain('[Unreleased]')
   })
 
   it('回归样本：收口前真实 CHANGELOG 的未收口形态 → 判失败', () => {
@@ -274,13 +290,30 @@ describe('checkChangelogRelease：边界场景', () => {
     expect(result.ok).toBe(false)
   })
 
-  it('说明段 / 引用 / HTML 注释 / 无空格列表均不计为条目', () => {
+  it('仅样板说明 / HTML 注释 / 分隔线 / 子标题不计为条目', () => {
     const result = checkChangelogRelease({
       changelogText: NON_ENTRY_FIXTURE,
       packageVersion: '2.5.3'
     })
     expect(result.unreleasedEntries).toHaveLength(0)
     expect(result.ok).toBe(true)
+  })
+
+  it('裸文本 / 引用 / 无空格列表都算未收口内容', () => {
+    const result = checkChangelogRelease({
+      changelogText: [
+        '## [Unreleased]',
+        '',
+        '这是一段已经随包发布的说明。',
+        '> 引用行也是内容',
+        '-item 没有空格仍然是内容',
+        '',
+        '## [2.5.3] - 2026-10-11'
+      ].join('\n'),
+      packageVersion: '2.5.3'
+    })
+    expect(result.unreleasedEntries).toHaveLength(3)
+    expect(result.ok).toBe(false)
   })
 
   it('标题含多余空格仍识别版本与日期', () => {

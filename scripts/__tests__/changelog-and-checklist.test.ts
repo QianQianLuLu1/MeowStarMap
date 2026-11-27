@@ -12,6 +12,8 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { checkChangelogRelease } from '../check-changelog-release'
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const read = (rel: string): string | null => {
   try {
@@ -56,6 +58,14 @@ describe('CHANGELOG 发版收口', () => {
       .split('\n')
       .filter((line) => /^\s*[-*]\s+\S/.test(line))
     expect(entryLines).toEqual([])
+
+    const pkg = JSON.parse(read('package.json') ?? '{}') as { version?: string }
+    const gate = checkChangelogRelease({
+      changelogText: text(),
+      packageVersion: pkg.version ?? ''
+    })
+    expect(gate.ok).toBe(true)
+    expect(gate.unreleasedEntries).toEqual([])
   })
 
   it('版本节新增行只写 commit 短哈希，不写 docs/plans 路径（归档判据防外部入站引用）', () => {

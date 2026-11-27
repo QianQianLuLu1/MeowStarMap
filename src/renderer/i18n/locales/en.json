@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "Auto-updater is not initialized (skipped by default in dev builds)",
+      "updateInstallerNotReady": "The update installer is not ready. Please download the update again.",
       "databaseNotInit": ""
     },
     "favorites": {

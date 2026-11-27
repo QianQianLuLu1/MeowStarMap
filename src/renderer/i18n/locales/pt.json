@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "O atualizador automático não está inicializado (ignorado por padrão em versões de desenvolvimento)",
+      "updateInstallerNotReady": "O instalador da atualização não está pronto. Baixe a atualização novamente.",
       "databaseNotInit": ""
     },
     "favorites": {

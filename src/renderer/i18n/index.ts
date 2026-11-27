@@ -165,20 +165,22 @@ export async function initializeI18n(): Promise<void> {
 // P3：切换前确保目标语言已加载（懒加载）
 export async function changeLanguage(code: string): Promise<string> {
   const resolved = resolveLanguage(code)
+  let effectiveLanguage = resolved
   if (resolved !== 'zh-CN' && !loadedLanguages.has(resolved)) {
-    await loadLanguage(resolved)
+    const loaded = await loadLanguage(resolved)
+    if (!loaded) effectiveLanguage = 'zh-CN'
   }
-  await i18n.changeLanguage(resolved)
+  await i18n.changeLanguage(effectiveLanguage)
   // a11y：同步 <html lang>，让屏幕阅读器按当前界面语言发音（index.html 硬编码 zh-CN）
   if (typeof document !== 'undefined') {
-    document.documentElement.lang = resolved
+    document.documentElement.lang = effectiveLanguage
   }
   try {
     localStorage.setItem('app-language', code)
   } catch {
     // localStorage 不可用时静默忽略
   }
-  return resolved
+  return effectiveLanguage
 }
 
 // P2-01：获取当前生效的语言代码（已解析，不会返回 'auto'）

@@ -48,8 +48,8 @@ export interface ChangelogReleaseCheckResult {
 
 // 节标题：## [Unreleased] | 未发布 / ## [2.5.3] - 2026-10-11（容忍标题尾部中英注释与多余空格）
 const SECTION_HEADING_RE = /^##\s+\[([^\]]+)\](?:\s*-\s*(\d{4}-\d{2}-\d{2}))?(?:\s+.*)?$/
-// 条目行：- / * 列表（含缩进子条目）；-item 无空格不算
-const ENTRY_LINE_RE = /^\s*[-*]\s+\S/
+const UNRELEASED_BOILERPLATE = new Set(['新增、即将在下个版本发布的功能或修复。'])
+const HORIZONTAL_RULE_RE = /^(?:-{3,}|\*{3,}|_{3,})$/
 // 语义化版本前缀（x.y.z）
 const VERSION_RE = /^\d+\.\d+\.\d+/
 
@@ -62,16 +62,34 @@ export function analyzeChangelog(changelogText: string): {
   const sections: ChangelogSection[] = []
   const unreleasedEntries: ChangelogEntry[] = []
   let current: ChangelogSection | null = null
+  let inUnreleasedComment = false
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(SECTION_HEADING_RE)
     if (match) {
       current = { version: (match[1] ?? '').trim(), date: match[2] ?? null, line: i + 1 }
       sections.push(current)
+      inUnreleasedComment = false
       continue
     }
-    if (current && current.version.toLowerCase() === 'unreleased' && ENTRY_LINE_RE.test(lines[i])) {
-      unreleasedEntries.push({ line: i + 1, text: lines[i].trim() })
+    if (!current || current.version.toLowerCase() !== 'unreleased') continue
+    const text = lines[i].trim()
+    if (inUnreleasedComment) {
+      if (text.includes('-->')) inUnreleasedComment = false
+      continue
     }
+    if (text.startsWith('<!--')) {
+      if (!text.includes('-->')) inUnreleasedComment = true
+      continue
+    }
+    if (
+      text === '' ||
+      HORIZONTAL_RULE_RE.test(text) ||
+      text.startsWith('### ') ||
+      UNRELEASED_BOILERPLATE.has(text)
+    ) {
+      continue
+    }
+    unreleasedEntries.push({ line: i + 1, text })
   }
   return { sections, unreleasedEntries }
 }

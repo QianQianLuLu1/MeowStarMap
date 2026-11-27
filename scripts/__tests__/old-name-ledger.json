@@ -94,7 +94,7 @@
     "owner": "QianQianLuLu1",
     "extra": ["github.com/your-repo/issues", "QQ群: 123456789", "QQ Group: 123456789"]
   },
-  "expectedTotal": 185,
+  "expectedTotal": 186,
   "allowed": {
     "ARCHITECTURE.en.md": {
       "reason": "模块导航表指称插件清单类型名 NikkiGalleryManifest（§1.2 禁改的类名，非产品自称）",
@@ -137,6 +137,12 @@
       "reason": "DEBT-031 条目记录的磁盘读数（旧 thumbnails 路径与旧仓库目录名），改名即伪造取证",
       "hits": {
         "NikkiGallery": 1,
+        "wxnn-photo-manager": 1
+      }
+    },
+    "docs/installer-compat.md": {
+      "reason": "旧版数据迁移文档必须写出历史可执行文件名，供用户核对旧安装与 SQLite WAL/SHM 快照",
+      "hits": {
         "wxnn-photo-manager": 1
       }
     },

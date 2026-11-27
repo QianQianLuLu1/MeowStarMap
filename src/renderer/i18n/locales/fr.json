@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "L'outil de mise à jour automatique n'est pas initialisé (ignoré par défaut dans les versions de développement)",
+      "updateInstallerNotReady": "Le programme d’installation de la mise à jour n’est pas prêt. Veuillez la télécharger à nouveau.",
       "databaseNotInit": ""
     },
     "favorites": {

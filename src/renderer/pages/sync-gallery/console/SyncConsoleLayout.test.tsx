@@ -94,6 +94,33 @@ describe('T1：五视图骨架与切换', () => {
     expect(unavailableChip).toHaveTextContent('同步组件未就绪')
   })
 
+  it('初始状态请求乱序返回时，不得覆盖更新的 Connect 刷新结果', async () => {
+    const resolvers: Array<(value: unknown) => void> = []
+    serverApi.getServerStatus.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve)
+        })
+    )
+    window.localStorage.setItem('syncConsole.view', 'about')
+    renderLayout()
+    await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByTestId('sync-console-nav-connect'))
+    await waitFor(() => expect(serverApi.getServerStatus).toHaveBeenCalledTimes(2))
+    const chip = screen.getByTestId('sync-console-status-chip')
+    await act(async () => {
+      resolvers[1](makeStatus({ running: false }))
+    })
+    await waitFor(() => expect(chip).toHaveAttribute('data-state', 'offline'))
+
+    await act(async () => {
+      resolvers[0](makeStatus({ running: true }))
+    })
+    expect(chip).toHaveAttribute('data-state', 'offline')
+    expect(chip).toHaveTextContent('同步服务已停止')
+  })
+
   it('状态通道缺席 / 返回 null ⇒ chip 未就绪，不臆造运行中', async () => {
     installElectronApi({ omitMethods: ['getServerStatus'] })
     const missing = renderLayout()

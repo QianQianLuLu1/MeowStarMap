@@ -22,7 +22,15 @@ import { IPC_ERROR_CODES } from '../../shared/types/ipc-types'
 import type { AppContext } from './app-context'
 import type { UpdatePayload } from '../../shared/types/electron-api'
 
-const { appMock, autoUpdaterMock, listeners, sendToRendererMock, loggerMock } = vi.hoisted(() => {
+const {
+  appMock,
+  autoUpdaterMock,
+  listeners,
+  sendToRendererMock,
+  loggerMock,
+  launchExternalInstallerMock,
+  validateInstallerPathMock
+} = vi.hoisted(() => {
   const listeners: Record<string, Array<(payload: unknown) => void>> = {}
   const autoUpdaterMock = {
     autoDownload: true,
@@ -36,7 +44,7 @@ const { appMock, autoUpdaterMock, listeners, sendToRendererMock, loggerMock } = 
       ;(listeners[event] ||= []).push(cb)
     },
     checkForUpdates: vi.fn(async () => undefined),
-    downloadUpdate: vi.fn(async () => undefined),
+    downloadUpdate: vi.fn(async (): Promise<string[]> => []),
     quitAndInstall: vi.fn(),
     // P6：生命周期日志需要 feed 信息；真实 AppUpdater 恒有该方法
     getFeedURL: vi.fn(async () => 'https://updates.example.test/latest.yml')
@@ -44,9 +52,11 @@ const { appMock, autoUpdaterMock, listeners, sendToRendererMock, loggerMock } = 
   return {
     listeners,
     autoUpdaterMock,
-    appMock: { isPackaged: true },
+    appMock: { isPackaged: true, quit: vi.fn() },
     sendToRendererMock: vi.fn(),
-    loggerMock: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
+    loggerMock: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+    launchExternalInstallerMock: vi.fn(() => 4321),
+    validateInstallerPathMock: vi.fn((value: string) => value)
   }
 })
 
@@ -55,8 +65,18 @@ vi.mock('electron-updater', () => ({ autoUpdater: autoUpdaterMock }))
 vi.mock('../utils/logger', () => ({ logger: loggerMock }))
 vi.mock('../i18n', () => ({ t: (key: string) => key }))
 vi.mock('./renderer-bridge', () => ({ sendToRenderer: sendToRendererMock }))
+vi.mock('./external-installer', () => ({
+  launchExternalInstaller: launchExternalInstallerMock,
+  validateInstallerPath: validateInstallerPathMock
+}))
 
 const fakeCtx = { mainWindow: null } as unknown as AppContext
+
+beforeEach(() => {
+  launchExternalInstallerMock.mockClear()
+  validateInstallerPathMock.mockReset().mockImplementation((value: string) => value)
+  appMock.quit.mockClear()
+})
 
 /** 每个用例都要重置模块级单例状态（initialized / ctxRef），否则用例间互相污染 */
 async function loadFresh() {
@@ -449,13 +469,68 @@ describe('事件透传与检查流程（回归锁：修复前后都应绿）', (
     expect(errorPushes).toHaveLength(1)
   })
 
-  it('quitAndInstall 透传 (false, true)：显示安装进度并在装完后重启', async () => {
+  it('downloadUpdate 返回的可信路径必须用于启动 Tauri 安装器，不再调用 electron-updater 安装', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    autoUpdaterMock.downloadUpdate.mockResolvedValue(['C:/updates/MeowStarMap-Installer-2.5.8.exe'])
+
+    await mod.downloadUpdate()
+    mod.quitAndInstall()
+
+    expect(validateInstallerPathMock).toHaveBeenCalledWith(
+      'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    )
+    expect(launchExternalInstallerMock).toHaveBeenCalledWith(
+      'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    )
+    expect(appMock.quit).toHaveBeenCalledTimes(1)
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+  })
+
+  it('新一轮下载失败后不得复用上一轮的可信安装器路径', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+    autoUpdaterMock.downloadUpdate.mockResolvedValueOnce([
+      'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    ])
+    await mod.downloadUpdate()
+
+    autoUpdaterMock.downloadUpdate.mockRejectedValueOnce(connectionRefusedError())
+    await mod.downloadUpdate()
+
+    expect(() => mod.quitAndInstall()).toThrowError(
+      expect.objectContaining({ code: IPC_ERROR_CODES.PRECONDITION_FAILED })
+    )
+    expect(launchExternalInstallerMock).not.toHaveBeenCalled()
+    expect(appMock.quit).not.toHaveBeenCalled()
+  })
+
+  it('update-downloaded 事件的 downloadedFile 也是可信安装来源', async () => {
     const mod = await loadFresh()
     mod.initAutoUpdater(fakeCtx)
 
+    emit('update-downloaded', {
+      version: '2.5.8',
+      downloadedFile: 'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    })
     mod.quitAndInstall()
 
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
+    expect(launchExternalInstallerMock).toHaveBeenCalledWith(
+      'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    )
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
+  })
+
+  it('没有可信下载文件时安装必须失败，不得启动任意路径或 electron-updater', async () => {
+    const mod = await loadFresh()
+    mod.initAutoUpdater(fakeCtx)
+
+    expect(() => mod.quitAndInstall()).toThrowError(
+      expect.objectContaining({ code: IPC_ERROR_CODES.PRECONDITION_FAILED })
+    )
+    expect(launchExternalInstallerMock).not.toHaveBeenCalled()
+    expect(appMock.quit).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
   })
 })
 
@@ -515,8 +590,15 @@ describe('P6：更新生命周期日志（[Update]，含版本与 feed 信息）
 
   it('quitAndInstall 留痕（安装并重启是生命周期终点，必须可诊断）', async () => {
     const mod = await initAndSettleFeed()
+    emit('update-downloaded', {
+      version: '2.5.8',
+      downloadedFile: 'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    })
     mod.quitAndInstall()
     expect(loggerMock.info).toHaveBeenCalledWith(expect.stringContaining('[Update] quitAndInstall'))
-    expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
+    expect(launchExternalInstallerMock).toHaveBeenCalledWith(
+      'C:/updates/MeowStarMap-Installer-2.5.8.exe'
+    )
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
   })
 })

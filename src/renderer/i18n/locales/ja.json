@@ -2925,6 +2925,7 @@
     "error": {
       "mainWindowNotInit": "",
       "updaterNotInit": "自動アップデータが初期化されていません（開発ビルドでは既定でスキップされます）",
+      "updateInstallerNotReady": "更新インストーラーの準備ができていません。更新を再ダウンロードしてください。",
       "databaseNotInit": ""
     },
     "favorites": {

@@ -48,6 +48,7 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   if (tempDir !== '') {
     fs.rmSync(tempDir, { recursive: true, force: true })
   }
@@ -99,6 +100,17 @@ describe('launchExternalInstaller', () => {
     expect(args).toEqual([...EXTERNAL_INSTALLER_ARGS])
     expect(options.detached).toBe(true)
     expect(unrefMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('校验后到启动前文件身份变化时拒绝启动', () => {
+    const exe = path.join(tempDir, 'Setup.exe')
+    fs.writeFileSync(exe, 'MZ')
+    const first = fs.lstatSync(exe)
+    const changed = { ...first, size: first.size + 1 }
+    vi.spyOn(fs, 'lstatSync').mockReturnValueOnce(first).mockReturnValueOnce(changed)
+
+    expect(() => launchExternalInstaller(exe)).toThrow()
+    expect(spawnMock).not.toHaveBeenCalled()
   })
 
   it('非法路径不启动子进程', () => {

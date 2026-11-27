@@ -131,6 +131,23 @@ describe('流水线与发布面的产品名', () => {
     expect(wf.split('release/*.exe').length - 1).toBe(2)
   })
 
+  it('Windows CI 必须同源构建 NSIS 与 Tauri，并校验指向 Tauri 的正式 feed', () => {
+    const wf = read('.github/workflows/build.yml')
+    const builder = read('scripts/build-installer.mjs')
+    expect(wf).toContain('npm --prefix installer ci')
+    expect(wf).toContain('actions-rust-lang/setup-rust-toolchain@v1')
+    expect(wf).toContain('repository: ToStardust/NikkiSync')
+    expect(wf).toContain('ref: 6bdab4b4b29b0af5103aafb2d3223e7903c6306c')
+    expect(wf).toContain('npm --prefix .cache/NikkiSync ci')
+    expect(wf).toContain('npm --prefix .cache/NikkiSync run build')
+    expect(wf).toContain('npm run link:nikkisync')
+    expect(wf).toContain('npm run verify:nikkisync')
+    expect(wf).toContain('npm run build:installer')
+    expect(wf).toContain('npm run verify:dist')
+    expect(builder).toContain("path.join(releaseDir, 'latest.yml')")
+    expect(builder).toContain("path.join(releaseDir, 'latest-installer.yml')")
+  })
+
   it('verify-audit.mjs 对包名的可执行断言与 package.json 互指相等', () => {
     // 该脚本读 ../NikkiSync 与本仓 package.json 做客观事实校验，断言值必须恒等于真实包名，
     // 否则任何人改完包名再跑它必抛——它是代码而非叙述，属本阶段范围

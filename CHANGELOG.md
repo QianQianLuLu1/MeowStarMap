@@ -19,20 +19,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 
 新增、即将在下个版本发布的功能或修复。
 
-### Added | 新增
-
-**安装器兼容层（自研安装器前置，2026-11-24）**：为后续用自研安装器替代 NSIS 提供应用侧兼容能力——
-① `src/main/app/install-manifest.ts`：打包态启动时写 `install-manifest.json`（安装目录 + userData 双份，
-含 appId/version/channel/arch/installDir/exePath），供安装器读取安装布局，避免猜注册表；
-② `src/main/app/external-installer.ts`：自定义安装器校验与启动通道（只接受绝对路径、`.exe`、非空文件；
-固定 `--updated --force-run` 参数，兼容旧 electron-updater 调用契约）；
-③ `scripts/generate-update-feed.ts`：以自定义安装器产物生成 electron-updater 兼容的 `latest.yml`
-（version/path/sha512/size/files[]），供发布流程上传。
-**`app:update:install` 兼容扩展**：新增可选载荷 `{ installerPath?: string }`；传入时改用自定义安装器
-覆盖安装，不传保持 electron-updater 原行为（向后兼容，旧渲染层零改动）。详见 `docs/installer-compat.md`。
-
-（已收口：2026-11-21 2.5.7 正式版发版轮将更新错误归类补口条目并入 [2.5.7] 节。）
-
 ---
 
 ## [2.5.7] - 2026-11-21
@@ -40,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/lang/zh-CN/
 > 2.5.7：正式版定版（由 2026-11-05 定版的 2.5.7-beta 预提交收口演进，beta 轮条目随本节发布）。四处版本声明位（package.json / lock 根与 packages[""] / preview mock / release/latest.yml）同步为 2.5.7，安装包名随 artifactName 模板为 MeowStarMap-Setup-2.5.7.exe。
 
 ### Added | 新增
+
+- **Tauri 自研安装器与正式更新链路（2026-11-24 起，2.5.7 发布收口）**：新增 Windows 分步安装器，支持全新安装、覆盖升级、取消回滚、旧版 SQLite WAL 数据迁移、单文件内嵌 payload、进度/日志与卸载；安装目录采用空白目录、manifest 匹配目录或注册表旧安装的安全白名单，payload 清单保持可选但长度/footer/版本/格式强制校验。应用侧 `install-manifest.json` 改为原子写入，正式更新仅使用 electron-updater 返回的 `downloadedFile` 可信路径并在启动前二次校验，渲染层 `app:update:install` 保持无参。CI 与本地发布同源生成 NSIS 与 Tauri 双安装器，正式 `latest.yml` 指向 Tauri；2.5.7 同版本客户端不立即自动升级，新链路从下一版本实际生效。
 
 - **同步控制台 IA 对齐上游并收口全宽底栏（2026-11-24，`874fed2`，TDD 红-绿闭环）**：移除 `SyncStatusBar` 全宽底栏，重启/导出诊断入口迁入 Connect 的 Android 卡与 About 反馈区；页面级标题 h2→h1，Settings/Connect 详情区统一 `<details>` 折叠，服务/配对/设备三个主操作区默认展开（避免主开关与设备空态被折叠隐藏，e2e N3c 红灯后收口）；About 改为品牌 hero + 下载磁贴 + 五链仓库区；最近删除入口恢复 `trash` 图标（`album` 会与灵感库重复，`ConsoleIcons` 注释约定）；修复 `space-y-*` 迁移到无样式 `sc-service-rows` 造成的列表分隔线与嵌套间距丢失——新增局部 `.sc-stack`（8px，旧 `space-y-2` 同值），去掉逐项包裹使 `.sc-setting-row:first-child` 分隔线恢复；删除 `ConsoleSection` 渲染期 `console.error` 死分支，订正 h2/底栏与 `SyncStatusBar` 陈旧注释；ConnectView 补重启/导出失败、取消、桥面缺席 5 条异常路径回归。展示层变更，主进程/IPC/协议/资源装载零改动。读数：`npm test` 551 files / 8972 passed / 20 skipped、`test:ci-linux` 550 passed + 1 skipped / 8973 passed + 19 skipped、`e2e:smoke` 23 passed / 1 skipped，install / build / typecheck / lint / format:check / typecheck:e2e / i18n:guard / audit / verify 全部 exit 0。
 

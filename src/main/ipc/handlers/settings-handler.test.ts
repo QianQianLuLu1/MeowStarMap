@@ -692,6 +692,31 @@ describe('settings:set referenceData.imageMirrorBaseUrl 图片加速入口', () 
     expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(KEY, '')
   })
 
+  it('边界：审计留痕记录 trim 后的实际落库值，而非原始空白输入', async () => {
+    const { logger } = await import('../../utils/logger')
+    const infoMock = vi.mocked(logger.info)
+    infoMock.mockClear()
+    const ctx = makeCtx({})
+    vi.mocked(ctx.dbManager.getSetting).mockReturnValue('https://old-mirror.example.test')
+    registerSettingsHandlers(ctx)
+    const result = (await getHandler(
+      handleMock,
+      'settings:set'
+    )([KEY, '  https://image-mirror.example.test  '])) as {
+      success: boolean
+      data?: { saved?: boolean }
+      error?: { message?: string }
+    }
+    expect(result.success, result.error?.message).toBe(true)
+    expect(ctx.dbManager.setSetting).toHaveBeenCalledWith(KEY, 'https://image-mirror.example.test')
+    const lines = infoMock.mock.calls
+      .map((call) => String(call[0]))
+      .filter((line) => line.includes('[Settings]'))
+    expect(lines).toEqual([
+      '[Settings] referenceData.imageMirrorBaseUrl: "https://old-mirror.example.test" → "https://image-mirror.example.test"'
+    ])
+  })
+
   it('异常：非字符串（数字/对象/null/布尔）被拒', async () => {
     registerSettingsHandlers(makeCtx({}))
     for (const value of [123, { evil: true }, null, true, ['https://a.example']]) {

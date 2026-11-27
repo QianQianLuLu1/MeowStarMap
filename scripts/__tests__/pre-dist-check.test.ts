@@ -172,6 +172,16 @@ describe('nikkiSyncPackedVerdict — 打包态 @nikkisync 缺失判定', () => {
       nikkiSyncPackedVerdict({ packedNikkiSyncExists: false, projectNikkiSyncLinkExists: false })
     ).toBe('skip')
   })
+
+  it('发布 tag：未建链且产物缺失必须 fail，不能发布残缺稳定包', () => {
+    expect(
+      nikkiSyncPackedVerdict({
+        packedNikkiSyncExists: false,
+        projectNikkiSyncLinkExists: false,
+        releaseMode: true
+      })
+    ).toBe('fail')
+  })
 })
 
 describe('nikkiSyncMissingDiagnosis — @nikkisync 缺失的原因分档', () => {
@@ -325,6 +335,12 @@ describe('F2 CI 环境判定核 stagedIconPackVerdict（2026-11-21 CI 红灯根�
     // 2026-11-21 修复前此处恒 fail：CI（无 NikkiSync 检出、npm ci 不建链）资产必然缺席，
     // runs #40~#43 的 Windows job 全部死于 pre-dist-check（红灯取证见本轮计划 §7）
     expect(stagedIconPackVerdict({ stagedMissing: true, nikkiSyncLinked: false })).toBe('skip')
+  })
+
+  it('发布 tag：资产缺失 + 未建链也必须 fail，避免残缺稳定包', () => {
+    expect(
+      stagedIconPackVerdict({ stagedMissing: true, nikkiSyncLinked: false, releaseMode: true })
+    ).toBe('fail')
   })
 
   it('边界：入参非布尔 ⇒ TypeError 且消息含特征串（fail-closed，不静默归一）', () => {

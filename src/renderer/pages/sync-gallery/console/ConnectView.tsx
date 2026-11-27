@@ -127,10 +127,12 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
 
   // R3 审查修复：在途刷新守卫——切走/卸载后慢响应不得再 setState（轮询与手动刷新共用）
   const pollAliveRef = useRef(false)
+  const refreshRequestRef = useRef(0)
 
   const refresh = useCallback(async (): Promise<void> => {
     const api = window.electronAPI
     if (!api) return
+    const request = ++refreshRequestRef.current
     try {
       const [nextStatus, nextDevices, nextRuntime] = await Promise.all([
         api.nikkisync.getServerStatus(),
@@ -140,7 +142,7 @@ export const ConnectView: React.FC<ConnectViewProps> = ({ onNavigate, onServerSt
           .getRuntimeStatus()
           .catch(() => null as { startupStages?: Array<{ stage: string; at: string }> } | null)
       ])
-      if (!pollAliveRef.current) return
+      if (!pollAliveRef.current || request !== refreshRequestRef.current) return
       setStatus(nextStatus)
       onServerStatusChange?.(nextStatus)
       // 外部输入一律不可信：畸形设备项/启动阶段项直接丢，不让脏数据在渲染期抛错（整页变错误页）

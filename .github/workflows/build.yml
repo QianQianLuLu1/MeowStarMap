@@ -52,6 +52,8 @@ jobs:
         env:
           # 双保险：--ignore-scripts 之外再显式跳过 electron 二进制下载
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - name: Install installer frontend dependencies
+        run: npm --prefix installer ci --ignore-scripts
       # 供应链安全：依赖树审计（audit-ci 内部执行 npm audit），high/critical 漏洞直接失败；
       # 本 job 是 test/build 的 needs 前置，失败即阻断下游 test / build / 发布
       # 豁免清单（allowlist）与 registry 覆盖统一维护在根目录 audit-ci.jsonc（唯一事实来源，
@@ -134,6 +136,8 @@ jobs:
         env:
           # 双保险：--ignore-scripts 之外再显式跳过 electron 二进制下载
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - name: Install installer frontend dependencies
+        run: npm --prefix installer ci --ignore-scripts
       # pool:forks 已在 vitest.config.ts 锁定；此处按分片跑
       - run: npm test -- --shard=${{ matrix.shard }}/10
 
@@ -157,6 +161,8 @@ jobs:
         run: npm ci --ignore-scripts
         env:
           ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+      - name: Install installer frontend dependencies
+        run: npm --prefix installer ci --ignore-scripts
       - name: Run coverage with thresholds
         run: npm run test:coverage
       - name: Upload coverage report
@@ -171,26 +177,52 @@ jobs:
           retention-days: 14
 
   build:
-    name: Build & Release (Windows x64 NSIS)
+    name: Build & Release (Windows x64 NSIS + Tauri)
     runs-on: windows-latest
     needs: [lint-typecheck, test, coverage]
     # 手动触发（workflow_dispatch）仅跑 storybook 文档站，保持既有 job 的原触发行为不变
     if: ${{ github.event_name != 'workflow_dispatch' }}
-    # 护栏：打包 + 冒烟挂起时兜底，防止流水线无限等待
-    timeout-minutes: 40
+    # 护栏：双包 + Rust 检查 + 冒烟挂起时兜底，防止流水线无限等待
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - name: Checkout pinned NikkiSync runtime
+        uses: actions/checkout@v5
+        with:
+          repository: ToStardust/NikkiSync
+          ref: 6bdab4b4b29b0af5103aafb2d3223e7903c6306c
+          path: .cache/NikkiSync
+          persist-credentials: false
       - uses: actions/setup-node@v5
         with:
           node-version-file: '.node-version'
           cache: 'npm'
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-pc-windows-msvc
       - name: Install dependencies
         run: npm ci
+      - name: Install installer frontend dependencies
+        run: npm --prefix installer ci
+      - name: Build and link pinned NikkiSync runtime
+        run: |
+          npm --prefix .cache/NikkiSync ci
+          npm --prefix .cache/NikkiSync run build
+          "NIKKISYNC_ROOT=${{ github.workspace }}/.cache/NikkiSync" >> $env:GITHUB_ENV
+          npm run link:nikkisync
+          npm run verify:nikkisync
       # 原 clean-clone-build job 的验证意图：在干净克隆环境优先编译主进程产物，
       # 漏提交的源文件会在此直接暴露为编译失败，再进入完整打包（dist:win）。
       # 合并进本 job 前置 step，省去一台独立 windows-latest runner 的 checkout + npm ci 原生编译开销。
       - name: Verify clean clone compiles main-process output
         run: npm run build
+      - name: Rust installer format check
+        run: cargo fmt --manifest-path installer/src-tauri/Cargo.toml --check
+      - name: Rust installer clippy
+        run: cargo clippy --manifest-path installer/src-tauri/Cargo.toml -- -D warnings
+      - name: Rust installer tests
+        run: cargo test --manifest-path installer/src-tauri/Cargo.toml
       - name: Build & publish (release tag)
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         run: npm run dist:win
@@ -201,12 +233,10 @@ jobs:
         run: npm run dist:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      # @nikkisync/* 不是声明依赖，CI 的 npm ci 必然不建链，NikkiSync 的 e2e 因此整件 skip
-      # （未建链门控见 e2e/nikkisync-guard.ts 与 e2e/nikkisync-runtime.e2e.ts）。
-      # 这一步只读地把链接事实与修复动作打进流水线日志，warn-only 不阻断：
-      # 未链接时 scripts/verify-nikkisync-link.ts 的全部条目都降为 warn，退出码仍为 0。
-      - name: NikkiSync link diagnostics (warn-only)
-        run: npm run verify:nikkisync
+      - name: Build Tauri installer from the same win-unpacked
+        run: npm run build:installer
+      - name: Verify final dual-package feed and asar
+        run: npm run verify:dist
       # 打包产物运行时冒烟（清单见 docs/manual-smoke-checklist.md；原方案文档已归档至
       # docs/archive/plans/e2e-smoke-playwright.md，该目录被 .gitignore 排除、不入仓，仅本机留存）：
       # tag 发布与 PR 两条分支的两个构建步骤之后都会到达此 step，发布前必须冒烟通过

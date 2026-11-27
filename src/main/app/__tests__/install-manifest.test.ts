@@ -4,17 +4,22 @@
  * @coverage 清单构造（字段完整/时间戳注入）/ 渠道推断（dev/beta/stable）
  * @dependencies electron（mock app 查询）、../utils/logger（mock）
  */
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 
-vi.mock('electron', () => ({
-  app: {
+const { appMock } = vi.hoisted(() => ({
+  appMock: {
     isPackaged: false,
-    getVersion: () => '2.5.7',
-    getName: () => 'meow-star-map',
-    getPath: (name: string) => (name === 'exe' ? 'C:/install/app.exe' : 'C:/userdata'),
-    getAppPath: () => 'C:/app'
+    getVersion: vi.fn(() => '2.5.7'),
+    getName: vi.fn(() => 'meow-star-map'),
+    getPath: vi.fn((name: string) => (name === 'exe' ? 'C:/install/app.exe' : 'C:/userdata')),
+    getAppPath: vi.fn(() => 'C:/app')
   }
 }))
+
+vi.mock('electron', () => ({ app: appMock }))
 
 vi.mock('../../utils/logger', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() }
@@ -24,6 +29,7 @@ import {
   buildInstallManifest,
   inferInstallChannel,
   INSTALL_MANIFEST_SCHEMA_VERSION,
+  writeInstallManifest,
   type InstallManifestInput
 } from '../install-manifest'
 
@@ -39,6 +45,41 @@ const input: InstallManifestInput = {
 }
 
 describe('install-manifest', () => {
+  let tempDir = ''
+
+  beforeEach(() => {
+    appMock.isPackaged = false
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'install-manifest-test-'))
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('打包态清单必须经临时文件原子替换两个落点', () => {
+    const installDir = path.join(tempDir, 'install')
+    const userData = path.join(tempDir, 'user-data')
+    appMock.isPackaged = true
+    appMock.getPath.mockImplementation((name: string) =>
+      name === 'exe' ? path.join(installDir, 'MeowStarMap.exe') : userData
+    )
+    const renameSpy = vi.spyOn(fs, 'renameSync')
+
+    writeInstallManifest()
+
+    expect(renameSpy).toHaveBeenCalledTimes(2)
+    for (const [source] of renameSpy.mock.calls) {
+      expect(String(source)).toContain('.install-manifest.json.tmp-')
+    }
+    expect(renameSpy.mock.calls.map(([, target]) => String(target))).toEqual(
+      expect.arrayContaining([
+        path.join(installDir, 'install-manifest.json'),
+        path.join(userData, 'install-manifest.json')
+      ])
+    )
+  })
+
   it('构造清单包含全部字段与 schemaVersion', () => {
     const manifest = buildInstallManifest(input)
     expect(manifest.schemaVersion).toBe(INSTALL_MANIFEST_SCHEMA_VERSION)

@@ -7,24 +7,39 @@
  * 补上缺失的「能力检测 ⇒ 自动触发」接线：App 启动与设置页共用同一决策入口。
  *
  * 探针 fail-open：getGpuStatus 失败/缺失一律视为硬件健康，绝不因探针失败
- * 改变用户视觉设置。档位每次启动固定，探测结果会话级缓存。
+ * 改变用户视觉设置。档位每次启动固定，探测结果会话级缓存；并发调用共享同一次
+ * 探测，已确认的正向降级结果不会被后续失败覆盖。
  */
 
 let softwareRendering: boolean | null = null
+let detectionPromise: Promise<boolean> | null = null
 
-/** 探测本次启动是否处于软件渲染（结果缓存；fail-open false） */
+/** 探测本次启动是否处于软件渲染（结果缓存；并发共享；fail-open false） */
 export async function detectSoftwareRendering(): Promise<boolean> {
   if (softwareRendering !== null) return softwareRendering
+  if (detectionPromise) return detectionPromise
+
+  const probe = (async (): Promise<boolean> => {
+    try {
+      const status = await window.electronAPI?.app?.getGpuStatus?.()
+      if (softwareRendering !== true) {
+        softwareRendering = Boolean(
+          status &&
+          (status.hardwareAcceleration?.enabled === false ||
+            (status.fallback?.compatLevel ?? 0) >= 1)
+        )
+      }
+    } catch {
+      if (softwareRendering !== true) softwareRendering = false
+    }
+    return softwareRendering === true
+  })()
+  detectionPromise = probe
   try {
-    const status = await window.electronAPI?.app?.getGpuStatus?.()
-    softwareRendering = Boolean(
-      status &&
-      (status.hardwareAcceleration?.enabled === false || (status.fallback?.compatLevel ?? 0) >= 1)
-    )
-  } catch {
-    softwareRendering = false
+    return await probe
+  } finally {
+    if (detectionPromise === probe) detectionPromise = null
   }
-  return softwareRendering
 }
 
 /** 玻璃档位统一决策：用户 lite 档或软件渲染强制降级，均挂 html.glass-lite */
@@ -38,4 +53,5 @@ export function applyGlassMode(effect: string): void {
 /** 测试专用：清空探测缓存（生产代码不得调用） */
 export function __resetGlassDegradationForTest(): void {
   softwareRendering = null
+  detectionPromise = null
 }

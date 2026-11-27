@@ -766,6 +766,87 @@ describe('exportLogsAsZip', () => {
       }
     })
 
+    it('审查修复轮：logs/ 中单个文件复制失败 ⇒ manifest 登记该文件 unreadable，其余文件照收', async () => {
+      fs.writeFileSync(path.join(mockLogDir, 'a-locked.log'), 'locked evidence', 'utf-8')
+      fs.writeFileSync(path.join(mockLogDir, 'z-ok.log'), 'readable evidence', 'utf-8')
+      const realCopy = fs.promises.copyFile.bind(fs.promises)
+      const copySpy = vi
+        .spyOn(fs.promises, 'copyFile')
+        .mockImplementation(async (src: unknown, dst: unknown, ...rest: unknown[]) => {
+          if (path.basename(String(src)) === 'a-locked.log') {
+            throw Object.assign(new Error('EBUSY: log locked'), { code: 'EBUSY' })
+          }
+          return (realCopy as never)(src as never, dst as never, ...(rest as never[]))
+        })
+      const writes: Array<{ dst: string; buf: Buffer }> = []
+      const realWrite = fs.promises.writeFile.bind(fs.promises)
+      const writeSpy = vi
+        .spyOn(fs.promises, 'writeFile')
+        .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+          writes.push({
+            dst: String(file),
+            buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+          })
+          return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+        })
+      try {
+        const r = await exportLogsAsZip(path.join(tmpRoot, 'logs-partial.zip'))
+        expect(r.success).toBe(true)
+        const manifest = readJson(writes, 'manifest.json')
+        expect(manifest?.contents).toContain('logs/')
+        expect(manifest?.missing).toContainEqual({
+          name: 'logs/a-locked.log',
+          reason: 'unreadable'
+        })
+        expect(
+          copySpy.mock.calls.some(([, dst]) => path.basename(String(dst)) === 'z-ok.log')
+        ).toBe(true)
+      } finally {
+        writeSpy.mockRestore()
+        copySpy.mockRestore()
+      }
+    })
+
+    it('审查修复轮：仅 startup-errors.log 复制失败 ⇒ missing 登记 unreadable 而非 absent', async () => {
+      const isolatedTmp = path.join(tmpRoot, 'isolated-tmp')
+      fs.mkdirSync(isolatedTmp)
+      const tmpSpy = vi.spyOn(os, 'tmpdir').mockReturnValue(isolatedTmp)
+      const realCopy = fs.promises.copyFile.bind(fs.promises)
+      const copySpy = vi
+        .spyOn(fs.promises, 'copyFile')
+        .mockImplementation(async (src: unknown, dst: unknown, ...rest: unknown[]) => {
+          if (String(src) === mockStartupLogPath) {
+            throw Object.assign(new Error('EBUSY: startup log locked'), { code: 'EBUSY' })
+          }
+          return (realCopy as never)(src as never, dst as never, ...(rest as never[]))
+        })
+      const writes: Array<{ dst: string; buf: Buffer }> = []
+      const realWrite = fs.promises.writeFile.bind(fs.promises)
+      const writeSpy = vi
+        .spyOn(fs.promises, 'writeFile')
+        .mockImplementation(async (file: unknown, data: unknown, ...rest: unknown[]) => {
+          writes.push({
+            dst: String(file),
+            buf: Buffer.isBuffer(data) ? data : Buffer.from(String(data))
+          })
+          return (realWrite as never)(file as never, data as never, ...(rest as never[]))
+        })
+      try {
+        const r = await exportLogsAsZip(path.join(tmpRoot, 'startup-locked.zip'))
+        expect(r.success).toBe(true)
+        const manifest = readJson(writes, 'manifest.json')
+        expect(manifest?.contents).not.toContain('startup-errors.log')
+        expect(manifest?.missing).toContainEqual({
+          name: 'startup-errors.log',
+          reason: 'unreadable'
+        })
+      } finally {
+        writeSpy.mockRestore()
+        copySpy.mockRestore()
+        tmpSpy.mockRestore()
+      }
+    })
+
     it('审查修复轮：crashes 目录纳入期望清单 ⇒ 未配置崩溃目录时 missing 如实登记 absent', async () => {
       // getCrashDirectoryAsync 经 require('./crash-service') 动态装配，vitest ESM 下
       // require 抛错走 catch → null（fail-open，见 getCrashDirectoryAsync 注释）：
@@ -779,6 +860,50 @@ describe('exportLogsAsZip', () => {
         missing.find((m) => m.name === 'crashes/')?.reason,
         '崩溃目录缺席必须可从 manifest 判定'
       ).toBe('absent')
+    })
+
+    it('审查修复轮：截尾读取时文件被截断 ⇒ 重取新文件尾部，不打包空日志', async () => {
+      const src = path.join(mockForensicsRoot, 'chromium-debug.log.old')
+      const newTail = Buffer.from('NEW-TAIL-AFTER-ROTATION\n', 'utf-8')
+      fs.writeFileSync(src, Buffer.alloc(3 * 1024 * 1024, 0x61))
+      const realOpen = fs.promises.open.bind(fs.promises)
+      let truncated = false
+      const openSpy = vi
+        .spyOn(fs.promises, 'open')
+        .mockImplementation(async (file: unknown, flags: unknown, ...rest: unknown[]) => {
+          const handle = (await (realOpen as never)(
+            file as never,
+            flags as never,
+            ...(rest as never[])
+          )) as fs.promises.FileHandle
+          if (String(file) !== src) return handle
+          return new Proxy(handle, {
+            get(target, prop, receiver) {
+              if (prop === 'read') {
+                return async (buf: Buffer, off: number, len: number, pos: number) => {
+                  if (!truncated) {
+                    truncated = true
+                    fs.writeFileSync(src, newTail)
+                  }
+                  return target.read(buf, off, len, pos)
+                }
+              }
+              const value = Reflect.get(target, prop, receiver)
+              return typeof value === 'function'
+                ? (value as (...a: unknown[]) => unknown).bind(target)
+                : value
+            }
+          })
+        })
+      try {
+        const { r, writes } = await exportWithCapture(path.join(tmpRoot, 'truncated-race.zip'))
+        expect(r.success).toBe(true)
+        const tailWrite = writes.find((w) => path.basename(w.dst) === 'chromium-debug.log.old')
+        expect(tailWrite, '轮转后的新文件仍应进入诊断包').toBeTruthy()
+        expect(tailWrite!.buf.equals(newTail)).toBe(true)
+      } finally {
+        openSpy.mockRestore()
+      }
     })
 
     it('审查修复轮：截尾复制遇轮转竞态（stat 后文件缩小）⇒ 按实读字节数截断，无 NUL 填充尾巴', async () => {
@@ -1183,6 +1308,33 @@ describe('exportLogsAsZip — 诊断包 1.3', () => {
     const hl = writes.find((w) => path.basename(w.dst) === 'chromium-debug.highlights.txt')
     expect(hl, '截断时应生成 highlights 文件').toBeTruthy()
     expect(hl!.buf.toString('utf-8')).toContain('FATAL:head-gpu exit_code=65539')
+  })
+
+  it('chromium 截断 ⇒ highlights 不整文件 readFile，仍有界流式提取头部证据', async () => {
+    const src = path.join(mockForensicsRoot, 'chromium-debug.log')
+    const big = Buffer.concat([
+      Buffer.from('FATAL:head-gpu exit_code=65539\n', 'utf-8'),
+      Buffer.alloc(3 * 1024 * 1024, 0x61),
+      Buffer.from('TAIL-MARKER\n', 'utf-8')
+    ])
+    fs.writeFileSync(src, big)
+    const realReadFile = fs.promises.readFile.bind(fs.promises)
+    const readFileSpy = vi
+      .spyOn(fs.promises, 'readFile')
+      .mockImplementation(async (file: unknown, ...rest: unknown[]) => {
+        if (String(file) === src) throw new Error('unbounded readFile is forbidden')
+        return (realReadFile as never)(file as never, ...(rest as never[]))
+      })
+    try {
+      const { r, writes } = await exportCapture(path.join(tmpRoot, 'hl-bounded.zip'))
+      expect(r.success).toBe(true)
+      const hl = writes.find((w) => path.basename(w.dst) === 'chromium-debug.highlights.txt')
+      expect(hl, '禁止整文件读取后仍应生成 highlights').toBeTruthy()
+      expect(hl!.buf.toString('utf-8')).toContain('FATAL:head-gpu exit_code=65539')
+      expect(readFileSpy.mock.calls.some(([file]) => String(file) === src)).toBe(false)
+    } finally {
+      readFileSpy.mockRestore()
+    }
   })
 
   it('应急落点收入 fallback/ 且 manifest.fallbackSources 登记来源', async () => {

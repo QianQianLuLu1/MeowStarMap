@@ -124,7 +124,8 @@ export class PairingService {
   /** P6：诊断留痕 fail-open——logger 缺席或抛错都不得影响配对主流程 */
   private log(level: 'info' | 'warn', message: string): void {
     try {
-      this.deps.logger?.[level](message)
+      const singleLine = message.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+      this.deps.logger?.[level](singleLine)
     } catch {
       // 日志通道故障静默降级
     }

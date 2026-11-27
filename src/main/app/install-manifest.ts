@@ -4,6 +4,7 @@ import path from 'node:path'
 import { app } from 'electron'
 import { t } from '../i18n'
 import { logger } from '../utils/logger'
+import { writeFileAtomicSync } from '../utils/atomic-file'
 
 /** 安装信息清单 schema 版本（自定义安装器读取时据此判兼容）。 */
 export const INSTALL_MANIFEST_SCHEMA_VERSION = 1
@@ -109,7 +110,7 @@ export function writeInstallManifest(): InstallManifestV1 | null {
     for (const target of resolveInstallManifestPaths()) {
       try {
         fs.mkdirSync(path.dirname(target), { recursive: true })
-        fs.writeFileSync(target, body, 'utf8')
+        writeFileAtomicSync(target, body)
       } catch (err) {
         logger.warn(`[install-manifest] 写入失败: ${target}`, err)
       }

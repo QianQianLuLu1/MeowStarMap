@@ -25,7 +25,7 @@ pub struct InstallOptions {
     pub import_certificate: bool,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallSummary {
     pub ok: bool,
@@ -41,12 +41,17 @@ pub struct InstallSummary {
 pub struct InstallProgress {
     pub percent: u8,
     pub message: String,
+    pub cancellable: bool,
 }
 
 #[tauri::command]
 pub fn get_install_progress() -> InstallProgress {
-    let (percent, message) = platform::progress_snapshot();
-    InstallProgress { percent, message }
+    let (percent, message, cancellable) = platform::progress_snapshot();
+    InstallProgress {
+        percent,
+        message,
+        cancellable,
+    }
 }
 
 #[tauri::command]
@@ -61,6 +66,28 @@ pub async fn detect_state() -> Result<InstallerState, String> {
         .map_err(|err| err.to_string())
 }
 
+#[derive(Debug, PartialEq, Eq)]
+enum InstallCompletion {
+    Exit(i32, Result<InstallSummary, String>),
+    Ui(Result<InstallSummary, String>),
+}
+
+fn resolve_install_completion(
+    silent: bool,
+    result: Result<Result<InstallSummary, String>, String>,
+) -> InstallCompletion {
+    let result = result
+        .map_err(|err| format!("安装线程异常: {err}"))
+        .and_then(|result| result);
+
+    if silent {
+        let code = if result.is_ok() { 0 } else { 1 };
+        InstallCompletion::Exit(code, result)
+    } else {
+        InstallCompletion::Ui(result)
+    }
+}
+
 #[tauri::command]
 pub async fn start_install(
     app: tauri::AppHandle,
@@ -72,14 +99,15 @@ pub async fn start_install(
     let result =
         tauri::async_runtime::spawn_blocking(move || platform::install(options, &install_app))
             .await
-            .map_err(|err| format!("安装线程异常: {err}"))?;
-    let summary = result.map_err(|err| err.to_string())?;
+            .map_err(|err| format!("安装线程异常: {err}"));
 
-    // 静默模式（/S、--silent、-s）：安装完成后直接退出进程，供旧 electron-updater 等待退出码。
-    if platform::is_silent() {
-        app.exit(0);
+    match resolve_install_completion(platform::is_silent(), result) {
+        InstallCompletion::Exit(code, result) => {
+            app.exit(code);
+            result
+        }
+        InstallCompletion::Ui(result) => result,
     }
-    Ok(summary)
 }
 
 #[tauri::command]
@@ -101,4 +129,86 @@ pub fn launch_app(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn close_installer(app: tauri::AppHandle) {
     app.exit(0);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn successful_summary() -> InstallSummary {
+        InstallSummary {
+            ok: true,
+            mode: "install".to_string(),
+            install_dir: r"C:\MeowStarMap".to_string(),
+            version: "2.5.7".to_string(),
+            steps: vec!["安装完成".to_string()],
+            warnings: vec![],
+        }
+    }
+
+    #[test]
+    fn silent_join_failure_exits_with_code_one() {
+        // 外层 Err 对应 spawn_blocking join 失败。
+        let result: Result<Result<InstallSummary, String>, String> =
+            Err("worker panicked".to_string());
+
+        assert_eq!(
+            resolve_install_completion(true, result),
+            InstallCompletion::Exit(1, Err("安装线程异常: worker panicked".to_string()))
+        );
+    }
+
+    #[test]
+    fn silent_install_failure_exits_with_code_one() {
+        // 内层 Err 对应 platform::install 返回 Err。
+        let result: Result<Result<InstallSummary, String>, String> =
+            Ok(Err("磁盘空间不足".to_string()));
+
+        assert_eq!(
+            resolve_install_completion(true, result),
+            InstallCompletion::Exit(1, Err("磁盘空间不足".to_string()))
+        );
+    }
+
+    #[test]
+    fn silent_success_exits_with_code_zero() {
+        let result: Result<Result<InstallSummary, String>, String> = Ok(Ok(successful_summary()));
+
+        assert_eq!(
+            resolve_install_completion(true, result),
+            InstallCompletion::Exit(0, Ok(successful_summary()))
+        );
+    }
+
+    #[test]
+    fn interactive_join_failure_returns_error_to_ui() {
+        let result: Result<Result<InstallSummary, String>, String> =
+            Err("worker panicked".to_string());
+
+        assert_eq!(
+            resolve_install_completion(false, result),
+            InstallCompletion::Ui(Err("安装线程异常: worker panicked".to_string()))
+        );
+    }
+
+    #[test]
+    fn interactive_install_failure_returns_error_to_ui() {
+        let result: Result<Result<InstallSummary, String>, String> =
+            Ok(Err("磁盘空间不足".to_string()));
+
+        assert_eq!(
+            resolve_install_completion(false, result),
+            InstallCompletion::Ui(Err("磁盘空间不足".to_string()))
+        );
+    }
+
+    #[test]
+    fn interactive_success_returns_summary_to_ui() {
+        let result: Result<Result<InstallSummary, String>, String> = Ok(Ok(successful_summary()));
+
+        assert_eq!(
+            resolve_install_completion(false, result),
+            InstallCompletion::Ui(Ok(successful_summary()))
+        );
+    }
 }
