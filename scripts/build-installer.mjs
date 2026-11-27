@@ -30,7 +30,7 @@ function argValue(name, fallback) {
 
 const payloadOnly = process.argv.includes('--payload-only')
 const unpacked = path.resolve(root, argValue('unpacked', 'release/win-unpacked'))
-const payloadOut = path.resolve(root, argValue('out', 'installer/payload.zip'))
+const payloadOut = path.resolve(root, argValue('out', 'release/payload.zip'))
 
 function fail(message) {
   console.error(`[build-installer] ✗ ${message}`)
@@ -130,7 +130,7 @@ try {
 
 // 运行时安装器会在自身目录查找 payload.zip；发布前把载荷放到安装器 exe 同级（兼容旧用法）
 const releasePayload = path.join(releaseDir, 'payload.zip')
-if (fs.existsSync(payloadOut)) {
+if (fs.existsSync(payloadOut) && path.resolve(payloadOut) !== path.resolve(releasePayload)) {
   fs.copyFileSync(payloadOut, releasePayload)
   console.log(`[build-installer] ✓ 载荷: ${path.relative(root, releasePayload)}`)
 }

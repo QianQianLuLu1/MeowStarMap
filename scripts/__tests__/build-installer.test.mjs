@@ -11,6 +11,15 @@ afterEach(() => {
   for (const root of roots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
 })
 
+describe('build-installer 载荷落点', () => {
+  it('默认载荷输出必须在 release/ 下，不把 zip 与清单落进 installer/ 污染工作区', () => {
+    const source = fs.readFileSync(path.join(import.meta.dirname, '..', 'build-installer.mjs'), 'utf8')
+    const defaultOut = /argValue\('out', '([^']+)'\)/.exec(source)
+    expect(defaultOut, '未找到 --out 默认值').not.toBeNull()
+    expect(defaultOut[1].replaceAll('\\', '/')).toMatch(/^release\//)
+  })
+})
+
 describe('embedPayload', () => {
   it('短写也必须循环写完整，不能静默生成损坏载荷', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'embed-payload-short-write-'))
